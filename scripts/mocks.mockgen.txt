@@ -48,4 +48,5 @@ github.com/ava-labs/avalanchego/vms/registry=VMGetter=vms/registry/mock_vm_gette
 github.com/ava-labs/avalanchego/vms/registry=VMRegisterer=vms/registry/mock_vm_registerer.go
 github.com/ava-labs/avalanchego/vms/registry=VMRegistry=vms/registry/mock_vm_registry.go
 github.com/ava-labs/avalanchego/vms=Factory,Manager=vms/mock_manager.go
+github.com/ava-labs/avalanchego/x/merkledb=MerkleDB=x/merkledb/mock_db.go
 github.com/ava-labs/avalanchego/x/sync=Client=x/sync/mock_client.go

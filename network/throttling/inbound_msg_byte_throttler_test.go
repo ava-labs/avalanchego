@@ -139,7 +139,7 @@ func TestInboundMsgByteThrottler(t *testing.T) {
 	throttler.Acquire(context.Background(), 1, vdr1ID)
 	require.Equal(config.AtLargeAllocSize-1, throttler.remainingAtLargeBytes)
 	require.Equal(config.VdrAllocSize, throttler.remainingVdrBytes)
-	require.Len(throttler.nodeToVdrBytesUsed, 0)
+	require.Empty(throttler.nodeToVdrBytesUsed)
 	require.Len(throttler.nodeToAtLargeBytesUsed, 1)
 	require.Equal(uint64(1), throttler.nodeToAtLargeBytesUsed[vdr1ID])
 
@@ -147,8 +147,8 @@ func TestInboundMsgByteThrottler(t *testing.T) {
 	throttler.release(&msgMetadata{msgSize: 1}, vdr1ID)
 	require.Equal(config.AtLargeAllocSize, throttler.remainingAtLargeBytes)
 	require.Equal(config.VdrAllocSize, throttler.remainingVdrBytes)
-	require.Len(throttler.nodeToVdrBytesUsed, 0)
-	require.Len(throttler.nodeToAtLargeBytesUsed, 0)
+	require.Empty(throttler.nodeToVdrBytesUsed)
+	require.Empty(throttler.nodeToAtLargeBytesUsed)
 
 	// Use all the at-large allocation bytes and 1 of the validator allocation bytes
 	// Should return immediately.
@@ -170,7 +170,7 @@ func TestInboundMsgByteThrottler(t *testing.T) {
 	require.Equal(config.VdrAllocSize/2, throttler.nodeToVdrBytesUsed[vdr2ID])
 	require.Len(throttler.nodeToVdrBytesUsed, 2)
 	require.Len(throttler.nodeToAtLargeBytesUsed, 1)
-	require.Len(throttler.nodeToWaitingMsgID, 0)
+	require.Empty(throttler.nodeToWaitingMsgID)
 	require.Zero(throttler.waitingToAcquire.Len())
 
 	// vdr1 should be able to acquire the rest of the validator allocation
@@ -256,14 +256,14 @@ func TestInboundMsgByteThrottler(t *testing.T) {
 	require.Len(throttler.nodeToVdrBytesUsed, 1)
 	require.Zero(throttler.nodeToVdrBytesUsed[vdr1ID])
 	require.Equal(config.AtLargeAllocSize/2-2, throttler.remainingAtLargeBytes)
-	require.Len(throttler.nodeToWaitingMsgID, 0)
+	require.Empty(throttler.nodeToWaitingMsgID)
 	require.Zero(throttler.waitingToAcquire.Len())
 
 	// Non-validator should be able to take the rest of the at-large bytes
 	throttler.Acquire(context.Background(), config.AtLargeAllocSize/2-2, nonVdrID)
 	require.Zero(throttler.remainingAtLargeBytes)
 	require.Equal(config.AtLargeAllocSize/2-1, throttler.nodeToAtLargeBytesUsed[nonVdrID])
-	require.Len(throttler.nodeToWaitingMsgID, 0)
+	require.Empty(throttler.nodeToWaitingMsgID)
 	require.Zero(throttler.waitingToAcquire.Len())
 
 	// But should block on subsequent Acquires
@@ -292,7 +292,7 @@ func TestInboundMsgByteThrottler(t *testing.T) {
 
 	require.Zero(throttler.nodeToAtLargeBytesUsed[vdr2ID])
 	require.Equal(config.VdrAllocSize, throttler.remainingVdrBytes)
-	require.Len(throttler.nodeToVdrBytesUsed, 0)
+	require.Empty(throttler.nodeToVdrBytesUsed)
 	require.Zero(throttler.remainingAtLargeBytes)
 	require.NotContains(throttler.nodeToWaitingMsgID, nonVdrID)
 	require.Zero(throttler.waitingToAcquire.Len())
@@ -300,7 +300,7 @@ func TestInboundMsgByteThrottler(t *testing.T) {
 	// Release all of vdr1's messages
 	throttler.release(&msgMetadata{msgSize: 1}, vdr1ID)
 	throttler.release(&msgMetadata{msgSize: config.AtLargeAllocSize/2 - 1}, vdr1ID)
-	require.Len(throttler.nodeToVdrBytesUsed, 0)
+	require.Empty(throttler.nodeToVdrBytesUsed)
 	require.Equal(config.VdrAllocSize, throttler.remainingVdrBytes)
 	require.Equal(config.AtLargeAllocSize/2, throttler.remainingAtLargeBytes)
 	require.Zero(throttler.nodeToAtLargeBytesUsed[vdr1ID])
@@ -311,10 +311,10 @@ func TestInboundMsgByteThrottler(t *testing.T) {
 	throttler.release(&msgMetadata{msgSize: 1}, nonVdrID)
 	throttler.release(&msgMetadata{msgSize: 1}, nonVdrID)
 	throttler.release(&msgMetadata{msgSize: config.AtLargeAllocSize/2 - 2}, nonVdrID)
-	require.Len(throttler.nodeToVdrBytesUsed, 0)
+	require.Empty(throttler.nodeToVdrBytesUsed)
 	require.Equal(config.VdrAllocSize, throttler.remainingVdrBytes)
 	require.Equal(config.AtLargeAllocSize, throttler.remainingAtLargeBytes)
-	require.Len(throttler.nodeToAtLargeBytesUsed, 0)
+	require.Empty(throttler.nodeToAtLargeBytesUsed)
 	require.Zero(throttler.nodeToAtLargeBytesUsed[nonVdrID])
 	require.NotContains(throttler.nodeToWaitingMsgID, nonVdrID)
 	require.Zero(throttler.waitingToAcquire.Len())

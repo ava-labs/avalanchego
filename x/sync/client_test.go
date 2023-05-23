@@ -27,7 +27,7 @@ import (
 
 func sendRangeRequest(
 	t *testing.T,
-	db *merkledb.Database,
+	db merkledb.MerkleDB,
 	request *syncpb.RangeProofRequest,
 	maxAttempts uint32,
 	modifyResponse func(*merkledb.RangeProof),
@@ -119,14 +119,14 @@ func TestGetRangeProof(t *testing.T) {
 	smallTrieRoot, err := smallTrieDB.GetMerkleRoot(context.Background())
 	require.NoError(t, err)
 
-	largeTrieKeyCount := 10_000
+	largeTrieKeyCount := 3 * defaultRequestKeyLimit
 	largeTrieDB, largeTrieKeys, err := generateTrieWithMinKeyLen(t, r, largeTrieKeyCount, 1)
 	require.NoError(t, err)
 	largeTrieRoot, err := largeTrieDB.GetMerkleRoot(context.Background())
 	require.NoError(t, err)
 
 	tests := map[string]struct {
-		db                  *merkledb.Database
+		db                  merkledb.MerkleDB
 		request             *syncpb.RangeProofRequest
 		modifyResponse      func(*merkledb.RangeProof)
 		expectedErr         error
@@ -232,7 +232,7 @@ func TestGetRangeProof(t *testing.T) {
 			modifyResponse: func(response *merkledb.RangeProof) {
 				response.KeyValues = response.KeyValues[:len(response.KeyValues)-2]
 			},
-			expectedErr: merkledb.ErrInvalidProof,
+			expectedErr: merkledb.ErrProofNodeNotForKey,
 		},
 		"removed key from middle of response": {
 			db: largeTrieDB,
@@ -282,8 +282,8 @@ func TestGetRangeProof(t *testing.T) {
 
 func sendChangeRequest(
 	t *testing.T,
-	db *merkledb.Database,
-	verificationDB *merkledb.Database,
+	db merkledb.MerkleDB,
+	verificationDB merkledb.MerkleDB,
 	request *syncpb.ChangeProofRequest,
 	maxAttempts uint32,
 	modifyResponse func(*merkledb.ChangeProof),
@@ -431,7 +431,7 @@ func TestGetChangeProof(t *testing.T) {
 	require.NoError(t, err)
 
 	tests := map[string]struct {
-		db                  *merkledb.Database
+		db                  merkledb.MerkleDB
 		request             *syncpb.ChangeProofRequest
 		modifyResponse      func(*merkledb.ChangeProof)
 		expectedErr         error
