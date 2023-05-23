@@ -20,6 +20,8 @@ type Peers interface {
 	validators.SetCallbackListener
 	validators.Connector
 
+	// Weight returns the cumulative weight of all validators in the set.
+	Weight() uint64
 	// ConnectedWeight returns the currently connected stake weight
 	ConnectedWeight() uint64
 	// PreferredPeers returns the currently connected validators. If there are
@@ -32,6 +34,8 @@ type peers struct {
 	lock sync.RWMutex
 	// validators maps nodeIDs to their current stake weight
 	validators map[ids.NodeID]uint64
+	// totalWeight is the total weight of all validators
+	totalWeight uint64
 	// connectedWeight contains the sum of all connected validator weights
 	connectedWeight uint64
 	// connectedValidators is the set of currently connected peers with a
@@ -52,6 +56,7 @@ func (p *peers) OnValidatorAdded(nodeID ids.NodeID, _ *bls.PublicKey, _ ids.ID, 
 	defer p.lock.Unlock()
 
 	p.validators[nodeID] = weight
+	p.totalWeight += weight
 	if p.connectedPeers.Contains(nodeID) {
 		p.connectedWeight += weight
 		p.connectedValidators.Add(nodeID)
@@ -63,6 +68,7 @@ func (p *peers) OnValidatorRemoved(nodeID ids.NodeID, weight uint64) {
 	defer p.lock.Unlock()
 
 	delete(p.validators, nodeID)
+	p.totalWeight -= weight
 	if p.connectedPeers.Contains(nodeID) {
 		p.connectedWeight -= weight
 		p.connectedValidators.Remove(nodeID)
@@ -74,6 +80,8 @@ func (p *peers) OnValidatorWeightChanged(nodeID ids.NodeID, oldWeight, newWeight
 	defer p.lock.Unlock()
 
 	p.validators[nodeID] = newWeight
+	p.totalWeight -= oldWeight
+	p.totalWeight += newWeight
 	if p.connectedPeers.Contains(nodeID) {
 		p.connectedWeight -= oldWeight
 		p.connectedWeight += newWeight
@@ -109,6 +117,13 @@ func (p *peers) ConnectedWeight() uint64 {
 	defer p.lock.RUnlock()
 
 	return p.connectedWeight
+}
+
+func (p *peers) Weight() uint64 {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+
+	return p.totalWeight
 }
 
 func (p *peers) PreferredPeers() set.Set[ids.NodeID] {

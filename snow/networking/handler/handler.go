@@ -79,6 +79,8 @@ type handler struct {
 
 	ctx *snow.ConsensusContext
 	// The validator set that validates this chain
+	// TODO: consider using peerTracker instead of validators
+	// since peerTracker is already tracking validators
 	validators validators.Set
 	// Receives messages from the VM
 	msgFromVMChan   <-chan common.Message
