@@ -40,6 +40,21 @@ func (m *MockHandler) EXPECT() *MockHandlerMockRecorder {
 	return m.recorder
 }
 
+// AwaitStopped mocks base method.
+func (m *MockHandler) AwaitStopped(arg0 context.Context) (time.Duration, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AwaitStopped", arg0)
+	ret0, _ := ret[0].(time.Duration)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// AwaitStopped indicates an expected call of AwaitStopped.
+func (mr *MockHandlerMockRecorder) AwaitStopped(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AwaitStopped", reflect.TypeOf((*MockHandler)(nil).AwaitStopped), arg0)
+}
+
 // Context mocks base method.
 func (m *MockHandler) Context() *snow.ConsensusContext {
 	m.ctrl.T.Helper()
@@ -193,18 +208,4 @@ func (m *MockHandler) StopWithError(arg0 context.Context, arg1 error) {
 func (mr *MockHandlerMockRecorder) StopWithError(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StopWithError", reflect.TypeOf((*MockHandler)(nil).StopWithError), arg0, arg1)
-}
-
-// Stopped mocks base method.
-func (m *MockHandler) Stopped() chan struct{} {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Stopped")
-	ret0, _ := ret[0].(chan struct{})
-	return ret0
-}
-
-// Stopped indicates an expected call of Stopped.
-func (mr *MockHandlerMockRecorder) Stopped() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Stopped", reflect.TypeOf((*MockHandler)(nil).Stopped))
 }
