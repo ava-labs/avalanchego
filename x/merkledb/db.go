@@ -747,16 +747,22 @@ func (db *merkleDB) onEviction(n *node) error {
 		return err
 	}
 
+	// Evict the oldest [evictionBatchSize] nodes from the cache
+	// and write them to disk. We write a batch of them, rather than
+	// just [n], so that we don't immediately evict and write another
+	// node, because each time this method is called we do a disk write.
 	var err error
 	for removedCount := 0; removedCount < evictionBatchSize; removedCount++ {
 		_, n, exists := db.nodeCache.removeOldest()
 		if !exists {
+			// The cache is empty.
 			break
 		}
+		// Note this must be = not := since we check
+		// [err] outside the loop.
 		if err = writeNodeToBatch(batch, n); err != nil {
 			break
 		}
-
 	}
 	if err == nil {
 		err = batch.Write()
@@ -770,9 +776,9 @@ func (db *merkleDB) onEviction(n *node) error {
 	return nil
 }
 
+// Writes [n] to [batch] if it's an intermediary node.
 func writeNodeToBatch(batch database.Batch, n *node) error {
 	if n == nil || n.hasValue() {
-		// only persist intermediary nodes
 		return nil
 	}
 
@@ -886,8 +892,7 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 			// Otherwise, intermediary nodes are persisted on cache eviction or
 			// shutdown.
 			db.metrics.IOKeyWrite()
-			err := writeNodeToBatch(db.batch, nodeChange.after)
-			if err != nil {
+			if err := writeNodeToBatch(db.batch, nodeChange.after); err != nil {
 				db.batch.Reset()
 				nodesSpan.End()
 				return err
