@@ -56,7 +56,7 @@ func (h *handler) networkHealthCheck() (interface{}, error) {
 }
 
 func (h *handler) getPercentConnected() float64 {
-	vdrSetWeight := h.validators.Weight()
+	vdrSetWeight := h.peerTracker.Weight()
 	if vdrSetWeight == 0 {
 		return 1
 	}
