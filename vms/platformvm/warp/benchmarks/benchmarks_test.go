@@ -7,9 +7,12 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -25,13 +28,126 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// To profile a specific benchmark, say BenchmarkGetCanonicalValidatorSetByDepth, run:
-// go test -run=^$ -bench ^BenchmarkGetCanonicalValidatorSetByDepth$ github.com/ava-labs/avalanchego/vms/platformvm/warp/benchmarks -cpuprofile=cpuprofile.out
+// To profile a specific benchmark, say BenchmarkGetCanonicalValidatorSetBySize, run:
+// go test -run=^$ -bench ^BenchmarkGetCanonicalValidatorSetBySize$ github.com/ava-labs/avalanchego/vms/platformvm/warp/benchmarks -cpuprofile=cpuprofile.out
 //
 // To analyze results run:
 // go tool pprof -web cpuprofile.out
 
 func BenchmarkGetCanonicalValidatorSetBySize(b *testing.B) {
+	require := require.New(b)
+	var (
+		subnetID            = ids.GenerateTestID()
+		pChainHeight        = uint64(1)
+		numNodes            = 10_000
+		getValidatorOutputs = make([]*validators.GetValidatorOutput, 0, numNodes)
+	)
+
+	for i := 0; i < numNodes; i++ {
+		nodeID := ids.GenerateTestNodeID()
+		blsPrivateKey, err := bls.NewSecretKey()
+		require.NoError(err)
+		blsPublicKey := bls.PublicFromSecretKey(blsPrivateKey)
+		getValidatorOutputs = append(getValidatorOutputs, &validators.GetValidatorOutput{
+			NodeID:    nodeID,
+			PublicKey: blsPublicKey,
+			Weight:    20,
+		})
+	}
+
+	for _, valCounts := range []int{0, 1, 10, 100, 1_000, 10_000} {
+		getValidatorsOutput := make(map[ids.NodeID]*validators.GetValidatorOutput)
+		for i := 0; i < valCounts; i++ {
+			validator := getValidatorOutputs[i]
+			getValidatorsOutput[validator.NodeID] = validator
+		}
+		validatorState := &validators.TestState{
+			GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+				return getValidatorsOutput, nil
+			},
+		}
+
+		b.Run(fmt.Sprintf("%d", valCounts), func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				vals, _, err := warp.GetCanonicalValidatorSet(
+					context.Background(),
+					validatorState,
+					pChainHeight,
+					subnetID,
+				)
+				require.NoError(err)
+				require.Len(vals, valCounts)
+			}
+		})
+	}
+}
+
+func BenchmarkGetCanonicalValidatorSetByDepth(b *testing.B) {
+	require := require.New(b)
+	var (
+		validatorsCount     = 10_000
+		heightsRange        = uint64(20)
+		validatorsPerHeight = validatorsCount / int(heightsRange)
+
+		subnetID            = ids.GenerateTestID()
+		getValidatorOutputs = make(map[uint64](map[ids.NodeID]*validators.GetValidatorOutput))
+	)
+
+	for depth := uint64(0); depth < heightsRange; depth++ {
+		getValidatorOutputs[heightsRange-depth] = make(map[ids.NodeID]*validators.GetValidatorOutput)
+		for i := 0; i < validatorsPerHeight; i++ {
+			nodeID := ids.GenerateTestNodeID()
+			blsPrivateKey, err := bls.NewSecretKey()
+			require.NoError(err)
+			blsPublicKey := bls.PublicFromSecretKey(blsPrivateKey)
+			getValidatorOutputs[heightsRange-depth][nodeID] = &validators.GetValidatorOutput{
+				NodeID:    nodeID,
+				PublicKey: blsPublicKey,
+				Weight:    20,
+			}
+		}
+	}
+	validatorState := &validators.TestState{
+		GetValidatorSetF: func(_ context.Context, depth uint64, subnetID ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+			res, found := getValidatorOutputs[depth]
+			if !found {
+				return nil, database.ErrNotFound
+			}
+			return res, nil
+		},
+	}
+
+	b.StartTimer() // start testing
+	for depth := uint64(0); depth < heightsRange; depth++ {
+		b.Run(fmt.Sprintf("%d", depth), func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				vals, _, err := warp.GetCanonicalValidatorSet(
+					context.Background(),
+					validatorState,
+					heightsRange-depth,
+					subnetID,
+				)
+				require.NoError(err)
+				require.Len(vals, validatorsPerHeight)
+			}
+		})
+	}
+	b.StopTimer() // done testing
+}
+
+func BenchmarkGetValidatorSet_Validators_100(b *testing.B) {
+	benchGetValidatorSetBySize(b, 100)
+}
+
+func BenchmarkGetValidatorSet_Validators_1000(b *testing.B) {
+	benchGetValidatorSetBySize(b, 1000)
+}
+
+func BenchmarkGetValidatorSet_Validators_10000(b *testing.B) {
+	benchGetValidatorSetBySize(b, 10_000)
+}
+
+func benchGetValidatorSetBySize(b *testing.B, validatorsCount int) {
 	b.StopTimer()
 	require := require.New(b)
 
@@ -43,16 +159,15 @@ func BenchmarkGetCanonicalValidatorSetBySize(b *testing.B) {
 	}()
 
 	pChainHeight := uint64(1)
-	numNodes := 10_000
 
-	// Store [numNodes] validators in state. They are all at the same height [pChainHeight]
+	// Store [validatorsCount] validators in state. They are all at the same height [pChainHeight]
 	diff, err := state.NewDiff(env.state.GetLastAccepted(), env.blkManager)
 	require.NoError(err)
-	for i := 0; i < numNodes; i++ {
+	for i := 0; i < validatorsCount; i++ {
 		nodeID := ids.GenerateTestNodeID()
 
 		// create primary network validator tx
-		addPrimaryValidatorTx, err := benchPrimaryNetworkValidatorTx(env.state, nodeID)
+		addPrimaryValidatorTx, err := createPrimaryNetworkValidatorTx(nodeID, env.state.GetTimestamp())
 		require.NoError(err)
 
 		// store corresponding primaryStaker in the diff
@@ -66,7 +181,7 @@ func BenchmarkGetCanonicalValidatorSetBySize(b *testing.B) {
 		diff.AddTx(addPrimaryValidatorTx, status.Committed)
 
 		// create subnet validator tx
-		permissionlessValidatorTx, err := benchSubnetValidatorTx(env.state, subnetID, nodeID)
+		permissionlessValidatorTx, err := createSubnetValidatorTx(subnetID, nodeID, env.state.GetTimestamp())
 		require.NoError(err)
 
 		// store corresponding staker in the diff
@@ -97,145 +212,20 @@ func BenchmarkGetCanonicalValidatorSetBySize(b *testing.B) {
 	require.NoError(env.state.Commit())
 
 	b.StartTimer() // start testing
-	for _, size := range []int{
-		0,
-		1,
-		10,
-		100,
-		1000,
-		numNodes,
-	} {
-		b.Run(fmt.Sprintf("%d", size), func(b *testing.B) {
-			for i := 0; i < b.N; i++ {
-				vals, _, err := warp.GetCanonicalValidatorSet(
-					context.Background(),
-					env.validatorsManager,
-					pChainHeight,
-					subnetID,
-				)
-				require.NoError(err)
-				require.True(len(vals) != 0)
-			}
-		})
+	for i := 0; i < b.N; i++ {
+		vals, err := env.validatorsManager.GetValidatorSet(
+			context.Background(),
+			pChainHeight,
+			subnetID,
+		)
+		require.NoError(err)
+		require.Len(vals, validatorsCount)
 	}
 	b.StopTimer() // done testing
 }
 
-func BenchmarkGetCanonicalValidatorSetByDepth(b *testing.B) {
-	b.StopTimer()
-	require := require.New(b)
-
-	// Prepare the bench environment (don't time it)
-	subnetID := ids.GenerateTestID()
-	env := newEnvironment(b, subnetID)
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-	}()
-
-	validatorsCount := 100
-	heightsRange := uint64(10)
-	validatorsPerHeight := validatorsCount / int(heightsRange)
-
-	// Store all primary network validators at height 1
-	primaryValidatorIDs := make([]ids.NodeID, 0, validatorsCount)
-	primaryDiff, err := state.NewDiff(env.state.GetLastAccepted(), env.blkManager)
-	require.NoError(err)
-	for i := 0; i < validatorsCount; i++ {
-		nodeID := ids.GenerateTestNodeID()
-		primaryValidatorIDs = append(primaryValidatorIDs, nodeID)
-
-		// create primary network validator tx
-		addPrimaryValidatorTx, err := benchPrimaryNetworkValidatorTx(env.state, nodeID)
-		require.NoError(err)
-
-		// store corresponding primaryStaker in the diff
-		primaryStaker, err := state.NewCurrentStaker(
-			addPrimaryValidatorTx.ID(),
-			addPrimaryValidatorTx.Unsigned.(*txs.AddPermissionlessValidatorTx),
-			10000, // potential reward
-		)
-		require.NoError(err)
-		primaryDiff.PutCurrentValidator(primaryStaker)
-		primaryDiff.AddTx(addPrimaryValidatorTx, status.Committed)
-	}
-	// Add a dummyBlock to update relevant quantities
-	dummyPrimariesBlock, err := blocks.NewBanffStandardBlock(
-		env.state.GetTimestamp(),
-		env.state.GetLastAccepted(),
-		1,
-		[]*txs.Tx{},
-	)
-	require.NoError(err)
-
-	// Push block and tx changes to env.state.
-	require.NoError(primaryDiff.Apply(env.state))
-	env.state.SetHeight(1)
-	env.state.AddStatelessBlock(dummyPrimariesBlock, choices.Accepted)
-	env.state.SetLastAccepted(dummyPrimariesBlock.BlockID)
-	require.NoError(env.state.Commit())
-
-	// store subnet validators at different heights
-	preSubnetValidatorsHeight := uint64(1)
-	for height := preSubnetValidatorsHeight; height < preSubnetValidatorsHeight+heightsRange; height++ {
-		subnetsValDiff, err := state.NewDiff(env.state.GetLastAccepted(), env.blkManager)
-		require.NoError(err)
-
-		for i := 0; i < validatorsPerHeight; i++ {
-			nodeIdx := int(height-preSubnetValidatorsHeight)*validatorsPerHeight + i
-			nodeID := primaryValidatorIDs[nodeIdx]
-
-			// create subnet validator tx
-			permissionlessValidatorTx, err := benchSubnetValidatorTx(env.state, subnetID, nodeID)
-			require.NoError(err)
-
-			// store corresponding staker in the diff
-			subnetStaker, err := state.NewCurrentStaker(
-				permissionlessValidatorTx.ID(),
-				permissionlessValidatorTx.Unsigned.(*txs.AddPermissionlessValidatorTx),
-				10000, // dummy potential reward
-			)
-			require.NoError(err)
-			subnetsValDiff.PutCurrentValidator(subnetStaker)
-			subnetsValDiff.AddTx(permissionlessValidatorTx, status.Committed)
-		}
-
-		// Add a dummyBlock to update relevant quantities
-		dummySecondaryBlock, err := blocks.NewBanffStandardBlock(
-			env.state.GetTimestamp(),
-			env.state.GetLastAccepted(),
-			height,
-			[]*txs.Tx{},
-		)
-		require.NoError(err)
-
-		// Push block and tx changes to env.state.
-		require.NoError(subnetsValDiff.Apply(env.state))
-		env.state.SetHeight(height)
-		env.state.AddStatelessBlock(dummySecondaryBlock, choices.Accepted)
-		env.state.SetLastAccepted(dummySecondaryBlock.BlockID)
-		require.NoError(env.state.Commit())
-	}
-
-	b.StartTimer() // start testing
-	for depth := uint64(0); depth < heightsRange; depth++ {
-		b.Run(fmt.Sprintf("%d", depth), func(b *testing.B) {
-			for i := 0; i < b.N; i++ {
-				vals, _, err := warp.GetCanonicalValidatorSet(
-					context.Background(),
-					env.validatorsManager,
-					heightsRange-depth,
-					subnetID,
-				)
-				require.NoError(err)
-				require.True(len(vals) != 0)
-			}
-		})
-	}
-	b.StopTimer() // done testing
-}
-
-// benchPrimaryNetworkValidatorTx returns a tx used in benchmarks to add a primary network validator.
-func benchPrimaryNetworkValidatorTx(chainState state.State, nodeID ids.NodeID) (*txs.Tx, error) {
+// createPrimaryNetworkValidatorTx returns a tx used in benchmarks to add a primary network validator.
+func createPrimaryNetworkValidatorTx(nodeID ids.NodeID, currentChainTime time.Time) (*txs.Tx, error) {
 	blsPrivateKey, err := bls.NewSecretKey()
 	if err != nil {
 		return nil, err
@@ -272,7 +262,7 @@ func benchPrimaryNetworkValidatorTx(chainState state.State, nodeID ids.NodeID) (
 		},
 		Validator: txs.Validator{
 			NodeID: nodeID,
-			Start:  uint64(chainState.GetTimestamp().Unix()),
+			Start:  uint64(currentChainTime.Unix()),
 			End:    uint64(mockable.MaxTime.Unix()),
 			Wght:   20,
 		},
@@ -304,8 +294,8 @@ func benchPrimaryNetworkValidatorTx(chainState state.State, nodeID ids.NodeID) (
 	return txs.NewSigned(uPermissionlessPrimaryValidatorTx, txs.Codec, nil)
 }
 
-// benchSubnetValidatorTx returns a tx used in benchmarks to add a subnet validator.
-func benchSubnetValidatorTx(chainState state.State, subnetID ids.ID, nodeID ids.NodeID) (*txs.Tx, error) {
+// createSubnetValidatorTx returns a tx used in benchmarks to add a subnet validator.
+func createSubnetValidatorTx(subnetID ids.ID, nodeID ids.NodeID, currentChainTime time.Time) (*txs.Tx, error) {
 	uPermissionlessValidatorTx := &txs.AddPermissionlessValidatorTx{
 		BaseTx: txs.BaseTx{
 			BaseTx: avax.BaseTx{
@@ -337,7 +327,7 @@ func benchSubnetValidatorTx(chainState state.State, subnetID ids.ID, nodeID ids.
 		},
 		Validator: txs.Validator{
 			NodeID: nodeID,
-			Start:  uint64(chainState.GetTimestamp().Unix()),
+			Start:  uint64(currentChainTime.Unix()),
 			End:    uint64(mockable.MaxTime.Unix()),
 			Wght:   20,
 		},
