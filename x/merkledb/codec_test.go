@@ -198,68 +198,6 @@ func FuzzCodecSerializedPath(f *testing.F) {
 	)
 }
 
-func FuzzCodecProofCanonical(f *testing.F) {
-	f.Add(
-		[]byte{
-			// RootID:
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			// Path:
-			// Num proof nodes = 1
-			0x02,
-			// Key Path:
-			// Nibble Length:
-			0x00,
-			// Value:
-			// Has Value = false
-			0x00,
-			// Num Children = 2
-			0x04,
-			// Child 0:
-			// index = 0
-			0x00,
-			// childID:
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			// Child 1:
-			// index = 0 <- should fail
-			0x00,
-			// childID:
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			// Key:
-			// length = 0
-			0x00,
-		},
-	)
-	f.Fuzz(
-		func(
-			t *testing.T,
-			b []byte,
-		) {
-			require := require.New(t)
-
-			codec := Codec.(*codecImpl)
-			proof := &Proof{}
-			got, err := codec.DecodeProof(b, proof)
-			if err != nil {
-				return
-			}
-
-			// Encoding [proof] should be the same as [b].
-			buf, err := codec.EncodeProof(got, proof)
-			require.NoError(err)
-			require.Equal(b, buf)
-		},
-	)
-}
-
 func FuzzCodecDBNodeCanonical(f *testing.F) {
 	f.Fuzz(
 		func(
@@ -279,47 +217,6 @@ func FuzzCodecDBNodeCanonical(f *testing.F) {
 			buf, err := codec.encodeDBNode(got, node)
 			require.NoError(err)
 			require.Equal(b, buf)
-		},
-	)
-}
-
-func FuzzCodecProofDeterministic(f *testing.F) {
-	f.Fuzz(
-		func(
-			t *testing.T,
-			randSeed int,
-			key []byte,
-			numProofNodes uint,
-		) {
-			require := require.New(t)
-
-			r := rand.New(rand.NewSource(int64(randSeed))) // #nosec G404
-
-			proofNodes := make([]ProofNode, numProofNodes)
-			for i := range proofNodes {
-				proofNodes[i] = newRandomProofNode(r)
-			}
-
-			proof := Proof{
-				Path: proofNodes,
-				Key:  key,
-			}
-
-			proofBytes, err := Codec.EncodeProof(Version, &proof)
-			require.NoError(err)
-
-			var gotProof Proof
-			gotVersion, err := Codec.DecodeProof(proofBytes, &gotProof)
-			require.NoError(err)
-			require.Equal(Version, gotVersion)
-
-			nilEmptySlices(&proof)
-			nilEmptySlices(&gotProof)
-			require.Equal(proof, gotProof)
-
-			proofBytes2, err := Codec.EncodeProof(Version, &gotProof)
-			require.NoError(err)
-			require.Equal(proofBytes, proofBytes2)
 		},
 	)
 }
@@ -387,20 +284,6 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 			require.Equal(nodeBytes, nodeBytes2)
 		},
 	)
-}
-
-func TestCodec_DecodeProof(t *testing.T) {
-	require := require.New(t)
-
-	_, err := Codec.DecodeProof([]byte{1}, nil)
-	require.ErrorIs(err, errDecodeNil)
-
-	var (
-		proof         Proof
-		tooShortBytes = make([]byte, minProofLen-1)
-	)
-	_, err = Codec.DecodeProof(tooShortBytes, &proof)
-	require.ErrorIs(err, io.ErrUnexpectedEOF)
 }
 
 func TestCodec_DecodeDBNode(t *testing.T) {
