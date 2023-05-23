@@ -778,7 +778,7 @@ func (db *merkleDB) onEviction(n *node) error {
 
 // Writes [n] to [batch] if it's an intermediary node.
 func writeNodeToBatch(batch database.Batch, n *node) error {
-	if n == nil || n.hasValue() {
+	if n == nil {
 		return nil
 	}
 
