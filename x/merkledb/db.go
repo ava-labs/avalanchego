@@ -131,8 +131,8 @@ type merkleDB struct {
 	// Should be held before taking [db.lock]
 	commitLock sync.RWMutex
 
-	nodeDB       database.Database
-	currentBatch database.Batch
+	nodeDB database.Database
+	batch  database.Batch
 
 	// Stores data about the database's current state.
 	metadataDB database.Database
@@ -174,7 +174,7 @@ func newDatabase(
 		childViews: make([]*trieView, 0, defaultPreallocationSize),
 	}
 
-	trieDB.currentBatch = trieDB.nodeDB.NewBatch()
+	trieDB.batch = trieDB.nodeDB.NewBatch()
 
 	// Note: trieDB.OnEviction is responsible for writing intermediary nodes to
 	// disk as they are evicted from the cache.
@@ -346,7 +346,7 @@ func (db *merkleDB) Close() error {
 		return err
 	}
 
-	if err := db.commitCurrentBatch(); err != nil {
+	if err := db.commit(); err != nil {
 		return err
 	}
 
@@ -873,8 +873,8 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 	for key, nodeChange := range changes.nodes {
 		if nodeChange.after == nil {
 			db.metrics.IOKeyWrite()
-			if err := db.currentBatch.Delete(key.Bytes()); err != nil {
-				db.currentBatch.Reset()
+			if err := db.batch.Delete(key.Bytes()); err != nil {
+				db.batch.Reset()
 				nodesSpan.End()
 				return err
 			}
@@ -886,9 +886,9 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 			// Otherwise, intermediary nodes are persisted on cache eviction or
 			// shutdown.
 			db.metrics.IOKeyWrite()
-			err := writeNodeToBatch(db.currentBatch, nodeChange.after)
+			err := writeNodeToBatch(db.batch, nodeChange.after)
 			if err != nil {
-				db.currentBatch.Reset()
+				db.batch.Reset()
 				nodesSpan.End()
 				return err
 			}
@@ -897,10 +897,10 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 	nodesSpan.End()
 
 	_, commitSpan := db.tracer.Start(ctx, "MerkleDB.commitChanges.dbCommit")
-	err := db.commitCurrentBatch()
+	err := db.commit()
 	commitSpan.End()
 	if err != nil {
-		db.currentBatch.Reset()
+		db.batch.Reset()
 		return err
 	}
 
@@ -1119,18 +1119,18 @@ func (db *merkleDB) initializeRootIfNeeded() (ids.ID, error) {
 	if err != nil {
 		return ids.Empty, err
 	}
-	if err := db.currentBatch.Put(rootKey, rootBytes); err != nil {
+	if err := db.batch.Put(rootKey, rootBytes); err != nil {
 		return ids.Empty, err
 	}
 
-	return db.root.id, db.commitCurrentBatch()
+	return db.root.id, db.commit()
 }
 
-func (db *merkleDB) commitCurrentBatch() error {
-	if err := db.currentBatch.Write(); err != nil {
+func (db *merkleDB) commit() error {
+	if err := db.batch.Write(); err != nil {
 		return err
 	}
-	db.currentBatch.Reset()
+	db.batch.Reset()
 	return nil
 }
 
