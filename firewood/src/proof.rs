@@ -78,6 +78,12 @@ impl From<DbError> for ProofError {
     }
 }
 
+impl From<rlp::DecoderError> for ProofError {
+    fn from(_: rlp::DecoderError) -> ProofError {
+        ProofError::DecodeError
+    }
+}
+
 impl fmt::Display for ProofError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -391,13 +397,17 @@ impl Proof {
         let mut key_index = 0;
         let mut branch_index: u8 = 0;
         let mut iter = 0;
+
         loop {
             let cur_proof = proofs_map
                 .get(&cur_hash)
                 .ok_or(ProofError::ProofNodeMissing)?;
             // TODO(Hao): (Optimization) If a node is alreay decode we don't need to decode again.
-            let (mut chd_ptr, sub_proof, size) =
-                self.decode_node(merkle, cur_key, cur_proof, false)?;
+            let (chd_ptr, sub_proof, size) = self.decode_node(merkle, cur_key, cur_proof, false)?;
+
+            // I thinkn it's impossible for chd_ptr to be None...
+            let mut chd_ptr = Some(chd_ptr);
+
             // Link the child to the parent based on the node type.
             match &u_ref.inner() {
                 NodeType::Branch(n) => {
@@ -467,7 +477,10 @@ impl Proof {
                             let proof = proofs_map
                                 .get(&p.hash.unwrap())
                                 .ok_or(ProofError::ProofNodeMissing)?;
-                            (chd_ptr, _, _) = self.decode_node(merkle, cur_key, proof, true)?;
+                            let (decoded_chd_ptr, _, _) =
+                                self.decode_node(merkle, cur_key, proof, true)?;
+
+                            chd_ptr = Some(decoded_chd_ptr);
 
                             // Link the child to the parent based on the node type.
                             match &u_ref.inner() {
@@ -564,23 +577,21 @@ impl Proof {
     ///
     /// * `end_node` - A boolean indicates whether this is the end node to decode, thus no `key`
     ///                to be present.
-    #[allow(clippy::type_complexity)]
     fn decode_node(
         &self,
         merkle: &Merkle,
         key: &[u8],
         buf: &[u8],
         end_node: bool,
-    ) -> Result<(Option<ObjPtr<Node>>, Option<SubProof>, usize), ProofError> {
+    ) -> Result<(ObjPtr<Node>, Option<SubProof>, usize), ProofError> {
         let rlp = rlp::Rlp::new(buf);
-        let size = rlp.item_count().unwrap();
+        let size = rlp.item_count()?;
+
         match size {
             EXT_NODE_SIZE => {
                 let cur_key_path: Vec<_> = rlp
-                    .at(0)
-                    .unwrap()
-                    .as_val::<Vec<u8>>()
-                    .unwrap()
+                    .at(0)?
+                    .as_val::<Vec<u8>>()?
                     .into_iter()
                     .flat_map(to_nibble_array)
                     .collect();
@@ -588,104 +599,136 @@ impl Proof {
                 let (cur_key_path, term) = PartialPath::decode(cur_key_path);
                 let cur_key = cur_key_path.into_inner();
 
-                let rlp = rlp.at(1).unwrap();
+                let rlp = rlp.at(1)?;
+
                 let data = if rlp.is_data() {
-                    rlp.as_val::<Vec<u8>>().unwrap()
+                    rlp.as_val::<Vec<u8>>()?
                 } else {
                     rlp.as_raw().to_vec()
                 };
 
-                let ext_ptr: Option<ObjPtr<Node>>;
-                let subproof: Option<SubProof>;
-                if term {
-                    ext_ptr = Some(
-                        merkle
-                            .new_node(Node::new(NodeType::Leaf(LeafNode::new(
-                                cur_key.clone(),
-                                data.clone(),
-                            ))))
-                            .map_err(|_| ProofError::DecodeError)?
-                            .as_ptr(),
-                    );
-                    subproof = Some(SubProof {
-                        rlp: data,
-                        hash: None,
-                    });
-                } else {
-                    ext_ptr = Some(
-                        merkle
-                            .new_node(Node::new(NodeType::Extension(ExtNode::new(
-                                cur_key.clone(),
-                                ObjPtr::null(),
-                                Some(data.clone()),
-                            ))))
-                            .map_err(|_| ProofError::DecodeError)?
-                            .as_ptr(),
-                    );
-                    subproof = self.generate_subproof(data)?;
-                }
-
                 // Check if the key of current node match with the given key.
                 if key.len() < cur_key.len() || key[..cur_key.len()] != cur_key {
+                    let ext_ptr = get_ext_ptr(merkle, term, Data(data), CurKey(cur_key))?;
+
                     return Ok((ext_ptr, None, 0));
                 }
-                Ok((ext_ptr, subproof, cur_key.len()))
+
+                let subproof = if term {
+                    Some(SubProof {
+                        rlp: data.clone(),
+                        hash: None,
+                    })
+                } else {
+                    self.generate_subproof(data.clone())?
+                };
+
+                let cur_key_len = cur_key.len();
+
+                let ext_ptr = get_ext_ptr(merkle, term, Data(data), CurKey(cur_key))?;
+
+                Ok((ext_ptr, subproof, cur_key_len))
             }
+
             BRANCH_NODE_SIZE => {
+                let data_rlp = rlp.at(NBRANCH)?;
+
                 // Extract the value of the branch node.
-                let mut value: Option<Vec<u8>> = None;
-                let data_rlp = rlp.at(NBRANCH).unwrap();
                 // Skip if rlp is empty data
-                if !data_rlp.is_empty() {
+                let value = if !data_rlp.is_empty() {
                     let data = if data_rlp.is_data() {
                         data_rlp.as_val::<Vec<u8>>().unwrap()
                     } else {
                         data_rlp.as_raw().to_vec()
                     };
-                    value = Some(data);
-                }
+
+                    Some(data)
+                } else {
+                    None
+                };
 
                 // Record rlp values of all children.
                 let mut chd_eth_rlp: [Option<Vec<u8>>; NBRANCH] = Default::default();
-                #[allow(clippy::needless_range_loop)]
-                for i in 0..NBRANCH {
-                    let rlp = rlp.at(i).unwrap();
-                    // Skip if rlp is empty data
-                    if !rlp.is_empty() {
-                        let data = if rlp.is_data() {
-                            rlp.as_val::<Vec<u8>>().unwrap()
+
+                for (i, chd) in rlp.into_iter().take(NBRANCH).enumerate() {
+                    if !chd.is_empty() {
+                        // Skip if chd is empty data
+                        let data = if chd.is_data() {
+                            chd.as_val()?
                         } else {
-                            rlp.as_raw().to_vec()
+                            chd.as_raw().to_vec()
                         };
+
                         chd_eth_rlp[i] = Some(data);
                     }
                 }
-                let chd = [None; NBRANCH];
-                let t = NodeType::Branch(BranchNode::new(chd, value, chd_eth_rlp.clone()));
-                let branch_ptr = merkle
-                    .new_node(Node::new(t))
-                    .map_err(|_| ProofError::ProofNodeMissing)?;
+
                 // If the node is the last one to be decoded, then no subproof to be extracted.
                 if end_node {
-                    return Ok((Some(branch_ptr.as_ptr()), None, 1));
-                } else if key.is_empty() {
+                    let branch_ptr = build_branch_ptr(merkle, value, chd_eth_rlp)?;
+
+                    return Ok((branch_ptr, None, 1));
+                }
+
+                if key.is_empty() {
                     return Err(ProofError::NoSuchNode);
                 }
 
                 // Check if the subproof with the given key exist.
                 let index = key[0] as usize;
-                let data: Vec<u8> = if chd_eth_rlp[index].is_none() {
-                    return Ok((Some(branch_ptr.as_ptr()), None, 1));
-                } else {
-                    chd_eth_rlp[index].clone().unwrap()
+
+                let Some(data) = chd_eth_rlp[index].clone() else {
+                    let branch_ptr = build_branch_ptr(merkle, value, chd_eth_rlp)?;
+
+                    return Ok((branch_ptr, None, 1));
                 };
+
+                let branch_ptr = build_branch_ptr(merkle, value, chd_eth_rlp)?;
                 let subproof = self.generate_subproof(data)?;
-                Ok((Some(branch_ptr.as_ptr()), subproof, 1))
+
+                Ok((branch_ptr, subproof, 1))
             }
+
             // RLP length can only be the two cases above.
             _ => Err(ProofError::DecodeError),
         }
     }
+}
+
+struct CurKey(Vec<u8>);
+struct Data(Vec<u8>);
+
+fn get_ext_ptr(
+    merkle: &Merkle,
+    term: bool,
+    Data(data): Data,
+    CurKey(cur_key): CurKey,
+) -> Result<ObjPtr<Node>, ProofError> {
+    let node = if term {
+        NodeType::Leaf(LeafNode::new(cur_key, data))
+    } else {
+        NodeType::Extension(ExtNode::new(cur_key, ObjPtr::null(), Some(data)))
+    };
+
+    merkle
+        .new_node(Node::new(node))
+        .map(|node| node.as_ptr())
+        .map_err(|_| ProofError::DecodeError)
+}
+
+fn build_branch_ptr(
+    merkle: &Merkle,
+    value: Option<Vec<u8>>,
+    chd_eth_rlp: [Option<Vec<u8>>; NBRANCH],
+) -> Result<ObjPtr<Node>, ProofError> {
+    let node = BranchNode::new([None; NBRANCH], value, chd_eth_rlp);
+    let node = NodeType::Branch(node);
+    let node = Node::new(node);
+
+    merkle
+        .new_node(node)
+        .map_err(|_| ProofError::ProofNodeMissing)
+        .map(|node| node.as_ptr())
 }
 
 // unset_internal removes all internal node references.
