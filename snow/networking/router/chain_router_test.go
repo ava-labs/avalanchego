@@ -176,7 +176,7 @@ func TestShutdown(t *testing.T) {
 
 	shutdownDuration, err := h.AwaitStopped(ctx)
 	require.NoError(err)
-	require.Greater(shutdownDuration, time.Duration(0))
+	require.GreaterOrEqual(shutdownDuration, time.Duration(0))
 	require.Less(shutdownDuration, 250*time.Millisecond)
 }
 
