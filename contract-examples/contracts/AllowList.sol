@@ -13,6 +13,12 @@ contract AllowList is Ownable {
   uint256 constant STATUS_ENABLED = 1;
   uint256 constant STATUS_ADMIN = 2;
 
+  enum Role {
+    None,
+    Enabled,
+    Admin
+  }
+
   constructor(address precompileAddr) Ownable() {
     allowList = IAllowList(precompileAddr);
   }

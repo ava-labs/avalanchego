@@ -19,7 +19,7 @@
       "baseFeeChangeDenominator": 48,
       "minBlockGasCost": 0,
       "maxBlockGasCost": 10000000,
-      "targetBlockRate": 2,
+      "targetBlockRate": 1,
       "blockGasCostStep": 500000
     },
     "rewardManagerConfig": {

@@ -19,7 +19,7 @@
       "baseFeeChangeDenominator": 48,
       "minBlockGasCost": 0,
       "maxBlockGasCost": 10000000,
-      "targetBlockRate": 2,
+      "targetBlockRate": 1,
       "blockGasCostStep": 500000
     },
     "txAllowListConfig": {
@@ -31,6 +31,9 @@
   },
   "alloc": {
     "8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC": {
+      "balance": "0x52B7D2DCC80CD2E4000000"
+    },
+    "0Fa8EA536Be85F32724D57A37758761B86416123": {
       "balance": "0x52B7D2DCC80CD2E4000000"
     }
   },

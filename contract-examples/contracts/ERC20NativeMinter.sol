@@ -5,11 +5,12 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "./AllowList.sol";
 import "./INativeMinter.sol";
 
+// Precompiled Native Minter Contract Address
+address constant MINTER_ADDRESS = 0x0200000000000000000000000000000000000001;
+// Designated Blackhole Address
+address constant BLACKHOLE_ADDRESS = 0x0100000000000000000000000000000000000000;
+
 contract ERC20NativeMinter is ERC20, AllowList {
-  // Precompiled Native Minter Contract Address
-  address constant MINTER_ADDRESS = 0x0200000000000000000000000000000000000001;
-  // Designated Blackhole Address
-  address constant BLACKHOLE_ADDRESS = 0x0100000000000000000000000000000000000000;
   string private constant TOKEN_NAME = "ERC20NativeMinterToken";
   string private constant TOKEN_SYMBOL = "XMPL";
 
