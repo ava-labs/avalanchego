@@ -368,15 +368,21 @@ func (cr *ChainRouter) Shutdown(ctx context.Context) {
 		chain.Stop(ctx)
 	}
 
-	ticker := time.NewTicker(cr.closeTimeout)
-	defer ticker.Stop()
+	ctx, cancel := context.WithTimeout(ctx, cr.closeTimeout)
+	defer cancel()
 
 	for _, chain := range prevChains {
-		select {
-		case <-chain.Stopped():
-		case <-ticker.C:
-			cr.log.Warn("timed out while shutting down the chains")
-			return
+		shutdownDuration, err := chain.AwaitStopped(ctx)
+
+		chainLog := chain.Context().Log
+		if err != nil {
+			chainLog.Warn("timed out while shutting down",
+				zap.Error(err),
+			)
+		} else {
+			chainLog.Info("chain shutdown",
+				zap.Duration("shutdownDuration", shutdownDuration),
+			)
 		}
 	}
 }
@@ -646,12 +652,19 @@ func (cr *ChainRouter) removeChain(ctx context.Context, chainID ids.ID) {
 
 	chain.Stop(ctx)
 
-	ticker := time.NewTicker(cr.closeTimeout)
-	defer ticker.Stop()
-	select {
-	case <-chain.Stopped():
-	case <-ticker.C:
-		chain.Context().Log.Warn("timed out while shutting down")
+	ctx, cancel := context.WithTimeout(ctx, cr.closeTimeout)
+	shutdownDuration, err := chain.AwaitStopped(ctx)
+	cancel()
+
+	chainLog := chain.Context().Log
+	if err != nil {
+		chainLog.Warn("timed out while shutting down",
+			zap.Error(err),
+		)
+	} else {
+		chainLog.Info("chain shutdown",
+			zap.Duration("shutdownDuration", shutdownDuration),
+		)
 	}
 
 	if cr.onFatal != nil && cr.criticalChains.Contains(chainID) {
