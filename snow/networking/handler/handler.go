@@ -63,9 +63,13 @@ type Handler interface {
 	Start(ctx context.Context, recoverPanic bool)
 	Push(ctx context.Context, msg Message)
 	Len() int
+
 	Stop(ctx context.Context)
 	StopWithError(ctx context.Context, err error)
-	Stopped() chan struct{}
+	// AwaitStopped returns an error if the call would block and [ctx] is done.
+	// Even if [ctx] is done when passed into this function, this function will
+	// return a nil error if it will not block.
+	AwaitStopped(ctx context.Context) (time.Duration, error)
 }
 
 // handler passes incoming messages from the network to the consensus engine.
@@ -104,6 +108,8 @@ type handler struct {
 	timeouts         chan struct{}
 
 	closeOnce            sync.Once
+	startClosingTime     time.Time
+	totalClosingTime     time.Duration
 	closingChan          chan struct{}
 	numDispatchersClosed int
 	// Closed when this handler and [engine] are done shutting down
@@ -305,6 +311,8 @@ func (h *handler) RegisterTimeout(d time.Duration) {
 // Note: It is possible for Stop to be called before/concurrently with Start.
 func (h *handler) Stop(ctx context.Context) {
 	h.closeOnce.Do(func() {
+		h.startClosingTime = h.clock.Time()
+
 		// Must hold the locks here to ensure there's no race condition in where
 		// we check the value of [h.closing] after the call to [Signal].
 		h.syncMessageQueue.Shutdown()
@@ -340,8 +348,19 @@ func (h *handler) StopWithError(ctx context.Context, err error) {
 	h.Stop(ctx)
 }
 
-func (h *handler) Stopped() chan struct{} {
-	return h.closed
+func (h *handler) AwaitStopped(ctx context.Context) (time.Duration, error) {
+	select {
+	case <-h.closed:
+		return h.totalClosingTime, nil
+	default:
+	}
+
+	select {
+	case <-ctx.Done():
+		return 0, ctx.Err()
+	case <-h.closed:
+		return h.totalClosingTime, nil
+	}
 }
 
 func (h *handler) dispatchSync(ctx context.Context) {
@@ -977,8 +996,16 @@ func (h *handler) shutdown(ctx context.Context) {
 		if h.onStopped != nil {
 			go h.onStopped()
 		}
+
+		h.totalClosingTime = h.clock.Time().Sub(h.startClosingTime)
 		close(h.closed)
 	}()
+
+	// shutdown may be called during Start, so we populate the start closing
+	// time here in case Stop was never called.
+	if h.startClosingTime.IsZero() {
+		h.startClosingTime = h.clock.Time()
+	}
 
 	state := h.ctx.State.Get()
 	engine, ok := h.engineManager.Get(state.Type).Get(state.State)
