@@ -1,5 +1,9 @@
 # Release Notes
 
+## [v0.12.2](https://github.com/ava-labs/coreth/releases/tag/v0.12.2)
+
+- Increase default trie dirty cache size from 256MB to 512MB
+
 ## [v0.12.1](https://github.com/ava-labs/coreth/releases/tag/v0.12.1)
 
 - Bump AvalancheGo dependency to v1.10.1
