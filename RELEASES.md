@@ -6,8 +6,14 @@ This version is backwards compatible to [v1.10.0](https://github.com/ava-labs/av
 
 ### APIs
 
-- Significantly improved the performance of `platform.getStake`.
-- Added `portion_filled` metric for all metered caches.
+- Significantly improved the performance of `platform.getStake`
+- Added `portion_filled` metric for all metered caches
+- Added resource metrics by process
+  - `avalanche_system_resources_num_cpu_cycles`
+  - `avalanche_system_resources_num_disk_read_bytes`
+  - `avalanche_system_resources_num_disk_reads`
+  - `avalanche_system_resources_num_disk_write_bytes`
+  - `avalanche_system_resources_num_disk_writes`
 
 ### Configs
 
@@ -23,7 +29,8 @@ This version is backwards compatible to [v1.10.0](https://github.com/ava-labs/av
 
 ### Fixes
 
-- Fixed `--network-compression-type` to correctly honor the requested compression type, rather than always using gzip.
+- Fixed `--network-compression-type` to correctly honor the requested compression type, rather than always using gzip
+- Fixed CPU metrics on macos
 
 ### What's Changed
 
