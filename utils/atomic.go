@@ -3,9 +3,7 @@
 
 package utils
 
-import (
-	"sync"
-)
+import "sync"
 
 type Atomic[T any] struct {
 	lock  sync.RWMutex

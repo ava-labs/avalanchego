@@ -668,8 +668,8 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 				)
 			},
 			assertMsgToMyself: func(require *require.Assertions, msg message.InboundMessage) {
-				innerMsg, ok := msg.Message().(*p2p.GetStateSummaryFrontier)
-				require.True(ok)
+				require.IsType(&p2p.GetStateSummaryFrontier{}, msg.Message())
+				innerMsg := msg.Message().(*p2p.GetStateSummaryFrontier)
 				require.Equal(chainID[:], innerMsg.ChainId)
 				require.Equal(requestID, innerMsg.RequestId)
 				require.Equal(uint64(deadline), innerMsg.Deadline)
@@ -713,8 +713,8 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 				)
 			},
 			assertMsgToMyself: func(require *require.Assertions, msg message.InboundMessage) {
-				innerMsg, ok := msg.Message().(*p2p.GetAcceptedStateSummary)
-				require.True(ok)
+				require.IsType(&p2p.GetAcceptedStateSummary{}, msg.Message())
+				innerMsg := msg.Message().(*p2p.GetAcceptedStateSummary)
 				require.Equal(chainID[:], innerMsg.ChainId)
 				require.Equal(requestID, innerMsg.RequestId)
 				require.Equal(uint64(deadline), innerMsg.Deadline)
@@ -757,8 +757,8 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 				)
 			},
 			assertMsgToMyself: func(require *require.Assertions, msg message.InboundMessage) {
-				innerMsg, ok := msg.Message().(*p2p.GetAcceptedFrontier)
-				require.True(ok)
+				require.IsType(&p2p.GetAcceptedFrontier{}, msg.Message())
+				innerMsg := msg.Message().(*p2p.GetAcceptedFrontier)
 				require.Equal(chainID[:], innerMsg.ChainId)
 				require.Equal(requestID, innerMsg.RequestId)
 				require.Equal(uint64(deadline), innerMsg.Deadline)
@@ -802,8 +802,8 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 				)
 			},
 			assertMsgToMyself: func(require *require.Assertions, msg message.InboundMessage) {
-				innerMsg, ok := msg.Message().(*p2p.GetAccepted)
-				require.True(ok)
+				require.IsType(&p2p.GetAccepted{}, msg.Message())
+				innerMsg := msg.Message().(*p2p.GetAccepted)
 				require.Equal(chainID[:], innerMsg.ChainId)
 				require.Equal(requestID, innerMsg.RequestId)
 				require.Equal(uint64(deadline), innerMsg.Deadline)
@@ -957,8 +957,8 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 				).Return(nil, nil) // Don't care about the message
 			},
 			assertMsgToMyself: func(require *require.Assertions, msg message.InboundMessage) {
-				innerMsg, ok := msg.Message().(*p2p.StateSummaryFrontier)
-				require.True(ok)
+				require.IsType(&p2p.StateSummaryFrontier{}, msg.Message())
+				innerMsg := msg.Message().(*p2p.StateSummaryFrontier)
 				require.Equal(chainID[:], innerMsg.ChainId)
 				require.Equal(requestID, innerMsg.RequestId)
 				require.Equal(summary, innerMsg.Summary)
@@ -985,8 +985,8 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 				).Return(nil, nil) // Don't care about the message
 			},
 			assertMsgToMyself: func(require *require.Assertions, msg message.InboundMessage) {
-				innerMsg, ok := msg.Message().(*p2p.AcceptedStateSummary)
-				require.True(ok)
+				require.IsType(&p2p.AcceptedStateSummary{}, msg.Message())
+				innerMsg := msg.Message().(*p2p.AcceptedStateSummary)
 				require.Equal(chainID[:], innerMsg.ChainId)
 				require.Equal(requestID, innerMsg.RequestId)
 				for i, summaryID := range summaryIDs {
@@ -1015,8 +1015,8 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 				).Return(nil, nil) // Don't care about the message
 			},
 			assertMsgToMyself: func(require *require.Assertions, msg message.InboundMessage) {
-				innerMsg, ok := msg.Message().(*p2p.AcceptedFrontier)
-				require.True(ok)
+				require.IsType(&p2p.AcceptedFrontier{}, msg.Message())
+				innerMsg := msg.Message().(*p2p.AcceptedFrontier)
 				require.Equal(chainID[:], innerMsg.ChainId)
 				require.Equal(requestID, innerMsg.RequestId)
 				for i, summaryID := range summaryIDs {
@@ -1045,8 +1045,8 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 				).Return(nil, nil) // Don't care about the message
 			},
 			assertMsgToMyself: func(require *require.Assertions, msg message.InboundMessage) {
-				innerMsg, ok := msg.Message().(*p2p.Accepted)
-				require.True(ok)
+				require.IsType(&p2p.Accepted{}, msg.Message())
+				innerMsg := msg.Message().(*p2p.Accepted)
 				require.Equal(chainID[:], innerMsg.ChainId)
 				require.Equal(requestID, innerMsg.RequestId)
 				for i, summaryID := range summaryIDs {
@@ -1170,8 +1170,8 @@ func TestSender_Single_Request(t *testing.T) {
 				)
 			},
 			assertMsgToMyself: func(require *require.Assertions, msg message.InboundMessage) {
-				innerMsg, ok := msg.Message().(*message.GetAncestorsFailed)
-				require.True(ok)
+				require.IsType(&message.GetAncestorsFailed{}, msg.Message())
+				innerMsg := msg.Message().(*message.GetAncestorsFailed)
 				require.Equal(chainID, innerMsg.ChainID)
 				require.Equal(requestID, innerMsg.RequestID)
 				require.Equal(engineType, innerMsg.EngineType)
@@ -1209,8 +1209,8 @@ func TestSender_Single_Request(t *testing.T) {
 				)
 			},
 			assertMsgToMyself: func(require *require.Assertions, msg message.InboundMessage) {
-				innerMsg, ok := msg.Message().(*message.GetFailed)
-				require.True(ok)
+				require.IsType(&message.GetFailed{}, msg.Message())
+				innerMsg := msg.Message().(*message.GetFailed)
 				require.Equal(chainID, innerMsg.ChainID)
 				require.Equal(requestID, innerMsg.RequestID)
 				require.Equal(engineType, innerMsg.EngineType)
