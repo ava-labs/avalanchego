@@ -166,10 +166,10 @@ type ChainConfig struct {
 }
 
 type ManagerConfig struct {
-	StakingEnabled bool            // True iff the network has staking enabled
-	StakingCert    tls.Certificate // needed to sign snowman++ blocks
-	StakingBLSKey  *bls.SecretKey
-	TracingEnabled bool
+	SybilProtectionEnabled bool
+	StakingCert            tls.Certificate // needed to sign snowman++ blocks
+	StakingBLSKey          *bls.SecretKey
+	TracingEnabled         bool
 	// Must not be used unless [TracingEnabled] is true as this may be nil.
 	Tracer                      trace.Tracer
 	Log                         logging.Logger
@@ -542,7 +542,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 
 	var vdrs validators.Set // Validators validating this blockchain
 	var hasValidators bool
-	if m.StakingEnabled {
+	if m.SybilProtectionEnabled {
 		vdrs, hasValidators = m.Validators.Get(chainParams.SubnetID)
 	} else { // Staking is disabled. Every peer validates every subnet.
 		vdrs, hasValidators = m.Validators.Get(constants.PrimaryNetworkID)
@@ -1089,7 +1089,7 @@ func (m *manager) createSnowmanChain(
 			m.validatorState = validators.Trace(m.validatorState, "lockedState", m.Tracer)
 		}
 
-		if !m.ManagerConfig.StakingEnabled {
+		if !m.ManagerConfig.SybilProtectionEnabled {
 			m.validatorState = validators.NewNoValidatorsState(m.validatorState)
 			ctx.ValidatorState = validators.NewNoValidatorsState(ctx.ValidatorState)
 		}

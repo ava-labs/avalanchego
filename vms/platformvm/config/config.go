@@ -33,7 +33,7 @@ type Config struct {
 	UptimeLockedCalculator uptime.LockedCalculator
 
 	// True if the node is being run with staking enabled
-	StakingEnabled bool
+	SybilProtectionEnabled bool
 
 	// Set of subnets that this node is validating
 	TrackedSubnets set.Set[ids.ID]
@@ -149,7 +149,7 @@ func (c *Config) GetCreateSubnetTxFee(timestamp time.Time) uint64 {
 // Create the blockchain described in [tx], but only if this node is a member of
 // the subnet that validates the chain
 func (c *Config) CreateChain(chainID ids.ID, tx *txs.CreateChainTx) {
-	if c.StakingEnabled && // Staking is enabled, so nodes might not validate all chains
+	if c.SybilProtectionEnabled && // Sybil protection is enabled, so nodes might not validate all chains
 		constants.PrimaryNetworkID != tx.SubnetID && // All nodes must validate the primary network
 		!c.TrackedSubnets.Contains(tx.SubnetID) { // This node doesn't validate this blockchain
 		return
