@@ -11,6 +11,8 @@ import (
 
 	"github.com/golang/mock/gomock"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -143,13 +145,16 @@ func initVMGetterTest(t *testing.T) *vmGetterTestResources {
 
 	mockReader := filesystem.NewMockReader(ctrl)
 	mockManager := vms.NewMockManager(ctrl)
+	mockRegistry := prometheus.NewRegistry()
+	mockCPUTracker, err := resource.NewManager(" ", time.Hour, time.Hour, time.Hour, mockRegistry)
+	require.NoError(t, err)
 
 	getter := NewVMGetter(
 		VMGetterConfig{
 			FileReader:      mockReader,
 			Manager:         mockManager,
 			PluginDirectory: pluginDir,
-			CPUTracker:      resource.NewManager("", time.Hour, time.Hour, time.Hour),
+			CPUTracker:      mockCPUTracker,
 		},
 	)
 
