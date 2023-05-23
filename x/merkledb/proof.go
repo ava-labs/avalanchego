@@ -337,20 +337,16 @@ func (proof *RangeProof) ToProto() *syncpb.RangeProofResponse {
 func (proof *RangeProof) UnmarshalProto(pbProof *syncpb.RangeProofResponse) error {
 	proof.StartProof = make([]ProofNode, len(pbProof.Start))
 	for i, protoNode := range pbProof.Start {
-		var node ProofNode
-		if err := node.UnmarshalProto(protoNode); err != nil {
+		if err := proof.StartProof[i].UnmarshalProto(protoNode); err != nil {
 			return err
 		}
-		proof.StartProof[i] = node
 	}
 
 	proof.EndProof = make([]ProofNode, len(pbProof.End))
 	for i, protoNode := range pbProof.End {
-		var node ProofNode
-		if err := node.UnmarshalProto(protoNode); err != nil {
+		if err := proof.EndProof[i].UnmarshalProto(protoNode); err != nil {
 			return err
 		}
-		proof.EndProof[i] = node
 	}
 
 	proof.KeyValues = make([]KeyValue, len(pbProof.KeyValues))
@@ -609,20 +605,16 @@ func (proof *ChangeProof) UnmarshalProto(pbProof *syncpb.ChangeProof) error {
 
 	proof.StartProof = make([]ProofNode, len(pbProof.StartProof))
 	for i, protoNode := range pbProof.StartProof {
-		var node ProofNode
-		if err := node.UnmarshalProto(protoNode); err != nil {
+		if err := proof.StartProof[i].UnmarshalProto(protoNode); err != nil {
 			return err
 		}
-		proof.StartProof[i] = node
 	}
 
 	proof.EndProof = make([]ProofNode, len(pbProof.EndProof))
 	for i, protoNode := range pbProof.EndProof {
-		var node ProofNode
-		if err := node.UnmarshalProto(protoNode); err != nil {
+		if err := proof.EndProof[i].UnmarshalProto(protoNode); err != nil {
 			return err
 		}
-		proof.EndProof[i] = node
 	}
 
 	proof.KeyChanges = make([]KeyChange, len(pbProof.KeyChanges))
