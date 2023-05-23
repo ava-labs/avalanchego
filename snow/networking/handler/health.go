@@ -46,28 +46,21 @@ func (h *handler) networkHealthCheck() (interface{}, error) {
 
 	var err error
 	if percentConnected < h.ctx.MinPercentConnectedStakeHealthy {
-		err = getPercentErr(percentConnected, h.ctx.MinPercentConnectedStakeHealthy)
+		err = fmt.Errorf("connected to %f%% of network stake; should be connected to at least %f%%",
+			percentConnected*100,
+			h.ctx.MinPercentConnectedStakeHealthy*100,
+		)
 	}
 
 	return details, err
 }
 
 func (h *handler) getPercentConnected() float64 {
-	vdrSetWeight := h.peerTracker.Weight()
+	vdrSetWeight := h.validators.Weight()
 	if vdrSetWeight == 0 {
 		return 1
 	}
 
 	connectedStake := h.peerTracker.ConnectedWeight()
 	return float64(connectedStake) / float64(vdrSetWeight)
-}
-
-func getPercentErr(percentConnected float64, minPercentConnected float64) error {
-	if percentConnected < minPercentConnected {
-		return fmt.Errorf("connected to %f%% of network stake; should be connected to at least %f%%",
-			percentConnected*100,
-			minPercentConnected*100,
-		)
-	}
-	return nil
 }
