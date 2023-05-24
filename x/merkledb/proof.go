@@ -308,7 +308,7 @@ func (proof *RangeProof) Verify(
 	return nil
 }
 
-func (proof *RangeProof) ToProto() *syncpb.RangeProofResponse {
+func (proof *RangeProof) ToProto() *syncpb.RangeProof {
 	startProof := make([]*syncpb.ProofNode, len(proof.StartProof))
 	for i, node := range proof.StartProof {
 		startProof[i] = node.ToProto()
@@ -327,14 +327,14 @@ func (proof *RangeProof) ToProto() *syncpb.RangeProofResponse {
 		}
 	}
 
-	return &syncpb.RangeProofResponse{
+	return &syncpb.RangeProof{
 		Start:     startProof,
 		End:       endProof,
 		KeyValues: keyValues,
 	}
 }
 
-func (proof *RangeProof) UnmarshalProto(pbProof *syncpb.RangeProofResponse) error {
+func (proof *RangeProof) UnmarshalProto(pbProof *syncpb.RangeProof) error {
 	proof.StartProof = make([]ProofNode, len(pbProof.Start))
 	for i, protoNode := range pbProof.Start {
 		if err := proof.StartProof[i].UnmarshalProto(protoNode); err != nil {
