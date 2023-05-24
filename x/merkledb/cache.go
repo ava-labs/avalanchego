@@ -26,7 +26,7 @@ func newOnEvictCache[K comparable, V any](maxSize int, onEviction func(V) error)
 	}
 }
 
-// RemoveOldest returns and removes the oldest element from this cache.
+// removeOldest returns and removes the oldest element from this cache.
 func (c *onEvictCache[K, V]) removeOldest() (K, V, bool) {
 	k, v, exists := c.fifo.Oldest()
 	if exists {
