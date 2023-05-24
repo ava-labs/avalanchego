@@ -27,8 +27,8 @@ func TestTxGossip(t *testing.T) {
 	require.NoError(err)
 	require.Equal(builtMsgBytes, parsedMsgIntf.Bytes())
 
-	parsedMsg, ok := parsedMsgIntf.(*TxGossip)
-	require.True(ok)
+	require.IsType(&TxGossip{}, parsedMsgIntf)
+	parsedMsg := parsedMsgIntf.(*TxGossip)
 
 	require.Equal(tx, parsedMsg.Tx)
 }

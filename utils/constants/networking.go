@@ -78,7 +78,7 @@ const (
 	DefaultBenchlistMinFailingDuration = 2*time.Minute + 30*time.Second
 
 	// Router
-	DefaultConsensusGossipFrequency                        = 10 * time.Second
+	DefaultAcceptedFrontierGossipFrequency                 = 10 * time.Second
 	DefaultConsensusAppConcurrency                         = 2
 	DefaultConsensusShutdownTimeout                        = 30 * time.Second
 	DefaultConsensusGossipAcceptedFrontierValidatorSize    = 0
@@ -100,6 +100,7 @@ const (
 	DefaultInboundThrottlerBandwidthMaxBurstSize    = DefaultMaxMessageSize
 	DefaultInboundThrottlerCPUMaxRecheckDelay       = 5 * time.Second
 	DefaultInboundThrottlerDiskMaxRecheckDelay      = 5 * time.Second
+	MinInboundThrottlerMaxRecheckDelay              = time.Millisecond
 
 	// Outbound Throttling
 	DefaultOutboundThrottlerAtLargeAllocSize    = 32 * units.MiB

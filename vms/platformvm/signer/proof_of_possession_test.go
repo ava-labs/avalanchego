@@ -22,17 +22,20 @@ func TestProofOfPossession(t *testing.T) {
 	blsPOP, err = newProofOfPossession()
 	require.NoError(err)
 	blsPOP.ProofOfPossession = [bls.SignatureLen]byte{}
-	require.ErrorIs(blsPOP.Verify(), bls.ErrFailedSignatureDecompress)
+	err = blsPOP.Verify()
+	require.ErrorIs(err, bls.ErrFailedSignatureDecompress)
 
 	blsPOP, err = newProofOfPossession()
 	require.NoError(err)
 	blsPOP.PublicKey = [bls.PublicKeyLen]byte{}
-	require.ErrorIs(blsPOP.Verify(), bls.ErrFailedPublicKeyDecompress)
+	err = blsPOP.Verify()
+	require.ErrorIs(err, bls.ErrFailedPublicKeyDecompress)
 
 	newBLSPOP, err := newProofOfPossession()
 	require.NoError(err)
 	newBLSPOP.ProofOfPossession = blsPOP.ProofOfPossession
-	require.ErrorIs(newBLSPOP.Verify(), errInvalidProofOfPossession)
+	err = newBLSPOP.Verify()
+	require.ErrorIs(err, errInvalidProofOfPossession)
 }
 
 func TestNewProofOfPossessionDeterministic(t *testing.T) {

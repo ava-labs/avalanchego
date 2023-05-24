@@ -3,9 +3,7 @@
 
 package constants
 
-import (
-	"testing"
-)
+import "testing"
 
 func TestGetHRP(t *testing.T) {
 	tests := []struct {

@@ -29,7 +29,7 @@ const (
 )
 
 var (
-	_ Client = &client{}
+	_ Client = (*client)(nil)
 
 	errInvalidRangeProof = errors.New("failed to verify range proof")
 	errTooManyKeys       = errors.New("response contains more than requested keys")
@@ -92,8 +92,8 @@ func (c *client) GetChangeProof(ctx context.Context, req *syncpb.ChangeProofRequ
 
 		// Ensure the response does not contain more than the requested number of leaves
 		// and the start and end roots match the requested roots.
-		if len(changeProof.KeyValues)+len(changeProof.DeletedKeys) > int(req.KeyLimit) {
-			return nil, fmt.Errorf("%w: (%d) > %d)", errTooManyKeys, len(changeProof.KeyValues), req.KeyLimit)
+		if len(changeProof.KeyChanges) > int(req.KeyLimit) {
+			return nil, fmt.Errorf("%w: (%d) > %d)", errTooManyKeys, len(changeProof.KeyChanges), req.KeyLimit)
 		}
 
 		endRoot, err := ids.ToID(req.EndRoot)

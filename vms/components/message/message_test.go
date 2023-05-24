@@ -38,8 +38,8 @@ func TestParseProto(t *testing.T) {
 	parsedMsgIntf, err := Parse(msgBytes)
 	require.NoError(err)
 
-	parsedMsg, ok := parsedMsgIntf.(*TxGossip)
-	require.True(ok)
+	require.IsType(&TxGossip{}, parsedMsgIntf)
+	parsedMsg := parsedMsgIntf.(*TxGossip)
 
 	require.Equal(txBytes, parsedMsg.Tx)
 

@@ -26,6 +26,8 @@ import (
 const defaultPreallocationSize = 100
 
 var (
+	_ TrieView = (*trieView)(nil)
+
 	ErrCommitted          = errors.New("view has been committed")
 	ErrInvalid            = errors.New("the trie this view was based on has changed, rendering this view invalid")
 	ErrOddLengthWithValue = errors.New(
@@ -35,8 +37,6 @@ var (
 	ErrStartAfterEnd    = errors.New("start key > end key")
 	ErrViewIsNotAChild  = errors.New("passed in view is required to be a child of the current view")
 	ErrNoValidRoot      = errors.New("a valid root was not provided to the trieView constructor")
-
-	_ TrieView = &trieView{}
 
 	numCPU = runtime.NumCPU()
 )
@@ -997,10 +997,8 @@ func (t *trieView) applyChangedValuesToTrie(ctx context.Context) error {
 			if err := t.removeFromTrie(key); err != nil {
 				return err
 			}
-		} else {
-			if _, err := t.insertIntoTrie(key, change); err != nil {
-				return err
-			}
+		} else if _, err := t.insertIntoTrie(key, change); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -1228,7 +1226,7 @@ func (t *trieView) insertIntoTrie(
 
 	existingChildKey := key[:closestNodeKeyLength+1] + existingChildEntry.compressedPath
 
-	// the existing child's key is of length: len(closestNodekey) + 1 for the child index + len(existing child's compressed key)
+	// the existing child's key is of length: len(closestNodeKey) + 1 for the child index + len(existing child's compressed key)
 	// if that length is less than or equal to the branch node's key that implies that the existing child's key matched the key to be inserted
 	// since it matched the key to be inserted, it should have been returned by GetPathTo
 	if len(existingChildKey) <= len(branchNode.key) {

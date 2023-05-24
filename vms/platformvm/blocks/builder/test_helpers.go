@@ -35,7 +35,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/utils/window"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -55,14 +54,10 @@ import (
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
 	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
+	pvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
 )
 
-const (
-	testNetworkID                 = 10 // To be used in tests
-	defaultWeight                 = 10000
-	maxRecentlyAcceptedWindowSize = 256
-	recentlyAcceptedWindowTTL     = 5 * time.Minute
-)
+const defaultWeight = 10000
 
 var (
 	defaultMinStakingDuration = 24 * time.Hour
@@ -147,14 +142,6 @@ func newEnvironment(t *testing.T) *environment {
 	genesisID := res.state.GetLastAccepted()
 
 	registerer := prometheus.NewRegistry()
-	window := window.New[ids.ID](
-		window.Config{
-			Clock:   res.clk,
-			MaxSize: maxRecentlyAcceptedWindowSize,
-			TTL:     recentlyAcceptedWindowTTL,
-		},
-	)
-
 	res.sender = &common.SenderTest{T: t}
 
 	metrics, err := metrics.New("", registerer, res.config.TrackedSubnets)
@@ -183,7 +170,7 @@ func newEnvironment(t *testing.T) *environment {
 		metrics,
 		res.state,
 		&res.backend,
-		window,
+		pvalidators.TestManager,
 	)
 
 	client := sender.NewSender(res.sender, res.ctx.Log)
@@ -352,9 +339,9 @@ func defaultConfig() *config.Config {
 
 func defaultClock() *mockable.Clock {
 	// set time after Banff fork (and before default nextStakerTime)
-	clk := mockable.Clock{}
+	clk := &mockable.Clock{}
 	clk.Set(defaultGenesisTime)
-	return &clk
+	return clk
 }
 
 type fxVMInt struct {
@@ -395,10 +382,9 @@ func defaultFx(clk *mockable.Clock, log logging.Logger, isBootstrapped bool) fx.
 
 func buildGenesisTest(ctx *snow.Context) []byte {
 	genesisUTXOs := make([]api.UTXO, len(preFundedKeys))
-	hrp := constants.NetworkIDToHRP[testNetworkID]
 	for i, key := range preFundedKeys {
 		id := key.PublicKey().Address()
-		addr, err := address.FormatBech32(hrp, id.Bytes())
+		addr, err := address.FormatBech32(constants.UnitTestHRP, id.Bytes())
 		if err != nil {
 			panic(err)
 		}
@@ -411,7 +397,7 @@ func buildGenesisTest(ctx *snow.Context) []byte {
 	genesisValidators := make([]api.PermissionlessValidator, len(preFundedKeys))
 	for i, key := range preFundedKeys {
 		nodeID := ids.NodeID(key.PublicKey().Address())
-		addr, err := address.FormatBech32(hrp, nodeID.Bytes())
+		addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
 		if err != nil {
 			panic(err)
 		}
@@ -434,7 +420,7 @@ func buildGenesisTest(ctx *snow.Context) []byte {
 	}
 
 	buildGenesisArgs := api.BuildGenesisArgs{
-		NetworkID:     json.Uint32(testNetworkID),
+		NetworkID:     json.Uint32(constants.UnitTestID),
 		AvaxAssetID:   ctx.AVAXAssetID,
 		UTXOs:         genesisUTXOs,
 		Validators:    genesisValidators,

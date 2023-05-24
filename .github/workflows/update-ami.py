@@ -1,39 +1,41 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 import json
 import os 
 import boto3
 import uuid
 import re
-import packer
+import subprocess
 
-uid = str(uuid.uuid4())
-file = '.github/workflows/amichange.json'
-packerfile = ".github/packer/ubuntu-focal-x86_64-public-ami.json"
+# Globals
+amifile = '.github/workflows/amichange.json'
+packerfile = ".github/packer/ubuntu-jammy-x86_64-public-ami.json"
 
-update_marketplace = True
+# Environment Globals
 product_id = os.getenv('PRODUCT_ID')
 role_arn = os.getenv('ROLE_ARN')
 vtag = os.getenv('TAG')
 tag = vtag.replace('v', '')
-variables = [product_id,role_arn,tag]
-
-for var in variables:
-  if var is None:
-    print("A Variable is not set correctly or this is not the right repo.  Only validating packer.")
-    update_marketplace = False
-
-if 'rc' in tag or 'fuji' in tag:
-  print("This is a release candidate.  Only validating packer.")
-  update_marketplace = False
+skip_create_ami = os.getenv('SKIP_CREATE_AMI', "True")
 
 def packer_build(packerfile):
-  p = packer.Packer(packerfile)
-  output = p.build(parallel=False, debug=False, force=False)
-  found = re.findall('ami-[a-z0-9]*', str(output))
-  return found[-1]
+  print("Running the packer build")
+  subprocess.run('/usr/local/bin/packer build ' + packerfile, shell=True)
 
-def parse_amichange(object):
-  with open(object, 'r') as file:
+def packer_build_update(packerfile):
+  print("Creating packer AMI image for Marketplace")
+  output = subprocess.run('/usr/local/bin/packer build ' + packerfile, shell=True, stdout=subprocess.PIPE)
+  found = re.findall('ami-[a-z0-9]*', str(output.stdout))
+
+  if found:
+    amiid = found[-1]
+    return amiid
+  else:
+    raise RuntimeError(f"No AMI ID found in packer output: {output.stdout}")
+
+def parse_amichange(amifile, amiid, role_arn, tag):
+  # Create json blob to submit with the catalog update
+  print("Updating the json artifact with recent amiid and tag information")
+  with open(amifile, 'r') as file:
     data = json.load(file)
 
   data['DeliveryOptions'][0]['Details']['AmiDeliveryOptionDetails']['AmiSource']['AmiId']=amiid
@@ -41,11 +43,14 @@ def parse_amichange(object):
   data['Version']['VersionTitle']=tag
   return json.dumps(data)
 
-amiid=packer_build(packerfile)
-
-if update_marketplace:
-
+def update_ami(amifile, amiid):
+  # Update the catalog with the last amiimage
+  print('Updating the marketplace image')
   client = boto3.client('marketplace-catalog',region_name='us-east-1')
+  uid = str(uuid.uuid4())
+  global tag
+  global product_id
+  global role_arn
 
   try:
     response = client.start_change_set(
@@ -57,7 +62,7 @@ if update_marketplace:
             'Type': 'AmiProduct@1.0',
             'Identifier': product_id
           },
-            'Details': parse_amichange(file),
+            'Details': parse_amichange(amifile,amiid,role_arn,tag),
             'ChangeName': 'Update'
           },
         ],
@@ -67,4 +72,15 @@ if update_marketplace:
     print(response)
   except client.exceptions.ResourceInUseException:
     print("The product is currently blocked by Amazon.  Please check the product site for more details")
+  except Exception as e:
+    print(f"An error occurred while updating AMI delivery options: {e}")
+
+def main():
+  if skip_create_ami == "True":
+    packer_build(packerfile)
+  else:
+    update_ami(amifile, packer_build_update(packerfile))
+
+if __name__ == '__main__':
+  main()
 
