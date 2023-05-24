@@ -4,7 +4,6 @@
 package state
 
 import (
-	"errors"
 	"fmt"
 	"time"
 
@@ -42,8 +41,11 @@ var (
 	defaultValidateEndTime    = defaultValidateStartTime.Add(10 * defaultMinStakingDuration)
 	defaultTxFee              = uint64(100)
 
-	errNonEmptyIteratorExpected = errors.New("expected non-empty iterator, got no elements")
+	pending stakerStatus = 0
+	current stakerStatus = 1
 )
+
+type stakerStatus int
 
 type versionsHolder struct {
 	baseState State
