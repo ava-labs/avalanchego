@@ -224,7 +224,7 @@ func simpleStakerStateProperties(storeCreatorF func() (Stakers, error)) *gopter.
 		subnetID = ids.GenerateTestID()
 		nodeID   = ids.GenerateTestNodeID()
 	)
-	properties.Property("some current delegators ops", prop.ForAll(
+	properties.Property("add, delete and query current delegators", prop.ForAll(
 		func(val Staker, dels []Staker) string {
 			store, err := storeCreatorF()
 			if err != nil {
