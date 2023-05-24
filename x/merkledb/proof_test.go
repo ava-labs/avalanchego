@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
-func getBasicDB() (*Database, error) {
+func getBasicDB() (*merkleDB, error) {
 	return newDatabase(
 		context.Background(),
 		memdb.New(),
@@ -29,7 +29,7 @@ func getBasicDB() (*Database, error) {
 	)
 }
 
-func writeBasicBatch(t *testing.T, db *Database) {
+func writeBasicBatch(t *testing.T, db *merkleDB) {
 	batch := db.NewBatch()
 	require.NoError(t, batch.Put([]byte{0}, []byte{0}))
 	require.NoError(t, batch.Put([]byte{1}, []byte{1}))
@@ -905,7 +905,7 @@ func Test_ChangeProof_Missing_History_For_EndRoot(t *testing.T) {
 	require.NotNil(t, proof)
 	require.False(t, proof.HadRootsInHistory)
 
-	require.NoError(t, proof.Verify(context.Background(), db, nil, nil, db.getMerkleRoot()))
+	require.NoError(t, db.VerifyChangeProof(context.Background(), proof, nil, nil, db.getMerkleRoot()))
 }
 
 func Test_ChangeProof_BadBounds(t *testing.T) {
@@ -1005,7 +1005,7 @@ func Test_ChangeProof_Verify(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, proof)
 
-	err = proof.Verify(context.Background(), dbClone, []byte("key21"), []byte("key30"), db.getMerkleRoot())
+	err = dbClone.VerifyChangeProof(context.Background(), proof, []byte("key21"), []byte("key30"), db.getMerkleRoot())
 	require.NoError(t, err)
 
 	// low maxLength
@@ -1013,7 +1013,7 @@ func Test_ChangeProof_Verify(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, proof)
 
-	err = proof.Verify(context.Background(), dbClone, nil, nil, db.getMerkleRoot())
+	err = dbClone.VerifyChangeProof(context.Background(), proof, nil, nil, db.getMerkleRoot())
 	require.NoError(t, err)
 
 	// nil start/end
@@ -1021,7 +1021,7 @@ func Test_ChangeProof_Verify(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, proof)
 
-	err = proof.Verify(context.Background(), dbClone, nil, nil, endRoot)
+	err = dbClone.VerifyChangeProof(context.Background(), proof, nil, nil, endRoot)
 	require.NoError(t, err)
 
 	err = dbClone.CommitChangeProof(context.Background(), proof)
@@ -1035,7 +1035,7 @@ func Test_ChangeProof_Verify(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, proof)
 
-	err = proof.Verify(context.Background(), dbClone, []byte("key20"), []byte("key30"), db.getMerkleRoot())
+	err = dbClone.VerifyChangeProof(context.Background(), proof, []byte("key20"), []byte("key30"), db.getMerkleRoot())
 	require.NoError(t, err)
 }
 
@@ -1098,7 +1098,7 @@ func Test_ChangeProof_Verify_Bad_Data(t *testing.T) {
 
 			tt.malform(proof)
 
-			err = proof.Verify(context.Background(), dbClone, []byte{2}, []byte{3, 0}, db.getMerkleRoot())
+			err = dbClone.VerifyChangeProof(context.Background(), proof, []byte{2}, []byte{3, 0}, db.getMerkleRoot())
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
@@ -1315,7 +1315,7 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			db, err := getBasicDB()
 			require.NoError(t, err)
-			err = tt.proof.Verify(context.Background(), db, tt.start, tt.end, ids.Empty)
+			err = db.VerifyChangeProof(context.Background(), tt.proof, tt.start, tt.end, ids.Empty)
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
