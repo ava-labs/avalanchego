@@ -53,10 +53,10 @@ pub mod walerror;
 use async_trait::async_trait;
 use firewood_libaio::{AioBuilder, AioManager};
 use libc::off_t;
+#[cfg(not(target_os = "linux"))]
+use nix::fcntl::OFlag;
 #[cfg(target_os = "linux")]
 use nix::fcntl::{fallocate, FallocateFlags, OFlag};
-#[cfg(not(target_os = "linux"))]
-use nix::fcntl::{open, openat, OFlag};
 use nix::unistd::{close, ftruncate};
 use std::fs;
 use std::os::fd::IntoRawFd;
