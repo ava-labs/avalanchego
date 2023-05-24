@@ -1,6 +1,6 @@
 # Release Notes
 
-## [v1.10.1](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.1)
+## [v1.10.2](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.2)
 
 This version is backwards compatible to [v1.10.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0). It is optional, but encouraged. The supported plugin version is `26`.
 
@@ -73,6 +73,8 @@ This version is backwards compatible to [v1.10.0](https://github.com/ava-labs/av
 - Add CPU cycles and number of disk read/write metrics by pid by @coffeeavax in https://github.com/ava-labs/avalanchego/pull/1334
 - Fetch process resource stats as best-effort by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1543
 - Add serialization tests for transactions added in Banff by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1513
+- Log chain shutdown duration by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1545
+- add interface for MerkleDB by @danlaine in https://github.com/ava-labs/avalanchego/pull/1519
 
 ### New Contributors
 
