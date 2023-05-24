@@ -1195,15 +1195,20 @@ func (n *Node) initVdrs() validators.Set {
 
 // Initialize [n.resourceManager].
 func (n *Node) initResourceManager(reg prometheus.Registerer) error {
-	n.resourceManager = resource.NewManager(
+	resourceManager, err := resource.NewManager(
+		n.Log,
 		n.Config.DatabaseConfig.Path,
 		n.Config.SystemTrackerFrequency,
 		n.Config.SystemTrackerCPUHalflife,
 		n.Config.SystemTrackerDiskHalflife,
+		reg,
 	)
+	if err != nil {
+		return err
+	}
+	n.resourceManager = resourceManager
 	n.resourceManager.TrackProcess(os.Getpid())
 
-	var err error
 	n.resourceTracker, err = tracker.NewResourceTracker(reg, n.resourceManager, &meter.ContinuousFactory{}, n.Config.SystemTrackerProcessingHalflife)
 	return err
 }
@@ -1306,7 +1311,7 @@ func (n *Node) Initialize(
 		n.Log,
 		n.MetricsRegisterer,
 		n.networkNamespace,
-		constants.DefaultNetworkCompressionType,
+		n.Config.NetworkConfig.CompressionType,
 		n.Config.NetworkConfig.MaximumInboundMessageTimeout,
 	)
 	if err != nil {

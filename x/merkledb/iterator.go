@@ -8,7 +8,7 @@ import "github.com/ava-labs/avalanchego/database"
 var _ database.Iterator = (*iterator)(nil)
 
 type iterator struct {
-	db       *Database
+	db       *merkleDB
 	nodeIter database.Iterator
 	current  *node
 	err      error
