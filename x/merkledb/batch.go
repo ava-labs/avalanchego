@@ -12,7 +12,7 @@ var _ database.Batch = (*batch)(nil)
 type batch struct {
 	database.BatchOps
 
-	db *Database
+	db *merkleDB
 }
 
 // apply all operations in order to the database and write the result to disk
