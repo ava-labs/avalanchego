@@ -44,7 +44,12 @@ var (
 
 	errNonEmptyIteratorExpected = errors.New("expected non-empty iterator, got no elements")
 	errValidatorSetUpdate       = errors.New("inserted staker cannot be found in validator set")
+
+	pending stakerStatus = 0
+	current stakerStatus = 1
 )
+
+type stakerStatus int
 
 type versionsHolder struct {
 	baseState State
