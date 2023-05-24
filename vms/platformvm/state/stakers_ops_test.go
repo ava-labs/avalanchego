@@ -70,15 +70,10 @@ func simpleStakerStateProperties(storeCreatorF func() (Stakers, error)) *gopter.
 			if err != database.ErrNotFound {
 				return fmt.Sprintf("unexpected error %v, got %v", database.ErrNotFound, err)
 			}
-
-			currIT, err := store.GetCurrentStakerIterator() // check version 2
+			err = checkCurrentStakersContent(store, []Staker{})
 			if err != nil {
-				return fmt.Sprintf("unexpected failure in staker iterator creation, error %v", err)
+				return err.Error()
 			}
-			if currIT.Next() {
-				return fmt.Sprintf("expected empty iterator, got at least element %v", currIT.Value())
-			}
-			currIT.Release()
 
 			// it's fine deleting unknown validator
 			store.DeleteCurrentValidator(&s)
@@ -86,15 +81,10 @@ func simpleStakerStateProperties(storeCreatorF func() (Stakers, error)) *gopter.
 			if err != database.ErrNotFound {
 				return fmt.Sprintf("unexpected error %v, got %v", database.ErrNotFound, err)
 			}
-
-			currIT, err = store.GetCurrentStakerIterator() // check version 2
+			err = checkCurrentStakersContent(store, []Staker{})
 			if err != nil {
-				return fmt.Sprintf("unexpected failure in staker iterator creation, error %v", err)
+				return err.Error()
 			}
-			if currIT.Next() {
-				return fmt.Sprintf("expected empty iterator, got at least element %v", currIT.Value())
-			}
-			currIT.Release()
 
 			// insert the staker and show it can be found
 			store.PutCurrentValidator(&s)
@@ -105,18 +95,10 @@ func simpleStakerStateProperties(storeCreatorF func() (Stakers, error)) *gopter.
 			if !reflect.DeepEqual(&s, retrievedStaker) {
 				return fmt.Sprintf("wrong staker retrieved expected %v, got %v", &s, retrievedStaker)
 			}
-
-			currIT, err = store.GetCurrentStakerIterator() // check version 2
+			err = checkCurrentStakersContent(store, []Staker{s})
 			if err != nil {
-				return fmt.Sprintf("unexpected failure in staker iterator creation, error %v", err)
+				return err.Error()
 			}
-			if !currIT.Next() {
-				return errNonEmptyIteratorExpected.Error()
-			}
-			if !reflect.DeepEqual(currIT.Value(), retrievedStaker) {
-				return fmt.Sprintf("wrong staker retrieved expected %v, got %v", &s, retrievedStaker)
-			}
-			currIT.Release()
 
 			// delete the staker and show it won't be found anymore
 			store.DeleteCurrentValidator(&s)
@@ -124,15 +106,10 @@ func simpleStakerStateProperties(storeCreatorF func() (Stakers, error)) *gopter.
 			if err != database.ErrNotFound {
 				return fmt.Sprintf("unexpected error %v, got %v", database.ErrNotFound, err)
 			}
-
-			currIT, err = store.GetCurrentStakerIterator() // check version 2
+			err = checkCurrentStakersContent(store, []Staker{})
 			if err != nil {
-				return fmt.Sprintf("unexpected failure in staker iterator creation, error %v", err)
+				return err.Error()
 			}
-			if currIT.Next() {
-				return fmt.Sprintf("expected empty iterator, got at least element %v", currIT.Value())
-			}
-			currIT.Release()
 
 			return ""
 		},
@@ -240,18 +217,10 @@ func simpleStakerStateProperties(storeCreatorF func() (Stakers, error)) *gopter.
 			if !reflect.DeepEqual(&val, retrievedValidator) {
 				return fmt.Sprintf("wrong staker retrieved expected %v, got %v", &val, retrievedValidator)
 			}
-
-			valIt, err := store.GetCurrentStakerIterator() // check version 2
+			err = checkCurrentStakersContent(store, []Staker{val})
 			if err != nil {
-				return fmt.Sprintf("unexpected failure in staker iterator creation, error %v", err)
+				return err.Error()
 			}
-			if !valIt.Next() {
-				return errNonEmptyIteratorExpected.Error()
-			}
-			if !reflect.DeepEqual(valIt.Value(), retrievedValidator) {
-				return fmt.Sprintf("wrong staker retrieved expected %v, got %v", &val, retrievedValidator)
-			}
-			valIt.Release()
 
 			// store delegators
 			for _, del := range dels {
@@ -304,23 +273,11 @@ func simpleStakerStateProperties(storeCreatorF func() (Stakers, error)) *gopter.
 			delIt.Release()
 
 			// check no missing delegators in the whole staker set
-			for _, del := range dels {
-				found := false
-				fullDelIt, err := store.GetCurrentStakerIterator()
-				if err != nil {
-					return fmt.Sprintf("unexpected failure in current delegators iterator creation, error %v", err)
-				}
-				for fullDelIt.Next() {
-					if reflect.DeepEqual(*fullDelIt.Value(), del) {
-						found = true
-						break
-					}
-				}
-				fullDelIt.Release()
-
-				if !found {
-					return fmt.Sprintf("missing delegator %v", del)
-				}
+			stakersSet := dels
+			stakersSet = append(stakersSet, val)
+			err = checkCurrentStakersContent(store, stakersSet)
+			if err != nil {
+				return err.Error()
 			}
 
 			// delete delegators
@@ -380,17 +337,10 @@ func simpleStakerStateProperties(storeCreatorF func() (Stakers, error)) *gopter.
 				return fmt.Sprintf("wrong staker retrieved expected %v, got %v", &val, retrievedValidator)
 			}
 
-			valIt, err := store.GetCurrentStakerIterator() // check version 2
+			err = checkCurrentStakersContent(store, []Staker{val})
 			if err != nil {
-				return fmt.Sprintf("unexpected failure in staker iterator creation, error %v", err)
+				return err.Error()
 			}
-			if !valIt.Next() {
-				return errNonEmptyIteratorExpected.Error()
-			}
-			if !reflect.DeepEqual(valIt.Value(), retrievedValidator) {
-				return fmt.Sprintf("wrong staker retrieved expected %v, got %v", &val, retrievedValidator)
-			}
-			valIt.Release()
 
 			// store delegators
 			for _, del := range dels {
@@ -503,4 +453,47 @@ func simpleStakerStateProperties(storeCreatorF func() (Stakers, error)) *gopter.
 	))
 
 	return properties
+}
+
+// verify wheter store contains exactly the stakers specify in the list.
+// stakers order does not matter. Also stakers get consumes while checking
+func checkCurrentStakersContent(store Stakers, stakers []Staker) error {
+	currIT, err := store.GetCurrentStakerIterator()
+	if err != nil {
+		return fmt.Errorf("unexpected failure in staker iterator creation, error %v", err)
+	}
+	defer currIT.Release()
+
+	if len(stakers) == 0 {
+		if currIT.Next() {
+			return fmt.Errorf("expected empty iterator, got at least element %v", currIT.Value())
+		}
+		return nil
+	}
+
+	for currIT.Next() {
+		var (
+			staker = currIT.Value()
+			found  = false
+
+			retrievedStakerIdx = 0
+		)
+
+		for idx, s := range stakers {
+			if reflect.DeepEqual(staker, &s) {
+				retrievedStakerIdx = idx
+				found = true
+			}
+		}
+		if !found {
+			return fmt.Errorf("found extra staker %v", staker)
+		}
+		stakers[retrievedStakerIdx] = stakers[len(stakers)-1] // order does not matter
+		stakers = stakers[:len(stakers)-1]
+	}
+
+	if len(stakers) != 0 {
+		return fmt.Errorf("missing stakers")
+	}
+	return nil
 }
