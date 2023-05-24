@@ -1713,6 +1713,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 					PotentialReward:          staker.PotentialReward,
 					PotentialDelegateeReward: 0,
 					StakerStartTime:          staker.StartTime.Unix(),
+					StakerEndTime:            staker.EndTime.Unix(),
 				}
 
 				// Let's start using V1 as soon as we deploy code. No need to
