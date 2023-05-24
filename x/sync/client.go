@@ -127,7 +127,7 @@ func (c *client) GetRangeProof(ctx context.Context, req *syncpb.RangeProofReques
 			return nil, fmt.Errorf("%w: (%d) > %d)", errTooManyBytes, len(responseBytes), req.BytesLimit)
 		}
 
-		var rangeProofProto syncpb.RangeProofResponse
+		var rangeProofProto syncpb.RangeProof
 		if err := proto.Unmarshal(responseBytes, &rangeProofProto); err != nil {
 			return nil, err
 		}
