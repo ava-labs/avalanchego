@@ -5,6 +5,7 @@ package proposervm
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -132,7 +133,7 @@ func (vm *VM) BatchedParseBlock(ctx context.Context, blks [][]byte) ([]snowman.B
 		blkID := statelessBlk.ID()
 
 		_, status, err := vm.State.GetBlock(blkID)
-		if err == database.ErrNotFound {
+		if errors.Is(err, database.ErrNotFound) {
 			status = choices.Processing
 		} else if err != nil {
 			return nil, err

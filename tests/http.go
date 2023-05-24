@@ -6,6 +6,7 @@ package tests
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -62,10 +63,10 @@ func getHTTPLines(url string) ([]string, error) {
 	lines := []string{}
 	for {
 		line, err := rd.ReadString('\n')
+		if errors.Is(err, io.EOF) {
+			break
+		}
 		if err != nil {
-			if err == io.EOF {
-				break
-			}
 			_ = resp.Body.Close()
 			return nil, err
 		}

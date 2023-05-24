@@ -95,7 +95,7 @@ func newIndex(
 
 	// Get next accepted index from db
 	nextAcceptedIndex, err := database.GetUInt64(i.vDB, nextAcceptedIndexKey)
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		// Couldn't find it in the database. Must not have accepted any containers in previous runs.
 		i.log.Info("created new index",
 			zap.Uint64("nextAcceptedIndex", i.nextAcceptedIndex),

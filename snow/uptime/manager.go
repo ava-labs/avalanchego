@@ -4,6 +4,7 @@
 package uptime
 
 import (
+	"errors"
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -219,7 +220,7 @@ func (m *manager) updateSubnetUptime(nodeID ids.NodeID, subnetID ids.ID) error {
 	}
 
 	newDuration, newLastUpdated, err := m.CalculateUptime(nodeID, subnetID)
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		// If a non-validator disconnects, we don't care
 		return nil
 	}

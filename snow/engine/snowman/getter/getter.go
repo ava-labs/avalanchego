@@ -5,6 +5,7 @@ package getter
 
 import (
 	"context"
+	"errors"
 
 	"go.uber.org/zap"
 
@@ -104,7 +105,7 @@ func (gh *getter) GetAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID
 	summaryIDs := make([]ids.ID, 0, len(heights))
 	for _, height := range heights {
 		summary, err := gh.ssVM.GetStateSummary(ctx, height)
-		if err == block.ErrStateSyncableVMNotImplemented {
+		if errors.Is(err, block.ErrStateSyncableVMNotImplemented) {
 			gh.log.Debug("dropping GetAcceptedStateSummary message",
 				zap.String("reason", "state sync not supported"),
 				zap.Stringer("nodeID", nodeID),

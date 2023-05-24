@@ -5,6 +5,7 @@ package indexer
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -85,7 +86,7 @@ func (hi *heightIndexer) MarkRepaired(repaired bool) {
 // and works asynchronously without blocking the VM.
 func (hi *heightIndexer) RepairHeightIndex(ctx context.Context) error {
 	startBlkID, err := hi.state.GetCheckpoint()
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		hi.MarkRepaired(true)
 		return nil // nothing to do
 	}
@@ -127,7 +128,7 @@ func (hi *heightIndexer) doRepair(ctx context.Context, currentProBlkID ids.ID, l
 
 		processingStart := time.Now()
 		currentAcceptedBlk, _, err := hi.state.GetBlock(currentProBlkID)
-		if err == database.ErrNotFound {
+		if errors.Is(err, database.ErrNotFound) {
 			// We have visited all the proposerVM blocks. Because we previously
 			// verified that we needed to perform a repair, we know that this
 			// will not happen on the first iteration. This guarantees that

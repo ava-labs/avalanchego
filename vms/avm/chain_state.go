@@ -4,6 +4,8 @@
 package avm
 
 import (
+	"errors"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -29,7 +31,7 @@ func (s *chainState) GetTx(txID ids.ID) (*txs.Tx, error) {
 	// marked as Accepted. However, this function aims to only return accepted
 	// transactions.
 	status, err := s.State.GetStatus(txID)
-	if err == database.ErrNotFound {
+	if errors.Is(err, database.ErrNotFound) {
 		// If the status wasn't persisted, then the transaction was written
 		// after the linearization, and is accepted.
 		return tx, nil
