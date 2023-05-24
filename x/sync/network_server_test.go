@@ -107,7 +107,7 @@ func Test_Server_GetRangeProof(t *testing.T) {
 				func(_ context.Context, _ ids.NodeID, requestID uint32, responseBytes []byte) error {
 					// grab a copy of the proof so we can inspect it later
 					if !test.proofNil {
-						var proofProto syncpb.RangeProofResponse
+						var proofProto syncpb.RangeProof
 						err := proto.Unmarshal(responseBytes, &proofProto)
 						require.NoError(err)
 
