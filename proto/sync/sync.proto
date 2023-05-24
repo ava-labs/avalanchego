@@ -65,8 +65,8 @@ message ProofNode {
   map<uint32, bytes> children = 3;
 }
 
-// RangeProofResponse is the response to a RangeProofRequest.
-message RangeProofResponse {
+// RangeProof is the response to a RangeProofRequest.
+message RangeProof {
   repeated ProofNode start = 1;
   repeated ProofNode end = 2;
   repeated KeyValue key_values = 3;
@@ -88,6 +88,6 @@ message ChangeProof {
 message ChangeProofResponse {
   oneof response {
     ChangeProof change_proof = 1;
-    RangeProofResponse range_proof = 2;
+    RangeProof range_proof = 2;
   }
 }
