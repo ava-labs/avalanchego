@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avalanche
@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -39,6 +40,7 @@ var (
 	errUnknownVertex = errors.New("unknown vertex")
 	errFailedParsing = errors.New("failed parsing")
 	errMissing       = errors.New("missing")
+	errTest          = errors.New("non-nil error")
 )
 
 type dummyHandler struct {
@@ -48,6 +50,10 @@ type dummyHandler struct {
 func (dh *dummyHandler) onDoneBootstrapping(ctx context.Context, lastReqID uint32) error {
 	lastReqID++
 	return dh.startEngineF(ctx, lastReqID)
+}
+
+func noopStarter(context.Context, uint32) error {
+	return nil
 }
 
 func TestEngineShutdown(t *testing.T) {
@@ -62,7 +68,7 @@ func TestEngineShutdown(t *testing.T) {
 	}
 	engCfg.VM = vm
 
-	transitive, err := newTransitive(engCfg)
+	transitive, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,7 +104,7 @@ func TestEngineAdd(t *testing.T) {
 
 	manager.CantEdge = false
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -243,7 +249,7 @@ func TestEngineQuery(t *testing.T) {
 		panic("Should have errored")
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -265,7 +271,7 @@ func TestEngineQuery(t *testing.T) {
 	}
 
 	chitted := new(bool)
-	sender.SendChitsF = func(_ context.Context, inVdr ids.NodeID, _ uint32, prefs []ids.ID) {
+	sender.SendChitsF = func(_ context.Context, inVdr ids.NodeID, _ uint32, prefs []ids.ID, _ []ids.ID) {
 		if *chitted {
 			t.Fatalf("Sent multiple chits")
 		}
@@ -383,7 +389,7 @@ func TestEngineQuery(t *testing.T) {
 
 	// The peer returned [vtx1] from our query for [vtx0], which means we will
 	// need to request the missing [vtx1].
-	if err := te.Chits(context.Background(), vdr, *queryRequestID, []ids.ID{vtx1.ID()}); err != nil {
+	if err := te.Chits(context.Background(), vdr, *queryRequestID, []ids.ID{vtx1.ID()}, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -551,7 +557,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 		TxsV:     []snowstorm.Tx{tx0},
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -627,18 +633,18 @@ func TestEngineMultipleQuery(t *testing.T) {
 
 	s2 := []ids.ID{vtx0.ID()}
 
-	if err := te.Chits(context.Background(), vdr0, *queryRequestID, s0); err != nil {
+	if err := te.Chits(context.Background(), vdr0, *queryRequestID, s0, nil); err != nil {
 		t.Fatal(err)
 	}
 	if err := te.QueryFailed(context.Background(), vdr1, *queryRequestID); err != nil {
 		t.Fatal(err)
 	}
-	if err := te.Chits(context.Background(), vdr2, *queryRequestID, s2); err != nil {
+	if err := te.Chits(context.Background(), vdr2, *queryRequestID, s2, nil); err != nil {
 		t.Fatal(err)
 	}
 
 	// Should be dropped because the query was marked as failed
-	if err := te.Chits(context.Background(), vdr1, *queryRequestID, s0); err != nil {
+	if err := te.Chits(context.Background(), vdr1, *queryRequestID, s0, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -711,7 +717,7 @@ func TestEngineBlockedIssue(t *testing.T) {
 		TxsV:    []snowstorm.Tx{tx0},
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -785,7 +791,7 @@ func TestEngineAbandonResponse(t *testing.T) {
 		return nil, errUnknownVertex
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -863,7 +869,7 @@ func TestEngineScheduleRepoll(t *testing.T) {
 	sender.Default(true)
 	sender.CantSendGetAcceptedFrontier = false
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -923,7 +929,7 @@ func TestEngineRejectDoubleSpendTx(t *testing.T) {
 	engCfg.Manager = manager
 	manager.Default(true)
 
-	vm := &vertex.TestVM{TestVM: common.TestVM{T: t}}
+	vm := &vertex.TestVM{TestVM: block.TestVM{TestVM: common.TestVM{T: t}}}
 	engCfg.VM = vm
 	vm.Default(true)
 
@@ -988,7 +994,7 @@ func TestEngineRejectDoubleSpendTx(t *testing.T) {
 	}
 
 	vm.CantSetState = false
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1029,7 +1035,7 @@ func TestEngineRejectDoubleSpendIssuedTx(t *testing.T) {
 	engCfg.Manager = manager
 	manager.Default(true)
 
-	vm := &vertex.TestVM{TestVM: common.TestVM{T: t}}
+	vm := &vertex.TestVM{TestVM: block.TestVM{TestVM: common.TestVM{T: t}}}
 	engCfg.VM = vm
 	vm.Default(true)
 
@@ -1082,7 +1088,7 @@ func TestEngineRejectDoubleSpendIssuedTx(t *testing.T) {
 	}
 
 	vm.CantSetState = false
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1167,7 +1173,7 @@ func TestEngineIssueRepoll(t *testing.T) {
 		panic("Should have errored")
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1217,7 +1223,7 @@ func TestEngineReissue(t *testing.T) {
 	manager.Default(true)
 	engCfg.Manager = manager
 
-	vm := &vertex.TestVM{TestVM: common.TestVM{T: t}}
+	vm := &vertex.TestVM{TestVM: block.TestVM{TestVM: common.TestVM{T: t}}}
 	vm.Default(true)
 	engCfg.VM = vm
 
@@ -1301,7 +1307,7 @@ func TestEngineReissue(t *testing.T) {
 	}
 
 	vm.CantSetState = false
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1354,7 +1360,7 @@ func TestEngineReissue(t *testing.T) {
 
 	// must vote on the first poll for the second one to settle
 	// *queryRequestID is 1
-	if err := te.Chits(context.Background(), vdr, *queryRequestID, []ids.ID{vtx.ID()}); err != nil {
+	if err := te.Chits(context.Background(), vdr, *queryRequestID, []ids.ID{vtx.ID()}, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1371,7 +1377,7 @@ func TestEngineReissue(t *testing.T) {
 	}
 
 	// vote on second poll, *queryRequestID is 2
-	if err := te.Chits(context.Background(), vdr, *queryRequestID, []ids.ID{vtx.ID()}); err != nil {
+	if err := te.Chits(context.Background(), vdr, *queryRequestID, []ids.ID{vtx.ID()}, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1405,7 +1411,7 @@ func TestEngineLargeIssue(t *testing.T) {
 	manager.Default(true)
 	engCfg.Manager = manager
 
-	vm := &vertex.TestVM{TestVM: common.TestVM{T: t}}
+	vm := &vertex.TestVM{TestVM: block.TestVM{TestVM: common.TestVM{T: t}}}
 	vm.Default(true)
 	engCfg.VM = vm
 
@@ -1458,7 +1464,7 @@ func TestEngineLargeIssue(t *testing.T) {
 	}
 
 	vm.CantSetState = false
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1539,7 +1545,7 @@ func TestEngineGetVertex(t *testing.T) {
 		panic("Should have errored")
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1612,7 +1618,7 @@ func TestEngineInsufficientValidators(t *testing.T) {
 		panic("Should have errored")
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1692,7 +1698,7 @@ func TestEnginePushGossip(t *testing.T) {
 		panic("Should have errored")
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1782,7 +1788,7 @@ func TestEngineSingleQuery(t *testing.T) {
 		panic("Should have errored")
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1874,7 +1880,7 @@ func TestEngineParentBlockingInsert(t *testing.T) {
 		panic("Should have errored")
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1962,7 +1968,7 @@ func TestEngineAbandonChit(t *testing.T) {
 		panic("Should have errored")
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	require.NoError(err)
 
 	err = te.Start(context.Background(), 0)
@@ -1987,7 +1993,7 @@ func TestEngineAbandonChit(t *testing.T) {
 	}
 
 	// Register a voter dependency on an unknown vertex.
-	err = te.Chits(context.Background(), vdr, reqID, []ids.ID{fakeVtxID})
+	err = te.Chits(context.Background(), vdr, reqID, []ids.ID{fakeVtxID}, nil)
 	require.NoError(err)
 	require.Len(te.vtxBlocked, 1)
 
@@ -2060,7 +2066,7 @@ func TestEngineAbandonChitWithUnexpectedPutVertex(t *testing.T) {
 		panic("Should have errored")
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	require.NoError(err)
 
 	err = te.Start(context.Background(), 0)
@@ -2085,7 +2091,7 @@ func TestEngineAbandonChitWithUnexpectedPutVertex(t *testing.T) {
 	}
 
 	// Register a voter dependency on an unknown vertex.
-	err = te.Chits(context.Background(), vdr, reqID, []ids.ID{fakeVtxID})
+	err = te.Chits(context.Background(), vdr, reqID, []ids.ID{fakeVtxID}, nil)
 	require.NoError(err)
 	require.Len(te.vtxBlocked, 1)
 
@@ -2179,7 +2185,7 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 		panic("Should have errored")
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2303,7 +2309,7 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 		panic("Should have errored")
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2341,7 +2347,7 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 		panic("Should have errored")
 	}
 
-	if err := te.Chits(context.Background(), vdr, *queryRequestID, []ids.ID{blockingVtx.ID()}); err != nil {
+	if err := te.Chits(context.Background(), vdr, *queryRequestID, []ids.ID{blockingVtx.ID()}, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2438,7 +2444,7 @@ func TestEngineMissingTx(t *testing.T) {
 		panic("Should have errored")
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2476,7 +2482,7 @@ func TestEngineMissingTx(t *testing.T) {
 		panic("Should have errored")
 	}
 
-	if err := te.Chits(context.Background(), vdr, *queryRequestID, []ids.ID{blockingVtx.ID()}); err != nil {
+	if err := te.Chits(context.Background(), vdr, *queryRequestID, []ids.ID{blockingVtx.ID()}, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2545,7 +2551,7 @@ func TestEngineIssueBlockingTx(t *testing.T) {
 		TxsV:     []snowstorm.Tx{tx0, tx1},
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2581,6 +2587,7 @@ func TestEngineReissueAbortedVertex(t *testing.T) {
 
 	manager := vertex.NewTestManager(t)
 	manager.Default(true)
+	manager.TestStorage.CantEdge = false
 	engCfg.Manager = manager
 
 	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
@@ -2627,7 +2634,7 @@ func TestEngineReissueAbortedVertex(t *testing.T) {
 		panic("Unknown vertex requested")
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2707,7 +2714,6 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 	vals.RegisterCallbackListener(startup)
 
 	bootCfg.Beacons = vals
-	bootCfg.Validators = vals
 	bootCfg.StartupTracker = startup
 	engCfg.Validators = vals
 
@@ -2720,10 +2726,11 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 
 	manager := vertex.NewTestManager(t)
 	manager.Default(true)
+	manager.TestStorage.CantEdge = false
 	bootCfg.Manager = manager
 	engCfg.Manager = manager
 
-	vm := &vertex.TestVM{TestVM: common.TestVM{T: t}}
+	vm := &vertex.TestVM{TestVM: block.TestVM{TestVM: common.TestVM{T: t}}}
 	vm.Default(true)
 	bootCfg.VM = vm
 	engCfg.VM = vm
@@ -2802,12 +2809,13 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 		context.Background(),
 		bootCfg,
 		dh.onDoneBootstrapping,
+		noopStarter,
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2925,7 +2933,7 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 		t.Fatalf("Unknown bytes provided")
 		panic("Unknown bytes provided")
 	}
-	sender.SendChitsF = func(_ context.Context, inVdr ids.NodeID, _ uint32, chits []ids.ID) {
+	sender.SendChitsF = func(_ context.Context, inVdr ids.NodeID, _ uint32, chits []ids.ID, _ []ids.ID) {
 		if inVdr != vdr {
 			t.Fatalf("Sent to the wrong validator")
 		}
@@ -2983,7 +2991,6 @@ func TestEngineReBootstrapFails(t *testing.T) {
 	vals.RegisterCallbackListener(startup)
 
 	bootCfg.Beacons = vals
-	bootCfg.Validators = vals
 	bootCfg.StartupTracker = startup
 	engCfg.Validators = vals
 
@@ -2999,7 +3006,7 @@ func TestEngineReBootstrapFails(t *testing.T) {
 	bootCfg.Manager = manager
 	engCfg.Manager = manager
 
-	vm := &vertex.TestVM{TestVM: common.TestVM{T: t}}
+	vm := &vertex.TestVM{TestVM: block.TestVM{TestVM: common.TestVM{T: t}}}
 	vm.Default(true)
 	bootCfg.VM = vm
 	engCfg.VM = vm
@@ -3064,6 +3071,7 @@ func TestEngineReBootstrapFails(t *testing.T) {
 		context.Background(),
 		bootCfg,
 		dh.onDoneBootstrapping,
+		noopStarter,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -3102,13 +3110,14 @@ func TestEngineReBootstrapFails(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	bootCfg.Ctx.Registerer = prometheus.NewRegistry()
+	bootCfg.Ctx.AvalancheRegisterer = prometheus.NewRegistry()
 
 	// re-register the Transitive
 	bootstrapper2, err := bootstrap.New(
 		context.Background(),
 		bootCfg,
 		dh.onDoneBootstrapping,
+		noopStarter,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -3148,7 +3157,6 @@ func TestEngineReBootstrappingIntoConsensus(t *testing.T) {
 	vals.RegisterCallbackListener(startup)
 
 	bootCfg.Beacons = vals
-	bootCfg.Validators = vals
 	bootCfg.StartupTracker = startup
 	engCfg.Validators = vals
 
@@ -3164,7 +3172,7 @@ func TestEngineReBootstrappingIntoConsensus(t *testing.T) {
 	bootCfg.Manager = manager
 	engCfg.Manager = manager
 
-	vm := &vertex.TestVM{TestVM: common.TestVM{T: t}}
+	vm := &vertex.TestVM{TestVM: block.TestVM{TestVM: common.TestVM{T: t}}}
 	vm.Default(true)
 	bootCfg.VM = vm
 	engCfg.VM = vm
@@ -3243,12 +3251,13 @@ func TestEngineReBootstrappingIntoConsensus(t *testing.T) {
 		context.Background(),
 		bootCfg,
 		dh.onDoneBootstrapping,
+		noopStarter,
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3375,7 +3384,7 @@ func TestEngineReBootstrappingIntoConsensus(t *testing.T) {
 		t.Fatalf("Unknown bytes provided")
 		panic("Unknown bytes provided")
 	}
-	sender.SendChitsF = func(_ context.Context, inVdr ids.NodeID, _ uint32, chits []ids.ID) {
+	sender.SendChitsF = func(_ context.Context, inVdr ids.NodeID, _ uint32, chits []ids.ID, _ []ids.ID) {
 		if inVdr != vdr {
 			t.Fatalf("Sent to the wrong validator")
 		}
@@ -3449,7 +3458,7 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		VerifyV: errors.New(""),
+		VerifyV: errTest,
 	}
 	tx1.InputIDsV = append(tx1.InputIDsV, utxos[1])
 
@@ -3472,7 +3481,7 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 		TxsV:     []snowstorm.Tx{tx1},
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3508,10 +3517,10 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 		case vtx1.ID():
 			return vtx1, nil
 		}
-		return nil, errors.New("Unknown vtx")
+		return nil, errUnknownVertex
 	}
 
-	if err := te.Chits(context.Background(), vdr, *reqID, []ids.ID{vtx1.ID()}); err != nil {
+	if err := te.Chits(context.Background(), vdr, *reqID, []ids.ID{vtx1.ID()}, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3553,7 +3562,7 @@ func TestEnginePartiallyValidVertex(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		VerifyV: errors.New(""),
+		VerifyV: errTest,
 	}
 	tx1.InputIDsV = append(tx1.InputIDsV, utxos[1])
 
@@ -3567,7 +3576,7 @@ func TestEnginePartiallyValidVertex(t *testing.T) {
 		TxsV:     []snowstorm.Tx{tx0, tx1},
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3619,7 +3628,7 @@ func TestEngineGossip(t *testing.T) {
 		StatusV: choices.Accepted,
 	}}
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3722,7 +3731,7 @@ func TestEngineInvalidVertexIgnoredFromUnexpectedPeer(t *testing.T) {
 		BytesV:   []byte{2},
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3866,7 +3875,7 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 		BytesV:   []byte{2},
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3971,7 +3980,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 	manager := vertex.NewTestManager(t)
 	engCfg.Manager = manager
 
-	vm := &vertex.TestVM{TestVM: common.TestVM{T: t}}
+	vm := &vertex.TestVM{TestVM: block.TestVM{TestVM: common.TestVM{T: t}}}
 	vm.Default(true)
 	engCfg.VM = vm
 
@@ -4010,7 +4019,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 	}
 
 	vm.CantSetState = false
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -4088,7 +4097,7 @@ func TestEngineDuplicatedIssuance(t *testing.T) {
 
 	manager.Default(true)
 
-	vm := &vertex.TestVM{TestVM: common.TestVM{T: t}}
+	vm := &vertex.TestVM{TestVM: block.TestVM{TestVM: common.TestVM{T: t}}}
 	vm.Default(true)
 	engCfg.VM = vm
 
@@ -4132,7 +4141,7 @@ func TestEngineDuplicatedIssuance(t *testing.T) {
 	}
 
 	vm.CantSetState = false
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -4252,7 +4261,7 @@ func TestEngineDoubleChit(t *testing.T) {
 		panic("Should have errored")
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -4289,7 +4298,7 @@ func TestEngineDoubleChit(t *testing.T) {
 		t.Fatalf("Wrong tx status: %s ; expected: %s", status, choices.Processing)
 	}
 
-	if err := te.Chits(context.Background(), vdr0, *reqID, votes); err != nil {
+	if err := te.Chits(context.Background(), vdr0, *reqID, votes, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -4297,7 +4306,7 @@ func TestEngineDoubleChit(t *testing.T) {
 		t.Fatalf("Wrong tx status: %s ; expected: %s", status, choices.Processing)
 	}
 
-	if err := te.Chits(context.Background(), vdr0, *reqID, votes); err != nil {
+	if err := te.Chits(context.Background(), vdr0, *reqID, votes, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -4305,7 +4314,7 @@ func TestEngineDoubleChit(t *testing.T) {
 		t.Fatalf("Wrong tx status: %s ; expected: %s", status, choices.Processing)
 	}
 
-	if err := te.Chits(context.Background(), vdr1, *reqID, votes); err != nil {
+	if err := te.Chits(context.Background(), vdr1, *reqID, votes, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -4416,7 +4425,7 @@ func TestEngineBubbleVotes(t *testing.T) {
 		panic("should have errored")
 	}
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -4451,7 +4460,7 @@ func TestEngineBubbleVotes(t *testing.T) {
 
 	// can't apply votes yet because pendingVtx0 isn't issued because missingVtx
 	// is missing
-	err = te.Chits(context.Background(), vdr, *queryReqID, []ids.ID{pendingVtx1.ID()})
+	err = te.Chits(context.Background(), vdr, *queryReqID, []ids.ID{pendingVtx1.ID()}, nil)
 	require.NoError(t, err)
 	require.Equal(t, choices.Processing, tx0.Status(), "wrong tx status")
 	require.Equal(t, choices.Processing, tx1.Status(), "wrong tx status")
@@ -4487,7 +4496,7 @@ func TestEngineIssue(t *testing.T) {
 	manager.Default(true)
 	engCfg.Manager = manager
 
-	vm := &vertex.TestVM{TestVM: common.TestVM{T: t}}
+	vm := &vertex.TestVM{TestVM: block.TestVM{TestVM: common.TestVM{T: t}}}
 	vm.Default(true)
 	engCfg.VM = vm
 
@@ -4539,7 +4548,7 @@ func TestEngineIssue(t *testing.T) {
 	}
 
 	vm.CantSetState = false
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -4596,7 +4605,7 @@ func TestEngineIssue(t *testing.T) {
 		t.Fatalf("Should have issued txs differently")
 	}
 
-	if err := te.Chits(context.Background(), vdr, queryRequestID, []ids.ID{vtxID}); err != nil {
+	if err := te.Chits(context.Background(), vdr, queryRequestID, []ids.ID{vtxID}, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -4635,13 +4644,13 @@ func TestAbandonTx(t *testing.T) {
 	manager.CantGetVtx = false
 	engCfg.Manager = manager
 
-	vm := &vertex.TestVM{TestVM: common.TestVM{T: t}}
+	vm := &vertex.TestVM{TestVM: block.TestVM{TestVM: common.TestVM{T: t}}}
 	vm.Default(true)
 	vm.CantSetState = false
 
 	engCfg.VM = vm
 
-	te, err := newTransitive(engCfg)
+	te, err := newTransitive(engCfg, noopStarter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -4668,7 +4677,7 @@ func TestAbandonTx(t *testing.T) {
 		DependenciesV: []snowstorm.Tx{gTx},
 		InputIDsV:     []ids.ID{gTx.ID()},
 		BytesV:        utils.RandomBytes(32),
-		VerifyV:       errors.New(""),
+		VerifyV:       errTest,
 	}
 
 	tx1 := &snowstorm.TestTx{ // Depends on tx0
@@ -4721,7 +4730,7 @@ func TestAbandonTx(t *testing.T) {
 			return vtx1, nil
 		}
 		require.FailNow("should have asked to parse vtx1")
-		return nil, errors.New("should have asked to parse vtx1")
+		return nil, nil
 	}
 	err = te.Put(context.Background(), vdr, 0, vtx1.Bytes())
 	require.NoError(err)
@@ -4737,7 +4746,7 @@ func TestAbandonTx(t *testing.T) {
 			return vtx0, nil
 		}
 		require.FailNow("should have asked to parse vtx0")
-		return nil, errors.New("should have asked to parse vtx0")
+		return nil, nil
 	}
 	err = te.Put(context.Background(), vdr, 0, vtx0.Bytes())
 	require.NoError(err)
@@ -4773,7 +4782,7 @@ func TestSendMixedQuery(t *testing.T) {
 				engCfg.Params.Alpha = 12
 				engCfg.Params.MixedQueryNumPushVdr = 12
 				engCfg.Params.MixedQueryNumPushNonVdr = 11
-				te, err := newTransitive(engCfg)
+				te, err := newTransitive(engCfg, noopStarter)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -4884,4 +4893,126 @@ func TestSendMixedQuery(t *testing.T) {
 				}
 			})
 	}
+}
+
+func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
+	require := require.New(t)
+
+	_, _, engCfg := DefaultConfig()
+	engCfg.Params.BatchSize = 1
+	engCfg.Params.BetaVirtuous = 2
+	engCfg.Params.BetaRogue = 2
+	engCfg.Params.OptimalProcessing = 1
+
+	sender := &common.SenderTest{T: t}
+	sender.Default(true)
+	sender.CantSendGetAcceptedFrontier = false
+	engCfg.Sender = sender
+
+	vals := validators.NewSet()
+	engCfg.Validators = vals
+
+	vdr := ids.GenerateTestNodeID()
+	require.NoError(vals.Add(vdr, nil, ids.Empty, 1))
+
+	manager := vertex.NewTestManager(t)
+	manager.Default(true)
+	engCfg.Manager = manager
+
+	vm := &vertex.TestVM{TestVM: block.TestVM{TestVM: common.TestVM{T: t}}}
+	vm.Default(true)
+	engCfg.VM = vm
+
+	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
+	mVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
+
+	gTx := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
+
+	utxos := []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
+
+	tx := &snowstorm.TestTx{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		DependenciesV: []snowstorm.Tx{gTx},
+		InputIDsV:     utxos[:1],
+	}
+
+	manager.EdgeF = func(context.Context) []ids.ID {
+		return []ids.ID{gVtx.ID(), mVtx.ID()}
+	}
+	manager.GetVtxF = func(_ context.Context, id ids.ID) (avalanche.Vertex, error) {
+		switch id {
+		case gVtx.ID():
+			return gVtx, nil
+		case mVtx.ID():
+			return mVtx, nil
+		}
+		t.Fatalf("Unknown vertex")
+		panic("Should have errored")
+	}
+
+	vm.CantSetState = false
+	te, err := newTransitive(engCfg, noopStarter)
+	require.NoError(err)
+	require.NoError(te.Start(context.Background(), 0))
+
+	vtx := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentsV: []avalanche.Vertex{gVtx, mVtx},
+		TxsV:     []snowstorm.Tx{tx},
+		BytesV:   utils.RandomBytes(32),
+	}
+
+	queryRequestID := new(uint32)
+	sender.SendPushQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], requestID uint32, vtxBytes []byte) {
+		require.Contains(inVdrs, vdr)
+		require.Equal(vtx.Bytes(), vtxBytes)
+		*queryRequestID = requestID
+	}
+
+	require.NoError(te.issue(context.Background(), vtx))
+
+	manager.GetVtxF = func(_ context.Context, id ids.ID) (avalanche.Vertex, error) {
+		switch id {
+		case gVtx.ID():
+			return gVtx, nil
+		case mVtx.ID():
+			return mVtx, nil
+		case vtx.ID():
+			return vtx, nil
+		}
+		t.Fatalf("unknown vertex")
+		panic("Should have errored")
+	}
+
+	require.Equal(choices.Processing, vtx.Status())
+
+	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], requestID uint32, vtxID ids.ID) {
+		require.Contains(inVdrs, vdr)
+		require.Equal(vtx.ID(), vtxID)
+		*queryRequestID = requestID
+	}
+
+	vtxIDs := []ids.ID{vtx.ID()}
+	require.NoError(te.Chits(context.Background(), vdr, *queryRequestID, vtxIDs, vtxIDs))
+
+	require.Equal(choices.Processing, vtx.Status())
+
+	require.NoError(te.QueryFailed(context.Background(), vdr, *queryRequestID))
+
+	require.Equal(choices.Accepted, vtx.Status())
 }

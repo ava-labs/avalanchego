@@ -8,7 +8,7 @@
 //
 // Much love to the original authors for their work.
 // **********************************************************
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package proposervm
@@ -258,10 +258,10 @@ func (p *postForkCommonComponents) buildChild(
 			newTimestamp,
 			pChainHeight,
 			p.vm.ctx.NodeID,
-			p.vm.ctx.StakingCertLeaf,
+			p.vm.stakingCertLeaf,
 			innerBlock.Bytes(),
 			p.vm.ctx.ChainID,
-			p.vm.ctx.StakingLeafSigner,
+			p.vm.stakingLeafSigner,
 		)
 	}
 	if err != nil {

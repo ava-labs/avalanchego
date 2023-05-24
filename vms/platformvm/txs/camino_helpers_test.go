@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
@@ -23,7 +23,7 @@ const (
 )
 
 var (
-	caminoPreFundedKeys      = crypto.BuildTestKeys()
+	caminoPreFundedKeys      = secp256k1.TestKeys()
 	defaultGenesisTime       = time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC)
 	defaultValidateStartTime = defaultGenesisTime
 	defaultValidateEndTime   = defaultValidateStartTime.Add(10 * defaultMinStakingDuration)

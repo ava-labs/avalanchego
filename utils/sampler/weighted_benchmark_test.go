@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sampler
@@ -11,6 +11,8 @@ import (
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
+
+var errOverflow = errors.New("overflow error")
 
 // BenchmarkAllWeightedSampling
 func BenchmarkAllWeightedSampling(b *testing.B) {
@@ -96,7 +98,7 @@ func CalcWeightedPoW(exponent float64, size int) (uint64, []uint64, error) {
 		totalWeight = newWeight
 	}
 	if totalWeight > math.MaxInt64 {
-		return 0, nil, errors.New("overflow error")
+		return 0, nil, errOverflow
 	}
 	return totalWeight, weights, nil
 }

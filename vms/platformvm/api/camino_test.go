@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/stretchr/testify/require"
 )
@@ -139,7 +138,7 @@ func TestBuildCaminoGenesis(t *testing.T) {
 									}},
 								},
 							},
-							Validator: validator.Validator{
+							Validator: txs.Validator{
 								NodeID: nodeID,
 								Start:  0,
 								End:    20,

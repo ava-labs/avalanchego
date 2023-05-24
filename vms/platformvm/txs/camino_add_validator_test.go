@@ -10,11 +10,10 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/nodeid"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
-	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -22,7 +21,7 @@ func TestCaminoAddValidatorTxSyntacticVerify(t *testing.T) {
 	ctx := snow.DefaultContextTest()
 	ctx.AVAXAssetID = ids.GenerateTestID()
 	nodeKey, nodeID := nodeid.GenerateCaminoNodeKeyAndID()
-	signers := [][]*crypto.PrivateKeySECP256K1R{{caminoPreFundedKeys[0]}, {nodeKey}}
+	signers := [][]*secp256k1.PrivateKey{{caminoPreFundedKeys[0]}, {nodeKey}}
 	outputOwners := secp256k1fx.OutputOwners{
 		Locktime:  0,
 		Threshold: 1,
@@ -111,7 +110,7 @@ func TestCaminoAddValidatorTxSyntacticVerify(t *testing.T) {
 							generateTestOut(ctx.AVAXAssetID, defaultCaminoValidatorWeight, outputOwners, ids.Empty, locked.ThisTxID),
 						},
 					}},
-					Validator: validator.Validator{
+					Validator: Validator{
 						NodeID: nodeID,
 						Start:  uint64(defaultValidateStartTime.Unix()) + 1,
 						End:    uint64(defaultValidateEndTime.Unix()),

@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -33,10 +33,10 @@ import (
 )
 
 func TestUnlockUTXOs(t *testing.T) {
-	testHandler := defaultCaminoHandler(t, nil)
+	testHandler := defaultCaminoHandler(t)
 	ctx := testHandler.ctx
 
-	cryptFactory := crypto.FactorySECP256K1R{}
+	cryptFactory := secp256k1.Factory{}
 	key, err := cryptFactory.NewPrivateKey()
 	require.NoError(t, err)
 	address := key.PublicKey().Address()
@@ -177,10 +177,8 @@ func TestLock(t *testing.T) {
 
 	testState := defaultState(config, ctx, baseDB, rewardsCalc)
 
-	cryptFactory := crypto.FactorySECP256K1R{}
+	cryptFactory := secp256k1.Factory{}
 	key, err := cryptFactory.NewPrivateKey()
-	secpKey, ok := key.(*crypto.PrivateKeySECP256K1R)
-	require.True(t, ok)
 	require.NoError(t, err)
 	address := key.PublicKey().Address()
 	outputOwners := secp256k1fx.OutputOwners{
@@ -189,7 +187,7 @@ func TestLock(t *testing.T) {
 		Addrs:     []ids.ShortID{address},
 	}
 
-	testKeys := crypto.BuildTestKeys()
+	testKeys := secp256k1.TestKeys()
 	changeOwners := secp256k1fx.OutputOwners{
 		Locktime:  0,
 		Threshold: 1,
@@ -438,30 +436,31 @@ func TestLock(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			require := require.New(t)
 
-			internalState := state.NewMockState(ctrl)
+			state := state.NewMockState(ctrl)
 			utxoIDs := []ids.ID{}
 			var want want
-			var expectedSigners [][]*crypto.PrivateKeySECP256K1R
+			var expectedSigners [][]*secp256k1.PrivateKey
 			if tt.expectError == nil {
 				want = tt.generateWant(tt.utxos)
-				expectedSigners = make([][]*crypto.PrivateKeySECP256K1R, len(want.ins))
+				expectedSigners = make([][]*secp256k1.PrivateKey, len(want.ins))
 				for i := range want.ins {
-					expectedSigners[i] = []*crypto.PrivateKeySECP256K1R{secpKey}
+					expectedSigners[i] = []*secp256k1.PrivateKey{key}
 				}
 			}
 
 			for _, utxo := range tt.utxos {
 				testState.AddUTXO(utxo)
 				utxoIDs = append(utxoIDs, utxo.InputID())
-				internalState.EXPECT().GetUTXO(utxo.InputID()).Return(testState.GetUTXO(utxo.InputID()))
+				state.EXPECT().GetUTXO(utxo.InputID()).Return(testState.GetUTXO(utxo.InputID()))
 			}
-			internalState.EXPECT().UTXOIDs(address.Bytes(), ids.Empty, math.MaxInt).Return(utxoIDs, nil)
-			internalState.EXPECT().GetMultisigAlias(gomock.Any()).Return(nil, database.ErrNotFound).AnyTimes()
+			state.EXPECT().UTXOIDs(address.Bytes(), ids.Empty, math.MaxInt).Return(utxoIDs, nil)
+			state.EXPECT().GetMultisigAlias(gomock.Any()).Return(nil, database.ErrNotFound).AnyTimes()
 
-			testHandler := defaultCaminoHandler(t, internalState)
+			testHandler := defaultCaminoHandler(t)
 
 			ins, outs, signers, _, err := testHandler.Lock(
-				[]*crypto.PrivateKeySECP256K1R{secpKey},
+				state,
+				[]*secp256k1.PrivateKey{key},
 				tt.args.totalAmountToSpend,
 				tt.args.totalAmountToBurn,
 				tt.args.appliedLockState,
@@ -487,7 +486,7 @@ func TestVerifyLockUTXOs(t *testing.T) {
 	require.NoError(t, fx.InitializeVM(&secp256k1fx.TestVM{}))
 	require.NoError(t, fx.Bootstrapped())
 	tx := &dummyUnsignedTx{txs.BaseTx{}}
-	tx.Initialize([]byte{0})
+	tx.SetBytes([]byte{0})
 
 	outputOwners1, cred1 := generateOwnersAndSig(tx)
 	outputOwners2, cred2 := generateOwnersAndSig(tx)
@@ -504,8 +503,8 @@ func TestVerifyLockUTXOs(t *testing.T) {
 	depositTxID1 := ids.ID{0, 1}
 	depositTxID2 := ids.ID{0, 2}
 
-	noMsigState := func(c *gomock.Controller) *state.MockState {
-		s := state.NewMockState(c)
+	noMsigState := func(c *gomock.Controller) *state.MockChain {
+		s := state.NewMockChain(c)
 		s.EXPECT().GetMultisigAlias(gomock.Any()).Return(nil, database.ErrNotFound).AnyTimes()
 		return s
 	}
@@ -513,7 +512,7 @@ func TestVerifyLockUTXOs(t *testing.T) {
 	// Note that setting [chainTimestamp] also set's the VM's clock.
 	// Adjust input/output locktimes accordingly.
 	tests := map[string]struct {
-		state            func(*gomock.Controller) *state.MockState
+		state            func(*gomock.Controller) *state.MockChain
 		utxos            []*avax.UTXO
 		ins              func([]*avax.UTXO) []*avax.TransferableInput
 		outs             []*avax.TransferableOutput
@@ -678,8 +677,8 @@ func TestVerifyLockUTXOs(t *testing.T) {
 			expectedErr:      errLockedFundsNotMarkedAsLocked,
 		},
 		"Fail: bond, produced output has invalid msig owner": {
-			state: func(c *gomock.Controller) *state.MockState {
-				s := state.NewMockState(c)
+			state: func(c *gomock.Controller) *state.MockChain {
+				s := state.NewMockChain(c)
 				s.EXPECT().GetMultisigAlias(outputOwners1.Addrs[0]).Return(nil, database.ErrNotFound)
 				s.EXPECT().GetMultisigAlias(msigAddr).Return(invalidCycledMsigAlias, nil).Times(2)
 				return s
@@ -696,8 +695,8 @@ func TestVerifyLockUTXOs(t *testing.T) {
 			expectedErr:      secp256k1fx.ErrMsigCombination,
 		},
 		"Fail: bond, but no outs are actually bonded;  produced output has invalid msig owner": {
-			state: func(c *gomock.Controller) *state.MockState {
-				s := state.NewMockState(c)
+			state: func(c *gomock.Controller) *state.MockChain {
+				s := state.NewMockChain(c)
 				s.EXPECT().GetMultisigAlias(outputOwners1.Addrs[0]).Return(nil, database.ErrNotFound)
 				s.EXPECT().GetMultisigAlias(msigAddr).Return(invalidCycledMsigAlias, nil).Times(2)
 				return s
@@ -904,7 +903,7 @@ func TestVerifyLockUTXOs(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
-			testHandler := defaultCaminoHandler(t, tt.state(ctrl))
+			testHandler := defaultCaminoHandler(t)
 
 			var ins []*avax.TransferableInput
 			if tt.ins != nil {
@@ -912,6 +911,7 @@ func TestVerifyLockUTXOs(t *testing.T) {
 			}
 
 			err := testHandler.VerifyLockUTXOs(
+				tt.state(ctrl),
 				tx,
 				tt.utxos,
 				ins,
@@ -943,7 +943,7 @@ func TestGetDepositUnlockableAmounts(t *testing.T) {
 
 	defaultState(config, ctx, baseDB, rewardsCalc)
 	tx := &dummyUnsignedTx{txs.BaseTx{}}
-	tx.Initialize([]byte{0})
+	tx.SetBytes([]byte{0})
 	outputOwners, _ := generateOwnersAndSig(tx)
 	now := time.Now()
 	depositedAmount := uint64(1000)
@@ -1049,7 +1049,7 @@ func TestGetDepositUnlockableAmounts(t *testing.T) {
 }
 
 func TestUnlockDeposit(t *testing.T) {
-	testHandler := defaultCaminoHandler(t, nil)
+	testHandler := defaultCaminoHandler(t)
 	ctx := testHandler.ctx
 
 	testID := ids.GenerateTestID()
@@ -1064,7 +1064,7 @@ func TestUnlockDeposit(t *testing.T) {
 
 	type args struct {
 		state        func(*gomock.Controller) state.Chain
-		keys         []*crypto.PrivateKeySECP256K1R
+		keys         []*secp256k1.PrivateKey
 		depositTxIDs []ids.ID
 	}
 	sigIndices := []uint32{0}
@@ -1073,7 +1073,7 @@ func TestUnlockDeposit(t *testing.T) {
 		args  args
 		want  []*avax.TransferableInput
 		want1 []*avax.TransferableOutput
-		want2 [][]*crypto.PrivateKeySECP256K1R
+		want2 [][]*secp256k1.PrivateKey
 		err   error
 	}{
 		"Error retrieving unlockable amounts": {
@@ -1120,9 +1120,10 @@ func TestUnlockDeposit(t *testing.T) {
 						UnlockPeriodDuration: uint32((10 * time.Minute).Seconds()),
 					}, nil)
 					s.EXPECT().LockedUTXOs(depositTxSet, gomock.Any(), locked.StateDeposited).Return(depositedUTXOs, nil)
+					s.EXPECT().GetMultisigAlias(preFundedKeys[0].Address()).Return(nil, database.ErrNotFound)
 					return s
 				},
-				keys:         []*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
+				keys:         []*secp256k1.PrivateKey{preFundedKeys[0]},
 				depositTxIDs: []ids.ID{testID},
 			},
 			want: []*avax.TransferableInput{
@@ -1132,7 +1133,7 @@ func TestUnlockDeposit(t *testing.T) {
 				generateTestOut(ctx.AVAXAssetID, depositedAmount/2, outputOwners, ids.Empty, ids.Empty),
 				generateTestOut(ctx.AVAXAssetID, depositedAmount/2, outputOwners, testID, ids.Empty),
 			},
-			want2: [][]*crypto.PrivateKeySECP256K1R{{preFundedKeys[0]}},
+			want2: [][]*secp256k1.PrivateKey{{preFundedKeys[0]}},
 		},
 		"Successful full unlock": {
 			args: args{
@@ -1153,9 +1154,10 @@ func TestUnlockDeposit(t *testing.T) {
 						UnlockPeriodDuration: uint32((2 * time.Minute).Seconds()),
 					}, nil)
 					s.EXPECT().LockedUTXOs(depositTxSet, gomock.Any(), locked.StateDeposited).Return(depositedUTXOs, nil)
+					s.EXPECT().GetMultisigAlias(preFundedKeys[0].Address()).Return(nil, database.ErrNotFound)
 					return s
 				},
-				keys:         []*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
+				keys:         []*secp256k1.PrivateKey{preFundedKeys[0]},
 				depositTxIDs: []ids.ID{testID},
 			},
 			want: []*avax.TransferableInput{
@@ -1164,7 +1166,7 @@ func TestUnlockDeposit(t *testing.T) {
 			want1: []*avax.TransferableOutput{
 				generateTestOut(ctx.AVAXAssetID, depositedAmount, outputOwners, ids.Empty, ids.Empty),
 			},
-			want2: [][]*crypto.PrivateKeySECP256K1R{{preFundedKeys[0]}},
+			want2: [][]*secp256k1.PrivateKey{{preFundedKeys[0]}},
 		},
 	}
 	for name, tt := range tests {
@@ -1188,7 +1190,7 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 	assetID := ids.ID{'C', 'A', 'M'}
 	wrongAssetID := ids.ID{'C', 'A', 'T'}
 	tx := &dummyUnsignedTx{txs.BaseTx{}}
-	tx.Initialize([]byte{0})
+	tx.SetBytes([]byte{0})
 	owner1, cred1 := generateOwnersAndSig(tx)
 	depositTxID1 := ids.ID{0, 0, 1}
 	depositTxID2 := ids.ID{0, 0, 2}
@@ -1209,12 +1211,6 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 	depositExpiredTime := deposit1.StartTime().Add(time.Duration(deposit1.Duration) * time.Second)
 	unlockableAmount := deposit1.UnlockableAmount(depositOffer, uint64(depositNotExpiredTime.Unix()))
 
-	noMsigState := func(ctrl *gomock.Controller) *state.MockState {
-		s := state.NewMockState(ctrl)
-		s.EXPECT().GetMultisigAlias(gomock.Any()).Return(nil, database.ErrNotFound).AnyTimes()
-		return s
-	}
-
 	type args struct {
 		state        func(ctrl *gomock.Controller) *state.MockChain
 		tx           txs.UnsignedTx
@@ -1226,13 +1222,11 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 		assetID      ids.ID
 	}
 	tests := map[string]struct {
-		handlerState           func(ctrl *gomock.Controller) *state.MockState
 		args                   args
 		expectedUnlockedAmount map[ids.ID]uint64
 		expectedErr            error
 	}{
 		"Number of inputs-credentials mismatch": {
-			handlerState: noMsigState,
 			args: args{
 				state: state.NewMockChain,
 				utxos: []*avax.UTXO{{}},
@@ -1242,7 +1236,6 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 			expectedErr: errInputsCredentialsMismatch,
 		},
 		"Number of inputs-utxos mismatch": {
-			handlerState: noMsigState,
 			args: args{
 				state: state.NewMockChain,
 				utxos: []*avax.UTXO{{}, {}},
@@ -1252,7 +1245,6 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 			expectedErr: errInputsUTXOsMismatch,
 		},
 		"Bad credentials": {
-			handlerState: noMsigState,
 			args: args{
 				state: state.NewMockChain,
 				utxos: []*avax.UTXO{{}},
@@ -1262,7 +1254,6 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 			expectedErr: errBadCredentials,
 		},
 		"UTXO AssetID mismatch": {
-			handlerState: noMsigState,
 			args: args{
 				state: func(ctrl *gomock.Controller) *state.MockChain {
 					s := state.NewMockChain(ctrl)
@@ -1281,7 +1272,6 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 			expectedErr: errAssetIDMismatch,
 		},
 		"Input AssetID mismatch": {
-			handlerState: noMsigState,
 			args: args{
 				state: func(ctrl *gomock.Controller) *state.MockChain {
 					s := state.NewMockChain(ctrl)
@@ -1300,7 +1290,6 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 			expectedErr: errAssetIDMismatch,
 		},
 		"UTXO locked, but not deposited": {
-			handlerState: noMsigState,
 			args: args{
 				state: func(ctrl *gomock.Controller) *state.MockChain {
 					s := state.NewMockChain(ctrl)
@@ -1319,7 +1308,6 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 			expectedErr: errUnlockingUnlockedUTXO,
 		},
 		"Input and utxo lock IDs mismatch: utxo isn't locked, but input is locked": {
-			handlerState: noMsigState,
 			args: args{
 				state: func(ctrl *gomock.Controller) *state.MockChain {
 					s := state.NewMockChain(ctrl)
@@ -1338,7 +1326,6 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 			expectedErr: errLockIDsMismatch,
 		},
 		"Input and utxo lock IDs mismatch: different depositTxIDs": {
-			handlerState: noMsigState,
 			args: args{
 				state: func(ctrl *gomock.Controller) *state.MockChain {
 					s := state.NewMockChain(ctrl)
@@ -1357,7 +1344,6 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 			expectedErr: errLockIDsMismatch,
 		},
 		"Input and utxo lock IDs mismatch: different bondTxIDs": {
-			handlerState: noMsigState,
 			args: args{
 				state: func(ctrl *gomock.Controller) *state.MockChain {
 					s := state.NewMockChain(ctrl)
@@ -1376,7 +1362,6 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 			expectedErr: errLockIDsMismatch,
 		},
 		"Input and utxo lock IDs mismatch: utxo is locked, but input isn't locked": {
-			handlerState: noMsigState,
 			args: args{
 				state: func(ctrl *gomock.Controller) *state.MockChain {
 					s := state.NewMockChain(ctrl)
@@ -1395,7 +1380,6 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 			expectedErr: errLockedFundsNotMarkedAsLocked,
 		},
 		"Input and utxo amount mismatch, utxo is deposited": {
-			handlerState: noMsigState,
 			args: args{
 				state: func(ctrl *gomock.Controller) *state.MockChain {
 					s := state.NewMockChain(ctrl)
@@ -1416,13 +1400,13 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 			expectedErr: errUTXOOutTypeOrAmtMissmatch,
 		},
 		"Insufficient amount to cover burn fees (deposit not expired)": {
-			handlerState: noMsigState,
 			args: args{
 				state: func(ctrl *gomock.Controller) *state.MockChain {
 					s := state.NewMockChain(ctrl)
 					s.EXPECT().GetTimestamp().Return(depositNotExpiredTime)
 					s.EXPECT().GetDeposit(depositTxID1).Return(deposit1, nil).Times(2)
 					s.EXPECT().GetDepositOffer(deposit1.DepositOfferID).Return(depositOffer, nil)
+					s.EXPECT().GetMultisigAlias(owner1.Addrs[0]).Return(nil, database.ErrNotFound)
 					return s
 				},
 				tx: tx,
@@ -1439,13 +1423,13 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 			expectedErr: errNotBurnedEnough,
 		},
 		"Unlocked more deposited tokens than available (deposit not expired)": {
-			handlerState: noMsigState,
 			args: args{
 				state: func(ctrl *gomock.Controller) *state.MockChain {
 					s := state.NewMockChain(ctrl)
 					s.EXPECT().GetTimestamp().Return(depositNotExpiredTime)
 					s.EXPECT().GetDeposit(depositTxID1).Return(deposit1, nil).Times(2)
 					s.EXPECT().GetDepositOffer(deposit1.DepositOfferID).Return(depositOffer, nil)
+					s.EXPECT().GetMultisigAlias(owner1.Addrs[0]).Return(nil, database.ErrNotFound)
 					return s
 				},
 				tx: tx,
@@ -1462,12 +1446,12 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 			expectedErr: errUnlockedMoreThanAvailable,
 		},
 		"Produces outputs exceed inputs (deposit expired)": {
-			handlerState: noMsigState,
 			args: args{
 				state: func(ctrl *gomock.Controller) *state.MockChain {
 					s := state.NewMockChain(ctrl)
 					s.EXPECT().GetDeposit(depositTxID1).Return(deposit1, nil)
 					s.EXPECT().GetTimestamp().Return(depositExpiredTime)
+					s.EXPECT().GetMultisigAlias(owner1.Addrs[0]).Return(nil, database.ErrNotFound)
 					return s
 				},
 				tx: tx,
@@ -1487,12 +1471,12 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 			expectedErr: errWrongProducedAmount,
 		},
 		"Consumed-produced amount mismatch": {
-			handlerState: noMsigState,
 			args: args{
 				state: func(ctrl *gomock.Controller) *state.MockChain {
 					s := state.NewMockChain(ctrl)
 					s.EXPECT().GetDeposit(depositTxID1).Return(deposit1, nil)
 					s.EXPECT().GetTimestamp().Return(depositNotExpiredTime)
+					s.EXPECT().GetMultisigAlias(owner1.Addrs[0]).Return(nil, database.ErrNotFound)
 					return s
 				},
 				tx: tx,
@@ -1512,13 +1496,13 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 			expectedErr: errWrongProducedAmount,
 		},
 		"Partially consumed deposited amount (deposit expired)": {
-			handlerState: noMsigState,
 			args: args{
 				state: func(ctrl *gomock.Controller) *state.MockChain {
 					s := state.NewMockChain(ctrl)
 					s.EXPECT().GetTimestamp().Return(depositExpiredTime)
 					s.EXPECT().GetDeposit(depositTxID1).Return(deposit1, nil).Times(2)
 					s.EXPECT().GetDepositOffer(deposit1.DepositOfferID).Return(depositOffer, nil)
+					s.EXPECT().GetMultisigAlias(owner1.Addrs[0]).Return(nil, database.ErrNotFound)
 					return s
 				},
 				tx: tx,
@@ -1538,7 +1522,6 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 			expectedErr: errNotConsumedDeposit,
 		},
 		"Success (expired deposit)": {
-			handlerState: noMsigState,
 			args: args{
 				state: func(ctrl *gomock.Controller) *state.MockChain {
 					s := state.NewMockChain(ctrl)
@@ -1561,13 +1544,13 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 			expectedUnlockedAmount: map[ids.ID]uint64{depositTxID1: deposit1.Amount},
 		},
 		"Success (not expired deposit)": {
-			handlerState: noMsigState,
 			args: args{
 				state: func(ctrl *gomock.Controller) *state.MockChain {
 					s := state.NewMockChain(ctrl)
 					s.EXPECT().GetTimestamp().Return(depositNotExpiredTime)
 					s.EXPECT().GetDeposit(depositTxID1).Return(deposit1, nil).Times(2)
 					s.EXPECT().GetDepositOffer(deposit1.DepositOfferID).Return(depositOffer, nil)
+					s.EXPECT().GetMultisigAlias(owner1.Addrs[0]).Return(nil, database.ErrNotFound)
 					return s
 				},
 				tx: tx,
@@ -1584,13 +1567,13 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 			expectedUnlockedAmount: map[ids.ID]uint64{depositTxID1: unlockableAmount},
 		},
 		"Success (not expired deposit), burn fee": {
-			handlerState: noMsigState,
 			args: args{
 				state: func(ctrl *gomock.Controller) *state.MockChain {
 					s := state.NewMockChain(ctrl)
 					s.EXPECT().GetTimestamp().Return(depositNotExpiredTime)
 					s.EXPECT().GetDeposit(depositTxID1).Return(deposit1, nil).Times(2)
 					s.EXPECT().GetDepositOffer(deposit1.DepositOfferID).Return(depositOffer, nil)
+					s.EXPECT().GetMultisigAlias(owner1.Addrs[0]).Return(nil, database.ErrNotFound).Times(2)
 					return s
 				},
 				tx: tx,
@@ -1613,7 +1596,7 @@ func TestVerifyUnlockDepositedUTXOs(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
-			unlockedAmount, err := defaultCaminoHandler(t, tt.handlerState(ctrl)).VerifyUnlockDepositedUTXOs(
+			unlockedAmount, err := defaultCaminoHandler(t).VerifyUnlockDepositedUTXOs(
 				tt.args.state(ctrl),
 				tt.args.tx,
 				tt.args.utxos,

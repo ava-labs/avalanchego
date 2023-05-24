@@ -1,16 +1,16 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avm
 
 import (
-	"container/list"
 	"context"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
 )
@@ -33,7 +33,10 @@ func setupWS(t *testing.T, isAVAXAsset bool) ([]byte, *VM, *WalletService, *atom
 		genesisTx = GetCreateTxFromGenesisTest(t, genesisBytes, feeAssetName)
 	}
 
-	ws := &WalletService{vm: vm, pendingTxMap: make(map[ids.ID]*list.Element), pendingTxOrdering: list.New()}
+	ws := &WalletService{
+		vm:         vm,
+		pendingTxs: linkedhashmap.New[ids.ID, *txs.Tx](),
+	}
 	return genesisBytes, vm, ws, m, genesisTx
 }
 

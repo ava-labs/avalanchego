@@ -59,7 +59,7 @@ func TestGetMultisigAlias(t *testing.T) {
 		},
 		"Fail: msig alias in cache, but removed": {
 			caminoState: func(c *gomock.Controller) *caminoState {
-				cache := cache.NewMockCacher(c)
+				cache := cache.NewMockCacher[ids.ShortID, *multisig.AliasWithNonce](c)
 				cache.EXPECT().Get(multisigAlias.ID).Return(nil, true)
 				return &caminoState{
 					multisigAliasesCache: cache,
@@ -77,7 +77,7 @@ func TestGetMultisigAlias(t *testing.T) {
 		},
 		"Fail: not found in db": {
 			caminoState: func(c *gomock.Controller) *caminoState {
-				cache := cache.NewMockCacher(c)
+				cache := cache.NewMockCacher[ids.ShortID, *multisig.AliasWithNonce](c)
 				cache.EXPECT().Get(multisigAlias.ID).Return(nil, false)
 				cache.EXPECT().Put(multisigAlias.ID, nil)
 				db := database.NewMockDatabase(c)
@@ -118,7 +118,7 @@ func TestGetMultisigAlias(t *testing.T) {
 		},
 		"OK: msig alias in cache": {
 			caminoState: func(c *gomock.Controller) *caminoState {
-				cache := cache.NewMockCacher(c)
+				cache := cache.NewMockCacher[ids.ShortID, *multisig.AliasWithNonce](c)
 				cache.EXPECT().Get(multisigAlias.ID).Return(multisigAlias, true)
 				return &caminoState{
 					multisigAliasesCache: cache,
@@ -136,7 +136,7 @@ func TestGetMultisigAlias(t *testing.T) {
 		},
 		"OK: msig alias in db": {
 			caminoState: func(c *gomock.Controller) *caminoState {
-				cache := cache.NewMockCacher(c)
+				cache := cache.NewMockCacher[ids.ShortID, *multisig.AliasWithNonce](c)
 				cache.EXPECT().Get(multisigAlias.ID).Return(nil, false)
 				cache.EXPECT().Put(multisigAlias.ID, multisigAlias)
 				db := database.NewMockDatabase(c)
@@ -159,7 +159,7 @@ func TestGetMultisigAlias(t *testing.T) {
 		},
 		"Fail: db error": {
 			caminoState: func(c *gomock.Controller) *caminoState {
-				cache := cache.NewMockCacher(c)
+				cache := cache.NewMockCacher[ids.ShortID, *multisig.AliasWithNonce](c)
 				cache.EXPECT().Get(multisigAlias.ID).Return(nil, false)
 				db := database.NewMockDatabase(c)
 				db.EXPECT().Get(multisigAlias.ID[:]).Return(nil, testError)
@@ -203,7 +203,7 @@ func TestSetMultisigAlias(t *testing.T) {
 	}{
 		"OK": {
 			caminoState: func(c *gomock.Controller) *caminoState {
-				cache := cache.NewMockCacher(c)
+				cache := cache.NewMockCacher[ids.ShortID, *multisig.AliasWithNonce](c)
 				cache.EXPECT().Evict(multisigAlias.ID)
 				return &caminoState{
 					multisigAliasesCache: cache,

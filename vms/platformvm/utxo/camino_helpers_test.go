@@ -10,13 +10,13 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
+	"github.com/ava-labs/avalanchego/vms/platformvm/caminoconfig"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
@@ -49,7 +50,7 @@ var (
 	defaultValidateStartTime  = defaultGenesisTime
 	defaultValidateEndTime    = defaultValidateStartTime.Add(10 * defaultMinStakingDuration)
 	defaultCaminoBalance      = 100 * defaultCaminoValidatorWeight
-	preFundedKeys             = crypto.BuildTestKeys()
+	preFundedKeys             = secp256k1.TestKeys()
 	defaultTxFee              = uint64(100)
 )
 
@@ -58,7 +59,7 @@ func defaultConfig() *config.Config {
 	primaryVdrs := validators.NewSet()
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 	return &config.Config{
-		Chains:                 chains.MockManager{},
+		Chains:                 chains.TestManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		Validators:             vdrs,
 		TxFee:                  defaultTxFee,
@@ -78,7 +79,7 @@ func defaultConfig() *config.Config {
 		ApricotPhase3Time: defaultValidateEndTime,
 		ApricotPhase5Time: defaultValidateEndTime,
 		BanffTime:         mockable.MaxTime,
-		CaminoConfig: config.CaminoConfig{
+		CaminoConfig: caminoconfig.Config{
 			DaoProposalBondAmount: 100 * units.Avax,
 		},
 	}
@@ -164,6 +165,7 @@ func defaultState(
 		ctx,
 		metrics.Noop,
 		rewards,
+		&utils.Atomic[bool]{},
 	)
 	if err != nil {
 		panic(err)
@@ -337,7 +339,7 @@ func generateTestStakeableOut(assetID ids.ID, amount, locktime uint64, outputOwn
 func generateOwnersAndSig(tx txs.UnsignedTx) (secp256k1fx.OutputOwners, *secp256k1fx.Credential) {
 	txHash := hashing.ComputeHash256(tx.Bytes())
 
-	cryptFactory := crypto.FactorySECP256K1R{}
+	cryptFactory := secp256k1.Factory{}
 	key, err := cryptFactory.NewPrivateKey()
 	if err != nil {
 		panic(err)
@@ -353,13 +355,13 @@ func generateOwnersAndSig(tx txs.UnsignedTx) (secp256k1fx.OutputOwners, *secp256
 	if err != nil {
 		panic(err)
 	}
-	cred := &secp256k1fx.Credential{Sigs: make([][crypto.SECP256K1RSigLen]byte, 1)}
+	cred := &secp256k1fx.Credential{Sigs: make([][secp256k1.SignatureLen]byte, 1)}
 	copy(cred.Sigs[0][:], sig)
 
 	return outputOwners, cred
 }
 
-func defaultCaminoHandler(t *testing.T, state avax.UTXOReader) *caminoHandler {
+func defaultCaminoHandler(t *testing.T) *caminoHandler {
 	fx := &secp256k1fx.Fx{}
 
 	err := fx.InitializeVM(&secp256k1fx.TestVM{})
@@ -368,19 +370,11 @@ func defaultCaminoHandler(t *testing.T, state avax.UTXOReader) *caminoHandler {
 	err = fx.Bootstrapped()
 	require.NoError(t, err)
 
-	if state == nil {
-		state = avax.NewUTXOState(
-			memdb.New(),
-			txs.Codec,
-		)
-	}
-
 	return &caminoHandler{
 		handler: handler{
-			ctx:         snow.DefaultContextTest(),
-			clk:         &mockable.Clock{},
-			utxosReader: state,
-			fx:          fx,
+			ctx: snow.DefaultContextTest(),
+			clk: &mockable.Clock{},
+			fx:  fx,
 		},
 		lockModeBondDeposit: true,
 	}

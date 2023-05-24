@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package peer
@@ -11,9 +11,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
+	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/utils/logging"
-
-	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
 )
 
 func TestMessageQueue(t *testing.T) {
@@ -37,7 +36,7 @@ func TestMessageQueue(t *testing.T) {
 		testID := ids.GenerateTestID()
 		testID2 := ids.GenerateTestID()
 		m, err := mc.Pong(uint32(i),
-			[]*p2ppb.SubnetUptime{
+			[]*p2p.SubnetUptime{
 				{SubnetId: testID[:], Uptime: uint32(i)},
 				{SubnetId: testID2[:], Uptime: uint32(i)},
 			})

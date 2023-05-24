@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
@@ -20,6 +20,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/version"
 )
+
+var errUnknownTx = errors.New("unknown tx")
 
 func newTestSerializer(t *testing.T, parse func(context.Context, []byte) (snowstorm.Tx, error)) *Serializer {
 	vm := vertex.TestVM{}
@@ -309,7 +311,7 @@ func TestParseVertexWithIncorrectChainID(t *testing.T) {
 		if bytes.Equal(b, []byte{1}) {
 			return &snowstorm.TestTx{}, nil
 		}
-		return nil, errors.New("invalid tx")
+		return nil, errUnknownTx
 	})
 
 	if _, err := s.ParseVtx(context.Background(), vtxBytes); err == nil {
@@ -332,12 +334,10 @@ func TestParseVertexWithInvalidTxs(t *testing.T) {
 
 	s := newTestSerializer(t, func(_ context.Context, b []byte) (snowstorm.Tx, error) {
 		switch {
-		case bytes.Equal(b, []byte{1}):
-			return nil, errors.New("invalid tx")
 		case bytes.Equal(b, []byte{2}):
 			return &snowstorm.TestTx{}, nil
 		default:
-			return nil, errors.New("invalid tx")
+			return nil, errUnknownTx
 		}
 	})
 
@@ -605,11 +605,11 @@ func TestStopVertexVerifyNotAllowedTimestamp(t *testing.T) {
 
 	_, parseTx := generateTestTxs('a')
 	ts := newTestSerializer(t, parseTx)
-	ts.XChainMigrationTime = version.XChainMigrationDefaultTime
+	ts.CortinaTime = version.CortinaDefaultTime
 
 	svtx := newTestUniqueVertex(t, ts, nil, nil, true)
 	svtx.time = func() time.Time {
-		return version.XChainMigrationDefaultTime.Add(-time.Second)
+		return version.CortinaDefaultTime.Add(-time.Second)
 	}
 
 	if verr := svtx.Verify(context.Background()); !errors.Is(verr, errStopVertexNotAllowedTimestamp) {
@@ -667,7 +667,7 @@ func generateTestTxs(idSlice ...byte) ([]snowstorm.Tx, func(context.Context, []b
 	parseTx := func(_ context.Context, b []byte) (snowstorm.Tx, error) {
 		tx, ok := bytesToTx[string(b)]
 		if !ok {
-			return nil, errors.New("unknown tx bytes")
+			return nil, errUnknownTx
 		}
 		return tx, nil
 	}

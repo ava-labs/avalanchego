@@ -1,4 +1,14 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2023, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package api
@@ -70,6 +80,12 @@ type GetBlockArgs struct {
 	Encoding formatting.Encoding `json:"encoding"`
 }
 
+// GetBlockByHeightArgs is the parameters supplied to the GetBlockByHeight API
+type GetBlockByHeightArgs struct {
+	Height   uint64              `json:"height"`
+	Encoding formatting.Encoding `json:"encoding"`
+}
+
 // GetBlockResponse is the response object for the GetBlock API.
 type GetBlockResponse struct {
 	Block interface{} `json:"block"`
@@ -78,6 +94,10 @@ type GetBlockResponse struct {
 	// If GetBlockResponse.Encoding is formatting.JSON, GetBlockResponse.Block
 	// is the actual block returned as a JSON.
 	Encoding formatting.Encoding `json:"encoding"`
+}
+
+type GetHeightResponse struct {
+	Height json.Uint64 `json:"height"`
 }
 
 // FormattedBlock defines a JSON formatted struct containing a block in Hex

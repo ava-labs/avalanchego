@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package chain
@@ -21,7 +21,14 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
-var _ Block = (*TestBlock)(nil)
+var (
+	_ Block = (*TestBlock)(nil)
+
+	errCantBuildBlock = errors.New("can't build new block")
+	errVerify         = errors.New("verify failed")
+	errAccept         = errors.New("accept failed")
+	errReject         = errors.New("reject failed")
+)
 
 type TestBlock struct {
 	*snowman.TestBlock
@@ -122,7 +129,7 @@ func createInternalBlockFuncs(t *testing.T, blks []*TestBlock) (
 }
 
 func cantBuildBlock(context.Context) (snowman.Block, error) {
-	return nil, errors.New("can't build new block")
+	return nil, errCantBuildBlock
 }
 
 // checkProcessingBlock checks that [blk] is of the correct type and is
@@ -399,11 +406,11 @@ func TestStateDecideBlock(t *testing.T) {
 	genesisBlock := testBlks[0]
 	genesisBlock.SetStatus(choices.Accepted)
 	badAcceptBlk := testBlks[1]
-	badAcceptBlk.AcceptV = errors.New("this block should fail on Accept")
+	badAcceptBlk.AcceptV = errAccept
 	badVerifyBlk := testBlks[2]
-	badVerifyBlk.VerifyV = errors.New("this block should fail verification")
+	badVerifyBlk.VerifyV = errVerify
 	badRejectBlk := testBlks[3]
-	badRejectBlk.RejectV = errors.New("this block should fail on reject")
+	badRejectBlk.RejectV = errReject
 	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
 	chainState := NewState(&Config{
 		DecidedCacheSize:    2,
@@ -684,7 +691,7 @@ func TestStateBytesToIDCache(t *testing.T) {
 	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
 	buildBlock := func(context.Context) (snowman.Block, error) {
 		t.Fatal("shouldn't have been called")
-		return nil, errors.New("")
+		return nil, nil
 	}
 
 	chainState := NewState(&Config{
@@ -886,4 +893,45 @@ func TestStateParseTransitivelyAcceptedBlock(t *testing.T) {
 	if blk1.Height() != parsedBlk1.Height() {
 		t.Fatalf("Parsed blk1 reported incorrect height. Expected %d got %d", blk1.Height(), parsedBlk1.Height())
 	}
+}
+
+func TestIsProcessing(t *testing.T) {
+	testBlks := NewTestBlocks(2)
+	genesisBlock := testBlks[0]
+	genesisBlock.SetStatus(choices.Accepted)
+	blk1 := testBlks[1]
+
+	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
+	chainState := NewState(&Config{
+		DecidedCacheSize:    2,
+		MissingCacheSize:    2,
+		UnverifiedCacheSize: 2,
+		BytesToIDCacheSize:  2,
+		LastAcceptedBlock:   genesisBlock,
+		GetBlock:            getBlock,
+		UnmarshalBlock:      parseBlock,
+		BuildBlock:          cantBuildBlock,
+		GetBlockIDAtHeight:  getCanonicalBlockID,
+	})
+
+	// Parse blk1
+	parsedBlk1, err := chainState.ParseBlock(context.Background(), blk1.Bytes())
+	require.NoError(t, err)
+
+	// Check that it is not processing in consensus
+	require.False(t, chainState.IsProcessing(parsedBlk1.ID()))
+
+	// Verify blk1
+	err = parsedBlk1.Verify(context.Background())
+	require.NoError(t, err)
+
+	// Check that it is processing in consensus
+	require.True(t, chainState.IsProcessing(parsedBlk1.ID()))
+
+	// Accept blk1
+	err = parsedBlk1.Accept(context.Background())
+	require.NoError(t, err)
+
+	// Check that it is no longer processing in consensus
+	require.False(t, chainState.IsProcessing(parsedBlk1.ID()))
 }

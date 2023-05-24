@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package syncer
@@ -23,6 +23,12 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 
 	safeMath "github.com/ava-labs/avalanchego/utils/math"
+)
+
+var (
+	errInvalidSummary = errors.New("invalid summary")
+	errEmptySummary   = errors.New("empty summary")
+	errUnknownSummary = errors.New("unknown summary")
 )
 
 func TestStateSyncerIsEnabledIfVMSupportsStateSyncing(t *testing.T) {
@@ -102,7 +108,6 @@ func TestStateSyncingStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 
 	commonCfg := common.Config{
 		Ctx:            snow.DefaultConsensusContextTest(),
-		Validators:     vdrs,
 		Beacons:        vdrs,
 		SampleK:        vdrs.Len(),
 		Alpha:          alpha,
@@ -392,7 +397,7 @@ func TestMalformedStateSummaryFrontiersAreDropped(t *testing.T) {
 	fullVM.CantParseStateSummary = true
 	fullVM.ParseStateSummaryF = func(context.Context, []byte) (block.StateSummary, error) {
 		isSummaryDecoded = true
-		return nil, errors.New("invalid state summary")
+		return nil, errInvalidSummary
 	}
 
 	// pick one of the vdrs that have been reached out
@@ -465,7 +470,7 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 	fullVM.CantParseStateSummary = true
 	fullVM.ParseStateSummaryF = func(_ context.Context, summaryBytes []byte) (block.StateSummary, error) {
 		require.Empty(summaryBytes)
-		return nil, errors.New("empty summary")
+		return nil, errEmptySummary
 	}
 
 	// assume timeout is reached and vdrs is marked as unresponsive
@@ -548,9 +553,9 @@ func TestStateSyncIsRestartedIfTooManyFrontierSeedersTimeout(t *testing.T) {
 				BytesV:  summaryBytes,
 			}, nil
 		case bytes.Equal(b, nil):
-			return nil, errors.New("Empty Summary")
+			return nil, errEmptySummary
 		default:
-			return nil, errors.New("unexpected Summary")
+			return nil, errUnknownSummary
 		}
 	}
 
@@ -951,7 +956,7 @@ func TestStateSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 		case bytes.Equal(b, minoritySummaryBytes):
 			return minoritySummary, nil
 		default:
-			return nil, errors.New("unknown state summary")
+			return nil, errUnknownSummary
 		}
 	}
 
@@ -999,13 +1004,13 @@ func TestStateSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 
 	majoritySummaryCalled := false
 	minoritySummaryCalled := false
-	summary.AcceptF = func(context.Context) (bool, error) {
+	summary.AcceptF = func(context.Context) (block.StateSyncMode, error) {
 		majoritySummaryCalled = true
-		return true, nil
+		return block.StateSyncStatic, nil
 	}
-	minoritySummary.AcceptF = func(context.Context) (bool, error) {
+	minoritySummary.AcceptF = func(context.Context) (block.StateSyncMode, error) {
 		minoritySummaryCalled = true
-		return true, nil
+		return block.StateSyncStatic, nil
 	}
 
 	// let a majority of voters return summaryID, and a minority return minoritySummaryID. The rest timeout.
@@ -1120,9 +1125,9 @@ func TestVotingIsRestartedIfMajorityIsNotReachedDueToTimeouts(t *testing.T) {
 	require.False(syncer.pendingSeeders.Len() != 0)
 
 	minoritySummaryCalled := false
-	minoritySummary.AcceptF = func(context.Context) (bool, error) {
+	minoritySummary.AcceptF = func(context.Context) (block.StateSyncMode, error) {
 		minoritySummaryCalled = true
-		return true, nil
+		return block.StateSyncStatic, nil
 	}
 
 	// Let a majority of voters timeout.
@@ -1208,7 +1213,7 @@ func TestStateSyncIsStoppedIfEnoughVotesAreCastedWithNoClearMajority(t *testing.
 		case bytes.Equal(b, minoritySummaryBytes):
 			return minoritySummary2, nil
 		default:
-			return nil, errors.New("unknown state summary")
+			return nil, errUnknownSummary
 		}
 	}
 
@@ -1256,13 +1261,13 @@ func TestStateSyncIsStoppedIfEnoughVotesAreCastedWithNoClearMajority(t *testing.
 
 	majoritySummaryCalled := false
 	minoritySummaryCalled := false
-	minoritySummary1.AcceptF = func(context.Context) (bool, error) {
+	minoritySummary1.AcceptF = func(context.Context) (block.StateSyncMode, error) {
 		majoritySummaryCalled = true
-		return true, nil
+		return block.StateSyncStatic, nil
 	}
-	minoritySummary2.AcceptF = func(context.Context) (bool, error) {
+	minoritySummary2.AcceptF = func(context.Context) (block.StateSyncMode, error) {
 		minoritySummaryCalled = true
-		return true, nil
+		return block.StateSyncStatic, nil
 	}
 
 	stateSyncFullyDone := false

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package handler
@@ -16,10 +16,13 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
+	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
+
+const engineType = p2p.EngineType_ENGINE_TYPE_SNOWMAN
 
 func TestQueue(t *testing.T) {
 	ctrl := gomock.NewController(t)
@@ -37,13 +40,17 @@ func TestQueue(t *testing.T) {
 	currentTime := time.Now()
 	u.clock.Set(currentTime)
 
-	msg1 := message.InboundPullQuery(
-		ids.Empty,
-		0,
-		time.Second,
-		ids.GenerateTestID(),
-		vdr1ID,
-	)
+	msg1 := Message{
+		InboundMessage: message.InboundPullQuery(
+			ids.Empty,
+			0,
+			time.Second,
+			ids.GenerateTestID(),
+			vdr1ID,
+			engineType,
+		),
+		EngineType: engineType,
+	}
 
 	// Push then pop should work regardless of usage when there are no other
 	// messages on [u.msgs]
@@ -92,13 +99,17 @@ func TestQueue(t *testing.T) {
 	require.EqualValues(1, u.nodeToUnprocessedMsgs[vdr1ID])
 	require.EqualValues(1, u.Len())
 
-	msg2 := message.InboundPullQuery(
-		ids.Empty,
-		0,
-		time.Second,
-		ids.GenerateTestID(),
-		vdr2ID,
-	)
+	msg2 := Message{
+		InboundMessage: message.InboundPullQuery(
+			ids.Empty,
+			0,
+			time.Second,
+			ids.GenerateTestID(),
+			vdr2ID,
+			engineType,
+		),
+		EngineType: engineType,
+	}
 
 	// Push msg2 from vdr2ID
 	u.Push(context.Background(), msg2)
@@ -121,8 +132,14 @@ func TestQueue(t *testing.T) {
 	// u is now empty
 	// Non-validators should be able to put messages onto [u]
 	nonVdrNodeID1, nonVdrNodeID2 := ids.GenerateTestNodeID(), ids.GenerateTestNodeID()
-	msg3 := message.InboundPullQuery(ids.Empty, 0, 0, ids.Empty, nonVdrNodeID1)
-	msg4 := message.InboundPushQuery(ids.Empty, 0, 0, nil, nonVdrNodeID2)
+	msg3 := Message{
+		InboundMessage: message.InboundPullQuery(ids.Empty, 0, 0, ids.Empty, nonVdrNodeID1, engineType),
+		EngineType:     engineType,
+	}
+	msg4 := Message{
+		InboundMessage: message.InboundPushQuery(ids.Empty, 0, 0, nil, nonVdrNodeID2, engineType),
+		EngineType:     engineType,
+	}
 	u.Push(context.Background(), msg3)
 	u.Push(context.Background(), msg4)
 	u.Push(context.Background(), msg1)

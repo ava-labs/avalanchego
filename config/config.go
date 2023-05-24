@@ -8,12 +8,13 @@
 //
 // Much love to the original authors for their work.
 // **********************************************************
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package config
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
@@ -29,7 +30,7 @@ import (
 
 	"github.com/spf13/viper"
 
-	"github.com/ava-labs/avalanchego/app/runner"
+	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
@@ -43,9 +44,9 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
-	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
@@ -58,16 +59,15 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/storage"
 	"github.com/ava-labs/avalanchego/utils/timer"
-	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/proposervm"
 )
 
 const (
-	pluginsDirName       = "plugins"
 	chainConfigFileName  = "config"
 	chainUpgradeFileName = "upgrade"
 	subnetConfigFileExt  = ".json"
+	ipResolutionTimeout  = 30 * time.Second
 )
 
 var (
@@ -84,56 +84,13 @@ var (
 	errStakeMaxConsumptionTooLarge   = fmt.Errorf("max stake consumption must be less than or equal to %d", reward.PercentDenominator)
 	errStakeMaxConsumptionBelowMin   = errors.New("stake max consumption can't be less than min stake consumption")
 	errStakeMintingPeriodBelowMin    = errors.New("stake minting period can't be less than max stake duration")
-	errCannotWhitelistPrimaryNetwork = errors.New("cannot whitelist primary network")
+	errCannotTrackPrimaryNetwork     = errors.New("cannot track primary network")
 	errStakingKeyContentUnset        = fmt.Errorf("%s key not set but %s set", StakingTLSKeyContentKey, StakingCertContentKey)
 	errStakingCertContentUnset       = fmt.Errorf("%s key set but %s not set", StakingTLSKeyContentKey, StakingCertContentKey)
+	errMissingStakingSigningKeyFile  = errors.New("missing staking signing key file")
 	errTracingEndpointEmpty          = fmt.Errorf("%s cannot be empty", TracingEndpointKey)
+	errPluginDirNotADirectory        = errors.New("plugin dir is not a directory")
 )
-
-func GetRunnerConfig(v *viper.Viper) (runner.Config, error) {
-	config := runner.Config{
-		DisplayVersionAndExit: v.GetBool(VersionKey),
-		BuildDir:              GetExpandedArg(v, BuildDirKey),
-		PluginMode:            v.GetBool(PluginModeKey),
-	}
-
-	// Build directory should have this structure:
-	//
-	// build
-	// ├── avalanchego (the binary from compiling the app directory)
-	// └── plugins
-	//     └── evm
-	validBuildDir := func(dir string) bool {
-		info, err := os.Stat(dir)
-		if err != nil || !info.IsDir() {
-			return false
-		}
-
-		// make sure the expected subdirectory exists
-		_, err = os.Stat(filepath.Join(dir, pluginsDirName))
-		return err == nil
-	}
-	if validBuildDir(config.BuildDir) {
-		return config, nil
-	}
-
-	foundBuildDir := false
-	for _, dir := range defaultBuildDirs {
-		dir = GetExpandedString(v, dir)
-		if validBuildDir(dir) {
-			config.BuildDir = dir
-			foundBuildDir = true
-			break
-		}
-	}
-	if !foundBuildDir {
-		return runner.Config{}, fmt.Errorf(
-			"couldn't find valid build directory in any of the default locations: %s",
-			defaultBuildDirs,
-		)
-	}
-	return config, nil
-}
 
 func getConsensusConfig(v *viper.Viper) avalanche.Parameters {
 	return avalanche.Parameters{
@@ -256,6 +213,12 @@ func getHTTPConfig(v *viper.Viper) (node.HTTPConfig, error) {
 	}
 
 	config := node.HTTPConfig{
+		HTTPConfig: server.HTTPConfig{
+			ReadTimeout:       v.GetDuration(HTTPReadTimeoutKey),
+			ReadHeaderTimeout: v.GetDuration(HTTPReadHeaderTimeoutKey),
+			WriteTimeout:      v.GetDuration(HTTPWriteTimeoutKey),
+			IdleTimeout:       v.GetDuration(HTTPIdleTimeoutKey),
+		},
 		APIConfig: node.APIConfig{
 			APIIndexerConfig: node.APIIndexerConfig{
 				IndexAPIEnabled:      v.GetBool(IndexEnabledKey),
@@ -273,9 +236,8 @@ func getHTTPConfig(v *viper.Viper) (node.HTTPConfig, error) {
 		HTTPSKey:          httpsKey,
 		HTTPSCert:         httpsCert,
 		APIAllowedOrigins: v.GetStringSlice(HTTPAllowedOrigins),
-
-		ShutdownTimeout: v.GetDuration(HTTPShutdownTimeoutKey),
-		ShutdownWait:    v.GetDuration(HTTPShutdownWaitKey),
+		ShutdownTimeout:   v.GetDuration(HTTPShutdownTimeoutKey),
+		ShutdownWait:      v.GetDuration(HTTPShutdownWaitKey),
 	}
 
 	config.APIAuthConfig, err = getAPIAuthConfig(v)
@@ -329,8 +291,8 @@ func getAdaptiveTimeoutConfig(v *viper.Viper) (timer.AdaptiveTimeoutConfig, erro
 	return config, nil
 }
 
-func getGossipConfig(v *viper.Viper) sender.GossipConfig {
-	return sender.GossipConfig{
+func getGossipConfig(v *viper.Viper) subnets.GossipConfig {
+	return subnets.GossipConfig{
 		AcceptedFrontierValidatorSize:    uint(v.GetUint32(ConsensusGossipAcceptedFrontierValidatorSizeKey)),
 		AcceptedFrontierNonValidatorSize: uint(v.GetUint32(ConsensusGossipAcceptedFrontierNonValidatorSizeKey)),
 		AcceptedFrontierPeerSize:         uint(v.GetUint32(ConsensusGossipAcceptedFrontierPeerSizeKey)),
@@ -343,7 +305,7 @@ func getGossipConfig(v *viper.Viper) sender.GossipConfig {
 	}
 }
 
-func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, error) {
+func getNetworkConfig(v *viper.Viper, stakingEnabled bool, halflife time.Duration) (network.Config, error) {
 	// Set the max number of recent inbound connections upgraded to be
 	// equal to the max number of inbound connections per second.
 	maxInboundConnsPerSec := v.GetFloat64(InboundThrottlerMaxConnsPerSecKey)
@@ -386,6 +348,7 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 		},
 
 		HealthConfig: network.HealthConfig{
+			Enabled:                      stakingEnabled,
 			MaxTimeSinceMsgSent:          v.GetDuration(NetworkHealthMaxTimeSinceMsgSentKey),
 			MaxTimeSinceMsgReceived:      v.GetDuration(NetworkHealthMaxTimeSinceMsgReceivedKey),
 			MaxPortionSendQueueBytesFull: v.GetFloat64(NetworkHealthMaxPortionSendQueueFillKey),
@@ -393,6 +356,9 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 			MaxSendFailRate:              v.GetFloat64(NetworkHealthMaxSendFailRateKey),
 			SendFailRateHalflife:         halflife,
 		},
+
+		ProxyEnabled:           v.GetBool(NetworkTCPProxyEnabledKey),
+		ProxyReadHeaderTimeout: v.GetDuration(NetworkTCPProxyReadTimeoutKey),
 
 		DialerConfig: dialer.Config{
 			ThrottleRps:       v.GetUint32(OutboundConnectionThrottlingRpsKey),
@@ -464,7 +430,9 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 	return config, nil
 }
 
-func getBenchlistConfig(v *viper.Viper, alpha, k int) (benchlist.Config, error) {
+func getBenchlistConfig(v *viper.Viper, consensusParameters avalanche.Parameters) (benchlist.Config, error) {
+	alpha := consensusParameters.Alpha
+	k := consensusParameters.K
 	config := benchlist.Config{
 		Threshold:              v.GetInt(BenchlistFailThresholdKey),
 		Duration:               v.GetDuration(BenchlistDurationKey),
@@ -609,7 +577,9 @@ func getIPConfig(v *viper.Viper) (node.IPConfig, error) {
 		}
 
 		// Use that to resolve our public IP.
-		ip, err := resolver.Resolve()
+		ctx, cancel := context.WithTimeout(context.Background(), ipResolutionTimeout)
+		defer cancel()
+		ip, err := resolver.Resolve(ctx)
 		if err != nil {
 			return node.IPConfig{}, fmt.Errorf("couldn't resolve public IP: %w", err)
 		}
@@ -763,7 +733,7 @@ func getStakingSigner(v *viper.Viper) (*bls.SecretKey, error) {
 	}
 
 	if v.IsSet(StakingSignerKeyPathKey) {
-		return nil, errors.New("missing staking signing key file")
+		return nil, errMissingStakingSigningKeyFile
 	}
 
 	key, err := bls.NewSecretKey()
@@ -864,17 +834,17 @@ func getTxFeeConfig(v *viper.Viper, networkID uint32) genesis.TxFeeConfig {
 	return genesis.GetTxFeeConfig(networkID)
 }
 
-func getGenesisData(v *viper.Viper, networkID uint32) ([]byte, ids.ID, error) {
+func getGenesisData(v *viper.Viper, networkID uint32, stakingCfg *genesis.StakingConfig) ([]byte, ids.ID, error) {
 	// try first loading genesis content directly from flag/env-var
 	if v.IsSet(GenesisConfigContentKey) {
 		genesisData := v.GetString(GenesisConfigContentKey)
-		return genesis.FromFlag(networkID, genesisData)
+		return genesis.FromFlag(networkID, genesisData, stakingCfg)
 	}
 
 	// if content is not specified go for the file
 	if v.IsSet(GenesisConfigFileKey) {
 		genesisFileName := GetExpandedArg(v, GenesisConfigFileKey)
-		return genesis.FromFile(networkID, genesisFileName)
+		return genesis.FromFile(networkID, genesisFileName, stakingCfg)
 	}
 
 	// finally if file is not specified/readable go for the predefined config
@@ -882,9 +852,11 @@ func getGenesisData(v *viper.Viper, networkID uint32) ([]byte, ids.ID, error) {
 	return genesis.FromConfig(config)
 }
 
-func getWhitelistedSubnets(v *viper.Viper) (set.Set[ids.ID], error) {
-	whitelistedSubnetIDs := set.Set[ids.ID]{}
-	for _, subnet := range strings.Split(v.GetString(WhitelistedSubnetsKey), ",") {
+func getTrackedSubnets(v *viper.Viper) (set.Set[ids.ID], error) {
+	trackSubnetsStr := v.GetString(TrackSubnetsKey)
+	trackSubnetsStrs := strings.Split(trackSubnetsStr, ",")
+	trackedSubnetIDs := set.NewSet[ids.ID](len(trackSubnetsStrs))
+	for _, subnet := range trackSubnetsStrs {
 		if subnet == "" {
 			continue
 		}
@@ -893,11 +865,11 @@ func getWhitelistedSubnets(v *viper.Viper) (set.Set[ids.ID], error) {
 			return nil, fmt.Errorf("couldn't parse subnetID %q: %w", subnet, err)
 		}
 		if subnetID == constants.PrimaryNetworkID {
-			return nil, errCannotWhitelistPrimaryNetwork
+			return nil, errCannotTrackPrimaryNetwork
 		}
-		whitelistedSubnetIDs.Add(subnetID)
+		trackedSubnetIDs.Add(subnetID)
 	}
-	return whitelistedSubnetIDs, nil
+	return trackedSubnetIDs, nil
 }
 
 func getDatabaseConfig(v *viper.Viper, networkID uint32) (node.DatabaseConfig, error) {
@@ -973,21 +945,21 @@ func getChainAliases(v *viper.Viper) (map[ids.ID][]string, error) {
 	return getAliases(v, "chain aliases", ChainAliasesContentKey, ChainAliasesFileKey)
 }
 
-func getVMManager(v *viper.Viper) (vms.Manager, error) {
+func getVMAliaser(v *viper.Viper) (ids.Aliaser, error) {
 	vmAliases, err := getVMAliases(v)
 	if err != nil {
 		return nil, err
 	}
 
-	manager := vms.NewManager()
+	aliser := ids.NewAliaser()
 	for vmID, aliases := range vmAliases {
 		for _, alias := range aliases {
-			if err := manager.Alias(vmID, alias); err != nil {
+			if err := aliser.Alias(vmID, alias); err != nil {
 				return nil, err
 			}
 		}
 	}
-	return manager, nil
+	return aliser, nil
 }
 
 // getPathFromDirKey reads flag value from viper instance and then checks the folder existence
@@ -1081,14 +1053,16 @@ func readChainConfigPath(chainConfigPath string) (map[string]chains.ChainConfig,
 	return chainConfigMap, nil
 }
 
-func getSubnetConfigs(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]chains.SubnetConfig, error) {
+// getSubnetConfigsFromFlags reads subnet configs from the correct place
+// (flag or file) and returns a non-nil map.
+func getSubnetConfigs(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]subnets.Config, error) {
 	if v.IsSet(SubnetConfigContentKey) {
 		return getSubnetConfigsFromFlags(v, subnetIDs)
 	}
 	return getSubnetConfigsFromDir(v, subnetIDs)
 }
 
-func getSubnetConfigsFromFlags(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]chains.SubnetConfig, error) {
+func getSubnetConfigsFromFlags(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]subnets.Config, error) {
 	subnetConfigContentB64 := v.GetString(SubnetConfigContentKey)
 	subnetConfigContent, err := base64.StdEncoding.DecodeString(subnetConfigContentB64)
 	if err != nil {
@@ -1101,32 +1075,38 @@ func getSubnetConfigsFromFlags(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]c
 		return nil, fmt.Errorf("could not unmarshal JSON: %w", err)
 	}
 
-	res := make(map[ids.ID]chains.SubnetConfig)
+	res := make(map[ids.ID]subnets.Config)
 	for _, subnetID := range subnetIDs {
 		if rawSubnetConfigBytes, ok := subnetConfigs[subnetID]; ok {
-			subnetConfig, err := parseSubnetConfigs(rawSubnetConfigBytes, getDefaultSubnetConfig(v))
-			if err != nil {
+			config := getDefaultSubnetConfig(v)
+			if err := json.Unmarshal(rawSubnetConfigBytes, &config); err != nil {
 				return nil, err
 			}
-			res[subnetID] = subnetConfig
+
+			if err := config.Valid(); err != nil {
+				return nil, err
+			}
+
+			res[subnetID] = config
 		}
 	}
 	return res, nil
 }
 
 // getSubnetConfigs reads SubnetConfigs to node config map
-func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]chains.SubnetConfig, error) {
+func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]subnets.Config, error) {
 	subnetConfigPath, err := getPathFromDirKey(v, SubnetConfigDirKey)
 	if err != nil {
 		return nil, err
 	}
+
+	subnetConfigs := make(map[ids.ID]subnets.Config)
 	if len(subnetConfigPath) == 0 {
 		// subnet config path does not exist but not explicitly specified, so ignore it
-		return make(map[ids.ID]chains.SubnetConfig), nil
+		return subnetConfigs, nil
 	}
 
 	// reads subnet config files from a path and given subnetIDs and returns a map.
-	subnetConfigs := make(map[ids.ID]chains.SubnetConfig)
 	for _, subnetID := range subnetIDs {
 		filePath := filepath.Join(subnetConfigPath, subnetID.String()+subnetConfigFileExt)
 		fileInfo, err := os.Stat(filePath)
@@ -1145,29 +1125,24 @@ func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]cha
 		if err != nil {
 			return nil, err
 		}
-		config, err := parseSubnetConfigs(file, getDefaultSubnetConfig(v))
-		if err != nil {
+
+		config := getDefaultSubnetConfig(v)
+		if err := json.Unmarshal(file, &config); err != nil {
 			return nil, err
 		}
+
+		if err := config.Valid(); err != nil {
+			return nil, err
+		}
+
 		subnetConfigs[subnetID] = config
 	}
 
 	return subnetConfigs, nil
 }
 
-func parseSubnetConfigs(data []byte, defaultSubnetConfig chains.SubnetConfig) (chains.SubnetConfig, error) {
-	if err := json.Unmarshal(data, &defaultSubnetConfig); err != nil {
-		return chains.SubnetConfig{}, err
-	}
-
-	if err := defaultSubnetConfig.ConsensusParameters.Valid(); err != nil {
-		return chains.SubnetConfig{}, fmt.Errorf("invalid consensus parameters: %w", err)
-	}
-	return defaultSubnetConfig, nil
-}
-
-func getDefaultSubnetConfig(v *viper.Viper) chains.SubnetConfig {
-	return chains.SubnetConfig{
+func getDefaultSubnetConfig(v *viper.Viper) subnets.Config {
+	return subnets.Config{
 		ConsensusParameters:   getConsensusConfig(v),
 		ValidatorOnly:         false,
 		GossipConfig:          getGossipConfig(v),
@@ -1257,17 +1232,40 @@ func getTraceConfig(v *viper.Viper) (trace.Config, error) {
 	}, nil
 }
 
-func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
-	nodeConfig := node.Config{}
+// Returns the path to the directory that contains VM binaries.
+func getPluginDir(v *viper.Viper) (string, error) {
+	pluginDir := GetExpandedString(v, v.GetString(PluginDirKey))
 
-	// Plugin directory defaults to [buildDir]/[pluginsDirName]
-	nodeConfig.PluginDir = filepath.Join(buildDir, pluginsDirName)
+	if v.IsSet(PluginDirKey) {
+		// If the flag was given, assert it exists and is a directory
+		info, err := os.Stat(pluginDir)
+		if err != nil {
+			return "", fmt.Errorf("plugin dir %q not found: %w", pluginDir, err)
+		}
+		if !info.IsDir() {
+			return "", fmt.Errorf("%w: %q", errPluginDirNotADirectory, pluginDir)
+		}
+	} else {
+		// If the flag wasn't given, make sure the default location exists.
+		if err := os.MkdirAll(pluginDir, perms.ReadWriteExecute); err != nil {
+			return "", fmt.Errorf("failed to create plugin dir at %s: %w", pluginDir, err)
+		}
+	}
 
-	// Consensus Parameters
-	nodeConfig.ConsensusParams = getConsensusConfig(v)
-	if err := nodeConfig.ConsensusParams.Valid(); err != nil {
+	return pluginDir, nil
+}
+
+func GetNodeConfig(v *viper.Viper) (node.Config, error) {
+	var (
+		nodeConfig node.Config
+		err        error
+	)
+
+	nodeConfig.PluginDir, err = getPluginDir(v)
+	if err != nil {
 		return node.Config{}, err
 	}
+
 	nodeConfig.ConsensusShutdownTimeout = v.GetDuration(ConsensusShutdownTimeoutKey)
 	if nodeConfig.ConsensusShutdownTimeout < 0 {
 		return node.Config{}, fmt.Errorf("%q must be >= 0", ConsensusShutdownTimeoutKey)
@@ -1281,7 +1279,6 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 
 	nodeConfig.UseCurrentHeight = v.GetBool(ProposerVMUseCurrentHeightKey)
 
-	var err error
 	// Logging
 	nodeConfig.LoggingConfig, err = getLoggingConfig(v)
 	if err != nil {
@@ -1312,8 +1309,8 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 		return node.Config{}, err
 	}
 
-	// Whitelisted Subnets
-	nodeConfig.WhitelistedSubnets, err = getWhitelistedSubnets(v)
+	// Tracked Subnets
+	nodeConfig.TrackedSubnets, err = getTrackedSubnets(v)
 	if err != nil {
 		return node.Config{}, err
 	}
@@ -1352,15 +1349,27 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	}
 
 	// Network Config
-	nodeConfig.NetworkConfig, err = getNetworkConfig(v, healthCheckAveragerHalflife)
+	nodeConfig.NetworkConfig, err = getNetworkConfig(v, nodeConfig.EnableStaking, healthCheckAveragerHalflife)
 	if err != nil {
 		return node.Config{}, err
 	}
 
-	nodeConfig.GossipConfig = getGossipConfig(v)
+	// Subnet Configs
+	subnetConfigs, err := getSubnetConfigs(v, nodeConfig.TrackedSubnets.List())
+	if err != nil {
+		return node.Config{}, fmt.Errorf("couldn't read subnet configs: %w", err)
+	}
+
+	primaryNetworkConfig := getDefaultSubnetConfig(v)
+	if err := primaryNetworkConfig.Valid(); err != nil {
+		return node.Config{}, fmt.Errorf("invalid consensus parameters: %w", err)
+	}
+	subnetConfigs[constants.PrimaryNetworkID] = primaryNetworkConfig
+
+	nodeConfig.SubnetConfigs = subnetConfigs
 
 	// Benchlist
-	nodeConfig.BenchlistConfig, err = getBenchlistConfig(v, nodeConfig.ConsensusParams.Alpha, nodeConfig.ConsensusParams.K)
+	nodeConfig.BenchlistConfig, err = getBenchlistConfig(v, primaryNetworkConfig.ConsensusParameters)
 	if err != nil {
 		return node.Config{}, err
 	}
@@ -1372,7 +1381,8 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	nodeConfig.TxFeeConfig = getTxFeeConfig(v, nodeConfig.NetworkID)
 
 	// Genesis Data
-	nodeConfig.GenesisBytes, nodeConfig.AvaxAssetID, err = getGenesisData(v, nodeConfig.NetworkID)
+	genesisStakingCfg := nodeConfig.StakingConfig.StakingConfig
+	nodeConfig.GenesisBytes, nodeConfig.AvaxAssetID, err = getGenesisData(v, nodeConfig.NetworkID, &genesisStakingCfg)
 	if err != nil {
 		return node.Config{}, fmt.Errorf("unable to load genesis file: %w", err)
 	}
@@ -1389,16 +1399,9 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 		return node.Config{}, err
 	}
 
-	// Subnet Configs
-	subnetConfigs, err := getSubnetConfigs(v, nodeConfig.WhitelistedSubnets.List())
-	if err != nil {
-		return node.Config{}, fmt.Errorf("couldn't read subnet configs: %w", err)
-	}
-	nodeConfig.SubnetConfigs = subnetConfigs
-
 	// Node health
 	nodeConfig.MinPercentConnectedStakeHealthy = map[ids.ID]float64{
-		constants.PrimaryNetworkID: calcMinConnectedStake(nodeConfig.ConsensusParams.Parameters),
+		constants.PrimaryNetworkID: calcMinConnectedStake(primaryNetworkConfig.ConsensusParameters.Parameters),
 	}
 
 	for subnetID, config := range subnetConfigs {
@@ -1418,7 +1421,7 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	}
 
 	// VM Aliases
-	nodeConfig.VMManager, err = getVMManager(v)
+	nodeConfig.VMAliaser, err = getVMAliaser(v)
 	if err != nil {
 		return node.Config{}, err
 	}

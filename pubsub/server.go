@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package pubsub
@@ -68,6 +68,7 @@ type Server struct {
 	subscribedConnections *connections
 }
 
+// Deprecated: The pubsub server is deprecated.
 func New(log logging.Logger) *Server {
 	return &Server{
 		log:                   log,

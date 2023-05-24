@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowman
@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
+	"github.com/ava-labs/avalanchego/utils/bag"
 )
 
 // Consensus represents a general snowman instance that can be used directly to
@@ -44,13 +45,16 @@ type Consensus interface {
 	// chain.
 	IsPreferred(Block) bool
 
+	// Returns the ID of the last accepted decision.
+	LastAccepted() ids.ID
+
 	// Returns the ID of the tail of the strongly preferred sequence of
 	// decisions.
 	Preference() ids.ID
 
 	// RecordPoll collects the results of a network poll. Assumes all decisions
 	// have been previously added. Returns if a critical error has occurred.
-	RecordPoll(context.Context, ids.Bag) error
+	RecordPoll(context.Context, bag.Bag[ids.ID]) error
 
 	// Finalized returns true if all decisions that have been added have been
 	// finalized. Note, it is possible that after returning finalized, a new

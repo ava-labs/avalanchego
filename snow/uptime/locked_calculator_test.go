@@ -1,10 +1,9 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package uptime
 
 import (
-	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -29,41 +28,40 @@ func TestLockedCalculator(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 	subnetID := ids.GenerateTestID()
 	_, _, err := lc.CalculateUptime(nodeID, subnetID)
-	require.ErrorIs(err, errNotReady)
+	require.ErrorIs(err, errStillBootstrapping)
 
 	_, err = lc.CalculateUptimePercent(nodeID, subnetID)
-	require.ErrorIs(err, errNotReady)
+	require.ErrorIs(err, errStillBootstrapping)
 
 	_, err = lc.CalculateUptimePercentFrom(nodeID, subnetID, time.Now())
-	require.ErrorIs(err, errNotReady)
+	require.ErrorIs(err, errStillBootstrapping)
 
-	var isBootstrapped utils.AtomicBool
+	var isBootstrapped utils.Atomic[bool]
 	mockCalc := NewMockCalculator(ctrl)
 
 	// Should still error because ctx is not bootstrapped
 	lc.SetCalculator(&isBootstrapped, &sync.Mutex{}, mockCalc)
 	_, _, err = lc.CalculateUptime(nodeID, subnetID)
-	require.ErrorIs(err, errNotReady)
+	require.ErrorIs(err, errStillBootstrapping)
 
 	_, err = lc.CalculateUptimePercent(nodeID, subnetID)
-	require.ErrorIs(err, errNotReady)
+	require.ErrorIs(err, errStillBootstrapping)
 
 	_, err = lc.CalculateUptimePercentFrom(nodeID, subnetID, time.Now())
-	require.EqualValues(errNotReady, err)
+	require.EqualValues(errStillBootstrapping, err)
 
-	isBootstrapped.SetValue(true)
+	isBootstrapped.Set(true)
 
 	// Should return the value from the mocked inner calculator
-	mockErr := errors.New("mock error")
-	mockCalc.EXPECT().CalculateUptime(gomock.Any(), gomock.Any()).AnyTimes().Return(time.Duration(0), time.Time{}, mockErr)
+	mockCalc.EXPECT().CalculateUptime(gomock.Any(), gomock.Any()).AnyTimes().Return(time.Duration(0), time.Time{}, errTest)
 	_, _, err = lc.CalculateUptime(nodeID, subnetID)
-	require.ErrorIs(err, mockErr)
+	require.ErrorIs(err, errTest)
 
-	mockCalc.EXPECT().CalculateUptimePercent(gomock.Any(), gomock.Any()).AnyTimes().Return(float64(0), mockErr)
+	mockCalc.EXPECT().CalculateUptimePercent(gomock.Any(), gomock.Any()).AnyTimes().Return(float64(0), errTest)
 	_, err = lc.CalculateUptimePercent(nodeID, subnetID)
-	require.ErrorIs(err, mockErr)
+	require.ErrorIs(err, errTest)
 
-	mockCalc.EXPECT().CalculateUptimePercentFrom(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(float64(0), mockErr)
+	mockCalc.EXPECT().CalculateUptimePercentFrom(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(float64(0), errTest)
 	_, err = lc.CalculateUptimePercentFrom(nodeID, subnetID, time.Now())
-	require.ErrorIs(err, mockErr)
+	require.ErrorIs(err, errTest)
 }

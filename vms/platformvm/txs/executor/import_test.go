@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -23,27 +23,22 @@ import (
 func TestNewImportTx(t *testing.T) {
 	env := newEnvironment( /*postBanff*/ false)
 	defer func() {
-		if err := shutdownEnvironment(env); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, shutdownEnvironment(env))
 	}()
 
 	type test struct {
 		description   string
 		sourceChainID ids.ID
 		sharedMemory  atomic.SharedMemory
-		sourceKeys    []*crypto.PrivateKeySECP256K1R
+		sourceKeys    []*secp256k1.PrivateKey
 		timestamp     time.Time
 		shouldErr     bool
 		shouldVerify  bool
 	}
 
-	factory := crypto.FactorySECP256K1R{}
-	sourceKeyIntf, err := factory.NewPrivateKey()
-	if err != nil {
-		t.Fatal(err)
-	}
-	sourceKey := sourceKeyIntf.(*crypto.PrivateKeySECP256K1R)
+	factory := secp256k1.Factory{}
+	sourceKey, err := factory.NewPrivateKey()
+	require.NoError(t, err)
 
 	cnt := new(byte)
 
@@ -74,19 +69,24 @@ func TestNewImportTx(t *testing.T) {
 				},
 			}
 			utxoBytes, err := txs.Codec.Marshal(txs.Version, utxo)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
+
 			inputID := utxo.InputID()
-			if err := peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{env.ctx.ChainID: {PutRequests: []*atomic.Element{{
-				Key:   inputID[:],
-				Value: utxoBytes,
-				Traits: [][]byte{
-					sourceKey.PublicKey().Address().Bytes(),
+			err = peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{
+				env.ctx.ChainID: {
+					PutRequests: []*atomic.Element{
+						{
+							Key:   inputID[:],
+							Value: utxoBytes,
+							Traits: [][]byte{
+								sourceKey.PublicKey().Address().Bytes(),
+							},
+						},
+					},
 				},
-			}}}}); err != nil {
-				t.Fatal(err)
-			}
+			},
+			)
+			require.NoError(t, err)
 		}
 
 		return sm
@@ -104,7 +104,7 @@ func TestNewImportTx(t *testing.T) {
 					env.ctx.AVAXAssetID: env.config.TxFee - 1,
 				},
 			),
-			sourceKeys: []*crypto.PrivateKeySECP256K1R{sourceKey},
+			sourceKeys: []*secp256k1.PrivateKey{sourceKey},
 			shouldErr:  true,
 		},
 		{
@@ -116,7 +116,7 @@ func TestNewImportTx(t *testing.T) {
 					env.ctx.AVAXAssetID: env.config.TxFee,
 				},
 			),
-			sourceKeys:   []*crypto.PrivateKeySECP256K1R{sourceKey},
+			sourceKeys:   []*secp256k1.PrivateKey{sourceKey},
 			shouldErr:    false,
 			shouldVerify: true,
 		},
@@ -129,7 +129,7 @@ func TestNewImportTx(t *testing.T) {
 					env.ctx.AVAXAssetID: env.config.TxFee,
 				},
 			),
-			sourceKeys:   []*crypto.PrivateKeySECP256K1R{sourceKey},
+			sourceKeys:   []*secp256k1.PrivateKey{sourceKey},
 			timestamp:    env.config.ApricotPhase5Time,
 			shouldErr:    false,
 			shouldVerify: true,
@@ -144,7 +144,7 @@ func TestNewImportTx(t *testing.T) {
 					customAssetID:       1,
 				},
 			),
-			sourceKeys:   []*crypto.PrivateKeySECP256K1R{sourceKey},
+			sourceKeys:   []*secp256k1.PrivateKey{sourceKey},
 			timestamp:    env.config.BanffTime,
 			shouldErr:    false,
 			shouldVerify: true,
@@ -185,7 +185,7 @@ func TestNewImportTx(t *testing.T) {
 				totalOut += out.Out.Amount()
 			}
 
-			require.Equal(env.config.TxFee, totalIn-totalOut, "burned too much")
+			require.Equal(env.config.TxFee, totalIn-totalOut)
 
 			fakedState, err := state.NewDiff(lastAcceptedID, env)
 			require.NoError(err)

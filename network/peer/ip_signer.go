@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package peer
@@ -46,7 +46,7 @@ func (s *IPSigner) GetSignedIP() (*SignedIP, error) {
 	signedIP := s.signedIP
 	s.signedIPLock.RUnlock()
 	ip := s.ip.IPPort()
-	if signedIP != nil && signedIP.IP.IP.Equal(ip) {
+	if signedIP != nil && signedIP.IPPort.Equal(ip) {
 		return signedIP, nil
 	}
 
@@ -58,13 +58,13 @@ func (s *IPSigner) GetSignedIP() (*SignedIP, error) {
 	// same time, we should verify that we are the first thread to attempt to
 	// update it.
 	signedIP = s.signedIP
-	if signedIP != nil && signedIP.IP.IP.Equal(ip) {
+	if signedIP != nil && signedIP.IPPort.Equal(ip) {
 		return signedIP, nil
 	}
 
 	// We should now sign our new IP at the current timestamp.
 	unsignedIP := UnsignedIP{
-		IP:        ip,
+		IPPort:    ip,
 		Timestamp: s.clock.Unix(),
 	}
 	signedIP, err := unsignedIP.Sign(s.signer)

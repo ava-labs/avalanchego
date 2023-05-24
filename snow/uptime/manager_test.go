@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package uptime
@@ -12,6 +12,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 )
+
+var errTest = errors.New("non-nil error")
 
 func TestStartTracking(t *testing.T) {
 	require := require.New(t)
@@ -45,7 +47,7 @@ func TestStartTrackingDBError(t *testing.T) {
 	startTime := time.Now()
 
 	s := NewTestState()
-	s.dbWriteError = errors.New("err")
+	s.dbWriteError = errTest
 	s.AddNode(nodeID0, subnetID, startTime)
 
 	up := NewManager(s).(*manager)
@@ -200,7 +202,7 @@ func TestStopTrackingConnectedDBError(t *testing.T) {
 	err = up.Connect(nodeID0, subnetID)
 	require.NoError(err)
 
-	s.dbReadError = errors.New("err")
+	s.dbReadError = errTest
 	err = up.StopTracking([]ids.NodeID{nodeID0}, subnetID)
 	require.Error(err)
 }
@@ -252,7 +254,7 @@ func TestStopTrackingNonConnectedDBError(t *testing.T) {
 	currentTime = currentTime.Add(time.Second)
 	up.clock.Set(currentTime)
 
-	s.dbWriteError = errors.New("err")
+	s.dbWriteError = errTest
 	err = up.StopTracking([]ids.NodeID{nodeID0}, subnetID)
 	require.Error(err)
 }

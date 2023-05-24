@@ -31,11 +31,11 @@ func (cs *caminoState) GetClaimable(ownerID ids.ID) (*Claimable, error) {
 		return claimable, nil
 	}
 
-	if claimableIntf, ok := cs.claimablesCache.Get(ownerID); ok {
-		if claimableIntf == nil {
+	if claimable, ok := cs.claimablesCache.Get(ownerID); ok {
+		if claimable == nil {
 			return nil, database.ErrNotFound
 		}
-		return claimableIntf.(*Claimable), nil
+		return claimable, nil
 	}
 
 	claimableBytes, err := cs.claimablesDB.Get(ownerID[:])

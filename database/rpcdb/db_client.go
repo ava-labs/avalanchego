@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package rpcdb
@@ -6,26 +6,15 @@ package rpcdb
 import (
 	"context"
 	"encoding/json"
-	"sync/atomic"
 
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/nodb"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 
 	rpcdbpb "github.com/ava-labs/avalanchego/proto/pb/rpcdb"
-)
-
-const (
-	maxBatchSize = 128 * units.KiB
-
-	// baseElementSize is an approximation of the protobuf encoding overhead per
-	// element
-	baseElementSize = 8 // bytes
 )
 
 var (
@@ -38,8 +27,7 @@ var (
 type DatabaseClient struct {
 	client rpcdbpb.DatabaseClient
 
-	closed     utils.AtomicBool
-	batchIndex int64
+	closed utils.Atomic[bool]
 }
 
 // NewClient returns a database instance connected to a remote database instance
@@ -55,7 +43,7 @@ func (db *DatabaseClient) Has(key []byte) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return resp.Has, errCodeToError[resp.Err]
+	return resp.Has, errEnumToError[resp.Err]
 }
 
 // Get attempts to return the value that was mapped to the key that was provided
@@ -66,7 +54,7 @@ func (db *DatabaseClient) Get(key []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return resp.Value, errCodeToError[resp.Err]
+	return resp.Value, errEnumToError[resp.Err]
 }
 
 // Put attempts to set the value this key maps to
@@ -78,7 +66,7 @@ func (db *DatabaseClient) Put(key, value []byte) error {
 	if err != nil {
 		return err
 	}
-	return errCodeToError[resp.Err]
+	return errEnumToError[resp.Err]
 }
 
 // Delete attempts to remove any mapping from the key
@@ -89,7 +77,7 @@ func (db *DatabaseClient) Delete(key []byte) error {
 	if err != nil {
 		return err
 	}
-	return errCodeToError[resp.Err]
+	return errEnumToError[resp.Err]
 }
 
 // NewBatch returns a new batch
@@ -116,7 +104,9 @@ func (db *DatabaseClient) NewIteratorWithStartAndPrefix(start, prefix []byte) da
 		Prefix: prefix,
 	})
 	if err != nil {
-		return &nodb.Iterator{Err: err}
+		return &database.IteratorError{
+			Err: err,
+		}
 	}
 	return &iterator{
 		db: db,
@@ -133,17 +123,17 @@ func (db *DatabaseClient) Compact(start, limit []byte) error {
 	if err != nil {
 		return err
 	}
-	return errCodeToError[resp.Err]
+	return errEnumToError[resp.Err]
 }
 
 // Close attempts to close the database
 func (db *DatabaseClient) Close() error {
-	db.closed.SetValue(true)
+	db.closed.Set(true)
 	resp, err := db.client.Close(context.Background(), &rpcdbpb.CloseRequest{})
 	if err != nil {
 		return err
 	}
-	return errCodeToError[resp.Err]
+	return errEnumToError[resp.Err]
 }
 
 func (db *DatabaseClient) HealthCheck(ctx context.Context) (interface{}, error) {
@@ -155,104 +145,40 @@ func (db *DatabaseClient) HealthCheck(ctx context.Context) (interface{}, error) 
 	return json.RawMessage(health.Details), nil
 }
 
-type keyValue struct {
-	key    []byte
-	value  []byte
-	delete bool
-}
-
 type batch struct {
-	db     *DatabaseClient
-	writes []keyValue
-	size   int
-}
+	database.BatchOps
 
-func (b *batch) Put(key, value []byte) error {
-	b.writes = append(b.writes, keyValue{utils.CopyBytes(key), utils.CopyBytes(value), false})
-	b.size += len(key) + len(value)
-	return nil
-}
-
-func (b *batch) Delete(key []byte) error {
-	b.writes = append(b.writes, keyValue{utils.CopyBytes(key), nil, true})
-	b.size += len(key)
-	return nil
-}
-
-func (b *batch) Size() int {
-	return b.size
+	db *DatabaseClient
 }
 
 func (b *batch) Write() error {
-	request := &rpcdbpb.WriteBatchRequest{
-		Id:        atomic.AddInt64(&b.db.batchIndex, 1),
-		Continues: true,
-	}
-	currentSize := 0
-	keySet := set.NewSet[string](len(b.writes))
-	for i := len(b.writes) - 1; i >= 0; i-- {
-		kv := b.writes[i]
-		key := string(kv.key)
+	request := &rpcdbpb.WriteBatchRequest{}
+	keySet := set.NewSet[string](len(b.Ops))
+	for i := len(b.Ops) - 1; i >= 0; i-- {
+		op := b.Ops[i]
+		key := string(op.Key)
 		if keySet.Contains(key) {
 			continue
 		}
 		keySet.Add(key)
 
-		sizeChange := baseElementSize + len(kv.key) + len(kv.value)
-		if newSize := currentSize + sizeChange; newSize > maxBatchSize {
-			resp, err := b.db.client.WriteBatch(context.Background(), request)
-			if err != nil {
-				return err
-			}
-			if err := errCodeToError[resp.Err]; err != nil {
-				return err
-			}
-			currentSize = 0
-			request.Deletes = request.Deletes[:0]
-			request.Puts = request.Puts[:0]
-		}
-		currentSize += sizeChange
-
-		if kv.delete {
+		if op.Delete {
 			request.Deletes = append(request.Deletes, &rpcdbpb.DeleteRequest{
-				Key: kv.key,
+				Key: op.Key,
 			})
 		} else {
 			request.Puts = append(request.Puts, &rpcdbpb.PutRequest{
-				Key:   kv.key,
-				Value: kv.value,
+				Key:   op.Key,
+				Value: op.Value,
 			})
 		}
 	}
 
-	request.Continues = false
 	resp, err := b.db.client.WriteBatch(context.Background(), request)
 	if err != nil {
 		return err
 	}
-	return errCodeToError[resp.Err]
-}
-
-func (b *batch) Reset() {
-	if cap(b.writes) > len(b.writes)*database.MaxExcessCapacityFactor {
-		b.writes = make([]keyValue, 0, cap(b.writes)/database.CapacityReductionFactor)
-	} else {
-		b.writes = b.writes[:0]
-	}
-	b.size = 0
-}
-
-func (b *batch) Replay(w database.KeyValueWriterDeleter) error {
-	for _, keyvalue := range b.writes {
-		if keyvalue.delete {
-			if err := w.Delete(keyvalue.key); err != nil {
-				return err
-			}
-		} else if err := w.Put(keyvalue.key, keyvalue.value); err != nil {
-			return err
-		}
-	}
-	return nil
+	return errEnumToError[resp.Err]
 }
 
 func (b *batch) Inner() database.Batch {
@@ -270,7 +196,7 @@ type iterator struct {
 // Next attempts to move the iterator to the next element and returns if this
 // succeeded
 func (it *iterator) Next() bool {
-	if it.db.closed.GetValue() {
+	if it.db.closed.Get() {
 		it.data = nil
 		it.errs.Add(database.ErrClosed)
 		return false
@@ -304,7 +230,7 @@ func (it *iterator) Error() error {
 	if err != nil {
 		it.errs.Add(err)
 	} else {
-		it.errs.Add(errCodeToError[resp.Err])
+		it.errs.Add(errEnumToError[resp.Err])
 	}
 	return it.errs.Err
 }
@@ -333,6 +259,6 @@ func (it *iterator) Release() {
 	if err != nil {
 		it.errs.Add(err)
 	} else {
-		it.errs.Add(errCodeToError[resp.Err])
+		it.errs.Add(errEnumToError[resp.Err])
 	}
 }

@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/nodeid"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
@@ -112,7 +112,7 @@ func TestCaminoBuilderNewAddSubnetValidatorTxNodeSig(t *testing.T) {
 	tests := map[string]struct {
 		caminoConfig api.Camino
 		nodeID       ids.NodeID
-		nodeKey      *crypto.PrivateKeySECP256K1R
+		nodeKey      *secp256k1.PrivateKey
 		expectedErr  error
 	}{
 		"Happy path, LockModeBondDeposit false, VerifyNodeSignature true": {
@@ -161,7 +161,7 @@ func TestCaminoBuilderNewAddSubnetValidatorTxNodeSig(t *testing.T) {
 				uint64(defaultValidateEndTime.Unix()),
 				tt.nodeID,
 				testSubnet1.ID(),
-				[]*crypto.PrivateKeySECP256K1R{testCaminoSubnet1ControlKeys[0], testCaminoSubnet1ControlKeys[1], tt.nodeKey},
+				[]*secp256k1.PrivateKey{testCaminoSubnet1ControlKeys[0], testCaminoSubnet1ControlKeys[1], tt.nodeKey},
 				ids.ShortEmpty,
 			)
 			require.ErrorIs(t, err, tt.expectedErr)
@@ -253,7 +253,7 @@ func TestUnlockDepositTx(t *testing.T) {
 
 			tx, err := env.txBuilder.NewUnlockDepositTx(
 				[]ids.ID{depositTxID},
-				[]*crypto.PrivateKeySECP256K1R{testKey.(*crypto.PrivateKeySECP256K1R)},
+				[]*secp256k1.PrivateKey{testKey},
 				nil,
 			)
 			require.ErrorIs(t, err, tt.expectedErr)
@@ -308,7 +308,7 @@ func TestNewClaimTx(t *testing.T) {
 	type args struct {
 		claimables []txs.ClaimAmount
 		claimTo    *secp256k1fx.OutputOwners
-		keys       []*crypto.PrivateKeySECP256K1R
+		keys       []*secp256k1.PrivateKey
 		change     *secp256k1fx.OutputOwners
 	}
 
@@ -334,7 +334,7 @@ func TestNewClaimTx(t *testing.T) {
 					ID: depositTxID1, Type: txs.ClaimTypeActiveDepositReward, Amount: 11,
 				}},
 				claimTo: &rewardOwner1,
-				keys: []*crypto.PrivateKeySECP256K1R{
+				keys: []*secp256k1.PrivateKey{
 					feeKey,
 					rewardOwner1Key,
 				},
@@ -354,7 +354,7 @@ func TestNewClaimTx(t *testing.T) {
 						Amount:    11,
 						OwnerAuth: &secp256k1fx.Input{SigIndices: []uint32{0}},
 					}},
-				}, txs.Codec, [][]*crypto.PrivateKeySECP256K1R{
+				}, txs.Codec, [][]*secp256k1.PrivateKey{
 					{feeKey},
 					{rewardOwner1Key},
 				})
@@ -382,7 +382,7 @@ func TestNewClaimTx(t *testing.T) {
 					{ID: depositTxID2, Type: txs.ClaimTypeActiveDepositReward, Amount: 22},
 				},
 				claimTo: &rewardOwner1,
-				keys: []*crypto.PrivateKeySECP256K1R{
+				keys: []*secp256k1.PrivateKey{
 					feeKey,
 					rewardOwner1Key,
 					rewardOwner2Key,
@@ -420,7 +420,7 @@ func TestNewClaimTx(t *testing.T) {
 							OwnerAuth: &secp256k1fx.Input{SigIndices: []uint32{0}},
 						},
 					},
-				}, txs.Codec, [][]*crypto.PrivateKeySECP256K1R{
+				}, txs.Codec, [][]*secp256k1.PrivateKey{
 					{feeKey},
 					{rewardOwner1Key},
 					{rewardOwner2Key},
@@ -455,7 +455,7 @@ func TestNewClaimTx(t *testing.T) {
 					{ID: depositTxID2, Type: txs.ClaimTypeActiveDepositReward, Amount: 22},
 				},
 				claimTo: &rewardOwner1,
-				keys: []*crypto.PrivateKeySECP256K1R{
+				keys: []*secp256k1.PrivateKey{
 					feeKey,
 					rewardOwner1Key,
 					rewardOwner2Key,
@@ -493,7 +493,7 @@ func TestNewClaimTx(t *testing.T) {
 							OwnerAuth: &secp256k1fx.Input{SigIndices: []uint32{0}},
 						},
 					},
-				}, txs.Codec, [][]*crypto.PrivateKeySECP256K1R{
+				}, txs.Codec, [][]*secp256k1.PrivateKey{
 					{feeKey},
 					{rewardOwner1Key, rewardOwner2Key},
 					{rewardOwner1Key},
@@ -520,7 +520,7 @@ func TestNewClaimTx(t *testing.T) {
 					ID: claimableOwnerID, Type: txs.ClaimTypeAllTreasury, Amount: 60,
 				}},
 				claimTo: &rewardOwner1,
-				keys: []*crypto.PrivateKeySECP256K1R{
+				keys: []*secp256k1.PrivateKey{
 					feeKey,
 					rewardOwner1Key,
 				},
@@ -540,7 +540,7 @@ func TestNewClaimTx(t *testing.T) {
 						Amount:    60,
 						OwnerAuth: &secp256k1fx.Input{SigIndices: []uint32{0}},
 					}},
-				}, txs.Codec, [][]*crypto.PrivateKeySECP256K1R{
+				}, txs.Codec, [][]*secp256k1.PrivateKey{
 					{feeKey},
 					{rewardOwner1Key},
 				})
@@ -574,7 +574,7 @@ func TestNewClaimTx(t *testing.T) {
 					{ID: claimableOwnerID, Type: txs.ClaimTypeAllTreasury, Amount: 60},
 				},
 				claimTo: &rewardOwner1,
-				keys: []*crypto.PrivateKeySECP256K1R{
+				keys: []*secp256k1.PrivateKey{
 					feeKey,
 					rewardOwner1Key,
 					rewardOwner2Key,
@@ -612,7 +612,7 @@ func TestNewClaimTx(t *testing.T) {
 							OwnerAuth: &secp256k1fx.Input{SigIndices: []uint32{0}},
 						},
 					},
-				}, txs.Codec, [][]*crypto.PrivateKeySECP256K1R{
+				}, txs.Codec, [][]*secp256k1.PrivateKey{
 					{feeKey},
 					{rewardOwner1Key, rewardOwner2Key},
 					{rewardOwner1Key},
@@ -637,7 +637,7 @@ func TestNewClaimTx(t *testing.T) {
 					ID: depositTxID1, Type: txs.ClaimTypeActiveDepositReward, Amount: 11,
 				}},
 				claimTo: &rewardOwner1,
-				keys:    []*crypto.PrivateKeySECP256K1R{feeKey},
+				keys:    []*secp256k1.PrivateKey{feeKey},
 			},
 			expectedErr: database.ErrNotFound,
 		},
@@ -656,7 +656,7 @@ func TestNewClaimTx(t *testing.T) {
 					ID: depositTxID1, Type: txs.ClaimTypeActiveDepositReward, Amount: 11,
 				}},
 				claimTo: &rewardOwner1,
-				keys:    []*crypto.PrivateKeySECP256K1R{feeKey},
+				keys:    []*secp256k1.PrivateKey{feeKey},
 			},
 			expectedErr: errNotSECPOwner,
 		},
@@ -676,7 +676,7 @@ func TestNewClaimTx(t *testing.T) {
 					ID: depositTxID1, Type: txs.ClaimTypeActiveDepositReward, Amount: 11,
 				}},
 				claimTo: &rewardOwner1,
-				keys:    []*crypto.PrivateKeySECP256K1R{feeKey},
+				keys:    []*secp256k1.PrivateKey{feeKey},
 			},
 			expectedErr: errKeyMissing,
 		},
@@ -695,7 +695,7 @@ func TestNewClaimTx(t *testing.T) {
 					ID: claimableOwnerID, Type: txs.ClaimTypeAllTreasury, Amount: 1,
 				}},
 				claimTo: &rewardOwner1,
-				keys:    []*crypto.PrivateKeySECP256K1R{feeKey},
+				keys:    []*secp256k1.PrivateKey{feeKey},
 			},
 			expectedErr: database.ErrNotFound,
 		},
@@ -716,7 +716,7 @@ func TestNewClaimTx(t *testing.T) {
 					ID: claimableOwnerID, Type: txs.ClaimTypeAllTreasury, Amount: 1,
 				}},
 				claimTo: &rewardOwner1,
-				keys:    []*crypto.PrivateKeySECP256K1R{feeKey},
+				keys:    []*secp256k1.PrivateKey{feeKey},
 			},
 			expectedErr: errKeyMissing,
 		},

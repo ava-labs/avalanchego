@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package handler
@@ -13,6 +13,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
+	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -21,18 +22,28 @@ import (
 
 var _ MessageQueue = (*messageQueue)(nil)
 
+// Message defines individual messages that have been parsed from the network
+// and are now pending execution from the chain.
+type Message struct {
+	// The original message from the peer
+	message.InboundMessage
+	// The desired engine type to execute this message. If not specified,
+	// the current executing engine type is used.
+	EngineType p2p.EngineType
+}
+
 type MessageQueue interface {
 	// Add a message.
 	//
 	// If called after [Shutdown], the message will immediately be marked as
 	// having been handled.
-	Push(context.Context, message.InboundMessage)
+	Push(context.Context, Message)
 
 	// Remove and return a message and its context.
 	//
 	// If there are no available messages, this function will block until a
 	// message becomes available or the queue is [Shutdown].
-	Pop() (context.Context, message.InboundMessage, bool)
+	Pop() (context.Context, Message, bool)
 
 	// Returns the number of messages currently on the queue
 	Len() int
@@ -81,7 +92,7 @@ func NewMessageQueue(
 	return m, m.metrics.initialize(metricsNamespace, metricsRegisterer, ops)
 }
 
-func (m *messageQueue) Push(ctx context.Context, msg message.InboundMessage) {
+func (m *messageQueue) Push(ctx context.Context, msg Message) {
 	m.cond.L.Lock()
 	defer m.cond.L.Unlock()
 
@@ -108,13 +119,13 @@ func (m *messageQueue) Push(ctx context.Context, msg message.InboundMessage) {
 
 // FIFO, but skip over messages whose senders whose messages have caused us to
 // use excessive CPU recently.
-func (m *messageQueue) Pop() (context.Context, message.InboundMessage, bool) {
+func (m *messageQueue) Pop() (context.Context, Message, bool) {
 	m.cond.L.Lock()
 	defer m.cond.L.Unlock()
 
 	for {
 		if m.closed {
-			return nil, nil, false
+			return nil, Message{}, false
 		}
 		if len(m.msgAndCtxs) != 0 {
 			break
@@ -222,6 +233,6 @@ func (m *messageQueue) canPop(msg message.InboundMessage) bool {
 }
 
 type msgAndContext struct {
-	msg message.InboundMessage
+	msg Message
 	ctx context.Context
 }

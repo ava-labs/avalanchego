@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package metrics
@@ -11,6 +11,8 @@ import (
 
 	dto "github.com/prometheus/client_model/go"
 )
+
+var errTest = errors.New("non-nil error")
 
 func TestOptionalGathererEmptyGather(t *testing.T) {
 	require := require.New(t)
@@ -40,16 +42,15 @@ func TestOptionalGathererAddedError(t *testing.T) {
 
 	g := NewOptionalGatherer()
 
-	expected := errors.New(":(")
 	tg := &testGatherer{
-		err: expected,
+		err: errTest,
 	}
 
 	err := g.Register(tg)
 	require.NoError(err)
 
 	mfs, err := g.Gather()
-	require.Equal(expected, err)
+	require.ErrorIs(err, errTest)
 	require.Empty(mfs)
 }
 

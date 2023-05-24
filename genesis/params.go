@@ -8,7 +8,7 @@
 //
 // Much love to the original authors for their work.
 // **********************************************************
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package genesis
@@ -17,7 +17,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/caminoconfig"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 )
 
@@ -43,7 +43,7 @@ type StakingConfig struct {
 	// RewardConfig is the config for the reward function.
 	RewardConfig reward.Config `json:"rewardConfig"`
 	// CaminoConfig is the config for camino related features.
-	CaminoConfig config.CaminoConfig `json:"caminoConfig"`
+	CaminoConfig caminoconfig.Config `json:"caminoConfig"`
 }
 
 type TxFeeConfig struct {

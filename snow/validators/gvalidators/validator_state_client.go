@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package gvalidators
@@ -39,6 +39,16 @@ func (c *Client) GetCurrentHeight(ctx context.Context) (uint64, error) {
 		return 0, err
 	}
 	return resp.Height, nil
+}
+
+func (c *Client) GetSubnetID(ctx context.Context, chainID ids.ID) (ids.ID, error) {
+	resp, err := c.client.GetSubnetID(ctx, &pb.GetSubnetIDRequest{
+		ChainId: chainID[:],
+	})
+	if err != nil {
+		return ids.Empty, err
+	}
+	return ids.ToID(resp.SubnetId)
 }
 
 func (c *Client) GetValidatorSet(

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowstorm
@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/bag"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 
@@ -57,9 +58,11 @@ var (
 	}
 
 	Red, Green, Blue, Alpha *TestTx
+
+	errTest = errors.New("non-nil error")
 )
 
-//  R - G - B - A
+// R - G - B - A
 func Setup() {
 	Red = &TestTx{}
 	Green = &TestTx{}
@@ -129,7 +132,7 @@ func MetricsTest(t *testing.T, factory Factory) {
 			BetaRogue:         2,
 			ConcurrentRepolls: 1,
 		}
-		err := ctx.Registerer.Register(prometheus.NewCounter(prometheus.CounterOpts{
+		err := ctx.AvalancheRegisterer.Register(prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "tx_processing",
 		}))
 		if err != nil {
@@ -149,7 +152,7 @@ func MetricsTest(t *testing.T, factory Factory) {
 			BetaRogue:         2,
 			ConcurrentRepolls: 1,
 		}
-		err := ctx.Registerer.Register(prometheus.NewCounter(prometheus.CounterOpts{
+		err := ctx.AvalancheRegisterer.Register(prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "tx_accepted",
 		}))
 		if err != nil {
@@ -169,7 +172,7 @@ func MetricsTest(t *testing.T, factory Factory) {
 			BetaRogue:         2,
 			ConcurrentRepolls: 1,
 		}
-		err := ctx.Registerer.Register(prometheus.NewCounter(prometheus.CounterOpts{
+		err := ctx.AvalancheRegisterer.Register(prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "tx_rejected",
 		}))
 		if err != nil {
@@ -249,7 +252,7 @@ func LeftoverInputTest(t *testing.T, factory Factory) {
 		t.Fatalf("Finalized too early")
 	}
 
-	r := ids.Bag{}
+	r := bag.Bag[ids.ID]{}
 	r.SetThreshold(2)
 	r.AddCount(Red.ID(), 2)
 	if updated, err := graph.RecordPoll(context.Background(), r); err != nil {
@@ -309,7 +312,7 @@ func LowerConfidenceTest(t *testing.T, factory Factory) {
 		t.Fatalf("Finalized too early")
 	}
 
-	r := ids.Bag{}
+	r := bag.Bag[ids.ID]{}
 	r.SetThreshold(2)
 	r.AddCount(Red.ID(), 2)
 	if updated, err := graph.RecordPoll(context.Background(), r); err != nil {
@@ -372,7 +375,7 @@ func MiddleConfidenceTest(t *testing.T, factory Factory) {
 		t.Fatalf("Finalized too early")
 	}
 
-	r := ids.Bag{}
+	r := bag.Bag[ids.ID]{}
 	r.SetThreshold(2)
 	r.AddCount(Red.ID(), 2)
 	if updated, err := graph.RecordPoll(context.Background(), r); err != nil {
@@ -429,7 +432,7 @@ func IndependentTest(t *testing.T, factory Factory) {
 		t.Fatalf("Finalized too early")
 	}
 
-	ra := ids.Bag{}
+	ra := bag.Bag[ids.ID]{}
 	ra.SetThreshold(2)
 	ra.AddCount(Red.ID(), 2)
 	ra.AddCount(Alpha.ID(), 2)
@@ -602,7 +605,7 @@ func AddNonEmptyWhitelistTest(t *testing.T, factory Factory) {
 	}
 	ctx := snow.DefaultConsensusContextTest()
 	reg := prometheus.NewRegistry()
-	ctx.Registerer = reg
+	ctx.AvalancheRegisterer = reg
 	err := graph.Initialize(ctx, params)
 	if err != nil {
 		t.Fatal(err)
@@ -734,7 +737,7 @@ func AddNonEmptyWhitelistTest(t *testing.T, factory Factory) {
 		t.Fatal("unexpected Finalized")
 	}
 
-	r := ids.Bag{}
+	r := bag.Bag[ids.ID]{}
 	r.SetThreshold(2)
 	r.AddCount(tx1.ID(), 2)
 
@@ -979,7 +982,7 @@ func AcceptingDependencyTest(t *testing.T, factory Factory) {
 		t.Fatalf("Wrong status. %s should be %s", purple.ID(), choices.Processing)
 	}
 
-	g := ids.Bag{}
+	g := bag.Bag[ids.ID]{}
 	g.Add(Green.ID())
 	if updated, err := graph.RecordPoll(context.Background(), g); err != nil {
 		t.Fatal(err)
@@ -1003,7 +1006,7 @@ func AcceptingDependencyTest(t *testing.T, factory Factory) {
 		t.Fatalf("Wrong status. %s should be %s", purple.ID(), choices.Processing)
 	}
 
-	rp := ids.Bag{}
+	rp := bag.Bag[ids.ID]{}
 	rp.Add(Red.ID(), purple.ID())
 	if updated, err := graph.RecordPoll(context.Background(), rp); err != nil {
 		t.Fatal(err)
@@ -1027,7 +1030,7 @@ func AcceptingDependencyTest(t *testing.T, factory Factory) {
 		t.Fatalf("Wrong status. %s should be %s", purple.ID(), choices.Processing)
 	}
 
-	r := ids.Bag{}
+	r := bag.Bag[ids.ID]{}
 	r.Add(Red.ID())
 	if updated, err := graph.RecordPoll(context.Background(), r); err != nil {
 		t.Fatal(err)
@@ -1121,7 +1124,7 @@ func AcceptingSlowDependencyTest(t *testing.T, factory Factory) {
 		t.Fatalf("Wrong status. %s should be %s", purple.ID(), choices.Processing)
 	}
 
-	g := ids.Bag{}
+	g := bag.Bag[ids.ID]{}
 	g.Add(Green.ID())
 	if updated, err := graph.RecordPoll(context.Background(), g); err != nil {
 		t.Fatal(err)
@@ -1145,7 +1148,7 @@ func AcceptingSlowDependencyTest(t *testing.T, factory Factory) {
 		t.Fatalf("Wrong status. %s should be %s", purple.ID(), choices.Processing)
 	}
 
-	p := ids.Bag{}
+	p := bag.Bag[ids.ID]{}
 	p.Add(purple.ID())
 	if updated, err := graph.RecordPoll(context.Background(), p); err != nil {
 		t.Fatal(err)
@@ -1169,7 +1172,7 @@ func AcceptingSlowDependencyTest(t *testing.T, factory Factory) {
 		t.Fatalf("Wrong status. %s should be %s", purple.ID(), choices.Processing)
 	}
 
-	rp := ids.Bag{}
+	rp := bag.Bag[ids.ID]{}
 	rp.Add(Red.ID(), purple.ID())
 	if updated, err := graph.RecordPoll(context.Background(), rp); err != nil {
 		t.Fatal(err)
@@ -1193,7 +1196,7 @@ func AcceptingSlowDependencyTest(t *testing.T, factory Factory) {
 		t.Fatalf("Wrong status. %s should be %s", purple.ID(), choices.Processing)
 	}
 
-	r := ids.Bag{}
+	r := bag.Bag[ids.ID]{}
 	r.Add(Red.ID())
 	if updated, err := graph.RecordPoll(context.Background(), r); err != nil {
 		t.Fatal(err)
@@ -1272,7 +1275,7 @@ func RejectingDependencyTest(t *testing.T, factory Factory) {
 		t.Fatalf("Wrong status. %s should be %s", purple.ID(), choices.Processing)
 	}
 
-	gp := ids.Bag{}
+	gp := bag.Bag[ids.ID]{}
 	gp.Add(Green.ID(), purple.ID())
 	if updated, err := graph.RecordPoll(context.Background(), gp); err != nil {
 		t.Fatal(err)
@@ -1452,7 +1455,7 @@ func VirtuousDependsOnRogueTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	votes := ids.Bag{}
+	votes := bag.Bag[ids.ID]{}
 	votes.Add(rogue1.ID())
 	votes.Add(virtuous.ID())
 	if updated, err := graph.RecordPoll(context.Background(), votes); err != nil {
@@ -1475,7 +1478,7 @@ func ErrorOnVacuouslyAcceptedTest(t *testing.T, factory Factory) {
 
 	purple := &TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.Empty.Prefix(7),
-		AcceptV: errors.New(""),
+		AcceptV: errTest,
 		StatusV: choices.Processing,
 	}}
 
@@ -1504,7 +1507,7 @@ func ErrorOnAcceptedTest(t *testing.T, factory Factory) {
 
 	purple := &TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.Empty.Prefix(7),
-		AcceptV: errors.New(""),
+		AcceptV: errTest,
 		StatusV: choices.Processing,
 	}}
 	purple.InputIDsV = append(purple.InputIDsV, ids.Empty.Prefix(4))
@@ -1528,7 +1531,7 @@ func ErrorOnAcceptedTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	votes := ids.Bag{}
+	votes := bag.Bag[ids.ID]{}
 	votes.Add(purple.ID())
 	if _, err := graph.RecordPoll(context.Background(), votes); err == nil {
 		t.Fatalf("Should have errored on accepting an invalid tx")
@@ -1548,7 +1551,7 @@ func ErrorOnRejectingLowerConfidenceConflictTest(t *testing.T, factory Factory) 
 
 	pink := &TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.Empty.Prefix(8),
-		RejectV: errors.New(""),
+		RejectV: errTest,
 		StatusV: choices.Processing,
 	}}
 	pink.InputIDsV = append(pink.InputIDsV, x)
@@ -1574,7 +1577,7 @@ func ErrorOnRejectingLowerConfidenceConflictTest(t *testing.T, factory Factory) 
 		t.Fatal(err)
 	}
 
-	votes := ids.Bag{}
+	votes := bag.Bag[ids.ID]{}
 	votes.Add(purple.ID())
 	if _, err := graph.RecordPoll(context.Background(), votes); err == nil {
 		t.Fatalf("Should have errored on rejecting an invalid tx")
@@ -1594,7 +1597,7 @@ func ErrorOnRejectingHigherConfidenceConflictTest(t *testing.T, factory Factory)
 
 	pink := &TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.Empty.Prefix(8),
-		RejectV: errors.New(""),
+		RejectV: errTest,
 		StatusV: choices.Processing,
 	}}
 	pink.InputIDsV = append(pink.InputIDsV, x)
@@ -1620,7 +1623,7 @@ func ErrorOnRejectingHigherConfidenceConflictTest(t *testing.T, factory Factory)
 		t.Fatal(err)
 	}
 
-	votes := ids.Bag{}
+	votes := bag.Bag[ids.ID]{}
 	votes.Add(purple.ID())
 	if _, err := graph.RecordPoll(context.Background(), votes); err == nil {
 		t.Fatalf("Should have errored on rejecting an invalid tx")
@@ -1649,7 +1652,7 @@ func UTXOCleanupTest(t *testing.T, factory Factory) {
 	err = graph.Add(context.Background(), Green)
 	require.NoError(t, err)
 
-	redVotes := ids.Bag{}
+	redVotes := bag.Bag[ids.ID]{}
 	redVotes.Add(Red.ID())
 	changed, err := graph.RecordPoll(context.Background(), redVotes)
 	require.NoError(t, err)
@@ -1665,7 +1668,7 @@ func UTXOCleanupTest(t *testing.T, factory Factory) {
 	err = graph.Add(context.Background(), Blue)
 	require.NoError(t, err)
 
-	blueVotes := ids.Bag{}
+	blueVotes := bag.Bag[ids.ID]{}
 	blueVotes.Add(Blue.ID())
 	changed, err = graph.RecordPoll(context.Background(), blueVotes)
 	require.NoError(t, err)
@@ -1744,7 +1747,7 @@ func StringTest(t *testing.T, factory Factory, prefix string) {
 		t.Fatalf("Finalized too early")
 	}
 
-	rb := ids.Bag{}
+	rb := bag.Bag[ids.ID]{}
 	rb.SetThreshold(2)
 	rb.AddCount(Red.ID(), 2)
 	rb.AddCount(Blue.ID(), 2)
@@ -1780,7 +1783,7 @@ func StringTest(t *testing.T, factory Factory, prefix string) {
 		t.Fatalf("Finalized too early")
 	}
 
-	ga := ids.Bag{}
+	ga := bag.Bag[ids.ID]{}
 	ga.SetThreshold(2)
 	ga.AddCount(Green.ID(), 2)
 	ga.AddCount(Alpha.ID(), 2)
@@ -1814,7 +1817,7 @@ func StringTest(t *testing.T, factory Factory, prefix string) {
 		t.Fatalf("Finalized too early")
 	}
 
-	empty := ids.Bag{}
+	empty := bag.Bag[ids.ID]{}
 	if changed, err := graph.RecordPoll(context.Background(), empty); err != nil {
 		t.Fatal(err)
 	} else if changed {

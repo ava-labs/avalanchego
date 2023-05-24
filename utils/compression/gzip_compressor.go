@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package compression
@@ -12,7 +12,7 @@ import (
 	"math"
 	"sync"
 
-	"github.com/ava-labs/avalanchego/utils"
+	"golang.org/x/exp/slices"
 )
 
 var (
@@ -52,7 +52,7 @@ func (g *gzipCompressor) Compress(msg []byte) ([]byte, error) {
 	}
 
 	compressed := g.writeBuffer.Bytes()
-	compressedCopy := utils.CopyBytes(compressed)
+	compressedCopy := slices.Clone(compressed)
 	return compressedCopy, nil
 }
 

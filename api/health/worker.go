@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package health
@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+
+	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/utils"
 )
@@ -60,16 +62,16 @@ func (w *worker) RegisterCheck(name string, checker Checker) error {
 }
 
 func (w *worker) RegisterMonotonicCheck(name string, checker Checker) error {
-	var result utils.AtomicInterface
-	return w.RegisterCheck(name, CheckerFunc(func(ctx context.Context) (interface{}, error) {
-		details := result.GetValue()
+	var result utils.Atomic[any]
+	return w.RegisterCheck(name, CheckerFunc(func(ctx context.Context) (any, error) {
+		details := result.Get()
 		if details != nil {
 			return details, nil
 		}
 
 		details, err := checker.HealthCheck(ctx)
 		if err == nil {
-			result.SetValue(details)
+			result.Set(details)
 		}
 		return details, err
 	}))
@@ -120,10 +122,7 @@ func (w *worker) runChecks(ctx context.Context) {
 	// during this iteration. If [w.checks] is modified during this iteration of
 	// [runChecks], then the added check will not be run until the next
 	// iteration.
-	checks := make(map[string]Checker, len(w.checks))
-	for name, checker := range w.checks {
-		checks[name] = checker
-	}
+	checks := maps.Clone(w.checks)
 	w.checksLock.RUnlock()
 
 	var wg sync.WaitGroup

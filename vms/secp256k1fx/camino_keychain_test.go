@@ -8,7 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/vms/components/multisig"
 	"github.com/stretchr/testify/require"
@@ -43,11 +43,8 @@ func TestSpendMultiSigNoMSig(t *testing.T) {
 	for _, keyStr := range keys {
 		skBytes, err := formatting.Decode(formatting.HexNC, keyStr)
 		require.NoError(err)
-
-		skIntf, err := kc.factory.ToPrivateKey(skBytes)
+		sk, err := kc.factory.ToPrivateKey(skBytes)
 		require.NoError(err)
-		sk, ok := skIntf.(*crypto.PrivateKeySECP256K1R)
-		require.True(ok, "Factory should have returned secp256k1r private key")
 		kc.Add(sk)
 		addresses = append(addresses, sk.PublicKey().Address())
 	}
@@ -80,11 +77,8 @@ func TestSpendMultiSigMSig(t *testing.T) {
 	for _, keyStr := range keys {
 		skBytes, err := formatting.Decode(formatting.HexNC, keyStr)
 		require.NoError(err)
-
-		skIntf, err := kc.factory.ToPrivateKey(skBytes)
+		sk, err := kc.factory.ToPrivateKey(skBytes)
 		require.NoError(err)
-		sk, ok := skIntf.(*crypto.PrivateKeySECP256K1R)
-		require.True(ok, "Factory should have returned secp256k1r private key")
 		kc.Add(sk)
 		addresses = append(addresses, sk.PublicKey().Address())
 	}
@@ -119,7 +113,7 @@ func TestSpendMultiSigFakeKeys(t *testing.T) {
 		addrBytes, err := ids.ShortFromString(addr)
 		require.NoError(err)
 
-		sk := crypto.FakePrivateKey(addrBytes)
+		sk := secp256k1.FakePrivateKey(addrBytes)
 		kc.Add(sk)
 
 		addresses = append(addresses, sk.PublicKey().Address())
@@ -151,11 +145,8 @@ func TestSpendMultiSigCycle(t *testing.T) {
 	for _, keyStr := range keys {
 		skBytes, err := formatting.Decode(formatting.HexNC, keyStr)
 		require.NoError(err)
-
-		skIntf, err := kc.factory.ToPrivateKey(skBytes)
+		sk, err := kc.factory.ToPrivateKey(skBytes)
 		require.NoError(err)
-		sk, ok := skIntf.(*crypto.PrivateKeySECP256K1R)
-		require.True(ok, "Factory should have returned secp256k1r private key")
 		kc.Add(sk)
 		addresses = append(addresses, sk.PublicKey().Address())
 	}
@@ -193,10 +184,8 @@ func TestUnverifiedNestedOwner(t *testing.T) {
 		skBytes, err := formatting.Decode(formatting.HexNC, keyStr)
 		require.NoError(err)
 
-		skIntf, err := kc.factory.ToPrivateKey(skBytes)
+		sk, err := kc.factory.ToPrivateKey(skBytes)
 		require.NoError(err)
-		sk, ok := skIntf.(*crypto.PrivateKeySECP256K1R)
-		require.True(ok, "Factory should have returned secp256k1r private key")
 		// Only one signer for this test
 		if i == 1 {
 			kc.Add(sk)

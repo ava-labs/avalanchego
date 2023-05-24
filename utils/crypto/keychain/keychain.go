@@ -1,14 +1,4 @@
-// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
-//
-// This file is a derived work, based on ava-labs code whose
-// original notices appear below.
-//
-// It is distributed under the same license conditions as the
-// original code from which it is derived.
-//
-// Much love to the original authors for their work.
-// **********************************************************
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package keychain
@@ -19,8 +9,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
-
-	ledger "github.com/ava-labs/avalanche-ledger-go"
 )
 
 var (
@@ -37,6 +25,7 @@ var (
 // to sign a hash
 type Signer interface {
 	SignHash([]byte) ([]byte, error)
+	Sign([]byte) ([]byte, error)
 	Address() ids.ShortID
 }
 
@@ -53,7 +42,7 @@ type Keychain interface {
 // ledgerKeychain is an abstraction of the underlying ledger hardware device,
 // to be able to get a signer from a finite set of derived signers
 type ledgerKeychain struct {
-	ledger    ledger.Ledger
+	ledger    Ledger
 	addrs     set.Set[ids.ShortID]
 	addrToIdx map[ids.ShortID]uint32
 }
@@ -61,13 +50,13 @@ type ledgerKeychain struct {
 // ledgerSigner is an abstraction of the underlying ledger hardware device,
 // to be able sign for a specific address
 type ledgerSigner struct {
-	ledger ledger.Ledger
+	ledger Ledger
 	idx    uint32
 	addr   ids.ShortID
 }
 
 // NewLedgerKeychain creates a new Ledger with [numToDerive] addresses.
-func NewLedgerKeychain(l ledger.Ledger, numToDerive int) (Keychain, error) {
+func NewLedgerKeychain(l Ledger, numToDerive int) (Keychain, error) {
 	if numToDerive < 1 {
 		return nil, ErrInvalidNumAddrsToDerive
 	}
@@ -81,7 +70,7 @@ func NewLedgerKeychain(l ledger.Ledger, numToDerive int) (Keychain, error) {
 }
 
 // NewLedgerKeychainFromIndices creates a new Ledger with addresses taken from the given [indices].
-func NewLedgerKeychainFromIndices(l ledger.Ledger, indices []uint32) (Keychain, error) {
+func NewLedgerKeychainFromIndices(l Ledger, indices []uint32) (Keychain, error) {
 	if len(indices) == 0 {
 		return nil, ErrInvalidIndicesLength
 	}
@@ -91,7 +80,6 @@ func NewLedgerKeychainFromIndices(l ledger.Ledger, indices []uint32) (Keychain, 
 		return nil, err
 	}
 
-	addrsLen := len(addrs)
 	if len(addrs) != len(indices) {
 		return nil, fmt.Errorf(
 			"%w. expected %d, got %d",
@@ -101,11 +89,12 @@ func NewLedgerKeychainFromIndices(l ledger.Ledger, indices []uint32) (Keychain, 
 		)
 	}
 
-	addrsSet := set.NewSet[ids.ShortID](addrsLen)
-	addrToIdx := make(map[ids.ShortID]uint32, addrsLen)
-	for i, addr := range addrs {
-		addrsSet.Add(ids.ShortID(addr))
-		addrToIdx[ids.ShortID(addr)] = indices[i]
+	addrsSet := set.NewSet[ids.ShortID](len(addrs))
+	addrsSet.Add(addrs...)
+
+	addrToIdx := map[ids.ShortID]uint32{}
+	for i := range indices {
+		addrToIdx[addrs[i]] = indices[i]
 	}
 
 	return &ledgerKeychain{
@@ -132,10 +121,31 @@ func (l *ledgerKeychain) Get(addr ids.ShortID) (Signer, bool) {
 	}, true
 }
 
+// expects to receive a hash of the unsigned tx bytes
 func (l *ledgerSigner) SignHash(b []byte) ([]byte, error) {
 	// Sign using the address with index l.idx on the ledger device. The number
 	// of returned signatures should be the same length as the provided indices.
 	sigs, err := l.ledger.SignHash(b, []uint32{l.idx})
+	if err != nil {
+		return nil, err
+	}
+
+	if sigsLen := len(sigs); sigsLen != 1 {
+		return nil, fmt.Errorf(
+			"%w. expected 1, got %d",
+			ErrInvalidNumSignatures,
+			sigsLen,
+		)
+	}
+
+	return sigs[0], err
+}
+
+// expects to receive the unsigned tx bytes
+func (l *ledgerSigner) Sign(b []byte) ([]byte, error) {
+	// Sign using the address with index l.idx on the ledger device. The number
+	// of returned signatures should be the same length as the provided indices.
+	sigs, err := l.ledger.Sign(b, []uint32{l.idx})
 	if err != nil {
 		return nil, err
 	}

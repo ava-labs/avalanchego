@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package linearcodec
@@ -86,6 +86,11 @@ func (c *linearCodec) RegisterType(val interface{}) error {
 	c.typeToTypeID[valType] = c.nextTypeID
 	c.nextTypeID++
 	return nil
+}
+
+func (*linearCodec) PrefixSize(reflect.Type) int {
+	// see PackPrefix implementation
+	return wrappers.IntLen
 }
 
 func (c *linearCodec) PackPrefix(p *wrappers.Packer, valueType reflect.Type) error {

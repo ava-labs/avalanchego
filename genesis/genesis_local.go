@@ -8,7 +8,7 @@
 //
 // Much love to the original authors for their work.
 // **********************************************************
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package genesis
@@ -19,10 +19,10 @@ import (
 	_ "embed"
 
 	"github.com/ava-labs/avalanchego/utils/cb58"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/caminoconfig"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 )
 
@@ -32,15 +32,15 @@ import (
 
 const (
 	VMRQKeyStr          = "vmRQiZeXEXYMyJhEiqdC2z5JhuDbxL8ix9UVvjgMu2Er1NepE"
-	VMRQKeyFormattedStr = crypto.PrivateKeyPrefix + VMRQKeyStr
+	VMRQKeyFormattedStr = secp256k1.PrivateKeyPrefix + VMRQKeyStr
 
 	EWOQKeyStr          = "ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN"
-	EWOQKeyFormattedStr = crypto.PrivateKeyPrefix + EWOQKeyStr
+	EWOQKeyFormattedStr = secp256k1.PrivateKeyPrefix + EWOQKeyStr
 )
 
 var (
-	VMRQKey *crypto.PrivateKeySECP256K1R
-	EWOQKey *crypto.PrivateKeySECP256K1R
+	VMRQKey *secp256k1.PrivateKey
+	EWOQKey *secp256k1.PrivateKey
 
 	//go:embed genesis_local.json
 	localGenesisConfigJSON []byte
@@ -72,7 +72,7 @@ var (
 				MintingPeriod:      365 * 24 * time.Hour,
 				SupplyCap:          720 * units.MegaAvax,
 			},
-			CaminoConfig: config.CaminoConfig{
+			CaminoConfig: caminoconfig.Config{
 				DaoProposalBondAmount: 100 * units.Avax,
 			},
 		},
@@ -86,16 +86,13 @@ func init() {
 	ewoqBytes, err := cb58.Decode(EWOQKeyStr)
 	errs.Add(err)
 
-	factory := crypto.FactorySECP256K1R{}
-	vmrqIntf, err := factory.ToPrivateKey(vmrqBytes)
+	factory := secp256k1.Factory{}
+	VMRQKey, err = factory.ToPrivateKey(vmrqBytes)
 	errs.Add(err)
-	ewoqIntf, err := factory.ToPrivateKey(ewoqBytes)
+	EWOQKey, err = factory.ToPrivateKey(ewoqBytes)
 	errs.Add(err)
 
 	if errs.Err != nil {
 		panic(errs.Err)
 	}
-
-	VMRQKey = vmrqIntf.(*crypto.PrivateKeySECP256K1R)
-	EWOQKey = ewoqIntf.(*crypto.PrivateKeySECP256K1R)
 }

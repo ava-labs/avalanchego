@@ -8,7 +8,7 @@
 //
 // Much love to the original authors for their work.
 // **********************************************************
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package peer
@@ -20,7 +20,7 @@ import (
 	"net"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 )
 
 var (
@@ -79,7 +79,7 @@ func connToIDAndCert(conn *tls.Conn) (ids.NodeID, net.Conn, *x509.Certificate, e
 }
 
 func CertToID(cert *x509.Certificate) (ids.NodeID, error) {
-	pubKeyBytes, err := crypto.RecoverSecp256PublicKey(cert)
+	pubKeyBytes, err := secp256k1.RecoverSecp256PublicKey(cert)
 	if err != nil {
 		return ids.EmptyNodeID, err
 	}

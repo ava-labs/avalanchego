@@ -9,18 +9,18 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/staking"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 )
 
 var localNodesCount = 5
 
-func LoadLocalCaminoNodeKeysAndIDs(localStakingPath string) ([]*crypto.PrivateKeySECP256K1R, []ids.NodeID) {
-	nodeKeys := make([]*crypto.PrivateKeySECP256K1R, localNodesCount)
+func LoadLocalCaminoNodeKeysAndIDs(localStakingPath string) ([]*secp256k1.PrivateKey, []ids.NodeID) {
+	nodeKeys := make([]*secp256k1.PrivateKey, localNodesCount)
 	nodeIDs := make([]ids.NodeID, localNodesCount)
 
 	for index := 0; index < localNodesCount; index++ {
-		secp256Factory := crypto.FactorySECP256K1R{}
-		var nodePrivateKey crypto.PrivateKey
+		secp256Factory := secp256k1.Factory{}
+		var nodePrivateKey *secp256k1.PrivateKey
 
 		cert, err := staking.LoadTLSCertFromFiles(
 			localStakingPath+"staker"+strconv.Itoa(index+1)+".key",
@@ -33,32 +33,23 @@ func LoadLocalCaminoNodeKeysAndIDs(localStakingPath string) ([]*crypto.PrivateKe
 		if !ok {
 			panic("Wrong private key type")
 		}
-		secpPrivateKey := crypto.RsaPrivateKeyToSecp256PrivateKey(rsaKey)
+		secpPrivateKey := secp256k1.RsaPrivateKeyToSecp256PrivateKey(rsaKey)
 		nodePrivateKey, err = secp256Factory.ToPrivateKey(secpPrivateKey.Serialize())
 		if err != nil {
 			panic(err)
 		}
-		nodeSECP256PrivateKey, ok := nodePrivateKey.(*crypto.PrivateKeySECP256K1R)
-		if !ok {
-			panic("Could not cast node's private key to PrivateKeySECP256K1R")
-		}
-		nodeID := nodePrivateKey.PublicKey().Address()
-		nodeKeys[index] = nodeSECP256PrivateKey
+		nodeID := nodePrivateKey.Address()
+		nodeKeys[index] = nodePrivateKey
 		nodeIDs[index] = ids.NodeID(nodeID)
 	}
 	return nodeKeys, nodeIDs
 }
 
-func GenerateCaminoNodeKeyAndID() (*crypto.PrivateKeySECP256K1R, ids.NodeID) {
-	secp256Factory := crypto.FactorySECP256K1R{}
+func GenerateCaminoNodeKeyAndID() (*secp256k1.PrivateKey, ids.NodeID) {
+	secp256Factory := secp256k1.Factory{}
 	nodePrivateKey, err := secp256Factory.NewPrivateKey()
 	if err != nil {
 		panic("Couldn't generate private key")
 	}
-	nodeSECP256PrivateKey, ok := nodePrivateKey.(*crypto.PrivateKeySECP256K1R)
-	if !ok {
-		panic("Could not cast node's private key to PrivateKeySECP256K1R")
-	}
-	nodeID := nodePrivateKey.PublicKey().Address()
-	return nodeSECP256PrivateKey, ids.NodeID(nodeID)
+	return nodePrivateKey, ids.NodeID(nodePrivateKey.Address())
 }

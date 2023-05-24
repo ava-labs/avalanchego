@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
@@ -11,16 +11,16 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
 var (
-	errNilOperation              = errors.New("nil operation is not valid")
-	errNilFxOperation            = errors.New("nil fx operation is not valid")
-	errNotSortedAndUniqueUTXOIDs = errors.New("utxo IDs not sorted and unique")
+	ErrNilOperation              = errors.New("nil operation is not valid")
+	ErrNilFxOperation            = errors.New("nil fx operation is not valid")
+	ErrNotSortedAndUniqueUTXOIDs = errors.New("utxo IDs not sorted and unique")
 )
 
 type Operation struct {
@@ -33,11 +33,11 @@ type Operation struct {
 func (op *Operation) Verify() error {
 	switch {
 	case op == nil:
-		return errNilOperation
+		return ErrNilOperation
 	case op.Op == nil:
-		return errNilFxOperation
+		return ErrNilFxOperation
 	case !utils.IsSortedAndUniqueSortable(op.UTXOIDs):
-		return errNotSortedAndUniqueUTXOIDs
+		return ErrNotSortedAndUniqueUTXOIDs
 	default:
 		return verify.All(&op.Asset, op.Op)
 	}
@@ -82,7 +82,7 @@ func IsSortedAndUniqueOperations(ops []*Operation, c codec.Manager) bool {
 
 type innerSortOperationsWithSigners struct {
 	ops     []*Operation
-	signers [][]*crypto.PrivateKeySECP256K1R
+	signers [][]*secp256k1.PrivateKey
 	codec   codec.Manager
 }
 
@@ -110,6 +110,6 @@ func (ops *innerSortOperationsWithSigners) Swap(i, j int) {
 	ops.signers[j], ops.signers[i] = ops.signers[i], ops.signers[j]
 }
 
-func SortOperationsWithSigners(ops []*Operation, signers [][]*crypto.PrivateKeySECP256K1R, codec codec.Manager) {
+func SortOperationsWithSigners(ops []*Operation, signers [][]*secp256k1.PrivateKey, codec codec.Manager) {
 	sort.Sort(&innerSortOperationsWithSigners{ops: ops, signers: signers, codec: codec})
 }

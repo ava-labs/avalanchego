@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/nodeid"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -33,9 +33,9 @@ func TestDeferredStakers(t *testing.T) {
 
 	type staker struct {
 		nodeID                        ids.NodeID
-		nodeKey                       *crypto.PrivateKeySECP256K1R
+		nodeKey                       *secp256k1.PrivateKey
 		nodeOwnerAddr                 ids.ShortID
-		nodeOwnerKey                  *crypto.PrivateKeySECP256K1R
+		nodeOwnerKey                  *secp256k1.PrivateKey
 		startTime, endTime, deferTime time.Time
 	}
 	type test struct {
@@ -56,9 +56,9 @@ func TestDeferredStakers(t *testing.T) {
 	// staker5Deferred	        |---|--------------------|
 
 	nodeIDs := make([]ids.NodeID, 6)
-	nodeKeys := make([]*crypto.PrivateKeySECP256K1R, 6)
+	nodeKeys := make([]*secp256k1.PrivateKey, 6)
 	nodeOwnerAddresses := make([]ids.ShortID, 6)
-	nodeOwnerKeys := make([]*crypto.PrivateKeySECP256K1R, 6)
+	nodeOwnerKeys := make([]*secp256k1.PrivateKey, 6)
 	for i := range [6]int{} {
 		nodeKeys[i], nodeIDs[i] = nodeid.GenerateCaminoNodeKeyAndID()
 		nodeOwnerKeys[i], nodeOwnerAddresses[i], _ = generateKeyAndOwner(t)
@@ -206,7 +206,7 @@ func TestDeferredStakers(t *testing.T) {
 			dummyHeight := uint64(1)
 
 			subnetID := testSubnet1.ID()
-			env.config.WhitelistedSubnets.Add(subnetID)
+			env.config.TrackedSubnets.Add(subnetID)
 			env.config.Validators.Add(subnetID, validators.NewSet())
 
 			for _, staker := range test.stakers {
@@ -216,7 +216,7 @@ func TestDeferredStakers(t *testing.T) {
 					staker.endTime,
 					staker.nodeID,
 					staker.nodeOwnerAddr,
-					[]*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0], staker.nodeKey, staker.nodeOwnerKey},
+					[]*secp256k1.PrivateKey{caminoPreFundedKeys[0], staker.nodeKey, staker.nodeOwnerKey},
 				)
 				require.NoError(err)
 			}
@@ -228,7 +228,7 @@ func TestDeferredStakers(t *testing.T) {
 					uint64(staker.endTime.Unix()),
 					staker.nodeID, // validator ID
 					subnetID,      // Subnet ID
-					[]*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0], caminoPreFundedKeys[1], staker.nodeKey},
+					[]*secp256k1.PrivateKey{caminoPreFundedKeys[0], caminoPreFundedKeys[1], staker.nodeKey},
 					ids.ShortEmpty,
 				)
 				require.NoError(err)
@@ -321,7 +321,7 @@ func addCaminoPendingValidator(
 	endTime time.Time,
 	nodeID ids.NodeID,
 	nodeOwnerAddr ids.ShortID,
-	keys []*crypto.PrivateKeySECP256K1R,
+	keys []*secp256k1.PrivateKey,
 ) (*txs.Tx, error) {
 	env.state.SetShortIDLink(ids.ShortID(nodeID), state.ShortLinkKeyRegisterNode, &nodeOwnerAddr)
 	link := ids.ShortID(nodeID)
@@ -363,7 +363,7 @@ func addCaminoPendingValidator(
 	return tx, nil
 }
 
-func deferValidator(env *caminoEnvironment, nodeOwnerAddress ids.ShortID, key *crypto.PrivateKeySECP256K1R) (*txs.Tx, error) {
+func deferValidator(env *caminoEnvironment, nodeOwnerAddress ids.ShortID, key *secp256k1.PrivateKey) (*txs.Tx, error) {
 	outputOwners := &secp256k1fx.OutputOwners{
 		Locktime:  0,
 		Threshold: 1,
@@ -374,7 +374,7 @@ func deferValidator(env *caminoEnvironment, nodeOwnerAddress ids.ShortID, key *c
 		nodeOwnerAddress,
 		false,
 		txs.AddressStateNodeDeferred,
-		[]*crypto.PrivateKeySECP256K1R{key},
+		[]*secp256k1.PrivateKey{key},
 		outputOwners,
 	)
 	if err != nil {

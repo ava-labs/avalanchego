@@ -37,7 +37,7 @@ func (cs *caminoState) GetMultisigAlias(id ids.ShortID) (*multisig.AliasWithNonc
 		if alias == nil {
 			return nil, database.ErrNotFound
 		}
-		return alias.(*multisig.AliasWithNonce), nil
+		return alias, nil
 	}
 
 	maBytes, err := cs.multisigAliasesDB.Get(id[:])

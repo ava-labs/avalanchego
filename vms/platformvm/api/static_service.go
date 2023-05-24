@@ -8,7 +8,7 @@
 //
 // Much love to the original authors for their work.
 // **********************************************************
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package api
@@ -30,7 +30,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txheap"
-	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -97,12 +96,15 @@ func (utxo UTXO) Less(other UTXO) bool {
 // [NodeID] is the node ID of the staker
 // [Uptime] is the observed uptime of this staker
 type Staker struct {
-	TxID        ids.ID       `json:"txID"`
-	StartTime   json.Uint64  `json:"startTime"`
-	EndTime     json.Uint64  `json:"endTime"`
-	Weight      *json.Uint64 `json:"weight,omitempty"`
+	TxID      ids.ID      `json:"txID"`
+	StartTime json.Uint64 `json:"startTime"`
+	EndTime   json.Uint64 `json:"endTime"`
+	Weight    json.Uint64 `json:"weight"`
+	NodeID    ids.NodeID  `json:"nodeID"`
+
+	// Deprecated: Use Weight instead
+	// TODO: remove [StakeAmount] after enough time for dependencies to update
 	StakeAmount *json.Uint64 `json:"stakeAmount,omitempty"`
-	NodeID      ids.NodeID   `json:"nodeID"`
 }
 
 // Owner is the repr. of a reward owner sent over APIs.
@@ -131,8 +133,11 @@ type PermissionlessValidator struct {
 	Connected             bool                      `json:"connected"`
 	Staked                []UTXO                    `json:"staked,omitempty"`
 	Signer                *signer.ProofOfPossession `json:"signer,omitempty"`
+
 	// The delegators delegating to this validator
-	Delegators []PrimaryDelegator `json:"delegators"`
+	DelegatorCount  *json.Uint64        `json:"delegatorCount,omitempty"`
+	DelegatorWeight *json.Uint64        `json:"delegatorWeight,omitempty"`
+	Delegators      *[]PrimaryDelegator `json:"delegators,omitempty"`
 }
 
 // PermissionedValidator is the repr. of a permissioned validator sent over APIs.
@@ -148,17 +153,6 @@ type PrimaryDelegator struct {
 	Staker
 	RewardOwner     *Owner       `json:"rewardOwner,omitempty"`
 	PotentialReward *json.Uint64 `json:"potentialReward,omitempty"`
-}
-
-func (v *Staker) GetWeight() uint64 {
-	switch {
-	case v.Weight != nil:
-		return uint64(*v.Weight)
-	case v.StakeAmount != nil:
-		return uint64(*v.StakeAmount)
-	default:
-		return 0
-	}
 }
 
 // Chain defines a chain that exists
@@ -329,7 +323,7 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 				NetworkID:    uint32(args.NetworkID),
 				BlockchainID: ids.Empty,
 			}},
-			Validator: validator.Validator{
+			Validator: txs.Validator{
 				NodeID: vdr.NodeID,
 				Start:  uint64(args.Time),
 				End:    uint64(vdr.EndTime),
@@ -339,7 +333,7 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 			RewardsOwner:     owner,
 			DelegationShares: delegationFee,
 		}}
-		if err := tx.Sign(txs.GenesisCodec, nil); err != nil {
+		if err := tx.Initialize(txs.GenesisCodec); err != nil {
 			return err
 		}
 
@@ -365,7 +359,7 @@ func (*StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, repl
 			GenesisData: genesisBytes,
 			SubnetAuth:  &secp256k1fx.Input{},
 		}}
-		if err := tx.Sign(txs.GenesisCodec, nil); err != nil {
+		if err := tx.Initialize(txs.GenesisCodec); err != nil {
 			return err
 		}
 

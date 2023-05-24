@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package builder
@@ -11,8 +11,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto"
-	"github.com/ava-labs/avalanchego/vms/platformvm/message"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/vms/components/message"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 
 	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
@@ -25,12 +25,10 @@ func getValidTx(txBuilder txbuilder.Builder, t *testing.T) *txs.Tx {
 		constants.AVMID,
 		nil,
 		"chain name",
-		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		ids.ShortEmpty,
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	return tx
 }
 
@@ -63,7 +61,7 @@ func TestMempoolValidGossipedTxIsAddedToMempool(t *testing.T) {
 	env.ctx.Lock.Unlock()
 	// show that unknown tx is added to mempool
 	err = env.AppGossip(context.Background(), nodeID, msgBytes)
-	require.NoError(err, "error in reception of gossiped tx")
+	require.NoError(err)
 	require.True(env.Builder.Has(txID))
 	// Grab lock back
 	env.ctx.Lock.Lock()
@@ -73,13 +71,11 @@ func TestMempoolValidGossipedTxIsAddedToMempool(t *testing.T) {
 
 	// show gossiped bytes can be decoded to the original tx
 	replyIntf, err := message.Parse(gossipedBytes)
-	require.NoError(err, "failed to parse gossip")
+	require.NoError(err)
 
-	reply, ok := replyIntf.(*message.Tx)
-	require.True(ok, "unknown message type")
-
+	reply := replyIntf.(*message.Tx)
 	retrivedTx, err := txs.Parse(txs.Codec, reply.Tx)
-	require.NoError(err, "failed parsing tx")
+	require.NoError(err)
 
 	require.Equal(txID, retrivedTx.ID())
 }
@@ -97,7 +93,7 @@ func TestMempoolInvalidGossipedTxIsNotAddedToMempool(t *testing.T) {
 	// create a tx and mark as invalid
 	tx := getValidTx(env.txBuilder, t)
 	txID := tx.ID()
-	env.Builder.MarkDropped(txID, "dropped for testing")
+	env.Builder.MarkDropped(txID, errTestingDropped)
 
 	// show that the invalid tx is not requested
 	nodeID := ids.GenerateTestNodeID()
@@ -107,7 +103,7 @@ func TestMempoolInvalidGossipedTxIsNotAddedToMempool(t *testing.T) {
 	env.ctx.Lock.Unlock()
 	err = env.AppGossip(context.Background(), nodeID, msgBytes)
 	env.ctx.Lock.Lock()
-	require.NoError(err, "error in reception of gossiped tx")
+	require.NoError(err)
 	require.False(env.Builder.Has(txID))
 }
 
@@ -132,18 +128,16 @@ func TestMempoolNewLocaTxIsGossiped(t *testing.T) {
 	txID := tx.ID()
 
 	err := env.Builder.AddUnverifiedTx(tx)
-	require.NoError(err, "couldn't add tx to mempool")
+	require.NoError(err)
 	require.True(gossipedBytes != nil)
 
 	// show gossiped bytes can be decoded to the original tx
 	replyIntf, err := message.Parse(gossipedBytes)
-	require.NoError(err, "failed to parse gossip")
+	require.NoError(err)
 
-	reply, ok := replyIntf.(*message.Tx)
-	require.True(ok, "unknown message type")
-
+	reply := replyIntf.(*message.Tx)
 	retrivedTx, err := txs.Parse(txs.Codec, reply.Tx)
-	require.NoError(err, "failed parsing tx")
+	require.NoError(err)
 
 	require.Equal(txID, retrivedTx.ID())
 
@@ -151,7 +145,7 @@ func TestMempoolNewLocaTxIsGossiped(t *testing.T) {
 	gossipedBytes = nil
 	env.Builder.Remove([]*txs.Tx{tx})
 	err = env.Builder.Add(tx)
-	require.NoError(err, "could not reintroduce tx to mempool")
+	require.NoError(err)
 
 	require.True(gossipedBytes == nil)
 }

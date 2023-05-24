@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -60,7 +59,7 @@ var (
 	errClaimableCredentialMissmatch = errors.New("claimable credential isn't matching")
 	errDepositNotFound              = errors.New("deposit not found")
 	errWrongCredentialsNumber       = errors.New("unexpected number of credentials")
-	errWrongOwnerType               = errors.New("wrong owner type")
+	ErrWrongOwnerType               = errors.New("wrong owner type")
 	errImportedUTXOMissmatch        = errors.New("imported input doesn't match expected utxo")
 	errInputAmountMissmatch         = errors.New("utxo amount doesn't match input amount")
 	errInputsUTXOSMismatch          = errors.New("number of inputs is different from number of utxos")
@@ -177,7 +176,7 @@ func (e *CaminoStandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error 
 		return errStakeTooLong
 	}
 
-	if e.Backend.Bootstrapped.GetValue() {
+	if e.Backend.Bootstrapped.Get() {
 		currentTimestamp := e.State.GetTimestamp()
 		// Ensure the proposed validator starts after the current time
 		startTime := tx.StartTime()
@@ -196,7 +195,7 @@ func (e *CaminoStandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error 
 
 		rewardOwner, ok := tx.RewardsOwner.(*secp256k1fx.OutputOwners)
 		if !ok {
-			return errWrongOwnerType
+			return ErrWrongOwnerType
 		}
 
 		if err := e.Fx.VerifyMultisigOwner(
@@ -236,7 +235,7 @@ func (e *CaminoStandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error 
 		return err
 	}
 	e.State.PutPendingValidator(newStaker)
-	utxo.Consume(e.State, tx.Ins)
+	avax.Consume(e.State, tx.Ins)
 	if err := utxo.ProduceLocked(e.State, txID, tx.Outs, locked.StateBonded); err != nil {
 		return err
 	}
@@ -281,34 +280,8 @@ func (e *CaminoStandardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error 
 	return e.StandardTxExecutor.AddDelegatorTx(tx)
 }
 
-func (e *CaminoStandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
-	caminoConfig, err := e.State.CaminoConfig()
-	if err != nil {
-		return err
-	}
-
-	if caminoConfig.LockModeBondDeposit {
-		return errWrongTxType
-	}
-
-	if err := locked.VerifyLockMode(tx.Ins, tx.Outs, caminoConfig.LockModeBondDeposit); err != nil {
-		return err
-	}
-
-	// Signer (node signature) has to recover to nodeID in case we
-	// add a validator to the primary network
-	if tx.Subnet == constants.PrimaryNetworkID && tx.Signer.Key() != nil {
-		sigs := make([][crypto.SECP256K1RSigLen]byte, 1)
-		copy(sigs[0][:], tx.Signer.Signature()[:crypto.SECP256K1RSigLen])
-
-		if err := e.verifyNodeSignatureSig(tx.NodeID(),
-			&secp256k1fx.Credential{Sigs: sigs},
-		); err != nil {
-			return err
-		}
-	}
-
-	return e.StandardTxExecutor.AddPermissionlessValidatorTx(tx)
+func (*CaminoStandardTxExecutor) AddPermissionlessValidatorTx(*txs.AddPermissionlessValidatorTx) error {
+	return errWrongTxType
 }
 
 func (e *CaminoStandardTxExecutor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
@@ -591,10 +564,10 @@ func (e *CaminoProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) 
 
 	txID := e.Tx.ID()
 
-	utxo.Consume(e.OnCommitState, caminoTx.Ins)
-	utxo.Consume(e.OnAbortState, caminoTx.Ins)
-	utxo.Produce(e.OnCommitState, txID, caminoTx.Outs)
-	utxo.Produce(e.OnAbortState, txID, caminoTx.Outs)
+	avax.Consume(e.OnCommitState, caminoTx.Ins)
+	avax.Consume(e.OnAbortState, caminoTx.Ins)
+	avax.Produce(e.OnCommitState, txID, caminoTx.Outs)
+	avax.Produce(e.OnAbortState, txID, caminoTx.Outs)
 
 	return nil
 }
@@ -644,7 +617,7 @@ func (e *CaminoStandardTxExecutor) DepositTx(tx *txs.DepositTx) error {
 
 	rewardOwner, ok := tx.RewardsOwner.(*secp256k1fx.OutputOwners)
 	if !ok {
-		return errWrongOwnerType
+		return ErrWrongOwnerType
 	}
 
 	if err := e.Fx.VerifyMultisigOwner(
@@ -700,7 +673,7 @@ func (e *CaminoStandardTxExecutor) DepositTx(tx *txs.DepositTx) error {
 	e.State.SetCurrentSupply(constants.PrimaryNetworkID, newSupply)
 	e.State.AddDeposit(txID, deposit)
 
-	utxo.Consume(e.State, tx.Ins)
+	avax.Consume(e.State, tx.Ins)
 	if err := utxo.ProduceLocked(e.State, txID, tx.Outs, locked.StateDeposited); err != nil {
 		return err
 	}
@@ -772,7 +745,7 @@ func (e *CaminoStandardTxExecutor) UnlockDepositTx(tx *txs.UnlockDepositTx) erro
 				if err == database.ErrNotFound {
 					scepOwner, ok := deposit.RewardOwner.(*secp256k1fx.OutputOwners)
 					if !ok {
-						return errWrongOwnerType
+						return ErrWrongOwnerType
 					}
 					claimable = &state.Claimable{
 						Owner: scepOwner,
@@ -807,8 +780,8 @@ func (e *CaminoStandardTxExecutor) UnlockDepositTx(tx *txs.UnlockDepositTx) erro
 		}
 	}
 
-	utxo.Consume(e.State, tx.Ins)
-	utxo.Produce(e.State, txID, tx.Outs)
+	avax.Consume(e.State, tx.Ins)
+	avax.Produce(e.State, txID, tx.Outs)
 
 	return nil
 }
@@ -971,8 +944,8 @@ func (e *CaminoStandardTxExecutor) ClaimTx(tx *txs.ClaimTx) error {
 		return fmt.Errorf("%w: %s", errFlowCheckFailed, err)
 	}
 
-	utxo.Consume(e.State, tx.Ins)
-	utxo.Produce(e.State, txID, tx.Outs)
+	avax.Consume(e.State, tx.Ins)
+	avax.Produce(e.State, txID, tx.Outs)
 
 	return nil
 }
@@ -1079,9 +1052,9 @@ func (e *CaminoStandardTxExecutor) RegisterNodeTx(tx *txs.RegisterNodeTx) error 
 	txID := e.Tx.ID()
 
 	// Consume the UTXOS
-	utxo.Consume(e.State, tx.Ins)
+	avax.Consume(e.State, tx.Ins)
 	// Produce the UTXOS
-	utxo.Produce(e.State, txID, tx.Outs)
+	avax.Produce(e.State, txID, tx.Outs)
 
 	if !oldNodeIDEmpty {
 		e.State.SetShortIDLink(ids.ShortID(tx.OldNodeID), state.ShortLinkKeyRegisterNode, nil)
@@ -1117,7 +1090,7 @@ func (e *CaminoStandardTxExecutor) RewardsImportTx(tx *txs.RewardsImportTx) erro
 		return err
 	}
 
-	if e.Bootstrapped.GetValue() {
+	if e.Bootstrapped.Get() {
 		// Getting all treasury utxos exported from c-chain, collecting ones that are old enough
 
 		allUTXOBytes, _, _, err := e.Ctx.SharedMemory.Indexed(
@@ -1287,7 +1260,7 @@ func (e *CaminoStandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 		return err
 	}
 
-	if e.Bootstrapped.GetValue() {
+	if e.Bootstrapped.Get() {
 		if err := e.Backend.FlowChecker.VerifyLock(
 			tx,
 			e.State,
@@ -1303,8 +1276,8 @@ func (e *CaminoStandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 		}
 	}
 
-	utxo.Consume(e.State, tx.Ins)
-	utxo.Produce(e.State, e.Tx.ID(), tx.Outs)
+	avax.Consume(e.State, tx.Ins)
+	avax.Produce(e.State, e.Tx.ID(), tx.Outs)
 
 	return nil
 }
@@ -1379,9 +1352,9 @@ func (e *CaminoStandardTxExecutor) MultisigAliasTx(tx *txs.MultisigAliasTx) erro
 	})
 
 	// Consume the UTXOS
-	utxo.Consume(e.State, tx.Ins)
+	avax.Consume(e.State, tx.Ins)
 	// Produce the UTXOS
-	utxo.Produce(e.State, txID, tx.Outs)
+	avax.Produce(e.State, txID, tx.Outs)
 
 	return nil
 }
@@ -1482,9 +1455,9 @@ func (e *CaminoStandardTxExecutor) AddressStateTx(tx *txs.AddressStateTx) error 
 	}
 
 	// Consume the UTXOS
-	utxo.Consume(e.State, tx.Ins)
+	avax.Consume(e.State, tx.Ins)
 	// Produce the UTXOS
-	utxo.Produce(e.State, txID, tx.Outs)
+	avax.Produce(e.State, txID, tx.Outs)
 	// Set the new states if changed
 	if states != newStates {
 		e.State.SetAddressStates(tx.Address, newStates)

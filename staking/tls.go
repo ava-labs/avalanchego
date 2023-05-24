@@ -8,7 +8,7 @@
 //
 // Much love to the original authors for their work.
 // **********************************************************
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package staking
@@ -28,10 +28,10 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	utilsSecp256k1 "github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/decred/dcrd/dcrec/secp256k1/v3"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 )
 
 var errDuplicateExtension = errors.New("duplicate certificate extension")
@@ -142,9 +142,9 @@ func NewCertAndKeyBytesWithSecpKey(secpKey *secp256k1.PrivateKey) ([]byte, []byt
 	}
 	// Create SECP256K1 key to sign cert with
 	if secpKey == nil {
-		secpKey = crypto.RsaPrivateKeyToSecp256PrivateKey(rsaKey)
+		secpKey = utilsSecp256k1.RsaPrivateKeyToSecp256PrivateKey(rsaKey)
 	}
-	extension := crypto.SignRsaPublicKey(secpKey, &rsaKey.PublicKey)
+	extension := utilsSecp256k1.SignRsaPublicKey(secpKey, &rsaKey.PublicKey)
 
 	// Create self-signed staking cert
 	certTemplate := &x509.Certificate{

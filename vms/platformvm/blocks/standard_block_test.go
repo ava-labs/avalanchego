@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package blocks
@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -33,14 +32,14 @@ func TestNewBanffStandardBlock(t *testing.T) {
 				},
 			},
 			StakeOuts: []*avax.TransferableOutput{},
-			Validator: validator.Validator{},
+			Validator: txs.Validator{},
 			RewardsOwner: &secp256k1fx.OutputOwners{
 				Addrs: []ids.ShortID{},
 			},
 		},
 		Creds: []verify.Verifiable{},
 	}
-	require.NoError(tx.Sign(txs.Codec, nil))
+	require.NoError(tx.Initialize(txs.Codec))
 
 	blk, err := NewBanffStandardBlock(
 		timestamp,
@@ -51,8 +50,8 @@ func TestNewBanffStandardBlock(t *testing.T) {
 	require.NoError(err)
 
 	// Make sure the block and tx are initialized
-	require.NotNil(blk.Bytes())
-	require.NotNil(blk.Transactions[0].Bytes())
+	require.NotEmpty(blk.Bytes())
+	require.NotEmpty(blk.Transactions[0].Bytes())
 	require.NotEqual(ids.Empty, blk.Transactions[0].ID())
 	require.Equal(tx.Bytes(), blk.Transactions[0].Bytes())
 	require.Equal(timestamp, blk.Timestamp())
@@ -75,14 +74,14 @@ func TestNewApricotStandardBlock(t *testing.T) {
 				},
 			},
 			StakeOuts: []*avax.TransferableOutput{},
-			Validator: validator.Validator{},
+			Validator: txs.Validator{},
 			RewardsOwner: &secp256k1fx.OutputOwners{
 				Addrs: []ids.ShortID{},
 			},
 		},
 		Creds: []verify.Verifiable{},
 	}
-	require.NoError(tx.Sign(txs.Codec, nil))
+	require.NoError(tx.Initialize(txs.Codec))
 
 	blk, err := NewApricotStandardBlock(
 		parentID,
@@ -92,8 +91,8 @@ func TestNewApricotStandardBlock(t *testing.T) {
 	require.NoError(err)
 
 	// Make sure the block and tx are initialized
-	require.NotNil(blk.Bytes())
-	require.NotNil(blk.Transactions[0].Bytes())
+	require.NotEmpty(blk.Bytes())
+	require.NotEmpty(blk.Transactions[0].Bytes())
 	require.NotEqual(ids.Empty, blk.Transactions[0].ID())
 	require.Equal(tx.Bytes(), blk.Transactions[0].Bytes())
 	require.Equal(parentID, blk.Parent())

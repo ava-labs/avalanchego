@@ -90,18 +90,15 @@ func writeDeferredDiff(
 	deferredValidatorList linkeddb.LinkedDB,
 	validatorDiff *diffValidator,
 ) error {
-	if validatorDiff.validatorModified {
-		staker := validatorDiff.validator
-
-		var err error
-		if validatorDiff.validatorDeleted {
-			err = deferredValidatorList.Delete(staker.TxID[:])
-		} else {
-			err = deferredValidatorList.Put(staker.TxID[:], nil)
-		}
-		if err != nil {
-			return fmt.Errorf("failed to update deferred validator: %w", err)
-		}
+	var err error
+	switch validatorDiff.validatorStatus {
+	case added:
+		err = deferredValidatorList.Put(validatorDiff.validator.TxID[:], nil)
+	case deleted:
+		err = deferredValidatorList.Delete(validatorDiff.validator.TxID[:])
+	}
+	if err != nil {
+		return fmt.Errorf("failed to update deferred validator: %w", err)
 	}
 	return nil
 }

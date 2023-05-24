@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package blocks
@@ -69,7 +69,7 @@ type ApricotProposalBlock struct {
 
 func (b *ApricotProposalBlock) initialize(bytes []byte) error {
 	b.CommonBlock.initialize(bytes)
-	if err := b.Tx.Sign(txs.Codec, nil); err != nil {
+	if err := b.Tx.Initialize(txs.Codec); err != nil {
 		return fmt.Errorf("failed to initialize tx: %w", err)
 	}
 	return nil

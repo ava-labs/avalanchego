@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package gvalidators
@@ -6,15 +6,11 @@ package gvalidators
 import (
 	"context"
 	"errors"
-	"net"
 	"testing"
 
 	"github.com/golang/mock/gomock"
 
 	"github.com/stretchr/testify/require"
-
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/test/bufconn"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -23,8 +19,6 @@ import (
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/validatorstate"
 )
-
-const bufSize = 1024 * 1024
 
 var errCustom = errors.New("custom")
 
@@ -41,27 +35,19 @@ func setupState(t testing.TB, ctrl *gomock.Controller) *testState {
 		server: validators.NewMockState(ctrl),
 	}
 
-	listener := bufconn.Listen(bufSize)
+	listener, err := grpcutils.NewListener()
+	if err != nil {
+		t.Fatalf("Failed to create listener: %s", err)
+	}
 	serverCloser := grpcutils.ServerCloser{}
 
-	serverFunc := func(opts []grpc.ServerOption) *grpc.Server {
-		server := grpc.NewServer(opts...)
-		pb.RegisterValidatorStateServer(server, NewServer(state.server))
-		serverCloser.Add(server)
-		return server
-	}
+	server := grpcutils.NewServer()
+	pb.RegisterValidatorStateServer(server, NewServer(state.server))
+	serverCloser.Add(server)
 
-	go grpcutils.Serve(listener, serverFunc)
+	go grpcutils.Serve(listener, server)
 
-	dialer := grpc.WithContextDialer(
-		func(context.Context, string) (net.Conn, error) {
-			return listener.Dial()
-		},
-	)
-
-	dopts := grpcutils.DefaultDialOptions
-	dopts = append(dopts, dialer)
-	conn, err := grpcutils.Dial("", dopts...)
+	conn, err := grpcutils.Dial(listener.Addr().String())
 	if err != nil {
 		t.Fatalf("Failed to dial: %s", err)
 	}
@@ -118,6 +104,30 @@ func TestGetCurrentHeight(t *testing.T) {
 	state.server.EXPECT().GetCurrentHeight(gomock.Any()).Return(expectedHeight, errCustom)
 
 	_, err = state.client.GetCurrentHeight(context.Background())
+	require.Error(err)
+}
+
+func TestGetSubnetID(t *testing.T) {
+	require := require.New(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	state := setupState(t, ctrl)
+	defer state.closeFn()
+
+	// Happy path
+	chainID := ids.GenerateTestID()
+	expectedSubnetID := ids.GenerateTestID()
+	state.server.EXPECT().GetSubnetID(gomock.Any(), chainID).Return(expectedSubnetID, nil)
+
+	subnetID, err := state.client.GetSubnetID(context.Background(), chainID)
+	require.NoError(err)
+	require.Equal(expectedSubnetID, subnetID)
+
+	// Error path
+	state.server.EXPECT().GetSubnetID(gomock.Any(), chainID).Return(expectedSubnetID, errCustom)
+
+	_, err = state.client.GetSubnetID(context.Background(), chainID)
 	require.Error(err)
 }
 

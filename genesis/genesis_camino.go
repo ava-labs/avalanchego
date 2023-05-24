@@ -9,7 +9,7 @@ import (
 	_ "embed"
 
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/caminoconfig"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 )
 
@@ -39,7 +39,7 @@ var (
 				MintingPeriod:      5 * 365 * 24 * time.Hour,
 				SupplyCap:          1000 * units.MegaAvax,
 			},
-			CaminoConfig: config.CaminoConfig{
+			CaminoConfig: caminoconfig.Config{
 				DaoProposalBondAmount: 1 * units.KiloAvax,
 			},
 		},

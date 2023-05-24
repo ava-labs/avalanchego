@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
@@ -17,6 +17,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
+
+var errTest = errors.New("non-nil error")
 
 func TestInitialStateVerifySerialization(t *testing.T) {
 	c := linearcodec.NewDefault()
@@ -144,7 +146,7 @@ func TestInitialStateVerifyInvalidOutput(t *testing.T) {
 
 	is := InitialState{
 		FxIndex: 0,
-		Outs:    []verify.State{&avax.TestVerifiable{Err: errors.New("")}},
+		Outs:    []verify.State{&avax.TestVerifiable{Err: errTest}},
 	}
 	if err := is.Verify(m, numFxs); err == nil {
 		t.Fatalf("Should have erred due to an invalid output")

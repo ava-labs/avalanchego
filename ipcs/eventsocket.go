@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package ipcs
@@ -24,13 +24,31 @@ type EventSockets struct {
 }
 
 // newEventSockets creates a *ChainIPCs with both consensus and decisions IPCs
-func newEventSockets(ctx context, chainID ids.ID, consensusAcceptorGroup, decisionAcceptorGroup snow.AcceptorGroup) (*EventSockets, error) {
-	consensusIPC, err := newEventIPCSocket(ctx, chainID, ipcConsensusIdentifier, consensusAcceptorGroup)
+func newEventSockets(
+	ctx context,
+	chainID ids.ID,
+	blockAcceptorGroup snow.AcceptorGroup,
+	txAcceptorGroup snow.AcceptorGroup,
+	vertexAcceptorGroup snow.AcceptorGroup,
+) (*EventSockets, error) {
+	consensusIPC, err := newEventIPCSocket(
+		ctx,
+		chainID,
+		ipcConsensusIdentifier,
+		blockAcceptorGroup,
+		vertexAcceptorGroup,
+	)
 	if err != nil {
 		return nil, err
 	}
 
-	decisionsIPC, err := newEventIPCSocket(ctx, chainID, ipcDecisionsIdentifier, decisionAcceptorGroup)
+	decisionsIPC, err := newEventIPCSocket(
+		ctx,
+		chainID,
+		ipcDecisionsIdentifier,
+		blockAcceptorGroup,
+		txAcceptorGroup,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +111,13 @@ type eventSocket struct {
 
 // newEventIPCSocket creates a *eventSocket for the given chain and
 // EventDispatcher that writes to a local IPC socket
-func newEventIPCSocket(ctx context, chainID ids.ID, name string, acceptorGroup snow.AcceptorGroup) (*eventSocket, error) {
+func newEventIPCSocket(
+	ctx context,
+	chainID ids.ID,
+	name string,
+	snowmanAcceptorGroup snow.AcceptorGroup,
+	avalancheAcceptorGroup snow.AcceptorGroup,
+) (*eventSocket, error) {
 	var (
 		url     = ipcURL(ctx, chainID, name)
 		ipcName = ipcIdentifierPrefix + "-" + name
@@ -109,7 +133,12 @@ func newEventIPCSocket(ctx context, chainID ids.ID, name string, acceptorGroup s
 		url:    url,
 		socket: socket.NewSocket(url, ctx.log),
 		unregisterFn: func() error {
-			return acceptorGroup.DeregisterAcceptor(chainID, ipcName)
+			errs := wrappers.Errs{}
+			errs.Add(
+				snowmanAcceptorGroup.DeregisterAcceptor(chainID, ipcName),
+				avalancheAcceptorGroup.DeregisterAcceptor(chainID, ipcName),
+			)
+			return errs.Err
 		},
 	}
 
@@ -120,7 +149,14 @@ func newEventIPCSocket(ctx context, chainID ids.ID, name string, acceptorGroup s
 		return nil, err
 	}
 
-	if err := acceptorGroup.RegisterAcceptor(chainID, ipcName, eis, false); err != nil {
+	if err := snowmanAcceptorGroup.RegisterAcceptor(chainID, ipcName, eis, false); err != nil {
+		if err := eis.stop(); err != nil {
+			return nil, err
+		}
+		return nil, err
+	}
+
+	if err := avalancheAcceptorGroup.RegisterAcceptor(chainID, ipcName, eis, false); err != nil {
 		if err := eis.stop(); err != nil {
 			return nil, err
 		}

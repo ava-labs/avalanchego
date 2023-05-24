@@ -28,6 +28,8 @@ type ValidatorStateClient interface {
 	GetMinimumHeight(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetMinimumHeightResponse, error)
 	// GetCurrentHeight returns the current height of the P-chain.
 	GetCurrentHeight(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetCurrentHeightResponse, error)
+	// GetSubnetID returns the subnetID of the provided chain.
+	GetSubnetID(ctx context.Context, in *GetSubnetIDRequest, opts ...grpc.CallOption) (*GetSubnetIDResponse, error)
 	// GetValidatorSet returns the weights of the nodeIDs for the provided
 	// subnet at the requested P-chain height.
 	GetValidatorSet(ctx context.Context, in *GetValidatorSetRequest, opts ...grpc.CallOption) (*GetValidatorSetResponse, error)
@@ -59,6 +61,15 @@ func (c *validatorStateClient) GetCurrentHeight(ctx context.Context, in *emptypb
 	return out, nil
 }
 
+func (c *validatorStateClient) GetSubnetID(ctx context.Context, in *GetSubnetIDRequest, opts ...grpc.CallOption) (*GetSubnetIDResponse, error) {
+	out := new(GetSubnetIDResponse)
+	err := c.cc.Invoke(ctx, "/validatorstate.ValidatorState/GetSubnetID", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *validatorStateClient) GetValidatorSet(ctx context.Context, in *GetValidatorSetRequest, opts ...grpc.CallOption) (*GetValidatorSetResponse, error) {
 	out := new(GetValidatorSetResponse)
 	err := c.cc.Invoke(ctx, "/validatorstate.ValidatorState/GetValidatorSet", in, out, opts...)
@@ -77,6 +88,8 @@ type ValidatorStateServer interface {
 	GetMinimumHeight(context.Context, *emptypb.Empty) (*GetMinimumHeightResponse, error)
 	// GetCurrentHeight returns the current height of the P-chain.
 	GetCurrentHeight(context.Context, *emptypb.Empty) (*GetCurrentHeightResponse, error)
+	// GetSubnetID returns the subnetID of the provided chain.
+	GetSubnetID(context.Context, *GetSubnetIDRequest) (*GetSubnetIDResponse, error)
 	// GetValidatorSet returns the weights of the nodeIDs for the provided
 	// subnet at the requested P-chain height.
 	GetValidatorSet(context.Context, *GetValidatorSetRequest) (*GetValidatorSetResponse, error)
@@ -92,6 +105,9 @@ func (UnimplementedValidatorStateServer) GetMinimumHeight(context.Context, *empt
 }
 func (UnimplementedValidatorStateServer) GetCurrentHeight(context.Context, *emptypb.Empty) (*GetCurrentHeightResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetCurrentHeight not implemented")
+}
+func (UnimplementedValidatorStateServer) GetSubnetID(context.Context, *GetSubnetIDRequest) (*GetSubnetIDResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetSubnetID not implemented")
 }
 func (UnimplementedValidatorStateServer) GetValidatorSet(context.Context, *GetValidatorSetRequest) (*GetValidatorSetResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetValidatorSet not implemented")
@@ -145,6 +161,24 @@ func _ValidatorState_GetCurrentHeight_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ValidatorState_GetSubnetID_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetSubnetIDRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ValidatorStateServer).GetSubnetID(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/validatorstate.ValidatorState/GetSubnetID",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ValidatorStateServer).GetSubnetID(ctx, req.(*GetSubnetIDRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _ValidatorState_GetValidatorSet_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetValidatorSetRequest)
 	if err := dec(in); err != nil {
@@ -177,6 +211,10 @@ var ValidatorState_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetCurrentHeight",
 			Handler:    _ValidatorState_GetCurrentHeight_Handler,
+		},
+		{
+			MethodName: "GetSubnetID",
+			Handler:    _ValidatorState_GetSubnetID_Handler,
 		},
 		{
 			MethodName: "GetValidatorSet",

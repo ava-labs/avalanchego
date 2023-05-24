@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package config
@@ -54,6 +54,10 @@ const (
 	HTTPAllowedOrigins                                 = "http-allowed-origins"
 	HTTPShutdownTimeoutKey                             = "http-shutdown-timeout"
 	HTTPShutdownWaitKey                                = "http-shutdown-wait"
+	HTTPReadTimeoutKey                                 = "http-read-timeout"
+	HTTPReadHeaderTimeoutKey                           = "http-read-header-timeout"
+	HTTPWriteTimeoutKey                                = "http-write-timeout"
+	HTTPIdleTimeoutKey                                 = "http-idle-timeout"
 	APIAuthRequiredKey                                 = "api-auth-required"
 	APIAuthPasswordKey                                 = "api-auth-password"
 	APIAuthPasswordFileKey                             = "api-auth-password-file"
@@ -100,11 +104,12 @@ const (
 	NetworkRequireValidatorToConnectKey                = "network-require-validator-to-connect"
 	NetworkPeerReadBufferSizeKey                       = "network-peer-read-buffer-size"
 	NetworkPeerWriteBufferSizeKey                      = "network-peer-write-buffer-size"
+	NetworkTCPProxyEnabledKey                          = "network-tcp-proxy-enabled"
+	NetworkTCPProxyReadTimeoutKey                      = "network-tcp-proxy-read-timeout"
 	NetworkTLSKeyLogFileKey                            = "network-tls-key-log-file-unsafe"
 	BenchlistFailThresholdKey                          = "benchlist-fail-threshold"
 	BenchlistDurationKey                               = "benchlist-duration"
 	BenchlistMinFailingDurationKey                     = "benchlist-min-failing-duration"
-	BuildDirKey                                        = "build-dir"
 	LogsDirKey                                         = "log-dir"
 	LogLevelKey                                        = "log-level"
 	LogDisplayLevelKey                                 = "log-display-level"
@@ -126,7 +131,7 @@ const (
 	SnowMaxTimeProcessingKey                           = "snow-max-time-processing"
 	SnowMixedQueryNumPushVdrKey                        = "snow-mixed-query-num-push-vdr"
 	SnowMixedQueryNumPushNonVdrKey                     = "snow-mixed-query-num-push-non-vdr"
-	WhitelistedSubnetsKey                              = "whitelisted-subnets"
+	TrackSubnetsKey                                    = "track-subnets"
 	AdminAPIEnabledKey                                 = "api-admin-enabled"
 	InfoAPIEnabledKey                                  = "api-info-enabled"
 	KeystoreAPIEnabledKey                              = "api-keystore-enabled"
@@ -157,7 +162,7 @@ const (
 	HealthCheckAveragerHalflifeKey                     = "health-check-averager-halflife"
 	RetryBootstrapKey                                  = "bootstrap-retry-enabled"
 	RetryBootstrapWarnFrequencyKey                     = "bootstrap-retry-warn-frequency"
-	PluginModeKey                                      = "plugin-mode-enabled"
+	PluginDirKey                                       = "plugin-dir"
 	BootstrapBeaconConnectionTimeoutKey                = "bootstrap-beacon-connection-timeout"
 	BootstrapMaxTimeGetAncestorsKey                    = "bootstrap-max-time-get-ancestors"
 	BootstrapAncestorsMaxContainersSentKey             = "bootstrap-ancestors-max-containers-sent"

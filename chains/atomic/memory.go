@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package atomic
@@ -49,7 +49,7 @@ func (m *Memory) NewSharedMemory(chainID ids.ID) SharedMemory {
 // database
 //
 // Invariant: ReleaseSharedDatabase must be called after to free the database
-//            associated with [sharedID]
+// associated with [sharedID]
 func (m *Memory) GetSharedDatabase(db database.Database, sharedID ids.ID) database.Database {
 	lock := m.makeLock(sharedID)
 	lock.Lock()
@@ -59,9 +59,8 @@ func (m *Memory) GetSharedDatabase(db database.Database, sharedID ids.ID) databa
 // ReleaseSharedDatabase unlocks the provided DB
 //
 // Note: ReleaseSharedDatabase must be called only after a corresponding call to
-//       GetSharedDatabase.
-//       If ReleaseSharedDatabase is called without a corresponding one-to-one
-//       call with GetSharedDatabase, it will panic.
+// GetSharedDatabase. If ReleaseSharedDatabase is called without a corresponding
+// one-to-one call with GetSharedDatabase, it will panic.
 func (m *Memory) ReleaseSharedDatabase(sharedID ids.ID) {
 	lock := m.releaseLock(sharedID)
 	lock.Unlock()

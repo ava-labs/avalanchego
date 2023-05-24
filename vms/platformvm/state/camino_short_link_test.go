@@ -49,7 +49,7 @@ func TestGetShortIDLink(t *testing.T) {
 		},
 		"Fail: shortID link in cache, but removed": {
 			caminoState: func(c *gomock.Controller) *caminoState {
-				cache := cache.NewMockCacher(c)
+				cache := cache.NewMockCacher[ids.ID, *ids.ShortID](c)
 				cache.EXPECT().Get(linkKey).Return(nil, true)
 				return &caminoState{
 					shortLinksCache: cache,
@@ -68,7 +68,7 @@ func TestGetShortIDLink(t *testing.T) {
 		},
 		"Fail: not found in db": {
 			caminoState: func(c *gomock.Controller) *caminoState {
-				cache := cache.NewMockCacher(c)
+				cache := cache.NewMockCacher[ids.ID, *ids.ShortID](c)
 				cache.EXPECT().Get(linkKey).Return(nil, false)
 				cache.EXPECT().Put(linkKey, nil)
 				db := database.NewMockDatabase(c)
@@ -111,8 +111,8 @@ func TestGetShortIDLink(t *testing.T) {
 		},
 		"OK: shortID link in cache": {
 			caminoState: func(c *gomock.Controller) *caminoState {
-				cache := cache.NewMockCacher(c)
-				cache.EXPECT().Get(linkKey).Return(shortID2, true)
+				cache := cache.NewMockCacher[ids.ID, *ids.ShortID](c)
+				cache.EXPECT().Get(linkKey).Return(&shortID2, true)
 				return &caminoState{
 					shortLinksCache: cache,
 					caminoDiff:      &caminoDiff{},
@@ -130,9 +130,9 @@ func TestGetShortIDLink(t *testing.T) {
 		},
 		"OK: shortID link in db": {
 			caminoState: func(c *gomock.Controller) *caminoState {
-				cache := cache.NewMockCacher(c)
+				cache := cache.NewMockCacher[ids.ID, *ids.ShortID](c)
 				cache.EXPECT().Get(linkKey).Return(nil, false)
-				cache.EXPECT().Put(linkKey, shortID2)
+				cache.EXPECT().Put(linkKey, &shortID2)
 				db := database.NewMockDatabase(c)
 				db.EXPECT().Get(linkKey[:]).Return(shortID2[:], nil)
 				return &caminoState{
@@ -154,7 +154,7 @@ func TestGetShortIDLink(t *testing.T) {
 		},
 		"Fail: db error": {
 			caminoState: func(c *gomock.Controller) *caminoState {
-				cache := cache.NewMockCacher(c)
+				cache := cache.NewMockCacher[ids.ID, *ids.ShortID](c)
 				cache.EXPECT().Get(linkKey).Return(nil, false)
 				db := database.NewMockDatabase(c)
 				db.EXPECT().Get(linkKey[:]).Return(nil, testError)
@@ -203,7 +203,7 @@ func TestSetShortIDLink(t *testing.T) {
 	}{
 		"OK: set link": {
 			caminoState: func(c *gomock.Controller) *caminoState {
-				cache := cache.NewMockCacher(c)
+				cache := cache.NewMockCacher[ids.ID, *ids.ShortID](c)
 				cache.EXPECT().Evict(linkKey)
 				return &caminoState{
 					shortLinksCache: cache,
@@ -224,7 +224,7 @@ func TestSetShortIDLink(t *testing.T) {
 		},
 		"OK: remove link": {
 			caminoState: func(c *gomock.Controller) *caminoState {
-				cache := cache.NewMockCacher(c)
+				cache := cache.NewMockCacher[ids.ID, *ids.ShortID](c)
 				cache.EXPECT().Evict(linkKey)
 				return &caminoState{
 					shortLinksCache: cache,

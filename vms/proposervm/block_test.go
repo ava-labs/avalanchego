@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package proposervm
@@ -62,12 +62,12 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 		ChainVM:        innerVM,
 		blockBuilderVM: innerBlockBuilderVM,
 		ctx: &snow.Context{
-			ValidatorState:    vdrState,
-			Log:               logging.NoLog{},
-			StakingCertLeaf:   &x509.Certificate{},
-			StakingLeafSigner: pk,
+			ValidatorState: vdrState,
+			Log:            logging.NoLog{},
 		},
-		Windower: windower,
+		Windower:          windower,
+		stakingCertLeaf:   &x509.Certificate{},
+		stakingLeafSigner: pk,
 	}
 
 	blk := &postForkCommonComponents{

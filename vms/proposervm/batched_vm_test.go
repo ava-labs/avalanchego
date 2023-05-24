@@ -8,7 +8,7 @@
 //
 // Much love to the original authors for their work.
 // **********************************************************
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package proposervm
@@ -17,7 +17,6 @@ import (
 	"bytes"
 	"context"
 	"crypto"
-	"errors"
 	"testing"
 	"time"
 
@@ -638,7 +637,7 @@ func TestBatchedParseBlockPreForkOnly(t *testing.T) {
 			case bytes.Equal(blkBytes, coreBlk3.Bytes()):
 				res = append(res, coreBlk3)
 			default:
-				return nil, errors.New("Unexpected call to parse unknown block")
+				return nil, errUnknownBlock
 			}
 		}
 		return res, nil
@@ -744,7 +743,7 @@ func TestBatchedParseBlockPostForkOnly(t *testing.T) {
 			case bytes.Equal(blkBytes, coreBlk3.Bytes()):
 				res = append(res, coreBlk3)
 			default:
-				return nil, errors.New("Unexpected call to parse unknown block")
+				return nil, errUnknownBlock
 			}
 		}
 		return res, nil
@@ -904,7 +903,7 @@ func TestBatchedParseBlockAtSnomanPlusPlusFork(t *testing.T) {
 			case bytes.Equal(blkBytes, coreBlk4.Bytes()):
 				res = append(res, coreBlk4)
 			default:
-				return nil, errors.New("Unexpected call to parse unknown block")
+				return nil, errUnknownBlock
 			}
 		}
 		return res, nil
@@ -990,7 +989,14 @@ func initTestRemoteProposerVM(
 		}
 	}
 
-	proVM := New(coreVM, proBlkStartTime, 0, DefaultMinBlockDelay)
+	proVM := New(
+		coreVM,
+		proBlkStartTime,
+		0,
+		DefaultMinBlockDelay,
+		pTestCert.PrivateKey.(crypto.Signer),
+		pTestCert.Leaf,
+	)
 
 	valState := &validators.TestState{
 		T: t,
@@ -1024,8 +1030,6 @@ func initTestRemoteProposerVM(
 
 	ctx := snow.DefaultContextTest()
 	ctx.NodeID = pTestNodeID
-	ctx.StakingCertLeaf = pTestCert.Leaf
-	ctx.StakingLeafSigner = pTestCert.PrivateKey.(crypto.Signer)
 	ctx.ValidatorState = valState
 
 	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)

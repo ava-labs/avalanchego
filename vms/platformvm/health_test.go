@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package platformvm
@@ -68,7 +68,7 @@ func TestHealthCheckSubnet(t *testing.T) {
 
 			subnetID := ids.GenerateTestID()
 			subnetVdrs := validators.NewSet()
-			vm.WhitelistedSubnets.Add(subnetID)
+			vm.TrackedSubnets.Add(subnetID)
 			testVdrCount := 4
 			for i := 0; i < testVdrCount; i++ {
 				subnetVal := ids.GenerateTestNodeID()

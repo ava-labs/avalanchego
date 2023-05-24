@@ -34,9 +34,7 @@ message ReadResponse {
   // read is the payload in bytes
   bytes read = 1;
   // error is an error message
-  string error = 2;
-  // errored is true if an error has been set
-  bool errored = 3;
+  optional string error = 2;
 }
 
 message WriteRequest {
@@ -48,9 +46,7 @@ message WriteResponse {
   // length of the response in bytes
   int32 length = 1;
   // error is an error message
-  string error = 2;
-  // errored is true if an error has been set
-  bool errored = 3;
+  optional string error = 2;
 }
 
 message SetDeadlineRequest {
