@@ -742,7 +742,12 @@ func (db *merkleDB) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 // As soon as [db.nodeCache] no longer has [node], [db.nodeDB] does.
 // Non-nil error is fatal -- causes [db] to close.
 func (db *merkleDB) onEviction(n *node) error {
+	if n.hasValue() {
+		return nil
+	}
+
 	batch := db.nodeDB.NewBatch()
+
 	if err := writeNodeToBatch(batch, n); err != nil {
 		return err
 	}
@@ -754,6 +759,9 @@ func (db *merkleDB) onEviction(n *node) error {
 	var err error
 	for removedCount := 0; removedCount < evictionBatchSize; removedCount++ {
 		_, n, exists := db.nodeCache.removeOldest()
+		if n.hasValue() {
+			continue
+		}
 		if !exists {
 			// The cache is empty.
 			break
