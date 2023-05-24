@@ -146,7 +146,7 @@ func (cs *caminoState) writeDeposits() error {
 		cs.depositsNextToUnlockTime = &nextUnlockTime
 	}
 
-	// adding new deposits to db
+	// adding new deposits to db, deleting removed deposits from db
 	for depositTxID, depositDiff := range cs.modifiedDeposits {
 		delete(cs.modifiedDeposits, depositTxID)
 		if depositDiff.removed {

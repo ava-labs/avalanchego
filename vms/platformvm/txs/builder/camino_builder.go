@@ -676,7 +676,7 @@ func (b *caminoBuilder) NewSystemUnlockDepositTx(
 		}},
 	}
 
-	tx, err := txs.NewSigned(utx, txs.Codec, make([][]*secp256k1.PrivateKey, len(ins)))
+	tx, err := txs.NewSigned(utx, txs.Codec, nil)
 	if err != nil {
 		return nil, err
 	}
