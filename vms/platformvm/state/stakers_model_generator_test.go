@@ -14,8 +14,8 @@ import (
 	"github.com/leanovate/gopter/prop"
 )
 
-// TestGeneratedStakersValidity documents and verifies the
-// invariants enforced by the staker generator
+// TestGeneratedStakersValidity tests the staker generator itself.
+// It documents and verifies theinvariants enforced by the staker generator.
 func TestGeneratedStakersValidity(t *testing.T) {
 	properties := gopter.NewProperties(nil)
 

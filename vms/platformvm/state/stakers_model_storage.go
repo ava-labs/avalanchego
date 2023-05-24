@@ -224,7 +224,7 @@ type stakersStorageIteratorModel struct {
 	// sortedStakers contains the sorted list of stakers
 	// as it should be returned by iteration.
 	// sortedStakers must be sorted upon stakersStorageIteratorModel creation.
-	// Stakers are evicted from sortedStakers as Value() is called.
+	// Stakers are evicted from sortedStakers as Next() is called.
 	sortedStakers []*Staker
 }
 

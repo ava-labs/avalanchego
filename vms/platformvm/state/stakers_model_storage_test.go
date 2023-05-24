@@ -240,6 +240,8 @@ func (*deleteCurrentValidatorCommand) Run(sut commands.SystemUnderTest) commands
 	if err != nil {
 		panic(err)
 	}
+	defer stakerIt.Release()
+
 	var (
 		found     = false
 		validator *Staker
@@ -255,7 +257,6 @@ func (*deleteCurrentValidatorCommand) Run(sut commands.SystemUnderTest) commands
 	if !found {
 		return sys // no current validator to delete
 	}
-	stakerIt.Release()
 
 	topDiff.DeleteCurrentValidator(validator)
 	return sys // returns sys to allow comparison with state in PostCondition
@@ -267,6 +268,7 @@ func (*deleteCurrentValidatorCommand) NextState(cmdState commands.State) command
 	if err != nil {
 		return err
 	}
+	defer stakerIt.Release()
 
 	var (
 		found     = false
@@ -283,7 +285,6 @@ func (*deleteCurrentValidatorCommand) NextState(cmdState commands.State) command
 	if !found {
 		return cmdState // no current validator to add delegator to
 	}
-	stakerIt.Release()
 
 	model.DeleteCurrentValidator(validator)
 	return cmdState
@@ -338,6 +339,7 @@ func addCurrentDelegatorInSystem(sys *sysUnderTest, candidateDelegator *Staker) 
 	if err != nil {
 		return err
 	}
+	defer stakerIt.Release()
 
 	var (
 		found     = false
@@ -354,7 +356,6 @@ func addCurrentDelegatorInSystem(sys *sysUnderTest, candidateDelegator *Staker) 
 	if !found {
 		return nil // no current validator to add delegator to
 	}
-	stakerIt.Release()
 
 	// 2. Add a delegator to it
 	delegator := candidateDelegator
@@ -385,6 +386,7 @@ func addCurrentDelegatorInModel(model *stakersStorageModel, candidateDelegator *
 	if err != nil {
 		return err
 	}
+	defer stakerIt.Release()
 
 	var (
 		found     = false
@@ -401,7 +403,6 @@ func addCurrentDelegatorInModel(model *stakersStorageModel, candidateDelegator *
 	if !found {
 		return nil // no current validator to add delegator to
 	}
-	stakerIt.Release()
 
 	// 2. Add a delegator to it
 	delegator := candidateDelegator
@@ -451,6 +452,8 @@ func (*deleteCurrentDelegatorCommand) Run(sut commands.SystemUnderTest) commands
 	if err != nil {
 		panic(err)
 	}
+	defer stakerIt.Release()
+
 	var (
 		found     = false
 		delegator *Staker
@@ -465,7 +468,6 @@ func (*deleteCurrentDelegatorCommand) Run(sut commands.SystemUnderTest) commands
 	if !found {
 		return sys // no current validator to delete
 	}
-	stakerIt.Release()
 
 	topDiff.DeleteCurrentDelegator(delegator)
 	return sys // returns sys to allow comparison with state in PostCondition
@@ -477,6 +479,7 @@ func (*deleteCurrentDelegatorCommand) NextState(cmdState commands.State) command
 	if err != nil {
 		return err
 	}
+	defer stakerIt.Release()
 
 	var (
 		found     = false
@@ -492,7 +495,6 @@ func (*deleteCurrentDelegatorCommand) NextState(cmdState commands.State) command
 	if !found {
 		return cmdState // no current validator to add delegator to
 	}
-	stakerIt.Release()
 
 	model.DeleteCurrentDelegator(delegator)
 	return cmdState
