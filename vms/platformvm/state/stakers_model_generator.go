@@ -68,7 +68,7 @@ func stakerGenerator(
 }
 
 // stakerTimeData holds Staker's time related data in order to generate them
-// while fullfilling the following constrains:
+// while fulfilling the following constrains:
 // 1. EndTime >= StartTime
 // 2. NextTime == EndTime for current priorities
 // 3. NextTime == StartTime for pending priorities
@@ -205,7 +205,7 @@ var genID = gen.SliceOfN(lengthID, gen.UInt8()).FlatMap(
 	reflect.TypeOf([]byte{}),
 )
 
-// genID is the helper generator for ids.NodeID objects
+// genNodeID is the helper generator for ids.NodeID objects
 var genNodeID = gen.SliceOfN(lengthNodeID, gen.UInt8()).FlatMap(
 	func(v interface{}) gopter.Gen {
 		byteSlice := v.([]byte)
