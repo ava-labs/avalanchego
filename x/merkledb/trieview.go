@@ -95,7 +95,7 @@ type trieView struct {
 	// A Nothing value indicates that the key has been removed.
 	unappliedValueChanges map[path]Maybe[[]byte]
 
-	db *Database
+	db *merkleDB
 
 	// The root of the trie represented by this view.
 	root *node
@@ -155,7 +155,7 @@ func (t *trieView) NewPreallocatedView(
 
 // Creates a new view with the given [parentTrie].
 func newTrieView(
-	db *Database,
+	db *merkleDB,
 	parentTrie TrieView,
 	root *node,
 	estimatedSize int,
@@ -176,7 +176,7 @@ func newTrieView(
 
 // Creates a new view with the given [parentTrie].
 func newTrieViewWithChanges(
-	db *Database,
+	db *merkleDB,
 	parentTrie TrieView,
 	changes *changeSummary,
 	estimatedSize int,
