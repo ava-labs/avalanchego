@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avm
@@ -20,7 +20,7 @@ var addrStrArray = []string{
 	"Jz9ayEDt7dx9hDx45aXALujWmL9ZUuqe7",
 }
 
-var testHRP = constants.NetworkIDToHRP[networkID]
+var testHRP = constants.NetworkIDToHRP[constants.UnitTestID]
 
 func TestBuildGenesis(t *testing.T) {
 	ss := CreateStaticService()

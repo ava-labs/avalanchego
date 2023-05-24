@@ -8,7 +8,7 @@
 //
 // Much love to the original authors for their work.
 // **********************************************************
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package platformvm
@@ -20,7 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
@@ -38,14 +38,24 @@ type Client interface {
 	// GetHeight returns the current block height of the P Chain
 	GetHeight(ctx context.Context, options ...rpc.Option) (uint64, error)
 	// ExportKey returns the private key corresponding to [address] from [user]'s account
-	ExportKey(ctx context.Context, user api.UserPass, address ids.ShortID, options ...rpc.Option) (*crypto.PrivateKeySECP256K1R, error)
+	//
+	// Deprecated: Keys should no longer be stored on the node.
+	ExportKey(ctx context.Context, user api.UserPass, address ids.ShortID, options ...rpc.Option) (*secp256k1.PrivateKey, error)
 	// ImportKey imports the specified [privateKey] to [user]'s keystore
-	ImportKey(ctx context.Context, user api.UserPass, privateKey *crypto.PrivateKeySECP256K1R, options ...rpc.Option) (ids.ShortID, error)
+	//
+	// Deprecated: Keys should no longer be stored on the node.
+	ImportKey(ctx context.Context, user api.UserPass, privateKey *secp256k1.PrivateKey, options ...rpc.Option) (ids.ShortID, error)
 	// GetBalance returns the balance of [addrs] on the P Chain
+	//
+	// Deprecated: GetUTXOs should be used instead.
 	GetBalance(ctx context.Context, addrs []ids.ShortID, options ...rpc.Option) (*GetBalanceResponse, error)
 	// CreateAddress creates a new address for [user]
+	//
+	// Deprecated: Keys should no longer be stored on the node.
 	CreateAddress(ctx context.Context, user api.UserPass, options ...rpc.Option) (ids.ShortID, error)
 	// ListAddresses returns an array of platform addresses controlled by [user]
+	//
+	// Deprecated: Keys should no longer be stored on the node.
 	ListAddresses(ctx context.Context, user api.UserPass, options ...rpc.Option) ([]ids.ShortID, error)
 	// GetUTXOs returns the byte representation of the UTXOs controlled by [addrs]
 	GetUTXOs(
@@ -68,6 +78,8 @@ type Client interface {
 		options ...rpc.Option,
 	) ([][]byte, ids.ShortID, ids.ID, error)
 	// GetSubnets returns information about the specified subnets
+	//
+	// Deprecated: Subnets should be fetched from a dedicated indexer.
 	GetSubnets(ctx context.Context, subnetIDs []ids.ID, options ...rpc.Option) ([]ClientSubnet, error)
 	// GetStakingAssetID returns the assetID of the asset used for staking on
 	// subnet corresponding to [subnetID]
@@ -82,6 +94,9 @@ type Client interface {
 	SampleValidators(ctx context.Context, subnetID ids.ID, sampleSize uint16, options ...rpc.Option) ([]ids.NodeID, error)
 	// AddValidator issues a transaction to add a validator to the primary network
 	// and returns the txID
+	//
+	// Deprecated: Transactions should be issued using the
+	// `avalanchego/wallet/chain/p.Wallet` utility.
 	AddValidator(
 		ctx context.Context,
 		user api.UserPass,
@@ -97,6 +112,9 @@ type Client interface {
 	) (ids.ID, error)
 	// AddDelegator issues a transaction to add a delegator to the primary network
 	// and returns the txID
+	//
+	// Deprecated: Transactions should be issued using the
+	// `avalanchego/wallet/chain/p.Wallet` utility.
 	AddDelegator(
 		ctx context.Context,
 		user api.UserPass,
@@ -111,6 +129,9 @@ type Client interface {
 	) (ids.ID, error)
 	// AddSubnetValidator issues a transaction to add validator [nodeID] to subnet
 	// with ID [subnetID] and returns the txID
+	//
+	// Deprecated: Transactions should be issued using the
+	// `avalanchego/wallet/chain/p.Wallet` utility.
 	AddSubnetValidator(
 		ctx context.Context,
 		user api.UserPass,
@@ -124,6 +145,9 @@ type Client interface {
 		options ...rpc.Option,
 	) (ids.ID, error)
 	// CreateSubnet issues a transaction to create [subnet] and returns the txID
+	//
+	// Deprecated: Transactions should be issued using the
+	// `avalanchego/wallet/chain/p.Wallet` utility.
 	CreateSubnet(
 		ctx context.Context,
 		user api.UserPass,
@@ -134,6 +158,9 @@ type Client interface {
 		options ...rpc.Option,
 	) (ids.ID, error)
 	// ExportAVAX issues an ExportTx transaction and returns the txID
+	//
+	// Deprecated: Transactions should be issued using the
+	// `avalanchego/wallet/chain/p.Wallet` utility.
 	ExportAVAX(
 		ctx context.Context,
 		user api.UserPass,
@@ -145,6 +172,9 @@ type Client interface {
 		options ...rpc.Option,
 	) (ids.ID, error)
 	// ImportAVAX issues an ImportTx transaction and returns the txID
+	//
+	// Deprecated: Transactions should be issued using the
+	// `avalanchego/wallet/chain/p.Wallet` utility.
 	ImportAVAX(
 		ctx context.Context,
 		user api.UserPass,
@@ -155,6 +185,9 @@ type Client interface {
 		options ...rpc.Option,
 	) (ids.ID, error)
 	// CreateBlockchain issues a CreateBlockchain transaction and returns the txID
+	//
+	// Deprecated: Transactions should be issued using the
+	// `avalanchego/wallet/chain/p.Wallet` utility.
 	CreateBlockchain(
 		ctx context.Context,
 		user api.UserPass,
@@ -174,6 +207,8 @@ type Client interface {
 	// Validates returns the list of blockchains that are validated by the subnet with ID [subnetID]
 	Validates(ctx context.Context, subnetID ids.ID, options ...rpc.Option) ([]ids.ID, error)
 	// GetBlockchains returns the list of blockchains on the platform
+	//
+	// Deprecated: Blockchains should be fetched from a dedicated indexer.
 	GetBlockchains(ctx context.Context, options ...rpc.Option) ([]APIBlockchain, error)
 	// IssueTx issues the transaction and returns its txID
 	IssueTx(ctx context.Context, tx []byte, options ...rpc.Option) (ids.ID, error)
@@ -183,6 +218,8 @@ type Client interface {
 	GetTxStatus(ctx context.Context, txID ids.ID, options ...rpc.Option) (*GetTxStatusResponse, error)
 	// AwaitTxDecided polls [GetTxStatus] until a status is returned that
 	// implies the tx may be decided.
+	// TODO: Move this function off of the Client interface into a utility
+	// function.
 	AwaitTxDecided(
 		ctx context.Context,
 		txID ids.ID,
@@ -191,6 +228,9 @@ type Client interface {
 	) (*GetTxStatusResponse, error)
 	// GetStake returns the amount of nAVAX that [addrs] have cumulatively
 	// staked on the Primary Network.
+	//
+	// Deprecated: Stake should be calculated using GetTx, GetCurrentValidators,
+	// and GetPendingValidators.
 	GetStake(ctx context.Context, addrs []ids.ShortID, options ...rpc.Option) (map[ids.ID]uint64, [][]byte, error)
 	// GetMinStake returns the minimum staking amount in nAVAX for validators
 	// and delegators respectively
@@ -199,6 +239,9 @@ type Client interface {
 	GetTotalStake(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (uint64, error)
 	// GetMaxStakeAmount returns the maximum amount of nAVAX staking to the named
 	// node during the time period.
+	//
+	// Deprecated: The MaxStakeAmount should be calculated using
+	// GetCurrentValidators, and GetPendingValidators.
 	GetMaxStakeAmount(
 		ctx context.Context,
 		subnetID ids.ID,
@@ -208,6 +251,8 @@ type Client interface {
 		options ...rpc.Option,
 	) (uint64, error)
 	// GetRewardUTXOs returns the reward UTXOs for a transaction
+	//
+	// Deprecated: GetRewardUTXOs should be fetched from a dedicated indexer.
 	GetRewardUTXOs(context.Context, *api.GetTxArgs, ...rpc.Option) ([][]byte, error)
 	// GetTimestamp returns the current chain timestamp
 	GetTimestamp(ctx context.Context, options ...rpc.Option) (time.Time, error)
@@ -231,12 +276,12 @@ func NewClient(uri string) Client {
 }
 
 func (c *client) GetHeight(ctx context.Context, options ...rpc.Option) (uint64, error) {
-	res := &GetHeightResponse{}
+	res := &api.GetHeightResponse{}
 	err := c.requester.SendRequest(ctx, "platform.getHeight", struct{}{}, res, options...)
 	return uint64(res.Height), err
 }
 
-func (c *client) ExportKey(ctx context.Context, user api.UserPass, address ids.ShortID, options ...rpc.Option) (*crypto.PrivateKeySECP256K1R, error) {
+func (c *client) ExportKey(ctx context.Context, user api.UserPass, address ids.ShortID, options ...rpc.Option) (*secp256k1.PrivateKey, error) {
 	res := &ExportKeyReply{}
 	err := c.requester.SendRequest(ctx, "platform.exportKey", &ExportKeyArgs{
 		UserPass: user,
@@ -245,7 +290,7 @@ func (c *client) ExportKey(ctx context.Context, user api.UserPass, address ids.S
 	return res.PrivateKey, err
 }
 
-func (c *client) ImportKey(ctx context.Context, user api.UserPass, privateKey *crypto.PrivateKeySECP256K1R, options ...rpc.Option) (ids.ShortID, error) {
+func (c *client) ImportKey(ctx context.Context, user api.UserPass, privateKey *secp256k1.PrivateKey, options ...rpc.Option) (ids.ShortID, error) {
 	res := &api.JSONAddress{}
 	err := c.requester.SendRequest(ctx, "platform.importKey", &ImportKeyArgs{
 		UserPass:   user,
@@ -448,6 +493,7 @@ func (c *client) AddValidator(
 		},
 		Staker: platformapi.Staker{
 			NodeID:      nodeID,
+			Weight:      jsonStakeAmount,
 			StakeAmount: &jsonStakeAmount,
 			StartTime:   json.Uint64(startTime),
 			EndTime:     json.Uint64(endTime),
@@ -480,6 +526,7 @@ func (c *client) AddDelegator(
 		},
 		Staker: platformapi.Staker{
 			NodeID:      nodeID,
+			Weight:      jsonStakeAmount,
 			StakeAmount: &jsonStakeAmount,
 			StartTime:   json.Uint64(startTime),
 			EndTime:     json.Uint64(endTime),
@@ -511,6 +558,7 @@ func (c *client) AddSubnetValidator(
 		},
 		Staker: platformapi.Staker{
 			NodeID:      nodeID,
+			Weight:      jsonStakeAmount,
 			StakeAmount: &jsonStakeAmount,
 			StartTime:   json.Uint64(startTime),
 			EndTime:     json.Uint64(endTime),

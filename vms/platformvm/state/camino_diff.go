@@ -53,20 +53,20 @@ func (d *diff) LockedUTXOs(txIDs set.Set[ids.ID], addresses set.Set[ids.ShortID]
 		remaining.Add(k)
 	}
 	for i := len(retUtxos) - 1; i >= 0; i-- {
-		if utxo, exists := d.modifiedUTXOs[retUtxos[i].InputID()]; exists {
-			if utxo.utxo == nil {
+		utxoID := retUtxos[i].InputID()
+		if utxo, exists := d.modifiedUTXOs[utxoID]; exists {
+			if utxo == nil {
 				retUtxos = append(retUtxos[:i], retUtxos[i+1:]...)
 			} else {
-				retUtxos[i] = utxo.utxo
+				retUtxos[i] = utxo
 			}
-			delete(remaining, utxo.utxoID)
+			delete(remaining, utxoID)
 		}
 	}
 
 	// Step 2: Append new UTXOs
 	for utxoID := range remaining {
-		utxo := d.modifiedUTXOs[utxoID].utxo
-		if utxo != nil {
+		if utxo := d.modifiedUTXOs[utxoID]; utxo != nil {
 			if lockedOut, ok := utxo.Out.(*locked.Out); ok &&
 				lockedOut.IDs.Match(lockState, txIDs) {
 				retUtxos = append(retUtxos, utxo)
@@ -351,12 +351,12 @@ func (d *diff) GetNotDistributedValidatorReward() (uint64, error) {
 func (d *diff) GetDeferredValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
 	// If the validator was modified in this diff, return the modified
 	// validator.
-	newValidator, ok := d.caminoDiff.deferredStakerDiffs.GetValidator(subnetID, nodeID)
-	if ok {
-		if newValidator == nil {
-			return nil, database.ErrNotFound
-		}
+	newValidator, validatorDiffStatus := d.caminoDiff.deferredStakerDiffs.GetValidator(subnetID, nodeID)
+	switch validatorDiffStatus {
+	case added:
 		return newValidator, nil
+	case deleted:
+		return nil, database.ErrNotFound
 	}
 
 	// If the validator wasn't modified in this diff, ask the parent state.
@@ -429,12 +429,11 @@ func (d *diff) ApplyCaminoState(baseState State) {
 
 	for _, validatorDiffs := range d.caminoDiff.deferredStakerDiffs.validatorDiffs {
 		for _, validatorDiff := range validatorDiffs {
-			if validatorDiff.validatorModified {
-				if validatorDiff.validatorDeleted {
-					baseState.DeleteDeferredValidator(validatorDiff.validator)
-				} else {
-					baseState.PutDeferredValidator(validatorDiff.validator)
-				}
+			switch validatorDiff.validatorStatus {
+			case added:
+				baseState.PutDeferredValidator(validatorDiff.validator)
+			case deleted:
+				baseState.DeleteDeferredValidator(validatorDiff.validator)
 			}
 		}
 	}

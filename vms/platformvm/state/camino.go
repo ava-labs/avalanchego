@@ -167,7 +167,7 @@ type caminoState struct {
 	deferredValidatorList linkeddb.LinkedDB
 
 	// Address State
-	addressStateCache cache.Cacher
+	addressStateCache cache.Cacher[ids.ShortID, uint64]
 	addressStateDB    database.Database
 
 	// Deposit offers
@@ -177,22 +177,22 @@ type caminoState struct {
 	// Deposits
 	depositsNextToUnlockTime *time.Time
 	depositsNextToUnlockIDs  []ids.ID
-	depositsCache            cache.Cacher
+	depositsCache            cache.Cacher[ids.ID, *deposit.Deposit]
 	depositsDB               database.Database
 	depositIDsByEndtimeDB    database.Database
 
 	// MSIG aliases
-	multisigAliasesCache cache.Cacher
+	multisigAliasesCache cache.Cacher[ids.ShortID, *multisig.AliasWithNonce]
 	multisigAliasesDB    database.Database
 
 	// ShortIDs link
-	shortLinksCache cache.Cacher
+	shortLinksCache cache.Cacher[ids.ID, *ids.ShortID]
 	shortLinksDB    database.Database
 
 	//  Claimables
 	notDistributedValidatorReward uint64
 	claimablesDB                  database.Database
-	claimablesCache               cache.Cacher
+	claimablesCache               cache.Cacher[ids.ID, *Claimable]
 }
 
 func newCaminoDiff() *caminoDiff {
@@ -207,46 +207,46 @@ func newCaminoDiff() *caminoDiff {
 }
 
 func newCaminoState(baseDB, validatorsDB database.Database, metricsReg prometheus.Registerer) (*caminoState, error) {
-	addressStateCache, err := metercacher.New(
+	addressStateCache, err := metercacher.New[ids.ShortID, uint64](
 		"address_state_cache",
 		metricsReg,
-		&cache.LRU{Size: addressStateCacheSize},
+		&cache.LRU[ids.ShortID, uint64]{Size: addressStateCacheSize},
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	depositsCache, err := metercacher.New(
+	depositsCache, err := metercacher.New[ids.ID, *deposit.Deposit](
 		"deposits_cache",
 		metricsReg,
-		&cache.LRU{Size: depositsCacheSize},
+		&cache.LRU[ids.ID, *deposit.Deposit]{Size: depositsCacheSize},
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	shortLinksCache, err := metercacher.New(
+	shortLinksCache, err := metercacher.New[ids.ID, *ids.ShortID](
 		"short_links_cache",
 		metricsReg,
-		&cache.LRU{Size: shortLinksCacheSize},
+		&cache.LRU[ids.ID, *ids.ShortID]{Size: shortLinksCacheSize},
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	multisigOwnersCache, err := metercacher.New(
+	multisigOwnersCache, err := metercacher.New[ids.ShortID, *multisig.AliasWithNonce](
 		"msig_owners_cache",
 		metricsReg,
-		&cache.LRU{Size: msigOwnersCacheSize},
+		&cache.LRU[ids.ShortID, *multisig.AliasWithNonce]{Size: msigOwnersCacheSize},
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	claimablesCache, err := metercacher.New(
+	claimablesCache, err := metercacher.New[ids.ID, *Claimable](
 		"claimables_cache",
 		metricsReg,
-		&cache.LRU{Size: claimablesCacheSize},
+		&cache.LRU[ids.ID, *Claimable]{Size: claimablesCacheSize},
 	)
 	if err != nil {
 		return nil, err

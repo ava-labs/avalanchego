@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avm
@@ -6,6 +6,14 @@ package avm
 import (
 	"errors"
 	"testing"
+)
+
+var (
+	errCalledInitialize      = errors.New("unexpectedly called Initialize")
+	errCalledBootstrapping   = errors.New("unexpectedly called Bootstrapping")
+	errCalledBootstrapped    = errors.New("unexpectedly called Bootstrapped")
+	errCalledVerifyTransfer  = errors.New("unexpectedly called VerifyTransfer")
+	errCalledVerifyOperation = errors.New("unexpectedly called VerifyOperation")
 )
 
 type FxTest struct {
@@ -40,9 +48,9 @@ func (fx *FxTest) Initialize(vm interface{}) error {
 		return nil
 	}
 	if fx.T != nil {
-		fx.T.Fatalf("Unexpectedly called Initialize")
+		fx.T.Fatal(errCalledInitialize)
 	}
-	return errors.New("Unexpectedly called Initialize")
+	return errCalledInitialize
 }
 
 func (fx *FxTest) Bootstrapping() error {
@@ -53,9 +61,9 @@ func (fx *FxTest) Bootstrapping() error {
 		return nil
 	}
 	if fx.T != nil {
-		fx.T.Fatalf("Unexpectedly called Bootstrapping")
+		fx.T.Fatal(errCalledBootstrapping)
 	}
-	return errors.New("Unexpectedly called Bootstrapping")
+	return errCalledBootstrapping
 }
 
 func (fx *FxTest) Bootstrapped() error {
@@ -66,9 +74,9 @@ func (fx *FxTest) Bootstrapped() error {
 		return nil
 	}
 	if fx.T != nil {
-		fx.T.Fatalf("Unexpectedly called Bootstrapped")
+		fx.T.Fatal(errCalledBootstrapped)
 	}
-	return errors.New("Unexpectedly called Bootstrapped")
+	return errCalledBootstrapped
 }
 
 func (fx *FxTest) VerifyTransfer(tx, in, cred, utxo interface{}) error {
@@ -79,9 +87,9 @@ func (fx *FxTest) VerifyTransfer(tx, in, cred, utxo interface{}) error {
 		return nil
 	}
 	if fx.T != nil {
-		fx.T.Fatalf("Unexpectedly called VerifyTransfer")
+		fx.T.Fatal(errCalledVerifyTransfer)
 	}
-	return errors.New("Unexpectedly called VerifyTransfer")
+	return errCalledVerifyTransfer
 }
 
 func (fx *FxTest) VerifyOperation(tx, op, cred interface{}, utxos []interface{}) error {
@@ -92,7 +100,7 @@ func (fx *FxTest) VerifyOperation(tx, op, cred interface{}, utxos []interface{})
 		return nil
 	}
 	if fx.T != nil {
-		fx.T.Fatalf("Unexpectedly called VerifyOperation")
+		fx.T.Fatal(errCalledVerifyOperation)
 	}
-	return errors.New("Unexpectedly called VerifyOperation")
+	return errCalledVerifyOperation
 }

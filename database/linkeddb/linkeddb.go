@@ -8,7 +8,7 @@
 //
 // Much love to the original authors for their work.
 // **********************************************************
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package linkeddb
@@ -17,10 +17,10 @@ import (
 	"sync"
 
 	"golang.org/x/exp/maps"
+	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/utils"
 )
 
 const (
@@ -55,7 +55,7 @@ type linkedDB struct {
 	headKeyIsSynced, headKeyExists, headKeyIsUpdated, updatedHeadKeyExists bool
 	headKey, updatedHeadKey                                                []byte
 	// these variables provide caching for the nodes.
-	nodeCache    cache.Cacher // key -> *node
+	nodeCache    cache.Cacher[string, *node] // key -> *node
 	updatedNodes map[string]*node
 
 	// db is the underlying database that this list is stored in.
@@ -74,7 +74,7 @@ type node struct {
 
 func New(db database.Database, cacheSize int) LinkedDB {
 	return &linkedDB{
-		nodeCache:    &cache.LRU{Size: cacheSize},
+		nodeCache:    &cache.LRU[string, *node]{Size: cacheSize},
 		updatedNodes: make(map[string]*node),
 		db:           db,
 		batch:        db.NewBatch(),
@@ -109,7 +109,7 @@ func (ldb *linkedDB) Put(key, value []byte) error {
 	// If the key already has a node in the list, update that node.
 	existingNode, err := ldb.getNode(key)
 	if err == nil {
-		existingNode.Value = utils.CopyBytes(value)
+		existingNode.Value = slices.Clone(value)
 		if err := ldb.putNode(key, existingNode); err != nil {
 			return err
 		}
@@ -120,10 +120,8 @@ func (ldb *linkedDB) Put(key, value []byte) error {
 	}
 
 	// The key isn't currently in the list, so we should add it as the head.
-	newHead := node{Value: utils.CopyBytes(value)}
-	// Make a copy of the key to prevent range changes
-	key = utils.CopyBytes(key)
-
+	newHead := node{Value: slices.Clone(value)}
+	key = slices.Clone(key)
 	if headKey, err := ldb.getHeadKey(); err == nil {
 		// The list currently has a head, so we need to update the old head.
 		oldHead, err := ldb.getNode(headKey)
@@ -313,8 +311,7 @@ func (ldb *linkedDB) getNode(key []byte) (node, error) {
 	defer ldb.cacheLock.Unlock()
 
 	keyStr := string(key)
-	if nodeIntf, exists := ldb.nodeCache.Get(keyStr); exists {
-		n := nodeIntf.(*node)
+	if n, exists := ldb.nodeCache.Get(keyStr); exists {
 		if n == nil {
 			return node{}, database.ErrNotFound
 		}
@@ -323,9 +320,7 @@ func (ldb *linkedDB) getNode(key []byte) (node, error) {
 
 	nodeBytes, err := ldb.db.Get(nodeKey(key))
 	if err == database.ErrNotFound {
-		// Passing [nil] without the pointer cast would result in a panic when
-		// performing the type assertion in the above cache check.
-		ldb.nodeCache.Put(keyStr, (*node)(nil))
+		ldb.nodeCache.Put(keyStr, nil)
 		return node{}, err
 	}
 	if err != nil {

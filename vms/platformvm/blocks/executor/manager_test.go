@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -65,8 +65,6 @@ func TestGetBlock(t *testing.T) {
 }
 
 func TestManagerLastAccepted(t *testing.T) {
-	require := require.New(t)
-
 	lastAcceptedID := ids.GenerateTestID()
 	manager := &manager{
 		backend: &backend{
@@ -74,5 +72,5 @@ func TestManagerLastAccepted(t *testing.T) {
 		},
 	}
 
-	require.Equal(lastAcceptedID, manager.LastAccepted())
+	require.Equal(t, lastAcceptedID, manager.LastAccepted())
 }

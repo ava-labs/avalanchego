@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package config
@@ -19,6 +19,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/subnets"
 )
 
 func TestGetChainConfigsFromFiles(t *testing.T) {
@@ -395,36 +396,36 @@ func TestGetVMAliasesDirNotExists(t *testing.T) {
 func TestGetSubnetConfigsFromFile(t *testing.T) {
 	tests := map[string]struct {
 		givenJSON  string
-		testF      func(*require.Assertions, map[ids.ID]chains.SubnetConfig)
+		testF      func(*require.Assertions, map[ids.ID]subnets.Config)
 		errMessage string
 		fileName   string
 	}{
 		"wrong config": {
 			fileName:  "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
 			givenJSON: `thisisnotjson`,
-			testF: func(require *require.Assertions, given map[ids.ID]chains.SubnetConfig) {
+			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
 				require.Nil(given)
 			},
 			errMessage: "invalid character",
 		},
-		"subnet is not whitelisted": {
+		"subnet is not tracked": {
 			fileName:  "Gmt4fuNsGJAd2PX86LBvycGaBpgCYKbuULdCLZs3SEs1Jx1LU.json",
 			givenJSON: `{"validatorOnly": true}`,
-			testF: func(require *require.Assertions, given map[ids.ID]chains.SubnetConfig) {
+			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
 				require.Empty(given)
 			},
 		},
 		"wrong extension": {
 			fileName:  "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.yaml",
 			givenJSON: `{"validatorOnly": true}`,
-			testF: func(require *require.Assertions, given map[ids.ID]chains.SubnetConfig) {
+			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
 				require.Empty(given)
 			},
 		},
 		"invalid consensus parameters": {
 			fileName:  "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
 			givenJSON: `{"consensusParameters":{"k": 111, "alpha":1234} }`,
-			testF: func(require *require.Assertions, given map[ids.ID]chains.SubnetConfig) {
+			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
 				require.Nil(given)
 			},
 			errMessage: "fails the condition that: alpha <= k",
@@ -432,7 +433,7 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 		"correct config": {
 			fileName:  "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
 			givenJSON: `{"validatorOnly": true, "consensusParameters":{"parents": 111, "alpha":16} }`,
-			testF: func(require *require.Assertions, given map[ids.ID]chains.SubnetConfig) {
+			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
 				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
 				config, ok := given[id]
 				require.True(ok)
@@ -448,14 +449,14 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 		"gossip config": {
 			fileName:  "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
 			givenJSON: `{"appGossipNonValidatorSize": 100 }`,
-			testF: func(require *require.Assertions, given map[ids.ID]chains.SubnetConfig) {
+			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
 				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
 				config, ok := given[id]
 				require.True(ok)
-				require.Equal(uint(100), config.AppGossipNonValidatorSize)
+				require.Equal(uint(100), config.GossipConfig.AppGossipNonValidatorSize)
 				// must still respect defaults
 				require.Equal(20, config.ConsensusParameters.K)
-				require.Equal(uint(10), config.AppGossipValidatorSize)
+				require.Equal(uint(10), config.GossipConfig.AppGossipValidatorSize)
 			},
 			errMessage: "",
 		},
@@ -487,19 +488,19 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 func TestGetSubnetConfigsFromFlags(t *testing.T) {
 	tests := map[string]struct {
 		givenJSON  string
-		testF      func(*require.Assertions, map[ids.ID]chains.SubnetConfig)
+		testF      func(*require.Assertions, map[ids.ID]subnets.Config)
 		errMessage string
 	}{
 		"no configs": {
 			givenJSON: `{}`,
-			testF: func(require *require.Assertions, given map[ids.ID]chains.SubnetConfig) {
+			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
 				require.Empty(given)
 			},
 			errMessage: "",
 		},
 		"entry with no config": {
 			givenJSON: `{"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i":{}}`,
-			testF: func(require *require.Assertions, given map[ids.ID]chains.SubnetConfig) {
+			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
 				require.True(len(given) == 1)
 				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
 				config, ok := given[id]
@@ -508,9 +509,9 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 				require.Equal(20, config.ConsensusParameters.K)
 			},
 		},
-		"subnet is not whitelisted": {
+		"subnet is not tracked": {
 			givenJSON: `{"Gmt4fuNsGJAd2PX86LBvycGaBpgCYKbuULdCLZs3SEs1Jx1LU":{"validatorOnly":true}}`,
-			testF: func(require *require.Assertions, given map[ids.ID]chains.SubnetConfig) {
+			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
 				require.Empty(given)
 			},
 		},
@@ -523,7 +524,7 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 					}
 				}
 			}`,
-			testF: func(require *require.Assertions, given map[ids.ID]chains.SubnetConfig) {
+			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
 				require.Empty(given)
 			},
 			errMessage: "fails the condition that: alpha <= k",
@@ -539,7 +540,7 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 					"validatorOnly": true
 				}
 			}`,
-			testF: func(require *require.Assertions, given map[ids.ID]chains.SubnetConfig) {
+			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
 				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
 				config, ok := given[id]
 				require.True(ok)
@@ -548,8 +549,8 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 				require.Equal(20, config.ConsensusParameters.Alpha)
 				require.Equal(30, config.ConsensusParameters.K)
 				// must still respect defaults
-				require.Equal(uint(10), config.AppGossipValidatorSize)
-				require.Equal(1024, config.ConsensusParameters.MaxOutstandingItems)
+				require.Equal(uint(10), config.GossipConfig.AppGossipValidatorSize)
+				require.Equal(256, config.ConsensusParameters.MaxOutstandingItems)
 			},
 			errMessage: "",
 		},
@@ -614,17 +615,8 @@ func setupViperFlags() *viper.Viper {
 
 func setupViper(configFilePath string) *viper.Viper {
 	v := setupViperFlags()
-	// need to set it since in tests executable dir is somewhere /var/tmp/ (or wherever is designated by go)
-	// thus it searches buildDir in /var/tmp/
-	// but actual buildDir resides under project_root/build
-	currentPath, err := os.Getwd()
-	if err != nil {
-		log.Fatal(err)
-	}
-	v.Set(BuildDirKey, filepath.Join(currentPath, "..", "build"))
 	v.SetConfigFile(configFilePath)
-	err = v.ReadInConfig()
-	if err != nil {
+	if err := v.ReadInConfig(); err != nil {
 		log.Fatal(err)
 	}
 	return v

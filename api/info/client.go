@@ -8,13 +8,14 @@
 //
 // Much love to the original authors for their work.
 // **********************************************************
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package info
 
 import (
 	"context"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/rpc"
@@ -23,7 +24,8 @@ import (
 
 var _ Client = (*client)(nil)
 
-// Client interface for an Info API Client
+// Client interface for an Info API Client.
+// See also AwaitBootstrapped.
 type Client interface {
 	GetNodeVersion(context.Context, ...rpc.Option) (*GetNodeVersionReply, error)
 	GetNodeID(context.Context, ...rpc.Option) (ids.NodeID, *signer.ProofOfPossession, error)
@@ -121,4 +123,26 @@ func (c *client) GetVMs(ctx context.Context, options ...rpc.Option) (map[ids.ID]
 	res := &GetVMsReply{}
 	err := c.requester.SendRequest(ctx, "info.getVMs", struct{}{}, res, options...)
 	return res.VMs, err
+}
+
+// AwaitBootstrapped polls the node every [freq] to check if [chainID] has
+// finished bootstrapping. Returns true once [chainID] reports that it has
+// finished bootstrapping.
+// Only returns an error if [ctx] returns an error.
+func AwaitBootstrapped(ctx context.Context, c Client, chainID string, freq time.Duration, options ...rpc.Option) (bool, error) {
+	ticker := time.NewTicker(freq)
+	defer ticker.Stop()
+
+	for {
+		res, err := c.IsBootstrapped(ctx, chainID, options...)
+		if err == nil && res {
+			return true, nil
+		}
+
+		select {
+		case <-ticker.C:
+		case <-ctx.Done():
+			return false, ctx.Err()
+		}
+	}
 }

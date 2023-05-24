@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/nodeid"
@@ -43,10 +43,8 @@ func TestRemoveDeferredValidator(t *testing.T) {
 
 	nodeKey, nodeID := nodeid.GenerateCaminoNodeKeyAndID()
 
-	key, err := testKeyFactory.NewPrivateKey()
+	consortiumMemberKey, err := testKeyFactory.NewPrivateKey()
 	require.NoError(err)
-	consortiumMemberKey, ok := key.(*crypto.PrivateKeySECP256K1R)
-	require.True(ok)
 
 	outputOwners := &secp256k1fx.OutputOwners{
 		Locktime:  0,
@@ -82,7 +80,7 @@ func TestRemoveDeferredValidator(t *testing.T) {
 		consortiumMemberKey.Address(),
 		false,
 		txs.AddressStateConsortium,
-		[]*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0]},
+		[]*secp256k1.PrivateKey{caminoPreFundedKeys[0]},
 		outputOwners,
 	)
 	require.NoError(err)
@@ -102,7 +100,7 @@ func TestRemoveDeferredValidator(t *testing.T) {
 		ids.EmptyNodeID,
 		nodeID,
 		consortiumMemberKey.Address(),
-		[]*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0], nodeKey, consortiumMemberKey},
+		[]*secp256k1.PrivateKey{caminoPreFundedKeys[0], nodeKey, consortiumMemberKey},
 		outputOwners,
 	)
 	require.NoError(err)
@@ -128,7 +126,7 @@ func TestRemoveDeferredValidator(t *testing.T) {
 		consortiumMemberKey.Address(),
 		ids.ShortEmpty,
 		reward.PercentDenominator,
-		[]*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0], consortiumMemberKey},
+		[]*secp256k1.PrivateKey{caminoPreFundedKeys[0], consortiumMemberKey},
 		ids.ShortEmpty,
 	)
 	require.NoError(err)
@@ -154,7 +152,7 @@ func TestRemoveDeferredValidator(t *testing.T) {
 		consortiumMemberKey.Address(),
 		false,
 		txs.AddressStateNodeDeferred,
-		[]*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0]},
+		[]*secp256k1.PrivateKey{caminoPreFundedKeys[0]},
 		outputOwners,
 	)
 	require.NoError(err)
@@ -192,7 +190,7 @@ func TestRemoveDeferredValidator(t *testing.T) {
 	require.NoError(err)
 
 	commit := options[1].(*blockexecutor.Block)
-	_, ok = commit.Block.(*blocks.BanffCommitBlock)
+	_, ok := commit.Block.(*blocks.BanffCommitBlock)
 	require.True(ok)
 
 	abort := options[0].(*blockexecutor.Block)
@@ -243,10 +241,8 @@ func TestRemoveReactivatedValidator(t *testing.T) {
 
 	nodeKey, nodeID := nodeid.GenerateCaminoNodeKeyAndID()
 
-	key, err := testKeyFactory.NewPrivateKey()
+	consortiumMemberKey, err := testKeyFactory.NewPrivateKey()
 	require.NoError(err)
-	consortiumMemberKey, ok := key.(*crypto.PrivateKeySECP256K1R)
-	require.True(ok)
 
 	outputOwners := &secp256k1fx.OutputOwners{
 		Locktime:  0,
@@ -282,7 +278,7 @@ func TestRemoveReactivatedValidator(t *testing.T) {
 		consortiumMemberKey.Address(),
 		false,
 		txs.AddressStateConsortium,
-		[]*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0]},
+		[]*secp256k1.PrivateKey{caminoPreFundedKeys[0]},
 		outputOwners,
 	)
 	require.NoError(err)
@@ -302,7 +298,7 @@ func TestRemoveReactivatedValidator(t *testing.T) {
 		ids.EmptyNodeID,
 		nodeID,
 		consortiumMemberKey.Address(),
-		[]*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0], nodeKey, consortiumMemberKey},
+		[]*secp256k1.PrivateKey{caminoPreFundedKeys[0], nodeKey, consortiumMemberKey},
 		outputOwners,
 	)
 	require.NoError(err)
@@ -329,7 +325,7 @@ func TestRemoveReactivatedValidator(t *testing.T) {
 		consortiumMemberKey.Address(),
 		ids.ShortEmpty,
 		reward.PercentDenominator,
-		[]*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0], nodeKey, consortiumMemberKey},
+		[]*secp256k1.PrivateKey{caminoPreFundedKeys[0], nodeKey, consortiumMemberKey},
 		ids.ShortEmpty,
 	)
 	require.NoError(err)
@@ -355,7 +351,7 @@ func TestRemoveReactivatedValidator(t *testing.T) {
 		consortiumMemberKey.Address(),
 		false,
 		txs.AddressStateNodeDeferred,
-		[]*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0]},
+		[]*secp256k1.PrivateKey{caminoPreFundedKeys[0]},
 		outputOwners,
 	)
 	require.NoError(err)
@@ -381,7 +377,7 @@ func TestRemoveReactivatedValidator(t *testing.T) {
 		consortiumMemberKey.Address(),
 		true,
 		txs.AddressStateNodeDeferred,
-		[]*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0]},
+		[]*secp256k1.PrivateKey{caminoPreFundedKeys[0]},
 		outputOwners,
 	)
 	require.NoError(err)
@@ -415,7 +411,7 @@ func TestRemoveReactivatedValidator(t *testing.T) {
 	require.NoError(err)
 
 	commit := options[1].(*blockexecutor.Block)
-	_, ok = commit.Block.(*blocks.BanffCommitBlock)
+	_, ok := commit.Block.(*blocks.BanffCommitBlock)
 	require.True(ok)
 
 	abort := options[0].(*blockexecutor.Block)
@@ -480,7 +476,7 @@ func TestDepositsAutoUnlock(t *testing.T) {
 		Address: depositOwnerAddrBech32,
 	}})
 	vm.ctx.Lock.Lock()
-	defer func() { require.NoError(vm.Shutdown(context.Background())) }() //nolint:revive
+	defer func() { require.NoError(vm.Shutdown(context.Background())) }() //nolint:lint
 
 	// Add deposit
 	depositTx, err := vm.txBuilder.NewDepositTx(
@@ -488,7 +484,7 @@ func TestDepositsAutoUnlock(t *testing.T) {
 		depositOffer.MaxDuration,
 		depositOffer.ID,
 		depositOwnerAddr,
-		[]*crypto.PrivateKeySECP256K1R{depositOwnerKey},
+		[]*secp256k1.PrivateKey{depositOwnerKey},
 		&depositOwner,
 	)
 	require.NoError(err)

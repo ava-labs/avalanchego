@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avalanche
@@ -20,40 +20,45 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
+	"github.com/ava-labs/avalanchego/utils/bag"
 	"github.com/ava-labs/avalanchego/utils/compare"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 type testFunc func(*testing.T, Factory)
 
-var testFuncs = []testFunc{
-	MetricsTest,
-	NumProcessingTest,
-	AddTest,
-	VertexIssuedTest,
-	TxIssuedTest,
-	VirtuousTest,
-	VirtuousSkippedUpdateTest,
-	VotingTest,
-	IgnoreInvalidVotingTest,
-	IgnoreInvalidTransactionVertexVotingTest,
-	TransitiveVotingTest,
-	SplitVotingTest,
-	TransitiveRejectionTest,
-	IsVirtuousTest,
-	QuiesceTest,
-	QuiesceAfterVotingTest,
-	TransactionVertexTest,
-	OrphansTest,
-	OrphansUpdateTest,
-	ErrorOnVacuousAcceptTest,
-	ErrorOnTxAcceptTest,
-	ErrorOnVtxAcceptTest,
-	ErrorOnVtxRejectTest,
-	ErrorOnParentVtxRejectTest,
-	ErrorOnTransitiveVtxRejectTest,
-	SilenceTransactionVertexEventsTest,
-}
+var (
+	testFuncs = []testFunc{
+		MetricsTest,
+		NumProcessingTest,
+		AddTest,
+		VertexIssuedTest,
+		TxIssuedTest,
+		VirtuousTest,
+		VirtuousSkippedUpdateTest,
+		VotingTest,
+		IgnoreInvalidVotingTest,
+		IgnoreInvalidTransactionVertexVotingTest,
+		TransitiveVotingTest,
+		SplitVotingTest,
+		TransitiveRejectionTest,
+		IsVirtuousTest,
+		QuiesceTest,
+		QuiesceAfterVotingTest,
+		TransactionVertexTest,
+		OrphansTest,
+		OrphansUpdateTest,
+		ErrorOnVacuousAcceptTest,
+		ErrorOnTxAcceptTest,
+		ErrorOnVtxAcceptTest,
+		ErrorOnVtxRejectTest,
+		ErrorOnParentVtxRejectTest,
+		ErrorOnTransitiveVtxRejectTest,
+		SilenceTransactionVertexEventsTest,
+	}
+
+	errTest = errors.New("non-nil error")
+)
 
 func runConsensusTests(t *testing.T, factory Factory) {
 	for _, test := range testFuncs {
@@ -84,7 +89,7 @@ func MetricsTest(t *testing.T, factory Factory) {
 			Parents:   2,
 			BatchSize: 1,
 		}
-		err := ctx.Registerer.Register(prometheus.NewGauge(prometheus.GaugeOpts{
+		err := ctx.AvalancheRegisterer.Register(prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "vtx_processing",
 		}))
 		if err != nil {
@@ -108,7 +113,7 @@ func MetricsTest(t *testing.T, factory Factory) {
 			Parents:   2,
 			BatchSize: 1,
 		}
-		err := ctx.Registerer.Register(prometheus.NewGauge(prometheus.GaugeOpts{
+		err := ctx.AvalancheRegisterer.Register(prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "vtx_accepted",
 		}))
 		if err != nil {
@@ -132,7 +137,7 @@ func MetricsTest(t *testing.T, factory Factory) {
 			Parents:   2,
 			BatchSize: 1,
 		}
-		err := ctx.Registerer.Register(prometheus.NewGauge(prometheus.GaugeOpts{
+		err := ctx.AvalancheRegisterer.Register(prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "vtx_rejected",
 		}))
 		if err != nil {
@@ -245,7 +250,7 @@ func NumProcessingTest(t *testing.T, factory Factory) {
 		t.Fatalf("expected %d vertices processing but returned %d", 2, numProcessing)
 	}
 
-	votes := ids.UniqueBag{}
+	votes := bag.UniqueBag[ids.ID]{}
 	votes.Add(0, vtx0.ID())
 	if err := avl.RecordPoll(context.Background(), votes); err != nil {
 		t.Fatal(err)
@@ -291,8 +296,8 @@ func AddTest(t *testing.T, factory Factory) {
 
 	ctx := snow.DefaultConsensusContextTest()
 	// track consensus events to ensure idempotency in case of redundant vertex adds
-	consensusEvents := snow.NewAcceptorTracker()
-	ctx.ConsensusAcceptor = consensusEvents
+	vertexEvents := snow.NewAcceptorTracker()
+	ctx.VertexAcceptor = vertexEvents
 
 	if err := avl.Initialize(context.Background(), ctx, params, seedVertices); err != nil {
 		t.Fatal(err)
@@ -388,7 +393,7 @@ func AddTest(t *testing.T, factory Factory) {
 			if !compare.UnsortedEquals(tv.preferenceSet, preferenceSet) {
 				t.Fatalf("#%d-%d: expected preferenceSet %v, got %v", i, j, preferenceSet, tv.preferenceSet)
 			}
-			if accepted, _ := consensusEvents.IsAccepted(tv.toAdd.ID()); accepted != tv.accepted {
+			if accepted, _ := vertexEvents.IsAccepted(tv.toAdd.ID()); accepted != tv.accepted {
 				t.Fatalf("#%d-%d: expected accepted %d, got %d", i, j, tv.accepted, accepted)
 			}
 		}
@@ -626,7 +631,7 @@ func VirtuousTest(t *testing.T, factory Factory) {
 		t.Fatalf("Wrong virtuous")
 	}
 
-	votes := ids.UniqueBag{}
+	votes := bag.UniqueBag[ids.ID]{}
 	votes.Add(0, vtx1.ID())
 	votes.Add(1, vtx1.ID())
 
@@ -764,7 +769,7 @@ func VirtuousSkippedUpdateTest(t *testing.T, factory Factory) {
 		t.Fatalf("Wrong number of virtuous.")
 	} else if !virtuous.Contains(vtx0.IDV) {
 		t.Fatalf("Wrong virtuous")
-	} else if err := avl.RecordPoll(context.Background(), ids.UniqueBag{}); err != nil {
+	} else if err := avl.RecordPoll(context.Background(), bag.UniqueBag[ids.ID]{}); err != nil {
 		t.Fatal(err)
 	} else if virtuous := avl.Virtuous(); virtuous.Len() != 1 {
 		t.Fatalf("Wrong number of virtuous.")
@@ -854,7 +859,7 @@ func VotingTest(t *testing.T, factory Factory) {
 	}
 
 	// create poll results, all vote for vtx1, not for vtx0
-	sm := ids.UniqueBag{}
+	sm := bag.UniqueBag[ids.ID]{}
 	sm.Add(0, vtx1.IDV)
 	sm.Add(1, vtx1.IDV)
 
@@ -963,7 +968,7 @@ func IgnoreInvalidVotingTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	sm := ids.UniqueBag{}
+	sm := bag.UniqueBag[ids.ID]{}
 	sm.Add(0, vtx0.IDV)
 	sm.Add(1, vtx1.IDV)
 
@@ -1044,7 +1049,7 @@ func IgnoreInvalidTransactionVertexVotingTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	sm := ids.UniqueBag{}
+	sm := bag.UniqueBag[ids.ID]{}
 	sm.Add(0, vtx0.IDV)
 	sm.Add(1, vtx1.IDV)
 
@@ -1143,7 +1148,7 @@ func TransitiveVotingTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	sm1 := ids.UniqueBag{}
+	sm1 := bag.UniqueBag[ids.ID]{}
 	sm1.Add(0, vtx0.IDV)
 	sm1.Add(1, vtx2.IDV)
 
@@ -1159,7 +1164,7 @@ func TransitiveVotingTest(t *testing.T, factory Factory) {
 		t.Fatalf("Tx should have been accepted")
 	}
 
-	sm2 := ids.UniqueBag{}
+	sm2 := bag.UniqueBag[ids.ID]{}
 	sm2.Add(0, vtx2.IDV)
 	sm2.Add(1, vtx2.IDV)
 
@@ -1244,7 +1249,7 @@ func SplitVotingTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	sm1 := ids.UniqueBag{}
+	sm1 := bag.UniqueBag[ids.ID]{}
 	sm1.Add(0, vtx0.IDV) // peer 0 votes for the tx though vtx0
 	sm1.Add(1, vtx1.IDV) // peer 1 votes for the tx though vtx1
 
@@ -1261,7 +1266,7 @@ func SplitVotingTest(t *testing.T, factory Factory) {
 	}
 
 	// Give alpha votes for both tranaction vertices
-	sm2 := ids.UniqueBag{}
+	sm2 := bag.UniqueBag[ids.ID]{}
 	sm2.Add(0, vtx0.IDV, vtx1.IDV) // peer 0 votes for vtx0 and vtx1
 	sm2.Add(1, vtx0.IDV, vtx1.IDV) // peer 1 votes for vtx0 and vtx1
 
@@ -1368,7 +1373,7 @@ func TransitiveRejectionTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	sm := ids.UniqueBag{}
+	sm := bag.UniqueBag[ids.ID]{}
 	sm.Add(0, vtx1.IDV)
 	sm.Add(1, vtx1.IDV)
 
@@ -1618,7 +1623,7 @@ func QuiesceTest(t *testing.T, factory Factory) {
 
 	// The virtuous frontier is only updated sometimes, so force the frontier to
 	// be re-calculated by changing the preference of tx1.
-	sm1 := ids.UniqueBag{}
+	sm1 := bag.UniqueBag[ids.ID]{}
 	sm1.Add(0, vtx1.IDV)
 	if err := avl.RecordPoll(context.Background(), sm1); err != nil {
 		t.Fatal(err)
@@ -1637,7 +1642,7 @@ func QuiesceTest(t *testing.T, factory Factory) {
 		t.Fatalf("Shouldn't quiesce")
 	}
 
-	sm2 := ids.UniqueBag{}
+	sm2 := bag.UniqueBag[ids.ID]{}
 	sm2.Add(0, vtx2.IDV)
 	if err := avl.RecordPoll(context.Background(), sm2); err != nil {
 		t.Fatal(err)
@@ -1766,7 +1771,7 @@ func QuiesceAfterVotingTest(t *testing.T, factory Factory) {
 		t.Fatalf("Shouldn't quiesce")
 	}
 
-	sm12 := ids.UniqueBag{}
+	sm12 := bag.UniqueBag[ids.ID]{}
 	sm12.Add(0, vtx1.IDV, vtx2.IDV)
 	if err := avl.RecordPoll(context.Background(), sm12); err != nil {
 		t.Fatal(err)
@@ -1778,7 +1783,7 @@ func QuiesceAfterVotingTest(t *testing.T, factory Factory) {
 		t.Fatalf("Shouldn't quiesce")
 	}
 
-	sm023 := ids.UniqueBag{}
+	sm023 := bag.UniqueBag[ids.ID]{}
 	sm023.Add(0, vtx0.IDV, vtx2.IDV, vtx3.IDV)
 	if err := avl.RecordPoll(context.Background(), sm023); err != nil {
 		t.Fatal(err)
@@ -1789,7 +1794,7 @@ func QuiesceAfterVotingTest(t *testing.T, factory Factory) {
 		t.Fatalf("Shouldn't quiesce")
 	}
 
-	sm3 := ids.UniqueBag{}
+	sm3 := bag.UniqueBag[ids.ID]{}
 	sm3.Add(0, vtx3.IDV)
 	if err := avl.RecordPoll(context.Background(), sm3); err != nil {
 		t.Fatal(err)
@@ -1860,7 +1865,7 @@ func TransactionVertexTest(t *testing.T, factory Factory) {
 
 	// After voting for the transaction vertex beta times, the vertex should
 	// also be accepted.
-	bags := ids.UniqueBag{}
+	bags := bag.UniqueBag[ids.ID]{}
 	bags.Add(0, vtx0.IDV)
 	bags.Add(1, vtx0.IDV)
 	if err := avl.RecordPoll(context.Background(), bags); err != nil {
@@ -1986,7 +1991,7 @@ func OrphansTest(t *testing.T, factory Factory) {
 		t.Fatalf("Wrong number of orphans")
 	}
 
-	sm := ids.UniqueBag{}
+	sm := bag.UniqueBag[ids.ID]{}
 	sm.Add(0, vtx1.IDV)
 	if err := avl.RecordPoll(context.Background(), sm); err != nil {
 		t.Fatal(err)
@@ -2116,7 +2121,7 @@ func OrphansUpdateTest(t *testing.T, factory Factory) {
 
 	// Record a successful poll to change the preference from vtx1 to vtx2 and
 	// update the orphan set.
-	votes := ids.UniqueBag{}
+	votes := bag.UniqueBag[ids.ID]{}
 	votes.Add(0, vtx2.IDV)
 	if err := avl.RecordPoll(context.Background(), votes); err != nil {
 		t.Fatal(err)
@@ -2171,7 +2176,7 @@ func ErrorOnVacuousAcceptTest(t *testing.T, factory Factory) {
 
 	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
-		AcceptV: errors.New(""),
+		AcceptV: errTest,
 		StatusV: choices.Processing,
 	}}
 
@@ -2220,7 +2225,7 @@ func ErrorOnTxAcceptTest(t *testing.T, factory Factory) {
 
 	tx0 := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
 		IDV:     ids.GenerateTestID(),
-		AcceptV: errors.New(""),
+		AcceptV: errTest,
 		StatusV: choices.Processing,
 	}}
 	tx0.InputIDsV = append(tx0.InputIDsV, utxos[0])
@@ -2239,7 +2244,7 @@ func ErrorOnTxAcceptTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	votes := ids.UniqueBag{}
+	votes := bag.UniqueBag[ids.ID]{}
 	votes.Add(0, vtx0.IDV)
 	if err := avl.RecordPoll(context.Background(), votes); err == nil {
 		t.Fatalf("Should have errored on vertex acceptance")
@@ -2283,7 +2288,7 @@ func ErrorOnVtxAcceptTest(t *testing.T, factory Factory) {
 	vtx0 := &TestVertex{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			AcceptV: errors.New(""),
+			AcceptV: errTest,
 			StatusV: choices.Processing,
 		},
 		ParentsV: vts,
@@ -2295,7 +2300,7 @@ func ErrorOnVtxAcceptTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	votes := ids.UniqueBag{}
+	votes := bag.UniqueBag[ids.ID]{}
 	votes.Add(0, vtx0.IDV)
 	if err := avl.RecordPoll(context.Background(), votes); err == nil {
 		t.Fatalf("Should have errored on vertex acceptance")
@@ -2355,7 +2360,7 @@ func ErrorOnVtxRejectTest(t *testing.T, factory Factory) {
 	vtx1 := &TestVertex{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			RejectV: errors.New(""),
+			RejectV: errTest,
 			StatusV: choices.Processing,
 		},
 		ParentsV: vts,
@@ -2369,7 +2374,7 @@ func ErrorOnVtxRejectTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	votes := ids.UniqueBag{}
+	votes := bag.UniqueBag[ids.ID]{}
 	votes.Add(0, vtx0.IDV)
 	if err := avl.RecordPoll(context.Background(), votes); err == nil {
 		t.Fatalf("Should have errored on vertex rejection")
@@ -2429,7 +2434,7 @@ func ErrorOnParentVtxRejectTest(t *testing.T, factory Factory) {
 	vtx1 := &TestVertex{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			RejectV: errors.New(""),
+			RejectV: errTest,
 			StatusV: choices.Processing,
 		},
 		ParentsV: vts,
@@ -2455,7 +2460,7 @@ func ErrorOnParentVtxRejectTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	votes := ids.UniqueBag{}
+	votes := bag.UniqueBag[ids.ID]{}
 	votes.Add(0, vtx0.IDV)
 	if err := avl.RecordPoll(context.Background(), votes); err == nil {
 		t.Fatalf("Should have errored on vertex rejection")
@@ -2525,7 +2530,7 @@ func ErrorOnTransitiveVtxRejectTest(t *testing.T, factory Factory) {
 	vtx2 := &TestVertex{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			RejectV: errors.New(""),
+			RejectV: errTest,
 			StatusV: choices.Processing,
 		},
 		ParentsV: []Vertex{vtx1},
@@ -2540,7 +2545,7 @@ func ErrorOnTransitiveVtxRejectTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	votes := ids.UniqueBag{}
+	votes := bag.UniqueBag[ids.ID]{}
 	votes.Add(0, vtx0.IDV)
 	if err := avl.RecordPoll(context.Background(), votes); err == nil {
 		t.Fatalf("Should have errored on vertex rejection")
@@ -2571,7 +2576,7 @@ func SilenceTransactionVertexEventsTest(t *testing.T, factory Factory) {
 
 	ctx := snow.DefaultConsensusContextTest()
 	tracker := snow.NewAcceptorTracker()
-	ctx.DecisionAcceptor = tracker
+	ctx.TxAcceptor = tracker
 
 	err := avl.Initialize(context.Background(), ctx, params, vts)
 	if err != nil {
@@ -2591,7 +2596,7 @@ func SilenceTransactionVertexEventsTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	}
 
-	votes := ids.UniqueBag{}
+	votes := bag.UniqueBag[ids.ID]{}
 	votes.Add(0, vtx0.IDV)
 	if err := avl.RecordPoll(context.Background(), votes); err != nil {
 		t.Fatal(err)

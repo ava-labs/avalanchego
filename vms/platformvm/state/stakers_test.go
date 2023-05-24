@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
@@ -146,32 +146,53 @@ func TestDiffStakersValidator(t *testing.T) {
 
 	v.PutDelegator(delegator)
 
-	_, ok := v.GetValidator(ids.GenerateTestID(), delegator.NodeID)
-	require.False(ok)
+	// validators not available in the diff are marked as unmodified
+	_, status := v.GetValidator(ids.GenerateTestID(), delegator.NodeID)
+	require.Equal(unmodified, status)
 
-	_, ok = v.GetValidator(delegator.SubnetID, ids.GenerateTestNodeID())
-	require.False(ok)
+	_, status = v.GetValidator(delegator.SubnetID, ids.GenerateTestNodeID())
+	require.Equal(unmodified, status)
 
-	_, ok = v.GetValidator(delegator.SubnetID, delegator.NodeID)
-	require.False(ok)
+	// delegator addition shouldn't change validatorStatus
+	_, status = v.GetValidator(delegator.SubnetID, delegator.NodeID)
+	require.Equal(unmodified, status)
 
 	stakerIterator := v.GetStakerIterator(EmptyIterator)
 	assertIteratorsEqual(t, NewSliceIterator(delegator), stakerIterator)
 
 	v.PutValidator(staker)
 
-	returnedStaker, ok := v.GetValidator(staker.SubnetID, staker.NodeID)
-	require.True(ok)
+	returnedStaker, status := v.GetValidator(staker.SubnetID, staker.NodeID)
+	require.Equal(added, status)
 	require.Equal(staker, returnedStaker)
 
 	v.DeleteValidator(staker)
 
-	returnedStaker, ok = v.GetValidator(staker.SubnetID, staker.NodeID)
-	require.True(ok)
-	require.Nil(returnedStaker)
+	// Validators created and deleted in the same diff are marked as unmodified.
+	// This means they won't be pushed to baseState if diff.Apply(baseState) is
+	// called.
+	_, status = v.GetValidator(staker.SubnetID, staker.NodeID)
+	require.Equal(unmodified, status)
 
 	stakerIterator = v.GetStakerIterator(EmptyIterator)
 	assertIteratorsEqual(t, NewSliceIterator(delegator), stakerIterator)
+}
+
+func TestDiffStakersDeleteValidator(t *testing.T) {
+	require := require.New(t)
+	staker := newTestStaker()
+	delegator := newTestStaker()
+
+	v := diffStakers{}
+
+	_, status := v.GetValidator(ids.GenerateTestID(), delegator.NodeID)
+	require.Equal(unmodified, status)
+
+	v.DeleteValidator(staker)
+
+	returnedStaker, status := v.GetValidator(staker.SubnetID, staker.NodeID)
+	require.Equal(deleted, status)
+	require.Nil(returnedStaker)
 }
 
 func TestDiffStakersDelegator(t *testing.T) {

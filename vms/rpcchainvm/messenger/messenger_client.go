@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package messenger
@@ -23,7 +23,7 @@ func NewClient(client messengerpb.MessengerClient) *Client {
 
 func (c *Client) Notify(msg common.Message) error {
 	_, err := c.client.Notify(context.Background(), &messengerpb.NotifyRequest{
-		Message: uint32(msg),
+		Message: messengerpb.Message(msg),
 	})
 	return err
 }

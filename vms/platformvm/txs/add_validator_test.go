@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
@@ -11,12 +11,11 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
-	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -25,7 +24,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	clk := mockable.Clock{}
 	ctx := snow.DefaultContextTest()
 	ctx.AVAXAssetID = ids.GenerateTestID()
-	signers := [][]*crypto.PrivateKeySECP256K1R{preFundedKeys}
+	signers := [][]*secp256k1.PrivateKey{preFundedKeys}
 
 	var (
 		stx            *Tx
@@ -82,7 +81,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 			Ins:          inputs,
 			Outs:         outputs,
 		}},
-		Validator: validator.Validator{
+		Validator: Validator{
 			NodeID: ctx.NodeID,
 			Start:  uint64(clk.Time().Unix()),
 			End:    uint64(clk.Time().Add(time.Hour).Unix()),
@@ -147,7 +146,7 @@ func TestAddValidatorTxSyntacticVerifyNotAVAX(t *testing.T) {
 	clk := mockable.Clock{}
 	ctx := snow.DefaultContextTest()
 	ctx.AVAXAssetID = ids.GenerateTestID()
-	signers := [][]*crypto.PrivateKeySECP256K1R{preFundedKeys}
+	signers := [][]*secp256k1.PrivateKey{preFundedKeys}
 
 	var (
 		stx            *Tx
@@ -199,7 +198,7 @@ func TestAddValidatorTxSyntacticVerifyNotAVAX(t *testing.T) {
 			Ins:          inputs,
 			Outs:         outputs,
 		}},
-		Validator: validator.Validator{
+		Validator: Validator{
 			NodeID: ctx.NodeID,
 			Start:  uint64(clk.Time().Unix()),
 			End:    uint64(clk.Time().Add(time.Hour).Unix()),

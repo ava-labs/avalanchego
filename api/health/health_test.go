@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package health
@@ -23,6 +23,8 @@ const (
 	checkFreq = time.Millisecond
 	awaitFreq = 50 * time.Microsecond
 )
+
+var errUnhealthy = errors.New("unhealthy")
 
 func awaitReadiness(r Reporter) {
 	for {
@@ -190,13 +192,10 @@ func TestPassingChecks(t *testing.T) {
 func TestPassingThenFailingChecks(t *testing.T) {
 	require := require.New(t)
 
-	var (
-		shouldCheckErr utils.AtomicBool
-		checkErr       = errors.New("unhealthy")
-	)
+	var shouldCheckErr utils.Atomic[bool]
 	check := CheckerFunc(func(context.Context) (interface{}, error) {
-		if shouldCheckErr.GetValue() {
-			return checkErr.Error(), checkErr
+		if shouldCheckErr.Get() {
+			return errUnhealthy.Error(), errUnhealthy
 		}
 		return "", nil
 	})
@@ -229,7 +228,7 @@ func TestPassingThenFailingChecks(t *testing.T) {
 		require.True(liveness)
 	}
 
-	shouldCheckErr.SetValue(true)
+	shouldCheckErr.Set(true)
 
 	awaitHealthy(h, false)
 	awaitLiveness(h, false)

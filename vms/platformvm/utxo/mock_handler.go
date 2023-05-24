@@ -11,7 +11,7 @@ import (
 	reflect "reflect"
 
 	ids "github.com/ava-labs/avalanchego/ids"
-	crypto "github.com/ava-labs/avalanchego/utils/crypto"
+	secp256k1 "github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
 	verify "github.com/ava-labs/avalanchego/vms/components/verify"
 	locked "github.com/ava-labs/avalanchego/vms/platformvm/locked"
@@ -45,11 +45,11 @@ func (m *MockHandler) EXPECT() *MockHandlerMockRecorder {
 }
 
 // Authorize mocks base method.
-func (m *MockHandler) Authorize(arg0 state.Chain, arg1 ids.ID, arg2 []*crypto.PrivateKeySECP256K1R) (verify.Verifiable, []*crypto.PrivateKeySECP256K1R, error) {
+func (m *MockHandler) Authorize(arg0 state.Chain, arg1 ids.ID, arg2 []*secp256k1.PrivateKey) (verify.Verifiable, []*secp256k1.PrivateKey, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Authorize", arg0, arg1, arg2)
 	ret0, _ := ret[0].(verify.Verifiable)
-	ret1, _ := ret[1].([]*crypto.PrivateKeySECP256K1R)
+	ret1, _ := ret[1].([]*secp256k1.PrivateKey)
 	ret2, _ := ret[2].(error)
 	return ret0, ret1, ret2
 }
@@ -61,12 +61,12 @@ func (mr *MockHandlerMockRecorder) Authorize(arg0, arg1, arg2 interface{}) *gomo
 }
 
 // Lock mocks base method.
-func (m *MockHandler) Lock(arg0 []*crypto.PrivateKeySECP256K1R, arg1, arg2 uint64, arg3 locked.State, arg4, arg5 *secp256k1fx.OutputOwners, arg6 uint64) ([]*avax.TransferableInput, []*avax.TransferableOutput, [][]*crypto.PrivateKeySECP256K1R, error) {
+func (m *MockHandler) Lock(arg0 []*secp256k1.PrivateKey, arg1, arg2 uint64, arg3 locked.State, arg4, arg5 *secp256k1fx.OutputOwners, arg6 uint64) ([]*avax.TransferableInput, []*avax.TransferableOutput, [][]*secp256k1.PrivateKey, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Lock", arg0, arg1, arg2, arg3, arg4, arg5, arg6)
 	ret0, _ := ret[0].([]*avax.TransferableInput)
 	ret1, _ := ret[1].([]*avax.TransferableOutput)
-	ret2, _ := ret[2].([][]*crypto.PrivateKeySECP256K1R)
+	ret2, _ := ret[2].([][]*secp256k1.PrivateKey)
 	ret3, _ := ret[3].(error)
 	return ret0, ret1, ret2, ret3
 }
@@ -78,13 +78,13 @@ func (mr *MockHandlerMockRecorder) Lock(arg0, arg1, arg2, arg3, arg4, arg5, arg6
 }
 
 // Spend mocks base method.
-func (m *MockHandler) Spend(arg0 []*crypto.PrivateKeySECP256K1R, arg1, arg2 uint64, arg3 ids.ShortID) ([]*avax.TransferableInput, []*avax.TransferableOutput, []*avax.TransferableOutput, [][]*crypto.PrivateKeySECP256K1R, error) {
+func (m *MockHandler) Spend(arg0 []*secp256k1.PrivateKey, arg1, arg2 uint64, arg3 ids.ShortID) ([]*avax.TransferableInput, []*avax.TransferableOutput, []*avax.TransferableOutput, [][]*secp256k1.PrivateKey, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Spend", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].([]*avax.TransferableInput)
 	ret1, _ := ret[1].([]*avax.TransferableOutput)
 	ret2, _ := ret[2].([]*avax.TransferableOutput)
-	ret3, _ := ret[3].([][]*crypto.PrivateKeySECP256K1R)
+	ret3, _ := ret[3].([][]*secp256k1.PrivateKey)
 	ret4, _ := ret[4].(error)
 	return ret0, ret1, ret2, ret3, ret4
 }
@@ -112,12 +112,12 @@ func (mr *MockHandlerMockRecorder) Unlock(arg0, arg1, arg2 interface{}) *gomock.
 }
 
 // UnlockDeposit mocks base method.
-func (m *MockHandler) UnlockDeposit(arg0 state.Chain, arg1 []*crypto.PrivateKeySECP256K1R, arg2 []ids.ID) ([]*avax.TransferableInput, []*avax.TransferableOutput, [][]*crypto.PrivateKeySECP256K1R, error) {
+func (m *MockHandler) UnlockDeposit(arg0 state.Chain, arg1 []*secp256k1.PrivateKey, arg2 []ids.ID) ([]*avax.TransferableInput, []*avax.TransferableOutput, [][]*secp256k1.PrivateKey, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UnlockDeposit", arg0, arg1, arg2)
 	ret0, _ := ret[0].([]*avax.TransferableInput)
 	ret1, _ := ret[1].([]*avax.TransferableOutput)
-	ret2, _ := ret[2].([][]*crypto.PrivateKeySECP256K1R)
+	ret2, _ := ret[2].([][]*secp256k1.PrivateKey)
 	ret3, _ := ret[3].(error)
 	return ret0, ret1, ret2, ret3
 }
@@ -129,7 +129,7 @@ func (mr *MockHandlerMockRecorder) UnlockDeposit(arg0, arg1, arg2 interface{}) *
 }
 
 // VerifyLock mocks base method.
-func (m *MockHandler) VerifyLock(arg0 txs.UnsignedTx, arg1 state.UTXOGetter, arg2 []*avax.TransferableInput, arg3 []*avax.TransferableOutput, arg4 []verify.Verifiable, arg5 uint64, arg6 ids.ID, arg7 locked.State) error {
+func (m *MockHandler) VerifyLock(arg0 txs.UnsignedTx, arg1 avax.UTXOGetter, arg2 []*avax.TransferableInput, arg3 []*avax.TransferableOutput, arg4 []verify.Verifiable, arg5 uint64, arg6 ids.ID, arg7 locked.State) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "VerifyLock", arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7)
 	ret0, _ := ret[0].(error)
@@ -143,7 +143,7 @@ func (mr *MockHandlerMockRecorder) VerifyLock(arg0, arg1, arg2, arg3, arg4, arg5
 }
 
 // VerifySpend mocks base method.
-func (m *MockHandler) VerifySpend(arg0 txs.UnsignedTx, arg1 state.UTXOGetter, arg2 []*avax.TransferableInput, arg3 []*avax.TransferableOutput, arg4 []verify.Verifiable, arg5 map[ids.ID]uint64) error {
+func (m *MockHandler) VerifySpend(arg0 txs.UnsignedTx, arg1 avax.UTXOGetter, arg2 []*avax.TransferableInput, arg3 []*avax.TransferableOutput, arg4 []verify.Verifiable, arg5 map[ids.ID]uint64) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "VerifySpend", arg0, arg1, arg2, arg3, arg4, arg5)
 	ret0, _ := ret[0].(error)

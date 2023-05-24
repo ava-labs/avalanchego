@@ -20,7 +20,6 @@ import (
 	pvm_genesis "github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/golang/mock/gomock"
 	"github.com/prometheus/client_golang/prometheus"
@@ -416,7 +415,7 @@ func defaultGenesisState(addresses []pvm_genesis.AddressState, deposits []*txs.T
 				Validators: []*txs.Tx{{Unsigned: &txs.CaminoAddValidatorTx{
 					AddValidatorTx: txs.AddValidatorTx{
 						BaseTx:       txs.BaseTx{},
-						Validator:    validator.Validator{},
+						Validator:    txs.Validator{},
 						RewardsOwner: &secp256k1fx.OutputOwners{},
 					},
 					NodeOwnerAuth: &secp256k1fx.Input{},

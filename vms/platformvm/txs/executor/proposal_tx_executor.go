@@ -8,7 +8,7 @@
 //
 // Much love to the original authors for their work.
 // **********************************************************
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -27,7 +27,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 )
 
 const (
@@ -133,9 +132,9 @@ func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 
 	// Set up the state if this tx is committed
 	// Consume the UTXOs
-	utxo.Consume(e.OnCommitState, tx.Ins)
+	avax.Consume(e.OnCommitState, tx.Ins)
 	// Produce the UTXOs
-	utxo.Produce(e.OnCommitState, txID, tx.Outs)
+	avax.Produce(e.OnCommitState, txID, tx.Outs)
 
 	newStaker, err := state.NewPendingStaker(txID, tx)
 	if err != nil {
@@ -146,9 +145,9 @@ func (e *ProposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 
 	// Set up the state if this tx is aborted
 	// Consume the UTXOs
-	utxo.Consume(e.OnAbortState, tx.Ins)
+	avax.Consume(e.OnAbortState, tx.Ins)
 	// Produce the UTXOs
-	utxo.Produce(e.OnAbortState, txID, onAbortOuts)
+	avax.Produce(e.OnAbortState, txID, onAbortOuts)
 
 	e.PrefersCommit = tx.StartTime().After(e.Clk.Time())
 	return nil
@@ -181,9 +180,9 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 
 	// Set up the state if this tx is committed
 	// Consume the UTXOs
-	utxo.Consume(e.OnCommitState, tx.Ins)
+	avax.Consume(e.OnCommitState, tx.Ins)
 	// Produce the UTXOs
-	utxo.Produce(e.OnCommitState, txID, tx.Outs)
+	avax.Produce(e.OnCommitState, txID, tx.Outs)
 
 	newStaker, err := state.NewPendingStaker(txID, tx)
 	if err != nil {
@@ -194,9 +193,9 @@ func (e *ProposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 
 	// Set up the state if this tx is aborted
 	// Consume the UTXOs
-	utxo.Consume(e.OnAbortState, tx.Ins)
+	avax.Consume(e.OnAbortState, tx.Ins)
 	// Produce the UTXOs
-	utxo.Produce(e.OnAbortState, txID, tx.Outs)
+	avax.Produce(e.OnAbortState, txID, tx.Outs)
 
 	e.PrefersCommit = tx.StartTime().After(e.Clk.Time())
 	return nil
@@ -230,9 +229,9 @@ func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 
 	// Set up the state if this tx is committed
 	// Consume the UTXOs
-	utxo.Consume(e.OnCommitState, tx.Ins)
+	avax.Consume(e.OnCommitState, tx.Ins)
 	// Produce the UTXOs
-	utxo.Produce(e.OnCommitState, txID, tx.Outs)
+	avax.Produce(e.OnCommitState, txID, tx.Outs)
 
 	newStaker, err := state.NewPendingStaker(txID, tx)
 	if err != nil {
@@ -243,9 +242,9 @@ func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 
 	// Set up the state if this tx is aborted
 	// Consume the UTXOs
-	utxo.Consume(e.OnAbortState, tx.Ins)
+	avax.Consume(e.OnAbortState, tx.Ins)
 	// Produce the UTXOs
-	utxo.Produce(e.OnAbortState, txID, onAbortOuts)
+	avax.Produce(e.OnAbortState, txID, onAbortOuts)
 
 	e.PrefersCommit = tx.StartTime().After(e.Clk.Time())
 	return nil

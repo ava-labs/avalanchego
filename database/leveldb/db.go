@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package leveldb
@@ -22,6 +22,8 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/util"
 
 	"go.uber.org/zap"
+
+	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils"
@@ -77,7 +79,7 @@ type Database struct {
 	// metrics is only initialized and used when [MetricUpdateFrequency] is >= 0
 	// in the config
 	metrics   metrics
-	closed    utils.AtomicBool
+	closed    utils.Atomic[bool]
 	closeOnce sync.Once
 	// closeCh is closed when Close() is called.
 	closeCh chan struct{}
@@ -351,7 +353,7 @@ func (db *Database) Compact(start []byte, limit []byte) error {
 }
 
 func (db *Database) Close() error {
-	db.closed.SetValue(true)
+	db.closed.Set(true)
 	db.closeOnce.Do(func() {
 		close(db.closeCh)
 	})
@@ -360,7 +362,7 @@ func (db *Database) Close() error {
 }
 
 func (db *Database) HealthCheck(context.Context) (interface{}, error) {
-	if db.closed.GetValue() {
+	if db.closed.Get() {
 		return nil, database.ErrClosed
 	}
 	return nil, nil
@@ -447,7 +449,7 @@ type iter struct {
 
 func (it *iter) Next() bool {
 	// Short-circuit and set an error if the underlying database has been closed.
-	if it.db.closed.GetValue() {
+	if it.db.closed.Get() {
 		it.key = nil
 		it.val = nil
 		it.err = database.ErrClosed
@@ -456,8 +458,8 @@ func (it *iter) Next() bool {
 
 	hasNext := it.Iterator.Next()
 	if hasNext {
-		it.key = utils.CopyBytes(it.Iterator.Key())
-		it.val = utils.CopyBytes(it.Iterator.Value())
+		it.key = slices.Clone(it.Iterator.Key())
+		it.val = slices.Clone(it.Iterator.Value())
 	} else {
 		it.key = nil
 		it.val = nil

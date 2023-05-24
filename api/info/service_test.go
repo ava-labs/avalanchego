@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package info
@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms"
 )
 
-var errOops = errors.New("oops")
+var errTest = errors.New("non-nil error")
 
 type getVMsTest struct {
 	info          *Info
@@ -61,7 +61,7 @@ func TestGetVMsSuccess(t *testing.T) {
 		id2: alias2[1:],
 	}
 
-	resources.mockLog.EXPECT().Debug(gomock.Any()).Times(1)
+	resources.mockLog.EXPECT().Debug(gomock.Any(), gomock.Any()).Times(1)
 	resources.mockVMManager.EXPECT().ListFactories().Times(1).Return(vmIDs, nil)
 	resources.mockVMManager.EXPECT().Aliases(id1).Times(1).Return(alias1, nil)
 	resources.mockVMManager.EXPECT().Aliases(id2).Times(1).Return(alias2, nil)
@@ -78,13 +78,13 @@ func TestGetVMsVMsListFactoriesFails(t *testing.T) {
 	resources := initGetVMsTest(t)
 	defer resources.ctrl.Finish()
 
-	resources.mockLog.EXPECT().Debug(gomock.Any()).Times(1)
-	resources.mockVMManager.EXPECT().ListFactories().Times(1).Return(nil, errOops)
+	resources.mockLog.EXPECT().Debug(gomock.Any(), gomock.Any()).Times(1)
+	resources.mockVMManager.EXPECT().ListFactories().Times(1).Return(nil, errTest)
 
 	reply := GetVMsReply{}
 	err := resources.info.GetVMs(nil, nil, &reply)
 
-	require.Equal(t, errOops, err)
+	require.Equal(t, errTest, err)
 }
 
 // Tests GetVMs if we can't get our vm aliases.
@@ -97,13 +97,13 @@ func TestGetVMsGetAliasesFails(t *testing.T) {
 	vmIDs := []ids.ID{id1, id2}
 	alias1 := []string{id1.String(), "vm1-alias-1", "vm1-alias-2"}
 
-	resources.mockLog.EXPECT().Debug(gomock.Any()).Times(1)
+	resources.mockLog.EXPECT().Debug(gomock.Any(), gomock.Any()).Times(1)
 	resources.mockVMManager.EXPECT().ListFactories().Times(1).Return(vmIDs, nil)
 	resources.mockVMManager.EXPECT().Aliases(id1).Times(1).Return(alias1, nil)
-	resources.mockVMManager.EXPECT().Aliases(id2).Times(1).Return(nil, errOops)
+	resources.mockVMManager.EXPECT().Aliases(id2).Times(1).Return(nil, errTest)
 
 	reply := GetVMsReply{}
 	err := resources.info.GetVMs(nil, nil, &reply)
 
-	require.Equal(t, err, errOops)
+	require.Equal(t, err, errTest)
 }

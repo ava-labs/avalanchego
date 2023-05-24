@@ -8,7 +8,7 @@
 //
 // Much love to the original authors for their work.
 // **********************************************************
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package block
@@ -20,7 +20,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/staking"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -112,7 +112,7 @@ func (b *statelessBlock) initialize(bytes []byte) error {
 
 	b.cert = cert
 
-	nodeIDBytes, err := crypto.RecoverSecp256PublicKey(cert)
+	nodeIDBytes, err := secp256k1.RecoverSecp256PublicKey(cert)
 	if err != nil {
 		return err
 	}

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package bootstrap
@@ -14,6 +14,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -94,7 +95,7 @@ func New(ctx context.Context, config Config, onFinished func(ctx context.Context
 		PutHandler:                  common.NewNoOpPutHandler(config.Ctx.Log),
 		QueryHandler:                common.NewNoOpQueryHandler(config.Ctx.Log),
 		ChitsHandler:                common.NewNoOpChitsHandler(config.Ctx.Log),
-		AppHandler:                  common.NewNoOpAppHandler(config.Ctx.Log),
+		AppHandler:                  config.VM,
 
 		Fetcher: common.Fetcher{
 			OnFinished: onFinished,
@@ -121,7 +122,10 @@ func New(ctx context.Context, config Config, onFinished func(ctx context.Context
 func (b *bootstrapper) Start(ctx context.Context, startReqID uint32) error {
 	b.Ctx.Log.Info("starting bootstrapper")
 
-	b.Ctx.SetState(snow.Bootstrapping)
+	b.Ctx.State.Set(snow.EngineState{
+		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+		State: snow.Bootstrapping,
+	})
 	if err := b.VM.SetState(ctx, snow.Bootstrapping); err != nil {
 		return fmt.Errorf("failed to notify VM that bootstrapping has started: %w",
 			err)
@@ -276,7 +280,7 @@ func (b *bootstrapper) Timeout(ctx context.Context) error {
 	}
 	b.awaitingTimeout = false
 
-	if !b.Config.Subnet.IsBootstrapped() {
+	if !b.Config.BootstrapTracker.IsBootstrapped() {
 		return b.Restart(ctx, true)
 	}
 	b.fetchETA.Set(0)
@@ -292,7 +296,15 @@ func (b *bootstrapper) Shutdown(ctx context.Context) error {
 	return b.VM.Shutdown(ctx)
 }
 
-func (*bootstrapper) Notify(context.Context, common.Message) error {
+func (b *bootstrapper) Notify(_ context.Context, msg common.Message) error {
+	if msg != common.StateSyncDone {
+		b.Ctx.Log.Warn("received an unexpected message from the VM",
+			zap.Stringer("msg", msg),
+		)
+		return nil
+	}
+
+	b.Ctx.StateSyncing.Set(false)
 	return nil
 }
 
@@ -552,8 +564,7 @@ func (b *bootstrapper) checkFinish(ctx context.Context) error {
 		b.Config.Ctx,
 		b,
 		b.Config.SharedCfg.Restarted,
-		b.Ctx.ConsensusAcceptor,
-		b.Ctx.DecisionAcceptor,
+		b.Ctx.BlockAcceptor,
 	)
 	if err != nil || b.Halted() {
 		return err
@@ -578,11 +589,11 @@ func (b *bootstrapper) checkFinish(ctx context.Context) error {
 	}
 
 	// Notify the subnet that this chain is synced
-	b.Config.Subnet.Bootstrapped(b.Ctx.ChainID)
+	b.Config.BootstrapTracker.Bootstrapped(b.Ctx.ChainID)
 
 	// If the subnet hasn't finished bootstrapping, this chain should remain
 	// syncing.
-	if !b.Config.Subnet.IsBootstrapped() {
+	if !b.Config.BootstrapTracker.IsBootstrapped() {
 		if !b.Config.SharedCfg.Restarted {
 			b.Ctx.Log.Info("waiting for the remaining chains in this subnet to finish syncing")
 		} else {

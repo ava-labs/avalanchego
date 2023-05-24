@@ -19,7 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
+	"github.com/ava-labs/avalanchego/vms/platformvm/caminoconfig"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -40,14 +41,12 @@ const (
 
 var (
 	localStakingPath          = "../../staking/local/"
-	caminoPreFundedKeys       = crypto.BuildTestKeys()
+	caminoPreFundedKeys       = secp256k1.TestKeys()
 	_, caminoPreFundedNodeIDs = nodeid.LoadLocalCaminoNodeKeysAndIDs(localStakingPath)
 )
 
 func newCaminoVM(genesisConfig api.Camino, genesisUTXOs []api.UTXO) *VM {
-	vm := &VM{
-		Factory: Factory{defaultCaminoConfig(true)},
-	}
+	vm := &VM{Config: defaultCaminoConfig(true)}
 
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	chainDBManager := baseDBManager.NewPrefixDBManager([]byte{0})
@@ -90,7 +89,7 @@ func newCaminoVM(genesisConfig api.Camino, genesisUTXOs []api.UTXO) *VM {
 			caminoPreFundedKeys[1].PublicKey().Address(),
 			caminoPreFundedKeys[2].PublicKey().Address(),
 		},
-		[]*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0]},
+		[]*secp256k1.PrivateKey{caminoPreFundedKeys[0]},
 		caminoPreFundedKeys[0].PublicKey().Address(),
 	)
 	if err != nil {
@@ -120,7 +119,7 @@ func defaultCaminoConfig(postBanff bool) config.Config {
 	primaryVdrs := validators.NewSet()
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 	return config.Config{
-		Chains:                 chains.MockManager{},
+		Chains:                 chains.TestManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		Validators:             vdrs,
 		TxFee:                  defaultTxFee,
@@ -140,7 +139,7 @@ func defaultCaminoConfig(postBanff bool) config.Config {
 		ApricotPhase3Time: defaultValidateEndTime,
 		ApricotPhase5Time: defaultValidateEndTime,
 		BanffTime:         banffTime,
-		CaminoConfig: config.CaminoConfig{
+		CaminoConfig: caminoconfig.Config{
 			DaoProposalBondAmount: 100 * units.Avax,
 		},
 	}
@@ -207,15 +206,11 @@ func newCaminoGenesisWithUTXOs(caminoGenesisConfig api.Camino, genesisUTXOs []ap
 	return &buildGenesisArgs, genesisBytes
 }
 
-func generateKeyAndOwner(t *testing.T) (*crypto.PrivateKeySECP256K1R, ids.ShortID, secp256k1fx.OutputOwners) {
+func generateKeyAndOwner(t *testing.T) (*secp256k1.PrivateKey, ids.ShortID, secp256k1fx.OutputOwners) {
 	key, err := testKeyFactory.NewPrivateKey()
 	require.NoError(t, err)
-
-	secpKey, ok := key.(*crypto.PrivateKeySECP256K1R)
-	require.True(t, ok)
-	addr := secpKey.Address()
-
-	return secpKey, addr, secp256k1fx.OutputOwners{
+	addr := key.Address()
+	return key, addr, secp256k1fx.OutputOwners{
 		Locktime:  0,
 		Threshold: 1,
 		Addrs:     []ids.ShortID{addr},

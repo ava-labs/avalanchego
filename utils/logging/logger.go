@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package logging
@@ -35,6 +35,9 @@ type Logger interface {
 	// Log extremely detailed events that can be useful for inspecting every
 	// aspect of the program
 	Verbo(msg string, fields ...zap.Field)
+
+	// SetLevel that this logger should log to
+	SetLevel(level Level)
 
 	// Recovers a panic, logs the error, and rethrows the panic.
 	StopOnPanic()

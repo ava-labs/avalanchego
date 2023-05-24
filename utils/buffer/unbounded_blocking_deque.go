@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package buffer
@@ -123,6 +123,16 @@ func (q *unboundedBlockingDeque[T]) PeekLeft() (T, bool) {
 	return q.Deque.PeekLeft()
 }
 
+func (q *unboundedBlockingDeque[T]) Index(i int) (T, bool) {
+	q.lock.RLock()
+	defer q.lock.RUnlock()
+
+	if q.closed {
+		return utils.Zero[T](), false
+	}
+	return q.Deque.Index(i)
+}
+
 func (q *unboundedBlockingDeque[T]) Len() int {
 	q.lock.RLock()
 	defer q.lock.RUnlock()
@@ -131,6 +141,16 @@ func (q *unboundedBlockingDeque[T]) Len() int {
 		return 0
 	}
 	return q.Deque.Len()
+}
+
+func (q *unboundedBlockingDeque[T]) List() []T {
+	q.lock.RLock()
+	defer q.lock.RUnlock()
+
+	if q.closed {
+		return nil
+	}
+	return q.Deque.List()
 }
 
 func (q *unboundedBlockingDeque[T]) Close() {

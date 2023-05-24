@@ -1,10 +1,9 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package metrics
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -43,16 +42,15 @@ func TestMultiGathererAddedError(t *testing.T) {
 
 	g := NewMultiGatherer()
 
-	expected := errors.New(":(")
 	tg := &testGatherer{
-		err: expected,
+		err: errTest,
 	}
 
 	err := g.Register("", tg)
 	require.NoError(err)
 
 	mfs, err := g.Gather()
-	require.Equal(expected, err)
+	require.ErrorIs(err, errTest)
 	require.Empty(mfs)
 }
 

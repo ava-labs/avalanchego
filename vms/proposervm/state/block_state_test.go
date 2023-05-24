@@ -8,7 +8,7 @@
 //
 // Much love to the original authors for their work.
 // **********************************************************
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
@@ -28,7 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 
-	crypto2 "github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 )
 
 func testBlockState(a *require.Assertions, bs BlockState) {
@@ -44,7 +44,7 @@ func testBlockState(a *require.Assertions, bs BlockState) {
 	cert := tlsCert.Leaf
 	key := tlsCert.PrivateKey.(crypto.Signer)
 
-	nodeIDBytes, err := crypto2.RecoverSecp256PublicKey(cert)
+	nodeIDBytes, err := secp256k1.RecoverSecp256PublicKey(cert)
 	a.NoError(err)
 	nodeID, err := ids.ToNodeID(nodeIDBytes)
 	a.NoError(err)
@@ -137,7 +137,7 @@ func initCommonTestData(a *require.Assertions) (database.Database, BlockState, b
 	cert := tlsCert.Leaf
 	key := tlsCert.PrivateKey.(crypto.Signer)
 
-	nodeIDBytes, err := crypto2.RecoverSecp256PublicKey(cert)
+	nodeIDBytes, err := secp256k1.RecoverSecp256PublicKey(cert)
 	a.NoError(err)
 	nodeID, err := ids.ToNodeID(nodeIDBytes)
 	a.NoError(err)

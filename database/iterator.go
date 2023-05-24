@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 // For ease of implementation, our database's interface matches Ethereum's
@@ -6,6 +6,8 @@
 // EVM chain.
 
 package database
+
+var _ Iterator = (*IteratorError)(nil)
 
 // Iterator iterates over a database's key/value pairs.
 //
@@ -60,3 +62,26 @@ type Iteratee interface {
 	// key.
 	NewIteratorWithStartAndPrefix(start, prefix []byte) Iterator
 }
+
+// IteratorError does nothing and returns the provided error
+type IteratorError struct {
+	Err error
+}
+
+func (*IteratorError) Next() bool {
+	return false
+}
+
+func (i *IteratorError) Error() error {
+	return i.Err
+}
+
+func (*IteratorError) Key() []byte {
+	return nil
+}
+
+func (*IteratorError) Value() []byte {
+	return nil
+}
+
+func (*IteratorError) Release() {}

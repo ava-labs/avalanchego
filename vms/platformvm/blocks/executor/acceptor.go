@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -26,7 +26,7 @@ type acceptor struct {
 	*backend
 	metrics          metrics.Metrics
 	recentlyAccepted window.Window[ids.ID]
-	bootstrapped     *utils.AtomicBool
+	bootstrapped     *utils.Atomic[bool]
 }
 
 func (a *acceptor) BanffAbortBlock(b *blocks.BanffAbortBlock) error {
@@ -180,7 +180,7 @@ func (a *acceptor) abortBlock(b blocks.Block) error {
 		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
 	}
 
-	if a.bootstrapped.GetValue() {
+	if a.bootstrapped.Get() {
 		if parentState.initiallyPreferCommit {
 			a.metrics.MarkOptionVoteLost()
 		} else {
@@ -198,7 +198,7 @@ func (a *acceptor) commitBlock(b blocks.Block) error {
 		return fmt.Errorf("%w: %s", state.ErrMissingParentState, parentID)
 	}
 
-	if a.bootstrapped.GetValue() {
+	if a.bootstrapped.Get() {
 		if parentState.initiallyPreferCommit {
 			a.metrics.MarkOptionVoteWon()
 		} else {

@@ -12,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
@@ -27,7 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
@@ -39,6 +38,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/multisig"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
+	"github.com/ava-labs/avalanchego/vms/platformvm/caminoconfig"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
@@ -60,13 +60,13 @@ const (
 )
 
 var (
-	caminoPreFundedKeys                             = crypto.BuildTestKeys()
+	caminoPreFundedKeys                             = secp256k1.TestKeys()
 	caminoPreFundedNodeKeys, caminoPreFundedNodeIDs = nodeid.LoadLocalCaminoNodeKeysAndIDs(localStakingPath)
 	testCaminoSubnet1ControlKeys                    = caminoPreFundedKeys[0:3]
 )
 
 type caminoEnvironment struct {
-	isBootstrapped *utils.AtomicBool
+	isBootstrapped *utils.Atomic[bool]
 	config         *config.Config
 	clk            *mockable.Clock
 	baseDB         *versiondb.Database
@@ -95,8 +95,8 @@ func (e *caminoEnvironment) SetState(blkID ids.ID, chainState state.Chain) {
 }
 
 func newCaminoEnvironment(postBanff, addSubnet bool, caminoGenesisConf api.Camino) *caminoEnvironment {
-	var isBootstrapped utils.AtomicBool
-	isBootstrapped.SetValue(true)
+	var isBootstrapped utils.Atomic[bool]
+	isBootstrapped.Set(true)
 
 	config := defaultCaminoConfig(postBanff)
 	clk := defaultClock(postBanff)
@@ -105,7 +105,7 @@ func newCaminoEnvironment(postBanff, addSubnet bool, caminoGenesisConf api.Camin
 	baseDB := versiondb.New(baseDBManager.Current().Database)
 	ctx, msm := defaultCtx(baseDB)
 
-	fx := defaultFx(&clk, ctx.Log, isBootstrapped.GetValue())
+	fx := defaultFx(&clk, ctx.Log, isBootstrapped.Get())
 
 	rewards := reward.NewCalculator(config.RewardConfig)
 
@@ -113,7 +113,7 @@ func newCaminoEnvironment(postBanff, addSubnet bool, caminoGenesisConf api.Camin
 
 	atomicUTXOs := avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
 	uptimes := uptime.NewManager(baseState)
-	utxoHandler := utxo.NewCaminoHandler(ctx, &clk, baseState, fx, true)
+	utxoHandler := utxo.NewCaminoHandler(ctx, &clk, fx, true)
 
 	txBuilder := builder.NewCamino(
 		ctx,
@@ -173,7 +173,7 @@ func addCaminoSubnet(
 			caminoPreFundedKeys[1].PublicKey().Address(),
 			caminoPreFundedKeys[2].PublicKey().Address(),
 		},
-		[]*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0]},
+		[]*secp256k1.PrivateKey{caminoPreFundedKeys[0]},
 		caminoPreFundedKeys[0].PublicKey().Address(),
 	)
 	if err != nil {
@@ -218,6 +218,7 @@ func defaultCaminoState(
 		ctx,
 		metrics.Noop,
 		rewards,
+		&utils.Atomic[bool]{},
 	)
 	if err != nil {
 		panic(err)
@@ -247,7 +248,7 @@ func defaultCaminoConfig(postBanff bool) config.Config {
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 
 	return config.Config{
-		Chains:                 chains.MockManager{},
+		Chains:                 chains.TestManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		Validators:             vdrs,
 		TxFee:                  defaultTxFee,
@@ -267,7 +268,7 @@ func defaultCaminoConfig(postBanff bool) config.Config {
 		ApricotPhase3Time: defaultValidateEndTime,
 		ApricotPhase5Time: defaultValidateEndTime,
 		BanffTime:         banffTime,
-		CaminoConfig: config.CaminoConfig{
+		CaminoConfig: caminoconfig.Config{
 			DaoProposalBondAmount: 100 * units.Avax,
 		},
 	}
@@ -496,15 +497,11 @@ func generateInsFromUTXOs(utxos []*avax.UTXO) []*avax.TransferableInput {
 	return ins
 }
 
-func generateKeyAndOwner(t *testing.T) (*crypto.PrivateKeySECP256K1R, ids.ShortID, secp256k1fx.OutputOwners) {
+func generateKeyAndOwner(t *testing.T) (*secp256k1.PrivateKey, ids.ShortID, secp256k1fx.OutputOwners) {
 	key, err := testKeyfactory.NewPrivateKey()
 	require.NoError(t, err)
-
-	secpKey, ok := key.(*crypto.PrivateKeySECP256K1R)
-	require.True(t, ok)
-	addr := secpKey.Address()
-
-	return secpKey, addr, secp256k1fx.OutputOwners{
+	addr := key.Address()
+	return key, addr, secp256k1fx.OutputOwners{
 		Locktime:  0,
 		Threshold: 1,
 		Addrs:     []ids.ShortID{addr},
@@ -514,7 +511,7 @@ func generateKeyAndOwner(t *testing.T) (*crypto.PrivateKeySECP256K1R, ids.ShortI
 // msgOwnersWithKeys is created in order to be able to sort both keys and owners by address
 type msgOwnersWithKeys struct {
 	Owners *secp256k1fx.OutputOwners
-	Keys   []*crypto.PrivateKeySECP256K1R
+	Keys   []*secp256k1.PrivateKey
 }
 
 func (mo msgOwnersWithKeys) Len() int {
@@ -530,22 +527,20 @@ func (mo msgOwnersWithKeys) Less(i, j int) bool {
 	return bytes.Compare(mo.Owners.Addrs[i].Bytes(), mo.Owners.Addrs[j].Bytes()) < 0
 }
 
-func generateMsigAliasAndKeys(t *testing.T, threshold, addrsCount uint32, sorted bool) ([]*crypto.PrivateKeySECP256K1R, *multisig.AliasWithNonce, *secp256k1fx.OutputOwners, *secp256k1fx.OutputOwners) {
+func generateMsigAliasAndKeys(t *testing.T, threshold, addrsCount uint32, sorted bool) ([]*secp256k1.PrivateKey, *multisig.AliasWithNonce, *secp256k1fx.OutputOwners, *secp256k1fx.OutputOwners) {
 	msgOwners := msgOwnersWithKeys{
 		Owners: &secp256k1fx.OutputOwners{
 			Threshold: threshold,
 			Addrs:     make([]ids.ShortID, addrsCount),
 		},
-		Keys: make([]*crypto.PrivateKeySECP256K1R, addrsCount),
+		Keys: make([]*secp256k1.PrivateKey, addrsCount),
 	}
 
 	for i := uint32(0); i < addrsCount; i++ {
 		key, err := testKeyfactory.NewPrivateKey()
 		require.NoError(t, err)
-		secpKey, ok := key.(*crypto.PrivateKeySECP256K1R)
-		require.True(t, ok)
-		msgOwners.Owners.Addrs[i] = secpKey.Address()
-		msgOwners.Keys[i] = secpKey
+		msgOwners.Owners.Addrs[i] = key.Address()
+		msgOwners.Keys[i] = key
 	}
 
 	if sorted {
@@ -566,7 +561,7 @@ func generateMsigAliasAndKeys(t *testing.T, threshold, addrsCount uint32, sorted
 }
 
 func shutdownCaminoEnvironment(env *caminoEnvironment) error {
-	if env.isBootstrapped.GetValue() {
+	if env.isBootstrapped.Get() {
 		primaryValidatorSet, exist := env.config.Validators.Get(constants.PrimaryNetworkID)
 		if !exist {
 			return errors.New("no default subnet validators")
@@ -597,11 +592,10 @@ func shutdownCaminoEnvironment(env *caminoEnvironment) error {
 
 func newCaminoEnvironmentWithMocks(
 	caminoGenesisConf api.Camino,
-	mockableState state.State,
 	sharedMemory atomic.SharedMemory,
 ) *caminoEnvironment {
-	var isBootstrapped utils.AtomicBool
-	isBootstrapped.SetValue(true)
+	var isBootstrapped utils.Atomic[bool]
+	isBootstrapped.Set(true)
 
 	vmConfig := defaultCaminoConfig(true)
 
@@ -611,13 +605,11 @@ func newCaminoEnvironmentWithMocks(
 	baseDB := versiondb.New(baseDBManager.Current().Database)
 	ctx, msm := defaultCtx(baseDB)
 
-	fx := defaultFx(&clk, ctx.Log, isBootstrapped.GetValue())
+	fx := defaultFx(&clk, ctx.Log, isBootstrapped.Get())
 
 	rewards := reward.NewCalculator(vmConfig.RewardConfig)
 
-	if mockableState == nil {
-		mockableState = defaultCaminoState(&vmConfig, ctx, baseDB, rewards, caminoGenesisConf)
-	}
+	defaultState := defaultCaminoState(&vmConfig, ctx, baseDB, rewards, caminoGenesisConf)
 
 	if sharedMemory != nil {
 		msm = &mutableSharedMemory{
@@ -627,8 +619,8 @@ func newCaminoEnvironmentWithMocks(
 	}
 
 	atomicUTXOs := avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
-	uptimes := uptime.NewManager(mockableState)
-	utxoHandler := utxo.NewCaminoHandler(ctx, &clk, mockableState, fx, true)
+	uptimes := uptime.NewManager(defaultState)
+	utxoHandler := utxo.NewCaminoHandler(ctx, &clk, fx, true)
 
 	return &caminoEnvironment{
 		isBootstrapped: &isBootstrapped,
@@ -638,7 +630,7 @@ func newCaminoEnvironmentWithMocks(
 		ctx:            ctx,
 		msm:            msm,
 		fx:             fx,
-		state:          mockableState,
+		state:          defaultState,
 		states:         make(map[ids.ID]state.Chain),
 		atomicUTXOs:    atomicUTXOs,
 		uptimes:        uptimes,
@@ -648,7 +640,7 @@ func newCaminoEnvironmentWithMocks(
 			&vmConfig,
 			&clk,
 			fx,
-			mockableState,
+			defaultState,
 			atomicUTXOs,
 			utxoHandler,
 		),
@@ -665,33 +657,11 @@ func newCaminoEnvironmentWithMocks(
 	}
 }
 
-func stateExpectingShutdownCaminoEnvironment(c *gomock.Controller) *state.MockState {
-	s := state.NewMockState(c)
-	s.EXPECT().SetHeight(uint64(math.MaxUint64))
-	s.EXPECT().Commit()
-	s.EXPECT().Close()
-	return s
-}
-
-func expectStateGetMultisigAliases(s *state.MockState, addrs []ids.ShortID, aliases []*multisig.AliasWithNonce) {
-	for i := range addrs {
-		var alias *multisig.AliasWithNonce
-		if i < len(aliases) {
-			alias = aliases[i]
-		}
-		if alias == nil {
-			s.EXPECT().GetMultisigAlias(addrs[i]).Return(nil, database.ErrNotFound)
-		} else {
-			s.EXPECT().GetMultisigAlias(addrs[i]).Return(alias, nil)
-		}
-	}
-}
-
 func expectVerifyMultisigPermission(s *state.MockDiff, addrs []ids.ShortID, aliases []*multisig.AliasWithNonce) {
-	expectDiffGetMultisigAliases(s, addrs, aliases)
+	expectGetMultisigAliases(s, addrs, aliases)
 }
 
-func expectDiffGetMultisigAliases(s *state.MockDiff, addrs []ids.ShortID, aliases []*multisig.AliasWithNonce) {
+func expectGetMultisigAliases(s *state.MockDiff, addrs []ids.ShortID, aliases []*multisig.AliasWithNonce) {
 	for i := range addrs {
 		var alias *multisig.AliasWithNonce
 		if i < len(aliases) {
@@ -705,12 +675,26 @@ func expectDiffGetMultisigAliases(s *state.MockDiff, addrs []ids.ShortID, aliase
 	}
 }
 
-func expectVerifyLock(s *state.MockDiff, ins []*avax.TransferableInput, utxos []*avax.UTXO) {
+func expectVerifyLock(
+	s *state.MockDiff,
+	ins []*avax.TransferableInput,
+	utxos []*avax.UTXO,
+	addrs []ids.ShortID,
+	aliases []*multisig.AliasWithNonce,
+) {
 	expectGetUTXOsFromInputs(s, ins, utxos)
+	expectGetMultisigAliases(s, addrs, aliases)
 }
 
-func expectVerifyUnlock(s *state.MockDiff, ins []*avax.TransferableInput, utxos []*avax.UTXO) {
+func expectVerifyUnlockDeposit(
+	s *state.MockDiff,
+	ins []*avax.TransferableInput,
+	utxos []*avax.UTXO,
+	addrs []ids.ShortID,
+	aliases []*multisig.AliasWithNonce, //nolint:unparam
+) {
 	expectGetUTXOsFromInputs(s, ins, utxos)
+	expectGetMultisigAliases(s, addrs, aliases)
 }
 
 func expectGetUTXOsFromInputs(s *state.MockDiff, ins []*avax.TransferableInput, utxos []*avax.UTXO) {

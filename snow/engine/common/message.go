@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package common
@@ -16,7 +16,7 @@ const (
 	// PendingTxs notifies a consensus engine that
 	// its VM has pending transactions
 	// (i.e. it would like to add a new block/vertex to consensus)
-	PendingTxs Message = iota
+	PendingTxs Message = iota + 1
 
 	// StateSyncDone notifies the state syncer engine that the VM has finishing
 	// syncing the requested state summary.

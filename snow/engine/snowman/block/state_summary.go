@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package block
@@ -21,9 +21,8 @@ type StateSummary interface {
 	// Bytes returns a byte slice than can be used to reconstruct this summary.
 	Bytes() []byte
 
-	// Accept triggers the VM to start state syncing this summary.
+	// Accept triggers the VM to start state syncing to this summary.
 	//
-	// The returned boolean will be [true] if the VM has started state sync or
-	// [false] if the VM has skipped state sync.
-	Accept(context.Context) (bool, error)
+	// It returns the state sync mode selected by the VM.
+	Accept(context.Context) (StateSyncMode, error)
 }

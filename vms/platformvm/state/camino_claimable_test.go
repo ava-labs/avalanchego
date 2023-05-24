@@ -50,7 +50,7 @@ func TestGetClaimable(t *testing.T) {
 		},
 		"Fail: claimable in cache, but removed": {
 			caminoState: func(c *gomock.Controller) *caminoState {
-				cache := cache.NewMockCacher(c)
+				cache := cache.NewMockCacher[ids.ID, *Claimable](c)
 				cache.EXPECT().Get(claimableOwnerID).Return(nil, true)
 				return &caminoState{
 					claimablesCache: cache,
@@ -68,7 +68,7 @@ func TestGetClaimable(t *testing.T) {
 		},
 		"Fail: not found in db": {
 			caminoState: func(c *gomock.Controller) *caminoState {
-				cache := cache.NewMockCacher(c)
+				cache := cache.NewMockCacher[ids.ID, *Claimable](c)
 				cache.EXPECT().Get(claimableOwnerID).Return(nil, false)
 				cache.EXPECT().Put(claimableOwnerID, nil)
 				db := database.NewMockDatabase(c)
@@ -110,7 +110,7 @@ func TestGetClaimable(t *testing.T) {
 		},
 		"OK: claimable in cache": {
 			caminoState: func(c *gomock.Controller) *caminoState {
-				cache := cache.NewMockCacher(c)
+				cache := cache.NewMockCacher[ids.ID, *Claimable](c)
 				cache.EXPECT().Get(claimableOwnerID).Return(claimable, true)
 				return &caminoState{
 					claimablesCache: cache,
@@ -128,7 +128,7 @@ func TestGetClaimable(t *testing.T) {
 		},
 		"OK: claimable in db": {
 			caminoState: func(c *gomock.Controller) *caminoState {
-				cache := cache.NewMockCacher(c)
+				cache := cache.NewMockCacher[ids.ID, *Claimable](c)
 				cache.EXPECT().Get(claimableOwnerID).Return(nil, false)
 				cache.EXPECT().Put(claimableOwnerID, claimable)
 				db := database.NewMockDatabase(c)
@@ -151,7 +151,7 @@ func TestGetClaimable(t *testing.T) {
 		},
 		"Fail: db error": {
 			caminoState: func(c *gomock.Controller) *caminoState {
-				cache := cache.NewMockCacher(c)
+				cache := cache.NewMockCacher[ids.ID, *Claimable](c)
 				cache.EXPECT().Get(claimableOwnerID).Return(nil, false)
 				db := database.NewMockDatabase(c)
 				db.EXPECT().Get(claimableOwnerID[:]).Return(nil, testError)
@@ -201,7 +201,7 @@ func TestSetClaimable(t *testing.T) {
 	}{
 		"OK": {
 			caminoState: func(c *gomock.Controller) *caminoState {
-				cache := cache.NewMockCacher(c)
+				cache := cache.NewMockCacher[ids.ID, *Claimable](c)
 				cache.EXPECT().Evict(ownerID)
 				return &caminoState{
 					claimablesCache: cache,

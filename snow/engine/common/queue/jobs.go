@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package queue
@@ -117,8 +117,8 @@ func (j *Jobs) ExecuteAll(
 	restarted bool,
 	acceptors ...snow.Acceptor,
 ) (int, error) {
-	chainCtx.Executing(true)
-	defer chainCtx.Executing(false)
+	chainCtx.Executing.Set(true)
+	defer chainCtx.Executing.Set(false)
 
 	numExecuted := 0
 	numToExecute := j.state.numJobs

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
@@ -22,8 +22,8 @@ import (
 )
 
 var (
-	_ cache.Evictable  = (*uniqueVertex)(nil)
-	_ avalanche.Vertex = (*uniqueVertex)(nil)
+	_ cache.Evictable[ids.ID] = (*uniqueVertex)(nil)
+	_ avalanche.Vertex        = (*uniqueVertex)(nil)
 )
 
 // uniqueVertex acts as a cache for vertices in the database.
@@ -171,7 +171,7 @@ func (vtx *uniqueVertex) ID() ids.ID {
 	return vtx.id
 }
 
-func (vtx *uniqueVertex) Key() interface{} {
+func (vtx *uniqueVertex) Key() ids.ID {
 	return vtx.id
 }
 
@@ -264,7 +264,7 @@ func (vtx *uniqueVertex) Verify(ctx context.Context) error {
 		if vtx.time != nil {
 			now = vtx.time()
 		}
-		allowed := vtx.serializer.XChainMigrationTime
+		allowed := vtx.serializer.CortinaTime
 		if now.Before(allowed) {
 			return errStopVertexNotAllowedTimestamp
 		}

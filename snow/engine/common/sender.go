@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package common
@@ -117,7 +117,7 @@ type QuerySender interface {
 	SendPullQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, containerID ids.ID)
 
 	// Send chits to the specified node
-	SendChits(ctx context.Context, nodeID ids.NodeID, requestID uint32, votes []ids.ID)
+	SendChits(ctx context.Context, nodeID ids.NodeID, requestID uint32, votes []ids.ID, accepted []ids.ID)
 }
 
 // Gossiper defines how a consensus engine gossips a container on the accepted

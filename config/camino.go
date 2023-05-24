@@ -7,7 +7,7 @@ import (
 	"flag"
 
 	"github.com/ava-labs/avalanchego/genesis"
-	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/caminoconfig"
 	"github.com/spf13/viper"
 )
 
@@ -20,8 +20,8 @@ func addCaminoFlags(fs *flag.FlagSet) {
 	fs.Uint64(DaoProposalBondAmountKey, genesis.LocalParams.CaminoConfig.DaoProposalBondAmount, "Amount, in nAVAX, required to place a DAO proposal")
 }
 
-func getCaminoPlatformConfig(v *viper.Viper) config.CaminoConfig {
-	conf := config.CaminoConfig{
+func getCaminoPlatformConfig(v *viper.Viper) caminoconfig.Config {
+	conf := caminoconfig.Config{
 		DaoProposalBondAmount: v.GetUint64(DaoProposalBondAmountKey),
 	}
 	return conf

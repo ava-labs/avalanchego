@@ -1782,11 +1782,11 @@ func TestDiffLockedUTXOs(t *testing.T) {
 				return &diff{
 					stateVersions: newMockStateVersions(c, parentStateID, parentState),
 					parentID:      parentStateID,
-					modifiedUTXOs: map[ids.ID]*utxoModification{
-						addedUTXO3.InputID():   {utxoID: addedUTXO3.InputID(), utxo: addedUTXO3},
-						addedUTXO4.InputID():   {utxoID: addedUTXO4.InputID(), utxo: addedUTXO4},
-						removedUTXO1.InputID(): {utxoID: removedUTXO1.InputID()},
-						removedUTXO2.InputID(): {utxoID: removedUTXO2.InputID()},
+					modifiedUTXOs: map[ids.ID]*avax.UTXO{
+						addedUTXO3.InputID():   addedUTXO3,
+						addedUTXO4.InputID():   addedUTXO4,
+						removedUTXO1.InputID(): nil,
+						removedUTXO2.InputID(): nil,
 					},
 				}
 			},
@@ -1794,11 +1794,11 @@ func TestDiffLockedUTXOs(t *testing.T) {
 				return &diff{
 					stateVersions: actualDiff.stateVersions,
 					parentID:      actualDiff.parentID,
-					modifiedUTXOs: map[ids.ID]*utxoModification{
-						addedUTXO3.InputID():   {utxoID: addedUTXO3.InputID(), utxo: addedUTXO3},
-						addedUTXO4.InputID():   {utxoID: addedUTXO4.InputID(), utxo: addedUTXO4},
-						removedUTXO1.InputID(): {utxoID: removedUTXO1.InputID()},
-						removedUTXO2.InputID(): {utxoID: removedUTXO2.InputID()},
+					modifiedUTXOs: map[ids.ID]*avax.UTXO{
+						addedUTXO3.InputID():   addedUTXO3,
+						addedUTXO4.InputID():   addedUTXO4,
+						removedUTXO1.InputID(): nil,
+						removedUTXO2.InputID(): nil,
 					},
 				}
 			},
@@ -1811,13 +1811,13 @@ func TestDiffLockedUTXOs(t *testing.T) {
 				return &diff{
 					stateVersions: newMockStateVersions(c, parentStateID, parentState),
 					parentID:      parentStateID,
-					modifiedUTXOs: map[ids.ID]*utxoModification{
-						parentUTXO1.InputID(): {utxoID: parentUTXO1.InputID()},
-						parentUTXO2.InputID(): {utxoID: parentUTXO2.InputID()},
-						parentUTXO3.InputID(): {utxoID: parentUTXO3.InputID(), utxo: &avax.UTXO{UTXOID: parentUTXO3.UTXOID}},
-						parentUTXO4.InputID(): {utxoID: parentUTXO4.InputID(), utxo: &avax.UTXO{UTXOID: parentUTXO4.UTXOID}},
-						addedUTXO1.InputID():  {utxoID: addedUTXO1.InputID(), utxo: addedUTXO1},
-						addedUTXO2.InputID():  {utxoID: addedUTXO2.InputID(), utxo: addedUTXO2},
+					modifiedUTXOs: map[ids.ID]*avax.UTXO{
+						parentUTXO1.InputID(): nil,
+						parentUTXO2.InputID(): nil,
+						parentUTXO3.InputID(): {UTXOID: parentUTXO3.UTXOID},
+						parentUTXO4.InputID(): {UTXOID: parentUTXO4.UTXOID},
+						addedUTXO1.InputID():  addedUTXO1,
+						addedUTXO2.InputID():  addedUTXO2,
 					},
 				}
 			},
@@ -1825,13 +1825,13 @@ func TestDiffLockedUTXOs(t *testing.T) {
 				return &diff{
 					stateVersions: actualDiff.stateVersions,
 					parentID:      actualDiff.parentID,
-					modifiedUTXOs: map[ids.ID]*utxoModification{
-						parentUTXO1.InputID(): {utxoID: parentUTXO1.InputID()},
-						parentUTXO2.InputID(): {utxoID: parentUTXO2.InputID()},
-						parentUTXO3.InputID(): {utxoID: parentUTXO3.InputID(), utxo: &avax.UTXO{UTXOID: parentUTXO3.UTXOID}},
-						parentUTXO4.InputID(): {utxoID: parentUTXO4.InputID(), utxo: &avax.UTXO{UTXOID: parentUTXO4.UTXOID}},
-						addedUTXO1.InputID():  {utxoID: addedUTXO1.InputID(), utxo: addedUTXO1},
-						addedUTXO2.InputID():  {utxoID: addedUTXO2.InputID(), utxo: addedUTXO2},
+					modifiedUTXOs: map[ids.ID]*avax.UTXO{
+						parentUTXO1.InputID(): nil,
+						parentUTXO2.InputID(): nil,
+						parentUTXO3.InputID(): {UTXOID: parentUTXO3.UTXOID},
+						parentUTXO4.InputID(): {UTXOID: parentUTXO4.UTXOID},
+						addedUTXO1.InputID():  addedUTXO1,
+						addedUTXO2.InputID():  addedUTXO2,
 					},
 				}
 			},
@@ -1844,9 +1844,9 @@ func TestDiffLockedUTXOs(t *testing.T) {
 		},
 		"OK: all utxos removed": {
 			diff: func(t *testing.T, c *gomock.Controller) *diff {
-				modifiedUTXOs := map[ids.ID]*utxoModification{}
+				modifiedUTXOs := map[ids.ID]*avax.UTXO{}
 				for i := 0; i < len(parentUTXOs); i++ {
-					modifiedUTXOs[parentUTXOs[i].InputID()] = &utxoModification{utxoID: parentUTXOs[i].InputID()}
+					modifiedUTXOs[parentUTXOs[i].InputID()] = nil
 				}
 				parentState := NewMockChain(c)
 				parentState.EXPECT().LockedUTXOs(lockTxIDs, addresses, lockState).Return(parentUTXOs, nil)
@@ -1857,9 +1857,9 @@ func TestDiffLockedUTXOs(t *testing.T) {
 				}
 			},
 			expectedDiff: func(actualDiff *diff) *diff {
-				modifiedUTXOs := map[ids.ID]*utxoModification{}
+				modifiedUTXOs := map[ids.ID]*avax.UTXO{}
 				for i := 0; i < len(parentUTXOs); i++ {
-					modifiedUTXOs[parentUTXOs[i].InputID()] = &utxoModification{utxoID: parentUTXOs[i].InputID()}
+					modifiedUTXOs[parentUTXOs[i].InputID()] = nil
 				}
 				return &diff{
 					stateVersions: actualDiff.stateVersions,
@@ -2906,7 +2906,7 @@ func TestDiffGetDeferredValidator(t *testing.T) {
 			diff: func(c *gomock.Controller) *diff {
 				return &diff{caminoDiff: &caminoDiff{
 					deferredStakerDiffs: diffStakers{validatorDiffs: map[ids.ID]map[ids.NodeID]*diffValidator{
-						subnetID1: {nodeID1: {validator: staker, validatorModified: true}},
+						subnetID1: {nodeID1: {validator: staker, validatorStatus: added}},
 					}},
 				}}
 			},
@@ -2915,7 +2915,7 @@ func TestDiffGetDeferredValidator(t *testing.T) {
 			expectedDiff: func(actualDiff *diff) *diff {
 				return &diff{caminoDiff: &caminoDiff{
 					deferredStakerDiffs: diffStakers{validatorDiffs: map[ids.ID]map[ids.NodeID]*diffValidator{
-						subnetID1: {nodeID1: {validator: staker, validatorModified: true}},
+						subnetID1: {nodeID1: {validator: staker, validatorStatus: added}},
 					}},
 				}}
 			},
@@ -2947,7 +2947,7 @@ func TestDiffGetDeferredValidator(t *testing.T) {
 				return &diff{
 					caminoDiff: &caminoDiff{
 						deferredStakerDiffs: diffStakers{validatorDiffs: map[ids.ID]map[ids.NodeID]*diffValidator{
-							subnetID1: {nodeID1: {validatorModified: true}},
+							subnetID1: {nodeID1: {validatorStatus: deleted}},
 						}},
 					},
 				}
@@ -2958,7 +2958,7 @@ func TestDiffGetDeferredValidator(t *testing.T) {
 				return &diff{
 					caminoDiff: &caminoDiff{
 						deferredStakerDiffs: diffStakers{validatorDiffs: map[ids.ID]map[ids.NodeID]*diffValidator{
-							subnetID1: {nodeID1: {validatorModified: true}},
+							subnetID1: {nodeID1: {validatorStatus: deleted}},
 						}},
 					},
 				}
@@ -3113,12 +3113,11 @@ func TestDiffApplyCaminoState(t *testing.T) {
 				}
 				for _, validatorDiffs := range d.caminoDiff.deferredStakerDiffs.validatorDiffs {
 					for _, validatorDiff := range validatorDiffs {
-						if validatorDiff.validatorModified {
-							if validatorDiff.validatorDeleted {
-								s.EXPECT().DeleteDeferredValidator(validatorDiff.validator)
-							} else {
-								s.EXPECT().PutDeferredValidator(validatorDiff.validator)
-							}
+						switch validatorDiff.validatorStatus {
+						case deleted:
+							s.EXPECT().DeleteDeferredValidator(validatorDiff.validator)
+						case added:
+							s.EXPECT().PutDeferredValidator(validatorDiff.validator)
 						}
 					}
 				}

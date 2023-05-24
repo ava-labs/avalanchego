@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
@@ -20,18 +20,17 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/treasury"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
-	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 var (
 	_ CaminoBuilder = (*caminoBuilder)(nil)
 
-	fakeTreasuryKey      = crypto.FakePrivateKey(treasury.Addr)
+	fakeTreasuryKey      = secp256k1.FakePrivateKey(treasury.Addr)
 	fakeTreasuryKeychain = secp256k1fx.NewKeychain(fakeTreasuryKey)
 
 	errKeyMissing       = errors.New("couldn't find key matching address")
-	errWrongNodeKeyType = errors.New("node key type isn't *crypto.PrivateKeySECP256K1R")
+	errWrongNodeKeyType = errors.New("node key type isn't *secp256k1.PrivateKey")
 	errNotSECPOwner     = errors.New("owner is not *secp256k1fx.OutputOwners")
 	errWrongLockMode    = errors.New("this tx can't be used with this caminoGenesis.LockModeBondDeposit")
 	errNoUTXOsForImport = errors.New("no utxos for import")
@@ -53,7 +52,7 @@ type CaminoTxBuilder interface {
 		nodeOwnerAddress ids.ShortID,
 		rewardAddress ids.ShortID,
 		shares uint32,
-		keys []*crypto.PrivateKeySECP256K1R,
+		keys []*secp256k1.PrivateKey,
 		changeAddr ids.ShortID,
 	) (*txs.Tx, error)
 
@@ -61,7 +60,7 @@ type CaminoTxBuilder interface {
 		address ids.ShortID,
 		remove bool,
 		state uint8,
-		keys []*crypto.PrivateKeySECP256K1R,
+		keys []*secp256k1.PrivateKey,
 		change *secp256k1fx.OutputOwners,
 	) (*txs.Tx, error)
 
@@ -70,20 +69,20 @@ type CaminoTxBuilder interface {
 		duration uint32,
 		depositOfferID ids.ID,
 		rewardAddress ids.ShortID,
-		keys []*crypto.PrivateKeySECP256K1R,
+		keys []*secp256k1.PrivateKey,
 		change *secp256k1fx.OutputOwners,
 	) (*txs.Tx, error)
 
 	NewUnlockDepositTx(
 		depositTxIDs []ids.ID,
-		keys []*crypto.PrivateKeySECP256K1R,
+		keys []*secp256k1.PrivateKey,
 		change *secp256k1fx.OutputOwners,
 	) (*txs.Tx, error)
 
 	NewClaimTx(
 		claimables []txs.ClaimAmount,
 		claimTo *secp256k1fx.OutputOwners,
-		keys []*crypto.PrivateKeySECP256K1R,
+		keys []*secp256k1.PrivateKey,
 		change *secp256k1fx.OutputOwners,
 	) (*txs.Tx, error)
 
@@ -91,14 +90,14 @@ type CaminoTxBuilder interface {
 		oldNodeID ids.NodeID,
 		newNodeID ids.NodeID,
 		nodeOwnerAddress ids.ShortID,
-		keys []*crypto.PrivateKeySECP256K1R,
+		keys []*secp256k1.PrivateKey,
 		change *secp256k1fx.OutputOwners,
 	) (*txs.Tx, error)
 
 	NewBaseTx(
 		amount uint64,
 		transferTo *secp256k1fx.OutputOwners,
-		keys []*crypto.PrivateKeySECP256K1R,
+		keys []*secp256k1.PrivateKey,
 		change *secp256k1fx.OutputOwners,
 	) (*txs.Tx, error)
 
@@ -114,7 +113,7 @@ func NewCamino(
 	cfg *config.Config,
 	clk *mockable.Clock,
 	fx fx.Fx,
-	state state.Chain,
+	state state.State,
 	atomicUTXOManager avax.AtomicUTXOManager,
 	utxoSpender utxo.Spender,
 ) CaminoBuilder {
@@ -143,7 +142,7 @@ func (b *caminoBuilder) NewCaminoAddValidatorTx(
 	nodeOwnerAddress ids.ShortID,
 	rewardAddress ids.ShortID,
 	shares uint32,
-	keys []*crypto.PrivateKeySECP256K1R,
+	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
 	caminoGenesis, err := b.state.CaminoConfig()
@@ -165,6 +164,7 @@ func (b *caminoBuilder) NewCaminoAddValidatorTx(
 	}
 
 	ins, outs, signers, _, err := b.Lock(
+		b.state,
 		keys,
 		stakeAmount,
 		b.cfg.AddPrimaryNetworkValidatorFee,
@@ -204,7 +204,7 @@ func (b *caminoBuilder) NewCaminoAddValidatorTx(
 				Ins:          ins,
 				Outs:         outs,
 			}},
-			Validator: validator.Validator{
+			Validator: txs.Validator{
 				NodeID: nodeID,
 				Start:  startTime,
 				End:    endTime,
@@ -231,7 +231,7 @@ func (b *caminoBuilder) NewAddSubnetValidatorTx(
 	endTime uint64,
 	nodeID ids.NodeID,
 	subnetID ids.ID,
-	keys []*crypto.PrivateKeySECP256K1R,
+	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
 ) (*txs.Tx, error) {
 	tx, err := b.builder.NewAddSubnetValidatorTx(
@@ -258,7 +258,7 @@ func (b *caminoBuilder) NewAddSubnetValidatorTx(
 		return nil, err
 	}
 
-	if err := tx.Sign(txs.Codec, [][]*crypto.PrivateKeySECP256K1R{nodeSigners}); err != nil {
+	if err := tx.Sign(txs.Codec, [][]*secp256k1.PrivateKey{nodeSigners}); err != nil {
 		return nil, err
 	}
 
@@ -294,10 +294,10 @@ func (b *caminoBuilder) NewAddressStateTx(
 	address ids.ShortID,
 	remove bool,
 	state uint8,
-	keys []*crypto.PrivateKeySECP256K1R,
+	keys []*secp256k1.PrivateKey,
 	change *secp256k1fx.OutputOwners,
 ) (*txs.Tx, error) {
-	ins, outs, signers, _, err := b.Lock(keys, 0, b.cfg.TxFee, locked.StateUnlocked, nil, change, 0)
+	ins, outs, signers, _, err := b.Lock(b.state, keys, 0, b.cfg.TxFee, locked.StateUnlocked, nil, change, 0)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -327,7 +327,7 @@ func (b *caminoBuilder) NewDepositTx(
 	duration uint32,
 	depositOfferID ids.ID,
 	rewardAddress ids.ShortID,
-	keys []*crypto.PrivateKeySECP256K1R,
+	keys []*secp256k1.PrivateKey,
 	change *secp256k1fx.OutputOwners,
 ) (*txs.Tx, error) {
 	caminoGenesis, err := b.state.CaminoConfig()
@@ -338,7 +338,7 @@ func (b *caminoBuilder) NewDepositTx(
 		return nil, errWrongLockMode
 	}
 
-	ins, outs, signers, _, err := b.Lock(keys, amount, b.cfg.TxFee, locked.StateDeposited, nil, change, 0)
+	ins, outs, signers, _, err := b.Lock(b.state, keys, amount, b.cfg.TxFee, locked.StateDeposited, nil, change, 0)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -368,7 +368,7 @@ func (b *caminoBuilder) NewDepositTx(
 
 func (b *caminoBuilder) NewUnlockDepositTx(
 	depositTxIDs []ids.ID,
-	keys []*crypto.PrivateKeySECP256K1R,
+	keys []*secp256k1.PrivateKey,
 	change *secp256k1fx.OutputOwners,
 ) (*txs.Tx, error) {
 	caminoGenesis, err := b.state.CaminoConfig()
@@ -386,7 +386,7 @@ func (b *caminoBuilder) NewUnlockDepositTx(
 	}
 
 	// burning fee
-	feeIns, feeOuts, feeSigners, _, err := b.Lock(keys, 0, b.cfg.TxFee, locked.StateUnlocked, nil, change, 0)
+	feeIns, feeOuts, feeSigners, _, err := b.Lock(b.state, keys, 0, b.cfg.TxFee, locked.StateUnlocked, nil, change, 0)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -419,7 +419,7 @@ func (b *caminoBuilder) NewUnlockDepositTx(
 func (b *caminoBuilder) NewClaimTx(
 	claimables []txs.ClaimAmount,
 	claimTo *secp256k1fx.OutputOwners,
-	keys []*crypto.PrivateKeySECP256K1R,
+	keys []*secp256k1.PrivateKey,
 	change *secp256k1fx.OutputOwners,
 ) (*txs.Tx, error) {
 	caminoGenesis, err := b.state.CaminoConfig()
@@ -430,7 +430,7 @@ func (b *caminoBuilder) NewClaimTx(
 		return nil, errWrongLockMode
 	}
 
-	ins, outs, signers, _, err := b.Lock(keys, 0, b.cfg.TxFee, locked.StateUnlocked, nil, change, 0)
+	ins, outs, signers, _, err := b.Lock(b.state, keys, 0, b.cfg.TxFee, locked.StateUnlocked, nil, change, 0)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -508,15 +508,15 @@ func (b *caminoBuilder) NewRegisterNodeTx(
 	oldNodeID ids.NodeID,
 	newNodeID ids.NodeID,
 	nodeOwnerAddress ids.ShortID,
-	keys []*crypto.PrivateKeySECP256K1R,
+	keys []*secp256k1.PrivateKey,
 	change *secp256k1fx.OutputOwners,
 ) (*txs.Tx, error) {
-	ins, outs, signers, _, err := b.Lock(keys, 0, b.cfg.TxFee, locked.StateUnlocked, nil, change, 0)
+	ins, outs, signers, _, err := b.Lock(b.state, keys, 0, b.cfg.TxFee, locked.StateUnlocked, nil, change, 0)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
 
-	nodeSigners := []*crypto.PrivateKeySECP256K1R{}
+	nodeSigners := []*secp256k1.PrivateKey{}
 	if newNodeID != ids.EmptyNodeID {
 		nodeSigners, err = getSigner(keys, ids.ShortID(newNodeID))
 		if err != nil {
@@ -564,10 +564,10 @@ func (b *caminoBuilder) NewRegisterNodeTx(
 func (b *caminoBuilder) NewBaseTx(
 	amount uint64,
 	transferTo *secp256k1fx.OutputOwners,
-	keys []*crypto.PrivateKeySECP256K1R,
+	keys []*secp256k1.PrivateKey,
 	change *secp256k1fx.OutputOwners,
 ) (*txs.Tx, error) {
-	ins, outs, signers, _, err := b.Lock(keys, amount, b.cfg.TxFee, locked.StateUnlocked, transferTo, change, 0)
+	ins, outs, signers, _, err := b.Lock(b.state, keys, amount, b.cfg.TxFee, locked.StateUnlocked, transferTo, change, 0)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -676,7 +676,7 @@ func (b *caminoBuilder) NewSystemUnlockDepositTx(
 		}},
 	}
 
-	tx, err := txs.NewSigned(utx, txs.Codec, make([][]*crypto.PrivateKeySECP256K1R, len(ins)))
+	tx, err := txs.NewSigned(utx, txs.Codec, make([][]*secp256k1.PrivateKey, len(ins)))
 	if err != nil {
 		return nil, err
 	}
@@ -684,24 +684,24 @@ func (b *caminoBuilder) NewSystemUnlockDepositTx(
 }
 
 func getSigner(
-	keys []*crypto.PrivateKeySECP256K1R,
+	keys []*secp256k1.PrivateKey,
 	address ids.ShortID,
-) ([]*crypto.PrivateKeySECP256K1R, error) {
+) ([]*secp256k1.PrivateKey, error) {
 	return getSigners(keys, []ids.ShortID{address})
 }
 
 func getSigners(
-	keys []*crypto.PrivateKeySECP256K1R,
+	keys []*secp256k1.PrivateKey,
 	addresses []ids.ShortID,
-) ([]*crypto.PrivateKeySECP256K1R, error) {
-	signers := make([]*crypto.PrivateKeySECP256K1R, len(addresses))
+) ([]*secp256k1.PrivateKey, error) {
+	signers := make([]*secp256k1.PrivateKey, len(addresses))
 	for i, addr := range addresses {
 		signer, found := secp256k1fx.NewKeychain(keys...).Get(addr)
 		if !found {
 			return nil, fmt.Errorf("%w %s", errKeyMissing, addr.String())
 		}
 
-		key, ok := signer.(*crypto.PrivateKeySECP256K1R)
+		key, ok := signer.(*secp256k1.PrivateKey)
 		if !ok {
 			return nil, errWrongNodeKeyType
 		}

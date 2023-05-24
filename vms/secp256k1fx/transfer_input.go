@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package secp256k1fx
@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 )
 
-var errNoValueInput = errors.New("input has no value")
+var ErrNoValueInput = errors.New("input has no value")
 
 type TransferInput struct {
 	Amt   uint64 `serialize:"true" json:"amount"`
@@ -29,7 +29,7 @@ func (in *TransferInput) Verify() error {
 	case in == nil:
 		return errNilInput
 	case in.Amt == 0:
-		return errNoValueInput
+		return ErrNoValueInput
 	default:
 		return in.Input.Verify()
 	}

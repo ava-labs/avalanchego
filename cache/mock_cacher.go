@@ -14,75 +14,75 @@ import (
 )
 
 // MockCacher is a mock of Cacher interface.
-type MockCacher struct {
+type MockCacher[K comparable, V any] struct {
 	ctrl     *gomock.Controller
-	recorder *MockCacherMockRecorder
+	recorder *MockCacherMockRecorder[K, V]
 }
 
 // MockCacherMockRecorder is the mock recorder for MockCacher.
-type MockCacherMockRecorder struct {
-	mock *MockCacher
+type MockCacherMockRecorder[K comparable, V any] struct {
+	mock *MockCacher[K, V]
 }
 
 // NewMockCacher creates a new mock instance.
-func NewMockCacher(ctrl *gomock.Controller) *MockCacher {
-	mock := &MockCacher{ctrl: ctrl}
-	mock.recorder = &MockCacherMockRecorder{mock}
+func NewMockCacher[K comparable, V any](ctrl *gomock.Controller) *MockCacher[K, V] {
+	mock := &MockCacher[K, V]{ctrl: ctrl}
+	mock.recorder = &MockCacherMockRecorder[K, V]{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockCacher) EXPECT() *MockCacherMockRecorder {
+func (m *MockCacher[K, V]) EXPECT() *MockCacherMockRecorder[K, V] {
 	return m.recorder
 }
 
 // Evict mocks base method.
-func (m *MockCacher) Evict(arg0 interface{}) {
+func (m *MockCacher[K, V]) Evict(arg0 K) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "Evict", arg0)
 }
 
 // Evict indicates an expected call of Evict.
-func (mr *MockCacherMockRecorder) Evict(arg0 interface{}) *gomock.Call {
+func (mr *MockCacherMockRecorder[K, V]) Evict(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Evict", reflect.TypeOf((*MockCacher)(nil).Evict), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Evict", reflect.TypeOf((*MockCacher[K, V])(nil).Evict), arg0)
 }
 
 // Flush mocks base method.
-func (m *MockCacher) Flush() {
+func (m *MockCacher[K, V]) Flush() {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "Flush")
 }
 
 // Flush indicates an expected call of Flush.
-func (mr *MockCacherMockRecorder) Flush() *gomock.Call {
+func (mr *MockCacherMockRecorder[K, V]) Flush() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Flush", reflect.TypeOf((*MockCacher)(nil).Flush))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Flush", reflect.TypeOf((*MockCacher[K, V])(nil).Flush))
 }
 
 // Get mocks base method.
-func (m *MockCacher) Get(arg0 interface{}) (interface{}, bool) {
+func (m *MockCacher[K, V]) Get(arg0 K) (V, bool) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Get", arg0)
-	ret0, _ := ret[0].(interface{})
+	ret0, _ := ret[0].(V)
 	ret1, _ := ret[1].(bool)
 	return ret0, ret1
 }
 
 // Get indicates an expected call of Get.
-func (mr *MockCacherMockRecorder) Get(arg0 interface{}) *gomock.Call {
+func (mr *MockCacherMockRecorder[K, V]) Get(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockCacher)(nil).Get), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockCacher[K, V])(nil).Get), arg0)
 }
 
 // Put mocks base method.
-func (m *MockCacher) Put(arg0, arg1 interface{}) {
+func (m *MockCacher[K, V]) Put(arg0 K, arg1 V) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "Put", arg0, arg1)
 }
 
 // Put indicates an expected call of Put.
-func (mr *MockCacherMockRecorder) Put(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockCacherMockRecorder[K, V]) Put(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Put", reflect.TypeOf((*MockCacher)(nil).Put), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Put", reflect.TypeOf((*MockCacher[K, V])(nil).Put), arg0, arg1)
 }

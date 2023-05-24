@@ -8,7 +8,7 @@
 //
 // Much love to the original authors for their work.
 // **********************************************************
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package proposervm
@@ -377,10 +377,10 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 		coreBlk.Timestamp(),
 		0, // pChainHeight
 		proVM.ctx.NodeID,
-		proVM.ctx.StakingCertLeaf,
+		proVM.stakingCertLeaf,
 		coreBlk.Bytes(),
 		proVM.ctx.ChainID,
-		proVM.ctx.StakingLeafSigner,
+		proVM.stakingLeafSigner,
 	)
 	if err != nil {
 		t.Fatalf("unexpectedly could not build block due to %s", err)
@@ -811,10 +811,10 @@ func TestBlockVerify_ForkBlockIsOracleBlockButChildrenAreSigned(t *testing.T) {
 		firstBlock.Timestamp(),
 		0, // pChainHeight,
 		proVM.ctx.NodeID,
-		proVM.ctx.StakingCertLeaf,
+		proVM.stakingCertLeaf,
 		coreBlk.opts[0].Bytes(),
 		proVM.ctx.ChainID,
-		proVM.ctx.StakingLeafSigner,
+		proVM.stakingLeafSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")

@@ -50,7 +50,7 @@ func TestGetAddressStates(t *testing.T) {
 		},
 		"OK: address states in cache": {
 			caminoState: func(c *gomock.Controller) *caminoState {
-				cache := cache.NewMockCacher(c)
+				cache := cache.NewMockCacher[ids.ShortID, uint64](c)
 				cache.EXPECT().Get(address).Return(addressStates, true)
 				return &caminoState{
 					addressStateCache: cache,
@@ -68,8 +68,8 @@ func TestGetAddressStates(t *testing.T) {
 		},
 		"OK: address states in db": {
 			caminoState: func(c *gomock.Controller) *caminoState {
-				cache := cache.NewMockCacher(c)
-				cache.EXPECT().Get(address).Return(nil, false)
+				cache := cache.NewMockCacher[ids.ShortID, uint64](c)
+				cache.EXPECT().Get(address).Return(uint64(0), false)
 				cache.EXPECT().Put(address, addressStates)
 				db := database.NewMockDatabase(c)
 				db.EXPECT().Get(address[:]).Return(addressStatesBytes, nil)
@@ -91,8 +91,8 @@ func TestGetAddressStates(t *testing.T) {
 		},
 		"OK: not found in db": {
 			caminoState: func(c *gomock.Controller) *caminoState {
-				cache := cache.NewMockCacher(c)
-				cache.EXPECT().Get(address).Return(nil, false)
+				cache := cache.NewMockCacher[ids.ShortID, uint64](c)
+				cache.EXPECT().Get(address).Return(uint64(0), false)
 				cache.EXPECT().Put(address, uint64(0))
 				db := database.NewMockDatabase(c)
 				db.EXPECT().Get(address[:]).Return(nil, database.ErrNotFound)
@@ -113,8 +113,8 @@ func TestGetAddressStates(t *testing.T) {
 		},
 		"Fail: db error": {
 			caminoState: func(c *gomock.Controller) *caminoState {
-				cache := cache.NewMockCacher(c)
-				cache.EXPECT().Get(address).Return(nil, false)
+				cache := cache.NewMockCacher[ids.ShortID, uint64](c)
+				cache.EXPECT().Get(address).Return(uint64(0), false)
 				db := database.NewMockDatabase(c)
 				db.EXPECT().Get(address[:]).Return(nil, testError)
 				return &caminoState{
@@ -159,7 +159,7 @@ func TestSetAddressStates(t *testing.T) {
 	}{
 		"OK": {
 			caminoState: func(c *gomock.Controller) *caminoState {
-				cache := cache.NewMockCacher(c)
+				cache := cache.NewMockCacher[ids.ShortID, uint64](c)
 				cache.EXPECT().Evict(address)
 				return &caminoState{
 					addressStateCache: cache,

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package hierarchycodec
@@ -101,6 +101,11 @@ func (c *hierarchyCodec) RegisterType(val interface{}) error {
 	c.typeIDToType[valTypeID] = valType
 	c.typeToTypeID[valType] = valTypeID
 	return nil
+}
+
+func (*hierarchyCodec) PrefixSize(reflect.Type) int {
+	// see PackPrefix implementation
+	return wrappers.ShortLen + wrappers.ShortLen
 }
 
 func (c *hierarchyCodec) PackPrefix(p *wrappers.Packer, valueType reflect.Type) error {

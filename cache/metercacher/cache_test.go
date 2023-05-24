@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package metercacher
@@ -9,12 +9,13 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/ids"
 )
 
 func TestInterface(t *testing.T) {
 	for _, test := range cache.CacherTests {
-		cache := &cache.LRU{Size: test.Size}
-		c, err := New("", prometheus.NewRegistry(), cache)
+		cache := &cache.LRU[ids.ID, int]{Size: test.Size}
+		c, err := New[ids.ID, int]("", prometheus.NewRegistry(), cache)
 		if err != nil {
 			t.Fatal(err)
 		}

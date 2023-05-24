@@ -1,10 +1,10 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package platformvm
 
 import (
-	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 )
@@ -17,6 +17,6 @@ type Factory struct {
 }
 
 // New returns a new instance of the Platform Chain
-func (f *Factory) New(*snow.Context) (interface{}, error) {
-	return &VM{Factory: *f}, nil
+func (f *Factory) New(logging.Logger) (interface{}, error) {
+	return &VM{Config: f.Config}, nil
 }

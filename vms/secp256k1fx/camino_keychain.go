@@ -8,7 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/multisig"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -29,7 +29,7 @@ func (kc *Keychain) SpendMultiSig(
 	time uint64,
 	msigIntf interface{},
 ) (
-	verify.Verifiable, []*crypto.PrivateKeySECP256K1R, error,
+	verify.Verifiable, []*secp256k1.PrivateKey, error,
 ) {
 	// get the multisig alias getter
 	msig, ok := msigIntf.(AliasGetter)
@@ -49,7 +49,7 @@ func (kc *Keychain) SpendMultiSig(
 
 	// assume non-multisigs for reserving memory
 	sigs := make([]uint32, 0, owners.Threshold)
-	keys := make([]*crypto.PrivateKeySECP256K1R, 0, owners.Threshold)
+	keys := make([]*secp256k1.PrivateKey, 0, owners.Threshold)
 
 	tf := func(addr ids.ShortID, totalVisited, totalVerified uint32) (bool, error) {
 		if key, exists := kc.get(addr); exists {
@@ -138,7 +138,7 @@ func TraverseOwners(out *OutputOwners, msig AliasGetter, callback TraverseOwnerF
 				cycleCheck.Add(addr)
 				owners, ok := alias.Owners.(*OutputOwners)
 				if !ok {
-					return 0, errWrongOwnerType
+					return 0, ErrWrongOwnerType
 				}
 				stack = append(stack, &stackItem{
 					owners:            owners,
@@ -221,7 +221,7 @@ func TraverseAliases(out *OutputOwners, msig AliasGetter, callback TraverseAlias
 
 				owners, ok := alias.Owners.(*OutputOwners)
 				if !ok {
-					return errWrongOwnerType
+					return ErrWrongOwnerType
 				}
 				stack = append(stack, &stackItem{
 					owners: owners,

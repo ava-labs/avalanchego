@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 // Package state manages the meta-data required by consensus for an avalanche
@@ -44,16 +44,16 @@ type Serializer struct {
 }
 
 type SerializerConfig struct {
-	ChainID             ids.ID
-	VM                  vertex.DAGVM
-	DB                  database.Database
-	Log                 logging.Logger
-	XChainMigrationTime time.Time
+	ChainID     ids.ID
+	VM          vertex.DAGVM
+	DB          database.Database
+	Log         logging.Logger
+	CortinaTime time.Time
 }
 
 func NewSerializer(config SerializerConfig) vertex.Manager {
 	versionDB := versiondb.New(config.DB)
-	dbCache := &cache.LRU{Size: dbCacheSize}
+	dbCache := &cache.LRU[ids.ID, any]{Size: dbCacheSize}
 	s := Serializer{
 		SerializerConfig: config,
 		versionDB:        versionDB,

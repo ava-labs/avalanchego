@@ -4,6 +4,7 @@
 package builder
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math"
@@ -25,7 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
@@ -37,6 +38,7 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
+	"github.com/ava-labs/avalanchego/vms/platformvm/caminoconfig"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
@@ -67,12 +69,13 @@ var (
 	avaxAssetID                  = ids.ID{'y', 'e', 'e', 't'}
 	xChainID                     = ids.Empty.Prefix(0)
 	cChainID                     = ids.Empty.Prefix(1)
-	caminoPreFundedKeys          = crypto.BuildTestKeys()
+	caminoPreFundedKeys          = secp256k1.TestKeys()
 	_, caminoPreFundedNodeIDs    = nodeid.LoadLocalCaminoNodeKeysAndIDs(localStakingPath)
 	testCaminoSubnet1ControlKeys = caminoPreFundedKeys[0:3]
 	lastAcceptedID               = ids.GenerateTestID()
 	testSubnet1                  *txs.Tx
-	testKeyfactory               crypto.FactorySECP256K1R
+	testKeyfactory               secp256k1.Factory
+	errMissing                   = errors.New("missing")
 )
 
 type mutableSharedMemory struct {
@@ -80,7 +83,7 @@ type mutableSharedMemory struct {
 }
 
 type caminoEnvironment struct {
-	isBootstrapped *utils.AtomicBool
+	isBootstrapped *utils.Atomic[bool]
 	config         *config.Config
 	clk            *mockable.Clock
 	baseDB         *versiondb.Database
@@ -108,22 +111,9 @@ func (e *caminoEnvironment) SetState(blkID ids.ID, chainState state.Chain) {
 	e.states[blkID] = chainState
 }
 
-// TODO: snLookup currently duplicated in vm_test.go. Remove duplication
-type snLookup struct {
-	chainsToSubnet map[ids.ID]ids.ID
-}
-
-func (sn *snLookup) SubnetID(chainID ids.ID) (ids.ID, error) {
-	subnetID, ok := sn.chainsToSubnet[chainID]
-	if !ok {
-		return ids.ID{}, errors.New("")
-	}
-	return subnetID, nil
-}
-
 func newCaminoEnvironment(postBanff bool, caminoGenesisConf api.Camino) *caminoEnvironment {
-	var isBootstrapped utils.AtomicBool
-	isBootstrapped.SetValue(true)
+	var isBootstrapped utils.Atomic[bool]
+	isBootstrapped.Set(true)
 
 	config := defaultCaminoConfig(postBanff)
 	clk := defaultClock(postBanff)
@@ -132,14 +122,14 @@ func newCaminoEnvironment(postBanff bool, caminoGenesisConf api.Camino) *caminoE
 	baseDB := versiondb.New(baseDBManager.Current().Database)
 	ctx, msm := defaultCtx(baseDB)
 
-	fx := defaultFx(&clk, ctx.Log, isBootstrapped.GetValue())
+	fx := defaultFx(&clk, ctx.Log, isBootstrapped.Get())
 
 	rewards := reward.NewCalculator(config.RewardConfig)
 	baseState := defaultCaminoState(&config, ctx, baseDB, rewards, caminoGenesisConf)
 
 	atomicUTXOs := avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
 	uptimes := uptime.NewManager(baseState)
-	utxoHandler := utxo.NewCaminoHandler(ctx, &clk, baseState, fx, true)
+	utxoHandler := utxo.NewCaminoHandler(ctx, &clk, fx, true)
 
 	txBuilder := NewCamino(
 		ctx,
@@ -185,8 +175,8 @@ func newCaminoEnvironment(postBanff bool, caminoGenesisConf api.Camino) *caminoE
 }
 
 func newCaminoBuilder(postBanff bool, state state.State) (*caminoBuilder, *versiondb.Database) {
-	var isBootstrapped utils.AtomicBool
-	isBootstrapped.SetValue(true)
+	var isBootstrapped utils.Atomic[bool]
+	isBootstrapped.Set(true)
 
 	config := defaultCaminoConfig(postBanff)
 	clk := defaultClock(postBanff)
@@ -195,10 +185,10 @@ func newCaminoBuilder(postBanff bool, state state.State) (*caminoBuilder, *versi
 	baseDB := versiondb.New(baseDBManager.Current().Database)
 	ctx, _ := defaultCtx(baseDB)
 
-	fx := defaultFx(&clk, ctx.Log, isBootstrapped.GetValue())
+	fx := defaultFx(&clk, ctx.Log, isBootstrapped.Get())
 
 	atomicUTXOs := avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
-	utxoHandler := utxo.NewHandler(ctx, &clk, state, fx)
+	utxoHandler := utxo.NewHandler(ctx, &clk, fx)
 
 	txBuilder := NewCamino(
 		ctx,
@@ -231,7 +221,7 @@ func addCaminoSubnet(
 			caminoPreFundedKeys[1].PublicKey().Address(),
 			caminoPreFundedKeys[2].PublicKey().Address(),
 		},
-		[]*crypto.PrivateKeySECP256K1R{caminoPreFundedKeys[0]},
+		[]*secp256k1.PrivateKey{caminoPreFundedKeys[0]},
 		caminoPreFundedKeys[0].PublicKey().Address(),
 	)
 	if err != nil {
@@ -274,11 +264,17 @@ func defaultCtx(db database.Database) (*snow.Context, *mutableSharedMemory) {
 	}
 	ctx.SharedMemory = msm
 
-	ctx.SNLookup = &snLookup{
-		chainsToSubnet: map[ids.ID]ids.ID{
-			constants.PlatformChainID: constants.PrimaryNetworkID,
-			xChainID:                  constants.PrimaryNetworkID,
-			cChainID:                  constants.PrimaryNetworkID,
+	ctx.ValidatorState = &validators.TestState{
+		GetSubnetIDF: func(_ context.Context, chainID ids.ID) (ids.ID, error) {
+			subnetID, ok := map[ids.ID]ids.ID{
+				constants.PlatformChainID: constants.PrimaryNetworkID,
+				xChainID:                  constants.PrimaryNetworkID,
+				cChainID:                  constants.PrimaryNetworkID,
+			}[chainID]
+			if !ok {
+				return ids.Empty, errMissing
+			}
+			return subnetID, nil
 		},
 	}
 
@@ -348,6 +344,7 @@ func defaultCaminoState(
 		ctx,
 		metrics.Noop,
 		rewards,
+		&utils.Atomic[bool]{},
 	)
 	if err != nil {
 		panic(err)
@@ -377,7 +374,7 @@ func defaultCaminoConfig(postBanff bool) config.Config {
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 
 	return config.Config{
-		Chains:                 chains.MockManager{},
+		Chains:                 chains.TestManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		Validators:             vdrs,
 		TxFee:                  defaultTxFee,
@@ -397,7 +394,7 @@ func defaultCaminoConfig(postBanff bool) config.Config {
 		ApricotPhase3Time: defaultValidateEndTime,
 		ApricotPhase5Time: defaultValidateEndTime,
 		BanffTime:         banffTime,
-		CaminoConfig: config.CaminoConfig{
+		CaminoConfig: caminoconfig.Config{
 			DaoProposalBondAmount: 100 * units.Avax,
 		},
 	}
@@ -474,7 +471,7 @@ func buildCaminoGenesisTest(ctx *snow.Context, caminoGenesisConf api.Camino) []b
 }
 
 func shutdownCaminoEnvironment(env *caminoEnvironment) error {
-	if env.isBootstrapped.GetValue() {
+	if env.isBootstrapped.Get() {
 		primaryValidatorSet, exist := env.config.Validators.Get(constants.PrimaryNetworkID)
 		if !exist {
 			return errors.New("no default subnet validators")
@@ -526,19 +523,14 @@ func generateTestUTXO(txID ids.ID, assetID ids.ID, amount uint64, outputOwners s
 	return testUTXO
 }
 
-func generateKeyAndOwner() (*crypto.PrivateKeySECP256K1R, ids.ShortID, secp256k1fx.OutputOwners) {
+func generateKeyAndOwner() (*secp256k1.PrivateKey, ids.ShortID, secp256k1fx.OutputOwners) {
 	key, err := testKeyfactory.NewPrivateKey()
 	if err != nil {
 		panic(err)
 	}
+	addr := key.Address()
 
-	secpKey, ok := key.(*crypto.PrivateKeySECP256K1R)
-	if !ok {
-		panic("key isn't secp key")
-	}
-	addr := secpKey.Address()
-
-	return secpKey, addr, secp256k1fx.OutputOwners{
+	return key, addr, secp256k1fx.OutputOwners{
 		Locktime:  0,
 		Threshold: 1,
 		Addrs:     []ids.ShortID{addr},
@@ -579,8 +571,8 @@ func generateTestInFromUTXO(utxo *avax.UTXO, sigIndices []uint32, init bool) *av
 }
 
 func newCaminoBuilderWithMocks(postBanff bool, state state.State, sharedMemory atomic.SharedMemory) (*caminoBuilder, *versiondb.Database) {
-	var isBootstrapped utils.AtomicBool
-	isBootstrapped.SetValue(true)
+	var isBootstrapped utils.Atomic[bool]
+	isBootstrapped.Set(true)
 
 	config := defaultCaminoConfig(postBanff)
 	clk := defaultClock(postBanff)
@@ -593,10 +585,10 @@ func newCaminoBuilderWithMocks(postBanff bool, state state.State, sharedMemory a
 		ctx.SharedMemory = sharedMemory
 	}
 
-	fx := defaultFx(&clk, ctx.Log, isBootstrapped.GetValue())
+	fx := defaultFx(&clk, ctx.Log, isBootstrapped.Get())
 
 	atomicUTXOs := avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
-	utxoHandler := utxo.NewHandler(ctx, &clk, state, fx)
+	utxoHandler := utxo.NewHandler(ctx, &clk, fx)
 
 	txBuilder := NewCamino(
 		ctx,

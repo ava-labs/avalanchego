@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package math
@@ -51,13 +51,13 @@ func TestAdd64(t *testing.T) {
 	require.Equal(uint64(1<<63), sum)
 
 	_, err = Add64(1, maxUint64)
-	require.Error(err)
+	require.ErrorIs(err, ErrOverflow)
 
 	_, err = Add64(maxUint64, 1)
-	require.Error(err)
+	require.ErrorIs(err, ErrOverflow)
 
 	_, err = Add64(maxUint64, maxUint64)
-	require.Error(err)
+	require.ErrorIs(err, ErrOverflow)
 }
 
 func TestSub(t *testing.T) {
@@ -80,10 +80,10 @@ func TestSub(t *testing.T) {
 	require.Equal(uint64(1), got)
 
 	_, err = Sub(uint64(1), uint64(2))
-	require.Error(err)
+	require.ErrorIs(err, ErrUnderflow)
 
 	_, err = Sub(maxUint64-1, maxUint64)
-	require.Error(err)
+	require.ErrorIs(err, ErrUnderflow)
 }
 
 func TestMul64(t *testing.T) {
@@ -114,7 +114,7 @@ func TestMul64(t *testing.T) {
 	require.Equal(uint64(0), got)
 
 	_, err = Mul64(maxUint64-1, 2)
-	require.Error(err)
+	require.ErrorIs(err, ErrOverflow)
 }
 
 func TestAbsDiff(t *testing.T) {

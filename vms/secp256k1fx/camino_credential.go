@@ -8,7 +8,7 @@ import (
 	"errors"
 
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
@@ -16,7 +16,7 @@ var errSigIdxsNotUniqueOrSorted = errors.New("signature indices not sorted or un
 
 type CredentialIntf interface {
 	verify.Verifiable
-	Signatures() [][crypto.SECP256K1RSigLen]byte
+	Signatures() [][secp256k1.SignatureLen]byte
 	SignatureIndices() []uint32
 }
 
@@ -29,7 +29,7 @@ type MultisigCredential struct {
 
 /************ AVAX ***********/
 
-func (cr *Credential) Signatures() [][crypto.SECP256K1RSigLen]byte {
+func (cr *Credential) Signatures() [][secp256k1.SignatureLen]byte {
 	return cr.Sigs
 }
 
@@ -62,7 +62,7 @@ func (mcr *MultisigCredential) SignatureIndices() []uint32 {
 func (mcr *MultisigCredential) Verify() error {
 	switch {
 	case mcr == nil:
-		return errNilCredential
+		return ErrNilCredential
 	case !utils.IsSortedAndUniqueOrdered(mcr.SigIdxs):
 		return errSigIdxsNotUniqueOrSorted
 	default:

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package message
@@ -117,14 +117,16 @@ func InboundGetAcceptedFrontier(
 	requestID uint32,
 	deadline time.Duration,
 	nodeID ids.NodeID,
+	engineType p2p.EngineType,
 ) InboundMessage {
 	return &inboundMessage{
 		nodeID: nodeID,
 		op:     GetAcceptedFrontierOp,
 		message: &p2p.GetAcceptedFrontier{
-			ChainId:   chainID[:],
-			RequestId: requestID,
-			Deadline:  uint64(deadline),
+			ChainId:    chainID[:],
+			RequestId:  requestID,
+			Deadline:   uint64(deadline),
+			EngineType: engineType,
 		},
 		expiration: time.Now().Add(deadline),
 	}
@@ -156,6 +158,7 @@ func InboundGetAccepted(
 	deadline time.Duration,
 	containerIDs []ids.ID,
 	nodeID ids.NodeID,
+	engineType p2p.EngineType,
 ) InboundMessage {
 	containerIDBytes := make([][]byte, len(containerIDs))
 	encodeIDs(containerIDs, containerIDBytes)
@@ -167,6 +170,7 @@ func InboundGetAccepted(
 			RequestId:    requestID,
 			Deadline:     uint64(deadline),
 			ContainerIds: containerIDBytes,
+			EngineType:   engineType,
 		},
 		expiration: time.Now().Add(deadline),
 	}
@@ -198,15 +202,17 @@ func InboundPushQuery(
 	deadline time.Duration,
 	container []byte,
 	nodeID ids.NodeID,
+	engineType p2p.EngineType,
 ) InboundMessage {
 	return &inboundMessage{
 		nodeID: nodeID,
 		op:     PushQueryOp,
 		message: &p2p.PushQuery{
-			ChainId:   chainID[:],
-			RequestId: requestID,
-			Deadline:  uint64(deadline),
-			Container: container,
+			ChainId:    chainID[:],
+			RequestId:  requestID,
+			Deadline:   uint64(deadline),
+			Container:  container,
+			EngineType: engineType,
 		},
 		expiration: time.Now().Add(deadline),
 	}
@@ -218,6 +224,7 @@ func InboundPullQuery(
 	deadline time.Duration,
 	containerID ids.ID,
 	nodeID ids.NodeID,
+	engineType p2p.EngineType,
 ) InboundMessage {
 	return &inboundMessage{
 		nodeID: nodeID,
@@ -227,6 +234,7 @@ func InboundPullQuery(
 			RequestId:   requestID,
 			Deadline:    uint64(deadline),
 			ContainerId: containerID[:],
+			EngineType:  engineType,
 		},
 		expiration: time.Now().Add(deadline),
 	}
@@ -235,18 +243,22 @@ func InboundPullQuery(
 func InboundChits(
 	chainID ids.ID,
 	requestID uint32,
-	containerIDs []ids.ID,
+	preferredContainerIDs []ids.ID,
+	acceptedContainerIDs []ids.ID,
 	nodeID ids.NodeID,
 ) InboundMessage {
-	containerIDBytes := make([][]byte, len(containerIDs))
-	encodeIDs(containerIDs, containerIDBytes)
+	preferredContainerIDBytes := make([][]byte, len(preferredContainerIDs))
+	encodeIDs(preferredContainerIDs, preferredContainerIDBytes)
+	acceptedContainerIDBytes := make([][]byte, len(acceptedContainerIDs))
+	encodeIDs(acceptedContainerIDs, acceptedContainerIDBytes)
 	return &inboundMessage{
 		nodeID: nodeID,
 		op:     ChitsOp,
 		message: &p2p.Chits{
-			ChainId:      chainID[:],
-			RequestId:    requestID,
-			ContainerIds: containerIDBytes,
+			ChainId:               chainID[:],
+			RequestId:             requestID,
+			PreferredContainerIds: preferredContainerIDBytes,
+			AcceptedContainerIds:  acceptedContainerIDBytes,
 		},
 		expiration: mockable.MaxTime,
 	}

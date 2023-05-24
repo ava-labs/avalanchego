@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package ipcs
@@ -35,23 +35,33 @@ type context struct {
 // ChainIPCs maintains IPCs for a set of chains
 type ChainIPCs struct {
 	context
-	chains                 map[ids.ID]*EventSockets
-	consensusAcceptorGroup snow.AcceptorGroup
-	decisionAcceptorGroup  snow.AcceptorGroup
+	chains              map[ids.ID]*EventSockets
+	blockAcceptorGroup  snow.AcceptorGroup
+	txAcceptorGroup     snow.AcceptorGroup
+	vertexAcceptorGroup snow.AcceptorGroup
 }
 
 // NewChainIPCs creates a new *ChainIPCs that writes consensus and decision
 // events to IPC sockets
-func NewChainIPCs(log logging.Logger, path string, networkID uint32, consensusAcceptorGroup, decisionAcceptorGroup snow.AcceptorGroup, defaultChainIDs []ids.ID) (*ChainIPCs, error) {
+func NewChainIPCs(
+	log logging.Logger,
+	path string,
+	networkID uint32,
+	blockAcceptorGroup snow.AcceptorGroup,
+	txAcceptorGroup snow.AcceptorGroup,
+	vertexAcceptorGroup snow.AcceptorGroup,
+	defaultChainIDs []ids.ID,
+) (*ChainIPCs, error) {
 	cipcs := &ChainIPCs{
 		context: context{
 			log:       log,
 			networkID: networkID,
 			path:      path,
 		},
-		chains:                 make(map[ids.ID]*EventSockets),
-		consensusAcceptorGroup: consensusAcceptorGroup,
-		decisionAcceptorGroup:  decisionAcceptorGroup,
+		chains:              make(map[ids.ID]*EventSockets),
+		blockAcceptorGroup:  blockAcceptorGroup,
+		txAcceptorGroup:     txAcceptorGroup,
+		vertexAcceptorGroup: vertexAcceptorGroup,
 	}
 	for _, chainID := range defaultChainIDs {
 		if _, err := cipcs.Publish(chainID); err != nil {
@@ -70,7 +80,13 @@ func (cipcs *ChainIPCs) Publish(chainID ids.ID) (*EventSockets, error) {
 		return es, nil
 	}
 
-	es, err := newEventSockets(cipcs.context, chainID, cipcs.consensusAcceptorGroup, cipcs.decisionAcceptorGroup)
+	es, err := newEventSockets(
+		cipcs.context,
+		chainID,
+		cipcs.blockAcceptorGroup,
+		cipcs.txAcceptorGroup,
+		cipcs.vertexAcceptorGroup,
+	)
 	if err != nil {
 		cipcs.log.Error("can't create ipcs",
 			zap.Error(err),

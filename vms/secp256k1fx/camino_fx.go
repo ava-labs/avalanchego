@@ -5,12 +5,11 @@ package secp256k1fx
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/multisig"
@@ -20,7 +19,7 @@ import (
 var (
 	errNotSecp256Cred  = errors.New("expected secp256k1 credentials")
 	errWrongOutputType = errors.New("wrong output type")
-	errNotAliasGetter  = errors.New("state isn't msig alias getter")
+	ErrNotAliasGetter  = errors.New("state isn't msig alias getter")
 	ErrMsigCombination = errors.New("msig combinations not supported")
 )
 
@@ -33,7 +32,7 @@ type AliasGetter interface {
 }
 
 type (
-	RecoverMap map[ids.ShortID][crypto.SECP256K1RSigLen]byte
+	RecoverMap map[ids.ShortID][secp256k1.SignatureLen]byte
 )
 
 type CaminoFx struct {
@@ -78,7 +77,7 @@ func (fx *CaminoFx) VerifyTransfer(txIntf, inIntf, credIntf, utxoIntf interface{
 
 func (fx *Fx) RecoverAddresses(utx UnsignedTx, verifies []verify.Verifiable) (RecoverMap, error) {
 	ret := make(RecoverMap, len(verifies))
-	visited := make(map[[crypto.SECP256K1RSigLen]byte]bool)
+	visited := make(map[[secp256k1.SignatureLen]byte]bool)
 
 	txHash := hashing.ComputeHash256(utx.Bytes())
 	for _, v := range verifies {
@@ -108,11 +107,11 @@ func (*Fx) VerifyMultisigOwner(outIntf, msigIntf interface{}) error {
 	}
 	owners, ok := out.Owners().(*OutputOwners)
 	if !ok {
-		return errWrongOwnerType
+		return ErrWrongOwnerType
 	}
 	msig, ok := msigIntf.(AliasGetter)
 	if !ok {
-		return errNotAliasGetter
+		return ErrNotAliasGetter
 	}
 
 	// We don't support msig combinations / nesting for now
@@ -125,7 +124,7 @@ func (*Fx) VerifyMultisigOwner(outIntf, msigIntf interface{}) error {
 		}
 		aliasOwners, ok := alias.Owners.(*OutputOwners)
 		if !ok {
-			return errWrongOwnerType
+			return ErrWrongOwnerType
 		}
 		owners = aliasOwners
 	}
@@ -144,33 +143,33 @@ func (*Fx) VerifyMultisigOwner(outIntf, msigIntf interface{}) error {
 func (fx *Fx) VerifyMultisigTransfer(txIntf, inIntf, credIntf, utxoIntf, msigIntf interface{}) error {
 	tx, ok := txIntf.(UnsignedTx)
 	if !ok {
-		return errWrongTxType
+		return ErrWrongTxType
 	}
 	in, ok := inIntf.(*TransferInput)
 	if !ok {
-		return errWrongInputType
+		return ErrWrongInputType
 	}
 	cred, ok := credIntf.(CredentialIntf)
 	if !ok {
-		return errWrongCredentialType
+		return ErrWrongCredentialType
 	}
 	out, ok := utxoIntf.(TransferOutputIntf)
 	if !ok {
-		return errWrongUTXOType
+		return ErrWrongUTXOType
 	}
 	owners, ok := out.Owners().(*OutputOwners)
 	if !ok {
-		return errWrongOwnerType
+		return ErrWrongOwnerType
 	}
 	msig, ok := msigIntf.(AliasGetter)
 	if !ok {
-		return errNotAliasGetter
+		return ErrNotAliasGetter
 	}
 
 	if err := verify.All(out, in, cred); err != nil {
 		return err
 	} else if out.Amount() != in.Amt {
-		return fmt.Errorf("out amount and input differ")
+		return errors.New("out amount and input differ")
 	}
 
 	return fx.verifyMultisigCredentials(tx, &in.Input, cred, owners, msig)
@@ -179,24 +178,24 @@ func (fx *Fx) VerifyMultisigTransfer(txIntf, inIntf, credIntf, utxoIntf, msigInt
 func (fx *Fx) VerifyMultisigPermission(txIntf, inIntf, credIntf, ownerIntf, msigIntf interface{}) error {
 	tx, ok := txIntf.(UnsignedTx)
 	if !ok {
-		return errWrongTxType
+		return ErrWrongTxType
 	}
 	in, ok := inIntf.(*Input)
 	if !ok {
-		return errWrongInputType
+		return ErrWrongInputType
 	}
 	cred, ok := credIntf.(CredentialIntf)
 	if !ok {
-		return errWrongCredentialType
+		return ErrWrongCredentialType
 	}
 	owners, ok := ownerIntf.(*OutputOwners)
 	if !ok {
-		return errWrongUTXOType
+		return ErrWrongUTXOType
 	}
 
 	msig, ok := msigIntf.(AliasGetter)
 	if !ok {
-		return errNotAliasGetter
+		return ErrNotAliasGetter
 	}
 
 	if err := verify.All(owners, in, cred); err != nil {
@@ -209,11 +208,11 @@ func (fx *Fx) VerifyMultisigPermission(txIntf, inIntf, credIntf, ownerIntf, msig
 func (*Fx) CollectMultisigAliases(ownerIntf, msigIntf interface{}) ([]interface{}, error) {
 	owners, ok := ownerIntf.(*OutputOwners)
 	if !ok {
-		return nil, errWrongUTXOType
+		return nil, ErrWrongUTXOType
 	}
 	msig, ok := msigIntf.(AliasGetter)
 	if !ok {
-		return nil, errNotAliasGetter
+		return nil, ErrNotAliasGetter
 	}
 
 	return collectMultisigAliases(owners, msig)
@@ -226,7 +225,7 @@ func (fx *Fx) verifyMultisigCredentials(tx UnsignedTx, in *Input, cred Credentia
 	}
 
 	if len(sigIdxs) != len(cred.Signatures()) {
-		return errInputCredentialSignersMismatch
+		return ErrInputCredentialSignersMismatch
 	}
 
 	resolved, err := fx.RecoverAddresses(tx, []verify.Verifiable{cred})
@@ -257,7 +256,7 @@ func (fx *Fx) verifyMultisigCredentials(tx UnsignedTx, in *Input, cred Credentia
 		return err
 	}
 	if sigsVerified < uint32(len(sigIdxs)) {
-		return errTooManySigners
+		return ErrTooManySigners
 	}
 
 	return nil
@@ -280,7 +279,7 @@ func collectMultisigAliases(owners *OutputOwners, msig AliasGetter) ([]interface
 // The delimiter is a `nil` PrivateKey.
 // If no delimiter exists, the given PrivateKeys are used for both from and signing
 // Having different sets of `from` and `signer` allows multisignature feature
-func ExtractFromAndSigners(keys []*crypto.PrivateKeySECP256K1R) (set.Set[ids.ShortID], []*crypto.PrivateKeySECP256K1R) {
+func ExtractFromAndSigners(keys []*secp256k1.PrivateKey) (set.Set[ids.ShortID], []*secp256k1.PrivateKey) {
 	// find nil key which splits froms and signer
 	splitIndex := len(keys)
 	for index, key := range keys {
@@ -305,7 +304,7 @@ func ExtractFromAndSigners(keys []*crypto.PrivateKeySECP256K1R) (set.Set[ids.Sho
 	}
 
 	// Signers which will signe the Outputs
-	signer := make([]*crypto.PrivateKeySECP256K1R, len(keys)-splitIndex-1)
+	signer := make([]*secp256k1.PrivateKey, len(keys)-splitIndex-1)
 	for index := 0; index < len(signer); index++ {
 		signer[index] = keys[index+splitIndex+1]
 	}

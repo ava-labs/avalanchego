@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"testing"
@@ -27,7 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
@@ -75,7 +76,7 @@ var (
 	defaultValidateEndTime    = defaultValidateStartTime.Add(10 * defaultMinStakingDuration)
 	defaultMinValidatorStake  = 5 * units.MilliAvax
 	defaultBalance            = 100 * defaultMinValidatorStake
-	preFundedKeys             = crypto.BuildTestKeys()
+	preFundedKeys             = secp256k1.TestKeys()
 	avaxAssetID               = ids.ID{'y', 'e', 'e', 't'}
 	defaultTxFee              = uint64(100)
 	xChainID                  = ids.Empty.Prefix(0)
@@ -85,6 +86,7 @@ var (
 	testSubnet1  *txs.Tx
 
 	errMissingPrimaryValidators = errors.New("missing primary validator set")
+	errMissing                  = errors.New("missing")
 )
 
 type stakerStatus uint
@@ -109,7 +111,7 @@ type environment struct {
 	mempool    mempool.Mempool
 	sender     *common.SenderTest
 
-	isBootstrapped *utils.AtomicBool
+	isBootstrapped *utils.Atomic[bool]
 	config         *config.Config
 	clk            *mockable.Clock
 	baseDB         *versiondb.Database
@@ -128,31 +130,18 @@ func (*environment) ResetBlockTimer() {
 	// dummy call, do nothing for now
 }
 
-// TODO snLookup currently duplicated in vm_test.go. Consider removing duplication
-type snLookup struct {
-	chainsToSubnet map[ids.ID]ids.ID
-}
-
-func (sn *snLookup) SubnetID(chainID ids.ID) (ids.ID, error) {
-	subnetID, ok := sn.chainsToSubnet[chainID]
-	if !ok {
-		return ids.ID{}, errors.New("")
-	}
-	return subnetID, nil
-}
-
 func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 	res := &environment{
-		isBootstrapped: &utils.AtomicBool{},
+		isBootstrapped: &utils.Atomic[bool]{},
 		config:         defaultConfig(),
 		clk:            defaultClock(),
 	}
-	res.isBootstrapped.SetValue(true)
+	res.isBootstrapped.Set(true)
 
 	baseDBManager := db_manager.NewMemDB(version.Semantic1_0_0)
 	res.baseDB = versiondb.New(baseDBManager.Current().Database)
 	res.ctx = defaultCtx(res.baseDB)
-	res.fx = defaultFx(res.clk, res.ctx.Log, res.isBootstrapped.GetValue())
+	res.fx = defaultFx(res.clk, res.ctx.Log, res.isBootstrapped.Get())
 
 	rewardsCalc := reward.NewCalculator(res.config.RewardConfig)
 	res.atomicUTXOs = avax.NewAtomicUTXOManager(res.ctx.SharedMemory, txs.Codec)
@@ -160,7 +149,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 	if ctrl == nil {
 		res.state = defaultState(res.config, res.ctx, res.baseDB, rewardsCalc)
 		res.uptimes = uptime.NewManager(res.state)
-		res.utxosHandler = utxo.NewHandler(res.ctx, res.clk, res.state, res.fx)
+		res.utxosHandler = utxo.NewHandler(res.ctx, res.clk, res.fx)
 		res.txBuilder = p_tx_builder.New(
 			res.ctx,
 			res.config,
@@ -174,7 +163,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 		genesisBlkID = ids.GenerateTestID()
 		res.mockedState = state.NewMockState(ctrl)
 		res.uptimes = uptime.NewManager(res.mockedState)
-		res.utxosHandler = utxo.NewHandler(res.ctx, res.clk, res.mockedState, res.fx)
+		res.utxosHandler = utxo.NewHandler(res.ctx, res.clk, res.fx)
 		res.txBuilder = p_tx_builder.New(
 			res.ctx,
 			res.config,
@@ -252,7 +241,7 @@ func addSubnet(env *environment) {
 			preFundedKeys[1].PublicKey().Address(),
 			preFundedKeys[2].PublicKey().Address(),
 		},
-		[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
+		[]*secp256k1.PrivateKey{preFundedKeys[0]},
 		preFundedKeys[0].PublicKey().Address(),
 	)
 	if err != nil {
@@ -295,6 +284,7 @@ func defaultState(
 		ctx,
 		metrics.Noop,
 		rewards,
+		&utils.Atomic[bool]{},
 	)
 	if err != nil {
 		panic(err)
@@ -325,11 +315,17 @@ func defaultCtx(db database.Database) *snow.Context {
 
 	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
 
-	ctx.SNLookup = &snLookup{
-		chainsToSubnet: map[ids.ID]ids.ID{
-			constants.PlatformChainID: constants.PrimaryNetworkID,
-			xChainID:                  constants.PrimaryNetworkID,
-			cChainID:                  constants.PrimaryNetworkID,
+	ctx.ValidatorState = &validators.TestState{
+		GetSubnetIDF: func(_ context.Context, chainID ids.ID) (ids.ID, error) {
+			subnetID, ok := map[ids.ID]ids.ID{
+				constants.PlatformChainID: constants.PrimaryNetworkID,
+				xChainID:                  constants.PrimaryNetworkID,
+				cChainID:                  constants.PrimaryNetworkID,
+			}[chainID]
+			if !ok {
+				return ids.Empty, errMissing
+			}
+			return subnetID, nil
 		},
 	}
 
@@ -341,7 +337,7 @@ func defaultConfig() *config.Config {
 	primaryVdrs := validators.NewSet()
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 	return &config.Config{
-		Chains:                 chains.MockManager{},
+		Chains:                 chains.TestManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		Validators:             vdrs,
 		TxFee:                  defaultTxFee,
@@ -477,7 +473,7 @@ func shutdownEnvironment(t *environment) error {
 		return nil
 	}
 
-	if t.isBootstrapped.GetValue() {
+	if t.isBootstrapped.Get() {
 		primaryValidatorSet, exist := t.config.Validators.Get(constants.PrimaryNetworkID)
 		if !exist {
 			return errMissingPrimaryValidators
@@ -511,7 +507,7 @@ func addPendingValidator(
 	endTime time.Time,
 	nodeID ids.NodeID,
 	rewardAddress ids.ShortID,
-	keys []*crypto.PrivateKeySECP256K1R,
+	keys []*secp256k1.PrivateKey,
 ) (*txs.Tx, error) {
 	addPendingValidatorTx, err := env.txBuilder.NewAddValidatorTx(
 		env.config.MinValidatorStake,

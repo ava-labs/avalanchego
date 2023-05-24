@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package logging
@@ -104,6 +104,12 @@ func (l *log) Debug(msg string, fields ...zap.Field) {
 
 func (l *log) Verbo(msg string, fields ...zap.Field) {
 	l.log(Verbo, msg, fields...)
+}
+
+func (l *log) SetLevel(level Level) {
+	for _, core := range l.wrappedCores {
+		core.AtomicLevel.SetLevel(zapcore.Level(level))
+	}
 }
 
 func (l *log) StopOnPanic() {

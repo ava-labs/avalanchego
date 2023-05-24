@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -11,7 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -46,14 +46,10 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	require.NoError(err)
 
 	onCommitState, err := state.NewDiff(lastAcceptedID, env)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	onAbortState, err := state.NewDiff(lastAcceptedID, env)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	txExecutor := ProposalTxExecutor{
 		OnCommitState: onCommitState,
@@ -71,14 +67,10 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	require.NoError(err)
 
 	onCommitState, err = state.NewDiff(lastAcceptedID, env)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	onAbortState, err = state.NewDiff(lastAcceptedID, env)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	txExecutor = ProposalTxExecutor{
 		OnCommitState: onCommitState,
@@ -93,14 +85,10 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	require.NoError(err)
 
 	onCommitState, err = state.NewDiff(lastAcceptedID, env)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	onAbortState, err = state.NewDiff(lastAcceptedID, env)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	txExecutor = ProposalTxExecutor{
 		OnCommitState: onCommitState,
@@ -158,14 +146,10 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	require.NoError(err)
 
 	onCommitState, err := state.NewDiff(lastAcceptedID, env)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	onAbortState, err := state.NewDiff(lastAcceptedID, env)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	txExecutor := ProposalTxExecutor{
 		OnCommitState: onCommitState,
@@ -195,14 +179,10 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	require.NoError(err)
 
 	onCommitState, err = state.NewDiff(lastAcceptedID, env)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	onAbortState, err = state.NewDiff(lastAcceptedID, env)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	txExecutor = ProposalTxExecutor{
 		OnCommitState: onCommitState,
@@ -240,9 +220,7 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment( /*postBanff*/ false)
 	defer func() {
-		if err := shutdownEnvironment(env); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(shutdownEnvironment(env))
 	}()
 	dummyHeight := uint64(1)
 
@@ -260,7 +238,7 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 		vdrNodeID,        // node ID
 		vdrRewardAddress, // reward address
 		reward.PercentDenominator/4,
-		[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
+		[]*secp256k1.PrivateKey{preFundedKeys[0]},
 		ids.ShortEmpty,
 	)
 	require.NoError(err)
@@ -274,7 +252,7 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 		delEndTime,
 		vdrNodeID,
 		delRewardAddress,
-		[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
+		[]*secp256k1.PrivateKey{preFundedKeys[0]},
 		ids.ShortEmpty, // Change address
 	)
 	require.NoError(err)
@@ -312,14 +290,10 @@ func TestRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	require.NoError(err)
 
 	onCommitState, err := state.NewDiff(lastAcceptedID, env)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	onAbortState, err := state.NewDiff(lastAcceptedID, env)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	txExecutor := ProposalTxExecutor{
 		OnCommitState: onCommitState,
@@ -370,9 +344,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment( /*postBanff*/ false)
 	defer func() {
-		if err := shutdownEnvironment(env); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(shutdownEnvironment(env))
 	}()
 	dummyHeight := uint64(1)
 
@@ -393,7 +365,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 		vdrNodeID,        // node ID
 		vdrRewardAddress, // reward address
 		reward.PercentDenominator/4,
-		[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
+		[]*secp256k1.PrivateKey{preFundedKeys[0]},
 		ids.ShortEmpty,
 	)
 	require.NoError(err)
@@ -406,7 +378,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 		delEndTime,
 		vdrNodeID,
 		delRewardAddress,
-		[]*crypto.PrivateKeySECP256K1R{preFundedKeys[0]},
+		[]*secp256k1.PrivateKey{preFundedKeys[0]},
 		ids.ShortEmpty,
 	)
 	require.NoError(err)
@@ -437,14 +409,10 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	require.NoError(err)
 
 	onCommitState, err := state.NewDiff(lastAcceptedID, env)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	onAbortState, err := state.NewDiff(lastAcceptedID, env)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	txExecutor := ProposalTxExecutor{
 		OnCommitState: onCommitState,

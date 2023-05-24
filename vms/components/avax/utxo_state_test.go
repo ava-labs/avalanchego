@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avax
@@ -64,7 +64,7 @@ func TestUTXOState(t *testing.T) {
 	require.Equal(database.ErrNotFound, err)
 
 	err = s.DeleteUTXO(utxoID)
-	require.Equal(database.ErrNotFound, err)
+	require.NoError(err)
 
 	err = s.PutUTXO(utxo)
 	require.NoError(err)

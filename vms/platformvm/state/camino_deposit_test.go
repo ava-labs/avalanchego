@@ -62,7 +62,7 @@ func TestGetDeposit(t *testing.T) {
 		},
 		"Fail: deposit in cache, but removed": {
 			caminoState: func(c *gomock.Controller) *caminoState {
-				cache := cache.NewMockCacher(c)
+				cache := cache.NewMockCacher[ids.ID, *deposit.Deposit](c)
 				cache.EXPECT().Get(depositTxID).Return(nil, true)
 				return &caminoState{
 					depositsCache: cache,
@@ -124,7 +124,7 @@ func TestGetDeposit(t *testing.T) {
 		},
 		"OK: deposit in cache": {
 			caminoState: func(c *gomock.Controller) *caminoState {
-				cache := cache.NewMockCacher(c)
+				cache := cache.NewMockCacher[ids.ID, *deposit.Deposit](c)
 				cache.EXPECT().Get(depositTxID).Return(deposit1, true)
 				return &caminoState{
 					depositsCache: cache,
@@ -142,7 +142,7 @@ func TestGetDeposit(t *testing.T) {
 		},
 		"OK: deposit in db": {
 			caminoState: func(c *gomock.Controller) *caminoState {
-				cache := cache.NewMockCacher(c)
+				cache := cache.NewMockCacher[ids.ID, *deposit.Deposit](c)
 				cache.EXPECT().Get(depositTxID).Return(nil, false)
 				cache.EXPECT().Put(depositTxID, deposit1)
 				db := database.NewMockDatabase(c)
@@ -165,7 +165,7 @@ func TestGetDeposit(t *testing.T) {
 		},
 		"Fail: db error": {
 			caminoState: func(c *gomock.Controller) *caminoState {
-				cache := cache.NewMockCacher(c)
+				cache := cache.NewMockCacher[ids.ID, *deposit.Deposit](c)
 				cache.EXPECT().Get(depositTxID).Return(nil, false)
 				db := database.NewMockDatabase(c)
 				db.EXPECT().Get(depositTxID[:]).Return(nil, testError)
@@ -244,7 +244,7 @@ func TestModifyDeposit(t *testing.T) {
 	}{
 		"OK": {
 			caminoState: func(c *gomock.Controller) *caminoState {
-				depositsCache := cache.NewMockCacher(c)
+				depositsCache := cache.NewMockCacher[ids.ID, *deposit.Deposit](c)
 				depositsCache.EXPECT().Evict(depositTxID)
 				return &caminoState{
 					depositsCache: depositsCache,
@@ -288,7 +288,7 @@ func TestRemoveDeposit(t *testing.T) {
 	}{
 		"OK": {
 			caminoState: func(c *gomock.Controller) *caminoState {
-				depositsCache := cache.NewMockCacher(c)
+				depositsCache := cache.NewMockCacher[ids.ID, *deposit.Deposit](c)
 				depositsCache.EXPECT().Evict(depositTxID)
 				return &caminoState{
 					depositsCache: depositsCache,

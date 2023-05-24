@@ -8,13 +8,12 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
-	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -27,23 +26,22 @@ type caminoHandler struct {
 func NewCaminoHandler(
 	ctx *snow.Context,
 	clk *mockable.Clock,
-	utxoReader avax.UTXOReader,
 	fx fx.Fx,
 	lockModeBondDeposit bool,
 ) Handler {
 	return &caminoHandler{
 		handler: handler{
-			ctx:         ctx,
-			clk:         clk,
-			utxosReader: utxoReader,
-			fx:          fx,
+			ctx: ctx,
+			clk: clk,
+			fx:  fx,
 		},
 		lockModeBondDeposit: lockModeBondDeposit,
 	}
 }
 
 func (h *caminoHandler) Spend(
-	keys []*crypto.PrivateKeySECP256K1R,
+	utxoDB avax.UTXOReader,
+	keys []*secp256k1.PrivateKey,
 	amount uint64,
 	fee uint64,
 	changeAddr ids.ShortID,
@@ -51,7 +49,7 @@ func (h *caminoHandler) Spend(
 	[]*avax.TransferableInput, // inputs
 	[]*avax.TransferableOutput, // returnedOutputs
 	[]*avax.TransferableOutput, // stakedOutputs
-	[][]*crypto.PrivateKeySECP256K1R, // signers
+	[][]*secp256k1.PrivateKey, // signers
 	error,
 ) {
 	if h.lockModeBondDeposit {
@@ -63,18 +61,18 @@ func (h *caminoHandler) Spend(
 				Addrs:     []ids.ShortID{changeAddr},
 			}
 		}
-		inputs, outputs, signers, _, err := h.Lock(keys, amount, fee, locked.StateUnlocked, nil, change, 0)
+		inputs, outputs, signers, _, err := h.Lock(utxoDB, keys, amount, fee, locked.StateUnlocked, nil, change, 0)
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}
 		return inputs, outputs, []*avax.TransferableOutput{}, signers, nil
 	}
-	return h.handler.Spend(keys, amount, fee, changeAddr)
+	return h.handler.Spend(utxoDB, keys, amount, fee, changeAddr)
 }
 
 func (h *caminoHandler) VerifySpend(
 	tx txs.UnsignedTx,
-	utxoDB state.UTXOGetter,
+	utxoDB avax.UTXOGetter,
 	ins []*avax.TransferableInput,
 	outs []*avax.TransferableOutput,
 	creds []verify.Verifiable,
@@ -102,6 +100,7 @@ func (h *caminoHandler) VerifySpend(
 }
 
 func (h *caminoHandler) VerifySpendUTXOs(
+	utxoDB avax.UTXOGetter,
 	tx txs.UnsignedTx,
 	utxos []*avax.UTXO,
 	ins []*avax.TransferableInput,
@@ -115,7 +114,13 @@ func (h *caminoHandler) VerifySpendUTXOs(
 			return err
 		}
 
+		msigState, ok := utxoDB.(secp256k1fx.AliasGetter)
+		if !ok {
+			return secp256k1fx.ErrNotAliasGetter
+		}
+
 		return h.VerifyLockUTXOs(
+			msigState,
 			tx,
 			utxos,
 			ins,
@@ -127,7 +132,7 @@ func (h *caminoHandler) VerifySpendUTXOs(
 			locked.StateUnlocked,
 		)
 	}
-	return h.handler.VerifySpendUTXOs(tx, utxos, ins, outs, creds, unlockedProduced)
+	return h.handler.VerifySpendUTXOs(nil, tx, utxos, ins, outs, creds, unlockedProduced)
 }
 
 func (h *caminoHandler) toAVAXBurnedAmount(unlockedProduced map[ids.ID]uint64) (uint64, error) {

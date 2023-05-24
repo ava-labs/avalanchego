@@ -10,7 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 )
 
 func TestMultisigCredentialVerify(t *testing.T) {
@@ -54,7 +54,7 @@ func TestMultisigCredentialSerialize(t *testing.T) {
 	}
 	cred := MultisigCredential{
 		Credential: Credential{
-			Sigs: [][crypto.SECP256K1RSigLen]byte{
+			Sigs: [][secp256k1.SignatureLen]byte{
 				{
 					0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
 					0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package secp256k1fx
@@ -62,7 +62,7 @@ func TestOutputVerifyNoValue(t *testing.T) {
 			},
 		},
 	}
-	require.ErrorIs(out.Verify(), errNoValueOutput)
+	require.ErrorIs(out.Verify(), ErrNoValueOutput)
 }
 
 func TestOutputVerifyUnspendable(t *testing.T) {

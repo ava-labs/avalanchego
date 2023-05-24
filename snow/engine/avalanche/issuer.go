@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avalanche
@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/bag"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -136,7 +137,7 @@ func (i *issuer) Update(ctx context.Context) {
 		)
 	}
 
-	vdrBag := ids.NodeIDBag{} // Validators to sample repr. as a set
+	vdrBag := bag.Bag[ids.NodeID]{} // Validators to sample repr. as a set
 	vdrBag.Add(vdrIDs...)
 
 	i.t.RequestID++

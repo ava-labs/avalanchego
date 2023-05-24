@@ -8,7 +8,7 @@
 //
 // Much love to the original authors for their work.
 // **********************************************************
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -206,7 +206,7 @@ func (v *verifier) ApricotAtomicBlock(b *blocks.ApricotAtomicBlock) error {
 
 	if err := b.Tx.Unsigned.Visit(&atomicExecutor); err != nil {
 		txID := b.Tx.ID()
-		v.MarkDropped(txID, err.Error()) // cache tx as dropped
+		v.MarkDropped(txID, err) // cache tx as dropped
 		return fmt.Errorf("tx %s failed semantic verification: %w", txID, err)
 	}
 
@@ -376,7 +376,7 @@ func (v *verifier) proposalBlock(
 
 	if err := b.Tx.Unsigned.Visit(&txExecutor); err != nil {
 		txID := b.Tx.ID()
-		v.MarkDropped(txID, err.Error()) // cache tx as dropped
+		v.MarkDropped(txID, err) // cache tx as dropped
 		return err
 	}
 
@@ -425,7 +425,7 @@ func (v *verifier) standardBlock(
 		}
 		if err := tx.Unsigned.Visit(&txExecutor); err != nil {
 			txID := tx.ID()
-			v.MarkDropped(txID, err.Error()) // cache tx as dropped
+			v.MarkDropped(txID, err) // cache tx as dropped
 			return err
 		}
 		// ensure it doesn't overlap with current input batch

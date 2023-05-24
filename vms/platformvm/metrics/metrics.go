@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package metrics
@@ -53,7 +53,7 @@ type Metrics interface {
 func New(
 	namespace string,
 	registerer prometheus.Registerer,
-	whitelistedSubnets set.Set[ids.ID],
+	trackedSubnets set.Set[ids.ID],
 ) (Metrics, error) {
 	blockMetrics, err := newBlockMetrics(namespace, registerer)
 	m := &metrics{
@@ -151,8 +151,8 @@ func New(
 		registerer.Register(m.validatorSetsDuration),
 	)
 
-	// init subnet tracker metrics with whitelisted subnets
-	for subnetID := range whitelistedSubnets {
+	// init subnet tracker metrics with tracked subnets
+	for subnetID := range trackedSubnets {
 		// initialize to 0
 		m.subnetPercentConnected.WithLabelValues(subnetID.String()).Set(0)
 	}

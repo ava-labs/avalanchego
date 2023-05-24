@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
@@ -17,9 +17,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
-	"github.com/ava-labs/avalanchego/vms/platformvm/validator"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
+
+var errCustom = errors.New("custom error")
 
 func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 	type test struct {
@@ -53,8 +54,6 @@ func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 
 	// A BaseTx that fails syntactic verification.
 	invalidBaseTx := BaseTx{}
-
-	errCustom := errors.New("custom error")
 
 	tests := []test{
 		{
@@ -90,7 +89,7 @@ func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 				rewardsOwner.EXPECT().Verify().Return(errCustom)
 				return &AddPermissionlessDelegatorTx{
 					BaseTx: validBaseTx,
-					Validator: validator.Validator{
+					Validator: Validator{
 						Wght: 1,
 					},
 					Subnet: ids.GenerateTestID(),
@@ -119,7 +118,7 @@ func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 				stakeOut.EXPECT().Verify().Return(errCustom)
 				return &AddPermissionlessDelegatorTx{
 					BaseTx: validBaseTx,
-					Validator: validator.Validator{
+					Validator: Validator{
 						Wght: 1,
 					},
 					Subnet: ids.GenerateTestID(),
@@ -143,7 +142,7 @@ func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 				rewardsOwner.EXPECT().Verify().Return(nil).AnyTimes()
 				return &AddPermissionlessDelegatorTx{
 					BaseTx: validBaseTx,
-					Validator: validator.Validator{
+					Validator: Validator{
 						Wght: 1,
 					},
 					Subnet: ids.GenerateTestID(),
@@ -178,7 +177,7 @@ func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 				assetID := ids.GenerateTestID()
 				return &AddPermissionlessDelegatorTx{
 					BaseTx: validBaseTx,
-					Validator: validator.Validator{
+					Validator: Validator{
 						Wght: 1,
 					},
 					Subnet: ids.GenerateTestID(),
@@ -213,7 +212,7 @@ func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 				assetID := ids.GenerateTestID()
 				return &AddPermissionlessDelegatorTx{
 					BaseTx: validBaseTx,
-					Validator: validator.Validator{
+					Validator: Validator{
 						Wght: 1,
 					},
 					Subnet: ids.GenerateTestID(),
@@ -248,7 +247,7 @@ func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 				assetID := ids.GenerateTestID()
 				return &AddPermissionlessDelegatorTx{
 					BaseTx: validBaseTx,
-					Validator: validator.Validator{
+					Validator: Validator{
 						Wght: 2,
 					},
 					Subnet: ids.GenerateTestID(),
@@ -283,7 +282,7 @@ func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 				assetID := ids.GenerateTestID()
 				return &AddPermissionlessDelegatorTx{
 					BaseTx: validBaseTx,
-					Validator: validator.Validator{
+					Validator: Validator{
 						Wght: 2,
 					},
 					Subnet: constants.PrimaryNetworkID,
@@ -314,21 +313,19 @@ func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
 			tx := tt.txFunc(ctrl)
 			err := tx.SyntacticVerify(ctx)
-			require.ErrorIs(err, tt.err)
+			require.ErrorIs(t, err, tt.err)
 		})
 	}
 
 	t.Run("invalid BaseTx", func(t *testing.T) {
-		require := require.New(t)
 		tx := &AddPermissionlessDelegatorTx{
 			BaseTx: invalidBaseTx,
-			Validator: validator.Validator{
+			Validator: Validator{
 				NodeID: ids.GenerateTestNodeID(),
 			},
 			StakeOuts: []*avax.TransferableOutput{
@@ -343,11 +340,10 @@ func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 			},
 		}
 		err := tx.SyntacticVerify(ctx)
-		require.Error(err)
+		require.Error(t, err)
 	})
 
 	t.Run("stake overflow", func(t *testing.T) {
-		require := require.New(t)
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
@@ -356,7 +352,7 @@ func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 		assetID := ids.GenerateTestID()
 		tx := &AddPermissionlessDelegatorTx{
 			BaseTx: validBaseTx,
-			Validator: validator.Validator{
+			Validator: Validator{
 				NodeID: ids.GenerateTestNodeID(),
 				Wght:   1,
 			},
@@ -382,7 +378,7 @@ func TestAddPermissionlessDelegatorTxSyntacticVerify(t *testing.T) {
 			DelegationRewardsOwner: rewardsOwner,
 		}
 		err := tx.SyntacticVerify(ctx)
-		require.Error(err)
+		require.Error(t, err)
 	})
 }
 

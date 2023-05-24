@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -36,7 +36,7 @@ var (
 	errCreateTransferables    = errors.New("can't create transferables")
 	errSerializeTransferables = errors.New("can't serialize transferables")
 	errEncodeTransferables    = errors.New("can't encode transferables as string")
-	errWrongOwnerType         = errors.New("wrong owner type")
+	ErrWrongOwnerType         = errors.New("wrong owner type")
 	errSerializeOwners        = errors.New("can't serialize owners")
 )
 
@@ -77,10 +77,6 @@ func (s *CaminoService) GetBalance(_ *http.Request, args *GetBalanceRequest, res
 	response.LockModeBondDeposit = caminoConfig.LockModeBondDeposit
 	if !caminoConfig.LockModeBondDeposit {
 		return s.Service.GetBalance(nil, args, &response.avax)
-	}
-
-	if args.Address != nil {
-		args.Addresses = append(args.Addresses, *args.Address)
 	}
 
 	s.vm.ctx.Log.Debug("Platform: GetBalance called",
@@ -177,6 +173,32 @@ type GetConfigurationReply struct {
 	VerifyNodeSignature bool `json:"verifyNodeSignature"`
 	// Camino LockModeBondDeposit
 	LockModeBondDeposit bool `json:"lockModeBondDeposit"`
+}
+
+func (s *CaminoService) appendBlockchains(subnetID ids.ID, response *GetBlockchainsResponse) error {
+	chains, err := s.vm.state.GetChains(subnetID)
+	if err != nil {
+		return fmt.Errorf(
+			"couldn't retrieve chains for subnet %q: %w",
+			subnetID,
+			err,
+		)
+	}
+
+	for _, chainTx := range chains {
+		chainID := chainTx.ID()
+		chain, ok := chainTx.Unsigned.(*txs.CreateChainTx)
+		if !ok {
+			return fmt.Errorf("expected tx type *txs.CreateChainTx but got %T", chainTx.Unsigned)
+		}
+		response.Blockchains = append(response.Blockchains, APIBlockchain{
+			ID:       chainID,
+			Name:     chain.ChainName,
+			SubnetID: subnetID,
+			VMID:     chain.VMID,
+		})
+	}
+	return nil
 }
 
 // GetConfiguration returns platformVM configuration
@@ -312,7 +334,7 @@ func (s *CaminoService) GetMultisigAlias(_ *http.Request, args *api.JSONAddress,
 	}
 	owners, ok := alias.Owners.(*secp256k1fx.OutputOwners)
 	if !ok {
-		return errWrongOwnerType
+		return ErrWrongOwnerType
 	}
 
 	response.Memo = alias.Memo
@@ -372,6 +394,7 @@ func (s *CaminoService) Spend(_ *http.Request, args *SpendArgs, response *SpendR
 	}
 
 	ins, outs, signers, owners, err := s.vm.txBuilder.Lock(
+		s.vm.state,
 		privKeys,
 		uint64(args.AmountToLock),
 		uint64(args.AmountToBurn),
@@ -686,7 +709,7 @@ type APIDeposit struct {
 func (s *CaminoService) apiDepositFromDeposit(depositTxID ids.ID, deposit *deposit.Deposit) (*APIDeposit, error) {
 	rewardOwner, ok := deposit.RewardOwner.(*secp256k1fx.OutputOwners)
 	if !ok {
-		return nil, errWrongOwnerType
+		return nil, ErrWrongOwnerType
 	}
 	apiOwner, err := s.apiOwnerFromSECP(rewardOwner)
 	if err != nil {
@@ -759,14 +782,14 @@ func (s *CaminoService) GetLastAcceptedBlock(r *http.Request, _ *struct{}, reply
 	return nil
 }
 
-func (s *Service) getKeystoreKeys(creds *api.UserPass, from *api.JSONFromAddrs) ([]*crypto.PrivateKeySECP256K1R, error) {
+func (s *Service) getKeystoreKeys(creds *api.UserPass, from *api.JSONFromAddrs) ([]*secp256k1.PrivateKey, error) {
 	user, err := keystore.NewUserFromKeystore(s.vm.ctx.Keystore, creds.Username, creds.Password)
 	if err != nil {
 		return nil, err
 	}
 	defer user.Close()
 
-	var keys []*crypto.PrivateKeySECP256K1R
+	var keys []*secp256k1.PrivateKey
 	if len(from.Signer) > 0 {
 		if len(from.From) == 0 {
 			return nil, errNoKeys
@@ -823,16 +846,16 @@ func (s *Service) getKeystoreKeys(creds *api.UserPass, from *api.JSONFromAddrs) 
 // getFakeKeys creates SECP256K1 private keys which have only the purpose to provide the address.
 // Used for calls like spend() which provide fromAddrs and signers required to get the correct UTXOs
 // for the transaction. These private keys can never recover to the public address they contain.
-func (s *Service) getFakeKeys(from *api.JSONFromAddrs) ([]*crypto.PrivateKeySECP256K1R, error) {
+func (s *Service) getFakeKeys(from *api.JSONFromAddrs) ([]*secp256k1.PrivateKey, error) {
 	// Parse the from addresses
 	fromAddrs, err := avax.ParseServiceAddresses(s.addrManager, from.From)
 	if err != nil {
 		return nil, err
 	}
 
-	keys := []*crypto.PrivateKeySECP256K1R{}
+	keys := []*secp256k1.PrivateKey{}
 	for fromAddr := range fromAddrs {
-		keys = append(keys, crypto.FakePrivateKey(fromAddr))
+		keys = append(keys, secp256k1.FakePrivateKey(fromAddr))
 	}
 
 	if len(from.Signer) > 0 {
@@ -844,7 +867,7 @@ func (s *Service) getFakeKeys(from *api.JSONFromAddrs) ([]*crypto.PrivateKeySECP
 
 		keys = append(keys, nil)
 		for signerAddr := range signerAddrs {
-			keys = append(keys, crypto.FakePrivateKey(signerAddr))
+			keys = append(keys, secp256k1.FakePrivateKey(signerAddr))
 		}
 	}
 
