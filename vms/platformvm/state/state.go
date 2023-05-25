@@ -1161,7 +1161,7 @@ func (s *state) loadCurrentStakers() error {
 		}
 		tx, _, err := s.GetTx(txID)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed loading validator transaction txID %v, %w", txID, err)
 		}
 		stakerTx, ok := tx.Unsigned.(txs.Staker)
 		if !ok {
@@ -1179,6 +1179,7 @@ func (s *state) loadCurrentStakers() error {
 			defaultEndTime = preStaker.EndTime()
 		}
 		metadata := &validatorMetadata{
+			txID: txID,
 			// use the start values as the fallback
 			// in case they are not stored in the database
 			StakerStartTime: defaultStartTime.Unix(),
