@@ -41,6 +41,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
@@ -205,7 +206,94 @@ func (vm *VM) Initialize(
 	chainCtx.Log.Info("initializing last accepted",
 		zap.Stringer("blkID", lastAcceptedID),
 	)
-	return vm.SetPreference(ctx, lastAcceptedID)
+	if err := vm.SetPreference(ctx, lastAcceptedID); err != nil {
+		return err
+	}
+
+	return vm.loadFakeSubnetForBenchmarks()
+}
+
+func (vm *VM) loadFakeSubnetForBenchmarks() error {
+	// duly create a fake subnet
+	unsignedSubnetTx := &txs.CreateSubnetTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    vm.ctx.NetworkID,
+			BlockchainID: vm.ctx.ChainID,
+			Ins:          []*avax.TransferableInput{},
+			Outs:         []*avax.TransferableOutput{},
+		}},
+		Owner: &secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+		},
+	}
+	subnetTx, err := txs.NewSigned(unsignedSubnetTx, txs.Codec, nil)
+	if err != nil {
+		return fmt.Errorf("failed signing fake subnet tx, %w", err)
+	}
+	if err := subnetTx.SyntacticVerify(vm.ctx); err != nil {
+		return fmt.Errorf("failed sintax verification of fake subnet tx, %w", err)
+	}
+	fakeSubnetID := subnetTx.ID()
+
+	vm.state.AddSubnet(subnetTx)
+	vm.state.AddTx(subnetTx, status.Committed)
+	if err := vm.state.Commit(); err != nil {
+		return fmt.Errorf("failed committing fake subnet, %w", err)
+	}
+
+	// promote all primary network validators to fake subnet validators
+	primaryVals, ok := vm.Config.Validators.Get(constants.PrimaryNetworkID)
+	if !ok {
+		return pvalidators.ErrMissingValidator
+	}
+	primaryValsList := primaryVals.List()
+	diff, err := state.NewDiff(vm.state.GetLastAccepted(), vm.manager)
+	if err != nil {
+		return fmt.Errorf("could not create diff for fake subnet, %w", err)
+	}
+	for _, val := range primaryValsList {
+		unsignedAddSubnetVal := &txs.AddSubnetValidatorTx{
+			BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+				NetworkID:    vm.ctx.NetworkID,
+				BlockchainID: vm.ctx.ChainID,
+				Ins:          []*avax.TransferableInput{},
+				Outs:         []*avax.TransferableOutput{},
+			}},
+			SubnetValidator: txs.SubnetValidator{
+				Validator: txs.Validator{
+					NodeID: val.NodeID,
+					Start:  uint64(vm.state.GetTimestamp().Unix()),
+					End:    uint64(mockable.MaxTime.Unix()),
+					Wght:   10,
+				},
+				Subnet: fakeSubnetID,
+			},
+			SubnetAuth: &secp256k1fx.Input{
+				SigIndices: []uint32{0, 1},
+			},
+		}
+		addSubnetVal, err := txs.NewSigned(unsignedAddSubnetVal, txs.Codec, nil)
+		if err != nil {
+			return fmt.Errorf("failed signing fake subnet tx, %w", err)
+		}
+		if err := addSubnetVal.SyntacticVerify(vm.ctx); err != nil {
+			return fmt.Errorf("failed sintax verification of fake subnet tx, %w", err)
+		}
+
+		staker, err := state.NewCurrentStaker(addSubnetVal.TxID, unsignedAddSubnetVal, 10)
+		if err != nil {
+			return fmt.Errorf("failed creating staker object from stakerTx, %w", err)
+		}
+
+		diff.AddTx(addSubnetVal, status.Committed)
+		diff.PutCurrentValidator(staker)
+	}
+	if err := diff.Apply(vm.state); err != nil {
+		return fmt.Errorf("failed applying diff, %w", err)
+	}
+
+	return nil
 }
 
 // Create all chains that exist that this node validates.
