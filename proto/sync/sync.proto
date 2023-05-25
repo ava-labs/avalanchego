@@ -74,7 +74,7 @@ message RangeProof {
 
 // ChangeProof is a possible response to a ChangeProofRequest.
 // It only consists of a proof of the smallest changed key,
-// the highest changed key, and the keys that have changed 
+// the highest changed key, and the keys that have changed
 // between those. Some keys may be deleted (hence
 // the use of KeyChange instead of KeyValue).
 message ChangeProof {
