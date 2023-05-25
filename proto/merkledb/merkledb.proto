@@ -8,7 +8,7 @@ import "rpcdb/rpcdb.proto";
 option go_package = "github.com/ava-labs/avalanchego/proto/pb/merkledb";
 
 // TODO add support for views.
-service MerkleDBService {
+service MerkleDB {
   rpc GetMerkleRoot(google.protobuf.Empty) returns (GetMerkleRootResponse);
 
   rpc GetChangeProof(ChangeProofRequest) returns (ChangeProof);

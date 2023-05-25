@@ -20,21 +20,21 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	MerkleDBService_GetMerkleRoot_FullMethodName     = "/merkledb.MerkleDBService/GetMerkleRoot"
-	MerkleDBService_GetChangeProof_FullMethodName    = "/merkledb.MerkleDBService/GetChangeProof"
-	MerkleDBService_VerifyChangeProof_FullMethodName = "/merkledb.MerkleDBService/VerifyChangeProof"
-	MerkleDBService_CommitChangeProof_FullMethodName = "/merkledb.MerkleDBService/CommitChangeProof"
-	MerkleDBService_GetProof_FullMethodName          = "/merkledb.MerkleDBService/GetProof"
-	MerkleDBService_VerifyProof_FullMethodName       = "/merkledb.MerkleDBService/VerifyProof"
-	MerkleDBService_GetRangeProof_FullMethodName     = "/merkledb.MerkleDBService/GetRangeProof"
-	MerkleDBService_VerifyRangeProof_FullMethodName  = "/merkledb.MerkleDBService/VerifyRangeProof"
-	MerkleDBService_CommitRangeProof_FullMethodName  = "/merkledb.MerkleDBService/CommitRangeProof"
+	MerkleDB_GetMerkleRoot_FullMethodName     = "/merkledb.MerkleDB/GetMerkleRoot"
+	MerkleDB_GetChangeProof_FullMethodName    = "/merkledb.MerkleDB/GetChangeProof"
+	MerkleDB_VerifyChangeProof_FullMethodName = "/merkledb.MerkleDB/VerifyChangeProof"
+	MerkleDB_CommitChangeProof_FullMethodName = "/merkledb.MerkleDB/CommitChangeProof"
+	MerkleDB_GetProof_FullMethodName          = "/merkledb.MerkleDB/GetProof"
+	MerkleDB_VerifyProof_FullMethodName       = "/merkledb.MerkleDB/VerifyProof"
+	MerkleDB_GetRangeProof_FullMethodName     = "/merkledb.MerkleDB/GetRangeProof"
+	MerkleDB_VerifyRangeProof_FullMethodName  = "/merkledb.MerkleDB/VerifyRangeProof"
+	MerkleDB_CommitRangeProof_FullMethodName  = "/merkledb.MerkleDB/CommitRangeProof"
 )
 
-// MerkleDBServiceClient is the client API for MerkleDBService service.
+// MerkleDBClient is the client API for MerkleDB service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-type MerkleDBServiceClient interface {
+type MerkleDBClient interface {
 	GetMerkleRoot(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetMerkleRootResponse, error)
 	GetChangeProof(ctx context.Context, in *ChangeProofRequest, opts ...grpc.CallOption) (*ChangeProof, error)
 	VerifyChangeProof(ctx context.Context, in *ChangeProof, opts ...grpc.CallOption) (*Error, error)
@@ -46,99 +46,99 @@ type MerkleDBServiceClient interface {
 	CommitRangeProof(ctx context.Context, in *CommitRangeProofRequest, opts ...grpc.CallOption) (*Error, error)
 }
 
-type merkleDBServiceClient struct {
+type merkleDBClient struct {
 	cc grpc.ClientConnInterface
 }
 
-func NewMerkleDBServiceClient(cc grpc.ClientConnInterface) MerkleDBServiceClient {
-	return &merkleDBServiceClient{cc}
+func NewMerkleDBClient(cc grpc.ClientConnInterface) MerkleDBClient {
+	return &merkleDBClient{cc}
 }
 
-func (c *merkleDBServiceClient) GetMerkleRoot(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetMerkleRootResponse, error) {
+func (c *merkleDBClient) GetMerkleRoot(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetMerkleRootResponse, error) {
 	out := new(GetMerkleRootResponse)
-	err := c.cc.Invoke(ctx, MerkleDBService_GetMerkleRoot_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, MerkleDB_GetMerkleRoot_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *merkleDBServiceClient) GetChangeProof(ctx context.Context, in *ChangeProofRequest, opts ...grpc.CallOption) (*ChangeProof, error) {
+func (c *merkleDBClient) GetChangeProof(ctx context.Context, in *ChangeProofRequest, opts ...grpc.CallOption) (*ChangeProof, error) {
 	out := new(ChangeProof)
-	err := c.cc.Invoke(ctx, MerkleDBService_GetChangeProof_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, MerkleDB_GetChangeProof_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *merkleDBServiceClient) VerifyChangeProof(ctx context.Context, in *ChangeProof, opts ...grpc.CallOption) (*Error, error) {
+func (c *merkleDBClient) VerifyChangeProof(ctx context.Context, in *ChangeProof, opts ...grpc.CallOption) (*Error, error) {
 	out := new(Error)
-	err := c.cc.Invoke(ctx, MerkleDBService_VerifyChangeProof_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, MerkleDB_VerifyChangeProof_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *merkleDBServiceClient) CommitChangeProof(ctx context.Context, in *ChangeProof, opts ...grpc.CallOption) (*Error, error) {
+func (c *merkleDBClient) CommitChangeProof(ctx context.Context, in *ChangeProof, opts ...grpc.CallOption) (*Error, error) {
 	out := new(Error)
-	err := c.cc.Invoke(ctx, MerkleDBService_CommitChangeProof_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, MerkleDB_CommitChangeProof_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *merkleDBServiceClient) GetProof(ctx context.Context, in *GetProofRequest, opts ...grpc.CallOption) (*Proof, error) {
+func (c *merkleDBClient) GetProof(ctx context.Context, in *GetProofRequest, opts ...grpc.CallOption) (*Proof, error) {
 	out := new(Proof)
-	err := c.cc.Invoke(ctx, MerkleDBService_GetProof_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, MerkleDB_GetProof_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *merkleDBServiceClient) VerifyProof(ctx context.Context, in *Proof, opts ...grpc.CallOption) (*Error, error) {
+func (c *merkleDBClient) VerifyProof(ctx context.Context, in *Proof, opts ...grpc.CallOption) (*Error, error) {
 	out := new(Error)
-	err := c.cc.Invoke(ctx, MerkleDBService_VerifyProof_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, MerkleDB_VerifyProof_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *merkleDBServiceClient) GetRangeProof(ctx context.Context, in *RangeProofRequest, opts ...grpc.CallOption) (*RangeProof, error) {
+func (c *merkleDBClient) GetRangeProof(ctx context.Context, in *RangeProofRequest, opts ...grpc.CallOption) (*RangeProof, error) {
 	out := new(RangeProof)
-	err := c.cc.Invoke(ctx, MerkleDBService_GetRangeProof_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, MerkleDB_GetRangeProof_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *merkleDBServiceClient) VerifyRangeProof(ctx context.Context, in *RangeProof, opts ...grpc.CallOption) (*Error, error) {
+func (c *merkleDBClient) VerifyRangeProof(ctx context.Context, in *RangeProof, opts ...grpc.CallOption) (*Error, error) {
 	out := new(Error)
-	err := c.cc.Invoke(ctx, MerkleDBService_VerifyRangeProof_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, MerkleDB_VerifyRangeProof_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *merkleDBServiceClient) CommitRangeProof(ctx context.Context, in *CommitRangeProofRequest, opts ...grpc.CallOption) (*Error, error) {
+func (c *merkleDBClient) CommitRangeProof(ctx context.Context, in *CommitRangeProofRequest, opts ...grpc.CallOption) (*Error, error) {
 	out := new(Error)
-	err := c.cc.Invoke(ctx, MerkleDBService_CommitRangeProof_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, MerkleDB_CommitRangeProof_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-// MerkleDBServiceServer is the server API for MerkleDBService service.
-// All implementations must embed UnimplementedMerkleDBServiceServer
+// MerkleDBServer is the server API for MerkleDB service.
+// All implementations must embed UnimplementedMerkleDBServer
 // for forward compatibility
-type MerkleDBServiceServer interface {
+type MerkleDBServer interface {
 	GetMerkleRoot(context.Context, *emptypb.Empty) (*GetMerkleRootResponse, error)
 	GetChangeProof(context.Context, *ChangeProofRequest) (*ChangeProof, error)
 	VerifyChangeProof(context.Context, *ChangeProof) (*Error, error)
@@ -148,257 +148,257 @@ type MerkleDBServiceServer interface {
 	GetRangeProof(context.Context, *RangeProofRequest) (*RangeProof, error)
 	VerifyRangeProof(context.Context, *RangeProof) (*Error, error)
 	CommitRangeProof(context.Context, *CommitRangeProofRequest) (*Error, error)
-	mustEmbedUnimplementedMerkleDBServiceServer()
+	mustEmbedUnimplementedMerkleDBServer()
 }
 
-// UnimplementedMerkleDBServiceServer must be embedded to have forward compatible implementations.
-type UnimplementedMerkleDBServiceServer struct {
+// UnimplementedMerkleDBServer must be embedded to have forward compatible implementations.
+type UnimplementedMerkleDBServer struct {
 }
 
-func (UnimplementedMerkleDBServiceServer) GetMerkleRoot(context.Context, *emptypb.Empty) (*GetMerkleRootResponse, error) {
+func (UnimplementedMerkleDBServer) GetMerkleRoot(context.Context, *emptypb.Empty) (*GetMerkleRootResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetMerkleRoot not implemented")
 }
-func (UnimplementedMerkleDBServiceServer) GetChangeProof(context.Context, *ChangeProofRequest) (*ChangeProof, error) {
+func (UnimplementedMerkleDBServer) GetChangeProof(context.Context, *ChangeProofRequest) (*ChangeProof, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetChangeProof not implemented")
 }
-func (UnimplementedMerkleDBServiceServer) VerifyChangeProof(context.Context, *ChangeProof) (*Error, error) {
+func (UnimplementedMerkleDBServer) VerifyChangeProof(context.Context, *ChangeProof) (*Error, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method VerifyChangeProof not implemented")
 }
-func (UnimplementedMerkleDBServiceServer) CommitChangeProof(context.Context, *ChangeProof) (*Error, error) {
+func (UnimplementedMerkleDBServer) CommitChangeProof(context.Context, *ChangeProof) (*Error, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CommitChangeProof not implemented")
 }
-func (UnimplementedMerkleDBServiceServer) GetProof(context.Context, *GetProofRequest) (*Proof, error) {
+func (UnimplementedMerkleDBServer) GetProof(context.Context, *GetProofRequest) (*Proof, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetProof not implemented")
 }
-func (UnimplementedMerkleDBServiceServer) VerifyProof(context.Context, *Proof) (*Error, error) {
+func (UnimplementedMerkleDBServer) VerifyProof(context.Context, *Proof) (*Error, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method VerifyProof not implemented")
 }
-func (UnimplementedMerkleDBServiceServer) GetRangeProof(context.Context, *RangeProofRequest) (*RangeProof, error) {
+func (UnimplementedMerkleDBServer) GetRangeProof(context.Context, *RangeProofRequest) (*RangeProof, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetRangeProof not implemented")
 }
-func (UnimplementedMerkleDBServiceServer) VerifyRangeProof(context.Context, *RangeProof) (*Error, error) {
+func (UnimplementedMerkleDBServer) VerifyRangeProof(context.Context, *RangeProof) (*Error, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method VerifyRangeProof not implemented")
 }
-func (UnimplementedMerkleDBServiceServer) CommitRangeProof(context.Context, *CommitRangeProofRequest) (*Error, error) {
+func (UnimplementedMerkleDBServer) CommitRangeProof(context.Context, *CommitRangeProofRequest) (*Error, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CommitRangeProof not implemented")
 }
-func (UnimplementedMerkleDBServiceServer) mustEmbedUnimplementedMerkleDBServiceServer() {}
+func (UnimplementedMerkleDBServer) mustEmbedUnimplementedMerkleDBServer() {}
 
-// UnsafeMerkleDBServiceServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to MerkleDBServiceServer will
+// UnsafeMerkleDBServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to MerkleDBServer will
 // result in compilation errors.
-type UnsafeMerkleDBServiceServer interface {
-	mustEmbedUnimplementedMerkleDBServiceServer()
+type UnsafeMerkleDBServer interface {
+	mustEmbedUnimplementedMerkleDBServer()
 }
 
-func RegisterMerkleDBServiceServer(s grpc.ServiceRegistrar, srv MerkleDBServiceServer) {
-	s.RegisterService(&MerkleDBService_ServiceDesc, srv)
+func RegisterMerkleDBServer(s grpc.ServiceRegistrar, srv MerkleDBServer) {
+	s.RegisterService(&MerkleDB_ServiceDesc, srv)
 }
 
-func _MerkleDBService_GetMerkleRoot_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _MerkleDB_GetMerkleRoot_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(MerkleDBServiceServer).GetMerkleRoot(ctx, in)
+		return srv.(MerkleDBServer).GetMerkleRoot(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: MerkleDBService_GetMerkleRoot_FullMethodName,
+		FullMethod: MerkleDB_GetMerkleRoot_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(MerkleDBServiceServer).GetMerkleRoot(ctx, req.(*emptypb.Empty))
+		return srv.(MerkleDBServer).GetMerkleRoot(ctx, req.(*emptypb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _MerkleDBService_GetChangeProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _MerkleDB_GetChangeProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ChangeProofRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(MerkleDBServiceServer).GetChangeProof(ctx, in)
+		return srv.(MerkleDBServer).GetChangeProof(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: MerkleDBService_GetChangeProof_FullMethodName,
+		FullMethod: MerkleDB_GetChangeProof_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(MerkleDBServiceServer).GetChangeProof(ctx, req.(*ChangeProofRequest))
+		return srv.(MerkleDBServer).GetChangeProof(ctx, req.(*ChangeProofRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _MerkleDBService_VerifyChangeProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _MerkleDB_VerifyChangeProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ChangeProof)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(MerkleDBServiceServer).VerifyChangeProof(ctx, in)
+		return srv.(MerkleDBServer).VerifyChangeProof(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: MerkleDBService_VerifyChangeProof_FullMethodName,
+		FullMethod: MerkleDB_VerifyChangeProof_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(MerkleDBServiceServer).VerifyChangeProof(ctx, req.(*ChangeProof))
+		return srv.(MerkleDBServer).VerifyChangeProof(ctx, req.(*ChangeProof))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _MerkleDBService_CommitChangeProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _MerkleDB_CommitChangeProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ChangeProof)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(MerkleDBServiceServer).CommitChangeProof(ctx, in)
+		return srv.(MerkleDBServer).CommitChangeProof(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: MerkleDBService_CommitChangeProof_FullMethodName,
+		FullMethod: MerkleDB_CommitChangeProof_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(MerkleDBServiceServer).CommitChangeProof(ctx, req.(*ChangeProof))
+		return srv.(MerkleDBServer).CommitChangeProof(ctx, req.(*ChangeProof))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _MerkleDBService_GetProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _MerkleDB_GetProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetProofRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(MerkleDBServiceServer).GetProof(ctx, in)
+		return srv.(MerkleDBServer).GetProof(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: MerkleDBService_GetProof_FullMethodName,
+		FullMethod: MerkleDB_GetProof_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(MerkleDBServiceServer).GetProof(ctx, req.(*GetProofRequest))
+		return srv.(MerkleDBServer).GetProof(ctx, req.(*GetProofRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _MerkleDBService_VerifyProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _MerkleDB_VerifyProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Proof)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(MerkleDBServiceServer).VerifyProof(ctx, in)
+		return srv.(MerkleDBServer).VerifyProof(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: MerkleDBService_VerifyProof_FullMethodName,
+		FullMethod: MerkleDB_VerifyProof_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(MerkleDBServiceServer).VerifyProof(ctx, req.(*Proof))
+		return srv.(MerkleDBServer).VerifyProof(ctx, req.(*Proof))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _MerkleDBService_GetRangeProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _MerkleDB_GetRangeProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(RangeProofRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(MerkleDBServiceServer).GetRangeProof(ctx, in)
+		return srv.(MerkleDBServer).GetRangeProof(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: MerkleDBService_GetRangeProof_FullMethodName,
+		FullMethod: MerkleDB_GetRangeProof_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(MerkleDBServiceServer).GetRangeProof(ctx, req.(*RangeProofRequest))
+		return srv.(MerkleDBServer).GetRangeProof(ctx, req.(*RangeProofRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _MerkleDBService_VerifyRangeProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _MerkleDB_VerifyRangeProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(RangeProof)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(MerkleDBServiceServer).VerifyRangeProof(ctx, in)
+		return srv.(MerkleDBServer).VerifyRangeProof(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: MerkleDBService_VerifyRangeProof_FullMethodName,
+		FullMethod: MerkleDB_VerifyRangeProof_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(MerkleDBServiceServer).VerifyRangeProof(ctx, req.(*RangeProof))
+		return srv.(MerkleDBServer).VerifyRangeProof(ctx, req.(*RangeProof))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _MerkleDBService_CommitRangeProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _MerkleDB_CommitRangeProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CommitRangeProofRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(MerkleDBServiceServer).CommitRangeProof(ctx, in)
+		return srv.(MerkleDBServer).CommitRangeProof(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: MerkleDBService_CommitRangeProof_FullMethodName,
+		FullMethod: MerkleDB_CommitRangeProof_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(MerkleDBServiceServer).CommitRangeProof(ctx, req.(*CommitRangeProofRequest))
+		return srv.(MerkleDBServer).CommitRangeProof(ctx, req.(*CommitRangeProofRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-// MerkleDBService_ServiceDesc is the grpc.ServiceDesc for MerkleDBService service.
+// MerkleDB_ServiceDesc is the grpc.ServiceDesc for MerkleDB service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
-var MerkleDBService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "merkledb.MerkleDBService",
-	HandlerType: (*MerkleDBServiceServer)(nil),
+var MerkleDB_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "merkledb.MerkleDB",
+	HandlerType: (*MerkleDBServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
 			MethodName: "GetMerkleRoot",
-			Handler:    _MerkleDBService_GetMerkleRoot_Handler,
+			Handler:    _MerkleDB_GetMerkleRoot_Handler,
 		},
 		{
 			MethodName: "GetChangeProof",
-			Handler:    _MerkleDBService_GetChangeProof_Handler,
+			Handler:    _MerkleDB_GetChangeProof_Handler,
 		},
 		{
 			MethodName: "VerifyChangeProof",
-			Handler:    _MerkleDBService_VerifyChangeProof_Handler,
+			Handler:    _MerkleDB_VerifyChangeProof_Handler,
 		},
 		{
 			MethodName: "CommitChangeProof",
-			Handler:    _MerkleDBService_CommitChangeProof_Handler,
+			Handler:    _MerkleDB_CommitChangeProof_Handler,
 		},
 		{
 			MethodName: "GetProof",
-			Handler:    _MerkleDBService_GetProof_Handler,
+			Handler:    _MerkleDB_GetProof_Handler,
 		},
 		{
 			MethodName: "VerifyProof",
-			Handler:    _MerkleDBService_VerifyProof_Handler,
+			Handler:    _MerkleDB_VerifyProof_Handler,
 		},
 		{
 			MethodName: "GetRangeProof",
-			Handler:    _MerkleDBService_GetRangeProof_Handler,
+			Handler:    _MerkleDB_GetRangeProof_Handler,
 		},
 		{
 			MethodName: "VerifyRangeProof",
-			Handler:    _MerkleDBService_VerifyRangeProof_Handler,
+			Handler:    _MerkleDB_VerifyRangeProof_Handler,
 		},
 		{
 			MethodName: "CommitRangeProof",
-			Handler:    _MerkleDBService_CommitRangeProof_Handler,
+			Handler:    _MerkleDB_CommitRangeProof_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
