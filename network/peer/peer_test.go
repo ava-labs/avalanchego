@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
+	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -60,7 +61,7 @@ func newMessageCreator(t *testing.T) message.Creator {
 	return mc
 }
 
-func makeRawTestPeers(t *testing.T) (*rawTestPeer, *rawTestPeer) {
+func makeRawTestPeers(t *testing.T, trackedSubnets set.Set[ids.ID]) (*rawTestPeer, *rawTestPeer) {
 	t.Helper()
 	require := require.New(t)
 
@@ -98,7 +99,8 @@ func makeRawTestPeers(t *testing.T) (*rawTestPeer, *rawTestPeer) {
 		Log:                  logging.NoLog{},
 		InboundMsgThrottler:  throttling.NewNoInboundThrottler(),
 		VersionCompatibility: version.GetCompatibility(constants.LocalID),
-		MySubnets:            set.Set[ids.ID]{},
+		MySubnets:            trackedSubnets,
+		UptimeCalculator:     uptime.NoOpCalculator,
 		Beacons:              validators.NewSet(),
 		NetworkID:            constants.LocalID,
 		PingFrequency:        constants.DefaultPingFrequency,
@@ -146,8 +148,8 @@ func makeRawTestPeers(t *testing.T) (*rawTestPeer, *rawTestPeer) {
 	return peer0, peer1
 }
 
-func makeTestPeers(t *testing.T) (*testPeer, *testPeer) {
-	rawPeer0, rawPeer1 := makeRawTestPeers(t)
+func makeTestPeers(t *testing.T, trackedSubnets set.Set[ids.ID]) (*testPeer, *testPeer) {
+	rawPeer0, rawPeer1 := makeRawTestPeers(t, trackedSubnets)
 
 	peer0 := &testPeer{
 		Peer: Start(
@@ -182,11 +184,11 @@ func makeTestPeers(t *testing.T) (*testPeer, *testPeer) {
 	return peer0, peer1
 }
 
-func makeReadyTestPeers(t *testing.T) (*testPeer, *testPeer) {
+func makeReadyTestPeers(t *testing.T, trackedSubnets set.Set[ids.ID]) (*testPeer, *testPeer) {
 	t.Helper()
 	require := require.New(t)
 
-	peer0, peer1 := makeTestPeers(t)
+	peer0, peer1 := makeTestPeers(t, trackedSubnets)
 
 	err := peer0.AwaitReady(context.Background())
 	require.NoError(err)
@@ -204,8 +206,7 @@ func makeReadyTestPeers(t *testing.T) (*testPeer, *testPeer) {
 func TestReady(t *testing.T) {
 	require := require.New(t)
 
-	rawPeer0, rawPeer1 := makeRawTestPeers(t)
-
+	rawPeer0, rawPeer1 := makeRawTestPeers(t, set.Set[ids.ID]{})
 	peer0 := Start(
 		rawPeer0.config,
 		rawPeer0.conn,
@@ -255,7 +256,7 @@ func TestReady(t *testing.T) {
 func TestSend(t *testing.T) {
 	require := require.New(t)
 
-	peer0, peer1 := makeReadyTestPeers(t)
+	peer0, peer1 := makeReadyTestPeers(t, set.Set[ids.ID]{})
 	mc := newMessageCreator(t)
 
 	outboundGetMsg, err := mc.Get(ids.Empty, 1, time.Second, ids.Empty, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
@@ -272,4 +273,121 @@ func TestSend(t *testing.T) {
 	require.NoError(err)
 	err = peer1.AwaitClosed(context.Background())
 	require.NoError(err)
+}
+
+func TestPingUptimes(t *testing.T) {
+	randomSubnetID := ids.GenerateTestID()
+	trackedSubnets := set.NewSet[ids.ID](1)
+	trackedSubnets.Add(randomSubnetID)
+	nonTrackingSubnetID := ids.GenerateTestID()
+
+	peer0, peer1 := makeReadyTestPeers(t, trackedSubnets)
+	mc := newMessageCreator(t)
+
+	testCases := []struct {
+		name     string
+		msg      message.OutboundMessage
+		assertFn func(*testing.T, *testPeer)
+		closed   bool
+	}{
+		{
+			name: "primary network only",
+			msg: func() message.OutboundMessage {
+				pingMsg, err := mc.Ping(1, nil)
+				require.NoError(t, err)
+				return pingMsg
+			}(),
+			assertFn: func(t *testing.T, peer *testPeer) {
+				uptime, ok := peer.ObservedUptime(constants.PrimaryNetworkID)
+				require.True(t, ok)
+				require.Equal(t, uint32(1), uptime)
+
+				uptime, ok = peer.ObservedUptime(randomSubnetID)
+				require.False(t, ok)
+				require.Equal(t, uint32(0), uptime)
+			},
+		},
+		{
+			name: "primary network and subnet",
+			msg: func() message.OutboundMessage {
+				pingMsg, err := mc.Ping(1, []*p2p.SubnetUptime{
+					{SubnetId: randomSubnetID[:], Uptime: 1},
+				})
+				require.NoError(t, err)
+				return pingMsg
+			}(),
+			assertFn: func(t *testing.T, peer *testPeer) {
+				uptime, ok := peer.ObservedUptime(constants.PrimaryNetworkID)
+				require.True(t, ok)
+				require.Equal(t, uint32(1), uptime)
+
+				uptime, ok = peer.ObservedUptime(randomSubnetID)
+				require.True(t, ok)
+				require.Equal(t, uint32(1), uptime)
+			},
+		},
+		{
+			name: "primary network and non tracked subnet",
+			msg: func() message.OutboundMessage {
+				pingMsg, err := mc.Ping(1, []*p2p.SubnetUptime{
+					{SubnetId: nonTrackingSubnetID[:], Uptime: 1},
+					{SubnetId: randomSubnetID[:], Uptime: 1},
+				})
+				require.NoError(t, err)
+				return pingMsg
+			}(),
+			assertFn: func(t *testing.T, peer *testPeer) {
+				uptime, ok := peer.ObservedUptime(constants.PrimaryNetworkID)
+				require.True(t, ok)
+				require.Equal(t, uint32(1), uptime)
+
+				uptime, ok = peer.ObservedUptime(randomSubnetID)
+				require.True(t, ok)
+				require.Equal(t, uint32(1), uptime)
+
+				uptime, ok = peer.ObservedUptime(nonTrackingSubnetID)
+				require.False(t, ok)
+				require.Equal(t, uint32(0), uptime)
+			},
+			closed: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		sent := peer0.Send(context.Background(), tc.msg)
+		require.True(t, sent)
+
+		if tc.closed {
+			err := peer0.AwaitClosed(context.Background())
+			require.NoError(t, err)
+		} else {
+			// we send Get message after ping to ensure Ping is handled by the time
+			// Get is handled. This is because Get is routed to the handler
+			// whereas Ping is handled by the peer directly.
+			// We have no way to know when the peer has handled the Ping message
+			sendAndFlush(t, peer0, peer1)
+		}
+		tc.assertFn(t, peer1)
+	}
+
+	peer1.StartClose()
+	peer0.StartClose()
+	err := peer0.AwaitClosed(context.Background())
+	require.NoError(t, err)
+	err = peer1.AwaitClosed(context.Background())
+	require.NoError(t, err)
+}
+
+// Helper to send a message from sender to receiver and assert that the
+// receiver receives the message. This can be used to test a prior message
+// was handled by the peer.
+func sendAndFlush(t *testing.T, sender *testPeer, receiver *testPeer) {
+	t.Helper()
+	mc := newMessageCreator(t)
+	outboundGetMsg, err := mc.Get(ids.Empty, 1, time.Second, ids.Empty, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
+	require.NoError(t, err)
+	sent := sender.Send(context.Background(), outboundGetMsg)
+	require.True(t, sent)
+	inboundGetMsg := <-receiver.inboundMsgChan
+	require.Equal(t, message.GetOp, inboundGetMsg.Op())
 }
