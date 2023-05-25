@@ -43,6 +43,10 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
+const (
+	memoryPadLimit = 1024 * 1024
+)
+
 var assetTracers = make(map[string]string)
 
 // init retrieves the JavaScript transaction tracers included in go-ethereum.
@@ -220,9 +224,11 @@ func (t *jsTracer) CaptureTxStart(gasLimit uint64) {
 	t.gasLimit = gasLimit
 }
 
-// CaptureTxStart implements the Tracer interface and is invoked at the end of
+// CaptureTxEnd implements the Tracer interface and is invoked at the end of
 // transaction processing.
-func (t *jsTracer) CaptureTxEnd(restGas uint64) {}
+func (t *jsTracer) CaptureTxEnd(restGas uint64) {
+	t.ctx["gasUsed"] = t.vm.ToValue(t.gasLimit - restGas)
+}
 
 // CaptureStart implements the Tracer interface to initialize the tracing operation.
 func (t *jsTracer) CaptureStart(env *vm.EVM, from common.Address, to common.Address, create bool, input []byte, gas uint64, value *big.Int) {
@@ -249,7 +255,6 @@ func (t *jsTracer) CaptureStart(env *vm.EVM, from common.Address, to common.Addr
 	// Update list of precompiles based on current block
 	rules := env.ChainConfig().AvalancheRules(env.Context.BlockNumber, env.Context.Time)
 	t.activePrecompiles = vm.ActivePrecompiles(rules)
-	t.ctx["intrinsicGas"] = t.vm.ToValue(t.gasLimit - gas)
 }
 
 // CaptureState implements the Tracer interface to trace a single step of VM execution.
@@ -293,7 +298,6 @@ func (t *jsTracer) CaptureFault(pc uint64, op vm.OpCode, gas, cost uint64, scope
 func (t *jsTracer) CaptureEnd(output []byte, gasUsed uint64, duration time.Duration, err error) {
 	t.ctx["output"] = t.vm.ToValue(output)
 	t.ctx["time"] = t.vm.ToValue(duration.String())
-	t.ctx["gasUsed"] = t.vm.ToValue(gasUsed)
 	if err != nil {
 		t.ctx["error"] = t.vm.ToValue(err.Error())
 	}
@@ -572,10 +576,15 @@ func (mo *memoryObj) slice(begin, end int64) ([]byte, error) {
 	if end < begin || begin < 0 {
 		return nil, fmt.Errorf("tracer accessed out of bound memory: offset %d, end %d", begin, end)
 	}
-	if mo.memory.Len() < int(end) {
-		return nil, fmt.Errorf("tracer accessed out of bound memory: available %d, offset %d, size %d", mo.memory.Len(), begin, end-begin)
+	mlen := mo.memory.Len()
+	if end-int64(mlen) > memoryPadLimit {
+		return nil, fmt.Errorf("tracer reached limit for padding memory slice: end %d, memorySize %d", end, mlen)
 	}
-	return mo.memory.GetCopy(begin, end-begin), nil
+	slice := make([]byte, end-begin)
+	end = min(end, int64(mo.memory.Len()))
+	ptr := mo.memory.GetPtr(begin, end-begin)
+	copy(slice[:], ptr[:])
+	return slice, nil
 }
 
 func (mo *memoryObj) GetUint(addr int64) goja.Value {
@@ -954,4 +963,11 @@ func (l *steplog) setupObject() *goja.Object {
 	o.Set("memory", l.memory.setupObject())
 	o.Set("contract", l.contract.setupObject())
 	return o
+}
+
+func min(a, b int64) int64 {
+	if a < b {
+		return a
+	}
+	return b
 }

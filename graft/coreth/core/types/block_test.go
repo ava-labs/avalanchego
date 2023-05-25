@@ -75,7 +75,7 @@ func TestBlockEncoding(t *testing.T) {
 	check("ExtDataGasUsed", block.ExtDataGasUsed(), (*big.Int)(nil))
 	check("BlockGasCost", block.BlockGasCost(), (*big.Int)(nil))
 
-	check("Size", block.Size(), common.StorageSize(len(blockEnc)))
+	check("Size", block.Size(), uint64(len(blockEnc)))
 	check("BlockHash", block.Hash(), common.HexToHash("0608e5d5e13c337f226b621a0b08b3d50470f1961329826fd59f5a241d1df49e"))
 
 	txHash := common.HexToHash("f5a60149da2ea4e97061a9f47c66036ee843fa76cd1f9ce5a71eb55ff90b2e0e")
@@ -112,7 +112,7 @@ func TestEIP1559BlockEncoding(t *testing.T) {
 	check("Hash", block.Hash(), common.HexToHash("2aefaa81ae43541bf2d608e2bb26a157212394abad4d219c06163be0d5d010f8"))
 	check("Nonce", block.Nonce(), uint64(0xa13a5a8c8f2bb1c4))
 	check("Time", block.Time(), uint64(1426516743))
-	check("Size", block.Size(), common.StorageSize(len(blockEnc)))
+	check("Size", block.Size(), uint64(len(blockEnc)))
 	check("BaseFee", block.BaseFee(), new(big.Int).SetUint64(1_000_000_000))
 	check("ExtDataGasUsed", block.ExtDataGasUsed(), (*big.Int)(nil))
 	check("BlockGasCost", block.BlockGasCost(), (*big.Int)(nil))
@@ -177,7 +177,7 @@ func TestEIP2718BlockEncoding(t *testing.T) {
 	check("Root", block.Root(), common.HexToHash("ef1552a40b7165c3cd773806b9e0c165b75356e0314bf0706f279c729f51e017"))
 	check("Nonce", block.Nonce(), uint64(0xa13a5a8c8f2bb1c4))
 	check("Time", block.Time(), uint64(1426516743))
-	check("Size", block.Size(), common.StorageSize(len(blockEnc)))
+	check("Size", block.Size(), uint64(len(blockEnc)))
 	check("ExtDataHash", block.header.ExtDataHash, common.HexToHash("0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"))
 	check("BaseFee", block.BaseFee(), (*big.Int)(nil))
 	check("ExtDataGasUsed", block.ExtDataGasUsed(), (*big.Int)(nil))
@@ -258,7 +258,7 @@ func TestBlockEncodingWithExtraData(t *testing.T) {
 	check("ExtDataGasUsed", block.ExtDataGasUsed(), (*big.Int)(nil))
 	check("BlockGasCost", block.BlockGasCost(), (*big.Int)(nil))
 
-	check("Size", block.Size(), common.StorageSize(len(blockEnc)))
+	check("Size", block.Size(), uint64(len(blockEnc)))
 	check("BlockHash", block.Hash(), common.HexToHash("4504ee98a94d16dbd70a35370501a3cb00c2965b012672085fbd328a72962902"))
 
 	check("len(Transactions)", len(block.Transactions()), 0)
@@ -388,7 +388,7 @@ func TestAP4BlockEncoding(t *testing.T) {
 	check("Hash", block.Hash(), common.HexToHash("0xc41340f5d2af79a12373bc8d6f0f05f9f98b240834608f428da171449e8a1468"))
 	check("Nonce", block.Nonce(), uint64(0xa13a5a8c8f2bb1c4))
 	check("Time", block.Time(), uint64(1426516743))
-	check("Size", block.Size(), common.StorageSize(len(blockEnc)))
+	check("Size", block.Size(), uint64(len(blockEnc)))
 	check("BaseFee", block.BaseFee(), big.NewInt(1_000_000_000))
 	check("ExtDataGasUsed", block.ExtDataGasUsed(), big.NewInt(25_000))
 	check("BlockGasCost", block.BlockGasCost(), big.NewInt(1_000_000))

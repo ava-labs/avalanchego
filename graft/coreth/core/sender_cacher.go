@@ -55,9 +55,9 @@ type TxSenderCacher struct {
 	tasksMu sync.RWMutex
 }
 
-// newTxSenderCacher creates a new transaction sender background cacher and starts
+// NewTxSenderCacher creates a new transaction sender background cacher and starts
 // as many processing goroutines as allowed by the GOMAXPROCS on construction.
-func newTxSenderCacher(threads int) *TxSenderCacher {
+func NewTxSenderCacher(threads int) *TxSenderCacher {
 	cacher := &TxSenderCacher{
 		tasks:   make(chan *txSenderCacherRequest, threads),
 		threads: threads,

@@ -565,7 +565,7 @@ func (b *SimulatedBackend) EstimateGas(ctx context.Context, call interfaces.Call
 		available := new(big.Int).Set(balance)
 		if call.Value != nil {
 			if call.Value.Cmp(available) >= 0 {
-				return 0, errors.New("insufficient funds for transfer")
+				return 0, core.ErrInsufficientFundsForTransfer
 			}
 			available.Sub(available, call.Value)
 		}
@@ -833,8 +833,12 @@ func (b *SimulatedBackend) AdjustTime(adjustment time.Duration) error {
 	if len(b.acceptedBlock.Transactions()) != 0 {
 		return errors.New("Could not adjust time on non-empty block")
 	}
+	block := b.blockchain.GetBlockByHash(b.acceptedBlock.ParentHash())
+	if block == nil {
+		return fmt.Errorf("could not find parent")
+	}
 
-	blocks, _, _ := core.GenerateChain(b.config, b.blockchain.CurrentBlock(), dummy.NewFaker(), b.database, 1, 10, func(number int, block *core.BlockGen) {
+	blocks, _, _ := core.GenerateChain(b.config, block, dummy.NewFaker(), b.database, 1, 10, func(number int, block *core.BlockGen) {
 		block.OffsetTime(int64(adjustment.Seconds()))
 	})
 	stateDB, _ := b.blockchain.State()
@@ -903,11 +907,18 @@ func (fb *filterBackend) ChainDb() ethdb.Database { return fb.db }
 
 func (fb *filterBackend) EventMux() *event.TypeMux { panic("not supported") }
 
-func (fb *filterBackend) HeaderByNumber(ctx context.Context, block rpc.BlockNumber) (*types.Header, error) {
-	if block == rpc.LatestBlockNumber {
+func (fb *filterBackend) HeaderByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Header, error) {
+	switch number {
+	case rpc.PendingBlockNumber, rpc.AcceptedBlockNumber:
+		if block := fb.backend.acceptedBlock; block != nil {
+			return block.Header(), nil
+		}
+		return nil, nil
+	case rpc.LatestBlockNumber:
 		return fb.bc.CurrentHeader(), nil
+	default:
+		return fb.bc.GetHeaderByNumber(uint64(number.Int64())), nil
 	}
-	return fb.bc.GetHeaderByNumber(uint64(block.Int64())), nil
 }
 
 func (fb *filterBackend) HeaderByHash(ctx context.Context, hash common.Hash) (*types.Header, error) {
@@ -950,6 +961,14 @@ func (fb *filterBackend) SubscribePendingLogsEvent(ch chan<- []*types.Log) event
 func (fb *filterBackend) BloomStatus() (uint64, uint64) { return 4096, 0 }
 
 func (fb *filterBackend) ServiceFilter(ctx context.Context, ms *bloombits.MatcherSession) {
+	panic("not supported")
+}
+
+func (fb *filterBackend) ChainConfig() *params.ChainConfig {
+	panic("not supported")
+}
+
+func (fb *filterBackend) CurrentHeader() *types.Header {
 	panic("not supported")
 }
 

@@ -39,7 +39,7 @@ import (
 	"github.com/ava-labs/coreth/ethdb"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ethereum/go-ethereum/common"
-	lru "github.com/hashicorp/golang-lru"
+	"github.com/ethereum/go-ethereum/common/lru"
 )
 
 const (
@@ -70,10 +70,9 @@ type HeaderChain struct {
 	currentHeader     atomic.Value // Current head of the header chain (may be above the block chain!)
 	currentHeaderHash common.Hash  // Hash of the current head of the header chain (prevent recomputing all the time)
 
-	headerCache         *lru.Cache                       // Cache for the most recent block headers
-	tdCache             *lru.Cache                       // Cache for the most recent block total difficulties
-	numberCache         *lru.Cache                       // Cache for the most recent block numbers
-	acceptedNumberCache FIFOCache[uint64, *types.Header] // Cache for most recent accepted heights to headers (only modified in accept)
+	headerCache         *lru.Cache[common.Hash, *types.Header]
+	numberCache         *lru.Cache[common.Hash, uint64]  // most recent block numbers
+	acceptedNumberCache FIFOCache[uint64, *types.Header] // most recent accepted heights to headers (only modified in accept)
 
 	rand   *mrand.Rand
 	engine consensus.Engine
@@ -82,9 +81,6 @@ type HeaderChain struct {
 // NewHeaderChain creates a new HeaderChain structure. ProcInterrupt points
 // to the parent's interrupt semaphore.
 func NewHeaderChain(chainDb ethdb.Database, config *params.ChainConfig, cacheConfig *CacheConfig, engine consensus.Engine) (*HeaderChain, error) {
-	headerCache, _ := lru.New(headerCacheLimit)
-	tdCache, _ := lru.New(tdCacheLimit)
-	numberCache, _ := lru.New(numberCacheLimit)
 	acceptedNumberCache := NewFIFOCache[uint64, *types.Header](cacheConfig.AcceptedCacheSize)
 
 	// Seed a fast but crypto originating random generator
@@ -96,9 +92,8 @@ func NewHeaderChain(chainDb ethdb.Database, config *params.ChainConfig, cacheCon
 	hc := &HeaderChain{
 		config:              config,
 		chainDb:             chainDb,
-		headerCache:         headerCache,
-		tdCache:             tdCache,
-		numberCache:         numberCache,
+		headerCache:         lru.NewCache[common.Hash, *types.Header](headerCacheLimit),
+		numberCache:         lru.NewCache[common.Hash, uint64](numberCacheLimit),
 		acceptedNumberCache: acceptedNumberCache,
 		rand:                mrand.New(mrand.NewSource(seed.Int64())),
 		engine:              engine,
@@ -124,8 +119,7 @@ func NewHeaderChain(chainDb ethdb.Database, config *params.ChainConfig, cacheCon
 // from the cache or database
 func (hc *HeaderChain) GetBlockNumber(hash common.Hash) *uint64 {
 	if cached, ok := hc.numberCache.Get(hash); ok {
-		number := cached.(uint64)
-		return &number
+		return &cached
 	}
 	number := rawdb.ReadHeaderNumber(hc.chainDb, hash)
 	if number != nil {
@@ -139,7 +133,7 @@ func (hc *HeaderChain) GetBlockNumber(hash common.Hash) *uint64 {
 func (hc *HeaderChain) GetHeader(hash common.Hash, number uint64) *types.Header {
 	// Short circuit if the header's already in the cache, retrieve otherwise
 	if header, ok := hc.headerCache.Get(hash); ok {
-		return header.(*types.Header)
+		return header
 	}
 	header := rawdb.ReadHeader(hc.chainDb, hash, number)
 	if header == nil {

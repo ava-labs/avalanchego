@@ -279,7 +279,8 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 		}
 	}
 	// Create an account and state iterator pointing to the current generator marker
-	accTrie, err := trie.NewStateTrie(common.Hash{}, dl.root, dl.triedb)
+	trieId := trie.StateTrieID(dl.root)
+	accTrie, err := trie.NewStateTrie(trieId, dl.triedb)
 	if err != nil {
 		// The account trie is missing (GC), surf the chain until one becomes available
 		stats.Info("Trie missing, state snapshotting paused", dl.root, dl.genMarker)
@@ -334,7 +335,8 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 		// If the iterated account is a contract, iterate through corresponding contract
 		// storage to generate snapshot entries.
 		if acc.Root != emptyRoot {
-			storeTrie, err := trie.NewStateTrie(accountHash, acc.Root, dl.triedb)
+			storeTrieId := trie.StorageTrieID(dl.root, accountHash, acc.Root)
+			storeTrie, err := trie.NewStateTrie(storeTrieId, dl.triedb)
 			if err != nil {
 				log.Error("Generator failed to access storage trie", "root", dl.root, "account", accountHash, "stroot", acc.Root, "err", err)
 				abort := <-dl.genAbort

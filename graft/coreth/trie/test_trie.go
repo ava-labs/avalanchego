@@ -73,11 +73,11 @@ func FillTrie(t *testing.T, numKeys int, keySize int, testTrie *Trie) ([][]byte,
 // AssertTrieConsistency ensures given trieDB [a] and [b] both have the same
 // non-empty trie at [root]. (all key/value pairs must be equal)
 func AssertTrieConsistency(t testing.TB, root common.Hash, a, b *Database, onLeaf func(key, val []byte) error) {
-	trieA, err := New(common.Hash{}, root, a)
+	trieA, err := New(TrieID(root), a)
 	if err != nil {
 		t.Fatalf("error creating trieA, root=%s, err=%v", root, err)
 	}
-	trieB, err := New(common.Hash{}, root, b)
+	trieB, err := New(TrieID(root), b)
 	if err != nil {
 		t.Fatalf("error creating trieB, root=%s, err=%v", root, err)
 	}
@@ -107,7 +107,7 @@ func AssertTrieConsistency(t testing.TB, root common.Hash, a, b *Database, onLea
 func CorruptTrie(t *testing.T, trieDB *Database, root common.Hash, n int) {
 	batch := trieDB.diskdb.NewBatch()
 	// next delete some trie nodes
-	tr, err := New(common.Hash{}, root, trieDB)
+	tr, err := New(TrieID(root), trieDB)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -145,7 +145,7 @@ func FillAccounts(
 		accounts    = make(map[*keystore.Key]*types.StateAccount, numAccounts)
 	)
 
-	tr, err := NewStateTrie(common.Hash{}, root, trieDB)
+	tr, err := NewStateTrie(TrieID(root), trieDB)
 	if err != nil {
 		t.Fatalf("error opening trie: %v", err)
 	}

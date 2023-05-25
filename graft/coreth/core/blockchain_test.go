@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/coreth/core/state/pruner"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/core/vm"
+	"github.com/ava-labs/coreth/eth/tracers/logger"
 	"github.com/ava-labs/coreth/ethdb"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ethereum/go-ethereum/common"
@@ -45,6 +46,10 @@ var (
 		AcceptorQueueLimit:    64,
 	}
 )
+
+func newGwei(n int64) *big.Int {
+	return new(big.Int).Mul(big.NewInt(n), big.NewInt(params.GWei))
+}
 
 func createBlockChain(
 	db ethdb.Database,
@@ -354,7 +359,14 @@ func TestBlockChainOfflinePruningUngracefulShutdown(t *testing.T) {
 		if err := blockchain.CleanBlockRootsAboveLastAccepted(); err != nil {
 			return nil, err
 		}
-		pruner, err := pruner.NewPruner(db, tempDir, 256)
+
+		prunerConfig := pruner.Config{
+			Datadir:   tempDir,
+			BloomSize: 256,
+			Cachedir:  pruningConfig.TrieCleanJournal,
+		}
+
+		pruner, err := pruner.NewPruner(db, prunerConfig)
 		if err != nil {
 			return nil, fmt.Errorf("offline pruning failed (%s, %d): %w", tempDir, 256, err)
 		}
@@ -478,7 +490,7 @@ func TestUngracefulAsyncShutdown(t *testing.T) {
 				Pruning:               true,
 				CommitInterval:        4096,
 				SnapshotLimit:         256,
-				SkipSnapshotRebuild:   true, // Ensure the test errors if snapshot initialization fails
+				SnapshotNoBuild:       true, // Ensure the test errors if snapshot initialization fails
 				AcceptorQueueLimit:    1000, // ensure channel doesn't block
 			}, gspec, lastAcceptedHash)
 			if err != nil {
@@ -609,6 +621,119 @@ func TestUngracefulAsyncShutdown(t *testing.T) {
 	}
 }
 
+// TODO: simplify the unindexer logic and this test.
+func TestTransactionIndices(t *testing.T) {
+	// Configure and generate a sample block chain
+	require := require.New(t)
+	var (
+		key1, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
+		key2, _ = crypto.HexToECDSA("8a1f9a8f95be41cd7ccb6168179afb4504aefe388d1e14474d32c45c72ce7b7a")
+		addr1   = crypto.PubkeyToAddress(key1.PublicKey)
+		addr2   = crypto.PubkeyToAddress(key2.PublicKey)
+		funds   = big.NewInt(10000000000000)
+		gspec   = &Genesis{
+			Config: &params.ChainConfig{HomesteadBlock: new(big.Int)},
+			Alloc:  GenesisAlloc{addr1: {Balance: funds}},
+		}
+		signer = types.LatestSigner(gspec.Config)
+	)
+	genDb, blocks, _, err := GenerateChainWithGenesis(gspec, dummy.NewDummyEngine(&TestCallbacks), 128, 10, func(i int, block *BlockGen) {
+		tx, err := types.SignTx(types.NewTransaction(block.TxNonce(addr1), addr2, big.NewInt(10000), params.TxGas, nil, nil), signer, key1)
+		require.NoError(err)
+		block.AddTx(tx)
+	})
+	require.NoError(err)
+
+	blocks2, _, err := GenerateChain(gspec.Config, blocks[len(blocks)-1], dummy.NewDummyEngine(&TestCallbacks), genDb, 10, 10, nil)
+	require.NoError(err)
+
+	check := func(tail *uint64, chain *BlockChain) {
+		stored := rawdb.ReadTxIndexTail(chain.db)
+		require.EqualValues(tail, stored)
+
+		if tail == nil {
+			return
+		}
+		for i := *tail; i <= chain.CurrentBlock().NumberU64(); i++ {
+			block := rawdb.ReadBlock(chain.db, rawdb.ReadCanonicalHash(chain.db, i), i)
+			if block.Transactions().Len() == 0 {
+				continue
+			}
+			for _, tx := range block.Transactions() {
+				index := rawdb.ReadTxLookupEntry(chain.db, tx.Hash())
+				require.NotNilf(index, "Miss transaction indices, number %d hash %s", i, tx.Hash().Hex())
+			}
+		}
+
+		for i := uint64(0); i < *tail; i++ {
+			block := rawdb.ReadBlock(chain.db, rawdb.ReadCanonicalHash(chain.db, i), i)
+			if block.Transactions().Len() == 0 {
+				continue
+			}
+			for _, tx := range block.Transactions() {
+				index := rawdb.ReadTxLookupEntry(chain.db, tx.Hash())
+				require.Nilf(index, "Transaction indices should be deleted, number %d hash %s", i, tx.Hash().Hex())
+			}
+		}
+	}
+
+	conf := &CacheConfig{
+		TrieCleanLimit:        256,
+		TrieDirtyLimit:        256,
+		TrieDirtyCommitTarget: 20,
+		Pruning:               true,
+		CommitInterval:        4096,
+		SnapshotLimit:         256,
+		SnapshotNoBuild:       true, // Ensure the test errors if snapshot initialization fails
+		AcceptorQueueLimit:    64,
+	}
+
+	// Init block chain and check all needed indices has been indexed.
+	chainDB := rawdb.NewMemoryDatabase()
+	chain, err := createBlockChain(chainDB, conf, gspec, common.Hash{})
+	require.NoError(err)
+
+	_, err = chain.InsertChain(blocks)
+	require.NoError(err)
+
+	for _, block := range blocks {
+		err := chain.Accept(block)
+		require.NoError(err)
+	}
+	chain.DrainAcceptorQueue()
+
+	chain.Stop()
+	check(nil, chain) // check all indices has been indexed
+
+	lastAcceptedHash := chain.CurrentHeader().Hash()
+
+	// Reconstruct a block chain which only reserves limited tx indices
+	// 128 blocks were previously indexed. Now we add a new block at each test step.
+	limit := []uint64{130 /* 129 + 1 reserve all */, 64 /* drop stale */, 32 /* shorten history */}
+	tails := []uint64{0 /* reserve all */, 67 /* 130 - 64 + 1 */, 100 /* 131 - 32 + 1 */}
+	for i, l := range limit {
+		conf.TxLookupLimit = l
+
+		chain, err := createBlockChain(chainDB, conf, gspec, lastAcceptedHash)
+		require.NoError(err)
+
+		newBlks := blocks2[i : i+1]
+		_, err = chain.InsertChain(newBlks) // Feed chain a higher block to trigger indices updater.
+		require.NoError(err)
+
+		err = chain.Accept(newBlks[0]) // Accept the block to trigger indices updater.
+		require.NoError(err)
+
+		chain.DrainAcceptorQueue()
+		time.Sleep(50 * time.Millisecond) // Wait for indices initialisation
+
+		chain.Stop()
+		check(&tails[i], chain)
+
+		lastAcceptedHash = chain.CurrentHeader().Hash()
+	}
+}
+
 // TestCanonicalHashMarker tests all the canonical hash markers are updated/deleted
 // correctly in case reorg is called.
 func TestCanonicalHashMarker(t *testing.T) {
@@ -717,119 +842,7 @@ func TestCanonicalHashMarker(t *testing.T) {
 				}
 			}
 		}
-	}
-}
-
-func TestTransactionIndices(t *testing.T) {
-	// Configure and generate a sample block chain
-	require := require.New(t)
-	var (
-		key1, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
-		key2, _ = crypto.HexToECDSA("8a1f9a8f95be41cd7ccb6168179afb4504aefe388d1e14474d32c45c72ce7b7a")
-		addr1   = crypto.PubkeyToAddress(key1.PublicKey)
-		addr2   = crypto.PubkeyToAddress(key2.PublicKey)
-		funds   = big.NewInt(10000000000000)
-		gspec   = &Genesis{
-			Config: &params.ChainConfig{HomesteadBlock: new(big.Int)},
-			Alloc:  GenesisAlloc{addr1: {Balance: funds}},
-		}
-		signer = types.LatestSigner(gspec.Config)
-	)
-	height := uint64(128)
-	genDb, blocks, _, err := GenerateChainWithGenesis(gspec, dummy.NewDummyEngine(&TestCallbacks), int(height), 10, func(i int, block *BlockGen) {
-		tx, err := types.SignTx(types.NewTransaction(block.TxNonce(addr1), addr2, big.NewInt(10000), params.TxGas, nil, nil), signer, key1)
-		require.NoError(err)
-		block.AddTx(tx)
-	})
-	require.NoError(err)
-
-	blocks2, _, err := GenerateChain(gspec.Config, blocks[len(blocks)-1], dummy.NewDummyEngine(&TestCallbacks), genDb, 10, 10, nil)
-	require.NoError(err)
-
-	check := func(tail *uint64, chain *BlockChain) {
-		stored := rawdb.ReadTxIndexTail(chain.db)
-		require.EqualValues(tail, stored)
-
-		if tail == nil {
-			return
-		}
-		for i := *tail; i <= chain.CurrentBlock().NumberU64(); i++ {
-			block := rawdb.ReadBlock(chain.db, rawdb.ReadCanonicalHash(chain.db, i), i)
-			if block.Transactions().Len() == 0 {
-				continue
-			}
-			for _, tx := range block.Transactions() {
-				index := rawdb.ReadTxLookupEntry(chain.db, tx.Hash())
-				require.NotNilf(index, "Miss transaction indices, number %d hash %s", i, tx.Hash().Hex())
-			}
-		}
-
-		for i := uint64(0); i < *tail; i++ {
-			block := rawdb.ReadBlock(chain.db, rawdb.ReadCanonicalHash(chain.db, i), i)
-			if block.Transactions().Len() == 0 {
-				continue
-			}
-			for _, tx := range block.Transactions() {
-				index := rawdb.ReadTxLookupEntry(chain.db, tx.Hash())
-				require.Nilf(index, "Transaction indices should be deleted, number %d hash %s", i, tx.Hash().Hex())
-			}
-		}
-	}
-
-	conf := &CacheConfig{
-		TrieCleanLimit:        256,
-		TrieDirtyLimit:        256,
-		TrieDirtyCommitTarget: 20,
-		Pruning:               true,
-		CommitInterval:        4096,
-		SnapshotLimit:         256,
-		SkipSnapshotRebuild:   true, // Ensure the test errors if snapshot initialization fails
-		AcceptorQueueLimit:    64,
-	}
-
-	// Init block chain and check all needed indices has been indexed.
-	chainDB := rawdb.NewMemoryDatabase()
-	chain, err := createBlockChain(chainDB, conf, gspec, common.Hash{})
-	require.NoError(err)
-
-	_, err = chain.InsertChain(blocks)
-	require.NoError(err)
-
-	for _, block := range blocks {
-		err := chain.Accept(block)
-		require.NoError(err)
-	}
-	chain.DrainAcceptorQueue()
-
-	chain.Stop()
-	check(nil, chain) // check all indices has been indexed
-
-	lastAcceptedHash := chain.CurrentHeader().Hash()
-
-	// Reconstruct a block chain which only reserves limited tx indices
-	// 128 blocks were previously indexed. Now we add a new block at each test step.
-	limit := []uint64{130 /* 129 + 1 reserve all */, 64 /* drop stale */, 32 /* shorten history */}
-	tails := []uint64{0 /* reserve all */, 67 /* 130 - 64 + 1 */, 100 /* 131 - 32 + 1 */}
-	for i, l := range limit {
-		conf.TxLookupLimit = l
-
-		chain, err := createBlockChain(chainDB, conf, gspec, lastAcceptedHash)
-		require.NoError(err)
-
-		newBlks := blocks2[i : i+1]
-		_, err = chain.InsertChain(newBlks) // Feed chain a higher block to trigger indices updater.
-		require.NoError(err)
-
-		err = chain.Accept(newBlks[0]) // Accept the block to trigger indices updater.
-		require.NoError(err)
-
-		chain.DrainAcceptorQueue()
-		time.Sleep(50 * time.Millisecond) // Wait for indices initialisation
-
 		chain.Stop()
-		check(&tails[i], chain)
-
-		lastAcceptedHash = chain.CurrentHeader().Hash()
 	}
 }
 
@@ -841,7 +854,7 @@ func TestTxLookupBlockChain(t *testing.T) {
 		Pruning:               true,
 		CommitInterval:        4096,
 		SnapshotLimit:         256,
-		SkipSnapshotRebuild:   true, // Ensure the test errors if snapshot initialization fails
+		SnapshotNoBuild:       true, // Ensure the test errors if snapshot initialization fails
 		AcceptorQueueLimit:    64,   // ensure channel doesn't block
 		TxLookupLimit:         5,
 	}
@@ -852,5 +865,298 @@ func TestTxLookupBlockChain(t *testing.T) {
 		t.Run(tt.Name, func(t *testing.T) {
 			tt.testFunc(t, createTxLookupBlockChain)
 		})
+	}
+}
+
+func TestCreateThenDeletePreByzantium(t *testing.T) {
+	// We want to use pre-byzantium rules where we have intermediate state roots
+	// between transactions.
+	config := *params.TestLaunchConfig
+	config.ByzantiumBlock = nil
+	config.ConstantinopleBlock = nil
+	config.PetersburgBlock = nil
+	config.IstanbulBlock = nil
+	config.MuirGlacierBlock = nil
+	testCreateThenDelete(t, &config)
+}
+func TestCreateThenDeletePostByzantium(t *testing.T) {
+	testCreateThenDelete(t, params.TestChainConfig)
+}
+
+// testCreateThenDelete tests a creation and subsequent deletion of a contract, happening
+// within the same block.
+func testCreateThenDelete(t *testing.T, config *params.ChainConfig) {
+	var (
+		engine = dummy.NewFaker()
+		// A sender who makes transactions, has some funds
+		key, _      = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
+		address     = crypto.PubkeyToAddress(key.PublicKey)
+		destAddress = crypto.CreateAddress(address, 0)
+		funds       = big.NewInt(params.Ether) // Note: additional funds are provided here compared to go-ethereum so test completes.
+	)
+
+	// runtime code is 	0x60ffff : PUSH1 0xFF SELFDESTRUCT, a.k.a SELFDESTRUCT(0xFF)
+	code := append([]byte{0x60, 0xff, 0xff}, make([]byte, 32-3)...)
+	initCode := []byte{
+		// SSTORE 1:1
+		byte(vm.PUSH1), 0x1,
+		byte(vm.PUSH1), 0x1,
+		byte(vm.SSTORE),
+		// Get the runtime-code on the stack
+		byte(vm.PUSH32)}
+	initCode = append(initCode, code...)
+	initCode = append(initCode, []byte{
+		byte(vm.PUSH1), 0x0, // offset
+		byte(vm.MSTORE),
+		byte(vm.PUSH1), 0x3, // size
+		byte(vm.PUSH1), 0x0, // offset
+		byte(vm.RETURN), // return 3 bytes of zero-code
+	}...)
+	gspec := &Genesis{
+		Config: config,
+		Alloc: GenesisAlloc{
+			address: {Balance: funds},
+		},
+	}
+	nonce := uint64(0)
+	signer := types.HomesteadSigner{}
+	_, blocks, _, _ := GenerateChainWithGenesis(gspec, engine, 2, 10, func(i int, b *BlockGen) {
+		fee := big.NewInt(1)
+		if b.header.BaseFee != nil {
+			fee = b.header.BaseFee
+		}
+		b.SetCoinbase(common.Address{1})
+		tx, _ := types.SignNewTx(key, signer, &types.LegacyTx{
+			Nonce:    nonce,
+			GasPrice: new(big.Int).Set(fee),
+			Gas:      100000,
+			Data:     initCode,
+		})
+		nonce++
+		b.AddTx(tx)
+		tx, _ = types.SignNewTx(key, signer, &types.LegacyTx{
+			Nonce:    nonce,
+			GasPrice: new(big.Int).Set(fee),
+			Gas:      100000,
+			To:       &destAddress,
+		})
+		b.AddTx(tx)
+		nonce++
+	})
+	// Import the canonical chain
+	chain, err := NewBlockChain(rawdb.NewMemoryDatabase(), DefaultCacheConfig, gspec, engine, vm.Config{
+		//Debug:  true,
+		//Tracer: logger.NewJSONLogger(nil, os.Stdout),
+	}, common.Hash{}, false)
+	if err != nil {
+		t.Fatalf("failed to create tester chain: %v", err)
+	}
+	// Import the blocks
+	for _, block := range blocks {
+		if _, err := chain.InsertChain([]*types.Block{block}); err != nil {
+			t.Fatalf("block %d: failed to insert into chain: %v", block.NumberU64(), err)
+		}
+	}
+}
+
+// TestTransientStorageReset ensures the transient storage is wiped correctly
+// between transactions.
+func TestTransientStorageReset(t *testing.T) {
+	var (
+		engine      = dummy.NewFaker()
+		key, _      = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
+		address     = crypto.PubkeyToAddress(key.PublicKey)
+		destAddress = crypto.CreateAddress(address, 0)
+		funds       = big.NewInt(params.Ether) // Note: additional funds are provided here compared to go-ethereum so test completes.
+		vmConfig    = vm.Config{
+			ExtraEips: []int{1153}, // Enable transient storage EIP
+		}
+	)
+	code := append([]byte{
+		// TLoad value with location 1
+		byte(vm.PUSH1), 0x1,
+		byte(vm.TLOAD),
+
+		// PUSH location
+		byte(vm.PUSH1), 0x1,
+
+		// SStore location:value
+		byte(vm.SSTORE),
+	}, make([]byte, 32-6)...)
+	initCode := []byte{
+		// TSTORE 1:1
+		byte(vm.PUSH1), 0x1,
+		byte(vm.PUSH1), 0x1,
+		byte(vm.TSTORE),
+
+		// Get the runtime-code on the stack
+		byte(vm.PUSH32)}
+	initCode = append(initCode, code...)
+	initCode = append(initCode, []byte{
+		byte(vm.PUSH1), 0x0, // offset
+		byte(vm.MSTORE),
+		byte(vm.PUSH1), 0x6, // size
+		byte(vm.PUSH1), 0x0, // offset
+		byte(vm.RETURN), // return 6 bytes of zero-code
+	}...)
+	gspec := &Genesis{
+		Config: params.TestChainConfig,
+		Alloc: GenesisAlloc{
+			address: {Balance: funds},
+		},
+	}
+	nonce := uint64(0)
+	signer := types.HomesteadSigner{}
+	_, blocks, _, _ := GenerateChainWithGenesis(gspec, engine, 1, 10, func(i int, b *BlockGen) {
+		fee := big.NewInt(1)
+		if b.header.BaseFee != nil {
+			fee = b.header.BaseFee
+		}
+		b.SetCoinbase(common.Address{1})
+		tx, _ := types.SignNewTx(key, signer, &types.LegacyTx{
+			Nonce:    nonce,
+			GasPrice: new(big.Int).Set(fee),
+			Gas:      100000,
+			Data:     initCode,
+		})
+		nonce++
+		b.AddTxWithVMConfig(tx, vmConfig)
+
+		tx, _ = types.SignNewTx(key, signer, &types.LegacyTx{
+			Nonce:    nonce,
+			GasPrice: new(big.Int).Set(fee),
+			Gas:      100000,
+			To:       &destAddress,
+		})
+		b.AddTxWithVMConfig(tx, vmConfig)
+		nonce++
+	})
+
+	// Initialize the blockchain with 1153 enabled.
+	chain, err := NewBlockChain(rawdb.NewMemoryDatabase(), DefaultCacheConfig, gspec, engine, vmConfig, common.Hash{}, false)
+	if err != nil {
+		t.Fatalf("failed to create tester chain: %v", err)
+	}
+	// Import the blocks
+	if _, err := chain.InsertChain(blocks); err != nil {
+		t.Fatalf("failed to insert into chain: %v", err)
+	}
+	// Check the storage
+	state, err := chain.StateAt(chain.CurrentHeader().Root)
+	if err != nil {
+		t.Fatalf("Failed to load state %v", err)
+	}
+	loc := common.BytesToHash([]byte{1})
+	slot := state.GetState(destAddress, loc)
+	if slot != (common.Hash{}) {
+		t.Fatalf("Unexpected dirty storage slot")
+	}
+}
+
+func TestEIP3651(t *testing.T) {
+	var (
+		aa     = common.HexToAddress("0x000000000000000000000000000000000000aaaa")
+		bb     = common.HexToAddress("0x000000000000000000000000000000000000bbbb")
+		engine = dummy.NewFaker()
+
+		// A sender who makes transactions, has some funds
+		key1, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
+		key2, _ = crypto.HexToECDSA("8a1f9a8f95be41cd7ccb6168179afb4504aefe388d1e14474d32c45c72ce7b7a")
+		addr1   = crypto.PubkeyToAddress(key1.PublicKey)
+		addr2   = crypto.PubkeyToAddress(key2.PublicKey)
+		funds   = new(big.Int).Mul(common.Big1, big.NewInt(params.Ether))
+		gspec   = &Genesis{
+			Config: params.TestChainConfig,
+			Alloc: GenesisAlloc{
+				addr1: {Balance: funds},
+				addr2: {Balance: funds},
+				// The address 0xAAAA sloads 0x00 and 0x01
+				aa: {
+					Code: []byte{
+						byte(vm.PC),
+						byte(vm.PC),
+						byte(vm.SLOAD),
+						byte(vm.SLOAD),
+					},
+					Nonce:   0,
+					Balance: big.NewInt(0),
+				},
+				// The address 0xBBBB calls 0xAAAA
+				bb: {
+					Code: []byte{
+						byte(vm.PUSH1), 0, // out size
+						byte(vm.DUP1),  // out offset
+						byte(vm.DUP1),  // out insize
+						byte(vm.DUP1),  // in offset
+						byte(vm.PUSH2), // address
+						byte(0xaa),
+						byte(0xaa),
+						byte(vm.GAS), // gas
+						byte(vm.DELEGATECALL),
+					},
+					Nonce:   0,
+					Balance: big.NewInt(0),
+				},
+			},
+		}
+	)
+
+	signer := types.LatestSigner(gspec.Config)
+
+	_, blocks, _, _ := GenerateChainWithGenesis(gspec, engine, 1, 10, func(i int, b *BlockGen) {
+		b.SetCoinbase(aa)
+		// One transaction to Coinbase
+		txdata := &types.DynamicFeeTx{
+			ChainID:    gspec.Config.ChainID,
+			Nonce:      0,
+			To:         &bb,
+			Gas:        500000,
+			GasFeeCap:  newGwei(225),
+			GasTipCap:  big.NewInt(2),
+			AccessList: nil,
+			Data:       []byte{},
+		}
+		tx := types.NewTx(txdata)
+		tx, _ = types.SignTx(tx, signer, key1)
+
+		b.AddTx(tx)
+	})
+	chain, err := NewBlockChain(rawdb.NewMemoryDatabase(), DefaultCacheConfig, gspec, engine, vm.Config{Tracer: logger.NewMarkdownLogger(&logger.Config{}, os.Stderr)}, common.Hash{}, false)
+	if err != nil {
+		t.Fatalf("failed to create tester chain: %v", err)
+	}
+	if n, err := chain.InsertChain(blocks); err != nil {
+		t.Fatalf("block %d: failed to insert into chain: %v", n, err)
+	}
+
+	block := chain.GetBlockByNumber(1)
+
+	// 1+2: Ensure EIP-1559 access lists are accounted for via gas usage.
+	innerGas := vm.GasQuickStep*2 + params.ColdSloadCostEIP2929*2
+	expectedGas := params.TxGas + 5*vm.GasFastestStep + vm.GasQuickStep + 100 + innerGas // 100 because 0xaaaa is in access list
+	if block.GasUsed() != expectedGas {
+		t.Fatalf("incorrect amount of gas spent: expected %d, got %d", expectedGas, block.GasUsed())
+	}
+
+	state, _ := chain.State()
+
+	// 3: Ensure that miner received the gasUsed * (block baseFee + effectiveGasTip).
+	// Note this differs from go-ethereum where the miner receives the gasUsed * block baseFee,
+	// as our handling of the coinbase payment is different.
+	// Note we use block.GasUsed() here as there is only one tx.
+	actual := state.GetBalance(block.Coinbase())
+	tx := block.Transactions()[0]
+	gasPrice := new(big.Int).Add(block.BaseFee(), tx.EffectiveGasTipValue(block.BaseFee()))
+	expected := new(big.Int).SetUint64(block.GasUsed() * gasPrice.Uint64())
+	if actual.Cmp(expected) != 0 {
+		t.Fatalf("miner balance incorrect: expected %d, got %d", expected, actual)
+	}
+
+	// 4: Ensure the tx sender paid for the gasUsed * (block baseFee + effectiveGasTip).
+	// Note this differs from go-ethereum where the miner receives the gasUsed * block baseFee,
+	// as our handling of the coinbase payment is different.
+	actual = new(big.Int).Sub(funds, state.GetBalance(addr1))
+	if actual.Cmp(expected) != 0 {
+		t.Fatalf("sender balance incorrect: expected %d, got %d", expected, actual)
 	}
 }

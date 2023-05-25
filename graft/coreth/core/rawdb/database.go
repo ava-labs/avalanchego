@@ -183,16 +183,6 @@ func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
 			bloomBits.Add(size)
 		case bytes.HasPrefix(key, BloomBitsIndexPrefix):
 			bloomBits.Add(size)
-		case bytes.HasPrefix(key, []byte("clique-")) && len(key) == 7+common.HashLength:
-			cliqueSnaps.Add(size)
-		case bytes.HasPrefix(key, []byte("cht-")) ||
-			bytes.HasPrefix(key, []byte("chtIndexV2-")) ||
-			bytes.HasPrefix(key, []byte("chtRootV2-")): // Canonical hash trie
-			chtTrieNodes.Add(size)
-		case bytes.HasPrefix(key, []byte("blt-")) ||
-			bytes.HasPrefix(key, []byte("bltIndex-")) ||
-			bytes.HasPrefix(key, []byte("bltRoot-")): // Bloomtrie sub
-			bloomTrieNodes.Add(size)
 		case bytes.HasPrefix(key, syncStorageTriesPrefix) && len(key) == syncStorageTriesKeyLength:
 			syncProgress.Add(size)
 		case bytes.HasPrefix(key, syncSegmentsPrefix) && len(key) == syncSegmentsKeyLength:
@@ -256,7 +246,6 @@ func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
 	if unaccounted.size > 0 {
 		log.Error("Database contains unaccounted data", "size", unaccounted.size, "count", unaccounted.count)
 	}
-
 	return nil
 }
 

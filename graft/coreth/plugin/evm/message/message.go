@@ -9,8 +9,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 
-	"github.com/ethereum/go-ethereum/common"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/units"
 )
@@ -20,7 +18,7 @@ const (
 	// any [EthTxsGossip] or [AtomicTxGossip] message. We do not limit inbound messages to
 	// this size, however. Max inbound message size is enforced by the codec
 	// (512KB).
-	EthMsgSoftCapSize = common.StorageSize(64 * units.KiB)
+	EthMsgSoftCapSize = 64 * units.KiB
 )
 
 var (

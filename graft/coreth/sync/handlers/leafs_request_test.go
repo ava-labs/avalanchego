@@ -71,6 +71,12 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 	}
 	snapshotProvider := &TestSnapshotProvider{}
 	leafsHandler := NewLeafsRequestHandler(trieDB, snapshotProvider, message.Codec, mockHandlerStats)
+	snapConfig := snapshot.Config{
+		CacheSize:  64,
+		AsyncBuild: false,
+		NoBuild:    false,
+		SkipVerify: true,
+	}
 
 	tests := map[string]struct {
 		prepareTestFn    func() (context.Context, message.LeafsRequest)
@@ -441,7 +447,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 		},
 		"account data served from snapshot": {
 			prepareTestFn: func() (context.Context, message.LeafsRequest) {
-				snap, err := snapshot.New(memdb, trieDB, 64, common.Hash{}, accountTrieRoot, false, true, false)
+				snap, err := snapshot.New(snapConfig, memdb, trieDB, common.Hash{}, accountTrieRoot)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -468,7 +474,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 		},
 		"partial account data served from snapshot": {
 			prepareTestFn: func() (context.Context, message.LeafsRequest) {
-				snap, err := snapshot.New(memdb, trieDB, 64, common.Hash{}, accountTrieRoot, false, true, false)
+				snap, err := snapshot.New(snapConfig, memdb, trieDB, common.Hash{}, accountTrieRoot)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -524,7 +530,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 		},
 		"storage data served from snapshot": {
 			prepareTestFn: func() (context.Context, message.LeafsRequest) {
-				snap, err := snapshot.New(memdb, trieDB, 64, common.Hash{}, accountTrieRoot, false, true, false)
+				snap, err := snapshot.New(snapConfig, memdb, trieDB, common.Hash{}, accountTrieRoot)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -552,7 +558,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 		},
 		"partial storage data served from snapshot": {
 			prepareTestFn: func() (context.Context, message.LeafsRequest) {
-				snap, err := snapshot.New(memdb, trieDB, 64, common.Hash{}, accountTrieRoot, false, true, false)
+				snap, err := snapshot.New(snapConfig, memdb, trieDB, common.Hash{}, accountTrieRoot)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -603,7 +609,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 		},
 		"last snapshot key removed": {
 			prepareTestFn: func() (context.Context, message.LeafsRequest) {
-				snap, err := snapshot.New(memdb, trieDB, 64, common.Hash{}, accountTrieRoot, false, true, false)
+				snap, err := snapshot.New(snapConfig, memdb, trieDB, common.Hash{}, accountTrieRoot)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -639,7 +645,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 		},
 		"request last key when removed from snapshot": {
 			prepareTestFn: func() (context.Context, message.LeafsRequest) {
-				snap, err := snapshot.New(memdb, trieDB, 64, common.Hash{}, accountTrieRoot, false, true, false)
+				snap, err := snapshot.New(snapConfig, memdb, trieDB, common.Hash{}, accountTrieRoot)
 				if err != nil {
 					t.Fatal(err)
 				}

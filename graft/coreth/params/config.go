@@ -207,8 +207,8 @@ type AvalancheContext struct {
 	BlockchainID common.Hash
 }
 
-// String implements the fmt.Stringer interface.
-func (c *ChainConfig) String() string {
+// Description returns a human-readable description of ChainConfig.
+func (c *ChainConfig) Description() string {
 	var banner string
 
 	banner += fmt.Sprintf("Chain ID:  %v\n", c.ChainID)

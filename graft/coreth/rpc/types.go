@@ -78,7 +78,7 @@ const (
 )
 
 // UnmarshalJSON parses the given JSON fragment into a BlockNumber. It supports:
-// - "accepted", "finalized", "latest", "earliest" or "pending" as string arguments
+// - "accepted", "safe", "finalized", "latest", "earliest" or "pending" as string arguments
 // - the block number
 // Returned errors:
 // - an invalid block number error when the given argument isn't a known strings

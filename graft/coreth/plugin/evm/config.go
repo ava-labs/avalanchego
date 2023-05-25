@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/coreth/core"
+	"github.com/ava-labs/coreth/core/txpool"
 	"github.com/ava-labs/coreth/eth"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/spf13/cast"
@@ -23,7 +23,7 @@ const (
 	defaultTrieDirtyCommitTarget                      = 20
 	defaultSnapshotCache                              = 256
 	defaultSyncableCommitInterval                     = defaultCommitInterval * 4
-	defaultSnapshotAsync                              = true
+	defaultSnapshotWait                               = false
 	defaultRpcGasCap                                  = 50_000_000 // Default to 50M Gas Limit
 	defaultRpcTxFeeCap                                = 100        // 100 AVAX
 	defaultMetricsExpensiveEnabled                    = true
@@ -104,7 +104,7 @@ type Config struct {
 
 	// Eth Settings
 	Preimages      bool `json:"preimages-enabled"`
-	SnapshotAsync  bool `json:"snapshot-async"`
+	SnapshotWait   bool `json:"snapshot-wait"`
 	SnapshotVerify bool `json:"snapshot-verification-enabled"`
 
 	// Pruning Settings
@@ -208,14 +208,14 @@ func (c *Config) SetDefaults() {
 	c.RPCTxFeeCap = defaultRpcTxFeeCap
 	c.MetricsExpensiveEnabled = defaultMetricsExpensiveEnabled
 
-	c.TxPoolJournal = core.DefaultTxPoolConfig.Journal
-	c.TxPoolRejournal = Duration{core.DefaultTxPoolConfig.Rejournal}
-	c.TxPoolPriceLimit = core.DefaultTxPoolConfig.PriceLimit
-	c.TxPoolPriceBump = core.DefaultTxPoolConfig.PriceBump
-	c.TxPoolAccountSlots = core.DefaultTxPoolConfig.AccountSlots
-	c.TxPoolGlobalSlots = core.DefaultTxPoolConfig.GlobalSlots
-	c.TxPoolAccountQueue = core.DefaultTxPoolConfig.AccountQueue
-	c.TxPoolGlobalQueue = core.DefaultTxPoolConfig.GlobalQueue
+	c.TxPoolJournal = txpool.DefaultConfig.Journal
+	c.TxPoolRejournal = Duration{txpool.DefaultConfig.Rejournal}
+	c.TxPoolPriceLimit = txpool.DefaultConfig.PriceLimit
+	c.TxPoolPriceBump = txpool.DefaultConfig.PriceBump
+	c.TxPoolAccountSlots = txpool.DefaultConfig.AccountSlots
+	c.TxPoolGlobalSlots = txpool.DefaultConfig.GlobalSlots
+	c.TxPoolAccountQueue = txpool.DefaultConfig.AccountQueue
+	c.TxPoolGlobalQueue = txpool.DefaultConfig.GlobalQueue
 
 	c.APIMaxDuration.Duration = defaultApiMaxDuration
 	c.WSCPURefillRate.Duration = defaultWsCpuRefillRate
@@ -229,7 +229,7 @@ func (c *Config) SetDefaults() {
 	c.TrieDirtyCommitTarget = defaultTrieDirtyCommitTarget
 	c.SnapshotCache = defaultSnapshotCache
 	c.AcceptorQueueLimit = defaultAcceptorQueueLimit
-	c.SnapshotAsync = defaultSnapshotAsync
+	c.SnapshotWait = defaultSnapshotWait
 	c.TxRegossipFrequency.Duration = defaultTxRegossipFrequency
 	c.TxRegossipMaxSize = defaultTxRegossipMaxSize
 	c.OfflinePruningBloomFilterSize = defaultOfflinePruningBloomFilterSize

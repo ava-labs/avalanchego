@@ -129,10 +129,13 @@ func Execute(code, input []byte, cfg *Config) ([]byte, *state.StateDB, error) {
 		address = common.BytesToAddress([]byte("contract"))
 		vmenv   = NewEnv(cfg)
 		sender  = vm.AccountRef(cfg.Origin)
+		rules   = cfg.ChainConfig.AvalancheRules(vmenv.Context.BlockNumber, vmenv.Context.Time)
 	)
-	if rules := cfg.ChainConfig.AvalancheRules(vmenv.Context.BlockNumber, vmenv.Context.Time); rules.IsApricotPhase2 {
-		cfg.State.PrepareAccessList(cfg.Origin, &address, vm.ActivePrecompiles(rules), nil)
-	}
+	// Execute the preparatory steps for state transition which includes:
+	// - prepare accessList(post-berlin/ApricotPhase2)
+	// - reset transient storage(eip 1153)
+	cfg.State.Prepare(rules, cfg.Origin, cfg.Coinbase, &address, vm.ActivePrecompiles(rules), nil)
+
 	cfg.State.CreateAccount(address)
 	// set the receiver's (the executing contract) code for execution.
 	cfg.State.SetCode(address, code)
@@ -144,7 +147,6 @@ func Execute(code, input []byte, cfg *Config) ([]byte, *state.StateDB, error) {
 		cfg.GasLimit,
 		cfg.Value,
 	)
-
 	return ret, cfg.State, err
 }
 
@@ -161,10 +163,13 @@ func Create(input []byte, cfg *Config) ([]byte, common.Address, uint64, error) {
 	var (
 		vmenv  = NewEnv(cfg)
 		sender = vm.AccountRef(cfg.Origin)
+		rules  = cfg.ChainConfig.AvalancheRules(vmenv.Context.BlockNumber, vmenv.Context.Time)
 	)
-	if rules := cfg.ChainConfig.AvalancheRules(vmenv.Context.BlockNumber, vmenv.Context.Time); rules.IsApricotPhase2 {
-		cfg.State.PrepareAccessList(cfg.Origin, nil, vm.ActivePrecompiles(rules), nil)
-	}
+	// Execute the preparatory steps for state transition which includes:
+	// - prepare accessList(post-berlin/ApricotPhase2)
+	// - reset transient storage(eip 1153)
+	cfg.State.Prepare(rules, cfg.Origin, cfg.Coinbase, nil, vm.ActivePrecompiles(rules), nil)
+
 	// Call the code with the given configuration.
 	code, address, leftOverGas, err := vmenv.Create(
 		sender,
@@ -183,14 +188,17 @@ func Create(input []byte, cfg *Config) ([]byte, common.Address, uint64, error) {
 func Call(address common.Address, input []byte, cfg *Config) ([]byte, uint64, error) {
 	setDefaults(cfg)
 
-	vmenv := NewEnv(cfg)
+	var (
+		vmenv   = NewEnv(cfg)
+		sender  = cfg.State.GetOrNewStateObject(cfg.Origin)
+		statedb = cfg.State
+		rules   = cfg.ChainConfig.AvalancheRules(vmenv.Context.BlockNumber, vmenv.Context.Time)
+	)
+	// Execute the preparatory steps for state transition which includes:
+	// - prepare accessList(post-berlin/ApricotPhase2)
+	// - reset transient storage(eip 1153)
+	statedb.Prepare(rules, cfg.Origin, cfg.Coinbase, &address, vm.ActivePrecompiles(rules), nil)
 
-	sender := cfg.State.GetOrNewStateObject(cfg.Origin)
-	statedb := cfg.State
-
-	if rules := cfg.ChainConfig.AvalancheRules(vmenv.Context.BlockNumber, vmenv.Context.Time); rules.IsApricotPhase2 {
-		statedb.PrepareAccessList(cfg.Origin, &address, vm.ActivePrecompiles(rules), nil)
-	}
 	// Call the code with the given configuration.
 	ret, leftOverGas, err := vmenv.Call(
 		sender,
