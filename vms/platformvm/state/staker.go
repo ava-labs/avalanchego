@@ -171,6 +171,10 @@ func ShiftStakerAheadInPlace(s *Staker) {
 	s.NextTime = s.NextTime.Add(s.StakingPeriod)
 }
 
+func (s *Staker) ShouldRestake() bool {
+	return s.NextTime.Before(s.EndTime)
+}
+
 func (s *Staker) EarliestStopTime() time.Time {
 	candidateStopTime := s.NextTime
 	if s.Priority.IsValidator() && s.SubnetID == constants.PrimaryNetworkID {

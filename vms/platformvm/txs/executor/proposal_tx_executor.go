@@ -366,15 +366,13 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 	switch uStakerTx := stakerTx.Unsigned.(type) {
 	case txs.ValidatorTx:
 		var (
-			shouldRestake = stakerToRemove.NextTime.Before(stakerToRemove.EndTime)
-
 			stake   = uStakerTx.Stake()
 			outputs = uStakerTx.Outputs()
 			// Invariant: The staked asset must be equal to the reward asset.
 			stakeAsset = stake[0].Asset
 		)
 
-		if shouldRestake {
+		if stakerToRemove.ShouldRestake() {
 			shiftedStaker := *stakerToRemove
 			state.ShiftStakerAheadInPlace(&shiftedStaker)
 			if err := e.OnCommitState.UpdateCurrentValidator(&shiftedStaker); err != nil {
@@ -488,15 +486,13 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		//            [txs.ValidatorTx] interface.
 	case txs.DelegatorTx:
 		var (
-			shouldRestake = stakerToRemove.NextTime.Before(stakerToRemove.EndTime)
-
 			stake   = uStakerTx.Stake()
 			outputs = uStakerTx.Outputs()
 			// Invariant: The staked asset must be equal to the reward asset.
 			stakeAsset = stake[0].Asset
 		)
 
-		if shouldRestake {
+		if stakerToRemove.ShouldRestake() {
 			shiftedStaker := *stakerToRemove
 			state.ShiftStakerAheadInPlace(&shiftedStaker)
 			if err := e.OnCommitState.UpdateCurrentDelegator(&shiftedStaker); err != nil {
