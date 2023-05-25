@@ -892,7 +892,7 @@ func Test_Sync_Error_During_Sync(t *testing.T) {
 		},
 	).AnyTimes()
 	client.EXPECT().GetChangeProof(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
-		func(ctx context.Context, request *syncpb.ChangeProofRequest, _ *merkledb.MerkleDB) (*merkledb.ChangeProof, error) {
+		func(ctx context.Context, request *syncpb.ChangeProofRequest, _ merkledb.MerkleDB) (*merkledb.ChangeProof, error) {
 			startRoot, err := ids.ToID(request.StartRootHash)
 			require.NoError(err)
 			endRoot, err := ids.ToID(request.EndRootHash)
