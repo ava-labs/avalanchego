@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -24,7 +23,6 @@ import (
 )
 
 const (
-	validatorSetsCacheSize        = 64
 	maxRecentlyAcceptedWindowSize = 256
 	recentlyAcceptedWindowTTL     = 5 * time.Minute
 )
@@ -56,7 +54,6 @@ func NewManager(
 		state:   state,
 		metrics: metrics,
 		clk:     clk,
-		caches:  make(map[ids.ID]cache.Cacher[uint64, map[ids.NodeID]*validators.GetValidatorOutput]),
 		recentlyAccepted: window.New[ids.ID](
 			window.Config{
 				Clock:   clk,
@@ -73,10 +70,7 @@ type manager struct {
 	metrics metrics.Metrics
 	clk     *mockable.Clock
 
-	// Maps caches for each subnet that is currently tracked.
-	// Key: Subnet ID
-	// Value: cache mapping height -> validator set map
-	caches map[ids.ID]cache.Cacher[uint64, map[ids.NodeID]*validators.GetValidatorOutput]
+	// dropped caches to simulate worst case scenario when serving validators set
 
 	// sliding window of blocks that were recently accepted
 	recentlyAccepted window.Window[ids.ID]
@@ -132,20 +126,6 @@ func (m *manager) GetCurrentHeight(context.Context) (uint64, error) {
 }
 
 func (m *manager) GetValidatorSet(ctx context.Context, height uint64, subnetID ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-	validatorSetsCache, exists := m.caches[subnetID]
-	if !exists {
-		validatorSetsCache = &cache.LRU[uint64, map[ids.NodeID]*validators.GetValidatorOutput]{Size: validatorSetsCacheSize}
-		// Only cache tracked subnets
-		if subnetID == constants.PrimaryNetworkID || m.cfg.TrackedSubnets.Contains(subnetID) {
-			m.caches[subnetID] = validatorSetsCache
-		}
-	}
-
-	if validatorSet, ok := validatorSetsCache.Get(height); ok {
-		m.metrics.IncValidatorSetsCached()
-		return validatorSet, nil
-	}
-
 	lastAcceptedHeight, err := m.GetCurrentHeight(ctx)
 	if err != nil {
 		return nil, err
@@ -191,9 +171,6 @@ func (m *manager) GetValidatorSet(ctx context.Context, height uint64, subnetID i
 			return nil, err
 		}
 	}
-
-	// cache the validator set
-	validatorSetsCache.Put(height, vdrSet)
 
 	endTime := m.clk.Time()
 	m.metrics.IncValidatorSetsCreated()
