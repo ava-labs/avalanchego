@@ -96,12 +96,12 @@ func (c *client) GetChangeProof(ctx context.Context, req *syncpb.ChangeProofRequ
 			return nil, fmt.Errorf("%w: (%d) > %d)", errTooManyKeys, len(changeProof.KeyChanges), req.KeyLimit)
 		}
 
-		endRoot, err := ids.ToID(req.EndRoot)
+		endRoot, err := ids.ToID(req.EndRootHash)
 		if err != nil {
 			return nil, err
 		}
 
-		if err := db.VerifyChangeProof(ctx, changeProof, req.Start, req.End, endRoot); err != nil {
+		if err := db.VerifyChangeProof(ctx, changeProof, req.StartKey, req.EndKey, endRoot); err != nil {
 			return nil, fmt.Errorf("%s due to %w", errInvalidRangeProof, err)
 		}
 		return changeProof, nil
@@ -137,15 +137,15 @@ func (c *client) GetRangeProof(ctx context.Context, req *syncpb.RangeProofReques
 			return nil, fmt.Errorf("%w: (%d) > %d)", errTooManyKeys, len(rangeProof.KeyValues), req.KeyLimit)
 		}
 
-		root, err := ids.ToID(req.Root)
+		root, err := ids.ToID(req.RootHash)
 		if err != nil {
 			return nil, err
 		}
 
 		if err := rangeProof.Verify(
 			ctx,
-			req.Start,
-			req.End,
+			req.StartKey,
+			req.EndKey,
 			root,
 		); err != nil {
 			return nil, fmt.Errorf("%s due to %w", errInvalidRangeProof, err)
