@@ -65,9 +65,12 @@ type Config struct {
 	Tracer trace.Tracer
 }
 
-type MerkleDB interface {
-	database.Database
-	Trie
+type SyncableDB interface {
+	// GetMerkleRoot returns the merkle root of the Trie
+	GetMerkleRoot(ctx context.Context) (ids.ID, error)
+
+	// GetProof generates a proof of the value associated with a particular key, or a proof of its absence from the trie
+	GetProof(ctx context.Context, bytesPath []byte) (*Proof, error)
 
 	// GetChangeProof returns a proof for a subset of the key/value changes in key range
 	// [start, end] that occurred between [startRootID] and [endRootID].
@@ -119,6 +122,12 @@ type MerkleDB interface {
 	// CommitRangeProof commits the key/value pairs within the [proof] to the db.
 	// [start] is the smallest key in the range this [proof] covers.
 	CommitRangeProof(ctx context.Context, start []byte, proof *RangeProof) error
+}
+
+type MerkleDB interface {
+	database.Database
+	Trie
+	SyncableDB
 }
 
 // merkleDB can only be edited by committing changes from a trieView.
