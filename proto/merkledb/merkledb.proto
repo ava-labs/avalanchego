@@ -18,6 +18,7 @@ service MerkleDBService {
   rpc VerifyProof(Proof) returns (ErrorResponse);
 
   rpc GetRangeProof(RangeProofRequest) returns (RangeProof);
+  rpc VerifyRangeProof(RangeProof) returns (ErrorResponse);
   rpc CommitRangeProof(CommitRangeProofRequest) returns (ErrorResponse);
 }
 

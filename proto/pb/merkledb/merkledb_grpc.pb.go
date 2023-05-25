@@ -28,7 +28,9 @@ type MerkleDBServiceClient interface {
 	VerifyChangeProof(ctx context.Context, in *ChangeProof, opts ...grpc.CallOption) (*ErrorResponse, error)
 	CommitChangeProof(ctx context.Context, in *ChangeProof, opts ...grpc.CallOption) (*ErrorResponse, error)
 	GetProof(ctx context.Context, in *GetProofRequest, opts ...grpc.CallOption) (*Proof, error)
+	VerifyProof(ctx context.Context, in *Proof, opts ...grpc.CallOption) (*ErrorResponse, error)
 	GetRangeProof(ctx context.Context, in *RangeProofRequest, opts ...grpc.CallOption) (*RangeProof, error)
+	VerifyRangeProof(ctx context.Context, in *RangeProof, opts ...grpc.CallOption) (*ErrorResponse, error)
 	CommitRangeProof(ctx context.Context, in *CommitRangeProofRequest, opts ...grpc.CallOption) (*ErrorResponse, error)
 }
 
@@ -85,9 +87,27 @@ func (c *merkleDBServiceClient) GetProof(ctx context.Context, in *GetProofReques
 	return out, nil
 }
 
+func (c *merkleDBServiceClient) VerifyProof(ctx context.Context, in *Proof, opts ...grpc.CallOption) (*ErrorResponse, error) {
+	out := new(ErrorResponse)
+	err := c.cc.Invoke(ctx, "/merkledb.MerkleDBService/VerifyProof", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *merkleDBServiceClient) GetRangeProof(ctx context.Context, in *RangeProofRequest, opts ...grpc.CallOption) (*RangeProof, error) {
 	out := new(RangeProof)
 	err := c.cc.Invoke(ctx, "/merkledb.MerkleDBService/GetRangeProof", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *merkleDBServiceClient) VerifyRangeProof(ctx context.Context, in *RangeProof, opts ...grpc.CallOption) (*ErrorResponse, error) {
+	out := new(ErrorResponse)
+	err := c.cc.Invoke(ctx, "/merkledb.MerkleDBService/VerifyRangeProof", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +132,9 @@ type MerkleDBServiceServer interface {
 	VerifyChangeProof(context.Context, *ChangeProof) (*ErrorResponse, error)
 	CommitChangeProof(context.Context, *ChangeProof) (*ErrorResponse, error)
 	GetProof(context.Context, *GetProofRequest) (*Proof, error)
+	VerifyProof(context.Context, *Proof) (*ErrorResponse, error)
 	GetRangeProof(context.Context, *RangeProofRequest) (*RangeProof, error)
+	VerifyRangeProof(context.Context, *RangeProof) (*ErrorResponse, error)
 	CommitRangeProof(context.Context, *CommitRangeProofRequest) (*ErrorResponse, error)
 	mustEmbedUnimplementedMerkleDBServiceServer()
 }
@@ -136,8 +158,14 @@ func (UnimplementedMerkleDBServiceServer) CommitChangeProof(context.Context, *Ch
 func (UnimplementedMerkleDBServiceServer) GetProof(context.Context, *GetProofRequest) (*Proof, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetProof not implemented")
 }
+func (UnimplementedMerkleDBServiceServer) VerifyProof(context.Context, *Proof) (*ErrorResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method VerifyProof not implemented")
+}
 func (UnimplementedMerkleDBServiceServer) GetRangeProof(context.Context, *RangeProofRequest) (*RangeProof, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetRangeProof not implemented")
+}
+func (UnimplementedMerkleDBServiceServer) VerifyRangeProof(context.Context, *RangeProof) (*ErrorResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method VerifyRangeProof not implemented")
 }
 func (UnimplementedMerkleDBServiceServer) CommitRangeProof(context.Context, *CommitRangeProofRequest) (*ErrorResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CommitRangeProof not implemented")
@@ -245,6 +273,24 @@ func _MerkleDBService_GetProof_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _MerkleDBService_VerifyProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Proof)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MerkleDBServiceServer).VerifyProof(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/merkledb.MerkleDBService/VerifyProof",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MerkleDBServiceServer).VerifyProof(ctx, req.(*Proof))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _MerkleDBService_GetRangeProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(RangeProofRequest)
 	if err := dec(in); err != nil {
@@ -259,6 +305,24 @@ func _MerkleDBService_GetRangeProof_Handler(srv interface{}, ctx context.Context
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(MerkleDBServiceServer).GetRangeProof(ctx, req.(*RangeProofRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MerkleDBService_VerifyRangeProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RangeProof)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MerkleDBServiceServer).VerifyRangeProof(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/merkledb.MerkleDBService/VerifyRangeProof",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MerkleDBServiceServer).VerifyRangeProof(ctx, req.(*RangeProof))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -309,8 +373,16 @@ var MerkleDBService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _MerkleDBService_GetProof_Handler,
 		},
 		{
+			MethodName: "VerifyProof",
+			Handler:    _MerkleDBService_VerifyProof_Handler,
+		},
+		{
 			MethodName: "GetRangeProof",
 			Handler:    _MerkleDBService_GetRangeProof_Handler,
+		},
+		{
+			MethodName: "VerifyRangeProof",
+			Handler:    _MerkleDBService_VerifyRangeProof_Handler,
 		},
 		{
 			MethodName: "CommitRangeProof",
