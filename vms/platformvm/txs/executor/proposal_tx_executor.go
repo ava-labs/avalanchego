@@ -569,7 +569,7 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		// can be cumulated, each related to a different staking period. We make
 		// sure to index the reward UTXOs correctly by appending them to previous ones.
 		utxosOffset := len(outputs) + len(stake)
-		currentRewardUTXOs, err := e.OnCommitState.GetRewardUTXOs(tx.TxID)
+		currentRewardUTXOs, err := e.OnCommitState.GetRewardUTXOs(stakerToRemove.TxID)
 		if err != nil {
 			return fmt.Errorf("failed to create output: %w", err)
 		}

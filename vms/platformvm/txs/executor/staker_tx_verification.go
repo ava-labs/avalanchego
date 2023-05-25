@@ -485,21 +485,6 @@ func verifyAddPermissionlessValidatorTx(
 		return err
 	}
 
-	var (
-		primaryNetworkValidator *state.Staker
-		err                     error
-	)
-	if tx.Subnet != constants.PlatformChainID {
-		primaryNetworkValidator, err = GetValidator(chainState, constants.PrimaryNetworkID, tx.Validator.NodeID)
-		if err != nil {
-			return fmt.Errorf(
-				"failed to fetch the primary network validator for %s: %w",
-				tx.Validator.NodeID,
-				err,
-			)
-		}
-	}
-
 	if !backend.Bootstrapped.Get() {
 		return nil
 	}
@@ -583,6 +568,15 @@ func verifyAddPermissionlessValidatorTx(
 
 	var txFee uint64
 	if tx.Subnet != constants.PrimaryNetworkID {
+		primaryNetworkValidator, err := GetValidator(chainState, constants.PrimaryNetworkID, tx.Validator.NodeID)
+		if err != nil {
+			return fmt.Errorf(
+				"failed to fetch the primary network validator for %s: %w",
+				tx.Validator.NodeID,
+				err,
+			)
+		}
+
 		// Ensure that the period this validator validates the specified subnet
 		// is a subset of the time they validate the primary network.
 		stakerStart := currentTimestamp

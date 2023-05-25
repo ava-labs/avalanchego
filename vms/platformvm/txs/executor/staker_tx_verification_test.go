@@ -132,11 +132,6 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			},
 			stateF: func(ctrl *gomock.Controller) state.Chain {
 				s := state.NewMockChain(ctrl)
-				primaryValidatorMock := &state.Staker{
-					SubnetID: constants.PrimaryNetworkID,
-					EndTime:  mockable.MaxTime,
-				}
-				s.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, gomock.Any()).Return(primaryValidatorMock, nil)
 				return s
 			},
 			sTxF: func() *txs.Tx {
@@ -189,11 +184,6 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			},
 			stateF: func(ctrl *gomock.Controller) state.Chain {
 				s := state.NewMockChain(ctrl)
-				primaryValidatorMock := &state.Staker{
-					SubnetID: constants.PrimaryNetworkID,
-					EndTime:  mockable.MaxTime,
-				}
-				s.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, gomock.Any()).Return(primaryValidatorMock, nil)
 				s.EXPECT().GetTimestamp().Return(time.Unix(0, 0))
 				s.EXPECT().GetSubnetTransformation(subnetID).Return(&transformTx, nil)
 				return s
@@ -223,11 +213,6 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			},
 			stateF: func(ctrl *gomock.Controller) state.Chain {
 				s := state.NewMockChain(ctrl)
-				primaryValidatorMock := &state.Staker{
-					SubnetID: constants.PrimaryNetworkID,
-					EndTime:  mockable.MaxTime,
-				}
-				s.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, gomock.Any()).Return(primaryValidatorMock, nil)
 				s.EXPECT().GetTimestamp().Return(time.Unix(0, 0))
 				s.EXPECT().GetSubnetTransformation(subnetID).Return(&transformTx, nil)
 				return s
@@ -257,11 +242,6 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			},
 			stateF: func(ctrl *gomock.Controller) state.Chain {
 				s := state.NewMockChain(ctrl)
-				primaryValidatorMock := &state.Staker{
-					SubnetID: constants.PrimaryNetworkID,
-					EndTime:  mockable.MaxTime,
-				}
-				s.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, gomock.Any()).Return(primaryValidatorMock, nil)
 				s.EXPECT().GetTimestamp().Return(time.Unix(0, 0))
 				s.EXPECT().GetSubnetTransformation(subnetID).Return(&transformTx, nil)
 				return s
@@ -292,11 +272,6 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			},
 			stateF: func(ctrl *gomock.Controller) state.Chain {
 				s := state.NewMockChain(ctrl)
-				primaryValidatorMock := &state.Staker{
-					SubnetID: constants.PrimaryNetworkID,
-					EndTime:  mockable.MaxTime,
-				}
-				s.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, gomock.Any()).Return(primaryValidatorMock, nil)
 				s.EXPECT().GetTimestamp().Return(time.Unix(0, 0))
 				s.EXPECT().GetSubnetTransformation(subnetID).Return(&transformTx, nil)
 				return s
@@ -330,11 +305,6 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			},
 			stateF: func(ctrl *gomock.Controller) state.Chain {
 				s := state.NewMockChain(ctrl)
-				primaryValidatorMock := &state.Staker{
-					SubnetID: constants.PrimaryNetworkID,
-					EndTime:  mockable.MaxTime,
-				}
-				s.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, gomock.Any()).Return(primaryValidatorMock, nil)
 				s.EXPECT().GetTimestamp().Return(time.Unix(0, 0))
 				s.EXPECT().GetSubnetTransformation(subnetID).Return(&transformTx, nil)
 				return s
@@ -368,11 +338,6 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			},
 			stateF: func(ctrl *gomock.Controller) state.Chain {
 				s := state.NewMockChain(ctrl)
-				primaryValidatorMock := &state.Staker{
-					SubnetID: constants.PrimaryNetworkID,
-					EndTime:  mockable.MaxTime,
-				}
-				s.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, gomock.Any()).Return(primaryValidatorMock, nil)
 				s.EXPECT().GetTimestamp().Return(time.Unix(0, 0))
 				s.EXPECT().GetSubnetTransformation(subnetID).Return(&transformTx, nil)
 				return s
@@ -408,11 +373,6 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			},
 			stateF: func(ctrl *gomock.Controller) state.Chain {
 				s := state.NewMockChain(ctrl)
-				primaryValidatorMock := &state.Staker{
-					SubnetID: constants.PrimaryNetworkID,
-					EndTime:  mockable.MaxTime,
-				}
-				s.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, gomock.Any()).Return(primaryValidatorMock, nil)
 				s.EXPECT().GetTimestamp().Return(time.Unix(0, 0))
 				s.EXPECT().GetSubnetTransformation(subnetID).Return(&transformTx, nil)
 				// State says validator exists

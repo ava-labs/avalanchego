@@ -168,6 +168,8 @@ func TestContinuousStakingForkRewardValidatorTxExecuteOnCommit(t *testing.T) {
 func TestContinuousStakingForkRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(continuousStakingFork)
+	env.clk.Set(defaultValidateStartTime.Add(time.Second))
+	env.state.SetTimestamp(defaultValidateStartTime.Add(time.Second))
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
@@ -304,6 +306,8 @@ func TestContinuousStakingForkRewardValidatorTxExecuteOnAbort(t *testing.T) {
 func TestContinuousStakingForkRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(continuousStakingFork)
+	env.clk.Set(defaultValidateStartTime.Add(time.Second))
+	env.state.SetTimestamp(defaultValidateStartTime.Add(time.Second))
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
