@@ -41,6 +41,7 @@ var (
 	ErrNilProofNode                = errors.New("proof node is nil")
 	ErrNilValueOrHash              = errors.New("proof node's valueOrHash field is nil")
 	ErrNilSerializedPath           = errors.New("serialized path is nil")
+	ErrNilRangeProof               = errors.New("range proof is nil")
 )
 
 type ProofNode struct {
@@ -345,6 +346,10 @@ func (proof *RangeProof) ToProto() *syncpb.RangeProof {
 }
 
 func (proof *RangeProof) UnmarshalProto(pbProof *syncpb.RangeProof) error {
+	if pbProof == nil {
+		return ErrNilRangeProof
+	}
+
 	proof.StartProof = make([]ProofNode, len(pbProof.Start))
 	for i, protoNode := range pbProof.Start {
 		if err := proof.StartProof[i].UnmarshalProto(protoNode); err != nil {

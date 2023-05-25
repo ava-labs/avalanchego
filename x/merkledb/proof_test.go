@@ -1572,6 +1572,12 @@ func TestProofNodeProtoMarshalUnmarshal(t *testing.T) {
 	}
 }
 
+func TestRangeProofUnmarshalProtoNil(t *testing.T) {
+	var proof RangeProof
+	err := proof.UnmarshalProto(nil)
+	require.ErrorIs(t, err, ErrNilRangeProof)
+}
+
 func TestRangeProofProtoMarshalUnmarshal(t *testing.T) {
 	require := require.New(t)
 	rand := rand.New(rand.NewSource(1337)) // #nosec G404
