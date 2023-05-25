@@ -55,9 +55,12 @@ use firewood_libaio::{AioBuilder, AioManager};
 use libc::off_t;
 #[cfg(not(target_os = "linux"))]
 use nix::fcntl::OFlag;
-#[cfg(target_os = "linux")]
-use nix::fcntl::{fallocate, FallocateFlags, OFlag};
 use nix::unistd::{close, ftruncate};
+#[cfg(target_os = "linux")]
+use nix::{
+    errno::Errno,
+    fcntl::{fallocate, posix_fallocate, FallocateFlags, OFlag},
+};
 use std::fs;
 use std::os::fd::IntoRawFd;
 use std::os::unix::io::RawFd;
@@ -99,16 +102,24 @@ impl Drop for WalFileAio {
 impl WalFile for WalFileAio {
     #[cfg(target_os = "linux")]
     async fn allocate(&self, offset: WalPos, length: usize) -> Result<(), WalError> {
+        let (offset, length) = (offset as off_t, length as off_t);
         // TODO: is there any async version of fallocate?
-        return fallocate(
+        fallocate(
             self.fd,
             FallocateFlags::FALLOC_FL_ZERO_RANGE,
-            offset as off_t,
-            length as off_t,
+            offset,
+            length,
         )
-        .map(|_| ())
-        .map_err(Into::into);
+        .or_else(|err| match err {
+            Errno::EOPNOTSUPP => posix_fallocate(self.fd, offset, length),
+            _ => {
+                eprintln!("fallocate failed with error: {err:?}");
+                Err(err)
+            }
+        })
+        .map_err(Into::into)
     }
+
     #[cfg(not(target_os = "linux"))]
     // TODO: macos support is possible here, but possibly unnecessary
     async fn allocate(&self, _offset: WalPos, _length: usize) -> Result<(), WalError> {
