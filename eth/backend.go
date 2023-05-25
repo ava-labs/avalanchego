@@ -41,6 +41,7 @@ import (
 	"github.com/ava-labs/coreth/core/bloombits"
 	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/core/state/pruner"
+	"github.com/ava-labs/coreth/core/txpool"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/core/vm"
 	"github.com/ava-labs/coreth/eth/ethconfig"
@@ -74,7 +75,7 @@ type Ethereum struct {
 	config *Config
 
 	// Handlers
-	txPool     *core.TxPool
+	txPool     *txpool.TxPool
 	blockchain *core.BlockChain
 
 	// DB interfaces
@@ -144,7 +145,7 @@ func New(
 	// Since RecoverPruning will only continue a pruning run that already began, we do not need to ensure that
 	// reprocessState has already been called and completed successfully. To ensure this, we must maintain
 	// that Prune is only run after reprocessState has finished successfully.
-	if err := pruner.RecoverPruning(config.OfflinePruningDataDirectory, chainDb); err != nil {
+	if err := pruner.RecoverPruning(config.OfflinePruningDataDirectory, chainDb, config.TrieCleanJournal); err != nil {
 		log.Error("Failed to recover state", "error", err)
 	}
 
@@ -197,9 +198,9 @@ func New(
 			AllowMissingTries:               config.AllowMissingTries,
 			SnapshotDelayInit:               config.SnapshotDelayInit,
 			SnapshotLimit:                   config.SnapshotCache,
-			SnapshotAsync:                   config.SnapshotAsync,
+			SnapshotWait:                    config.SnapshotWait,
 			SnapshotVerify:                  config.SnapshotVerify,
-			SkipSnapshotRebuild:             config.SkipSnapshotRebuild,
+			SnapshotNoBuild:                 config.SkipSnapshotRebuild,
 			Preimages:                       config.Preimages,
 			AcceptedCacheSize:               config.AcceptedCacheSize,
 			TxLookupLimit:                   config.TxLookupLimit,
@@ -223,7 +224,7 @@ func New(
 	eth.bloomIndexer.Start(eth.blockchain)
 
 	config.TxPool.Journal = ""
-	eth.txPool = core.NewTxPool(config.TxPool, eth.blockchain.Config(), eth.blockchain)
+	eth.txPool = txpool.NewTxPool(config.TxPool, eth.blockchain.Config(), eth.blockchain)
 
 	eth.miner = miner.New(eth, &config.Miner, eth.blockchain.Config(), eth.EventMux(), eth.engine, clock)
 
@@ -336,7 +337,7 @@ func (s *Ethereum) Miner() *miner.Miner { return s.miner }
 
 func (s *Ethereum) AccountManager() *accounts.Manager { return s.accountManager }
 func (s *Ethereum) BlockChain() *core.BlockChain      { return s.blockchain }
-func (s *Ethereum) TxPool() *core.TxPool              { return s.txPool }
+func (s *Ethereum) TxPool() *txpool.TxPool            { return s.txPool }
 func (s *Ethereum) EventMux() *event.TypeMux          { return s.eventMux }
 func (s *Ethereum) Engine() consensus.Engine          { return s.engine }
 func (s *Ethereum) ChainDb() ethdb.Database           { return s.chainDb }
@@ -439,7 +440,13 @@ func (s *Ethereum) handleOfflinePruning(cacheConfig *core.CacheConfig, gspec *co
 	s.blockchain.Stop()
 	s.blockchain = nil
 	log.Info("Starting offline pruning", "dataDir", s.config.OfflinePruningDataDirectory, "bloomFilterSize", s.config.OfflinePruningBloomFilterSize)
-	pruner, err := pruner.NewPruner(s.chainDb, s.config.OfflinePruningDataDirectory, s.config.OfflinePruningBloomFilterSize)
+	prunerConfig := pruner.Config{
+		BloomSize: s.config.OfflinePruningBloomFilterSize,
+		Cachedir:  s.config.TrieCleanJournal,
+		Datadir:   s.config.OfflinePruningDataDirectory,
+	}
+
+	pruner, err := pruner.NewPruner(s.chainDb, prunerConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create new pruner with data directory: %s, size: %d, due to: %w", s.config.OfflinePruningDataDirectory, s.config.OfflinePruningBloomFilterSize, err)
 	}

@@ -79,7 +79,7 @@ func TestHeaderInsertion(t *testing.T) {
 			Config:  params.TestChainConfig,
 		}
 	)
-	genesis := gspec.ToBlock(nil)
+	genesis := gspec.ToBlock()
 	chain, err := NewBlockChain(db, DefaultCacheConfig, gspec, dummy.NewFaker(), vm.Config{}, common.Hash{}, false)
 	if err != nil {
 		t.Fatal(err)

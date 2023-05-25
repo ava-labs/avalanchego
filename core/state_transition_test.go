@@ -89,7 +89,7 @@ func executeStateTransitionTest(t *testing.T, st stateTransitionTest) {
 			},
 			GasLimit: params.ApricotPhase1GasLimit,
 		}
-		genesis       = gspec.ToBlock(nil)
+		genesis       = gspec.ToBlock()
 		engine        = dummy.NewFaker()
 		blockchain, _ = NewBlockChain(db, DefaultCacheConfig, gspec, engine, vm.Config{}, common.Hash{}, false)
 	)

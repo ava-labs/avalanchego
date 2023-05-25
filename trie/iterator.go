@@ -385,7 +385,12 @@ func (it *nodeIterator) resolveHash(hash hashNode, path []byte) (node, error) {
 			}
 		}
 	}
-	return it.trie.resolveHash(hash, path)
+	// Retrieve the specified node from the underlying node reader.
+	// it.trie.resolveAndTrack is not used since in that function the
+	// loaded blob will be tracked, while it's not required here since
+	// all loaded nodes won't be linked to trie at all and track nodes
+	// may lead to out-of-memory issue.
+	return it.trie.reader.node(path, common.BytesToHash(hash))
 }
 
 func (it *nodeIterator) resolveBlob(hash hashNode, path []byte) ([]byte, error) {
@@ -394,7 +399,12 @@ func (it *nodeIterator) resolveBlob(hash hashNode, path []byte) ([]byte, error) 
 			return blob, nil
 		}
 	}
-	return it.trie.resolveBlob(hash, path)
+	// Retrieve the specified node from the underlying node reader.
+	// it.trie.resolveAndTrack is not used since in that function the
+	// loaded blob will be tracked, while it's not required here since
+	// all loaded nodes won't be linked to trie at all and track nodes
+	// may lead to out-of-memory issue.
+	return it.trie.reader.nodeBlob(path, common.BytesToHash(hash))
 }
 
 func (st *nodeIteratorState) resolve(it *nodeIterator, path []byte) error {

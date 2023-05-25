@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/coreth/core/txpool"
 	"github.com/ava-labs/coreth/params"
 
 	"github.com/ava-labs/avalanchego/snow"
@@ -26,7 +27,7 @@ type blockBuilder struct {
 	ctx         *snow.Context
 	chainConfig *params.ChainConfig
 
-	txPool   *core.TxPool
+	txPool   *txpool.TxPool
 	mempool  *Mempool
 	gossiper Gossiper
 

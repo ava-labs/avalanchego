@@ -27,11 +27,10 @@
 package vm
 
 import (
-	"hash"
-
 	"github.com/ava-labs/coreth/vmerrs"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 )
 
@@ -65,21 +64,13 @@ type ScopeContext struct {
 	Contract *Contract
 }
 
-// keccakState wraps sha3.state. In addition to the usual hash methods, it also supports
-// Read to get a variable amount of data from the hash state. Read is faster than Sum
-// because it doesn't copy the internal state, but also modifies the internal state.
-type keccakState interface {
-	hash.Hash
-	Read([]byte) (int, error)
-}
-
 // EVMInterpreter represents an EVM interpreter
 type EVMInterpreter struct {
 	evm *EVM
 	cfg Config
 
-	hasher    keccakState // Keccak256 hasher instance shared across opcodes
-	hasherBuf common.Hash // Keccak256 hasher result array shared aross opcodes
+	hasher    crypto.KeccakState // Keccak256 hasher instance shared across opcodes
+	hasherBuf common.Hash        // Keccak256 hasher result array shared aross opcodes
 
 	readOnly   bool   // Whether to throw on stateful modifications
 	returnData []byte // Last CALL's return data for subsequent reuse
@@ -113,18 +104,20 @@ func NewEVMInterpreter(evm *EVM, cfg Config) *EVMInterpreter {
 		default:
 			cfg.JumpTable = &frontierInstructionSet
 		}
-		// TODO: update this to the new go-ethereum code when the relevant code is merged.
-		if len(evm.Config.ExtraEips) > 0 {
+		var extraEips []int
+		if len(cfg.ExtraEips) > 0 {
 			// Deep-copy jumptable to prevent modification of opcodes in other tables
 			cfg.JumpTable = copyJumpTable(cfg.JumpTable)
 		}
-		for i, eip := range cfg.ExtraEips {
+		for _, eip := range cfg.ExtraEips {
 			if err := EnableEIP(eip, cfg.JumpTable); err != nil {
 				// Disable it, so caller can check if it's activated or not
-				cfg.ExtraEips = append(cfg.ExtraEips[:i], cfg.ExtraEips[i+1:]...)
 				log.Error("EIP activation failed", "eip", eip, "error", err)
+			} else {
+				extraEips = append(extraEips, eip)
 			}
 		}
+		cfg.ExtraEips = extraEips
 	}
 
 	return &EVMInterpreter{

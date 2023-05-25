@@ -540,14 +540,14 @@ func testRepair(t *testing.T, tt *rewindTest, snapshots bool) {
 	// If sidechain blocks are needed, make a light chain and import it
 	var sideblocks types.Blocks
 	if tt.sidechainBlocks > 0 {
-		sideblocks, _, _ = GenerateChain(gspec.Config, gspec.ToBlock(nil), engine, rawdb.NewMemoryDatabase(), tt.sidechainBlocks, 10, func(i int, b *BlockGen) {
+		sideblocks, _, _ = GenerateChain(gspec.Config, gspec.ToBlock(), engine, rawdb.NewMemoryDatabase(), tt.sidechainBlocks, 10, func(i int, b *BlockGen) {
 			b.SetCoinbase(common.Address{0x01})
 		})
 		if _, err := chain.InsertChain(sideblocks); err != nil {
 			t.Fatalf("Failed to import side chain: %v", err)
 		}
 	}
-	canonblocks, _, _ := GenerateChain(gspec.Config, gspec.ToBlock(nil), engine, rawdb.NewMemoryDatabase(), tt.canonicalBlocks, 10, func(i int, b *BlockGen) {
+	canonblocks, _, _ := GenerateChain(gspec.Config, gspec.ToBlock(), engine, rawdb.NewMemoryDatabase(), tt.canonicalBlocks, 10, func(i int, b *BlockGen) {
 		b.SetCoinbase(common.Address{0x02})
 		b.SetDifficulty(big.NewInt(1000000))
 	})
@@ -571,6 +571,7 @@ func testRepair(t *testing.T, tt *rewindTest, snapshots bool) {
 
 	// Pull the plug on the database, simulating a hard crash
 	db.Close()
+	chain.stopWithoutSaving()
 
 	// Start a new blockchain back up and see where the repair leads us
 	db, err = rawdb.NewLevelDBDatabase(datadir, 0, 0, "", false)

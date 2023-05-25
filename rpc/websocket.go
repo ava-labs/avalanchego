@@ -37,7 +37,7 @@ import (
 	"sync"
 	"time"
 
-	mapset "github.com/deckarep/golang-set"
+	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/gorilla/websocket"
 )
@@ -83,7 +83,7 @@ func (s *Server) WebsocketHandlerWithDuration(allowedOrigins []string, apiMaxDur
 // websocket upgrade process. When a '*' is specified as an allowed origins all
 // connections are accepted.
 func wsHandshakeValidator(allowedOrigins []string) func(*http.Request) bool {
-	origins := mapset.NewSet()
+	origins := mapset.NewSet[string]()
 	allowAllOrigins := false
 
 	for _, origin := range allowedOrigins {
@@ -136,10 +136,10 @@ func (e wsHandshakeError) Error() string {
 	return s
 }
 
-func originIsAllowed(allowedOrigins mapset.Set, browserOrigin string) bool {
+func originIsAllowed(allowedOrigins mapset.Set[string], browserOrigin string) bool {
 	it := allowedOrigins.Iterator()
 	for origin := range it.C {
-		if ruleAllowsOrigin(origin.(string), browserOrigin) {
+		if ruleAllowsOrigin(origin, browserOrigin) {
 			return true
 		}
 	}

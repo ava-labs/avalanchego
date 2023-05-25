@@ -214,8 +214,8 @@ func (oracle *Oracle) FeeHistory(ctx context.Context, blocks int, unresolvedLast
 
 		i := int(blockNumber - oldestBlock)
 		var sb *slimBlock
-		if sbRaw, ok := oracle.historyCache.Get(blockNumber); ok {
-			sb = sbRaw.(*slimBlock)
+		if sbCache, ok := oracle.historyCache.Get(blockNumber); ok {
+			sb = sbCache
 		} else {
 			block, err := oracle.backend.BlockByNumber(ctx, rpc.BlockNumber(blockNumber))
 			if err != nil {

@@ -88,6 +88,10 @@ func (b *testBackend) SubscribeChainAcceptedEvent(ch chan<- core.ChainEvent) eve
 	return nil
 }
 
+func (b *testBackend) teardown() {
+	b.chain.Stop()
+}
+
 func newTestBackendFakerEngine(t *testing.T, config *params.ChainConfig, numBlocks int, extDataGasUsage *big.Int, genBlocks func(i int, b *core.BlockGen)) *testBackend {
 	var gspec = &core.Genesis{
 		Config: config,
@@ -113,6 +117,8 @@ func newTestBackendFakerEngine(t *testing.T, config *params.ChainConfig, numBloc
 	return &testBackend{chain: chain}
 }
 
+// newTestBackend creates a test backend. OBS: don't forget to invoke tearDown
+// after use, otherwise the blockchain instance will mem-leak via goroutines.
 func newTestBackend(t *testing.T, config *params.ChainConfig, numBlocks int, extDataGasUsage *big.Int, genBlocks func(i int, b *core.BlockGen)) *testBackend {
 	var gspec = &core.Genesis{
 		Config: config,
@@ -199,6 +205,7 @@ func applyGasPriceTest(t *testing.T, test suggestTipCapTest, config Config) {
 	oracle.clock.Set(time.Unix(20, 0))
 
 	got, err := oracle.SuggestTipCap(context.Background())
+	backend.teardown()
 	require.NoError(t, err)
 
 	if got.Cmp(test.expectedTip) != 0 {
@@ -354,6 +361,8 @@ func TestSuggestGasPricePreAP3(t *testing.T) {
 			b.AddTx(tx)
 		}
 	})
+	defer backend.teardown()
+
 	oracle, err := NewOracle(backend, config)
 	require.NoError(t, err)
 

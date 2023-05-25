@@ -30,13 +30,12 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/VictoriaMetrics/fastcache"
 	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/ethdb"
 	"github.com/ava-labs/coreth/trie"
 	"github.com/ethereum/go-ethereum/common"
-	lru "github.com/hashicorp/golang-lru"
+	"github.com/ethereum/go-ethereum/common/lru"
 )
 
 const (
@@ -53,7 +52,7 @@ type Database interface {
 	OpenTrie(root common.Hash) (Trie, error)
 
 	// OpenStorageTrie opens the storage trie of an account.
-	OpenStorageTrie(addrHash, root common.Hash) (Trie, error)
+	OpenStorageTrie(stateRoot common.Hash, addrHash, root common.Hash) (Trie, error)
 
 	// CopyTrie returns an independent copy of the given trie.
 	CopyTrie(Trie) Trie
@@ -140,25 +139,34 @@ func NewDatabase(db ethdb.Database) Database {
 // is safe for concurrent use and retains a lot of collapsed RLP trie nodes in a
 // large memory cache.
 func NewDatabaseWithConfig(db ethdb.Database, config *trie.Config) Database {
-	csc, _ := lru.New(codeSizeCacheSize)
 	return &cachingDB{
-		db:            trie.NewDatabaseWithConfig(db, config),
 		disk:          db,
-		codeSizeCache: csc,
-		codeCache:     fastcache.New(codeCacheSize),
+		codeSizeCache: lru.NewCache[common.Hash, int](codeSizeCacheSize),
+		codeCache:     lru.NewSizeConstrainedCache[common.Hash, []byte](codeCacheSize),
+		triedb:        trie.NewDatabaseWithConfig(db, config),
+	}
+}
+
+// NewDatabaseWithNodeDB creates a state database with an already initialized node database.
+func NewDatabaseWithNodeDB(db ethdb.Database, triedb *trie.Database) Database {
+	return &cachingDB{
+		disk:          db,
+		codeSizeCache: lru.NewCache[common.Hash, int](codeSizeCacheSize),
+		codeCache:     lru.NewSizeConstrainedCache[common.Hash, []byte](codeCacheSize),
+		triedb:        triedb,
 	}
 }
 
 type cachingDB struct {
-	db            *trie.Database
 	disk          ethdb.KeyValueStore
-	codeSizeCache *lru.Cache
-	codeCache     *fastcache.Cache
+	codeSizeCache *lru.Cache[common.Hash, int]
+	codeCache     *lru.SizeConstrainedCache[common.Hash, []byte]
+	triedb        *trie.Database
 }
 
 // OpenTrie opens the main account trie at a specific root hash.
 func (db *cachingDB) OpenTrie(root common.Hash) (Trie, error) {
-	tr, err := trie.NewStateTrie(common.Hash{}, root, db.db)
+	tr, err := trie.NewStateTrie(trie.StateTrieID(root), db.triedb)
 	if err != nil {
 		return nil, err
 	}
@@ -166,8 +174,8 @@ func (db *cachingDB) OpenTrie(root common.Hash) (Trie, error) {
 }
 
 // OpenStorageTrie opens the storage trie of an account.
-func (db *cachingDB) OpenStorageTrie(addrHash, root common.Hash) (Trie, error) {
-	tr, err := trie.NewStateTrie(addrHash, root, db.db)
+func (db *cachingDB) OpenStorageTrie(stateRoot common.Hash, addrHash, root common.Hash) (Trie, error) {
+	tr, err := trie.NewStateTrie(trie.StorageTrieID(stateRoot, addrHash, root), db.triedb)
 	if err != nil {
 		return nil, err
 	}
@@ -186,12 +194,13 @@ func (db *cachingDB) CopyTrie(t Trie) Trie {
 
 // ContractCode retrieves a particular contract's code.
 func (db *cachingDB) ContractCode(addrHash, codeHash common.Hash) ([]byte, error) {
-	if code := db.codeCache.Get(nil, codeHash.Bytes()); len(code) > 0 {
+	code, _ := db.codeCache.Get(codeHash)
+	if len(code) > 0 {
 		return code, nil
 	}
-	code := rawdb.ReadCode(db.disk, codeHash)
+	code = rawdb.ReadCode(db.disk, codeHash)
 	if len(code) > 0 {
-		db.codeCache.Set(codeHash.Bytes(), code)
+		db.codeCache.Add(codeHash, code)
 		db.codeSizeCache.Add(codeHash, len(code))
 		return code, nil
 	}
@@ -201,7 +210,7 @@ func (db *cachingDB) ContractCode(addrHash, codeHash common.Hash) ([]byte, error
 // ContractCodeSize retrieves a particular contracts code's size.
 func (db *cachingDB) ContractCodeSize(addrHash, codeHash common.Hash) (int, error) {
 	if cached, ok := db.codeSizeCache.Get(codeHash); ok {
-		return cached.(int), nil
+		return cached, nil
 	}
 	code, err := db.ContractCode(addrHash, codeHash)
 	return len(code), err
@@ -214,5 +223,5 @@ func (db *cachingDB) DiskDB() ethdb.KeyValueStore {
 
 // TrieDB retrieves any intermediate trie-node caching layer.
 func (db *cachingDB) TrieDB() *trie.Database {
-	return db.db
+	return db.triedb
 }

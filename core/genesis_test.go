@@ -37,13 +37,14 @@ import (
 	"github.com/ava-labs/coreth/core/vm"
 	"github.com/ava-labs/coreth/ethdb"
 	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/trie"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 )
 
-func setupGenesisBlock(db ethdb.Database, genesis *Genesis, lastAcceptedHash common.Hash) (*params.ChainConfig, common.Hash, error) {
-	return SetupGenesisBlock(db, genesis, lastAcceptedHash, false)
+func setupGenesisBlock(db ethdb.Database, triedb *trie.Database, genesis *Genesis, lastAcceptedHash common.Hash) (*params.ChainConfig, common.Hash, error) {
+	return SetupGenesisBlock(db, triedb, genesis, lastAcceptedHash, false)
 }
 
 func TestGenesisBlockForTesting(t *testing.T) {
@@ -81,7 +82,7 @@ func TestSetupGenesis(t *testing.T) {
 		{
 			name: "genesis without ChainConfig",
 			fn: func(db ethdb.Database) (*params.ChainConfig, common.Hash, error) {
-				return setupGenesisBlock(db, new(Genesis), common.Hash{})
+				return setupGenesisBlock(db, trie.NewDatabase(db), new(Genesis), common.Hash{})
 			},
 			wantErr:    errGenesisNoConfig,
 			wantConfig: nil,
@@ -89,7 +90,7 @@ func TestSetupGenesis(t *testing.T) {
 		{
 			name: "no block in DB, genesis == nil",
 			fn: func(db ethdb.Database) (*params.ChainConfig, common.Hash, error) {
-				return setupGenesisBlock(db, nil, common.Hash{})
+				return setupGenesisBlock(db, trie.NewDatabase(db), nil, common.Hash{})
 			},
 			wantErr:    ErrNoGenesis,
 			wantConfig: nil,
@@ -98,7 +99,7 @@ func TestSetupGenesis(t *testing.T) {
 			name: "custom block in DB, genesis == nil",
 			fn: func(db ethdb.Database) (*params.ChainConfig, common.Hash, error) {
 				customg.MustCommit(db)
-				return setupGenesisBlock(db, nil, common.Hash{})
+				return setupGenesisBlock(db, trie.NewDatabase(db), nil, common.Hash{})
 			},
 			wantErr:    ErrNoGenesis,
 			wantConfig: nil,
@@ -107,7 +108,7 @@ func TestSetupGenesis(t *testing.T) {
 			name: "compatible config in DB",
 			fn: func(db ethdb.Database) (*params.ChainConfig, common.Hash, error) {
 				oldcustomg.MustCommit(db)
-				return setupGenesisBlock(db, &customg, customghash)
+				return setupGenesisBlock(db, trie.NewDatabase(db), &customg, customghash)
 			},
 			wantHash:   customghash,
 			wantConfig: customg.Config,
@@ -132,7 +133,7 @@ func TestSetupGenesis(t *testing.T) {
 				}
 
 				// This should return a compatibility error.
-				return setupGenesisBlock(db, &customg, bc.lastAccepted.Hash())
+				return setupGenesisBlock(db, trie.NewDatabase(db), &customg, bc.lastAccepted.Hash())
 			},
 			wantHash:   customghash,
 			wantConfig: customg.Config,
@@ -213,7 +214,7 @@ func TestNetworkUpgradeBetweenHeadAndAcceptedBlock(t *testing.T) {
 	require.Less(bc.lastAccepted.Time(), apricotPhase2Timestamp.Uint64())
 
 	// This should not return any error since the last accepted block is before the activation block.
-	config, _, err := setupGenesisBlock(db, &activatedGenesis, bc.lastAccepted.Hash())
+	config, _, err := setupGenesisBlock(db, trie.NewDatabase(db), &activatedGenesis, bc.lastAccepted.Hash())
 	require.NoError(err)
 	if !reflect.DeepEqual(config, activatedGenesis.Config) {
 		t.Errorf("returned %v\nwant     %v", config, activatedGenesis.Config)

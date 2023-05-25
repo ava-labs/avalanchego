@@ -72,6 +72,8 @@ type testBackend struct {
 	relHook func() // Hook is invoked when the requested state is released
 }
 
+// testBackend creates a new test backend. OBS: After test is done, teardown must be
+// invoked in order to release associated resources.
 func newTestBackend(t *testing.T, n int, gspec *core.Genesis, generator func(i int, b *core.BlockGen)) *testBackend {
 	backend := &testBackend{
 		chainConfig: gspec.Config,
@@ -156,6 +158,11 @@ func (b *testBackend) ChainDb() ethdb.Database {
 	return b.chaindb
 }
 
+// teardown releases the associated resources.
+func (b *testBackend) teardown() {
+	b.chain.Stop()
+}
+
 func (b *testBackend) StateAtBlock(ctx context.Context, block *types.Block, reexec uint64, base *state.StateDB, readOnly bool, preferDisk bool) (*state.StateDB, StateReleaseFunc, error) {
 	statedb, err := b.chain.StateAt(block.Root())
 	if err != nil {
@@ -216,13 +223,15 @@ func TestTraceCall(t *testing.T) {
 		}}
 	genBlocks := 10
 	signer := types.HomesteadSigner{}
-	api := NewAPI(newTestBackend(t, genBlocks, genesis, func(i int, b *core.BlockGen) {
+	backend := newTestBackend(t, genBlocks, genesis, func(i int, b *core.BlockGen) {
 		// Transfer from account[0] to account[1]
 		//    value: 1000 wei
 		//    fee:   0 wei
 		tx, _ := types.SignTx(types.NewTransaction(uint64(i), accounts[1].addr, big.NewInt(1000), params.TxGas, b.BaseFee(), nil), signer, accounts[0].key)
 		b.AddTx(tx)
-	}))
+	})
+	defer backend.teardown()
+	api := NewAPI(backend)
 	var testSuite = []struct {
 		blockNumber rpc.BlockNumber
 		call        ethapi.TransactionArgs
@@ -348,14 +357,16 @@ func TestTraceTransaction(t *testing.T) {
 	}
 	target := common.Hash{}
 	signer := types.HomesteadSigner{}
-	api := NewAPI(newTestBackend(t, 1, genesis, func(i int, b *core.BlockGen) {
+	backend := newTestBackend(t, 1, genesis, func(i int, b *core.BlockGen) {
 		// Transfer from account[0] to account[1]
 		//    value: 1000 wei
 		//    fee:   0 wei
 		tx, _ := types.SignTx(types.NewTransaction(uint64(i), accounts[1].addr, big.NewInt(1000), params.TxGas, new(big.Int).Add(b.BaseFee(), big.NewInt(int64(500*params.GWei))), nil), signer, accounts[0].key)
 		b.AddTx(tx)
 		target = tx.Hash()
-	}))
+	})
+	defer backend.chain.Stop()
+	api := NewAPI(backend)
 	result, err := api.TraceTransaction(context.Background(), target, nil)
 	if err != nil {
 		t.Errorf("Failed to trace transaction %v", err)
@@ -390,13 +401,15 @@ func TestTraceBlock(t *testing.T) {
 	}
 	genBlocks := 10
 	signer := types.HomesteadSigner{}
-	api := NewAPI(newTestBackend(t, genBlocks, genesis, func(i int, b *core.BlockGen) {
+	backend := newTestBackend(t, genBlocks, genesis, func(i int, b *core.BlockGen) {
 		// Transfer from account[0] to account[1]
 		//    value: 1000 wei
 		//    fee:   0 wei
-		tx, _ := types.SignTx(types.NewTransaction(uint64(i), accounts[1].addr, big.NewInt(1000), params.TxGas, new(big.Int).Add(b.BaseFee(), big.NewInt(int64(500*params.GWei))), nil), signer, accounts[0].key)
+		tx, _ := types.SignTx(types.NewTransaction(uint64(i), accounts[1].addr, big.NewInt(1000), params.TxGas, b.BaseFee(), nil), signer, accounts[0].key)
 		b.AddTx(tx)
-	}))
+	})
+	defer backend.chain.Stop()
+	api := NewAPI(backend)
 
 	var testSuite = []struct {
 		blockNumber rpc.BlockNumber
@@ -468,13 +481,15 @@ func TestTracingWithOverrides(t *testing.T) {
 	}
 	genBlocks := 10
 	signer := types.HomesteadSigner{}
-	api := NewAPI(newTestBackend(t, genBlocks, genesis, func(i int, b *core.BlockGen) {
+	backend := newTestBackend(t, genBlocks, genesis, func(i int, b *core.BlockGen) {
 		// Transfer from account[0] to account[1]
 		//    value: 1000 wei
 		//    fee:   0 wei
 		tx, _ := types.SignTx(types.NewTransaction(uint64(i), accounts[1].addr, big.NewInt(1000), params.TxGas, b.BaseFee(), nil), signer, accounts[0].key)
 		b.AddTx(tx)
-	}))
+	})
+	defer backend.chain.Stop()
+	api := NewAPI(backend)
 	randomAccounts := newAccounts(3)
 	type res struct {
 		Gas         int

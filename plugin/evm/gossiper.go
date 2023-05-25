@@ -24,6 +24,7 @@ import (
 
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/state"
+	"github.com/ava-labs/coreth/core/txpool"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/plugin/evm/message"
 )
@@ -57,7 +58,7 @@ type pushGossiper struct {
 
 	client        peer.NetworkClient
 	blockchain    *core.BlockChain
-	txPool        *core.TxPool
+	txPool        *txpool.TxPool
 	atomicMempool *Mempool
 
 	// We attempt to batch transactions we need to gossip to avoid runaway
@@ -344,7 +345,7 @@ func (n *pushGossiper) gossipEthTxs(force bool) (int, error) {
 	for _, tx := range txs {
 		txHash := tx.Hash()
 		txStatus := n.txPool.Status([]common.Hash{txHash})[0]
-		if txStatus != core.TxStatusPending {
+		if txStatus != txpool.TxStatusPending {
 			continue
 		}
 
@@ -370,7 +371,7 @@ func (n *pushGossiper) gossipEthTxs(force bool) (int, error) {
 
 	// Attempt to gossip [selectedTxs]
 	msgTxs := make([]*types.Transaction, 0)
-	msgTxsSize := common.StorageSize(0)
+	msgTxsSize := uint64(0)
 	for _, tx := range selectedTxs {
 		size := tx.Size()
 		if msgTxsSize+size > message.EthMsgSoftCapSize {
@@ -406,7 +407,7 @@ func (n *pushGossiper) GossipEthTxs(txs []*types.Transaction) error {
 type GossipHandler struct {
 	vm            *VM
 	atomicMempool *Mempool
-	txPool        *core.TxPool
+	txPool        *txpool.TxPool
 	stats         GossipReceivedStats
 }
 
@@ -509,7 +510,7 @@ func (h *GossipHandler) HandleEthTxs(nodeID ids.NodeID, msg message.EthTxsGossip
 				"err", err,
 				"tx", txs[i].Hash(),
 			)
-			if err == core.ErrAlreadyKnown {
+			if err == txpool.ErrAlreadyKnown {
 				h.stats.IncEthTxsGossipReceivedKnown()
 			} else {
 				h.stats.IncAtomicGossipReceivedError()

@@ -38,6 +38,7 @@ import (
 	"github.com/ava-labs/coreth/core/state/snapshot"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/metrics"
+	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/trie"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -111,6 +112,9 @@ type StateDB struct {
 	// Per-transaction access list
 	accessList *accessList
 
+	// Transient storage
+	transientStorage transientStorage
+
 	// Journal of state modifications. This is the backbone of
 	// Snapshot and RevertToSnapshot.
 	journal        *journal
@@ -166,6 +170,7 @@ func NewWithSnapshot(root common.Hash, db Database, snap snapshot.Snapshot) (*St
 		preimages:           make(map[common.Hash][]byte),
 		journal:             newJournal(),
 		accessList:          newAccessList(),
+		transientStorage:    newTransientStorage(),
 		hasher:              crypto.NewKeccakState(),
 	}
 	if snap != nil {
@@ -520,6 +525,35 @@ func (s *StateDB) Suicide(addr common.Address) bool {
 	return true
 }
 
+// SetTransientState sets transient storage for a given account. It
+// adds the change to the journal so that it can be rolled back
+// to its previous value if there is a revert.
+func (s *StateDB) SetTransientState(addr common.Address, key, value common.Hash) {
+	prev := s.GetTransientState(addr, key)
+	if prev == value {
+		return
+	}
+
+	s.journal.append(transientStorageChange{
+		account:  &addr,
+		key:      key,
+		prevalue: prev,
+	})
+
+	s.setTransientState(addr, key, value)
+}
+
+// setTransientState is a lower level setter for transient storage. It
+// is called during a revert to prevent modifications to the journal.
+func (s *StateDB) setTransientState(addr common.Address, key, value common.Hash) {
+	s.transientStorage.Set(addr, key, value)
+}
+
+// GetTransientState gets transient storage for a given account.
+func (s *StateDB) GetTransientState(addr common.Address, key common.Hash) common.Hash {
+	return s.transientStorage.Get(addr, key)
+}
+
 //
 // Setting, updating & deleting state object methods.
 //
@@ -736,7 +770,7 @@ func (s *StateDB) Copy() *StateDB {
 		// nil
 		if object, exist := s.stateObjects[addr]; exist {
 			// Even though the original object is dirty, we are not copying the journal,
-			// so we need to make sure that anyside effect the journal would have caused
+			// so we need to make sure that any side-effect the journal would have caused
 			// during a commit (or similar op) is already applied to the copy.
 			state.stateObjects[addr] = object.deepCopy(state)
 
@@ -776,6 +810,8 @@ func (s *StateDB) Copy() *StateDB {
 	// However, it doesn't cost us much to copy an empty list, so we do it anyway
 	// to not blow up if we ever decide copy it in the middle of a transaction
 	state.accessList = s.accessList.Copy()
+
+	state.transientStorage = s.transientStorage.Copy()
 
 	// If there's a prefetcher running, make an inactive copy of it that can
 	// only access data but does not actively preload (since the user will not
@@ -864,8 +900,8 @@ func (s *StateDB) Finalise(deleteEmptyObjects bool) {
 			// resurrect an account; but the snapshotter needs both events.
 			if s.snap != nil {
 				s.snapDestructs[obj.addrHash] = struct{}{} // We need to maintain account deletions explicitly (will remain set indefinitely)
-				delete(s.snapAccounts, obj.addrHash)       // Clear out any previously updated account data (may be recreated via a ressurrect)
-				delete(s.snapStorage, obj.addrHash)        // Clear out any previously updated storage data (may be recreated via a ressurrect)
+				delete(s.snapAccounts, obj.addrHash)       // Clear out any previously updated account data (may be recreated via a resurrect)
+				delete(s.snapStorage, obj.addrHash)        // Clear out any previously updated storage data (may be recreated via a resurrect)
 			}
 		} else {
 			obj.finalise(true) // Prefetch slots in the background
@@ -948,9 +984,10 @@ func (s *StateDB) IntermediateRoot(deleteEmptyObjects bool) common.Hash {
 	return s.trie.Hash()
 }
 
-// Prepare sets the current transaction hash and index which are
-// used when the EVM emits new state logs.
-func (s *StateDB) Prepare(thash common.Hash, ti int) {
+// SetTxContext sets the current transaction hash and index which are
+// used when the EVM emits new state logs. It should be invoked before
+// transaction execution.
+func (s *StateDB) SetTxContext(thash common.Hash, ti int) {
 	s.thash = thash
 	s.txIndex = ti
 }
@@ -984,9 +1021,11 @@ func (s *StateDB) commit(deleteEmptyObjects bool, snaps *snapshot.Tree, blockHas
 
 	// Commit objects to the trie, measuring the elapsed time
 	var (
-		accountTrieNodes int
-		storageTrieNodes int
-		nodes            = trie.NewMergedNodeSet()
+		accountTrieNodesUpdated int
+		accountTrieNodesDeleted int
+		storageTrieNodesUpdated int
+		storageTrieNodesDeleted int
+		nodes                   = trie.NewMergedNodeSet()
 	)
 	codeWriter := s.db.DiskDB().NewBatch()
 	for addr := range s.stateObjectsDirty {
@@ -997,7 +1036,7 @@ func (s *StateDB) commit(deleteEmptyObjects bool, snaps *snapshot.Tree, blockHas
 				obj.dirtyCode = false
 			}
 			// Write any storage changes in the state object to its storage trie
-			set, err := obj.CommitTrie(s.db)
+			set, err := obj.commitTrie(s.db)
 			if err != nil {
 				return common.Hash{}, err
 			}
@@ -1006,9 +1045,17 @@ func (s *StateDB) commit(deleteEmptyObjects bool, snaps *snapshot.Tree, blockHas
 				if err := nodes.Merge(set); err != nil {
 					return common.Hash{}, err
 				}
-				storageTrieNodes += set.Len()
+				updates, deleted := set.Size()
+				storageTrieNodesUpdated += updates
+				storageTrieNodesDeleted += deleted
 			}
 		}
+		// If the contract is destructed, the storage is still left in the
+		// database as dangling data. Theoretically it's should be wiped from
+		// database as well, but in hash-based-scheme it's extremely hard to
+		// determine that if the trie nodes are also referenced by other storage,
+		// and in path-based-scheme some technical challenges are still unsolved.
+		// Although it won't affect the correctness but please fix it TODO(rjl493456442).
 	}
 	if len(s.stateObjectsDirty) > 0 {
 		s.stateObjectsDirty = make(map[common.Address]struct{})
@@ -1032,7 +1079,7 @@ func (s *StateDB) commit(deleteEmptyObjects bool, snaps *snapshot.Tree, blockHas
 		if err := nodes.Merge(set); err != nil {
 			return common.Hash{}, err
 		}
-		accountTrieNodes = set.Len()
+		accountTrieNodesUpdated, accountTrieNodesDeleted = set.Size()
 	}
 	if metrics.EnabledExpensive {
 		s.AccountCommits += time.Since(start)
@@ -1041,67 +1088,92 @@ func (s *StateDB) commit(deleteEmptyObjects bool, snaps *snapshot.Tree, blockHas
 		storageUpdatedMeter.Mark(int64(s.StorageUpdated))
 		accountDeletedMeter.Mark(int64(s.AccountDeleted))
 		storageDeletedMeter.Mark(int64(s.StorageDeleted))
-		accountTrieCommittedMeter.Mark(int64(accountTrieNodes))
-		storageTriesCommittedMeter.Mark(int64(storageTrieNodes))
+		accountTrieUpdatedMeter.Mark(int64(accountTrieNodesUpdated))
+		accountTrieDeletedMeter.Mark(int64(accountTrieNodesDeleted))
+		storageTriesUpdatedMeter.Mark(int64(storageTrieNodesUpdated))
+		storageTriesDeletedMeter.Mark(int64(storageTrieNodesDeleted))
 		s.AccountUpdated, s.AccountDeleted = 0, 0
 		s.StorageUpdated, s.StorageDeleted = 0, 0
 	}
 	// If snapshotting is enabled, update the snapshot tree with this new version
 	if snaps != nil {
+		start := time.Now()
 		if s.snap == nil {
 			log.Error(fmt.Sprintf("cannot commit with snaps without a pre-existing snap layer, parentHash: %s, blockHash: %s", parentHash, blockHash))
-		}
-		if metrics.EnabledExpensive {
-			defer func(start time.Time) { s.SnapshotCommits += time.Since(start) }(time.Now())
 		}
 		if err := snaps.Update(blockHash, root, parentHash, s.snapDestructs, s.snapAccounts, s.snapStorage); err != nil {
 			log.Warn("Failed to update snapshot tree", "to", root, "err", err)
 		}
+		if metrics.EnabledExpensive {
+			s.SnapshotCommits += time.Since(start)
+		}
 		s.snap, s.snapDestructs, s.snapAccounts, s.snapStorage = nil, nil, nil, nil
 	}
-	if referenceRoot {
-		if err := s.db.TrieDB().UpdateAndReferenceRoot(nodes, root); err != nil {
-			return common.Hash{}, err
-		}
-	} else {
-		if err := s.db.TrieDB().Update(nodes); err != nil {
-			return common.Hash{}, err
-		}
+	if root == (common.Hash{}) {
+		root = emptyRoot
 	}
-	s.originalRoot = root
-	if metrics.EnabledExpensive {
-		s.TrieDBCommits += time.Since(start)
+	origin := s.originalRoot
+	if origin == (common.Hash{}) {
+		origin = emptyRoot
+	}
+	if root != origin {
+		start := time.Now()
+		if referenceRoot {
+			if err := s.db.TrieDB().UpdateAndReferenceRoot(nodes, root); err != nil {
+				return common.Hash{}, err
+			}
+		} else {
+			if err := s.db.TrieDB().Update(nodes); err != nil {
+				return common.Hash{}, err
+			}
+		}
+		s.originalRoot = root
+		if metrics.EnabledExpensive {
+			s.TrieDBCommits += time.Since(start)
+		}
 	}
 	return root, err
 }
 
-// PrepareAccessList handles the preparatory steps for executing a state transition with
-// regards to both EIP-2929 and EIP-2930:
+// Prepare handles the preparatory steps for executing a state transition with.
+// This method must be invoked before state transition.
 //
+// Berlin fork (aka ApricotPhase2):
 // - Add sender to access list (2929)
 // - Add destination to access list (2929)
 // - Add precompiles to access list (2929)
 // - Add the contents of the optional tx access list (2930)
 //
-// This method should only be called if Berlin/ApricotPhase2/2929+2930 is applicable at the current number.
-func (s *StateDB) PrepareAccessList(sender common.Address, dst *common.Address, precompiles []common.Address, list types.AccessList) {
-	// Clear out any leftover from previous executions
-	s.accessList = newAccessList()
+// Potential EIPs:
+// - Reset access list (Berlin/ApricotPhase2)
+// - Add coinbase to access list (EIP-3651/DUpgrade)
+// - Reset transient storage (EIP-1153)
+func (s *StateDB) Prepare(rules params.Rules, sender, coinbase common.Address, dst *common.Address, precompiles []common.Address, list types.AccessList) {
+	if rules.IsApricotPhase2 {
+		// Clear out any leftover from previous executions
+		al := newAccessList()
+		s.accessList = al
 
-	s.AddAddressToAccessList(sender)
-	if dst != nil {
-		s.AddAddressToAccessList(*dst)
-		// If it's a create-tx, the destination will be added inside evm.create
-	}
-	for _, addr := range precompiles {
-		s.AddAddressToAccessList(addr)
-	}
-	for _, el := range list {
-		s.AddAddressToAccessList(el.Address)
-		for _, key := range el.StorageKeys {
-			s.AddSlotToAccessList(el.Address, key)
+		al.AddAddress(sender)
+		if dst != nil {
+			al.AddAddress(*dst)
+			// If it's a create-tx, the destination will be added inside evm.create
+		}
+		for _, addr := range precompiles {
+			al.AddAddress(addr)
+		}
+		for _, el := range list {
+			al.AddAddress(el.Address)
+			for _, key := range el.StorageKeys {
+				al.AddSlot(el.Address, key)
+			}
+		}
+		if rules.IsDUpgrade { // EIP-3651: warm coinbase
+			al.AddAddress(coinbase)
 		}
 	}
+	// Reset transient storage at the beginning of transaction execution
+	s.transientStorage = newTransientStorage()
 }
 
 // AddAddressToAccessList adds the given address to the access list

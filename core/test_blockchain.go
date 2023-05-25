@@ -201,7 +201,6 @@ func TestInsertChainAcceptSingleBlock(t *testing.T, create func(db ethdb.Databas
 		Config: &params.ChainConfig{HomesteadBlock: new(big.Int)},
 		Alloc:  GenesisAlloc{addr1: {Balance: genesisBalance}},
 	}
-
 	blockchain, err := create(chainDB, gspec, common.Hash{})
 	if err != nil {
 		t.Fatal(err)
@@ -881,7 +880,7 @@ func TestReorgReInsert(t *testing.T, create func(db ethdb.Database, gspec *Genes
 		Config: &params.ChainConfig{HomesteadBlock: new(big.Int)},
 		Alloc:  GenesisAlloc{addr1: {Balance: genesisBalance}},
 	}
-	genesis := gspec.ToBlock(nil)
+	genesis := gspec.ToBlock()
 
 	blockchain, err := create(chainDB, gspec, common.Hash{})
 	if err != nil {

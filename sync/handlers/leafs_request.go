@@ -99,7 +99,11 @@ func (lrh *LeafsRequestHandler) OnLeafsRequest(ctx context.Context, nodeID ids.N
 		return nil, nil
 	}
 
-	t, err := trie.New(leafsRequest.Account, leafsRequest.Root, lrh.trieDB)
+	// TODO: We should know the state root that accounts correspond to,
+	// as this information will be necessary to access storage tries when
+	// the trie is path based.
+	stateRoot := common.Hash{}
+	t, err := trie.New(trie.StorageTrieID(stateRoot, leafsRequest.Account, leafsRequest.Root), lrh.trieDB)
 	if err != nil {
 		log.Debug("error opening trie when processing request, dropping request", "nodeID", nodeID, "requestID", requestID, "root", leafsRequest.Root, "err", err)
 		lrh.stats.IncMissingRoot()
