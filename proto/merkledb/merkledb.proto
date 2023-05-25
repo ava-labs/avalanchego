@@ -1,0 +1,120 @@
+syntax = "proto3";
+
+package merkledb;
+
+import "google/protobuf/empty.proto";
+
+option go_package = "github.com/ava-labs/avalanchego/proto/pb/merkledb";
+
+// TODO add support for views.
+service MerkleDBService {
+  rpc GetMerkleRoot(google.protobuf.Empty) returns (GetMerkleRootResponse);
+
+  rpc GetChangeProof(ChangeProofRequest) returns (ChangeProof);
+  rpc VerifyChangeProof(ChangeProof) returns (ErrorResponse);
+  rpc CommitChangeProof(ChangeProof) returns (ErrorResponse);
+
+  rpc GetProof(GetProofRequest) returns (Proof);
+  rpc VerifyProof(Proof) returns (ErrorResponse);
+
+  rpc GetRangeProof(RangeProofRequest) returns (RangeProof);
+  rpc CommitRangeProof(CommitRangeProofRequest) returns (ErrorResponse);
+}
+
+// TODO: All of the below is copy-pasted from avalanchego.
+// We should import these definitions once they're in buf.build.
+
+// TODO use enum / improve this.
+message ErrorResponse {
+  string message = 1;
+  bool is_error = 2;
+}
+
+message GetProofRequest {
+  bytes key = 1;
+}
+
+message Proof {
+  repeated ProofNode proof = 1;
+}
+
+message GetMerkleRootResponse {
+  bytes root_hash = 1;
+}
+
+// KeyValue represents a single key and its value.
+message KeyValue {
+  bytes key = 1;
+  bytes value = 2;
+}
+
+// KeyChange is a change for a key from one revision to another.
+// If the value is None, the key was deleted.
+message KeyChange {
+  bytes key = 1;
+  MaybeBytes value = 2;
+}
+
+// SerializedPath is the serialized representation of a path.
+message SerializedPath {
+  uint32 nibble_length = 1;
+  bytes value = 2;
+}
+
+// MaybeBytes is an option wrapping bytes.
+message MaybeBytes {
+  bytes value = 1;
+  // If false, this is None.
+  bool is_nothing = 2;
+}
+
+// ProofNode is a node in a merkle proof.
+message ProofNode {
+  SerializedPath key = 1;
+  MaybeBytes value_or_hash = 2;
+  map<uint32, bytes> children = 3;
+}
+
+// RangeProof is the response to a RangeProofRequest.
+message RangeProof {
+  repeated ProofNode start = 1;
+  repeated ProofNode end = 2;
+  repeated KeyValue key_values = 3;
+}
+
+message CommitRangeProofRequest {
+  bytes start_key = 1;
+  RangeProof range_proof = 2;
+}
+
+// ChangeProof is a possible response to a ChangeProofRequest.
+// It only consists of a proof of the smallest changed key,
+// the highest changed key, and the keys that have changed
+// between those. Some keys may be deleted (hence
+// the use of KeyChange instead of KeyValue).
+message ChangeProof {
+  bool had_roots_in_history = 1; // TODO remove
+  repeated ProofNode start_proof = 2;
+  repeated ProofNode end_proof = 3;
+  repeated KeyChange key_changes = 4;
+}
+
+// A RangeProofRequest requests the key-value pairs in a given key range
+// at a specific revision.
+message RangeProofRequest {
+  bytes root_hash = 1;
+  bytes start_key = 2;
+  bytes end_key = 3;
+  uint32 key_limit = 4;
+  uint32 bytes_limit = 5;
+}
+
+// A ChangeProofRequest requests the changes between two revisions.
+message ChangeProofRequest {
+  bytes start_root_hash = 1;
+  bytes end_root_hash = 2;
+  bytes start_key = 3;
+  bytes end_key = 4;
+  uint32 key_limit = 5;
+  uint32 bytes_limit = 6;
+}

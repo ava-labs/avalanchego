@@ -11,8 +11,8 @@ import (
 	context "context"
 	reflect "reflect"
 
-	sync "github.com/ava-labs/avalanchego/proto/pb/sync"
-	merkledb "github.com/ava-labs/avalanchego/x/merkledb"
+	merkledb "github.com/ava-labs/avalanchego/proto/pb/merkledb"
+	merkledb0 "github.com/ava-labs/avalanchego/x/merkledb"
 	gomock "github.com/golang/mock/gomock"
 )
 
@@ -40,10 +40,10 @@ func (m *MockClient) EXPECT() *MockClientMockRecorder {
 }
 
 // GetChangeProof mocks base method.
-func (m *MockClient) GetChangeProof(arg0 context.Context, arg1 *sync.ChangeProofRequest, arg2 merkledb.MerkleDB) (*merkledb.ChangeProof, error) {
+func (m *MockClient) GetChangeProof(arg0 context.Context, arg1 *merkledb.ChangeProofRequest, arg2 merkledb0.MerkleDB) (*merkledb0.ChangeProof, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetChangeProof", arg0, arg1, arg2)
-	ret0, _ := ret[0].(*merkledb.ChangeProof)
+	ret0, _ := ret[0].(*merkledb0.ChangeProof)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -55,10 +55,10 @@ func (mr *MockClientMockRecorder) GetChangeProof(arg0, arg1, arg2 interface{}) *
 }
 
 // GetRangeProof mocks base method.
-func (m *MockClient) GetRangeProof(arg0 context.Context, arg1 *sync.RangeProofRequest) (*merkledb.RangeProof, error) {
+func (m *MockClient) GetRangeProof(arg0 context.Context, arg1 *merkledb.RangeProofRequest) (*merkledb0.RangeProof, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetRangeProof", arg0, arg1)
-	ret0, _ := ret[0].(*merkledb.RangeProof)
+	ret0, _ := ret[0].(*merkledb0.RangeProof)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 
+	merkledbpb "github.com/ava-labs/avalanchego/proto/pb/merkledb"
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
@@ -41,11 +42,11 @@ var (
 type Client interface {
 	// GetRangeProof synchronously sends the given request, returning a parsed StateResponse or error
 	// Note: this verifies the response including the range proof.
-	GetRangeProof(ctx context.Context, request *syncpb.RangeProofRequest) (*merkledb.RangeProof, error)
+	GetRangeProof(ctx context.Context, request *merkledbpb.RangeProofRequest) (*merkledb.RangeProof, error)
 	// GetChangeProof synchronously sends the given request, returning a parsed ChangesResponse or error
 	// [verificationDB] is the local db that has all key/values in it for the proof's startroot within the proof's key range
 	// Note: this verifies the response including the change proof.
-	GetChangeProof(ctx context.Context, request *syncpb.ChangeProofRequest, verificationDB merkledb.MerkleDB) (*merkledb.ChangeProof, error)
+	GetChangeProof(ctx context.Context, request *merkledbpb.ChangeProofRequest, verificationDB merkledb.MerkleDB) (*merkledb.ChangeProof, error)
 }
 
 type client struct {
@@ -79,7 +80,7 @@ func NewClient(config *ClientConfig) Client {
 // GetChangeProof synchronously retrieves the change proof given by [req].
 // Upon failure, retries until the context is expired.
 // The returned change proof is verified.
-func (c *client) GetChangeProof(ctx context.Context, req *syncpb.ChangeProofRequest, db merkledb.MerkleDB) (*merkledb.ChangeProof, error) {
+func (c *client) GetChangeProof(ctx context.Context, req *merkledbpb.ChangeProofRequest, db merkledb.MerkleDB) (*merkledb.ChangeProof, error) {
 	parseFn := func(ctx context.Context, responseBytes []byte) (*merkledb.ChangeProof, error) {
 		if len(responseBytes) > int(req.BytesLimit) {
 			return nil, fmt.Errorf("%w: (%d) > %d)", errTooManyBytes, len(responseBytes), req.BytesLimit)
@@ -96,12 +97,12 @@ func (c *client) GetChangeProof(ctx context.Context, req *syncpb.ChangeProofRequ
 			return nil, fmt.Errorf("%w: (%d) > %d)", errTooManyKeys, len(changeProof.KeyChanges), req.KeyLimit)
 		}
 
-		endRoot, err := ids.ToID(req.EndRoot)
+		endRoot, err := ids.ToID(req.EndRootHash)
 		if err != nil {
 			return nil, err
 		}
 
-		if err := db.VerifyChangeProof(ctx, changeProof, req.Start, req.End, endRoot); err != nil {
+		if err := db.VerifyChangeProof(ctx, changeProof, req.StartKey, req.EndKey, endRoot); err != nil {
 			return nil, fmt.Errorf("%s due to %w", errInvalidRangeProof, err)
 		}
 		return changeProof, nil
@@ -121,7 +122,7 @@ func (c *client) GetChangeProof(ctx context.Context, req *syncpb.ChangeProofRequ
 // GetRangeProof synchronously retrieves the range proof given by [req].
 // Upon failure, retries until the context is expired.
 // The returned range proof is verified.
-func (c *client) GetRangeProof(ctx context.Context, req *syncpb.RangeProofRequest) (*merkledb.RangeProof, error) {
+func (c *client) GetRangeProof(ctx context.Context, req *merkledbpb.RangeProofRequest) (*merkledb.RangeProof, error) {
 	parseFn := func(ctx context.Context, responseBytes []byte) (*merkledb.RangeProof, error) {
 		if len(responseBytes) > int(req.BytesLimit) {
 			return nil, fmt.Errorf("%w: (%d) > %d)", errTooManyBytes, len(responseBytes), req.BytesLimit)
@@ -137,15 +138,15 @@ func (c *client) GetRangeProof(ctx context.Context, req *syncpb.RangeProofReques
 			return nil, fmt.Errorf("%w: (%d) > %d)", errTooManyKeys, len(rangeProof.KeyValues), req.KeyLimit)
 		}
 
-		root, err := ids.ToID(req.Root)
+		root, err := ids.ToID(req.RootHash)
 		if err != nil {
 			return nil, err
 		}
 
 		if err := rangeProof.Verify(
 			ctx,
-			req.Start,
-			req.End,
+			req.StartKey,
+			req.EndKey,
 			root,
 		); err != nil {
 			return nil, fmt.Errorf("%s due to %w", errInvalidRangeProof, err)
