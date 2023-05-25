@@ -1503,6 +1503,54 @@ func TestProofNodeUnmarshalProtoInvalidChildIndex(t *testing.T) {
 	require.ErrorIs(t, err, ErrInvalidChildIndex)
 }
 
+func TestProofNodeUnmarshalProtoMissingFields(t *testing.T) {
+	rand := rand.New(rand.NewSource(1337)) // #nosec G404
+
+	type test struct {
+		name        string
+		nodeFunc    func() *syncpb.ProofNode
+		expectedErr error
+	}
+
+	tests := []test{
+		{
+			name: "nil node",
+			nodeFunc: func() *syncpb.ProofNode {
+				return nil
+			},
+			expectedErr: ErrNilProofNode,
+		},
+		{
+			name: "nil ValueOrHash",
+			nodeFunc: func() *syncpb.ProofNode {
+				node := newRandomProofNode(rand)
+				protoNode := node.ToProto()
+				protoNode.ValueOrHash = nil
+				return protoNode
+			},
+			expectedErr: ErrNilValueOrHash,
+		},
+		{
+			name: "nil key",
+			nodeFunc: func() *syncpb.ProofNode {
+				node := newRandomProofNode(rand)
+				protoNode := node.ToProto()
+				protoNode.Key = nil
+				return protoNode
+			},
+			expectedErr: ErrNilSerializedPath,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var node ProofNode
+			err := node.UnmarshalProto(tt.nodeFunc())
+			require.ErrorIs(t, err, tt.expectedErr)
+		})
+	}
+}
+
 func TestProofNodeProtoMarshalUnmarshal(t *testing.T) {
 	require := require.New(t)
 	rand := rand.New(rand.NewSource(1337)) // #nosec G404
