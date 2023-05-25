@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
 const (
@@ -56,6 +58,19 @@ type Parameters struct {
 	MixedQueryNumPushNonVdr int `json:"mixedQueryNumPushNonVdr" yaml:"mixedQueryNumPushNonVdr"`
 }
 
+var DefaultParameters = Parameters{
+	K:                       20,
+	Alpha:                   15,
+	BetaVirtuous:            20,
+	BetaRogue:               20,
+	ConcurrentRepolls:       4,
+	OptimalProcessing:       10,
+	MaxOutstandingItems:     256,
+	MaxItemProcessingTime:   30 * time.Second,
+	MixedQueryNumPushVdr:    10,
+	MixedQueryNumPushNonVdr: 2,
+}
+
 // Verify returns nil if the parameters describe a valid initialization.
 func (p Parameters) Verify() error {
 	switch {
@@ -86,4 +101,11 @@ func (p Parameters) Verify() error {
 	default:
 		return nil
 	}
+}
+
+func (p Parameters) MinPercentConnectedStakeHealthy() float64 {
+	alpha := p.Alpha
+	k := p.K
+	r := float64(alpha) / float64(k)
+	return r*(1-constants.MinConnectedStakeBuffer) + constants.MinConnectedStakeBuffer
 }

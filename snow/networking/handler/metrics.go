@@ -39,10 +39,7 @@ func newMetrics(namespace string, reg prometheus.Registerer) (*metrics, error) {
 		Name:      "async_expired",
 		Help:      "Incoming async messages dropped because the message deadline expired",
 	})
-	// TODO: remove this comment
-	// This was in PlatformVM code before, and it was forced initialized to 0
-	// for each subnet. Moving this here means this will be initialized
-	// for per chain.
+
 	percentConnected := prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespace,
 		Name:      "percent_connected",

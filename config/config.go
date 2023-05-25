@@ -1179,8 +1179,9 @@ func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]sub
 }
 
 func getDefaultSubnetConfig(v *viper.Viper) subnets.Config {
+	consensusParams := getConsensusConfig(v)
 	return subnets.Config{
-		ConsensusParameters:   getConsensusConfig(v),
+		ConsensusParameters:   consensusParams,
 		ValidatorOnly:         false,
 		GossipConfig:          getGossipConfig(v),
 		ProposerMinBlockDelay: proposervm.DefaultMinBlockDelay,
@@ -1442,21 +1443,6 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 		return node.Config{}, err
 	}
 
-	// Node health
-	nodeConfig.MinPercentConnectedStakeHealthy = map[ids.ID]float64{
-		constants.PrimaryNetworkID: calcMinConnectedStake(primaryNetworkConfig.ConsensusParameters),
-	}
-
-	// Invariant: nodeConfig.MinPercentConnectedStakeHealthy is populated for all tracked subnets
-	// including the primary network
-	for _, subnetID := range nodeConfig.TrackedSubnets.List() {
-		if subnetConfig, ok := subnetConfigs[subnetID]; ok {
-			nodeConfig.MinPercentConnectedStakeHealthy[subnetID] = calcMinConnectedStake(subnetConfig.ConsensusParameters)
-		} else {
-			nodeConfig.MinPercentConnectedStakeHealthy[subnetID] = calcMinConnectedStake(primaryNetworkConfig.ConsensusParameters)
-		}
-	}
-
 	// Chain Configs
 	nodeConfig.ChainConfigs, err = getChainConfigs(v)
 	if err != nil {
@@ -1509,15 +1495,6 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 
 	nodeConfig.ProvidedFlags = providedFlags(v)
 	return nodeConfig, nil
-}
-
-// calcMinConnectedStake takes [consensusParams] as input and calculates the
-// expected min connected stake percentage according to alpha and k.
-func calcMinConnectedStake(consensusParams snowball.Parameters) float64 {
-	alpha := consensusParams.Alpha
-	k := consensusParams.K
-	r := float64(alpha) / float64(k)
-	return r*(1-constants.MinConnectedStakeBuffer) + constants.MinConnectedStakeBuffer
 }
 
 func providedFlags(v *viper.Viper) map[string]interface{} {

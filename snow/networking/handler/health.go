@@ -5,8 +5,11 @@ package handler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 )
+
+var ErrNotConnectedEnoughStake = errors.New("not connected to enough stake")
 
 func (h *handler) HealthCheck(ctx context.Context) (interface{}, error) {
 	h.ctx.Lock.Lock()
@@ -34,7 +37,8 @@ func (h *handler) HealthCheck(ctx context.Context) (interface{}, error) {
 	if networkingErr == nil {
 		return intf, engineErr
 	}
-	return intf, fmt.Errorf("engine: %w ; networking: %v", engineErr, networkingErr)
+	// TODO: Update this to return both errors with %w once we upgrade to Go 1.20
+	return intf, fmt.Errorf("engine: %v; networking: %v", engineErr, networkingErr)
 }
 
 func (h *handler) networkHealthCheck() (interface{}, error) {
@@ -45,10 +49,13 @@ func (h *handler) networkHealthCheck() (interface{}, error) {
 	h.metrics.SetPercentConnected(percentConnected)
 
 	var err error
-	if percentConnected < h.ctx.MinPercentConnectedStakeHealthy {
-		err = fmt.Errorf("connected to %f%% of network stake; should be connected to at least %f%%",
+	subnetConfig := h.subnet.Config()
+	minPercentStake := subnetConfig.ConsensusParameters.MinPercentConnectedStakeHealthy()
+	if percentConnected < minPercentStake {
+		err = fmt.Errorf("%w: connected to %f%%; required at least %f%%",
+			ErrNotConnectedEnoughStake,
 			percentConnected*100,
-			h.ctx.MinPercentConnectedStakeHealthy*100,
+			minPercentStake*100,
 		)
 	}
 

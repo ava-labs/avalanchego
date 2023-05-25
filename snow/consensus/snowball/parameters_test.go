@@ -7,6 +7,9 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestParametersVerify(t *testing.T) {
@@ -228,5 +231,42 @@ func TestParametersInvalidMaxItemProcessingTime(t *testing.T) {
 
 	if err := p.Verify(); err == nil {
 		t.Fatalf("Should have failed due to invalid max item processing time")
+	}
+}
+
+func TestCalcMinConnectedStake(t *testing.T) {
+	tests := []struct {
+		name             string
+		params           Parameters
+		expectedMinStake float64
+	}{
+		{
+			name:             "default",
+			params:           DefaultParameters,
+			expectedMinStake: 0.8,
+		},
+		{
+			name: "custom",
+			params: Parameters{
+				K:                       60,
+				Alpha:                   15,
+				BetaVirtuous:            20,
+				BetaRogue:               20,
+				ConcurrentRepolls:       4,
+				OptimalProcessing:       10,
+				MaxOutstandingItems:     256,
+				MaxItemProcessingTime:   30 * time.Second,
+				MixedQueryNumPushVdr:    10,
+				MixedQueryNumPushNonVdr: 2,
+			},
+			expectedMinStake: 0.4,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			minStake := tt.params.MinPercentConnectedStakeHealthy()
+			require.Equal(t, tt.expectedMinStake, minStake)
+		})
 	}
 }

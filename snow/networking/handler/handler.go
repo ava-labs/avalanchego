@@ -121,7 +121,7 @@ type handler struct {
 
 	subnetConnector validators.SubnetConnector
 
-	subnetAllower subnets.Allower
+	subnet subnets.Subnet
 
 	// Tracks the peers that are currently connected to this subnet
 	peerTracker commontracker.Peers
@@ -152,7 +152,7 @@ func New(
 		closed:           make(chan struct{}),
 		resourceTracker:  resourceTracker,
 		subnetConnector:  subnetConnector,
-		subnetAllower:    subnet,
+		subnet:           subnet,
 		peerTracker:      peerTracker,
 	}
 
@@ -179,7 +179,7 @@ func (h *handler) Context() *snow.ConsensusContext {
 }
 
 func (h *handler) ShouldHandle(nodeID ids.NodeID) bool {
-	return h.subnetAllower.IsAllowed(nodeID, h.validators.Contains(nodeID))
+	return h.subnet.IsAllowed(nodeID, h.validators.Contains(nodeID))
 }
 
 func (h *handler) SetEngineManager(engineManager *EngineManager) {

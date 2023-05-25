@@ -87,10 +87,10 @@ var (
 	// Bootstrapping prefixes for ChainVMs
 	bootstrappingDB = []byte("bs")
 
-	errUnknownVMType          = errors.New("the vm should have type avalanche.DAGVM or snowman.ChainVM")
-	errCreatePlatformVM       = errors.New("attempted to create a chain running the PlatformVM")
-	errNotBootstrapped        = errors.New("subnets not bootstrapped")
-	errNoPlatformSubnetConfig = errors.New("subnet config for platform chain not found")
+	errUnknownVMType         = errors.New("the vm should have type avalanche.DAGVM or snowman.ChainVM")
+	errCreatePlatformVM      = errors.New("attempted to create a chain running the PlatformVM")
+	errNotBootstrapped       = errors.New("subnets not bootstrapped")
+	errNoPrimarySubnetConfig = errors.New("no subnet config for primary network found")
 
 	_ Manager = (*manager)(nil)
 )
@@ -224,15 +224,6 @@ type ManagerConfig struct {
 	StateSyncBeacons []ids.NodeID
 
 	ChainDataDir string
-
-	// Subnet ID --> Minimum portion of the subnet's stake this node must be
-	// connected to in order to report healthy.
-	// [constants.PrimaryNetworkID] is always a key in this map.
-	// If a subnet is in this map, but it isn't tracked, its corresponding value
-	// isn't used.
-	// If a subnet is tracked but not in this map, we use the value for the
-	// Primary Network.
-	MinPercentConnectedStakeHealthy map[ids.ID]float64
 }
 
 type manager struct {
@@ -466,16 +457,6 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 		return nil, fmt.Errorf("error while registering vm's metrics %w", err)
 	}
 
-	minPercentConnected, ok := m.MinPercentConnectedStakeHealthy[chainParams.SubnetID]
-	if !ok {
-		// try primary min percent
-		minPercentConnected, ok = m.MinPercentConnectedStakeHealthy[constants.PrimaryNetworkID]
-		if !ok {
-			// fallback to default
-			minPercentConnected = constants.DefaultMinConnectedStake
-		}
-	}
-
 	ctx := &snow.ConsensusContext{
 		Context: &snow.Context{
 			NetworkID: m.NetworkID,
@@ -499,12 +480,11 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 			ValidatorState: m.validatorState,
 			ChainDataDir:   chainDataDir,
 		},
-		BlockAcceptor:                   m.BlockAcceptorGroup,
-		TxAcceptor:                      m.TxAcceptorGroup,
-		VertexAcceptor:                  m.VertexAcceptorGroup,
-		Registerer:                      consensusMetrics,
-		AvalancheRegisterer:             avalancheConsensusMetrics,
-		MinPercentConnectedStakeHealthy: minPercentConnected,
+		BlockAcceptor:       m.BlockAcceptorGroup,
+		TxAcceptor:          m.TxAcceptorGroup,
+		VertexAcceptor:      m.VertexAcceptorGroup,
+		Registerer:          consensusMetrics,
+		AvalancheRegisterer: avalancheConsensusMetrics,
 	}
 
 	// Get a factory for the vm we want to use on our chain
@@ -832,8 +812,9 @@ func (m *manager) createAvalancheChain(
 		sampleK = int(bootstrapWeight)
 	}
 
-	connectedVdrs := tracker.NewPeers()
-	vdrs.RegisterCallbackListener(connectedVdrs)
+	connectedBeacons := tracker.NewPeers()
+	startupTracker := tracker.NewStartup(connectedBeacons, (3*bootstrapWeight+3)/4)
+	beacons.RegisterCallbackListener(startupTracker)
 
 	// Asynchronously passes messages from the network to the consensus engine
 	h, err := handler.New(
@@ -845,15 +826,11 @@ func (m *manager) createAvalancheChain(
 		m.ResourceTracker,
 		validators.UnhandledSubnetConnector, // avalanche chains don't use subnet connector
 		sb,
-		connectedVdrs,
+		connectedBeacons, // beacons == vdrs for non-platform chains
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing network handler: %w", err)
 	}
-
-	connectedBeacons := tracker.NewPeers()
-	startupTracker := tracker.NewStartup(connectedBeacons, (3*bootstrapWeight+3)/4)
-	beacons.RegisterCallbackListener(startupTracker)
 
 	snowmanCommonCfg := common.Config{
 		Ctx:                            ctx,
@@ -1170,8 +1147,18 @@ func (m *manager) createSnowmanChain(
 		sampleK = int(bootstrapWeight)
 	}
 
-	connectedVdrs := tracker.NewPeers()
-	vdrs.RegisterCallbackListener(connectedVdrs)
+	connectedBeacons := tracker.NewPeers()
+	startupTracker := tracker.NewStartup(connectedBeacons, (3*bootstrapWeight+3)/4)
+	beacons.RegisterCallbackListener(startupTracker)
+	connectedVdrs := connectedBeacons
+
+	// If this is the P-Chain, then we need to create a new connectedVdrs
+	// that tracks the validators connected to the P-Chain. This is because
+	// the P-Chain is the only chain that can have custom beacons.
+	if ctx.ChainID == constants.PlatformChainID {
+		connectedVdrs = tracker.NewPeers()
+		vdrs.RegisterCallbackListener(connectedVdrs)
+	}
 
 	// Asynchronously passes messages from the network to the consensus engine
 	h, err := handler.New(
@@ -1188,10 +1175,6 @@ func (m *manager) createSnowmanChain(
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize message handler: %w", err)
 	}
-
-	connectedBeacons := tracker.NewPeers()
-	startupTracker := tracker.NewStartup(connectedBeacons, (3*bootstrapWeight+3)/4)
-	beacons.RegisterCallbackListener(startupTracker)
 
 	commonCfg := common.Config{
 		Ctx:                            ctx,
@@ -1348,7 +1331,7 @@ func (m *manager) StartChainCreator(platformParams ChainParameters) error {
 	// throw a fatal error.
 	sbConfig, ok := m.SubnetConfigs[constants.PrimaryNetworkID]
 	if !ok {
-		return errNoPlatformSubnetConfig
+		return errNoPrimarySubnetConfig
 	}
 
 	sb := subnets.New(m.NodeID, sbConfig)

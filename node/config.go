@@ -218,10 +218,6 @@ type Config struct {
 
 	TraceConfig trace.Config `json:"traceConfig"`
 
-	// See comment on [MinPercentConnectedStakeHealthy] in platformvm.Config
-	// TODO: consider moving to subnet config
-	MinPercentConnectedStakeHealthy map[ids.ID]float64 `json:"minPercentConnectedStakeHealthy"`
-
 	// See comment on [UseCurrentHeight] in platformvm.Config
 	UseCurrentHeight bool `json:"useCurrentHeight"`
 

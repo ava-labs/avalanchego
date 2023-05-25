@@ -5,7 +5,6 @@ package handler
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -15,12 +14,12 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	commontracker "github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/subnets"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -28,13 +27,17 @@ import (
 
 func TestHealthCheckSubnet(t *testing.T) {
 	tests := map[string]struct {
-		minStake float64
+		consensusParams snowball.Parameters
 	}{
-		"default min stake": {
-			minStake: constants.DefaultMinConnectedStake,
+		"default consensus params": {
+			consensusParams: snowball.DefaultParameters,
 		},
-		"custom min stake": {
-			minStake: 0.40,
+		"custom consensus params": {
+			func() snowball.Parameters {
+				params := snowball.DefaultParameters
+				params.K = params.Alpha
+				return params
+			}(),
 		},
 	}
 
@@ -56,6 +59,13 @@ func TestHealthCheckSubnet(t *testing.T) {
 
 			peerTracker := commontracker.NewPeers()
 			vdrs.RegisterCallbackListener(peerTracker)
+
+			sb := subnets.New(
+				ctx.NodeID,
+				subnets.Config{
+					ConsensusParameters: test.consensusParams,
+				},
+			)
 			handlerIntf, err := New(
 				ctx,
 				vdrs,
@@ -64,7 +74,7 @@ func TestHealthCheckSubnet(t *testing.T) {
 				testThreadPoolSize,
 				resourceTracker,
 				validators.UnhandledSubnetConnector,
-				subnets.New(ctx.NodeID, subnets.Config{}),
+				sb,
 				peerTracker,
 			)
 
@@ -112,25 +122,27 @@ func TestHealthCheckSubnet(t *testing.T) {
 				vdrIDs.Add(vdrID)
 			}
 
-			ctx.MinPercentConnectedStakeHealthy = test.minStake
-
 			for index, vdr := range vdrs.List() {
 				err := peerTracker.Connected(context.Background(), vdr.NodeID, nil)
 				require.NoError(err)
 				details, err := handlerIntf.HealthCheck(context.Background())
 				connectedPerc := float64(index+1) / float64(testVdrCount)
-				if connectedPerc >= test.minStake {
+				conf := sb.Config()
+				minStake := conf.ConsensusParameters.MinPercentConnectedStakeHealthy()
+				if connectedPerc >= minStake {
 					require.NoError(err)
 				} else {
-					expectedDetails := map[string]float64{
-						"percentConnected": connectedPerc,
-					}
-					require.Contains(fmt.Sprint(details), fmt.Sprint(expectedDetails))
-					err := fmt.Errorf("connected to %f%% of network stake; should be connected to at least %f%%",
-						connectedPerc*100,
-						test.minStake*100,
-					)
-					require.Contains(err.Error(), err.Error())
+					detailsMap, ok := details.(map[string]interface{})
+					require.True(ok)
+					networkingMap, ok := detailsMap["networking"]
+					require.True(ok)
+					networkingDetails, ok := networkingMap.(map[string]float64)
+					require.True(ok)
+					percentConnected, ok := networkingDetails["percentConnected"]
+					require.True(ok)
+					require.Equal(connectedPerc, percentConnected)
+
+					require.ErrorIs(err, ErrNotConnectedEnoughStake)
 				}
 			}
 		})
