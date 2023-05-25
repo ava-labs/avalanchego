@@ -304,7 +304,7 @@ func TestPingUptimes(t *testing.T) {
 
 				uptime, ok = peer.ObservedUptime(randomSubnetID)
 				require.False(t, ok)
-				require.Equal(t, uint32(0), uptime)
+				require.Zero(t, uptime)
 			},
 		},
 		{
@@ -347,7 +347,7 @@ func TestPingUptimes(t *testing.T) {
 
 				uptime, ok = peer.ObservedUptime(nonTrackingSubnetID)
 				require.False(t, ok)
-				require.Equal(t, uint32(0), uptime)
+				require.Zero(t, uptime)
 			},
 			closed: true,
 		},
