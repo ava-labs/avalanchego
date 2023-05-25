@@ -262,12 +262,12 @@ func (m *StateSyncManager) getAndApplyChangeProof(ctx context.Context, workItem 
 	changeProof, err := m.config.Client.GetChangeProof(
 		ctx,
 		&syncpb.ChangeProofRequest{
-			StartRootHash:  workItem.LocalRootID[:],
-			EndRootHash:    rootID[:],
+			StartRootHash: workItem.LocalRootID[:],
+			EndRootHash:   rootID[:],
 			StartKey:      workItem.start,
 			EndKey:        workItem.end,
-			KeyLimit:   defaultRequestKeyLimit,
-			BytesLimit: defaultRequestByteSizeLimit,
+			KeyLimit:      defaultRequestKeyLimit,
+			BytesLimit:    defaultRequestByteSizeLimit,
 		},
 		m.config.SyncDB,
 	)
@@ -311,9 +311,9 @@ func (m *StateSyncManager) getAndApplyRangeProof(ctx context.Context, workItem *
 	rootID := m.getTargetRoot()
 	proof, err := m.config.Client.GetRangeProof(ctx,
 		&syncpb.RangeProofRequest{
-			RootHash:       rootID[:],
-			StartKey:      workItem.start,
-			EndKey:        workItem.end,
+			RootHash:   rootID[:],
+			StartKey:   workItem.start,
+			EndKey:     workItem.end,
 			KeyLimit:   defaultRequestKeyLimit,
 			BytesLimit: defaultRequestByteSizeLimit,
 		},
