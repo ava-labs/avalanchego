@@ -22,9 +22,6 @@ service MerkleDBService {
   rpc CommitRangeProof(CommitRangeProofRequest) returns (ErrorResponse);
 }
 
-// TODO: All of the below is copy-pasted from avalanchego.
-// We should import these definitions once they're in buf.build.
-
 // TODO use enum / improve this.
 message ErrorResponse {
   string message = 1;
