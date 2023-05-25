@@ -7,7 +7,7 @@ import "merkledb/merkledb.proto";
 option go_package = "github.com/ava-labs/avalanchego/proto/pb/sync";
 
 // Request represents a request for information during syncing.
-message Request {
+message SyncRequest {
   oneof message {
     merkledb.RangeProofRequest range_proof_request = 1;
     merkledb.ChangeProofRequest change_proof_request = 2;

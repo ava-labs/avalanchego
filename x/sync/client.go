@@ -108,8 +108,8 @@ func (c *client) GetChangeProof(ctx context.Context, req *merkledbpb.ChangeProof
 		return changeProof, nil
 	}
 
-	reqBytes, err := proto.Marshal(&syncpb.Request{
-		Message: &syncpb.Request_ChangeProofRequest{
+	reqBytes, err := proto.Marshal(&syncpb.SyncRequest{
+		Message: &syncpb.SyncRequest_ChangeProofRequest{
 			ChangeProofRequest: req,
 		},
 	})
@@ -154,8 +154,8 @@ func (c *client) GetRangeProof(ctx context.Context, req *merkledbpb.RangeProofRe
 		return rangeProof, nil
 	}
 
-	reqBytes, err := proto.Marshal(&syncpb.Request{
-		Message: &syncpb.Request_RangeProofRequest{
+	reqBytes, err := proto.Marshal(&syncpb.SyncRequest{
+		Message: &syncpb.SyncRequest_RangeProofRequest{
 			RangeProofRequest: req,
 		},
 	})
