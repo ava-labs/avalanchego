@@ -3,6 +3,7 @@ syntax = "proto3";
 package merkledb;
 
 import "google/protobuf/empty.proto";
+import "rpcdb/rpcdb.proto";
 
 option go_package = "github.com/ava-labs/avalanchego/proto/pb/merkledb";
 
@@ -11,21 +12,19 @@ service MerkleDBService {
   rpc GetMerkleRoot(google.protobuf.Empty) returns (GetMerkleRootResponse);
 
   rpc GetChangeProof(ChangeProofRequest) returns (ChangeProof);
-  rpc VerifyChangeProof(ChangeProof) returns (ErrorResponse);
-  rpc CommitChangeProof(ChangeProof) returns (ErrorResponse);
+  rpc VerifyChangeProof(ChangeProof) returns (Error);
+  rpc CommitChangeProof(ChangeProof) returns (Error);
 
   rpc GetProof(GetProofRequest) returns (Proof);
-  rpc VerifyProof(Proof) returns (ErrorResponse);
+  rpc VerifyProof(Proof) returns (Error);
 
   rpc GetRangeProof(RangeProofRequest) returns (RangeProof);
-  rpc VerifyRangeProof(RangeProof) returns (ErrorResponse);
-  rpc CommitRangeProof(CommitRangeProofRequest) returns (ErrorResponse);
+  rpc VerifyRangeProof(RangeProof) returns (Error);
+  rpc CommitRangeProof(CommitRangeProofRequest) returns (Error);
 }
 
-// TODO use enum / improve this.
-message ErrorResponse {
-  string message = 1;
-  bool is_error = 2;
+message Error {
+  rpcdb.Error error = 1;
 }
 
 message GetProofRequest {

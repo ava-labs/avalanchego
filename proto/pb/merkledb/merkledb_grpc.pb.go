@@ -37,13 +37,13 @@ const (
 type MerkleDBServiceClient interface {
 	GetMerkleRoot(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetMerkleRootResponse, error)
 	GetChangeProof(ctx context.Context, in *ChangeProofRequest, opts ...grpc.CallOption) (*ChangeProof, error)
-	VerifyChangeProof(ctx context.Context, in *ChangeProof, opts ...grpc.CallOption) (*ErrorResponse, error)
-	CommitChangeProof(ctx context.Context, in *ChangeProof, opts ...grpc.CallOption) (*ErrorResponse, error)
+	VerifyChangeProof(ctx context.Context, in *ChangeProof, opts ...grpc.CallOption) (*Error, error)
+	CommitChangeProof(ctx context.Context, in *ChangeProof, opts ...grpc.CallOption) (*Error, error)
 	GetProof(ctx context.Context, in *GetProofRequest, opts ...grpc.CallOption) (*Proof, error)
-	VerifyProof(ctx context.Context, in *Proof, opts ...grpc.CallOption) (*ErrorResponse, error)
+	VerifyProof(ctx context.Context, in *Proof, opts ...grpc.CallOption) (*Error, error)
 	GetRangeProof(ctx context.Context, in *RangeProofRequest, opts ...grpc.CallOption) (*RangeProof, error)
-	VerifyRangeProof(ctx context.Context, in *RangeProof, opts ...grpc.CallOption) (*ErrorResponse, error)
-	CommitRangeProof(ctx context.Context, in *CommitRangeProofRequest, opts ...grpc.CallOption) (*ErrorResponse, error)
+	VerifyRangeProof(ctx context.Context, in *RangeProof, opts ...grpc.CallOption) (*Error, error)
+	CommitRangeProof(ctx context.Context, in *CommitRangeProofRequest, opts ...grpc.CallOption) (*Error, error)
 }
 
 type merkleDBServiceClient struct {
@@ -72,8 +72,8 @@ func (c *merkleDBServiceClient) GetChangeProof(ctx context.Context, in *ChangePr
 	return out, nil
 }
 
-func (c *merkleDBServiceClient) VerifyChangeProof(ctx context.Context, in *ChangeProof, opts ...grpc.CallOption) (*ErrorResponse, error) {
-	out := new(ErrorResponse)
+func (c *merkleDBServiceClient) VerifyChangeProof(ctx context.Context, in *ChangeProof, opts ...grpc.CallOption) (*Error, error) {
+	out := new(Error)
 	err := c.cc.Invoke(ctx, MerkleDBService_VerifyChangeProof_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -81,8 +81,8 @@ func (c *merkleDBServiceClient) VerifyChangeProof(ctx context.Context, in *Chang
 	return out, nil
 }
 
-func (c *merkleDBServiceClient) CommitChangeProof(ctx context.Context, in *ChangeProof, opts ...grpc.CallOption) (*ErrorResponse, error) {
-	out := new(ErrorResponse)
+func (c *merkleDBServiceClient) CommitChangeProof(ctx context.Context, in *ChangeProof, opts ...grpc.CallOption) (*Error, error) {
+	out := new(Error)
 	err := c.cc.Invoke(ctx, MerkleDBService_CommitChangeProof_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -99,8 +99,8 @@ func (c *merkleDBServiceClient) GetProof(ctx context.Context, in *GetProofReques
 	return out, nil
 }
 
-func (c *merkleDBServiceClient) VerifyProof(ctx context.Context, in *Proof, opts ...grpc.CallOption) (*ErrorResponse, error) {
-	out := new(ErrorResponse)
+func (c *merkleDBServiceClient) VerifyProof(ctx context.Context, in *Proof, opts ...grpc.CallOption) (*Error, error) {
+	out := new(Error)
 	err := c.cc.Invoke(ctx, MerkleDBService_VerifyProof_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -117,8 +117,8 @@ func (c *merkleDBServiceClient) GetRangeProof(ctx context.Context, in *RangeProo
 	return out, nil
 }
 
-func (c *merkleDBServiceClient) VerifyRangeProof(ctx context.Context, in *RangeProof, opts ...grpc.CallOption) (*ErrorResponse, error) {
-	out := new(ErrorResponse)
+func (c *merkleDBServiceClient) VerifyRangeProof(ctx context.Context, in *RangeProof, opts ...grpc.CallOption) (*Error, error) {
+	out := new(Error)
 	err := c.cc.Invoke(ctx, MerkleDBService_VerifyRangeProof_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -126,8 +126,8 @@ func (c *merkleDBServiceClient) VerifyRangeProof(ctx context.Context, in *RangeP
 	return out, nil
 }
 
-func (c *merkleDBServiceClient) CommitRangeProof(ctx context.Context, in *CommitRangeProofRequest, opts ...grpc.CallOption) (*ErrorResponse, error) {
-	out := new(ErrorResponse)
+func (c *merkleDBServiceClient) CommitRangeProof(ctx context.Context, in *CommitRangeProofRequest, opts ...grpc.CallOption) (*Error, error) {
+	out := new(Error)
 	err := c.cc.Invoke(ctx, MerkleDBService_CommitRangeProof_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -141,13 +141,13 @@ func (c *merkleDBServiceClient) CommitRangeProof(ctx context.Context, in *Commit
 type MerkleDBServiceServer interface {
 	GetMerkleRoot(context.Context, *emptypb.Empty) (*GetMerkleRootResponse, error)
 	GetChangeProof(context.Context, *ChangeProofRequest) (*ChangeProof, error)
-	VerifyChangeProof(context.Context, *ChangeProof) (*ErrorResponse, error)
-	CommitChangeProof(context.Context, *ChangeProof) (*ErrorResponse, error)
+	VerifyChangeProof(context.Context, *ChangeProof) (*Error, error)
+	CommitChangeProof(context.Context, *ChangeProof) (*Error, error)
 	GetProof(context.Context, *GetProofRequest) (*Proof, error)
-	VerifyProof(context.Context, *Proof) (*ErrorResponse, error)
+	VerifyProof(context.Context, *Proof) (*Error, error)
 	GetRangeProof(context.Context, *RangeProofRequest) (*RangeProof, error)
-	VerifyRangeProof(context.Context, *RangeProof) (*ErrorResponse, error)
-	CommitRangeProof(context.Context, *CommitRangeProofRequest) (*ErrorResponse, error)
+	VerifyRangeProof(context.Context, *RangeProof) (*Error, error)
+	CommitRangeProof(context.Context, *CommitRangeProofRequest) (*Error, error)
 	mustEmbedUnimplementedMerkleDBServiceServer()
 }
 
@@ -161,25 +161,25 @@ func (UnimplementedMerkleDBServiceServer) GetMerkleRoot(context.Context, *emptyp
 func (UnimplementedMerkleDBServiceServer) GetChangeProof(context.Context, *ChangeProofRequest) (*ChangeProof, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetChangeProof not implemented")
 }
-func (UnimplementedMerkleDBServiceServer) VerifyChangeProof(context.Context, *ChangeProof) (*ErrorResponse, error) {
+func (UnimplementedMerkleDBServiceServer) VerifyChangeProof(context.Context, *ChangeProof) (*Error, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method VerifyChangeProof not implemented")
 }
-func (UnimplementedMerkleDBServiceServer) CommitChangeProof(context.Context, *ChangeProof) (*ErrorResponse, error) {
+func (UnimplementedMerkleDBServiceServer) CommitChangeProof(context.Context, *ChangeProof) (*Error, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CommitChangeProof not implemented")
 }
 func (UnimplementedMerkleDBServiceServer) GetProof(context.Context, *GetProofRequest) (*Proof, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetProof not implemented")
 }
-func (UnimplementedMerkleDBServiceServer) VerifyProof(context.Context, *Proof) (*ErrorResponse, error) {
+func (UnimplementedMerkleDBServiceServer) VerifyProof(context.Context, *Proof) (*Error, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method VerifyProof not implemented")
 }
 func (UnimplementedMerkleDBServiceServer) GetRangeProof(context.Context, *RangeProofRequest) (*RangeProof, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetRangeProof not implemented")
 }
-func (UnimplementedMerkleDBServiceServer) VerifyRangeProof(context.Context, *RangeProof) (*ErrorResponse, error) {
+func (UnimplementedMerkleDBServiceServer) VerifyRangeProof(context.Context, *RangeProof) (*Error, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method VerifyRangeProof not implemented")
 }
-func (UnimplementedMerkleDBServiceServer) CommitRangeProof(context.Context, *CommitRangeProofRequest) (*ErrorResponse, error) {
+func (UnimplementedMerkleDBServiceServer) CommitRangeProof(context.Context, *CommitRangeProofRequest) (*Error, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CommitRangeProof not implemented")
 }
 func (UnimplementedMerkleDBServiceServer) mustEmbedUnimplementedMerkleDBServiceServer() {}
