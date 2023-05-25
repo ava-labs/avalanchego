@@ -42,6 +42,8 @@ var (
 	ErrNilValueOrHash              = errors.New("proof node's valueOrHash field is nil")
 	ErrNilSerializedPath           = errors.New("serialized path is nil")
 	ErrNilRangeProof               = errors.New("range proof is nil")
+	ErrNilChangeProof              = errors.New("change proof is nil")
+	ErrNilMaybeBytes               = errors.New("maybe bytes is nil")
 )
 
 type ProofNode struct {
@@ -471,6 +473,10 @@ func (proof *ChangeProof) ToProto() *syncpb.ChangeProof {
 }
 
 func (proof *ChangeProof) UnmarshalProto(pbProof *syncpb.ChangeProof) error {
+	if pbProof == nil {
+		return ErrNilChangeProof
+	}
+
 	proof.HadRootsInHistory = pbProof.HadRootsInHistory
 
 	proof.StartProof = make([]ProofNode, len(pbProof.StartProof))
@@ -489,6 +495,10 @@ func (proof *ChangeProof) UnmarshalProto(pbProof *syncpb.ChangeProof) error {
 
 	proof.KeyChanges = make([]KeyChange, len(pbProof.KeyChanges))
 	for i, kv := range pbProof.KeyChanges {
+		if kv.Value == nil {
+			return ErrNilMaybeBytes
+		}
+
 		if kv.Value.IsNothing && len(kv.Value.Value) != 0 {
 			return ErrInvalidMaybe
 		}

@@ -1491,6 +1491,64 @@ func TestChangeProofProtoMarshalUnmarshal(t *testing.T) {
 	}
 }
 
+func TestChangeProofUnmarshalProtoNil(t *testing.T) {
+	var proof ChangeProof
+	err := proof.UnmarshalProto(nil)
+	require.ErrorIs(t, err, ErrNilChangeProof)
+}
+
+func TestChangeProofUnmarshalProtoNilValue(t *testing.T) {
+	rand := rand.New(rand.NewSource(1337)) // #nosec G404
+
+	// Make a random change proof.
+	startProofLen := rand.Intn(32)
+	startProof := make([]ProofNode, startProofLen)
+	for i := 0; i < startProofLen; i++ {
+		startProof[i] = newRandomProofNode(rand)
+	}
+
+	endProofLen := rand.Intn(32)
+	endProof := make([]ProofNode, endProofLen)
+	for i := 0; i < endProofLen; i++ {
+		endProof[i] = newRandomProofNode(rand)
+	}
+
+	numKeyChanges := rand.Intn(128) + 1
+	keyChanges := make([]KeyChange, numKeyChanges)
+	for i := 0; i < numKeyChanges; i++ {
+		keyLen := rand.Intn(32)
+		key := make([]byte, keyLen)
+		_, _ = rand.Read(key)
+
+		var value Maybe[[]byte]
+		hasValue := rand.Intn(2) == 0
+		if hasValue {
+			valueLen := rand.Intn(32)
+			valueBytes := make([]byte, valueLen)
+			_, _ = rand.Read(valueBytes)
+			value = Some(valueBytes)
+		}
+
+		keyChanges[i] = KeyChange{
+			Key:   key,
+			Value: value,
+		}
+	}
+
+	proof := ChangeProof{
+		StartProof: startProof,
+		EndProof:   endProof,
+		KeyChanges: keyChanges,
+	}
+	protoProof := proof.ToProto()
+	// Make a value nil
+	protoProof.KeyChanges[0].Value = nil
+
+	var unmarshaledProof ChangeProof
+	err := unmarshaledProof.UnmarshalProto(protoProof)
+	require.ErrorIs(t, err, ErrNilMaybeBytes)
+}
+
 func TestChangeProofUnmarshalProtoInvalidMaybe(t *testing.T) {
 	protoProof := &syncpb.ChangeProof{
 		KeyChanges: []*syncpb.KeyChange{
