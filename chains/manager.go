@@ -524,7 +524,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 	var hasValidators bool
 	if m.SybilProtectionEnabled {
 		vdrs, hasValidators = m.Validators.Get(chainParams.SubnetID)
-	} else { // Staking is disabled. Every peer validates every subnet.
+	} else { // Sybil protection is disabled. Every peer validates every subnet.
 		vdrs, hasValidators = m.Validators.Get(constants.PrimaryNetworkID)
 	}
 	if !hasValidators {

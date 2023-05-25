@@ -42,7 +42,7 @@ func (h *handler) HealthCheck(ctx context.Context) (interface{}, error) {
 }
 
 func (h *handler) networkHealthCheck() (interface{}, error) {
-	percentConnected := h.getPercentConnected()
+	percentConnected := h.peerTracker.ConnectedPercent()
 	details := map[string]float64{
 		"percentConnected": percentConnected,
 	}
@@ -60,14 +60,4 @@ func (h *handler) networkHealthCheck() (interface{}, error) {
 	}
 
 	return details, err
-}
-
-func (h *handler) getPercentConnected() float64 {
-	vdrSetWeight := h.peerTracker.Weight()
-	if vdrSetWeight == 0 {
-		return 1
-	}
-
-	connectedStake := h.peerTracker.ConnectedWeight()
-	return float64(connectedStake) / float64(vdrSetWeight)
 }

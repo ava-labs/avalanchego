@@ -24,6 +24,8 @@ type Peers interface {
 	Weight() uint64
 	// ConnectedWeight returns the currently connected stake weight
 	ConnectedWeight() uint64
+	// ConnectedValidators returns the currently connected stake percentage [0, 1]
+	ConnectedPercent() float64
 	// PreferredPeers returns the currently connected validators. If there are
 	// no currently connected validators then it will return the currently
 	// connected peers.
@@ -120,10 +122,20 @@ func (p *peers) ConnectedWeight() uint64 {
 }
 
 func (p *peers) Weight() uint64 {
+	return p.totalWeight
+}
+
+func (p *peers) ConnectedPercent() float64 {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
-	return p.totalWeight
+	vdrSetWeight := p.Weight()
+	if vdrSetWeight == 0 {
+		return 1
+	}
+
+	connectedStake := p.ConnectedWeight()
+	return float64(connectedStake) / float64(vdrSetWeight)
 }
 
 func (p *peers) PreferredPeers() set.Set[ids.NodeID] {
