@@ -250,6 +250,11 @@ func defaultState(
 	if err := state.Commit(); err != nil {
 		panic(err)
 	}
+	state.SetHeight( /*height*/ 0)
+	if err := state.Commit(); err != nil {
+		panic(err)
+	}
+
 	return state
 }
 
