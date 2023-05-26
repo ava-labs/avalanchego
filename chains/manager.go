@@ -87,10 +87,10 @@ var (
 	// Bootstrapping prefixes for ChainVMs
 	bootstrappingDB = []byte("bs")
 
-	errUnknownVMType         = errors.New("the vm should have type avalanche.DAGVM or snowman.ChainVM")
-	errCreatePlatformVM      = errors.New("attempted to create a chain running the PlatformVM")
-	errNotBootstrapped       = errors.New("subnets not bootstrapped")
-	errNoPrimarySubnetConfig = errors.New("no subnet config for primary network found")
+	errUnknownVMType          = errors.New("the vm should have type avalanche.DAGVM or snowman.ChainVM")
+	errCreatePlatformVM       = errors.New("attempted to create a chain running the PlatformVM")
+	errNotBootstrapped        = errors.New("subnets not bootstrapped")
+	errNoPrimaryNetworkConfig = errors.New("no subnet config for primary network found")
 
 	_ Manager = (*manager)(nil)
 )
@@ -1331,7 +1331,7 @@ func (m *manager) StartChainCreator(platformParams ChainParameters) error {
 	// throw a fatal error.
 	sbConfig, ok := m.SubnetConfigs[constants.PrimaryNetworkID]
 	if !ok {
-		return errNoPrimarySubnetConfig
+		return errNoPrimaryNetworkConfig
 	}
 
 	sb := subnets.New(m.NodeID, sbConfig)
