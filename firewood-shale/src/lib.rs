@@ -34,6 +34,13 @@ pub enum ShaleError {
     Io(#[from] std::io::Error),
 }
 
+// TODO:
+// this could probably included with ShaleError,
+// but keeping it separate for now as Obj/ObjRef might change in the near future
+#[derive(Debug, Error)]
+#[error("write error")]
+pub struct ObjWriteError;
+
 pub type SpaceID = u8;
 pub const INVALID_SPACE_ID: SpaceID = 0xff;
 
@@ -183,11 +190,16 @@ impl<T: ?Sized> Obj<T> {
 impl<T: ?Sized> Obj<T> {
     /// Write to the underlying object. Returns `Some(())` on success.
     #[inline]
-    pub fn write(&mut self, modify: impl FnOnce(&mut T)) -> Option<()> {
+    pub fn write(&mut self, modify: impl FnOnce(&mut T)) -> Result<(), ObjWriteError> {
         modify(self.value.write());
+
         // if `estimate_mem_image` gives overflow, the object will not be written
-        self.dirty = Some(self.value.estimate_mem_image()?);
-        Some(())
+        self.dirty = match self.value.estimate_mem_image() {
+            Some(len) => Some(len),
+            None => return Err(ObjWriteError),
+        };
+
+        Ok(())
     }
 
     #[inline(always)]
@@ -244,11 +256,13 @@ impl<'a, T> ObjRef<'a, T> {
     }
 
     #[inline]
-    pub fn write(&mut self, modify: impl FnOnce(&mut T)) -> Option<()> {
+    pub fn write(&mut self, modify: impl FnOnce(&mut T)) -> Result<(), ObjWriteError> {
         let inner = self.inner.as_mut().unwrap();
         inner.write(modify)?;
+
         self.cache.get_inner_mut().dirty.insert(inner.as_ptr());
-        Some(())
+
+        Ok(())
     }
 }
 

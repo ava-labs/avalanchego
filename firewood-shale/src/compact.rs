@@ -324,15 +324,20 @@ impl<T: Storable, M: CachedStore> CompactSpaceInner<T, M> {
     fn del_desc(&mut self, desc_addr: ObjPtr<CompactDescriptor>) -> Result<(), ShaleError> {
         let desc_size = CompactDescriptor::MSIZE;
         debug_assert!((desc_addr.addr - self.header.base_addr.addr) % desc_size == 0);
-        self.header.meta_space_tail.write(|r| **r -= desc_size);
+        self.header
+            .meta_space_tail
+            .write(|r| **r -= desc_size)
+            .unwrap();
+
         if desc_addr.addr != **self.header.meta_space_tail {
             let desc_last =
                 self.get_descriptor(ObjPtr::new_from_addr(**self.header.meta_space_tail))?;
             let mut desc = self.get_descriptor(ObjPtr::new_from_addr(desc_addr.addr))?;
-            desc.write(|r| *r = *desc_last);
+            desc.write(|r| *r = *desc_last).unwrap();
             let mut header = self.get_header(ObjPtr::new(desc.haddr))?;
-            header.write(|h| h.desc_addr = desc_addr);
+            header.write(|h| h.desc_addr = desc_addr).unwrap();
         }
+
         Ok(())
     }
 
@@ -340,7 +345,9 @@ impl<T: Storable, M: CachedStore> CompactSpaceInner<T, M> {
         let addr = **self.header.meta_space_tail;
         self.header
             .meta_space_tail
-            .write(|r| **r += CompactDescriptor::MSIZE);
+            .write(|r| **r += CompactDescriptor::MSIZE)
+            .unwrap();
+
         Ok(ObjPtr::new_from_addr(addr))
     }
 
@@ -404,7 +411,8 @@ impl<T: Storable, M: CachedStore> CompactSpaceInner<T, M> {
             desc.write(|d| {
                 d.payload_size = payload_size;
                 d.haddr = h;
-            });
+            })
+            .unwrap();
         }
         let mut h = self.get_header(ObjPtr::new(h))?;
         let mut f = self.get_footer(ObjPtr::new(f))?;
@@ -412,8 +420,10 @@ impl<T: Storable, M: CachedStore> CompactSpaceInner<T, M> {
             h.payload_size = payload_size;
             h.is_freed = true;
             h.desc_addr = desc_addr;
-        });
-        f.write(|f| f.payload_size = payload_size);
+        })
+        .unwrap();
+        f.write(|f| f.payload_size = payload_size).unwrap();
+
         Ok(())
     }
 
@@ -447,7 +457,7 @@ impl<T: Storable, M: CachedStore> CompactSpaceInner<T, M> {
                     let mut header = self.get_header(ObjPtr::new(desc_haddr))?;
                     assert_eq!(header.payload_size, desc_payload_size);
                     assert!(header.is_freed);
-                    header.write(|h| h.is_freed = false);
+                    header.write(|h| h.is_freed = false).unwrap();
                 }
                 self.del_desc(ptr)?;
                 true
@@ -457,15 +467,17 @@ impl<T: Storable, M: CachedStore> CompactSpaceInner<T, M> {
                     let mut lheader = self.get_header(ObjPtr::new(desc_haddr))?;
                     assert_eq!(lheader.payload_size, desc_payload_size);
                     assert!(lheader.is_freed);
-                    lheader.write(|h| {
-                        h.is_freed = false;
-                        h.payload_size = length;
-                    });
+                    lheader
+                        .write(|h| {
+                            h.is_freed = false;
+                            h.payload_size = length;
+                        })
+                        .unwrap();
                 }
                 {
                     let mut lfooter = self.get_footer(ObjPtr::new(desc_haddr + hsize + length))?;
                     //assert!(lfooter.payload_size == desc_payload_size);
-                    lfooter.write(|f| f.payload_size = length);
+                    lfooter.write(|f| f.payload_size = length).unwrap();
                 }
 
                 let offset = desc_haddr + hsize + length + fsize;
@@ -473,23 +485,27 @@ impl<T: Storable, M: CachedStore> CompactSpaceInner<T, M> {
                 let rdesc_addr = self.new_desc()?;
                 {
                     let mut rdesc = self.get_descriptor(rdesc_addr)?;
-                    rdesc.write(|rd| {
-                        rd.payload_size = rpayload_size;
-                        rd.haddr = offset;
-                    });
+                    rdesc
+                        .write(|rd| {
+                            rd.payload_size = rpayload_size;
+                            rd.haddr = offset;
+                        })
+                        .unwrap();
                 }
                 {
                     let mut rheader = self.get_header(ObjPtr::new(offset))?;
-                    rheader.write(|rh| {
-                        rh.is_freed = true;
-                        rh.payload_size = rpayload_size;
-                        rh.desc_addr = rdesc_addr;
-                    });
+                    rheader
+                        .write(|rh| {
+                            rh.is_freed = true;
+                            rh.payload_size = rpayload_size;
+                            rh.desc_addr = rdesc_addr;
+                        })
+                        .unwrap();
                 }
                 {
                     let mut rfooter =
                         self.get_footer(ObjPtr::new(offset + hsize + rpayload_size))?;
-                    rfooter.write(|f| f.payload_size = rpayload_size);
+                    rfooter.write(|f| f.payload_size = rpayload_size).unwrap();
                 }
                 self.del_desc(ptr)?;
                 true
@@ -497,7 +513,7 @@ impl<T: Storable, M: CachedStore> CompactSpaceInner<T, M> {
                 false
             };
             if exit {
-                self.header.alloc_addr.write(|r| *r = ptr);
+                self.header.alloc_addr.write(|r| *r = ptr).unwrap();
                 res = Some(desc_haddr + hsize);
                 break;
             }
@@ -516,23 +532,27 @@ impl<T: Storable, M: CachedStore> CompactSpaceInner<T, M> {
         let regn_size = 1 << self.regn_nbit;
         let total_length = CompactHeader::MSIZE + length + CompactFooter::MSIZE;
         let mut offset = **self.header.compact_space_tail;
-        self.header.compact_space_tail.write(|r| {
-            // an item is always fully in one region
-            let rem = regn_size - (offset & (regn_size - 1));
-            if rem < total_length {
-                offset += rem;
-                **r += rem;
-            }
-            **r += total_length
-        });
+        self.header
+            .compact_space_tail
+            .write(|r| {
+                // an item is always fully in one region
+                let rem = regn_size - (offset & (regn_size - 1));
+                if rem < total_length {
+                    offset += rem;
+                    **r += rem;
+                }
+                **r += total_length
+            })
+            .unwrap();
         let mut h = self.get_header(ObjPtr::new(offset))?;
         let mut f = self.get_footer(ObjPtr::new(offset + CompactHeader::MSIZE + length))?;
         h.write(|h| {
             h.payload_size = length;
             h.is_freed = false;
             h.desc_addr = ObjPtr::new(0);
-        });
-        f.write(|f| f.payload_size = length);
+        })
+        .unwrap();
+        f.write(|f| f.payload_size = length).unwrap();
         Ok(offset + CompactHeader::MSIZE)
     }
 }

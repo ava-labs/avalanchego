@@ -792,7 +792,7 @@ impl Storable for Node {
 
 macro_rules! write_node {
     ($self: expr, $r: expr, $modify: expr, $parents: expr, $deleted: expr) => {
-        if let None = $r.write($modify) {
+        if let Err(_) = $r.write($modify) {
             let ptr = $self.new_node($r.clone())?.as_ptr();
             $self.set_parent(ptr, $parents);
             $deleted.push($r.as_ptr());
@@ -1014,7 +1014,7 @@ impl Merkle {
                                                     Some(Data(val));
                                                 b.rehash()
                                             })
-                                            .is_none()
+                                            .is_err()
                                         {
                                             u.1 = self.new_node(b_ref.clone())?.as_ptr();
                                             deleted.push(b_ref.as_ptr());
@@ -1407,7 +1407,7 @@ impl Merkle {
                                     .insert(0, idx);
                                     c.rehash()
                                 })
-                                .is_none()
+                                .is_err()
                             {
                                 deleted.push(c_ptr);
                                 self.new_node(c_ref.clone())?.as_ptr()
@@ -1527,7 +1527,7 @@ impl Merkle {
                             .insert(0, idx);
                             c.rehash()
                         })
-                        .is_none()
+                        .is_err()
                     {
                         deleted.push(c_ptr);
                         self.new_node(c_ref.clone())?.as_ptr()
@@ -1559,7 +1559,7 @@ impl Merkle {
                             *path0 = PartialPath(path);
                             c.rehash()
                         })
-                        .is_none()
+                        .is_err()
                     {
                         deleted.push(c_ptr);
                         self.new_node(c_ref.clone())?.as_ptr()
