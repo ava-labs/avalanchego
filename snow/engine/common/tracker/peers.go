@@ -20,8 +20,6 @@ type Peers interface {
 	validators.SetCallbackListener
 	validators.Connector
 
-	// Weight returns the cumulative weight of all validators in the set.
-	Weight() uint64
 	// ConnectedWeight returns the currently connected stake weight
 	ConnectedWeight() uint64
 	// ConnectedValidators returns the currently connected stake percentage [0, 1]
@@ -121,21 +119,14 @@ func (p *peers) ConnectedWeight() uint64 {
 	return p.connectedWeight
 }
 
-func (p *peers) Weight() uint64 {
-	return p.totalWeight
-}
-
 func (p *peers) ConnectedPercent() float64 {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
-	vdrSetWeight := p.Weight()
-	if vdrSetWeight == 0 {
+	if p.totalWeight == 0 {
 		return 1
 	}
-
-	connectedStake := p.ConnectedWeight()
-	return float64(connectedStake) / float64(vdrSetWeight)
+	return float64(p.connectedWeight) / float64(p.totalWeight)
 }
 
 func (p *peers) PreferredPeers() set.Set[ids.NodeID] {
