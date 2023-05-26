@@ -6,7 +6,7 @@ use std::sync::Arc;
 use std::{cell::RefCell, collections::HashMap};
 
 use super::{
-    Ash, AshRecord, CachedSpace, FilePool, MemStoreR, Page, StoreDelta, StoreError, WalConfig,
+    AshRecord, CachedSpace, FilePool, MemStoreR, Page, StoreDelta, StoreError, WalConfig,
     PAGE_SIZE_NBIT,
 };
 
@@ -203,9 +203,9 @@ impl DiskBuffer {
                 store,
                 |raw, _| {
                     let batch = AshRecord::deserialize(raw);
-                    for (space_id, Ash { old, new }) in batch.0 {
-                        for (old, data) in old.into_iter().zip(new.into_iter()) {
-                            let offset = old.offset;
+                    for (space_id, ash) in batch.0 {
+                        for (undo, redo) in ash.iter() {
+                            let offset = undo.offset;
                             let file_pool = self.file_pools[space_id as usize].as_ref().unwrap();
                             let file_nbit = file_pool.get_file_nbit();
                             let file_mask = (1 << file_nbit) - 1;
@@ -220,7 +220,7 @@ impl DiskBuffer {
                                         ))
                                     })?
                                     .get_fd(),
-                                &data,
+                                &redo.data,
                                 (offset & file_mask) as nix::libc::off_t,
                             )
                             .map_err(|e| {
@@ -501,7 +501,7 @@ mod tests {
     use super::*;
     use crate::{
         file,
-        storage::{DeltaPage, StoreConfig, StoreRevMut, StoreRevMutDelta},
+        storage::{Ash, DeltaPage, StoreConfig, StoreRevMut, StoreRevMutDelta},
     };
     use shale::CachedStore;
 

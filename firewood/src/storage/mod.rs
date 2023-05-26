@@ -64,17 +64,24 @@ pub struct SpaceWrite {
 }
 
 #[derive(Debug)]
+/// In memory representation of Write-ahead log with `undo` and `redo`.
 pub struct Ash {
-    pub old: Vec<SpaceWrite>,
-    pub new: Vec<Box<[u8]>>,
+    /// Deltas to undo the changes.
+    pub undo: Vec<SpaceWrite>,
+    /// Deltas to replay the changes.
+    pub redo: Vec<SpaceWrite>,
 }
 
 impl Ash {
     fn new() -> Self {
         Self {
-            old: Vec::new(),
-            new: Vec::new(),
+            undo: Vec::new(),
+            redo: Vec::new(),
         }
+    }
+
+    fn iter(&self) -> impl Iterator<Item = (&SpaceWrite, &SpaceWrite)> {
+        self.undo.iter().zip(self.redo.iter())
     }
 }
 
@@ -87,12 +94,19 @@ impl growthring::wal::Record for AshRecord {
         bytes.extend((self.0.len() as u64).to_le_bytes());
         for (space_id, w) in self.0.iter() {
             bytes.extend((*space_id).to_le_bytes());
-            bytes.extend((w.old.len() as u32).to_le_bytes());
-            for (sw_old, sw_new) in w.old.iter().zip(w.new.iter()) {
-                bytes.extend(sw_old.offset.to_le_bytes());
-                bytes.extend((sw_old.data.len() as u64).to_le_bytes());
-                bytes.extend(&*sw_old.data);
-                bytes.extend(&**sw_new);
+            bytes.extend(
+                (u32::try_from(w.undo.len()).expect("size of undo shoud be a `u32`")).to_le_bytes(),
+            );
+
+            for (sw_undo, sw_redo) in w.iter() {
+                bytes.extend(sw_undo.offset.to_le_bytes());
+                bytes.extend(
+                    (u64::try_from(sw_undo.data.len())
+                        .expect("length of undo data shoud be a `u64`"))
+                    .to_le_bytes(),
+                );
+                bytes.extend(&*sw_undo.data);
+                bytes.extend(&*sw_redo.data);
             }
         }
         bytes.into()
@@ -110,23 +124,27 @@ impl AshRecord {
                 let space_id = u8::from_le_bytes(r[..1].try_into().unwrap());
                 let wlen = u32::from_le_bytes(r[1..5].try_into().unwrap());
                 r = &r[5..];
-                let mut old = Vec::new();
-                let mut new = Vec::new();
+                let mut undo = Vec::new();
+                let mut redo = Vec::new();
                 for _ in 0..wlen {
                     let offset = u64::from_le_bytes(r[..8].try_into().unwrap());
                     let data_len = u64::from_le_bytes(r[8..16].try_into().unwrap());
                     r = &r[16..];
-                    let old_write = SpaceWrite {
+                    let undo_write = SpaceWrite {
                         offset,
                         data: r[..data_len as usize].into(),
                     };
                     r = &r[data_len as usize..];
-                    let new_data: Box<[u8]> = r[..data_len as usize].into();
+                    // let new_data: Box<[u8]> = r[..data_len as usize].into();
+                    let redo_write = SpaceWrite {
+                        offset,
+                        data: r[..data_len as usize].into(),
+                    };
                     r = &r[data_len as usize..];
-                    old.push(old_write);
-                    new.push(new_data);
+                    undo.push(undo_write);
+                    redo.push(redo_write);
                 }
-                (space_id, Ash { old, new })
+                (space_id, Ash { undo, redo })
             })
             .collect();
         Self(writes)
@@ -513,37 +531,37 @@ impl CachedStore for StoreRevMut {
         let s_off = (offset & PAGE_MASK) as usize;
         let e_pid = end >> PAGE_SIZE_NBIT;
         let e_off = (end & PAGE_MASK) as usize;
-        let mut old: Vec<u8> = Vec::new();
-        let new: Box<[u8]> = change.into();
+        let mut undo: Vec<u8> = Vec::new();
+        let data: Box<[u8]> = change.into();
         if s_pid == e_pid {
             let slice = &mut self.get_page_mut(s_pid)[s_off..e_off + 1];
-            old.extend(&*slice);
+            undo.extend(&*slice);
             slice.copy_from_slice(change)
         } else {
             let len = PAGE_SIZE as usize - s_off;
             {
                 let slice = &mut self.get_page_mut(s_pid)[s_off..];
-                old.extend(&*slice);
+                undo.extend(&*slice);
                 slice.copy_from_slice(&change[..len]);
             }
             change = &change[len..];
             for p in s_pid + 1..e_pid {
                 let mut slice = self.get_page_mut(p);
-                old.extend(&*slice);
+                undo.extend(&*slice);
                 slice.copy_from_slice(&change[..PAGE_SIZE as usize]);
                 change = &change[PAGE_SIZE as usize..];
             }
             let slice = &mut self.get_page_mut(e_pid)[..e_off + 1];
-            old.extend(&*slice);
+            undo.extend(&*slice);
             slice.copy_from_slice(change);
         }
         let plain = &mut self.deltas.borrow_mut().plain;
-        assert!(old.len() == new.len());
-        plain.old.push(SpaceWrite {
+        assert!(undo.len() == data.len());
+        plain.undo.push(SpaceWrite {
             offset,
-            data: old.into(),
+            data: undo.into(),
         });
-        plain.new.push(new);
+        plain.redo.push(SpaceWrite { offset, data });
     }
 
     fn id(&self) -> SpaceID {
