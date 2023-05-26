@@ -31,10 +31,10 @@ type Metrics interface {
 	// Mark that a validator set was cached.
 	IncValidatorSetsCached()
 	// Mark that we spent the given time computing validator diffs.
-	SetValidatorSetsDuration(time.Duration)
+	AddValidatorSetsDuration(time.Duration)
 	// Mark that we computed a validator diff at a height with the given
 	// difference from the top.
-	SetValidatorSetsHeightDiff(uint64)
+	AddValidatorSetsHeightDiff(uint64)
 	// Mark that this much stake is staked on the node.
 	SetLocalStake(uint64)
 	// Mark that this much stake is staked in the network.
@@ -119,13 +119,13 @@ func New(
 		}),
 		validatorSetsHeightDiff: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
-			Name:      "validator_sets_height_diff",
-			Help:      "Number of validator sets diffs applied for generating a validator sets request",
+			Name:      "validator_sets_height_diff_sum",
+			Help:      "Total number of validator sets diffs applied for generating validator sets",
 		}),
 		validatorSetsDuration: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
-			Name:      "validator_sets_duration",
-			Help:      "Time spent serving a validator sets request in nanoseconds",
+			Name:      "validator_sets_duration_sum",
+			Help:      "Total amount of time generating validator sets in nanoseconds",
 		}),
 	}
 
@@ -199,12 +199,12 @@ func (m *metrics) IncValidatorSetsCached() {
 	m.validatorSetsCached.Inc()
 }
 
-func (m *metrics) SetValidatorSetsDuration(d time.Duration) {
-	m.validatorSetsDuration.Set(float64(d))
+func (m *metrics) AddValidatorSetsDuration(d time.Duration) {
+	m.validatorSetsDuration.Add(float64(d))
 }
 
-func (m *metrics) SetValidatorSetsHeightDiff(d uint64) {
-	m.validatorSetsHeightDiff.Set(float64(d))
+func (m *metrics) AddValidatorSetsHeightDiff(d uint64) {
+	m.validatorSetsHeightDiff.Add(float64(d))
 }
 
 func (m *metrics) SetLocalStake(s uint64) {
