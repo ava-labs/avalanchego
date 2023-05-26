@@ -10,7 +10,7 @@
 //!
 //!
 //! // Start with empty WAL (truncate = true).
-//! let store = WalStoreAio::new("./walfiles", true, None).unwrap();
+//! let store = WalStoreAio::new("/tmp/walfiles", true, None).unwrap();
 //! let mut wal = block_on(loader.load(store, |_, _| {Ok(())}, 0)).unwrap();
 //! // Write a vector of records to WAL.
 //! for f in wal.grow(vec!["record1(foo)", "record2(bar)", "record3(foobar)"]).into_iter() {
@@ -20,7 +20,7 @@
 //!
 //!
 //! // Load from WAL (truncate = false).
-//! let store = WalStoreAio::new("./walfiles", false, None).unwrap();
+//! let store = WalStoreAio::new("/tmp/walfiles", false, None).unwrap();
 //! let mut wal = block_on(loader.load(store, |payload, ringid| {
 //!     // redo the operations in your application
 //!     println!("recover(payload={}, ringid={:?})",
@@ -35,14 +35,14 @@
 //! // Then assume all these records are not longer needed. We can tell WalWriter by the `peel`
 //! // method.
 //! block_on(wal.peel(ring_ids, 0)).unwrap();
-//! // There will only be one remaining file in ./walfiles.
+//! // There will only be one remaining file in /tmp/walfiles.
 //!
-//! let store = WalStoreAio::new("./walfiles", false, None).unwrap();
+//! let store = WalStoreAio::new("/tmp/walfiles", false, None).unwrap();
 //! let wal = block_on(loader.load(store, |payload, _| {
 //!     println!("payload.len() = {}", payload.len());
 //!     Ok(())
 //! }, 0)).unwrap();
-//! // After each recovery, the ./walfiles is empty.
+//! // After each recovery, the /tmp/walfiles is empty.
 //! ```
 
 #[macro_use]

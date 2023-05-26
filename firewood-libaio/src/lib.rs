@@ -14,7 +14,7 @@
 //!     .write(true)
 //!     .create(true)
 //!     .truncate(true)
-//!     .open("test")
+//!     .open("/tmp/test")
 //!     .unwrap();
 //! let fd = file.as_raw_fd();
 //! // keep all returned futures in a vector
@@ -32,6 +32,7 @@
 //!     spawner.spawn_local(h).unwrap();
 //! }
 //! pool.run();
+//! # std::fs::remove_file("/tmp/test").ok();
 //! ```
 
 mod abi;

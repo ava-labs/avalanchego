@@ -3,6 +3,11 @@ use futures::executor::LocalPool;
 use futures::future::FutureExt;
 use futures::task::LocalSpawnExt;
 use std::os::unix::io::AsRawFd;
+use std::path::Path;
+
+fn tmp_dir() -> &'static Path {
+    Path::new(option_env!("CARGO_TARGET_TMPDIR").unwrap_or("/tmp"))
+}
 
 #[test]
 fn simple1() {
@@ -12,7 +17,7 @@ fn simple1() {
         .write(true)
         .create(true)
         .truncate(true)
-        .open("test")
+        .open(tmp_dir().join("test"))
         .unwrap();
     let fd = file.as_raw_fd();
     let ws = vec![(0, "hello"), (5, "world"), (2, "xxxx")]
@@ -38,7 +43,7 @@ fn simple2() {
         .write(true)
         .create(true)
         .truncate(true)
-        .open("test2")
+        .open(tmp_dir().join("test2"))
         .unwrap();
     let fd = file.as_raw_fd();
     let ws = (0..4000)
