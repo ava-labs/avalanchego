@@ -280,8 +280,21 @@ func (e *CaminoStandardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error 
 	return e.StandardTxExecutor.AddDelegatorTx(tx)
 }
 
-func (*CaminoStandardTxExecutor) AddPermissionlessValidatorTx(*txs.AddPermissionlessValidatorTx) error {
-	return errWrongTxType
+func (e *CaminoStandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
+	caminoConfig, err := e.State.CaminoConfig()
+	if err != nil {
+		return err
+	}
+
+	if caminoConfig.LockModeBondDeposit {
+		return errWrongTxType
+	}
+
+	if err := locked.VerifyLockMode(tx.Ins, tx.Outs, caminoConfig.LockModeBondDeposit); err != nil {
+		return err
+	}
+
+	return e.StandardTxExecutor.AddPermissionlessValidatorTx(tx)
 }
 
 func (e *CaminoStandardTxExecutor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
