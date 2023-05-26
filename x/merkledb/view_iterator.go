@@ -43,7 +43,7 @@ func (t *trieView) NewIteratorWithStartAndPrefix(start, prefix []byte) database.
 	}
 }
 
-// iterator walks over both the in memory database and the underlying database
+// viewIterator walks over both the in memory database and the underlying database
 // at the same time.
 type viewIterator struct {
 	view *trieView
