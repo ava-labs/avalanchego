@@ -174,8 +174,8 @@ func (m *manager) GetValidatorSet(ctx context.Context, height uint64, subnetID i
 
 	endTime := m.clk.Time()
 	m.metrics.IncValidatorSetsCreated()
-	m.metrics.AddValidatorSetsDuration(endTime.Sub(startTime))
-	m.metrics.AddValidatorSetsHeightDiff(lastAcceptedHeight - height)
+	m.metrics.SetValidatorSetsDuration(endTime.Sub(startTime))
+	m.metrics.SetValidatorSetsHeightDiff(lastAcceptedHeight - height)
 	return vdrSet, nil
 }
 

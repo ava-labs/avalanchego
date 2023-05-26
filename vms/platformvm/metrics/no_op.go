@@ -35,9 +35,9 @@ func (noopMetrics) IncValidatorSetsCreated() {}
 
 func (noopMetrics) IncValidatorSetsCached() {}
 
-func (noopMetrics) AddValidatorSetsDuration(time.Duration) {}
+func (noopMetrics) SetValidatorSetsDuration(time.Duration) {}
 
-func (noopMetrics) AddValidatorSetsHeightDiff(uint64) {}
+func (noopMetrics) SetValidatorSetsHeightDiff(uint64) {}
 
 func (noopMetrics) SetLocalStake(uint64) {}
 

@@ -31,10 +31,10 @@ type Metrics interface {
 	// Mark that a validator set was cached.
 	IncValidatorSetsCached()
 	// Mark that we spent the given time computing validator diffs.
-	AddValidatorSetsDuration(time.Duration)
+	SetValidatorSetsDuration(time.Duration)
 	// Mark that we computed a validator diff at a height with the given
 	// difference from the top.
-	AddValidatorSetsHeightDiff(uint64)
+	SetValidatorSetsHeightDiff(uint64)
 	// Mark that this much stake is staked on the node.
 	SetLocalStake(uint64)
 	// Mark that this much stake is staked in the network.
@@ -199,12 +199,12 @@ func (m *metrics) IncValidatorSetsCached() {
 	m.validatorSetsCached.Inc()
 }
 
-func (m *metrics) AddValidatorSetsDuration(d time.Duration) {
-	m.validatorSetsDuration.Add(float64(d))
+func (m *metrics) SetValidatorSetsDuration(d time.Duration) {
+	m.validatorSetsDuration.Set(float64(d))
 }
 
-func (m *metrics) AddValidatorSetsHeightDiff(d uint64) {
-	m.validatorSetsHeightDiff.Add(float64(d))
+func (m *metrics) SetValidatorSetsHeightDiff(d uint64) {
+	m.validatorSetsHeightDiff.Set(float64(d))
 }
 
 func (m *metrics) SetLocalStake(s uint64) {
