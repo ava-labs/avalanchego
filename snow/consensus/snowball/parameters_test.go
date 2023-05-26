@@ -234,7 +234,7 @@ func TestParametersInvalidMaxItemProcessingTime(t *testing.T) {
 	}
 }
 
-func TestCalcMinPercentConnected(t *testing.T) {
+func TestParametersMinPercentConnectedHealthy(t *testing.T) {
 	tests := []struct {
 		name                        string
 		params                      Parameters
