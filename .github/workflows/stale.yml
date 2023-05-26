@@ -1,7 +1,7 @@
 name: Mark stale issues and pull requests
 on:
   schedule:
-    - cron: '0 0 * * *' # Run every day at midnight UTC
+    - cron: '0 0 * * 0' # Run every day at midnight UTC on Sunday
 jobs:
   stale:
     runs-on: ubuntu-latest
