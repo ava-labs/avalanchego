@@ -112,9 +112,10 @@ func (it *viewIterator) Next() bool {
 			memValue := it.sortedChanges[0].Value
 
 			dbKey := it.Iterator.Key()
-
+			compareResult := bytes.Compare(memKey, dbKey)
+			
 			switch {
-			case bytes.Compare(memKey, dbKey) < 0:
+			case compareResult < 0:
 				// the current change has a smaller key than the underlying db key
 				// move to the next change
 				it.sortedChanges = it.sortedChanges[1:]
@@ -125,7 +126,7 @@ func (it *viewIterator) Next() bool {
 					it.value = memValue.value
 					return true
 				}
-			case bytes.Compare(dbKey, memKey) < 0:
+			case compareResult > 0:
 				// the db key is smaller, so return it and iterate the underlying iterator
 				it.key = dbKey
 				it.value = it.Iterator.Value()
