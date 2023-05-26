@@ -234,16 +234,16 @@ func TestParametersInvalidMaxItemProcessingTime(t *testing.T) {
 	}
 }
 
-func TestCalcMinConnectedStake(t *testing.T) {
+func TestCalcMinPercentConnected(t *testing.T) {
 	tests := []struct {
-		name             string
-		params           Parameters
-		expectedMinStake float64
+		name                        string
+		params                      Parameters
+		expectedMinPercentConnected float64
 	}{
 		{
-			name:             "default",
-			params:           DefaultParameters,
-			expectedMinStake: 0.8,
+			name:                        "default",
+			params:                      DefaultParameters,
+			expectedMinPercentConnected: 0.8,
 		},
 		{
 			name: "custom",
@@ -259,14 +259,14 @@ func TestCalcMinConnectedStake(t *testing.T) {
 				MixedQueryNumPushVdr:    10,
 				MixedQueryNumPushNonVdr: 2,
 			},
-			expectedMinStake: 0.4,
+			expectedMinPercentConnected: 0.4,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			minStake := tt.params.MinPercentConnectedStakeHealthy()
-			require.Equal(t, tt.expectedMinStake, minStake)
+			minStake := tt.params.MinPercentConnectedHealthy()
+			require.Equal(t, tt.expectedMinPercentConnected, minStake)
 		})
 	}
 }

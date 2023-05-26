@@ -7,11 +7,16 @@ import (
 	"errors"
 	"fmt"
 	"time"
-
-	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
 const (
+	// MinPercentConnectedBuffer is the safety buffer for calculation of
+	// MinPercentConnected. This increases the required percentage above
+	// alpha/k. This value must be [0-1].
+	// 0 means MinPercentConnected = alpha/k.
+	// 1 means MinPercentConnected = 1 (fully connected).
+	MinPercentConnectedBuffer = .2
+
 	errMsg = "" +
 		`__________                    .___` + "\n" +
 		`\______   \____________     __| _/__.__.` + "\n" +
@@ -29,7 +34,22 @@ const (
 		`        \/         \/         \/` + "\n"
 )
 
-var ErrParametersInvalid = errors.New("parameters invalid")
+var (
+	DefaultParameters = Parameters{
+		K:                       20,
+		Alpha:                   15,
+		BetaVirtuous:            20,
+		BetaRogue:               20,
+		ConcurrentRepolls:       4,
+		OptimalProcessing:       10,
+		MaxOutstandingItems:     256,
+		MaxItemProcessingTime:   30 * time.Second,
+		MixedQueryNumPushVdr:    10,
+		MixedQueryNumPushNonVdr: 2,
+	}
+
+	ErrParametersInvalid = errors.New("parameters invalid")
+)
 
 // Parameters required for snowball consensus
 type Parameters struct {
@@ -56,19 +76,6 @@ type Parameters struct {
 	// send a Push Query to this many validators and a Pull Query to the other
 	// k - MixedQueryNumPushVdr validators. Must be in [0, K].
 	MixedQueryNumPushNonVdr int `json:"mixedQueryNumPushNonVdr" yaml:"mixedQueryNumPushNonVdr"`
-}
-
-var DefaultParameters = Parameters{
-	K:                       20,
-	Alpha:                   15,
-	BetaVirtuous:            20,
-	BetaRogue:               20,
-	ConcurrentRepolls:       4,
-	OptimalProcessing:       10,
-	MaxOutstandingItems:     256,
-	MaxItemProcessingTime:   30 * time.Second,
-	MixedQueryNumPushVdr:    10,
-	MixedQueryNumPushNonVdr: 2,
 }
 
 // Verify returns nil if the parameters describe a valid initialization.
@@ -103,9 +110,9 @@ func (p Parameters) Verify() error {
 	}
 }
 
-func (p Parameters) MinPercentConnectedStakeHealthy() float64 {
+func (p Parameters) MinPercentConnectedHealthy() float64 {
 	alpha := p.Alpha
 	k := p.K
 	r := float64(alpha) / float64(k)
-	return r*(1-constants.MinConnectedStakeBuffer) + constants.MinConnectedStakeBuffer
+	return r*(1-MinPercentConnectedBuffer) + MinPercentConnectedBuffer
 }

@@ -130,10 +130,10 @@ func TestHealthCheckSubnet(t *testing.T) {
 				require.NoError(err)
 
 				details, err := handlerIntf.HealthCheck(context.Background())
-				connectedPerc := float64(index+1) / float64(testVdrCount)
+				expectedPercentConnected := float64(index+1) / float64(testVdrCount)
 				conf := sb.Config()
-				minStake := conf.ConsensusParameters.MinPercentConnectedStakeHealthy()
-				if connectedPerc >= minStake {
+				minPercentConnected := conf.ConsensusParameters.MinPercentConnectedHealthy()
+				if expectedPercentConnected >= minPercentConnected {
 					require.NoError(err)
 					continue
 				}
@@ -147,7 +147,7 @@ func TestHealthCheckSubnet(t *testing.T) {
 				require.True(ok)
 				percentConnected, ok := networkingDetails["percentConnected"]
 				require.True(ok)
-				require.Equal(connectedPerc, percentConnected)
+				require.Equal(expectedPercentConnected, percentConnected)
 			}
 		})
 	}
