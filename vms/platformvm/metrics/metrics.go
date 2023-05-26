@@ -119,13 +119,13 @@ func New(
 		}),
 		validatorSetsHeightDiff: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
-			Name:      "validator_sets_height_diff_sum",
-			Help:      "Total number of validator sets diffs applied for generating validator sets",
+			Name:      "validator_sets_height_diff",
+			Help:      "Number of validator sets diffs applied for generating a validator sets request",
 		}),
 		validatorSetsDuration: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
-			Name:      "validator_sets_duration_sum",
-			Help:      "Total amount of time generating validator sets in nanoseconds",
+			Name:      "validator_sets_duration",
+			Help:      "Time spent serving a validator sets request in nanoseconds",
 		}),
 	}
 
