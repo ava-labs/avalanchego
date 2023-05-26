@@ -145,7 +145,7 @@ type ChainParameters struct {
 	VMID ids.ID
 	// The IDs of the feature extensions this chain is running.
 	FxIDs []ids.ID
-	// Should only be set if the default beacons can't be used.
+	// Invariant: Only used when [ID] is the P-chain ID.
 	CustomBeacons validators.Set
 }
 
@@ -531,13 +531,6 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 		return nil, fmt.Errorf("couldn't get validator set of subnet with ID %s. The subnet may not exist", chainParams.SubnetID)
 	}
 
-	beacons := vdrs
-	if chainParams.CustomBeacons != nil {
-		beacons = chainParams.CustomBeacons
-	}
-
-	bootstrapWeight := beacons.Weight()
-
 	var chain *chain
 	switch vm := vm.(type) {
 	case vertex.LinearizableVMWithEngine:
@@ -545,16 +538,19 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 			ctx,
 			chainParams.GenesisData,
 			vdrs,
-			beacons,
 			vm,
 			fxs,
-			bootstrapWeight,
 			sb,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("error while creating new avalanche vm %w", err)
 		}
 	case block.ChainVM:
+		beacons := vdrs
+		if chainParams.ID == constants.PlatformChainID {
+			beacons = chainParams.CustomBeacons
+		}
+
 		chain, err = m.createSnowmanChain(
 			ctx,
 			chainParams.GenesisData,
@@ -562,7 +558,6 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 			beacons,
 			vm,
 			fxs,
-			bootstrapWeight,
 			sb,
 		)
 		if err != nil {
@@ -588,11 +583,9 @@ func (m *manager) AddRegistrant(r Registrant) {
 func (m *manager) createAvalancheChain(
 	ctx *snow.ConsensusContext,
 	genesisData []byte,
-	vdrs,
-	beacons validators.Set,
+	vdrs validators.Set,
 	vm vertex.LinearizableVMWithEngine,
 	fxs []*common.Fx,
-	bootstrapWeight uint64,
 	sb subnets.Subnet,
 ) (*chain, error) {
 	ctx.Lock.Lock()
@@ -806,15 +799,17 @@ func (m *manager) createAvalancheChain(
 		appSender:    snowmanMessageSender,
 	}
 
+	bootstrapWeight := vdrs.Weight()
+
 	consensusParams := sb.Config().ConsensusParameters
 	sampleK := consensusParams.K
 	if uint64(sampleK) > bootstrapWeight {
 		sampleK = int(bootstrapWeight)
 	}
 
-	connectedBeacons := tracker.NewPeers()
-	startupTracker := tracker.NewStartup(connectedBeacons, (3*bootstrapWeight+3)/4)
-	beacons.RegisterCallbackListener(startupTracker)
+	connectedValidators := tracker.NewPeers()
+	startupTracker := tracker.NewStartup(connectedValidators, (3*bootstrapWeight+3)/4)
+	vdrs.RegisterCallbackListener(startupTracker)
 
 	// Asynchronously passes messages from the network to the consensus engine
 	h, err := handler.New(
@@ -826,7 +821,7 @@ func (m *manager) createAvalancheChain(
 		m.ResourceTracker,
 		validators.UnhandledSubnetConnector, // avalanche chains don't use subnet connector
 		sb,
-		connectedBeacons, // beacons == vdrs for non-platform chains
+		connectedValidators,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing network handler: %w", err)
@@ -834,7 +829,7 @@ func (m *manager) createAvalancheChain(
 
 	snowmanCommonCfg := common.Config{
 		Ctx:                            ctx,
-		Beacons:                        beacons,
+		Beacons:                        vdrs,
 		SampleK:                        sampleK,
 		Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
 		StartupTracker:                 startupTracker,
@@ -899,7 +894,7 @@ func (m *manager) createAvalancheChain(
 
 	avalancheCommonCfg := common.Config{
 		Ctx:                            ctx,
-		Beacons:                        beacons,
+		Beacons:                        vdrs,
 		SampleK:                        sampleK,
 		StartupTracker:                 startupTracker,
 		Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
@@ -980,11 +975,10 @@ func (m *manager) createAvalancheChain(
 func (m *manager) createSnowmanChain(
 	ctx *snow.ConsensusContext,
 	genesisData []byte,
-	vdrs,
+	vdrs validators.Set,
 	beacons validators.Set,
 	vm block.ChainVM,
 	fxs []*common.Fx,
-	bootstrapWeight uint64,
 	sb subnets.Subnet,
 ) (*chain, error) {
 	ctx.Lock.Lock()
@@ -1140,6 +1134,8 @@ func (m *manager) createSnowmanChain(
 	); err != nil {
 		return nil, err
 	}
+
+	bootstrapWeight := beacons.Weight()
 
 	consensusParams := sb.Config().ConsensusParameters
 	sampleK := consensusParams.K
