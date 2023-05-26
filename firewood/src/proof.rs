@@ -396,17 +396,14 @@ impl Proof {
         let proofs_map = &self.0;
         let mut key_index = 0;
         let mut branch_index: u8 = 0;
-        let mut iter = 0;
 
         loop {
             let cur_proof = proofs_map
                 .get(&cur_hash)
                 .ok_or(ProofError::ProofNodeMissing)?;
             // TODO(Hao): (Optimization) If a node is alreay decode we don't need to decode again.
-            let (chd_ptr, sub_proof, size) = self.decode_node(merkle, cur_key, cur_proof, false)?;
-
-            // I thinkn it's impossible for chd_ptr to be None...
-            let mut chd_ptr = Some(chd_ptr);
+            let (mut chd_ptr, sub_proof, size) =
+                self.decode_node(merkle, cur_key, cur_proof, false)?;
 
             // Link the child to the parent based on the node type.
             match &u_ref.inner() {
@@ -414,14 +411,14 @@ impl Proof {
                     match n.chd()[branch_index as usize] {
                         // If the child already resolved, then use the existing node.
                         Some(node) => {
-                            chd_ptr = Some(node);
+                            chd_ptr = node;
                         }
                         None => {
                             // insert the leaf to the empty slot
                             u_ref
                                 .write(|u| {
                                     let uu = u.inner_mut().as_branch_mut().unwrap();
-                                    uu.chd_mut()[branch_index as usize] = chd_ptr;
+                                    uu.chd_mut()[branch_index as usize] = Some(chd_ptr);
                                 })
                                 .unwrap();
                         }
@@ -434,36 +431,24 @@ impl Proof {
                         u_ref
                             .write(|u| {
                                 let uu = u.inner_mut().as_extension_mut().unwrap();
-                                *uu.chd_mut() = if let Some(chd_p) = chd_ptr {
-                                    chd_p
-                                } else {
-                                    ObjPtr::null()
-                                }
+                                *uu.chd_mut() = chd_ptr;
                             })
                             .unwrap();
                     } else {
-                        chd_ptr = Some(node);
+                        chd_ptr = node;
                     }
                 }
                 // We should not hit a leaf node as a parent.
                 _ => return Err(ProofError::InvalidNode(MerkleError::ParentLeafBranch)),
             };
 
-            if chd_ptr.is_some() {
-                u_ref = merkle
-                    .get_node(chd_ptr.unwrap())
-                    .map_err(|_| ProofError::DecodeError)?;
-                // If the new parent is a branch node, record the index to correctly link the next child to it.
-                if u_ref.inner().as_branch().is_some() {
-                    branch_index = chunks[key_index];
-                }
-            } else {
-                // Root node must be included in the proof.
-                if iter == 0 {
-                    return Err(ProofError::ProofNodeMissing);
-                }
+            u_ref = merkle
+                .get_node(chd_ptr)
+                .map_err(|_| ProofError::DecodeError)?;
+            // If the new parent is a branch node, record the index to correctly link the next child to it.
+            if u_ref.inner().as_branch().is_some() {
+                branch_index = chunks[key_index];
             }
-            iter += 1;
 
             key_index += size;
             match sub_proof {
@@ -477,10 +462,8 @@ impl Proof {
                             let proof = proofs_map
                                 .get(&p.hash.unwrap())
                                 .ok_or(ProofError::ProofNodeMissing)?;
-                            let (decoded_chd_ptr, _, _) =
-                                self.decode_node(merkle, cur_key, proof, true)?;
 
-                            chd_ptr = Some(decoded_chd_ptr);
+                            chd_ptr = self.decode_node(merkle, cur_key, proof, true)?.0;
 
                             // Link the child to the parent based on the node type.
                             match &u_ref.inner() {
@@ -493,7 +476,8 @@ impl Proof {
                                             u_ref
                                                 .write(|u| {
                                                     let uu = u.inner_mut().as_branch_mut().unwrap();
-                                                    uu.chd_mut()[branch_index as usize] = chd_ptr;
+                                                    uu.chd_mut()[branch_index as usize] =
+                                                        Some(chd_ptr);
                                                 })
                                                 .unwrap();
                                         }
@@ -506,11 +490,7 @@ impl Proof {
                                         u_ref
                                             .write(|u| {
                                                 let uu = u.inner_mut().as_extension_mut().unwrap();
-                                                *uu.chd_mut() = if let Some(chd_p) = chd_ptr {
-                                                    chd_p
-                                                } else {
-                                                    ObjPtr::null()
-                                                }
+                                                *uu.chd_mut() = chd_ptr;
                                             })
                                             .unwrap();
                                     }
@@ -524,26 +504,23 @@ impl Proof {
                             };
                         }
                         drop(u_ref);
-                        if chd_ptr.is_some() {
-                            let c_ref = merkle
-                                .get_node(chd_ptr.unwrap())
-                                .map_err(|_| ProofError::DecodeError)?;
-                            match &c_ref.inner() {
-                                NodeType::Branch(n) => {
-                                    if let Some(v) = n.value() {
-                                        data = Some(v.deref().to_vec());
-                                    }
+                        let c_ref = merkle
+                            .get_node(chd_ptr)
+                            .map_err(|_| ProofError::DecodeError)?;
+                        match &c_ref.inner() {
+                            NodeType::Branch(n) => {
+                                if let Some(v) = n.value() {
+                                    data = Some(v.deref().to_vec());
                                 }
-                                NodeType::Leaf(n) => {
-                                    // Return the value on the node only when the key matches exactly
-                                    // (e.g. the length path of subproof node is 0).
-                                    if p.hash.is_none() || (p.hash.is_some() && n.path().len() == 0)
-                                    {
-                                        data = Some(n.data().deref().to_vec());
-                                    }
-                                }
-                                _ => (),
                             }
+                            NodeType::Leaf(n) => {
+                                // Return the value on the node only when the key matches exactly
+                                // (e.g. the length path of subproof node is 0).
+                                if p.hash.is_none() || (p.hash.is_some() && n.path().len() == 0) {
+                                    data = Some(n.data().deref().to_vec());
+                                }
+                            }
+                            _ => (),
                         }
                         return Ok(data);
                     }
