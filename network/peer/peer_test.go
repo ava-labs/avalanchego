@@ -276,19 +276,19 @@ func TestSend(t *testing.T) {
 }
 
 func TestPingUptimes(t *testing.T) {
-	randomSubnetID := ids.GenerateTestID()
-	trackedSubnets := set.NewSet[ids.ID](1)
-	trackedSubnets.Add(randomSubnetID)
-	nonTrackingSubnetID := ids.GenerateTestID()
+	trackedSubnetID := ids.GenerateTestID()
+	untrackedSubnetID := ids.GenerateTestID()
 
-	peer0, peer1 := makeReadyTestPeers(t, trackedSubnets)
+	trackedSubnets := set.NewSet[ids.ID](1)
+	trackedSubnets.Add(trackedSubnetID)
+
 	mc := newMessageCreator(t)
 
 	testCases := []struct {
-		name     string
-		msg      message.OutboundMessage
-		assertFn func(*testing.T, *testPeer)
-		closed   bool
+		name        string
+		msg         message.OutboundMessage
+		shouldClose bool
+		assertFn    func(*require.Assertions, *testPeer)
 	}{
 		{
 			name: "primary network only",
@@ -297,85 +297,96 @@ func TestPingUptimes(t *testing.T) {
 				require.NoError(t, err)
 				return pingMsg
 			}(),
-			assertFn: func(t *testing.T, peer *testPeer) {
+			assertFn: func(require *require.Assertions, peer *testPeer) {
 				uptime, ok := peer.ObservedUptime(constants.PrimaryNetworkID)
-				require.True(t, ok)
-				require.Equal(t, uint32(1), uptime)
+				require.True(ok)
+				require.Equal(uint32(1), uptime)
 
-				uptime, ok = peer.ObservedUptime(randomSubnetID)
-				require.False(t, ok)
-				require.Zero(t, uptime)
+				uptime, ok = peer.ObservedUptime(trackedSubnetID)
+				require.False(ok)
+				require.Zero(uptime)
 			},
 		},
 		{
 			name: "primary network and subnet",
 			msg: func() message.OutboundMessage {
-				pingMsg, err := mc.Ping(1, []*p2p.SubnetUptime{
-					{SubnetId: randomSubnetID[:], Uptime: 1},
-				})
+				pingMsg, err := mc.Ping(
+					1,
+					[]*p2p.SubnetUptime{
+						{
+							SubnetId: trackedSubnetID[:],
+							Uptime:   1,
+						},
+					},
+				)
 				require.NoError(t, err)
 				return pingMsg
 			}(),
-			assertFn: func(t *testing.T, peer *testPeer) {
+			assertFn: func(require *require.Assertions, peer *testPeer) {
 				uptime, ok := peer.ObservedUptime(constants.PrimaryNetworkID)
-				require.True(t, ok)
-				require.Equal(t, uint32(1), uptime)
+				require.True(ok)
+				require.Equal(uint32(1), uptime)
 
-				uptime, ok = peer.ObservedUptime(randomSubnetID)
-				require.True(t, ok)
-				require.Equal(t, uint32(1), uptime)
+				uptime, ok = peer.ObservedUptime(trackedSubnetID)
+				require.True(ok)
+				require.Equal(uint32(1), uptime)
 			},
 		},
 		{
 			name: "primary network and non tracked subnet",
 			msg: func() message.OutboundMessage {
-				pingMsg, err := mc.Ping(1, []*p2p.SubnetUptime{
-					{SubnetId: nonTrackingSubnetID[:], Uptime: 1},
-					{SubnetId: randomSubnetID[:], Uptime: 1},
-				})
+				pingMsg, err := mc.Ping(
+					1,
+					[]*p2p.SubnetUptime{
+						{
+							SubnetId: untrackedSubnetID[:],
+							Uptime:   1,
+						},
+						{
+							SubnetId: trackedSubnetID[:],
+							Uptime:   1,
+						},
+					},
+				)
 				require.NoError(t, err)
 				return pingMsg
 			}(),
-			assertFn: func(t *testing.T, peer *testPeer) {
-				uptime, ok := peer.ObservedUptime(constants.PrimaryNetworkID)
-				require.True(t, ok)
-				require.Equal(t, uint32(1), uptime)
-
-				uptime, ok = peer.ObservedUptime(randomSubnetID)
-				require.True(t, ok)
-				require.Equal(t, uint32(1), uptime)
-
-				uptime, ok = peer.ObservedUptime(nonTrackingSubnetID)
-				require.False(t, ok)
-				require.Zero(t, uptime)
-			},
-			closed: true,
+			shouldClose: true,
 		},
 	}
 
+	// Note: we reuse peers across tests because makeReadyTestPeers takes awhile
+	// to run.
+	peer0, peer1 := makeReadyTestPeers(t, trackedSubnets)
+	defer func() {
+		peer1.StartClose()
+		peer0.StartClose()
+		require.NoError(t, peer0.AwaitClosed(context.Background()))
+		require.NoError(t, peer1.AwaitClosed(context.Background()))
+	}()
+
 	for _, tc := range testCases {
-		sent := peer0.Send(context.Background(), tc.msg)
-		require.True(t, sent)
+		t.Run(tc.name, func(t *testing.T) {
+			require := require.New(t)
 
-		if tc.closed {
-			err := peer0.AwaitClosed(context.Background())
-			require.NoError(t, err)
-		} else {
-			// we send Get message after ping to ensure Ping is handled by the time
-			// Get is handled. This is because Get is routed to the handler
-			// whereas Ping is handled by the peer directly.
-			// We have no way to know when the peer has handled the Ping message
+			require.True(peer0.Send(context.Background(), tc.msg))
+
+			// Note: shouldClose should only be `true` for the last test because
+			// we reuse peers across tests.
+			if tc.shouldClose {
+				require.NoError(peer1.AwaitClosed(context.Background()))
+				return
+			}
+
+			// we send Get message after ping to ensure Ping is handled by the
+			// time Get is handled. This is because Get is routed to the handler
+			// whereas Ping is handled by the peer directly. We have no way to
+			// know when the peer has handled the Ping message.
 			sendAndFlush(t, peer0, peer1)
-		}
-		tc.assertFn(t, peer1)
-	}
 
-	peer1.StartClose()
-	peer0.StartClose()
-	err := peer0.AwaitClosed(context.Background())
-	require.NoError(t, err)
-	err = peer1.AwaitClosed(context.Background())
-	require.NoError(t, err)
+			tc.assertFn(require, peer1)
+		})
+	}
 }
 
 // Helper to send a message from sender to receiver and assert that the
