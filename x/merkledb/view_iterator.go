@@ -123,7 +123,7 @@ func (it *viewIterator) Next() bool {
 				// if current change is not a deletion, return it
 				if !memValue.IsNothing() {
 					it.key = memKey
-					it.value = bytes.Clone(memValue.value)
+					it.value = slices.Clone(memValue.value)
 					return true
 				}
 			case compareResult > 0:
@@ -140,7 +140,7 @@ func (it *viewIterator) Next() bool {
 
 				if !memValue.IsNothing() {
 					it.key = memKey
-					it.value = bytes.Clone(memValue.value)
+					it.value = slices.Clone(memValue.value)
 					return true
 				}
 			}
