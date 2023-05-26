@@ -113,7 +113,7 @@ func (it *viewIterator) Next() bool {
 
 			dbKey := it.Iterator.Key()
 			compareResult := bytes.Compare(memKey, dbKey)
-			
+
 			switch {
 			case compareResult < 0:
 				// the current change has a smaller key than the underlying db key
