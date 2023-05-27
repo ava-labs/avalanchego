@@ -43,7 +43,7 @@ var _ = e2e.DescribeXChain("[Virtuous Transfer Tx AVAX]", func() {
 			"virtuous-transfer-tx-avax",
 		),
 		func() {
-			rpcEps := e2e.Env.GetURIs()
+			rpcEps := e2e.Env.GetURIsRW()
 			gomega.Expect(rpcEps).ShouldNot(gomega.BeEmpty())
 
 			allMetrics := []string{

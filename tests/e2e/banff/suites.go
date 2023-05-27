@@ -33,12 +33,9 @@ var _ = ginkgo.Describe("[Banff]", func() {
 			"banff",
 		),
 		func() {
-			ginkgo.By("reload initial snapshot for test independence", func() {
-				err := e2e.Env.RestoreInitialState(true /*switchOffNetworkFirst*/)
-				gomega.Expect(err).Should(gomega.BeNil())
-			})
+			e2e.Env.EnsurePristineNetwork()
 
-			uris := e2e.Env.GetURIs()
+			uris := e2e.Env.GetURIsRW()
 			gomega.Expect(uris).ShouldNot(gomega.BeEmpty())
 
 			kc := secp256k1fx.NewKeychain(genesis.EWOQKey)

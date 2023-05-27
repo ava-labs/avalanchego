@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
@@ -26,8 +25,7 @@ import (
 type ClusterType byte
 
 const (
-	Unknown ClusterType = iota
-	StandAlone
+	StandAlone ClusterType = iota
 	PreExisting
 
 	// Enough for primary.NewWallet to fetch initial UTXOs.
@@ -43,24 +41,19 @@ const (
 // Env is the global struct containing all we need to test
 var (
 	Env = &TestEnvironment{
-		testEnvironmentConfig: &testEnvironmentConfig{
-			clusterType: Unknown,
-		},
+		testEnvironmentConfig: &testEnvironmentConfig{},
 	}
 
-	errGRPCAndURIsSpecified = errors.New("either network-runner-grpc-endpoint or uris should be specified, not both")
-	errNoKeyFile            = errors.New("test keys file not provided")
-	errUnknownClusterType   = errors.New("unhandled cluster type")
-	errNotNetworkRunnerCLI  = errors.New("not network-runner cli")
+	errNoKeyFile           = errors.New("test keys file not provided")
+	errUnknownClusterType  = errors.New("unhandled cluster type")
+	errNotNetworkRunnerCLI = errors.New("not network-runner cli")
 )
 
 type testEnvironmentConfig struct {
-	clusterType               ClusterType
-	logLevel                  string
-	networkRunnerGRPCEndpoint string
-	avalancheGoExecPath       string
-	avalancheGoLogLevel       string
-	testKeysFile              string
+	clusterType         ClusterType
+	avalancheGoExecPath string
+	avalancheGoLogLevel string
+	testKeysFile        string
 
 	// we snapshot initial state, right after starting cluster
 	// to be able to reset state if needed and isolate tests
@@ -70,6 +63,8 @@ type testEnvironmentConfig struct {
 type TestEnvironment struct {
 	*testEnvironmentConfig
 
+	setupCalled bool
+
 	runnerMu     sync.RWMutex
 	runnerCli    runner_sdk.Client
 	runnerGRPCEp string
@@ -77,74 +72,112 @@ type TestEnvironment struct {
 	urisMu sync.RWMutex
 	uris   []string
 
+	// isNetworkPristine is set to true after network creation and
+	// false after a call to GetURIsRW to know when a test needs the
+	// network to be recreated. Not used if clusterType is
+	// PreExisting.
+	isNetworkPristine bool
+
 	testKeysMu sync.RWMutex
 	testKeys   []*secp256k1.PrivateKey
-
-	snapMu  sync.RWMutex
-	snapped bool
 }
 
-// should be called only once
-// must be called before StartCluster
-// Note that either networkRunnerGRPCEp or uris must be specified
-func (te *TestEnvironment) ConfigCluster(
-	logLevel string,
+// Setup ensures the environment is configured with a network that can
+// be targeted for testing.
+func (te *TestEnvironment) Setup(
+	networkRunnerClientLogLevel string,
 	networkRunnerGRPCEp string,
 	avalancheGoExecPath string,
 	avalancheGoLogLevel string,
-	uris string,
 	testKeysFile string,
+	usePersistentNetwork bool,
 ) error {
-	if avalancheGoExecPath != "" {
-		if _, err := os.Stat(avalancheGoExecPath); err != nil {
-			return fmt.Errorf("could not find avalanchego binary: %w", err)
-		}
+	// TODO(marun) Use testify instead of returning errors
+	if te.setupCalled {
+		return errors.New("setup has already been called and should only be called once")
+	} else {
+		te.setupCalled = true
 	}
 
-	te.testKeysFile = testKeysFile
-	te.snapshotName = "ginkgo" + time.Now().String()
-	switch {
-	case networkRunnerGRPCEp != "" && len(uris) == 0:
+	// Ensure the network-runner client is initialized and can access the network-runner.
+	err := te.initRunnerClient(networkRunnerClientLogLevel, networkRunnerGRPCEp)
+	if err != nil {
+		return err
+	}
+
+	// TODO(marun) Maybe lazy-load so that errors only fail dependent tests?
+	err = te.LoadKeys(testKeysFile)
+	if err != nil {
+		return err
+	}
+
+	if usePersistentNetwork {
+		te.clusterType = PreExisting
+
+		tests.Outf("{{yellow}}Using a pre-existing network{{/}}\n")
+
+		// Read the URIs for the existing network so that tests can access the nodes.
+
+		err = te.refreshURIs()
+		if err != nil {
+			return err
+		}
+
+	} else {
 		te.clusterType = StandAlone
-		te.logLevel = logLevel
-		te.networkRunnerGRPCEndpoint = networkRunnerGRPCEp
+
+		// Create a new network
+
+		if avalancheGoExecPath != "" {
+			if _, err := os.Stat(avalancheGoExecPath); err != nil {
+				return fmt.Errorf("could not find avalanchego binary: %w", err)
+			}
+		}
+
 		te.avalancheGoExecPath = avalancheGoExecPath
 		te.avalancheGoLogLevel = avalancheGoLogLevel
 
-		err := te.setRunnerClient(te.logLevel, te.networkRunnerGRPCEndpoint)
+		err := te.startCluster()
 		if err != nil {
-			return fmt.Errorf("could not setup network-runner client: %w", err)
+			return err
 		}
-
-		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-		presp, err := te.GetRunnerClient().Ping(ctx)
-		cancel()
-		if err != nil {
-			return fmt.Errorf("could not ping network-runner client: %w", err)
-		}
-		tests.Outf("{{green}}network-runner running in PID %d{{/}}\n", presp.Pid)
-
-		// URIs will be set upon cluster start here
-		return nil
-
-	case networkRunnerGRPCEp == "" && len(uris) != 0:
-		te.clusterType = PreExisting
-		uriSlice := strings.Split(uris, ",")
-		te.setURIs(uriSlice)
-		tests.Outf("{{green}}URIs:{{/}} %q\n", uriSlice)
-		return nil
-
-	default:
-		return errGRPCAndURIsSpecified
 	}
+
+	return nil
 }
 
-func (te *TestEnvironment) LoadKeys() error {
+// initRunnerClient configures the network-runner client and checks
+// that it can reach the network-runner endpoint.
+func (te *TestEnvironment) initRunnerClient(logLevel string, gRPCEp string) error {
+	tests.Outf("Configuring network-runner client\n")
+
+	if len(gRPCEp) == 0 {
+		errors.New("network runner grpc endpoint is required")
+	}
+
+	err := te.setRunnerClient(logLevel, gRPCEp)
+	if err != nil {
+		return fmt.Errorf("could not setup network-runner client: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	presp, err := te.GetRunnerClient().Ping(ctx)
+	cancel()
+	if err != nil {
+		return fmt.Errorf("could not ping network-runner client: %w", err)
+	}
+
+	tests.Outf("{{green}}network-runner running in PID %d{{/}}\n", presp.Pid)
+
+	return nil
+}
+
+func (te *TestEnvironment) LoadKeys(testKeysFile string) error {
 	// load test keys
-	if len(te.testKeysFile) == 0 {
+	if len(testKeysFile) == 0 {
 		return errNoKeyFile
 	}
-	testKeys, err := tests.LoadHexTestKeys(te.testKeysFile)
+	testKeys, err := tests.LoadHexTestKeys(testKeysFile)
 	if err != nil {
 		return fmt.Errorf("failed loading test keys: %w", err)
 	}
@@ -152,39 +185,62 @@ func (te *TestEnvironment) LoadKeys() error {
 	return nil
 }
 
-func (te *TestEnvironment) StartCluster() error {
-	switch te.clusterType {
-	case StandAlone:
-		tests.Outf("{{magenta}}starting network-runner with %q{{/}}\n", te.avalancheGoExecPath)
-		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-		resp, err := te.GetRunnerClient().Start(ctx, te.avalancheGoExecPath,
-			runner_sdk.WithNumNodes(5),
-			runner_sdk.WithGlobalNodeConfig(fmt.Sprintf(`{"log-level":"%s"}`, te.avalancheGoLogLevel)),
-		)
-		cancel()
-		if err != nil {
-			return fmt.Errorf("could not start network-runner: %w", err)
-		}
-		tests.Outf("{{green}}successfully started network-runner: {{/}} %+v\n", resp.ClusterInfo.NodeNames)
-
-		// start is async, so wait some time for cluster health
-		time.Sleep(time.Minute)
-
-		ctx, cancel = context.WithTimeout(context.Background(), 2*time.Minute)
-		_, err = te.GetRunnerClient().Health(ctx)
-		cancel()
-		if err != nil {
-			return fmt.Errorf("could not check health network-runner: %w", err)
-		}
-
-		return te.refreshURIs()
-
-	case PreExisting:
-		return nil // nothing to do, really
-
-	default:
-		return errUnknownClusterType
+// EnsurePristineNetwork attempts to ensure that the currently active
+// network is compatible with tests that require a pristine
+// (unmodified) state.
+func (te *TestEnvironment) EnsurePristineNetwork() {
+	if te.clusterType == PreExisting {
+		tests.Outf("{{yellow}}unable to ensure pristine initial state with a pre-existing network.{{/}}\n")
+		return
 	}
+
+	if te.isNetworkPristine {
+		tests.Outf("{{green}}network is already pristine.{{/}}\n")
+		return
+	}
+
+	tests.Outf("{{yellow}}network state is not pristine, the current network needs to be replaced.{{/}}\n")
+
+	tests.Outf("{{magenta}}shutting down the current network.{{/}}\n")
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultShutdownTimeout)
+	_, err := te.GetRunnerClient().Stop(ctx)
+	cancel()
+	gomega.Expect(err).Should(gomega.BeNil())
+	tests.Outf("{{green}}network shutdown successful.{{/}}\n")
+
+	err = te.startCluster()
+	gomega.Expect(err).Should(gomega.BeNil())
+}
+
+// startCluster launches a new network via the network-runner client.
+func (te *TestEnvironment) startCluster() error {
+	tests.Outf("{{magenta}}starting network with %q{{/}}\n", te.avalancheGoExecPath)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	resp, err := te.GetRunnerClient().Start(ctx, te.avalancheGoExecPath,
+		runner_sdk.WithNumNodes(5),
+		runner_sdk.WithGlobalNodeConfig(fmt.Sprintf(`{"log-level":"%s"}`, te.avalancheGoLogLevel)),
+	)
+	cancel()
+	if err != nil {
+		return fmt.Errorf("could not start network: %w", err)
+	}
+
+	tests.Outf("{{green}}successfully started network: {{/}} %+v\n", resp.ClusterInfo.NodeNames)
+
+	ctx, cancel = context.WithTimeout(context.Background(), 2*time.Minute)
+	_, err = te.GetRunnerClient().Health(ctx)
+	cancel()
+	if err != nil {
+		return fmt.Errorf("could not check network health: %w", err)
+	}
+
+	tests.Outf("{{green}}network reporting health{{/}}\n")
+
+	te.isNetworkPristine = true
+
+	err = te.refreshURIs()
+	return err
 }
 
 func (te *TestEnvironment) refreshURIs() error {
@@ -199,6 +255,8 @@ func (te *TestEnvironment) refreshURIs() error {
 	return nil
 }
 
+// setRunnerClient initializes the network-runner client that will be
+// used for interacting with test networks.
 func (te *TestEnvironment) setRunnerClient(logLevel string, gRPCEp string) error {
 	te.runnerMu.Lock()
 	defer te.runnerMu.Unlock()
@@ -246,7 +304,24 @@ func (te *TestEnvironment) setURIs(us []string) {
 	te.urisMu.Unlock()
 }
 
-func (te *TestEnvironment) GetURIs() []string {
+// GetURIsRW returns the current network URIs for read and write
+// operations. The network is assumed to have been modified from its
+// initial state after this function has been called.
+//
+// TODO(marun) Find a better way of determining whether a network has
+// been modified from its initial state. Or maybe ensure most (if not
+// all) tests are capable of targeting any network in a
+// non-pathological state?
+func (te *TestEnvironment) GetURIsRW() []string {
+	te.urisMu.RLock()
+	us := te.uris
+	te.isNetworkPristine = false
+	te.urisMu.RUnlock()
+	return us
+}
+
+// GetURIsRO returns the current network URIs for read-only operations.
+func (te *TestEnvironment) GetURIsRO() []string {
 	te.urisMu.RLock()
 	us := te.uris
 	te.urisMu.RUnlock()
@@ -271,12 +346,15 @@ func (te *TestEnvironment) GetTestKeys() ([]*secp256k1.PrivateKey, []ids.ShortID
 	return testKeys, testKeyAddrs, keyChain
 }
 
-func (te *TestEnvironment) ShutdownCluster() error {
-	if te.GetRunnerGRPCEndpoint() == "" {
-		// we connected directly to existing cluster
-		// nothing to shutdown
+func (te *TestEnvironment) Teardown() error {
+	gomega.Expect(te.setupCalled).Should(gomega.BeTrue())
+
+	if te.clusterType == PreExisting {
+		tests.Outf("{{yellow}}teardown not required for persistent network{{/}}\n")
 		return nil
 	}
+
+	// Teardown the active network.
 
 	runnerCli := te.GetRunnerClient()
 	if runnerCli == nil {
@@ -293,51 +371,4 @@ func (te *TestEnvironment) ShutdownCluster() error {
 
 	tests.Outf("{{red}}shutting down network-runner client{{/}}\n")
 	return te.closeRunnerClient()
-}
-
-func (te *TestEnvironment) SnapInitialState() error {
-	te.snapMu.RLock()
-	defer te.snapMu.RUnlock()
-
-	if te.snapped {
-		return nil // initial state snapshot already captured
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	_, err := te.runnerCli.SaveSnapshot(ctx, te.snapshotName)
-	cancel()
-	if err != nil {
-		return err
-	}
-	te.snapped = true
-	return nil
-}
-
-func (te *TestEnvironment) RestoreInitialState(switchOffNetworkFirst bool) error {
-	te.snapMu.Lock()
-	defer te.snapMu.Unlock()
-
-	if switchOffNetworkFirst {
-		ctx, cancel := context.WithTimeout(context.Background(), DefaultShutdownTimeout)
-		_, err := te.GetRunnerClient().Stop(ctx)
-		cancel()
-		gomega.Expect(err).Should(gomega.BeNil())
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	_, err := te.GetRunnerClient().LoadSnapshot(ctx, te.snapshotName)
-	cancel()
-	if err != nil {
-		return err
-	}
-
-	// make sure cluster goes back to health before moving on
-	ctx, cancel = context.WithTimeout(context.Background(), DefaultShutdownTimeout)
-	_, err = te.GetRunnerClient().Health(ctx)
-	cancel()
-	if err != nil {
-		return fmt.Errorf("could not check health network-runner: %w", err)
-	}
-
-	return te.refreshURIs()
 }

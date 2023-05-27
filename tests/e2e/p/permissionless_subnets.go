@@ -42,12 +42,9 @@ var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
 			"permissionless-subnets",
 		),
 		func() {
-			ginkgo.By("reload initial snapshot for test independence", func() {
-				err := e2e.Env.RestoreInitialState(true /*switchOffNetworkFirst*/)
-				gomega.Expect(err).Should(gomega.BeNil())
-			})
+			e2e.Env.EnsurePristineNetwork()
 
-			rpcEps := e2e.Env.GetURIs()
+			rpcEps := e2e.Env.GetURIsRW()
 			gomega.Expect(rpcEps).ShouldNot(gomega.BeEmpty())
 			nodeURI := rpcEps[0]
 

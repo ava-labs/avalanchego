@@ -27,21 +27,20 @@ func TestE2E(t *testing.T) {
 }
 
 var (
-	// helpers to parse test flags
-	logLevel string
+	networkRunnerGRPCEp   string
+	networkRunnerLogLevel string
 
-	networkRunnerGRPCEp              string
 	networkRunnerAvalancheGoExecPath string
 	networkRunnerAvalancheGoLogLevel string
 
-	uris string
-
 	testKeysFile string
+
+	usePersistentNetwork bool
 )
 
 func init() {
 	flag.StringVar(
-		&logLevel,
+		&networkRunnerLogLevel,
 		"log-level",
 		"info",
 		"log level",
@@ -50,68 +49,54 @@ func init() {
 	flag.StringVar(
 		&networkRunnerGRPCEp,
 		"network-runner-grpc-endpoint",
+		// TODO(marun) Default this.
 		"",
-		"[optional] gRPC server endpoint for network-runner (only required for local network-runner tests)",
+		"gRPC server endpoint for network-runner",
 	)
 	flag.StringVar(
 		&networkRunnerAvalancheGoExecPath,
 		"network-runner-avalanchego-path",
+		// TODO(marun) Default this.
 		"",
-		"[optional] avalanchego executable path (only required for local network-runner tests)",
+		"[optional] avalanchego executable path (required if not using a persistent network)",
 	)
 	flag.StringVar(
 		&networkRunnerAvalancheGoLogLevel,
 		"network-runner-avalanchego-log-level",
 		"INFO",
-		"[optional] avalanchego log-level (only required for local network-runner tests)",
-	)
-
-	// e.g., custom network HTTP RPC endpoints
-	flag.StringVar(
-		&uris,
-		"uris",
-		"",
-		"HTTP RPC endpoint URIs for avalanche node (comma-separated, required to run against existing cluster)",
+		"[optional] avalanchego log-level (used if not using a persistent network)",
 	)
 
 	// file that contains a list of new-line separated secp256k1 private keys
 	flag.StringVar(
 		&testKeysFile,
 		"test-keys-file",
+		// TODO(marun) Default this to the in-tree file
 		"",
 		"file that contains a list of new-line separated hex-encoded secp256k1 private keys (assume test keys are pre-funded, for test networks)",
+	)
+
+	flag.BoolVar(
+		&usePersistentNetwork,
+		"use-persistent-network",
+		false,
+		"whether to target a network that is already running. Useful for speeding up test development.",
 	)
 }
 
 var _ = ginkgo.BeforeSuite(func() {
-	err := e2e.Env.ConfigCluster(
-		logLevel,
+	err := e2e.Env.Setup(
+		networkRunnerLogLevel,
 		networkRunnerGRPCEp,
 		networkRunnerAvalancheGoExecPath,
 		networkRunnerAvalancheGoLogLevel,
-		uris,
 		testKeysFile,
+		usePersistentNetwork,
 	)
-	gomega.Expect(err).Should(gomega.BeNil())
-
-	// check cluster can be started
-	err = e2e.Env.StartCluster()
-	gomega.Expect(err).Should(gomega.BeNil())
-
-	// load keys
-	err = e2e.Env.LoadKeys()
-	gomega.Expect(err).Should(gomega.BeNil())
-
-	// take initial snapshot. cluster will be switched off
-	err = e2e.Env.SnapInitialState()
-	gomega.Expect(err).Should(gomega.BeNil())
-
-	// restart cluster
-	err = e2e.Env.RestoreInitialState(false /*switchOffNetworkFirst*/)
 	gomega.Expect(err).Should(gomega.BeNil())
 })
 
 var _ = ginkgo.AfterSuite(func() {
-	err := e2e.Env.ShutdownCluster()
+	err := e2e.Env.Teardown()
 	gomega.Expect(err).Should(gomega.BeNil())
 })

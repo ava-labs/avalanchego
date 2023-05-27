@@ -46,7 +46,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 		),
 		ginkgo.FlakeAttempts(2),
 		func() {
-			rpcEps := e2e.Env.GetURIs()
+			rpcEps := e2e.Env.GetURIsRW()
 			gomega.Expect(rpcEps).ShouldNot(gomega.BeEmpty())
 			nodeURI := rpcEps[0]
 
