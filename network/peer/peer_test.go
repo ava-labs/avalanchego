@@ -339,6 +339,8 @@ func TestPingUptimes(t *testing.T) {
 					1,
 					[]*p2p.SubnetUptime{
 						{
+							// Providing the untrackedSubnetID here should cause
+							// the remote peer to disconnect from us.
 							SubnetId: untrackedSubnetID[:],
 							Uptime:   1,
 						},
@@ -371,7 +373,7 @@ func TestPingUptimes(t *testing.T) {
 
 			require.True(peer0.Send(context.Background(), tc.msg))
 
-			// Note: shouldClose should only be `true` for the last test because
+			// Note: shouldClose can only be `true` for the last test because
 			// we reuse peers across tests.
 			if tc.shouldClose {
 				require.NoError(peer1.AwaitClosed(context.Background()))
