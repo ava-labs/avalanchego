@@ -245,9 +245,15 @@ func (b *builder) ResetBlockTimer() {
 // (i.e. within local time plus [MaxFutureStartFrom]).
 func (b *builder) dropExpiredStakerTxs(timestamp time.Time) {
 	minStartTime := timestamp.Add(txexecutor.SyncBound)
-	for b.Mempool.HasStakerTx() {
-		tx := b.Mempool.PeekStakerTx()
-		startTime := tx.Unsigned.(txs.Staker).StartTime()
+	iter := b.Mempool.GetTxIterator()
+	for iter.Next() {
+		tx := iter.Value()
+		stakerTx, ok := tx.Unsigned.(txs.Staker)
+		if !ok {
+			continue
+		}
+
+		startTime := stakerTx.StartTime()
 		if !startTime.Before(minStartTime) {
 			// The next proposal tx in the mempool starts sufficiently far in
 			// the future.

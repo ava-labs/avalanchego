@@ -403,14 +403,18 @@ func TestBuildBlock(t *testing.T) {
 		{
 			name: "has decision txs",
 			builderF: func(ctrl *gomock.Controller) *builder {
-				mempool := mempool.NewMockMempool(ctrl)
+				mp := mempool.NewMockMempool(ctrl)
+				txIter := mempool.NewMockTxIterator(ctrl)
+				gomock.InOrder(
+					txIter.EXPECT().Next().Return(true),
+					txIter.EXPECT().Value().Return(transactions[0]),
+				)
+				mp.EXPECT().GetTxIterator().Return(txIter).Times(1)
+				mp.EXPECT().HasTxs().Return(true)
+				mp.EXPECT().PeekTxs(targetBlockSize).Return(transactions)
 
-				// There are txs.
-				mempool.EXPECT().HasStakerTx().Return(false)
-				mempool.EXPECT().HasTxs().Return(true)
-				mempool.EXPECT().PeekTxs(targetBlockSize).Return(transactions)
 				return &builder{
-					Mempool: mempool,
+					Mempool: mp,
 				}
 			},
 			timestamp:        parentTimestamp,
@@ -450,16 +454,18 @@ func TestBuildBlock(t *testing.T) {
 		{
 			name: "no stakers tx",
 			builderF: func(ctrl *gomock.Controller) *builder {
-				mempool := mempool.NewMockMempool(ctrl)
-
-				// There are no txs.
-				mempool.EXPECT().HasStakerTx().Return(false)
-				mempool.EXPECT().HasTxs().Return(false)
+				mp := mempool.NewMockMempool(ctrl)
+				txIter := mempool.NewMockTxIterator(ctrl)
+				gomock.InOrder(
+					txIter.EXPECT().Next().Return(false),
+				)
+				mp.EXPECT().GetTxIterator().Return(txIter).Times(1)
+				mp.EXPECT().HasTxs().Return(false)
 
 				clk := &mockable.Clock{}
 				clk.Set(now)
 				return &builder{
-					Mempool: mempool,
+					Mempool: mp,
 					txExecutorBackend: &txexecutor.Backend{
 						Ctx: &snow.Context{
 							Log: logging.NoLog{},
@@ -498,17 +504,19 @@ func TestBuildBlock(t *testing.T) {
 		{
 			name: "should advance time",
 			builderF: func(ctrl *gomock.Controller) *builder {
-				mempool := mempool.NewMockMempool(ctrl)
-
-				// There are no txs.
-				mempool.EXPECT().HasStakerTx().Return(false)
-				mempool.EXPECT().HasTxs().Return(false)
-				mempool.EXPECT().PeekTxs(targetBlockSize).Return(nil)
+				mp := mempool.NewMockMempool(ctrl)
+				txIter := mempool.NewMockTxIterator(ctrl)
+				gomock.InOrder(
+					txIter.EXPECT().Next().Return(false),
+				)
+				mp.EXPECT().GetTxIterator().Return(txIter).Times(1)
+				mp.EXPECT().HasTxs().Return(false)
+				mp.EXPECT().PeekTxs(targetBlockSize).Return(nil)
 
 				clk := &mockable.Clock{}
 				clk.Set(now)
 				return &builder{
-					Mempool: mempool,
+					Mempool: mp,
 					txExecutorBackend: &txexecutor.Backend{
 						Clk: clk,
 					},
@@ -553,17 +561,20 @@ func TestBuildBlock(t *testing.T) {
 		{
 			name: "has a staker tx no force",
 			builderF: func(ctrl *gomock.Controller) *builder {
-				mempool := mempool.NewMockMempool(ctrl)
-
-				// There is a tx.
-				mempool.EXPECT().HasStakerTx().Return(false)
-				mempool.EXPECT().HasTxs().Return(true)
-				mempool.EXPECT().PeekTxs(targetBlockSize).Return([]*txs.Tx{transactions[0]})
+				mp := mempool.NewMockMempool(ctrl)
+				txIter := mempool.NewMockTxIterator(ctrl)
+				gomock.InOrder(
+					txIter.EXPECT().Next().Return(true),
+					txIter.EXPECT().Value().Return(transactions[0]),
+				)
+				mp.EXPECT().GetTxIterator().Return(txIter).Times(1)
+				mp.EXPECT().HasTxs().Return(true)
+				mp.EXPECT().PeekTxs(targetBlockSize).Return(transactions)
 
 				clk := &mockable.Clock{}
 				clk.Set(now)
 				return &builder{
-					Mempool: mempool,
+					Mempool: mp,
 					txExecutorBackend: &txexecutor.Backend{
 						Clk: clk,
 					},
@@ -606,18 +617,20 @@ func TestBuildBlock(t *testing.T) {
 		{
 			name: "has a staker tx with force",
 			builderF: func(ctrl *gomock.Controller) *builder {
-				mempool := mempool.NewMockMempool(ctrl)
-
-				// There are no decision txs
-				// There is a staker tx.
-				mempool.EXPECT().HasStakerTx().Return(false)
-				mempool.EXPECT().HasTxs().Return(true)
-				mempool.EXPECT().PeekTxs(targetBlockSize).Return([]*txs.Tx{transactions[0]})
+				mp := mempool.NewMockMempool(ctrl)
+				txIter := mempool.NewMockTxIterator(ctrl)
+				gomock.InOrder(
+					txIter.EXPECT().Next().Return(true),
+					txIter.EXPECT().Value().Return(transactions[0]),
+				)
+				mp.EXPECT().GetTxIterator().Return(txIter).Times(1)
+				mp.EXPECT().HasTxs().Return(true)
+				mp.EXPECT().PeekTxs(targetBlockSize).Return(transactions)
 
 				clk := &mockable.Clock{}
 				clk.Set(now)
 				return &builder{
-					Mempool: mempool,
+					Mempool: mp,
 					txExecutorBackend: &txexecutor.Backend{
 						Clk: clk,
 					},
