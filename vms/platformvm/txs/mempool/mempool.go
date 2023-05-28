@@ -70,8 +70,10 @@ type Mempool interface {
 	// (both decision and staker) are included into Standard blocks.
 	// HasTxs allow to check for availability of any mempool transaction.
 	HasTxs() bool
+
 	// PeekTxs returns the next txs for Banff blocks
 	// up to maxTxsBytes without removing them from the mempool.
+	// TODO: remove this
 	PeekTxs(maxTxsBytes int) []*txs.Tx
 
 	HasStakerTx() bool
@@ -245,6 +247,7 @@ func (m *mempool) HasTxs() bool {
 	return m.unissuedDecisionTxs.Len() > 0 || m.unissuedStakerTxs.Len() > 0
 }
 
+// TODO: remove this
 func (m *mempool) PeekTxs(maxTxsBytes int) []*txs.Tx {
 	var txs []*txs.Tx
 	txsSizeSum := 0
