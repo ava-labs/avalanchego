@@ -104,6 +104,20 @@ func (mr *MockMempoolMockRecorder) GetDropReason(arg0 interface{}) *gomock.Call 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDropReason", reflect.TypeOf((*MockMempool)(nil).GetDropReason), arg0)
 }
 
+// GetTxIterator mocks base method.
+func (m *MockMempool) GetTxIterator() TxIterator {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetTxIterator")
+	ret0, _ := ret[0].(TxIterator)
+	return ret0
+}
+
+// GetTxIterator indicates an expected call of GetTxIterator.
+func (mr *MockMempoolMockRecorder) GetTxIterator() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTxIterator", reflect.TypeOf((*MockMempool)(nil).GetTxIterator))
+}
+
 // Has mocks base method.
 func (m *MockMempool) Has(arg0 ids.ID) bool {
 	m.ctrl.T.Helper()

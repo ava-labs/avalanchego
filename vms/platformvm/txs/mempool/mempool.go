@@ -44,6 +44,17 @@ type BlockTimer interface {
 	ResetBlockTimer()
 }
 
+// Defines transaction iterator with mempool.
+type TxIterator interface {
+	// Moves the iterator to the next transaction.
+	// Returns false once there's no more transaction to return.
+	Next() bool
+
+	// Returns the current transaction.
+	// Should only be called after a call to Next which returned true.
+	Value() *txs.Tx
+}
+
 type Mempool interface {
 	// we may want to be able to stop valid transactions
 	// from entering the mempool, e.g. during blocks creation
@@ -68,6 +79,8 @@ type Mempool interface {
 	// It returns nil if !HasStakerTx().
 	// It's guaranteed that the returned tx, if not nil, is a StakerTx.
 	PeekStakerTx() *txs.Tx
+
+	GetTxIterator() TxIterator
 
 	// Note: dropped txs are added to droppedTxIDs but not
 	// not evicted from unissued decision/staker txs.
@@ -233,7 +246,7 @@ func (m *mempool) HasTxs() bool {
 }
 
 func (m *mempool) PeekTxs(maxTxsBytes int) []*txs.Tx {
-	txs := make([]*txs.Tx, 0)
+	var txs []*txs.Tx
 	txsSizeSum := 0
 
 	txIter := m.unissuedDecisionTxs.NewIterator()
@@ -290,6 +303,10 @@ func (m *mempool) PeekStakerTx() *txs.Tx {
 
 	_, tx, _ := m.unissuedStakerTxs.Newest()
 	return tx
+}
+
+func (m *mempool) GetTxIterator() TxIterator {
+	return m.unissuedDecisionTxs.NewIterator()
 }
 
 func (m *mempool) MarkDropped(txID ids.ID, reason error) {
