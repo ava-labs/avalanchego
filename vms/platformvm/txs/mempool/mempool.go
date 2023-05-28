@@ -76,11 +76,10 @@ type Mempool interface {
 	// TODO: remove this
 	PeekTxs(maxTxsBytes int) []*txs.Tx
 
-	HasStakerTx() bool
-	// PeekStakerTx returns the next stakerTx without removing it from mempool.
+	// PeekTx returns the next stakerTx without removing it from mempool.
 	// It returns nil if !HasStakerTx().
 	// It's guaranteed that the returned tx, if not nil, is a StakerTx.
-	PeekStakerTx() *txs.Tx
+	PeekTx() *txs.Tx
 
 	GetTxIterator() TxIterator
 
@@ -101,11 +100,8 @@ type mempool struct {
 	bytesAvailableMetric prometheus.Gauge
 	bytesAvailable       int
 
-	unissuedDecisionTxs linkedhashmap.LinkedHashmap[ids.ID, *txs.Tx]
-	decisionTxsNum      prometheus.Gauge
-
-	unissuedStakerTxs linkedhashmap.LinkedHashmap[ids.ID, *txs.Tx]
-	stakerTxsNum      prometheus.Gauge
+	unissuedTxs linkedhashmap.LinkedHashmap[ids.ID, *txs.Tx]
+	txsNum      prometheus.Gauge
 
 	// Key: Tx ID
 	// Value: Verification error
@@ -130,21 +126,12 @@ func NewMempool(
 		return nil, err
 	}
 
-	decisionTxsNum := prometheus.NewGauge(prometheus.GaugeOpts{
+	txsNum := prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespace,
-		Name:      "decision_txs",
-		Help:      "Number of decision transactions in the mempool",
+		Name:      "txs",
+		Help:      "Number of decision/staker transactions in the mempool",
 	})
-	if err := registerer.Register(decisionTxsNum); err != nil {
-		return nil, err
-	}
-
-	stakerTxsNum := prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespace,
-		Name:      "staker_txs",
-		Help:      "Number of staker transactions in the mempool",
-	})
-	if err := registerer.Register(stakerTxsNum); err != nil {
+	if err := registerer.Register(txsNum); err != nil {
 		return nil, err
 	}
 
@@ -153,11 +140,8 @@ func NewMempool(
 		bytesAvailableMetric: bytesAvailableMetric,
 		bytesAvailable:       maxMempoolSize,
 
-		unissuedDecisionTxs: linkedhashmap.New[ids.ID, *txs.Tx](),
-		decisionTxsNum:      decisionTxsNum,
-
-		unissuedStakerTxs: linkedhashmap.New[ids.ID, *txs.Tx](),
-		stakerTxsNum:      stakerTxsNum,
+		unissuedTxs: linkedhashmap.New[ids.ID, *txs.Tx](),
+		txsNum:      txsNum,
 
 		droppedTxIDs:  &cache.LRU[ids.ID, error]{Size: droppedTxIDsCacheSize},
 		consumedUTXOs: set.NewSet[ids.ID](initialConsumedUTXOsSize),
@@ -225,10 +209,7 @@ func (m *mempool) Has(txID ids.ID) bool {
 }
 
 func (m *mempool) Get(txID ids.ID) *txs.Tx {
-	if tx, _ := m.unissuedDecisionTxs.Get(txID); tx != nil {
-		return tx
-	}
-	tx, _ := m.unissuedStakerTxs.Get(txID)
+	tx, _ := m.unissuedTxs.Get(txID)
 	return tx
 }
 
@@ -244,7 +225,7 @@ func (m *mempool) Remove(txsToRemove []*txs.Tx) {
 }
 
 func (m *mempool) HasTxs() bool {
-	return m.unissuedDecisionTxs.Len() > 0 || m.unissuedStakerTxs.Len() > 0
+	return m.unissuedTxs.Len() > 0
 }
 
 // TODO: remove this
@@ -252,14 +233,7 @@ func (m *mempool) PeekTxs(maxTxsBytes int) []*txs.Tx {
 	var txs []*txs.Tx
 	txsSizeSum := 0
 
-	txIter := m.unissuedDecisionTxs.NewIterator()
-	for txsSizeSum <= maxTxsBytes && txIter.Next() {
-		tx := txIter.Value()
-		txs = append(txs, tx)
-		txsSizeSum += tx.Size()
-	}
-
-	txIter = m.unissuedStakerTxs.NewIterator()
+	txIter := m.unissuedTxs.NewIterator()
 	for txsSizeSum <= maxTxsBytes && txIter.Next() {
 		tx := txIter.Value()
 		txs = append(txs, tx)
@@ -269,47 +243,27 @@ func (m *mempool) PeekTxs(maxTxsBytes int) []*txs.Tx {
 	return txs
 }
 
-func (m *mempool) addDecisionTx(tx *txs.Tx) {
-	m.unissuedDecisionTxs.Put(tx.ID(), tx)
+func (m *mempool) addTx(tx *txs.Tx) {
+	m.unissuedTxs.Put(tx.ID(), tx)
 	m.register(tx)
 }
 
-func (m *mempool) addStakerTx(tx *txs.Tx) {
-	m.unissuedStakerTxs.Put(tx.ID(), tx)
-	m.register(tx)
-}
-
-func (m *mempool) HasStakerTx() bool {
-	return m.unissuedStakerTxs.Len() > 0
-}
-
-func (m *mempool) removeDecisionTxs(txs []*txs.Tx) {
+func (m *mempool) removeTxs(txs ...*txs.Tx) {
 	for _, tx := range txs {
 		txID := tx.ID()
-		if m.unissuedDecisionTxs.Delete(txID) {
+		if m.unissuedTxs.Delete(txID) {
 			m.deregister(tx)
 		}
 	}
 }
 
-func (m *mempool) removeStakerTx(tx *txs.Tx) {
-	txID := tx.ID()
-	if m.unissuedStakerTxs.Delete(txID) {
-		m.deregister(tx)
-	}
-}
-
-func (m *mempool) PeekStakerTx() *txs.Tx {
-	if m.unissuedStakerTxs.Len() == 0 {
-		return nil
-	}
-
-	_, tx, _ := m.unissuedStakerTxs.Newest()
+func (m *mempool) PeekTx() *txs.Tx {
+	_, tx, _ := m.unissuedTxs.Newest()
 	return tx
 }
 
 func (m *mempool) GetTxIterator() TxIterator {
-	return m.unissuedDecisionTxs.NewIterator()
+	return m.unissuedTxs.NewIterator()
 }
 
 func (m *mempool) MarkDropped(txID ids.ID, reason error) {

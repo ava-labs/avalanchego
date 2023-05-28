@@ -30,56 +30,56 @@ func (*issuer) RewardValidatorTx(*txs.RewardValidatorTx) error {
 }
 
 func (i *issuer) AddValidatorTx(*txs.AddValidatorTx) error {
-	i.m.addStakerTx(i.tx)
+	i.m.addTx(i.tx)
 	return nil
 }
 
 func (i *issuer) AddSubnetValidatorTx(*txs.AddSubnetValidatorTx) error {
-	i.m.addStakerTx(i.tx)
+	i.m.addTx(i.tx)
 	return nil
 }
 
 func (i *issuer) AddDelegatorTx(*txs.AddDelegatorTx) error {
-	i.m.addStakerTx(i.tx)
+	i.m.addTx(i.tx)
 	return nil
 }
 
 func (i *issuer) RemoveSubnetValidatorTx(*txs.RemoveSubnetValidatorTx) error {
-	i.m.addDecisionTx(i.tx)
+	i.m.addTx(i.tx)
 	return nil
 }
 
 func (i *issuer) CreateChainTx(*txs.CreateChainTx) error {
-	i.m.addDecisionTx(i.tx)
+	i.m.addTx(i.tx)
 	return nil
 }
 
 func (i *issuer) CreateSubnetTx(*txs.CreateSubnetTx) error {
-	i.m.addDecisionTx(i.tx)
+	i.m.addTx(i.tx)
 	return nil
 }
 
 func (i *issuer) ImportTx(*txs.ImportTx) error {
-	i.m.addDecisionTx(i.tx)
+	i.m.addTx(i.tx)
 	return nil
 }
 
 func (i *issuer) ExportTx(*txs.ExportTx) error {
-	i.m.addDecisionTx(i.tx)
+	i.m.addTx(i.tx)
 	return nil
 }
 
 func (i *issuer) TransformSubnetTx(*txs.TransformSubnetTx) error {
-	i.m.addDecisionTx(i.tx)
+	i.m.addTx(i.tx)
 	return nil
 }
 
 func (i *issuer) AddPermissionlessValidatorTx(*txs.AddPermissionlessValidatorTx) error {
-	i.m.addStakerTx(i.tx)
+	i.m.addTx(i.tx)
 	return nil
 }
 
 func (i *issuer) AddPermissionlessDelegatorTx(*txs.AddPermissionlessDelegatorTx) error {
-	i.m.addStakerTx(i.tx)
+	i.m.addTx(i.tx)
 	return nil
 }
