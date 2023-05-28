@@ -174,6 +174,39 @@ func TestProposalTxsInMempool(t *testing.T) {
 	}
 }
 
+func TestPeekTxsWithLimit(t *testing.T) {
+	require := require.New(t)
+
+	registerer := prometheus.NewRegistry()
+	mpool, err := NewMempool("mempool", registerer, &noopBlkTimer{})
+	require.NoError(err)
+
+	txsN := 20
+	txs, err := createTestDecisionTxs(10)
+	require.NoError(err)
+	for _, tx := range txs {
+		require.NoError(mpool.Add(tx))
+	}
+
+	txsToPeek := txsN / 2
+	txsToPeekSize := 0
+	for i := 0; i < txsToPeek; i++ {
+		txsToPeekSize += txs[i].Size()
+	}
+
+	peeked := mpool.PeekTxs(0)
+	require.Nil(peeked)
+
+	peeked = mpool.PeekTxs(1)
+	require.Nil(peeked)
+
+	peeked = mpool.PeekTxs(txsToPeekSize)
+	require.Equal(txs[:txsToPeek], peeked)
+
+	peeked = mpool.PeekTxs(math.MaxInt)
+	require.Equal(txs, peeked)
+}
+
 func createTestDecisionTxs(count int) ([]*txs.Tx, error) {
 	decisionTxs := make([]*txs.Tx, 0, count)
 	for i := uint32(0); i < uint32(count); i++ {

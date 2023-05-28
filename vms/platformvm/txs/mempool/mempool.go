@@ -234,10 +234,13 @@ func (m *mempool) PeekTxs(maxTxsBytes int) []*txs.Tx {
 	txsSizeSum := 0
 
 	txIter := m.unissuedTxs.NewIterator()
-	for txsSizeSum <= maxTxsBytes && txIter.Next() {
+	for txIter.Next() {
 		tx := txIter.Value()
-		txs = append(txs, tx)
 		txsSizeSum += tx.Size()
+		if txsSizeSum > maxTxsBytes {
+			break
+		}
+		txs = append(txs, tx)
 	}
 
 	return txs
