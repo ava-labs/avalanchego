@@ -34,27 +34,27 @@ func newNoopTracer() trace.Tracer {
 }
 
 type mockClient struct {
-	db *merkledb.Database
+	db merkledb.MerkleDB
 }
 
-func (client *mockClient) GetChangeProof(ctx context.Context, request *syncpb.ChangeProofRequest, _ *merkledb.Database) (*merkledb.ChangeProof, error) {
-	startRoot, err := ids.ToID(request.StartRoot)
+func (client *mockClient) GetChangeProof(ctx context.Context, request *syncpb.ChangeProofRequest, _ merkledb.MerkleDB) (*merkledb.ChangeProof, error) {
+	startRoot, err := ids.ToID(request.StartRootHash)
 	if err != nil {
 		return nil, err
 	}
-	endRoot, err := ids.ToID(request.EndRoot)
+	endRoot, err := ids.ToID(request.EndRootHash)
 	if err != nil {
 		return nil, err
 	}
-	return client.db.GetChangeProof(ctx, startRoot, endRoot, request.Start, request.End, int(request.KeyLimit))
+	return client.db.GetChangeProof(ctx, startRoot, endRoot, request.StartKey, request.EndKey, int(request.KeyLimit))
 }
 
 func (client *mockClient) GetRangeProof(ctx context.Context, request *syncpb.RangeProofRequest) (*merkledb.RangeProof, error) {
-	root, err := ids.ToID(request.Root)
+	root, err := ids.ToID(request.RootHash)
 	if err != nil {
 		return nil, err
 	}
-	return client.db.GetRangeProofAtRoot(ctx, root, request.Start, request.End, int(request.KeyLimit))
+	return client.db.GetRangeProofAtRoot(ctx, root, request.StartKey, request.EndKey, int(request.KeyLimit))
 }
 
 func Test_Creation(t *testing.T) {
@@ -892,12 +892,12 @@ func Test_Sync_Error_During_Sync(t *testing.T) {
 		},
 	).AnyTimes()
 	client.EXPECT().GetChangeProof(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
-		func(ctx context.Context, request *syncpb.ChangeProofRequest, _ *merkledb.Database) (*merkledb.ChangeProof, error) {
-			startRoot, err := ids.ToID(request.StartRoot)
+		func(ctx context.Context, request *syncpb.ChangeProofRequest, _ merkledb.MerkleDB) (*merkledb.ChangeProof, error) {
+			startRoot, err := ids.ToID(request.StartRootHash)
 			require.NoError(err)
-			endRoot, err := ids.ToID(request.EndRoot)
+			endRoot, err := ids.ToID(request.EndRootHash)
 			require.NoError(err)
-			return dbToSync.GetChangeProof(ctx, startRoot, endRoot, request.Start, request.End, int(request.KeyLimit))
+			return dbToSync.GetChangeProof(ctx, startRoot, endRoot, request.StartKey, request.EndKey, int(request.KeyLimit))
 		},
 	).AnyTimes()
 
@@ -979,19 +979,19 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 		client.EXPECT().GetRangeProof(gomock.Any(), gomock.Any()).DoAndReturn(
 			func(ctx context.Context, request *syncpb.RangeProofRequest) (*merkledb.RangeProof, error) {
 				<-updatedRootChan
-				root, err := ids.ToID(request.Root)
+				root, err := ids.ToID(request.RootHash)
 				require.NoError(err)
-				return dbToSync.GetRangeProofAtRoot(ctx, root, request.Start, request.End, int(request.KeyLimit))
+				return dbToSync.GetRangeProofAtRoot(ctx, root, request.StartKey, request.EndKey, int(request.KeyLimit))
 			},
 		).AnyTimes()
 		client.EXPECT().GetChangeProof(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
-			func(ctx context.Context, request *syncpb.ChangeProofRequest, _ *merkledb.Database) (*merkledb.ChangeProof, error) {
+			func(ctx context.Context, request *syncpb.ChangeProofRequest, _ merkledb.MerkleDB) (*merkledb.ChangeProof, error) {
 				<-updatedRootChan
-				startRoot, err := ids.ToID(request.StartRoot)
+				startRoot, err := ids.ToID(request.StartRootHash)
 				require.NoError(err)
-				endRoot, err := ids.ToID(request.EndRoot)
+				endRoot, err := ids.ToID(request.EndRootHash)
 				require.NoError(err)
-				return dbToSync.GetChangeProof(ctx, startRoot, endRoot, request.Start, request.End, int(request.KeyLimit))
+				return dbToSync.GetChangeProof(ctx, startRoot, endRoot, request.StartKey, request.EndKey, int(request.KeyLimit))
 			},
 		).AnyTimes()
 
@@ -1038,8 +1038,8 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 	defer ctrl.Finish()
 
 	m, err := NewStateSyncManager(StateSyncConfig{
-		SyncDB:                &merkledb.Database{}, // Not used
-		Client:                NewMockClient(ctrl),  // Not used
+		SyncDB:                merkledb.NewMockMerkleDB(ctrl), // Not used
+		Client:                NewMockClient(ctrl),            // Not used
 		TargetRoot:            ids.Empty,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
@@ -1079,12 +1079,12 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 	require.Equal(1, m.unprocessedWork.Len())
 }
 
-func generateTrie(t *testing.T, r *rand.Rand, count int) (*merkledb.Database, error) {
+func generateTrie(t *testing.T, r *rand.Rand, count int) (merkledb.MerkleDB, error) {
 	db, _, err := generateTrieWithMinKeyLen(t, r, count, 0)
 	return db, err
 }
 
-func generateTrieWithMinKeyLen(t *testing.T, r *rand.Rand, count int, minKeyLen int) (*merkledb.Database, [][]byte, error) {
+func generateTrieWithMinKeyLen(t *testing.T, r *rand.Rand, count int, minKeyLen int) (merkledb.MerkleDB, [][]byte, error) {
 	db, err := merkledb.New(
 		context.Background(),
 		memdb.New(),

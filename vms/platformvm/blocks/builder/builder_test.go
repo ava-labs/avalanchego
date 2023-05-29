@@ -790,7 +790,7 @@ func TestMempoolValidTxIsAddedToMempool(t *testing.T) {
 	require.True(env.Builder.Has(txID))
 
 	// and gossiped if it has just been discovered
-	require.True(gossipedBytes != nil)
+	require.NotNil(gossipedBytes)
 
 	// show gossiped bytes can be decoded to the original tx
 	replyIntf, err := message.Parse(gossipedBytes)
@@ -827,7 +827,7 @@ func TestMempoolNewLocalTxIsGossiped(t *testing.T) {
 
 	err := env.Builder.AddUnverifiedTx(tx)
 	require.NoError(err)
-	require.True(gossipedBytes != nil)
+	require.NotNil(gossipedBytes)
 
 	// show gossiped bytes can be decoded to the original tx
 	replyIntf, err := message.Parse(gossipedBytes)
@@ -845,5 +845,5 @@ func TestMempoolNewLocalTxIsGossiped(t *testing.T) {
 	err = env.Builder.Add(tx)
 	require.NoError(err)
 
-	require.True(gossipedBytes == nil)
+	require.Nil(gossipedBytes)
 }
