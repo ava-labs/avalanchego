@@ -44,9 +44,8 @@ fn main() {
         println!("{revision_root_hash:?}");
 
         // Get a revision while a batch is active.
-        let revision_root_hash = db
-            .get_revision(1, None)
-            .expect("revision-1 should exist")
+        let revision = db.get_revision(1, None).expect("revision-1 should exist");
+        let revision_root_hash = revision
             .kv_root_hash()
             .expect("root-hash for revision-1 should exist");
         println!("{revision_root_hash:?}");
@@ -71,9 +70,18 @@ fn main() {
             .kv_root_hash()
             .expect("root-hash for revision-1 should exist");
         assert_ne!(revision_root_hash, new_revision_root_hash);
-
         let val = db.kv_get("k").unwrap();
         assert_eq!("v".as_bytes().to_vec(), val);
+
+        // When reading a specific revision, after new commits the revision remains consistent.
+        let val = revision.kv_get("k");
+        assert_eq!(None, val);
+        let val = revision.kv_get("dof").unwrap();
+        assert_eq!("verb".as_bytes().to_vec(), val);
+        let actual_revision_root_hash = revision
+            .kv_root_hash()
+            .expect("root-hash for revision-2 should exist");
+        assert_eq!(revision_root_hash, actual_revision_root_hash);
     }
     {
         let db =
