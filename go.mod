@@ -13,7 +13,7 @@ require (
 	github.com/Microsoft/go-winio v0.5.2
 	github.com/NYTimes/gziphandler v1.1.1
 	github.com/ava-labs/avalanche-network-runner-sdk v0.3.0
-	github.com/ava-labs/coreth v0.12.1-rc.0
+	github.com/ava-labs/coreth v0.12.2-rc.0
 	github.com/ava-labs/ledger-avalanche/go v0.0.0-20230105152938-00a24d05a8c7
 	github.com/btcsuite/btcd/btcutil v1.1.3
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.1.0
@@ -59,7 +59,7 @@ require (
 	gonum.org/v1/gonum v0.11.0
 	google.golang.org/genproto v0.0.0-20221027153422-115e99e71e1c
 	google.golang.org/grpc v1.50.1
-	google.golang.org/protobuf v1.28.1
+	google.golang.org/protobuf v1.30.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 )
 
