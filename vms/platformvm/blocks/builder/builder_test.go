@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
@@ -367,6 +368,11 @@ func TestBuildBlock(t *testing.T) {
 				return &builder{
 					Mempool:   mempool,
 					txBuilder: txBuilder,
+					txExecutorBackend: &txexecutor.Backend{
+						Config: &config.Config{
+							ContinuousStakingTime: time.Time{}, //activate latest fork
+						},
+					},
 				}
 			},
 			timestamp:        parentTimestamp,
@@ -390,6 +396,7 @@ func TestBuildBlock(t *testing.T) {
 			},
 			expectedBlkF: func(require *require.Assertions) blocks.Block {
 				expectedBlk, err := blocks.NewBanffProposalBlock(
+					blocks.Version1,
 					parentTimestamp,
 					parentID,
 					height,
@@ -411,6 +418,11 @@ func TestBuildBlock(t *testing.T) {
 				mempool.EXPECT().PeekTxs(targetBlockSize).Return(transactions)
 				return &builder{
 					Mempool: mempool,
+					txExecutorBackend: &txexecutor.Backend{
+						Config: &config.Config{
+							ContinuousStakingTime: time.Time{}, //activate latest fork
+						},
+					},
 				}
 			},
 			timestamp:        parentTimestamp,
@@ -437,6 +449,7 @@ func TestBuildBlock(t *testing.T) {
 			},
 			expectedBlkF: func(require *require.Assertions) blocks.Block {
 				expectedBlk, err := blocks.NewBanffStandardBlock(
+					blocks.Version1,
 					parentTimestamp,
 					parentID,
 					height,
@@ -461,6 +474,9 @@ func TestBuildBlock(t *testing.T) {
 				return &builder{
 					Mempool: mempool,
 					txExecutorBackend: &txexecutor.Backend{
+						Config: &config.Config{
+							ContinuousStakingTime: time.Time{}, //activate latest fork
+						},
 						Ctx: &snow.Context{
 							Log: logging.NoLog{},
 						},
@@ -510,6 +526,9 @@ func TestBuildBlock(t *testing.T) {
 				return &builder{
 					Mempool: mempool,
 					txExecutorBackend: &txexecutor.Backend{
+						Config: &config.Config{
+							ContinuousStakingTime: time.Time{}, //activate latest fork
+						},
 						Clk: clk,
 					},
 				}
@@ -540,6 +559,7 @@ func TestBuildBlock(t *testing.T) {
 			},
 			expectedBlkF: func(require *require.Assertions) blocks.Block {
 				expectedBlk, err := blocks.NewBanffStandardBlock(
+					blocks.Version1,
 					now.Add(-1*time.Second), // note the advanced time
 					parentID,
 					height,
@@ -565,6 +585,9 @@ func TestBuildBlock(t *testing.T) {
 				return &builder{
 					Mempool: mempool,
 					txExecutorBackend: &txexecutor.Backend{
+						Config: &config.Config{
+							ContinuousStakingTime: time.Time{}, //activate latest fork
+						},
 						Clk: clk,
 					},
 				}
@@ -593,6 +616,7 @@ func TestBuildBlock(t *testing.T) {
 			},
 			expectedBlkF: func(require *require.Assertions) blocks.Block {
 				expectedBlk, err := blocks.NewBanffStandardBlock(
+					blocks.Version1,
 					parentTimestamp,
 					parentID,
 					height,
@@ -619,6 +643,9 @@ func TestBuildBlock(t *testing.T) {
 				return &builder{
 					Mempool: mempool,
 					txExecutorBackend: &txexecutor.Backend{
+						Config: &config.Config{
+							ContinuousStakingTime: time.Time{}, //activate latest fork
+						},
 						Clk: clk,
 					},
 				}
@@ -647,6 +674,7 @@ func TestBuildBlock(t *testing.T) {
 			},
 			expectedBlkF: func(require *require.Assertions) blocks.Block {
 				expectedBlk, err := blocks.NewBanffStandardBlock(
+					blocks.Version1,
 					parentTimestamp,
 					parentID,
 					height,

@@ -583,7 +583,7 @@ func TestBanffAbortBlockTimestampChecks(t *testing.T) {
 
 			// build and verify child block
 			childHeight := parentHeight + 1
-			statelessAbortBlk, err := blocks.NewBanffAbortBlock(test.childTime, parentID, childHeight)
+			statelessAbortBlk, err := blocks.NewBanffAbortBlock(blocks.Version1, test.childTime, parentID, childHeight)
 			require.NoError(err)
 
 			// setup parent state
@@ -680,7 +680,7 @@ func TestBanffCommitBlockTimestampChecks(t *testing.T) {
 
 			// build and verify child block
 			childHeight := parentHeight + 1
-			statelessCommitBlk, err := blocks.NewBanffCommitBlock(test.childTime, parentID, childHeight)
+			statelessCommitBlk, err := blocks.NewBanffCommitBlock(blocks.Version1, test.childTime, parentID, childHeight)
 			require.NoError(err)
 
 			// setup parent state
@@ -919,6 +919,7 @@ func TestVerifierVisitBanffStandardBlockWithProposalBlockParent(t *testing.T) {
 	}
 
 	blk, err := blocks.NewBanffStandardBlock(
+		blocks.Version1,
 		parentTime.Add(time.Second),
 		parentID,
 		2,
@@ -1016,6 +1017,7 @@ func TestVerifierVisitBanffCommitBlockUnexpectedParentState(t *testing.T) {
 	}
 
 	blk, err := blocks.NewBanffCommitBlock(
+		blocks.Version1,
 		timestamp,
 		parentID,
 		2,
@@ -1109,6 +1111,7 @@ func TestVerifierVisitBanffAbortBlockUnexpectedParentState(t *testing.T) {
 	}
 
 	blk, err := blocks.NewBanffAbortBlock(
+		blocks.Version1,
 		timestamp,
 		parentID,
 		2,

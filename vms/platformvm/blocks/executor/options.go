@@ -33,7 +33,7 @@ func (o *options) BanffProposalBlock(b *blocks.BanffProposalBlock) error {
 	nextHeight := b.Height() + 1
 
 	var err error
-	o.commitBlock, err = blocks.NewBanffCommitBlock(timestamp, blkID, nextHeight)
+	o.commitBlock, err = blocks.NewBanffCommitBlock(b.Version(), timestamp, blkID, nextHeight)
 	if err != nil {
 		return fmt.Errorf(
 			"failed to create commit block: %w",
@@ -41,7 +41,7 @@ func (o *options) BanffProposalBlock(b *blocks.BanffProposalBlock) error {
 		)
 	}
 
-	o.abortBlock, err = blocks.NewBanffAbortBlock(timestamp, blkID, nextHeight)
+	o.abortBlock, err = blocks.NewBanffAbortBlock(b.Version(), timestamp, blkID, nextHeight)
 	if err != nil {
 		return fmt.Errorf(
 			"failed to create abort block: %w",

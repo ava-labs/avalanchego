@@ -198,7 +198,7 @@ func TestGetTxStatus(t *testing.T) {
 			},
 		},
 	}
-	utxoBytes, err := txs.Codec.Marshal(txs.Version, utxo)
+	utxoBytes, err := txs.Codec.Marshal(txs.Version0, utxo)
 	require.NoError(err)
 
 	inputID := utxo.InputID()
@@ -776,6 +776,7 @@ func TestGetBlock(t *testing.T) {
 			require.NoError(err)
 
 			statelessBlock, err := blocks.NewBanffStandardBlock(
+				blocks.Version1,
 				preferred.Timestamp(),
 				preferred.ID(),
 				preferred.Height()+1,

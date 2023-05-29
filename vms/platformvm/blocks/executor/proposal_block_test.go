@@ -267,6 +267,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	{
 		// wrong height
 		statelessProposalBlock, err := blocks.NewBanffProposalBlock(
+			blocks.Version1,
 			parentTime.Add(time.Second),
 			parentID,
 			banffParentBlk.Height(),
@@ -296,6 +297,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	{
 		// wrong timestamp, earlier than parent
 		statelessProposalBlock, err := blocks.NewBanffProposalBlock(
+			blocks.Version1,
 			parentTime.Add(-1*time.Second),
 			parentID,
 			banffParentBlk.Height()+1,
@@ -313,6 +315,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 		initClkTime := env.clk.Time()
 		env.clk.Set(parentTime.Add(-executor.SyncBound))
 		statelessProposalBlock, err := blocks.NewBanffProposalBlock(
+			blocks.Version1,
 			parentTime.Add(time.Second),
 			parentID,
 			banffParentBlk.Height()+1,
@@ -330,6 +333,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 		// wrong timestamp, skipped staker set change event
 		skippedStakerEventTimeStamp := nextStakerTime.Add(time.Second)
 		statelessProposalBlock, err := blocks.NewBanffProposalBlock(
+			blocks.Version1,
 			skippedStakerEventTimeStamp,
 			parentID,
 			banffParentBlk.Height()+1,
@@ -351,6 +355,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 		}
 		require.NoError(invalidTx.Initialize(txs.Codec))
 		statelessProposalBlock, err := blocks.NewBanffProposalBlock(
+			blocks.Version1,
 			parentTime.Add(time.Second),
 			parentID,
 			banffParentBlk.Height()+1,
@@ -366,6 +371,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	{
 		// include too many transactions
 		statelessProposalBlock, err := blocks.NewBanffProposalBlock(
+			blocks.Version1,
 			nextStakerTime,
 			parentID,
 			banffParentBlk.Height()+1,
@@ -382,6 +388,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	{
 		// valid
 		statelessProposalBlock, err := blocks.NewBanffProposalBlock(
+			blocks.Version1,
 			nextStakerTime,
 			parentID,
 			banffParentBlk.Height()+1,
@@ -679,6 +686,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 				parentBlk, _, err := env.state.GetStatelessBlock(preferredID)
 				require.NoError(err)
 				statelessProposalBlock, err := blocks.NewBanffProposalBlock(
+					blocks.Version1,
 					newTime,
 					parentBlk.ID(),
 					parentBlk.Height()+1,
@@ -839,6 +847,7 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 	parentBlk, _, err := env.state.GetStatelessBlock(preferredID)
 	require.NoError(err)
 	statelessProposalBlock, err := blocks.NewBanffProposalBlock(
+		blocks.Version1,
 		subnetVdr1EndTime,
 		parentBlk.ID(),
 		parentBlk.Height()+1,
@@ -953,6 +962,7 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 			parentBlk, _, err := env.state.GetStatelessBlock(preferredID)
 			require.NoError(err)
 			statelessProposalBlock, err := blocks.NewBanffProposalBlock(
+				blocks.Version1,
 				subnetVdr1StartTime,
 				parentBlk.ID(),
 				parentBlk.Height()+1,
@@ -1040,6 +1050,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 	parentBlk, _, err := env.state.GetStatelessBlock(preferredID)
 	require.NoError(err)
 	statelessProposalBlock, err := blocks.NewBanffProposalBlock(
+		blocks.Version1,
 		pendingValidatorStartTime,
 		parentBlk.ID(),
 		parentBlk.Height()+1,
@@ -1136,6 +1147,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 	parentBlk, _, err = env.state.GetStatelessBlock(preferredID)
 	require.NoError(err)
 	statelessProposalBlock, err = blocks.NewBanffProposalBlock(
+		blocks.Version1,
 		pendingDelegatorStartTime,
 		parentBlk.ID(),
 		parentBlk.Height()+1,
@@ -1229,6 +1241,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	parentBlk, _, err := env.state.GetStatelessBlock(preferredID)
 	require.NoError(err)
 	statelessProposalBlock, err := blocks.NewBanffProposalBlock(
+		blocks.Version1,
 		pendingValidatorStartTime,
 		parentBlk.ID(),
 		parentBlk.Height()+1,
@@ -1324,6 +1337,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	parentBlk, _, err = env.state.GetStatelessBlock(preferredID)
 	require.NoError(err)
 	statelessProposalBlock, err = blocks.NewBanffProposalBlock(
+		blocks.Version1,
 		pendingDelegatorStartTime,
 		parentBlk.ID(),
 		parentBlk.Height()+1,

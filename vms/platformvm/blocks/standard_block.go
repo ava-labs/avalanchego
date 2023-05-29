@@ -31,6 +31,7 @@ func (b *BanffStandardBlock) Visit(v Visitor) error {
 }
 
 func NewBanffStandardBlock(
+	version uint16,
 	timestamp time.Time,
 	parentID ids.ID,
 	height uint64,
@@ -46,7 +47,7 @@ func NewBanffStandardBlock(
 			Transactions: txs,
 		},
 	}
-	return blk, initialize(blk)
+	return blk, initialize(blk, version)
 }
 
 type ApricotStandardBlock struct {
@@ -54,8 +55,8 @@ type ApricotStandardBlock struct {
 	Transactions []*txs.Tx `serialize:"true" json:"txs"`
 }
 
-func (b *ApricotStandardBlock) initialize(bytes []byte) error {
-	b.CommonBlock.initialize(bytes)
+func (b *ApricotStandardBlock) initialize(bytes []byte, version uint16) error {
+	b.CommonBlock.initialize(bytes, version)
 	for _, tx := range b.Transactions {
 		if err := tx.Initialize(txs.Codec); err != nil {
 			return fmt.Errorf("failed to sign block: %w", err)
@@ -93,5 +94,5 @@ func NewApricotStandardBlock(
 		},
 		Transactions: txs,
 	}
-	return blk, initialize(blk)
+	return blk, initialize(blk, Version0)
 }

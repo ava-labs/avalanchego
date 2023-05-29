@@ -55,6 +55,9 @@ type AddPermissionlessValidatorTx struct {
 	// For example, if this validator has DelegationShares=300,000 then they
 	// take 30% of rewards from delegators
 	DelegationShares uint32 `serialize:"true" json:"shares"`
+
+	ContinuousStakingAuth verify.Verifiable `serialize:"postContinuousFork" json:"stakingAuthorization"`
+	RewardRestakingShares uint32            `serialize:"postContinuousFork" json:"rewardRestakingShares"`
 }
 
 // InitCtx sets the FxID fields in the inputs and outputs of this

@@ -12,8 +12,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-// Version is the current default codec version
-const Version = txs.Version
+// Version0 is the current default codec version
+const (
+	Version0 = txs.Version0
+	Version1 = txs.Version1
+)
 
 // GenesisCode allows blocks of larger than usual size to be parsed.
 // While this gives flexibility in accommodating large genesis blocks
@@ -25,13 +28,16 @@ var (
 )
 
 func init() {
-	c := linearcodec.NewDefault()
+	c0 := linearcodec.New([]string{"serialize"}, linearcodec.DefaultMaxSliceLength)
+	c1 := linearcodec.New([]string{"serialize", txs.TagV1}, linearcodec.DefaultMaxSliceLength)
 	Codec = codec.NewDefaultManager()
-	gc := linearcodec.NewCustomMaxLength(math.MaxInt32)
+
+	gC0 := linearcodec.New([]string{"serialize"}, math.MaxInt32)
+	gC1 := linearcodec.New([]string{"serialize", txs.TagV1}, math.MaxInt32)
 	GenesisCodec = codec.NewManager(math.MaxInt32)
 
 	errs := wrappers.Errs{}
-	for _, c := range []codec.Registry{c, gc} {
+	for _, c := range []codec.Registry{c0, c1, gC0, gC1} {
 		errs.Add(
 			RegisterApricotBlockTypes(c),
 			txs.RegisterUnsignedTxsTypes(c),
@@ -39,8 +45,11 @@ func init() {
 		)
 	}
 	errs.Add(
-		Codec.RegisterCodec(Version, c),
-		GenesisCodec.RegisterCodec(Version, gc),
+		Codec.RegisterCodec(Version1, c1),
+		GenesisCodec.RegisterCodec(Version1, gC1),
+
+		Codec.RegisterCodec(Version0, c0),
+		GenesisCodec.RegisterCodec(Version0, gC0),
 	)
 	if errs.Errored() {
 		panic(errs.Err)

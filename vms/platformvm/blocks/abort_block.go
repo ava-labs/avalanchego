@@ -30,6 +30,7 @@ func (b *BanffAbortBlock) Visit(v Visitor) error {
 }
 
 func NewBanffAbortBlock(
+	version uint16,
 	timestamp time.Time,
 	parentID ids.ID,
 	height uint64,
@@ -43,15 +44,15 @@ func NewBanffAbortBlock(
 			},
 		},
 	}
-	return blk, initialize(blk)
+	return blk, initialize(blk, version)
 }
 
 type ApricotAbortBlock struct {
 	CommonBlock `serialize:"true"`
 }
 
-func (b *ApricotAbortBlock) initialize(bytes []byte) error {
-	b.CommonBlock.initialize(bytes)
+func (b *ApricotAbortBlock) initialize(bytes []byte, version uint16) error {
+	b.CommonBlock.initialize(bytes, version)
 	return nil
 }
 
@@ -78,5 +79,5 @@ func NewApricotAbortBlock(
 			Hght:   height,
 		},
 	}
-	return blk, initialize(blk)
+	return blk, initialize(blk, Version0)
 }

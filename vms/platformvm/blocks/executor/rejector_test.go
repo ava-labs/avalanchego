@@ -35,6 +35,7 @@ func TestRejectBlock(t *testing.T) {
 			name: "proposal block",
 			newBlockFunc: func() (blocks.Block, error) {
 				return blocks.NewBanffProposalBlock(
+					blocks.Version1,
 					time.Now(),
 					ids.GenerateTestID(),
 					1,
@@ -74,6 +75,7 @@ func TestRejectBlock(t *testing.T) {
 			name: "standard block",
 			newBlockFunc: func() (blocks.Block, error) {
 				return blocks.NewBanffStandardBlock(
+					blocks.Version1,
 					time.Now(),
 					ids.GenerateTestID(),
 					1,
@@ -95,7 +97,7 @@ func TestRejectBlock(t *testing.T) {
 		{
 			name: "commit",
 			newBlockFunc: func() (blocks.Block, error) {
-				return blocks.NewBanffCommitBlock(time.Now(), ids.GenerateTestID() /*parent*/, 1 /*height*/)
+				return blocks.NewBanffCommitBlock(blocks.Version1, time.Now(), ids.GenerateTestID() /*parent*/, 1 /*height*/)
 			},
 			rejectFunc: func(r *rejector, blk blocks.Block) error {
 				return r.BanffCommitBlock(blk.(*blocks.BanffCommitBlock))
@@ -104,7 +106,7 @@ func TestRejectBlock(t *testing.T) {
 		{
 			name: "abort",
 			newBlockFunc: func() (blocks.Block, error) {
-				return blocks.NewBanffAbortBlock(time.Now(), ids.GenerateTestID() /*parent*/, 1 /*height*/)
+				return blocks.NewBanffAbortBlock(blocks.Version1, time.Now(), ids.GenerateTestID() /*parent*/, 1 /*height*/)
 			},
 			rejectFunc: func(r *rejector, blk blocks.Block) error {
 				return r.BanffAbortBlock(blk.(*blocks.BanffAbortBlock))

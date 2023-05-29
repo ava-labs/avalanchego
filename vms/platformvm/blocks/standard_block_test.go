@@ -42,6 +42,7 @@ func TestNewBanffStandardBlock(t *testing.T) {
 	require.NoError(tx.Initialize(txs.Codec))
 
 	blk, err := NewBanffStandardBlock(
+		Version1,
 		timestamp,
 		parentID,
 		height,

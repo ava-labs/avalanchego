@@ -50,7 +50,7 @@ func TestAtomicTxImports(t *testing.T) {
 			},
 		},
 	}
-	utxoBytes, err := txs.Codec.Marshal(txs.Version, utxo)
+	utxoBytes, err := txs.Codec.Marshal(txs.Version0, utxo)
 	require.NoError(err)
 
 	inputID := utxo.InputID()

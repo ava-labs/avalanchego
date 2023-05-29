@@ -5,6 +5,6 @@ package genesis
 
 import "github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 
-const Version = blocks.Version
+const Version = blocks.Version0
 
 var Codec = blocks.GenesisCodec

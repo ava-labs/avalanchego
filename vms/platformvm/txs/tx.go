@@ -49,12 +49,12 @@ func NewSigned(
 }
 
 func (tx *Tx) Initialize(c codec.Manager) error {
-	signedBytes, err := c.Marshal(Version, tx)
+	signedBytes, err := c.Marshal(Version0, tx)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal ProposalTx: %w", err)
 	}
 
-	unsignedBytesLen, err := c.Size(Version, &tx.Unsigned)
+	unsignedBytesLen, err := c.Size(Version0, &tx.Unsigned)
 	if err != nil {
 		return fmt.Errorf("couldn't calculate UnsignedTx marshal length: %w", err)
 	}
@@ -79,7 +79,7 @@ func Parse(c codec.Manager, signedBytes []byte) (*Tx, error) {
 		return nil, fmt.Errorf("couldn't parse tx: %w", err)
 	}
 
-	unsignedBytesLen, err := c.Size(Version, &tx.Unsigned)
+	unsignedBytesLen, err := c.Size(Version0, &tx.Unsigned)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't calculate UnsignedTx marshal length: %w", err)
 	}
@@ -136,7 +136,7 @@ func (tx *Tx) SyntacticVerify(ctx *snow.Context) error {
 // Note: We explicitly pass the codec in Sign since we may need to sign P-Chain
 // genesis txs whose length exceed the max length of txs.Codec.
 func (tx *Tx) Sign(c codec.Manager, signers [][]*secp256k1.PrivateKey) error {
-	unsignedBytes, err := c.Marshal(Version, &tx.Unsigned)
+	unsignedBytes, err := c.Marshal(Version0, &tx.Unsigned)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal UnsignedTx: %w", err)
 	}
@@ -157,7 +157,7 @@ func (tx *Tx) Sign(c codec.Manager, signers [][]*secp256k1.PrivateKey) error {
 		tx.Creds = append(tx.Creds, cred) // Attach credential
 	}
 
-	signedBytes, err := c.Marshal(Version, tx)
+	signedBytes, err := c.Marshal(Version0, tx)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal ProposalTx: %w", err)
 	}

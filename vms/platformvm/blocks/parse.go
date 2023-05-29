@@ -7,8 +7,9 @@ import "github.com/ava-labs/avalanchego/codec"
 
 func Parse(c codec.Manager, b []byte) (Block, error) {
 	var blk Block
-	if _, err := c.Unmarshal(b, &blk); err != nil {
+	version, err := c.Unmarshal(b, &blk)
+	if err != nil {
 		return nil, err
 	}
-	return blk, blk.initialize(b)
+	return blk, blk.initialize(b, version)
 }

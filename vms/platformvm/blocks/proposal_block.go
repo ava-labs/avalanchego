@@ -44,6 +44,7 @@ func (b *BanffProposalBlock) Visit(v Visitor) error {
 }
 
 func NewBanffProposalBlock(
+	version uint16,
 	timestamp time.Time,
 	parentID ids.ID,
 	height uint64,
@@ -59,7 +60,7 @@ func NewBanffProposalBlock(
 			Tx: tx,
 		},
 	}
-	return blk, initialize(blk)
+	return blk, initialize(blk, version)
 }
 
 type ApricotProposalBlock struct {
@@ -67,8 +68,8 @@ type ApricotProposalBlock struct {
 	Tx          *txs.Tx `serialize:"true" json:"tx"`
 }
 
-func (b *ApricotProposalBlock) initialize(bytes []byte) error {
-	b.CommonBlock.initialize(bytes)
+func (b *ApricotProposalBlock) initialize(bytes []byte, version uint16) error {
+	b.CommonBlock.initialize(bytes, version)
 	if err := b.Tx.Initialize(txs.Codec); err != nil {
 		return fmt.Errorf("failed to initialize tx: %w", err)
 	}
@@ -102,5 +103,5 @@ func NewApricotProposalBlock(
 		},
 		Tx: tx,
 	}
-	return blk, initialize(blk)
+	return blk, initialize(blk, Version0)
 }

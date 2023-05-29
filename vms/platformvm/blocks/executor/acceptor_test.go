@@ -183,6 +183,7 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 	}
 
 	blk, err := blocks.NewBanffStandardBlock(
+		blocks.Version1,
 		clk.Time(),
 		parentID,
 		1,

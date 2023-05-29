@@ -18,11 +18,13 @@ type CommonBlock struct {
 
 	BlockID ids.ID `json:"id"`
 	bytes   []byte
+	version uint16
 }
 
-func (b *CommonBlock) initialize(bytes []byte) {
+func (b *CommonBlock) initialize(bytes []byte, version uint16) {
 	b.BlockID = hashing.ComputeHash256Array(bytes)
 	b.bytes = bytes
+	b.version = version
 }
 
 func (b *CommonBlock) ID() ids.ID {
@@ -39,4 +41,8 @@ func (b *CommonBlock) Bytes() []byte {
 
 func (b *CommonBlock) Height() uint64 {
 	return b.Hght
+}
+
+func (b *CommonBlock) Version() uint16 {
+	return b.version
 }

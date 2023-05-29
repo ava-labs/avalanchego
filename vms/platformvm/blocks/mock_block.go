@@ -136,15 +136,15 @@ func (mr *MockBlockMockRecorder) Visit(arg0 interface{}) *gomock.Call {
 }
 
 // initialize mocks base method.
-func (m *MockBlock) initialize(arg0 []byte) error {
+func (m *MockBlock) initialize(arg0 []byte, arg1 uint16) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "initialize", arg0)
+	ret := m.ctrl.Call(m, "initialize", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // initialize indicates an expected call of initialize.
-func (mr *MockBlockMockRecorder) initialize(arg0 interface{}) *gomock.Call {
+func (mr *MockBlockMockRecorder) initialize(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "initialize", reflect.TypeOf((*MockBlock)(nil).initialize), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "initialize", reflect.TypeOf((*MockBlock)(nil).initialize), arg0, arg1)
 }

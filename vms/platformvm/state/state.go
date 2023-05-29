@@ -977,7 +977,7 @@ func (s *state) GetValidatorWeightDiffs(height uint64, subnetID ids.ID) (map[ids
 		Height:   height,
 		SubnetID: subnetID,
 	}
-	prefixBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, prefixStruct)
+	prefixBytes, err := blocks.GenesisCodec.Marshal(blocks.Version0, prefixStruct)
 	if err != nil {
 		return nil, err
 	}
@@ -1607,7 +1607,7 @@ func (s *state) writeBlocks() error {
 		)
 
 		// Note: blocks to be stored are verified, so it's safe to marshal them with GenesisCodec
-		blockBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, &stBlk)
+		blockBytes, err := blocks.GenesisCodec.Marshal(blocks.Version0, &stBlk)
 		if err != nil {
 			return fmt.Errorf("failed to marshal block %s to store: %w", blkID, err)
 		}
@@ -1680,7 +1680,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 			Height:   height,
 			SubnetID: subnetID,
 		}
-		prefixBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, prefixStruct)
+		prefixBytes, err := blocks.GenesisCodec.Marshal(blocks.Version0, prefixStruct)
 		if err != nil {
 			return fmt.Errorf("failed to create prefix bytes: %w", err)
 		}
@@ -1771,7 +1771,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 			}
 			weightDiffs[nodeID] = weightDiff
 
-			weightDiffBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, weightDiff)
+			weightDiffBytes, err := blocks.GenesisCodec.Marshal(blocks.Version0, weightDiff)
 			if err != nil {
 				return fmt.Errorf("failed to serialize validator weight diff: %w", err)
 			}
@@ -1953,7 +1953,7 @@ func (s *state) writeTXs() error {
 
 		// Note that we're serializing a [txBytesAndStatus] here, not a
 		// *txs.Tx, so we don't use [txs.Codec].
-		txBytes, err := txs.GenesisCodec.Marshal(txs.Version, &stx)
+		txBytes, err := txs.GenesisCodec.Marshal(txs.Version0, &stx)
 		if err != nil {
 			return fmt.Errorf("failed to serialize tx: %w", err)
 		}
@@ -1978,7 +1978,7 @@ func (s *state) writeRewardUTXOs() error {
 		txDB := linkeddb.NewDefault(rawTxDB)
 
 		for _, utxo := range utxos {
-			utxoBytes, err := txs.GenesisCodec.Marshal(txs.Version, utxo)
+			utxoBytes, err := txs.GenesisCodec.Marshal(txs.Version0, utxo)
 			if err != nil {
 				return fmt.Errorf("failed to serialize reward UTXO: %w", err)
 			}

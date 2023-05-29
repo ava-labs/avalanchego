@@ -47,7 +47,7 @@ func TestStandardBlocks(t *testing.T) {
 		require.Equal(txs, parsed.Txs())
 
 		// check that banff standard block can be built and parsed
-		banffStandardBlk, err := NewBanffStandardBlock(blkTimestamp, parentID, height, txs)
+		banffStandardBlk, err := NewBanffStandardBlock(Version1, blkTimestamp, parentID, height, txs)
 		require.NoError(err)
 
 		// parse block
@@ -105,6 +105,7 @@ func TestProposalBlocks(t *testing.T) {
 
 		// check that banff proposal block can be built and parsed
 		banffProposalBlk, err := NewBanffProposalBlock(
+			Version1,
 			blkTimestamp,
 			parentID,
 			height,
@@ -156,7 +157,7 @@ func TestCommitBlock(t *testing.T) {
 		require.Equal(apricotCommitBlk.Height(), parsed.Height())
 
 		// check that banff commit block can be built and parsed
-		banffCommitBlk, err := NewBanffCommitBlock(blkTimestamp, parentID, height)
+		banffCommitBlk, err := NewBanffCommitBlock(Version1, blkTimestamp, parentID, height)
 		require.NoError(err)
 
 		// parse block
@@ -199,7 +200,7 @@ func TestAbortBlock(t *testing.T) {
 		require.Equal(apricotAbortBlk.Height(), parsed.Height())
 
 		// check that banff abort block can be built and parsed
-		banffAbortBlk, err := NewBanffAbortBlock(blkTimestamp, parentID, height)
+		banffAbortBlk, err := NewBanffAbortBlock(Version1, blkTimestamp, parentID, height)
 		require.NoError(err)
 
 		// parse block
