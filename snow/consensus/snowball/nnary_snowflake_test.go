@@ -3,9 +3,7 @@
 
 package snowball
 
-import (
-	"testing"
-)
+import "testing"
 
 func TestNnarySnowflake(t *testing.T) {
 	betaVirtuous := 2

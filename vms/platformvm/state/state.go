@@ -10,6 +10,8 @@ import (
 
 	"github.com/google/btree"
 
+	"go.uber.org/zap"
+
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -28,6 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
@@ -40,17 +43,21 @@ import (
 )
 
 const (
+	blockCacheSize               = 64 * units.MiB
+	txCacheSize                  = 128 * units.MiB
+	transformedSubnetTxCacheSize = 4 * units.MiB
+
 	validatorDiffsCacheSize = 2048
 	blockIDCacheSize        = 2048
-	blockCacheSize          = 2048
-	txCacheSize             = 2048
 	rewardUTXOsCacheSize    = 2048
 	chainCacheSize          = 2048
 	chainDBCacheSize        = 2048
 )
 
 var (
-	_ State = (*state)(nil)
+	_ State              = (*state)(nil)
+	_ cache.SizedElement = (*stateBlk)(nil)
+	_ cache.SizedElement = (*txAndStatus)(nil)
 
 	ErrDelegatorSubset              = errors.New("delegator's time range must be a subset of the validator's time range")
 	errMissingValidatorSet          = errors.New("missing validator set")
@@ -155,6 +162,13 @@ type stateBlk struct {
 	Blk    blocks.Block
 	Bytes  []byte         `serialize:"true"`
 	Status choices.Status `serialize:"true"`
+}
+
+func (b *stateBlk) Size() int {
+	if b == nil {
+		return wrappers.LongLen
+	}
+	return len(b.Bytes) + wrappers.IntLen + wrappers.LongLen
 }
 
 /*
@@ -343,6 +357,13 @@ type txAndStatus struct {
 	status status.Status
 }
 
+func (t *txAndStatus) Size() int {
+	if t == nil {
+		return wrappers.LongLen
+	}
+	return t.tx.Size() + wrappers.IntLen + wrappers.LongLen
+}
+
 func New(
 	db database.Database,
 	genesisBytes []byte,
@@ -394,10 +415,10 @@ func new(
 		return nil, err
 	}
 
-	blockCache, err := metercacher.New[ids.ID, *stateBlk](
+	blockCache, err := metercacher.New(
 		"block_cache",
 		metricsReg,
-		&cache.LRU[ids.ID, *stateBlk]{Size: blockCacheSize},
+		cache.NewSizedLRU[ids.ID, *stateBlk](blockCacheSize),
 	)
 	if err != nil {
 		return nil, err
@@ -439,10 +460,10 @@ func new(
 		return nil, err
 	}
 
-	txCache, err := metercacher.New[ids.ID, *txAndStatus](
+	txCache, err := metercacher.New(
 		"tx_cache",
 		metricsReg,
-		&cache.LRU[ids.ID, *txAndStatus]{Size: txCacheSize},
+		cache.NewSizedLRU[ids.ID, *txAndStatus](txCacheSize),
 	)
 	if err != nil {
 		return nil, err
@@ -466,10 +487,10 @@ func new(
 
 	subnetBaseDB := prefixdb.New(subnetPrefix, baseDB)
 
-	transformedSubnetCache, err := metercacher.New[ids.ID, *txs.Tx](
+	transformedSubnetCache, err := metercacher.New(
 		"transformed_subnet_cache",
 		metricsReg,
-		&cache.LRU[ids.ID, *txs.Tx]{Size: chainCacheSize},
+		cache.NewSizedLRU[ids.ID, *txs.Tx](transformedSubnetTxCacheSize),
 	)
 	if err != nil {
 		return nil, err
@@ -1549,7 +1570,10 @@ func (s *state) writeBlocks() error {
 		}
 
 		delete(s.addedBlocks, blkID)
-		s.blockCache.Put(blkID, &stBlk)
+		// Note: Evict is used rather than Put here because stBlk may end up
+		// referencing additional data (because of shared byte slices) that
+		// would not be properly accounted for in the cache sizing.
+		s.blockCache.Evict(blkID)
 		if err := s.blockDB.Put(blkID[:], blockBytes); err != nil {
 			return fmt.Errorf("failed to write block %s: %w", blkID, err)
 		}
@@ -1891,7 +1915,10 @@ func (s *state) writeTXs() error {
 		}
 
 		delete(s.addedTxs, txID)
-		s.txCache.Put(txID, txStatus)
+		// Note: Evict is used rather than Put here because stx may end up
+		// referencing additional data (because of shared byte slices) that
+		// would not be properly accounted for in the cache sizing.
+		s.txCache.Evict(txID)
 		if err := s.txDB.Put(txID[:], txBytes); err != nil {
 			return fmt.Errorf("failed to add tx: %w", err)
 		}
@@ -1954,7 +1981,10 @@ func (s *state) writeTransformedSubnets() error {
 		txID := tx.ID()
 
 		delete(s.transformedSubnets, subnetID)
-		s.transformedSubnetCache.Put(subnetID, tx)
+		// Note: Evict is used rather than Put here because tx may end up
+		// referencing additional data (because of shared byte slices) that
+		// would not be properly accounted for in the cache sizing.
+		s.transformedSubnetCache.Evict(subnetID)
 		if err := database.PutID(s.transformedSubnetDB, subnetID[:], txID); err != nil {
 			return fmt.Errorf("failed to write transformed subnet: %w", err)
 		}
@@ -2013,16 +2043,20 @@ func (s *state) writeMetadata() error {
 
 // TODO: Remove after next hard-fork when everybody has run this.
 func (s *state) populateBlockHeightIndex() error {
-	blk, _, err := s.GetStatelessBlock(s.lastAccepted)
+	lastAcceptedBlk, _, err := s.GetStatelessBlock(s.lastAccepted)
 	if err != nil {
-		return fmt.Errorf("failed to retrieve last accepted block from local disk: %w", err)
+		return fmt.Errorf("failed to get last accepted block from local disk: %w", err)
 	}
 
-	heightKey := database.PackUInt64(blk.Height())
-	if _, err := database.GetID(s.blockIDDB, heightKey); err == nil {
+	lastAcceptedHeight := lastAcceptedBlk.Height()
+	lastAcceptedHeightKey := database.PackUInt64(lastAcceptedHeight)
+	if _, err := database.GetID(s.blockIDDB, lastAcceptedHeightKey); err == nil {
 		// If the last accepted block is in [s.blockIDDB], no backfilling is required.
 		return nil
 	}
+
+	s.ctx.Log.Info("populating platformvm block height index")
+	startTime := time.Now()
 
 	blockIterator := s.blockDB.NewIterator()
 	defer blockIterator.Release()
@@ -2043,10 +2077,10 @@ func (s *state) populateBlockHeightIndex() error {
 		blkHeight := blkState.Blk.Height()
 		blkID := blkState.Blk.ID()
 
-		// Populate the in-memory cache with the [blockIDCacheSize] most recent blocks
-		if math.AbsDiff(s.currentHeight, blkHeight) <= blockIDCacheSize {
-			s.addedBlockIDs[blkHeight] = blkID
-			s.blockIDCache.Put(blkHeight, blkID)
+		// During the indexing process, we skip [lastAcceptedHeight] as we use it to
+		// determine if the index is complete.
+		if blkHeight == lastAcceptedHeight {
+			continue
 		}
 
 		heightKey := database.PackUInt64(blkHeight)
@@ -2054,6 +2088,12 @@ func (s *state) populateBlockHeightIndex() error {
 			return fmt.Errorf("failed to add blockID: %w", err)
 		}
 	}
+
+	if err := database.PutID(s.blockIDDB, lastAcceptedHeightKey, s.lastAccepted); err != nil {
+		return fmt.Errorf("failed to add blockID: %w", err)
+	}
+
+	s.ctx.Log.Info("populated platformvm block height index", zap.Duration("elapsed", time.Since(startTime)))
 
 	return nil
 }

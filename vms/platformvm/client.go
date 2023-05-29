@@ -725,7 +725,7 @@ func (c *client) GetTx(ctx context.Context, txID ids.ID, options ...rpc.Option) 
 }
 
 func (c *client) GetTxStatus(ctx context.Context, txID ids.ID, options ...rpc.Option) (*GetTxStatusResponse, error) {
-	res := new(GetTxStatusResponse)
+	res := &GetTxStatusResponse{}
 	err := c.requester.SendRequest(
 		ctx,
 		"platform.getTxStatus",
@@ -765,7 +765,7 @@ func (c *client) GetStake(
 	validatorsOnly bool,
 	options ...rpc.Option,
 ) (map[ids.ID]uint64, [][]byte, error) {
-	res := new(GetStakeReply)
+	res := &GetStakeReply{}
 	err := c.requester.SendRequest(ctx, "platform.getStake", &GetStakeArgs{
 		JSONAddresses: api.JSONAddresses{
 			Addresses: ids.ShortIDsToStrings(addrs),
@@ -794,7 +794,7 @@ func (c *client) GetStake(
 }
 
 func (c *client) GetMinStake(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (uint64, uint64, error) {
-	res := new(GetMinStakeReply)
+	res := &GetMinStakeReply{}
 	err := c.requester.SendRequest(ctx, "platform.getMinStake", &GetMinStakeArgs{
 		SubnetID: subnetID,
 	}, res, options...)
@@ -802,7 +802,7 @@ func (c *client) GetMinStake(ctx context.Context, subnetID ids.ID, options ...rp
 }
 
 func (c *client) GetTotalStake(ctx context.Context, subnetID ids.ID, options ...rpc.Option) (uint64, error) {
-	res := new(GetTotalStakeReply)
+	res := &GetTotalStakeReply{}
 	err := c.requester.SendRequest(ctx, "platform.getTotalStake", &GetTotalStakeArgs{
 		SubnetID: subnetID,
 	}, res, options...)
@@ -816,7 +816,7 @@ func (c *client) GetTotalStake(ctx context.Context, subnetID ids.ID, options ...
 }
 
 func (c *client) GetMaxStakeAmount(ctx context.Context, subnetID ids.ID, nodeID ids.NodeID, startTime, endTime uint64, options ...rpc.Option) (uint64, error) {
-	res := new(GetMaxStakeAmountReply)
+	res := &GetMaxStakeAmountReply{}
 	err := c.requester.SendRequest(ctx, "platform.getMaxStakeAmount", &GetMaxStakeAmountArgs{
 		SubnetID:  subnetID,
 		NodeID:    nodeID,
@@ -859,15 +859,14 @@ func (c *client) GetValidatorsAt(ctx context.Context, subnetID ids.ID, height ui
 }
 
 func (c *client) GetBlock(ctx context.Context, blockID ids.ID, options ...rpc.Option) ([]byte, error) {
-	response := &api.FormattedBlock{}
+	res := &api.FormattedBlock{}
 	if err := c.requester.SendRequest(ctx, "platform.getBlock", &api.GetBlockArgs{
 		BlockID:  blockID,
 		Encoding: formatting.Hex,
-	}, response, options...); err != nil {
+	}, res, options...); err != nil {
 		return nil, err
 	}
-
-	return formatting.Decode(response.Encoding, response.Block)
+	return formatting.Decode(res.Encoding, res.Block)
 }
 
 func (c *client) GetBlockByHeight(ctx context.Context, height uint64, options ...rpc.Option) ([]byte, error) {

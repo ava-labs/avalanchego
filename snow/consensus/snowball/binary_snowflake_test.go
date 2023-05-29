@@ -3,9 +3,7 @@
 
 package snowball
 
-import (
-	"testing"
-)
+import "testing"
 
 func TestBinarySnowflake(t *testing.T) {
 	blue := 0
