@@ -38,7 +38,8 @@ func TestTransferInputVerify(t *testing.T) {
 func TestTransferInputVerifyNil(t *testing.T) {
 	require := require.New(t)
 	in := (*TransferInput)(nil)
-	require.ErrorIs(in.Verify(), errNilInput)
+	err := in.Verify()
+	require.ErrorIs(err, ErrNilInput)
 }
 
 func TestTransferInputVerifyNoValue(t *testing.T) {
@@ -49,7 +50,8 @@ func TestTransferInputVerifyNoValue(t *testing.T) {
 			SigIndices: []uint32{0, 1},
 		},
 	}
-	require.ErrorIs(in.Verify(), ErrNoValueInput)
+	err := in.Verify()
+	require.ErrorIs(err, ErrNoValueInput)
 }
 
 func TestTransferInputVerifyDuplicated(t *testing.T) {
@@ -60,7 +62,8 @@ func TestTransferInputVerifyDuplicated(t *testing.T) {
 			SigIndices: []uint32{0, 0},
 		},
 	}
-	require.ErrorIs(in.Verify(), errNotSortedUnique)
+	err := in.Verify()
+	require.ErrorIs(err, ErrInputIndicesNotSortedUnique)
 }
 
 func TestTransferInputVerifyUnsorted(t *testing.T) {
@@ -71,7 +74,8 @@ func TestTransferInputVerifyUnsorted(t *testing.T) {
 			SigIndices: []uint32{1, 0},
 		},
 	}
-	require.ErrorIs(in.Verify(), errNotSortedUnique)
+	err := in.Verify()
+	require.ErrorIs(err, ErrInputIndicesNotSortedUnique)
 }
 
 func TestTransferInputSerialize(t *testing.T) {

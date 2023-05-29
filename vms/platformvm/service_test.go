@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -169,7 +170,7 @@ func TestGetTxStatus(t *testing.T) {
 
 	// put the chain in existing chain list
 	err = service.vm.Builder.AddUnverifiedTx(tx)
-	require.Error(err)
+	require.ErrorIs(err, database.ErrNotFound) // Missing shared memory UTXO
 
 	mutableSharedMemory.SharedMemory = sm
 
@@ -265,7 +266,7 @@ func TestGetTx(t *testing.T) {
 				}
 				var response api.GetTxReply
 				err = service.GetTx(nil, arg, &response)
-				require.Error(err)
+				require.ErrorIs(err, database.ErrNotFound) // We haven't issued the tx yet
 
 				err = service.vm.Builder.AddUnverifiedTx(tx)
 				require.NoError(err)
@@ -285,8 +286,7 @@ func TestGetTx(t *testing.T) {
 						require.NoError(err)
 
 						commit := options[0].(*blockexecutor.Block)
-						_, ok := commit.Block.(*blocks.BanffCommitBlock)
-						require.True(ok)
+						require.IsType(&blocks.BanffCommitBlock{}, commit.Block)
 
 						err := commit.Verify(context.Background())
 						require.NoError(err)
@@ -307,7 +307,9 @@ func TestGetTx(t *testing.T) {
 					require.Equal(tx.Bytes(), responseTxBytes)
 
 				case formatting.JSON:
-					require.Equal(tx, response.Tx)
+					require.IsType((*txs.Tx)(nil), response.Tx)
+					responseTx := response.Tx.(*txs.Tx)
+					require.Equal(tx.ID(), responseTx.ID())
 				}
 
 				err = service.vm.Shutdown(context.Background())
@@ -367,14 +369,14 @@ func TestGetStake(t *testing.T) {
 		addrsStrs = append(addrsStrs, addr)
 
 		args := GetStakeArgs{
-			api.JSONAddresses{
+			JSONAddresses: api.JSONAddresses{
 				Addresses: []string{addr},
 			},
-			formatting.Hex,
+			Encoding: formatting.Hex,
 		}
 		response := GetStakeReply{}
 		require.NoError(service.GetStake(nil, &args, &response))
-		require.EqualValues(uint64(defaultWeight), uint64(response.Staked))
+		require.Equal(defaultWeight, uint64(response.Staked))
 		require.Len(response.Outputs, 1)
 
 		// Unmarshal into an output
@@ -386,8 +388,8 @@ func TestGetStake(t *testing.T) {
 		require.NoError(err)
 
 		out := output.Out.(*secp256k1fx.TransferOutput)
-		require.EqualValues(defaultWeight, out.Amount())
-		require.EqualValues(1, out.Threshold)
+		require.Equal(defaultWeight, out.Amount())
+		require.Equal(uint32(1), out.Threshold)
 		require.Len(out.Addrs, 1)
 		require.Equal(keys[i].PublicKey().Address(), out.Addrs[0])
 		require.Zero(out.Locktime)
@@ -395,14 +397,14 @@ func TestGetStake(t *testing.T) {
 
 	// Make sure this works for multiple addresses
 	args := GetStakeArgs{
-		api.JSONAddresses{
+		JSONAddresses: api.JSONAddresses{
 			Addresses: addrsStrs,
 		},
-		formatting.Hex,
+		Encoding: formatting.Hex,
 	}
 	response := GetStakeReply{}
 	require.NoError(service.GetStake(nil, &args, &response))
-	require.EqualValues(len(genesis.Validators)*defaultWeight, response.Staked)
+	require.Equal(len(genesis.Validators)*int(defaultWeight), int(response.Staked))
 	require.Len(response.Outputs, len(genesis.Validators))
 
 	for _, outputStr := range response.Outputs {
@@ -414,13 +416,13 @@ func TestGetStake(t *testing.T) {
 		require.NoError(err)
 
 		out := output.Out.(*secp256k1fx.TransferOutput)
-		require.EqualValues(defaultWeight, out.Amount())
-		require.EqualValues(1, out.Threshold)
+		require.Equal(defaultWeight, out.Amount())
+		require.Equal(uint32(1), out.Threshold)
 		require.Zero(out.Locktime)
 		require.Len(out.Addrs, 1)
 	}
 
-	oldStake := uint64(defaultWeight)
+	oldStake := defaultWeight
 
 	// Add a delegator
 	stakeAmount := service.vm.MinDelegatorStake + 12345
@@ -452,7 +454,7 @@ func TestGetStake(t *testing.T) {
 	addr, _ := service.addrManager.FormatLocalAddress(keys[0].PublicKey().Address())
 	args.Addresses = []string{addr}
 	require.NoError(service.GetStake(nil, &args, &response))
-	require.EqualValues(oldStake+stakeAmount, uint64(response.Staked))
+	require.Equal(oldStake+stakeAmount, uint64(response.Staked))
 	require.Len(response.Outputs, 2)
 
 	// Unmarshal into transferable outputs
@@ -465,7 +467,7 @@ func TestGetStake(t *testing.T) {
 	}
 
 	// Make sure the stake amount is as expected
-	require.EqualValues(stakeAmount+oldStake, outputs[0].Out.Amount()+outputs[1].Out.Amount())
+	require.Equal(stakeAmount+oldStake, outputs[0].Out.Amount()+outputs[1].Out.Amount())
 
 	oldStake = uint64(response.Staked)
 
@@ -498,7 +500,7 @@ func TestGetStake(t *testing.T) {
 
 	// Make sure the delegator has the right stake (old stake + stakeAmount)
 	require.NoError(service.GetStake(nil, &args, &response))
-	require.EqualValues(oldStake+stakeAmount, response.Staked)
+	require.Equal(oldStake+stakeAmount, uint64(response.Staked))
 	require.Len(response.Outputs, 3)
 
 	// Unmarshal
@@ -511,7 +513,7 @@ func TestGetStake(t *testing.T) {
 	}
 
 	// Make sure the stake amount is as expected
-	require.EqualValues(stakeAmount+oldStake, outputs[0].Out.Amount()+outputs[1].Out.Amount()+outputs[2].Out.Amount())
+	require.Equal(stakeAmount+oldStake, outputs[0].Out.Amount()+outputs[1].Out.Amount()+outputs[2].Out.Amount())
 }
 
 // Test method GetCurrentValidators
@@ -534,7 +536,7 @@ func TestGetCurrentValidators(t *testing.T) {
 
 	err := service.GetCurrentValidators(nil, &args, &response)
 	require.NoError(err)
-	require.Equal(len(genesis.Validators), len(response.Validators))
+	require.Len(response.Validators, len(genesis.Validators))
 
 	for _, vdr := range genesis.Validators {
 		found := false
@@ -557,7 +559,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	delegatorStartTime := uint64(defaultValidateStartTime.Unix())
 	delegatorEndTime := uint64(defaultValidateStartTime.Add(defaultMinStakingDuration).Unix())
 
-	tx, err := service.vm.txBuilder.NewAddDelegatorTx(
+	delTx, err := service.vm.txBuilder.NewAddDelegatorTx(
 		stakeAmount,
 		delegatorStartTime,
 		delegatorEndTime,
@@ -569,14 +571,14 @@ func TestGetCurrentValidators(t *testing.T) {
 	require.NoError(err)
 
 	staker, err := state.NewCurrentStaker(
-		tx.ID(),
-		tx.Unsigned.(*txs.AddDelegatorTx),
+		delTx.ID(),
+		delTx.Unsigned.(*txs.AddDelegatorTx),
 		0,
 	)
 	require.NoError(err)
 
 	service.vm.state.PutCurrentDelegator(staker)
-	service.vm.state.AddTx(tx, status.Committed)
+	service.vm.state.AddTx(delTx, status.Committed)
 	err = service.vm.state.Commit()
 	require.NoError(err)
 
@@ -584,7 +586,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	args = GetCurrentValidatorsArgs{SubnetID: constants.PrimaryNetworkID}
 	err = service.GetCurrentValidators(nil, &args, &response)
 	require.NoError(err)
-	require.Equal(len(genesis.Validators), len(response.Validators))
+	require.Len(response.Validators, len(genesis.Validators))
 
 	// Make sure the delegator is there
 	found := false
@@ -610,7 +612,7 @@ func TestGetCurrentValidators(t *testing.T) {
 		require.Equal(vdr.NodeID, innerVdr.NodeID)
 
 		require.NotNil(innerVdr.Delegators)
-		require.Equal(1, len(*innerVdr.Delegators))
+		require.Len(*innerVdr.Delegators, 1)
 		delegator := (*innerVdr.Delegators)[0]
 		require.Equal(delegator.NodeID, innerVdr.NodeID)
 		require.Equal(uint64(delegator.StartTime), delegatorStartTime)
@@ -618,6 +620,27 @@ func TestGetCurrentValidators(t *testing.T) {
 		require.Equal(uint64(delegator.Weight), stakeAmount)
 	}
 	require.True(found)
+
+	// Reward the delegator
+	tx, err := service.vm.txBuilder.NewRewardValidatorTx(delTx.ID())
+	require.NoError(err)
+	service.vm.state.AddTx(tx, status.Committed)
+	service.vm.state.DeleteCurrentDelegator(staker)
+	require.NoError(service.vm.state.SetDelegateeReward(staker.SubnetID, staker.NodeID, 100000))
+	require.NoError(service.vm.state.Commit())
+
+	// Call getValidators
+	response = GetCurrentValidatorsReply{}
+	require.NoError(service.GetCurrentValidators(nil, &args, &response))
+	require.Len(response.Validators, len(genesis.Validators))
+
+	for _, vdr := range response.Validators {
+		castVdr := vdr.(pchainapi.PermissionlessValidator)
+		if castVdr.NodeID != validatorNodeID {
+			continue
+		}
+		require.Equal(uint64(100000), uint64(*castVdr.AccruedDelegateeReward))
+	}
 }
 
 func TestGetTimestamp(t *testing.T) {
@@ -702,7 +725,9 @@ func TestGetBlock(t *testing.T) {
 
 			switch {
 			case test.encoding == formatting.JSON:
-				require.Equal(statelessBlock, response.Block)
+				require.IsType((*blocks.BanffStandardBlock)(nil), response.Block)
+				responseBlock := response.Block.(*blocks.BanffStandardBlock)
+				require.Equal(statelessBlock.ID(), responseBlock.ID())
 
 				_, err = stdjson.Marshal(response)
 				require.NoError(err)

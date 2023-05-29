@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
-func getBasicDB() (*Database, error) {
+func getBasicDB() (*merkleDB, error) {
 	return newDatabase(
 		context.Background(),
 		memdb.New(),
@@ -29,7 +29,7 @@ func getBasicDB() (*Database, error) {
 	)
 }
 
-func writeBasicBatch(t *testing.T, db *Database) {
+func writeBasicBatch(t *testing.T, db *merkleDB) {
 	batch := db.NewBatch()
 	require.NoError(t, batch.Put([]byte{0}, []byte{0}))
 	require.NoError(t, batch.Put([]byte{1}, []byte{1}))
@@ -122,7 +122,7 @@ func Test_Proof_Marshal_Errors(t *testing.T) {
 }
 
 func verifyPath(t *testing.T, path1, path2 []ProofNode) {
-	require.Equal(t, len(path1), len(path2))
+	require.Len(t, path2, len(path1))
 	for i := range path1 {
 		require.True(t, bytes.Equal(path1[i].KeyPath.Value, path2[i].KeyPath.Value))
 		require.Equal(t, path1[i].KeyPath.hasOddLength(), path2[i].KeyPath.hasOddLength())
@@ -782,105 +782,6 @@ func Test_RangeProof_Marshal_Errors(t *testing.T) {
 	}
 }
 
-func TestChangeProofGetLargestKey(t *testing.T) {
-	type test struct {
-		name     string
-		proof    ChangeProof
-		end      []byte
-		expected []byte
-	}
-
-	tests := []test{
-		{
-			name:     "empty proof",
-			proof:    ChangeProof{},
-			end:      []byte{0},
-			expected: []byte{0},
-		},
-		{
-			name: "1 KV no deleted keys",
-			proof: ChangeProof{
-				KeyValues: []KeyValue{
-					{
-						Key: []byte{1},
-					},
-				},
-			},
-			end:      []byte{0},
-			expected: []byte{1},
-		},
-		{
-			name: "2 KV no deleted keys",
-			proof: ChangeProof{
-				KeyValues: []KeyValue{
-					{
-						Key: []byte{1},
-					},
-					{
-						Key: []byte{2},
-					},
-				},
-			},
-			end:      []byte{0},
-			expected: []byte{2},
-		},
-		{
-			name: "no KVs 1 deleted key",
-			proof: ChangeProof{
-				DeletedKeys: [][]byte{{1}},
-			},
-			end:      []byte{0},
-			expected: []byte{1},
-		},
-		{
-			name: "no KVs 2 deleted keys",
-			proof: ChangeProof{
-				DeletedKeys: [][]byte{{1}, {2}},
-			},
-			end:      []byte{0},
-			expected: []byte{2},
-		},
-		{
-			name: "KV and deleted keys; KV larger",
-			proof: ChangeProof{
-				KeyValues: []KeyValue{
-					{
-						Key: []byte{1},
-					},
-					{
-						Key: []byte{3},
-					},
-				},
-				DeletedKeys: [][]byte{{0}, {2}},
-			},
-			end:      []byte{5},
-			expected: []byte{3},
-		},
-		{
-			name: "KV and deleted keys; deleted key larger",
-			proof: ChangeProof{
-				KeyValues: []KeyValue{
-					{
-						Key: []byte{0},
-					},
-					{
-						Key: []byte{2},
-					},
-				},
-				DeletedKeys: [][]byte{{1}, {3}},
-			},
-			end:      []byte{5},
-			expected: []byte{3},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			require.Equal(t, tt.expected, tt.proof.getLargestKey(tt.end))
-		})
-	}
-}
-
 func Test_ChangeProof_Marshal(t *testing.T) {
 	db, err := getBasicDB()
 	require.NoError(t, err)
@@ -945,9 +846,9 @@ func Test_ChangeProof_Marshal(t *testing.T) {
 	verifyPath(t, proof.StartProof, parsedProof.StartProof)
 	verifyPath(t, proof.EndProof, parsedProof.EndProof)
 
-	for index, kv := range proof.KeyValues {
-		require.True(t, bytes.Equal(kv.Key, parsedProof.KeyValues[index].Key))
-		require.True(t, bytes.Equal(kv.Value, parsedProof.KeyValues[index].Value))
+	for index, kv := range proof.KeyChanges {
+		require.True(t, bytes.Equal(kv.Key, parsedProof.KeyChanges[index].Key))
+		require.True(t, bytes.Equal(kv.Value.value, parsedProof.KeyChanges[index].Value.value))
 	}
 }
 
@@ -980,8 +881,7 @@ func Test_ChangeProof_Marshal_Errors(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, proof)
 	require.True(t, proof.HadRootsInHistory)
-	require.Len(t, proof.KeyValues, 8)
-	require.Len(t, proof.DeletedKeys, 2)
+	require.Len(t, proof.KeyChanges, 10)
 
 	proofBytes, err := Codec.EncodeChangeProof(Version, proof)
 	require.NoError(t, err)
@@ -1005,7 +905,7 @@ func Test_ChangeProof_Missing_History_For_EndRoot(t *testing.T) {
 	require.NotNil(t, proof)
 	require.False(t, proof.HadRootsInHistory)
 
-	require.NoError(t, proof.Verify(context.Background(), db, nil, nil, db.getMerkleRoot()))
+	require.NoError(t, db.VerifyChangeProof(context.Background(), proof, nil, nil, db.getMerkleRoot()))
 }
 
 func Test_ChangeProof_BadBounds(t *testing.T) {
@@ -1105,7 +1005,7 @@ func Test_ChangeProof_Verify(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, proof)
 
-	err = proof.Verify(context.Background(), dbClone, []byte("key21"), []byte("key30"), db.getMerkleRoot())
+	err = dbClone.VerifyChangeProof(context.Background(), proof, []byte("key21"), []byte("key30"), db.getMerkleRoot())
 	require.NoError(t, err)
 
 	// low maxLength
@@ -1113,7 +1013,7 @@ func Test_ChangeProof_Verify(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, proof)
 
-	err = proof.Verify(context.Background(), dbClone, nil, nil, db.getMerkleRoot())
+	err = dbClone.VerifyChangeProof(context.Background(), proof, nil, nil, db.getMerkleRoot())
 	require.NoError(t, err)
 
 	// nil start/end
@@ -1121,7 +1021,7 @@ func Test_ChangeProof_Verify(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, proof)
 
-	err = proof.Verify(context.Background(), dbClone, nil, nil, endRoot)
+	err = dbClone.VerifyChangeProof(context.Background(), proof, nil, nil, endRoot)
 	require.NoError(t, err)
 
 	err = dbClone.CommitChangeProof(context.Background(), proof)
@@ -1135,7 +1035,7 @@ func Test_ChangeProof_Verify(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, proof)
 
-	err = proof.Verify(context.Background(), dbClone, []byte("key20"), []byte("key30"), db.getMerkleRoot())
+	err = dbClone.VerifyChangeProof(context.Background(), proof, []byte("key20"), []byte("key30"), db.getMerkleRoot())
 	require.NoError(t, err)
 }
 
@@ -1169,7 +1069,7 @@ func Test_ChangeProof_Verify_Bad_Data(t *testing.T) {
 		{
 			name: "missing key/value",
 			malform: func(proof *ChangeProof) {
-				proof.KeyValues = proof.KeyValues[1:]
+				proof.KeyChanges = proof.KeyChanges[1:]
 			},
 			expectedErr: ErrProofValueDoesntMatch,
 		},
@@ -1198,7 +1098,7 @@ func Test_ChangeProof_Verify_Bad_Data(t *testing.T) {
 
 			tt.malform(proof)
 
-			err = proof.Verify(context.Background(), dbClone, []byte{2}, []byte{3, 0}, db.getMerkleRoot())
+			err = dbClone.VerifyChangeProof(context.Background(), proof, []byte{2}, []byte{3, 0}, db.getMerkleRoot())
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
@@ -1225,7 +1125,7 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 			name: "no roots in history and non-empty key-values",
 			proof: &ChangeProof{
 				HadRootsInHistory: false,
-				KeyValues:         []KeyValue{{Key: []byte{1}, Value: []byte{1}}},
+				KeyChanges:        []KeyChange{{Key: []byte{1}, Value: Some([]byte{1})}},
 			},
 			start:       []byte{0},
 			end:         nil, // Also tests start can be after end if end is nil
@@ -1235,7 +1135,7 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 			name: "no roots in history and non-empty deleted keys",
 			proof: &ChangeProof{
 				HadRootsInHistory: false,
-				DeletedKeys:       [][]byte{{1}},
+				KeyChanges:        []KeyChange{{Key: []byte{1}}},
 			},
 			start:       nil,
 			end:         nil,
@@ -1293,7 +1193,7 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 			name: "no start proof",
 			proof: &ChangeProof{
 				HadRootsInHistory: true,
-				DeletedKeys:       [][]byte{{1}},
+				KeyChanges:        []KeyChange{{Key: []byte{1}}},
 			},
 			start:       []byte{1},
 			end:         nil,
@@ -1303,7 +1203,7 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 			name: "non-increasing key-values",
 			proof: &ChangeProof{
 				HadRootsInHistory: true,
-				KeyValues: []KeyValue{
+				KeyChanges: []KeyChange{
 					{Key: []byte{1}},
 					{Key: []byte{0}},
 				},
@@ -1317,7 +1217,7 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 			proof: &ChangeProof{
 				HadRootsInHistory: true,
 				StartProof:        []ProofNode{{}},
-				KeyValues: []KeyValue{
+				KeyChanges: []KeyChange{
 					{Key: []byte{0}},
 				},
 			},
@@ -1330,7 +1230,7 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 			proof: &ChangeProof{
 				HadRootsInHistory: true,
 				EndProof:          []ProofNode{{}},
-				KeyValues: []KeyValue{
+				KeyChanges: []KeyChange{
 					{Key: []byte{2}},
 				},
 			},
@@ -1339,43 +1239,17 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 			expectedErr: ErrStateFromOutsideOfRange,
 		},
 		{
-			name: "non-increasing deleted keys",
+			name: "duplicate key",
 			proof: &ChangeProof{
 				HadRootsInHistory: true,
-				DeletedKeys: [][]byte{
-					{1},
-					{1},
+				KeyChanges: []KeyChange{
+					{Key: []byte{1}},
+					{Key: []byte{1}},
 				},
 			},
 			start:       nil,
 			end:         nil,
 			expectedErr: ErrNonIncreasingValues,
-		},
-		{
-			name: "deleted key too low",
-			proof: &ChangeProof{
-				HadRootsInHistory: true,
-				StartProof:        []ProofNode{{}},
-				DeletedKeys: [][]byte{
-					{0},
-				},
-			},
-			start:       []byte{1},
-			end:         nil,
-			expectedErr: ErrStateFromOutsideOfRange,
-		},
-		{
-			name: "deleted key too great",
-			proof: &ChangeProof{
-				HadRootsInHistory: true,
-				EndProof:          []ProofNode{{}},
-				DeletedKeys: [][]byte{
-					{1},
-				},
-			},
-			start:       nil,
-			end:         []byte{0},
-			expectedErr: ErrStateFromOutsideOfRange,
 		},
 		{
 			name: "start proof node has wrong prefix",
@@ -1407,8 +1281,8 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 			name: "end proof node has wrong prefix",
 			proof: &ChangeProof{
 				HadRootsInHistory: true,
-				KeyValues: []KeyValue{
-					{Key: []byte{1, 2}}, // Also tests [end] set to greatest key-value/deleted key
+				KeyChanges: []KeyChange{
+					{Key: []byte{1, 2}, Value: Some([]byte{0})},
 				},
 				EndProof: []ProofNode{
 					{KeyPath: newPath([]byte{2}).Serialize()},
@@ -1423,8 +1297,8 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 			name: "end proof non-increasing",
 			proof: &ChangeProof{
 				HadRootsInHistory: true,
-				DeletedKeys: [][]byte{
-					{1, 2, 3}, // Also tests [end] set to greatest key-value/deleted key
+				KeyChanges: []KeyChange{
+					{Key: []byte{1, 2, 3}},
 				},
 				EndProof: []ProofNode{
 					{KeyPath: newPath([]byte{1}).Serialize()},
@@ -1441,7 +1315,7 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			db, err := getBasicDB()
 			require.NoError(t, err)
-			err = tt.proof.Verify(context.Background(), db, tt.start, tt.end, ids.Empty)
+			err = db.VerifyChangeProof(context.Background(), tt.proof, tt.start, tt.end, ids.Empty)
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}

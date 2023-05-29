@@ -254,16 +254,16 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 	// Configure benchlist
 	n.Config.BenchlistConfig.Validators = n.vdrs
 	n.Config.BenchlistConfig.Benchable = n.Config.ConsensusRouter
-	n.Config.BenchlistConfig.StakingEnabled = n.Config.EnableStaking
+	n.Config.BenchlistConfig.SybilProtectionEnabled = n.Config.SybilProtectionEnabled
 	n.benchlistManager = benchlist.NewManager(&n.Config.BenchlistConfig)
 
 	n.uptimeCalculator = uptime.NewLockedCalculator()
 
 	consensusRouter := n.Config.ConsensusRouter
-	if !n.Config.EnableStaking {
-		// Staking is disabled so we don't have a txID that added us as a
-		// validator. Because each validator needs a txID associated with it, we
-		// hack one together by just padding our nodeID with zeroes.
+	if !n.Config.SybilProtectionEnabled {
+		// Sybil protection is disabled so we don't have a txID that added us as
+		// a validator. Because each validator needs a txID associated with it,
+		// we hack one together by just padding our nodeID with zeroes.
 		dummyTxID := ids.Empty
 		copy(dummyTxID[:], n.ID[:])
 
@@ -271,7 +271,7 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 			n.ID,
 			bls.PublicFromSecretKey(n.Config.StakingSigningKey),
 			dummyTxID,
-			n.Config.DisabledStakingWeight,
+			n.Config.SybilProtectionDisabledWeight,
 		)
 		if err != nil {
 			return err
@@ -280,7 +280,7 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 		consensusRouter = &insecureValidatorManager{
 			Router: consensusRouter,
 			vdrs:   primaryNetVdrs,
-			weight: n.Config.DisabledStakingWeight,
+			weight: n.Config.SybilProtectionDisabledWeight,
 		}
 	}
 
@@ -695,7 +695,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		timeoutManager,
 		n.Config.ConsensusShutdownTimeout,
 		criticalChains,
-		n.Config.EnableStaking,
+		n.Config.SybilProtectionEnabled,
 		n.Config.TrackedSubnets,
 		n.Shutdown,
 		n.Config.RouterHealthConfig,
@@ -707,7 +707,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	}
 
 	n.chainManager = chains.New(&chains.ManagerConfig{
-		StakingEnabled:                          n.Config.EnableStaking,
+		SybilProtectionEnabled:                  n.Config.SybilProtectionEnabled,
 		StakingCert:                             n.Config.StakingTLSCert,
 		StakingBLSKey:                           n.Config.StakingSigningKey,
 		Log:                                     n.Log,
@@ -739,7 +739,8 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		Metrics:                                 n.MetricsGatherer,
 		SubnetConfigs:                           n.Config.SubnetConfigs,
 		ChainConfigs:                            n.Config.ChainConfigs,
-		ConsensusGossipFrequency:                n.Config.ConsensusGossipFrequency,
+		AcceptedFrontierGossipFrequency:         n.Config.AcceptedFrontierGossipFrequency,
+		ConsensusAppConcurrency:                 n.Config.ConsensusAppConcurrency,
 		BootstrapMaxTimeGetAncestors:            n.Config.BootstrapMaxTimeGetAncestors,
 		BootstrapAncestorsMaxContainersSent:     n.Config.BootstrapAncestorsMaxContainersSent,
 		BootstrapAncestorsMaxContainersReceived: n.Config.BootstrapAncestorsMaxContainersReceived,
@@ -763,10 +764,10 @@ func (n *Node) initVMs() error {
 
 	vdrs := n.vdrs
 
-	// If staking is disabled, ignore updates to Subnets' validator sets
-	// Instead of updating node's validator manager, platform chain makes changes
-	// to its own local validator manager (which isn't used for sampling)
-	if !n.Config.EnableStaking {
+	// If sybil protection is disabled, we provide the P-chain its own local
+	// validator manager that will not be used by the rest of the node. This
+	// allows the node's validator sets to be determined by network connections.
+	if !n.Config.SybilProtectionEnabled {
 		vdrs = validators.NewManager()
 		primaryVdrs := validators.NewSet()
 		_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
@@ -787,7 +788,7 @@ func (n *Node) initVMs() error {
 				Chains:                          n.chainManager,
 				Validators:                      vdrs,
 				UptimeLockedCalculator:          n.uptimeCalculator,
-				StakingEnabled:                  n.Config.EnableStaking,
+				SybilProtectionEnabled:          n.Config.SybilProtectionEnabled,
 				TrackedSubnets:                  n.Config.TrackedSubnets,
 				TxFee:                           n.Config.TxFee,
 				CreateAssetTxFee:                n.Config.CreateAssetTxFee,
@@ -1029,18 +1030,18 @@ func (n *Node) initHealthAPI() error {
 	}
 
 	n.Log.Info("initializing Health API")
-	err = healthChecker.RegisterHealthCheck("network", n.Net)
+	err = healthChecker.RegisterHealthCheck("network", n.Net, health.GlobalTag)
 	if err != nil {
 		return fmt.Errorf("couldn't register network health check: %w", err)
 	}
 
-	err = healthChecker.RegisterHealthCheck("router", n.Config.ConsensusRouter)
+	err = healthChecker.RegisterHealthCheck("router", n.Config.ConsensusRouter, health.GlobalTag)
 	if err != nil {
 		return fmt.Errorf("couldn't register router health check: %w", err)
 	}
 
 	// TODO: add database health to liveness check
-	err = healthChecker.RegisterHealthCheck("database", n.DB)
+	err = healthChecker.RegisterHealthCheck("database", n.DB, health.GlobalTag)
 	if err != nil {
 		return fmt.Errorf("couldn't register database health check: %w", err)
 	}
@@ -1067,7 +1068,7 @@ func (n *Node) initHealthAPI() error {
 		}, err
 	})
 
-	err = n.health.RegisterHealthCheck("diskspace", diskSpaceCheck)
+	err = n.health.RegisterHealthCheck("diskspace", diskSpaceCheck, health.GlobalTag)
 	if err != nil {
 		return fmt.Errorf("couldn't register resource health check: %w", err)
 	}
@@ -1195,15 +1196,20 @@ func (n *Node) initVdrs() validators.Set {
 
 // Initialize [n.resourceManager].
 func (n *Node) initResourceManager(reg prometheus.Registerer) error {
-	n.resourceManager = resource.NewManager(
+	resourceManager, err := resource.NewManager(
+		n.Log,
 		n.Config.DatabaseConfig.Path,
 		n.Config.SystemTrackerFrequency,
 		n.Config.SystemTrackerCPUHalflife,
 		n.Config.SystemTrackerDiskHalflife,
+		reg,
 	)
+	if err != nil {
+		return err
+	}
+	n.resourceManager = resourceManager
 	n.resourceManager.TrackProcess(os.Getpid())
 
-	var err error
 	n.resourceTracker, err = tracker.NewResourceTracker(reg, n.resourceManager, &meter.ContinuousFactory{}, n.Config.SystemTrackerProcessingHalflife)
 	return err
 }
@@ -1303,9 +1309,10 @@ func (n *Node) Initialize(
 	// message.Creator currently record metrics under network namespace
 	n.networkNamespace = "network"
 	n.msgCreator, err = message.NewCreator(
+		n.Log,
 		n.MetricsRegisterer,
 		n.networkNamespace,
-		n.Config.NetworkConfig.CompressionEnabled,
+		n.Config.NetworkConfig.CompressionType,
 		n.Config.NetworkConfig.MaximumInboundMessageTimeout,
 	)
 	if err != nil {
@@ -1394,7 +1401,7 @@ func (n *Node) shutdown() {
 			}, errShuttingDown
 		})
 
-		err := n.health.RegisterHealthCheck("shuttingDown", shuttingDownCheck)
+		err := n.health.RegisterHealthCheck("shuttingDown", shuttingDownCheck, health.GlobalTag)
 		if err != nil {
 			n.Log.Debug("couldn't register shuttingDown health check",
 				zap.Error(err),

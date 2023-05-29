@@ -54,8 +54,8 @@ func TestKeychainAdd(t *testing.T) {
 	addr, _ := ids.ShortFromString(addrs[0])
 	rsk, exists := kc.Get(addr)
 	require.True(exists)
-	rsksecp, ok := rsk.(*secp256k1.PrivateKey)
-	require.True(ok, "Factory should have returned secp256k1r private key")
+	require.IsType(&secp256k1.PrivateKey{}, rsk)
+	rsksecp := rsk.(*secp256k1.PrivateKey)
 	require.Equal(sk.Bytes(), rsksecp.Bytes())
 
 	addrs := kc.Addresses()
@@ -67,7 +67,7 @@ func TestKeychainNew(t *testing.T) {
 	require := require.New(t)
 	kc := NewKeychain()
 
-	require.Equal(0, kc.Addresses().Len())
+	require.Zero(kc.Addresses().Len())
 
 	sk, err := kc.New()
 	require.NoError(err)
@@ -157,8 +157,8 @@ func TestKeychainSpendMint(t *testing.T) {
 	vinput, keys, err := kc.Spend(&mint, 0)
 	require.NoError(err)
 
-	input, ok := vinput.(*Input)
-	require.True(ok)
+	require.IsType(&Input{}, vinput)
+	input := vinput.(*Input)
 	require.NoError(input.Verify())
 	require.Equal([]uint32{0, 1}, input.SigIndices)
 	require.Len(keys, 2)
@@ -206,8 +206,8 @@ func TestKeychainSpendTransfer(t *testing.T) {
 	vinput, keys, err := kc.Spend(&transfer, 54321)
 	require.NoError(err)
 
-	input, ok := vinput.(*TransferInput)
-	require.True(ok)
+	require.IsType(&TransferInput{}, vinput)
+	input := vinput.(*TransferInput)
 	require.NoError(input.Verify())
 	require.Equal(uint64(12345), input.Amount())
 	require.Equal([]uint32{0, 1}, input.SigIndices)

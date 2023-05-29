@@ -20,7 +20,7 @@ func TestOutputOwnersVerify(t *testing.T) {
 		{
 			name:        "nil",
 			out:         nil,
-			expectedErr: errNilOutput,
+			expectedErr: ErrNilOutput,
 		},
 		{
 			name: "threshold > num addrs",
@@ -28,7 +28,7 @@ func TestOutputOwnersVerify(t *testing.T) {
 				Threshold: 1,
 				Addrs:     []ids.ShortID{},
 			},
-			expectedErr: errOutputUnspendable,
+			expectedErr: ErrOutputUnspendable,
 		},
 		{
 			name: "unoptimized",
@@ -36,7 +36,7 @@ func TestOutputOwnersVerify(t *testing.T) {
 				Threshold: 0,
 				Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 			},
-			expectedErr: errOutputUnoptimized,
+			expectedErr: ErrOutputUnoptimized,
 		},
 		{
 			name: "not sorted",
@@ -44,7 +44,7 @@ func TestOutputOwnersVerify(t *testing.T) {
 				Threshold: 1,
 				Addrs:     []ids.ShortID{{2}, {1}},
 			},
-			expectedErr: errAddrsNotSortedUnique,
+			expectedErr: ErrAddrsNotSortedUnique,
 		},
 		{
 			name: "not unique",
@@ -52,7 +52,7 @@ func TestOutputOwnersVerify(t *testing.T) {
 				Threshold: 1,
 				Addrs:     []ids.ShortID{{2}, {2}},
 			},
-			expectedErr: errAddrsNotSortedUnique,
+			expectedErr: ErrAddrsNotSortedUnique,
 		},
 		{
 			name: "passes verification",
@@ -67,8 +67,10 @@ func TestOutputOwnersVerify(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			require.ErrorIs(tt.out.Verify(), tt.expectedErr)
-			require.ErrorIs(tt.out.VerifyState(), tt.expectedErr)
+			err := tt.out.Verify()
+			require.ErrorIs(err, tt.expectedErr)
+			err = tt.out.VerifyState()
+			require.ErrorIs(err, tt.expectedErr)
 		})
 	}
 }
@@ -160,7 +162,7 @@ func TestMarshalJSONRequiresCtxWhenAddrsArePresent(t *testing.T) {
 	}
 
 	_, err := out.MarshalJSON()
-	require.ErrorIs(err, errMarshal)
+	require.ErrorIs(err, ErrMarshal)
 }
 
 func TestMarshalJSONDoesNotRequireCtxWhenAddrsAreAbsent(t *testing.T) {

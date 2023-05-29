@@ -23,11 +23,13 @@ const (
 )
 
 var (
+	ErrUnknownVersion = errors.New("unknown codec version")
+
 	errMarshalNil        = errors.New("can't marshal nil pointer or interface")
 	errUnmarshalNil      = errors.New("can't unmarshal nil")
+	errUnmarshalTooBig   = errors.New("byte array exceeds maximum length")
 	errCantPackVersion   = errors.New("couldn't pack codec version")
 	errCantUnpackVersion = errors.New("couldn't unpack codec version")
-	errUnknownVersion    = errors.New("unknown codec version")
 	errDuplicatedVersion = errors.New("duplicated codec version")
 )
 
@@ -37,10 +39,6 @@ var _ Manager = (*manager)(nil)
 type Manager interface {
 	// Associate the given codec with the given version ID
 	RegisterCodec(version uint16, codec Codec) error
-
-	// Define the maximum size, in bytes, of something serialized/deserialized
-	// by this codec manager
-	SetMaxSize(int)
 
 	// Size returns the size, in bytes, of [value] when it's marshaled
 	// using the codec with the given version.
@@ -90,13 +88,6 @@ func (m *manager) RegisterCodec(version uint16, codec Codec) error {
 	return nil
 }
 
-// SetMaxSize of bytes allowed
-func (m *manager) SetMaxSize(size int) {
-	m.lock.Lock()
-	m.maxSize = size
-	m.lock.Unlock()
-}
-
 func (m *manager) Size(version uint16, value interface{}) (int, error) {
 	if value == nil {
 		return 0, errMarshalNil // can't marshal nil
@@ -107,7 +98,7 @@ func (m *manager) Size(version uint16, value interface{}) (int, error) {
 	m.lock.RUnlock()
 
 	if !exists {
-		return 0, errUnknownVersion
+		return 0, ErrUnknownVersion
 	}
 
 	res, err := c.Size(value)
@@ -125,9 +116,8 @@ func (m *manager) Marshal(version uint16, value interface{}) ([]byte, error) {
 	m.lock.RLock()
 	c, exists := m.codecs[version]
 	m.lock.RUnlock()
-
 	if !exists {
-		return nil, errUnknownVersion
+		return nil, ErrUnknownVersion
 	}
 
 	p := wrappers.Packer{
@@ -148,26 +138,23 @@ func (m *manager) Unmarshal(bytes []byte, dest interface{}) (uint16, error) {
 		return 0, errUnmarshalNil
 	}
 
-	m.lock.RLock()
-	if len(bytes) > m.maxSize {
-		m.lock.RUnlock()
-		return 0, fmt.Errorf("byte array exceeds maximum length, %d", m.maxSize)
+	if byteLen := len(bytes); byteLen > m.maxSize {
+		return 0, fmt.Errorf("%w: %d > %d", errUnmarshalTooBig, byteLen, m.maxSize)
 	}
 
 	p := wrappers.Packer{
 		Bytes: bytes,
 	}
-
 	version := p.UnpackShort()
 	if p.Errored() { // Make sure the codec version is correct
-		m.lock.RUnlock()
 		return 0, errCantUnpackVersion
 	}
 
+	m.lock.RLock()
 	c, exists := m.codecs[version]
 	m.lock.RUnlock()
 	if !exists {
-		return version, errUnknownVersion
+		return version, ErrUnknownVersion
 	}
 	return version, c.Unmarshal(p.Bytes[p.Offset:], dest)
 }

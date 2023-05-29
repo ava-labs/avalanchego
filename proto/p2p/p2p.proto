@@ -17,8 +17,12 @@ message Message {
     // This field is only set if the message type supports compression.
     bytes compressed_gzip = 1;
 
+    // zstd-compressed bytes of a "p2p.Message" whose "oneof" "message" field is
+    // NOT compressed_* BUT one of the message types (e.g. ping, pong, etc.).
+    // This field is only set if the message type supports compression.
+    bytes compressed_zstd = 2;
+
     // Fields lower than 10 are reserved for other compression algorithms.
-    // TODO: support COMPRESS_ZSTD
     // TODO: support COMPRESS_SNAPPY
 
     // Network messages:
@@ -57,12 +61,16 @@ message Message {
   }
 }
 
-// Message that the local node sends to its remote peers,
-// in order to periodically check its uptime.
+// Message that a node sends to its peers in order to periodically check
+// responsivness and report the local node's uptime measurements of the peer.
 //
-// On receiving "ping", the remote peer responds with the observed
-// uptime value of the message sender in "pong" message.
-message Ping {}
+// On receiving a "ping", the peer should respond with a "pong".
+message Ping {
+  // uptime is the primary network uptime percentage.
+  uint32 uptime = 1;
+  // subnet_uptimes contains subnet uptime percentages.
+  repeated SubnetUptime subnet_uptimes = 2;
+}
 
 // Contains subnet id and the related observed subnet uptime of the message
 // receiver (remote peer).
@@ -75,6 +83,7 @@ message SubnetUptime {
 // from the sender's point of view, in response to "ping" message.
 // Uptimes are expected to be provided as integers ranging in [0, 100].
 message Pong {
+  // Deprecated: remove all these fields in the future, but keep the message.
   // uptime is the primary network uptime percentage.
   uint32 uptime = 1;
   // subnet_uptimes contains subnet uptime percentages.

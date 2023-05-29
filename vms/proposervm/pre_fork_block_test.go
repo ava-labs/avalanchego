@@ -51,6 +51,8 @@ func TestOracle_PreForkBlkImplementsInterface(t *testing.T) {
 }
 
 func TestOracle_PreForkBlkCanBuiltOnPreForkOption(t *testing.T) {
+	require := require.New(t)
+
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, mockable.MaxTime, 0)
 
 	// create pre fork oracle block ...
@@ -107,10 +109,8 @@ func TestOracle_PreForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 	}
 
 	// retrieve options ...
-	preForkOracleBlk, ok := parentBlk.(*preForkBlock)
-	if !ok {
-		t.Fatal("expected pre fork block")
-	}
+	require.IsType(&preForkBlock{}, parentBlk)
+	preForkOracleBlk := parentBlk.(*preForkBlock)
 	opts, err := preForkOracleBlk.Options(context.Background())
 	if err != nil {
 		t.Fatal("could not retrieve options from pre fork oracle block")
@@ -142,12 +142,12 @@ func TestOracle_PreForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 	if err != nil {
 		t.Fatal("could not build pre fork block on pre fork option block")
 	}
-	if _, ok := preForkChild.(*preForkBlock); !ok {
-		t.Fatal("expected pre fork block built on pre fork option block")
-	}
+	require.IsType(&preForkBlock{}, preForkChild)
 }
 
 func TestOracle_PostForkBlkCanBuiltOnPreForkOption(t *testing.T) {
+	require := require.New(t)
+
 	activationTime := genesisTimestamp.Add(10 * time.Second)
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, 0)
 
@@ -210,10 +210,8 @@ func TestOracle_PostForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 	}
 
 	// retrieve options ...
-	preForkOracleBlk, ok := parentBlk.(*preForkBlock)
-	if !ok {
-		t.Fatal("expected pre fork block")
-	}
+	require.IsType(&preForkBlock{}, parentBlk)
+	preForkOracleBlk := parentBlk.(*preForkBlock)
 	opts, err := preForkOracleBlk.Options(context.Background())
 	if err != nil {
 		t.Fatal("could not retrieve options from pre fork oracle block")
@@ -245,9 +243,7 @@ func TestOracle_PostForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 	if err != nil {
 		t.Fatal("could not build pre fork block on pre fork option block")
 	}
-	if _, ok := postForkChild.(*postForkBlock); !ok {
-		t.Fatal("expected pre fork block built on pre fork option block")
-	}
+	require.IsType(&postForkBlock{}, postForkChild)
 }
 
 func TestBlockVerify_PreFork_ParentChecks(t *testing.T) {
@@ -327,6 +323,8 @@ func TestBlockVerify_PreFork_ParentChecks(t *testing.T) {
 }
 
 func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
+	require := require.New(t)
+
 	activationTime := genesisTimestamp.Add(10 * time.Second)
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, 0)
 	if !coreGenBlk.Timestamp().Before(activationTime) {
@@ -353,9 +351,8 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 	preForkChild, err := proVM.BuildBlock(context.Background())
 	if err != nil {
 		t.Fatalf("unexpectedly could not build block due to %s", err)
-	} else if _, ok := preForkChild.(*preForkBlock); !ok {
-		t.Fatal("expected preForkBlock")
 	}
+	require.IsType(&preForkBlock{}, preForkChild)
 
 	if err := preForkChild.Verify(context.Background()); err != nil {
 		t.Fatal("pre Fork blocks should verify before fork")
@@ -428,9 +425,8 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 	lastPreForkBlk, err := proVM.BuildBlock(context.Background())
 	if err != nil {
 		t.Fatalf("unexpectedly could not build block due to %s", err)
-	} else if _, ok := lastPreForkBlk.(*preForkBlock); !ok {
-		t.Fatal("expected preForkBlock")
 	}
+	require.IsType(&preForkBlock{}, lastPreForkBlk)
 
 	if err := lastPreForkBlk.Verify(context.Background()); err != nil {
 		t.Fatal("pre Fork blocks should verify before fork")
@@ -468,9 +464,8 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 	firstPostForkBlk, err := proVM.BuildBlock(context.Background())
 	if err != nil {
 		t.Fatalf("unexpectedly could not build block due to %s", err)
-	} else if _, ok := firstPostForkBlk.(*postForkBlock); !ok {
-		t.Fatal("expected preForkBlock")
 	}
+	require.IsType(&postForkBlock{}, firstPostForkBlk)
 
 	if err := firstPostForkBlk.Verify(context.Background()); err != nil {
 		t.Fatal("pre Fork blocks should verify before fork")
@@ -478,6 +473,8 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 }
 
 func TestBlockVerify_BlocksBuiltOnPostForkGenesis(t *testing.T) {
+	require := require.New(t)
+
 	activationTime := genesisTimestamp.Add(-1 * time.Second)
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, activationTime, 0)
 	proVM.Set(activationTime)
@@ -501,9 +498,8 @@ func TestBlockVerify_BlocksBuiltOnPostForkGenesis(t *testing.T) {
 	postForkChild, err := proVM.BuildBlock(context.Background())
 	if err != nil {
 		t.Fatalf("unexpectedly could not build block due to %s", err)
-	} else if _, ok := postForkChild.(*postForkBlock); !ok {
-		t.Fatal("expected postForkBlock")
 	}
+	require.IsType(&postForkBlock{}, postForkChild)
 
 	if err := postForkChild.Verify(context.Background()); err != nil {
 		t.Fatal("post Fork blocks should verify after fork")
@@ -580,6 +576,8 @@ func TestBlockAccept_PreFork_SetsLastAcceptedBlock(t *testing.T) {
 
 // ProposerBlock.Reject tests section
 func TestBlockReject_PreForkBlock_InnerBlockIsRejected(t *testing.T) {
+	require := require.New(t)
+
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, mockable.MaxTime, 0) // disable ProBlks
 	coreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -598,10 +596,8 @@ func TestBlockReject_PreForkBlock_InnerBlockIsRejected(t *testing.T) {
 	if err != nil {
 		t.Fatal("could not build block")
 	}
-	proBlk, ok := sb.(*preForkBlock)
-	if !ok {
-		t.Fatal("built block has not expected type")
-	}
+	require.IsType(&preForkBlock{}, sb)
+	proBlk := sb.(*preForkBlock)
 
 	if err := proBlk.Reject(context.Background()); err != nil {
 		t.Fatal("could not reject block")
