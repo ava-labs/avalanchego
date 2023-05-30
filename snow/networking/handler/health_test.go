@@ -121,13 +121,11 @@ func TestHealthCheckSubnet(t *testing.T) {
 				vdrID := ids.GenerateTestNodeID()
 				vdrIDs.Add(vdrID)
 
-				err := vdrs.Add(vdrID, nil, ids.Empty, 100)
-				require.NoError(err)
+				require.NoError(vdrs.Add(vdrID, nil, ids.Empty, 100))
 			}
 
 			for index, vdr := range vdrs.List() {
-				err := peerTracker.Connected(context.Background(), vdr.NodeID, nil)
-				require.NoError(err)
+				require.NoError(peerTracker.Connected(context.Background(), vdr.NodeID, nil))
 
 				details, err := handlerIntf.HealthCheck(context.Background())
 				expectedPercentConnected := float64(index+1) / float64(testVdrCount)
