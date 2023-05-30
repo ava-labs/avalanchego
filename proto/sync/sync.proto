@@ -25,7 +25,6 @@ service SyncableDB {
   rpc GetProof(GetProofRequest) returns (GetProofResponse);
 
   rpc GetRangeProof(GetRangeProofRequest) returns (GetRangeProofResponse);
-  rpc VerifyRangeProof(VerifyRangeProofRequest) returns (VerifyRangeProofResponse);
   rpc CommitRangeProof(CommitRangeProofRequest) returns (CommitRangeProofResponse);
 }
 
@@ -83,14 +82,6 @@ message GetRangeProofRequest {
 
 message GetRangeProofResponse {
   RangeProof proof = 1;
-}
-
-message VerifyRangeProofRequest {
-  RangeProof proof = 1;
-}
-
-message VerifyRangeProofResponse {
-  rpcdb.Error error = 1;
 }
 
 message CommitRangeProofRequest {
