@@ -141,8 +141,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 		require.ErrorIs(err, ErrChildBlockAfterStakerChangeTime)
 	}
 
-	err = shutdownEnvironment(env)
-	require.NoError(err)
+	require.NoError(shutdownEnvironment(env))
 
 	// Case: Timestamp is after next validator end time
 	env = newEnvironment(false /*=postBanff*/, false /*=postCortina*/)
@@ -589,8 +588,7 @@ func TestTrackedSubnet(t *testing.T) {
 			env.state.PutPendingValidator(staker)
 			env.state.AddTx(tx, status.Committed)
 			env.state.SetHeight(dummyHeight)
-			err = env.state.Commit()
-			require.NoError(err)
+			require.NoError(env.state.Commit())
 
 			// Advance time to the staker's start time.
 			env.clk.Set(subnetVdr1StartTime)
@@ -609,8 +607,7 @@ func TestTrackedSubnet(t *testing.T) {
 				Backend:       &env.backend,
 				Tx:            tx,
 			}
-			err = tx.Unsigned.Visit(&executor)
-			require.NoError(err)
+			require.NoError(tx.Unsigned.Visit(&executor))
 
 			require.NoError(executor.OnCommitState.Apply(env.state))
 
@@ -659,8 +656,7 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 		Backend:       &env.backend,
 		Tx:            tx,
 	}
-	err = tx.Unsigned.Visit(&executor)
-	require.NoError(err)
+	require.NoError(tx.Unsigned.Visit(&executor))
 
 	require.NoError(executor.OnCommitState.Apply(env.state))
 
@@ -719,8 +715,7 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 		Backend:       &env.backend,
 		Tx:            tx,
 	}
-	err = tx.Unsigned.Visit(&executor)
-	require.NoError(err)
+	require.NoError(tx.Unsigned.Visit(&executor))
 
 	require.NoError(executor.OnCommitState.Apply(env.state))
 
@@ -764,8 +759,7 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 		Backend:       &env.backend,
 		Tx:            tx,
 	}
-	err = tx.Unsigned.Visit(&executor)
-	require.NoError(err)
+	require.NoError(tx.Unsigned.Visit(&executor))
 
 	require.NoError(executor.OnCommitState.Apply(env.state))
 
@@ -819,8 +813,7 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 		Backend:       &env.backend,
 		Tx:            tx,
 	}
-	err = tx.Unsigned.Visit(&executor)
-	require.NoError(err)
+	require.NoError(tx.Unsigned.Visit(&executor))
 
 	require.NoError(executor.OnCommitState.Apply(env.state))
 
@@ -858,8 +851,7 @@ func TestAdvanceTimeTxInitiallyPrefersCommit(t *testing.T) {
 		Backend:       &env.backend,
 		Tx:            tx,
 	}
-	err = tx.Unsigned.Visit(&executor)
-	require.NoError(err)
+	require.NoError(tx.Unsigned.Visit(&executor))
 
 	require.True(executor.PrefersCommit, "should prefer to commit this tx because its proposed timestamp it's within sync bound")
 }

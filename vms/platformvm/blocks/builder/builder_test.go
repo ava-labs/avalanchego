@@ -51,8 +51,7 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	env.sender.SendAppGossipF = func(context.Context, []byte) error {
 		return nil
 	}
-	err := env.Builder.AddUnverifiedTx(tx)
-	require.NoError(err)
+	require.NoError(env.Builder.AddUnverifiedTx(tx))
 
 	has := env.mempool.Has(txID)
 	require.True(has)
