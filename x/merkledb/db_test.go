@@ -700,7 +700,7 @@ type testOperation struct {
 	delete bool
 }
 
-func applyOperations(t *Database, ops []*testOperation) (Trie, error) {
+func applyOperations(t *merkleDB, ops []*testOperation) (Trie, error) {
 	view, err := t.NewView()
 	if err != nil {
 		return nil, err
@@ -710,10 +710,8 @@ func applyOperations(t *Database, ops []*testOperation) (Trie, error) {
 			if err := view.Remove(context.Background(), op.key); err != nil {
 				return nil, err
 			}
-		} else {
-			if err := view.Insert(context.Background(), op.key, op.value); err != nil {
-				return nil, err
-			}
+		} else if err := view.Insert(context.Background(), op.key, op.value); err != nil {
+			return nil, err
 		}
 	}
 	return view, nil
@@ -812,9 +810,9 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 			require.NoError(err)
 			changeProofDB, err := getBasicDB()
 			require.NoError(err)
-			err = changeProof.Verify(
+			err = changeProofDB.VerifyChangeProof(
 				context.Background(),
-				changeProofDB,
+				changeProof,
 				step.key,
 				step.value,
 				root,
