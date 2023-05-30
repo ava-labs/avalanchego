@@ -2,12 +2,13 @@
 // versions:
 // - protoc-gen-go-grpc v1.3.0
 // - protoc             (unknown)
-// source: merkledb/syncabledb.proto
+// source: sync/syncable_db.proto
 
-package merkledb
+package sync
 
 import (
 	context "context"
+	merkledb "github.com/ava-labs/avalanchego/proto/pb/merkledb"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -20,28 +21,28 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	SyncableDB_GetMerkleRoot_FullMethodName     = "/merkledb.SyncableDB/GetMerkleRoot"
-	SyncableDB_GetChangeProof_FullMethodName    = "/merkledb.SyncableDB/GetChangeProof"
-	SyncableDB_VerifyChangeProof_FullMethodName = "/merkledb.SyncableDB/VerifyChangeProof"
-	SyncableDB_CommitChangeProof_FullMethodName = "/merkledb.SyncableDB/CommitChangeProof"
-	SyncableDB_GetProof_FullMethodName          = "/merkledb.SyncableDB/GetProof"
-	SyncableDB_GetRangeProof_FullMethodName     = "/merkledb.SyncableDB/GetRangeProof"
-	SyncableDB_VerifyRangeProof_FullMethodName  = "/merkledb.SyncableDB/VerifyRangeProof"
-	SyncableDB_CommitRangeProof_FullMethodName  = "/merkledb.SyncableDB/CommitRangeProof"
+	SyncableDB_GetMerkleRoot_FullMethodName     = "/sync.SyncableDB/GetMerkleRoot"
+	SyncableDB_GetChangeProof_FullMethodName    = "/sync.SyncableDB/GetChangeProof"
+	SyncableDB_VerifyChangeProof_FullMethodName = "/sync.SyncableDB/VerifyChangeProof"
+	SyncableDB_CommitChangeProof_FullMethodName = "/sync.SyncableDB/CommitChangeProof"
+	SyncableDB_GetProof_FullMethodName          = "/sync.SyncableDB/GetProof"
+	SyncableDB_GetRangeProof_FullMethodName     = "/sync.SyncableDB/GetRangeProof"
+	SyncableDB_VerifyRangeProof_FullMethodName  = "/sync.SyncableDB/VerifyRangeProof"
+	SyncableDB_CommitRangeProof_FullMethodName  = "/sync.SyncableDB/CommitRangeProof"
 )
 
 // SyncableDBClient is the client API for SyncableDB service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type SyncableDBClient interface {
-	GetMerkleRoot(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetMerkleRootResponse, error)
-	GetChangeProof(ctx context.Context, in *ChangeProofRequest, opts ...grpc.CallOption) (*ChangeProof, error)
-	VerifyChangeProof(ctx context.Context, in *ChangeProof, opts ...grpc.CallOption) (*Error, error)
-	CommitChangeProof(ctx context.Context, in *ChangeProof, opts ...grpc.CallOption) (*Error, error)
-	GetProof(ctx context.Context, in *GetProofRequest, opts ...grpc.CallOption) (*Proof, error)
-	GetRangeProof(ctx context.Context, in *RangeProofRequest, opts ...grpc.CallOption) (*RangeProof, error)
-	VerifyRangeProof(ctx context.Context, in *RangeProof, opts ...grpc.CallOption) (*Error, error)
-	CommitRangeProof(ctx context.Context, in *CommitRangeProofRequest, opts ...grpc.CallOption) (*Error, error)
+	GetMerkleRoot(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*merkledb.GetMerkleRootResponse, error)
+	GetChangeProof(ctx context.Context, in *merkledb.ChangeProofRequest, opts ...grpc.CallOption) (*merkledb.ChangeProof, error)
+	VerifyChangeProof(ctx context.Context, in *merkledb.ChangeProof, opts ...grpc.CallOption) (*Error, error)
+	CommitChangeProof(ctx context.Context, in *merkledb.ChangeProof, opts ...grpc.CallOption) (*Error, error)
+	GetProof(ctx context.Context, in *merkledb.GetProofRequest, opts ...grpc.CallOption) (*merkledb.Proof, error)
+	GetRangeProof(ctx context.Context, in *merkledb.RangeProofRequest, opts ...grpc.CallOption) (*merkledb.RangeProof, error)
+	VerifyRangeProof(ctx context.Context, in *merkledb.RangeProof, opts ...grpc.CallOption) (*Error, error)
+	CommitRangeProof(ctx context.Context, in *merkledb.CommitRangeProofRequest, opts ...grpc.CallOption) (*Error, error)
 }
 
 type syncableDBClient struct {
@@ -52,8 +53,8 @@ func NewSyncableDBClient(cc grpc.ClientConnInterface) SyncableDBClient {
 	return &syncableDBClient{cc}
 }
 
-func (c *syncableDBClient) GetMerkleRoot(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetMerkleRootResponse, error) {
-	out := new(GetMerkleRootResponse)
+func (c *syncableDBClient) GetMerkleRoot(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*merkledb.GetMerkleRootResponse, error) {
+	out := new(merkledb.GetMerkleRootResponse)
 	err := c.cc.Invoke(ctx, SyncableDB_GetMerkleRoot_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -61,8 +62,8 @@ func (c *syncableDBClient) GetMerkleRoot(ctx context.Context, in *emptypb.Empty,
 	return out, nil
 }
 
-func (c *syncableDBClient) GetChangeProof(ctx context.Context, in *ChangeProofRequest, opts ...grpc.CallOption) (*ChangeProof, error) {
-	out := new(ChangeProof)
+func (c *syncableDBClient) GetChangeProof(ctx context.Context, in *merkledb.ChangeProofRequest, opts ...grpc.CallOption) (*merkledb.ChangeProof, error) {
+	out := new(merkledb.ChangeProof)
 	err := c.cc.Invoke(ctx, SyncableDB_GetChangeProof_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -70,7 +71,7 @@ func (c *syncableDBClient) GetChangeProof(ctx context.Context, in *ChangeProofRe
 	return out, nil
 }
 
-func (c *syncableDBClient) VerifyChangeProof(ctx context.Context, in *ChangeProof, opts ...grpc.CallOption) (*Error, error) {
+func (c *syncableDBClient) VerifyChangeProof(ctx context.Context, in *merkledb.ChangeProof, opts ...grpc.CallOption) (*Error, error) {
 	out := new(Error)
 	err := c.cc.Invoke(ctx, SyncableDB_VerifyChangeProof_FullMethodName, in, out, opts...)
 	if err != nil {
@@ -79,7 +80,7 @@ func (c *syncableDBClient) VerifyChangeProof(ctx context.Context, in *ChangeProo
 	return out, nil
 }
 
-func (c *syncableDBClient) CommitChangeProof(ctx context.Context, in *ChangeProof, opts ...grpc.CallOption) (*Error, error) {
+func (c *syncableDBClient) CommitChangeProof(ctx context.Context, in *merkledb.ChangeProof, opts ...grpc.CallOption) (*Error, error) {
 	out := new(Error)
 	err := c.cc.Invoke(ctx, SyncableDB_CommitChangeProof_FullMethodName, in, out, opts...)
 	if err != nil {
@@ -88,8 +89,8 @@ func (c *syncableDBClient) CommitChangeProof(ctx context.Context, in *ChangeProo
 	return out, nil
 }
 
-func (c *syncableDBClient) GetProof(ctx context.Context, in *GetProofRequest, opts ...grpc.CallOption) (*Proof, error) {
-	out := new(Proof)
+func (c *syncableDBClient) GetProof(ctx context.Context, in *merkledb.GetProofRequest, opts ...grpc.CallOption) (*merkledb.Proof, error) {
+	out := new(merkledb.Proof)
 	err := c.cc.Invoke(ctx, SyncableDB_GetProof_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -97,8 +98,8 @@ func (c *syncableDBClient) GetProof(ctx context.Context, in *GetProofRequest, op
 	return out, nil
 }
 
-func (c *syncableDBClient) GetRangeProof(ctx context.Context, in *RangeProofRequest, opts ...grpc.CallOption) (*RangeProof, error) {
-	out := new(RangeProof)
+func (c *syncableDBClient) GetRangeProof(ctx context.Context, in *merkledb.RangeProofRequest, opts ...grpc.CallOption) (*merkledb.RangeProof, error) {
+	out := new(merkledb.RangeProof)
 	err := c.cc.Invoke(ctx, SyncableDB_GetRangeProof_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -106,7 +107,7 @@ func (c *syncableDBClient) GetRangeProof(ctx context.Context, in *RangeProofRequ
 	return out, nil
 }
 
-func (c *syncableDBClient) VerifyRangeProof(ctx context.Context, in *RangeProof, opts ...grpc.CallOption) (*Error, error) {
+func (c *syncableDBClient) VerifyRangeProof(ctx context.Context, in *merkledb.RangeProof, opts ...grpc.CallOption) (*Error, error) {
 	out := new(Error)
 	err := c.cc.Invoke(ctx, SyncableDB_VerifyRangeProof_FullMethodName, in, out, opts...)
 	if err != nil {
@@ -115,7 +116,7 @@ func (c *syncableDBClient) VerifyRangeProof(ctx context.Context, in *RangeProof,
 	return out, nil
 }
 
-func (c *syncableDBClient) CommitRangeProof(ctx context.Context, in *CommitRangeProofRequest, opts ...grpc.CallOption) (*Error, error) {
+func (c *syncableDBClient) CommitRangeProof(ctx context.Context, in *merkledb.CommitRangeProofRequest, opts ...grpc.CallOption) (*Error, error) {
 	out := new(Error)
 	err := c.cc.Invoke(ctx, SyncableDB_CommitRangeProof_FullMethodName, in, out, opts...)
 	if err != nil {
@@ -128,14 +129,14 @@ func (c *syncableDBClient) CommitRangeProof(ctx context.Context, in *CommitRange
 // All implementations must embed UnimplementedSyncableDBServer
 // for forward compatibility
 type SyncableDBServer interface {
-	GetMerkleRoot(context.Context, *emptypb.Empty) (*GetMerkleRootResponse, error)
-	GetChangeProof(context.Context, *ChangeProofRequest) (*ChangeProof, error)
-	VerifyChangeProof(context.Context, *ChangeProof) (*Error, error)
-	CommitChangeProof(context.Context, *ChangeProof) (*Error, error)
-	GetProof(context.Context, *GetProofRequest) (*Proof, error)
-	GetRangeProof(context.Context, *RangeProofRequest) (*RangeProof, error)
-	VerifyRangeProof(context.Context, *RangeProof) (*Error, error)
-	CommitRangeProof(context.Context, *CommitRangeProofRequest) (*Error, error)
+	GetMerkleRoot(context.Context, *emptypb.Empty) (*merkledb.GetMerkleRootResponse, error)
+	GetChangeProof(context.Context, *merkledb.ChangeProofRequest) (*merkledb.ChangeProof, error)
+	VerifyChangeProof(context.Context, *merkledb.ChangeProof) (*Error, error)
+	CommitChangeProof(context.Context, *merkledb.ChangeProof) (*Error, error)
+	GetProof(context.Context, *merkledb.GetProofRequest) (*merkledb.Proof, error)
+	GetRangeProof(context.Context, *merkledb.RangeProofRequest) (*merkledb.RangeProof, error)
+	VerifyRangeProof(context.Context, *merkledb.RangeProof) (*Error, error)
+	CommitRangeProof(context.Context, *merkledb.CommitRangeProofRequest) (*Error, error)
 	mustEmbedUnimplementedSyncableDBServer()
 }
 
@@ -143,28 +144,28 @@ type SyncableDBServer interface {
 type UnimplementedSyncableDBServer struct {
 }
 
-func (UnimplementedSyncableDBServer) GetMerkleRoot(context.Context, *emptypb.Empty) (*GetMerkleRootResponse, error) {
+func (UnimplementedSyncableDBServer) GetMerkleRoot(context.Context, *emptypb.Empty) (*merkledb.GetMerkleRootResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetMerkleRoot not implemented")
 }
-func (UnimplementedSyncableDBServer) GetChangeProof(context.Context, *ChangeProofRequest) (*ChangeProof, error) {
+func (UnimplementedSyncableDBServer) GetChangeProof(context.Context, *merkledb.ChangeProofRequest) (*merkledb.ChangeProof, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetChangeProof not implemented")
 }
-func (UnimplementedSyncableDBServer) VerifyChangeProof(context.Context, *ChangeProof) (*Error, error) {
+func (UnimplementedSyncableDBServer) VerifyChangeProof(context.Context, *merkledb.ChangeProof) (*Error, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method VerifyChangeProof not implemented")
 }
-func (UnimplementedSyncableDBServer) CommitChangeProof(context.Context, *ChangeProof) (*Error, error) {
+func (UnimplementedSyncableDBServer) CommitChangeProof(context.Context, *merkledb.ChangeProof) (*Error, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CommitChangeProof not implemented")
 }
-func (UnimplementedSyncableDBServer) GetProof(context.Context, *GetProofRequest) (*Proof, error) {
+func (UnimplementedSyncableDBServer) GetProof(context.Context, *merkledb.GetProofRequest) (*merkledb.Proof, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetProof not implemented")
 }
-func (UnimplementedSyncableDBServer) GetRangeProof(context.Context, *RangeProofRequest) (*RangeProof, error) {
+func (UnimplementedSyncableDBServer) GetRangeProof(context.Context, *merkledb.RangeProofRequest) (*merkledb.RangeProof, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetRangeProof not implemented")
 }
-func (UnimplementedSyncableDBServer) VerifyRangeProof(context.Context, *RangeProof) (*Error, error) {
+func (UnimplementedSyncableDBServer) VerifyRangeProof(context.Context, *merkledb.RangeProof) (*Error, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method VerifyRangeProof not implemented")
 }
-func (UnimplementedSyncableDBServer) CommitRangeProof(context.Context, *CommitRangeProofRequest) (*Error, error) {
+func (UnimplementedSyncableDBServer) CommitRangeProof(context.Context, *merkledb.CommitRangeProofRequest) (*Error, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CommitRangeProof not implemented")
 }
 func (UnimplementedSyncableDBServer) mustEmbedUnimplementedSyncableDBServer() {}
@@ -199,7 +200,7 @@ func _SyncableDB_GetMerkleRoot_Handler(srv interface{}, ctx context.Context, dec
 }
 
 func _SyncableDB_GetChangeProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ChangeProofRequest)
+	in := new(merkledb.ChangeProofRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -211,13 +212,13 @@ func _SyncableDB_GetChangeProof_Handler(srv interface{}, ctx context.Context, de
 		FullMethod: SyncableDB_GetChangeProof_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SyncableDBServer).GetChangeProof(ctx, req.(*ChangeProofRequest))
+		return srv.(SyncableDBServer).GetChangeProof(ctx, req.(*merkledb.ChangeProofRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _SyncableDB_VerifyChangeProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ChangeProof)
+	in := new(merkledb.ChangeProof)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -229,13 +230,13 @@ func _SyncableDB_VerifyChangeProof_Handler(srv interface{}, ctx context.Context,
 		FullMethod: SyncableDB_VerifyChangeProof_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SyncableDBServer).VerifyChangeProof(ctx, req.(*ChangeProof))
+		return srv.(SyncableDBServer).VerifyChangeProof(ctx, req.(*merkledb.ChangeProof))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _SyncableDB_CommitChangeProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ChangeProof)
+	in := new(merkledb.ChangeProof)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -247,13 +248,13 @@ func _SyncableDB_CommitChangeProof_Handler(srv interface{}, ctx context.Context,
 		FullMethod: SyncableDB_CommitChangeProof_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SyncableDBServer).CommitChangeProof(ctx, req.(*ChangeProof))
+		return srv.(SyncableDBServer).CommitChangeProof(ctx, req.(*merkledb.ChangeProof))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _SyncableDB_GetProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetProofRequest)
+	in := new(merkledb.GetProofRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -265,13 +266,13 @@ func _SyncableDB_GetProof_Handler(srv interface{}, ctx context.Context, dec func
 		FullMethod: SyncableDB_GetProof_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SyncableDBServer).GetProof(ctx, req.(*GetProofRequest))
+		return srv.(SyncableDBServer).GetProof(ctx, req.(*merkledb.GetProofRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _SyncableDB_GetRangeProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(RangeProofRequest)
+	in := new(merkledb.RangeProofRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -283,13 +284,13 @@ func _SyncableDB_GetRangeProof_Handler(srv interface{}, ctx context.Context, dec
 		FullMethod: SyncableDB_GetRangeProof_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SyncableDBServer).GetRangeProof(ctx, req.(*RangeProofRequest))
+		return srv.(SyncableDBServer).GetRangeProof(ctx, req.(*merkledb.RangeProofRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _SyncableDB_VerifyRangeProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(RangeProof)
+	in := new(merkledb.RangeProof)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -301,13 +302,13 @@ func _SyncableDB_VerifyRangeProof_Handler(srv interface{}, ctx context.Context, 
 		FullMethod: SyncableDB_VerifyRangeProof_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SyncableDBServer).VerifyRangeProof(ctx, req.(*RangeProof))
+		return srv.(SyncableDBServer).VerifyRangeProof(ctx, req.(*merkledb.RangeProof))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _SyncableDB_CommitRangeProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CommitRangeProofRequest)
+	in := new(merkledb.CommitRangeProofRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -319,7 +320,7 @@ func _SyncableDB_CommitRangeProof_Handler(srv interface{}, ctx context.Context, 
 		FullMethod: SyncableDB_CommitRangeProof_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SyncableDBServer).CommitRangeProof(ctx, req.(*CommitRangeProofRequest))
+		return srv.(SyncableDBServer).CommitRangeProof(ctx, req.(*merkledb.CommitRangeProofRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -328,7 +329,7 @@ func _SyncableDB_CommitRangeProof_Handler(srv interface{}, ctx context.Context, 
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var SyncableDB_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "merkledb.SyncableDB",
+	ServiceName: "sync.SyncableDB",
 	HandlerType: (*SyncableDBServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
@@ -365,5 +366,5 @@ var SyncableDB_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "merkledb/syncabledb.proto",
+	Metadata: "sync/syncable_db.proto",
 }

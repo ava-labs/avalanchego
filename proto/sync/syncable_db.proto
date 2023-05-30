@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package sync;
+
+import "google/protobuf/empty.proto";
+import "merkledb/merkledb.proto";
+import "rpcdb/rpcdb.proto";
+
+option go_package = "github.com/ava-labs/avalanchego/proto/pb/sync";
+
+// TODO add support for views.
+service SyncableDB {
+  rpc GetMerkleRoot(google.protobuf.Empty) returns (merkledb.GetMerkleRootResponse);
+
+  rpc GetChangeProof(merkledb.ChangeProofRequest) returns (merkledb.ChangeProof);
+  rpc VerifyChangeProof(merkledb.ChangeProof) returns (Error);
+  rpc CommitChangeProof(merkledb.ChangeProof) returns (Error);
+
+  rpc GetProof(merkledb.GetProofRequest) returns (merkledb.Proof);
+
+  rpc GetRangeProof(merkledb.RangeProofRequest) returns (merkledb.RangeProof);
+  rpc VerifyRangeProof(merkledb.RangeProof) returns (Error);
+  rpc CommitRangeProof(merkledb.CommitRangeProofRequest) returns (Error);
+}
+
+message Error {
+  rpcdb.Error error = 1;
+}
