@@ -1490,7 +1490,8 @@ func TestChangeProofUnmarshalProtoNilValue(t *testing.T) {
 	protoProof.KeyChanges[0].Value = nil
 
 	var unmarshaledProof ChangeProof
-	require.ErrorIs(t, unmarshaledProof.UnmarshalProto(protoProof), ErrNilMaybeBytes)
+	err := unmarshaledProof.UnmarshalProto(protoProof)
+	require.ErrorIs(t, err, ErrNilMaybeBytes)
 }
 
 func TestChangeProofUnmarshalProtoInvalidMaybe(t *testing.T) {
