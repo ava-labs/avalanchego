@@ -1308,8 +1308,7 @@ func TestProofNodeProtoMarshalUnmarshal(t *testing.T) {
 		// Assert the unmarshaled one is the same as the original.
 		protoNode := node.ToProto()
 		var unmarshaledNode ProofNode
-		err := unmarshaledNode.UnmarshalProto(protoNode)
-		require.NoError(err)
+		require.NoError(unmarshaledNode.UnmarshalProto(protoNode))
 		require.Equal(node, unmarshaledNode)
 
 		// Marshaling again should yield same result.
@@ -1369,8 +1368,7 @@ func TestRangeProofProtoMarshalUnmarshal(t *testing.T) {
 		// Assert the unmarshaled one is the same as the original.
 		var unmarshaledProof RangeProof
 		protoProof := proof.ToProto()
-		err := unmarshaledProof.UnmarshalProto(protoProof)
-		require.NoError(err)
+		require.NoError(unmarshaledProof.UnmarshalProto(protoProof))
 		require.Equal(proof, unmarshaledProof)
 
 		// Marshaling again should yield same result.
