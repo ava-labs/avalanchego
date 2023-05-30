@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package sync;
 
-import "merkledb/merkledb.proto";
+import "merkledb/syncabledb.proto";
 
 option go_package = "github.com/ava-labs/avalanchego/proto/pb/sync";
 
