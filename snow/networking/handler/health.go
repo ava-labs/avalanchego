@@ -46,7 +46,6 @@ func (h *handler) networkHealthCheck() (interface{}, error) {
 	details := map[string]float64{
 		"percentConnected": percentConnected,
 	}
-	h.metrics.SetPercentConnected(percentConnected)
 
 	var err error
 	subnetConfig := h.subnet.Config()

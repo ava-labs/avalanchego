@@ -807,8 +807,14 @@ func (m *manager) createAvalancheChain(
 		sampleK = int(bootstrapWeight)
 	}
 
-	connectedValidators := tracker.NewPeers()
-	startupTracker := tracker.NewStartup(connectedValidators, (3*bootstrapWeight+3)/4)
+	connectedValidators, err := tracker.NewMeteredPeers("", ctx.Registerer)
+	if err != nil {
+		return nil, fmt.Errorf("error creating peer tracker: %w", err)
+	}
+	vdrs.RegisterCallbackListener(connectedValidators)
+
+	connectedBeacons := tracker.NewPeers()
+	startupTracker := tracker.NewStartup(connectedBeacons, (3*bootstrapWeight+3)/4)
 	vdrs.RegisterCallbackListener(startupTracker)
 
 	// Asynchronously passes messages from the network to the consensus engine
@@ -1143,18 +1149,15 @@ func (m *manager) createSnowmanChain(
 		sampleK = int(bootstrapWeight)
 	}
 
+	connectedValidators, err := tracker.NewMeteredPeers("", ctx.Registerer)
+	if err != nil {
+		return nil, fmt.Errorf("error creating peer tracker: %w", err)
+	}
+	vdrs.RegisterCallbackListener(connectedValidators)
+
 	connectedBeacons := tracker.NewPeers()
 	startupTracker := tracker.NewStartup(connectedBeacons, (3*bootstrapWeight+3)/4)
 	beacons.RegisterCallbackListener(startupTracker)
-	connectedVdrs := connectedBeacons
-
-	// If this is the P-Chain, then we need to create a new connectedVdrs
-	// that tracks the validators connected to the P-Chain. This is because
-	// the P-Chain is the only chain that can have custom beacons.
-	if ctx.ChainID == constants.PlatformChainID {
-		connectedVdrs = tracker.NewPeers()
-		vdrs.RegisterCallbackListener(connectedVdrs)
-	}
 
 	// Asynchronously passes messages from the network to the consensus engine
 	h, err := handler.New(
@@ -1166,7 +1169,7 @@ func (m *manager) createSnowmanChain(
 		m.ResourceTracker,
 		subnetConnector,
 		sb,
-		connectedVdrs,
+		connectedValidators,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize message handler: %w", err)
