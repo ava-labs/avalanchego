@@ -298,8 +298,9 @@ func addNodeFlags(fs *pflag.FlagSet) {
 
 	// Bootstrapping
 	fs.String(BootstrappersKey, "", "JSON-encoded list of bootstrap node ids and ips to connect to. If set, overrides --bootstrap-ips/ids. Example: '[{\"id\":\"NodeID-JR4dVmy6ffUGAKCBDkyCbeZbyHQBeDsET\",\"ip\":\"127.0.0.1:9630\"}]'")
-	fs.String(BootstrapIPsKey, "", "[DEPRECATED] Comma separated list of bootstrap peer ips to connect to. Example: 127.0.0.1:9630,127.0.0.1:9631")
-	fs.String(BootstrapIDsKey, "", "[DEPRECATED] Comma separated list of bootstrap peer ids to connect to. Example: NodeID-JR4dVmy6ffUGAKCBDkyCbeZbyHQBeDsET,NodeID-8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
+        // TODO: add [DEPRECATED] and deprecate
+	fs.String(BootstrapIPsKey, "", "Comma separated list of bootstrap peer ips to connect to. Example: 127.0.0.1:9630,127.0.0.1:9631")
+	fs.String(BootstrapIDsKey, "", "Comma separated list of bootstrap peer ids to connect to. Example: NodeID-JR4dVmy6ffUGAKCBDkyCbeZbyHQBeDsET,NodeID-8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
 	fs.Bool(RetryBootstrapKey, true, "Specifies whether bootstrap should be retried")
 	fs.Int(RetryBootstrapWarnFrequencyKey, 50, "Specifies how many times bootstrap should be retried before warning the operator")
 	fs.Duration(BootstrapBeaconConnectionTimeoutKey, time.Minute, "Timeout before emitting a warn log when connecting to bootstrapping beacons")
