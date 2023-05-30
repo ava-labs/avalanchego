@@ -27,7 +27,7 @@ import (
 
 func sendRangeRequest(
 	t *testing.T,
-	db merkledb.MerkleDB,
+	db SyncableDB,
 	request *syncpb.RangeProofRequest,
 	maxAttempts uint32,
 	modifyResponse func(*merkledb.RangeProof),
@@ -123,7 +123,7 @@ func TestGetRangeProof(t *testing.T) {
 	require.NoError(t, err)
 
 	tests := map[string]struct {
-		db                  merkledb.MerkleDB
+		db                  SyncableDB
 		request             *syncpb.RangeProofRequest
 		modifyResponse      func(*merkledb.RangeProof)
 		expectedErr         error
@@ -209,10 +209,10 @@ func TestGetRangeProof(t *testing.T) {
 			},
 			modifyResponse: func(response *merkledb.RangeProof) {
 				start := response.KeyValues[1].Key
-				proof, err := largeTrieDB.GetRangeProof(context.Background(), start, nil, defaultRequestKeyLimit)
-				if err != nil {
-					panic(err)
-				}
+				rootID, err := largeTrieDB.GetMerkleRoot(context.Background())
+				require.NoError(t, err)
+				proof, err := largeTrieDB.GetRangeProofAtRoot(context.Background(), rootID, start, nil, defaultRequestKeyLimit)
+				require.NoError(t, err)
 				response.KeyValues = proof.KeyValues
 				response.StartProof = proof.StartProof
 				response.EndProof = proof.EndProof
@@ -279,8 +279,8 @@ func TestGetRangeProof(t *testing.T) {
 
 func sendChangeRequest(
 	t *testing.T,
-	db merkledb.MerkleDB,
-	verificationDB merkledb.MerkleDB,
+	db SyncableDB,
+	verificationDB SyncableDB,
 	request *syncpb.ChangeProofRequest,
 	maxAttempts uint32,
 	modifyResponse func(*merkledb.ChangeProof),
@@ -423,7 +423,7 @@ func TestGetChangeProof(t *testing.T) {
 	require.NoError(t, err)
 
 	tests := map[string]struct {
-		db                  merkledb.MerkleDB
+		db                  SyncableDB
 		request             *syncpb.ChangeProofRequest
 		modifyResponse      func(*merkledb.ChangeProof)
 		expectedErr         error

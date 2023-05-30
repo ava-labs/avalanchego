@@ -106,7 +106,7 @@ type StateSyncManager struct {
 }
 
 type StateSyncConfig struct {
-	SyncDB                merkledb.MerkleDB
+	SyncDB                SyncableDB
 	Client                Client
 	SimultaneousWorkLimit int
 	Log                   logging.Logger
