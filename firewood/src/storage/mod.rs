@@ -574,8 +574,8 @@ impl CachedStore for StoreRevMut {
 pub struct ZeroStore(Rc<()>);
 
 #[cfg(test)]
-impl ZeroStore {
-    pub fn new() -> Self {
+impl Default for ZeroStore {
+    fn default() -> Self {
         Self(Rc::new(()))
     }
 }
@@ -612,7 +612,7 @@ fn test_from_ash() {
             println!("[0x{l:x}, 0x{r:x})");
             writes.push(SpaceWrite { offset: l, data });
         }
-        let z = Rc::new(ZeroStore::new());
+        let z = Rc::new(ZeroStore::default());
         let rev = StoreRevShared::from_ash(z, &writes);
         println!("{rev:?}");
         assert_eq!(
@@ -714,7 +714,7 @@ impl CachedSpaceInner {
         pid: u64,
     ) -> Result<&'static mut [u8], StoreError<std::io::Error>> {
         let base = match self.pinned_pages.get_mut(&pid) {
-            Some(mut e) => {
+            Some(e) => {
                 e.0 += 1;
                 e.1.as_mut_ptr()
             }

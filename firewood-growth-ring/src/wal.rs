@@ -608,7 +608,7 @@ impl<F: WalStore> WalWriter<F> {
             .file_pool
             .write(writes)
             .into_iter()
-            .map(move |f| async move { f.await }.shared())
+            .map(move |f| f.shared())
             .collect();
 
         res.into_iter()

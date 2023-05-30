@@ -710,7 +710,7 @@ mod tests {
 
         // initial write
         let data = b"hello world";
-        let hash: [u8; HASH_SIZE] = sha3::Keccak256::digest(&data).into();
+        let hash: [u8; HASH_SIZE] = sha3::Keccak256::digest(data).into();
         let obj_ref = space.put_item(Hash(hash), 0).unwrap();
         assert_eq!(obj_ref.as_ptr().addr(), 4113);
         // create hash ptr from address and attempt to read dirty write.

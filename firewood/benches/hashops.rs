@@ -13,7 +13,7 @@ const ZERO_HASH: Hash = Hash([0u8; HASH_SIZE]);
 fn bench_dehydrate(b: &mut Bencher) {
     let mut to = [1u8; HASH_SIZE];
     b.iter(|| {
-        ZERO_HASH.dehydrate(&mut to);
+        ZERO_HASH.dehydrate(&mut to).unwrap();
     });
 }
 

@@ -1,5 +1,4 @@
 #[cfg(test)]
-#[allow(dead_code)]
 use async_trait::async_trait;
 use futures::executor::block_on;
 use growthring::wal::{WalBytes, WalError, WalFile, WalLoader, WalPos, WalRingId, WalStore};
@@ -637,19 +636,17 @@ impl PaintingSim {
                 let i0 = ops.len() - self.m;
                 let mut canvas0 = canvas0.new_reference(&ops[..i0]);
                 let mut res = None;
-                'outer: loop {
-                    if canvas.is_same(&canvas0) {
-                        break;
-                    }
-                    for i in i0..ops.len() {
-                        canvas0.prepaint(&ops[i], &WalRingId::empty_id());
-                        canvas0.paint_all();
-                        if canvas.is_same(&canvas0) {
-                            break 'outer;
+                'outer: {
+                    if !canvas.is_same(&canvas0) {
+                        for op in ops.iter().skip(i0) {
+                            canvas0.prepaint(op, &WalRingId::empty_id());
+                            canvas0.paint_all();
+                            if canvas.is_same(&canvas0) {
+                                break 'outer;
+                            }
                         }
                     }
                     res = Some(canvas0);
-                    break;
                 }
                 res
             }

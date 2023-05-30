@@ -365,9 +365,9 @@ fn test_range_proof() -> Result<(), ProofError> {
 
         let mut keys = Vec::new();
         let mut vals = Vec::new();
-        for i in start..end {
-            keys.push(&items[i].0);
-            vals.push(&items[i].1);
+        for item in items[start..end].iter() {
+            keys.push(&item.0);
+            vals.push(&item.1);
         }
 
         merkle.verify_range_proof(&proof, &items[start].0, &items[end - 1].0, keys, vals)?;
@@ -400,9 +400,9 @@ fn test_bad_range_proof() -> Result<(), ProofError> {
 
         let mut keys: Vec<[u8; 32]> = Vec::new();
         let mut vals: Vec<[u8; 20]> = Vec::new();
-        for i in start..end {
-            keys.push(*items[i].0);
-            vals.push(*items[i].1);
+        for item in items[start..end].iter() {
+            keys.push(*item.0);
+            vals.push(*item.1);
         }
 
         let test_case: u32 = rand::thread_rng().gen_range(0..6);
@@ -496,9 +496,9 @@ fn test_range_proof_with_non_existent_proof() -> Result<(), ProofError> {
 
         let mut keys: Vec<[u8; 32]> = Vec::new();
         let mut vals: Vec<[u8; 20]> = Vec::new();
-        for i in start..end {
-            keys.push(*items[i].0);
-            vals.push(*items[i].1);
+        for item in items[start..end].iter() {
+            keys.push(*item.0);
+            vals.push(*item.1);
         }
 
         merkle.verify_range_proof(&proof, first, last, keys, vals)?;
@@ -544,9 +544,9 @@ fn test_range_proof_with_invalid_non_existent_proof() -> Result<(), ProofError> 
     let mut keys: Vec<[u8; 32]> = Vec::new();
     let mut vals: Vec<[u8; 20]> = Vec::new();
     // Create gap
-    for i in start..end {
-        keys.push(*items[i].0);
-        vals.push(*items[i].1);
+    for item in items[start..end].iter() {
+        keys.push(*item.0);
+        vals.push(*item.1);
     }
     assert!(merkle
         .verify_range_proof(&proof, first, *items[end - 1].0, keys, vals)
@@ -567,9 +567,9 @@ fn test_range_proof_with_invalid_non_existent_proof() -> Result<(), ProofError> 
     let mut keys: Vec<[u8; 32]> = Vec::new();
     let mut vals: Vec<[u8; 20]> = Vec::new();
     // Create gap
-    for i in start..end {
-        keys.push(*items[i].0);
-        vals.push(*items[i].1);
+    for item in items[start..end].iter() {
+        keys.push(*item.0);
+        vals.push(*item.1);
     }
     assert!(merkle
         .verify_range_proof(&proof, *items[start].0, last, keys, vals)
@@ -777,13 +777,15 @@ fn test_gapped_range_proof() -> Result<(), ProofError> {
 
     let mut keys = Vec::new();
     let mut vals = Vec::new();
-    for i in first..last {
-        if i == (first + last) / 2 {
-            continue;
-        }
-        keys.push(&items[i].0);
-        vals.push(&items[i].1);
-    }
+    let middle = (first + last) / 2 - first;
+    items[first..last]
+        .iter()
+        .enumerate()
+        .filter(|(pos, _)| *pos != middle)
+        .for_each(|(_, item)| {
+            keys.push(&item.0);
+            vals.push(&item.1);
+        });
 
     assert!(merkle
         .verify_range_proof(&proof, &items[0].0, &items[items.len() - 1].0, keys, vals)
@@ -1005,17 +1007,18 @@ fn test_all_elements_empty_value_range_proof() -> Result<(), ProofError> {
 
 #[test]
 fn test_range_proof_keys_with_shared_prefix() -> Result<(), ProofError> {
-    let mut items = Vec::new();
-    items.push((
-        hex::decode("aa10000000000000000000000000000000000000000000000000000000000000")
-            .expect("Decoding failed"),
-        hex::decode("02").expect("Decoding failed"),
-    ));
-    items.push((
-        hex::decode("aa20000000000000000000000000000000000000000000000000000000000000")
-            .expect("Decoding failed"),
-        hex::decode("03").expect("Decoding failed"),
-    ));
+    let items = vec![
+        (
+            hex::decode("aa10000000000000000000000000000000000000000000000000000000000000")
+                .expect("Decoding failed"),
+            hex::decode("02").expect("Decoding failed"),
+        ),
+        (
+            hex::decode("aa20000000000000000000000000000000000000000000000000000000000000")
+                .expect("Decoding failed"),
+            hex::decode("03").expect("Decoding failed"),
+        ),
+    ];
     let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000)?;
 
     let start = hex::decode("0000000000000000000000000000000000000000000000000000000000000000")
@@ -1029,7 +1032,7 @@ fn test_range_proof_keys_with_shared_prefix() -> Result<(), ProofError> {
     assert!(!end_proof.0.is_empty());
     proof.concat_proofs(end_proof);
 
-    let item_iter = items.clone().into_iter();
+    let item_iter = items.into_iter();
     let keys = item_iter.clone().map(|item| item.0).collect();
     let vals = item_iter.map(|item| item.1).collect();
 

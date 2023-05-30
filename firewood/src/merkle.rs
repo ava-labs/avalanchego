@@ -1375,7 +1375,7 @@ impl Merkle {
                                 self,
                                 p_ref,
                                 |p| {
-                                    let mut pp = p.inner.as_extension_mut().unwrap();
+                                    let pp = p.inner.as_extension_mut().unwrap();
                                     pp.0 .0.push(idx);
                                     pp.1 = c_ptr;
                                     p.rehash();
