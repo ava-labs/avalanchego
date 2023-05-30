@@ -4,9 +4,12 @@
 package ips
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestIPPortEqual(t *testing.T) {
@@ -58,27 +61,17 @@ func TestIPPortEqual(t *testing.T) {
 	}
 	for i, tt := range tests {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-			ipPort := &IPDesc{}
-			if err := ipPort.UnmarshalJSON([]byte(tt.ipPort)); err != nil {
-				t.Fatalf("failed to IPDesc.UnmarshalJSON %v", err)
-			}
+			require := require.New(t)
 
-			if isEqual := IPPort(*ipPort).Equal(tt.ipPort1); !isEqual {
-				t.Error("Expected decoded IPDesc to be equal to IPPort")
-			}
+			ipPort := IPDesc{}
+			require.NoError(ipPort.UnmarshalJSON([]byte(tt.ipPort)))
+			require.Equal(tt.ipPort1, IPPort(ipPort))
 
-			if tt.ipPort1.IP == nil {
-				t.Error("ipPort1 nil")
-			} else if tt.ipPort2.IP == nil {
-				t.Error("ipPort2 nil")
-			}
-			result := tt.ipPort1.Equal(tt.ipPort2)
-			if result && result != tt.result {
-				t.Error("Expected IPPort to be equal, but they were not")
-			}
-			if !result && result != tt.result {
-				t.Error("Expected IPPort to be unequal, but they were equal")
-			}
+			ipPortJSON, err := json.Marshal(ipPort)
+			require.NoError(err)
+			require.Equal(tt.ipPort, string(ipPortJSON))
+
+			require.Equal(tt.result, tt.ipPort1.Equal(tt.ipPort2))
 		})
 	}
 }
