@@ -50,8 +50,7 @@ func TestBlockBuilderMaxMempoolSizeHandling(t *testing.T) {
 	// shortcut to simulated almost filled mempool
 	mempool.bytesAvailable = len(tx.Bytes())
 
-	err = mempool.Add(tx)
-	require.NoError(err)
+	require.NoError(mempool.Add(tx))
 }
 
 func TestTxsInMempool(t *testing.T) {
@@ -83,7 +82,7 @@ func TestTxsInMempool(t *testing.T) {
 		require.True(mempool.Has(txID))
 
 		retrieved := mempool.Get(txID)
-		require.True(retrieved != nil)
+		require.NotNil(retrieved)
 		require.Equal(tx, retrieved)
 
 		// tx exists in mempool
