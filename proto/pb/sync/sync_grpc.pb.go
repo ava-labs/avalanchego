@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.3.0
 // - protoc             (unknown)
-// source: sync/syncable_db.proto
+// source: sync/sync.proto
 
 package sync
 
@@ -365,5 +365,5 @@ var SyncableDB_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "sync/syncable_db.proto",
+	Metadata: "sync/sync.proto",
 }
