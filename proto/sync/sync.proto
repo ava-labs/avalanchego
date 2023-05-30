@@ -15,7 +15,6 @@ message Request {
   }
 }
 
-// TODO add support for views.
 service SyncableDB {
   rpc GetMerkleRoot(google.protobuf.Empty) returns (GetMerkleRootResponse);
 
