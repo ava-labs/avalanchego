@@ -10,8 +10,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"go.opentelemetry.io/otel/attribute"
 
 	oteltrace "go.opentelemetry.io/otel/trace"
@@ -27,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 const (
@@ -53,27 +52,7 @@ var (
 	errSameRoot = errors.New("start and end root are the same")
 )
 
-type Config struct {
-	// The number of changes to the database that we store in memory in order to
-	// serve change proofs.
-	HistoryLength int
-	NodeCacheSize int
-	// If [Reg] is nil, metrics are collected locally but not exported through
-	// Prometheus.
-	// This may be useful for testing.
-	Reg    prometheus.Registerer
-	Tracer trace.Tracer
-}
-
-type SyncableDB interface {
-	MerkleRootGetter
-	ProofGetter
-
-	// Returns nil if the trie given in [proof] has root [expectedRootID].
-	// That is, this is a valid proof that [proof.Key] exists/doesn't exist
-	// in the trie with root [expectedRootID].
-	VerifyProof(ctx context.Context, proof *Proof, expectedRootID ids.ID) error
-
+type ChangeProofGetter interface {
 	// GetChangeProof returns a proof for a subset of the key/value changes in key range
 	// [start, end] that occurred between [startRootID] and [endRootID].
 	// Returns at most [maxLength] key/value pairs.
@@ -85,7 +64,9 @@ type SyncableDB interface {
 		end []byte,
 		maxLength int,
 	) (*ChangeProof, error)
+}
 
+type ChangeProofVerifier interface {
 	// Returns nil iff all of the following hold:
 	//   - [start] <= [end].
 	//   - [proof] is non-empty iff [proof.HadRootsInHistory].
@@ -107,10 +88,14 @@ type SyncableDB interface {
 		end []byte,
 		expectedEndRootID ids.ID,
 	) error
+}
 
+type ChangeProofCommitter interface {
 	// CommitChangeProof commits the key/value pairs within the [proof] to the db.
 	CommitChangeProof(ctx context.Context, proof *ChangeProof) error
+}
 
+type RangeProofGetter interface {
 	// GetRangeProofAtRoot returns a proof for the key/value pairs in this trie within the range
 	// [start, end] when the root of the trie was [rootID].
 	GetRangeProofAtRoot(
@@ -120,7 +105,9 @@ type SyncableDB interface {
 		end []byte,
 		maxLength int,
 	) (*RangeProof, error)
+}
 
+type RangeProofCommitter interface {
 	// CommitRangeProof commits the key/value pairs within the [proof] to the db.
 	// [start] is the smallest key in the range this [proof] covers.
 	CommitRangeProof(ctx context.Context, start []byte, proof *RangeProof) error
@@ -129,7 +116,25 @@ type SyncableDB interface {
 type MerkleDB interface {
 	database.Database
 	Trie
-	SyncableDB
+	MerkleRootGetter
+	ProofGetter
+	ChangeProofGetter
+	ChangeProofVerifier
+	ChangeProofCommitter
+	RangeProofGetter
+	RangeProofCommitter
+}
+
+type Config struct {
+	// The number of changes to the database that we store in memory in order to
+	// serve change proofs.
+	HistoryLength int
+	NodeCacheSize int
+	// If [Reg] is nil, metrics are collected locally but not exported through
+	// Prometheus.
+	// This may be useful for testing.
+	Reg    prometheus.Registerer
+	Tracer trace.Tracer
 }
 
 // merkleDB can only be edited by committing changes from a trieView.
@@ -477,10 +482,6 @@ func (db *merkleDB) getProof(ctx context.Context, key []byte) (*Proof, error) {
 	}
 	// Don't need to lock [view] because nobody else has a reference to it.
 	return view.getProof(ctx, key)
-}
-
-func (*merkleDB) VerifyProof(ctx context.Context, proof *Proof, expectedRootID ids.ID) error {
-	return proof.Verify(ctx, expectedRootID)
 }
 
 // GetRangeProof returns a proof for the key/value pairs in this trie within the range
