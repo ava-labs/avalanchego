@@ -533,12 +533,8 @@ func getBootstrapConfig(v *viper.Viper, networkID uint32) (node.BootstrapConfig,
 		BootstrapAncestorsMaxContainersReceived: int(v.GetUint(BootstrapAncestorsMaxContainersReceivedKey)),
 	}
 
-	if v.IsSet(BootstrappersKey) {
-		s := v.GetString(BootstrappersKey)
-		return config, json.Unmarshal([]byte(s), &config.Bootstrappers)
-	}
-
-	// "--bootstrappers" is not set, so fallback to old flags
+	// TODO: check "v.IsSet(BootstrappersKey)" to just parse JSON value with "&config.Bootstrappers"
+	// TODO: deprecate "BootstrapIPsKey" and "BootstrapIDsKey"
 	ipsSet := v.IsSet(BootstrapIPsKey)
 	idsSet := v.IsSet(BootstrapIDsKey)
 	if ipsSet && !idsSet {
