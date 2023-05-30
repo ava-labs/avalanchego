@@ -510,8 +510,7 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	// add a tx to the mempool
 	tx := transactions[0]
 	txID := tx.ID()
-	err = mempool.Add(tx)
-	require.NoError(err)
+	require.NoError(mempool.Add(tx))
 
 	has := mempool.Has(txID)
 	require.True(has)
