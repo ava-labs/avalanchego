@@ -8,7 +8,7 @@ import "rpcdb/rpcdb.proto";
 option go_package = "github.com/ava-labs/avalanchego/proto/pb/sync";
 
 // Request represents a request for information during syncing.
-message SyncRequest {
+message Request {
   oneof message {
     GetRangeProofRequest range_proof_request = 1;
     GetChangeProofRequest change_proof_request = 2;

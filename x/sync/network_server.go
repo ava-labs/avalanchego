@@ -67,7 +67,7 @@ func (s *NetworkServer) AppRequest(
 	deadline time.Time,
 	request []byte,
 ) error {
-	var req syncpb.SyncRequest
+	var req syncpb.Request
 	if err := proto.Unmarshal(request, &req); err != nil {
 		s.log.Debug(
 			"failed to unmarshal AppRequest",
@@ -106,9 +106,9 @@ func (s *NetworkServer) AppRequest(
 
 	var err error
 	switch req := req.GetMessage().(type) {
-	case *syncpb.SyncRequest_ChangeProofRequest:
+	case *syncpb.Request_ChangeProofRequest:
 		err = s.HandleChangeProofRequest(ctx, nodeID, requestID, req.ChangeProofRequest)
-	case *syncpb.SyncRequest_RangeProofRequest:
+	case *syncpb.Request_RangeProofRequest:
 		err = s.HandleRangeProofRequest(ctx, nodeID, requestID, req.RangeProofRequest)
 	default:
 		s.log.Debug(
