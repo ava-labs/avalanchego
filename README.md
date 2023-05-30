@@ -98,9 +98,9 @@ reader and writer interfaces to have consistent read/write semantics.
 - [ ] Concurrent readers of pinned revisions while allowing additional batches
 to commit, to support parallel reads for the past consistent states. The revisions
 are uniquely identified by root hashes.
-- [ ] Pin a reader to a specific revision, so that future commits or other
+- [x] Pin a reader to a specific revision, so that future commits or other
 operations do not see any changes.
-- [ ] Be able to read-your-write in a batch that is not committed. Uncommitted
+- [x] Be able to read-your-write in a batch that is not committed. Uncommitted
 changes will not be shown to any other concurrent readers.
 - [ ] Add some metrics framework to support timings and volume for future milestones
 
