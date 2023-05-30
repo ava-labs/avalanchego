@@ -573,9 +573,10 @@ func getBootstrapConfig(v *viper.Viper, networkID uint32) (node.BootstrapConfig,
 		if id == "" {
 			continue
 		}
+
 		nodeID, err := ids.NodeIDFromString(id)
 		if err != nil {
-			return node.BootstrapConfig{}, fmt.Errorf("couldn't parse bootstrap peer id %s: %w", nodeID, err)
+			return node.BootstrapConfig{}, fmt.Errorf("couldn't parse bootstrap peer id %s: %w", id, err)
 		}
 		bootstrapNodeIDs = append(bootstrapNodeIDs, nodeID)
 	}
