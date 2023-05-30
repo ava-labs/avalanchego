@@ -205,8 +205,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 
 			vm.ctx.Lock.Lock()
 			defer func() {
-				err := vm.Shutdown(context.Background())
-				require.NoError(err)
+				require.NoError(vm.Shutdown(context.Background()))
 
 				vm.ctx.Lock.Unlock()
 			}()
@@ -231,8 +230,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			require.NoError(err)
 
 			// issue the add validator tx
-			err = vm.Builder.AddUnverifiedTx(addValidatorTx)
-			require.NoError(err)
+			require.NoError(vm.Builder.AddUnverifiedTx(addValidatorTx))
 
 			// trigger block creation for the validator tx
 			addValidatorBlock, err := vm.Builder.BuildBlock(context.Background())
@@ -254,8 +252,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			require.NoError(err)
 
 			// issue the first add delegator tx
-			err = vm.Builder.AddUnverifiedTx(addFirstDelegatorTx)
-			require.NoError(err)
+			require.NoError(vm.Builder.AddUnverifiedTx(addFirstDelegatorTx))
 
 			// trigger block creation for the first add delegator tx
 			addFirstDelegatorBlock, err := vm.Builder.BuildBlock(context.Background())
@@ -277,8 +274,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			require.NoError(err)
 
 			// issue the second add delegator tx
-			err = vm.Builder.AddUnverifiedTx(addSecondDelegatorTx)
-			require.NoError(err)
+			require.NoError(vm.Builder.AddUnverifiedTx(addSecondDelegatorTx))
 
 			// trigger block creation for the second add delegator tx
 			addSecondDelegatorBlock, err := vm.Builder.BuildBlock(context.Background())
@@ -300,8 +296,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			require.NoError(err)
 
 			// issue the third add delegator tx
-			err = vm.Builder.AddUnverifiedTx(addThirdDelegatorTx)
-			require.NoError(err)
+			require.NoError(vm.Builder.AddUnverifiedTx(addThirdDelegatorTx))
 
 			// trigger block creation for the third add delegator tx
 			addThirdDelegatorBlock, err := vm.Builder.BuildBlock(context.Background())
@@ -323,8 +318,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			require.NoError(err)
 
 			// issue the fourth add delegator tx
-			err = vm.Builder.AddUnverifiedTx(addFourthDelegatorTx)
-			require.NoError(err)
+			require.NoError(vm.Builder.AddUnverifiedTx(addFourthDelegatorTx))
 
 			// trigger block creation for the fourth add delegator tx
 			addFourthDelegatorBlock, err := vm.Builder.BuildBlock(context.Background())
@@ -366,7 +360,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 	}()
 
 	msgChan := make(chan common.Message, 1)
-	err := vm.Initialize(
+	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
 		baseDBManager,
@@ -376,8 +370,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 		msgChan,
 		nil,
 		nil,
-	)
-	require.NoError(err)
+	))
 
 	m := atomic.NewMemory(atomicDB)
 	vm.ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
@@ -471,8 +464,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	vm, baseDB, mutableSharedMemory := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		err := vm.Shutdown(context.Background())
-		require.NoError(err)
+		require.NoError(vm.Shutdown(context.Background()))
 
 		vm.ctx.Lock.Unlock()
 	}()
@@ -515,8 +507,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	require.NoError(err)
 
 	addValidatorStandardBlk := vm.manager.NewBlock(statelessBlk)
-	err = addValidatorStandardBlk.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(addValidatorStandardBlk.Verify(context.Background()))
 
 	// Verify that the new validator now in pending validator set
 	{
@@ -559,10 +550,9 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 		},
 	}
 	signedImportTx := &txs.Tx{Unsigned: unsignedImportTx}
-	err = signedImportTx.Sign(txs.Codec, [][]*secp256k1.PrivateKey{
+	require.NoError(signedImportTx.Sign(txs.Codec, [][]*secp256k1.PrivateKey{
 		{}, // There is one input, with no required signers
-	})
-	require.NoError(err)
+	}))
 
 	// Create the standard block that will fail verification, and then be
 	// re-verified.
@@ -600,7 +590,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	require.NoError(err)
 
 	inputID := utxo.InputID()
-	err = peerSharedMemory.Apply(
+	require.NoError(peerSharedMemory.Apply(
 		map[ids.ID]*atomic.Requests{
 			vm.ctx.ChainID: {
 				PutRequests: []*atomic.Element{
@@ -611,13 +601,11 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 				},
 			},
 		},
-	)
-	require.NoError(err)
+	))
 
 	// Because the shared memory UTXO has now been populated, the block should
 	// pass verification.
-	err = importBlk.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(importBlk.Verify(context.Background()))
 
 	// The status shouldn't have been changed during a successful verification.
 	importBlkStatus = importBlk.Status()
@@ -641,8 +629,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	require.NoError(err)
 
 	advanceTimeStandardBlk := vm.manager.NewBlock(statelessAdvanceTimeStandardBlk)
-	err = advanceTimeStandardBlk.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(advanceTimeStandardBlk.Verify(context.Background()))
 
 	// Accept all the blocks
 	allBlocks := []snowman.Block{
@@ -651,8 +638,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 		advanceTimeStandardBlk,
 	}
 	for _, blk := range allBlocks {
-		err = blk.Accept(context.Background())
-		require.NoError(err)
+		require.NoError(blk.Accept(context.Background()))
 
 		status := blk.Status()
 		require.Equal(choices.Accepted, status)
@@ -693,8 +679,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	vm, baseDB, mutableSharedMemory := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		err := vm.Shutdown(context.Background())
-		require.NoError(err)
+		require.NoError(vm.Shutdown(context.Background()))
 
 		vm.ctx.Lock.Unlock()
 	}()
@@ -736,8 +721,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	require.NoError(err)
 
 	addValidatorStandardBlk0 := vm.manager.NewBlock(statelessAddValidatorStandardBlk0)
-	err = addValidatorStandardBlk0.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(addValidatorStandardBlk0.Verify(context.Background()))
 
 	// Verify that first new validator now in pending validator set
 	{
@@ -766,8 +750,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	require.NoError(err)
 
 	advanceTimeStandardBlk0 := vm.manager.NewBlock(statelessAdvanceTimeStandardBlk0)
-	err = advanceTimeStandardBlk0.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(advanceTimeStandardBlk0.Verify(context.Background()))
 
 	// Verify that the first new validator is now in the current validator set.
 	{
@@ -816,10 +799,9 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		},
 	}
 	signedImportTx := &txs.Tx{Unsigned: unsignedImportTx}
-	err = signedImportTx.Sign(txs.Codec, [][]*secp256k1.PrivateKey{
+	require.NoError(signedImportTx.Sign(txs.Codec, [][]*secp256k1.PrivateKey{
 		{}, // There is one input, with no required signers
-	})
-	require.NoError(err)
+	}))
 
 	// Create the standard block that will fail verification, and then be
 	// re-verified.
@@ -856,7 +838,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	require.NoError(err)
 
 	inputID := utxo.InputID()
-	err = peerSharedMemory.Apply(
+	require.NoError(peerSharedMemory.Apply(
 		map[ids.ID]*atomic.Requests{
 			vm.ctx.ChainID: {
 				PutRequests: []*atomic.Element{
@@ -867,13 +849,11 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 				},
 			},
 		},
-	)
-	require.NoError(err)
+	))
 
 	// Because the shared memory UTXO has now been populated, the block should
 	// pass verification.
-	err = importBlk.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(importBlk.Verify(context.Background()))
 
 	// The status shouldn't have been changed during a successful verification.
 	importBlkStatus = importBlk.Status()
@@ -912,8 +892,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	addValidatorStandardBlk1 := vm.manager.NewBlock(statelessAddValidatorStandardBlk1)
 
-	err = addValidatorStandardBlk1.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(addValidatorStandardBlk1.Verify(context.Background()))
 
 	// Verify that the second new validator now in pending validator set
 	{
@@ -942,8 +921,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	require.NoError(err)
 
 	advanceTimeStandardBlk1 := vm.manager.NewBlock(statelessAdvanceTimeStandardBlk1)
-	err = advanceTimeStandardBlk1.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(advanceTimeStandardBlk1.Verify(context.Background()))
 
 	// Verify that the second new validator is now in the current validator set.
 	{
@@ -969,8 +947,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		advanceTimeStandardBlk1,
 	}
 	for _, blk := range allBlocks {
-		err = blk.Accept(context.Background())
-		require.NoError(err)
+		require.NoError(blk.Accept(context.Background()))
 
 		status := blk.Status()
 		require.Equal(choices.Accepted, status)
@@ -1020,8 +997,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		err := vm.Shutdown(context.Background())
-		require.NoError(err)
+		require.NoError(vm.Shutdown(context.Background()))
 
 		vm.ctx.Lock.Unlock()
 	}()
@@ -1168,8 +1144,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 
 	vm.ctx.Lock.Lock()
 	defer func() {
-		err := vm.Shutdown(context.Background())
-		require.NoError(err)
+		require.NoError(vm.Shutdown(context.Background()))
 
 		vm.ctx.Lock.Unlock()
 	}()
@@ -1194,8 +1169,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 	require.NoError(err)
 
 	// issue the add validator tx
-	err = vm.Builder.AddUnverifiedTx(addValidatorTx)
-	require.NoError(err)
+	require.NoError(vm.Builder.AddUnverifiedTx(addValidatorTx))
 
 	// trigger block creation for the validator tx
 	addValidatorBlock, err := vm.Builder.BuildBlock(context.Background())
@@ -1217,8 +1191,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 	require.NoError(err)
 
 	// issue the first add delegator tx
-	err = vm.Builder.AddUnverifiedTx(addFirstDelegatorTx)
-	require.NoError(err)
+	require.NoError(vm.Builder.AddUnverifiedTx(addFirstDelegatorTx))
 
 	// trigger block creation for the first add delegator tx
 	addFirstDelegatorBlock, err := vm.Builder.BuildBlock(context.Background())
@@ -1255,8 +1228,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 
 	vm.ctx.Lock.Lock()
 	defer func() {
-		err := vm.Shutdown(context.Background())
-		require.NoError(err)
+		require.NoError(vm.Shutdown(context.Background()))
 
 		vm.ctx.Lock.Unlock()
 	}()
@@ -1279,8 +1251,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 	)
 	require.NoError(err)
 
-	err = vm.Builder.AddUnverifiedTx(addValidatorTx)
-	require.NoError(err)
+	require.NoError(vm.Builder.AddUnverifiedTx(addValidatorTx))
 
 	// trigger block creation for the validator tx
 	addValidatorBlock, err := vm.Builder.BuildBlock(context.Background())
@@ -1297,8 +1268,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 	)
 	require.NoError(err)
 
-	err = vm.Builder.AddUnverifiedTx(createSubnetTx)
-	require.NoError(err)
+	require.NoError(vm.Builder.AddUnverifiedTx(createSubnetTx))
 
 	// trigger block creation for the subnet tx
 	createSubnetBlock, err := vm.Builder.BuildBlock(context.Background())
@@ -1318,8 +1288,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 	)
 	require.NoError(err)
 
-	err = vm.Builder.AddUnverifiedTx(addSubnetValidatorTx)
-	require.NoError(err)
+	require.NoError(vm.Builder.AddUnverifiedTx(addSubnetValidatorTx))
 
 	// trigger block creation for the validator tx
 	addSubnetValidatorBlock, err := vm.Builder.BuildBlock(context.Background())
@@ -1348,8 +1317,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 	// validator set into the current validator set.
 	vm.clock.Set(validatorStartTime)
 
-	err = vm.Builder.AddUnverifiedTx(removeSubnetValidatorTx)
-	require.NoError(err)
+	require.NoError(vm.Builder.AddUnverifiedTx(removeSubnetValidatorTx))
 
 	// trigger block creation for the validator tx
 	removeSubnetValidatorBlock, err := vm.Builder.BuildBlock(context.Background())
@@ -1377,8 +1345,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 
 	vm.ctx.Lock.Lock()
 	defer func() {
-		err := vm.Shutdown(context.Background())
-		require.NoError(err)
+		require.NoError(vm.Shutdown(context.Background()))
 
 		vm.ctx.Lock.Unlock()
 	}()
@@ -1401,8 +1368,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 	)
 	require.NoError(err)
 
-	err = vm.Builder.AddUnverifiedTx(addValidatorTx)
-	require.NoError(err)
+	require.NoError(vm.Builder.AddUnverifiedTx(addValidatorTx))
 
 	// trigger block creation for the validator tx
 	addValidatorBlock, err := vm.Builder.BuildBlock(context.Background())
@@ -1419,8 +1385,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 	)
 	require.NoError(err)
 
-	err = vm.Builder.AddUnverifiedTx(createSubnetTx)
-	require.NoError(err)
+	require.NoError(vm.Builder.AddUnverifiedTx(createSubnetTx))
 
 	// trigger block creation for the subnet tx
 	createSubnetBlock, err := vm.Builder.BuildBlock(context.Background())
@@ -1431,8 +1396,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 
 	vm.TrackedSubnets.Add(createSubnetTx.ID())
 	subnetValidators := validators.NewSet()
-	err = vm.state.ValidatorSet(createSubnetTx.ID(), subnetValidators)
-	require.NoError(err)
+	require.NoError(vm.state.ValidatorSet(createSubnetTx.ID(), subnetValidators))
 
 	added := vm.Validators.Add(createSubnetTx.ID(), subnetValidators)
 	require.True(added)
@@ -1448,8 +1412,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 	)
 	require.NoError(err)
 
-	err = vm.Builder.AddUnverifiedTx(addSubnetValidatorTx)
-	require.NoError(err)
+	require.NoError(vm.Builder.AddUnverifiedTx(addSubnetValidatorTx))
 
 	// trigger block creation for the validator tx
 	addSubnetValidatorBlock, err := vm.Builder.BuildBlock(context.Background())
@@ -1470,8 +1433,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 	// validator set into the current validator set.
 	vm.clock.Set(validatorStartTime)
 
-	err = vm.Builder.AddUnverifiedTx(removeSubnetValidatorTx)
-	require.NoError(err)
+	require.NoError(vm.Builder.AddUnverifiedTx(removeSubnetValidatorTx))
 
 	// trigger block creation for the validator tx
 	removeSubnetValidatorBlock, err := vm.Builder.BuildBlock(context.Background())

@@ -160,8 +160,7 @@ func Test_Server_GetChangeProof(t *testing.T) {
 		_, err = r.Read(val)
 		require.NoError(t, err)
 
-		err = view.Insert(context.Background(), key, val)
-		require.NoError(t, err)
+		require.NoError(t, view.Insert(context.Background(), key, val))
 
 		deleteKeyStart := make([]byte, r.Intn(10))
 		_, err = r.Read(deleteKeyStart)
@@ -169,8 +168,7 @@ func Test_Server_GetChangeProof(t *testing.T) {
 
 		it := trieDB.NewIteratorWithStart(deleteKeyStart)
 		if it.Next() {
-			err = view.Remove(context.Background(), it.Key())
-			require.NoError(t, err)
+			require.NoError(t, view.Remove(context.Background(), it.Key()))
 		}
 		require.NoError(t, it.Error())
 		it.Release()
