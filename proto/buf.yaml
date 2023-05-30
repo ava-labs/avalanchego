@@ -18,7 +18,6 @@ lint:
     - RPC_REQUEST_STANDARD_NAME # explicit <rpc>+Request naming
     - RPC_RESPONSE_STANDARD_NAME # explicit <rpc>+Response naming
     - PACKAGE_VERSION_SUFFIX # versioned naming <service>.v1beta
-    - RPC_REQUEST_RESPONSE_UNIQUE # unique request and response types
   ignore:
     # TODO: how will fixing this affect functionality. Multiple fields are used as the request
     # or response type for multiple RPCs

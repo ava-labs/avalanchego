@@ -25,7 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 
-	merkledbpb "github.com/ava-labs/avalanchego/proto/pb/merkledb"
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
@@ -152,7 +151,7 @@ func (s *NetworkServer) HandleChangeProofRequest(
 	ctx context.Context,
 	nodeID ids.NodeID,
 	requestID uint32,
-	req *merkledbpb.ChangeProofRequest,
+	req *syncpb.GetChangeProofRequest,
 ) error {
 	if req.BytesLimit == 0 ||
 		req.KeyLimit == 0 ||
@@ -223,7 +222,7 @@ func (s *NetworkServer) HandleRangeProofRequest(
 	ctx context.Context,
 	nodeID ids.NodeID,
 	requestID uint32,
-	req *merkledbpb.RangeProofRequest,
+	req *syncpb.GetRangeProofRequest,
 ) error {
 	if req.BytesLimit == 0 ||
 		req.KeyLimit == 0 ||

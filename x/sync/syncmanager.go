@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 
-	merkledbpb "github.com/ava-labs/avalanchego/proto/pb/merkledb"
+	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
 const (
@@ -261,7 +261,7 @@ func (m *StateSyncManager) getAndApplyChangeProof(ctx context.Context, workItem 
 
 	changeProof, err := m.config.Client.GetChangeProof(
 		ctx,
-		&merkledbpb.ChangeProofRequest{
+		&syncpb.GetChangeProofRequest{
 			StartRootHash: workItem.LocalRootID[:],
 			EndRootHash:   rootID[:],
 			StartKey:      workItem.start,
@@ -310,7 +310,7 @@ func (m *StateSyncManager) getAndApplyChangeProof(ctx context.Context, workItem 
 func (m *StateSyncManager) getAndApplyRangeProof(ctx context.Context, workItem *syncWorkItem) {
 	rootID := m.getTargetRoot()
 	proof, err := m.config.Client.GetRangeProof(ctx,
-		&merkledbpb.RangeProofRequest{
+		&syncpb.GetRangeProofRequest{
 			RootHash:   rootID[:],
 			StartKey:   workItem.start,
 			EndKey:     workItem.end,

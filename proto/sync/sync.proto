@@ -2,22 +2,22 @@ syntax = "proto3";
 
 package sync;
 
-import "merkledb/merkledb.proto";
+import "sync/syncable_db.proto";
 
 option go_package = "github.com/ava-labs/avalanchego/proto/pb/sync";
 
 // Request represents a request for information during syncing.
 message SyncRequest {
   oneof message {
-    merkledb.RangeProofRequest range_proof_request = 1;
-    merkledb.ChangeProofRequest change_proof_request = 2;
+    GetRangeProofRequest range_proof_request = 1;
+    GetChangeProofRequest change_proof_request = 2;
   }
 }
 
 // ChangeProofResponse is the response for a ChangeProofRequest.
 message ChangeProofResponse {
   oneof response {
-    merkledb.ChangeProof change_proof = 1;
-    merkledb.RangeProof range_proof = 2;
+    ChangeProof change_proof = 1;
+    RangeProof range_proof = 2;
   }
 }

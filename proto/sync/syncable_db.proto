@@ -3,26 +3,150 @@ syntax = "proto3";
 package sync;
 
 import "google/protobuf/empty.proto";
-import "merkledb/merkledb.proto";
 import "rpcdb/rpcdb.proto";
 
 option go_package = "github.com/ava-labs/avalanchego/proto/pb/sync";
 
 // TODO add support for views.
 service SyncableDB {
-  rpc GetMerkleRoot(google.protobuf.Empty) returns (merkledb.GetMerkleRootResponse);
+  rpc GetMerkleRoot(google.protobuf.Empty) returns (GetMerkleRootResponse);
 
-  rpc GetChangeProof(merkledb.ChangeProofRequest) returns (merkledb.ChangeProof);
-  rpc VerifyChangeProof(merkledb.ChangeProof) returns (Error);
-  rpc CommitChangeProof(merkledb.ChangeProof) returns (Error);
+  rpc GetChangeProof(GetChangeProofRequest) returns (GetChangeProofResponse);
+  rpc VerifyChangeProof(VerifyChangeProofRequest) returns (VerifyChangeProofResponse);
+  rpc CommitChangeProof(CommitChangeProofRequest) returns (CommitChangeProofResponse);
 
-  rpc GetProof(merkledb.GetProofRequest) returns (merkledb.Proof);
+  rpc GetProof(GetProofRequest) returns (GetProofResponse);
 
-  rpc GetRangeProof(merkledb.RangeProofRequest) returns (merkledb.RangeProof);
-  rpc VerifyRangeProof(merkledb.RangeProof) returns (Error);
-  rpc CommitRangeProof(merkledb.CommitRangeProofRequest) returns (Error);
+  rpc GetRangeProof(GetRangeProofRequest) returns (GetRangeProofResponse);
+  rpc VerifyRangeProof(VerifyRangeProofRequest) returns (VerifyRangeProofResponse);
+  rpc CommitRangeProof(CommitRangeProofRequest) returns (CommitRangeProofResponse);
 }
 
-message Error {
+message GetChangeProofResponse {
+  ChangeProof proof = 1;
+}
+
+message VerifyChangeProofRequest {
+  ChangeProof proof = 1;
+}
+
+message VerifyChangeProofResponse {
   rpcdb.Error error = 1;
+}
+
+message CommitChangeProofRequest {
+  ChangeProof proof = 1;
+}
+
+message CommitChangeProofResponse {
+  rpcdb.Error error = 1;
+}
+
+message GetProofRequest {
+  bytes key = 1;
+}
+
+message GetProofResponse {
+  Proof proof = 1;
+}
+
+message Proof {
+  repeated ProofNode proof = 1;
+}
+
+message GetMerkleRootResponse {
+  bytes root_hash = 1;
+}
+
+// KeyValue represents a single key and its value.
+message KeyValue {
+  bytes key = 1;
+  bytes value = 2;
+}
+
+// KeyChange is a change for a key from one revision to another.
+// If the value is None, the key was deleted.
+message KeyChange {
+  bytes key = 1;
+  MaybeBytes value = 2;
+}
+
+// SerializedPath is the serialized representation of a path.
+message SerializedPath {
+  uint32 nibble_length = 1;
+  bytes value = 2;
+}
+
+// MaybeBytes is an option wrapping bytes.
+message MaybeBytes {
+  bytes value = 1;
+  // If false, this is None.
+  bool is_nothing = 2;
+}
+
+// ProofNode is a node in a merkle proof.
+message ProofNode {
+  SerializedPath key = 1;
+  MaybeBytes value_or_hash = 2;
+  map<uint32, bytes> children = 3;
+}
+
+// RangeProof is the response to a RangeProofRequest.
+message RangeProof {
+  repeated ProofNode start = 1;
+  repeated ProofNode end = 2;
+  repeated KeyValue key_values = 3;
+}
+
+message CommitRangeProofRequest {
+  bytes start_key = 1;
+  RangeProof range_proof = 2;
+}
+
+message CommitRangeProofResponse {
+  rpcdb.Error error = 1;
+}
+
+// ChangeProof is a possible response to a ChangeProofRequest.
+// It only consists of a proof of the smallest changed key,
+// the highest changed key, and the keys that have changed
+// between those. Some keys may be deleted (hence
+// the use of KeyChange instead of KeyValue).
+message ChangeProof {
+  bool had_roots_in_history = 1; // TODO remove
+  repeated ProofNode start_proof = 2;
+  repeated ProofNode end_proof = 3;
+  repeated KeyChange key_changes = 4;
+}
+
+// A GetRangeProofRequest requests the key-value pairs in a given key range
+// at a specific revision.
+message GetRangeProofRequest {
+  bytes root_hash = 1;
+  bytes start_key = 2;
+  bytes end_key = 3;
+  uint32 key_limit = 4;
+  uint32 bytes_limit = 5;
+}
+
+message GetRangeProofResponse {
+  RangeProof proof = 1;
+}
+
+message VerifyRangeProofRequest {
+  RangeProof proof = 1;
+}
+
+message VerifyRangeProofResponse {
+  rpcdb.Error error = 1;
+}
+
+// A GetChangeProofRequest requests the changes between two revisions.
+message GetChangeProofRequest {
+  bytes start_root_hash = 1;
+  bytes end_root_hash = 2;
+  bytes start_key = 3;
+  bytes end_key = 4;
+  uint32 key_limit = 5;
+  uint32 bytes_limit = 6;
 }
