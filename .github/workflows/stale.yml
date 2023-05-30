@@ -8,6 +8,9 @@ jobs:
     steps:
       - uses: actions/stale@v8
         with:
+          # Overall configuration
+          operations-per-run: 100
+
           # PR configuration
           days-before-pr-stale: 30
           stale-pr-message: 'This PR has become stale because it has been open for 30 days with no activity. Adding the `lifecycle/frozen` label will cause this PR to ignore lifecycle events.'
