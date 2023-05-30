@@ -190,13 +190,11 @@ func makeReadyTestPeers(t *testing.T, trackedSubnets set.Set[ids.ID]) (*testPeer
 
 	peer0, peer1 := makeTestPeers(t, trackedSubnets)
 
-	err := peer0.AwaitReady(context.Background())
-	require.NoError(err)
+	require.NoError(peer0.AwaitReady(context.Background()))
 	isReady := peer0.Ready()
 	require.True(isReady)
 
-	err = peer1.AwaitReady(context.Background())
-	require.NoError(err)
+	require.NoError(peer1.AwaitReady(context.Background()))
 	isReady = peer1.Ready()
 	require.True(isReady)
 
@@ -236,21 +234,17 @@ func TestReady(t *testing.T) {
 		),
 	)
 
-	err := peer0.AwaitReady(context.Background())
-	require.NoError(err)
+	require.NoError(peer0.AwaitReady(context.Background()))
 	isReady = peer0.Ready()
 	require.True(isReady)
 
-	err = peer1.AwaitReady(context.Background())
-	require.NoError(err)
+	require.NoError(peer1.AwaitReady(context.Background()))
 	isReady = peer1.Ready()
 	require.True(isReady)
 
 	peer0.StartClose()
-	err = peer0.AwaitClosed(context.Background())
-	require.NoError(err)
-	err = peer1.AwaitClosed(context.Background())
-	require.NoError(err)
+	require.NoError(peer0.AwaitClosed(context.Background()))
+	require.NoError(peer1.AwaitClosed(context.Background()))
 }
 
 func TestSend(t *testing.T) {
@@ -269,10 +263,8 @@ func TestSend(t *testing.T) {
 	require.Equal(message.GetOp, inboundGetMsg.Op())
 
 	peer1.StartClose()
-	err = peer0.AwaitClosed(context.Background())
-	require.NoError(err)
-	err = peer1.AwaitClosed(context.Background())
-	require.NoError(err)
+	require.NoError(peer0.AwaitClosed(context.Background()))
+	require.NoError(peer1.AwaitClosed(context.Background()))
 }
 
 func TestPingUptimes(t *testing.T) {
