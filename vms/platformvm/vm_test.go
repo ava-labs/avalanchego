@@ -402,11 +402,8 @@ func defaultVM() (*VM, database.Database, *mutableSharedMemory) {
 
 func GenesisVMWithArgs(t *testing.T, args *api.BuildGenesisArgs) ([]byte, chan common.Message, *VM, *atomic.Memory) {
 	require := require.New(t)
-	var (
-		genesisBytes []byte
-		err          error
-	)
 
+	var genesisBytes []byte
 	if args != nil {
 		_, genesisBytes = BuildGenesisTestWithArgs(t, args)
 	} else {
@@ -464,6 +461,9 @@ func GenesisVMWithArgs(t *testing.T, args *api.BuildGenesisArgs) ([]byte, chan c
 	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
 
 	// Create a subnet and store it in testSubnet1
+	// Note: testSubnet1 is a global and should be set when calling this
+	// function.
+	var err error
 	testSubnet1, err = vm.txBuilder.NewCreateSubnetTx(
 		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
 		// control keys are keys[0], keys[1], keys[2]
