@@ -15,14 +15,6 @@ message Request {
   }
 }
 
-// ChangeProofResponse is the response for a ChangeProofRequest.
-message ChangeProofResponse {
-  oneof response {
-    ChangeProof change_proof = 1;
-    RangeProof range_proof = 2;
-  }
-}
-
 // TODO add support for views.
 service SyncableDB {
   rpc GetMerkleRoot(google.protobuf.Empty) returns (GetMerkleRootResponse);
