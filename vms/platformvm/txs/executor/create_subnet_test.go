@@ -70,7 +70,7 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 				Owner: &secp256k1fx.OutputOwners{},
 			}
 			tx := &txs.Tx{Unsigned: utx}
-			require.NoError(tx.Sign(txs.Codec, signers))
+			require.NoError(tx.Sign(txs.Version1, txs.Codec, signers))
 
 			stateDiff, err := state.NewDiff(lastAcceptedID, env)
 			require.NoError(err)

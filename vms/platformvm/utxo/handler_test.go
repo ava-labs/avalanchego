@@ -1091,6 +1091,7 @@ func TestVerifySpendUTXOs(t *testing.T) {
 		t.Run(test.description, func(t *testing.T) {
 			require := require.New(t)
 			err := h.VerifySpendUTXOs(
+				txs.Version1,
 				&unsignedTx,
 				test.utxos,
 				test.ins,

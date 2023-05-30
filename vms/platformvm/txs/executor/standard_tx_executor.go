@@ -62,6 +62,7 @@ func (e *StandardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 	timestamp := e.State.GetTimestamp()
 	createBlockchainTxFee := e.Config.GetCreateBlockchainTxFee(timestamp)
 	if err := e.FlowChecker.VerifySpend(
+		e.Tx.Version(),
 		tx,
 		e.State,
 		tx.Ins,
@@ -101,6 +102,7 @@ func (e *StandardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	timestamp := e.State.GetTimestamp()
 	createSubnetTxFee := e.Config.GetCreateSubnetTxFee(timestamp)
 	if err := e.FlowChecker.VerifySpend(
+		e.Tx.Version(),
 		tx,
 		e.State,
 		tx.Ins,
@@ -169,6 +171,7 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 		copy(ins[len(tx.Ins):], tx.ImportedInputs)
 
 		if err := e.FlowChecker.VerifySpendUTXOs(
+			e.Tx.Version(),
 			tx,
 			utxos,
 			ins,
@@ -214,6 +217,7 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 
 	// Verify the flowcheck
 	if err := e.FlowChecker.VerifySpend(
+		e.Tx.Version(),
 		tx,
 		e.State,
 		tx.Ins,
@@ -244,7 +248,7 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 			Out:   out.Out,
 		}
 
-		utxoBytes, err := txs.Codec.Marshal(txs.Version0, utxo)
+		utxoBytes, err := txs.Codec.Marshal(e.Tx.Version(), utxo)
 		if err != nil {
 			return fmt.Errorf("failed to marshal UTXO: %w", err)
 		}
@@ -386,6 +390,7 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 
 	totalRewardAmount := tx.MaximumSupply - tx.InitialSupply
 	if err := e.Backend.FlowChecker.VerifySpend(
+		e.Tx.Version(),
 		tx,
 		e.State,
 		tx.Ins,

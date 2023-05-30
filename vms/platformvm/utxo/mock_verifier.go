@@ -41,29 +41,29 @@ func (m *MockVerifier) EXPECT() *MockVerifierMockRecorder {
 }
 
 // VerifySpend mocks base method.
-func (m *MockVerifier) VerifySpend(arg0 txs.UnsignedTx, arg1 avax.UTXOGetter, arg2 []*avax.TransferableInput, arg3 []*avax.TransferableOutput, arg4 []verify.Verifiable, arg5 map[ids.ID]uint64) error {
+func (m *MockVerifier) VerifySpend(arg0 uint16, arg1 txs.UnsignedTx, arg2 avax.UTXOGetter, arg3 []*avax.TransferableInput, arg4 []*avax.TransferableOutput, arg5 []verify.Verifiable, arg6 map[ids.ID]uint64) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "VerifySpend", arg0, arg1, arg2, arg3, arg4, arg5)
+	ret := m.ctrl.Call(m, "VerifySpend", arg0, arg1, arg2, arg3, arg4, arg5, arg6)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // VerifySpend indicates an expected call of VerifySpend.
-func (mr *MockVerifierMockRecorder) VerifySpend(arg0, arg1, arg2, arg3, arg4, arg5 interface{}) *gomock.Call {
+func (mr *MockVerifierMockRecorder) VerifySpend(arg0, arg1, arg2, arg3, arg4, arg5, arg6 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifySpend", reflect.TypeOf((*MockVerifier)(nil).VerifySpend), arg0, arg1, arg2, arg3, arg4, arg5)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifySpend", reflect.TypeOf((*MockVerifier)(nil).VerifySpend), arg0, arg1, arg2, arg3, arg4, arg5, arg6)
 }
 
 // VerifySpendUTXOs mocks base method.
-func (m *MockVerifier) VerifySpendUTXOs(arg0 txs.UnsignedTx, arg1 []*avax.UTXO, arg2 []*avax.TransferableInput, arg3 []*avax.TransferableOutput, arg4 []verify.Verifiable, arg5 map[ids.ID]uint64) error {
+func (m *MockVerifier) VerifySpendUTXOs(arg0 uint16, arg1 txs.UnsignedTx, arg2 []*avax.UTXO, arg3 []*avax.TransferableInput, arg4 []*avax.TransferableOutput, arg5 []verify.Verifiable, arg6 map[ids.ID]uint64) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "VerifySpendUTXOs", arg0, arg1, arg2, arg3, arg4, arg5)
+	ret := m.ctrl.Call(m, "VerifySpendUTXOs", arg0, arg1, arg2, arg3, arg4, arg5, arg6)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // VerifySpendUTXOs indicates an expected call of VerifySpendUTXOs.
-func (mr *MockVerifierMockRecorder) VerifySpendUTXOs(arg0, arg1, arg2, arg3, arg4, arg5 interface{}) *gomock.Call {
+func (mr *MockVerifierMockRecorder) VerifySpendUTXOs(arg0, arg1, arg2, arg3, arg4, arg5, arg6 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifySpendUTXOs", reflect.TypeOf((*MockVerifier)(nil).VerifySpendUTXOs), arg0, arg1, arg2, arg3, arg4, arg5)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifySpendUTXOs", reflect.TypeOf((*MockVerifier)(nil).VerifySpendUTXOs), arg0, arg1, arg2, arg3, arg4, arg5, arg6)
 }

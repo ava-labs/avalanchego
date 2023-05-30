@@ -104,6 +104,7 @@ type Verifier interface {
 	//
 	// Note: [unlockedProduced] is modified by this method.
 	VerifySpend(
+		version uint16,
 		tx txs.UnsignedTx,
 		utxoDB avax.UTXOGetter,
 		ins []*avax.TransferableInput,
@@ -124,6 +125,7 @@ type Verifier interface {
 	//
 	// Note: [unlockedProduced] is modified by this method.
 	VerifySpendUTXOs(
+		version uint16,
 		tx txs.UnsignedTx,
 		utxos []*avax.UTXO,
 		ins []*avax.TransferableInput,
@@ -496,6 +498,7 @@ func (h *handler) AuthorizeStopStaking(
 }
 
 func (h *handler) VerifySpend(
+	version uint16,
 	tx txs.UnsignedTx,
 	utxoDB avax.UTXOGetter,
 	ins []*avax.TransferableInput,
@@ -516,10 +519,11 @@ func (h *handler) VerifySpend(
 		utxos[index] = utxo
 	}
 
-	return h.VerifySpendUTXOs(tx, utxos, ins, outs, creds, unlockedProduced)
+	return h.VerifySpendUTXOs(version, tx, utxos, ins, outs, creds, unlockedProduced)
 }
 
 func (h *handler) VerifySpendUTXOs(
+	version uint16,
 	tx txs.UnsignedTx,
 	utxos []*avax.UTXO,
 	ins []*avax.TransferableInput,
@@ -623,7 +627,7 @@ func (h *handler) VerifySpendUTXOs(
 			return fmt.Errorf("expected fx.Owned but got %T", out)
 		}
 		owner := owned.Owners()
-		ownerBytes, err := txs.Codec.Marshal(txs.Version0, owner)
+		ownerBytes, err := txs.Codec.Marshal(version, owner)
 		if err != nil {
 			return fmt.Errorf("couldn't marshal owner: %w", err)
 		}

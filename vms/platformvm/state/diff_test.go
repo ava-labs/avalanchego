@@ -339,7 +339,7 @@ func TestDiffTx(t *testing.T) {
 			SubnetID: subnetID,
 		},
 	}
-	tx.SetBytes(utils.RandomBytes(16), utils.RandomBytes(16))
+	tx.SetBytes(utils.RandomBytes(16), utils.RandomBytes(16), txs.Version1)
 	d.AddTx(tx, status.Committed)
 
 	{
@@ -358,7 +358,7 @@ func TestDiffTx(t *testing.T) {
 				SubnetID: subnetID,
 			},
 		}
-		parentTx.SetBytes(utils.RandomBytes(16), utils.RandomBytes(16))
+		parentTx.SetBytes(utils.RandomBytes(16), utils.RandomBytes(16), txs.Version1)
 		state.EXPECT().GetTx(parentTx.ID()).Return(parentTx, status.Committed, nil).Times(1)
 		gotParentTx, gotStatus, err := d.GetTx(parentTx.ID())
 		require.NoError(err)

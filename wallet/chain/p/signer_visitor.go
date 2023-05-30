@@ -267,7 +267,8 @@ func (s *signerVisitor) getSubnetSigners(subnetID ids.ID, subnetAuth verify.Veri
 
 // TODO: remove [signHash] after the ledger supports signing all transactions.
 func sign(tx *txs.Tx, signHash bool, txSigners [][]keychain.Signer) error {
-	unsignedBytes, err := txs.Codec.Marshal(txs.Version0, &tx.Unsigned)
+	version := uint16(txs.Version0)
+	unsignedBytes, err := txs.Codec.Marshal(version, &tx.Unsigned)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal unsigned tx: %w", err)
 	}
@@ -332,6 +333,6 @@ func sign(tx *txs.Tx, signHash bool, txSigners [][]keychain.Signer) error {
 	if err != nil {
 		return fmt.Errorf("couldn't marshal tx: %w", err)
 	}
-	tx.SetBytes(unsignedBytes, signedBytes)
+	tx.SetBytes(unsignedBytes, signedBytes, version)
 	return nil
 }

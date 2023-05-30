@@ -95,7 +95,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			Creds:    []verify.Verifiable{},
 		}
 	)
-	verifiedSignedTx.SetBytes([]byte{1}, []byte{2})
+	verifiedSignedTx.SetBytes([]byte{1}, []byte{2}, txs.Version1)
 
 	tests := []test{
 		{
@@ -437,6 +437,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					gomock.Any(),
 					gomock.Any(),
 					gomock.Any(),
+					gomock.Any(),
 				).Return(ErrFlowCheckFailed)
 
 				return &Backend{
@@ -479,6 +480,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 
 				flowChecker := utxo.NewMockVerifier(ctrl)
 				flowChecker.EXPECT().VerifySpend(
+					gomock.Any(),
 					gomock.Any(),
 					gomock.Any(),
 					gomock.Any(),
@@ -531,6 +533,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 
 				flowChecker := utxo.NewMockVerifier(ctrl)
 				flowChecker.EXPECT().VerifySpend(
+					gomock.Any(),
 					gomock.Any(),
 					gomock.Any(),
 					gomock.Any(),

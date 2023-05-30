@@ -224,7 +224,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 				SubnetAuth: subnetAuth,
 			}
 			tx := &txs.Tx{Unsigned: utx}
-			err = tx.Sign(txs.Codec, signers)
+			err = tx.Sign(txs.Version1, txs.Codec, signers)
 			require.NoError(err)
 
 			stateDiff, err := state.NewDiff(lastAcceptedID, env)

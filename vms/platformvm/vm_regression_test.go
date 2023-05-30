@@ -566,7 +566,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 		},
 	}
 	signedImportTx := &txs.Tx{Unsigned: unsignedImportTx}
-	err = signedImportTx.Sign(txs.Codec, [][]*secp256k1.PrivateKey{
+	err = signedImportTx.Sign(txs.Version1, txs.Codec, [][]*secp256k1.PrivateKey{
 		{}, // There is one input, with no required signers
 	})
 	require.NoError(err)
@@ -827,7 +827,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		},
 	}
 	signedImportTx := &txs.Tx{Unsigned: unsignedImportTx}
-	err = signedImportTx.Sign(txs.Codec, [][]*secp256k1.PrivateKey{
+	err = signedImportTx.Sign(txs.Version1, txs.Codec, [][]*secp256k1.PrivateKey{
 		{}, // There is one input, with no required signers
 	})
 	require.NoError(err)

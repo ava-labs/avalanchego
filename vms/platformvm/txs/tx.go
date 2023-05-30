@@ -35,21 +35,23 @@ type Tx struct {
 	// The credentials of this transaction
 	Creds []verify.Verifiable `serialize:"true" json:"credentials"`
 
-	TxID  ids.ID `json:"id"`
-	bytes []byte
+	TxID    ids.ID `json:"id"`
+	bytes   []byte
+	version uint16
 }
 
 func NewSigned(
 	unsigned UnsignedTx,
+	version uint16,
 	c codec.Manager,
 	signers [][]*secp256k1.PrivateKey,
 ) (*Tx, error) {
 	res := &Tx{Unsigned: unsigned}
-	return res, res.Sign(c, signers)
+	return res, res.Sign(version, c, signers)
 }
 
 func (tx *Tx) Initialize(c codec.Manager, version uint16) error {
-	signedBytes, err := c.Marshal(Version0, tx)
+	signedBytes, err := c.Marshal(version, tx)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal ProposalTx: %w", err)
 	}
@@ -60,14 +62,15 @@ func (tx *Tx) Initialize(c codec.Manager, version uint16) error {
 	}
 
 	unsignedBytes := signedBytes[:unsignedBytesLen]
-	tx.SetBytes(unsignedBytes, signedBytes)
+	tx.SetBytes(unsignedBytes, signedBytes, version)
 	return nil
 }
 
-func (tx *Tx) SetBytes(unsignedBytes, signedBytes []byte) {
+func (tx *Tx) SetBytes(unsignedBytes, signedBytes []byte, version uint16) {
 	tx.Unsigned.SetBytes(unsignedBytes)
 	tx.bytes = signedBytes
 	tx.TxID = hashing.ComputeHash256Array(signedBytes)
+	tx.version = version
 }
 
 // Parse signed tx starting from its byte representation.
@@ -75,17 +78,18 @@ func (tx *Tx) SetBytes(unsignedBytes, signedBytes []byte) {
 // P-Chain genesis txs whose length exceed the max length of txs.Codec.
 func Parse(c codec.Manager, signedBytes []byte) (*Tx, error) {
 	tx := &Tx{}
-	if _, err := c.Unmarshal(signedBytes, tx); err != nil {
+	version, err := c.Unmarshal(signedBytes, tx)
+	if err != nil {
 		return nil, fmt.Errorf("couldn't parse tx: %w", err)
 	}
 
-	unsignedBytesLen, err := c.Size(Version0, &tx.Unsigned)
+	unsignedBytesLen, err := c.Size(version, &tx.Unsigned)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't calculate UnsignedTx marshal length: %w", err)
 	}
 
 	unsignedBytes := signedBytes[:unsignedBytesLen]
-	tx.SetBytes(unsignedBytes, signedBytes)
+	tx.SetBytes(unsignedBytes, signedBytes, version)
 	return tx, nil
 }
 
@@ -102,6 +106,10 @@ func (tx *Tx) Bytes() []byte {
 
 func (tx *Tx) ID() ids.ID {
 	return tx.TxID
+}
+
+func (tx *Tx) Version() uint16 {
+	return tx.version
 }
 
 // UTXOs returns the UTXOs transaction is producing.
@@ -135,8 +143,8 @@ func (tx *Tx) SyntacticVerify(ctx *snow.Context) error {
 // Sign this transaction with the provided signers
 // Note: We explicitly pass the codec in Sign since we may need to sign P-Chain
 // genesis txs whose length exceed the max length of txs.Codec.
-func (tx *Tx) Sign(c codec.Manager, signers [][]*secp256k1.PrivateKey) error {
-	unsignedBytes, err := c.Marshal(Version0, &tx.Unsigned)
+func (tx *Tx) Sign(version uint16, c codec.Manager, signers [][]*secp256k1.PrivateKey) error {
+	unsignedBytes, err := c.Marshal(version, &tx.Unsigned)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal UnsignedTx: %w", err)
 	}
@@ -157,10 +165,10 @@ func (tx *Tx) Sign(c codec.Manager, signers [][]*secp256k1.PrivateKey) error {
 		tx.Creds = append(tx.Creds, cred) // Attach credential
 	}
 
-	signedBytes, err := c.Marshal(Version0, tx)
+	signedBytes, err := c.Marshal(version, tx)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal ProposalTx: %w", err)
 	}
-	tx.SetBytes(unsignedBytes, signedBytes)
+	tx.SetBytes(unsignedBytes, signedBytes, version)
 	return nil
 }

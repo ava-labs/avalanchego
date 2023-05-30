@@ -99,14 +99,14 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	}
 
 	// Case: valid tx
-	stx, err = NewSigned(addValidatorTx, Codec, signers)
+	stx, err = NewSigned(addValidatorTx, Version1, Codec, signers)
 	require.NoError(err)
 	require.NoError(stx.SyntacticVerify(ctx))
 
 	// Case: Wrong network ID
 	addValidatorTx.SyntacticallyVerified = false
 	addValidatorTx.NetworkID++
-	stx, err = NewSigned(addValidatorTx, Codec, signers)
+	stx, err = NewSigned(addValidatorTx, Version1, Codec, signers)
 	require.NoError(err)
 	err = stx.SyntacticVerify(ctx)
 	require.ErrorIs(err, avax.ErrWrongNetworkID)
@@ -118,7 +118,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		Out.(*stakeable.LockOut).
 		TransferableOut.(*secp256k1fx.TransferOutput).
 		Addrs = nil
-	stx, err = NewSigned(addValidatorTx, Codec, signers)
+	stx, err = NewSigned(addValidatorTx, Version1, Codec, signers)
 	require.NoError(err)
 	err = stx.SyntacticVerify(ctx)
 	require.ErrorIs(err, secp256k1fx.ErrOutputUnspendable)
@@ -127,7 +127,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	// Case: Rewards owner has no addresses
 	addValidatorTx.SyntacticallyVerified = false
 	addValidatorTx.RewardsOwner.(*secp256k1fx.OutputOwners).Addrs = nil
-	stx, err = NewSigned(addValidatorTx, Codec, signers)
+	stx, err = NewSigned(addValidatorTx, Version1, Codec, signers)
 	require.NoError(err)
 	err = stx.SyntacticVerify(ctx)
 	require.ErrorIs(err, secp256k1fx.ErrOutputUnspendable)
@@ -136,7 +136,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	// Case: Too many shares
 	addValidatorTx.SyntacticallyVerified = false
 	addValidatorTx.DelegationShares++ // 1 more than max amount
-	stx, err = NewSigned(addValidatorTx, Codec, signers)
+	stx, err = NewSigned(addValidatorTx, Version1, Codec, signers)
 	require.NoError(err)
 	err = stx.SyntacticVerify(ctx)
 	require.ErrorIs(err, errTooManyShares)
@@ -215,7 +215,7 @@ func TestAddValidatorTxSyntacticVerifyNotAVAX(t *testing.T) {
 		DelegationShares: reward.PercentDenominator,
 	}
 
-	stx, err = NewSigned(addValidatorTx, Codec, signers)
+	stx, err = NewSigned(addValidatorTx, Version1, Codec, signers)
 	require.NoError(err)
 
 	err = stx.SyntacticVerify(ctx)

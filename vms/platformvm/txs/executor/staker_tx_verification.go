@@ -129,6 +129,7 @@ func verifyAddValidatorTx(
 
 	// Verify the flowcheck
 	if err := backend.FlowChecker.VerifySpend(
+		sTx.Version(),
 		tx,
 		chainState,
 		tx.Ins,
@@ -257,6 +258,7 @@ func verifyAddSubnetValidatorTx(
 
 	// Verify the flowcheck
 	if err := backend.FlowChecker.VerifySpend(
+		sTx.Version(),
 		tx,
 		chainState,
 		tx.Ins,
@@ -333,6 +335,7 @@ func removeSubnetValidatorValidation(
 
 	// Verify the flowcheck
 	if err := backend.FlowChecker.VerifySpend(
+		sTx.Version(),
 		tx,
 		chainState,
 		tx.Ins,
@@ -448,6 +451,7 @@ func verifyAddDelegatorTx(
 
 	// Verify the flowcheck
 	if err := backend.FlowChecker.VerifySpend(
+		sTx.Version(),
 		tx,
 		chainState,
 		tx.Ins,
@@ -604,6 +608,7 @@ func verifyAddPermissionlessValidatorTx(
 
 	// Verify the flowcheck
 	if err := backend.FlowChecker.VerifySpend(
+		sTx.Version(),
 		tx,
 		chainState,
 		tx.Ins,
@@ -800,6 +805,7 @@ func verifyAddPermissionlessDelegatorTx(
 
 	// Verify the flowcheck
 	if err := backend.FlowChecker.VerifySpend(
+		sTx.Version(),
 		tx,
 		chainState,
 		tx.Ins,
@@ -915,6 +921,7 @@ func verifyStopStakerTx(
 
 		// Verify the flowcheck
 		if err := backend.FlowChecker.VerifySpend(
+			sTx.Version(),
 			tx,
 			chainState,
 			tx.Ins,
