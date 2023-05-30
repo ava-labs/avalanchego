@@ -2,6 +2,8 @@ name: buf-push
 
 on:
   push:
+    tags:
+      - "*"
     branches:
       - master
       - dev
