@@ -26,7 +26,7 @@ func (ipDesc IPDesc) String() string {
 }
 
 func (ipDesc IPDesc) MarshalJSON() ([]byte, error) {
-	return []byte("\"" + fmt.Sprintf("%s:%d", ipDesc.IP, ipDesc.Port) + "\""), nil
+	return []byte(`"` + fmt.Sprintf("%s:%d", ipDesc.IP, ipDesc.Port) + `"`), nil
 }
 
 func (ipDesc *IPDesc) UnmarshalJSON(b []byte) error {

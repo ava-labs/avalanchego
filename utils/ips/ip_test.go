@@ -18,19 +18,19 @@ func TestIPPortEqual(t *testing.T) {
 	}{
 		// Expected equal
 		{
-			"\"127.0.0.1:0\"",
+			`"127.0.0.1:0"`,
 			IPPort{net.ParseIP("127.0.0.1"), 0},
 			IPPort{net.ParseIP("127.0.0.1"), 0},
 			true,
 		},
 		{
-			"\"[::1]:0\"",
+			`"[::1]:0"`,
 			IPPort{net.ParseIP("::1"), 0},
 			IPPort{net.ParseIP("::1"), 0},
 			true,
 		},
 		{
-			"\"127.0.0.1:0\"",
+			`"127.0.0.1:0"`,
 			IPPort{net.ParseIP("127.0.0.1"), 0},
 			IPPort{net.ParseIP("::ffff:127.0.0.1"), 0},
 			true,
@@ -38,19 +38,19 @@ func TestIPPortEqual(t *testing.T) {
 
 		// Expected unequal
 		{
-			"\"127.0.0.1:0\"",
+			`"127.0.0.1:0"`,
 			IPPort{net.ParseIP("127.0.0.1"), 0},
 			IPPort{net.ParseIP("1.2.3.4"), 0},
 			false,
 		},
 		{
-			"\"[::1]:0\"",
+			`"[::1]:0"`,
 			IPPort{net.ParseIP("::1"), 0},
 			IPPort{net.ParseIP("2001::1"), 0},
 			false,
 		},
 		{
-			"\"127.0.0.1:0\"",
+			`"127.0.0.1:0"`,
 			IPPort{net.ParseIP("127.0.0.1"), 0},
 			IPPort{net.ParseIP("127.0.0.1"), 1},
 			false,
