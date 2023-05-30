@@ -58,7 +58,7 @@ type ApricotStandardBlock struct {
 func (b *ApricotStandardBlock) initialize(bytes []byte, version uint16) error {
 	b.CommonBlock.initialize(bytes, version)
 	for _, tx := range b.Transactions {
-		if err := tx.Initialize(txs.Codec); err != nil {
+		if err := tx.Initialize(txs.Codec, version); err != nil {
 			return fmt.Errorf("failed to sign block: %w", err)
 		}
 	}

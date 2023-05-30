@@ -1447,7 +1447,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 			},
 		}},
 	}}
-	err := tx.Initialize(txs.Codec)
+	err := tx.Initialize(txs.Codec, txs.Version1)
 	require.NoError(err)
 
 	preferred, err := vm.Builder.Preferred()
@@ -1564,7 +1564,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 			},
 		}},
 	}}
-	require.NoError(tx.Initialize(txs.Codec))
+	require.NoError(tx.Initialize(txs.Codec, txs.Version1))
 
 	statelessBlk, err := blocks.NewBanffStandardBlock(
 		blocks.Version1,
@@ -1708,7 +1708,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 			},
 		}},
 	}}
-	require.NoError(tx.Initialize(txs.Codec))
+	require.NoError(tx.Initialize(txs.Codec, txs.Version1))
 
 	nextChainTime := initialClkTime.Add(time.Second)
 	preferredID := preferred.ID()
@@ -2025,7 +2025,7 @@ func TestUnverifiedParent(t *testing.T) {
 			},
 		}},
 	}}
-	require.NoError(tx1.Initialize(txs.Codec))
+	require.NoError(tx1.Initialize(txs.Codec, txs.Version1))
 
 	preferred, err := vm.Builder.Preferred()
 	require.NoError(err)
@@ -2063,7 +2063,7 @@ func TestUnverifiedParent(t *testing.T) {
 			},
 		}},
 	}}
-	require.NoError(tx1.Initialize(txs.Codec))
+	require.NoError(tx1.Initialize(txs.Codec, txs.Version1))
 	nextChainTime = nextChainTime.Add(time.Second)
 	vm.clock.Set(nextChainTime)
 	statelessSecondAdvanceTimeBlk, err := blocks.NewBanffStandardBlock(

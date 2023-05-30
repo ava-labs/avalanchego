@@ -370,7 +370,7 @@ func TestBuildBlock(t *testing.T) {
 					txBuilder: txBuilder,
 					txExecutorBackend: &txexecutor.Backend{
 						Config: &config.Config{
-							ContinuousStakingTime: time.Time{}, //activate latest fork
+							ContinuousStakingTime: time.Time{}, // activate latest fork
 						},
 					},
 				}
@@ -420,7 +420,7 @@ func TestBuildBlock(t *testing.T) {
 					Mempool: mempool,
 					txExecutorBackend: &txexecutor.Backend{
 						Config: &config.Config{
-							ContinuousStakingTime: time.Time{}, //activate latest fork
+							ContinuousStakingTime: time.Time{}, // activate latest fork
 						},
 					},
 				}
@@ -475,7 +475,7 @@ func TestBuildBlock(t *testing.T) {
 					Mempool: mempool,
 					txExecutorBackend: &txexecutor.Backend{
 						Config: &config.Config{
-							ContinuousStakingTime: time.Time{}, //activate latest fork
+							ContinuousStakingTime: time.Time{}, // activate latest fork
 						},
 						Ctx: &snow.Context{
 							Log: logging.NoLog{},
@@ -527,7 +527,7 @@ func TestBuildBlock(t *testing.T) {
 					Mempool: mempool,
 					txExecutorBackend: &txexecutor.Backend{
 						Config: &config.Config{
-							ContinuousStakingTime: time.Time{}, //activate latest fork
+							ContinuousStakingTime: time.Time{}, // activate latest fork
 						},
 						Clk: clk,
 					},
@@ -586,7 +586,7 @@ func TestBuildBlock(t *testing.T) {
 					Mempool: mempool,
 					txExecutorBackend: &txexecutor.Backend{
 						Config: &config.Config{
-							ContinuousStakingTime: time.Time{}, //activate latest fork
+							ContinuousStakingTime: time.Time{}, // activate latest fork
 						},
 						Clk: clk,
 					},
@@ -644,7 +644,7 @@ func TestBuildBlock(t *testing.T) {
 					Mempool: mempool,
 					txExecutorBackend: &txexecutor.Backend{
 						Config: &config.Config{
-							ContinuousStakingTime: time.Time{}, //activate latest fork
+							ContinuousStakingTime: time.Time{}, // activate latest fork
 						},
 						Clk: clk,
 					},

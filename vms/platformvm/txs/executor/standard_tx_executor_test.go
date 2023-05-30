@@ -1105,7 +1105,7 @@ func newRemoveSubnetValidatorTx(t *testing.T) (*txs.RemoveSubnetValidatorTx, *tx
 		Unsigned: unsignedTx,
 		Creds:    creds,
 	}
-	require.NoError(t, tx.Initialize(txs.Codec))
+	require.NoError(t, tx.Initialize(txs.Codec, txs.Version1))
 	return unsignedTx, tx
 }
 
@@ -1488,7 +1488,7 @@ func newTransformSubnetTx(t *testing.T) (*txs.TransformSubnetTx, *txs.Tx) {
 		Unsigned: unsignedTx,
 		Creds:    creds,
 	}
-	require.NoError(t, tx.Initialize(txs.Codec))
+	require.NoError(t, tx.Initialize(txs.Codec, txs.Version1))
 	return unsignedTx, tx
 }
 

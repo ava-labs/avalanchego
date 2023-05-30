@@ -39,7 +39,7 @@ func TestNewBanffStandardBlock(t *testing.T) {
 		},
 		Creds: []verify.Verifiable{},
 	}
-	require.NoError(tx.Initialize(txs.Codec))
+	require.NoError(tx.Initialize(txs.Codec, txs.Version1))
 
 	blk, err := NewBanffStandardBlock(
 		Version1,
@@ -82,7 +82,7 @@ func TestNewApricotStandardBlock(t *testing.T) {
 		},
 		Creds: []verify.Verifiable{},
 	}
-	require.NoError(tx.Initialize(txs.Codec))
+	require.NoError(tx.Initialize(txs.Codec, txs.Version0))
 
 	blk, err := NewApricotStandardBlock(
 		parentID,

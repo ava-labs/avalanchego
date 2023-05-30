@@ -48,13 +48,13 @@ func NewSigned(
 	return res, res.Sign(c, signers)
 }
 
-func (tx *Tx) Initialize(c codec.Manager) error {
+func (tx *Tx) Initialize(c codec.Manager, version uint16) error {
 	signedBytes, err := c.Marshal(Version0, tx)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal ProposalTx: %w", err)
 	}
 
-	unsignedBytesLen, err := c.Size(Version0, &tx.Unsigned)
+	unsignedBytesLen, err := c.Size(version, &tx.Unsigned)
 	if err != nil {
 		return fmt.Errorf("couldn't calculate UnsignedTx marshal length: %w", err)
 	}
