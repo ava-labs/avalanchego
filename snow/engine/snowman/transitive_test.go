@@ -1188,8 +1188,7 @@ func TestEngineAbandonChit(t *testing.T) {
 		reqID = requestID
 	}
 
-	err := te.issue(context.Background(), blk, false)
-	require.NoError(err)
+	require.NoError(te.issue(context.Background(), blk, false))
 
 	fakeBlkID := ids.GenerateTestID()
 	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
@@ -1202,14 +1201,12 @@ func TestEngineAbandonChit(t *testing.T) {
 	}
 
 	// Register a voter dependency on an unknown block.
-	err = te.Chits(context.Background(), vdr, reqID, []ids.ID{fakeBlkID}, nil)
-	require.NoError(err)
+	require.NoError(te.Chits(context.Background(), vdr, reqID, []ids.ID{fakeBlkID}, nil))
 	require.Len(te.blocked, 1)
 
 	sender.CantSendPullQuery = false
 
-	err = te.GetFailed(context.Background(), vdr, reqID)
-	require.NoError(err)
+	require.NoError(te.GetFailed(context.Background(), vdr, reqID))
 	require.Empty(te.blocked)
 }
 
@@ -1246,8 +1243,7 @@ func TestEngineAbandonChitWithUnexpectedPutBlock(t *testing.T) {
 		reqID = requestID
 	}
 
-	err := te.issue(context.Background(), blk, true)
-	require.NoError(err)
+	require.NoError(te.issue(context.Background(), blk, true))
 
 	fakeBlkID := ids.GenerateTestID()
 	vm.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
@@ -1260,8 +1256,7 @@ func TestEngineAbandonChitWithUnexpectedPutBlock(t *testing.T) {
 	}
 
 	// Register a voter dependency on an unknown block.
-	err = te.Chits(context.Background(), vdr, reqID, []ids.ID{fakeBlkID}, nil)
-	require.NoError(err)
+	require.NoError(te.Chits(context.Background(), vdr, reqID, []ids.ID{fakeBlkID}, nil))
 	require.Len(te.blocked, 1)
 
 	sender.CantSendPullQuery = false
@@ -1274,8 +1269,7 @@ func TestEngineAbandonChitWithUnexpectedPutBlock(t *testing.T) {
 
 	// Respond with an unexpected block and verify that the request is correctly
 	// cleared.
-	err = te.Put(context.Background(), vdr, reqID, gBlkBytes)
-	require.NoError(err)
+	require.NoError(te.Put(context.Background(), vdr, reqID, gBlkBytes))
 	require.Empty(te.blocked)
 }
 
@@ -2697,6 +2691,10 @@ func TestEngineNonPreferredAmplification(t *testing.T) {
 //	B
 func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 	vdr, _, sender, vm, te, gBlk := setupDefaultConfig(t)
+	expectedVdrSet := set.Set[ids.NodeID]{}
+	expectedVdrSet.Add(vdr)
+
+	require := require.New(t)
 
 	// [blk1] is a child of [gBlk] and currently passes verification
 	blk1 := &snowman.TestBlock{
@@ -2729,13 +2727,14 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 		case bytes.Equal(b, blk2.Bytes()):
 			return blk2, nil
 		default:
-			t.Fatalf("Unknown block bytes")
+			require.FailNow("Unknown block bytes")
 			return nil, nil
 		}
 	}
 
-	// The VM should only be able to retrieve [gBlk] from storage
-	// TODO GetBlockF should be updated after blocks are verified/accepted
+	// for now, this VM should only be able to retrieve [gBlk] from storage
+	// this "GetBlockF" will be updated after blocks are verified/accepted
+	// in the following tests
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case gBlk.ID():
@@ -2749,54 +2748,40 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 	reqID := new(uint32)
 	sender.SendGetF = func(_ context.Context, inVdr ids.NodeID, requestID uint32, blkID ids.ID) {
 		*reqID = requestID
-		if *asked {
-			t.Fatalf("Asked multiple times")
-		}
-		if blkID != blk1.ID() {
-			t.Fatalf("Expected engine to request blk1")
-		}
-		if inVdr != vdr {
-			t.Fatalf("Expected engine to request blk2 from vdr")
-		}
+		require.False(*asked)
+		require.Equal(blk1.ID(), blkID)
+		require.Equal(vdr, inVdr)
 		*asked = true
 	}
-	// Receive Gossip message for [blk2] first and expect the sender to issue a Get request for
-	// its ancestor: [blk1].
-	if err := te.Put(context.Background(), vdr, constants.GossipMsgRequestID, blk2.Bytes()); err != nil {
-		t.Fatal(err)
-	}
-
-	if !*asked {
-		t.Fatalf("Didn't ask for missing blk1")
-	}
+	// This engine receives a Gossip message for [blk2] which was "unknown" in this engine.
+	// The engine thus learns about its ancestor [blk1] and should send a Get request for it.
+	// (see above for expected "Get" request)
+	require.NoError(te.Put(context.Background(), vdr, constants.GossipMsgRequestID, blk2.Bytes()))
+	require.True(*asked)
 
 	// Prepare to PushQuery [blk1] after our Get request is fulfilled. We should not PushQuery
 	// [blk2] since it currently fails verification.
 	queried := new(bool)
 	queryRequestID := new(uint32)
 	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], requestID uint32, blkID ids.ID) {
-		if *queried {
-			t.Fatalf("Asked multiple times")
-		}
+		require.False(*queried)
 		*queried = true
+
 		*queryRequestID = requestID
 		vdrSet := set.Set[ids.NodeID]{}
 		vdrSet.Add(vdr)
-		if !inVdrs.Equals(vdrSet) {
-			t.Fatalf("Asking wrong validator for preference")
-		}
-		if blk1.ID() != blkID {
-			t.Fatalf("Asking for wrong block")
-		}
+		require.Equal(vdrSet, inVdrs)
+		require.Equal(blk1.ID(), blkID)
 	}
+	// This engine now handles the response to the "Get" request. This should cause [blk1] to be issued
+	// which will result in attempting to issue [blk2]. However, [blk2] should fail verification and be dropped.
+	// By issuing [blk1], this node should fire a "PushQuery" request for [blk1].
+	// (see above for expected "PushQuery" request)
+	require.NoError(te.Put(context.Background(), vdr, *reqID, blk1.Bytes()))
+	require.True(*asked)
+	require.True(*queried, "Didn't query the newly issued blk1")
 
-	// Answer the request, this should allow [blk1] to be issued and cause [blk2] to
-	// fail verification.
-	if err := te.Put(context.Background(), vdr, *reqID, blk1.Bytes()); err != nil {
-		t.Fatal(err)
-	}
-
-	// now blk1 is verified, vm can return it
+	// now [blk1] is verified, vm can return it
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case gBlk.ID():
@@ -2808,41 +2793,28 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 		}
 	}
 
-	if !*queried {
-		t.Fatalf("Didn't ask for preferences regarding blk1")
-	}
-
 	sendReqID := new(uint32)
 	reqVdr := new(ids.NodeID)
 	// Update GetF to produce a more detailed error message in the case that receiving a Chits
 	// message causes us to send another Get request.
 	sender.SendGetF = func(_ context.Context, inVdr ids.NodeID, requestID uint32, blkID ids.ID) {
-		switch blkID {
-		case blk1.ID():
-			t.Fatal("Unexpectedly sent a Get request for blk1")
-		case blk2.ID():
-			*sendReqID = requestID
-			*reqVdr = inVdr
-			return
-		default:
-			t.Fatal("Unexpectedly sent a Get request for unknown block")
-		}
+		require.Equal(blk2.ID(), blkID)
+
+		*sendReqID = requestID
+		*reqVdr = inVdr
 	}
 
-	// Now we are expecting a Chits message, and we receive it for blk2 instead of blk1
-	// The votes should be bubbled through blk2 despite the fact that it is failing verification.
-	if err := te.Chits(context.Background(), vdr, *queryRequestID, []ids.ID{blk2.ID()}, nil); err != nil {
-		t.Fatal(err)
-	}
+	// Now we are expecting a Chits message, and we receive it for [blk2]
+	// instead of [blk1]. This will cause the node to again request [blk2].
+	require.NoError(te.Chits(context.Background(), vdr, *queryRequestID, []ids.ID{blk2.ID()}, nil))
 
-	if err := te.Put(context.Background(), *reqVdr, *sendReqID, blk2.Bytes()); err != nil {
-		t.Fatal(err)
-	}
+	// The votes should be bubbled through [blk2] despite the fact that it is
+	// failing verification.
+	require.NoError(te.Put(context.Background(), *reqVdr, *sendReqID, blk2.Bytes()))
 
 	// The vote should be bubbled through [blk2], such that [blk1] gets marked as Accepted.
-	if blk1.Status() != choices.Accepted {
-		t.Fatalf("Expected blk1 to be Accepted, but found status: %s", blk1.Status())
-	}
+	require.Equal(choices.Accepted, blk1.Status())
+	require.Equal(choices.Processing, blk2.Status())
 
 	// Now that [blk1] has been marked as Accepted, [blk2] can pass verification.
 	blk2.VerifyV = nil
@@ -2861,37 +2833,19 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 	*queried = false
 	// Prepare to PushQuery [blk2] after receiving a Gossip message with [blk2].
 	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], requestID uint32, blkID ids.ID) {
-		if *queried {
-			t.Fatalf("Asked multiple times")
-		}
+		require.False(*queried)
 		*queried = true
 		*queryRequestID = requestID
-		vdrSet := set.Set[ids.NodeID]{}
-		vdrSet.Add(vdr)
-		if !inVdrs.Equals(vdrSet) {
-			t.Fatalf("Asking wrong validator for preference")
-		}
-		if blk2.ID() != blkID {
-			t.Fatalf("Asking for wrong block")
-		}
+		require.Equal(expectedVdrSet, inVdrs)
+		require.Equal(blk2.ID(), blkID)
 	}
 	// Expect that the Engine will send a PushQuery after receiving this Gossip message for [blk2].
-	if err := te.Put(context.Background(), vdr, constants.GossipMsgRequestID, blk2.Bytes()); err != nil {
-		t.Fatal(err)
-	}
-
-	if !*queried {
-		t.Fatalf("Didn't ask for preferences regarding blk2")
-	}
+	require.NoError(te.Put(context.Background(), vdr, constants.GossipMsgRequestID, blk2.Bytes()))
+	require.True(*queried)
 
 	// After a single vote for [blk2], it should be marked as accepted.
-	if err := te.Chits(context.Background(), vdr, *queryRequestID, []ids.ID{blk2.ID()}, nil); err != nil {
-		t.Fatal(err)
-	}
-
-	if blk2.Status() != choices.Accepted {
-		t.Fatalf("Expected blk2 to be Accepted, but found status: %s", blk2.Status())
-	}
+	require.NoError(te.Chits(context.Background(), vdr, *queryRequestID, []ids.ID{blk2.ID()}, nil))
+	require.Equal(choices.Accepted, blk2.Status())
 }
 
 // Test that in the following scenario, if block B fails verification, votes
@@ -2909,6 +2863,10 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 //	C
 func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 	vdr, _, sender, vm, te, gBlk := setupDefaultConfig(t)
+	expectedVdrSet := set.Set[ids.NodeID]{}
+	expectedVdrSet.Add(vdr)
+
+	require := require.New(t)
 
 	// [blk1] is a child of [gBlk] and currently passes verification
 	blk1 := &snowman.TestBlock{
@@ -2954,7 +2912,7 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 		case bytes.Equal(b, blk3.Bytes()):
 			return blk3, nil
 		default:
-			t.Fatalf("Unknown block bytes")
+			require.FailNow("Unknown block bytes")
 			return nil, nil
 		}
 	}
@@ -2975,26 +2933,15 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 	reqID := new(uint32)
 	sender.SendGetF = func(_ context.Context, inVdr ids.NodeID, requestID uint32, blkID ids.ID) {
 		*reqID = requestID
-		if *asked {
-			t.Fatalf("Asked multiple times")
-		}
-		if blkID != blk2.ID() {
-			t.Fatalf("Expected engine to request blk2")
-		}
-		if inVdr != vdr {
-			t.Fatalf("Expected engine to request blk2 from vdr")
-		}
+		require.False(*asked)
+		require.Equal(blk2.ID(), blkID)
+		require.Equal(vdr, inVdr)
 		*asked = true
 	}
 	// Receive Gossip message for [blk3] first and expect the sender to issue a
 	// Get request for its ancestor: [blk2].
-	if err := te.Put(context.Background(), vdr, constants.GossipMsgRequestID, blk3.Bytes()); err != nil {
-		t.Fatal(err)
-	}
-
-	if !*asked {
-		t.Fatalf("Didn't ask for missing blk2")
-	}
+	require.NoError(te.Put(context.Background(), vdr, constants.GossipMsgRequestID, blk3.Bytes()))
+	require.True(*asked)
 
 	// Prepare to PushQuery [blk1] after our request for [blk2] is fulfilled.
 	// We should not PushQuery [blk2] since it currently fails verification.
@@ -3002,29 +2949,16 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 	queried := new(bool)
 	queryRequestID := new(uint32)
 	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], requestID uint32, blkID ids.ID) {
-		if *queried {
-			t.Fatalf("Asked multiple times")
-		}
+		require.False(*queried)
 		*queried = true
 		*queryRequestID = requestID
-		vdrSet := set.Set[ids.NodeID]{}
-		vdrSet.Add(vdr)
-		if !inVdrs.Equals(vdrSet) {
-			t.Fatalf("Asking wrong validator for preference")
-		}
-		if blk1.ID() != blkID {
-			t.Fatalf("Asking for wrong block")
-		}
+		require.Equal(expectedVdrSet, inVdrs)
+		require.Equal(blk1.ID(), blkID)
 	}
 
 	// Answer the request, this should result in [blk1] being issued as well.
-	if err := te.Put(context.Background(), vdr, *reqID, blk2.Bytes()); err != nil {
-		t.Fatal(err)
-	}
-
-	if !*queried {
-		t.Fatalf("Didn't ask for preferences regarding blk1")
-	}
+	require.NoError(te.Put(context.Background(), vdr, *reqID, blk2.Bytes()))
+	require.True(*queried)
 
 	sendReqID := new(uint32)
 	reqVdr := new(ids.NodeID)
@@ -3033,7 +2967,7 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 	sender.SendGetF = func(_ context.Context, inVdr ids.NodeID, requestID uint32, blkID ids.ID) {
 		switch blkID {
 		case blk1.ID():
-			t.Fatal("Unexpectedly sent a Get request for blk1")
+			require.FailNow("Unexpectedly sent a Get request for blk1")
 		case blk2.ID():
 			t.Logf("sending get for blk2 with %d", requestID)
 			*sendReqID = requestID
@@ -3045,41 +2979,22 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 			*reqVdr = inVdr
 			return
 		default:
-			t.Fatal("Unexpectedly sent a Get request for unknown block")
+			require.FailNow("Unexpectedly sent a Get request for unknown block")
 		}
 	}
 
-	sender.SendPullQueryF = func(_ context.Context, _ set.Set[ids.NodeID], _ uint32, blkID ids.ID) {
-		switch blkID {
-		case blk1.ID():
-			t.Fatal("Unexpectedly sent a PullQuery request for blk1")
-		case blk2.ID():
-			t.Fatal("Unexpectedly sent a PullQuery request for blk2")
-		case blk3.ID():
-			t.Fatal("Unexpectedly sent a PullQuery request for blk3")
-		default:
-			t.Fatal("Unexpectedly sent a PullQuery request for unknown block")
-		}
-	}
+	// Now we are expecting a Chits message and we receive it for [blk3].
+	// This will cause the node to again request [blk3].
+	require.NoError(te.Chits(context.Background(), vdr, *queryRequestID, []ids.ID{blk3.ID()}, nil))
 
-	// Now we are expecting a Chits message, and we receive it for [blk3]
-	// instead of blk1. This will cause the node to again request [blk3].
-	if err := te.Chits(context.Background(), vdr, *queryRequestID, []ids.ID{blk3.ID()}, nil); err != nil {
-		t.Fatal(err)
-	}
-
-	// Drop the re-request for blk3 to cause the poll to termindate. The votes
-	// should be bubbled through blk3 despite the fact that it hasn't been
+	// Drop the re-request for [blk3] to cause the poll to terminate. The votes
+	// should be bubbled through [blk3] despite the fact that it hasn't been
 	// issued.
-	if err := te.GetFailed(context.Background(), *reqVdr, *sendReqID); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(te.GetFailed(context.Background(), *reqVdr, *sendReqID))
 
 	// The vote should be bubbled through [blk3] and [blk2] such that [blk1]
 	// gets marked as Accepted.
-	if blk1.Status() != choices.Accepted {
-		t.Fatalf("Expected blk1 to be Accepted, but found status: %s", blk1.Status())
-	}
+	require.Equal(choices.Accepted, blk1.Status())
 }
 
 // func TestSendQuery(t *testing.T) {
@@ -3286,8 +3201,7 @@ func TestEngineBuildBlockWithCachedNonVerifiedParent(t *testing.T) {
 	}
 
 	// Give the engine the grandparent
-	err := te.Put(context.Background(), vdr, 0, grandParentBlk.BytesV)
-	require.NoError(err)
+	require.NoError(te.Put(context.Background(), vdr, 0, grandParentBlk.BytesV))
 
 	vm.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
 		require.Equal(parentBlkA.BytesV, b)
@@ -3297,8 +3211,7 @@ func TestEngineBuildBlockWithCachedNonVerifiedParent(t *testing.T) {
 	// Give the node [parentBlkA]/[parentBlkB].
 	// When it's parsed we get [parentBlkA] (not [parentBlkB]).
 	// [parentBlkA] fails verification and gets put into [te.nonVerifiedCache].
-	err = te.Put(context.Background(), vdr, 0, parentBlkA.BytesV)
-	require.NoError(err)
+	require.NoError(te.Put(context.Background(), vdr, 0, parentBlkA.BytesV))
 
 	vm.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
 		require.Equal(parentBlkB.BytesV, b)
@@ -3330,15 +3243,11 @@ func TestEngineBuildBlockWithCachedNonVerifiedParent(t *testing.T) {
 	// When we fetch it using [GetBlockF] we get [parentBlkB].
 	// Note that [parentBlkB] doesn't fail verification and is issued into consensus.
 	// This evicts [parentBlkA] from [te.nonVerifiedCache].
-	err = te.Put(context.Background(), vdr, 0, parentBlkA.BytesV)
-	require.NoError(err)
+	require.NoError(te.Put(context.Background(), vdr, 0, parentBlkA.BytesV))
 
 	// Give 2 chits for [parentBlkA]/[parentBlkB]
-	err = te.Chits(context.Background(), vdr, *queryRequestAID, []ids.ID{parentBlkB.IDV}, nil)
-	require.NoError(err)
-
-	err = te.Chits(context.Background(), vdr, *queryRequestGPID, []ids.ID{parentBlkB.IDV}, nil)
-	require.NoError(err)
+	require.NoError(te.Chits(context.Background(), vdr, *queryRequestAID, []ids.ID{parentBlkB.IDV}, nil))
+	require.NoError(te.Chits(context.Background(), vdr, *queryRequestGPID, []ids.ID{parentBlkB.IDV}, nil))
 
 	// Assert that the blocks' statuses are correct.
 	// The evicted [parentBlkA] shouldn't be changed.
@@ -3355,8 +3264,7 @@ func TestEngineBuildBlockWithCachedNonVerifiedParent(t *testing.T) {
 	}
 
 	// Should issue a new block and send a query for it.
-	err = te.Notify(context.Background(), common.PendingTxs)
-	require.NoError(err)
+	require.NoError(te.Notify(context.Background(), common.PendingTxs))
 	require.True(*sentQuery)
 }
 

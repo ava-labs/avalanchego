@@ -158,8 +158,7 @@ func TestNetworkAppGossip(t *testing.T) {
 				tt.mempoolFunc(ctrl),
 				tt.appSenderFunc(ctrl),
 			)
-			err = n.AppGossip(context.Background(), ids.GenerateTestNodeID(), tt.msgBytesFunc())
-			require.NoError(err)
+			require.NoError(n.AppGossip(context.Background(), ids.GenerateTestNodeID(), tt.msgBytesFunc()))
 		})
 	}
 }
@@ -326,8 +325,8 @@ func TestNetworkGossipTx(t *testing.T) {
 		mempool.NewMockMempool(ctrl),
 		appSender,
 	)
-	n, ok := nIntf.(*network)
-	require.True(ok)
+	require.IsType(&network{}, nIntf)
+	n := nIntf.(*network)
 
 	// Case: Tx was recently gossiped
 	txID := ids.GenerateTestID()

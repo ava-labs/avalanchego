@@ -5,7 +5,6 @@ package executor
 
 import (
 	"testing"
-	"time"
 
 	"github.com/golang/mock/gomock"
 
@@ -19,12 +18,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/utils/window"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/validators"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -61,12 +60,11 @@ func TestAcceptorVisitProposalBlock(t *testing.T) {
 			},
 			state: s,
 		},
-		metrics:          metrics.Noop,
-		recentlyAccepted: nil,
+		metrics:    metrics.Noop,
+		validators: validators.TestManager,
 	}
 
-	err = acceptor.ApricotProposalBlock(blk)
-	require.NoError(err)
+	require.NoError(acceptor.ApricotProposalBlock(blk))
 
 	require.Equal(blkID, acceptor.backend.lastAccepted)
 
@@ -98,12 +96,8 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 				SharedMemory: sharedMemory,
 			},
 		},
-		metrics: metrics.Noop,
-		recentlyAccepted: window.New[ids.ID](window.Config{
-			Clock:   &mockable.Clock{},
-			MaxSize: 1,
-			TTL:     time.Hour,
-		}),
+		metrics:    metrics.Noop,
+		validators: validators.TestManager,
 	}
 
 	blk, err := blocks.NewApricotAtomicBlock(
@@ -159,8 +153,7 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 	onAcceptState.EXPECT().Apply(s).Times(1)
 	sharedMemory.EXPECT().Apply(atomicRequests, batch).Return(nil).Times(1)
 
-	err = acceptor.ApricotAtomicBlock(blk)
-	require.NoError(err)
+	require.NoError(acceptor.ApricotAtomicBlock(blk))
 }
 
 func TestAcceptorVisitStandardBlock(t *testing.T) {
@@ -183,12 +176,8 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 				SharedMemory: sharedMemory,
 			},
 		},
-		metrics: metrics.Noop,
-		recentlyAccepted: window.New[ids.ID](window.Config{
-			Clock:   clk,
-			MaxSize: 1,
-			TTL:     time.Hour,
-		}),
+		metrics:    metrics.Noop,
+		validators: validators.TestManager,
 	}
 
 	blk, err := blocks.NewBanffStandardBlock(
@@ -253,8 +242,7 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 	onAcceptState.EXPECT().Apply(s).Times(1)
 	sharedMemory.EXPECT().Apply(atomicRequests, batch).Return(nil).Times(1)
 
-	err = acceptor.BanffStandardBlock(blk)
-	require.NoError(err)
+	require.NoError(acceptor.BanffStandardBlock(blk))
 	require.True(calledOnAcceptFunc)
 	require.Equal(blk.ID(), acceptor.backend.lastAccepted)
 }
@@ -278,12 +266,8 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 				SharedMemory: sharedMemory,
 			},
 		},
-		metrics: metrics.Noop,
-		recentlyAccepted: window.New[ids.ID](window.Config{
-			Clock:   &mockable.Clock{},
-			MaxSize: 1,
-			TTL:     time.Hour,
-		}),
+		metrics:      metrics.Noop,
+		validators:   validators.TestManager,
 		bootstrapped: &utils.Atomic[bool]{},
 	}
 
@@ -350,8 +334,7 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 		s.EXPECT().Commit().Return(nil).Times(1),
 	)
 
-	err = acceptor.ApricotCommitBlock(blk)
-	require.NoError(err)
+	require.NoError(acceptor.ApricotCommitBlock(blk))
 	require.Equal(blk.ID(), acceptor.backend.lastAccepted)
 }
 
@@ -374,12 +357,8 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 				SharedMemory: sharedMemory,
 			},
 		},
-		metrics: metrics.Noop,
-		recentlyAccepted: window.New[ids.ID](window.Config{
-			Clock:   &mockable.Clock{},
-			MaxSize: 1,
-			TTL:     time.Hour,
-		}),
+		metrics:      metrics.Noop,
+		validators:   validators.TestManager,
 		bootstrapped: &utils.Atomic[bool]{},
 	}
 
@@ -447,7 +426,6 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 		s.EXPECT().Commit().Return(nil).Times(1),
 	)
 
-	err = acceptor.ApricotAbortBlock(blk)
-	require.NoError(err)
+	require.NoError(acceptor.ApricotAbortBlock(blk))
 	require.Equal(blk.ID(), acceptor.backend.lastAccepted)
 }

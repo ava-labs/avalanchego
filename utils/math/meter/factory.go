@@ -3,9 +3,7 @@
 
 package meter
 
-import (
-	"time"
-)
+import "time"
 
 // Factory returns new meters.
 type Factory interface {

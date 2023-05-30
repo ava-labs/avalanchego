@@ -86,7 +86,7 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 	ctx := snow.DefaultContextTest()
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
 
-	err := vm.Initialize(
+	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
 		dbManager,
@@ -96,8 +96,7 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 		nil,
 		nil,
 		nil,
-	)
-	require.NoError(err)
+	))
 
 	return innerVM, vm
 }
@@ -610,9 +609,10 @@ func TestNoStateSummariesServedWhileRepairingHeightIndex(t *testing.T) {
 
 	// set height index to reindexing
 	proVM.hIndexer.MarkRepaired(false)
-	require.ErrorIs(proVM.VerifyHeightIndex(context.Background()), block.ErrIndexIncomplete)
+	err := proVM.VerifyHeightIndex(context.Background())
+	require.ErrorIs(err, block.ErrIndexIncomplete)
 
-	_, err := proVM.GetLastStateSummary(context.Background())
+	_, err = proVM.GetLastStateSummary(context.Background())
 	require.ErrorIs(err, block.ErrIndexIncomplete)
 
 	_, err = proVM.GetStateSummary(context.Background(), summaryHeight)
