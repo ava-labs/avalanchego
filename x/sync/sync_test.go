@@ -34,10 +34,10 @@ func newNoopTracer() trace.Tracer {
 }
 
 type mockClient struct {
-	db merkledb.MerkleDB
+	db SyncableDB
 }
 
-func (client *mockClient) GetChangeProof(ctx context.Context, request *syncpb.ChangeProofRequest, _ merkledb.MerkleDB) (*merkledb.ChangeProof, error) {
+func (client *mockClient) GetChangeProof(ctx context.Context, request *syncpb.ChangeProofRequest, _ SyncableDB) (*merkledb.ChangeProof, error) {
 	startRoot, err := ids.ToID(request.StartRootHash)
 	if err != nil {
 		return nil, err
@@ -871,7 +871,7 @@ func Test_Sync_Error_During_Sync(t *testing.T) {
 		},
 	).AnyTimes()
 	client.EXPECT().GetChangeProof(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
-		func(ctx context.Context, request *syncpb.ChangeProofRequest, _ merkledb.MerkleDB) (*merkledb.ChangeProof, error) {
+		func(ctx context.Context, request *syncpb.ChangeProofRequest, _ SyncableDB) (*merkledb.ChangeProof, error) {
 			startRoot, err := ids.ToID(request.StartRootHash)
 			require.NoError(err)
 			endRoot, err := ids.ToID(request.EndRootHash)
@@ -961,7 +961,7 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 			},
 		).AnyTimes()
 		client.EXPECT().GetChangeProof(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
-			func(ctx context.Context, request *syncpb.ChangeProofRequest, _ merkledb.MerkleDB) (*merkledb.ChangeProof, error) {
+			func(ctx context.Context, request *syncpb.ChangeProofRequest, _ SyncableDB) (*merkledb.ChangeProof, error) {
 				<-updatedRootChan
 				startRoot, err := ids.ToID(request.StartRootHash)
 				require.NoError(err)
