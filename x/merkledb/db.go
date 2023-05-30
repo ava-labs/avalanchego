@@ -66,11 +66,8 @@ type Config struct {
 }
 
 type SyncableDB interface {
-	// GetMerkleRoot returns the merkle root of the Trie
-	GetMerkleRoot(ctx context.Context) (ids.ID, error)
-
-	// GetProof generates a proof of the value associated with a particular key, or a proof of its absence from the trie
-	GetProof(ctx context.Context, bytesPath []byte) (*Proof, error)
+	MerkleRootGetter
+	ProofGetter
 
 	// GetChangeProof returns a proof for a subset of the key/value changes in key range
 	// [start, end] that occurred between [startRootID] and [endRootID].
