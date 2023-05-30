@@ -16,7 +16,6 @@ service SyncableDB {
   rpc CommitChangeProof(ChangeProof) returns (Error);
 
   rpc GetProof(GetProofRequest) returns (Proof);
-  rpc VerifyProof(Proof) returns (Error);
 
   rpc GetRangeProof(RangeProofRequest) returns (RangeProof);
   rpc VerifyRangeProof(RangeProof) returns (Error);
