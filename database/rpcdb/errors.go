@@ -20,7 +20,7 @@ var (
 	}
 )
 
-func ErrorToRPCError(err error) error {
+func errorToRPCError(err error) error {
 	if _, ok := errorToErrEnum[err]; ok {
 		return nil
 	}
