@@ -62,6 +62,7 @@ const (
 
 var (
 	// Deprecated key --> deprecation message (i.e. which key replaces it)
+        // TODO: deprecate "BootstrapIDsKey" and "BootstrapIPsKey"
 	deprecatedKeys = map[string]string{
 		NetworkCompressionEnabledKey:           fmt.Sprintf("use --%s instead", NetworkCompressionTypeKey),
 		BootstrapIDsKey:                        fmt.Sprintf("use --%s instead", BootstrappersKey),
