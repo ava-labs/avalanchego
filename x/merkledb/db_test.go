@@ -659,7 +659,7 @@ type testOperation struct {
 	delete bool
 }
 
-func applyOperations(t *Database, ops []*testOperation) (Trie, error) {
+func applyOperations(t *merkleDB, ops []*testOperation) (Trie, error) {
 	view, err := t.NewView()
 	if err != nil {
 		return nil, err
@@ -766,9 +766,9 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 			require.NoError(err)
 			changeProofDB, err := getBasicDB()
 			require.NoError(err)
-			require.NoError(changeProof.Verify(
+			require.NoError(changeProofDB.VerifyChangeProof(
 				context.Background(),
-				changeProofDB,
+				changeProof,
 				step.key,
 				step.value,
 				root,
