@@ -1327,8 +1327,7 @@ func TestAtomicImport(t *testing.T) {
 				},
 			},
 		},
-	},
-	))
+	}))
 
 	tx, err := vm.txBuilder.NewImportTx(
 		vm.ctx.XChainID,
