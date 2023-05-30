@@ -8,9 +8,18 @@ jobs:
     steps:
       - uses: actions/stale@v8
         with:
-          stale-issue-message: 'This issue is stale because it has been open 60 days with no activity. Remove the stale label or leave a comment or this will be closed in 7 days.'
-          stale-pr-message: 'This pull request is stale because it has been open 60 days with no activity.'
-          close-issue-message: 'This issue was closed because it has been marked as stale for 7 days with no activity.'
-          days-before-stale: 60
-          days-before-close: 7
-          days-before-pr-close: -1 # don't close stale PRs
+          # PR configuration
+          days-before-pr-stale: 30
+          stale-pr-message: 'This PR has become stale because it has been open for 30 days with no activity. Adding the `lifecycle/frozen` label will cause this PR to ignore lifecycle events.'
+          days-before-pr-close: -1
+          stale-pr-label: lifecycle/stale
+          exempt-pr-labels: lifecycle/frozen
+          close-pr-label: lifecycle/rotten
+
+          # Issue configuration
+          days-before-issue-stale: 60
+          stale-issue-message: 'This issue has become stale because it has been open 60 days with no activity. Adding the `lifecycle/frozen` label will cause this issue to ignore lifecycle events.'
+          days-before-issue-close: -1
+          stale-issue-label: lifecycle/stale
+          exempt-issue-labels: lifecycle/frozen
+          close-issue-label: lifecycle/rotten
