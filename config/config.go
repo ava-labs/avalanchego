@@ -66,7 +66,7 @@ var (
 		NetworkCompressionEnabledKey:           fmt.Sprintf("use --%s instead", NetworkCompressionTypeKey),
 		BootstrapIDsKey:                        fmt.Sprintf("use --%s instead", BootstrappersKey),
 		BootstrapIPsKey:                        fmt.Sprintf("use --%s instead", BootstrappersKey),
-    GenesisConfigFileKey:                   fmt.Sprintf("use --%s instead", GenesisFileKey),
+		GenesisConfigFileKey:                   fmt.Sprintf("use --%s instead", GenesisFileKey),
 		GenesisConfigContentKey:                fmt.Sprintf("use --%s instead", GenesisFileContentKey),
 		InboundConnUpgradeThrottlerCooldownKey: fmt.Sprintf("use --%s instead", NetworkInboundConnUpgradeThrottlerCooldownKey),
 		InboundThrottlerMaxConnsPerSecKey:      fmt.Sprintf("use --%s instead", NetworkInboundThrottlerMaxConnsPerSecKey),
