@@ -37,7 +37,6 @@ func newMetrics(namespace string, reg prometheus.Registerer) (*metrics, error) {
 		Name:      "async_expired",
 		Help:      "Incoming async messages dropped because the message deadline expired",
 	})
-
 	errs.Add(
 		reg.Register(expired),
 		reg.Register(asyncExpired),
