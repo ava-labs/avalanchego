@@ -308,8 +308,7 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 		Backend:       &env.backend,
 		Tx:            tx,
 	}
-	err = tx.Unsigned.Visit(&txExecutor)
-	require.NoError(err)
+	require.NoError(tx.Unsigned.Visit(&txExecutor))
 
 	vdrDestSet := set.Set[ids.ShortID]{}
 	vdrDestSet.Add(vdrRewardAddress)
@@ -446,8 +445,7 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 		Backend:       &env.backend,
 		Tx:            tx,
 	}
-	err = tx.Unsigned.Visit(&txExecutor)
-	require.NoError(err)
+	require.NoError(tx.Unsigned.Visit(&txExecutor))
 
 	// The delegator should be rewarded if the ProposalTx is committed. Since the
 	// delegatee's share is 25%, we expect the delegator to receive 75% of the reward.
@@ -809,8 +807,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 		Backend:       &env.backend,
 		Tx:            tx,
 	}
-	err = tx.Unsigned.Visit(&txExecutor)
-	require.NoError(err)
+	require.NoError(tx.Unsigned.Visit(&txExecutor))
 
 	vdrDestSet := set.Set[ids.ShortID]{}
 	vdrDestSet.Add(vdrRewardAddress)
