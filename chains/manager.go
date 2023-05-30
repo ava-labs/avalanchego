@@ -813,10 +813,6 @@ func (m *manager) createAvalancheChain(
 	}
 	vdrs.RegisterCallbackListener(connectedValidators)
 
-	connectedBeacons := tracker.NewPeers()
-	startupTracker := tracker.NewStartup(connectedBeacons, (3*bootstrapWeight+3)/4)
-	vdrs.RegisterCallbackListener(startupTracker)
-
 	// Asynchronously passes messages from the network to the consensus engine
 	h, err := handler.New(
 		ctx,
@@ -832,6 +828,10 @@ func (m *manager) createAvalancheChain(
 	if err != nil {
 		return nil, fmt.Errorf("error initializing network handler: %w", err)
 	}
+
+	connectedBeacons := tracker.NewPeers()
+	startupTracker := tracker.NewStartup(connectedBeacons, (3*bootstrapWeight+3)/4)
+	vdrs.RegisterCallbackListener(startupTracker)
 
 	snowmanCommonCfg := common.Config{
 		Ctx:                            ctx,
@@ -1155,10 +1155,6 @@ func (m *manager) createSnowmanChain(
 	}
 	vdrs.RegisterCallbackListener(connectedValidators)
 
-	connectedBeacons := tracker.NewPeers()
-	startupTracker := tracker.NewStartup(connectedBeacons, (3*bootstrapWeight+3)/4)
-	beacons.RegisterCallbackListener(startupTracker)
-
 	// Asynchronously passes messages from the network to the consensus engine
 	h, err := handler.New(
 		ctx,
@@ -1174,6 +1170,10 @@ func (m *manager) createSnowmanChain(
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize message handler: %w", err)
 	}
+
+	connectedBeacons := tracker.NewPeers()
+	startupTracker := tracker.NewStartup(connectedBeacons, (3*bootstrapWeight+3)/4)
+	beacons.RegisterCallbackListener(startupTracker)
 
 	commonCfg := common.Config{
 		Ctx:                            ctx,
