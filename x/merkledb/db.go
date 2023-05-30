@@ -65,17 +65,14 @@ type Config struct {
 	Tracer trace.Tracer
 }
 
-type ProofVerifier interface {
+type SyncableDB interface {
+	MerkleRootGetter
+	ProofGetter
+
 	// Returns nil if the trie given in [proof] has root [expectedRootID].
 	// That is, this is a valid proof that [proof.Key] exists/doesn't exist
 	// in the trie with root [expectedRootID].
 	VerifyProof(ctx context.Context, proof *Proof, expectedRootID ids.ID) error
-}
-
-type SyncableDB interface {
-	MerkleRootGetter
-	ProofGetter
-	ProofVerifier
 
 	// GetChangeProof returns a proof for a subset of the key/value changes in key range
 	// [start, end] that occurred between [startRootID] and [endRootID].
@@ -482,7 +479,7 @@ func (db *merkleDB) getProof(ctx context.Context, key []byte) (*Proof, error) {
 	return view.getProof(ctx, key)
 }
 
-func (db *merkleDB) VerifyProof(ctx context.Context, proof *Proof, expectedRootID ids.ID) error {
+func (*merkleDB) VerifyProof(ctx context.Context, proof *Proof, expectedRootID ids.ID) error {
 	return proof.Verify(ctx, expectedRootID)
 }
 
