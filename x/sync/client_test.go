@@ -12,9 +12,9 @@ import (
 
 	"github.com/golang/mock/gomock"
 
-	"google.golang.org/protobuf/proto"
-
 	"github.com/stretchr/testify/require"
+
+	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
