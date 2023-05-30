@@ -10,6 +10,29 @@ macro_rules! kv_dump {
 }
 
 #[test]
+fn test_basic_metrics() {
+    let cfg = DbConfig::builder()
+        .meta_ncached_pages(1024)
+        .meta_ncached_files(128)
+        .payload_ncached_pages(1024)
+        .payload_ncached_files(128)
+        .payload_file_nbit(16)
+        .payload_regn_nbit(16)
+        .wal(
+            WalConfig::builder()
+                .file_nbit(15)
+                .block_nbit(8)
+                .max_revisions(10)
+                .build(),
+        );
+    let db = Db::new("test_revisions_db2", &cfg.clone().truncate(true).build()).unwrap();
+    let metrics = db.metrics();
+    assert_eq!(metrics.kv_get.hit_count.get(), 0);
+    db.kv_get("a").ok();
+    assert_eq!(metrics.kv_get.hit_count.get(), 1);
+}
+
+#[test]
 fn test_revisions() {
     use rand::{rngs::StdRng, Rng, SeedableRng};
     let cfg = DbConfig::builder()
