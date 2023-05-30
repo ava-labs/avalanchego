@@ -1,5 +1,0 @@
-syntax = "proto3";
-
-package sync;
-
-option go_package = "github.com/ava-labs/avalanchego/proto/pb/sync";
