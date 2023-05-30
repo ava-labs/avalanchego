@@ -256,14 +256,12 @@ func Test_Server_GetChangeProof(t *testing.T) {
 					// grab a copy of the proof so we can inspect it later
 					if !test.proofNil {
 						var responseProto syncpb.ChangeProofResponse
-						err := proto.Unmarshal(responseBytes, &responseProto)
-						require.NoError(err)
+						require.NoError(proto.Unmarshal(responseBytes, &responseProto))
 
 						// TODO when the client/server support including range proofs in the response,
 						// this will need to be updated.
 						var p merkledb.ChangeProof
-						err = p.UnmarshalProto(responseProto.GetChangeProof())
-						require.NoError(err)
+						require.NoError(p.UnmarshalProto(responseProto.GetChangeProof()))
 						proofResult = &p
 					}
 					return nil

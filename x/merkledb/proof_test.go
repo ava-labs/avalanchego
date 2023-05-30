@@ -1427,8 +1427,7 @@ func TestChangeProofProtoMarshalUnmarshal(t *testing.T) {
 		// Assert the unmarshaled one is the same as the original.
 		var unmarshaledProof ChangeProof
 		protoProof := proof.ToProto()
-		err := unmarshaledProof.UnmarshalProto(protoProof)
-		require.NoError(err)
+		require.NoError(unmarshaledProof.UnmarshalProto(protoProof))
 		require.Equal(proof, unmarshaledProof)
 
 		// Marshaling again should yield same result.
@@ -1491,8 +1490,7 @@ func TestChangeProofUnmarshalProtoNilValue(t *testing.T) {
 	protoProof.KeyChanges[0].Value = nil
 
 	var unmarshaledProof ChangeProof
-	err := unmarshaledProof.UnmarshalProto(protoProof)
-	require.ErrorIs(t, err, ErrNilMaybeBytes)
+	require.ErrorIs(t, unmarshaledProof.UnmarshalProto(protoProof), ErrNilMaybeBytes)
 }
 
 func TestChangeProofUnmarshalProtoInvalidMaybe(t *testing.T) {
