@@ -27,7 +27,7 @@ import (
 
 func sendRangeRequest(
 	t *testing.T,
-	db merkledb.MerkleDB,
+	db SyncableDB,
 	request *merkledbpb.RangeProofRequest,
 	maxAttempts uint32,
 	modifyResponse func(*merkledb.RangeProof),
@@ -45,8 +45,7 @@ func sendRangeRequest(
 	handler := NewNetworkServer(sender, db, logging.NoLog{})
 	clientNodeID, serverNodeID := ids.GenerateTestNodeID(), ids.GenerateTestNodeID()
 	networkClient := NewNetworkClient(sender, clientNodeID, 1, logging.NoLog{})
-	err := networkClient.Connected(context.Background(), serverNodeID, version.CurrentApp)
-	require.NoError(err)
+	require.NoError(networkClient.Connected(context.Background(), serverNodeID, version.CurrentApp))
 	client := NewClient(&ClientConfig{
 		NetworkClient: networkClient,
 		Metrics:       &mockMetrics{},
@@ -75,8 +74,7 @@ func sendRangeRequest(
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				err := handler.AppRequest(ctx, clientNodeID, requestID, deadline, requestBytes)
-				require.NoError(err)
+				require.NoError(handler.AppRequest(ctx, clientNodeID, requestID, deadline, requestBytes))
 			}() // should be on a goroutine so the test can make progress.
 			return nil
 		},
@@ -101,8 +99,7 @@ func sendRangeRequest(
 			// reserialize the response and pass it to the client to complete the handling.
 			responseBytes, err = merkledb.Codec.EncodeRangeProof(merkledb.Version, response)
 			require.NoError(err)
-			err = networkClient.AppResponse(context.Background(), serverNodeID, requestID, responseBytes)
-			require.NoError(err)
+			require.NoError(networkClient.AppResponse(context.Background(), serverNodeID, requestID, responseBytes))
 			return nil
 		},
 	).AnyTimes()
@@ -126,7 +123,7 @@ func TestGetRangeProof(t *testing.T) {
 	require.NoError(t, err)
 
 	tests := map[string]struct {
-		db                  merkledb.MerkleDB
+		db                  SyncableDB
 		request             *merkledbpb.RangeProofRequest
 		modifyResponse      func(*merkledb.RangeProof)
 		expectedErr         error
@@ -212,10 +209,10 @@ func TestGetRangeProof(t *testing.T) {
 			},
 			modifyResponse: func(response *merkledb.RangeProof) {
 				start := response.KeyValues[1].Key
-				proof, err := largeTrieDB.GetRangeProof(context.Background(), start, nil, defaultRequestKeyLimit)
-				if err != nil {
-					panic(err)
-				}
+				rootID, err := largeTrieDB.GetMerkleRoot(context.Background())
+				require.NoError(t, err)
+				proof, err := largeTrieDB.GetRangeProofAtRoot(context.Background(), rootID, start, nil, defaultRequestKeyLimit)
+				require.NoError(t, err)
 				response.KeyValues = proof.KeyValues
 				response.StartProof = proof.StartProof
 				response.EndProof = proof.EndProof
@@ -282,8 +279,8 @@ func TestGetRangeProof(t *testing.T) {
 
 func sendChangeRequest(
 	t *testing.T,
-	db merkledb.MerkleDB,
-	verificationDB merkledb.MerkleDB,
+	db SyncableDB,
+	verificationDB SyncableDB,
 	request *merkledbpb.ChangeProofRequest,
 	maxAttempts uint32,
 	modifyResponse func(*merkledb.ChangeProof),
@@ -301,8 +298,7 @@ func sendChangeRequest(
 	handler := NewNetworkServer(sender, db, logging.NoLog{})
 	clientNodeID, serverNodeID := ids.GenerateTestNodeID(), ids.GenerateTestNodeID()
 	networkClient := NewNetworkClient(sender, clientNodeID, 1, logging.NoLog{})
-	err := networkClient.Connected(context.Background(), serverNodeID, version.CurrentApp)
-	require.NoError(err)
+	require.NoError(networkClient.Connected(context.Background(), serverNodeID, version.CurrentApp))
 	client := NewClient(&ClientConfig{
 		NetworkClient: networkClient,
 		Metrics:       &mockMetrics{},
@@ -331,8 +327,7 @@ func sendChangeRequest(
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				err := handler.AppRequest(ctx, clientNodeID, requestID, deadline, requestBytes)
-				require.NoError(err)
+				require.NoError(handler.AppRequest(ctx, clientNodeID, requestID, deadline, requestBytes))
 			}() // should be on a goroutine so the test can make progress.
 			return nil
 		},
@@ -357,8 +352,7 @@ func sendChangeRequest(
 			// reserialize the response and pass it to the client to complete the handling.
 			responseBytes, err = merkledb.Codec.EncodeChangeProof(merkledb.Version, response)
 			require.NoError(err)
-			err = networkClient.AppResponse(context.Background(), serverNodeID, requestID, responseBytes)
-			require.NoError(err)
+			require.NoError(networkClient.AppResponse(context.Background(), serverNodeID, requestID, responseBytes))
 			return nil
 		},
 	).AnyTimes()
@@ -407,8 +401,7 @@ func TestGetChangeProof(t *testing.T) {
 			_, err = r.Read(val)
 			require.NoError(t, err)
 
-			err = view.Insert(context.Background(), key, val)
-			require.NoError(t, err)
+			require.NoError(t, view.Insert(context.Background(), key, val))
 		}
 
 		// delete a key
@@ -418,8 +411,7 @@ func TestGetChangeProof(t *testing.T) {
 
 		it := trieDB.NewIteratorWithStart(deleteKeyStart)
 		if it.Next() {
-			err = view.Remove(context.Background(), it.Key())
-			require.NoError(t, err)
+			require.NoError(t, view.Remove(context.Background(), it.Key()))
 		}
 		require.NoError(t, it.Error())
 		it.Release()
@@ -431,7 +423,7 @@ func TestGetChangeProof(t *testing.T) {
 	require.NoError(t, err)
 
 	tests := map[string]struct {
-		db                  merkledb.MerkleDB
+		db                  SyncableDB
 		request             *merkledbpb.ChangeProofRequest
 		modifyResponse      func(*merkledb.ChangeProof)
 		expectedErr         error

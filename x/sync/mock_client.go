@@ -40,7 +40,7 @@ func (m *MockClient) EXPECT() *MockClientMockRecorder {
 }
 
 // GetChangeProof mocks base method.
-func (m *MockClient) GetChangeProof(arg0 context.Context, arg1 *merkledb.ChangeProofRequest, arg2 merkledb0.MerkleDB) (*merkledb0.ChangeProof, error) {
+func (m *MockClient) GetChangeProof(arg0 context.Context, arg1 *merkledb.ChangeProofRequest, arg2 SyncableDB) (*merkledb0.ChangeProof, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetChangeProof", arg0, arg1, arg2)
 	ret0, _ := ret[0].(*merkledb0.ChangeProof)
