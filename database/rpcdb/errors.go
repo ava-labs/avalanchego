@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	ErrEnumToError = map[rpcdbpb.Error]error{
+	errEnumToError = map[rpcdbpb.Error]error{
 		rpcdbpb.Error_ERROR_CLOSED:    database.ErrClosed,
 		rpcdbpb.Error_ERROR_NOT_FOUND: database.ErrNotFound,
 	}
