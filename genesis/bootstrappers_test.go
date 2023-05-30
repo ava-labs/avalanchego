@@ -6,19 +6,21 @@ package genesis
 import (
 	"testing"
 
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
 func TestSampleBootstrappers(t *testing.T) {
 	require := require.New(t)
 
 	for networkID, networkName := range constants.NetworkIDToNetworkName {
-		bootstrappers := SampleBootstrappers(networkID, 10)
+		length := 10
+		bootstrappers := SampleBootstrappers(networkID, length)
 		t.Logf("%s bootstrappers: %+v", networkName, bootstrappers)
 
 		if networkID == constants.MainnetID || networkID == constants.FujiID {
-			require.NotEmpty(bootstrappers)
+			require.Len(bootstrappers, length)
 		}
 	}
 }

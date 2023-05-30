@@ -533,8 +533,8 @@ func getBootstrapConfig(v *viper.Viper, networkID uint32) (node.BootstrapConfig,
 		BootstrapAncestorsMaxContainersReceived: int(v.GetUint(BootstrapAncestorsMaxContainersReceivedKey)),
 	}
 
-	// TODO: check "v.IsSet(BootstrappersKey)" to just parse JSON value with "&config.Bootstrappers"
-	// TODO: deprecate "BootstrapIPsKey" and "BootstrapIDsKey"
+	// TODO: Add a "BootstrappersKey" flag to more clearly enforce ID and IP
+	// length equality.
 	ipsSet := v.IsSet(BootstrapIPsKey)
 	idsSet := v.IsSet(BootstrapIDsKey)
 	if ipsSet && !idsSet {
@@ -543,49 +543,48 @@ func getBootstrapConfig(v *viper.Viper, networkID uint32) (node.BootstrapConfig,
 	if !ipsSet && idsSet {
 		return node.BootstrapConfig{}, fmt.Errorf("set %q but didn't set %q", BootstrapIDsKey, BootstrapIPsKey)
 	}
-
-	bootstrappers := genesis.SampleBootstrappers(networkID, 5)
-	if ipsSet {
-		bootstrapIPs := strings.Split(v.GetString(BootstrapIPsKey), ",")
-
-		bootstrappers = make([]genesis.Bootstrapper, 0, len(bootstrapIPs))
-		for _, bootstrapIP := range bootstrapIPs {
-			ip := strings.TrimSpace(bootstrapIP)
-			if ip == "" {
-				continue
-			}
-
-			addr, err := ips.ToIPPort(ip)
-			if err != nil {
-				return node.BootstrapConfig{}, fmt.Errorf("couldn't parse bootstrap ip %s: %w", ip, err)
-			}
-			bootstrappers = append(bootstrappers, genesis.Bootstrapper{ID: ids.EmptyNodeID, IP: ips.IPDesc(addr)})
-		}
+	if !ipsSet && !idsSet {
+		config.Bootstrappers = genesis.SampleBootstrappers(networkID, 5)
+		return config, nil
 	}
-	config.Bootstrappers = bootstrappers
 
-	if idsSet {
-		bootstrapIDs := strings.Split(v.GetString(BootstrapIDsKey), ",")
-
-		bootstrapNodeIDs := make([]ids.NodeID, 0, len(bootstrapIDs))
-		for _, bootstrapID := range bootstrapIDs {
-			id := strings.TrimSpace(bootstrapID)
-			if id == "" {
-				continue
-			}
-			nodeID, err := ids.NodeIDFromString(id)
-			if err != nil {
-				return node.BootstrapConfig{}, fmt.Errorf("couldn't parse bootstrap peer id %s: %w", nodeID, err)
-			}
-			bootstrapNodeIDs = append(bootstrapNodeIDs, nodeID)
+	bootstrapIPs := strings.Split(v.GetString(BootstrapIPsKey), ",")
+	config.Bootstrappers = make([]genesis.Bootstrapper, 0, len(bootstrapIPs))
+	for _, bootstrapIP := range bootstrapIPs {
+		ip := strings.TrimSpace(bootstrapIP)
+		if ip == "" {
+			continue
 		}
 
-		if len(config.Bootstrappers) != len(bootstrapNodeIDs) {
-			return node.BootstrapConfig{}, fmt.Errorf("expected the number of bootstrapIPs (%d) to match the number of bootstrapNodeIDs (%d)", len(config.Bootstrappers), len(bootstrapNodeIDs))
+		addr, err := ips.ToIPPort(ip)
+		if err != nil {
+			return node.BootstrapConfig{}, fmt.Errorf("couldn't parse bootstrap ip %s: %w", ip, err)
 		}
-		for i, nodeID := range bootstrapNodeIDs {
-			config.Bootstrappers[i].ID = nodeID
+		config.Bootstrappers = append(config.Bootstrappers, genesis.Bootstrapper{
+			// ID is populated below
+			IP: ips.IPDesc(addr),
+		})
+	}
+
+	bootstrapIDs := strings.Split(v.GetString(BootstrapIDsKey), ",")
+	bootstrapNodeIDs := make([]ids.NodeID, 0, len(bootstrapIDs))
+	for _, bootstrapID := range bootstrapIDs {
+		id := strings.TrimSpace(bootstrapID)
+		if id == "" {
+			continue
 		}
+		nodeID, err := ids.NodeIDFromString(id)
+		if err != nil {
+			return node.BootstrapConfig{}, fmt.Errorf("couldn't parse bootstrap peer id %s: %w", nodeID, err)
+		}
+		bootstrapNodeIDs = append(bootstrapNodeIDs, nodeID)
+	}
+
+	if len(config.Bootstrappers) != len(bootstrapNodeIDs) {
+		return node.BootstrapConfig{}, fmt.Errorf("expected the number of bootstrapIPs (%d) to match the number of bootstrapIDs (%d)", len(config.Bootstrappers), len(bootstrapNodeIDs))
+	}
+	for i, nodeID := range bootstrapNodeIDs {
+		config.Bootstrappers[i].ID = nodeID
 	}
 
 	return config, nil

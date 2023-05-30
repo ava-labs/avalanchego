@@ -4,9 +4,10 @@
 package genesis
 
 import (
-	_ "embed"
 	"encoding/json"
 	"fmt"
+
+	_ "embed"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -49,6 +50,5 @@ func SampleBootstrappers(networkID uint32, count int) []Bootstrapper {
 	for _, index := range indices {
 		sampled = append(sampled, bootstrappers[int(index)])
 	}
-
 	return sampled
 }
