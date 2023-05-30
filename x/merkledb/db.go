@@ -52,7 +52,7 @@ var (
 	errSameRoot = errors.New("start and end root are the same")
 )
 
-type ChangeProofGetter interface {
+type ChangeProofer interface {
 	// GetChangeProof returns a proof for a subset of the key/value changes in key range
 	// [start, end] that occurred between [startRootID] and [endRootID].
 	// Returns at most [maxLength] key/value pairs.
@@ -64,9 +64,7 @@ type ChangeProofGetter interface {
 		end []byte,
 		maxLength int,
 	) (*ChangeProof, error)
-}
 
-type ChangeProofVerifier interface {
 	// Returns nil iff all of the following hold:
 	//   - [start] <= [end].
 	//   - [proof] is non-empty iff [proof.HadRootsInHistory].
@@ -88,14 +86,12 @@ type ChangeProofVerifier interface {
 		end []byte,
 		expectedEndRootID ids.ID,
 	) error
-}
 
-type ChangeProofCommitter interface {
 	// CommitChangeProof commits the key/value pairs within the [proof] to the db.
 	CommitChangeProof(ctx context.Context, proof *ChangeProof) error
 }
 
-type RangeProofGetter interface {
+type RangeProofer interface {
 	// GetRangeProofAtRoot returns a proof for the key/value pairs in this trie within the range
 	// [start, end] when the root of the trie was [rootID].
 	GetRangeProofAtRoot(
@@ -105,9 +101,7 @@ type RangeProofGetter interface {
 		end []byte,
 		maxLength int,
 	) (*RangeProof, error)
-}
 
-type RangeProofCommitter interface {
 	// CommitRangeProof commits the key/value pairs within the [proof] to the db.
 	// [start] is the smallest key in the range this [proof] covers.
 	CommitRangeProof(ctx context.Context, start []byte, proof *RangeProof) error
@@ -118,11 +112,8 @@ type MerkleDB interface {
 	Trie
 	MerkleRootGetter
 	ProofGetter
-	ChangeProofGetter
-	ChangeProofVerifier
-	ChangeProofCommitter
-	RangeProofGetter
-	RangeProofCommitter
+	ChangeProofer
+	RangeProofer
 }
 
 type Config struct {
