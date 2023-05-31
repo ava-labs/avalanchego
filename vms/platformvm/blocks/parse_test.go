@@ -105,7 +105,7 @@ func TestProposalBlocks(t *testing.T) {
 
 		// check that banff proposal block can be built and parsed
 		banffProposalBlk, err := NewBanffProposalBlock(
-			Version1,
+			Version0,
 			blkTimestamp,
 			parentID,
 			height,

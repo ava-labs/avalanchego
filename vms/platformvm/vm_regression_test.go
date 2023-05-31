@@ -438,7 +438,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 	preferredHeight := preferred.Height()
 
 	statelessStandardBlk, err := blocks.NewBanffStandardBlock(
-		blocks.Version1,
+		currentTxVersion(vm),
 		preferredChainTime,
 		preferredID,
 		preferredHeight+1,
@@ -448,7 +448,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 	addSubnetBlk0 := vm.manager.NewBlock(statelessStandardBlk)
 
 	statelessStandardBlk, err = blocks.NewBanffStandardBlock(
-		blocks.Version1,
+		currentTxVersion(vm),
 		preferredChainTime,
 		preferredID,
 		preferredHeight+1,
@@ -458,7 +458,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 	addSubnetBlk1 := vm.manager.NewBlock(statelessStandardBlk)
 
 	statelessStandardBlk, err = blocks.NewBanffStandardBlock(
-		blocks.Version1,
+		currentTxVersion(vm),
 		preferredChainTime,
 		addSubnetBlk1.ID(),
 		preferredHeight+2,
@@ -526,7 +526,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	preferredHeight := preferred.Height()
 
 	statelessBlk, err := blocks.NewBanffStandardBlock(
-		blocks.Version1,
+		currentTxVersion(vm),
 		preferredChainTime,
 		preferredID,
 		preferredHeight+1,
@@ -591,7 +591,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	preferredHeight = addValidatorStandardBlk.Height()
 
 	statelessImportBlk, err := blocks.NewBanffStandardBlock(
-		blocks.Version1,
+		currentTxVersion(vm),
 		preferredChainTime,
 		preferredID,
 		preferredHeight+1,
@@ -617,7 +617,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	mutableSharedMemory.SharedMemory = m.NewSharedMemory(vm.ctx.ChainID)
 	peerSharedMemory := m.NewSharedMemory(vm.ctx.XChainID)
 
-	utxoBytes, err := txs.Codec.Marshal(txs.Version0, utxo)
+	utxoBytes, err := txs.Codec.Marshal(currentTxVersion(vm), utxo)
 	require.NoError(err)
 
 	inputID := utxo.InputID()
@@ -654,7 +654,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	preferredHeight = importBlk.Height()
 
 	statelessAdvanceTimeStandardBlk, err := blocks.NewBanffStandardBlock(
-		blocks.Version1,
+		currentTxVersion(vm),
 		newValidatorStartTime,
 		preferredID,
 		preferredHeight+1,
@@ -751,7 +751,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredHeight := preferred.Height()
 
 	statelessAddValidatorStandardBlk0, err := blocks.NewBanffStandardBlock(
-		blocks.Version1,
+		currentTxVersion(vm),
 		preferredChainTime,
 		preferredID,
 		preferredHeight+1,
@@ -782,7 +782,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredHeight = addValidatorStandardBlk0.Height()
 
 	statelessAdvanceTimeStandardBlk0, err := blocks.NewBanffStandardBlock(
-		blocks.Version1,
+		currentTxVersion(vm),
 		newValidatorStartTime0,
 		preferredID,
 		preferredHeight+1,
@@ -853,7 +853,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredHeight = advanceTimeStandardBlk0.Height()
 
 	statelessImportBlk, err := blocks.NewBanffStandardBlock(
-		blocks.Version1,
+		currentTxVersion(vm),
 		preferredChainTime,
 		preferredID,
 		preferredHeight+1,
@@ -930,7 +930,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredHeight = importBlk.Height()
 
 	statelessAddValidatorStandardBlk1, err := blocks.NewBanffStandardBlock(
-		blocks.Version1,
+		currentTxVersion(vm),
 		preferredChainTime,
 		preferredID,
 		preferredHeight+1,
@@ -962,7 +962,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredHeight = addValidatorStandardBlk1.Height()
 
 	statelessAdvanceTimeStandardBlk1, err := blocks.NewBanffStandardBlock(
-		blocks.Version1,
+		currentTxVersion(vm),
 		newValidatorStartTime1,
 		preferredID,
 		preferredHeight+1,
@@ -1106,7 +1106,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	preferredHeight := preferred.Height()
 
 	statelessStandardBlk, err := blocks.NewBanffStandardBlock(
-		blocks.Version1,
+		currentTxVersion(vm),
 		preferredChainTime,
 		preferredID,
 		preferredHeight+1,
@@ -1142,7 +1142,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	preferredHeight = preferred.Height()
 
 	statelessStandardBlk, err = blocks.NewBanffStandardBlock(
-		blocks.Version1,
+		currentTxVersion(vm),
 		newValidatorStartTime0,
 		preferredID,
 		preferredHeight+1,

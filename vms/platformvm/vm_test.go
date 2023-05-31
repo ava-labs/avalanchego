@@ -696,7 +696,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 	statelessBlk, err := blocks.NewBanffStandardBlock(
-		blocks.Version1,
+		currentTxVersion(vm),
 		preferred.Timestamp(),
 		preferredID,
 		preferredHeight+1,
@@ -1178,7 +1178,7 @@ func TestRewardValidatorPreferred(t *testing.T) {
 // Ensure BuildBlock errors when there is no block to build
 func TestUnneededBuildBlock(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(latestFork)
+	vm, _, _ := defaultVM(cortinaFork)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		err := vm.Shutdown(context.Background())
@@ -1390,7 +1390,7 @@ func TestAtomicImport(t *testing.T) {
 			},
 		},
 	}
-	utxoBytes, err := txs.Codec.Marshal(txs.Version0, utxo)
+	utxoBytes, err := txs.Codec.Marshal(currentTxVersion(vm), utxo)
 	require.NoError(err)
 
 	inputID := utxo.InputID()
@@ -1468,7 +1468,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 			},
 		}},
 	}}
-	err := tx.Initialize(txs.Codec, txs.Version1)
+	err := tx.Initialize(txs.Codec, currentTxVersion(vm))
 	require.NoError(err)
 
 	preferred, err := vm.Builder.Preferred()
@@ -1585,10 +1585,10 @@ func TestRestartFullyAccepted(t *testing.T) {
 			},
 		}},
 	}}
-	require.NoError(tx.Initialize(txs.Codec, txs.Version1))
+	require.NoError(tx.Initialize(txs.Codec, currentTxVersion(firstVM)))
 
 	statelessBlk, err := blocks.NewBanffStandardBlock(
-		blocks.Version1,
+		currentTxVersion(firstVM),
 		nextChainTime,
 		preferredID,
 		preferredHeight+1,
@@ -1729,13 +1729,13 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 			},
 		}},
 	}}
-	require.NoError(tx.Initialize(txs.Codec, txs.Version1))
+	require.NoError(tx.Initialize(txs.Codec, currentTxVersion(vm)))
 
 	nextChainTime := initialClkTime.Add(time.Second)
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 	statelessBlk, err := blocks.NewBanffStandardBlock(
-		blocks.Version1,
+		currentTxVersion(vm),
 		nextChainTime,
 		preferredID,
 		preferredHeight+1,
@@ -2046,7 +2046,7 @@ func TestUnverifiedParent(t *testing.T) {
 			},
 		}},
 	}}
-	require.NoError(tx1.Initialize(txs.Codec, txs.Version1))
+	require.NoError(tx1.Initialize(txs.Codec, currentTxVersion(vm)))
 
 	preferred, err := vm.Builder.Preferred()
 	require.NoError(err)
@@ -2055,7 +2055,7 @@ func TestUnverifiedParent(t *testing.T) {
 	preferredHeight := preferred.Height()
 
 	statelessBlk, err := blocks.NewBanffStandardBlock(
-		blocks.Version1,
+		currentTxVersion(vm),
 		nextChainTime,
 		preferredID,
 		preferredHeight+1,
@@ -2084,11 +2084,11 @@ func TestUnverifiedParent(t *testing.T) {
 			},
 		}},
 	}}
-	require.NoError(tx1.Initialize(txs.Codec, txs.Version1))
+	require.NoError(tx1.Initialize(txs.Codec, currentTxVersion(vm)))
 	nextChainTime = nextChainTime.Add(time.Second)
 	vm.clock.Set(nextChainTime)
 	statelessSecondAdvanceTimeBlk, err := blocks.NewBanffStandardBlock(
-		blocks.Version1,
+		currentTxVersion(vm),
 		nextChainTime,
 		firstAdvanceTimeBlk.ID(),
 		firstAdvanceTimeBlk.Height()+1,
@@ -2524,7 +2524,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	require.NoError(err)
 
 	statelessBlock, err := blocks.NewBanffStandardBlock(
-		blocks.Version1,
+		currentTxVersion(vm),
 		vm.state.GetTimestamp(),
 		createSubnetBlock.ID(),
 		createSubnetBlock.Height()+1,
