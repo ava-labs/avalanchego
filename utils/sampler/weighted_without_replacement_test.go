@@ -95,10 +95,9 @@ func WeightedWithoutReplacementOutOfRangeTest(
 	t *testing.T,
 	s WeightedWithoutReplacement,
 ) {
-	err := s.Initialize([]uint64{1})
-	require.NoError(t, err)
+	require.NoError(t, s.Initialize([]uint64{1}))
 
-	_, err = s.Sample(2)
+	_, err := s.Sample(2)
 	require.ErrorIs(t, err, ErrOutOfRange)
 }
 
@@ -106,8 +105,7 @@ func WeightedWithoutReplacementEmptyWithoutWeightTest(
 	t *testing.T,
 	s WeightedWithoutReplacement,
 ) {
-	err := s.Initialize(nil)
-	require.NoError(t, err)
+	require.NoError(t, s.Initialize(nil))
 
 	indices, err := s.Sample(0)
 	require.NoError(t, err)
@@ -118,8 +116,7 @@ func WeightedWithoutReplacementEmptyTest(
 	t *testing.T,
 	s WeightedWithoutReplacement,
 ) {
-	err := s.Initialize([]uint64{1})
-	require.NoError(t, err)
+	require.NoError(t, s.Initialize([]uint64{1}))
 
 	indices, err := s.Sample(0)
 	require.NoError(t, err)
@@ -130,8 +127,7 @@ func WeightedWithoutReplacementSingletonTest(
 	t *testing.T,
 	s WeightedWithoutReplacement,
 ) {
-	err := s.Initialize([]uint64{1})
-	require.NoError(t, err)
+	require.NoError(t, s.Initialize([]uint64{1}))
 
 	indices, err := s.Sample(1)
 	require.NoError(t, err)
@@ -142,8 +138,7 @@ func WeightedWithoutReplacementWithZeroTest(
 	t *testing.T,
 	s WeightedWithoutReplacement,
 ) {
-	err := s.Initialize([]uint64{0, 1})
-	require.NoError(t, err)
+	require.NoError(t, s.Initialize([]uint64{0, 1}))
 
 	indices, err := s.Sample(1)
 	require.NoError(t, err)
@@ -159,8 +154,7 @@ func WeightedWithoutReplacementDistributionTest(
 	t *testing.T,
 	s WeightedWithoutReplacement,
 ) {
-	err := s.Initialize([]uint64{1, 1, 2})
-	require.NoError(t, err)
+	require.NoError(t, s.Initialize([]uint64{1, 1, 2}))
 
 	indices, err := s.Sample(4)
 	require.NoError(t, err)

@@ -10,9 +10,9 @@ import (
 
 	"github.com/google/btree"
 
-	"go.uber.org/zap"
-
 	"github.com/prometheus/client_golang/prometheus"
+
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/cache/metercacher"
@@ -30,6 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -131,7 +132,7 @@ type State interface {
 	GetStatelessBlock(blockID ids.ID) (blocks.Block, choices.Status, error)
 	AddStatelessBlock(block blocks.Block, status choices.Status)
 
-	GetBlockID(height uint64) (ids.ID, error)
+	GetBlockIDAtHeight(height uint64) (ids.ID, error)
 
 	// ValidatorSet adds all the validators and delegators of [subnetID] into
 	// [vdrs].
@@ -1615,7 +1616,7 @@ func (s *state) GetStatelessBlock(blockID ids.ID) (blocks.Block, choices.Status,
 	return blkState.Blk, blkState.Status, nil
 }
 
-func (s *state) GetBlockID(height uint64) (ids.ID, error) {
+func (s *state) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
 	if blkID, exists := s.addedBlockIDs[height]; exists {
 		return blkID, nil
 	}
@@ -2051,22 +2052,31 @@ func (s *state) populateBlockHeightIndex() error {
 	lastAcceptedHeight := lastAcceptedBlk.Height()
 	lastAcceptedHeightKey := database.PackUInt64(lastAcceptedHeight)
 	if _, err := database.GetID(s.blockIDDB, lastAcceptedHeightKey); err == nil {
-		// If the last accepted block is in [s.blockIDDB], no backfilling is required.
+		// If the last accepted block is in [s.blockIDDB], no backfilling is
+		// required.
 		return nil
 	}
 
 	s.ctx.Log.Info("populating platformvm block height index")
-	startTime := time.Now()
+	var (
+		startTime  = time.Now()
+		lastUpdate = startTime
+	)
 
 	blockIterator := s.blockDB.NewIterator()
 	defer blockIterator.Release()
-	for blockIterator.Next() {
+	for indexed := uint64(0); blockIterator.Next(); {
 		blkBytes := blockIterator.Value()
 
-		// Note: stored blocks are verified, so it's safe to unmarshal them with GenesisCodec
+		// Note: stored blocks are verified, so it's safe to unmarshal them with
+		// GenesisCodec
 		blkState := stateBlk{}
 		if _, err := blocks.GenesisCodec.Unmarshal(blkBytes, &blkState); err != nil {
 			return err
+		}
+
+		if blkState.Status != choices.Accepted {
+			continue
 		}
 
 		blkState.Blk, err = blocks.Parse(blocks.GenesisCodec, blkState.Bytes)
@@ -2077,23 +2087,30 @@ func (s *state) populateBlockHeightIndex() error {
 		blkHeight := blkState.Blk.Height()
 		blkID := blkState.Blk.ID()
 
-		// During the indexing process, we skip [lastAcceptedHeight] as we use it to
-		// determine if the index is complete.
-		if blkHeight == lastAcceptedHeight {
-			continue
-		}
-
 		heightKey := database.PackUInt64(blkHeight)
 		if err := database.PutID(s.blockIDDB, heightKey, blkID); err != nil {
 			return fmt.Errorf("failed to add blockID: %w", err)
 		}
+
+		indexed++
+
+		if time.Since(lastUpdate) > 5*time.Second {
+			eta := timer.EstimateETA(startTime, indexed, lastAcceptedHeight+1)
+			s.ctx.Log.Info("populating platformvm block height index",
+				zap.Uint64("progress", indexed),
+				zap.Uint64("end", lastAcceptedHeight+1),
+				zap.Duration("eta", eta),
+			)
+			lastUpdate = time.Now()
+		}
 	}
 
-	if err := database.PutID(s.blockIDDB, lastAcceptedHeightKey, s.lastAccepted); err != nil {
-		return fmt.Errorf("failed to add blockID: %w", err)
+	if err := s.Commit(); err != nil {
+		return err
 	}
 
-	s.ctx.Log.Info("populated platformvm block height index", zap.Duration("elapsed", time.Since(startTime)))
-
+	s.ctx.Log.Info("populated platformvm block height index",
+		zap.Duration("elapsed", time.Since(startTime)),
+	)
 	return nil
 }
