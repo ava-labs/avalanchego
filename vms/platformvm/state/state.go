@@ -30,6 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -2051,19 +2052,25 @@ func (s *state) populateBlockHeightIndex() error {
 	lastAcceptedHeight := lastAcceptedBlk.Height()
 	lastAcceptedHeightKey := database.PackUInt64(lastAcceptedHeight)
 	if _, err := database.GetID(s.blockIDDB, lastAcceptedHeightKey); err == nil {
-		// If the last accepted block is in [s.blockIDDB], no backfilling is required.
+		// If the last accepted block is in [s.blockIDDB], no backfilling is
+		// required.
 		return nil
 	}
 
 	s.ctx.Log.Info("populating platformvm block height index")
-	startTime := time.Now()
+	var (
+		startTime  = time.Now()
+		lastUpdate = startTime
+	)
 
 	blockIterator := s.blockDB.NewIterator()
 	defer blockIterator.Release()
-	for blockIterator.Next() {
+	for i := uint64(0); blockIterator.Next(); i++ {
+
 		blkBytes := blockIterator.Value()
 
-		// Note: stored blocks are verified, so it's safe to unmarshal them with GenesisCodec
+		// Note: stored blocks are verified, so it's safe to unmarshal them with
+		// GenesisCodec
 		blkState := stateBlk{}
 		if _, err := blocks.GenesisCodec.Unmarshal(blkBytes, &blkState); err != nil {
 			return err
@@ -2077,23 +2084,28 @@ func (s *state) populateBlockHeightIndex() error {
 		blkHeight := blkState.Blk.Height()
 		blkID := blkState.Blk.ID()
 
-		// During the indexing process, we skip [lastAcceptedHeight] as we use it to
-		// determine if the index is complete.
-		if blkHeight == lastAcceptedHeight {
-			continue
-		}
-
 		heightKey := database.PackUInt64(blkHeight)
 		if err := database.PutID(s.blockIDDB, heightKey, blkID); err != nil {
 			return fmt.Errorf("failed to add blockID: %w", err)
 		}
+
+		if time.Since(lastUpdate) > 5*time.Second {
+			eta := timer.EstimateETA(startTime, i+1, lastAcceptedHeight+1)
+			s.ctx.Log.Info("populating platformvm block height index",
+				zap.Uint64("progress", i+1),
+				zap.Uint64("end", lastAcceptedHeight+1),
+				zap.Duration("eta", eta),
+			)
+			lastUpdate = time.Now()
+		}
 	}
 
-	if err := database.PutID(s.blockIDDB, lastAcceptedHeightKey, s.lastAccepted); err != nil {
-		return fmt.Errorf("failed to add blockID: %w", err)
+	if err := s.Commit(); err != nil {
+		return err
 	}
 
-	s.ctx.Log.Info("populated platformvm block height index", zap.Duration("elapsed", time.Since(startTime)))
-
+	s.ctx.Log.Info("populated platformvm block height index",
+		zap.Duration("elapsed", time.Since(startTime)),
+	)
 	return nil
 }
