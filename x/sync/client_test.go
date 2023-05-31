@@ -14,6 +14,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"google.golang.org/protobuf/proto"
+
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -87,17 +89,19 @@ func sendRangeRequest(
 	).DoAndReturn(
 		func(_ context.Context, _ ids.NodeID, requestID uint32, responseBytes []byte) error {
 			// deserialize the response so we can modify it if needed.
-			response := &merkledb.RangeProof{}
-			_, err := merkledb.Codec.DecodeRangeProof(responseBytes, response)
-			require.NoError(err)
+			var responseProto syncpb.RangeProof
+			require.NoError(proto.Unmarshal(responseBytes, &responseProto))
+
+			var response merkledb.RangeProof
+			require.NoError(response.UnmarshalProto(&responseProto))
 
 			// modify if needed
 			if modifyResponse != nil {
-				modifyResponse(response)
+				modifyResponse(&response)
 			}
 
 			// reserialize the response and pass it to the client to complete the handling.
-			responseBytes, err = merkledb.Codec.EncodeRangeProof(merkledb.Version, response)
+			responseBytes, err := proto.Marshal(response.ToProto())
 			require.NoError(err)
 			require.NoError(networkClient.AppResponse(context.Background(), serverNodeID, requestID, responseBytes))
 			return nil
@@ -270,7 +274,7 @@ func TestGetRangeProof(t *testing.T) {
 			if test.expectedResponseLen > 0 {
 				require.Len(proof.KeyValues, test.expectedResponseLen)
 			}
-			bytes, err := merkledb.Codec.EncodeRangeProof(merkledb.Version, proof)
+			bytes, err := proto.Marshal(proof.ToProto())
 			require.NoError(err)
 			require.Less(len(bytes), int(test.request.BytesLimit))
 		})

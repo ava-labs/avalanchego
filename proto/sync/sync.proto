@@ -15,6 +15,10 @@ message Request {
   }
 }
 
+// The interface required by an x/sync/SyncManager for syncing.
+// Note this service definition only exists for use in tests.
+// A database shouldn't expose this over the internet, as it
+// allows for reading/writing to the database.
 service SyncableDB {
   rpc GetMerkleRoot(google.protobuf.Empty) returns (GetMerkleRootResponse);
 
@@ -25,7 +29,6 @@ service SyncableDB {
   rpc GetProof(GetProofRequest) returns (GetProofResponse);
 
   rpc GetRangeProof(GetRangeProofRequest) returns (GetRangeProofResponse);
-  rpc VerifyRangeProof(VerifyRangeProofRequest) returns (VerifyRangeProofResponse);
   rpc CommitRangeProof(CommitRangeProofRequest) returns (CommitRangeProofResponse);
 }
 
@@ -33,7 +36,6 @@ message GetMerkleRootResponse {
   bytes root_hash = 1;
 }
 
-// A GetChangeProofRequest requests the changes between two revisions.
 message GetChangeProofRequest {
   bytes start_root_hash = 1;
   bytes end_root_hash = 2;
@@ -71,8 +73,6 @@ message GetProofResponse {
   Proof proof = 1;
 }
 
-// A GetRangeProofRequest requests the key-value pairs in a given key range
-// at a specific revision.
 message GetRangeProofRequest {
   bytes root_hash = 1;
   bytes start_key = 2;
@@ -85,14 +85,6 @@ message GetRangeProofResponse {
   RangeProof proof = 1;
 }
 
-message VerifyRangeProofRequest {
-  RangeProof proof = 1;
-}
-
-message VerifyRangeProofResponse {
-  rpcdb.Error error = 1;
-}
-
 message CommitRangeProofRequest {
   bytes start_key = 1;
   RangeProof range_proof = 2;
@@ -102,10 +94,6 @@ message CommitRangeProofResponse {
   rpcdb.Error error = 1;
 }
 
-// ChangeProof consists of a proof of the smallest changed key,
-// a proof of the highest changed key, and the keys that have changed
-// between those. Some keys may be deleted (hence the use of KeyChange
-// instead of KeyValue).
 message ChangeProof {
   bool had_roots_in_history = 1; // TODO remove
   Proof start_proof = 2;
@@ -113,7 +101,6 @@ message ChangeProof {
   repeated KeyChange key_changes = 4;
 }
 
-// RangeProof is the response to a GetRangeProofRequest.
 message RangeProof {
   Proof start = 1;
   Proof end = 2;
@@ -124,34 +111,29 @@ message Proof {
   repeated ProofNode proof = 1;
 }
 
-// ProofNode is a node in a merkle proof.
 message ProofNode {
   SerializedPath key = 1;
   MaybeBytes value_or_hash = 2;
   map<uint32, bytes> children = 3;
 }
 
-// KeyChange is a change for a key from one revision to another.
-// If the value is None, the key was deleted.
 message KeyChange {
   bytes key = 1;
   MaybeBytes value = 2;
 }
 
-// SerializedPath is the serialized representation of a path.
 message SerializedPath {
-  uint32 nibble_length = 1;
+  uint64 nibble_length = 1;
   bytes value = 2;
 }
 
-// MaybeBytes is an option wrapping bytes.
 message MaybeBytes {
   bytes value = 1;
   // If false, this is None.
+  // Otherwise this is Some.
   bool is_nothing = 2;
 }
 
-// KeyValue represents a single key and its value.
 message KeyValue {
   bytes key = 1;
   bytes value = 2;

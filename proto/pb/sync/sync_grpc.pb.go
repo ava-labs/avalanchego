@@ -26,7 +26,6 @@ const (
 	SyncableDB_CommitChangeProof_FullMethodName = "/sync.SyncableDB/CommitChangeProof"
 	SyncableDB_GetProof_FullMethodName          = "/sync.SyncableDB/GetProof"
 	SyncableDB_GetRangeProof_FullMethodName     = "/sync.SyncableDB/GetRangeProof"
-	SyncableDB_VerifyRangeProof_FullMethodName  = "/sync.SyncableDB/VerifyRangeProof"
 	SyncableDB_CommitRangeProof_FullMethodName  = "/sync.SyncableDB/CommitRangeProof"
 )
 
@@ -40,7 +39,6 @@ type SyncableDBClient interface {
 	CommitChangeProof(ctx context.Context, in *CommitChangeProofRequest, opts ...grpc.CallOption) (*CommitChangeProofResponse, error)
 	GetProof(ctx context.Context, in *GetProofRequest, opts ...grpc.CallOption) (*GetProofResponse, error)
 	GetRangeProof(ctx context.Context, in *GetRangeProofRequest, opts ...grpc.CallOption) (*GetRangeProofResponse, error)
-	VerifyRangeProof(ctx context.Context, in *VerifyRangeProofRequest, opts ...grpc.CallOption) (*VerifyRangeProofResponse, error)
 	CommitRangeProof(ctx context.Context, in *CommitRangeProofRequest, opts ...grpc.CallOption) (*CommitRangeProofResponse, error)
 }
 
@@ -106,15 +104,6 @@ func (c *syncableDBClient) GetRangeProof(ctx context.Context, in *GetRangeProofR
 	return out, nil
 }
 
-func (c *syncableDBClient) VerifyRangeProof(ctx context.Context, in *VerifyRangeProofRequest, opts ...grpc.CallOption) (*VerifyRangeProofResponse, error) {
-	out := new(VerifyRangeProofResponse)
-	err := c.cc.Invoke(ctx, SyncableDB_VerifyRangeProof_FullMethodName, in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *syncableDBClient) CommitRangeProof(ctx context.Context, in *CommitRangeProofRequest, opts ...grpc.CallOption) (*CommitRangeProofResponse, error) {
 	out := new(CommitRangeProofResponse)
 	err := c.cc.Invoke(ctx, SyncableDB_CommitRangeProof_FullMethodName, in, out, opts...)
@@ -134,7 +123,6 @@ type SyncableDBServer interface {
 	CommitChangeProof(context.Context, *CommitChangeProofRequest) (*CommitChangeProofResponse, error)
 	GetProof(context.Context, *GetProofRequest) (*GetProofResponse, error)
 	GetRangeProof(context.Context, *GetRangeProofRequest) (*GetRangeProofResponse, error)
-	VerifyRangeProof(context.Context, *VerifyRangeProofRequest) (*VerifyRangeProofResponse, error)
 	CommitRangeProof(context.Context, *CommitRangeProofRequest) (*CommitRangeProofResponse, error)
 	mustEmbedUnimplementedSyncableDBServer()
 }
@@ -160,9 +148,6 @@ func (UnimplementedSyncableDBServer) GetProof(context.Context, *GetProofRequest)
 }
 func (UnimplementedSyncableDBServer) GetRangeProof(context.Context, *GetRangeProofRequest) (*GetRangeProofResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetRangeProof not implemented")
-}
-func (UnimplementedSyncableDBServer) VerifyRangeProof(context.Context, *VerifyRangeProofRequest) (*VerifyRangeProofResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method VerifyRangeProof not implemented")
 }
 func (UnimplementedSyncableDBServer) CommitRangeProof(context.Context, *CommitRangeProofRequest) (*CommitRangeProofResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CommitRangeProof not implemented")
@@ -288,24 +273,6 @@ func _SyncableDB_GetRangeProof_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
-func _SyncableDB_VerifyRangeProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(VerifyRangeProofRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(SyncableDBServer).VerifyRangeProof(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: SyncableDB_VerifyRangeProof_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SyncableDBServer).VerifyRangeProof(ctx, req.(*VerifyRangeProofRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _SyncableDB_CommitRangeProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CommitRangeProofRequest)
 	if err := dec(in); err != nil {
@@ -354,10 +321,6 @@ var SyncableDB_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetRangeProof",
 			Handler:    _SyncableDB_GetRangeProof_Handler,
-		},
-		{
-			MethodName: "VerifyRangeProof",
-			Handler:    _SyncableDB_VerifyRangeProof_Handler,
 		},
 		{
 			MethodName: "CommitRangeProof",
