@@ -157,6 +157,7 @@ func (m *manager) GetValidatorSet(ctx context.Context, height uint64, subnetID i
 	// get the start time to track metrics
 	startTime := m.clk.Time()
 
+	// Note: currentSubnetValidators may be empty if subnet has no currently active validators
 	currentSubnetValidators, ok := m.cfg.Validators.Get(subnetID)
 	if !ok {
 		currentSubnetValidators = validators.NewSet()
@@ -170,24 +171,38 @@ func (m *manager) GetValidatorSet(ctx context.Context, height uint64, subnetID i
 		return nil, ErrMissingValidator
 	}
 
-	// Load BLS key from primary network stakers (BLS key is not stored in subnet, only in primary network counterpart)
 	currentSubnetValidatorList := currentSubnetValidators.List()
 	vdrSet := make(map[ids.NodeID]*validators.GetValidatorOutput, len(currentSubnetValidatorList))
+
+	// Duly initialize validators weight, if some of them are currently validating primary network
 	for _, vdr := range currentSubnetValidatorList {
-		primaryVdr, ok := currentPrimaryNetworkValidators.Get(vdr.NodeID)
-		if !ok {
-			// This should never happen
-			return nil, fmt.Errorf("%w: %s", ErrMissingValidator, vdr.NodeID)
-		}
 		vdrSet[vdr.NodeID] = &validators.GetValidatorOutput{
-			NodeID:    vdr.NodeID,
-			PublicKey: primaryVdr.PublicKey,
-			Weight:    vdr.Weight,
+			NodeID: vdr.NodeID,
+			Weight: vdr.Weight,
 		}
 	}
 
 	for diffHeight := lastAcceptedHeight; diffHeight > height; diffHeight-- {
-		err := m.applyValidatorDiffs(vdrSet, subnetID, diffHeight)
+		err := m.applyValidatorWeightDiffs(vdrSet, subnetID, diffHeight)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Load BLS key from currently active primary network validators
+	// Note that this BLS key is not necessarily the right one, since
+	// a primary network validator may have restaked multiple times and
+	// changed its BLS key in the selected height interval.
+	for _, vdr := range vdrSet {
+		primaryVdr, ok := currentPrimaryNetworkValidators.Get(vdr.NodeID)
+		if ok {
+			vdr.PublicKey = primaryVdr.PublicKey
+		}
+	}
+
+	// Make sure we pick the right BLS key
+	for diffHeight := lastAcceptedHeight; diffHeight > height; diffHeight-- {
+		err := m.applyValidatorPKDiffs(vdrSet, diffHeight)
 		if err != nil {
 			return nil, err
 		}
@@ -203,7 +218,7 @@ func (m *manager) GetValidatorSet(ctx context.Context, height uint64, subnetID i
 	return vdrSet, nil
 }
 
-func (m *manager) applyValidatorDiffs(
+func (m *manager) applyValidatorWeightDiffs(
 	vdrSet map[ids.NodeID]*validators.GetValidatorOutput,
 	subnetID ids.ID,
 	height uint64,
@@ -244,21 +259,26 @@ func (m *manager) applyValidatorDiffs(
 		}
 	}
 
+	return nil
+}
+
+func (m *manager) applyValidatorPKDiffs(
+	vdrSet map[ids.NodeID]*validators.GetValidatorOutput,
+	height uint64,
+) error {
 	pkDiffs, err := m.state.GetValidatorPublicKeyDiffs(height)
 	if err != nil {
 		return err
 	}
 
 	for nodeID, pk := range pkDiffs {
-		// pkDiffs includes all primary network key diffs, if we are
-		// fetching a subnet's validator set, we should ignore non-subnet
-		// validators.
 		if vdr, ok := vdrSet[nodeID]; ok {
 			// The validator's public key was removed at this block, so it
 			// was in the validator set before.
 			vdr.PublicKey = pk
 		}
 	}
+
 	return nil
 }
 

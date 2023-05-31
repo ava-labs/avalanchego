@@ -82,16 +82,16 @@ var (
 func TestVM_GetValidatorSet(t *testing.T) {
 	// Populate the validator set to use below
 	var (
-		numVdrs       = 4
-		vdrBaseWeight = uint64(1_000)
-		vdrs          []*validators.Validator
+		numVdrs        = 4
+		vdrBaseWeight  = uint64(1_000)
+		testValidators []*validators.Validator
 	)
 
 	for i := 0; i < numVdrs; i++ {
 		sk, err := bls.NewSecretKey()
 		require.NoError(t, err)
 
-		vdrs = append(vdrs, &validators.Validator{
+		testValidators = append(testValidators, &validators.Validator{
 			NodeID:    ids.GenerateTestNodeID(),
 			PublicKey: bls.PublicFromSecretKey(sk),
 			Weight:    vdrBaseWeight + uint64(i),
@@ -105,7 +105,7 @@ func TestVM_GetValidatorSet(t *testing.T) {
 		lastAcceptedHeight uint64
 		subnetID           ids.ID
 		// Validator sets at tip
-		currentPrimaryNetworkValidators []*validators.Validator
+		currentPrimaryNetworkValidators map[ids.NodeID]*validators.Validator
 		currentSubnetValidators         []*validators.Validator
 		// Diff at tip, block before tip, etc.
 		// This must have [lastAcceptedHeight] - [height] elements
@@ -129,17 +129,17 @@ func TestVM_GetValidatorSet(t *testing.T) {
 			name:               "at tip",
 			height:             1,
 			lastAcceptedHeight: 1,
-			currentPrimaryNetworkValidators: []*validators.Validator{
-				copyPrimaryValidator(vdrs[0]),
+			currentPrimaryNetworkValidators: map[ids.NodeID]*validators.Validator{
+				testValidators[0].NodeID: copyPrimaryValidator(testValidators[0]),
 			},
 			currentSubnetValidators: []*validators.Validator{
-				copySubnetValidator(vdrs[0]),
+				copySubnetValidator(testValidators[0]),
 			},
 			expectedVdrSet: map[ids.NodeID]*validators.GetValidatorOutput{
-				vdrs[0].NodeID: {
-					NodeID:    vdrs[0].NodeID,
-					PublicKey: vdrs[0].PublicKey,
-					Weight:    vdrs[0].Weight,
+				testValidators[0].NodeID: {
+					NodeID:    testValidators[0].NodeID,
+					PublicKey: testValidators[0].PublicKey,
+					Weight:    testValidators[0].Weight,
 				},
 			},
 			expectedErr: nil,
@@ -148,53 +148,53 @@ func TestVM_GetValidatorSet(t *testing.T) {
 			name:               "1 before tip",
 			height:             2,
 			lastAcceptedHeight: 3,
-			currentPrimaryNetworkValidators: []*validators.Validator{
-				copyPrimaryValidator(vdrs[0]),
-				copyPrimaryValidator(vdrs[1]),
+			currentPrimaryNetworkValidators: map[ids.NodeID]*validators.Validator{
+				testValidators[0].NodeID: copyPrimaryValidator(testValidators[0]),
+				testValidators[1].NodeID: copyPrimaryValidator(testValidators[1]),
 			},
 			currentSubnetValidators: []*validators.Validator{
 				// At tip we have these 2 validators
-				copySubnetValidator(vdrs[0]),
-				copySubnetValidator(vdrs[1]),
+				copySubnetValidator(testValidators[0]),
+				copySubnetValidator(testValidators[1]),
 			},
 			weightDiffs: []map[ids.NodeID]*state.ValidatorWeightDiff{
 				{
 					// At the tip block vdrs[0] lost weight, vdrs[1] gained weight,
 					// and vdrs[2] left
-					vdrs[0].NodeID: {
+					testValidators[0].NodeID: {
 						Decrease: true,
 						Amount:   1,
 					},
-					vdrs[1].NodeID: {
+					testValidators[1].NodeID: {
 						Decrease: false,
 						Amount:   1,
 					},
-					vdrs[2].NodeID: {
+					testValidators[2].NodeID: {
 						Decrease: true,
-						Amount:   vdrs[2].Weight,
+						Amount:   testValidators[2].Weight,
 					},
 				},
 			},
 			pkDiffs: []map[ids.NodeID]*bls.PublicKey{
 				{
-					vdrs[2].NodeID: vdrs[2].PublicKey,
+					testValidators[2].NodeID: testValidators[2].PublicKey,
 				},
 			},
 			expectedVdrSet: map[ids.NodeID]*validators.GetValidatorOutput{
-				vdrs[0].NodeID: {
-					NodeID:    vdrs[0].NodeID,
-					PublicKey: vdrs[0].PublicKey,
-					Weight:    vdrs[0].Weight + 1,
+				testValidators[0].NodeID: {
+					NodeID:    testValidators[0].NodeID,
+					PublicKey: testValidators[0].PublicKey,
+					Weight:    testValidators[0].Weight + 1,
 				},
-				vdrs[1].NodeID: {
-					NodeID:    vdrs[1].NodeID,
-					PublicKey: vdrs[1].PublicKey,
-					Weight:    vdrs[1].Weight - 1,
+				testValidators[1].NodeID: {
+					NodeID:    testValidators[1].NodeID,
+					PublicKey: testValidators[1].PublicKey,
+					Weight:    testValidators[1].Weight - 1,
 				},
-				vdrs[2].NodeID: {
-					NodeID:    vdrs[2].NodeID,
-					PublicKey: vdrs[2].PublicKey,
-					Weight:    vdrs[2].Weight,
+				testValidators[2].NodeID: {
+					NodeID:    testValidators[2].NodeID,
+					PublicKey: testValidators[2].PublicKey,
+					Weight:    testValidators[2].Weight,
 				},
 			},
 			expectedErr: nil,
@@ -203,65 +203,65 @@ func TestVM_GetValidatorSet(t *testing.T) {
 			name:               "2 before tip",
 			height:             3,
 			lastAcceptedHeight: 5,
-			currentPrimaryNetworkValidators: []*validators.Validator{
-				copyPrimaryValidator(vdrs[0]),
-				copyPrimaryValidator(vdrs[1]),
+			currentPrimaryNetworkValidators: map[ids.NodeID]*validators.Validator{
+				testValidators[0].NodeID: copyPrimaryValidator(testValidators[0]),
+				testValidators[1].NodeID: copyPrimaryValidator(testValidators[1]),
 			},
 			currentSubnetValidators: []*validators.Validator{
 				// At tip we have these 2 validators
-				copySubnetValidator(vdrs[0]),
-				copySubnetValidator(vdrs[1]),
+				copySubnetValidator(testValidators[0]),
+				copySubnetValidator(testValidators[1]),
 			},
 			weightDiffs: []map[ids.NodeID]*state.ValidatorWeightDiff{
 				{
 					// At the tip block vdrs[0] lost weight, vdrs[1] gained weight,
 					// and vdrs[2] left
-					vdrs[0].NodeID: {
+					testValidators[0].NodeID: {
 						Decrease: true,
 						Amount:   1,
 					},
-					vdrs[1].NodeID: {
+					testValidators[1].NodeID: {
 						Decrease: false,
 						Amount:   1,
 					},
-					vdrs[2].NodeID: {
+					testValidators[2].NodeID: {
 						Decrease: true,
-						Amount:   vdrs[2].Weight,
+						Amount:   testValidators[2].Weight,
 					},
 				},
 				{
 					// At the block before tip vdrs[0] lost weight, vdrs[1] gained weight,
 					// vdrs[2] joined
-					vdrs[0].NodeID: {
+					testValidators[0].NodeID: {
 						Decrease: true,
 						Amount:   1,
 					},
-					vdrs[1].NodeID: {
+					testValidators[1].NodeID: {
 						Decrease: false,
 						Amount:   1,
 					},
-					vdrs[2].NodeID: {
+					testValidators[2].NodeID: {
 						Decrease: false,
-						Amount:   vdrs[2].Weight,
+						Amount:   testValidators[2].Weight,
 					},
 				},
 			},
 			pkDiffs: []map[ids.NodeID]*bls.PublicKey{
 				{
-					vdrs[2].NodeID: vdrs[2].PublicKey,
+					testValidators[2].NodeID: testValidators[2].PublicKey,
 				},
 				{},
 			},
 			expectedVdrSet: map[ids.NodeID]*validators.GetValidatorOutput{
-				vdrs[0].NodeID: {
-					NodeID:    vdrs[0].NodeID,
-					PublicKey: vdrs[0].PublicKey,
-					Weight:    vdrs[0].Weight + 2,
+				testValidators[0].NodeID: {
+					NodeID:    testValidators[0].NodeID,
+					PublicKey: testValidators[0].PublicKey,
+					Weight:    testValidators[0].Weight + 2,
 				},
-				vdrs[1].NodeID: {
-					NodeID:    vdrs[1].NodeID,
-					PublicKey: vdrs[1].PublicKey,
-					Weight:    vdrs[1].Weight - 2,
+				testValidators[1].NodeID: {
+					NodeID:    testValidators[1].NodeID,
+					PublicKey: testValidators[1].PublicKey,
+					Weight:    testValidators[1].Weight - 2,
 				},
 			},
 			expectedErr: nil,
@@ -270,30 +270,30 @@ func TestVM_GetValidatorSet(t *testing.T) {
 			name:               "1 before tip; nil public key",
 			height:             4,
 			lastAcceptedHeight: 5,
-			currentPrimaryNetworkValidators: []*validators.Validator{
-				copyPrimaryValidator(vdrs[0]),
-				copyPrimaryValidator(vdrs[1]),
+			currentPrimaryNetworkValidators: map[ids.NodeID]*validators.Validator{
+				testValidators[0].NodeID: copyPrimaryValidator(testValidators[0]),
+				testValidators[1].NodeID: copyPrimaryValidator(testValidators[1]),
 			},
 			currentSubnetValidators: []*validators.Validator{
 				// At tip we have these 2 validators
-				copySubnetValidator(vdrs[0]),
-				copySubnetValidator(vdrs[1]),
+				copySubnetValidator(testValidators[0]),
+				copySubnetValidator(testValidators[1]),
 			},
 			weightDiffs: []map[ids.NodeID]*state.ValidatorWeightDiff{
 				{
 					// At the tip block vdrs[0] lost weight, vdrs[1] gained weight,
 					// and vdrs[2] left
-					vdrs[0].NodeID: {
+					testValidators[0].NodeID: {
 						Decrease: true,
 						Amount:   1,
 					},
-					vdrs[1].NodeID: {
+					testValidators[1].NodeID: {
 						Decrease: false,
 						Amount:   1,
 					},
-					vdrs[2].NodeID: {
+					testValidators[2].NodeID: {
 						Decrease: true,
-						Amount:   vdrs[2].Weight,
+						Amount:   testValidators[2].Weight,
 					},
 				},
 			},
@@ -301,19 +301,19 @@ func TestVM_GetValidatorSet(t *testing.T) {
 				{},
 			},
 			expectedVdrSet: map[ids.NodeID]*validators.GetValidatorOutput{
-				vdrs[0].NodeID: {
-					NodeID:    vdrs[0].NodeID,
-					PublicKey: vdrs[0].PublicKey,
-					Weight:    vdrs[0].Weight + 1,
+				testValidators[0].NodeID: {
+					NodeID:    testValidators[0].NodeID,
+					PublicKey: testValidators[0].PublicKey,
+					Weight:    testValidators[0].Weight + 1,
 				},
-				vdrs[1].NodeID: {
-					NodeID:    vdrs[1].NodeID,
-					PublicKey: vdrs[1].PublicKey,
-					Weight:    vdrs[1].Weight - 1,
+				testValidators[1].NodeID: {
+					NodeID:    testValidators[1].NodeID,
+					PublicKey: testValidators[1].PublicKey,
+					Weight:    testValidators[1].Weight - 1,
 				},
-				vdrs[2].NodeID: {
-					NodeID: vdrs[2].NodeID,
-					Weight: vdrs[2].Weight,
+				testValidators[2].NodeID: {
+					NodeID: testValidators[2].NodeID,
+					Weight: testValidators[2].Weight,
 				},
 			},
 			expectedErr: nil,
@@ -323,31 +323,31 @@ func TestVM_GetValidatorSet(t *testing.T) {
 			height:             5,
 			lastAcceptedHeight: 6,
 			subnetID:           ids.GenerateTestID(),
-			currentPrimaryNetworkValidators: []*validators.Validator{
-				copyPrimaryValidator(vdrs[0]),
-				copyPrimaryValidator(vdrs[1]),
-				copyPrimaryValidator(vdrs[3]),
+			currentPrimaryNetworkValidators: map[ids.NodeID]*validators.Validator{
+				testValidators[0].NodeID: copyPrimaryValidator(testValidators[0]),
+				testValidators[1].NodeID: copyPrimaryValidator(testValidators[1]),
+				testValidators[3].NodeID: copyPrimaryValidator(testValidators[3]),
 			},
 			currentSubnetValidators: []*validators.Validator{
 				// At tip we have these 2 validators
-				copySubnetValidator(vdrs[0]),
-				copySubnetValidator(vdrs[1]),
+				copySubnetValidator(testValidators[0]),
+				copySubnetValidator(testValidators[1]),
 			},
 			weightDiffs: []map[ids.NodeID]*state.ValidatorWeightDiff{
 				{
 					// At the tip block vdrs[0] lost weight, vdrs[1] gained weight,
 					// and vdrs[2] left
-					vdrs[0].NodeID: {
+					testValidators[0].NodeID: {
 						Decrease: true,
 						Amount:   1,
 					},
-					vdrs[1].NodeID: {
+					testValidators[1].NodeID: {
 						Decrease: false,
 						Amount:   1,
 					},
-					vdrs[2].NodeID: {
+					testValidators[2].NodeID: {
 						Decrease: true,
-						Amount:   vdrs[2].Weight,
+						Amount:   testValidators[2].Weight,
 					},
 				},
 			},
@@ -355,19 +355,19 @@ func TestVM_GetValidatorSet(t *testing.T) {
 				{},
 			},
 			expectedVdrSet: map[ids.NodeID]*validators.GetValidatorOutput{
-				vdrs[0].NodeID: {
-					NodeID:    vdrs[0].NodeID,
-					PublicKey: vdrs[0].PublicKey,
-					Weight:    vdrs[0].Weight + 1,
+				testValidators[0].NodeID: {
+					NodeID:    testValidators[0].NodeID,
+					PublicKey: testValidators[0].PublicKey,
+					Weight:    testValidators[0].Weight + 1,
 				},
-				vdrs[1].NodeID: {
-					NodeID:    vdrs[1].NodeID,
-					PublicKey: vdrs[1].PublicKey,
-					Weight:    vdrs[1].Weight - 1,
+				testValidators[1].NodeID: {
+					NodeID:    testValidators[1].NodeID,
+					PublicKey: testValidators[1].PublicKey,
+					Weight:    testValidators[1].Weight - 1,
 				},
-				vdrs[2].NodeID: {
-					NodeID: vdrs[2].NodeID,
-					Weight: vdrs[2].Weight,
+				testValidators[2].NodeID: {
+					NodeID: testValidators[2].NodeID,
+					Weight: testValidators[2].Weight,
 				},
 			},
 			expectedErr: nil,
@@ -377,25 +377,25 @@ func TestVM_GetValidatorSet(t *testing.T) {
 			height:             4,
 			lastAcceptedHeight: 5,
 			subnetID:           ids.GenerateTestID(),
-			currentPrimaryNetworkValidators: []*validators.Validator{
-				copyPrimaryValidator(vdrs[0]),
+			currentPrimaryNetworkValidators: map[ids.NodeID]*validators.Validator{
+				testValidators[0].NodeID: copyPrimaryValidator(testValidators[0]),
 			},
 			currentSubnetValidators: []*validators.Validator{
-				copySubnetValidator(vdrs[0]),
+				copySubnetValidator(testValidators[0]),
 			},
 			weightDiffs: []map[ids.NodeID]*state.ValidatorWeightDiff{
 				{},
 			},
 			pkDiffs: []map[ids.NodeID]*bls.PublicKey{
 				{
-					vdrs[1].NodeID: vdrs[1].PublicKey,
+					testValidators[1].NodeID: testValidators[1].PublicKey,
 				},
 			},
 			expectedVdrSet: map[ids.NodeID]*validators.GetValidatorOutput{
-				vdrs[0].NodeID: {
-					NodeID:    vdrs[0].NodeID,
-					PublicKey: vdrs[0].PublicKey,
-					Weight:    vdrs[0].Weight,
+				testValidators[0].NodeID: {
+					NodeID:    testValidators[0].NodeID,
+					PublicKey: testValidators[0].PublicKey,
+					Weight:    testValidators[0].Weight,
 				},
 			},
 			expectedErr: nil,
@@ -436,8 +436,14 @@ func TestVM_GetValidatorSet(t *testing.T) {
 				mockPrimaryVdrSet = validators.NewMockSet(ctrl)
 				vdrs.EXPECT().Get(constants.PrimaryNetworkID).Return(mockPrimaryVdrSet, true).AnyTimes()
 			}
-			for _, vdr := range tt.currentPrimaryNetworkValidators {
-				mockPrimaryVdrSet.EXPECT().Get(vdr.NodeID).Return(vdr, true).AnyTimes()
+
+			for _, vdr := range testValidators {
+				_, current := tt.currentPrimaryNetworkValidators[vdr.NodeID]
+				if current {
+					mockPrimaryVdrSet.EXPECT().Get(vdr.NodeID).Return(vdr, true).AnyTimes()
+				} else {
+					mockPrimaryVdrSet.EXPECT().Get(vdr.NodeID).Return(nil, false).AnyTimes()
+				}
 			}
 
 			// Tell state what diffs to report
