@@ -55,37 +55,37 @@ func TestCaminoBuilderTxAddressState(t *testing.T) {
 
 	tests := map[string]struct {
 		remove      bool
-		state       uint8
+		state       txs.AddressStateBit
 		address     ids.ShortID
 		expectedErr error
 	}{
 		"KYC Role: Add": {
 			remove:      false,
-			state:       txs.AddressStateRoleKyc,
+			state:       txs.AddressStateBitRoleKYC,
 			address:     caminoPreFundedKeys[0].PublicKey().Address(),
 			expectedErr: nil,
 		},
 		"KYC Role: Remove": {
 			remove:      true,
-			state:       txs.AddressStateRoleKyc,
+			state:       txs.AddressStateBitRoleKYC,
 			address:     caminoPreFundedKeys[0].PublicKey().Address(),
 			expectedErr: nil,
 		},
 		"Admin Role: Add": {
 			remove:      false,
-			state:       txs.AddressStateRoleAdmin,
+			state:       txs.AddressStateBitRoleAdmin,
 			address:     caminoPreFundedKeys[0].PublicKey().Address(),
 			expectedErr: nil,
 		},
 		"Admin Role: Remove": {
 			remove:      true,
-			state:       txs.AddressStateRoleAdmin,
+			state:       txs.AddressStateBitRoleAdmin,
 			address:     caminoPreFundedKeys[0].PublicKey().Address(),
 			expectedErr: nil,
 		},
 		"Empty Address": {
 			remove:      false,
-			state:       txs.AddressStateRoleKyc,
+			state:       txs.AddressStateBitRoleKYC,
 			address:     ids.ShortEmpty,
 			expectedErr: txs.ErrEmptyAddress,
 		},

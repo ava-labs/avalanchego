@@ -248,17 +248,17 @@ func TestSyncGenesis(t *testing.T) {
 				g: defaultGenesisState([]pvm_genesis.AddressState{
 					{
 						Address: initialAdmin,
-						State:   txs.AddressStateRoleAdminBit,
+						State:   txs.AddressStateRoleAdmin,
 					},
 					{
 						Address: shortID,
-						State:   txs.AddressStateRoleKycBit,
+						State:   txs.AddressStateRoleKYC,
 					},
 				}, depositTxs, initialAdmin),
 			},
 			cs: *wrappers.IgnoreError(newCaminoState(baseDB, validatorsDB, prometheus.NewRegistry())).(*caminoState),
 			want: caminoDiff{
-				modifiedAddressStates: map[ids.ShortID]uint64{initialAdmin: txs.AddressStateRoleAdminBit, shortID: txs.AddressStateRoleKycBit},
+				modifiedAddressStates: map[ids.ShortID]txs.AddressState{initialAdmin: txs.AddressStateRoleAdmin, shortID: txs.AddressStateRoleKYC},
 				modifiedDepositOffers: map[ids.ID]*deposit.Offer{
 					depositOffers[0].ID: depositOffers[0],
 					depositOffers[1].ID: depositOffers[1],

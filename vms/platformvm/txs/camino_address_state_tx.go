@@ -11,28 +11,36 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 )
 
+type (
+	AddressState    uint64
+	AddressStateBit uint8
+)
+
 // AddressState flags, max 63
 const (
-	AddressStateRoleAdmin    = uint8(0)
-	AddressStateRoleAdminBit = uint64(0b1)
-	AddressStateRoleKyc      = uint8(1)
-	AddressStateRoleKycBit   = uint64(0b10)
-	AddressStateRoleBits     = uint64(0b11)
+	AddressStateBitRoleAdmin    AddressStateBit = 0
+	AddressStateBitRoleKYC      AddressStateBit = 1
+	AddressStateBitKYCVerified  AddressStateBit = 32
+	AddressStateBitKYCExpired   AddressStateBit = 33
+	AddressStateBitConsortium   AddressStateBit = 38
+	AddressStateBitNodeDeferred AddressStateBit = 39
+	AddressStateBitMax          AddressStateBit = 63
 
-	AddressStateKycVerified    = uint8(32)
-	AddressStateKycVerifiedBit = uint64(0b0100000000000000000000000000000000)
-	AddressStateKycExpired     = uint8(33)
-	AddressStateKycExpiredBit  = uint64(0b1000000000000000000000000000000000)
-	AddressStateKycBits        = uint64(0b1100000000000000000000000000000000)
+	AddressStateEmpty AddressState = 0
 
-	AddressStateConsortium      = uint8(38)
-	AddressStateConsortiumBit   = uint64(0b0100000000000000000000000000000000000000)
-	AddressStateNodeDeferred    = uint8(39)
-	AddressStateNodeDeferredBit = uint64(0b1000000000000000000000000000000000000000)
-	AddressStateVoteBits        = uint64(0b1100000000000000000000000000000000000000)
+	AddressStateRoleAdmin AddressState = 0b1
+	AddressStateRoleKYC   AddressState = 0b10
+	AddressStateRoleAll   AddressState = 0b11
 
-	AddressStateMax       = uint8(63)
-	AddressStateValidBits = AddressStateRoleBits | AddressStateKycBits | AddressStateVoteBits
+	AddressStateKYCVerified AddressState = 0b0100000000000000000000000000000000
+	AddressStateKYCExpired  AddressState = 0b1000000000000000000000000000000000
+	AddressStateKYCAll      AddressState = AddressStateKYCVerified | AddressStateKYCExpired
+
+	AddressStateConsortiumMember AddressState = 0b0100000000000000000000000000000000000000
+	AddressStateNodeDeferred     AddressState = 0b1000000000000000000000000000000000000000
+	AddressStateVoteBits         AddressState = 0b1100000000000000000000000000000000000000 // TODO @evlekht rename ?
+
+	AddressStateValidBits = AddressStateRoleAll | AddressStateKYCAll | AddressStateVoteBits
 )
 
 var (
@@ -49,7 +57,7 @@ type AddressStateTx struct {
 	// The address to add / remove state
 	Address ids.ShortID `serialize:"true" json:"address"`
 	// The state to set / unset
-	State uint8 `serialize:"true" json:"state"`
+	State AddressStateBit `serialize:"true" json:"state"`
 	// Remove or add the flag ?
 	Remove bool `serialize:"true" json:"remove"`
 }
@@ -63,7 +71,7 @@ func (tx *AddressStateTx) SyntacticVerify(ctx *snow.Context) error {
 		return nil
 	case tx.Address == ids.ShortEmpty:
 		return ErrEmptyAddress
-	case tx.State > AddressStateMax || AddressStateValidBits&(uint64(1)<<tx.State) == 0:
+	case tx.State > AddressStateBitMax || AddressStateValidBits&AddressState(uint64(1)<<tx.State) == 0:
 		return ErrInvalidState
 	}
 

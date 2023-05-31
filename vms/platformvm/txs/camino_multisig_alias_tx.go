@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/multisig"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 )
 
 var (
@@ -49,6 +50,10 @@ func (tx *MultisigAliasTx) SyntacticVerify(ctx *snow.Context) error {
 	}
 	if err := verify.All(&tx.MultisigAlias, tx.Auth); err != nil {
 		return fmt.Errorf("%w: %s", errFailedToVerifyAliasOrAuth, err.Error())
+	}
+
+	if err := locked.VerifyNoLocks(tx.Ins, tx.Outs); err != nil {
+		return err
 	}
 
 	// cache that this is valid

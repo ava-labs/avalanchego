@@ -89,6 +89,10 @@ type CaminoProposalTxExecutor struct {
  * has access to this node specific private key.
  */
 func (e *CaminoStandardTxExecutor) verifyNodeSignature(nodeID ids.NodeID) error {
+	if len(e.Tx.Creds) < 2 {
+		return errWrongCredentialsNumber
+	}
+
 	return e.verifyNodeSignatureSig(nodeID, e.Tx.Creds[len(e.Tx.Creds)-1])
 }
 
@@ -136,6 +140,10 @@ func (e *CaminoStandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error 
 
 	if err := e.Tx.SyntacticVerify(e.Backend.Ctx); err != nil {
 		return err
+	}
+
+	if len(e.Tx.Creds) < 2 {
+		return errWrongCredentialsNumber
 	}
 
 	// verify that node owned by consortium member
@@ -562,7 +570,7 @@ func (e *CaminoProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) 
 		if err != nil {
 			return err
 		}
-		e.OnCommitState.SetAddressStates(nodeOwnerAddressOnCommit, nodeOwnerAddressStateOnCommit&^txs.AddressStateNodeDeferredBit)
+		e.OnCommitState.SetAddressStates(nodeOwnerAddressOnCommit, nodeOwnerAddressStateOnCommit&^txs.AddressStateNodeDeferred)
 
 		// Reset deferred bit on node owner address for onAbortState
 		nodeOwnerAddressOnAbort, err := e.OnAbortState.GetShortIDLink(
@@ -576,7 +584,7 @@ func (e *CaminoProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) 
 		if err != nil {
 			return err
 		}
-		e.OnCommitState.SetAddressStates(nodeOwnerAddressOnAbort, nodeOwnerAddressStateOnAbort&^txs.AddressStateNodeDeferredBit)
+		e.OnCommitState.SetAddressStates(nodeOwnerAddressOnAbort, nodeOwnerAddressStateOnAbort&^txs.AddressStateNodeDeferred)
 	}
 
 	txID := e.Tx.ID()
@@ -1059,7 +1067,7 @@ func (e *CaminoStandardTxExecutor) RegisterNodeTx(tx *txs.RegisterNodeTx) error 
 		return err
 	}
 
-	if consortiumMemberAddressState&txs.AddressStateConsortiumBit == 0 {
+	if consortiumMemberAddressState&txs.AddressStateConsortiumMember == 0 {
 		return errNotConsortiumMember
 	}
 
@@ -1380,10 +1388,6 @@ func (e *CaminoStandardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 }
 
 func (e *CaminoStandardTxExecutor) MultisigAliasTx(tx *txs.MultisigAliasTx) error {
-	if err := locked.VerifyNoLocks(tx.Ins, tx.Outs); err != nil {
-		return err
-	}
-
 	if err := e.Tx.SyntacticVerify(e.Ctx); err != nil {
 		return err
 	}
@@ -1398,6 +1402,10 @@ func (e *CaminoStandardTxExecutor) MultisigAliasTx(tx *txs.MultisigAliasTx) erro
 	// Update existing multisig definition
 
 	if tx.MultisigAlias.ID != ids.ShortEmpty {
+		if len(e.Tx.Creds) < 2 {
+			return errWrongCredentialsNumber
+		}
+
 		alias, err := e.State.GetMultisigAlias(tx.MultisigAlias.ID)
 		if err != nil {
 			return fmt.Errorf("%w, alias: %s", errAliasNotFound, tx.MultisigAlias.ID)
@@ -1434,7 +1442,7 @@ func (e *CaminoStandardTxExecutor) MultisigAliasTx(tx *txs.MultisigAliasTx) erro
 		e.Ctx.AVAXAssetID,
 		locked.StateUnlocked,
 	); err != nil {
-		return err
+		return fmt.Errorf("%w: %s", errFlowCheckFailed, err)
 	}
 
 	// update state
@@ -1482,7 +1490,7 @@ func (e *CaminoStandardTxExecutor) AddressStateTx(tx *txs.AddressStateTx) error 
 	}
 
 	// Accumulate roles over all signers
-	roles := uint64(0)
+	roles := txs.AddressStateEmpty
 	for address := range addresses {
 		states, err := e.State.GetAddressStates(address)
 		if err != nil {
@@ -1490,7 +1498,7 @@ func (e *CaminoStandardTxExecutor) AddressStateTx(tx *txs.AddressStateTx) error 
 		}
 		roles |= states
 	}
-	statesBit := uint64(1) << uint64(tx.State)
+	statesBit := txs.AddressState(1) << tx.State // TODO@ check that cast removal is ok
 
 	// Verify that roles are allowed to modify tx.State
 	if err := verifyAccess(roles, statesBit); err != nil {
@@ -1526,7 +1534,7 @@ func (e *CaminoStandardTxExecutor) AddressStateTx(tx *txs.AddressStateTx) error 
 
 	txID := e.Tx.ID()
 
-	if tx.State == txs.AddressStateNodeDeferred {
+	if tx.State == txs.AddressStateBitNodeDeferred {
 		nodeShortID, err := e.State.GetShortIDLink(tx.Address, state.ShortLinkKeyRegisterNode)
 		if err != nil {
 			return fmt.Errorf("couldn't get consortium member registered nodeID: %w", err)
@@ -1563,14 +1571,14 @@ func (e *CaminoStandardTxExecutor) AddressStateTx(tx *txs.AddressStateTx) error 
 	return nil
 }
 
-func verifyAccess(roles, statesBit uint64) error {
+func verifyAccess(roles, statesBit txs.AddressState) error {
 	switch {
-	case (roles & txs.AddressStateRoleAdminBit) != 0:
-	case (txs.AddressStateKycBits & statesBit) != 0:
-		if (roles & txs.AddressStateRoleKycBit) == 0 {
+	case (roles & txs.AddressStateRoleAdmin) != 0:
+	case (txs.AddressStateKYCAll & statesBit) != 0:
+		if (roles & txs.AddressStateRoleKYC) == 0 {
 			return errInvalidRoles
 		}
-	case (txs.AddressStateRoleBits & statesBit) != 0:
+	case (txs.AddressStateRoleAll & statesBit) != 0:
 		return errInvalidRoles
 	}
 	return nil

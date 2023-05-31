@@ -221,10 +221,10 @@ func (mr *MockChainMockRecorder) DeleteUTXO(arg0 interface{}) *gomock.Call {
 }
 
 // GetAddressStates mocks base method.
-func (m *MockChain) GetAddressStates(arg0 ids.ShortID) (uint64, error) {
+func (m *MockChain) GetAddressStates(arg0 ids.ShortID) (txs.AddressState, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetAddressStates", arg0)
-	ret0, _ := ret[0].(uint64)
+	ret0, _ := ret[0].(txs.AddressState)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -699,7 +699,7 @@ func (mr *MockChainMockRecorder) PutPendingValidator(arg0 interface{}) *gomock.C
 }
 
 // SetAddressStates mocks base method.
-func (m *MockChain) SetAddressStates(arg0 ids.ShortID, arg1 uint64) {
+func (m *MockChain) SetAddressStates(arg0 ids.ShortID, arg1 txs.AddressState) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "SetAddressStates", arg0, arg1)
 }

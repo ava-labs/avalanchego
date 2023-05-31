@@ -70,8 +70,8 @@ type CaminoApply interface {
 type CaminoDiff interface {
 	// Address State
 
-	SetAddressStates(ids.ShortID, uint64)
-	GetAddressStates(ids.ShortID) (uint64, error)
+	SetAddressStates(ids.ShortID, txs.AddressState)
+	GetAddressStates(ids.ShortID) (txs.AddressState, error)
 
 	// Deposit offers
 
@@ -144,7 +144,7 @@ type CaminoConfig struct {
 
 type caminoDiff struct {
 	deferredStakerDiffs                   diffStakers
-	modifiedAddressStates                 map[ids.ShortID]uint64
+	modifiedAddressStates                 map[ids.ShortID]txs.AddressState
 	modifiedDepositOffers                 map[ids.ID]*deposit.Offer
 	modifiedDeposits                      map[ids.ID]*depositDiff
 	modifiedMultisigAliases               map[ids.ShortID]*multisig.AliasWithNonce
@@ -167,7 +167,7 @@ type caminoState struct {
 	deferredValidatorList linkeddb.LinkedDB
 
 	// Address State
-	addressStateCache cache.Cacher[ids.ShortID, uint64]
+	addressStateCache cache.Cacher[ids.ShortID, txs.AddressState]
 	addressStateDB    database.Database
 
 	// Deposit offers
@@ -197,7 +197,7 @@ type caminoState struct {
 
 func newCaminoDiff() *caminoDiff {
 	return &caminoDiff{
-		modifiedAddressStates:   make(map[ids.ShortID]uint64),
+		modifiedAddressStates:   make(map[ids.ShortID]txs.AddressState),
 		modifiedDepositOffers:   make(map[ids.ID]*deposit.Offer),
 		modifiedDeposits:        make(map[ids.ID]*depositDiff),
 		modifiedMultisigAliases: make(map[ids.ShortID]*multisig.AliasWithNonce),
@@ -207,10 +207,10 @@ func newCaminoDiff() *caminoDiff {
 }
 
 func newCaminoState(baseDB, validatorsDB database.Database, metricsReg prometheus.Registerer) (*caminoState, error) {
-	addressStateCache, err := metercacher.New[ids.ShortID, uint64](
+	addressStateCache, err := metercacher.New[ids.ShortID, txs.AddressState](
 		"address_state_cache",
 		metricsReg,
-		&cache.LRU[ids.ShortID, uint64]{Size: addressStateCacheSize},
+		&cache.LRU[ids.ShortID, txs.AddressState]{Size: addressStateCacheSize},
 	)
 	if err != nil {
 		return nil, err
@@ -323,11 +323,11 @@ func (cs *caminoState) SyncGenesis(s *state, g *genesis.State) error {
 		return err
 	}
 	cs.SetAddressStates(g.Camino.InitialAdmin,
-		initalAdminAddressState|txs.AddressStateRoleAdminBit)
+		initalAdminAddressState|txs.AddressStateRoleAdmin)
 
 	addrStateTx, err := txs.NewSigned(&txs.AddressStateTx{
 		Address: g.Camino.InitialAdmin,
-		State:   txs.AddressStateRoleAdmin,
+		State:   txs.AddressStateBitRoleAdmin,
 		Remove:  false,
 	}, txs.Codec, nil)
 	if err != nil {

@@ -250,10 +250,10 @@ type SetAddressStateArgs struct {
 	api.UserPass
 	api.JSONFromAddrs
 
-	Change  platformapi.Owner `json:"change"`
-	Address string            `json:"address"`
-	State   uint8             `json:"state"`
-	Remove  bool              `json:"remove"`
+	Change  platformapi.Owner   `json:"change"`
+	Address string              `json:"address"`
+	State   txs.AddressStateBit `json:"state"`
+	Remove  bool                `json:"remove"`
 }
 
 // AddAdressState issues an AddAdressStateTx

@@ -59,7 +59,7 @@ type CaminoTxBuilder interface {
 	NewAddressStateTx(
 		address ids.ShortID,
 		remove bool,
-		state uint8,
+		state txs.AddressStateBit,
 		keys []*secp256k1.PrivateKey,
 		change *secp256k1fx.OutputOwners,
 	) (*txs.Tx, error)
@@ -293,7 +293,7 @@ func (b *caminoBuilder) NewRewardValidatorTx(txID ids.ID) (*txs.Tx, error) {
 func (b *caminoBuilder) NewAddressStateTx(
 	address ids.ShortID,
 	remove bool,
-	state uint8,
+	state txs.AddressStateBit,
 	keys []*secp256k1.PrivateKey,
 	change *secp256k1fx.OutputOwners,
 ) (*txs.Tx, error) {

@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 func NewCaminoDiff(
@@ -93,11 +94,11 @@ func (d *diff) CaminoConfig() (*CaminoConfig, error) {
 	return parentState.CaminoConfig()
 }
 
-func (d *diff) SetAddressStates(address ids.ShortID, states uint64) {
+func (d *diff) SetAddressStates(address ids.ShortID, states txs.AddressState) {
 	d.caminoDiff.modifiedAddressStates[address] = states
 }
 
-func (d *diff) GetAddressStates(address ids.ShortID) (uint64, error) {
+func (d *diff) GetAddressStates(address ids.ShortID) (txs.AddressState, error) {
 	if states, ok := d.caminoDiff.modifiedAddressStates[address]; ok {
 		return states, nil
 	}

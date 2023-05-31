@@ -79,7 +79,7 @@ func TestRemoveDeferredValidator(t *testing.T) {
 	tx, err := vm.txBuilder.NewAddressStateTx(
 		consortiumMemberKey.Address(),
 		false,
-		txs.AddressStateConsortium,
+		txs.AddressStateBitConsortium,
 		[]*secp256k1.PrivateKey{caminoPreFundedKeys[0]},
 		outputOwners,
 	)
@@ -151,7 +151,7 @@ func TestRemoveDeferredValidator(t *testing.T) {
 	tx, err = vm.txBuilder.NewAddressStateTx(
 		consortiumMemberKey.Address(),
 		false,
-		txs.AddressStateNodeDeferred,
+		txs.AddressStateBitNodeDeferred,
 		[]*secp256k1.PrivateKey{caminoPreFundedKeys[0]},
 		outputOwners,
 	)
@@ -175,7 +175,7 @@ func TestRemoveDeferredValidator(t *testing.T) {
 
 	// Verify that the validator's owner's deferred state and consortium member is true
 	ownerState, _ := vm.state.GetAddressStates(consortiumMemberKey.Address())
-	require.Equal(ownerState, txs.AddressStateNodeDeferredBit|txs.AddressStateConsortiumBit)
+	require.Equal(ownerState, txs.AddressStateNodeDeferred|txs.AddressStateConsortiumMember)
 
 	// Fast-forward clock to time for validator to be rewarded
 	vm.clock.Set(endTime)
@@ -226,7 +226,7 @@ func TestRemoveDeferredValidator(t *testing.T) {
 
 	// Verify that the validator's owner's deferred state is false
 	ownerState, _ = vm.state.GetAddressStates(consortiumMemberKey.Address())
-	require.Equal(ownerState, txs.AddressStateConsortiumBit)
+	require.Equal(ownerState, txs.AddressStateConsortiumMember)
 
 	timestamp := vm.state.GetTimestamp()
 	require.Equal(endTime.Unix(), timestamp.Unix())
@@ -277,7 +277,7 @@ func TestRemoveReactivatedValidator(t *testing.T) {
 	tx, err := vm.txBuilder.NewAddressStateTx(
 		consortiumMemberKey.Address(),
 		false,
-		txs.AddressStateConsortium,
+		txs.AddressStateBitConsortium,
 		[]*secp256k1.PrivateKey{caminoPreFundedKeys[0]},
 		outputOwners,
 	)
@@ -350,7 +350,7 @@ func TestRemoveReactivatedValidator(t *testing.T) {
 	tx, err = vm.txBuilder.NewAddressStateTx(
 		consortiumMemberKey.Address(),
 		false,
-		txs.AddressStateNodeDeferred,
+		txs.AddressStateBitNodeDeferred,
 		[]*secp256k1.PrivateKey{caminoPreFundedKeys[0]},
 		outputOwners,
 	)
@@ -376,7 +376,7 @@ func TestRemoveReactivatedValidator(t *testing.T) {
 	tx, err = vm.txBuilder.NewAddressStateTx(
 		consortiumMemberKey.Address(),
 		true,
-		txs.AddressStateNodeDeferred,
+		txs.AddressStateBitNodeDeferred,
 		[]*secp256k1.PrivateKey{caminoPreFundedKeys[0]},
 		outputOwners,
 	)

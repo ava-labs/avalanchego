@@ -977,7 +977,7 @@ func TestCaminoLockedInsOrLockedOuts(t *testing.T) {
 					Outs:         tt.outs,
 				}},
 				Address: caminoPreFundedKeys[0].PublicKey().Address(),
-				State:   uint8(0),
+				State:   0,
 				Remove:  false,
 			}
 
@@ -1630,27 +1630,27 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 	tests := map[string]struct {
 		stateAddress  ids.ShortID
 		targetAddress ids.ShortID
-		txFlag        uint8
-		existingState uint64
+		txFlag        txs.AddressStateBit
+		existingState txs.AddressState
 		expectedErr   error
-		expectedState uint64
+		expectedState txs.AddressState
 		remove        bool
 	}{
 		// Bob has Admin State, and he is trying to give himself Admin Role (again)
 		"State: Admin, Flag: Admin, Add, Same Address": {
 			stateAddress:  bob,
 			targetAddress: bob,
-			txFlag:        txs.AddressStateRoleAdmin,
-			existingState: txs.AddressStateRoleAdminBit,
-			expectedState: txs.AddressStateRoleAdminBit,
+			txFlag:        txs.AddressStateBitRoleAdmin,
+			existingState: txs.AddressStateRoleAdmin,
+			expectedState: txs.AddressStateRoleAdmin,
 			remove:        false,
 		},
 		// Bob has KYC State, and he is trying to give himself KYC Role (again)
 		"State: KYC, Flag: KYC, Add, Same Address": {
 			stateAddress:  bob,
 			targetAddress: bob,
-			txFlag:        txs.AddressStateRoleKyc,
-			existingState: txs.AddressStateRoleKycBit,
+			txFlag:        txs.AddressStateBitRoleKYC,
+			existingState: txs.AddressStateRoleKYC,
 			expectedErr:   errInvalidRoles,
 			remove:        false,
 		},
@@ -1658,8 +1658,8 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 		"State: KYC, Flag: Admin, Add, Same Address": {
 			stateAddress:  bob,
 			targetAddress: bob,
-			txFlag:        txs.AddressStateRoleAdmin,
-			existingState: txs.AddressStateRoleKycBit,
+			txFlag:        txs.AddressStateBitRoleAdmin,
+			existingState: txs.AddressStateRoleKYC,
 			expectedErr:   errInvalidRoles,
 			remove:        false,
 		},
@@ -1667,26 +1667,26 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 		"State: Admin, Flag: Admin, Add, Different Address": {
 			stateAddress:  bob,
 			targetAddress: alice,
-			txFlag:        txs.AddressStateRoleAdmin,
-			existingState: txs.AddressStateRoleAdminBit,
-			expectedState: txs.AddressStateRoleAdminBit,
+			txFlag:        txs.AddressStateBitRoleAdmin,
+			existingState: txs.AddressStateRoleAdmin,
+			expectedState: txs.AddressStateRoleAdmin,
 			remove:        false,
 		},
 		// Bob has Admin State, and he is trying to give Alice KYC Role
 		"State: Admin, Flag: kyc, Add, Different Address": {
 			stateAddress:  bob,
 			targetAddress: alice,
-			txFlag:        txs.AddressStateRoleKyc,
-			existingState: txs.AddressStateRoleAdminBit,
-			expectedState: txs.AddressStateRoleKycBit,
+			txFlag:        txs.AddressStateBitRoleKYC,
+			existingState: txs.AddressStateRoleAdmin,
+			expectedState: txs.AddressStateRoleKYC,
 			remove:        false,
 		},
 		// Bob has Admin State, and he is trying to remove from Alice the KYC Role
 		"State: Admin, Flag: kyc, Remove, Different Address": {
 			stateAddress:  bob,
 			targetAddress: alice,
-			txFlag:        txs.AddressStateRoleKyc,
-			existingState: txs.AddressStateRoleAdminBit,
+			txFlag:        txs.AddressStateBitRoleKYC,
+			existingState: txs.AddressStateRoleAdmin,
 			expectedState: 0,
 			remove:        true,
 		},
@@ -1694,53 +1694,53 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 		"State: Admin, Flag: KYC Verified, Add, Different Address": {
 			stateAddress:  bob,
 			targetAddress: alice,
-			txFlag:        txs.AddressStateKycVerified,
-			existingState: txs.AddressStateRoleAdminBit,
-			expectedState: txs.AddressStateKycVerifiedBit,
+			txFlag:        txs.AddressStateBitKYCVerified,
+			existingState: txs.AddressStateRoleAdmin,
+			expectedState: txs.AddressStateKYCVerified,
 			remove:        false,
 		},
 		// Bob has Admin State, and he is trying to give Alice the KYC Expired State
 		"State: Admin, Flag: KYC Expired, Add, Different Address": {
 			stateAddress:  bob,
 			targetAddress: alice,
-			txFlag:        txs.AddressStateKycExpired,
-			existingState: txs.AddressStateRoleAdminBit,
-			expectedState: txs.AddressStateKycExpiredBit,
+			txFlag:        txs.AddressStateBitKYCExpired,
+			existingState: txs.AddressStateRoleAdmin,
+			expectedState: txs.AddressStateKYCExpired,
 			remove:        false,
 		},
 		// Bob has Admin State, and he is trying to give Alice the Consortium State
 		"State: Admin, Flag: Consortium, Add, Different Address": {
 			stateAddress:  bob,
 			targetAddress: alice,
-			txFlag:        txs.AddressStateConsortium,
-			existingState: txs.AddressStateRoleAdminBit,
-			expectedState: txs.AddressStateConsortiumBit,
+			txFlag:        txs.AddressStateBitConsortium,
+			existingState: txs.AddressStateRoleAdmin,
+			expectedState: txs.AddressStateConsortiumMember,
 			remove:        false,
 		},
 		// Bob has KYC State, and he is trying to give Alice KYC Expired State
 		"State: KYC, Flag: KYC Expired, Add, Different Address": {
 			stateAddress:  bob,
 			targetAddress: alice,
-			txFlag:        txs.AddressStateKycExpired,
-			existingState: txs.AddressStateRoleKycBit,
-			expectedState: txs.AddressStateKycExpiredBit,
+			txFlag:        txs.AddressStateBitKYCExpired,
+			existingState: txs.AddressStateRoleKYC,
+			expectedState: txs.AddressStateKYCExpired,
 			remove:        false,
 		},
 		// Bob has KYC State, and he is trying to give Alice KYC Expired State
 		"State: KYC, Flag: KYC Verified, Add, Different Address": {
 			stateAddress:  bob,
 			targetAddress: alice,
-			txFlag:        txs.AddressStateKycVerified,
-			existingState: txs.AddressStateRoleKycBit,
-			expectedState: txs.AddressStateKycVerifiedBit,
+			txFlag:        txs.AddressStateBitKYCVerified,
+			existingState: txs.AddressStateRoleKYC,
+			expectedState: txs.AddressStateKYCVerified,
 			remove:        false,
 		},
 		// Some Address has Admin State, and he is trying to give Alice Admin Role
 		"Wrong address": {
 			stateAddress:  ids.GenerateTestShortID(),
 			targetAddress: alice,
-			txFlag:        txs.AddressStateRoleAdmin,
-			existingState: txs.AddressStateRoleAdminBit,
+			txFlag:        txs.AddressStateBitRoleAdmin,
+			existingState: txs.AddressStateRoleAdmin,
 			expectedErr:   errInvalidRoles,
 			remove:        false,
 		},
@@ -1748,8 +1748,8 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 		"Empty State Address": {
 			stateAddress:  ids.ShortEmpty,
 			targetAddress: alice,
-			txFlag:        txs.AddressStateRoleAdmin,
-			existingState: txs.AddressStateRoleAdminBit,
+			txFlag:        txs.AddressStateBitRoleAdmin,
+			existingState: txs.AddressStateRoleAdmin,
 			expectedErr:   errInvalidRoles,
 			remove:        false,
 		},
@@ -1757,8 +1757,8 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 		"Empty Target Address": {
 			stateAddress:  bob,
 			targetAddress: ids.ShortEmpty,
-			txFlag:        txs.AddressStateRoleAdmin,
-			existingState: txs.AddressStateRoleAdminBit,
+			txFlag:        txs.AddressStateBitRoleAdmin,
+			existingState: txs.AddressStateRoleAdmin,
 			expectedErr:   txs.ErrEmptyAddress,
 			remove:        false,
 		},
@@ -3740,7 +3740,7 @@ func TestCaminoStandardTxExecutorRegisterNodeTx(t *testing.T) {
 		"Not consortium member": {
 			state: func(c *gomock.Controller, utx *txs.RegisterNodeTx) *state.MockDiff {
 				s := state.NewMockDiff(c)
-				s.EXPECT().GetAddressStates(utx.NodeOwnerAddress).Return(uint64(0), nil)
+				s.EXPECT().GetAddressStates(utx.NodeOwnerAddress).Return(txs.AddressStateEmpty, nil)
 				return s
 			},
 			utx: func() *txs.RegisterNodeTx {
@@ -3760,7 +3760,7 @@ func TestCaminoStandardTxExecutorRegisterNodeTx(t *testing.T) {
 		"Consortium member has already registered node": {
 			state: func(c *gomock.Controller, utx *txs.RegisterNodeTx) *state.MockDiff {
 				s := state.NewMockDiff(c)
-				s.EXPECT().GetAddressStates(utx.NodeOwnerAddress).Return(txs.AddressStateConsortiumBit, nil)
+				s.EXPECT().GetAddressStates(utx.NodeOwnerAddress).Return(txs.AddressStateConsortiumMember, nil)
 				s.EXPECT().GetShortIDLink(utx.NodeOwnerAddress, state.ShortLinkKeyRegisterNode).
 					Return(nodeAddr2, nil)
 				return s
@@ -3782,7 +3782,7 @@ func TestCaminoStandardTxExecutorRegisterNodeTx(t *testing.T) {
 		"Old node is in current validator's set": {
 			state: func(c *gomock.Controller, utx *txs.RegisterNodeTx) *state.MockDiff {
 				s := state.NewMockDiff(c)
-				s.EXPECT().GetAddressStates(utx.NodeOwnerAddress).Return(txs.AddressStateConsortiumBit, nil)
+				s.EXPECT().GetAddressStates(utx.NodeOwnerAddress).Return(txs.AddressStateConsortiumMember, nil)
 				s.EXPECT().GetShortIDLink(utx.NodeOwnerAddress, state.ShortLinkKeyRegisterNode).
 					Return(nodeAddr1, nil)
 				expectVerifyMultisigPermission(s, []ids.ShortID{utx.NodeOwnerAddress}, nil)
@@ -3808,7 +3808,7 @@ func TestCaminoStandardTxExecutorRegisterNodeTx(t *testing.T) {
 		"Old node is in pending validator's set": {
 			state: func(c *gomock.Controller, utx *txs.RegisterNodeTx) *state.MockDiff {
 				s := state.NewMockDiff(c)
-				s.EXPECT().GetAddressStates(utx.NodeOwnerAddress).Return(txs.AddressStateConsortiumBit, nil)
+				s.EXPECT().GetAddressStates(utx.NodeOwnerAddress).Return(txs.AddressStateConsortiumMember, nil)
 				s.EXPECT().GetShortIDLink(utx.NodeOwnerAddress, state.ShortLinkKeyRegisterNode).
 					Return(nodeAddr1, nil)
 				expectVerifyMultisigPermission(s, []ids.ShortID{utx.NodeOwnerAddress}, nil)
@@ -3836,7 +3836,7 @@ func TestCaminoStandardTxExecutorRegisterNodeTx(t *testing.T) {
 		"Old node is in deferred validator's set": {
 			state: func(c *gomock.Controller, utx *txs.RegisterNodeTx) *state.MockDiff {
 				s := state.NewMockDiff(c)
-				s.EXPECT().GetAddressStates(utx.NodeOwnerAddress).Return(txs.AddressStateConsortiumBit, nil)
+				s.EXPECT().GetAddressStates(utx.NodeOwnerAddress).Return(txs.AddressStateConsortiumMember, nil)
 				s.EXPECT().GetShortIDLink(utx.NodeOwnerAddress, state.ShortLinkKeyRegisterNode).
 					Return(nodeAddr1, nil)
 				expectVerifyMultisigPermission(s, []ids.ShortID{utx.NodeOwnerAddress}, nil)
@@ -3866,7 +3866,7 @@ func TestCaminoStandardTxExecutorRegisterNodeTx(t *testing.T) {
 		"OK: change registered node": {
 			state: func(c *gomock.Controller, utx *txs.RegisterNodeTx) *state.MockDiff {
 				s := state.NewMockDiff(c)
-				s.EXPECT().GetAddressStates(utx.NodeOwnerAddress).Return(txs.AddressStateConsortiumBit, nil)
+				s.EXPECT().GetAddressStates(utx.NodeOwnerAddress).Return(txs.AddressStateConsortiumMember, nil)
 				s.EXPECT().GetShortIDLink(utx.NodeOwnerAddress, state.ShortLinkKeyRegisterNode).
 					Return(nodeAddr1, nil)
 				expectVerifyMultisigPermission(s, []ids.ShortID{utx.NodeOwnerAddress}, nil)
@@ -3911,7 +3911,7 @@ func TestCaminoStandardTxExecutorRegisterNodeTx(t *testing.T) {
 		"OK: consortium member is msig alias": {
 			state: func(c *gomock.Controller, utx *txs.RegisterNodeTx) *state.MockDiff {
 				s := state.NewMockDiff(c)
-				s.EXPECT().GetAddressStates(utx.NodeOwnerAddress).Return(txs.AddressStateConsortiumBit, nil)
+				s.EXPECT().GetAddressStates(utx.NodeOwnerAddress).Return(txs.AddressStateConsortiumMember, nil)
 				s.EXPECT().GetShortIDLink(utx.NodeOwnerAddress, state.ShortLinkKeyRegisterNode).
 					Return(ids.ShortEmpty, database.ErrNotFound)
 				s.EXPECT().GetShortIDLink(ids.ShortID(utx.NewNodeID), state.ShortLinkKeyRegisterNode).
@@ -3957,7 +3957,7 @@ func TestCaminoStandardTxExecutorRegisterNodeTx(t *testing.T) {
 		"OK": {
 			state: func(c *gomock.Controller, utx *txs.RegisterNodeTx) *state.MockDiff {
 				s := state.NewMockDiff(c)
-				s.EXPECT().GetAddressStates(utx.NodeOwnerAddress).Return(txs.AddressStateConsortiumBit, nil)
+				s.EXPECT().GetAddressStates(utx.NodeOwnerAddress).Return(txs.AddressStateConsortiumMember, nil)
 				s.EXPECT().GetShortIDLink(utx.NodeOwnerAddress, state.ShortLinkKeyRegisterNode).
 					Return(ids.ShortEmpty, database.ErrNotFound)
 				s.EXPECT().GetShortIDLink(ids.ShortID(utx.NewNodeID), state.ShortLinkKeyRegisterNode).
@@ -4415,7 +4415,7 @@ func TestCaminoStandardTxExecutorSuspendValidator(t *testing.T) {
 			tx, err := env.txBuilder.NewAddressStateTx(
 				setAddressStateArgs.address,
 				setAddressStateArgs.remove,
-				txs.AddressStateNodeDeferred,
+				txs.AddressStateBitNodeDeferred,
 				setAddressStateArgs.keys,
 				setAddressStateArgs.changeAddr,
 			)

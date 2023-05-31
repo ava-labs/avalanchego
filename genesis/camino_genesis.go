@@ -364,12 +364,12 @@ func buildPGenesis(config *Config, hrp string, xGenesisBytes []byte, xGenesisDat
 	// Getting args from allocations
 
 	for _, allocation := range config.Camino.Allocations {
-		var addrState uint64
+		var addrState pchaintxs.AddressState
 		if allocation.AddressStates.ConsortiumMember {
-			addrState |= pchaintxs.AddressStateConsortiumBit
+			addrState |= pchaintxs.AddressStateConsortiumMember
 		}
 		if allocation.AddressStates.KYCVerified {
-			addrState |= pchaintxs.AddressStateKycVerifiedBit
+			addrState |= pchaintxs.AddressStateKYCVerified
 		}
 		if addrState != 0 {
 			platformvmArgs.Camino.AddressStates = append(platformvmArgs.Camino.AddressStates, genesis.AddressState{

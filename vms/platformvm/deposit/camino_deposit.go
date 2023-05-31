@@ -18,11 +18,13 @@ import (
 	"github.com/ava-labs/avalanchego/vms/types"
 )
 
+type OfferFlag uint64
+
 const (
 	interestRateBase        = 365 * 24 * 60 * 60
 	interestRateDenominator = 1_000_000 * interestRateBase
 
-	OfferFlagLocked uint64 = 0b1
+	OfferFlagLocked OfferFlag = 0b1
 )
 
 var bigInterestRateDenominator = (&big.Int{}).SetInt64(interestRateDenominator)
@@ -41,7 +43,7 @@ type Offer struct {
 	UnlockPeriodDuration    uint32              `serialize:"true" json:"unlockPeriodDuration"`    // Duration of period during which tokens deposited with this offer will be unlocked. The unlock period starts at the end of deposit minus unlockPeriodDuration
 	NoRewardsPeriodDuration uint32              `serialize:"true" json:"noRewardsPeriodDuration"` // Duration of period during which rewards won't be accumulated. No rewards period starts at the end of deposit minus unlockPeriodDuration
 	Memo                    types.JSONByteSlice `serialize:"true" json:"memo"`                    // Arbitrary offer memo
-	Flags                   uint64              `serialize:"true" json:"flags"`                   // Bitfield with flags
+	Flags                   OfferFlag           `serialize:"true" json:"flags"`                   // Bitfield with flags
 }
 
 // Sets offer id from its bytes hash

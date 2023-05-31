@@ -211,16 +211,16 @@ type AddressStates struct {
 }
 
 type DepositOffer struct {
-	InterestRateNominator   uint64 `json:"interestRateNominator"`
-	Start                   uint64 `json:"start"`
-	End                     uint64 `json:"end"`
-	MinAmount               uint64 `json:"minAmount"`
-	MinDuration             uint32 `json:"minDuration"`
-	MaxDuration             uint32 `json:"maxDuration"`
-	UnlockPeriodDuration    uint32 `json:"unlockPeriodDuration"`
-	NoRewardsPeriodDuration uint32 `json:"noRewardsPeriodDuration"`
-	Memo                    string `json:"memo"`
-	Flags                   uint64 `json:"flags"`
+	InterestRateNominator   uint64            `json:"interestRateNominator"`
+	Start                   uint64            `json:"start"`
+	End                     uint64            `json:"end"`
+	MinAmount               uint64            `json:"minAmount"`
+	MinDuration             uint32            `json:"minDuration"`
+	MaxDuration             uint32            `json:"maxDuration"`
+	UnlockPeriodDuration    uint32            `json:"unlockPeriodDuration"`
+	NoRewardsPeriodDuration uint32            `json:"noRewardsPeriodDuration"`
+	Memo                    string            `json:"memo"`
+	Flags                   deposit.OfferFlag `json:"flags"`
 }
 
 func (parsedOffer DepositOffer) Unparse(startime uint64) (UnparsedDepositOffer, error) {

@@ -44,8 +44,8 @@ type ConsortiumMemberNodeID struct {
 }
 
 type AddressState struct {
-	Address ids.ShortID `serialize:"true"`
-	State   uint64      `serialize:"true"`
+	Address ids.ShortID      `serialize:"true"`
+	State   txs.AddressState `serialize:"true"`
 }
 
 type Block struct {
