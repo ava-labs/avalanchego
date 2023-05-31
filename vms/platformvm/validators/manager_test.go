@@ -5,6 +5,8 @@ package validators
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -16,14 +18,22 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/database"
+	dbmanager "github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
@@ -425,6 +435,125 @@ func TestVM_GetValidatorSet(t *testing.T) {
 			r.Equal(tt.expectedVdrSet, gotVdrSet)
 		})
 	}
+}
+
+func Test_RegressionBLSKeyDiff(t *testing.T) {
+	// create manager from empty state
+	require := require.New(t)
+
+	var (
+		cfg = defaultConfig()
+		clk = &mockable.Clock{}
+		ctx = defaultCtx()
+	)
+
+	baseDBManager := dbmanager.NewMemDB(version.Semantic1_0_0)
+	db := versiondb.New(baseDBManager.Current().Database)
+	rewardsCalc := reward.NewCalculator(cfg.RewardConfig)
+	genesisBytes := buildGenesisTest(ctx)
+	state, err := state.New(
+		db,
+		genesisBytes,
+		prometheus.NewRegistry(),
+		&cfg,
+		ctx,
+		metrics.Noop,
+		rewardsCalc,
+		&utils.Atomic[bool]{},
+	)
+	require.NoError(err)
+
+	valMan := NewManager(cfg, state, metrics.Noop, clk)
+
+	height, err := valMan.GetCurrentHeight(context.Background())
+	require.NoError(err)
+	require.Equal(uint64(0), height)
+}
+
+func defaultConfig() config.Config {
+	vdrs := validators.NewManager()
+	primaryVdrs := validators.NewSet()
+	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
+
+	defaultTxFee := uint64(100)
+	defaultMinStakingDuration := 24 * time.Hour
+	defaultMaxStakingDuration := 365 * 24 * time.Hour
+
+	return config.Config{
+		Chains:                 chains.TestManager,
+		UptimeLockedCalculator: uptime.NewLockedCalculator(),
+		Validators:             vdrs,
+		TxFee:                  defaultTxFee,
+		CreateSubnetTxFee:      100 * defaultTxFee,
+		CreateBlockchainTxFee:  100 * defaultTxFee,
+		MinValidatorStake:      5 * units.MilliAvax,
+		MaxValidatorStake:      500 * units.MilliAvax,
+		MinDelegatorStake:      1 * units.MilliAvax,
+		MinStakeDuration:       defaultMinStakingDuration,
+		MaxStakeDuration:       defaultMaxStakingDuration,
+		RewardConfig:           defaultRewardConfig,
+	}
+}
+
+func defaultCtx() *snow.Context {
+	ctx := snow.DefaultContextTest()
+
+	var (
+		avaxAssetID = ids.ID{'y', 'e', 'e', 't'}
+		xChainID    = ids.Empty.Prefix(0)
+		cChainID    = ids.Empty.Prefix(1)
+	)
+
+	ctx.NetworkID = 10
+	ctx.XChainID = xChainID
+	ctx.CChainID = cChainID
+	ctx.AVAXAssetID = avaxAssetID
+	ctx.ValidatorState = &validators.TestState{
+		GetSubnetIDF: func(_ context.Context, chainID ids.ID) (ids.ID, error) {
+			subnetID, ok := map[ids.ID]ids.ID{
+				constants.PlatformChainID: constants.PrimaryNetworkID,
+				xChainID:                  constants.PrimaryNetworkID,
+				cChainID:                  constants.PrimaryNetworkID,
+			}[chainID]
+			if !ok {
+				return ids.Empty, errors.New("missing")
+			}
+			return subnetID, nil
+		},
+	}
+
+	return ctx
+}
+
+func buildGenesisTest(ctx *snow.Context) []byte {
+	// empty genesis, no validators nor utxos.
+	genesisUTXOs := make([]api.UTXO, 0)
+	genesisValidators := make([]api.PermissionlessValidator, 0)
+	defaultGenesisTime := time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	buildGenesisArgs := api.BuildGenesisArgs{
+		NetworkID:     json.Uint32(constants.UnitTestID),
+		AvaxAssetID:   ctx.AVAXAssetID,
+		UTXOs:         genesisUTXOs,
+		Validators:    genesisValidators,
+		Chains:        nil,
+		Time:          json.Uint64(defaultGenesisTime.Unix()),
+		InitialSupply: json.Uint64(360 * units.MegaAvax),
+		Encoding:      formatting.Hex,
+	}
+
+	buildGenesisResponse := api.BuildGenesisReply{}
+	platformvmSS := api.StaticService{}
+	if err := platformvmSS.BuildGenesis(nil, &buildGenesisArgs, &buildGenesisResponse); err != nil {
+		panic(fmt.Errorf("problem while building platform chain's genesis state: %w", err))
+	}
+
+	genesisBytes, err := formatting.Decode(buildGenesisResponse.Encoding, buildGenesisResponse.Bytes)
+	if err != nil {
+		panic(err)
+	}
+
+	return genesisBytes
 }
 
 func copyPrimaryValidator(vdr *validators.Validator) *validators.Validator {
