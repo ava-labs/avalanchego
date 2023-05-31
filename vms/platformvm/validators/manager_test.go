@@ -5,6 +5,7 @@ package validators
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"testing"
@@ -45,6 +46,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -468,10 +470,9 @@ func TestVM_GetValidatorSet(t *testing.T) {
 func Test_RegressionBLSKeyDiff(t *testing.T) {
 	// setup
 	require := require.New(t)
-	cfg, clk, pState, txBuilder, err := buildSetup()
+	cfg, ctx, clk, pState, txBuilder, err := buildSetup()
 	require.NoError(err)
 
-	// valMan := NewManager(cfg, pState, metrics.Noop, clk)
 	currentHeight := uint64(1)
 	currentTime := clk.Time().Add(time.Second)
 	clk.Set(currentTime)
@@ -498,51 +499,118 @@ func Test_RegressionBLSKeyDiff(t *testing.T) {
 	require.NoError(pState.ValidatorSet(subnetID, subnetValidators))
 	require.True(cfg.Validators.Add(subnetID, subnetValidators))
 
-	// move time/height ahead
-	currentHeight++
-	currentTime = clk.Time().Add(time.Second)
-	clk.Set(currentTime)
-
 	// A subnet validator should stake twice before its primary network counterpart stops staking
 	var (
-		primaryStartTime = currentTime
-		subnetStartTime1 = primaryStartTime.Add(2 * time.Second)
+		primaryStartTime   = currentTime.Add(time.Second)
+		primaryStartHeight = currentHeight + 1
+
+		subnetStartTime1   = primaryStartTime.Add(2 * time.Second)
+		subnetStartHeight1 = primaryStartHeight + 1
+
 		subnetEndTime1   = subnetStartTime1.Add(defaultMinStakingDuration)
-		subnetStartTime2 = subnetEndTime1.Add(2 * time.Second)
+		subnetEndHeight1 = subnetStartHeight1 + 1
+
+		subnetStartTime2   = subnetEndTime1.Add(2 * time.Second)
+		subnetStartHeight2 = subnetEndHeight1 + 1
+
 		subnetEndTime2   = subnetStartTime2.Add(defaultMinStakingDuration)
+		subnetEndHeight2 = subnetStartHeight2 + 1
+
 		primaryEndTime   = subnetEndTime2.Add(time.Second)
+		primaryEndHeight = subnetEndHeight2 + 1
 	)
+
+	// move time/height ahead
+	currentHeight = primaryStartHeight
+	currentTime = primaryStartTime
+	clk.Set(currentTime)
 
 	// insert primary network validator
 	nodeID := ids.GenerateTestNodeID()
 	addr := preFundedKeys[0].PublicKey().Address()
-	primaryTx, err := txBuilder.NewAddValidatorTx(
-		1, // Weight
-		uint64(primaryStartTime.Unix()),
-		uint64(primaryEndTime.Unix()),
-		nodeID,
-		addr,
-		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{preFundedKeys[0]},
-		addr,
+	skBytes, err := hex.DecodeString("6668fecd4595b81e4d568398c820bbf3f073cb222902279fa55ebb84764ed2e3")
+	require.NoError(err)
+	sk, err := bls.SecretKeyFromBytes(skBytes)
+	require.NoError(err)
+
+	uPrimaryTx := &txs.AddPermissionlessValidatorTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    ctx.NetworkID,
+			BlockchainID: ctx.ChainID,
+			Ins:          []*avax.TransferableInput{},
+			Outs:         []*avax.TransferableOutput{},
+		}},
+		Validator: txs.Validator{
+			NodeID: nodeID,
+			Start:  uint64(primaryStartTime.Unix()),
+			End:    uint64(primaryEndTime.Unix()),
+			Wght:   2000000000000,
+		},
+		Subnet: constants.PrimaryNetworkID,
+		Signer: signer.NewProofOfPossession(sk),
+		StakeOuts: []*avax.TransferableOutput{
+			{
+				Asset: avax.Asset{
+					ID: avaxAssetID,
+				},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: 2 * units.KiloAvax,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Locktime:  0,
+						Threshold: 1,
+						Addrs: []ids.ShortID{
+							addr,
+						},
+					},
+				},
+			},
+		},
+		ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
+			Locktime:  0,
+			Threshold: 1,
+			Addrs: []ids.ShortID{
+				addr,
+			},
+		},
+		DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
+			Locktime:  0,
+			Threshold: 1,
+			Addrs: []ids.ShortID{
+				addr,
+			},
+		},
+		DelegationShares: reward.PercentDenominator,
+	}
+	primaryTx, err := txs.NewSigned(uPrimaryTx, txs.Codec, nil)
+	require.NoError(err)
+	require.NoError(primaryTx.SyntacticVerify(ctx))
+
+	require.NoError(err)
+	dummyBlock, err := blocks.NewBanffStandardBlock(
+		currentTime,
+		pState.GetLastAccepted(),
+		currentHeight,
+		[]*txs.Tx{primaryTx},
 	)
 	require.NoError(err)
 
 	primaryValidator, err := state.NewCurrentStaker(
 		primaryTx.ID(),
-		primaryTx.Unsigned.(*txs.AddValidatorTx),
+		uPrimaryTx,
 		0,
 	)
 	require.NoError(err)
 
 	pState.PutCurrentValidator(primaryValidator)
+	pState.SetLastAccepted(dummyBlock.ID())
+	pState.AddStatelessBlock(dummyBlock, choices.Accepted)
 	pState.AddTx(primaryTx, status.Committed)
 	pState.SetHeight(currentHeight)
 	pState.SetTimestamp(currentTime)
 	require.NoError(pState.Commit())
 
 	// move time/height ahead
-	currentHeight++
+	currentHeight = subnetStartHeight1
 	currentTime = subnetStartTime1
 	clk.Set(currentTime)
 
@@ -557,6 +625,13 @@ func Test_RegressionBLSKeyDiff(t *testing.T) {
 		addr,
 	)
 	require.NoError(err)
+	dummyBlock, err = blocks.NewBanffStandardBlock(
+		currentTime,
+		pState.GetLastAccepted(),
+		currentHeight,
+		[]*txs.Tx{subnetFirstTx},
+	)
+	require.NoError(err)
 
 	firstSubnetValidator, err := state.NewCurrentStaker(
 		subnetFirstTx.ID(),
@@ -566,24 +641,36 @@ func Test_RegressionBLSKeyDiff(t *testing.T) {
 	require.NoError(err)
 
 	pState.PutCurrentValidator(firstSubnetValidator)
+	pState.SetLastAccepted(dummyBlock.ID())
+	pState.AddStatelessBlock(dummyBlock, choices.Accepted)
 	pState.AddTx(subnetFirstTx, status.Committed)
 	pState.SetHeight(currentHeight)
 	pState.SetTimestamp(currentTime)
 	require.NoError(pState.Commit())
 
 	// move time/height ahead
-	currentHeight++
+	currentHeight = subnetEndHeight1
 	currentTime = subnetEndTime1
 	clk.Set(currentTime)
 
 	// drop first subnet validator
+	dummyBlock, err = blocks.NewBanffStandardBlock(
+		currentTime,
+		pState.GetLastAccepted(),
+		currentHeight,
+		[]*txs.Tx{},
+	)
+	require.NoError(err)
+
 	pState.DeleteCurrentValidator(firstSubnetValidator)
+	pState.SetLastAccepted(dummyBlock.ID())
+	pState.AddStatelessBlock(dummyBlock, choices.Accepted)
 	pState.SetHeight(currentHeight)
 	pState.SetTimestamp(currentTime)
 	require.NoError(pState.Commit())
 
 	// move time/height ahead
-	currentHeight++
+	currentHeight = subnetStartHeight2
 	currentTime = subnetStartTime2
 	clk.Set(currentTime)
 
@@ -598,6 +685,13 @@ func Test_RegressionBLSKeyDiff(t *testing.T) {
 		addr,
 	)
 	require.NoError(err)
+	dummyBlock, err = blocks.NewBanffStandardBlock(
+		currentTime,
+		pState.GetLastAccepted(),
+		currentHeight,
+		[]*txs.Tx{subnetSecondTx},
+	)
+	require.NoError(err)
 
 	secondSubnetValidator, err := state.NewCurrentStaker(
 		subnetSecondTx.ID(),
@@ -607,36 +701,63 @@ func Test_RegressionBLSKeyDiff(t *testing.T) {
 	require.NoError(err)
 
 	pState.PutCurrentValidator(secondSubnetValidator)
+	pState.SetLastAccepted(dummyBlock.ID())
+	pState.AddStatelessBlock(dummyBlock, choices.Accepted)
 	pState.AddTx(subnetSecondTx, status.Committed)
 	pState.SetHeight(currentHeight)
 	pState.SetTimestamp(currentTime)
 	require.NoError(pState.Commit())
 
 	// move time/height ahead
-	currentHeight++
+	currentHeight = subnetEndHeight2
 	currentTime = subnetEndTime2
 	clk.Set(currentTime)
 
 	// drop second subnet validator
+	dummyBlock, err = blocks.NewBanffStandardBlock(
+		currentTime,
+		pState.GetLastAccepted(),
+		currentHeight,
+		[]*txs.Tx{},
+	)
+	require.NoError(err)
+
 	pState.DeleteCurrentValidator(secondSubnetValidator)
+	pState.SetLastAccepted(dummyBlock.ID())
+	pState.AddStatelessBlock(dummyBlock, choices.Accepted)
 	pState.SetHeight(currentHeight)
 	pState.SetTimestamp(currentTime)
 	require.NoError(pState.Commit())
 
 	// move time/height ahead
-	currentHeight++
+	currentHeight = primaryEndHeight
 	currentTime = primaryEndTime
 	clk.Set(currentTime)
 
 	// drop primary network validator
+	dummyBlock, err = blocks.NewBanffStandardBlock(
+		currentTime,
+		pState.GetLastAccepted(),
+		currentHeight,
+		[]*txs.Tx{},
+	)
+	require.NoError(err)
+
 	pState.DeleteCurrentValidator(primaryValidator)
+	pState.SetLastAccepted(dummyBlock.ID())
+	pState.AddStatelessBlock(dummyBlock, choices.Accepted)
 	pState.SetHeight(currentHeight)
 	pState.SetTimestamp(currentTime)
 	require.NoError(pState.Commit())
+
+	valMan := NewManager(*cfg, pState, metrics.Noop, clk)
+	_, err = valMan.GetValidatorSet(context.Background(), primaryStartHeight+1, constants.PrimaryNetworkID)
+	require.NoError(err)
 }
 
 func buildSetup() (
 	*config.Config,
+	*snow.Context,
 	*mockable.Clock,
 	state.State,
 	builder.Builder,
@@ -700,7 +821,7 @@ func buildSetup() (
 		&utils.Atomic[bool]{},
 	)
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("could not build pState, %w", err)
+		return nil, nil, nil, nil, nil, fmt.Errorf("could not build pState, %w", err)
 	}
 
 	// build fx
@@ -711,10 +832,10 @@ func buildSetup() (
 	}
 	fx := &secp256k1fx.Fx{}
 	if err := fx.Initialize(fxVMInt); err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("could not build feature extension, %w", err)
+		return nil, nil, nil, nil, nil, fmt.Errorf("could not build feature extension, %w", err)
 	}
 	if err := fx.Bootstrapped(); err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("could not bootstrap feature extension, %w", err)
+		return nil, nil, nil, nil, nil, fmt.Errorf("could not bootstrap feature extension, %w", err)
 	}
 
 	atomicUTXOs := avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
@@ -728,7 +849,7 @@ func buildSetup() (
 		atomicUTXOs,
 		utxoHandler,
 	)
-	return cfg, clk, pState, txBuilder, nil
+	return cfg, ctx, clk, pState, txBuilder, nil
 }
 
 type fxVMInt struct {
