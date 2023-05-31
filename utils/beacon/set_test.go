@@ -46,8 +46,7 @@ func TestSet(t *testing.T) {
 	len := s.Len()
 	require.Zero(len)
 
-	err := s.Add(b0)
-	require.NoError(err)
+	require.NoError(s.Add(b0))
 
 	idsArg = s.IDsArg()
 	require.Equal("NodeID-111111111111111111116DBWJs", idsArg)
@@ -56,7 +55,7 @@ func TestSet(t *testing.T) {
 	len = s.Len()
 	require.Equal(1, len)
 
-	err = s.Add(b0)
+	err := s.Add(b0)
 	require.ErrorIs(err, errDuplicateID)
 
 	idsArg = s.IDsArg()
@@ -66,8 +65,7 @@ func TestSet(t *testing.T) {
 	len = s.Len()
 	require.Equal(1, len)
 
-	err = s.Add(b1)
-	require.NoError(err)
+	require.NoError(s.Add(b1))
 
 	idsArg = s.IDsArg()
 	require.Equal("NodeID-111111111111111111116DBWJs,NodeID-6HgC8KRBEhXYbF4riJyJFLSHt37UNuRt", idsArg)
@@ -76,8 +74,7 @@ func TestSet(t *testing.T) {
 	len = s.Len()
 	require.Equal(2, len)
 
-	err = s.Add(b2)
-	require.NoError(err)
+	require.NoError(s.Add(b2))
 
 	idsArg = s.IDsArg()
 	require.Equal("NodeID-111111111111111111116DBWJs,NodeID-6HgC8KRBEhXYbF4riJyJFLSHt37UNuRt,NodeID-BaMPFdqMUQ46BV8iRcwbVfsam55kMqcp", idsArg)
@@ -86,8 +83,7 @@ func TestSet(t *testing.T) {
 	len = s.Len()
 	require.Equal(3, len)
 
-	err = s.RemoveByID(b0.ID())
-	require.NoError(err)
+	require.NoError(s.RemoveByID(b0.ID()))
 
 	idsArg = s.IDsArg()
 	require.Equal("NodeID-BaMPFdqMUQ46BV8iRcwbVfsam55kMqcp,NodeID-6HgC8KRBEhXYbF4riJyJFLSHt37UNuRt", idsArg)
@@ -96,8 +92,7 @@ func TestSet(t *testing.T) {
 	len = s.Len()
 	require.Equal(2, len)
 
-	err = s.RemoveByIP(b1.IP())
-	require.NoError(err)
+	require.NoError(s.RemoveByIP(b1.IP()))
 
 	idsArg = s.IDsArg()
 	require.Equal("NodeID-BaMPFdqMUQ46BV8iRcwbVfsam55kMqcp", idsArg)

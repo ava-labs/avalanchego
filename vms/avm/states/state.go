@@ -51,7 +51,7 @@ type ReadOnlyChain interface {
 	GetUTXOFromID(utxoID *avax.UTXOID) (*avax.UTXO, error)
 
 	GetTx(txID ids.ID) (*txs.Tx, error)
-	GetBlockID(height uint64) (ids.ID, error)
+	GetBlockIDAtHeight(height uint64) (ids.ID, error)
 	GetBlock(blkID ids.ID) (blocks.Block, error)
 	GetLastAccepted() ids.ID
 	GetTimestamp() time.Time
@@ -288,7 +288,7 @@ func (s *state) AddTx(tx *txs.Tx) {
 	s.addedTxs[tx.ID()] = tx
 }
 
-func (s *state) GetBlockID(height uint64) (ids.ID, error) {
+func (s *state) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
 	if blkID, exists := s.addedBlockIDs[height]; exists {
 		return blkID, nil
 	}
