@@ -194,10 +194,19 @@ func newEnvironment(t *testing.T, fork activeFork) *environment { //nolint:golin
 	return res
 }
 
+func (e *environment) currentTxVersion() uint16 {
+	version := uint16(txs.Version1)
+	if !e.config.IsContinuousStakingActivated(e.state.GetTimestamp()) {
+		version = txs.Version0
+	}
+	return version
+}
+
 func addSubnet(env *environment) {
 	// Create a subnet
 	var err error
 	testSubnet1, err = env.txBuilder.NewCreateSubnetTx(
+		env.currentTxVersion(),
 		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
 		[]ids.ShortID{ // control keys
 			preFundedKeys[0].PublicKey().Address(),

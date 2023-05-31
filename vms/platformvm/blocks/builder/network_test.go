@@ -18,8 +18,9 @@ import (
 	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 )
 
-func getValidTx(txBuilder txbuilder.Builder, t *testing.T) *txs.Tx {
+func getValidTx(version uint16, txBuilder txbuilder.Builder, t *testing.T) *txs.Tx {
 	tx, err := txBuilder.NewCreateChainTx(
+		version,
 		testSubnet1.ID(),
 		nil,
 		constants.AVMID,
@@ -51,7 +52,7 @@ func TestMempoolValidGossipedTxIsAddedToMempool(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 
 	// create a tx
-	tx := getValidTx(env.txBuilder, t)
+	tx := getValidTx(env.currentTxVersion(), env.txBuilder, t)
 	txID := tx.ID()
 
 	msg := message.Tx{Tx: tx.Bytes()}
@@ -91,7 +92,7 @@ func TestMempoolInvalidGossipedTxIsNotAddedToMempool(t *testing.T) {
 	}()
 
 	// create a tx and mark as invalid
-	tx := getValidTx(env.txBuilder, t)
+	tx := getValidTx(env.currentTxVersion(), env.txBuilder, t)
 	txID := tx.ID()
 	env.Builder.MarkDropped(txID, errTestingDropped)
 
@@ -124,7 +125,7 @@ func TestMempoolNewLocaTxIsGossiped(t *testing.T) {
 	}
 
 	// add a tx to the mempool and show it gets gossiped
-	tx := getValidTx(env.txBuilder, t)
+	tx := getValidTx(env.currentTxVersion(), env.txBuilder, t)
 	txID := tx.ID()
 
 	err := env.Builder.AddUnverifiedTx(tx)

@@ -38,6 +38,7 @@ func TestContinuousStakingForkRewardValidatorTxExecuteOnCommit(t *testing.T) {
 
 	valRewardAddress := ids.GenerateTestShortID()
 	addValTx, err := env.txBuilder.NewAddValidatorTx(
+		env.currentTxVersion(),
 		env.config.MinValidatorStake,
 		uint64(0),
 		uint64(24*60*60), // 24h in seconds
@@ -65,7 +66,7 @@ func TestContinuousStakingForkRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	require.NoError(err)
 
 	// Case 1: Chain timestamp is wrong
-	tx, err := env.txBuilder.NewRewardValidatorTx(continuousStaker.TxID)
+	tx, err := env.txBuilder.NewRewardValidatorTx(env.currentTxVersion(), continuousStaker.TxID)
 	require.NoError(err)
 
 	onCommitState, err := state.NewDiff(lastAcceptedID, env)
@@ -87,7 +88,7 @@ func TestContinuousStakingForkRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	env.state.SetTimestamp(continuousStaker.NextTime)
 
 	// Case 2: Wrong validator
-	tx, err = env.txBuilder.NewRewardValidatorTx(ids.GenerateTestID())
+	tx, err = env.txBuilder.NewRewardValidatorTx(env.currentTxVersion(), ids.GenerateTestID())
 	require.NoError(err)
 
 	onCommitState, err = state.NewDiff(lastAcceptedID, env)
@@ -106,7 +107,7 @@ func TestContinuousStakingForkRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	require.ErrorIs(err, ErrRemoveWrongStaker)
 
 	// Case 3: Happy path
-	tx, err = env.txBuilder.NewRewardValidatorTx(continuousStaker.TxID)
+	tx, err = env.txBuilder.NewRewardValidatorTx(env.currentTxVersion(), continuousStaker.TxID)
 	require.NoError(err)
 
 	onCommitState, err = state.NewDiff(lastAcceptedID, env)
@@ -181,6 +182,7 @@ func TestContinuousStakingForkRewardValidatorTxExecuteOnAbort(t *testing.T) {
 
 	valRewardAddress := ids.GenerateTestShortID()
 	addValTx, err := env.txBuilder.NewAddValidatorTx(
+		env.currentTxVersion(),
 		env.config.MinValidatorStake,
 		uint64(0),
 		uint64(24*60*60), // 24h in seconds
@@ -208,7 +210,7 @@ func TestContinuousStakingForkRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	require.NoError(err)
 
 	// Case 1: Chain timestamp is wrong
-	tx, err := env.txBuilder.NewRewardValidatorTx(continuousStaker.TxID)
+	tx, err := env.txBuilder.NewRewardValidatorTx(env.currentTxVersion(), continuousStaker.TxID)
 	require.NoError(err)
 
 	onCommitState, err := state.NewDiff(lastAcceptedID, env)
@@ -230,7 +232,7 @@ func TestContinuousStakingForkRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	env.state.SetTimestamp(continuousStaker.NextTime)
 
 	// Case 2: Wrong validator
-	tx, err = env.txBuilder.NewRewardValidatorTx(ids.GenerateTestID())
+	tx, err = env.txBuilder.NewRewardValidatorTx(env.currentTxVersion(), ids.GenerateTestID())
 	require.NoError(err)
 
 	txExecutor = ProposalTxExecutor{
@@ -243,7 +245,7 @@ func TestContinuousStakingForkRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	require.ErrorIs(err, ErrRemoveWrongStaker)
 
 	// Case 3: Happy path
-	tx, err = env.txBuilder.NewRewardValidatorTx(continuousStaker.TxID)
+	tx, err = env.txBuilder.NewRewardValidatorTx(env.currentTxVersion(), continuousStaker.TxID)
 	require.NoError(err)
 
 	onCommitState, err = state.NewDiff(lastAcceptedID, env)
@@ -319,6 +321,7 @@ func TestContinuousStakingForkRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	stakersPeriod := uint64(24 * 60 * 60) // 24h in seconds
 
 	vdrTx, err := env.txBuilder.NewAddValidatorTx(
+		env.currentTxVersion(),
 		env.config.MinValidatorStake,
 		uint64(0),
 		stakersPeriod,
@@ -331,6 +334,7 @@ func TestContinuousStakingForkRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	require.NoError(err)
 
 	delTx, err := env.txBuilder.NewAddDelegatorTx(
+		env.currentTxVersion(),
 		env.config.MinDelegatorStake,
 		uint64(0),
 		stakersPeriod,
@@ -389,7 +393,7 @@ func TestContinuousStakingForkRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	stake := vdrSet.GetWeight(vdrNodeID)
 	require.Equal(env.config.MinValidatorStake+env.config.MinDelegatorStake, stake)
 
-	tx, err := env.txBuilder.NewRewardValidatorTx(delTx.ID())
+	tx, err := env.txBuilder.NewRewardValidatorTx(env.currentTxVersion(), delTx.ID())
 	require.NoError(err)
 
 	// Create Delegator Diff
@@ -457,7 +461,7 @@ func TestContinuousStakingForkRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
 
-	tx, err = env.txBuilder.NewRewardValidatorTx(vdrStaker.TxID)
+	tx, err = env.txBuilder.NewRewardValidatorTx(env.currentTxVersion(), vdrStaker.TxID)
 	require.NoError(err)
 
 	// Create Validator Diff
@@ -567,7 +571,7 @@ func TestCortinaForkRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	stakerToRemoveTx := stakerToRemoveTxIntf.Unsigned.(*txs.AddValidatorTx)
 
 	// Case 1: Chain timestamp is wrong
-	tx, err := env.txBuilder.NewRewardValidatorTx(stakerToRemove.TxID)
+	tx, err := env.txBuilder.NewRewardValidatorTx(env.currentTxVersion(), stakerToRemove.TxID)
 	require.NoError(err)
 
 	onCommitState, err := state.NewDiff(lastAcceptedID, env)
@@ -589,7 +593,7 @@ func TestCortinaForkRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	env.state.SetTimestamp(stakerToRemove.EndTime)
 
 	// Case 2: Wrong validator
-	tx, err = env.txBuilder.NewRewardValidatorTx(ids.GenerateTestID())
+	tx, err = env.txBuilder.NewRewardValidatorTx(env.currentTxVersion(), ids.GenerateTestID())
 	require.NoError(err)
 
 	onCommitState, err = state.NewDiff(lastAcceptedID, env)
@@ -608,7 +612,7 @@ func TestCortinaForkRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	require.ErrorIs(err, ErrRemoveWrongStaker)
 
 	// Case 3: Happy path
-	tx, err = env.txBuilder.NewRewardValidatorTx(stakerToRemove.TxID)
+	tx, err = env.txBuilder.NewRewardValidatorTx(env.currentTxVersion(), stakerToRemove.TxID)
 	require.NoError(err)
 
 	onCommitState, err = state.NewDiff(lastAcceptedID, env)
@@ -676,7 +680,7 @@ func TestCortinaStakingForkRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	stakerToRemoveTx := stakerToRemoveTxIntf.Unsigned.(*txs.AddValidatorTx)
 
 	// Case 1: Chain timestamp is wrong
-	tx, err := env.txBuilder.NewRewardValidatorTx(stakerToRemove.TxID)
+	tx, err := env.txBuilder.NewRewardValidatorTx(env.currentTxVersion(), stakerToRemove.TxID)
 	require.NoError(err)
 
 	onCommitState, err := state.NewDiff(lastAcceptedID, env)
@@ -698,7 +702,7 @@ func TestCortinaStakingForkRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	env.state.SetTimestamp(stakerToRemove.EndTime)
 
 	// Case 2: Wrong validator
-	tx, err = env.txBuilder.NewRewardValidatorTx(ids.GenerateTestID())
+	tx, err = env.txBuilder.NewRewardValidatorTx(env.currentTxVersion(), ids.GenerateTestID())
 	require.NoError(err)
 
 	txExecutor = ProposalTxExecutor{
@@ -711,7 +715,7 @@ func TestCortinaStakingForkRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	require.ErrorIs(err, ErrRemoveWrongStaker)
 
 	// Case 3: Happy path
-	tx, err = env.txBuilder.NewRewardValidatorTx(stakerToRemove.TxID)
+	tx, err = env.txBuilder.NewRewardValidatorTx(env.currentTxVersion(), stakerToRemove.TxID)
 	require.NoError(err)
 
 	onCommitState, err = state.NewDiff(lastAcceptedID, env)
@@ -775,6 +779,7 @@ func TestCortinaForkRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	vdrNodeID := ids.GenerateTestNodeID()
 
 	vdrTx, err := env.txBuilder.NewAddValidatorTx(
+		env.currentTxVersion(),
 		env.config.MinValidatorStake, // stakeAmt
 		vdrStartTime,
 		vdrEndTime,
@@ -790,6 +795,7 @@ func TestCortinaForkRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	delEndTime := vdrEndTime
 
 	delTx, err := env.txBuilder.NewAddDelegatorTx(
+		env.currentTxVersion(),
 		env.config.MinDelegatorStake,
 		delStartTime,
 		delEndTime,
@@ -835,7 +841,7 @@ func TestCortinaForkRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	stake := vdrSet.GetWeight(vdrNodeID)
 	require.Equal(env.config.MinValidatorStake+env.config.MinDelegatorStake, stake)
 
-	tx, err := env.txBuilder.NewRewardValidatorTx(delTx.ID())
+	tx, err := env.txBuilder.NewRewardValidatorTx(env.currentTxVersion(), delTx.ID())
 	require.NoError(err)
 
 	onCommitState, err := state.NewDiff(lastAcceptedID, env)
@@ -906,6 +912,7 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	vdrNodeID := ids.GenerateTestNodeID()
 
 	vdrTx, err := env.txBuilder.NewAddValidatorTx(
+		env.currentTxVersion(),
 		env.config.MinValidatorStake,
 		vdrStartTime,
 		vdrEndTime,
@@ -921,6 +928,7 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	delEndTime := vdrEndTime
 
 	delTx, err := env.txBuilder.NewAddDelegatorTx(
+		env.currentTxVersion(),
 		env.config.MinDelegatorStake,
 		delStartTime,
 		delEndTime,
@@ -978,7 +986,7 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	stake := vdrSet.GetWeight(vdrNodeID)
 	require.Equal(env.config.MinValidatorStake+env.config.MinDelegatorStake, stake)
 
-	tx, err := env.txBuilder.NewRewardValidatorTx(delTx.ID())
+	tx, err := env.txBuilder.NewRewardValidatorTx(env.currentTxVersion(), delTx.ID())
 	require.NoError(err)
 
 	// Create Delegator Diff
@@ -1027,7 +1035,7 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
 
-	tx, err = env.txBuilder.NewRewardValidatorTx(vdrStaker.TxID)
+	tx, err = env.txBuilder.NewRewardValidatorTx(env.currentTxVersion(), vdrStaker.TxID)
 	require.NoError(err)
 
 	// Create Validator Diff
@@ -1133,6 +1141,7 @@ func TestCortinaForkRewardDelegatorTxAndValidatorTxExecuteOnCommit(t *testing.T)
 	vdrNodeID := ids.GenerateTestNodeID()
 
 	vdrTx, err := env.txBuilder.NewAddValidatorTx(
+		env.currentTxVersion(),
 		env.config.MinValidatorStake, // stakeAmt
 		vdrStartTime,
 		vdrEndTime,
@@ -1148,6 +1157,7 @@ func TestCortinaForkRewardDelegatorTxAndValidatorTxExecuteOnCommit(t *testing.T)
 	delEndTime := vdrEndTime
 
 	delTx, err := env.txBuilder.NewAddDelegatorTx(
+		env.currentTxVersion(),
 		env.config.MinDelegatorStake,
 		delStartTime,
 		delEndTime,
@@ -1198,7 +1208,7 @@ func TestCortinaForkRewardDelegatorTxAndValidatorTxExecuteOnCommit(t *testing.T)
 	oldDelBalance, err := avax.GetBalance(env.state, delDestSet)
 	require.NoError(err)
 
-	tx, err := env.txBuilder.NewRewardValidatorTx(delTx.ID())
+	tx, err := env.txBuilder.NewRewardValidatorTx(env.currentTxVersion(), delTx.ID())
 	require.NoError(err)
 
 	// Create Delegator Diffs
@@ -1226,7 +1236,7 @@ func TestCortinaForkRewardDelegatorTxAndValidatorTxExecuteOnCommit(t *testing.T)
 	vdrOnAbortState, err := state.NewDiff(testID, env)
 	require.NoError(err)
 
-	tx, err = env.txBuilder.NewRewardValidatorTx(vdrTx.ID())
+	tx, err = env.txBuilder.NewRewardValidatorTx(env.currentTxVersion(), vdrTx.ID())
 	require.NoError(err)
 
 	txExecutor = ProposalTxExecutor{
@@ -1302,6 +1312,7 @@ func TestCortinaForkRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	vdrNodeID := ids.GenerateTestNodeID()
 
 	vdrTx, err := env.txBuilder.NewAddValidatorTx(
+		env.currentTxVersion(),
 		env.config.MinValidatorStake, // stakeAmt
 		vdrStartTime,
 		vdrEndTime,
@@ -1316,6 +1327,7 @@ func TestCortinaForkRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	delStartTime := vdrStartTime
 	delEndTime := vdrEndTime
 	delTx, err := env.txBuilder.NewAddDelegatorTx(
+		env.currentTxVersion(),
 		env.config.MinDelegatorStake,
 		delStartTime,
 		delEndTime,
@@ -1354,7 +1366,7 @@ func TestCortinaForkRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
 
-	tx, err := env.txBuilder.NewRewardValidatorTx(delTx.ID())
+	tx, err := env.txBuilder.NewRewardValidatorTx(env.currentTxVersion(), delTx.ID())
 	require.NoError(err)
 
 	onCommitState, err := state.NewDiff(lastAcceptedID, env)
@@ -1423,6 +1435,7 @@ func TestBanffForkRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	vdrNodeID := ids.GenerateTestNodeID()
 
 	vdrTx, err := env.txBuilder.NewAddValidatorTx(
+		env.currentTxVersion(),
 		env.config.MinValidatorStake, // stakeAmt
 		vdrStartTime,
 		vdrEndTime,
@@ -1438,6 +1451,7 @@ func TestBanffForkRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	delEndTime := vdrEndTime
 
 	delTx, err := env.txBuilder.NewAddDelegatorTx(
+		env.currentTxVersion(),
 		env.config.MinDelegatorStake,
 		delStartTime,
 		delEndTime,
@@ -1483,7 +1497,7 @@ func TestBanffForkRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	stake := vdrSet.GetWeight(vdrNodeID)
 	require.Equal(env.config.MinValidatorStake+env.config.MinDelegatorStake, stake)
 
-	tx, err := env.txBuilder.NewRewardValidatorTx(delTx.ID())
+	tx, err := env.txBuilder.NewRewardValidatorTx(env.currentTxVersion(), delTx.ID())
 	require.NoError(err)
 
 	onCommitState, err := state.NewDiff(lastAcceptedID, env)

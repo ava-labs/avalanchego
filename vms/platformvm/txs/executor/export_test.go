@@ -55,6 +55,7 @@ func TestNewExportTx(t *testing.T) {
 			defer ctrl.Finish()
 
 			tx, err := env.txBuilder.NewExportTx(
+				env.currentTxVersion(),
 				defaultBalance-defaultTxFee, // Amount of tokens to export
 				tt.destinationChainID,
 				to,

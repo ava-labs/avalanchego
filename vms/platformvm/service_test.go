@@ -220,7 +220,13 @@ func TestGetTxStatus(t *testing.T) {
 	oldSharedMemory := mutableSharedMemory.SharedMemory
 	mutableSharedMemory.SharedMemory = sm
 
-	tx, err := service.vm.txBuilder.NewImportTx(xChainID, ids.ShortEmpty, []*secp256k1.PrivateKey{recipientKey}, ids.ShortEmpty)
+	tx, err := service.vm.txBuilder.NewImportTx(
+		service.currentTxVersion(),
+		xChainID,
+		ids.ShortEmpty,
+		[]*secp256k1.PrivateKey{recipientKey},
+		ids.ShortEmpty,
+	)
 	require.NoError(err)
 
 	mutableSharedMemory.SharedMemory = oldSharedMemory
@@ -272,6 +278,7 @@ func TestGetTx(t *testing.T) {
 			"standard block",
 			func(service *Service) (*txs.Tx, error) {
 				return service.vm.txBuilder.NewCreateChainTx( // Test GetTx works for standard blocks
+					service.currentTxVersion(),
 					testSubnet1.ID(),
 					nil,
 					constants.AVMID,
@@ -286,6 +293,7 @@ func TestGetTx(t *testing.T) {
 			"proposal block",
 			func(service *Service) (*txs.Tx, error) {
 				return service.vm.txBuilder.NewAddValidatorTx( // Test GetTx works for proposal blocks
+					service.currentTxVersion(),
 					service.vm.MinValidatorStake,
 					uint64(service.vm.clock.Time().Add(txexecutor.SyncBound).Unix()),
 					uint64(service.vm.clock.Time().Add(txexecutor.SyncBound).Add(defaultMinStakingDuration).Unix()),
@@ -301,6 +309,7 @@ func TestGetTx(t *testing.T) {
 			"atomic block",
 			func(service *Service) (*txs.Tx, error) {
 				return service.vm.txBuilder.NewExportTx( // Test GetTx works for proposal blocks
+					service.currentTxVersion(),
 					100,
 					service.vm.ctx.XChainID,
 					ids.GenerateTestShortID(),
@@ -496,6 +505,7 @@ func TestGetStake(t *testing.T) {
 	delegatorStartTime := defaultGenesisTime
 	delegatorEndTime := defaultGenesisTime.Add(defaultMinStakingDuration)
 	tx, err := service.vm.txBuilder.NewAddDelegatorTx(
+		service.currentTxVersion(),
 		stakeAmount,
 		uint64(delegatorStartTime.Unix()),
 		uint64(delegatorEndTime.Unix()),
@@ -547,6 +557,7 @@ func TestGetStake(t *testing.T) {
 	pendingStakerNodeID := ids.GenerateTestNodeID()
 	pendingStakerEndTime := uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix())
 	tx, err = service.vm.txBuilder.NewAddValidatorTx(
+		service.currentTxVersion(),
 		stakeAmount,
 		uint64(defaultGenesisTime.Unix()),
 		pendingStakerEndTime,
@@ -630,6 +641,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	delegatorEndTime := defaultValidateStartTime.Add(defaultMinStakingDuration)
 
 	delTx, err := service.vm.txBuilder.NewAddDelegatorTx(
+		service.currentTxVersion(),
 		stakeAmount,
 		uint64(delegatorStartTime.Unix()),
 		uint64(delegatorEndTime.Unix()),
@@ -695,7 +707,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	require.True(found)
 
 	// Reward the delegator
-	tx, err := service.vm.txBuilder.NewRewardValidatorTx(delTx.ID())
+	tx, err := service.vm.txBuilder.NewRewardValidatorTx(service.currentTxVersion(), delTx.ID())
 	require.NoError(err)
 	service.vm.state.AddTx(tx, status.Committed)
 	service.vm.state.DeleteCurrentDelegator(staker)
@@ -762,6 +774,7 @@ func TestGetBlock(t *testing.T) {
 
 			// Make a block an accept it, then check we can get it.
 			tx, err := service.vm.txBuilder.NewCreateChainTx( // Test GetTx works for standard blocks
+				service.currentTxVersion(),
 				testSubnet1.ID(),
 				nil,
 				constants.AVMID,

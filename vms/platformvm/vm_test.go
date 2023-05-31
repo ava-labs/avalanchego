@@ -426,6 +426,7 @@ func defaultVM(fork activeFork) (*VM, database.Database, *mutableSharedMemory) {
 	// Note: following Banff activation, block acceptance will move
 	// chain time ahead
 	testSubnet1, err = vm.txBuilder.NewCreateSubnetTx(
+		currentTxVersion(vm),
 		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
 		// control keys are keys[0], keys[1], keys[2]
 		[]ids.ShortID{keys[0].PublicKey().Address(), keys[1].PublicKey().Address(), keys[2].PublicKey().Address()},
@@ -447,6 +448,14 @@ func defaultVM(fork activeFork) (*VM, database.Database, *mutableSharedMemory) {
 	}
 
 	return vm, baseDBManager.Current().Database, msm
+}
+
+func currentTxVersion(vm *VM) uint16 {
+	version := uint16(txs.Version1)
+	if !vm.Config.IsContinuousStakingActivated(vm.state.GetTimestamp()) {
+		version = txs.Version0
+	}
+	return version
 }
 
 func GenesisVMWithArgs(t *testing.T, args *api.BuildGenesisArgs) ([]byte, chan common.Message, *VM, *atomic.Memory) {
@@ -515,6 +524,7 @@ func GenesisVMWithArgs(t *testing.T, args *api.BuildGenesisArgs) ([]byte, chan c
 
 	// Create a subnet and store it in testSubnet1
 	testSubnet1, err = vm.txBuilder.NewCreateSubnetTx(
+		currentTxVersion(vm),
 		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
 		// control keys are keys[0], keys[1], keys[2]
 		[]ids.ShortID{keys[0].PublicKey().Address(), keys[1].PublicKey().Address(), keys[2].PublicKey().Address()},
@@ -619,6 +629,7 @@ func TestAddValidatorCommit(t *testing.T) {
 
 	// create valid tx
 	tx, err := vm.txBuilder.NewAddValidatorTx(
+		currentTxVersion(vm),
 		vm.MinValidatorStake,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
@@ -667,6 +678,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 
 	// create invalid tx
 	tx, err := vm.txBuilder.NewAddValidatorTx(
+		currentTxVersion(vm),
 		vm.MinValidatorStake,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
@@ -724,6 +736,7 @@ func TestAddValidatorReject(t *testing.T) {
 
 	// create valid tx
 	tx, err := vm.txBuilder.NewAddValidatorTx(
+		currentTxVersion(vm),
 		vm.MinValidatorStake,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
@@ -770,6 +783,7 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 
 	// create valid tx
 	tx, err := vm.txBuilder.NewAddValidatorTx(
+		currentTxVersion(vm),
 		vm.MinValidatorStake,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
@@ -806,6 +820,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	// note that [startTime, endTime] is a subset of time that keys[0]
 	// validates primary network ([defaultValidateStartTime, defaultValidateEndTime])
 	tx, err := vm.txBuilder.NewAddSubnetValidatorTx(
+		currentTxVersion(vm),
 		defaultWeight,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
@@ -854,6 +869,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	// note that [startTime, endTime] is a subset of time that keys[0]
 	// validates primary network ([defaultValidateStartTime, defaultValidateEndTime])
 	tx, err := vm.txBuilder.NewAddSubnetValidatorTx(
+		currentTxVersion(vm),
 		defaultWeight,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
@@ -1185,6 +1201,7 @@ func TestCreateChain(t *testing.T) {
 	}()
 
 	tx, err := vm.txBuilder.NewCreateChainTx(
+		currentTxVersion(vm),
 		testSubnet1.ID(),
 		nil,
 		ids.ID{'t', 'e', 's', 't', 'v', 'm'},
@@ -1240,6 +1257,7 @@ func TestCreateSubnet(t *testing.T) {
 	nodeID := ids.NodeID(keys[0].PublicKey().Address())
 
 	createSubnetTx, err := vm.txBuilder.NewCreateSubnetTx(
+		currentTxVersion(vm),
 		1, // threshold
 		[]ids.ShortID{ // control keys
 			keys[0].PublicKey().Address(),
@@ -1281,6 +1299,7 @@ func TestCreateSubnet(t *testing.T) {
 	endTime := startTime.Add(defaultMinStakingDuration)
 	// [startTime, endTime] is subset of time keys[0] validates default subnet so tx is valid
 	addValidatorTx, err := vm.txBuilder.NewAddSubnetValidatorTx(
+		currentTxVersion(vm),
 		defaultWeight,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),
@@ -1350,6 +1369,7 @@ func TestAtomicImport(t *testing.T) {
 	peerSharedMemory := m.NewSharedMemory(vm.ctx.XChainID)
 
 	_, err := vm.txBuilder.NewImportTx(
+		currentTxVersion(vm),
 		vm.ctx.XChainID,
 		recipientKey.PublicKey().Address(),
 		[]*secp256k1.PrivateKey{keys[0]},
@@ -1391,6 +1411,7 @@ func TestAtomicImport(t *testing.T) {
 	require.NoError(err)
 
 	tx, err := vm.txBuilder.NewImportTx(
+		currentTxVersion(vm),
 		vm.ctx.XChainID,
 		recipientKey.PublicKey().Address(),
 		[]*secp256k1.PrivateKey{recipientKey},
@@ -2440,6 +2461,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	id := key.PublicKey().Address()
 
 	addValidatorTx, err := vm.txBuilder.NewAddValidatorTx(
+		currentTxVersion(vm),
 		defaultMaxValidatorStake,
 		uint64(validatorStartTime.Unix()),
 		uint64(validatorEndTime.Unix()),
@@ -2462,6 +2484,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 	createSubnetTx, err := vm.txBuilder.NewCreateSubnetTx(
+		currentTxVersion(vm),
 		1,
 		[]ids.ShortID{id},
 		[]*secp256k1.PrivateKey{keys[0]},
@@ -2480,6 +2503,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 	addSubnetValidatorTx, err := vm.txBuilder.NewAddSubnetValidatorTx(
+		currentTxVersion(vm),
 		defaultMaxValidatorStake,
 		uint64(validatorStartTime.Unix()),
 		uint64(validatorEndTime.Unix()),
@@ -2491,6 +2515,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	require.NoError(err)
 
 	removeSubnetValidatorTx, err := vm.txBuilder.NewRemoveSubnetValidatorTx(
+		currentTxVersion(vm),
 		ids.NodeID(id),
 		createSubnetTx.ID(),
 		[]*secp256k1.PrivateKey{key, keys[2]},

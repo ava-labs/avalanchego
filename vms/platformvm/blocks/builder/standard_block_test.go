@@ -66,6 +66,7 @@ func TestAtomicTxImports(t *testing.T) {
 	require.NoError(err)
 
 	tx, err := env.txBuilder.NewImportTx(
+		env.currentTxVersion(),
 		env.ctx.XChainID,
 		recipientKey.PublicKey().Address(),
 		[]*secp256k1.PrivateKey{recipientKey},

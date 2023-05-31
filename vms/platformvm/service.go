@@ -87,6 +87,14 @@ type Service struct {
 	stakerAttributesCache *cache.LRU[ids.ID, *stakerAttributes]
 }
 
+func (s *Service) currentTxVersion() uint16 {
+	version := uint16(txs.Version1)
+	if !s.vm.Config.IsContinuousStakingActivated(s.vm.state.GetTimestamp()) {
+		version = txs.Version0
+	}
+	return version
+}
+
 // All attributes are optional and may not be filled for each stakerTx.
 type stakerAttributes struct {
 	shares                 uint32
@@ -1234,6 +1242,7 @@ func (s *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, reply *a
 
 	// Create the transaction
 	tx, err := s.vm.txBuilder.NewAddValidatorTx(
+		s.currentTxVersion(),
 		uint64(args.Weight),                  // Stake amount
 		uint64(args.StartTime),               // Start time
 		uint64(args.EndTime),                 // End time
@@ -1344,6 +1353,7 @@ func (s *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, reply *a
 
 	// Create the transaction
 	tx, err := s.vm.txBuilder.NewAddDelegatorTx(
+		s.currentTxVersion(),
 		uint64(args.Weight),    // Stake amount
 		uint64(args.StartTime), // Start time
 		uint64(args.EndTime),   // End time
@@ -1449,6 +1459,7 @@ func (s *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValidatorAr
 
 	// Create the transaction
 	tx, err := s.vm.txBuilder.NewAddSubnetValidatorTx(
+		s.currentTxVersion(),
 		uint64(args.Weight),    // Stake amount
 		uint64(args.StartTime), // Start time
 		uint64(args.EndTime),   // End time
@@ -1527,6 +1538,7 @@ func (s *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, response
 
 	// Create the transaction
 	tx, err := s.vm.txBuilder.NewCreateSubnetTx(
+		s.currentTxVersion(),
 		uint32(args.Threshold), // Threshold
 		controlKeys.List(),     // Control Addresses
 		privKeys.Keys,          // Private keys
@@ -1621,6 +1633,7 @@ func (s *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, response *ap
 
 	// Create the transaction
 	tx, err := s.vm.txBuilder.NewExportTx(
+		s.currentTxVersion(),
 		uint64(args.Amount), // Amount
 		chainID,             // ID of the chain to send the funds to
 		to,                  // Address
@@ -1706,6 +1719,7 @@ func (s *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, response *ap
 	}
 
 	tx, err := s.vm.txBuilder.NewImportTx(
+		s.currentTxVersion(),
 		chainID,
 		to,
 		privKeys.Keys,
@@ -1827,6 +1841,7 @@ func (s *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchainArgs, 
 
 	// Create the transaction
 	tx, err := s.vm.txBuilder.NewCreateChainTx(
+		s.currentTxVersion(),
 		args.SubnetID,
 		genesisBytes,
 		vmID,

@@ -56,6 +56,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 
 	// create valid tx
 	addValidatorTx, err := vm.txBuilder.NewAddValidatorTx(
+		currentTxVersion(vm),
 		vm.MinValidatorStake,
 		uint64(validatorStartTime.Unix()),
 		uint64(validatorEndTime.Unix()),
@@ -89,6 +90,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 
 	// create valid tx
 	addFirstDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
+		currentTxVersion(vm),
 		4*vm.MinValidatorStake, // maximum amount of stake this delegator can provide
 		uint64(firstDelegatorStartTime.Unix()),
 		uint64(firstDelegatorEndTime.Unix()),
@@ -123,6 +125,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 
 	// create valid tx
 	addSecondDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
+		currentTxVersion(vm),
 		vm.MinDelegatorStake,
 		uint64(secondDelegatorStartTime.Unix()),
 		uint64(secondDelegatorEndTime.Unix()),
@@ -147,6 +150,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 
 	// create valid tx
 	addThirdDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
+		currentTxVersion(vm),
 		vm.MinDelegatorStake,
 		uint64(thirdDelegatorStartTime.Unix()),
 		uint64(thirdDelegatorEndTime.Unix()),
@@ -220,6 +224,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 
 			// create valid tx
 			addValidatorTx, err := vm.txBuilder.NewAddValidatorTx(
+				currentTxVersion(vm),
 				validatorStake,
 				uint64(validatorStartTime.Unix()),
 				uint64(validatorEndTime.Unix()),
@@ -244,6 +249,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 
 			// create valid tx
 			addFirstDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
+				currentTxVersion(vm),
 				delegator1Stake,
 				uint64(delegator1StartTime.Unix()),
 				uint64(delegator1EndTime.Unix()),
@@ -267,6 +273,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 
 			// create valid tx
 			addSecondDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
+				currentTxVersion(vm),
 				delegator2Stake,
 				uint64(delegator2StartTime.Unix()),
 				uint64(delegator2EndTime.Unix()),
@@ -290,6 +297,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 
 			// create valid tx
 			addThirdDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
+				currentTxVersion(vm),
 				delegator3Stake,
 				uint64(delegator3StartTime.Unix()),
 				uint64(delegator3EndTime.Unix()),
@@ -313,6 +321,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 
 			// create valid tx
 			addFourthDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
+				currentTxVersion(vm),
 				delegator4Stake,
 				uint64(delegator4StartTime.Unix()),
 				uint64(delegator4EndTime.Unix()),
@@ -395,6 +404,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 	addr1 := key1.PublicKey().Address()
 
 	addSubnetTx0, err := vm.txBuilder.NewCreateSubnetTx(
+		currentTxVersion(vm),
 		1,
 		[]ids.ShortID{addr0},
 		[]*secp256k1.PrivateKey{key0},
@@ -403,6 +413,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 	require.NoError(err)
 
 	addSubnetTx1, err := vm.txBuilder.NewCreateSubnetTx(
+		currentTxVersion(vm),
 		1,
 		[]ids.ShortID{addr1},
 		[]*secp256k1.PrivateKey{key1},
@@ -411,6 +422,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 	require.NoError(err)
 
 	addSubnetTx2, err := vm.txBuilder.NewCreateSubnetTx(
+		currentTxVersion(vm),
 		1,
 		[]ids.ShortID{addr1},
 		[]*secp256k1.PrivateKey{key1},
@@ -493,6 +505,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 
 	// Create the tx to add a new validator
 	addValidatorTx, err := vm.txBuilder.NewAddValidatorTx(
+		currentTxVersion(vm),
 		vm.MinValidatorStake,
 		uint64(newValidatorStartTime.Unix()),
 		uint64(newValidatorEndTime.Unix()),
@@ -717,6 +730,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	// Create the tx to add the first new validator
 	addValidatorTx0, err := vm.txBuilder.NewAddValidatorTx(
+		currentTxVersion(vm),
 		vm.MaxValidatorStake,
 		uint64(newValidatorStartTime0.Unix()),
 		uint64(newValidatorEndTime0.Unix()),
@@ -898,6 +912,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	// Create the tx to add the second new validator
 	addValidatorTx1, err := vm.txBuilder.NewAddValidatorTx(
+		currentTxVersion(vm),
 		vm.MaxValidatorStake,
 		uint64(newValidatorStartTime1.Unix()),
 		uint64(newValidatorEndTime1.Unix()),
@@ -1070,6 +1085,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 
 	// Create the tx to add the first new validator
 	addValidatorTx0, err := vm.txBuilder.NewAddValidatorTx(
+		currentTxVersion(vm),
 		vm.MaxValidatorStake,
 		uint64(newValidatorStartTime0.Unix()),
 		uint64(newValidatorEndTime0.Unix()),
@@ -1198,6 +1214,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 
 	// create valid tx
 	addValidatorTx, err := vm.txBuilder.NewAddValidatorTx(
+		currentTxVersion(vm),
 		validatorStake,
 		uint64(validatorStartTime.Unix()),
 		uint64(validatorEndTime.Unix()),
@@ -1222,6 +1239,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 
 	// create valid tx
 	addFirstDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
+		currentTxVersion(vm),
 		delegator1Stake,
 		uint64(delegator1StartTime.Unix()),
 		uint64(delegator1EndTime.Unix()),
@@ -1245,6 +1263,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 
 	// create valid tx
 	addSecondDelegatorTx, err := vm.txBuilder.NewAddDelegatorTx(
+		currentTxVersion(vm),
 		delegator2Stake,
 		uint64(delegator2StartTime.Unix()),
 		uint64(delegator2EndTime.Unix()),
@@ -1284,6 +1303,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 	changeAddr := keys[0].PublicKey().Address()
 
 	addValidatorTx, err := vm.txBuilder.NewAddValidatorTx(
+		currentTxVersion(vm),
 		defaultMaxValidatorStake,
 		uint64(validatorStartTime.Unix()),
 		uint64(validatorEndTime.Unix()),
@@ -1306,6 +1326,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 	createSubnetTx, err := vm.txBuilder.NewCreateSubnetTx(
+		currentTxVersion(vm),
 		1,
 		[]ids.ShortID{changeAddr},
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
@@ -1324,6 +1345,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 	addSubnetValidatorTx, err := vm.txBuilder.NewAddSubnetValidatorTx(
+		currentTxVersion(vm),
 		defaultMaxValidatorStake,
 		uint64(validatorStartTime.Unix()),
 		uint64(validatorEndTime.Unix()),
@@ -1353,6 +1375,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 	require.Empty(emptyValidatorSet)
 
 	removeSubnetValidatorTx, err := vm.txBuilder.NewRemoveSubnetValidatorTx(
+		currentTxVersion(vm),
 		ids.NodeID(id),
 		createSubnetTx.ID(),
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
@@ -1406,6 +1429,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 	changeAddr := keys[0].PublicKey().Address()
 
 	addValidatorTx, err := vm.txBuilder.NewAddValidatorTx(
+		currentTxVersion(vm),
 		defaultMaxValidatorStake,
 		uint64(validatorStartTime.Unix()),
 		uint64(validatorEndTime.Unix()),
@@ -1428,6 +1452,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 	createSubnetTx, err := vm.txBuilder.NewCreateSubnetTx(
+		currentTxVersion(vm),
 		1,
 		[]ids.ShortID{changeAddr},
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
@@ -1454,6 +1479,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 	require.True(added)
 
 	addSubnetValidatorTx, err := vm.txBuilder.NewAddSubnetValidatorTx(
+		currentTxVersion(vm),
 		defaultMaxValidatorStake,
 		uint64(validatorStartTime.Unix()),
 		uint64(validatorEndTime.Unix()),
@@ -1475,6 +1501,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 	removeSubnetValidatorTx, err := vm.txBuilder.NewRemoveSubnetValidatorTx(
+		currentTxVersion(vm),
 		ids.NodeID(id),
 		createSubnetTx.ID(),
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},

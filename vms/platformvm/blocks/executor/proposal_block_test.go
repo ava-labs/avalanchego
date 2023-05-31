@@ -593,6 +593,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 				start := staker.startTime.Unix()
 				end := staker.startTime.Add(staker.stakingPeriod).Unix()
 				tx, err := env.txBuilder.NewAddValidatorTx(
+					env.currentTxVersion(),
 					env.config.MinValidatorStake,
 					uint64(start),
 					uint64(end),
@@ -619,6 +620,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 				start := subStaker.startTime.Unix()
 				end := subStaker.startTime.Add(subStaker.stakingPeriod).Unix()
 				tx, err := env.txBuilder.NewAddSubnetValidatorTx(
+					env.currentTxVersion(),
 					10, // Weight
 					uint64(start),
 					uint64(end),
@@ -647,6 +649,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 				// so to allow proposalBlk issuance
 				staker0.stakingPeriod = newTime.Sub(staker0.startTime)
 				addStaker0, err := env.txBuilder.NewAddValidatorTx(
+					env.currentTxVersion(),
 					10,
 					uint64(staker0.startTime.Unix()),
 					uint64(staker0.startTime.Add(staker0.stakingPeriod).Unix()),
@@ -749,6 +752,7 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 	subnetVdr1StartTime := defaultValidateStartTime
 	subnetVdr1EndTime := defaultValidateStartTime.Add(defaultMinStakingDuration)
 	tx, err := env.txBuilder.NewAddSubnetValidatorTx(
+		env.currentTxVersion(),
 		1,                                  // Weight
 		uint64(subnetVdr1StartTime.Unix()), // Start time
 		uint64(subnetVdr1EndTime.Unix()),   // end time
@@ -778,6 +782,7 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 	// Queue a staker that joins the staker set after the above validator leaves
 	subnetVdr2NodeID := ids.NodeID(preFundedKeys[1].PublicKey().Address())
 	tx, err = env.txBuilder.NewAddSubnetValidatorTx(
+		env.currentTxVersion(),
 		1, // Weight
 		uint64(subnetVdr1EndTime.Add(time.Second).Unix()),                                // Start time
 		uint64(subnetVdr1EndTime.Add(time.Second).Add(defaultMinStakingDuration).Unix()), // end time
@@ -808,6 +813,7 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 	staker0StartTime := defaultValidateStartTime
 	staker0EndTime := subnetVdr1EndTime
 	addStaker0, err := env.txBuilder.NewAddValidatorTx(
+		env.currentTxVersion(),
 		10,
 		uint64(staker0StartTime.Unix()),
 		uint64(staker0EndTime.Unix()),
@@ -895,6 +901,7 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 			subnetVdr1StartTime := defaultGenesisTime.Add(1 * time.Minute)
 			subnetVdr1EndTime := defaultGenesisTime.Add(10 * defaultMinStakingDuration).Add(1 * time.Minute)
 			tx, err := env.txBuilder.NewAddSubnetValidatorTx(
+				env.currentTxVersion(),
 				1,                                  // Weight
 				uint64(subnetVdr1StartTime.Unix()), // Start time
 				uint64(subnetVdr1EndTime.Unix()),   // end time
@@ -923,6 +930,7 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 			staker0StartTime := defaultGenesisTime
 			staker0EndTime := subnetVdr1StartTime
 			addStaker0, err := env.txBuilder.NewAddValidatorTx(
+				env.currentTxVersion(),
 				10,
 				uint64(staker0StartTime.Unix()),
 				uint64(staker0EndTime.Unix()),
@@ -1011,6 +1019,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 	staker0StartTime := defaultGenesisTime
 	staker0EndTime := pendingValidatorStartTime
 	addStaker0, err := env.txBuilder.NewAddValidatorTx(
+		env.currentTxVersion(),
 		10,
 		uint64(staker0StartTime.Unix()),
 		uint64(staker0EndTime.Unix()),
@@ -1079,6 +1088,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 	pendingDelegatorEndTime := pendingDelegatorStartTime.Add(1 * time.Second)
 
 	addDelegatorTx, err := env.txBuilder.NewAddDelegatorTx(
+		env.currentTxVersion(),
 		env.config.MinDelegatorStake,
 		uint64(pendingDelegatorStartTime.Unix()),
 		uint64(pendingDelegatorEndTime.Unix()),
@@ -1108,6 +1118,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 	// so to allow proposalBlk issuance
 	staker0EndTime = pendingDelegatorStartTime
 	addStaker0, err = env.txBuilder.NewAddValidatorTx(
+		env.currentTxVersion(),
 		10,
 		uint64(staker0StartTime.Unix()),
 		uint64(staker0EndTime.Unix()),
@@ -1202,6 +1213,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	staker0StartTime := defaultGenesisTime
 	staker0EndTime := pendingValidatorStartTime
 	addStaker0, err := env.txBuilder.NewAddValidatorTx(
+		env.currentTxVersion(),
 		10,
 		uint64(staker0StartTime.Unix()),
 		uint64(staker0EndTime.Unix()),
@@ -1269,6 +1281,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	pendingDelegatorStartTime := pendingValidatorStartTime.Add(1 * time.Second)
 	pendingDelegatorEndTime := pendingDelegatorStartTime.Add(defaultMinStakingDuration)
 	addDelegatorTx, err := env.txBuilder.NewAddDelegatorTx(
+		env.currentTxVersion(),
 		env.config.MinDelegatorStake,
 		uint64(pendingDelegatorStartTime.Unix()),
 		uint64(pendingDelegatorEndTime.Unix()),
@@ -1298,6 +1311,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	// so to allow proposalBlk issuance
 	staker0EndTime = pendingDelegatorStartTime
 	addStaker0, err = env.txBuilder.NewAddValidatorTx(
+		env.currentTxVersion(),
 		10,
 		uint64(staker0StartTime.Unix()),
 		uint64(staker0EndTime.Unix()),

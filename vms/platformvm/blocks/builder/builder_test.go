@@ -46,7 +46,7 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	}()
 
 	// add a tx to it
-	tx := getValidTx(env.txBuilder, t)
+	tx := getValidTx(env.currentTxVersion(), env.txBuilder, t)
 	txID := tx.ID()
 
 	env.sender.SendAppGossipF = func(context.Context, []byte) error {
@@ -81,7 +81,7 @@ func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
 	}()
 
 	// create candidate tx
-	tx := getValidTx(env.txBuilder, t)
+	tx := getValidTx(env.currentTxVersion(), env.txBuilder, t)
 	txID := tx.ID()
 
 	// A tx simply added to mempool is obviously not marked as dropped
@@ -363,7 +363,7 @@ func TestBuildBlock(t *testing.T) {
 
 				// The tx builder should be asked to build a reward tx
 				txBuilder := txbuilder.NewMockBuilder(ctrl)
-				txBuilder.EXPECT().NewRewardValidatorTx(stakerTxID).Return(transactions[0], nil)
+				txBuilder.EXPECT().NewRewardValidatorTx(gomock.Any(), stakerTxID).Return(transactions[0], nil)
 
 				return &builder{
 					Mempool:   mempool,

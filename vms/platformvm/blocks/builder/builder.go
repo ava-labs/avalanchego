@@ -356,19 +356,19 @@ func buildBlock(
 		return nil, fmt.Errorf("could not find next staker to reward: %w", err)
 	}
 
-	blkVersion := uint16(blocks.Version1)
+	version := uint16(blocks.Version1)
 	if !builder.txExecutorBackend.Config.IsContinuousStakingActivated(timestamp) {
-		blkVersion = blocks.Version0
+		version = blocks.Version0
 	}
 
 	if shouldReward {
-		rewardValidatorTx, err := builder.txBuilder.NewRewardValidatorTx(stakerTxID)
+		rewardValidatorTx, err := builder.txBuilder.NewRewardValidatorTx(version, stakerTxID)
 		if err != nil {
 			return nil, fmt.Errorf("could not build tx to reward staker: %w", err)
 		}
 
 		return blocks.NewBanffProposalBlock(
-			blkVersion,
+			version,
 			timestamp,
 			parentID,
 			height,
@@ -387,7 +387,7 @@ func buildBlock(
 
 	// Issue a block with as many transactions as possible.
 	return blocks.NewBanffStandardBlock(
-		blkVersion,
+		version,
 		timestamp,
 		parentID,
 		height,

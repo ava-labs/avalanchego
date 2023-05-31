@@ -528,6 +528,7 @@ func TestBanffStandardBlockUpdateStakers(t *testing.T) {
 				start := staker.startTime
 				end := staker.startTime.Add(staker.stakingPeriod)
 				tx, err := env.txBuilder.NewAddSubnetValidatorTx(
+					env.currentTxVersion(),
 					10, // Weight
 					uint64(start.Unix()),
 					uint64(end.Unix()),
@@ -619,6 +620,7 @@ func TestBanffStandardBlockRemoveSubnetValidator(t *testing.T) {
 	subnetVdr1StartTime := defaultValidateStartTime
 	subnetVdr1EndTime := defaultValidateStartTime.Add(defaultMinStakingDuration)
 	tx, err := env.txBuilder.NewAddSubnetValidatorTx(
+		env.currentTxVersion(),
 		1,                                  // Weight
 		uint64(subnetVdr1StartTime.Unix()), // Start time
 		uint64(subnetVdr1EndTime.Unix()),   // end time
@@ -648,6 +650,7 @@ func TestBanffStandardBlockRemoveSubnetValidator(t *testing.T) {
 	// Queue a staker that joins the staker set after the above validator leaves
 	subnetVdr2NodeID := ids.NodeID(preFundedKeys[1].PublicKey().Address())
 	tx, err = env.txBuilder.NewAddSubnetValidatorTx(
+		env.currentTxVersion(),
 		1, // Weight
 		uint64(subnetVdr1EndTime.Add(time.Second).Unix()),                                // Start time
 		uint64(subnetVdr1EndTime.Add(time.Second).Add(defaultMinStakingDuration).Unix()), // end time
@@ -721,6 +724,7 @@ func TestBanffStandardBlockTrackedSubnet(t *testing.T) {
 			subnetVdr1StartTime := defaultGenesisTime.Add(1 * time.Minute)
 			subnetVdr1EndTime := defaultGenesisTime.Add(10 * defaultMinStakingDuration).Add(1 * time.Minute)
 			tx, err := env.txBuilder.NewAddSubnetValidatorTx(
+				env.currentTxVersion(),
 				1,                                  // Weight
 				uint64(subnetVdr1StartTime.Unix()), // Start time
 				uint64(subnetVdr1EndTime.Unix()),   // end time
@@ -817,6 +821,7 @@ func TestBanffStandardBlockDelegatorStakerWeight(t *testing.T) {
 	pendingDelegatorEndTime := pendingDelegatorStartTime.Add(1 * time.Second)
 
 	addDelegatorTx, err := env.txBuilder.NewAddDelegatorTx(
+		env.currentTxVersion(),
 		env.config.MinDelegatorStake,
 		uint64(pendingDelegatorStartTime.Unix()),
 		uint64(pendingDelegatorEndTime.Unix()),

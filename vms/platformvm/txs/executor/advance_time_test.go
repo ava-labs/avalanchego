@@ -372,6 +372,7 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 
 			for _, staker := range test.subnetStakers {
 				tx, err := env.txBuilder.NewAddSubnetValidatorTx(
+					env.currentTxVersion(),
 					10, // Weight
 					uint64(staker.startTime.Unix()),
 					uint64(staker.endTime.Unix()),
@@ -466,6 +467,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	subnetVdr1StartTime := defaultValidateStartTime
 	subnetVdr1EndTime := defaultValidateStartTime.Add(defaultMinStakingDuration)
 	tx, err := env.txBuilder.NewAddSubnetValidatorTx(
+		env.currentTxVersion(),
 		1,                                  // Weight
 		uint64(subnetVdr1StartTime.Unix()), // Start time
 		uint64(subnetVdr1EndTime.Unix()),   // end time
@@ -496,6 +498,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	// Queue a staker that joins the staker set after the above validator leaves
 	subnetVdr2NodeID := ids.NodeID(preFundedKeys[1].PublicKey().Address())
 	tx, err = env.txBuilder.NewAddSubnetValidatorTx(
+		env.currentTxVersion(),
 		1, // Weight
 		uint64(subnetVdr1EndTime.Add(time.Second).Unix()),                                // Start time
 		uint64(subnetVdr1EndTime.Add(time.Second).Add(defaultMinStakingDuration).Unix()), // end time
@@ -573,6 +576,7 @@ func TestTrackedSubnet(t *testing.T) {
 			subnetVdr1StartTime := defaultGenesisTime.Add(1 * time.Minute)
 			subnetVdr1EndTime := defaultGenesisTime.Add(10 * defaultMinStakingDuration).Add(1 * time.Minute)
 			tx, err := env.txBuilder.NewAddSubnetValidatorTx(
+				env.currentTxVersion(),
 				1,                                  // Weight
 				uint64(subnetVdr1StartTime.Unix()), // Start time
 				uint64(subnetVdr1EndTime.Unix()),   // end time
@@ -681,6 +685,7 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	pendingDelegatorEndTime := pendingDelegatorStartTime.Add(1 * time.Second)
 
 	addDelegatorTx, err := env.txBuilder.NewAddDelegatorTx(
+		env.currentTxVersion(),
 		env.config.MinDelegatorStake,
 		uint64(pendingDelegatorStartTime.Unix()),
 		uint64(pendingDelegatorEndTime.Unix()),
@@ -785,6 +790,7 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	pendingDelegatorStartTime := pendingValidatorStartTime.Add(1 * time.Second)
 	pendingDelegatorEndTime := pendingDelegatorStartTime.Add(defaultMinStakingDuration)
 	addDelegatorTx, err := env.txBuilder.NewAddDelegatorTx(
+		env.currentTxVersion(),
 		env.config.MinDelegatorStake,
 		uint64(pendingDelegatorStartTime.Unix()),
 		uint64(pendingDelegatorEndTime.Unix()),
@@ -932,6 +938,7 @@ func addPendingValidator(
 	keys []*secp256k1.PrivateKey,
 ) (*txs.Tx, error) {
 	addPendingValidatorTx, err := env.txBuilder.NewAddValidatorTx(
+		env.currentTxVersion(),
 		env.config.MinValidatorStake,
 		uint64(startTime.Unix()),
 		uint64(endTime.Unix()),

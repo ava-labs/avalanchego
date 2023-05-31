@@ -35,6 +35,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 	// pending validator set with the minimum staking amount
 	addMinStakeValidator := func(target *environment) {
 		tx, err := target.txBuilder.NewAddValidatorTx(
+			target.currentTxVersion(),
 			target.config.MinValidatorStake, // stake amount
 			newValidatorStartTime,           // start time
 			newValidatorEndTime,             // end time
@@ -67,6 +68,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 	// pending validator set with the maximum staking amount
 	addMaxStakeValidator := func(target *environment) {
 		tx, err := target.txBuilder.NewAddValidatorTx(
+			target.currentTxVersion(),
 			target.config.MaxValidatorStake, // stake amount
 			newValidatorStartTime,           // start time
 			newValidatorEndTime,             // end time
@@ -257,6 +259,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			}()
 
 			tx, err := freshTH.txBuilder.NewAddDelegatorTx(
+				freshTH.currentTxVersion(),
 				tt.stakeAmount,
 				tt.startTime,
 				tt.endTime,
@@ -304,6 +307,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		// but stops validating subnet after stops validating primary network
 		// (note that keys[0] is a genesis validator)
 		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
+			env.currentTxVersion(),
 			defaultWeight,
 			uint64(defaultValidateStartTime.Unix())+1,
 			uint64(defaultValidateEndTime.Unix())+1,
@@ -336,6 +340,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		// primary network validation period
 		// (note that keys[0] is a genesis validator)
 		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
+			env.currentTxVersion(),
 			defaultWeight,
 			uint64(defaultValidateStartTime.Unix())+1,
 			uint64(defaultValidateEndTime.Unix()),
@@ -372,6 +377,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 	dsEndTime := dsStartTime.Add(5 * defaultMinStakingDuration)
 
 	addDSTx, err := env.txBuilder.NewAddValidatorTx(
+		env.currentTxVersion(),
 		env.config.MinValidatorStake, // stake amount
 		uint64(dsStartTime.Unix()),   // start time
 		uint64(dsEndTime.Unix()),     // end time
@@ -386,6 +392,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 	{
 		// Case: Proposed validator isn't in pending or current validator sets
 		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
+			env.currentTxVersion(),
 			defaultWeight,
 			uint64(dsStartTime.Unix()), // start validating subnet before primary network
 			uint64(dsEndTime.Unix()),
@@ -435,6 +442,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		// Case: Proposed validator is pending validator of primary network
 		// but starts validating subnet before primary network
 		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
+			env.currentTxVersion(),
 			defaultWeight,
 			uint64(dsStartTime.Unix())-1, // start validating subnet before primary network
 			uint64(dsEndTime.Unix()),
@@ -465,6 +473,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		// Case: Proposed validator is pending validator of primary network
 		// but stops validating subnet after primary network
 		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
+			env.currentTxVersion(),
 			defaultWeight,
 			uint64(dsStartTime.Unix()),
 			uint64(dsEndTime.Unix())+1, // stop validating subnet after stopping validating primary network
@@ -495,6 +504,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		// Case: Proposed validator is pending validator of primary network and
 		// period validating subnet is subset of time validating primary network
 		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
+			env.currentTxVersion(),
 			defaultWeight,
 			uint64(dsStartTime.Unix()), // same start time as for primary network
 			uint64(dsEndTime.Unix()),   // same end time as for primary network
@@ -528,6 +538,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 
 	{
 		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
+			env.currentTxVersion(),
 			defaultWeight,               // weight
 			uint64(newTimestamp.Unix()), // start time
 			uint64(newTimestamp.Add(defaultMinStakingDuration).Unix()), // end time
@@ -560,6 +571,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 	// Case: Proposed validator already validating the subnet
 	// First, add validator as validator of subnet
 	subnetTx, err := env.txBuilder.NewAddSubnetValidatorTx(
+		env.currentTxVersion(),
 		defaultWeight,                           // weight
 		uint64(defaultValidateStartTime.Unix()), // start time
 		uint64(defaultValidateEndTime.Unix()),   // end time
@@ -589,6 +601,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 	{
 		// Node with ID nodeIDKey.PublicKey().Address() now validating subnet with ID testSubnet1.ID
 		duplicateSubnetTx, err := env.txBuilder.NewAddSubnetValidatorTx(
+			env.currentTxVersion(),
 			defaultWeight, // weight
 			uint64(defaultValidateStartTime.Unix())+1, // start time
 			uint64(defaultValidateEndTime.Unix()),     // end time
@@ -623,6 +636,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 	{
 		// Case: Too few signatures
 		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
+			env.currentTxVersion(),
 			defaultWeight,                       // weight
 			uint64(defaultGenesisTime.Unix())+1, // start time
 			uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix())+1, // end time
@@ -659,6 +673,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 	{
 		// Case: Control Signature from invalid key (keys[3] is not a control key)
 		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
+			env.currentTxVersion(),
 			defaultWeight,                       // weight
 			uint64(defaultGenesisTime.Unix())+1, // start time
 			uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix())+1, // end time
@@ -694,6 +709,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 		// Case: Proposed validator in pending validator set for subnet
 		// First, add validator to pending validator set of subnet
 		tx, err := env.txBuilder.NewAddSubnetValidatorTx(
+			env.currentTxVersion(),
 			defaultWeight,                       // weight
 			uint64(defaultGenesisTime.Unix())+1, // start time
 			uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix())+1, // end time
@@ -750,6 +766,7 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 	{
 		// Case: Validator's start time too early
 		tx, err := env.txBuilder.NewAddValidatorTx(
+			env.currentTxVersion(),
 			env.config.MinValidatorStake,
 			uint64(defaultValidateStartTime.Unix()),
 			uint64(defaultValidateEndTime.Unix()),
@@ -780,6 +797,7 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 	{
 		// Case: Validator's start time too far in the future
 		tx, err := env.txBuilder.NewAddValidatorTx(
+			env.currentTxVersion(),
 			env.config.MinValidatorStake,
 			uint64(defaultValidateStartTime.Add(MaxFutureStartTime).Unix()+1),
 			uint64(defaultValidateStartTime.Add(MaxFutureStartTime).Add(defaultMinStakingDuration).Unix()+1),
@@ -810,6 +828,7 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 	{
 		// Case: Validator already validating primary network
 		tx, err := env.txBuilder.NewAddValidatorTx(
+			env.currentTxVersion(),
 			env.config.MinValidatorStake,
 			uint64(defaultValidateStartTime.Unix())+1,
 			uint64(defaultValidateEndTime.Unix()),
@@ -841,6 +860,7 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 		// Case: Validator in pending validator set of primary network
 		startTime := defaultGenesisTime.Add(1 * time.Second)
 		tx, err := env.txBuilder.NewAddValidatorTx(
+			env.currentTxVersion(),
 			env.config.MinValidatorStake,                            // stake amount
 			uint64(startTime.Unix()),                                // start time
 			uint64(startTime.Add(defaultMinStakingDuration).Unix()), // end time
@@ -888,6 +908,7 @@ func TestProposalTxExecuteAddValidator(t *testing.T) {
 	{
 		// Case: Validator doesn't have enough tokens to cover stake amount
 		tx, err := env.txBuilder.NewAddValidatorTx( // create the tx
+			env.currentTxVersion(),
 			env.config.MinValidatorStake,
 			uint64(defaultValidateStartTime.Unix())+1,
 			uint64(defaultValidateEndTime.Unix()),

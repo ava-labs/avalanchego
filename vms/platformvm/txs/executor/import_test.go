@@ -155,6 +155,7 @@ func TestNewImportTx(t *testing.T) {
 
 			env.msm.SharedMemory = tt.sharedMemory
 			tx, err := env.txBuilder.NewImportTx(
+				env.currentTxVersion(),
 				tt.sourceChainID,
 				to,
 				tt.sourceKeys,

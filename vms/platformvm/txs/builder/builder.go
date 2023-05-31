@@ -44,6 +44,7 @@ type AtomicTxBuilder interface {
 	// keys: keys to import the funds
 	// changeAddr: address to send change to, if there is any
 	NewImportTx(
+		version uint16,
 		chainID ids.ID,
 		to ids.ShortID,
 		keys []*secp256k1.PrivateKey,
@@ -56,6 +57,7 @@ type AtomicTxBuilder interface {
 	// keys: keys to pay the fee and provide the tokens
 	// changeAddr: address to send change to, if there is any
 	NewExportTx(
+		version uint16,
 		amount uint64,
 		chainID ids.ID,
 		to ids.ShortID,
@@ -73,6 +75,7 @@ type DecisionTxBuilder interface {
 	// keys: keys to sign the tx
 	// changeAddr: address to send change to, if there is any
 	NewCreateChainTx(
+		version uint16,
 		subnetID ids.ID,
 		genesisData []byte,
 		vmID ids.ID,
@@ -87,6 +90,7 @@ type DecisionTxBuilder interface {
 	// keys: keys to pay the fee
 	// changeAddr: address to send change to, if there is any
 	NewCreateSubnetTx(
+		version uint16,
 		threshold uint32,
 		ownerAddrs []ids.ShortID,
 		keys []*secp256k1.PrivateKey,
@@ -104,6 +108,7 @@ type ProposalTxBuilder interface {
 	// keys: Keys providing the staked tokens
 	// changeAddr: Address to send change to, if there is any
 	NewAddValidatorTx(
+		version uint16,
 		stakeAmount,
 		startTime,
 		endTime uint64,
@@ -122,6 +127,7 @@ type ProposalTxBuilder interface {
 	// keys: keys providing the staked tokens
 	// changeAddr: address to send change to, if there is any
 	NewAddDelegatorTx(
+		version uint16,
 		stakeAmount,
 		startTime,
 		endTime uint64,
@@ -139,6 +145,7 @@ type ProposalTxBuilder interface {
 	// keys: keys to use for adding the validator
 	// changeAddr: address to send change to, if there is any
 	NewAddSubnetValidatorTx(
+		version uint16,
 		weight,
 		startTime,
 		endTime uint64,
@@ -153,6 +160,7 @@ type ProposalTxBuilder interface {
 	// keys: keys to use for removing the validator
 	// changeAddr: address to send change to, if there is any
 	NewRemoveSubnetValidatorTx(
+		version uint16,
 		nodeID ids.NodeID,
 		subnetID ids.ID,
 		keys []*secp256k1.PrivateKey,
@@ -165,10 +173,11 @@ type ProposalTxBuilder interface {
 
 	// RewardStakerTx creates a new transaction that proposes to remove the staker
 	// [validatorID] from the default validator set.
-	NewRewardValidatorTx(txID ids.ID) (*txs.Tx, error)
+	NewRewardValidatorTx(version uint16, txID ids.ID) (*txs.Tx, error)
 
 	// NewStopStakerTx creates a new transaction that stops the staker with TxID txID.
 	NewStopStakerTx(
+		version uint16,
 		txID ids.ID,
 		keys []*secp256k1.PrivateKey,
 		changeAddr ids.ShortID,
@@ -207,6 +216,7 @@ type builder struct {
 }
 
 func (b *builder) NewImportTx(
+	version uint16,
 	from ids.ID,
 	to ids.ShortID,
 	keys []*secp256k1.PrivateKey,
@@ -297,7 +307,7 @@ func (b *builder) NewImportTx(
 		SourceChain:    from,
 		ImportedInputs: importedInputs,
 	}
-	tx, err := txs.NewSigned(utx, txs.Version1, txs.Codec, signers)
+	tx, err := txs.NewSigned(utx, version, txs.Codec, signers)
 	if err != nil {
 		return nil, err
 	}
@@ -306,6 +316,7 @@ func (b *builder) NewImportTx(
 
 // TODO: should support other assets than AVAX
 func (b *builder) NewExportTx(
+	version uint16,
 	amount uint64,
 	chainID ids.ID,
 	to ids.ShortID,
@@ -342,7 +353,7 @@ func (b *builder) NewExportTx(
 			},
 		}},
 	}
-	tx, err := txs.NewSigned(utx, txs.Version1, txs.Codec, signers)
+	tx, err := txs.NewSigned(utx, version, txs.Codec, signers)
 	if err != nil {
 		return nil, err
 	}
@@ -350,6 +361,7 @@ func (b *builder) NewExportTx(
 }
 
 func (b *builder) NewCreateChainTx(
+	version uint16,
 	subnetID ids.ID,
 	genesisData []byte,
 	vmID ids.ID,
@@ -389,7 +401,7 @@ func (b *builder) NewCreateChainTx(
 		GenesisData: genesisData,
 		SubnetAuth:  subnetAuth,
 	}
-	tx, err := txs.NewSigned(utx, txs.Version1, txs.Codec, signers)
+	tx, err := txs.NewSigned(utx, version, txs.Codec, signers)
 	if err != nil {
 		return nil, err
 	}
@@ -397,6 +409,7 @@ func (b *builder) NewCreateChainTx(
 }
 
 func (b *builder) NewCreateSubnetTx(
+	version uint16,
 	threshold uint32,
 	ownerAddrs []ids.ShortID,
 	keys []*secp256k1.PrivateKey,
@@ -425,7 +438,7 @@ func (b *builder) NewCreateSubnetTx(
 			Addrs:     ownerAddrs,
 		},
 	}
-	tx, err := txs.NewSigned(utx, txs.Version1, txs.Codec, signers)
+	tx, err := txs.NewSigned(utx, version, txs.Codec, signers)
 	if err != nil {
 		return nil, err
 	}
@@ -433,6 +446,7 @@ func (b *builder) NewCreateSubnetTx(
 }
 
 func (b *builder) NewAddValidatorTx(
+	version uint16,
 	stakeAmount,
 	startTime,
 	endTime uint64,
@@ -468,7 +482,7 @@ func (b *builder) NewAddValidatorTx(
 		},
 		DelegationShares: shares,
 	}
-	tx, err := txs.NewSigned(utx, txs.Version1, txs.Codec, signers)
+	tx, err := txs.NewSigned(utx, version, txs.Codec, signers)
 	if err != nil {
 		return nil, err
 	}
@@ -476,6 +490,7 @@ func (b *builder) NewAddValidatorTx(
 }
 
 func (b *builder) NewAddDelegatorTx(
+	version uint16,
 	stakeAmount,
 	startTime,
 	endTime uint64,
@@ -509,7 +524,7 @@ func (b *builder) NewAddDelegatorTx(
 			Addrs:     []ids.ShortID{rewardAddress},
 		},
 	}
-	tx, err := txs.NewSigned(utx, txs.Version1, txs.Codec, signers)
+	tx, err := txs.NewSigned(utx, version, txs.Codec, signers)
 	if err != nil {
 		return nil, err
 	}
@@ -517,6 +532,7 @@ func (b *builder) NewAddDelegatorTx(
 }
 
 func (b *builder) NewAddSubnetValidatorTx(
+	version uint16,
 	weight,
 	startTime,
 	endTime uint64,
@@ -555,7 +571,7 @@ func (b *builder) NewAddSubnetValidatorTx(
 		},
 		SubnetAuth: subnetAuth,
 	}
-	tx, err := txs.NewSigned(utx, txs.Version1, txs.Codec, signers)
+	tx, err := txs.NewSigned(utx, version, txs.Codec, signers)
 	if err != nil {
 		return nil, err
 	}
@@ -563,6 +579,7 @@ func (b *builder) NewAddSubnetValidatorTx(
 }
 
 func (b *builder) NewRemoveSubnetValidatorTx(
+	version uint16,
 	nodeID ids.NodeID,
 	subnetID ids.ID,
 	keys []*secp256k1.PrivateKey,
@@ -591,7 +608,7 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 		NodeID:     nodeID,
 		SubnetAuth: subnetAuth,
 	}
-	tx, err := txs.NewSigned(utx, txs.Version1, txs.Codec, signers)
+	tx, err := txs.NewSigned(utx, version, txs.Codec, signers)
 	if err != nil {
 		return nil, err
 	}
@@ -600,16 +617,16 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 
 func (b *builder) NewAdvanceTimeTx(timestamp time.Time) (*txs.Tx, error) {
 	utx := &txs.AdvanceTimeTx{Time: uint64(timestamp.Unix())}
-	tx, err := txs.NewSigned(utx, txs.Version1, txs.Codec, nil)
+	tx, err := txs.NewSigned(utx, txs.Version0, txs.Codec, nil)
 	if err != nil {
 		return nil, err
 	}
 	return tx, tx.SyntacticVerify(b.ctx)
 }
 
-func (b *builder) NewRewardValidatorTx(txID ids.ID) (*txs.Tx, error) {
+func (b *builder) NewRewardValidatorTx(version uint16, txID ids.ID) (*txs.Tx, error) {
 	utx := &txs.RewardValidatorTx{TxID: txID}
-	tx, err := txs.NewSigned(utx, txs.Version1, txs.Codec, nil)
+	tx, err := txs.NewSigned(utx, version, txs.Codec, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -618,6 +635,7 @@ func (b *builder) NewRewardValidatorTx(txID ids.ID) (*txs.Tx, error) {
 }
 
 func (b *builder) NewStopStakerTx(
+	version uint16,
 	txID ids.ID,
 	keys []*secp256k1.PrivateKey,
 	changeAddr ids.ShortID,
@@ -644,7 +662,7 @@ func (b *builder) NewStopStakerTx(
 		StakerAuth: stopStakerAuth,
 	}
 
-	tx, err := txs.NewSigned(utx, txs.Version1, txs.Codec, signers)
+	tx, err := txs.NewSigned(utx, version, txs.Codec, signers)
 	if err != nil {
 		return nil, err
 	}
