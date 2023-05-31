@@ -18,17 +18,17 @@ func TestInputVerifyNil(t *testing.T) {
 		{
 			name:        "nil input",
 			in:          nil,
-			expectedErr: errNilInput,
+			expectedErr: ErrNilInput,
 		},
 		{
 			name:        "not sorted",
 			in:          &Input{SigIndices: []uint32{2, 1}},
-			expectedErr: errNotSortedUnique,
+			expectedErr: ErrInputIndicesNotSortedUnique,
 		},
 		{
 			name:        "not unique",
 			in:          &Input{SigIndices: []uint32{2, 2}},
-			expectedErr: errNotSortedUnique,
+			expectedErr: ErrInputIndicesNotSortedUnique,
 		},
 		{
 			name:        "passes verification",
@@ -39,8 +39,8 @@ func TestInputVerifyNil(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
-			require.ErrorIs(tt.in.Verify(), tt.expectedErr)
+			err := tt.in.Verify()
+			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
 }

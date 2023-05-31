@@ -4,6 +4,7 @@
 package merkledb
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 
@@ -155,31 +156,43 @@ func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start, end []b
 				return false
 			}
 
+			// Add the changes from this commit to [combinedChanges].
 			for key, valueChange := range item.values {
-				if (len(startPath) == 0 || key.Compare(startPath) >= 0) &&
-					(len(endPath) == 0 || key.Compare(endPath) <= 0) {
-					if existing, ok := combinedChanges.values[key]; ok {
-						existing.after = valueChange.after
-					} else {
-						combinedChanges.values[key] = &change[Maybe[[]byte]]{
-							before: valueChange.before,
-							after:  valueChange.after,
-						}
+				// The key is outside the range [start, end].
+				if (len(startPath) > 0 && key.Compare(startPath) < 0) ||
+					(len(endPath) > 0 && key.Compare(endPath) > 0) {
+					continue
+				}
+
+				// A change to this key already exists in [combinedChanges]
+				// so update its before value with the earlier before value
+				if existing, ok := combinedChanges.values[key]; ok {
+					existing.after = valueChange.after
+					if existing.before.hasValue == existing.after.hasValue &&
+						bytes.Equal(existing.before.value, existing.after.value) {
+						// The change to this key is a no-op, so remove it from [combinedChanges].
+						delete(combinedChanges.values, key)
+						sortedKeys.Delete(key)
+					}
+				} else {
+					combinedChanges.values[key] = &change[Maybe[[]byte]]{
+						before: valueChange.before,
+						after:  valueChange.after,
 					}
 					sortedKeys.ReplaceOrInsert(key)
 				}
 			}
-
-			// Keep only the smallest [maxLength] items in [combinedChanges.values].
-			for sortedKeys.Len() > maxLength {
-				if greatestKey, found := sortedKeys.DeleteMax(); found {
-					delete(combinedChanges.values, greatestKey)
-				}
-			}
-
+			// continue to next change list
 			return true
-		},
-	)
+		})
+
+	// Keep only the smallest [maxLength] items in [combinedChanges.values].
+	for sortedKeys.Len() > maxLength {
+		if greatestKey, found := sortedKeys.DeleteMax(); found {
+			delete(combinedChanges.values, greatestKey)
+		}
+	}
+
 	return combinedChanges, nil
 }
 

@@ -15,8 +15,8 @@ const (
 )
 
 var (
-	errNilInput        = errors.New("nil input")
-	errNotSortedUnique = errors.New("signatures not sorted and unique")
+	ErrNilInput                    = errors.New("nil input")
+	ErrInputIndicesNotSortedUnique = errors.New("address indices not sorted and unique")
 )
 
 type Input struct {
@@ -35,9 +35,9 @@ func (in *Input) Cost() (uint64, error) {
 func (in *Input) Verify() error {
 	switch {
 	case in == nil:
-		return errNilInput
+		return ErrNilInput
 	case !utils.IsSortedAndUniqueOrdered(in.SigIndices):
-		return errNotSortedUnique
+		return ErrInputIndicesNotSortedUnique
 	default:
 		return nil
 	}

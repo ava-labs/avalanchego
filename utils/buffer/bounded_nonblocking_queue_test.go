@@ -14,7 +14,7 @@ func TestNewBoundedQueue(t *testing.T) {
 
 	// Case: maxSize < 1
 	_, err := NewBoundedQueue[bool](0, nil)
-	require.Error(err)
+	require.ErrorIs(err, errInvalidMaxSize)
 
 	// Case: maxSize == 1 and nil onEvict
 	b, err := NewBoundedQueue[bool](1, nil)
@@ -36,7 +36,7 @@ func TestBoundedQueue(t *testing.T) {
 	b, err := NewBoundedQueue(maxSize, onEvict)
 	require.NoError(err)
 
-	require.Equal(0, b.Len())
+	require.Zero(b.Len())
 
 	// Fill the queue
 	for i := 0; i < maxSize; i++ {
@@ -44,7 +44,7 @@ func TestBoundedQueue(t *testing.T) {
 		require.Equal(i+1, b.Len())
 		got, ok := b.Peek()
 		require.True(ok)
-		require.Equal(0, got)
+		require.Zero(got)
 		got, ok = b.Index(i)
 		require.True(ok)
 		require.Equal(i, got)
@@ -71,7 +71,7 @@ func TestBoundedQueue(t *testing.T) {
 	require.False(ok)
 	_, ok = b.Index(0)
 	require.False(ok)
-	require.Equal(0, b.Len())
+	require.Zero(b.Len())
 	require.Empty(b.List())
 
 	// Fill the queue again
@@ -131,7 +131,7 @@ func TestBoundedQueue(t *testing.T) {
 	// Queue is empty
 
 	require.Empty(b.List())
-	require.Equal(0, b.Len())
+	require.Zero(b.Len())
 	require.Equal([]int{0, 1, 2}, evicted)
 	_, ok = b.Pop()
 	require.False(ok)

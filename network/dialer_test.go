@@ -30,8 +30,9 @@ func newTestDialer() *testDialer {
 }
 
 func (d *testDialer) NewListener() (ips.DynamicIPPort, *testListener) {
+	// Uses a private IP to easily enable testing AllowPrivateIPs
 	ip := ips.NewDynamicIPPort(
-		net.IPv6loopback,
+		net.IPv4(10, 0, 0, 0),
 		uint16(len(d.listeners)),
 	)
 	staticIP := ip.IPPort()

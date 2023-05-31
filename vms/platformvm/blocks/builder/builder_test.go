@@ -61,8 +61,8 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	blkIntf, err := env.Builder.BuildBlock(context.Background())
 	require.NoError(err)
 
-	blk, ok := blkIntf.(*blockexecutor.Block)
-	require.True(ok)
+	require.IsType(&blockexecutor.Block{}, blkIntf)
+	blk := blkIntf.(*blockexecutor.Block)
 	require.Len(blk.Txs(), 1)
 	require.Equal(txID, blk.Txs()[0].ID())
 
@@ -138,7 +138,7 @@ func TestGetNextStakerToReward(t *testing.T) {
 			stateF: func(ctrl *gomock.Controller) state.Chain {
 				return state.NewMockChain(ctrl)
 			},
-			expectedErr: errEndOfTime,
+			expectedErr: ErrEndOfTime,
 		},
 		{
 			name:      "no stakers",
@@ -289,11 +289,10 @@ func TestGetNextStakerToReward(t *testing.T) {
 
 			state := tt.stateF(ctrl)
 			txID, shouldReward, err := getNextStakerToReward(tt.timestamp, state)
+			require.ErrorIs(err, tt.expectedErr)
 			if tt.expectedErr != nil {
-				require.Equal(tt.expectedErr, err)
 				return
 			}
-			require.NoError(err)
 			require.Equal(tt.expectedTxID, txID)
 			require.Equal(tt.expectedShouldReward, shouldReward)
 		})
@@ -494,7 +493,7 @@ func TestBuildBlock(t *testing.T) {
 			expectedBlkF: func(*require.Assertions) blocks.Block {
 				return nil
 			},
-			expectedErr: errNoPendingBlocks,
+			expectedErr: ErrNoPendingBlocks,
 		},
 		{
 			name: "should advance time",
@@ -679,7 +678,7 @@ func TestBuildBlock(t *testing.T) {
 				return
 			}
 			require.NoError(err)
-			require.EqualValues(tt.expectedBlkF(require), gotBlk)
+			require.Equal(tt.expectedBlkF(require), gotBlk)
 		})
 	}
 }

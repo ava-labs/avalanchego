@@ -3,9 +3,7 @@
 
 package timer
 
-import (
-	"time"
-)
+import "time"
 
 // EstimateETA attempts to estimate the remaining time for a job to finish given
 // the [startTime] and it's current progress.

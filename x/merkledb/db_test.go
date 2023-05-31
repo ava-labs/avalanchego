@@ -374,21 +374,22 @@ func Test_MerkleDB_InsertNil(t *testing.T) {
 }
 
 func Test_MerkleDB_InsertAndRetrieve(t *testing.T) {
+	require := require.New(t)
+
 	db, err := getBasicDB()
-	require.NoError(t, err)
+	require.NoError(err)
 
 	// value hasn't been inserted so shouldn't exist
 	value, err := db.Get([]byte("key"))
-	require.Error(t, err)
-	require.Equal(t, database.ErrNotFound, err)
-	require.Nil(t, value)
+	require.ErrorIs(err, database.ErrNotFound)
+	require.Nil(value)
 
 	err = db.Put([]byte("key"), []byte("value"))
-	require.NoError(t, err)
+	require.NoError(err)
 
 	value, err = db.Get([]byte("key"))
-	require.NoError(t, err)
-	require.Equal(t, []byte("value"), value)
+	require.NoError(err)
+	require.Equal([]byte("value"), value)
 }
 
 func Test_MerkleDB_HealthCheck(t *testing.T) {
@@ -522,8 +523,8 @@ func TestDatabaseCommitChanges(t *testing.T) {
 	// Make a view and inser/delete a key-value pair.
 	view1Intf, err := db.NewView()
 	require.NoError(err)
-	view1, ok := view1Intf.(*trieView)
-	require.True(ok)
+	require.IsType(&trieView{}, view1Intf)
+	view1 := view1Intf.(*trieView)
 	err = view1.Insert(context.Background(), []byte{3}, []byte{3})
 	require.NoError(err)
 	err = view1.Remove(context.Background(), []byte{1})
@@ -534,14 +535,14 @@ func TestDatabaseCommitChanges(t *testing.T) {
 	// Make a second view
 	view2Intf, err := db.NewView()
 	require.NoError(err)
-	view2, ok := view2Intf.(*trieView)
-	require.True(ok)
+	require.IsType(&trieView{}, view2Intf)
+	view2 := view2Intf.(*trieView)
 
 	// Make a view atop a view
 	view3Intf, err := view1.NewView()
 	require.NoError(err)
-	view3, ok := view3Intf.(*trieView)
-	require.True(ok)
+	require.IsType(&trieView{}, view3Intf)
+	view3 := view3Intf.(*trieView)
 
 	// view3
 	//  |
@@ -591,18 +592,18 @@ func TestDatabaseInvalidateChildrenExcept(t *testing.T) {
 	// Create children
 	view1Intf, err := db.NewView()
 	require.NoError(err)
-	view1, ok := view1Intf.(*trieView)
-	require.True(ok)
+	require.IsType(&trieView{}, view1Intf)
+	view1 := view1Intf.(*trieView)
 
 	view2Intf, err := db.NewView()
 	require.NoError(err)
-	view2, ok := view2Intf.(*trieView)
-	require.True(ok)
+	require.IsType(&trieView{}, view2Intf)
+	view2 := view2Intf.(*trieView)
 
 	view3Intf, err := db.NewView()
 	require.NoError(err)
-	view3, ok := view3Intf.(*trieView)
-	require.True(ok)
+	require.IsType(&trieView{}, view3Intf)
+	view3 := view3Intf.(*trieView)
 
 	db.invalidateChildrenExcept(view1)
 
@@ -699,7 +700,7 @@ type testOperation struct {
 	delete bool
 }
 
-func applyOperations(t *Database, ops []*testOperation) (Trie, error) {
+func applyOperations(t *merkleDB, ops []*testOperation) (Trie, error) {
 	view, err := t.NewView()
 	if err != nil {
 		return nil, err
@@ -709,10 +710,8 @@ func applyOperations(t *Database, ops []*testOperation) (Trie, error) {
 			if err := view.Remove(context.Background(), op.key); err != nil {
 				return nil, err
 			}
-		} else {
-			if err := view.Insert(context.Background(), op.key, op.value); err != nil {
-				return nil, err
-			}
+		} else if err := view.Insert(context.Background(), op.key, op.value); err != nil {
+			return nil, err
 		}
 	}
 	return view, nil
@@ -811,15 +810,15 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 			require.NoError(err)
 			changeProofDB, err := getBasicDB()
 			require.NoError(err)
-			err = changeProof.Verify(
+			err = changeProofDB.VerifyChangeProof(
 				context.Background(),
-				changeProofDB,
+				changeProof,
 				step.key,
 				step.value,
 				root,
 			)
 			require.NoError(err)
-			require.LessOrEqual(len(changeProof.KeyValues)+len(changeProof.DeletedKeys), 100)
+			require.LessOrEqual(len(changeProof.KeyChanges), 100)
 		case opWriteBatch:
 			oldRoot, err := db.GetMerkleRoot(context.Background())
 			require.NoError(err)

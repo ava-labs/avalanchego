@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
@@ -62,9 +63,13 @@ type Handler interface {
 	Start(ctx context.Context, recoverPanic bool)
 	Push(ctx context.Context, msg Message)
 	Len() int
+
 	Stop(ctx context.Context)
 	StopWithError(ctx context.Context, err error)
-	Stopped() chan struct{}
+	// AwaitStopped returns an error if the call would block and [ctx] is done.
+	// Even if [ctx] is done when passed into this function, this function will
+	// return a nil error if it will not block.
+	AwaitStopped(ctx context.Context) (time.Duration, error)
 }
 
 // handler passes incoming messages from the network to the consensus engine.
@@ -103,6 +108,8 @@ type handler struct {
 	timeouts         chan struct{}
 
 	closeOnce            sync.Once
+	startClosingTime     time.Time
+	totalClosingTime     time.Duration
 	closingChan          chan struct{}
 	numDispatchersClosed int
 	// Closed when this handler and [engine] are done shutting down
@@ -304,6 +311,8 @@ func (h *handler) RegisterTimeout(d time.Duration) {
 // Note: It is possible for Stop to be called before/concurrently with Start.
 func (h *handler) Stop(ctx context.Context) {
 	h.closeOnce.Do(func() {
+		h.startClosingTime = h.clock.Time()
+
 		// Must hold the locks here to ensure there's no race condition in where
 		// we check the value of [h.closing] after the call to [Signal].
 		h.syncMessageQueue.Shutdown()
@@ -339,8 +348,19 @@ func (h *handler) StopWithError(ctx context.Context, err error) {
 	h.Stop(ctx)
 }
 
-func (h *handler) Stopped() chan struct{} {
-	return h.closed
+func (h *handler) AwaitStopped(ctx context.Context) (time.Duration, error) {
+	select {
+	case <-h.closed:
+		return h.totalClosingTime, nil
+	default:
+	}
+
+	select {
+	case <-ctx.Done():
+		return 0, ctx.Err()
+	case <-h.closed:
+		return h.totalClosingTime, nil
+	}
 }
 
 func (h *handler) dispatchSync(ctx context.Context) {
@@ -432,15 +452,18 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 		// execution (may change during execution)
 		isNormalOp = h.ctx.State.Get().State == snow.NormalOp
 	)
-	h.ctx.Log.Debug("forwarding sync message to consensus",
-		zap.Stringer("nodeID", nodeID),
-		zap.Stringer("messageOp", op),
-	)
-	h.ctx.Log.Verbo("forwarding sync message to consensus",
-		zap.Stringer("nodeID", nodeID),
-		zap.Stringer("messageOp", op),
-		zap.Any("message", body),
-	)
+	if h.ctx.Log.Enabled(logging.Verbo) {
+		h.ctx.Log.Verbo("forwarding sync message to consensus",
+			zap.Stringer("nodeID", nodeID),
+			zap.Stringer("messageOp", op),
+			zap.Any("message", body),
+		)
+	} else {
+		h.ctx.Log.Debug("forwarding sync message to consensus",
+			zap.Stringer("nodeID", nodeID),
+			zap.Stringer("messageOp", op),
+		)
+	}
 	h.resourceTracker.StartProcessing(nodeID, startTime)
 	h.ctx.Lock.Lock()
 	lockAcquiredTime := h.clock.Time()
@@ -450,12 +473,12 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 		var (
 			endTime           = h.clock.Time()
 			messageHistograms = h.metrics.messages[op]
-			msgHandlingTime   = lockAcquiredTime.Sub(startTime)
 			processingTime    = endTime.Sub(startTime)
+			msgHandlingTime   = endTime.Sub(lockAcquiredTime)
 		)
 		h.resourceTracker.StopProcessing(nodeID, endTime)
-		messageHistograms.msgHandlingTime.Observe(float64(msgHandlingTime))
 		messageHistograms.processingTime.Observe(float64(processingTime))
+		messageHistograms.msgHandlingTime.Observe(float64(msgHandlingTime))
 		msg.OnFinishedHandling()
 		h.ctx.Log.Debug("finished handling sync message",
 			zap.Stringer("messageOp", op),
@@ -756,15 +779,18 @@ func (h *handler) executeAsyncMsg(ctx context.Context, msg Message) error {
 		body      = msg.Message()
 		startTime = h.clock.Time()
 	)
-	h.ctx.Log.Debug("forwarding async message to consensus",
-		zap.Stringer("nodeID", nodeID),
-		zap.Stringer("messageOp", op),
-	)
-	h.ctx.Log.Verbo("forwarding async message to consensus",
-		zap.Stringer("nodeID", nodeID),
-		zap.Stringer("messageOp", op),
-		zap.Any("message", body),
-	)
+	if h.ctx.Log.Enabled(logging.Verbo) {
+		h.ctx.Log.Verbo("forwarding async message to consensus",
+			zap.Stringer("nodeID", nodeID),
+			zap.Stringer("messageOp", op),
+			zap.Any("message", body),
+		)
+	} else {
+		h.ctx.Log.Debug("forwarding async message to consensus",
+			zap.Stringer("nodeID", nodeID),
+			zap.Stringer("messageOp", op),
+		)
+	}
 	h.resourceTracker.StartProcessing(nodeID, startTime)
 	defer func() {
 		var (
@@ -854,13 +880,16 @@ func (h *handler) handleChanMsg(msg message.InboundMessage) error {
 		// execution (may change during execution)
 		isNormalOp = h.ctx.State.Get().State == snow.NormalOp
 	)
-	h.ctx.Log.Debug("forwarding chan message to consensus",
-		zap.Stringer("messageOp", op),
-	)
-	h.ctx.Log.Verbo("forwarding chan message to consensus",
-		zap.Stringer("messageOp", op),
-		zap.Any("message", body),
-	)
+	if h.ctx.Log.Enabled(logging.Verbo) {
+		h.ctx.Log.Verbo("forwarding chan message to consensus",
+			zap.Stringer("messageOp", op),
+			zap.Any("message", body),
+		)
+	} else {
+		h.ctx.Log.Debug("forwarding chan message to consensus",
+			zap.Stringer("messageOp", op),
+		)
+	}
 	h.ctx.Lock.Lock()
 	lockAcquiredTime := h.clock.Time()
 	defer func() {
@@ -869,11 +898,11 @@ func (h *handler) handleChanMsg(msg message.InboundMessage) error {
 		var (
 			endTime           = h.clock.Time()
 			messageHistograms = h.metrics.messages[op]
-			msgHandlingTime   = lockAcquiredTime.Sub(startTime)
 			processingTime    = endTime.Sub(startTime)
+			msgHandlingTime   = endTime.Sub(lockAcquiredTime)
 		)
-		messageHistograms.msgHandlingTime.Observe(float64(msgHandlingTime))
 		messageHistograms.processingTime.Observe(float64(processingTime))
+		messageHistograms.msgHandlingTime.Observe(float64(msgHandlingTime))
 		msg.OnFinishedHandling()
 		h.ctx.Log.Debug("finished handling chan message",
 			zap.Stringer("messageOp", op),
@@ -904,19 +933,6 @@ func (h *handler) handleChanMsg(msg message.InboundMessage) error {
 		return engine.Notify(context.TODO(), common.Message(msg.Notification))
 
 	case *message.GossipRequest:
-		// TODO: After Cortina is activated, this can be removed as everyone
-		// will have accepted the StopVertex.
-		if state.Type == p2p.EngineType_ENGINE_TYPE_SNOWMAN {
-			avalancheEngine, ok := h.engineManager.Get(p2p.EngineType_ENGINE_TYPE_AVALANCHE).Get(state.State)
-			if ok {
-				// This chain was linearized, so we should gossip the Avalanche
-				// accepted frontier to make sure everyone eventually linearizes
-				// the chain.
-				if err := avalancheEngine.Gossip(context.TODO()); err != nil {
-					return err
-				}
-			}
-		}
 		return engine.Gossip(context.TODO())
 
 	case *message.Timeout:
@@ -980,8 +996,16 @@ func (h *handler) shutdown(ctx context.Context) {
 		if h.onStopped != nil {
 			go h.onStopped()
 		}
+
+		h.totalClosingTime = h.clock.Time().Sub(h.startClosingTime)
 		close(h.closed)
 	}()
+
+	// shutdown may be called during Start, so we populate the start closing
+	// time here in case Stop was never called.
+	if h.startClosingTime.IsZero() {
+		h.startClosingTime = h.clock.Time()
+	}
 
 	state := h.ctx.State.Get()
 	engine, ok := h.engineManager.Get(state.Type).Get(state.State)

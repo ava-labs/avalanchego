@@ -43,8 +43,7 @@ func TestStandardBlocks(t *testing.T) {
 		require.Equal(apricotStandardBlk.Parent(), parsed.Parent())
 		require.Equal(apricotStandardBlk.Height(), parsed.Height())
 
-		_, ok := parsed.(*ApricotStandardBlock)
-		require.True(ok)
+		require.IsType(&ApricotStandardBlock{}, parsed)
 		require.Equal(txs, parsed.Txs())
 
 		// check that banff standard block can be built and parsed
@@ -60,8 +59,8 @@ func TestStandardBlocks(t *testing.T) {
 		require.Equal(banffStandardBlk.Bytes(), parsed.Bytes())
 		require.Equal(banffStandardBlk.Parent(), parsed.Parent())
 		require.Equal(banffStandardBlk.Height(), parsed.Height())
-		parsedBanffStandardBlk, ok := parsed.(*BanffStandardBlock)
-		require.True(ok)
+		require.IsType(&BanffStandardBlock{}, parsed)
+		parsedBanffStandardBlk := parsed.(*BanffStandardBlock)
 		require.Equal(txs, parsedBanffStandardBlk.Txs())
 
 		// timestamp check for banff blocks only
@@ -100,8 +99,8 @@ func TestProposalBlocks(t *testing.T) {
 		require.Equal(apricotProposalBlk.Parent(), parsed.Parent())
 		require.Equal(apricotProposalBlk.Height(), parsed.Height())
 
-		parsedApricotProposalBlk, ok := parsed.(*ApricotProposalBlock)
-		require.True(ok)
+		require.IsType(&ApricotProposalBlock{}, parsed)
+		parsedApricotProposalBlk := parsed.(*ApricotProposalBlock)
 		require.Equal([]*txs.Tx{tx}, parsedApricotProposalBlk.Txs())
 
 		// check that banff proposal block can be built and parsed
@@ -122,8 +121,8 @@ func TestProposalBlocks(t *testing.T) {
 		require.Equal(banffProposalBlk.Bytes(), parsed.Bytes())
 		require.Equal(banffProposalBlk.Parent(), banffProposalBlk.Parent())
 		require.Equal(banffProposalBlk.Height(), parsed.Height())
-		parsedBanffProposalBlk, ok := parsed.(*BanffProposalBlock)
-		require.True(ok)
+		require.IsType(&BanffProposalBlock{}, parsed)
+		parsedBanffProposalBlk := parsed.(*BanffProposalBlock)
 		require.Equal([]*txs.Tx{tx}, parsedBanffProposalBlk.Txs())
 
 		// timestamp check for banff blocks only
@@ -171,8 +170,8 @@ func TestCommitBlock(t *testing.T) {
 		require.Equal(banffCommitBlk.Height(), parsed.Height())
 
 		// timestamp check for banff blocks only
-		parsedBanffCommitBlk, ok := parsed.(*BanffCommitBlock)
-		require.True(ok)
+		require.IsType(&BanffCommitBlock{}, parsed)
+		parsedBanffCommitBlk := parsed.(*BanffCommitBlock)
 		require.Equal(banffCommitBlk.Timestamp(), parsedBanffCommitBlk.Timestamp())
 	}
 }
@@ -214,8 +213,8 @@ func TestAbortBlock(t *testing.T) {
 		require.Equal(banffAbortBlk.Height(), parsed.Height())
 
 		// timestamp check for banff blocks only
-		parsedBanffAbortBlk, ok := parsed.(*BanffAbortBlock)
-		require.True(ok)
+		require.IsType(&BanffAbortBlock{}, parsed)
+		parsedBanffAbortBlk := parsed.(*BanffAbortBlock)
 		require.Equal(banffAbortBlk.Timestamp(), parsedBanffAbortBlk.Timestamp())
 	}
 }
@@ -247,8 +246,8 @@ func TestAtomicBlock(t *testing.T) {
 		require.Equal(atomicBlk.Parent(), parsed.Parent())
 		require.Equal(atomicBlk.Height(), parsed.Height())
 
-		parsedAtomicBlk, ok := parsed.(*ApricotAtomicBlock)
-		require.True(ok)
+		require.IsType(&ApricotAtomicBlock{}, parsed)
+		parsedAtomicBlk := parsed.(*ApricotAtomicBlock)
 		require.Equal([]*txs.Tx{tx}, parsedAtomicBlk.Txs())
 	}
 }

@@ -6,6 +6,7 @@ package gvalidators
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -81,7 +82,8 @@ func TestGetMinimumHeight(t *testing.T) {
 	state.server.EXPECT().GetMinimumHeight(gomock.Any()).Return(expectedHeight, errCustom)
 
 	_, err = state.client.GetMinimumHeight(context.Background())
-	require.Error(err)
+	// TODO: require specific error
+	require.Error(err) //nolint:forbidigo // currently returns grpc error
 }
 
 func TestGetCurrentHeight(t *testing.T) {
@@ -104,7 +106,8 @@ func TestGetCurrentHeight(t *testing.T) {
 	state.server.EXPECT().GetCurrentHeight(gomock.Any()).Return(expectedHeight, errCustom)
 
 	_, err = state.client.GetCurrentHeight(context.Background())
-	require.Error(err)
+	// TODO: require specific error
+	require.Error(err) //nolint:forbidigo // currently returns grpc error
 }
 
 func TestGetSubnetID(t *testing.T) {
@@ -128,7 +131,8 @@ func TestGetSubnetID(t *testing.T) {
 	state.server.EXPECT().GetSubnetID(gomock.Any(), chainID).Return(expectedSubnetID, errCustom)
 
 	_, err = state.client.GetSubnetID(context.Background(), chainID)
-	require.Error(err)
+	// TODO: require specific error
+	require.Error(err) //nolint:forbidigo // currently returns grpc error
 }
 
 func TestGetValidatorSet(t *testing.T) {
@@ -179,5 +183,68 @@ func TestGetValidatorSet(t *testing.T) {
 	state.server.EXPECT().GetValidatorSet(gomock.Any(), height, subnetID).Return(expectedVdrs, errCustom)
 
 	_, err = state.client.GetValidatorSet(context.Background(), height, subnetID)
-	require.Error(err)
+	// TODO: require specific error
+	require.Error(err) //nolint:forbidigo // currently returns grpc error
+}
+
+func TestPublicKeyDeserialize(t *testing.T) {
+	require := require.New(t)
+
+	sk, err := bls.NewSecretKey()
+	require.NoError(err)
+	pk := bls.PublicFromSecretKey(sk)
+
+	pkBytes := pk.Serialize()
+	pkDe := new(bls.PublicKey).Deserialize(pkBytes)
+	require.NotNil(pkDe)
+	require.Equal(pk, pkDe)
+}
+
+// BenchmarkGetValidatorSet measures the time it takes complete a gRPC client
+// request based on a mocked validator set.
+func BenchmarkGetValidatorSet(b *testing.B) {
+	for _, size := range []int{1, 16, 32, 1024, 2048} {
+		vs := setupValidatorSet(b, size)
+		b.Run(fmt.Sprintf("get_validator_set_%d_validators", size), func(b *testing.B) {
+			benchmarkGetValidatorSet(b, vs)
+		})
+	}
+}
+
+func benchmarkGetValidatorSet(b *testing.B, vs map[ids.NodeID]*validators.GetValidatorOutput) {
+	require := require.New(b)
+	ctrl := gomock.NewController(b)
+	state := setupState(b, ctrl)
+	defer func() {
+		ctrl.Finish()
+		state.closeFn()
+	}()
+
+	height := uint64(1337)
+	subnetID := ids.GenerateTestID()
+	state.server.EXPECT().GetValidatorSet(gomock.Any(), height, subnetID).Return(vs, nil).AnyTimes()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := state.client.GetValidatorSet(context.Background(), height, subnetID)
+		require.NoError(err)
+	}
+	b.StopTimer()
+}
+
+func setupValidatorSet(b *testing.B, size int) map[ids.NodeID]*validators.GetValidatorOutput {
+	b.Helper()
+
+	set := make(map[ids.NodeID]*validators.GetValidatorOutput, size)
+	sk, err := bls.NewSecretKey()
+	require.NoError(b, err)
+	pk := bls.PublicFromSecretKey(sk)
+	for i := 0; i < size; i++ {
+		id := ids.GenerateTestNodeID()
+		set[id] = &validators.GetValidatorOutput{
+			NodeID:    id,
+			PublicKey: pk,
+			Weight:    uint64(i),
+		}
+	}
+	return set
 }
