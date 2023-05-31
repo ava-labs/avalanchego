@@ -2065,7 +2065,7 @@ func (s *state) populateBlockHeightIndex() error {
 
 	blockIterator := s.blockDB.NewIterator()
 	defer blockIterator.Release()
-	for i := uint64(0); blockIterator.Next(); i++ {
+	for indexed := uint64(0); blockIterator.Next(); {
 		blkBytes := blockIterator.Value()
 
 		// Note: stored blocks are verified, so it's safe to unmarshal them with
@@ -2073,6 +2073,10 @@ func (s *state) populateBlockHeightIndex() error {
 		blkState := stateBlk{}
 		if _, err := blocks.GenesisCodec.Unmarshal(blkBytes, &blkState); err != nil {
 			return err
+		}
+
+		if blkState.Status != choices.Accepted {
+			continue
 		}
 
 		blkState.Blk, err = blocks.Parse(blocks.GenesisCodec, blkState.Bytes)
@@ -2088,10 +2092,12 @@ func (s *state) populateBlockHeightIndex() error {
 			return fmt.Errorf("failed to add blockID: %w", err)
 		}
 
+		indexed++
+
 		if time.Since(lastUpdate) > 5*time.Second {
-			eta := timer.EstimateETA(startTime, i+1, lastAcceptedHeight+1)
+			eta := timer.EstimateETA(startTime, indexed, lastAcceptedHeight+1)
 			s.ctx.Log.Info("populating platformvm block height index",
-				zap.Uint64("progress", i+1),
+				zap.Uint64("progress", indexed),
 				zap.Uint64("end", lastAcceptedHeight+1),
 				zap.Duration("eta", eta),
 			)
