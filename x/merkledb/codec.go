@@ -41,7 +41,7 @@ const (
 )
 
 var (
-	_ EncoderDecoder = (*codecImpl)(nil)
+	_ encoderDecoder = (*codecImpl)(nil)
 
 	trueBytes  = []byte{trueByte}
 	falseBytes = []byte{falseByte}
@@ -62,23 +62,23 @@ var (
 	errInvalidCodecVersion  = errors.New("invalid codec version")
 )
 
-// EncoderDecoder defines the interface needed by merkleDB to marshal
+// encoderDecoder defines the interface needed by merkleDB to marshal
 // and unmarshal relevant types.
-type EncoderDecoder interface {
-	Encoder
-	Decoder
+type encoderDecoder interface {
+	encoder
+	decoder
 }
 
-type Encoder interface {
+type encoder interface {
 	encodeDBNode(version uint16, n *dbNode) ([]byte, error)
 	encodeHashValues(version uint16, hv *hashValues) ([]byte, error)
 }
 
-type Decoder interface {
+type decoder interface {
 	decodeDBNode(bytes []byte, n *dbNode) (uint16, error)
 }
 
-func newCodec() (EncoderDecoder, uint16) {
+func newCodec() (encoderDecoder, uint16) {
 	return &codecImpl{
 		varIntPool: sync.Pool{
 			New: func() interface{} {

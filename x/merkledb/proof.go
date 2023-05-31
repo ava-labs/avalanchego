@@ -503,7 +503,7 @@ func (proof *ChangeProof) UnmarshalProto(pbProof *syncpb.ChangeProof) error {
 			return ErrInvalidMaybe
 		}
 
-		var value Maybe[[]byte]
+		value := Nothing[[]byte]()
 		if !kv.Value.IsNothing {
 			value = Some(kv.Value.Value)
 		}

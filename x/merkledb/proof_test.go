@@ -1402,7 +1402,7 @@ func TestChangeProofProtoMarshalUnmarshal(t *testing.T) {
 			key := make([]byte, keyLen)
 			_, _ = rand.Read(key)
 
-			var value Maybe[[]byte]
+			value := Nothing[[]byte]()
 			hasValue := rand.Intn(2) == 0
 			if hasValue {
 				valueLen := rand.Intn(32)
@@ -1465,7 +1465,7 @@ func TestChangeProofUnmarshalProtoNilValue(t *testing.T) {
 		key := make([]byte, keyLen)
 		_, _ = rand.Read(key)
 
-		var value Maybe[[]byte]
+		value := Nothing[[]byte]()
 		hasValue := rand.Intn(2) == 0
 		if hasValue {
 			valueLen := rand.Intn(32)
