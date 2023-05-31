@@ -40,6 +40,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
 )
 
 func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
@@ -1650,19 +1652,29 @@ func Test_RegressionBLSKeyDiff(t *testing.T) {
 	subnetEndHeight2, err := vm.GetCurrentHeight(context.Background())
 	require.NoError(err)
 
-	// // move time ahead, terminating primary network validator
-	// currentTime = primaryEndTime
-	// vm.clock.Set(currentTime)
-	// vm.state.SetTimestamp(currentTime)
+	// move time ahead, terminating primary network validator
+	currentTime = primaryEndTime
+	vm.clock.Set(currentTime)
+	vm.state.SetTimestamp(currentTime)
 
-	// blk, err = vm.Builder.BuildBlock(context.Background())
-	// require.NoError(err)
-	// require.NoError(blk.Verify(context.Background()))
-	// require.NoError(blk.Accept(context.Background()))
-	// require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
+	blk, err = vm.Builder.BuildBlock(context.Background()) // must be a proposal block rewarding the primary validator
+	require.NoError(err)
+	require.NoError(blk.Verify(context.Background()))
 
-	// _, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
-	// require.ErrorIs(err, database.ErrNotFound)
+	proposalBlk := blk.(snowman.OracleBlock)
+	options, err := proposalBlk.Options(context.Background())
+	require.NoError(err)
+
+	commit := options[0].(*blockexecutor.Block)
+	require.IsType(&blocks.BanffCommitBlock{}, commit.Block)
+
+	require.NoError(blk.Accept(context.Background()))
+	require.NoError(commit.Verify(context.Background()))
+	require.NoError(commit.Accept(context.Background()))
+	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
+
+	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+	require.ErrorIs(err, database.ErrNotFound)
 
 	// Finally the test
 	for _, height := range []uint64{
