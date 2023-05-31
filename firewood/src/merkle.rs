@@ -997,31 +997,32 @@ impl Merkle {
             }
             None => {
                 if rem_path.len() == n_path.len() {
-                    let mut err = None;
+                    let mut result = Ok(None);
+
                     write_node!(
                         self,
                         u_ref,
                         |u| {
-                            #[allow(clippy::blocks_in_if_conditions)]
                             match &mut u.inner {
                                 NodeType::Leaf(u) => u.1 = Data(val),
                                 NodeType::Extension(u) => {
-                                    if let Err(e) = (|| {
-                                        let mut b_ref = self.get_node(u.1)?;
-                                        if b_ref
-                                            .write(|b| {
-                                                b.inner.as_branch_mut().unwrap().value =
-                                                    Some(Data(val));
-                                                b.rehash()
-                                            })
-                                            .is_err()
-                                        {
+                                    let write_result = self.get_node(u.1).and_then(|mut b_ref| {
+                                        let write_result = b_ref.write(|b| {
+                                            b.inner.as_branch_mut().unwrap().value =
+                                                Some(Data(val));
+                                            b.rehash()
+                                        });
+
+                                        if write_result.is_err() {
                                             u.1 = self.new_node(b_ref.clone())?.as_ptr();
                                             deleted.push(b_ref.as_ptr());
                                         }
+
                                         Ok(())
-                                    })() {
-                                        err = Some(Err(e))
+                                    });
+
+                                    if let Err(e) = write_result {
+                                        result = Err(e);
                                     }
                                 }
                                 _ => unreachable!(),
@@ -1031,8 +1032,10 @@ impl Merkle {
                         parents,
                         deleted
                     );
-                    return err.unwrap_or_else(|| Ok(None));
+
+                    return result;
                 }
+
                 let (leaf_ptr, prefix, idx, v) = if rem_path.len() < n_path.len() {
                     // key path is a prefix of the path to u
                     u_ref
@@ -1388,7 +1391,6 @@ impl Merkle {
                     }
                 }
                 NodeType::Leaf(_) | NodeType::Extension(_) => {
-                    #[allow(clippy::blocks_in_if_conditions)]
                     match &p_ref.inner {
                         NodeType::Branch(_) => {
                             //                            ____[Leaf/Ext]
@@ -1396,25 +1398,26 @@ impl Merkle {
                             // from: [p: Branch] -> [b]x*
                             //                           \____[Leaf]x
                             // to: [p: Branch] -> [Leaf/Ext]
-                            let c_ptr = if c_ref
-                                .write(|c| {
-                                    (match &mut c.inner {
-                                        NodeType::Leaf(n) => &mut n.0,
-                                        NodeType::Extension(n) => &mut n.0,
-                                        _ => unreachable!(),
-                                    })
-                                    .0
-                                    .insert(0, idx);
-                                    c.rehash()
-                                })
-                                .is_err()
-                            {
+                            let write_result = c_ref.write(|c| {
+                                let partial_path = match &mut c.inner {
+                                    NodeType::Leaf(n) => &mut n.0,
+                                    NodeType::Extension(n) => &mut n.0,
+                                    _ => unreachable!(),
+                                };
+
+                                partial_path.0.insert(0, idx);
+                                c.rehash()
+                            });
+
+                            let c_ptr = if write_result.is_err() {
                                 deleted.push(c_ptr);
                                 self.new_node(c_ref.clone())?.as_ptr()
                             } else {
                                 c_ptr
                             };
+
                             drop(c_ref);
+
                             p_ref
                                 .write(|p| {
                                     p.inner.as_branch_mut().unwrap().chd[p_idx as usize] =
@@ -1430,7 +1433,8 @@ impl Merkle {
                             //                              \____[Leaf]x
                             // to: P -> [p: Leaf/Ext]
                             deleted.push(p_ptr);
-                            if !write_node!(
+
+                            let write_failed = write_node!(
                                 self,
                                 c_ref,
                                 |c| {
@@ -1447,7 +1451,9 @@ impl Merkle {
                                 },
                                 parents,
                                 deleted
-                            ) {
+                            );
+
+                            if !write_failed {
                                 drop(c_ref);
                                 self.set_parent(c_ptr, parents);
                             }
@@ -1515,20 +1521,17 @@ impl Merkle {
                 NodeType::Branch(_) => {
                     // from: [Branch] -> [Branch]x -> [Leaf/Ext]
                     // to: [Branch] -> [Leaf/Ext]
-                    #[allow(clippy::blocks_in_if_conditions)]
-                    let c_ptr = if c_ref
-                        .write(|c| {
-                            match &mut c.inner {
-                                NodeType::Leaf(n) => &mut n.0,
-                                NodeType::Extension(n) => &mut n.0,
-                                _ => unreachable!(),
-                            }
-                            .0
-                            .insert(0, idx);
-                            c.rehash()
-                        })
-                        .is_err()
-                    {
+                    let write_result = c_ref.write(|c| {
+                        match &mut c.inner {
+                            NodeType::Leaf(n) => &mut n.0,
+                            NodeType::Extension(n) => &mut n.0,
+                            _ => unreachable!(),
+                        }
+                        .0
+                        .insert(0, idx);
+                        c.rehash()
+                    });
+                    if write_result.is_err() {
                         deleted.push(c_ptr);
                         self.new_node(c_ref.clone())?.as_ptr()
                     } else {
@@ -1545,27 +1548,26 @@ impl Merkle {
                 NodeType::Extension(n) => {
                     // from: P -> [Ext] -> [Branch]x -> [Leaf/Ext]
                     // to: P -> [Leaf/Ext]
-                    #[allow(clippy::blocks_in_if_conditions)]
-                    let c_ptr = if c_ref
-                        .write(|c| {
-                            let mut path = n.0.clone().into_inner();
-                            path.push(idx);
-                            let path0 = match &mut c.inner {
-                                NodeType::Leaf(n) => &mut n.0,
-                                NodeType::Extension(n) => &mut n.0,
-                                _ => unreachable!(),
-                            };
-                            path.extend(&**path0);
-                            *path0 = PartialPath(path);
-                            c.rehash()
-                        })
-                        .is_err()
-                    {
+                    let write_result = c_ref.write(|c| {
+                        let mut path = n.0.clone().into_inner();
+                        path.push(idx);
+                        let path0 = match &mut c.inner {
+                            NodeType::Leaf(n) => &mut n.0,
+                            NodeType::Extension(n) => &mut n.0,
+                            _ => unreachable!(),
+                        };
+                        path.extend(&**path0);
+                        *path0 = PartialPath(path);
+                        c.rehash()
+                    });
+
+                    let c_ptr = if write_result.is_err() {
                         deleted.push(c_ptr);
                         self.new_node(c_ref.clone())?.as_ptr()
                     } else {
                         c_ptr
                     };
+
                     deleted.push(b_ref.as_ptr());
                     drop(c_ref);
                     self.set_parent(c_ptr, parents);
