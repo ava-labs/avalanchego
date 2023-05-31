@@ -750,9 +750,32 @@ func Test_RegressionBLSKeyDiff(t *testing.T) {
 	pState.SetTimestamp(currentTime)
 	require.NoError(pState.Commit())
 
+	// Finally the test
 	valMan := NewManager(*cfg, pState, metrics.Noop, clk)
-	_, err = valMan.GetValidatorSet(context.Background(), primaryStartHeight+1, constants.PrimaryNetworkID)
-	require.NoError(err)
+	for _, height := range []uint64{
+		primaryStartHeight,
+		subnetStartHeight1,
+		subnetEndHeight2,
+	} {
+		primaryVals, err := valMan.GetValidatorSet(context.Background(), height, constants.PrimaryNetworkID)
+		require.NoError(err)
+
+		primaryVal, found := primaryVals[nodeID]
+		require.True(found)
+		require.True(primaryVal.PublicKey != nil)
+	}
+
+	for _, height := range []uint64{
+		subnetStartHeight1,
+		subnetEndHeight2,
+	} {
+		subnetVals, err := valMan.GetValidatorSet(context.Background(), height, subnetID)
+		require.NoError(err)
+
+		subnetVal, found := subnetVals[nodeID]
+		require.True(found)
+		require.True(subnetVal.PublicKey != nil)
+	}
 }
 
 func buildSetup() (
