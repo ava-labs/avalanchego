@@ -267,10 +267,11 @@ func (s *NetworkServer) HandleRangeProofRequest(
 			return err
 		}
 
-		proofBytes, err := merkledb.Codec.EncodeRangeProof(merkledb.Version, rangeProof)
+		proofBytes, err := proto.Marshal(rangeProof.ToProto())
 		if err != nil {
 			return err
 		}
+
 		if len(proofBytes) < bytesLimit {
 			return s.appSender.SendAppResponse(ctx, nodeID, requestID, proofBytes)
 		}
