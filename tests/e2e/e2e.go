@@ -45,7 +45,6 @@ var (
 	}
 
 	errNoKeyFile           = errors.New("test keys file not provided")
-	errUnknownClusterType  = errors.New("unhandled cluster type")
 	errNotNetworkRunnerCLI = errors.New("not network-runner cli")
 )
 
@@ -53,11 +52,6 @@ type testEnvironmentConfig struct {
 	clusterType         ClusterType
 	avalancheGoExecPath string
 	avalancheGoLogLevel string
-	testKeysFile        string
-
-	// we snapshot initial state, right after starting cluster
-	// to be able to reset state if needed and isolate tests
-	snapshotName string
 }
 
 type TestEnvironment struct {
@@ -122,7 +116,6 @@ func (te *TestEnvironment) Setup(
 		if err != nil {
 			return err
 		}
-
 	} else {
 		te.clusterType = StandAlone
 
@@ -152,7 +145,7 @@ func (te *TestEnvironment) initRunnerClient(logLevel string, gRPCEp string) erro
 	tests.Outf("Configuring network-runner client\n")
 
 	if len(gRPCEp) == 0 {
-		errors.New("network runner grpc endpoint is required")
+		return errors.New("network runner grpc endpoint is required")
 	}
 
 	err := te.setRunnerClient(logLevel, gRPCEp)
