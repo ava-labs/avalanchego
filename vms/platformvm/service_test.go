@@ -14,6 +14,7 @@ import (
 	stdjson "encoding/json"
 
 	"github.com/golang/mock/gomock"
+
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/api"
