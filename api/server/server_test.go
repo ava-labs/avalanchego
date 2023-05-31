@@ -8,8 +8,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/snow"
 )
 
 func TestRejectMiddleware(t *testing.T) {
