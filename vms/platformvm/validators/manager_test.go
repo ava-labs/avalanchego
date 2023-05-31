@@ -516,8 +516,7 @@ func Test_RegressionBLSKeyDiff(t *testing.T) {
 		subnetEndTime2   = subnetStartTime2.Add(defaultMinStakingDuration)
 		subnetEndHeight2 = subnetStartHeight2 + 1
 
-		primaryEndTime   = subnetEndTime2.Add(time.Second)
-		primaryEndHeight = subnetEndHeight2 + 1
+		primaryEndTime = subnetEndTime2.Add(time.Second)
 	)
 
 	// move time/height ahead
@@ -729,27 +728,6 @@ func Test_RegressionBLSKeyDiff(t *testing.T) {
 	pState.SetTimestamp(currentTime)
 	require.NoError(pState.Commit())
 
-	// move time/height ahead
-	currentHeight = primaryEndHeight
-	currentTime = primaryEndTime
-	clk.Set(currentTime)
-
-	// drop primary network validator
-	dummyBlock, err = blocks.NewBanffStandardBlock(
-		currentTime,
-		pState.GetLastAccepted(),
-		currentHeight,
-		[]*txs.Tx{},
-	)
-	require.NoError(err)
-
-	pState.DeleteCurrentValidator(primaryValidator)
-	pState.SetLastAccepted(dummyBlock.ID())
-	pState.AddStatelessBlock(dummyBlock, choices.Accepted)
-	pState.SetHeight(currentHeight)
-	pState.SetTimestamp(currentTime)
-	require.NoError(pState.Commit())
-
 	// Finally the test
 	valMan := NewManager(*cfg, pState, metrics.Noop, clk)
 	for _, height := range []uint64{
@@ -762,7 +740,7 @@ func Test_RegressionBLSKeyDiff(t *testing.T) {
 
 		primaryVal, found := primaryVals[nodeID]
 		require.True(found)
-		require.True(primaryVal.PublicKey != nil)
+		require.NotNil(primaryVal.PublicKey)
 	}
 
 	for _, height := range []uint64{
@@ -774,7 +752,7 @@ func Test_RegressionBLSKeyDiff(t *testing.T) {
 
 		subnetVal, found := subnetVals[nodeID]
 		require.True(found)
-		require.True(subnetVal.PublicKey != nil)
+		require.NotNil(subnetVal.PublicKey)
 	}
 }
 
