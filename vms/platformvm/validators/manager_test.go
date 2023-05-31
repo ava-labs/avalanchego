@@ -767,7 +767,7 @@ func Test_RegressionBLSKeyDiff(t *testing.T) {
 
 	for _, height := range []uint64{
 		subnetStartHeight1,
-		subnetEndHeight2,
+		subnetStartHeight2,
 	} {
 		subnetVals, err := valMan.GetValidatorSet(context.Background(), height, subnetID)
 		require.NoError(err)
