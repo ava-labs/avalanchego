@@ -44,7 +44,7 @@ func SortBytes[T ~[]byte](arr []T) {
 	})
 }
 
-// Returns true iff the elements in [s] are sorted.
+// Returns true iff the elements in [arr] are sorted.
 func IsSortedBytes[T ~[]byte](arr []T) bool {
 	for i := 0; i < len(arr)-1; i++ {
 		if bytes.Compare(arr[i], arr[i+1]) == 1 {
