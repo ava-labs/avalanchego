@@ -775,17 +775,13 @@ fn test_gapped_range_proof() -> Result<(), ProofError> {
     assert!(!end_proof.0.is_empty());
     proof.concat_proofs(end_proof);
 
-    let mut keys = Vec::new();
-    let mut vals = Vec::new();
     let middle = (first + last) / 2 - first;
-    items[first..last]
+    let (keys, vals): (Vec<&[u8; 32]>, Vec<&[u8; 4]>) = items[first..last]
         .iter()
         .enumerate()
         .filter(|(pos, _)| *pos != middle)
-        .for_each(|(_, item)| {
-            keys.push(&item.0);
-            vals.push(&item.1);
-        });
+        .map(|(_, item)| (&item.0, &item.1))
+        .unzip();
 
     assert!(merkle
         .verify_range_proof(&proof, &items[0].0, &items[items.len() - 1].0, keys, vals)
