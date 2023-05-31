@@ -10,9 +10,9 @@ import (
 
 	"github.com/google/btree"
 
-	"go.uber.org/zap"
-
 	"github.com/prometheus/client_golang/prometheus"
+
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/cache/metercacher"
@@ -131,7 +131,7 @@ type State interface {
 	GetStatelessBlock(blockID ids.ID) (blocks.Block, choices.Status, error)
 	AddStatelessBlock(block blocks.Block, status choices.Status)
 
-	GetBlockID(height uint64) (ids.ID, error)
+	GetBlockIDAtHeight(height uint64) (ids.ID, error)
 
 	// ValidatorSet adds all the validators and delegators of [subnetID] into
 	// [vdrs].
@@ -1615,7 +1615,7 @@ func (s *state) GetStatelessBlock(blockID ids.ID) (blocks.Block, choices.Status,
 	return blkState.Blk, blkState.Status, nil
 }
 
-func (s *state) GetBlockID(height uint64) (ids.ID, error) {
+func (s *state) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
 	if blkID, exists := s.addedBlockIDs[height]; exists {
 		return blkID, nil
 	}
