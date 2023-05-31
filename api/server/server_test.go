@@ -39,7 +39,7 @@ func TestRejectMiddleware(t *testing.T) {
 		},
 		{
 			name: "chain is done bootstrapping",
-			handlerFunc: func(require *require.Assertions) http.Handler {
+			handlerFunc: func(*require.Assertions) http.Handler {
 				return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 					w.WriteHeader(http.StatusTeapot)
 				})
