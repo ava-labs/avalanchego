@@ -15,6 +15,10 @@ message Request {
   }
 }
 
+// The interface required by an x/sync/SyncManager for syncing.
+// Note this service definition only exists for use in tests.
+// A database shouldn't expose this over the internet, as it
+// allows for reading/writing to the database.
 service SyncableDB {
   rpc GetMerkleRoot(google.protobuf.Empty) returns (GetMerkleRootResponse);
 
