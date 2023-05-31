@@ -247,9 +247,8 @@ func TestDeadlockRegression(t *testing.T) {
 
 	for i := 0; i < 1000; i++ {
 		lock.Lock()
-		err = h.RegisterHealthCheck(fmt.Sprintf("check-%d", i), check)
+		require.NoError(h.RegisterHealthCheck(fmt.Sprintf("check-%d", i), check))
 		lock.Unlock()
-		require.NoError(err)
 	}
 
 	awaitHealthy(t, h, true)

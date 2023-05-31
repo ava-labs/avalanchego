@@ -14,6 +14,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+
+	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
 const verificationCacheSize = 2_000
@@ -34,6 +36,12 @@ var (
 	ErrProofNodeNotForKey          = errors.New("the provided node has a key that is not a prefix of the specified key")
 	ErrProofValueDoesntMatch       = errors.New("the provided value does not match the proof node for the provided key's value")
 	ErrProofNodeHasUnincludedValue = errors.New("the provided proof has a value for a key within the range that is not present in the provided key/values")
+	ErrInvalidMaybe                = errors.New("maybe is nothing but has value")
+	ErrInvalidChildIndex           = fmt.Errorf("child index must be less than %d", NodeBranchFactor)
+	ErrNilProofNode                = errors.New("proof node is nil")
+	ErrNilValueOrHash              = errors.New("proof node's valueOrHash field is nil")
+	ErrNilSerializedPath           = errors.New("serialized path is nil")
+	ErrNilRangeProof               = errors.New("range proof is nil")
 )
 
 type ProofNode struct {
@@ -43,6 +51,68 @@ type ProofNode struct {
 	// The hash of the value in this node otherwise.
 	ValueOrHash Maybe[[]byte]
 	Children    map[byte]ids.ID
+}
+
+// Assumes [node.Key.KeyPath.NibbleLength] <= math.MaxUint64.
+func (node *ProofNode) ToProto() *syncpb.ProofNode {
+	pbNode := &syncpb.ProofNode{
+		Key: &syncpb.SerializedPath{
+			NibbleLength: uint64(node.KeyPath.NibbleLength),
+			Value:        node.KeyPath.Value,
+		},
+		Children: make(map[uint32][]byte, len(node.Children)),
+	}
+
+	for childIndex, childID := range node.Children {
+		childID := childID
+		pbNode.Children[uint32(childIndex)] = childID[:]
+	}
+
+	if node.ValueOrHash.hasValue {
+		pbNode.ValueOrHash = &syncpb.MaybeBytes{
+			Value: node.ValueOrHash.value,
+		}
+	} else {
+		pbNode.ValueOrHash = &syncpb.MaybeBytes{
+			IsNothing: true,
+		}
+	}
+
+	return pbNode
+}
+
+func (node *ProofNode) UnmarshalProto(pbNode *syncpb.ProofNode) error {
+	switch {
+	case pbNode == nil:
+		return ErrNilProofNode
+	case pbNode.ValueOrHash == nil:
+		return ErrNilValueOrHash
+	case pbNode.ValueOrHash.IsNothing && len(pbNode.ValueOrHash.Value) != 0:
+		return ErrInvalidMaybe
+	case pbNode.Key == nil:
+		return ErrNilSerializedPath
+	}
+
+	node.KeyPath.NibbleLength = int(pbNode.Key.NibbleLength)
+	node.KeyPath.Value = pbNode.Key.Value
+
+	node.Children = make(map[byte]ids.ID, len(pbNode.Children))
+	for childIndex, childIDBytes := range pbNode.Children {
+		if childIndex >= NodeBranchFactor {
+			return ErrInvalidChildIndex
+		}
+		childID, err := ids.ToID(childIDBytes)
+		if err != nil {
+			return err
+		}
+		node.Children[byte(childIndex)] = childID
+	}
+
+	if !pbNode.ValueOrHash.IsNothing {
+		node.ValueOrHash = Some(pbNode.ValueOrHash.Value)
+	}
+
+	return nil
 }
 
 // An inclusion/exclustion proof of a key.
@@ -246,6 +316,62 @@ func (proof *RangeProof) Verify(
 	if expectedRootID != calculatedRoot {
 		return fmt.Errorf("%w:[%s], expected:[%s]", ErrInvalidProof, calculatedRoot, expectedRootID)
 	}
+	return nil
+}
+
+func (proof *RangeProof) ToProto() *syncpb.RangeProof {
+	startProof := make([]*syncpb.ProofNode, len(proof.StartProof))
+	for i, node := range proof.StartProof {
+		startProof[i] = node.ToProto()
+	}
+
+	endProof := make([]*syncpb.ProofNode, len(proof.EndProof))
+	for i, node := range proof.EndProof {
+		endProof[i] = node.ToProto()
+	}
+
+	keyValues := make([]*syncpb.KeyValue, len(proof.KeyValues))
+	for i, kv := range proof.KeyValues {
+		keyValues[i] = &syncpb.KeyValue{
+			Key:   kv.Key,
+			Value: kv.Value,
+		}
+	}
+
+	return &syncpb.RangeProof{
+		Start:     startProof,
+		End:       endProof,
+		KeyValues: keyValues,
+	}
+}
+
+func (proof *RangeProof) UnmarshalProto(pbProof *syncpb.RangeProof) error {
+	if pbProof == nil {
+		return ErrNilRangeProof
+	}
+
+	proof.StartProof = make([]ProofNode, len(pbProof.Start))
+	for i, protoNode := range pbProof.Start {
+		if err := proof.StartProof[i].UnmarshalProto(protoNode); err != nil {
+			return err
+		}
+	}
+
+	proof.EndProof = make([]ProofNode, len(pbProof.End))
+	for i, protoNode := range pbProof.End {
+		if err := proof.EndProof[i].UnmarshalProto(protoNode); err != nil {
+			return err
+		}
+	}
+
+	proof.KeyValues = make([]KeyValue, len(pbProof.KeyValues))
+	for i, kv := range pbProof.KeyValues {
+		proof.KeyValues[i] = KeyValue{
+			Key:   kv.Key,
+			Value: kv.Value,
+		}
+	}
+
 	return nil
 }
 

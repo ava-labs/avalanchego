@@ -10,8 +10,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"go.opentelemetry.io/otel/attribute"
 
 	oteltrace "go.opentelemetry.io/otel/trace"
@@ -27,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 const (
@@ -53,22 +52,7 @@ var (
 	errSameRoot = errors.New("start and end root are the same")
 )
 
-type Config struct {
-	// The number of changes to the database that we store in memory in order to
-	// serve change proofs.
-	HistoryLength int
-	NodeCacheSize int
-	// If [Reg] is nil, metrics are collected locally but not exported through
-	// Prometheus.
-	// This may be useful for testing.
-	Reg    prometheus.Registerer
-	Tracer trace.Tracer
-}
-
-type MerkleDB interface {
-	database.Database
-	Trie
-
+type ChangeProofer interface {
 	// GetChangeProof returns a proof for a subset of the key/value changes in key range
 	// [start, end] that occurred between [startRootID] and [endRootID].
 	// Returns at most [maxLength] key/value pairs.
@@ -105,7 +89,9 @@ type MerkleDB interface {
 
 	// CommitChangeProof commits the key/value pairs within the [proof] to the db.
 	CommitChangeProof(ctx context.Context, proof *ChangeProof) error
+}
 
+type RangeProofer interface {
 	// GetRangeProofAtRoot returns a proof for the key/value pairs in this trie within the range
 	// [start, end] when the root of the trie was [rootID].
 	GetRangeProofAtRoot(
@@ -119,6 +105,27 @@ type MerkleDB interface {
 	// CommitRangeProof commits the key/value pairs within the [proof] to the db.
 	// [start] is the smallest key in the range this [proof] covers.
 	CommitRangeProof(ctx context.Context, start []byte, proof *RangeProof) error
+}
+
+type MerkleDB interface {
+	database.Database
+	Trie
+	MerkleRootGetter
+	ProofGetter
+	ChangeProofer
+	RangeProofer
+}
+
+type Config struct {
+	// The number of changes to the database that we store in memory in order to
+	// serve change proofs.
+	HistoryLength int
+	NodeCacheSize int
+	// If [Reg] is nil, metrics are collected locally but not exported through
+	// Prometheus.
+	// This may be useful for testing.
+	Reg    prometheus.Registerer
+	Tracer trace.Tracer
 }
 
 // merkleDB can only be edited by committing changes from a trieView.

@@ -46,8 +46,7 @@ func TestValidatorUptimes(t *testing.T) {
 	// set uptime
 	newUpDuration := testMetadata.UpDuration + 1
 	newLastUpdated := testMetadata.lastUpdated.Add(time.Hour)
-	err = state.SetUptime(nodeID, subnetID, newUpDuration, newLastUpdated)
-	require.NoError(err)
+	require.NoError(state.SetUptime(nodeID, subnetID, newUpDuration, newLastUpdated))
 
 	// get new uptime
 	upDuration, lastUpdated, err = state.GetUptime(nodeID, subnetID)
@@ -83,8 +82,7 @@ func TestWriteValidatorMetadata(t *testing.T) {
 	primaryDB := memdb.New()
 	subnetDB := memdb.New()
 	// write empty uptimes
-	err := state.WriteValidatorMetadata(primaryDB, subnetDB)
-	require.NoError(err)
+	require.NoError(state.WriteValidatorMetadata(primaryDB, subnetDB))
 
 	// load uptime
 	nodeID := ids.GenerateTestNodeID()
@@ -98,8 +96,7 @@ func TestWriteValidatorMetadata(t *testing.T) {
 	state.LoadValidatorMetadata(nodeID, subnetID, testUptimeReward)
 
 	// write state, should not reflect to DB yet
-	err = state.WriteValidatorMetadata(primaryDB, subnetDB)
-	require.NoError(err)
+	require.NoError(state.WriteValidatorMetadata(primaryDB, subnetDB))
 	require.False(primaryDB.Has(testUptimeReward.txID[:]))
 	require.False(subnetDB.Has(testUptimeReward.txID[:]))
 
@@ -112,12 +109,10 @@ func TestWriteValidatorMetadata(t *testing.T) {
 	// update uptimes
 	newUpDuration := testUptimeReward.UpDuration + 1
 	newLastUpdated := testUptimeReward.lastUpdated.Add(time.Hour)
-	err = state.SetUptime(nodeID, subnetID, newUpDuration, newLastUpdated)
-	require.NoError(err)
+	require.NoError(state.SetUptime(nodeID, subnetID, newUpDuration, newLastUpdated))
 
 	// write uptimes, should reflect to subnet DB
-	err = state.WriteValidatorMetadata(primaryDB, subnetDB)
-	require.NoError(err)
+	require.NoError(state.WriteValidatorMetadata(primaryDB, subnetDB))
 	require.False(primaryDB.Has(testUptimeReward.txID[:]))
 	require.True(subnetDB.Has(testUptimeReward.txID[:]))
 }
@@ -149,8 +144,7 @@ func TestValidatorDelegateeRewards(t *testing.T) {
 
 	// set delegatee reward
 	newDelegateeReward := testMetadata.PotentialDelegateeReward + 100000
-	err = state.SetDelegateeReward(subnetID, nodeID, newDelegateeReward)
-	require.NoError(err)
+	require.NoError(state.SetDelegateeReward(subnetID, nodeID, newDelegateeReward))
 
 	// get new delegatee reward
 	delegateeReward, err = state.GetDelegateeReward(subnetID, nodeID)

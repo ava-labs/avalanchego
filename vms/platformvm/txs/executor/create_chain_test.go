@@ -161,8 +161,7 @@ func TestCreateChainTxValid(t *testing.T) {
 		State:   stateDiff,
 		Tx:      tx,
 	}
-	err = tx.Unsigned.Visit(&executor)
-	require.NoError(err)
+	require.NoError(tx.Unsigned.Visit(&executor))
 }
 
 func TestCreateChainTxAP3FeeChange(t *testing.T) {
@@ -224,8 +223,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 				SubnetAuth: subnetAuth,
 			}
 			tx := &txs.Tx{Unsigned: utx}
-			err = tx.Sign(txs.Codec, signers)
-			require.NoError(err)
+			require.NoError(tx.Sign(txs.Codec, signers))
 
 			stateDiff, err := state.NewDiff(lastAcceptedID, env)
 			require.NoError(err)
