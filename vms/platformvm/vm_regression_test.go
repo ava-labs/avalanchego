@@ -1453,6 +1453,13 @@ func Test_RegressionBLSKeyDiff(t *testing.T) {
 	// setup
 	require := require.New(t)
 	vm, _, _ := defaultVM()
+	vm.ctx.Lock.Lock()
+	defer func() {
+		require.NoError(vm.Shutdown(context.Background()))
+
+		vm.ctx.Lock.Unlock()
+	}()
+
 	subnetID := testSubnet1.TxID
 
 	// setup heights/time
