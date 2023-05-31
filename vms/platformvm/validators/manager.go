@@ -170,6 +170,7 @@ func (m *manager) GetValidatorSet(ctx context.Context, height uint64, subnetID i
 		return nil, ErrMissingValidator
 	}
 
+	// Load BLS key from primary network stakers (BLS key is not stored in subnet, only in primary network counterpart)
 	currentSubnetValidatorList := currentSubnetValidators.List()
 	vdrSet := make(map[ids.NodeID]*validators.GetValidatorOutput, len(currentSubnetValidatorList))
 	for _, vdr := range currentSubnetValidatorList {

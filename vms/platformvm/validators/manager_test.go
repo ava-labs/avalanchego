@@ -17,6 +17,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/chains"
+	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
 	dbmanager "github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/versiondb"
@@ -28,26 +30,53 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/status"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
+	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+)
+
+const (
+	defaultTxFee              = uint64(100)
+	defaultMinStakingDuration = 24 * time.Hour
+	defaultMaxStakingDuration = 365 * 24 * time.Hour
+	defaultMinValidatorStake  = 5 * units.MilliAvax
+	defaultBalance            = 100 * defaultMinValidatorStake
 )
 
 // AVAX asset ID in tests
-var defaultRewardConfig = reward.Config{
-	MaxConsumptionRate: .12 * reward.PercentDenominator,
-	MinConsumptionRate: .10 * reward.PercentDenominator,
-	MintingPeriod:      365 * 24 * time.Hour,
-	SupplyCap:          720 * units.MegaAvax,
-}
+var (
+	defaultRewardConfig = reward.Config{
+		MaxConsumptionRate: .12 * reward.PercentDenominator,
+		MinConsumptionRate: .10 * reward.PercentDenominator,
+		MintingPeriod:      365 * 24 * time.Hour,
+		SupplyCap:          720 * units.MegaAvax,
+	}
+
+	defaultGenesisTime = time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC)
+	preFundedKeys      = secp256k1.TestKeys()
+	avaxAssetID        = ids.ID{'y', 'e', 'e', 't'}
+	xChainID           = ids.Empty.Prefix(0)
+	cChainID           = ids.Empty.Prefix(1)
+)
 
 func TestVM_GetValidatorSet(t *testing.T) {
 	// Populate the validator set to use below
@@ -438,51 +467,115 @@ func TestVM_GetValidatorSet(t *testing.T) {
 }
 
 func Test_RegressionBLSKeyDiff(t *testing.T) {
-	// create manager from empty state
+	// setup
 	require := require.New(t)
+	/*cfg*/ _, clk, pState, txBuilder, err := buildSetup()
+	require.NoError(err)
 
+	// valMan := NewManager(cfg, pState, metrics.Noop, clk)
+	currentHeight := uint64(1)
+	currentTime := clk.Time().Add(time.Second)
+	clk.Set(currentTime)
+
+	// add a subnet
+	subnetTx, err := txBuilder.NewCreateSubnetTx(
+		1, // threshold
+		[]ids.ShortID{ // control keys
+			preFundedKeys[0].PublicKey().Address(),
+		},
+		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		preFundedKeys[0].PublicKey().Address(),
+	)
+	require.NoError(err)
+	pState.AddSubnet(subnetTx)
+	pState.AddTx(subnetTx, status.Committed)
+	pState.SetHeight(currentHeight)
+	pState.SetTimestamp(clk.Time())
+	require.NoError(pState.Commit())
+
+	// A subnet validator should stake twice before its primary network counterpart stops staking
 	var (
-		cfg = defaultConfig()
-		clk = &mockable.Clock{}
-		ctx = defaultCtx()
+		subnetID         = subnetTx.ID()
+		primaryStartTime = time.Unix(0, 0)
+		subnetStartTime1 = time.Unix(1, 0)
+		subnetEndTime1   = subnetStartTime1.Add(defaultMinStakingDuration)
+		subnetStartTime2 = subnetEndTime1.Add(2 * time.Second)
+		subnetEndTime2   = subnetStartTime2.Add(defaultMinStakingDuration)
+		primaryEndTime   = subnetEndTime2.Add(time.Second)
 	)
 
-	baseDBManager := dbmanager.NewMemDB(version.Semantic1_0_0)
-	db := versiondb.New(baseDBManager.Current().Database)
-	rewardsCalc := reward.NewCalculator(cfg.RewardConfig)
-	genesisBytes := buildGenesisTest(ctx)
-	state, err := state.New(
-		db,
-		genesisBytes,
-		prometheus.NewRegistry(),
-		&cfg,
-		ctx,
-		metrics.Noop,
-		rewardsCalc,
-		&utils.Atomic[bool]{},
+	// insert primary network validator
+	nodeID := ids.GenerateTestNodeID()
+	addr := preFundedKeys[0].PublicKey().Address()
+	primaryTx, err := txBuilder.NewAddValidatorTx(
+		1, // Weight
+		uint64(primaryStartTime.Unix()),
+		uint64(primaryEndTime.Unix()),
+		nodeID,
+		addr,
+		reward.PercentDenominator,
+		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		addr,
 	)
 	require.NoError(err)
 
-	valMan := NewManager(cfg, state, metrics.Noop, clk)
-
-	height, err := valMan.GetCurrentHeight(context.Background())
+	primaryValidator, err := state.NewCurrentStaker(
+		primaryTx.ID(),
+		primaryTx.Unsigned.(*txs.AddValidatorTx),
+		0,
+	)
 	require.NoError(err)
-	require.Equal(uint64(0), height)
+
+	pState.PutCurrentValidator(primaryValidator)
+	pState.AddTx(primaryTx, status.Committed)
+	pState.SetHeight(currentHeight)
+	pState.SetTimestamp(primaryStartTime)
+	require.NoError(pState.Commit())
+
+	// insert first subnet validator
+	currentHeight++
+	subnetFirstTx, err := txBuilder.NewAddSubnetValidatorTx(
+		1,                               // Weight
+		uint64(primaryStartTime.Unix()), // Start time
+		uint64(primaryEndTime.Unix()),   // end time
+		nodeID,                          // Node ID
+		subnetID,
+		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		addr,
+	)
+	require.NoError(err)
+
+	firstSubnetValidator, err := state.NewCurrentStaker(
+		subnetFirstTx.ID(),
+		subnetFirstTx.Unsigned.(*txs.AddSubnetValidatorTx),
+		0,
+	)
+	require.NoError(err)
+
+	pState.PutCurrentValidator(firstSubnetValidator)
+	pState.AddTx(subnetFirstTx, status.Committed)
+	pState.SetHeight(currentHeight)
+	pState.SetTimestamp(subnetStartTime1)
+	require.NoError(pState.Commit())
 }
 
-func defaultConfig() config.Config {
+func buildSetup() (
+	*config.Config,
+	*mockable.Clock,
+	state.State,
+	builder.Builder,
+	error,
+) {
+	// build platformVM config
 	vdrs := validators.NewManager()
 	primaryVdrs := validators.NewSet()
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
-
-	defaultTxFee := uint64(100)
-	defaultMinStakingDuration := 24 * time.Hour
-	defaultMaxStakingDuration := 365 * 24 * time.Hour
-
-	return config.Config{
+	trackedSubnets := set.NewSet[ids.ID](1) // will add subnet later on
+	cfg := &config.Config{
 		Chains:                 chains.TestManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		Validators:             vdrs,
+		TrackedSubnets:         trackedSubnets,
 		TxFee:                  defaultTxFee,
 		CreateSubnetTxFee:      100 * defaultTxFee,
 		CreateBlockchainTxFee:  100 * defaultTxFee,
@@ -493,17 +586,9 @@ func defaultConfig() config.Config {
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
 	}
-}
 
-func defaultCtx() *snow.Context {
+	// build context
 	ctx := snow.DefaultContextTest()
-
-	var (
-		avaxAssetID = ids.ID{'y', 'e', 'e', 't'}
-		xChainID    = ids.Empty.Prefix(0)
-		cChainID    = ids.Empty.Prefix(1)
-	)
-
 	ctx.NetworkID = 10
 	ctx.XChainID = xChainID
 	ctx.CChainID = cChainID
@@ -521,13 +606,95 @@ func defaultCtx() *snow.Context {
 			return subnetID, nil
 		},
 	}
+	clk := &mockable.Clock{}
+	clk.Set(defaultGenesisTime)
 
-	return ctx
+	baseDBManager := dbmanager.NewMemDB(version.Semantic1_0_0)
+	db := versiondb.New(baseDBManager.Current().Database)
+	rewardsCalc := reward.NewCalculator(cfg.RewardConfig)
+	genesisBytes := buildGenesisTest(ctx)
+	pState, err := state.New(
+		db,
+		genesisBytes,
+		prometheus.NewRegistry(),
+		cfg,
+		ctx,
+		metrics.Noop,
+		rewardsCalc,
+		&utils.Atomic[bool]{},
+	)
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("could not build pState, %w", err)
+	}
+
+	var isBootstrapped utils.Atomic[bool]
+	isBootstrapped.Set(true)
+	fx := defaultFx(clk, ctx.Log, isBootstrapped.Get())
+	atomicUTXOs := avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
+	utxoHandler := utxo.NewHandler(ctx, clk, fx)
+	txBuilder := builder.New(
+		ctx,
+		cfg,
+		clk,
+		fx,
+		pState,
+		atomicUTXOs,
+		utxoHandler,
+	)
+	return cfg, clk, pState, txBuilder, nil
+}
+
+type fxVMInt struct {
+	registry codec.Registry
+	clk      *mockable.Clock
+	log      logging.Logger
+}
+
+func (fvi *fxVMInt) CodecRegistry() codec.Registry {
+	return fvi.registry
+}
+
+func (fvi *fxVMInt) Clock() *mockable.Clock {
+	return fvi.clk
+}
+
+func (fvi *fxVMInt) Logger() logging.Logger {
+	return fvi.log
+}
+
+func defaultFx(clk *mockable.Clock, log logging.Logger, isBootstrapped bool) fx.Fx {
+	fxVMInt := &fxVMInt{
+		registry: linearcodec.NewDefault(),
+		clk:      clk,
+		log:      log,
+	}
+	res := &secp256k1fx.Fx{}
+	if err := res.Initialize(fxVMInt); err != nil {
+		panic(err)
+	}
+	if isBootstrapped {
+		if err := res.Bootstrapped(); err != nil {
+			panic(err)
+		}
+	}
+	return res
 }
 
 func buildGenesisTest(ctx *snow.Context) []byte {
-	// empty genesis, no validators nor utxos.
-	genesisUTXOs := make([]api.UTXO, 0)
+	genesisUTXOs := make([]api.UTXO, len(preFundedKeys))
+	for i, key := range preFundedKeys {
+		id := key.PublicKey().Address()
+		addr, err := address.FormatBech32(constants.UnitTestHRP, id.Bytes())
+		if err != nil {
+			panic(err)
+		}
+		genesisUTXOs[i] = api.UTXO{
+			Amount:  json.Uint64(defaultBalance),
+			Address: addr,
+		}
+	}
+
+	// No validators in this genesis. We want to control in test which stakers are added and when
 	genesisValidators := make([]api.PermissionlessValidator, 0)
 	defaultGenesisTime := time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC)
 
