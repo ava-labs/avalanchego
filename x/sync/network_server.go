@@ -45,11 +45,11 @@ var ErrMinProofSizeIsTooLarge = errors.New("cannot generate any proof within the
 
 type NetworkServer struct {
 	appSender common.AppSender // Used to respond to peer requests via AppResponse.
-	db        merkledb.MerkleDB
+	db        SyncableDB
 	log       logging.Logger
 }
 
-func NewNetworkServer(appSender common.AppSender, db merkledb.MerkleDB, log logging.Logger) *NetworkServer {
+func NewNetworkServer(appSender common.AppSender, db SyncableDB, log logging.Logger) *NetworkServer {
 	return &NetworkServer{
 		appSender: appSender,
 		db:        db,
@@ -267,10 +267,11 @@ func (s *NetworkServer) HandleRangeProofRequest(
 			return err
 		}
 
-		proofBytes, err := merkledb.Codec.EncodeRangeProof(merkledb.Version, rangeProof)
+		proofBytes, err := proto.Marshal(rangeProof.ToProto())
 		if err != nil {
 			return err
 		}
+
 		if len(proofBytes) < bytesLimit {
 			return s.appSender.SendAppResponse(ctx, nodeID, requestID, proofBytes)
 		}

@@ -21,6 +21,8 @@ import (
 func newRandomProofNode(r *rand.Rand) ProofNode {
 	key := make([]byte, r.Intn(32)) // #nosec G404
 	_, _ = r.Read(key)              // #nosec G404
+	serializedKey := newPath(key).Serialize()
+
 	val := make([]byte, r.Intn(64)) // #nosec G404
 	_, _ = r.Read(val)              // #nosec G404
 
@@ -32,22 +34,28 @@ func newRandomProofNode(r *rand.Rand) ProofNode {
 			children[byte(j)] = childID
 		}
 	}
-	// use the hash instead when length is greater than the hash length
-	if len(val) >= HashLength {
-		val = hashing.ComputeHash256(val)
-	} else if len(val) == 0 {
-		// We do this because when we encode a value of []byte{} we will later
-		// decode it as nil.
-		// Doing this prevents inconsistency when comparing the encoded and
-		// decoded values.
-		// Calling nilEmptySlices doesn't set this because it is a private
-		// variable on the struct
-		val = nil
+
+	hasValue := rand.Intn(2) == 1 // #nosec G404
+	var valueOrHash Maybe[[]byte]
+	if hasValue {
+		// use the hash instead when length is greater than the hash length
+		if len(val) >= HashLength {
+			val = hashing.ComputeHash256(val)
+		} else if len(val) == 0 {
+			// We do this because when we encode a value of []byte{} we will later
+			// decode it as nil.
+			// Doing this prevents inconsistency when comparing the encoded and
+			// decoded values.
+			// Calling nilEmptySlices doesn't set this because it is a private
+			// variable on the struct
+			val = nil
+		}
+		valueOrHash = Some(val)
 	}
 
 	return ProofNode{
-		KeyPath:     newPath(key).Serialize(),
-		ValueOrHash: Some(val),
+		KeyPath:     serializedKey,
+		ValueOrHash: valueOrHash,
 		Children:    children,
 	}
 }
@@ -290,29 +298,6 @@ func FuzzCodecChangeProofCanonical(f *testing.F) {
 	)
 }
 
-func FuzzCodecRangeProofCanonical(f *testing.F) {
-	f.Fuzz(
-		func(
-			t *testing.T,
-			b []byte,
-		) {
-			require := require.New(t)
-
-			codec := Codec.(*codecImpl)
-			proof := &RangeProof{}
-			got, err := codec.DecodeRangeProof(b, proof)
-			if err != nil {
-				return
-			}
-
-			// Encoding [proof] should be the same as [b].
-			buf, err := codec.EncodeRangeProof(got, proof)
-			require.NoError(err)
-			require.Equal(b, buf)
-		},
-	)
-}
-
 func FuzzCodecDBNodeCanonical(f *testing.F) {
 	f.Fuzz(
 		func(
@@ -431,66 +416,6 @@ func FuzzCodecChangeProofDeterministic(f *testing.F) {
 	)
 }
 
-func FuzzCodecRangeProofDeterministic(f *testing.F) {
-	f.Fuzz(
-		func(
-			t *testing.T,
-			randSeed int,
-			numStartProofNodes uint,
-			numEndProofNodes uint,
-			numKeyValues uint,
-		) {
-			r := rand.New(rand.NewSource(int64(randSeed))) // #nosec G404
-
-			var rootID ids.ID
-			_, _ = r.Read(rootID[:]) // #nosec G404
-
-			startProofNodes := make([]ProofNode, numStartProofNodes)
-			for i := range startProofNodes {
-				startProofNodes[i] = newRandomProofNode(r)
-			}
-
-			endProofNodes := make([]ProofNode, numEndProofNodes)
-			for i := range endProofNodes {
-				endProofNodes[i] = newRandomProofNode(r)
-			}
-
-			keyValues := make([]KeyValue, numKeyValues)
-			for i := range keyValues {
-				key := make([]byte, r.Intn(32)) // #nosec G404
-				_, _ = r.Read(key)              // #nosec G404
-				val := make([]byte, r.Intn(32)) // #nosec G404
-				_, _ = r.Read(val)              // #nosec G404
-				keyValues[i] = KeyValue{
-					Key:   key,
-					Value: val,
-				}
-			}
-
-			proof := RangeProof{
-				StartProof: startProofNodes,
-				EndProof:   endProofNodes,
-				KeyValues:  keyValues,
-			}
-
-			proofBytes, err := Codec.EncodeRangeProof(Version, &proof)
-			require.NoError(t, err)
-
-			var gotProof RangeProof
-			_, err = Codec.DecodeRangeProof(proofBytes, &gotProof)
-			require.NoError(t, err)
-
-			nilEmptySlices(&proof)
-			nilEmptySlices(&gotProof)
-			require.Equal(t, proof, gotProof)
-
-			proofBytes2, err := Codec.EncodeRangeProof(Version, &gotProof)
-			require.NoError(t, err)
-			require.Equal(t, proofBytes, proofBytes2)
-		},
-	)
-}
-
 func FuzzCodecDBNodeDeterministic(f *testing.F) {
 	f.Fuzz(
 		func(
@@ -601,38 +526,6 @@ func TestCodec_DecodeChangeProof(t *testing.T) {
 	require.NoError(Codec.(*codecImpl).encodeInt(proofBytesBuf, -1))
 
 	_, err = Codec.DecodeChangeProof(proofBytesBuf.Bytes(), &parsedProof)
-	require.ErrorIs(err, errNegativeNumKeyValues)
-}
-
-func TestCodec_DecodeRangeProof(t *testing.T) {
-	require := require.New(t)
-
-	_, err := Codec.DecodeRangeProof([]byte{1}, nil)
-	require.ErrorIs(err, errDecodeNil)
-
-	var (
-		parsedProof   RangeProof
-		tooShortBytes = make([]byte, minRangeProofLen-1)
-	)
-	_, err = Codec.DecodeRangeProof(tooShortBytes, &parsedProof)
-	require.ErrorIs(err, io.ErrUnexpectedEOF)
-
-	proof := RangeProof{
-		StartProof: nil,
-		EndProof:   nil,
-		KeyValues:  nil,
-	}
-
-	proofBytes, err := Codec.EncodeRangeProof(Version, &proof)
-	require.NoError(err)
-
-	// Remove key-values length (0) from end
-	proofBytes = proofBytes[:len(proofBytes)-minVarIntLen]
-	proofBytesBuf := bytes.NewBuffer(proofBytes)
-	// Put key-value length (-1) at end
-	require.NoError(Codec.(*codecImpl).encodeInt(proofBytesBuf, -1))
-
-	_, err = Codec.DecodeRangeProof(proofBytesBuf.Bytes(), &parsedProof)
 	require.ErrorIs(err, errNegativeNumKeyValues)
 }
 
