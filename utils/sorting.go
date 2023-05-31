@@ -38,10 +38,20 @@ func SortByHash[T ~[]byte](s []T) {
 // Sorts a 2D byte slice.
 // Each byte slice is not sorted internally; the byte slices are sorted relative
 // to one another.
-func SortBytes[T ~[]byte](arr []T) {
-	slices.SortFunc(arr, func(i, j T) bool {
+func SortBytes[T ~[]byte](s []T) {
+	slices.SortFunc(s, func(i, j T) bool {
 		return bytes.Compare(i, j) == -1
 	})
+}
+
+// Returns true iff the elements in [s] are sorted.
+func IsSortedBytes[T ~[]byte](s []T) bool {
+	for i := 0; i < len(s)-1; i++ {
+		if bytes.Compare(s[i], s[i+1]) == 1 {
+			return false
+		}
+	}
+	return true
 }
 
 // Returns true iff the elements in [s] are unique and sorted.
@@ -82,10 +92,10 @@ func IsSortedAndUniqueByHash[T ~[]byte](s []T) bool {
 }
 
 // Returns true iff the elements in [s] are unique.
-func IsUnique[T comparable](elts []T) bool {
+func IsUnique[T comparable](s []T) bool {
 	// Can't use set.Set because it'd be a circular import.
-	asMap := make(map[T]struct{}, len(elts))
-	for _, elt := range elts {
+	asMap := make(map[T]struct{}, len(s))
+	for _, elt := range s {
 		if _, ok := asMap[elt]; ok {
 			return false
 		}
