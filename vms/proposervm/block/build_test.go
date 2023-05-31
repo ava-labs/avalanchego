@@ -84,8 +84,7 @@ func TestBuildCertSigned(t *testing.T) {
 	require.Equal(timestamp, builtBlock.Timestamp())
 	require.Equal(innerBlockBytes, builtBlock.Block())
 
-	err = builtBlock.Verify(true, chainID, nil)
-	require.NoError(err)
+	require.NoError(builtBlock.Verify(true, chainID, nil))
 
 	err = builtBlock.Verify(false, chainID, nil)
 	require.ErrorIs(err, errUnexpectedProposer)
@@ -108,8 +107,7 @@ func TestBuildUnsigned(t *testing.T) {
 	require.Equal(innerBlockBytes, builtBlock.Block())
 	require.Equal(ids.EmptyNodeID, builtBlock.Proposer())
 
-	err = builtBlock.Verify(false, ids.Empty, nil)
-	require.NoError(err)
+	require.NoError(builtBlock.Verify(false, ids.Empty, nil))
 
 	err = builtBlock.Verify(true, ids.Empty, nil)
 	require.ErrorIs(err, errMissingProposer)

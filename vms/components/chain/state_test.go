@@ -920,15 +920,13 @@ func TestIsProcessing(t *testing.T) {
 	require.False(t, chainState.IsProcessing(parsedBlk1.ID()))
 
 	// Verify blk1
-	err = parsedBlk1.Verify(context.Background())
-	require.NoError(t, err)
+	require.NoError(t, parsedBlk1.Verify(context.Background()))
 
 	// Check that it is processing in consensus
 	require.True(t, chainState.IsProcessing(parsedBlk1.ID()))
 
 	// Accept blk1
-	err = parsedBlk1.Accept(context.Background())
-	require.NoError(t, err)
+	require.NoError(t, parsedBlk1.Accept(context.Background()))
 
 	// Check that it is no longer processing in consensus
 	require.False(t, chainState.IsProcessing(parsedBlk1.ID()))
