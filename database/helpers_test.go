@@ -6,6 +6,7 @@ package database
 import (
 	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -15,9 +16,13 @@ import (
 )
 
 func TestSortednessUint64(t *testing.T) {
+	seed := time.Now().UnixNano()
+	t.Log("Seed: ", seed)
+	rand := rand.New(rand.NewSource(seed)) //#nosec G404
+
 	ints := make([]uint64, 1024)
 	for i := range ints {
-		ints[i] = rand.Uint64() //#nosec G404
+		ints[i] = rand.Uint64()
 	}
 	slices.Sort(ints)
 
@@ -29,9 +34,13 @@ func TestSortednessUint64(t *testing.T) {
 }
 
 func TestSortednessUint32(t *testing.T) {
+	seed := time.Now().UnixNano()
+	t.Log("Seed: ", seed)
+	rand := rand.New(rand.NewSource(seed)) //#nosec G404
+
 	ints := make([]uint32, 1024)
 	for i := range ints {
-		ints[i] = rand.Uint32() //#nosec G404
+		ints[i] = rand.Uint32()
 	}
 	slices.Sort(ints)
 
