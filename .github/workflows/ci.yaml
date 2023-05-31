@@ -9,21 +9,6 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  lint:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
-          components: rustfmt, clippy
-      - name: Lint
-        run: cargo fmt -- --check
-      - name: Clippy
-        run: cargo clippy -- -D warnings
-
   build:
     runs-on: ubuntu-latest
 
@@ -33,10 +18,40 @@ jobs:
         with:
           toolchain: stable
           override: true
+      - name: Cache Cargo intermediate products
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          # We can do this now because we use specific verison and update with Dependabot
+          # but if we make the deps any less specifc, we'll have to fix
+          key: ${{ runner.os }}-deps-${{ hashFiles('**/Cargo.toml') }}-${{ hashFiles('**/*.rs') }}
+          # start from the previous set of cached dependencies
+          restore-keys: |
+            ${{ runner.os }}-deps-${{ hashFiles('**/Cargo.toml') }}-
+            ${{ runner.os }}-deps-
+      # TODO: do a `cargo fetch` here first
+      - name: Check
+        run: cargo check --workspace --tests --examples --benches
       - name: Build
-        run: cargo build --verbose
+        run: cargo build --workspace --tests --examples --benches
+      - name: Save Build Deps
+        uses: actions/cache/save@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: cache-build-${{ github.run_id }}-${{ github.run_attempt }}
 
-  test:
+  lint:
+    needs: build
     runs-on: ubuntu-latest
 
     steps:
@@ -45,10 +60,49 @@ jobs:
         with:
           toolchain: stable
           override: true
+          components: rustfmt, clippy
+      - name: Restore Check Deps
+        id: cache-build-deps-restore
+        uses: actions/cache/restore@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: cache-build-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Format
+        run: cargo fmt -- --check
+      - name: Clippy
+        run: cargo clippy -- -D warnings
+
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - name: Restore Check Deps
+        id: cache-build-deps-restore
+        uses: actions/cache/restore@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: cache-build-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Run tests
         run: cargo test --verbose
 
   e2e:
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -56,16 +110,29 @@ jobs:
         with:
           toolchain: stable
           override: true
+      - name: Restore Check Deps
+        id: cache-build-deps-restore
+        uses: actions/cache/restore@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: cache-build-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Run simple example
         run: RUST_BACKTRACE=1 cargo run --example simple
       - name: Run dump example
         run: RUST_BACKTRACE=1 cargo run --example dump
-      - name: Run benchmark example
-        run: RUST_BACKTRACE=1 cargo run --example benchmark -- --nbatch 100 --batch-size 1000
+        # benchmarks were not being done in --release mode, we can enable this again later
+        # - name: Run benchmark example
+        #   run: RUST_BACKTRACE=1 cargo run --example benchmark -- --nbatch 100 --batch-size 1000
       - name: Run rev example
         run: RUST_BACKTRACE=1 cargo run --example rev
 
   docs:
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -73,6 +140,17 @@ jobs:
         with:
           toolchain: stable
           override: true
+      - name: Restore Check Deps
+        id: cache-build-deps-restore
+        uses: actions/cache/restore@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: cache-build-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Lint intra docs links
         run: cargo rustdoc -p firewood --lib -- -D rustdoc::broken-intra-doc-links
       - name: Lint missing crate-level docs
