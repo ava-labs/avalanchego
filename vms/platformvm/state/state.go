@@ -2066,7 +2066,6 @@ func (s *state) populateBlockHeightIndex() error {
 	blockIterator := s.blockDB.NewIterator()
 	defer blockIterator.Release()
 	for i := uint64(0); blockIterator.Next(); i++ {
-
 		blkBytes := blockIterator.Value()
 
 		// Note: stored blocks are verified, so it's safe to unmarshal them with
