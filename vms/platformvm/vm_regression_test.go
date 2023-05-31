@@ -5,6 +5,7 @@ package platformvm
 
 import (
 	"context"
+	"encoding/hex"
 	"testing"
 	"time"
 
@@ -25,14 +26,18 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -1441,4 +1446,293 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 	require.NoError(removeSubnetValidatorBlock.Verify(context.Background()))
 	require.NoError(removeSubnetValidatorBlock.Accept(context.Background()))
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
+}
+
+func Test_RegressionBLSKeyDiff(t *testing.T) {
+	// setup
+	require := require.New(t)
+	vm, _, _ := defaultVM()
+	subnetID := testSubnet1.TxID
+
+	// setup heights/time
+	currentHeight, err := vm.GetCurrentHeight(context.Background())
+	require.NoError(err)
+	currentTime := vm.clock.Time()
+
+	// A subnet validator should stake twice before its primary network counterpart stops staking
+	var (
+		primaryStartTime   = currentTime.Add(time.Second)
+		primaryStartHeight = currentHeight + 1
+
+		subnetStartTime1   = primaryStartTime.Add(2 * time.Second)
+		subnetStartHeight1 = primaryStartHeight + 1
+
+		subnetEndTime1   = subnetStartTime1.Add(defaultMinStakingDuration)
+		subnetEndHeight1 = subnetStartHeight1 + 1
+
+		subnetStartTime2   = subnetEndTime1.Add(2 * time.Second)
+		subnetStartHeight2 = subnetEndHeight1 + 1
+
+		subnetEndTime2   = subnetStartTime2.Add(defaultMinStakingDuration)
+		subnetEndHeight2 = subnetStartHeight2 + 1
+
+		primaryEndTime   = subnetEndTime2.Add(time.Second)
+		primaryEndHeight = subnetEndHeight2 + 1
+	)
+
+	// move time/height ahead
+	currentHeight = primaryStartHeight
+	currentTime = primaryStartTime
+	vm.clock.Set(currentTime)
+
+	// insert primary network validator
+	nodeID := ids.GenerateTestNodeID()
+	addr := keys[0].PublicKey().Address()
+	skBytes, err := hex.DecodeString("6668fecd4595b81e4d568398c820bbf3f073cb222902279fa55ebb84764ed2e3")
+	require.NoError(err)
+	sk, err := bls.SecretKeyFromBytes(skBytes)
+	require.NoError(err)
+
+	uPrimaryTx := &txs.AddPermissionlessValidatorTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    vm.ctx.NetworkID,
+			BlockchainID: vm.ctx.ChainID,
+			Ins:          []*avax.TransferableInput{},
+			Outs:         []*avax.TransferableOutput{},
+		}},
+		Validator: txs.Validator{
+			NodeID: nodeID,
+			Start:  uint64(primaryStartTime.Unix()),
+			End:    uint64(primaryEndTime.Unix()),
+			Wght:   2000000000000,
+		},
+		Subnet: constants.PrimaryNetworkID,
+		Signer: signer.NewProofOfPossession(sk),
+		StakeOuts: []*avax.TransferableOutput{
+			{
+				Asset: avax.Asset{
+					ID: avaxAssetID,
+				},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: 2 * units.KiloAvax,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Locktime:  0,
+						Threshold: 1,
+						Addrs: []ids.ShortID{
+							addr,
+						},
+					},
+				},
+			},
+		},
+		ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
+			Locktime:  0,
+			Threshold: 1,
+			Addrs: []ids.ShortID{
+				addr,
+			},
+		},
+		DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
+			Locktime:  0,
+			Threshold: 1,
+			Addrs: []ids.ShortID{
+				addr,
+			},
+		},
+		DelegationShares: reward.PercentDenominator,
+	}
+	primaryTx, err := txs.NewSigned(uPrimaryTx, txs.Codec, nil)
+	require.NoError(err)
+	require.NoError(primaryTx.SyntacticVerify(vm.ctx))
+
+	require.NoError(err)
+	dummyBlock, err := blocks.NewBanffStandardBlock(
+		currentTime,
+		vm.state.GetLastAccepted(),
+		currentHeight,
+		[]*txs.Tx{primaryTx},
+	)
+	require.NoError(err)
+
+	primaryValidator, err := state.NewCurrentStaker(
+		primaryTx.ID(),
+		uPrimaryTx,
+		0,
+	)
+	require.NoError(err)
+
+	vm.state.PutCurrentValidator(primaryValidator)
+	vm.state.SetLastAccepted(dummyBlock.ID())
+	vm.state.AddStatelessBlock(dummyBlock, choices.Accepted)
+	vm.state.AddTx(primaryTx, status.Committed)
+	vm.state.SetHeight(currentHeight)
+	vm.state.SetTimestamp(currentTime)
+	require.NoError(vm.state.Commit())
+
+	// move time/height ahead
+	currentHeight = subnetStartHeight1
+	currentTime = subnetStartTime1
+	vm.clock.Set(currentTime)
+
+	// insert first subnet validator
+	subnetFirstTx, err := vm.txBuilder.NewAddSubnetValidatorTx(
+		1,                               // Weight
+		uint64(subnetStartTime1.Unix()), // Start time
+		uint64(subnetEndTime1.Unix()),   // end time
+		nodeID,                          // Node ID
+		subnetID,
+		[]*secp256k1.PrivateKey{keys[0], keys[1]},
+		addr,
+	)
+	require.NoError(err)
+	dummyBlock, err = blocks.NewBanffStandardBlock(
+		currentTime,
+		vm.state.GetLastAccepted(),
+		currentHeight,
+		[]*txs.Tx{subnetFirstTx},
+	)
+	require.NoError(err)
+
+	firstSubnetValidator, err := state.NewCurrentStaker(
+		subnetFirstTx.ID(),
+		subnetFirstTx.Unsigned.(*txs.AddSubnetValidatorTx),
+		0,
+	)
+	require.NoError(err)
+
+	vm.state.PutCurrentValidator(firstSubnetValidator)
+	vm.state.SetLastAccepted(dummyBlock.ID())
+	vm.state.AddStatelessBlock(dummyBlock, choices.Accepted)
+	vm.state.AddTx(subnetFirstTx, status.Committed)
+	vm.state.SetHeight(currentHeight)
+	vm.state.SetTimestamp(currentTime)
+	require.NoError(vm.state.Commit())
+
+	// move time/height ahead
+	currentHeight = subnetEndHeight1
+	currentTime = subnetEndTime1
+	vm.clock.Set(currentTime)
+
+	// drop first subnet validator
+	dummyBlock, err = blocks.NewBanffStandardBlock(
+		currentTime,
+		vm.state.GetLastAccepted(),
+		currentHeight,
+		[]*txs.Tx{},
+	)
+	require.NoError(err)
+
+	vm.state.DeleteCurrentValidator(firstSubnetValidator)
+	vm.state.SetLastAccepted(dummyBlock.ID())
+	vm.state.AddStatelessBlock(dummyBlock, choices.Accepted)
+	vm.state.SetHeight(currentHeight)
+	vm.state.SetTimestamp(currentTime)
+	require.NoError(vm.state.Commit())
+
+	// move time/height ahead
+	currentHeight = subnetStartHeight2
+	currentTime = subnetStartTime2
+	vm.clock.Set(currentTime)
+
+	// insert second subnet validator
+	subnetSecondTx, err := vm.txBuilder.NewAddSubnetValidatorTx(
+		1,                               // Weight
+		uint64(subnetStartTime2.Unix()), // Start time
+		uint64(subnetEndTime2.Unix()),   // end time
+		nodeID,                          // Node ID
+		subnetID,
+		[]*secp256k1.PrivateKey{keys[0], keys[1]},
+		addr,
+	)
+	require.NoError(err)
+	dummyBlock, err = blocks.NewBanffStandardBlock(
+		currentTime,
+		vm.state.GetLastAccepted(),
+		currentHeight,
+		[]*txs.Tx{subnetSecondTx},
+	)
+	require.NoError(err)
+
+	secondSubnetValidator, err := state.NewCurrentStaker(
+		subnetSecondTx.ID(),
+		subnetSecondTx.Unsigned.(*txs.AddSubnetValidatorTx),
+		0,
+	)
+	require.NoError(err)
+
+	vm.state.PutCurrentValidator(secondSubnetValidator)
+	vm.state.SetLastAccepted(dummyBlock.ID())
+	vm.state.AddStatelessBlock(dummyBlock, choices.Accepted)
+	vm.state.AddTx(subnetSecondTx, status.Committed)
+	vm.state.SetHeight(currentHeight)
+	vm.state.SetTimestamp(currentTime)
+	require.NoError(vm.state.Commit())
+
+	// move time/height ahead
+	currentHeight = subnetEndHeight2
+	currentTime = subnetEndTime2
+	vm.clock.Set(currentTime)
+
+	// drop second subnet validator
+	dummyBlock, err = blocks.NewBanffStandardBlock(
+		currentTime,
+		vm.state.GetLastAccepted(),
+		currentHeight,
+		[]*txs.Tx{},
+	)
+	require.NoError(err)
+
+	vm.state.DeleteCurrentValidator(secondSubnetValidator)
+	vm.state.SetLastAccepted(dummyBlock.ID())
+	vm.state.AddStatelessBlock(dummyBlock, choices.Accepted)
+	vm.state.SetHeight(currentHeight)
+	vm.state.SetTimestamp(currentTime)
+	require.NoError(vm.state.Commit())
+
+	// move time/height ahead
+	currentHeight = primaryEndHeight
+	currentTime = primaryEndTime
+	vm.clock.Set(currentTime)
+
+	// drop primary network validator
+	dummyBlock, err = blocks.NewBanffStandardBlock(
+		currentTime,
+		vm.state.GetLastAccepted(),
+		currentHeight,
+		[]*txs.Tx{},
+	)
+	require.NoError(err)
+
+	vm.state.DeleteCurrentValidator(primaryValidator)
+	vm.state.SetLastAccepted(dummyBlock.ID())
+	vm.state.AddStatelessBlock(dummyBlock, choices.Accepted)
+	vm.state.SetHeight(currentHeight)
+	vm.state.SetTimestamp(currentTime)
+	require.NoError(vm.state.Commit())
+
+	// Finally the test
+	for _, height := range []uint64{
+		primaryStartHeight,
+		subnetStartHeight1,
+		subnetEndHeight2,
+	} {
+		primaryVals, err := vm.State.GetValidatorSet(context.Background(), height, constants.PrimaryNetworkID)
+		require.NoError(err)
+
+		primaryVal, found := primaryVals[nodeID]
+		require.True(found)
+		require.NotNil(primaryVal.PublicKey)
+	}
+
+	for _, height := range []uint64{
+		subnetStartHeight1,
+		subnetStartHeight2,
+	} {
+		subnetVals, err := vm.State.GetValidatorSet(context.Background(), height, subnetID)
+		require.NoError(err)
+
+		subnetVal, found := subnetVals[nodeID]
+		require.True(found)
+		require.NotNil(subnetVal.PublicKey)
+	}
 }
