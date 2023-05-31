@@ -43,7 +43,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
-	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -469,7 +468,7 @@ func TestVM_GetValidatorSet(t *testing.T) {
 func Test_RegressionBLSKeyDiff(t *testing.T) {
 	// setup
 	require := require.New(t)
-	/*cfg*/ _, clk, pState, txBuilder, err := buildSetup()
+	cfg, clk, pState, txBuilder, err := buildSetup()
 	require.NoError(err)
 
 	// valMan := NewManager(cfg, pState, metrics.Noop, clk)
@@ -493,11 +492,21 @@ func Test_RegressionBLSKeyDiff(t *testing.T) {
 	pState.SetTimestamp(clk.Time())
 	require.NoError(pState.Commit())
 
+	subnetID := subnetTx.ID()
+	cfg.TrackedSubnets.Add(subnetID)
+	subnetValidators := validators.NewSet()
+	require.NoError(pState.ValidatorSet(subnetID, subnetValidators))
+	require.True(cfg.Validators.Add(subnetID, subnetValidators))
+
+	// move time/height ahead
+	currentHeight++
+	currentTime = clk.Time().Add(time.Second)
+	clk.Set(currentTime)
+
 	// A subnet validator should stake twice before its primary network counterpart stops staking
 	var (
-		subnetID         = subnetTx.ID()
-		primaryStartTime = time.Unix(0, 0)
-		subnetStartTime1 = time.Unix(1, 0)
+		primaryStartTime = currentTime
+		subnetStartTime1 = primaryStartTime.Add(2 * time.Second)
 		subnetEndTime1   = subnetStartTime1.Add(defaultMinStakingDuration)
 		subnetStartTime2 = subnetEndTime1.Add(2 * time.Second)
 		subnetEndTime2   = subnetStartTime2.Add(defaultMinStakingDuration)
@@ -529,15 +538,19 @@ func Test_RegressionBLSKeyDiff(t *testing.T) {
 	pState.PutCurrentValidator(primaryValidator)
 	pState.AddTx(primaryTx, status.Committed)
 	pState.SetHeight(currentHeight)
-	pState.SetTimestamp(primaryStartTime)
+	pState.SetTimestamp(currentTime)
 	require.NoError(pState.Commit())
 
-	// insert first subnet validator
+	// move time/height ahead
 	currentHeight++
+	currentTime = subnetStartTime1
+	clk.Set(currentTime)
+
+	// insert first subnet validator
 	subnetFirstTx, err := txBuilder.NewAddSubnetValidatorTx(
 		1,                               // Weight
-		uint64(primaryStartTime.Unix()), // Start time
-		uint64(primaryEndTime.Unix()),   // end time
+		uint64(subnetStartTime1.Unix()), // Start time
+		uint64(subnetEndTime1.Unix()),   // end time
 		nodeID,                          // Node ID
 		subnetID,
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
@@ -555,7 +568,70 @@ func Test_RegressionBLSKeyDiff(t *testing.T) {
 	pState.PutCurrentValidator(firstSubnetValidator)
 	pState.AddTx(subnetFirstTx, status.Committed)
 	pState.SetHeight(currentHeight)
-	pState.SetTimestamp(subnetStartTime1)
+	pState.SetTimestamp(currentTime)
+	require.NoError(pState.Commit())
+
+	// move time/height ahead
+	currentHeight++
+	currentTime = subnetEndTime1
+	clk.Set(currentTime)
+
+	// drop first subnet validator
+	pState.DeleteCurrentValidator(firstSubnetValidator)
+	pState.SetHeight(currentHeight)
+	pState.SetTimestamp(currentTime)
+	require.NoError(pState.Commit())
+
+	// move time/height ahead
+	currentHeight++
+	currentTime = subnetStartTime2
+	clk.Set(currentTime)
+
+	// insert second subnet validator
+	subnetSecondTx, err := txBuilder.NewAddSubnetValidatorTx(
+		1,                               // Weight
+		uint64(subnetStartTime2.Unix()), // Start time
+		uint64(subnetEndTime2.Unix()),   // end time
+		nodeID,                          // Node ID
+		subnetID,
+		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+		addr,
+	)
+	require.NoError(err)
+
+	secondSubnetValidator, err := state.NewCurrentStaker(
+		subnetSecondTx.ID(),
+		subnetSecondTx.Unsigned.(*txs.AddSubnetValidatorTx),
+		0,
+	)
+	require.NoError(err)
+
+	pState.PutCurrentValidator(secondSubnetValidator)
+	pState.AddTx(subnetSecondTx, status.Committed)
+	pState.SetHeight(currentHeight)
+	pState.SetTimestamp(currentTime)
+	require.NoError(pState.Commit())
+
+	// move time/height ahead
+	currentHeight++
+	currentTime = subnetEndTime2
+	clk.Set(currentTime)
+
+	// drop second subnet validator
+	pState.DeleteCurrentValidator(secondSubnetValidator)
+	pState.SetHeight(currentHeight)
+	pState.SetTimestamp(currentTime)
+	require.NoError(pState.Commit())
+
+	// move time/height ahead
+	currentHeight++
+	currentTime = primaryEndTime
+	clk.Set(currentTime)
+
+	// drop primary network validator
+	pState.DeleteCurrentValidator(primaryValidator)
+	pState.SetHeight(currentHeight)
+	pState.SetTimestamp(currentTime)
 	require.NoError(pState.Commit())
 }
 
@@ -627,9 +703,20 @@ func buildSetup() (
 		return nil, nil, nil, nil, fmt.Errorf("could not build pState, %w", err)
 	}
 
-	var isBootstrapped utils.Atomic[bool]
-	isBootstrapped.Set(true)
-	fx := defaultFx(clk, ctx.Log, isBootstrapped.Get())
+	// build fx
+	fxVMInt := &fxVMInt{
+		registry: linearcodec.NewDefault(),
+		clk:      clk,
+		log:      ctx.Log,
+	}
+	fx := &secp256k1fx.Fx{}
+	if err := fx.Initialize(fxVMInt); err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("could not build feature extension, %w", err)
+	}
+	if err := fx.Bootstrapped(); err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("could not bootstrap feature extension, %w", err)
+	}
+
 	atomicUTXOs := avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
 	utxoHandler := utxo.NewHandler(ctx, clk, fx)
 	txBuilder := builder.New(
@@ -660,24 +747,6 @@ func (fvi *fxVMInt) Clock() *mockable.Clock {
 
 func (fvi *fxVMInt) Logger() logging.Logger {
 	return fvi.log
-}
-
-func defaultFx(clk *mockable.Clock, log logging.Logger, isBootstrapped bool) fx.Fx {
-	fxVMInt := &fxVMInt{
-		registry: linearcodec.NewDefault(),
-		clk:      clk,
-		log:      log,
-	}
-	res := &secp256k1fx.Fx{}
-	if err := res.Initialize(fxVMInt); err != nil {
-		panic(err)
-	}
-	if isBootstrapped {
-		if err := res.Bootstrapped(); err != nil {
-			panic(err)
-		}
-	}
-	return res
 }
 
 func buildGenesisTest(ctx *snow.Context) []byte {
