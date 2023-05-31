@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -14,6 +15,8 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+
+	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
 func getBasicDB() (*merkleDB, error) {
@@ -681,85 +684,6 @@ func Test_RangeProof_EmptyValues(t *testing.T) {
 		[]byte("key2"),
 		db.root.id,
 	))
-}
-
-func Test_RangeProof_Marshal_Nil(t *testing.T) {
-	db, err := getBasicDB()
-	require.NoError(t, err)
-	writeBasicBatch(t, db)
-
-	val, err := db.Get([]byte{1})
-	require.NoError(t, err)
-	require.Equal(t, []byte{1}, val)
-
-	proof, err := db.GetRangeProof(context.Background(), []byte("key1"), []byte("key35"), 10)
-	require.NoError(t, err)
-	require.NotNil(t, proof)
-
-	proofBytes, err := Codec.EncodeRangeProof(Version, proof)
-	require.NoError(t, err)
-
-	parsedProof := &RangeProof{}
-	_, err = Codec.DecodeRangeProof(proofBytes, parsedProof)
-	require.NoError(t, err)
-
-	verifyPath(t, proof.StartProof, parsedProof.StartProof)
-	verifyPath(t, proof.EndProof, parsedProof.EndProof)
-
-	for index, kv := range proof.KeyValues {
-		require.True(t, bytes.Equal(kv.Key, parsedProof.KeyValues[index].Key))
-		require.True(t, bytes.Equal(kv.Value, parsedProof.KeyValues[index].Value))
-	}
-}
-
-func Test_RangeProof_Marshal(t *testing.T) {
-	db, err := getBasicDB()
-	require.NoError(t, err)
-
-	writeBasicBatch(t, db)
-
-	val, err := db.Get([]byte{1})
-	require.NoError(t, err)
-	require.Equal(t, []byte{1}, val)
-
-	proof, err := db.GetRangeProof(context.Background(), nil, nil, 10)
-	require.NoError(t, err)
-	require.NotNil(t, proof)
-
-	proofBytes, err := Codec.EncodeRangeProof(Version, proof)
-	require.NoError(t, err)
-
-	parsedProof := &RangeProof{}
-	_, err = Codec.DecodeRangeProof(proofBytes, parsedProof)
-	require.NoError(t, err)
-
-	verifyPath(t, proof.StartProof, parsedProof.StartProof)
-	verifyPath(t, proof.EndProof, parsedProof.EndProof)
-
-	for index, state := range proof.KeyValues {
-		require.True(t, bytes.Equal(state.Key, parsedProof.KeyValues[index].Key))
-		require.True(t, bytes.Equal(state.Value, parsedProof.KeyValues[index].Value))
-	}
-}
-
-func Test_RangeProof_Marshal_Errors(t *testing.T) {
-	db, err := getBasicDB()
-	require.NoError(t, err)
-	writeBasicBatch(t, db)
-
-	proof, err := db.GetRangeProof(context.Background(), nil, nil, 10)
-	require.NoError(t, err)
-	require.NotNil(t, proof)
-
-	proofBytes, err := Codec.EncodeRangeProof(Version, proof)
-	require.NoError(t, err)
-
-	for i := 1; i < len(proofBytes); i++ {
-		broken := proofBytes[:i]
-		parsedProof := &RangeProof{}
-		_, err = Codec.DecodeRangeProof(broken, parsedProof)
-		require.ErrorIs(t, err, io.ErrUnexpectedEOF)
-	}
 }
 
 func Test_ChangeProof_Marshal(t *testing.T) {
@@ -1460,5 +1384,179 @@ func TestVerifyProofPath(t *testing.T) {
 			err := verifyProofPath(tt.path, newPath(tt.proofKey))
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
+	}
+}
+
+func TestProofNodeUnmarshalProtoInvalidMaybe(t *testing.T) {
+	rand := rand.New(rand.NewSource(1337)) // #nosec G404
+
+	node := newRandomProofNode(rand)
+	protoNode := node.ToProto()
+
+	// It's invalid to have a value and be nothing.
+	protoNode.ValueOrHash = &syncpb.MaybeBytes{
+		Value:     []byte{1, 2, 3},
+		IsNothing: true,
+	}
+
+	var unmarshaledNode ProofNode
+	err := unmarshaledNode.UnmarshalProto(protoNode)
+	require.ErrorIs(t, err, ErrInvalidMaybe)
+}
+
+func TestProofNodeUnmarshalProtoInvalidChildBytes(t *testing.T) {
+	rand := rand.New(rand.NewSource(1337)) // #nosec G404
+
+	node := newRandomProofNode(rand)
+	protoNode := node.ToProto()
+
+	protoNode.Children = map[uint32][]byte{
+		1: []byte("not 32 bytes"),
+	}
+
+	var unmarshaledNode ProofNode
+	err := unmarshaledNode.UnmarshalProto(protoNode)
+	require.ErrorIs(t, err, hashing.ErrInvalidHashLen)
+}
+
+func TestProofNodeUnmarshalProtoInvalidChildIndex(t *testing.T) {
+	rand := rand.New(rand.NewSource(1337)) // #nosec G404
+
+	node := newRandomProofNode(rand)
+	protoNode := node.ToProto()
+
+	childID := ids.GenerateTestID()
+	protoNode.Children[NodeBranchFactor] = childID[:]
+
+	var unmarshaledNode ProofNode
+	err := unmarshaledNode.UnmarshalProto(protoNode)
+	require.ErrorIs(t, err, ErrInvalidChildIndex)
+}
+
+func TestProofNodeUnmarshalProtoMissingFields(t *testing.T) {
+	rand := rand.New(rand.NewSource(1337)) // #nosec G404
+
+	type test struct {
+		name        string
+		nodeFunc    func() *syncpb.ProofNode
+		expectedErr error
+	}
+
+	tests := []test{
+		{
+			name: "nil node",
+			nodeFunc: func() *syncpb.ProofNode {
+				return nil
+			},
+			expectedErr: ErrNilProofNode,
+		},
+		{
+			name: "nil ValueOrHash",
+			nodeFunc: func() *syncpb.ProofNode {
+				node := newRandomProofNode(rand)
+				protoNode := node.ToProto()
+				protoNode.ValueOrHash = nil
+				return protoNode
+			},
+			expectedErr: ErrNilValueOrHash,
+		},
+		{
+			name: "nil key",
+			nodeFunc: func() *syncpb.ProofNode {
+				node := newRandomProofNode(rand)
+				protoNode := node.ToProto()
+				protoNode.Key = nil
+				return protoNode
+			},
+			expectedErr: ErrNilSerializedPath,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var node ProofNode
+			err := node.UnmarshalProto(tt.nodeFunc())
+			require.ErrorIs(t, err, tt.expectedErr)
+		})
+	}
+}
+
+func TestProofNodeProtoMarshalUnmarshal(t *testing.T) {
+	require := require.New(t)
+	rand := rand.New(rand.NewSource(1337)) // #nosec G404
+
+	for i := 0; i < 1_000; i++ {
+		node := newRandomProofNode(rand)
+
+		// Marshal and unmarshal it.
+		// Assert the unmarshaled one is the same as the original.
+		protoNode := node.ToProto()
+		var unmarshaledNode ProofNode
+		require.NoError(unmarshaledNode.UnmarshalProto(protoNode))
+		require.Equal(node, unmarshaledNode)
+
+		// Marshaling again should yield same result.
+		protoUnmarshaledNode := unmarshaledNode.ToProto()
+		require.Equal(protoNode, protoUnmarshaledNode)
+	}
+}
+
+func TestRangeProofUnmarshalProtoNil(t *testing.T) {
+	var proof RangeProof
+	err := proof.UnmarshalProto(nil)
+	require.ErrorIs(t, err, ErrNilRangeProof)
+}
+
+func TestRangeProofProtoMarshalUnmarshal(t *testing.T) {
+	require := require.New(t)
+	rand := rand.New(rand.NewSource(1337)) // #nosec G404
+
+	for i := 0; i < 500; i++ {
+		// Make a random range proof.
+		startProofLen := rand.Intn(32)
+		startProof := make([]ProofNode, startProofLen)
+		for i := 0; i < startProofLen; i++ {
+			startProof[i] = newRandomProofNode(rand)
+		}
+
+		endProofLen := rand.Intn(32)
+		endProof := make([]ProofNode, endProofLen)
+		for i := 0; i < endProofLen; i++ {
+			endProof[i] = newRandomProofNode(rand)
+		}
+
+		numKeyValues := rand.Intn(128)
+		keyValues := make([]KeyValue, numKeyValues)
+		for i := 0; i < numKeyValues; i++ {
+			keyLen := rand.Intn(32)
+			key := make([]byte, keyLen)
+			_, _ = rand.Read(key)
+
+			valueLen := rand.Intn(32)
+			value := make([]byte, valueLen)
+			_, _ = rand.Read(value)
+
+			keyValues[i] = KeyValue{
+				Key:   key,
+				Value: value,
+			}
+		}
+
+		proof := RangeProof{
+			StartProof: startProof,
+			EndProof:   endProof,
+			KeyValues:  keyValues,
+		}
+
+		// Marshal and unmarshal it.
+		// Assert the unmarshaled one is the same as the original.
+		var unmarshaledProof RangeProof
+		protoProof := proof.ToProto()
+		require.NoError(unmarshaledProof.UnmarshalProto(protoProof))
+		require.Equal(proof, unmarshaledProof)
+
+		// Marshaling again should yield same result.
+		protoUnmarshaledProof := unmarshaledProof.ToProto()
+		require.Equal(protoProof, protoUnmarshaledProof)
 	}
 }
