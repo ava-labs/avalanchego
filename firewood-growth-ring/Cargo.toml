@@ -20,11 +20,13 @@ nix = "0.26.2"
 libc = "0.2.133"
 bytemuck = {version = "1.13.1", features = ["derive"]}
 thiserror = "1.0.40"
+tokio = { version = "1.28.1", features = ["fs"] }
 
 [dev-dependencies]
 hex = "0.4.3"
 rand = "0.8.5"
 indexmap = "1.9.1"
+tokio = { version = "1.28.1", features = ["tokio-macros", "rt", "macros"] }
 
 [lib]
 name = "growthring"

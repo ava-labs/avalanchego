@@ -182,7 +182,6 @@ pub trait WalFile {
     /// Read data with offset. Return `Ok(None)` when it reaches EOF.
     async fn read(&self, offset: WalPos, length: usize) -> Result<Option<WalBytes>, WalError>;
     /// Truncate a file to a specified length.
-    #[allow(clippy::result_unit_err)]
     async fn truncate(&self, length: usize) -> Result<(), WalError>;
 }
 
