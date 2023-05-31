@@ -47,7 +47,7 @@ message KeyChange {
 
 // SerializedPath is the serialized representation of a path.
 message SerializedPath {
-  uint32 nibble_length = 1;
+  uint64 nibble_length = 1;
   bytes value = 2;
 }
 
