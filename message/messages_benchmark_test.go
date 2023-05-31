@@ -128,10 +128,10 @@ func BenchmarkUnmarshalVersion(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		if useBuilder {
 			_, err = codec.parseInbound(rawMsg, dummyNodeID, dummyOnFinishedHandling)
+			require.NoError(err)
 		} else {
 			var msg p2p.Message
-			err = proto.Unmarshal(rawMsg, &msg)
+			require.NoError(proto.Unmarshal(rawMsg, &msg))
 		}
-		require.NoError(err)
 	}
 }

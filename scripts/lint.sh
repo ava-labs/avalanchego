@@ -21,7 +21,7 @@ fi
 # by default, "./scripts/lint.sh" runs all lint tests
 # to run only "license_header" test
 # TESTS='license_header' ./scripts/lint.sh
-TESTS=${TESTS:-"golangci_lint license_header require_error_is_no_funcs_as_params single_import interface_compliance_nil require_equal_zero require_len_zero require_equal_len require_nil"}
+TESTS=${TESTS:-"golangci_lint license_header require_error_is_no_funcs_as_params single_import interface_compliance_nil require_equal_zero require_len_zero require_equal_len require_nil require_no_error_inline_func"}
 
 function test_golangci_lint {
   go install -v github.com/golangci/golangci-lint/cmd/golangci-lint@v1.51.2
@@ -120,6 +120,15 @@ function test_require_nil {
   if grep -R -o -P 'require\.ErrorIs.+?nil\)' .; then
     echo ""
     echo "Use require.NoError instead of require.ErrorIs when testing for nil error."
+    echo ""
+    return 1
+  fi
+}
+
+function test_require_no_error_inline_func {
+  if grep -R -zo -P '\t+err :?= ((?!require|if).|\n)*require\.NoError\((t, )?err\)' .; then
+    echo ""
+    echo "Checking that a function with a single error return doesn't error should be done in-line."
     echo ""
     return 1
   fi
