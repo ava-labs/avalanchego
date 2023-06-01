@@ -18,6 +18,16 @@ import (
 	"github.com/leanovate/gopter/prop"
 )
 
+const (
+	pending stakerStatus = 0
+	current stakerStatus = 1
+)
+
+var (
+	errNonEmptyIteratorExpected = errors.New("expected non-empty iterator, got no elements")
+	errValidatorSetUpdate       = errors.New("inserted staker cannot be found in validator set")
+)
+
 // TestGeneralStakerContainersProperties checks that State and Diff conform our stakersStorageModel.
 // TestGeneralStakerContainersProperties tests State and Diff in isolation, over simple operations.
 // TestStateAndDiffComparisonToStorageModel carries a more involved verification over a production-like

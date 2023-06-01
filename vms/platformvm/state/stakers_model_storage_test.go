@@ -259,7 +259,7 @@ func updateCurrentValidatorInSystem(sys *sysUnderTest) error {
 	}
 
 	var (
-		found  = false
+		found  bool
 		staker *Staker
 	)
 	for !found && stakerIt.Next() {
@@ -268,9 +268,11 @@ func updateCurrentValidatorInSystem(sys *sysUnderTest) error {
 			staker.Priority == txs.SubnetPermissionlessValidatorCurrentPriority ||
 			staker.Priority == txs.PrimaryNetworkValidatorCurrentPriority {
 			found = true
+			break
 		}
 	}
 	if !found {
+		stakerIt.Release()
 		return nil // no current validator to update
 	}
 	stakerIt.Release()
@@ -308,7 +310,7 @@ func updateCurrentValidatorInModel(model *stakersStorageModel) error {
 	}
 
 	var (
-		found  = false
+		found  bool
 		staker *Staker
 	)
 	for !found && stakerIt.Next() {
@@ -317,9 +319,11 @@ func updateCurrentValidatorInModel(model *stakersStorageModel) error {
 			staker.Priority == txs.SubnetPermissionlessValidatorCurrentPriority ||
 			staker.Priority == txs.PrimaryNetworkValidatorCurrentPriority {
 			found = true
+			break
 		}
 	}
 	if !found {
+		stakerIt.Release()
 		return nil // no current validator to update
 	}
 	stakerIt.Release()
@@ -608,9 +612,11 @@ func updateCurrentDelegatorInSystem(sys *sysUnderTest) error {
 		if delegator.Priority == txs.SubnetPermissionlessDelegatorCurrentPriority ||
 			delegator.Priority == txs.PrimaryNetworkDelegatorCurrentPriority {
 			found = true
+			break
 		}
 	}
 	if !found {
+		stakerIt.Release()
 		return nil // no current validator to update
 	}
 	stakerIt.Release()
@@ -653,6 +659,7 @@ func updateCurrentDelegatorInModel(model *stakersStorageModel) error {
 		}
 	}
 	if !found {
+		stakerIt.Release()
 		return nil // no current validator to update
 	}
 	stakerIt.Release()

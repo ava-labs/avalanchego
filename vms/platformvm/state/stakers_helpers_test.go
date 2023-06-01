@@ -4,7 +4,6 @@
 package state
 
 import (
-	"errors"
 	"fmt"
 	"time"
 
@@ -41,12 +40,6 @@ var (
 	defaultValidateStartTime  = defaultGenesisTime
 	defaultValidateEndTime    = defaultValidateStartTime.Add(10 * defaultMinStakingDuration)
 	defaultTxFee              = uint64(100)
-
-	errNonEmptyIteratorExpected = errors.New("expected non-empty iterator, got no elements")
-	errValidatorSetUpdate       = errors.New("inserted staker cannot be found in validator set")
-
-	pending stakerStatus = 0
-	current stakerStatus = 1
 )
 
 type stakerStatus int
