@@ -35,7 +35,7 @@ func TestVerifyFxUsage(t *testing.T) {
 
 	genesisBytes := BuildGenesisTest(t)
 	issuer := make(chan common.Message, 1)
-	err := vm.Initialize(
+	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
 		manager.NewMemDB(version.Semantic1_0_0),
@@ -54,8 +54,7 @@ func TestVerifyFxUsage(t *testing.T) {
 			},
 		},
 		nil,
-	)
-	require.NoError(err)
+	))
 	vm.batchTimeout = 0
 
 	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
@@ -98,7 +97,7 @@ func TestVerifyFxUsage(t *testing.T) {
 	}}
 	require.NoError(vm.parser.InitializeTx(createAssetTx))
 
-	_, err = vm.IssueTx(createAssetTx.Bytes())
+	_, err := vm.IssueTx(createAssetTx.Bytes())
 	require.NoError(err)
 
 	mintNFTTx := &txs.Tx{Unsigned: &txs.OperationTx{
