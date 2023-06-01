@@ -61,8 +61,7 @@ func TestWaitForReady(t *testing.T) {
 
 	db := rpcdb.NewClient(pb.NewDatabaseClient(conn))
 
-	err = db.Put([]byte("foo"), []byte("bar"))
-	require.NoError(err)
+	require.NoError(db.Put([]byte("foo"), []byte("bar")))
 
 	noWaitListener, err := NewListener()
 	require.NoError(err)

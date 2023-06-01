@@ -71,6 +71,11 @@ func (l *log) Stop() {
 	}
 }
 
+// Enabled returns true if the given level is at or above this level.
+func (l *log) Enabled(lvl Level) bool {
+	return l.internalLogger.Level().Enabled(zapcore.Level(lvl))
+}
+
 // Should only be called from [Level] functions.
 func (l *log) log(level Level, msg string, fields ...zap.Field) {
 	if ce := l.internalLogger.Check(zapcore.Level(level), msg); ce != nil {
