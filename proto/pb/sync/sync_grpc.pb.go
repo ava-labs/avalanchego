@@ -37,9 +37,9 @@ type SyncableDBClient interface {
 	GetProof(ctx context.Context, in *GetProofRequest, opts ...grpc.CallOption) (*GetProofResponse, error)
 	GetChangeProof(ctx context.Context, in *GetChangeProofRequest, opts ...grpc.CallOption) (*ChangeProof, error)
 	VerifyChangeProof(ctx context.Context, in *VerifyChangeProofRequest, opts ...grpc.CallOption) (*VerifyChangeProofResponse, error)
-	CommitChangeProof(ctx context.Context, in *CommitChangeProofRequest, opts ...grpc.CallOption) (*CommitChangeProofResponse, error)
+	CommitChangeProof(ctx context.Context, in *CommitChangeProofRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	GetRangeProof(ctx context.Context, in *GetRangeProofRequest, opts ...grpc.CallOption) (*GetRangeProofResponse, error)
-	CommitRangeProof(ctx context.Context, in *CommitRangeProofRequest, opts ...grpc.CallOption) (*CommitRangeProofResponse, error)
+	CommitRangeProof(ctx context.Context, in *CommitRangeProofRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type syncableDBClient struct {
@@ -86,8 +86,8 @@ func (c *syncableDBClient) VerifyChangeProof(ctx context.Context, in *VerifyChan
 	return out, nil
 }
 
-func (c *syncableDBClient) CommitChangeProof(ctx context.Context, in *CommitChangeProofRequest, opts ...grpc.CallOption) (*CommitChangeProofResponse, error) {
-	out := new(CommitChangeProofResponse)
+func (c *syncableDBClient) CommitChangeProof(ctx context.Context, in *CommitChangeProofRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, SyncableDB_CommitChangeProof_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -104,8 +104,8 @@ func (c *syncableDBClient) GetRangeProof(ctx context.Context, in *GetRangeProofR
 	return out, nil
 }
 
-func (c *syncableDBClient) CommitRangeProof(ctx context.Context, in *CommitRangeProofRequest, opts ...grpc.CallOption) (*CommitRangeProofResponse, error) {
-	out := new(CommitRangeProofResponse)
+func (c *syncableDBClient) CommitRangeProof(ctx context.Context, in *CommitRangeProofRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, SyncableDB_CommitRangeProof_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -121,9 +121,9 @@ type SyncableDBServer interface {
 	GetProof(context.Context, *GetProofRequest) (*GetProofResponse, error)
 	GetChangeProof(context.Context, *GetChangeProofRequest) (*ChangeProof, error)
 	VerifyChangeProof(context.Context, *VerifyChangeProofRequest) (*VerifyChangeProofResponse, error)
-	CommitChangeProof(context.Context, *CommitChangeProofRequest) (*CommitChangeProofResponse, error)
+	CommitChangeProof(context.Context, *CommitChangeProofRequest) (*emptypb.Empty, error)
 	GetRangeProof(context.Context, *GetRangeProofRequest) (*GetRangeProofResponse, error)
-	CommitRangeProof(context.Context, *CommitRangeProofRequest) (*CommitRangeProofResponse, error)
+	CommitRangeProof(context.Context, *CommitRangeProofRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedSyncableDBServer()
 }
 
@@ -143,13 +143,13 @@ func (UnimplementedSyncableDBServer) GetChangeProof(context.Context, *GetChangeP
 func (UnimplementedSyncableDBServer) VerifyChangeProof(context.Context, *VerifyChangeProofRequest) (*VerifyChangeProofResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method VerifyChangeProof not implemented")
 }
-func (UnimplementedSyncableDBServer) CommitChangeProof(context.Context, *CommitChangeProofRequest) (*CommitChangeProofResponse, error) {
+func (UnimplementedSyncableDBServer) CommitChangeProof(context.Context, *CommitChangeProofRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CommitChangeProof not implemented")
 }
 func (UnimplementedSyncableDBServer) GetRangeProof(context.Context, *GetRangeProofRequest) (*GetRangeProofResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetRangeProof not implemented")
 }
-func (UnimplementedSyncableDBServer) CommitRangeProof(context.Context, *CommitRangeProofRequest) (*CommitRangeProofResponse, error) {
+func (UnimplementedSyncableDBServer) CommitRangeProof(context.Context, *CommitRangeProofRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CommitRangeProof not implemented")
 }
 func (UnimplementedSyncableDBServer) mustEmbedUnimplementedSyncableDBServer() {}

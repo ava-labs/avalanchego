@@ -3,7 +3,6 @@ syntax = "proto3";
 package sync;
 
 import "google/protobuf/empty.proto";
-import "rpcdb/rpcdb.proto";
 
 option go_package = "github.com/ava-labs/avalanchego/proto/pb/sync";
 
@@ -26,10 +25,10 @@ service SyncableDB {
 
   rpc GetChangeProof(GetChangeProofRequest) returns (ChangeProof);
   rpc VerifyChangeProof(VerifyChangeProofRequest) returns (VerifyChangeProofResponse);
-  rpc CommitChangeProof(CommitChangeProofRequest) returns (CommitChangeProofResponse);
+  rpc CommitChangeProof(CommitChangeProofRequest) returns (google.protobuf.Empty);
 
   rpc GetRangeProof(GetRangeProofRequest) returns (GetRangeProofResponse);
-  rpc CommitRangeProof(CommitRangeProofRequest) returns (CommitRangeProofResponse);
+  rpc CommitRangeProof(CommitRangeProofRequest) returns (google.protobuf.Empty);
 }
 
 message GetMerkleRootResponse {
@@ -71,15 +70,12 @@ message VerifyChangeProofRequest {
 }
 
 message VerifyChangeProofResponse {
-  rpcdb.Error error = 1;
+  // If empty, there was no error.
+  string error = 1;
 }
 
 message CommitChangeProofRequest {
   ChangeProof proof = 1;
-}
-
-message CommitChangeProofResponse {
-  rpcdb.Error error = 1;
 }
 
 message GetRangeProofRequest {
@@ -97,10 +93,6 @@ message GetRangeProofResponse {
 message CommitRangeProofRequest {
   bytes start_key = 1;
   RangeProof range_proof = 2;
-}
-
-message CommitRangeProofResponse {
-  rpcdb.Error error = 1;
 }
 
 message ChangeProof {
