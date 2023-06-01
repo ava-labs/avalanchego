@@ -282,8 +282,6 @@ func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uin
 func (t *Transitive) QueryFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 	lastAccepted, ok := t.acceptedFrontiers.LastAccepted(nodeID)
 	if ok {
-		// Chits calls QueryFailed if [votes] doesn't have length 1, so this
-		// check is required to avoid infinite mutual recursion.
 		return t.Chits(ctx, nodeID, requestID, lastAccepted, lastAccepted)
 	}
 
