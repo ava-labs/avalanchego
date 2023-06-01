@@ -39,16 +39,6 @@ jobs:
         run: cargo check --workspace --tests --examples --benches
       - name: Build
         run: cargo build --workspace --tests --examples --benches
-      - name: Save Build Deps
-        uses: actions/cache/save@v3
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: cache-build-${{ github.run_id }}-${{ github.run_attempt }}
 
   lint:
     needs: build
@@ -71,7 +61,7 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: cache-build-${{ github.run_id }}-${{ github.run_attempt }}
+          key: ${{ runner.os }}-deps-${{ hashFiles('**/Cargo.toml') }}-${{ hashFiles('**/*.rs') }}
       - name: Format
         run: cargo fmt -- --check
       - name: Clippy
@@ -97,7 +87,7 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: cache-build-${{ github.run_id }}-${{ github.run_attempt }}
+          key: ${{ runner.os }}-deps-${{ hashFiles('**/Cargo.toml') }}-${{ hashFiles('**/*.rs') }}
       - name: Run tests
         run: cargo test --verbose
 
@@ -120,7 +110,7 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: cache-build-${{ github.run_id }}-${{ github.run_attempt }}
+          key: ${{ runner.os }}-deps-${{ hashFiles('**/Cargo.toml') }}-${{ hashFiles('**/*.rs') }}
       - name: Run simple example
         run: RUST_BACKTRACE=1 cargo run --example simple
       - name: Run dump example
@@ -150,7 +140,7 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: cache-build-${{ github.run_id }}-${{ github.run_attempt }}
+          key: ${{ runner.os }}-deps-${{ hashFiles('**/Cargo.toml') }}-${{ hashFiles('**/*.rs') }}
       - name: Lint intra docs links
         run: cargo rustdoc -p firewood --lib -- -D rustdoc::broken-intra-doc-links
       - name: Lint missing crate-level docs

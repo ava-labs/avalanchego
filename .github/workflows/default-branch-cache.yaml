@@ -1,0 +1,43 @@
+# because apparently caches are isolated across branches
+name: default-branch-cache
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - name: Cache Cargo intermediate products
+        id: cargo-cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          # We can do this now because we use specific verison and update with Dependabot
+          # but if we make the deps any less specifc, we'll have to fix
+          key: ${{ runner.os }}-deps-${{ hashFiles('**/Cargo.toml') }}-${{ hashFiles('**/*.rs') }}
+          # start from the previous set of cached dependencies
+          restore-keys: |
+            ${{ runner.os }}-deps-${{ hashFiles('**/Cargo.toml') }}-
+            ${{ runner.os }}-deps-
+      # TODO: do a `cargo fetch` here first
+      - name: Check
+        run: cargo check --workspace --tests --examples --benches
+      - name: Build
+        run: cargo build --workspace --tests --examples --benches
