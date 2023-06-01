@@ -26,7 +26,6 @@ func TestSet(t *testing.T) {
 	s.Add(id1)
 	require.True(s.Contains(id1))
 	require.Len(s.List(), 1)
-	require.Equal(len(s.List()), 1)
 	require.Equal(id1, s.List()[0])
 
 	s.Clear()
@@ -53,11 +52,11 @@ func TestSetCappedList(t *testing.T) {
 
 	id := 0
 
-	require.Len(s.CappedList(0), 0)
+	require.Empty(s.CappedList(0))
 
 	s.Add(id)
 
-	require.Len(s.CappedList(0), 0)
+	require.Empty(s.CappedList(0))
 	require.Len(s.CappedList(1), 1)
 	require.Equal(s.CappedList(1)[0], id)
 	require.Len(s.CappedList(2), 1)
@@ -66,7 +65,7 @@ func TestSetCappedList(t *testing.T) {
 	id2 := 1
 	s.Add(id2)
 
-	require.Len(s.CappedList(0), 0)
+	require.Empty(s.CappedList(0))
 	require.Len(s.CappedList(1), 1)
 	require.Len(s.CappedList(2), 2)
 	require.Len(s.CappedList(3), 2)
@@ -82,35 +81,37 @@ func TestSetClear(t *testing.T) {
 		set.Add(i)
 	}
 	set.Clear()
-	require.Len(t, set, 0)
+	require.Empty(t, set)
 	set.Add(1337)
 	require.Len(t, set, 1)
 }
 
 func TestSetPop(t *testing.T) {
+	require := require.New(t)
+
 	var s Set[int]
 	_, ok := s.Pop()
-	require.False(t, ok)
+	require.False(ok)
 
 	s = make(Set[int])
 	_, ok = s.Pop()
-	require.False(t, ok)
+	require.False(ok)
 
 	id1, id2 := 0, 1
 	s.Add(id1, id2)
 
 	got, ok := s.Pop()
-	require.True(t, ok)
-	require.True(t, got == id1 || got == id2)
-	require.EqualValues(t, 1, s.Len())
+	require.True(ok)
+	require.True(got == id1 || got == id2)
+	require.Equal(1, s.Len())
 
 	got, ok = s.Pop()
-	require.True(t, ok)
-	require.True(t, got == id1 || got == id2)
-	require.EqualValues(t, 0, s.Len())
+	require.True(ok)
+	require.True(got == id1 || got == id2)
+	require.Zero(s.Len())
 
 	_, ok = s.Pop()
-	require.False(t, ok)
+	require.False(ok)
 }
 
 func TestSetMarshalJSON(t *testing.T) {
@@ -144,8 +145,7 @@ func TestSetUnmarshalJSON(t *testing.T) {
 	require := require.New(t)
 	set := Set[int]{}
 	{
-		err := set.UnmarshalJSON([]byte("[]"))
-		require.NoError(err)
+		require.NoError(set.UnmarshalJSON([]byte("[]")))
 		require.Empty(set)
 	}
 	id1, id2 := 1, 2
@@ -154,29 +154,25 @@ func TestSetUnmarshalJSON(t *testing.T) {
 	id2JSON, err := json.Marshal(id2)
 	require.NoError(err)
 	{
-		err := set.UnmarshalJSON([]byte(fmt.Sprintf("[%s]", string(id1JSON))))
-		require.NoError(err)
+		require.NoError(set.UnmarshalJSON([]byte(fmt.Sprintf("[%s]", string(id1JSON)))))
 		require.Len(set, 1)
 		require.Contains(set, id1)
 	}
 	{
-		err := set.UnmarshalJSON([]byte(fmt.Sprintf("[%s,%s]", string(id1JSON), string(id2JSON))))
-		require.NoError(err)
+		require.NoError(set.UnmarshalJSON([]byte(fmt.Sprintf("[%s,%s]", string(id1JSON), string(id2JSON)))))
 		require.Len(set, 2)
 		require.Contains(set, id1)
 		require.Contains(set, id2)
 	}
 	{
-		err := set.UnmarshalJSON([]byte(fmt.Sprintf("[%d,%d,%d]", 3, 4, 5)))
-		require.NoError(err)
+		require.NoError(set.UnmarshalJSON([]byte(fmt.Sprintf("[%d,%d,%d]", 3, 4, 5))))
 		require.Len(set, 3)
 		require.Contains(set, 3)
 		require.Contains(set, 4)
 		require.Contains(set, 5)
 	}
 	{
-		err := set.UnmarshalJSON([]byte(fmt.Sprintf("[%d,%d,%d, %d]", 3, 4, 5, 3)))
-		require.NoError(err)
+		require.NoError(set.UnmarshalJSON([]byte(fmt.Sprintf("[%d,%d,%d, %d]", 3, 4, 5, 3))))
 		require.Len(set, 3)
 		require.Contains(set, 3)
 		require.Contains(set, 4)
@@ -185,10 +181,8 @@ func TestSetUnmarshalJSON(t *testing.T) {
 	{
 		set1 := Set[int]{}
 		set2 := Set[int]{}
-		err := set1.UnmarshalJSON([]byte(fmt.Sprintf("[%s,%s]", string(id1JSON), string(id2JSON))))
-		require.NoError(err)
-		err = set2.UnmarshalJSON([]byte(fmt.Sprintf("[%s,%s]", string(id2JSON), string(id1JSON))))
-		require.NoError(err)
+		require.NoError(set1.UnmarshalJSON([]byte(fmt.Sprintf("[%s,%s]", string(id1JSON), string(id2JSON)))))
+		require.NoError(set2.UnmarshalJSON([]byte(fmt.Sprintf("[%s,%s]", string(id2JSON), string(id1JSON)))))
 		require.Equal(set1, set2)
 	}
 }

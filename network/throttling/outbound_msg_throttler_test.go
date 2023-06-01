@@ -55,39 +55,39 @@ func TestSybilOutboundMsgThrottler(t *testing.T) {
 	msg := testMsgWithSize(ctrl, 1)
 	acquired := throttlerIntf.Acquire(msg, vdr1ID)
 	require.True(acquired)
-	require.EqualValues(config.AtLargeAllocSize-1, throttler.remainingAtLargeBytes)
-	require.EqualValues(config.VdrAllocSize, throttler.remainingVdrBytes)
-	require.Len(throttler.nodeToVdrBytesUsed, 0)
+	require.Equal(config.AtLargeAllocSize-1, throttler.remainingAtLargeBytes)
+	require.Equal(config.VdrAllocSize, throttler.remainingVdrBytes)
+	require.Empty(throttler.nodeToVdrBytesUsed)
 	require.Len(throttler.nodeToAtLargeBytesUsed, 1)
-	require.EqualValues(1, throttler.nodeToAtLargeBytesUsed[vdr1ID])
+	require.Equal(uint64(1), throttler.nodeToAtLargeBytesUsed[vdr1ID])
 
 	// Release the bytes
 	throttlerIntf.Release(msg, vdr1ID)
-	require.EqualValues(config.AtLargeAllocSize, throttler.remainingAtLargeBytes)
-	require.EqualValues(config.VdrAllocSize, throttler.remainingVdrBytes)
-	require.Len(throttler.nodeToVdrBytesUsed, 0)
-	require.Len(throttler.nodeToAtLargeBytesUsed, 0)
+	require.Equal(config.AtLargeAllocSize, throttler.remainingAtLargeBytes)
+	require.Equal(config.VdrAllocSize, throttler.remainingVdrBytes)
+	require.Empty(throttler.nodeToVdrBytesUsed)
+	require.Empty(throttler.nodeToAtLargeBytesUsed)
 
 	// Use all the at-large allocation bytes and 1 of the validator allocation bytes
 	msg = testMsgWithSize(ctrl, config.AtLargeAllocSize+1)
 	acquired = throttlerIntf.Acquire(msg, vdr1ID)
 	require.True(acquired)
 	// vdr1 at-large bytes used: 1024. Validator bytes used: 1
-	require.EqualValues(0, throttler.remainingAtLargeBytes)
-	require.EqualValues(config.VdrAllocSize-1, throttler.remainingVdrBytes)
-	require.EqualValues(throttler.nodeToVdrBytesUsed[vdr1ID], 1)
+	require.Zero(throttler.remainingAtLargeBytes)
+	require.Equal(throttler.remainingVdrBytes, config.VdrAllocSize-1)
+	require.Equal(uint64(1), throttler.nodeToVdrBytesUsed[vdr1ID])
 	require.Len(throttler.nodeToVdrBytesUsed, 1)
 	require.Len(throttler.nodeToAtLargeBytesUsed, 1)
-	require.EqualValues(config.AtLargeAllocSize, throttler.nodeToAtLargeBytesUsed[vdr1ID])
+	require.Equal(config.AtLargeAllocSize, throttler.nodeToAtLargeBytesUsed[vdr1ID])
 
 	// The other validator should be able to acquire half the validator allocation.
 	msg = testMsgWithSize(ctrl, config.AtLargeAllocSize/2)
 	acquired = throttlerIntf.Acquire(msg, vdr2ID)
 	require.True(acquired)
 	// vdr2 at-large bytes used: 0. Validator bytes used: 512
-	require.EqualValues(config.VdrAllocSize/2-1, throttler.remainingVdrBytes)
-	require.EqualValues(throttler.nodeToVdrBytesUsed[vdr1ID], 1)
-	require.EqualValues(throttler.nodeToVdrBytesUsed[vdr2ID], config.VdrAllocSize/2)
+	require.Equal(throttler.remainingVdrBytes, config.VdrAllocSize/2-1)
+	require.Equal(uint64(1), throttler.nodeToVdrBytesUsed[vdr1ID], 1)
+	require.Equal(config.VdrAllocSize/2, throttler.nodeToVdrBytesUsed[vdr2ID])
 	require.Len(throttler.nodeToVdrBytesUsed, 2)
 	require.Len(throttler.nodeToAtLargeBytesUsed, 1)
 
@@ -96,9 +96,9 @@ func TestSybilOutboundMsgThrottler(t *testing.T) {
 	acquired = throttlerIntf.Acquire(msg, vdr1ID)
 	require.True(acquired)
 	// vdr1 at-large bytes used: 1024. Validator bytes used: 512
-	require.EqualValues(throttler.nodeToVdrBytesUsed[vdr1ID], config.VdrAllocSize/2)
+	require.Equal(throttler.nodeToVdrBytesUsed[vdr1ID], config.VdrAllocSize/2)
 	require.Len(throttler.nodeToAtLargeBytesUsed, 1)
-	require.EqualValues(config.AtLargeAllocSize, throttler.nodeToAtLargeBytesUsed[vdr1ID])
+	require.Equal(config.AtLargeAllocSize, throttler.nodeToAtLargeBytesUsed[vdr1ID])
 
 	// Trying to take more bytes for either node should fail
 	msg = testMsgWithSize(ctrl, 1)
@@ -117,11 +117,11 @@ func TestSybilOutboundMsgThrottler(t *testing.T) {
 	msg = testMsgWithSize(ctrl, config.AtLargeAllocSize+1)
 	throttlerIntf.Release(msg, vdr1ID)
 
-	require.EqualValues(config.NodeMaxAtLargeBytes/2, throttler.remainingVdrBytes)
+	require.Equal(config.NodeMaxAtLargeBytes/2, throttler.remainingVdrBytes)
 	require.Len(throttler.nodeToAtLargeBytesUsed, 1) // vdr1
-	require.EqualValues(config.AtLargeAllocSize/2-1, throttler.nodeToAtLargeBytesUsed[vdr1ID])
+	require.Equal(config.AtLargeAllocSize/2-1, throttler.nodeToAtLargeBytesUsed[vdr1ID])
 	require.Len(throttler.nodeToVdrBytesUsed, 1)
-	require.EqualValues(config.AtLargeAllocSize/2+1, throttler.remainingAtLargeBytes)
+	require.Equal(config.AtLargeAllocSize/2+1, throttler.remainingAtLargeBytes)
 
 	// Non-validator should be able to take the rest of the at-large bytes
 	// nonVdrID at-large bytes used: 513
@@ -129,8 +129,8 @@ func TestSybilOutboundMsgThrottler(t *testing.T) {
 	msg = testMsgWithSize(ctrl, config.AtLargeAllocSize/2+1)
 	acquired = throttlerIntf.Acquire(msg, nonVdrID)
 	require.True(acquired)
-	require.EqualValues(0, throttler.remainingAtLargeBytes)
-	require.EqualValues(config.AtLargeAllocSize/2+1, throttler.nodeToAtLargeBytesUsed[nonVdrID])
+	require.Zero(throttler.remainingAtLargeBytes)
+	require.Equal(config.AtLargeAllocSize/2+1, throttler.nodeToAtLargeBytesUsed[nonVdrID])
 
 	// Non-validator shouldn't be able to acquire more since at-large allocation empty
 	msg = testMsgWithSize(ctrl, 1)
@@ -140,27 +140,27 @@ func TestSybilOutboundMsgThrottler(t *testing.T) {
 	// Release all of vdr2's messages
 	msg = testMsgWithSize(ctrl, config.AtLargeAllocSize/2)
 	throttlerIntf.Release(msg, vdr2ID)
-	require.EqualValues(0, throttler.nodeToAtLargeBytesUsed[vdr2ID])
-	require.EqualValues(config.VdrAllocSize, throttler.remainingVdrBytes)
-	require.Len(throttler.nodeToVdrBytesUsed, 0)
-	require.EqualValues(0, throttler.remainingAtLargeBytes)
+	require.Zero(throttler.nodeToAtLargeBytesUsed[vdr2ID])
+	require.Equal(config.VdrAllocSize, throttler.remainingVdrBytes)
+	require.Empty(throttler.nodeToVdrBytesUsed)
+	require.Zero(throttler.remainingAtLargeBytes)
 
 	// Release all of vdr1's messages
 	msg = testMsgWithSize(ctrl, config.VdrAllocSize/2-1)
 	throttlerIntf.Release(msg, vdr1ID)
-	require.Len(throttler.nodeToVdrBytesUsed, 0)
-	require.EqualValues(config.VdrAllocSize, throttler.remainingVdrBytes)
-	require.EqualValues(config.AtLargeAllocSize/2-1, throttler.remainingAtLargeBytes)
-	require.EqualValues(0, throttler.nodeToAtLargeBytesUsed[vdr1ID])
+	require.Empty(throttler.nodeToVdrBytesUsed)
+	require.Equal(config.VdrAllocSize, throttler.remainingVdrBytes)
+	require.Equal(config.AtLargeAllocSize/2-1, throttler.remainingAtLargeBytes)
+	require.Zero(throttler.nodeToAtLargeBytesUsed[vdr1ID])
 
 	// Release nonVdr's messages
 	msg = testMsgWithSize(ctrl, config.AtLargeAllocSize/2+1)
 	throttlerIntf.Release(msg, nonVdrID)
-	require.Len(throttler.nodeToVdrBytesUsed, 0)
-	require.EqualValues(config.VdrAllocSize, throttler.remainingVdrBytes)
-	require.EqualValues(config.AtLargeAllocSize, throttler.remainingAtLargeBytes)
-	require.Len(throttler.nodeToAtLargeBytesUsed, 0)
-	require.EqualValues(0, throttler.nodeToAtLargeBytesUsed[nonVdrID])
+	require.Empty(throttler.nodeToVdrBytesUsed)
+	require.Equal(config.VdrAllocSize, throttler.remainingVdrBytes)
+	require.Equal(config.AtLargeAllocSize, throttler.remainingAtLargeBytes)
+	require.Empty(throttler.nodeToAtLargeBytesUsed)
+	require.Zero(throttler.nodeToAtLargeBytesUsed[nonVdrID])
 }
 
 // Ensure that the limit on taking from the at-large allocation is enforced
@@ -205,11 +205,11 @@ func TestSybilOutboundMsgThrottlerMaxNonVdr(t *testing.T) {
 	// Validator should only be able to take [MaxAtLargeBytes]
 	msg = testMsgWithSize(ctrl, config.NodeMaxAtLargeBytes+1)
 	throttlerIntf.Acquire(msg, vdr1ID)
-	require.EqualValues(config.NodeMaxAtLargeBytes, throttler.nodeToAtLargeBytesUsed[vdr1ID])
-	require.EqualValues(1, throttler.nodeToVdrBytesUsed[vdr1ID])
-	require.EqualValues(config.NodeMaxAtLargeBytes, throttler.nodeToAtLargeBytesUsed[nonVdrNodeID1])
-	require.EqualValues(config.NodeMaxAtLargeBytes, throttler.nodeToAtLargeBytesUsed[nonVdrNodeID2])
-	require.EqualValues(config.AtLargeAllocSize-config.NodeMaxAtLargeBytes*3, throttler.remainingAtLargeBytes)
+	require.Equal(config.NodeMaxAtLargeBytes, throttler.nodeToAtLargeBytesUsed[vdr1ID])
+	require.Equal(uint64(1), throttler.nodeToVdrBytesUsed[vdr1ID])
+	require.Equal(config.NodeMaxAtLargeBytes, throttler.nodeToAtLargeBytesUsed[nonVdrNodeID1])
+	require.Equal(config.NodeMaxAtLargeBytes, throttler.nodeToAtLargeBytesUsed[nonVdrNodeID2])
+	require.Equal(config.AtLargeAllocSize-config.NodeMaxAtLargeBytes*3, throttler.remainingAtLargeBytes)
 }
 
 // Ensure that the throttler honors requested bypasses
@@ -262,10 +262,10 @@ func TestBypassThrottling(t *testing.T) {
 	msg.EXPECT().Op().Return(message.AppGossipOp).AnyTimes()
 	msg.EXPECT().Bytes().Return(make([]byte, config.NodeMaxAtLargeBytes+1)).AnyTimes()
 	throttlerIntf.Acquire(msg, vdr1ID)
-	require.EqualValues(0, throttler.nodeToAtLargeBytesUsed[vdr1ID])
-	require.EqualValues(0, throttler.nodeToVdrBytesUsed[vdr1ID])
-	require.EqualValues(1, throttler.nodeToAtLargeBytesUsed[nonVdrNodeID1])
-	require.EqualValues(config.AtLargeAllocSize-1, throttler.remainingAtLargeBytes)
+	require.Zero(throttler.nodeToAtLargeBytesUsed[vdr1ID])
+	require.Zero(throttler.nodeToVdrBytesUsed[vdr1ID])
+	require.Equal(uint64(1), throttler.nodeToAtLargeBytesUsed[nonVdrNodeID1])
+	require.Equal(config.AtLargeAllocSize-1, throttler.remainingAtLargeBytes)
 }
 
 func testMsgWithSize(ctrl *gomock.Controller, size uint64) message.OutboundMessage {

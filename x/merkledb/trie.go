@@ -13,7 +13,21 @@ import (
 
 var errNoNewRoot = errors.New("there was no updated root in change list")
 
+type MerkleRootGetter interface {
+	// GetMerkleRoot returns the merkle root of the Trie
+	GetMerkleRoot(ctx context.Context) (ids.ID, error)
+}
+
+type ProofGetter interface {
+	// GetProof generates a proof of the value associated with a particular key,
+	// or a proof of its absence from the trie
+	GetProof(ctx context.Context, bytesPath []byte) (*Proof, error)
+}
+
 type ReadOnlyTrie interface {
+	MerkleRootGetter
+	ProofGetter
+
 	// GetValue gets the value associated with the specified key
 	// database.ErrNotFound if the key is not present
 	GetValue(ctx context.Context, key []byte) ([]byte, error)
@@ -26,14 +40,8 @@ type ReadOnlyTrie interface {
 	// database.ErrNotFound if the key is not present
 	getValue(key path, lock bool) ([]byte, error)
 
-	// GetMerkleRoot returns the merkle root of the Trie
-	GetMerkleRoot(ctx context.Context) (ids.ID, error)
-
 	// get an editable copy of the node with the given key path
 	getEditableNode(key path) (*node, error)
-
-	// GetProof generates a proof of the value associated with a particular key, or a proof of its absence from the trie
-	GetProof(ctx context.Context, bytesPath []byte) (*Proof, error)
 
 	// GetRangeProof generates a proof of up to maxLength smallest key/values with keys between start and end
 	GetRangeProof(ctx context.Context, start, end []byte, maxLength int) (*RangeProof, error)
