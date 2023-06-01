@@ -15,28 +15,32 @@ import (
 
 func TestRejectMiddleware(t *testing.T) {
 	type test struct {
-		name            string
-		handlerFunc     func(*require.Assertions) http.Handler
-		contextFunc     func() *snow.ConsensusContext
-		expectedErrCode int
+		name               string
+		handlerFunc        func(*require.Assertions) http.Handler
+		state              snow.State
+		expectedStatusCode int
 	}
 
 	tests := []test{
 		{
-			name: "chain is bootstrapping",
+			name: "chain is state syncing",
 			handlerFunc: func(require *require.Assertions) http.Handler {
-				return http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+				return http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 					require.Fail("shouldn't have called handler")
 				})
 			},
-			contextFunc: func() *snow.ConsensusContext {
-				ctx := &snow.ConsensusContext{}
-				ctx.State.Set(snow.EngineState{
-					State: snow.Bootstrapping,
+			state:              snow.StateSyncing,
+			expectedStatusCode: http.StatusServiceUnavailable,
+		},
+		{
+			name: "chain is bootstrapping",
+			handlerFunc: func(require *require.Assertions) http.Handler {
+				return http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+					require.Fail("shouldn't have called handler")
 				})
-				return ctx
 			},
-			expectedErrCode: http.StatusServiceUnavailable,
+			state:              snow.Bootstrapping,
+			expectedStatusCode: http.StatusServiceUnavailable,
 		},
 		{
 			name: "chain is done bootstrapping",
@@ -45,14 +49,8 @@ func TestRejectMiddleware(t *testing.T) {
 					w.WriteHeader(http.StatusTeapot)
 				})
 			},
-			contextFunc: func() *snow.ConsensusContext {
-				ctx := &snow.ConsensusContext{}
-				ctx.State.Set(snow.EngineState{
-					State: snow.NormalOp,
-				})
-				return ctx
-			},
-			expectedErrCode: http.StatusTeapot,
+			state:              snow.NormalOp,
+			expectedStatusCode: http.StatusTeapot,
 		},
 	}
 
@@ -60,10 +58,15 @@ func TestRejectMiddleware(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			middleware := rejectMiddleware(tt.handlerFunc(require), tt.contextFunc())
+			ctx := &snow.ConsensusContext{}
+			ctx.State.Set(snow.EngineState{
+				State: tt.state,
+			})
+
+			middleware := rejectMiddleware(tt.handlerFunc(require), ctx)
 			w := httptest.NewRecorder()
 			middleware.ServeHTTP(w, nil)
-			require.Equal(tt.expectedErrCode, w.Code)
+			require.Equal(tt.expectedStatusCode, w.Code)
 		})
 	}
 }
