@@ -4,29 +4,36 @@
 package ips
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestIPPortEqual(t *testing.T) {
 	tests := []struct {
+		ipPort  string
 		ipPort1 IPPort
 		ipPort2 IPPort
 		result  bool
 	}{
 		// Expected equal
 		{
+			`"127.0.0.1:0"`,
 			IPPort{net.ParseIP("127.0.0.1"), 0},
 			IPPort{net.ParseIP("127.0.0.1"), 0},
 			true,
 		},
 		{
+			`"[::1]:0"`,
 			IPPort{net.ParseIP("::1"), 0},
 			IPPort{net.ParseIP("::1"), 0},
 			true,
 		},
 		{
+			`"127.0.0.1:0"`,
 			IPPort{net.ParseIP("127.0.0.1"), 0},
 			IPPort{net.ParseIP("::ffff:127.0.0.1"), 0},
 			true,
@@ -34,16 +41,19 @@ func TestIPPortEqual(t *testing.T) {
 
 		// Expected unequal
 		{
+			`"127.0.0.1:0"`,
 			IPPort{net.ParseIP("127.0.0.1"), 0},
 			IPPort{net.ParseIP("1.2.3.4"), 0},
 			false,
 		},
 		{
+			`"[::1]:0"`,
 			IPPort{net.ParseIP("::1"), 0},
 			IPPort{net.ParseIP("2001::1"), 0},
 			false,
 		},
 		{
+			`"127.0.0.1:0"`,
 			IPPort{net.ParseIP("127.0.0.1"), 0},
 			IPPort{net.ParseIP("127.0.0.1"), 1},
 			false,
@@ -51,18 +61,17 @@ func TestIPPortEqual(t *testing.T) {
 	}
 	for i, tt := range tests {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-			if tt.ipPort1.IP == nil {
-				t.Error("ipPort1 nil")
-			} else if tt.ipPort2.IP == nil {
-				t.Error("ipPort2 nil")
-			}
-			result := tt.ipPort1.Equal(tt.ipPort2)
-			if result && result != tt.result {
-				t.Error("Expected IPPort to be equal, but they were not")
-			}
-			if !result && result != tt.result {
-				t.Error("Expected IPPort to be unequal, but they were equal")
-			}
+			require := require.New(t)
+
+			ipPort := IPDesc{}
+			require.NoError(ipPort.UnmarshalJSON([]byte(tt.ipPort)))
+			require.Equal(tt.ipPort1, IPPort(ipPort))
+
+			ipPortJSON, err := json.Marshal(ipPort)
+			require.NoError(err)
+			require.Equal(tt.ipPort, string(ipPortJSON))
+
+			require.Equal(tt.result, tt.ipPort1.Equal(tt.ipPort2))
 		})
 	}
 }

@@ -26,8 +26,7 @@ func TestBlockchainStatusJSON(t *testing.T) {
 		require.NoError(err)
 
 		var parsedStatus BlockchainStatus
-		err = json.Unmarshal(statusJSON, &parsedStatus)
-		require.NoError(err)
+		require.NoError(json.Unmarshal(statusJSON, &parsedStatus))
 		require.Equal(status, parsedStatus)
 	}
 
@@ -39,8 +38,7 @@ func TestBlockchainStatusJSON(t *testing.T) {
 
 	{
 		status := Validating
-		err := json.Unmarshal([]byte("null"), &status)
-		require.NoError(err)
+		require.NoError(json.Unmarshal([]byte("null"), &status))
 		require.Equal(Validating, status)
 	}
 

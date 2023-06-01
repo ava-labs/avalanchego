@@ -16,7 +16,7 @@ func Test_SyncWorkHeap_Heap_Methods(t *testing.T) {
 	require := require.New(t)
 
 	h := newSyncWorkHeap()
-	require.Equal(0, h.Len())
+	require.Zero(h.Len())
 
 	item1 := &heapItem{
 		workItem: &syncWorkItem{
@@ -30,16 +30,16 @@ func Test_SyncWorkHeap_Heap_Methods(t *testing.T) {
 	require.Equal(1, h.Len())
 	require.Len(h.priorityHeap, 1)
 	require.Equal(item1, h.priorityHeap[0])
-	require.Equal(0, h.priorityHeap[0].heapIndex)
+	require.Zero(h.priorityHeap[0].heapIndex)
 	require.Equal(1, h.sortedItems.Len())
 	gotItem, ok := h.sortedItems.Get(item1)
 	require.True(ok)
 	require.Equal(item1, gotItem)
 
 	h.Pop()
-	require.Equal(0, h.Len())
-	require.Len(h.priorityHeap, 0)
-	require.Equal(0, h.sortedItems.Len())
+	require.Zero(h.Len())
+	require.Empty(h.priorityHeap)
+	require.Zero(h.sortedItems.Len())
 
 	item2 := &heapItem{
 		workItem: &syncWorkItem{
@@ -55,7 +55,7 @@ func Test_SyncWorkHeap_Heap_Methods(t *testing.T) {
 	require.Len(h.priorityHeap, 2)
 	require.Equal(item1, h.priorityHeap[0])
 	require.Equal(item2, h.priorityHeap[1])
-	require.Equal(0, item1.heapIndex)
+	require.Zero(item1.heapIndex)
 	require.Equal(1, item2.heapIndex)
 	require.Equal(2, h.sortedItems.Len())
 	gotItem, ok = h.sortedItems.Get(item1)
@@ -71,7 +71,7 @@ func Test_SyncWorkHeap_Heap_Methods(t *testing.T) {
 	require.Equal(item2, h.priorityHeap[0])
 	require.Equal(item1, h.priorityHeap[1])
 	require.Equal(1, item1.heapIndex)
-	require.Equal(0, item2.heapIndex)
+	require.Zero(item2.heapIndex)
 
 	require.False(h.Less(0, 1))
 
@@ -84,9 +84,9 @@ func Test_SyncWorkHeap_Heap_Methods(t *testing.T) {
 	gotItem = h.Pop().(*heapItem)
 	require.Equal(item2, gotItem)
 
-	require.Equal(0, h.Len())
-	require.Len(h.priorityHeap, 0)
-	require.Equal(0, h.sortedItems.Len())
+	require.Zero(h.Len())
+	require.Empty(h.priorityHeap)
+	require.Zero(h.sortedItems.Len())
 }
 
 // Tests Insert and GetWork
@@ -137,7 +137,7 @@ func Test_SyncWorkHeap_Insert_GetWork(t *testing.T) {
 	gotItem = h.GetWork()
 	require.Nil(gotItem)
 
-	require.Equal(0, h.Len())
+	require.Zero(h.Len())
 }
 
 func Test_SyncWorkHeap_remove(t *testing.T) {
@@ -157,9 +157,9 @@ func Test_SyncWorkHeap_remove(t *testing.T) {
 	heapItem1 := h.priorityHeap[0]
 	h.remove(heapItem1)
 
-	require.Equal(0, h.Len())
-	require.Len(h.priorityHeap, 0)
-	require.Equal(0, h.sortedItems.Len())
+	require.Zero(h.Len())
+	require.Empty(h.priorityHeap)
+	require.Zero(h.sortedItems.Len())
 
 	item2 := &syncWorkItem{
 		start:       []byte{2},
@@ -177,15 +177,15 @@ func Test_SyncWorkHeap_remove(t *testing.T) {
 	require.Equal(1, h.Len())
 	require.Len(h.priorityHeap, 1)
 	require.Equal(1, h.sortedItems.Len())
-	require.Equal(0, h.priorityHeap[0].heapIndex)
+	require.Zero(h.priorityHeap[0].heapIndex)
 	require.Equal(item1, h.priorityHeap[0].workItem)
 
 	heapItem1 = h.priorityHeap[0]
 	require.Equal(item1, heapItem1.workItem)
 	h.remove(heapItem1)
-	require.Equal(0, h.Len())
-	require.Len(h.priorityHeap, 0)
-	require.Equal(0, h.sortedItems.Len())
+	require.Zero(h.Len())
+	require.Empty(h.priorityHeap)
+	require.Zero(h.sortedItems.Len())
 }
 
 func Test_SyncWorkHeap_Merge_Insert(t *testing.T) {

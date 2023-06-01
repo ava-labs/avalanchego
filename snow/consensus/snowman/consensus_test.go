@@ -626,8 +626,8 @@ func RecordPollSplitVoteNoChangeTest(t *testing.T, factory Factory) {
 	require.False(sm.Finalized())
 
 	metrics := gatherCounterGauge(t, registerer)
-	require.EqualValues(0, metrics["polls_failed"])
-	require.EqualValues(1, metrics["polls_successful"])
+	require.Zero(metrics["polls_failed"])
+	require.Equal(float64(1), metrics["polls_successful"])
 
 	// The second poll will do nothing
 	require.NoError(sm.RecordPoll(context.Background(), votes))
@@ -635,8 +635,8 @@ func RecordPollSplitVoteNoChangeTest(t *testing.T, factory Factory) {
 	require.False(sm.Finalized())
 
 	metrics = gatherCounterGauge(t, registerer)
-	require.EqualValues(1, metrics["polls_failed"])
-	require.EqualValues(1, metrics["polls_successful"])
+	require.Equal(float64(1), metrics["polls_failed"])
+	require.Equal(float64(1), metrics["polls_successful"])
 }
 
 func RecordPollWhenFinalizedTest(t *testing.T, factory Factory) {
@@ -1080,8 +1080,7 @@ func RecordPollDivergedVotingTest(t *testing.T, factory Factory) {
 		MaxOutstandingItems:   1,
 		MaxItemProcessingTime: 1,
 	}
-	err := sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp)
-	require.NoError(err)
+	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
 
 	block0 := &TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -1116,31 +1115,26 @@ func RecordPollDivergedVotingTest(t *testing.T, factory Factory) {
 		HeightV: block2.HeightV + 1,
 	}
 
-	err = sm.Add(context.Background(), block0)
-	require.NoError(err)
+	require.NoError(sm.Add(context.Background(), block0))
 
-	err = sm.Add(context.Background(), block1)
-	require.NoError(err)
+	require.NoError(sm.Add(context.Background(), block1))
 
 	// The first bit is contested as either 0 or 1. When voting for [block0] and
 	// when the first bit is 1, the following bits have been decided to follow
 	// the 255 remaining bits of [block0].
 	votes0 := bag.Bag[ids.ID]{}
 	votes0.Add(block0.ID())
-	err = sm.RecordPoll(context.Background(), votes0)
-	require.NoError(err)
+	require.NoError(sm.RecordPoll(context.Background(), votes0))
 
 	// Although we are adding in [block2] here - the underlying snowball
 	// instance has already decided it is rejected. Snowman doesn't actually
 	// know that though, because that is an implementation detail of the
 	// Snowball trie that is used.
-	err = sm.Add(context.Background(), block2)
-	require.NoError(err)
+	require.NoError(sm.Add(context.Background(), block2))
 
 	// Because [block2] is effectively rejected, [block3] is also effectively
 	// rejected.
-	err = sm.Add(context.Background(), block3)
-	require.NoError(err)
+	require.NoError(sm.Add(context.Background(), block3))
 
 	require.Equal(block0.ID(), sm.Preference())
 	require.Equal(choices.Processing, block0.Status(), "should not be accepted yet")
@@ -1166,8 +1160,7 @@ func RecordPollDivergedVotingTest(t *testing.T, factory Factory) {
 	// transitively.
 	votes3 := bag.Bag[ids.ID]{}
 	votes3.Add(block3.ID())
-	err = sm.RecordPoll(context.Background(), votes3)
-	require.NoError(err)
+	require.NoError(sm.RecordPoll(context.Background(), votes3))
 
 	require.True(sm.Finalized(), "finalized too late")
 	require.Equal(choices.Accepted, block0.Status(), "should be accepted")
@@ -1751,7 +1744,8 @@ func ErrorOnAddDecidedBlock(t *testing.T, factory Factory) {
 		ParentV: Genesis.IDV,
 		HeightV: Genesis.HeightV + 1,
 	}
-	require.ErrorIs(sm.Add(context.Background(), block0), errDuplicateAdd)
+	err := sm.Add(context.Background(), block0)
+	require.ErrorIs(err, errDuplicateAdd)
 }
 
 func ErrorOnAddDuplicateBlockID(t *testing.T, factory Factory) {
@@ -1789,7 +1783,8 @@ func ErrorOnAddDuplicateBlockID(t *testing.T, factory Factory) {
 	}
 
 	require.NoError(sm.Add(context.Background(), block0))
-	require.ErrorIs(sm.Add(context.Background(), block1), errDuplicateAdd)
+	err := sm.Add(context.Background(), block1)
+	require.ErrorIs(err, errDuplicateAdd)
 }
 
 func gatherCounterGauge(t *testing.T, reg *prometheus.Registry) map[string]float64 {

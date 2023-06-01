@@ -27,13 +27,12 @@ func TestPeers(t *testing.T) {
 	require.Zero(p.ConnectedWeight())
 	require.Empty(p.PreferredPeers())
 
-	err := p.Connected(context.Background(), nodeID, version.CurrentApp)
-	require.NoError(err)
-	require.EqualValues(5, p.ConnectedWeight())
+	require.NoError(p.Connected(context.Background(), nodeID, version.CurrentApp))
+	require.Equal(uint64(5), p.ConnectedWeight())
 	require.Contains(p.PreferredPeers(), nodeID)
 
 	p.OnValidatorWeightChanged(nodeID, 5, 10)
-	require.EqualValues(10, p.ConnectedWeight())
+	require.Equal(uint64(10), p.ConnectedWeight())
 	require.Contains(p.PreferredPeers(), nodeID)
 
 	p.OnValidatorRemoved(nodeID, 10)
@@ -41,11 +40,10 @@ func TestPeers(t *testing.T) {
 	require.Contains(p.PreferredPeers(), nodeID)
 
 	p.OnValidatorAdded(nodeID, nil, ids.Empty, 5)
-	require.EqualValues(5, p.ConnectedWeight())
+	require.Equal(uint64(5), p.ConnectedWeight())
 	require.Contains(p.PreferredPeers(), nodeID)
 
-	err = p.Disconnected(context.Background(), nodeID)
-	require.NoError(err)
+	require.NoError(p.Disconnected(context.Background(), nodeID))
 	require.Zero(p.ConnectedWeight())
 	require.Empty(p.PreferredPeers())
 }
