@@ -315,7 +315,7 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	// TODO: Replace this temporary flag description after the X-chain
 	// linearization with "Beta value to use for virtuous transactions"
 	fs.Int(SnowVirtuousCommitThresholdKey, snowball.DefaultParameters.BetaVirtuous, "This flag is temporarily ignored due to the X-chain linearization")
-	fs.Int(SnowRogueCommitThresholdKey, snowball.DefaultParameters.BetaVirtuous, "Beta value to use for rogue transactions")
+	fs.Int(SnowRogueCommitThresholdKey, snowball.DefaultParameters.BetaRogue, "Beta value to use for rogue transactions")
 	fs.Int(SnowConcurrentRepollsKey, snowball.DefaultParameters.ConcurrentRepolls, "Minimum number of concurrent polls for finalizing consensus")
 	fs.Int(SnowOptimalProcessingKey, snowball.DefaultParameters.OptimalProcessing, "Optimal number of processing containers in consensus")
 	fs.Int(SnowMaxProcessingKey, snowball.DefaultParameters.MaxOutstandingItems, "Maximum number of processing items to be considered healthy")

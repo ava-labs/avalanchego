@@ -28,7 +28,7 @@ type Peers interface {
 
 	// ConnectedWeight returns the currently connected stake weight
 	ConnectedWeight() uint64
-	// ConnectedValidators returns the currently connected stake percentage [0, 1]
+	// ConnectedPercent returns the currently connected stake percentage [0, 1]
 	ConnectedPercent() float64
 	// PreferredPeers returns the currently connected validators. If there are
 	// no currently connected validators then it will return the currently

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -248,14 +247,8 @@ func TestParametersMinPercentConnectedHealthy(t *testing.T) {
 		{
 			name: "custom",
 			params: Parameters{
-				K:                     60,
-				Alpha:                 15,
-				BetaVirtuous:          20,
-				BetaRogue:             20,
-				ConcurrentRepolls:     4,
-				OptimalProcessing:     10,
-				MaxOutstandingItems:   256,
-				MaxItemProcessingTime: 30 * time.Second,
+				K:     60,
+				Alpha: 15,
 			},
 			expectedMinPercentConnected: 0.4,
 		},

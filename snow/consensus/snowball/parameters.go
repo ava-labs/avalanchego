@@ -38,7 +38,7 @@ var (
 	DefaultParameters = Parameters{
 		K:                     20,
 		Alpha:                 15,
-		BetaVirtuous:          20,
+		BetaVirtuous:          15,
 		BetaRogue:             20,
 		ConcurrentRepolls:     4,
 		OptimalProcessing:     10,

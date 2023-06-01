@@ -735,8 +735,6 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 
 	// Connection messages can be sent to the currently executing engine
 	case *message.Connected:
-		// We can track peers connected to this chain handler or we can
-		// try to get this information from the P-chain.
 		err := h.peerTracker.Connected(ctx, nodeID, msg.NodeVersion)
 		if err != nil {
 			return err
