@@ -1317,28 +1317,6 @@ func TestProofNodeProtoMarshalUnmarshal(t *testing.T) {
 	}
 }
 
-func TestRangeProofUnmarshalProtoNil(t *testing.T) {
-	require := require.New(t)
-
-	var proof RangeProof
-	err := proof.UnmarshalProto(nil)
-	require.ErrorIs(err, ErrNilRangeProof)
-
-	protoProof := &syncpb.RangeProof{
-		Start: nil,
-		End:   &syncpb.Proof{},
-	}
-	err = proof.UnmarshalProto(protoProof)
-	require.ErrorIs(err, ErrNilStartProof)
-
-	protoProof = &syncpb.RangeProof{
-		Start: &syncpb.Proof{},
-		End:   nil,
-	}
-	err = proof.UnmarshalProto(protoProof)
-	require.ErrorIs(err, ErrNilEndProof)
-}
-
 func TestRangeProofProtoMarshalUnmarshal(t *testing.T) {
 	require := require.New(t)
 	rand := rand.New(rand.NewSource(1337)) // #nosec G404
@@ -1512,8 +1490,6 @@ func TestChangeProofUnmarshalProtoNilValue(t *testing.T) {
 
 func TestChangeProofUnmarshalProtoInvalidMaybe(t *testing.T) {
 	protoProof := &syncpb.ChangeProof{
-		StartProof: &syncpb.Proof{},
-		EndProof:   &syncpb.Proof{},
 		KeyChanges: []*syncpb.KeyChange{
 			{
 				Key: []byte{1},
@@ -1528,26 +1504,4 @@ func TestChangeProofUnmarshalProtoInvalidMaybe(t *testing.T) {
 	var proof ChangeProof
 	err := proof.UnmarshalProto(protoProof)
 	require.ErrorIs(t, err, ErrInvalidMaybe)
-}
-
-func TestChangeProofUnmarshalProtoNoStartProof(t *testing.T) {
-	require := require.New(t)
-
-	var proof ChangeProof
-	err := proof.UnmarshalProto(&syncpb.ChangeProof{
-		StartProof: nil,
-		EndProof:   &syncpb.Proof{},
-	})
-	require.ErrorIs(err, ErrNilStartProof)
-}
-
-func TestChangeProofUnmarshalProtoNoEndProof(t *testing.T) {
-	require := require.New(t)
-
-	var proof ChangeProof
-	err := proof.UnmarshalProto(&syncpb.ChangeProof{
-		StartProof: &syncpb.Proof{},
-		EndProof:   nil,
-	})
-	require.ErrorIs(err, ErrNilEndProof)
 }

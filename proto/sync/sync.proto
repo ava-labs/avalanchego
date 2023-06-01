@@ -43,6 +43,12 @@ message GetProofResponse {
   Proof proof = 1;
 }
 
+message Proof {
+  bytes key = 1;
+  MaybeBytes value = 2;
+  repeated ProofNode proof = 3;
+}
+
 message GetChangeProofRequest {
   bytes start_root_hash = 1;
   bytes end_root_hash = 2;
@@ -97,19 +103,15 @@ message CommitRangeProofRequest {
 
 message ChangeProof {
   bool had_roots_in_history = 1; // TODO remove
-  Proof start_proof = 2;
-  Proof end_proof = 3;
+  repeated ProofNode start_proof = 2;
+  repeated ProofNode end_proof = 3;
   repeated KeyChange key_changes = 4;
 }
 
 message RangeProof {
-  Proof start = 1;
-  Proof end = 2;
+  repeated ProofNode start = 1;
+  repeated ProofNode end = 2;
   repeated KeyValue key_values = 3;
-}
-
-message Proof {
-  repeated ProofNode proof = 1;
 }
 
 message ProofNode {
