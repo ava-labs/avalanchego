@@ -33,9 +33,7 @@ func TestInvalidBlock(t *testing.T) {
 	})
 	require.NoError(err)
 
-	blkBytes := []byte{}
-
-	_, err = parser.ParseBlock(blkBytes)
+	_, err = parser.ParseBlock(nil)
 	require.ErrorIs(err, codec.ErrCantUnpackVersion)
 }
 
