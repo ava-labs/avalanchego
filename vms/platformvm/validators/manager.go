@@ -174,7 +174,8 @@ func (m *manager) GetValidatorSet(ctx context.Context, height uint64, subnetID i
 	currentSubnetValidatorList := currentSubnetValidators.List()
 	vdrSet := make(map[ids.NodeID]*validators.GetValidatorOutput, len(currentSubnetValidatorList))
 
-	// Initialize primary network validators.
+	// Initialize subnet validators before applying the weight diffs. Failing to do this
+	// may cause weight rebuild to err.
 	for _, vdr := range currentSubnetValidatorList {
 		vdrSet[vdr.NodeID] = &validators.GetValidatorOutput{
 			NodeID: vdr.NodeID,
