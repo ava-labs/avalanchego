@@ -1007,10 +1007,10 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 		Unsigned: &unsignedCreateAssetTx,
 	}
 	tests := []struct {
-		name      string
-		stateFunc func(*gomock.Controller) states.Chain
-		txFunc    func(*require.Assertions) *txs.Tx
-		err       error
+		name        string
+		stateFunc   func(*gomock.Controller) states.Chain
+		txFunc      func(*require.Assertions) *txs.Tx
+		expectedErr error
 	}{
 		{
 			name: "valid",
@@ -1023,7 +1023,7 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 			txFunc: func(*require.Assertions) *txs.Tx {
 				return importTx
 			},
-			err: nil,
+			expectedErr: nil,
 		},
 		{
 			name: "not allowed input feature extension",
@@ -1041,7 +1041,7 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 			txFunc: func(*require.Assertions) *txs.Tx {
 				return importTx
 			},
-			err: errIncompatibleFx,
+			expectedErr: errIncompatibleFx,
 		},
 		{
 			name: "invalid signature",
@@ -1063,7 +1063,7 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 				))
 				return tx
 			},
-			err: secp256k1fx.ErrWrongSig,
+			expectedErr: secp256k1fx.ErrWrongSig,
 		},
 		{
 			name: "not allowed output feature extension",
@@ -1092,7 +1092,7 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 				))
 				return tx
 			},
-			err: errIncompatibleFx,
+			expectedErr: errIncompatibleFx,
 		},
 		{
 			name: "unknown asset",
@@ -1105,7 +1105,7 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 			txFunc: func(*require.Assertions) *txs.Tx {
 				return importTx
 			},
-			err: database.ErrNotFound,
+			expectedErr: database.ErrNotFound,
 		},
 		{
 			name: "not an asset",
@@ -1121,7 +1121,7 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 			txFunc: func(*require.Assertions) *txs.Tx {
 				return importTx
 			},
-			err: errNotAnAsset,
+			expectedErr: errNotAnAsset,
 		},
 	}
 	for _, test := range tests {
@@ -1138,7 +1138,7 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 				State:   state,
 				Tx:      tx,
 			})
-			require.ErrorIs(err, test.err)
+			require.ErrorIs(err, test.expectedErr)
 		})
 	}
 }
