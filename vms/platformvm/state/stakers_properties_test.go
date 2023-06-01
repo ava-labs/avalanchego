@@ -889,7 +889,7 @@ func buildDiffOnTopOfBaseState(trackedSubnets []ids.ID) (Diff, State, error) {
 }
 
 // verify whether store contains exactly the stakers specify in the list.
-// stakers order does not matter. Also stakers get consumes while checking
+// stakers order does not matter. Also stakers get consumes while checking.
 func checkStakersContent(store Stakers, stakers []Staker, stakersType stakerStatus) error {
 	var (
 		it  StakerIterator
