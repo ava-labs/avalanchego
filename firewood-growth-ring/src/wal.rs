@@ -105,8 +105,14 @@ pub struct WalRingId {
     counter: u32,
 }
 
+impl Default for WalRingId {
+    fn default() -> Self {
+        Self::empty_id()
+    }
+}
+
 impl WalRingId {
-    pub fn empty_id() -> Self {
+    pub const fn empty_id() -> Self {
         WalRingId {
             start: 0,
             end: 0,

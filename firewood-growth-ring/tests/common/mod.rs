@@ -620,44 +620,44 @@ impl PaintingSim {
         .unwrap();
         println!("last = {}/{}, applied = {}", last_idx, ops.len(), napplied);
         canvas.paint_all();
+
         // recover complete
-        let canvas0 = if last_idx > 0 {
-            let canvas0 = canvas.new_reference(&ops[..last_idx]);
-            if canvas.is_same(&canvas0) {
-                None
-            } else {
-                Some(canvas0)
-            }
-        } else {
-            let canvas0 = canvas.new_reference(&[]);
-            if canvas.is_same(&canvas0) {
-                None
-            } else {
-                let i0 = ops.len() - self.m;
-                let mut canvas0 = canvas0.new_reference(&ops[..i0]);
-                let mut res = None;
-                'outer: {
-                    if !canvas.is_same(&canvas0) {
-                        for op in ops.iter().skip(i0) {
-                            canvas0.prepaint(op, &WalRingId::empty_id());
-                            canvas0.paint_all();
-                            if canvas.is_same(&canvas0) {
-                                break 'outer;
-                            }
-                        }
-                    }
-                    res = Some(canvas0);
-                }
-                res
-            }
-        };
-        if let Some(canvas0) = canvas0 {
+        let start_ops = if last_idx > 0 { &ops[..last_idx] } else { &[] };
+        let canvas0 = canvas.new_reference(start_ops);
+
+        if canvas.is_same(&canvas0) {
+            return true;
+        }
+
+        if last_idx > 0 {
             canvas.print(40);
             canvas0.print(40);
-            false
-        } else {
-            true
+
+            return false;
         }
+
+        let (start_ops, end_ops) = ops.split_at(self.m);
+        let mut canvas0 = canvas0.new_reference(start_ops);
+
+        if canvas.is_same(&canvas0) {
+            return true;
+        }
+
+        for op in end_ops {
+            const EMPTY_ID: WalRingId = WalRingId::empty_id();
+
+            canvas0.prepaint(op, &EMPTY_ID);
+            canvas0.paint_all();
+
+            if canvas.is_same(&canvas0) {
+                return true;
+            }
+        }
+
+        canvas.print(40);
+        canvas0.print(40);
+
+        false
     }
 
     pub fn new_canvas(&self) -> Canvas {
