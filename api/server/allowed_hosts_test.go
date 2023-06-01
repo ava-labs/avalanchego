@@ -55,7 +55,7 @@ func TestAllowedHostsHandler_ServeHTTP(t *testing.T) {
 
 			baseHandler := &testHandler{}
 
-			apiAllowedHostsHandler := filterInvalidHosts(
+			httpAllowedHostsHandler := filterInvalidHosts(
 				baseHandler,
 				test.allowed,
 			)
@@ -64,7 +64,7 @@ func TestAllowedHostsHandler_ServeHTTP(t *testing.T) {
 			r := httptest.NewRequest("", "/", nil)
 			r.Host = test.host
 
-			apiAllowedHostsHandler.ServeHTTP(w, r)
+			httpAllowedHostsHandler.ServeHTTP(w, r)
 
 			if test.serve {
 				require.True(baseHandler.called)
