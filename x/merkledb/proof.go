@@ -44,6 +44,8 @@ var (
 	ErrNilRangeProof               = errors.New("range proof is nil")
 	ErrNilStartProof               = errors.New("start proof is nil")
 	ErrNilEndProof                 = errors.New("end proof is nil")
+	ErrNilChangeProof              = errors.New("change proof is nil")
+	ErrNilMaybeBytes               = errors.New("maybe bytes is nil")
 )
 
 type ProofNode struct {
@@ -440,6 +442,100 @@ type ChangeProof struct {
 	// end root (inclusive).
 	// Sorted by increasing key.
 	KeyChanges []KeyChange
+}
+
+func (proof *ChangeProof) ToProto() *syncpb.ChangeProof {
+	startProof := &syncpb.Proof{
+		Proof: make([]*syncpb.ProofNode, len(proof.StartProof)),
+	}
+	for i, node := range proof.StartProof {
+		startProof.Proof[i] = node.ToProto()
+	}
+
+	endProof := &syncpb.Proof{
+		Proof: make([]*syncpb.ProofNode, len(proof.EndProof)),
+	}
+	for i, node := range proof.EndProof {
+		endProof.Proof[i] = node.ToProto()
+	}
+
+	keyChanges := make([]*syncpb.KeyChange, len(proof.KeyChanges))
+	for i, kv := range proof.KeyChanges {
+		var value syncpb.MaybeBytes
+		if kv.Value.hasValue {
+			value = syncpb.MaybeBytes{
+				Value:     kv.Value.value,
+				IsNothing: false,
+			}
+		} else {
+			value = syncpb.MaybeBytes{
+				Value:     nil,
+				IsNothing: true,
+			}
+		}
+		keyChanges[i] = &syncpb.KeyChange{
+			Key:   kv.Key,
+			Value: &value,
+		}
+	}
+
+	return &syncpb.ChangeProof{
+		HadRootsInHistory: proof.HadRootsInHistory,
+		StartProof:        startProof,
+		EndProof:          endProof,
+		KeyChanges:        keyChanges,
+	}
+}
+
+func (proof *ChangeProof) UnmarshalProto(pbProof *syncpb.ChangeProof) error {
+	switch {
+	case pbProof == nil:
+		return ErrNilChangeProof
+	case pbProof.StartProof == nil:
+		// TODO we could allow nil proofs here.
+		// Should we do that?
+		return ErrNilStartProof
+	case pbProof.EndProof == nil:
+		return ErrNilEndProof
+	}
+
+	proof.HadRootsInHistory = pbProof.HadRootsInHistory
+
+	proof.StartProof = make([]ProofNode, len(pbProof.StartProof.Proof))
+	for i, protoNode := range pbProof.StartProof.Proof {
+		if err := proof.StartProof[i].UnmarshalProto(protoNode); err != nil {
+			return err
+		}
+	}
+
+	proof.EndProof = make([]ProofNode, len(pbProof.EndProof.Proof))
+	for i, protoNode := range pbProof.EndProof.Proof {
+		if err := proof.EndProof[i].UnmarshalProto(protoNode); err != nil {
+			return err
+		}
+	}
+
+	proof.KeyChanges = make([]KeyChange, len(pbProof.KeyChanges))
+	for i, kv := range pbProof.KeyChanges {
+		if kv.Value == nil {
+			return ErrNilMaybeBytes
+		}
+
+		if kv.Value.IsNothing && len(kv.Value.Value) != 0 {
+			return ErrInvalidMaybe
+		}
+
+		value := Nothing[[]byte]()
+		if !kv.Value.IsNothing {
+			value = Some(kv.Value.Value)
+		}
+		proof.KeyChanges[i] = KeyChange{
+			Key:   kv.Key,
+			Value: value,
+		}
+	}
+
+	return nil
 }
 
 // Verifies that all values present in the [proof]:

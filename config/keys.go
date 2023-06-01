@@ -54,6 +54,7 @@ const (
 	HTTPSCertFileKey                                   = "http-tls-cert-file"
 	HTTPSCertContentKey                                = "http-tls-cert-file-content"
 	HTTPAllowedOrigins                                 = "http-allowed-origins"
+	HTTPAllowedHostsKey                                = "http-allowed-hosts"
 	HTTPShutdownTimeoutKey                             = "http-shutdown-timeout"
 	HTTPShutdownWaitKey                                = "http-shutdown-wait"
 	HTTPReadTimeoutKey                                 = "http-read-timeout"

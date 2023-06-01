@@ -596,6 +596,7 @@ func (n *Node) initAPIServer() error {
 			"api",
 			n.MetricsRegisterer,
 			n.Config.HTTPConfig.HTTPConfig,
+			n.Config.HTTPAllowedHosts,
 		)
 		return err
 	}
@@ -618,6 +619,7 @@ func (n *Node) initAPIServer() error {
 		"api",
 		n.MetricsRegisterer,
 		n.Config.HTTPConfig.HTTPConfig,
+		n.Config.HTTPAllowedHosts,
 		a,
 	)
 	if err != nil {
