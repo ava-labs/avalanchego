@@ -633,6 +633,8 @@ func (t *Transitive) wasIssued(blk snowman.Block) bool {
 }
 
 // Issue [blk] to consensus once its ancestors have been issued.
+// If [push] is true, a push query will be used. Otherwise, a pull query will be
+// used.
 func (t *Transitive) issue(ctx context.Context, blk snowman.Block, push bool) error {
 	blkID := blk.ID()
 
@@ -717,6 +719,8 @@ func (t *Transitive) pullQuery(ctx context.Context, blkID ids.ID) {
 
 // Send a query for this block. Some validators will be sent
 // a Push Query and some will be sent a Pull Query.
+// If [push] is true, a push query will be used. Otherwise, a pull query will be
+// used.
 func (t *Transitive) sendQuery(ctx context.Context, blk snowman.Block, push bool) {
 	t.Ctx.Log.Verbo("sampling from validators",
 		zap.Stringer("validators", t.Validators),
@@ -751,6 +755,8 @@ func (t *Transitive) sendQuery(ctx context.Context, blk snowman.Block, push bool
 }
 
 // issue [blk] to consensus
+// If [push] is true, a push query will be used. Otherwise, a pull query will be
+// used.
 func (t *Transitive) deliver(ctx context.Context, blk snowman.Block, push bool) error {
 	blkID := blk.ID()
 	if t.Consensus.Decided(blk) || t.Consensus.Processing(blkID) {
