@@ -22,11 +22,11 @@ message Request {
 service SyncableDB {
   rpc GetMerkleRoot(google.protobuf.Empty) returns (GetMerkleRootResponse);
 
+  rpc GetProof(GetProofRequest) returns (GetProofResponse);
+
   rpc GetChangeProof(GetChangeProofRequest) returns (GetChangeProofResponse);
   rpc VerifyChangeProof(VerifyChangeProofRequest) returns (VerifyChangeProofResponse);
   rpc CommitChangeProof(CommitChangeProofRequest) returns (CommitChangeProofResponse);
-
-  rpc GetProof(GetProofRequest) returns (GetProofResponse);
 
   rpc GetRangeProof(GetRangeProofRequest) returns (GetRangeProofResponse);
   rpc CommitRangeProof(CommitRangeProofRequest) returns (CommitRangeProofResponse);
@@ -34,6 +34,14 @@ service SyncableDB {
 
 message GetMerkleRootResponse {
   bytes root_hash = 1;
+}
+
+message GetProofRequest {
+  bytes key = 1;
+}
+
+message GetProofResponse {
+  Proof proof = 1;
 }
 
 message GetChangeProofRequest {
@@ -54,6 +62,9 @@ message GetChangeProofResponse {
 
 message VerifyChangeProofRequest {
   ChangeProof proof = 1;
+  bytes start_key = 2;
+  bytes end_key = 3;
+  bytes expected_root_hash = 4;
 }
 
 message VerifyChangeProofResponse {
@@ -66,14 +77,6 @@ message CommitChangeProofRequest {
 
 message CommitChangeProofResponse {
   rpcdb.Error error = 1;
-}
-
-message GetProofRequest {
-  bytes key = 1;
-}
-
-message GetProofResponse {
-  Proof proof = 1;
 }
 
 message GetRangeProofRequest {

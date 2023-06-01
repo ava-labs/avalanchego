@@ -21,10 +21,10 @@ const _ = grpc.SupportPackageIsVersion7
 
 const (
 	SyncableDB_GetMerkleRoot_FullMethodName     = "/sync.SyncableDB/GetMerkleRoot"
+	SyncableDB_GetProof_FullMethodName          = "/sync.SyncableDB/GetProof"
 	SyncableDB_GetChangeProof_FullMethodName    = "/sync.SyncableDB/GetChangeProof"
 	SyncableDB_VerifyChangeProof_FullMethodName = "/sync.SyncableDB/VerifyChangeProof"
 	SyncableDB_CommitChangeProof_FullMethodName = "/sync.SyncableDB/CommitChangeProof"
-	SyncableDB_GetProof_FullMethodName          = "/sync.SyncableDB/GetProof"
 	SyncableDB_GetRangeProof_FullMethodName     = "/sync.SyncableDB/GetRangeProof"
 	SyncableDB_CommitRangeProof_FullMethodName  = "/sync.SyncableDB/CommitRangeProof"
 )
@@ -34,10 +34,10 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type SyncableDBClient interface {
 	GetMerkleRoot(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetMerkleRootResponse, error)
+	GetProof(ctx context.Context, in *GetProofRequest, opts ...grpc.CallOption) (*GetProofResponse, error)
 	GetChangeProof(ctx context.Context, in *GetChangeProofRequest, opts ...grpc.CallOption) (*GetChangeProofResponse, error)
 	VerifyChangeProof(ctx context.Context, in *VerifyChangeProofRequest, opts ...grpc.CallOption) (*VerifyChangeProofResponse, error)
 	CommitChangeProof(ctx context.Context, in *CommitChangeProofRequest, opts ...grpc.CallOption) (*CommitChangeProofResponse, error)
-	GetProof(ctx context.Context, in *GetProofRequest, opts ...grpc.CallOption) (*GetProofResponse, error)
 	GetRangeProof(ctx context.Context, in *GetRangeProofRequest, opts ...grpc.CallOption) (*GetRangeProofResponse, error)
 	CommitRangeProof(ctx context.Context, in *CommitRangeProofRequest, opts ...grpc.CallOption) (*CommitRangeProofResponse, error)
 }
@@ -53,6 +53,15 @@ func NewSyncableDBClient(cc grpc.ClientConnInterface) SyncableDBClient {
 func (c *syncableDBClient) GetMerkleRoot(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetMerkleRootResponse, error) {
 	out := new(GetMerkleRootResponse)
 	err := c.cc.Invoke(ctx, SyncableDB_GetMerkleRoot_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *syncableDBClient) GetProof(ctx context.Context, in *GetProofRequest, opts ...grpc.CallOption) (*GetProofResponse, error) {
+	out := new(GetProofResponse)
+	err := c.cc.Invoke(ctx, SyncableDB_GetProof_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -86,15 +95,6 @@ func (c *syncableDBClient) CommitChangeProof(ctx context.Context, in *CommitChan
 	return out, nil
 }
 
-func (c *syncableDBClient) GetProof(ctx context.Context, in *GetProofRequest, opts ...grpc.CallOption) (*GetProofResponse, error) {
-	out := new(GetProofResponse)
-	err := c.cc.Invoke(ctx, SyncableDB_GetProof_FullMethodName, in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *syncableDBClient) GetRangeProof(ctx context.Context, in *GetRangeProofRequest, opts ...grpc.CallOption) (*GetRangeProofResponse, error) {
 	out := new(GetRangeProofResponse)
 	err := c.cc.Invoke(ctx, SyncableDB_GetRangeProof_FullMethodName, in, out, opts...)
@@ -118,10 +118,10 @@ func (c *syncableDBClient) CommitRangeProof(ctx context.Context, in *CommitRange
 // for forward compatibility
 type SyncableDBServer interface {
 	GetMerkleRoot(context.Context, *emptypb.Empty) (*GetMerkleRootResponse, error)
+	GetProof(context.Context, *GetProofRequest) (*GetProofResponse, error)
 	GetChangeProof(context.Context, *GetChangeProofRequest) (*GetChangeProofResponse, error)
 	VerifyChangeProof(context.Context, *VerifyChangeProofRequest) (*VerifyChangeProofResponse, error)
 	CommitChangeProof(context.Context, *CommitChangeProofRequest) (*CommitChangeProofResponse, error)
-	GetProof(context.Context, *GetProofRequest) (*GetProofResponse, error)
 	GetRangeProof(context.Context, *GetRangeProofRequest) (*GetRangeProofResponse, error)
 	CommitRangeProof(context.Context, *CommitRangeProofRequest) (*CommitRangeProofResponse, error)
 	mustEmbedUnimplementedSyncableDBServer()
@@ -134,6 +134,9 @@ type UnimplementedSyncableDBServer struct {
 func (UnimplementedSyncableDBServer) GetMerkleRoot(context.Context, *emptypb.Empty) (*GetMerkleRootResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetMerkleRoot not implemented")
 }
+func (UnimplementedSyncableDBServer) GetProof(context.Context, *GetProofRequest) (*GetProofResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetProof not implemented")
+}
 func (UnimplementedSyncableDBServer) GetChangeProof(context.Context, *GetChangeProofRequest) (*GetChangeProofResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetChangeProof not implemented")
 }
@@ -142,9 +145,6 @@ func (UnimplementedSyncableDBServer) VerifyChangeProof(context.Context, *VerifyC
 }
 func (UnimplementedSyncableDBServer) CommitChangeProof(context.Context, *CommitChangeProofRequest) (*CommitChangeProofResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CommitChangeProof not implemented")
-}
-func (UnimplementedSyncableDBServer) GetProof(context.Context, *GetProofRequest) (*GetProofResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetProof not implemented")
 }
 func (UnimplementedSyncableDBServer) GetRangeProof(context.Context, *GetRangeProofRequest) (*GetRangeProofResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetRangeProof not implemented")
@@ -179,6 +179,24 @@ func _SyncableDB_GetMerkleRoot_Handler(srv interface{}, ctx context.Context, dec
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(SyncableDBServer).GetMerkleRoot(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SyncableDB_GetProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetProofRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SyncableDBServer).GetProof(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SyncableDB_GetProof_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SyncableDBServer).GetProof(ctx, req.(*GetProofRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -237,24 +255,6 @@ func _SyncableDB_CommitChangeProof_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
-func _SyncableDB_GetProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetProofRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(SyncableDBServer).GetProof(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: SyncableDB_GetProof_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SyncableDBServer).GetProof(ctx, req.(*GetProofRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _SyncableDB_GetRangeProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetRangeProofRequest)
 	if err := dec(in); err != nil {
@@ -303,6 +303,10 @@ var SyncableDB_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _SyncableDB_GetMerkleRoot_Handler,
 		},
 		{
+			MethodName: "GetProof",
+			Handler:    _SyncableDB_GetProof_Handler,
+		},
+		{
 			MethodName: "GetChangeProof",
 			Handler:    _SyncableDB_GetChangeProof_Handler,
 		},
@@ -313,10 +317,6 @@ var SyncableDB_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CommitChangeProof",
 			Handler:    _SyncableDB_CommitChangeProof_Handler,
-		},
-		{
-			MethodName: "GetProof",
-			Handler:    _SyncableDB_GetProof_Handler,
 		},
 		{
 			MethodName: "GetRangeProof",
