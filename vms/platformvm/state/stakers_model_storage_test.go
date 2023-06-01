@@ -251,6 +251,7 @@ func (*deleteCurrentValidatorCommand) Run(sut commands.SystemUnderTest) commands
 			validator.Priority == txs.SubnetPermissionlessValidatorCurrentPriority ||
 			validator.Priority == txs.PrimaryNetworkValidatorCurrentPriority {
 			found = true
+			break
 		}
 	}
 	if !found {
@@ -280,6 +281,7 @@ func (*deleteCurrentValidatorCommand) NextState(cmdState commands.State) command
 			validator.Priority == txs.SubnetPermissionlessValidatorCurrentPriority ||
 			validator.Priority == txs.PrimaryNetworkValidatorCurrentPriority {
 			found = true
+			break
 		}
 	}
 	if !found {
@@ -352,6 +354,7 @@ func addCurrentDelegatorInSystem(sys *sysUnderTest, candidateDelegator *Staker) 
 			validator.Priority == txs.SubnetPermissionlessValidatorCurrentPriority ||
 			validator.Priority == txs.PrimaryNetworkValidatorCurrentPriority {
 			found = true
+			break
 		}
 	}
 	if !found {
@@ -400,6 +403,7 @@ func addCurrentDelegatorInModel(model *stakersStorageModel, candidateDelegator *
 			validator.Priority == txs.SubnetPermissionlessValidatorCurrentPriority ||
 			validator.Priority == txs.PrimaryNetworkValidatorCurrentPriority {
 			found = true
+			break
 		}
 	}
 	if !found {
@@ -466,6 +470,7 @@ func (*deleteCurrentDelegatorCommand) Run(sut commands.SystemUnderTest) commands
 		if delegator.Priority == txs.SubnetPermissionlessDelegatorCurrentPriority ||
 			delegator.Priority == txs.PrimaryNetworkDelegatorCurrentPriority {
 			found = true
+			break
 		}
 	}
 	if !found {
@@ -494,6 +499,7 @@ func (*deleteCurrentDelegatorCommand) NextState(cmdState commands.State) command
 		if delegator.Priority == txs.SubnetPermissionlessDelegatorCurrentPriority ||
 			delegator.Priority == txs.PrimaryNetworkDelegatorCurrentPriority {
 			found = true
+			break
 		}
 	}
 	if !found {
