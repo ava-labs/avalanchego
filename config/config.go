@@ -108,14 +108,12 @@ func getConsensusConfig(v *viper.Viper) snowball.Parameters {
 		//
 		// TODO: After the X-chain linearization use the
 		// SnowVirtuousCommitThresholdKey as before.
-		BetaVirtuous:            v.GetInt(SnowRogueCommitThresholdKey),
-		BetaRogue:               v.GetInt(SnowRogueCommitThresholdKey),
-		ConcurrentRepolls:       v.GetInt(SnowConcurrentRepollsKey),
-		OptimalProcessing:       v.GetInt(SnowOptimalProcessingKey),
-		MaxOutstandingItems:     v.GetInt(SnowMaxProcessingKey),
-		MaxItemProcessingTime:   v.GetDuration(SnowMaxTimeProcessingKey),
-		MixedQueryNumPushVdr:    int(v.GetUint(SnowMixedQueryNumPushVdrKey)),
-		MixedQueryNumPushNonVdr: int(v.GetUint(SnowMixedQueryNumPushNonVdrKey)),
+		BetaVirtuous:          v.GetInt(SnowRogueCommitThresholdKey),
+		BetaRogue:             v.GetInt(SnowRogueCommitThresholdKey),
+		ConcurrentRepolls:     v.GetInt(SnowConcurrentRepollsKey),
+		OptimalProcessing:     v.GetInt(SnowOptimalProcessingKey),
+		MaxOutstandingItems:   v.GetInt(SnowMaxProcessingKey),
+		MaxItemProcessingTime: v.GetDuration(SnowMaxTimeProcessingKey),
 	}
 }
 
