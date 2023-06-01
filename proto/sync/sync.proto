@@ -46,7 +46,10 @@ message GetChangeProofRequest {
 }
 
 message GetChangeProofResponse {
-  ChangeProof proof = 1;
+  oneof response {
+    ChangeProof change_proof = 1;
+    RangeProof range_proof = 2;
+  }
 }
 
 message VerifyChangeProofRequest {
