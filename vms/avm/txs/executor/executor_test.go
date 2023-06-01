@@ -227,8 +227,7 @@ func TestCreateAssetTxExecutor(t *testing.T) {
 	}
 
 	// Execute createAssetTx
-	err = createAssetTx.Unsigned.Visit(executor)
-	require.NoError(err)
+	require.NoError(createAssetTx.Unsigned.Visit(executor))
 
 	// Verify the consumed UTXO was removed from the state
 	_, err = executor.State.GetUTXO(utxoID.InputID())
