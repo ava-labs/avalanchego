@@ -5,13 +5,11 @@ package sync
 
 import (
 	"context"
-	"errors"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	"github.com/ava-labs/avalanchego/database/rpcdb"
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
@@ -40,7 +38,7 @@ func (s *SyncableDBServer) GetMerkleRoot(ctx context.Context, _ *emptypb.Empty) 
 	}, nil
 }
 
-func (s *SyncableDBServer) GetChangeProof(ctx context.Context, req *syncpb.GetChangeProofRequest) (*syncpb.GetChangeProofResponse, error) {
+func (s *SyncableDBServer) GetChangeProof(ctx context.Context, req *syncpb.GetChangeProofRequest) (*syncpb.ChangeProof, error) {
 	startRootID, err := ids.ToID(req.StartRootHash)
 	if err != nil {
 		return nil, err
@@ -53,22 +51,37 @@ func (s *SyncableDBServer) GetChangeProof(ctx context.Context, req *syncpb.GetCh
 	if err != nil {
 		return nil, err
 	}
-	return &syncpb.GetChangeProofResponse{ // TODO fix
-		Proof: &syncpb.ChangeProof{
-			HadRootsInHistory: changeProof.HadRootsInHistory,
-			StartProof:        &syncpb.Proof{},
-			EndProof:          &syncpb.Proof{},
-			KeyChanges:        []*syncpb.KeyChange{},
-		},
+	return changeProof.ToProto(), nil
+}
+
+func (s *SyncableDBServer) VerifyChangeProof(ctx context.Context, req *syncpb.VerifyChangeProofRequest) (*syncpb.VerifyChangeProofResponse, error) {
+	var proof merkledb.ChangeProof
+	if err := proof.UnmarshalProto(req.Proof); err != nil {
+		return nil, err
+	}
+
+	rootID, err := ids.ToID(req.ExpectedRootHash)
+	if err != nil {
+		return nil, err
+	}
+
+	var errString string
+	if err = s.db.VerifyChangeProof(ctx, &proof, req.StartKey, req.EndKey, rootID); err != nil {
+		errString = err.Error()
+	}
+	return &syncpb.VerifyChangeProofResponse{
+		Error: errString,
 	}, nil
 }
 
-func (*SyncableDBServer) VerifyChangeProof(context.Context, *syncpb.VerifyChangeProofRequest) (*syncpb.VerifyChangeProofResponse, error) {
-	return nil, errors.New("TODO")
-}
+func (s *SyncableDBServer) CommitChangeProof(ctx context.Context, req *syncpb.CommitChangeProofRequest) (*emptypb.Empty, error) {
+	var proof merkledb.ChangeProof
+	if err := proof.UnmarshalProto(req.Proof); err != nil {
+		return nil, err
+	}
 
-func (*SyncableDBServer) CommitChangeProof(context.Context, *syncpb.CommitChangeProofRequest) (*syncpb.CommitChangeProofResponse, error) {
-	return nil, errors.New("TODO")
+	err := s.db.CommitChangeProof(ctx, &proof)
+	return &emptypb.Empty{}, err
 }
 
 func (s *SyncableDBServer) GetProof(ctx context.Context, req *syncpb.GetProofRequest) (*syncpb.GetProofResponse, error) {
@@ -127,16 +140,14 @@ func (s *SyncableDBServer) GetRangeProof(ctx context.Context, req *syncpb.GetRan
 	return protoProof, nil
 }
 
-func (s *SyncableDBServer) CommitRangeProof(ctx context.Context, req *syncpb.CommitRangeProofRequest) (*syncpb.CommitRangeProofResponse, error) {
+func (s *SyncableDBServer) CommitRangeProof(ctx context.Context, req *syncpb.CommitRangeProofRequest) (*emptypb.Empty, error) {
 	var proof merkledb.RangeProof
 	if err := proof.UnmarshalProto(req.RangeProof); err != nil {
 		return nil, err
 	}
 
 	err := s.db.CommitRangeProof(ctx, req.StartKey, &proof)
-	return &syncpb.CommitRangeProofResponse{
-		Error: rpcdb.ErrorToErrEnum[err],
-	}, rpcdb.ErrorToRPCError(err)
+	return &emptypb.Empty{}, err
 }
 
 type SyncableDBClient struct{}
