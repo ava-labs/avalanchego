@@ -5,6 +5,8 @@ package sync
 
 import (
 	"context"
+	"errors"
+	"math"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/x/merkledb"
@@ -13,7 +15,10 @@ import (
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
-var _ syncpb.SyncableDBServer = (*SyncableDBServer)(nil)
+var (
+	_ syncpb.SyncableDBServer = (*SyncableDBServer)(nil)
+	_ SyncableDB              = (*SyncableDBClient)(nil)
+)
 
 type SyncableDB interface {
 	merkledb.MerkleRootGetter
@@ -150,4 +155,105 @@ func (s *SyncableDBServer) CommitRangeProof(ctx context.Context, req *syncpb.Com
 	return &emptypb.Empty{}, err
 }
 
-type SyncableDBClient struct{}
+type SyncableDBClient struct {
+	client syncpb.SyncableDBClient
+}
+
+func (c *SyncableDBClient) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
+	resp, err := c.client.GetMerkleRoot(ctx, &emptypb.Empty{})
+	if err != nil {
+		return ids.ID{}, err
+	}
+	return ids.ToID(resp.RootHash)
+}
+
+func (c *SyncableDBClient) GetChangeProof(ctx context.Context, startRootID, endRootID ids.ID, startKey, endKey []byte, keyLimit int) (*merkledb.ChangeProof, error) {
+	resp, err := c.client.GetChangeProof(ctx, &syncpb.GetChangeProofRequest{
+		StartRootHash: startRootID[:],
+		EndRootHash:   endRootID[:],
+		StartKey:      startKey,
+		EndKey:        endKey,
+		KeyLimit:      uint32(keyLimit),
+	})
+	if err != nil {
+		return nil, err
+	}
+	var proof merkledb.ChangeProof
+	if err := proof.UnmarshalProto(resp); err != nil {
+		return nil, err
+	}
+	return &proof, nil
+}
+
+func (c *SyncableDBClient) VerifyChangeProof(ctx context.Context, proof *merkledb.ChangeProof, startKey, endKey []byte, expectedRootID ids.ID) error {
+	resp, err := c.client.VerifyChangeProof(ctx, &syncpb.VerifyChangeProofRequest{
+		Proof:            proof.ToProto(),
+		StartKey:         startKey,
+		EndKey:           endKey,
+		ExpectedRootHash: expectedRootID[:],
+	})
+	if err != nil {
+		return err
+	}
+
+	if len(resp.Error) == 0 {
+		return nil
+	}
+	return errors.New(resp.Error)
+}
+
+func (c *SyncableDBClient) CommitChangeProof(ctx context.Context, proof *merkledb.ChangeProof) error {
+	_, err := c.client.CommitChangeProof(ctx, &syncpb.CommitChangeProofRequest{
+		Proof: proof.ToProto(),
+	})
+	return err
+}
+
+func (c *SyncableDBClient) GetProof(ctx context.Context, key []byte) (*merkledb.Proof, error) {
+	resp, err := c.client.GetProof(ctx, &syncpb.GetProofRequest{
+		Key: key,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	proof := merkledb.Proof{
+		Key:   key,
+		Value: merkledb.Nothing[[]byte](), // TODO get this from response
+		Path:  make([]merkledb.ProofNode, len(resp.Proof.Proof)),
+	}
+	for i, node := range resp.Proof.Proof {
+		if err := proof.Path[i].UnmarshalProto(node); err != nil {
+			return nil, err
+		}
+	}
+	return &proof, nil
+}
+
+func (c *SyncableDBClient) GetRangeProofAtRoot(ctx context.Context, rootID ids.ID, startKey, endKey []byte, keyLimit int) (*merkledb.RangeProof, error) {
+	resp, err := c.client.GetRangeProof(ctx, &syncpb.GetRangeProofRequest{
+		RootHash: rootID[:],
+		StartKey: startKey,
+		EndKey:   endKey,
+		KeyLimit: uint32(keyLimit),
+		// Only needed for over-the-network calls.
+		BytesLimit: math.MaxUint32,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var proof merkledb.RangeProof
+	if err := proof.UnmarshalProto(resp.Proof); err != nil {
+		return nil, err
+	}
+	return &proof, nil
+}
+
+func (c *SyncableDBClient) CommitRangeProof(ctx context.Context, startKey []byte, proof *merkledb.RangeProof) error {
+	_, err := c.client.CommitRangeProof(ctx, &syncpb.CommitRangeProofRequest{
+		StartKey:   startKey,
+		RangeProof: proof.ToProto(),
+	})
+	return err
+}
