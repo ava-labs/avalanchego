@@ -24,7 +24,7 @@ service SyncableDB {
 
   rpc GetProof(GetProofRequest) returns (GetProofResponse);
 
-  rpc GetChangeProof(GetChangeProofRequest) returns (GetChangeProofResponse);
+  rpc GetChangeProof(GetChangeProofRequest) returns (ChangeProof);
   rpc VerifyChangeProof(VerifyChangeProofRequest) returns (VerifyChangeProofResponse);
   rpc CommitChangeProof(CommitChangeProofRequest) returns (CommitChangeProofResponse);
 
@@ -53,6 +53,9 @@ message GetChangeProofRequest {
   uint32 bytes_limit = 6;
 }
 
+// TODO improve naming. This is the response to a sync request
+// for a change proof, but it's not a response to a GetChangeProof
+// request on the SyncableDB service. That's confusing.
 message GetChangeProofResponse {
   oneof response {
     ChangeProof change_proof = 1;
