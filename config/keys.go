@@ -144,6 +144,7 @@ const (
 	KeystoreAPIEnabledKey                              = "api-keystore-enabled"
 	MetricsAPIEnabledKey                               = "api-metrics-enabled"
 	HealthAPIEnabledKey                                = "api-health-enabled"
+	APIAllowedHostsKey                                 = "api-allowed-hosts"
 	IpcAPIEnabledKey                                   = "api-ipcs-enabled"
 	IpcsChainIDsKey                                    = "ipcs-chain-ids"
 	IpcsPathKey                                        = "ipcs-path"

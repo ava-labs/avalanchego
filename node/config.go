@@ -54,6 +54,7 @@ type HTTPConfig struct {
 	HTTPSCert    []byte `json:"-"`
 
 	APIAllowedOrigins []string `json:"apiAllowedOrigins"`
+	APIAllowedHosts   []string `json:"apiAllowedHosts"`
 
 	ShutdownTimeout time.Duration `json:"shutdownTimeout"`
 	ShutdownWait    time.Duration `json:"shutdownWait"`
