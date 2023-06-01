@@ -846,12 +846,16 @@ func TestEngineBuildBlock(t *testing.T) {
 		}
 	}
 
-	queried := new(bool)
+	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], _ uint32, _ ids.ID) {
+		t.Fatalf("should not be sending pulls when we are the block producer")
+	}
+
+	pushSent := new(bool)
 	sender.SendPushQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], _ uint32, blkBytes []byte) {
-		if *queried {
+		if *pushSent {
 			t.Fatalf("Asked multiple times")
 		}
-		*queried = true
+		*pushSent = true
 		vdrSet := set.Set[ids.NodeID]{}
 		vdrSet.Add(vdr)
 		if !inVdrs.Equals(vdrSet) {
@@ -866,7 +870,7 @@ func TestEngineBuildBlock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !*queried {
+	if !*pushSent {
 		t.Fatalf("Should have sent a query to the peer")
 	}
 }
@@ -2996,137 +3000,6 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 	// gets marked as Accepted.
 	require.Equal(choices.Accepted, blk1.Status())
 }
-
-// func TestSendQuery(t *testing.T) {
-// 	type test struct {
-// 		isVdr bool
-// 	}
-// 	tests := []test{
-// 		{isVdr: true},
-// 		{isVdr: false},
-// 	}
-// 	for _, tt := range tests {
-// 		t.Run(
-// 			fmt.Sprintf("is validator: %v", tt.isVdr),
-// 			func(t *testing.T) {
-// 				engConfig := DefaultConfigs()
-// 				commonCfg := common.DefaultConfigTest()
-// 				// Override the parameters k and MixedQueryNumPushNonVdr,
-// 				// and update the validator set to have k validators.
-// 				engConfig.Params.Alpha = 12
-// 				engConfig.Params.K = 20
-// 				_, _, sender, vm, te, gBlk := setup(t, commonCfg, engConfig)
-//
-// 				vdrs := set.Set[ids.NodeID]{}
-// 				te.Validators = validators.NewSet()
-// 				for i := 0; i < te.Params.K; i++ {
-// 					vdrID := ids.GenerateTestNodeID()
-// 					vdrs.Add(vdrID)
-// 					err := te.Validators.Add(vdrID, nil, ids.Empty, 1)
-// 					if err != nil {
-// 						t.Fatal(err)
-// 					}
-// 				}
-// 				if tt.isVdr {
-// 					vdrs.Add(te.Ctx.NodeID)
-// 					err := te.Validators.Add(te.Ctx.NodeID, nil, ids.Empty, 1)
-// 					if err != nil {
-// 						t.Fatal(err)
-// 					}
-// 				}
-//
-// 				// [blk1] is a child of [gBlk] and passes verification
-// 				blk1 := &snowman.TestBlock{
-// 					TestDecidable: choices.TestDecidable{
-// 						IDV:     ids.GenerateTestID(),
-// 						StatusV: choices.Processing,
-// 					},
-// 					ParentV: gBlk.ID(),
-// 					HeightV: 1,
-// 					BytesV:  []byte{1},
-// 				}
-//
-// 				// The VM should be able to parse [blk1]
-// 				vm.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
-// 					switch {
-// 					case bytes.Equal(b, blk1.Bytes()):
-// 						return blk1, nil
-// 					default:
-// 						t.Fatalf("Unknown block bytes")
-// 						return nil, nil
-// 					}
-// 				}
-//
-// 				// The VM should only be able to retrieve [gBlk] from storage
-// 				vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-// 					switch blkID {
-// 					case gBlk.ID():
-// 						return gBlk, nil
-// 					default:
-// 						return nil, errUnknownBlock
-// 					}
-// 				}
-//
-// 				pullQuerySent := new(bool)
-// 				pullQueryReqID := new(uint32)
-// 				pullQueriedVdrs := set.Set[ids.NodeID]{}
-// 				sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], requestID uint32, blkID ids.ID) {
-// 					switch {
-// 					case *pullQuerySent:
-// 						t.Fatalf("Asked multiple times")
-// 					case blkID != blk1.ID():
-// 						t.Fatalf("Expected engine to request blk1")
-// 					}
-// 					pullQueriedVdrs.Union(inVdrs)
-// 					*pullQuerySent = true
-// 					*pullQueryReqID = requestID
-// 				}
-//
-// 				pushQuerySent := new(bool)
-// 				pushQueryReqID := new(uint32)
-// 				pushQueriedVdrs := set.Set[ids.NodeID]{}
-// 				sender.SendPushQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], requestID uint32, blkBytes []byte) {
-// 					switch {
-// 					case *pushQuerySent:
-// 						t.Fatal("Asked multiple times")
-// 					case !bytes.Equal(blkBytes, blk1.Bytes()):
-// 						t.Fatal("got unexpected block bytes instead of blk1")
-// 					}
-// 					*pushQuerySent = true
-// 					*pushQueryReqID = requestID
-// 					pushQueriedVdrs.Union(inVdrs)
-// 				}
-//
-// 				// Give the engine blk1. It should insert it into consensus and send a mixed query
-// 				// consisting of 12 push queries and 8 pull queries.
-// 				if err := te.Put(context.Background(), te.Validators.List()[0].NodeID, constants.GossipMsgRequestID, blk1.Bytes()); err != nil {
-// 					t.Fatal(err)
-// 				}
-//
-// 				switch {
-// 				case !*pullQuerySent:
-// 					t.Fatal("expected us to send pull queries")
-// 				case !*pushQuerySent:
-// 					t.Fatal("expected us to send push queries")
-// 				case *pushQueryReqID != *pullQueryReqID:
-// 					t.Fatalf("expected equal push query (%v) and pull query (%v) req IDs", *pushQueryReqID, *pullQueryReqID)
-// 				case pushQueriedVdrs.Len()+pullQueriedVdrs.Len() != te.Config.Params.K:
-// 					t.Fatalf("expected num push queried (%d) + num pull queried (%d) to be %d", pushQueriedVdrs.Len(), pullQueriedVdrs.Len(), te.Config.Params.K)
-// 				case !tt.isVdr && pushQueriedVdrs.Len() != te.Params.MixedQueryNumPushNonVdr:
-// 					t.Fatalf("expected num push queried (%d) to be %d", pushQueriedVdrs.Len(), te.Params.MixedQueryNumPushNonVdr)
-// 				case tt.isVdr && pushQueriedVdrs.Len() != te.Params.MixedQueryNumPushVdr:
-// 					t.Fatalf("expected num push queried (%d) to be %d", pushQueriedVdrs.Len(), te.Params.MixedQueryNumPushVdr)
-// 				}
-//
-// 				pullQueriedVdrs.Union(pushQueriedVdrs) // Now this holds all queried validators (push and pull)
-// 				for vdr := range pullQueriedVdrs {
-// 					if !vdrs.Contains(vdr) {
-// 						t.Fatalf("got unexpected vdr %v", vdr)
-// 					}
-// 				}
-// 			})
-// 	}
-// }
 
 func TestEngineBuildBlockWithCachedNonVerifiedParent(t *testing.T) {
 	require := require.New(t)
