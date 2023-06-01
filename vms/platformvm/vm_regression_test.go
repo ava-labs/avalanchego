@@ -1490,7 +1490,7 @@ func Test_RegressionBLSKeyDiff(t *testing.T) {
 	ins, unstakedOuts, stakedOuts, signers, err := utxoHandler.Spend(
 		vm.state,
 		keys,
-		vm.MinValidatorStake, // stakeAmount
+		vm.MinValidatorStake,
 		vm.Config.AddPrimaryNetworkValidatorFee,
 		addr, // change Addresss
 	)
@@ -1630,11 +1630,10 @@ func Test_RegressionBLSKeyDiff(t *testing.T) {
 	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 
-	// Finally the test
+	// Show that validators are rebuilt with their BLS key
 	for _, height := range []uint64{
 		primaryStartHeight,
 		subnetStartHeight,
-		// subnetEndHeight2,
 	} {
 		primaryVals, err := vm.State.GetValidatorSet(context.Background(), height, constants.PrimaryNetworkID)
 		require.NoError(err)
@@ -1646,7 +1645,6 @@ func Test_RegressionBLSKeyDiff(t *testing.T) {
 
 	for _, height := range []uint64{
 		subnetStartHeight,
-		// subnetStartHeight2,
 	} {
 		subnetVals, err := vm.State.GetValidatorSet(context.Background(), height, subnetID)
 		require.NoError(err)

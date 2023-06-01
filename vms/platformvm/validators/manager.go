@@ -174,7 +174,7 @@ func (m *manager) GetValidatorSet(ctx context.Context, height uint64, subnetID i
 	currentSubnetValidatorList := currentSubnetValidators.List()
 	vdrSet := make(map[ids.NodeID]*validators.GetValidatorOutput, len(currentSubnetValidatorList))
 
-	// Duly initialize validators weight, if some of them are currently validating primary network
+	// Initialize primary network validators.
 	for _, vdr := range currentSubnetValidatorList {
 		vdrSet[vdr.NodeID] = &validators.GetValidatorOutput{
 			NodeID: vdr.NodeID,
@@ -190,7 +190,7 @@ func (m *manager) GetValidatorSet(ctx context.Context, height uint64, subnetID i
 	}
 
 	// Load BLS key from currently active primary network validators
-	// Note that this BLS key is not necessarily the right one, since
+	// Invariant: This BLS key is not necessarily valid, since
 	// a primary network validator may have restaked multiple times and
 	// changed its BLS key in the selected height interval.
 	for _, vdr := range vdrSet {
@@ -200,7 +200,7 @@ func (m *manager) GetValidatorSet(ctx context.Context, height uint64, subnetID i
 		}
 	}
 
-	// Make sure we pick the right BLS key
+	// Ensure BLS key is valid
 	for diffHeight := lastAcceptedHeight; diffHeight > height; diffHeight-- {
 		err := m.applyValidatorPKDiffs(vdrSet, diffHeight)
 		if err != nil {
