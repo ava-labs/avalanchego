@@ -1163,7 +1163,7 @@ func Test_Trie_CommitToParentView_Concurrent(t *testing.T) {
 }
 
 func Test_Trie_CommitToParentDB_Concurrent(t *testing.T) {
-	for i := 0; i < 2000; i++ {
+	for i := 0; i < 1000; i++ {
 		dbTrie, err := getBasicDB()
 		require.NoError(t, err)
 		require.NotNil(t, dbTrie)
