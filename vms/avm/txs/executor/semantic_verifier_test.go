@@ -904,27 +904,21 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 		},
 	)
 	require.NoError(t, err)
+
 	codec := parser.Codec()
-	txID := ids.GenerateTestID()
 	utxoID := avax.UTXOID{
-		TxID:        txID,
+		TxID:        ids.GenerateTestID(),
 		OutputIndex: 2,
 	}
 
 	asset := avax.Asset{
 		ID: ids.GenerateTestID(),
 	}
-	inputSigner := secp256k1fx.Input{
-		SigIndices: []uint32{0},
-	}
-	fxInput := secp256k1fx.TransferInput{
-		Amt:   12345,
-		Input: inputSigner,
-	}
-	input := avax.TransferableInput{
-		UTXOID: utxoID,
-		Asset:  asset,
-		In:     &fxInput,
+	outputOwners := secp256k1fx.OutputOwners{
+		Threshold: 1,
+		Addrs: []ids.ShortID{
+			keys[0].Address(),
+		},
 	}
 	baseTx := txs.BaseTx{
 		BaseTx: avax.BaseTx{
@@ -933,22 +927,38 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 			Outs: []*avax.TransferableOutput{{
 				Asset: asset,
 				Out: &secp256k1fx.TransferOutput{
-					Amt: 1000,
-					OutputOwners: secp256k1fx.OutputOwners{
-						Threshold: 1,
-						Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
-					},
+					Amt:          1000,
+					OutputOwners: outputOwners,
 				},
 			}},
 		},
 	}
-	importTx := txs.ImportTx{
+	input := avax.TransferableInput{
+		UTXOID: utxoID,
+		Asset:  asset,
+		In: &secp256k1fx.TransferInput{
+			Amt: 12345,
+			Input: secp256k1fx.Input{
+				SigIndices: []uint32{0},
+			},
+		},
+	}
+	unsignedImportTx := txs.ImportTx{
 		BaseTx:      baseTx,
 		SourceChain: ctx.CChainID,
 		ImportedIns: []*avax.TransferableInput{
 			&input,
 		},
 	}
+	importTx := &txs.Tx{
+		Unsigned: &unsignedImportTx,
+	}
+	require.NoError(t, importTx.SignSECP256K1Fx(
+		codec,
+		[][]*secp256k1.PrivateKey{
+			{keys[0]},
+		},
+	))
 
 	backend := &Backend{
 		Ctx:    ctx,
@@ -965,12 +975,7 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 		Bootstrapped:  true,
 	}
 	require.NoError(t, fx.Bootstrapped())
-	outputOwners := secp256k1fx.OutputOwners{
-		Threshold: 1,
-		Addrs: []ids.ShortID{
-			keys[0].PublicKey().Address(),
-		},
-	}
+
 	output := secp256k1fx.TransferOutput{
 		Amt:          12345,
 		OutputOwners: outputOwners,
@@ -980,21 +985,18 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 		Asset:  asset,
 		Out:    &output,
 	}
-	peerSharedMemory := m.NewSharedMemory(ctx.CChainID)
 	utxoBytes, err := codec.Marshal(txs.CodecVersion, utxo)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+
+	peerSharedMemory := m.NewSharedMemory(ctx.CChainID)
 	inputID := utxo.InputID()
-	if err := peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{ctx.ChainID: {PutRequests: []*atomic.Element{{
+	require.NoError(t, peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{ctx.ChainID: {PutRequests: []*atomic.Element{{
 		Key:   inputID[:],
 		Value: utxoBytes,
 		Traits: [][]byte{
 			keys[0].PublicKey().Address().Bytes(),
 		},
-	}}}}); err != nil {
-		t.Fatal(err)
-	}
+	}}}}))
 
 	unsignedCreateAssetTx := txs.CreateAssetTx{
 		States: []*txs.InitialState{{
@@ -1018,18 +1020,8 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 				state.EXPECT().GetTx(asset.ID).Return(&createAssetTx, nil).AnyTimes()
 				return state
 			},
-			txFunc: func(require *require.Assertions) *txs.Tx {
-				tx := &txs.Tx{
-					Unsigned: &importTx,
-				}
-				err := tx.SignSECP256K1Fx(
-					codec,
-					[][]*secp256k1.PrivateKey{
-						{keys[0]},
-					},
-				)
-				require.NoError(err)
-				return tx
+			txFunc: func(*require.Assertions) *txs.Tx {
+				return importTx
 			},
 			err: nil,
 		},
@@ -1046,18 +1038,8 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 				state.EXPECT().GetTx(asset.ID).Return(&createAssetTx, nil).AnyTimes()
 				return state
 			},
-			txFunc: func(require *require.Assertions) *txs.Tx {
-				tx := &txs.Tx{
-					Unsigned: &importTx,
-				}
-				err := tx.SignSECP256K1Fx(
-					codec,
-					[][]*secp256k1.PrivateKey{
-						{keys[0]},
-					},
-				)
-				require.NoError(err)
-				return tx
+			txFunc: func(*require.Assertions) *txs.Tx {
+				return importTx
 			},
 			err: errIncompatibleFx,
 		},
@@ -1071,15 +1053,14 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 			},
 			txFunc: func(require *require.Assertions) *txs.Tx {
 				tx := &txs.Tx{
-					Unsigned: &importTx,
+					Unsigned: &unsignedImportTx,
 				}
-				err := tx.SignSECP256K1Fx(
+				require.NoError(tx.SignSECP256K1Fx(
 					codec,
 					[][]*secp256k1.PrivateKey{
 						{keys[1]},
 					},
-				)
-				require.NoError(err)
+				))
 				return tx
 			},
 			err: secp256k1fx.ErrWrongSig,
@@ -1097,7 +1078,7 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 				return state
 			},
 			txFunc: func(require *require.Assertions) *txs.Tx {
-				importTx := importTx
+				importTx := unsignedImportTx
 				importTx.Ins = nil
 				importTx.ImportedIns = []*avax.TransferableInput{
 					&input,
@@ -1105,11 +1086,10 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 				tx := &txs.Tx{
 					Unsigned: &importTx,
 				}
-				err := tx.SignSECP256K1Fx(
+				require.NoError(tx.SignSECP256K1Fx(
 					codec,
-					[][]*secp256k1.PrivateKey{},
-				)
-				require.NoError(err)
+					nil,
+				))
 				return tx
 			},
 			err: errIncompatibleFx,
@@ -1122,18 +1102,8 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 				state.EXPECT().GetTx(asset.ID).Return(nil, database.ErrNotFound)
 				return state
 			},
-			txFunc: func(require *require.Assertions) *txs.Tx {
-				tx := &txs.Tx{
-					Unsigned: &importTx,
-				}
-				err := tx.SignSECP256K1Fx(
-					codec,
-					[][]*secp256k1.PrivateKey{
-						{keys[0]},
-					},
-				)
-				require.NoError(err)
-				return tx
+			txFunc: func(*require.Assertions) *txs.Tx {
+				return importTx
 			},
 			err: database.ErrNotFound,
 		},
@@ -1148,18 +1118,8 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 				state.EXPECT().GetTx(asset.ID).Return(&tx, nil)
 				return state
 			},
-			txFunc: func(require *require.Assertions) *txs.Tx {
-				tx := &txs.Tx{
-					Unsigned: &importTx,
-				}
-				err := tx.SignSECP256K1Fx(
-					codec,
-					[][]*secp256k1.PrivateKey{
-						{keys[0]},
-					},
-				)
-				require.NoError(err)
-				return tx
+			txFunc: func(*require.Assertions) *txs.Tx {
+				return importTx
 			},
 			err: errNotAnAsset,
 		},
@@ -1167,11 +1127,13 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
+
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
+
 			state := test.stateFunc(ctrl)
 			tx := test.txFunc(require)
-			err = tx.Unsigned.Visit(&SemanticVerifier{
+			err := tx.Unsigned.Visit(&SemanticVerifier{
 				Backend: backend,
 				State:   state,
 				Tx:      tx,
