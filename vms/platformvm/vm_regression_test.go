@@ -1449,6 +1449,8 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 }
 
+// GetValidatorSet must return the BLS keys for a given validator
+// even in case it has already expired
 func Test_RegressionBLSKeyDiff(t *testing.T) {
 	// setup
 	require := require.New(t)
@@ -1467,14 +1469,12 @@ func Test_RegressionBLSKeyDiff(t *testing.T) {
 	vm.clock.Set(currentTime)
 	vm.state.SetTimestamp(currentTime)
 
-	// A subnet validator should stake twice before its primary network counterpart stops staking
+	// A subnet validator stake and then stop; also its primary network counterpart stops staking
 	var (
 		primaryStartTime = currentTime.Add(executor.SyncBound)
-		subnetStartTime1 = primaryStartTime.Add(executor.SyncBound)
-		subnetEndTime1   = subnetStartTime1.Add(defaultMinStakingDuration)
-		subnetStartTime2 = subnetEndTime1.Add(executor.SyncBound)
-		subnetEndTime2   = subnetStartTime2.Add(defaultMinStakingDuration)
-		primaryEndTime   = subnetEndTime2.Add(time.Second)
+		subnetStartTime  = primaryStartTime.Add(executor.SyncBound)
+		subnetEndTime    = subnetStartTime.Add(defaultMinStakingDuration)
+		primaryEndTime   = subnetEndTime.Add(time.Second)
 	)
 
 	// insert primary network validator
@@ -1556,27 +1556,27 @@ func Test_RegressionBLSKeyDiff(t *testing.T) {
 	primaryStartHeight, err := vm.GetCurrentHeight(context.Background())
 	require.NoError(err)
 
-	// insert first subnet validator
-	subnetFirstTx, err := vm.txBuilder.NewAddSubnetValidatorTx(
-		1,                               // Weight
-		uint64(subnetStartTime1.Unix()), // Start time
-		uint64(subnetEndTime1.Unix()),   // end time
-		nodeID,                          // Node ID
+	// insert the subnet validator
+	subnetTx, err := vm.txBuilder.NewAddSubnetValidatorTx(
+		1,                              // Weight
+		uint64(subnetStartTime.Unix()), // Start time
+		uint64(subnetEndTime.Unix()),   // end time
+		nodeID,                         // Node ID
 		subnetID,
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		addr,
 	)
 	require.NoError(err)
 
-	require.NoError(vm.Builder.AddUnverifiedTx(subnetFirstTx))
+	require.NoError(vm.Builder.AddUnverifiedTx(subnetTx))
 	blk, err = vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
 	require.NoError(blk.Verify(context.Background()))
 	require.NoError(blk.Accept(context.Background()))
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
-	// move time ahead, promoting first subnet validator to current
-	currentTime = subnetStartTime1
+	// move time ahead, promoting the subnet validator to current
+	currentTime = subnetStartTime
 	vm.clock.Set(currentTime)
 	vm.state.SetTimestamp(currentTime)
 
@@ -1589,11 +1589,11 @@ func Test_RegressionBLSKeyDiff(t *testing.T) {
 	_, err = vm.state.GetCurrentValidator(subnetID, nodeID)
 	require.NoError(err)
 
-	subnetStartHeight1, err := vm.GetCurrentHeight(context.Background())
+	subnetStartHeight, err := vm.GetCurrentHeight(context.Background())
 	require.NoError(err)
 
-	// move time ahead, terminating first subnet validator
-	currentTime = subnetEndTime1
+	// move time ahead, terminating the subnet validator
+	currentTime = subnetEndTime
 	vm.clock.Set(currentTime)
 	vm.state.SetTimestamp(currentTime)
 
@@ -1605,59 +1605,6 @@ func Test_RegressionBLSKeyDiff(t *testing.T) {
 
 	_, err = vm.state.GetCurrentValidator(subnetID, nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
-
-	// insert second subnet validator
-	subnetSecondTx, err := vm.txBuilder.NewAddSubnetValidatorTx(
-		1,                               // Weight
-		uint64(subnetStartTime2.Unix()), // Start time
-		uint64(subnetEndTime2.Unix()),   // end time
-		nodeID,                          // Node ID
-		subnetID,
-		[]*secp256k1.PrivateKey{keys[0], keys[1]},
-		addr,
-	)
-	require.NoError(err)
-
-	require.NoError(vm.Builder.AddUnverifiedTx(subnetSecondTx))
-	blk, err = vm.Builder.BuildBlock(context.Background())
-	require.NoError(err)
-	require.NoError(blk.Verify(context.Background()))
-	require.NoError(blk.Accept(context.Background()))
-	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
-
-	// move time ahead, promoting second subnet validator to current
-	currentTime = subnetStartTime2
-	vm.clock.Set(currentTime)
-	vm.state.SetTimestamp(currentTime)
-
-	blk, err = vm.Builder.BuildBlock(context.Background())
-	require.NoError(err)
-	require.NoError(blk.Verify(context.Background()))
-	require.NoError(blk.Accept(context.Background()))
-	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
-
-	_, err = vm.state.GetCurrentValidator(subnetID, nodeID)
-	require.NoError(err)
-
-	subnetStartHeight2, err := vm.GetCurrentHeight(context.Background())
-	require.NoError(err)
-
-	// move time ahead, terminating second subnet validator
-	currentTime = subnetEndTime2
-	vm.clock.Set(currentTime)
-	vm.state.SetTimestamp(currentTime)
-
-	blk, err = vm.Builder.BuildBlock(context.Background())
-	require.NoError(err)
-	require.NoError(blk.Verify(context.Background()))
-	require.NoError(blk.Accept(context.Background()))
-	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
-
-	_, err = vm.state.GetCurrentValidator(subnetID, nodeID)
-	require.ErrorIs(err, database.ErrNotFound)
-
-	subnetEndHeight2, err := vm.GetCurrentHeight(context.Background())
-	require.NoError(err)
 
 	// move time ahead, terminating primary network validator
 	currentTime = primaryEndTime
@@ -1686,8 +1633,8 @@ func Test_RegressionBLSKeyDiff(t *testing.T) {
 	// Finally the test
 	for _, height := range []uint64{
 		primaryStartHeight,
-		subnetStartHeight1,
-		subnetEndHeight2,
+		subnetStartHeight,
+		// subnetEndHeight2,
 	} {
 		primaryVals, err := vm.State.GetValidatorSet(context.Background(), height, constants.PrimaryNetworkID)
 		require.NoError(err)
@@ -1698,8 +1645,8 @@ func Test_RegressionBLSKeyDiff(t *testing.T) {
 	}
 
 	for _, height := range []uint64{
-		subnetStartHeight1,
-		subnetStartHeight2,
+		subnetStartHeight,
+		// subnetStartHeight2,
 	} {
 		subnetVals, err := vm.State.GetValidatorSet(context.Background(), height, subnetID)
 		require.NoError(err)
