@@ -85,8 +85,15 @@ func (c *client) GetChangeProof(ctx context.Context, req *syncpb.ChangeProofRequ
 			return nil, fmt.Errorf("%w: (%d) > %d)", errTooManyBytes, len(responseBytes), req.BytesLimit)
 		}
 
-		changeProof := &merkledb.ChangeProof{}
-		if _, err := merkledb.Codec.DecodeChangeProof(responseBytes, changeProof); err != nil {
+		var changeProofResp syncpb.ChangeProofResponse
+		if err := proto.Unmarshal(responseBytes, &changeProofResp); err != nil {
+			return nil, err
+		}
+
+		// TODO: When the server is updated so that the response can be a
+		// RangeProof, this must be updated to handle that case.
+		var changeProof merkledb.ChangeProof
+		if err := changeProof.UnmarshalProto(changeProofResp.GetChangeProof()); err != nil {
 			return nil, err
 		}
 
@@ -101,10 +108,10 @@ func (c *client) GetChangeProof(ctx context.Context, req *syncpb.ChangeProofRequ
 			return nil, err
 		}
 
-		if err := db.VerifyChangeProof(ctx, changeProof, req.StartKey, req.EndKey, endRoot); err != nil {
+		if err := db.VerifyChangeProof(ctx, &changeProof, req.StartKey, req.EndKey, endRoot); err != nil {
 			return nil, fmt.Errorf("%s due to %w", errInvalidRangeProof, err)
 		}
-		return changeProof, nil
+		return &changeProof, nil
 	}
 
 	reqBytes, err := proto.Marshal(&syncpb.Request{
@@ -127,8 +134,13 @@ func (c *client) GetRangeProof(ctx context.Context, req *syncpb.RangeProofReques
 			return nil, fmt.Errorf("%w: (%d) > %d)", errTooManyBytes, len(responseBytes), req.BytesLimit)
 		}
 
-		rangeProof := &merkledb.RangeProof{}
-		if _, err := merkledb.Codec.DecodeRangeProof(responseBytes, rangeProof); err != nil {
+		var rangeProofProto syncpb.RangeProof
+		if err := proto.Unmarshal(responseBytes, &rangeProofProto); err != nil {
+			return nil, err
+		}
+
+		var rangeProof merkledb.RangeProof
+		if err := rangeProof.UnmarshalProto(&rangeProofProto); err != nil {
 			return nil, err
 		}
 
@@ -150,7 +162,7 @@ func (c *client) GetRangeProof(ctx context.Context, req *syncpb.RangeProofReques
 		); err != nil {
 			return nil, fmt.Errorf("%s due to %w", errInvalidRangeProof, err)
 		}
-		return rangeProof, nil
+		return &rangeProof, nil
 	}
 
 	reqBytes, err := proto.Marshal(&syncpb.Request{

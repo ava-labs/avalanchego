@@ -4,7 +4,9 @@
 package utils
 
 import (
+	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -55,6 +57,23 @@ func TestSortSliceSortable(t *testing.T) {
 	s = []sortable{3, 1, 2}
 	Sort(s)
 	require.Equal([]sortable{1, 2, 3}, s)
+}
+
+func TestSortBytesIsSortedBytes(t *testing.T) {
+	require := require.New(t)
+
+	seed := time.Now().UnixNano()
+	t.Log("Seed: ", seed)
+	rand := rand.New(rand.NewSource(seed)) //#nosec G404
+
+	slices := make([][]byte, 1024)
+	for j := 0; j < len(slices); j++ {
+		slices[j] = make([]byte, 32)
+		_, _ = rand.Read(slices[j])
+	}
+	require.False(IsSortedBytes(slices))
+	SortBytes(slices)
+	require.True(IsSortedBytes(slices))
 }
 
 func TestIsSortedAndUniqueSortable(t *testing.T) {

@@ -588,7 +588,7 @@ func (n *Node) initAPIServer() error {
 			n.LogFactory,
 			n.Config.HTTPHost,
 			n.Config.HTTPPort,
-			n.Config.APIAllowedOrigins,
+			n.Config.HTTPAllowedOrigins,
 			n.Config.ShutdownTimeout,
 			n.ID,
 			n.Config.TraceConfig.Enabled,
@@ -596,6 +596,7 @@ func (n *Node) initAPIServer() error {
 			"api",
 			n.MetricsRegisterer,
 			n.Config.HTTPConfig.HTTPConfig,
+			n.Config.HTTPAllowedHosts,
 		)
 		return err
 	}
@@ -610,7 +611,7 @@ func (n *Node) initAPIServer() error {
 		n.LogFactory,
 		n.Config.HTTPHost,
 		n.Config.HTTPPort,
-		n.Config.APIAllowedOrigins,
+		n.Config.HTTPAllowedOrigins,
 		n.Config.ShutdownTimeout,
 		n.ID,
 		n.Config.TraceConfig.Enabled,
@@ -618,6 +619,7 @@ func (n *Node) initAPIServer() error {
 		"api",
 		n.MetricsRegisterer,
 		n.Config.HTTPConfig.HTTPConfig,
+		n.Config.HTTPAllowedHosts,
 		a,
 	)
 	if err != nil {
