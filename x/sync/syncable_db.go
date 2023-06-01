@@ -120,20 +120,16 @@ func (s *SyncableDBServer) GetRangeProof(ctx context.Context, req *syncpb.GetRan
 
 	protoProof := &syncpb.GetRangeProofResponse{
 		Proof: &syncpb.RangeProof{
-			Start: &syncpb.Proof{
-				Proof: make([]*syncpb.ProofNode, len(proof.StartProof)),
-			},
-			End: &syncpb.Proof{
-				Proof: make([]*syncpb.ProofNode, len(proof.EndProof)),
-			},
+			Start:     make([]*syncpb.ProofNode, len(proof.StartProof)),
+			End:       make([]*syncpb.ProofNode, len(proof.EndProof)),
 			KeyValues: make([]*syncpb.KeyValue, len(proof.KeyValues)),
 		},
 	}
 	for i, node := range proof.StartProof {
-		protoProof.Proof.Start.Proof[i] = node.ToProto()
+		protoProof.Proof.Start[i] = node.ToProto()
 	}
 	for i, node := range proof.EndProof {
-		protoProof.Proof.End.Proof[i] = node.ToProto()
+		protoProof.Proof.End[i] = node.ToProto()
 	}
 	for i, kv := range proof.KeyValues {
 		protoProof.Proof.KeyValues[i] = &syncpb.KeyValue{
@@ -217,9 +213,15 @@ func (c *SyncableDBClient) GetProof(ctx context.Context, key []byte) (*merkledb.
 		return nil, err
 	}
 
+	// TODO implement unmarshal for merkledb.Proof
+	value := merkledb.Nothing[[]byte]()
+	if !resp.Proof.Value.IsNothing {
+		value = merkledb.Some(resp.Proof.Value.Value)
+	}
+
 	proof := merkledb.Proof{
-		Key:   key,
-		Value: merkledb.Nothing[[]byte](), // TODO get this from response
+		Key:   resp.Proof.Key,
+		Value: value,
 		Path:  make([]merkledb.ProofNode, len(resp.Proof.Proof)),
 	}
 	for i, node := range resp.Proof.Proof {
@@ -237,6 +239,8 @@ func (c *SyncableDBClient) GetRangeProofAtRoot(ctx context.Context, rootID ids.I
 		EndKey:   endKey,
 		KeyLimit: uint32(keyLimit),
 		// Only needed for over-the-network calls.
+		// TODO do we need to handle this?
+		// Remove from proto?
 		BytesLimit: math.MaxUint32,
 	})
 	if err != nil {
