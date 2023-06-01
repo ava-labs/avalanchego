@@ -14,14 +14,14 @@ var (
 		rpcdbpb.Error_ERROR_CLOSED:    database.ErrClosed,
 		rpcdbpb.Error_ERROR_NOT_FOUND: database.ErrNotFound,
 	}
-	errorToErrEnum = map[error]rpcdbpb.Error{
+	ErrorToErrEnum = map[error]rpcdbpb.Error{
 		database.ErrClosed:   rpcdbpb.Error_ERROR_CLOSED,
 		database.ErrNotFound: rpcdbpb.Error_ERROR_NOT_FOUND,
 	}
 )
 
-func errorToRPCError(err error) error {
-	if _, ok := errorToErrEnum[err]; ok {
+func ErrorToRPCError(err error) error {
+	if _, ok := ErrorToErrEnum[err]; ok {
 		return nil
 	}
 	return err

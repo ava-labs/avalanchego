@@ -11,10 +11,11 @@ import (
 	"github.com/ava-labs/avalanchego/x/merkledb"
 	"google.golang.org/protobuf/types/known/emptypb"
 
+	"github.com/ava-labs/avalanchego/database/rpcdb"
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
-var _ syncpb.SyncableDBServer = &SyncableDBServer{}
+var _ syncpb.SyncableDBServer = (*SyncableDBServer)(nil)
 
 type SyncableDB interface {
 	merkledb.MerkleRootGetter
@@ -36,7 +37,7 @@ func (s *SyncableDBServer) GetMerkleRoot(ctx context.Context, _ *emptypb.Empty) 
 	}
 	return &syncpb.GetMerkleRootResponse{
 		RootHash: root[:],
-	}, nil // TODO return rpc error
+	}, nil
 }
 
 func (s *SyncableDBServer) GetChangeProof(ctx context.Context, req *syncpb.GetChangeProofRequest) (*syncpb.GetChangeProofResponse, error) {
@@ -62,28 +63,80 @@ func (s *SyncableDBServer) GetChangeProof(ctx context.Context, req *syncpb.GetCh
 	}, nil
 }
 
-func (s *SyncableDBServer) VerifyChangeProof(context.Context, *syncpb.VerifyChangeProofRequest) (*syncpb.VerifyChangeProofResponse, error) {
+func (*SyncableDBServer) VerifyChangeProof(context.Context, *syncpb.VerifyChangeProofRequest) (*syncpb.VerifyChangeProofResponse, error) {
 	return nil, errors.New("TODO")
 }
 
-func (s *SyncableDBServer) CommitChangeProof(context.Context, *syncpb.CommitChangeProofRequest) (*syncpb.CommitChangeProofResponse, error) {
+func (*SyncableDBServer) CommitChangeProof(context.Context, *syncpb.CommitChangeProofRequest) (*syncpb.CommitChangeProofResponse, error) {
 	return nil, errors.New("TODO")
 }
 
-func (s *SyncableDBServer) GetProof(context.Context, *syncpb.GetProofRequest) (*syncpb.GetProofResponse, error) {
-	return nil, errors.New("TODO")
+func (s *SyncableDBServer) GetProof(ctx context.Context, req *syncpb.GetProofRequest) (*syncpb.GetProofResponse, error) {
+	proof, err := s.db.GetProof(ctx, req.Key)
+	if err != nil {
+		return nil, err
+	}
+
+	protoProof := &syncpb.GetProofResponse{
+		Proof: &syncpb.Proof{
+			Proof: make([]*syncpb.ProofNode, len(proof.Path)),
+		},
+	}
+	for i, node := range proof.Path {
+		protoProof.Proof.Proof[i] = node.ToProto()
+	}
+
+	return protoProof, nil
 }
 
-func (s *SyncableDBServer) GetRangeProof(context.Context, *syncpb.GetRangeProofRequest) (*syncpb.GetRangeProofResponse, error) {
-	return nil, errors.New("TODO")
+func (s *SyncableDBServer) GetRangeProof(ctx context.Context, req *syncpb.GetRangeProofRequest) (*syncpb.GetRangeProofResponse, error) {
+	rootID, err := ids.ToID(req.RootHash)
+	if err != nil {
+		return nil, err
+	}
+
+	proof, err := s.db.GetRangeProofAtRoot(ctx, rootID, req.StartKey, req.EndKey, int(req.KeyLimit))
+	if err != nil {
+		return nil, err
+	}
+
+	protoProof := &syncpb.GetRangeProofResponse{
+		Proof: &syncpb.RangeProof{
+			Start: &syncpb.Proof{
+				Proof: make([]*syncpb.ProofNode, len(proof.StartProof)),
+			},
+			End: &syncpb.Proof{
+				Proof: make([]*syncpb.ProofNode, len(proof.EndProof)),
+			},
+			KeyValues: make([]*syncpb.KeyValue, len(proof.KeyValues)),
+		},
+	}
+	for i, node := range proof.StartProof {
+		protoProof.Proof.Start.Proof[i] = node.ToProto()
+	}
+	for i, node := range proof.EndProof {
+		protoProof.Proof.End.Proof[i] = node.ToProto()
+	}
+	for i, kv := range proof.KeyValues {
+		protoProof.Proof.KeyValues[i] = &syncpb.KeyValue{
+			Key:   kv.Key,
+			Value: kv.Value,
+		}
+	}
+
+	return protoProof, nil
 }
 
-func (s *SyncableDBServer) VerifyRangeProof(context.Context, *syncpb.VerifyRangeProofRequest) (*syncpb.VerifyRangeProofResponse, error) {
-	return nil, errors.New("TODO")
-}
+func (s *SyncableDBServer) CommitRangeProof(ctx context.Context, req *syncpb.CommitRangeProofRequest) (*syncpb.CommitRangeProofResponse, error) {
+	var proof merkledb.RangeProof
+	if err := proof.UnmarshalProto(req.RangeProof); err != nil {
+		return nil, err
+	}
 
-func (s *SyncableDBServer) CommitRangeProof(context.Context, *syncpb.CommitRangeProofRequest) (*syncpb.CommitRangeProofResponse, error) {
-	return nil, errors.New("TODO")
+	err := s.db.CommitRangeProof(ctx, req.StartKey, &proof)
+	return &syncpb.CommitRangeProofResponse{
+		Error: rpcdb.ErrorToErrEnum[err],
+	}, rpcdb.ErrorToRPCError(err)
 }
 
 type SyncableDBClient struct{}
