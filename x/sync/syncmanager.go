@@ -261,7 +261,7 @@ func (m *StateSyncManager) getAndApplyChangeProof(ctx context.Context, workItem 
 
 	changeProof, err := m.config.Client.GetChangeProof(
 		ctx,
-		&syncpb.GetChangeProofRequest{
+		&syncpb.SyncGetChangeProofRequest{
 			StartRootHash: workItem.LocalRootID[:],
 			EndRootHash:   rootID[:],
 			StartKey:      workItem.start,
@@ -310,7 +310,7 @@ func (m *StateSyncManager) getAndApplyChangeProof(ctx context.Context, workItem 
 func (m *StateSyncManager) getAndApplyRangeProof(ctx context.Context, workItem *syncWorkItem) {
 	rootID := m.getTargetRoot()
 	proof, err := m.config.Client.GetRangeProof(ctx,
-		&syncpb.GetRangeProofRequest{
+		&syncpb.SyncGetRangeProofRequest{
 			RootHash:   rootID[:],
 			StartKey:   workItem.start,
 			EndKey:     workItem.end,

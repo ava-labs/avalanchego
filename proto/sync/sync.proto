@@ -9,8 +9,8 @@ option go_package = "github.com/ava-labs/avalanchego/proto/pb/sync";
 // Request represents a request for information during syncing.
 message Request {
   oneof message {
-    GetRangeProofRequest range_proof_request = 1;
-    GetChangeProofRequest change_proof_request = 2;
+    SyncGetRangeProofRequest range_proof_request = 1;
+    SyncGetChangeProofRequest change_proof_request = 2;
   }
 }
 
@@ -49,13 +49,23 @@ message Proof {
   repeated ProofNode proof = 3;
 }
 
-message GetChangeProofRequest {
+// For use in sync client, which has a restriction on the size of
+// the response. GetChangeProof in the SyncableDB service doesn't.
+message SyncGetChangeProofRequest {
   bytes start_root_hash = 1;
   bytes end_root_hash = 2;
   bytes start_key = 3;
   bytes end_key = 4;
   uint32 key_limit = 5;
   uint32 bytes_limit = 6;
+}
+
+message GetChangeProofRequest {
+  bytes start_root_hash = 1;
+  bytes end_root_hash = 2;
+  bytes start_key = 3;
+  bytes end_key = 4;
+  uint32 key_limit = 5;
 }
 
 // TODO improve naming. This is the response to a sync request
@@ -82,6 +92,16 @@ message VerifyChangeProofResponse {
 
 message CommitChangeProofRequest {
   ChangeProof proof = 1;
+}
+
+// For use in sync client, which has a restriction on the size of
+// the response. GetRangeProof in the SyncableDB service doesn't.
+message SyncGetRangeProofRequest {
+  bytes root_hash = 1;
+  bytes start_key = 2;
+  bytes end_key = 3;
+  uint32 key_limit = 4;
+  uint32 bytes_limit = 5;
 }
 
 message GetRangeProofRequest {
