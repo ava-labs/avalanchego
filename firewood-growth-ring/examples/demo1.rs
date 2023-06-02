@@ -2,11 +2,11 @@ use futures::executor::block_on;
 use growthring::{
     wal::{WalBytes, WalLoader, WalRingId, WalWriter},
     walerror::WalError,
-    WalStoreAio,
+    WalFileAio, WalStoreAio,
 };
 use rand::{seq::SliceRandom, Rng, SeedableRng};
 
-fn test(records: Vec<String>, wal: &mut WalWriter<WalStoreAio>) -> Vec<WalRingId> {
+fn test(records: Vec<String>, wal: &mut WalWriter<WalFileAio, WalStoreAio>) -> Vec<WalRingId> {
     let mut res = Vec::new();
     for r in wal.grow(records).into_iter() {
         let ring_id = futures::executor::block_on(r).unwrap().1;

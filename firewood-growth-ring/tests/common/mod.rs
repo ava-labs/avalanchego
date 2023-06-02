@@ -119,27 +119,31 @@ impl<'a, G: FailGen> WalStoreEmul<'a, G> {
 }
 
 #[async_trait(?Send)]
-impl<'a, G> WalStore for WalStoreEmul<'a, G>
+impl<'a, G> WalStore<WalFileEmul<G>> for WalStoreEmul<'a, G>
 where
     G: 'static + FailGen,
 {
     type FileNameIter = std::vec::IntoIter<String>;
 
-    async fn open_file(&self, filename: &str, touch: bool) -> Result<Box<dyn WalFile>, WalError> {
+    async fn open_file(&self, filename: &str, touch: bool) -> Result<WalFileEmul<G>, WalError> {
         if self.fgen.next_fail() {
             return Err(WalError::Other("open_file fgen next fail".to_string()));
         }
         match self.state.borrow_mut().files.entry(filename.to_string()) {
-            hash_map::Entry::Occupied(e) => Ok(Box::new(WalFileEmul {
-                file: e.get().clone(),
-                fgen: self.fgen.clone(),
-            })),
+            hash_map::Entry::Occupied(e) => {
+                let file = WalFileEmul {
+                    file: e.get().clone(),
+                    fgen: self.fgen.clone(),
+                };
+                Ok(file)
+            }
             hash_map::Entry::Vacant(e) => {
                 if touch {
-                    Ok(Box::new(WalFileEmul {
+                    let file = WalFileEmul {
                         file: e.insert(Rc::new(FileContentEmul::new())).clone(),
                         fgen: self.fgen.clone(),
-                    }))
+                    };
+                    Ok(file)
                 } else {
                     Err(WalError::Other("open_file not found".to_string()))
                 }

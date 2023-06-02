@@ -7,11 +7,14 @@ use futures::{
 };
 
 use std::cell::{RefCell, UnsafeCell};
-use std::collections::{hash_map, BinaryHeap, HashMap, VecDeque};
 use std::convert::{TryFrom, TryInto};
 use std::mem::MaybeUninit;
 use std::num::NonZeroUsize;
 use std::pin::Pin;
+use std::{
+    collections::{hash_map, BinaryHeap, HashMap, VecDeque},
+    marker::PhantomData,
+};
 
 pub use crate::walerror::WalError;
 
@@ -192,11 +195,11 @@ pub trait WalFile {
 }
 
 #[async_trait(?Send)]
-pub trait WalStore {
+pub trait WalStore<F: WalFile> {
     type FileNameIter: Iterator<Item = String>;
 
     /// Open a file given the filename, create the file if not exists when `touch` is `true`.
-    async fn open_file(&self, filename: &str, touch: bool) -> Result<Box<dyn WalFile>, WalError>;
+    async fn open_file(&self, filename: &str, touch: bool) -> Result<F, WalError>;
     /// Unlink a file given the filename.
     async fn remove_file(&self, filename: String) -> Result<(), WalError>;
     /// Enumerate all Wal filenames. It should include all Wal files that are previously opened
@@ -205,20 +208,21 @@ pub trait WalStore {
     fn enumerate_files(&self) -> Result<Self::FileNameIter, WalError>;
 }
 
-struct WalFileHandle<'a, F: WalStore> {
+struct WalFileHandle<'a, F: WalFile + 'static, S: WalStore<F>> {
     fid: WalFileId,
     handle: &'a dyn WalFile,
-    pool: *const WalFilePool<F>,
+    pool: *const WalFilePool<F, S>,
+    wal_file: PhantomData<F>,
 }
 
-impl<'a, F: WalStore> std::ops::Deref for WalFileHandle<'a, F> {
+impl<'a, F: WalFile, S: WalStore<F>> std::ops::Deref for WalFileHandle<'a, F, S> {
     type Target = dyn WalFile + 'a;
     fn deref(&self) -> &Self::Target {
         self.handle
     }
 }
 
-impl<'a, F: WalStore> Drop for WalFileHandle<'a, F> {
+impl<'a, F: WalFile + 'static, S: WalStore<F>> Drop for WalFileHandle<'a, F, S> {
     fn drop(&mut self) {
         unsafe {
             (*self.pool).release_file(self.fid);
@@ -228,9 +232,9 @@ impl<'a, F: WalStore> Drop for WalFileHandle<'a, F> {
 
 /// The middle layer that manages WAL file handles and invokes public trait functions to actually
 /// manipulate files and their contents.
-struct WalFilePool<F: WalStore> {
-    store: F,
-    header_file: Box<dyn WalFile>,
+struct WalFilePool<F: WalFile, S: WalStore<F>> {
+    store: S,
+    header_file: F,
     handle_cache: RefCell<lru::LruCache<WalFileId, Box<dyn WalFile>>>,
     #[allow(clippy::type_complexity)]
     handle_used: RefCell<HashMap<WalFileId, UnsafeCell<(Box<dyn WalFile>, usize)>>>,
@@ -243,9 +247,9 @@ struct WalFilePool<F: WalStore> {
     block_nbit: u64,
 }
 
-impl<F: WalStore> WalFilePool<F> {
+impl<F: WalFile + 'static, S: WalStore<F>> WalFilePool<F, S> {
     async fn new(
-        store: F,
+        store: S,
         file_nbit: u64,
         block_nbit: u64,
         cache_size: NonZeroUsize,
@@ -283,8 +287,8 @@ impl<F: WalStore> WalFilePool<F> {
 
     #[allow(clippy::await_holding_refcell_ref)]
     // TODO: Refactor to remove mutable reference from being awaited.
-    async fn get_file(&self, fid: u64, touch: bool) -> Result<WalFileHandle<F>, WalError> {
-        let pool = self as *const WalFilePool<F>;
+    async fn get_file(&self, fid: u64, touch: bool) -> Result<WalFileHandle<F, S>, WalError> {
+        let pool = self as *const WalFilePool<F, S>;
         if let Some(h) = self.handle_cache.borrow_mut().pop(&fid) {
             let handle = match self.handle_used.borrow_mut().entry(fid) {
                 hash_map::Entry::Vacant(e) => unsafe {
@@ -292,15 +296,20 @@ impl<F: WalStore> WalFilePool<F> {
                 },
                 _ => unreachable!(),
             };
-            Ok(WalFileHandle { fid, handle, pool })
+            Ok(WalFileHandle {
+                fid,
+                handle,
+                pool,
+                wal_file: PhantomData,
+            })
         } else {
             let v = unsafe {
                 &mut *match self.handle_used.borrow_mut().entry(fid) {
                     hash_map::Entry::Occupied(e) => e.into_mut(),
-                    hash_map::Entry::Vacant(e) => e.insert(UnsafeCell::new((
-                        self.store.open_file(&get_fname(fid), touch).await?,
-                        0,
-                    ))),
+                    hash_map::Entry::Vacant(e) => {
+                        let file = self.store.open_file(&get_fname(fid), touch).await?;
+                        e.insert(UnsafeCell::new((Box::new(file), 0)))
+                    }
                 }
                 .get()
             };
@@ -309,6 +318,7 @@ impl<F: WalStore> WalFilePool<F> {
                 fid,
                 handle: &*v.0,
                 pool,
+                wal_file: PhantomData,
             })
         }
     }
@@ -357,7 +367,7 @@ impl<F: WalStore> WalFilePool<F> {
         let alloc = async move {
             last_write.await?;
             let mut last_h: Option<
-                Pin<Box<dyn Future<Output = Result<WalFileHandle<'a, F>, WalError>> + 'a>>,
+                Pin<Box<dyn Future<Output = Result<WalFileHandle<'a, F, S>, WalError>> + 'a>>,
             > = None;
             for ((next_fid, wl), h) in meta.into_iter().zip(files.into_iter()) {
                 if let Some(lh) = last_h.take() {
@@ -384,18 +394,22 @@ impl<F: WalStore> WalFilePool<F> {
             }
             Ok(())
         };
+
         let mut res = Vec::new();
         let mut prev = Box::pin(alloc) as Pin<Box<dyn Future<Output = _> + 'a>>;
+
         for (off, w) in writes.into_iter() {
             let f = self.get_file(off >> file_nbit, true);
             let w = (async move {
                 prev.await?;
-                f.await?.write(off & (file_size - 1), w).await
+                let f = f.await?;
+                f.write(off & (file_size - 1), w).await
             })
             .shared();
             prev = Box::pin(w.clone());
             res.push(Box::pin(w) as Pin<Box<dyn Future<Output = _> + 'a>>)
         }
+
         unsafe {
             (*self.last_write.get()) = MaybeUninit::new(std::mem::transmute::<
                 Pin<Box<dyn Future<Output = _> + 'a>>,
@@ -453,18 +467,18 @@ impl<F: WalStore> WalFilePool<F> {
     }
 }
 
-pub struct WalWriter<F: WalStore> {
+pub struct WalWriter<F: WalFile, S: WalStore<F>> {
     state: WalState,
-    file_pool: WalFilePool<F>,
+    file_pool: WalFilePool<F, S>,
     block_buffer: WalBytes,
     block_size: u32,
     msize: usize,
 }
 
-unsafe impl<F> Send for WalWriter<F> where F: WalStore + Send {}
+unsafe impl<F: WalFile, S> Send for WalWriter<F, S> where S: WalStore<F> + Send {}
 
-impl<F: WalStore> WalWriter<F> {
-    fn new(state: WalState, file_pool: WalFilePool<F>) -> Self {
+impl<F: WalFile + 'static, S: WalStore<F>> WalWriter<F, S> {
+    fn new(state: WalState, file_pool: WalFilePool<F, S>) -> Self {
         let mut b = Vec::new();
         let block_size = 1 << file_pool.block_nbit as u32;
         let msize = std::mem::size_of::<WalRingBlob>();
@@ -839,8 +853,8 @@ impl WalLoader {
 
     #[allow(clippy::await_holding_refcell_ref)]
     // TODO: Refactor to a more safe solution.
-    fn read_rings<'a, F: WalStore + 'a>(
-        file: &'a WalFileHandle<'a, F>,
+    fn read_rings<'a, F: WalFile + 'static, S: WalStore<F> + 'a>(
+        file: &'a WalFileHandle<'a, F, S>,
         read_payload: bool,
         block_nbit: u64,
         recover_policy: &'a RecoverPolicy,
@@ -848,10 +862,10 @@ impl WalLoader {
         let block_size = 1 << block_nbit;
         let msize = std::mem::size_of::<WalRingBlob>();
 
-        struct Vars<'a, F: WalStore> {
+        struct Vars<'a, F: WalFile + 'static, S: WalStore<F>> {
             done: bool,
             off: u64,
-            file: &'a WalFileHandle<'a, F>,
+            file: &'a WalFileHandle<'a, F, S>,
         }
 
         let vars = std::rc::Rc::new(std::cell::RefCell::new(Vars {
@@ -948,9 +962,9 @@ impl WalLoader {
     }
 
     #[allow(clippy::await_holding_refcell_ref)]
-    fn read_records<'a, F: WalStore + 'a>(
+    fn read_records<'a, F: WalFile + 'static, S: WalStore<F> + 'a>(
         &'a self,
-        file: &'a WalFileHandle<'a, F>,
+        file: &'a WalFileHandle<'a, F, S>,
         chunks: &'a mut Option<(Vec<WalBytes>, WalPos)>,
     ) -> impl futures::Stream<Item = Result<(WalBytes, WalRingId, u32), bool>> + 'a {
         let fid = file.fid;
@@ -958,11 +972,11 @@ impl WalLoader {
         let block_size = 1 << self.block_nbit;
         let msize = std::mem::size_of::<WalRingBlob>();
 
-        struct Vars<'a, F: WalStore> {
+        struct Vars<'a, F: WalFile + 'static, S: WalStore<F>> {
             done: bool,
             chunks: &'a mut Option<(Vec<WalBytes>, WalPos)>,
             off: u64,
-            file: &'a WalFileHandle<'a, F>,
+            file: &'a WalFileHandle<'a, F, S>,
         }
 
         let vars = std::rc::Rc::new(std::cell::RefCell::new(Vars {
@@ -1115,12 +1129,16 @@ impl WalLoader {
     }
 
     /// Recover by reading the Wal files.
-    pub async fn load<S: WalStore, F: FnMut(WalBytes, WalRingId) -> Result<(), WalError>>(
+    pub async fn load<
+        F: WalFile + 'static,
+        S: WalStore<F>,
+        Func: FnMut(WalBytes, WalRingId) -> Result<(), WalError>,
+    >(
         &self,
         store: S,
-        mut recover_func: F,
+        mut recover_func: Func,
         keep_nrecords: u32,
-    ) -> Result<WalWriter<S>, WalError> {
+    ) -> Result<WalWriter<F, S>, WalError> {
         let msize = std::mem::size_of::<WalRingBlob>();
         assert!(self.file_nbit > self.block_nbit);
         assert!(msize < 1 << self.block_nbit);
@@ -1141,7 +1159,7 @@ impl WalLoader {
 
         let mut chunks = None;
         let mut pre_skip = true;
-        let mut scanned: Vec<(String, WalFileHandle<S>)> = Vec::new();
+        let mut scanned: Vec<(String, WalFileHandle<F, S>)> = Vec::new();
         let mut counter = 0;
 
         // TODO: check for missing logfiles

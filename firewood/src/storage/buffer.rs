@@ -11,6 +11,7 @@ use super::{
 };
 
 use aiofut::{AioBuilder, AioError, AioManager};
+use growthring::WalFileAio;
 use growthring::{
     wal::{RecoverPolicy, WalLoader, WalWriter},
     walerror::WalError,
@@ -92,7 +93,7 @@ pub struct DiskBuffer {
     local_pool: Rc<tokio::task::LocalSet>,
     task_id: u64,
     tasks: Rc<RefCell<HashMap<u64, Option<tokio::task::JoinHandle<()>>>>>,
-    wal: Option<Rc<Mutex<WalWriter<WalStoreAio>>>>,
+    wal: Option<Rc<Mutex<WalWriter<WalFileAio, WalStoreAio>>>>,
     cfg: DiskBufferConfig,
     wal_cfg: WalConfig,
 }
