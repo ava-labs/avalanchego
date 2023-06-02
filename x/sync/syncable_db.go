@@ -276,7 +276,6 @@ func (c *SyncableDBClient) GetRangeProofAtRoot(
 		StartKey: startKey,
 		EndKey:   endKey,
 		KeyLimit: uint32(keyLimit),
-		// BytesLimit: c.maxMessageSize, TODO remove
 	})
 	if err != nil {
 		return nil, err
