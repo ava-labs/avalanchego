@@ -137,8 +137,6 @@ const (
 	SnowOptimalProcessingKey                           = "snow-optimal-processing"
 	SnowMaxProcessingKey                               = "snow-max-processing"
 	SnowMaxTimeProcessingKey                           = "snow-max-time-processing"
-	SnowMixedQueryNumPushVdrKey                        = "snow-mixed-query-num-push-vdr"
-	SnowMixedQueryNumPushNonVdrKey                     = "snow-mixed-query-num-push-non-vdr"
 	TrackSubnetsKey                                    = "track-subnets"
 	AdminAPIEnabledKey                                 = "api-admin-enabled"
 	InfoAPIEnabledKey                                  = "api-info-enabled"

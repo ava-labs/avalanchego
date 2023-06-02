@@ -33,16 +33,12 @@ type Backend interface {
 type backend struct {
 	Context
 	ChainUTXOs
-
-	chainID ids.ID
 }
 
-func NewBackend(ctx Context, chainID ids.ID, utxos ChainUTXOs) Backend {
+func NewBackend(ctx Context, utxos ChainUTXOs) Backend {
 	return &backend{
 		Context:    ctx,
 		ChainUTXOs: utxos,
-
-		chainID: chainID,
 	}
 }
 
@@ -56,19 +52,20 @@ func (b *backend) AcceptTx(ctx stdcontext.Context, tx *txs.Tx) error {
 		return err
 	}
 
+	chainID := b.Context.BlockchainID()
 	inputUTXOs := tx.Unsigned.InputUTXOs()
 	for _, utxoID := range inputUTXOs {
 		if utxoID.Symbol {
 			continue
 		}
-		if err := b.RemoveUTXO(ctx, b.chainID, utxoID.InputID()); err != nil {
+		if err := b.RemoveUTXO(ctx, chainID, utxoID.InputID()); err != nil {
 			return err
 		}
 	}
 
 	outputUTXOs := tx.UTXOs()
 	for _, utxo := range outputUTXOs {
-		if err := b.AddUTXO(ctx, b.chainID, utxo); err != nil {
+		if err := b.AddUTXO(ctx, chainID, utxo); err != nil {
 			return err
 		}
 	}
