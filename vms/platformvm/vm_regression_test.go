@@ -6,6 +6,7 @@ package platformvm
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"testing"
 	"time"
 
@@ -1556,6 +1557,16 @@ func Test_RegressionBLSKeyDiff(t *testing.T) {
 	primaryStartHeight, err := vm.GetCurrentHeight(context.Background())
 	require.NoError(err)
 
+	// Show that primary validator is rebuilt with its BLS key
+	require.NoError(
+		checkValidatorBlsKeyIsSet(
+			vm.State,
+			nodeID,
+			constants.PrimaryNetworkID,
+			primaryStartHeight,
+			uPrimaryTx.Signer.Key()),
+	)
+
 	// insert the subnet validator
 	subnetTx, err := vm.txBuilder.NewAddSubnetValidatorTx(
 		1,                              // Weight
@@ -1592,6 +1603,27 @@ func Test_RegressionBLSKeyDiff(t *testing.T) {
 	subnetStartHeight, err := vm.GetCurrentHeight(context.Background())
 	require.NoError(err)
 
+	// Show that primary validator is rebuilt with its BLS key
+	for height := primaryStartHeight; height <= subnetStartHeight; height++ {
+		require.NoError(
+			checkValidatorBlsKeyIsSet(
+				vm.State,
+				nodeID,
+				constants.PrimaryNetworkID,
+				height,
+				uPrimaryTx.Signer.Key()),
+		)
+	}
+
+	// Show that subnet validator is rebuilt with its BLS key
+	require.NoError(checkValidatorBlsKeyIsSet(
+		vm.State,
+		nodeID,
+		subnetID,
+		subnetStartHeight,
+		uPrimaryTx.Signer.Key()),
+	)
+
 	// move time ahead, terminating the subnet validator
 	currentTime = subnetEndTime
 	vm.clock.Set(currentTime)
@@ -1605,6 +1637,42 @@ func Test_RegressionBLSKeyDiff(t *testing.T) {
 
 	_, err = vm.state.GetCurrentValidator(subnetID, nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
+
+	subnetEndHeight, err := vm.GetCurrentHeight(context.Background())
+	require.NoError(err)
+
+	// Show that primary validator is rebuilt with its BLS key
+	for height := primaryStartHeight; height <= subnetEndHeight; height++ {
+		require.NoError(
+			checkValidatorBlsKeyIsSet(
+				vm.State,
+				nodeID,
+				constants.PrimaryNetworkID,
+				height,
+				uPrimaryTx.Signer.Key()),
+		)
+	}
+
+	// Show that subnet validator is rebuilt with its BLS key
+	for height := subnetStartHeight; height < subnetEndHeight; height++ {
+		require.NoError(checkValidatorBlsKeyIsSet(
+			vm.State,
+			nodeID,
+			subnetID,
+			height,
+			uPrimaryTx.Signer.Key()),
+		)
+	}
+
+	// show that at subnetEndHeight, subnet validator is not shown anymore
+	require.ErrorIs(checkValidatorBlsKeyIsSet(
+		vm.State,
+		nodeID,
+		subnetID,
+		subnetEndHeight,
+		uPrimaryTx.Signer.Key()),
+		database.ErrNotFound,
+	)
 
 	// move time ahead, terminating primary network validator
 	currentTime = primaryEndTime
@@ -1630,27 +1698,71 @@ func Test_RegressionBLSKeyDiff(t *testing.T) {
 	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 
+	primaryEndHeight, err := vm.GetCurrentHeight(context.Background())
+	require.NoError(err)
+
 	// Show that validators are rebuilt with their BLS key
-	for _, height := range []uint64{
-		primaryStartHeight,
-		subnetStartHeight,
-	} {
-		primaryVals, err := vm.State.GetValidatorSet(context.Background(), height, constants.PrimaryNetworkID)
-		require.NoError(err)
+	for height := primaryStartHeight; height < primaryEndHeight; height++ {
+		require.NoError(
+			checkValidatorBlsKeyIsSet(
+				vm.State,
+				nodeID,
+				constants.PrimaryNetworkID,
+				height,
+				uPrimaryTx.Signer.Key()),
+		)
+	}
+	require.ErrorIs(checkValidatorBlsKeyIsSet(
+		vm.State,
+		nodeID,
+		constants.PrimaryNetworkID,
+		primaryEndHeight,
+		uPrimaryTx.Signer.Key()),
+		database.ErrNotFound,
+	)
 
-		primaryVal, found := primaryVals[nodeID]
-		require.True(found)
-		require.NotNil(primaryVal.PublicKey)
+	for height := subnetStartHeight; height < subnetEndHeight; height++ {
+		require.NoError(
+			checkValidatorBlsKeyIsSet(
+				vm.State,
+				nodeID,
+				subnetID,
+				height,
+				uPrimaryTx.Signer.Key()),
+		)
 	}
 
-	for _, height := range []uint64{
-		subnetStartHeight,
-	} {
-		subnetVals, err := vm.State.GetValidatorSet(context.Background(), height, subnetID)
-		require.NoError(err)
-
-		subnetVal, found := subnetVals[nodeID]
-		require.True(found)
-		require.NotNil(subnetVal.PublicKey)
+	for height := subnetEndHeight; height <= primaryEndHeight; height++ {
+		require.ErrorIs(checkValidatorBlsKeyIsSet(
+			vm.State,
+			nodeID,
+			subnetID,
+			primaryEndHeight,
+			uPrimaryTx.Signer.Key()),
+			database.ErrNotFound,
+		)
 	}
+}
+
+func checkValidatorBlsKeyIsSet(
+	valState validators.State,
+	nodeID ids.NodeID,
+	subnetID ids.ID,
+	height uint64,
+	expectedBlsKey *bls.PublicKey,
+) error {
+	vals, err := valState.GetValidatorSet(context.Background(), height, subnetID)
+	if err != nil {
+		return err
+	}
+
+	val, found := vals[nodeID]
+	if !found {
+		return database.ErrNotFound
+	}
+	if val.PublicKey != expectedBlsKey {
+		return errors.New("unexpected BLS key")
+	}
+
+	return nil
 }
