@@ -95,16 +95,11 @@ func (s *SyncableDBServer) GetProof(ctx context.Context, req *syncpb.GetProofReq
 		return nil, err
 	}
 
-	protoProof := &syncpb.GetProofResponse{
-		Proof: &syncpb.Proof{
-			Proof: make([]*syncpb.ProofNode, len(proof.Path)),
-		},
-	}
-	for i, node := range proof.Path {
-		protoProof.Proof.Proof[i] = node.ToProto()
-	}
+	protoProof := proof.ToProto()
 
-	return protoProof, nil
+	return &syncpb.GetProofResponse{
+		Proof: protoProof,
+	}, nil
 }
 
 func (s *SyncableDBServer) GetRangeProof(ctx context.Context, req *syncpb.GetRangeProofRequest) (*syncpb.GetRangeProofResponse, error) {
