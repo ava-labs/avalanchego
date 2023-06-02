@@ -67,7 +67,6 @@ func TestDecisionTxsInMempool(t *testing.T) {
 
 	// txs must not already there before we start
 	require.False(mpool.HasTxs())
-	require.Equal((*txs.Tx)(nil), mpool.PeekTx())
 
 	for _, tx := range decisionTxs {
 		// tx not already there
@@ -123,7 +122,6 @@ func TestProposalTxsInMempool(t *testing.T) {
 
 	// txs should not be already there
 	require.False(mpool.HasTxs())
-	require.Equal((*txs.Tx)(nil), mpool.PeekTx())
 
 	for i, tx := range proposalTxs {
 		require.False(mpool.Has(tx.ID()))
@@ -138,13 +136,6 @@ func TestProposalTxsInMempool(t *testing.T) {
 		retrieved := mpool.Get(tx.ID())
 		require.NotNil(retrieved)
 		require.Equal(tx, retrieved)
-
-		{
-			// we can peek it
-			peeked := mpool.PeekTx()
-			require.NotNil(peeked)
-			require.Equal(tx, peeked)
-		}
 
 		{
 			// we can peek it

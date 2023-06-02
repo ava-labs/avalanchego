@@ -158,20 +158,6 @@ func (mr *MockMempoolMockRecorder) MarkDropped(arg0, arg1 interface{}) *gomock.C
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MarkDropped", reflect.TypeOf((*MockMempool)(nil).MarkDropped), arg0, arg1)
 }
 
-// PeekTx mocks base method.
-func (m *MockMempool) PeekTx() *txs.Tx {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PeekTx")
-	ret0, _ := ret[0].(*txs.Tx)
-	return ret0
-}
-
-// PeekTx indicates an expected call of PeekTx.
-func (mr *MockMempoolMockRecorder) PeekTx() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PeekTx", reflect.TypeOf((*MockMempool)(nil).PeekTx))
-}
-
 // PeekTxs mocks base method.
 func (m *MockMempool) PeekTxs(arg0 int) []*txs.Tx {
 	m.ctrl.T.Helper()

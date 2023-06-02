@@ -76,11 +76,6 @@ type Mempool interface {
 	// TODO: remove this
 	PeekTxs(maxTxsBytes int) []*txs.Tx
 
-	// PeekTx returns the next stakerTx without removing it from mempool.
-	// It returns nil if !HasStakerTx().
-	// It's guaranteed that the returned tx, if not nil, is a StakerTx.
-	PeekTx() *txs.Tx
-
 	GetTxIterator() TxIterator
 
 	// Note: dropped txs are added to droppedTxIDs but not
@@ -258,11 +253,6 @@ func (m *mempool) removeTxs(txs ...*txs.Tx) {
 			m.deregister(tx)
 		}
 	}
-}
-
-func (m *mempool) PeekTx() *txs.Tx {
-	_, tx, _ := m.unissuedTxs.Newest()
-	return tx
 }
 
 func (m *mempool) GetTxIterator() TxIterator {
