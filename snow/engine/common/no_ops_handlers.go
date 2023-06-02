@@ -242,12 +242,14 @@ func NewNoOpChitsHandler(log logging.Logger) ChitsHandler {
 	return &noOpChitsHandler{log: log}
 }
 
-func (nop *noOpChitsHandler) Chits(_ context.Context, nodeID ids.NodeID, requestID uint32, _, _ []ids.ID) error {
+func (nop *noOpChitsHandler) Chits(_ context.Context, nodeID ids.NodeID, requestID uint32, preferredID, acceptedID ids.ID) error {
 	nop.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),
 		zap.Stringer("messageOp", message.ChitsOp),
 		zap.Stringer("nodeID", nodeID),
 		zap.Uint32("requestID", requestID),
+		zap.Stringer("preferredID", preferredID),
+		zap.Stringer("acceptedID", acceptedID),
 	)
 	return nil
 }

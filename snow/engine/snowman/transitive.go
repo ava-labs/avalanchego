@@ -249,23 +249,8 @@ func (t *Transitive) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID
 	return t.buildBlocks(ctx)
 }
 
-func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32, votes []ids.ID, accepted []ids.ID) error {
-	t.acceptedFrontiers.SetAcceptedFrontier(nodeID, accepted)
-
-	// Since this is a linear chain, there should only be one ID in the vote set
-	if len(votes) != 1 {
-		t.Ctx.Log.Debug("failing Chits",
-			zap.String("reason", "expected only 1 vote"),
-			zap.Int("numVotes", len(votes)),
-			zap.Stringer("nodeID", nodeID),
-			zap.Uint32("requestID", requestID),
-		)
-		// because QueryFailed doesn't utilize the assumption that we actually
-		// sent a Query message, we can safely call QueryFailed here to
-		// potentially abandon the request.
-		return t.QueryFailed(ctx, nodeID, requestID)
-	}
-	blkID := votes[0]
+func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID, acceptedID ids.ID) error {
+	t.acceptedFrontiers.SetLastAccepted(nodeID, acceptedID)
 
 	t.Ctx.Log.Verbo("called Chits for the block",
 		zap.Stringer("blkID", blkID),
@@ -295,10 +280,8 @@ func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uin
 }
 
 func (t *Transitive) QueryFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
-	lastAccepted := t.acceptedFrontiers.AcceptedFrontier(nodeID)
-	if len(lastAccepted) == 1 {
-		// Chits calls QueryFailed if [votes] doesn't have length 1, so this
-		// check is required to avoid infinite mutual recursion.
+	lastAccepted, ok := t.acceptedFrontiers.LastAccepted(nodeID)
+	if ok {
 		return t.Chits(ctx, nodeID, requestID, lastAccepted, lastAccepted)
 	}
 
@@ -463,9 +446,9 @@ func (t *Transitive) GetBlock(ctx context.Context, blkID ids.ID) (snowman.Block,
 func (t *Transitive) sendChits(ctx context.Context, nodeID ids.NodeID, requestID uint32) {
 	lastAccepted := t.Consensus.LastAccepted()
 	if t.Ctx.StateSyncing.Get() {
-		t.Sender.SendChits(ctx, nodeID, requestID, []ids.ID{lastAccepted}, []ids.ID{lastAccepted})
+		t.Sender.SendChits(ctx, nodeID, requestID, lastAccepted, lastAccepted)
 	} else {
-		t.Sender.SendChits(ctx, nodeID, requestID, []ids.ID{t.Consensus.Preference()}, []ids.ID{lastAccepted})
+		t.Sender.SendChits(ctx, nodeID, requestID, t.Consensus.Preference(), lastAccepted)
 	}
 }
 

@@ -672,9 +672,9 @@ func TestMessage(t *testing.T) {
 			msg: &p2p.Message{
 				Message: &p2p.Message_Chits{
 					Chits: &p2p.Chits{
-						ChainId:               testID[:],
-						RequestId:             1,
-						PreferredContainerIds: [][]byte{testID[:], testID[:]},
+						ChainId:     testID[:],
+						RequestId:   1,
+						PreferredId: testID[:],
 					},
 				},
 			},
