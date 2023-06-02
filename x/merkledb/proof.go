@@ -46,6 +46,8 @@ var (
 	ErrNilEndProof                 = errors.New("end proof is nil")
 	ErrNilChangeProof              = errors.New("change proof is nil")
 	ErrNilMaybeBytes               = errors.New("maybe bytes is nil")
+	ErrNilProof                    = errors.New("proof is nil")
+	ErrNilValue                    = errors.New("value is nil")
 )
 
 type ProofNode struct {
@@ -189,6 +191,53 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID) error {
 	if expectedRootID != gotRootID {
 		return fmt.Errorf("%w:[%s], expected:[%s]", ErrInvalidProof, gotRootID, expectedRootID)
 	}
+	return nil
+}
+
+func (proof *Proof) ToProto() *syncpb.Proof {
+	value := &syncpb.MaybeBytes{}
+	if !proof.Value.IsNothing() {
+		value.Value = proof.Value.Value()
+	} else {
+		value.IsNothing = true
+	}
+
+	pbProof := &syncpb.Proof{
+		Key:   proof.Key,
+		Value: value,
+	}
+
+	pbProof.Proof = make([]*syncpb.ProofNode, len(proof.Path))
+	for i, node := range proof.Path {
+		pbProof.Proof[i] = node.ToProto()
+	}
+
+	return pbProof
+}
+
+func (proof *Proof) UnmarshalProto(pbProof *syncpb.Proof) error {
+	switch {
+	case pbProof == nil:
+		return ErrNilProof
+	case pbProof.Value == nil:
+		return ErrNilValue
+	case pbProof.Value.IsNothing && len(pbProof.Value.Value) != 0:
+		return ErrInvalidMaybe
+	}
+
+	proof.Key = pbProof.Key
+
+	if !pbProof.Value.IsNothing {
+		proof.Value = Some(pbProof.Value.Value)
+	}
+
+	proof.Path = make([]ProofNode, len(pbProof.Proof))
+	for i, pbNode := range pbProof.Proof {
+		if err := proof.Path[i].UnmarshalProto(pbNode); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
