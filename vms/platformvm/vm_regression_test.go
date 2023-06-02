@@ -1472,10 +1472,12 @@ func Test_RegressionBLSKeyDiff(t *testing.T) {
 
 	// A subnet validator stake and then stop; also its primary network counterpart stops staking
 	var (
-		primaryStartTime = currentTime.Add(executor.SyncBound)
-		subnetStartTime  = primaryStartTime.Add(executor.SyncBound)
-		subnetEndTime    = subnetStartTime.Add(defaultMinStakingDuration)
-		primaryEndTime   = subnetEndTime.Add(time.Second)
+		primaryStartTime   = currentTime.Add(executor.SyncBound)
+		subnetStartTime    = primaryStartTime.Add(executor.SyncBound)
+		subnetEndTime      = subnetStartTime.Add(defaultMinStakingDuration)
+		primaryEndTime     = subnetEndTime.Add(time.Second)
+		primaryReStartTime = primaryEndTime.Add(executor.SyncBound)
+		primaryReEndTime   = primaryReStartTime.Add(defaultMinStakingDuration)
 	)
 
 	// insert primary network validator
@@ -1483,7 +1485,7 @@ func Test_RegressionBLSKeyDiff(t *testing.T) {
 	addr := keys[0].PublicKey().Address()
 	skBytes, err := hex.DecodeString("6668fecd4595b81e4d568398c820bbf3f073cb222902279fa55ebb84764ed2e3")
 	require.NoError(err)
-	sk, err := bls.SecretKeyFromBytes(skBytes)
+	sk1, err := bls.SecretKeyFromBytes(skBytes)
 	require.NoError(err)
 
 	// build primary network validator with BLS key
@@ -1511,7 +1513,7 @@ func Test_RegressionBLSKeyDiff(t *testing.T) {
 			Wght:   vm.MinValidatorStake,
 		},
 		Subnet:    constants.PrimaryNetworkID,
-		Signer:    signer.NewProofOfPossession(sk),
+		Signer:    signer.NewProofOfPossession(sk1),
 		StakeOuts: stakedOuts,
 		ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
 			Locktime:  0,
@@ -1557,16 +1559,6 @@ func Test_RegressionBLSKeyDiff(t *testing.T) {
 	primaryStartHeight, err := vm.GetCurrentHeight(context.Background())
 	require.NoError(err)
 
-	// Show that primary validator is rebuilt with its BLS key
-	require.NoError(
-		checkValidatorBlsKeyIsSet(
-			vm.State,
-			nodeID,
-			constants.PrimaryNetworkID,
-			primaryStartHeight,
-			uPrimaryTx.Signer.Key()),
-	)
-
 	// insert the subnet validator
 	subnetTx, err := vm.txBuilder.NewAddSubnetValidatorTx(
 		1,                              // Weight
@@ -1603,27 +1595,6 @@ func Test_RegressionBLSKeyDiff(t *testing.T) {
 	subnetStartHeight, err := vm.GetCurrentHeight(context.Background())
 	require.NoError(err)
 
-	// Show that primary validator is rebuilt with its BLS key
-	for height := primaryStartHeight; height <= subnetStartHeight; height++ {
-		require.NoError(
-			checkValidatorBlsKeyIsSet(
-				vm.State,
-				nodeID,
-				constants.PrimaryNetworkID,
-				height,
-				uPrimaryTx.Signer.Key()),
-		)
-	}
-
-	// Show that subnet validator is rebuilt with its BLS key
-	require.NoError(checkValidatorBlsKeyIsSet(
-		vm.State,
-		nodeID,
-		subnetID,
-		subnetStartHeight,
-		uPrimaryTx.Signer.Key()),
-	)
-
 	// move time ahead, terminating the subnet validator
 	currentTime = subnetEndTime
 	vm.clock.Set(currentTime)
@@ -1640,39 +1611,6 @@ func Test_RegressionBLSKeyDiff(t *testing.T) {
 
 	subnetEndHeight, err := vm.GetCurrentHeight(context.Background())
 	require.NoError(err)
-
-	// Show that primary validator is rebuilt with its BLS key
-	for height := primaryStartHeight; height <= subnetEndHeight; height++ {
-		require.NoError(
-			checkValidatorBlsKeyIsSet(
-				vm.State,
-				nodeID,
-				constants.PrimaryNetworkID,
-				height,
-				uPrimaryTx.Signer.Key()),
-		)
-	}
-
-	// Show that subnet validator is rebuilt with its BLS key
-	for height := subnetStartHeight; height < subnetEndHeight; height++ {
-		require.NoError(checkValidatorBlsKeyIsSet(
-			vm.State,
-			nodeID,
-			subnetID,
-			height,
-			uPrimaryTx.Signer.Key()),
-		)
-	}
-
-	// show that at subnetEndHeight, subnet validator is not shown anymore
-	require.ErrorIs(checkValidatorBlsKeyIsSet(
-		vm.State,
-		nodeID,
-		subnetID,
-		subnetEndHeight,
-		uPrimaryTx.Signer.Key()),
-		database.ErrNotFound,
-	)
 
 	// move time ahead, terminating primary network validator
 	currentTime = primaryEndTime
@@ -1701,38 +1639,119 @@ func Test_RegressionBLSKeyDiff(t *testing.T) {
 	primaryEndHeight, err := vm.GetCurrentHeight(context.Background())
 	require.NoError(err)
 
-	// Show that validators are rebuilt with their BLS key
+	// reinsert primary validator with a different BLS key
+	sk2, err := bls.NewSecretKey()
+	require.NoError(err)
+	require.NotEqual(sk1, sk2)
+
+	ins, unstakedOuts, stakedOuts, signers, err = utxoHandler.Spend(
+		vm.state,
+		keys,
+		vm.MinValidatorStake,
+		vm.Config.AddPrimaryNetworkValidatorFee,
+		addr, // change Addresss
+	)
+	require.NoError(err)
+
+	uPrimaryRestartTx := &txs.AddPermissionlessValidatorTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    vm.ctx.NetworkID,
+			BlockchainID: vm.ctx.ChainID,
+			Ins:          ins,
+			Outs:         unstakedOuts,
+		}},
+		Validator: txs.Validator{
+			NodeID: nodeID,
+			Start:  uint64(primaryReStartTime.Unix()),
+			End:    uint64(primaryReEndTime.Unix()),
+			Wght:   vm.MinValidatorStake,
+		},
+		Subnet:    constants.PrimaryNetworkID,
+		Signer:    signer.NewProofOfPossession(sk2),
+		StakeOuts: stakedOuts,
+		ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
+			Locktime:  0,
+			Threshold: 1,
+			Addrs: []ids.ShortID{
+				addr,
+			},
+		},
+		DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
+			Locktime:  0,
+			Threshold: 1,
+			Addrs: []ids.ShortID{
+				addr,
+			},
+		},
+		DelegationShares: reward.PercentDenominator,
+	}
+	primaryRestartTx, err := txs.NewSigned(uPrimaryRestartTx, txs.Codec, signers)
+	require.NoError(err)
+	require.NoError(uPrimaryRestartTx.SyntacticVerify(vm.ctx))
+
+	require.NoError(vm.Builder.AddUnverifiedTx(primaryRestartTx))
+	blk, err = vm.Builder.BuildBlock(context.Background())
+	require.NoError(err)
+	require.NoError(blk.Verify(context.Background()))
+	require.NoError(blk.Accept(context.Background()))
+	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
+
+	// move time ahead, promoting restarted primary validator to current
+	currentTime = primaryReStartTime
+	vm.clock.Set(currentTime)
+	vm.state.SetTimestamp(currentTime)
+
+	blk, err = vm.Builder.BuildBlock(context.Background())
+	require.NoError(err)
+	require.NoError(blk.Verify(context.Background()))
+	require.NoError(blk.Accept(context.Background()))
+	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
+
+	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+	require.NoError(err)
+
+	primaryRestartHeight, err := vm.GetCurrentHeight(context.Background())
+	require.NoError(err)
+
+	// Show that validators are rebuilt with the right BLS key
 	for height := primaryStartHeight; height < primaryEndHeight; height++ {
-		require.NoError(
-			checkValidatorBlsKeyIsSet(
-				vm.State,
-				nodeID,
-				constants.PrimaryNetworkID,
-				height,
-				uPrimaryTx.Signer.Key()),
+		require.NoError(checkValidatorBlsKeyIsSet(
+			vm.State,
+			nodeID,
+			constants.PrimaryNetworkID,
+			height,
+			uPrimaryTx.Signer.Key()),
 		)
 	}
-	require.ErrorIs(checkValidatorBlsKeyIsSet(
+	for height := primaryEndHeight; height < primaryRestartHeight; height++ {
+		require.ErrorIs(checkValidatorBlsKeyIsSet(
+			vm.State,
+			nodeID,
+			constants.PrimaryNetworkID,
+			primaryEndHeight,
+			uPrimaryTx.Signer.Key()),
+			database.ErrNotFound,
+		)
+	}
+	require.NoError(checkValidatorBlsKeyIsSet(
 		vm.State,
 		nodeID,
 		constants.PrimaryNetworkID,
-		primaryEndHeight,
-		uPrimaryTx.Signer.Key()),
-		database.ErrNotFound,
+		primaryRestartHeight,
+		uPrimaryRestartTx.Signer.Key()),
 	)
 
 	for height := subnetStartHeight; height < subnetEndHeight; height++ {
-		require.NoError(
-			checkValidatorBlsKeyIsSet(
-				vm.State,
-				nodeID,
-				subnetID,
-				height,
-				uPrimaryTx.Signer.Key()),
+		require.NoError(checkValidatorBlsKeyIsSet(
+			vm.State,
+			nodeID,
+			subnetID,
+			height,
+			uPrimaryTx.Signer.Key()),
 		)
 	}
 
-	for height := subnetEndHeight; height <= primaryEndHeight; height++ {
+	for height := subnetEndHeight; height <= primaryRestartHeight; height++ {
 		require.ErrorIs(checkValidatorBlsKeyIsSet(
 			vm.State,
 			nodeID,
