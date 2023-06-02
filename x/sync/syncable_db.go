@@ -27,6 +27,10 @@ type SyncableDB interface {
 	merkledb.RangeProofer
 }
 
+func NewSyncableDBServer(db SyncableDB) *SyncableDBServer {
+	return &SyncableDBServer{db: db}
+}
+
 type SyncableDBServer struct {
 	syncpb.UnsafeSyncableDBServer
 
@@ -173,10 +177,12 @@ func (s *SyncableDBServer) CommitRangeProof(
 	return &emptypb.Empty{}, err
 }
 
+func NewSyncableDBClient(client syncpb.SyncableDBClient) *SyncableDBClient {
+	return &SyncableDBClient{client: client}
+}
+
 type SyncableDBClient struct {
 	client syncpb.SyncableDBClient
-
-	maxMessageSize uint32
 }
 
 func (c *SyncableDBClient) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
@@ -266,11 +272,11 @@ func (c *SyncableDBClient) GetRangeProofAtRoot(
 	keyLimit int,
 ) (*merkledb.RangeProof, error) {
 	resp, err := c.client.GetRangeProof(ctx, &syncpb.GetRangeProofRequest{
-		RootHash:   rootID[:],
-		StartKey:   startKey,
-		EndKey:     endKey,
-		KeyLimit:   uint32(keyLimit),
-		BytesLimit: c.maxMessageSize,
+		RootHash: rootID[:],
+		StartKey: startKey,
+		EndKey:   endKey,
+		KeyLimit: uint32(keyLimit),
+		// BytesLimit: c.maxMessageSize, TODO remove
 	})
 	if err != nil {
 		return nil, err
