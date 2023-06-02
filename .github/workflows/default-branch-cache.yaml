@@ -19,9 +19,9 @@ jobs:
         with:
           toolchain: stable
           override: true
-      - name: Cache Cargo intermediate products
+      - name: Restore Cargo Cache
         id: cargo-cache
-        uses: actions/cache@v3
+        uses: actions/cache/restore@v3
         with:
           path: |
             ~/.cargo/bin/
@@ -41,3 +41,13 @@ jobs:
         run: cargo check --workspace --tests --examples --benches
       - name: Build
         run: cargo build --workspace --tests --examples --benches
+      - name: Save Cargo Cache
+        uses: actions/cache/save@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ steps.cargo-cache.outputs.cache-primary-key }}
