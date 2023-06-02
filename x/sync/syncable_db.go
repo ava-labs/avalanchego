@@ -8,9 +8,10 @@ import (
 	"errors"
 	"math"
 
+	"google.golang.org/protobuf/types/known/emptypb"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/x/merkledb"
-	"google.golang.org/protobuf/types/known/emptypb"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
