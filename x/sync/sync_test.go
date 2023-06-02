@@ -37,7 +37,7 @@ type mockClient struct {
 	db SyncableDB
 }
 
-func (client *mockClient) GetChangeProof(ctx context.Context, request *syncpb.GetChangeProofRequest, _ SyncableDB) (*merkledb.ChangeProof, error) {
+func (client *mockClient) GetChangeProof(ctx context.Context, request *syncpb.SyncGetChangeProofRequest, _ SyncableDB) (*merkledb.ChangeProof, error) {
 	startRoot, err := ids.ToID(request.StartRootHash)
 	if err != nil {
 		return nil, err
@@ -49,7 +49,7 @@ func (client *mockClient) GetChangeProof(ctx context.Context, request *syncpb.Ge
 	return client.db.GetChangeProof(ctx, startRoot, endRoot, request.StartKey, request.EndKey, int(request.KeyLimit))
 }
 
-func (client *mockClient) GetRangeProof(ctx context.Context, request *syncpb.GetRangeProofRequest) (*merkledb.RangeProof, error) {
+func (client *mockClient) GetRangeProof(ctx context.Context, request *syncpb.SyncGetRangeProofRequest) (*merkledb.RangeProof, error) {
 	root, err := ids.ToID(request.RootHash)
 	if err != nil {
 		return nil, err

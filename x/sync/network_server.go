@@ -151,7 +151,7 @@ func (s *NetworkServer) HandleChangeProofRequest(
 	ctx context.Context,
 	nodeID ids.NodeID,
 	requestID uint32,
-	req *syncpb.GetChangeProofRequest,
+	req *syncpb.SyncGetChangeProofRequest,
 ) error {
 	if req.BytesLimit == 0 ||
 		req.KeyLimit == 0 ||
@@ -232,7 +232,7 @@ func (s *NetworkServer) HandleRangeProofRequest(
 	ctx context.Context,
 	nodeID ids.NodeID,
 	requestID uint32,
-	req *syncpb.GetRangeProofRequest,
+	req *syncpb.SyncGetRangeProofRequest,
 ) error {
 	if req.BytesLimit == 0 ||
 		req.KeyLimit == 0 ||
