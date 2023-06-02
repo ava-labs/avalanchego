@@ -19,7 +19,6 @@ pub struct Account {
 
 impl Account {
     pub fn empty_code() -> &'static Hash {
-        use once_cell::sync::OnceCell;
         static V: OnceCell<Hash> = OnceCell::new();
         V.get_or_init(|| {
             Hash(

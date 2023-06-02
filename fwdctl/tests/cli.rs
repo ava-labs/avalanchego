@@ -222,8 +222,6 @@ mod tmpdb {
         path::{Path, PathBuf},
     };
 
-    use lazy_static::lazy_static;
-
     const FIREWOOD_TEST_DB_NAME: &str = "test_firewood";
     const TARGET_TMP_DIR: Option<&str> = option_env!("CARGO_TARGET_TMPDIR");
 
@@ -242,19 +240,12 @@ mod tmpdb {
             &self.path
         }
     }
-    lazy_static! {
-        static ref DB_PATH: DbPath = {
-            let path = [
-                TARGET_TMP_DIR.unwrap_or(&std::env::var("TMPDIR").unwrap_or("/tmp".to_string())),
-                FIREWOOD_TEST_DB_NAME,
-            ]
-            .iter()
-            .collect::<PathBuf>();
-            DbPath { path }
-        };
-    }
+    pub fn path() -> DbPath {
+        let path = Path::new(
+            TARGET_TMP_DIR.unwrap_or(&std::env::var("TMPDIR").unwrap_or("/tmp".to_string())),
+        )
+        .join(FIREWOOD_TEST_DB_NAME);
 
-    pub fn path() -> &'static DbPath {
-        &DB_PATH
+        DbPath { path }
     }
 }

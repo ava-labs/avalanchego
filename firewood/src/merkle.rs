@@ -4,16 +4,16 @@
 use crate::proof::Proof;
 
 use enum_as_inner::EnumAsInner;
-use once_cell::unsync::OnceCell;
 use sha3::Digest;
 use shale::{CachedStore, ObjPtr, ObjRef, ShaleError, ShaleStore, Storable};
 
-use std::cell::Cell;
+use std::cell::{Cell, OnceCell};
 use std::cmp;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt::{self, Debug};
 use std::io::{Cursor, Read, Write};
+use std::sync::OnceLock;
 
 pub const NBRANCH: usize = 16;
 pub const HASH_SIZE: usize = 32;
@@ -467,11 +467,11 @@ impl Node {
     fn new_from_hash(root_hash: Option<Hash>, eth_rlp_long: Option<bool>, inner: NodeType) -> Self {
         Self {
             root_hash: match root_hash {
-                Some(h) => OnceCell::with_value(h),
+                Some(h) => OnceCell::from(h),
                 None => OnceCell::new(),
             },
             eth_rlp_long: match eth_rlp_long {
-                Some(b) => OnceCell::with_value(b),
+                Some(b) => OnceCell::from(b),
                 None => OnceCell::new(),
             },
             eth_rlp: OnceCell::new(),
@@ -847,8 +847,7 @@ impl Merkle {
     }
 
     pub fn empty_root() -> &'static Hash {
-        use once_cell::sync::OnceCell;
-        static V: OnceCell<Hash> = OnceCell::new();
+        static V: OnceLock<Hash> = OnceLock::new();
         V.get_or_init(|| {
             Hash(
                 hex::decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
