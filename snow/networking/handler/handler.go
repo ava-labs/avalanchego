@@ -712,31 +712,31 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 		return engine.PullQuery(ctx, nodeID, msg.RequestId, containerID)
 
 	case *p2p.Chits:
-		votes, err := getIDs(msg.PreferredContainerIds)
+		preferredID, err := ids.ToID(msg.PreferredId)
 		if err != nil {
 			h.ctx.Log.Debug("message with invalid field",
 				zap.Stringer("nodeID", nodeID),
 				zap.Stringer("messageOp", message.ChitsOp),
 				zap.Uint32("requestID", msg.RequestId),
-				zap.String("field", "PreferredContainerIDs"),
+				zap.String("field", "PreferredID"),
 				zap.Error(err),
 			)
 			return engine.QueryFailed(ctx, nodeID, msg.RequestId)
 		}
 
-		accepted, err := getIDs(msg.AcceptedContainerIds)
+		acceptedID, err := ids.ToID(msg.AcceptedId)
 		if err != nil {
 			h.ctx.Log.Debug("message with invalid field",
 				zap.Stringer("nodeID", nodeID),
 				zap.Stringer("messageOp", message.ChitsOp),
 				zap.Uint32("requestID", msg.RequestId),
-				zap.String("field", "AcceptedContainerIDs"),
+				zap.String("field", "AcceptedID"),
 				zap.Error(err),
 			)
 			return engine.QueryFailed(ctx, nodeID, msg.RequestId)
 		}
 
-		return engine.Chits(ctx, nodeID, msg.RequestId, votes, accepted)
+		return engine.Chits(ctx, nodeID, msg.RequestId, preferredID, acceptedID)
 
 	case *message.QueryFailed:
 		return engine.QueryFailed(ctx, nodeID, msg.RequestID)

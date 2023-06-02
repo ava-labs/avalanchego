@@ -28,11 +28,9 @@ func TestLinkedDB(t *testing.T) {
 	_, err = ldb.Get(key)
 	require.Equal(database.ErrNotFound, err, "Expected db.Get to return a Not Found error.")
 
-	err = ldb.Delete(key)
-	require.NoError(err)
+	require.NoError(ldb.Delete(key))
 
-	err = ldb.Put(key, value)
-	require.NoError(err)
+	require.NoError(ldb.Put(key, value))
 
 	has, err = ldb.Has(key)
 	require.NoError(err)
@@ -42,8 +40,7 @@ func TestLinkedDB(t *testing.T) {
 	require.NoError(err)
 	require.Equal(value, v)
 
-	err = ldb.Delete(key)
-	require.NoError(err)
+	require.NoError(ldb.Delete(key))
 
 	has, err = ldb.Has(key)
 	require.NoError(err)
@@ -68,18 +65,15 @@ func TestLinkedDBDuplicatedPut(t *testing.T) {
 	value1 := []byte("world1")
 	value2 := []byte("world2")
 
-	err := ldb.Put(key, value1)
-	require.NoError(err)
+	require.NoError(ldb.Put(key, value1))
 
-	err = ldb.Put(key, value2)
-	require.NoError(err)
+	require.NoError(ldb.Put(key, value2))
 
 	v, err := ldb.Get(key)
 	require.NoError(err)
 	require.Equal(value2, v)
 
-	err = ldb.Delete(key)
-	require.NoError(err)
+	require.NoError(ldb.Delete(key))
 
 	iterator := db.NewIterator()
 	next := iterator.Next()
@@ -100,11 +94,9 @@ func TestLinkedDBMultiplePuts(t *testing.T) {
 	value2 := []byte("world2")
 	value3 := []byte("world3")
 
-	err := ldb.Put(key1, value1)
-	require.NoError(err)
+	require.NoError(ldb.Put(key1, value1))
 
-	err = ldb.Put(key2, value2)
-	require.NoError(err)
+	require.NoError(ldb.Put(key2, value2))
 
 	v, err := ldb.Get(key1)
 	require.NoError(err)
@@ -114,23 +106,17 @@ func TestLinkedDBMultiplePuts(t *testing.T) {
 	require.NoError(err)
 	require.Equal(value2, v)
 
-	err = ldb.Delete(key2)
-	require.NoError(err)
+	require.NoError(ldb.Delete(key2))
 
-	err = ldb.Put(key2, value2)
-	require.NoError(err)
+	require.NoError(ldb.Put(key2, value2))
 
-	err = ldb.Put(key3, value3)
-	require.NoError(err)
+	require.NoError(ldb.Put(key3, value3))
 
-	err = ldb.Delete(key2)
-	require.NoError(err)
+	require.NoError(ldb.Delete(key2))
 
-	err = ldb.Delete(key1)
-	require.NoError(err)
+	require.NoError(ldb.Delete(key1))
 
-	err = ldb.Delete(key3)
-	require.NoError(err)
+	require.NoError(ldb.Delete(key3))
 
 	iterator := db.NewIterator()
 	next := iterator.Next()
@@ -154,8 +140,7 @@ func TestEmptyLinkedDBIterator(t *testing.T) {
 	v := iterator.Value()
 	require.Nil(v, "The iterator returned the wrong value")
 
-	err := iterator.Error()
-	require.NoError(err)
+	require.NoError(iterator.Error())
 
 	iterator.Release()
 }
@@ -169,8 +154,7 @@ func TestLinkedDBLoadHeadKey(t *testing.T) {
 	key := []byte("hello")
 	value := []byte("world")
 
-	err := ldb.Put(key, value)
-	require.NoError(err)
+	require.NoError(ldb.Put(key, value))
 
 	ldb = NewDefault(db)
 
@@ -193,8 +177,7 @@ func TestLinkedDBLoadHeadKey(t *testing.T) {
 	v = iterator.Value()
 	require.Nil(v, "The iterator returned the wrong value")
 
-	err = iterator.Error()
-	require.NoError(err)
+	require.NoError(iterator.Error())
 
 	iterator.Release()
 }
@@ -208,8 +191,7 @@ func TestSingleLinkedDBIterator(t *testing.T) {
 	key := []byte("hello")
 	value := []byte("world")
 
-	err := ldb.Put(key, value)
-	require.NoError(err)
+	require.NoError(ldb.Put(key, value))
 
 	iterator := ldb.NewIterator()
 	next := iterator.Next()
@@ -230,8 +212,7 @@ func TestSingleLinkedDBIterator(t *testing.T) {
 	v = iterator.Value()
 	require.Nil(v, "The iterator returned the wrong value")
 
-	err = iterator.Error()
-	require.NoError(err)
+	require.NoError(iterator.Error())
 
 	iterator.Release()
 }
@@ -247,11 +228,9 @@ func TestMultipleLinkedDBIterator(t *testing.T) {
 	value0 := []byte("world0")
 	value1 := []byte("world1")
 
-	err := ldb.Put(key0, value0)
-	require.NoError(err)
+	require.NoError(ldb.Put(key0, value0))
 
-	err = ldb.Put(key1, value1)
-	require.NoError(err)
+	require.NoError(ldb.Put(key1, value1))
 
 	iterator := ldb.NewIterator()
 	next := iterator.Next()
@@ -275,8 +254,7 @@ func TestMultipleLinkedDBIterator(t *testing.T) {
 	next = iterator.Next()
 	require.False(next, "The iterator should now be exhausted")
 
-	err = iterator.Error()
-	require.NoError(err)
+	require.NoError(iterator.Error())
 
 	iterator.Release()
 }
@@ -292,11 +270,9 @@ func TestMultipleLinkedDBIteratorStart(t *testing.T) {
 	value0 := []byte("world0")
 	value1 := []byte("world1")
 
-	err := ldb.Put(key0, value0)
-	require.NoError(err)
+	require.NoError(ldb.Put(key0, value0))
 
-	err = ldb.Put(key1, value1)
-	require.NoError(err)
+	require.NoError(ldb.Put(key1, value1))
 
 	iterator := ldb.NewIteratorWithStart(key1)
 	next := iterator.Next()
@@ -320,8 +296,7 @@ func TestMultipleLinkedDBIteratorStart(t *testing.T) {
 	next = iterator.Next()
 	require.False(next, "The iterator should now be exhausted")
 
-	err = iterator.Error()
-	require.NoError(err)
+	require.NoError(iterator.Error())
 
 	iterator.Release()
 }
@@ -337,11 +312,9 @@ func TestSingleLinkedDBIteratorStart(t *testing.T) {
 	value0 := []byte("world0")
 	value1 := []byte("world1")
 
-	err := ldb.Put(key0, value0)
-	require.NoError(err)
+	require.NoError(ldb.Put(key0, value0))
 
-	err = ldb.Put(key1, value1)
-	require.NoError(err)
+	require.NoError(ldb.Put(key1, value1))
 
 	iterator := ldb.NewIteratorWithStart(key0)
 
@@ -357,8 +330,7 @@ func TestSingleLinkedDBIteratorStart(t *testing.T) {
 	next = iterator.Next()
 	require.False(next, "The iterator should now be exhausted")
 
-	err = iterator.Error()
-	require.NoError(err)
+	require.NoError(iterator.Error())
 
 	iterator.Release()
 }
@@ -377,11 +349,9 @@ func TestEmptyLinkedDBIteratorStart(t *testing.T) {
 	value0 := []byte("world0")
 	value1 := []byte("world1")
 
-	err := ldb.Put(key0, value0)
-	require.NoError(err)
+	require.NoError(ldb.Put(key0, value0))
 
-	err = ldb.Put(key1, value1)
-	require.NoError(err)
+	require.NoError(ldb.Put(key1, value1))
 
 	iter := ldb.NewIteratorWithStart(key2)
 
@@ -393,8 +363,7 @@ func TestEmptyLinkedDBIteratorStart(t *testing.T) {
 	}
 	require.Equal(2, i)
 
-	err = iter.Error()
-	require.NoError(err)
+	require.NoError(iter.Error())
 
 	iter.Release()
 }
@@ -412,15 +381,13 @@ func TestLinkedDBIsEmpty(t *testing.T) {
 	key := []byte("hello")
 	value := []byte("world")
 
-	err = ldb.Put(key, value)
-	require.NoError(err)
+	require.NoError(ldb.Put(key, value))
 
 	isEmpty, err = ldb.IsEmpty()
 	require.NoError(err)
 	require.False(isEmpty)
 
-	err = ldb.Delete(key)
-	require.NoError(err)
+	require.NoError(ldb.Delete(key))
 
 	isEmpty, err = ldb.IsEmpty()
 	require.NoError(err)
@@ -441,22 +408,19 @@ func TestLinkedDBHeadKey(t *testing.T) {
 	key1 := []byte("hello1")
 	value1 := []byte("world1")
 
-	err = ldb.Put(key0, value0)
-	require.NoError(err)
+	require.NoError(ldb.Put(key0, value0))
 
 	headKey, err := ldb.HeadKey()
 	require.NoError(err)
 	require.Equal(key0, headKey)
 
-	err = ldb.Put(key1, value1)
-	require.NoError(err)
+	require.NoError(ldb.Put(key1, value1))
 
 	headKey, err = ldb.HeadKey()
 	require.NoError(err)
 	require.Equal(key1, headKey)
 
-	err = ldb.Delete(key1)
-	require.NoError(err)
+	require.NoError(ldb.Delete(key1))
 
 	headKey, err = ldb.HeadKey()
 	require.NoError(err)
@@ -477,24 +441,21 @@ func TestLinkedDBHead(t *testing.T) {
 	key1 := []byte("hello1")
 	value1 := []byte("world1")
 
-	err = ldb.Put(key0, value0)
-	require.NoError(err)
+	require.NoError(ldb.Put(key0, value0))
 
 	headKey, headVal, err := ldb.Head()
 	require.NoError(err)
 	require.Equal(key0, headKey)
 	require.Equal(value0, headVal)
 
-	err = ldb.Put(key1, value1)
-	require.NoError(err)
+	require.NoError(ldb.Put(key1, value1))
 
 	headKey, headVal, err = ldb.Head()
 	require.NoError(err)
 	require.Equal(key1, headKey)
 	require.Equal(value1, headVal)
 
-	err = ldb.Delete(key1)
-	require.NoError(err)
+	require.NoError(ldb.Delete(key1))
 
 	headKey, headVal, err = ldb.Head()
 	require.NoError(err)

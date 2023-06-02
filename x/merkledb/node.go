@@ -60,7 +60,7 @@ func newNode(parent *node, key path) *node {
 // Parse [nodeBytes] to a node and set its key to [key].
 func parseNode(key path, nodeBytes []byte) (*node, error) {
 	n := dbNode{}
-	if _, err := Codec.decodeDBNode(nodeBytes, &n); err != nil {
+	if _, err := codec.decodeDBNode(nodeBytes, &n); err != nil {
 		return nil, err
 	}
 	result := &node{
@@ -84,7 +84,7 @@ func (n *node) marshal() ([]byte, error) {
 		return n.nodeBytes, nil
 	}
 
-	nodeBytes, err := Codec.encodeDBNode(Version, &(n.dbNode))
+	nodeBytes, err := codec.encodeDBNode(version, &(n.dbNode))
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +111,7 @@ func (n *node) calculateID(metrics merkleMetrics) error {
 		Key:      n.key.Serialize(),
 	}
 
-	bytes, err := Codec.encodeHashValues(Version, hv)
+	bytes, err := codec.encodeHashValues(version, hv)
 	if err != nil {
 		return err
 	}

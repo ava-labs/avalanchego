@@ -158,8 +158,7 @@ func TestNetworkAppGossip(t *testing.T) {
 				tt.mempoolFunc(ctrl),
 				tt.appSenderFunc(ctrl),
 			)
-			err = n.AppGossip(context.Background(), ids.GenerateTestNodeID(), tt.msgBytesFunc())
-			require.NoError(err)
+			require.NoError(n.AppGossip(context.Background(), ids.GenerateTestNodeID(), tt.msgBytesFunc()))
 		})
 	}
 }

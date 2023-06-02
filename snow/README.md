@@ -68,7 +68,7 @@ The main role of the `sender` is to build and send outbound messages. It is actu
 
 ## [Consensus Engine](https://github.com/ava-labs/avalanchego/blob/master/snow/consensus/snowman/consensus.go)
 
-Consensus is defined as getting a group of distributed systems to agree on an outcome. In the case of the Avalanche network, consensus is achieved when validators are in agreement with the state of the blockchain. The novel consensus algorithm is documented in the [white paper](https://assets.website-files.com/5d80307810123f5ffbb34d6e/6009805681b416f34dcae012_Avalanche%20Consensus%20Whitepaper.pdf). There are two main consensus algorithms: Avalanche and Snowman. The engine is responsible for adding proposing a new block to consensus, repeatedly polling the network for decisions (accept/reject), and communicating that decision to the `Sender`.
+Consensus is defined as getting a group of distributed systems to agree on an outcome. In the case of the Avalanche network, consensus is achieved when validators are in agreement with the state of the blockchain. The novel consensus algorithm is documented in the [white paper](https://assets.website-files.com/5d80307810123f5ffbb34d6e/6009805681b416f34dcae012_Avalanche%20Consensus%20Whitepaper.pdf). There are two main consensus algorithms: Avalanche and Snowman. The engine is responsible for proposing a new block to consensus, repeatedly polling the network for decisions (accept/reject), and communicating that decision to the `Sender`.
 
 ## [Blockchain Creation](https://github.com/ava-labs/avalanchego/blob/master/chains/manager.go)
 
