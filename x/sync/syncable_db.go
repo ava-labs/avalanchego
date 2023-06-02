@@ -52,7 +52,14 @@ func (s *SyncableDBServer) GetChangeProof(ctx context.Context, req *syncpb.GetCh
 	if err != nil {
 		return nil, err
 	}
-	changeProof, err := s.db.GetChangeProof(ctx, startRootID, endRootID, req.StartKey, req.EndKey, int(req.KeyLimit))
+	changeProof, err := s.db.GetChangeProof(
+		ctx,
+		startRootID,
+		endRootID,
+		req.StartKey,
+		req.EndKey,
+		int(req.KeyLimit),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -70,8 +77,9 @@ func (s *SyncableDBServer) VerifyChangeProof(ctx context.Context, req *syncpb.Ve
 		return nil, err
 	}
 
+	// TODO there's probably a better way to do this.
 	var errString string
-	if err = s.db.VerifyChangeProof(ctx, &proof, req.StartKey, req.EndKey, rootID); err != nil {
+	if err := s.db.VerifyChangeProof(ctx, &proof, req.StartKey, req.EndKey, rootID); err != nil {
 		errString = err.Error()
 	}
 	return &syncpb.VerifyChangeProofResponse{
@@ -95,10 +103,8 @@ func (s *SyncableDBServer) GetProof(ctx context.Context, req *syncpb.GetProofReq
 		return nil, err
 	}
 
-	protoProof := proof.ToProto()
-
 	return &syncpb.GetProofResponse{
-		Proof: protoProof,
+		Proof: proof.ToProto(),
 	}, nil
 }
 
@@ -176,7 +182,13 @@ func (c *SyncableDBClient) GetChangeProof(ctx context.Context, startRootID, endR
 	return &proof, nil
 }
 
-func (c *SyncableDBClient) VerifyChangeProof(ctx context.Context, proof *merkledb.ChangeProof, startKey, endKey []byte, expectedRootID ids.ID) error {
+func (c *SyncableDBClient) VerifyChangeProof(
+	ctx context.Context,
+	proof *merkledb.ChangeProof,
+	startKey []byte,
+	endKey []byte,
+	expectedRootID ids.ID,
+) error {
 	resp, err := c.client.VerifyChangeProof(ctx, &syncpb.VerifyChangeProofRequest{
 		Proof:            proof.ToProto(),
 		StartKey:         startKey,
@@ -187,6 +199,7 @@ func (c *SyncableDBClient) VerifyChangeProof(ctx context.Context, proof *merkled
 		return err
 	}
 
+	// TODO there's probably a better way to do this.
 	if len(resp.Error) == 0 {
 		return nil
 	}
@@ -215,7 +228,13 @@ func (c *SyncableDBClient) GetProof(ctx context.Context, key []byte) (*merkledb.
 	return &proof, nil
 }
 
-func (c *SyncableDBClient) GetRangeProofAtRoot(ctx context.Context, rootID ids.ID, startKey, endKey []byte, keyLimit int) (*merkledb.RangeProof, error) {
+func (c *SyncableDBClient) GetRangeProofAtRoot(
+	ctx context.Context,
+	rootID ids.ID,
+	startKey []byte,
+	endKey []byte,
+	keyLimit int,
+) (*merkledb.RangeProof, error) {
 	resp, err := c.client.GetRangeProof(ctx, &syncpb.GetRangeProofRequest{
 		RootHash: rootID[:],
 		StartKey: startKey,
