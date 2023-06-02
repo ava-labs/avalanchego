@@ -1505,3 +1505,70 @@ func TestChangeProofUnmarshalProtoInvalidMaybe(t *testing.T) {
 	err := proof.UnmarshalProto(protoProof)
 	require.ErrorIs(t, err, ErrInvalidMaybe)
 }
+
+func TestProofProtoMarshalUnmarshal(t *testing.T) {
+	require := require.New(t)
+	rand := rand.New(rand.NewSource(1337)) // #nosec G404
+
+	for i := 0; i < 500; i++ {
+		// Make a random proof.
+		proofLen := rand.Intn(32)
+		proofPath := make([]ProofNode, proofLen)
+		for i := 0; i < proofLen; i++ {
+			proofPath[i] = newRandomProofNode(rand)
+		}
+
+		keyLen := rand.Intn(32)
+		key := make([]byte, keyLen)
+		_, _ = rand.Read(key)
+
+		hasValue := rand.Intn(2) == 1
+		value := Nothing[[]byte]()
+		if hasValue {
+			valueLen := rand.Intn(32)
+			valueBytes := make([]byte, valueLen)
+			_, _ = rand.Read(valueBytes)
+			value = Some(valueBytes)
+		}
+
+		proof := Proof{
+			Key:   key,
+			Value: value,
+			Path:  proofPath,
+		}
+
+		// Marshal and unmarshal it.
+		// Assert the unmarshaled one is the same as the original.
+		var unmarshaledProof Proof
+		protoProof := proof.ToProto()
+		require.NoError(unmarshaledProof.UnmarshalProto(protoProof))
+		require.Equal(proof, unmarshaledProof)
+
+		// Marshaling again should yield same result.
+		protoUnmarshaledProof := unmarshaledProof.ToProto()
+		require.Equal(protoProof, protoUnmarshaledProof)
+	}
+}
+
+func TestProofProtoMarshalUnmarshalNil(t *testing.T) {
+	var proof Proof
+	err := proof.UnmarshalProto(nil)
+	require.ErrorIs(t, err, ErrNilProof)
+}
+
+func TestProofProtoMarshalUnmarshalNilValue(t *testing.T) {
+	var proof Proof
+	err := proof.UnmarshalProto(&syncpb.Proof{})
+	require.ErrorIs(t, err, ErrNilValue)
+}
+
+func TestProofProtoMarshalUnmarshalInvalidMaybe(t *testing.T) {
+	var proof Proof
+	err := proof.UnmarshalProto(&syncpb.Proof{
+		Value: &syncpb.MaybeBytes{
+			IsNothing: true,
+			Value:     []byte{1},
+		},
+	})
+	require.ErrorIs(t, err, ErrInvalidMaybe)
+}
