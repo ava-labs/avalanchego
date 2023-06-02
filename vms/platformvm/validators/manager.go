@@ -180,7 +180,7 @@ func (m *manager) GetValidatorSet(ctx context.Context, height uint64, subnetID i
 		return nil, ErrMissingValidator
 	}
 	currentPrimaryValidatorList := currentPrimaryNetworkValidators.List()
-	primarySet := make(map[ids.NodeID]*validators.GetValidatorOutput, len(currentSubnetValidatorList))
+	primarySet := make(map[ids.NodeID]*validators.GetValidatorOutput, len(currentPrimaryValidatorList))
 	for _, vdr := range currentPrimaryValidatorList {
 		primarySet[vdr.NodeID] = &validators.GetValidatorOutput{
 			NodeID:    vdr.NodeID,
