@@ -6,7 +6,6 @@ package sync
 import (
 	"context"
 	"errors"
-	"math"
 
 	"google.golang.org/protobuf/types/known/emptypb"
 
@@ -34,7 +33,10 @@ type SyncableDBServer struct {
 	db SyncableDB
 }
 
-func (s *SyncableDBServer) GetMerkleRoot(ctx context.Context, _ *emptypb.Empty) (*syncpb.GetMerkleRootResponse, error) {
+func (s *SyncableDBServer) GetMerkleRoot(
+	ctx context.Context,
+	_ *emptypb.Empty,
+) (*syncpb.GetMerkleRootResponse, error) {
 	root, err := s.db.GetMerkleRoot(ctx)
 	if err != nil {
 		return nil, err
@@ -44,7 +46,10 @@ func (s *SyncableDBServer) GetMerkleRoot(ctx context.Context, _ *emptypb.Empty) 
 	}, nil
 }
 
-func (s *SyncableDBServer) GetChangeProof(ctx context.Context, req *syncpb.GetChangeProofRequest) (*syncpb.ChangeProof, error) {
+func (s *SyncableDBServer) GetChangeProof(
+	ctx context.Context,
+	req *syncpb.GetChangeProofRequest,
+) (*syncpb.ChangeProof, error) {
 	startRootID, err := ids.ToID(req.StartRootHash)
 	if err != nil {
 		return nil, err
@@ -67,7 +72,10 @@ func (s *SyncableDBServer) GetChangeProof(ctx context.Context, req *syncpb.GetCh
 	return changeProof.ToProto(), nil
 }
 
-func (s *SyncableDBServer) VerifyChangeProof(ctx context.Context, req *syncpb.VerifyChangeProofRequest) (*syncpb.VerifyChangeProofResponse, error) {
+func (s *SyncableDBServer) VerifyChangeProof(
+	ctx context.Context,
+	req *syncpb.VerifyChangeProofRequest,
+) (*syncpb.VerifyChangeProofResponse, error) {
 	var proof merkledb.ChangeProof
 	if err := proof.UnmarshalProto(req.Proof); err != nil {
 		return nil, err
@@ -88,7 +96,10 @@ func (s *SyncableDBServer) VerifyChangeProof(ctx context.Context, req *syncpb.Ve
 	}, nil
 }
 
-func (s *SyncableDBServer) CommitChangeProof(ctx context.Context, req *syncpb.CommitChangeProofRequest) (*emptypb.Empty, error) {
+func (s *SyncableDBServer) CommitChangeProof(
+	ctx context.Context,
+	req *syncpb.CommitChangeProofRequest,
+) (*emptypb.Empty, error) {
 	var proof merkledb.ChangeProof
 	if err := proof.UnmarshalProto(req.Proof); err != nil {
 		return nil, err
@@ -98,7 +109,10 @@ func (s *SyncableDBServer) CommitChangeProof(ctx context.Context, req *syncpb.Co
 	return &emptypb.Empty{}, err
 }
 
-func (s *SyncableDBServer) GetProof(ctx context.Context, req *syncpb.GetProofRequest) (*syncpb.GetProofResponse, error) {
+func (s *SyncableDBServer) GetProof(
+	ctx context.Context,
+	req *syncpb.GetProofRequest,
+) (*syncpb.GetProofResponse, error) {
 	proof, err := s.db.GetProof(ctx, req.Key)
 	if err != nil {
 		return nil, err
@@ -109,7 +123,10 @@ func (s *SyncableDBServer) GetProof(ctx context.Context, req *syncpb.GetProofReq
 	}, nil
 }
 
-func (s *SyncableDBServer) GetRangeProof(ctx context.Context, req *syncpb.GetRangeProofRequest) (*syncpb.GetRangeProofResponse, error) {
+func (s *SyncableDBServer) GetRangeProof(
+	ctx context.Context,
+	req *syncpb.GetRangeProofRequest,
+) (*syncpb.GetRangeProofResponse, error) {
 	rootID, err := ids.ToID(req.RootHash)
 	if err != nil {
 		return nil, err
@@ -143,7 +160,10 @@ func (s *SyncableDBServer) GetRangeProof(ctx context.Context, req *syncpb.GetRan
 	return protoProof, nil
 }
 
-func (s *SyncableDBServer) CommitRangeProof(ctx context.Context, req *syncpb.CommitRangeProofRequest) (*emptypb.Empty, error) {
+func (s *SyncableDBServer) CommitRangeProof(
+	ctx context.Context,
+	req *syncpb.CommitRangeProofRequest,
+) (*emptypb.Empty, error) {
 	var proof merkledb.RangeProof
 	if err := proof.UnmarshalProto(req.RangeProof); err != nil {
 		return nil, err
@@ -155,6 +175,8 @@ func (s *SyncableDBServer) CommitRangeProof(ctx context.Context, req *syncpb.Com
 
 type SyncableDBClient struct {
 	client syncpb.SyncableDBClient
+
+	maxMessageSize uint32
 }
 
 func (c *SyncableDBClient) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
@@ -165,7 +187,14 @@ func (c *SyncableDBClient) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
 	return ids.ToID(resp.RootHash)
 }
 
-func (c *SyncableDBClient) GetChangeProof(ctx context.Context, startRootID, endRootID ids.ID, startKey, endKey []byte, keyLimit int) (*merkledb.ChangeProof, error) {
+func (c *SyncableDBClient) GetChangeProof(
+	ctx context.Context,
+	startRootID ids.ID,
+	endRootID ids.ID,
+	startKey []byte,
+	endKey []byte,
+	keyLimit int,
+) (*merkledb.ChangeProof, error) {
 	resp, err := c.client.GetChangeProof(ctx, &syncpb.GetChangeProofRequest{
 		StartRootHash: startRootID[:],
 		EndRootHash:   endRootID[:],
@@ -237,14 +266,11 @@ func (c *SyncableDBClient) GetRangeProofAtRoot(
 	keyLimit int,
 ) (*merkledb.RangeProof, error) {
 	resp, err := c.client.GetRangeProof(ctx, &syncpb.GetRangeProofRequest{
-		RootHash: rootID[:],
-		StartKey: startKey,
-		EndKey:   endKey,
-		KeyLimit: uint32(keyLimit),
-		// Only needed for over-the-network calls.
-		// TODO do we need to handle this?
-		// Remove from proto?
-		BytesLimit: math.MaxUint32,
+		RootHash:   rootID[:],
+		StartKey:   startKey,
+		EndKey:     endKey,
+		KeyLimit:   uint32(keyLimit),
+		BytesLimit: c.maxMessageSize,
 	})
 	if err != nil {
 		return nil, err
@@ -257,7 +283,11 @@ func (c *SyncableDBClient) GetRangeProofAtRoot(
 	return &proof, nil
 }
 
-func (c *SyncableDBClient) CommitRangeProof(ctx context.Context, startKey []byte, proof *merkledb.RangeProof) error {
+func (c *SyncableDBClient) CommitRangeProof(
+	ctx context.Context,
+	startKey []byte,
+	proof *merkledb.RangeProof,
+) error {
 	_, err := c.client.CommitRangeProof(ctx, &syncpb.CommitRangeProofRequest{
 		StartKey:   startKey,
 		RangeProof: proof.ToProto(),
