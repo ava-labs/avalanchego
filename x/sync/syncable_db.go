@@ -213,21 +213,9 @@ func (c *SyncableDBClient) GetProof(ctx context.Context, key []byte) (*merkledb.
 		return nil, err
 	}
 
-	// TODO implement unmarshal for merkledb.Proof
-	value := merkledb.Nothing[[]byte]()
-	if !resp.Proof.Value.IsNothing {
-		value = merkledb.Some(resp.Proof.Value.Value)
-	}
-
-	proof := merkledb.Proof{
-		Key:   resp.Proof.Key,
-		Value: value,
-		Path:  make([]merkledb.ProofNode, len(resp.Proof.Proof)),
-	}
-	for i, node := range resp.Proof.Proof {
-		if err := proof.Path[i].UnmarshalProto(node); err != nil {
-			return nil, err
-		}
+	var proof merkledb.Proof
+	if err := proof.UnmarshalProto(resp.Proof); err != nil {
+		return nil, err
 	}
 	return &proof, nil
 }
