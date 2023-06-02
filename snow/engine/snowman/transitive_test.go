@@ -213,7 +213,7 @@ func TestEngineQuery(t *testing.T) {
 	}
 
 	chitted := new(bool)
-	sender.SendChitsF = func(_ context.Context, inVdr ids.NodeID, requestID uint32, prefSet []ids.ID, accepted []ids.ID) {
+	sender.SendChitsF = func(_ context.Context, inVdr ids.NodeID, requestID uint32, vote ids.ID, accepted ids.ID) {
 		if *chitted {
 			t.Fatalf("Sent multiple chits")
 		}
@@ -221,16 +221,10 @@ func TestEngineQuery(t *testing.T) {
 		if requestID != 15 {
 			t.Fatalf("Wrong request ID")
 		}
-		if len(prefSet) != 1 {
-			t.Fatal("Should only be one vote")
-		}
-		if gBlk.ID() != prefSet[0] {
+		if gBlk.ID() != vote {
 			t.Fatalf("Wrong chits block")
 		}
-		if len(accepted) != 1 {
-			t.Fatal("accepted should only have one element")
-		}
-		if gBlk.ID() != accepted[0] {
+		if gBlk.ID() != accepted {
 			t.Fatalf("Wrong accepted frontier")
 		}
 	}
@@ -343,7 +337,7 @@ func TestEngineQuery(t *testing.T) {
 			t.Fatalf("Asking for wrong block")
 		}
 	}
-	if err := te.Chits(context.Background(), vdr, *queryRequestID, []ids.ID{blk1.ID()}, nil); err != nil {
+	if err := te.Chits(context.Background(), vdr, *queryRequestID, blk1.ID(), blk1.ID()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -553,11 +547,10 @@ func TestEngineMultipleQuery(t *testing.T) {
 			t.Fatalf("Asking for wrong block")
 		}
 	}
-	blkSet := []ids.ID{blk1.ID()}
-	if err := te.Chits(context.Background(), vdr0, *queryRequestID, blkSet, nil); err != nil {
+	if err := te.Chits(context.Background(), vdr0, *queryRequestID, blk1.ID(), blk1.ID()); err != nil {
 		t.Fatal(err)
 	}
-	if err := te.Chits(context.Background(), vdr1, *queryRequestID, blkSet, nil); err != nil {
+	if err := te.Chits(context.Background(), vdr1, *queryRequestID, blk1.ID(), blk1.ID()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -598,8 +591,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 	}
 
 	// Should be dropped because the query was already filled
-	blkSet = []ids.ID{blk0.ID()}
-	if err := te.Chits(context.Background(), vdr2, *queryRequestID, blkSet, nil); err != nil {
+	if err := te.Chits(context.Background(), vdr2, *queryRequestID, blk0.ID(), blk0.ID()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -769,7 +761,7 @@ func TestEnginePushQuery(t *testing.T) {
 	}
 
 	chitted := new(bool)
-	sender.SendChitsF = func(_ context.Context, inVdr ids.NodeID, requestID uint32, votes []ids.ID, accepted []ids.ID) {
+	sender.SendChitsF = func(_ context.Context, inVdr ids.NodeID, requestID uint32, vote ids.ID, accepted ids.ID) {
 		if *chitted {
 			t.Fatalf("Sent chit multiple times")
 		}
@@ -780,16 +772,10 @@ func TestEnginePushQuery(t *testing.T) {
 		if requestID != 20 {
 			t.Fatalf("Wrong request id")
 		}
-		if len(votes) != 1 {
-			t.Fatal("votes should only have one element")
-		}
-		if gBlk.ID() != votes[0] {
+		if gBlk.ID() != vote {
 			t.Fatalf("Asking for wrong block")
 		}
-		if len(accepted) != 1 {
-			t.Fatal("accepted should only have one element")
-		}
-		if gBlk.ID() != accepted[0] {
+		if gBlk.ID() != accepted {
 			t.Fatalf("Wrong accepted frontier")
 		}
 	}
@@ -1205,7 +1191,7 @@ func TestEngineAbandonChit(t *testing.T) {
 	}
 
 	// Register a voter dependency on an unknown block.
-	require.NoError(te.Chits(context.Background(), vdr, reqID, []ids.ID{fakeBlkID}, nil))
+	require.NoError(te.Chits(context.Background(), vdr, reqID, fakeBlkID, fakeBlkID))
 	require.Len(te.blocked, 1)
 
 	sender.CantSendPullQuery = false
@@ -1260,7 +1246,7 @@ func TestEngineAbandonChitWithUnexpectedPutBlock(t *testing.T) {
 	}
 
 	// Register a voter dependency on an unknown block.
-	require.NoError(te.Chits(context.Background(), vdr, reqID, []ids.ID{fakeBlkID}, nil))
+	require.NoError(te.Chits(context.Background(), vdr, reqID, fakeBlkID, fakeBlkID))
 	require.Len(te.blocked, 1)
 
 	sender.CantSendPullQuery = false
@@ -1427,7 +1413,7 @@ func TestEngineBlockingChitResponse(t *testing.T) {
 	sender.SendPushQueryF = nil
 	sender.CantSendPushQuery = false
 
-	if err := te.Chits(context.Background(), vdr, *queryRequestID, []ids.ID{blockingBlk.ID()}, nil); err != nil {
+	if err := te.Chits(context.Background(), vdr, *queryRequestID, blockingBlk.ID(), blockingBlk.ID()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1545,7 +1531,7 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := te.Chits(context.Background(), vdr, *reqID, []ids.ID{invalidBlkID}, nil); err != nil {
+	if err := te.Chits(context.Background(), vdr, *reqID, invalidBlkID, invalidBlkID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2003,13 +1989,11 @@ func TestEngineDoubleChit(t *testing.T) {
 		panic("Should have errored")
 	}
 
-	blkSet := []ids.ID{blk.ID()}
-
 	if status := blk.Status(); status != choices.Processing {
 		t.Fatalf("Wrong status: %s ; expected: %s", status, choices.Processing)
 	}
 
-	if err := te.Chits(context.Background(), vdr0, *queryRequestID, blkSet, nil); err != nil {
+	if err := te.Chits(context.Background(), vdr0, *queryRequestID, blk.ID(), blk.ID()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2017,7 +2001,7 @@ func TestEngineDoubleChit(t *testing.T) {
 		t.Fatalf("Wrong status: %s ; expected: %s", status, choices.Processing)
 	}
 
-	if err := te.Chits(context.Background(), vdr0, *queryRequestID, blkSet, nil); err != nil {
+	if err := te.Chits(context.Background(), vdr0, *queryRequestID, blk.ID(), blk.ID()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2025,7 +2009,7 @@ func TestEngineDoubleChit(t *testing.T) {
 		t.Fatalf("Wrong status: %s ; expected: %s", status, choices.Processing)
 	}
 
-	if err := te.Chits(context.Background(), vdr1, *queryRequestID, blkSet, nil); err != nil {
+	if err := te.Chits(context.Background(), vdr1, *queryRequestID, blk.ID(), blk.ID()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2170,7 +2154,7 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 		}
 	}
 
-	if err := te.Chits(context.Background(), vdr, reqID, []ids.ID{blk0.ID()}, nil); err != nil {
+	if err := te.Chits(context.Background(), vdr, reqID, blk0.ID(), blk0.ID()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2252,7 +2236,7 @@ func TestEngineReceiveNewRejectedBlock(t *testing.T) {
 		t.Fatalf("Didn't query for the new block")
 	}
 
-	if err := te.Chits(context.Background(), vdr, reqID, []ids.ID{acceptedBlk.ID()}, nil); err != nil {
+	if err := te.Chits(context.Background(), vdr, reqID, acceptedBlk.ID(), acceptedBlk.ID()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2367,7 +2351,7 @@ func TestEngineRejectionAmplification(t *testing.T) {
 		}
 	}
 
-	if err := te.Chits(context.Background(), vdr, reqID, []ids.ID{acceptedBlk.ID()}, nil); err != nil {
+	if err := te.Chits(context.Background(), vdr, reqID, acceptedBlk.ID(), acceptedBlk.ID()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2488,7 +2472,7 @@ func TestEngineTransitiveRejectionAmplificationDueToRejectedParent(t *testing.T)
 		t.Fatalf("Didn't query for the new block")
 	}
 
-	if err := te.Chits(context.Background(), vdr, reqID, []ids.ID{acceptedBlk.ID()}, nil); err != nil {
+	if err := te.Chits(context.Background(), vdr, reqID, acceptedBlk.ID(), acceptedBlk.ID()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2597,7 +2581,7 @@ func TestEngineTransitiveRejectionAmplificationDueToInvalidParent(t *testing.T) 
 		}
 	}
 
-	if err := te.Chits(context.Background(), vdr, reqID, []ids.ID{acceptedBlk.ID()}, nil); err != nil {
+	if err := te.Chits(context.Background(), vdr, reqID, acceptedBlk.ID(), acceptedBlk.ID()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2810,7 +2794,7 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 
 	// Now we are expecting a Chits message, and we receive it for [blk2]
 	// instead of [blk1]. This will cause the node to again request [blk2].
-	require.NoError(te.Chits(context.Background(), vdr, *queryRequestID, []ids.ID{blk2.ID()}, nil))
+	require.NoError(te.Chits(context.Background(), vdr, *queryRequestID, blk2.ID(), blk2.ID()))
 
 	// The votes should be bubbled through [blk2] despite the fact that it is
 	// failing verification.
@@ -2848,7 +2832,7 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 	require.True(*queried)
 
 	// After a single vote for [blk2], it should be marked as accepted.
-	require.NoError(te.Chits(context.Background(), vdr, *queryRequestID, []ids.ID{blk2.ID()}, nil))
+	require.NoError(te.Chits(context.Background(), vdr, *queryRequestID, blk2.ID(), blk2.ID()))
 	require.Equal(choices.Accepted, blk2.Status())
 }
 
@@ -2989,7 +2973,7 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 
 	// Now we are expecting a Chits message and we receive it for [blk3].
 	// This will cause the node to again request [blk3].
-	require.NoError(te.Chits(context.Background(), vdr, *queryRequestID, []ids.ID{blk3.ID()}, nil))
+	require.NoError(te.Chits(context.Background(), vdr, *queryRequestID, blk3.ID(), blk3.ID()))
 
 	// Drop the re-request for [blk3] to cause the poll to terminate. The votes
 	// should be bubbled through [blk3] despite the fact that it hasn't been
@@ -3119,8 +3103,8 @@ func TestEngineBuildBlockWithCachedNonVerifiedParent(t *testing.T) {
 	require.NoError(te.Put(context.Background(), vdr, 0, parentBlkA.BytesV))
 
 	// Give 2 chits for [parentBlkA]/[parentBlkB]
-	require.NoError(te.Chits(context.Background(), vdr, *queryRequestAID, []ids.ID{parentBlkB.IDV}, nil))
-	require.NoError(te.Chits(context.Background(), vdr, *queryRequestGPID, []ids.ID{parentBlkB.IDV}, nil))
+	require.NoError(te.Chits(context.Background(), vdr, *queryRequestAID, parentBlkB.IDV, parentBlkB.IDV))
+	require.NoError(te.Chits(context.Background(), vdr, *queryRequestGPID, parentBlkB.IDV, parentBlkB.IDV))
 
 	// Assert that the blocks' statuses are correct.
 	// The evicted [parentBlkA] shouldn't be changed.
@@ -3232,8 +3216,7 @@ func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 		*queryRequestID = requestID
 	}
 
-	blkIDs := []ids.ID{blk.ID()}
-	require.NoError(te.Chits(context.Background(), vdr, *queryRequestID, blkIDs, blkIDs))
+	require.NoError(te.Chits(context.Background(), vdr, *queryRequestID, blk.ID(), blk.ID()))
 
 	require.Equal(choices.Processing, blk.Status())
 
