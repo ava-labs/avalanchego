@@ -113,19 +113,16 @@ func TestAcceptedFrontier(t *testing.T) {
 	require.IsType(t, &getter{}, bsIntf)
 	bs := bsIntf.(*getter)
 
-	var accepted []ids.ID
-	sender.SendAcceptedFrontierF = func(_ context.Context, _ ids.NodeID, _ uint32, frontier []ids.ID) {
-		accepted = frontier
+	var accepted ids.ID
+	sender.SendAcceptedFrontierF = func(_ context.Context, _ ids.NodeID, _ uint32, containerID ids.ID) {
+		accepted = containerID
 	}
 
 	if err := bs.GetAcceptedFrontier(context.Background(), ids.EmptyNodeID, 0); err != nil {
 		t.Fatal(err)
 	}
 
-	if len(accepted) != 1 {
-		t.Fatalf("Only one block should be accepted")
-	}
-	if accepted[0] != blkID {
+	if accepted != blkID {
 		t.Fatalf("Blk should be accepted")
 	}
 }

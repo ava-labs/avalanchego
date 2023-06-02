@@ -454,7 +454,7 @@ func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs set.Set[id
 	}
 }
 
-func (s *sender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) {
+func (s *sender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
 	ctx = utils.Detach(ctx)
 
 	// Sending this message to myself.
@@ -462,7 +462,7 @@ func (s *sender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, re
 		inMsg := message.InboundAcceptedFrontier(
 			s.ctx.ChainID,
 			requestID,
-			containerIDs,
+			containerID,
 			nodeID,
 		)
 		go s.router.HandleInbound(ctx, inMsg)
@@ -473,14 +473,14 @@ func (s *sender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, re
 	outMsg, err := s.msgCreator.AcceptedFrontier(
 		s.ctx.ChainID,
 		requestID,
-		containerIDs,
+		containerID,
 	)
 	if err != nil {
 		s.ctx.Log.Error("failed to build message",
 			zap.Stringer("messageOp", message.AcceptedFrontierOp),
 			zap.Stringer("chainID", s.ctx.ChainID),
 			zap.Uint32("requestID", requestID),
-			zap.Stringers("containerIDs", containerIDs),
+			zap.Stringer("containerID", containerID),
 			zap.Error(err),
 		)
 		return
@@ -501,7 +501,7 @@ func (s *sender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, re
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("chainID", s.ctx.ChainID),
 			zap.Uint32("requestID", requestID),
-			zap.Stringers("containerIDs", containerIDs),
+			zap.Stringer("containerID", containerID),
 		)
 	}
 }
