@@ -59,17 +59,17 @@ type health struct {
 }
 
 func New(log logging.Logger, registerer prometheus.Registerer) (Health, error) {
-	readinessWorker, err := newWorker("readiness", registerer)
+	readinessWorker, err := newWorker(log, "readiness", registerer)
 	if err != nil {
 		return nil, err
 	}
 
-	healthWorker, err := newWorker("health", registerer)
+	healthWorker, err := newWorker(log, "health", registerer)
 	if err != nil {
 		return nil, err
 	}
 
-	livenessWorker, err := newWorker("liveness", registerer)
+	livenessWorker, err := newWorker(log, "liveness", registerer)
 	return &health{
 		log:       log,
 		readiness: readinessWorker,
@@ -93,7 +93,8 @@ func (h *health) RegisterLivenessCheck(name string, checker Checker, tags ...str
 func (h *health) Readiness(tags ...string) (map[string]Result, bool) {
 	results, healthy := h.readiness.Results(tags...)
 	if !healthy {
-		h.log.Warn("failing readiness check",
+		h.log.Warn("failing check",
+			zap.String("namespace", "readiness"),
 			zap.Reflect("reason", results),
 		)
 	}
@@ -103,7 +104,8 @@ func (h *health) Readiness(tags ...string) (map[string]Result, bool) {
 func (h *health) Health(tags ...string) (map[string]Result, bool) {
 	results, healthy := h.health.Results(tags...)
 	if !healthy {
-		h.log.Warn("failing health check",
+		h.log.Warn("failing check",
+			zap.String("namespace", "health"),
 			zap.Reflect("reason", results),
 		)
 	}
@@ -113,7 +115,8 @@ func (h *health) Health(tags ...string) (map[string]Result, bool) {
 func (h *health) Liveness(tags ...string) (map[string]Result, bool) {
 	results, healthy := h.liveness.Results(tags...)
 	if !healthy {
-		h.log.Warn("failing liveness check",
+		h.log.Warn("failing check",
+			zap.String("namespace", "liveness"),
 			zap.Reflect("reason", results),
 		)
 	}

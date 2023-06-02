@@ -12,18 +12,23 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"go.uber.org/zap"
+
 	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var errDuplicateCheck = errors.New("duplicated check")
 
 type worker struct {
+	log        logging.Logger
+	namespace  string
 	metrics    *metrics
 	checksLock sync.RWMutex
-	checks     map[string]Checker
+	checks     map[string]*checker
 
 	resultsLock sync.RWMutex
 	results     map[string]Result
@@ -35,18 +40,29 @@ type worker struct {
 	closer    chan struct{}
 }
 
-func newWorker(namespace string, registerer prometheus.Registerer) (*worker, error) {
+type checker struct {
+	checker Checker
+	tags    []string
+}
+
+func newWorker(
+	log logging.Logger,
+	namespace string,
+	registerer prometheus.Registerer,
+) (*worker, error) {
 	metrics, err := newMetrics(namespace, registerer)
 	return &worker{
-		metrics: metrics,
-		checks:  make(map[string]Checker),
-		results: make(map[string]Result),
-		closer:  make(chan struct{}),
-		tags:    make(map[string]set.Set[string]),
+		log:       log,
+		namespace: namespace,
+		metrics:   metrics,
+		checks:    make(map[string]*checker),
+		results:   make(map[string]Result),
+		closer:    make(chan struct{}),
+		tags:      make(map[string]set.Set[string]),
 	}, err
 }
 
-func (w *worker) RegisterCheck(name string, checker Checker, tags ...string) error {
+func (w *worker) RegisterCheck(name string, check Checker, tags ...string) error {
 	w.checksLock.Lock()
 	defer w.checksLock.Unlock()
 
@@ -57,7 +73,10 @@ func (w *worker) RegisterCheck(name string, checker Checker, tags ...string) err
 	w.resultsLock.Lock()
 	defer w.resultsLock.Unlock()
 
-	w.checks[name] = checker
+	w.checks[name] = &checker{
+		checker: check,
+		tags:    tags,
+	}
 	w.results[name] = notYetRunResult
 
 	// Add the check to the tag
@@ -68,7 +87,7 @@ func (w *worker) RegisterCheck(name string, checker Checker, tags ...string) err
 	}
 
 	// Whenever a new check is added - it is failing
-	w.metrics.failingChecks.Inc()
+	w.markUnhealthy(tags)
 	return nil
 }
 
@@ -172,7 +191,7 @@ func (w *worker) runChecks(ctx context.Context) {
 	wg.Wait()
 }
 
-func (w *worker) runCheck(ctx context.Context, wg *sync.WaitGroup, name string, check Checker) {
+func (w *worker) runCheck(ctx context.Context, wg *sync.WaitGroup, name string, check *checker) {
 	defer wg.Done()
 
 	start := time.Now()
@@ -180,7 +199,7 @@ func (w *worker) runCheck(ctx context.Context, wg *sync.WaitGroup, name string, 
 	// To avoid any deadlocks when [RegisterCheck] is called with a lock
 	// that is grabbed by [check.HealthCheck], we ensure that no locks
 	// are held when [check.HealthCheck] is called.
-	details, err := check.HealthCheck(ctx)
+	details, err := check.checker.HealthCheck(ctx)
 	end := time.Now()
 
 	result := Result{
@@ -204,10 +223,34 @@ func (w *worker) runCheck(ctx context.Context, wg *sync.WaitGroup, name string, 
 		}
 
 		if prevResult.Error == nil {
-			w.metrics.failingChecks.Inc()
+			w.log.Warn("check started failing",
+				zap.String("namespace", w.namespace),
+				zap.String("name", name),
+				zap.Strings("tags", check.tags),
+				zap.Error(err),
+			)
+			w.markUnhealthy(check.tags)
 		}
 	} else if prevResult.Error != nil {
-		w.metrics.failingChecks.Dec()
+		w.log.Info("check started passing",
+			zap.String("namespace", w.namespace),
+			zap.String("name", name),
+			zap.Strings("tags", check.tags),
+			zap.Error(err),
+		)
+		w.markHealthy(check.tags)
 	}
 	w.results[name] = result
+}
+
+func (w *worker) markUnhealthy(tags []string) {
+	for _, tag := range tags {
+		w.metrics.failingChecks.WithLabelValues(tag).Inc()
+	}
+}
+
+func (w *worker) markHealthy(tags []string) {
+	for _, tag := range tags {
+		w.metrics.failingChecks.WithLabelValues(tag).Dec()
+	}
 }
