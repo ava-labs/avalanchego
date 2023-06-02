@@ -333,34 +333,34 @@ func TestVM_GetValidatorSet(t *testing.T) {
 			},
 			expectedErr: nil,
 		},
-		// {
-		// 	name:               "unrelated primary network key removal on subnet lookup",
-		// 	height:             4,
-		// 	lastAcceptedHeight: 5,
-		// 	subnetID:           ids.GenerateTestID(),
-		// 	currentPrimaryNetworkValidators: map[ids.NodeID]*validators.Validator{
-		// 		testValidators[0].NodeID: copyPrimaryValidator(testValidators[0]),
-		// 	},
-		// 	currentSubnetValidators: []*validators.Validator{
-		// 		copySubnetValidator(testValidators[0]),
-		// 	},
-		// 	weightDiffs: []map[ids.NodeID]*state.ValidatorWeightDiff{
-		// 		{},
-		// 	},
-		// 	pkDiffs: []map[ids.NodeID]*bls.PublicKey{
-		// 		{
-		// 			testValidators[1].NodeID: testValidators[1].PublicKey,
-		// 		},
-		// 	},
-		// 	expectedVdrSet: map[ids.NodeID]*validators.GetValidatorOutput{
-		// 		testValidators[0].NodeID: {
-		// 			NodeID:    testValidators[0].NodeID,
-		// 			PublicKey: testValidators[0].PublicKey,
-		// 			Weight:    testValidators[0].Weight,
-		// 		},
-		// 	},
-		// 	expectedErr: nil,
-		// },
+		{
+			name:               "unrelated primary network key removal on subnet lookup",
+			height:             4,
+			lastAcceptedHeight: 5,
+			subnetID:           ids.GenerateTestID(),
+			currentPrimaryNetworkValidators: map[ids.NodeID]*validators.Validator{
+				testValidators[0].NodeID: copyPrimaryValidator(testValidators[0]),
+			},
+			currentSubnetValidators: []*validators.Validator{
+				copySubnetValidator(testValidators[0]),
+			},
+			weightDiffs: map[uint64]map[ids.NodeID]*state.ValidatorWeightDiff{
+				5: {},
+			},
+			pkDiffs: map[uint64]map[ids.NodeID]*bls.PublicKey{
+				5: {
+					testValidators[1].NodeID: testValidators[1].PublicKey,
+				},
+			},
+			expectedVdrSet: map[ids.NodeID]*validators.GetValidatorOutput{
+				testValidators[0].NodeID: {
+					NodeID:    testValidators[0].NodeID,
+					PublicKey: testValidators[0].PublicKey,
+					Weight:    testValidators[0].Weight,
+				},
+			},
+			expectedErr: nil,
+		},
 	}
 
 	for _, tt := range tests {
