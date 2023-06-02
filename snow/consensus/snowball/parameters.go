@@ -44,16 +44,6 @@ type Parameters struct {
 	// Reports unhealthy if there is an item processing for longer than this
 	// duration.
 	MaxItemProcessingTime time.Duration `json:"maxItemProcessingTime" yaml:"maxItemProcessingTime"`
-
-	// If this node is a validator, when a container is inserted into consensus,
-	// send a Push Query to this many validators and a Pull Query to the other
-	// k - MixedQueryNumPushVdr validators. Must be in [0, K].
-	MixedQueryNumPushVdr int `json:"mixedQueryNumPushVdr" yaml:"mixedQueryNumPushVdr"`
-
-	// If this node is not a validator, when a container is inserted into consensus,
-	// send a Push Query to this many validators and a Pull Query to the other
-	// k - MixedQueryNumPushVdr validators. Must be in [0, K].
-	MixedQueryNumPushNonVdr int `json:"mixedQueryNumPushNonVdr" yaml:"mixedQueryNumPushNonVdr"`
 }
 
 // Verify returns nil if the parameters describe a valid initialization.
@@ -79,10 +69,6 @@ func (p Parameters) Verify() error {
 		return fmt.Errorf("%w: maxOutstandingItems = %d: fails the condition that: 0 < maxOutstandingItems", ErrParametersInvalid, p.MaxOutstandingItems)
 	case p.MaxItemProcessingTime <= 0:
 		return fmt.Errorf("%w: maxItemProcessingTime = %d: fails the condition that: 0 < maxItemProcessingTime", ErrParametersInvalid, p.MaxItemProcessingTime)
-	case p.MixedQueryNumPushVdr > p.K:
-		return fmt.Errorf("%w: mixedQueryNumPushVdr (%d) > K (%d)", ErrParametersInvalid, p.MixedQueryNumPushVdr, p.K)
-	case p.MixedQueryNumPushNonVdr > p.K:
-		return fmt.Errorf("%w: mixedQueryNumPushNonVdr (%d) > K (%d)", ErrParametersInvalid, p.MixedQueryNumPushNonVdr, p.K)
 	default:
 		return nil
 	}

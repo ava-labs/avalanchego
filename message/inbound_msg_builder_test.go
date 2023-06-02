@@ -327,8 +327,8 @@ func TestInboundMsgBuilder(t *testing.T) {
 			msg := InboundChits(
 				chainID,
 				requestID,
-				containerIDs,
-				acceptedContainerIDs,
+				containerIDs[0],
+				acceptedContainerIDs[0],
 				nodeID,
 			)
 
@@ -339,18 +339,8 @@ func TestInboundMsgBuilder(t *testing.T) {
 			innerMsg := msg.Message().(*p2p.Chits)
 			require.Equal(chainID[:], innerMsg.ChainId)
 			require.Equal(requestID, innerMsg.RequestId)
-			containerIDsBytes := make([][]byte, len(containerIDs))
-			for i, id := range containerIDs {
-				id := id
-				containerIDsBytes[i] = id[:]
-			}
-			require.Equal(containerIDsBytes, innerMsg.PreferredContainerIds)
-			acceptedContainerIDsBytes := make([][]byte, len(acceptedContainerIDs))
-			for i, id := range acceptedContainerIDs {
-				id := id
-				acceptedContainerIDsBytes[i] = id[:]
-			}
-			require.Equal(acceptedContainerIDsBytes, innerMsg.AcceptedContainerIds)
+			require.Equal(containerIDs[0][:], innerMsg.PreferredId)
+			require.Equal(acceptedContainerIDs[0][:], innerMsg.AcceptedId)
 		},
 	)
 
