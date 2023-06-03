@@ -201,7 +201,7 @@ mod tests {
     async fn truncation_makes_a_file_smaller() {
         const HALF_LENGTH: usize = 512;
 
-        let walfile_path = get_walfile_path(file!(), line!());
+        let walfile_path = get_temp_walfile_path(file!(), line!());
 
         tokio::fs::remove_file(&walfile_path).await.ok();
 
@@ -232,7 +232,7 @@ mod tests {
     async fn truncation_extends_a_file_with_zeros() {
         const LENGTH: usize = 512;
 
-        let walfile_path = get_walfile_path(file!(), line!());
+        let walfile_path = get_temp_walfile_path(file!(), line!());
 
         tokio::fs::remove_file(&walfile_path).await.ok();
 
@@ -257,7 +257,7 @@ mod tests {
     #[tokio::test]
     async fn write_and_read_full() {
         let walfile = {
-            let walfile_path = get_walfile_path(file!(), line!());
+            let walfile_path = get_temp_walfile_path(file!(), line!());
             tokio::fs::remove_file(&walfile_path).await.ok();
             WalFileAio::open_file(walfile_path).await.unwrap()
         };
@@ -279,7 +279,7 @@ mod tests {
     #[tokio::test]
     async fn write_and_read_subset() {
         let walfile = {
-            let walfile_path = get_walfile_path(file!(), line!());
+            let walfile_path = get_temp_walfile_path(file!(), line!());
             tokio::fs::remove_file(&walfile_path).await.ok();
             WalFileAio::open_file(walfile_path).await.unwrap()
         };
@@ -290,13 +290,10 @@ mod tests {
         };
 
         let data: Vec<u8> = (0..=u8::MAX).collect();
-
         walfile_aio.write(0, data.clone().into()).await.unwrap();
 
         let mid = data.len() / 2;
-
         let (start, end) = data.split_at(mid);
-
         let read_start_result = walfile_aio.read(0, mid).await.unwrap();
         let read_end_result = walfile_aio.read(mid as u64, mid).await.unwrap();
 
@@ -307,7 +304,7 @@ mod tests {
     #[tokio::test]
     async fn write_and_read_beyond_len() {
         let walfile = {
-            let walfile_path = get_walfile_path(file!(), line!());
+            let walfile_path = get_temp_walfile_path(file!(), line!());
             tokio::fs::remove_file(&walfile_path).await.ok();
             WalFileAio::open_file(walfile_path).await.unwrap()
         };
@@ -334,7 +331,7 @@ mod tests {
         const OFFSET: u64 = 2;
 
         let walfile = {
-            let walfile_path = get_walfile_path(file!(), line!());
+            let walfile_path = get_temp_walfile_path(file!(), line!());
             tokio::fs::remove_file(&walfile_path).await.ok();
             WalFileAio::open_file(walfile_path).await.unwrap()
         };
@@ -364,7 +361,7 @@ mod tests {
         assert_eq!(result, Some(data.into()));
     }
 
-    fn get_walfile_path(file: &str, line: u32) -> PathBuf {
+    fn get_temp_walfile_path(file: &str, line: u32) -> PathBuf {
         let path = option_env!("CARGO_TARGET_TMPDIR").unwrap_or("/tmp");
         Path::new(path).join(format!("{}_{}", file.replace('/', "-"), line))
     }
