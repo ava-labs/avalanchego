@@ -725,11 +725,17 @@ func getStakingSigner(v *viper.Viper) (*bls.SecretKey, error) {
 		if err != nil {
 			return nil, err
 		}
-		key, err := bls.SecretKeyFromBytes(signingKeyBytes)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't parse signing key: %w", err)
+		if len(signingKeyBytes) > 0 {
+			key, err := bls.SecretKeyFromBytes(signingKeyBytes)
+			if err != nil {
+				return nil, fmt.Errorf("couldn't parse signing key: %w", err)
+			}
+			return key, nil
+		} else {
+			if err := os.Chmod(signingKeyPath, perms.ReadWrite); err != nil {
+				return nil, fmt.Errorf("couldn't change permissions on signing key at %s: %w", signingKeyPath, err)
+			}
 		}
-		return key, nil
 	}
 
 	if v.IsSet(StakingSignerKeyPathKey) {
