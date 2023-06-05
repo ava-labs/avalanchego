@@ -745,6 +745,7 @@ func (db *merkleDB) onEviction(n *node) error {
 	batch := db.nodeDB.NewBatch()
 
 	if n != nil && !n.hasValue() {
+		// only persist intermediary nodes
 		if err := writeNodeToBatch(batch, n); err != nil {
 			return err
 		}
@@ -762,6 +763,7 @@ func (db *merkleDB) onEviction(n *node) error {
 			break
 		}
 		if n == nil || n.hasValue() {
+			// only persist intermediary nodes
 			continue
 		}
 		// Note this must be = not := since we check
@@ -782,12 +784,8 @@ func (db *merkleDB) onEviction(n *node) error {
 	return nil
 }
 
-// Writes [n] to [batch]
+// Writes [n] to [batch]. Assumes [n] is non-nil.
 func writeNodeToBatch(batch database.Batch, n *node) error {
-	if n == nil {
-		return nil
-	}
-
 	nodeBytes, err := n.marshal()
 	if err != nil {
 		return err
