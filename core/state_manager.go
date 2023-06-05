@@ -66,7 +66,7 @@ type TrieWriter interface {
 
 type TrieDB interface {
 	Dereference(root common.Hash)
-	Commit(root common.Hash, report bool, callback func(common.Hash)) error
+	Commit(root common.Hash, report bool) error
 	Size() (common.StorageSize, common.StorageSize)
 	Cap(limit common.StorageSize) error
 }
@@ -103,7 +103,7 @@ func (np *noPruningTrieWriter) InsertTrie(block *types.Block) error {
 func (np *noPruningTrieWriter) AcceptTrie(block *types.Block) error {
 	// We don't need to call [Dereference] on the block root at the end of this
 	// function because it is removed from the [TrieDB.Dirties] map in [Commit].
-	return np.TrieDB.Commit(block.Root(), false, nil)
+	return np.TrieDB.Commit(block.Root(), false)
 }
 
 func (np *noPruningTrieWriter) RejectTrie(block *types.Block) error {
@@ -151,7 +151,7 @@ func (cm *cappedMemoryTrieWriter) AcceptTrie(block *types.Block) error {
 	// Commit this root if we have reached the [commitInterval].
 	modCommitInterval := block.NumberU64() % cm.commitInterval
 	if modCommitInterval == 0 {
-		if err := cm.TrieDB.Commit(root, true, nil); err != nil {
+		if err := cm.TrieDB.Commit(root, true); err != nil {
 			return fmt.Errorf("failed to commit trie for block %s: %w", block.Hash().Hex(), err)
 		}
 		return nil
@@ -199,5 +199,5 @@ func (cm *cappedMemoryTrieWriter) Shutdown() error {
 
 	// Attempt to commit last item added to [dereferenceQueue] on shutdown to avoid
 	// re-processing the state on the next startup.
-	return cm.TrieDB.Commit(last, true, nil)
+	return cm.TrieDB.Commit(last, true)
 }

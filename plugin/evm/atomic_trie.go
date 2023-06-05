@@ -203,7 +203,7 @@ func (a *atomicTrie) OpenTrie(root common.Hash) (*trie.Trie, error) {
 
 // commit calls commit on the underlying trieDB and updates metadata pointers.
 func (a *atomicTrie) commit(height uint64, root common.Hash) error {
-	if err := a.trieDB.Commit(root, false, nil); err != nil {
+	if err := a.trieDB.Commit(root, false); err != nil {
 		return err
 	}
 	log.Info("committed atomic trie", "root", root.String(), "height", height)

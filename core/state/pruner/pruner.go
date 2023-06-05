@@ -282,7 +282,7 @@ func (p *Pruner) Prune(root common.Hash) error {
 	// Ensure the root is really present. The weak assumption
 	// is the presence of root can indicate the presence of the
 	// entire trie.
-	if !rawdb.HasTrieNode(p.db, root) {
+	if !rawdb.HasLegacyTrieNode(p.db, root) {
 		return fmt.Errorf("associated state[%x] is not present", root)
 	} else {
 		log.Info("Selecting last accepted block root as the pruning target", "root", root)
@@ -331,7 +331,7 @@ func RecoverPruning(datadir string, db ethdb.Database, trieCachePath string) err
 	}
 	headBlock := rawdb.ReadHeadBlock(db)
 	if headBlock == nil {
-		return errors.New("Failed to load head block")
+		return errors.New("failed to load head block")
 	}
 	stateBloom, err := NewStateBloomFromDisk(stateBloomPath)
 	if err != nil {

@@ -301,8 +301,12 @@ func newWebsocketCodec(conn *websocket.Conn, host string, req http.Header) Serve
 		conn.SetReadDeadline(time.Time{})
 		return nil
 	})
+
+	encode := func(v interface{}, isErrorResponse bool) error {
+		return conn.WriteJSON(v)
+	}
 	wc := &websocketCodec{
-		jsonCodec: NewFuncCodec(conn, conn.WriteJSON, conn.ReadJSON).(*jsonCodec),
+		jsonCodec: NewFuncCodec(conn, encode, conn.ReadJSON).(*jsonCodec),
 		conn:      conn,
 		pingReset: make(chan struct{}, 1),
 		info: PeerInfo{
@@ -329,12 +333,12 @@ func (wc *websocketCodec) peerInfo() PeerInfo {
 	return wc.info
 }
 
-func (wc *websocketCodec) writeJSON(ctx context.Context, v interface{}) error {
-	return wc.writeJSONSkipDeadline(ctx, v, false)
+func (wc *websocketCodec) writeJSON(ctx context.Context, v interface{}, isError bool) error {
+	return wc.writeJSONSkipDeadline(ctx, v, isError, false)
 }
 
-func (wc *websocketCodec) writeJSONSkipDeadline(ctx context.Context, v interface{}, skip bool) error {
-	err := wc.jsonCodec.writeJSONSkipDeadline(ctx, v, skip)
+func (wc *websocketCodec) writeJSONSkipDeadline(ctx context.Context, v interface{}, isError bool, skip bool) error {
+	err := wc.jsonCodec.writeJSONSkipDeadline(ctx, v, isError, skip)
 	if err == nil {
 		// Notify pingLoop to delay the next idle ping.
 		select {

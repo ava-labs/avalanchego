@@ -265,7 +265,6 @@ func TestValLength56(t *testing.T) {
 func TestUpdateSmallNodes(t *testing.T) {
 	st := NewStackTrie(nil)
 	nt := NewEmpty(NewDatabase(rawdb.NewMemoryDatabase()))
-
 	kvs := []struct {
 		K string
 		V string
@@ -294,7 +293,6 @@ func TestUpdateVariableKeys(t *testing.T) {
 	t.SkipNow()
 	st := NewStackTrie(nil)
 	nt := NewEmpty(NewDatabase(rawdb.NewMemoryDatabase()))
-
 	kvs := []struct {
 		K string
 		V string

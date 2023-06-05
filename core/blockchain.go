@@ -1384,14 +1384,10 @@ func (bc *BlockChain) insertBlock(block *types.Block, writes bool) error {
 }
 
 // collectLogs collects the logs that were generated or removed during
-// the processing of the block that corresponds with the given hash.
-// These logs are later announced as deleted or reborn.
-func (bc *BlockChain) collectLogs(hash common.Hash, removed bool) []*types.Log {
-	number := bc.hc.GetBlockNumber(hash)
-	if number == nil {
-		return nil
-	}
-	receipts := rawdb.ReadReceipts(bc.db, hash, *number, bc.chainConfig)
+// the processing of a block. These logs are later announced as deleted or reborn.
+func (bc *BlockChain) collectLogs(b *types.Block, removed bool) []*types.Log {
+	receipts := rawdb.ReadRawReceipts(bc.db, b.Hash(), b.NumberU64())
+	receipts.DeriveFields(bc.chainConfig, b.Hash(), b.NumberU64(), b.Time(), b.Transactions())
 
 	var logs []*types.Log
 	for _, receipt := range receipts {
@@ -1515,7 +1511,7 @@ func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 		bc.chainSideFeed.Send(ChainSideEvent{Block: oldChain[i]})
 
 		// Collect deleted logs for notification
-		if logs := bc.collectLogs(oldChain[i].Hash(), true); len(logs) > 0 {
+		if logs := bc.collectLogs(oldChain[i], true); len(logs) > 0 {
 			deletedLogs = append(deletedLogs, logs...)
 		}
 		if len(deletedLogs) > 512 {
@@ -1530,7 +1526,7 @@ func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 	// New logs:
 	var rebirthLogs []*types.Log
 	for i := len(newChain) - 1; i >= 1; i-- {
-		if logs := bc.collectLogs(newChain[i].Hash(), false); len(logs) > 0 {
+		if logs := bc.collectLogs(newChain[i], false); len(logs) > 0 {
 			rebirthLogs = append(rebirthLogs, logs...)
 		}
 		if len(rebirthLogs) > 512 {
@@ -1854,7 +1850,7 @@ func (bc *BlockChain) reprocessState(current *types.Block, reexec uint64) error 
 	nodes, imgs := triedb.Size()
 	log.Info("Historical state regenerated", "block", current.NumberU64(), "elapsed", time.Since(start), "nodes", nodes, "preimages", imgs)
 	if previousRoot != (common.Hash{}) {
-		return triedb.Commit(previousRoot, true, nil)
+		return triedb.Commit(previousRoot, true)
 	}
 	return nil
 }
@@ -1937,7 +1933,7 @@ func (bc *BlockChain) populateMissingTries() error {
 		}
 
 		// Commit root to disk so that it can be accessed directly
-		if err := triedb.Commit(root, false, nil); err != nil {
+		if err := triedb.Commit(root, false); err != nil {
 			return err
 		}
 		parent = current

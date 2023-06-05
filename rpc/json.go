@@ -178,18 +178,22 @@ type ConnRemoteAddr interface {
 // support for parsing arguments and serializing (result) objects.
 type jsonCodec struct {
 	remote  string
-	closer  sync.Once                 // close closed channel once
-	closeCh chan interface{}          // closed on Close
-	decode  func(v interface{}) error // decoder to allow multiple transports
-	encMu   sync.Mutex                // guards the encoder
-	encode  func(v interface{}) error // encoder to allow multiple transports
+	closer  sync.Once        // close closed channel once
+	closeCh chan interface{} // closed on Close
+	decode  decodeFunc       // decoder to allow multiple transports
+	encMu   sync.Mutex       // guards the encoder
+	encode  encodeFunc       // encoder to allow multiple transports
 	conn    deadlineCloser
 }
+
+type encodeFunc = func(v interface{}, isErrorResponse bool) error
+
+type decodeFunc = func(v interface{}) error
 
 // NewFuncCodec creates a codec which uses the given functions to read and write. If conn
 // implements ConnRemoteAddr, log messages will use it to include the remote address of
 // the connection.
-func NewFuncCodec(conn deadlineCloser, encode, decode func(v interface{}) error) ServerCodec {
+func NewFuncCodec(conn deadlineCloser, encode encodeFunc, decode decodeFunc) ServerCodec {
 	codec := &jsonCodec{
 		closeCh: make(chan interface{}),
 		encode:  encode,
@@ -208,7 +212,11 @@ func NewCodec(conn Conn) ServerCodec {
 	enc := json.NewEncoder(conn)
 	dec := json.NewDecoder(conn)
 	dec.UseNumber()
-	return NewFuncCodec(conn, enc.Encode, dec.Decode)
+
+	encode := func(v interface{}, isErrorResponse bool) error {
+		return enc.Encode(v)
+	}
+	return NewFuncCodec(conn, encode, dec.Decode)
 }
 
 func (c *jsonCodec) peerInfo() PeerInfo {
@@ -238,11 +246,11 @@ func (c *jsonCodec) readBatch() (messages []*jsonrpcMessage, batch bool, err err
 	return messages, batch, nil
 }
 
-func (c *jsonCodec) writeJSON(ctx context.Context, val interface{}) error {
-	return c.writeJSONSkipDeadline(ctx, val, false)
+func (c *jsonCodec) writeJSON(ctx context.Context, val interface{}, isErrorResponse bool) error {
+	return c.writeJSONSkipDeadline(ctx, val, isErrorResponse, false)
 }
 
-func (c *jsonCodec) writeJSONSkipDeadline(ctx context.Context, v interface{}, skip bool) error {
+func (c *jsonCodec) writeJSONSkipDeadline(ctx context.Context, v interface{}, isErrorResponse bool, skip bool) error {
 	c.encMu.Lock()
 	defer c.encMu.Unlock()
 
@@ -254,7 +262,7 @@ func (c *jsonCodec) writeJSONSkipDeadline(ctx context.Context, v interface{}, sk
 		}
 	}
 	c.conn.SetWriteDeadline(deadline)
-	return c.encode(v)
+	return c.encode(v, isErrorResponse)
 }
 
 func (c *jsonCodec) close() {

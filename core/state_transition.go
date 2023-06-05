@@ -52,7 +52,7 @@ var emptyCodeHash = crypto.Keccak256Hash(nil)
 //
 //  1. Nonce handling
 //  2. Pre pay gas
-//  3. Create a new state object if the recipient is \0*32
+//  3. Create a new state object if the recipient is nil
 //  4. Value transfer
 //
 // == If contract creation ==
@@ -271,7 +271,7 @@ func (st *StateTransition) preCheck() error {
 		}
 	}
 	// Make sure that transaction gasFeeCap is greater than the baseFee (post london)
-	if st.evm.ChainConfig().IsApricotPhase3(st.evm.Context.Time) {
+	if st.evm.ChainConfig().IsApricotPhase3(st.evm.Context.Timestamp()) {
 		// Skip the checks if gas fields are zero and baseFee was explicitly disabled (eth_call)
 		if !st.evm.Config.NoBaseFee || st.gasFeeCap.BitLen() > 0 || st.gasTipCap.BitLen() > 0 {
 			if l := st.gasFeeCap.BitLen(); l > 256 {
@@ -333,7 +333,7 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	var (
 		msg              = st.msg
 		sender           = vm.AccountRef(msg.From())
-		rules            = st.evm.ChainConfig().AvalancheRules(st.evm.Context.BlockNumber, st.evm.Context.Time)
+		rules            = st.evm.ChainConfig().AvalancheRules(st.evm.Context.BlockNumber, st.evm.Context.Timestamp())
 		contractCreation = msg.To() == nil
 	)
 

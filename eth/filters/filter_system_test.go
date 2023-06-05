@@ -28,6 +28,7 @@ package filters
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/big"
 	"math/rand"
@@ -52,14 +53,15 @@ import (
 )
 
 type testBackend struct {
-	db              ethdb.Database
-	sections        uint64
-	txFeed          event.Feed
-	acceptedTxFeed  event.Feed
-	logsFeed        event.Feed
-	rmLogsFeed      event.Feed
-	pendingLogsFeed event.Feed
-	chainFeed       event.Feed
+	db                ethdb.Database
+	sections          uint64
+	txFeed            event.Feed
+	acceptedTxFeed    event.Feed
+	logsFeed          event.Feed
+	rmLogsFeed        event.Feed
+	pendingLogsFeed   event.Feed
+	chainFeed         event.Feed
+	chainAcceptedFeed event.Feed
 }
 
 func (b *testBackend) ChainConfig() *params.ChainConfig {
@@ -114,6 +116,13 @@ func (b *testBackend) HeaderByHash(ctx context.Context, hash common.Hash) (*type
 	return rawdb.ReadHeader(b.db, hash, *number), nil
 }
 
+func (b *testBackend) GetBody(ctx context.Context, hash common.Hash, number rpc.BlockNumber) (*types.Body, error) {
+	if body := rawdb.ReadBody(b.db, hash, uint64(number)); body != nil {
+		return body, nil
+	}
+	return nil, errors.New("block body not found")
+}
+
 func (b *testBackend) GetReceipts(ctx context.Context, hash common.Hash) (types.Receipts, error) {
 	if number := rawdb.ReadHeaderNumber(b.db, hash); number != nil {
 		return rawdb.ReadReceipts(b.db, hash, *number, params.TestChainConfig), nil
@@ -155,7 +164,7 @@ func (b *testBackend) SubscribeChainEvent(ch chan<- core.ChainEvent) event.Subsc
 }
 
 func (b *testBackend) SubscribeChainAcceptedEvent(ch chan<- core.ChainEvent) event.Subscription {
-	return b.chainFeed.Subscribe(ch)
+	return b.chainAcceptedFeed.Subscribe(ch)
 }
 
 func (b *testBackend) BloomStatus() (uint64, uint64) {

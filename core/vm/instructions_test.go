@@ -213,7 +213,7 @@ func TestAddMod(t *testing.T) {
 	var (
 		env            = NewEVM(BlockContext{}, TxContext{}, nil, params.TestChainConfig, Config{})
 		stack          = newstack()
-		evmInterpreter = NewEVMInterpreter(env, env.Config)
+		evmInterpreter = NewEVMInterpreter(env)
 		pc             = uint64(0)
 	)
 	tests := []struct {
@@ -303,7 +303,7 @@ func opBenchmark(bench *testing.B, op executionFunc, args ...string) {
 		env            = NewEVM(BlockContext{}, TxContext{}, nil, params.TestChainConfig, Config{})
 		stack          = newstack()
 		scope          = &ScopeContext{nil, stack, nil}
-		evmInterpreter = NewEVMInterpreter(env, env.Config)
+		evmInterpreter = NewEVMInterpreter(env)
 	)
 
 	env.interpreter = evmInterpreter
@@ -544,7 +544,7 @@ func TestOpMstore(t *testing.T) {
 		env            = NewEVM(BlockContext{}, TxContext{}, nil, params.TestChainConfig, Config{})
 		stack          = newstack()
 		mem            = NewMemory()
-		evmInterpreter = NewEVMInterpreter(env, env.Config)
+		evmInterpreter = NewEVMInterpreter(env)
 	)
 
 	env.interpreter = evmInterpreter
@@ -570,7 +570,7 @@ func BenchmarkOpMstore(bench *testing.B) {
 		env            = NewEVM(BlockContext{}, TxContext{}, nil, params.TestChainConfig, Config{})
 		stack          = newstack()
 		mem            = NewMemory()
-		evmInterpreter = NewEVMInterpreter(env, env.Config)
+		evmInterpreter = NewEVMInterpreter(env)
 	)
 
 	env.interpreter = evmInterpreter
@@ -593,7 +593,7 @@ func TestOpTstore(t *testing.T) {
 		env            = NewEVM(BlockContext{}, TxContext{}, statedb, params.TestChainConfig, Config{})
 		stack          = newstack()
 		mem            = NewMemory()
-		evmInterpreter = NewEVMInterpreter(env, env.Config)
+		evmInterpreter = NewEVMInterpreter(env)
 		caller         = common.Address{}
 		to             = common.Address{1}
 		contractRef    = contractRef{caller}
@@ -635,7 +635,7 @@ func BenchmarkOpKeccak256(bench *testing.B) {
 		env            = NewEVM(BlockContext{}, TxContext{}, nil, params.TestChainConfig, Config{})
 		stack          = newstack()
 		mem            = NewMemory()
-		evmInterpreter = NewEVMInterpreter(env, env.Config)
+		evmInterpreter = NewEVMInterpreter(env)
 	)
 	env.interpreter = evmInterpreter
 	mem.Resize(32)
