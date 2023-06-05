@@ -306,7 +306,7 @@ func addPrimaryValidatorWithBLSKey(vm *VM, data *state.Staker) (*state.Staker, e
 		return nil, fmt.Errorf("could not create AddPermissionlessValidatorTx with BLS key, %w", err)
 	}
 	if err := signedTx.SyntacticVerify(vm.ctx); err != nil {
-                return nil, fmt.Errorf("failed syntax verification of AddPermissionlessValidatorTx, %w", err)
+		return nil, fmt.Errorf("failed syntax verification of AddPermissionlessValidatorTx, %w", err)
 	}
 	return internalAddValidator(vm, signedTx)
 }
@@ -346,7 +346,7 @@ func internalAddValidator(vm *VM, signedTx *txs.Tx) (*state.Staker, error) {
 		return nil, fmt.Errorf("failed accepting block, %s", err.Error())
 	}
 	if err := vm.SetPreference(context.Background(), vm.manager.LastAccepted()); err != nil {
-                return nil, fmt.Errorf("failed getting last accepted block, %s", err.Error())
+		return nil, fmt.Errorf("failed setting preference, %s", err.Error())
 	}
 
 	// move time ahead, promoting the validator to current
@@ -362,10 +362,10 @@ func internalAddValidator(vm *VM, signedTx *txs.Tx) (*state.Staker, error) {
 		return nil, fmt.Errorf("failed verifying block, %s", err.Error())
 	}
 	if err := blk.Accept(context.Background()); err != nil {
-                return fmt.Errorf("failed accepting block, %s", err.Error())
+		return nil, fmt.Errorf("failed accepting block, %s", err.Error())
 	}
 	if err := vm.SetPreference(context.Background(), vm.manager.LastAccepted()); err != nil {
-		return fmt.Errorf("failed getting last accepted block, %s", err.Error())
+		return nil, fmt.Errorf("failed setting preference, %s", err.Error())
 	}
 
 	return vm.state.GetCurrentValidator(stakerTx.SubnetID(), stakerTx.NodeID())
@@ -387,7 +387,7 @@ func terminateSubnetValidator(vm *VM, validator *state.Staker) error {
 		return fmt.Errorf("failed accepting block, %s", err.Error())
 	}
 	if err := vm.SetPreference(context.Background(), vm.manager.LastAccepted()); err != nil {
-		return fmt.Errorf("failed getting last accepted block, %s", err.Error())
+		return fmt.Errorf("failed setting preference, %s", err.Error())
 	}
 
 	// _, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
@@ -431,7 +431,7 @@ func terminatePrimaryValidator(vm *VM, validator *state.Staker) error {
 	}
 
 	if err := vm.SetPreference(context.Background(), vm.manager.LastAccepted()); err != nil {
-		return fmt.Errorf("failed verifying block, %s", err.Error())
+		return fmt.Errorf("failed setting preference, %s", err.Error())
 	}
 
 	// _, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
