@@ -8,12 +8,13 @@ import (
 	"errors"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"go.uber.org/zap"
 )
 
 var ErrRemoteVMNotImplemented = errors.New("vm does not implement RemoteVM interface")
@@ -77,11 +78,15 @@ func GetAncestors(
 	ancestorsBytesLen := len(blk.Bytes()) + wrappers.IntLen // length, in bytes, of all elements of ancestors
 
 	for numFetched := 1; numFetched < maxBlocksNum && time.Since(startTime) < maxBlocksRetrivalTime; numFetched++ {
-		blk, err = vm.GetBlock(ctx, blk.Parent())
-		if err != nil {
+		parentID := blk.Parent()
+		blk, err = vm.GetBlock(ctx, parentID)
+		if err == database.ErrNotFound {
 			// After state sync we may not have the full chain
-			log.Debug("failed to get block during ancestorial lookup",
-				zap.String("parent id", blk.Parent().String()),
+			break
+		}
+		if err != nil {
+			log.Error("failed to get block during ancestorial lookup",
+				zap.String("parentID", parentID.String()),
 				zap.Error(err),
 			)
 			break
