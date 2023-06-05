@@ -69,7 +69,9 @@ func (wh *syncWorkHeap) GetWork() *syncWorkItem {
 	if wh.closed || wh.Len() == 0 {
 		return nil
 	}
-	return wh.Pop().workItem
+	item := heap.Pop(&wh.innerHeap).(*heapItem)
+	wh.sortedItems.Delete(item)
+	return item.workItem
 }
 
 // Insert the item into the heap, merging it with existing items
@@ -139,7 +141,6 @@ func (wh *syncWorkHeap) MergeInsert(item *syncWorkItem) {
 	if mergedBefore == nil && mergedAfter == nil {
 		// We didn't merge [item] with an existing one; put it in the heap.
 		wh.Push(&heapItem{workItem: item})
-		// heap.Push(&wh.innerHeap, &heapItem{workItem: item})
 	}
 }
 
@@ -164,22 +165,8 @@ func (wh *syncWorkHeap) Len() int {
 	return wh.innerHeap.Len()
 }
 
-func (wh *syncWorkHeap) Less(i int, j int) bool {
-	return wh.innerHeap.Less(i, j)
-}
-
-func (wh *syncWorkHeap) Swap(i int, j int) {
-	wh.innerHeap.Swap(i, j)
-}
-
-func (wh *syncWorkHeap) Pop() *heapItem {
-	item := wh.innerHeap.Pop().(*heapItem)
-	wh.sortedItems.Delete(item)
-	return item
-}
-
 func (wh *syncWorkHeap) Push(item *heapItem) {
-	wh.innerHeap.Push(item)
+	heap.Push(&wh.innerHeap, item)
 	wh.sortedItems.ReplaceOrInsert(item)
 }
 
