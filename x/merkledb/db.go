@@ -744,11 +744,13 @@ func (db *merkleDB) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 func (db *merkleDB) onEviction(n *node) error {
 	batch := db.nodeDB.NewBatch()
 
-	if n != nil && !n.hasValue() {
-		// only persist intermediary nodes
-		if err := writeNodeToBatch(batch, n); err != nil {
-			return err
-		}
+	// the evicted node isn't an intermediary node, so skip writing.
+	if n == nil || n.hasValue() {
+		return nil
+	}
+
+	if err := writeNodeToBatch(batch, n); err != nil {
+		return err
 	}
 
 	// Evict the oldest [evictionBatchSize] nodes from the cache
