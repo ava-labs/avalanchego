@@ -1450,7 +1450,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 }
 
 // GetValidatorSet must return the BLS keys for a given validator
-// even in case it has already expired
+// correctly when queried at a previous height, even in case it has currently expired
 func Test_RegressionBLSKeyDiff(t *testing.T) {
 	// setup
 	require := require.New(t)
