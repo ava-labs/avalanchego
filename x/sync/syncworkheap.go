@@ -58,7 +58,10 @@ func (wh *syncWorkHeap) Insert(item *syncWorkItem) {
 		return
 	}
 
-	wh.Push(&heapItem{workItem: item})
+	wrappedItem := &heapItem{workItem: item}
+
+	heap.Push(&wh.innerHeap, wrappedItem)
+	wh.sortedItems.ReplaceOrInsert(wrappedItem)
 }
 
 // Pops and returns a work item from the heap.
@@ -138,7 +141,7 @@ func (wh *syncWorkHeap) MergeInsert(item *syncWorkItem) {
 	// nothing was merged, so add new item to the heap
 	if mergedBefore == nil && mergedAfter == nil {
 		// We didn't merge [item] with an existing one; put it in the heap.
-		wh.Push(&heapItem{workItem: item})
+		wh.Insert(item)
 	}
 }
 
@@ -161,11 +164,6 @@ func (wh *syncWorkHeap) remove(item *heapItem) {
 
 func (wh *syncWorkHeap) Len() int {
 	return wh.innerHeap.Len()
-}
-
-func (wh *syncWorkHeap) Push(item *heapItem) {
-	heap.Push(&wh.innerHeap, item)
-	wh.sortedItems.ReplaceOrInsert(item)
 }
 
 // below this line are the implementations required for heap.Interface
