@@ -71,6 +71,8 @@ func newWorker(
 }
 
 func (w *worker) RegisterCheck(name string, check Checker, tags ...string) error {
+	// We ensure [AllTag] isn't contained in [tags] to prevent metrics from
+	// double counting.
 	if slices.Contains(tags, AllTag) {
 		return fmt.Errorf("%w: %q", errRestrictedTag, AllTag)
 	}
