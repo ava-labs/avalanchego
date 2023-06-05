@@ -62,7 +62,7 @@ type FrontierSender interface {
 		ctx context.Context,
 		nodeID ids.NodeID,
 		requestID uint32,
-		containerIDs []ids.ID,
+		containerID ids.ID,
 	)
 }
 
