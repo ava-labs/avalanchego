@@ -81,15 +81,15 @@ func (s *tracedSender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs set.
 	s.sender.SendGetAcceptedFrontier(ctx, nodeIDs, requestID)
 }
 
-func (s *tracedSender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) {
+func (s *tracedSender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
 	ctx, span := s.tracer.Start(ctx, "tracedSender.SendAcceptedFrontier", oteltrace.WithAttributes(
 		attribute.Stringer("recipients", nodeID),
 		attribute.Int64("requestID", int64(requestID)),
-		attribute.Int("numContainerIDs", len(containerIDs)),
+		attribute.Stringer("containerID", containerID),
 	))
 	defer span.End()
 
-	s.sender.SendAcceptedFrontier(ctx, nodeID, requestID, containerIDs)
+	s.sender.SendAcceptedFrontier(ctx, nodeID, requestID, containerID)
 }
 
 func (s *tracedSender) SendGetAccepted(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, containerIDs []ids.ID) {

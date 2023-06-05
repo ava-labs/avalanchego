@@ -970,7 +970,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 		msg := message.InboundAcceptedFrontier(
 			ctx.ChainID,
 			requestID,
-			nil,
+			ids.Empty,
 			nodeID,
 		)
 		chainRouter.HandleInbound(context.Background(), msg)

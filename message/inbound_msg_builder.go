@@ -135,18 +135,16 @@ func InboundGetAcceptedFrontier(
 func InboundAcceptedFrontier(
 	chainID ids.ID,
 	requestID uint32,
-	containerIDs []ids.ID,
+	containerID ids.ID,
 	nodeID ids.NodeID,
 ) InboundMessage {
-	containerIDBytes := make([][]byte, len(containerIDs))
-	encodeIDs(containerIDs, containerIDBytes)
 	return &inboundMessage{
 		nodeID: nodeID,
 		op:     AcceptedFrontierOp,
 		message: &p2p.AcceptedFrontier{
-			ChainId:      chainID[:],
-			RequestId:    requestID,
-			ContainerIds: containerIDBytes,
+			ChainId:     chainID[:],
+			RequestId:   requestID,
+			ContainerId: containerID[:],
 		},
 		expiration: mockable.MaxTime,
 	}
