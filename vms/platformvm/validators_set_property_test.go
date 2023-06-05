@@ -387,7 +387,7 @@ func terminateSubnetValidator(vm *VM, validator *state.Staker) error {
 		return fmt.Errorf("failed accepting block, %s", err.Error())
 	}
 	if err := vm.SetPreference(context.Background(), vm.manager.LastAccepted()); err != nil {
-		return fmt.Errorf("failed verifying block, %s", err.Error())
+		return fmt.Errorf("failed getting last accepted block, %s", err.Error())
 	}
 
 	// _, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
