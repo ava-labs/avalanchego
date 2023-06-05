@@ -1,6 +1,5 @@
 # Health Checking
 
-
 ## Health Check Types
 
 ### Readiness
