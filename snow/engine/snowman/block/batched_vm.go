@@ -85,7 +85,7 @@ func GetAncestors(
 			break
 		}
 		if err != nil {
-			log.Error("failed to get block during ancestorial lookup",
+			log.Error("failed to get block during ancestors lookup",
 				zap.String("parentID", parentID.String()),
 				zap.Error(err),
 			)
