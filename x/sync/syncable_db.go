@@ -3,9 +3,7 @@
 
 package sync
 
-import (
-	"github.com/ava-labs/avalanchego/x/merkledb"
-)
+import "github.com/ava-labs/avalanchego/x/merkledb"
 
 type SyncableDB interface {
 	merkledb.MerkleRootGetter
