@@ -60,7 +60,7 @@ func GetAncestors(
 	startTime := time.Now()
 	blk, err := vm.GetBlock(ctx, blkID)
 	if err == database.ErrNotFound {
-		// special case ErrNotFound as an empty response: this signals
+		// Special case ErrNotFound as an empty response: this signals
 		// the client to avoid contacting this node for further ancestors
 		// as they may have been pruned or unavailable due to state-sync.
 		return nil, nil
@@ -76,6 +76,7 @@ func GetAncestors(
 	for numFetched := 1; numFetched < maxBlocksNum && time.Since(startTime) < maxBlocksRetrivalTime; numFetched++ {
 		blk, err = vm.GetBlock(ctx, blk.Parent())
 		if err != nil {
+			// After state sync we may not have the full chain
 			break
 		}
 		blkBytes := blk.Bytes()
