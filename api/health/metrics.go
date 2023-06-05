@@ -21,6 +21,7 @@ func newMetrics(namespace string, registerer prometheus.Registerer) (*metrics, e
 			[]string{"tag"},
 		),
 	}
-	metrics.failingChecks.WithLabelValues(GlobalTag).Set(0)
+	metrics.failingChecks.WithLabelValues(AllTag).Set(0)
+	metrics.failingChecks.WithLabelValues(ApplicationTag).Set(0)
 	return metrics, registerer.Register(metrics.failingChecks)
 }

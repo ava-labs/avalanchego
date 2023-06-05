@@ -364,7 +364,6 @@ func (m *manager) createChain(chainParams ChainParameters) {
 			health.CheckerFunc(func(context.Context) (interface{}, error) {
 				return nil, healthCheckErr
 			}),
-			health.GlobalTag,
 			chainParams.SubnetID.String(),
 		)
 		if err != nil {
@@ -964,7 +963,7 @@ func (m *manager) createAvalancheChain(
 	})
 
 	// Register health check for this chain
-	if err := m.Health.RegisterHealthCheck(chainAlias, h, health.GlobalTag, ctx.SubnetID.String()); err != nil {
+	if err := m.Health.RegisterHealthCheck(chainAlias, h, ctx.SubnetID.String()); err != nil {
 		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", chainAlias, err)
 	}
 
@@ -1262,7 +1261,7 @@ func (m *manager) createSnowmanChain(
 	})
 
 	// Register health checks
-	if err := m.Health.RegisterHealthCheck(chainAlias, h, health.GlobalTag, ctx.SubnetID.String()); err != nil {
+	if err := m.Health.RegisterHealthCheck(chainAlias, h, ctx.SubnetID.String()); err != nil {
 		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", chainAlias, err)
 	}
 
@@ -1306,10 +1305,10 @@ func (m *manager) registerBootstrappedHealthChecks() error {
 		}
 		return []ids.ID{}, nil
 	})
-	if err := m.Health.RegisterReadinessCheck("bootstrapped", bootstrappedCheck, health.GlobalTag); err != nil {
+	if err := m.Health.RegisterReadinessCheck("bootstrapped", bootstrappedCheck, health.ApplicationTag); err != nil {
 		return fmt.Errorf("couldn't register bootstrapped readiness check: %w", err)
 	}
-	if err := m.Health.RegisterHealthCheck("bootstrapped", bootstrappedCheck, health.GlobalTag); err != nil {
+	if err := m.Health.RegisterHealthCheck("bootstrapped", bootstrappedCheck, health.ApplicationTag); err != nil {
 		return fmt.Errorf("couldn't register bootstrapped health check: %w", err)
 	}
 	return nil

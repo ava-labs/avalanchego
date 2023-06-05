@@ -14,11 +14,15 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-// GlobalTag is the tag that is returned for all health check results,
-// regardless of the tags passed to the Reporter.
-// Registering a health check with this tag will ensure that it is always
-// included in the results.
-const GlobalTag = "global"
+const (
+	// AllTag is automatically added to every registered check.
+	AllTag = "all"
+	// ApplicationTag checks will act as if they specified every tag that has
+	// been registered.
+	// Registering a health check with this tag will ensure that it is always
+	// included in all health query results.
+	ApplicationTag = "application"
+)
 
 var _ Health = (*health)(nil)
 

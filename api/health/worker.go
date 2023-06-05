@@ -15,13 +15,19 @@ import (
 	"go.uber.org/zap"
 
 	"golang.org/x/exp/maps"
+	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-var errDuplicateCheck = errors.New("duplicated check")
+var (
+	allTags = []string{AllTag}
+
+	errRestrictedTag  = errors.New("restricted tag")
+	errDuplicateCheck = errors.New("duplicated check")
+)
 
 type worker struct {
 	log        logging.Logger
@@ -30,9 +36,10 @@ type worker struct {
 	checksLock sync.RWMutex
 	checks     map[string]*checker
 
-	resultsLock sync.RWMutex
-	results     map[string]Result
-	tags        map[string]set.Set[string] // tag -> set of check names
+	resultsLock                 sync.RWMutex
+	results                     map[string]Result
+	numFailingApplicationChecks int
+	tags                        map[string]set.Set[string] // tag -> set of check names
 
 	startOnce sync.Once
 	closeOnce sync.Once
@@ -41,8 +48,9 @@ type worker struct {
 }
 
 type checker struct {
-	checker Checker
-	tags    []string
+	checker            Checker
+	isApplicationCheck bool
+	tags               []string
 }
 
 func newWorker(
@@ -63,6 +71,10 @@ func newWorker(
 }
 
 func (w *worker) RegisterCheck(name string, check Checker, tags ...string) error {
+	if slices.Contains(tags, AllTag) {
+		return fmt.Errorf("%w: %q", errRestrictedTag, AllTag)
+	}
+
 	w.checksLock.Lock()
 	defer w.checksLock.Unlock()
 
@@ -73,18 +85,26 @@ func (w *worker) RegisterCheck(name string, check Checker, tags ...string) error
 	w.resultsLock.Lock()
 	defer w.resultsLock.Unlock()
 
-	w.checks[name] = &checker{
-		checker: check,
-		tags:    tags,
-	}
-	w.results[name] = notYetRunResult
-
-	// Add the check to the tag
+	// Add the check to each tag
 	for _, tag := range tags {
 		names := w.tags[tag]
 		names.Add(name)
 		w.tags[tag] = names
 	}
+	// Add the special AllTag descriptor
+	names := w.tags[AllTag]
+	names.Add(name)
+	w.tags[AllTag] = names
+
+	applicationChecks := w.tags[ApplicationTag]
+	isApplicationCheck := applicationChecks.Contains(name)
+
+	w.checks[name] = &checker{
+		checker:            check,
+		isApplicationCheck: isApplicationCheck,
+		tags:               tags,
+	}
+	w.results[name] = notYetRunResult
 
 	// Whenever a new check is added - it is failing
 	w.log.Info("registered new check and initialized its state to failing",
@@ -92,7 +112,28 @@ func (w *worker) RegisterCheck(name string, check Checker, tags ...string) error
 		zap.String("name", name),
 		zap.Strings("tags", tags),
 	)
-	w.markUnhealthy(tags)
+
+	// If this is a new application-wide check, then all of the registered tags
+	// now have one additional failing check.
+	if isApplicationCheck {
+		for tag := range w.tags {
+			w.metrics.failingChecks.WithLabelValues(tag).Inc()
+		}
+		w.numFailingApplicationChecks++
+		return nil
+	}
+
+	// Mark all the tags as failing
+	for _, tag := range tags {
+		gauge := w.metrics.failingChecks.WithLabelValues(tag)
+		gauge.Inc()
+		// If this is the first time this tag was registered, we also need to
+		// account for the currently failing application-wide checks.
+		if w.tags[tag].Len() == 1 {
+			gauge.Add(float64(w.numFailingApplicationChecks))
+		}
+	}
+	w.metrics.failingChecks.WithLabelValues(AllTag).Inc()
 	return nil
 }
 
@@ -116,35 +157,29 @@ func (w *worker) Results(tags ...string) (map[string]Result, bool) {
 	w.resultsLock.RLock()
 	defer w.resultsLock.RUnlock()
 
-	results := make(map[string]Result, len(w.results))
-	healthy := true
+	// if no tags are specified, return all checks
+	if len(tags) == 0 {
+		tags = allTags
+	}
 
-	// if tags are specified, iterate through registered check names in the tag
-	if len(tags) > 0 {
-		names := set.Set[string]{}
-		// prepare tagSet for global tag
-		tagSet := set.NewSet[string](len(tags) + 1)
-		tagSet.Add(tags...)
-		// we always want to include the global tag
-		tagSet.Add(GlobalTag)
-		for tag := range tagSet {
-			if set, ok := w.tags[tag]; ok {
-				names.Union(set)
-			}
+	names := set.Set[string]{}
+	tagSet := set.NewSet[string](len(tags) + 1)
+	tagSet.Add(tags...)
+	tagSet.Add(ApplicationTag) // we always want to include the application tag
+	for tag := range tagSet {
+		if set, ok := w.tags[tag]; ok {
+			names.Union(set)
 		}
-		for name := range names {
-			if result, ok := w.results[name]; ok {
-				results[name] = result
-				healthy = healthy && result.Error == nil
-			}
-		}
-	} else { // if tags are not specified, iterate through all registered check names
-		for name, result := range w.results {
+	}
+
+	results := make(map[string]Result, names.Len())
+	healthy := true
+	for name := range names {
+		if result, ok := w.results[name]; ok {
 			results[name] = result
 			healthy = healthy && result.Error == nil
 		}
 	}
-
 	return results, healthy
 }
 
@@ -234,7 +269,17 @@ func (w *worker) runCheck(ctx context.Context, wg *sync.WaitGroup, name string, 
 				zap.Strings("tags", check.tags),
 				zap.Error(err),
 			)
-			w.markUnhealthy(check.tags)
+			if check.isApplicationCheck {
+				for tag := range w.tags {
+					w.metrics.failingChecks.WithLabelValues(tag).Inc()
+				}
+				w.numFailingApplicationChecks++
+			} else {
+				for _, tag := range check.tags {
+					w.metrics.failingChecks.WithLabelValues(tag).Inc()
+				}
+				w.metrics.failingChecks.WithLabelValues(AllTag).Inc()
+			}
 		}
 	} else if prevResult.Error != nil {
 		w.log.Info("check started passing",
@@ -243,19 +288,17 @@ func (w *worker) runCheck(ctx context.Context, wg *sync.WaitGroup, name string, 
 			zap.Strings("tags", check.tags),
 			zap.Error(err),
 		)
-		w.markHealthy(check.tags)
+		if check.isApplicationCheck {
+			for tag := range w.tags {
+				w.metrics.failingChecks.WithLabelValues(tag).Dec()
+			}
+			w.numFailingApplicationChecks--
+		} else {
+			for _, tag := range check.tags {
+				w.metrics.failingChecks.WithLabelValues(tag).Dec()
+			}
+			w.metrics.failingChecks.WithLabelValues(AllTag).Dec()
+		}
 	}
 	w.results[name] = result
-}
-
-func (w *worker) markUnhealthy(tags []string) {
-	for _, tag := range tags {
-		w.metrics.failingChecks.WithLabelValues(tag).Inc()
-	}
-}
-
-func (w *worker) markHealthy(tags []string) {
-	for _, tag := range tags {
-		w.metrics.failingChecks.WithLabelValues(tag).Dec()
-	}
 }
