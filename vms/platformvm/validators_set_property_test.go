@@ -306,7 +306,7 @@ func addPrimaryValidatorWithBLSKey(vm *VM, data *state.Staker) (*state.Staker, e
 		return nil, fmt.Errorf("could not create AddPermissionlessValidatorTx with BLS key, %w", err)
 	}
 	if err := signedTx.SyntacticVerify(vm.ctx); err != nil {
-		return nil, fmt.Errorf("failed sintax verification of AddPermissionlessValidatorTx, %w", err)
+                return nil, fmt.Errorf("failed syntax verification of AddPermissionlessValidatorTx, %w", err)
 	}
 	return internalAddValidator(vm, signedTx)
 }
