@@ -104,15 +104,15 @@ func (e *tracedEngine) GetAcceptedFrontier(ctx context.Context, nodeID ids.NodeI
 	return e.engine.GetAcceptedFrontier(ctx, nodeID, requestID)
 }
 
-func (e *tracedEngine) AcceptedFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
+func (e *tracedEngine) AcceptedFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) error {
 	ctx, span := e.tracer.Start(ctx, "tracedEngine.AcceptedFrontier", oteltrace.WithAttributes(
 		attribute.Stringer("nodeID", nodeID),
 		attribute.Int64("requestID", int64(requestID)),
-		attribute.Int("numContainerIDs", len(containerIDs)),
+		attribute.Stringer("containerID", containerID),
 	))
 	defer span.End()
 
-	return e.engine.AcceptedFrontier(ctx, nodeID, requestID, containerIDs)
+	return e.engine.AcceptedFrontier(ctx, nodeID, requestID, containerID)
 }
 
 func (e *tracedEngine) GetAcceptedFrontierFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
