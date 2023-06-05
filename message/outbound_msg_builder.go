@@ -82,7 +82,7 @@ type OutboundMsgBuilder interface {
 	AcceptedFrontier(
 		chainID ids.ID,
 		requestID uint32,
-		containerIDs []ids.ID,
+		containerID ids.ID,
 	) (OutboundMessage, error)
 
 	GetAccepted(
@@ -400,17 +400,15 @@ func (b *outMsgBuilder) GetAcceptedFrontier(
 func (b *outMsgBuilder) AcceptedFrontier(
 	chainID ids.ID,
 	requestID uint32,
-	containerIDs []ids.ID,
+	containerID ids.ID,
 ) (OutboundMessage, error) {
-	containerIDBytes := make([][]byte, len(containerIDs))
-	encodeIDs(containerIDs, containerIDBytes)
 	return b.builder.createOutbound(
 		&p2p.Message{
 			Message: &p2p.Message_AcceptedFrontier_{
 				AcceptedFrontier_: &p2p.AcceptedFrontier{
-					ChainId:      chainID[:],
-					RequestId:    requestID,
-					ContainerIds: containerIDBytes,
+					ChainId:     chainID[:],
+					RequestId:   requestID,
+					ContainerId: containerID[:],
 				},
 			},
 		},
