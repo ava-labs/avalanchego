@@ -976,7 +976,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 		msg := message.InboundAcceptedFrontier(
 			ctx.ChainID,
 			requestID,
-			nil,
+			ids.Empty,
 			nodeID,
 		)
 		chainRouter.HandleInbound(context.Background(), msg)
@@ -1028,8 +1028,8 @@ func TestRouterClearTimeouts(t *testing.T) {
 		msg := message.InboundChits(
 			ctx.ChainID,
 			requestID,
-			nil,
-			nil,
+			ids.Empty,
+			ids.Empty,
 			nodeID,
 		)
 		chainRouter.HandleInbound(context.Background(), msg)

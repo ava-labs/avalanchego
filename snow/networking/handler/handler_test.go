@@ -592,7 +592,7 @@ func TestDynamicEngineTypeDispatch(t *testing.T) {
 			engine.ContextF = func() *snow.ConsensusContext {
 				return ctx
 			}
-			engine.ChitsF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredIDs []ids.ID, acceptedIDs []ids.ID) error {
+			engine.ChitsF = func(context.Context, ids.NodeID, uint32, ids.ID, ids.ID) error {
 				close(messageReceived)
 				return nil
 			}
@@ -613,8 +613,8 @@ func TestDynamicEngineTypeDispatch(t *testing.T) {
 				InboundMessage: message.InboundChits(
 					ids.Empty,
 					uint32(0),
-					nil,
-					nil,
+					ids.Empty,
+					ids.Empty,
 					ids.EmptyNodeID,
 				),
 				EngineType: test.requestedEngineType,
