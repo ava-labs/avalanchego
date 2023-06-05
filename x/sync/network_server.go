@@ -203,10 +203,20 @@ func (s *NetworkServer) HandleChangeProofRequest(
 			return err
 		}
 
-		proofBytes, err := merkledb.Codec.EncodeChangeProof(merkledb.Version, changeProof)
+		proofBytes, err := proto.Marshal(&syncpb.ChangeProofResponse{
+			// TODO: Remove [changeProof.HadRootsInHistory] and if
+			// this node is unable to serve a change proof because it has
+			// insufficient history, get a range proof and set [Response]
+			// to that range proof.
+			// When this change is made, the client must be updated accordingly.
+			Response: &syncpb.ChangeProofResponse_ChangeProof{
+				ChangeProof: changeProof.ToProto(),
+			},
+		})
 		if err != nil {
 			return err
 		}
+
 		if len(proofBytes) < bytesLimit {
 			return s.appSender.SendAppResponse(ctx, nodeID, requestID, proofBytes)
 		}
@@ -267,10 +277,11 @@ func (s *NetworkServer) HandleRangeProofRequest(
 			return err
 		}
 
-		proofBytes, err := merkledb.Codec.EncodeRangeProof(merkledb.Version, rangeProof)
+		proofBytes, err := proto.Marshal(rangeProof.ToProto())
 		if err != nil {
 			return err
 		}
+
 		if len(proofBytes) < bytesLimit {
 			return s.appSender.SendAppResponse(ctx, nodeID, requestID, proofBytes)
 		}

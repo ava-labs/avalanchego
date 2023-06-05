@@ -56,7 +56,7 @@ func (mr *MockOutboundMsgBuilderMockRecorder) Accepted(arg0, arg1, arg2 interfac
 }
 
 // AcceptedFrontier mocks base method.
-func (m *MockOutboundMsgBuilder) AcceptedFrontier(arg0 ids.ID, arg1 uint32, arg2 []ids.ID) (OutboundMessage, error) {
+func (m *MockOutboundMsgBuilder) AcceptedFrontier(arg0 ids.ID, arg1 uint32, arg2 ids.ID) (OutboundMessage, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AcceptedFrontier", arg0, arg1, arg2)
 	ret0, _ := ret[0].(OutboundMessage)
@@ -146,7 +146,7 @@ func (mr *MockOutboundMsgBuilderMockRecorder) AppResponse(arg0, arg1, arg2 inter
 }
 
 // Chits mocks base method.
-func (m *MockOutboundMsgBuilder) Chits(arg0 ids.ID, arg1 uint32, arg2, arg3 []ids.ID) (OutboundMessage, error) {
+func (m *MockOutboundMsgBuilder) Chits(arg0 ids.ID, arg1 uint32, arg2, arg3 ids.ID) (OutboundMessage, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Chits", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(OutboundMessage)

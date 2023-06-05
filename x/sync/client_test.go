@@ -14,6 +14,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"google.golang.org/protobuf/proto"
+
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -87,17 +89,19 @@ func sendRangeRequest(
 	).DoAndReturn(
 		func(_ context.Context, _ ids.NodeID, requestID uint32, responseBytes []byte) error {
 			// deserialize the response so we can modify it if needed.
-			response := &merkledb.RangeProof{}
-			_, err := merkledb.Codec.DecodeRangeProof(responseBytes, response)
-			require.NoError(err)
+			var responseProto syncpb.RangeProof
+			require.NoError(proto.Unmarshal(responseBytes, &responseProto))
+
+			var response merkledb.RangeProof
+			require.NoError(response.UnmarshalProto(&responseProto))
 
 			// modify if needed
 			if modifyResponse != nil {
-				modifyResponse(response)
+				modifyResponse(&response)
 			}
 
 			// reserialize the response and pass it to the client to complete the handling.
-			responseBytes, err = merkledb.Codec.EncodeRangeProof(merkledb.Version, response)
+			responseBytes, err := proto.Marshal(response.ToProto())
 			require.NoError(err)
 			require.NoError(networkClient.AppResponse(context.Background(), serverNodeID, requestID, responseBytes))
 			return nil
@@ -262,15 +266,14 @@ func TestGetRangeProof(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			require := require.New(t)
 			proof, err := sendRangeRequest(t, test.db, test.request, 1, test.modifyResponse)
+			require.ErrorIs(err, test.expectedErr)
 			if test.expectedErr != nil {
-				require.ErrorIs(err, test.expectedErr)
 				return
 			}
-			require.NoError(err)
 			if test.expectedResponseLen > 0 {
 				require.Len(proof.KeyValues, test.expectedResponseLen)
 			}
-			bytes, err := merkledb.Codec.EncodeRangeProof(merkledb.Version, proof)
+			bytes, err := proto.Marshal(proof.ToProto())
 			require.NoError(err)
 			require.Less(len(bytes), int(test.request.BytesLimit))
 		})
@@ -340,17 +343,25 @@ func sendChangeRequest(
 	).DoAndReturn(
 		func(_ context.Context, _ ids.NodeID, requestID uint32, responseBytes []byte) error {
 			// deserialize the response so we can modify it if needed.
-			response := &merkledb.ChangeProof{}
-			_, err := merkledb.Codec.DecodeChangeProof(responseBytes, response)
-			require.NoError(err)
+			var responseProto syncpb.ChangeProofResponse
+			require.NoError(proto.Unmarshal(responseBytes, &responseProto))
+
+			var changeProof merkledb.ChangeProof
+			// TODO when the client/server support including range proofs in the response,
+			// this will need to be updated.
+			require.NoError(changeProof.UnmarshalProto(responseProto.GetChangeProof()))
 
 			// modify if needed
 			if modifyResponse != nil {
-				modifyResponse(response)
+				modifyResponse(&changeProof)
 			}
 
 			// reserialize the response and pass it to the client to complete the handling.
-			responseBytes, err = merkledb.Codec.EncodeChangeProof(merkledb.Version, response)
+			responseBytes, err := proto.Marshal(&syncpb.ChangeProofResponse{
+				Response: &syncpb.ChangeProofResponse_ChangeProof{
+					ChangeProof: changeProof.ToProto(),
+				},
+			})
 			require.NoError(err)
 			require.NoError(networkClient.AppResponse(context.Background(), serverNodeID, requestID, responseBytes))
 			return nil
@@ -523,15 +534,21 @@ func TestGetChangeProof(t *testing.T) {
 			require := require.New(t)
 
 			proof, err := sendChangeRequest(t, trieDB, verificationDB, test.request, 1, test.modifyResponse)
+			require.ErrorIs(err, test.expectedErr)
 			if test.expectedErr != nil {
-				require.ErrorIs(err, test.expectedErr)
 				return
 			}
-			require.NoError(err)
 			if test.expectedResponseLen > 0 {
 				require.LessOrEqual(len(proof.KeyChanges), test.expectedResponseLen)
 			}
-			bytes, err := merkledb.Codec.EncodeChangeProof(merkledb.Version, proof)
+
+			// TODO when the client/server support including range proofs in the response,
+			// this will need to be updated.
+			bytes, err := proto.Marshal(&syncpb.ChangeProofResponse{
+				Response: &syncpb.ChangeProofResponse_ChangeProof{
+					ChangeProof: proof.ToProto(),
+				},
+			})
 			require.NoError(err)
 			require.LessOrEqual(len(bytes), int(test.request.BytesLimit))
 		})

@@ -211,7 +211,7 @@ func ChainTxTest(t *testing.T, c Chain) {
 func ChainBlockTest(t *testing.T, c Chain) {
 	require := require.New(t)
 
-	fetchedBlkID, err := c.GetBlockID(populatedBlkHeight)
+	fetchedBlkID, err := c.GetBlockIDAtHeight(populatedBlkHeight)
 	require.NoError(err)
 	require.Equal(populatedBlkID, fetchedBlkID)
 
@@ -220,7 +220,7 @@ func ChainBlockTest(t *testing.T, c Chain) {
 	require.Equal(populatedBlk.ID(), fetchedBlk.ID())
 
 	// Pull again for the cached path
-	fetchedBlkID, err = c.GetBlockID(populatedBlkHeight)
+	fetchedBlkID, err = c.GetBlockIDAtHeight(populatedBlkHeight)
 	require.NoError(err)
 	require.Equal(populatedBlkID, fetchedBlkID)
 
@@ -247,14 +247,14 @@ func ChainBlockTest(t *testing.T, c Chain) {
 	blkID := blk.ID()
 	blkHeight := blk.Height()
 
-	_, err = c.GetBlockID(blkHeight)
+	_, err = c.GetBlockIDAtHeight(blkHeight)
 	require.ErrorIs(err, database.ErrNotFound)
 
 	_, err = c.GetBlock(blkID)
 	require.ErrorIs(err, database.ErrNotFound)
 
 	// Pull again for the cached path
-	_, err = c.GetBlockID(blkHeight)
+	_, err = c.GetBlockIDAtHeight(blkHeight)
 	require.ErrorIs(err, database.ErrNotFound)
 
 	_, err = c.GetBlock(blkID)
@@ -262,7 +262,7 @@ func ChainBlockTest(t *testing.T, c Chain) {
 
 	c.AddBlock(blk)
 
-	fetchedBlkID, err = c.GetBlockID(blkHeight)
+	fetchedBlkID, err = c.GetBlockIDAtHeight(blkHeight)
 	require.NoError(err)
 	require.Equal(blkID, fetchedBlkID)
 
