@@ -58,16 +58,18 @@ func (wh *syncWorkHeap) Insert(item *syncWorkItem) {
 		return
 	}
 
-	heap.Push(&wh.innerHeap, &heapItem{workItem: item})
+	wh.Push(&heapItem{workItem: item})
+
+	// heap.Push(&wh.innerHeap,)
 }
 
 // Pops and returns a work item from the heap.
 // Returns nil if no work is available or the heap is closed.
 func (wh *syncWorkHeap) GetWork() *syncWorkItem {
-	if wh.closed || wh.innerHeap.Len() == 0 {
+	if wh.closed || wh.Len() == 0 {
 		return nil
 	}
-	return heap.Pop(&wh.innerHeap).(*heapItem).workItem
+	return wh.Pop().workItem
 }
 
 // Insert the item into the heap, merging it with existing items
@@ -136,7 +138,8 @@ func (wh *syncWorkHeap) MergeInsert(item *syncWorkItem) {
 	// nothing was merged, so add new item to the heap
 	if mergedBefore == nil && mergedAfter == nil {
 		// We didn't merge [item] with an existing one; put it in the heap.
-		heap.Push(&wh.innerHeap, &heapItem{workItem: item})
+		wh.Push(&heapItem{workItem: item})
+		// heap.Push(&wh.innerHeap, &heapItem{workItem: item})
 	}
 }
 
