@@ -93,12 +93,13 @@ func NewNoOpAcceptedFrontierHandler(log logging.Logger) AcceptedFrontierHandler 
 	return &noOpAcceptedFrontierHandler{log: log}
 }
 
-func (nop *noOpAcceptedFrontierHandler) AcceptedFrontier(_ context.Context, nodeID ids.NodeID, requestID uint32, _ []ids.ID) error {
+func (nop *noOpAcceptedFrontierHandler) AcceptedFrontier(_ context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) error {
 	nop.log.Debug("dropping request",
 		zap.String("reason", "unhandled by this gear"),
 		zap.Stringer("messageOp", message.AcceptedFrontierOp),
 		zap.Stringer("nodeID", nodeID),
 		zap.Uint32("requestID", requestID),
+		zap.Stringer("containerID", containerID),
 	)
 	return nil
 }
