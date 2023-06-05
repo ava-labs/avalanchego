@@ -221,7 +221,7 @@ func (m *manager) applyValidatorDiffs(
 		return err
 	}
 	for nodeID, weightDiff := range primaryWeightDiffs {
-		if err := rebuildWeight(primarySet, nodeID, weightDiff); err != nil {
+		if err := applyWeightDiff(primarySet, nodeID, weightDiff); err != nil {
 			return err
 		}
 	}
@@ -244,7 +244,7 @@ func (m *manager) applyValidatorDiffs(
 		return err
 	}
 	for nodeID, weightDiff := range targetWeightDiffs {
-		if err := rebuildWeight(targetSet, nodeID, weightDiff); err != nil {
+		if err := applyWeightDiff(targetSet, nodeID, weightDiff); err != nil {
 			return err
 		}
 	}
@@ -259,7 +259,7 @@ func (m *manager) applyValidatorDiffs(
 	return nil
 }
 
-func rebuildWeight(
+func applyWeightDiff(
 	targetSet map[ids.NodeID]*validators.GetValidatorOutput,
 	nodeID ids.NodeID,
 	weightDiff *state.ValidatorWeightDiff,
