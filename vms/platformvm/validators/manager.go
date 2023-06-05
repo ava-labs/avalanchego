@@ -164,7 +164,15 @@ func (m *manager) GetValidatorSet(ctx context.Context, height uint64, subnetID i
 			return nil, err
 		}
 	}
-	subnetSet := make(map[ids.NodeID]*validators.GetValidatorOutput, currentSubnetValidators.Len())
+	currentSubnetValidatorList := currentSubnetValidators.List()
+	subnetSet := make(map[ids.NodeID]*validators.GetValidatorOutput, len(currentSubnetValidatorList))
+	for _, vdr := range currentSubnetValidatorList {
+		subnetSet[vdr.NodeID] = &validators.GetValidatorOutput{
+			NodeID: vdr.NodeID,
+			// PublicKey will be picked from primary validators
+			Weight: vdr.Weight,
+		}
+	}
 
 	currentPrimaryNetworkValidators, ok := m.cfg.Validators.Get(constants.PrimaryNetworkID)
 	if !ok {
@@ -174,18 +182,15 @@ func (m *manager) GetValidatorSet(ctx context.Context, height uint64, subnetID i
 	currentPrimaryValidatorList := currentPrimaryNetworkValidators.List()
 	primarySet := make(map[ids.NodeID]*validators.GetValidatorOutput, len(currentPrimaryValidatorList))
 	for _, vdr := range currentPrimaryValidatorList {
-		if currentSubnetValidators.Contains(vdr.NodeID) {
-			subnetSet[vdr.NodeID] = &validators.GetValidatorOutput{
-				NodeID:    vdr.NodeID,
-				PublicKey: vdr.PublicKey,
-				Weight:    vdr.Weight,
-			}
-		}
-
 		primarySet[vdr.NodeID] = &validators.GetValidatorOutput{
 			NodeID:    vdr.NodeID,
 			PublicKey: vdr.PublicKey,
 			Weight:    vdr.Weight,
+		}
+
+		// fill PK from primary network
+		if _, found := subnetSet[vdr.NodeID]; found {
+			subnetSet[vdr.NodeID].PublicKey = vdr.PublicKey
 		}
 	}
 

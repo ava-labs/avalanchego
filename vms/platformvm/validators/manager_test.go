@@ -397,16 +397,6 @@ func TestVM_GetValidatorSet(t *testing.T) {
 				mockSubnetVdrSet = validators.NewMockSet(ctrl)
 				mockSubnetVdrSet.EXPECT().List().Return(tt.currentSubnetValidators).AnyTimes()
 			}
-			mockSubnetVdrSet.EXPECT().Len().Return(len(tt.currentSubnetValidators)).AnyTimes()
-			mockSubnetVdrSet.EXPECT().Contains(gomock.Any()).DoAndReturn(func(nodeID ids.NodeID) bool {
-				for _, vdr := range tt.currentSubnetValidators {
-					if vdr.NodeID == nodeID {
-						return true
-					}
-				}
-
-				return false
-			}).AnyTimes()
 			vdrs.EXPECT().Get(tt.subnetID).Return(mockSubnetVdrSet, true).AnyTimes()
 
 			for _, vdr := range testValidators {
