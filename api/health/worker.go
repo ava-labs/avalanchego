@@ -87,6 +87,11 @@ func (w *worker) RegisterCheck(name string, check Checker, tags ...string) error
 	}
 
 	// Whenever a new check is added - it is failing
+	w.log.Info("registered new check and initialized its state to failing",
+		zap.String("namespace", w.namespace),
+		zap.String("name", name),
+		zap.Strings("tags", tags),
+	)
 	w.markUnhealthy(tags)
 	return nil
 }
