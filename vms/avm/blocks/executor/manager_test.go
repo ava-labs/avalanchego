@@ -317,8 +317,7 @@ func TestVerifyUniqueInputs(t *testing.T) {
 	// Case: No inputs
 	{
 		m := &manager{}
-		err := m.VerifyUniqueInputs(ids.GenerateTestID(), set.Set[ids.ID]{})
-		require.NoError(err)
+		require.NoError(m.VerifyUniqueInputs(ids.GenerateTestID(), set.Set[ids.ID]{}))
 	}
 
 	// blk0 is blk1's parent
@@ -344,6 +343,5 @@ func TestVerifyUniqueInputs(t *testing.T) {
 	err := m.VerifyUniqueInputs(blk1ID, set.Set[ids.ID]{inputID: struct{}{}})
 	require.ErrorIs(err, ErrConflictingParentTxs)
 
-	err = m.VerifyUniqueInputs(blk1ID, set.Set[ids.ID]{ids.GenerateTestID(): struct{}{}})
-	require.NoError(err)
+	require.NoError(m.VerifyUniqueInputs(blk1ID, set.Set[ids.ID]{ids.GenerateTestID(): struct{}{}}))
 }

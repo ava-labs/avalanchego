@@ -51,8 +51,7 @@ var defaultSubnetConfig = subnets.Config{
 func TestTimeout(t *testing.T) {
 	require := require.New(t)
 	vdrs := validators.NewSet()
-	err := vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1)
-	require.NoError(err)
+	require.NoError(vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 	benchlist := benchlist.NewNoBenchlist()
 	tm, err := timeout.NewManager(
 		&timer.AdaptiveTimeoutConfig{
@@ -81,7 +80,7 @@ func TestTimeout(t *testing.T) {
 	)
 	require.NoError(err)
 
-	err = chainRouter.Initialize(
+	require.NoError(chainRouter.Initialize(
 		ids.EmptyNodeID,
 		logging.NoLog{},
 		tm,
@@ -93,8 +92,7 @@ func TestTimeout(t *testing.T) {
 		router.HealthConfig{},
 		"",
 		prometheus.NewRegistry(),
-	)
-	require.NoError(err)
+	))
 
 	ctx := snow.DefaultConsensusContextTest()
 	externalSender := &ExternalSenderTest{TB: t}
@@ -290,16 +288,14 @@ func TestTimeout(t *testing.T) {
 			vdrIDs.Union(nodeIDs)
 			wg.Add(1)
 			requestID++
-			err := sender.SendAppRequest(cancelledCtx, nodeIDs, requestID, nil)
-			require.NoError(err)
+			require.NoError(sender.SendAppRequest(cancelledCtx, nodeIDs, requestID, nil))
 		}
 		{
 			chainID := ids.GenerateTestID()
 			chains.Add(chainID)
 			wg.Add(1)
 			requestID++
-			err := sender.SendCrossChainAppRequest(cancelledCtx, chainID, requestID, nil)
-			require.NoError(err)
+			require.NoError(sender.SendCrossChainAppRequest(cancelledCtx, chainID, requestID, nil))
 		}
 	}
 
@@ -323,8 +319,7 @@ func TestTimeout(t *testing.T) {
 
 func TestReliableMessages(t *testing.T) {
 	vdrs := validators.NewSet()
-	err := vdrs.Add(ids.NodeID{1}, nil, ids.Empty, 1)
-	require.NoError(t, err)
+	require.NoError(t, vdrs.Add(ids.NodeID{1}, nil, ids.Empty, 1))
 	benchlist := benchlist.NewNoBenchlist()
 	tm, err := timeout.NewManager(
 		&timer.AdaptiveTimeoutConfig{
@@ -354,7 +349,7 @@ func TestReliableMessages(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	err = chainRouter.Initialize(
+	require.NoError(t, chainRouter.Initialize(
 		ids.EmptyNodeID,
 		logging.NoLog{},
 		tm,
@@ -366,8 +361,7 @@ func TestReliableMessages(t *testing.T) {
 		router.HealthConfig{},
 		"",
 		prometheus.NewRegistry(),
-	)
-	require.NoError(t, err)
+	))
 
 	ctx := snow.DefaultConsensusContextTest()
 
@@ -473,8 +467,7 @@ func TestReliableMessages(t *testing.T) {
 func TestReliableMessagesToMyself(t *testing.T) {
 	benchlist := benchlist.NewNoBenchlist()
 	vdrs := validators.NewSet()
-	err := vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1)
-	require.NoError(t, err)
+	require.NoError(t, vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 	tm, err := timeout.NewManager(
 		&timer.AdaptiveTimeoutConfig{
 			InitialTimeout:     10 * time.Millisecond,
@@ -503,7 +496,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	err = chainRouter.Initialize(
+	require.NoError(t, chainRouter.Initialize(
 		ids.EmptyNodeID,
 		logging.NoLog{},
 		tm,
@@ -515,8 +508,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		router.HealthConfig{},
 		"",
 		prometheus.NewRegistry(),
-	)
-	require.NoError(t, err)
+	))
 
 	ctx := snow.DefaultConsensusContextTest()
 
@@ -1007,7 +999,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 				msgCreator.EXPECT().AcceptedFrontier(
 					chainID,
 					requestID,
-					summaryIDs,
+					summaryIDs[0],
 				).Return(nil, nil) // Don't care about the message
 			},
 			assertMsgToMyself: func(require *require.Assertions, msg message.InboundMessage) {
@@ -1015,9 +1007,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 				innerMsg := msg.Message().(*p2p.AcceptedFrontier)
 				require.Equal(chainID[:], innerMsg.ChainId)
 				require.Equal(requestID, innerMsg.RequestId)
-				for i, summaryID := range summaryIDs {
-					require.Equal(summaryID[:], innerMsg.ContainerIds[i])
-				}
+				require.Equal(summaryIDs[0][:], innerMsg.ContainerId)
 			},
 			setExternalSenderExpect: func(externalSender *MockExternalSender) {
 				externalSender.EXPECT().Send(
@@ -1028,7 +1018,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 				).Return(nil)
 			},
 			sendF: func(_ *require.Assertions, sender common.Sender, nodeID ids.NodeID) {
-				sender.SendAcceptedFrontier(context.Background(), nodeID, requestID, summaryIDs)
+				sender.SendAcceptedFrontier(context.Background(), nodeID, requestID, summaryIDs[0])
 			},
 		},
 		{

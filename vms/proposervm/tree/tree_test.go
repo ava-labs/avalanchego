@@ -43,8 +43,7 @@ func TestAcceptSingleBlock(t *testing.T) {
 	_, contains = tr.Get(block)
 	require.True(contains)
 
-	err := tr.Accept(context.Background(), block)
-	require.NoError(err)
+	require.NoError(tr.Accept(context.Background(), block))
 	require.Equal(choices.Accepted, block.Status())
 }
 
@@ -78,8 +77,7 @@ func TestAcceptBlockConflict(t *testing.T) {
 	_, contains = tr.Get(blockToReject)
 	require.True(contains)
 
-	err := tr.Accept(context.Background(), blockToAccept)
-	require.NoError(err)
+	require.NoError(tr.Accept(context.Background(), blockToAccept))
 	require.Equal(choices.Accepted, blockToAccept.Status())
 	require.Equal(choices.Rejected, blockToReject.Status())
 }
@@ -126,8 +124,7 @@ func TestAcceptChainConflict(t *testing.T) {
 	_, contains = tr.Get(blockToRejectChild)
 	require.True(contains)
 
-	err := tr.Accept(context.Background(), blockToAccept)
-	require.NoError(err)
+	require.NoError(tr.Accept(context.Background(), blockToAccept))
 	require.Equal(choices.Accepted, blockToAccept.Status())
 	require.Equal(choices.Rejected, blockToReject.Status())
 	require.Equal(choices.Rejected, blockToRejectChild.Status())

@@ -54,8 +54,7 @@ func TestFetchUTXOs(t *testing.T) {
 	db := memdb.New()
 	s := NewUTXOState(db, manager)
 
-	err := s.PutUTXO(utxo)
-	require.NoError(err)
+	require.NoError(s.PutUTXO(utxo))
 
 	utxos, err := GetAllUTXOs(s, addrs)
 	require.NoError(err)
@@ -111,8 +110,7 @@ func TestGetPaginatedUTXOs(t *testing.T) {
 				},
 			},
 		}
-		err := s.PutUTXO(utxo0)
-		require.NoError(err)
+		require.NoError(s.PutUTXO(utxo0))
 
 		utxo1 := &UTXO{
 			UTXOID: UTXOID{
@@ -129,8 +127,7 @@ func TestGetPaginatedUTXOs(t *testing.T) {
 				},
 			},
 		}
-		err = s.PutUTXO(utxo1)
-		require.NoError(err)
+		require.NoError(s.PutUTXO(utxo1))
 
 		utxo2 := &UTXO{
 			UTXOID: UTXOID{
@@ -147,8 +144,7 @@ func TestGetPaginatedUTXOs(t *testing.T) {
 				},
 			},
 		}
-		err = s.PutUTXO(utxo2)
-		require.NoError(err)
+		require.NoError(s.PutUTXO(utxo2))
 	}
 
 	var (
