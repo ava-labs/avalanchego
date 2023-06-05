@@ -655,12 +655,12 @@ func (vm *VMServer) GetAncestors(ctx context.Context, req *vmpb.GetAncestorsRequ
 
 	blocks, err := block.GetAncestors(
 		ctx,
+		vm.log,
 		vm.vm,
 		blkID,
 		maxBlksNum,
 		maxBlksSize,
 		maxBlocksRetrivalTime,
-		vm.log,
 	)
 	return &vmpb.GetAncestorsResponse{
 		BlksBytes: blocks,

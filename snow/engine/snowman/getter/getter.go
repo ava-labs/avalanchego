@@ -150,6 +150,7 @@ func (gh *getter) GetAccepted(ctx context.Context, nodeID ids.NodeID, requestID 
 func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID) error {
 	ancestorsBytes, err := block.GetAncestors(
 		ctx,
+		gh.log,
 		gh.vm,
 		blkID,
 		gh.cfg.AncestorsMaxContainersSent,
