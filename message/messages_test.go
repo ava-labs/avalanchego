@@ -415,9 +415,9 @@ func TestMessage(t *testing.T) {
 			msg: &p2p.Message{
 				Message: &p2p.Message_AcceptedFrontier_{
 					AcceptedFrontier_: &p2p.AcceptedFrontier{
-						ChainId:      testID[:],
-						RequestId:    1,
-						ContainerIds: [][]byte{testID[:], testID[:]},
+						ChainId:     testID[:],
+						RequestId:   1,
+						ContainerId: testID[:],
 					},
 				},
 			},

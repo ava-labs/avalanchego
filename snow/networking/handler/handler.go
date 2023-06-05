@@ -601,19 +601,19 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 		return engine.GetAcceptedFrontier(ctx, nodeID, msg.RequestId)
 
 	case *p2p.AcceptedFrontier:
-		containerIDs, err := getIDs(msg.ContainerIds)
+		containerID, err := ids.ToID(msg.ContainerId)
 		if err != nil {
 			h.ctx.Log.Debug("message with invalid field",
 				zap.Stringer("nodeID", nodeID),
 				zap.Stringer("messageOp", message.AcceptedFrontierOp),
 				zap.Uint32("requestID", msg.RequestId),
-				zap.String("field", "ContainerIDs"),
+				zap.String("field", "ContainerID"),
 				zap.Error(err),
 			)
 			return engine.GetAcceptedFrontierFailed(ctx, nodeID, msg.RequestId)
 		}
 
-		return engine.AcceptedFrontier(ctx, nodeID, msg.RequestId, containerIDs)
+		return engine.AcceptedFrontier(ctx, nodeID, msg.RequestId, containerID)
 
 	case *message.GetAcceptedFrontierFailed:
 		return engine.GetAcceptedFrontierFailed(ctx, nodeID, msg.RequestID)
