@@ -59,8 +59,6 @@ func (wh *syncWorkHeap) Insert(item *syncWorkItem) {
 	}
 
 	wh.Push(&heapItem{workItem: item})
-
-	// heap.Push(&wh.innerHeap,)
 }
 
 // Pops and returns a work item from the heap.
