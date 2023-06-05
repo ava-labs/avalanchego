@@ -195,8 +195,7 @@ func (m *manager) GetValidatorSet(ctx context.Context, height uint64, subnetID i
 	}
 
 	for diffHeight := lastAcceptedHeight; diffHeight > height; diffHeight-- {
-		err := m.applyValidatorDiffs(subnetSet, primarySet, subnetID, diffHeight)
-		if err != nil {
+		if err := m.applyValidatorDiffs(subnetSet, primarySet, subnetID, diffHeight); err != nil {
 			return nil, err
 		}
 	}
@@ -222,8 +221,7 @@ func (m *manager) applyValidatorDiffs(
 		return err
 	}
 	for nodeID, weightDiff := range primaryWeightDiffs {
-		err := rebuildWeight(primarySet, nodeID, weightDiff)
-		if err != nil {
+		if err := rebuildWeight(primarySet, nodeID, weightDiff); err != nil {
 			return err
 		}
 	}
@@ -246,8 +244,7 @@ func (m *manager) applyValidatorDiffs(
 		return err
 	}
 	for nodeID, weightDiff := range targetWeightDiffs {
-		err := rebuildWeight(targetSet, nodeID, weightDiff)
-		if err != nil {
+		if err := rebuildWeight(targetSet, nodeID, weightDiff); err != nil {
 			return err
 		}
 	}

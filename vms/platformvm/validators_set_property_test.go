@@ -11,6 +11,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leanovate/gopter"
+	"github.com/leanovate/gopter/gen"
+	"github.com/leanovate/gopter/prop"
+
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database/manager"
@@ -41,9 +45,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/leanovate/gopter"
-	"github.com/leanovate/gopter/gen"
-	"github.com/leanovate/gopter/prop"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
 )
@@ -80,7 +81,7 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 			vm.clock.Set(currentTime)
 			vm.state.SetTimestamp(currentTime)
 
-			// build validator sequence out of random (tey reproducible) input
+			// build validator sequence out of random (yet reproducible) input
 			validatorsTimes, err := buildTimestampsList(events, currentTime, nodeID)
 			if err != nil {
 				return fmt.Sprintf("failed building events sequence, %s", err.Error())
