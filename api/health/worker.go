@@ -288,7 +288,6 @@ func (w *worker) runCheck(ctx context.Context, wg *sync.WaitGroup, name string, 
 			zap.String("namespace", w.namespace),
 			zap.String("name", name),
 			zap.Strings("tags", check.tags),
-			zap.Error(err),
 		)
 		if check.isApplicationCheck {
 			for tag := range w.tags {
