@@ -442,7 +442,9 @@ func terminatePrimaryValidator(vm *VM, validator *state.Staker) error {
 // buildTimestampsList creates validators start and end time, given the event list.
 // output is returned as a list of state.Stakers, just because it's a convenient object to
 // collect all relevant information.
-// buildTimestampsList guarantees that start/end times of contiguous stakers do not overlap
+// buildTimestampsList creates validators start and end time, given the event list.
+// output is returned as a list of state.Stakers, just because it's a convenient object to
+// collect all relevant information.
 func buildTimestampsList(events []string, currentTime time.Time, nodeID ids.NodeID) ([]*state.Staker, error) {
 	res := make([]*state.Staker, 0, len(events))
 
