@@ -11,7 +11,9 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"go.uber.org/zap"
 )
 
 var ErrRemoteVMNotImplemented = errors.New("vm does not implement RemoteVM interface")
@@ -33,6 +35,7 @@ type BatchedChainVM interface {
 
 func GetAncestors(
 	ctx context.Context,
+	log logging.Logger,
 	vm Getter, // fetch blocks
 	blkID ids.ID, // first requested block
 	maxBlocksNum int, // max number of blocks to be retrieved
@@ -77,6 +80,10 @@ func GetAncestors(
 		blk, err = vm.GetBlock(ctx, blk.Parent())
 		if err != nil {
 			// After state sync we may not have the full chain
+			log.Debug("failed to get block during ancestorial lookup",
+				zap.String("parent id", blk.Parent().String()),
+				zap.Error(err),
+			)
 			break
 		}
 		blkBytes := blk.Bytes()
@@ -85,7 +92,7 @@ func GetAncestors(
 		// is repr. by an int.
 		newLen := ancestorsBytesLen + len(blkBytes) + wrappers.IntLen
 		if newLen > maxBlocksSize {
-			// reached maximum response size
+			// Reached maximum response size
 			break
 		}
 		ancestorsBytes = append(ancestorsBytes, blkBytes)
