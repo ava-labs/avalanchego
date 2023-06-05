@@ -362,7 +362,7 @@ func internalAddValidator(vm *VM, signedTx *txs.Tx) (*state.Staker, error) {
 		return nil, fmt.Errorf("failed verifying block, %s", err.Error())
 	}
 	if err := blk.Accept(context.Background()); err != nil {
-		return nil, fmt.Errorf("failed verifying block, %s", err.Error())
+                return fmt.Errorf("failed accepting block, %s", err.Error())
 	}
 	if err := vm.SetPreference(context.Background(), vm.manager.LastAccepted()); err != nil {
 		return fmt.Errorf("failed getting last accepted block, %s", err.Error())
