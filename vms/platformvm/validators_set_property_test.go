@@ -81,7 +81,7 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 			vm.clock.Set(currentTime)
 			vm.state.SetTimestamp(currentTime)
 
-			// build validator sequence out of random (yet reproducible) input
+			// build validator sequences out of pseudo-random events
 			validatorsTimes, err := buildTimestampsList(events, currentTime, nodeID)
 			if err != nil {
 				return fmt.Sprintf("failed building events sequence, %s", err.Error())
