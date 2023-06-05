@@ -139,9 +139,9 @@ func TestSetupGenesis(t *testing.T) {
 			wantConfig: customg.Config,
 			wantErr: &params.ConfigCompatError{
 				What:         "ApricotPhase1 fork block timestamp",
-				StoredConfig: big.NewInt(90),
-				NewConfig:    big.NewInt(100),
-				RewindTo:     89,
+				StoredTime:   u64(90),
+				NewTime:      u64(100),
+				RewindToTime: 89,
 			},
 		},
 	}

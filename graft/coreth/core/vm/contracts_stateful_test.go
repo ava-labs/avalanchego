@@ -73,7 +73,7 @@ func TestPackNativeAssetCallInput(t *testing.T) {
 func TestStatefulPrecompile(t *testing.T) {
 	vmCtx := BlockContext{
 		BlockNumber:       big.NewInt(0),
-		Time:              big.NewInt(0),
+		Time:              0,
 		CanTransfer:       CanTransfer,
 		CanTransferMC:     CanTransferMC,
 		Transfer:          Transfer,

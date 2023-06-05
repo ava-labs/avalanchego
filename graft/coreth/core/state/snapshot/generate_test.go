@@ -127,12 +127,12 @@ func checkSnapRoot(t *testing.T, snap *diskLayer, trieRoot common.Hash) {
 	t.Helper()
 	accIt := snap.AccountIterator(common.Hash{})
 	defer accIt.Release()
-	snapRoot, err := generateTrieRoot(nil, nil, accIt, common.Hash{}, stackTrieGenerate,
+	snapRoot, err := generateTrieRoot(nil, "", accIt, common.Hash{}, stackTrieGenerate,
 		func(db ethdb.KeyValueWriter, accountHash, codeHash common.Hash, stat *generateStats) (common.Hash, error) {
 			storageIt, _ := snap.StorageIterator(accountHash, common.Hash{})
 			defer storageIt.Release()
 
-			hash, err := generateTrieRoot(nil, nil, storageIt, accountHash, stackTrieGenerate, nil, stat, false)
+			hash, err := generateTrieRoot(nil, "", storageIt, accountHash, stackTrieGenerate, nil, stat, false)
 			if err != nil {
 				return common.Hash{}, err
 			}
@@ -200,7 +200,7 @@ func (t *testHelper) makeStorageTrie(stateRoot, owner common.Hash, keys []string
 	if !commit {
 		return stTrie.Hash().Bytes()
 	}
-	root, nodes, _ := stTrie.Commit(false)
+	root, nodes := stTrie.Commit(false)
 	if nodes != nil {
 		t.nodes.Merge(nodes)
 	}
@@ -208,12 +208,12 @@ func (t *testHelper) makeStorageTrie(stateRoot, owner common.Hash, keys []string
 }
 
 func (t *testHelper) Commit() common.Hash {
-	root, nodes, _ := t.accTrie.Commit(true)
+	root, nodes := t.accTrie.Commit(true)
 	if nodes != nil {
 		t.nodes.Merge(nodes)
 	}
 	t.triedb.Update(t.nodes)
-	t.triedb.Commit(root, false, nil)
+	t.triedb.Commit(root, false)
 	return root
 }
 
@@ -401,7 +401,7 @@ func TestGenerateCorruptAccountTrie(t *testing.T) {
 	root := helper.Commit() // Root: 0xfa04f652e8bd3938971bf7d71c3c688574af334ca8bc20e64b01ba610ae93cad
 
 	// Delete an account trie leaf and ensure the generator chokes
-	helper.triedb.Commit(root, false, nil)
+	helper.triedb.Commit(root, false)
 	helper.diskdb.Delete(common.HexToHash("0xf73118e0254ce091588d66038744a0afae5f65a194de67cff310c683ae43329e").Bytes())
 
 	snap := generateSnapshot(helper.diskdb, helper.triedb, 16, testBlockHash, root, nil)

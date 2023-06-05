@@ -29,7 +29,6 @@ package native
 import (
 	"encoding/json"
 	"math/big"
-	"time"
 
 	"github.com/ava-labs/coreth/core/vm"
 	"github.com/ava-labs/coreth/eth/tracers"
@@ -37,7 +36,7 @@ import (
 )
 
 func init() {
-	register("muxTracer", newMuxTracer)
+	tracers.DefaultDirectory.Register("muxTracer", newMuxTracer, false)
 }
 
 // muxTracer is a go implementation of the Tracer interface which
@@ -58,7 +57,7 @@ func newMuxTracer(ctx *tracers.Context, cfg json.RawMessage) (tracers.Tracer, er
 	objects := make([]tracers.Tracer, 0, len(config))
 	names := make([]string, 0, len(config))
 	for k, v := range config {
-		t, err := tracers.New(k, ctx, v)
+		t, err := tracers.DefaultDirectory.New(k, ctx, v)
 		if err != nil {
 			return nil, err
 		}
@@ -77,9 +76,9 @@ func (t *muxTracer) CaptureStart(env *vm.EVM, from common.Address, to common.Add
 }
 
 // CaptureEnd is called after the call finishes to finalize the tracing.
-func (t *muxTracer) CaptureEnd(output []byte, gasUsed uint64, elapsed time.Duration, err error) {
+func (t *muxTracer) CaptureEnd(output []byte, gasUsed uint64, err error) {
 	for _, t := range t.tracers {
-		t.CaptureEnd(output, gasUsed, elapsed, err)
+		t.CaptureEnd(output, gasUsed, err)
 	}
 }
 

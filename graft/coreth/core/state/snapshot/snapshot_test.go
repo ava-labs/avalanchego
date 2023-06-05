@@ -27,6 +27,7 @@
 package snapshot
 
 import (
+	crand "crypto/rand"
 	"fmt"
 	"math/big"
 	"math/rand"
@@ -41,7 +42,7 @@ import (
 // randomHash generates a random blob of data and returns it as a hash.
 func randomHash() common.Hash {
 	var hash common.Hash
-	if n, err := rand.Read(hash[:]); n != common.HashLength || err != nil {
+	if n, err := crand.Read(hash[:]); n != common.HashLength || err != nil {
 		panic(err)
 	}
 	return hash

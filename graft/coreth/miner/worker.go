@@ -98,8 +98,9 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 		chainConfig: chainConfig,
 		engine:      engine,
 		eth:         eth,
-		mux:         mux,
 		chain:       eth.BlockChain(),
+		mux:         mux,
+		coinbase:    config.Etherbase,
 		clock:       clock,
 	}
 

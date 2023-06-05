@@ -38,7 +38,7 @@ import (
 )
 
 func init() {
-	register("4byteTracer", newFourByteTracer)
+	tracers.DefaultDirectory.Register("4byteTracer", newFourByteTracer, false)
 }
 
 // fourByteTracer searches for 4byte-identifiers, and collects them for post-processing.
@@ -91,7 +91,7 @@ func (t *fourByteTracer) store(id []byte, size int) {
 // CaptureStart implements the EVMLogger interface to initialize the tracing operation.
 func (t *fourByteTracer) CaptureStart(env *vm.EVM, from common.Address, to common.Address, create bool, input []byte, gas uint64, value *big.Int) {
 	// Update list of precompiles based on current block
-	rules := env.ChainConfig().AvalancheRules(env.Context.BlockNumber, env.Context.Time)
+	rules := env.ChainConfig().AvalancheRules(env.Context.BlockNumber, env.Context.Timestamp())
 	t.activePrecompiles = vm.ActivePrecompiles(rules)
 
 	// Save the outer calldata also

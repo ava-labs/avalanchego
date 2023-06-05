@@ -182,7 +182,7 @@ func SetupGenesisBlock(
 	}
 	// We have the genesis block in database but the corresponding state is missing.
 	header := rawdb.ReadHeader(db, stored, 0)
-	if _, err := state.New(header.Root, state.NewDatabaseWithNodeDB(db, triedb), nil); err != nil {
+	if header.Root != types.EmptyRootHash && !rawdb.HasLegacyTrieNode(db, header.Root) {
 		// Ensure the stored genesis matches with the given one.
 		hash := genesis.ToBlock().Hash()
 		if hash != stored {
@@ -226,7 +226,7 @@ func SetupGenesisBlock(
 		log.Info("skipping verifying activated network upgrades on chain config")
 	} else {
 		compatErr := storedcfg.CheckCompatible(newcfg, height, timestamp)
-		if compatErr != nil && height != 0 && compatErr.RewindTo != 0 {
+		if compatErr != nil && ((height != 0 && compatErr.RewindToBlock != 0) || (timestamp != 0 && compatErr.RewindToTime != 0)) {
 			return newcfg, stored, compatErr
 		}
 	}
@@ -298,7 +298,7 @@ func (g *Genesis) toBlock(db ethdb.Database, triedb *trie.Database) *types.Block
 		}
 	}
 	statedb.Commit(false, false)
-	if err := statedb.Database().TrieDB().Commit(root, true, nil); err != nil {
+	if err := statedb.Database().TrieDB().Commit(root, true); err != nil {
 		panic(fmt.Sprintf("unable to commit genesis block: %v", err))
 	}
 

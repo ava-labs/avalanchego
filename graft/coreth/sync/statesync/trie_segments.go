@@ -65,7 +65,7 @@ type trieToSync struct {
 func NewTrieToSync(sync *stateSync, root common.Hash, account common.Hash, syncTask syncTask) (*trieToSync, error) {
 	batch := sync.db.NewBatch() // TODO: migrate state sync to use database schemes.
 	writeFn := func(owner common.Hash, path []byte, hash common.Hash, blob []byte) {
-		rawdb.WriteTrieNode(batch, hash, blob)
+		rawdb.WriteTrieNode(batch, owner, path, hash, blob, rawdb.HashScheme)
 	}
 	trieToSync := &trieToSync{
 		sync:         sync,

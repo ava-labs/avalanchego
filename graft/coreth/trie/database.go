@@ -419,7 +419,7 @@ func (db *Database) node(hash common.Hash) ([]byte, *cachedNode, error) {
 	memcacheDirtyMissMeter.Mark(1)
 
 	// Content unavailable in memory, attempt to retrieve from disk
-	enc := rawdb.ReadTrieNode(db.diskdb, hash)
+	enc := rawdb.ReadLegacyTrieNode(db.diskdb, hash)
 	if len(enc) > 0 {
 		if db.cleans != nil {
 			db.cleans.Set(hash[:], enc)
@@ -572,7 +572,7 @@ func (db *Database) writeFlushItems(toFlush []*flushItem) error {
 	for _, item := range toFlush {
 		rlp := item.node.rlp()
 		item.rlp = rlp
-		rawdb.WriteTrieNode(batch, item.hash, rlp)
+		rawdb.WriteLegacyTrieNode(batch, item.hash, rlp)
 
 		// If we exceeded the ideal batch size, commit and reset
 		if batch.ValueSize() >= ethdb.IdealBatchSize {
@@ -681,7 +681,7 @@ func (db *Database) Cap(limit common.StorageSize) error {
 // Commit iterates over all the children of a particular node, writes them out
 // to disk, forcefully tearing down all references in both directions. As a side
 // effect, all pre-images accumulated up to this point are also written.
-func (db *Database) Commit(node common.Hash, report bool, callback func(common.Hash)) error {
+func (db *Database) Commit(node common.Hash, report bool) error {
 	start := time.Now()
 	if db.preimages != nil {
 		if err := db.preimages.commit(true); err != nil {
@@ -695,7 +695,7 @@ func (db *Database) Commit(node common.Hash, report bool, callback func(common.H
 	db.lock.RLock()
 	lockStart := time.Now()
 	nodes, storage := len(db.dirties), db.dirtiesSize
-	toFlush, err := db.commit(node, make([]*flushItem, 0, 128), callback)
+	toFlush, err := db.commit(node, make([]*flushItem, 0, 128))
 	if err != nil {
 		db.lock.RUnlock()
 		log.Error("Failed to commit trie from trie database", "err", err)
@@ -746,7 +746,7 @@ func (db *Database) Commit(node common.Hash, report bool, callback func(common.H
 //
 // [callback] will be invoked as soon as it is determined a trie node will be
 // flushed to disk (before it is actually written).
-func (db *Database) commit(hash common.Hash, toFlush []*flushItem, callback func(common.Hash)) ([]*flushItem, error) {
+func (db *Database) commit(hash common.Hash, toFlush []*flushItem) ([]*flushItem, error) {
 	// If the node does not exist, it's a previously committed node
 	node, ok := db.dirties[hash]
 	if !ok {
@@ -755,7 +755,7 @@ func (db *Database) commit(hash common.Hash, toFlush []*flushItem, callback func
 	var err error
 	node.forChilds(func(child common.Hash) {
 		if err == nil {
-			toFlush, err = db.commit(child, toFlush, callback)
+			toFlush, err = db.commit(child, toFlush)
 		}
 	})
 	if err != nil {
@@ -765,9 +765,6 @@ func (db *Database) commit(hash common.Hash, toFlush []*flushItem, callback func
 	// that children are committed before their parents (an invariant of this
 	// package).
 	toFlush = append(toFlush, &flushItem{hash, node, nil})
-	if callback != nil {
-		callback(hash)
-	}
 	return toFlush, nil
 }
 
@@ -972,6 +969,6 @@ func (db *Database) CommitPreimages() error {
 }
 
 // Scheme returns the node scheme used in the database.
-func (db *Database) Scheme() NodeScheme {
-	return &hashScheme{}
+func (db *Database) Scheme() string {
+	return rawdb.HashScheme
 }
