@@ -71,6 +71,7 @@ var (
 	errMixedDeposits                  = errors.New("tx has expired deposit input and active-deposit/unlocked input")
 	errExpiredDepositNotFullyUnlocked = errors.New("unlocked only part of expired deposit")
 	errBurnedDepositUnlock            = errors.New("burned undeposited tokens")
+	errAdminCannotBeDeleted           = errors.New("admin cannot be deleted")
 )
 
 type CaminoStandardTxExecutor struct {
@@ -1513,6 +1514,11 @@ func (e *CaminoStandardTxExecutor) AddressStateTx(tx *txs.AddressStateTx) error 
 	// Calculate new states
 	newStates := states
 	if tx.Remove && (states&statesBit) != 0 {
+		for signerAddresses := range addresses {
+			if signerAddresses == tx.Address && (states&txs.AddressStateRoleAdmin) == 1 {
+				return errAdminCannotBeDeleted
+			}
+		}
 		newStates ^= statesBit
 	} else if !tx.Remove {
 		newStates |= statesBit

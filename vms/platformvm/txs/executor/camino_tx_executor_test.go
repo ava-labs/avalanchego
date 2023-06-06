@@ -1672,6 +1672,15 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 			expectedState: txs.AddressStateRoleAdmin,
 			remove:        false,
 		},
+		// Bob has Admin State, and he is trying to remove from Alice the Admin Role
+		"State: Admin, Flag: Admin, Remove, Different Address": {
+			stateAddress:  bob,
+			targetAddress: alice,
+			txFlag:        txs.AddressStateBitRoleAdmin,
+			existingState: txs.AddressStateRoleAdmin,
+			expectedState: 0,
+			remove:        true,
+		},
 		// Bob has Admin State, and he is trying to give Alice KYC Role
 		"State: Admin, Flag: kyc, Add, Different Address": {
 			stateAddress:  bob,
@@ -1688,6 +1697,16 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 			txFlag:        txs.AddressStateBitRoleKYC,
 			existingState: txs.AddressStateRoleAdmin,
 			expectedState: 0,
+			remove:        true,
+		},
+		// Bob has Admin State, and he is trying to remove it from himself
+		"State: Admin, Flag: admin, Remove, Same Address": {
+			stateAddress:  bob,
+			targetAddress: bob,
+			txFlag:        txs.AddressStateBitRoleAdmin,
+			existingState: txs.AddressStateRoleAdmin,
+			expectedState: 0,
+			expectedErr:   errAdminCannotBeDeleted,
 			remove:        true,
 		},
 		// Bob has Admin State, and he is trying to give Alice the KYC Verified State
