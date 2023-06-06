@@ -383,11 +383,11 @@ func (v *baseStakers) pruneValidator(subnetID ids.ID, nodeID ids.NodeID) {
 type diffStakers struct {
 	// subnetID --> nodeID --> diff for that validator
 	// validatorDiffs helps tracking diffs to be pushed to lower level diff/state upon Apply
-	// moveover it supports stakers iteration over a specific subnetID/nodeID pair
+	// moreover it supports stakers iteration over a specific subnetID/nodeID pair
 	validatorDiffs map[ids.ID]map[ids.NodeID]*diffValidator
 
 	// allStakers contains all validators/delegators added/updated/deleted in the diff.
-	// allStakers enables iteration over all stakers, regardless their subnetID/nodeID
+	// allStakers enables iteration over all stakers, regardless of their subnetID/nodeID
 	allStakers map[ids.ID]stakerAndStatus
 
 	// addedStakersOnly supports stakers iteration. It contains only stakers that were
@@ -412,8 +412,10 @@ type diffValidator struct {
 	// validatorStatus describes whether a validator has been added or removed.
 	validator stakerAndStatus
 
-	// delegators lists all
-	delegators      map[ids.ID]stakerAndStatus // by TxID
+	// delegators groups all delegators associated with validator, by their TxID.
+	// the added delegators are also stored in the addedDelegators tree to speed up
+	// iteration (instead of building the tree upon iteration)
+	delegators      map[ids.ID]stakerAndStatus
 	addedDelegators *btree.BTreeG[*Staker]
 }
 
