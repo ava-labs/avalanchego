@@ -19,7 +19,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
-	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils"
@@ -29,8 +28,8 @@ import (
 )
 
 const (
-	RootPath = EmptyPath
-
+	RootPath          = EmptyPath
+	evictionBatchSize = 100
 	// TODO: name better
 	rebuildViewSizeFractionOfCacheSize = 50
 	minRebuildViewSizePerCommit        = 1000
@@ -139,9 +138,7 @@ type merkleDB struct {
 	// Should be held before taking [db.lock]
 	commitLock sync.RWMutex
 
-	// versiondb that the other dbs are built on.
-	// Allows the changes made to the snapshot and [nodeDB] to be atomic.
-	nodeDB *versiondb.Database
+	nodeDB database.Database
 
 	// Stores data about the database's current state.
 	metadataDB database.Database
@@ -176,7 +173,7 @@ func newDatabase(
 ) (*merkleDB, error) {
 	trieDB := &merkleDB{
 		metrics:    metrics,
-		nodeDB:     versiondb.New(prefixdb.New(nodePrefix, db)),
+		nodeDB:     prefixdb.New(nodePrefix, db),
 		metadataDB: prefixdb.New(metadataPrefix, db),
 		history:    newTrieHistory(config.HistoryLength),
 		tracer:     config.Tracer,
@@ -265,8 +262,7 @@ func (db *merkleDB) rebuild(ctx context.Context) error {
 				return err
 			}
 			currentViewSize++
-		}
-		if err := db.nodeDB.Delete(key); err != nil {
+		} else if err := db.nodeDB.Delete(key); err != nil {
 			return err
 		}
 	}
@@ -351,10 +347,6 @@ func (db *merkleDB) Close() error {
 	if err := db.nodeCache.Flush(); err != nil {
 		// There was an error during cache eviction.
 		// Don't commit to disk.
-		return err
-	}
-
-	if err := db.nodeDB.Commit(); err != nil {
 		return err
 	}
 
@@ -749,29 +741,58 @@ func (db *merkleDB) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 // the movement of [node] from [db.nodeCache] to [db.nodeDB] is atomic.
 // As soon as [db.nodeCache] no longer has [node], [db.nodeDB] does.
 // Non-nil error is fatal -- causes [db] to close.
-func (db *merkleDB) onEviction(node *node) error {
-	if node == nil || node.hasValue() {
-		// only persist intermediary nodes
+func (db *merkleDB) onEviction(n *node) error {
+	// the evicted node isn't an intermediary node, so skip writing.
+	if n == nil || n.hasValue() {
 		return nil
 	}
 
-	nodeBytes, err := node.marshal()
-	if err != nil {
-		db.onEvictionErr.Set(err)
-		// Prevent reads/writes from/to [db.nodeDB] to avoid inconsistent state.
-		_ = db.nodeDB.Close()
-		// This is a fatal error.
-		go db.Close()
+	batch := db.nodeDB.NewBatch()
+	if err := writeNodeToBatch(batch, n); err != nil {
 		return err
 	}
 
-	if err := db.nodeDB.Put(node.key.Bytes(), nodeBytes); err != nil {
+	// Evict the oldest [evictionBatchSize] nodes from the cache
+	// and write them to disk. We write a batch of them, rather than
+	// just [n], so that we don't immediately evict and write another
+	// node, because each time this method is called we do a disk write.
+	var err error
+	for removedCount := 0; removedCount < evictionBatchSize; removedCount++ {
+		_, n, exists := db.nodeCache.removeOldest()
+		if !exists {
+			// The cache is empty.
+			break
+		}
+		if n == nil || n.hasValue() {
+			// only persist intermediary nodes
+			continue
+		}
+		// Note this must be = not := since we check
+		// [err] outside the loop.
+		if err = writeNodeToBatch(batch, n); err != nil {
+			break
+		}
+	}
+	if err == nil {
+		err = batch.Write()
+	}
+	if err != nil {
 		db.onEvictionErr.Set(err)
 		_ = db.nodeDB.Close()
 		go db.Close()
 		return err
 	}
 	return nil
+}
+
+// Writes [n] to [batch]. Assumes [n] is non-nil.
+func writeNodeToBatch(batch database.Batch, n *node) error {
+	nodeBytes, err := n.marshal()
+	if err != nil {
+		return err
+	}
+
+	return batch.Put(n.key.Bytes(), nodeBytes)
 }
 
 // Put upserts the key/value pair into the db.
@@ -859,19 +880,13 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 		return errNoNewRoot
 	}
 
-	// commit any outstanding cache evicted nodes.
-	// Note that we do this here because below we may Abort
-	// [db.nodeDB], which would cause us to lose these changes.
-	if err := db.nodeDB.Commit(); err != nil {
-		return err
-	}
+	batch := db.nodeDB.NewBatch()
 
 	_, nodesSpan := db.tracer.Start(ctx, "MerkleDB.commitChanges.writeNodes")
 	for key, nodeChange := range changes.nodes {
 		if nodeChange.after == nil {
 			db.metrics.IOKeyWrite()
-			if err := db.nodeDB.Delete(key.Bytes()); err != nil {
-				db.nodeDB.Abort()
+			if err := batch.Delete(key.Bytes()); err != nil {
 				nodesSpan.End()
 				return err
 			}
@@ -883,15 +898,7 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 			// Otherwise, intermediary nodes are persisted on cache eviction or
 			// shutdown.
 			db.metrics.IOKeyWrite()
-			nodeBytes, err := nodeChange.after.marshal()
-			if err != nil {
-				db.nodeDB.Abort()
-				nodesSpan.End()
-				return err
-			}
-
-			if err := db.nodeDB.Put(key.Bytes(), nodeBytes); err != nil {
-				db.nodeDB.Abort()
+			if err := writeNodeToBatch(batch, nodeChange.after); err != nil {
 				nodesSpan.End()
 				return err
 			}
@@ -900,10 +907,9 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 	nodesSpan.End()
 
 	_, commitSpan := db.tracer.Start(ctx, "MerkleDB.commitChanges.dbCommit")
-	err := db.nodeDB.Commit()
+	err := batch.Write()
 	commitSpan.End()
 	if err != nil {
-		db.nodeDB.Abort()
 		return err
 	}
 
@@ -1122,11 +1128,13 @@ func (db *merkleDB) initializeRootIfNeeded() (ids.ID, error) {
 	if err != nil {
 		return ids.Empty, err
 	}
-	if err := db.nodeDB.Put(rootKey, rootBytes); err != nil {
+
+	batch := db.nodeDB.NewBatch()
+	if err := batch.Put(rootKey, rootBytes); err != nil {
 		return ids.Empty, err
 	}
 
-	return db.root.id, db.nodeDB.Commit()
+	return db.root.id, batch.Write()
 }
 
 // Returns a view of the trie as it was when it had root [rootID] for keys within range [start, end].
