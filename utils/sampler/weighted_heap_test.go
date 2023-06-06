@@ -14,8 +14,7 @@ func TestWeightedHeapInitialize(t *testing.T) {
 
 	h := weightedHeap{}
 
-	err := h.Initialize([]uint64{2, 2, 1, 3, 3, 1, 3})
-	require.NoError(err)
+	require.NoError(h.Initialize([]uint64{2, 2, 1, 3, 3, 1, 3}))
 
 	expectedOrdering := []int{3, 4, 6, 0, 1, 2, 5}
 	for i, elem := range h.heap {

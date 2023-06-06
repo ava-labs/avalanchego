@@ -149,7 +149,7 @@ type Node struct {
 	tlsKeyLogWriterCloser io.WriteCloser
 
 	// this node's initial connections to the network
-	beacons validators.Set
+	bootstrappers validators.Set
 
 	// current validators of the network
 	vdrs validators.Manager
@@ -284,8 +284,8 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 		}
 	}
 
-	numBeacons := n.beacons.Len()
-	requiredConns := (3*numBeacons + 3) / 4
+	numBootstrappers := n.bootstrappers.Len()
+	requiredConns := (3*numBootstrappers + 3) / 4
 
 	if requiredConns > 0 {
 		// Set a timer that will fire after a given timeout unless we connect
@@ -295,7 +295,7 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 			// If the timeout fires and we're already shutting down, nothing to do.
 			if !n.shuttingDown.Get() {
 				n.Log.Warn("failed to connect to bootstrap nodes",
-					zap.Stringer("beacons", n.beacons),
+					zap.Stringer("bootstrappers", n.bootstrappers),
 					zap.Duration("duration", n.Config.BootstrapBeaconConnectionTimeout),
 				)
 			}
@@ -307,7 +307,7 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 		consensusRouter = &beaconManager{
 			Router:        consensusRouter,
 			timer:         timer,
-			beacons:       n.beacons,
+			beacons:       n.bootstrappers,
 			requiredConns: int64(requiredConns),
 		}
 	}
@@ -330,7 +330,7 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 	n.Config.NetworkConfig.MyIPPort = n.Config.IPPort
 	n.Config.NetworkConfig.NetworkID = n.Config.NetworkID
 	n.Config.NetworkConfig.Validators = n.vdrs
-	n.Config.NetworkConfig.Beacons = n.beacons
+	n.Config.NetworkConfig.Beacons = n.bootstrappers
 	n.Config.NetworkConfig.TLSConfig = tlsConfig
 	n.Config.NetworkConfig.TLSKey = tlsKey
 	n.Config.NetworkConfig.TrackedSubnets = n.Config.TrackedSubnets
@@ -386,8 +386,8 @@ func (n *Node) Dispatch() error {
 	}
 
 	// Add bootstrap nodes to the peer network
-	for i, peerIP := range n.Config.BootstrapIPs {
-		n.Net.ManuallyTrack(n.Config.BootstrapIDs[i], peerIP)
+	for _, bootstrapper := range n.Config.Bootstrappers {
+		n.Net.ManuallyTrack(bootstrapper.ID, ips.IPPort(bootstrapper.IP))
 	}
 
 	// Start P2P connections
@@ -481,13 +481,13 @@ func (n *Node) initDatabase() error {
 }
 
 // Set the node IDs of the peers this node should first connect to
-func (n *Node) initBeacons() error {
-	n.beacons = validators.NewSet()
-	for _, peerID := range n.Config.BootstrapIDs {
+func (n *Node) initBootstrappers() error {
+	n.bootstrappers = validators.NewSet()
+	for _, bootstrapper := range n.Config.Bootstrappers {
 		// Note: The beacon connection manager will treat all beaconIDs as
 		//       equal.
 		// Invariant: We never use the TxID or BLS keys populated here.
-		if err := n.beacons.Add(peerID, nil, ids.Empty, 1); err != nil {
+		if err := n.bootstrappers.Add(bootstrapper.ID, nil, ids.Empty, 1); err != nil {
 			return err
 		}
 	}
@@ -565,7 +565,7 @@ func (n *Node) initChains(genesisBytes []byte) error {
 		SubnetID:      constants.PrimaryNetworkID,
 		GenesisData:   genesisBytes, // Specifies other chains to create
 		VMID:          constants.PlatformVMID,
-		CustomBeacons: n.beacons,
+		CustomBeacons: n.bootstrappers,
 	}
 
 	// Start the chain creator with the Platform Chain
@@ -588,7 +588,7 @@ func (n *Node) initAPIServer() error {
 			n.LogFactory,
 			n.Config.HTTPHost,
 			n.Config.HTTPPort,
-			n.Config.APIAllowedOrigins,
+			n.Config.HTTPAllowedOrigins,
 			n.Config.ShutdownTimeout,
 			n.ID,
 			n.Config.TraceConfig.Enabled,
@@ -596,6 +596,7 @@ func (n *Node) initAPIServer() error {
 			"api",
 			n.MetricsRegisterer,
 			n.Config.HTTPConfig.HTTPConfig,
+			n.Config.HTTPAllowedHosts,
 		)
 		return err
 	}
@@ -610,7 +611,7 @@ func (n *Node) initAPIServer() error {
 		n.LogFactory,
 		n.Config.HTTPHost,
 		n.Config.HTTPPort,
-		n.Config.APIAllowedOrigins,
+		n.Config.HTTPAllowedOrigins,
 		n.Config.ShutdownTimeout,
 		n.ID,
 		n.Config.TraceConfig.Enabled,
@@ -618,6 +619,7 @@ func (n *Node) initAPIServer() error {
 		"api",
 		n.MetricsRegisterer,
 		n.Config.HTTPConfig.HTTPConfig,
+		n.Config.HTTPAllowedHosts,
 		a,
 	)
 	if err != nil {
@@ -1269,7 +1271,7 @@ func (n *Node) Initialize(
 
 	n.VMManager = vms.NewManager(n.VMFactoryLog, config.VMAliaser)
 
-	if err := n.initBeacons(); err != nil { // Configure the beacons
+	if err := n.initBootstrappers(); err != nil { // Configure the bootstrappers
 		return fmt.Errorf("problem initializing node beacons: %w", err)
 	}
 

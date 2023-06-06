@@ -95,7 +95,7 @@ func NewWalletWithTxsAndState(
 
 	xChainID := xCTX.BlockchainID()
 	xUTXOs := NewChainUTXOs(xChainID, utxos)
-	xBackend := x.NewBackend(xCTX, xChainID, xUTXOs)
+	xBackend := x.NewBackend(xCTX, xUTXOs)
 	xBuilder := x.NewBuilder(addrs, xBackend)
 	xSigner := x.NewSigner(kc, xBackend)
 	xClient := avm.NewClient(uri, "X")
