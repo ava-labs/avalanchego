@@ -28,7 +28,7 @@ import (
 )
 
 const (
-	DefaultEvictionBatchSize = 1_000
+	DefaultEvictionBatchSize = 1000
 	RootPath                 = EmptyPath
 	// TODO: name better
 	rebuildViewSizeFractionOfCacheSize = 50
