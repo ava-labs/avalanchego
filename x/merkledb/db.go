@@ -28,8 +28,7 @@ import (
 )
 
 const (
-	RootPath          = EmptyPath
-	evictionBatchSize = 100
+	RootPath = EmptyPath
 	// TODO: name better
 	rebuildViewSizeFractionOfCacheSize = 50
 	minRebuildViewSizePerCommit        = 1000
@@ -116,6 +115,9 @@ type MerkleDB interface {
 }
 
 type Config struct {
+	// The number of nodes that are evicted from the cache and written to
+	// disk at a time.
+	EvictionBatchSize int
 	// The number of changes to the database that we store in memory in order to
 	// serve change proofs.
 	HistoryLength int
@@ -144,8 +146,9 @@ type merkleDB struct {
 	metadataDB database.Database
 
 	// If a value is nil, the corresponding key isn't in the trie.
-	nodeCache     onEvictCache[path, *node]
-	onEvictionErr utils.Atomic[error]
+	nodeCache         onEvictCache[path, *node]
+	onEvictionErr     utils.Atomic[error]
+	evictionBatchSize int
 
 	// Stores change lists. Used to serve change proofs and construct
 	// historical views of the trie.
@@ -172,12 +175,13 @@ func newDatabase(
 	metrics merkleMetrics,
 ) (*merkleDB, error) {
 	trieDB := &merkleDB{
-		metrics:    metrics,
-		nodeDB:     prefixdb.New(nodePrefix, db),
-		metadataDB: prefixdb.New(metadataPrefix, db),
-		history:    newTrieHistory(config.HistoryLength),
-		tracer:     config.Tracer,
-		childViews: make([]*trieView, 0, defaultPreallocationSize),
+		metrics:           metrics,
+		nodeDB:            prefixdb.New(nodePrefix, db),
+		metadataDB:        prefixdb.New(metadataPrefix, db),
+		history:           newTrieHistory(config.HistoryLength),
+		tracer:            config.Tracer,
+		childViews:        make([]*trieView, 0, defaultPreallocationSize),
+		evictionBatchSize: config.EvictionBatchSize,
 	}
 
 	// Note: trieDB.OnEviction is responsible for writing intermediary nodes to
@@ -757,7 +761,7 @@ func (db *merkleDB) onEviction(n *node) error {
 	// just [n], so that we don't immediately evict and write another
 	// node, because each time this method is called we do a disk write.
 	var err error
-	for removedCount := 0; removedCount < evictionBatchSize; removedCount++ {
+	for removedCount := 0; removedCount < db.evictionBatchSize; removedCount++ {
 		_, n, exists := db.nodeCache.removeOldest()
 		if !exists {
 			// The cache is empty.
