@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/golang/mock/gomock"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/stretchr/testify/require"
 
@@ -26,6 +27,16 @@ import (
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
+
+func newDefaultDBConfig() merkledb.Config {
+	return merkledb.Config{
+		EvictionBatchSize: 100,
+		HistoryLength:     defaultRequestKeyLimit,
+		NodeCacheSize:     defaultRequestKeyLimit,
+		Reg:               prometheus.NewRegistry(),
+		Tracer:            newNoopTracer(),
+	}
+}
 
 func sendRangeRequest(
 	t *testing.T,
@@ -374,24 +385,25 @@ func sendChangeRequest(
 func TestGetChangeProof(t *testing.T) {
 	r := rand.New(rand.NewSource(1)) // #nosec G404
 
+	trieDBConfig := newDefaultDBConfig()
+	trieDBConfig.HistoryLength = defaultRequestKeyLimit
+	trieDBConfig.NodeCacheSize = defaultRequestKeyLimit
+
 	trieDB, err := merkledb.New(
 		context.Background(),
 		memdb.New(),
-		merkledb.Config{
-			Tracer:        newNoopTracer(),
-			HistoryLength: defaultRequestKeyLimit,
-			NodeCacheSize: defaultRequestKeyLimit,
-		},
+		trieDBConfig,
 	)
 	require.NoError(t, err)
+
+	verificationDBConfig := newDefaultDBConfig()
+	verificationDBConfig.HistoryLength = defaultRequestKeyLimit
+	verificationDBConfig.NodeCacheSize = defaultRequestKeyLimit
+
 	verificationDB, err := merkledb.New(
 		context.Background(),
 		memdb.New(),
-		merkledb.Config{
-			Tracer:        newNoopTracer(),
-			HistoryLength: defaultRequestKeyLimit,
-			NodeCacheSize: defaultRequestKeyLimit,
-		},
+		verificationDBConfig,
 	)
 	require.NoError(t, err)
 	startRoot, err := trieDB.GetMerkleRoot(context.Background())
