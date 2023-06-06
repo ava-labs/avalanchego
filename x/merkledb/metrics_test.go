@@ -7,8 +7,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -19,11 +17,7 @@ func Test_Metrics_Basic_Usage(t *testing.T) {
 	db, err := New(
 		context.Background(),
 		memdb.New(),
-		Config{
-			Tracer:        newNoopTracer(),
-			HistoryLength: 300,
-			NodeCacheSize: minCacheSize,
-		},
+		newDefaultConfig(),
 	)
 	require.NoError(t, err)
 
@@ -51,12 +45,7 @@ func Test_Metrics_Initialize(t *testing.T) {
 	db, err := New(
 		context.Background(),
 		memdb.New(),
-		Config{
-			Tracer:        newNoopTracer(),
-			HistoryLength: 300,
-			Reg:           prometheus.NewRegistry(),
-			NodeCacheSize: 1000,
-		},
+		newDefaultConfig(),
 	)
 	require.NoError(t, err)
 

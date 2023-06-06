@@ -20,11 +20,7 @@ func Test_History_Simple(t *testing.T) {
 	db, err := New(
 		context.Background(),
 		memdb.New(),
-		Config{
-			Tracer:        newNoopTracer(),
-			HistoryLength: 300,
-			NodeCacheSize: minCacheSize,
-		},
+		newDefaultConfig(),
 	)
 	require.NoError(err)
 	batch := db.NewBatch()
@@ -91,11 +87,7 @@ func Test_History_Large(t *testing.T) {
 		db, err := New(
 			context.Background(),
 			memdb.New(),
-			Config{
-				Tracer:        newNoopTracer(),
-				HistoryLength: 1500,
-				NodeCacheSize: 1000,
-			},
+			newDefaultConfig(),
 		)
 		require.NoError(err)
 		roots := []ids.ID{}
@@ -144,11 +136,7 @@ func Test_History_Bad_GetValueChanges_Input(t *testing.T) {
 	db, err := New(
 		context.Background(),
 		memdb.New(),
-		Config{
-			Tracer:        newNoopTracer(),
-			HistoryLength: 5,
-			NodeCacheSize: minCacheSize,
-		},
+		newDefaultConfig(),
 	)
 	require.NoError(err)
 	batch := db.NewBatch()
@@ -210,11 +198,7 @@ func Test_History_Trigger_History_Queue_Looping(t *testing.T) {
 	db, err := New(
 		context.Background(),
 		memdb.New(),
-		Config{
-			Tracer:        newNoopTracer(),
-			HistoryLength: 2,
-			NodeCacheSize: minCacheSize,
-		},
+		newDefaultConfig(),
 	)
 	require.NoError(err)
 	batch := db.NewBatch()
@@ -264,11 +248,7 @@ func Test_History_Values_Lookup_Over_Queue_Break(t *testing.T) {
 	db, err := New(
 		context.Background(),
 		memdb.New(),
-		Config{
-			Tracer:        newNoopTracer(),
-			HistoryLength: 4,
-			NodeCacheSize: minCacheSize,
-		},
+		newDefaultConfig(),
 	)
 	require.NoError(err)
 	batch := db.NewBatch()
@@ -314,11 +294,7 @@ func Test_History_RepeatedRoot(t *testing.T) {
 	db, err := New(
 		context.Background(),
 		memdb.New(),
-		Config{
-			Tracer:        newNoopTracer(),
-			HistoryLength: 100,
-			NodeCacheSize: minCacheSize,
-		},
+		newDefaultConfig(),
 	)
 	require.NoError(err)
 	batch := db.NewBatch()
@@ -362,11 +338,7 @@ func Test_History_ExcessDeletes(t *testing.T) {
 	db, err := New(
 		context.Background(),
 		memdb.New(),
-		Config{
-			Tracer:        newNoopTracer(),
-			HistoryLength: 100,
-			NodeCacheSize: minCacheSize,
-		},
+		newDefaultConfig(),
 	)
 	require.NoError(err)
 	batch := db.NewBatch()
@@ -398,11 +370,7 @@ func Test_History_DontIncludeAllNodes(t *testing.T) {
 	db, err := New(
 		context.Background(),
 		memdb.New(),
-		Config{
-			Tracer:        newNoopTracer(),
-			HistoryLength: 100,
-			NodeCacheSize: minCacheSize,
-		},
+		newDefaultConfig(),
 	)
 	require.NoError(err)
 	batch := db.NewBatch()
@@ -430,11 +398,7 @@ func Test_History_Branching2Nodes(t *testing.T) {
 	db, err := New(
 		context.Background(),
 		memdb.New(),
-		Config{
-			Tracer:        newNoopTracer(),
-			HistoryLength: 100,
-			NodeCacheSize: minCacheSize,
-		},
+		newDefaultConfig(),
 	)
 	require.NoError(err)
 	batch := db.NewBatch()
@@ -462,11 +426,7 @@ func Test_History_Branching3Nodes(t *testing.T) {
 	db, err := New(
 		context.Background(),
 		memdb.New(),
-		Config{
-			Tracer:        newNoopTracer(),
-			HistoryLength: 100,
-			NodeCacheSize: minCacheSize,
-		},
+		newDefaultConfig(),
 	)
 	require.NoError(err)
 	batch := db.NewBatch()
@@ -494,11 +454,7 @@ func Test_History_MaxLength(t *testing.T) {
 	db, err := New(
 		context.Background(),
 		memdb.New(),
-		Config{
-			Tracer:        newNoopTracer(),
-			HistoryLength: 2,
-			NodeCacheSize: 1000,
-		},
+		newDefaultConfig(),
 	)
 	require.NoError(err)
 
@@ -528,11 +484,7 @@ func Test_Change_List(t *testing.T) {
 	db, err := New(
 		context.Background(),
 		memdb.New(),
-		Config{
-			Tracer:        newNoopTracer(),
-			HistoryLength: 100,
-			NodeCacheSize: minCacheSize,
-		},
+		newDefaultConfig(),
 	)
 	require.NoError(err)
 	batch := db.NewBatch()

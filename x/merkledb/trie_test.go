@@ -753,11 +753,7 @@ func Test_Trie_MultipleStates(t *testing.T) {
 			db, err := New(
 				context.Background(),
 				rdb,
-				Config{
-					Tracer:        newNoopTracer(),
-					HistoryLength: 100,
-					NodeCacheSize: 100,
-				},
+				newDefaultConfig(),
 			)
 			require.NoError(t, err)
 			defer db.Close()
