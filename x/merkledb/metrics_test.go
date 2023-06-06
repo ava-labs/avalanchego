@@ -14,10 +14,15 @@ import (
 )
 
 func Test_Metrics_Basic_Usage(t *testing.T) {
+	config := newDefaultConfig()
+	// Set to nil so that we use a mockMetrics instead of the real one inside
+	// merkledb.
+	config.Reg = nil
+
 	db, err := New(
 		context.Background(),
 		memdb.New(),
-		newDefaultConfig(),
+		config,
 	)
 	require.NoError(t, err)
 
