@@ -18,6 +18,7 @@ type State interface {
 type IsState interface {
 	isState()
 }
+
 type IsNotState interface {
 	isState() error
 }
