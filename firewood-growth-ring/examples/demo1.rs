@@ -2,11 +2,11 @@ use futures::executor::block_on;
 use growthring::{
     wal::{WalBytes, WalLoader, WalRingId, WalWriter},
     walerror::WalError,
-    WalFileAio, WalStoreAio,
+    WalFileImpl, WalStoreImpl,
 };
 use rand::{seq::SliceRandom, Rng, SeedableRng};
 
-fn test(records: Vec<String>, wal: &mut WalWriter<WalFileAio, WalStoreAio>) -> Vec<WalRingId> {
+fn test(records: Vec<String>, wal: &mut WalWriter<WalFileImpl, WalStoreImpl>) -> Vec<WalRingId> {
     let mut res = Vec::new();
     for r in wal.grow(records).into_iter() {
         let ring_id = futures::executor::block_on(r).unwrap().1;
@@ -31,7 +31,7 @@ fn main() {
     let mut loader = WalLoader::new();
     loader.file_nbit(9).block_nbit(8);
 
-    let store = WalStoreAio::new(wal_dir, true, None).unwrap();
+    let store = WalStoreImpl::new(wal_dir, true).unwrap();
     let mut wal = block_on(loader.load(store, recover, 0)).unwrap();
     for _ in 0..3 {
         test(
@@ -49,7 +49,7 @@ fn main() {
         );
     }
 
-    let store = WalStoreAio::new(wal_dir, false, None).unwrap();
+    let store = WalStoreImpl::new(wal_dir, false).unwrap();
     let mut wal = block_on(loader.load(store, recover, 0)).unwrap();
     for _ in 0..3 {
         test(
@@ -63,7 +63,7 @@ fn main() {
         );
     }
 
-    let store = WalStoreAio::new(wal_dir, false, None).unwrap();
+    let store = WalStoreImpl::new(wal_dir, false).unwrap();
     let mut wal = block_on(loader.load(store, recover, 100)).unwrap();
     let mut history = std::collections::VecDeque::new();
     for _ in 0..3 {

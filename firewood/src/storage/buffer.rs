@@ -11,11 +11,11 @@ use super::{
 };
 
 use aiofut::{AioBuilder, AioError, AioManager};
-use growthring::WalFileAio;
+use growthring::WalFileImpl;
 use growthring::{
     wal::{RecoverPolicy, WalLoader, WalWriter},
     walerror::WalError,
-    WalStoreAio,
+    WalStoreImpl,
 };
 use shale::SpaceID;
 use tokio::sync::oneshot::error::RecvError;
@@ -93,7 +93,7 @@ pub struct DiskBuffer {
     local_pool: Rc<tokio::task::LocalSet>,
     task_id: u64,
     tasks: Rc<RefCell<HashMap<u64, Option<tokio::task::JoinHandle<()>>>>>,
-    wal: Option<Rc<Mutex<WalWriter<WalFileAio, WalStoreAio>>>>,
+    wal: Option<Rc<Mutex<WalWriter<WalFileImpl, WalStoreImpl>>>>,
     cfg: DiskBufferConfig,
     wal_cfg: WalConfig,
 }
@@ -188,8 +188,7 @@ impl DiskBuffer {
         let final_path = rootpath.clone().join(waldir.clone());
         let mut aiobuilder = AioBuilder::default();
         aiobuilder.max_events(self.cfg.wal_max_aio_requests as u32);
-        let aiomgr = aiobuilder.build()?;
-        let store = WalStoreAio::new(final_path.clone(), false, Some(aiomgr))?;
+        let store = WalStoreImpl::new(final_path.clone(), false)?;
         let mut loader = WalLoader::new();
         loader
             .file_nbit(self.wal_cfg.file_nbit)

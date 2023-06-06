@@ -3,14 +3,14 @@
 //! # Examples
 //!
 //! ```no_run
-//! use growthring::{WalStoreAio, wal::WalLoader};
+//! use growthring::{WalStoreImpl, wal::WalLoader};
 //! use futures::executor::block_on;
 //! let mut loader = WalLoader::new();
 //! loader.file_nbit(9).block_nbit(8);
 //!
 //!
 //! // Start with empty WAL (truncate = true).
-//! let store = WalStoreAio::new("/tmp/walfiles", true, None).unwrap();
+//! let store = WalStoreImpl::new("/tmp/walfiles", true).unwrap();
 //! let mut wal = block_on(loader.load(store, |_, _| {Ok(())}, 0)).unwrap();
 //! // Write a vector of records to WAL.
 //! for f in wal.grow(vec!["record1(foo)", "record2(bar)", "record3(foobar)"]).into_iter() {
@@ -20,7 +20,7 @@
 //!
 //!
 //! // Load from WAL (truncate = false).
-//! let store = WalStoreAio::new("/tmp/walfiles", false, None).unwrap();
+//! let store = WalStoreImpl::new("/tmp/walfiles", false).unwrap();
 //! let mut wal = block_on(loader.load(store, |payload, ringid| {
 //!     // redo the operations in your application
 //!     println!("recover(payload={}, ringid={:?})",
@@ -37,7 +37,7 @@
 //! block_on(wal.peel(ring_ids, 0)).unwrap();
 //! // There will only be one remaining file in /tmp/walfiles.
 //!
-//! let store = WalStoreAio::new("/tmp/walfiles", false, None).unwrap();
+//! let store = WalStoreImpl::new("/tmp/walfiles", false).unwrap();
 //! let wal = block_on(loader.load(store, |payload, _| {
 //!     println!("payload.len() = {}", payload.len());
 //!     Ok(())
@@ -51,23 +51,22 @@ pub mod wal;
 pub mod walerror;
 
 use async_trait::async_trait;
-use firewood_libaio::{AioBuilder, AioManager};
 use nix::fcntl::OFlag;
 use std::fs;
-use std::os::fd::AsRawFd;
+use std::io::SeekFrom;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
-use tokio::fs::{File, OpenOptions};
+use tokio::{
+    fs::{File, OpenOptions},
+    io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt},
+    sync::Mutex,
+};
 use wal::{WalBytes, WalFile, WalPos, WalStore};
 use walerror::WalError;
 
-pub struct WalFileAio {
-    file: File,
-    aio_manager: Arc<AioManager>,
-}
+struct RawWalFile(File);
 
-impl WalFileAio {
-    async fn open_file<P: AsRef<Path>>(path: P) -> Result<File, std::io::Error> {
+impl RawWalFile {
+    pub async fn open<P: AsRef<Path>>(path: P) -> Result<Self, std::io::Error> {
         OpenOptions::new()
             .read(true)
             .write(true)
@@ -76,68 +75,73 @@ impl WalFileAio {
             .mode(0o600)
             .open(path)
             .await
+            .map(Self)
     }
+}
 
-    fn new(file: File, aio_manager: Arc<AioManager>) -> Self {
-        Self { file, aio_manager }
+pub struct WalFileImpl {
+    file_mutex: Mutex<RawWalFile>,
+}
+
+impl From<RawWalFile> for WalFileImpl {
+    fn from(file: RawWalFile) -> Self {
+        let file = Mutex::new(file);
+        Self { file_mutex: file }
     }
 }
 
 #[async_trait(?Send)]
-impl WalFile for WalFileAio {
+impl WalFile for WalFileImpl {
     async fn allocate(&self, offset: WalPos, length: usize) -> Result<(), WalError> {
-        self.file
+        self.file_mutex
+            .lock()
+            .await
+            .0
             .set_len(offset + length as u64)
             .await
             .map_err(Into::into)
     }
 
     async fn truncate(&self, len: usize) -> Result<(), WalError> {
-        self.file.set_len(len as u64).await.map_err(Into::into)
+        self.file_mutex
+            .lock()
+            .await
+            .0
+            .set_len(len as u64)
+            .await
+            .map_err(Into::into)
     }
 
     async fn write(&self, offset: WalPos, data: WalBytes) -> Result<(), WalError> {
-        let fd = self.file.as_raw_fd();
-        let (res, data) = self.aio_manager.write(fd, offset, data, None).await;
-        res.map_err(Into::into).and_then(|nwrote| {
-            if nwrote == data.len() {
-                Ok(())
-            } else {
-                Err(WalError::Other(format!(
-                    "partial write; wrote {nwrote} expected {} for fd {}",
-                    data.len(),
-                    fd
-                )))
-            }
-        })
+        let file = &mut self.file_mutex.lock().await.0;
+        file.seek(SeekFrom::Start(offset)).await?;
+
+        Ok(file.write_all(&data).await?)
     }
 
     async fn read(&self, offset: WalPos, length: usize) -> Result<Option<WalBytes>, WalError> {
-        let fd = self.file.as_raw_fd();
-        let (res, data) = self.aio_manager.read(fd, offset, length, None).await;
-        res.map_err(From::from)
-            .map(|nread| if nread == length { Some(data) } else { None })
+        let (result, bytes_read) = {
+            let mut result = Vec::with_capacity(length);
+            let file = &mut self.file_mutex.lock().await.0;
+            file.seek(SeekFrom::Start(offset)).await?;
+            let bytes_read = file.read_buf(&mut result).await?;
+            (result, bytes_read)
+        };
+
+        let result = Some(result)
+            .filter(|_| bytes_read == length)
+            .map(Vec::into_boxed_slice);
+
+        Ok(result)
     }
 }
 
-pub struct WalStoreAio {
+pub struct WalStoreImpl {
     root_dir: PathBuf,
-    aiomgr: Arc<AioManager>,
 }
 
-unsafe impl Send for WalStoreAio {}
-
-impl WalStoreAio {
-    pub fn new<P: AsRef<Path>>(
-        wal_dir: P,
-        truncate: bool,
-        aiomgr: Option<AioManager>,
-    ) -> Result<Self, WalError> {
-        let aio = match aiomgr {
-            Some(aiomgr) => Arc::new(aiomgr),
-            None => Arc::new(AioBuilder::default().build()?),
-        };
-
+impl WalStoreImpl {
+    pub fn new<P: AsRef<Path>>(wal_dir: P, truncate: bool) -> Result<Self, WalError> {
         if truncate {
             if let Err(e) = fs::remove_dir_all(&wal_dir) {
                 if e.kind() != std::io::ErrorKind::NotFound {
@@ -150,9 +154,8 @@ impl WalStoreAio {
             fs::create_dir(&wal_dir)?;
         }
 
-        Ok(WalStoreAio {
+        Ok(WalStoreImpl {
             root_dir: wal_dir.as_ref().to_path_buf(),
-            aiomgr: aio,
         })
     }
 }
@@ -168,15 +171,15 @@ pub fn oflags() -> OFlag {
 }
 
 #[async_trait(?Send)]
-impl WalStore<WalFileAio> for WalStoreAio {
+impl WalStore<WalFileImpl> for WalStoreImpl {
     type FileNameIter = std::vec::IntoIter<String>;
 
-    async fn open_file(&self, filename: &str, _touch: bool) -> Result<WalFileAio, WalError> {
+    async fn open_file(&self, filename: &str, _touch: bool) -> Result<WalFileImpl, WalError> {
         let path = self.root_dir.join(filename);
 
-        let file = WalFileAio::open_file(path).await?;
+        let file = RawWalFile::open(path).await?;
 
-        Ok(WalFileAio::new(file, self.aiomgr.clone()))
+        Ok(file.into())
     }
 
     async fn remove_file(&self, filename: String) -> Result<(), WalError> {
@@ -205,11 +208,9 @@ mod tests {
 
         tokio::fs::remove_file(&walfile_path).await.ok();
 
-        let aio_manager = AioBuilder::default().build().unwrap();
+        let walfile = RawWalFile::open(walfile_path).await.unwrap();
 
-        let walfile = WalFileAio::open_file(walfile_path).await.unwrap();
-
-        let walfile_aio = WalFileAio::new(walfile, Arc::new(aio_manager));
+        let walfile_impl = WalFileImpl::from(walfile);
 
         let first_half = vec![1u8; HALF_LENGTH];
         let second_half = vec![2u8; HALF_LENGTH];
@@ -220,10 +221,10 @@ mod tests {
             .chain(second_half.iter().copied())
             .collect();
 
-        walfile_aio.write(0, data).await.unwrap();
-        walfile_aio.truncate(HALF_LENGTH).await.unwrap();
+        walfile_impl.write(0, data).await.unwrap();
+        walfile_impl.truncate(HALF_LENGTH).await.unwrap();
 
-        let result = walfile_aio.read(0, HALF_LENGTH).await.unwrap();
+        let result = walfile_impl.read(0, HALF_LENGTH).await.unwrap();
 
         assert_eq!(result, Some(first_half.into()))
     }
@@ -236,20 +237,18 @@ mod tests {
 
         tokio::fs::remove_file(&walfile_path).await.ok();
 
-        let aio_manager = AioBuilder::default().build().unwrap();
+        let walfile = RawWalFile::open(walfile_path).await.unwrap();
 
-        let walfile = WalFileAio::open_file(walfile_path).await.unwrap();
+        let walfile_impl = WalFileImpl::from(walfile);
 
-        let walfile_aio = WalFileAio::new(walfile, Arc::new(aio_manager));
-
-        walfile_aio
+        walfile_impl
             .write(0, vec![1u8; LENGTH].into())
             .await
             .unwrap();
 
-        walfile_aio.truncate(2 * LENGTH).await.unwrap();
+        walfile_impl.truncate(2 * LENGTH).await.unwrap();
 
-        let result = walfile_aio.read(LENGTH as u64, LENGTH).await.unwrap();
+        let result = walfile_impl.read(LENGTH as u64, LENGTH).await.unwrap();
 
         assert_eq!(result, Some(vec![0u8; LENGTH].into()))
     }
@@ -259,19 +258,16 @@ mod tests {
         let walfile = {
             let walfile_path = get_temp_walfile_path(file!(), line!());
             tokio::fs::remove_file(&walfile_path).await.ok();
-            WalFileAio::open_file(walfile_path).await.unwrap()
+            RawWalFile::open(walfile_path).await.unwrap()
         };
 
-        let walfile_aio = {
-            let aio_manager = AioBuilder::default().build().unwrap();
-            WalFileAio::new(walfile, Arc::new(aio_manager))
-        };
+        let walfile_impl = WalFileImpl::from(walfile);
 
         let data: Vec<u8> = (0..=u8::MAX).collect();
 
-        walfile_aio.write(0, data.clone().into()).await.unwrap();
+        walfile_impl.write(0, data.clone().into()).await.unwrap();
 
-        let result = walfile_aio.read(0, data.len()).await.unwrap();
+        let result = walfile_impl.read(0, data.len()).await.unwrap();
 
         assert_eq!(result, Some(data.into()));
     }
@@ -281,21 +277,18 @@ mod tests {
         let walfile = {
             let walfile_path = get_temp_walfile_path(file!(), line!());
             tokio::fs::remove_file(&walfile_path).await.ok();
-            WalFileAio::open_file(walfile_path).await.unwrap()
+            RawWalFile::open(walfile_path).await.unwrap()
         };
 
-        let walfile_aio = {
-            let aio_manager = AioBuilder::default().build().unwrap();
-            WalFileAio::new(walfile, Arc::new(aio_manager))
-        };
+        let walfile_impl = WalFileImpl::from(walfile);
 
         let data: Vec<u8> = (0..=u8::MAX).collect();
-        walfile_aio.write(0, data.clone().into()).await.unwrap();
+        walfile_impl.write(0, data.clone().into()).await.unwrap();
 
         let mid = data.len() / 2;
         let (start, end) = data.split_at(mid);
-        let read_start_result = walfile_aio.read(0, mid).await.unwrap();
-        let read_end_result = walfile_aio.read(mid as u64, mid).await.unwrap();
+        let read_start_result = walfile_impl.read(0, mid).await.unwrap();
+        let read_end_result = walfile_impl.read(mid as u64, mid).await.unwrap();
 
         assert_eq!(read_start_result, Some(start.into()));
         assert_eq!(read_end_result, Some(end.into()));
@@ -306,19 +299,16 @@ mod tests {
         let walfile = {
             let walfile_path = get_temp_walfile_path(file!(), line!());
             tokio::fs::remove_file(&walfile_path).await.ok();
-            WalFileAio::open_file(walfile_path).await.unwrap()
+            RawWalFile::open(walfile_path).await.unwrap()
         };
 
-        let walfile_aio = {
-            let aio_manager = AioBuilder::default().build().unwrap();
-            WalFileAio::new(walfile, Arc::new(aio_manager))
-        };
+        let walfile_impl = WalFileImpl::from(walfile);
 
         let data: Vec<u8> = (0..=u8::MAX).collect();
 
-        walfile_aio.write(0, data.clone().into()).await.unwrap();
+        walfile_impl.write(0, data.clone().into()).await.unwrap();
 
-        let result = walfile_aio
+        let result = walfile_impl
             .read((data.len() / 2) as u64, data.len())
             .await
             .unwrap();
@@ -333,22 +323,19 @@ mod tests {
         let walfile = {
             let walfile_path = get_temp_walfile_path(file!(), line!());
             tokio::fs::remove_file(&walfile_path).await.ok();
-            WalFileAio::open_file(walfile_path).await.unwrap()
+            RawWalFile::open(walfile_path).await.unwrap()
         };
 
-        let walfile_aio = {
-            let aio_manager = AioBuilder::default().build().unwrap();
-            WalFileAio::new(walfile, Arc::new(aio_manager))
-        };
+        let walfile_impl = WalFileImpl::from(walfile);
 
         let data: Vec<u8> = (0..=u8::MAX).collect();
 
-        walfile_aio
+        walfile_impl
             .write(OFFSET, data.clone().into())
             .await
             .unwrap();
 
-        let result = walfile_aio
+        let result = walfile_impl
             .read(0, data.len() + OFFSET as usize)
             .await
             .unwrap();

@@ -20,7 +20,7 @@ nix = "0.26.2"
 libc = "0.2.133"
 bytemuck = {version = "1.13.1", features = ["derive"]}
 thiserror = "1.0.40"
-tokio = { version = "1.28.1", features = ["fs"] }
+tokio = { version = "1.28.1", features = ["fs", "io-util", "sync"] }
 
 [dev-dependencies]
 hex = "0.4.3"

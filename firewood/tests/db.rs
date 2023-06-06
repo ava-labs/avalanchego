@@ -25,7 +25,7 @@ fn test_basic_metrics() {
                 .max_revisions(10)
                 .build(),
         );
-    let db = Db::new("test_revisions_db2", &cfg.clone().truncate(true).build()).unwrap();
+    let db = Db::new("test_revisions_db2", &cfg.truncate(true).build()).unwrap();
     let metrics = db.metrics();
     assert_eq!(metrics.kv_get.hit_count.get(), 0);
     db.kv_get("a").ok();
