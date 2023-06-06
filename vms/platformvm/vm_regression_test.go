@@ -1463,12 +1463,12 @@ func Test_RegressionBLSKeyDiff(t *testing.T) {
 	}()
 	subnetID := testSubnet1.TxID
 
-	// setup heights/time
+	// setup time
 	currentTime := defaultGenesisTime
 	vm.clock.Set(currentTime)
 	vm.state.SetTimestamp(currentTime)
 
-	// A subnet validator stake and then stop; also its primary network counterpart stops staking
+	// A subnet validator stakes and then stops; also its primary network counterpart stops staking
 	var (
 		primaryStartTime   = currentTime.Add(executor.SyncBound)
 		subnetStartTime    = primaryStartTime.Add(executor.SyncBound)
@@ -1776,7 +1776,7 @@ func Test_RegressionPrimaryNetworkValidatorEmptyBLSKeyDiff(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	// setup heights/time
+	// setup time
 	currentTime := defaultGenesisTime
 	vm.clock.Set(currentTime)
 	vm.state.SetTimestamp(currentTime)
@@ -1955,7 +1955,7 @@ func Test_RegressionSubnetkValidatorEmptyBLSKeyDiff(t *testing.T) {
 	}()
 	subnetID := testSubnet1.TxID
 
-	// setup heights/time
+	// setup time
 	currentTime := defaultGenesisTime
 	vm.clock.Set(currentTime)
 	vm.state.SetTimestamp(currentTime)

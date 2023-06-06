@@ -57,6 +57,11 @@ const (
 
 var errEmptyEventsList = errors.New("empty events list")
 
+// for a given (permissioned) subnet, the test stakes and restakes multiple times
+// a node as a primary and subnet validator. The BLS key of the node is changed across
+// staking periods, and it can even be nil. We test that GetValidatorSet returns
+// the correct primary and subnet validators data, with the right BLS key version at
+// all relevant heights.
 func TestGetValidatorsSetProperty(t *testing.T) {
 	properties := gopter.NewProperties(nil)
 
