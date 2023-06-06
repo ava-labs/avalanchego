@@ -86,7 +86,8 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 			vm.clock.Set(currentTime)
 			vm.state.SetTimestamp(currentTime)
 
-			// build validator sequences out of pseudo-random events
+			// build a valid sequence of validators start/end times, given the random
+			// events sequence received as test input
 			validatorsTimes, err := buildTimestampsList(events, currentTime, nodeID)
 			if err != nil {
 				return fmt.Sprintf("failed building events sequence, %s", err.Error())
@@ -116,8 +117,8 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 					}
 				}
 
-				switch ev.Priority {
-				case txs.SubnetPermissionlessValidatorCurrentPriority:
+				switch ev.eventType {
+				case startSubnetValidator:
 					currentSubnetValidator, err = addSubnetValidator(vm, ev, subnetID)
 					if err != nil {
 						return fmt.Sprintf("could not add subnet validator, %s", err.Error())
@@ -126,7 +127,7 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 						return fmt.Sprintf("could not take validators snapshot, %s", err.Error())
 					}
 
-				case txs.PrimaryNetworkValidatorCurrentPriority:
+				case startPrimaryWithoutBLS:
 					// when adding a primary validator, also remove the current primary one
 					if currentPrimaryValidator != nil {
 						err := terminatePrimaryValidator(vm, currentPrimaryValidator)
@@ -139,24 +140,37 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 							return fmt.Sprintf("could not take validators snapshot, %s", err.Error())
 						}
 					}
+					currentPrimaryValidator, err = addPrimaryValidatorWithoutBLSKey(vm, ev)
+					if err != nil {
+						return fmt.Sprintf("could not add primary validator without BLS key, %s", err.Error())
+					}
+					if err := takeValidatorsSnapshotAtCurrentHeight(vm, validatorsSetByHeightAndSubnet); err != nil {
+						return fmt.Sprintf("could not take validators snapshot, %s", err.Error())
+					}
 
-					if ev.PublicKey == nil {
-						currentPrimaryValidator, err = addPrimaryValidatorWithoutBLSKey(vm, ev)
+				case startPrimaryWithBLS:
+					// when adding a primary validator, also remove the current primary one
+					if currentPrimaryValidator != nil {
+						err := terminatePrimaryValidator(vm, currentPrimaryValidator)
 						if err != nil {
-							return fmt.Sprintf("could not create AddValidatorTx, %s", err.Error())
+							return fmt.Sprintf("could not terminate current primary validator, %s", err.Error())
 						}
-					} else {
-						currentPrimaryValidator, err = addPrimaryValidatorWithBLSKey(vm, ev)
-						if err != nil {
-							return fmt.Sprintf("could not add primary validator with BLS key, %s", err.Error())
+						// no need to nil current primary validator, we'll reassign immediately
+
+						if err := takeValidatorsSnapshotAtCurrentHeight(vm, validatorsSetByHeightAndSubnet); err != nil {
+							return fmt.Sprintf("could not take validators snapshot, %s", err.Error())
 						}
+					}
+					currentPrimaryValidator, err = addPrimaryValidatorWithBLSKey(vm, ev)
+					if err != nil {
+						return fmt.Sprintf("could not add primary validator with BLS key, %s", err.Error())
 					}
 					if err := takeValidatorsSnapshotAtCurrentHeight(vm, validatorsSetByHeightAndSubnet); err != nil {
 						return fmt.Sprintf("could not take validators snapshot, %s", err.Error())
 					}
 
 				default:
-					return fmt.Sprintf("unexpected staker type, %v", ev.Priority)
+					return fmt.Sprintf("unexpected staker type, %v", ev.eventType)
 				}
 			}
 			if err := takeValidatorsSnapshotAtCurrentHeight(vm, validatorsSetByHeightAndSubnet); err != nil {
@@ -239,13 +253,13 @@ func takeValidatorsSnapshotAtCurrentHeight(vm *VM, validatorsSetByHeightAndSubne
 	return nil
 }
 
-func addSubnetValidator(vm *VM, data *state.Staker, subnetID ids.ID) (*state.Staker, error) {
+func addSubnetValidator(vm *VM, data *validatorInputData, subnetID ids.ID) (*state.Staker, error) {
 	addr := keys[0].PublicKey().Address()
 	signedTx, err := vm.txBuilder.NewAddSubnetValidatorTx(
 		vm.Config.MinValidatorStake,
-		uint64(data.StartTime.Unix()),
-		uint64(data.EndTime.Unix()),
-		data.NodeID,
+		uint64(data.startTime.Unix()),
+		uint64(data.endTime.Unix()),
+		data.nodeID,
 		subnetID,
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
 		addr,
@@ -256,7 +270,7 @@ func addSubnetValidator(vm *VM, data *state.Staker, subnetID ids.ID) (*state.Sta
 	return internalAddValidator(vm, signedTx)
 }
 
-func addPrimaryValidatorWithBLSKey(vm *VM, data *state.Staker) (*state.Staker, error) {
+func addPrimaryValidatorWithBLSKey(vm *VM, data *validatorInputData) (*state.Staker, error) {
 	addr := keys[0].PublicKey().Address()
 	utxoHandler := utxo.NewHandler(vm.ctx, &vm.clock, vm.fx)
 	ins, unstakedOuts, stakedOuts, signers, err := utxoHandler.Spend(
@@ -282,9 +296,9 @@ func addPrimaryValidatorWithBLSKey(vm *VM, data *state.Staker) (*state.Staker, e
 			Outs:         unstakedOuts,
 		}},
 		Validator: txs.Validator{
-			NodeID: data.NodeID,
-			Start:  uint64(data.StartTime.Unix()),
-			End:    uint64(data.EndTime.Unix()),
+			NodeID: data.nodeID,
+			Start:  uint64(data.startTime.Unix()),
+			End:    uint64(data.endTime.Unix()),
 			Wght:   vm.MinValidatorStake,
 		},
 		Subnet:    constants.PrimaryNetworkID,
@@ -316,13 +330,13 @@ func addPrimaryValidatorWithBLSKey(vm *VM, data *state.Staker) (*state.Staker, e
 	return internalAddValidator(vm, signedTx)
 }
 
-func addPrimaryValidatorWithoutBLSKey(vm *VM, data *state.Staker) (*state.Staker, error) {
+func addPrimaryValidatorWithoutBLSKey(vm *VM, data *validatorInputData) (*state.Staker, error) {
 	addr := keys[0].PublicKey().Address()
 	signedTx, err := vm.txBuilder.NewAddValidatorTx(
 		vm.Config.MinValidatorStake,
-		uint64(data.StartTime.Unix()),
-		uint64(data.EndTime.Unix()),
-		data.NodeID,
+		uint64(data.startTime.Unix()),
+		uint64(data.endTime.Unix()),
+		data.nodeID,
 		addr,
 		reward.PercentDenominator,
 		[]*secp256k1.PrivateKey{keys[0], keys[1]},
@@ -440,11 +454,19 @@ func terminatePrimaryValidator(vm *VM, validator *state.Staker) error {
 	return nil
 }
 
+type validatorInputData struct {
+	eventType string
+	startTime time.Time
+	endTime   time.Time
+	nodeID    ids.NodeID
+	publicKey *bls.PublicKey
+}
+
 // buildTimestampsList creates validators start and end time, given the event list.
 // output is returned as a list of state.Stakers, just because it's a convenient object to
 // collect all relevant information.
-func buildTimestampsList(events []string, currentTime time.Time, nodeID ids.NodeID) ([]*state.Staker, error) {
-	res := make([]*state.Staker, 0, len(events))
+func buildTimestampsList(events []string, currentTime time.Time, nodeID ids.NodeID) ([]*validatorInputData, error) {
+	res := make([]*validatorInputData, 0, len(events))
 
 	currentTime = currentTime.Add(executor.SyncBound)
 	switch endTime := currentTime.Add(defaultMinStakingDuration); events[0] {
@@ -454,20 +476,20 @@ func buildTimestampsList(events []string, currentTime time.Time, nodeID ids.Node
 			return nil, fmt.Errorf("could not make private key, %w", err)
 		}
 
-		res = append(res, &state.Staker{
-			NodeID:    nodeID,
-			StartTime: currentTime,
-			EndTime:   endTime,
-			PublicKey: bls.PublicFromSecretKey(sk),
-			Priority:  txs.PrimaryNetworkValidatorCurrentPriority,
+		res = append(res, &validatorInputData{
+			eventType: startPrimaryWithBLS,
+			startTime: currentTime,
+			endTime:   endTime,
+			nodeID:    nodeID,
+			publicKey: bls.PublicFromSecretKey(sk),
 		})
 	case startPrimaryWithoutBLS:
-		res = append(res, &state.Staker{
-			NodeID:    nodeID,
-			StartTime: currentTime,
-			EndTime:   endTime,
-			PublicKey: nil,
-			Priority:  txs.PrimaryNetworkValidatorCurrentPriority,
+		res = append(res, &validatorInputData{
+			eventType: startPrimaryWithoutBLS,
+			startTime: currentTime,
+			endTime:   endTime,
+			nodeID:    nodeID,
+			publicKey: nil,
 		})
 	default:
 		return nil, fmt.Errorf("unexpected initial event %s", events[0])
@@ -482,45 +504,44 @@ func buildTimestampsList(events []string, currentTime time.Time, nodeID ids.Node
 		switch currentEvent := events[i]; currentEvent {
 		case startSubnetValidator:
 			endTime := currentTime.Add(defaultMinStakingDuration)
-			val := &state.Staker{
-				NodeID:    nodeID,
-				StartTime: currentTime,
-				EndTime:   endTime,
-				PublicKey: nil,
-				Priority:  txs.SubnetPermissionlessValidatorCurrentPriority,
-			}
-			res = append(res, val)
+			res = append(res, &validatorInputData{
+				eventType: startSubnetValidator,
+				startTime: currentTime,
+				endTime:   endTime,
+				nodeID:    nodeID,
+				publicKey: nil,
+			})
 
-			currentPrimaryVal.EndTime = endTime.Add(time.Second)
+			currentPrimaryVal.endTime = endTime.Add(time.Second)
 			currentTime = endTime.Add(time.Second)
 
 		case startPrimaryWithBLS:
-			currentTime = currentPrimaryVal.EndTime.Add(executor.SyncBound)
+			currentTime = currentPrimaryVal.endTime.Add(executor.SyncBound)
 			sk, err := bls.NewSecretKey()
 			if err != nil {
 				return nil, fmt.Errorf("could not make private key, %w", err)
 			}
 
 			endTime := currentTime.Add(defaultMinStakingDuration)
-			val := &state.Staker{
-				NodeID:    nodeID,
-				StartTime: currentTime,
-				EndTime:   endTime,
-				PublicKey: bls.PublicFromSecretKey(sk),
-				Priority:  txs.PrimaryNetworkValidatorCurrentPriority,
+			val := &validatorInputData{
+				eventType: startPrimaryWithBLS,
+				startTime: currentTime,
+				endTime:   endTime,
+				nodeID:    nodeID,
+				publicKey: bls.PublicFromSecretKey(sk),
 			}
 			res = append(res, val)
 			currentPrimaryVal = val
 
 		case startPrimaryWithoutBLS:
-			currentTime = currentPrimaryVal.EndTime.Add(executor.SyncBound)
+			currentTime = currentPrimaryVal.endTime.Add(executor.SyncBound)
 			endTime := currentTime.Add(defaultMinStakingDuration)
-			val := &state.Staker{
-				NodeID:    nodeID,
-				StartTime: currentTime,
-				EndTime:   endTime,
-				PublicKey: nil,
-				Priority:  txs.PrimaryNetworkValidatorCurrentPriority,
+			val := &validatorInputData{
+				eventType: startPrimaryWithoutBLS,
+				startTime: currentTime,
+				endTime:   endTime,
+				nodeID:    nodeID,
+				publicKey: nil,
 			}
 			res = append(res, val)
 			currentPrimaryVal = val
@@ -548,7 +569,7 @@ func TestTimestampListGenerator(t *testing.T) {
 			// nil out non subnet validators
 			subnetIndexes := make([]int, 0)
 			for idx, ev := range validatorsTimes {
-				if ev.Priority == txs.SubnetPermissionlessValidatorCurrentPriority {
+				if ev.eventType == startSubnetValidator {
 					subnetIndexes = append(subnetIndexes, idx)
 				}
 			}
@@ -561,15 +582,15 @@ func TestTimestampListGenerator(t *testing.T) {
 				if ev == nil {
 					continue // a subnet validator
 				}
-				if currentEventTime.After(ev.StartTime) {
+				if currentEventTime.After(ev.startTime) {
 					return fmt.Sprintf("validator %d start time larger than current event time", i)
 				}
 
-				if ev.StartTime.After(ev.EndTime) {
+				if ev.startTime.After(ev.endTime) {
 					return fmt.Sprintf("validator %d start time larger than its end time", i)
 				}
 
-				currentEventTime = ev.EndTime
+				currentEventTime = ev.endTime
 			}
 
 			return ""
@@ -601,7 +622,7 @@ func TestTimestampListGenerator(t *testing.T) {
 			// nil out non subnet validators
 			nonSubnetIndexes := make([]int, 0)
 			for idx, ev := range validatorsTimes {
-				if ev.Priority != txs.SubnetPermissionlessValidatorCurrentPriority {
+				if ev.eventType != startSubnetValidator {
 					nonSubnetIndexes = append(nonSubnetIndexes, idx)
 				}
 			}
@@ -614,15 +635,15 @@ func TestTimestampListGenerator(t *testing.T) {
 				if ev == nil {
 					continue // a non-subnet validator
 				}
-				if currentEventTime.After(ev.StartTime) {
+				if currentEventTime.After(ev.startTime) {
 					return fmt.Sprintf("validator %d start time larger than current event time", i)
 				}
 
-				if ev.StartTime.After(ev.EndTime) {
+				if ev.startTime.After(ev.endTime) {
 					return fmt.Sprintf("validator %d start time larger than its end time", i)
 				}
 
-				currentEventTime = ev.EndTime
+				currentEventTime = ev.endTime
 			}
 
 			return ""
@@ -653,14 +674,14 @@ func TestTimestampListGenerator(t *testing.T) {
 
 			currentPrimaryValidator := validatorsTimes[0]
 			for i := 1; i < len(validatorsTimes); i++ {
-				if validatorsTimes[i].Priority != txs.SubnetPermissionlessValidatorCurrentPriority {
+				if validatorsTimes[i].eventType != startSubnetValidator {
 					currentPrimaryValidator = validatorsTimes[i]
 					continue
 				}
 
 				subnetVal := validatorsTimes[i]
-				if currentPrimaryValidator.StartTime.After(subnetVal.StartTime) ||
-					subnetVal.EndTime.After(currentPrimaryValidator.EndTime) {
+				if currentPrimaryValidator.startTime.After(subnetVal.startTime) ||
+					subnetVal.endTime.After(currentPrimaryValidator.endTime) {
 					return "subnet validator not bounded by primary network ones"
 				}
 			}
