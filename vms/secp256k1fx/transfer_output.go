@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	_ verify.State = (*OutputOwners)(nil)
+	_ verify.State = (*TransferOutput)(nil)
 
 	ErrNoValueOutput = errors.New("output has no value")
 )
@@ -51,9 +51,7 @@ func (out *TransferOutput) Verify() error {
 	}
 }
 
-func (out *TransferOutput) VerifyState() error {
-	return out.Verify()
-}
+func (*TransferOutput) IsState() {}
 
 func (out *TransferOutput) Owners() interface{} {
 	return &out.OutputOwners

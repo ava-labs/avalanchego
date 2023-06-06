@@ -63,6 +63,18 @@ func (mr *MockTransferableOutMockRecorder) InitCtx(arg0 interface{}) *gomock.Cal
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InitCtx", reflect.TypeOf((*MockTransferableOut)(nil).InitCtx), arg0)
 }
 
+// IsState mocks base method.
+func (m *MockTransferableOut) IsState() {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "IsState")
+}
+
+// IsState indicates an expected call of IsState.
+func (mr *MockTransferableOutMockRecorder) IsState() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsState", reflect.TypeOf((*MockTransferableOut)(nil).IsState))
+}
+
 // Verify mocks base method.
 func (m *MockTransferableOut) Verify() error {
 	m.ctrl.T.Helper()
@@ -75,18 +87,4 @@ func (m *MockTransferableOut) Verify() error {
 func (mr *MockTransferableOutMockRecorder) Verify() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Verify", reflect.TypeOf((*MockTransferableOut)(nil).Verify))
-}
-
-// VerifyState mocks base method.
-func (m *MockTransferableOut) VerifyState() error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "VerifyState")
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// VerifyState indicates an expected call of VerifyState.
-func (mr *MockTransferableOutMockRecorder) VerifyState() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyState", reflect.TypeOf((*MockTransferableOut)(nil).VerifyState))
 }

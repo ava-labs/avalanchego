@@ -56,6 +56,4 @@ func (out *TransferOutput) Verify() error {
 	}
 }
 
-func (out *TransferOutput) VerifyState() error {
-	return out.Verify()
-}
+func (*TransferOutput) IsState() {}

@@ -14,7 +14,14 @@ type Verifiable interface {
 type State interface {
 	snow.ContextInitializable
 	Verifiable
-	VerifyState() error
+
+	IsState()
+}
+
+// NotState that can be verified
+type NotState interface {
+	// IsState should always return an error
+	IsState() error
 }
 
 // All returns nil if all the verifiables were verified with no errors

@@ -157,6 +157,20 @@ func (mr *MockOwnerMockRecorder) InitCtx(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InitCtx", reflect.TypeOf((*MockOwner)(nil).InitCtx), arg0)
 }
 
+// IsState mocks base method.
+func (m *MockOwner) IsState() error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IsState")
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// IsState indicates an expected call of IsState.
+func (mr *MockOwnerMockRecorder) IsState() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsState", reflect.TypeOf((*MockOwner)(nil).IsState))
+}
+
 // Verify mocks base method.
 func (m *MockOwner) Verify() error {
 	m.ctrl.T.Helper()

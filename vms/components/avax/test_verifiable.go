@@ -13,9 +13,7 @@ func (v *TestVerifiable) Verify() error {
 	return v.Err
 }
 
-func (v *TestVerifiable) VerifyState() error {
-	return v.Err
-}
+func (v *TestVerifiable) IsState() {}
 
 type TestTransferable struct {
 	TestVerifiable

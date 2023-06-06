@@ -6,8 +6,11 @@ package nftfx
 import (
 	"encoding/json"
 
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
+
+var _ verify.State = (*MintOutput)(nil)
 
 type MintOutput struct {
 	GroupID                  uint32 `serialize:"true" json:"groupID"`
@@ -26,3 +29,5 @@ func (out *MintOutput) MarshalJSON() ([]byte, error) {
 	result["groupID"] = out.GroupID
 	return json.Marshal(result)
 }
+
+func (*MintOutput) IsState() {}

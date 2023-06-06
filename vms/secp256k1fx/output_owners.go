@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
 var (
@@ -22,8 +21,7 @@ var (
 	ErrOutputUnoptimized    = errors.New("output representation should be optimized")
 	ErrAddrsNotSortedUnique = errors.New("addresses not sorted and unique")
 	ErrMarshal              = errors.New("cannot marshal without ctx")
-
-	_ verify.State = (*OutputOwners)(nil)
+	ErrNotState             = errors.New("not state")
 )
 
 type OutputOwners struct {
@@ -135,8 +133,8 @@ func (out *OutputOwners) Verify() error {
 	}
 }
 
-func (out *OutputOwners) VerifyState() error {
-	return out.Verify()
+func (*OutputOwners) IsState() error {
+	return ErrNotState
 }
 
 func (out *OutputOwners) Sort() {
