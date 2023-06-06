@@ -13,6 +13,8 @@ import (
 var _ verify.State = (*MintOutput)(nil)
 
 type MintOutput struct {
+	verify.IsState `json:"-"`
+
 	GroupID                  uint32 `serialize:"true" json:"groupID"`
 	secp256k1fx.OutputOwners `serialize:"true"`
 }
@@ -29,5 +31,3 @@ func (out *MintOutput) MarshalJSON() ([]byte, error) {
 	result["groupID"] = out.GroupID
 	return json.Marshal(result)
 }
-
-func (*MintOutput) IsState() {}

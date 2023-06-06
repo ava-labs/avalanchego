@@ -44,8 +44,9 @@ type Fx interface {
 }
 
 type Owner interface {
+	verify.IsNotState
+
 	verify.Verifiable
-	verify.NotState
 	snow.ContextInitializable
 }
 

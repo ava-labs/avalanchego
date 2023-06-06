@@ -5,23 +5,21 @@ package verify
 
 import "github.com/ava-labs/avalanchego/snow"
 
-// Verifiable can be verified
 type Verifiable interface {
 	Verify() error
 }
 
-// State that can be verified
 type State interface {
 	snow.ContextInitializable
 	Verifiable
-
-	IsState()
+	IsState
 }
 
-// NotState that can be verified
-type NotState interface {
-	// IsState should always return an error
-	IsState() error
+type IsState interface {
+	isState()
+}
+type IsNotState interface {
+	isState() error
 }
 
 // All returns nil if all the verifiables were verified with no errors

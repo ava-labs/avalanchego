@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
 var (
@@ -25,6 +26,8 @@ var (
 )
 
 type OutputOwners struct {
+	verify.IsNotState `json:"-"`
+
 	Locktime  uint64        `serialize:"true" json:"locktime"`
 	Threshold uint32        `serialize:"true" json:"threshold"`
 	Addrs     []ids.ShortID `serialize:"true" json:"addresses"`
@@ -131,10 +134,6 @@ func (out *OutputOwners) Verify() error {
 	default:
 		return nil
 	}
-}
-
-func (*OutputOwners) IsState() error {
-	return ErrNotState
 }
 
 func (out *OutputOwners) Sort() {

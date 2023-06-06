@@ -14,15 +14,17 @@ var (
 	_ Addressable     = (*TestAddressable)(nil)
 )
 
-type TestState struct{ Err error }
+type TestState struct {
+	verify.IsState
+
+	Err error
+}
 
 func (*TestState) InitCtx(*snow.Context) {}
 
 func (v *TestState) Verify() error {
 	return v.Err
 }
-
-func (*TestState) IsState() {}
 
 type TestTransferable struct {
 	TestState

@@ -11,7 +11,7 @@ import (
 var _ verify.State = (*OwnedOutput)(nil)
 
 type OwnedOutput struct {
+	verify.IsState `json:"-"`
+
 	secp256k1fx.OutputOwners `serialize:"true"`
 }
-
-func (*OwnedOutput) IsState() {}

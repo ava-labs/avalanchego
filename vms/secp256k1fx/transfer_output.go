@@ -17,6 +17,8 @@ var (
 )
 
 type TransferOutput struct {
+	verify.IsState `json:"-"`
+
 	Amt uint64 `serialize:"true" json:"amount"`
 
 	OutputOwners `serialize:"true"`
@@ -50,8 +52,6 @@ func (out *TransferOutput) Verify() error {
 		return out.OutputOwners.Verify()
 	}
 }
-
-func (*TransferOutput) IsState() {}
 
 func (out *TransferOutput) Owners() interface{} {
 	return &out.OutputOwners

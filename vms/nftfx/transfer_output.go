@@ -26,6 +26,8 @@ var (
 )
 
 type TransferOutput struct {
+	verify.IsState `json:"-"`
+
 	GroupID                  uint32              `serialize:"true" json:"groupID"`
 	Payload                  types.JSONByteSlice `serialize:"true" json:"payload"`
 	secp256k1fx.OutputOwners `serialize:"true"`
@@ -55,5 +57,3 @@ func (out *TransferOutput) Verify() error {
 		return out.OutputOwners.Verify()
 	}
 }
-
-func (*TransferOutput) IsState() {}

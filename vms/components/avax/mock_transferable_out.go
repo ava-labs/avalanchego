@@ -11,11 +11,14 @@ import (
 	reflect "reflect"
 
 	snow "github.com/ava-labs/avalanchego/snow"
+	verify "github.com/ava-labs/avalanchego/vms/components/verify"
 	gomock "github.com/golang/mock/gomock"
 )
 
 // MockTransferableOut is a mock of TransferableOut interface.
 type MockTransferableOut struct {
+	verify.IsState
+
 	ctrl     *gomock.Controller
 	recorder *MockTransferableOutMockRecorder
 }
@@ -61,18 +64,6 @@ func (m *MockTransferableOut) InitCtx(arg0 *snow.Context) {
 func (mr *MockTransferableOutMockRecorder) InitCtx(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InitCtx", reflect.TypeOf((*MockTransferableOut)(nil).InitCtx), arg0)
-}
-
-// IsState mocks base method.
-func (m *MockTransferableOut) IsState() {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "IsState")
-}
-
-// IsState indicates an expected call of IsState.
-func (mr *MockTransferableOutMockRecorder) IsState() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsState", reflect.TypeOf((*MockTransferableOut)(nil).IsState))
 }
 
 // Verify mocks base method.
