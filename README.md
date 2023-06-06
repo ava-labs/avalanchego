@@ -102,7 +102,9 @@ are uniquely identified by root hashes.
 operations do not see any changes.
 - [x] Be able to read-your-write in a batch that is not committed. Uncommitted
 changes will not be shown to any other concurrent readers.
-- [ ] Add some metrics framework to support timings and volume for future milestones
+- [x] Add some metrics framework to support timings and volume for future milestones
+To support this, a new method Db::metrics() returns an object that can be serialized
+into prometheus metrics or json (it implements [serde::Serialize])
 
 ### Seasoned milestone
 This milestone will add support for proposals, including proposed future
