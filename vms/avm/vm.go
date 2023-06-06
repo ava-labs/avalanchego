@@ -319,15 +319,6 @@ func (vm *VM) onNormalOperationsStarted() error {
 		return err
 	}
 
-	txID, err := ids.FromString("2JPwx3rbUy877CWYhtXpfPVS5tD8KfnbiF5pxMRu6jCaq5dnME")
-	if err != nil {
-		return err
-	}
-	utxoID := avax.UTXOID{
-		TxID:        txID,
-		OutputIndex: 192,
-	}
-	vm.state.DeleteUTXO(utxoID.InputID())
 	if err := vm.state.Commit(); err != nil {
 		return err
 	}
@@ -547,7 +538,6 @@ func (vm *VM) IssueTx(b []byte) (ids.ID, error) {
 		return tx.ID(), nil
 	}
 
-	// TODO: After the chain is linearized, remove the following code.
 	tx, err := vm.parseTx(b)
 	if err != nil {
 		return ids.ID{}, err

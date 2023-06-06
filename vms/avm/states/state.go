@@ -422,10 +422,22 @@ func (s *state) GetStatus(id ids.ID) (choices.Status, error) {
 		return *status, nil
 	}
 
-	if tx, err := s.GetTx(id); tx != nil && err == nil {
-		return choices.Accepted, nil
+	val, err := database.GetUInt32(s.statusDB, id[:])
+	if err == database.ErrNotFound {
+		s.statusCache.Put(id, nil)
+		return choices.Unknown, database.ErrNotFound
 	}
-	return choices.Unknown, nil
+	if err != nil {
+		return choices.Unknown, err
+	}
+
+	status := choices.Status(val)
+	if err := status.Valid(); err != nil {
+		return choices.Unknown, err
+	}
+
+	s.statusCache.Put(id, &status)
+	return status, nil
 }
 
 // TODO: remove status support
@@ -591,9 +603,7 @@ func (s *state) CleanupTxs() error {
 		}
 		txStatus := choices.Status(valStatus)
 
-		switch txStatus {
-		case choices.Accepted:
-			// find UTXOs consumed by accepted tx
+		if txStatus == choices.Accepted {
 			utxos := tx.Unsigned.InputUTXOs()
 			// remove all the UTXOs consumed by the tx
 			for _, UTXO := range utxos {
@@ -602,19 +612,6 @@ func (s *state) CleanupTxs() error {
 					return err
 				}
 			}
-		default:
-			// remove all these transactions from map
-			delete(s.addedTxs, txID)
-			// remove all these transactions from cache
-			s.txCache.Evict(txID)
-			// remove all these transactions from db
-			if err := s.txDB.Delete(key); err != nil {
-				return err
-			}
-		}
-		s.statusCache.Evict(txID)
-		if err := s.statusDB.Delete(key); err != nil {
-			return err
 		}
 	}
 	return nil
