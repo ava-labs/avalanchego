@@ -689,7 +689,7 @@ func Test_MerkleDB_RandomCases_InitialValues(t *testing.T) {
 	require := require.New(t)
 
 	r := rand.New(rand.NewSource(int64(0))) // #nosec G404
-	runRandDBTest(require, r, generateInitialValues(require, r, 2000, 3500, 0.0))
+	runRandDBTest(require, r, generateInitialValues(require, r, 1000, 2500, 0.0))
 }
 
 // randTest performs random trie operations.

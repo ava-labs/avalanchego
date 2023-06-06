@@ -119,6 +119,7 @@ func New(
 	namespace string,
 	registerer prometheus.Registerer,
 	httpConfig HTTPConfig,
+	allowedHosts []string,
 	wrappers ...Wrapper,
 ) (Server, error) {
 	m, err := newMetrics(namespace, registerer)
@@ -127,10 +128,11 @@ func New(
 	}
 
 	router := newRouter()
+	allowedHostsHandler := filterInvalidHosts(router, allowedHosts)
 	corsHandler := cors.New(cors.Options{
 		AllowedOrigins:   allowedOrigins,
 		AllowCredentials: true,
-	}).Handler(router)
+	}).Handler(allowedHostsHandler)
 	gzipHandler := gziphandler.GzipHandler(corsHandler)
 	var handler http.Handler = http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
