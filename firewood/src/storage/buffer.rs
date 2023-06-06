@@ -497,19 +497,24 @@ impl DiskBufferRequester {
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
+    use sha3::Digest;
+    use std::path::{Path, PathBuf};
+    use tempdir::TempDir;
 
     use super::*;
     use crate::{
         file,
-        storage::{Ash, DeltaPage, StoreConfig, StoreRevMut, StoreRevMutDelta},
+        storage::{
+            Ash, DeltaPage, StoreConfig, StoreRevMut, StoreRevMutDelta, StoreRevShared, ZeroStore,
+        },
     };
     use shale::CachedStore;
 
     const STATE_SPACE: SpaceID = 0x0;
+    const HASH_SIZE: usize = 32;
     #[test]
     #[ignore = "ref: https://github.com/ava-labs/firewood/issues/45"]
-    fn test_buffer() {
+    fn test_buffer_with_undo() {
         let tmpdb = [
             &std::env::var("CARGO_TARGET_DIR").unwrap_or("/tmp".to_string()),
             "sender_api_test_db",
@@ -548,7 +553,7 @@ mod tests {
         disk_requester.reg_cached_space(state_cache.as_ref());
 
         // memory mapped store
-        let mut mut_store = StoreRevMut::new(state_cache as Rc<dyn MemStoreR>);
+        let mut mut_store = StoreRevMut::new(state_cache);
 
         let change = b"this is a test";
 
@@ -596,6 +601,94 @@ mod tests {
 
         // verify
         assert_eq!(disk_requester.collect_ash(1).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_buffer_with_redo() {
+        let buf_cfg = DiskBufferConfig::builder().max_buffered(1).build();
+        let wal_cfg = WalConfig::builder().build();
+        let disk_requester = init_buffer(buf_cfg, wal_cfg);
+
+        // TODO: Run the test in a separate standalone directory for concurrency reasons
+        let tmp_dir = TempDir::new("firewood").unwrap();
+        let path = get_file_path(tmp_dir.path(), file!(), line!());
+        let (root_db_path, reset) = crate::file::open_dir(path, true).unwrap();
+
+        // file descriptor of the state directory
+        let state_path = file::touch_dir("state", &root_db_path).unwrap();
+        assert!(reset);
+        // create a new wal directory on top of root_db_fd
+        disk_requester.init_wal("wal", root_db_path);
+
+        // create a new state cache which tracks on disk state.
+        let state_cache = Rc::new(
+            CachedSpace::new(
+                &StoreConfig::builder()
+                    .ncached_pages(1)
+                    .ncached_files(1)
+                    .space_id(STATE_SPACE)
+                    .file_nbit(1)
+                    .rootdir(state_path)
+                    .build(),
+            )
+            .unwrap(),
+        );
+
+        // add an in memory cached space. this will allow us to write to the
+        // disk buffer then later persist the change to disk.
+        disk_requester.reg_cached_space(state_cache.as_ref());
+
+        // memory mapped store
+        let mut mut_store = StoreRevMut::new(state_cache.clone());
+
+        // mutate the in memory buffer.
+        let data = b"this is another test";
+        let hash: [u8; HASH_SIZE] = sha3::Keccak256::digest(&data).into();
+
+        // write to the in memory buffer (ash) not yet to disk
+        mut_store.write(0, &hash);
+        assert_eq!(mut_store.id(), STATE_SPACE);
+
+        // wal should have no records.
+        assert!(disk_requester.collect_ash(1).unwrap().is_empty());
+
+        // get RO view of the buffer from the beginning.
+        let view = mut_store.get_view(0, hash.len() as u64).unwrap();
+        assert_eq!(view.as_deref(), hash);
+
+        // Commit the change. Take the delta from cached store,
+        // then apply changes to the CachedSpace.
+        let (redo_delta, wal) = mut_store.take_delta();
+        state_cache.update(&redo_delta).unwrap();
+
+        // create a mutation request to the disk buffer by passing the page and write batch.
+        // wal is empty
+        assert!(disk_requester.collect_ash(1).unwrap().is_empty());
+        // page is not yet persisted to disk.
+        assert!(disk_requester.get_page(STATE_SPACE, 0).is_none());
+        disk_requester.write(
+            vec![BufferWrite {
+                space_id: STATE_SPACE,
+                delta: redo_delta,
+            }],
+            AshRecord([(STATE_SPACE, wal)].into()),
+        );
+
+        // verify
+        assert_eq!(disk_requester.collect_ash(1).unwrap().len(), 1);
+        let ashes = disk_requester.collect_ash(1).unwrap();
+
+        // replay the redo from the wal
+        let shared_store = StoreRevShared::from_ash(
+            Rc::new(ZeroStore::default()),
+            &ashes[0].0[&STATE_SPACE].redo,
+        );
+        let view = shared_store.get_view(0, hash.len() as u64).unwrap();
+        assert_eq!(view.as_deref(), hash);
+    }
+
+    fn get_file_path(path: &Path, file: &str, line: u32) -> PathBuf {
+        path.join(format!("{}_{}", file.replace('/', "-"), line))
     }
 
     fn init_buffer(buf_cfg: DiskBufferConfig, wal_cfg: WalConfig) -> DiskBufferRequester {

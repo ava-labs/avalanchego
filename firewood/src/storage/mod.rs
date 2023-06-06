@@ -63,7 +63,7 @@ pub struct SpaceWrite {
     data: Box<[u8]>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 /// In memory representation of Write-ahead log with `undo` and `redo`.
 pub struct Ash {
     /// Deltas to undo the changes.
@@ -263,7 +263,7 @@ impl StoreDelta {
 }
 
 pub struct StoreRev {
-    prev: RefCell<Rc<dyn MemStoreR>>,
+    base_space: RefCell<Rc<dyn MemStoreR>>,
     delta: StoreDelta,
 }
 
@@ -279,7 +279,7 @@ impl fmt::Debug for StoreRev {
 
 impl MemStoreR for StoreRev {
     fn get_slice(&self, offset: u64, length: u64) -> Option<Vec<u8>> {
-        let prev = self.prev.borrow();
+        let base_space = self.base_space.borrow();
         let mut start = offset;
         let end = start + length;
         let delta = &self.delta;
@@ -287,7 +287,7 @@ impl MemStoreR for StoreRev {
         let mut r = delta.len();
         // no dirty page, before or after all dirty pages
         if r == 0 {
-            return prev.get_slice(start, end - start);
+            return base_space.get_slice(start, end - start);
         }
         // otherwise, some dirty pages are covered by the range
         while r - l > 1 {
@@ -302,12 +302,12 @@ impl MemStoreR for StoreRev {
             l += 1
         }
         if l >= delta.len() || end < delta[l].offset() {
-            return prev.get_slice(start, end - start);
+            return base_space.get_slice(start, end - start);
         }
         let mut data = Vec::new();
         let p_off = std::cmp::min(end - delta[l].offset(), PAGE_SIZE);
         if start < delta[l].offset() {
-            data.extend(prev.get_slice(start, delta[l].offset() - start)?);
+            data.extend(base_space.get_slice(start, delta[l].offset() - start)?);
             data.extend(&delta[l].data()[..p_off as usize]);
         } else {
             data.extend(&delta[l].data()[(start - delta[l].offset()) as usize..p_off as usize]);
@@ -316,11 +316,11 @@ impl MemStoreR for StoreRev {
         while start < end {
             l += 1;
             if l >= delta.len() || end < delta[l].offset() {
-                data.extend(prev.get_slice(start, end - start)?);
+                data.extend(base_space.get_slice(start, end - start)?);
                 break;
             }
             if delta[l].offset() > start {
-                data.extend(prev.get_slice(start, delta[l].offset() - start)?);
+                data.extend(base_space.get_slice(start, delta[l].offset() - start)?);
             }
             if end < delta[l].offset() + PAGE_SIZE {
                 data.extend(&delta[l].data()[..(end - delta[l].offset()) as usize]);
@@ -334,7 +334,7 @@ impl MemStoreR for StoreRev {
     }
 
     fn id(&self) -> SpaceID {
-        self.prev.borrow().id()
+        self.base_space.borrow().id()
     }
 }
 
@@ -342,19 +342,19 @@ impl MemStoreR for StoreRev {
 pub struct StoreRevShared(Rc<StoreRev>);
 
 impl StoreRevShared {
-    pub fn from_ash(prev: Rc<dyn MemStoreR>, writes: &[SpaceWrite]) -> Self {
-        let delta = StoreDelta::new(prev.as_ref(), writes);
-        let prev = RefCell::new(prev);
-        Self(Rc::new(StoreRev { prev, delta }))
+    pub fn from_ash(base_space: Rc<dyn MemStoreR>, writes: &[SpaceWrite]) -> Self {
+        let delta = StoreDelta::new(base_space.as_ref(), writes);
+        let base_space = RefCell::new(base_space);
+        Self(Rc::new(StoreRev { base_space, delta }))
     }
 
-    pub fn from_delta(prev: Rc<dyn MemStoreR>, delta: StoreDelta) -> Self {
-        let prev = RefCell::new(prev);
-        Self(Rc::new(StoreRev { prev, delta }))
+    pub fn from_delta(base_space: Rc<dyn MemStoreR>, delta: StoreDelta) -> Self {
+        let base_space = RefCell::new(base_space);
+        Self(Rc::new(StoreRev { base_space, delta }))
     }
 
-    pub fn set_prev(&mut self, prev: Rc<dyn MemStoreR>) {
-        *self.0.prev.borrow_mut() = prev
+    pub fn set_base_space(&mut self, base_space: Rc<dyn MemStoreR>) {
+        *self.0.base_space.borrow_mut() = base_space
     }
 
     pub fn inner(&self) -> &Rc<StoreRev> {
@@ -421,26 +421,26 @@ impl<S: Clone + CachedStore + 'static> DerefMut for StoreShared<S> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct StoreRevMutDelta {
     pages: HashMap<u64, Box<Page>>,
     plain: Ash,
 }
 
 #[derive(Clone, Debug)]
+/// A mutable revision of the store. The view is constucted by applying the `deltas` to the
+/// `base space`. The `deltas` tracks both `undo` and `redo` to be able to rewind or reapply
+/// the changes.
 pub struct StoreRevMut {
-    prev: Rc<dyn MemStoreR>,
+    base_space: Rc<dyn MemStoreR>,
     deltas: Rc<RefCell<StoreRevMutDelta>>,
 }
 
 impl StoreRevMut {
-    pub fn new(prev: Rc<dyn MemStoreR>) -> Self {
+    pub fn new(base_space: Rc<dyn MemStoreR>) -> Self {
         Self {
-            prev,
-            deltas: Rc::new(RefCell::new(StoreRevMutDelta {
-                pages: HashMap::new(),
-                plain: Ash::new(),
-            })),
+            base_space,
+            deltas: Default::default(),
         }
     }
 
@@ -448,7 +448,7 @@ impl StoreRevMut {
         let mut deltas = self.deltas.borrow_mut();
         if deltas.pages.get(&pid).is_none() {
             let page = Box::new(
-                self.prev
+                self.base_space
                     .get_slice(pid << PAGE_SIZE_NBIT, PAGE_SIZE)
                     .unwrap()
                     .try_into()
@@ -494,23 +494,27 @@ impl CachedStore for StoreRevMut {
             if s_pid == e_pid {
                 match deltas.get(&s_pid) {
                     Some(p) => p[s_off..e_off + 1].to_vec(),
-                    None => self.prev.get_slice(offset, length)?,
+                    None => self.base_space.get_slice(offset, length)?,
                 }
             } else {
                 let mut data = match deltas.get(&s_pid) {
                     Some(p) => p[s_off..].to_vec(),
-                    None => self.prev.get_slice(offset, PAGE_SIZE - s_off as u64)?,
+                    None => self
+                        .base_space
+                        .get_slice(offset, PAGE_SIZE - s_off as u64)?,
                 };
                 for p in s_pid + 1..e_pid {
                     match deltas.get(&p) {
                         Some(p) => data.extend(**p),
-                        None => data.extend(&self.prev.get_slice(p << PAGE_SIZE_NBIT, PAGE_SIZE)?),
+                        None => {
+                            data.extend(&self.base_space.get_slice(p << PAGE_SIZE_NBIT, PAGE_SIZE)?)
+                        }
                     };
                 }
                 match deltas.get(&e_pid) {
                     Some(p) => data.extend(&p[..e_off + 1]),
                     None => data.extend(
-                        self.prev
+                        self.base_space
                             .get_slice(e_pid << PAGE_SIZE_NBIT, e_off as u64 + 1)?,
                     ),
                 }
@@ -532,40 +536,46 @@ impl CachedStore for StoreRevMut {
         let e_pid = end >> PAGE_SIZE_NBIT;
         let e_off = (end & PAGE_MASK) as usize;
         let mut undo: Vec<u8> = Vec::new();
-        let data: Box<[u8]> = change.into();
+        let redo: Box<[u8]> = change.into();
+
         if s_pid == e_pid {
             let slice = &mut self.get_page_mut(s_pid)[s_off..e_off + 1];
             undo.extend(&*slice);
             slice.copy_from_slice(change)
         } else {
             let len = PAGE_SIZE as usize - s_off;
+
             {
                 let slice = &mut self.get_page_mut(s_pid)[s_off..];
                 undo.extend(&*slice);
                 slice.copy_from_slice(&change[..len]);
             }
+
             change = &change[len..];
+
             for p in s_pid + 1..e_pid {
                 let mut slice = self.get_page_mut(p);
                 undo.extend(&*slice);
                 slice.copy_from_slice(&change[..PAGE_SIZE as usize]);
                 change = &change[PAGE_SIZE as usize..];
             }
+
             let slice = &mut self.get_page_mut(e_pid)[..e_off + 1];
             undo.extend(&*slice);
             slice.copy_from_slice(change);
         }
+
         let plain = &mut self.deltas.borrow_mut().plain;
-        assert!(undo.len() == data.len());
+        assert!(undo.len() == redo.len());
         plain.undo.push(SpaceWrite {
             offset,
             data: undo.into(),
         });
-        plain.redo.push(SpaceWrite { offset, data });
+        plain.redo.push(SpaceWrite { offset, data: redo });
     }
 
     fn id(&self) -> SpaceID {
-        self.prev.id()
+        self.base_space.id()
     }
 }
 

@@ -1048,14 +1048,16 @@ impl WriteBatch {
         if let Some(rev) = revisions.inner.front_mut() {
             rev.merkle
                 .meta
-                .set_prev(new_base.merkle.meta.inner().clone());
+                .set_base_space(new_base.merkle.meta.inner().clone());
             rev.merkle
                 .payload
-                .set_prev(new_base.merkle.payload.inner().clone());
-            rev.blob.meta.set_prev(new_base.blob.meta.inner().clone());
+                .set_base_space(new_base.merkle.payload.inner().clone());
+            rev.blob
+                .meta
+                .set_base_space(new_base.blob.meta.inner().clone());
             rev.blob
                 .payload
-                .set_prev(new_base.blob.payload.inner().clone());
+                .set_base_space(new_base.blob.payload.inner().clone());
         }
         revisions.inner.push_front(new_base);
         while revisions.inner.len() > revisions.max_revisions {

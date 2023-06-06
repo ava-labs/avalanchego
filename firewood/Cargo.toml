@@ -47,6 +47,7 @@ predicates = "3.0.1"
 serial_test = "2.0.0"
 clap = { version = "4.0.29" }
 bencher = "0.1.5"
+tempdir = "0.3.7"
 
 [features]
 # proof API
