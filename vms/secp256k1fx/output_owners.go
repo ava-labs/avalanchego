@@ -22,7 +22,6 @@ var (
 	ErrOutputUnoptimized    = errors.New("output representation should be optimized")
 	ErrAddrsNotSortedUnique = errors.New("addresses not sorted and unique")
 	ErrMarshal              = errors.New("cannot marshal without ctx")
-	ErrNotState             = errors.New("not state")
 )
 
 type OutputOwners struct {
