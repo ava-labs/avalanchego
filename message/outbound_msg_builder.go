@@ -82,7 +82,7 @@ type OutboundMsgBuilder interface {
 	AcceptedFrontier(
 		chainID ids.ID,
 		requestID uint32,
-		containerIDs []ids.ID,
+		containerID ids.ID,
 	) (OutboundMessage, error)
 
 	GetAccepted(
@@ -147,8 +147,8 @@ type OutboundMsgBuilder interface {
 	Chits(
 		chainID ids.ID,
 		requestID uint32,
-		preferredContainerIDs []ids.ID,
-		acceptedContainerIDs []ids.ID,
+		preferredID ids.ID,
+		acceptedID ids.ID,
 	) (OutboundMessage, error)
 
 	AppRequest(
@@ -400,17 +400,15 @@ func (b *outMsgBuilder) GetAcceptedFrontier(
 func (b *outMsgBuilder) AcceptedFrontier(
 	chainID ids.ID,
 	requestID uint32,
-	containerIDs []ids.ID,
+	containerID ids.ID,
 ) (OutboundMessage, error) {
-	containerIDBytes := make([][]byte, len(containerIDs))
-	encodeIDs(containerIDs, containerIDBytes)
 	return b.builder.createOutbound(
 		&p2p.Message{
 			Message: &p2p.Message_AcceptedFrontier_{
 				AcceptedFrontier_: &p2p.AcceptedFrontier{
-					ChainId:      chainID[:],
-					RequestId:    requestID,
-					ContainerIds: containerIDBytes,
+					ChainId:     chainID[:],
+					RequestId:   requestID,
+					ContainerId: containerID[:],
 				},
 			},
 		},
@@ -608,21 +606,17 @@ func (b *outMsgBuilder) PullQuery(
 func (b *outMsgBuilder) Chits(
 	chainID ids.ID,
 	requestID uint32,
-	preferredContainerIDs []ids.ID,
-	acceptedContainerIDs []ids.ID,
+	preferredID ids.ID,
+	acceptedID ids.ID,
 ) (OutboundMessage, error) {
-	preferredContainerIDBytes := make([][]byte, len(preferredContainerIDs))
-	encodeIDs(preferredContainerIDs, preferredContainerIDBytes)
-	acceptedContainerIDBytes := make([][]byte, len(acceptedContainerIDs))
-	encodeIDs(acceptedContainerIDs, acceptedContainerIDBytes)
 	return b.builder.createOutbound(
 		&p2p.Message{
 			Message: &p2p.Message_Chits{
 				Chits: &p2p.Chits{
-					ChainId:               chainID[:],
-					RequestId:             requestID,
-					PreferredContainerIds: preferredContainerIDBytes,
-					AcceptedContainerIds:  acceptedContainerIDBytes,
+					ChainId:     chainID[:],
+					RequestId:   requestID,
+					PreferredId: preferredID[:],
+					AcceptedId:  acceptedID[:],
 				},
 			},
 		},

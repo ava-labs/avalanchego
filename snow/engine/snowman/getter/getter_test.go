@@ -82,6 +82,8 @@ func testSetup(
 }
 
 func TestAcceptedFrontier(t *testing.T) {
+	require := require.New(t)
+
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -102,32 +104,22 @@ func TestAcceptedFrontier(t *testing.T) {
 		return blkID, nil
 	}
 	vm.GetBlockF = func(_ context.Context, bID ids.ID) (snowman.Block, error) {
-		require.Equal(t, blkID, bID)
+		require.Equal(blkID, bID)
 		return dummyBlk, nil
 	}
 
 	bsIntf, err := New(vm, config)
-	if err != nil {
-		t.Fatal(err)
-	}
-	require.IsType(t, &getter{}, bsIntf)
+	require.NoError(err)
+	require.IsType(&getter{}, bsIntf)
 	bs := bsIntf.(*getter)
 
-	var accepted []ids.ID
-	sender.SendAcceptedFrontierF = func(_ context.Context, _ ids.NodeID, _ uint32, frontier []ids.ID) {
-		accepted = frontier
+	var accepted ids.ID
+	sender.SendAcceptedFrontierF = func(_ context.Context, _ ids.NodeID, _ uint32, containerID ids.ID) {
+		accepted = containerID
 	}
 
-	if err := bs.GetAcceptedFrontier(context.Background(), ids.EmptyNodeID, 0); err != nil {
-		t.Fatal(err)
-	}
-
-	if len(accepted) != 1 {
-		t.Fatalf("Only one block should be accepted")
-	}
-	if accepted[0] != blkID {
-		t.Fatalf("Blk should be accepted")
-	}
+	require.NoError(bs.GetAcceptedFrontier(context.Background(), ids.EmptyNodeID, 0))
+	require.Equal(blkID, accepted)
 }
 
 func TestFilterAccepted(t *testing.T) {
