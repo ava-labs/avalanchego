@@ -71,11 +71,16 @@ func (c *onEvictCache[K, V]) Flush() error {
 		c.lock.Unlock()
 	}()
 
+	// Note that we can't use [c.fifo]'s iterator because [c.onEviction]
+	// modifies [c.fifo], which violates the iterator's invariant.
 	var errs wrappers.Errs
-	iter := c.fifo.NewIterator()
-	for iter.Next() {
-		errs.Add(c.onEviction(iter.Value()))
-	}
+	for {
+		_, node, exists := c.removeOldest()
+		if !exists {
+			// The cache is empty.
+			return errs.Err
+		}
 
-	return errs.Err
+		errs.Add(c.onEviction(node))
+	}
 }
