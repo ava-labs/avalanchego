@@ -94,16 +94,14 @@ func WeightedInitializeOverflowTest(t *testing.T, s Weighted) {
 }
 
 func WeightedOutOfRangeTest(t *testing.T, s Weighted) {
-	err := s.Initialize([]uint64{1})
-	require.NoError(t, err)
+	require.NoError(t, s.Initialize([]uint64{1}))
 
-	_, err = s.Sample(1)
+	_, err := s.Sample(1)
 	require.ErrorIs(t, err, ErrOutOfRange)
 }
 
 func WeightedSingletonTest(t *testing.T, s Weighted) {
-	err := s.Initialize([]uint64{1})
-	require.NoError(t, err)
+	require.NoError(t, s.Initialize([]uint64{1}))
 
 	index, err := s.Sample(0)
 	require.NoError(t, err)
@@ -111,8 +109,7 @@ func WeightedSingletonTest(t *testing.T, s Weighted) {
 }
 
 func WeightedWithZeroTest(t *testing.T, s Weighted) {
-	err := s.Initialize([]uint64{0, 1})
-	require.NoError(t, err)
+	require.NoError(t, s.Initialize([]uint64{0, 1}))
 
 	index, err := s.Sample(0)
 	require.NoError(t, err)
@@ -120,8 +117,7 @@ func WeightedWithZeroTest(t *testing.T, s Weighted) {
 }
 
 func WeightedDistributionTest(t *testing.T, s Weighted) {
-	err := s.Initialize([]uint64{1, 1, 2, 3, 4})
-	require.NoError(t, err)
+	require.NoError(t, s.Initialize([]uint64{1, 1, 2, 3, 4}))
 
 	counts := make([]int, 5)
 	for i := uint64(0); i < 11; i++ {
