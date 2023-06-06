@@ -55,7 +55,7 @@ const (
 	startSubnetValidator   = "subnet-validator\n"
 )
 
-var errZeroLenghtEventsList = errors.New("unexpected zero length for events")
+var errEmptyEventsList = errors.New("empty events list")
 
 func TestGetValidatorsSetProperty(t *testing.T) {
 	properties := gopter.NewProperties(nil)
@@ -163,10 +163,10 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 				for subnet, validatorsSet := range subnetSets {
 					res, err := vm.GetValidatorSet(context.Background(), height, subnet)
 					if err != nil {
-						return fmt.Sprintf("failed GetValidatorSet, %v", err)
+						return fmt.Sprintf("failed GetValidatorSet, %s", err.Error())
 					}
 					if !reflect.DeepEqual(validatorsSet, res) {
-						return fmt.Sprintf("failed validators set comparison, %v", err)
+						return fmt.Sprintf("failed validators set comparison, %s", err.Error())
 					}
 				}
 			}
@@ -216,7 +216,7 @@ func takeValidatorsSnapshotAtCurrentHeight(vm *VM, validatorsSetByHeightAndSubne
 		}
 
 		blsKey := v.PublicKey
-		if v.SubnetID != constants.PlatformChainID {
+		if v.SubnetID != constants.PrimaryNetworkID {
 			// pick bls key from primary validator
 			s, err := vm.state.GetCurrentValidator(constants.PlatformChainID, v.NodeID)
 			if err != nil {
@@ -262,7 +262,7 @@ func addPrimaryValidatorWithBLSKey(vm *VM, data *state.Staker) (*state.Staker, e
 		addr, // change Addresss
 	)
 	if err != nil {
-		return nil, fmt.Errorf("could not create inputs/ourputs for permissionless validator, %w", err)
+		return nil, fmt.Errorf("could not create inputs/outputs for permissionless validator, %w", err)
 	}
 	sk, err := bls.NewSecretKey()
 	if err != nil {
@@ -332,21 +332,21 @@ func addPrimaryValidatorWithoutBLSKey(vm *VM, data *state.Staker) (*state.Staker
 func internalAddValidator(vm *VM, signedTx *txs.Tx) (*state.Staker, error) {
 	stakerTx := signedTx.Unsigned.(txs.StakerTx)
 	if err := vm.Builder.AddUnverifiedTx(signedTx); err != nil {
-		return nil, fmt.Errorf("could not add tx to mempool, %s", err.Error())
+		return nil, fmt.Errorf("could not add tx to mempool, %w", err)
 	}
 
 	blk, err := vm.Builder.BuildBlock(context.Background())
 	if err != nil {
-		return nil, fmt.Errorf("failed building block, %s", err.Error())
+		return nil, fmt.Errorf("failed building block, %w", err)
 	}
 	if err := blk.Verify(context.Background()); err != nil {
-		return nil, fmt.Errorf("failed verifying block, %s", err.Error())
+		return nil, fmt.Errorf("failed verifying block, %w", err)
 	}
 	if err := blk.Accept(context.Background()); err != nil {
-		return nil, fmt.Errorf("failed accepting block, %s", err.Error())
+		return nil, fmt.Errorf("failed accepting block, %w", err)
 	}
 	if err := vm.SetPreference(context.Background(), vm.manager.LastAccepted()); err != nil {
-		return nil, fmt.Errorf("failed setting preference, %s", err.Error())
+		return nil, fmt.Errorf("failed setting preference, %w", err)
 	}
 
 	// move time ahead, promoting the validator to current
@@ -356,16 +356,16 @@ func internalAddValidator(vm *VM, signedTx *txs.Tx) (*state.Staker, error) {
 
 	blk, err = vm.Builder.BuildBlock(context.Background())
 	if err != nil {
-		return nil, fmt.Errorf("failed building block, %s", err.Error())
+		return nil, fmt.Errorf("failed building block, %w", err)
 	}
 	if err := blk.Verify(context.Background()); err != nil {
-		return nil, fmt.Errorf("failed verifying block, %s", err.Error())
+		return nil, fmt.Errorf("failed verifying block, %w", err)
 	}
 	if err := blk.Accept(context.Background()); err != nil {
-		return nil, fmt.Errorf("failed accepting block, %s", err.Error())
+		return nil, fmt.Errorf("failed accepting block, %w", err)
 	}
 	if err := vm.SetPreference(context.Background(), vm.manager.LastAccepted()); err != nil {
-		return nil, fmt.Errorf("failed setting preference, %s", err.Error())
+		return nil, fmt.Errorf("failed setting preference, %w", err)
 	}
 
 	return vm.state.GetCurrentValidator(stakerTx.SubnetID(), stakerTx.NodeID())
@@ -378,16 +378,16 @@ func terminateSubnetValidator(vm *VM, validator *state.Staker) error {
 
 	blk, err := vm.Builder.BuildBlock(context.Background())
 	if err != nil {
-		return fmt.Errorf("failed building block, %s", err.Error())
+		return fmt.Errorf("failed building block, %w", err)
 	}
 	if err := blk.Verify(context.Background()); err != nil {
-		return fmt.Errorf("failed verifying block, %s", err.Error())
+		return fmt.Errorf("failed verifying block, %w", err)
 	}
 	if err := blk.Accept(context.Background()); err != nil {
-		return fmt.Errorf("failed accepting block, %s", err.Error())
+		return fmt.Errorf("failed accepting block, %w", err)
 	}
 	if err := vm.SetPreference(context.Background(), vm.manager.LastAccepted()); err != nil {
-		return fmt.Errorf("failed setting preference, %s", err.Error())
+		return fmt.Errorf("failed setting preference, %w", err)
 	}
 
 	return nil
@@ -400,36 +400,36 @@ func terminatePrimaryValidator(vm *VM, validator *state.Staker) error {
 
 	blk, err := vm.Builder.BuildBlock(context.Background())
 	if err != nil {
-		return fmt.Errorf("failed building block, %s", err.Error())
+		return fmt.Errorf("failed building block, %w", err)
 	}
 	if err := blk.Verify(context.Background()); err != nil {
-		return fmt.Errorf("failed verifying block, %s", err.Error())
+		return fmt.Errorf("failed verifying block, %w", err)
 	}
 
 	proposalBlk := blk.(snowman.OracleBlock)
 	options, err := proposalBlk.Options(context.Background())
 	if err != nil {
-		return fmt.Errorf("failed retrieving options, %s", err.Error())
+		return fmt.Errorf("failed retrieving options, %w", err)
 	}
 
 	commit := options[0].(*blockexecutor.Block)
 	_, ok := commit.Block.(*blocks.BanffCommitBlock)
 	if !ok {
-		return fmt.Errorf("failed retrieving commit option, %s", err.Error())
+		return fmt.Errorf("failed retrieving commit option, %w", err)
 	}
 	if err := blk.Accept(context.Background()); err != nil {
-		return fmt.Errorf("failed accepting block, %s", err.Error())
+		return fmt.Errorf("failed accepting block, %w", err)
 	}
 
 	if err := commit.Verify(context.Background()); err != nil {
-		return fmt.Errorf("failed verifying commit block, %s", err.Error())
+		return fmt.Errorf("failed verifying commit block, %w", err)
 	}
 	if err := commit.Accept(context.Background()); err != nil {
-		return fmt.Errorf("failed accepting commit block, %s", err.Error())
+		return fmt.Errorf("failed accepting commit block, %w", err)
 	}
 
 	if err := vm.SetPreference(context.Background(), vm.manager.LastAccepted()); err != nil {
-		return fmt.Errorf("failed setting preference, %s", err.Error())
+		return fmt.Errorf("failed setting preference, %w", err)
 	}
 
 	return nil
@@ -537,7 +537,7 @@ func TestTimestampListGenerator(t *testing.T) {
 			}
 
 			if len(validatorsTimes) == 0 {
-				return errZeroLenghtEventsList.Error()
+				return errEmptyEventsList.Error()
 			}
 
 			// nil out non subnet validators
@@ -590,7 +590,7 @@ func TestTimestampListGenerator(t *testing.T) {
 			}
 
 			if len(validatorsTimes) == 0 {
-				return errZeroLenghtEventsList.Error()
+				return errEmptyEventsList.Error()
 			}
 
 			// nil out non subnet validators
@@ -643,7 +643,7 @@ func TestTimestampListGenerator(t *testing.T) {
 			}
 
 			if len(validatorsTimes) == 0 {
-				return errZeroLenghtEventsList.Error()
+				return errEmptyEventsList.Error()
 			}
 
 			currentPrimaryValidator := validatorsTimes[0]
