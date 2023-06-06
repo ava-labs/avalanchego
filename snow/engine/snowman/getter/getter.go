@@ -131,7 +131,7 @@ func (gh *getter) GetAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, re
 	if err != nil {
 		return err
 	}
-	gh.sender.SendAcceptedFrontier(ctx, nodeID, requestID, []ids.ID{lastAccepted})
+	gh.sender.SendAcceptedFrontier(ctx, nodeID, requestID, lastAccepted)
 	return nil
 }
 

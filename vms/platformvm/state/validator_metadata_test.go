@@ -218,7 +218,7 @@ func TestParseValidatorMetadata(t *testing.T) {
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x86, 0xA0,
 			},
 			expected: &validatorMetadata{
-				UpDuration:      time.Duration(6000000),
+				UpDuration:      6000000,
 				LastUpdated:     900000,
 				PotentialReward: 100000,
 				lastUpdated:     time.Unix(900000, 0),
@@ -240,7 +240,7 @@ func TestParseValidatorMetadata(t *testing.T) {
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x4E, 0x20,
 			},
 			expected: &validatorMetadata{
-				UpDuration:               time.Duration(6000000),
+				UpDuration:               6000000,
 				LastUpdated:              900000,
 				PotentialReward:          100000,
 				PotentialDelegateeReward: 20000,

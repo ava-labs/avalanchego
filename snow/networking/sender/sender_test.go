@@ -999,7 +999,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 				msgCreator.EXPECT().AcceptedFrontier(
 					chainID,
 					requestID,
-					summaryIDs,
+					summaryIDs[0],
 				).Return(nil, nil) // Don't care about the message
 			},
 			assertMsgToMyself: func(require *require.Assertions, msg message.InboundMessage) {
@@ -1007,9 +1007,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 				innerMsg := msg.Message().(*p2p.AcceptedFrontier)
 				require.Equal(chainID[:], innerMsg.ChainId)
 				require.Equal(requestID, innerMsg.RequestId)
-				for i, summaryID := range summaryIDs {
-					require.Equal(summaryID[:], innerMsg.ContainerIds[i])
-				}
+				require.Equal(summaryIDs[0][:], innerMsg.ContainerId)
 			},
 			setExternalSenderExpect: func(externalSender *MockExternalSender) {
 				externalSender.EXPECT().Send(
@@ -1020,7 +1018,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 				).Return(nil)
 			},
 			sendF: func(_ *require.Assertions, sender common.Sender, nodeID ids.NodeID) {
-				sender.SendAcceptedFrontier(context.Background(), nodeID, requestID, summaryIDs)
+				sender.SendAcceptedFrontier(context.Background(), nodeID, requestID, summaryIDs[0])
 			},
 		},
 		{

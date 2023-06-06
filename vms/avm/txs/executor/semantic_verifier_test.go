@@ -11,12 +11,17 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/avm/states"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
@@ -872,4 +877,268 @@ func TestSemanticVerifierExportTxDifferentSubnet(t *testing.T) {
 		Tx:      tx,
 	})
 	require.ErrorIs(err, verify.ErrMismatchedSubnetIDs)
+}
+
+func TestSemanticVerifierImportTx(t *testing.T) {
+	ctx := newContext(t)
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	validatorState := validators.NewMockState(ctrl)
+	validatorState.EXPECT().GetSubnetID(gomock.Any(), ctx.CChainID).AnyTimes().Return(ctx.SubnetID, nil)
+	ctx.ValidatorState = validatorState
+
+	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
+	m := atomic.NewMemory(prefixdb.New([]byte{0}, baseDBManager.Current().Database))
+	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
+
+	typeToFxIndex := make(map[reflect.Type]int)
+	fx := &secp256k1fx.Fx{}
+	parser, err := txs.NewCustomParser(
+		typeToFxIndex,
+		new(mockable.Clock),
+		logging.NoWarn{},
+		[]fxs.Fx{
+			fx,
+		},
+	)
+	require.NoError(t, err)
+
+	codec := parser.Codec()
+	utxoID := avax.UTXOID{
+		TxID:        ids.GenerateTestID(),
+		OutputIndex: 2,
+	}
+
+	asset := avax.Asset{
+		ID: ids.GenerateTestID(),
+	}
+	outputOwners := secp256k1fx.OutputOwners{
+		Threshold: 1,
+		Addrs: []ids.ShortID{
+			keys[0].Address(),
+		},
+	}
+	baseTx := txs.BaseTx{
+		BaseTx: avax.BaseTx{
+			NetworkID:    constants.UnitTestID,
+			BlockchainID: ctx.ChainID,
+			Outs: []*avax.TransferableOutput{{
+				Asset: asset,
+				Out: &secp256k1fx.TransferOutput{
+					Amt:          1000,
+					OutputOwners: outputOwners,
+				},
+			}},
+		},
+	}
+	input := avax.TransferableInput{
+		UTXOID: utxoID,
+		Asset:  asset,
+		In: &secp256k1fx.TransferInput{
+			Amt: 12345,
+			Input: secp256k1fx.Input{
+				SigIndices: []uint32{0},
+			},
+		},
+	}
+	unsignedImportTx := txs.ImportTx{
+		BaseTx:      baseTx,
+		SourceChain: ctx.CChainID,
+		ImportedIns: []*avax.TransferableInput{
+			&input,
+		},
+	}
+	importTx := &txs.Tx{
+		Unsigned: &unsignedImportTx,
+	}
+	require.NoError(t, importTx.SignSECP256K1Fx(
+		codec,
+		[][]*secp256k1.PrivateKey{
+			{keys[0]},
+		},
+	))
+
+	backend := &Backend{
+		Ctx:    ctx,
+		Config: &feeConfig,
+		Fxs: []*fxs.ParsedFx{
+			{
+				ID: secp256k1fx.ID,
+				Fx: fx,
+			},
+		},
+		TypeToFxIndex: typeToFxIndex,
+		Codec:         codec,
+		FeeAssetID:    ids.GenerateTestID(),
+		Bootstrapped:  true,
+	}
+	require.NoError(t, fx.Bootstrapped())
+
+	output := secp256k1fx.TransferOutput{
+		Amt:          12345,
+		OutputOwners: outputOwners,
+	}
+	utxo := avax.UTXO{
+		UTXOID: utxoID,
+		Asset:  asset,
+		Out:    &output,
+	}
+	utxoBytes, err := codec.Marshal(txs.CodecVersion, utxo)
+	require.NoError(t, err)
+
+	peerSharedMemory := m.NewSharedMemory(ctx.CChainID)
+	inputID := utxo.InputID()
+	require.NoError(t, peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{ctx.ChainID: {PutRequests: []*atomic.Element{{
+		Key:   inputID[:],
+		Value: utxoBytes,
+		Traits: [][]byte{
+			keys[0].PublicKey().Address().Bytes(),
+		},
+	}}}}))
+
+	unsignedCreateAssetTx := txs.CreateAssetTx{
+		States: []*txs.InitialState{{
+			FxIndex: 0,
+		}},
+	}
+	createAssetTx := txs.Tx{
+		Unsigned: &unsignedCreateAssetTx,
+	}
+	tests := []struct {
+		name        string
+		stateFunc   func(*gomock.Controller) states.Chain
+		txFunc      func(*require.Assertions) *txs.Tx
+		expectedErr error
+	}{
+		{
+			name: "valid",
+			stateFunc: func(ctrl *gomock.Controller) states.Chain {
+				state := states.NewMockChain(ctrl)
+				state.EXPECT().GetUTXOFromID(&utxoID).Return(&utxo, nil).AnyTimes()
+				state.EXPECT().GetTx(asset.ID).Return(&createAssetTx, nil).AnyTimes()
+				return state
+			},
+			txFunc: func(*require.Assertions) *txs.Tx {
+				return importTx
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "not allowed input feature extension",
+			stateFunc: func(ctrl *gomock.Controller) states.Chain {
+				state := states.NewMockChain(ctrl)
+				unsignedCreateAssetTx := unsignedCreateAssetTx
+				unsignedCreateAssetTx.States = nil
+				createAssetTx := txs.Tx{
+					Unsigned: &unsignedCreateAssetTx,
+				}
+				state.EXPECT().GetUTXOFromID(&utxoID).Return(&utxo, nil).AnyTimes()
+				state.EXPECT().GetTx(asset.ID).Return(&createAssetTx, nil).AnyTimes()
+				return state
+			},
+			txFunc: func(*require.Assertions) *txs.Tx {
+				return importTx
+			},
+			expectedErr: errIncompatibleFx,
+		},
+		{
+			name: "invalid signature",
+			stateFunc: func(ctrl *gomock.Controller) states.Chain {
+				state := states.NewMockChain(ctrl)
+				state.EXPECT().GetUTXOFromID(&utxoID).Return(&utxo, nil).AnyTimes()
+				state.EXPECT().GetTx(asset.ID).Return(&createAssetTx, nil).AnyTimes()
+				return state
+			},
+			txFunc: func(require *require.Assertions) *txs.Tx {
+				tx := &txs.Tx{
+					Unsigned: &unsignedImportTx,
+				}
+				require.NoError(tx.SignSECP256K1Fx(
+					codec,
+					[][]*secp256k1.PrivateKey{
+						{keys[1]},
+					},
+				))
+				return tx
+			},
+			expectedErr: secp256k1fx.ErrWrongSig,
+		},
+		{
+			name: "not allowed output feature extension",
+			stateFunc: func(ctrl *gomock.Controller) states.Chain {
+				state := states.NewMockChain(ctrl)
+				unsignedCreateAssetTx := unsignedCreateAssetTx
+				unsignedCreateAssetTx.States = nil
+				createAssetTx := txs.Tx{
+					Unsigned: &unsignedCreateAssetTx,
+				}
+				state.EXPECT().GetTx(asset.ID).Return(&createAssetTx, nil).AnyTimes()
+				return state
+			},
+			txFunc: func(require *require.Assertions) *txs.Tx {
+				importTx := unsignedImportTx
+				importTx.Ins = nil
+				importTx.ImportedIns = []*avax.TransferableInput{
+					&input,
+				}
+				tx := &txs.Tx{
+					Unsigned: &importTx,
+				}
+				require.NoError(tx.SignSECP256K1Fx(
+					codec,
+					nil,
+				))
+				return tx
+			},
+			expectedErr: errIncompatibleFx,
+		},
+		{
+			name: "unknown asset",
+			stateFunc: func(ctrl *gomock.Controller) states.Chain {
+				state := states.NewMockChain(ctrl)
+				state.EXPECT().GetUTXOFromID(&utxoID).Return(&utxo, nil).AnyTimes()
+				state.EXPECT().GetTx(asset.ID).Return(nil, database.ErrNotFound)
+				return state
+			},
+			txFunc: func(*require.Assertions) *txs.Tx {
+				return importTx
+			},
+			expectedErr: database.ErrNotFound,
+		},
+		{
+			name: "not an asset",
+			stateFunc: func(ctrl *gomock.Controller) states.Chain {
+				state := states.NewMockChain(ctrl)
+				tx := txs.Tx{
+					Unsigned: &baseTx,
+				}
+				state.EXPECT().GetUTXOFromID(&utxoID).Return(&utxo, nil).AnyTimes()
+				state.EXPECT().GetTx(asset.ID).Return(&tx, nil)
+				return state
+			},
+			txFunc: func(*require.Assertions) *txs.Tx {
+				return importTx
+			},
+			expectedErr: errNotAnAsset,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			state := test.stateFunc(ctrl)
+			tx := test.txFunc(require)
+			err := tx.Unsigned.Visit(&SemanticVerifier{
+				Backend: backend,
+				State:   state,
+				Tx:      tx,
+			})
+			require.ErrorIs(err, test.expectedErr)
+		})
+	}
 }

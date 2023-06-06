@@ -80,7 +80,7 @@ func NewCommonBootstrapper(config Config) Bootstrapper {
 	}
 }
 
-func (b *bootstrapper) AcceptedFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
+func (b *bootstrapper) AcceptedFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) error {
 	// ignores any late responses
 	if requestID != b.Config.SharedCfg.RequestID {
 		b.Ctx.Log.Debug("received out-of-sync AcceptedFrontier message",
@@ -98,12 +98,39 @@ func (b *bootstrapper) AcceptedFrontier(ctx context.Context, nodeID ids.NodeID, 
 		return nil
 	}
 
-	// Mark that we received a response from [nodeID]
-	b.pendingReceiveAcceptedFrontier.Remove(nodeID)
-
 	// Union the reported accepted frontier from [nodeID] with the accepted
 	// frontier we got from others
-	b.acceptedFrontierSet.Add(containerIDs...)
+	b.acceptedFrontierSet.Add(containerID)
+	return b.markAcceptedFrontierReceived(ctx, nodeID)
+}
+
+func (b *bootstrapper) GetAcceptedFrontierFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
+	// ignores any late responses
+	if requestID != b.Config.SharedCfg.RequestID {
+		b.Ctx.Log.Debug("received out-of-sync GetAcceptedFrontierFailed message",
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint32("expectedRequestID", b.Config.SharedCfg.RequestID),
+			zap.Uint32("requestID", requestID),
+		)
+		return nil
+	}
+
+	if !b.pendingReceiveAcceptedFrontier.Contains(nodeID) {
+		b.Ctx.Log.Debug("received unexpected GetAcceptedFrontierFailed message",
+			zap.Stringer("nodeID", nodeID),
+		)
+		return nil
+	}
+
+	// If we can't get a response from [nodeID], act as though they said their
+	// accepted frontier is empty and we add the validator to the failed list
+	b.failedAcceptedFrontier.Add(nodeID)
+	return b.markAcceptedFrontierReceived(ctx, nodeID)
+}
+
+func (b *bootstrapper) markAcceptedFrontierReceived(ctx context.Context, nodeID ids.NodeID) error {
+	// Mark that we received a response from [nodeID]
+	b.pendingReceiveAcceptedFrontier.Remove(nodeID)
 
 	b.sendGetAcceptedFrontiers(ctx)
 
@@ -148,23 +175,6 @@ func (b *bootstrapper) AcceptedFrontier(ctx context.Context, nodeID ids.NodeID, 
 
 	b.sendGetAccepted(ctx)
 	return nil
-}
-
-func (b *bootstrapper) GetAcceptedFrontierFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
-	// ignores any late responses
-	if requestID != b.Config.SharedCfg.RequestID {
-		b.Ctx.Log.Debug("received out-of-sync GetAcceptedFrontierFailed message",
-			zap.Stringer("nodeID", nodeID),
-			zap.Uint32("expectedRequestID", b.Config.SharedCfg.RequestID),
-			zap.Uint32("requestID", requestID),
-		)
-		return nil
-	}
-
-	// If we can't get a response from [nodeID], act as though they said their
-	// accepted frontier is empty and we add the validator to the failed list
-	b.failedAcceptedFrontier.Add(nodeID)
-	return b.AcceptedFrontier(ctx, nodeID, requestID, nil)
 }
 
 func (b *bootstrapper) Accepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) error {
