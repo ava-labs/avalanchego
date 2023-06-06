@@ -5,18 +5,18 @@ package avax
 
 import "github.com/ava-labs/avalanchego/snow"
 
-type TestVerifiable struct{ Err error }
+type TestState struct{ Err error }
 
-func (*TestVerifiable) InitCtx(*snow.Context) {}
+func (*TestState) InitCtx(*snow.Context) {}
 
-func (v *TestVerifiable) Verify() error {
+func (v *TestState) Verify() error {
 	return v.Err
 }
 
-func (*TestVerifiable) IsState() {}
+func (*TestState) IsState() {}
 
 type TestTransferable struct {
-	TestVerifiable
+	TestState
 
 	Val uint64 `serialize:"true"`
 }
