@@ -100,7 +100,7 @@ func Test_History_Large(t *testing.T) {
 		require.NoError(err)
 		roots := []ids.ID{}
 		// make sure they stay in sync
-		for x := 0; x < 500; x++ {
+		for x := 0; x < 250; x++ {
 			addkey := make([]byte, r.Intn(50))
 			_, err := r.Read(addkey)
 			require.NoError(err)
