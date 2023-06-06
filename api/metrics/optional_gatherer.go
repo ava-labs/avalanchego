@@ -5,6 +5,7 @@ package metrics
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -54,7 +55,7 @@ func (g *optionalGatherer) Register(gatherer prometheus.Gatherer) error {
 	defer g.lock.Unlock()
 
 	if g.gatherer != nil {
-		return errDuplicatedRegister
+		return fmt.Errorf("err: %w, gatherer: %#v", errDuplicatedRegister, g.gatherer)
 	}
 	g.gatherer = gatherer
 	return nil
