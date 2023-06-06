@@ -385,25 +385,17 @@ func sendChangeRequest(
 func TestGetChangeProof(t *testing.T) {
 	r := rand.New(rand.NewSource(1)) // #nosec G404
 
-	trieDBConfig := newDefaultDBConfig()
-	trieDBConfig.HistoryLength = defaultRequestKeyLimit
-	trieDBConfig.NodeCacheSize = defaultRequestKeyLimit
-
 	trieDB, err := merkledb.New(
 		context.Background(),
 		memdb.New(),
-		trieDBConfig,
+		newDefaultDBConfig(),
 	)
 	require.NoError(t, err)
-
-	verificationDBConfig := newDefaultDBConfig()
-	verificationDBConfig.HistoryLength = defaultRequestKeyLimit
-	verificationDBConfig.NodeCacheSize = defaultRequestKeyLimit
 
 	verificationDB, err := merkledb.New(
 		context.Background(),
 		memdb.New(),
-		verificationDBConfig,
+		newDefaultDBConfig(),
 	)
 	require.NoError(t, err)
 	startRoot, err := trieDB.GetMerkleRoot(context.Background())
