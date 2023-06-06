@@ -50,9 +50,9 @@ import (
 )
 
 const (
-	startPrimaryWithBLS    = "primary-validator-with-BLS-key\n"
-	startPrimaryWithoutBLS = "primary-validator-without-BLS-key\n"
-	startSubnetValidator   = "subnet-validator\n"
+	startPrimaryWithBLS    uint8 = 0
+	startPrimaryWithoutBLS uint8 = 1
+	startSubnetValidator   uint8 = 2
 )
 
 var errEmptyEventsList = errors.New("empty events list")
@@ -70,7 +70,7 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 	// properties := gopter.NewProperties(parameters)
 
 	properties.Property("check GetValidatorSet", prop.ForAll(
-		func(events []string) string {
+		func(events []uint8) string {
 			vm, subnetID, err := buildVM()
 			if err != nil {
 				return fmt.Sprintf("failed building vm, %s", err.Error())
@@ -196,7 +196,7 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 			startPrimaryWithoutBLS,
 			startSubnetValidator,
 		)).SuchThat(func(v interface{}) bool {
-			list := v.([]string)
+			list := v.([]uint8)
 			return len(list) > 0 && (list[0] == startPrimaryWithBLS || list[0] == startPrimaryWithoutBLS)
 		}),
 	),
@@ -455,7 +455,7 @@ func terminatePrimaryValidator(vm *VM, validator *state.Staker) error {
 }
 
 type validatorInputData struct {
-	eventType string
+	eventType uint8
 	startTime time.Time
 	endTime   time.Time
 	nodeID    ids.NodeID
@@ -465,7 +465,7 @@ type validatorInputData struct {
 // buildTimestampsList creates validators start and end time, given the event list.
 // output is returned as a list of state.Stakers, just because it's a convenient object to
 // collect all relevant information.
-func buildTimestampsList(events []string, currentTime time.Time, nodeID ids.NodeID) ([]*validatorInputData, error) {
+func buildTimestampsList(events []uint8, currentTime time.Time, nodeID ids.NodeID) ([]*validatorInputData, error) {
 	res := make([]*validatorInputData, 0, len(events))
 
 	currentTime = currentTime.Add(executor.SyncBound)
@@ -492,7 +492,7 @@ func buildTimestampsList(events []string, currentTime time.Time, nodeID ids.Node
 			publicKey: nil,
 		})
 	default:
-		return nil, fmt.Errorf("unexpected initial event %s", events[0])
+		return nil, fmt.Errorf("unexpected initial event %d", events[0])
 	}
 
 	// track current primary validator to make sure its staking period
@@ -554,7 +554,7 @@ func TestTimestampListGenerator(t *testing.T) {
 	properties := gopter.NewProperties(nil)
 
 	properties.Property("primary validators are returned in sequence", prop.ForAll(
-		func(events []string) string {
+		func(events []uint8) string {
 			currentTime := time.Now()
 			nodeID := ids.GenerateTestNodeID()
 			validatorsTimes, err := buildTimestampsList(events, currentTime, nodeID)
@@ -600,14 +600,14 @@ func TestTimestampListGenerator(t *testing.T) {
 			startPrimaryWithoutBLS,
 			startSubnetValidator,
 		)).SuchThat(func(v interface{}) bool {
-			list := v.([]string)
+			list := v.([]uint8)
 			return len(list) > 0 && (list[0] == startPrimaryWithBLS || list[0] == startPrimaryWithoutBLS)
 		}),
 	),
 	)
 
 	properties.Property("subnet validators are returned in sequence", prop.ForAll(
-		func(events []string) string {
+		func(events []uint8) string {
 			currentTime := time.Now()
 			nodeID := ids.GenerateTestNodeID()
 			validatorsTimes, err := buildTimestampsList(events, currentTime, nodeID)
@@ -653,14 +653,14 @@ func TestTimestampListGenerator(t *testing.T) {
 			startPrimaryWithoutBLS,
 			startSubnetValidator,
 		)).SuchThat(func(v interface{}) bool {
-			list := v.([]string)
+			list := v.([]uint8)
 			return len(list) > 0 && (list[0] == startPrimaryWithBLS || list[0] == startPrimaryWithoutBLS)
 		}),
 	),
 	)
 
 	properties.Property("subnet validators' times are bound by a primary validator's times", prop.ForAll(
-		func(events []string) string {
+		func(events []uint8) string {
 			currentTime := time.Now()
 			nodeID := ids.GenerateTestNodeID()
 			validatorsTimes, err := buildTimestampsList(events, currentTime, nodeID)
@@ -692,7 +692,7 @@ func TestTimestampListGenerator(t *testing.T) {
 			startPrimaryWithoutBLS,
 			startSubnetValidator,
 		)).SuchThat(func(v interface{}) bool {
-			list := v.([]string)
+			list := v.([]uint8)
 			return len(list) > 0 && (list[0] == startPrimaryWithBLS || list[0] == startPrimaryWithoutBLS)
 		}),
 	),

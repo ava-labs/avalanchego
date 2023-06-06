@@ -165,6 +165,8 @@ func (m *manager) GetValidatorSet(ctx context.Context, height uint64, subnetID i
 		}
 	}
 	currentSubnetValidatorList := currentSubnetValidators.List()
+
+	// Node ID --> Information about the node's validating of [subnetID].
 	subnetSet := make(map[ids.NodeID]*validators.GetValidatorOutput, len(currentSubnetValidatorList))
 	for _, vdr := range currentSubnetValidatorList {
 		subnetSet[vdr.NodeID] = &validators.GetValidatorOutput{
@@ -180,6 +182,8 @@ func (m *manager) GetValidatorSet(ctx context.Context, height uint64, subnetID i
 		return nil, ErrMissingValidator
 	}
 	currentPrimaryValidatorList := currentPrimaryNetworkValidators.List()
+
+	// Node ID --> Validator information for the node validating the Primary Network.
 	primarySet := make(map[ids.NodeID]*validators.GetValidatorOutput, len(currentPrimaryValidatorList))
 	for _, vdr := range currentPrimaryValidatorList {
 		primarySet[vdr.NodeID] = &validators.GetValidatorOutput{
@@ -189,8 +193,8 @@ func (m *manager) GetValidatorSet(ctx context.Context, height uint64, subnetID i
 		}
 
 		// fill PK from primary network
-		if _, found := subnetSet[vdr.NodeID]; found {
-			subnetSet[vdr.NodeID].PublicKey = vdr.PublicKey
+		if subnetVdr, found := subnetSet[vdr.NodeID]; found {
+			subnetVdr.PublicKey = vdr.PublicKey
 		}
 	}
 
@@ -211,7 +215,7 @@ func (m *manager) GetValidatorSet(ctx context.Context, height uint64, subnetID i
 }
 
 func (m *manager) applyValidatorDiffs(
-	targetSet, primarySet map[ids.NodeID]*validators.GetValidatorOutput,
+	subnetSet, primarySet map[ids.NodeID]*validators.GetValidatorOutput,
 	subnetID ids.ID,
 	height uint64,
 ) error {
@@ -244,13 +248,13 @@ func (m *manager) applyValidatorDiffs(
 		return err
 	}
 	for nodeID, weightDiff := range targetWeightDiffs {
-		if err := applyWeightDiff(targetSet, nodeID, weightDiff); err != nil {
+		if err := applyWeightDiff(subnetSet, nodeID, weightDiff); err != nil {
 			return err
 		}
 	}
 
 	// rebuild public key of target validators, just peeking in primary validators set
-	for nodeID, vdr := range targetSet {
+	for nodeID, vdr := range subnetSet {
 		if primary, found := primarySet[nodeID]; found {
 			vdr.PublicKey = primary.PublicKey
 		}
