@@ -390,8 +390,6 @@ func terminateSubnetValidator(vm *VM, validator *state.Staker) error {
 		return fmt.Errorf("failed setting preference, %s", err.Error())
 	}
 
-	// _, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
-	// require.ErrorIs(err, database.ErrNotFound)
 	return nil
 }
 
@@ -434,14 +432,9 @@ func terminatePrimaryValidator(vm *VM, validator *state.Staker) error {
 		return fmt.Errorf("failed setting preference, %s", err.Error())
 	}
 
-	// _, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
-	// require.ErrorIs(err, database.ErrNotFound)
 	return nil
 }
 
-// buildTimestampsList creates validators start and end time, given the event list.
-// output is returned as a list of state.Stakers, just because it's a convenient object to
-// collect all relevant information.
 // buildTimestampsList creates validators start and end time, given the event list.
 // output is returned as a list of state.Stakers, just because it's a convenient object to
 // collect all relevant information.
