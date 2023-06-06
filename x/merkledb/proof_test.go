@@ -1550,19 +1550,19 @@ func TestProofProtoMarshalUnmarshal(t *testing.T) {
 	}
 }
 
-func TestProofProtoMarshalUnmarshalNil(t *testing.T) {
+func TestProofProtoUnmarshalNil(t *testing.T) {
 	var proof Proof
 	err := proof.UnmarshalProto(nil)
 	require.ErrorIs(t, err, ErrNilProof)
 }
 
-func TestProofProtoMarshalUnmarshalNilValue(t *testing.T) {
+func TestProofProtoUnmarshalNilValue(t *testing.T) {
 	var proof Proof
 	err := proof.UnmarshalProto(&syncpb.Proof{})
 	require.ErrorIs(t, err, ErrNilValue)
 }
 
-func TestProofProtoMarshalUnmarshalInvalidMaybe(t *testing.T) {
+func TestProofProtoUnmarshalInvalidMaybe(t *testing.T) {
 	var proof Proof
 	err := proof.UnmarshalProto(&syncpb.Proof{
 		Value: &syncpb.MaybeBytes{
