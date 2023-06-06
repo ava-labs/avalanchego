@@ -198,8 +198,15 @@ func (m *manager) GetValidatorSet(ctx context.Context, height uint64, subnetID i
 		}
 	}
 
+	// fully rebuild primary network validators at [height] first
 	for diffHeight := lastAcceptedHeight; diffHeight > height; diffHeight-- {
-		if err := m.applyValidatorDiffs(subnetSet, primarySet, subnetID, diffHeight); err != nil {
+		if err := m.rebuildPrimaryValidatorSet(primarySet, diffHeight); err != nil {
+			return nil, err
+		}
+	}
+
+	for diffHeight := lastAcceptedHeight; diffHeight > height; diffHeight-- {
+		if err := m.rebuildSubnetValidatorSet(subnetSet, primarySet, subnetID, diffHeight); err != nil {
 			return nil, err
 		}
 	}
@@ -214,12 +221,10 @@ func (m *manager) GetValidatorSet(ctx context.Context, height uint64, subnetID i
 	return subnetSet, nil
 }
 
-func (m *manager) applyValidatorDiffs(
-	subnetSet, primarySet map[ids.NodeID]*validators.GetValidatorOutput,
-	subnetID ids.ID,
+func (m *manager) rebuildPrimaryValidatorSet(
+	primarySet map[ids.NodeID]*validators.GetValidatorOutput,
 	height uint64,
 ) error {
-	// fully rebuild primary network validators at [height]
 	primaryWeightDiffs, err := m.state.GetValidatorWeightDiffs(height, constants.PlatformChainID)
 	if err != nil {
 		return err
@@ -241,8 +246,14 @@ func (m *manager) applyValidatorDiffs(
 			vdr.PublicKey = pk
 		}
 	}
+	return nil
+}
 
-	// rebuild weights of target validators
+func (m *manager) rebuildSubnetValidatorSet(
+	subnetSet, primarySet map[ids.NodeID]*validators.GetValidatorOutput,
+	subnetID ids.ID,
+	height uint64,
+) error {
 	targetWeightDiffs, err := m.state.GetValidatorWeightDiffs(height, subnetID)
 	if err != nil {
 		return err
