@@ -2595,43 +2595,6 @@ func (s *Service) GetBlock(_ *http.Request, args *api.GetBlockArgs, response *ap
 	return nil
 }
 
-// GetBlockByHeight returns the block at the given height.
-func (s *Service) GetBlockByHeight(_ *http.Request, args *api.GetBlockByHeightArgs, response *api.GetBlockResponse) error {
-	s.vm.ctx.Log.Debug("API called",
-		zap.String("service", "platform"),
-		zap.String("method", "getBlockByHeight"),
-		zap.Uint64("height", uint64(args.Height)),
-	)
-
-	response.Encoding = args.Encoding
-
-	blockID, err := s.vm.state.GetBlockIDAtHeight(uint64(args.Height))
-	if err != nil {
-		return fmt.Errorf("couldn't get block at height %d: %w", args.Height, err)
-	}
-	block, err := s.vm.manager.GetStatelessBlock(blockID)
-	if err != nil {
-		s.vm.ctx.Log.Error("couldn't get accepted block",
-			zap.Stringer("blkID", blockID),
-			zap.Error(err),
-		)
-		return fmt.Errorf("couldn't get block with id %s: %w", blockID, err)
-	}
-
-	if args.Encoding == formatting.JSON {
-		block.InitCtx(s.vm.ctx)
-		response.Block = block
-		return nil
-	}
-
-	response.Block, err = formatting.Encode(args.Encoding, block.Bytes())
-	if err != nil {
-		return fmt.Errorf("couldn't encode block %s as string: %w", blockID, err)
-	}
-
-	return nil
-}
-
 func (s *Service) getAPIUptime(staker *state.Staker) (*json.Float32, error) {
 	// Only report uptimes that we have been actively tracking.
 	if constants.PrimaryNetworkID != staker.SubnetID && !s.vm.TrackedSubnets.Contains(staker.SubnetID) {
