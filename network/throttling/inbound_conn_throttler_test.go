@@ -56,8 +56,7 @@ func TestInboundConnThrottlerClose(t *testing.T) {
 		},
 	}
 	wrappedL := NewThrottledListener(l, 1)
-	err := wrappedL.Close()
-	require.NoError(err)
+	require.NoError(wrappedL.Close())
 	require.True(closed)
 
 	select {
@@ -67,7 +66,7 @@ func TestInboundConnThrottlerClose(t *testing.T) {
 	}
 
 	// Accept() should return an error because the context is cancelled
-	_, err = wrappedL.Accept()
+	_, err := wrappedL.Accept()
 	require.ErrorIs(err, context.Canceled)
 }
 
