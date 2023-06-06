@@ -60,24 +60,6 @@ func newRandomProofNode(r *rand.Rand) ProofNode {
 	}
 }
 
-func newKeyChanges(r *rand.Rand, num uint) []KeyChange {
-	keyChanges := make([]KeyChange, num)
-	for i := range keyChanges {
-		key := make([]byte, r.Intn(32)) // #nosec G404
-		_, _ = r.Read(key)              // #nosec G404
-		val := make([]byte, r.Intn(32)) // #nosec G404
-		_, _ = r.Read(val)              // #nosec G404
-		if len(val) == 0 {
-			val = nil
-		}
-		keyChanges[i] = KeyChange{
-			Key:   key,
-			Value: Some(val),
-		}
-	}
-	return keyChanges
-}
-
 func nilEmptySlices(dest interface{}) {
 	if dest == nil {
 		return
@@ -134,7 +116,7 @@ func FuzzCodecBool(f *testing.F) {
 		) {
 			require := require.New(t)
 
-			codec := Codec.(*codecImpl)
+			codec := codec.(*codecImpl)
 			reader := bytes.NewReader(b)
 			startLen := reader.Len()
 			got, err := codec.decodeBool(reader)
@@ -162,7 +144,7 @@ func FuzzCodecInt(f *testing.F) {
 		) {
 			require := require.New(t)
 
-			codec := Codec.(*codecImpl)
+			codec := codec.(*codecImpl)
 			reader := bytes.NewReader(b)
 			startLen := reader.Len()
 			got, err := codec.decodeInt(reader)
@@ -190,7 +172,7 @@ func FuzzCodecSerializedPath(f *testing.F) {
 		) {
 			require := require.New(t)
 
-			codec := Codec.(*codecImpl)
+			codec := codec.(*codecImpl)
 			reader := bytes.NewReader(b)
 			startLen := reader.Len()
 			got, err := codec.decodeSerializedPath(reader)
@@ -213,91 +195,6 @@ func FuzzCodecSerializedPath(f *testing.F) {
 	)
 }
 
-func FuzzCodecProofCanonical(f *testing.F) {
-	f.Add(
-		[]byte{
-			// RootID:
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			// Path:
-			// Num proof nodes = 1
-			0x02,
-			// Key Path:
-			// Nibble Length:
-			0x00,
-			// Value:
-			// Has Value = false
-			0x00,
-			// Num Children = 2
-			0x04,
-			// Child 0:
-			// index = 0
-			0x00,
-			// childID:
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			// Child 1:
-			// index = 0 <- should fail
-			0x00,
-			// childID:
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			// Key:
-			// length = 0
-			0x00,
-		},
-	)
-	f.Fuzz(
-		func(
-			t *testing.T,
-			b []byte,
-		) {
-			require := require.New(t)
-
-			codec := Codec.(*codecImpl)
-			proof := &Proof{}
-			got, err := codec.DecodeProof(b, proof)
-			if err != nil {
-				return
-			}
-
-			// Encoding [proof] should be the same as [b].
-			buf, err := codec.EncodeProof(got, proof)
-			require.NoError(err)
-			require.Equal(b, buf)
-		},
-	)
-}
-
-func FuzzCodecChangeProofCanonical(f *testing.F) {
-	f.Fuzz(
-		func(
-			t *testing.T,
-			b []byte,
-		) {
-			require := require.New(t)
-
-			codec := Codec.(*codecImpl)
-			proof := &ChangeProof{}
-			got, err := codec.DecodeChangeProof(b, proof)
-			if err != nil {
-				return
-			}
-
-			// Encoding [proof] should be the same as [b].
-			buf, err := codec.EncodeChangeProof(got, proof)
-			require.NoError(err)
-			require.Equal(b, buf)
-		},
-	)
-}
-
 func FuzzCodecDBNodeCanonical(f *testing.F) {
 	f.Fuzz(
 		func(
@@ -306,7 +203,7 @@ func FuzzCodecDBNodeCanonical(f *testing.F) {
 		) {
 			require := require.New(t)
 
-			codec := Codec.(*codecImpl)
+			codec := codec.(*codecImpl)
 			node := &dbNode{}
 			got, err := codec.decodeDBNode(b, node)
 			if err != nil {
@@ -317,101 +214,6 @@ func FuzzCodecDBNodeCanonical(f *testing.F) {
 			buf, err := codec.encodeDBNode(got, node)
 			require.NoError(err)
 			require.Equal(b, buf)
-		},
-	)
-}
-
-func FuzzCodecProofDeterministic(f *testing.F) {
-	f.Fuzz(
-		func(
-			t *testing.T,
-			randSeed int,
-			key []byte,
-			numProofNodes uint,
-		) {
-			require := require.New(t)
-
-			r := rand.New(rand.NewSource(int64(randSeed))) // #nosec G404
-
-			proofNodes := make([]ProofNode, numProofNodes)
-			for i := range proofNodes {
-				proofNodes[i] = newRandomProofNode(r)
-			}
-
-			proof := Proof{
-				Path: proofNodes,
-				Key:  key,
-			}
-
-			proofBytes, err := Codec.EncodeProof(Version, &proof)
-			require.NoError(err)
-
-			var gotProof Proof
-			gotVersion, err := Codec.DecodeProof(proofBytes, &gotProof)
-			require.NoError(err)
-			require.Equal(Version, gotVersion)
-
-			nilEmptySlices(&proof)
-			nilEmptySlices(&gotProof)
-			require.Equal(proof, gotProof)
-
-			proofBytes2, err := Codec.EncodeProof(Version, &gotProof)
-			require.NoError(err)
-			require.Equal(proofBytes, proofBytes2)
-		},
-	)
-}
-
-func FuzzCodecChangeProofDeterministic(f *testing.F) {
-	f.Fuzz(
-		func(
-			t *testing.T,
-			randSeed int,
-			hadRootsInHistory bool,
-			numProofNodes uint,
-			numChangedKeys uint,
-			numDeletedKeys uint,
-		) {
-			require := require.New(t)
-
-			r := rand.New(rand.NewSource(int64(randSeed))) // #nosec G404
-
-			startProofNodes := make([]ProofNode, numProofNodes)
-			endProofNodes := make([]ProofNode, numProofNodes)
-			for i := range startProofNodes {
-				startProofNodes[i] = newRandomProofNode(r)
-				endProofNodes[i] = newRandomProofNode(r)
-			}
-
-			keyChanges := newKeyChanges(r, numChangedKeys)
-			for i := uint(0); i < numDeletedKeys; i++ {
-				keyToDelete := make([]byte, r.Intn(32)) // #nosec G404
-				_, _ = r.Read(keyToDelete)              // #nosec G404
-				keyChanges = append(keyChanges, KeyChange{Key: keyToDelete})
-			}
-
-			proof := ChangeProof{
-				HadRootsInHistory: hadRootsInHistory,
-				StartProof:        startProofNodes,
-				EndProof:          endProofNodes,
-				KeyChanges:        keyChanges,
-			}
-
-			proofBytes, err := Codec.EncodeChangeProof(Version, &proof)
-			require.NoError(err)
-
-			var gotProof ChangeProof
-			gotVersion, err := Codec.DecodeChangeProof(proofBytes, &gotProof)
-			require.NoError(err)
-			require.Equal(Version, gotVersion)
-
-			nilEmptySlices(&proof)
-			nilEmptySlices(&gotProof)
-			require.Equal(proof, gotProof)
-
-			proofBytes2, err := Codec.EncodeChangeProof(Version, &gotProof)
-			require.NoError(err)
-			require.Equal(proofBytes, proofBytes2)
 		},
 	)
 }
@@ -462,84 +264,36 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 				children: children,
 			}
 
-			nodeBytes, err := Codec.encodeDBNode(Version, &node)
+			nodeBytes, err := codec.encodeDBNode(version, &node)
 			require.NoError(err)
 
 			var gotNode dbNode
-			gotVersion, err := Codec.decodeDBNode(nodeBytes, &gotNode)
+			gotVersion, err := codec.decodeDBNode(nodeBytes, &gotNode)
 			require.NoError(err)
-			require.Equal(Version, gotVersion)
+			require.Equal(version, gotVersion)
 
 			nilEmptySlices(&node)
 			nilEmptySlices(&gotNode)
 			require.Equal(node, gotNode)
 
-			nodeBytes2, err := Codec.encodeDBNode(Version, &gotNode)
+			nodeBytes2, err := codec.encodeDBNode(version, &gotNode)
 			require.NoError(err)
 			require.Equal(nodeBytes, nodeBytes2)
 		},
 	)
 }
 
-func TestCodec_DecodeProof(t *testing.T) {
-	require := require.New(t)
-
-	_, err := Codec.DecodeProof([]byte{1}, nil)
-	require.ErrorIs(err, errDecodeNil)
-
-	var (
-		proof         Proof
-		tooShortBytes = make([]byte, minProofLen-1)
-	)
-	_, err = Codec.DecodeProof(tooShortBytes, &proof)
-	require.ErrorIs(err, io.ErrUnexpectedEOF)
-}
-
-func TestCodec_DecodeChangeProof(t *testing.T) {
-	require := require.New(t)
-
-	_, err := Codec.DecodeChangeProof([]byte{1}, nil)
-	require.ErrorIs(err, errDecodeNil)
-
-	var (
-		parsedProof   ChangeProof
-		tooShortBytes = make([]byte, minChangeProofLen-1)
-	)
-	_, err = Codec.DecodeChangeProof(tooShortBytes, &parsedProof)
-	require.ErrorIs(err, io.ErrUnexpectedEOF)
-
-	proof := ChangeProof{
-		HadRootsInHistory: true,
-		StartProof:        nil,
-		EndProof:          nil,
-		KeyChanges:        nil,
-	}
-
-	proofBytes, err := Codec.EncodeChangeProof(Version, &proof)
-	require.NoError(err)
-
-	// Remove key-values length (0) from end
-	proofBytes = proofBytes[:len(proofBytes)-minVarIntLen]
-
-	// Put key-values length of -1
-	proofBytesBuf := bytes.NewBuffer(proofBytes)
-	require.NoError(Codec.(*codecImpl).encodeInt(proofBytesBuf, -1))
-
-	_, err = Codec.DecodeChangeProof(proofBytesBuf.Bytes(), &parsedProof)
-	require.ErrorIs(err, errNegativeNumKeyValues)
-}
-
 func TestCodec_DecodeDBNode(t *testing.T) {
 	require := require.New(t)
 
-	_, err := Codec.decodeDBNode([]byte{1}, nil)
+	_, err := codec.decodeDBNode([]byte{1}, nil)
 	require.ErrorIs(err, errDecodeNil)
 
 	var (
 		parsedDBNode  dbNode
 		tooShortBytes = make([]byte, minDBNodeLen-1)
 	)
-	_, err = Codec.decodeDBNode(tooShortBytes, &parsedDBNode)
+	_, err = codec.decodeDBNode(tooShortBytes, &parsedDBNode)
 	require.ErrorIs(err, io.ErrUnexpectedEOF)
 
 	proof := dbNode{
@@ -547,16 +301,16 @@ func TestCodec_DecodeDBNode(t *testing.T) {
 		children: map[byte]child{},
 	}
 
-	nodeBytes, err := Codec.encodeDBNode(Version, &proof)
+	nodeBytes, err := codec.encodeDBNode(version, &proof)
 	require.NoError(err)
 
 	// Remove num children (0) from end
 	nodeBytes = nodeBytes[:len(nodeBytes)-minVarIntLen]
 	proofBytesBuf := bytes.NewBuffer(nodeBytes)
 	// Put num children -1 at end
-	require.NoError(Codec.(*codecImpl).encodeInt(proofBytesBuf, -1))
+	require.NoError(codec.(*codecImpl).encodeInt(proofBytesBuf, -1))
 
-	_, err = Codec.decodeDBNode(proofBytesBuf.Bytes(), &parsedDBNode)
+	_, err = codec.decodeDBNode(proofBytesBuf.Bytes(), &parsedDBNode)
 	require.ErrorIs(err, errNegativeNumChildren)
 
 	// Remove num children from end
@@ -564,8 +318,8 @@ func TestCodec_DecodeDBNode(t *testing.T) {
 	nodeBytes = nodeBytes[:len(nodeBytes)-minVarIntLen]
 	proofBytesBuf = bytes.NewBuffer(nodeBytes)
 	// Put num children NodeBranchFactor+1 at end
-	require.NoError(Codec.(*codecImpl).encodeInt(proofBytesBuf, NodeBranchFactor+1))
+	require.NoError(codec.(*codecImpl).encodeInt(proofBytesBuf, NodeBranchFactor+1))
 
-	_, err = Codec.decodeDBNode(proofBytesBuf.Bytes(), &parsedDBNode)
+	_, err = codec.decodeDBNode(proofBytesBuf.Bytes(), &parsedDBNode)
 	require.ErrorIs(err, errTooManyChildren)
 }

@@ -4,9 +4,7 @@
 package merkledb
 
 import (
-	"bytes"
 	"context"
-	"io"
 	"math/rand"
 	"testing"
 
@@ -42,98 +40,10 @@ func writeBasicBatch(t *testing.T, db *merkleDB) {
 	require.NoError(t, batch.Write())
 }
 
-func Test_Proof_Marshal(t *testing.T) {
-	require := require.New(t)
-	dbTrie, err := getBasicDB()
-	require.NoError(err)
-	require.NotNil(dbTrie)
-	writeBasicBatch(t, dbTrie)
-
-	proof, err := dbTrie.GetProof(context.Background(), []byte{1})
-	require.NoError(err)
-	require.NotNil(proof)
-
-	proofBytes, err := Codec.EncodeProof(Version, proof)
-	require.NoError(err)
-
-	parsedProof := &Proof{}
-	_, err = Codec.DecodeProof(proofBytes, parsedProof)
-	require.NoError(err)
-
-	verifyPath(t, proof.Path, parsedProof.Path)
-	require.Equal([]byte{1}, proof.Value.value)
-}
-
 func Test_Proof_Empty(t *testing.T) {
 	proof := &Proof{}
 	err := proof.Verify(context.Background(), ids.Empty)
 	require.ErrorIs(t, err, ErrNoProof)
-}
-
-func Test_Proof_MissingValue(t *testing.T) {
-	trie, err := getBasicDB()
-	require.NoError(t, err)
-	require.NotNil(t, trie)
-
-	require.NoError(t, trie.Insert(context.Background(), []byte{1}, []byte{0}))
-	require.NoError(t, trie.Insert(context.Background(), []byte{1, 2}, []byte{0}))
-	require.NoError(t, trie.Insert(context.Background(), []byte{1, 2, 4}, []byte{0}))
-	require.NoError(t, trie.Insert(context.Background(), []byte{1, 3}, []byte{0}))
-
-	// get a proof for a value not in the db
-	proof, err := trie.GetProof(context.Background(), []byte{1, 2, 3})
-	require.NoError(t, err)
-	require.NotNil(t, proof)
-
-	require.True(t, proof.Value.IsNothing())
-
-	proofBytes, err := Codec.EncodeProof(Version, proof)
-	require.NoError(t, err)
-
-	parsedProof := &Proof{}
-	_, err = Codec.DecodeProof(proofBytes, parsedProof)
-	require.NoError(t, err)
-
-	verifyPath(t, proof.Path, parsedProof.Path)
-}
-
-func Test_Proof_Marshal_Errors(t *testing.T) {
-	trie, err := getBasicDB()
-	require.NoError(t, err)
-	require.NotNil(t, trie)
-
-	writeBasicBatch(t, trie)
-
-	proof, err := trie.GetProof(context.Background(), []byte{1})
-	require.NoError(t, err)
-	require.NotNil(t, proof)
-
-	proofBytes, err := Codec.EncodeProof(Version, proof)
-	require.NoError(t, err)
-
-	for i := 1; i < len(proofBytes); i++ {
-		broken := proofBytes[:i]
-		parsed := &Proof{}
-		_, err = Codec.DecodeProof(broken, parsed)
-		require.ErrorIs(t, err, io.ErrUnexpectedEOF)
-	}
-
-	// add a child at an invalid index
-	proof.Path[0].Children[255] = ids.Empty
-	_, err = Codec.EncodeProof(Version, proof)
-	require.ErrorIs(t, err, errChildIndexTooLarge)
-}
-
-func verifyPath(t *testing.T, path1, path2 []ProofNode) {
-	require.Len(t, path2, len(path1))
-	for i := range path1 {
-		require.True(t, bytes.Equal(path1[i].KeyPath.Value, path2[i].KeyPath.Value))
-		require.Equal(t, path1[i].KeyPath.hasOddLength(), path2[i].KeyPath.hasOddLength())
-		require.True(t, bytes.Equal(path1[i].ValueOrHash.value, path2[i].ValueOrHash.value))
-		for childIndex := range path1[i].Children {
-			require.Equal(t, path1[i].Children[childIndex], path2[i].Children[childIndex])
-		}
-	}
 }
 
 func Test_Proof_Verify_Bad_Data(t *testing.T) {
@@ -684,100 +594,6 @@ func Test_RangeProof_EmptyValues(t *testing.T) {
 		[]byte("key2"),
 		db.root.id,
 	))
-}
-
-func Test_ChangeProof_Marshal(t *testing.T) {
-	db, err := getBasicDB()
-	require.NoError(t, err)
-	batch := db.NewBatch()
-	require.NoError(t, batch.Put([]byte("key0"), []byte("value0")))
-	require.NoError(t, batch.Put([]byte("key1"), []byte("value1")))
-	require.NoError(t, batch.Put([]byte("key2"), []byte("value2")))
-	require.NoError(t, batch.Put([]byte("key3"), []byte("value3")))
-	require.NoError(t, batch.Put([]byte("key4"), []byte("value4")))
-	require.NoError(t, batch.Write())
-	startRoot, err := db.GetMerkleRoot(context.Background())
-	require.NoError(t, err)
-
-	batch = db.NewBatch()
-	require.NoError(t, batch.Put([]byte("key4"), []byte("value0")))
-	require.NoError(t, batch.Put([]byte("key5"), []byte("value1")))
-	require.NoError(t, batch.Put([]byte("key6"), []byte("value2")))
-	require.NoError(t, batch.Put([]byte("key7"), []byte("value3")))
-	require.NoError(t, batch.Put([]byte("key8"), []byte("value4")))
-	require.NoError(t, batch.Write())
-
-	batch = db.NewBatch()
-	require.NoError(t, batch.Put([]byte("key9"), []byte("value0")))
-	require.NoError(t, batch.Put([]byte("key10"), []byte("value1")))
-	require.NoError(t, batch.Put([]byte("key11"), []byte("value2")))
-	require.NoError(t, batch.Put([]byte("key12"), []byte("value3")))
-	require.NoError(t, batch.Put([]byte("key13"), []byte("value4")))
-	require.NoError(t, batch.Write())
-	endroot, err := db.GetMerkleRoot(context.Background())
-	require.NoError(t, err)
-
-	proof, err := db.GetChangeProof(context.Background(), startRoot, endroot, nil, nil, 50)
-	require.NoError(t, err)
-	require.NotNil(t, proof)
-	require.True(t, proof.HadRootsInHistory)
-
-	proofBytes, err := Codec.EncodeChangeProof(Version, proof)
-	require.NoError(t, err)
-
-	parsedProof := &ChangeProof{}
-	_, err = Codec.DecodeChangeProof(proofBytes, parsedProof)
-	require.NoError(t, err)
-
-	verifyPath(t, proof.StartProof, parsedProof.StartProof)
-	verifyPath(t, proof.EndProof, parsedProof.EndProof)
-
-	for index, kv := range proof.KeyChanges {
-		require.True(t, bytes.Equal(kv.Key, parsedProof.KeyChanges[index].Key))
-		require.True(t, bytes.Equal(kv.Value.value, parsedProof.KeyChanges[index].Value.value))
-	}
-}
-
-func Test_ChangeProof_Marshal_Errors(t *testing.T) {
-	db, err := getBasicDB()
-	require.NoError(t, err)
-	writeBasicBatch(t, db)
-	startRoot, err := db.GetMerkleRoot(context.Background())
-	require.NoError(t, err)
-
-	batch := db.NewBatch()
-	require.NoError(t, batch.Put([]byte{5}, []byte{5}))
-	require.NoError(t, batch.Put([]byte{6}, []byte{6}))
-	require.NoError(t, batch.Put([]byte{7}, []byte{7}))
-	require.NoError(t, batch.Put([]byte{8}, []byte{8}))
-	require.NoError(t, batch.Delete([]byte{0}))
-	require.NoError(t, batch.Write())
-
-	batch = db.NewBatch()
-	require.NoError(t, batch.Put([]byte{9}, []byte{9}))
-	require.NoError(t, batch.Put([]byte{10}, []byte{10}))
-	require.NoError(t, batch.Put([]byte{11}, []byte{11}))
-	require.NoError(t, batch.Put([]byte{12}, []byte{12}))
-	require.NoError(t, batch.Delete([]byte{1}))
-	require.NoError(t, batch.Write())
-	endroot, err := db.GetMerkleRoot(context.Background())
-	require.NoError(t, err)
-
-	proof, err := db.GetChangeProof(context.Background(), startRoot, endroot, nil, nil, 50)
-	require.NoError(t, err)
-	require.NotNil(t, proof)
-	require.True(t, proof.HadRootsInHistory)
-	require.Len(t, proof.KeyChanges, 10)
-
-	proofBytes, err := Codec.EncodeChangeProof(Version, proof)
-	require.NoError(t, err)
-
-	for i := 1; i < len(proofBytes); i++ {
-		broken := proofBytes[:i]
-		parsedProof := &ChangeProof{}
-		_, err = Codec.DecodeChangeProof(broken, parsedProof)
-		require.ErrorIs(t, err, io.ErrUnexpectedEOF)
-	}
 }
 
 func Test_ChangeProof_Missing_History_For_EndRoot(t *testing.T) {
@@ -1559,4 +1375,139 @@ func TestRangeProofProtoMarshalUnmarshal(t *testing.T) {
 		protoUnmarshaledProof := unmarshaledProof.ToProto()
 		require.Equal(protoProof, protoUnmarshaledProof)
 	}
+}
+
+func TestChangeProofProtoMarshalUnmarshal(t *testing.T) {
+	require := require.New(t)
+	rand := rand.New(rand.NewSource(1337)) // #nosec G404
+
+	for i := 0; i < 500; i++ {
+		// Make a random change proof.
+		startProofLen := rand.Intn(32)
+		startProof := make([]ProofNode, startProofLen)
+		for i := 0; i < startProofLen; i++ {
+			startProof[i] = newRandomProofNode(rand)
+		}
+
+		endProofLen := rand.Intn(32)
+		endProof := make([]ProofNode, endProofLen)
+		for i := 0; i < endProofLen; i++ {
+			endProof[i] = newRandomProofNode(rand)
+		}
+
+		numKeyChanges := rand.Intn(128)
+		keyChanges := make([]KeyChange, numKeyChanges)
+		for i := 0; i < numKeyChanges; i++ {
+			keyLen := rand.Intn(32)
+			key := make([]byte, keyLen)
+			_, _ = rand.Read(key)
+
+			value := Nothing[[]byte]()
+			hasValue := rand.Intn(2) == 0
+			if hasValue {
+				valueLen := rand.Intn(32)
+				valueBytes := make([]byte, valueLen)
+				_, _ = rand.Read(valueBytes)
+				value = Some(valueBytes)
+			}
+
+			keyChanges[i] = KeyChange{
+				Key:   key,
+				Value: value,
+			}
+		}
+
+		proof := ChangeProof{
+			StartProof: startProof,
+			EndProof:   endProof,
+			KeyChanges: keyChanges,
+		}
+
+		// Marshal and unmarshal it.
+		// Assert the unmarshaled one is the same as the original.
+		var unmarshaledProof ChangeProof
+		protoProof := proof.ToProto()
+		require.NoError(unmarshaledProof.UnmarshalProto(protoProof))
+		require.Equal(proof, unmarshaledProof)
+
+		// Marshaling again should yield same result.
+		protoUnmarshaledProof := unmarshaledProof.ToProto()
+		require.Equal(protoProof, protoUnmarshaledProof)
+	}
+}
+
+func TestChangeProofUnmarshalProtoNil(t *testing.T) {
+	var proof ChangeProof
+	err := proof.UnmarshalProto(nil)
+	require.ErrorIs(t, err, ErrNilChangeProof)
+}
+
+func TestChangeProofUnmarshalProtoNilValue(t *testing.T) {
+	rand := rand.New(rand.NewSource(1337)) // #nosec G404
+
+	// Make a random change proof.
+	startProofLen := rand.Intn(32)
+	startProof := make([]ProofNode, startProofLen)
+	for i := 0; i < startProofLen; i++ {
+		startProof[i] = newRandomProofNode(rand)
+	}
+
+	endProofLen := rand.Intn(32)
+	endProof := make([]ProofNode, endProofLen)
+	for i := 0; i < endProofLen; i++ {
+		endProof[i] = newRandomProofNode(rand)
+	}
+
+	numKeyChanges := rand.Intn(128) + 1
+	keyChanges := make([]KeyChange, numKeyChanges)
+	for i := 0; i < numKeyChanges; i++ {
+		keyLen := rand.Intn(32)
+		key := make([]byte, keyLen)
+		_, _ = rand.Read(key)
+
+		value := Nothing[[]byte]()
+		hasValue := rand.Intn(2) == 0
+		if hasValue {
+			valueLen := rand.Intn(32)
+			valueBytes := make([]byte, valueLen)
+			_, _ = rand.Read(valueBytes)
+			value = Some(valueBytes)
+		}
+
+		keyChanges[i] = KeyChange{
+			Key:   key,
+			Value: value,
+		}
+	}
+
+	proof := ChangeProof{
+		StartProof: startProof,
+		EndProof:   endProof,
+		KeyChanges: keyChanges,
+	}
+	protoProof := proof.ToProto()
+	// Make a value nil
+	protoProof.KeyChanges[0].Value = nil
+
+	var unmarshaledProof ChangeProof
+	err := unmarshaledProof.UnmarshalProto(protoProof)
+	require.ErrorIs(t, err, ErrNilMaybeBytes)
+}
+
+func TestChangeProofUnmarshalProtoInvalidMaybe(t *testing.T) {
+	protoProof := &syncpb.ChangeProof{
+		KeyChanges: []*syncpb.KeyChange{
+			{
+				Key: []byte{1},
+				Value: &syncpb.MaybeBytes{
+					Value:     []byte{1},
+					IsNothing: true,
+				},
+			},
+		},
+	}
+
+	var proof ChangeProof
+	err := proof.UnmarshalProto(protoProof)
+	require.ErrorIs(t, err, ErrInvalidMaybe)
 }
