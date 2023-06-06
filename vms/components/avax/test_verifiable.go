@@ -3,7 +3,16 @@
 
 package avax
 
-import "github.com/ava-labs/avalanchego/snow"
+import (
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
+)
+
+var (
+	_ verify.State    = (*TestState)(nil)
+	_ TransferableOut = (*TestTransferable)(nil)
+	_ Addressable     = (*TestAddressable)(nil)
+)
 
 type TestState struct{ Err error }
 
