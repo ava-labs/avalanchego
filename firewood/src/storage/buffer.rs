@@ -603,6 +603,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "ref: https://github.com/ava-labs/firewood/issues/45"]
     fn test_buffer_with_redo() {
         let buf_cfg = DiskBufferConfig::builder().max_buffered(1).build();
         let wal_cfg = WalConfig::builder().build();
