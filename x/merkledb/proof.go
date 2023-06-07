@@ -42,8 +42,6 @@ var (
 	ErrNilValueOrHash              = errors.New("proof node's valueOrHash field is nil")
 	ErrNilSerializedPath           = errors.New("serialized path is nil")
 	ErrNilRangeProof               = errors.New("range proof is nil")
-	ErrNilStartProof               = errors.New("start proof is nil")
-	ErrNilEndProof                 = errors.New("end proof is nil")
 	ErrNilChangeProof              = errors.New("change proof is nil")
 	ErrNilMaybeBytes               = errors.New("maybe bytes is nil")
 	ErrNilProof                    = errors.New("proof is nil")
