@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 
-	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
+	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
 func getBasicDB() (*merkleDB, error) {
@@ -1210,7 +1210,7 @@ func TestProofNodeUnmarshalProtoInvalidMaybe(t *testing.T) {
 	protoNode := node.ToProto()
 
 	// It's invalid to have a value and be nothing.
-	protoNode.ValueOrHash = &syncpb.MaybeBytes{
+	protoNode.ValueOrHash = &pb.MaybeBytes{
 		Value:     []byte{1, 2, 3},
 		IsNothing: true,
 	}
@@ -1254,21 +1254,21 @@ func TestProofNodeUnmarshalProtoMissingFields(t *testing.T) {
 
 	type test struct {
 		name        string
-		nodeFunc    func() *syncpb.ProofNode
+		nodeFunc    func() *pb.ProofNode
 		expectedErr error
 	}
 
 	tests := []test{
 		{
 			name: "nil node",
-			nodeFunc: func() *syncpb.ProofNode {
+			nodeFunc: func() *pb.ProofNode {
 				return nil
 			},
 			expectedErr: ErrNilProofNode,
 		},
 		{
 			name: "nil ValueOrHash",
-			nodeFunc: func() *syncpb.ProofNode {
+			nodeFunc: func() *pb.ProofNode {
 				node := newRandomProofNode(rand)
 				protoNode := node.ToProto()
 				protoNode.ValueOrHash = nil
@@ -1278,7 +1278,7 @@ func TestProofNodeUnmarshalProtoMissingFields(t *testing.T) {
 		},
 		{
 			name: "nil key",
-			nodeFunc: func() *syncpb.ProofNode {
+			nodeFunc: func() *pb.ProofNode {
 				node := newRandomProofNode(rand)
 				protoNode := node.ToProto()
 				protoNode.Key = nil
@@ -1315,12 +1315,6 @@ func TestProofNodeProtoMarshalUnmarshal(t *testing.T) {
 		protoUnmarshaledNode := unmarshaledNode.ToProto()
 		require.Equal(protoNode, protoUnmarshaledNode)
 	}
-}
-
-func TestRangeProofUnmarshalProtoNil(t *testing.T) {
-	var proof RangeProof
-	err := proof.UnmarshalProto(nil)
-	require.ErrorIs(t, err, ErrNilRangeProof)
 }
 
 func TestRangeProofProtoMarshalUnmarshal(t *testing.T) {
@@ -1495,11 +1489,11 @@ func TestChangeProofUnmarshalProtoNilValue(t *testing.T) {
 }
 
 func TestChangeProofUnmarshalProtoInvalidMaybe(t *testing.T) {
-	protoProof := &syncpb.ChangeProof{
-		KeyChanges: []*syncpb.KeyChange{
+	protoProof := &pb.ChangeProof{
+		KeyChanges: []*pb.KeyChange{
 			{
 				Key: []byte{1},
-				Value: &syncpb.MaybeBytes{
+				Value: &pb.MaybeBytes{
 					Value:     []byte{1},
 					IsNothing: true,
 				},
@@ -1510,4 +1504,87 @@ func TestChangeProofUnmarshalProtoInvalidMaybe(t *testing.T) {
 	var proof ChangeProof
 	err := proof.UnmarshalProto(protoProof)
 	require.ErrorIs(t, err, ErrInvalidMaybe)
+}
+
+func TestProofProtoMarshalUnmarshal(t *testing.T) {
+	require := require.New(t)
+	rand := rand.New(rand.NewSource(1337)) // #nosec G404
+
+	for i := 0; i < 500; i++ {
+		// Make a random proof.
+		proofLen := rand.Intn(32)
+		proofPath := make([]ProofNode, proofLen)
+		for i := 0; i < proofLen; i++ {
+			proofPath[i] = newRandomProofNode(rand)
+		}
+
+		keyLen := rand.Intn(32)
+		key := make([]byte, keyLen)
+		_, _ = rand.Read(key)
+
+		hasValue := rand.Intn(2) == 1
+		value := Nothing[[]byte]()
+		if hasValue {
+			valueLen := rand.Intn(32)
+			valueBytes := make([]byte, valueLen)
+			_, _ = rand.Read(valueBytes)
+			value = Some(valueBytes)
+		}
+
+		proof := Proof{
+			Key:   key,
+			Value: value,
+			Path:  proofPath,
+		}
+
+		// Marshal and unmarshal it.
+		// Assert the unmarshaled one is the same as the original.
+		var unmarshaledProof Proof
+		protoProof := proof.ToProto()
+		require.NoError(unmarshaledProof.UnmarshalProto(protoProof))
+		require.Equal(proof, unmarshaledProof)
+
+		// Marshaling again should yield same result.
+		protoUnmarshaledProof := unmarshaledProof.ToProto()
+		require.Equal(protoProof, protoUnmarshaledProof)
+	}
+}
+
+func TestProofProtoUnmarshal(t *testing.T) {
+	type test struct {
+		name        string
+		proof       *pb.Proof
+		expectedErr error
+	}
+
+	tests := []test{
+		{
+			name:        "nil",
+			proof:       nil,
+			expectedErr: ErrNilProof,
+		},
+		{
+			name:        "nil value",
+			proof:       &pb.Proof{},
+			expectedErr: ErrNilValue,
+		},
+		{
+			name: "invalid maybe",
+			proof: &pb.Proof{
+				Value: &pb.MaybeBytes{
+					Value:     []byte{1},
+					IsNothing: true,
+				},
+			},
+			expectedErr: ErrInvalidMaybe,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var proof Proof
+			err := proof.UnmarshalProto(tt.proof)
+			require.ErrorIs(t, err, tt.expectedErr)
+		})
+	}
 }
