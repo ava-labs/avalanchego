@@ -4,6 +4,7 @@
 package merkledb
 
 import (
+	"bytes"
 	"context"
 	"math/rand"
 	"sort"
@@ -157,10 +158,10 @@ func Test_TrieView_IteratorStartPrefix(t *testing.T) {
 // iterating over the last view.
 func Test_TrieView_Iterator_Random(t *testing.T) {
 	require := require.New(t)
-	rand := rand.New(rand.NewSource(1337))
+	rand := rand.New(rand.NewSource(1337)) // #nosec G404
 
 	var (
-		numKeyChanges = 2_000
+		numKeyChanges = 5_000
 		maxKeyLen     = 16
 		maxValLen     = 16
 	)
@@ -168,9 +169,9 @@ func Test_TrieView_Iterator_Random(t *testing.T) {
 	keyChanges := []KeyChange{}
 	for i := 0; i < numKeyChanges; i++ {
 		key := make([]byte, rand.Intn(maxKeyLen))
-		rand.Read(key)
+		_, _ = rand.Read(key)
 		value := make([]byte, rand.Intn(maxValLen))
-		rand.Read(value)
+		_, _ = rand.Read(value)
 		keyChanges = append(keyChanges, KeyChange{
 			Key:   key,
 			Value: Some(value),
@@ -228,4 +229,33 @@ func Test_TrieView_Iterator_Random(t *testing.T) {
 		i++
 	}
 	require.Equal(len(uniqueKeys), i)
+	iter.Release()
+
+	// Test with start and prefix.
+	prefix := []byte{128}
+	start := []byte{128, 5}
+	iter = view3.NewIteratorWithStartAndPrefix(start, prefix)
+	startPrefixUniqueKeys := []string{}
+	// Remove keys that don't have the prefix/are before the start.
+	for i := 0; i < len(uniqueKeys); i++ {
+		if bytes.HasPrefix([]byte(uniqueKeys[i]), prefix) && bytes.Compare([]byte(uniqueKeys[i]), start) >= 0 {
+			startPrefixUniqueKeys = append(startPrefixUniqueKeys, uniqueKeys[i])
+		}
+	}
+	require.Greater(len(startPrefixUniqueKeys), 0) // Sanity check to make sure we have some keys to test.
+	i = 0
+	for iter.Next() {
+		expectedKey := startPrefixUniqueKeys[i]
+		expectedValue := uniqueKeyChanges[expectedKey]
+		require.Equal([]byte(expectedKey), iter.Key())
+		if len(expectedValue) == 0 {
+			// Don't differentiate between nil and []byte{}
+			require.Len(iter.Value(), 0)
+		} else {
+			require.Equal(expectedValue, iter.Value())
+		}
+		i++
+	}
+	require.Equal(len(startPrefixUniqueKeys), i)
+	iter.Release()
 }
