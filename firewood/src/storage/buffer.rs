@@ -643,7 +643,7 @@ mod tests {
 
         // mutate the in memory buffer.
         let data = b"this is another test";
-        let hash: [u8; HASH_SIZE] = sha3::Keccak256::digest(&data).into();
+        let hash: [u8; HASH_SIZE] = sha3::Keccak256::digest(data).into();
 
         // write to the in memory buffer (ash) not yet to disk
         mut_store.write(0, &hash);
