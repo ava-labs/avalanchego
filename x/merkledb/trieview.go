@@ -22,7 +22,10 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-const defaultPreallocationSize = 100
+const (
+	initKeyValuesSize        = 256
+	defaultPreallocationSize = 100
+)
 
 var (
 	_ TrieView = (*trieView)(nil)
@@ -419,11 +422,14 @@ func (t *trieView) GetRangeProof(
 
 	var result RangeProof
 
-	result.KeyValues = make([]KeyValue, 0)
+	result.KeyValues = make([]KeyValue, 0, initKeyValuesSize)
 	it := t.NewIteratorWithStart(start)
 	for it.Next() && len(result.KeyValues) < maxLength && (len(end) == 0 || bytes.Compare(it.Key(), end) <= 0) {
 		// clone the value to prevent editing of the values stored within the trie
-		result.KeyValues = append(result.KeyValues, KeyValue{Key: it.Key(), Value: slices.Clone(it.Value())})
+		result.KeyValues = append(result.KeyValues, KeyValue{
+			Key:   it.Key(),
+			Value: slices.Clone(it.Value()),
+		})
 	}
 	it.Release()
 
