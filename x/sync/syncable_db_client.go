@@ -12,17 +12,17 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 
-	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
+	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
 var _ SyncableDB = (*SyncableDBClient)(nil)
 
-func NewSyncableDBClient(client syncpb.SyncableDBClient) *SyncableDBClient {
+func NewSyncableDBClient(client pb.SyncableDBClient) *SyncableDBClient {
 	return &SyncableDBClient{client: client}
 }
 
 type SyncableDBClient struct {
-	client syncpb.SyncableDBClient
+	client pb.SyncableDBClient
 }
 
 func (c *SyncableDBClient) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
@@ -41,7 +41,7 @@ func (c *SyncableDBClient) GetChangeProof(
 	endKey []byte,
 	keyLimit int,
 ) (*merkledb.ChangeProof, error) {
-	resp, err := c.client.GetChangeProof(ctx, &syncpb.GetChangeProofRequest{
+	resp, err := c.client.GetChangeProof(ctx, &pb.GetChangeProofRequest{
 		StartRootHash: startRootID[:],
 		EndRootHash:   endRootID[:],
 		StartKey:      startKey,
@@ -65,7 +65,7 @@ func (c *SyncableDBClient) VerifyChangeProof(
 	endKey []byte,
 	expectedRootID ids.ID,
 ) error {
-	resp, err := c.client.VerifyChangeProof(ctx, &syncpb.VerifyChangeProofRequest{
+	resp, err := c.client.VerifyChangeProof(ctx, &pb.VerifyChangeProofRequest{
 		Proof:            proof.ToProto(),
 		StartKey:         startKey,
 		EndKey:           endKey,
@@ -83,14 +83,14 @@ func (c *SyncableDBClient) VerifyChangeProof(
 }
 
 func (c *SyncableDBClient) CommitChangeProof(ctx context.Context, proof *merkledb.ChangeProof) error {
-	_, err := c.client.CommitChangeProof(ctx, &syncpb.CommitChangeProofRequest{
+	_, err := c.client.CommitChangeProof(ctx, &pb.CommitChangeProofRequest{
 		Proof: proof.ToProto(),
 	})
 	return err
 }
 
 func (c *SyncableDBClient) GetProof(ctx context.Context, key []byte) (*merkledb.Proof, error) {
-	resp, err := c.client.GetProof(ctx, &syncpb.GetProofRequest{
+	resp, err := c.client.GetProof(ctx, &pb.GetProofRequest{
 		Key: key,
 	})
 	if err != nil {
@@ -111,7 +111,7 @@ func (c *SyncableDBClient) GetRangeProofAtRoot(
 	endKey []byte,
 	keyLimit int,
 ) (*merkledb.RangeProof, error) {
-	resp, err := c.client.GetRangeProof(ctx, &syncpb.GetRangeProofRequest{
+	resp, err := c.client.GetRangeProof(ctx, &pb.GetRangeProofRequest{
 		RootHash: rootID[:],
 		StartKey: startKey,
 		EndKey:   endKey,
@@ -133,7 +133,7 @@ func (c *SyncableDBClient) CommitRangeProof(
 	startKey []byte,
 	proof *merkledb.RangeProof,
 ) error {
-	_, err := c.client.CommitRangeProof(ctx, &syncpb.CommitRangeProofRequest{
+	_, err := c.client.CommitRangeProof(ctx, &pb.CommitRangeProofRequest{
 		StartKey:   startKey,
 		RangeProof: proof.ToProto(),
 	})

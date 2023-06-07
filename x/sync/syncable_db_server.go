@@ -11,17 +11,17 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 
-	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
+	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
-var _ syncpb.SyncableDBServer = (*SyncableDBServer)(nil)
+var _ pb.SyncableDBServer = (*SyncableDBServer)(nil)
 
 func NewSyncableDBServer(db SyncableDB) *SyncableDBServer {
 	return &SyncableDBServer{db: db}
 }
 
 type SyncableDBServer struct {
-	syncpb.UnsafeSyncableDBServer
+	pb.UnsafeSyncableDBServer
 
 	db SyncableDB
 }
@@ -29,20 +29,20 @@ type SyncableDBServer struct {
 func (s *SyncableDBServer) GetMerkleRoot(
 	ctx context.Context,
 	_ *emptypb.Empty,
-) (*syncpb.GetMerkleRootResponse, error) {
+) (*pb.GetMerkleRootResponse, error) {
 	root, err := s.db.GetMerkleRoot(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return &syncpb.GetMerkleRootResponse{
+	return &pb.GetMerkleRootResponse{
 		RootHash: root[:],
 	}, nil
 }
 
 func (s *SyncableDBServer) GetChangeProof(
 	ctx context.Context,
-	req *syncpb.GetChangeProofRequest,
-) (*syncpb.ChangeProof, error) {
+	req *pb.GetChangeProofRequest,
+) (*pb.ChangeProof, error) {
 	startRootID, err := ids.ToID(req.StartRootHash)
 	if err != nil {
 		return nil, err
@@ -67,8 +67,8 @@ func (s *SyncableDBServer) GetChangeProof(
 
 func (s *SyncableDBServer) VerifyChangeProof(
 	ctx context.Context,
-	req *syncpb.VerifyChangeProofRequest,
-) (*syncpb.VerifyChangeProofResponse, error) {
+	req *pb.VerifyChangeProofRequest,
+) (*pb.VerifyChangeProofResponse, error) {
 	var proof merkledb.ChangeProof
 	if err := proof.UnmarshalProto(req.Proof); err != nil {
 		return nil, err
@@ -84,14 +84,14 @@ func (s *SyncableDBServer) VerifyChangeProof(
 	if err := s.db.VerifyChangeProof(ctx, &proof, req.StartKey, req.EndKey, rootID); err != nil {
 		errString = err.Error()
 	}
-	return &syncpb.VerifyChangeProofResponse{
+	return &pb.VerifyChangeProofResponse{
 		Error: errString,
 	}, nil
 }
 
 func (s *SyncableDBServer) CommitChangeProof(
 	ctx context.Context,
-	req *syncpb.CommitChangeProofRequest,
+	req *pb.CommitChangeProofRequest,
 ) (*emptypb.Empty, error) {
 	var proof merkledb.ChangeProof
 	if err := proof.UnmarshalProto(req.Proof); err != nil {
@@ -104,22 +104,22 @@ func (s *SyncableDBServer) CommitChangeProof(
 
 func (s *SyncableDBServer) GetProof(
 	ctx context.Context,
-	req *syncpb.GetProofRequest,
-) (*syncpb.GetProofResponse, error) {
+	req *pb.GetProofRequest,
+) (*pb.GetProofResponse, error) {
 	proof, err := s.db.GetProof(ctx, req.Key)
 	if err != nil {
 		return nil, err
 	}
 
-	return &syncpb.GetProofResponse{
+	return &pb.GetProofResponse{
 		Proof: proof.ToProto(),
 	}, nil
 }
 
 func (s *SyncableDBServer) GetRangeProof(
 	ctx context.Context,
-	req *syncpb.GetRangeProofRequest,
-) (*syncpb.GetRangeProofResponse, error) {
+	req *pb.GetRangeProofRequest,
+) (*pb.GetRangeProofResponse, error) {
 	rootID, err := ids.ToID(req.RootHash)
 	if err != nil {
 		return nil, err
@@ -130,11 +130,11 @@ func (s *SyncableDBServer) GetRangeProof(
 		return nil, err
 	}
 
-	protoProof := &syncpb.GetRangeProofResponse{
-		Proof: &syncpb.RangeProof{
-			Start:     make([]*syncpb.ProofNode, len(proof.StartProof)),
-			End:       make([]*syncpb.ProofNode, len(proof.EndProof)),
-			KeyValues: make([]*syncpb.KeyValue, len(proof.KeyValues)),
+	protoProof := &pb.GetRangeProofResponse{
+		Proof: &pb.RangeProof{
+			Start:     make([]*pb.ProofNode, len(proof.StartProof)),
+			End:       make([]*pb.ProofNode, len(proof.EndProof)),
+			KeyValues: make([]*pb.KeyValue, len(proof.KeyValues)),
 		},
 	}
 	for i, node := range proof.StartProof {
@@ -144,7 +144,7 @@ func (s *SyncableDBServer) GetRangeProof(
 		protoProof.Proof.End[i] = node.ToProto()
 	}
 	for i, kv := range proof.KeyValues {
-		protoProof.Proof.KeyValues[i] = &syncpb.KeyValue{
+		protoProof.Proof.KeyValues[i] = &pb.KeyValue{
 			Key:   kv.Key,
 			Value: kv.Value,
 		}
@@ -155,7 +155,7 @@ func (s *SyncableDBServer) GetRangeProof(
 
 func (s *SyncableDBServer) CommitRangeProof(
 	ctx context.Context,
-	req *syncpb.CommitRangeProofRequest,
+	req *pb.CommitRangeProofRequest,
 ) (*emptypb.Empty, error) {
 	var proof merkledb.RangeProof
 	if err := proof.UnmarshalProto(req.RangeProof); err != nil {
