@@ -199,8 +199,7 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 			list := v.([]uint8)
 			return len(list) > 0 && (list[0] == startPrimaryWithBLS || list[0] == startPrimaryWithoutBLS)
 		}),
-	),
-	)
+	))
 
 	properties.TestingRun(t)
 }
@@ -603,8 +602,7 @@ func TestTimestampListGenerator(t *testing.T) {
 			list := v.([]uint8)
 			return len(list) > 0 && (list[0] == startPrimaryWithBLS || list[0] == startPrimaryWithoutBLS)
 		}),
-	),
-	)
+	))
 
 	properties.Property("subnet validators are returned in sequence", prop.ForAll(
 		func(events []uint8) string {
@@ -656,8 +654,7 @@ func TestTimestampListGenerator(t *testing.T) {
 			list := v.([]uint8)
 			return len(list) > 0 && (list[0] == startPrimaryWithBLS || list[0] == startPrimaryWithoutBLS)
 		}),
-	),
-	)
+	))
 
 	properties.Property("subnet validators' times are bound by a primary validator's times", prop.ForAll(
 		func(events []uint8) string {
@@ -695,8 +692,7 @@ func TestTimestampListGenerator(t *testing.T) {
 			list := v.([]uint8)
 			return len(list) > 0 && (list[0] == startPrimaryWithBLS || list[0] == startPrimaryWithoutBLS)
 		}),
-	),
-	)
+	))
 
 	properties.TestingRun(t)
 }
