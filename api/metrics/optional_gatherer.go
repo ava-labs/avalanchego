@@ -52,7 +52,7 @@ func (g *optionalGatherer) Register(gatherer prometheus.Gatherer) error {
 	defer g.lock.Unlock()
 
 	if g.gatherer != nil {
-		return fmt.Errorf("attempt to register existing gatherer failed %#v", g.gatherer)
+		return fmt.Errorf("%w %#v", errReregisterGatherer, g.gatherer)
 	}
 	g.gatherer = gatherer
 	return nil

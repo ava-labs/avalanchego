@@ -30,7 +30,7 @@ func TestMultiGathererDuplicatedPrefix(t *testing.T) {
 	require.NoError(g.Register("", og))
 
 	err := g.Register("", og)
-	require.ErrorContains(err, "attempt to register existing gathererer for namespace")
+	require.ErrorIs(err, errReregisterGatherer)
 
 	require.NoError(g.Register("lol", og))
 }

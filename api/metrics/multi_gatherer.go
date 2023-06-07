@@ -4,6 +4,7 @@
 package metrics
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 
@@ -16,6 +17,8 @@ import (
 
 var (
 	_ MultiGatherer = (*multiGatherer)(nil)
+
+	errReregisterGatherer = errors.New("attempt to register existing gathererer")
 )
 
 // MultiGatherer extends the Gatherer interface by allowing additional gatherers
@@ -75,7 +78,7 @@ func (g *multiGatherer) Register(namespace string, gatherer prometheus.Gatherer)
 	defer g.lock.Unlock()
 
 	if existingGatherer, exists := g.gatherers[namespace]; exists {
-		return fmt.Errorf("attempt to register existing gathererer for namespace %q failed; existing: %#v", namespace, existingGatherer)
+		return fmt.Errorf("%w for namespace %q failed; existing: %#v", errReregisterGatherer, namespace, existingGatherer)
 	}
 
 	g.gatherers[namespace] = gatherer
