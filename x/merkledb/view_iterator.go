@@ -7,6 +7,7 @@ import (
 	"bytes"
 
 	"github.com/ava-labs/avalanchego/database"
+
 	"golang.org/x/exp/slices"
 )
 
@@ -29,8 +30,12 @@ func (t *trieView) NewIteratorWithStartAndPrefix(start, prefix []byte) database.
 		if (len(start) > 0 && bytes.Compare(start, key) > 0) || !bytes.HasPrefix(key, prefix) {
 			continue
 		}
-		changes = append(changes, KeyChange{Key: key, Value: change.after})
+		changes = append(changes, KeyChange{
+			Key:   key,
+			Value: change.after,
+		})
 	}
+
 	// sort [changes] so they can be merged with the parent trie's state
 	slices.SortFunc(changes, func(a, b KeyChange) bool {
 		return bytes.Compare(a.Key, b.Key) == -1
