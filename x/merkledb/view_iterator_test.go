@@ -4,9 +4,13 @@
 package merkledb
 
 import (
+	"context"
+	"math/rand"
+	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"golang.org/x/exp/maps"
 )
 
 func Test_TrieView_Iterator(t *testing.T) {
@@ -146,4 +150,82 @@ func Test_TrieView_IteratorStartPrefix(t *testing.T) {
 	require.Nil(iterator.Key())
 	require.Nil(iterator.Value())
 	require.NoError(iterator.Error())
+}
+
+// Test view iteration by creating a stack of views,
+// inserting random key/value pairs into them, and
+// iterating over the last view.
+func Test_TrieView_Iterator_Random(t *testing.T) {
+	require := require.New(t)
+	rand := rand.New(rand.NewSource(1337))
+
+	var (
+		numKeyChanges = 2_000
+		maxKeyLen     = 16
+		maxValLen     = 16
+	)
+
+	keyChanges := []KeyChange{}
+	for i := 0; i < numKeyChanges; i++ {
+		key := make([]byte, rand.Intn(maxKeyLen))
+		rand.Read(key)
+		value := make([]byte, rand.Intn(maxValLen))
+		rand.Read(value)
+		keyChanges = append(keyChanges, KeyChange{
+			Key:   key,
+			Value: Some(value),
+		})
+	}
+
+	db, err := getBasicDB()
+	require.NoError(err)
+
+	for i := 0; i < numKeyChanges/4; i++ {
+		require.NoError(db.Put(keyChanges[i].Key, keyChanges[i].Value.value))
+	}
+
+	view1, err := db.NewView()
+	require.NoError(err)
+
+	for i := numKeyChanges / 4; i < 2*numKeyChanges/4; i++ {
+		require.NoError(view1.Insert(context.Background(), keyChanges[i].Key, keyChanges[i].Value.value))
+	}
+
+	view2, err := view1.NewView()
+	require.NoError(err)
+
+	for i := 2 * numKeyChanges / 4; i < 3*numKeyChanges/4; i++ {
+		require.NoError(view2.Insert(context.Background(), keyChanges[i].Key, keyChanges[i].Value.value))
+	}
+
+	view3, err := view2.NewView()
+	require.NoError(err)
+
+	for i := 3 * numKeyChanges / 4; i < numKeyChanges; i++ {
+		require.NoError(view3.Insert(context.Background(), keyChanges[i].Key, keyChanges[i].Value.value))
+	}
+
+	// Might have introduced duplicates, so only expect the latest value.
+	uniqueKeyChanges := make(map[string][]byte)
+	for _, keyChange := range keyChanges {
+		uniqueKeyChanges[string(keyChange.Key)] = keyChange.Value.value
+	}
+
+	iter := view3.NewIterator()
+	uniqueKeys := maps.Keys(uniqueKeyChanges)
+	sort.Strings(uniqueKeys)
+	i := 0
+	for iter.Next() {
+		expectedKey := uniqueKeys[i]
+		expectedValue := uniqueKeyChanges[expectedKey]
+		require.Equal([]byte(expectedKey), iter.Key())
+		if len(expectedValue) == 0 {
+			// Don't differentiate between nil and []byte{}
+			require.Len(iter.Value(), 0)
+		} else {
+			require.Equal(expectedValue, iter.Value())
+		}
+		i++
+	}
+	require.Equal(len(uniqueKeys), i)
 }

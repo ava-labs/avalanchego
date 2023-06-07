@@ -43,7 +43,7 @@ func (t *trieView) NewIteratorWithStartAndPrefix(start, prefix []byte) database.
 
 	return &viewIterator{
 		view:          t,
-		Iterator:      t.parentTrie.NewIteratorWithStartAndPrefix(start, prefix),
+		parentIter:    t.parentTrie.NewIteratorWithStartAndPrefix(start, prefix),
 		sortedChanges: changes,
 	}
 }
@@ -51,97 +51,94 @@ func (t *trieView) NewIteratorWithStartAndPrefix(start, prefix []byte) database.
 // viewIterator walks over both the in memory database and the underlying database
 // at the same time.
 type viewIterator struct {
-	view *trieView
-	database.Iterator
+	view       *trieView
+	parentIter database.Iterator
 
 	key, value []byte
 	err        error
 
 	sortedChanges []KeyChange
 
-	initialized, exhausted bool
+	initialized, parentIterExhausted bool
 }
 
 // Next moves the iterator to the next key/value pair. It returns whether the
 // iterator is exhausted. We must pay careful attention to set the proper values
 // based on if the in memory db or the underlying db should be read next
 func (it *viewIterator) Next() bool {
-	// Short-circuit and set an error if the underlying database has been closed.
-	if it.view.db.closed {
+	switch {
+	case it.view.db.closed:
+		// Short-circuit and set an error if the underlying database has been closed.
 		it.key = nil
 		it.value = nil
 		it.err = database.ErrClosed
 		return false
-	}
-
-	if it.view.invalidated {
+	case it.view.invalidated:
 		it.key = nil
 		it.value = nil
 		it.err = ErrInvalid
 		return false
-	}
-
-	if !it.initialized {
-		it.exhausted = !it.Iterator.Next()
+	case !it.initialized:
+		it.parentIterExhausted = !it.parentIter.Next()
 		it.initialized = true
 	}
 
 	for {
 		switch {
-		case it.exhausted && len(it.sortedChanges) == 0:
+		case it.parentIterExhausted && len(it.sortedChanges) == 0:
 			// there are no more changes or underlying key/values
 			it.key = nil
 			it.value = nil
 			return false
-		case it.exhausted:
+		case it.parentIterExhausted:
 			// there are no more underlying key/values, so use the local changes
-			nextKey := it.sortedChanges[0].Key
-			nextValue := it.sortedChanges[0].Value
+			nextKeyValue := it.sortedChanges[0]
 
 			// move to next change
 			it.sortedChanges = it.sortedChanges[1:]
 
-			// if current change is not a deletion, return it
-			if !nextValue.IsNothing() {
-				it.key = nextKey
-				it.value = nextValue.value
+			// If current change is not a deletion, return it.
+			// Otherwise go to next loop iteration.
+			if !nextKeyValue.Value.IsNothing() {
+				it.key = nextKeyValue.Key
+				it.value = nextKeyValue.Value.value
 				return true
 			}
 		case len(it.sortedChanges) == 0:
-			it.key = it.Iterator.Key()
-			it.value = it.Iterator.Value()
-			it.exhausted = !it.Iterator.Next()
+			it.key = it.parentIter.Key()
+			it.value = it.parentIter.Value()
+			it.parentIterExhausted = !it.parentIter.Next()
 			return true
 		default:
 			memKey := it.sortedChanges[0].Key
 			memValue := it.sortedChanges[0].Value
 
-			dbKey := it.Iterator.Key()
-			compareResult := bytes.Compare(memKey, dbKey)
+			dbKey := it.parentIter.Key()
 
-			switch {
-			case compareResult < 0:
-				// the current change has a smaller key than the underlying db key
-				// move to the next change
+			switch bytes.Compare(memKey, dbKey) {
+			case -1:
+				// The current change has a smaller key than the parent key.
+				// Move to the next change.
 				it.sortedChanges = it.sortedChanges[1:]
 
-				// if current change is not a deletion, return it
+				// If current change is not a deletion, return it.
+				// Otherwise go to next loop iteration.
 				if !memValue.IsNothing() {
 					it.key = memKey
 					it.value = slices.Clone(memValue.value)
 					return true
 				}
-			case compareResult > 0:
-				// the db key is smaller, so return it and iterate the underlying iterator
+			case 1:
+				// The parent key is smaller, so return it and iterate the parent iterator
 				it.key = dbKey
-				it.value = it.Iterator.Value()
-				it.exhausted = !it.Iterator.Next()
+				it.value = it.parentIter.Value()
+				it.parentIterExhausted = !it.parentIter.Next()
 				return true
 			default:
 				// the keys are the same, so use the local change and
-				// iterate both the sorted changes and the underlying iterator
+				// iterate both the sorted changes and the parent iterator
 				it.sortedChanges = it.sortedChanges[1:]
-				it.exhausted = !it.Iterator.Next()
+				it.parentIterExhausted = !it.parentIter.Next()
 
 				if !memValue.IsNothing() {
 					it.key = memKey
@@ -157,7 +154,7 @@ func (it *viewIterator) Error() error {
 	if it.err != nil {
 		return it.err
 	}
-	return it.Iterator.Error()
+	return it.parentIter.Error()
 }
 
 func (it *viewIterator) Key() []byte {
@@ -172,5 +169,5 @@ func (it *viewIterator) Release() {
 	it.key = nil
 	it.value = nil
 	it.sortedChanges = nil
-	it.Iterator.Release()
+	it.parentIter.Release()
 }
