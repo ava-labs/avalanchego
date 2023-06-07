@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 
-	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
+	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
 func getBasicDB() (*merkleDB, error) {
@@ -1210,7 +1210,7 @@ func TestProofNodeUnmarshalProtoInvalidMaybe(t *testing.T) {
 	protoNode := node.ToProto()
 
 	// It's invalid to have a value and be nothing.
-	protoNode.ValueOrHash = &syncpb.MaybeBytes{
+	protoNode.ValueOrHash = &pb.MaybeBytes{
 		Value:     []byte{1, 2, 3},
 		IsNothing: true,
 	}
@@ -1254,21 +1254,21 @@ func TestProofNodeUnmarshalProtoMissingFields(t *testing.T) {
 
 	type test struct {
 		name        string
-		nodeFunc    func() *syncpb.ProofNode
+		nodeFunc    func() *pb.ProofNode
 		expectedErr error
 	}
 
 	tests := []test{
 		{
 			name: "nil node",
-			nodeFunc: func() *syncpb.ProofNode {
+			nodeFunc: func() *pb.ProofNode {
 				return nil
 			},
 			expectedErr: ErrNilProofNode,
 		},
 		{
 			name: "nil ValueOrHash",
-			nodeFunc: func() *syncpb.ProofNode {
+			nodeFunc: func() *pb.ProofNode {
 				node := newRandomProofNode(rand)
 				protoNode := node.ToProto()
 				protoNode.ValueOrHash = nil
@@ -1278,7 +1278,7 @@ func TestProofNodeUnmarshalProtoMissingFields(t *testing.T) {
 		},
 		{
 			name: "nil key",
-			nodeFunc: func() *syncpb.ProofNode {
+			nodeFunc: func() *pb.ProofNode {
 				node := newRandomProofNode(rand)
 				protoNode := node.ToProto()
 				protoNode.Key = nil
@@ -1489,11 +1489,11 @@ func TestChangeProofUnmarshalProtoNilValue(t *testing.T) {
 }
 
 func TestChangeProofUnmarshalProtoInvalidMaybe(t *testing.T) {
-	protoProof := &syncpb.ChangeProof{
-		KeyChanges: []*syncpb.KeyChange{
+	protoProof := &pb.ChangeProof{
+		KeyChanges: []*pb.KeyChange{
 			{
 				Key: []byte{1},
-				Value: &syncpb.MaybeBytes{
+				Value: &pb.MaybeBytes{
 					Value:     []byte{1},
 					IsNothing: true,
 				},
@@ -1550,25 +1550,41 @@ func TestProofProtoMarshalUnmarshal(t *testing.T) {
 	}
 }
 
-func TestProofProtoUnmarshalNil(t *testing.T) {
-	var proof Proof
-	err := proof.UnmarshalProto(nil)
-	require.ErrorIs(t, err, ErrNilProof)
-}
+func TestProofProtoUnmarshal(t *testing.T) {
+	type test struct {
+		name        string
+		proof       *pb.Proof
+		expectedErr error
+	}
 
-func TestProofProtoUnmarshalNilValue(t *testing.T) {
-	var proof Proof
-	err := proof.UnmarshalProto(&syncpb.Proof{})
-	require.ErrorIs(t, err, ErrNilValue)
-}
-
-func TestProofProtoUnmarshalInvalidMaybe(t *testing.T) {
-	var proof Proof
-	err := proof.UnmarshalProto(&syncpb.Proof{
-		Value: &syncpb.MaybeBytes{
-			IsNothing: true,
-			Value:     []byte{1},
+	tests := []test{
+		{
+			name:        "nil",
+			proof:       nil,
+			expectedErr: ErrNilProof,
 		},
-	})
-	require.ErrorIs(t, err, ErrInvalidMaybe)
+		{
+			name:        "nil value",
+			proof:       &pb.Proof{},
+			expectedErr: ErrNilValue,
+		},
+		{
+			name: "invalid maybe",
+			proof: &pb.Proof{
+				Value: &pb.MaybeBytes{
+					Value:     []byte{1},
+					IsNothing: true,
+				},
+			},
+			expectedErr: ErrInvalidMaybe,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var proof Proof
+			err := proof.UnmarshalProto(tt.proof)
+			require.ErrorIs(t, err, tt.expectedErr)
+		})
+	}
 }
