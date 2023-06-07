@@ -75,6 +75,7 @@ type VMServer struct {
 
 	processMetrics prometheus.Gatherer
 	dbManager      manager.Manager
+	log            logging.Logger
 
 	serverCloser grpcutils.ServerCloser
 	connCloser   wrappers.Closer
@@ -184,6 +185,16 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 	}
 	vm.dbManager = dbManager
 
+	// TODO: Allow the logger to be configured by the client
+	vm.log = logging.NewLogger(
+		fmt.Sprintf("<%s Chain>", chainID),
+		logging.NewWrappedCore(
+			logging.Info,
+			originalStderr,
+			logging.Colors.ConsoleEncoder(),
+		),
+	)
+
 	clientConn, err := grpcutils.Dial(
 		req.ServerAddr,
 		grpcutils.WithChainUnaryInterceptor(grpcClientMetrics.UnaryClientInterceptor()),
@@ -233,15 +244,7 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 		CChainID:    cChainID,
 		AVAXAssetID: avaxAssetID,
 
-		// TODO: Allow the logger to be configured by the client
-		Log: logging.NewLogger(
-			fmt.Sprintf("<%s Chain>", chainID),
-			logging.NewWrappedCore(
-				logging.Info,
-				originalStderr,
-				logging.Colors.ConsoleEncoder(),
-			),
-		),
+		Log:          vm.log,
 		Keystore:     keystoreClient,
 		SharedMemory: sharedMemoryClient,
 		BCLookup:     bcLookupClient,
@@ -652,6 +655,7 @@ func (vm *VMServer) GetAncestors(ctx context.Context, req *vmpb.GetAncestorsRequ
 
 	blocks, err := block.GetAncestors(
 		ctx,
+		vm.log,
 		vm.vm,
 		blkID,
 		maxBlksNum,
