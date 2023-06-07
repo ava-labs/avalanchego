@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package sync
+package gsyncabledb
 
 import (
 	"context"
@@ -11,11 +11,12 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/x/merkledb"
+	"github.com/ava-labs/avalanchego/x/sync"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
-var _ SyncableDB = (*SyncableDBClient)(nil)
+var _ sync.SyncableDB = (*SyncableDBClient)(nil)
 
 func NewSyncableDBClient(client pb.SyncableDBClient) *SyncableDBClient {
 	return &SyncableDBClient{client: client}
