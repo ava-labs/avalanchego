@@ -5,7 +5,6 @@ package platformvm
 
 import (
 	"context"
-	"encoding/hex"
 	"errors"
 	"testing"
 	"time"
@@ -1480,11 +1479,11 @@ func Test_RegressionBLSKeyDiff(t *testing.T) {
 	)
 
 	// insert primary network validator
-	nodeID := ids.GenerateTestNodeID()
-	addr := keys[0].PublicKey().Address()
-	skBytes, err := hex.DecodeString("6668fecd4595b81e4d568398c820bbf3f073cb222902279fa55ebb84764ed2e3")
-	require.NoError(err)
-	sk1, err := bls.SecretKeyFromBytes(skBytes)
+	var (
+		nodeID = ids.GenerateTestNodeID()
+		addr   = keys[0].PublicKey().Address()
+	)
+	sk1, err := bls.NewSecretKey()
 	require.NoError(err)
 
 	// build primary network validator with BLS key
