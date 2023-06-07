@@ -59,14 +59,14 @@ type testBackend struct {
 
 func (b *testBackend) HeaderByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Header, error) {
 	if number == rpc.LatestBlockNumber {
-		return b.chain.CurrentBlock().Header(), nil
+		return b.chain.CurrentBlock(), nil
 	}
 	return b.chain.GetHeaderByNumber(uint64(number)), nil
 }
 
 func (b *testBackend) BlockByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Block, error) {
 	if number == rpc.LatestBlockNumber {
-		return b.chain.CurrentBlock(), nil
+		number = rpc.BlockNumber(b.chain.CurrentBlock().Number.Uint64())
 	}
 	return b.chain.GetBlockByNumber(uint64(number)), nil
 }
@@ -159,7 +159,11 @@ func (b *testBackend) CurrentHeader() *types.Header {
 }
 
 func (b *testBackend) LastAcceptedBlock() *types.Block {
-	return b.chain.CurrentBlock()
+	current := b.chain.CurrentBlock()
+	if current == nil {
+		return nil
+	}
+	return b.chain.GetBlockByNumber(current.Number.Uint64())
 }
 
 func (b *testBackend) GetBlockByNumber(number uint64) *types.Block {

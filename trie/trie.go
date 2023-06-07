@@ -32,13 +32,9 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/coreth/core/types"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
-)
-
-var (
-	// emptyRoot is the known root hash of an empty trie.
-	emptyRoot = common.HexToHash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
 )
 
 // Trie is a Merkle Patricia Trie. Use New to create a trie that sits on
@@ -97,7 +93,7 @@ func New(id *ID, db NodeReader) (*Trie, error) {
 		reader: reader,
 		//tracer: newTracer(),
 	}
-	if id.Root != (common.Hash{}) && id.Root != emptyRoot {
+	if id.Root != (common.Hash{}) && id.Root != types.EmptyRootHash {
 		rootnode, err := trie.resolveAndTrack(id.Root[:], nil)
 		if err != nil {
 			return nil, err
@@ -582,7 +578,7 @@ func (t *Trie) Commit(collectLeaf bool) (common.Hash, *NodeSet) {
 		// Wrap tracked deletions as the return
 		set := NewNodeSet(t.owner)
 		t.tracer.markDeletions(set)
-		return emptyRoot, set
+		return types.EmptyRootHash, set
 	}
 	// Derive the hash for all dirty nodes first. We hold the assumption
 	// in the following procedure that all nodes are hashed.
@@ -605,7 +601,7 @@ func (t *Trie) Commit(collectLeaf bool) (common.Hash, *NodeSet) {
 // hashRoot calculates the root hash of the given trie
 func (t *Trie) hashRoot() (node, node, error) {
 	if t.root == nil {
-		return hashNode(emptyRoot.Bytes()), nil, nil
+		return hashNode(types.EmptyRootHash.Bytes()), nil, nil
 	}
 	// If the number of changes is below 100, we let one thread handle it
 	h := newHasher(t.unhashed >= 100)

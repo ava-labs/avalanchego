@@ -50,6 +50,7 @@ type filter struct {
 	typ      Type
 	deadline *time.Timer // filter is inactive when deadline triggers
 	hashes   []common.Hash
+	fullTx   bool
 	txs      []*types.Transaction
 	crit     FilterCriteria
 	logs     []*types.Log
@@ -114,14 +115,14 @@ func (api *FilterAPI) timeoutLoop(timeout time.Duration) {
 //
 // It is part of the filter package because this filter can be used through the
 // `eth_getFilterChanges` polling method that is also used for log filters.
-func (api *FilterAPI) NewPendingTransactionFilter() rpc.ID {
+func (api *FilterAPI) NewPendingTransactionFilter(fullTx *bool) rpc.ID {
 	var (
 		pendingTxs   = make(chan []*types.Transaction)
 		pendingTxSub = api.events.SubscribePendingTxs(pendingTxs)
 	)
 
 	api.filtersMu.Lock()
-	api.filters[pendingTxSub.ID] = &filter{typ: PendingTransactionsSubscription, deadline: time.NewTimer(api.timeout), txs: make([]*types.Transaction, 0), s: pendingTxSub}
+	api.filters[pendingTxSub.ID] = &filter{typ: PendingTransactionsSubscription, fullTx: fullTx != nil && *fullTx, deadline: time.NewTimer(api.timeout), txs: make([]*types.Transaction, 0), s: pendingTxSub}
 	api.filtersMu.Unlock()
 
 	go func() {
@@ -514,6 +515,14 @@ func (api *FilterAPI) GetFilterChanges(id rpc.ID) (interface{}, error) {
 	api.filtersMu.Lock()
 	defer api.filtersMu.Unlock()
 
+	chainConfig := api.sys.backend.ChainConfig()
+	latest := api.sys.backend.CurrentHeader()
+
+	var baseFee *big.Int
+	if latest != nil {
+		baseFee = latest.BaseFee
+	}
+
 	if f, found := api.filters[id]; found {
 		if !f.deadline.Stop() {
 			// timer expired but filter is not yet removed in timeout loop
@@ -528,9 +537,21 @@ func (api *FilterAPI) GetFilterChanges(id rpc.ID) (interface{}, error) {
 			f.hashes = nil
 			return returnHashes(hashes), nil
 		case PendingTransactionsSubscription, AcceptedTransactionsSubscription:
-			txs := f.txs
-			f.txs = nil
-			return txs, nil
+			if f.fullTx {
+				txs := make([]*ethapi.RPCTransaction, 0, len(f.txs))
+				for _, tx := range f.txs {
+					txs = append(txs, ethapi.NewRPCTransaction(tx, latest, baseFee, chainConfig))
+				}
+				f.txs = nil
+				return txs, nil
+			} else {
+				hashes := make([]common.Hash, 0, len(f.txs))
+				for _, tx := range f.txs {
+					hashes = append(hashes, tx.Hash())
+				}
+				f.txs = nil
+				return hashes, nil
+			}
 		case LogsSubscription, AcceptedLogsSubscription, MinedAndPendingLogsSubscription:
 			logs := f.logs
 			f.logs = nil

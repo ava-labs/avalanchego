@@ -218,7 +218,7 @@ type BlockChain struct {
 	// Readers don't need to take it, they can just read the database.
 	chainmu sync.RWMutex
 
-	currentBlock atomic.Value // Current head of the block chain
+	currentBlock atomic.Pointer[types.Header] // Current head of the block chain
 
 	bodyCache     *lru.Cache[common.Hash, *types.Body]                // Cache for the most recent block bodies
 	receiptsCache *lru.Cache[common.Hash, []*types.Receipt]           // Cache for the most recent receipts per block
@@ -346,8 +346,7 @@ func NewBlockChain(
 		return nil, ErrNoGenesis
 	}
 
-	var nilBlock *types.Block
-	bc.currentBlock.Store(nilBlock)
+	bc.currentBlock.Store(nil)
 
 	// Create the state manager
 	bc.stateManager = NewTrieWriter(bc.triedb, cacheConfig)
@@ -366,8 +365,8 @@ func NewBlockChain(
 
 	// Make sure the state associated with the block is available
 	head := bc.CurrentBlock()
-	if !bc.HasState(head.Root()) {
-		return nil, fmt.Errorf("head state missing %d:%s", head.Number(), head.Hash())
+	if !bc.HasState(head.Root) {
+		return nil, fmt.Errorf("head state missing %d:%s", head.Number, head.Hash())
 	}
 
 	if err := bc.protectTrieIndex(); err != nil {
@@ -689,15 +688,15 @@ func (bc *BlockChain) loadLastState(lastAcceptedHash common.Hash) error {
 		return errors.New("could not read head block hash")
 	}
 	// Make sure the entire head block is available
-	currentBlock := bc.GetBlockByHash(head)
-	if currentBlock == nil {
+	headBlock := bc.GetBlockByHash(head)
+	if headBlock == nil {
 		return fmt.Errorf("could not load head block %s", head.Hex())
 	}
 	// Everything seems to be fine, set as the head block
-	bc.currentBlock.Store(currentBlock)
+	bc.currentBlock.Store(headBlock.Header())
 
 	// Restore the last known head header
-	currentHeader := currentBlock.Header()
+	currentHeader := headBlock.Header()
 	if head := rawdb.ReadHeadHeaderHash(bc.db); head != (common.Hash{}) {
 		if header := bc.GetHeaderByHash(head); header != nil {
 			currentHeader = header
@@ -706,7 +705,7 @@ func (bc *BlockChain) loadLastState(lastAcceptedHash common.Hash) error {
 	bc.hc.SetCurrentHeader(currentHeader)
 
 	log.Info("Loaded most recent local header", "number", currentHeader.Number, "hash", currentHeader.Hash(), "age", common.PrettyAge(time.Unix(int64(currentHeader.Time), 0)))
-	log.Info("Loaded most recent local full block", "number", currentBlock.Number(), "hash", currentBlock.Hash(), "age", common.PrettyAge(time.Unix(int64(currentBlock.Time()), 0)))
+	log.Info("Loaded most recent local full block", "number", headBlock.Number(), "hash", headBlock.Hash(), "age", common.PrettyAge(time.Unix(int64(headBlock.Time()), 0)))
 
 	// Otherwise, set the last accepted block and perform a re-org.
 	bc.lastAccepted = bc.GetBlockByHash(lastAcceptedHash)
@@ -736,7 +735,7 @@ func (bc *BlockChain) loadGenesisState() error {
 
 	// Last update all in-memory chain markers
 	bc.lastAccepted = bc.genesisBlock
-	bc.currentBlock.Store(bc.genesisBlock)
+	bc.currentBlock.Store(bc.genesisBlock.Header())
 	bc.hc.SetGenesis(bc.genesisBlock.Header())
 	bc.hc.SetCurrentHeader(bc.genesisBlock.Header())
 	return nil
@@ -744,7 +743,7 @@ func (bc *BlockChain) loadGenesisState() error {
 
 // Export writes the active chain to the given writer.
 func (bc *BlockChain) Export(w io.Writer) error {
-	return bc.ExportN(w, uint64(0), bc.CurrentBlock().NumberU64())
+	return bc.ExportN(w, uint64(0), bc.CurrentBlock().Number.Uint64())
 }
 
 // ExportN writes a subset of the active chain to the given writer.
@@ -806,7 +805,7 @@ func (bc *BlockChain) writeHeadBlock(block *types.Block) {
 	}
 	// Update all in-memory chain markers in the last step
 	bc.hc.SetCurrentHeader(block.Header())
-	bc.currentBlock.Store(block)
+	bc.currentBlock.Store(block.Header())
 }
 
 // ValidateCanonicalChain confirms a canonical chain is well-formed.
@@ -816,19 +815,19 @@ func (bc *BlockChain) ValidateCanonicalChain() error {
 
 	current := bc.CurrentBlock()
 	i := 0
-	log.Info("Beginning to validate canonical chain", "startBlock", current.NumberU64())
+	log.Info("Beginning to validate canonical chain", "startBlock", current.Number)
 
 	for current.Hash() != bc.genesisBlock.Hash() {
 		blkByHash := bc.GetBlockByHash(current.Hash())
 		if blkByHash == nil {
-			return fmt.Errorf("couldn't find block by hash %s at height %d", current.Hash().String(), current.Number())
+			return fmt.Errorf("couldn't find block by hash %s at height %d", current.Hash().String(), current.Number)
 		}
 		if blkByHash.Hash() != current.Hash() {
 			return fmt.Errorf("blockByHash returned a block with an unexpected hash: %s, expected: %s", blkByHash.Hash().String(), current.Hash().String())
 		}
-		blkByNumber := bc.GetBlockByNumber(current.Number().Uint64())
+		blkByNumber := bc.GetBlockByNumber(current.Number.Uint64())
 		if blkByNumber == nil {
-			return fmt.Errorf("couldn't find block by number at height %d", current.Number())
+			return fmt.Errorf("couldn't find block by number at height %d", current.Number)
 		}
 		if blkByNumber.Hash() != current.Hash() {
 			return fmt.Errorf("blockByNumber returned a block with unexpected hash: %s, expected: %s", blkByNumber.Hash().String(), current.Hash().String())
@@ -836,26 +835,32 @@ func (bc *BlockChain) ValidateCanonicalChain() error {
 
 		hdrByHash := bc.GetHeaderByHash(current.Hash())
 		if hdrByHash == nil {
-			return fmt.Errorf("couldn't find block header by hash %s at height %d", current.Hash().String(), current.Number())
+			return fmt.Errorf("couldn't find block header by hash %s at height %d", current.Hash().String(), current.Number)
 		}
 		if hdrByHash.Hash() != current.Hash() {
 			return fmt.Errorf("hdrByHash returned a block header with an unexpected hash: %s, expected: %s", hdrByHash.Hash().String(), current.Hash().String())
 		}
-		hdrByNumber := bc.GetHeaderByNumber(current.Number().Uint64())
+		hdrByNumber := bc.GetHeaderByNumber(current.Number.Uint64())
 		if hdrByNumber == nil {
-			return fmt.Errorf("couldn't find block header by number at height %d", current.Number())
+			return fmt.Errorf("couldn't find block header by number at height %d", current.Number)
 		}
 		if hdrByNumber.Hash() != current.Hash() {
 			return fmt.Errorf("hdrByNumber returned a block header with unexpected hash: %s, expected: %s", hdrByNumber.Hash().String(), current.Hash().String())
 		}
 
-		txs := current.Body().Transactions
+		// Lookup the full block to get the transactions
+		block := bc.GetBlock(current.Hash(), current.Number.Uint64())
+		if block == nil {
+			log.Error("Current block not found in database", "block", current.Number, "hash", current.Hash())
+			return fmt.Errorf("current block missing: #%d [%x..]", current.Number, current.Hash().Bytes()[:4])
+		}
+		txs := block.Transactions()
 
 		// Transactions are only indexed beneath the last accepted block, so we only check
 		// that the transactions have been indexed, if we are checking below the last accepted
 		// block.
-		shouldIndexTxs := bc.cacheConfig.TxLookupLimit == 0 || bc.lastAccepted.NumberU64() < current.NumberU64()+bc.cacheConfig.TxLookupLimit
-		if current.NumberU64() <= bc.lastAccepted.NumberU64() && shouldIndexTxs {
+		shouldIndexTxs := bc.cacheConfig.TxLookupLimit == 0 || bc.lastAccepted.NumberU64() < current.Number.Uint64()+bc.cacheConfig.TxLookupLimit
+		if current.Number.Uint64() <= bc.lastAccepted.NumberU64() && shouldIndexTxs {
 			// Ensure that all of the transactions have been stored correctly in the canonical
 			// chain
 			for txIndex, tx := range txs {
@@ -866,8 +871,8 @@ func (bc *BlockChain) ValidateCanonicalChain() error {
 				if txLookup.BlockHash != current.Hash() {
 					return fmt.Errorf("tx lookup returned with incorrect block hash: %s, expected: %s", txLookup.BlockHash.String(), current.Hash().String())
 				}
-				if txLookup.BlockIndex != current.Number().Uint64() {
-					return fmt.Errorf("tx lookup returned with incorrect block index: %d, expected: %d", txLookup.BlockIndex, current.Number().Uint64())
+				if txLookup.BlockIndex != current.Number.Uint64() {
+					return fmt.Errorf("tx lookup returned with incorrect block index: %d, expected: %d", txLookup.BlockIndex, current.Number)
 				}
 				if txLookup.Index != uint64(txIndex) {
 					return fmt.Errorf("tx lookup returned with incorrect transaction index: %d, expected: %d", txLookup.Index, txIndex)
@@ -886,8 +891,8 @@ func (bc *BlockChain) ValidateCanonicalChain() error {
 			if txReceipt.BlockHash != current.Hash() {
 				return fmt.Errorf("transaction receipt had block hash %s, but expected %s", txReceipt.BlockHash.String(), current.Hash().String())
 			}
-			if txReceipt.BlockNumber.Uint64() != current.NumberU64() {
-				return fmt.Errorf("transaction receipt had block number %d, but expected %d", txReceipt.BlockNumber.Uint64(), current.NumberU64())
+			if txReceipt.BlockNumber.Uint64() != current.Number.Uint64() {
+				return fmt.Errorf("transaction receipt had block number %d, but expected %d", txReceipt.BlockNumber.Uint64(), current.Number)
 			}
 		}
 
@@ -896,9 +901,9 @@ func (bc *BlockChain) ValidateCanonicalChain() error {
 			log.Info("Validate Canonical Chain Update", "totalBlocks", i)
 		}
 
-		parent := bc.GetBlockByHash(current.ParentHash())
-		if parent.Hash() != current.ParentHash() {
-			return fmt.Errorf("getBlockByHash retrieved parent block with incorrect hash, found %s, expected: %s", parent.Hash().String(), current.ParentHash().String())
+		parent := bc.GetHeaderByHash(current.ParentHash)
+		if parent.Hash() != current.ParentHash {
+			return fmt.Errorf("getBlockByHash retrieved parent block with incorrect hash, found %s, expected: %s", parent.Hash().String(), current.ParentHash.String())
 		}
 		current = parent
 	}
@@ -1387,7 +1392,7 @@ func (bc *BlockChain) insertBlock(block *types.Block, writes bool) error {
 // the processing of a block. These logs are later announced as deleted or reborn.
 func (bc *BlockChain) collectLogs(b *types.Block, removed bool) []*types.Log {
 	receipts := rawdb.ReadRawReceipts(bc.db, b.Hash(), b.NumberU64())
-	receipts.DeriveFields(bc.chainConfig, b.Hash(), b.NumberU64(), b.Time(), b.Transactions())
+	receipts.DeriveFields(bc.chainConfig, b.Hash(), b.NumberU64(), b.Time(), b.BaseFee(), b.Transactions())
 
 	var logs []*types.Log
 	for _, receipt := range receipts {
@@ -1405,15 +1410,18 @@ func (bc *BlockChain) collectLogs(b *types.Block, removed bool) []*types.Log {
 // reorg takes two blocks, an old chain and a new chain and will reconstruct the
 // blocks and inserts them to be part of the new canonical chain and accumulates
 // potential missing transactions and post an event about them.
-func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
+func (bc *BlockChain) reorg(oldHead *types.Header, newHead *types.Block) error {
 	var (
-		newHead = newBlock
-		oldHead = oldBlock
-
 		newChain    types.Blocks
 		oldChain    types.Blocks
 		commonBlock *types.Block
 	)
+	oldBlock := bc.GetBlock(oldHead.Hash(), oldHead.Number.Uint64())
+	if oldBlock == nil {
+		return errors.New("current head block missing")
+	}
+	newBlock := newHead
+
 	// Reduce the longer chain to the same number as the shorter one
 	if oldBlock.NumberU64() > newBlock.NumberU64() {
 		// Old chain is longer, gather all transactions and logs as deleted ones
@@ -1427,10 +1435,10 @@ func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 		}
 	}
 	if oldBlock == nil {
-		return fmt.Errorf("invalid old chain")
+		return errors.New("invalid old chain")
 	}
 	if newBlock == nil {
-		return fmt.Errorf("invalid new chain")
+		return errors.New("invalid new chain")
 	}
 	// Both sides of the reorg are at the same number, reduce both until the common
 	// ancestor is found
@@ -1473,7 +1481,7 @@ func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 		logFn(msg, "number", commonBlock.Number(), "hash", commonBlock.Hash(),
 			"drop", len(oldChain), "dropfrom", oldChain[0].Hash(), "add", len(newChain), "addfrom", newChain[0].Hash())
 	} else {
-		log.Debug("Preference change (rewind to ancestor) occurred", "oldnum", oldHead.Number(), "oldhash", oldHead.Hash(), "newnum", newHead.Number(), "newhash", newHead.Hash())
+		log.Debug("Preference change (rewind to ancestor) occurred", "oldnum", oldHead.Number, "oldhash", oldHead.Hash(), "newnum", newHead.Number(), "newhash", newHead.Hash())
 	}
 	// Insert the new chain(except the head block(reverse order)),
 	// taking care of the proper incremental order.
@@ -1692,7 +1700,7 @@ func (bc *BlockChain) reprocessBlock(parent *types.Block, current *types.Block) 
 }
 
 // initSnapshot instantiates a Snapshot instance and adds it to [bc]
-func (bc *BlockChain) initSnapshot(b *types.Block) {
+func (bc *BlockChain) initSnapshot(b *types.Header) {
 	if bc.cacheConfig.SnapshotLimit <= 0 || bc.snaps != nil {
 		return
 	}
@@ -1703,9 +1711,9 @@ func (bc *BlockChain) initSnapshot(b *types.Block) {
 	//
 	// Additionally, we should always repair a snapshot if starting at genesis
 	// if [SnapshotLimit] > 0.
-	asyncBuild := !bc.cacheConfig.SnapshotWait && b.NumberU64() > 0
-	noBuild := bc.cacheConfig.SnapshotNoBuild && b.NumberU64() > 0
-	log.Info("Initializing snapshots", "async", asyncBuild, "rebuild", !noBuild, "headHash", b.Hash(), "headRoot", b.Root())
+	asyncBuild := !bc.cacheConfig.SnapshotWait && b.Number.Uint64() > 0
+	noBuild := bc.cacheConfig.SnapshotNoBuild && b.Number.Uint64() > 0
+	log.Info("Initializing snapshots", "async", asyncBuild, "rebuild", !noBuild, "headHash", b.Hash(), "headRoot", b.Root)
 	snapconfig := snapshot.Config{
 		CacheSize:  bc.cacheConfig.SnapshotLimit,
 		NoBuild:    noBuild,
@@ -1713,9 +1721,9 @@ func (bc *BlockChain) initSnapshot(b *types.Block) {
 		SkipVerify: !bc.cacheConfig.SnapshotVerify,
 	}
 	var err error
-	bc.snaps, err = snapshot.New(snapconfig, bc.db, bc.triedb, b.Hash(), b.Root())
+	bc.snaps, err = snapshot.New(snapconfig, bc.db, bc.triedb, b.Hash(), b.Root)
 	if err != nil {
-		log.Error("failed to initialize snapshots", "headHash", b.Hash(), "headRoot", b.Root(), "err", err, "async", asyncBuild)
+		log.Error("failed to initialize snapshots", "headHash", b.Hash(), "headRoot", b.Root, "err", err, "async", asyncBuild)
 	}
 }
 
@@ -1815,7 +1823,7 @@ func (bc *BlockChain) reprocessState(current *types.Block, reexec uint64) error 
 			// that the node stops mid-way through snapshot flattening (performed across multiple DB batches).
 			// If snapshot initialization is delayed due to state sync, skip initializing snaps here
 			if !bc.cacheConfig.SnapshotDelayInit {
-				bc.initSnapshot(parent)
+				bc.initSnapshot(parent.Header())
 			}
 			writeIndices = true // Set [writeIndices] to true, so that the indices will be updated from the last accepted tip onwards.
 		}
@@ -2051,7 +2059,7 @@ func (bc *BlockChain) ResetToStateSyncedBlock(block *types.Block) error {
 	// Update all in-memory chain markers
 	bc.lastAccepted = block
 	bc.acceptorTip = block
-	bc.currentBlock.Store(block)
+	bc.currentBlock.Store(block.Header())
 	bc.hc.SetCurrentHeader(block.Header())
 
 	lastAcceptedHash := block.Hash()
@@ -2065,8 +2073,8 @@ func (bc *BlockChain) ResetToStateSyncedBlock(block *types.Block) error {
 
 	// Make sure the state associated with the block is available
 	head := bc.CurrentBlock()
-	if !bc.HasState(head.Root()) {
-		return fmt.Errorf("head state missing %d:%s", head.Number(), head.Hash())
+	if !bc.HasState(head.Root) {
+		return fmt.Errorf("head state missing %d:%s", head.Number, head.Hash())
 	}
 
 	bc.initSnapshot(head)
