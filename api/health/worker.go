@@ -34,7 +34,7 @@ type worker struct {
 	namespace  string
 	metrics    *metrics
 	checksLock sync.RWMutex
-	checks     map[string]*checker
+	checks     map[string]*taggedChecker
 
 	resultsLock                 sync.RWMutex
 	results                     map[string]Result
@@ -47,7 +47,7 @@ type worker struct {
 	closer    chan struct{}
 }
 
-type checker struct {
+type taggedChecker struct {
 	checker            Checker
 	isApplicationCheck bool
 	tags               []string
@@ -63,7 +63,7 @@ func newWorker(
 		log:       log,
 		namespace: namespace,
 		metrics:   metrics,
-		checks:    make(map[string]*checker),
+		checks:    make(map[string]*taggedChecker),
 		results:   make(map[string]Result),
 		closer:    make(chan struct{}),
 		tags:      make(map[string]set.Set[string]),
@@ -101,7 +101,7 @@ func (w *worker) RegisterCheck(name string, check Checker, tags ...string) error
 	applicationChecks := w.tags[ApplicationTag]
 	isApplicationCheck := applicationChecks.Contains(name)
 
-	w.checks[name] = &checker{
+	w.checks[name] = &taggedChecker{
 		checker:            check,
 		isApplicationCheck: isApplicationCheck,
 		tags:               tags,
@@ -118,6 +118,7 @@ func (w *worker) RegisterCheck(name string, check Checker, tags ...string) error
 	// If this is a new application-wide check, then all of the registered tags
 	// now have one additional failing check.
 	if isApplicationCheck {
+		// Note: [w.tags] will include AllTag.
 		for tag := range w.tags {
 			w.metrics.failingChecks.WithLabelValues(tag).Inc()
 		}
@@ -233,7 +234,7 @@ func (w *worker) runChecks(ctx context.Context) {
 	wg.Wait()
 }
 
-func (w *worker) runCheck(ctx context.Context, wg *sync.WaitGroup, name string, check *checker) {
+func (w *worker) runCheck(ctx context.Context, wg *sync.WaitGroup, name string, check *taggedChecker) {
 	defer wg.Done()
 
 	start := time.Now()
@@ -272,6 +273,7 @@ func (w *worker) runCheck(ctx context.Context, wg *sync.WaitGroup, name string, 
 				zap.Error(err),
 			)
 			if check.isApplicationCheck {
+				// Note: [w.tags] will include AllTag.
 				for tag := range w.tags {
 					w.metrics.failingChecks.WithLabelValues(tag).Inc()
 				}
@@ -290,6 +292,7 @@ func (w *worker) runCheck(ctx context.Context, wg *sync.WaitGroup, name string, 
 			zap.Strings("tags", check.tags),
 		)
 		if check.isApplicationCheck {
+			// Note: [w.tags] will include AllTag.
 			for tag := range w.tags {
 				w.metrics.failingChecks.WithLabelValues(tag).Dec()
 			}
