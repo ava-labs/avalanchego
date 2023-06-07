@@ -39,6 +39,8 @@ func (noopMetrics) AddValidatorSetsDuration(time.Duration) {}
 
 func (noopMetrics) AddValidatorSetsHeightDiff(uint64) {}
 
+func (noopMetrics) AddValidatorSetsOpsCountDiff(uint) {}
+
 func (noopMetrics) SetLocalStake(uint64) {}
 
 func (noopMetrics) SetTotalStake(uint64) {}

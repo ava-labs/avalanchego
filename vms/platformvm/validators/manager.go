@@ -165,17 +165,20 @@ func (m *manager) GetValidatorSet(ctx context.Context, height uint64, subnetID i
 		}
 	}
 
+	totalOpsCount := uint(0)
 	for diffHeight := lastAcceptedHeight; diffHeight > height; diffHeight-- {
-		err := m.applyValidatorDiffs(vdrSet, subnetID, diffHeight)
+		opsCount, err := m.applyValidatorDiffs(vdrSet, subnetID, diffHeight)
 		if err != nil {
 			return nil, err
 		}
+		totalOpsCount += opsCount
 	}
 
 	endTime := m.clk.Time()
 	m.metrics.IncValidatorSetsCreated()
 	m.metrics.AddValidatorSetsDuration(endTime.Sub(startTime))
 	m.metrics.AddValidatorSetsHeightDiff(lastAcceptedHeight - height)
+	m.metrics.AddValidatorSetsOpsCountDiff(totalOpsCount)
 	return vdrSet, nil
 }
 
@@ -183,12 +186,13 @@ func (m *manager) applyValidatorDiffs(
 	vdrSet map[ids.NodeID]*validators.GetValidatorOutput,
 	subnetID ids.ID,
 	height uint64,
-) error {
+) (uint, error) {
 	weightDiffs, err := m.state.GetValidatorWeightDiffs(height, subnetID)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
+	opsCount := uint(0)
 	for nodeID, weightDiff := range weightDiffs {
 		vdr, ok := vdrSet[nodeID]
 		if !ok {
@@ -197,6 +201,7 @@ func (m *manager) applyValidatorDiffs(
 				NodeID: nodeID,
 			}
 			vdrSet[nodeID] = vdr
+			opsCount++
 		}
 
 		// The weight of this node changed at this block.
@@ -209,20 +214,22 @@ func (m *manager) applyValidatorDiffs(
 			// prior block it was lower.
 			vdr.Weight, err = math.Sub(vdr.Weight, weightDiff.Amount)
 		}
+		opsCount++
 		if err != nil {
-			return err
+			return 0, err
 		}
 
 		if vdr.Weight == 0 {
 			// The validator's weight was 0 before this block so
 			// they weren't in the validator set.
 			delete(vdrSet, nodeID)
+			opsCount++
 		}
 	}
 
 	pkDiffs, err := m.state.GetValidatorPublicKeyDiffs(height)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	for nodeID, pk := range pkDiffs {
@@ -233,9 +240,10 @@ func (m *manager) applyValidatorDiffs(
 			// The validator's public key was removed at this block, so it
 			// was in the validator set before.
 			vdr.PublicKey = pk
+			opsCount++
 		}
 	}
-	return nil
+	return opsCount, nil
 }
 
 func (m *manager) GetSubnetID(_ context.Context, chainID ids.ID) (ids.ID, error) {

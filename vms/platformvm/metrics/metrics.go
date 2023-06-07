@@ -35,6 +35,8 @@ type Metrics interface {
 	// Mark that we computed a validator diff at a height with the given
 	// difference from the top.
 	AddValidatorSetsHeightDiff(uint64)
+
+	AddValidatorSetsOpsCountDiff(uint)
 	// Mark that this much stake is staked on the node.
 	SetLocalStake(uint64)
 	// Mark that this much stake is staked in the network.
@@ -122,6 +124,11 @@ func New(
 			Name:      "validator_sets_height_diff_sum",
 			Help:      "Total number of validator sets diffs applied for generating validator sets",
 		}),
+		validatorSetsOpsCountDiff: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "validator_sets_diffs_ops_count_sum",
+			Help:      "Total number of validator sets operations in diffs for generating validator sets",
+		}),
 		validatorSetsDuration: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
 			Name:      "validator_sets_duration_sum",
@@ -148,6 +155,7 @@ func New(
 		registerer.Register(m.validatorSetsCreated),
 		registerer.Register(m.validatorSetsCached),
 		registerer.Register(m.validatorSetsHeightDiff),
+		registerer.Register(m.validatorSetsOpsCountDiff),
 		registerer.Register(m.validatorSetsDuration),
 	)
 
@@ -173,10 +181,11 @@ type metrics struct {
 
 	numVotesWon, numVotesLost prometheus.Counter
 
-	validatorSetsCached     prometheus.Counter
-	validatorSetsCreated    prometheus.Counter
-	validatorSetsHeightDiff prometheus.Gauge
-	validatorSetsDuration   prometheus.Gauge
+	validatorSetsCached       prometheus.Counter
+	validatorSetsCreated      prometheus.Counter
+	validatorSetsHeightDiff   prometheus.Gauge
+	validatorSetsOpsCountDiff prometheus.Gauge
+	validatorSetsDuration     prometheus.Gauge
 }
 
 func (m *metrics) MarkOptionVoteWon() {
@@ -205,6 +214,10 @@ func (m *metrics) AddValidatorSetsDuration(d time.Duration) {
 
 func (m *metrics) AddValidatorSetsHeightDiff(d uint64) {
 	m.validatorSetsHeightDiff.Add(float64(d))
+}
+
+func (m *metrics) AddValidatorSetsOpsCountDiff(d uint) {
+	m.validatorSetsOpsCountDiff.Add(float64(d))
 }
 
 func (m *metrics) SetLocalStake(s uint64) {
