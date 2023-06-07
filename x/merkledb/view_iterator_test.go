@@ -222,7 +222,7 @@ func Test_TrieView_Iterator_Random(t *testing.T) {
 		require.Equal([]byte(expectedKey), iter.Key())
 		if len(expectedValue) == 0 {
 			// Don't differentiate between nil and []byte{}
-			require.Len(iter.Value(), 0)
+			require.Zero(iter.Value(), 0)
 		} else {
 			require.Equal(expectedValue, iter.Value())
 		}
@@ -250,7 +250,7 @@ func Test_TrieView_Iterator_Random(t *testing.T) {
 		require.Equal([]byte(expectedKey), iter.Key())
 		if len(expectedValue) == 0 {
 			// Don't differentiate between nil and []byte{}
-			require.Len(iter.Value(), 0)
+			require.Zero(iter.Value())
 		} else {
 			require.Equal(expectedValue, iter.Value())
 		}
