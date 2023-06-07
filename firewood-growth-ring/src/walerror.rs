@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use firewood_libaio::AioError;
 use nix::errno::Errno;
 use thiserror::Error;
 
@@ -14,8 +13,6 @@ pub enum WalError {
     InvalidChecksum,
     #[error("an I/O error has occurred")]
     IOError(Arc<std::io::Error>),
-    #[error("lib AIO error has occurred")]
-    AIOError(AioError),
     #[error("Wal directory already exists")]
     WalDirExists,
 }
@@ -29,11 +26,5 @@ impl From<i32> for WalError {
 impl From<std::io::Error> for WalError {
     fn from(err: std::io::Error) -> Self {
         Self::IOError(Arc::new(err))
-    }
-}
-
-impl From<AioError> for WalError {
-    fn from(err: AioError) -> Self {
-        Self::AIOError(err)
     }
 }
