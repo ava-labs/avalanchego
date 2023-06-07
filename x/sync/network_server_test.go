@@ -255,7 +255,7 @@ func Test_Server_GetChangeProof(t *testing.T) {
 				func(_ context.Context, _ ids.NodeID, requestID uint32, responseBytes []byte) error {
 					// grab a copy of the proof so we can inspect it later
 					if !test.proofNil {
-						var responseProto pb.GetChangeProofResponse
+						var responseProto pb.SyncGetChangeProofResponse
 						require.NoError(proto.Unmarshal(responseBytes, &responseProto))
 
 						// TODO when the client/server support including range proofs in the response,
@@ -284,8 +284,8 @@ func Test_Server_GetChangeProof(t *testing.T) {
 
 			// TODO when the client/server support including range proofs in the response,
 			// this will need to be updated.
-			bytes, err := proto.Marshal(&pb.GetChangeProofResponse{
-				Response: &pb.GetChangeProofResponse_ChangeProof{
+			bytes, err := proto.Marshal(&pb.SyncGetChangeProofResponse{
+				Response: &pb.SyncGetChangeProofResponse_ChangeProof{
 					ChangeProof: proofResult.ToProto(),
 				},
 			})

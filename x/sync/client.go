@@ -85,7 +85,7 @@ func (c *client) GetChangeProof(ctx context.Context, req *pb.SyncGetChangeProofR
 			return nil, fmt.Errorf("%w: (%d) > %d)", errTooManyBytes, len(responseBytes), req.BytesLimit)
 		}
 
-		var changeProofResp pb.GetChangeProofResponse
+		var changeProofResp pb.SyncGetChangeProofResponse
 		if err := proto.Unmarshal(responseBytes, &changeProofResp); err != nil {
 			return nil, err
 		}

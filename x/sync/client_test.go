@@ -354,7 +354,7 @@ func sendChangeRequest(
 	).DoAndReturn(
 		func(_ context.Context, _ ids.NodeID, requestID uint32, responseBytes []byte) error {
 			// deserialize the response so we can modify it if needed.
-			var responseProto pb.GetChangeProofResponse
+			var responseProto pb.SyncGetChangeProofResponse
 			require.NoError(proto.Unmarshal(responseBytes, &responseProto))
 
 			var changeProof merkledb.ChangeProof
@@ -368,8 +368,8 @@ func sendChangeRequest(
 			}
 
 			// reserialize the response and pass it to the client to complete the handling.
-			responseBytes, err := proto.Marshal(&pb.GetChangeProofResponse{
-				Response: &pb.GetChangeProofResponse_ChangeProof{
+			responseBytes, err := proto.Marshal(&pb.SyncGetChangeProofResponse{
+				Response: &pb.SyncGetChangeProofResponse_ChangeProof{
 					ChangeProof: changeProof.ToProto(),
 				},
 			})
@@ -548,8 +548,8 @@ func TestGetChangeProof(t *testing.T) {
 
 			// TODO when the client/server support including range proofs in the response,
 			// this will need to be updated.
-			bytes, err := proto.Marshal(&pb.GetChangeProofResponse{
-				Response: &pb.GetChangeProofResponse_ChangeProof{
+			bytes, err := proto.Marshal(&pb.SyncGetChangeProofResponse{
+				Response: &pb.SyncGetChangeProofResponse_ChangeProof{
 					ChangeProof: proof.ToProto(),
 				},
 			})

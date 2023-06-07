@@ -203,13 +203,13 @@ func (s *NetworkServer) HandleChangeProofRequest(
 			return err
 		}
 
-		proofBytes, err := proto.Marshal(&pb.GetChangeProofResponse{
+		proofBytes, err := proto.Marshal(&pb.SyncGetChangeProofResponse{
 			// TODO: Remove [changeProof.HadRootsInHistory] and if
 			// this node is unable to serve a change proof because it has
 			// insufficient history, get a range proof and set [Response]
 			// to that range proof.
 			// When this change is made, the client must be updated accordingly.
-			Response: &pb.GetChangeProofResponse_ChangeProof{
+			Response: &pb.SyncGetChangeProofResponse_ChangeProof{
 				ChangeProof: changeProof.ToProto(),
 			},
 		})

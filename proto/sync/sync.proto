@@ -60,22 +60,19 @@ message SyncGetChangeProofRequest {
   uint32 bytes_limit = 6;
 }
 
+message SyncGetChangeProofResponse {
+  oneof response {
+    ChangeProof change_proof = 1;
+    RangeProof range_proof = 2;
+  }
+}
+
 message GetChangeProofRequest {
   bytes start_root_hash = 1;
   bytes end_root_hash = 2;
   bytes start_key = 3;
   bytes end_key = 4;
   uint32 key_limit = 5;
-}
-
-// TODO improve naming. This is the response to a sync request
-// for a change proof, but it's not a response to a GetChangeProof
-// request on the SyncableDB service. That's confusing.
-message GetChangeProofResponse {
-  oneof response {
-    ChangeProof change_proof = 1;
-    RangeProof range_proof = 2;
-  }
 }
 
 message VerifyChangeProofRequest {
