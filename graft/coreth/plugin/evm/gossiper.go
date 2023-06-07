@@ -188,7 +188,7 @@ func (n *pushGossiper) queueRegossipTxs() types.Transactions {
 
 	// Add best transactions to be gossiped (preferring local txs)
 	tip := n.blockchain.CurrentBlock()
-	state, err := n.blockchain.StateAt(tip.Root())
+	state, err := n.blockchain.StateAt(tip.Root)
 	if err != nil || state == nil {
 		log.Debug(
 			"could not get state at tip",
@@ -197,14 +197,14 @@ func (n *pushGossiper) queueRegossipTxs() types.Transactions {
 		)
 		return nil
 	}
-	localQueued := n.queueExecutableTxs(state, tip.BaseFee(), localTxs, n.config.TxRegossipMaxSize)
+	localQueued := n.queueExecutableTxs(state, tip.BaseFee, localTxs, n.config.TxRegossipMaxSize)
 	localCount := len(localQueued)
 	n.stats.IncEthTxsRegossipQueuedLocal(localCount)
 	if localCount >= n.config.TxRegossipMaxSize {
 		n.stats.IncEthTxsRegossipQueued()
 		return localQueued
 	}
-	remoteQueued := n.queueExecutableTxs(state, tip.BaseFee(), remoteTxs, n.config.TxRegossipMaxSize-localCount)
+	remoteQueued := n.queueExecutableTxs(state, tip.BaseFee, remoteTxs, n.config.TxRegossipMaxSize-localCount)
 	n.stats.IncEthTxsRegossipQueuedRemote(len(remoteQueued))
 	if localCount+len(remoteQueued) > 0 {
 		// only increment the regossip stat when there are any txs queued

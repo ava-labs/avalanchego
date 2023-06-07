@@ -51,11 +51,6 @@ type revision struct {
 	journalIndex int
 }
 
-var (
-	// emptyRoot is the known root hash of an empty trie.
-	emptyRoot = common.HexToHash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
-)
-
 type proofList [][]byte
 
 func (n *proofList) Put(key []byte, value []byte) error {
@@ -649,10 +644,10 @@ func (s *StateDB) getDeletedStateObject(addr common.Address) *stateObject {
 				Root:        common.BytesToHash(acc.Root),
 			}
 			if len(data.CodeHash) == 0 {
-				data.CodeHash = emptyCodeHash
+				data.CodeHash = types.EmptyCodeHash.Bytes()
 			}
 			if data.Root == (common.Hash{}) {
-				data.Root = emptyRoot
+				data.Root = types.EmptyRootHash
 			}
 		}
 	}
@@ -1138,11 +1133,11 @@ func (s *StateDB) commit(deleteEmptyObjects bool, snaps *snapshot.Tree, blockHas
 		s.stateObjectsDestruct = make(map[common.Address]struct{})
 	}
 	if root == (common.Hash{}) {
-		root = emptyRoot
+		root = types.EmptyRootHash
 	}
 	origin := s.originalRoot
 	if origin == (common.Hash{}) {
-		origin = emptyRoot
+		origin = types.EmptyRootHash
 	}
 	if root != origin {
 		start := time.Now()

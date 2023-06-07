@@ -1332,12 +1332,12 @@ func (vm *VM) verifyTxAtTip(tx *Tx) error {
 	// Note: we fetch the current block and then the state at that block instead of the current state directly
 	// since we need the header of the current block below.
 	preferredBlock := vm.blockChain.CurrentBlock()
-	preferredState, err := vm.blockChain.StateAt(preferredBlock.Root())
+	preferredState, err := vm.blockChain.StateAt(preferredBlock.Root)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve block state at tip while verifying atomic tx: %w", err)
 	}
 	rules := vm.currentRules()
-	parentHeader := preferredBlock.Header()
+	parentHeader := preferredBlock
 	var nextBaseFee *big.Int
 	timestamp := vm.clock.Time().Unix()
 	bigTimestamp := big.NewInt(timestamp)

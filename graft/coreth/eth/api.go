@@ -195,16 +195,20 @@ func (api *DebugAPI) DumpBlock(blockNr rpc.BlockNumber) (state.Dump, error) {
 		OnlyWithAddresses: true,
 		Max:               AccountRangeMaxResults, // Sanity limit over RPC
 	}
-	var block *types.Block
+	var header *types.Header
 	if blockNr.IsAccepted() {
-		block = api.eth.LastAcceptedBlock()
+		header = api.eth.LastAcceptedBlock().Header()
 	} else {
-		block = api.eth.blockchain.GetBlockByNumber(uint64(blockNr))
+		block := api.eth.blockchain.GetBlockByNumber(uint64(blockNr))
+		if block == nil {
+			return state.Dump{}, fmt.Errorf("block #%d not found", blockNr)
+		}
+		header = block.Header()
 	}
-	if block == nil {
+	if header == nil {
 		return state.Dump{}, fmt.Errorf("block #%d not found", blockNr)
 	}
-	stateDb, err := api.eth.BlockChain().StateAt(block.Root())
+	stateDb, err := api.eth.BlockChain().StateAt(header.Root)
 	if err != nil {
 		return state.Dump{}, err
 	}
@@ -235,16 +239,20 @@ func (api *DebugAPI) AccountRange(blockNrOrHash rpc.BlockNumberOrHash, start hex
 	var err error
 
 	if number, ok := blockNrOrHash.Number(); ok {
-		var block *types.Block
+		var header *types.Header
 		if number.IsAccepted() {
-			block = api.eth.LastAcceptedBlock()
+			header = api.eth.LastAcceptedBlock().Header()
 		} else {
-			block = api.eth.blockchain.GetBlockByNumber(uint64(number))
+			block := api.eth.blockchain.GetBlockByNumber(uint64(number))
+			if block == nil {
+				return state.IteratorDump{}, fmt.Errorf("block #%d not found", number)
+			}
+			header = block.Header()
 		}
-		if block == nil {
+		if header == nil {
 			return state.IteratorDump{}, fmt.Errorf("block #%d not found", number)
 		}
-		stateDb, err = api.eth.BlockChain().StateAt(block.Root())
+		stateDb, err = api.eth.BlockChain().StateAt(header.Root)
 		if err != nil {
 			return state.IteratorDump{}, err
 		}
@@ -429,7 +437,7 @@ func (api *DebugAPI) GetAccessibleState(from, to rpc.BlockNumber) (uint64, error
 			if block == nil {
 				return 0, fmt.Errorf("current block missing")
 			}
-			return block.NumberU64(), nil
+			return block.Number.Uint64(), nil
 		}
 		return uint64(num.Int64()), nil
 	}

@@ -654,7 +654,7 @@ func TestTransactionIndices(t *testing.T) {
 		if tail == nil {
 			return
 		}
-		for i := *tail; i <= chain.CurrentBlock().NumberU64(); i++ {
+		for i := *tail; i <= chain.CurrentBlock().Number.Uint64(); i++ {
 			block := rawdb.ReadBlock(chain.db, rawdb.ReadCanonicalHash(chain.db, i), i)
 			if block.Transactions().Len() == 0 {
 				continue

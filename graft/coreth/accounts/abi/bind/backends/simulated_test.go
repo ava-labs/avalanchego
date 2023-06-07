@@ -1210,7 +1210,7 @@ func TestFork(t *testing.T) {
 		sim.Commit(false)
 	}
 	// 3.
-	if sim.blockchain.CurrentBlock().NumberU64() != uint64(n) {
+	if sim.blockchain.CurrentBlock().Number.Uint64() != uint64(n) {
 		t.Error("wrong chain length")
 	}
 	// 4.
@@ -1220,7 +1220,7 @@ func TestFork(t *testing.T) {
 		sim.Commit(false)
 	}
 	// 6.
-	if sim.blockchain.CurrentBlock().NumberU64() != uint64(n+1) {
+	if sim.blockchain.CurrentBlock().Number.Uint64() != uint64(n+1) {
 		t.Error("wrong chain length")
 	}
 }
@@ -1368,7 +1368,7 @@ func TestCommitReturnValue(t *testing.T) {
 	sim := simTestBackend(testAddr)
 	defer sim.Close()
 
-	startBlockHeight := sim.blockchain.CurrentBlock().NumberU64()
+	startBlockHeight := sim.blockchain.CurrentBlock().Number.Uint64()
 
 	// Test if Commit returns the correct block hash
 	h1 := sim.Commit(true)

@@ -40,6 +40,7 @@ import (
 	"testing/quick"
 
 	"github.com/ava-labs/coreth/core/rawdb"
+	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/ethdb"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/ethereum/go-ethereum/common"
@@ -56,7 +57,7 @@ func init() {
 func TestEmptyTrie(t *testing.T) {
 	trie := NewEmpty(NewDatabase(rawdb.NewMemoryDatabase()))
 	res := trie.Hash()
-	exp := emptyRoot
+	exp := types.EmptyRootHash
 	if res != exp {
 		t.Errorf("expected %x got %x", exp, res)
 	}
@@ -439,7 +440,7 @@ func runRandTest(rt randTest) bool {
 			}
 		case opProve:
 			hash := tr.Hash()
-			if hash == emptyRoot {
+			if hash == types.EmptyRootHash {
 				continue
 			}
 			proofDb := rawdb.NewMemoryDatabase()
@@ -733,7 +734,7 @@ func makeAccounts(size int) (addresses [][20]byte, accounts [][]byte) {
 	for i := 0; i < len(accounts); i++ {
 		var (
 			nonce = uint64(random.Int63())
-			root  = emptyRoot
+			root  = types.EmptyRootHash
 			code  = crypto.Keccak256(nil)
 		)
 		// The big.Rand function is not deterministic with regards to 64 vs 32 bit systems,

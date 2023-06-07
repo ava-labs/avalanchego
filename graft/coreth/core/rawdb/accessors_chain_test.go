@@ -111,8 +111,8 @@ func TestBlockStorage(t *testing.T) {
 	block := types.NewBlockWithHeader(&types.Header{
 		Extra:       []byte("test block"),
 		UncleHash:   types.EmptyUncleHash,
-		TxHash:      types.EmptyRootHash,
-		ReceiptHash: types.EmptyRootHash,
+		TxHash:      types.EmptyTxsHash,
+		ReceiptHash: types.EmptyReceiptsHash,
 	})
 	if entry := ReadBlock(db, block.Hash(), block.NumberU64()); entry != nil {
 		t.Fatalf("Non existent block returned: %v", entry)
@@ -159,8 +159,8 @@ func TestPartialBlockStorage(t *testing.T) {
 	block := types.NewBlockWithHeader(&types.Header{
 		Extra:       []byte("test block"),
 		UncleHash:   types.EmptyUncleHash,
-		TxHash:      types.EmptyRootHash,
-		ReceiptHash: types.EmptyRootHash,
+		TxHash:      types.EmptyTxsHash,
+		ReceiptHash: types.EmptyReceiptsHash,
 	})
 	// Store a header and check that it's not recognized as a block
 	WriteHeader(db, block.Header())

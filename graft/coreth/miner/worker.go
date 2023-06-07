@@ -125,8 +125,8 @@ func (w *worker) commitNewWork() (*types.Block, error) {
 	// Note: in order to support asynchronous block production, blocks are allowed to have
 	// the same timestamp as their parent. This allows more than one block to be produced
 	// per second.
-	if parent.Time() >= uint64(timestamp) {
-		timestamp = int64(parent.Time())
+	if parent.Time >= uint64(timestamp) {
+		timestamp = int64(parent.Time)
 	}
 
 	var gasLimit uint64
@@ -137,11 +137,11 @@ func (w *worker) commitNewWork() (*types.Block, error) {
 	} else {
 		// The gas limit is set in phase1 to ApricotPhase1GasLimit because the ceiling and floor were set to the same value
 		// such that the gas limit converged to it. Since this is hardbaked now, we remove the ability to configure it.
-		gasLimit = core.CalcGasLimit(parent.GasUsed(), parent.GasLimit(), params.ApricotPhase1GasLimit, params.ApricotPhase1GasLimit)
+		gasLimit = core.CalcGasLimit(parent.GasUsed, parent.GasLimit, params.ApricotPhase1GasLimit, params.ApricotPhase1GasLimit)
 	}
 	header := &types.Header{
 		ParentHash: parent.Hash(),
-		Number:     new(big.Int).Add(parent.Number(), common.Big1),
+		Number:     new(big.Int).Add(parent.Number, common.Big1),
 		GasLimit:   gasLimit,
 		Extra:      nil,
 		Time:       uint64(timestamp),
@@ -150,7 +150,7 @@ func (w *worker) commitNewWork() (*types.Block, error) {
 	bigTimestamp := big.NewInt(timestamp)
 	if w.chainConfig.IsApricotPhase3(bigTimestamp) {
 		var err error
-		header.Extra, header.BaseFee, err = dummy.CalcBaseFee(w.chainConfig, parent.Header(), uint64(timestamp))
+		header.Extra, header.BaseFee, err = dummy.CalcBaseFee(w.chainConfig, parent, uint64(timestamp))
 		if err != nil {
 			return nil, fmt.Errorf("failed to calculate new base fee: %w", err)
 		}
@@ -168,7 +168,7 @@ func (w *worker) commitNewWork() (*types.Block, error) {
 		return nil, fmt.Errorf("failed to create new current environment: %w", err)
 	}
 	// Configure any stateful precompiles that should go into effect during this block.
-	w.chainConfig.CheckConfigurePrecompiles(new(big.Int).SetUint64(parent.Time()), types.NewBlockWithHeader(header), env.state)
+	w.chainConfig.CheckConfigurePrecompiles(new(big.Int).SetUint64(parent.Time), types.NewBlockWithHeader(header), env.state)
 
 	// Fill the block with all available pending transactions.
 	pending := w.eth.TxPool().Pending(true)
@@ -194,15 +194,15 @@ func (w *worker) commitNewWork() (*types.Block, error) {
 	return w.commit(env)
 }
 
-func (w *worker) createCurrentEnvironment(parent *types.Block, header *types.Header, tstart time.Time) (*environment, error) {
-	state, err := w.chain.StateAt(parent.Root())
+func (w *worker) createCurrentEnvironment(parent *types.Header, header *types.Header, tstart time.Time) (*environment, error) {
+	state, err := w.chain.StateAt(parent.Root)
 	if err != nil {
 		return nil, err
 	}
 	return &environment{
 		signer:  types.MakeSigner(w.chainConfig, header.Number, new(big.Int).SetUint64(header.Time)),
 		state:   state,
-		parent:  parent.Header(),
+		parent:  parent,
 		header:  header,
 		tcount:  0,
 		gasPool: new(core.GasPool).AddGas(header.GasLimit),
@@ -211,11 +211,15 @@ func (w *worker) createCurrentEnvironment(parent *types.Block, header *types.Hea
 }
 
 func (w *worker) commitTransaction(env *environment, tx *types.Transaction, coinbase common.Address) ([]*types.Log, error) {
-	snap := env.state.Snapshot()
+	var (
+		snap = env.state.Snapshot()
+		gp   = env.gasPool.Gas()
+	)
 
 	receipt, err := core.ApplyTransaction(w.chainConfig, w.chain, &coinbase, env.gasPool, env.state, env.header, tx, &env.header.GasUsed, *w.chain.GetVMConfig())
 	if err != nil {
 		env.state.RevertToSnapshot(snap)
+		env.gasPool.SetGas(gp)
 		return nil, err
 	}
 	env.txs = append(env.txs, tx)

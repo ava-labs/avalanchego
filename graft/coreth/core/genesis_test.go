@@ -199,7 +199,7 @@ func TestNetworkUpgradeBetweenHeadAndAcceptedBlock(t *testing.T) {
 
 	require.Equal(blocks[1].Hash(), bc.lastAccepted.Hash())
 	// header must be bigger than last accepted
-	require.Greater(block.Time(), bc.lastAccepted.Time())
+	require.Greater(block.Time, bc.lastAccepted.Time())
 
 	activatedGenesis := customg
 	apricotPhase2Timestamp := big.NewInt(51)
@@ -209,7 +209,7 @@ func TestNetworkUpgradeBetweenHeadAndAcceptedBlock(t *testing.T) {
 	activatedGenesis.Config = &updatedApricotPhase2Config
 
 	// assert block is after the activation block
-	require.Greater(block.Time(), apricotPhase2Timestamp.Uint64())
+	require.Greater(block.Time, apricotPhase2Timestamp.Uint64())
 	// assert last accepted block is before the activation block
 	require.Less(bc.lastAccepted.Time(), apricotPhase2Timestamp.Uint64())
 

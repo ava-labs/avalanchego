@@ -34,6 +34,7 @@ import (
 	"io"
 	"sync"
 
+	"github.com/ava-labs/coreth/core/types"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 )
@@ -417,7 +418,7 @@ func (st *StackTrie) hashRec(hasher *hasher, path []byte) {
 		return
 
 	case emptyNode:
-		st.val = emptyRoot.Bytes()
+		st.val = types.EmptyRootHash.Bytes()
 		st.key = st.key[:0]
 		st.nodeType = hashedNode
 		return

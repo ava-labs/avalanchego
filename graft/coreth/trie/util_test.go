@@ -31,6 +31,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/coreth/core/rawdb"
+	"github.com/ava-labs/coreth/core/types"
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -296,7 +297,7 @@ func TestDeleteAll(t *testing.T) {
 		trie.Delete([]byte(val.k))
 	}
 	root, set = trie.Commit(false)
-	if root != emptyRoot {
+	if root != types.EmptyRootHash {
 		t.Fatalf("Invalid trie root %v", root)
 	}
 	for path, blob := range set.deletes {

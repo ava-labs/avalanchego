@@ -34,12 +34,12 @@ import (
 	"time"
 
 	"github.com/ava-labs/coreth/core/rawdb"
+	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/ethdb"
 	"github.com/ava-labs/coreth/trie"
 	"github.com/ava-labs/coreth/utils"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 )
@@ -47,14 +47,6 @@ import (
 const (
 	snapshotCacheNamespace            = "state/snapshot/clean/fastcache" // prefix for detailed stats from the snapshot fastcache
 	snapshotCacheStatsUpdateFrequency = 1000                             // update stats from the snapshot fastcache once per 1000 ops
-)
-
-var (
-	// emptyRoot is the known root hash of an empty trie.
-	emptyRoot = common.HexToHash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
-
-	// emptyCode is the known hash of the empty EVM bytecode.
-	emptyCode = crypto.Keccak256Hash(nil)
 )
 
 // generatorStats is a collection of statistics gathered by the snapshot generator
@@ -334,7 +326,7 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 		}
 		// If the iterated account is a contract, iterate through corresponding contract
 		// storage to generate snapshot entries.
-		if acc.Root != emptyRoot {
+		if acc.Root != types.EmptyRootHash {
 			storeTrieId := trie.StorageTrieID(dl.root, accountHash, acc.Root)
 			storeTrie, err := trie.NewStateTrie(storeTrieId, dl.triedb)
 			if err != nil {

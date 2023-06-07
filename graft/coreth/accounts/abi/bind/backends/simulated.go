@@ -127,7 +127,10 @@ func NewSimulatedBackendWithDatabase(database ethdb.Database, alloc core.Genesis
 	backend.filterSystem = filters.NewFilterSystem(filterBackend, filters.Config{})
 	backend.events = filters.NewEventSystem(backend.filterSystem)
 
-	backend.rollback(blockchain.CurrentBlock())
+	header := backend.blockchain.CurrentBlock()
+	block := backend.blockchain.GetBlock(header.Hash(), header.Number.Uint64())
+
+	backend.rollback(block)
 	return backend
 }
 
@@ -173,7 +176,10 @@ func (b *SimulatedBackend) Rollback() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	b.rollback(b.blockchain.CurrentBlock())
+	header := b.blockchain.CurrentBlock()
+	block := b.blockchain.GetBlock(header.Hash(), header.Number.Uint64())
+
+	b.rollback(block)
 }
 
 func (b *SimulatedBackend) rollback(parent *types.Block) {
@@ -212,7 +218,7 @@ func (b *SimulatedBackend) Fork(ctx context.Context, parent common.Hash) error {
 
 // stateByBlockNumber retrieves a state by a given blocknumber.
 func (b *SimulatedBackend) stateByBlockNumber(ctx context.Context, blockNumber *big.Int) (*state.StateDB, error) {
-	if blockNumber == nil || blockNumber.Cmp(b.blockchain.CurrentBlock().Number()) == 0 {
+	if blockNumber == nil || blockNumber.Cmp(b.blockchain.CurrentBlock().Number) == 0 {
 		return b.blockchain.State()
 	}
 	block, err := b.blockByNumber(ctx, blockNumber)
@@ -341,7 +347,7 @@ func (b *SimulatedBackend) BlockByNumber(ctx context.Context, number *big.Int) (
 // (associated with its hash) if found without Lock.
 func (b *SimulatedBackend) blockByNumber(ctx context.Context, number *big.Int) (*types.Block, error) {
 	if number == nil || number.Cmp(b.acceptedBlock.Number()) == 0 {
-		return b.blockchain.CurrentBlock(), nil
+		return b.blockByHash(ctx, b.blockchain.CurrentBlock().Hash())
 	}
 
 	block := b.blockchain.GetBlockByNumber(uint64(number.Int64()))
@@ -469,7 +475,7 @@ func (b *SimulatedBackend) CallContract(ctx context.Context, call interfaces.Cal
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	if blockNumber != nil && blockNumber.Cmp(b.blockchain.CurrentBlock().Number()) != 0 {
+	if blockNumber != nil && blockNumber.Cmp(b.blockchain.CurrentBlock().Number) != 0 {
 		return nil, errBlockNumberUnsupported
 	}
 	stateDB, err := b.blockchain.State()
@@ -493,7 +499,7 @@ func (b *SimulatedBackend) AcceptedCallContract(ctx context.Context, call interf
 	defer b.mu.Unlock()
 	defer b.acceptedState.RevertToSnapshot(b.acceptedState.Snapshot())
 
-	res, err := b.callContract(ctx, call, b.acceptedBlock, b.acceptedState)
+	res, err := b.callContract(ctx, call, b.acceptedBlock.Header(), b.acceptedState)
 	if err != nil {
 		return nil, err
 	}
@@ -587,7 +593,7 @@ func (b *SimulatedBackend) EstimateGas(ctx context.Context, call interfaces.Call
 		call.Gas = gas
 
 		snapshot := b.acceptedState.Snapshot()
-		res, err := b.callContract(ctx, call, b.acceptedBlock, b.acceptedState)
+		res, err := b.callContract(ctx, call, b.acceptedBlock.Header(), b.acceptedState)
 		b.acceptedState.RevertToSnapshot(snapshot)
 
 		if err != nil {
@@ -637,7 +643,7 @@ func (b *SimulatedBackend) EstimateGas(ctx context.Context, call interfaces.Call
 
 // callContract implements common code between normal and pending contract calls.
 // state is modified during execution, make sure to copy it if necessary.
-func (b *SimulatedBackend) callContract(ctx context.Context, call interfaces.CallMsg, block *types.Block, stateDB *state.StateDB) (*core.ExecutionResult, error) {
+func (b *SimulatedBackend) callContract(ctx context.Context, call interfaces.CallMsg, header *types.Header, stateDB *state.StateDB) (*core.ExecutionResult, error) {
 	// Gas prices post 1559 need to be initialized
 	if call.GasPrice != nil && (call.GasFeeCap != nil || call.GasTipCap != nil) {
 		return nil, errors.New("both gasPrice and (maxFeePerGas or maxPriorityFeePerGas) specified")
@@ -676,20 +682,33 @@ func (b *SimulatedBackend) callContract(ctx context.Context, call interfaces.Cal
 	if call.Value == nil {
 		call.Value = new(big.Int)
 	}
+
 	// Set infinite balance to the fake caller account.
 	from := stateDB.GetOrNewStateObject(call.From)
 	from.SetBalance(math.MaxBig256)
-	// Execute the call.
-	msg := callMsg{call}
 
-	txContext := core.NewEVMTxContext(msg)
-	evmContext := core.NewEVMBlockContext(block.Header(), b.blockchain, nil)
+	// Execute the call.
+	msg := &core.Message{
+		From:              call.From,
+		To:                call.To,
+		Value:             call.Value,
+		GasLimit:          call.Gas,
+		GasPrice:          call.GasPrice,
+		GasFeeCap:         call.GasFeeCap,
+		GasTipCap:         call.GasTipCap,
+		Data:              call.Data,
+		AccessList:        call.AccessList,
+		SkipAccountChecks: true,
+	}
+
 	// Create a new environment which holds all relevant information
 	// about the transaction and calling mechanisms.
+	txContext := core.NewEVMTxContext(msg)
+	evmContext := core.NewEVMBlockContext(header, b.blockchain, nil)
 	vmEnv := vm.NewEVM(evmContext, txContext, stateDB, b.config, vm.Config{NoBaseFee: true})
 	gasPool := new(core.GasPool).AddGas(math.MaxUint64)
 
-	return core.NewStateTransition(vmEnv, msg, gasPool).TransitionDb()
+	return core.ApplyMessage(vmEnv, msg, gasPool)
 }
 
 // SendTransaction updates the pending block to include the given transaction.
@@ -853,23 +872,6 @@ func (b *SimulatedBackend) AdjustTime(adjustment time.Duration) error {
 func (b *SimulatedBackend) Blockchain() *core.BlockChain {
 	return b.blockchain
 }
-
-// callMsg implements core.Message to allow passing it as a transaction simulator.
-type callMsg struct {
-	interfaces.CallMsg
-}
-
-func (m callMsg) From() common.Address         { return m.CallMsg.From }
-func (m callMsg) Nonce() uint64                { return 0 }
-func (m callMsg) IsFake() bool                 { return true }
-func (m callMsg) To() *common.Address          { return m.CallMsg.To }
-func (m callMsg) GasPrice() *big.Int           { return m.CallMsg.GasPrice }
-func (m callMsg) GasFeeCap() *big.Int          { return m.CallMsg.GasFeeCap }
-func (m callMsg) GasTipCap() *big.Int          { return m.CallMsg.GasTipCap }
-func (m callMsg) Gas() uint64                  { return m.CallMsg.Gas }
-func (m callMsg) Value() *big.Int              { return m.CallMsg.Value }
-func (m callMsg) Data() []byte                 { return m.CallMsg.Data }
-func (m callMsg) AccessList() types.AccessList { return m.CallMsg.AccessList }
 
 // filterBackend implements filters.Backend to support filtering for logs without
 // taking bloom-bits acceleration structures into account.
