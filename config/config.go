@@ -62,6 +62,7 @@ const (
 
 var (
 	// Deprecated key --> deprecation message (i.e. which key replaces it)
+	// TODO: deprecate "BootstrapIDsKey" and "BootstrapIPsKey"
 	deprecatedKeys = map[string]string{
 		NetworkCompressionEnabledKey:           fmt.Sprintf("use --%s instead", NetworkCompressionTypeKey),
 		GenesisConfigFileKey:                   fmt.Sprintf("use --%s instead", GenesisFileKey),
@@ -107,14 +108,12 @@ func getConsensusConfig(v *viper.Viper) snowball.Parameters {
 		//
 		// TODO: After the X-chain linearization use the
 		// SnowVirtuousCommitThresholdKey as before.
-		BetaVirtuous:            v.GetInt(SnowRogueCommitThresholdKey),
-		BetaRogue:               v.GetInt(SnowRogueCommitThresholdKey),
-		ConcurrentRepolls:       v.GetInt(SnowConcurrentRepollsKey),
-		OptimalProcessing:       v.GetInt(SnowOptimalProcessingKey),
-		MaxOutstandingItems:     v.GetInt(SnowMaxProcessingKey),
-		MaxItemProcessingTime:   v.GetDuration(SnowMaxTimeProcessingKey),
-		MixedQueryNumPushVdr:    int(v.GetUint(SnowMixedQueryNumPushVdrKey)),
-		MixedQueryNumPushNonVdr: int(v.GetUint(SnowMixedQueryNumPushNonVdrKey)),
+		BetaVirtuous:          v.GetInt(SnowRogueCommitThresholdKey),
+		BetaRogue:             v.GetInt(SnowRogueCommitThresholdKey),
+		ConcurrentRepolls:     v.GetInt(SnowConcurrentRepollsKey),
+		OptimalProcessing:     v.GetInt(SnowOptimalProcessingKey),
+		MaxOutstandingItems:   v.GetInt(SnowMaxProcessingKey),
+		MaxItemProcessingTime: v.GetDuration(SnowMaxTimeProcessingKey),
 	}
 }
 
@@ -237,14 +236,15 @@ func getHTTPConfig(v *viper.Viper) (node.HTTPConfig, error) {
 			MetricsAPIEnabled:  v.GetBool(MetricsAPIEnabledKey),
 			HealthAPIEnabled:   v.GetBool(HealthAPIEnabledKey),
 		},
-		HTTPHost:          v.GetString(HTTPHostKey),
-		HTTPPort:          uint16(v.GetUint(HTTPPortKey)),
-		HTTPSEnabled:      v.GetBool(HTTPSEnabledKey),
-		HTTPSKey:          httpsKey,
-		HTTPSCert:         httpsCert,
-		APIAllowedOrigins: v.GetStringSlice(HTTPAllowedOrigins),
-		ShutdownTimeout:   v.GetDuration(HTTPShutdownTimeoutKey),
-		ShutdownWait:      v.GetDuration(HTTPShutdownWaitKey),
+		HTTPHost:           v.GetString(HTTPHostKey),
+		HTTPPort:           uint16(v.GetUint(HTTPPortKey)),
+		HTTPSEnabled:       v.GetBool(HTTPSEnabledKey),
+		HTTPSKey:           httpsKey,
+		HTTPSCert:          httpsCert,
+		HTTPAllowedOrigins: v.GetStringSlice(HTTPAllowedOrigins),
+		HTTPAllowedHosts:   v.GetStringSlice(HTTPAllowedHostsKey),
+		ShutdownTimeout:    v.GetDuration(HTTPShutdownTimeoutKey),
+		ShutdownWait:       v.GetDuration(HTTPShutdownWaitKey),
 	}
 
 	config.APIAuthConfig, err = getAPIAuthConfig(v)
@@ -532,6 +532,8 @@ func getBootstrapConfig(v *viper.Viper, networkID uint32) (node.BootstrapConfig,
 		BootstrapAncestorsMaxContainersReceived: int(v.GetUint(BootstrapAncestorsMaxContainersReceivedKey)),
 	}
 
+	// TODO: Add a "BootstrappersKey" flag to more clearly enforce ID and IP
+	// length equality.
 	ipsSet := v.IsSet(BootstrapIPsKey)
 	idsSet := v.IsSet(BootstrapIDsKey)
 	if ipsSet && !idsSet {
@@ -540,40 +542,49 @@ func getBootstrapConfig(v *viper.Viper, networkID uint32) (node.BootstrapConfig,
 	if !ipsSet && idsSet {
 		return node.BootstrapConfig{}, fmt.Errorf("set %q but didn't set %q", BootstrapIDsKey, BootstrapIPsKey)
 	}
-
-	bootstrapIPs, bootstrapIDs := genesis.SampleBeacons(networkID, 5)
-	if ipsSet {
-		bootstrapIPs = strings.Split(v.GetString(BootstrapIPsKey), ",")
+	if !ipsSet && !idsSet {
+		config.Bootstrappers = genesis.SampleBootstrappers(networkID, 5)
+		return config, nil
 	}
-	for _, ip := range bootstrapIPs {
+
+	bootstrapIPs := strings.Split(v.GetString(BootstrapIPsKey), ",")
+	config.Bootstrappers = make([]genesis.Bootstrapper, 0, len(bootstrapIPs))
+	for _, bootstrapIP := range bootstrapIPs {
+		ip := strings.TrimSpace(bootstrapIP)
 		if ip == "" {
 			continue
 		}
+
 		addr, err := ips.ToIPPort(ip)
 		if err != nil {
 			return node.BootstrapConfig{}, fmt.Errorf("couldn't parse bootstrap ip %s: %w", ip, err)
 		}
-		config.BootstrapIPs = append(config.BootstrapIPs, addr)
+		config.Bootstrappers = append(config.Bootstrappers, genesis.Bootstrapper{
+			// ID is populated below
+			IP: ips.IPDesc(addr),
+		})
 	}
 
-	if idsSet {
-		bootstrapIDs = strings.Split(v.GetString(BootstrapIDsKey), ",")
-	}
-	for _, id := range bootstrapIDs {
+	bootstrapIDs := strings.Split(v.GetString(BootstrapIDsKey), ",")
+	bootstrapNodeIDs := make([]ids.NodeID, 0, len(bootstrapIDs))
+	for _, bootstrapID := range bootstrapIDs {
+		id := strings.TrimSpace(bootstrapID)
 		if id == "" {
 			continue
 		}
+
 		nodeID, err := ids.NodeIDFromString(id)
 		if err != nil {
 			return node.BootstrapConfig{}, fmt.Errorf("couldn't parse bootstrap peer id %s: %w", id, err)
 		}
-		config.BootstrapIDs = append(config.BootstrapIDs, nodeID)
+		bootstrapNodeIDs = append(bootstrapNodeIDs, nodeID)
 	}
 
-	lenIPs := len(config.BootstrapIPs)
-	lenIDs := len(config.BootstrapIDs)
-	if lenIPs != lenIDs {
-		return node.BootstrapConfig{}, fmt.Errorf("expected the number of bootstrapIPs (%d) to match the number of bootstrapIDs (%d)", lenIPs, lenIDs)
+	if len(config.Bootstrappers) != len(bootstrapNodeIDs) {
+		return node.BootstrapConfig{}, fmt.Errorf("expected the number of bootstrapIPs (%d) to match the number of bootstrapIDs (%d)", len(config.Bootstrappers), len(bootstrapNodeIDs))
+	}
+	for i, nodeID := range bootstrapNodeIDs {
+		config.Bootstrappers[i].ID = nodeID
 	}
 
 	return config, nil
