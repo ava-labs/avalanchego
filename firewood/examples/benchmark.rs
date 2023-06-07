@@ -4,6 +4,7 @@
 use clap::Parser;
 use criterion::Criterion;
 use firewood::db::{Db, DbConfig, WalConfig};
+use rand::{rngs::StdRng, Rng, SeedableRng};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -18,51 +19,52 @@ struct Args {
     no_root_hash: bool,
 }
 
-/// cargo run --example benchmark -- --nbatch 100 --batch-size 1000
 fn main() {
     let args = Args::parse();
 
     let cfg = DbConfig::builder().wal(WalConfig::builder().max_revisions(10).build());
-    {
-        use rand::{Rng, SeedableRng};
-        let mut c = Criterion::default();
-        let mut group = c.benchmark_group("insert".to_string());
-        let mut rng = rand::rngs::StdRng::seed_from_u64(args.seed);
-        let nbatch = args.nbatch;
-        let batch_size = args.batch_size;
-        let total = nbatch * batch_size;
-        let root_hash = !args.no_root_hash;
-        let mut workload = Vec::new();
-        for _ in 0..nbatch {
-            let mut batch: Vec<(Vec<_>, Vec<_>)> = Vec::new();
-            for _ in 0..batch_size {
-                batch.push((rng.gen::<[u8; 32]>().into(), rng.gen::<[u8; 32]>().into()));
-            }
-            workload.push(batch);
-        }
-        println!("workload prepared");
-        group
-            .sampling_mode(criterion::SamplingMode::Flat)
-            .sample_size(10);
-        group.throughput(criterion::Throughput::Elements(total as u64));
-        group.bench_with_input(
-            format!("nbatch={nbatch} batch_size={batch_size}"),
-            &workload,
-            |b, workload| {
-                b.iter(|| {
-                    let db = Db::new("benchmark_db", &cfg.clone().truncate(true).build()).unwrap();
-                    for batch in workload.iter() {
-                        let mut wb = db.new_writebatch();
-                        for (k, v) in batch {
-                            wb = wb.kv_insert(k, v.clone()).unwrap();
-                        }
-                        if !root_hash {
-                            wb = wb.no_root_hash();
-                        }
-                        wb.commit();
+    let mut c = Criterion::default();
+    let mut group = c.benchmark_group("insert");
+    let mut rng = StdRng::seed_from_u64(args.seed);
+
+    let workload: Vec<Vec<([u8; 32], [u8; 32])>> = (0..args.nbatch)
+        .map(|_| {
+            (0..args.batch_size)
+                .map(|_| (rng.gen(), rng.gen()))
+                .collect()
+        })
+        .collect();
+
+    println!("workload prepared");
+
+    group
+        .sampling_mode(criterion::SamplingMode::Flat)
+        .sample_size(10);
+
+    let total = (args.nbatch * args.batch_size) as u64;
+    group.throughput(criterion::Throughput::Elements(total));
+
+    group.bench_with_input(
+        format!("nbatch={} batch_size={}", args.nbatch, args.batch_size),
+        &workload,
+        |b, workload| {
+            b.iter(|| {
+                let db = Db::new("benchmark_db", &cfg.clone().truncate(true).build()).unwrap();
+
+                for batch in workload.iter() {
+                    let mut wb = db.new_writebatch();
+
+                    for (k, v) in batch {
+                        wb = wb.kv_insert(k, v.to_vec()).unwrap();
                     }
-                })
-            },
-        );
-    }
+
+                    if args.no_root_hash {
+                        wb = wb.no_root_hash();
+                    }
+
+                    wb.commit();
+                }
+            })
+        },
+    );
 }
