@@ -1534,22 +1534,13 @@ func Test_RegressionBLSKeyDiff(t *testing.T) {
 	require.NoError(primaryTx.SyntacticVerify(vm.ctx))
 
 	require.NoError(vm.Builder.AddUnverifiedTx(primaryTx))
-	blk, err := vm.Builder.BuildBlock(context.Background())
-	require.NoError(err)
-	require.NoError(blk.Verify(context.Background()))
-	require.NoError(blk.Accept(context.Background()))
-	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
+	require.NoError(buildAndAcceptStandardBlock(vm))
 
 	// move time ahead, promoting primary validator to current
 	currentTime = primaryStartTime
 	vm.clock.Set(currentTime)
 	vm.state.SetTimestamp(currentTime)
-
-	blk, err = vm.Builder.BuildBlock(context.Background())
-	require.NoError(err)
-	require.NoError(blk.Verify(context.Background()))
-	require.NoError(blk.Accept(context.Background()))
-	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
+	require.NoError(buildAndAcceptStandardBlock(vm))
 
 	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.NoError(err)
@@ -1570,22 +1561,13 @@ func Test_RegressionBLSKeyDiff(t *testing.T) {
 	require.NoError(err)
 
 	require.NoError(vm.Builder.AddUnverifiedTx(subnetTx))
-	blk, err = vm.Builder.BuildBlock(context.Background())
-	require.NoError(err)
-	require.NoError(blk.Verify(context.Background()))
-	require.NoError(blk.Accept(context.Background()))
-	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
+	require.NoError(buildAndAcceptStandardBlock(vm))
 
 	// move time ahead, promoting the subnet validator to current
 	currentTime = subnetStartTime
 	vm.clock.Set(currentTime)
 	vm.state.SetTimestamp(currentTime)
-
-	blk, err = vm.Builder.BuildBlock(context.Background())
-	require.NoError(err)
-	require.NoError(blk.Verify(context.Background()))
-	require.NoError(blk.Accept(context.Background()))
-	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
+	require.NoError(buildAndAcceptStandardBlock(vm))
 
 	_, err = vm.state.GetCurrentValidator(subnetID, nodeID)
 	require.NoError(err)
@@ -1597,12 +1579,7 @@ func Test_RegressionBLSKeyDiff(t *testing.T) {
 	currentTime = subnetEndTime
 	vm.clock.Set(currentTime)
 	vm.state.SetTimestamp(currentTime)
-
-	blk, err = vm.Builder.BuildBlock(context.Background())
-	require.NoError(err)
-	require.NoError(blk.Verify(context.Background()))
-	require.NoError(blk.Accept(context.Background()))
-	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
+	require.NoError(buildAndAcceptStandardBlock(vm))
 
 	_, err = vm.state.GetCurrentValidator(subnetID, nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
@@ -1615,7 +1592,7 @@ func Test_RegressionBLSKeyDiff(t *testing.T) {
 	vm.clock.Set(currentTime)
 	vm.state.SetTimestamp(currentTime)
 
-	blk, err = vm.Builder.BuildBlock(context.Background()) // must be a proposal block rewarding the primary validator
+	blk, err := vm.Builder.BuildBlock(context.Background()) // must be a proposal block rewarding the primary validator
 	require.NoError(err)
 	require.NoError(blk.Verify(context.Background()))
 
@@ -1688,22 +1665,13 @@ func Test_RegressionBLSKeyDiff(t *testing.T) {
 	require.NoError(uPrimaryRestartTx.SyntacticVerify(vm.ctx))
 
 	require.NoError(vm.Builder.AddUnverifiedTx(primaryRestartTx))
-	blk, err = vm.Builder.BuildBlock(context.Background())
-	require.NoError(err)
-	require.NoError(blk.Verify(context.Background()))
-	require.NoError(blk.Accept(context.Background()))
-	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
+	require.NoError(buildAndAcceptStandardBlock(vm))
 
 	// move time ahead, promoting restarted primary validator to current
 	currentTime = primaryReStartTime
 	vm.clock.Set(currentTime)
 	vm.state.SetTimestamp(currentTime)
-
-	blk, err = vm.Builder.BuildBlock(context.Background())
-	require.NoError(err)
-	require.NoError(blk.Verify(context.Background()))
-	require.NoError(blk.Accept(context.Background()))
-	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
+	require.NoError(buildAndAcceptStandardBlock(vm))
 
 	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.NoError(err)
@@ -1805,22 +1773,13 @@ func Test_RegressionPrimaryNetworkValidatorEmptyBLSKeyDiff(t *testing.T) {
 	require.NoError(err)
 
 	require.NoError(vm.Builder.AddUnverifiedTx(primaryTx1))
-	blk, err := vm.Builder.BuildBlock(context.Background())
-	require.NoError(err)
-	require.NoError(blk.Verify(context.Background()))
-	require.NoError(blk.Accept(context.Background()))
-	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
+	require.NoError(buildAndAcceptStandardBlock(vm))
 
 	// move time ahead, promoting primary validator to current
 	currentTime = primaryStartTime1
 	vm.clock.Set(currentTime)
 	vm.state.SetTimestamp(currentTime)
-
-	blk, err = vm.Builder.BuildBlock(context.Background())
-	require.NoError(err)
-	require.NoError(blk.Verify(context.Background()))
-	require.NoError(blk.Accept(context.Background()))
-	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
+	require.NoError(buildAndAcceptStandardBlock(vm))
 
 	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.NoError(err)
@@ -1833,7 +1792,7 @@ func Test_RegressionPrimaryNetworkValidatorEmptyBLSKeyDiff(t *testing.T) {
 	vm.clock.Set(currentTime)
 	vm.state.SetTimestamp(currentTime)
 
-	blk, err = vm.Builder.BuildBlock(context.Background()) // must be a proposal block rewarding the primary validator
+	blk, err := vm.Builder.BuildBlock(context.Background()) // must be a proposal block rewarding the primary validator
 	require.NoError(err)
 	require.NoError(blk.Verify(context.Background()))
 
@@ -1906,22 +1865,13 @@ func Test_RegressionPrimaryNetworkValidatorEmptyBLSKeyDiff(t *testing.T) {
 	require.NoError(uPrimaryRestartTx.SyntacticVerify(vm.ctx))
 
 	require.NoError(vm.Builder.AddUnverifiedTx(primaryRestartTx))
-	blk, err = vm.Builder.BuildBlock(context.Background())
-	require.NoError(err)
-	require.NoError(blk.Verify(context.Background()))
-	require.NoError(blk.Accept(context.Background()))
-	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
+	require.NoError(buildAndAcceptStandardBlock(vm))
 
 	// move time ahead, promoting restarted primary validator to current
 	currentTime = primaryStartTime2
 	vm.clock.Set(currentTime)
 	vm.state.SetTimestamp(currentTime)
-
-	blk, err = vm.Builder.BuildBlock(context.Background())
-	require.NoError(err)
-	require.NoError(blk.Verify(context.Background()))
-	require.NoError(blk.Accept(context.Background()))
-	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
+	require.NoError(buildAndAcceptStandardBlock(vm))
 
 	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.NoError(err)
@@ -1986,22 +1936,13 @@ func Test_RegressionSubnetkValidatorEmptyBLSKeyDiff(t *testing.T) {
 	require.NoError(err)
 
 	require.NoError(vm.Builder.AddUnverifiedTx(primaryTx1))
-	blk, err := vm.Builder.BuildBlock(context.Background())
-	require.NoError(err)
-	require.NoError(blk.Verify(context.Background()))
-	require.NoError(blk.Accept(context.Background()))
-	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
+	require.NoError(buildAndAcceptStandardBlock(vm))
 
 	// move time ahead, promoting primary validator to current
 	currentTime = primaryStartTime1
 	vm.clock.Set(currentTime)
 	vm.state.SetTimestamp(currentTime)
-
-	blk, err = vm.Builder.BuildBlock(context.Background())
-	require.NoError(err)
-	require.NoError(blk.Verify(context.Background()))
-	require.NoError(blk.Accept(context.Background()))
-	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
+	require.NoError(buildAndAcceptStandardBlock(vm))
 
 	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.NoError(err)
@@ -2022,22 +1963,13 @@ func Test_RegressionSubnetkValidatorEmptyBLSKeyDiff(t *testing.T) {
 	require.NoError(err)
 
 	require.NoError(vm.Builder.AddUnverifiedTx(subnetTx))
-	blk, err = vm.Builder.BuildBlock(context.Background())
-	require.NoError(err)
-	require.NoError(blk.Verify(context.Background()))
-	require.NoError(blk.Accept(context.Background()))
-	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
+	require.NoError(buildAndAcceptStandardBlock(vm))
 
 	// move time ahead, promoting the subnet validator to current
 	currentTime = subnetStartTime
 	vm.clock.Set(currentTime)
 	vm.state.SetTimestamp(currentTime)
-
-	blk, err = vm.Builder.BuildBlock(context.Background())
-	require.NoError(err)
-	require.NoError(blk.Verify(context.Background()))
-	require.NoError(blk.Accept(context.Background()))
-	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
+	require.NoError(buildAndAcceptStandardBlock(vm))
 
 	_, err = vm.state.GetCurrentValidator(subnetID, nodeID)
 	require.NoError(err)
@@ -2049,12 +1981,7 @@ func Test_RegressionSubnetkValidatorEmptyBLSKeyDiff(t *testing.T) {
 	currentTime = subnetEndTime
 	vm.clock.Set(currentTime)
 	vm.state.SetTimestamp(currentTime)
-
-	blk, err = vm.Builder.BuildBlock(context.Background())
-	require.NoError(err)
-	require.NoError(blk.Verify(context.Background()))
-	require.NoError(blk.Accept(context.Background()))
-	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
+	require.NoError(buildAndAcceptStandardBlock(vm))
 
 	_, err = vm.state.GetCurrentValidator(subnetID, nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
@@ -2067,7 +1994,7 @@ func Test_RegressionSubnetkValidatorEmptyBLSKeyDiff(t *testing.T) {
 	vm.clock.Set(currentTime)
 	vm.state.SetTimestamp(currentTime)
 
-	blk, err = vm.Builder.BuildBlock(context.Background()) // must be a proposal block rewarding the primary validator
+	blk, err := vm.Builder.BuildBlock(context.Background()) // must be a proposal block rewarding the primary validator
 	require.NoError(err)
 	require.NoError(blk.Verify(context.Background()))
 
@@ -2140,23 +2067,14 @@ func Test_RegressionSubnetkValidatorEmptyBLSKeyDiff(t *testing.T) {
 	require.NoError(uPrimaryRestartTx.SyntacticVerify(vm.ctx))
 
 	require.NoError(vm.Builder.AddUnverifiedTx(primaryRestartTx))
-	blk, err = vm.Builder.BuildBlock(context.Background())
-	require.NoError(err)
-	require.NoError(blk.Verify(context.Background()))
-	require.NoError(blk.Accept(context.Background()))
-	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
+	require.NoError(buildAndAcceptStandardBlock(vm))
 
 	// move time ahead, promoting restarted primary validator to current
 	currentTime = primaryStartTime2
 	vm.clock.Set(currentTime)
 	vm.state.SetTimestamp(currentTime)
 
-	blk, err = vm.Builder.BuildBlock(context.Background())
-	require.NoError(err)
-	require.NoError(blk.Verify(context.Background()))
-	require.NoError(blk.Accept(context.Background()))
-	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
-
+	require.NoError(buildAndAcceptStandardBlock(vm))
 	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.NoError(err)
 
@@ -2179,6 +2097,23 @@ func Test_RegressionSubnetkValidatorEmptyBLSKeyDiff(t *testing.T) {
 			emptySigner.Key()),
 		)
 	}
+}
+
+func buildAndAcceptStandardBlock(vm *VM) error {
+	blk, err := vm.Builder.BuildBlock(context.Background())
+	if err != nil {
+		return err
+	}
+
+	if err := blk.Verify(context.Background()); err != nil {
+		return err
+	}
+
+	if err := blk.Accept(context.Background()); err != nil {
+		return err
+	}
+
+	return vm.SetPreference(context.Background(), vm.manager.LastAccepted())
 }
 
 func checkValidatorBlsKeyIsSet(
