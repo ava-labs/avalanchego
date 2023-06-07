@@ -25,7 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 
-	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
+	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
 const (
@@ -67,7 +67,7 @@ func (s *NetworkServer) AppRequest(
 	deadline time.Time,
 	request []byte,
 ) error {
-	var req syncpb.Request
+	var req pb.Request
 	if err := proto.Unmarshal(request, &req); err != nil {
 		s.log.Debug(
 			"failed to unmarshal AppRequest",
@@ -106,9 +106,9 @@ func (s *NetworkServer) AppRequest(
 
 	var err error
 	switch req := req.GetMessage().(type) {
-	case *syncpb.Request_ChangeProofRequest:
+	case *pb.Request_ChangeProofRequest:
 		err = s.HandleChangeProofRequest(ctx, nodeID, requestID, req.ChangeProofRequest)
-	case *syncpb.Request_RangeProofRequest:
+	case *pb.Request_RangeProofRequest:
 		err = s.HandleRangeProofRequest(ctx, nodeID, requestID, req.RangeProofRequest)
 	default:
 		s.log.Debug(
@@ -151,7 +151,7 @@ func (s *NetworkServer) HandleChangeProofRequest(
 	ctx context.Context,
 	nodeID ids.NodeID,
 	requestID uint32,
-	req *syncpb.ChangeProofRequest,
+	req *pb.SyncGetChangeProofRequest,
 ) error {
 	if req.BytesLimit == 0 ||
 		req.KeyLimit == 0 ||
@@ -203,13 +203,13 @@ func (s *NetworkServer) HandleChangeProofRequest(
 			return err
 		}
 
-		proofBytes, err := proto.Marshal(&syncpb.ChangeProofResponse{
+		proofBytes, err := proto.Marshal(&pb.SyncGetChangeProofResponse{
 			// TODO: Remove [changeProof.HadRootsInHistory] and if
 			// this node is unable to serve a change proof because it has
 			// insufficient history, get a range proof and set [Response]
 			// to that range proof.
 			// When this change is made, the client must be updated accordingly.
-			Response: &syncpb.ChangeProofResponse_ChangeProof{
+			Response: &pb.SyncGetChangeProofResponse_ChangeProof{
 				ChangeProof: changeProof.ToProto(),
 			},
 		})
@@ -232,7 +232,7 @@ func (s *NetworkServer) HandleRangeProofRequest(
 	ctx context.Context,
 	nodeID ids.NodeID,
 	requestID uint32,
-	req *syncpb.RangeProofRequest,
+	req *pb.SyncGetRangeProofRequest,
 ) error {
 	if req.BytesLimit == 0 ||
 		req.KeyLimit == 0 ||
