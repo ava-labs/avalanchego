@@ -4,7 +4,6 @@
 package metrics
 
 import (
-	"errors"
 	"fmt"
 	"sync"
 
@@ -14,8 +13,6 @@ import (
 )
 
 var (
-	errDuplicatedRegister = errors.New("duplicated register")
-
 	_ OptionalGatherer = (*optionalGatherer)(nil)
 )
 
@@ -55,7 +52,7 @@ func (g *optionalGatherer) Register(gatherer prometheus.Gatherer) error {
 	defer g.lock.Unlock()
 
 	if g.gatherer != nil {
-		return fmt.Errorf("err: %w, gatherer: %#v", errDuplicatedRegister, g.gatherer)
+		return fmt.Errorf("attempt to register existing gatherer failed %#v", g.gatherer)
 	}
 	g.gatherer = gatherer
 	return nil

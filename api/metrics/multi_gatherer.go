@@ -4,7 +4,6 @@
 package metrics
 
 import (
-	"errors"
 	"fmt"
 	"sync"
 
@@ -16,8 +15,6 @@ import (
 )
 
 var (
-	errDuplicatedPrefix = errors.New("duplicated prefix")
-
 	_ MultiGatherer = (*multiGatherer)(nil)
 )
 
@@ -78,7 +75,7 @@ func (g *multiGatherer) Register(namespace string, gatherer prometheus.Gatherer)
 	defer g.lock.Unlock()
 
 	if existingGatherer, exists := g.gatherers[namespace]; exists {
-		return fmt.Errorf("err: %w, namespace: %s, existingGatherer: %#v", errDuplicatedPrefix, namespace, existingGatherer)
+		return fmt.Errorf("attempt to register existing gathererer for namespace %q failed; existing: %#v", namespace, existingGatherer)
 	}
 
 	g.gatherers[namespace] = gatherer
