@@ -12,9 +12,7 @@ import (
 	dto "github.com/prometheus/client_model/go"
 )
 
-var (
-	_ OptionalGatherer = (*optionalGatherer)(nil)
-)
+var _ OptionalGatherer = (*optionalGatherer)(nil)
 
 // OptionalGatherer extends the Gatherer interface by allowing the optional
 // registration of a single gatherer. If no gatherer is registered, Gather will
