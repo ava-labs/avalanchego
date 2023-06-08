@@ -24,8 +24,9 @@ const (
 )
 
 var (
-	errNonEmptyIteratorExpected = errors.New("expected non-empty iterator, got no elements")
-	errValidatorSetUpdate       = errors.New("inserted staker cannot be found in validator set")
+	errNonEmptyIteratorExpected          = errors.New("expected non-empty iterator, got no elements")
+	errMissingValidatotFromValidatorSet  = errors.New("staker cannot be found in validator set")
+	errUnexpectedValidatotInValidatorSet = errors.New("unexpected staker found in validator set")
 )
 
 // TestGeneralStakerContainersProperties checks that State and Diff conform our stakersStorageModel.
@@ -764,7 +765,7 @@ func TestValidatorSetOperations(t *testing.T) {
 			}
 
 			if !set.Contains(nodeID) {
-				return errValidatorSetUpdate.Error()
+				return errMissingValidatotFromValidatorSet.Error()
 			}
 
 			if set.GetWeight(nodeID) != s.Weight {
@@ -812,7 +813,7 @@ func TestValidatorSetOperations(t *testing.T) {
 			}
 
 			if !set.Contains(nodeID) {
-				return errValidatorSetUpdate.Error()
+				return errMissingValidatotFromValidatorSet.Error()
 			}
 
 			if set.GetWeight(nodeID) != updatedStaker.Weight {
@@ -855,7 +856,7 @@ func TestValidatorSetOperations(t *testing.T) {
 			}
 
 			if set.Contains(nodeID) {
-				return errValidatorSetUpdate.Error()
+				return errUnexpectedValidatotInValidatorSet.Error()
 			}
 
 			if set.GetWeight(nodeID) != 0 {
