@@ -827,7 +827,7 @@ func TestMessage(t *testing.T) {
 	}
 }
 
-// Tests the Stringer interface on inbound messages and internal messages
+// Tests the Stringer interface on inbound messages
 func TestInboundMessageToString(t *testing.T) {
 	t.Parallel()
 
