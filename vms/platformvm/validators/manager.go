@@ -308,7 +308,6 @@ func (m *manager) makeSubnetValidatorSet(
 				zap.Stringer("nodeID", nodeID),
 			)
 			return nil, ErrMissingValidator
-
 		}
 		subnetValidator.PublicKey = primaryValidator.PublicKey
 	}
