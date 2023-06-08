@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -24,6 +25,16 @@ const minCacheSize = 1000
 func newNoopTracer() trace.Tracer {
 	tracer, _ := trace.New(trace.Config{Enabled: false})
 	return tracer
+}
+
+func newDefaultConfig() Config {
+	return Config{
+		EvictionBatchSize: 100,
+		HistoryLength:     100,
+		NodeCacheSize:     1_000,
+		Reg:               prometheus.NewRegistry(),
+		Tracer:            newNoopTracer(),
+	}
 }
 
 func Test_MerkleDB_Get_Safety(t *testing.T) {
@@ -86,11 +97,7 @@ func Test_MerkleDB_DB_Load_Root_From_DB(t *testing.T) {
 	db, err := New(
 		context.Background(),
 		rdb,
-		Config{
-			Tracer:        newNoopTracer(),
-			HistoryLength: 100,
-			NodeCacheSize: 100,
-		},
+		newDefaultConfig(),
 	)
 	require.NoError(err)
 
@@ -112,11 +119,7 @@ func Test_MerkleDB_DB_Load_Root_From_DB(t *testing.T) {
 	db, err = New(
 		context.Background(),
 		rdb,
-		Config{
-			Tracer:        newNoopTracer(),
-			HistoryLength: 100,
-			NodeCacheSize: 100,
-		},
+		newDefaultConfig(),
 	)
 	require.NoError(err)
 	reloadedRoot, err := db.GetMerkleRoot(context.Background())
@@ -132,14 +135,13 @@ func Test_MerkleDB_DB_Rebuild(t *testing.T) {
 
 	initialSize := 10_000
 
+	config := newDefaultConfig()
+	config.NodeCacheSize = initialSize
+
 	db, err := New(
 		context.Background(),
 		rdb,
-		Config{
-			Tracer:        newNoopTracer(),
-			HistoryLength: 100,
-			NodeCacheSize: initialSize,
-		},
+		config,
 	)
 	require.NoError(err)
 
@@ -167,10 +169,7 @@ func Test_MerkleDB_Failed_Batch_Commit(t *testing.T) {
 	db, err := New(
 		context.Background(),
 		memDB,
-		Config{
-			Tracer:        newNoopTracer(),
-			HistoryLength: 300,
-		},
+		newDefaultConfig(),
 	)
 	require.NoError(t, err)
 
@@ -190,11 +189,7 @@ func Test_MerkleDB_Value_Cache(t *testing.T) {
 	db, err := New(
 		context.Background(),
 		memDB,
-		Config{
-			Tracer:        newNoopTracer(),
-			HistoryLength: 300,
-			NodeCacheSize: minCacheSize,
-		},
+		newDefaultConfig(),
 	)
 	require.NoError(t, err)
 
@@ -815,11 +810,7 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 			dbTrie, err := newDatabase(
 				context.Background(),
 				memdb.New(),
-				Config{
-					Tracer:        newNoopTracer(),
-					HistoryLength: 0,
-					NodeCacheSize: minCacheSize,
-				},
+				newDefaultConfig(),
 				&mockMetrics{},
 			)
 			require.NoError(err)
