@@ -19,7 +19,7 @@ func Test_SerializedPath_NibbleVal(t *testing.T) {
 
 func Test_SerializedPath_AppendNibble(t *testing.T) {
 	path := SerializedPath{Value: []byte{}}
-	require.Equal(t, 0, path.NibbleLength)
+	require.Zero(t, path.NibbleLength)
 
 	path = path.AppendNibble(1)
 	require.Equal(t, 1, path.NibbleLength)

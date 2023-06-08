@@ -7,10 +7,12 @@ import (
 	"bytes"
 	"container/heap"
 
+	"github.com/ava-labs/avalanchego/utils/math"
+
 	"github.com/google/btree"
 )
 
-var _ heap.Interface = &syncWorkHeap{}
+var _ heap.Interface = (*syncWorkHeap)(nil)
 
 type heapItem struct {
 	workItem  *syncWorkItem
@@ -78,22 +80,25 @@ func (wh *syncWorkHeap) MergeInsert(item *syncWorkItem) {
 		return
 	}
 
-	var mergedRange *heapItem
+	var mergedBefore, mergedAfter *heapItem
+	searchItem := &heapItem{
+		workItem: &syncWorkItem{
+			start: item.start,
+		},
+	}
 
 	// Find the item with the greatest start range which is less than [item.start].
 	// Note that the iterator function will run at most once, since it always returns false.
 	wh.sortedItems.DescendLessOrEqual(
-		&heapItem{
-			workItem: &syncWorkItem{
-				start: item.start,
-			},
-		},
+		searchItem,
 		func(beforeItem *heapItem) bool {
 			if item.LocalRootID == beforeItem.workItem.LocalRootID && bytes.Equal(beforeItem.workItem.end, item.start) {
 				// [beforeItem.start, beforeItem.end] and [item.start, item.end] are
 				// merged into [beforeItem.start, item.end]
 				beforeItem.workItem.end = item.end
-				mergedRange = beforeItem
+				beforeItem.workItem.priority = math.Max(item.priority, beforeItem.workItem.priority)
+				heap.Fix(wh, beforeItem.heapIndex)
+				mergedBefore = beforeItem
 			}
 			return false
 		})
@@ -101,42 +106,33 @@ func (wh *syncWorkHeap) MergeInsert(item *syncWorkItem) {
 	// Find the item with the smallest start range which is greater than [item.start].
 	// Note that the iterator function will run at most once, since it always returns false.
 	wh.sortedItems.AscendGreaterOrEqual(
-		&heapItem{
-			workItem: &syncWorkItem{
-				start: item.start,
-			},
-		},
+		searchItem,
 		func(afterItem *heapItem) bool {
 			if item.LocalRootID == afterItem.workItem.LocalRootID && bytes.Equal(afterItem.workItem.start, item.end) {
-				if mergedRange != nil {
-					// [beforeItem.start, item.end] and [afterItem.start, afterItem.end] are merged
-					// into [beforeItem.start, afterItem.end].
-					// Modify [mergedRange] and remove [afterItem] since [mergedRange] now contains the entire
-					// range that was covered by [afterItem].
-					wh.remove(afterItem)
-					mergedRange.workItem.end = afterItem.workItem.end
-					if afterItem.workItem.priority > mergedRange.workItem.priority {
-						mergedRange.workItem.priority = afterItem.workItem.priority
-						heap.Fix(wh, mergedRange.heapIndex)
-					}
-				} else {
-					// [item.start, item.end] and [afterItem.start, afterItem.end] are merged into
-					// [item.start, afterItem.end].
-					afterItem.workItem.start = item.start
-					mergedRange = afterItem
-				}
+				// [item.start, item.end] and [afterItem.start, afterItem.end] are merged into
+				// [item.start, afterItem.end].
+				afterItem.workItem.start = item.start
+				afterItem.workItem.priority = math.Max(item.priority, afterItem.workItem.priority)
+				heap.Fix(wh, afterItem.heapIndex)
+				mergedAfter = afterItem
 			}
 			return false
 		})
 
-	if mergedRange != nil {
-		// We merged [item] with at least one existing item.
-		if item.priority > mergedRange.workItem.priority {
-			mergedRange.workItem.priority = item.priority
-			// Priority was updated; fix position in the heap.
-			heap.Fix(wh, mergedRange.heapIndex)
-		}
-	} else {
+	// if the new item should be merged with both the item before and the item after,
+	// we can combine the before item with the after item
+	if mergedBefore != nil && mergedAfter != nil {
+		// combine the two ranges
+		mergedBefore.workItem.end = mergedAfter.workItem.end
+		// remove the second range since it is now covered by the first
+		wh.remove(mergedAfter)
+		// update the priority
+		mergedBefore.workItem.priority = math.Max(mergedBefore.workItem.priority, mergedAfter.workItem.priority)
+		heap.Fix(wh, mergedBefore.heapIndex)
+	}
+
+	// nothing was merged, so add new item to the heap
+	if mergedBefore == nil && mergedAfter == nil {
 		// We didn't merge [item] with an existing one; put it in the heap.
 		heap.Push(wh, &heapItem{workItem: item})
 	}

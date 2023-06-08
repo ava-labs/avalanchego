@@ -66,7 +66,7 @@ func TestBeaconManager_DataRace(t *testing.T) {
 	wg.Wait()
 
 	// we should have a weight of numValidators now
-	require.EqualValues(numValidators, b.numConns)
+	require.Equal(int64(numValidators), b.numConns)
 
 	// disconnect numValidators validators
 	wg.Add(numValidators)

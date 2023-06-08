@@ -477,7 +477,7 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 		"entry with no config": {
 			givenJSON: `{"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i":{}}`,
 			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
-				require.True(len(given) == 1)
+				require.Len(given, 1)
 				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
 				config, ok := given[id]
 				require.True(ok)
@@ -549,14 +549,6 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestCalcMinConnectedStake(t *testing.T) {
-	v := setupViperFlags()
-	defaultParams := getConsensusConfig(v)
-	defaultExpectedMinStake := 0.8
-	minStake := calcMinConnectedStake(defaultParams)
-	require.Equal(t, defaultExpectedMinStake, minStake)
 }
 
 // setups config json file and writes content

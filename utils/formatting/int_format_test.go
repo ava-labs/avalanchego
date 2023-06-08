@@ -3,9 +3,7 @@
 
 package formatting
 
-import (
-	"testing"
-)
+import "testing"
 
 func TestIntFormat(t *testing.T) {
 	if format := IntFormat(0); format != "%01d" {

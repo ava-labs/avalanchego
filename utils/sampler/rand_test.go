@@ -205,6 +205,6 @@ func FuzzRNG(f *testing.F) {
 		mathRNG := rand.New(stdSource) //#nosec G404
 		stdVal := mathRNG.Int63n(int64(max + 1))
 		require.Equal(val, uint64(stdVal))
-		require.Equal(len(source.nums), len(stdSource.nums))
+		require.Len(stdSource.nums, len(source.nums))
 	})
 }

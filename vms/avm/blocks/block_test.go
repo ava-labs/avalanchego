@@ -25,6 +25,18 @@ var (
 	assetID = ids.GenerateTestID()
 )
 
+func TestInvalidBlock(t *testing.T) {
+	require := require.New(t)
+
+	parser, err := NewParser([]fxs.Fx{
+		&secp256k1fx.Fx{},
+	})
+	require.NoError(err)
+
+	_, err = parser.ParseBlock(nil)
+	require.ErrorIs(err, codec.ErrCantUnpackVersion)
+}
+
 func TestStandardBlocks(t *testing.T) {
 	// check standard block can be built and parsed
 	require := require.New(t)
@@ -55,8 +67,8 @@ func TestStandardBlocks(t *testing.T) {
 	require.Equal(standardBlk.Bytes(), parsed.Bytes())
 	require.Equal(standardBlk.Timestamp(), parsed.Timestamp())
 
-	parsedStandardBlk, ok := parsed.(*StandardBlock)
-	require.True(ok)
+	require.IsType(&StandardBlock{}, parsed)
+	parsedStandardBlk := parsed.(*StandardBlock)
 
 	require.Equal(txs, parsedStandardBlk.Txs())
 	require.Equal(parsed.Txs(), parsedStandardBlk.Txs())

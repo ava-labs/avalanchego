@@ -81,15 +81,15 @@ func (s *tracedSender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs set.
 	s.sender.SendGetAcceptedFrontier(ctx, nodeIDs, requestID)
 }
 
-func (s *tracedSender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) {
+func (s *tracedSender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
 	ctx, span := s.tracer.Start(ctx, "tracedSender.SendAcceptedFrontier", oteltrace.WithAttributes(
 		attribute.Stringer("recipients", nodeID),
 		attribute.Int64("requestID", int64(requestID)),
-		attribute.Int("numContainerIDs", len(containerIDs)),
+		attribute.Stringer("containerID", containerID),
 	))
 	defer span.End()
 
-	s.sender.SendAcceptedFrontier(ctx, nodeID, requestID, containerIDs)
+	s.sender.SendAcceptedFrontier(ctx, nodeID, requestID, containerID)
 }
 
 func (s *tracedSender) SendGetAccepted(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, containerIDs []ids.ID) {
@@ -177,16 +177,16 @@ func (s *tracedSender) SendPullQuery(ctx context.Context, nodeIDs set.Set[ids.No
 	s.sender.SendPullQuery(ctx, nodeIDs, requestID, containerID)
 }
 
-func (s *tracedSender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID uint32, votes []ids.ID, accepted []ids.ID) {
+func (s *tracedSender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredID ids.ID, acceptedID ids.ID) {
 	ctx, span := s.tracer.Start(ctx, "tracedSender.SendChits", oteltrace.WithAttributes(
 		attribute.Stringer("recipients", nodeID),
 		attribute.Int64("requestID", int64(requestID)),
-		attribute.Int("numVotes", len(votes)),
-		attribute.Int("numAccepted", len(accepted)),
+		attribute.Stringer("preferredID", preferredID),
+		attribute.Stringer("acceptedID", acceptedID),
 	))
 	defer span.End()
 
-	s.sender.SendChits(ctx, nodeID, requestID, votes, accepted)
+	s.sender.SendChits(ctx, nodeID, requestID, preferredID, acceptedID)
 }
 
 func (s *tracedSender) SendCrossChainAppRequest(ctx context.Context, chainID ids.ID, requestID uint32, appRequestBytes []byte) error {
