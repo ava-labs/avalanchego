@@ -50,8 +50,6 @@ type InboundMessage interface {
 	// BytesSavedCompression returns the number of bytes that this message saved
 	// due to being compressed
 	BytesSavedCompression() int
-	// Returns string representation of message
-	String() string
 }
 
 type inboundMessage struct {

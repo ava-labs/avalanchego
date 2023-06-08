@@ -6,6 +6,7 @@ package message
 import (
 	"bytes"
 	"net"
+	"strings"
 	"testing"
 	"time"
 
@@ -825,6 +826,47 @@ func TestMessage(t *testing.T) {
 			require.Equal(tv.op, parsedMsg.Op())
 		}))
 	}
+}
+
+// Tests the Stringer interface on inbound messages and internal messages
+func TestInboundMessageToString(t *testing.T) {
+	t.Parallel()
+
+	require := require.New(t)
+
+	mb, err := newMsgBuilder(
+		logging.NoLog{},
+		"test",
+		prometheus.NewRegistry(),
+		5*time.Second,
+	)
+	require.NoError(err)
+
+	// msg that will become the tested InboundMessage
+	msg := &p2p.Message{
+		Message: &p2p.Message_Pong{
+			Pong: &p2p.Pong{
+				Uptime: 100,
+			},
+		},
+	}
+
+	msgBytes, err := proto.Marshal(msg)
+	require.NoError(err)
+
+	inboundMsg, err := mb.parseInbound(msgBytes, ids.EmptyNodeID, func() {})
+	require.NoError(err)
+
+	require.True(strings.HasSuffix(inboundMsg.String(), "pong Message: uptime:100"))
+
+	testID := ids.GenerateTestID()
+
+	internalMsg := &GetStateSummaryFrontierFailed{
+		ChainID:   testID,
+		RequestID: 1,
+	}
+
+	require.True(strings.HasSuffix(internalMsg.String(), "RequestID: 1"))
 }
 
 func TestEmptyInboundMessage(t *testing.T) {

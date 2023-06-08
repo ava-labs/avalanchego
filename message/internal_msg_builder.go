@@ -377,7 +377,7 @@ type CrossChainAppRequest struct {
 
 func (m *CrossChainAppRequest) String() string {
 	return fmt.Sprintf(
-		"SourceChainID: %s DestinationChainID: %s EngineType: %d Message: %s",
+		"SourceChainID: %s DestinationChainID: %s RequestID: %d Message: %s",
 		m.SourceChainID, m.DestinationChainID, m.RequestID, m.Message)
 }
 
@@ -422,7 +422,7 @@ type CrossChainAppRequestFailed struct {
 
 func (m *CrossChainAppRequestFailed) String() string {
 	return fmt.Sprintf(
-		"SourceChainID: %s DestinationChainID: %s EngineType: %d",
+		"SourceChainID: %s DestinationChainID: %s RequestID: %d",
 		m.SourceChainID, m.DestinationChainID, m.RequestID)
 }
 
@@ -465,7 +465,7 @@ type CrossChainAppResponse struct {
 
 func (m *CrossChainAppResponse) String() string {
 	return fmt.Sprintf(
-		"SourceChainID: %v DestinationChainID: %v EngineType: %v Message: %v",
+		"SourceChainID: %v DestinationChainID: %v RequestID: %v Message: %v",
 		m.SourceChainID, m.DestinationChainID, m.RequestID, m.Message)
 }
 
@@ -588,7 +588,7 @@ func InternalVMMessage(
 
 type GossipRequest struct{}
 
-func (_ GossipRequest) String() string {
+func (GossipRequest) String() string {
 	return ""
 }
 
@@ -605,7 +605,7 @@ func InternalGossipRequest(
 
 type Timeout struct{}
 
-func (_ Timeout) String() string {
+func (Timeout) String() string {
 	return ""
 }
 

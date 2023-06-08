@@ -32,10 +32,6 @@ type Message struct {
 	EngineType p2p.EngineType
 }
 
-func (m Message) String() string {
-	return m.Message().String()
-}
-
 type MessageQueue interface {
 	// Add a message.
 	//
