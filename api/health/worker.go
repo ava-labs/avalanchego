@@ -100,12 +100,12 @@ func (w *worker) RegisterCheck(name string, check Checker, tags ...string) error
 
 	applicationChecks := w.tags[ApplicationTag]
 	isApplicationCheck := applicationChecks.Contains(name)
-
-	w.checks[name] = &taggedChecker{
+	tc := &taggedChecker{
 		checker:            check,
 		isApplicationCheck: isApplicationCheck,
 		tags:               tags,
 	}
+	w.checks[name] = tc
 	w.results[name] = notYetRunResult
 
 	// Whenever a new check is added - it is failing
@@ -117,26 +117,7 @@ func (w *worker) RegisterCheck(name string, check Checker, tags ...string) error
 
 	// If this is a new application-wide check, then all of the registered tags
 	// now have one additional failing check.
-	if isApplicationCheck {
-		// Note: [w.tags] will include AllTag.
-		for tag := range w.tags {
-			w.metrics.failingChecks.WithLabelValues(tag).Inc()
-		}
-		w.numFailingApplicationChecks++
-		return nil
-	}
-
-	// Mark all the tags as failing
-	for _, tag := range tags {
-		gauge := w.metrics.failingChecks.WithLabelValues(tag)
-		gauge.Inc()
-		// If this is the first time this tag was registered, we also need to
-		// account for the currently failing application-wide checks.
-		if w.tags[tag].Len() == 1 {
-			gauge.Add(float64(w.numFailingApplicationChecks))
-		}
-	}
-	w.metrics.failingChecks.WithLabelValues(AllTag).Inc()
+	w.updateMetrics(tc, false, true)
 	return nil
 }
 
@@ -272,18 +253,7 @@ func (w *worker) runCheck(ctx context.Context, wg *sync.WaitGroup, name string, 
 				zap.Strings("tags", check.tags),
 				zap.Error(err),
 			)
-			if check.isApplicationCheck {
-				// Note: [w.tags] will include AllTag.
-				for tag := range w.tags {
-					w.metrics.failingChecks.WithLabelValues(tag).Inc()
-				}
-				w.numFailingApplicationChecks++
-			} else {
-				for _, tag := range check.tags {
-					w.metrics.failingChecks.WithLabelValues(tag).Inc()
-				}
-				w.metrics.failingChecks.WithLabelValues(AllTag).Inc()
-			}
+			w.updateMetrics(check, false, false)
 		}
 	} else if prevResult.Error != nil {
 		w.log.Info("check started passing",
@@ -291,18 +261,51 @@ func (w *worker) runCheck(ctx context.Context, wg *sync.WaitGroup, name string, 
 			zap.String("name", name),
 			zap.Strings("tags", check.tags),
 		)
-		if check.isApplicationCheck {
-			// Note: [w.tags] will include AllTag.
-			for tag := range w.tags {
-				w.metrics.failingChecks.WithLabelValues(tag).Dec()
-			}
-			w.numFailingApplicationChecks--
-		} else {
-			for _, tag := range check.tags {
-				w.metrics.failingChecks.WithLabelValues(tag).Dec()
-			}
-			w.metrics.failingChecks.WithLabelValues(AllTag).Dec()
-		}
+		w.updateMetrics(check, true, false)
 	}
 	w.results[name] = result
+}
+
+// updateMetrics updates the metrics for the given check. If [healthy] is true,
+// then the check is considered healthy and the metrics are decremented.
+// Otherwise, the check is considered unhealthy and the metrics are incremented.
+// [register] must be true only if this is the first time the check is being
+// registered.
+func (w *worker) updateMetrics(tc *taggedChecker, healthy bool, register bool) {
+	if tc.isApplicationCheck {
+		// Note: [w.tags] will include AllTag.
+		for tag := range w.tags {
+			gauge := w.metrics.failingChecks.WithLabelValues(tag)
+			if healthy {
+				gauge.Dec()
+			} else {
+				gauge.Inc()
+			}
+		}
+		if healthy {
+			w.numFailingApplicationChecks--
+		} else {
+			w.numFailingApplicationChecks++
+		}
+	} else {
+		for _, tag := range tc.tags {
+			gauge := w.metrics.failingChecks.WithLabelValues(tag)
+			if healthy {
+				gauge.Dec()
+			} else {
+				gauge.Inc()
+				// If this is the first time this tag was registered, we also need to
+				// account for the currently failing application-wide checks.
+				if register && w.tags[tag].Len() == 1 {
+					gauge.Add(float64(w.numFailingApplicationChecks))
+				}
+			}
+		}
+		gauge := w.metrics.failingChecks.WithLabelValues(AllTag)
+		if healthy {
+			gauge.Dec()
+		} else {
+			gauge.Inc()
+		}
+	}
 }
