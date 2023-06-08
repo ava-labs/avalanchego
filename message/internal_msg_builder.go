@@ -67,7 +67,7 @@ type GetStateSummaryFrontierFailed struct {
 }
 
 func (m *GetStateSummaryFrontierFailed) String() string {
-	return fmt.Sprintf("ChainID: %v RequestID: %v",
+	return fmt.Sprintf("ChainID: %s RequestID: %d",
 		m.ChainID, m.RequestID)
 }
 
@@ -101,7 +101,7 @@ type GetAcceptedStateSummaryFailed struct {
 }
 
 func (m *GetAcceptedStateSummaryFailed) String() string {
-	return fmt.Sprintf("ChainID: %v RequestID: %v",
+	return fmt.Sprintf("ChainID: %s RequestID: %d",
 		m.ChainID, m.RequestID)
 }
 
@@ -136,7 +136,7 @@ type GetAcceptedFrontierFailed struct {
 }
 
 func (m *GetAcceptedFrontierFailed) String() string {
-	return fmt.Sprintf("ChainID: %v RequestID: %v EngineType: %v",
+	return fmt.Sprintf("ChainID: %s RequestID: %d EngineType: %s",
 		m.ChainID, m.RequestID, m.EngineType)
 }
 
@@ -177,7 +177,7 @@ type GetAcceptedFailed struct {
 }
 
 func (m *GetAcceptedFailed) String() string {
-	return fmt.Sprintf("ChainID: %v RequestID: %v EngineType: %v",
+	return fmt.Sprintf("ChainID: %s RequestID: %d EngineType: %s",
 		m.ChainID, m.RequestID, m.EngineType)
 }
 
@@ -218,7 +218,7 @@ type GetAncestorsFailed struct {
 }
 
 func (m *GetAncestorsFailed) String() string {
-	return fmt.Sprintf("ChainID: %v RequestID: %v EngineType: %v",
+	return fmt.Sprintf("ChainID: %s RequestID: %d EngineType: %s",
 		m.ChainID, m.RequestID, m.EngineType)
 }
 
@@ -259,7 +259,7 @@ type GetFailed struct {
 }
 
 func (m *GetFailed) String() string {
-	return fmt.Sprintf("ChainID: %v RequestID: %v EngineType: %v",
+	return fmt.Sprintf("ChainID: %s RequestID: %d EngineType: %s",
 		m.ChainID, m.RequestID, m.EngineType)
 }
 
@@ -300,7 +300,7 @@ type QueryFailed struct {
 }
 
 func (m *QueryFailed) String() string {
-	return fmt.Sprintf("ChainID: %v RequestID: %v EngineType: %v",
+	return fmt.Sprintf("ChainID: %s RequestID: %d EngineType: %s",
 		m.ChainID, m.RequestID, m.EngineType)
 }
 
@@ -340,7 +340,7 @@ type AppRequestFailed struct {
 }
 
 func (m *AppRequestFailed) String() string {
-	return fmt.Sprintf("ChainID: %v RequestID: %v",
+	return fmt.Sprintf("ChainID: %s RequestID: %d",
 		m.ChainID, m.RequestID)
 }
 
@@ -377,7 +377,7 @@ type CrossChainAppRequest struct {
 
 func (m *CrossChainAppRequest) String() string {
 	return fmt.Sprintf(
-		"SourceChainID: %v DestinationChainID: %v EngineType: %v Message: %v",
+		"SourceChainID: %s DestinationChainID: %s EngineType: %d Message: %s",
 		m.SourceChainID, m.DestinationChainID, m.RequestID, m.Message)
 }
 
@@ -422,7 +422,7 @@ type CrossChainAppRequestFailed struct {
 
 func (m *CrossChainAppRequestFailed) String() string {
 	return fmt.Sprintf(
-		"SourceChainID: %v DestinationChainID: %v EngineType: %v",
+		"SourceChainID: %s DestinationChainID: %s EngineType: %d",
 		m.SourceChainID, m.DestinationChainID, m.RequestID)
 }
 
@@ -549,7 +549,7 @@ func InternalConnectedSubnet(nodeID ids.NodeID, subnetID ids.ID) InboundMessage 
 
 type Disconnected struct{}
 
-func (m *Disconnected) String() string {
+func (_ Disconnected) String() string {
 	return ""
 }
 
@@ -588,7 +588,7 @@ func InternalVMMessage(
 
 type GossipRequest struct{}
 
-func (m *GossipRequest) String() string {
+func (_ GossipRequest) String() string {
 	return ""
 }
 
@@ -605,7 +605,7 @@ func InternalGossipRequest(
 
 type Timeout struct{}
 
-func (m *Timeout) String() string {
+func (_ Timeout) String() string {
 	return ""
 }
 

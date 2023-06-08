@@ -34,6 +34,7 @@ var (
 
 // InboundMessage represents a set of fields for an inbound message
 type InboundMessage interface {
+	fmt.Stringer
 	// NodeID returns the ID of the node that sent this message
 	NodeID() ids.NodeID
 	// Op returns the op that describes this message type
@@ -89,7 +90,8 @@ func (m *inboundMessage) BytesSavedCompression() int {
 }
 
 func (m *inboundMessage) String() string {
-	return m.Message().String()
+	return fmt.Sprintf("NodeID: %s Op: %s Message: %s",
+		m.nodeID, m.op, m.message)
 }
 
 // OutboundMessage represents a set of fields for an outbound message that can

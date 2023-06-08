@@ -360,7 +360,7 @@ func (h *handler) dispatchSync(ctx context.Context) {
 			h.StopWithError(ctx, fmt.Errorf(
 				"%w while processing sync message: %s",
 				err,
-				msg.String(),
+				msg,
 			))
 			return
 		}
@@ -414,7 +414,7 @@ func (h *handler) dispatchChans(ctx context.Context) {
 			h.StopWithError(ctx, fmt.Errorf(
 				"%w while processing chan message: %s",
 				err,
-				msg.String(),
+				msg,
 			))
 			return
 		}
@@ -742,7 +742,7 @@ func (h *handler) handleAsyncMsg(ctx context.Context, msg Message) {
 			h.StopWithError(ctx, fmt.Errorf(
 				"%w while processing async message: %s",
 				err,
-				msg.String(),
+				msg,
 			))
 		}
 	})
