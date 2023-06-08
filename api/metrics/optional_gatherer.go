@@ -4,7 +4,7 @@
 package metrics
 
 import (
-	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -12,11 +12,7 @@ import (
 	dto "github.com/prometheus/client_model/go"
 )
 
-var (
-	errDuplicatedRegister = errors.New("duplicated register")
-
-	_ OptionalGatherer = (*optionalGatherer)(nil)
-)
+var _ OptionalGatherer = (*optionalGatherer)(nil)
 
 // OptionalGatherer extends the Gatherer interface by allowing the optional
 // registration of a single gatherer. If no gatherer is registered, Gather will
@@ -54,7 +50,7 @@ func (g *optionalGatherer) Register(gatherer prometheus.Gatherer) error {
 	defer g.lock.Unlock()
 
 	if g.gatherer != nil {
-		return errDuplicatedRegister
+		return fmt.Errorf("%w; %#v", errReregisterGatherer, g.gatherer)
 	}
 	g.gatherer = gatherer
 	return nil
