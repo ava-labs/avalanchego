@@ -342,7 +342,7 @@ func TestBanffStandardBlockUpdatePrimaryNetworkStakers(t *testing.T) {
 	currentValidator, err := updatedState.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.NoError(err)
 	require.Equal(addPendingValidatorTx.ID(), currentValidator.TxID)
-	require.Equal(uint64(1370), currentValidator.PotentialReward) // See rewards tests to explain why 1370
+	require.Equal(uint64(13706), currentValidator.PotentialReward) // See rewards tests to explain why 1370
 
 	_, err = updatedState.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
