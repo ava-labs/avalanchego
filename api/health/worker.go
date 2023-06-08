@@ -117,7 +117,7 @@ func (w *worker) RegisterCheck(name string, check Checker, tags ...string) error
 
 	// If this is a new application-wide check, then all of the registered tags
 	// now have one additional failing check.
-	w.updateMetrics(tc, false, true)
+	w.updateMetrics(tc, false /*healthy*/, true /*register*/)
 	return nil
 }
 
