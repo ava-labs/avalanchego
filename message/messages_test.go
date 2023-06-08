@@ -6,7 +6,6 @@ package message
 import (
 	"bytes"
 	"net"
-	"strings"
 	"testing"
 	"time"
 
@@ -850,23 +849,16 @@ func TestInboundMessageToString(t *testing.T) {
 			},
 		},
 	}
-
 	msgBytes, err := proto.Marshal(msg)
 	require.NoError(err)
 
 	inboundMsg, err := mb.parseInbound(msgBytes, ids.EmptyNodeID, func() {})
 	require.NoError(err)
 
-	require.True(strings.HasSuffix(inboundMsg.String(), "pong Message: uptime:100"))
+	require.Equal("NodeID-111111111111111111116DBWJs Op: pong Message: uptime:100", inboundMsg.String())
 
-	testID := ids.GenerateTestID()
-
-	internalMsg := &GetStateSummaryFrontierFailed{
-		ChainID:   testID,
-		RequestID: 1,
-	}
-
-	require.True(strings.HasSuffix(internalMsg.String(), "RequestID: 1"))
+	internalMsg := InternalGetStateSummaryFrontierFailed(ids.EmptyNodeID, ids.Empty, 1)
+	require.Equal("NodeID-111111111111111111116DBWJs Op: get_state_summary_frontier_failed Message: ChainID: 11111111111111111111111111111111LpoYY RequestID: 1", internalMsg.String())
 }
 
 func TestEmptyInboundMessage(t *testing.T) {

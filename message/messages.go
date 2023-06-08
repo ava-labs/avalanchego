@@ -88,7 +88,7 @@ func (m *inboundMessage) BytesSavedCompression() int {
 }
 
 func (m *inboundMessage) String() string {
-	return fmt.Sprintf("NodeID: %s Op: %s Message: %s",
+	return fmt.Sprintf("%s Op: %s Message: %s",
 		m.nodeID, m.op, m.message)
 }
 

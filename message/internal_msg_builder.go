@@ -16,49 +16,66 @@ import (
 
 var (
 	disconnected  = &Disconnected{}
-	timeout       = &Timeout{}
 	gossipRequest = &GossipRequest{}
+	timeout       = &Timeout{}
 
+	_ fmt.Stringer    = (*GetStateSummaryFrontierFailed)(nil)
 	_ chainIDGetter   = (*GetStateSummaryFrontierFailed)(nil)
 	_ requestIDGetter = (*GetStateSummaryFrontierFailed)(nil)
 
+	_ fmt.Stringer    = (*GetAcceptedStateSummaryFailed)(nil)
 	_ chainIDGetter   = (*GetAcceptedStateSummaryFailed)(nil)
 	_ requestIDGetter = (*GetAcceptedStateSummaryFailed)(nil)
 
+	_ fmt.Stringer     = (*GetAcceptedFrontierFailed)(nil)
 	_ chainIDGetter    = (*GetAcceptedFrontierFailed)(nil)
 	_ requestIDGetter  = (*GetAcceptedFrontierFailed)(nil)
 	_ engineTypeGetter = (*GetAcceptedFrontierFailed)(nil)
 
+	_ fmt.Stringer     = (*GetAcceptedFailed)(nil)
 	_ chainIDGetter    = (*GetAcceptedFailed)(nil)
 	_ requestIDGetter  = (*GetAcceptedFailed)(nil)
 	_ engineTypeGetter = (*GetAcceptedFailed)(nil)
 
+	_ fmt.Stringer     = (*GetAncestorsFailed)(nil)
 	_ chainIDGetter    = (*GetAncestorsFailed)(nil)
 	_ requestIDGetter  = (*GetAncestorsFailed)(nil)
 	_ engineTypeGetter = (*GetAncestorsFailed)(nil)
 
+	_ fmt.Stringer     = (*GetFailed)(nil)
 	_ chainIDGetter    = (*GetFailed)(nil)
 	_ requestIDGetter  = (*GetFailed)(nil)
 	_ engineTypeGetter = (*GetFailed)(nil)
 
+	_ fmt.Stringer     = (*QueryFailed)(nil)
 	_ chainIDGetter    = (*QueryFailed)(nil)
 	_ requestIDGetter  = (*QueryFailed)(nil)
 	_ engineTypeGetter = (*QueryFailed)(nil)
 
+	_ fmt.Stringer    = (*AppRequestFailed)(nil)
 	_ chainIDGetter   = (*AppRequestFailed)(nil)
 	_ requestIDGetter = (*AppRequestFailed)(nil)
 
+	_ fmt.Stringer        = (*CrossChainAppRequest)(nil)
 	_ sourceChainIDGetter = (*CrossChainAppRequest)(nil)
 	_ chainIDGetter       = (*CrossChainAppRequest)(nil)
 	_ requestIDGetter     = (*CrossChainAppRequest)(nil)
 
+	_ fmt.Stringer        = (*CrossChainAppRequestFailed)(nil)
 	_ sourceChainIDGetter = (*CrossChainAppRequestFailed)(nil)
 	_ chainIDGetter       = (*CrossChainAppRequestFailed)(nil)
 	_ requestIDGetter     = (*CrossChainAppRequestFailed)(nil)
 
+	_ fmt.Stringer        = (*CrossChainAppResponse)(nil)
 	_ sourceChainIDGetter = (*CrossChainAppResponse)(nil)
 	_ chainIDGetter       = (*CrossChainAppResponse)(nil)
 	_ requestIDGetter     = (*CrossChainAppResponse)(nil)
+
+	_ fmt.Stringer = (*Disconnected)(nil)
+
+	_ fmt.Stringer = (*GossipRequest)(nil)
+
+	_ fmt.Stringer = (*Timeout)(nil)
 )
 
 type GetStateSummaryFrontierFailed struct {
@@ -67,8 +84,10 @@ type GetStateSummaryFrontierFailed struct {
 }
 
 func (m *GetStateSummaryFrontierFailed) String() string {
-	return fmt.Sprintf("ChainID: %s RequestID: %d",
-		m.ChainID, m.RequestID)
+	return fmt.Sprintf(
+		"ChainID: %s RequestID: %d",
+		m.ChainID, m.RequestID,
+	)
 }
 
 func (m *GetStateSummaryFrontierFailed) GetChainId() []byte {
@@ -101,8 +120,10 @@ type GetAcceptedStateSummaryFailed struct {
 }
 
 func (m *GetAcceptedStateSummaryFailed) String() string {
-	return fmt.Sprintf("ChainID: %s RequestID: %d",
-		m.ChainID, m.RequestID)
+	return fmt.Sprintf(
+		"ChainID: %s RequestID: %d",
+		m.ChainID, m.RequestID,
+	)
 }
 
 func (m *GetAcceptedStateSummaryFailed) GetChainId() []byte {
@@ -136,8 +157,10 @@ type GetAcceptedFrontierFailed struct {
 }
 
 func (m *GetAcceptedFrontierFailed) String() string {
-	return fmt.Sprintf("ChainID: %s RequestID: %d EngineType: %s",
-		m.ChainID, m.RequestID, m.EngineType)
+	return fmt.Sprintf(
+		"ChainID: %s RequestID: %d EngineType: %s",
+		m.ChainID, m.RequestID, m.EngineType,
+	)
 }
 
 func (m *GetAcceptedFrontierFailed) GetChainId() []byte {
@@ -177,8 +200,10 @@ type GetAcceptedFailed struct {
 }
 
 func (m *GetAcceptedFailed) String() string {
-	return fmt.Sprintf("ChainID: %s RequestID: %d EngineType: %s",
-		m.ChainID, m.RequestID, m.EngineType)
+	return fmt.Sprintf(
+		"ChainID: %s RequestID: %d EngineType: %s",
+		m.ChainID, m.RequestID, m.EngineType,
+	)
 }
 
 func (m *GetAcceptedFailed) GetChainId() []byte {
@@ -218,8 +243,10 @@ type GetAncestorsFailed struct {
 }
 
 func (m *GetAncestorsFailed) String() string {
-	return fmt.Sprintf("ChainID: %s RequestID: %d EngineType: %s",
-		m.ChainID, m.RequestID, m.EngineType)
+	return fmt.Sprintf(
+		"ChainID: %s RequestID: %d EngineType: %s",
+		m.ChainID, m.RequestID, m.EngineType,
+	)
 }
 
 func (m *GetAncestorsFailed) GetChainId() []byte {
@@ -259,8 +286,10 @@ type GetFailed struct {
 }
 
 func (m *GetFailed) String() string {
-	return fmt.Sprintf("ChainID: %s RequestID: %d EngineType: %s",
-		m.ChainID, m.RequestID, m.EngineType)
+	return fmt.Sprintf(
+		"ChainID: %s RequestID: %d EngineType: %s",
+		m.ChainID, m.RequestID, m.EngineType,
+	)
 }
 
 func (m *GetFailed) GetChainId() []byte {
@@ -300,8 +329,10 @@ type QueryFailed struct {
 }
 
 func (m *QueryFailed) String() string {
-	return fmt.Sprintf("ChainID: %s RequestID: %d EngineType: %s",
-		m.ChainID, m.RequestID, m.EngineType)
+	return fmt.Sprintf(
+		"ChainID: %s RequestID: %d EngineType: %s",
+		m.ChainID, m.RequestID, m.EngineType,
+	)
 }
 
 func (m *QueryFailed) GetChainId() []byte {
@@ -340,8 +371,10 @@ type AppRequestFailed struct {
 }
 
 func (m *AppRequestFailed) String() string {
-	return fmt.Sprintf("ChainID: %s RequestID: %d",
-		m.ChainID, m.RequestID)
+	return fmt.Sprintf(
+		"ChainID: %s RequestID: %d",
+		m.ChainID, m.RequestID,
+	)
 }
 
 func (m *AppRequestFailed) GetChainId() []byte {
@@ -377,8 +410,9 @@ type CrossChainAppRequest struct {
 
 func (m *CrossChainAppRequest) String() string {
 	return fmt.Sprintf(
-		"SourceChainID: %s DestinationChainID: %s RequestID: %d Message: %s",
-		m.SourceChainID, m.DestinationChainID, m.RequestID, m.Message)
+		"SourceChainID: %s DestinationChainID: %s RequestID: %d Message: 0x%x",
+		m.SourceChainID, m.DestinationChainID, m.RequestID, m.Message,
+	)
 }
 
 func (m *CrossChainAppRequest) GetSourceChainID() ids.ID {
@@ -423,7 +457,8 @@ type CrossChainAppRequestFailed struct {
 func (m *CrossChainAppRequestFailed) String() string {
 	return fmt.Sprintf(
 		"SourceChainID: %s DestinationChainID: %s RequestID: %d",
-		m.SourceChainID, m.DestinationChainID, m.RequestID)
+		m.SourceChainID, m.DestinationChainID, m.RequestID,
+	)
 }
 
 func (m *CrossChainAppRequestFailed) GetSourceChainID() ids.ID {
@@ -465,8 +500,9 @@ type CrossChainAppResponse struct {
 
 func (m *CrossChainAppResponse) String() string {
 	return fmt.Sprintf(
-		"SourceChainID: %v DestinationChainID: %v RequestID: %v Message: %v",
-		m.SourceChainID, m.DestinationChainID, m.RequestID, m.Message)
+		"SourceChainID: %s DestinationChainID: %s RequestID: %d Message: 0x%x",
+		m.SourceChainID, m.DestinationChainID, m.RequestID, m.Message,
+	)
 }
 
 func (m *CrossChainAppResponse) GetSourceChainID() ids.ID {
@@ -507,8 +543,9 @@ type Connected struct {
 
 func (m *Connected) String() string {
 	return fmt.Sprintf(
-		"NodeVersion: %v",
-		m.NodeVersion)
+		"NodeVersion: %s",
+		m.NodeVersion,
+	)
 }
 
 func InternalConnected(nodeID ids.NodeID, nodeVersion *version.Application) InboundMessage {
@@ -530,8 +567,9 @@ type ConnectedSubnet struct {
 
 func (m *ConnectedSubnet) String() string {
 	return fmt.Sprintf(
-		"SubnetID: %v",
-		m.SubnetID)
+		"SubnetID: %s",
+		m.SubnetID,
+	)
 }
 
 // InternalConnectedSubnet returns a message that indicates the node with [nodeID] is
@@ -568,8 +606,9 @@ type VMMessage struct {
 
 func (m *VMMessage) String() string {
 	return fmt.Sprintf(
-		"Notification: %v",
-		m.Notification)
+		"Notification: %d",
+		m.Notification,
+	)
 }
 
 func InternalVMMessage(
