@@ -349,7 +349,7 @@ func (*updateCurrentValidatorCommand) PostCondition(cmdState commands.State, res
 }
 
 func (*updateCurrentValidatorCommand) String() string {
-	return "AddDiffAndUpdateCurrentValidator"
+	return "updateCurrentValidatorCommand"
 }
 
 var genUpdateCurrentValidatorCommand = gen.IntRange(1, 2).Map(
@@ -686,7 +686,7 @@ func (*updateCurrentDelegatorCommand) PostCondition(cmdState commands.State, res
 }
 
 func (*updateCurrentDelegatorCommand) String() string {
-	return "AddDiffAndUpdateCurrentDelegator"
+	return "updateCurrentDelegator"
 }
 
 var genUpdateCurrentDelegatorCommand = gen.IntRange(1, 2).Map(
