@@ -1305,10 +1305,10 @@ func (m *manager) registerBootstrappedHealthChecks() error {
 		}
 		return []ids.ID{}, nil
 	})
-	if err := m.Health.RegisterReadinessCheck("bootstrapped", bootstrappedCheck); err != nil {
+	if err := m.Health.RegisterReadinessCheck("bootstrapped", bootstrappedCheck, health.ApplicationTag); err != nil {
 		return fmt.Errorf("couldn't register bootstrapped readiness check: %w", err)
 	}
-	if err := m.Health.RegisterHealthCheck("bootstrapped", bootstrappedCheck); err != nil {
+	if err := m.Health.RegisterHealthCheck("bootstrapped", bootstrappedCheck, health.ApplicationTag); err != nil {
 		return fmt.Errorf("couldn't register bootstrapped health check: %w", err)
 	}
 	return nil
