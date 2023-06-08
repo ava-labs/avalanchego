@@ -580,7 +580,7 @@ func TestStateStakersProperties(t *testing.T) {
 			}
 
 			err = baseState.UpdateCurrentValidator(&s)
-			if err == nil {
+			if !errors.Is(err, ErrUpdatingUnknownOrDeletedStaker) {
 				return "unexpected update of unknown validator"
 			}
 
@@ -599,7 +599,7 @@ func TestStateStakersProperties(t *testing.T) {
 			baseState.PutCurrentValidator(&s)
 			baseState.DeleteCurrentValidator(&s)
 			err = baseState.UpdateCurrentValidator(&s)
-			if err == nil {
+			if !errors.Is(err, ErrUpdatingUnknownOrDeletedStaker) {
 				return "unexpected update of unknown validator"
 			}
 
@@ -616,7 +616,7 @@ func TestStateStakersProperties(t *testing.T) {
 			}
 
 			err = baseState.UpdateCurrentDelegator(&s)
-			if err == nil {
+			if !errors.Is(err, ErrUpdatingUnknownOrDeletedStaker) {
 				return "unexpected update of delegator from unknown subnetID/nodeID"
 			}
 
@@ -638,7 +638,7 @@ func TestStateStakersProperties(t *testing.T) {
 
 			baseState.PutCurrentValidator(&val)
 			err = baseState.UpdateCurrentDelegator(&del)
-			if err == nil {
+			if !errors.Is(err, ErrUpdatingUnknownOrDeletedStaker) {
 				return "unexpected update of unknown delegator from known subnetID/nodeID"
 			}
 
@@ -681,7 +681,7 @@ func TestDiffStakersProperties(t *testing.T) {
 			diff.DeleteCurrentValidator(&s) // mark validator as deleted
 
 			err = diff.UpdateCurrentValidator(&s)
-			if err == nil {
+			if !errors.Is(err, ErrUpdatingUnknownOrDeletedStaker) {
 				return "expected error while updating validator in diff, got nil"
 			}
 
@@ -717,7 +717,7 @@ func TestDiffStakersProperties(t *testing.T) {
 			diff.DeleteCurrentDelegator(&s) // mark delegator as deleted
 
 			err = diff.UpdateCurrentDelegator(&s)
-			if err == nil {
+			if !errors.Is(err, ErrUpdatingUnknownOrDeletedStaker) {
 				return "expected error while updating delegator in diff, got nil"
 			}
 
