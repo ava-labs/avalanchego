@@ -117,7 +117,7 @@ func newEnvironment(t *testing.T, fork activeFork) *environment { //nolint:unpar
 	res := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
 		config:         defaultConfig(fork),
-		clk:            defaultClock(fork != apricotPhase5Fork),
+		clk:            defaultClock(),
 	}
 	res.isBootstrapped.Set(true)
 
@@ -232,6 +232,11 @@ func addSubnet(env *environment) {
 	if err := stateDiff.Apply(env.state); err != nil {
 		panic(err)
 	}
+	if err := env.state.Commit(); err != nil {
+		panic(err)
+	}
+
+	defaultBalance -= env.config.GetCreateSubnetTxFee(env.clk.Time())
 }
 
 func defaultState(
@@ -305,19 +310,19 @@ func defaultConfig(fork activeFork) *config.Config {
 
 	switch fork {
 	case apricotPhase3Fork:
-		apricotPhase3Time = defaultValidateEndTime
+		apricotPhase3Time = defaultGenesisTime
 	case apricotPhase5Fork:
-		apricotPhase5Time = defaultValidateEndTime
-		apricotPhase3Time = defaultValidateEndTime
+		apricotPhase5Time = defaultGenesisTime
+		apricotPhase3Time = defaultGenesisTime
 	case banffFork:
-		banffTime = defaultValidateEndTime
-		apricotPhase5Time = defaultValidateEndTime
-		apricotPhase3Time = defaultValidateEndTime
+		banffTime = defaultGenesisTime
+		apricotPhase5Time = defaultGenesisTime
+		apricotPhase3Time = defaultGenesisTime
 	case cortinaFork:
-		cortinaTime = defaultValidateEndTime
-		banffTime = defaultValidateEndTime
-		apricotPhase5Time = defaultValidateEndTime
-		apricotPhase3Time = defaultValidateEndTime
+		cortinaTime = defaultGenesisTime
+		banffTime = defaultGenesisTime
+		apricotPhase5Time = defaultGenesisTime
+		apricotPhase3Time = defaultGenesisTime
 	default:
 		panic(fmt.Errorf("unhandled fork %d", fork))
 	}
@@ -332,9 +337,9 @@ func defaultConfig(fork activeFork) *config.Config {
 		TxFee:                  defaultTxFee,
 		CreateSubnetTxFee:      100 * defaultTxFee,
 		CreateBlockchainTxFee:  100 * defaultTxFee,
-		MinValidatorStake:      5 * units.MilliAvax,
-		MaxValidatorStake:      500 * units.MilliAvax,
-		MinDelegatorStake:      1 * units.MilliAvax,
+		MinValidatorStake:      10 * defaultMinValidatorStake,
+		MaxValidatorStake:      50 * defaultMinValidatorStake,
+		MinDelegatorStake:      defaultMinValidatorStake,
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig: reward.Config{
@@ -350,12 +355,8 @@ func defaultConfig(fork activeFork) *config.Config {
 	}
 }
 
-func defaultClock(postFork bool) *mockable.Clock {
+func defaultClock() *mockable.Clock {
 	now := defaultGenesisTime
-	if postFork {
-		// 1 second after latest fork
-		now = defaultValidateEndTime.Add(-2 * time.Second)
-	}
 	clk := &mockable.Clock{}
 	clk.Set(now)
 	return clk
@@ -473,7 +474,6 @@ func shutdownEnvironment(env *environment) error {
 		for i, vdr := range primaryValidators {
 			validatorIDs[i] = vdr.NodeID
 		}
-
 		if err := env.uptimes.StopTracking(validatorIDs, constants.PrimaryNetworkID); err != nil {
 			return err
 		}
