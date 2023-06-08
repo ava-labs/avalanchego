@@ -39,7 +39,7 @@ type InboundMessage interface {
 	// Op returns the op that describes this message type
 	Op() Op
 	// Message returns the message that was sent
-	Message() any
+	Message() fmt.Stringer
 	// Expiration returns the time that the sender will have already timed out
 	// this request
 	Expiration() time.Time
@@ -49,12 +49,14 @@ type InboundMessage interface {
 	// BytesSavedCompression returns the number of bytes that this message saved
 	// due to being compressed
 	BytesSavedCompression() int
+	// Returns string representation of message
+	String() string
 }
 
 type inboundMessage struct {
 	nodeID                ids.NodeID
 	op                    Op
-	message               any
+	message               fmt.Stringer
 	expiration            time.Time
 	onFinishedHandling    func()
 	bytesSavedCompression int
@@ -68,7 +70,7 @@ func (m *inboundMessage) Op() Op {
 	return m.op
 }
 
-func (m *inboundMessage) Message() any {
+func (m *inboundMessage) Message() fmt.Stringer {
 	return m.message
 }
 
@@ -84,6 +86,10 @@ func (m *inboundMessage) OnFinishedHandling() {
 
 func (m *inboundMessage) BytesSavedCompression() int {
 	return m.bytesSavedCompression
+}
+
+func (m *inboundMessage) String() string {
+	return m.Message().String()
 }
 
 // OutboundMessage represents a set of fields for an outbound message that can
