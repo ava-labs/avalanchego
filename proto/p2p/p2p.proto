@@ -206,7 +206,7 @@ message AcceptedFrontier {
 
   bytes chain_id = 1;
   uint32 request_id = 2;
-  repeated bytes container_ids = 3;
+  bytes container_id = 3;
 }
 
 // Message to request for the accepted blocks/vertices of the "remote" peer.

@@ -185,7 +185,7 @@ func TestInboundMsgBuilder(t *testing.T) {
 			msg := InboundAcceptedFrontier(
 				chainID,
 				requestID,
-				containerIDs,
+				containerIDs[0],
 				nodeID,
 			)
 
@@ -196,12 +196,7 @@ func TestInboundMsgBuilder(t *testing.T) {
 			innerMsg := msg.Message().(*p2p.AcceptedFrontier)
 			require.Equal(chainID[:], innerMsg.ChainId)
 			require.Equal(requestID, innerMsg.RequestId)
-			containerIDsBytes := make([][]byte, len(containerIDs))
-			for i, id := range containerIDs {
-				id := id
-				containerIDsBytes[i] = id[:]
-			}
-			require.Equal(containerIDsBytes, innerMsg.ContainerIds)
+			require.Equal(containerIDs[0][:], innerMsg.ContainerId)
 		},
 	)
 
