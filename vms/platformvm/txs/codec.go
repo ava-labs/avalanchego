@@ -53,19 +53,22 @@ func init() {
 
 // RegisterUnsignedTxsTypes allows registering relevant type of unsigned package
 // in the right sequence. Following repackaging of platformvm package, a few
-// subpackage-level codecs were introduced, each handling serialization of specific types.
+// subpackage-level codecs were introduced, each handling serialization of
+// specific types.
+//
 // RegisterUnsignedTxsTypes is made exportable so to guarantee that other codecs
 // are coherent with components one.
-func RegisterUnsignedTxsTypes(targetCodec codec.Registry) error {
+func RegisterUnsignedTxsTypes(targetCodec linearcodec.Codec) error {
 	errs := wrappers.Errs{}
+
+	// The Fx is registered here because this is the same place it is registered
+	// in the AVM. This ensures that the typeIDs match up for utxos in shared
+	// memory.
+	errs.Add(targetCodec.RegisterType(&secp256k1fx.TransferInput{}))
+	targetCodec.SkipRegistrations(1)
+	errs.Add(targetCodec.RegisterType(&secp256k1fx.TransferOutput{}))
+	targetCodec.SkipRegistrations(1)
 	errs.Add(
-		// The Fx is registered here because this is the same place it is
-		// registered in the AVM. This ensures that the typeIDs match up for
-		// utxos in shared memory.
-		targetCodec.RegisterType(&secp256k1fx.TransferInput{}),
-		targetCodec.RegisterType(&secp256k1fx.MintOutput{}),
-		targetCodec.RegisterType(&secp256k1fx.TransferOutput{}),
-		targetCodec.RegisterType(&secp256k1fx.MintOperation{}),
 		targetCodec.RegisterType(&secp256k1fx.Credential{}),
 		targetCodec.RegisterType(&secp256k1fx.Input{}),
 		targetCodec.RegisterType(&secp256k1fx.OutputOwners{}),
