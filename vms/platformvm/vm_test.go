@@ -1779,6 +1779,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		cpuTracker,
 		vm,
 		subnets.New(ctx.NodeID, subnets.Config{}),
+		tracker.NewPeers(),
 	)
 	require.NoError(err)
 

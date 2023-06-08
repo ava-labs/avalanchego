@@ -30,6 +30,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+
+	commontracker "github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 )
 
 const (
@@ -82,6 +84,8 @@ type handler struct {
 
 	ctx *snow.ConsensusContext
 	// The validator set that validates this chain
+	// TODO: consider using peerTracker instead of validators
+	// since peerTracker is already tracking validators
 	validators validators.Set
 	// Receives messages from the VM
 	msgFromVMChan   <-chan common.Message
@@ -117,7 +121,10 @@ type handler struct {
 
 	subnetConnector validators.SubnetConnector
 
-	subnetAllower subnets.Allower
+	subnet subnets.Subnet
+
+	// Tracks the peers that are currently connected to this subnet
+	peerTracker commontracker.Peers
 }
 
 // Initialize this consensus handler
@@ -131,6 +138,7 @@ func New(
 	resourceTracker tracker.ResourceTracker,
 	subnetConnector validators.SubnetConnector,
 	subnet subnets.Subnet,
+	peerTracker commontracker.Peers,
 ) (Handler, error) {
 	h := &handler{
 		ctx:              ctx,
@@ -144,7 +152,8 @@ func New(
 		closed:           make(chan struct{}),
 		resourceTracker:  resourceTracker,
 		subnetConnector:  subnetConnector,
-		subnetAllower:    subnet,
+		subnet:           subnet,
+		peerTracker:      peerTracker,
 	}
 
 	var err error
@@ -170,7 +179,7 @@ func (h *handler) Context() *snow.ConsensusContext {
 }
 
 func (h *handler) ShouldHandle(nodeID ids.NodeID) bool {
-	return h.subnetAllower.IsAllowed(nodeID, h.validators.Contains(nodeID))
+	return h.subnet.IsAllowed(nodeID, h.validators.Contains(nodeID))
 }
 
 func (h *handler) SetEngineManager(engineManager *EngineManager) {
@@ -254,23 +263,6 @@ func (h *handler) Start(ctx context.Context, recoverPanic bool) {
 		go h.ctx.Log.RecoverAndPanic(dispatchAsync)
 		go h.ctx.Log.RecoverAndPanic(dispatchChans)
 	}
-}
-
-func (h *handler) HealthCheck(ctx context.Context) (interface{}, error) {
-	h.ctx.Lock.Lock()
-	defer h.ctx.Lock.Unlock()
-
-	state := h.ctx.State.Get()
-	engine, ok := h.engineManager.Get(state.Type).Get(state.State)
-	if !ok {
-		return nil, fmt.Errorf(
-			"%w %s running %s",
-			errMissingEngine,
-			state.State,
-			state.Type,
-		)
-	}
-	return engine.HealthCheck(ctx)
 }
 
 // Push the message onto the handler's queue
@@ -743,12 +735,20 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 
 	// Connection messages can be sent to the currently executing engine
 	case *message.Connected:
+		err := h.peerTracker.Connected(ctx, nodeID, msg.NodeVersion)
+		if err != nil {
+			return err
+		}
 		return engine.Connected(ctx, nodeID, msg.NodeVersion)
 
 	case *message.ConnectedSubnet:
 		return h.subnetConnector.ConnectedSubnet(ctx, nodeID, msg.SubnetID)
 
 	case *message.Disconnected:
+		err := h.peerTracker.Disconnected(ctx, nodeID)
+		if err != nil {
+			return err
+		}
 		return engine.Disconnected(ctx, nodeID)
 
 	default:
