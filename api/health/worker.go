@@ -99,7 +99,6 @@ func (w *worker) RegisterCheck(name string, check Checker, tags ...string) error
 	w.tags[AllTag] = names
 
 	applicationChecks := w.tags[ApplicationTag]
-	isApplicationCheck := applicationChecks.Contains(name)
 	tc := &taggedChecker{
 		checker:            check,
 		isApplicationCheck: applicationChecks.Contains(name),
@@ -117,7 +116,7 @@ func (w *worker) RegisterCheck(name string, check Checker, tags ...string) error
 
 	// If this is a new application-wide check, then all of the registered tags
 	// now have one additional failing check.
-	w.updateMetrics(tc, false /*healthy*/, true /*register*/)
+	w.updateMetrics(tc, false /*=healthy*/, true /*=register*/)
 	return nil
 }
 
@@ -253,7 +252,7 @@ func (w *worker) runCheck(ctx context.Context, wg *sync.WaitGroup, name string, 
 				zap.Strings("tags", check.tags),
 				zap.Error(err),
 			)
-			w.updateMetrics(check, false, false)
+			w.updateMetrics(check, false /*=healthy*/, false /*=register*/)
 		}
 	} else if prevResult.Error != nil {
 		w.log.Info("check started passing",
@@ -261,7 +260,7 @@ func (w *worker) runCheck(ctx context.Context, wg *sync.WaitGroup, name string, 
 			zap.String("name", name),
 			zap.Strings("tags", check.tags),
 		)
-		w.updateMetrics(check, true, false)
+		w.updateMetrics(check, true /*=healthy*/, false /*=register*/)
 	}
 	w.results[name] = result
 }
