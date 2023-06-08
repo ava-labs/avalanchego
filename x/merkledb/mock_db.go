@@ -13,7 +13,6 @@ import (
 
 	database "github.com/ava-labs/avalanchego/database"
 	ids "github.com/ava-labs/avalanchego/ids"
-	set "github.com/ava-labs/avalanchego/utils/set"
 	gomock "github.com/golang/mock/gomock"
 )
 
@@ -429,21 +428,6 @@ func (m *MockMerkleDB) getEditableNode(arg0 path) (*node, error) {
 func (mr *MockMerkleDBMockRecorder) getEditableNode(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "getEditableNode", reflect.TypeOf((*MockMerkleDB)(nil).getEditableNode), arg0)
-}
-
-// getKeyValues mocks base method.
-func (m *MockMerkleDB) getKeyValues(arg0, arg1 []byte, arg2 int, arg3 set.Set[string], arg4 bool) ([]KeyValue, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "getKeyValues", arg0, arg1, arg2, arg3, arg4)
-	ret0, _ := ret[0].([]KeyValue)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// getKeyValues indicates an expected call of getKeyValues.
-func (mr *MockMerkleDBMockRecorder) getKeyValues(arg0, arg1, arg2, arg3, arg4 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "getKeyValues", reflect.TypeOf((*MockMerkleDB)(nil).getKeyValues), arg0, arg1, arg2, arg3, arg4)
 }
 
 // getValue mocks base method.

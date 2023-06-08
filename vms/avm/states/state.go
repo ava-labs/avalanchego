@@ -625,7 +625,6 @@ func (s *state) CleanupTxs() error {
 				return err
 			}
 		}
-
 	}
 	return nil
 }

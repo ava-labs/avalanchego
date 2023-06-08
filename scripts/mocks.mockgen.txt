@@ -29,11 +29,9 @@ github.com/ava-labs/avalanchego/vms/avm/metrics=Metrics=vms/avm/metrics/mock_met
 github.com/ava-labs/avalanchego/vms/avm/states=Chain,State,Diff=vms/avm/states/mock_states.go
 github.com/ava-labs/avalanchego/vms/avm/txs/mempool=Mempool=vms/avm/txs/mempool/mock_mempool.go
 github.com/ava-labs/avalanchego/vms/components/avax=TransferableIn=vms/components/avax/mock_transferable_in.go
-github.com/ava-labs/avalanchego/vms/components/avax=TransferableOut=vms/components/avax/mock_transferable_out.go
 github.com/ava-labs/avalanchego/vms/components/verify=Verifiable=vms/components/verify/mock_verifiable.go
 github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor=Manager=vms/platformvm/blocks/executor/mock_manager.go
 github.com/ava-labs/avalanchego/vms/platformvm/blocks=Block=vms/platformvm/blocks/mock_block.go
-github.com/ava-labs/avalanchego/vms/platformvm/fx=Fx,Owner=vms/platformvm/fx/mock_fx.go
 github.com/ava-labs/avalanchego/vms/platformvm/state=Chain=vms/platformvm/state/mock_chain.go
 github.com/ava-labs/avalanchego/vms/platformvm/state=Diff=vms/platformvm/state/mock_diff.go
 github.com/ava-labs/avalanchego/vms/platformvm/state=StakerIterator=vms/platformvm/state/mock_staker_iterator.go
