@@ -42,7 +42,7 @@ A range proof sent by a server may be valid but not contain all of the key-value
 
 For each key range, the sync client keeps track of the root ID of the database revision for which it has downloaded that key range. For example, it will store information that says something like, "I have all of the key-value pairs that were in range [`start`, `end`] when the database's root was `rootID`" for some keys `start` and `end`, and some database `rootID`. Note that `rootID` is the root ID that the client is trying to sync to, not the root ID of its own incomplete database.
 
-If the first range proof contained all of the key-value pairs up to some key `end`, the client recognizes that it must fetch all of the keys after `end`. It divides the remaining key range into chunks, and repeats this process by asking servers for a range proof for each chunk until it has all of the key-value pairs in the database.
+If the first range proof contained all of the key-value pairs up to some key `end`, the client recognizes that it must fetch all of the keys after `end`. It repeatedly requests range proofs or change proofs for chunks of the remaining key range until it has all of the key-value pairs in the database. Note that the client may split the remaining key range into chunks and fetch each chunk of key-value pairs in parallel.
 
 However, the database may be changing as the client is syncing. The sync client can be notified that the root ID of the database it's trying to sync to has changed. Detecting that the root ID to sync to has changed is done outside this package. If this occurs, the key-value pairs the client has learned about via range proofs may no longer be valid.
 
