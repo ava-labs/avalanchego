@@ -1449,9 +1449,9 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 }
 
-// GetValidatorSet must return the BLS keys for a given validator
-// correctly when queried at a previous height, even in case it has currently expired
-func Test_RegressionBLSKeyDiff(t *testing.T) {
+// GetValidatorSet must return the BLS keys for a given validator correctly when
+// queried at a previous height, even in case it has currently expired
+func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 	// setup
 	require := require.New(t)
 	vm, _, _ := defaultVM()
@@ -1729,10 +1729,10 @@ func Test_RegressionBLSKeyDiff(t *testing.T) {
 	}
 }
 
-func Test_RegressionPrimaryNetworkValidatorEmptyBLSKeyDiff(t *testing.T) {
-	// A primary network validator has an empty BLS key. Then it restakes
-	// adding the BLS key. Querying the validator set back when BLS key was empty
-	// must return an empty BLS key.
+func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
+	// A primary network validator has an empty BLS key. Then it restakes adding
+	// the BLS key. Querying the validator set back when BLS key was empty must
+	// return an empty BLS key.
 
 	// setup
 	require := require.New(t)
@@ -1888,11 +1888,11 @@ func Test_RegressionPrimaryNetworkValidatorEmptyBLSKeyDiff(t *testing.T) {
 	}
 }
 
-func Test_RegressionSubnetkValidatorEmptyBLSKeyDiff(t *testing.T) {
+func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	// A primary network validator has an empty BLS key and a subnet validator.
-	// Primary network validator terminates its first staking cycle and it restakes
-	// adding the BLS key. Querying the validator set back when BLS key was empty
-	// must return an empty BLS key for the subnet validator
+	// Primary network validator terminates its first staking cycle and it
+	// restakes adding the BLS key. Querying the validator set back when BLS key
+	// was empty must return an empty BLS key for the subnet validator
 
 	// setup
 	require := require.New(t)
