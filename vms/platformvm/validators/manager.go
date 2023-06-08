@@ -35,7 +35,7 @@ const (
 var (
 	_ validators.State = (*manager)(nil)
 
-	ErrMissingValidator = errors.New("missing validator")
+	ErrMissingValidator = errors.New("missing validator set")
 )
 
 // Manager adds the ability to introduce newly acceted blocks IDs to the State
@@ -210,7 +210,7 @@ func (m *manager) makePrimaryNetworkValidatorSet(
 	if !ok {
 		// This should never happen
 		m.log.Error(ErrMissingValidator.Error(),
-			zap.Stringer("networkID", constants.PrimaryNetworkID),
+			zap.Stringer("subnetID", constants.PrimaryNetworkID),
 		)
 		return nil, ErrMissingValidator
 	}
@@ -304,7 +304,11 @@ func (m *manager) makeSubnetValidatorSet(
 		primaryValidator, ok := primarySet[nodeID]
 		if !ok {
 			// This should never happen
+			m.log.Error(ErrMissingValidator.Error(),
+				zap.Stringer("nodeID", nodeID),
+			)
 			return nil, ErrMissingValidator
+
 		}
 		subnetValidator.PublicKey = primaryValidator.PublicKey
 	}

@@ -387,7 +387,7 @@ func TestVM_GetValidatorSet(t *testing.T) {
 			r.NoError(err)
 
 			clk := &mockable.Clock{}
-			validatorssSet := NewManager(logging.NoLog{}, cfg, mockState, metrics, clk)
+			validatorSet := NewManager(logging.NoLog{}, cfg, mockState, metrics, clk)
 
 			// Mock the VM's validators
 			mockPrimaryVdrSet := validators.NewMockSet(ctrl)
@@ -427,7 +427,7 @@ func TestVM_GetValidatorSet(t *testing.T) {
 			mockState.EXPECT().GetStatelessBlock(mockTipID).Return(mockTip, choices.Accepted, nil)
 
 			// Compute validator set at previous height
-			gotVdrSet, err := validatorssSet.GetValidatorSet(context.Background(), tt.height, tt.subnetID)
+			gotVdrSet, err := validatorSet.GetValidatorSet(context.Background(), tt.height, tt.subnetID)
 			r.ErrorIs(err, tt.expectedErr)
 			if tt.expectedErr != nil {
 				return
