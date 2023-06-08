@@ -35,7 +35,8 @@ const (
 var (
 	_ validators.State = (*manager)(nil)
 
-	ErrMissingValidator = errors.New("missing validator set")
+	ErrMissingValidator    = errors.New("missing validator")
+	ErrMissingValidatorSet = errors.New("missing validator set")
 )
 
 // Manager adds the ability to introduce newly acceted blocks IDs to the State
@@ -209,10 +210,10 @@ func (m *manager) makePrimaryNetworkValidatorSet(
 	currentValidators, ok := m.cfg.Validators.Get(constants.PrimaryNetworkID)
 	if !ok {
 		// This should never happen
-		m.log.Error(ErrMissingValidator.Error(),
+		m.log.Error(ErrMissingValidatorSet.Error(),
 			zap.Stringer("subnetID", constants.PrimaryNetworkID),
 		)
-		return nil, ErrMissingValidator
+		return nil, ErrMissingValidatorSet
 	}
 	currentValidatorList := currentValidators.List()
 
@@ -306,6 +307,7 @@ func (m *manager) makeSubnetValidatorSet(
 			// This should never happen
 			m.log.Error(ErrMissingValidator.Error(),
 				zap.Stringer("nodeID", nodeID),
+				zap.Stringer("subnetID", subnetID),
 			)
 			return nil, ErrMissingValidator
 		}
