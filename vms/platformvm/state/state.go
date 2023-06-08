@@ -12,8 +12,6 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"go.uber.org/zap"
-
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/cache/metercacher"
 	"github.com/ava-labs/avalanchego/database"
@@ -30,7 +28,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/math"
-	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -49,7 +46,6 @@ const (
 	transformedSubnetTxCacheSize = 4 * units.MiB
 
 	validatorDiffsCacheSize = 2048
-	blockIDCacheSize        = 2048
 	rewardUTXOsCacheSize    = 2048
 	chainCacheSize          = 2048
 	chainDBCacheSize        = 2048
@@ -65,7 +61,6 @@ var (
 	errValidatorSetAlreadyPopulated = errors.New("validator set already populated")
 	errDuplicateValidatorSet        = errors.New("duplicate validator set")
 
-	blockIDPrefix                 = []byte("blockID")
 	blockPrefix                   = []byte("block")
 	validatorsPrefix              = []byte("validators")
 	currentPrefix                 = []byte("current")
@@ -131,8 +126,6 @@ type State interface {
 
 	GetStatelessBlock(blockID ids.ID) (blocks.Block, choices.Status, error)
 	AddStatelessBlock(block blocks.Block, status choices.Status)
-
-	GetBlockIDAtHeight(height uint64) (ids.ID, error)
 
 	// ValidatorSet adds all the validators and delegators of [subnetID] into
 	// [vdrs].
@@ -209,8 +202,6 @@ func (b *stateBlk) Size() int {
  * |   '-. height
  * |     '-. list
  * |       '-- nodeID -> public key
- * |-. blockIDs
- * | '-- height -> blockID
  * |-. blocks
  * | '-- blockID -> block bytes
  * |-. txs
@@ -250,13 +241,11 @@ type state struct {
 
 	currentHeight uint64
 
-	addedBlockIDs map[uint64]ids.ID            // map of height -> blockID
-	blockIDCache  cache.Cacher[uint64, ids.ID] // cache of height -> blockID. If the entry is ids.Empty, it is not in the database
-	blockIDDB     database.Database
-
-	addedBlocks map[ids.ID]stateBlk             // map of blockID -> Block
-	blockCache  cache.Cacher[ids.ID, *stateBlk] // cache of blockID -> Block. If the entry is nil, it is not in the database
-	blockDB     database.Database
+	addedBlocks map[ids.ID]stateBlk // map of blockID -> Block
+	// cache of blockID -> Block
+	// If the block isn't known, nil is cached.
+	blockCache cache.Cacher[ids.ID, *stateBlk]
+	blockDB    database.Database
 
 	validatorsDB                 database.Database
 	currentValidatorsDB          database.Database
@@ -407,15 +396,6 @@ func new(
 	rewards reward.Calculator,
 	bootstrapped *utils.Atomic[bool],
 ) (*state, error) {
-	blockIDCache, err := metercacher.New[uint64, ids.ID](
-		"block_id_cache",
-		metricsReg,
-		&cache.LRU[uint64, ids.ID]{Size: blockIDCacheSize},
-	)
-	if err != nil {
-		return nil, err
-	}
-
 	blockCache, err := metercacher.New(
 		"block_cache",
 		metricsReg,
@@ -533,10 +513,6 @@ func new(
 		rewards:      rewards,
 		bootstrapped: bootstrapped,
 		baseDB:       baseDB,
-
-		addedBlockIDs: make(map[uint64]ids.ID),
-		blockIDCache:  blockIDCache,
-		blockIDDB:     prefixdb.New(blockIDPrefix, baseDB),
 
 		addedBlocks: make(map[ids.ID]stateBlk),
 		blockCache:  blockCache,
@@ -1113,7 +1089,6 @@ func (s *state) load() error {
 		s.loadCurrentValidators(),
 		s.loadPendingValidators(),
 		s.initValidatorSets(),
-		s.populateBlockHeightIndex(), // Must be called after loadMetadata
 	)
 	return errs.Err
 }
@@ -1409,7 +1384,6 @@ func (s *state) initValidatorSets() error {
 func (s *state) write(updateValidators bool, height uint64) error {
 	errs := wrappers.Errs{}
 	errs.Add(
-		s.writeBlockIDs(),
 		s.writeBlocks(),
 		s.writeCurrentStakers(updateValidators, height),
 		s.writePendingStakers(),
@@ -1449,7 +1423,6 @@ func (s *state) Close() error {
 		s.chainDB.Close(),
 		s.singletonDB.Close(),
 		s.blockDB.Close(),
-		s.blockIDDB.Close(),
 	)
 	return errs.Err
 }
@@ -1509,9 +1482,7 @@ func (s *state) init(genesisBytes []byte) error {
 }
 
 func (s *state) AddStatelessBlock(block blocks.Block, status choices.Status) {
-	blkID := block.ID()
-	s.addedBlockIDs[block.Height()] = blkID
-	s.addedBlocks[blkID] = stateBlk{
+	s.addedBlocks[block.ID()] = stateBlk{
 		Blk:    block,
 		Bytes:  block.Bytes(),
 		Status: status,
@@ -1542,19 +1513,6 @@ func (s *state) CommitBatch() (database.Batch, error) {
 		return nil, err
 	}
 	return s.baseDB.CommitBatch()
-}
-
-func (s *state) writeBlockIDs() error {
-	for height, blkID := range s.addedBlockIDs {
-		heightKey := database.PackUInt64(height)
-
-		delete(s.addedBlockIDs, height)
-		s.blockIDCache.Put(height, blkID)
-		if err := database.PutID(s.blockIDDB, heightKey, blkID); err != nil {
-			return fmt.Errorf("failed to add blockID: %w", err)
-		}
-	}
-	return nil
 }
 
 func (s *state) writeBlocks() error {
@@ -1614,33 +1572,6 @@ func (s *state) GetStatelessBlock(blockID ids.ID) (blocks.Block, choices.Status,
 
 	s.blockCache.Put(blockID, &blkState)
 	return blkState.Blk, blkState.Status, nil
-}
-
-func (s *state) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
-	if blkID, exists := s.addedBlockIDs[height]; exists {
-		return blkID, nil
-	}
-	if blkID, cached := s.blockIDCache.Get(height); cached {
-		if blkID == ids.Empty {
-			return ids.Empty, database.ErrNotFound
-		}
-
-		return blkID, nil
-	}
-
-	heightKey := database.PackUInt64(height)
-
-	blkID, err := database.GetID(s.blockIDDB, heightKey)
-	if err == database.ErrNotFound {
-		s.blockIDCache.Put(height, ids.Empty)
-		return ids.Empty, database.ErrNotFound
-	}
-	if err != nil {
-		return ids.Empty, err
-	}
-
-	s.blockIDCache.Put(height, blkID)
-	return blkID, nil
 }
 
 func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error {
@@ -2039,78 +1970,5 @@ func (s *state) writeMetadata() error {
 		}
 		s.persistedLastAccepted = s.lastAccepted
 	}
-	return nil
-}
-
-// TODO: Remove after next hard-fork when everybody has run this.
-func (s *state) populateBlockHeightIndex() error {
-	lastAcceptedBlk, _, err := s.GetStatelessBlock(s.lastAccepted)
-	if err != nil {
-		return fmt.Errorf("failed to get last accepted block from local disk: %w", err)
-	}
-
-	lastAcceptedHeight := lastAcceptedBlk.Height()
-	lastAcceptedHeightKey := database.PackUInt64(lastAcceptedHeight)
-	if _, err := database.GetID(s.blockIDDB, lastAcceptedHeightKey); err == nil {
-		// If the last accepted block is in [s.blockIDDB], no backfilling is
-		// required.
-		return nil
-	}
-
-	s.ctx.Log.Info("populating platformvm block height index")
-	var (
-		startTime  = time.Now()
-		lastUpdate = startTime
-	)
-
-	blockIterator := s.blockDB.NewIterator()
-	defer blockIterator.Release()
-	for indexed := uint64(0); blockIterator.Next(); {
-		blkBytes := blockIterator.Value()
-
-		// Note: stored blocks are verified, so it's safe to unmarshal them with
-		// GenesisCodec
-		blkState := stateBlk{}
-		if _, err := blocks.GenesisCodec.Unmarshal(blkBytes, &blkState); err != nil {
-			return err
-		}
-
-		if blkState.Status != choices.Accepted {
-			continue
-		}
-
-		blkState.Blk, err = blocks.Parse(blocks.GenesisCodec, blkState.Bytes)
-		if err != nil {
-			return err
-		}
-
-		blkHeight := blkState.Blk.Height()
-		blkID := blkState.Blk.ID()
-
-		heightKey := database.PackUInt64(blkHeight)
-		if err := database.PutID(s.blockIDDB, heightKey, blkID); err != nil {
-			return fmt.Errorf("failed to add blockID: %w", err)
-		}
-
-		indexed++
-
-		if time.Since(lastUpdate) > 5*time.Second {
-			eta := timer.EstimateETA(startTime, indexed, lastAcceptedHeight+1)
-			s.ctx.Log.Info("populating platformvm block height index",
-				zap.Uint64("progress", indexed),
-				zap.Uint64("end", lastAcceptedHeight+1),
-				zap.Duration("eta", eta),
-			)
-			lastUpdate = time.Now()
-		}
-	}
-
-	if err := s.Commit(); err != nil {
-		return err
-	}
-
-	s.ctx.Log.Info("populated platformvm block height index",
-		zap.Duration("elapsed", time.Since(startTime)),
-	)
 	return nil
 }
