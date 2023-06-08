@@ -3,22 +3,31 @@
 
 package avax
 
-import "github.com/ava-labs/avalanchego/snow"
+import (
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
+)
 
-type TestVerifiable struct{ Err error }
+var (
+	_ verify.State    = (*TestState)(nil)
+	_ TransferableOut = (*TestTransferable)(nil)
+	_ Addressable     = (*TestAddressable)(nil)
+)
 
-func (*TestVerifiable) InitCtx(*snow.Context) {}
+type TestState struct {
+	verify.IsState `json:"-"`
 
-func (v *TestVerifiable) Verify() error {
-	return v.Err
+	Err error
 }
 
-func (v *TestVerifiable) VerifyState() error {
+func (*TestState) InitCtx(*snow.Context) {}
+
+func (v *TestState) Verify() error {
 	return v.Err
 }
 
 type TestTransferable struct {
-	TestVerifiable
+	TestState
 
 	Val uint64 `serialize:"true"`
 }
