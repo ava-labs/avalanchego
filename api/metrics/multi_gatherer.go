@@ -18,7 +18,7 @@ import (
 var (
 	_ MultiGatherer = (*multiGatherer)(nil)
 
-	errReregisterGatherer = errors.New("attempt to register existing gathererer")
+	errReregisterGatherer = errors.New("attempt to register existing gatherer")
 )
 
 // MultiGatherer extends the Gatherer interface by allowing additional gatherers
