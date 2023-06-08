@@ -135,7 +135,7 @@ func TestInitialStateVerifyNilOutput(t *testing.T) {
 
 func TestInitialStateVerifyInvalidOutput(t *testing.T) {
 	c := linearcodec.NewDefault()
-	if err := c.RegisterType(&avax.TestVerifiable{}); err != nil {
+	if err := c.RegisterType(&avax.TestState{}); err != nil {
 		t.Fatal(err)
 	}
 	m := codec.NewDefaultManager()
@@ -146,7 +146,7 @@ func TestInitialStateVerifyInvalidOutput(t *testing.T) {
 
 	is := InitialState{
 		FxIndex: 0,
-		Outs:    []verify.State{&avax.TestVerifiable{Err: errTest}},
+		Outs:    []verify.State{&avax.TestState{Err: errTest}},
 	}
 	if err := is.Verify(m, numFxs); err == nil {
 		t.Fatalf("Should have erred due to an invalid output")
