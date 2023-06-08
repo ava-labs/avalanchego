@@ -382,7 +382,7 @@ func TestVM_GetValidatorSet(t *testing.T) {
 			}
 			mockState := state.NewMockState(ctrl)
 
-			metrics, err := metrics.New("", prometheus.NewRegistry(), cfg.TrackedSubnets)
+			metrics, err := metrics.New("", prometheus.NewRegistry())
 			r.NoError(err)
 
 			clk := &mockable.Clock{}
