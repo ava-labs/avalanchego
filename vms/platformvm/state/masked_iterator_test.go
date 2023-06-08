@@ -205,7 +205,7 @@ func maskedIteratorTestGenerator() []gopter.Gen {
 			nums := v.([]int)
 			deletedCount := nums[0]
 			updatedCount := nums[1]
-			return deletedCount >= 0 && updatedCount >= 0 && deletedCount+updatedCount <= parentStakersCount
+			return deletedCount+updatedCount <= parentStakersCount
 		}),
 	}
 }

@@ -60,6 +60,7 @@ func (i *maskedIterator) Next() bool {
 		return false // done iteration
 	case nextParentStaker == nil && len(i.nextInLine) != 0:
 		i.nextStaker = i.nextInLine[0]
+		i.nextInLine[0] = nil
 		i.nextInLine = i.nextInLine[1:]
 		return true
 	case nextParentStaker != nil && len(i.nextInLine) == 0:
