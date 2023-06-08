@@ -298,8 +298,7 @@ func BuildGenesisTestWithArgs(t *testing.T, args *api.BuildGenesisArgs) (*api.Bu
 
 	buildGenesisResponse := api.BuildGenesisReply{}
 	platformvmSS := api.StaticService{}
-	err := platformvmSS.BuildGenesis(nil, &buildGenesisArgs, &buildGenesisResponse)
-	require.NoError(err)
+	require.NoError(platformvmSS.BuildGenesis(nil, &buildGenesisArgs, &buildGenesisResponse))
 
 	genesisBytes, err := formatting.Decode(buildGenesisResponse.Encoding, buildGenesisResponse.Bytes)
 	require.NoError(err)
@@ -403,8 +402,8 @@ func defaultVM() (*VM, database.Database, *mutableSharedMemory) {
 
 func GenesisVMWithArgs(t *testing.T, args *api.BuildGenesisArgs) ([]byte, chan common.Message, *VM, *atomic.Memory) {
 	require := require.New(t)
-	var genesisBytes []byte
 
+	var genesisBytes []byte
 	if args != nil {
 		_, genesisBytes = BuildGenesisTestWithArgs(t, args)
 	} else {
@@ -447,7 +446,7 @@ func GenesisVMWithArgs(t *testing.T, args *api.BuildGenesisArgs) ([]byte, chan c
 	appSender.SendAppGossipF = func(context.Context, []byte) error {
 		return nil
 	}
-	err := vm.Initialize(
+	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
 		chainDBManager,
@@ -457,13 +456,14 @@ func GenesisVMWithArgs(t *testing.T, args *api.BuildGenesisArgs) ([]byte, chan c
 		msgChan,
 		nil,
 		appSender,
-	)
-	require.NoError(err)
+	))
 
-	err = vm.SetState(context.Background(), snow.NormalOp)
-	require.NoError(err)
+	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
 
 	// Create a subnet and store it in testSubnet1
+	// Note: testSubnet1 is a global and should be set when calling this
+	// function.
+	var err error
 	testSubnet1, err = vm.txBuilder.NewCreateSubnetTx(
 		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
 		// control keys are keys[0], keys[1], keys[2]
@@ -473,17 +473,14 @@ func GenesisVMWithArgs(t *testing.T, args *api.BuildGenesisArgs) ([]byte, chan c
 	)
 	require.NoError(err)
 
-	err = vm.Builder.AddUnverifiedTx(testSubnet1)
-	require.NoError(err)
+	require.NoError(vm.Builder.AddUnverifiedTx(testSubnet1))
 
 	blk, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
 
-	err = blk.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(blk.Verify(context.Background()))
 
-	err = blk.Accept(context.Background())
-	require.NoError(err)
+	require.NoError(blk.Accept(context.Background()))
 
 	return genesisBytes, msgChan, vm, m
 }
@@ -494,8 +491,7 @@ func TestGenesis(t *testing.T) {
 	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		err := vm.Shutdown(context.Background())
-		require.NoError(err)
+		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -602,8 +598,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		err := vm.Shutdown(context.Background())
-		require.NoError(err)
+		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -701,8 +696,7 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		err := vm.Shutdown(context.Background())
-		require.NoError(err)
+		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -1105,8 +1099,7 @@ func TestUnneededBuildBlock(t *testing.T) {
 	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		err := vm.Shutdown(context.Background())
-		require.NoError(err)
+		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
 	}()
 	_, err := vm.Builder.BuildBlock(context.Background())
@@ -1119,8 +1112,7 @@ func TestCreateChain(t *testing.T) {
 	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		err := vm.Shutdown(context.Background())
-		require.NoError(err)
+		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -1135,17 +1127,14 @@ func TestCreateChain(t *testing.T) {
 	)
 	require.NoError(err)
 
-	err = vm.Builder.AddUnverifiedTx(tx)
-	require.NoError(err)
+	require.NoError(vm.Builder.AddUnverifiedTx(tx))
 
 	blk, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err) // should contain proposal to create chain
 
-	err = blk.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(blk.Verify(context.Background()))
 
-	err = blk.Accept(context.Background())
-	require.NoError(err)
+	require.NoError(blk.Accept(context.Background()))
 
 	_, txStatus, err := vm.state.GetTx(tx.ID())
 	require.NoError(err)
@@ -1285,8 +1274,7 @@ func TestAtomicImport(t *testing.T) {
 	vm, baseDB, mutableSharedMemory := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		err := vm.Shutdown(context.Background())
-		require.NoError(err)
+		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -1327,7 +1315,7 @@ func TestAtomicImport(t *testing.T) {
 	require.NoError(err)
 
 	inputID := utxo.InputID()
-	err = peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{
+	require.NoError(peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{
 		vm.ctx.ChainID: {
 			PutRequests: []*atomic.Element{
 				{
@@ -1339,9 +1327,7 @@ func TestAtomicImport(t *testing.T) {
 				},
 			},
 		},
-	},
-	)
-	require.NoError(err)
+	}))
 
 	tx, err := vm.txBuilder.NewImportTx(
 		vm.ctx.XChainID,
@@ -1351,17 +1337,14 @@ func TestAtomicImport(t *testing.T) {
 	)
 	require.NoError(err)
 
-	err = vm.Builder.AddUnverifiedTx(tx)
-	require.NoError(err)
+	require.NoError(vm.Builder.AddUnverifiedTx(tx))
 
 	blk, err := vm.Builder.BuildBlock(context.Background())
 	require.NoError(err)
 
-	err = blk.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(blk.Verify(context.Background()))
 
-	err = blk.Accept(context.Background())
-	require.NoError(err)
+	require.NoError(blk.Accept(context.Background()))
 
 	_, txStatus, err := vm.state.GetTx(tx.ID())
 	require.NoError(err)
@@ -1378,8 +1361,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		err := vm.Shutdown(context.Background())
-		require.NoError(err)
+		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -1400,8 +1382,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 			},
 		}},
 	}}
-	err := tx.Initialize(txs.Codec)
-	require.NoError(err)
+	require.NoError(tx.Initialize(txs.Codec))
 
 	preferred, err := vm.Builder.Preferred()
 	require.NoError(err)
@@ -1421,17 +1402,13 @@ func TestOptimisticAtomicImport(t *testing.T) {
 	err = blk.Verify(context.Background())
 	require.ErrorIs(err, database.ErrNotFound) // erred due to missing shared memory UTXOs
 
-	err = vm.SetState(context.Background(), snow.Bootstrapping)
-	require.NoError(err)
+	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
 
-	err = blk.Verify(context.Background())
-	require.NoError(err) // skips shared memory UTXO verification during bootstrapping
+	require.NoError(blk.Verify(context.Background())) // skips shared memory UTXO verification during bootstrapping
 
-	err = blk.Accept(context.Background())
-	require.NoError(err)
+	require.NoError(blk.Accept(context.Background()))
 
-	err = vm.SetState(context.Background(), snow.NormalOp)
-	require.NoError(err)
+	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
 
 	_, txStatus, err := vm.state.GetTx(tx.ID())
 	require.NoError(err)
@@ -1474,7 +1451,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 	firstCtx.Lock.Lock()
 
 	firstMsgChan := make(chan common.Message, 1)
-	err := firstVM.Initialize(
+	require.NoError(firstVM.Initialize(
 		context.Background(),
 		firstCtx,
 		firstDB,
@@ -1484,8 +1461,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 		firstMsgChan,
 		nil,
 		nil,
-	)
-	require.NoError(err)
+	))
 
 	genesisID, err := firstVM.LastAccepted(context.Background())
 	require.NoError(err)
@@ -1553,14 +1529,13 @@ func TestRestartFullyAccepted(t *testing.T) {
 	secondVM.clock.Set(initialClkTime)
 	secondCtx.Lock.Lock()
 	defer func() {
-		err := secondVM.Shutdown(context.Background())
-		require.NoError(err)
+		require.NoError(secondVM.Shutdown(context.Background()))
 		secondCtx.Lock.Unlock()
 	}()
 
 	secondDB := db.NewPrefixDBManager([]byte{})
 	secondMsgChan := make(chan common.Message, 1)
-	err = secondVM.Initialize(
+	require.NoError(secondVM.Initialize(
 		context.Background(),
 		secondCtx,
 		secondDB,
@@ -1570,8 +1545,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 		secondMsgChan,
 		nil,
 		nil,
-	)
-	require.NoError(err)
+	))
 
 	lastAccepted, err := secondVM.LastAccepted(context.Background())
 	require.NoError(err)
@@ -1620,7 +1594,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	ctx.Lock.Lock()
 
 	msgChan := make(chan common.Message, 1)
-	err = vm.Initialize(
+	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
 		vmDBManager,
@@ -1630,8 +1604,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		msgChan,
 		nil,
 		nil,
-	)
-	require.NoError(err)
+	))
 
 	preferred, err := vm.Builder.Preferred()
 	require.NoError(err)
@@ -1700,7 +1673,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	mc, err := message.NewCreator(logging.NoLog{}, metrics, "dummyNamespace", constants.DefaultNetworkCompressionType, 10*time.Second)
 	require.NoError(err)
 
-	err = chainRouter.Initialize(
+	require.NoError(chainRouter.Initialize(
 		ids.EmptyNodeID,
 		logging.NoLog{},
 		timeoutManager,
@@ -1712,8 +1685,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		router.HealthConfig{},
 		"",
 		prometheus.NewRegistry(),
-	)
-	require.NoError(err)
+	))
 
 	externalSender := &sender.ExternalSenderTest{TB: t}
 	externalSender.Default(true)
@@ -1862,8 +1834,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	h.Start(context.Background(), false)
 
 	ctx.Lock.Lock()
-	err = bootstrapper.Connected(context.Background(), peerID, version.CurrentApp)
-	require.NoError(err)
+	require.NoError(bootstrapper.Connected(context.Background(), peerID, version.CurrentApp))
 
 	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs set.Set[ids.NodeID], _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
 		inMsgIntf, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
@@ -1875,9 +1846,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		return nodeIDs
 	}
 
-	frontier := []ids.ID{advanceTimeBlkID}
-	err = bootstrapper.AcceptedFrontier(context.Background(), peerID, reqID, frontier)
-	require.NoError(err)
+	require.NoError(bootstrapper.AcceptedFrontier(context.Background(), peerID, reqID, advanceTimeBlkID))
 
 	externalSender.SendF = func(msg message.OutboundMessage, nodeIDs set.Set[ids.NodeID], _ ids.ID, _ subnets.Allower) set.Set[ids.NodeID] {
 		inMsgIntf, err := mc.Parse(msg.Bytes(), ctx.NodeID, func() {})
@@ -1893,6 +1862,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		return nodeIDs
 	}
 
+	frontier := []ids.ID{advanceTimeBlkID}
 	require.NoError(bootstrapper.Accepted(context.Background(), peerID, reqID, frontier))
 
 	externalSender.SendF = nil
@@ -1937,7 +1907,7 @@ func TestUnverifiedParent(t *testing.T) {
 	}()
 
 	msgChan := make(chan common.Message, 1)
-	err := vm.Initialize(
+	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
 		dbManager,
@@ -1947,8 +1917,7 @@ func TestUnverifiedParent(t *testing.T) {
 		msgChan,
 		nil,
 		nil,
-	)
-	require.NoError(err)
+	))
 
 	// include a tx1 to make the block be accepted
 	tx1 := &txs.Tx{Unsigned: &txs.ImportTx{
@@ -1984,8 +1953,7 @@ func TestUnverifiedParent(t *testing.T) {
 	)
 	require.NoError(err)
 	firstAdvanceTimeBlk := vm.manager.NewBlock(statelessBlk)
-	err = firstAdvanceTimeBlk.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(firstAdvanceTimeBlk.Verify(context.Background()))
 
 	// include a tx1 to make the block be accepted
 	tx2 := &txs.Tx{Unsigned: &txs.ImportTx{
@@ -2093,7 +2061,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	firstCtx.Lock.Lock()
 
 	firstMsgChan := make(chan common.Message, 1)
-	err := firstVM.Initialize(
+	require.NoError(firstVM.Initialize(
 		context.Background(),
 		firstCtx,
 		firstDB,
@@ -2103,8 +2071,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		firstMsgChan,
 		nil,
 		nil,
-	)
-	require.NoError(err)
+	))
 
 	initialClkTime := banffForkTime.Add(time.Second)
 	firstVM.clock.Set(initialClkTime)
@@ -2139,7 +2106,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	}()
 
 	secondMsgChan := make(chan common.Message, 1)
-	err = secondVM.Initialize(
+	require.NoError(secondVM.Initialize(
 		context.Background(),
 		secondCtx,
 		secondDB,
@@ -2149,8 +2116,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 		secondMsgChan,
 		nil,
 		nil,
-	)
-	require.NoError(err)
+	))
 
 	secondVM.clock.Set(defaultValidateStartTime.Add(2 * defaultMinStakingDuration))
 	secondVM.uptimeManager.(uptime.TestManager).SetTime(defaultValidateStartTime.Add(2 * defaultMinStakingDuration))
@@ -2269,7 +2235,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 
 	msgChan := make(chan common.Message, 1)
 	appSender := &common.SenderTest{T: t}
-	err := vm.Initialize(
+	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
 		db,
@@ -2279,8 +2245,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 		msgChan,
 		nil,
 		appSender,
-	)
-	require.NoError(err)
+	))
 
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -2363,8 +2328,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 
 	vm.ctx.Lock.Lock()
 	defer func() {
-		err := vm.Shutdown(context.Background())
-		require.NoError(err)
+		require.NoError(vm.Shutdown(context.Background()))
 
 		vm.ctx.Lock.Unlock()
 	}()
@@ -2386,8 +2350,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	)
 	require.NoError(err)
 
-	err = vm.Builder.AddUnverifiedTx(addValidatorTx)
-	require.NoError(err)
+	require.NoError(vm.Builder.AddUnverifiedTx(addValidatorTx))
 
 	// trigger block creation for the validator tx
 	addValidatorBlock, err := vm.Builder.BuildBlock(context.Background())
@@ -2404,8 +2367,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	)
 	require.NoError(err)
 
-	err = vm.Builder.AddUnverifiedTx(createSubnetTx)
-	require.NoError(err)
+	require.NoError(vm.Builder.AddUnverifiedTx(createSubnetTx))
 
 	// trigger block creation for the subnet tx
 	createSubnetBlock, err := vm.Builder.BuildBlock(context.Background())

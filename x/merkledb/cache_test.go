@@ -28,8 +28,7 @@ func TestNewOnEvictCache(t *testing.T) {
 	require.Zero(cache.fifo.Len())
 	// Can't test function equality directly so do this
 	// to make sure it was assigned correctly
-	err := cache.onEviction(0)
-	require.NoError(err)
+	require.NoError(cache.onEviction(0))
 	require.True(called)
 }
 
@@ -53,8 +52,7 @@ func TestOnEvictCacheNoOnEvictionError(t *testing.T) {
 	require.False(ok)
 
 	// Put key
-	err := cache.Put(0, 0)
-	require.NoError(err)
+	require.NoError(cache.Put(0, 0))
 	require.Equal(1, cache.fifo.Len())
 
 	// Get key
@@ -68,8 +66,7 @@ func TestOnEvictCacheNoOnEvictionError(t *testing.T) {
 
 	// Fill the cache
 	for i := 1; i < maxSize; i++ {
-		err := cache.Put(i, i)
-		require.NoError(err)
+		require.NoError(cache.Put(i, i))
 		require.Equal(i+1, cache.fifo.Len())
 	}
 	require.Empty(evicted)
@@ -77,8 +74,7 @@ func TestOnEvictCacheNoOnEvictionError(t *testing.T) {
 	// Cache has [0,1,2]
 
 	// Put another key. This should evict the oldest inserted key (0).
-	err = cache.Put(maxSize, maxSize)
-	require.NoError(err)
+	require.NoError(cache.Put(maxSize, maxSize))
 	require.Equal(maxSize, cache.fifo.Len())
 	require.Len(evicted, 1)
 	require.Zero(evicted[0])
@@ -121,8 +117,7 @@ func TestOnEvictCacheNoOnEvictionError(t *testing.T) {
 	require.False(iter.Next())
 
 	// Put another key to evict the oldest inserted key (1).
-	err = cache.Put(maxSize+1, maxSize+1)
-	require.NoError(err)
+	require.NoError(cache.Put(maxSize+1, maxSize+1))
 	require.Equal(maxSize, cache.fifo.Len())
 	require.Len(evicted, 2)
 	require.Equal(1, evicted[1])
@@ -144,8 +139,7 @@ func TestOnEvictCacheNoOnEvictionError(t *testing.T) {
 	_, ok = cache.Get(1)
 	require.False(ok)
 
-	err = cache.Flush()
-	require.NoError(err)
+	require.NoError(cache.Flush())
 
 	// Cache should be empty
 	require.Zero(cache.fifo.Len())
@@ -177,8 +171,7 @@ func TestOnEvictCacheOnEvictionError(t *testing.T) {
 
 	// Fill the cache
 	for i := 0; i < maxSize; i++ {
-		err := cache.Put(i, i)
-		require.NoError(err)
+		require.NoError(cache.Put(i, i))
 		require.Equal(i+1, cache.fifo.Len())
 	}
 
