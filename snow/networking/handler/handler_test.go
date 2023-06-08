@@ -26,6 +26,8 @@ import (
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/resource"
+
+	commontracker "github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 )
 
 const testThreadPoolSize = 2
@@ -57,6 +59,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
+		commontracker.NewPeers(),
 	)
 	require.NoError(t, err)
 	handler := handlerIntf.(*handler)
@@ -151,6 +154,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
+		commontracker.NewPeers(),
 	)
 	require.NoError(t, err)
 	handler := handlerIntf.(*handler)
@@ -241,6 +245,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
+		commontracker.NewPeers(),
 	)
 	require.NoError(t, err)
 	handler := handlerIntf.(*handler)
@@ -320,6 +325,7 @@ func TestHandlerDispatchInternal(t *testing.T) {
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
+		commontracker.NewPeers(),
 	)
 	require.NoError(t, err)
 
@@ -397,6 +403,7 @@ func TestHandlerSubnetConnector(t *testing.T) {
 		resourceTracker,
 		connector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
+		commontracker.NewPeers(),
 	)
 	require.NoError(t, err)
 
@@ -566,6 +573,7 @@ func TestDynamicEngineTypeDispatch(t *testing.T) {
 				resourceTracker,
 				validators.UnhandledSubnetConnector,
 				subnets.New(ids.EmptyNodeID, subnets.Config{}),
+				commontracker.NewPeers(),
 			)
 			require.NoError(t, err)
 
