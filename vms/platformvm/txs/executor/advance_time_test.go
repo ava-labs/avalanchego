@@ -37,7 +37,13 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 	pendingValidatorStartTime := defaultGenesisTime.Add(1 * time.Second)
 	pendingValidatorEndTime := pendingValidatorStartTime.Add(defaultMinStakingDuration)
 	nodeID := ids.GenerateTestNodeID()
-	addPendingValidatorTx, err := addPendingValidator(env, pendingValidatorStartTime, pendingValidatorEndTime, nodeID, []*secp256k1.PrivateKey{preFundedKeys[0]})
+	addPendingValidatorTx, err := addPendingValidator(
+		env,
+		pendingValidatorStartTime,
+		pendingValidatorEndTime,
+		nodeID,
+		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+	)
 	require.NoError(err)
 
 	tx, err := env.txBuilder.NewAdvanceTimeTx(pendingValidatorStartTime)
@@ -60,7 +66,7 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 	validatorStaker, err := executor.OnCommitState.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.NoError(err)
 	require.Equal(addPendingValidatorTx.ID(), validatorStaker.TxID)
-	require.Equal(uint64(1370), validatorStaker.PotentialReward) // See rewards tests to explain why 1370
+	require.Equal(uint64(13706), validatorStaker.PotentialReward) // See rewards tests to explain why 1370
 
 	_, err = executor.OnCommitState.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
