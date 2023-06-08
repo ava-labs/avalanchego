@@ -730,16 +730,16 @@ func TestAtomicTxImports(t *testing.T) {
 	require.NoError(err)
 
 	inputID := utxo.InputID()
-	err = peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{
-		env.ctx.ChainID: {PutRequests: []*atomic.Element{{
-			Key:   inputID[:],
-			Value: utxoBytes,
-			Traits: [][]byte{
-				recipientKey.PublicKey().Address().Bytes(),
-			},
-		}}},
-	})
-	require.NoError(err)
+	require.NoError(
+		peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{
+			env.ctx.ChainID: {PutRequests: []*atomic.Element{{
+				Key:   inputID[:],
+				Value: utxoBytes,
+				Traits: [][]byte{
+					recipientKey.PublicKey().Address().Bytes(),
+				},
+			}}},
+		}))
 
 	tx, err := env.txBuilder.NewImportTx(
 		env.ctx.XChainID,
@@ -782,8 +782,7 @@ func TestMempoolValidTxIsAddedToMempool(t *testing.T) {
 	txID := tx.ID()
 
 	// show that unknown tx is added to mempool
-	err := env.AddUnverifiedTx(tx)
-	require.NoError(err)
+	require.NoError(env.AddUnverifiedTx(tx))
 
 	require.True(env.Builder.Has(txID))
 
@@ -823,8 +822,7 @@ func TestMempoolNewLocalTxIsGossiped(t *testing.T) {
 	tx := env.getValidTx(t)
 	txID := tx.ID()
 
-	err := env.Builder.AddUnverifiedTx(tx)
-	require.NoError(err)
+	require.NoError(env.Builder.AddUnverifiedTx(tx))
 	require.NotNil(gossipedBytes)
 
 	// show gossiped bytes can be decoded to the original tx
@@ -840,8 +838,7 @@ func TestMempoolNewLocalTxIsGossiped(t *testing.T) {
 	// show that transaction is not re-gossiped if recently added to mempool
 	gossipedBytes = nil
 	env.Builder.Remove([]*txs.Tx{tx})
-	err = env.Builder.Add(tx)
-	require.NoError(err)
+	require.NoError(env.Builder.Add(tx))
 
 	require.Nil(gossipedBytes)
 }
