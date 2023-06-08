@@ -159,12 +159,12 @@ func putDelegator(staker *Staker, domain map[subnetNodeKey]map[ids.ID]*Staker) {
 		nodeID:   staker.NodeID,
 	}
 
-	ls, found := domain[key]
+	dels, found := domain[key]
 	if !found {
-		ls = make(map[ids.ID]*Staker)
-		domain[key] = ls
+		dels = make(map[ids.ID]*Staker)
+		domain[key] = dels
 	}
-	ls[staker.TxID] = staker
+	dels[staker.TxID] = staker
 }
 
 func (m *stakersStorageModel) UpdateCurrentDelegator(staker *Staker) error {
@@ -173,14 +173,14 @@ func (m *stakersStorageModel) UpdateCurrentDelegator(staker *Staker) error {
 		nodeID:   staker.NodeID,
 	}
 
-	ls, found := m.currentDelegators[key]
+	dels, found := m.currentDelegators[key]
 	if !found {
 		return ErrUpdatingUnknownOrDeletedStaker
 	}
-	if _, found := ls[staker.TxID]; !found {
+	if _, found := dels[staker.TxID]; !found {
 		return ErrUpdatingUnknownOrDeletedStaker
 	}
-	ls[staker.TxID] = staker
+	dels[staker.TxID] = staker
 	return nil
 }
 

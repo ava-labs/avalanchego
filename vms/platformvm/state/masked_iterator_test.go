@@ -216,9 +216,9 @@ func buildMaskedIterator(parentStakers []Staker, deletedIndexes []int, updatedIn
 	StakerIterator,
 ) {
 	parentTree := btree.NewG(defaultTreeDegree, (*Staker).Less)
-	for _, staker := range parentStakers {
-		cpy := staker
-		parentTree.ReplaceOrInsert(&cpy)
+	for idx := range parentStakers {
+		s := &parentStakers[idx]
+		parentTree.ReplaceOrInsert(s)
 	}
 	parentIt := NewTreeIterator(parentTree)
 
@@ -231,10 +231,8 @@ func buildMaskedIterator(parentStakers []Staker, deletedIndexes []int, updatedIn
 	updatedStakers := make(map[ids.ID]*Staker)
 	for _, idx := range updatedIndexes {
 		s := parentStakers[idx]
-
-		cpy := s
-		RotateStakerTimesInPlace(&cpy)
-		updatedStakers[s.TxID] = &cpy
+		RotateStakerTimesInPlace(&s)
+		updatedStakers[s.TxID] = &s
 	}
 
 	return deletedStakers, updatedStakers, NewMaskedIterator(parentIt, deletedStakers, updatedStakers)
