@@ -102,7 +102,7 @@ func (w *worker) RegisterCheck(name string, check Checker, tags ...string) error
 	isApplicationCheck := applicationChecks.Contains(name)
 	tc := &taggedChecker{
 		checker:            check,
-		isApplicationCheck: isApplicationCheck,
+		isApplicationCheck: applicationChecks.Contains(name),
 		tags:               tags,
 	}
 	w.checks[name] = tc
