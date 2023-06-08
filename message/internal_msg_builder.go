@@ -549,7 +549,7 @@ func InternalConnectedSubnet(nodeID ids.NodeID, subnetID ids.ID) InboundMessage 
 
 type Disconnected struct{}
 
-func (_ Disconnected) String() string {
+func (Disconnected) String() string {
 	return ""
 }
 
