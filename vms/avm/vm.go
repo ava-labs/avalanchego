@@ -314,11 +314,11 @@ func (vm *VM) onNormalOperationsStarted() error {
 			return err
 		}
 	}
-
+	vm.ctx.Log.Info("Cleaning up Txs starts now %d", zap.String("startTime", time.Now().String()))
 	if err := vm.state.CleanupTxs(); err != nil {
 		return err
 	}
-
+	vm.ctx.Log.Info("Cleaning up Txs completes at ", zap.String("finishTime", time.Now().String()))
 	if err := vm.state.Commit(); err != nil {
 		return err
 	}

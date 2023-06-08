@@ -435,7 +435,6 @@ func (s *state) GetStatus(id ids.ID) (choices.Status, error) {
 	if err := status.Valid(); err != nil {
 		return choices.Unknown, err
 	}
-
 	s.statusCache.Put(id, &status)
 	return status, nil
 }
@@ -612,7 +611,21 @@ func (s *state) CleanupTxs() error {
 					return err
 				}
 			}
+		} else {
+			// remove all these transactions from map
+			delete(s.addedTxs, txID)
+			// remove all these transactions from cache
+			s.txCache.Evict(txID)
+			// remove all these transactions from db
+			if err := s.txDB.Delete(key); err != nil {
+				return err
+			}
+			s.statusCache.Evict(txID)
+			if err := s.statusDB.Delete(key); err != nil {
+				return err
+			}
 		}
+
 	}
 	return nil
 }
