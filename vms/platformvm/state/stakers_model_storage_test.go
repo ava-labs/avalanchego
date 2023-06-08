@@ -656,6 +656,7 @@ func updateCurrentDelegatorInModel(model *stakersStorageModel) error {
 		if delegator.Priority == txs.SubnetPermissionlessDelegatorCurrentPriority ||
 			delegator.Priority == txs.PrimaryNetworkDelegatorCurrentPriority {
 			found = true
+			break
 		}
 	}
 	if !found {
