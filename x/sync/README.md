@@ -38,12 +38,11 @@ This message is sent from the server to the client in response to a `SyncGetChan
 
 For each key range, the sync client keeps track of the root ID of the database revision for which it has downloaded that key range. For example, it will store information that says something like, "I have all of the key-value pairs that were in range [`start`, `end`] when the database's root was `rootID`" for some keys `start` and `end`, and some database `rootID`. Note that `rootID` is the root ID that the client is trying to sync to, not the root ID of its own incomplete database.
 
-When the client starts with an empty database, it has no key-value pairs. It requests from a server a range proof for the entire database. The server replies with a range proof, which the client verifies. If it's valid, the key-value pairs in the proof are written to the database. If it's not, the client drops the proof and requests the proof from another server. 
+When the client starts syncing, it requests from a server a range proof for the entire database. The server replies with a range proof, which the client verifies. If it's valid, the key-value pairs in the proof are written to the database. If it's not, the client drops the proof and requests the proof from another server. 
 
 A range proof sent by a server may be valid but not contain all of the key-value pairs in the requested range. For example, a client might request all the key-value pairs in [`start`, `end`] but only receive those in range [`start`, `end'`] where `end'` < `end`. There might be too many key-value pairs to include in one message, or the server may be too busy to provide any more in its response. Unless the database is very small, this means that the range proof the client receives in response to its range proof request for the entire database will not contain all of the key-value pairs in the database.
 
 If a client requests a range proof for range [`start`, `end`] but only receives a range proof for [`start`, `end'`] where `end'` < `end` it recognizes that it must still fetch all of the keys in [`end`, `end'`]. It repeatedly requests range proofs for chunks of the remaining key range until it has all of the key-value pairs in [`start`, `end`]. Note that the client may split the remaining key range into chunks and fetch chunks of key-value pairs in parallel.
-
 
 The database may be changing as the client is syncing. The sync client can be notified that the root ID of the database it's trying to sync to has changed. Detecting that the root ID to sync to has changed is done outside this package. If this occurs, the key-value pairs the client has learned about via range proofs may no longer be valid.
 
@@ -53,7 +52,7 @@ A server needs to have history in order to serve a change proof. Namely, it need
 
 Note that for both range proofs and change proofs, if a server can't serve the entire requested key range in one response, its response will omit keys from the end of the range rather than the start. For example, if a client requests a range proof for range [`start`, `end`] but the server can't fit all the key-value pairs in one response, it'll send a range proof for [`start`, `end'`] where `end'` < `end`, as opposed to sending a range proof for [`start'`, `end`] where `start'` > `start`.
 
-Eventually, the client will have all of the key-value pairs in the database. At this point, it's synced.
+Eventually, by repeatedly requesting, receiving, verifying and applying range and change proofs, the client will have all of the key-value pairs in the database. At this point, it's synced.
 
 ## TODOs
 
