@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/window"
@@ -21,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"go.uber.org/zap"
 )
 
 const (
@@ -46,12 +48,14 @@ type Manager interface {
 }
 
 func NewManager(
+	log logging.Logger,
 	cfg config.Config,
 	state state.State,
 	metrics metrics.Metrics,
 	clk *mockable.Clock,
 ) Manager {
 	return &manager{
+		log:     log,
 		cfg:     cfg,
 		state:   state,
 		metrics: metrics,
@@ -68,6 +72,7 @@ func NewManager(
 }
 
 type manager struct {
+	log     logging.Logger
 	cfg     config.Config
 	state   state.State
 	metrics metrics.Metrics
@@ -203,6 +208,9 @@ func (m *manager) makePrimaryNetworkValidatorSet(
 	currentValidators, ok := m.cfg.Validators.Get(constants.PrimaryNetworkID)
 	if !ok {
 		// This should never happen
+		m.log.Error(ErrMissingValidator.Error(),
+			zap.Stringer("networkID", constants.PrimaryNetworkID),
+		)
 		return nil, ErrMissingValidator
 	}
 	currentValidatorList := currentValidators.List()

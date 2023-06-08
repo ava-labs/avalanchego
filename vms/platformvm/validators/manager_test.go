@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
@@ -386,7 +387,7 @@ func TestVM_GetValidatorSet(t *testing.T) {
 			r.NoError(err)
 
 			clk := &mockable.Clock{}
-			validatorssSet := NewManager(cfg, mockState, metrics, clk)
+			validatorssSet := NewManager(logging.NoLog{}, cfg, mockState, metrics, clk)
 
 			// Mock the VM's validators
 			mockPrimaryVdrSet := validators.NewMockSet(ctrl)
