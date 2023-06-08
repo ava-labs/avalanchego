@@ -222,14 +222,15 @@ func Test_TrieView_Iterator_Random(t *testing.T) {
 		require.Equal([]byte(expectedKey), iter.Key())
 		if len(expectedValue) == 0 {
 			// Don't differentiate between nil and []byte{}
-			require.Empty(iter.Value(), 0)
+			require.Empty(iter.Value())
 		} else {
 			require.Equal(expectedValue, iter.Value())
 		}
 		i++
 	}
-	require.Equal(len(uniqueKeys), i)
+	require.Len(uniqueKeys, i)
 	iter.Release()
+	require.NoError(iter.Error())
 
 	// Test with start and prefix.
 	prefix := []byte{128}
@@ -242,7 +243,7 @@ func Test_TrieView_Iterator_Random(t *testing.T) {
 			startPrefixUniqueKeys = append(startPrefixUniqueKeys, uniqueKeys[i])
 		}
 	}
-	require.Greater(len(startPrefixUniqueKeys), 0) // Sanity check to make sure we have some keys to test.
+	require.NotEmpty(startPrefixUniqueKeys) // Sanity check to make sure we have some keys to test.
 	i = 0
 	for iter.Next() {
 		expectedKey := startPrefixUniqueKeys[i]
@@ -256,6 +257,7 @@ func Test_TrieView_Iterator_Random(t *testing.T) {
 		}
 		i++
 	}
-	require.Equal(len(startPrefixUniqueKeys), i)
+	require.Len(startPrefixUniqueKeys, i)
 	iter.Release()
+	require.NoError(iter.Error())
 }

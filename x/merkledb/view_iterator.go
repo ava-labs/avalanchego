@@ -64,7 +64,7 @@ type viewIterator struct {
 
 // Next moves the iterator to the next key/value pair. It returns whether the
 // iterator is exhausted. We must pay careful attention to set the proper values
-// based on if the in memory db or the underlying db should be read next
+// based on if the in memory changes or the underlying db should be read next
 func (it *viewIterator) Next() bool {
 	switch {
 	case it.view.db.closed:
@@ -113,9 +113,9 @@ func (it *viewIterator) Next() bool {
 			memKey := it.sortedChanges[0].Key
 			memValue := it.sortedChanges[0].Value
 
-			dbKey := it.parentIter.Key()
+			parentKey := it.parentIter.Key()
 
-			switch bytes.Compare(memKey, dbKey) {
+			switch bytes.Compare(memKey, parentKey) {
 			case -1:
 				// The current change has a smaller key than the parent key.
 				// Move to the next change.
@@ -130,7 +130,7 @@ func (it *viewIterator) Next() bool {
 				}
 			case 1:
 				// The parent key is smaller, so return it and iterate the parent iterator
-				it.key = dbKey
+				it.key = parentKey
 				it.value = it.parentIter.Value()
 				it.parentIterExhausted = !it.parentIter.Next()
 				return true

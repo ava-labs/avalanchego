@@ -432,6 +432,9 @@ func (t *trieView) GetRangeProof(
 		})
 	}
 	it.Release()
+	if err := it.Error(); err != nil {
+		return nil, err
+	}
 
 	// This proof may not contain all key-value pairs in [start, end] due to size limitations.
 	// The end proof we provide should be for the last key-value pair in the proof, not for
