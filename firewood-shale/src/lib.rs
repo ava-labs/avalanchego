@@ -41,11 +41,11 @@ pub enum ShaleError {
 #[error("write error")]
 pub struct ObjWriteError;
 
-pub type SpaceID = u8;
-pub const INVALID_SPACE_ID: SpaceID = 0xff;
+pub type SpaceId = u8;
+pub const INVALID_SPACE_ID: SpaceId = 0xff;
 
 pub struct DiskWrite {
-    pub space_id: SpaceID,
+    pub space_id: SpaceId,
     pub space_off: u64,
     pub data: Box<[u8]>,
 }
@@ -86,7 +86,7 @@ pub trait CachedStore: Debug {
     /// should be immediately visible to all `CachedView` associated to this linear space.
     fn write(&mut self, offset: u64, change: &[u8]);
     /// Returns the identifier of this storage space.
-    fn id(&self) -> SpaceID;
+    fn id(&self) -> SpaceId;
 }
 
 /// Opaque typed pointer in the 64-bit virtual addressable space.
@@ -203,7 +203,7 @@ impl<T: ?Sized> Obj<T> {
     }
 
     #[inline(always)]
-    pub fn get_space_id(&self) -> SpaceID {
+    pub fn get_space_id(&self) -> SpaceId {
         self.value.get_mem_store().id()
     }
 

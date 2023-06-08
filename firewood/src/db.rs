@@ -16,7 +16,7 @@ use parking_lot::{Mutex, RwLock};
 #[cfg(feature = "eth")]
 use primitive_types::U256;
 use shale::ShaleError;
-use shale::{compact::CompactSpaceHeader, CachedStore, ObjPtr, SpaceID, Storable, StoredView};
+use shale::{compact::CompactSpaceHeader, CachedStore, ObjPtr, SpaceId, Storable, StoredView};
 use typed_builder::TypedBuilder;
 
 #[cfg(feature = "eth")]
@@ -31,10 +31,10 @@ use crate::storage::{
     StoreRevShared, PAGE_SIZE_NBIT,
 };
 
-const MERKLE_META_SPACE: SpaceID = 0x0;
-const MERKLE_PAYLOAD_SPACE: SpaceID = 0x1;
-const BLOB_META_SPACE: SpaceID = 0x2;
-const BLOB_PAYLOAD_SPACE: SpaceID = 0x3;
+const MERKLE_META_SPACE: SpaceId = 0x0;
+const MERKLE_PAYLOAD_SPACE: SpaceId = 0x1;
+const BLOB_META_SPACE: SpaceId = 0x2;
+const BLOB_PAYLOAD_SPACE: SpaceId = 0x3;
 const SPACE_RESERVED: u64 = 0x1000;
 
 const MAGIC_STR: &[u8; 13] = b"firewood v0.1";

@@ -4,7 +4,7 @@ use std::fmt::Debug;
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 
-use crate::{CachedStore, CachedView, SpaceID};
+use crate::{CachedStore, CachedView, SpaceId};
 
 /// Purely volatile, vector-based implementation for [CachedStore]. This is good for testing or trying
 /// out stuff (persistent data structures) built on [ShaleStore] in memory, without having to write
@@ -12,11 +12,11 @@ use crate::{CachedStore, CachedView, SpaceID};
 #[derive(Debug)]
 pub struct PlainMem {
     space: Rc<RefCell<Vec<u8>>>,
-    id: SpaceID,
+    id: SpaceId,
 }
 
 impl PlainMem {
-    pub fn new(size: u64, id: SpaceID) -> Self {
+    pub fn new(size: u64, id: SpaceId) -> Self {
         let mut space: Vec<u8> = Vec::new();
         space.resize(size as usize, 0);
         let space = Rc::new(RefCell::new(space));
@@ -60,7 +60,7 @@ impl CachedStore for PlainMem {
         vect.as_mut_slice()[offset..offset + length].copy_from_slice(change);
     }
 
-    fn id(&self) -> SpaceID {
+    fn id(&self) -> SpaceId {
         self.id
     }
 }
@@ -101,11 +101,11 @@ impl CachedView for PlainMemView {
 #[derive(Debug)]
 pub struct DynamicMem {
     space: Rc<UnsafeCell<Vec<u8>>>,
-    id: SpaceID,
+    id: SpaceId,
 }
 
 impl DynamicMem {
-    pub fn new(size: u64, id: SpaceID) -> Self {
+    pub fn new(size: u64, id: SpaceId) -> Self {
         let space = Rc::new(UnsafeCell::new(vec![0; size as usize]));
         Self { space, id }
     }
@@ -158,7 +158,7 @@ impl CachedStore for DynamicMem {
         self.get_space_mut()[offset..offset + length].copy_from_slice(change)
     }
 
-    fn id(&self) -> SpaceID {
+    fn id(&self) -> SpaceId {
         self.id
     }
 }

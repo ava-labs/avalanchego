@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::Arc;
 
-use shale::{CachedStore, CachedView, SpaceID};
+use shale::{CachedStore, CachedView, SpaceId};
 
 use nix::fcntl::{flock, FlockArg};
 use thiserror::Error;
@@ -52,10 +52,11 @@ impl<T> From<std::io::Error> for StoreError<T> {
 pub trait MemStoreR: Debug {
     /// Returns a slice of bytes from memory.
     fn get_slice(&self, offset: u64, length: u64) -> Option<Vec<u8>>;
-    fn id(&self) -> SpaceID;
+    fn id(&self) -> SpaceId;
 }
 
-type Page = [u8; PAGE_SIZE as usize];
+// Page should be boxed as to not take up so much stack-space
+type Page = Box<[u8; PAGE_SIZE as usize]>;
 
 #[derive(Debug)]
 pub struct SpaceWrite {
@@ -86,7 +87,7 @@ impl Ash {
 }
 
 #[derive(Debug)]
-pub struct AshRecord(pub HashMap<SpaceID, Ash>);
+pub struct AshRecord(pub HashMap<SpaceId, Ash>);
 
 impl growthring::wal::Record for AshRecord {
     fn serialize(&self) -> growthring::wal::WalBytes {
@@ -152,7 +153,7 @@ impl AshRecord {
 }
 
 /// Basic copy-on-write item in the linear storage space for multi-versioning.
-pub struct DeltaPage(u64, Box<Page>);
+pub struct DeltaPage(u64, Page);
 
 impl DeltaPage {
     #[inline(always)]
@@ -333,7 +334,7 @@ impl MemStoreR for StoreRev {
         Some(data)
     }
 
-    fn id(&self) -> SpaceID {
+    fn id(&self) -> SpaceId {
         self.base_space.borrow().id()
     }
 }
@@ -381,7 +382,7 @@ impl CachedStore for StoreRevShared {
         // Writes could be induced by lazy hashing and we can just ignore those
     }
 
-    fn id(&self) -> SpaceID {
+    fn id(&self) -> SpaceId {
         <StoreRev as MemStoreR>::id(&self.0)
     }
 }
@@ -423,7 +424,7 @@ impl<S: Clone + CachedStore + 'static> DerefMut for StoreShared<S> {
 
 #[derive(Debug, Default)]
 struct StoreRevMutDelta {
-    pages: HashMap<u64, Box<Page>>,
+    pages: HashMap<u64, Page>,
     plain: Ash,
 }
 
@@ -574,7 +575,7 @@ impl CachedStore for StoreRevMut {
         plain.redo.push(SpaceWrite { offset, data: redo });
     }
 
-    fn id(&self) -> SpaceID {
+    fn id(&self) -> SpaceId {
         self.base_space.id()
     }
 }
@@ -596,7 +597,7 @@ impl MemStoreR for ZeroStore {
         Some(vec![0; length as usize])
     }
 
-    fn id(&self) -> SpaceID {
+    fn id(&self) -> SpaceId {
         shale::INVALID_SPACE_ID
     }
 }
@@ -646,14 +647,14 @@ pub struct StoreConfig {
     ncached_files: usize,
     #[builder(default = 22)] // 4MB file by default
     file_nbit: u64,
-    space_id: SpaceID,
+    space_id: SpaceId,
     rootdir: PathBuf,
 }
 
 #[derive(Debug)]
 struct CachedSpaceInner {
-    cached_pages: lru::LruCache<u64, Box<Page>>,
-    pinned_pages: HashMap<u64, (usize, Box<Page>)>,
+    cached_pages: lru::LruCache<u64, Page>,
+    pinned_pages: HashMap<u64, (usize, Page)>,
     files: Arc<FilePool>,
     disk_buffer: DiskBufferRequester,
 }
@@ -661,7 +662,7 @@ struct CachedSpaceInner {
 #[derive(Clone, Debug)]
 pub struct CachedSpace {
     inner: Rc<RefCell<CachedSpaceInner>>,
-    space_id: SpaceID,
+    space_id: SpaceId,
 }
 
 impl CachedSpace {
@@ -696,11 +697,7 @@ impl CachedSpace {
 }
 
 impl CachedSpaceInner {
-    fn fetch_page(
-        &mut self,
-        space_id: SpaceID,
-        pid: u64,
-    ) -> Result<Box<Page>, StoreError<io::Error>> {
+    fn fetch_page(&mut self, space_id: SpaceId, pid: u64) -> Result<Page, StoreError<io::Error>> {
         if let Some(p) = self.disk_buffer.get_page(space_id, pid) {
             return Ok(Box::new(*p));
         }
@@ -708,19 +705,20 @@ impl CachedSpaceInner {
         let file_size = 1 << file_nbit;
         let poff = pid << PAGE_SIZE_NBIT;
         let file = self.files.get_file(poff >> file_nbit)?;
-        let mut page: Page = [0; PAGE_SIZE as usize];
+        let mut page = Page::new([0; PAGE_SIZE as usize]);
         nix::sys::uio::pread(
             file.get_fd(),
-            &mut page,
+            page.deref_mut(),
             (poff & (file_size - 1)) as nix::libc::off_t,
         )
         .map_err(StoreError::System)?;
-        Ok(Box::new(page))
+
+        Ok(page)
     }
 
     fn pin_page(
         &mut self,
-        space_id: SpaceID,
+        space_id: SpaceId,
         pid: u64,
     ) -> Result<&'static mut [u8], StoreError<std::io::Error>> {
         let base = match self.pinned_pages.get_mut(&pid) {
@@ -823,7 +821,7 @@ impl MemStoreR for CachedSpace {
         Some(data)
     }
 
-    fn id(&self) -> SpaceID {
+    fn id(&self) -> SpaceId {
         self.space_id
     }
 }
