@@ -9,11 +9,12 @@ import (
 	"time"
 
 	"github.com/golang/mock/gomock"
-	"golang.org/x/exp/maps"
 
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/stretchr/testify/require"
+
+	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/database"
