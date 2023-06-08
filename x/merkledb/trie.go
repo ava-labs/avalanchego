@@ -7,8 +7,8 @@ import (
 	"context"
 	"errors"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var errNoNewRoot = errors.New("there was no updated root in change list")
@@ -46,13 +46,7 @@ type ReadOnlyTrie interface {
 	// GetRangeProof generates a proof of up to maxLength smallest key/values with keys between start and end
 	GetRangeProof(ctx context.Context, start, end []byte, maxLength int) (*RangeProof, error)
 
-	getKeyValues(
-		start []byte,
-		end []byte,
-		maxLength int,
-		keysToIgnore set.Set[string],
-		lock bool,
-	) ([]KeyValue, error)
+	database.Iteratee
 }
 
 type Trie interface {

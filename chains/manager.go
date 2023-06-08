@@ -90,7 +90,7 @@ var (
 	errUnknownVMType          = errors.New("the vm should have type avalanche.DAGVM or snowman.ChainVM")
 	errCreatePlatformVM       = errors.New("attempted to create a chain running the PlatformVM")
 	errNotBootstrapped        = errors.New("subnets not bootstrapped")
-	errNoPlatformSubnetConfig = errors.New("subnet config for platform chain not found")
+	errNoPrimaryNetworkConfig = errors.New("no subnet config for primary network found")
 
 	_ Manager = (*manager)(nil)
 )
@@ -145,7 +145,7 @@ type ChainParameters struct {
 	VMID ids.ID
 	// The IDs of the feature extensions this chain is running.
 	FxIDs []ids.ID
-	// Should only be set if the default beacons can't be used.
+	// Invariant: Only used when [ID] is the P-chain ID.
 	CustomBeacons validators.Set
 }
 
@@ -521,22 +521,15 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 	}
 
 	var vdrs validators.Set // Validators validating this blockchain
-	var ok bool
+	var hasValidators bool
 	if m.SybilProtectionEnabled {
-		vdrs, ok = m.Validators.Get(chainParams.SubnetID)
+		vdrs, hasValidators = m.Validators.Get(chainParams.SubnetID)
 	} else { // Sybil protection is disabled. Every peer validates every subnet.
-		vdrs, ok = m.Validators.Get(constants.PrimaryNetworkID)
+		vdrs, hasValidators = m.Validators.Get(constants.PrimaryNetworkID)
 	}
-	if !ok {
+	if !hasValidators {
 		return nil, fmt.Errorf("couldn't get validator set of subnet with ID %s. The subnet may not exist", chainParams.SubnetID)
 	}
-
-	beacons := vdrs
-	if chainParams.CustomBeacons != nil {
-		beacons = chainParams.CustomBeacons
-	}
-
-	bootstrapWeight := beacons.Weight()
 
 	var chain *chain
 	switch vm := vm.(type) {
@@ -545,16 +538,19 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 			ctx,
 			chainParams.GenesisData,
 			vdrs,
-			beacons,
 			vm,
 			fxs,
-			bootstrapWeight,
 			sb,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("error while creating new avalanche vm %w", err)
 		}
 	case block.ChainVM:
+		beacons := vdrs
+		if chainParams.ID == constants.PlatformChainID {
+			beacons = chainParams.CustomBeacons
+		}
+
 		chain, err = m.createSnowmanChain(
 			ctx,
 			chainParams.GenesisData,
@@ -562,7 +558,6 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 			beacons,
 			vm,
 			fxs,
-			bootstrapWeight,
 			sb,
 		)
 		if err != nil {
@@ -588,11 +583,9 @@ func (m *manager) AddRegistrant(r Registrant) {
 func (m *manager) createAvalancheChain(
 	ctx *snow.ConsensusContext,
 	genesisData []byte,
-	vdrs,
-	beacons validators.Set,
+	vdrs validators.Set,
 	vm vertex.LinearizableVMWithEngine,
 	fxs []*common.Fx,
-	bootstrapWeight uint64,
 	sb subnets.Subnet,
 ) (*chain, error) {
 	ctx.Lock.Lock()
@@ -806,11 +799,19 @@ func (m *manager) createAvalancheChain(
 		appSender:    snowmanMessageSender,
 	}
 
+	bootstrapWeight := vdrs.Weight()
+
 	consensusParams := sb.Config().ConsensusParameters
 	sampleK := consensusParams.K
 	if uint64(sampleK) > bootstrapWeight {
 		sampleK = int(bootstrapWeight)
 	}
+
+	connectedValidators, err := tracker.NewMeteredPeers("", ctx.Registerer)
+	if err != nil {
+		return nil, fmt.Errorf("error creating peer tracker: %w", err)
+	}
+	vdrs.RegisterCallbackListener(connectedValidators)
 
 	// Asynchronously passes messages from the network to the consensus engine
 	h, err := handler.New(
@@ -822,18 +823,19 @@ func (m *manager) createAvalancheChain(
 		m.ResourceTracker,
 		validators.UnhandledSubnetConnector, // avalanche chains don't use subnet connector
 		sb,
+		connectedValidators,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing network handler: %w", err)
 	}
 
-	connectedPeers := tracker.NewPeers()
-	startupTracker := tracker.NewStartup(connectedPeers, (3*bootstrapWeight+3)/4)
-	beacons.RegisterCallbackListener(startupTracker)
+	connectedBeacons := tracker.NewPeers()
+	startupTracker := tracker.NewStartup(connectedBeacons, (3*bootstrapWeight+3)/4)
+	vdrs.RegisterCallbackListener(startupTracker)
 
 	snowmanCommonCfg := common.Config{
 		Ctx:                            ctx,
-		Beacons:                        beacons,
+		Beacons:                        vdrs,
 		SampleK:                        sampleK,
 		Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
 		StartupTracker:                 startupTracker,
@@ -898,7 +900,7 @@ func (m *manager) createAvalancheChain(
 
 	avalancheCommonCfg := common.Config{
 		Ctx:                            ctx,
-		Beacons:                        beacons,
+		Beacons:                        vdrs,
 		SampleK:                        sampleK,
 		StartupTracker:                 startupTracker,
 		Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
@@ -979,11 +981,10 @@ func (m *manager) createAvalancheChain(
 func (m *manager) createSnowmanChain(
 	ctx *snow.ConsensusContext,
 	genesisData []byte,
-	vdrs,
+	vdrs validators.Set,
 	beacons validators.Set,
 	vm block.ChainVM,
 	fxs []*common.Fx,
-	bootstrapWeight uint64,
 	sb subnets.Subnet,
 ) (*chain, error) {
 	ctx.Lock.Lock()
@@ -1140,11 +1141,19 @@ func (m *manager) createSnowmanChain(
 		return nil, err
 	}
 
+	bootstrapWeight := beacons.Weight()
+
 	consensusParams := sb.Config().ConsensusParameters
 	sampleK := consensusParams.K
 	if uint64(sampleK) > bootstrapWeight {
 		sampleK = int(bootstrapWeight)
 	}
+
+	connectedValidators, err := tracker.NewMeteredPeers("", ctx.Registerer)
+	if err != nil {
+		return nil, fmt.Errorf("error creating peer tracker: %w", err)
+	}
+	vdrs.RegisterCallbackListener(connectedValidators)
 
 	// Asynchronously passes messages from the network to the consensus engine
 	h, err := handler.New(
@@ -1156,13 +1165,14 @@ func (m *manager) createSnowmanChain(
 		m.ResourceTracker,
 		subnetConnector,
 		sb,
+		connectedValidators,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize message handler: %w", err)
 	}
 
-	connectedPeers := tracker.NewPeers()
-	startupTracker := tracker.NewStartup(connectedPeers, (3*bootstrapWeight+3)/4)
+	connectedBeacons := tracker.NewPeers()
+	startupTracker := tracker.NewStartup(connectedBeacons, (3*bootstrapWeight+3)/4)
 	beacons.RegisterCallbackListener(startupTracker)
 
 	commonCfg := common.Config{
@@ -1305,10 +1315,10 @@ func (m *manager) registerBootstrappedHealthChecks() error {
 		}
 		return []ids.ID{}, nil
 	})
-	if err := m.Health.RegisterReadinessCheck("bootstrapped", bootstrappedCheck); err != nil {
+	if err := m.Health.RegisterReadinessCheck("bootstrapped", bootstrappedCheck, health.ApplicationTag); err != nil {
 		return fmt.Errorf("couldn't register bootstrapped readiness check: %w", err)
 	}
-	if err := m.Health.RegisterHealthCheck("bootstrapped", bootstrappedCheck); err != nil {
+	if err := m.Health.RegisterHealthCheck("bootstrapped", bootstrappedCheck, health.ApplicationTag); err != nil {
 		return fmt.Errorf("couldn't register bootstrapped health check: %w", err)
 	}
 	return nil
@@ -1320,7 +1330,7 @@ func (m *manager) StartChainCreator(platformParams ChainParameters) error {
 	// throw a fatal error.
 	sbConfig, ok := m.SubnetConfigs[constants.PrimaryNetworkID]
 	if !ok {
-		return errNoPlatformSubnetConfig
+		return errNoPrimaryNetworkConfig
 	}
 
 	sb := subnets.New(m.NodeID, sbConfig)
