@@ -87,7 +87,7 @@ a range proof for [`requested_start`, `proof_end`] where `proof_end` < `requeste
 it recognizes that it must still fetch all of the keys in [`proof_end`, `requested_end`]. 
 It repeatedly requests range proofs for chunks of the remaining key range until it has all of the 
 key-value pairs in [`requested_start`, `requested_end`].
-Note that the client may split the remaining key range into chunks and fetch chunks of key-value pairs in parallel.
+The client may split the remaining key range into chunks and fetch chunks of key-value pairs in parallel, possibly even from different servers.
 
 Additional commits to the database may occur while the client is syncing.
 The sync client can be notified that the root hash of the database it's trying to sync to has changed.
@@ -96,8 +96,9 @@ For example, if the database is being used to store blockchain state then the sy
 notified when a new block is accepted because that implies a commit to the database.
 If this occurs, the key-value pairs the client has learned about via range proofs may no longer be up to date.
 
-We use change proofs to correct the out of date key-value pairs. When the sync client is notified that
-the root hash to sync to has changed, it requests a change proof from a server for a given key range.
+We use change proofs as an optimization to correct the out of date key-value pairs.
+When the sync client is notified that the root hash to sync to has changed, it requests a change proof 
+from a server for a given key range.
 For example, if a client has the key-value pairs in range [`start`, `end`] that were in the database 
 when it had `root_hash`, then it will request a change proof that provides all of the key-value changes 
 in range [`start`, `end`] from the database version with root hash `root_hash` to the database version with root hash `new_root_hash`.
@@ -106,7 +107,8 @@ If it's not, the client drops the proof and requests the proof from another serv
 
 A server needs to have history in order to serve a change proof.
 Namely, it needs to know all of the database changes between two roots.
-If the server does not have sufficient history to generate a change proof, it will send a range proof instead.
+If the server does not have sufficient history to generate a change proof, it will send a range proof for
+the requested range at revision `new_root_hash` instead.
 The client will verify and apply the range proof. (Note that change proofs are just an optimization for bandwidth and speed.
 A range proof for a given key range and revision has the same information as a change proof from
 `old_root_hash` to `new_root_hash` for the key range, assuming the client has the key-value pairs 
