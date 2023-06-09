@@ -23,7 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 
-	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
+	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
 var _ Client = (*mockClient)(nil)
@@ -37,7 +37,7 @@ type mockClient struct {
 	db SyncableDB
 }
 
-func (client *mockClient) GetChangeProof(ctx context.Context, request *syncpb.ChangeProofRequest, _ SyncableDB) (*merkledb.ChangeProof, error) {
+func (client *mockClient) GetChangeProof(ctx context.Context, request *pb.SyncGetChangeProofRequest, _ SyncableDB) (*merkledb.ChangeProof, error) {
 	startRoot, err := ids.ToID(request.StartRootHash)
 	if err != nil {
 		return nil, err
@@ -49,7 +49,7 @@ func (client *mockClient) GetChangeProof(ctx context.Context, request *syncpb.Ch
 	return client.db.GetChangeProof(ctx, startRoot, endRoot, request.StartKey, request.EndKey, int(request.KeyLimit))
 }
 
-func (client *mockClient) GetRangeProof(ctx context.Context, request *syncpb.RangeProofRequest) (*merkledb.RangeProof, error) {
+func (client *mockClient) GetRangeProof(ctx context.Context, request *pb.SyncGetRangeProofRequest) (*merkledb.RangeProof, error) {
 	root, err := ids.ToID(request.RootHash)
 	if err != nil {
 		return nil, err
@@ -61,11 +61,7 @@ func Test_Creation(t *testing.T) {
 	db, err := merkledb.New(
 		context.Background(),
 		memdb.New(),
-		merkledb.Config{
-			Tracer:        newNoopTracer(),
-			HistoryLength: 0,
-			NodeCacheSize: 1000,
-		},
+		newDefaultDBConfig(),
 	)
 	require.NoError(t, err)
 
@@ -87,11 +83,7 @@ func Test_Completion(t *testing.T) {
 		emptyDB, err := merkledb.New(
 			context.Background(),
 			memdb.New(),
-			merkledb.Config{
-				Tracer:        newNoopTracer(),
-				HistoryLength: 0,
-				NodeCacheSize: 1000,
-			},
+			newDefaultDBConfig(),
 		)
 		require.NoError(t, err)
 		emptyRoot, err := emptyDB.GetMerkleRoot(context.Background())
@@ -99,11 +91,7 @@ func Test_Completion(t *testing.T) {
 		db, err := merkledb.New(
 			context.Background(),
 			memdb.New(),
-			merkledb.Config{
-				Tracer:        newNoopTracer(),
-				HistoryLength: 0,
-				NodeCacheSize: 1000,
-			},
+			newDefaultDBConfig(),
 		)
 		require.NoError(t, err)
 		syncer, err := NewStateSyncManager(StateSyncConfig{
@@ -198,11 +186,7 @@ func Test_Sync_FindNextKey_InSync(t *testing.T) {
 		db, err := merkledb.New(
 			context.Background(),
 			memdb.New(),
-			merkledb.Config{
-				Tracer:        newNoopTracer(),
-				HistoryLength: 0,
-				NodeCacheSize: 1000,
-			},
+			newDefaultDBConfig(),
 		)
 		require.NoError(t, err)
 		syncer, err := NewStateSyncManager(StateSyncConfig{
@@ -267,11 +251,7 @@ func Test_Sync_FindNextKey_Deleted(t *testing.T) {
 	db, err := merkledb.New(
 		context.Background(),
 		memdb.New(),
-		merkledb.Config{
-			Tracer:        newNoopTracer(),
-			HistoryLength: 0,
-			NodeCacheSize: 1000,
-		},
+		newDefaultDBConfig(),
 	)
 	require.NoError(t, err)
 	require.NoError(t, db.Put([]byte{0x10}, []byte{1}))
@@ -313,11 +293,7 @@ func Test_Sync_FindNextKey_BranchInLocal(t *testing.T) {
 	db, err := merkledb.New(
 		context.Background(),
 		memdb.New(),
-		merkledb.Config{
-			Tracer:        newNoopTracer(),
-			HistoryLength: 0,
-			NodeCacheSize: 1000,
-		},
+		newDefaultDBConfig(),
 	)
 	require.NoError(t, err)
 	require.NoError(t, db.Put([]byte{0x11}, []byte{1}))
@@ -347,11 +323,7 @@ func Test_Sync_FindNextKey_BranchInReceived(t *testing.T) {
 	db, err := merkledb.New(
 		context.Background(),
 		memdb.New(),
-		merkledb.Config{
-			Tracer:        newNoopTracer(),
-			HistoryLength: 0,
-			NodeCacheSize: 1000,
-		},
+		newDefaultDBConfig(),
 	)
 	require.NoError(t, err)
 	require.NoError(t, db.Put([]byte{0x11}, []byte{1}))
@@ -389,11 +361,7 @@ func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 		db, err := merkledb.New(
 			context.Background(),
 			memdb.New(),
-			merkledb.Config{
-				Tracer:        newNoopTracer(),
-				HistoryLength: 0,
-				NodeCacheSize: 1000,
-			},
+			newDefaultDBConfig(),
 		)
 		require.NoError(t, err)
 		syncer, err := NewStateSyncManager(StateSyncConfig{
@@ -466,11 +434,7 @@ func Test_Sync_FindNextKey_DifferentChild(t *testing.T) {
 		db, err := merkledb.New(
 			context.Background(),
 			memdb.New(),
-			merkledb.Config{
-				Tracer:        newNoopTracer(),
-				HistoryLength: 0,
-				NodeCacheSize: 1000,
-			},
+			newDefaultDBConfig(),
 		)
 		require.NoError(t, err)
 		syncer, err := NewStateSyncManager(StateSyncConfig{
@@ -514,22 +478,14 @@ func TestFindNextKeyRandom(t *testing.T) {
 	remoteDB, err := merkledb.New(
 		context.Background(),
 		memdb.New(),
-		merkledb.Config{
-			Tracer:        newNoopTracer(),
-			HistoryLength: defaultRequestKeyLimit,
-			NodeCacheSize: defaultRequestKeyLimit,
-		},
+		newDefaultDBConfig(),
 	)
 	require.NoError(err)
 
 	localDB, err := merkledb.New(
 		context.Background(),
 		memdb.New(),
-		merkledb.Config{
-			Tracer:        newNoopTracer(),
-			HistoryLength: defaultRequestKeyLimit,
-			NodeCacheSize: defaultRequestKeyLimit,
-		},
+		newDefaultDBConfig(),
 	)
 	require.NoError(err)
 
@@ -729,11 +685,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 		db, err := merkledb.New(
 			context.Background(),
 			memdb.New(),
-			merkledb.Config{
-				Tracer:        newNoopTracer(),
-				HistoryLength: 0,
-				NodeCacheSize: 1000,
-			},
+			newDefaultDBConfig(),
 		)
 		require.NoError(t, err)
 		syncer, err := NewStateSyncManager(StateSyncConfig{
@@ -787,11 +739,7 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 		db, err := merkledb.New(
 			context.Background(),
 			memdb.New(),
-			merkledb.Config{
-				Tracer:        newNoopTracer(),
-				HistoryLength: 0,
-				NodeCacheSize: 1000,
-			},
+			newDefaultDBConfig(),
 		)
 		require.NoError(t, err)
 
@@ -856,22 +804,18 @@ func Test_Sync_Error_During_Sync(t *testing.T) {
 	db, err := merkledb.New(
 		context.Background(),
 		memdb.New(),
-		merkledb.Config{
-			Tracer:        newNoopTracer(),
-			HistoryLength: 0,
-			NodeCacheSize: 1000,
-		},
+		newDefaultDBConfig(),
 	)
 	require.NoError(err)
 
 	client := NewMockClient(ctrl)
 	client.EXPECT().GetRangeProof(gomock.Any(), gomock.Any()).DoAndReturn(
-		func(ctx context.Context, request *syncpb.RangeProofRequest) (*merkledb.RangeProof, error) {
+		func(ctx context.Context, request *pb.SyncGetRangeProofRequest) (*merkledb.RangeProof, error) {
 			return nil, errInvalidRangeProof
 		},
 	).AnyTimes()
 	client.EXPECT().GetChangeProof(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
-		func(ctx context.Context, request *syncpb.ChangeProofRequest, _ SyncableDB) (*merkledb.ChangeProof, error) {
+		func(ctx context.Context, request *pb.SyncGetChangeProofRequest, _ SyncableDB) (*merkledb.ChangeProof, error) {
 			startRoot, err := ids.ToID(request.StartRootHash)
 			require.NoError(err)
 			endRoot, err := ids.ToID(request.EndRootHash)
@@ -939,11 +883,7 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 		db, err := merkledb.New(
 			context.Background(),
 			memdb.New(),
-			merkledb.Config{
-				Tracer:        newNoopTracer(),
-				HistoryLength: 0,
-				NodeCacheSize: 1000,
-			},
+			newDefaultDBConfig(),
 		)
 		require.NoError(err)
 
@@ -953,7 +893,7 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 
 		client := NewMockClient(ctrl)
 		client.EXPECT().GetRangeProof(gomock.Any(), gomock.Any()).DoAndReturn(
-			func(ctx context.Context, request *syncpb.RangeProofRequest) (*merkledb.RangeProof, error) {
+			func(ctx context.Context, request *pb.SyncGetRangeProofRequest) (*merkledb.RangeProof, error) {
 				<-updatedRootChan
 				root, err := ids.ToID(request.RootHash)
 				require.NoError(err)
@@ -961,7 +901,7 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 			},
 		).AnyTimes()
 		client.EXPECT().GetChangeProof(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
-			func(ctx context.Context, request *syncpb.ChangeProofRequest, _ SyncableDB) (*merkledb.ChangeProof, error) {
+			func(ctx context.Context, request *pb.SyncGetChangeProofRequest, _ SyncableDB) (*merkledb.ChangeProof, error) {
 				<-updatedRootChan
 				startRoot, err := ids.ToID(request.StartRootHash)
 				require.NoError(err)
@@ -1062,11 +1002,7 @@ func generateTrieWithMinKeyLen(t *testing.T, r *rand.Rand, count int, minKeyLen 
 	db, err := merkledb.New(
 		context.Background(),
 		memdb.New(),
-		merkledb.Config{
-			Tracer:        newNoopTracer(),
-			HistoryLength: 1000,
-			NodeCacheSize: 1000,
-		},
+		newDefaultDBConfig(),
 	)
 	if err != nil {
 		return nil, nil, err

@@ -40,7 +40,7 @@ func (m *MockClient) EXPECT() *MockClientMockRecorder {
 }
 
 // GetChangeProof mocks base method.
-func (m *MockClient) GetChangeProof(arg0 context.Context, arg1 *sync.ChangeProofRequest, arg2 SyncableDB) (*merkledb.ChangeProof, error) {
+func (m *MockClient) GetChangeProof(arg0 context.Context, arg1 *sync.SyncGetChangeProofRequest, arg2 SyncableDB) (*merkledb.ChangeProof, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetChangeProof", arg0, arg1, arg2)
 	ret0, _ := ret[0].(*merkledb.ChangeProof)
@@ -55,7 +55,7 @@ func (mr *MockClientMockRecorder) GetChangeProof(arg0, arg1, arg2 interface{}) *
 }
 
 // GetRangeProof mocks base method.
-func (m *MockClient) GetRangeProof(arg0 context.Context, arg1 *sync.RangeProofRequest) (*merkledb.RangeProof, error) {
+func (m *MockClient) GetRangeProof(arg0 context.Context, arg1 *sync.SyncGetRangeProofRequest) (*merkledb.RangeProof, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetRangeProof", arg0, arg1)
 	ret0, _ := ret[0].(*merkledb.RangeProof)
