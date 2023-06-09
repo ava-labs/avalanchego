@@ -424,7 +424,7 @@ func (h *handler) dispatchChans(ctx context.Context) {
 
 		if err := h.handleChanMsg(msg); err != nil {
 			h.StopWithError(ctx, fmt.Errorf(
-				"%w while processing async message: %s",
+				"%w while processing chan message: %s",
 				err,
 				msg,
 			))
