@@ -23,7 +23,6 @@ This version is backwards compatible to [v1.10.0](https://github.com/ava-labs/av
 - Removed `--snow-mixed-query-num-push-non-vdr`
 - Removed `minPercentConnectedStakeHealthy` from the subnet config
 
-
 ### Fixes
 
 - Fixed `platformvm.GetValidatorSet` returning incorrect BLS public keys
