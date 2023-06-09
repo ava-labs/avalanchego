@@ -95,6 +95,34 @@ pub struct Options {
     #[arg(
         long,
         required = false,
+        default_value_t = 16384,
+        value_name = "ROOT_HASH_NCACHED_PAGES",
+        help = "Maximum cached pages for the free list of the item stash."
+    )]
+    pub root_hash_ncached_pages: usize,
+
+    #[arg(
+        long,
+        required = false,
+        default_value_t = 1024,
+        value_name = "ROOT_HASH_NCACHED_FILES",
+        help = "Maximum cached file descriptors for the free list of the item stash."
+    )]
+    pub root_hash_ncached_files: usize,
+
+    #[arg(
+        long,
+        required = false,
+        default_value_t = 22,
+        value_name = "ROOT_HASH_FILE_NBIT",
+        help = "Number of low-bits in the 64-bit address to determine the file ID. It is the exponent to
+    the power of 2 for the file size."
+    )]
+    pub root_hash_file_nbit: u64,
+
+    #[arg(
+        long,
+        required = false,
         value_parser = value_parser!(bool),
         default_missing_value = "false",
         default_value_t = false,
@@ -235,6 +263,9 @@ pub fn initialize_db_config(opts: &Options) -> DbConfig {
         payload_file_nbit: opts.payload_file_nbit,
         payload_max_walk: opts.payload_max_walk,
         payload_regn_nbit: opts.payload_regn_nbit,
+        root_hash_ncached_pages: opts.payload_ncached_pages,
+        root_hash_ncached_files: opts.root_hash_ncached_files,
+        root_hash_file_nbit: opts.root_hash_file_nbit,
         truncate: opts.truncate,
         rev: DbRevConfig {
             merkle_ncached_objs: opts.merkle_ncached_objs,

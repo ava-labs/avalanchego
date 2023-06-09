@@ -22,19 +22,20 @@ use typed_builder::TypedBuilder;
 #[cfg(feature = "eth")]
 use crate::account::{Account, AccountRlp, Blob, BlobStash};
 use crate::file;
-use crate::merkle::{Hash, IdTrans, Merkle, MerkleError, Node};
+use crate::merkle::{IdTrans, Merkle, MerkleError, Node, TrieHash, TRIE_HASH_LEN};
 use crate::proof::{Proof, ProofError};
 use crate::storage::buffer::{BufferWrite, DiskBuffer, DiskBufferRequester};
 pub use crate::storage::{buffer::DiskBufferConfig, WalConfig};
 use crate::storage::{
     AshRecord, CachedSpace, MemStoreR, SpaceWrite, StoreConfig, StoreDelta, StoreRevMut,
-    StoreRevShared, PAGE_SIZE_NBIT,
+    StoreRevShared, ZeroStore, PAGE_SIZE_NBIT,
 };
 
 const MERKLE_META_SPACE: SpaceId = 0x0;
 const MERKLE_PAYLOAD_SPACE: SpaceId = 0x1;
 const BLOB_META_SPACE: SpaceId = 0x2;
 const BLOB_PAYLOAD_SPACE: SpaceId = 0x3;
+const ROOT_HASH_SPACE: SpaceId = 0x4;
 const SPACE_RESERVED: u64 = 0x1000;
 
 const MAGIC_STR: &[u8; 13] = b"firewood v0.1";
@@ -95,6 +96,7 @@ struct DbParams {
     payload_regn_nbit: u64,
     wal_file_nbit: u64,
     wal_block_nbit: u64,
+    root_hash_file_nbit: u64,
 }
 
 /// Config for accessing a version of the DB.
@@ -139,6 +141,16 @@ pub struct DbConfig {
     /// partitioned into multiple regions. Just use the default value.
     #[builder(default = 22)]
     pub payload_regn_nbit: u64,
+    /// Maximum cached pages for the free list of the item stash.
+    #[builder(default = 16384)] // 64M total size by default
+    pub root_hash_ncached_pages: usize,
+    /// Maximum cached file descriptors for the free list of the item stash.
+    #[builder(default = 1024)] // 1K fds by default
+    pub root_hash_ncached_files: usize,
+    /// Number of low-bits in the 64-bit address to determine the file ID. It is the exponent to
+    /// the power of 2 for the file size.
+    #[builder(default = 22)] // 4MB file by default
+    pub root_hash_file_nbit: u64,
     /// Whether to truncate the DB when opening it. If set, the DB will be reset and all its
     /// existing contents will be lost.
     #[builder(default = false)]
@@ -330,7 +342,7 @@ impl DbRev {
     }
 
     /// Get root hash of the generic key-value storage.
-    pub fn kv_root_hash(&self) -> Result<Hash, DbError> {
+    pub fn kv_root_hash(&self) -> Result<TrieHash, DbError> {
         self.merkle
             .root_hash::<IdTrans>(self.header.kv_root)
             .map_err(DbError::Merkle)
@@ -402,7 +414,7 @@ impl DbRev {
     }
 
     /// Get root hash of the world state of all accounts.
-    pub fn root_hash(&self) -> Result<Hash, DbError> {
+    pub fn root_hash(&self) -> Result<TrieHash, DbError> {
         self.merkle
             .root_hash::<AccountRlp>(self.header.acc_root)
             .map_err(DbError::Merkle)
@@ -459,8 +471,9 @@ struct DbInner {
     latest: DbRev,
     disk_requester: DiskBufferRequester,
     disk_thread: Option<JoinHandle<()>>,
-    staging: Universe<Rc<StoreRevMut>>,
-    cached: Universe<Rc<CachedSpace>>,
+    data_staging: Universe<Rc<StoreRevMut>>,
+    data_cache: Universe<Rc<CachedSpace>>,
+    root_hash_staging: StoreRevMut,
 }
 
 impl Drop for DbInner {
@@ -481,6 +494,7 @@ pub struct Db {
 
 pub struct DbRevInner {
     inner: VecDeque<Universe<StoreRevShared>>,
+    root_hashes: VecDeque<TrieHash>,
     max_revisions: usize,
     base: Universe<StoreRevShared>,
 }
@@ -503,6 +517,8 @@ impl Db {
         let blob_meta_path = file::touch_dir("meta", &blob_path)?;
         let blob_payload_path = file::touch_dir("compact", &blob_path)?;
 
+        let root_hash_path = file::touch_dir("root_hash", &db_path)?;
+
         let file0 = crate::file::File::new(0, SPACE_RESERVED, &merkle_meta_path)?;
         let fd0 = file0.get_fd();
 
@@ -524,6 +540,7 @@ impl Db {
                 payload_regn_nbit: cfg.payload_regn_nbit,
                 wal_file_nbit: cfg.wal.file_nbit,
                 wal_block_nbit: cfg.wal.block_nbit,
+                root_hash_file_nbit: cfg.root_hash_file_nbit,
             };
             nix::sys::uio::pwrite(fd0, &shale::util::get_raw_bytes(&header), 0)
                 .map_err(DbError::System)?;
@@ -537,7 +554,7 @@ impl Db {
         let header: DbParams = cast_slice(&header_bytes)[0];
 
         // setup disk buffer
-        let cached = Universe {
+        let data_cache = Universe {
             merkle: SubUniverse::new(
                 Rc::new(
                     CachedSpace::new(
@@ -592,6 +609,19 @@ impl Db {
             ),
         };
 
+        let root_hash_cache = Rc::new(
+            CachedSpace::new(
+                &StoreConfig::builder()
+                    .ncached_pages(cfg.root_hash_ncached_pages)
+                    .ncached_files(cfg.root_hash_ncached_files)
+                    .space_id(ROOT_HASH_SPACE)
+                    .file_nbit(header.root_hash_file_nbit)
+                    .rootdir(root_hash_path)
+                    .build(),
+            )
+            .unwrap(),
+        );
+
         let wal = WalConfig::builder()
             .file_nbit(header.wal_file_nbit)
             .block_nbit(header.wal_block_nbit)
@@ -605,29 +635,31 @@ impl Db {
             disk_buffer.run()
         }));
 
-        disk_requester.reg_cached_space(cached.merkle.meta.as_ref());
-        disk_requester.reg_cached_space(cached.merkle.payload.as_ref());
-        disk_requester.reg_cached_space(cached.blob.meta.as_ref());
-        disk_requester.reg_cached_space(cached.blob.payload.as_ref());
+        disk_requester.reg_cached_space(data_cache.merkle.meta.as_ref());
+        disk_requester.reg_cached_space(data_cache.merkle.payload.as_ref());
+        disk_requester.reg_cached_space(data_cache.blob.meta.as_ref());
+        disk_requester.reg_cached_space(data_cache.blob.payload.as_ref());
+        disk_requester.reg_cached_space(root_hash_cache.as_ref());
 
-        let mut staging = Universe {
+        let mut data_staging = Universe {
             merkle: SubUniverse::new(
                 Rc::new(StoreRevMut::new(
-                    cached.merkle.meta.clone() as Rc<dyn MemStoreR>
+                    data_cache.merkle.meta.clone() as Rc<dyn MemStoreR>
                 )),
                 Rc::new(StoreRevMut::new(
-                    cached.merkle.payload.clone() as Rc<dyn MemStoreR>
+                    data_cache.merkle.payload.clone() as Rc<dyn MemStoreR>
                 )),
             ),
             blob: SubUniverse::new(
                 Rc::new(StoreRevMut::new(
-                    cached.blob.meta.clone() as Rc<dyn MemStoreR>
+                    data_cache.blob.meta.clone() as Rc<dyn MemStoreR>
                 )),
                 Rc::new(StoreRevMut::new(
-                    cached.blob.payload.clone() as Rc<dyn MemStoreR>
+                    data_cache.blob.payload.clone() as Rc<dyn MemStoreR>
                 )),
             ),
         };
+        let root_hash_staging = StoreRevMut::new(root_hash_cache);
 
         // recover from Wal
         disk_requester.init_wal("wal", db_path);
@@ -643,7 +675,7 @@ impl Db {
 
         if reset {
             // initialize space headers
-            let initializer = Rc::<StoreRevMut>::make_mut(&mut staging.merkle.meta);
+            let initializer = Rc::<StoreRevMut>::make_mut(&mut data_staging.merkle.meta);
             initializer.write(
                 merkle_payload_header.addr(),
                 &shale::to_dehydrated(&shale::compact::CompactSpaceHeader::new(
@@ -655,7 +687,7 @@ impl Db {
                 db_header.addr(),
                 &shale::to_dehydrated(&DbHeader::new_empty())?,
             );
-            let initializer = Rc::<StoreRevMut>::make_mut(&mut staging.blob.meta);
+            let initializer = Rc::<StoreRevMut>::make_mut(&mut data_staging.blob.meta);
             initializer.write(
                 blob_payload_header.addr(),
                 &shale::to_dehydrated(&shale::compact::CompactSpaceHeader::new(
@@ -666,8 +698,8 @@ impl Db {
         }
 
         let (mut db_header_ref, merkle_payload_header_ref, _blob_payload_header_ref) = {
-            let merkle_meta_ref = staging.merkle.meta.as_ref();
-            let blob_meta_ref = staging.blob.meta.as_ref();
+            let merkle_meta_ref = data_staging.merkle.meta.as_ref();
+            let blob_meta_ref = data_staging.blob.meta.as_ref();
 
             (
                 StoredView::ptr_to_obj(merkle_meta_ref, db_header, DbHeader::MSIZE).unwrap(),
@@ -687,8 +719,8 @@ impl Db {
         };
 
         let merkle_space = shale::compact::CompactSpace::new(
-            staging.merkle.meta.clone(),
-            staging.merkle.payload.clone(),
+            data_staging.merkle.meta.clone(),
+            data_staging.merkle.payload.clone(),
             merkle_payload_header_ref,
             shale::ObjCache::new(cfg.rev.merkle_ncached_objs),
             cfg.payload_max_walk,
@@ -730,8 +762,8 @@ impl Db {
         latest.flush_dirty().unwrap();
 
         let base = Universe {
-            merkle: get_sub_universe_from_empty_delta(&cached.merkle),
-            blob: get_sub_universe_from_empty_delta(&cached.blob),
+            merkle: get_sub_universe_from_empty_delta(&data_cache.merkle),
+            blob: get_sub_universe_from_empty_delta(&data_cache.blob),
         };
 
         Ok(Self {
@@ -739,11 +771,13 @@ impl Db {
                 latest,
                 disk_thread,
                 disk_requester,
-                staging,
-                cached,
+                data_staging,
+                data_cache,
+                root_hash_staging,
             })),
             revisions: Arc::new(Mutex::new(DbRevInner {
                 inner: VecDeque::new(),
+                root_hashes: VecDeque::new(),
                 max_revisions: cfg.wal.max_revisions as usize,
                 base,
             })),
@@ -758,7 +792,6 @@ impl Db {
         WriteBatch {
             m: Arc::clone(&self.inner),
             r: Arc::clone(&self.revisions),
-            root_hash_recalc: true,
             committed: false,
         }
     }
@@ -768,7 +801,7 @@ impl Db {
         self.inner.read().latest.kv_dump(w)
     }
     /// Get root hash of the latest generic key-value storage.
-    pub fn kv_root_hash(&self) -> Result<Hash, DbError> {
+    pub fn kv_root_hash(&self) -> Result<TrieHash, DbError> {
         self.inner.read().latest.kv_root_hash()
     }
 
@@ -781,23 +814,68 @@ impl Db {
             .kv_get(key)
             .ok_or(DbError::KeyNotFound)
     }
-    /// Get a handle that grants the access to any committed state of the entire DB.
+    /// Get a handle that grants the access to any committed state of the entire DB,
+    /// with a given root hash. If the given root hash matches with more than one
+    /// revisions, we use the most recent one as the trie are the same.
     ///
-    /// The latest revision (nback) starts from 0, which is the current state.
-    /// If nback equals is above the configured maximum number of revisions, this function returns None.
-    /// Returns `None` if `nback` is greater than the configured maximum amount of revisions.
+    /// If no revision with matching root hash found, returns None.
     #[measure([HitCount])]
-    pub fn get_revision(&self, nback: usize, cfg: Option<DbRevConfig>) -> Option<Revision> {
+    pub fn get_revision(&self, root_hash: TrieHash, cfg: Option<DbRevConfig>) -> Option<Revision> {
         let mut revisions = self.revisions.lock();
-        let inner = self.inner.read();
+        let inner_lock = self.inner.read();
 
-        let rlen = revisions.inner.len();
-        if nback > revisions.max_revisions {
+        // Find the revision index with the given root hash.
+        let (nback, found) = {
+            let mut nback = 0;
+            let mut found = false;
+
+            for (i, r) in revisions.root_hashes.iter().enumerate() {
+                if *r == root_hash {
+                    nback = i;
+                    found = true;
+                    break;
+                }
+            }
+
+            if !found {
+                let rlen = revisions.root_hashes.len();
+                if rlen < revisions.max_revisions {
+                    let ashes = inner_lock
+                        .disk_requester
+                        .collect_ash(revisions.max_revisions)
+                        .ok()
+                        .unwrap();
+                    for (i, ash) in ashes.iter().skip(rlen).enumerate() {
+                        // Replay the redo from the wal
+                        let root_hash_store = StoreRevShared::from_ash(
+                            Rc::new(ZeroStore::default()),
+                            &ash.0[&ROOT_HASH_SPACE].redo,
+                        );
+                        // No need the usage of `ShaleStore`, as this is just simple Hash value.
+                        let r = root_hash_store
+                            .get_view(0, TRIE_HASH_LEN as u64)
+                            .unwrap()
+                            .as_deref();
+                        let r = TrieHash(r[..TRIE_HASH_LEN].try_into().unwrap());
+                        if r == root_hash {
+                            nback = i;
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            (nback, found)
+        };
+
+        if !found {
             return None;
         }
+
+        let rlen = revisions.inner.len();
         if rlen < nback {
             // TODO: Remove unwrap
-            let ashes = inner.disk_requester.collect_ash(nback).ok().unwrap();
+            let ashes = inner_lock.disk_requester.collect_ash(nback).ok().unwrap();
             for mut ash in ashes.into_iter().skip(rlen) {
                 for (_, a) in ash.0.iter_mut() {
                     a.undo.reverse()
@@ -805,7 +883,7 @@ impl Db {
 
                 let u = match revisions.inner.back() {
                     Some(u) => u.to_mem_store_r(),
-                    None => inner.cached.to_mem_store_r(),
+                    None => inner_lock.data_cache.to_mem_store_r(),
                 };
                 revisions.inner.push_back(u.rewind(
                     &ash.0[&MERKLE_META_SPACE].undo,
@@ -815,11 +893,8 @@ impl Db {
                 ));
             }
         }
-        if revisions.inner.len() < nback {
-            return None;
-        }
-        // set up the storage layout
 
+        // Set up the storage layout
         let mut offset = std::mem::size_of::<DbParams>() as u64;
         // DbHeader starts after DbParams in merkle meta space
         let db_header: ObjPtr<DbHeader> = ObjPtr::new_from_addr(offset);
@@ -836,7 +911,8 @@ impl Db {
         } else {
             &revisions.inner[nback - 1]
         };
-        drop(inner);
+        // Release the lock after we find the revision
+        drop(inner_lock);
 
         let (db_header_ref, merkle_payload_header_ref, _blob_payload_header_ref) = {
             let merkle_meta_ref = &space.merkle.meta;
@@ -905,7 +981,7 @@ impl Db {
     }
 
     /// Get root hash of the latest world state of all accounts.
-    pub fn root_hash(&self) -> Result<Hash, DbError> {
+    pub fn root_hash(&self) -> Result<TrieHash, DbError> {
         self.inner.read().latest.root_hash()
     }
 
@@ -953,7 +1029,6 @@ impl std::ops::Deref for Revision {
 pub struct WriteBatch {
     m: Arc<RwLock<DbInner>>,
     r: Arc<Mutex<DbRevInner>>,
-    root_hash_recalc: bool,
     committed: bool,
 }
 
@@ -986,89 +1061,104 @@ impl WriteBatch {
         drop(rev);
         Ok((self, old_value))
     }
-    /// Do not rehash merkle roots upon commit. This will leave the recalculation of the dirty root
-    /// hashes to future invocation of `root_hash`, `kv_root_hash` or batch commits.
-    pub fn no_root_hash(mut self) -> Self {
-        self.root_hash_recalc = false;
-        self
-    }
 
     /// Persist all changes to the DB. The atomicity of the [WriteBatch] guarantees all changes are
     /// either retained on disk or lost together during a crash.
     pub fn commit(mut self) {
         let mut rev_inner = self.m.write();
-        if self.root_hash_recalc {
-            #[cfg(feature = "eth")]
-            rev_inner.latest.root_hash().ok();
-            rev_inner.latest.kv_root_hash().ok();
-        }
+
+        #[cfg(feature = "eth")]
+        rev_inner.latest.root_hash().ok();
+
+        let kv_root_hash = rev_inner.latest.kv_root_hash().ok();
+        let kv_root_hash = kv_root_hash.expect("kv_root_hash should not be none");
+
         // clear the staging layer and apply changes to the CachedSpace
         rev_inner.latest.flush_dirty().unwrap();
-        let (merkle_payload_pages, merkle_payload_plain) =
-            rev_inner.staging.merkle.payload.take_delta();
-        let (merkle_meta_pages, merkle_meta_plain) = rev_inner.staging.merkle.meta.take_delta();
-        let (blob_payload_pages, blob_payload_plain) = rev_inner.staging.blob.payload.take_delta();
-        let (blob_meta_pages, blob_meta_plain) = rev_inner.staging.blob.meta.take_delta();
+        let (merkle_payload_redo, merkle_payload_wal) =
+            rev_inner.data_staging.merkle.payload.take_delta();
+        let (merkle_meta_redo, merkle_meta_wal) = rev_inner.data_staging.merkle.meta.take_delta();
+        let (blob_payload_redo, blob_payload_wal) =
+            rev_inner.data_staging.blob.payload.take_delta();
+        let (blob_meta_redo, blob_meta_wal) = rev_inner.data_staging.blob.meta.take_delta();
 
-        let old_merkle_meta_delta = rev_inner
-            .cached
+        let merkle_meta_undo = rev_inner
+            .data_cache
             .merkle
             .meta
-            .update(&merkle_meta_pages)
+            .update(&merkle_meta_redo)
             .unwrap();
-        let old_merkle_payload_delta = rev_inner
-            .cached
+        let merkle_payload_undo = rev_inner
+            .data_cache
             .merkle
             .payload
-            .update(&merkle_payload_pages)
+            .update(&merkle_payload_redo)
             .unwrap();
-        let old_blob_meta_delta = rev_inner.cached.blob.meta.update(&blob_meta_pages).unwrap();
-        let old_blob_payload_delta = rev_inner
-            .cached
+        let blob_meta_undo = rev_inner
+            .data_cache
+            .blob
+            .meta
+            .update(&blob_meta_redo)
+            .unwrap();
+        let blob_payload_undo = rev_inner
+            .data_cache
             .blob
             .payload
-            .update(&blob_payload_pages)
+            .update(&blob_payload_redo)
             .unwrap();
 
         // update the rolling window of past revisions
-        let new_base = Universe {
+        let latest_past = Universe {
             merkle: get_sub_universe_from_deltas(
-                &rev_inner.cached.merkle,
-                old_merkle_meta_delta,
-                old_merkle_payload_delta,
+                &rev_inner.data_cache.merkle,
+                merkle_meta_undo,
+                merkle_payload_undo,
             ),
             blob: get_sub_universe_from_deltas(
-                &rev_inner.cached.blob,
-                old_blob_meta_delta,
-                old_blob_payload_delta,
+                &rev_inner.data_cache.blob,
+                blob_meta_undo,
+                blob_payload_undo,
             ),
         };
 
         let mut revisions = self.r.lock();
+        let max_revisions = revisions.max_revisions;
         if let Some(rev) = revisions.inner.front_mut() {
             rev.merkle
                 .meta
-                .set_base_space(new_base.merkle.meta.inner().clone());
+                .set_base_space(latest_past.merkle.meta.inner().clone());
             rev.merkle
                 .payload
-                .set_base_space(new_base.merkle.payload.inner().clone());
+                .set_base_space(latest_past.merkle.payload.inner().clone());
             rev.blob
                 .meta
-                .set_base_space(new_base.blob.meta.inner().clone());
+                .set_base_space(latest_past.blob.meta.inner().clone());
             rev.blob
                 .payload
-                .set_base_space(new_base.blob.payload.inner().clone());
+                .set_base_space(latest_past.blob.payload.inner().clone());
         }
-        revisions.inner.push_front(new_base);
-        while revisions.inner.len() > revisions.max_revisions {
+        revisions.inner.push_front(latest_past);
+        while revisions.inner.len() > max_revisions {
             revisions.inner.pop_back();
         }
 
         let base = Universe {
-            merkle: get_sub_universe_from_empty_delta(&rev_inner.cached.merkle),
-            blob: get_sub_universe_from_empty_delta(&rev_inner.cached.blob),
+            merkle: get_sub_universe_from_empty_delta(&rev_inner.data_cache.merkle),
+            blob: get_sub_universe_from_empty_delta(&rev_inner.data_cache.blob),
         };
         revisions.base = base;
+
+        // update the rolling window of root hashes
+        revisions.root_hashes.push_front(kv_root_hash.clone());
+        if revisions.root_hashes.len() > max_revisions {
+            revisions
+                .root_hashes
+                .resize(max_revisions, TrieHash([0; TRIE_HASH_LEN]));
+        }
+
+        rev_inner.root_hash_staging.write(0, &kv_root_hash.0);
+        let (root_hash_redo, root_hash_wal) = rev_inner.root_hash_staging.take_delta();
+        // let base_root_hash = StoreRevShared::from_delta(rev_inner.root_hash_cache, root_hash_redo);
 
         self.committed = true;
 
@@ -1076,28 +1166,33 @@ impl WriteBatch {
         rev_inner.disk_requester.write(
             vec![
                 BufferWrite {
-                    space_id: rev_inner.staging.merkle.payload.id(),
-                    delta: merkle_payload_pages,
+                    space_id: rev_inner.data_staging.merkle.payload.id(),
+                    delta: merkle_payload_redo,
                 },
                 BufferWrite {
-                    space_id: rev_inner.staging.merkle.meta.id(),
-                    delta: merkle_meta_pages,
+                    space_id: rev_inner.data_staging.merkle.meta.id(),
+                    delta: merkle_meta_redo,
                 },
                 BufferWrite {
-                    space_id: rev_inner.staging.blob.payload.id(),
-                    delta: blob_payload_pages,
+                    space_id: rev_inner.data_staging.blob.payload.id(),
+                    delta: blob_payload_redo,
                 },
                 BufferWrite {
-                    space_id: rev_inner.staging.blob.meta.id(),
-                    delta: blob_meta_pages,
+                    space_id: rev_inner.data_staging.blob.meta.id(),
+                    delta: blob_meta_redo,
+                },
+                BufferWrite {
+                    space_id: rev_inner.root_hash_staging.id(),
+                    delta: root_hash_redo,
                 },
             ],
             AshRecord(
                 [
-                    (MERKLE_META_SPACE, merkle_meta_plain),
-                    (MERKLE_PAYLOAD_SPACE, merkle_payload_plain),
-                    (BLOB_META_SPACE, blob_meta_plain),
-                    (BLOB_PAYLOAD_SPACE, blob_payload_plain),
+                    (MERKLE_META_SPACE, merkle_meta_wal),
+                    (MERKLE_PAYLOAD_SPACE, merkle_payload_wal),
+                    (BLOB_META_SPACE, blob_meta_wal),
+                    (BLOB_PAYLOAD_SPACE, blob_payload_wal),
+                    (ROOT_HASH_SPACE, root_hash_wal),
                 ]
                 .into(),
             ),
@@ -1158,7 +1253,7 @@ impl WriteBatch {
                 blob_stash.free_blob(acc.code).map_err(DbError::Blob)?;
             }
             acc.set_code(
-                Hash(sha3::Keccak256::digest(code).into()),
+                TrieHash(sha3::Keccak256::digest(code).into()),
                 blob_stash
                     .new_blob(Blob::Code(code.to_vec()))
                     .map_err(DbError::Blob)?
@@ -1255,10 +1350,11 @@ impl Drop for WriteBatch {
     fn drop(&mut self) {
         if !self.committed {
             // drop the staging changes
-            self.m.read().staging.merkle.payload.take_delta();
-            self.m.read().staging.merkle.meta.take_delta();
-            self.m.read().staging.blob.payload.take_delta();
-            self.m.read().staging.blob.meta.take_delta();
+            self.m.read().data_staging.merkle.payload.take_delta();
+            self.m.read().data_staging.merkle.meta.take_delta();
+            self.m.read().data_staging.blob.payload.take_delta();
+            self.m.read().data_staging.blob.meta.take_delta();
+            self.m.read().root_hash_staging.take_delta();
         }
     }
 }

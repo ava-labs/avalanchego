@@ -580,18 +580,16 @@ impl CachedStore for StoreRevMut {
     }
 }
 
-#[cfg(test)]
 #[derive(Clone, Debug)]
+/// A zero-filled in memory store which can serve as a plain base to overlay deltas on top.
 pub struct ZeroStore(Rc<()>);
 
-#[cfg(test)]
 impl Default for ZeroStore {
     fn default() -> Self {
         Self(Rc::new(()))
     }
 }
 
-#[cfg(test)]
 impl MemStoreR for ZeroStore {
     fn get_slice(&self, _: u64, length: u64) -> Option<Vec<u8>> {
         Some(vec![0; length as usize])

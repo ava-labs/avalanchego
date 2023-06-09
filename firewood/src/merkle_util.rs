@@ -69,7 +69,7 @@ impl MerkleSetup {
         &mut self.merkle
     }
 
-    pub fn root_hash(&self) -> Result<Hash, DataStoreError> {
+    pub fn root_hash(&self) -> Result<TrieHash, DataStoreError> {
         self.merkle
             .root_hash::<IdTrans>(self.root)
             .map_err(|_err| DataStoreError::RootHashError)

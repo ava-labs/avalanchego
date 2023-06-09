@@ -2,27 +2,27 @@
 use std::ops::Deref;
 
 use bencher::{benchmark_group, benchmark_main, Bencher};
-use firewood::merkle::{Hash, Merkle, HASH_SIZE};
+use firewood::merkle::{Merkle, TrieHash, TRIE_HASH_LEN};
 use firewood_shale::{
     cached::PlainMem, compact::CompactSpaceHeader, CachedStore, ObjPtr, Storable, StoredView,
 };
 use rand::{distributions::Alphanumeric, Rng, SeedableRng};
 
-const ZERO_HASH: Hash = Hash([0u8; HASH_SIZE]);
+const ZERO_HASH: TrieHash = TrieHash([0u8; TRIE_HASH_LEN]);
 
 fn bench_dehydrate(b: &mut Bencher) {
-    let mut to = [1u8; HASH_SIZE];
+    let mut to = [1u8; TRIE_HASH_LEN];
     b.iter(|| {
         ZERO_HASH.dehydrate(&mut to).unwrap();
     });
 }
 
 fn bench_hydrate(b: &mut Bencher) {
-    let mut store = PlainMem::new(HASH_SIZE as u64, 0u8);
+    let mut store = PlainMem::new(TRIE_HASH_LEN as u64, 0u8);
     store.write(0, ZERO_HASH.deref());
 
     b.iter(|| {
-        Hash::hydrate(0, &store).unwrap();
+        TrieHash::hydrate(0, &store).unwrap();
     });
 }
 

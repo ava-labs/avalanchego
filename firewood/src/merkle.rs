@@ -16,7 +16,7 @@ use std::io::{Cursor, Read, Write};
 use std::sync::OnceLock;
 
 pub const NBRANCH: usize = 16;
-pub const HASH_SIZE: usize = 32;
+pub const TRIE_HASH_LEN: usize = 32;
 
 #[derive(Debug)]
 pub enum MerkleError {
@@ -44,20 +44,20 @@ impl fmt::Display for MerkleError {
 impl Error for MerkleError {}
 
 #[derive(PartialEq, Eq, Clone)]
-pub struct Hash(pub [u8; HASH_SIZE]);
+pub struct TrieHash(pub [u8; TRIE_HASH_LEN]);
 
-impl Hash {
+impl TrieHash {
     const MSIZE: u64 = 32;
 }
 
-impl std::ops::Deref for Hash {
-    type Target = [u8; HASH_SIZE];
-    fn deref(&self) -> &[u8; HASH_SIZE] {
+impl std::ops::Deref for TrieHash {
+    type Target = [u8; TRIE_HASH_LEN];
+    fn deref(&self) -> &[u8; TRIE_HASH_LEN] {
         &self.0
     }
 }
 
-impl Storable for Hash {
+impl Storable for TrieHash {
     fn hydrate<T: CachedStore>(addr: u64, mem: &T) -> Result<Self, ShaleError> {
         let raw = mem
             .get_view(addr, Self::MSIZE)
@@ -79,7 +79,7 @@ impl Storable for Hash {
     }
 }
 
-impl Debug for Hash {
+impl Debug for TrieHash {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         write!(f, "{}", hex::encode(self.0))
     }
@@ -228,7 +228,7 @@ impl BranchNode {
                         stream.append_empty_data();
                     } else {
                         let v = self.chd_eth_rlp[i].clone().unwrap();
-                        if v.len() == HASH_SIZE {
+                        if v.len() == TRIE_HASH_LEN {
                             stream.append(&v);
                         } else {
                             stream.append_raw(&v, 1);
@@ -339,7 +339,7 @@ impl ExtNode {
                 stream.append_empty_data();
             } else {
                 let v = self.2.clone().unwrap();
-                if v.len() == HASH_SIZE {
+                if v.len() == TRIE_HASH_LEN {
                     stream.append(&v);
                 } else {
                     stream.append_raw(&v, 1);
@@ -372,7 +372,7 @@ impl ExtNode {
 
 #[derive(PartialEq, Eq, Clone)]
 pub struct Node {
-    root_hash: OnceCell<Hash>,
+    root_hash: OnceCell<TrieHash>,
     eth_rlp_long: OnceCell<bool>,
     eth_rlp: OnceCell<Vec<u8>>,
     lazy_dirty: Cell<bool>,
@@ -424,17 +424,17 @@ impl Node {
             .get_or_init(|| self.inner.calc_eth_rlp::<T>(store))
     }
 
-    fn get_root_hash<T: ValueTransformer>(&self, store: &dyn ShaleStore<Node>) -> &Hash {
+    fn get_root_hash<T: ValueTransformer>(&self, store: &dyn ShaleStore<Node>) -> &TrieHash {
         self.root_hash.get_or_init(|| {
             self.lazy_dirty.set(true);
-            Hash(sha3::Keccak256::digest(self.get_eth_rlp::<T>(store)).into())
+            TrieHash(sha3::Keccak256::digest(self.get_eth_rlp::<T>(store)).into())
         })
     }
 
     fn get_eth_rlp_long<T: ValueTransformer>(&self, store: &dyn ShaleStore<Node>) -> bool {
         *self.eth_rlp_long.get_or_init(|| {
             self.lazy_dirty.set(true);
-            self.get_eth_rlp::<T>(store).len() >= HASH_SIZE
+            self.get_eth_rlp::<T>(store).len() >= TRIE_HASH_LEN
         })
     }
 
@@ -464,7 +464,11 @@ impl Node {
         &mut self.inner
     }
 
-    fn new_from_hash(root_hash: Option<Hash>, eth_rlp_long: Option<bool>, inner: NodeType) -> Self {
+    fn new_from_hash(
+        root_hash: Option<TrieHash>,
+        eth_rlp_long: Option<bool>,
+        inner: NodeType,
+    ) -> Self {
         Self {
             root_hash: match root_hash {
                 Some(h) => OnceCell::from(h),
@@ -498,7 +502,7 @@ impl Storable for Node {
         let root_hash = if attrs & Node::ROOT_HASH_VALID_BIT == 0 {
             None
         } else {
-            Some(Hash(
+            Some(TrieHash(
                 meta_raw.as_deref()[0..32]
                     .try_into()
                     .expect("invalid slice"),
@@ -846,10 +850,10 @@ impl Merkle {
         self.store.as_ref()
     }
 
-    pub fn empty_root() -> &'static Hash {
-        static V: OnceLock<Hash> = OnceLock::new();
+    pub fn empty_root() -> &'static TrieHash {
+        static V: OnceLock<TrieHash> = OnceLock::new();
         V.get_or_init(|| {
-            Hash(
+            TrieHash(
                 hex::decode("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
                     .unwrap()
                     .try_into()
@@ -858,7 +862,10 @@ impl Merkle {
         })
     }
 
-    pub fn root_hash<T: ValueTransformer>(&self, root: ObjPtr<Node>) -> Result<Hash, MerkleError> {
+    pub fn root_hash<T: ValueTransformer>(
+        &self,
+        root: ObjPtr<Node>,
+    ) -> Result<TrieHash, MerkleError> {
         let root = self
             .get_node(root)?
             .inner
@@ -1784,7 +1791,7 @@ impl Merkle {
         let mut chunks = Vec::new();
         chunks.extend(key.as_ref().iter().copied().flat_map(to_nibble_array));
 
-        let mut proofs: HashMap<[u8; HASH_SIZE], Vec<u8>> = HashMap::new();
+        let mut proofs: HashMap<[u8; TRIE_HASH_LEN], Vec<u8>> = HashMap::new();
         if root.is_null() {
             return Ok(Proof(proofs));
         }
@@ -1850,7 +1857,7 @@ impl Merkle {
         for node in nodes {
             let node = self.get_node(node)?;
             let rlp = <&[u8]>::clone(&node.get_eth_rlp::<T>(self.store.as_ref()));
-            let hash: [u8; HASH_SIZE] = sha3::Keccak256::digest(rlp).into();
+            let hash: [u8; TRIE_HASH_LEN] = sha3::Keccak256::digest(rlp).into();
             proofs.insert(hash, rlp.to_vec());
         }
         Ok(Proof(proofs))
@@ -2069,15 +2076,15 @@ mod test {
         }
     }
 
-    const ZERO_HASH: Hash = Hash([0u8; HASH_SIZE]);
+    const ZERO_HASH: TrieHash = TrieHash([0u8; TRIE_HASH_LEN]);
 
     #[test]
     fn test_hash_len() {
-        assert_eq!(HASH_SIZE, ZERO_HASH.dehydrated_len() as usize);
+        assert_eq!(TRIE_HASH_LEN, ZERO_HASH.dehydrated_len() as usize);
     }
     #[test]
     fn test_dehydrate() {
-        let mut to = [1u8; HASH_SIZE];
+        let mut to = [1u8; TRIE_HASH_LEN];
         assert_eq!(
             {
                 ZERO_HASH.dehydrate(&mut to).unwrap();
@@ -2089,9 +2096,9 @@ mod test {
 
     #[test]
     fn test_hydrate() {
-        let mut store = PlainMem::new(HASH_SIZE as u64, 0u8);
+        let mut store = PlainMem::new(TRIE_HASH_LEN as u64, 0u8);
         store.write(0, ZERO_HASH.deref());
-        assert_eq!(Hash::hydrate(0, &store).unwrap(), ZERO_HASH);
+        assert_eq!(TrieHash::hydrate(0, &store).unwrap(), ZERO_HASH);
     }
     #[test]
     fn test_partial_path_encoding() {

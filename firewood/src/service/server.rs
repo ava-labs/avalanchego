@@ -54,12 +54,12 @@ impl FirewoodService {
                     let _ = respond_to.send(id);
                 }
                 Request::NewRevision {
-                    nback,
+                    root_hash,
                     cfg,
                     respond_to,
                 } => {
                     let id: RevId = lastid.fetch_add(1, Ordering::Relaxed);
-                    let msg = match db.get_revision(nback, cfg) {
+                    let msg = match db.get_revision(root_hash, cfg) {
                         Some(rev) => {
                             revs.insert(id, rev);
                             Some(id)
@@ -220,15 +220,6 @@ impl FirewoodService {
                             Err(e) => Err(e),
                         };
                         respond_to.send(resp).unwrap();
-                    }
-                    BatchRequest::NoRootHash { handle, respond_to } => {
-                        // TODO: there's no way to report an error back to the caller here
-                        if handle == lastid.load(Ordering::Relaxed) - 1 {
-                            if let Some(batch) = active_batch {
-                                active_batch = Some(batch.no_root_hash());
-                            }
-                        }
-                        respond_to.send(()).unwrap();
                     }
                 },
             }

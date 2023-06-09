@@ -15,8 +15,6 @@ struct Args {
     batch_size: usize,
     #[arg(short, long, default_value_t = 0)]
     seed: u64,
-    #[arg(short, long, default_value_t = false)]
-    no_root_hash: bool,
 }
 
 fn main() {
@@ -56,10 +54,6 @@ fn main() {
 
                     for (k, v) in batch {
                         wb = wb.kv_insert(k, v.to_vec()).unwrap();
-                    }
-
-                    if args.no_root_hash {
-                        wb = wb.no_root_hash();
                     }
 
                     wb.commit();
