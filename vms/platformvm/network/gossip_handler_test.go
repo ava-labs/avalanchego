@@ -40,8 +40,7 @@ func TestValidGossipedTxIsAddedToBuilder(t *testing.T) {
 	builder.EXPECT().AddUnverifiedTx(tx).Times(1)
 	gossipHandler := NewGossipHandler(snow.DefaultContextTest(), builder)
 
-	err = gossipHandler.HandleTxGossip(ids.GenerateTestNodeID(), &msg)
-	require.NoError(err)
+	require.NoError(gossipHandler.HandleTxGossip(ids.GenerateTestNodeID(), &msg))
 }
 
 func TestInvalidTxIsNotAddedToBuilder(t *testing.T) {
@@ -61,8 +60,7 @@ func TestInvalidTxIsNotAddedToBuilder(t *testing.T) {
 	// show that the invalid tx is not added to builder
 	builder.EXPECT().AddUnverifiedTx(gomock.Any()).Times(0)
 	// handle the tx gossip
-	err = gossipHandler.HandleTxGossip(ids.GenerateTestNodeID(), &msg)
-	require.NoError(err)
+	require.NoError(gossipHandler.HandleTxGossip(ids.GenerateTestNodeID(), &msg))
 }
 
 func createTestTx(index int) (*txs.Tx, error) {
