@@ -67,6 +67,9 @@ The hash of the incomplete database on a client is never sent anywhere because i
 
 When the client is created, it is given the root hash of the revision to sync to.
 When it starts syncing, it requests from a server a range proof for the entire database.
+(To indicate that it wants no lower bound on the key range, the client doesn't provide a lower bound in the request.
+To indicate that it wants no upper bound, the client doesn't provide an upper bound. 
+Thus, to request the entire database, the client omits both the lower and upper bounds in its request.)
 The server replies with a range proof, which the client verifies.
 If it's valid, the key-value pairs in the proof are written to the database.
 If it's not, the client drops the proof and requests the proof from another server. 
@@ -118,6 +121,38 @@ the client will repeatedly request change proofs until it gets remaining key-val
 Eventually, by repeatedly requesting, receiving, verifying and applying range and change proofs,
 the client will have all of the key-value pairs in the database.
 At this point, it's synced.
+
+## Diagram
+
+
+Assuming you have `Root Hash` `r1` which has many keys, some of which are k25, k50 and k75,
+approximately 25%, 50%, and 75% of the way into the sorted set of keys, respectively, 
+this diagram shows an example flow from client to server:
+
+```mermaid
+  sequenceDiagram
+    Note right of Client: Normal sync flow
+    box Client/Server
+        participant Client
+        participant Server
+    end
+    box New Revision Notifier
+        participant Notifier
+    end
+    Notifier->>Client: CurrentRoot(r1)
+    Client->>Server: RangeProofRequest(r1, all)
+    Server->>Client: RangeProofResponse(r1, ..k25)
+    Client->>Server: RangeProofRequest(r1, k25..)
+    Server->>Client: RangeProofResponse(r1, k25..k75)
+    Notifier->>Client: NewRootHash(r2)
+    Client->>Server: ChangeProofRequest(r1, r2, 0..k75)
+    Server->>Client: ChangeProofResponse(r1, r2, 0..k50)
+    Client->>Server: ChangeProofRequest(r1, r2, k50..k75)
+    Server->>Client: ChangeProofResponse(r1, r2, k50..k75)
+    Note right of Client: client is @r2 through (..k75)
+    Client->>Server: RangeProofRequest(r2, k75..)
+    Server->>Client: RangeProofResponse(r2, k75..k100)
+```
 
 ## TODOs
 
