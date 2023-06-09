@@ -42,8 +42,7 @@ func TestFilter(t *testing.T) {
 	addrBytes := addrID[:]
 
 	fp := pubsub.NewFilterParam()
-	err := fp.Add(addrBytes)
-	require.NoError(err)
+	require.NoError(fp.Add(addrBytes))
 
 	parser := NewPubSubFilterer(&tx)
 	fr, _ := parser.Filter([]pubsub.Filter{&mockFilter{addr: addrBytes}})

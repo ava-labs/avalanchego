@@ -965,7 +965,6 @@ func RecordPollDivergedVotingTest(t *testing.T, factory Factory) {
 	// the 255 remaining bits of [block0].
 	votes0 := bag.Bag[ids.ID]{}
 	votes0.Add(block0.ID())
-
 	require.NoError(sm.RecordPoll(context.Background(), votes0))
 
 	// Although we are adding in [block2] here - the underlying snowball
@@ -1001,7 +1000,6 @@ func RecordPollDivergedVotingTest(t *testing.T, factory Factory) {
 	// transitively.
 	votes3 := bag.Bag[ids.ID]{}
 	votes3.Add(block3.ID())
-
 	require.NoError(sm.RecordPoll(context.Background(), votes3))
 	require.Zero(sm.NumProcessing())
 	require.Equal(choices.Accepted, block0.Status())

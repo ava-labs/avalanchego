@@ -10,6 +10,13 @@ import (
 )
 
 const (
+	// MinPercentConnectedBuffer is the safety buffer for calculation of
+	// MinPercentConnected. This increases the required percentage above
+	// alpha/k. This value must be [0-1].
+	// 0 means MinPercentConnected = alpha/k.
+	// 1 means MinPercentConnected = 1 (fully connected).
+	MinPercentConnectedBuffer = .2
+
 	errMsg = "" +
 		`__________                    .___` + "\n" +
 		`\______   \____________     __| _/__.__.` + "\n" +
@@ -27,7 +34,20 @@ const (
 		`        \/         \/         \/` + "\n"
 )
 
-var ErrParametersInvalid = errors.New("parameters invalid")
+var (
+	DefaultParameters = Parameters{
+		K:                     20,
+		Alpha:                 15,
+		BetaVirtuous:          15,
+		BetaRogue:             20,
+		ConcurrentRepolls:     4,
+		OptimalProcessing:     10,
+		MaxOutstandingItems:   256,
+		MaxItemProcessingTime: 30 * time.Second,
+	}
+
+	ErrParametersInvalid = errors.New("parameters invalid")
+)
 
 // Parameters required for snowball consensus
 type Parameters struct {
@@ -44,16 +64,6 @@ type Parameters struct {
 	// Reports unhealthy if there is an item processing for longer than this
 	// duration.
 	MaxItemProcessingTime time.Duration `json:"maxItemProcessingTime" yaml:"maxItemProcessingTime"`
-
-	// If this node is a validator, when a container is inserted into consensus,
-	// send a Push Query to this many validators and a Pull Query to the other
-	// k - MixedQueryNumPushVdr validators. Must be in [0, K].
-	MixedQueryNumPushVdr int `json:"mixedQueryNumPushVdr" yaml:"mixedQueryNumPushVdr"`
-
-	// If this node is not a validator, when a container is inserted into consensus,
-	// send a Push Query to this many validators and a Pull Query to the other
-	// k - MixedQueryNumPushVdr validators. Must be in [0, K].
-	MixedQueryNumPushNonVdr int `json:"mixedQueryNumPushNonVdr" yaml:"mixedQueryNumPushNonVdr"`
 }
 
 // Verify returns nil if the parameters describe a valid initialization.
@@ -79,11 +89,14 @@ func (p Parameters) Verify() error {
 		return fmt.Errorf("%w: maxOutstandingItems = %d: fails the condition that: 0 < maxOutstandingItems", ErrParametersInvalid, p.MaxOutstandingItems)
 	case p.MaxItemProcessingTime <= 0:
 		return fmt.Errorf("%w: maxItemProcessingTime = %d: fails the condition that: 0 < maxItemProcessingTime", ErrParametersInvalid, p.MaxItemProcessingTime)
-	case p.MixedQueryNumPushVdr > p.K:
-		return fmt.Errorf("%w: mixedQueryNumPushVdr (%d) > K (%d)", ErrParametersInvalid, p.MixedQueryNumPushVdr, p.K)
-	case p.MixedQueryNumPushNonVdr > p.K:
-		return fmt.Errorf("%w: mixedQueryNumPushNonVdr (%d) > K (%d)", ErrParametersInvalid, p.MixedQueryNumPushNonVdr, p.K)
 	default:
 		return nil
 	}
+}
+
+func (p Parameters) MinPercentConnectedHealthy() float64 {
+	alpha := p.Alpha
+	k := p.K
+	r := float64(alpha) / float64(k)
+	return r*(1-MinPercentConnectedBuffer) + MinPercentConnectedBuffer
 }
