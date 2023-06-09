@@ -16,9 +16,9 @@ import (
 )
 
 var (
-	errDuplicatedPrefix = errors.New("duplicated prefix")
-
 	_ MultiGatherer = (*multiGatherer)(nil)
+
+	errReregisterGatherer = errors.New("attempt to register existing gatherer")
 )
 
 // MultiGatherer extends the Gatherer interface by allowing additional gatherers
@@ -77,8 +77,8 @@ func (g *multiGatherer) Register(namespace string, gatherer prometheus.Gatherer)
 	g.lock.Lock()
 	defer g.lock.Unlock()
 
-	if _, exists := g.gatherers[namespace]; exists {
-		return errDuplicatedPrefix
+	if existingGatherer, exists := g.gatherers[namespace]; exists {
+		return fmt.Errorf("%w for namespace %q failed; existing: %#v", errReregisterGatherer, namespace, existingGatherer)
 	}
 
 	g.gatherers[namespace] = gatherer
