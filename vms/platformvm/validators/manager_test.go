@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
@@ -386,7 +387,7 @@ func TestVM_GetValidatorSet(t *testing.T) {
 			r.NoError(err)
 
 			clk := &mockable.Clock{}
-			validatorssSet := NewManager(cfg, mockState, metrics, clk)
+			validatorSet := NewManager(logging.NoLog{}, cfg, mockState, metrics, clk)
 
 			// Mock the VM's validators
 			mockPrimaryVdrSet := validators.NewMockSet(ctrl)
@@ -426,7 +427,7 @@ func TestVM_GetValidatorSet(t *testing.T) {
 			mockState.EXPECT().GetStatelessBlock(mockTipID).Return(mockTip, choices.Accepted, nil)
 
 			// Compute validator set at previous height
-			gotVdrSet, err := validatorssSet.GetValidatorSet(context.Background(), tt.height, tt.subnetID)
+			gotVdrSet, err := validatorSet.GetValidatorSet(context.Background(), tt.height, tt.subnetID)
 			r.ErrorIs(err, tt.expectedErr)
 			if tt.expectedErr != nil {
 				return
