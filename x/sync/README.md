@@ -127,26 +127,27 @@ At this point, it's synced.
 ## Diagram
 
 
-Assuming you have `Root Hash` `r1` which has many keys, some of which are k25, k50 and k75,
+Assuming you have `Root Hash` `r1` which has many keys, some of which are k25, k50, k75,
 approximately 25%, 50%, and 75% of the way into the sorted set of keys, respectively, 
 this diagram shows an example flow from client to server:
 
 ```mermaid
-  sequenceDiagram
-    Note right of Client: Normal sync flow
+sequenceDiagram
     box Client/Server
-        participant Client
         participant Server
+        participant Client
     end
     box New Revision Notifier
         participant Notifier
     end
+
+    Note right of Client: Normal sync flow
     Notifier->>Client: CurrentRoot(r1)
     Client->>Server: RangeProofRequest(r1, all)
     Server->>Client: RangeProofResponse(r1, ..k25)
     Client->>Server: RangeProofRequest(r1, k25..)
     Server->>Client: RangeProofResponse(r1, k25..k75)
-    Notifier->>Client: NewRootHash(r2)
+    Notifier-)Client: NewRootHash(r2)
     Client->>Server: ChangeProofRequest(r1, r2, 0..k75)
     Server->>Client: ChangeProofResponse(r1, r2, 0..k50)
     Client->>Server: ChangeProofRequest(r1, r2, k50..k75)
