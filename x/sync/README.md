@@ -36,7 +36,7 @@ This message is sent from the server to the client in response to a `SyncGetChan
 
 ## Algorithm
 
-For each key range, the sync client keeps track of the root hash of the database revision for which it has downloaded that key range. For example, it will store information that says something like, "I have all of the key-value pairs that were in range [`start`, `end`] when the database's root was `root_hash`" for some keys `start` and `end`, and some database `root_hash`. Note that `root_hash` is the root hash that the client is trying to sync to, not the root hash of its own incomplete database.
+For each key range, the sync client keeps track of the root hash of the revision for which it has downloaded that key range. For example, it will store information that says something like, "I have all of the key-value pairs that were in range [`start`, `end`] when the database's root was `root_hash`" for some keys `start` and `end`, and some database `root_hash`. Note that `root_hash` is the root hash of the revision that the client is trying to sync to, not the root hash of its own (incomplete) database. The hash of the incomplete database on a client is never sent anywhere because it does not represent a root hash of any revision.
 
 When the client starts syncing, it requests from a server a range proof for the entire database. The server replies with a range proof, which the client verifies. If it's valid, the key-value pairs in the proof are written to the database. If it's not, the client drops the proof and requests the proof from another server. 
 
