@@ -26,7 +26,6 @@ func TestHandleTxGossip(t *testing.T) {
 	handler := CounterHandler{}
 	msg := message.TxGossip{}
 
-	err := msg.Handle(&handler, ids.EmptyNodeID, 0)
-	require.NoError(err)
+	require.NoError(msg.Handle(&handler, ids.EmptyNodeID, 0))
 	require.Equal(1, handler.TxGossip)
 }
