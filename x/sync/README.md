@@ -20,7 +20,7 @@ For more information on range proofs and change proofs, see their definitions in
 
 ### `SyncGetRangeProofRequest`
 
-This message is sent from the client to the server to request a range proof for a given key range and root ID. That is, the client says, "Give me the key-value pairs that were in this key range when the database had this root."
+This message is sent from the client to the server to request a range proof for a given key range and root ID. That is, the client says, "Give me the key-value pairs that were in this key range when the database had this root." This request includes a limit on the number of key-value pairs to return, and the size of the response.
 
 ### `RangeProof`
 
@@ -28,7 +28,7 @@ This message is sent from the server to the client in response to a `SyncGetRang
 
 ### `SyncGetChangeProofRequest`
 
-This message is sent from the client to the server to request a change proof between the given root IDs. That is, the client says, "Give me the key-value pairs that changed between the time the database had this root and that root."
+This message is sent from the client to the server to request a change proof between the given root IDs. That is, the client says, "Give me the key-value pairs that changed between the time the database had this root and that root." This request includes a limit on the number of key-value pairs to return, and the size of the response.
 
 ### `SyncGetChangeProofResponse`
 
