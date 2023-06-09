@@ -35,6 +35,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/version"
+
+	commontracker "github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 )
 
 const testThreadPoolSize = 2
@@ -126,6 +128,7 @@ func TestTimeout(t *testing.T) {
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
+		commontracker.NewPeers(),
 	)
 	require.NoError(err)
 
@@ -396,6 +399,7 @@ func TestReliableMessages(t *testing.T) {
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
+		commontracker.NewPeers(),
 	)
 	require.NoError(t, err)
 
@@ -543,6 +547,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
+		commontracker.NewPeers(),
 	)
 	require.NoError(t, err)
 

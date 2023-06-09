@@ -101,15 +101,6 @@ type Config struct {
 	// Time of the Cortina network upgrade
 	CortinaTime time.Time
 
-	// Subnet ID --> Minimum portion of the subnet's stake this node must be
-	// connected to in order to report healthy.
-	// [constants.PrimaryNetworkID] is always a key in this map.
-	// If a subnet is in this map, but it isn't tracked, its corresponding value
-	// isn't used.
-	// If a subnet is tracked but not in this map, we use the value for the
-	// Primary Network.
-	MinPercentConnectedStakeHealthy map[ids.ID]float64
-
 	// UseCurrentHeight forces [GetMinimumHeight] to return the current height
 	// of the P-Chain instead of the oldest block in the [recentlyAccepted]
 	// window.
