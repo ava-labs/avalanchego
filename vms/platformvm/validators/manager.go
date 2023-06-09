@@ -9,11 +9,14 @@ import (
 	"fmt"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/window"
@@ -32,7 +35,8 @@ const (
 var (
 	_ validators.State = (*manager)(nil)
 
-	ErrMissingValidator = errors.New("missing validator")
+	ErrMissingValidator    = errors.New("missing validator")
+	ErrMissingValidatorSet = errors.New("missing validator set")
 )
 
 // Manager adds the ability to introduce newly acceted blocks IDs to the State
@@ -46,12 +50,14 @@ type Manager interface {
 }
 
 func NewManager(
+	log logging.Logger,
 	cfg config.Config,
 	state state.State,
 	metrics metrics.Metrics,
 	clk *mockable.Clock,
 ) Manager {
 	return &manager{
+		log:     log,
 		cfg:     cfg,
 		state:   state,
 		metrics: metrics,
@@ -68,6 +74,7 @@ func NewManager(
 }
 
 type manager struct {
+	log     logging.Logger
 	cfg     config.Config
 	state   state.State
 	metrics metrics.Metrics
@@ -203,7 +210,10 @@ func (m *manager) makePrimaryNetworkValidatorSet(
 	currentValidators, ok := m.cfg.Validators.Get(constants.PrimaryNetworkID)
 	if !ok {
 		// This should never happen
-		return nil, ErrMissingValidator
+		m.log.Error(ErrMissingValidatorSet.Error(),
+			zap.Stringer("subnetID", constants.PrimaryNetworkID),
+		)
+		return nil, ErrMissingValidatorSet
 	}
 	currentValidatorList := currentValidators.List()
 
@@ -295,6 +305,10 @@ func (m *manager) makeSubnetValidatorSet(
 		primaryValidator, ok := primarySet[nodeID]
 		if !ok {
 			// This should never happen
+			m.log.Error(ErrMissingValidator.Error(),
+				zap.Stringer("nodeID", nodeID),
+				zap.Stringer("subnetID", subnetID),
+			)
 			return nil, ErrMissingValidator
 		}
 		subnetValidator.PublicKey = primaryValidator.PublicKey
