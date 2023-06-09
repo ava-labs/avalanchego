@@ -1162,7 +1162,7 @@ func (db *merkleDB) getHistoricalViewForRange(
 	return newTrieViewWithChanges(db, db, changeHistory, len(changeHistory.nodes))
 }
 
-// Returns all of the keys in range [start, end] that aren't in [keySet].
+// Returns all keys in range [start, end] that aren't in [keySet].
 // If [start] is nil, then the range has no lower bound.
 // If [end] is nil, then the range has no upper bound.
 func (db *merkleDB) getKeysNotInSet(start, end []byte, keySet set.Set[string]) ([][]byte, error) {
@@ -1240,55 +1240,6 @@ func (db *merkleDB) getNode(key path) (*node, error) {
 
 	err = db.putNodeInCache(key, node)
 	return node, err
-}
-
-// If [lock], grabs [db.lock]'s read lock.
-// Otherwise assumes [db.lock] is already read locked.
-func (db *merkleDB) getKeyValues(
-	start []byte,
-	end []byte,
-	maxLength int,
-	keysToIgnore set.Set[string],
-	lock bool,
-) ([]KeyValue, error) {
-	if lock {
-		db.lock.RLock()
-		defer db.lock.RUnlock()
-	}
-
-	if db.closed {
-		return nil, database.ErrClosed
-	}
-
-	if maxLength <= 0 {
-		return nil, fmt.Errorf("%w but was %d", ErrInvalidMaxLength, maxLength)
-	}
-
-	it := db.NewIteratorWithStart(start)
-	defer it.Release()
-
-	remainingLength := maxLength
-	result := make([]KeyValue, 0, maxLength)
-	// Keep adding key/value pairs until one of the following:
-	// * We hit a key that is lexicographically larger than the end key.
-	// * [maxLength] elements are in [result].
-	// * There are no more values to add.
-	for remainingLength > 0 && it.Next() {
-		key := it.Key()
-		if len(end) != 0 && bytes.Compare(it.Key(), end) > 0 {
-			break
-		}
-		if keysToIgnore.Contains(string(key)) {
-			continue
-		}
-		result = append(result, KeyValue{
-			Key:   key,
-			Value: it.Value(),
-		})
-		remainingLength--
-	}
-
-	return result, it.Error()
 }
 
 // Returns a new view atop [db] with the changes in [ops] applied to it.

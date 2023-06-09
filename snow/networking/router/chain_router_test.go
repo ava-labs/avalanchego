@@ -34,6 +34,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/version"
+
+	commontracker "github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 )
 
 const (
@@ -97,6 +99,7 @@ func TestShutdown(t *testing.T) {
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		subnets.New(chainCtx.NodeID, subnets.Config{}),
+		commontracker.NewPeers(),
 	)
 	require.NoError(err)
 
@@ -232,6 +235,7 @@ func TestShutdownTimesOut(t *testing.T) {
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
+		commontracker.NewPeers(),
 	)
 	require.NoError(t, err)
 
@@ -386,6 +390,7 @@ func TestRouterTimeout(t *testing.T) {
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
+		commontracker.NewPeers(),
 	)
 	require.NoError(err)
 
@@ -854,6 +859,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
+		commontracker.NewPeers(),
 	)
 	require.NoError(t, err)
 
@@ -1143,6 +1149,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		sb,
+		commontracker.NewPeers(),
 	)
 	require.NoError(t, err)
 
@@ -1292,6 +1299,7 @@ func TestRouterCrossChainMessages(t *testing.T) {
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		subnets.New(requester.NodeID, subnets.Config{}),
+		commontracker.NewPeers(),
 	)
 	require.NoError(t, err)
 
@@ -1310,6 +1318,7 @@ func TestRouterCrossChainMessages(t *testing.T) {
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		subnets.New(responder.NodeID, subnets.Config{}),
+		commontracker.NewPeers(),
 	)
 	require.NoError(t, err)
 
@@ -1556,6 +1565,7 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		sb,
+		commontracker.NewPeers(),
 	)
 	require.NoError(t, err)
 
