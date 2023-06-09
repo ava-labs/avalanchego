@@ -82,13 +82,17 @@ var (
 	defaultGenesisTime        = time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC)
 	defaultValidateStartTime  = defaultGenesisTime
 	defaultValidateEndTime    = defaultValidateStartTime.Add(10 * defaultMinStakingDuration)
-	defaultMinValidatorStake  = 5 * units.MilliAvax
-	defaultBalance            = 100 * defaultMinValidatorStake
-	preFundedKeys             = secp256k1.TestKeys()
-	avaxAssetID               = ids.ID{'y', 'e', 'e', 't'}
-	defaultTxFee              = uint64(100)
-	xChainID                  = ids.Empty.Prefix(0)
-	cChainID                  = ids.Empty.Prefix(1)
+
+	defaultMinDelegatorStake = 1 * units.MilliAvax
+	defaultMinValidatorStake = 5 * defaultMinDelegatorStake
+	defaultMaxValidatorStake = 100 * defaultMinValidatorStake
+	defaultBalance           = defaultMaxValidatorStake // amount all genesis validators have in defaultVM
+
+	preFundedKeys = secp256k1.TestKeys()
+	avaxAssetID   = ids.ID{'y', 'e', 'e', 't'}
+	defaultTxFee  = uint64(100)
+	xChainID      = ids.Empty.Prefix(0)
+	cChainID      = ids.Empty.Prefix(1)
 
 	genesisBlkID ids.ID
 	testSubnet1  *txs.Tx
