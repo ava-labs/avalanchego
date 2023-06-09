@@ -37,7 +37,6 @@ type syncWorkHeap struct {
 
 func newSyncWorkHeap() *syncWorkHeap {
 	return &syncWorkHeap{
-		innerHeap: make([]*heapItem, 0),
 		sortedItems: btree.NewG(
 			2,
 			func(a, b *heapItem) bool {
@@ -147,18 +146,8 @@ func (wh *syncWorkHeap) MergeInsert(item *syncWorkItem) {
 
 // Deletes [item] from the heap.
 func (wh *syncWorkHeap) remove(item *heapItem) {
-	oldIndex := item.heapIndex
-	newLength := len(wh.innerHeap) - 1
+	heap.Remove(&wh.innerHeap, item.heapIndex)
 
-	// swap with last item, delete item, then fix heap if required
-	wh.innerHeap.Swap(newLength, item.heapIndex)
-	wh.innerHeap[newLength] = nil
-	wh.innerHeap = wh.innerHeap[:newLength]
-
-	// the item was already the last item, so nothing needs to be fixed
-	if oldIndex != newLength {
-		heap.Fix(&wh.innerHeap, oldIndex)
-	}
 	wh.sortedItems.Delete(item)
 }
 
