@@ -649,11 +649,16 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 				env.state.AddTx(addStaker0, status.Committed)
 				require.NoError(env.state.Commit())
 
+				currentStakerIterator, err := env.state.GetCurrentStakerIterator()
+				require.NoError(err)
+				require.True(currentStakerIterator.Next())
+				staker := currentStakerIterator.Value()
 				s0RewardTx := &txs.Tx{
 					Unsigned: &txs.RewardValidatorTx{
-						TxID: staker0.TxID,
+						TxID: staker.TxID,
 					},
 				}
+				currentStakerIterator.Release()
 				require.NoError(s0RewardTx.Initialize(txs.Codec))
 
 				// build proposal block moving ahead chain time
