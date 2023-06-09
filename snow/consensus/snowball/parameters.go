@@ -10,6 +10,13 @@ import (
 )
 
 const (
+	// MinPercentConnectedBuffer is the safety buffer for calculation of
+	// MinPercentConnected. This increases the required percentage above
+	// alpha/k. This value must be [0-1].
+	// 0 means MinPercentConnected = alpha/k.
+	// 1 means MinPercentConnected = 1 (fully connected).
+	MinPercentConnectedBuffer = .2
+
 	errMsg = "" +
 		`__________                    .___` + "\n" +
 		`\______   \____________     __| _/__.__.` + "\n" +
@@ -27,7 +34,20 @@ const (
 		`        \/         \/         \/` + "\n"
 )
 
-var ErrParametersInvalid = errors.New("parameters invalid")
+var (
+	DefaultParameters = Parameters{
+		K:                     20,
+		Alpha:                 15,
+		BetaVirtuous:          15,
+		BetaRogue:             20,
+		ConcurrentRepolls:     4,
+		OptimalProcessing:     10,
+		MaxOutstandingItems:   256,
+		MaxItemProcessingTime: 30 * time.Second,
+	}
+
+	ErrParametersInvalid = errors.New("parameters invalid")
+)
 
 // Parameters required for snowball consensus
 type Parameters struct {
@@ -72,4 +92,11 @@ func (p Parameters) Verify() error {
 	default:
 		return nil
 	}
+}
+
+func (p Parameters) MinPercentConnectedHealthy() float64 {
+	alpha := p.Alpha
+	k := p.K
+	r := float64(alpha) / float64(k)
+	return r*(1-MinPercentConnectedBuffer) + MinPercentConnectedBuffer
 }
