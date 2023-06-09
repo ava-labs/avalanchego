@@ -67,8 +67,8 @@ var (
 	}
 )
 
-func defaultService(t *testing.T) (*Service, *mutableSharedMemory) {
-	vm, _, mutableSharedMemory := defaultVM(latestFork)
+func defaultService(t *testing.T, addSubnet bool) (*Service, *mutableSharedMemory) {
+	vm, _, mutableSharedMemory := defaultVM(latestFork, addSubnet)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 	ks := keystore.New(logging.NoLog{}, manager.NewMemDB(version.Semantic1_0_0))
@@ -120,7 +120,7 @@ func TestExportKey(t *testing.T) {
 	args := ExportKeyArgs{}
 	require.NoError(stdjson.Unmarshal([]byte(jsonString), &args))
 
-	service, _ := defaultService(t)
+	service, _ := defaultService(t, false /*addSubnet*/)
 	defaultAddress(t, service)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
@@ -140,7 +140,7 @@ func TestImportKey(t *testing.T) {
 	args := ImportKeyArgs{}
 	require.NoError(stdjson.Unmarshal([]byte(jsonString), &args))
 
-	service, _ := defaultService(t)
+	service, _ := defaultService(t, false /*addSubnet*/)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(service.vm.Shutdown(context.Background()))
@@ -155,7 +155,7 @@ func TestImportKey(t *testing.T) {
 // Test issuing a tx and accepted
 func TestGetTxStatus(t *testing.T) {
 	require := require.New(t)
-	service, mutableSharedMemory := defaultService(t)
+	service, mutableSharedMemory := defaultService(t, false /*addSubnet*/)
 	defaultAddress(t, service)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
@@ -303,7 +303,7 @@ func TestGetTx(t *testing.T) {
 			)
 			t.Run(testName, func(t *testing.T) {
 				require := require.New(t)
-				service, _ := defaultService(t)
+				service, _ := defaultService(t, true /*addSubnet*/)
 				defaultAddress(t, service)
 				service.vm.ctx.Lock.Lock()
 
@@ -366,7 +366,7 @@ func TestGetTx(t *testing.T) {
 // Test method GetBalance
 func TestGetBalance(t *testing.T) {
 	require := require.New(t)
-	service, _ := defaultService(t)
+	service, _ := defaultService(t, false /*addSubnet*/)
 	defaultAddress(t, service)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
@@ -395,7 +395,7 @@ func TestGetBalance(t *testing.T) {
 
 func TestGetStake(t *testing.T) {
 	require := require.New(t)
-	service, _ := defaultService(t)
+	service, _ := defaultService(t, false /*addSubnet*/)
 	defaultAddress(t, service)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
@@ -563,7 +563,7 @@ func TestGetStake(t *testing.T) {
 // Test method GetCurrentValidators
 func TestGetCurrentValidators(t *testing.T) {
 	require := require.New(t)
-	service, _ := defaultService(t)
+	service, _ := defaultService(t, false /*addSubnet*/)
 	defaultAddress(t, service)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
@@ -685,7 +685,7 @@ func TestGetCurrentValidators(t *testing.T) {
 
 func TestGetTimestamp(t *testing.T) {
 	require := require.New(t)
-	service, _ := defaultService(t)
+	service, _ := defaultService(t, false /*addSubnet*/)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(service.vm.Shutdown(context.Background()))
@@ -721,7 +721,7 @@ func TestGetBlock(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
-			service, _ := defaultService(t)
+			service, _ := defaultService(t, true /*addSubnet*/)
 			service.vm.ctx.Lock.Lock()
 			defer service.vm.ctx.Lock.Unlock()
 

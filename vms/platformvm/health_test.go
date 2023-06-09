@@ -20,7 +20,7 @@ const defaultMinConnectedStake = 0.8
 func TestHealthCheckPrimaryNetwork(t *testing.T) {
 	require := require.New(t)
 
-	vm, _, _ := defaultVM(latestFork)
+	vm, _, _ := defaultVM(latestFork, false /*addSubnet*/)
 	vm.ctx.Lock.Lock()
 
 	defer func() {
@@ -58,7 +58,7 @@ func TestHealthCheckSubnet(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			require := require.New(t)
 
-			vm, _, _ := defaultVM(latestFork)
+			vm, _, _ := defaultVM(latestFork, false /*addSubnet*/)
 			vm.ctx.Lock.Lock()
 			defer func() {
 				require.NoError(vm.Shutdown(context.Background()))

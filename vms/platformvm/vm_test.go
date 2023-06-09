@@ -108,17 +108,15 @@ var (
 	// time that genesis validators stop validating
 	defaultValidateEndTime = defaultValidateStartTime.Add(10 * defaultMinStakingDuration)
 
-	latestForkTime = defaultValidateEndTime.Add(-5 * defaultMinStakingDuration)
+	latestForkTime = defaultGenesisTime
 
 	// each key controls an address that has [defaultBalance] AVAX at genesis
 	keys = secp256k1.TestKeys()
 
-	defaultMinValidatorStake = 5 * units.MilliAvax
-	defaultMaxValidatorStake = 500 * units.MilliAvax
 	defaultMinDelegatorStake = 1 * units.MilliAvax
-
-	// amount all genesis validators have in defaultVM
-	defaultBalance = 100 * defaultMinValidatorStake
+	defaultMinValidatorStake = 5 * defaultMinDelegatorStake
+	defaultMaxValidatorStake = 100 * defaultMinValidatorStake
+	defaultBalance           = 2 * defaultMaxValidatorStake // amount all genesis validators have in defaultVM
 
 	// subnet that exists at genesis in defaultVM
 	// Its controlKeys are keys[0], keys[1], keys[2]
@@ -317,7 +315,7 @@ func BuildGenesisTestWithArgs(t *testing.T, args *api.BuildGenesisArgs) (*api.Bu
 	return &buildGenesisArgs, genesisBytes
 }
 
-func defaultVM(fork activeFork) (*VM, database.Database, *mutableSharedMemory) {
+func defaultVM(fork activeFork, addSubnet bool) (*VM, database.Database, *mutableSharedMemory) {
 	vdrs := validators.NewManager()
 	primaryVdrs := validators.NewSet()
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
@@ -329,21 +327,22 @@ func defaultVM(fork activeFork) (*VM, database.Database, *mutableSharedMemory) {
 		cortinaTime       = mockable.MaxTime
 	)
 
+	latestForkTime = defaultGenesisTime
 	switch fork {
 	case apricotPhase3:
-		apricotPhase3Time = defaultValidateEndTime
+		apricotPhase3Time = latestForkTime
 	case apricotPhase5:
-		apricotPhase5Time = defaultValidateEndTime
-		apricotPhase3Time = defaultValidateEndTime
+		apricotPhase5Time = latestForkTime
+		apricotPhase3Time = latestForkTime
 	case banffFork:
 		banffTime = latestForkTime
-		apricotPhase5Time = defaultValidateEndTime
-		apricotPhase3Time = defaultValidateEndTime
+		apricotPhase5Time = latestForkTime
+		apricotPhase3Time = latestForkTime
 	case cortinaFork:
 		cortinaTime = latestForkTime
 		banffTime = latestForkTime
-		apricotPhase5Time = defaultValidateEndTime
-		apricotPhase3Time = defaultValidateEndTime
+		apricotPhase5Time = latestForkTime
+		apricotPhase3Time = latestForkTime
 	default:
 		panic(fmt.Errorf("unhandled fork %d", fork))
 	}
@@ -373,7 +372,7 @@ func defaultVM(fork activeFork) (*VM, database.Database, *mutableSharedMemory) {
 	chainDBManager := baseDBManager.NewPrefixDBManager([]byte{0})
 	atomicDB := prefixdb.New([]byte{1}, baseDBManager.Current().Database)
 
-	vm.clock.Set(latestForkTime.Add(time.Second))
+	vm.clock.Set(latestForkTime)
 	msgChan := make(chan common.Message, 1)
 	ctx := defaultContext()
 
@@ -412,28 +411,31 @@ func defaultVM(fork activeFork) (*VM, database.Database, *mutableSharedMemory) {
 		panic(err)
 	}
 
-	// Create a subnet and store it in testSubnet1
-	// Note: following Banff activation, block acceptance will move
-	// chain time ahead
-	testSubnet1, err = vm.txBuilder.NewCreateSubnetTx(
-		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
-		// control keys are keys[0], keys[1], keys[2]
-		[]ids.ShortID{keys[0].PublicKey().Address(), keys[1].PublicKey().Address(), keys[2].PublicKey().Address()},
-		[]*secp256k1.PrivateKey{keys[0]}, // pays tx fee
-		keys[0].PublicKey().Address(),    // change addr
-	)
-	if err != nil {
-		panic(err)
-	} else if err := vm.Builder.AddUnverifiedTx(testSubnet1); err != nil {
-		panic(err)
-	} else if blk, err := vm.Builder.BuildBlock(context.Background()); err != nil {
-		panic(err)
-	} else if err := blk.Verify(context.Background()); err != nil {
-		panic(err)
-	} else if err := blk.Accept(context.Background()); err != nil {
-		panic(err)
-	} else if err := vm.SetPreference(context.Background(), vm.manager.LastAccepted()); err != nil {
-		panic(err)
+	if addSubnet {
+		// Create a subnet and store it in testSubnet1
+		// Note: following Banff activation, block acceptance will move
+		// chain time ahead
+		testSubnet1, err = vm.txBuilder.NewCreateSubnetTx(
+			2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
+			// control keys are keys[0], keys[1], keys[2]
+			[]ids.ShortID{keys[0].PublicKey().Address(), keys[1].PublicKey().Address(), keys[2].PublicKey().Address()},
+			[]*secp256k1.PrivateKey{keys[0]}, // pays tx fee
+			keys[0].PublicKey().Address(),    // change addr
+		)
+		if err != nil {
+			panic(err)
+		} else if err := vm.Builder.AddUnverifiedTx(testSubnet1); err != nil {
+			panic(err)
+		} else if blk, err := vm.Builder.BuildBlock(context.Background()); err != nil {
+			panic(err)
+		} else if err := blk.Verify(context.Background()); err != nil {
+			panic(err)
+		} else if err := blk.Accept(context.Background()); err != nil {
+			panic(err)
+		} else if err := vm.SetPreference(context.Background(), vm.manager.LastAccepted()); err != nil {
+			panic(err)
+		}
+		defaultBalance -= vm.Config.GetCreateBlockchainTxFee(vm.clock.Time())
 	}
 
 	return vm, baseDBManager.Current().Database, msm
@@ -528,7 +530,7 @@ func GenesisVMWithArgs(t *testing.T, args *api.BuildGenesisArgs) ([]byte, chan c
 // Ensure genesis state is parsed from bytes and stored correctly
 func TestGenesis(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(latestFork)
+	vm, _, _ := defaultVM(latestFork, false /*addSubnet*/)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -560,7 +562,7 @@ func TestGenesis(t *testing.T) {
 
 		out := utxos[0].Out.(*secp256k1fx.TransferOutput)
 		if out.Amount() != uint64(utxo.Amount) {
-			id := keys[0].PublicKey().Address()
+			id := keys[1].PublicKey().Address()
 			addr, err := address.FormatBech32(constants.UnitTestHRP, id.Bytes())
 			require.NoError(err)
 
@@ -580,16 +582,12 @@ func TestGenesis(t *testing.T) {
 		nodeID := ids.NodeID(key.PublicKey().Address())
 		require.True(vdrSet.Contains(nodeID))
 	}
-
-	// Ensure the new subnet we created exists
-	_, _, err = vm.state.GetTx(testSubnet1.ID())
-	require.NoError(err)
 }
 
 // accept proposal to add validator to primary network
 func TestAddValidatorCommit(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(latestFork)
+	vm, _, _ := defaultVM(latestFork, false /*addSubnet*/)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -637,7 +635,7 @@ func TestAddValidatorCommit(t *testing.T) {
 // verify invalid attempt to add validator to primary network
 func TestInvalidAddValidatorCommit(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(latestFork)
+	vm, _, _ := defaultVM(latestFork, false /*addSubnet*/)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -691,7 +689,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 // Reject attempt to add validator to primary network
 func TestAddValidatorReject(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(latestFork)
+	vm, _, _ := defaultVM(latestFork, false /*addSubnet*/)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -737,7 +735,7 @@ func TestAddValidatorReject(t *testing.T) {
 // Reject proposal to add validator to primary network
 func TestAddValidatorInvalidNotReissued(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(latestFork)
+	vm, _, _ := defaultVM(latestFork, false /*addSubnet*/)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -771,7 +769,7 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 // Accept proposal to add validator to subnet
 func TestAddSubnetValidatorAccept(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(latestFork)
+	vm, _, _ := defaultVM(latestFork, true /*addSubnet*/)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -819,7 +817,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 // Reject proposal to add validator to subnet
 func TestAddSubnetValidatorReject(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(latestFork)
+	vm, _, _ := defaultVM(latestFork, true /*addSubnet*/)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -866,7 +864,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 // Test case where primary network validator rewarded
 func TestRewardValidatorAccept(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(latestFork)
+	vm, _, _ := defaultVM(latestFork, false /*addSubnet*/)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -961,7 +959,7 @@ func TestRewardValidatorAccept(t *testing.T) {
 // Test case where primary network validator not rewarded
 func TestRewardValidatorReject(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(latestFork)
+	vm, _, _ := defaultVM(latestFork, false /*addSubnet*/)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -1052,7 +1050,7 @@ func TestRewardValidatorReject(t *testing.T) {
 // Test case where primary network validator is preferred to be rewarded
 func TestRewardValidatorPreferred(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(latestFork)
+	vm, _, _ := defaultVM(latestFork, false /*addSubnet*/)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -1144,7 +1142,7 @@ func TestRewardValidatorPreferred(t *testing.T) {
 // Ensure BuildBlock errors when there is no block to build
 func TestUnneededBuildBlock(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(latestFork)
+	vm, _, _ := defaultVM(latestFork, false /*addSubnet*/)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -1157,7 +1155,7 @@ func TestUnneededBuildBlock(t *testing.T) {
 // test acceptance of proposal to create a new chain
 func TestCreateChain(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(latestFork)
+	vm, _, _ := defaultVM(latestFork, true /*addSubnet*/)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -1208,7 +1206,7 @@ func TestCreateChain(t *testing.T) {
 // 4) Advance timestamp to validator's end time (removing validator from current)
 func TestCreateSubnet(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(latestFork)
+	vm, _, _ := defaultVM(latestFork, false /*addSubnet*/)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -1319,7 +1317,7 @@ func TestCreateSubnet(t *testing.T) {
 // test asset import
 func TestAtomicImport(t *testing.T) {
 	require := require.New(t)
-	vm, baseDB, mutableSharedMemory := defaultVM(latestFork)
+	vm, baseDB, mutableSharedMemory := defaultVM(latestFork, false /*addSubnet*/)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -1406,7 +1404,7 @@ func TestAtomicImport(t *testing.T) {
 // test optimistic asset import
 func TestOptimisticAtomicImport(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(latestFork)
+	vm, _, _ := defaultVM(apricotPhase3, false /*addSubnet*/)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -2042,7 +2040,7 @@ func TestUnverifiedParent(t *testing.T) {
 }
 
 func TestMaxStakeAmount(t *testing.T) {
-	vm, _, _ := defaultVM(latestFork)
+	vm, _, _ := defaultVM(latestFork, false /*addSubnet*/)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(t, vm.Shutdown(context.Background()))
@@ -2093,6 +2091,7 @@ func TestMaxStakeAmount(t *testing.T) {
 
 func TestUptimeDisallowedWithRestart(t *testing.T) {
 	require := require.New(t)
+	latestForkTime = defaultValidateEndTime.Add(-5 * defaultMinStakingDuration)
 	_, genesisBytes := defaultGenesis()
 	db := manager.NewMemDB(version.Semantic1_0_0)
 
@@ -2269,6 +2268,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 
 func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	require := require.New(t)
+	latestForkTime = defaultValidateEndTime.Add(-5 * defaultMinStakingDuration)
 	_, genesisBytes := defaultGenesis()
 	db := manager.NewMemDB(version.Semantic1_0_0)
 
@@ -2379,7 +2379,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	validatorStartTime := latestForkTime.Add(txexecutor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 
-	vm, _, _ := defaultVM(latestFork)
+	vm, _, _ := defaultVM(latestFork, false /*addSubnet*/)
 
 	vm.ctx.Lock.Lock()
 	defer func() {
