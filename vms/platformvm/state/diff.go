@@ -562,10 +562,10 @@ func (d *diff) Apply(baseState State) error {
 			switch validatorDiff.validator.status {
 			case added:
 				baseState.PutPendingValidator(validatorDiff.validator.staker)
-			case deleted:
-				baseState.DeletePendingValidator(validatorDiff.validator.staker)
 			case updated:
 				return ErrUpdatingPendingStaker
+			case deleted:
+				baseState.DeletePendingValidator(validatorDiff.validator.staker)
 			case unmodified:
 				// nothing to do
 			default:

@@ -604,7 +604,7 @@ func (s *diffStakers) UpdateDelegator(staker *Staker) error {
 
 		s.allStakers[staker.TxID] = stakerAndStatus{
 			staker: staker,
-			status: updated,
+			status: added,
 		}
 		s.addedStakersOnly.Delete(prevStaker.staker)
 		s.addedStakersOnly.ReplaceOrInsert(staker)
