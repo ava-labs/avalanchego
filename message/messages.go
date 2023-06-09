@@ -34,12 +34,13 @@ var (
 
 // InboundMessage represents a set of fields for an inbound message
 type InboundMessage interface {
+	fmt.Stringer
 	// NodeID returns the ID of the node that sent this message
 	NodeID() ids.NodeID
 	// Op returns the op that describes this message type
 	Op() Op
 	// Message returns the message that was sent
-	Message() any
+	Message() fmt.Stringer
 	// Expiration returns the time that the sender will have already timed out
 	// this request
 	Expiration() time.Time
@@ -54,7 +55,7 @@ type InboundMessage interface {
 type inboundMessage struct {
 	nodeID                ids.NodeID
 	op                    Op
-	message               any
+	message               fmt.Stringer
 	expiration            time.Time
 	onFinishedHandling    func()
 	bytesSavedCompression int
@@ -68,7 +69,7 @@ func (m *inboundMessage) Op() Op {
 	return m.op
 }
 
-func (m *inboundMessage) Message() any {
+func (m *inboundMessage) Message() fmt.Stringer {
 	return m.message
 }
 
@@ -84,6 +85,11 @@ func (m *inboundMessage) OnFinishedHandling() {
 
 func (m *inboundMessage) BytesSavedCompression() int {
 	return m.bytesSavedCompression
+}
+
+func (m *inboundMessage) String() string {
+	return fmt.Sprintf("%s Op: %s Message: %s",
+		m.nodeID, m.op, m.message)
 }
 
 // OutboundMessage represents a set of fields for an outbound message that can
