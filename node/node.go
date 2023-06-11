@@ -586,7 +586,7 @@ func (n *Node) initAPIServer() error {
 			n.LogFactory,
 			n.Config.HTTPHost,
 			n.Config.HTTPPort,
-			n.Config.APIAllowedOrigins,
+			n.Config.HTTPAllowedOrigins,
 			n.Config.ShutdownTimeout,
 			n.ID,
 			n.Config.TraceConfig.Enabled,
@@ -594,6 +594,7 @@ func (n *Node) initAPIServer() error {
 			"api",
 			n.MetricsRegisterer,
 			n.Config.HTTPConfig.HTTPConfig,
+			n.Config.HTTPAllowedHosts,
 		)
 		return err
 	}
@@ -608,7 +609,7 @@ func (n *Node) initAPIServer() error {
 		n.LogFactory,
 		n.Config.HTTPHost,
 		n.Config.HTTPPort,
-		n.Config.APIAllowedOrigins,
+		n.Config.HTTPAllowedOrigins,
 		n.Config.ShutdownTimeout,
 		n.ID,
 		n.Config.TraceConfig.Enabled,
@@ -616,6 +617,7 @@ func (n *Node) initAPIServer() error {
 		"api",
 		n.MetricsRegisterer,
 		n.Config.HTTPConfig.HTTPConfig,
+		n.Config.HTTPAllowedHosts,
 		a,
 	)
 	if err != nil {
@@ -784,34 +786,33 @@ func (n *Node) initVMs() error {
 	errs.Add(
 		vmRegisterer.Register(context.TODO(), constants.PlatformVMID, &platformvm.Factory{
 			Config: platformconfig.Config{
-				Chains:                          n.chainManager,
-				Validators:                      vdrs,
-				UptimeLockedCalculator:          n.uptimeCalculator,
-				SybilProtectionEnabled:          n.Config.SybilProtectionEnabled,
-				TrackedSubnets:                  n.Config.TrackedSubnets,
-				TxFee:                           n.Config.TxFee,
-				CreateAssetTxFee:                n.Config.CreateAssetTxFee,
-				CreateSubnetTxFee:               n.Config.CreateSubnetTxFee,
-				TransformSubnetTxFee:            n.Config.TransformSubnetTxFee,
-				CreateBlockchainTxFee:           n.Config.CreateBlockchainTxFee,
-				AddPrimaryNetworkValidatorFee:   n.Config.AddPrimaryNetworkValidatorFee,
-				AddPrimaryNetworkDelegatorFee:   n.Config.AddPrimaryNetworkDelegatorFee,
-				AddSubnetValidatorFee:           n.Config.AddSubnetValidatorFee,
-				AddSubnetDelegatorFee:           n.Config.AddSubnetDelegatorFee,
-				UptimePercentage:                n.Config.UptimeRequirement,
-				MinValidatorStake:               n.Config.MinValidatorStake,
-				MaxValidatorStake:               n.Config.MaxValidatorStake,
-				MinDelegatorStake:               n.Config.MinDelegatorStake,
-				MinDelegationFee:                n.Config.MinDelegationFee,
-				MinStakeDuration:                n.Config.MinStakeDuration,
-				MaxStakeDuration:                n.Config.MaxStakeDuration,
-				RewardConfig:                    n.Config.RewardConfig,
-				ApricotPhase3Time:               version.GetApricotPhase3Time(n.Config.NetworkID),
-				ApricotPhase5Time:               version.GetApricotPhase5Time(n.Config.NetworkID),
-				BanffTime:                       version.GetBanffTime(n.Config.NetworkID),
-				CortinaTime:                     version.GetCortinaTime(n.Config.NetworkID),
-				MinPercentConnectedStakeHealthy: n.Config.MinPercentConnectedStakeHealthy,
-				UseCurrentHeight:                n.Config.UseCurrentHeight,
+				Chains:                        n.chainManager,
+				Validators:                    vdrs,
+				UptimeLockedCalculator:        n.uptimeCalculator,
+				SybilProtectionEnabled:        n.Config.SybilProtectionEnabled,
+				TrackedSubnets:                n.Config.TrackedSubnets,
+				TxFee:                         n.Config.TxFee,
+				CreateAssetTxFee:              n.Config.CreateAssetTxFee,
+				CreateSubnetTxFee:             n.Config.CreateSubnetTxFee,
+				TransformSubnetTxFee:          n.Config.TransformSubnetTxFee,
+				CreateBlockchainTxFee:         n.Config.CreateBlockchainTxFee,
+				AddPrimaryNetworkValidatorFee: n.Config.AddPrimaryNetworkValidatorFee,
+				AddPrimaryNetworkDelegatorFee: n.Config.AddPrimaryNetworkDelegatorFee,
+				AddSubnetValidatorFee:         n.Config.AddSubnetValidatorFee,
+				AddSubnetDelegatorFee:         n.Config.AddSubnetDelegatorFee,
+				UptimePercentage:              n.Config.UptimeRequirement,
+				MinValidatorStake:             n.Config.MinValidatorStake,
+				MaxValidatorStake:             n.Config.MaxValidatorStake,
+				MinDelegatorStake:             n.Config.MinDelegatorStake,
+				MinDelegationFee:              n.Config.MinDelegationFee,
+				MinStakeDuration:              n.Config.MinStakeDuration,
+				MaxStakeDuration:              n.Config.MaxStakeDuration,
+				RewardConfig:                  n.Config.RewardConfig,
+				ApricotPhase3Time:             version.GetApricotPhase3Time(n.Config.NetworkID),
+				ApricotPhase5Time:             version.GetApricotPhase5Time(n.Config.NetworkID),
+				BanffTime:                     version.GetBanffTime(n.Config.NetworkID),
+				CortinaTime:                   version.GetCortinaTime(n.Config.NetworkID),
+				UseCurrentHeight:              n.Config.UseCurrentHeight,
 			},
 		}),
 		vmRegisterer.Register(context.TODO(), constants.AVMID, &avm.Factory{
@@ -1029,18 +1030,18 @@ func (n *Node) initHealthAPI() error {
 	}
 
 	n.Log.Info("initializing Health API")
-	err = healthChecker.RegisterHealthCheck("network", n.Net, health.GlobalTag)
+	err = healthChecker.RegisterHealthCheck("network", n.Net, health.ApplicationTag)
 	if err != nil {
 		return fmt.Errorf("couldn't register network health check: %w", err)
 	}
 
-	err = healthChecker.RegisterHealthCheck("router", n.Config.ConsensusRouter, health.GlobalTag)
+	err = healthChecker.RegisterHealthCheck("router", n.Config.ConsensusRouter, health.ApplicationTag)
 	if err != nil {
 		return fmt.Errorf("couldn't register router health check: %w", err)
 	}
 
 	// TODO: add database health to liveness check
-	err = healthChecker.RegisterHealthCheck("database", n.DB, health.GlobalTag)
+	err = healthChecker.RegisterHealthCheck("database", n.DB, health.ApplicationTag)
 	if err != nil {
 		return fmt.Errorf("couldn't register database health check: %w", err)
 	}
@@ -1067,7 +1068,7 @@ func (n *Node) initHealthAPI() error {
 		}, err
 	})
 
-	err = n.health.RegisterHealthCheck("diskspace", diskSpaceCheck, health.GlobalTag)
+	err = n.health.RegisterHealthCheck("diskspace", diskSpaceCheck, health.ApplicationTag)
 	if err != nil {
 		return fmt.Errorf("couldn't register resource health check: %w", err)
 	}
@@ -1400,7 +1401,7 @@ func (n *Node) shutdown() {
 			}, errShuttingDown
 		})
 
-		err := n.health.RegisterHealthCheck("shuttingDown", shuttingDownCheck, health.GlobalTag)
+		err := n.health.RegisterHealthCheck("shuttingDown", shuttingDownCheck, health.ApplicationTag)
 		if err != nil {
 			n.Log.Debug("couldn't register shuttingDown health check",
 				zap.Error(err),

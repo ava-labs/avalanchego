@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 
-	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
+	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
 const verificationCacheSize = 2_000
@@ -42,6 +42,10 @@ var (
 	ErrNilValueOrHash              = errors.New("proof node's valueOrHash field is nil")
 	ErrNilSerializedPath           = errors.New("serialized path is nil")
 	ErrNilRangeProof               = errors.New("range proof is nil")
+	ErrNilChangeProof              = errors.New("change proof is nil")
+	ErrNilMaybeBytes               = errors.New("maybe bytes is nil")
+	ErrNilProof                    = errors.New("proof is nil")
+	ErrNilValue                    = errors.New("value is nil")
 )
 
 type ProofNode struct {
@@ -54,9 +58,9 @@ type ProofNode struct {
 }
 
 // Assumes [node.Key.KeyPath.NibbleLength] <= math.MaxUint64.
-func (node *ProofNode) ToProto() *syncpb.ProofNode {
-	pbNode := &syncpb.ProofNode{
-		Key: &syncpb.SerializedPath{
+func (node *ProofNode) ToProto() *pb.ProofNode {
+	pbNode := &pb.ProofNode{
+		Key: &pb.SerializedPath{
 			NibbleLength: uint64(node.KeyPath.NibbleLength),
 			Value:        node.KeyPath.Value,
 		},
@@ -69,11 +73,11 @@ func (node *ProofNode) ToProto() *syncpb.ProofNode {
 	}
 
 	if node.ValueOrHash.hasValue {
-		pbNode.ValueOrHash = &syncpb.MaybeBytes{
+		pbNode.ValueOrHash = &pb.MaybeBytes{
 			Value: node.ValueOrHash.value,
 		}
 	} else {
-		pbNode.ValueOrHash = &syncpb.MaybeBytes{
+		pbNode.ValueOrHash = &pb.MaybeBytes{
 			IsNothing: true,
 		}
 	}
@@ -81,7 +85,7 @@ func (node *ProofNode) ToProto() *syncpb.ProofNode {
 	return pbNode
 }
 
-func (node *ProofNode) UnmarshalProto(pbNode *syncpb.ProofNode) error {
+func (node *ProofNode) UnmarshalProto(pbNode *pb.ProofNode) error {
 	switch {
 	case pbNode == nil:
 		return ErrNilProofNode
@@ -185,6 +189,53 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID) error {
 	if expectedRootID != gotRootID {
 		return fmt.Errorf("%w:[%s], expected:[%s]", ErrInvalidProof, gotRootID, expectedRootID)
 	}
+	return nil
+}
+
+func (proof *Proof) ToProto() *pb.Proof {
+	value := &pb.MaybeBytes{}
+	if !proof.Value.IsNothing() {
+		value.Value = proof.Value.Value()
+	} else {
+		value.IsNothing = true
+	}
+
+	pbProof := &pb.Proof{
+		Key:   proof.Key,
+		Value: value,
+	}
+
+	pbProof.Proof = make([]*pb.ProofNode, len(proof.Path))
+	for i, node := range proof.Path {
+		pbProof.Proof[i] = node.ToProto()
+	}
+
+	return pbProof
+}
+
+func (proof *Proof) UnmarshalProto(pbProof *pb.Proof) error {
+	switch {
+	case pbProof == nil:
+		return ErrNilProof
+	case pbProof.Value == nil:
+		return ErrNilValue
+	case pbProof.Value.IsNothing && len(pbProof.Value.Value) != 0:
+		return ErrInvalidMaybe
+	}
+
+	proof.Key = pbProof.Key
+
+	if !pbProof.Value.IsNothing {
+		proof.Value = Some(pbProof.Value.Value)
+	}
+
+	proof.Path = make([]ProofNode, len(pbProof.Proof))
+	for i, pbNode := range pbProof.Proof {
+		if err := proof.Path[i].UnmarshalProto(pbNode); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -319,33 +370,33 @@ func (proof *RangeProof) Verify(
 	return nil
 }
 
-func (proof *RangeProof) ToProto() *syncpb.RangeProof {
-	startProof := make([]*syncpb.ProofNode, len(proof.StartProof))
+func (proof *RangeProof) ToProto() *pb.RangeProof {
+	startProof := make([]*pb.ProofNode, len(proof.StartProof))
 	for i, node := range proof.StartProof {
 		startProof[i] = node.ToProto()
 	}
 
-	endProof := make([]*syncpb.ProofNode, len(proof.EndProof))
+	endProof := make([]*pb.ProofNode, len(proof.EndProof))
 	for i, node := range proof.EndProof {
 		endProof[i] = node.ToProto()
 	}
 
-	keyValues := make([]*syncpb.KeyValue, len(proof.KeyValues))
+	keyValues := make([]*pb.KeyValue, len(proof.KeyValues))
 	for i, kv := range proof.KeyValues {
-		keyValues[i] = &syncpb.KeyValue{
+		keyValues[i] = &pb.KeyValue{
 			Key:   kv.Key,
 			Value: kv.Value,
 		}
 	}
 
-	return &syncpb.RangeProof{
+	return &pb.RangeProof{
 		Start:     startProof,
 		End:       endProof,
 		KeyValues: keyValues,
 	}
 }
 
-func (proof *RangeProof) UnmarshalProto(pbProof *syncpb.RangeProof) error {
+func (proof *RangeProof) UnmarshalProto(pbProof *pb.RangeProof) error {
 	if pbProof == nil {
 		return ErrNilRangeProof
 	}
@@ -429,6 +480,89 @@ type ChangeProof struct {
 	// end root (inclusive).
 	// Sorted by increasing key.
 	KeyChanges []KeyChange
+}
+
+func (proof *ChangeProof) ToProto() *pb.ChangeProof {
+	startProof := make([]*pb.ProofNode, len(proof.StartProof))
+	for i, node := range proof.StartProof {
+		startProof[i] = node.ToProto()
+	}
+
+	endProof := make([]*pb.ProofNode, len(proof.EndProof))
+	for i, node := range proof.EndProof {
+		endProof[i] = node.ToProto()
+	}
+
+	keyChanges := make([]*pb.KeyChange, len(proof.KeyChanges))
+	for i, kv := range proof.KeyChanges {
+		var value pb.MaybeBytes
+		if kv.Value.hasValue {
+			value = pb.MaybeBytes{
+				Value:     kv.Value.value,
+				IsNothing: false,
+			}
+		} else {
+			value = pb.MaybeBytes{
+				Value:     nil,
+				IsNothing: true,
+			}
+		}
+		keyChanges[i] = &pb.KeyChange{
+			Key:   kv.Key,
+			Value: &value,
+		}
+	}
+
+	return &pb.ChangeProof{
+		HadRootsInHistory: proof.HadRootsInHistory,
+		StartProof:        startProof,
+		EndProof:          endProof,
+		KeyChanges:        keyChanges,
+	}
+}
+
+func (proof *ChangeProof) UnmarshalProto(pbProof *pb.ChangeProof) error {
+	if pbProof == nil {
+		return ErrNilChangeProof
+	}
+
+	proof.HadRootsInHistory = pbProof.HadRootsInHistory
+
+	proof.StartProof = make([]ProofNode, len(pbProof.StartProof))
+	for i, protoNode := range pbProof.StartProof {
+		if err := proof.StartProof[i].UnmarshalProto(protoNode); err != nil {
+			return err
+		}
+	}
+
+	proof.EndProof = make([]ProofNode, len(pbProof.EndProof))
+	for i, protoNode := range pbProof.EndProof {
+		if err := proof.EndProof[i].UnmarshalProto(protoNode); err != nil {
+			return err
+		}
+	}
+
+	proof.KeyChanges = make([]KeyChange, len(pbProof.KeyChanges))
+	for i, kv := range pbProof.KeyChanges {
+		if kv.Value == nil {
+			return ErrNilMaybeBytes
+		}
+
+		if kv.Value.IsNothing && len(kv.Value.Value) != 0 {
+			return ErrInvalidMaybe
+		}
+
+		value := Nothing[[]byte]()
+		if !kv.Value.IsNothing {
+			value = Some(kv.Value.Value)
+		}
+		proof.KeyChanges[i] = KeyChange{
+			Key:   kv.Key,
+			Value: value,
+		}
+	}
+
+	return nil
 }
 
 // Verifies that all values present in the [proof]:

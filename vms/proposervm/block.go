@@ -284,7 +284,6 @@ func (p *postForkCommonComponents) buildChild(
 			p.vm.tlsSigner,
 		)
 	}
-
 	if err != nil {
 		return nil, err
 	}

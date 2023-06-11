@@ -35,6 +35,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/version"
+
+	commontracker "github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 )
 
 const testThreadPoolSize = 2
@@ -126,6 +128,7 @@ func TestTimeout(t *testing.T) {
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
+		commontracker.NewPeers(),
 	)
 	require.NoError(err)
 
@@ -396,6 +399,7 @@ func TestReliableMessages(t *testing.T) {
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
+		commontracker.NewPeers(),
 	)
 	require.NoError(t, err)
 
@@ -543,6 +547,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
+		commontracker.NewPeers(),
 	)
 	require.NoError(t, err)
 
@@ -999,7 +1004,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 				msgCreator.EXPECT().AcceptedFrontier(
 					chainID,
 					requestID,
-					summaryIDs,
+					summaryIDs[0],
 				).Return(nil, nil) // Don't care about the message
 			},
 			assertMsgToMyself: func(require *require.Assertions, msg message.InboundMessage) {
@@ -1007,9 +1012,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 				innerMsg := msg.Message().(*p2p.AcceptedFrontier)
 				require.Equal(chainID[:], innerMsg.ChainId)
 				require.Equal(requestID, innerMsg.RequestId)
-				for i, summaryID := range summaryIDs {
-					require.Equal(summaryID[:], innerMsg.ContainerIds[i])
-				}
+				require.Equal(summaryIDs[0][:], innerMsg.ContainerId)
 			},
 			setExternalSenderExpect: func(externalSender *MockExternalSender) {
 				externalSender.EXPECT().Send(
@@ -1020,7 +1023,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 				).Return(nil)
 			},
 			sendF: func(_ *require.Assertions, sender common.Sender, nodeID ids.NodeID) {
-				sender.SendAcceptedFrontier(context.Background(), nodeID, requestID, summaryIDs)
+				sender.SendAcceptedFrontier(context.Background(), nodeID, requestID, summaryIDs[0])
 			},
 		},
 		{

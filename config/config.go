@@ -108,14 +108,12 @@ func getConsensusConfig(v *viper.Viper) snowball.Parameters {
 		//
 		// TODO: After the X-chain linearization use the
 		// SnowVirtuousCommitThresholdKey as before.
-		BetaVirtuous:            v.GetInt(SnowRogueCommitThresholdKey),
-		BetaRogue:               v.GetInt(SnowRogueCommitThresholdKey),
-		ConcurrentRepolls:       v.GetInt(SnowConcurrentRepollsKey),
-		OptimalProcessing:       v.GetInt(SnowOptimalProcessingKey),
-		MaxOutstandingItems:     v.GetInt(SnowMaxProcessingKey),
-		MaxItemProcessingTime:   v.GetDuration(SnowMaxTimeProcessingKey),
-		MixedQueryNumPushVdr:    int(v.GetUint(SnowMixedQueryNumPushVdrKey)),
-		MixedQueryNumPushNonVdr: int(v.GetUint(SnowMixedQueryNumPushNonVdrKey)),
+		BetaVirtuous:          v.GetInt(SnowRogueCommitThresholdKey),
+		BetaRogue:             v.GetInt(SnowRogueCommitThresholdKey),
+		ConcurrentRepolls:     v.GetInt(SnowConcurrentRepollsKey),
+		OptimalProcessing:     v.GetInt(SnowOptimalProcessingKey),
+		MaxOutstandingItems:   v.GetInt(SnowMaxProcessingKey),
+		MaxItemProcessingTime: v.GetDuration(SnowMaxTimeProcessingKey),
 	}
 }
 
@@ -238,14 +236,15 @@ func getHTTPConfig(v *viper.Viper) (node.HTTPConfig, error) {
 			MetricsAPIEnabled:  v.GetBool(MetricsAPIEnabledKey),
 			HealthAPIEnabled:   v.GetBool(HealthAPIEnabledKey),
 		},
-		HTTPHost:          v.GetString(HTTPHostKey),
-		HTTPPort:          uint16(v.GetUint(HTTPPortKey)),
-		HTTPSEnabled:      v.GetBool(HTTPSEnabledKey),
-		HTTPSKey:          httpsKey,
-		HTTPSCert:         httpsCert,
-		APIAllowedOrigins: v.GetStringSlice(HTTPAllowedOrigins),
-		ShutdownTimeout:   v.GetDuration(HTTPShutdownTimeoutKey),
-		ShutdownWait:      v.GetDuration(HTTPShutdownWaitKey),
+		HTTPHost:           v.GetString(HTTPHostKey),
+		HTTPPort:           uint16(v.GetUint(HTTPPortKey)),
+		HTTPSEnabled:       v.GetBool(HTTPSEnabledKey),
+		HTTPSKey:           httpsKey,
+		HTTPSCert:          httpsCert,
+		HTTPAllowedOrigins: v.GetStringSlice(HTTPAllowedOrigins),
+		HTTPAllowedHosts:   v.GetStringSlice(HTTPAllowedHostsKey),
+		ShutdownTimeout:    v.GetDuration(HTTPShutdownTimeoutKey),
+		ShutdownWait:       v.GetDuration(HTTPShutdownWaitKey),
 	}
 
 	config.APIAuthConfig, err = getAPIAuthConfig(v)
@@ -1454,15 +1453,6 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 		return node.Config{}, err
 	}
 
-	// Node health
-	nodeConfig.MinPercentConnectedStakeHealthy = map[ids.ID]float64{
-		constants.PrimaryNetworkID: calcMinConnectedStake(primaryNetworkConfig.ConsensusParameters),
-	}
-
-	for subnetID, config := range subnetConfigs {
-		nodeConfig.MinPercentConnectedStakeHealthy[subnetID] = calcMinConnectedStake(config.ConsensusParameters)
-	}
-
 	// Chain Configs
 	nodeConfig.ChainConfigs, err = getChainConfigs(v)
 	if err != nil {
@@ -1515,15 +1505,6 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 
 	nodeConfig.ProvidedFlags = providedFlags(v)
 	return nodeConfig, nil
-}
-
-// calcMinConnectedStake takes [consensusParams] as input and calculates the
-// expected min connected stake percentage according to alpha and k.
-func calcMinConnectedStake(consensusParams snowball.Parameters) float64 {
-	alpha := consensusParams.Alpha
-	k := consensusParams.K
-	r := float64(alpha) / float64(k)
-	return r*(1-constants.MinConnectedStakeBuffer) + constants.MinConnectedStakeBuffer
 }
 
 func providedFlags(v *viper.Viper) map[string]interface{} {

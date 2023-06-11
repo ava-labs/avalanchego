@@ -55,11 +55,8 @@ func TestInvalidByzantineProposerParent(t *testing.T) {
 
 	coreVM.BuildBlockF = nil
 
-	err = aBlock.Verify(context.Background())
-	require.NoError(err)
-
-	err = aBlock.Accept(context.Background())
-	require.NoError(err)
+	require.NoError(aBlock.Verify(context.Background()))
+	require.NoError(aBlock.Accept(context.Background()))
 
 	yBlockBytes := []byte{2}
 	yBlock := &snowman.TestBlock{
@@ -178,14 +175,9 @@ func TestInvalidByzantineProposerOracleParent(t *testing.T) {
 	opts, err := aBlock.Options(context.Background())
 	require.NoError(err)
 
-	err = aBlock.Verify(context.Background())
-	require.NoError(err)
-
-	err = opts[0].Verify(context.Background())
-	require.NoError(err)
-
-	err = opts[1].Verify(context.Background())
-	require.NoError(err)
+	require.NoError(aBlock.Verify(context.Background()))
+	require.NoError(opts[0].Verify(context.Background()))
+	require.NoError(opts[1].Verify(context.Background()))
 
 	yBlock, err := proVM.ParseBlock(context.Background(), xBlock.opts[0].Bytes())
 	if err != nil {
@@ -196,8 +188,7 @@ func TestInvalidByzantineProposerOracleParent(t *testing.T) {
 	err = yBlock.Verify(context.Background())
 	require.ErrorIs(err, errUnexpectedBlockType)
 
-	err = aBlock.Accept(context.Background())
-	require.NoError(err)
+	require.NoError(aBlock.Accept(context.Background()))
 
 	err = yBlock.Verify(context.Background())
 	require.ErrorIs(err, errUnexpectedBlockType)
@@ -287,15 +278,13 @@ func TestInvalidByzantineProposerPreForkParent(t *testing.T) {
 		return
 	}
 
-	err = aBlock.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(aBlock.Verify(context.Background()))
 
 	// If there wasn't an error parsing - verify must return an error
 	err = bBlock.Verify(context.Background())
 	require.ErrorIs(err, errUnexpectedBlockType)
 
-	err = aBlock.Accept(context.Background())
-	require.NoError(err)
+	require.NoError(aBlock.Accept(context.Background()))
 
 	// If there wasn't an error parsing - verify must return an error
 	err = bBlock.Verify(context.Background())
@@ -389,8 +378,7 @@ func TestBlockVerify_PostForkOption_FaultyParent(t *testing.T) {
 	opts, err := aBlock.Options(context.Background())
 	require.NoError(err)
 
-	err = aBlock.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(aBlock.Verify(context.Background()))
 
 	err = opts[0].Verify(context.Background())
 	require.ErrorIs(err, errInnerParentMismatch)
@@ -482,9 +470,7 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 			status:   choices.Processing,
 		},
 	}
-
-	err = bBlock.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(bBlock.Verify(context.Background()))
 
 	// generate O1
 	statelessOuterOption, err := block.BuildOption(
@@ -513,8 +499,7 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 	require.NoError(err)
 
 	coreVM.BuildBlockF = nil
-	err = aBlock.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(aBlock.Verify(context.Background()))
 
 	statelessOuterOption, err = block.BuildOption(
 		aBlock.ID(),
@@ -530,9 +515,7 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 			status:   xInnerOption.Status(),
 		},
 	}
-
-	err = outerOption.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(outerOption.Verify(context.Background()))
 
 	// create an Oracle pre-fork block Z
 	// create post-fork block B from Y
@@ -576,8 +559,7 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 	require.NoError(err)
 
 	coreVM.BuildBlockF = nil
-	err = cBlock.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(cBlock.Verify(context.Background()))
 
 	// generate O3
 	statelessOuterOption, err = block.BuildOption(
@@ -671,11 +653,8 @@ func TestGetBlock_MutatedSignature(t *testing.T) {
 	builtBlk0, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
 
-	err = builtBlk0.Verify(context.Background())
-	require.NoError(err)
-
-	err = proVM.SetPreference(context.Background(), builtBlk0.ID())
-	require.NoError(err)
+	require.NoError(builtBlk0.Verify(context.Background()))
+	require.NoError(proVM.SetPreference(context.Background(), builtBlk0.ID()))
 
 	// The second propsal block will need to be signed because the timestamp
 	// hasn't moved forward

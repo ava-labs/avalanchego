@@ -206,7 +206,7 @@ message AcceptedFrontier {
 
   bytes chain_id = 1;
   uint32 request_id = 2;
-  repeated bytes container_ids = 3;
+  bytes container_id = 3;
 }
 
 // Message to request for the accepted blocks/vertices of the "remote" peer.
@@ -318,23 +318,22 @@ message PullQuery {
   EngineType engine_type = 5;
 }
 
-// Message that contains the votes/preferences of the local node,
-// in response to "push_query" or "pull_query" (e.g., preferred frontier).
+// Message that contains the votes/preferences of the node. It is sent in
+// response to a "push_query" or "pull_query" request.
 //
-// On receiving "chits", the engine issues those preferred containers of vertices/blocks
-// to the consensus. If the received container is not found, it responds back with
-// "get" message to fetch the missing container from the remote peer.
+// Upon receiving "chits", the engine will attempt to issue the preferred block
+// into consensus. If the referenced block is not locally available, the engine
+// will respond with a "get" message to fetch the missing block from the remote
+// peer.
 message Chits {
   reserved 5; // Until Cortina upgrade is activated
 
   bytes chain_id = 1;
   uint32 request_id = 2;
-  // Represents the current preferred frontier.
-  // TODO: Remove `repeated` once all chains are running Snowman.
-  repeated bytes preferred_container_ids = 3;
-  // Represents the current accepted frontier.
-  // TODO: Remove `repeated` once all chains are running Snowman.
-  repeated bytes accepted_container_ids = 4;
+  // Represents the current preferred block.
+  bytes preferred_id = 3;
+  // Represents the last accepted block.
+  bytes accepted_id = 4;
 }
 
 message AppRequest {

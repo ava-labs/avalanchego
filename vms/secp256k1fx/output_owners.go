@@ -22,11 +22,11 @@ var (
 	ErrOutputUnoptimized    = errors.New("output representation should be optimized")
 	ErrAddrsNotSortedUnique = errors.New("addresses not sorted and unique")
 	ErrMarshal              = errors.New("cannot marshal without ctx")
-
-	_ verify.State = (*OutputOwners)(nil)
 )
 
 type OutputOwners struct {
+	verify.IsNotState `json:"-"`
+
 	Locktime  uint64        `serialize:"true" json:"locktime"`
 	Threshold uint32        `serialize:"true" json:"threshold"`
 	Addrs     []ids.ShortID `serialize:"true" json:"addresses"`
@@ -133,10 +133,6 @@ func (out *OutputOwners) Verify() error {
 	default:
 		return nil
 	}
-}
-
-func (out *OutputOwners) VerifyState() error {
-	return out.Verify()
 }
 
 func (out *OutputOwners) Sort() {
