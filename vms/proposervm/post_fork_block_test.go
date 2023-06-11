@@ -133,11 +133,8 @@ func TestBlockVerify_PostForkBlock_ParentChecks(t *testing.T) {
 	prntProBlk, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
 
-	err = prntProBlk.Verify(context.Background())
-	require.NoError(err)
-
-	err = proVM.SetPreference(context.Background(), prntProBlk.ID())
-	require.NoError(err)
+	require.NoError(prntProBlk.Verify(context.Background()))
+	require.NoError(proVM.SetPreference(context.Background(), prntProBlk.ID()))
 
 	// .. create child block ...
 	childCoreBlk := &snowman.TestBlock{
@@ -180,8 +177,7 @@ func TestBlockVerify_PostForkBlock_ParentChecks(t *testing.T) {
 
 	proVM.Set(proVM.Time().Add(proposer.MaxDelay))
 	childProBlk.SignedBlock = childSlb
-	err = childProBlk.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(childProBlk.Verify(context.Background()))
 }
 
 func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
@@ -229,11 +225,8 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 	prntProBlk, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
 
-	err = prntProBlk.Verify(context.Background())
-	require.NoError(err)
-
-	err = proVM.SetPreference(context.Background(), prntProBlk.ID())
-	require.NoError(err)
+	require.NoError(prntProBlk.Verify(context.Background()))
+	require.NoError(proVM.SetPreference(context.Background(), prntProBlk.ID()))
 
 	prntTimestamp := prntProBlk.Timestamp()
 
@@ -309,8 +302,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 	require.NoError(err)
 
 	childProBlk.SignedBlock = childSlb
-	err = childProBlk.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(childProBlk.Verify(context.Background()))
 
 	// block can arrive after its creator window starts
 	afterWindowStart := prntTimestamp.Add(blkWinDelay).Add(5 * time.Second)
@@ -327,8 +319,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 	require.NoError(err)
 
 	childProBlk.SignedBlock = childSlb
-	err = childProBlk.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(childProBlk.Verify(context.Background()))
 
 	// block can arrive within submission window
 	atSubWindowEnd := proVM.Time().Add(proposer.MaxDelay)
@@ -342,8 +333,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 	require.NoError(err)
 
 	childProBlk.SignedBlock = childSlb
-	err = childProBlk.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(childProBlk.Verify(context.Background()))
 
 	// block timestamp cannot be too much in the future
 	afterSubWinEnd := proVM.Time().Add(maxSkew).Add(time.Second)
@@ -408,11 +398,8 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 	prntProBlk, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
 
-	err = prntProBlk.Verify(context.Background())
-	require.NoError(err)
-
-	err = proVM.SetPreference(context.Background(), prntProBlk.ID())
-	require.NoError(err)
+	require.NoError(prntProBlk.Verify(context.Background()))
+	require.NoError(proVM.SetPreference(context.Background(), prntProBlk.ID()))
 
 	prntBlkPChainHeight := pChainHeight
 
@@ -460,8 +447,7 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 	childProBlk.SignedBlock = childSlb
 
 	proVM.Set(childCoreBlk.Timestamp())
-	err = childProBlk.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(childProBlk.Verify(context.Background()))
 
 	// child P-Chain height may follow parent P-Chain height
 	pChainHeight = prntBlkPChainHeight * 2 // move ahead pChainHeight
@@ -474,8 +460,7 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 	require.NoError(err)
 
 	childProBlk.SignedBlock = childSlb
-	err = childProBlk.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(childProBlk.Verify(context.Background()))
 
 	// block P-Chain height can be equal to current P-Chain height
 	currPChainHeight, _ := proVM.ctx.ValidatorState.GetCurrentHeight(context.Background())
@@ -488,8 +473,7 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 	require.NoError(err)
 
 	childProBlk.SignedBlock = childSlb
-	err = childProBlk.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(childProBlk.Verify(context.Background()))
 
 	// block P-Chain height cannot be at higher than current P-Chain height
 	childSlb, err = block.BuildUnsigned(
@@ -582,11 +566,8 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 	oracleBlk, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
 
-	err = oracleBlk.Verify(context.Background())
-	require.NoError(err)
-
-	err = proVM.SetPreference(context.Background(), oracleBlk.ID())
-	require.NoError(err)
+	require.NoError(oracleBlk.Verify(context.Background()))
+	require.NoError(proVM.SetPreference(context.Background(), oracleBlk.ID()))
 
 	// retrieve one option and verify block built on it
 	require.IsType(&postForkBlock{}, oracleBlk)
@@ -595,11 +576,8 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 	require.NoError(err)
 	parentBlk := opts[0]
 
-	err = parentBlk.Verify(context.Background())
-	require.NoError(err)
-
-	err = proVM.SetPreference(context.Background(), parentBlk.ID())
-	require.NoError(err)
+	require.NoError(parentBlk.Verify(context.Background()))
+	require.NoError(proVM.SetPreference(context.Background(), parentBlk.ID()))
 
 	prntBlkPChainHeight := pChainHeight
 
@@ -648,8 +626,7 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 
 	childProBlk.SignedBlock = childSlb
 	proVM.Set(childCoreBlk.Timestamp())
-	err = childProBlk.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(childProBlk.Verify(context.Background()))
 
 	// child P-Chain height may follow parent P-Chain height
 	pChainHeight = prntBlkPChainHeight * 2 // move ahead pChainHeight
@@ -662,8 +639,7 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 	require.NoError(err)
 
 	childProBlk.SignedBlock = childSlb
-	err = childProBlk.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(childProBlk.Verify(context.Background()))
 
 	// block P-Chain height can be equal to current P-Chain height
 	currPChainHeight, _ := proVM.ctx.ValidatorState.GetCurrentHeight(context.Background())
@@ -676,8 +652,7 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 	require.NoError(err)
 
 	childProBlk.SignedBlock = childSlb
-	err = childProBlk.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(childProBlk.Verify(context.Background()))
 
 	// block P-Chain height cannot be at higher than current P-Chain height
 	childSlb, err = block.BuildUnsigned(
@@ -739,13 +714,11 @@ func TestBlockVerify_PostForkBlock_CoreBlockVerifyIsCalledOnce(t *testing.T) {
 	builtBlk, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
 
-	err = builtBlk.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(builtBlk.Verify(context.Background()))
 
 	// set error on coreBlock.Verify and recall Verify()
 	coreBlk.VerifyV = errDuplicateVerify
-	err = builtBlk.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(builtBlk.Verify(context.Background()))
 
 	// rebuild a block with the same core block
 	pChainHeight++
@@ -801,11 +774,8 @@ func TestBlockVerify_CertSignedBlock_InvalidIfBlsKeyIsRegistered(t *testing.T) {
 	prntProBlk, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
 
-	err = prntProBlk.Verify(context.Background())
-	require.NoError(err)
-
-	err = proVM.SetPreference(context.Background(), prntProBlk.ID())
-	require.NoError(err)
+	require.NoError(prntProBlk.Verify(context.Background()))
+	require.NoError(proVM.SetPreference(context.Background(), prntProBlk.ID()))
 
 	childCoreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -843,9 +813,7 @@ func TestBlockVerify_CertSignedBlock_InvalidIfBlsKeyIsRegistered(t *testing.T) {
 			status:   choices.Processing,
 		},
 	}
-
-	err = childProBlk.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(childProBlk.Verify(context.Background()))
 
 	// A Cert signed block does not, since BLS key is registered
 	certBlk, err := block.BuildCertSigned(
@@ -919,8 +887,7 @@ func TestBlockAccept_PostForkBlock_SetsLastAcceptedBlock(t *testing.T) {
 	require.NoError(err)
 
 	// test
-	err = builtBlk.Accept(context.Background())
-	require.NoError(err)
+	require.NoError(builtBlk.Accept(context.Background()))
 
 	coreVM.LastAcceptedF = func(context.Context) (ids.ID, error) {
 		if coreBlk.Status() == choices.Accepted {
@@ -967,8 +934,7 @@ func TestBlockAccept_PostForkBlock_TwoProBlocksWithSameCoreBlock_OneIsAccepted(t
 	require.NotEqual(proBlk1.ID(), proBlk2.ID())
 
 	// set proBlk1 as preferred
-	err = proBlk1.Accept(context.Background())
-	require.NoError(err)
+	require.NoError(proBlk1.Accept(context.Background()))
 	require.Equal(choices.Accepted, coreBlk.Status())
 
 	acceptedID, err := proVM.LastAccepted(context.Background())
@@ -1000,9 +966,7 @@ func TestBlockReject_PostForkBlock_InnerBlockIsNotRejected(t *testing.T) {
 	require.IsType(&postForkBlock{}, sb)
 	proBlk := sb.(*postForkBlock)
 
-	err = proBlk.Reject(context.Background())
-	require.NoError(err)
-
+	require.NoError(proBlk.Reject(context.Background()))
 	require.Equal(choices.Rejected, proBlk.Status())
 	require.NotEqual(choices.Rejected, proBlk.innerBlk.Status())
 }
@@ -1082,11 +1046,8 @@ func TestBlockVerify_PostForkBlock_ShouldBePostForkOption(t *testing.T) {
 	parentBlk, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
 
-	err = parentBlk.Verify(context.Background())
-	require.NoError(err)
-
-	err = proVM.SetPreference(context.Background(), parentBlk.ID())
-	require.NoError(err)
+	require.NoError(parentBlk.Verify(context.Background()))
+	require.NoError(proVM.SetPreference(context.Background(), parentBlk.ID()))
 
 	// retrieve options ...
 	require.IsType(&postForkBlock{}, parentBlk)
@@ -1098,11 +1059,8 @@ func TestBlockVerify_PostForkBlock_ShouldBePostForkOption(t *testing.T) {
 	require.IsType(&postForkOption{}, opts[0])
 
 	// ... and verify them the first time
-	err = opts[0].Verify(context.Background())
-	require.NoError(err)
-
-	err = opts[1].Verify(context.Background())
-	require.NoError(err)
+	require.NoError(opts[0].Verify(context.Background()))
+	require.NoError(opts[1].Verify(context.Background()))
 
 	// Build the child
 	statelessChild, err := block.BuildBlsSigned(

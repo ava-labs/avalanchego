@@ -111,12 +111,10 @@ func TestOracle_PreForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 	opts, err := preForkOracleBlk.Options(context.Background())
 	require.NoError(err)
 
-	err = opts[0].Verify(context.Background())
-	require.NoError(err)
+	require.NoError(opts[0].Verify(context.Background()))
 
 	// ... show a block can be built on top of an option
-	err = proVM.SetPreference(context.Background(), opts[0].ID())
-	require.NoError(err)
+	require.NoError(proVM.SetPreference(context.Background(), opts[0].ID()))
 
 	lastCoreBlk := &TestOptionsBlock{
 		TestBlock: snowman.TestBlock{
@@ -205,13 +203,10 @@ func TestOracle_PostForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 	preForkOracleBlk := parentBlk.(*preForkBlock)
 	opts, err := preForkOracleBlk.Options(context.Background())
 	require.NoError(err)
-
-	err = opts[0].Verify(context.Background())
-	require.NoError(err)
+	require.NoError(opts[0].Verify(context.Background()))
 
 	// ... show a block can be built on top of an option
-	err = proVM.SetPreference(context.Background(), opts[0].ID())
-	require.NoError(err)
+	require.NoError(proVM.SetPreference(context.Background(), opts[0].ID()))
 
 	lastCoreBlk := &TestOptionsBlock{
 		TestBlock: snowman.TestBlock{
@@ -297,8 +292,7 @@ func TestBlockVerify_PreFork_ParentChecks(t *testing.T) {
 
 	// child block referring known parent does verify
 	childCoreBlk.ParentV = prntProBlk.ID()
-	err = childProBlk.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(childProBlk.Verify(context.Background()))
 }
 
 func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
@@ -328,9 +322,7 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 	preForkChild, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
 	require.IsType(&preForkBlock{}, preForkChild)
-
-	err = preForkChild.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(preForkChild.Verify(context.Background()))
 
 	// postFork block does NOT verify if parent is before fork activation time
 	postForkStatelessChild, err := block.BuildBlsSigned(
@@ -365,8 +357,7 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 	coreVM.SetPreferenceF = func(_ context.Context, id ids.ID) error {
 		return nil
 	}
-	err = proVM.SetPreference(context.Background(), preForkChild.ID())
-	require.NoError(err)
+	require.NoError(proVM.SetPreference(context.Background(), preForkChild.ID()))
 
 	secondCoreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -396,11 +387,8 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 	require.NoError(err)
 	require.IsType(&preForkBlock{}, lastPreForkBlk)
 
-	err = lastPreForkBlk.Verify(context.Background())
-	require.NoError(err)
-
-	err = proVM.SetPreference(context.Background(), lastPreForkBlk.ID())
-	require.NoError(err)
+	require.NoError(lastPreForkBlk.Verify(context.Background()))
+	require.NoError(proVM.SetPreference(context.Background(), lastPreForkBlk.ID()))
 
 	thirdCoreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -431,9 +419,7 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 	firstPostForkBlk, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
 	require.IsType(&postForkBlock{}, firstPostForkBlk)
-
-	err = firstPostForkBlk.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(firstPostForkBlk.Verify(context.Background()))
 }
 
 func TestBlockVerify_BlocksBuiltOnPostForkGenesis(t *testing.T) {
@@ -461,9 +447,7 @@ func TestBlockVerify_BlocksBuiltOnPostForkGenesis(t *testing.T) {
 	postForkChild, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
 	require.IsType(&postForkBlock{}, postForkChild)
-
-	err = postForkChild.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(postForkChild.Verify(context.Background()))
 
 	// preFork block does NOT verify if parent is after fork activation time
 	preForkChild := preForkBlock{
@@ -515,8 +499,7 @@ func TestBlockAccept_PreFork_SetsLastAcceptedBlock(t *testing.T) {
 	require.NoError(err)
 
 	// test
-	err = builtBlk.Accept(context.Background())
-	require.NoError(err)
+	require.NoError(builtBlk.Accept(context.Background()))
 
 	coreVM.LastAcceptedF = func(context.Context) (ids.ID, error) {
 		if coreBlk.Status() == choices.Accepted {
@@ -551,9 +534,7 @@ func TestBlockReject_PreForkBlock_InnerBlockIsRejected(t *testing.T) {
 
 	require.IsType(&preForkBlock{}, sb)
 	proBlk := sb.(*preForkBlock)
-
-	err = proBlk.Reject(context.Background())
-	require.NoError(err)
+	require.NoError(proBlk.Reject(context.Background()))
 
 	require.Equal(choices.Rejected, proBlk.Status())
 	require.Equal(choices.Rejected, proBlk.Block.Status())
@@ -633,20 +614,15 @@ func TestBlockVerify_ForkBlockIsOracleBlock(t *testing.T) {
 	firstBlock, err := proVM.ParseBlock(context.Background(), coreBlk.Bytes())
 	require.NoError(err)
 
-	err = firstBlock.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(firstBlock.Verify(context.Background()))
 
 	oracleBlock, ok := firstBlock.(snowman.OracleBlock)
 	require.True(ok)
 
 	options, err := oracleBlock.Options(context.Background())
 	require.NoError(err)
-
-	err = options[0].Verify(context.Background())
-	require.NoError(err)
-
-	err = options[1].Verify(context.Background())
-	require.NoError(err)
+	require.NoError(options[0].Verify(context.Background()))
+	require.NoError(options[1].Verify(context.Background()))
 }
 
 func TestBlockVerify_ForkBlockIsOracleBlockButChildrenAreSigned(t *testing.T) {
@@ -723,8 +699,7 @@ func TestBlockVerify_ForkBlockIsOracleBlockButChildrenAreSigned(t *testing.T) {
 	firstBlock, err := proVM.ParseBlock(context.Background(), coreBlk.Bytes())
 	require.NoError(err)
 
-	err = firstBlock.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(firstBlock.Verify(context.Background()))
 
 	slb, err := block.BuildBlsSigned(
 		firstBlock.ID(), // refer unknown parent
