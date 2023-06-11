@@ -12,81 +12,99 @@ import (
 )
 
 // Tests heap.Interface methods Push, Pop, Swap, Len, Less.
-func Test_SyncWorkHeap_Heap_Methods(t *testing.T) {
+func Test_SyncWorkHeap_InnerHeap(t *testing.T) {
 	require := require.New(t)
 
-	h := newSyncWorkHeap()
-	require.Zero(h.Len())
-
-	item1 := &heapItem{
+	lowPriorityItem := &heapItem{
 		workItem: &syncWorkItem{
-			start:       nil,
-			end:         nil,
+			start:       []byte{1},
+			end:         []byte{2},
+			priority:    lowPriority,
+			LocalRootID: ids.GenerateTestID(),
+		},
+	}
+
+	mediumPriorityItem := &heapItem{
+		workItem: &syncWorkItem{
+			start:       []byte{3},
+			end:         []byte{4},
+			priority:    medPriority,
+			LocalRootID: ids.GenerateTestID(),
+		},
+	}
+
+	highPriorityItem := &heapItem{
+		workItem: &syncWorkItem{
+			start:       []byte{5},
+			end:         []byte{6},
 			priority:    highPriority,
 			LocalRootID: ids.GenerateTestID(),
 		},
 	}
-	h.Push(item1)
+
+	h := innerHeap{}
+	require.Zero(h.Len())
+
+	// Note we're calling Push and Pop on the heap directly,
+	// not using heap.Push and heap.Pop.
+	h.Push(lowPriorityItem)
+	// Heap has [lowPriorityItem]
 	require.Equal(1, h.Len())
-	require.Len(h.priorityHeap, 1)
-	require.Equal(item1, h.priorityHeap[0])
-	require.Zero(h.priorityHeap[0].heapIndex)
-	require.Equal(1, h.sortedItems.Len())
-	gotItem, ok := h.sortedItems.Get(item1)
-	require.True(ok)
-	require.Equal(item1, gotItem)
+	require.Equal(lowPriorityItem, h[0])
 
-	h.Pop()
+	got := h.Pop()
+	// Heap has []
+	require.Equal(lowPriorityItem, got)
 	require.Zero(h.Len())
-	require.Empty(h.priorityHeap)
-	require.Zero(h.sortedItems.Len())
 
-	item2 := &heapItem{
-		workItem: &syncWorkItem{
-			start:       []byte{0},
-			end:         []byte{1},
-			priority:    highPriority,
-			LocalRootID: ids.GenerateTestID(),
-		},
-	}
-	h.Push(item1)
-	h.Push(item2)
+	h.Push(lowPriorityItem)
+	h.Push(mediumPriorityItem)
+	// Heap has [lowPriorityItem, mediumPriorityItem]
 	require.Equal(2, h.Len())
-	require.Len(h.priorityHeap, 2)
-	require.Equal(item1, h.priorityHeap[0])
-	require.Equal(item2, h.priorityHeap[1])
-	require.Zero(item1.heapIndex)
-	require.Equal(1, item2.heapIndex)
-	require.Equal(2, h.sortedItems.Len())
-	gotItem, ok = h.sortedItems.Get(item1)
-	require.True(ok)
-	require.Equal(item1, gotItem)
-	gotItem, ok = h.sortedItems.Get(item2)
-	require.True(ok)
-	require.Equal(item2, gotItem)
+	require.Equal(lowPriorityItem, h[0])
+	require.Equal(mediumPriorityItem, h[1])
 
-	require.False(h.Less(0, 1))
+	got = h.Pop()
+	// Heap has [lowPriorityItem]
+	require.Equal(mediumPriorityItem, got)
+	require.Equal(1, h.Len())
+
+	got = h.Pop()
+	// Heap has []
+	require.Equal(lowPriorityItem, got)
+	require.Zero(h.Len())
+
+	h.Push(mediumPriorityItem)
+	h.Push(lowPriorityItem)
+	h.Push(highPriorityItem)
+	// Heap has [mediumPriorityItem, lowPriorityItem, highPriorityItem]
+	require.Equal(mediumPriorityItem, h[0])
+	require.Equal(lowPriorityItem, h[1])
+	require.Equal(highPriorityItem, h[2])
 
 	h.Swap(0, 1)
-	require.Equal(item2, h.priorityHeap[0])
-	require.Equal(item1, h.priorityHeap[1])
-	require.Equal(1, item1.heapIndex)
-	require.Zero(item2.heapIndex)
+	// Heap has [lowPriorityItem, mediumPriorityItem, highPriorityItem]
+	require.Equal(lowPriorityItem, h[0])
+	require.Equal(mediumPriorityItem, h[1])
+	require.Equal(highPriorityItem, h[2])
 
+	h.Swap(1, 2)
+	// Heap has [lowPriorityItem, highPriorityItem, mediumPriorityItem]
+	require.Equal(lowPriorityItem, h[0])
+	require.Equal(highPriorityItem, h[1])
+	require.Equal(mediumPriorityItem, h[2])
+
+	h.Swap(0, 2)
+	// Heap has [mediumPriorityItem, highPriorityItem, lowPriorityItem]
+	require.Equal(mediumPriorityItem, h[0])
+	require.Equal(highPriorityItem, h[1])
+	require.Equal(lowPriorityItem, h[2])
 	require.False(h.Less(0, 1))
-
-	item1.workItem.priority = lowPriority
-	require.True(h.Less(0, 1))
-
-	gotItem = h.Pop().(*heapItem)
-	require.Equal(item1, gotItem)
-
-	gotItem = h.Pop().(*heapItem)
-	require.Equal(item2, gotItem)
-
-	require.Zero(h.Len())
-	require.Empty(h.priorityHeap)
-	require.Zero(h.sortedItems.Len())
+	require.True(h.Less(1, 0))
+	require.True(h.Less(1, 2))
+	require.False(h.Less(2, 1))
+	require.True(h.Less(0, 2))
+	require.False(h.Less(2, 0))
 }
 
 // Tests Insert and GetWork
@@ -94,27 +112,27 @@ func Test_SyncWorkHeap_Insert_GetWork(t *testing.T) {
 	require := require.New(t)
 	h := newSyncWorkHeap()
 
-	item1 := &syncWorkItem{
-		start:       []byte{0},
-		end:         []byte{1},
+	lowPriorityItem := &syncWorkItem{
+		start:       []byte{4},
+		end:         []byte{5},
 		priority:    lowPriority,
 		LocalRootID: ids.GenerateTestID(),
 	}
-	item2 := &syncWorkItem{
-		start:       []byte{2},
-		end:         []byte{3},
+	mediumPriorityItem := &syncWorkItem{
+		start:       []byte{0},
+		end:         []byte{1},
 		priority:    medPriority,
 		LocalRootID: ids.GenerateTestID(),
 	}
-	item3 := &syncWorkItem{
-		start:       []byte{4},
-		end:         []byte{5},
+	highPriorityItem := &syncWorkItem{
+		start:       []byte{2},
+		end:         []byte{3},
 		priority:    highPriority,
 		LocalRootID: ids.GenerateTestID(),
 	}
-	h.Insert(item3)
-	h.Insert(item2)
-	h.Insert(item1)
+	h.Insert(highPriorityItem)
+	h.Insert(mediumPriorityItem)
+	h.Insert(lowPriorityItem)
 	require.Equal(3, h.Len())
 
 	// Ensure [sortedItems] is in right order.
@@ -125,15 +143,18 @@ func Test_SyncWorkHeap_Insert_GetWork(t *testing.T) {
 			return true
 		},
 	)
-	require.Equal([]*syncWorkItem{item1, item2, item3}, got)
+	require.Equal(
+		[]*syncWorkItem{mediumPriorityItem, highPriorityItem, lowPriorityItem},
+		got,
+	)
 
 	// Ensure priorities are in right order.
 	gotItem := h.GetWork()
-	require.Equal(item3, gotItem)
+	require.Equal(highPriorityItem, gotItem)
 	gotItem = h.GetWork()
-	require.Equal(item2, gotItem)
+	require.Equal(mediumPriorityItem, gotItem)
 	gotItem = h.GetWork()
-	require.Equal(item1, gotItem)
+	require.Equal(lowPriorityItem, gotItem)
 	gotItem = h.GetWork()
 	require.Nil(gotItem)
 
@@ -145,46 +166,63 @@ func Test_SyncWorkHeap_remove(t *testing.T) {
 
 	h := newSyncWorkHeap()
 
-	item1 := &syncWorkItem{
+	lowPriorityItem := &syncWorkItem{
 		start:       []byte{0},
 		end:         []byte{1},
 		priority:    lowPriority,
 		LocalRootID: ids.GenerateTestID(),
 	}
 
-	h.Insert(item1)
-
-	heapItem1 := h.priorityHeap[0]
-	h.remove(heapItem1)
-
-	require.Zero(h.Len())
-	require.Empty(h.priorityHeap)
-	require.Zero(h.sortedItems.Len())
-
-	item2 := &syncWorkItem{
+	mediumPriorityItem := &syncWorkItem{
 		start:       []byte{2},
 		end:         []byte{3},
 		priority:    medPriority,
 		LocalRootID: ids.GenerateTestID(),
 	}
 
-	h.Insert(item1)
-	h.Insert(item2)
+	highPriorityItem := &syncWorkItem{
+		start:       []byte{4},
+		end:         []byte{5},
+		priority:    highPriority,
+		LocalRootID: ids.GenerateTestID(),
+	}
 
-	heapItem2 := h.priorityHeap[0]
-	require.Equal(item2, heapItem2.workItem)
-	h.remove(heapItem2)
-	require.Equal(1, h.Len())
-	require.Len(h.priorityHeap, 1)
-	require.Equal(1, h.sortedItems.Len())
-	require.Zero(h.priorityHeap[0].heapIndex)
-	require.Equal(item1, h.priorityHeap[0].workItem)
+	h.Insert(lowPriorityItem)
 
-	heapItem1 = h.priorityHeap[0]
-	require.Equal(item1, heapItem1.workItem)
-	h.remove(heapItem1)
+	wrappedLowPriorityItem := h.innerHeap[0]
+	h.remove(wrappedLowPriorityItem)
+
 	require.Zero(h.Len())
-	require.Empty(h.priorityHeap)
+	require.Empty(h.innerHeap)
+	require.Zero(h.sortedItems.Len())
+
+	h.Insert(lowPriorityItem)
+	h.Insert(mediumPriorityItem)
+	h.Insert(highPriorityItem)
+
+	wrappedhighPriorityItem := h.innerHeap[0]
+	require.Equal(highPriorityItem, wrappedhighPriorityItem.workItem)
+	h.remove(wrappedhighPriorityItem)
+	require.Equal(2, h.Len())
+	require.Len(h.innerHeap, 2)
+	require.Equal(2, h.sortedItems.Len())
+	require.Zero(h.innerHeap[0].heapIndex)
+	require.Equal(mediumPriorityItem, h.innerHeap[0].workItem)
+
+	wrappedMediumPriorityItem := h.innerHeap[0]
+	require.Equal(mediumPriorityItem, wrappedMediumPriorityItem.workItem)
+	h.remove(wrappedMediumPriorityItem)
+	require.Equal(1, h.Len())
+	require.Len(h.innerHeap, 1)
+	require.Equal(1, h.sortedItems.Len())
+	require.Zero(h.innerHeap[0].heapIndex)
+	require.Equal(lowPriorityItem, h.innerHeap[0].workItem)
+
+	wrappedLowPriorityItem = h.innerHeap[0]
+	require.Equal(lowPriorityItem, wrappedLowPriorityItem.workItem)
+	h.remove(wrappedLowPriorityItem)
+	require.Zero(h.Len())
+	require.Empty(h.innerHeap)
 	require.Zero(h.sortedItems.Len())
 }
 
