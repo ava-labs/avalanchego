@@ -7,6 +7,7 @@ import (
 	"context"
 	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -1204,7 +1205,9 @@ func TestVerifyProofPath(t *testing.T) {
 }
 
 func TestProofNodeUnmarshalProtoInvalidMaybe(t *testing.T) {
-	rand := rand.New(rand.NewSource(1337)) // #nosec G404
+	now := time.Now().UnixNano()
+	t.Logf("seed: %d", now)
+	rand := rand.New(rand.NewSource(now)) // #nosec G404
 
 	node := newRandomProofNode(rand)
 	protoNode := node.ToProto()
@@ -1221,7 +1224,9 @@ func TestProofNodeUnmarshalProtoInvalidMaybe(t *testing.T) {
 }
 
 func TestProofNodeUnmarshalProtoInvalidChildBytes(t *testing.T) {
-	rand := rand.New(rand.NewSource(1337)) // #nosec G404
+	now := time.Now().UnixNano()
+	t.Logf("seed: %d", now)
+	rand := rand.New(rand.NewSource(now)) // #nosec G404
 
 	node := newRandomProofNode(rand)
 	protoNode := node.ToProto()
@@ -1236,7 +1241,9 @@ func TestProofNodeUnmarshalProtoInvalidChildBytes(t *testing.T) {
 }
 
 func TestProofNodeUnmarshalProtoInvalidChildIndex(t *testing.T) {
-	rand := rand.New(rand.NewSource(1337)) // #nosec G404
+	now := time.Now().UnixNano()
+	t.Logf("seed: %d", now)
+	rand := rand.New(rand.NewSource(now)) // #nosec G404
 
 	node := newRandomProofNode(rand)
 	protoNode := node.ToProto()
@@ -1250,7 +1257,9 @@ func TestProofNodeUnmarshalProtoInvalidChildIndex(t *testing.T) {
 }
 
 func TestProofNodeUnmarshalProtoMissingFields(t *testing.T) {
-	rand := rand.New(rand.NewSource(1337)) // #nosec G404
+	now := time.Now().UnixNano()
+	t.Logf("seed: %d", now)
+	rand := rand.New(rand.NewSource(now)) // #nosec G404
 
 	type test struct {
 		name        string
@@ -1299,7 +1308,9 @@ func TestProofNodeUnmarshalProtoMissingFields(t *testing.T) {
 
 func TestProofNodeProtoMarshalUnmarshal(t *testing.T) {
 	require := require.New(t)
-	rand := rand.New(rand.NewSource(1337)) // #nosec G404
+	now := time.Now().UnixNano()
+	t.Logf("seed: %d", now)
+	rand := rand.New(rand.NewSource(now)) // #nosec G404
 
 	for i := 0; i < 1_000; i++ {
 		node := newRandomProofNode(rand)
@@ -1319,7 +1330,9 @@ func TestProofNodeProtoMarshalUnmarshal(t *testing.T) {
 
 func TestRangeProofProtoMarshalUnmarshal(t *testing.T) {
 	require := require.New(t)
-	rand := rand.New(rand.NewSource(1337)) // #nosec G404
+	now := time.Now().UnixNano()
+	t.Logf("seed: %d", now)
+	rand := rand.New(rand.NewSource(now)) // #nosec G404
 
 	for i := 0; i < 500; i++ {
 		// Make a random range proof.
@@ -1373,7 +1386,9 @@ func TestRangeProofProtoMarshalUnmarshal(t *testing.T) {
 
 func TestChangeProofProtoMarshalUnmarshal(t *testing.T) {
 	require := require.New(t)
-	rand := rand.New(rand.NewSource(1337)) // #nosec G404
+	now := time.Now().UnixNano()
+	t.Logf("seed: %d", now)
+	rand := rand.New(rand.NewSource(now)) // #nosec G404
 
 	for i := 0; i < 500; i++ {
 		// Make a random change proof.
@@ -1437,7 +1452,9 @@ func TestChangeProofUnmarshalProtoNil(t *testing.T) {
 }
 
 func TestChangeProofUnmarshalProtoNilValue(t *testing.T) {
-	rand := rand.New(rand.NewSource(1337)) // #nosec G404
+	now := time.Now().UnixNano()
+	t.Logf("seed: %d", now)
+	rand := rand.New(rand.NewSource(now)) // #nosec G404
 
 	// Make a random change proof.
 	startProofLen := rand.Intn(32)
@@ -1508,7 +1525,9 @@ func TestChangeProofUnmarshalProtoInvalidMaybe(t *testing.T) {
 
 func TestProofProtoMarshalUnmarshal(t *testing.T) {
 	require := require.New(t)
-	rand := rand.New(rand.NewSource(1337)) // #nosec G404
+	now := time.Now().UnixNano()
+	t.Logf("seed: %d", now)
+	rand := rand.New(rand.NewSource(now)) // #nosec G404
 
 	for i := 0; i < 500; i++ {
 		// Make a random proof.
