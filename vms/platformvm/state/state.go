@@ -979,8 +979,7 @@ func (s *state) GetValidatorPublicKeyDiffs(startHeight uint64, endHeight uint64)
 
 		pkBytes := diffIter.Value()
 		if len(pkBytes) == 0 {
-			// TODO: expose removal
-			// pkDiffs[nodeID] = nil
+			pkDiffs[nodeID] = nil
 			continue
 		}
 

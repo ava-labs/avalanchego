@@ -229,27 +229,24 @@ func (m *manager) makePrimaryNetworkValidatorSet(
 	}
 
 	// Rebuild primary network validators at [height]
-	for diffHeight := currentHeight; diffHeight > targetHeight; diffHeight-- {
-		weightDiffs, err := m.state.GetValidatorWeightDiffs(diffHeight, diffHeight, constants.PlatformChainID)
-		if err != nil {
+	weightDiffs, err := m.state.GetValidatorWeightDiffs(currentHeight, targetHeight+1, constants.PlatformChainID)
+	if err != nil {
+		return nil, err
+	}
+	for nodeID, weightDiff := range weightDiffs {
+		if err := applyWeightDiff(validatorSet, nodeID, weightDiff); err != nil {
 			return nil, err
 		}
-		for nodeID, weightDiff := range weightDiffs {
-			if err := applyWeightDiff(validatorSet, nodeID, weightDiff); err != nil {
-				return nil, err
-			}
-		}
+	}
 
-		pkDiffs, err := m.state.GetValidatorPublicKeyDiffs(diffHeight, diffHeight)
-		if err != nil {
-			return nil, err
-		}
-		for nodeID, pk := range pkDiffs {
-			if vdr, ok := validatorSet[nodeID]; ok {
-				// The validator's public key was removed at this block, so it
-				// was in the validator set before.
-				vdr.PublicKey = pk
-			}
+	pkDiffs, err := m.state.GetValidatorPublicKeyDiffs(currentHeight, targetHeight+1)
+	if err != nil {
+		return nil, err
+	}
+	for nodeID, pk := range pkDiffs {
+		if vdr, ok := validatorSet[nodeID]; ok {
+			// The validator's public key was changed at this block.
+			vdr.PublicKey = pk
 		}
 	}
 	return validatorSet, nil
