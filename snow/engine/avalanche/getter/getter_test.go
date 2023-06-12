@@ -68,9 +68,7 @@ func TestAcceptedFrontier(t *testing.T) {
 
 	manager, sender, config := testSetup(t)
 
-	vtxID0 := ids.GenerateTestID()
-	vtxID1 := ids.GenerateTestID()
-	vtxID2 := ids.GenerateTestID()
+	vtxID := ids.GenerateTestID()
 
 	bsIntf, err := New(manager, config)
 	require.NoError(err)
@@ -79,26 +77,16 @@ func TestAcceptedFrontier(t *testing.T) {
 
 	manager.EdgeF = func(context.Context) []ids.ID {
 		return []ids.ID{
-			vtxID0,
-			vtxID1,
+			vtxID,
 		}
 	}
 
-	var accepted []ids.ID
-	sender.SendAcceptedFrontierF = func(_ context.Context, _ ids.NodeID, _ uint32, frontier []ids.ID) {
-		accepted = frontier
+	var accepted ids.ID
+	sender.SendAcceptedFrontierF = func(_ context.Context, _ ids.NodeID, _ uint32, containerID ids.ID) {
+		accepted = containerID
 	}
-
 	require.NoError(bs.GetAcceptedFrontier(context.Background(), ids.EmptyNodeID, 0))
-
-	acceptedSet := set.Set[ids.ID]{}
-	acceptedSet.Add(accepted...)
-
-	manager.EdgeF = nil
-
-	require.Contains(acceptedSet, vtxID0)
-	require.Contains(acceptedSet, vtxID1)
-	require.NotContains(acceptedSet, vtxID2)
+	require.Equal(vtxID, accepted)
 }
 
 func TestFilterAccepted(t *testing.T) {

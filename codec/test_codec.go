@@ -746,7 +746,7 @@ func TestTooLargeUnmarshal(codec GeneralCodec, t testing.TB) {
 
 	s := inner{}
 	_, err := manager.Unmarshal(bytes, &s)
-	require.ErrorIs(err, errUnmarshalTooBig)
+	require.ErrorIs(err, ErrUnmarshalTooBig)
 }
 
 type outerInterface interface {

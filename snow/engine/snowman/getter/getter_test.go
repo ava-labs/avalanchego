@@ -113,15 +113,13 @@ func TestAcceptedFrontier(t *testing.T) {
 	require.IsType(&getter{}, bsIntf)
 	bs := bsIntf.(*getter)
 
-	var accepted []ids.ID
-	sender.SendAcceptedFrontierF = func(_ context.Context, _ ids.NodeID, _ uint32, frontier []ids.ID) {
-		accepted = frontier
+	var accepted ids.ID
+	sender.SendAcceptedFrontierF = func(_ context.Context, _ ids.NodeID, _ uint32, containerID ids.ID) {
+		accepted = containerID
 	}
 
 	require.NoError(bs.GetAcceptedFrontier(context.Background(), ids.EmptyNodeID, 0))
-
-	require.Len(accepted, 1)
-	require.Equal(blkID, accepted[0])
+	require.Equal(blkID, accepted)
 }
 
 func TestFilterAccepted(t *testing.T) {
