@@ -248,7 +248,7 @@ func updateCurrentValidatorInSystem(sys *sysUnderTest) error {
 	// 1. check if there is a staker, already inserted. If not return
 	// 2. Add diff layer on top (to test update across diff layers)
 	// 3. query the staker
-	// 4. Rotate staker times and update the staker
+	// 4. shift staker times and update the staker
 
 	chain := sys.getTopChainState()
 
@@ -287,9 +287,9 @@ func updateCurrentValidatorInSystem(sys *sysUnderTest) error {
 		return err
 	}
 
-	// 4. Rotate staker times and update the staker
+	// 4. shift staker times and update the staker
 	updatedStaker := *staker
-	RotateStakerTimesInPlace(&updatedStaker)
+	ShiftStakerAheadInPlace(&updatedStaker)
 	return chain.UpdateCurrentValidator(&updatedStaker)
 }
 
@@ -329,7 +329,7 @@ func updateCurrentValidatorInModel(model *stakersStorageModel) error {
 	stakerIt.Release()
 
 	updatedStaker := *staker
-	RotateStakerTimesInPlace(&updatedStaker)
+	ShiftStakerAheadInPlace(&updatedStaker)
 	return model.UpdateCurrentValidator(&updatedStaker)
 }
 
@@ -593,7 +593,7 @@ func (*updateCurrentDelegatorCommand) Run(sut commands.SystemUnderTest) commands
 func updateCurrentDelegatorInSystem(sys *sysUnderTest) error {
 	// 1. check if there is a staker, already inserted. If not return
 	// 2. Add diff layer on top (to test update across diff layers)
-	// 3. Rotate staker times and update the staker
+	// 3. Shift staker times and update the staker
 
 	chain := sys.getTopChainState()
 
@@ -625,9 +625,9 @@ func updateCurrentDelegatorInSystem(sys *sysUnderTest) error {
 	sys.addDiffOnTop()
 	chain = sys.getTopChainState()
 
-	// 3. Rotate delegator times and update the staker
+	// 3. Shift delegator times and update the staker
 	updatedDelegator := *delegator
-	RotateStakerTimesInPlace(&updatedDelegator)
+	ShiftStakerAheadInPlace(&updatedDelegator)
 	return chain.UpdateCurrentDelegator(&updatedDelegator)
 }
 
@@ -666,7 +666,7 @@ func updateCurrentDelegatorInModel(model *stakersStorageModel) error {
 	stakerIt.Release()
 
 	updatedDelegator := *delegator
-	RotateStakerTimesInPlace(&updatedDelegator)
+	ShiftStakerAheadInPlace(&updatedDelegator)
 	return model.UpdateCurrentDelegator(&updatedDelegator)
 }
 
