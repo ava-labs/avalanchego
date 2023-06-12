@@ -123,6 +123,12 @@ func sendRangeRequest(
 }
 
 func TestGetRangeProof(t *testing.T) {
+	// TODO use time as random seed instead of 1
+	// once we move to go 1.20 which allows for
+	// joining multiple errors with %w. Right now,
+	// for some of these tests, we may get different
+	// errors based on randomness but we can only
+	// assert one error.
 	r := rand.New(rand.NewSource(1)) // #nosec G404
 
 	smallTrieKeyCount := defaultRequestKeyLimit
@@ -383,6 +389,12 @@ func sendChangeRequest(
 }
 
 func TestGetChangeProof(t *testing.T) {
+	// TODO use time as random seed instead of 1
+	// once we move to go 1.20 which allows for
+	// joining multiple errors with %w. Right now,
+	// for some of these tests, we may get different
+	// errors based on randomness but we can only
+	// assert one error.
 	r := rand.New(rand.NewSource(1)) // #nosec G404
 
 	trieDB, err := merkledb.New(
@@ -560,7 +572,9 @@ func TestGetChangeProof(t *testing.T) {
 }
 
 func TestRangeProofRetries(t *testing.T) {
-	r := rand.New(rand.NewSource(1)) // #nosec G404
+	now := time.Now().UnixNano()
+	t.Logf("seed: %d", now)
+	r := rand.New(rand.NewSource(now)) // #nosec G404
 	require := require.New(t)
 
 	keyCount := defaultRequestKeyLimit
