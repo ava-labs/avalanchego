@@ -133,12 +133,15 @@ func NewPendingStaker(txID ids.ID, staker txs.PreContinuousStakingStaker) (*Stak
 	}, nil
 }
 
-func RotateStakerTimesInPlace(s *Staker) {
+func ShiftStakerAheadInPlace(s *Staker) {
+	if s.Priority.IsPending() {
+		return // never shift pending stakers
+	}
+
 	var (
 		currEndTime = s.EndTime
 		duration    = s.EndTime.Sub(s.StartTime)
 	)
-
 	s.StartTime = currEndTime
 	s.EndTime = currEndTime.Add(duration)
 	if s.NextTime == currEndTime {

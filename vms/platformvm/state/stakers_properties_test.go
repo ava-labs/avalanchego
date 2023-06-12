@@ -149,7 +149,7 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 			// to avoid in-place modification of stakers already stored in store,
 			// as it must be done in prod code.
 			updatedStaker := s
-			RotateStakerTimesInPlace(&updatedStaker)
+			ShiftStakerAheadInPlace(&updatedStaker)
 
 			err = store.UpdateCurrentValidator(&updatedStaker)
 			if err != nil {
@@ -382,7 +382,7 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 				// to avoid in-place modification of stakers already stored in store,
 				// as it must be done in prod code.
 				updatedStaker := del
-				RotateStakerTimesInPlace(&updatedStaker)
+				ShiftStakerAheadInPlace(&updatedStaker)
 
 				err = store.UpdateCurrentDelegator(&updatedStaker)
 				if err != nil {
