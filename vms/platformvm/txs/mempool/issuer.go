@@ -106,6 +106,11 @@ func (i *issuer) AddPermissionlessDelegatorTx(*txs.AddPermissionlessDelegatorTx)
 	return nil
 }
 
+func (i *issuer) AddContinuousValidatorTx(*txs.AddContinuousValidatorTx) error {
+	i.m.addDecisionTx(i.tx)
+	return nil
+}
+
 func (i *issuer) StopStakerTx(*txs.StopStakerTx) error {
 	i.m.addDecisionTx(i.tx)
 	return nil

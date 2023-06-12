@@ -72,6 +72,10 @@ func (*AtomicTxExecutor) AddPermissionlessDelegatorTx(*txs.AddPermissionlessDele
 	return ErrWrongTxType
 }
 
+func (*AtomicTxExecutor) AddContinuousValidatorTx(*txs.AddContinuousValidatorTx) error {
+	return ErrWrongTxType
+}
+
 func (*AtomicTxExecutor) StopStakerTx(*txs.StopStakerTx) error {
 	return ErrWrongTxType
 }

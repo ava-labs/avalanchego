@@ -74,6 +74,10 @@ func (v *MempoolTxVerifier) AddPermissionlessDelegatorTx(tx *txs.AddPermissionle
 	return v.standardTx(tx)
 }
 
+func (v *MempoolTxVerifier) AddContinuousValidatorTx(tx *txs.AddContinuousValidatorTx) error {
+	return v.standardTx(tx)
+}
+
 func (v *MempoolTxVerifier) StopStakerTx(tx *txs.StopStakerTx) error {
 	return v.standardTx(tx)
 }

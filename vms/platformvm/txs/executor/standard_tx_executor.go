@@ -470,6 +470,10 @@ func (e *StandardTxExecutor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionl
 	return nil
 }
 
+func (*StandardTxExecutor) AddContinuousValidatorTx(*txs.AddContinuousValidatorTx) error {
+	return errors.New("not yet implemented")
+}
+
 func (e *StandardTxExecutor) StopStakerTx(tx *txs.StopStakerTx) error {
 	stakers, stopTime, err := verifyStopStakerTx(
 		e.Backend,

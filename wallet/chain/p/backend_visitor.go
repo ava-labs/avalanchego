@@ -99,6 +99,10 @@ func (b *backendVisitor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessD
 	return b.baseTx(&tx.BaseTx)
 }
 
+func (*backendVisitor) AddContinuousValidatorTx(*txs.AddContinuousValidatorTx) error {
+	return errors.New("not yet implemented")
+}
+
 func (*backendVisitor) StopStakerTx(*txs.StopStakerTx) error {
 	return errors.New("not yet implemented")
 }

@@ -164,6 +164,10 @@ func (s *signerVisitor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDe
 	return sign(s.tx, true, txSigners)
 }
 
+func (*signerVisitor) AddContinuousValidatorTx(*txs.AddContinuousValidatorTx) error {
+	return errors.New("not yet implemented")
+}
+
 func (*signerVisitor) StopStakerTx(*txs.StopStakerTx) error {
 	return errors.New("not yet implemented")
 }

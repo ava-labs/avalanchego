@@ -24,10 +24,14 @@ const (
 	//            are removed by the advancement of time. Permissionless stakers
 	//            are removed with a RewardValidatorTx after time has advanced.
 	SubnetPermissionedValidatorCurrentPriority
+
+	SubnetContinuousValidatorCurrentPriority
 	// then permissionless subnet delegators,
 	SubnetPermissionlessDelegatorCurrentPriority
 	// then permissionless subnet validators,
 	SubnetPermissionlessValidatorCurrentPriority
+
+	PrimaryNetworkContinuousValidatorCurrentPriority
 	// then primary network delegators,
 	PrimaryNetworkDelegatorCurrentPriority
 	// then primary network validators.
@@ -69,7 +73,9 @@ func (p Priority) IsDelegator() bool {
 func (p Priority) IsCurrentValidator() bool {
 	return p == PrimaryNetworkValidatorCurrentPriority ||
 		p == SubnetPermissionedValidatorCurrentPriority ||
-		p == SubnetPermissionlessValidatorCurrentPriority
+		p == SubnetPermissionlessValidatorCurrentPriority ||
+		p == PrimaryNetworkContinuousValidatorCurrentPriority ||
+		p == SubnetContinuousValidatorCurrentPriority
 }
 
 func (p Priority) IsCurrentDelegator() bool {

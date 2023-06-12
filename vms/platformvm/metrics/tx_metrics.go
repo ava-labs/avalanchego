@@ -4,6 +4,7 @@
 package metrics
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -133,6 +134,10 @@ func (m *txMetrics) AddPermissionlessValidatorTx(*txs.AddPermissionlessValidator
 func (m *txMetrics) AddPermissionlessDelegatorTx(*txs.AddPermissionlessDelegatorTx) error {
 	m.numAddPermissionlessDelegatorTxs.Inc()
 	return nil
+}
+
+func (*txMetrics) AddContinuousValidatorTx(*txs.AddContinuousValidatorTx) error {
+	return errors.New("not yet implemented")
 }
 
 func (m *txMetrics) StopStakerTx(*txs.StopStakerTx) error {

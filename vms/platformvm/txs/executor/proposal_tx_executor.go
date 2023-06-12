@@ -97,6 +97,10 @@ func (*ProposalTxExecutor) AddPermissionlessDelegatorTx(*txs.AddPermissionlessDe
 	return ErrWrongTxType
 }
 
+func (*ProposalTxExecutor) AddContinuousValidatorTx(*txs.AddContinuousValidatorTx) error {
+	return ErrWrongTxType
+}
+
 func (*ProposalTxExecutor) StopStakerTx(*txs.StopStakerTx) error {
 	return ErrWrongTxType
 }
