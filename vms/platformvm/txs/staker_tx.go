@@ -49,7 +49,6 @@ type commonStaker interface {
 	// there was no key registered by this transaction, it will return false.
 	PublicKey() (*bls.PublicKey, bool, error)
 	Weight() uint64
-	PendingPriority() Priority
 	CurrentPriority() Priority
 }
 
@@ -60,6 +59,7 @@ type Staker interface {
 
 type PreContinuousStakingStaker interface {
 	commonStaker
+	PendingPriority() Priority
 	StartTime() time.Time
 	EndTime() time.Time
 }
