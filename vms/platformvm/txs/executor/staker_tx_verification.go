@@ -31,6 +31,7 @@ var (
 	ErrNotValidator                    = errors.New("isn't a current or pending validator")
 	ErrRemovePermissionlessValidator   = errors.New("attempting to remove permissionless validator")
 	ErrStakeOverflow                   = errors.New("validator stake exceeds limit")
+	ErrPeriodMismatch                  = errors.New("delegator's period is not inside validator's one")
 	ErrOverDelegated                   = errors.New("validator would be over delegated")
 	ErrIsNotTransformSubnetTx          = errors.New("is not a transform subnet tx")
 	ErrTimestampNotBeforeStartTime     = errors.New("chain timestamp not before start time")
@@ -392,11 +393,15 @@ func verifyAddDelegatorTx(
 		return nil, err
 	}
 
-	canDelegate, err := canDelegate(chainState, primaryNetworkValidator, maximumWeight, newStaker)
+	fitsWindow := fitsValidationWindow(primaryNetworkValidator, newStaker)
+	if !fitsWindow {
+		return nil, ErrPeriodMismatch
+	}
+	overdelegated, err := overdelegated(chainState, primaryNetworkValidator, maximumWeight, newStaker)
 	if err != nil {
 		return nil, err
 	}
-	if !canDelegate {
+	if overdelegated {
 		return nil, ErrOverDelegated
 	}
 
@@ -686,11 +691,15 @@ func verifyAddPermissionlessDelegatorTx(
 		return err
 	}
 
-	canDelegate, err := canDelegate(chainState, validator, maximumWeight, newStaker)
+	fitsWindow := fitsValidationWindow(validator, newStaker)
+	if !fitsWindow {
+		return ErrPeriodMismatch
+	}
+	overdelegated, err := overdelegated(chainState, validator, maximumWeight, newStaker)
 	if err != nil {
 		return err
 	}
-	if !canDelegate {
+	if overdelegated {
 		return ErrOverDelegated
 	}
 
