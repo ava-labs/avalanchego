@@ -28,7 +28,7 @@ type PrecompileAccessibleState interface {
 // to initialize its state.
 type BlockContext interface {
 	Number() *big.Int
-	Timestamp() *big.Int
+	Timestamp() uint64
 }
 
 // ChainContext defines an interface that provides information to a stateful precompile
@@ -77,6 +77,7 @@ type statefulPrecompileFunction struct {
 }
 
 // newStatefulPrecompileFunction creates a stateful precompile function with the given arguments
+//
 //nolint:unused,deadcode
 func newStatefulPrecompileFunction(selector []byte, execute RunStatefulPrecompileFunc) *statefulPrecompileFunction {
 	return &statefulPrecompileFunction{
@@ -95,6 +96,7 @@ type statefulPrecompileWithFunctionSelectors struct {
 
 // newStatefulPrecompileWithFunctionSelectors generates new StatefulPrecompile using [functions] as the available functions and [fallback]
 // as an optional fallback if there is no input data. Note: the selector of [fallback] will be ignored, so it is required to be left empty.
+//
 //nolint:unused,deadcode
 func newStatefulPrecompileWithFunctionSelectors(fallback *statefulPrecompileFunction, functions []*statefulPrecompileFunction) StatefulPrecompiledContract {
 	// Ensure that if a fallback is present, it does not have a mistakenly populated function selector.

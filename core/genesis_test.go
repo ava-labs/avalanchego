@@ -38,6 +38,7 @@ import (
 	"github.com/ava-labs/coreth/ethdb"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/trie"
+	"github.com/ava-labs/coreth/utils"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
@@ -57,7 +58,7 @@ func TestGenesisBlockForTesting(t *testing.T) {
 
 func TestSetupGenesis(t *testing.T) {
 	apricotPhase1Config := *params.TestApricotPhase1Config
-	apricotPhase1Config.ApricotPhase1BlockTimestamp = big.NewInt(100)
+	apricotPhase1Config.ApricotPhase1BlockTimestamp = utils.NewUint64(100)
 	var (
 		customghash = common.HexToHash("0x1099a11e9e454bd3ef31d688cf21936671966407bc330f051d754b5ce401e7ed")
 		customg     = Genesis{
@@ -70,7 +71,7 @@ func TestSetupGenesis(t *testing.T) {
 	)
 
 	rollbackApricotPhase1Config := apricotPhase1Config
-	rollbackApricotPhase1Config.ApricotPhase1BlockTimestamp = big.NewInt(90)
+	rollbackApricotPhase1Config.ApricotPhase1BlockTimestamp = utils.NewUint64(90)
 	oldcustomg.Config = &rollbackApricotPhase1Config
 	tests := []struct {
 		name       string
@@ -202,16 +203,16 @@ func TestNetworkUpgradeBetweenHeadAndAcceptedBlock(t *testing.T) {
 	require.Greater(block.Time, bc.lastAccepted.Time())
 
 	activatedGenesis := customg
-	apricotPhase2Timestamp := big.NewInt(51)
+	apricotPhase2Timestamp := utils.NewUint64(51)
 	updatedApricotPhase2Config := *params.TestApricotPhase1Config
 	updatedApricotPhase2Config.ApricotPhase2BlockTimestamp = apricotPhase2Timestamp
 
 	activatedGenesis.Config = &updatedApricotPhase2Config
 
 	// assert block is after the activation block
-	require.Greater(block.Time, apricotPhase2Timestamp.Uint64())
+	require.Greater(block.Time, *apricotPhase2Timestamp)
 	// assert last accepted block is before the activation block
-	require.Less(bc.lastAccepted.Time(), apricotPhase2Timestamp.Uint64())
+	require.Less(bc.lastAccepted.Time(), *apricotPhase2Timestamp)
 
 	// This should not return any error since the last accepted block is before the activation block.
 	config, _, err := setupGenesisBlock(db, trie.NewDatabase(db), &activatedGenesis, bc.lastAccepted.Hash())

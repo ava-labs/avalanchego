@@ -134,8 +134,8 @@ func (b *BlockContext) Number() *big.Int {
 	return b.BlockNumber
 }
 
-func (b *BlockContext) Timestamp() *big.Int {
-	return new(big.Int).SetUint64(b.Time)
+func (b *BlockContext) Timestamp() uint64 {
+	return b.Time
 }
 
 // TxContext provides the EVM with information about a transaction.
@@ -192,7 +192,7 @@ func NewEVM(blockCtx BlockContext, txCtx TxContext, statedb StateDB, chainConfig
 		StateDB:     statedb,
 		Config:      config,
 		chainConfig: chainConfig,
-		chainRules:  chainConfig.AvalancheRules(blockCtx.BlockNumber, blockCtx.Timestamp()),
+		chainRules:  chainConfig.AvalancheRules(blockCtx.BlockNumber, blockCtx.Time),
 	}
 	evm.interpreter = NewEVMInterpreter(evm)
 	return evm
@@ -235,8 +235,7 @@ func (evm *EVM) Interpreter() *EVMInterpreter {
 func (evm *EVM) SetBlockContext(blockCtx BlockContext) {
 	evm.Context = blockCtx
 	num := blockCtx.BlockNumber
-	timestamp := blockCtx.Timestamp()
-	evm.chainRules = evm.chainConfig.AvalancheRules(num, timestamp)
+	evm.chainRules = evm.chainConfig.AvalancheRules(num, blockCtx.Time)
 }
 
 // Call executes the contract associated with the addr with the given input as

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/utils"
 )
 
 type mockGasPriceSetter struct {
@@ -62,7 +63,7 @@ func TestUpdateGasPriceShutsDown(t *testing.T) {
 	config := *params.TestChainConfig
 	// Set ApricotPhase3BlockTime one hour in the future so that it will
 	// create a goroutine waiting for an hour before updating the gas price
-	config.ApricotPhase3BlockTimestamp = big.NewInt(time.Now().Add(time.Hour).Unix())
+	config.ApricotPhase3BlockTimestamp = utils.TimeToNewUint64(time.Now().Add(time.Hour))
 	gpu := &gasPriceUpdater{
 		setter:       &mockGasPriceSetter{price: big.NewInt(1)},
 		chainConfig:  &config,
@@ -106,8 +107,8 @@ func TestUpdateGasPriceUpdatesPrice(t *testing.T) {
 	config := *params.TestChainConfig
 	// Set ApricotPhase3BlockTime 250ms in the future so that it will
 	// create a goroutine waiting for the time to update the gas price
-	config.ApricotPhase3BlockTimestamp = big.NewInt(time.Now().Add(250 * time.Millisecond).Unix())
-	config.ApricotPhase4BlockTimestamp = big.NewInt(time.Now().Add(3 * time.Second).Unix())
+	config.ApricotPhase3BlockTimestamp = utils.TimeToNewUint64(time.Now().Add(250 * time.Millisecond))
+	config.ApricotPhase4BlockTimestamp = utils.TimeToNewUint64(time.Now().Add(3 * time.Second))
 	gpu := &gasPriceUpdater{
 		setter:       &mockGasPriceSetter{price: big.NewInt(1)},
 		chainConfig:  &config,

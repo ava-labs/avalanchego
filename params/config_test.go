@@ -32,6 +32,8 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/ava-labs/coreth/utils"
 )
 
 func TestCheckCompatible(t *testing.T) {
@@ -114,7 +116,7 @@ func TestCheckCompatible(t *testing.T) {
 			headTimestamp: 0,
 			wantErr: &ConfigCompatError{
 				What:         "ApricotPhase5 fork block timestamp",
-				StoredTime:   newUint64(0),
+				StoredTime:   utils.NewUint64(0),
 				NewTime:      nil,
 				RewindToTime: 0,
 			},
@@ -126,7 +128,7 @@ func TestCheckCompatible(t *testing.T) {
 			headTimestamp: 100,
 			wantErr: &ConfigCompatError{
 				What:         "ApricotPhase5 fork block timestamp",
-				StoredTime:   newUint64(0),
+				StoredTime:   utils.NewUint64(0),
 				NewTime:      nil,
 				RewindToTime: 0,
 			},
@@ -143,17 +145,17 @@ func TestCheckCompatible(t *testing.T) {
 
 func TestConfigRules(t *testing.T) {
 	c := &ChainConfig{
-		CortinaBlockTimestamp: big.NewInt(500),
+		CortinaBlockTimestamp: utils.NewUint64(500),
 	}
-	var stamp *big.Int
+	var stamp uint64
 	if r := c.AvalancheRules(big.NewInt(0), stamp); r.IsCortina {
 		t.Errorf("expected %v to not be cortina", stamp)
 	}
-	stamp = big.NewInt(500)
+	stamp = 500
 	if r := c.AvalancheRules(big.NewInt(0), stamp); !r.IsCortina {
 		t.Errorf("expected %v to be cortina", stamp)
 	}
-	stamp.SetInt64(math.MaxInt64)
+	stamp = math.MaxInt64
 	if r := c.AvalancheRules(big.NewInt(0), stamp); !r.IsCortina {
 		t.Errorf("expected %v to be cortina", stamp)
 	}

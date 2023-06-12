@@ -43,6 +43,7 @@ import (
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/metrics"
 	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/utils"
 	"github.com/ava-labs/coreth/vmerrs"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/prque"
@@ -1345,7 +1346,7 @@ func (pool *TxPool) runReorg(done chan struct{}, reset *txpoolResetRequest, dirt
 	// because of another transaction (e.g. higher gas price).
 	if reset != nil {
 		pool.demoteUnexecutables()
-		if reset.newHead != nil && pool.chainconfig.IsApricotPhase3(new(big.Int).SetUint64(reset.newHead.Time)) {
+		if reset.newHead != nil && pool.chainconfig.IsApricotPhase3(reset.newHead.Time) {
 			_, baseFeeEstimate, err := dummy.EstimateNextBaseFee(pool.chainconfig, reset.newHead, uint64(time.Now().Unix()))
 			if err == nil {
 				pool.priced.SetBaseFee(baseFeeEstimate)
@@ -1480,10 +1481,9 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 	next := new(big.Int).Add(newHead.Number, big.NewInt(1))
 	pool.istanbul = pool.chainconfig.IsIstanbul(next)
 
-	timestamp := new(big.Int).SetUint64(newHead.Time)
-	pool.eip2718 = pool.chainconfig.IsApricotPhase2(timestamp)
-	pool.eip1559 = pool.chainconfig.IsApricotPhase3(timestamp)
-	pool.eip3860 = pool.chainconfig.IsDUpgrade(timestamp)
+	pool.eip2718 = pool.chainconfig.IsApricotPhase2(newHead.Time)
+	pool.eip1559 = pool.chainconfig.IsApricotPhase3(newHead.Time)
+	pool.eip3860 = pool.chainconfig.IsDUpgrade(newHead.Time)
 }
 
 // promoteExecutables moves transactions that have become processable from the
@@ -1755,7 +1755,7 @@ func (pool *TxPool) startPeriodicFeeUpdate() {
 
 	// Call updateBaseFee here to ensure that there is not a [baseFeeUpdateInterval] delay
 	// when starting up in ApricotPhase3 before the base fee is updated.
-	if time.Now().After(time.Unix(pool.chainconfig.ApricotPhase3BlockTimestamp.Int64(), 0)) {
+	if time.Now().After(utils.Uint64ToTime(pool.chainconfig.ApricotPhase3BlockTimestamp)) {
 		pool.updateBaseFee()
 	}
 
@@ -1768,7 +1768,7 @@ func (pool *TxPool) periodicBaseFeeUpdate() {
 
 	// Sleep until its time to start the periodic base fee update or the tx pool is shutting down
 	select {
-	case <-time.After(time.Until(time.Unix(pool.chainconfig.ApricotPhase3BlockTimestamp.Int64(), 0))):
+	case <-time.After(time.Until(utils.Uint64ToTime(pool.chainconfig.ApricotPhase3BlockTimestamp))):
 	case <-pool.generalShutdownChan:
 		return // Return early if shutting down
 	}

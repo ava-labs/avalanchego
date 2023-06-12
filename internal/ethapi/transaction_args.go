@@ -168,7 +168,7 @@ func (args *TransactionArgs) setFeeDefaults(ctx context.Context, b feeBackend) e
 	}
 	// Now attempt to fill in default value depending on whether London is active or not.
 	head := b.CurrentHeader()
-	if b.ChainConfig().IsApricotPhase3(new(big.Int).SetUint64(head.Time)) {
+	if b.ChainConfig().IsApricotPhase3(head.Time) {
 		// London is active, set maxPriorityFeePerGas and maxFeePerGas.
 		if err := args.setApricotPhase3FeeDefault(ctx, head, b); err != nil {
 			return err

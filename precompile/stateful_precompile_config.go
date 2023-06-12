@@ -4,8 +4,6 @@
 package precompile
 
 import (
-	"math/big"
-
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/ava-labs/coreth/utils"
@@ -19,7 +17,7 @@ type StatefulPrecompileConfig interface {
 	// 1) 0 indicates that the precompile should be enabled from genesis.
 	// 2) n indicates that the precompile should be enabled in the first block with timestamp >= [n].
 	// 3) nil indicates that the precompile is never enabled.
-	Timestamp() *big.Int
+	Timestamp() *uint64
 	// Configure is called on the first block where the stateful precompile should be enabled.
 	// This allows the stateful precompile to configure its own state via [StateDB] as necessary.
 	// This function must be deterministic since it will impact the EVM state. If a change to the
@@ -43,10 +41,9 @@ type StatefulPrecompileConfig interface {
 // TODO: add ability to call Configure at different timestamps, so that developers can easily re-configure by updating the
 // stateful precompile config.
 // Assumes that [config] is non-nil.
-func CheckConfigure(chainConfig ChainConfig, parentTimestamp *big.Int, blockContext BlockContext, precompileConfig StatefulPrecompileConfig, state StateDB) {
-	forkTimestamp := precompileConfig.Timestamp()
+func CheckConfigure(chainConfig ChainConfig, parentTimestamp *uint64, blockContext BlockContext, precompileConfig StatefulPrecompileConfig, state StateDB) {
 	// If the network upgrade goes into effect within this transition, configure the stateful precompile
-	if utils.IsForkTransition(forkTimestamp, parentTimestamp, blockContext.Timestamp()) {
+	if utils.IsForkTransition(precompileConfig.Timestamp(), parentTimestamp, blockContext.Timestamp()) {
 		// Set the nonce of the precompile's address (as is done when a contract is created) to ensure
 		// that it is marked as non-empty and will not be cleaned up when the statedb is finalized.
 		state.SetNonce(precompileConfig.Address(), 1)

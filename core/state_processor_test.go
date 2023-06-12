@@ -38,6 +38,7 @@ import (
 	"github.com/ava-labs/coreth/core/vm"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/trie"
+	"github.com/ava-labs/coreth/utils"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"golang.org/x/crypto/sha3"
@@ -231,8 +232,8 @@ func TestStateProcessorErrors(t *testing.T) {
 					PetersburgBlock:             big.NewInt(0),
 					IstanbulBlock:               big.NewInt(0),
 					MuirGlacierBlock:            big.NewInt(0),
-					ApricotPhase1BlockTimestamp: big.NewInt(0),
-					ApricotPhase2BlockTimestamp: big.NewInt(0),
+					ApricotPhase1BlockTimestamp: utils.NewUint64(0),
+					ApricotPhase2BlockTimestamp: utils.NewUint64(0),
 				},
 				Alloc: GenesisAlloc{
 					common.HexToAddress("0x71562b71999873DB5b286dF957af199Ec94617F7"): GenesisAccount{
@@ -326,17 +327,17 @@ func TestStateProcessorErrors(t *testing.T) {
 					PetersburgBlock:                 big.NewInt(0),
 					IstanbulBlock:                   big.NewInt(0),
 					MuirGlacierBlock:                big.NewInt(0),
-					ApricotPhase1BlockTimestamp:     big.NewInt(0),
-					ApricotPhase2BlockTimestamp:     big.NewInt(0),
-					ApricotPhase3BlockTimestamp:     big.NewInt(0),
-					ApricotPhase4BlockTimestamp:     big.NewInt(0),
-					ApricotPhase5BlockTimestamp:     big.NewInt(0),
-					ApricotPhasePre6BlockTimestamp:  big.NewInt(0),
-					ApricotPhase6BlockTimestamp:     big.NewInt(0),
-					ApricotPhasePost6BlockTimestamp: big.NewInt(0),
-					BanffBlockTimestamp:             big.NewInt(0),
-					CortinaBlockTimestamp:           big.NewInt(0),
-					DUpgradeBlockTimestamp:          big.NewInt(0),
+					ApricotPhase1BlockTimestamp:     utils.NewUint64(0),
+					ApricotPhase2BlockTimestamp:     utils.NewUint64(0),
+					ApricotPhase3BlockTimestamp:     utils.NewUint64(0),
+					ApricotPhase4BlockTimestamp:     utils.NewUint64(0),
+					ApricotPhase5BlockTimestamp:     utils.NewUint64(0),
+					ApricotPhasePre6BlockTimestamp:  utils.NewUint64(0),
+					ApricotPhase6BlockTimestamp:     utils.NewUint64(0),
+					ApricotPhasePost6BlockTimestamp: utils.NewUint64(0),
+					BanffBlockTimestamp:             utils.NewUint64(0),
+					CortinaBlockTimestamp:           utils.NewUint64(0),
+					DUpgradeBlockTimestamp:          utils.NewUint64(0),
 				},
 				Alloc: GenesisAlloc{
 					common.HexToAddress("0x71562b71999873DB5b286dF957af199Ec94617F7"): GenesisAccount{
@@ -400,10 +401,10 @@ func GenerateBadBlock(parent *types.Block, engine consensus.Engine, txs types.Tr
 		Time:      parent.Time() + 10,
 		UncleHash: types.EmptyUncleHash,
 	}
-	if config.IsApricotPhase3(new(big.Int).SetUint64(header.Time)) {
+	if config.IsApricotPhase3(header.Time) {
 		header.Extra, header.BaseFee, _ = dummy.CalcBaseFee(config, parent.Header(), header.Time)
 	}
-	if config.IsApricotPhase4(new(big.Int).SetUint64(header.Time)) {
+	if config.IsApricotPhase4(header.Time) {
 		header.BlockGasCost = big.NewInt(0)
 		header.ExtDataGasUsed = big.NewInt(0)
 	}
@@ -530,7 +531,7 @@ func nextBlock(config *params.ChainConfig, parent *types.Header, gasUsed uint64)
 		Number:     new(big.Int).Add(parent.Number, common.Big1),
 		Time:       parent.Time + 2,
 	}
-	if config.IsApricotPhase3(new(big.Int).SetUint64(header.Time)) {
+	if config.IsApricotPhase3(header.Time) {
 		header.Extra, header.BaseFee, _ = dummy.CalcBaseFee(config, parent, header.Time)
 	}
 	header.GasUsed = gasUsed

@@ -290,7 +290,7 @@ func (g *Genesis) toBlock(db ethdb.Database, triedb *trie.Database) *types.Block
 	if g.Difficulty == nil {
 		head.Difficulty = params.GenesisDifficulty
 	}
-	if g.Config != nil && g.Config.IsApricotPhase3(common.Big0) {
+	if g.Config != nil && g.Config.IsApricotPhase3(0) {
 		if g.BaseFee != nil {
 			head.BaseFee = g.BaseFee
 		} else {
@@ -298,10 +298,12 @@ func (g *Genesis) toBlock(db ethdb.Database, triedb *trie.Database) *types.Block
 		}
 	}
 	statedb.Commit(false, false)
-	if err := statedb.Database().TrieDB().Commit(root, true); err != nil {
-		panic(fmt.Sprintf("unable to commit genesis block: %v", err))
+	// Commit newly generated states into disk if it's not empty.
+	if root != types.EmptyRootHash {
+		if err := triedb.Commit(root, true); err != nil {
+			panic(fmt.Sprintf("unable to commit genesis block: %v", err))
+		}
 	}
-
 	return types.NewBlock(head, nil, nil, nil, trie.NewStackTrie(nil), nil, false)
 }
 

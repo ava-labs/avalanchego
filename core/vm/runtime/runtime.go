@@ -75,10 +75,10 @@ func setDefaults(cfg *Config) {
 			PetersburgBlock:             new(big.Int),
 			IstanbulBlock:               new(big.Int),
 			MuirGlacierBlock:            new(big.Int),
-			ApricotPhase1BlockTimestamp: new(big.Int),
-			ApricotPhase2BlockTimestamp: new(big.Int),
-			ApricotPhase3BlockTimestamp: new(big.Int),
-			ApricotPhase4BlockTimestamp: new(big.Int),
+			ApricotPhase1BlockTimestamp: new(uint64),
+			ApricotPhase2BlockTimestamp: new(uint64),
+			ApricotPhase3BlockTimestamp: new(uint64),
+			ApricotPhase4BlockTimestamp: new(uint64),
 		}
 	}
 
@@ -125,7 +125,7 @@ func Execute(code, input []byte, cfg *Config) ([]byte, *state.StateDB, error) {
 		address = common.BytesToAddress([]byte("contract"))
 		vmenv   = NewEnv(cfg)
 		sender  = vm.AccountRef(cfg.Origin)
-		rules   = cfg.ChainConfig.AvalancheRules(vmenv.Context.BlockNumber, vmenv.Context.Timestamp())
+		rules   = cfg.ChainConfig.AvalancheRules(vmenv.Context.BlockNumber, vmenv.Context.Time)
 	)
 	// Execute the preparatory steps for state transition which includes:
 	// - prepare accessList(post-berlin/ApricotPhase2)
@@ -159,7 +159,7 @@ func Create(input []byte, cfg *Config) ([]byte, common.Address, uint64, error) {
 	var (
 		vmenv  = NewEnv(cfg)
 		sender = vm.AccountRef(cfg.Origin)
-		rules  = cfg.ChainConfig.AvalancheRules(vmenv.Context.BlockNumber, vmenv.Context.Timestamp())
+		rules  = cfg.ChainConfig.AvalancheRules(vmenv.Context.BlockNumber, vmenv.Context.Time)
 	)
 	// Execute the preparatory steps for state transition which includes:
 	// - prepare accessList(post-berlin/ApricotPhase2)
@@ -188,7 +188,7 @@ func Call(address common.Address, input []byte, cfg *Config) ([]byte, uint64, er
 		vmenv   = NewEnv(cfg)
 		sender  = cfg.State.GetOrNewStateObject(cfg.Origin)
 		statedb = cfg.State
-		rules   = cfg.ChainConfig.AvalancheRules(vmenv.Context.BlockNumber, vmenv.Context.Timestamp())
+		rules   = cfg.ChainConfig.AvalancheRules(vmenv.Context.BlockNumber, vmenv.Context.Time)
 	)
 	// Execute the preparatory steps for state transition which includes:
 	// - prepare accessList(post-berlin/ApricotPhase2)
