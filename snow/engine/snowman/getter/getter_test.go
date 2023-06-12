@@ -34,8 +34,6 @@ func testSetup(
 	t *testing.T,
 	ctrl *gomock.Controller,
 ) (StateSyncEnabledMock, *common.SenderTest, common.Config) {
-	require := require.New(t)
-
 	ctx := snow.DefaultConsensusContextTest()
 
 	peers := validators.NewSet()
@@ -63,7 +61,7 @@ func testSetup(
 	sender.CantSendGetAcceptedFrontier = false
 
 	peer := ids.GenerateTestNodeID()
-	require.NoError(peers.Add(peer, nil, ids.Empty, 1))
+	require.NoError(t, peers.Add(peer, nil, ids.Empty, 1))
 
 	commonConfig := common.Config{
 		Ctx:                            ctx,

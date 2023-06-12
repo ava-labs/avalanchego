@@ -11,8 +11,6 @@ import (
 )
 
 func TestParametersVerify(t *testing.T) {
-	require := require.New(t)
-
 	p := Parameters{
 		K:                     1,
 		Alpha:                 1,
@@ -24,12 +22,10 @@ func TestParametersVerify(t *testing.T) {
 		MaxItemProcessingTime: 1,
 	}
 
-	require.NoError(p.Verify())
+	require.NoError(t, p.Verify())
 }
 
 func TestParametersAnotherVerify(t *testing.T) {
-	require := require.New(t)
-
 	p := Parameters{
 		K:                     1,
 		Alpha:                 1,
@@ -41,12 +37,10 @@ func TestParametersAnotherVerify(t *testing.T) {
 		MaxItemProcessingTime: 1,
 	}
 
-	require.NoError(p.Verify())
+	require.NoError(t, p.Verify())
 }
 
 func TestParametersYetAnotherVerify(t *testing.T) {
-	require := require.New(t)
-
 	p := Parameters{
 		K:                     1,
 		Alpha:                 1,
@@ -58,7 +52,7 @@ func TestParametersYetAnotherVerify(t *testing.T) {
 		MaxItemProcessingTime: 1,
 	}
 
-	require.NoError(p.Verify())
+	require.NoError(t, p.Verify())
 }
 
 func TestParametersInvalidK(t *testing.T) {

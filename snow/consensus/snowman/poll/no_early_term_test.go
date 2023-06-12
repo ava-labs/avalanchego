@@ -36,8 +36,6 @@ func TestNoEarlyTermResults(t *testing.T) {
 }
 
 func TestNoEarlyTermString(t *testing.T) {
-	require := require.New(t)
-
 	vtxID := ids.ID{1}
 
 	vdr1 := ids.NodeID{1}
@@ -58,11 +56,12 @@ func TestNoEarlyTermString(t *testing.T) {
     NodeID-BaMPFdqMUQ46BV8iRcwbVfsam55kMqcp: 1
 received Bag[ids.ID]: (Size = 1)
     SYXsAycDPUu4z2ZksJD5fh5nTDcH3vCFHnpcVye5XuJ2jArg: 1`
-	require.Equal(expected, poll.String())
+	require.Equal(t, expected, poll.String())
 }
 
 func TestNoEarlyTermDropsDuplicatedVotes(t *testing.T) {
 	require := require.New(t)
+
 	vtxID := ids.ID{1}
 
 	vdr1 := ids.NodeID{1}

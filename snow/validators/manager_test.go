@@ -96,9 +96,6 @@ func TestContains(t *testing.T) {
 	require.NoError(Add(m, subnetID, nodeID, nil, ids.Empty, 1))
 	require.True(Contains(m, subnetID, nodeID))
 
-	require.NoError(Add(m, subnetID, nodeID, nil, ids.Empty, 1))
-	require.True(Contains(m, subnetID, nodeID))
-
 	require.NoError(RemoveWeight(m, subnetID, nodeID, 1))
 	require.False(Contains(m, subnetID, nodeID))
 }
