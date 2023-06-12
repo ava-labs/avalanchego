@@ -1,5 +1,10 @@
 # Release Notes
 
+## [v0.12.3](https://github.com/ava-labs/coreth/releases/tag/v0.12.3)
+
+- Migrate go-ethereum changes through v1.11.4
+- Downgrade API error log from `Warn` to `Info`
+
 ## [v0.12.2](https://github.com/ava-labs/coreth/releases/tag/v0.12.2)
 
 - Increase default trie dirty cache size from 256MB to 512MB
