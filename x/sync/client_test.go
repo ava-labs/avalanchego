@@ -123,7 +123,9 @@ func sendRangeRequest(
 }
 
 func TestGetRangeProof(t *testing.T) {
-	r := rand.New(rand.NewSource(1)) // #nosec G404
+	now := time.Now().UnixNano()
+	t.Logf("seed: %v", now)
+	r := rand.New(rand.NewSource(now)) // #nosec G404
 
 	smallTrieKeyCount := defaultRequestKeyLimit
 	smallTrieDB, _, err := generateTrieWithMinKeyLen(t, r, smallTrieKeyCount, 1)
@@ -383,7 +385,9 @@ func sendChangeRequest(
 }
 
 func TestGetChangeProof(t *testing.T) {
-	r := rand.New(rand.NewSource(1)) // #nosec G404
+	now := time.Now().UnixNano()
+	t.Logf("seed: %v", now)
+	r := rand.New(rand.NewSource(now)) // #nosec G404
 
 	trieDB, err := merkledb.New(
 		context.Background(),
@@ -560,7 +564,9 @@ func TestGetChangeProof(t *testing.T) {
 }
 
 func TestRangeProofRetries(t *testing.T) {
-	r := rand.New(rand.NewSource(1)) // #nosec G404
+	now := time.Now().UnixNano()
+	t.Logf("seed: %v", now)
+	r := rand.New(rand.NewSource(now)) // #nosec G404
 	require := require.New(t)
 
 	keyCount := defaultRequestKeyLimit
