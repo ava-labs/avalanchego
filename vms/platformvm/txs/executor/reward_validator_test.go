@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -24,527 +23,527 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-func TestContinuousStakingForkRewardValidatorTxExecuteOnCommit(t *testing.T) {
-	require := require.New(t)
-	env := newEnvironment(latestFork)
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-	}()
-	dummyHeight := uint64(1)
-
-	// Add a continuous validator
-	onParentState, err := state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
-
-	valRewardAddress := ids.GenerateTestShortID()
-	addValTx, err := env.txBuilder.NewAddValidatorTx(
-		env.config.MinValidatorStake,
-		uint64(0),
-		uint64(24*60*60), // 24h in seconds
-		ids.GenerateTestNodeID(),
-		valRewardAddress,
-		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{preFundedKeys[0]},
-		ids.ShortEmpty,
-	)
-	require.NoError(err)
-	continuousStakerTx := addValTx.Unsigned.(*txs.AddValidatorTx)
-
-	addValExecutor := StandardTxExecutor{
-		State:   onParentState,
-		Backend: &env.backend,
-		Tx:      addValTx,
-	}
-	require.NoError(addValTx.Unsigned.Visit(&addValExecutor))
-	onParentState.AddTx(addValTx, status.Committed)
-	require.NoError(onParentState.Apply(env.state))
-	env.state.SetHeight(dummyHeight)
-	require.NoError(env.state.Commit())
-
-	continuousStaker, err := env.state.GetCurrentValidator(continuousStakerTx.SubnetID(), continuousStakerTx.NodeID())
-	require.NoError(err)
-
-	// Case 1: Chain timestamp is wrong
-	tx, err := env.txBuilder.NewRewardValidatorTx(continuousStaker.TxID)
-	require.NoError(err)
-
-	onCommitState, err := state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
-
-	onAbortState, err := state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
-
-	txExecutor := ProposalTxExecutor{
-		OnCommitState: onCommitState,
-		OnAbortState:  onAbortState,
-		Backend:       &env.backend,
-		Tx:            tx,
-	}
-	err = tx.Unsigned.Visit(&txExecutor)
-	require.ErrorIs(err, ErrRemoveStakerTooEarly)
-
-	// Advance chain timestamp to time that next validator should be rewarded
-	env.state.SetTimestamp(continuousStaker.NextTime)
-
-	// Case 2: Wrong validator
-	tx, err = env.txBuilder.NewRewardValidatorTx(ids.GenerateTestID())
-	require.NoError(err)
-
-	onCommitState, err = state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
-
-	onAbortState, err = state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
-
-	txExecutor = ProposalTxExecutor{
-		OnCommitState: onCommitState,
-		OnAbortState:  onAbortState,
-		Backend:       &env.backend,
-		Tx:            tx,
-	}
-	err = tx.Unsigned.Visit(&txExecutor)
-	require.ErrorIs(err, ErrRemoveWrongStaker)
-
-	// Case 3: Happy path
-	tx, err = env.txBuilder.NewRewardValidatorTx(continuousStaker.TxID)
-	require.NoError(err)
-
-	onCommitState, err = state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
-
-	onAbortState, err = state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
-
-	txExecutor = ProposalTxExecutor{
-		OnCommitState: onCommitState,
-		OnAbortState:  onAbortState,
-		Backend:       &env.backend,
-		Tx:            tx,
-	}
-	require.NoError(tx.Unsigned.Visit(&txExecutor))
-
-	onCommitStakerIterator, err := txExecutor.OnCommitState.GetCurrentStakerIterator()
-	require.NoError(err)
-
-	// check that post continuousStakingFork, staker is shifted ahead by its staking period
-	var shiftedStaker *state.Staker
-	for onCommitStakerIterator.Next() {
-		nextStaker := onCommitStakerIterator.Value()
-		if nextStaker.TxID == continuousStaker.TxID {
-			shiftedStaker = nextStaker
-			break
-		}
-	}
-	onCommitStakerIterator.Release()
-	require.NotNil(shiftedStaker)
-	require.Equal(continuousStaker.StakingPeriod, shiftedStaker.StakingPeriod)
-	require.Equal(continuousStaker.StartTime.Add(continuousStaker.StakingPeriod), shiftedStaker.StartTime)
-	require.Equal(continuousStaker.NextTime.Add(continuousStaker.StakingPeriod), shiftedStaker.NextTime)
-	require.Equal(continuousStaker.EndTime.Add(continuousStaker.StakingPeriod), shiftedStaker.EndTime)
-
-	// check that reward is given, while stake is not (because of restaking)
-	stakeOwners := continuousStakerTx.StakeOuts[0].Out.(*secp256k1fx.TransferOutput).AddressesSet()
-	rewardAddresses := set.NewSet[ids.ShortID](0)
-	rewardAddresses.Add(valRewardAddress)
-
-	stakeOldBalance, err := avax.GetBalance(env.state, stakeOwners)
-	require.NoError(err)
-	rewardsOldBalance, err := avax.GetBalance(env.state, rewardAddresses)
-	require.NoError(err)
-
-	require.NoError(txExecutor.OnCommitState.Apply(env.state))
-	env.state.SetHeight(dummyHeight + 1)
-	require.NoError(env.state.Commit())
-
-	stakeOnCommitBalance, err := avax.GetBalance(env.state, stakeOwners)
-	require.NoError(err)
-	rewardsOnCommitBalance, err := avax.GetBalance(env.state, rewardAddresses)
-	require.NoError(err)
-
-	require.Equal(stakeOnCommitBalance, stakeOldBalance)
-	require.Equal(rewardsOnCommitBalance, rewardsOldBalance+13706)
-}
-
-func TestContinuousStakingForkRewardValidatorTxExecuteOnAbort(t *testing.T) {
-	require := require.New(t)
-	env := newEnvironment(continuousStakingFork)
-	env.clk.Set(defaultValidateStartTime.Add(time.Second))
-	env.state.SetTimestamp(defaultValidateStartTime.Add(time.Second))
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-	}()
-	dummyHeight := uint64(1)
-
-	// Add a continuous validator
-	onParentState, err := state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
-
-	valRewardAddress := ids.GenerateTestShortID()
-	addValTx, err := env.txBuilder.NewAddValidatorTx(
-		env.config.MinValidatorStake,
-		uint64(0),
-		uint64(24*60*60), // 24h in seconds
-		ids.GenerateTestNodeID(),
-		valRewardAddress,
-		reward.PercentDenominator,
-		[]*secp256k1.PrivateKey{preFundedKeys[0]},
-		ids.ShortEmpty,
-	)
-	require.NoError(err)
-	continuousStakerTx := addValTx.Unsigned.(*txs.AddValidatorTx)
-
-	addValExecutor := StandardTxExecutor{
-		State:   onParentState,
-		Backend: &env.backend,
-		Tx:      addValTx,
-	}
-	require.NoError(addValTx.Unsigned.Visit(&addValExecutor))
-	onParentState.AddTx(addValTx, status.Committed)
-	require.NoError(onParentState.Apply(env.state))
-	env.state.SetHeight(dummyHeight)
-	require.NoError(env.state.Commit())
-
-	continuousStaker, err := env.state.GetCurrentValidator(continuousStakerTx.SubnetID(), continuousStakerTx.NodeID())
-	require.NoError(err)
-
-	// Case 1: Chain timestamp is wrong
-	tx, err := env.txBuilder.NewRewardValidatorTx(continuousStaker.TxID)
-	require.NoError(err)
-
-	onCommitState, err := state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
-
-	onAbortState, err := state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
-
-	txExecutor := ProposalTxExecutor{
-		OnCommitState: onCommitState,
-		OnAbortState:  onAbortState,
-		Backend:       &env.backend,
-		Tx:            tx,
-	}
-	err = tx.Unsigned.Visit(&txExecutor)
-	require.ErrorIs(err, ErrRemoveStakerTooEarly)
-
-	// Advance chain timestamp to time that next validator leaves
-	env.state.SetTimestamp(continuousStaker.NextTime)
-
-	// Case 2: Wrong validator
-	tx, err = env.txBuilder.NewRewardValidatorTx(ids.GenerateTestID())
-	require.NoError(err)
-
-	txExecutor = ProposalTxExecutor{
-		OnCommitState: onCommitState,
-		OnAbortState:  onAbortState,
-		Backend:       &env.backend,
-		Tx:            tx,
-	}
-	err = tx.Unsigned.Visit(&txExecutor)
-	require.ErrorIs(err, ErrRemoveWrongStaker)
-
-	// Case 3: Happy path
-	tx, err = env.txBuilder.NewRewardValidatorTx(continuousStaker.TxID)
-	require.NoError(err)
-
-	onCommitState, err = state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
-
-	onAbortState, err = state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
-
-	txExecutor = ProposalTxExecutor{
-		OnCommitState: onCommitState,
-		OnAbortState:  onAbortState,
-		Backend:       &env.backend,
-		Tx:            tx,
-	}
-	require.NoError(tx.Unsigned.Visit(&txExecutor))
-
-	onAbortStakerIterator, err := txExecutor.OnAbortState.GetCurrentStakerIterator()
-	require.NoError(err)
-
-	// check that post continuousStakingFork, staker is shifted ahead by its staking period
-	var shiftedStaker *state.Staker
-	for onAbortStakerIterator.Next() {
-		nextStaker := onAbortStakerIterator.Value()
-		if nextStaker.TxID == continuousStaker.TxID {
-			shiftedStaker = nextStaker
-			break
-		}
-	}
-	onAbortStakerIterator.Release()
-	require.NotNil(shiftedStaker)
-	require.NotNil(shiftedStaker)
-	require.Equal(continuousStaker.StakingPeriod, shiftedStaker.StakingPeriod)
-	require.Equal(continuousStaker.StartTime.Add(continuousStaker.StakingPeriod), shiftedStaker.StartTime)
-	require.Equal(continuousStaker.NextTime.Add(continuousStaker.StakingPeriod), shiftedStaker.NextTime)
-	require.Equal(continuousStaker.EndTime.Add(continuousStaker.StakingPeriod), shiftedStaker.EndTime)
-
-	// check that reward is given, while stake is not (because of restaking)
-	stakeOwners := continuousStakerTx.StakeOuts[0].Out.(*secp256k1fx.TransferOutput).AddressesSet()
-	rewardAddresses := set.NewSet[ids.ShortID](0)
-	rewardAddresses.Add(valRewardAddress)
-
-	stakeOldBalance, err := avax.GetBalance(env.state, stakeOwners)
-	require.NoError(err)
-	rewardsOldBalance, err := avax.GetBalance(env.state, rewardAddresses)
-	require.NoError(err)
-
-	require.NoError(txExecutor.OnAbortState.Apply(env.state))
-	env.state.SetHeight(dummyHeight + 1)
-	require.NoError(env.state.Commit())
-
-	stakeOnCommitBalance, err := avax.GetBalance(env.state, stakeOwners)
-	require.NoError(err)
-	rewardsOnCommitBalance, err := avax.GetBalance(env.state, rewardAddresses)
-	require.NoError(err)
-
-	require.Equal(stakeOnCommitBalance, stakeOldBalance)
-	require.Equal(rewardsOnCommitBalance, rewardsOldBalance)
-}
-
-func TestContinuousStakingForkRewardDelegatorTxExecuteOnCommit(t *testing.T) {
-	require := require.New(t)
-	env := newEnvironment(continuousStakingFork)
-	env.clk.Set(defaultValidateStartTime.Add(time.Second))
-	env.state.SetTimestamp(defaultValidateStartTime.Add(time.Second))
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-	}()
-	dummyHeight := uint64(1)
-
-	vdrRewardAddress := ids.GenerateTestShortID()
-	delRewardAddress := ids.GenerateTestShortID()
-	vdrNodeID := ids.GenerateTestNodeID()
-	stakersPeriod := uint64(24 * 60 * 60) // 24h in seconds
-
-	vdrTx, err := env.txBuilder.NewAddValidatorTx(
-		env.config.MinValidatorStake,
-		uint64(0),
-		stakersPeriod,
-		vdrNodeID,
-		vdrRewardAddress,
-		reward.PercentDenominator/4,
-		[]*secp256k1.PrivateKey{preFundedKeys[0]},
-		ids.ShortEmpty, /*=changeAddr*/
-	)
-	require.NoError(err)
-
-	delTx, err := env.txBuilder.NewAddDelegatorTx(
-		env.config.MinDelegatorStake,
-		uint64(0),
-		stakersPeriod,
-		vdrNodeID,
-		delRewardAddress,
-		[]*secp256k1.PrivateKey{preFundedKeys[0]},
-		ids.ShortEmpty, /*=changeAddr*/
-	)
-	require.NoError(err)
-
-	currentChainTime := env.state.GetTimestamp()
-	addValTx := vdrTx.Unsigned.(*txs.AddValidatorTx)
-	vdrRewardAmt := uint64(2000000)
-	vdrStaker, err := state.NewCurrentStaker(
-		vdrTx.ID(),
-		addValTx,
-		currentChainTime,
-		mockable.MaxTime,
-		vdrRewardAmt,
-	)
-	require.NoError(err)
-
-	addDelTx := delTx.Unsigned.(*txs.AddDelegatorTx)
-	delRewardAmt := uint64(1000000)
-	delStaker, err := state.NewCurrentStaker(
-		delTx.ID(),
-		addDelTx,
-		currentChainTime,
-		mockable.MaxTime,
-		delRewardAmt,
-	)
-	require.NoError(err)
-
-	env.state.PutCurrentValidator(vdrStaker)
-	env.state.AddTx(vdrTx, status.Committed)
-	env.state.PutCurrentDelegator(delStaker)
-	env.state.AddTx(delTx, status.Committed)
-	env.state.SetTimestamp(delStaker.NextTime)
-	env.state.SetHeight(dummyHeight)
-	require.NoError(env.state.Commit())
-
-	vdrDestSet := set.NewSet[ids.ShortID](0)
-	vdrDestSet.Add(vdrRewardAddress)
-	delDestSet := set.NewSet[ids.ShortID](0)
-	delDestSet.Add(delRewardAddress)
-
-	oldVdrBalance, err := avax.GetBalance(env.state, vdrDestSet)
-	require.NoError(err)
-	oldDelBalance, err := avax.GetBalance(env.state, delDestSet)
-	require.NoError(err)
-
-	// test validator stake
-	vdrSet, ok := env.config.Validators.Get(constants.PrimaryNetworkID)
-	require.True(ok)
-
-	stake := vdrSet.GetWeight(vdrNodeID)
-	require.Equal(env.config.MinValidatorStake+env.config.MinDelegatorStake, stake)
-
-	tx, err := env.txBuilder.NewRewardValidatorTx(delTx.ID())
-	require.NoError(err)
-
-	// Create Delegator Diff
-	onCommitState, err := state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
-
-	onAbortState, err := state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
-
-	txExecutor := ProposalTxExecutor{
-		OnCommitState: onCommitState,
-		OnAbortState:  onAbortState,
-		Backend:       &env.backend,
-		Tx:            tx,
-	}
-	require.NoError(tx.Unsigned.Visit(&txExecutor))
-
-	// check that delegator is not dropped from the staker set
-	onCommitStakerIterator, err := txExecutor.OnCommitState.GetCurrentStakerIterator()
-	require.NoError(err)
-
-	var shiftedStaker *state.Staker
-	for onCommitStakerIterator.Next() {
-		nextStaker := onCommitStakerIterator.Value()
-		if nextStaker.TxID == delStaker.TxID {
-			shiftedStaker = nextStaker
-			break
-		}
-	}
-	onCommitStakerIterator.Release()
-	require.NotNil(shiftedStaker)
-	require.Equal(delStaker.StakingPeriod, shiftedStaker.StakingPeriod)
-	require.Equal(delStaker.StartTime.Add(delStaker.StakingPeriod), shiftedStaker.StartTime)
-	require.Equal(delStaker.NextTime.Add(delStaker.StakingPeriod), shiftedStaker.NextTime)
-	require.Equal(delStaker.EndTime.Add(delStaker.StakingPeriod), shiftedStaker.EndTime)
-
-	// The delegator should be rewarded if the ProposalTx is committed. Since the
-	// delegatee's share is 25%, we expect the delegator to receive 75% of the reward.
-	// Since this is post [CortinaTime], the delegatee should not be rewarded until a
-	// RewardValidatorTx is issued for the delegatee.
-	numDelStakeUTXOs := uint32(len(delTx.Unsigned.InputIDs()))
-	delRewardUTXOID := &avax.UTXOID{
-		TxID:        delTx.ID(),
-		OutputIndex: numDelStakeUTXOs + 1,
-	}
-
-	utxo, err := onCommitState.GetUTXO(delRewardUTXOID.InputID())
-	require.NoError(err)
-	castUTXO, ok := utxo.Out.(*secp256k1fx.TransferOutput)
-	require.True(ok)
-	require.Equal(delRewardAmt*3/4, castUTXO.Amt, "expected delegator balance to increase by 3/4 of reward amount")
-	require.True(delDestSet.Equals(castUTXO.AddressesSet()), "expected reward UTXO to be issued to delDestSet")
-
-	preCortinaVdrRewardUTXOID := &avax.UTXOID{
-		TxID:        delTx.ID(),
-		OutputIndex: numDelStakeUTXOs + 2,
-	}
-	_, err = onCommitState.GetUTXO(preCortinaVdrRewardUTXOID.InputID())
-	require.ErrorIs(err, database.ErrNotFound)
-
-	// Commit Delegator Diff
-	require.NoError(txExecutor.OnCommitState.Apply(env.state))
-
-	env.state.SetHeight(dummyHeight)
-	require.NoError(env.state.Commit())
-
-	tx, err = env.txBuilder.NewRewardValidatorTx(vdrStaker.TxID)
-	require.NoError(err)
-
-	// Create Validator Diff
-	onCommitState, err = state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
-
-	onAbortState, err = state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
-
-	txExecutor = ProposalTxExecutor{
-		OnCommitState: onCommitState,
-		OnAbortState:  onAbortState,
-		Backend:       &env.backend,
-		Tx:            tx,
-	}
-	require.NoError(tx.Unsigned.Visit(&txExecutor))
-
-	require.NotEqual(vdrStaker.TxID, delStaker.TxID)
-
-	numVdrStakeUTXOs := uint32(len(delTx.Unsigned.InputIDs()))
-
-	// check for validator reward here
-	vdrRewardUTXOID := &avax.UTXOID{
-		TxID:        vdrTx.ID(),
-		OutputIndex: numVdrStakeUTXOs + 1,
-	}
-
-	utxo, err = onCommitState.GetUTXO(vdrRewardUTXOID.InputID())
-	require.NoError(err)
-	castUTXO, ok = utxo.Out.(*secp256k1fx.TransferOutput)
-	require.True(ok)
-	require.Equal(vdrRewardAmt, castUTXO.Amt, "expected validator to be rewarded")
-	require.True(vdrDestSet.Equals(castUTXO.AddressesSet()), "expected reward UTXO to be issued to vdrDestSet")
-
-	// check for validator's batched delegator rewards here
-	onCommitVdrDelRewardUTXOID := &avax.UTXOID{
-		TxID:        vdrTx.ID(),
-		OutputIndex: numVdrStakeUTXOs + 2,
-	}
-
-	utxo, err = onCommitState.GetUTXO(onCommitVdrDelRewardUTXOID.InputID())
-	require.NoError(err)
-	castUTXO, ok = utxo.Out.(*secp256k1fx.TransferOutput)
-	require.True(ok)
-	require.Equal(delRewardAmt/4, castUTXO.Amt, "expected validator to be rewarded with accrued delegator rewards")
-	require.True(vdrDestSet.Equals(castUTXO.AddressesSet()), "expected reward UTXO to be issued to vdrDestSet")
-
-	// aborted validator tx should still distribute accrued delegator rewards
-	onAbortVdrDelRewardUTXOID := &avax.UTXOID{
-		TxID:        vdrTx.ID(),
-		OutputIndex: numVdrStakeUTXOs + 1,
-	}
-
-	utxo, err = onAbortState.GetUTXO(onAbortVdrDelRewardUTXOID.InputID())
-	require.NoError(err)
-	castUTXO, ok = utxo.Out.(*secp256k1fx.TransferOutput)
-	require.True(ok)
-	require.Equal(delRewardAmt/4, castUTXO.Amt, "expected validator to be rewarded with accrued delegator rewards")
-	require.True(vdrDestSet.Equals(castUTXO.AddressesSet()), "expected reward UTXO to be issued to vdrDestSet")
-
-	_, err = onCommitState.GetUTXO(preCortinaVdrRewardUTXOID.InputID())
-	require.ErrorIs(err, database.ErrNotFound)
-
-	// Commit Validator Diff
-	require.NoError(txExecutor.OnCommitState.Apply(env.state))
-
-	env.state.SetHeight(dummyHeight)
-	require.NoError(env.state.Commit())
-
-	// Since the tx was committed, the delegator and the delegatee should be rewarded.
-	// The delegator reward should be higher since the delegatee's share is 25%.
-	commitVdrBalance, err := avax.GetBalance(env.state, vdrDestSet)
-	require.NoError(err)
-	vdrReward, err := math.Sub(commitVdrBalance, oldVdrBalance)
-	require.NoError(err)
-	delegateeReward, err := math.Sub(vdrReward, 2000000)
-	require.NoError(err)
-	require.NotZero(delegateeReward, "expected delegatee balance to increase because of reward")
-
-	commitDelBalance, err := avax.GetBalance(env.state, delDestSet)
-	require.NoError(err)
-	delReward, err := math.Sub(commitDelBalance, oldDelBalance)
-	require.NoError(err)
-	require.NotZero(delReward, "expected delegator balance to increase because of reward")
-
-	require.Less(delegateeReward, delReward, "the delegator's reward should be greater than the delegatee's because the delegatee's share is 25%")
-	require.Equal(delRewardAmt, delReward+delegateeReward, "expected total reward to be %d but is %d", delRewardAmt, delReward+vdrReward)
-}
+// TODO: use new txs to create continuous stakers and unlock these UTs
+// func TestContinuousStakingForkRewardValidatorTxExecuteOnCommit(t *testing.T) {
+// 	require := require.New(t)
+// 	env := newEnvironment(latestFork)
+// 	defer func() {
+// 		require.NoError(shutdownEnvironment(env))
+// 	}()
+// 	dummyHeight := uint64(1)
+
+// 	// Add a continuous validator
+// 	onParentState, err := state.NewDiff(lastAcceptedID, env)
+// 	require.NoError(err)
+
+// 	valRewardAddress := ids.GenerateTestShortID()
+// 	addValTx, err := env.txBuilder.NewAddValidatorTx(
+// 		env.config.MinValidatorStake,
+// 		uint64(0),
+// 		uint64(24*60*60), // 24h in seconds
+// 		ids.GenerateTestNodeID(),
+// 		valRewardAddress,
+// 		reward.PercentDenominator,
+// 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+// 		ids.ShortEmpty,
+// 	)
+// 	require.NoError(err)
+// 	continuousStakerTx := addValTx.Unsigned.(*txs.AddValidatorTx)
+
+// 	addValExecutor := StandardTxExecutor{
+// 		State:   onParentState,
+// 		Backend: &env.backend,
+// 		Tx:      addValTx,
+// 	}
+// 	require.NoError(addValTx.Unsigned.Visit(&addValExecutor))
+// 	onParentState.AddTx(addValTx, status.Committed)
+// 	require.NoError(onParentState.Apply(env.state))
+// 	env.state.SetHeight(dummyHeight)
+// 	require.NoError(env.state.Commit())
+
+// 	continuousStaker, err := env.state.GetCurrentValidator(continuousStakerTx.SubnetID(), continuousStakerTx.NodeID())
+// 	require.NoError(err)
+
+// 	// Case 1: Chain timestamp is wrong
+// 	tx, err := env.txBuilder.NewRewardValidatorTx(continuousStaker.TxID)
+// 	require.NoError(err)
+
+// 	onCommitState, err := state.NewDiff(lastAcceptedID, env)
+// 	require.NoError(err)
+
+// 	onAbortState, err := state.NewDiff(lastAcceptedID, env)
+// 	require.NoError(err)
+
+// 	txExecutor := ProposalTxExecutor{
+// 		OnCommitState: onCommitState,
+// 		OnAbortState:  onAbortState,
+// 		Backend:       &env.backend,
+// 		Tx:            tx,
+// 	}
+// 	err = tx.Unsigned.Visit(&txExecutor)
+// 	require.ErrorIs(err, ErrRemoveStakerTooEarly)
+
+// 	// Advance chain timestamp to time that next validator should be rewarded
+// 	env.state.SetTimestamp(continuousStaker.NextTime)
+
+// 	// Case 2: Wrong validator
+// 	tx, err = env.txBuilder.NewRewardValidatorTx(ids.GenerateTestID())
+// 	require.NoError(err)
+
+// 	onCommitState, err = state.NewDiff(lastAcceptedID, env)
+// 	require.NoError(err)
+
+// 	onAbortState, err = state.NewDiff(lastAcceptedID, env)
+// 	require.NoError(err)
+
+// 	txExecutor = ProposalTxExecutor{
+// 		OnCommitState: onCommitState,
+// 		OnAbortState:  onAbortState,
+// 		Backend:       &env.backend,
+// 		Tx:            tx,
+// 	}
+// 	err = tx.Unsigned.Visit(&txExecutor)
+// 	require.ErrorIs(err, ErrRemoveWrongStaker)
+
+// 	// Case 3: Happy path
+// 	tx, err = env.txBuilder.NewRewardValidatorTx(continuousStaker.TxID)
+// 	require.NoError(err)
+
+// 	onCommitState, err = state.NewDiff(lastAcceptedID, env)
+// 	require.NoError(err)
+
+// 	onAbortState, err = state.NewDiff(lastAcceptedID, env)
+// 	require.NoError(err)
+
+// 	txExecutor = ProposalTxExecutor{
+// 		OnCommitState: onCommitState,
+// 		OnAbortState:  onAbortState,
+// 		Backend:       &env.backend,
+// 		Tx:            tx,
+// 	}
+// 	require.NoError(tx.Unsigned.Visit(&txExecutor))
+
+// 	onCommitStakerIterator, err := txExecutor.OnCommitState.GetCurrentStakerIterator()
+// 	require.NoError(err)
+
+// 	// check that post continuousStakingFork, staker is shifted ahead by its staking period
+// 	var shiftedStaker *state.Staker
+// 	for onCommitStakerIterator.Next() {
+// 		nextStaker := onCommitStakerIterator.Value()
+// 		if nextStaker.TxID == continuousStaker.TxID {
+// 			shiftedStaker = nextStaker
+// 			break
+// 		}
+// 	}
+// 	onCommitStakerIterator.Release()
+// 	require.NotNil(shiftedStaker)
+// 	require.Equal(continuousStaker.StakingPeriod, shiftedStaker.StakingPeriod)
+// 	require.Equal(continuousStaker.StartTime.Add(continuousStaker.StakingPeriod), shiftedStaker.StartTime)
+// 	require.Equal(continuousStaker.NextTime.Add(continuousStaker.StakingPeriod), shiftedStaker.NextTime)
+// 	require.Equal(continuousStaker.EndTime.Add(continuousStaker.StakingPeriod), shiftedStaker.EndTime)
+
+// 	// check that reward is given, while stake is not (because of restaking)
+// 	stakeOwners := continuousStakerTx.StakeOuts[0].Out.(*secp256k1fx.TransferOutput).AddressesSet()
+// 	rewardAddresses := set.NewSet[ids.ShortID](0)
+// 	rewardAddresses.Add(valRewardAddress)
+
+// 	stakeOldBalance, err := avax.GetBalance(env.state, stakeOwners)
+// 	require.NoError(err)
+// 	rewardsOldBalance, err := avax.GetBalance(env.state, rewardAddresses)
+// 	require.NoError(err)
+
+// 	require.NoError(txExecutor.OnCommitState.Apply(env.state))
+// 	env.state.SetHeight(dummyHeight + 1)
+// 	require.NoError(env.state.Commit())
+
+// 	stakeOnCommitBalance, err := avax.GetBalance(env.state, stakeOwners)
+// 	require.NoError(err)
+// 	rewardsOnCommitBalance, err := avax.GetBalance(env.state, rewardAddresses)
+// 	require.NoError(err)
+
+// 	require.Equal(stakeOnCommitBalance, stakeOldBalance)
+// 	require.Equal(rewardsOnCommitBalance, rewardsOldBalance+13706)
+// }
+
+// func TestContinuousStakingForkRewardValidatorTxExecuteOnAbort(t *testing.T) {
+// 	require := require.New(t)
+// 	env := newEnvironment(continuousStakingFork)
+// 	env.clk.Set(defaultValidateStartTime.Add(time.Second))
+// 	env.state.SetTimestamp(defaultValidateStartTime.Add(time.Second))
+// 	defer func() {
+// 		require.NoError(shutdownEnvironment(env))
+// 	}()
+// 	dummyHeight := uint64(1)
+
+// 	// Add a continuous validator
+// 	onParentState, err := state.NewDiff(lastAcceptedID, env)
+// 	require.NoError(err)
+
+// 	valRewardAddress := ids.GenerateTestShortID()
+// 	addValTx, err := env.txBuilder.NewAddValidatorTx(
+// 		env.config.MinValidatorStake,
+// 		uint64(0),
+// 		uint64(24*60*60), // 24h in seconds
+// 		ids.GenerateTestNodeID(),
+// 		valRewardAddress,
+// 		reward.PercentDenominator,
+// 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+// 		ids.ShortEmpty,
+// 	)
+// 	require.NoError(err)
+// 	continuousStakerTx := addValTx.Unsigned.(*txs.AddValidatorTx)
+
+// 	addValExecutor := StandardTxExecutor{
+// 		State:   onParentState,
+// 		Backend: &env.backend,
+// 		Tx:      addValTx,
+// 	}
+// 	require.NoError(addValTx.Unsigned.Visit(&addValExecutor))
+// 	onParentState.AddTx(addValTx, status.Committed)
+// 	require.NoError(onParentState.Apply(env.state))
+// 	env.state.SetHeight(dummyHeight)
+// 	require.NoError(env.state.Commit())
+
+// 	continuousStaker, err := env.state.GetCurrentValidator(continuousStakerTx.SubnetID(), continuousStakerTx.NodeID())
+// 	require.NoError(err)
+
+// 	// Case 1: Chain timestamp is wrong
+// 	tx, err := env.txBuilder.NewRewardValidatorTx(continuousStaker.TxID)
+// 	require.NoError(err)
+
+// 	onCommitState, err := state.NewDiff(lastAcceptedID, env)
+// 	require.NoError(err)
+
+// 	onAbortState, err := state.NewDiff(lastAcceptedID, env)
+// 	require.NoError(err)
+
+// 	txExecutor := ProposalTxExecutor{
+// 		OnCommitState: onCommitState,
+// 		OnAbortState:  onAbortState,
+// 		Backend:       &env.backend,
+// 		Tx:            tx,
+// 	}
+// 	err = tx.Unsigned.Visit(&txExecutor)
+// 	require.ErrorIs(err, ErrRemoveStakerTooEarly)
+
+// 	// Advance chain timestamp to time that next validator leaves
+// 	env.state.SetTimestamp(continuousStaker.NextTime)
+
+// 	// Case 2: Wrong validator
+// 	tx, err = env.txBuilder.NewRewardValidatorTx(ids.GenerateTestID())
+// 	require.NoError(err)
+
+// 	txExecutor = ProposalTxExecutor{
+// 		OnCommitState: onCommitState,
+// 		OnAbortState:  onAbortState,
+// 		Backend:       &env.backend,
+// 		Tx:            tx,
+// 	}
+// 	err = tx.Unsigned.Visit(&txExecutor)
+// 	require.ErrorIs(err, ErrRemoveWrongStaker)
+
+// 	// Case 3: Happy path
+// 	tx, err = env.txBuilder.NewRewardValidatorTx(continuousStaker.TxID)
+// 	require.NoError(err)
+
+// 	onCommitState, err = state.NewDiff(lastAcceptedID, env)
+// 	require.NoError(err)
+
+// 	onAbortState, err = state.NewDiff(lastAcceptedID, env)
+// 	require.NoError(err)
+
+// 	txExecutor = ProposalTxExecutor{
+// 		OnCommitState: onCommitState,
+// 		OnAbortState:  onAbortState,
+// 		Backend:       &env.backend,
+// 		Tx:            tx,
+// 	}
+// 	require.NoError(tx.Unsigned.Visit(&txExecutor))
+
+// 	onAbortStakerIterator, err := txExecutor.OnAbortState.GetCurrentStakerIterator()
+// 	require.NoError(err)
+
+// 	// check that post continuousStakingFork, staker is shifted ahead by its staking period
+// 	var shiftedStaker *state.Staker
+// 	for onAbortStakerIterator.Next() {
+// 		nextStaker := onAbortStakerIterator.Value()
+// 		if nextStaker.TxID == continuousStaker.TxID {
+// 			shiftedStaker = nextStaker
+// 			break
+// 		}
+// 	}
+// 	onAbortStakerIterator.Release()
+// 	require.NotNil(shiftedStaker)
+// 	require.Equal(continuousStaker.StakingPeriod, shiftedStaker.StakingPeriod)
+// 	require.Equal(continuousStaker.StartTime.Add(continuousStaker.StakingPeriod), shiftedStaker.StartTime)
+// 	require.Equal(continuousStaker.NextTime.Add(continuousStaker.StakingPeriod), shiftedStaker.NextTime)
+// 	require.Equal(continuousStaker.EndTime.Add(continuousStaker.StakingPeriod), shiftedStaker.EndTime)
+
+// 	// check that reward is given, while stake is not (because of restaking)
+// 	stakeOwners := continuousStakerTx.StakeOuts[0].Out.(*secp256k1fx.TransferOutput).AddressesSet()
+// 	rewardAddresses := set.NewSet[ids.ShortID](0)
+// 	rewardAddresses.Add(valRewardAddress)
+
+// 	stakeOldBalance, err := avax.GetBalance(env.state, stakeOwners)
+// 	require.NoError(err)
+// 	rewardsOldBalance, err := avax.GetBalance(env.state, rewardAddresses)
+// 	require.NoError(err)
+
+// 	require.NoError(txExecutor.OnAbortState.Apply(env.state))
+// 	env.state.SetHeight(dummyHeight + 1)
+// 	require.NoError(env.state.Commit())
+
+// 	stakeOnCommitBalance, err := avax.GetBalance(env.state, stakeOwners)
+// 	require.NoError(err)
+// 	rewardsOnCommitBalance, err := avax.GetBalance(env.state, rewardAddresses)
+// 	require.NoError(err)
+
+// 	require.Equal(stakeOnCommitBalance, stakeOldBalance)
+// 	require.Equal(rewardsOnCommitBalance, rewardsOldBalance)
+// }
+
+// func TestContinuousStakingForkRewardDelegatorTxExecuteOnCommit(t *testing.T) {
+// 	require := require.New(t)
+// 	env := newEnvironment(continuousStakingFork)
+// 	env.clk.Set(defaultValidateStartTime.Add(time.Second))
+// 	env.state.SetTimestamp(defaultValidateStartTime.Add(time.Second))
+// 	defer func() {
+// 		require.NoError(shutdownEnvironment(env))
+// 	}()
+// 	dummyHeight := uint64(1)
+
+// 	vdrRewardAddress := ids.GenerateTestShortID()
+// 	delRewardAddress := ids.GenerateTestShortID()
+// 	vdrNodeID := ids.GenerateTestNodeID()
+// 	stakersPeriod := uint64(24 * 60 * 60) // 24h in seconds
+
+// 	vdrTx, err := env.txBuilder.NewAddValidatorTx(
+// 		env.config.MinValidatorStake,
+// 		uint64(0),
+// 		stakersPeriod,
+// 		vdrNodeID,
+// 		vdrRewardAddress,
+// 		reward.PercentDenominator/4,
+// 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+// 		ids.ShortEmpty, /*=changeAddr*/
+// 	)
+// 	require.NoError(err)
+
+// 	delTx, err := env.txBuilder.NewAddDelegatorTx(
+// 		env.config.MinDelegatorStake,
+// 		uint64(0),
+// 		stakersPeriod,
+// 		vdrNodeID,
+// 		delRewardAddress,
+// 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
+// 		ids.ShortEmpty, /*=changeAddr*/
+// 	)
+// 	require.NoError(err)
+
+// 	currentChainTime := env.state.GetTimestamp()
+// 	addValTx := vdrTx.Unsigned.(*txs.AddValidatorTx)
+// 	vdrRewardAmt := uint64(2000000)
+// 	vdrStaker, err := state.NewCurrentStaker(
+// 		vdrTx.ID(),
+// 		addValTx,
+// 		currentChainTime,
+// 		mockable.MaxTime,
+// 		vdrRewardAmt,
+// 	)
+// 	require.NoError(err)
+
+// 	addDelTx := delTx.Unsigned.(*txs.AddDelegatorTx)
+// 	delRewardAmt := uint64(1000000)
+// 	delStaker, err := state.NewCurrentStaker(
+// 		delTx.ID(),
+// 		addDelTx,
+// 		currentChainTime,
+// 		mockable.MaxTime,
+// 		delRewardAmt,
+// 	)
+// 	require.NoError(err)
+
+// 	env.state.PutCurrentValidator(vdrStaker)
+// 	env.state.AddTx(vdrTx, status.Committed)
+// 	env.state.PutCurrentDelegator(delStaker)
+// 	env.state.AddTx(delTx, status.Committed)
+// 	env.state.SetTimestamp(delStaker.NextTime)
+// 	env.state.SetHeight(dummyHeight)
+// 	require.NoError(env.state.Commit())
+
+// 	vdrDestSet := set.NewSet[ids.ShortID](0)
+// 	vdrDestSet.Add(vdrRewardAddress)
+// 	delDestSet := set.NewSet[ids.ShortID](0)
+// 	delDestSet.Add(delRewardAddress)
+
+// 	oldVdrBalance, err := avax.GetBalance(env.state, vdrDestSet)
+// 	require.NoError(err)
+// 	oldDelBalance, err := avax.GetBalance(env.state, delDestSet)
+// 	require.NoError(err)
+
+// 	// test validator stake
+// 	vdrSet, ok := env.config.Validators.Get(constants.PrimaryNetworkID)
+// 	require.True(ok)
+
+// 	stake := vdrSet.GetWeight(vdrNodeID)
+// 	require.Equal(env.config.MinValidatorStake+env.config.MinDelegatorStake, stake)
+
+// 	tx, err := env.txBuilder.NewRewardValidatorTx(delTx.ID())
+// 	require.NoError(err)
+
+// 	// Create Delegator Diff
+// 	onCommitState, err := state.NewDiff(lastAcceptedID, env)
+// 	require.NoError(err)
+
+// 	onAbortState, err := state.NewDiff(lastAcceptedID, env)
+// 	require.NoError(err)
+
+// 	txExecutor := ProposalTxExecutor{
+// 		OnCommitState: onCommitState,
+// 		OnAbortState:  onAbortState,
+// 		Backend:       &env.backend,
+// 		Tx:            tx,
+// 	}
+// 	require.NoError(tx.Unsigned.Visit(&txExecutor))
+
+// 	// check that delegator is not dropped from the staker set
+// 	onCommitStakerIterator, err := txExecutor.OnCommitState.GetCurrentStakerIterator()
+// 	require.NoError(err)
+
+// 	var shiftedStaker *state.Staker
+// 	for onCommitStakerIterator.Next() {
+// 		nextStaker := onCommitStakerIterator.Value()
+// 		if nextStaker.TxID == delStaker.TxID {
+// 			shiftedStaker = nextStaker
+// 			break
+// 		}
+// 	}
+// 	onCommitStakerIterator.Release()
+// 	require.NotNil(shiftedStaker)
+// 	require.Equal(delStaker.StakingPeriod, shiftedStaker.StakingPeriod)
+// 	require.Equal(delStaker.StartTime.Add(delStaker.StakingPeriod), shiftedStaker.StartTime)
+// 	require.Equal(delStaker.NextTime.Add(delStaker.StakingPeriod), shiftedStaker.NextTime)
+// 	require.Equal(delStaker.EndTime.Add(delStaker.StakingPeriod), shiftedStaker.EndTime)
+
+// 	// The delegator should be rewarded if the ProposalTx is committed. Since the
+// 	// delegatee's share is 25%, we expect the delegator to receive 75% of the reward.
+// 	// Since this is post [CortinaTime], the delegatee should not be rewarded until a
+// 	// RewardValidatorTx is issued for the delegatee.
+// 	numDelStakeUTXOs := uint32(len(delTx.Unsigned.InputIDs()))
+// 	delRewardUTXOID := &avax.UTXOID{
+// 		TxID:        delTx.ID(),
+// 		OutputIndex: numDelStakeUTXOs + 1,
+// 	}
+
+// 	utxo, err := onCommitState.GetUTXO(delRewardUTXOID.InputID())
+// 	require.NoError(err)
+// 	castUTXO, ok := utxo.Out.(*secp256k1fx.TransferOutput)
+// 	require.True(ok)
+// 	require.Equal(delRewardAmt*3/4, castUTXO.Amt, "expected delegator balance to increase by 3/4 of reward amount")
+// 	require.True(delDestSet.Equals(castUTXO.AddressesSet()), "expected reward UTXO to be issued to delDestSet")
+
+// 	preCortinaVdrRewardUTXOID := &avax.UTXOID{
+// 		TxID:        delTx.ID(),
+// 		OutputIndex: numDelStakeUTXOs + 2,
+// 	}
+// 	_, err = onCommitState.GetUTXO(preCortinaVdrRewardUTXOID.InputID())
+// 	require.ErrorIs(err, database.ErrNotFound)
+
+// 	// Commit Delegator Diff
+// 	require.NoError(txExecutor.OnCommitState.Apply(env.state))
+
+// 	env.state.SetHeight(dummyHeight)
+// 	require.NoError(env.state.Commit())
+
+// 	tx, err = env.txBuilder.NewRewardValidatorTx(vdrStaker.TxID)
+// 	require.NoError(err)
+
+// 	// Create Validator Diff
+// 	onCommitState, err = state.NewDiff(lastAcceptedID, env)
+// 	require.NoError(err)
+
+// 	onAbortState, err = state.NewDiff(lastAcceptedID, env)
+// 	require.NoError(err)
+
+// 	txExecutor = ProposalTxExecutor{
+// 		OnCommitState: onCommitState,
+// 		OnAbortState:  onAbortState,
+// 		Backend:       &env.backend,
+// 		Tx:            tx,
+// 	}
+// 	require.NoError(tx.Unsigned.Visit(&txExecutor))
+
+// 	require.NotEqual(vdrStaker.TxID, delStaker.TxID)
+
+// 	numVdrStakeUTXOs := uint32(len(delTx.Unsigned.InputIDs()))
+
+// 	// check for validator reward here
+// 	vdrRewardUTXOID := &avax.UTXOID{
+// 		TxID:        vdrTx.ID(),
+// 		OutputIndex: numVdrStakeUTXOs + 1,
+// 	}
+
+// 	utxo, err = onCommitState.GetUTXO(vdrRewardUTXOID.InputID())
+// 	require.NoError(err)
+// 	castUTXO, ok = utxo.Out.(*secp256k1fx.TransferOutput)
+// 	require.True(ok)
+// 	require.Equal(vdrRewardAmt, castUTXO.Amt, "expected validator to be rewarded")
+// 	require.True(vdrDestSet.Equals(castUTXO.AddressesSet()), "expected reward UTXO to be issued to vdrDestSet")
+
+// 	// check for validator's batched delegator rewards here
+// 	onCommitVdrDelRewardUTXOID := &avax.UTXOID{
+// 		TxID:        vdrTx.ID(),
+// 		OutputIndex: numVdrStakeUTXOs + 2,
+// 	}
+
+// 	utxo, err = onCommitState.GetUTXO(onCommitVdrDelRewardUTXOID.InputID())
+// 	require.NoError(err)
+// 	castUTXO, ok = utxo.Out.(*secp256k1fx.TransferOutput)
+// 	require.True(ok)
+// 	require.Equal(delRewardAmt/4, castUTXO.Amt, "expected validator to be rewarded with accrued delegator rewards")
+// 	require.True(vdrDestSet.Equals(castUTXO.AddressesSet()), "expected reward UTXO to be issued to vdrDestSet")
+
+// 	// aborted validator tx should still distribute accrued delegator rewards
+// 	onAbortVdrDelRewardUTXOID := &avax.UTXOID{
+// 		TxID:        vdrTx.ID(),
+// 		OutputIndex: numVdrStakeUTXOs + 1,
+// 	}
+
+// 	utxo, err = onAbortState.GetUTXO(onAbortVdrDelRewardUTXOID.InputID())
+// 	require.NoError(err)
+// 	castUTXO, ok = utxo.Out.(*secp256k1fx.TransferOutput)
+// 	require.True(ok)
+// 	require.Equal(delRewardAmt/4, castUTXO.Amt, "expected validator to be rewarded with accrued delegator rewards")
+// 	require.True(vdrDestSet.Equals(castUTXO.AddressesSet()), "expected reward UTXO to be issued to vdrDestSet")
+
+// 	_, err = onCommitState.GetUTXO(preCortinaVdrRewardUTXOID.InputID())
+// 	require.ErrorIs(err, database.ErrNotFound)
+
+// 	// Commit Validator Diff
+// 	require.NoError(txExecutor.OnCommitState.Apply(env.state))
+
+// 	env.state.SetHeight(dummyHeight)
+// 	require.NoError(env.state.Commit())
+
+// 	// Since the tx was committed, the delegator and the delegatee should be rewarded.
+// 	// The delegator reward should be higher since the delegatee's share is 25%.
+// 	commitVdrBalance, err := avax.GetBalance(env.state, vdrDestSet)
+// 	require.NoError(err)
+// 	vdrReward, err := math.Sub(commitVdrBalance, oldVdrBalance)
+// 	require.NoError(err)
+// 	delegateeReward, err := math.Sub(vdrReward, 2000000)
+// 	require.NoError(err)
+// 	require.NotZero(delegateeReward, "expected delegatee balance to increase because of reward")
+
+// 	commitDelBalance, err := avax.GetBalance(env.state, delDestSet)
+// 	require.NoError(err)
+// 	delReward, err := math.Sub(commitDelBalance, oldDelBalance)
+// 	require.NoError(err)
+// 	require.NotZero(delReward, "expected delegator balance to increase because of reward")
+
+// 	require.Less(delegateeReward, delReward, "the delegator's reward should be greater than the delegatee's because the delegatee's share is 25%")
+// 	require.Equal(delRewardAmt, delReward+delegateeReward, "expected total reward to be %d but is %d", delRewardAmt, delReward+vdrReward)
+// }
 
 func TestCortinaForkRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	require := require.New(t)

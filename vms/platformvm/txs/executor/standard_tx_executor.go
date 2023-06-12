@@ -11,9 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -281,8 +279,12 @@ func (e *StandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 		return err
 	}
 
-	txID := e.Tx.ID()
-	if err := e.addStakerFromStakerTx(tx, e.State.GetTimestamp(), mockable.MaxTime); err != nil {
+	var (
+		txID      = e.Tx.ID()
+		startTime = e.State.GetTimestamp()
+		endTime   = startTime.Add(tx.StakingPeriod())
+	)
+	if err := e.addStakerFromStakerTx(tx, startTime, endTime); err != nil {
 		return err
 	}
 
@@ -304,11 +306,10 @@ func (e *StandardTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 
 	var (
 		txID      = e.Tx.ID()
-		chainTime = e.State.GetTimestamp()
+		startTime = e.State.GetTimestamp()
+		endTime   = startTime.Add(tx.StakingPeriod())
 	)
-
-	err = e.addStakerFromStakerTx(tx, chainTime, chainTime.Add(tx.StakingPeriod()))
-	if err != nil {
+	if err := e.addStakerFromStakerTx(tx, startTime, endTime); err != nil {
 		return err
 	}
 
@@ -317,7 +318,7 @@ func (e *StandardTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 }
 
 func (e *StandardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
-	_, primaryValidatorEndTime, err := verifyAddDelegatorTx(
+	_, err := verifyAddDelegatorTx(
 		e.Backend,
 		e.State,
 		e.Tx,
@@ -327,8 +328,12 @@ func (e *StandardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 		return err
 	}
 
-	txID := e.Tx.ID()
-	if err := e.addStakerFromStakerTx(tx, e.State.GetTimestamp(), primaryValidatorEndTime); err != nil {
+	var (
+		txID      = e.Tx.ID()
+		startTime = e.State.GetTimestamp()
+		endTime   = startTime.Add(tx.StakingPeriod())
+	)
+	if err := e.addStakerFromStakerTx(tx, startTime, endTime); err != nil {
 		return err
 	}
 
@@ -427,16 +432,10 @@ func (e *StandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionl
 
 	var (
 		txID      = e.Tx.ID()
-		chainTime = e.State.GetTimestamp()
+		startTime = e.State.GetTimestamp()
+		endTime   = startTime.Add(tx.StakingPeriod())
 	)
-
-	if tx.SubnetID() == constants.PrimaryNetworkID {
-		err = e.addStakerFromStakerTx(tx, chainTime, mockable.MaxTime)
-	} else {
-		err = e.addStakerFromStakerTx(tx, chainTime, chainTime.Add(tx.StakingPeriod()))
-	}
-
-	if err != nil {
+	if err := e.addStakerFromStakerTx(tx, startTime, endTime); err != nil {
 		return err
 	}
 
@@ -446,7 +445,7 @@ func (e *StandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionl
 }
 
 func (e *StandardTxExecutor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
-	primaryValidatorEndTime, err := verifyAddPermissionlessDelegatorTx(
+	err := verifyAddPermissionlessDelegatorTx(
 		e.Backend,
 		e.State,
 		e.Tx,
@@ -456,8 +455,12 @@ func (e *StandardTxExecutor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionl
 		return err
 	}
 
-	txID := e.Tx.ID()
-	if err := e.addStakerFromStakerTx(tx, e.State.GetTimestamp(), primaryValidatorEndTime); err != nil {
+	var (
+		txID      = e.Tx.ID()
+		startTime = e.State.GetTimestamp()
+		endTime   = startTime.Add(tx.StakingPeriod())
+	)
+	if err := e.addStakerFromStakerTx(tx, startTime, endTime); err != nil {
 		return err
 	}
 

@@ -358,27 +358,26 @@ func verifyAddDelegatorTx(
 	tx *txs.AddDelegatorTx,
 ) (
 	[]*avax.TransferableOutput,
-	time.Time,
 	error,
 ) {
 	// Verify the tx is well-formed
 	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
-		return nil, time.Time{}, err
+		return nil, err
 	}
 
 	duration := tx.StakingPeriod()
 	switch {
 	case duration < backend.Config.MinStakeDuration:
 		// Ensure staking length is not too short
-		return nil, time.Time{}, ErrStakeTooShort
+		return nil, ErrStakeTooShort
 
 	case duration > backend.Config.MaxStakeDuration:
 		// Ensure staking length is not too long
-		return nil, time.Time{}, ErrStakeTooLong
+		return nil, ErrStakeTooLong
 
 	case tx.Validator.Wght < backend.Config.MinDelegatorStake:
 		// Ensure validator is staking at least the minimum amount
-		return nil, time.Time{}, ErrWeightTooSmall
+		return nil, ErrWeightTooSmall
 	}
 
 	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.StakeOuts))
@@ -387,7 +386,7 @@ func verifyAddDelegatorTx(
 
 	primaryNetworkValidator, err := GetValidator(chainState, constants.PrimaryNetworkID, tx.Validator.NodeID)
 	if err != nil {
-		return nil, time.Time{}, fmt.Errorf(
+		return nil, fmt.Errorf(
 			"failed to fetch the primary network validator for %s: %w",
 			tx.Validator.NodeID,
 			err,
@@ -395,7 +394,7 @@ func verifyAddDelegatorTx(
 	}
 
 	if !backend.Bootstrapped.Get() {
-		return outs, primaryNetworkValidator.EndTime, nil
+		return outs, nil
 	}
 
 	// Pre Continuous Staking fork activation, start time must be after current chain time.
@@ -408,7 +407,7 @@ func verifyAddDelegatorTx(
 	)
 	if !isContinuousStakingForkActive {
 		if !currentTimestamp.Before(preContinuousStakingStartTime) {
-			return nil, time.Time{}, fmt.Errorf(
+			return nil, fmt.Errorf(
 				"%w: %s >= %s",
 				ErrTimestampNotBeforeStartTime,
 				currentTimestamp,
@@ -419,7 +418,7 @@ func verifyAddDelegatorTx(
 
 	maximumWeight, err := math.Mul64(MaxValidatorWeightFactor, primaryNetworkValidator.Weight)
 	if err != nil {
-		return nil, time.Time{}, ErrStakeOverflow
+		return nil, ErrStakeOverflow
 	}
 
 	if backend.Config.IsApricotPhase3Activated(currentTimestamp) {
@@ -435,15 +434,15 @@ func verifyAddDelegatorTx(
 		newStaker, err = state.NewPendingStaker(txID, tx)
 	}
 	if err != nil {
-		return nil, time.Time{}, err
+		return nil, err
 	}
 
 	canDelegate, err := canDelegate(chainState, primaryNetworkValidator, maximumWeight, newStaker)
 	if err != nil {
-		return nil, time.Time{}, err
+		return nil, err
 	}
 	if !canDelegate {
-		return nil, time.Time{}, ErrOverDelegated
+		return nil, ErrOverDelegated
 	}
 
 	// Verify the flowcheck
@@ -457,7 +456,7 @@ func verifyAddDelegatorTx(
 			backend.Ctx.AVAXAssetID: backend.Config.AddPrimaryNetworkDelegatorFee,
 		},
 	); err != nil {
-		return nil, time.Time{}, fmt.Errorf("%w: %v", ErrFlowCheckFailed, err)
+		return nil, fmt.Errorf("%w: %v", ErrFlowCheckFailed, err)
 	}
 
 	if !isContinuousStakingForkActive {
@@ -465,11 +464,11 @@ func verifyAddDelegatorTx(
 		// to allow the verifier visitor to explicitly check for this error.
 		maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
 		if preContinuousStakingStartTime.After(maxStartTime) {
-			return nil, time.Time{}, ErrFutureStakeTime
+			return nil, ErrFutureStakeTime
 		}
 	}
 
-	return outs, primaryNetworkValidator.EndTime, nil
+	return outs, nil
 }
 
 // verifyAddPermissionlessValidatorTx carries out the validation for an
@@ -678,15 +677,15 @@ func verifyAddPermissionlessDelegatorTx(
 	chainState state.Chain,
 	sTx *txs.Tx,
 	tx *txs.AddPermissionlessDelegatorTx,
-) (time.Time, error) {
+) error {
 	// Verify the tx is well-formed
 	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
-		return time.Time{}, err
+		return err
 	}
 
 	validator, err := GetValidator(chainState, tx.Subnet, tx.Validator.NodeID)
 	if err != nil {
-		return time.Time{}, fmt.Errorf(
+		return fmt.Errorf(
 			"failed to fetch the validator for %s on %s: %w",
 			tx.Validator.NodeID,
 			tx.Subnet,
@@ -695,7 +694,7 @@ func verifyAddPermissionlessDelegatorTx(
 	}
 
 	if !backend.Bootstrapped.Get() {
-		return validator.EndTime, nil
+		return nil
 	}
 
 	// Pre Continuous Staking fork activation, start time must be after current chain time.
@@ -708,7 +707,7 @@ func verifyAddPermissionlessDelegatorTx(
 	)
 	if !isContinuousStakingForkActive {
 		if !currentTimestamp.Before(preContinuousStakingStartTime) {
-			return time.Time{}, fmt.Errorf(
+			return fmt.Errorf(
 				"chain timestamp (%s) not before validator's start time (%s)",
 				currentTimestamp,
 				preContinuousStakingStartTime,
@@ -718,7 +717,7 @@ func verifyAddPermissionlessDelegatorTx(
 
 	delegatorRules, err := getDelegatorRules(backend, chainState, tx.Subnet)
 	if err != nil {
-		return time.Time{}, err
+		return err
 	}
 
 	var (
@@ -728,19 +727,19 @@ func verifyAddPermissionlessDelegatorTx(
 	switch {
 	case tx.Validator.Wght < delegatorRules.minDelegatorStake:
 		// Ensure delegator is staking at least the minimum amount
-		return time.Time{}, ErrWeightTooSmall
+		return ErrWeightTooSmall
 
 	case duration < delegatorRules.minStakeDuration:
 		// Ensure staking length is not too short
-		return time.Time{}, ErrStakeTooShort
+		return ErrStakeTooShort
 
 	case duration > delegatorRules.maxStakeDuration:
 		// Ensure staking length is not too long
-		return time.Time{}, ErrStakeTooLong
+		return ErrStakeTooLong
 
 	case stakedAssetID != delegatorRules.assetID:
 		// Wrong assetID used
-		return time.Time{}, fmt.Errorf(
+		return fmt.Errorf(
 			"%w: %s != %s",
 			ErrWrongStakedAssetID,
 			delegatorRules.assetID,
@@ -766,15 +765,15 @@ func verifyAddPermissionlessDelegatorTx(
 		newStaker, err = state.NewPendingStaker(txID, tx)
 	}
 	if err != nil {
-		return time.Time{}, err
+		return err
 	}
 
 	canDelegate, err := canDelegate(chainState, validator, maximumWeight, newStaker)
 	if err != nil {
-		return time.Time{}, err
+		return err
 	}
 	if !canDelegate {
-		return time.Time{}, ErrOverDelegated
+		return ErrOverDelegated
 	}
 
 	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.StakeOuts))
@@ -790,7 +789,7 @@ func verifyAddPermissionlessDelegatorTx(
 		//            permissioned validator, so we verify this delegator is
 		//            pointing to a permissionless validator.
 		if validator.Priority.IsPermissionedValidator() {
-			return time.Time{}, ErrDelegateToPermissionedValidator
+			return ErrDelegateToPermissionedValidator
 		}
 
 		txFee = backend.Config.AddSubnetDelegatorFee
@@ -809,7 +808,7 @@ func verifyAddPermissionlessDelegatorTx(
 			backend.Ctx.AVAXAssetID: txFee,
 		},
 	); err != nil {
-		return time.Time{}, fmt.Errorf("%w: %v", ErrFlowCheckFailed, err)
+		return fmt.Errorf("%w: %v", ErrFlowCheckFailed, err)
 	}
 
 	if !isContinuousStakingForkActive {
@@ -817,11 +816,11 @@ func verifyAddPermissionlessDelegatorTx(
 		// to allow the verifier visitor to explicitly check for this error.
 		maxStartTime := currentTimestamp.Add(MaxFutureStartTime)
 		if preContinuousStakingStartTime.After(maxStartTime) {
-			return time.Time{}, ErrFutureStakeTime
+			return ErrFutureStakeTime
 		}
 	}
 
-	return validator.EndTime, nil
+	return nil
 }
 
 type addDelegatorRules struct {

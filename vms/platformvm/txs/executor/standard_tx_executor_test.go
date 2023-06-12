@@ -21,7 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
@@ -1036,7 +1035,7 @@ func TestStandardTxExecutorContinuousAddValidator(t *testing.T) {
 	require.Equal(env.state.GetTimestamp(), val.StartTime)
 	require.Equal(validatorDuration, val.StakingPeriod)
 	require.Equal(val.StartTime.Add(val.StakingPeriod), val.NextTime)
-	require.Equal(mockable.MaxTime, val.EndTime)
+	require.Equal(val.NextTime, val.EndTime)
 }
 
 // Returns a RemoveSubnetValidatorTx that passes syntactic verification.

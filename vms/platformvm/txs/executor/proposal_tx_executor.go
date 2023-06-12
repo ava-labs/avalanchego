@@ -212,7 +212,7 @@ func (e *ProposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 		)
 	}
 
-	onAbortOuts, _, err := verifyAddDelegatorTx(
+	onAbortOuts, err := verifyAddDelegatorTx(
 		e.Backend,
 		e.OnCommitState,
 		e.Tx,
