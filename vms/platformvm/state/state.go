@@ -203,13 +203,9 @@ func (b *stateBlk) Size() int {
  * | |   '-. list
  * | |     '-- txID -> nil
  * | |-. weight diffs
- * | | '-. height+subnet
- * | |   '-. list
- * | |     '-- nodeID -> weightChange
+ * | | '-- subnet+height+nodeID -> weightChange
  * | '-. pub key diffs
- * |   '-. height
- * |     '-. list
- * |       '-- nodeID -> public key
+ * |   '-- height+nodeID -> public key or nil
  * |-. blocks
  * | '-- blockID -> block bytes
  * |-. txs
