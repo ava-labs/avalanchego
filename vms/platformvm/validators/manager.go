@@ -230,7 +230,7 @@ func (m *manager) makePrimaryNetworkValidatorSet(
 
 	// Rebuild primary network validators at [height]
 	for diffHeight := currentHeight; diffHeight > targetHeight; diffHeight-- {
-		weightDiffs, err := m.state.GetValidatorWeightDiffs(diffHeight, constants.PlatformChainID)
+		weightDiffs, err := m.state.GetValidatorWeightDiffs(diffHeight, diffHeight, constants.PlatformChainID)
 		if err != nil {
 			return nil, err
 		}
@@ -240,7 +240,7 @@ func (m *manager) makePrimaryNetworkValidatorSet(
 			}
 		}
 
-		pkDiffs, err := m.state.GetValidatorPublicKeyDiffs(diffHeight)
+		pkDiffs, err := m.state.GetValidatorPublicKeyDiffs(diffHeight, diffHeight)
 		if err != nil {
 			return nil, err
 		}
@@ -280,16 +280,14 @@ func (m *manager) makeSubnetValidatorSet(
 	}
 
 	// Rebuild subnet validators at [targetHeight]
-	for diffHeight := currentHeight; diffHeight > targetHeight; diffHeight-- {
-		weightDiffs, err := m.state.GetValidatorWeightDiffs(diffHeight, subnetID)
-		if err != nil {
-			return nil, err
-		}
+	weightDiffs, err := m.state.GetValidatorWeightDiffs(currentHeight, targetHeight+1, subnetID)
+	if err != nil {
+		return nil, err
+	}
 
-		for nodeID, weightDiff := range weightDiffs {
-			if err := applyWeightDiff(subnetValidatorSet, nodeID, weightDiff); err != nil {
-				return nil, err
-			}
+	for nodeID, weightDiff := range weightDiffs {
+		if err := applyWeightDiff(subnetValidatorSet, nodeID, weightDiff); err != nil {
+			return nil, err
 		}
 	}
 

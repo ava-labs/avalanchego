@@ -246,7 +246,7 @@ func TestGetValidatorWeightDiffs(t *testing.T) {
 
 		for j, stakerDiff := range stakerDiffs[:i+1] {
 			for subnetID, expectedValidatorWeightDiffs := range stakerDiff.expectedValidatorWeightDiffs {
-				validatorWeightDiffs, err := state.GetValidatorWeightDiffs(uint64(j+1), subnetID)
+				validatorWeightDiffs, err := state.GetValidatorWeightDiffs(uint64(j+1), uint64(j+1), subnetID)
 				require.NoError(err)
 				require.Equal(expectedValidatorWeightDiffs, validatorWeightDiffs)
 			}
@@ -413,7 +413,7 @@ func TestGetValidatorPublicKeyDiffs(t *testing.T) {
 		require.NoError(state.Commit())
 
 		for j, stakerDiff := range stakerDiffs[:i+1] {
-			pkDiffs, err := state.GetValidatorPublicKeyDiffs(uint64(j + 1))
+			pkDiffs, err := state.GetValidatorPublicKeyDiffs(uint64(j+1), uint64(j+1))
 			require.NoError(err)
 			require.Equal(stakerDiff.expectedPublicKeyDiffs, pkDiffs)
 		}
@@ -817,16 +817,16 @@ func TestStateAddRemoveValidator(t *testing.T) {
 		}
 
 		// Assert that we get the expected weight diffs
-		gotSubnetWeightDiffs, err := state.GetValidatorWeightDiffs(newHeight, subnetID)
+		gotSubnetWeightDiffs, err := state.GetValidatorWeightDiffs(newHeight, newHeight, subnetID)
 		require.NoError(err)
 		require.Equal(diff.expectedSubnetWeightDiff, gotSubnetWeightDiffs)
 
-		gotWeightDiffs, err := state.GetValidatorWeightDiffs(newHeight, constants.PrimaryNetworkID)
+		gotWeightDiffs, err := state.GetValidatorWeightDiffs(newHeight, newHeight, constants.PrimaryNetworkID)
 		require.NoError(err)
 		require.Equal(diff.expectedPrimaryNetworkWeightDiff, gotWeightDiffs)
 
 		// Assert that we get the expected public key diff
-		gotPublicKeyDiffs, err := state.GetValidatorPublicKeyDiffs(newHeight)
+		gotPublicKeyDiffs, err := state.GetValidatorPublicKeyDiffs(newHeight, newHeight)
 		require.NoError(err)
 		require.Equal(diff.expectedPublicKeyDiff, gotPublicKeyDiffs)
 	}

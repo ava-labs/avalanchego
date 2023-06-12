@@ -130,11 +130,20 @@ type State interface {
 	// [vdrs].
 	ValidatorSet(subnetID ids.ID, vdrs validators.Set) error
 
-	GetValidatorWeightDiffs(height uint64, subnetID ids.ID) (map[ids.NodeID]*ValidatorWeightDiff, error)
+	// startHeight > endHeight
+	GetValidatorWeightDiffs(
+		startHeight uint64,
+		endHeight uint64,
+		subnetID ids.ID,
+	) (map[ids.NodeID]*ValidatorWeightDiff, error)
 
 	// Returns a map of node ID --> BLS Public Key for all validators
 	// that left the Primary Network validator set.
-	GetValidatorPublicKeyDiffs(height uint64) (map[ids.NodeID]*bls.PublicKey, error)
+	// startHeight > endHeight
+	GetValidatorPublicKeyDiffs(
+		startHeight uint64,
+		endHeight uint64,
+	) (map[ids.NodeID]*bls.PublicKey, error)
 
 	SetHeight(height uint64)
 
@@ -915,9 +924,9 @@ func (s *state) ValidatorSet(subnetID ids.ID, vdrs validators.Set) error {
 	return nil
 }
 
-func (s *state) GetValidatorWeightDiffs(height uint64, subnetID ids.ID) (map[ids.NodeID]*ValidatorWeightDiff, error) {
+func (s *state) GetValidatorWeightDiffs(startHeight uint64, endHeight uint64, subnetID ids.ID) (map[ids.NodeID]*ValidatorWeightDiff, error) {
 	diffIter := s.validatorWeightDiffsDB.NewIteratorWithStartAndPrefix(
-		getStartWeightKey(subnetID, height),
+		getStartWeightKey(subnetID, startHeight),
 		subnetID[:],
 	)
 	defer diffIter.Release()
@@ -928,7 +937,7 @@ func (s *state) GetValidatorWeightDiffs(height uint64, subnetID ids.ID) (map[ids
 		if err != nil {
 			return nil, err
 		}
-		if parsedHeight != height {
+		if parsedHeight < endHeight {
 			break
 		}
 
@@ -938,15 +947,23 @@ func (s *state) GetValidatorWeightDiffs(height uint64, subnetID ids.ID) (map[ids
 			return nil, err
 		}
 
-		weightDiffs[nodeID] = &weightDiff
+		prevWeightDiff, ok := weightDiffs[nodeID]
+		if !ok {
+			weightDiffs[nodeID] = &weightDiff
+			continue
+		}
+
+		if err := prevWeightDiff.Add(weightDiff.Decrease, weightDiff.Amount); err != nil {
+			return nil, err
+		}
 	}
 
 	return weightDiffs, diffIter.Error()
 }
 
-func (s *state) GetValidatorPublicKeyDiffs(height uint64) (map[ids.NodeID]*bls.PublicKey, error) {
+func (s *state) GetValidatorPublicKeyDiffs(startHeight uint64, endHeight uint64) (map[ids.NodeID]*bls.PublicKey, error) {
 	diffIter := s.validatorPublicKeyDiffsDB.NewIteratorWithStart(
-		getStartBLSKey(height),
+		getStartBLSKey(startHeight),
 	)
 	defer diffIter.Release()
 
@@ -956,7 +973,7 @@ func (s *state) GetValidatorPublicKeyDiffs(height uint64) (map[ids.NodeID]*bls.P
 		if err != nil {
 			return nil, err
 		}
-		if parsedHeight != height {
+		if parsedHeight < endHeight {
 			break
 		}
 
