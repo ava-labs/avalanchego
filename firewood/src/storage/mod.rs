@@ -4,7 +4,6 @@ pub mod buffer;
 use std::cell::{RefCell, RefMut};
 use std::collections::HashMap;
 use std::fmt::{self, Debug};
-use std::io;
 use std::num::NonZeroUsize;
 use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
@@ -654,7 +653,7 @@ struct CachedSpaceInner {
     cached_pages: lru::LruCache<u64, Page>,
     pinned_pages: HashMap<u64, (usize, Page)>,
     files: Arc<FilePool>,
-    disk_buffer: DiskBufferRequester,
+    disk_requester: DiskBufferRequester,
 }
 
 #[derive(Clone, Debug)]
@@ -664,7 +663,10 @@ pub struct CachedSpace {
 }
 
 impl CachedSpace {
-    pub fn new(cfg: &StoreConfig) -> Result<Self, StoreError<std::io::Error>> {
+    pub fn new(
+        cfg: &StoreConfig,
+        disk_requester: DiskBufferRequester,
+    ) -> Result<Self, StoreError<std::io::Error>> {
         let space_id = cfg.space_id;
         let files = Arc::new(FilePool::new(cfg)?);
         Ok(Self {
@@ -674,10 +676,14 @@ impl CachedSpace {
                 ),
                 pinned_pages: HashMap::new(),
                 files,
-                disk_buffer: DiskBufferRequester::default(),
+                disk_requester,
             })),
             space_id,
         })
+    }
+
+    pub fn clone_files(&self) -> Arc<FilePool> {
+        self.inner.borrow().files.clone()
     }
 
     /// Apply `delta` to the store and return the StoreDelta that can undo this change.
@@ -695,25 +701,6 @@ impl CachedSpace {
 }
 
 impl CachedSpaceInner {
-    fn fetch_page(&mut self, space_id: SpaceId, pid: u64) -> Result<Page, StoreError<io::Error>> {
-        if let Some(p) = self.disk_buffer.get_page(space_id, pid) {
-            return Ok(Box::new(*p));
-        }
-        let file_nbit = self.files.get_file_nbit();
-        let file_size = 1 << file_nbit;
-        let poff = pid << PAGE_SIZE_NBIT;
-        let file = self.files.get_file(poff >> file_nbit)?;
-        let mut page = Page::new([0; PAGE_SIZE as usize]);
-        nix::sys::uio::pread(
-            file.get_fd(),
-            page.deref_mut(),
-            (poff & (file_size - 1)) as nix::libc::off_t,
-        )
-        .map_err(StoreError::System)?;
-
-        Ok(page)
-    }
-
     fn pin_page(
         &mut self,
         space_id: SpaceId,
@@ -725,15 +712,37 @@ impl CachedSpaceInner {
                 e.1.as_mut_ptr()
             }
             None => {
-                let mut page = match self.cached_pages.pop(&pid) {
-                    Some(p) => p,
-                    None => self.fetch_page(space_id, pid)?,
+                let page = self
+                    .cached_pages
+                    .pop(&pid)
+                    .or_else(|| self.disk_requester.get_page(space_id, pid));
+                let mut page = match page {
+                    Some(page) => page,
+                    None => {
+                        let file_nbit = self.files.get_file_nbit();
+                        let file_size = 1 << file_nbit;
+                        let poff = pid << PAGE_SIZE_NBIT;
+                        let file = self.files.get_file(poff >> file_nbit)?;
+                        let mut page: Page = Page::new([0; PAGE_SIZE as usize]);
+
+                        nix::sys::uio::pread(
+                            file.get_fd(),
+                            page.deref_mut(),
+                            (poff & (file_size - 1)) as nix::libc::off_t,
+                        )
+                        .map_err(StoreError::System)?;
+
+                        page
+                    }
                 };
+
                 let ptr = page.as_mut_ptr();
                 self.pinned_pages.insert(pid, (1, page));
+
                 ptr
             }
         };
+
         Ok(unsafe { std::slice::from_raw_parts_mut(base, PAGE_SIZE as usize) })
     }
 

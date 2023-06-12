@@ -553,6 +553,33 @@ impl Db {
         let mut offset = header_bytes.len() as u64;
         let header: DbParams = cast_slice(&header_bytes)[0];
 
+        let wal = WalConfig::builder()
+            .file_nbit(header.wal_file_nbit)
+            .block_nbit(header.wal_block_nbit)
+            .max_revisions(cfg.wal.max_revisions)
+            .build();
+        let (sender, inbound) = tokio::sync::mpsc::channel(cfg.buffer.max_buffered);
+        let disk_requester = DiskBufferRequester::new(sender);
+        let buffer = cfg.buffer.clone();
+        let disk_thread = Some(std::thread::spawn(move || {
+            let disk_buffer = DiskBuffer::new(inbound, &buffer, &wal).unwrap();
+            disk_buffer.run()
+        }));
+
+        let root_hash_cache = Rc::new(
+            CachedSpace::new(
+                &StoreConfig::builder()
+                    .ncached_pages(cfg.root_hash_ncached_pages)
+                    .ncached_files(cfg.root_hash_ncached_files)
+                    .space_id(ROOT_HASH_SPACE)
+                    .file_nbit(header.root_hash_file_nbit)
+                    .rootdir(root_hash_path)
+                    .build(),
+                disk_requester.clone(),
+            )
+            .unwrap(),
+        );
+
         // setup disk buffer
         let data_cache = Universe {
             merkle: SubUniverse::new(
@@ -565,6 +592,7 @@ impl Db {
                             .file_nbit(header.meta_file_nbit)
                             .rootdir(merkle_meta_path)
                             .build(),
+                        disk_requester.clone(),
                     )
                     .unwrap(),
                 ),
@@ -577,6 +605,7 @@ impl Db {
                             .file_nbit(header.payload_file_nbit)
                             .rootdir(merkle_payload_path)
                             .build(),
+                        disk_requester.clone(),
                     )
                     .unwrap(),
                 ),
@@ -591,6 +620,7 @@ impl Db {
                             .file_nbit(header.meta_file_nbit)
                             .rootdir(blob_meta_path)
                             .build(),
+                        disk_requester.clone(),
                     )
                     .unwrap(),
                 ),
@@ -603,60 +633,33 @@ impl Db {
                             .file_nbit(header.payload_file_nbit)
                             .rootdir(blob_payload_path)
                             .build(),
+                        disk_requester.clone(),
                     )
                     .unwrap(),
                 ),
             ),
         };
 
-        let root_hash_cache = Rc::new(
-            CachedSpace::new(
-                &StoreConfig::builder()
-                    .ncached_pages(cfg.root_hash_ncached_pages)
-                    .ncached_files(cfg.root_hash_ncached_files)
-                    .space_id(ROOT_HASH_SPACE)
-                    .file_nbit(header.root_hash_file_nbit)
-                    .rootdir(root_hash_path)
-                    .build(),
-            )
-            .unwrap(),
-        );
-
-        let wal = WalConfig::builder()
-            .file_nbit(header.wal_file_nbit)
-            .block_nbit(header.wal_block_nbit)
-            .max_revisions(cfg.wal.max_revisions)
-            .build();
-        let (sender, inbound) = tokio::sync::mpsc::channel(cfg.buffer.max_buffered);
-        let disk_requester = DiskBufferRequester::new(sender);
-        let buffer = cfg.buffer.clone();
-        let disk_thread = Some(std::thread::spawn(move || {
-            let disk_buffer = DiskBuffer::new(inbound, &buffer, &wal).unwrap();
-            disk_buffer.run()
-        }));
-
-        disk_requester.reg_cached_space(data_cache.merkle.meta.as_ref());
-        disk_requester.reg_cached_space(data_cache.merkle.payload.as_ref());
-        disk_requester.reg_cached_space(data_cache.blob.meta.as_ref());
-        disk_requester.reg_cached_space(data_cache.blob.payload.as_ref());
-        disk_requester.reg_cached_space(root_hash_cache.as_ref());
+        [
+            data_cache.merkle.meta.as_ref(),
+            data_cache.merkle.payload.as_ref(),
+            data_cache.blob.meta.as_ref(),
+            data_cache.blob.payload.as_ref(),
+            root_hash_cache.as_ref(),
+        ]
+        .into_iter()
+        .for_each(|cached_space| {
+            disk_requester.reg_cached_space(cached_space.id(), cached_space.clone_files());
+        });
 
         let mut data_staging = Universe {
             merkle: SubUniverse::new(
-                Rc::new(StoreRevMut::new(
-                    data_cache.merkle.meta.clone() as Rc<dyn MemStoreR>
-                )),
-                Rc::new(StoreRevMut::new(
-                    data_cache.merkle.payload.clone() as Rc<dyn MemStoreR>
-                )),
+                Rc::new(StoreRevMut::new(data_cache.merkle.meta.clone())),
+                Rc::new(StoreRevMut::new(data_cache.merkle.payload.clone())),
             ),
             blob: SubUniverse::new(
-                Rc::new(StoreRevMut::new(
-                    data_cache.blob.meta.clone() as Rc<dyn MemStoreR>
-                )),
-                Rc::new(StoreRevMut::new(
-                    data_cache.blob.payload.clone() as Rc<dyn MemStoreR>
-                )),
+                Rc::new(StoreRevMut::new(data_cache.blob.meta.clone())),
+                Rc::new(StoreRevMut::new(data_cache.blob.payload.clone())),
             ),
         };
         let root_hash_staging = StoreRevMut::new(root_hash_cache);

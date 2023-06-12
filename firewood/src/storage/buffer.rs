@@ -5,10 +5,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::{cell::RefCell, collections::HashMap};
 
-use super::{
-    AshRecord, CachedSpace, FilePool, MemStoreR, Page, StoreDelta, StoreError, WalConfig,
-    PAGE_SIZE_NBIT,
-};
+use super::{AshRecord, FilePool, Page, StoreDelta, StoreError, WalConfig, PAGE_SIZE_NBIT};
 
 use aiofut::{AioBuilder, AioError, AioManager};
 use growthring::WalFileImpl;
@@ -128,6 +125,7 @@ impl DiskBuffer {
         })
     }
 
+    // TODO: fix this
     unsafe fn get_longlive_self(&mut self) -> &'static mut Self {
         std::mem::transmute::<&mut Self, &'static mut Self>(self)
     }
@@ -426,14 +424,6 @@ pub struct DiskBufferRequester {
     sender: mpsc::Sender<BufferCmd>,
 }
 
-impl Default for DiskBufferRequester {
-    fn default() -> Self {
-        Self {
-            sender: mpsc::channel(1).0,
-        }
-    }
-}
-
 impl DiskBufferRequester {
     /// Create a new requester.
     pub fn new(sender: mpsc::Sender<BufferCmd>) -> Self {
@@ -441,10 +431,10 @@ impl DiskBufferRequester {
     }
 
     /// Get a page from the buffer.
-    pub fn get_page(&self, space_id: SpaceId, pid: u64) -> Option<Page> {
+    pub fn get_page(&self, space_id: SpaceId, page_id: u64) -> Option<Page> {
         let (resp_tx, resp_rx) = oneshot::channel();
         self.sender
-            .blocking_send(BufferCmd::GetPage((space_id, pid), resp_tx))
+            .blocking_send(BufferCmd::GetPage((space_id, page_id), resp_tx))
             .map_err(StoreError::Send)
             .ok();
         resp_rx.blocking_recv().unwrap()
@@ -481,11 +471,9 @@ impl DiskBufferRequester {
     }
 
     /// Register a cached space to the buffer.
-    pub fn reg_cached_space(&self, space: &CachedSpace) {
-        let mut inner = space.inner.borrow_mut();
-        inner.disk_buffer = self.clone();
+    pub fn reg_cached_space(&self, space_id: SpaceId, files: Arc<FilePool>) {
         self.sender
-            .blocking_send(BufferCmd::RegCachedSpace(space.id(), inner.files.clone()))
+            .blocking_send(BufferCmd::RegCachedSpace(space_id, files))
             .map_err(StoreError::Send)
             .ok();
     }
@@ -501,7 +489,8 @@ mod tests {
     use crate::{
         file,
         storage::{
-            Ash, DeltaPage, StoreConfig, StoreRevMut, StoreRevMutDelta, StoreRevShared, ZeroStore,
+            Ash, CachedSpace, DeltaPage, MemStoreR, StoreConfig, StoreRevMut, StoreRevMutDelta,
+            StoreRevShared, ZeroStore,
         },
     };
     use shale::CachedStore;
@@ -540,13 +529,14 @@ mod tests {
                     .file_nbit(1)
                     .rootdir(state_path)
                     .build(),
+                disk_requester.clone(),
             )
             .unwrap(),
         );
 
         // add an in memory cached space. this will allow us to write to the
         // disk buffer then later persist the change to disk.
-        disk_requester.reg_cached_space(state_cache.as_ref());
+        disk_requester.reg_cached_space(state_cache.id(), state_cache.inner.borrow().files.clone());
 
         // memory mapped store
         let mut mut_store = StoreRevMut::new(state_cache);
@@ -627,13 +617,14 @@ mod tests {
                     .file_nbit(1)
                     .rootdir(state_path)
                     .build(),
+                disk_requester.clone(),
             )
             .unwrap(),
         );
 
         // add an in memory cached space. this will allow us to write to the
         // disk buffer then later persist the change to disk.
-        disk_requester.reg_cached_space(state_cache.as_ref());
+        disk_requester.reg_cached_space(state_cache.id(), state_cache.clone_files());
 
         // memory mapped store
         let mut mut_store = StoreRevMut::new(state_cache.clone());
