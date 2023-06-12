@@ -12,15 +12,9 @@ The goal of this guide is to lay out best practices regarding writing, testing a
 
 ## Prerequisites
 
-### NodeJS and Yarn
+### NodeJS and NPM
 
-First, install the LTS (long-term support) version of [nodejs](https://nodejs.org/en). This is `16.2.0` at the time of writing. NodeJS bundles `npm`.
-
-Next, install [yarn](https://yarnpkg.com):
-
-```zsh
-npm install -g yarn
-```
+First, install the LTS (long-term support) version of [nodejs](https://nodejs.org/en). This is `18.16.0` at the time of writing. NodeJS bundles `npm`.
 
 ### Solidity and Avalanche
 
@@ -33,7 +27,7 @@ Clone the repo and install the necessary packages via `yarn`.
 ```zsh
 $ git clone https://github.com/ava-labs/subnet-evm.git
 $ cd contract-examples
-$ yarn
+$ npm install
 ```
 
 ## Write Contracts
@@ -54,7 +48,7 @@ For more information about precompiles see [subnet-evm precompiles](https://gith
 
 Hardhat uses `hardhat.config.js` as the configuration file. You can define tasks, networks, compilers and more in that file. For more information see [here](https://hardhat.org/config/).
 
-In Subnet-EVM, we provide a pre-configured file [hardhat.config.ts](https://github.com/ava-labs/avalanche-smart-contract-quickstart/blob/main/hardhat.config.ts).
+In Subnet-EVM, we provide a pre-configured file [hardhat.config.ts](https://github.com/ava-labs/subnet-evm/blob/master/contract-examples/hardhat.config.ts).
 
 The HardHat config file includes a single network configuration: `local`. `local` defaults to using the following values for the RPC URL and the Chain ID:
 
@@ -73,11 +67,11 @@ Alternatively, you can copy and paste the `local` network configuration to creat
 
 ```json
 {
-  networks: {
-    mynetwork: {
-      url: "http://127.0.0.1:9650/ext/bc/28N1Tv5CZziQ3FKCaXmo8xtxoFtuoVA6NvZykAT5MtGjF4JkGs/rpc",
-      chainId: 33333,
-      accounts: [
+  "networks": {
+    "mynetwork": {
+      "url": "http://127.0.0.1:9650/ext/bc/28N1Tv5CZziQ3FKCaXmo8xtxoFtuoVA6NvZykAT5MtGjF4JkGs/rpc",
+      "chainId": 33333,
+      "accounts": [
         "0x56289e99c94b6912bfc12adc093c9b51124f0dc54ac7a766b2bc5ccf558d8027",
         "0x7b4198529994b0dc604278c99d153cfd069d594753d471171a1d102a10438e07",
         "0x15614556be13730e9e8d6eacc1603143e7b96987429df8726384c2ec4502ef6e",
@@ -89,8 +83,8 @@ Alternatively, you can copy and paste the `local` network configuration to creat
         "0x86f78c5416151fe3546dece84fda4b4b1e36089f2dbc48496faf3a950f16157c",
         "0x750839e9dbbd2a0910efe40f50b2f3b2f2f59f5580bb4b83bd8c1201cf9a010a"
       ],
-      pollingInterval: "1s"
-    },
+      "pollingInterval": "1s"
+    }
   }
 }
 ```

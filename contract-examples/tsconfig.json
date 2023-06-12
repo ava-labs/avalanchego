@@ -1,5 +1,19 @@
 {
   "compilerOptions": {
-    "resolveJsonModule": true
-  }
+    "outDir": "./dist/",
+    "baseUrl": ".",
+    "module": "commonjs",
+    "target": "es2020",
+    "lib": ["es2016"],
+    "typeRoots": ["./typings/**", "./node_modules/@types"],
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+  },
+  "exclude": ["node_modules", "artifacts", "cache"],
+  "typeAcquisition": {
+    "enable": true,
+    "exclude": ["bn.js"]
+  },
 }

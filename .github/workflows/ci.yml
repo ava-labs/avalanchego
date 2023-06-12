@@ -52,7 +52,7 @@ jobs:
         shell: bash
       - run: CURRENT_BRANCH=${{ github.head_ref || github.ref_name }} PUSH_DOCKER_IMAGE=true ./scripts/build_image.sh
         shell: bash
-      
+
   e2e_test:
     name: e2e tests
     runs-on: ubuntu-latest
@@ -68,9 +68,9 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: "14.x"
-      - name: Yarn install
-        run: yarn
+          node-version: "18.x"
+      - name: NPM Clean Install
+        run: npm ci
         working-directory: ./contract-examples
       - name: Install AvalancheGo Release
         shell: bash

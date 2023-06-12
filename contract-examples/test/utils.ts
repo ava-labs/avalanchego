@@ -74,7 +74,7 @@ const buildTestFn = (fnNameOrObject: FnNameOrObject, overrides = {}, debug = fal
 
   // return the test function that will be used by `it`
   // this function must be defined with the `function` keyword so that `this` is bound to the Mocha context
-  return async function() {
+  return async function () {
     // `Array.prototype.reduce` is used here to ensure that the test functions are called in order.
     // Each test function waits for its predecessor to complete before starting
     return fnObjects.reduce((p: Promise<undefined>, fn) => p.then(async () => {
