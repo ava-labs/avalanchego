@@ -763,13 +763,15 @@ func canDelegate(
 	weightLimit uint64,
 	delegator *state.Staker,
 ) (bool, error) {
-	if delegator.StartTime.Before(validator.StartTime) {
+	if !txs.BoundedBy(
+		delegator.StartTime,
+		delegator.EndTime,
+		validator.StartTime,
+		validator.EndTime,
+	) {
 		return false, nil
 	}
 	if delegator.StakingPeriod > validator.StakingPeriod {
-		return false, nil
-	}
-	if delegator.EndTime.After(validator.EndTime) {
 		return false, nil
 	}
 
