@@ -504,8 +504,8 @@ func (e *StandardTxExecutor) StopStakerTx(tx *txs.StopStakerTx) error {
 // Post Continuous Staking fork activation it has updates current supply in state
 func (e *StandardTxExecutor) addStakerFromStakerTx(
 	stakerTx txs.Staker,
-	chainTime time.Time,
-	endTimeBound time.Time,
+	startTime time.Time,
+	endTime time.Time,
 ) error {
 	// Pre Continuous Staking fork, stakers are added as pending first, then promoted
 	// to current when chainTime reaches their start time.
@@ -518,7 +518,7 @@ func (e *StandardTxExecutor) addStakerFromStakerTx(
 		err    error
 	)
 
-	if !e.Config.IsContinuousStakingActivated(chainTime) {
+	if !e.Config.IsContinuousStakingActivated(startTime) {
 		preContinuousStakingStakerTx, ok := stakerTx.(txs.PreContinuousStakingStaker)
 		if !ok {
 			return fmt.Errorf("expected tx type txs.PreContinuousStakingStaker but got %T", stakerTx)
@@ -554,8 +554,8 @@ func (e *StandardTxExecutor) addStakerFromStakerTx(
 		staker, err = state.NewCurrentStaker(
 			txID,
 			stakerTx,
-			chainTime,
-			endTimeBound,
+			startTime,
+			endTime,
 			potentialReward,
 		)
 	}

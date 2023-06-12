@@ -1083,7 +1083,7 @@ func (s *state) syncGenesis(genesisBlk blocks.Block, genesis *genesis.State) err
 		}
 
 		// tx is a genesis transactions, hence it's guaranteed to be
-		// pre Continuous staking fork. It's fine to use tx.StartTime
+		// pre Continuous staking fork. It's fine using tx.StartTime and tx.EndTime
 		staker, err := NewCurrentStaker(vdrTx.ID(), tx, tx.StartTime(), tx.EndTime(), potentialReward)
 		if err != nil {
 			return err
@@ -1186,6 +1186,8 @@ func (s *state) loadCurrentStakers() error {
 			txID: txID,
 			// use the start values as the fallback
 			// in case they are not stored in the database
+			// Note: we don't provide [LastUpdated] here because we expect it to
+			// always be present on disk.
 			StakerStartTime: defaultStartTime.Unix(),
 			StakerEndTime:   defaultEndTime.Unix(),
 		}
