@@ -162,7 +162,7 @@ func TestContinuousStakingForkRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	require.NoError(err)
 
 	require.Equal(stakeOnCommitBalance, stakeOldBalance)
-	require.Equal(rewardsOnCommitBalance, rewardsOldBalance+1370)
+	require.Equal(rewardsOnCommitBalance, rewardsOldBalance+13706)
 }
 
 func TestContinuousStakingForkRewardValidatorTxExecuteOnAbort(t *testing.T) {
@@ -405,8 +405,7 @@ func TestContinuousStakingForkRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 		Backend:       &env.backend,
 		Tx:            tx,
 	}
-	err = tx.Unsigned.Visit(&txExecutor)
-	require.NoError(err)
+	require.NoError(tx.Unsigned.Visit(&txExecutor))
 
 	// check that delegator is not dropped from the staker set
 	onCommitStakerIterator, err := txExecutor.OnCommitState.GetCurrentStakerIterator()
@@ -1495,8 +1494,7 @@ func TestBanffForkRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 		Backend:       &env.backend,
 		Tx:            tx,
 	}
-	err = tx.Unsigned.Visit(&txExecutor)
-	require.NoError(err)
+	require.NoError(tx.Unsigned.Visit(&txExecutor))
 
 	vdrDestSet := set.Set[ids.ShortID]{}
 	vdrDestSet.Add(vdrRewardAddress)

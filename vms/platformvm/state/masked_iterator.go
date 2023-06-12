@@ -60,6 +60,7 @@ func (i *maskedIterator) Next() bool {
 		return false // done iteration
 	case nextParentStaker == nil && len(i.nextInLine) != 0:
 		i.nextStaker = i.nextInLine[0]
+		i.nextInLine[0] = nil
 		i.nextInLine = i.nextInLine[1:]
 		return true
 	case nextParentStaker != nil && len(i.nextInLine) == 0:
@@ -74,9 +75,20 @@ func (i *maskedIterator) Next() bool {
 		}
 
 		i.nextStaker = nextInLine
+		i.nextInLine[0] = nil
 		i.nextInLine = i.nextInLine[1:]
-		i.nextInLine = append(i.nextInLine, nextParentStaker)
-		utils.Sort(i.nextInLine)
+
+		// insert nextParentStaker at the right position in i.nextInLine
+		idx := 0
+		for idx < len(i.nextInLine) && i.nextInLine[idx].Less(nextParentStaker) {
+			idx++
+		}
+		if len(i.nextInLine) == idx {
+			i.nextInLine = append(i.nextInLine, nextParentStaker)
+		} else {
+			i.nextInLine = append(i.nextInLine[:idx+1], i.nextInLine[idx:]...)
+			i.nextInLine[idx] = nextParentStaker
+		}
 		return true
 	}
 }

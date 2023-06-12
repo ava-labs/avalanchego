@@ -205,7 +205,7 @@ func maskedIteratorTestGenerator() []gopter.Gen {
 			nums := v.([]int)
 			deletedCount := nums[0]
 			updatedCount := nums[1]
-			return deletedCount >= 0 && updatedCount >= 0 && deletedCount+updatedCount <= parentStakersCount
+			return deletedCount+updatedCount <= parentStakersCount
 		}),
 	}
 }
@@ -216,9 +216,9 @@ func buildMaskedIterator(parentStakers []Staker, deletedIndexes []int, updatedIn
 	StakerIterator,
 ) {
 	parentTree := btree.NewG(defaultTreeDegree, (*Staker).Less)
-	for _, staker := range parentStakers {
-		cpy := staker
-		parentTree.ReplaceOrInsert(&cpy)
+	for idx := range parentStakers {
+		s := &parentStakers[idx]
+		parentTree.ReplaceOrInsert(s)
 	}
 	parentIt := NewTreeIterator(parentTree)
 
@@ -231,10 +231,8 @@ func buildMaskedIterator(parentStakers []Staker, deletedIndexes []int, updatedIn
 	updatedStakers := make(map[ids.ID]*Staker)
 	for _, idx := range updatedIndexes {
 		s := parentStakers[idx]
-
-		cpy := s
-		ShiftStakerAheadInPlace(&cpy)
-		updatedStakers[s.TxID] = &cpy
+		ShiftStakerAheadInPlace(&s)
+		updatedStakers[s.TxID] = &s
 	}
 
 	return deletedStakers, updatedStakers, NewMaskedIterator(parentIt, deletedStakers, updatedStakers)

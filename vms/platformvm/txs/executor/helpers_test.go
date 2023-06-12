@@ -68,14 +68,18 @@ var (
 	defaultGenesisTime        = time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC)
 	defaultValidateStartTime  = defaultGenesisTime
 	defaultValidateEndTime    = defaultValidateStartTime.Add(20 * defaultMinStakingDuration)
-	defaultMinValidatorStake  = 5 * units.MilliAvax
-	defaultBalance            = 100 * defaultMinValidatorStake
-	preFundedKeys             = secp256k1.TestKeys()
-	avaxAssetID               = ids.ID{'y', 'e', 'e', 't'}
-	defaultTxFee              = uint64(100)
-	xChainID                  = ids.Empty.Prefix(0)
-	cChainID                  = ids.Empty.Prefix(1)
-	lastAcceptedID            = ids.GenerateTestID()
+
+	defaultMinDelegatorStake = 1 * units.MilliAvax
+	defaultMinValidatorStake = 5 * defaultMinDelegatorStake
+	defaultMaxValidatorStake = 100 * defaultMinValidatorStake
+	defaultBalance           = 2 * defaultMaxValidatorStake // amount all genesis validators have in defaultVM
+
+	preFundedKeys  = secp256k1.TestKeys()
+	avaxAssetID    = ids.ID{'y', 'e', 'e', 't'}
+	defaultTxFee   = uint64(100)
+	xChainID       = ids.Empty.Prefix(0)
+	cChainID       = ids.Empty.Prefix(1)
+	lastAcceptedID = ids.GenerateTestID()
 
 	testSubnet1            *txs.Tx
 	testSubnet1ControlKeys = preFundedKeys[0:3]
@@ -125,7 +129,7 @@ func newEnvironment(fork activeFork) *environment {
 	isBootstrapped.Set(true)
 
 	config := defaultConfig(fork)
-	clk := defaultClock(fork != apricotPhase5Fork)
+	clk := defaultClock()
 
 	baseDBManager := manager.NewMemDB(version.CurrentDatabase)
 	baseDB := versiondb.New(baseDBManager.Current().Database)
@@ -222,6 +226,11 @@ func addSubnet(
 	if err := stateDiff.Apply(env.state); err != nil {
 		panic(err)
 	}
+	if err := env.state.Commit(); err != nil {
+		panic(err)
+	}
+
+	defaultBalance -= env.config.GetCreateSubnetTxFee(env.clk.Time())
 }
 
 func defaultState(
@@ -297,25 +306,25 @@ func defaultConfig(fork activeFork) *config.Config {
 
 	switch fork {
 	case apricotPhase3Fork:
-		apricotPhase3Time = defaultValidateEndTime
+		apricotPhase3Time = defaultGenesisTime
 	case apricotPhase5Fork:
-		apricotPhase5Time = defaultValidateEndTime
-		apricotPhase3Time = defaultValidateEndTime
+		apricotPhase5Time = defaultGenesisTime
+		apricotPhase3Time = defaultGenesisTime
 	case banffFork:
-		banffTime = defaultValidateEndTime
-		apricotPhase5Time = defaultValidateEndTime
-		apricotPhase3Time = defaultValidateEndTime
+		banffTime = defaultGenesisTime
+		apricotPhase5Time = defaultGenesisTime
+		apricotPhase3Time = defaultGenesisTime
 	case cortinaFork:
-		cortinaTime = defaultValidateStartTime
-		banffTime = defaultValidateEndTime
-		apricotPhase5Time = defaultValidateEndTime
-		apricotPhase3Time = defaultValidateEndTime
+		cortinaTime = defaultGenesisTime
+		banffTime = defaultGenesisTime
+		apricotPhase5Time = defaultGenesisTime
+		apricotPhase3Time = defaultGenesisTime
 	case continuousStakingFork:
-		continuousStakingTime = defaultValidateStartTime
-		cortinaTime = defaultValidateStartTime
-		banffTime = defaultValidateEndTime
-		apricotPhase5Time = defaultValidateEndTime
-		apricotPhase3Time = defaultValidateEndTime
+		continuousStakingTime = defaultGenesisTime
+		cortinaTime = defaultGenesisTime
+		banffTime = defaultGenesisTime
+		apricotPhase5Time = defaultGenesisTime
+		apricotPhase3Time = defaultGenesisTime
 	default:
 		panic(fmt.Errorf("unhandled fork %d", fork))
 	}
@@ -330,9 +339,9 @@ func defaultConfig(fork activeFork) *config.Config {
 		TxFee:                  defaultTxFee,
 		CreateSubnetTxFee:      100 * defaultTxFee,
 		CreateBlockchainTxFee:  100 * defaultTxFee,
-		MinValidatorStake:      5 * units.MilliAvax,
-		MaxValidatorStake:      500 * units.MilliAvax,
-		MinDelegatorStake:      1 * units.MilliAvax,
+		MinValidatorStake:      10 * defaultMinValidatorStake,
+		MaxValidatorStake:      50 * defaultMinValidatorStake,
+		MinDelegatorStake:      defaultMinValidatorStake,
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig: reward.Config{
@@ -349,12 +358,8 @@ func defaultConfig(fork activeFork) *config.Config {
 	}
 }
 
-func defaultClock(postFork bool) *mockable.Clock {
+func defaultClock() *mockable.Clock {
 	now := defaultGenesisTime
-	if postFork {
-		// 1 second after latest fork
-		now = defaultValidateEndTime.Add(-2 * time.Second)
-	}
 	clk := &mockable.Clock{}
 	clk.Set(now)
 	return clk

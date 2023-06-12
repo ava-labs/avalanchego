@@ -44,9 +44,6 @@ type Config struct {
 	// building a snowman++ block.
 	// TODO: Remove this flag once all VMs throttle their own block production.
 	ProposerMinBlockDelay time.Duration `json:"proposerMinBlockDelay" yaml:"proposerMinBlockDelay"`
-
-	// See comment on [MinPercentConnectedStakeHealthy] in platformvm.Config
-	MinPercentConnectedStakeHealthy float64 `json:"minPercentConnectedStakeHealthy" yaml:"minPercentConnectedStakeHealthy"`
 }
 
 func (c *Config) Valid() error {

@@ -612,7 +612,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 				start := subStaker.startTime.Unix()
 				end := subStaker.startTime.Add(subStaker.stakingPeriod).Unix()
 				tx, err := env.txBuilder.NewAddSubnetValidatorTx(
-					10, // Weight
+					env.config.MaxValidatorStake, // Weight
 					uint64(start),
 					uint64(end),
 					subStaker.nodeID, // validator ID
@@ -666,11 +666,16 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 				env.state.AddTx(addStaker0, status.Committed)
 				require.NoError(env.state.Commit())
 
+				currentStakerIterator, err := env.state.GetCurrentStakerIterator()
+				require.NoError(err)
+				require.True(currentStakerIterator.Next())
+				staker := currentStakerIterator.Value()
 				s0RewardTx := &txs.Tx{
 					Unsigned: &txs.RewardValidatorTx{
-						TxID: staker0.TxID,
+						TxID: staker.TxID,
 					},
 				}
+				currentStakerIterator.Release()
 				require.NoError(s0RewardTx.Initialize(txs.Codec))
 
 				// build proposal block moving ahead chain time
