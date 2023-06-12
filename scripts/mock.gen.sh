@@ -31,7 +31,7 @@ do
   mockgen -package=${package_name} -destination=${output_path} ${src_import_path} ${interface_name}
   
   go-license \
-  --config=./license.yml \
+  --config=./header.yml \
   "${output_path}"
 done < "$input"
 
