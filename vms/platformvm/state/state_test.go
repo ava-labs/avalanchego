@@ -250,8 +250,6 @@ func TestGetValidatorWeightDiffs(t *testing.T) {
 				require.NoError(err)
 				require.Equal(expectedValidatorWeightDiffs, validatorWeightDiffs)
 			}
-
-			state.validatorWeightDiffsCache.Flush()
 		}
 	}
 }
@@ -418,7 +416,6 @@ func TestGetValidatorPublicKeyDiffs(t *testing.T) {
 			pkDiffs, err := state.GetValidatorPublicKeyDiffs(uint64(j + 1))
 			require.NoError(err)
 			require.Equal(stakerDiff.expectedPublicKeyDiffs, pkDiffs)
-			state.validatorPublicKeyDiffsCache.Flush()
 		}
 	}
 }
@@ -496,7 +493,7 @@ func newStateFromDB(require *require.Assertions, db database.Database) State {
 	vdrs := validators.NewManager()
 	primaryVdrs := validators.NewSet()
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
-	state, err := new(
+	state, err := newState(
 		db,
 		metrics.Noop,
 		&config.Config{
