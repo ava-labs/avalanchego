@@ -103,8 +103,7 @@ func testPrestateDiffTracer(tracerName string, dirPath string, t *testing.T) {
 			// Configure a blockchain with the given prestate
 			var (
 				blockNumber = new(big.Int).SetUint64(uint64(test.Context.Number))
-				blockTime   = new(big.Int).SetUint64(uint64(test.Context.Time))
-				signer      = types.MakeSigner(test.Genesis.Config, blockNumber, blockTime)
+				signer      = types.MakeSigner(test.Genesis.Config, blockNumber, uint64(test.Context.Time))
 				origin, _   = signer.Sender(tx)
 				txContext   = vm.TxContext{
 					Origin:   origin,

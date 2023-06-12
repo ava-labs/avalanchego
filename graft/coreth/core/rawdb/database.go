@@ -101,13 +101,12 @@ func hasPreexistingDb(path string) string {
 // OpenOptions contains the options to apply when opening a database.
 // OBS: If AncientsDirectory is empty, it indicates that no freezer is to be used.
 type OpenOptions struct {
-	Type              string // "leveldb" | "pebble"
-	Directory         string // the datadir
-	AncientsDirectory string // the ancients-dir
-	Namespace         string // the namespace for database relevant metrics
-	Cache             int    // the capacity(in megabytes) of the data caching
-	Handles           int    // number of files to be open simultaneously
-	ReadOnly          bool
+	Type      string // "leveldb" | "pebble"
+	Directory string // the datadir
+	Namespace string // the namespace for database relevant metrics
+	Cache     int    // the capacity(in megabytes) of the data caching
+	Handles   int    // number of files to be open simultaneously
+	ReadOnly  bool
 }
 
 // openKeyValueDatabase opens a disk-based key-value database, e.g. leveldb or pebble.
@@ -251,7 +250,7 @@ func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
 			accountSnaps.Add(size)
 		case bytes.HasPrefix(key, SnapshotStoragePrefix) && len(key) == (len(SnapshotStoragePrefix)+2*common.HashLength):
 			storageSnaps.Add(size)
-		case bytes.HasPrefix(key, preimagePrefix) && len(key) == (len(preimagePrefix)+common.HashLength):
+		case bytes.HasPrefix(key, PreimagePrefix) && len(key) == (len(PreimagePrefix)+common.HashLength):
 			preimages.Add(size)
 		case bytes.HasPrefix(key, configPrefix) && len(key) == (len(configPrefix)+common.HashLength):
 			metadata.Add(size)

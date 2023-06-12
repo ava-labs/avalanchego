@@ -309,11 +309,10 @@ func makeHeader(chain consensus.ChainReader, config *params.ChainConfig, parent 
 		time = parent.Time() + gap
 	}
 
-	timestamp := new(big.Int).SetUint64(time)
 	var gasLimit uint64
-	if config.IsCortina(timestamp) {
+	if config.IsCortina(time) {
 		gasLimit = params.CortinaGasLimit
-	} else if config.IsApricotPhase1(timestamp) {
+	} else if config.IsApricotPhase1(time) {
 		gasLimit = params.ApricotPhase1GasLimit
 	} else {
 		gasLimit = CalcGasLimit(parent.GasUsed(), parent.GasLimit(), parent.GasLimit(), parent.GasLimit())
@@ -333,7 +332,7 @@ func makeHeader(chain consensus.ChainReader, config *params.ChainConfig, parent 
 		Number:   new(big.Int).Add(parent.Number(), common.Big1),
 		Time:     time,
 	}
-	if chain.Config().IsApricotPhase3(timestamp) {
+	if chain.Config().IsApricotPhase3(time) {
 		var err error
 		header.Extra, header.BaseFee, err = dummy.CalcBaseFee(chain.Config(), parent.Header(), time)
 		if err != nil {

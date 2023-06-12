@@ -509,8 +509,7 @@ func testRepair(t *testing.T, tt *rewindTest, snapshots bool) {
 	datadir := t.TempDir()
 
 	db, err := rawdb.Open(rawdb.OpenOptions{
-		Directory:         datadir,
-		AncientsDirectory: datadir,
+		Directory: datadir,
 	})
 	if err != nil {
 		t.Fatalf("Failed to create persistent database: %v", err)
@@ -578,8 +577,7 @@ func testRepair(t *testing.T, tt *rewindTest, snapshots bool) {
 
 	// Start a new blockchain back up and see where the repair leads us
 	db, err = rawdb.Open(rawdb.OpenOptions{
-		Directory:         datadir,
-		AncientsDirectory: datadir,
+		Directory: datadir,
 	})
 	if err != nil {
 		t.Fatalf("Failed to reopen persistent database: %v", err)

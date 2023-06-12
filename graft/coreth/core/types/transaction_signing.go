@@ -47,7 +47,7 @@ type sigCache struct {
 }
 
 // MakeSigner returns a Signer based on the given chain config and block number or time.
-func MakeSigner(config *params.ChainConfig, blockNumber *big.Int, blockTime *big.Int) Signer {
+func MakeSigner(config *params.ChainConfig, blockNumber *big.Int, blockTime uint64) Signer {
 	switch {
 	case config.IsApricotPhase3(blockTime):
 		return NewLondonSigner(config.ChainID)

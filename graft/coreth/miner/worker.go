@@ -120,19 +120,19 @@ func (w *worker) commitNewWork() (*types.Block, error) {
 	defer w.mu.RUnlock()
 
 	tstart := w.clock.Time()
-	timestamp := tstart.Unix()
+	timestamp := uint64(tstart.Unix())
 	parent := w.chain.CurrentBlock()
 	// Note: in order to support asynchronous block production, blocks are allowed to have
 	// the same timestamp as their parent. This allows more than one block to be produced
 	// per second.
-	if parent.Time >= uint64(timestamp) {
-		timestamp = int64(parent.Time)
+	if parent.Time >= timestamp {
+		timestamp = parent.Time
 	}
 
 	var gasLimit uint64
-	if w.chainConfig.IsCortina(big.NewInt(timestamp)) {
+	if w.chainConfig.IsCortina(timestamp) {
 		gasLimit = params.CortinaGasLimit
-	} else if w.chainConfig.IsApricotPhase1(big.NewInt(timestamp)) {
+	} else if w.chainConfig.IsApricotPhase1(timestamp) {
 		gasLimit = params.ApricotPhase1GasLimit
 	} else {
 		// The gas limit is set in phase1 to ApricotPhase1GasLimit because the ceiling and floor were set to the same value
@@ -144,13 +144,12 @@ func (w *worker) commitNewWork() (*types.Block, error) {
 		Number:     new(big.Int).Add(parent.Number, common.Big1),
 		GasLimit:   gasLimit,
 		Extra:      nil,
-		Time:       uint64(timestamp),
+		Time:       timestamp,
 	}
 	// Set BaseFee and Extra data field if we are post ApricotPhase3
-	bigTimestamp := big.NewInt(timestamp)
-	if w.chainConfig.IsApricotPhase3(bigTimestamp) {
+	if w.chainConfig.IsApricotPhase3(timestamp) {
 		var err error
-		header.Extra, header.BaseFee, err = dummy.CalcBaseFee(w.chainConfig, parent, uint64(timestamp))
+		header.Extra, header.BaseFee, err = dummy.CalcBaseFee(w.chainConfig, parent, timestamp)
 		if err != nil {
 			return nil, fmt.Errorf("failed to calculate new base fee: %w", err)
 		}
@@ -168,7 +167,7 @@ func (w *worker) commitNewWork() (*types.Block, error) {
 		return nil, fmt.Errorf("failed to create new current environment: %w", err)
 	}
 	// Configure any stateful precompiles that should go into effect during this block.
-	w.chainConfig.CheckConfigurePrecompiles(new(big.Int).SetUint64(parent.Time), types.NewBlockWithHeader(header), env.state)
+	w.chainConfig.CheckConfigurePrecompiles(&parent.Time, types.NewBlockWithHeader(header), env.state)
 
 	// Fill the block with all available pending transactions.
 	pending := w.eth.TxPool().Pending(true)
@@ -200,7 +199,7 @@ func (w *worker) createCurrentEnvironment(parent *types.Header, header *types.He
 		return nil, err
 	}
 	return &environment{
-		signer:  types.MakeSigner(w.chainConfig, header.Number, new(big.Int).SetUint64(header.Time)),
+		signer:  types.MakeSigner(w.chainConfig, header.Number, header.Time),
 		state:   state,
 		parent:  parent,
 		header:  header,

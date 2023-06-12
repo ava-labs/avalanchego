@@ -18,11 +18,11 @@ var (
 
 type mockBlockContext struct {
 	blockNumber *big.Int
-	timestamp   *big.Int
+	timestamp   uint64
 }
 
-func (mb *mockBlockContext) Number() *big.Int    { return mb.blockNumber }
-func (mb *mockBlockContext) Timestamp() *big.Int { return mb.timestamp }
+func (mb *mockBlockContext) Number() *big.Int  { return mb.blockNumber }
+func (mb *mockBlockContext) Timestamp() uint64 { return mb.timestamp }
 
 type mockAccessibleState struct {
 	state        *state.StateDB
