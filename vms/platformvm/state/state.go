@@ -57,6 +57,7 @@ var (
 	_ cache.SizedElement = (*txAndStatus)(nil)
 
 	ErrDelegatorSubset              = errors.New("delegator's time range must be a subset of the validator's time range")
+	ErrElasticSubnetConfigNotFound  = errors.New("elastic subnet configuration not found")
 	errMissingValidatorSet          = errors.New("missing validator set")
 	errValidatorSetAlreadyPopulated = errors.New("validator set already populated")
 	errDuplicateValidatorSet        = errors.New("duplicate validator set")
@@ -822,6 +823,9 @@ func (s *state) GetRewardConfig(subnetID ids.ID) (reward.Config, error) {
 	}
 
 	transformSubnetIntf, err := s.GetSubnetTransformation(subnetID)
+	if err == database.ErrNotFound {
+		return reward.Config{}, ErrElasticSubnetConfigNotFound
+	}
 	if err != nil {
 		return reward.Config{}, err
 	}

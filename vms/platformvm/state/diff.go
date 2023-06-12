@@ -424,9 +424,9 @@ func (d *diff) GetRewardConfig(subnetID ids.ID) (reward.Config, error) {
 		return reward.Config{}, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
 	}
 
-	parentCfg, err := parentState.GetRewardConfig(subnetID)
-	if err != nil {
-		return reward.Config{}, err
+	parentCfg, errParent := parentState.GetRewardConfig(subnetID)
+	if errParent != nil && errParent != ErrElasticSubnetConfigNotFound {
+		return reward.Config{}, errParent
 	}
 
 	if subnetID == constants.PrimaryNetworkID {
@@ -435,7 +435,7 @@ func (d *diff) GetRewardConfig(subnetID ids.ID) (reward.Config, error) {
 
 	transformSubnetIntf, exists := d.transformedSubnets[subnetID]
 	if !exists {
-		return parentCfg, nil
+		return parentCfg, errParent
 	}
 
 	// this diff contains a tx transforming requested subnet into elastic one
