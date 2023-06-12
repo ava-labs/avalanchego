@@ -615,7 +615,7 @@ func Test_MerkleDB_Random_Insert_Ordering(t *testing.T) {
 
 	for i := 0; i < 3; i++ {
 		now := time.Now().UnixNano()
-		t.Log("seed: ", now)
+		t.Logf("seed for iter %d: %d", i, now)
 		r := rand.New(rand.NewSource(now)) // #nosec G404
 
 		ops := make([]*testOperation, 0, totalState)
