@@ -160,7 +160,7 @@ func Test_TrieView_IteratorStartPrefix(t *testing.T) {
 func Test_TrieView_Iterator_Random(t *testing.T) {
 	require := require.New(t)
 	now := time.Now().UnixNano()
-	t.Logf("seed: %v", now)
+	t.Logf("seed: %d", now)
 	rand := rand.New(rand.NewSource(now)) // #nosec G404
 
 	var (

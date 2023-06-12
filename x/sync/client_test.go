@@ -573,7 +573,7 @@ func TestGetChangeProof(t *testing.T) {
 
 func TestRangeProofRetries(t *testing.T) {
 	now := time.Now().UnixNano()
-	t.Logf("seed: %v", now)
+	t.Logf("seed: %d", now)
 	r := rand.New(rand.NewSource(now)) // #nosec G404
 	require := require.New(t)
 
