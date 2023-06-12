@@ -248,7 +248,7 @@ func updateCurrentValidatorInSystem(sys *sysUnderTest) error {
 	// 1. check if there is a staker, already inserted. If not return
 	// 2. Add diff layer on top (to test update across diff layers)
 	// 3. query the staker
-	// 4. Shift staker times and update the staker
+	// 4. shift staker times and update the staker
 
 	chain := sys.getTopChainState()
 
@@ -287,7 +287,7 @@ func updateCurrentValidatorInSystem(sys *sysUnderTest) error {
 		return err
 	}
 
-	// 4. Shift staker times and update the staker
+	// 4. shift staker times and update the staker
 	updatedStaker := *staker
 	ShiftStakerAheadInPlace(&updatedStaker)
 	return chain.UpdateCurrentValidator(&updatedStaker)
@@ -592,7 +592,7 @@ func (*updateCurrentDelegatorCommand) Run(sut commands.SystemUnderTest) commands
 
 func updateCurrentDelegatorInSystem(sys *sysUnderTest) error {
 	// 1. check if there is a staker, already inserted. If not return
-	// 2.  Add diff layer on top (to test update across diff layers)
+	// 2. Add diff layer on top (to test update across diff layers)
 	// 3. Shift staker times and update the staker
 
 	chain := sys.getTopChainState()
