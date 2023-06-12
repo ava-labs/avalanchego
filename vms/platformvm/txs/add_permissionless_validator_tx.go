@@ -129,7 +129,7 @@ func (tx *AddPermissionlessValidatorTx) SyntacticVerify(ctx *snow.Context) error
 	case len(tx.StakeOuts) == 0: // Ensure there is provided stake
 		return errNoStake
 	case tx.DelegationShares > reward.PercentDenominator:
-		return errTooManyShares
+		return errTooManyDelegatorsShares
 	}
 
 	if err := tx.BaseTx.SyntacticVerify(ctx); err != nil {

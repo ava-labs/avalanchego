@@ -4,6 +4,7 @@
 package txs
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -19,7 +20,13 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-var _ ValidatorTx = (*AddContinuousValidatorTx)(nil)
+var (
+	_ ValidatorTx = (*AddContinuousValidatorTx)(nil)
+
+	errTooRestakeShares     = fmt.Errorf("a staker can only restake at most %d shares of its validation reward", reward.PercentDenominator)
+	errInvalidStakerAuthKey = errors.New("invalid staker authorization key")
+	errInvalidSubnetAuth    = errors.New("invalid subnet auth")
+)
 
 type AddContinuousValidatorTx struct {
 	// Metadata, inputs and outputs
@@ -49,7 +56,7 @@ type AddContinuousValidatorTx struct {
 	// take 30% of rewards from delegators
 	DelegationShares uint32 `serialize:"true" json:"Delegationshares"`
 	// Who is authorized to manage this validator
-	StakerAuthorizationKey fx.Owner `serialize:"true" json:"stakerAuthorizationKey"`
+	StakerAuthKey fx.Owner `serialize:"true" json:"stakerAuthorizationKey"`
 	// If the [Subnet] is the primary network, [SubnetAuth] is empty.
 	// If the [Subnet] is not the primary network, [SubnetAuth] is the
 	// auth that will be allowing this validator into the network
@@ -67,7 +74,7 @@ func (tx *AddContinuousValidatorTx) InitCtx(ctx *snow.Context) {
 	}
 	tx.ValidatorRewardsOwner.InitCtx(ctx)
 	tx.DelegatorRewardsOwner.InitCtx(ctx)
-	tx.StakerAuthorizationKey.InitCtx(ctx)
+	tx.StakerAuthKey.InitCtx(ctx)
 }
 
 func (tx *AddContinuousValidatorTx) SubnetID() ids.ID {
@@ -120,24 +127,51 @@ func (tx *AddContinuousValidatorTx) SyntacticVerify(ctx *snow.Context) error {
 		return errEmptyNodeID
 	case len(tx.StakeOuts) == 0: // Ensure there is provided stake
 		return errNoStake
+	case tx.ValidatorRewardRestakeShares > reward.PercentDenominator:
+		return errTooRestakeShares
 	case tx.DelegationShares > reward.PercentDenominator:
-		return errTooManyShares
+		return errTooManyDelegatorsShares
 	}
 
 	if err := tx.BaseTx.SyntacticVerify(ctx); err != nil {
 		return fmt.Errorf("failed to verify BaseTx: %w", err)
 	}
-	if err := verify.All(&tx.Validator, tx.Signer, tx.ValidatorRewardsOwner, tx.DelegatorRewardsOwner); err != nil {
-		return fmt.Errorf("failed to verify validator, signer, or rewards owners: %w", err)
+	if err := verify.All(
+		&tx.Validator,
+		tx.Signer,
+		tx.ValidatorRewardsOwner,
+		tx.DelegatorRewardsOwner,
+		tx.StakerAuthKey,
+		tx.SubnetAuth,
+	); err != nil {
+		return fmt.Errorf("failed to verify validator, signer, rewards or staker owners: %w", err)
 	}
 
-	hasKey := tx.Signer.Key() != nil
 	isPrimaryNetwork := tx.Subnet == constants.PrimaryNetworkID
+	hasKey := tx.Signer.Key() != nil
 	if hasKey != isPrimaryNetwork {
 		return fmt.Errorf(
 			"%w: hasKey=%v != isPrimaryNetwork=%v",
 			errInvalidSigner,
 			hasKey,
+			isPrimaryNetwork,
+		)
+	}
+	_, hasNotStakerAuthKey := tx.StakerAuthKey.(*fx.EmptyOwner)
+	if hasNotStakerAuthKey == isPrimaryNetwork {
+		return fmt.Errorf(
+			"%w: hasStakerAuthKey=%v != isPrimaryNetwork=%v",
+			errInvalidStakerAuthKey,
+			hasNotStakerAuthKey,
+			isPrimaryNetwork,
+		)
+	}
+	_, hasNotSubnetAuth := tx.SubnetAuth.(*verify.EmptyVerifiable)
+	if hasNotSubnetAuth == isPrimaryNetwork {
+		return fmt.Errorf(
+			"%w: hasNotSubnetAuth=%v != isPrimaryNetwork=%v",
+			errInvalidSubnetAuth,
+			hasNotSubnetAuth,
 			isPrimaryNetwork,
 		)
 	}

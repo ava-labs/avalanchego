@@ -12,6 +12,7 @@ import (
 var (
 	_ Fx    = (*secp256k1fx.Fx)(nil)
 	_ Owner = (*secp256k1fx.OutputOwners)(nil)
+	_ Owner = (*EmptyOwner)(nil)
 	_ Owned = (*secp256k1fx.TransferOutput)(nil)
 )
 
@@ -53,3 +54,13 @@ type Owner interface {
 type Owned interface {
 	Owners() interface{}
 }
+
+type EmptyOwner struct {
+	verify.IsNotState `json:"-"`
+}
+
+func (*EmptyOwner) Verify() error {
+	return nil
+}
+
+func (*EmptyOwner) InitCtx(*snow.Context) {}

@@ -4,7 +4,6 @@
 package txs
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -22,8 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/vms/types"
 )
-
-var errInvalidSubnetAuth = errors.New("invalid subnet auth")
 
 func TestRemoveSubnetValidatorTxSerialization(t *testing.T) {
 	require := require.New(t)

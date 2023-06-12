@@ -22,7 +22,7 @@ var (
 	_ ValidatorTx                = (*AddValidatorTx)(nil)
 	_ PreContinuousStakingStaker = (*AddValidatorTx)(nil)
 
-	errTooManyShares = fmt.Errorf("a staker can only require at most %d shares from delegators", reward.PercentDenominator)
+	errTooManyDelegatorsShares = fmt.Errorf("a staker can only require at most %d shares from delegators", reward.PercentDenominator)
 )
 
 // AddValidatorTx is an unsigned addValidatorTx
@@ -97,7 +97,7 @@ func (tx *AddValidatorTx) SyntacticVerify(ctx *snow.Context) error {
 	case tx.SyntacticallyVerified: // already passed syntactic verification
 		return nil
 	case tx.DelegationShares > reward.PercentDenominator: // Ensure delegators shares are in the allowed amount
-		return errTooManyShares
+		return errTooManyDelegatorsShares
 	}
 
 	if err := tx.BaseTx.SyntacticVerify(ctx); err != nil {
