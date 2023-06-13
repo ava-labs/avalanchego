@@ -60,25 +60,26 @@ var (
 	errValidatorSetAlreadyPopulated = errors.New("validator set already populated")
 	errDuplicateValidatorSet        = errors.New("duplicate validator set")
 
-	blockPrefix                      = []byte("block")
-	validatorsPrefix                 = []byte("validators")
-	currentPrefix                    = []byte("current")
-	pendingPrefix                    = []byte("pending")
-	validatorPrefix                  = []byte("validator")
-	delegatorPrefix                  = []byte("delegator")
-	subnetValidatorPrefix            = []byte("subnetValidator")
-	subnetDelegatorPrefix            = []byte("subnetDelegator")
-	nestedValidatorWeightDiffsPrefix = []byte("validatorDiffs")
-	flatValidatorWeightDiffsPrefix   = []byte("flatValidatorDiffs")
-	validatorPublicKeyDiffsPrefix    = []byte("flatPublicKeyDiffs")
-	txPrefix                         = []byte("tx")
-	rewardUTXOsPrefix                = []byte("rewardUTXOs")
-	utxoPrefix                       = []byte("utxo")
-	subnetPrefix                     = []byte("subnet")
-	transformedSubnetPrefix          = []byte("transformedSubnet")
-	supplyPrefix                     = []byte("supply")
-	chainPrefix                      = []byte("chain")
-	singletonPrefix                  = []byte("singleton")
+	blockPrefix                         = []byte("block")
+	validatorsPrefix                    = []byte("validators")
+	currentPrefix                       = []byte("current")
+	pendingPrefix                       = []byte("pending")
+	validatorPrefix                     = []byte("validator")
+	delegatorPrefix                     = []byte("delegator")
+	subnetValidatorPrefix               = []byte("subnetValidator")
+	subnetDelegatorPrefix               = []byte("subnetDelegator")
+	nestedValidatorWeightDiffsPrefix    = []byte("validatorDiffs")
+	nestedValidatorPublicKeyDiffsPrefix = []byte("publicKeyDiffs")
+	flatValidatorWeightDiffsPrefix      = []byte("flatValidatorDiffs")
+	flatValidatorPublicKeyDiffsPrefix   = []byte("flatPublicKeyDiffs")
+	txPrefix                            = []byte("tx")
+	rewardUTXOsPrefix                   = []byte("rewardUTXOs")
+	utxoPrefix                          = []byte("utxo")
+	subnetPrefix                        = []byte("subnet")
+	transformedSubnetPrefix             = []byte("transformedSubnet")
+	supplyPrefix                        = []byte("supply")
+	chainPrefix                         = []byte("chain")
+	singletonPrefix                     = []byte("singleton")
 
 	timestampKey     = []byte("timestamp")
 	currentSupplyKey = []byte("current supply")
@@ -272,9 +273,10 @@ type state struct {
 	pendingSubnetDelegatorBaseDB database.Database
 	pendingSubnetDelegatorList   linkeddb.LinkedDB
 
-	nestedValidatorWeightDiffsDB database.Database
-	flatValidatorWeightDiffsDB   database.Database
-	validatorPublicKeyDiffsDB    database.Database
+	nestedValidatorWeightDiffsDB    database.Database
+	nestedValidatorPublicKeyDiffsDB database.Database
+	flatValidatorWeightDiffsDB      database.Database
+	flatValidatorPublicKeyDiffsDB   database.Database
 
 	addedTxs map[ids.ID]*txAndStatus            // map of txID -> {*txs.Tx, Status}
 	txCache  cache.Cacher[ids.ID, *txAndStatus] // txID -> {*txs.Tx, Status}. If the entry is nil, it isn't in the database
@@ -425,8 +427,9 @@ func newState(
 	pendingSubnetDelegatorBaseDB := prefixdb.New(subnetDelegatorPrefix, pendingValidatorsDB)
 
 	nestedValidatorWeightDiffsDB := prefixdb.New(nestedValidatorWeightDiffsPrefix, validatorsDB)
+	nestedValidatorPublicKeyDiffsDB := prefixdb.New(nestedValidatorPublicKeyDiffsPrefix, validatorsDB)
 	flatValidatorWeightDiffsDB := prefixdb.New(flatValidatorWeightDiffsPrefix, validatorsDB)
-	validatorPublicKeyDiffsDB := prefixdb.New(validatorPublicKeyDiffsPrefix, validatorsDB)
+	flatValidatorPublicKeyDiffsDB := prefixdb.New(flatValidatorPublicKeyDiffsPrefix, validatorsDB)
 
 	txCache, err := metercacher.New(
 		"tx_cache",
@@ -508,28 +511,29 @@ func newState(
 		currentStakers: newBaseStakers(),
 		pendingStakers: newBaseStakers(),
 
-		validatorsDB:                 validatorsDB,
-		currentValidatorsDB:          currentValidatorsDB,
-		currentValidatorBaseDB:       currentValidatorBaseDB,
-		currentValidatorList:         linkeddb.NewDefault(currentValidatorBaseDB),
-		currentDelegatorBaseDB:       currentDelegatorBaseDB,
-		currentDelegatorList:         linkeddb.NewDefault(currentDelegatorBaseDB),
-		currentSubnetValidatorBaseDB: currentSubnetValidatorBaseDB,
-		currentSubnetValidatorList:   linkeddb.NewDefault(currentSubnetValidatorBaseDB),
-		currentSubnetDelegatorBaseDB: currentSubnetDelegatorBaseDB,
-		currentSubnetDelegatorList:   linkeddb.NewDefault(currentSubnetDelegatorBaseDB),
-		pendingValidatorsDB:          pendingValidatorsDB,
-		pendingValidatorBaseDB:       pendingValidatorBaseDB,
-		pendingValidatorList:         linkeddb.NewDefault(pendingValidatorBaseDB),
-		pendingDelegatorBaseDB:       pendingDelegatorBaseDB,
-		pendingDelegatorList:         linkeddb.NewDefault(pendingDelegatorBaseDB),
-		pendingSubnetValidatorBaseDB: pendingSubnetValidatorBaseDB,
-		pendingSubnetValidatorList:   linkeddb.NewDefault(pendingSubnetValidatorBaseDB),
-		pendingSubnetDelegatorBaseDB: pendingSubnetDelegatorBaseDB,
-		pendingSubnetDelegatorList:   linkeddb.NewDefault(pendingSubnetDelegatorBaseDB),
-		nestedValidatorWeightDiffsDB: nestedValidatorWeightDiffsDB,
-		flatValidatorWeightDiffsDB:   flatValidatorWeightDiffsDB,
-		validatorPublicKeyDiffsDB:    validatorPublicKeyDiffsDB,
+		validatorsDB:                    validatorsDB,
+		currentValidatorsDB:             currentValidatorsDB,
+		currentValidatorBaseDB:          currentValidatorBaseDB,
+		currentValidatorList:            linkeddb.NewDefault(currentValidatorBaseDB),
+		currentDelegatorBaseDB:          currentDelegatorBaseDB,
+		currentDelegatorList:            linkeddb.NewDefault(currentDelegatorBaseDB),
+		currentSubnetValidatorBaseDB:    currentSubnetValidatorBaseDB,
+		currentSubnetValidatorList:      linkeddb.NewDefault(currentSubnetValidatorBaseDB),
+		currentSubnetDelegatorBaseDB:    currentSubnetDelegatorBaseDB,
+		currentSubnetDelegatorList:      linkeddb.NewDefault(currentSubnetDelegatorBaseDB),
+		pendingValidatorsDB:             pendingValidatorsDB,
+		pendingValidatorBaseDB:          pendingValidatorBaseDB,
+		pendingValidatorList:            linkeddb.NewDefault(pendingValidatorBaseDB),
+		pendingDelegatorBaseDB:          pendingDelegatorBaseDB,
+		pendingDelegatorList:            linkeddb.NewDefault(pendingDelegatorBaseDB),
+		pendingSubnetValidatorBaseDB:    pendingSubnetValidatorBaseDB,
+		pendingSubnetValidatorList:      linkeddb.NewDefault(pendingSubnetValidatorBaseDB),
+		pendingSubnetDelegatorBaseDB:    pendingSubnetDelegatorBaseDB,
+		pendingSubnetDelegatorList:      linkeddb.NewDefault(pendingSubnetDelegatorBaseDB),
+		nestedValidatorWeightDiffsDB:    nestedValidatorWeightDiffsDB,
+		nestedValidatorPublicKeyDiffsDB: nestedValidatorPublicKeyDiffsDB,
+		flatValidatorWeightDiffsDB:      flatValidatorWeightDiffsDB,
+		flatValidatorPublicKeyDiffsDB:   flatValidatorPublicKeyDiffsDB,
 
 		addedTxs: make(map[ids.ID]*txAndStatus),
 		txDB:     prefixdb.New(txPrefix, baseDB),
@@ -1020,7 +1024,7 @@ func (s *state) GetValidatorPublicKeyDiffs(
 	startHeight uint64,
 	endHeight uint64,
 ) (map[ids.NodeID]*bls.PublicKey, error) {
-	diffIter := s.validatorPublicKeyDiffsDB.NewIteratorWithStart(
+	diffIter := s.flatValidatorPublicKeyDiffsDB.NewIteratorWithStart(
 		getStartBLSKey(startHeight),
 	)
 	defer diffIter.Release()
@@ -1608,6 +1612,10 @@ func (s *state) GetStatelessBlock(blockID ids.ID) (blocks.Block, choices.Status,
 }
 
 func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error {
+	heightBytes := database.PackUInt64(height)
+	rawPublicKeyDiffDB := prefixdb.New(heightBytes, s.nestedValidatorPublicKeyDiffsDB)
+	pkDiffDB := linkeddb.NewDefault(rawPublicKeyDiffDB)
+
 	for subnetID, validatorDiffs := range s.currentStakers.validatorDiffs {
 		delete(s.currentStakers.validatorDiffs, subnetID)
 
@@ -1618,6 +1626,17 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 			validatorDB = s.currentValidatorList
 			delegatorDB = s.currentDelegatorList
 		}
+
+		prefixStruct := heightWithSubnet{
+			Height:   height,
+			SubnetID: subnetID,
+		}
+		prefixBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, prefixStruct)
+		if err != nil {
+			return fmt.Errorf("failed to create prefix bytes: %w", err)
+		}
+		rawWeightDiffDB := prefixdb.New(prefixBytes, s.nestedValidatorWeightDiffsDB)
+		weightDiffDB := linkeddb.NewDefault(rawWeightDiffDB)
 
 		// Record the change in weight and/or public key for each validator.
 		for nodeID, validatorDiff := range validatorDiffs {
@@ -1636,7 +1655,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 				// keys.
 				if staker.PublicKey != nil {
 					// Record the public key of the validator being added.
-					err := s.validatorPublicKeyDiffsDB.Put(
+					err := s.flatValidatorPublicKeyDiffsDB.Put(
 						getBLSKey(height, nodeID),
 						nil,
 					)
@@ -1677,11 +1696,18 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 				// keys.
 				if staker.PublicKey != nil {
 					// Record the public key of the validator being removed.
-					err := s.validatorPublicKeyDiffsDB.Put(
+					err := s.flatValidatorPublicKeyDiffsDB.Put(
 						getBLSKey(height, nodeID),
 						staker.PublicKey.Serialize(),
 					)
 					if err != nil {
+						return err
+					}
+
+					// TODO: Remove this once we no longer support version
+					// rollbacks.
+					pkBytes := bls.PublicKeyToBytes(staker.PublicKey)
+					if err := pkDiffDB.Put(nodeID[:], pkBytes); err != nil {
 						return err
 					}
 				}
@@ -1718,6 +1744,11 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 				weightDiffBytes,
 			)
 			if err != nil {
+				return err
+			}
+
+			// TODO: Remove this once we no longer support version rollbacks.
+			if err := weightDiffDB.Put(nodeID[:], weightDiffBytes); err != nil {
 				return err
 			}
 
