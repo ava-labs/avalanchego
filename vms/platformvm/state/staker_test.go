@@ -297,7 +297,7 @@ func TestShiftStaker(t *testing.T) {
 	}
 	require.True(staker.NextTime.Before(staker.EndTime))
 
-	ShiftStakerAheadInPlace(staker)
+	ShiftStakerAheadInPlace(staker, mockable.MaxTime)
 	require.Equal(start.Add(stakingPeriod), staker.StartTime)
 	require.Equal(stakingPeriod, staker.StakingPeriod)
 	require.Equal(start.Add(2*stakingPeriod), staker.NextTime)
@@ -316,7 +316,7 @@ func TestShiftStaker(t *testing.T) {
 	require.False(staker.NextTime.After(staker.EndTime)) // invariant
 
 	for i := 1; i < periods; i++ {
-		ShiftStakerAheadInPlace(staker)
+		ShiftStakerAheadInPlace(staker, mockable.MaxTime)
 		require.Equal(start.Add(time.Duration(i)*stakingPeriod), staker.StartTime)
 		require.Equal(stakingPeriod, staker.StakingPeriod)
 		require.Equal(start.Add(time.Duration(i+1)*stakingPeriod), staker.NextTime)
@@ -327,7 +327,7 @@ func TestShiftStaker(t *testing.T) {
 
 	// staker reached end of life, shift must be ineffective
 	cpy := *staker
-	ShiftStakerAheadInPlace(&cpy)
+	ShiftStakerAheadInPlace(&cpy, mockable.MaxTime)
 	require.Equal(staker, &cpy)
 }
 
@@ -370,7 +370,7 @@ func TestPrimaryNetworkValidatorStopTimes(t *testing.T) {
 	require.Equal(stopTime, staker.EarliestStopTime())
 
 	// staker shift must not change stop time
-	ShiftStakerAheadInPlace(staker)
+	ShiftStakerAheadInPlace(staker, mockable.MaxTime)
 	require.Equal(stopTime, staker.EndTime)
 	require.Equal(stopTime, staker.EarliestStopTime())
 }

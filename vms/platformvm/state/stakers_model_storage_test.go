@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/leanovate/gopter"
 	"github.com/leanovate/gopter/commands"
@@ -289,7 +290,7 @@ func updateCurrentValidatorInSystem(sys *sysUnderTest) error {
 
 	// 4. shift staker times and update the staker
 	updatedStaker := *staker
-	ShiftStakerAheadInPlace(&updatedStaker)
+	ShiftStakerAheadInPlace(&updatedStaker, mockable.MaxTime)
 	return chain.UpdateCurrentValidator(&updatedStaker)
 }
 
@@ -329,7 +330,7 @@ func updateCurrentValidatorInModel(model *stakersStorageModel) error {
 	stakerIt.Release()
 
 	updatedStaker := *staker
-	ShiftStakerAheadInPlace(&updatedStaker)
+	ShiftStakerAheadInPlace(&updatedStaker, mockable.MaxTime)
 	return model.UpdateCurrentValidator(&updatedStaker)
 }
 
@@ -627,7 +628,7 @@ func updateCurrentDelegatorInSystem(sys *sysUnderTest) error {
 
 	// 3. Shift delegator times and update the staker
 	updatedDelegator := *delegator
-	ShiftStakerAheadInPlace(&updatedDelegator)
+	ShiftStakerAheadInPlace(&updatedDelegator, mockable.MaxTime)
 	return chain.UpdateCurrentDelegator(&updatedDelegator)
 }
 
@@ -666,7 +667,7 @@ func updateCurrentDelegatorInModel(model *stakersStorageModel) error {
 	stakerIt.Release()
 
 	updatedDelegator := *delegator
-	ShiftStakerAheadInPlace(&updatedDelegator)
+	ShiftStakerAheadInPlace(&updatedDelegator, mockable.MaxTime)
 	return model.UpdateCurrentDelegator(&updatedDelegator)
 }
 

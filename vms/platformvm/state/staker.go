@@ -160,15 +160,21 @@ func NewPendingStaker(txID ids.ID, staker txs.PreContinuousStakingStaker) (*Stak
 }
 
 // ShiftStakerAheadInPlace moves staker times ahead.
-func ShiftStakerAheadInPlace(s *Staker) {
+func ShiftStakerAheadInPlace(s *Staker, upperBound time.Time) {
 	if s.Priority.IsPending() {
 		return // never shift pending stakers
 	}
-	if s.NextTime.Equal(s.EndTime) {
+	if !s.ShouldRestake() {
 		return // can't shift, staker reached EOL
 	}
-	s.StartTime = s.StartTime.Add(s.StakingPeriod)
-	s.NextTime = s.NextTime.Add(s.StakingPeriod)
+
+	s.StartTime = s.NextTime
+
+	nextTime := s.NextTime.Add(s.StakingPeriod)
+	if nextTime.After(upperBound) {
+		nextTime = upperBound
+	}
+	s.NextTime = nextTime
 }
 
 func (s *Staker) ShouldRestake() bool {

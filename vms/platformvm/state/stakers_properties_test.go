@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/leanovate/gopter"
 	"github.com/leanovate/gopter/gen"
 	"github.com/leanovate/gopter/prop"
@@ -149,7 +150,7 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 			// to avoid in-place modification of stakers already stored in store,
 			// as it must be done in prod code.
 			updatedStaker := s
-			ShiftStakerAheadInPlace(&updatedStaker)
+			ShiftStakerAheadInPlace(&updatedStaker, mockable.MaxTime)
 
 			err = store.UpdateCurrentValidator(&updatedStaker)
 			if err != nil {
@@ -382,7 +383,7 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 				// to avoid in-place modification of stakers already stored in store,
 				// as it must be done in prod code.
 				updatedStaker := del
-				ShiftStakerAheadInPlace(&updatedStaker)
+				ShiftStakerAheadInPlace(&updatedStaker, mockable.MaxTime)
 
 				err = store.UpdateCurrentDelegator(&updatedStaker)
 				if err != nil {

@@ -18,6 +18,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
 func TestMaskedIterator(t *testing.T) {
@@ -231,7 +232,7 @@ func buildMaskedIterator(parentStakers []Staker, deletedIndexes []int, updatedIn
 	updatedStakers := make(map[ids.ID]*Staker)
 	for _, idx := range updatedIndexes {
 		s := parentStakers[idx]
-		ShiftStakerAheadInPlace(&s)
+		ShiftStakerAheadInPlace(&s, mockable.MaxTime)
 		updatedStakers[s.TxID] = &s
 	}
 
