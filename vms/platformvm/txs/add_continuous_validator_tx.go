@@ -167,7 +167,7 @@ func (tx *AddContinuousValidatorTx) SyntacticVerify(ctx *snow.Context) error {
 		)
 	}
 	_, hasNotSubnetAuth := tx.SubnetAuth.(*verify.EmptyVerifiable)
-	if hasNotSubnetAuth == isPrimaryNetwork {
+	if hasNotSubnetAuth != isPrimaryNetwork {
 		return fmt.Errorf(
 			"%w: hasNotSubnetAuth=%v != isPrimaryNetwork=%v",
 			errInvalidSubnetAuth,
