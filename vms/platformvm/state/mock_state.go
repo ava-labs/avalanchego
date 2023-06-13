@@ -15,7 +15,6 @@ import (
 	ids "github.com/ava-labs/avalanchego/ids"
 	choices "github.com/ava-labs/avalanchego/snow/choices"
 	validators "github.com/ava-labs/avalanchego/snow/validators"
-	bls "github.com/ava-labs/avalanchego/utils/crypto/bls"
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
 	blocks "github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	status "github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -140,6 +139,34 @@ func (m *MockState) AddUTXO(arg0 *avax.UTXO) {
 func (mr *MockStateMockRecorder) AddUTXO(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddUTXO", reflect.TypeOf((*MockState)(nil).AddUTXO), arg0)
+}
+
+// ApplyValidatorPublicKeyDiffs mocks base method.
+func (m *MockState) ApplyValidatorPublicKeyDiffs(arg0 map[ids.NodeID]*validators.GetValidatorOutput, arg1, arg2 uint64) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ApplyValidatorPublicKeyDiffs", arg0, arg1, arg2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ApplyValidatorPublicKeyDiffs indicates an expected call of ApplyValidatorPublicKeyDiffs.
+func (mr *MockStateMockRecorder) ApplyValidatorPublicKeyDiffs(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ApplyValidatorPublicKeyDiffs", reflect.TypeOf((*MockState)(nil).ApplyValidatorPublicKeyDiffs), arg0, arg1, arg2)
+}
+
+// ApplyValidatorWeightDiffs mocks base method.
+func (m *MockState) ApplyValidatorWeightDiffs(arg0 map[ids.NodeID]*validators.GetValidatorOutput, arg1, arg2 uint64, arg3 ids.ID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ApplyValidatorWeightDiffs", arg0, arg1, arg2, arg3)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ApplyValidatorWeightDiffs indicates an expected call of ApplyValidatorWeightDiffs.
+func (mr *MockStateMockRecorder) ApplyValidatorWeightDiffs(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ApplyValidatorWeightDiffs", reflect.TypeOf((*MockState)(nil).ApplyValidatorWeightDiffs), arg0, arg1, arg2, arg3)
 }
 
 // Close mocks base method.
@@ -529,36 +556,6 @@ func (m *MockState) GetUptime(arg0 ids.NodeID, arg1 ids.ID) (time.Duration, time
 func (mr *MockStateMockRecorder) GetUptime(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUptime", reflect.TypeOf((*MockState)(nil).GetUptime), arg0, arg1)
-}
-
-// GetValidatorPublicKeyDiffs mocks base method.
-func (m *MockState) GetValidatorPublicKeyDiffs(arg0 uint64) (map[ids.NodeID]*bls.PublicKey, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetValidatorPublicKeyDiffs", arg0)
-	ret0, _ := ret[0].(map[ids.NodeID]*bls.PublicKey)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetValidatorPublicKeyDiffs indicates an expected call of GetValidatorPublicKeyDiffs.
-func (mr *MockStateMockRecorder) GetValidatorPublicKeyDiffs(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetValidatorPublicKeyDiffs", reflect.TypeOf((*MockState)(nil).GetValidatorPublicKeyDiffs), arg0)
-}
-
-// GetValidatorWeightDiffs mocks base method.
-func (m *MockState) GetValidatorWeightDiffs(arg0 uint64, arg1 ids.ID) (map[ids.NodeID]*ValidatorWeightDiff, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetValidatorWeightDiffs", arg0, arg1)
-	ret0, _ := ret[0].(map[ids.NodeID]*ValidatorWeightDiff)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetValidatorWeightDiffs indicates an expected call of GetValidatorWeightDiffs.
-func (mr *MockStateMockRecorder) GetValidatorWeightDiffs(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetValidatorWeightDiffs", reflect.TypeOf((*MockState)(nil).GetValidatorWeightDiffs), arg0, arg1)
 }
 
 // PutCurrentDelegator mocks base method.

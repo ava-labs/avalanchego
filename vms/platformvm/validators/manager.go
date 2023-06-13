@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/window"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
@@ -312,43 +311,6 @@ func (m *manager) makeSubnetValidatorSet(
 		targetHeight+1,
 	)
 	return subnetValidatorSet, err
-}
-
-func applyWeightDiff(
-	targetSet map[ids.NodeID]*validators.GetValidatorOutput,
-	nodeID ids.NodeID,
-	weightDiff *state.ValidatorWeightDiff,
-) error {
-	vdr, ok := targetSet[nodeID]
-	if !ok {
-		// This node isn't in the current validator set.
-		vdr = &validators.GetValidatorOutput{
-			NodeID: nodeID,
-		}
-		targetSet[nodeID] = vdr
-	}
-
-	// The weight of this node changed at this block.
-	var err error
-	if weightDiff.Decrease {
-		// The validator's weight was decreased at this block, so in the
-		// prior block it was higher.
-		vdr.Weight, err = math.Add64(vdr.Weight, weightDiff.Amount)
-	} else {
-		// The validator's weight was increased at this block, so in the
-		// prior block it was lower.
-		vdr.Weight, err = math.Sub(vdr.Weight, weightDiff.Amount)
-	}
-	if err != nil {
-		return err
-	}
-
-	if vdr.Weight == 0 {
-		// The validator's weight was 0 before this block so
-		// they weren't in the validator set.
-		delete(targetSet, nodeID)
-	}
-	return nil
 }
 
 func (m *manager) GetSubnetID(_ context.Context, chainID ids.ID) (ids.ID, error) {
