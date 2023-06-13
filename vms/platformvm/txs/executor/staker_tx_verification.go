@@ -42,6 +42,7 @@ var (
 	ErrDelegateToPermissionedValidator = errors.New("delegation to permissioned validator")
 	ErrWrongStakedAssetID              = errors.New("incorrect staked assetID")
 	ErrUnauthorizedStakerStopping      = errors.New("unauthorized staker stopping")
+	ErrTxUnacceptableBeforeFork        = errors.New("tx unacceptable before fork")
 )
 
 // verifyAddValidatorTx carries out the validation for an AddValidatorTx.
@@ -890,7 +891,7 @@ func verifyAddContinuousValidatorTx(
 
 	currentTimestamp := chainState.GetTimestamp()
 	if !backend.Config.IsContinuousStakingActivated(currentTimestamp) {
-		return time.Time{}, errors.New("cannot accept AddContinuousValidatorTx before continuous staking fork")
+		return time.Time{}, ErrTxUnacceptableBeforeFork
 	}
 
 	subnetID := constants.PlatformChainID
@@ -1009,7 +1010,7 @@ func verifyAddContinuousDelegatorTx(
 
 	currentTimestamp := chainState.GetTimestamp()
 	if !backend.Config.IsContinuousStakingActivated(currentTimestamp) {
-		return time.Time{}, errors.New("cannot accept AddContinuousDelegatorTx before continuous staking fork")
+		return time.Time{}, ErrTxUnacceptableBeforeFork
 	}
 
 	delegatorRules, err := getDelegatorRules(backend, chainState, subnetID)

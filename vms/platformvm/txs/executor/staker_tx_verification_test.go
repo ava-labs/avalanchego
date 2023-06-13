@@ -30,6 +30,494 @@ import (
 // time.Duration underlying type is currently int64
 const stakerMaxDuration time.Duration = math.MaxInt64
 
+func TestVerifyAddContinuousValidatorTx(t *testing.T) {
+	type test struct {
+		name        string
+		backendF    func(*gomock.Controller) *Backend
+		stateF      func(*gomock.Controller) state.Chain
+		sTxF        func() *txs.Tx
+		txF         func() *txs.AddContinuousValidatorTx
+		expectedErr error
+	}
+
+	var (
+		cfg = config.Config{
+			MinValidatorStake: 1,
+			MaxValidatorStake: 2,
+			MinStakeDuration:  3 * time.Second,
+			MaxStakeDuration:  4 * time.Second,
+			MinDelegationFee:  5,
+		}
+		// This tx already passed syntactic verification.
+		now        = time.Now().Truncate(time.Second)
+		verifiedTx = txs.AddContinuousValidatorTx{
+			BaseTx: txs.BaseTx{
+				SyntacticallyVerified: true,
+				BaseTx: avax.BaseTx{
+					NetworkID:    1,
+					BlockchainID: ids.GenerateTestID(),
+					Outs:         []*avax.TransferableOutput{},
+					Ins:          []*avax.TransferableInput{},
+				},
+			},
+			Validator: txs.Validator{
+				NodeID: ids.GenerateTestNodeID(),
+				Start:  uint64(now.Unix()),
+				End:    uint64(now.Add(cfg.MinStakeDuration).Unix()),
+				Wght:   cfg.MinValidatorStake,
+			},
+			StakeOuts: []*avax.TransferableOutput{
+				{},
+			},
+			ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
+				Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+				Threshold: 1,
+			},
+			DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
+				Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+				Threshold: 1,
+			},
+			DelegationShares: 20_000,
+		}
+		verifiedSignedTx = txs.Tx{
+			Unsigned: &verifiedTx,
+			Creds:    []verify.Verifiable{},
+		}
+	)
+	verifiedSignedTx.SetBytes([]byte{1}, []byte{2})
+
+	tests := []test{
+		{
+			name: "fail syntactic verification",
+			backendF: func(*gomock.Controller) *Backend {
+				return &Backend{
+					Ctx: snow.DefaultContextTest(),
+					Config: &config.Config{
+						ContinuousStakingTime: time.Time{}, // activate latest fork
+					},
+				}
+			},
+			stateF: func(*gomock.Controller) state.Chain {
+				return nil
+			},
+			sTxF: func() *txs.Tx {
+				return nil
+			},
+			txF: func() *txs.AddContinuousValidatorTx {
+				return nil
+			},
+			expectedErr: txs.ErrNilSignedTx,
+		},
+		{
+			name: "not bootstrapped",
+			backendF: func(*gomock.Controller) *Backend {
+				return &Backend{
+					Ctx: snow.DefaultContextTest(),
+					Config: &config.Config{
+						ContinuousStakingTime: time.Time{}, // activate latest fork
+					},
+					Bootstrapped: &utils.Atomic[bool]{},
+				}
+			},
+			stateF: func(ctrl *gomock.Controller) state.Chain {
+				s := state.NewMockChain(ctrl)
+				return s
+			},
+			sTxF: func() *txs.Tx {
+				return &verifiedSignedTx
+			},
+			txF: func() *txs.AddContinuousValidatorTx {
+				return &verifiedTx
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "tx not accepted pre continuous fork",
+			backendF: func(*gomock.Controller) *Backend {
+				bootstrapped := &utils.Atomic[bool]{}
+				bootstrapped.Set(true)
+				return &Backend{
+					Ctx: snow.DefaultContextTest(),
+					Config: &config.Config{
+						CortinaTime:           time.Time{},
+						ContinuousStakingTime: mockable.MaxTime,
+					},
+					Bootstrapped: bootstrapped,
+				}
+			},
+			stateF: func(ctrl *gomock.Controller) state.Chain {
+				state := state.NewMockChain(ctrl)
+				state.EXPECT().GetTimestamp().Return(verifiedTx.StartTime())
+				return state
+			},
+			sTxF: func() *txs.Tx {
+				return &verifiedSignedTx
+			},
+			txF: func() *txs.AddContinuousValidatorTx {
+				return &verifiedTx
+			},
+			expectedErr: ErrTxUnacceptableBeforeFork,
+		},
+		{
+			name: "weight too low",
+			backendF: func(*gomock.Controller) *Backend {
+				bootstrapped := &utils.Atomic[bool]{}
+				bootstrapped.Set(true)
+				return &Backend{
+					Ctx: snow.DefaultContextTest(),
+					Config: &config.Config{
+						ContinuousStakingTime: time.Time{}, // activate latest fork
+						MinValidatorStake:     cfg.MinValidatorStake,
+						MaxValidatorStake:     cfg.MaxValidatorStake,
+						MinStakeDuration:      cfg.MinStakeDuration,
+						MaxStakeDuration:      cfg.MaxStakeDuration,
+						MinDelegationFee:      cfg.MinDelegationFee,
+					},
+					Bootstrapped: bootstrapped,
+				}
+			},
+			stateF: func(ctrl *gomock.Controller) state.Chain {
+				s := state.NewMockChain(ctrl)
+				s.EXPECT().GetTimestamp().Return(time.Unix(0, 0))
+				return s
+			},
+			sTxF: func() *txs.Tx {
+				return &verifiedSignedTx
+			},
+			txF: func() *txs.AddContinuousValidatorTx {
+				tx := verifiedTx // Note that this copies [verifiedTx]
+				tx.Validator.Wght = cfg.MinValidatorStake - 1
+				return &tx
+			},
+			expectedErr: ErrWeightTooSmall,
+		},
+		{
+			name: "weight too high",
+			backendF: func(*gomock.Controller) *Backend {
+				bootstrapped := &utils.Atomic[bool]{}
+				bootstrapped.Set(true)
+				return &Backend{
+					Ctx: snow.DefaultContextTest(),
+					Config: &config.Config{
+						ContinuousStakingTime: time.Time{}, // activate latest fork
+						MinValidatorStake:     cfg.MinValidatorStake,
+						MaxValidatorStake:     cfg.MaxValidatorStake,
+						MinStakeDuration:      cfg.MinStakeDuration,
+						MaxStakeDuration:      cfg.MaxStakeDuration,
+						MinDelegationFee:      cfg.MinDelegationFee,
+					},
+					Bootstrapped: bootstrapped,
+				}
+			},
+			stateF: func(ctrl *gomock.Controller) state.Chain {
+				s := state.NewMockChain(ctrl)
+				s.EXPECT().GetTimestamp().Return(time.Unix(0, 0))
+				return s
+			},
+			sTxF: func() *txs.Tx {
+				return &verifiedSignedTx
+			},
+			txF: func() *txs.AddContinuousValidatorTx {
+				tx := verifiedTx // Note that this copies [verifiedTx]
+				tx.Validator.Wght = cfg.MaxValidatorStake + 1
+				return &tx
+			},
+			expectedErr: ErrWeightTooLarge,
+		},
+		{
+			name: "insufficient delegation fee",
+			backendF: func(*gomock.Controller) *Backend {
+				bootstrapped := &utils.Atomic[bool]{}
+				bootstrapped.Set(true)
+				return &Backend{
+					Ctx: snow.DefaultContextTest(),
+					Config: &config.Config{
+						ContinuousStakingTime: time.Time{}, // activate latest fork
+						MinValidatorStake:     cfg.MinValidatorStake,
+						MaxValidatorStake:     cfg.MaxValidatorStake,
+						MinStakeDuration:      cfg.MinStakeDuration,
+						MaxStakeDuration:      cfg.MaxStakeDuration,
+						MinDelegationFee:      cfg.MinDelegationFee,
+					},
+					Bootstrapped: bootstrapped,
+				}
+			},
+			stateF: func(ctrl *gomock.Controller) state.Chain {
+				s := state.NewMockChain(ctrl)
+				s.EXPECT().GetTimestamp().Return(time.Unix(0, 0))
+				return s
+			},
+			sTxF: func() *txs.Tx {
+				return &verifiedSignedTx
+			},
+			txF: func() *txs.AddContinuousValidatorTx {
+				tx := verifiedTx // Note that this copies [verifiedTx]
+				tx.Validator.Wght = cfg.MaxValidatorStake
+				tx.DelegationShares = cfg.MinDelegationFee - 1
+				return &tx
+			},
+			expectedErr: ErrInsufficientDelegationFee,
+		},
+		{
+			name: "duration too short",
+			backendF: func(*gomock.Controller) *Backend {
+				bootstrapped := &utils.Atomic[bool]{}
+				bootstrapped.Set(true)
+				return &Backend{
+					Ctx: snow.DefaultContextTest(),
+					Config: &config.Config{
+						ContinuousStakingTime: time.Time{}, // activate latest fork
+						MinValidatorStake:     cfg.MinValidatorStake,
+						MaxValidatorStake:     cfg.MaxValidatorStake,
+						MinStakeDuration:      cfg.MinStakeDuration,
+						MaxStakeDuration:      cfg.MaxStakeDuration,
+						MinDelegationFee:      cfg.MinDelegationFee,
+					},
+					Bootstrapped: bootstrapped,
+				}
+			},
+			stateF: func(ctrl *gomock.Controller) state.Chain {
+				s := state.NewMockChain(ctrl)
+				s.EXPECT().GetTimestamp().Return(time.Unix(0, 0))
+				return s
+			},
+			sTxF: func() *txs.Tx {
+				return &verifiedSignedTx
+			},
+			txF: func() *txs.AddContinuousValidatorTx {
+				now := time.Now().Truncate(time.Second)
+				tx := verifiedTx // Note that this copies [verifiedTx]
+				tx.Validator.Wght = cfg.MaxValidatorStake
+				tx.DelegationShares = cfg.MinDelegationFee
+				// Note the duration is 1 less than the minimum
+				tx.Validator.Start = uint64(now.Add(time.Second).Unix())
+				tx.Validator.End = uint64(now.Add(cfg.MinStakeDuration).Unix())
+				return &tx
+			},
+			expectedErr: ErrStakeTooShort,
+		},
+		{
+			name: "duration too long",
+			backendF: func(*gomock.Controller) *Backend {
+				bootstrapped := &utils.Atomic[bool]{}
+				bootstrapped.Set(true)
+				return &Backend{
+					Ctx: snow.DefaultContextTest(),
+					Config: &config.Config{
+						ContinuousStakingTime: time.Time{}, // activate latest fork
+						MinValidatorStake:     cfg.MinValidatorStake,
+						MaxValidatorStake:     cfg.MaxValidatorStake,
+						MinStakeDuration:      cfg.MinStakeDuration,
+						MaxStakeDuration:      cfg.MaxStakeDuration,
+						MinDelegationFee:      cfg.MinDelegationFee,
+					},
+					Bootstrapped: bootstrapped,
+				}
+			},
+			stateF: func(ctrl *gomock.Controller) state.Chain {
+				s := state.NewMockChain(ctrl)
+				s.EXPECT().GetTimestamp().Return(time.Unix(0, 0))
+				return s
+			},
+			sTxF: func() *txs.Tx {
+				return &verifiedSignedTx
+			},
+			txF: func() *txs.AddContinuousValidatorTx {
+				now := time.Now().Truncate(time.Second)
+				tx := verifiedTx // Note that this copies [verifiedTx]
+				tx.Validator.Wght = cfg.MaxValidatorStake
+				tx.DelegationShares = cfg.MinDelegationFee
+				// Note the duration is more than the maximum
+				tx.Validator.Start = uint64(now.Unix())
+				tx.Validator.End = uint64(now.Add(time.Second).Add(cfg.MaxStakeDuration).Unix())
+				return &tx
+			},
+			expectedErr: ErrStakeTooLong,
+		},
+		{
+			name: "wrong assetID",
+			backendF: func(*gomock.Controller) *Backend {
+				bootstrapped := &utils.Atomic[bool]{}
+				bootstrapped.Set(true)
+				return &Backend{
+					Ctx: snow.DefaultContextTest(),
+					Config: &config.Config{
+						ContinuousStakingTime: time.Time{}, // activate latest fork
+						MinValidatorStake:     cfg.MinValidatorStake,
+						MaxValidatorStake:     cfg.MaxValidatorStake,
+						MinStakeDuration:      cfg.MinStakeDuration,
+						MaxStakeDuration:      cfg.MaxStakeDuration,
+						MinDelegationFee:      cfg.MinDelegationFee,
+					},
+					Bootstrapped: bootstrapped,
+				}
+			},
+			stateF: func(ctrl *gomock.Controller) state.Chain {
+				s := state.NewMockChain(ctrl)
+				s.EXPECT().GetTimestamp().Return(time.Unix(0, 0))
+				return s
+			},
+			sTxF: func() *txs.Tx {
+				return &verifiedSignedTx
+			},
+			txF: func() *txs.AddContinuousValidatorTx {
+				tx := verifiedTx // Note that this copies [verifiedTx]
+				tx.StakeOuts = []*avax.TransferableOutput{
+					{
+						Asset: avax.Asset{
+							ID: ids.GenerateTestID(),
+						},
+					},
+				}
+				return &tx
+			},
+			expectedErr: ErrWrongStakedAssetID,
+		},
+		{
+			name: "duplicate validator",
+			backendF: func(*gomock.Controller) *Backend {
+				bootstrapped := &utils.Atomic[bool]{}
+				bootstrapped.Set(true)
+				return &Backend{
+					Ctx: snow.DefaultContextTest(),
+					Config: &config.Config{
+						ContinuousStakingTime: time.Time{}, // activate latest fork
+						MinValidatorStake:     cfg.MinValidatorStake,
+						MaxValidatorStake:     cfg.MaxValidatorStake,
+						MinStakeDuration:      cfg.MinStakeDuration,
+						MaxStakeDuration:      cfg.MaxStakeDuration,
+						MinDelegationFee:      cfg.MinDelegationFee,
+					},
+					Bootstrapped: bootstrapped,
+				}
+			},
+			stateF: func(ctrl *gomock.Controller) state.Chain {
+				s := state.NewMockChain(ctrl)
+				s.EXPECT().GetTimestamp().Return(time.Unix(0, 0))
+				// State says validator exists
+				s.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, verifiedTx.NodeID()).Return(nil, nil)
+				return s
+			},
+			sTxF: func() *txs.Tx {
+				return &verifiedSignedTx
+			},
+			txF: func() *txs.AddContinuousValidatorTx {
+				return &verifiedTx
+			},
+			expectedErr: ErrDuplicateValidator,
+		},
+		{
+			name: "flow check fails",
+			backendF: func(ctrl *gomock.Controller) *Backend {
+				bootstrapped := &utils.Atomic[bool]{}
+				bootstrapped.Set(true)
+
+				flowChecker := utxo.NewMockVerifier(ctrl)
+				flowChecker.EXPECT().VerifySpend(
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+				).Return(ErrFlowCheckFailed)
+
+				return &Backend{
+					FlowChecker: flowChecker,
+					Config: &config.Config{
+						AddSubnetValidatorFee: 1,
+						ContinuousStakingTime: time.Time{}, // activate latest fork,
+						MinValidatorStake:     cfg.MinValidatorStake,
+						MaxValidatorStake:     cfg.MaxValidatorStake,
+						MinStakeDuration:      cfg.MinStakeDuration,
+						MaxStakeDuration:      cfg.MaxStakeDuration,
+						MinDelegationFee:      cfg.MinDelegationFee,
+					},
+					Ctx:          snow.DefaultContextTest(),
+					Bootstrapped: bootstrapped,
+				}
+			},
+			stateF: func(ctrl *gomock.Controller) state.Chain {
+				mockState := state.NewMockChain(ctrl)
+				mockState.EXPECT().GetTimestamp().Return(time.Unix(0, 0))
+				mockState.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, verifiedTx.NodeID()).Return(nil, database.ErrNotFound)
+				mockState.EXPECT().GetPendingValidator(constants.PrimaryNetworkID, verifiedTx.NodeID()).Return(nil, database.ErrNotFound)
+				return mockState
+			},
+			sTxF: func() *txs.Tx {
+				return &verifiedSignedTx
+			},
+			txF: func() *txs.AddContinuousValidatorTx {
+				return &verifiedTx
+			},
+			expectedErr: ErrFlowCheckFailed,
+		},
+		{
+			name: "success",
+			backendF: func(ctrl *gomock.Controller) *Backend {
+				bootstrapped := &utils.Atomic[bool]{}
+				bootstrapped.Set(true)
+
+				flowChecker := utxo.NewMockVerifier(ctrl)
+				flowChecker.EXPECT().VerifySpend(
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+				).Return(nil)
+
+				return &Backend{
+					FlowChecker: flowChecker,
+					Config: &config.Config{
+						AddSubnetValidatorFee: 1,
+						ContinuousStakingTime: time.Time{}, // activate latest fork,
+						MinValidatorStake:     cfg.MinValidatorStake,
+						MaxValidatorStake:     cfg.MaxValidatorStake,
+						MinStakeDuration:      cfg.MinStakeDuration,
+						MaxStakeDuration:      cfg.MaxStakeDuration,
+						MinDelegationFee:      cfg.MinDelegationFee,
+					},
+					Ctx:          snow.DefaultContextTest(),
+					Bootstrapped: bootstrapped,
+				}
+			},
+			stateF: func(ctrl *gomock.Controller) state.Chain {
+				mockState := state.NewMockChain(ctrl)
+				mockState.EXPECT().GetTimestamp().Return(time.Unix(0, 0))
+				mockState.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, verifiedTx.NodeID()).Return(nil, database.ErrNotFound)
+				mockState.EXPECT().GetPendingValidator(constants.PrimaryNetworkID, verifiedTx.NodeID()).Return(nil, database.ErrNotFound)
+				return mockState
+			},
+			sTxF: func() *txs.Tx {
+				return &verifiedSignedTx
+			},
+			txF: func() *txs.AddContinuousValidatorTx {
+				return &verifiedTx
+			},
+			expectedErr: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			var (
+				backend = tt.backendF(ctrl)
+				state   = tt.stateF(ctrl)
+				sTx     = tt.sTxF()
+				tx      = tt.txF()
+			)
+
+			_, err := verifyAddContinuousValidatorTx(backend, state, sTx, tx)
+			require.ErrorIs(t, err, tt.expectedErr)
+		})
+	}
+}
+
 func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 	type test struct {
 		name        string
