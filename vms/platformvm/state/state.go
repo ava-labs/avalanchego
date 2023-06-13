@@ -133,19 +133,21 @@ type State interface {
 	ValidatorSet(subnetID ids.ID, vdrs validators.Set) error
 
 	// startHeight > endHeight
-	GetValidatorWeightDiffs(
+	ApplyValidatorWeightDiffs(
+		validators map[ids.NodeID]*validators.GetValidatorOutput,
 		startHeight uint64,
 		endHeight uint64,
 		subnetID ids.ID,
-	) (map[ids.NodeID]*ValidatorWeightDiff, error)
+	) error
 
 	// Returns a map of node ID --> BLS Public Key for all validators
 	// that left the Primary Network validator set.
 	// startHeight > endHeight
-	GetValidatorPublicKeyDiffs(
+	ApplyValidatorPublicKeyDiffs(
+		validators map[ids.NodeID]*validators.GetValidatorOutput,
 		startHeight uint64,
 		endHeight uint64,
-	) (map[ids.NodeID]*bls.PublicKey, error)
+	) error
 
 	SetHeight(height uint64)
 
@@ -933,28 +935,26 @@ func (s *state) ValidatorSet(subnetID ids.ID, vdrs validators.Set) error {
 	return nil
 }
 
-func (s *state) GetValidatorWeightDiffs(
+func (s *state) ApplyValidatorWeightDiffs(
+	validators map[ids.NodeID]*validators.GetValidatorOutput,
 	startHeight uint64,
 	endHeight uint64,
 	subnetID ids.ID,
-) (map[ids.NodeID]*ValidatorWeightDiff, error) {
+) error {
 	diffIter := s.flatValidatorWeightDiffsDB.NewIteratorWithStartAndPrefix(
 		getStartWeightKey(subnetID, startHeight),
 		subnetID[:],
 	)
 	defer diffIter.Release()
 
-	var (
-		weightDiffs = make(map[ids.NodeID]*ValidatorWeightDiff)
-		prevHeight  = startHeight + 1
-	)
+	prevHeight := startHeight + 1
 	for diffIter.Next() {
 		_, parsedHeight, nodeID, err := parseWeightKey(diffIter.Key())
 		if err != nil {
-			return nil, err
+			return err
 		}
 		if parsedHeight < endHeight {
-			return weightDiffs, diffIter.Error()
+			return diffIter.Error()
 		}
 
 		prevHeight = parsedHeight
@@ -962,17 +962,11 @@ func (s *state) GetValidatorWeightDiffs(
 		weightDiff := ValidatorWeightDiff{}
 		_, err = blocks.GenesisCodec.Unmarshal(diffIter.Value(), &weightDiff)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
-		prevWeightDiff, ok := weightDiffs[nodeID]
-		if !ok {
-			weightDiffs[nodeID] = &weightDiff
-			continue
-		}
-
-		if err := prevWeightDiff.Add(weightDiff.Decrease, weightDiff.Amount); err != nil {
-			return nil, err
+		if err := applyWeightDiff(validators, nodeID, &weightDiff); err != nil {
+			return err
 		}
 	}
 
@@ -985,7 +979,7 @@ func (s *state) GetValidatorWeightDiffs(
 		}
 		prefixBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, prefixStruct)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		rawDiffDB := prefixdb.New(prefixBytes, s.nestedValidatorWeightDiffsDB)
@@ -996,58 +990,94 @@ func (s *state) GetValidatorWeightDiffs(
 		for diffIter.Next() {
 			nodeID, err := ids.ToNodeID(diffIter.Key())
 			if err != nil {
-				return nil, err
+				return err
 			}
 
 			weightDiff := ValidatorWeightDiff{}
 			_, err = blocks.GenesisCodec.Unmarshal(diffIter.Value(), &weightDiff)
 			if err != nil {
-				return nil, err
+				return err
 			}
 
-			prevWeightDiff, ok := weightDiffs[nodeID]
-			if !ok {
-				weightDiffs[nodeID] = &weightDiff
-				continue
-			}
-
-			if err := prevWeightDiff.Add(weightDiff.Decrease, weightDiff.Amount); err != nil {
-				return nil, err
+			if err := applyWeightDiff(validators, nodeID, &weightDiff); err != nil {
+				return err
 			}
 		}
 	}
 
-	return weightDiffs, diffIter.Error()
+	return diffIter.Error()
 }
 
-func (s *state) GetValidatorPublicKeyDiffs(
+func applyWeightDiff(
+	vdrs map[ids.NodeID]*validators.GetValidatorOutput,
+	nodeID ids.NodeID,
+	weightDiff *ValidatorWeightDiff,
+) error {
+	vdr, ok := vdrs[nodeID]
+	if !ok {
+		// This node isn't in the current validator set.
+		vdr = &validators.GetValidatorOutput{
+			NodeID: nodeID,
+		}
+		vdrs[nodeID] = vdr
+	}
+
+	// The weight of this node changed at this block.
+	var err error
+	if weightDiff.Decrease {
+		// The validator's weight was decreased at this block, so in the
+		// prior block it was higher.
+		vdr.Weight, err = math.Add64(vdr.Weight, weightDiff.Amount)
+	} else {
+		// The validator's weight was increased at this block, so in the
+		// prior block it was lower.
+		vdr.Weight, err = math.Sub(vdr.Weight, weightDiff.Amount)
+	}
+	if err != nil {
+		return err
+	}
+
+	if vdr.Weight == 0 {
+		// The validator's weight was 0 before this block so they weren't in the
+		// validator set.
+		delete(vdrs, nodeID)
+	}
+	return nil
+}
+
+func (s *state) ApplyValidatorPublicKeyDiffs(
+	validators map[ids.NodeID]*validators.GetValidatorOutput,
 	startHeight uint64,
 	endHeight uint64,
-) (map[ids.NodeID]*bls.PublicKey, error) {
+) error {
 	diffIter := s.flatValidatorPublicKeyDiffsDB.NewIteratorWithStart(
 		getStartBLSKey(startHeight),
 	)
 	defer diffIter.Release()
 
-	pkDiffs := make(map[ids.NodeID]*bls.PublicKey)
 	for diffIter.Next() {
 		parsedHeight, nodeID, err := parseBLSKey(diffIter.Key())
 		if err != nil {
-			return nil, err
+			return err
 		}
 		if parsedHeight < endHeight {
 			break
 		}
 
-		pkBytes := diffIter.Value()
-		if len(pkBytes) == 0 {
-			pkDiffs[nodeID] = nil
+		vdr, ok := validators[nodeID]
+		if !ok {
 			continue
 		}
 
-		pkDiffs[nodeID] = new(bls.PublicKey).Deserialize(pkBytes)
+		pkBytes := diffIter.Value()
+		if len(pkBytes) == 0 {
+			vdr.PublicKey = nil
+			continue
+		}
+
+		vdr.PublicKey = new(bls.PublicKey).Deserialize(pkBytes)
 	}
-	return pkDiffs, diffIter.Error()
+	return diffIter.Error()
 }
 
 func (s *state) syncGenesis(genesisBlk blocks.Block, genesis *genesis.State) error {

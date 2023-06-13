@@ -229,27 +229,22 @@ func (m *manager) makePrimaryNetworkValidatorSet(
 	}
 
 	// Rebuild primary network validators at [height]
-	weightDiffs, err := m.state.GetValidatorWeightDiffs(currentHeight, targetHeight+1, constants.PlatformChainID)
+	err := m.state.ApplyValidatorWeightDiffs(
+		validatorSet,
+		currentHeight,
+		targetHeight+1,
+		constants.PlatformChainID,
+	)
 	if err != nil {
 		return nil, err
-	}
-	for nodeID, weightDiff := range weightDiffs {
-		if err := applyWeightDiff(validatorSet, nodeID, weightDiff); err != nil {
-			return nil, err
-		}
 	}
 
-	pkDiffs, err := m.state.GetValidatorPublicKeyDiffs(currentHeight, targetHeight+1)
-	if err != nil {
-		return nil, err
-	}
-	for nodeID, pk := range pkDiffs {
-		if vdr, ok := validatorSet[nodeID]; ok {
-			// The validator's public key was changed at this block.
-			vdr.PublicKey = pk
-		}
-	}
-	return validatorSet, nil
+	err = m.state.ApplyValidatorPublicKeyDiffs(
+		validatorSet,
+		currentHeight,
+		targetHeight+1,
+	)
+	return validatorSet, err
 }
 
 func (m *manager) makeSubnetValidatorSet(
@@ -271,45 +266,52 @@ func (m *manager) makeSubnetValidatorSet(
 	for _, vdr := range currentValidatorList {
 		subnetValidatorSet[vdr.NodeID] = &validators.GetValidatorOutput{
 			NodeID: vdr.NodeID,
-			// PublicKey will be picked from primary validators
+			// PublicKey will be picked from primary validators after weights
+			// have been applied
 			Weight: vdr.Weight,
 		}
 	}
 
 	// Rebuild subnet validators at [targetHeight]
-	weightDiffs, err := m.state.GetValidatorWeightDiffs(currentHeight, targetHeight+1, subnetID)
+	err := m.state.ApplyValidatorWeightDiffs(
+		subnetValidatorSet,
+		currentHeight,
+		targetHeight+1,
+		subnetID,
+	)
 	if err != nil {
 		return nil, err
 	}
 
-	for nodeID, weightDiff := range weightDiffs {
-		if err := applyWeightDiff(subnetValidatorSet, nodeID, weightDiff); err != nil {
-			return nil, err
-		}
+	currentPrimaryValidators, ok := m.cfg.Validators.Get(constants.PrimaryNetworkID)
+	if !ok {
+		// This should never happen
+		m.log.Error(ErrMissingValidatorSet.Error(),
+			zap.Stringer("subnetID", constants.PrimaryNetworkID),
+		)
+		return nil, ErrMissingValidatorSet
 	}
 
-	// Get the public keys for all the validators at [targetHeight]
-	primarySet, err := m.getValidatorSetFrom(currentHeight, targetHeight, constants.PrimaryNetworkID)
-	if err != nil {
-		return nil, err
-	}
-
-	// Update the subnet validator set to include the public keys at
-	// [targetHeight].
-	for nodeID, subnetValidator := range subnetValidatorSet {
-		primaryValidator, ok := primarySet[nodeID]
+	for nodeID, vdr := range subnetValidatorSet {
+		primaryVdr, ok := currentPrimaryValidators.Get(nodeID)
 		if !ok {
 			// This should never happen
 			m.log.Error(ErrMissingValidator.Error(),
-				zap.Stringer("nodeID", nodeID),
 				zap.Stringer("subnetID", subnetID),
+				zap.Stringer("nodeID", vdr.NodeID),
 			)
 			return nil, ErrMissingValidator
 		}
-		subnetValidator.PublicKey = primaryValidator.PublicKey
+
+		vdr.PublicKey = primaryVdr.PublicKey
 	}
 
-	return subnetValidatorSet, nil
+	err = m.state.ApplyValidatorPublicKeyDiffs(
+		subnetValidatorSet,
+		currentHeight,
+		targetHeight+1,
+	)
+	return subnetValidatorSet, err
 }
 
 func applyWeightDiff(
