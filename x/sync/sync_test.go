@@ -177,7 +177,9 @@ func Test_Midpoint(t *testing.T) {
 
 func Test_Sync_FindNextKey_InSync(t *testing.T) {
 	for i := 0; i < 3; i++ {
-		r := rand.New(rand.NewSource(int64(i))) // #nosec G404
+		now := time.Now().UnixNano()
+		t.Logf("seed: %d", now)
+		r := rand.New(rand.NewSource(now)) // #nosec G404
 		dbToSync, err := generateTrie(t, r, 1000)
 		require.NoError(t, err)
 		syncRoot, err := dbToSync.GetMerkleRoot(context.Background())
@@ -352,7 +354,9 @@ func Test_Sync_FindNextKey_BranchInReceived(t *testing.T) {
 
 func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 	for i := 0; i < 10; i++ {
-		r := rand.New(rand.NewSource(int64(i))) // #nosec G404
+		now := time.Now().UnixNano()
+		t.Logf("seed: %d", now)
+		r := rand.New(rand.NewSource(now)) // #nosec G404
 		dbToSync, err := generateTrie(t, r, 1000)
 		require.NoError(t, err)
 		syncRoot, err := dbToSync.GetMerkleRoot(context.Background())
@@ -425,7 +429,9 @@ func isPrefix(data []byte, prefix []byte) bool {
 
 func Test_Sync_FindNextKey_DifferentChild(t *testing.T) {
 	for i := 0; i < 10; i++ {
-		r := rand.New(rand.NewSource(int64(i))) // #nosec G404
+		now := time.Now().UnixNano()
+		t.Logf("seed: %d", now)
+		r := rand.New(rand.NewSource(now)) // #nosec G404
 		dbToSync, err := generateTrie(t, r, 500)
 		require.NoError(t, err)
 		syncRoot, err := dbToSync.GetMerkleRoot(context.Background())
@@ -471,7 +477,9 @@ func Test_Sync_FindNextKey_DifferentChild(t *testing.T) {
 // Test findNextKey by computing the expected result in a naive, inefficient
 // way and comparing it to the actual result
 func TestFindNextKeyRandom(t *testing.T) {
-	rand := rand.New(rand.NewSource(1337)) //nolint:gosec
+	now := time.Now().UnixNano()
+	t.Logf("seed: %d", now)
+	rand := rand.New(rand.NewSource(now)) // #nosec G404
 	require := require.New(t)
 
 	// Create a "remote" database and "local" database
@@ -676,7 +684,9 @@ func TestFindNextKeyRandom(t *testing.T) {
 
 func Test_Sync_Result_Correct_Root(t *testing.T) {
 	for i := 0; i < 3; i++ {
-		r := rand.New(rand.NewSource(int64(i))) // #nosec G404
+		now := time.Now().UnixNano()
+		t.Logf("seed: %d", now)
+		r := rand.New(rand.NewSource(now)) // #nosec G404
 		dbToSync, err := generateTrie(t, r, 1000)
 		require.NoError(t, err)
 		syncRoot, err := dbToSync.GetMerkleRoot(context.Background())
@@ -730,7 +740,9 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 
 func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 	for i := 0; i < 3; i++ {
-		r := rand.New(rand.NewSource(int64(i))) // #nosec G404
+		now := time.Now().UnixNano()
+		t.Logf("seed: %d", now)
+		r := rand.New(rand.NewSource(now)) // #nosec G404
 		dbToSync, err := generateTrie(t, r, 3*maxKeyValuesLimit)
 		require.NoError(t, err)
 		syncRoot, err := dbToSync.GetMerkleRoot(context.Background())
@@ -793,7 +805,9 @@ func Test_Sync_Error_During_Sync(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	r := rand.New(rand.NewSource(int64(0))) // #nosec G404
+	now := time.Now().UnixNano()
+	t.Logf("seed: %d", now)
+	r := rand.New(rand.NewSource(now)) // #nosec G404
 
 	dbToSync, err := generateTrie(t, r, 100)
 	require.NoError(err)
@@ -846,7 +860,9 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 	defer ctrl.Finish()
 
 	for i := 0; i < 3; i++ {
-		r := rand.New(rand.NewSource(int64(i))) // #nosec G404
+		now := time.Now().UnixNano()
+		t.Logf("seed: %d", now)
+		r := rand.New(rand.NewSource(now)) // #nosec G404
 
 		dbToSync, err := generateTrie(t, r, 3*maxKeyValuesLimit)
 		require.NoError(err)
