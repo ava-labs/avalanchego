@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
+	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -84,6 +85,8 @@ func (tx *AddContinuousDelegatorTx) SyntacticVerify(ctx *snow.Context) error {
 		return nil
 	case len(tx.StakeOuts) == 0: // Ensure there is provided stake
 		return errNoStake
+	case tx.DelegatorRewardRestakeShares > reward.PercentDenominator:
+		return errTooRestakeShares
 	}
 
 	if err := tx.BaseTx.SyntacticVerify(ctx); err != nil {
