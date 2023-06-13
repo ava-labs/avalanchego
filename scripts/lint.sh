@@ -38,7 +38,7 @@ function test_license_header {
   while IFS= read -r line; do files+=("$line"); done < <(find . -type f -name '*.go' ! -name '*.pb.go' ! -name 'mock_*.go')
 
   go-license \
-  --config=./license.yml \
+  --config=./header.yml \
   ${_addlicense_flags} \
   "${files[@]}"
 }
