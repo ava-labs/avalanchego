@@ -4,7 +4,6 @@
 package metrics
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -29,6 +28,8 @@ type txMetrics struct {
 	numTransformSubnetTxs,
 	numAddPermissionlessValidatorTxs,
 	numAddPermissionlessDelegatorTxs,
+	numAddContinuousValidatorTxs,
+	numAddContinuousDelegatorTxs,
 	numStopStakerTxs prometheus.Counter
 }
 
@@ -51,6 +52,8 @@ func newTxMetrics(
 		numTransformSubnetTxs:            newTxMetric(namespace, "transform_subnet", registerer, &errs),
 		numAddPermissionlessValidatorTxs: newTxMetric(namespace, "add_permissionless_validator", registerer, &errs),
 		numAddPermissionlessDelegatorTxs: newTxMetric(namespace, "add_permissionless_delegator", registerer, &errs),
+		numAddContinuousValidatorTxs:     newTxMetric(namespace, "add_continuous_validator", registerer, &errs),
+		numAddContinuousDelegatorTxs:     newTxMetric(namespace, "add_continuous_delegator", registerer, &errs),
 		numStopStakerTxs:                 newTxMetric(namespace, "stop_staker_tx", registerer, &errs),
 	}
 	return m, errs.Err
@@ -136,12 +139,14 @@ func (m *txMetrics) AddPermissionlessDelegatorTx(*txs.AddPermissionlessDelegator
 	return nil
 }
 
-func (*txMetrics) AddContinuousValidatorTx(*txs.AddContinuousValidatorTx) error {
-	return errors.New("not yet implemented")
+func (m *txMetrics) AddContinuousValidatorTx(*txs.AddContinuousValidatorTx) error {
+	m.numAddContinuousValidatorTxs.Inc()
+	return nil
 }
 
-func (*txMetrics) AddContinuousDelegatorTx(*txs.AddContinuousDelegatorTx) error {
-	return errors.New("not yet implemented")
+func (m *txMetrics) AddContinuousDelegatorTx(*txs.AddContinuousDelegatorTx) error {
+	m.numAddContinuousDelegatorTxs.Inc()
+	return nil
 }
 
 func (m *txMetrics) StopStakerTx(*txs.StopStakerTx) error {
