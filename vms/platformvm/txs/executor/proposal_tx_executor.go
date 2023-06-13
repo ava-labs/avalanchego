@@ -718,11 +718,11 @@ func fitsValidationWindow(
 	return true
 }
 
-// overdelegated returns true if [validator] will be overdelegated when adding [delegator].
+// overDelegated returns true if [validator] will be overdelegated when adding [delegator].
 //
 // A [validator] would become overdelegated if:
 // - the maximum total weight on [validator] exceeds [weightLimit]
-func overdelegated(
+func overDelegated(
 	state state.Chain,
 	validator *state.Staker,
 	weightLimit uint64,

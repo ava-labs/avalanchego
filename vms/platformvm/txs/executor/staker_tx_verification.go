@@ -393,15 +393,14 @@ func verifyAddDelegatorTx(
 		return nil, err
 	}
 
-	fitsWindow := fitsValidationWindow(primaryNetworkValidator, newStaker)
-	if !fitsWindow {
+	if !fitsValidationWindow(primaryNetworkValidator, newStaker) {
 		return nil, ErrPeriodMismatch
 	}
-	overdelegated, err := overdelegated(chainState, primaryNetworkValidator, maximumWeight, newStaker)
+	overDelegated, err := overDelegated(chainState, primaryNetworkValidator, maximumWeight, newStaker)
 	if err != nil {
 		return nil, err
 	}
-	if overdelegated {
+	if overDelegated {
 		return nil, ErrOverDelegated
 	}
 
@@ -691,15 +690,14 @@ func verifyAddPermissionlessDelegatorTx(
 		return err
 	}
 
-	fitsWindow := fitsValidationWindow(validator, newStaker)
-	if !fitsWindow {
+	if !fitsValidationWindow(validator, newStaker) {
 		return ErrPeriodMismatch
 	}
-	overdelegated, err := overdelegated(chainState, validator, maximumWeight, newStaker)
+	overDelegated, err := overDelegated(chainState, validator, maximumWeight, newStaker)
 	if err != nil {
 		return err
 	}
-	if overdelegated {
+	if overDelegated {
 		return ErrOverDelegated
 	}
 
