@@ -367,294 +367,16 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		return fmt.Errorf("failed to get next removed staker tx: %w", err)
 	}
 
+	// Invariant: A [txs.DelegatorTx] does not also implement the
+	//            [txs.ValidatorTx] interface.
 	switch uStakerTx := stakerTx.Unsigned.(type) {
 	case txs.ValidatorTx:
-		var (
-			stake   = uStakerTx.Stake()
-			outputs = uStakerTx.Outputs()
-			// Invariant: The staked asset must be equal to the reward asset.
-			stakeAsset = stake[0].Asset
-		)
-
-		if stakerToRemove.ShouldRestake() {
-			shiftedStaker := *stakerToRemove
-			state.ShiftStakerAheadInPlace(&shiftedStaker)
-			if err := e.OnCommitState.UpdateCurrentValidator(&shiftedStaker); err != nil {
-				return fmt.Errorf("failed updating current validator: %w", err)
-			}
-			if err := e.OnAbortState.UpdateCurrentValidator(&shiftedStaker); err != nil {
-				return fmt.Errorf("failed updating current validator: %w", err)
-			}
-			// staked utxos will be returned only at the end of the staking period.
-		} else {
-			e.OnCommitState.DeleteCurrentValidator(stakerToRemove)
-			e.OnAbortState.DeleteCurrentValidator(stakerToRemove)
-
-			// Refund the stake only when validator is about to leave
-			// the staking set
-			for i, out := range stake {
-				utxo := &avax.UTXO{
-					UTXOID: avax.UTXOID{
-						TxID:        tx.TxID,
-						OutputIndex: uint32(len(outputs) + i),
-					},
-					Asset: out.Asset,
-					Out:   out.Output(),
-				}
-				e.OnCommitState.AddUTXO(utxo)
-				e.OnAbortState.AddUTXO(utxo)
-			}
+		if err := e.rewardValidatorTx(uStakerTx, stakerToRemove, tx); err != nil {
+			return err
 		}
-
-		// following Continuous staking fork activation multiple rewards UTXOS
-		// can be cumulated, each related to a different staking period. We make
-		// sure to index the reward UTXOs correctly by appending them to previous ones.
-		utxosOffset := len(outputs) + len(stake)
-		currentRewardUTXOs, err := e.OnCommitState.GetRewardUTXOs(tx.TxID)
-		if err != nil {
-			return fmt.Errorf("failed to create output: %w", err)
-		}
-		utxosOffset += len(currentRewardUTXOs)
-
-		// Provide the reward here
-		if stakerToRemove.PotentialReward > 0 {
-			validationRewardsOwner := uStakerTx.ValidationRewardsOwner()
-			outIntf, err := e.Fx.CreateOutput(stakerToRemove.PotentialReward, validationRewardsOwner)
-			if err != nil {
-				return fmt.Errorf("failed to create output: %w", err)
-			}
-			out, ok := outIntf.(verify.State)
-			if !ok {
-				return ErrInvalidState
-			}
-
-			utxo := &avax.UTXO{
-				UTXOID: avax.UTXOID{
-					TxID:        tx.TxID,
-					OutputIndex: uint32(utxosOffset),
-				},
-				Asset: stakeAsset,
-				Out:   out,
-			}
-			e.OnCommitState.AddUTXO(utxo)
-			e.OnCommitState.AddRewardUTXO(tx.TxID, utxo)
-
-			utxosOffset++
-		}
-
-		// Provide the accrued delegatee rewards from successful delegations here.
-		delegateeReward, err := e.OnCommitState.GetDelegateeReward(
-			stakerToRemove.SubnetID,
-			stakerToRemove.NodeID,
-		)
-		if err != nil && err != database.ErrNotFound {
-			return fmt.Errorf("failed to fetch accrued delegatee rewards: %w", err)
-		}
-
-		if delegateeReward > 0 {
-			delegationRewardsOwner := uStakerTx.DelegationRewardsOwner()
-			outIntf, err := e.Fx.CreateOutput(delegateeReward, delegationRewardsOwner)
-			if err != nil {
-				return fmt.Errorf("failed to create output: %w", err)
-			}
-			out, ok := outIntf.(verify.State)
-			if !ok {
-				return ErrInvalidState
-			}
-
-			onCommitUtxo := &avax.UTXO{
-				UTXOID: avax.UTXOID{
-					TxID:        tx.TxID,
-					OutputIndex: uint32(utxosOffset),
-				},
-				Asset: stakeAsset,
-				Out:   out,
-			}
-			e.OnCommitState.AddUTXO(onCommitUtxo)
-			e.OnCommitState.AddRewardUTXO(tx.TxID, onCommitUtxo)
-
-			onAbortUtxo := &avax.UTXO{
-				UTXOID: avax.UTXOID{
-					TxID: tx.TxID,
-					// Note: There is no [offset] if the RewardValidatorTx is
-					// aborted, because the validator reward is not awarded.
-					OutputIndex: uint32(utxosOffset - 1),
-				},
-				Asset: stakeAsset,
-				Out:   out,
-			}
-			e.OnAbortState.AddUTXO(onAbortUtxo)
-			e.OnAbortState.AddRewardUTXO(tx.TxID, onAbortUtxo)
-		}
-		// Invariant: A [txs.DelegatorTx] does not also implement the
-		//            [txs.ValidatorTx] interface.
 	case txs.DelegatorTx:
-		var (
-			stake   = uStakerTx.Stake()
-			outputs = uStakerTx.Outputs()
-			// Invariant: The staked asset must be equal to the reward asset.
-			stakeAsset = stake[0].Asset
-		)
-
-		if stakerToRemove.ShouldRestake() {
-			shiftedStaker := *stakerToRemove
-			state.ShiftStakerAheadInPlace(&shiftedStaker)
-			if err := e.OnCommitState.UpdateCurrentDelegator(&shiftedStaker); err != nil {
-				return fmt.Errorf("failed updating current delegator: %w", err)
-			}
-			if err := e.OnAbortState.UpdateCurrentDelegator(&shiftedStaker); err != nil {
-				return fmt.Errorf("failed updating current delegator: %w", err)
-			}
-			// staked utxos will be returned only at the end of the staking period.
-		} else {
-			e.OnCommitState.DeleteCurrentDelegator(stakerToRemove)
-			e.OnAbortState.DeleteCurrentDelegator(stakerToRemove)
-
-			// Refund the stake only when delegator is about to leave
-			// the staking set
-			for i, out := range stake {
-				utxo := &avax.UTXO{
-					UTXOID: avax.UTXOID{
-						TxID:        tx.TxID,
-						OutputIndex: uint32(len(outputs) + i),
-					},
-					Asset: out.Asset,
-					Out:   out.Output(),
-				}
-				e.OnCommitState.AddUTXO(utxo)
-				e.OnAbortState.AddUTXO(utxo)
-			}
-		}
-
-		// We're (possibly) rewarding a delegator, so we need to fetch
-		// the validator they are delegated to.
-		vdrStaker, err := e.OnCommitState.GetCurrentValidator(
-			stakerToRemove.SubnetID,
-			stakerToRemove.NodeID,
-		)
-		if err != nil {
-			return fmt.Errorf(
-				"failed to get whether %s is a validator: %w",
-				stakerToRemove.NodeID,
-				err,
-			)
-		}
-
-		vdrTxIntf, _, err := e.OnCommitState.GetTx(vdrStaker.TxID)
-		if err != nil {
-			return fmt.Errorf(
-				"failed to get whether %s is a validator: %w",
-				stakerToRemove.NodeID,
-				err,
-			)
-		}
-
-		// Invariant: Delegators must only be able to reference validator
-		//            transactions that implement [txs.ValidatorTx]. All
-		//            validator transactions implement this interface except the
-		//            AddSubnetValidatorTx.
-		vdrTx, ok := vdrTxIntf.Unsigned.(txs.ValidatorTx)
-		if !ok {
-			return ErrWrongTxType
-		}
-
-		// Calculate split of reward between delegator/delegatee
-		// The delegator gives stake to the validatee
-		validatorShares := vdrTx.Shares()
-		delegatorShares := reward.PercentDenominator - uint64(validatorShares)                            // parentTx.Shares <= reward.PercentDenominator so no underflow
-		delegatorReward := delegatorShares * (stakerToRemove.PotentialReward / reward.PercentDenominator) // delegatorShares <= reward.PercentDenominator so no overflow
-		// Delay rounding as long as possible for small numbers
-		if optimisticReward, err := math.Mul64(delegatorShares, stakerToRemove.PotentialReward); err == nil {
-			delegatorReward = optimisticReward / reward.PercentDenominator
-		}
-		delegateeReward := stakerToRemove.PotentialReward - delegatorReward // delegatorReward <= reward so no underflow
-
-		// following Continuous staking fork activation multiple rewards UTXOS
-		// can be cumulated, each related to a different staking period. We make
-		// sure to index the reward UTXOs correctly by appending them to previous ones.
-		utxosOffset := len(outputs) + len(stake)
-		currentRewardUTXOs, err := e.OnCommitState.GetRewardUTXOs(stakerToRemove.TxID)
-		if err != nil {
-			return fmt.Errorf("failed to create output: %w", err)
-		}
-		utxosOffset += len(currentRewardUTXOs)
-
-		// Reward the delegator here
-		if delegatorReward > 0 {
-			rewardsOwner := uStakerTx.RewardsOwner()
-			outIntf, err := e.Fx.CreateOutput(delegatorReward, rewardsOwner)
-			if err != nil {
-				return fmt.Errorf("failed to create output: %w", err)
-			}
-			out, ok := outIntf.(verify.State)
-			if !ok {
-				return ErrInvalidState
-			}
-			utxo := &avax.UTXO{
-				UTXOID: avax.UTXOID{
-					TxID:        tx.TxID,
-					OutputIndex: uint32(utxosOffset),
-				},
-				Asset: stakeAsset,
-				Out:   out,
-			}
-
-			e.OnCommitState.AddUTXO(utxo)
-			e.OnCommitState.AddRewardUTXO(tx.TxID, utxo)
-
-			utxosOffset++
-		}
-
-		// Reward the delegatee here
-		if delegateeReward > 0 {
-			if vdrStaker.StartTime.After(e.Config.CortinaTime) {
-				previousDelegateeReward, err := e.OnCommitState.GetDelegateeReward(
-					vdrStaker.SubnetID,
-					vdrStaker.NodeID,
-				)
-				if err != nil {
-					return fmt.Errorf("failed to get delegatee reward: %w", err)
-				}
-
-				// Invariant: The rewards calculator can never return a
-				//            [potentialReward] that would overflow the
-				//            accumulated rewards.
-				newDelegateeReward := previousDelegateeReward + delegateeReward
-
-				// For any validators starting after [CortinaTime], we defer rewarding the
-				// [delegateeReward] until their staking period is over.
-				err = e.OnCommitState.SetDelegateeReward(
-					vdrStaker.SubnetID,
-					vdrStaker.NodeID,
-					newDelegateeReward,
-				)
-				if err != nil {
-					return fmt.Errorf("failed to update delegatee reward: %w", err)
-				}
-			} else {
-				// For any validators who started prior to [CortinaTime], we issue the
-				// [delegateeReward] immediately.
-				delegationRewardsOwner := vdrTx.DelegationRewardsOwner()
-				outIntf, err := e.Fx.CreateOutput(delegateeReward, delegationRewardsOwner)
-				if err != nil {
-					return fmt.Errorf("failed to create output: %w", err)
-				}
-				out, ok := outIntf.(verify.State)
-				if !ok {
-					return ErrInvalidState
-				}
-				utxo := &avax.UTXO{
-					UTXOID: avax.UTXOID{
-						TxID:        tx.TxID,
-						OutputIndex: uint32(utxosOffset),
-					},
-					Asset: stakeAsset,
-					Out:   out,
-				}
-
-				e.OnCommitState.AddUTXO(utxo)
-				e.OnCommitState.AddRewardUTXO(tx.TxID, utxo)
-			}
+		if err := e.rewardDelegatorTx(uStakerTx, stakerToRemove, tx); err != nil {
+			return err
 		}
 	default:
 		// Invariant: Permissioned stakers are removed by the advancement of
@@ -705,172 +427,303 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 	return nil
 }
 
-// GetNextStakerChangeTime returns the next time a staker will be either added
-// or removed to/from the current validator set.
-func GetNextStakerChangeTime(state state.Chain) (time.Time, error) {
-	currentStakerIterator, err := state.GetCurrentStakerIterator()
-	if err != nil {
-		return time.Time{}, err
-	}
-	defer currentStakerIterator.Release()
+func (e *ProposalTxExecutor) rewardValidatorTx(
+	uStakerTx txs.ValidatorTx,
+	stakerToReward *state.Staker,
+	tx *txs.RewardValidatorTx,
+) error {
+	var (
+		stake   = uStakerTx.Stake()
+		outputs = uStakerTx.Outputs()
+		// Invariant: The staked asset must be equal to the reward asset.
+		stakeAsset = stake[0].Asset
+	)
 
-	pendingStakerIterator, err := state.GetPendingStakerIterator()
-	if err != nil {
-		return time.Time{}, err
-	}
-	defer pendingStakerIterator.Release()
-
-	hasCurrentStaker := currentStakerIterator.Next()
-	hasPendingStaker := pendingStakerIterator.Next()
-	switch {
-	case hasCurrentStaker && hasPendingStaker:
-		nextCurrentTime := currentStakerIterator.Value().NextTime
-		nextPendingTime := pendingStakerIterator.Value().NextTime
-		if nextCurrentTime.Before(nextPendingTime) {
-			return nextCurrentTime, nil
+	if stakerToReward.ShouldRestake() {
+		shiftedStaker := *stakerToReward
+		state.ShiftStakerAheadInPlace(&shiftedStaker)
+		if err := e.OnCommitState.UpdateCurrentValidator(&shiftedStaker); err != nil {
+			return fmt.Errorf("failed updating current validator: %w", err)
 		}
-		return nextPendingTime, nil
-	case hasCurrentStaker:
-		return currentStakerIterator.Value().NextTime, nil
-	case hasPendingStaker:
-		return pendingStakerIterator.Value().NextTime, nil
-	default:
-		return time.Time{}, database.ErrNotFound
-	}
-}
+		if err := e.OnAbortState.UpdateCurrentValidator(&shiftedStaker); err != nil {
+			return fmt.Errorf("failed updating current validator: %w", err)
+		}
+		// staked utxos will be returned only at the end of the staking period.
+	} else {
+		e.OnCommitState.DeleteCurrentValidator(stakerToReward)
+		e.OnAbortState.DeleteCurrentValidator(stakerToReward)
 
-// GetValidator returns information about the given validator, which may be a
-// current validator or pending validator.
-func GetValidator(state state.Chain, subnetID ids.ID, nodeID ids.NodeID) (*state.Staker, error) {
-	validator, err := state.GetCurrentValidator(subnetID, nodeID)
-	if err == nil {
-		// This node is currently validating the subnet.
-		return validator, nil
-	}
-	if err != database.ErrNotFound {
-		// Unexpected error occurred.
-		return nil, err
-	}
-	return state.GetPendingValidator(subnetID, nodeID)
-}
-
-// canDelegate returns true if [delegator] can be added as a delegator of
-// [validator].
-//
-// A [delegator] can be added if:
-// - [delegator]'s start time is not before [validator]'s start time
-// - [delegator]'s end time is not after [validator]'s end time
-// - the maximum total weight on [validator] will not exceed [weightLimit]
-func canDelegate(
-	state state.Chain,
-	validator *state.Staker,
-	weightLimit uint64,
-	delegator *state.Staker,
-) (bool, error) {
-	if !txs.BoundedBy(
-		delegator.StartTime,
-		delegator.EndTime,
-		validator.StartTime,
-		validator.EndTime,
-	) {
-		return false, nil
-	}
-	if delegator.StakingPeriod > validator.StakingPeriod {
-		return false, nil
+		// Refund the stake only when validator is about to leave
+		// the staking set
+		for i, out := range stake {
+			utxo := &avax.UTXO{
+				UTXOID: avax.UTXOID{
+					TxID:        tx.TxID,
+					OutputIndex: uint32(len(outputs) + i),
+				},
+				Asset: out.Asset,
+				Out:   out.Output(),
+			}
+			e.OnCommitState.AddUTXO(utxo)
+			e.OnAbortState.AddUTXO(utxo)
+		}
 	}
 
-	maxWeight, err := GetMaxWeight(state, validator, delegator.StartTime, delegator.EndTime)
+	// following Continuous staking fork activation multiple rewards UTXOS
+	// can be cumulated, each related to a different staking period. We make
+	// sure to index the reward UTXOs correctly by appending them to previous ones.
+	utxosOffset := len(outputs) + len(stake)
+	currentRewardUTXOs, err := e.OnCommitState.GetRewardUTXOs(tx.TxID)
 	if err != nil {
-		return false, err
+		return fmt.Errorf("failed to create output: %w", err)
 	}
-	newMaxWeight, err := math.Add64(maxWeight, delegator.Weight)
-	if err != nil {
-		return false, err
-	}
-	return newMaxWeight <= weightLimit, nil
-}
+	utxosOffset += len(currentRewardUTXOs)
 
-// GetMaxWeight returns the maximum total weight of the [validator], including
-// its own weight, between [startTime] and [endTime].
-// The weight changes are applied in the order they will be applied as chain
-// time advances.
-// Invariant:
-// - [validator.StartTime] <= [startTime] < [endTime] <= [validator.EndTime]
-func GetMaxWeight(
-	chainState state.Chain,
-	validator *state.Staker,
-	startTime time.Time,
-	endTime time.Time,
-) (uint64, error) {
-	currentDelegatorIterator, err := chainState.GetCurrentDelegatorIterator(validator.SubnetID, validator.NodeID)
-	if err != nil {
-		return 0, err
-	}
-
-	// TODO: We can optimize this by moving the current total weight to be
-	//       stored in the validator state.
-	//
-	// Calculate the current total weight on this validator, including the
-	// weight of the actual validator and the sum of the weights of all of the
-	// currently active delegators.
-	currentWeight := validator.Weight
-	for currentDelegatorIterator.Next() {
-		currentDelegator := currentDelegatorIterator.Value()
-
-		currentWeight, err = math.Add64(currentWeight, currentDelegator.Weight)
+	// Provide the reward here
+	if stakerToReward.PotentialReward > 0 {
+		validationRewardsOwner := uStakerTx.ValidationRewardsOwner()
+		outIntf, err := e.Fx.CreateOutput(stakerToReward.PotentialReward, validationRewardsOwner)
 		if err != nil {
-			currentDelegatorIterator.Release()
-			return 0, err
+			return fmt.Errorf("failed to create output: %w", err)
+		}
+		out, ok := outIntf.(verify.State)
+		if !ok {
+			return ErrInvalidState
+		}
+
+		utxo := &avax.UTXO{
+			UTXOID: avax.UTXOID{
+				TxID:        tx.TxID,
+				OutputIndex: uint32(utxosOffset),
+			},
+			Asset: stakeAsset,
+			Out:   out,
+		}
+		e.OnCommitState.AddUTXO(utxo)
+		e.OnCommitState.AddRewardUTXO(tx.TxID, utxo)
+
+		utxosOffset++
+	}
+
+	// Provide the accrued delegatee rewards from successful delegations here.
+	delegateeReward, err := e.OnCommitState.GetDelegateeReward(
+		stakerToReward.SubnetID,
+		stakerToReward.NodeID,
+	)
+	if err != nil && err != database.ErrNotFound {
+		return fmt.Errorf("failed to fetch accrued delegatee rewards: %w", err)
+	}
+
+	if delegateeReward > 0 {
+		delegationRewardsOwner := uStakerTx.DelegationRewardsOwner()
+		outIntf, err := e.Fx.CreateOutput(delegateeReward, delegationRewardsOwner)
+		if err != nil {
+			return fmt.Errorf("failed to create output: %w", err)
+		}
+		out, ok := outIntf.(verify.State)
+		if !ok {
+			return ErrInvalidState
+		}
+
+		onCommitUtxo := &avax.UTXO{
+			UTXOID: avax.UTXOID{
+				TxID:        tx.TxID,
+				OutputIndex: uint32(utxosOffset),
+			},
+			Asset: stakeAsset,
+			Out:   out,
+		}
+		e.OnCommitState.AddUTXO(onCommitUtxo)
+		e.OnCommitState.AddRewardUTXO(tx.TxID, onCommitUtxo)
+
+		// Note: There is no [offset] if the RewardValidatorTx is
+		// aborted, because the validator reward is not awarded.
+		onAbortUtxo := &avax.UTXO{
+			UTXOID: avax.UTXOID{
+				TxID: tx.TxID,
+
+				OutputIndex: uint32(utxosOffset - 1),
+			},
+			Asset: stakeAsset,
+			Out:   out,
+		}
+		e.OnAbortState.AddUTXO(onAbortUtxo)
+		e.OnAbortState.AddRewardUTXO(tx.TxID, onAbortUtxo)
+	}
+	return nil
+}
+
+func (e *ProposalTxExecutor) rewardDelegatorTx(
+	uStakerTx txs.DelegatorTx,
+	stakerToReward *state.Staker,
+	tx *txs.RewardValidatorTx,
+) error {
+	var (
+		stake   = uStakerTx.Stake()
+		outputs = uStakerTx.Outputs()
+		// Invariant: The staked asset must be equal to the reward asset.
+		stakeAsset = stake[0].Asset
+	)
+
+	if stakerToReward.ShouldRestake() {
+		shiftedStaker := *stakerToReward
+		state.ShiftStakerAheadInPlace(&shiftedStaker)
+		if err := e.OnCommitState.UpdateCurrentDelegator(&shiftedStaker); err != nil {
+			return fmt.Errorf("failed updating current delegator: %w", err)
+		}
+		if err := e.OnAbortState.UpdateCurrentDelegator(&shiftedStaker); err != nil {
+			return fmt.Errorf("failed updating current delegator: %w", err)
+		}
+		// staked utxos will be returned only at the end of the staking period.
+	} else {
+		e.OnCommitState.DeleteCurrentDelegator(stakerToReward)
+		e.OnAbortState.DeleteCurrentDelegator(stakerToReward)
+
+		// Refund the stake only when delegator is about to leave
+		// the staking set
+		for i, out := range stake {
+			utxo := &avax.UTXO{
+				UTXOID: avax.UTXOID{
+					TxID:        tx.TxID,
+					OutputIndex: uint32(len(outputs) + i),
+				},
+				Asset: out.Asset,
+				Out:   out.Output(),
+			}
+			e.OnCommitState.AddUTXO(utxo)
+			e.OnAbortState.AddUTXO(utxo)
 		}
 	}
-	currentDelegatorIterator.Release()
 
-	currentDelegatorIterator, err = chainState.GetCurrentDelegatorIterator(validator.SubnetID, validator.NodeID)
+	// We're (possibly) rewarding a delegator, so we need to fetch
+	// the validator they are delegated to.
+	vdrStaker, err := e.OnCommitState.GetCurrentValidator(
+		stakerToReward.SubnetID,
+		stakerToReward.NodeID,
+	)
 	if err != nil {
-		return 0, err
+		return fmt.Errorf(
+			"failed to get whether %s is a validator: %w",
+			stakerToReward.NodeID,
+			err,
+		)
 	}
-	pendingDelegatorIterator, err := chainState.GetPendingDelegatorIterator(validator.SubnetID, validator.NodeID)
+
+	vdrTxIntf, _, err := e.OnCommitState.GetTx(vdrStaker.TxID)
 	if err != nil {
-		currentDelegatorIterator.Release()
-		return 0, err
+		return fmt.Errorf(
+			"failed to get whether %s is a validator: %w",
+			stakerToReward.NodeID,
+			err,
+		)
 	}
-	delegatorChangesIterator := state.NewStakerDiffIterator(currentDelegatorIterator, pendingDelegatorIterator)
-	defer delegatorChangesIterator.Release()
 
-	// Iterate over the future stake weight changes and calculate the maximum
-	// total weight on the validator, only including the points in the time
-	// range [startTime, endTime].
-	var currentMax uint64
-	for delegatorChangesIterator.Next() {
-		delegator, isAdded := delegatorChangesIterator.Value()
-		// [delegator.NextTime] > [endTime]
-		if delegator.NextTime.After(endTime) {
-			// This delegation change (and all following changes) occurs after
-			// [endTime]. Since we're calculating the max amount staked in
-			// [startTime, endTime], we can stop.
-			break
+	// Invariant: Delegators must only be able to reference validator
+	//            transactions that implement [txs.ValidatorTx]. All
+	//            validator transactions implement this interface except the
+	//            AddSubnetValidatorTx.
+	vdrTx, ok := vdrTxIntf.Unsigned.(txs.ValidatorTx)
+	if !ok {
+		return ErrWrongTxType
+	}
+
+	// Calculate split of reward between delegator/delegatee
+	// The delegator gives stake to the validatee
+	validatorShares := vdrTx.Shares()
+	delegatorShares := reward.PercentDenominator - uint64(validatorShares)
+	delegatorReward := delegatorShares * (stakerToReward.PotentialReward / reward.PercentDenominator)
+	// Delay rounding as long as possible for small numbers
+	if optimisticReward, err := math.Mul64(delegatorShares, stakerToReward.PotentialReward); err == nil {
+		delegatorReward = optimisticReward / reward.PercentDenominator
+	}
+	delegateeReward := stakerToReward.PotentialReward - delegatorReward
+
+	// following Continuous staking fork activation multiple rewards UTXOS
+	// can be cumulated, each related to a different staking period. We make
+	// sure to index the reward UTXOs correctly by appending them to previous ones.
+	utxosOffset := len(outputs) + len(stake)
+	currentRewardUTXOs, err := e.OnCommitState.GetRewardUTXOs(stakerToReward.TxID)
+	if err != nil {
+		return fmt.Errorf("failed to create output: %w", err)
+	}
+	utxosOffset += len(currentRewardUTXOs)
+
+	// Reward the delegator here
+	if delegatorReward > 0 {
+		rewardsOwner := uStakerTx.RewardsOwner()
+		outIntf, err := e.Fx.CreateOutput(delegatorReward, rewardsOwner)
+		if err != nil {
+			return fmt.Errorf("failed to create output: %w", err)
+		}
+		out, ok := outIntf.(verify.State)
+		if !ok {
+			return ErrInvalidState
+		}
+		utxo := &avax.UTXO{
+			UTXOID: avax.UTXOID{
+				TxID:        tx.TxID,
+				OutputIndex: uint32(utxosOffset),
+			},
+			Asset: stakeAsset,
+			Out:   out,
 		}
 
-		// [delegator.NextTime] >= [startTime]
-		if !delegator.NextTime.Before(startTime) {
-			// We have advanced time to be at the inside of the delegation
-			// window. Make sure that the max weight is updated accordingly.
-			currentMax = math.Max(currentMax, currentWeight)
-		}
+		e.OnCommitState.AddUTXO(utxo)
+		e.OnCommitState.AddRewardUTXO(tx.TxID, utxo)
 
-		var op func(uint64, uint64) (uint64, error)
-		if isAdded {
-			op = math.Add64
+		utxosOffset++
+	}
+
+	// Reward the delegatee here
+	if delegateeReward > 0 {
+		if vdrStaker.StartTime.After(e.Config.CortinaTime) {
+			previousDelegateeReward, err := e.OnCommitState.GetDelegateeReward(
+				vdrStaker.SubnetID,
+				vdrStaker.NodeID,
+			)
+			if err != nil {
+				return fmt.Errorf("failed to get delegatee reward: %w", err)
+			}
+
+			// Invariant: The rewards calculator can never return a
+			//            [potentialReward] that would overflow the
+			//            accumulated rewards.
+			newDelegateeReward := previousDelegateeReward + delegateeReward
+
+			// For any validators starting after [CortinaTime], we defer rewarding the
+			// [delegateeReward] until their staking period is over.
+			err = e.OnCommitState.SetDelegateeReward(
+				vdrStaker.SubnetID,
+				vdrStaker.NodeID,
+				newDelegateeReward,
+			)
+			if err != nil {
+				return fmt.Errorf("failed to update delegatee reward: %w", err)
+			}
 		} else {
-			op = math.Sub[uint64]
-		}
-		currentWeight, err = op(currentWeight, delegator.Weight)
-		if err != nil {
-			return 0, err
+			// For any validators who started prior to [CortinaTime], we issue the
+			// [delegateeReward] immediately.
+			delegationRewardsOwner := vdrTx.DelegationRewardsOwner()
+			outIntf, err := e.Fx.CreateOutput(delegateeReward, delegationRewardsOwner)
+			if err != nil {
+				return fmt.Errorf("failed to create output: %w", err)
+			}
+			out, ok := outIntf.(verify.State)
+			if !ok {
+				return ErrInvalidState
+			}
+			utxo := &avax.UTXO{
+				UTXOID: avax.UTXOID{
+					TxID:        tx.TxID,
+					OutputIndex: uint32(utxosOffset),
+				},
+				Asset: stakeAsset,
+				Out:   out,
+			}
+
+			e.OnCommitState.AddUTXO(utxo)
+			e.OnCommitState.AddRewardUTXO(tx.TxID, utxo)
 		}
 	}
-	// Because we assume [startTime] < [endTime], we have advanced time to
-	// be at the end of the delegation window. Make sure that the max weight is
-	// updated accordingly.
-	return math.Max(currentMax, currentWeight), nil
+	return nil
 }
