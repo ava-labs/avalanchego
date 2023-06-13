@@ -888,14 +888,8 @@ func verifyAddContinuousValidatorTx(
 		return mockable.MaxTime, nil
 	}
 
-	// Pre Continuous Staking fork activation, start time must be after current chain time.
-	// Post Continuous Staking fork activation, only staking period matters, hence start time
-	// is not validated
-	var (
-		currentTimestamp              = chainState.GetTimestamp()
-		isContinuousStakingForkActive = backend.Config.IsContinuousStakingActivated(currentTimestamp)
-	)
-	if !isContinuousStakingForkActive {
+	currentTimestamp := chainState.GetTimestamp()
+	if !backend.Config.IsContinuousStakingActivated(currentTimestamp) {
 		return time.Time{}, errors.New("cannot accept AddContinuousValidatorTx before continuous staking fork")
 	}
 
@@ -979,6 +973,136 @@ func verifyAddContinuousValidatorTx(
 	}
 
 	return time.Time{}, nil
+}
+
+// verifyAddContinuousDelegatorTx carries out the validation for an
+// verifyAddContinuousDelegatorTx.
+func verifyAddContinuousDelegatorTx(
+	backend *Backend,
+	chainState state.Chain,
+	sTx *txs.Tx,
+	tx *txs.AddContinuousDelegatorTx,
+) (time.Time, error) {
+	// Verify the tx is well-formed
+	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
+		return time.Time{}, err
+	}
+
+	subnetID := constants.PrimaryNetworkID
+	if !backend.Bootstrapped.Get() {
+		validator, err := GetValidator(chainState, subnetID, tx.Validator.NodeID)
+		if err != nil {
+			return time.Time{}, fmt.Errorf(
+				"failed to fetch the validator for %s on %s: %w",
+				tx.Validator.NodeID,
+				subnetID,
+				err,
+			)
+		}
+
+		endTime := mockable.MaxTime
+		if endTime.After(validator.EndTime) {
+			endTime = validator.EndTime
+		}
+		return endTime, nil
+	}
+
+	currentTimestamp := chainState.GetTimestamp()
+	if !backend.Config.IsContinuousStakingActivated(currentTimestamp) {
+		return time.Time{}, errors.New("cannot accept AddContinuousDelegatorTx before continuous staking fork")
+	}
+
+	delegatorRules, err := getDelegatorRules(backend, chainState, subnetID)
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	var (
+		stakingPeriod = tx.StakingPeriod()
+		stakedAssetID = tx.StakeOuts[0].AssetID()
+	)
+	switch {
+	case tx.Validator.Wght < delegatorRules.minDelegatorStake:
+		// Ensure delegator is staking at least the minimum amount
+		return time.Time{}, ErrWeightTooSmall
+
+	case stakingPeriod < delegatorRules.minStakeDuration:
+		// Ensure staking length is not too short
+		return time.Time{}, ErrStakeTooShort
+
+	case stakingPeriod > delegatorRules.maxStakeDuration:
+		// Ensure staking length is not too long
+		return time.Time{}, ErrStakeTooLong
+
+	case stakedAssetID != delegatorRules.assetID:
+		// Wrong assetID used
+		return time.Time{}, fmt.Errorf(
+			"%w: %s != %s",
+			ErrWrongStakedAssetID,
+			delegatorRules.assetID,
+			stakedAssetID,
+		)
+	}
+
+	validator, err := GetValidator(chainState, subnetID, tx.Validator.NodeID)
+	if err != nil {
+		return time.Time{}, fmt.Errorf(
+			"failed to fetch the validator for %s on %s: %w",
+			tx.Validator.NodeID,
+			subnetID,
+			err,
+		)
+	}
+
+	maximumWeight, err := math.Mul64(
+		uint64(delegatorRules.maxValidatorWeightFactor),
+		validator.Weight,
+	)
+	if err != nil {
+		maximumWeight = stdmath.MaxUint64
+	}
+	maximumWeight = math.Min(maximumWeight, delegatorRules.maxValidatorStake)
+
+	txID := sTx.ID()
+	// potential reward does not matter
+	newStaker, err := state.NewCurrentStaker(txID, tx, currentTimestamp, currentTimestamp.Add(stakingPeriod), 0)
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	canDelegate, err := canDelegate(chainState, validator, maximumWeight, newStaker)
+	if err != nil {
+		return time.Time{}, err
+	}
+	if !canDelegate {
+		return time.Time{}, ErrOverDelegated
+	}
+
+	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.StakeOuts))
+	copy(outs, tx.Outs)
+	copy(outs[len(tx.Outs):], tx.StakeOuts)
+
+	txFee := backend.Config.AddPrimaryNetworkDelegatorFee
+
+	// Verify the flowcheck
+	if err := backend.FlowChecker.VerifySpend(
+		tx,
+		chainState,
+		tx.Ins,
+		outs,
+		sTx.Creds,
+		map[ids.ID]uint64{
+			backend.Ctx.AVAXAssetID: txFee,
+		},
+	); err != nil {
+		return time.Time{}, fmt.Errorf("%w: %v", ErrFlowCheckFailed, err)
+	}
+
+	endTime := mockable.MaxTime
+	if endTime.After(validator.EndTime) {
+		endTime = validator.EndTime
+	}
+	return endTime, nil
 }
 
 func verifyStopStakerTx(

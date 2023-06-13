@@ -495,8 +495,29 @@ func (e *StandardTxExecutor) AddContinuousValidatorTx(tx *txs.AddContinuousValid
 	return nil
 }
 
-func (*StandardTxExecutor) AddContinuousDelegatorTx(*txs.AddContinuousDelegatorTx) error {
-	return ErrWrongTxType
+func (e *StandardTxExecutor) AddContinuousDelegatorTx(tx *txs.AddContinuousDelegatorTx) error {
+	endTime, err := verifyAddContinuousDelegatorTx(
+		e.Backend,
+		e.State,
+		e.Tx,
+		tx,
+	)
+	if err != nil {
+		return err
+	}
+
+	var (
+		txID      = e.Tx.ID()
+		startTime = e.State.GetTimestamp()
+	)
+	if err := e.addStakerFromStakerTx(tx, startTime, endTime); err != nil {
+		return err
+	}
+
+	avax.Consume(e.State, tx.Ins)
+	avax.Produce(e.State, txID, tx.Outs)
+
+	return nil
 }
 
 func (e *StandardTxExecutor) StopStakerTx(tx *txs.StopStakerTx) error {
