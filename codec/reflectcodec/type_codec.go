@@ -1,3 +1,13 @@
+// Copyright (C) 2023, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
 // Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -197,7 +207,19 @@ func (c *genericCodec) size(value reflect.Value) (int, bool, error) {
 			size      int
 			constSize = true
 		)
-		for _, fieldDesc := range serializedFields {
+		upgradeVersion := uint16(0)
+		if serializedFields.CheckUpgrade {
+			upgradeVersionID := value.Field(0).Uint()
+			if upgradeVersionID&codec.UpgradePrefix == codec.UpgradePrefix {
+				upgradeVersion = codec.GetUpgradeVersion(upgradeVersionID)
+				size += wrappers.LongLen
+			}
+		}
+
+		for _, fieldDesc := range serializedFields.Fields {
+			if fieldDesc.UpgradeVersion > upgradeVersion {
+				break
+			}
 			innerSize, innerConstSize, err := c.size(value.Field(fieldDesc.Index))
 			if err != nil {
 				return 0, false, err
@@ -325,7 +347,21 @@ func (c *genericCodec) marshal(value reflect.Value, p *wrappers.Packer, maxSlice
 		if err != nil {
 			return err
 		}
-		for _, fieldDesc := range serializedFields { // Go through all fields of this struct that are serialized
+		upgradeVersion := uint16(0)
+		if serializedFields.CheckUpgrade {
+			upgradeVersionID := value.Field(0).Uint()
+			if upgradeVersionID&codec.UpgradePrefix == codec.UpgradePrefix {
+				upgradeVersion = codec.GetUpgradeVersion(upgradeVersionID)
+				p.PackLong(upgradeVersionID)
+				if p.Err != nil {
+					return p.Err
+				}
+			}
+		}
+		for _, fieldDesc := range serializedFields.Fields { // Go through all fields of this struct that are serialized
+			if fieldDesc.UpgradeVersion > upgradeVersion {
+				break
+			}
 			if err := c.marshal(value.Field(fieldDesc.Index), p, fieldDesc.MaxSliceLen); err != nil { // Serialize the field and write to byte array
 				return err
 			}
@@ -493,8 +529,27 @@ func (c *genericCodec) unmarshal(p *wrappers.Packer, value reflect.Value, maxSli
 		if err != nil {
 			return fmt.Errorf("couldn't unmarshal struct: %w", err)
 		}
+		upgradeVersion := uint16(0)
+		if serializedFieldIndices.CheckUpgrade {
+			upgradeVersionID := p.UnpackLong()
+			switch {
+			case p.Err != nil:
+				return p.Err
+			case upgradeVersionID&codec.UpgradePrefix != codec.UpgradePrefix:
+				p.RevertLong()
+			default:
+				value.Field(0).SetUint(upgradeVersionID)
+				upgradeVersion = codec.GetUpgradeVersion(upgradeVersionID)
+				if upgradeVersion > serializedFieldIndices.MaxUpgradeVersion {
+					return fmt.Errorf("incompatible upgrade version: %d", upgradeVersion)
+				}
+			}
+		}
 		// Go through the fields and umarshal into them
-		for _, fieldDesc := range serializedFieldIndices {
+		for _, fieldDesc := range serializedFieldIndices.Fields {
+			if fieldDesc.UpgradeVersion > upgradeVersion {
+				break
+			}
 			if err := c.unmarshal(p, value.Field(fieldDesc.Index), fieldDesc.MaxSliceLen); err != nil {
 				return fmt.Errorf("couldn't unmarshal struct: %w", err)
 			}

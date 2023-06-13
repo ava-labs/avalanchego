@@ -1,3 +1,13 @@
+// Copyright (C) 2023, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
 // Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -142,6 +152,14 @@ func (p *Packer) UnpackLong() uint64 {
 	val := binary.BigEndian.Uint64(p.Bytes[p.Offset:])
 	p.Offset += LongLen
 	return val
+}
+
+func (p *Packer) RevertLong() {
+	if p.Offset < LongLen {
+		p.Add(errBadLength)
+		return
+	}
+	p.Offset -= LongLen
 }
 
 // PackBool packs a bool into the byte array
