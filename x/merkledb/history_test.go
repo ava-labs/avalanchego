@@ -7,6 +7,7 @@ import (
 	"context"
 	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -87,7 +88,9 @@ func Test_History_Large(t *testing.T) {
 	require := require.New(t)
 
 	for i := 1; i < 10; i++ {
-		r := rand.New(rand.NewSource(int64(i))) // #nosec G404
+		now := time.Now().UnixNano()
+		t.Logf("seed for iter %d: %d", i, now)
+		r := rand.New(rand.NewSource(now)) // #nosec G404
 		db, err := New(
 			context.Background(),
 			memdb.New(),
