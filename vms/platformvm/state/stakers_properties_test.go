@@ -149,20 +149,20 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 			// update staker times as expected. We copy the updated staker
 			// to avoid in-place modification of stakers already stored in store,
 			// as it must be done in prod code.
-			updatedStaker := s
-			ShiftStakerAheadInPlace(&updatedStaker, mockable.MaxTime)
+			updatedValidator := s
+			ShiftValidatorAheadInPlace(&updatedValidator)
 
-			err = store.UpdateCurrentValidator(&updatedStaker)
+			err = store.UpdateCurrentValidator(&updatedValidator)
 			if err != nil {
 				return fmt.Sprintf("expected no error in updating, got %v", err)
 			}
 
 			// show that queries return updated staker, not original one
-			retrievedStaker, err = store.GetCurrentValidator(updatedStaker.SubnetID, updatedStaker.NodeID)
+			retrievedStaker, err = store.GetCurrentValidator(updatedValidator.SubnetID, updatedValidator.NodeID)
 			if err != nil {
 				return fmt.Sprintf("expected no error, got %v", err)
 			}
-			if !reflect.DeepEqual(&updatedStaker, retrievedStaker) {
+			if !reflect.DeepEqual(&updatedValidator, retrievedStaker) {
 				return fmt.Sprintf("wrong staker retrieved expected %v, got %v", &s, retrievedStaker)
 			}
 
@@ -382,16 +382,16 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 				// update staker times as expected. We copy the updated staker
 				// to avoid in-place modification of stakers already stored in store,
 				// as it must be done in prod code.
-				updatedStaker := del
-				ShiftStakerAheadInPlace(&updatedStaker, mockable.MaxTime)
+				updatedDelegator := del
+				ShiftDelegatorAheadInPlace(&updatedDelegator, mockable.MaxTime)
 
-				err = store.UpdateCurrentDelegator(&updatedStaker)
+				err = store.UpdateCurrentDelegator(&updatedDelegator)
 				if err != nil {
 					return fmt.Sprintf("expected no error in updating, got %v", err)
 				}
 
 				// check query returns updated staker - version 1
-				delIt, err := store.GetCurrentDelegatorIterator(updatedStaker.SubnetID, updatedStaker.NodeID)
+				delIt, err := store.GetCurrentDelegatorIterator(updatedDelegator.SubnetID, updatedDelegator.NodeID)
 				if err != nil {
 					return fmt.Sprintf("expected no error, got %v", err)
 				}
@@ -399,17 +399,17 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 				found := false
 				for delIt.Next() {
 					del := delIt.Value()
-					if del.TxID != updatedStaker.TxID {
+					if del.TxID != updatedDelegator.TxID {
 						continue
 					}
 					found = true
-					if !reflect.DeepEqual(&updatedStaker, del) {
-						return fmt.Sprintf("wrong staker retrieved expected %v, got %v", &updatedStaker, del)
+					if !reflect.DeepEqual(&updatedDelegator, del) {
+						return fmt.Sprintf("wrong staker retrieved expected %v, got %v", &updatedDelegator, del)
 					}
 					break
 				}
 				if !found {
-					return fmt.Sprintf("could not find updated staker %v", &updatedStaker)
+					return fmt.Sprintf("could not find updated staker %v", &updatedDelegator)
 				}
 				delIt.Release()
 
@@ -421,17 +421,17 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 				found = false
 				for stakerIt.Next() {
 					del := stakerIt.Value()
-					if del.TxID != updatedStaker.TxID {
+					if del.TxID != updatedDelegator.TxID {
 						continue
 					}
 					found = true
-					if !reflect.DeepEqual(&updatedStaker, del) {
-						return fmt.Sprintf("wrong staker retrieved expected %v, got %v", &updatedStaker, del)
+					if !reflect.DeepEqual(&updatedDelegator, del) {
+						return fmt.Sprintf("wrong staker retrieved expected %v, got %v", &updatedDelegator, del)
 					}
 					break
 				}
 				if !found {
-					return fmt.Sprintf("could not find updated staker %v", &updatedStaker)
+					return fmt.Sprintf("could not find updated staker %v", &updatedDelegator)
 				}
 				stakerIt.Release()
 			}

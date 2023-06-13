@@ -260,14 +260,14 @@ func updateCurrentValidatorInSystem(sys *sysUnderTest) error {
 	}
 
 	var (
-		found  bool
-		staker *Staker
+		found     bool
+		validator *Staker
 	)
 	for !found && stakerIt.Next() {
-		staker = stakerIt.Value()
-		if staker.Priority == txs.SubnetPermissionedValidatorCurrentPriority ||
-			staker.Priority == txs.SubnetPermissionlessValidatorCurrentPriority ||
-			staker.Priority == txs.PrimaryNetworkValidatorCurrentPriority {
+		validator = stakerIt.Value()
+		if validator.Priority == txs.SubnetPermissionedValidatorCurrentPriority ||
+			validator.Priority == txs.SubnetPermissionlessValidatorCurrentPriority ||
+			validator.Priority == txs.PrimaryNetworkValidatorCurrentPriority {
 			found = true
 			break
 		}
@@ -283,15 +283,15 @@ func updateCurrentValidatorInSystem(sys *sysUnderTest) error {
 	chain = sys.getTopChainState()
 
 	// 3. query the staker
-	staker, err = chain.GetCurrentValidator(staker.SubnetID, staker.NodeID)
+	validator, err = chain.GetCurrentValidator(validator.SubnetID, validator.NodeID)
 	if err != nil {
 		return err
 	}
 
 	// 4. shift staker times and update the staker
-	updatedStaker := *staker
-	ShiftStakerAheadInPlace(&updatedStaker, mockable.MaxTime)
-	return chain.UpdateCurrentValidator(&updatedStaker)
+	updatedValidator := *validator
+	ShiftValidatorAheadInPlace(&updatedValidator)
+	return chain.UpdateCurrentValidator(&updatedValidator)
 }
 
 func (*updateCurrentValidatorCommand) NextState(cmdState commands.State) commands.State {
@@ -311,14 +311,14 @@ func updateCurrentValidatorInModel(model *stakersStorageModel) error {
 	}
 
 	var (
-		found  bool
-		staker *Staker
+		found     bool
+		validator *Staker
 	)
 	for !found && stakerIt.Next() {
-		staker = stakerIt.Value()
-		if staker.Priority == txs.SubnetPermissionedValidatorCurrentPriority ||
-			staker.Priority == txs.SubnetPermissionlessValidatorCurrentPriority ||
-			staker.Priority == txs.PrimaryNetworkValidatorCurrentPriority {
+		validator = stakerIt.Value()
+		if validator.Priority == txs.SubnetPermissionedValidatorCurrentPriority ||
+			validator.Priority == txs.SubnetPermissionlessValidatorCurrentPriority ||
+			validator.Priority == txs.PrimaryNetworkValidatorCurrentPriority {
 			found = true
 			break
 		}
@@ -329,9 +329,9 @@ func updateCurrentValidatorInModel(model *stakersStorageModel) error {
 	}
 	stakerIt.Release()
 
-	updatedStaker := *staker
-	ShiftStakerAheadInPlace(&updatedStaker, mockable.MaxTime)
-	return model.UpdateCurrentValidator(&updatedStaker)
+	updatedValidator := *validator
+	ShiftValidatorAheadInPlace(&updatedValidator)
+	return model.UpdateCurrentValidator(&updatedValidator)
 }
 
 func (*updateCurrentValidatorCommand) PreCondition(commands.State) bool {
@@ -628,7 +628,7 @@ func updateCurrentDelegatorInSystem(sys *sysUnderTest) error {
 
 	// 3. Shift delegator times and update the staker
 	updatedDelegator := *delegator
-	ShiftStakerAheadInPlace(&updatedDelegator, mockable.MaxTime)
+	ShiftDelegatorAheadInPlace(&updatedDelegator, mockable.MaxTime)
 	return chain.UpdateCurrentDelegator(&updatedDelegator)
 }
 
@@ -667,7 +667,7 @@ func updateCurrentDelegatorInModel(model *stakersStorageModel) error {
 	stakerIt.Release()
 
 	updatedDelegator := *delegator
-	ShiftStakerAheadInPlace(&updatedDelegator, mockable.MaxTime)
+	ShiftDelegatorAheadInPlace(&updatedDelegator, mockable.MaxTime)
 	return model.UpdateCurrentDelegator(&updatedDelegator)
 }
 

@@ -290,6 +290,7 @@ func TestShiftStaker(t *testing.T) {
 
 	// Shift with max end time
 	staker := &Staker{
+		Priority:      txs.PrimaryNetworkContinuousValidatorCurrentPriority,
 		StartTime:     start,
 		StakingPeriod: stakingPeriod,
 		NextTime:      start.Add(stakingPeriod),
@@ -297,7 +298,7 @@ func TestShiftStaker(t *testing.T) {
 	}
 	require.True(staker.NextTime.Before(staker.EndTime))
 
-	ShiftStakerAheadInPlace(staker, mockable.MaxTime)
+	ShiftValidatorAheadInPlace(staker)
 	require.Equal(start.Add(stakingPeriod), staker.StartTime)
 	require.Equal(stakingPeriod, staker.StakingPeriod)
 	require.Equal(start.Add(2*stakingPeriod), staker.NextTime)
@@ -308,6 +309,7 @@ func TestShiftStaker(t *testing.T) {
 	periods := 5
 	end = start.Add(time.Duration(periods) * stakingPeriod)
 	staker = &Staker{
+		Priority:      txs.PrimaryNetworkContinuousValidatorCurrentPriority,
 		StartTime:     start,
 		StakingPeriod: stakingPeriod,
 		NextTime:      start.Add(stakingPeriod),
@@ -316,7 +318,7 @@ func TestShiftStaker(t *testing.T) {
 	require.False(staker.NextTime.After(staker.EndTime)) // invariant
 
 	for i := 1; i < periods; i++ {
-		ShiftStakerAheadInPlace(staker, mockable.MaxTime)
+		ShiftValidatorAheadInPlace(staker)
 		require.Equal(start.Add(time.Duration(i)*stakingPeriod), staker.StartTime)
 		require.Equal(stakingPeriod, staker.StakingPeriod)
 		require.Equal(start.Add(time.Duration(i+1)*stakingPeriod), staker.NextTime)
@@ -327,7 +329,7 @@ func TestShiftStaker(t *testing.T) {
 
 	// staker reached end of life, shift must be ineffective
 	cpy := *staker
-	ShiftStakerAheadInPlace(&cpy, mockable.MaxTime)
+	ShiftValidatorAheadInPlace(&cpy)
 	require.Equal(staker, &cpy)
 }
 
@@ -370,7 +372,7 @@ func TestPrimaryNetworkValidatorStopTimes(t *testing.T) {
 	require.Equal(stopTime, staker.EarliestStopTime())
 
 	// staker shift must not change stop time
-	ShiftStakerAheadInPlace(staker, mockable.MaxTime)
+	ShiftValidatorAheadInPlace(staker)
 	require.Equal(stopTime, staker.EndTime)
 	require.Equal(stopTime, staker.EarliestStopTime())
 }
