@@ -232,7 +232,11 @@ func buildMaskedIterator(parentStakers []Staker, deletedIndexes []int, updatedIn
 	updatedStakers := make(map[ids.ID]*Staker)
 	for _, idx := range updatedIndexes {
 		s := parentStakers[idx]
-		ShiftStakerAheadInPlace(&s, mockable.MaxTime)
+		if s.Priority.IsValidator() {
+			ShiftValidatorAheadInPlace(&s)
+		} else {
+			ShiftDelegatorAheadInPlace(&s, mockable.MaxTime)
+		}
 		updatedStakers[s.TxID] = &s
 	}
 

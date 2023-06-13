@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -446,7 +445,7 @@ func (e *ProposalTxExecutor) rewardValidatorTx(
 
 	if stakerToReward.ShouldRestake() {
 		shiftedStaker := *stakerToReward
-		state.ShiftStakerAheadInPlace(&shiftedStaker, mockable.MaxTime)
+		state.ShiftValidatorAheadInPlace(&shiftedStaker)
 		if err := e.OnCommitState.UpdateCurrentValidator(&shiftedStaker); err != nil {
 			return fmt.Errorf("failed updating current validator: %w", err)
 		}
@@ -580,7 +579,7 @@ func (e *ProposalTxExecutor) rewardDelegatorTx(
 		}
 
 		shiftedStaker := *stakerToReward
-		state.ShiftStakerAheadInPlace(&shiftedStaker, validator.NextTime)
+		state.ShiftDelegatorAheadInPlace(&shiftedStaker, validator.NextTime)
 		if err := e.OnCommitState.UpdateCurrentDelegator(&shiftedStaker); err != nil {
 			return fmt.Errorf("failed updating current delegator: %w", err)
 		}

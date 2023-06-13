@@ -160,7 +160,26 @@ func NewPendingStaker(txID ids.ID, staker txs.PreContinuousStakingStaker) (*Stak
 }
 
 // ShiftStakerAheadInPlace moves staker times ahead.
-func ShiftStakerAheadInPlace(s *Staker, upperBound time.Time) {
+func ShiftValidatorAheadInPlace(s *Staker) {
+	if !s.Priority.IsValidator() {
+		return // wrong function use. This sucks
+	}
+	if !s.Priority.IsValidator() || s.Priority.IsPending() {
+		return // never shift pending stakers
+	}
+	if !s.ShouldRestake() {
+		return // can't shift, staker reached EOL
+	}
+
+	s.StartTime = s.NextTime
+	s.NextTime = s.NextTime.Add(s.StakingPeriod)
+}
+
+// ShiftStakerAheadInPlace moves staker times ahead.
+func ShiftDelegatorAheadInPlace(s *Staker, nextTimeCap time.Time) {
+	if !s.Priority.IsDelegator() {
+		return // wrong function use. This sucks
+	}
 	if s.Priority.IsPending() {
 		return // never shift pending stakers
 	}
@@ -171,8 +190,8 @@ func ShiftStakerAheadInPlace(s *Staker, upperBound time.Time) {
 	s.StartTime = s.NextTime
 
 	nextTime := s.NextTime.Add(s.StakingPeriod)
-	if nextTime.After(upperBound) {
-		nextTime = upperBound
+	if nextTime.After(nextTimeCap) {
+		nextTime = nextTimeCap
 	}
 	s.NextTime = nextTime
 }
