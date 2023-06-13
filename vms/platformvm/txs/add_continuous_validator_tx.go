@@ -33,8 +33,9 @@ type AddContinuousValidatorTx struct {
 	BaseTx `serialize:"true"`
 	// Describes the validator
 	Validator `serialize:"true" json:"validator"`
-	// ID of the subnet this validator is validating
-	Subnet ids.ID `serialize:"true" json:"subnetID"`
+	// // ID of the subnet this validator is validating
+	// TODO ABENEGIA: will be added in next PR
+	// Subnet ids.ID `serialize:"true" json:"subnetID"`
 	// If the [Subnet] is the primary network, [Signer] is the BLS key for this
 	// validator. If the [Subnet] is not the primary network, this value is the
 	// empty signer
@@ -77,8 +78,8 @@ func (tx *AddContinuousValidatorTx) InitCtx(ctx *snow.Context) {
 	tx.StakerAuthKey.InitCtx(ctx)
 }
 
-func (tx *AddContinuousValidatorTx) SubnetID() ids.ID {
-	return tx.Subnet
+func (*AddContinuousValidatorTx) SubnetID() ids.ID {
+	return constants.PlatformChainID
 }
 
 func (tx *AddContinuousValidatorTx) NodeID() ids.NodeID {
@@ -93,11 +94,8 @@ func (tx *AddContinuousValidatorTx) PublicKey() (*bls.PublicKey, bool, error) {
 	return key, key != nil, nil
 }
 
-func (tx *AddContinuousValidatorTx) CurrentPriority() Priority {
-	if tx.Subnet == constants.PrimaryNetworkID {
-		return PrimaryNetworkContinuousValidatorCurrentPriority
-	}
-	return SubnetContinuousValidatorCurrentPriority
+func (*AddContinuousValidatorTx) CurrentPriority() Priority {
+	return PrimaryNetworkContinuousValidatorCurrentPriority
 }
 
 func (tx *AddContinuousValidatorTx) Stake() []*avax.TransferableOutput {
@@ -147,7 +145,7 @@ func (tx *AddContinuousValidatorTx) SyntacticVerify(ctx *snow.Context) error {
 		return fmt.Errorf("failed to verify validator, signer, rewards or staker owners: %w", err)
 	}
 
-	isPrimaryNetwork := tx.Subnet == constants.PrimaryNetworkID
+	isPrimaryNetwork := true // tx.Subnet == constants.PrimaryNetworkID
 	hasKey := tx.Signer.Key() != nil
 	if hasKey != isPrimaryNetwork {
 		return fmt.Errorf(

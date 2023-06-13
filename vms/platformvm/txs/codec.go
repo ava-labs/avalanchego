@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
@@ -97,6 +98,7 @@ func RegisterUnsignedTxsTypes(targetCodec linearcodec.Codec) error {
 		targetCodec.RegisterType(&signer.ProofOfPossession{}),
 
 		// Continuous Staking addition:
+		targetCodec.RegisterType(&verify.EmptyVerifiable{}),
 		targetCodec.RegisterType(&fx.EmptyOwner{}),
 		targetCodec.RegisterType(&AddContinuousValidatorTx{}),
 		targetCodec.RegisterType(&StopStakerTx{}),

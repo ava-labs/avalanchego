@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
@@ -866,6 +867,118 @@ func getDelegatorRules(
 		maxStakeDuration:         time.Duration(transformSubnet.MaxStakeDuration) * time.Second,
 		maxValidatorWeightFactor: transformSubnet.MaxValidatorWeightFactor,
 	}, nil
+}
+
+// verifyAddContinuousValidatorTx carries out the validation for an
+// verifyAddContinuousValidatorTx. It returns the end time for the staker
+// to be created if verification passes.
+func verifyAddContinuousValidatorTx(
+	backend *Backend,
+	chainState state.Chain,
+	sTx *txs.Tx,
+	tx *txs.AddContinuousValidatorTx,
+) (time.Time, error) {
+	// Verify the tx is well-formed
+	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
+		return time.Time{}, err
+	}
+
+	if !backend.Bootstrapped.Get() {
+		// TODO ABENEGIA: for now we just add primary network continuous stakers
+		return mockable.MaxTime, nil
+	}
+
+	// Pre Continuous Staking fork activation, start time must be after current chain time.
+	// Post Continuous Staking fork activation, only staking period matters, hence start time
+	// is not validated
+	var (
+		currentTimestamp              = chainState.GetTimestamp()
+		isContinuousStakingForkActive = backend.Config.IsContinuousStakingActivated(currentTimestamp)
+	)
+	if !isContinuousStakingForkActive {
+		return time.Time{}, errors.New("cannot accept AddContinuousValidatorTx before continuous staking fork")
+	}
+
+	subnetID := constants.PlatformChainID
+	validatorRules, err := getValidatorRules(backend, chainState, subnetID)
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	var (
+		stakingPeriod = tx.StakingPeriod()
+		stakedAssetID = tx.StakeOuts[0].AssetID()
+	)
+	switch {
+	case tx.Validator.Wght < validatorRules.minValidatorStake:
+		// Ensure validator is staking at least the minimum amount
+		return time.Time{}, ErrWeightTooSmall
+
+	case tx.Validator.Wght > validatorRules.maxValidatorStake:
+		// Ensure validator isn't staking too much
+		return time.Time{}, ErrWeightTooLarge
+
+	case tx.DelegationShares < validatorRules.minDelegationFee:
+		// Ensure the validator fee is at least the minimum amount
+		return time.Time{}, ErrInsufficientDelegationFee
+
+	case stakingPeriod < validatorRules.minStakeDuration:
+		// Ensure staking length is not too short
+		return time.Time{}, ErrStakeTooShort
+
+	case stakingPeriod > validatorRules.maxStakeDuration:
+		// Ensure staking length is not too long
+		return time.Time{}, ErrStakeTooLong
+
+	case stakedAssetID != validatorRules.assetID:
+		// Wrong assetID used
+		return time.Time{}, fmt.Errorf(
+			"%w: %s != %s",
+			ErrWrongStakedAssetID,
+			validatorRules.assetID,
+			stakedAssetID,
+		)
+	}
+
+	_, err = GetValidator(chainState, subnetID, tx.Validator.NodeID)
+	if err == nil {
+		return time.Time{}, fmt.Errorf(
+			"%w: %s on %s",
+			ErrDuplicateValidator,
+			tx.Validator.NodeID,
+			subnetID,
+		)
+	}
+	if err != database.ErrNotFound {
+		return time.Time{}, fmt.Errorf(
+			"failed to find whether %s is a validator on %s: %w",
+			tx.Validator.NodeID,
+			subnetID,
+			err,
+		)
+	}
+
+	txFee := backend.Config.AddPrimaryNetworkValidatorFee
+
+	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.StakeOuts))
+	copy(outs, tx.Outs)
+	copy(outs[len(tx.Outs):], tx.StakeOuts)
+
+	// Verify the flowcheck
+	if err := backend.FlowChecker.VerifySpend(
+		tx,
+		chainState,
+		tx.Ins,
+		outs,
+		sTx.Creds,
+		map[ids.ID]uint64{
+			backend.Ctx.AVAXAssetID: txFee,
+		},
+	); err != nil {
+		return time.Time{}, fmt.Errorf("%w: %v", ErrFlowCheckFailed, err)
+	}
+
+	return time.Time{}, nil
 }
 
 func verifyStopStakerTx(

@@ -470,8 +470,29 @@ func (e *StandardTxExecutor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionl
 	return nil
 }
 
-func (*StandardTxExecutor) AddContinuousValidatorTx(*txs.AddContinuousValidatorTx) error {
-	return errors.New("not yet implemented")
+func (e *StandardTxExecutor) AddContinuousValidatorTx(tx *txs.AddContinuousValidatorTx) error {
+	endTime, err := verifyAddContinuousValidatorTx(
+		e.Backend,
+		e.State,
+		e.Tx,
+		tx,
+	)
+	if err != nil {
+		return err
+	}
+
+	var (
+		txID      = e.Tx.ID()
+		startTime = e.State.GetTimestamp()
+	)
+	if err := e.addStakerFromStakerTx(tx, startTime, endTime); err != nil {
+		return err
+	}
+
+	avax.Consume(e.State, tx.Ins)
+	avax.Produce(e.State, txID, tx.Outs)
+
+	return nil
 }
 
 func (e *StandardTxExecutor) StopStakerTx(tx *txs.StopStakerTx) error {
