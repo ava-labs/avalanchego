@@ -26,6 +26,8 @@ import (
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/resource"
+
+	commontracker "github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 )
 
 const testThreadPoolSize = 2
@@ -39,8 +41,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 
 	vdrs := validators.NewSet()
 	vdr0 := ids.GenerateTestNodeID()
-	err := vdrs.Add(vdr0, nil, ids.Empty, 1)
-	require.NoError(t, err)
+	require.NoError(t, vdrs.Add(vdr0, nil, ids.Empty, 1))
 
 	resourceTracker, err := tracker.NewResourceTracker(
 		prometheus.NewRegistry(),
@@ -58,6 +59,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
+		commontracker.NewPeers(),
 	)
 	require.NoError(t, err)
 	handler := handlerIntf.(*handler)
@@ -134,8 +136,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 	ctx := snow.DefaultConsensusContextTest()
 
 	vdrs := validators.NewSet()
-	err := vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1)
-	require.NoError(t, err)
+	require.NoError(t, vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 
 	resourceTracker, err := tracker.NewResourceTracker(
 		prometheus.NewRegistry(),
@@ -153,6 +154,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
+		commontracker.NewPeers(),
 	)
 	require.NoError(t, err)
 	handler := handlerIntf.(*handler)
@@ -225,8 +227,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	closed := make(chan struct{}, 1)
 	ctx := snow.DefaultConsensusContextTest()
 	vdrs := validators.NewSet()
-	err := vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1)
-	require.NoError(t, err)
+	require.NoError(t, vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 
 	resourceTracker, err := tracker.NewResourceTracker(
 		prometheus.NewRegistry(),
@@ -244,6 +245,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
+		commontracker.NewPeers(),
 	)
 	require.NoError(t, err)
 	handler := handlerIntf.(*handler)
@@ -305,8 +307,7 @@ func TestHandlerDispatchInternal(t *testing.T) {
 	ctx := snow.DefaultConsensusContextTest()
 	msgFromVMChan := make(chan common.Message)
 	vdrs := validators.NewSet()
-	err := vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1)
-	require.NoError(t, err)
+	require.NoError(t, vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 
 	resourceTracker, err := tracker.NewResourceTracker(
 		prometheus.NewRegistry(),
@@ -324,6 +325,7 @@ func TestHandlerDispatchInternal(t *testing.T) {
 		resourceTracker,
 		validators.UnhandledSubnetConnector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
+		commontracker.NewPeers(),
 	)
 	require.NoError(t, err)
 
@@ -376,8 +378,7 @@ func TestHandlerDispatchInternal(t *testing.T) {
 func TestHandlerSubnetConnector(t *testing.T) {
 	ctx := snow.DefaultConsensusContextTest()
 	vdrs := validators.NewSet()
-	err := vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1)
-	require.NoError(t, err)
+	require.NoError(t, vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 
 	resourceTracker, err := tracker.NewResourceTracker(
 		prometheus.NewRegistry(),
@@ -402,6 +403,7 @@ func TestHandlerSubnetConnector(t *testing.T) {
 		resourceTracker,
 		connector,
 		subnets.New(ctx.NodeID, subnets.Config{}),
+		commontracker.NewPeers(),
 	)
 	require.NoError(t, err)
 
@@ -553,8 +555,7 @@ func TestDynamicEngineTypeDispatch(t *testing.T) {
 			messageReceived := make(chan struct{})
 			ctx := snow.DefaultConsensusContextTest()
 			vdrs := validators.NewSet()
-			err := vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1)
-			require.NoError(t, err)
+			require.NoError(t, vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 
 			resourceTracker, err := tracker.NewResourceTracker(
 				prometheus.NewRegistry(),
@@ -572,6 +573,7 @@ func TestDynamicEngineTypeDispatch(t *testing.T) {
 				resourceTracker,
 				validators.UnhandledSubnetConnector,
 				subnets.New(ids.EmptyNodeID, subnets.Config{}),
+				commontracker.NewPeers(),
 			)
 			require.NoError(t, err)
 
@@ -590,7 +592,7 @@ func TestDynamicEngineTypeDispatch(t *testing.T) {
 			engine.ContextF = func() *snow.ConsensusContext {
 				return ctx
 			}
-			engine.ChitsF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredIDs []ids.ID, acceptedIDs []ids.ID) error {
+			engine.ChitsF = func(context.Context, ids.NodeID, uint32, ids.ID, ids.ID) error {
 				close(messageReceived)
 				return nil
 			}
@@ -611,8 +613,8 @@ func TestDynamicEngineTypeDispatch(t *testing.T) {
 				InboundMessage: message.InboundChits(
 					ids.Empty,
 					uint32(0),
-					nil,
-					nil,
+					ids.Empty,
+					ids.Empty,
 					ids.EmptyNodeID,
 				),
 				EngineType: test.requestedEngineType,

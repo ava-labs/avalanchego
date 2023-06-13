@@ -152,7 +152,7 @@ func newEnvironment(t *testing.T) *environment {
 	registerer := prometheus.NewRegistry()
 	res.sender = &common.SenderTest{T: t}
 
-	metrics, err := metrics.New("", registerer, res.config.TrackedSubnets)
+	metrics, err := metrics.New("", registerer)
 	if err != nil {
 		panic(fmt.Errorf("failed to create metrics: %w", err))
 	}
@@ -250,11 +250,6 @@ func defaultState(
 	if err := state.Commit(); err != nil {
 		panic(err)
 	}
-	state.SetHeight( /*height*/ 0)
-	if err := state.Commit(); err != nil {
-		panic(err)
-	}
-
 	return state
 }
 

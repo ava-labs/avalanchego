@@ -53,7 +53,8 @@ type HTTPConfig struct {
 	HTTPSKey     []byte `json:"-"`
 	HTTPSCert    []byte `json:"-"`
 
-	APIAllowedOrigins []string `json:"apiAllowedOrigins"`
+	HTTPAllowedOrigins []string `json:"httpAllowedOrigins"`
+	HTTPAllowedHosts   []string `json:"httpAllowedHosts"`
 
 	ShutdownTimeout time.Duration `json:"shutdownTimeout"`
 	ShutdownWait    time.Duration `json:"shutdownWait"`
@@ -119,8 +120,7 @@ type BootstrapConfig struct {
 	// ancestors while responding to a GetAncestors message
 	BootstrapMaxTimeGetAncestors time.Duration `json:"bootstrapMaxTimeGetAncestors"`
 
-	BootstrapIDs []ids.NodeID `json:"bootstrapIDs"`
-	BootstrapIPs []ips.IPPort `json:"bootstrapIPs"`
+	Bootstrappers []genesis.Bootstrapper `json:"bootstrappers"`
 }
 
 type DatabaseConfig struct {
@@ -217,10 +217,6 @@ type Config struct {
 	WarningThresholdAvailableDiskSpace uint64 `json:"warningThresholdAvailableDiskSpace"`
 
 	TraceConfig trace.Config `json:"traceConfig"`
-
-	// See comment on [MinPercentConnectedStakeHealthy] in platformvm.Config
-	// TODO: consider moving to subnet config
-	MinPercentConnectedStakeHealthy map[ids.ID]float64 `json:"minPercentConnectedStakeHealthy"`
 
 	// See comment on [UseCurrentHeight] in platformvm.Config
 	UseCurrentHeight bool `json:"useCurrentHeight"`

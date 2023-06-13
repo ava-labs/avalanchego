@@ -27,11 +27,6 @@ const (
 
 	MaxContainersLen = int(4 * DefaultMaxMessageSize / 5)
 
-	// MinConnectedStakeBuffer is the safety buffer for calculation of MinConnectedStake.
-	// This increases the required stake percentage above alpha/k. Must be [0-1]
-	// 0 means MinConnectedStake = alpha/k, 1 means MinConnectedStake = 1 (fully connected)
-	MinConnectedStakeBuffer = .2
-
 	DefaultNetworkPeerListNumValidatorIPs        = 15
 	DefaultNetworkPeerListValidatorGossipSize    = 20
 	DefaultNetworkPeerListNonValidatorGossipSize = 0
@@ -80,7 +75,7 @@ const (
 	// Router
 	DefaultAcceptedFrontierGossipFrequency                 = 10 * time.Second
 	DefaultConsensusAppConcurrency                         = 2
-	DefaultConsensusShutdownTimeout                        = 30 * time.Second
+	DefaultConsensusShutdownTimeout                        = time.Minute
 	DefaultConsensusGossipAcceptedFrontierValidatorSize    = 0
 	DefaultConsensusGossipAcceptedFrontierNonValidatorSize = 0
 	DefaultConsensusGossipAcceptedFrontierPeerSize         = 15
