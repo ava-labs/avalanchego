@@ -7,6 +7,7 @@ import (
 	"context"
 	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -85,8 +86,6 @@ func Test_History_Large(t *testing.T) {
 	numIters := 250
 
 	for i := 1; i < 10; i++ {
-		r := rand.New(rand.NewSource(int64(i))) // #nosec G404
-
 		config := newDefaultConfig()
 		// History must be large enough to get the change proof
 		// after this loop. Multiply by four because every loop
@@ -99,6 +98,10 @@ func Test_History_Large(t *testing.T) {
 		)
 		require.NoError(err)
 		roots := []ids.ID{}
+
+		now := time.Now().UnixNano()
+		t.Logf("seed for iter %d: %d", i, now)
+		r := rand.New(rand.NewSource(now)) // #nosec G404
 		// make sure they stay in sync
 		for x := 0; x < numIters; x++ {
 			addkey := make([]byte, r.Intn(50))

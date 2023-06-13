@@ -23,7 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 
-	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
+	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
 var _ Client = (*mockClient)(nil)
@@ -37,7 +37,7 @@ type mockClient struct {
 	db SyncableDB
 }
 
-func (client *mockClient) GetChangeProof(ctx context.Context, request *syncpb.ChangeProofRequest, _ SyncableDB) (*merkledb.ChangeProof, error) {
+func (client *mockClient) GetChangeProof(ctx context.Context, request *pb.SyncGetChangeProofRequest, _ SyncableDB) (*merkledb.ChangeProof, error) {
 	startRoot, err := ids.ToID(request.StartRootHash)
 	if err != nil {
 		return nil, err
@@ -49,7 +49,7 @@ func (client *mockClient) GetChangeProof(ctx context.Context, request *syncpb.Ch
 	return client.db.GetChangeProof(ctx, startRoot, endRoot, request.StartKey, request.EndKey, int(request.KeyLimit))
 }
 
-func (client *mockClient) GetRangeProof(ctx context.Context, request *syncpb.RangeProofRequest) (*merkledb.RangeProof, error) {
+func (client *mockClient) GetRangeProof(ctx context.Context, request *pb.SyncGetRangeProofRequest) (*merkledb.RangeProof, error) {
 	root, err := ids.ToID(request.RootHash)
 	if err != nil {
 		return nil, err
@@ -177,7 +177,9 @@ func Test_Midpoint(t *testing.T) {
 
 func Test_Sync_FindNextKey_InSync(t *testing.T) {
 	for i := 0; i < 3; i++ {
-		r := rand.New(rand.NewSource(int64(i))) // #nosec G404
+		now := time.Now().UnixNano()
+		t.Logf("seed: %d", now)
+		r := rand.New(rand.NewSource(now)) // #nosec G404
 		dbToSync, err := generateTrie(t, r, 1000)
 		require.NoError(t, err)
 		syncRoot, err := dbToSync.GetMerkleRoot(context.Background())
@@ -352,7 +354,9 @@ func Test_Sync_FindNextKey_BranchInReceived(t *testing.T) {
 
 func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 	for i := 0; i < 10; i++ {
-		r := rand.New(rand.NewSource(int64(i))) // #nosec G404
+		now := time.Now().UnixNano()
+		t.Logf("seed: %d", now)
+		r := rand.New(rand.NewSource(now)) // #nosec G404
 		dbToSync, err := generateTrie(t, r, 1000)
 		require.NoError(t, err)
 		syncRoot, err := dbToSync.GetMerkleRoot(context.Background())
@@ -425,7 +429,9 @@ func isPrefix(data []byte, prefix []byte) bool {
 
 func Test_Sync_FindNextKey_DifferentChild(t *testing.T) {
 	for i := 0; i < 10; i++ {
-		r := rand.New(rand.NewSource(int64(i))) // #nosec G404
+		now := time.Now().UnixNano()
+		t.Logf("seed: %d", now)
+		r := rand.New(rand.NewSource(now)) // #nosec G404
 		dbToSync, err := generateTrie(t, r, 500)
 		require.NoError(t, err)
 		syncRoot, err := dbToSync.GetMerkleRoot(context.Background())
@@ -471,7 +477,9 @@ func Test_Sync_FindNextKey_DifferentChild(t *testing.T) {
 // Test findNextKey by computing the expected result in a naive, inefficient
 // way and comparing it to the actual result
 func TestFindNextKeyRandom(t *testing.T) {
-	rand := rand.New(rand.NewSource(1337)) //nolint:gosec
+	now := time.Now().UnixNano()
+	t.Logf("seed: %d", now)
+	rand := rand.New(rand.NewSource(now)) // #nosec G404
 	require := require.New(t)
 
 	// Create a "remote" database and "local" database
@@ -676,7 +684,9 @@ func TestFindNextKeyRandom(t *testing.T) {
 
 func Test_Sync_Result_Correct_Root(t *testing.T) {
 	for i := 0; i < 3; i++ {
-		r := rand.New(rand.NewSource(int64(i))) // #nosec G404
+		now := time.Now().UnixNano()
+		t.Logf("seed: %d", now)
+		r := rand.New(rand.NewSource(now)) // #nosec G404
 		dbToSync, err := generateTrie(t, r, 1000)
 		require.NoError(t, err)
 		syncRoot, err := dbToSync.GetMerkleRoot(context.Background())
@@ -730,7 +740,9 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 
 func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 	for i := 0; i < 3; i++ {
-		r := rand.New(rand.NewSource(int64(i))) // #nosec G404
+		now := time.Now().UnixNano()
+		t.Logf("seed: %d", now)
+		r := rand.New(rand.NewSource(now)) // #nosec G404
 		dbToSync, err := generateTrie(t, r, 3*maxKeyValuesLimit)
 		require.NoError(t, err)
 		syncRoot, err := dbToSync.GetMerkleRoot(context.Background())
@@ -793,7 +805,9 @@ func Test_Sync_Error_During_Sync(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	r := rand.New(rand.NewSource(int64(0))) // #nosec G404
+	now := time.Now().UnixNano()
+	t.Logf("seed: %d", now)
+	r := rand.New(rand.NewSource(now)) // #nosec G404
 
 	dbToSync, err := generateTrie(t, r, 100)
 	require.NoError(err)
@@ -810,12 +824,12 @@ func Test_Sync_Error_During_Sync(t *testing.T) {
 
 	client := NewMockClient(ctrl)
 	client.EXPECT().GetRangeProof(gomock.Any(), gomock.Any()).DoAndReturn(
-		func(ctx context.Context, request *syncpb.RangeProofRequest) (*merkledb.RangeProof, error) {
+		func(ctx context.Context, request *pb.SyncGetRangeProofRequest) (*merkledb.RangeProof, error) {
 			return nil, errInvalidRangeProof
 		},
 	).AnyTimes()
 	client.EXPECT().GetChangeProof(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
-		func(ctx context.Context, request *syncpb.ChangeProofRequest, _ SyncableDB) (*merkledb.ChangeProof, error) {
+		func(ctx context.Context, request *pb.SyncGetChangeProofRequest, _ SyncableDB) (*merkledb.ChangeProof, error) {
 			startRoot, err := ids.ToID(request.StartRootHash)
 			require.NoError(err)
 			endRoot, err := ids.ToID(request.EndRootHash)
@@ -846,7 +860,9 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 	defer ctrl.Finish()
 
 	for i := 0; i < 3; i++ {
-		r := rand.New(rand.NewSource(int64(i))) // #nosec G404
+		now := time.Now().UnixNano()
+		t.Logf("seed: %d", now)
+		r := rand.New(rand.NewSource(now)) // #nosec G404
 
 		dbToSync, err := generateTrie(t, r, 3*maxKeyValuesLimit)
 		require.NoError(err)
@@ -893,7 +909,7 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 
 		client := NewMockClient(ctrl)
 		client.EXPECT().GetRangeProof(gomock.Any(), gomock.Any()).DoAndReturn(
-			func(ctx context.Context, request *syncpb.RangeProofRequest) (*merkledb.RangeProof, error) {
+			func(ctx context.Context, request *pb.SyncGetRangeProofRequest) (*merkledb.RangeProof, error) {
 				<-updatedRootChan
 				root, err := ids.ToID(request.RootHash)
 				require.NoError(err)
@@ -901,7 +917,7 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 			},
 		).AnyTimes()
 		client.EXPECT().GetChangeProof(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
-			func(ctx context.Context, request *syncpb.ChangeProofRequest, _ SyncableDB) (*merkledb.ChangeProof, error) {
+			func(ctx context.Context, request *pb.SyncGetChangeProofRequest, _ SyncableDB) (*merkledb.ChangeProof, error) {
 				<-updatedRootChan
 				startRoot, err := ids.ToID(request.StartRootHash)
 				require.NoError(err)
