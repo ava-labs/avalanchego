@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/maps"
@@ -158,7 +159,9 @@ func Test_TrieView_IteratorStartPrefix(t *testing.T) {
 // iterating over the last view.
 func Test_TrieView_Iterator_Random(t *testing.T) {
 	require := require.New(t)
-	rand := rand.New(rand.NewSource(1337)) // #nosec G404
+	now := time.Now().UnixNano()
+	t.Logf("seed: %d", now)
+	rand := rand.New(rand.NewSource(now)) // #nosec G404
 
 	var (
 		numKeyChanges = 5_000
