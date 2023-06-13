@@ -25,13 +25,17 @@ const (
 	//            are removed with a RewardValidatorTx after time has advanced.
 	SubnetPermissionedValidatorCurrentPriority
 
+	// SubnetContinuousDelegatorCurrentPriority // TODO ABENEGIA: to activate in next PR
 	// SubnetContinuousValidatorCurrentPriority // TODO ABENEGIA: to activate in next PR
+
 	// then permissionless subnet delegators,
 	SubnetPermissionlessDelegatorCurrentPriority
 	// then permissionless subnet validators,
 	SubnetPermissionlessValidatorCurrentPriority
 
+	PrimaryNetworkContinuousDelegatorCurrentPriority
 	PrimaryNetworkContinuousValidatorCurrentPriority
+
 	// then primary network delegators,
 	PrimaryNetworkDelegatorCurrentPriority
 	// then primary network validators.
@@ -80,7 +84,9 @@ func (p Priority) IsCurrentValidator() bool {
 
 func (p Priority) IsCurrentDelegator() bool {
 	return p == PrimaryNetworkDelegatorCurrentPriority ||
-		p == SubnetPermissionlessDelegatorCurrentPriority
+		p == SubnetPermissionlessDelegatorCurrentPriority ||
+		p == PrimaryNetworkContinuousDelegatorCurrentPriority /*||
+		p == SubnetContinuousDelegatorCurrentPriority*/
 }
 
 func (p Priority) IsPendingValidator() bool {

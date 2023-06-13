@@ -495,6 +495,10 @@ func (e *StandardTxExecutor) AddContinuousValidatorTx(tx *txs.AddContinuousValid
 	return nil
 }
 
+func (*StandardTxExecutor) AddContinuousDelegatorTx(*txs.AddContinuousDelegatorTx) error {
+	return ErrWrongTxType
+}
+
 func (e *StandardTxExecutor) StopStakerTx(tx *txs.StopStakerTx) error {
 	stakers, stopTime, err := verifyStopStakerTx(
 		e.Backend,

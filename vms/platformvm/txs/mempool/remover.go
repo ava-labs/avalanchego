@@ -87,6 +87,11 @@ func (r *remover) AddContinuousValidatorTx(*txs.AddContinuousValidatorTx) error 
 	return nil
 }
 
+func (r *remover) AddContinuousDelegatorTx(*txs.AddContinuousDelegatorTx) error {
+	r.m.removeDecisionTxs([]*txs.Tx{r.tx})
+	return nil
+}
+
 func (r *remover) StopStakerTx(*txs.StopStakerTx) error {
 	r.m.removeDecisionTxs([]*txs.Tx{r.tx})
 	return nil

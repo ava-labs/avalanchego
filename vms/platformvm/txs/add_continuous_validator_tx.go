@@ -33,9 +33,11 @@ type AddContinuousValidatorTx struct {
 	BaseTx `serialize:"true"`
 	// Describes the validator
 	Validator `serialize:"true" json:"validator"`
-	// // ID of the subnet this validator is validating
+
 	// TODO ABENEGIA: will be added in next PR
+	// // ID of the subnet this validator is validating
 	// Subnet ids.ID `serialize:"true" json:"subnetID"`
+
 	// If the [Subnet] is the primary network, [Signer] is the BLS key for this
 	// validator. If the [Subnet] is not the primary network, this value is the
 	// empty signer

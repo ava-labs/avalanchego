@@ -168,6 +168,10 @@ func (*signerVisitor) AddContinuousValidatorTx(*txs.AddContinuousValidatorTx) er
 	return errors.New("not yet implemented")
 }
 
+func (*signerVisitor) AddContinuousDelegatorTx(*txs.AddContinuousDelegatorTx) error {
+	return errors.New("not yet implemented")
+}
+
 func (*signerVisitor) StopStakerTx(*txs.StopStakerTx) error {
 	return errors.New("not yet implemented")
 }

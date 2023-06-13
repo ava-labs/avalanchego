@@ -76,6 +76,10 @@ func (*AtomicTxExecutor) AddContinuousValidatorTx(*txs.AddContinuousValidatorTx)
 	return ErrWrongTxType
 }
 
+func (*AtomicTxExecutor) AddContinuousDelegatorTx(*txs.AddContinuousDelegatorTx) error {
+	return ErrWrongTxType
+}
+
 func (*AtomicTxExecutor) StopStakerTx(*txs.StopStakerTx) error {
 	return ErrWrongTxType
 }

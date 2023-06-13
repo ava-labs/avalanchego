@@ -111,6 +111,11 @@ func (i *issuer) AddContinuousValidatorTx(*txs.AddContinuousValidatorTx) error {
 	return nil
 }
 
+func (i *issuer) AddContinuousDelegatorTx(*txs.AddContinuousDelegatorTx) error {
+	i.m.addDecisionTx(i.tx)
+	return nil
+}
+
 func (i *issuer) StopStakerTx(*txs.StopStakerTx) error {
 	i.m.addDecisionTx(i.tx)
 	return nil

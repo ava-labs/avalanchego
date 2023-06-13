@@ -140,6 +140,10 @@ func (*txMetrics) AddContinuousValidatorTx(*txs.AddContinuousValidatorTx) error 
 	return errors.New("not yet implemented")
 }
 
+func (*txMetrics) AddContinuousDelegatorTx(*txs.AddContinuousDelegatorTx) error {
+	return errors.New("not yet implemented")
+}
+
 func (m *txMetrics) StopStakerTx(*txs.StopStakerTx) error {
 	m.numStopStakerTxs.Inc()
 	return nil

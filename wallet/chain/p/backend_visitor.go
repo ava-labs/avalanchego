@@ -103,6 +103,10 @@ func (*backendVisitor) AddContinuousValidatorTx(*txs.AddContinuousValidatorTx) e
 	return errors.New("not yet implemented")
 }
 
+func (*backendVisitor) AddContinuousDelegatorTx(*txs.AddContinuousDelegatorTx) error {
+	return errors.New("not yet implemented")
+}
+
 func (*backendVisitor) StopStakerTx(*txs.StopStakerTx) error {
 	return errors.New("not yet implemented")
 }
