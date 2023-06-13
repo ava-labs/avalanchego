@@ -171,7 +171,7 @@ func (f *Filter) Logs(ctx context.Context) ([]*types.Log, error) {
 
 	// If the requested range of blocks exceeds the maximum number of blocks allowed by the backend
 	// return an error instead of searching for the logs.
-	if maxBlocks := f.sys.backend.GetMaxBlocksPerRequest(); int64(end)-f.begin > maxBlocks && maxBlocks > 0 {
+	if maxBlocks := f.sys.backend.GetMaxBlocksPerRequest(); int64(end)-f.begin >= maxBlocks && maxBlocks > 0 {
 		return nil, fmt.Errorf("requested too many blocks from %d to %d, maximum is set to %d", f.begin, int64(end), maxBlocks)
 	}
 	// Gather all indexed logs, and finish with non indexed ones
