@@ -1,28 +1,31 @@
 //! Disk buffer for staging in memory pages and flushing them to disk.
-use std::fmt::Debug;
-use std::ops::IndexMut;
-use std::path::{Path, PathBuf};
-use std::rc::Rc;
-use std::sync::atomic::AtomicU64;
-use std::sync::atomic::Ordering::Relaxed;
-use std::sync::Arc;
-use std::{cell::RefCell, collections::HashMap};
-
-use crate::storage::DeltaPage;
-
 use super::{AshRecord, FilePool, Page, StoreDelta, StoreError, WalConfig, PAGE_SIZE_NBIT};
-
+use crate::storage::DeltaPage;
 use aiofut::{AioBuilder, AioError, AioManager};
 use futures::future::join_all;
-use growthring::WalFileImpl;
 use growthring::{
     wal::{RecoverPolicy, WalLoader, WalWriter},
     walerror::WalError,
-    WalStoreImpl,
+    WalFileImpl, WalStoreImpl,
 };
 use shale::SpaceId;
-use tokio::sync::oneshot::error::RecvError;
-use tokio::sync::{mpsc, oneshot, Mutex, Semaphore};
+use std::{
+    cell::RefCell,
+    collections::HashMap,
+    fmt::Debug,
+    ops::IndexMut,
+    path::{Path, PathBuf},
+    rc::Rc,
+    sync::Arc,
+};
+use tokio::{
+    sync::{
+        mpsc,
+        oneshot::{self, error::RecvError},
+        Mutex, Notify, Semaphore,
+    },
+    task,
+};
 use typed_builder::TypedBuilder;
 
 #[derive(Debug)]
@@ -136,18 +139,14 @@ impl DiskBuffer {
 
     #[tokio::main(flavor = "current_thread")]
     pub async fn run(self) {
-        // TODO: call local_pool.await to make sure that all pending futures finish instead of using the `tasks` HashMap.
-        static TASK_ID: AtomicU64 = AtomicU64::new(0);
-
         let mut inbound = self.inbound;
         let aiomgr = Rc::new(self.aiomgr);
         let cfg = self.cfg;
         let wal_cfg = self.wal_cfg;
 
-        let pending = Rc::new(RefCell::new(HashMap::new()));
+        let pending_writes = Rc::new(RefCell::new(HashMap::new()));
         let file_pools = Rc::new(RefCell::new(std::array::from_fn(|_| None)));
-        let local_pool = Rc::new(tokio::task::LocalSet::new());
-        let tasks = Rc::new(RefCell::new(HashMap::new()));
+        let local_pool = tokio::task::LocalSet::new();
 
         let max = WalQueueMax {
             batch: cfg.wal_max_batch,
@@ -160,56 +159,47 @@ impl DiskBuffer {
         let mut writes = Some(writes);
         let mut wal = None;
 
-        let notifier = Rc::new(tokio::sync::Notify::new());
+        let notifier = Rc::new(Notify::new());
 
         local_pool
-            .run_until(async {
+            // everything needs to be moved into this future in order to be properly dropped
+            .run_until(async move {
                 loop {
-                    let pending_len = pending.borrow().len();
+                    // can't hold the borrowed `pending_writes` across the .await point inside the if-statement
+                    let pending_len = pending_writes.borrow().len();
+
                     if pending_len >= cfg.max_pending {
                         notifier.notified().await;
                     }
 
-                    let req = inbound.recv().await.unwrap();
-
+                    // process the the request
                     let process_result = process(
-                        pending.clone(),
+                        pending_writes.clone(),
                         notifier.clone(),
                         file_pools.clone(),
                         aiomgr.clone(),
-                        local_pool.clone(),
-                        tasks.clone(),
                         &mut wal,
-                        &cfg,
                         &wal_cfg,
-                        req,
+                        inbound.recv().await.unwrap(),
                         max,
                         wal_in.clone(),
-                        &TASK_ID,
                         &mut writes,
                     )
                     .await;
 
+                    // stop handling new requests and exit the loop
                     if !process_result {
                         break;
                     }
                 }
-
-                drop(wal_in);
-
-                let handles: Vec<_> = tasks
-                    .borrow_mut()
-                    .iter_mut()
-                    .map(|(_, task)| task.take().unwrap())
-                    .collect();
-
-                for h in handles {
-                    h.await.unwrap();
-                }
             })
             .await;
+
+        // when finished process all requests, wait for any pending-futures to complete
+        local_pool.await;
     }
 }
+
 #[derive(Clone, Copy)]
 struct WalQueueMax {
     batch: usize,
@@ -217,36 +207,12 @@ struct WalQueueMax {
     pending: usize,
 }
 
-/// Processes an async AIOFuture request against the local pool.
-fn start_task<F: std::future::Future<Output = ()> + 'static>(
-    task_id: &AtomicU64,
-    tasks: Rc<RefCell<HashMap<u64, Option<tokio::task::JoinHandle<()>>>>>,
-    local_pool: Rc<tokio::task::LocalSet>,
-    fut: F,
-) {
-    let key = task_id.fetch_add(1, Relaxed);
-    let handle = local_pool.spawn_local({
-        let tasks = tasks.clone();
-
-        async move {
-            fut.await;
-            tasks.borrow_mut().remove(&key);
-        }
-    });
-
-    tasks.borrow_mut().insert(key, handle.into());
-}
-
 /// Add an pending pages to aio manager for processing by the local pool.
-#[allow(clippy::too_many_arguments)]
 fn schedule_write(
     pending: Rc<RefCell<HashMap<(SpaceId, u64), PendingPage>>>,
-    fc_notifier: Rc<tokio::sync::Notify>,
+    fc_notifier: Rc<Notify>,
     file_pools: Rc<RefCell<[Option<Arc<FilePool>>; 255]>>,
     aiomgr: Rc<AioManager>,
-    local_pool: Rc<tokio::task::LocalSet>,
-    task_id: &'static AtomicU64,
-    tasks: Rc<RefCell<HashMap<u64, Option<tokio::task::JoinHandle<()>>>>>,
     max: WalQueueMax,
     page_key: (SpaceId, u64),
 ) {
@@ -267,9 +233,6 @@ fn schedule_write(
     };
 
     let task = {
-        let tasks = tasks.clone();
-        let local_pool = local_pool.clone();
-
         async move {
             let (res, _) = fut.await;
             res.unwrap();
@@ -287,7 +250,7 @@ fn schedule_write(
                         e.remove();
 
                         if pending_len < max.pending {
-                            fc_notifier.notify_waiters();
+                            fc_notifier.notify_one();
                         }
 
                         false
@@ -303,43 +266,22 @@ fn schedule_write(
             };
 
             if write_again {
-                schedule_write(
-                    pending,
-                    fc_notifier,
-                    file_pools,
-                    aiomgr,
-                    local_pool,
-                    task_id,
-                    tasks,
-                    max,
-                    page_key,
-                );
+                schedule_write(pending, fc_notifier, file_pools, aiomgr, max, page_key);
             }
         }
     };
 
-    start_task(task_id, tasks, local_pool, task)
+    task::spawn_local(task);
 }
 
 /// Initialize the Wal subsystem if it does not exists and attempts to replay the Wal if exists.
 async fn init_wal(
     file_pools: &Rc<RefCell<[Option<Arc<FilePool>>; 255]>>,
-    cfg: &DiskBufferConfig,
-    wal_cfg: &WalConfig,
-    rootpath: &Path,
-    waldir: &str,
+    store: WalStoreImpl,
+    loader: WalLoader,
+    max_revisions: u32,
+    final_path: &Path,
 ) -> Result<Rc<Mutex<WalWriter<WalFileImpl, WalStoreImpl>>>, WalError> {
-    let final_path = rootpath.join(waldir);
-    let mut aiobuilder = AioBuilder::default();
-    aiobuilder.max_events(cfg.wal_max_aio_requests as u32);
-    let store = WalStoreImpl::new(final_path.clone(), false)?;
-
-    let mut loader = WalLoader::new();
-    loader
-        .file_nbit(wal_cfg.file_nbit)
-        .block_nbit(wal_cfg.block_nbit)
-        .recover_policy(RecoverPolicy::Strict);
-
     let wal = loader
         .load(
             store,
@@ -379,24 +321,20 @@ async fn init_wal(
 
                 Ok(())
             },
-            wal_cfg.max_revisions,
+            max_revisions,
         )
         .await?;
 
     Ok(Rc::new(Mutex::new(wal)))
 }
 
-#[allow(clippy::too_many_arguments)]
 async fn run_wal_queue(
-    task_id: &'static AtomicU64,
     max: WalQueueMax,
     wal: Rc<Mutex<WalWriter<WalFileImpl, WalStoreImpl>>>,
     pending: Rc<RefCell<HashMap<(SpaceId, u64), PendingPage>>>,
-    tasks: Rc<RefCell<HashMap<u64, Option<tokio::task::JoinHandle<()>>>>>,
-    local_pool: Rc<tokio::task::LocalSet>,
     file_pools: Rc<RefCell<[Option<Arc<FilePool>>; 255]>>,
     mut writes: mpsc::Receiver<(Vec<BufferWrite>, AshRecord)>,
-    fc_notifier: Rc<tokio::sync::Notify>,
+    fc_notifier: Rc<Notify>,
     aiomgr: Rc<AioManager>,
 ) {
     use std::collections::hash_map::Entry::*;
@@ -471,9 +409,6 @@ async fn run_wal_queue(
                         fc_notifier.clone(),
                         file_pools.clone(),
                         aiomgr.clone(),
-                        local_pool.clone(),
-                        task_id,
-                        tasks.clone(),
                         max,
                         page_key,
                     );
@@ -494,57 +429,72 @@ async fn run_wal_queue(
                 .unwrap()
         };
 
-        start_task(task_id, tasks.clone(), local_pool.clone(), task);
+        task::spawn_local(task);
     }
+
+    // if this function breaks for any reason, make sure there is no one waiting for staged writes.
+    fc_notifier.notify_one();
+}
+
+fn panic_on_intialization_failure_with<'a, T>(
+    rootpath: &'a Path,
+    waldir: &'a str,
+) -> impl Fn(WalError) -> T + 'a {
+    move |e| panic!("Initialize Wal in dir {rootpath:?} failed creating {waldir:?}: {e:?}")
 }
 
 #[allow(clippy::too_many_arguments)]
 async fn process(
     pending: Rc<RefCell<HashMap<(SpaceId, u64), PendingPage>>>,
-    fc_notifier: Rc<tokio::sync::Notify>,
+    fc_notifier: Rc<Notify>,
     file_pools: Rc<RefCell<[Option<Arc<FilePool>>; 255]>>,
     aiomgr: Rc<AioManager>,
-    local_pool: Rc<tokio::task::LocalSet>,
-    tasks: Rc<RefCell<HashMap<u64, Option<tokio::task::JoinHandle<()>>>>>,
     wal: &mut Option<Rc<Mutex<WalWriter<WalFileImpl, WalStoreImpl>>>>,
-    cfg: &DiskBufferConfig,
     wal_cfg: &WalConfig,
     req: BufferCmd,
     max: WalQueueMax,
     wal_in: mpsc::Sender<(Vec<BufferWrite>, AshRecord)>,
-    task_id: &'static AtomicU64,
     writes: &mut Option<mpsc::Receiver<(Vec<BufferWrite>, AshRecord)>>,
 ) -> bool {
     match req {
         BufferCmd::Shutdown => return false,
         BufferCmd::InitWal(rootpath, waldir) => {
-            let initialized_wal = init_wal(&file_pools, cfg, wal_cfg, &rootpath, &waldir)
-                .await
-                .unwrap_or_else(|e| {
-                    panic!(
-                        "Initialize Wal in dir {:?} failed creating {:?}: {e:?}",
-                        rootpath, waldir
-                    )
-                });
+            let final_path = rootpath.join(&waldir);
+
+            let store = WalStoreImpl::new(final_path.clone(), false)
+                .unwrap_or_else(panic_on_intialization_failure_with(&rootpath, &waldir));
+
+            let mut loader = WalLoader::new();
+            loader
+                .file_nbit(wal_cfg.file_nbit)
+                .block_nbit(wal_cfg.block_nbit)
+                .recover_policy(RecoverPolicy::Strict);
+
+            let initialized_wal = init_wal(
+                &file_pools,
+                store,
+                loader,
+                wal_cfg.max_revisions,
+                final_path.as_path(),
+            )
+            .await
+            .unwrap_or_else(panic_on_intialization_failure_with(&rootpath, &waldir));
+
+            wal.replace(initialized_wal.clone());
 
             let writes = writes.take().unwrap();
 
             let task = run_wal_queue(
-                task_id,
                 max,
-                initialized_wal.clone(),
+                initialized_wal,
                 pending,
-                tasks.clone(),
-                local_pool.clone(),
                 file_pools.clone(),
                 writes,
                 fc_notifier,
                 aiomgr,
             );
 
-            start_task(task_id, tasks, local_pool, task);
-
-            wal.replace(initialized_wal);
+            task::spawn_local(task);
         }
         BufferCmd::GetPage(page_key, tx) => tx
             .send(
