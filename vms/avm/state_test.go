@@ -95,8 +95,6 @@ func TestSetsAndGets(t *testing.T) {
 }
 
 func TestFundingNoAddresses(t *testing.T) {
-	require := require.New(t)
-
 	_, _, vm, _ := GenesisVMWithArgs(
 		t,
 		[]*common.Fx{{
@@ -112,7 +110,7 @@ func TestFundingNoAddresses(t *testing.T) {
 	)
 	ctx := vm.ctx
 	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
+		require.NoError(t, vm.Shutdown(context.Background()))
 		ctx.Lock.Unlock()
 	}()
 
