@@ -257,6 +257,11 @@ func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uin
 		zap.Stringer("nodeID", nodeID),
 		zap.Uint32("requestID", requestID))
 
+	added, err := t.issueFromByID(ctx, nodeID, blkID)
+	if err != nil {
+		return err
+	}
+
 	// Will record chits once [blkID] has been issued into consensus
 	v := &voter{
 		t:         t,
@@ -265,10 +270,6 @@ func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uin
 		response:  blkID,
 	}
 
-	added, err := t.issueFromByID(ctx, nodeID, blkID)
-	if err != nil {
-		return err
-	}
 	// Wait until [blkID] has been issued to consensus before applying this chit.
 	if !added {
 		v.deps.Add(blkID)
