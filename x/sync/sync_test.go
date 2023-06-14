@@ -542,7 +542,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 		)
 		require.NoError(err)
 
-		if len(remoteProof.KeyValues) == 0 { // TODO make sure this doesn't continue every time
+		if len(remoteProof.KeyValues) == 0 {
 			continue
 		}
 		lastReceivedKey := remoteProof.KeyValues[len(remoteProof.KeyValues)-1].Key
