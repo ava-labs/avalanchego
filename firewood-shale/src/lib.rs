@@ -91,6 +91,7 @@ pub trait CachedStore: Debug {
 
 /// Opaque typed pointer in the 64-bit virtual addressable space.
 #[repr(C)]
+#[derive(Debug)]
 pub struct ObjPtr<T: ?Sized> {
     pub(crate) addr: u64,
     phantom: PhantomData<T>,
@@ -150,7 +151,7 @@ impl<T: ?Sized> ObjPtr<T> {
 /// A addressed, typed, and read-writable handle for the stored item in [ShaleStore]. The object
 /// represents the decoded/mapped data. The implementation of [ShaleStore] could use [ObjCache] to
 /// turn a `TypedView` into an [ObjRef].
-pub trait TypedView<T: ?Sized>: Deref<Target = T> {
+pub trait TypedView<T: ?Sized>: std::fmt::Debug + Deref<Target = T> {
     /// Get the offset of the initial byte in the linear space.
     fn get_offset(&self) -> u64;
     /// Access it as a [CachedStore] object.
@@ -175,6 +176,7 @@ pub trait TypedView<T: ?Sized>: Deref<Target = T> {
 /// or [StoredView::ptr_to_obj]) could be useful for some unsafe access to a low-level item (e.g.
 /// headers/metadata at bootstrap or part of [ShaleStore] implementation) stored at a given [ObjPtr]
 /// . Users of [ShaleStore] implementation, however, will only use [ObjRef] for safeguarded access.
+#[derive(Debug)]
 pub struct Obj<T: ?Sized> {
     value: Box<dyn TypedView<T>>,
     dirty: Option<u64>,
@@ -240,6 +242,7 @@ impl<T> Deref for Obj<T> {
 }
 
 /// User handle that offers read & write access to the stored [ShaleStore] item.
+#[derive(Debug)]
 pub struct ObjRef<'a, T> {
     inner: Option<Obj<T>>,
     cache: ObjCache<T>,
@@ -291,7 +294,7 @@ impl<'a, T> Drop for ObjRef<'a, T> {
 
 /// A persistent item storage backed by linear logical space. New items can be created and old
 /// items could be retrieved or dropped.
-pub trait ShaleStore<T> {
+pub trait ShaleStore<T: Send + Sync>: Debug {
     /// Dereference [ObjPtr] to a unique handle that allows direct access to the item in memory.
     fn get_item(&'_ self, ptr: ObjPtr<T>) -> Result<ObjRef<'_, T>, ShaleError>;
     /// Allocate a new item.
@@ -330,6 +333,22 @@ pub struct StoredView<T: Storable> {
     len_limit: u64,
 }
 
+impl<T: Storable + Debug> Debug for StoredView<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let StoredView {
+            decoded,
+            offset,
+            len_limit,
+            mem: _,
+        } = self;
+        f.debug_struct("StoredView")
+            .field("decoded", decoded)
+            .field("offset", offset)
+            .field("len_limit", len_limit)
+            .finish()
+    }
+}
+
 impl<T: Storable> Deref for StoredView<T> {
     type Target = T;
     fn deref(&self) -> &T {
@@ -337,7 +356,7 @@ impl<T: Storable> Deref for StoredView<T> {
     }
 }
 
-impl<T: Storable> TypedView<T> for StoredView<T> {
+impl<T: Storable + Debug> TypedView<T> for StoredView<T> {
     fn get_offset(&self) -> u64 {
         self.offset
     }
@@ -371,7 +390,7 @@ impl<T: Storable> TypedView<T> for StoredView<T> {
     }
 }
 
-impl<T: Storable + 'static> StoredView<T> {
+impl<T: Storable + Debug + 'static> StoredView<T> {
     #[inline(always)]
     fn new<U: CachedStore>(offset: u64, len_limit: u64, space: &U) -> Result<Self, ShaleError> {
         let decoded = T::hydrate(offset, space)?;
@@ -439,7 +458,7 @@ impl<T: Storable> StoredView<T> {
         })
     }
 
-    pub fn slice<U: Storable + 'static>(
+    pub fn slice<U: Storable + Debug + 'static>(
         s: &Obj<T>,
         offset: u64,
         length: u64,
@@ -503,6 +522,7 @@ struct ObjCacheInner<T: ?Sized> {
 }
 
 /// [ObjRef] pool that is used by [ShaleStore] implementation to construct [ObjRef]s.
+#[derive(Debug)]
 pub struct ObjCache<T: ?Sized>(Rc<UnsafeCell<ObjCacheInner<T>>>);
 
 impl<T> ObjCache<T> {

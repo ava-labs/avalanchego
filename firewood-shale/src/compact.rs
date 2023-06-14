@@ -1,8 +1,10 @@
 use super::{CachedStore, Obj, ObjPtr, ObjRef, ShaleError, ShaleStore, Storable, StoredView};
 use std::cell::UnsafeCell;
+use std::fmt::Debug;
 use std::io::{Cursor, Write};
 use std::rc::Rc;
 
+#[derive(Debug)]
 pub struct CompactHeader {
     payload_size: u64,
     is_freed: bool,
@@ -53,6 +55,7 @@ impl Storable for CompactHeader {
     }
 }
 
+#[derive(Debug)]
 struct CompactFooter {
     payload_size: u64,
 }
@@ -83,7 +86,7 @@ impl Storable for CompactFooter {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 struct CompactDescriptor {
     payload_size: u64,
     haddr: u64, // pointer to the payload of freed space
@@ -122,6 +125,7 @@ impl Storable for CompactDescriptor {
     }
 }
 
+#[derive(Debug)]
 pub struct CompactSpaceHeader {
     meta_space_tail: u64,
     compact_space_tail: u64,
@@ -168,7 +172,7 @@ impl CompactSpaceHeader {
 }
 
 impl Storable for CompactSpaceHeader {
-    fn hydrate<T: CachedStore + std::fmt::Debug>(addr: u64, mem: &T) -> Result<Self, ShaleError> {
+    fn hydrate<T: CachedStore + Debug>(addr: u64, mem: &T) -> Result<Self, ShaleError> {
         let raw = mem
             .get_view(addr, Self::MSIZE)
             .ok_or(ShaleError::InvalidCacheView {
@@ -248,6 +252,7 @@ impl<T> std::ops::DerefMut for ObjPtrField<T> {
     }
 }
 
+#[derive(Debug)]
 struct U64Field(u64);
 
 impl U64Field {
@@ -305,7 +310,7 @@ impl<T: Storable, M: CachedStore> CompactSpaceInner<T, M> {
         StoredView::ptr_to_obj(self.meta_space.as_ref(), ptr, CompactDescriptor::MSIZE)
     }
 
-    fn get_data_ref<U: Storable + 'static>(
+    fn get_data_ref<U: Storable + Debug + 'static>(
         &self,
         ptr: ObjPtr<U>,
         len_limit: u64,
@@ -557,6 +562,7 @@ impl<T: Storable, M: CachedStore> CompactSpaceInner<T, M> {
     }
 }
 
+#[derive(Debug)]
 pub struct CompactSpace<T: Storable, M: CachedStore> {
     inner: UnsafeCell<CompactSpaceInner<T, M>>,
 }
@@ -584,7 +590,9 @@ impl<T: Storable, M: CachedStore> CompactSpace<T, M> {
     }
 }
 
-impl<T: Storable + 'static, M: CachedStore> ShaleStore<T> for CompactSpace<T, M> {
+impl<T: Storable + Send + Sync + Debug + 'static, M: CachedStore> ShaleStore<T>
+    for CompactSpace<T, M>
+{
     fn put_item(&'_ self, item: T, extra: u64) -> Result<ObjRef<'_, T>, ShaleError> {
         let size = item.dehydrated_len() + extra;
         let inner = unsafe { &mut *self.inner.get() };

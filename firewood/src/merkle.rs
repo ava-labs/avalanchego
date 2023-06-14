@@ -7,12 +7,12 @@ use enum_as_inner::EnumAsInner;
 use sha3::Digest;
 use shale::{CachedStore, ObjPtr, ObjRef, ShaleError, ShaleStore, Storable};
 
-use std::cell::{Cell, OnceCell};
 use std::cmp;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt::{self, Debug};
 use std::io::{Cursor, Read, Write};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::OnceLock;
 
 pub const NBRANCH: usize = 16;
@@ -212,9 +212,10 @@ impl BranchNode {
                     let mut c_ref = store.get_item(*c).unwrap();
                     if c_ref.get_eth_rlp_long::<T>(store) {
                         stream.append(&&(*c_ref.get_root_hash::<T>(store))[..]);
-                        if c_ref.lazy_dirty.get() {
+                        // See struct docs for ordering requirements
+                        if c_ref.lazy_dirty.load(Ordering::Relaxed) {
                             c_ref.write(|_| {}).unwrap();
-                            c_ref.lazy_dirty.set(false)
+                            c_ref.lazy_dirty.store(false, Ordering::Relaxed)
                         }
                     } else {
                         let c_rlp = &c_ref.get_eth_rlp::<T>(store);
@@ -325,9 +326,9 @@ impl ExtNode {
             stream.append(&from_nibbles(&self.0.encode(false)).collect::<Vec<_>>());
             if r.get_eth_rlp_long::<T>(store) {
                 stream.append(&&(*r.get_root_hash::<T>(store))[..]);
-                if r.lazy_dirty.get() {
+                if r.lazy_dirty.load(Ordering::Relaxed) {
                     r.write(|_| {}).unwrap();
-                    r.lazy_dirty.set(false)
+                    r.lazy_dirty.store(false, Ordering::Relaxed);
                 }
             } else {
                 stream.append_raw(r.get_eth_rlp::<T>(store), 1);
@@ -370,13 +371,45 @@ impl ExtNode {
     }
 }
 
-#[derive(PartialEq, Eq, Clone)]
+#[derive(Debug)]
 pub struct Node {
-    root_hash: OnceCell<TrieHash>,
-    eth_rlp_long: OnceCell<bool>,
-    eth_rlp: OnceCell<Vec<u8>>,
-    lazy_dirty: Cell<bool>,
+    root_hash: OnceLock<TrieHash>,
+    eth_rlp_long: OnceLock<bool>,
+    eth_rlp: OnceLock<Vec<u8>>,
+    // lazy_dirty is an atomicbool, but only writers ever set it
+    // Therefore, we can always use Relaxed ordering. It's atomic
+    // just to ensure Sync + Send.
+    lazy_dirty: AtomicBool,
     inner: NodeType,
+}
+
+impl Eq for Node {}
+impl PartialEq for Node {
+    fn eq(&self, other: &Self) -> bool {
+        let Node {
+            root_hash,
+            eth_rlp_long,
+            eth_rlp,
+            lazy_dirty,
+            inner,
+        } = self;
+        *root_hash == other.root_hash
+            && *eth_rlp_long == other.eth_rlp_long
+            && *eth_rlp == other.eth_rlp
+            && (*lazy_dirty).load(Ordering::Relaxed) == other.lazy_dirty.load(Ordering::Relaxed)
+            && *inner == other.inner
+    }
+}
+impl Clone for Node {
+    fn clone(&self) -> Self {
+        Self {
+            root_hash: self.root_hash.clone(),
+            eth_rlp_long: self.eth_rlp_long.clone(),
+            eth_rlp: self.eth_rlp.clone(),
+            lazy_dirty: AtomicBool::new(self.lazy_dirty.load(Ordering::Relaxed)),
+            inner: self.inner.clone(),
+        }
+    }
 }
 
 #[derive(PartialEq, Eq, Clone, Debug, EnumAsInner)]
@@ -402,18 +435,18 @@ impl Node {
     const LEAF_NODE: u8 = 0x2;
 
     fn max_branch_node_size() -> u64 {
-        let max_size: OnceCell<u64> = OnceCell::new();
+        let max_size: OnceLock<u64> = OnceLock::new();
         *max_size.get_or_init(|| {
             Self {
-                root_hash: OnceCell::new(),
-                eth_rlp_long: OnceCell::new(),
-                eth_rlp: OnceCell::new(),
+                root_hash: OnceLock::new(),
+                eth_rlp_long: OnceLock::new(),
+                eth_rlp: OnceLock::new(),
                 inner: NodeType::Branch(BranchNode {
                     chd: [Some(ObjPtr::null()); NBRANCH],
                     value: Some(Data(Vec::new())),
                     chd_eth_rlp: Default::default(),
                 }),
-                lazy_dirty: Cell::new(false),
+                lazy_dirty: AtomicBool::new(false),
             }
             .dehydrated_len()
         })
@@ -426,31 +459,31 @@ impl Node {
 
     fn get_root_hash<T: ValueTransformer>(&self, store: &dyn ShaleStore<Node>) -> &TrieHash {
         self.root_hash.get_or_init(|| {
-            self.lazy_dirty.set(true);
+            self.lazy_dirty.store(true, Ordering::Relaxed);
             TrieHash(sha3::Keccak256::digest(self.get_eth_rlp::<T>(store)).into())
         })
     }
 
     fn get_eth_rlp_long<T: ValueTransformer>(&self, store: &dyn ShaleStore<Node>) -> bool {
         *self.eth_rlp_long.get_or_init(|| {
-            self.lazy_dirty.set(true);
+            self.lazy_dirty.store(true, Ordering::Relaxed);
             self.get_eth_rlp::<T>(store).len() >= TRIE_HASH_LEN
         })
     }
 
     fn rehash(&mut self) {
-        self.eth_rlp = OnceCell::new();
-        self.eth_rlp_long = OnceCell::new();
-        self.root_hash = OnceCell::new();
+        self.eth_rlp = OnceLock::new();
+        self.eth_rlp_long = OnceLock::new();
+        self.root_hash = OnceLock::new();
     }
 
     pub fn new(inner: NodeType) -> Self {
         let mut s = Self {
-            root_hash: OnceCell::new(),
-            eth_rlp_long: OnceCell::new(),
-            eth_rlp: OnceCell::new(),
+            root_hash: OnceLock::new(),
+            eth_rlp_long: OnceLock::new(),
+            eth_rlp: OnceLock::new(),
             inner,
-            lazy_dirty: Cell::new(false),
+            lazy_dirty: AtomicBool::new(false),
         };
         s.rehash();
         s
@@ -471,16 +504,16 @@ impl Node {
     ) -> Self {
         Self {
             root_hash: match root_hash {
-                Some(h) => OnceCell::from(h),
-                None => OnceCell::new(),
+                Some(h) => OnceLock::from(h),
+                None => OnceLock::new(),
             },
             eth_rlp_long: match eth_rlp_long {
-                Some(b) => OnceCell::from(b),
-                None => OnceCell::new(),
+                Some(b) => OnceLock::from(b),
+                None => OnceLock::new(),
             },
-            eth_rlp: OnceCell::new(),
+            eth_rlp: OnceLock::new(),
             inner,
-            lazy_dirty: Cell::new(false),
+            lazy_dirty: AtomicBool::new(false),
         }
     }
 
@@ -807,6 +840,7 @@ macro_rules! write_node {
     };
 }
 
+#[derive(Debug)]
 pub struct Merkle {
     store: Box<dyn ShaleStore<Node>>,
 }
@@ -875,9 +909,9 @@ impl Merkle {
         Ok(if let Some(root) = root {
             let mut node = self.get_node(root)?;
             let res = node.get_root_hash::<T>(self.store.as_ref()).clone();
-            if node.lazy_dirty.get() {
+            if node.lazy_dirty.load(Ordering::Relaxed) {
                 node.write(|_| {}).unwrap();
-                node.lazy_dirty.set(false)
+                node.lazy_dirty.store(false, Ordering::Relaxed);
             }
             res
         } else {
