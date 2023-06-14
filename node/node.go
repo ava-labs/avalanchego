@@ -213,13 +213,8 @@ type Node struct {
 func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 	currentIPPort := n.Config.IPPort.IPPort()
 
-	// Default to binding to all interfaces on the specified port
-	listenAddress := fmt.Sprintf(":%d", currentIPPort.Port)
-
-	// If a listen host is provided, bind only to that address on the specified port.
-	//
-	// Providing either loopback address - `::1` for ipv6 and `127.0.0.1` for ipv4 - will avoid the
-	// need for a firewall exception on recent MacOS:
+	// Providing either loopback address - `::1` for ipv6 and `127.0.0.1` for ipv4 - as the listen
+	// host will avoid the need for a firewall exception on recent MacOS:
 	//
 	//   - MacOS requires a manually-approved firewall exception [1] for each version of a given
 	//   binary that wants to bind to all interfaces (i.e. with an address of `:[port]`). Each
@@ -230,15 +225,12 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 	//   Listen() to bind to loopback for both ipv4 and ipv6 is to bind to all interfaces [2] which
 	//   requires an exception.
 	//
-	//   - Thus, the only way to start a local avalanche network on MacOS without approving one or
-	//   more firewall exceptions for the targeted avalanchego binaries is to bind to loopback for
-	//   only a single network type by specifying either `::1` (ipv6) or `127.0.0.1` (ipv4).
+	//   - Thus, the only way to start a node on MacOS without approving a firewall exception for the
+	//   avalanchego binary is to bind to loopback by specifying the host to be `::1` or `127.0.0.1`.
 	//
 	// 1: https://apple.stackexchange.com/questions/393715/do-you-want-the-application-main-to-accept-incoming-network-connections-pop
 	// 2: https://github.com/golang/go/issues/56998
-	if len(n.Config.ListenHost) != 0 {
-		listenAddress = net.JoinHostPort(n.Config.ListenHost, fmt.Sprintf("%d", currentIPPort.Port))
-	}
+	listenAddress := net.JoinHostPort(n.Config.ListenHost, fmt.Sprintf("%d", currentIPPort.Port))
 
 	listener, err := net.Listen(constants.NetworkType, listenAddress)
 	if err != nil {
