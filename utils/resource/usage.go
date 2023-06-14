@@ -180,6 +180,7 @@ func (m *manager) update(diskPath string, frequency, cpuHalflife, diskHalflife t
 		if getBytesErr != nil {
 			m.log.Verbo("failed to lookup resource",
 				zap.String("resource", "system disk"),
+				zap.String("path", diskPath),
 				zap.Error(getBytesErr),
 			)
 		}
