@@ -545,14 +545,16 @@ func (bc *BlockChain) warmAcceptedCaches() {
 		startIndex = lastAccepted - cacheDiff
 	}
 	for i := startIndex; i <= lastAccepted; i++ {
-		header := bc.GetHeaderByNumber(i)
-		if header == nil {
+		block := bc.GetBlockByNumber(i)
+		if block == nil {
 			// This could happen if a node state-synced
 			log.Info("Exiting accepted cache warming early because header is nil", "height", i, "t", time.Since(startTime))
 			break
 		}
-		bc.hc.acceptedNumberCache.Put(header.Number.Uint64(), header)
-		bc.acceptedLogsCache.Put(header.Hash(), rawdb.ReadLogs(bc.db, header.Hash(), header.Number.Uint64()))
+		// TODO: handle blocks written to disk during state sync
+		bc.hc.acceptedNumberCache.Put(block.NumberU64(), block.Header())
+		logs := bc.collectUnflattenedLogs(block, false)
+		bc.acceptedLogsCache.Put(block.Hash(), logs)
 	}
 	log.Info("Warmed accepted caches", "start", startIndex, "end", lastAccepted, "t", time.Since(startTime))
 }
@@ -579,7 +581,7 @@ func (bc *BlockChain) startAcceptor() {
 
 		// Ensure [hc.acceptedNumberCache] and [acceptedLogsCache] have latest content
 		bc.hc.acceptedNumberCache.Put(next.NumberU64(), next.Header())
-		logs := rawdb.ReadLogs(bc.db, next.Hash(), next.NumberU64())
+		logs := bc.collectUnflattenedLogs(next, false)
 		bc.acceptedLogsCache.Put(next.Hash(), logs)
 
 		// Update accepted feeds
@@ -1387,23 +1389,32 @@ func (bc *BlockChain) insertBlock(block *types.Block, writes bool) error {
 	return nil
 }
 
-// collectLogs collects the logs that were generated or removed during
-// the processing of a block. These logs are later announced as deleted or reborn.
-func (bc *BlockChain) collectLogs(b *types.Block, removed bool) []*types.Log {
+// collectUnflattenedLogs collects the logs that were generated or removed during
+// the processing of a block.
+func (bc *BlockChain) collectUnflattenedLogs(b *types.Block, removed bool) [][]*types.Log {
 	receipts := rawdb.ReadRawReceipts(bc.db, b.Hash(), b.NumberU64())
 	receipts.DeriveFields(bc.chainConfig, b.Hash(), b.NumberU64(), b.Time(), b.BaseFee(), b.Transactions())
 
-	var logs []*types.Log
+	var logs [][]*types.Log
 	for _, receipt := range receipts {
-		for _, log := range receipt.Logs {
+		receiptLogs := make([]*types.Log, len(receipt.Logs))
+		for i, log := range receipt.Logs {
 			l := *log
 			if removed {
 				l.Removed = true
 			}
-			logs = append(logs, &l)
+			receiptLogs[i] = &l
 		}
+		logs = append(logs, receiptLogs)
 	}
 	return logs
+}
+
+// collectLogs collects the logs that were generated or removed during
+// the processing of a block. These logs are later announced as deleted or reborn.
+func (bc *BlockChain) collectLogs(b *types.Block, removed bool) []*types.Log {
+	unflattenedLogs := bc.collectUnflattenedLogs(b, removed)
+	return types.FlattenLogs(unflattenedLogs)
 }
 
 // reorg takes two blocks, an old chain and a new chain and will reconstruct the
