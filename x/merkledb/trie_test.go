@@ -5,7 +5,6 @@ package merkledb
 
 import (
 	"context"
-	"errors"
 	"math/rand"
 	"strconv"
 	"sync"
@@ -861,7 +860,7 @@ func Test_Trie_MultipleStates(t *testing.T) {
 				if pastRoot == ids.Empty {
 					pastRoot = mroot
 				} else {
-					require.Equal(pastRoot, mroot, "root mismatch")
+					require.Equal(pastRoot, mroot)
 				}
 			}
 		})
@@ -1270,7 +1269,7 @@ func Test_Trie_ConcurrentReadWrite(t *testing.T) {
 		func() bool {
 			value, err := newTrie.GetValue(context.Background(), []byte("key"))
 
-			if errors.Is(err, database.ErrNotFound) {
+			if err == database.ErrNotFound {
 				return false
 			}
 
