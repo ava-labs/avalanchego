@@ -18,7 +18,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-var _ DelegatorTx = (*AddContinuousDelegatorTx)(nil)
+var (
+	_ DelegatorTx      = (*AddContinuousDelegatorTx)(nil)
+	_ ContinuousStaker = (*AddContinuousDelegatorTx)(nil)
+)
 
 // AddContinuousDelegatorTx is an unsigned addPermissionlessDelegatorTx
 type AddContinuousDelegatorTx struct {
@@ -26,6 +29,8 @@ type AddContinuousDelegatorTx struct {
 	BaseTx `serialize:"true"`
 	// Describes the validator
 	Validator `serialize:"true" json:"validator"`
+	// Who is authorized to manage this delegator
+	DelegatorAuthKey fx.Owner `serialize:"true" json:"delegatorAuthorizationKey"`
 	// Where to send staked tokens when done validating
 	StakeOuts []*avax.TransferableOutput `serialize:"true" json:"stake"`
 	// Where to send staking rewards when done validating
@@ -45,6 +50,7 @@ func (tx *AddContinuousDelegatorTx) InitCtx(ctx *snow.Context) {
 		out.InitCtx(ctx)
 	}
 	tx.DelegationRewardsOwner.InitCtx(ctx)
+	tx.DelegatorAuthKey.InitCtx(ctx)
 }
 
 func (*AddContinuousDelegatorTx) SubnetID() ids.ID {
@@ -57,6 +63,10 @@ func (tx *AddContinuousDelegatorTx) NodeID() ids.NodeID {
 
 func (*AddContinuousDelegatorTx) PublicKey() (*bls.PublicKey, bool, error) {
 	return nil, false, nil
+}
+
+func (tx *AddContinuousDelegatorTx) ManagementKey() fx.Owner {
+	return tx.DelegatorAuthKey
 }
 
 func (*AddContinuousDelegatorTx) CurrentPriority() Priority {
@@ -87,7 +97,11 @@ func (tx *AddContinuousDelegatorTx) SyntacticVerify(ctx *snow.Context) error {
 	if err := tx.BaseTx.SyntacticVerify(ctx); err != nil {
 		return fmt.Errorf("failed to verify BaseTx: %w", err)
 	}
-	if err := verify.All(&tx.Validator, tx.DelegationRewardsOwner); err != nil {
+	if err := verify.All(
+		&tx.Validator,
+		tx.DelegatorAuthKey,
+		tx.DelegationRewardsOwner,
+	); err != nil {
 		return fmt.Errorf("failed to verify validator or rewards owner: %w", err)
 	}
 

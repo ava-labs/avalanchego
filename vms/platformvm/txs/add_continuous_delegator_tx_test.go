@@ -89,6 +89,10 @@ func TestAddContinuousDelegatorTxSyntacticVerify(t *testing.T) {
 					Validator: Validator{
 						NodeID: ids.GenerateTestNodeID(),
 					},
+					DelegatorAuthKey: &secp256k1fx.OutputOwners{
+						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+						Threshold: 1,
+					},
 					StakeOuts: []*avax.TransferableOutput{
 						{
 							Asset: avax.Asset{
@@ -113,6 +117,10 @@ func TestAddContinuousDelegatorTxSyntacticVerify(t *testing.T) {
 					Validator: Validator{
 						Wght: 1,
 					},
+					DelegatorAuthKey: &secp256k1fx.OutputOwners{
+						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+						Threshold: 1,
+					},
 					StakeOuts: []*avax.TransferableOutput{
 						{
 							Asset: avax.Asset{
@@ -135,6 +143,10 @@ func TestAddContinuousDelegatorTxSyntacticVerify(t *testing.T) {
 					BaseTx: validBaseTx,
 					Validator: Validator{
 						NodeID: ids.GenerateTestNodeID(),
+					},
+					DelegatorAuthKey: &secp256k1fx.OutputOwners{
+						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+						Threshold: 1,
 					},
 					StakeOuts: []*avax.TransferableOutput{
 						{
@@ -164,6 +176,10 @@ func TestAddContinuousDelegatorTxSyntacticVerify(t *testing.T) {
 					Validator: Validator{
 						Wght: 1,
 					},
+					DelegatorAuthKey: &secp256k1fx.OutputOwners{
+						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+						Threshold: 1,
+					},
 					StakeOuts: []*avax.TransferableOutput{
 						{
 							Asset: avax.Asset{
@@ -186,6 +202,10 @@ func TestAddContinuousDelegatorTxSyntacticVerify(t *testing.T) {
 					BaseTx: validBaseTx,
 					Validator: Validator{
 						Wght: 1,
+					},
+					DelegatorAuthKey: &secp256k1fx.OutputOwners{
+						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+						Threshold: 1,
 					},
 					StakeOuts: []*avax.TransferableOutput{
 						{
@@ -220,6 +240,10 @@ func TestAddContinuousDelegatorTxSyntacticVerify(t *testing.T) {
 					BaseTx: validBaseTx,
 					Validator: Validator{
 						Wght: 1,
+					},
+					DelegatorAuthKey: &secp256k1fx.OutputOwners{
+						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+						Threshold: 1,
 					},
 					StakeOuts: []*avax.TransferableOutput{
 						{
@@ -256,6 +280,10 @@ func TestAddContinuousDelegatorTxSyntacticVerify(t *testing.T) {
 						NodeID: ids.GenerateTestNodeID(),
 						Wght:   1,
 					},
+					DelegatorAuthKey: &secp256k1fx.OutputOwners{
+						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+						Threshold: 1,
+					},
 					StakeOuts: []*avax.TransferableOutput{
 						{
 							Asset: avax.Asset{
@@ -290,6 +318,10 @@ func TestAddContinuousDelegatorTxSyntacticVerify(t *testing.T) {
 					Validator: Validator{
 						Wght: 1,
 					},
+					DelegatorAuthKey: &secp256k1fx.OutputOwners{
+						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+						Threshold: 1,
+					},
 					StakeOuts: []*avax.TransferableOutput{
 						{
 							Asset: avax.Asset{
@@ -323,6 +355,10 @@ func TestAddContinuousDelegatorTxSyntacticVerify(t *testing.T) {
 					BaseTx: validBaseTx,
 					Validator: Validator{
 						Wght: 2,
+					},
+					DelegatorAuthKey: &secp256k1fx.OutputOwners{
+						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+						Threshold: 1,
 					},
 					StakeOuts: []*avax.TransferableOutput{
 						{

@@ -72,6 +72,7 @@ func TestVerifyAddContinuousValidatorTx(t *testing.T) {
 				End:    uint64(dummyTime.Add(primaryNetworkCfg.MinStakeDuration).Unix()),
 				Wght:   primaryNetworkCfg.MinValidatorStake,
 			},
+			// No BLS key not Auth one, since they are verified by syntax verification
 			StakeOuts: []*avax.TransferableOutput{
 				{},
 			},

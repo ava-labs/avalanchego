@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
-	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
@@ -1121,13 +1120,14 @@ func verifyStopStakerTx(
 	sTx *txs.Tx,
 	tx *txs.StopStakerTx,
 ) ([]*state.Staker, time.Time, error) {
-	if !backend.Config.IsContinuousStakingActivated(chainState.GetTimestamp()) {
-		return nil, time.Time{}, errors.New("StopStakerTx cannot be accepted before continuous staking fork activation")
-	}
-
 	// Verify the tx is well-formed
 	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
 		return nil, time.Time{}, err
+	}
+
+	currentTimestamp := chainState.GetTimestamp()
+	if !backend.Config.IsContinuousStakingActivated(currentTimestamp) {
+		return nil, time.Time{}, ErrTxUnacceptableBeforeFork
 	}
 
 	// retrieve staker to be stopped
@@ -1135,7 +1135,6 @@ func verifyStopStakerTx(
 		txID         = tx.TxID
 		stakerToStop *state.Staker
 	)
-
 	stakersIt, err := chainState.GetCurrentStakerIterator()
 	if err != nil {
 		stakersIt.Release()
@@ -1153,8 +1152,7 @@ func verifyStopStakerTx(
 	}
 
 	if backend.Bootstrapped.Get() {
-		// Full verification only one bootstrapping is done. Otherwise only execution
-
+		// We can skip full verification during bootstrap.
 		baseTxCreds, err := verifyStopStakerAuthorization(backend, chainState, sTx, txID, tx.StakerAuth)
 		if err != nil {
 			return nil, time.Time{}, err
@@ -1175,13 +1173,14 @@ func verifyStopStakerTx(
 		}
 	}
 
-	if !stakerToStop.Priority.IsValidator() || stakerToStop.SubnetID != constants.PrimaryNetworkID {
-		return []*state.Staker{stakerToStop}, stakerToStop.EarliestStopTime(), nil
+	candidateStopTime := stakerToStop.NextTime
+	if !stakerToStop.Priority.IsValidator() {
+		return []*state.Staker{stakerToStop}, candidateStopTime, nil
 	}
 
 	// primary network validators are special since, when stopping them, we need to handle
-	// their delegators and subnet validators as well, to make sure they don't outlive the
-	// primary network validators
+	// their delegators and subnet validators/delegator as well, to make sure they don't
+	// outlive the primary network validators.
 	res := []*state.Staker{stakerToStop}
 	stakersIt, err = chainState.GetCurrentStakerIterator()
 	if err != nil {
@@ -1193,9 +1192,12 @@ func verifyStopStakerTx(
 		if staker.NodeID == stakerToStop.NodeID && staker.TxID != stakerToStop.TxID {
 			res = append(res, staker)
 		}
+		if candidateStopTime.Before(staker.NextTime) {
+			candidateStopTime = candidateStopTime.Add(stakerToStop.StakingPeriod)
+		}
 	}
 	stakersIt.Release()
-	return res, stakerToStop.EarliestStopTime(), nil
+	return res, candidateStopTime, nil
 }
 
 func verifyStopStakerAuthorization(
@@ -1222,34 +1224,12 @@ func verifyStopStakerAuthorization(
 		)
 	}
 
-	var stakerOwner fx.Owner
-	switch uStakerTx := stakerTx.Unsigned.(type) {
-	case txs.ValidatorTx:
-		stakerOwner = uStakerTx.ValidationRewardsOwner()
-	case txs.DelegatorTx:
-		stakerOwner = uStakerTx.RewardsOwner()
-	case *txs.AddSubnetValidatorTx:
-		signedSubnetTx, _, err := chainState.GetTx(uStakerTx.Subnet)
-		if err != nil {
-			return nil, fmt.Errorf(
-				"tx creating subnet not found %q: %v",
-				uStakerTx.Subnet,
-				err,
-			)
-		}
-		subnetTx, ok := signedSubnetTx.Unsigned.(*txs.CreateSubnetTx)
-		if !ok {
-			return nil, ErrWrongTxType
-		}
-		stakerOwner = subnetTx.Owner
-	default:
-		return nil, fmt.Errorf(
-			"unhandled staker type: %t",
-			uStakerTx,
-		)
+	continuousStakerTx, ok := stakerTx.Unsigned.(txs.ContinuousStaker)
+	if !ok {
+		return nil, ErrUnauthorizedStakerStopping
 	}
 
-	err = backend.Fx.VerifyPermission(sTx.Unsigned, stakerAuth, stakerCred, stakerOwner)
+	err = backend.Fx.VerifyPermission(sTx.Unsigned, stakerAuth, stakerCred, continuousStakerTx.ManagementKey())
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrUnauthorizedStakerStopping, err)
 	}

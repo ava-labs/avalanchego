@@ -10,7 +10,6 @@ import (
 	"github.com/google/btree"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
@@ -119,6 +118,13 @@ func NewCurrentStaker(
 	}
 
 	stakingPeriod := staker.StakingPeriod()
+	nextTime := startTime.Add(stakingPeriod)
+	if nextTime.After(endTime) {
+		// delegators may be sometimes shorten up to avoid
+		// possibly outliving their validator
+		nextTime = endTime
+	}
+
 	return &Staker{
 		TxID:            txID,
 		NodeID:          staker.NodeID(),
@@ -129,7 +135,7 @@ func NewCurrentStaker(
 		StakingPeriod:   stakingPeriod,
 		EndTime:         endTime,
 		PotentialReward: potentialReward,
-		NextTime:        startTime.Add(stakingPeriod),
+		NextTime:        nextTime,
 		Priority:        staker.CurrentPriority(),
 	}, nil
 }
@@ -200,22 +206,13 @@ func (s *Staker) ShouldRestake() bool {
 	return s.NextTime.Before(s.EndTime)
 }
 
-func (s *Staker) EarliestStopTime() time.Time {
-	candidateStopTime := s.NextTime
-	if s.Priority.IsValidator() && s.SubnetID == constants.PrimaryNetworkID {
-		candidateStopTime = s.NextTime.Add(s.StakingPeriod) // stop at T+1 for now
-	}
-	if candidateStopTime.Before(s.EndTime) {
-		return candidateStopTime
-	}
-	return s.EndTime
-}
-
 func MarkStakerForRemovalInPlaceBeforeTime(s *Staker, stopTime time.Time) {
-	if stopTime.Before(s.EndTime) {
-		end := s.NextTime
-		for ; end.Before(stopTime); end = end.Add(s.StakingPeriod) {
-		}
-		s.EndTime = end
+	if !stopTime.Before(s.EndTime) {
+		return
 	}
+
+	end := s.NextTime
+	for ; end.Before(stopTime); end = end.Add(s.StakingPeriod) {
+	}
+	s.EndTime = end
 }

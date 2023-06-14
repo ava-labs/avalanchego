@@ -392,50 +392,6 @@ func TestShiftDelegator(t *testing.T) {
 	require.Equal(staker, &cpy)
 }
 
-func TestPrimaryNetworkValidatorStopTimes(t *testing.T) {
-	require := require.New(t)
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	// create the staker
-	nodeID := ids.GenerateTestNodeID()
-	subnetID := constants.PrimaryNetworkID
-	startTime := time.Now().Truncate(time.Second)
-	duration := 365 * 24 * time.Hour
-	endTime := mockable.MaxTime
-	currentPriority := txs.PrimaryNetworkValidatorCurrentPriority
-
-	stakerTx := txs.NewMockStaker(ctrl)
-	stakerTx.EXPECT().NodeID().Return(nodeID)
-	stakerTx.EXPECT().SubnetID().Return(subnetID)
-	stakerTx.EXPECT().StakingPeriod().Return(duration)
-	stakerTx.EXPECT().EndTime().Return(endTime).AnyTimes()
-	stakerTx.EXPECT().CurrentPriority().Return(currentPriority)
-
-	stakerTx.EXPECT().PublicKey().Return(nil, true, nil)
-	stakerTx.EXPECT().Weight().Return(uint64(123))
-
-	txID := ids.GenerateTestID()
-	potentialReward := uint64(54321)
-	staker, err := NewCurrentStaker(txID, stakerTx, startTime, endTime, potentialReward)
-	require.NoError(err)
-
-	// stopTime should be at T+1 staking period
-	require.Equal(startTime.Add(duration), staker.NextTime)
-	require.Equal(mockable.MaxTime, staker.EndTime)
-	stopTime := staker.EarliestStopTime()
-	require.Equal(staker.NextTime.Add(staker.StakingPeriod), stopTime)
-
-	MarkStakerForRemovalInPlaceBeforeTime(staker, stopTime)
-	require.Equal(stopTime, staker.EndTime)
-	require.Equal(stopTime, staker.EarliestStopTime())
-
-	// staker shift must not change stop time
-	ShiftValidatorAheadInPlace(staker)
-	require.Equal(stopTime, staker.EndTime)
-	require.Equal(stopTime, staker.EarliestStopTime())
-}
-
 func TestNonPrimaryNetworkValidatorStopTimes(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
@@ -467,11 +423,9 @@ func TestNonPrimaryNetworkValidatorStopTimes(t *testing.T) {
 	// stopTime should be at end of staking period
 	require.Equal(startTime.Add(duration), staker.NextTime)
 	require.Equal(mockable.MaxTime, staker.EndTime)
-	stopTime := staker.EarliestStopTime()
-	require.Equal(staker.NextTime, stopTime)
+	stopTime := startTime.Add(duration)
 
 	MarkStakerForRemovalInPlaceBeforeTime(staker, stopTime)
 	require.Equal(stopTime, staker.NextTime)
 	require.Equal(stopTime, staker.EndTime)
-	require.Equal(stopTime, staker.EarliestStopTime())
 }

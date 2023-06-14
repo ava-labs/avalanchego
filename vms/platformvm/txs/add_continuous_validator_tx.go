@@ -20,7 +20,8 @@ import (
 )
 
 var (
-	_ ValidatorTx = (*AddContinuousValidatorTx)(nil)
+	_ ValidatorTx      = (*AddContinuousValidatorTx)(nil)
+	_ ContinuousStaker = (*AddContinuousValidatorTx)(nil)
 
 	errTooRestakeShares = fmt.Errorf("a staker can only restake at most %d shares of its validation reward", reward.PercentDenominator)
 )
@@ -35,6 +36,8 @@ type AddContinuousValidatorTx struct {
 	//       This means that validators can share a key if they so choose.
 	//       However, a NodeID does uniquely map to a BLS key
 	Signer signer.Signer `serialize:"true" json:"signer"`
+	// Who is authorized to manage this validator
+	ValidatorAuthKey fx.Owner `serialize:"true" json:"validatorAuthorizationKey"`
 	// Where to send staked tokens when done validating
 	StakeOuts []*avax.TransferableOutput `serialize:"true" json:"stake"`
 	// Where to send validation rewards when done validating
@@ -61,6 +64,7 @@ func (tx *AddContinuousValidatorTx) InitCtx(ctx *snow.Context) {
 	}
 	tx.ValidatorRewardsOwner.InitCtx(ctx)
 	tx.DelegatorRewardsOwner.InitCtx(ctx)
+	tx.ValidatorAuthKey.InitCtx(ctx)
 }
 
 func (*AddContinuousValidatorTx) SubnetID() ids.ID {
@@ -77,6 +81,10 @@ func (tx *AddContinuousValidatorTx) PublicKey() (*bls.PublicKey, bool, error) {
 	}
 	key := tx.Signer.Key()
 	return key, key != nil, nil
+}
+
+func (tx *AddContinuousValidatorTx) ManagementKey() fx.Owner {
+	return tx.ValidatorAuthKey
 }
 
 func (*AddContinuousValidatorTx) CurrentPriority() Priority {
@@ -124,6 +132,7 @@ func (tx *AddContinuousValidatorTx) SyntacticVerify(ctx *snow.Context) error {
 		tx.Signer,
 		tx.ValidatorRewardsOwner,
 		tx.DelegatorRewardsOwner,
+		tx.ValidatorAuthKey,
 	); err != nil {
 		return fmt.Errorf("failed to verify validator, signer, rewards or staker owners: %w", err)
 	}

@@ -63,3 +63,8 @@ type PreContinuousStakingStaker interface {
 	StartTime() time.Time
 	EndTime() time.Time
 }
+
+type ContinuousStaker interface {
+	Staker
+	ManagementKey() fx.Owner
+}

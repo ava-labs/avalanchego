@@ -1085,7 +1085,11 @@ func TestStandardTxExecutorAddContinuousValidatorPostContinuousStakingFork(t *te
 			End:    uint64(dummyEndTime.Unix()),
 			Wght:   env.config.MinValidatorStake,
 		},
-		Signer:    blsPOP,
+		Signer: blsPOP,
+		ValidatorAuthKey: &secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+		},
 		StakeOuts: stakedOuts,
 		ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
 			Addrs:     []ids.ShortID{addr},
@@ -1183,6 +1187,10 @@ func TestStandardTxExecutorAddContinuousDelegatorPostContinuousStakingFork(t *te
 			Start:  uint64(dummyStartTime.Unix()),
 			End:    uint64(dummyEndTime.Unix()),
 			Wght:   env.config.MinValidatorStake,
+		},
+		DelegatorAuthKey: &secp256k1fx.OutputOwners{
+			Addrs:     []ids.ShortID{addr},
+			Threshold: 1,
 		},
 		StakeOuts: stakedOuts,
 		DelegationRewardsOwner: &secp256k1fx.OutputOwners{
