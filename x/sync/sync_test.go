@@ -668,7 +668,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 			// next key to get should be nil because we're done fetching the range.
 			require.Nil(gotFirstDiff)
 		} else {
-			require.Equal(smallestDiffKey.Value, gotFirstDiff, proofIndex) // TODO remove proofIndex
+			require.Equal(smallestDiffKey.Value, gotFirstDiff)
 		}
 	}
 }
