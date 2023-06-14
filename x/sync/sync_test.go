@@ -598,23 +598,31 @@ func TestFindNextKeyRandom(t *testing.T) {
 		slices.SortFunc(localKeyIDs, serializedPathLess)
 
 		// Filter out keys that are before the last received key
-		findBounds := func(keyIDs []keyAndID) int {
-			firstIdxAfterLastReceived := len(keyIDs)
+		findBounds := func(keyIDs []keyAndID) (int, int) {
+			var (
+				firstIdxInRange      = len(keyIDs)
+				firstIdxInRangeFound = false
+				firstIdxOutOfRange   = len(keyIDs)
+			)
 			for i, keyID := range keyIDs {
-				if bytes.Compare(keyID.key.Value, lastReceivedKey) > 0 {
-					firstIdxAfterLastReceived = i
+				if !firstIdxInRangeFound && bytes.Compare(keyID.key.Value, lastReceivedKey) >= 0 {
+					firstIdxInRange = i
+					firstIdxInRangeFound = true
+					continue
+				}
+				if bytes.Compare(keyID.key.Value, rangeEnd) > 0 {
+					firstIdxOutOfRange = i
 					break
 				}
-
 			}
-			return firstIdxAfterLastReceived
+			return firstIdxInRange, firstIdxOutOfRange
 		}
 
-		remoteFirstIdxAfterLastReceived := findBounds(remoteKeyIDs)
-		remoteKeyIDs = remoteKeyIDs[remoteFirstIdxAfterLastReceived:]
+		remoteFirstIdxAfterLastReceived, remoteFirstIdxAfterEnd := findBounds(remoteKeyIDs)
+		remoteKeyIDs = remoteKeyIDs[remoteFirstIdxAfterLastReceived:remoteFirstIdxAfterEnd]
 
-		localFirstIdxAfterLastReceived := findBounds(localKeyIDs)
-		localKeyIDs = localKeyIDs[localFirstIdxAfterLastReceived:]
+		localFirstIdxAfterLastReceived, localFirstIdxAfterEnd := findBounds(localKeyIDs)
+		localKeyIDs = localKeyIDs[localFirstIdxAfterLastReceived:localFirstIdxAfterEnd]
 
 		// Find smallest difference between the set of key/ID pairs proven by
 		// the remote/local proofs for key/ID pairs after the last received key.
