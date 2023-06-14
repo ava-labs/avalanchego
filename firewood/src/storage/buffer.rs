@@ -1,13 +1,19 @@
 //! Disk buffer for staging in memory pages and flushing them to disk.
 use std::fmt::Debug;
-use std::path::PathBuf;
+use std::ops::IndexMut;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
+use std::sync::atomic::AtomicU64;
+use std::sync::atomic::Ordering::Relaxed;
 use std::sync::Arc;
 use std::{cell::RefCell, collections::HashMap};
+
+use crate::storage::DeltaPage;
 
 use super::{AshRecord, FilePool, Page, StoreDelta, StoreError, WalConfig, PAGE_SIZE_NBIT};
 
 use aiofut::{AioBuilder, AioError, AioManager};
+use futures::future::join_all;
 use growthring::WalFileImpl;
 use growthring::{
     wal::{RecoverPolicy, WalLoader, WalWriter},
@@ -74,23 +80,34 @@ pub struct BufferWrite {
 struct PendingPage {
     staging_data: Page,
     file_nbit: u64,
-    staging_notifiers: Vec<Rc<Semaphore>>,
-    writing_notifiers: Vec<Rc<Semaphore>>,
+    notifiers: Notifiers,
+}
+
+#[derive(Debug)]
+struct Notifiers {
+    staging: Vec<Rc<Semaphore>>,
+    writing: Vec<Rc<Semaphore>>,
+}
+
+impl Notifiers {
+    /// adds one permit to earch semaphore clone and leaves an empty `Vec` for `writing`
+    fn drain_writing(&mut self) {
+        std::mem::take(&mut self.writing)
+            .into_iter()
+            .for_each(|notifier| notifier.add_permits(1))
+    }
+
+    /// takes all staging semaphores and moves them to writing, leaving an `Vec` for `staging`
+    fn staging_to_writing(&mut self) {
+        self.writing = std::mem::take(&mut self.staging);
+    }
 }
 
 /// Responsible for processing [`BufferCmd`]s from the [`DiskBufferRequester`]
 /// and managing the persistance of pages.
 pub struct DiskBuffer {
-    pending: HashMap<(SpaceId, u64), PendingPage>,
     inbound: mpsc::Receiver<BufferCmd>,
-    fc_notifier: Option<oneshot::Sender<()>>,
-    fc_blocker: Option<oneshot::Receiver<()>>,
-    file_pools: [Option<Arc<FilePool>>; 255],
     aiomgr: AioManager,
-    local_pool: Rc<tokio::task::LocalSet>,
-    task_id: u64,
-    tasks: Rc<RefCell<HashMap<u64, Option<tokio::task::JoinHandle<()>>>>>,
-    wal: Option<Rc<Mutex<WalWriter<WalFileImpl, WalStoreImpl>>>>,
     cfg: DiskBufferConfig,
     wal_cfg: WalConfig,
 }
@@ -110,300 +127,461 @@ impl DiskBuffer {
             .map_err(|_| AioError::OtherError)?;
 
         Ok(Self {
-            pending: HashMap::new(),
             cfg: cfg.clone(),
             inbound,
-            fc_notifier: None,
-            fc_blocker: None,
-            file_pools: std::array::from_fn(|_| None),
             aiomgr,
-            local_pool: Rc::new(tokio::task::LocalSet::new()),
-            task_id: 0,
-            tasks: Rc::new(RefCell::new(HashMap::new())),
-            wal: None,
             wal_cfg: wal.clone(),
         })
     }
 
-    // TODO: fix this
-    unsafe fn get_longlive_self(&mut self) -> &'static mut Self {
-        std::mem::transmute::<&mut Self, &'static mut Self>(self)
-    }
-
-    /// Add an pending pages to aio manager for processing by the local pool.
-    fn schedule_write(&mut self, page_key: (SpaceId, u64)) {
-        let p = self.pending.get(&page_key).unwrap();
-        let offset = page_key.1 << PAGE_SIZE_NBIT;
-        let fid = offset >> p.file_nbit;
-        let fmask = (1 << p.file_nbit) - 1;
-        let file = self.file_pools[page_key.0 as usize]
-            .as_ref()
-            .unwrap()
-            .get_file(fid)
-            .unwrap();
-        let fut = self
-            .aiomgr
-            .write(file.get_fd(), offset & fmask, p.staging_data.clone(), None);
-        let s = unsafe { self.get_longlive_self() };
-        self.start_task(async move {
-            let (res, _) = fut.await;
-            res.unwrap();
-            s.finish_write(page_key);
-        });
-    }
-
-    fn finish_write(&mut self, page_key: (SpaceId, u64)) {
-        use std::collections::hash_map::Entry::*;
-        match self.pending.entry(page_key) {
-            Occupied(mut e) => {
-                let slot = e.get_mut();
-                for notifier in std::mem::take(&mut slot.writing_notifiers) {
-                    notifier.add_permits(1)
-                }
-                if slot.staging_notifiers.is_empty() {
-                    e.remove();
-                    if self.pending.len() < self.cfg.max_pending {
-                        if let Some(notifier) = self.fc_notifier.take() {
-                            notifier.send(()).unwrap();
-                        }
-                    }
-                } else {
-                    assert!(slot.writing_notifiers.is_empty());
-                    std::mem::swap(&mut slot.writing_notifiers, &mut slot.staging_notifiers);
-                    // write again
-                    self.schedule_write(page_key);
-                }
-            }
-            _ => unreachable!(),
-        }
-    }
-
-    /// Initialize the Wal subsystem if it does not exists and attempts to replay the Wal if exists.
-    async fn init_wal(&mut self, rootpath: PathBuf, waldir: String) -> Result<(), WalError> {
-        let final_path = rootpath.clone().join(waldir.clone());
-        let mut aiobuilder = AioBuilder::default();
-        aiobuilder.max_events(self.cfg.wal_max_aio_requests as u32);
-        let store = WalStoreImpl::new(final_path.clone(), false)?;
-        let mut loader = WalLoader::new();
-        loader
-            .file_nbit(self.wal_cfg.file_nbit)
-            .block_nbit(self.wal_cfg.block_nbit)
-            .recover_policy(RecoverPolicy::Strict);
-        if self.wal.is_some() {
-            // already initialized
-            return Ok(());
-        }
-        let wal = loader
-            .load(
-                store,
-                |raw, _| {
-                    let batch = AshRecord::deserialize(raw);
-                    for (space_id, ash) in batch.0 {
-                        for (undo, redo) in ash.iter() {
-                            let offset = undo.offset;
-                            let file_pool = self.file_pools[space_id as usize].as_ref().unwrap();
-                            let file_nbit = file_pool.get_file_nbit();
-                            let file_mask = (1 << file_nbit) - 1;
-                            let fid = offset >> file_nbit;
-                            nix::sys::uio::pwrite(
-                                file_pool
-                                    .get_file(fid)
-                                    .map_err(|e| {
-                                        WalError::Other(format!(
-                                            "file pool error: {:?} - final path {:?}",
-                                            e, final_path
-                                        ))
-                                    })?
-                                    .get_fd(),
-                                &redo.data,
-                                (offset & file_mask) as nix::libc::off_t,
-                            )
-                            .map_err(|e| {
-                                WalError::Other(format!(
-                                    "wal loader error: {:?} - final path {:?}",
-                                    e, final_path
-                                ))
-                            })?;
-                        }
-                    }
-                    Ok(())
-                },
-                self.wal_cfg.max_revisions,
-            )
-            .await?;
-        self.wal = Some(Rc::new(Mutex::new(wal)));
-        Ok(())
-    }
-
-    async fn run_wal_queue(&mut self, mut writes: mpsc::Receiver<(Vec<BufferWrite>, AshRecord)>) {
-        use std::collections::hash_map::Entry::*;
-        loop {
-            let mut bwrites = Vec::new();
-            let mut records = Vec::new();
-
-            if let Some((bw, ac)) = writes.recv().await {
-                records.push(ac);
-                bwrites.extend(bw);
-            } else {
-                break;
-            }
-            while let Ok((bw, ac)) = writes.try_recv() {
-                records.push(ac);
-                bwrites.extend(bw);
-                if records.len() >= self.cfg.wal_max_batch {
-                    break;
-                }
-            }
-            // first write to Wal
-            let ring_ids: Vec<_> =
-                futures::future::join_all(self.wal.as_ref().unwrap().lock().await.grow(records))
-                    .await
-                    .into_iter()
-                    .map(|ring| ring.map_err(|_| "Wal Error while writing").unwrap().1)
-                    .collect();
-            let sem = Rc::new(tokio::sync::Semaphore::new(0));
-            let mut npermit = 0;
-            for BufferWrite { space_id, delta } in bwrites {
-                for w in delta.0 {
-                    let page_key = (space_id, w.0);
-                    match self.pending.entry(page_key) {
-                        Occupied(mut e) => {
-                            let e = e.get_mut();
-                            e.staging_data = w.1;
-                            e.staging_notifiers.push(sem.clone());
-                            npermit += 1;
-                        }
-                        Vacant(e) => {
-                            let file_nbit = self.file_pools[page_key.0 as usize]
-                                .as_ref()
-                                .unwrap()
-                                .file_nbit;
-                            e.insert(PendingPage {
-                                staging_data: w.1,
-                                file_nbit,
-                                staging_notifiers: Vec::new(),
-                                writing_notifiers: vec![sem.clone()],
-                            });
-                            npermit += 1;
-                            self.schedule_write(page_key);
-                        }
-                    }
-                }
-            }
-            let wal = self.wal.as_ref().unwrap().clone();
-            let max_revisions = self.wal_cfg.max_revisions;
-            self.start_task(async move {
-                let _ = sem.acquire_many(npermit).await.unwrap();
-                wal.lock()
-                    .await
-                    .peel(ring_ids, max_revisions)
-                    .await
-                    .map_err(|_| "Wal errore while pruning")
-                    .unwrap();
-            });
-            if self.pending.len() >= self.cfg.max_pending {
-                let (tx, rx) = oneshot::channel();
-                self.fc_notifier = Some(tx);
-                self.fc_blocker = Some(rx);
-            }
-        }
-    }
-
-    async fn process(
-        &mut self,
-        req: BufferCmd,
-        wal_in: &mpsc::Sender<(Vec<BufferWrite>, AshRecord)>,
-    ) -> bool {
-        match req {
-            BufferCmd::Shutdown => return false,
-            BufferCmd::InitWal(root_path, waldir) => {
-                self.init_wal(root_path.clone(), waldir.clone())
-                    .await
-                    .unwrap_or_else(|e| {
-                        panic!(
-                            "Initialize Wal in dir {:?} failed creating {:?}: {e:?}",
-                            root_path, waldir
-                        )
-                    });
-            }
-            BufferCmd::GetPage(page_key, tx) => tx
-                .send(self.pending.get(&page_key).map(|e| e.staging_data.clone()))
-                .unwrap(),
-            BufferCmd::WriteBatch(writes, wal_writes) => {
-                wal_in.send((writes, wal_writes)).await.unwrap();
-            }
-            BufferCmd::CollectAsh(nrecords, tx) => {
-                // wait to ensure writes are paused for Wal
-                let ash = self
-                    .wal
-                    .as_ref()
-                    .unwrap()
-                    .clone()
-                    .lock()
-                    .await
-                    .read_recent_records(nrecords, &RecoverPolicy::Strict)
-                    .await
-                    .unwrap()
-                    .into_iter()
-                    .map(AshRecord::deserialize)
-                    .collect();
-                tx.send(ash).unwrap();
-            }
-            BufferCmd::RegCachedSpace(space_id, files) => {
-                self.file_pools[space_id as usize] = Some(files)
-            }
-        }
-        true
-    }
-
-    /// Processes an async AIOFuture request against the local pool.
-    fn start_task<F: std::future::Future<Output = ()> + 'static>(&mut self, fut: F) {
-        let task_id = self.task_id;
-        self.task_id += 1;
-        let tasks = self.tasks.clone();
-        self.tasks.borrow_mut().insert(
-            task_id,
-            Some(self.local_pool.spawn_local(async move {
-                fut.await;
-                tasks.borrow_mut().remove(&task_id);
-            })),
-        );
-    }
-
     #[tokio::main(flavor = "current_thread")]
-    pub async fn run(mut self) {
-        let wal_in = {
-            let (tx, rx) = mpsc::channel(self.cfg.wal_max_buffered);
-            let s = unsafe { self.get_longlive_self() };
-            self.start_task(s.run_wal_queue(rx));
-            tx
+    pub async fn run(self) {
+        // TODO: call local_pool.await to make sure that all pending futures finish instead of using the `tasks` HashMap.
+        static TASK_ID: AtomicU64 = AtomicU64::new(0);
+
+        let mut inbound = self.inbound;
+        let aiomgr = Rc::new(self.aiomgr);
+        let cfg = self.cfg;
+        let wal_cfg = self.wal_cfg;
+
+        let pending = Rc::new(RefCell::new(HashMap::new()));
+        let file_pools = Rc::new(RefCell::new(std::array::from_fn(|_| None)));
+        let local_pool = Rc::new(tokio::task::LocalSet::new());
+        let tasks = Rc::new(RefCell::new(HashMap::new()));
+
+        let max = WalQueueMax {
+            batch: cfg.wal_max_batch,
+            revisions: wal_cfg.max_revisions,
+            pending: cfg.max_pending,
         };
-        self.local_pool
-            .clone()
+
+        let (wal_in, writes) = mpsc::channel(cfg.wal_max_buffered);
+
+        let mut writes = Some(writes);
+        let mut wal = None;
+
+        let notifier = Rc::new(tokio::sync::Notify::new());
+
+        local_pool
             .run_until(async {
                 loop {
-                    if let Some(fc) = self.fc_blocker.take() {
-                        // flow control, wait until ready
-                        fc.await.unwrap();
+                    let pending_len = pending.borrow().len();
+                    if pending_len >= cfg.max_pending {
+                        notifier.notified().await;
                     }
-                    let req = self.inbound.recv().await.unwrap();
-                    if !self.process(req, &wal_in).await {
+
+                    let req = inbound.recv().await.unwrap();
+
+                    let process_result = process(
+                        pending.clone(),
+                        notifier.clone(),
+                        file_pools.clone(),
+                        aiomgr.clone(),
+                        local_pool.clone(),
+                        tasks.clone(),
+                        &mut wal,
+                        &cfg,
+                        &wal_cfg,
+                        req,
+                        max,
+                        wal_in.clone(),
+                        &TASK_ID,
+                        &mut writes,
+                    )
+                    .await;
+
+                    if !process_result {
                         break;
                     }
                 }
+
                 drop(wal_in);
-                let handles: Vec<_> = self
-                    .tasks
+
+                let handles: Vec<_> = tasks
                     .borrow_mut()
                     .iter_mut()
                     .map(|(_, task)| task.take().unwrap())
                     .collect();
+
                 for h in handles {
                     h.await.unwrap();
                 }
             })
             .await;
     }
+}
+#[derive(Clone, Copy)]
+struct WalQueueMax {
+    batch: usize,
+    revisions: u32,
+    pending: usize,
+}
+
+/// Processes an async AIOFuture request against the local pool.
+fn start_task<F: std::future::Future<Output = ()> + 'static>(
+    task_id: &AtomicU64,
+    tasks: Rc<RefCell<HashMap<u64, Option<tokio::task::JoinHandle<()>>>>>,
+    local_pool: Rc<tokio::task::LocalSet>,
+    fut: F,
+) {
+    let key = task_id.fetch_add(1, Relaxed);
+    let handle = local_pool.spawn_local({
+        let tasks = tasks.clone();
+
+        async move {
+            fut.await;
+            tasks.borrow_mut().remove(&key);
+        }
+    });
+
+    tasks.borrow_mut().insert(key, handle.into());
+}
+
+/// Add an pending pages to aio manager for processing by the local pool.
+#[allow(clippy::too_many_arguments)]
+fn schedule_write(
+    pending: Rc<RefCell<HashMap<(SpaceId, u64), PendingPage>>>,
+    fc_notifier: Rc<tokio::sync::Notify>,
+    file_pools: Rc<RefCell<[Option<Arc<FilePool>>; 255]>>,
+    aiomgr: Rc<AioManager>,
+    local_pool: Rc<tokio::task::LocalSet>,
+    task_id: &'static AtomicU64,
+    tasks: Rc<RefCell<HashMap<u64, Option<tokio::task::JoinHandle<()>>>>>,
+    max: WalQueueMax,
+    page_key: (SpaceId, u64),
+) {
+    use std::collections::hash_map::Entry::*;
+
+    let fut = {
+        let pending = pending.borrow();
+        let p = pending.get(&page_key).unwrap();
+        let offset = page_key.1 << PAGE_SIZE_NBIT;
+        let fid = offset >> p.file_nbit;
+        let fmask = (1 << p.file_nbit) - 1;
+        let file = file_pools.borrow()[page_key.0 as usize]
+            .as_ref()
+            .unwrap()
+            .get_file(fid)
+            .unwrap();
+        aiomgr.write(file.get_fd(), offset & fmask, p.staging_data.clone(), None)
+    };
+
+    let task = {
+        let tasks = tasks.clone();
+        let local_pool = local_pool.clone();
+
+        async move {
+            let (res, _) = fut.await;
+            res.unwrap();
+
+            let pending_len = pending.borrow().len();
+
+            let write_again = match pending.borrow_mut().entry(page_key) {
+                Occupied(mut e) => {
+                    let slot = e.get_mut();
+
+                    slot.notifiers.drain_writing();
+
+                    // if staging is empty, all we need to do is notify any potential waiters
+                    if slot.notifiers.staging.is_empty() {
+                        e.remove();
+
+                        if pending_len < max.pending {
+                            fc_notifier.notify_waiters();
+                        }
+
+                        false
+                    } else {
+                        // if `staging` is not empty, move all semaphors to `writing` and recurse
+                        // to schedule the new writes.
+                        slot.notifiers.staging_to_writing();
+
+                        true
+                    }
+                }
+                _ => unreachable!(),
+            };
+
+            if write_again {
+                schedule_write(
+                    pending,
+                    fc_notifier,
+                    file_pools,
+                    aiomgr,
+                    local_pool,
+                    task_id,
+                    tasks,
+                    max,
+                    page_key,
+                );
+            }
+        }
+    };
+
+    start_task(task_id, tasks, local_pool, task)
+}
+
+/// Initialize the Wal subsystem if it does not exists and attempts to replay the Wal if exists.
+async fn init_wal(
+    file_pools: &Rc<RefCell<[Option<Arc<FilePool>>; 255]>>,
+    cfg: &DiskBufferConfig,
+    wal_cfg: &WalConfig,
+    rootpath: &Path,
+    waldir: &str,
+) -> Result<Rc<Mutex<WalWriter<WalFileImpl, WalStoreImpl>>>, WalError> {
+    let final_path = rootpath.join(waldir);
+    let mut aiobuilder = AioBuilder::default();
+    aiobuilder.max_events(cfg.wal_max_aio_requests as u32);
+    let store = WalStoreImpl::new(final_path.clone(), false)?;
+
+    let mut loader = WalLoader::new();
+    loader
+        .file_nbit(wal_cfg.file_nbit)
+        .block_nbit(wal_cfg.block_nbit)
+        .recover_policy(RecoverPolicy::Strict);
+
+    let wal = loader
+        .load(
+            store,
+            |raw, _| {
+                let batch = AshRecord::deserialize(raw);
+
+                for (space_id, ash) in batch.0 {
+                    for (undo, redo) in ash.iter() {
+                        let offset = undo.offset;
+                        let file_pools = file_pools.borrow();
+                        let file_pool = file_pools[space_id as usize].as_ref().unwrap();
+                        let file_nbit = file_pool.get_file_nbit();
+                        let file_mask = (1 << file_nbit) - 1;
+                        let fid = offset >> file_nbit;
+
+                        nix::sys::uio::pwrite(
+                            file_pool
+                                .get_file(fid)
+                                .map_err(|e| {
+                                    WalError::Other(format!(
+                                        "file pool error: {:?} - final path {:?}",
+                                        e, final_path
+                                    ))
+                                })?
+                                .get_fd(),
+                            &redo.data,
+                            (offset & file_mask) as nix::libc::off_t,
+                        )
+                        .map_err(|e| {
+                            WalError::Other(format!(
+                                "wal loader error: {:?} - final path {:?}",
+                                e, final_path
+                            ))
+                        })?;
+                    }
+                }
+
+                Ok(())
+            },
+            wal_cfg.max_revisions,
+        )
+        .await?;
+
+    Ok(Rc::new(Mutex::new(wal)))
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn run_wal_queue(
+    task_id: &'static AtomicU64,
+    max: WalQueueMax,
+    wal: Rc<Mutex<WalWriter<WalFileImpl, WalStoreImpl>>>,
+    pending: Rc<RefCell<HashMap<(SpaceId, u64), PendingPage>>>,
+    tasks: Rc<RefCell<HashMap<u64, Option<tokio::task::JoinHandle<()>>>>>,
+    local_pool: Rc<tokio::task::LocalSet>,
+    file_pools: Rc<RefCell<[Option<Arc<FilePool>>; 255]>>,
+    mut writes: mpsc::Receiver<(Vec<BufferWrite>, AshRecord)>,
+    fc_notifier: Rc<tokio::sync::Notify>,
+    aiomgr: Rc<AioManager>,
+) {
+    use std::collections::hash_map::Entry::*;
+
+    loop {
+        let mut bwrites = Vec::new();
+        let mut records = Vec::new();
+        let wal = wal.clone();
+
+        if let Some((bw, ac)) = writes.recv().await {
+            records.push(ac);
+            bwrites.extend(bw);
+        } else {
+            break;
+        }
+
+        while let Ok((bw, ac)) = writes.try_recv() {
+            records.push(ac);
+            bwrites.extend(bw);
+
+            if records.len() >= max.batch {
+                break;
+            }
+        }
+
+        // first write to Wal
+        let ring_ids = join_all(wal.clone().lock().await.grow(records))
+            .await
+            .into_iter()
+            .map(|ring| ring.map_err(|_| "Wal Error while writing").unwrap().1)
+            .collect::<Vec<_>>();
+        let sem = Rc::new(tokio::sync::Semaphore::new(0));
+        let mut npermit = 0;
+
+        for BufferWrite { space_id, delta } in bwrites {
+            for DeltaPage(page_id, page) in delta.0 {
+                let page_key = (space_id, page_id);
+
+                let should_write = match pending.borrow_mut().entry(page_key) {
+                    Occupied(mut e) => {
+                        let e = e.get_mut();
+                        e.staging_data = page;
+                        e.notifiers.staging.push(sem.clone());
+
+                        false
+                    }
+                    Vacant(e) => {
+                        let file_nbit = file_pools.borrow()[page_key.0 as usize]
+                            .as_ref()
+                            .unwrap()
+                            .file_nbit;
+
+                        e.insert(PendingPage {
+                            staging_data: page,
+                            file_nbit,
+                            notifiers: {
+                                let semaphore = sem.clone();
+                                Notifiers {
+                                    staging: Vec::new(),
+                                    writing: vec![semaphore],
+                                }
+                            },
+                        });
+
+                        true
+                    }
+                };
+
+                if should_write {
+                    schedule_write(
+                        pending.clone(),
+                        fc_notifier.clone(),
+                        file_pools.clone(),
+                        aiomgr.clone(),
+                        local_pool.clone(),
+                        task_id,
+                        tasks.clone(),
+                        max,
+                        page_key,
+                    );
+                }
+
+                npermit += 1;
+            }
+        }
+
+        let task = async move {
+            let _ = sem.acquire_many(npermit).await.unwrap();
+
+            wal.lock()
+                .await
+                .peel(ring_ids, max.revisions)
+                .await
+                .map_err(|_| "Wal errore while pruning")
+                .unwrap()
+        };
+
+        start_task(task_id, tasks.clone(), local_pool.clone(), task);
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn process(
+    pending: Rc<RefCell<HashMap<(SpaceId, u64), PendingPage>>>,
+    fc_notifier: Rc<tokio::sync::Notify>,
+    file_pools: Rc<RefCell<[Option<Arc<FilePool>>; 255]>>,
+    aiomgr: Rc<AioManager>,
+    local_pool: Rc<tokio::task::LocalSet>,
+    tasks: Rc<RefCell<HashMap<u64, Option<tokio::task::JoinHandle<()>>>>>,
+    wal: &mut Option<Rc<Mutex<WalWriter<WalFileImpl, WalStoreImpl>>>>,
+    cfg: &DiskBufferConfig,
+    wal_cfg: &WalConfig,
+    req: BufferCmd,
+    max: WalQueueMax,
+    wal_in: mpsc::Sender<(Vec<BufferWrite>, AshRecord)>,
+    task_id: &'static AtomicU64,
+    writes: &mut Option<mpsc::Receiver<(Vec<BufferWrite>, AshRecord)>>,
+) -> bool {
+    match req {
+        BufferCmd::Shutdown => return false,
+        BufferCmd::InitWal(rootpath, waldir) => {
+            let initialized_wal = init_wal(&file_pools, cfg, wal_cfg, &rootpath, &waldir)
+                .await
+                .unwrap_or_else(|e| {
+                    panic!(
+                        "Initialize Wal in dir {:?} failed creating {:?}: {e:?}",
+                        rootpath, waldir
+                    )
+                });
+
+            let writes = writes.take().unwrap();
+
+            let task = run_wal_queue(
+                task_id,
+                max,
+                initialized_wal.clone(),
+                pending,
+                tasks.clone(),
+                local_pool.clone(),
+                file_pools.clone(),
+                writes,
+                fc_notifier,
+                aiomgr,
+            );
+
+            start_task(task_id, tasks, local_pool, task);
+
+            wal.replace(initialized_wal);
+        }
+        BufferCmd::GetPage(page_key, tx) => tx
+            .send(
+                pending
+                    .borrow()
+                    .get(&page_key)
+                    .map(|e| e.staging_data.clone()),
+            )
+            .unwrap(),
+        BufferCmd::WriteBatch(writes, wal_writes) => {
+            wal_in.send((writes, wal_writes)).await.unwrap();
+        }
+        BufferCmd::CollectAsh(nrecords, tx) => {
+            // wait to ensure writes are paused for Wal
+            let ash = wal
+                .as_ref()
+                .unwrap()
+                .lock()
+                .await
+                .read_recent_records(nrecords, &RecoverPolicy::Strict)
+                .await
+                .unwrap()
+                .into_iter()
+                .map(AshRecord::deserialize)
+                .collect();
+            tx.send(ash).unwrap();
+        }
+        BufferCmd::RegCachedSpace(space_id, files) => {
+            file_pools
+                .borrow_mut()
+                .as_mut_slice()
+                .index_mut(space_id as usize)
+                .replace(files);
+        }
+    }
+
+    true
 }
 
 /// Communicates with the [`DiskBuffer`] over channels.

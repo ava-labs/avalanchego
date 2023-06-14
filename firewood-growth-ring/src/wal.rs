@@ -431,8 +431,10 @@ impl<F: WalFile + 'static, S: WalStore<F>> WalFilePool<F, S> {
         };
 
         let mut removes: Vec<Pin<Box<dyn Future<Output = Result<(), WalError>>>>> = Vec::new();
+
         while state.pending_removal.len() > 1 {
             let (fid, counter) = state.pending_removal.front().unwrap();
+
             if counter_lt(counter + keep_nrecords, state.counter) {
                 removes.push(self.store.remove_file(get_fname(*fid))
                     as Pin<Box<dyn Future<Output = _> + 'a>>);
@@ -441,19 +443,24 @@ impl<F: WalFile + 'static, S: WalStore<F>> WalFilePool<F, S> {
                 break;
             }
         }
+
         let p = async move {
             last_peel.await.ok();
+
             for r in removes.into_iter() {
                 r.await.ok();
             }
+
             Ok(())
         }
         .shared();
+
         unsafe {
             (*self.last_peel.get()) = MaybeUninit::new(std::mem::transmute(
                 Box::pin(p.clone()) as Pin<Box<dyn Future<Output = _> + 'a>>
             ))
         }
+
         p
     }
 
@@ -517,23 +524,29 @@ impl<F: WalFile + 'static, S: WalStore<F>> WalWriter<F, S> {
             let mut rsize = rec.len() as u32;
             let mut ring_start = None;
             assert!(rsize > 0);
+
             while rsize > 0 {
                 let remain = self.block_size - bbuff_cur;
+
                 if remain > msize {
                     let d = remain - msize;
                     let rs0 = self.state.next + (bbuff_cur - bbuff_start) as u64;
+
                     let blob = unsafe {
                         &mut *self.block_buffer[bbuff_cur as usize..]
                             .as_mut_ptr()
                             .cast::<WalRingBlob>()
                     };
+
                     bbuff_cur += msize;
+
                     if d >= rsize {
                         // the remaining rec fits in the block
                         let payload = rec;
                         blob.counter = self.state.counter;
                         blob.crc32 = CRC32.checksum(payload);
                         blob.rsize = rsize;
+
                         let (rs, rt) = if let Some(rs) = ring_start.take() {
                             self.state.counter += 1;
                             (rs, WalRingType::Last)
@@ -541,12 +554,14 @@ impl<F: WalFile + 'static, S: WalStore<F>> WalWriter<F, S> {
                             self.state.counter += 1;
                             (rs0, WalRingType::Full)
                         };
+
                         blob.rtype = rt as u8;
                         self.block_buffer[bbuff_cur as usize..bbuff_cur as usize + payload.len()]
                             .copy_from_slice(payload);
                         bbuff_cur += rsize;
                         rsize = 0;
                         let end = self.state.next + (bbuff_cur - bbuff_start) as u64;
+
                         res.push((
                             WalRingId {
                                 start: rs,
@@ -561,12 +576,14 @@ impl<F: WalFile + 'static, S: WalStore<F>> WalWriter<F, S> {
                         blob.counter = self.state.counter;
                         blob.crc32 = CRC32.checksum(payload);
                         blob.rsize = d;
+
                         blob.rtype = if ring_start.is_some() {
                             WalRingType::Middle
                         } else {
                             ring_start = Some(rs0);
                             WalRingType::First
                         } as u8;
+
                         self.block_buffer[bbuff_cur as usize..bbuff_cur as usize + payload.len()]
                             .copy_from_slice(payload);
                         bbuff_cur += d;
@@ -577,6 +594,7 @@ impl<F: WalFile + 'static, S: WalStore<F>> WalWriter<F, S> {
                     // add padding space by moving the point to the end of the block
                     bbuff_cur = self.block_size;
                 }
+
                 if bbuff_cur == self.block_size {
                     writes.push((
                         self.state.next,
@@ -590,6 +608,7 @@ impl<F: WalFile + 'static, S: WalStore<F>> WalWriter<F, S> {
                 }
             }
         }
+
         if bbuff_cur > bbuff_start {
             writes.push((
                 self.state.next,
@@ -597,26 +616,34 @@ impl<F: WalFile + 'static, S: WalStore<F>> WalWriter<F, S> {
                     .to_vec()
                     .into_boxed_slice(),
             ));
+
             self.state.next += (bbuff_cur - bbuff_start) as u64;
         }
 
         // mark the block info for each record
         let mut i = 0;
+
         'outer: for (j, (off, w)) in writes.iter().enumerate() {
             let blk_s = *off;
             let blk_e = blk_s + w.len() as u64;
+
             while res[i].0.end <= blk_s {
                 i += 1;
+
                 if i >= res.len() {
                     break 'outer;
                 }
             }
+
             while res[i].0.start < blk_e {
                 res[i].1.push(j);
+
                 if res[i].0.end >= blk_e {
                     break;
                 }
+
                 i += 1;
+
                 if i >= res.len() {
                     break 'outer;
                 }
@@ -652,19 +679,25 @@ impl<F: WalFile + 'static, S: WalStore<F>> WalWriter<F, S> {
         let msize = self.msize as u64;
         let block_size = self.block_size as u64;
         let state = &mut self.state;
+
         for rec in records.as_ref() {
             state.io_complete.push(*rec);
         }
+
         while let Some(s) = state.io_complete.peek().map(|&e| e.start) {
             if s != state.next_complete.end {
                 break;
             }
+
             let mut m = state.io_complete.pop().unwrap();
             let block_remain = block_size - (m.end & (block_size - 1));
+
             if block_remain <= msize {
                 m.end += block_remain
             }
+
             let fid = m.start >> state.file_nbit;
+
             match state.pending_removal.back_mut() {
                 Some(l) => {
                     if l.0 == fid {
@@ -677,9 +710,12 @@ impl<F: WalFile + 'static, S: WalStore<F>> WalWriter<F, S> {
                 }
                 None => state.pending_removal.push_back((fid, m.counter)),
             }
+
             state.next_complete = m;
         }
+
         self.file_pool.remove_files(state, keep_nrecords).await.ok();
+
         Ok(())
     }
 
