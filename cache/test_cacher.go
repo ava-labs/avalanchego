@@ -44,10 +44,12 @@ func TestBasic(t *testing.T, cache Cacher[ids.ID, TestSizedInt]) {
 	require.Equal(expectedValue1, value)
 
 	cache.Put(id1, expectedValue1)
+	value, found = cache.Get(id1)
 	require.True(found)
 	require.Equal(expectedValue1, value)
 
 	cache.Put(id1, expectedValue1)
+	value, found = cache.Get(id1)
 	require.True(found)
 	require.Equal(expectedValue1, value)
 

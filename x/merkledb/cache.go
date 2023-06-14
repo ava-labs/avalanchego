@@ -26,6 +26,15 @@ func newOnEvictCache[K comparable, V any](maxSize int, onEviction func(V) error)
 	}
 }
 
+// removeOldest returns and removes the oldest element from this cache.
+func (c *onEvictCache[K, V]) removeOldest() (K, V, bool) {
+	k, v, exists := c.fifo.Oldest()
+	if exists {
+		c.fifo.Delete(k)
+	}
+	return k, v, exists
+}
+
 // Get an element from this cache.
 func (c *onEvictCache[K, V]) Get(key K) (V, bool) {
 	c.lock.RLock()
@@ -44,14 +53,14 @@ func (c *onEvictCache[K, V]) Put(key K, value V) error {
 	c.fifo.Put(key, value) // Mark as MRU
 
 	if c.fifo.Len() > c.maxSize {
-		oldestKey, oldsetVal, _ := c.fifo.Oldest()
+		oldestKey, oldestVal, _ := c.fifo.Oldest()
 		c.fifo.Delete(oldestKey)
-		return c.onEviction(oldsetVal)
+		return c.onEviction(oldestVal)
 	}
 	return nil
 }
 
-// Removes all elements from the cache.
+// Flush removes all elements from the cache.
 // Returns the last non-nil error during [c.onEviction], if any.
 // If [c.onEviction] errors, it will still be called for any
 // subsequent elements and the cache will still be emptied.
@@ -62,11 +71,16 @@ func (c *onEvictCache[K, V]) Flush() error {
 		c.lock.Unlock()
 	}()
 
+	// Note that we can't use [c.fifo]'s iterator because [c.onEviction]
+	// modifies [c.fifo], which violates the iterator's invariant.
 	var errs wrappers.Errs
-	iter := c.fifo.NewIterator()
-	for iter.Next() {
-		val := iter.Value()
-		errs.Add(c.onEviction(val))
+	for {
+		_, node, exists := c.removeOldest()
+		if !exists {
+			// The cache is empty.
+			return errs.Err
+		}
+
+		errs.Add(c.onEviction(node))
 	}
-	return errs.Err
 }

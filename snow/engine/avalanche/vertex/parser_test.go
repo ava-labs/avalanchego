@@ -13,11 +13,9 @@ import (
 )
 
 func TestParseInvalid(t *testing.T) {
-	require := require.New(t)
-
 	vtxBytes := []byte{1, 2, 3, 4, 5}
 	_, err := Parse(vtxBytes)
-	require.ErrorIs(err, codec.ErrUnknownVersion)
+	require.ErrorIs(t, err, codec.ErrUnknownVersion)
 }
 
 func TestParseValid(t *testing.T) {

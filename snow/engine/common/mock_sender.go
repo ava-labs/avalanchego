@@ -159,7 +159,7 @@ func (mr *MockSenderMockRecorder) SendAppResponse(arg0, arg1, arg2, arg3 interfa
 }
 
 // SendChits mocks base method.
-func (m *MockSender) SendChits(arg0 context.Context, arg1 ids.NodeID, arg2 uint32, arg3, arg4 []ids.ID) {
+func (m *MockSender) SendChits(arg0 context.Context, arg1 ids.NodeID, arg2 uint32, arg3, arg4 ids.ID) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "SendChits", arg0, arg1, arg2, arg3, arg4)
 }

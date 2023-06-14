@@ -339,7 +339,7 @@ func TestGetOngoingSyncStateSummary(t *testing.T) {
 
 	// test unimplemented case; this is just a guard
 	_, err := vm.GetOngoingSyncStateSummary(context.Background())
-	require.ErrorIs(err, block.ErrStateSyncableVMNotImplemented)
+	require.Equal(block.ErrStateSyncableVMNotImplemented, err)
 
 	// test successful retrieval
 	summary, err := vm.GetOngoingSyncStateSummary(context.Background())
@@ -364,7 +364,7 @@ func TestGetLastStateSummary(t *testing.T) {
 
 	// test unimplemented case; this is just a guard
 	_, err := vm.GetLastStateSummary(context.Background())
-	require.ErrorIs(err, block.ErrStateSyncableVMNotImplemented)
+	require.Equal(block.ErrStateSyncableVMNotImplemented, err)
 
 	// test successful retrieval
 	summary, err := vm.GetLastStateSummary(context.Background())
@@ -389,7 +389,7 @@ func TestParseStateSummary(t *testing.T) {
 
 	// test unimplemented case; this is just a guard
 	_, err := vm.ParseStateSummary(context.Background(), mockedSummary.Bytes())
-	require.ErrorIs(err, block.ErrStateSyncableVMNotImplemented)
+	require.Equal(block.ErrStateSyncableVMNotImplemented, err)
 
 	// test successful parsing
 	summary, err := vm.ParseStateSummary(context.Background(), mockedSummary.Bytes())
@@ -418,7 +418,7 @@ func TestGetStateSummary(t *testing.T) {
 
 	// test unimplemented case; this is just a guard
 	_, err := vm.GetStateSummary(context.Background(), mockedSummary.Height())
-	require.ErrorIs(err, block.ErrStateSyncableVMNotImplemented)
+	require.Equal(block.ErrStateSyncableVMNotImplemented, err)
 
 	// test successful retrieval
 	summary, err := vm.GetStateSummary(context.Background(), mockedSummary.Height())

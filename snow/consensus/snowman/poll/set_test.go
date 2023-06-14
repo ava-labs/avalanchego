@@ -30,8 +30,7 @@ func TestNewSetErrorOnMetrics(t *testing.T) {
 		Name: "poll_duration",
 	})))
 
-	s := NewSet(factory, log, namespace, registerer)
-	require.NotNil(s)
+	require.NotNil(NewSet(factory, log, namespace, registerer))
 }
 
 func TestCreateAndFinishPollOutOfOrder_NewerFinishesFirst(t *testing.T) {
@@ -282,9 +281,9 @@ func TestSetString(t *testing.T) {
 
 	expected := `current polls: (Size = 1)
     RequestID 0:
-        waiting on Bag: (Size = 1)
+        waiting on Bag[ids.NodeID]: (Size = 1)
             NodeID-6HgC8KRBEhXYbF4riJyJFLSHt37UNuRt: 1
-        received Bag: (Size = 0)`
+        received Bag[ids.ID]: (Size = 0)`
 	require.True(s.Add(0, vdrs))
 	require.Equal(expected, s.String())
 }

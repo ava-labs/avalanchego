@@ -34,8 +34,6 @@ func testSetup(
 	t *testing.T,
 	ctrl *gomock.Controller,
 ) (StateSyncEnabledMock, *common.SenderTest, common.Config) {
-	require := require.New(t)
-
 	ctx := snow.DefaultConsensusContextTest()
 
 	peers := validators.NewSet()
@@ -63,7 +61,7 @@ func testSetup(
 	sender.CantSendGetAcceptedFrontier = false
 
 	peer := ids.GenerateTestNodeID()
-	require.NoError(peers.Add(peer, nil, ids.Empty, 1))
+	require.NoError(t, peers.Add(peer, nil, ids.Empty, 1))
 
 	commonConfig := common.Config{
 		Ctx:                            ctx,
@@ -113,15 +111,13 @@ func TestAcceptedFrontier(t *testing.T) {
 	require.IsType(&getter{}, bsIntf)
 	bs := bsIntf.(*getter)
 
-	var accepted []ids.ID
-	sender.SendAcceptedFrontierF = func(_ context.Context, _ ids.NodeID, _ uint32, frontier []ids.ID) {
-		accepted = frontier
+	var accepted ids.ID
+	sender.SendAcceptedFrontierF = func(_ context.Context, _ ids.NodeID, _ uint32, containerID ids.ID) {
+		accepted = containerID
 	}
 
 	require.NoError(bs.GetAcceptedFrontier(context.Background(), ids.EmptyNodeID, 0))
-
-	require.Len(accepted, 1)
-	require.Equal(blkID, accepted[0])
+	require.Equal(blkID, accepted)
 }
 
 func TestFilterAccepted(t *testing.T) {
