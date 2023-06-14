@@ -605,7 +605,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 				firstIdxOutOfRange   = len(keyIDs)
 			)
 			for i, keyID := range keyIDs {
-				if !firstIdxInRangeFound && bytes.Compare(keyID.key.Value, lastReceivedKey) >= 0 {
+				if !firstIdxInRangeFound && bytes.Compare(keyID.key.Value, lastReceivedKey) > 0 {
 					firstIdxInRange = i
 					firstIdxInRangeFound = true
 					continue
