@@ -773,19 +773,18 @@ func TestIssueNFT(t *testing.T) {
 
 // Test issuing a transaction that creates an Property family
 func TestIssueProperty(t *testing.T) {
+	require := require.New(t)
 	vm := &VM{}
 	ctx := NewContext(t)
 	ctx.Lock.Lock()
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(vm.Shutdown(context.Background()))
 		ctx.Lock.Unlock()
 	}()
 
 	genesisBytes := BuildGenesisTest(t)
 	issuer := make(chan common.Message, 1)
-	err := vm.Initialize(
+	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
 		manager.NewMemDB(version.Semantic1_0_0),
@@ -808,21 +807,11 @@ func TestIssueProperty(t *testing.T) {
 			},
 		},
 		nil,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	))
 	vm.batchTimeout = 0
 
-	err = vm.SetState(context.Background(), snow.Bootstrapping)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = vm.SetState(context.Background(), snow.NormalOp)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
+	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
 
 	createAssetTx := &txs.Tx{Unsigned: &txs.CreateAssetTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
@@ -844,13 +833,10 @@ func TestIssueProperty(t *testing.T) {
 			},
 		}},
 	}}
-	if err := vm.parser.InitializeTx(createAssetTx); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(vm.parser.InitializeTx(createAssetTx))
 
-	if _, err := vm.IssueTx(createAssetTx.Bytes()); err != nil {
-		t.Fatal(err)
-	}
+	_, err := vm.IssueTx(createAssetTx.Bytes())
+	require.NoError(err)
 
 	mintPropertyTx := &txs.Tx{Unsigned: &txs.OperationTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
@@ -879,16 +865,12 @@ func TestIssueProperty(t *testing.T) {
 	}}
 
 	codec := vm.parser.Codec()
-	err = mintPropertyTx.SignPropertyFx(codec, [][]*secp256k1.PrivateKey{
+	require.NoError(mintPropertyTx.SignPropertyFx(codec, [][]*secp256k1.PrivateKey{
 		{keys[0]},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	}))
 
-	if _, err := vm.IssueTx(mintPropertyTx.Bytes()); err != nil {
-		t.Fatal(err)
-	}
+	_, err = vm.IssueTx(mintPropertyTx.Bytes())
+	require.NoError(err)
 
 	burnPropertyTx := &txs.Tx{Unsigned: &txs.OperationTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
@@ -905,16 +887,12 @@ func TestIssueProperty(t *testing.T) {
 		}},
 	}}
 
-	err = burnPropertyTx.SignPropertyFx(codec, [][]*secp256k1.PrivateKey{
+	require.NoError(burnPropertyTx.SignPropertyFx(codec, [][]*secp256k1.PrivateKey{
 		{},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	}))
 
-	if _, err := vm.IssueTx(burnPropertyTx.Bytes()); err != nil {
-		t.Fatal(err)
-	}
+	_, err = vm.IssueTx(burnPropertyTx.Bytes())
+	require.NoError(err)
 }
 
 func setupTxFeeAssets(t *testing.T) ([]byte, chan common.Message, *VM, *atomic.Memory) {
@@ -978,8 +956,7 @@ func TestIssueTxWithFeeAsset(t *testing.T) {
 	genesisBytes, issuer, vm, _ := setupTxFeeAssets(t)
 	ctx := vm.ctx
 	defer func() {
-		err := vm.Shutdown(context.Background())
-		require.NoError(t, err)
+		require.NoError(t, vm.Shutdown(context.Background()))
 		ctx.Lock.Unlock()
 	}()
 	// send first asset
@@ -1004,8 +981,7 @@ func TestIssueTxWithAnotherAsset(t *testing.T) {
 	genesisBytes, issuer, vm, _ := setupTxFeeAssets(t)
 	ctx := vm.ctx
 	defer func() {
-		err := vm.Shutdown(context.Background())
-		require.NoError(t, err)
+		require.NoError(t, vm.Shutdown(context.Background()))
 		ctx.Lock.Unlock()
 	}()
 
@@ -1763,6 +1739,7 @@ func TestImportTxNotState(t *testing.T) {
 
 // Test issuing an import transaction.
 func TestIssueExportTx(t *testing.T) {
+	require := require.New(t)
 	genesisBytes := BuildGenesisTest(t)
 
 	issuer := make(chan common.Message, 1)
@@ -1779,7 +1756,7 @@ func TestIssueExportTx(t *testing.T) {
 
 	ctx.Lock.Lock()
 	vm := &VM{}
-	if err := vm.Initialize(
+	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
 		baseDBManager.NewPrefixDBManager([]byte{1}),
@@ -1791,18 +1768,11 @@ func TestIssueExportTx(t *testing.T) {
 			Fx: &secp256k1fx.Fx{},
 		}},
 		nil,
-	); err != nil {
-		t.Fatal(err)
-	}
+	))
 	vm.batchTimeout = 0
 
-	if err := vm.SetState(context.Background(), snow.Bootstrapping); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := vm.SetState(context.Background(), snow.NormalOp); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
+	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
 
 	key := keys[0]
 
@@ -1834,40 +1804,27 @@ func TestIssueExportTx(t *testing.T) {
 			},
 		}},
 	}}
-	if err := tx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(tx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
 
-	if _, err := vm.IssueTx(tx.Bytes()); err != nil {
-		t.Fatal(err)
-	}
+	_, err := vm.IssueTx(tx.Bytes())
+	require.NoError(err)
 
 	ctx.Lock.Unlock()
 
-	msg := <-issuer
-	if msg != common.PendingTxs {
-		t.Fatalf("Wrong message")
-	}
+	require.Equal(common.PendingTxs, <-issuer)
 
 	ctx.Lock.Lock()
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(vm.Shutdown(context.Background()))
 		ctx.Lock.Unlock()
 	}()
 
 	txs := vm.PendingTxs(context.Background())
-	if len(txs) != 1 {
-		t.Fatalf("Should have returned %d tx(s)", 1)
-	}
+	require.Len(txs, 1)
 
 	parsedTx := txs[0]
-	if err := parsedTx.Verify(context.Background()); err != nil {
-		t.Fatal(err)
-	} else if err := parsedTx.Accept(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(parsedTx.Verify(context.Background()))
+	require.NoError(parsedTx.Accept(context.Background()))
 
 	peerSharedMemory := m.NewSharedMemory(constants.PlatformChainID)
 	utxoBytes, _, _, err := peerSharedMemory.Indexed(
@@ -1879,12 +1836,8 @@ func TestIssueExportTx(t *testing.T) {
 		nil,
 		math.MaxInt32,
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(utxoBytes) != 1 {
-		t.Fatalf("wrong number of utxos %d", len(utxoBytes))
-	}
+	require.NoError(err)
+	require.Len(utxoBytes, 1)
 }
 
 func TestClearForceAcceptedExportTx(t *testing.T) {

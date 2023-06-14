@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 
-	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
+	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
 const (
@@ -106,7 +106,7 @@ type StateSyncManager struct {
 }
 
 type StateSyncConfig struct {
-	SyncDB                merkledb.MerkleDB
+	SyncDB                SyncableDB
 	Client                Client
 	SimultaneousWorkLimit int
 	Log                   logging.Logger
@@ -261,13 +261,13 @@ func (m *StateSyncManager) getAndApplyChangeProof(ctx context.Context, workItem 
 
 	changeProof, err := m.config.Client.GetChangeProof(
 		ctx,
-		&syncpb.ChangeProofRequest{
-			StartRoot:  workItem.LocalRootID[:],
-			EndRoot:    rootID[:],
-			Start:      workItem.start,
-			End:        workItem.end,
-			KeyLimit:   defaultRequestKeyLimit,
-			BytesLimit: defaultRequestByteSizeLimit,
+		&pb.SyncGetChangeProofRequest{
+			StartRootHash: workItem.LocalRootID[:],
+			EndRootHash:   rootID[:],
+			StartKey:      workItem.start,
+			EndKey:        workItem.end,
+			KeyLimit:      defaultRequestKeyLimit,
+			BytesLimit:    defaultRequestByteSizeLimit,
 		},
 		m.config.SyncDB,
 	)
@@ -310,10 +310,10 @@ func (m *StateSyncManager) getAndApplyChangeProof(ctx context.Context, workItem 
 func (m *StateSyncManager) getAndApplyRangeProof(ctx context.Context, workItem *syncWorkItem) {
 	rootID := m.getTargetRoot()
 	proof, err := m.config.Client.GetRangeProof(ctx,
-		&syncpb.RangeProofRequest{
-			Root:       rootID[:],
-			Start:      workItem.start,
-			End:        workItem.end,
+		&pb.SyncGetRangeProofRequest{
+			RootHash:   rootID[:],
+			StartKey:   workItem.start,
+			EndKey:     workItem.end,
 			KeyLimit:   defaultRequestKeyLimit,
 			BytesLimit: defaultRequestByteSizeLimit,
 		},
