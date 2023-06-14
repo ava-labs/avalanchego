@@ -223,10 +223,10 @@ func (te *TestEnvironment) StartCluster() error {
 			return fmt.Errorf("could not start network-runner: %w", err)
 		}
 		tests.Outf("{{green}}successfully started network-runner: {{/}} %+v\n", resp.ClusterInfo.NodeNames)
-		te.rootDataDir = resp.ClusterInfo.GetRootDataDir()
 
 		// start is async, so wait some time for cluster health
 		time.Sleep(time.Minute)
+		te.rootDataDir = resp.ClusterInfo.GetRootDataDir()
 
 		ctx, cancel = context.WithTimeout(context.Background(), 2*time.Minute)
 		_, err = te.GetRunnerClient().Health(ctx)
