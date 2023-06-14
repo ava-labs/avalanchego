@@ -19,13 +19,16 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -990,7 +993,7 @@ func TestStandardTxExecutorBanffAddValidator(t *testing.T) {
 	}
 }
 
-func TestStandardTxExecutorContinuousAddValidator(t *testing.T) {
+func TestStandardTxExecutorAddCurrentValidatorPostContinuousStakingFork(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(continuousStakingFork)
 	env.ctx.Lock.Lock()
@@ -1036,6 +1039,88 @@ func TestStandardTxExecutorContinuousAddValidator(t *testing.T) {
 	require.Equal(validatorDuration, val.StakingPeriod)
 	require.Equal(val.StartTime.Add(val.StakingPeriod), val.NextTime)
 	require.Equal(val.NextTime, val.EndTime)
+}
+
+func TestStandardTxExecutorAddContinuousValidatorPostContinuousStakingFork(t *testing.T) {
+	require := require.New(t)
+	env := newEnvironment(continuousStakingFork)
+	env.ctx.Lock.Lock()
+	defer func() {
+		require.NoError(shutdownEnvironment(env))
+	}()
+
+	var (
+		nodeID            = ids.GenerateTestNodeID()
+		validatorDuration = defaultMinStakingDuration
+		dummyStartTime    = time.Unix(0, 0)
+		dummyEndTime      = time.Unix(0, 0).Add(validatorDuration)
+		addr              = preFundedKeys[0].PublicKey().Address()
+	)
+
+	blsSK, err := bls.NewSecretKey()
+	require.NoError(err)
+	blsPOP := signer.NewProofOfPossession(blsSK)
+
+	utxosHandler := utxo.NewHandler(env.ctx, env.clk, env.fx)
+	ins, unstakedOuts, stakedOuts, signers, err := utxosHandler.Spend(
+		env.state,
+		preFundedKeys,
+		env.config.MinValidatorStake, // stakeAmount
+		env.config.AddPrimaryNetworkValidatorFee,
+		addr, // changeAddr
+	)
+	require.NoError(err)
+
+	// Create the tx
+	utx := &txs.AddContinuousValidatorTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    env.ctx.NetworkID,
+			BlockchainID: env.ctx.ChainID,
+			Ins:          ins,
+			Outs:         unstakedOuts,
+		}},
+		Validator: txs.Validator{
+			NodeID: nodeID,
+			Start:  uint64(dummyStartTime.Unix()),
+			End:    uint64(dummyEndTime.Unix()),
+			Wght:   env.config.MinValidatorStake,
+		},
+		Signer:    blsPOP,
+		StakeOuts: stakedOuts,
+		ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
+			Addrs:     []ids.ShortID{addr},
+			Threshold: 1,
+		},
+		ValidatorRewardRestakeShares: 0,
+		DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
+			Addrs:     []ids.ShortID{addr},
+			Threshold: 1,
+		},
+		DelegationShares: 20_000,
+	}
+	addContinuousValTx, err := txs.NewSigned(utx, txs.Codec, signers)
+	require.NoError(err)
+	require.NoError(addContinuousValTx.SyntacticVerify(env.ctx))
+
+	onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
+	require.NoError(err)
+
+	executor := StandardTxExecutor{
+		Backend: &env.backend,
+		State:   onAcceptState,
+		Tx:      addContinuousValTx,
+	}
+	require.NoError(addContinuousValTx.Unsigned.Visit(&executor))
+
+	// Check that a current validator is added
+	val, err := onAcceptState.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+	require.NoError(err)
+
+	require.Equal(addContinuousValTx.ID(), val.TxID)
+	require.Equal(env.state.GetTimestamp(), val.StartTime)
+	require.Equal(validatorDuration, val.StakingPeriod)
+	require.Equal(val.StartTime.Add(val.StakingPeriod), val.NextTime)
+	require.Equal(mockable.MaxTime, val.EndTime)
 }
 
 // Returns a RemoveSubnetValidatorTx that passes syntactic verification.

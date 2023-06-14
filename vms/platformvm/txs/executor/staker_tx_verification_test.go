@@ -4,6 +4,7 @@
 package executor
 
 import (
+	"errors"
 	"math"
 	"testing"
 	"time"
@@ -30,6 +31,8 @@ import (
 // time.Duration underlying type is currently int64
 const stakerMaxDuration time.Duration = math.MaxInt64
 
+var errCustom = errors.New("custom")
+
 func TestVerifyAddContinuousValidatorTx(t *testing.T) {
 	type test struct {
 		name        string
@@ -41,15 +44,16 @@ func TestVerifyAddContinuousValidatorTx(t *testing.T) {
 	}
 
 	var (
-		cfg = config.Config{
-			MinValidatorStake: 1,
-			MaxValidatorStake: 2,
-			MinStakeDuration:  3 * time.Second,
-			MaxStakeDuration:  4 * time.Second,
-			MinDelegationFee:  5,
+		primaryNetworkCfg = config.Config{
+			ContinuousStakingTime: time.Time{}, // activate latest fork
+			MinValidatorStake:     1,
+			MaxValidatorStake:     2,
+			MinStakeDuration:      3 * time.Second,
+			MaxStakeDuration:      4 * time.Second,
+			MinDelegationFee:      5,
 		}
 		// This tx already passed syntactic verification.
-		now        = time.Now().Truncate(time.Second)
+		dummyTime  = time.Now().Truncate(time.Second)
 		verifiedTx = txs.AddContinuousValidatorTx{
 			BaseTx: txs.BaseTx{
 				SyntacticallyVerified: true,
@@ -62,9 +66,9 @@ func TestVerifyAddContinuousValidatorTx(t *testing.T) {
 			},
 			Validator: txs.Validator{
 				NodeID: ids.GenerateTestNodeID(),
-				Start:  uint64(now.Unix()),
-				End:    uint64(now.Add(cfg.MinStakeDuration).Unix()),
-				Wght:   cfg.MinValidatorStake,
+				Start:  uint64(dummyTime.Unix()),
+				End:    uint64(dummyTime.Add(primaryNetworkCfg.MinStakeDuration).Unix()),
+				Wght:   primaryNetworkCfg.MinValidatorStake,
 			},
 			StakeOuts: []*avax.TransferableOutput{
 				{},
@@ -91,10 +95,8 @@ func TestVerifyAddContinuousValidatorTx(t *testing.T) {
 			name: "fail syntactic verification",
 			backendF: func(*gomock.Controller) *Backend {
 				return &Backend{
-					Ctx: snow.DefaultContextTest(),
-					Config: &config.Config{
-						ContinuousStakingTime: time.Time{}, // activate latest fork
-					},
+					Ctx:    snow.DefaultContextTest(),
+					Config: &primaryNetworkCfg,
 				}
 			},
 			stateF: func(*gomock.Controller) state.Chain {
@@ -112,10 +114,8 @@ func TestVerifyAddContinuousValidatorTx(t *testing.T) {
 			name: "not bootstrapped",
 			backendF: func(*gomock.Controller) *Backend {
 				return &Backend{
-					Ctx: snow.DefaultContextTest(),
-					Config: &config.Config{
-						ContinuousStakingTime: time.Time{}, // activate latest fork
-					},
+					Ctx:          snow.DefaultContextTest(),
+					Config:       &primaryNetworkCfg,
 					Bootstrapped: &utils.Atomic[bool]{},
 				}
 			},
@@ -136,12 +136,14 @@ func TestVerifyAddContinuousValidatorTx(t *testing.T) {
 			backendF: func(*gomock.Controller) *Backend {
 				bootstrapped := &utils.Atomic[bool]{}
 				bootstrapped.Set(true)
+
+				cfg := primaryNetworkCfg
+				cfg.CortinaTime = time.Time{}
+				cfg.ContinuousStakingTime = mockable.MaxTime
+
 				return &Backend{
-					Ctx: snow.DefaultContextTest(),
-					Config: &config.Config{
-						CortinaTime:           time.Time{},
-						ContinuousStakingTime: mockable.MaxTime,
-					},
+					Ctx:          snow.DefaultContextTest(),
+					Config:       &cfg,
 					Bootstrapped: bootstrapped,
 				}
 			},
@@ -164,15 +166,8 @@ func TestVerifyAddContinuousValidatorTx(t *testing.T) {
 				bootstrapped := &utils.Atomic[bool]{}
 				bootstrapped.Set(true)
 				return &Backend{
-					Ctx: snow.DefaultContextTest(),
-					Config: &config.Config{
-						ContinuousStakingTime: time.Time{}, // activate latest fork
-						MinValidatorStake:     cfg.MinValidatorStake,
-						MaxValidatorStake:     cfg.MaxValidatorStake,
-						MinStakeDuration:      cfg.MinStakeDuration,
-						MaxStakeDuration:      cfg.MaxStakeDuration,
-						MinDelegationFee:      cfg.MinDelegationFee,
-					},
+					Ctx:          snow.DefaultContextTest(),
+					Config:       &primaryNetworkCfg,
 					Bootstrapped: bootstrapped,
 				}
 			},
@@ -186,7 +181,7 @@ func TestVerifyAddContinuousValidatorTx(t *testing.T) {
 			},
 			txF: func() *txs.AddContinuousValidatorTx {
 				tx := verifiedTx // Note that this copies [verifiedTx]
-				tx.Validator.Wght = cfg.MinValidatorStake - 1
+				tx.Validator.Wght = primaryNetworkCfg.MinValidatorStake - 1
 				return &tx
 			},
 			expectedErr: ErrWeightTooSmall,
@@ -197,15 +192,8 @@ func TestVerifyAddContinuousValidatorTx(t *testing.T) {
 				bootstrapped := &utils.Atomic[bool]{}
 				bootstrapped.Set(true)
 				return &Backend{
-					Ctx: snow.DefaultContextTest(),
-					Config: &config.Config{
-						ContinuousStakingTime: time.Time{}, // activate latest fork
-						MinValidatorStake:     cfg.MinValidatorStake,
-						MaxValidatorStake:     cfg.MaxValidatorStake,
-						MinStakeDuration:      cfg.MinStakeDuration,
-						MaxStakeDuration:      cfg.MaxStakeDuration,
-						MinDelegationFee:      cfg.MinDelegationFee,
-					},
+					Ctx:          snow.DefaultContextTest(),
+					Config:       &primaryNetworkCfg,
 					Bootstrapped: bootstrapped,
 				}
 			},
@@ -219,7 +207,7 @@ func TestVerifyAddContinuousValidatorTx(t *testing.T) {
 			},
 			txF: func() *txs.AddContinuousValidatorTx {
 				tx := verifiedTx // Note that this copies [verifiedTx]
-				tx.Validator.Wght = cfg.MaxValidatorStake + 1
+				tx.Validator.Wght = primaryNetworkCfg.MaxValidatorStake + 1
 				return &tx
 			},
 			expectedErr: ErrWeightTooLarge,
@@ -230,15 +218,8 @@ func TestVerifyAddContinuousValidatorTx(t *testing.T) {
 				bootstrapped := &utils.Atomic[bool]{}
 				bootstrapped.Set(true)
 				return &Backend{
-					Ctx: snow.DefaultContextTest(),
-					Config: &config.Config{
-						ContinuousStakingTime: time.Time{}, // activate latest fork
-						MinValidatorStake:     cfg.MinValidatorStake,
-						MaxValidatorStake:     cfg.MaxValidatorStake,
-						MinStakeDuration:      cfg.MinStakeDuration,
-						MaxStakeDuration:      cfg.MaxStakeDuration,
-						MinDelegationFee:      cfg.MinDelegationFee,
-					},
+					Ctx:          snow.DefaultContextTest(),
+					Config:       &primaryNetworkCfg,
 					Bootstrapped: bootstrapped,
 				}
 			},
@@ -252,8 +233,8 @@ func TestVerifyAddContinuousValidatorTx(t *testing.T) {
 			},
 			txF: func() *txs.AddContinuousValidatorTx {
 				tx := verifiedTx // Note that this copies [verifiedTx]
-				tx.Validator.Wght = cfg.MaxValidatorStake
-				tx.DelegationShares = cfg.MinDelegationFee - 1
+				tx.Validator.Wght = primaryNetworkCfg.MaxValidatorStake
+				tx.DelegationShares = primaryNetworkCfg.MinDelegationFee - 1
 				return &tx
 			},
 			expectedErr: ErrInsufficientDelegationFee,
@@ -264,15 +245,8 @@ func TestVerifyAddContinuousValidatorTx(t *testing.T) {
 				bootstrapped := &utils.Atomic[bool]{}
 				bootstrapped.Set(true)
 				return &Backend{
-					Ctx: snow.DefaultContextTest(),
-					Config: &config.Config{
-						ContinuousStakingTime: time.Time{}, // activate latest fork
-						MinValidatorStake:     cfg.MinValidatorStake,
-						MaxValidatorStake:     cfg.MaxValidatorStake,
-						MinStakeDuration:      cfg.MinStakeDuration,
-						MaxStakeDuration:      cfg.MaxStakeDuration,
-						MinDelegationFee:      cfg.MinDelegationFee,
-					},
+					Ctx:          snow.DefaultContextTest(),
+					Config:       &primaryNetworkCfg,
 					Bootstrapped: bootstrapped,
 				}
 			},
@@ -285,13 +259,10 @@ func TestVerifyAddContinuousValidatorTx(t *testing.T) {
 				return &verifiedSignedTx
 			},
 			txF: func() *txs.AddContinuousValidatorTx {
-				now := time.Now().Truncate(time.Second)
 				tx := verifiedTx // Note that this copies [verifiedTx]
-				tx.Validator.Wght = cfg.MaxValidatorStake
-				tx.DelegationShares = cfg.MinDelegationFee
 				// Note the duration is 1 less than the minimum
-				tx.Validator.Start = uint64(now.Add(time.Second).Unix())
-				tx.Validator.End = uint64(now.Add(cfg.MinStakeDuration).Unix())
+				tx.Validator.Start = uint64(dummyTime.Add(time.Second).Unix())
+				tx.Validator.End = uint64(dummyTime.Add(primaryNetworkCfg.MinStakeDuration).Unix())
 				return &tx
 			},
 			expectedErr: ErrStakeTooShort,
@@ -302,15 +273,8 @@ func TestVerifyAddContinuousValidatorTx(t *testing.T) {
 				bootstrapped := &utils.Atomic[bool]{}
 				bootstrapped.Set(true)
 				return &Backend{
-					Ctx: snow.DefaultContextTest(),
-					Config: &config.Config{
-						ContinuousStakingTime: time.Time{}, // activate latest fork
-						MinValidatorStake:     cfg.MinValidatorStake,
-						MaxValidatorStake:     cfg.MaxValidatorStake,
-						MinStakeDuration:      cfg.MinStakeDuration,
-						MaxStakeDuration:      cfg.MaxStakeDuration,
-						MinDelegationFee:      cfg.MinDelegationFee,
-					},
+					Ctx:          snow.DefaultContextTest(),
+					Config:       &primaryNetworkCfg,
 					Bootstrapped: bootstrapped,
 				}
 			},
@@ -323,13 +287,10 @@ func TestVerifyAddContinuousValidatorTx(t *testing.T) {
 				return &verifiedSignedTx
 			},
 			txF: func() *txs.AddContinuousValidatorTx {
-				now := time.Now().Truncate(time.Second)
 				tx := verifiedTx // Note that this copies [verifiedTx]
-				tx.Validator.Wght = cfg.MaxValidatorStake
-				tx.DelegationShares = cfg.MinDelegationFee
 				// Note the duration is more than the maximum
-				tx.Validator.Start = uint64(now.Unix())
-				tx.Validator.End = uint64(now.Add(time.Second).Add(cfg.MaxStakeDuration).Unix())
+				tx.Validator.Start = uint64(dummyTime.Unix())
+				tx.Validator.End = uint64(dummyTime.Add(time.Second).Add(primaryNetworkCfg.MaxStakeDuration).Unix())
 				return &tx
 			},
 			expectedErr: ErrStakeTooLong,
@@ -340,15 +301,8 @@ func TestVerifyAddContinuousValidatorTx(t *testing.T) {
 				bootstrapped := &utils.Atomic[bool]{}
 				bootstrapped.Set(true)
 				return &Backend{
-					Ctx: snow.DefaultContextTest(),
-					Config: &config.Config{
-						ContinuousStakingTime: time.Time{}, // activate latest fork
-						MinValidatorStake:     cfg.MinValidatorStake,
-						MaxValidatorStake:     cfg.MaxValidatorStake,
-						MinStakeDuration:      cfg.MinStakeDuration,
-						MaxStakeDuration:      cfg.MaxStakeDuration,
-						MinDelegationFee:      cfg.MinDelegationFee,
-					},
+					Ctx:          snow.DefaultContextTest(),
+					Config:       &primaryNetworkCfg,
 					Bootstrapped: bootstrapped,
 				}
 			},
@@ -379,15 +333,8 @@ func TestVerifyAddContinuousValidatorTx(t *testing.T) {
 				bootstrapped := &utils.Atomic[bool]{}
 				bootstrapped.Set(true)
 				return &Backend{
-					Ctx: snow.DefaultContextTest(),
-					Config: &config.Config{
-						ContinuousStakingTime: time.Time{}, // activate latest fork
-						MinValidatorStake:     cfg.MinValidatorStake,
-						MaxValidatorStake:     cfg.MaxValidatorStake,
-						MinStakeDuration:      cfg.MinStakeDuration,
-						MaxStakeDuration:      cfg.MaxStakeDuration,
-						MinDelegationFee:      cfg.MinDelegationFee,
-					},
+					Ctx:          snow.DefaultContextTest(),
+					Config:       &primaryNetworkCfg,
 					Bootstrapped: bootstrapped,
 				}
 			},
@@ -407,6 +354,32 @@ func TestVerifyAddContinuousValidatorTx(t *testing.T) {
 			expectedErr: ErrDuplicateValidator,
 		},
 		{
+			name: "failed checking for existing validator",
+			backendF: func(*gomock.Controller) *Backend {
+				bootstrapped := &utils.Atomic[bool]{}
+				bootstrapped.Set(true)
+				return &Backend{
+					Ctx:          snow.DefaultContextTest(),
+					Config:       &primaryNetworkCfg,
+					Bootstrapped: bootstrapped,
+				}
+			},
+			stateF: func(ctrl *gomock.Controller) state.Chain {
+				s := state.NewMockChain(ctrl)
+				s.EXPECT().GetTimestamp().Return(time.Unix(0, 0))
+				// State says validator exists
+				s.EXPECT().GetCurrentValidator(constants.PrimaryNetworkID, verifiedTx.NodeID()).Return(nil, errCustom)
+				return s
+			},
+			sTxF: func() *txs.Tx {
+				return &verifiedSignedTx
+			},
+			txF: func() *txs.AddContinuousValidatorTx {
+				return &verifiedTx
+			},
+			expectedErr: errCustom,
+		},
+		{
 			name: "flow check fails",
 			backendF: func(ctrl *gomock.Controller) *Backend {
 				bootstrapped := &utils.Atomic[bool]{}
@@ -423,16 +396,8 @@ func TestVerifyAddContinuousValidatorTx(t *testing.T) {
 				).Return(ErrFlowCheckFailed)
 
 				return &Backend{
-					FlowChecker: flowChecker,
-					Config: &config.Config{
-						AddSubnetValidatorFee: 1,
-						ContinuousStakingTime: time.Time{}, // activate latest fork,
-						MinValidatorStake:     cfg.MinValidatorStake,
-						MaxValidatorStake:     cfg.MaxValidatorStake,
-						MinStakeDuration:      cfg.MinStakeDuration,
-						MaxStakeDuration:      cfg.MaxStakeDuration,
-						MinDelegationFee:      cfg.MinDelegationFee,
-					},
+					FlowChecker:  flowChecker,
+					Config:       &primaryNetworkCfg,
 					Ctx:          snow.DefaultContextTest(),
 					Bootstrapped: bootstrapped,
 				}
@@ -469,16 +434,8 @@ func TestVerifyAddContinuousValidatorTx(t *testing.T) {
 				).Return(nil)
 
 				return &Backend{
-					FlowChecker: flowChecker,
-					Config: &config.Config{
-						AddSubnetValidatorFee: 1,
-						ContinuousStakingTime: time.Time{}, // activate latest fork,
-						MinValidatorStake:     cfg.MinValidatorStake,
-						MaxValidatorStake:     cfg.MaxValidatorStake,
-						MinStakeDuration:      cfg.MinStakeDuration,
-						MaxStakeDuration:      cfg.MaxStakeDuration,
-						MinDelegationFee:      cfg.MinDelegationFee,
-					},
+					FlowChecker:  flowChecker,
+					Config:       &primaryNetworkCfg,
 					Ctx:          snow.DefaultContextTest(),
 					Bootstrapped: bootstrapped,
 				}
