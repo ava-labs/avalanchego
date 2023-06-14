@@ -105,12 +105,8 @@ var _ = ginkgo.BeforeSuite(func() {
 	err = e2e.Env.StartCluster()
 	gomega.Expect(err).Should(gomega.BeNil())
 
-	// start prometheus metrics collection
-	err = e2e.Env.StartMonitoring(networkRunnerPrometheusExecPath)
-	gomega.Expect(err).Should(gomega.BeNil())
-
-	// take a snapshot of current metrics
-	err = e2e.Env.SnapshotMetrics()
+	// start prometheus server
+	err = e2e.Env.StartPrometheus(networkRunnerPrometheusExecPath)
 	gomega.Expect(err).Should(gomega.BeNil())
 
 	// load keys
@@ -127,7 +123,9 @@ var _ = ginkgo.BeforeSuite(func() {
 })
 
 var _ = ginkgo.AfterSuite(func() {
-	err := e2e.Env.ShutdownCluster()
+	err := e2e.Env.PrometheusSnapshot()
+	gomega.Expect(err).Should(gomega.BeNil())
+	err = e2e.Env.ShutdownCluster()
 	gomega.Expect(err).Should(gomega.BeNil())
 	err = e2e.Env.StopMonitoring()
 	gomega.Expect(err).Should(gomega.BeNil())

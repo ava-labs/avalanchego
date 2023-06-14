@@ -147,30 +147,31 @@ func (te *TestEnvironment) ConfigCluster(
 	}
 }
 
-func (te *TestEnvironment) StartMonitoring(prometheusExecPath string) error {
+func (te *TestEnvironment) StartPrometheus(prometheusExecPath string) error {
 	cmd := subprocess.NewCmd(prometheusExecPath, fmt.Sprintf("--config.file=%s/prometheus.yaml", te.rootDataDir))
 	err := cmd.Start()
 	if err != nil {
 		return fmt.Errorf("failed to start prometheus: %w", err)
 	}
 	te.prometheusExec = cmd
+
 	return nil
 }
 
-func (te *TestEnvironment) SnapshotMetrics() error {
-	client, err := api.NewClient(api.Config{
+func (te *TestEnvironment) PrometheusSnapshot() error {
+	conn, err := api.NewClient(api.Config{
 		Address: "http://127.0.0.1:9090",
 	})
 	if err != nil {
-		return fmt.Errorf("failed to create prometheus client: %w", err)
+		return fmt.Errorf("failed to create prometheus conn: %w", err)
 	}
-	v1api := v1.NewAPI(client)
 
-	v, err := v1api.Snapshot(context.Background(), false)
+	client := v1.NewAPI(conn)
+	v, err := client.Snapshot(context.Background(), false)
 	if err != nil {
 		return fmt.Errorf("failed to create prometheus snapshot: %w", err)
 	}
-	tests.Outf("{{green}}metrics snapshot completed %q{{/}}\n", v.Name)
+	tests.Outf("{{green}}prometheus snapshot completed %q{{/}}\n", v.Name)
 
 	return nil
 }
