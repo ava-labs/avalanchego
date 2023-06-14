@@ -7,13 +7,13 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/leanovate/gopter"
+	"github.com/leanovate/gopter/gen"
 	blst "github.com/supranational/blst/bindings/go"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/leanovate/gopter"
-	"github.com/leanovate/gopter/gen"
 )
 
 type generatorPriorityType uint8
