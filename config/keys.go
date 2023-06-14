@@ -46,6 +46,7 @@ const (
 	OutboundConnectionTimeoutKey                       = "outbound-connection-timeout"
 	HTTPHostKey                                        = "http-host"
 	HTTPPortKey                                        = "http-port"
+	HTTPAllowInsecureLocalhost                         = "http-insecure-localhost"
 	HTTPSEnabledKey                                    = "http-tls-enabled"
 	HTTPSKeyFileKey                                    = "http-tls-key-file"
 	HTTPSKeyContentKey                                 = "http-tls-key-file-content"

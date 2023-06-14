@@ -64,6 +64,7 @@ type APIConfig struct {
 	APIIndexerConfig `json:"indexerConfig"`
 	IPCConfig        `json:"ipcConfig"`
 
+	AllowInsecureLocalhost bool `json:"allowInsecureLocalhost"`
 	// Enable/Disable APIs
 	AdminAPIEnabled    bool `json:"adminAPIEnabled"`
 	InfoAPIEnabled     bool `json:"infoAPIEnabled"`
