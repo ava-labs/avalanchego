@@ -72,6 +72,43 @@ func TestAddContinuousDelegatorTxSyntacticVerify(t *testing.T) {
 			err: nil,
 		},
 		{
+			name: "wrong management key",
+			txFunc: func(ctrl *gomock.Controller) *AddContinuousDelegatorTx {
+				rewardsOwner := fx.NewMockOwner(ctrl)
+				rewardsOwner.EXPECT().Verify().Return(nil).AnyTimes()
+				wrongManagementKey := fx.NewMockOwner(ctrl)
+				wrongManagementKey.EXPECT().Verify().Return(errCustom).AnyTimes()
+				assetID := ids.GenerateTestID()
+				return &AddContinuousDelegatorTx{
+					BaseTx: validBaseTx,
+					Validator: Validator{
+						Wght: 2,
+					},
+					DelegatorAuthKey: wrongManagementKey,
+					StakeOuts: []*avax.TransferableOutput{
+						{
+							Asset: avax.Asset{
+								ID: assetID,
+							},
+							Out: &secp256k1fx.TransferOutput{
+								Amt: 1,
+							},
+						},
+						{
+							Asset: avax.Asset{
+								ID: assetID,
+							},
+							Out: &secp256k1fx.TransferOutput{
+								Amt: 1,
+							},
+						},
+					},
+					DelegationRewardsOwner: rewardsOwner,
+				}
+			},
+			err: errCustom,
+		},
+		{
 			name: "no provided stake",
 			txFunc: func(*gomock.Controller) *AddContinuousDelegatorTx {
 				return &AddContinuousDelegatorTx{

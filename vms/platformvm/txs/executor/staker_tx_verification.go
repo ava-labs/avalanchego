@@ -43,6 +43,7 @@ var (
 	ErrUnauthorizedStakerStopping               = errors.New("unauthorized staker stopping")
 	ErrTxUnacceptableBeforeFork                 = errors.New("tx unacceptable before fork")
 	ErrCantContinuousDelegateToPendingValidator = errors.New("cannot do continuous delegation to pending validator")
+	ErrNoStakerToStop                           = errors.New("could not find staker to stop")
 )
 
 // verifyAddValidatorTx carries out the validation for an AddValidatorTx.
@@ -1135,20 +1136,21 @@ func verifyStopStakerTx(
 		txID         = tx.TxID
 		stakerToStop *state.Staker
 	)
-	stakersIt, err := chainState.GetCurrentStakerIterator()
+	theStakerIt, err := chainState.GetCurrentStakerIterator()
 	if err != nil {
-		stakersIt.Release()
 		return nil, time.Time{}, err
 	}
-	for stakersIt.Next() {
-		if stakersIt.Value().TxID == txID {
-			stakerToStop = stakersIt.Value()
+	defer theStakerIt.Release()
+	for theStakerIt.Next() {
+		staker := theStakerIt.Value()
+		if staker.TxID == txID {
+			stakerToStop = staker
 			break
 		}
 	}
-	stakersIt.Release()
+
 	if stakerToStop == nil {
-		return nil, time.Time{}, errors.New("could not find staker to stop among current ones")
+		return nil, time.Time{}, ErrNoStakerToStop
 	}
 
 	if backend.Bootstrapped.Get() {
@@ -1182,13 +1184,13 @@ func verifyStopStakerTx(
 	// their delegators and subnet validators/delegator as well, to make sure they don't
 	// outlive the primary network validators.
 	res := []*state.Staker{stakerToStop}
-	stakersIt, err = chainState.GetCurrentStakerIterator()
+	allStakersIt, err := chainState.GetCurrentStakerIterator()
 	if err != nil {
-		stakersIt.Release()
 		return nil, time.Time{}, err
 	}
-	for stakersIt.Next() {
-		staker := stakersIt.Value()
+	defer allStakersIt.Release()
+	for allStakersIt.Next() {
+		staker := allStakersIt.Value()
 		if staker.NodeID == stakerToStop.NodeID && staker.TxID != stakerToStop.TxID {
 			res = append(res, staker)
 		}
@@ -1196,7 +1198,7 @@ func verifyStopStakerTx(
 			candidateStopTime = candidateStopTime.Add(stakerToStop.StakingPeriod)
 		}
 	}
-	stakersIt.Release()
+
 	return res, candidateStopTime, nil
 }
 
@@ -1218,7 +1220,7 @@ func verifyStopStakerAuthorization(
 	stakerTx, _, err := chainState.GetTx(stakerTxID)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"staker tx not found %q: %v",
+			"staker tx not found %q: %w",
 			stakerTxID,
 			err,
 		)

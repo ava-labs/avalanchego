@@ -19,12 +19,15 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -34,6 +37,445 @@ import (
 const stakerMaxDuration time.Duration = math.MaxInt64
 
 var errCustom = errors.New("custom")
+
+func TestVerifyStopContinuousValidatorTx(t *testing.T) {
+	type test struct {
+		name                    string
+		backendF                func(*gomock.Controller) *Backend
+		stateF                  func(*gomock.Controller) state.Chain
+		sTxF                    func() *txs.Tx
+		txF                     func() *txs.StopStakerTx
+		expectedStoppingStakers []*state.Staker
+		expectedStopTime        time.Time
+		expectedErr             error
+	}
+
+	blsSK, err := bls.NewSecretKey()
+	require.NoError(t, err)
+	blsPOP := signer.NewProofOfPossession(blsSK)
+
+	primaryNetworkCfg := config.Config{
+		ContinuousStakingTime: time.Time{}, // activate latest fork
+		MinValidatorStake:     1,
+		MaxValidatorStake:     2,
+		MinStakeDuration:      3 * time.Second,
+		MaxStakeDuration:      4 * time.Second,
+		MinDelegationFee:      5,
+	}
+
+	addr := preFundedKeys[0].Address()
+
+	// primary validator tx to retrieve ValidatorAuthKey from
+	primaryValidatorTx := &txs.AddContinuousValidatorTx{
+		ValidatorAuthKey: &secp256k1fx.OutputOwners{
+			Addrs:     []ids.ShortID{addr},
+			Threshold: 1,
+		},
+	}
+	signedPrimaryValidatorTx := txs.Tx{
+		Unsigned: primaryValidatorTx,
+		Creds:    []verify.Verifiable{},
+	}
+	signedPrimaryValidatorTx.SetBytes([]byte{1}, []byte{2})
+
+	var (
+		chainTime        = time.Now().Truncate(time.Second)
+		primaryValidator = &state.Staker{
+			TxID:      signedPrimaryValidatorTx.ID(),
+			NodeID:    ids.GenerateTestNodeID(),
+			PublicKey: blsPOP.Key(),
+			SubnetID:  constants.PlatformChainID,
+			Weight:    primaryNetworkCfg.MinValidatorStake,
+
+			StartTime:       chainTime,
+			StakingPeriod:   primaryNetworkCfg.MinStakeDuration,
+			EndTime:         mockable.MaxTime,
+			PotentialReward: uint64(0), // not relevant for this test
+			NextTime:        chainTime.Add(primaryNetworkCfg.MinStakeDuration),
+			Priority:        txs.PrimaryNetworkContinuousValidatorCurrentPriority,
+		}
+
+		// This tx already passed syntactic verification.
+		verifiedTx = txs.StopStakerTx{
+			BaseTx: txs.BaseTx{
+				SyntacticallyVerified: true,
+				BaseTx: avax.BaseTx{
+					NetworkID:    1,
+					BlockchainID: ids.GenerateTestID(),
+					Outs:         []*avax.TransferableOutput{},
+					Ins:          []*avax.TransferableInput{},
+				},
+			},
+			TxID: primaryValidator.TxID,
+			StakerAuth: &secp256k1fx.Input{
+				SigIndices: []uint32{0},
+			},
+		}
+		verifiedSignedTx = txs.Tx{
+			Unsigned: &verifiedTx,
+			Creds: []verify.Verifiable{
+				&secp256k1fx.Credential{
+					Sigs: [][secp256k1.SignatureLen]byte{{1, 3, 3, 7}},
+				},
+			},
+		}
+	)
+	verifiedSignedTx.SetBytes([]byte{3}, []byte{4})
+
+	tests := []test{
+		{
+			name: "success",
+			backendF: func(ctrl *gomock.Controller) *Backend {
+				bootstrapped := &utils.Atomic[bool]{}
+				bootstrapped.Set(true)
+
+				fxMock := fx.NewMockFx(ctrl)
+				fxMock.EXPECT().VerifyPermission(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+
+				flowChecker := utxo.NewMockVerifier(ctrl)
+				flowChecker.EXPECT().VerifySpend(
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+				).Return(nil)
+
+				return &Backend{
+					Fx:           fxMock,
+					FlowChecker:  flowChecker,
+					Config:       &primaryNetworkCfg,
+					Ctx:          snow.DefaultContextTest(),
+					Bootstrapped: bootstrapped,
+				}
+			},
+			stateF: func(ctrl *gomock.Controller) state.Chain {
+				mockState := state.NewMockChain(ctrl)
+				mockState.EXPECT().GetTimestamp().Return(time.Unix(0, 0))
+				currentStakerIter := state.NewMockStakerIterator(ctrl)
+
+				// first round to find staker to stop
+				currentStakerIter.EXPECT().Next().Return(true)
+				currentStakerIter.EXPECT().Value().Return(primaryValidator)
+				currentStakerIter.EXPECT().Release()
+
+				// second round to find all stakers to stop. Bare minimum mocks to pass
+				currentStakerIter.EXPECT().Next().Return(false)
+				currentStakerIter.EXPECT().Release()
+
+				mockState.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil).AnyTimes()
+
+				mockState.EXPECT().GetTx(signedPrimaryValidatorTx.ID()).Return(&signedPrimaryValidatorTx, status.Committed, nil)
+				return mockState
+			},
+			sTxF: func() *txs.Tx {
+				return &verifiedSignedTx
+			},
+			txF: func() *txs.StopStakerTx {
+				return &verifiedTx
+			},
+			expectedStoppingStakers: []*state.Staker{primaryValidator},
+			expectedStopTime:        primaryValidator.NextTime,
+			expectedErr:             nil,
+		},
+		{
+			name: "fail syntactic verification",
+			backendF: func(*gomock.Controller) *Backend {
+				return &Backend{
+					Ctx:    snow.DefaultContextTest(),
+					Config: &primaryNetworkCfg,
+				}
+			},
+			stateF: func(*gomock.Controller) state.Chain {
+				return nil
+			},
+			sTxF: func() *txs.Tx {
+				return nil
+			},
+			txF: func() *txs.StopStakerTx {
+				return nil
+			},
+			expectedErr: txs.ErrNilSignedTx,
+		},
+		{
+			name: "not bootstrapped",
+			backendF: func(ctrl *gomock.Controller) *Backend {
+				bootstrapped := &utils.Atomic[bool]{}
+				bootstrapped.Set(false)
+
+				return &Backend{
+					Fx:           nil,
+					FlowChecker:  nil,
+					Config:       &primaryNetworkCfg,
+					Ctx:          snow.DefaultContextTest(),
+					Bootstrapped: bootstrapped,
+				}
+			},
+			stateF: func(ctrl *gomock.Controller) state.Chain {
+				mockState := state.NewMockChain(ctrl)
+				mockState.EXPECT().GetTimestamp().Return(time.Unix(0, 0))
+				currentStakerIter := state.NewMockStakerIterator(ctrl)
+
+				// first round to find staker to stop
+				currentStakerIter.EXPECT().Next().Return(true)
+				currentStakerIter.EXPECT().Value().Return(primaryValidator)
+				currentStakerIter.EXPECT().Release()
+
+				// second round to find all stakers to stop. Bare minimum mocks to pass
+				currentStakerIter.EXPECT().Next().Return(false)
+				currentStakerIter.EXPECT().Release()
+
+				mockState.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil).AnyTimes()
+				return mockState
+			},
+			sTxF: func() *txs.Tx {
+				return &verifiedSignedTx
+			},
+			txF: func() *txs.StopStakerTx {
+				return &verifiedTx
+			},
+			expectedStoppingStakers: []*state.Staker{primaryValidator},
+			expectedStopTime:        primaryValidator.NextTime,
+			expectedErr:             nil,
+		},
+		{
+			name: "tx not accepted pre continuous fork",
+			backendF: func(*gomock.Controller) *Backend {
+				bootstrapped := &utils.Atomic[bool]{}
+				bootstrapped.Set(true)
+
+				cfg := primaryNetworkCfg
+				cfg.CortinaTime = time.Time{}
+				cfg.ContinuousStakingTime = mockable.MaxTime
+
+				return &Backend{
+					Ctx:          snow.DefaultContextTest(),
+					Config:       &cfg,
+					Bootstrapped: bootstrapped,
+				}
+			},
+			stateF: func(ctrl *gomock.Controller) state.Chain {
+				mockState := state.NewMockChain(ctrl)
+				mockState.EXPECT().GetTimestamp().Return(time.Unix(0, 0))
+				return mockState
+			},
+			sTxF: func() *txs.Tx {
+				return &verifiedSignedTx
+			},
+			txF: func() *txs.StopStakerTx {
+				return &verifiedTx
+			},
+			expectedErr: ErrTxUnacceptableBeforeFork,
+		},
+		{
+			name: "failed getting staker iterator",
+			backendF: func(ctrl *gomock.Controller) *Backend {
+				bootstrapped := &utils.Atomic[bool]{}
+				bootstrapped.Set(true)
+
+				return &Backend{
+					Fx:           nil,
+					FlowChecker:  nil,
+					Config:       &primaryNetworkCfg,
+					Ctx:          snow.DefaultContextTest(),
+					Bootstrapped: bootstrapped,
+				}
+			},
+			stateF: func(ctrl *gomock.Controller) state.Chain {
+				mockState := state.NewMockChain(ctrl)
+				mockState.EXPECT().GetTimestamp().Return(time.Unix(0, 0))
+				mockState.EXPECT().GetCurrentStakerIterator().Return(nil, errCustom)
+				return mockState
+			},
+			sTxF: func() *txs.Tx {
+				return &verifiedSignedTx
+			},
+			txF: func() *txs.StopStakerTx {
+				return &verifiedTx
+			},
+			expectedErr: errCustom,
+		},
+		{
+			name: "no staker to stop",
+			backendF: func(ctrl *gomock.Controller) *Backend {
+				bootstrapped := &utils.Atomic[bool]{}
+				bootstrapped.Set(true)
+
+				return &Backend{
+					Fx:           nil,
+					FlowChecker:  nil,
+					Config:       &primaryNetworkCfg,
+					Ctx:          snow.DefaultContextTest(),
+					Bootstrapped: bootstrapped,
+				}
+			},
+			stateF: func(ctrl *gomock.Controller) state.Chain {
+				mockState := state.NewMockChain(ctrl)
+				mockState.EXPECT().GetTimestamp().Return(time.Unix(0, 0))
+
+				currentStakerIter := state.NewMockStakerIterator(ctrl)
+				currentStakerIter.EXPECT().Next().Return(false)
+				currentStakerIter.EXPECT().Release()
+				mockState.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil).AnyTimes()
+
+				return mockState
+			},
+			sTxF: func() *txs.Tx {
+				return &verifiedSignedTx
+			},
+			txF: func() *txs.StopStakerTx {
+				return &verifiedTx
+			},
+			expectedErr: ErrNoStakerToStop,
+		},
+		{
+			name: "failed staker stop verification",
+			backendF: func(ctrl *gomock.Controller) *Backend {
+				bootstrapped := &utils.Atomic[bool]{}
+				bootstrapped.Set(true)
+
+				fxMock := fx.NewMockFx(ctrl)
+				fxMock.EXPECT().VerifyPermission(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(errCustom)
+
+				return &Backend{
+					Fx:           fxMock,
+					FlowChecker:  nil,
+					Config:       &primaryNetworkCfg,
+					Ctx:          snow.DefaultContextTest(),
+					Bootstrapped: bootstrapped,
+				}
+			},
+			stateF: func(ctrl *gomock.Controller) state.Chain {
+				mockState := state.NewMockChain(ctrl)
+				mockState.EXPECT().GetTimestamp().Return(time.Unix(0, 0))
+				currentStakerIter := state.NewMockStakerIterator(ctrl)
+
+				// first round to find staker to stop
+				currentStakerIter.EXPECT().Next().Return(true)
+				currentStakerIter.EXPECT().Value().Return(primaryValidator)
+				currentStakerIter.EXPECT().Release()
+				mockState.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil).AnyTimes()
+
+				mockState.EXPECT().GetTx(signedPrimaryValidatorTx.ID()).Return(&signedPrimaryValidatorTx, status.Committed, nil)
+				return mockState
+			},
+			sTxF: func() *txs.Tx {
+				return &verifiedSignedTx
+			},
+			txF: func() *txs.StopStakerTx {
+				return &verifiedTx
+			},
+			expectedErr: ErrUnauthorizedStakerStopping,
+		},
+		{
+			name: "missing validator tx",
+			backendF: func(ctrl *gomock.Controller) *Backend {
+				bootstrapped := &utils.Atomic[bool]{}
+				bootstrapped.Set(true)
+
+				return &Backend{
+					Fx:           nil,
+					FlowChecker:  nil,
+					Config:       &primaryNetworkCfg,
+					Ctx:          snow.DefaultContextTest(),
+					Bootstrapped: bootstrapped,
+				}
+			},
+			stateF: func(ctrl *gomock.Controller) state.Chain {
+				mockState := state.NewMockChain(ctrl)
+				mockState.EXPECT().GetTimestamp().Return(time.Unix(0, 0))
+				currentStakerIter := state.NewMockStakerIterator(ctrl)
+
+				// first round to find staker to stop
+				currentStakerIter.EXPECT().Next().Return(true)
+				currentStakerIter.EXPECT().Value().Return(primaryValidator)
+				currentStakerIter.EXPECT().Release()
+				mockState.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil).AnyTimes()
+
+				mockState.EXPECT().GetTx(signedPrimaryValidatorTx.ID()).Return(nil, status.Unknown, errCustom)
+
+				return mockState
+			},
+			sTxF: func() *txs.Tx {
+				return &verifiedSignedTx
+			},
+			txF: func() *txs.StopStakerTx {
+				return &verifiedTx
+			},
+			expectedErr: errCustom,
+		},
+		{
+			name: "failed flow check",
+			backendF: func(ctrl *gomock.Controller) *Backend {
+				bootstrapped := &utils.Atomic[bool]{}
+				bootstrapped.Set(true)
+
+				fxMock := fx.NewMockFx(ctrl)
+				fxMock.EXPECT().VerifyPermission(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+
+				flowChecker := utxo.NewMockVerifier(ctrl)
+				flowChecker.EXPECT().VerifySpend(
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+				).Return(errCustom)
+
+				return &Backend{
+					Fx:           fxMock,
+					FlowChecker:  flowChecker,
+					Config:       &primaryNetworkCfg,
+					Ctx:          snow.DefaultContextTest(),
+					Bootstrapped: bootstrapped,
+				}
+			},
+			stateF: func(ctrl *gomock.Controller) state.Chain {
+				mockState := state.NewMockChain(ctrl)
+				mockState.EXPECT().GetTimestamp().Return(time.Unix(0, 0))
+				currentStakerIter := state.NewMockStakerIterator(ctrl)
+
+				// first round to find staker to stop
+				currentStakerIter.EXPECT().Next().Return(true)
+				currentStakerIter.EXPECT().Value().Return(primaryValidator)
+				currentStakerIter.EXPECT().Release()
+
+				mockState.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil).AnyTimes()
+
+				mockState.EXPECT().GetTx(signedPrimaryValidatorTx.ID()).Return(&signedPrimaryValidatorTx, status.Committed, nil)
+				return mockState
+			},
+			sTxF: func() *txs.Tx {
+				return &verifiedSignedTx
+			},
+			txF: func() *txs.StopStakerTx {
+				return &verifiedTx
+			},
+			expectedErr: ErrFlowCheckFailed,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			var (
+				backend = tt.backendF(ctrl)
+				state   = tt.stateF(ctrl)
+				sTx     = tt.sTxF()
+				tx      = tt.txF()
+			)
+
+			stoppingStakers, stoppingTime, err := verifyStopStakerTx(backend, state, sTx, tx)
+			require.ErrorIs(t, err, tt.expectedErr)
+			require.Equal(t, tt.expectedStoppingStakers, stoppingStakers)
+			require.Equal(t, tt.expectedStopTime, stoppingTime)
+		})
+	}
+}
 
 func TestVerifyAddContinuousValidatorTx(t *testing.T) {
 	type test struct {

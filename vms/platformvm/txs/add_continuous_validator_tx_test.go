@@ -238,6 +238,46 @@ func TestAddContinuousValidatorTxSyntacticVerify(t *testing.T) {
 			err: errInvalidSigner,
 		},
 		{
+			name: "wrong management key",
+			txFunc: func(ctrl *gomock.Controller) *AddContinuousValidatorTx {
+				rewardsOwner := fx.NewMockOwner(ctrl)
+				rewardsOwner.EXPECT().Verify().Return(nil).AnyTimes()
+				wrongManagementKey := fx.NewMockOwner(ctrl)
+				wrongManagementKey.EXPECT().Verify().Return(errCustom).AnyTimes()
+				assetID := ids.GenerateTestID()
+				return &AddContinuousValidatorTx{
+					BaseTx: validBaseTx,
+					Validator: Validator{
+						NodeID: ids.GenerateTestNodeID(),
+						Wght:   2,
+					},
+					Signer:           blsPOP,
+					ValidatorAuthKey: wrongManagementKey,
+					StakeOuts: []*avax.TransferableOutput{
+						{
+							Asset: avax.Asset{
+								ID: assetID,
+							},
+							Out: &secp256k1fx.TransferOutput{
+								Amt: 1,
+							},
+						},
+						{
+							Asset: avax.Asset{
+								ID: assetID,
+							},
+							Out: &secp256k1fx.TransferOutput{
+								Amt: 1,
+							},
+						},
+					},
+					ValidatorRewardsOwner: rewardsOwner,
+					DelegatorRewardsOwner: rewardsOwner,
+				}
+			},
+			err: errCustom,
+		},
+		{
 			name: "invalid stake output",
 			txFunc: func(ctrl *gomock.Controller) *AddContinuousValidatorTx {
 				rewardsOwner := fx.NewMockOwner(ctrl)
