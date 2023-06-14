@@ -158,7 +158,7 @@ func (te *TestEnvironment) StartPrometheus(prometheusExecPath string) error {
 	return nil
 }
 
-func(*TestEnvironment)  PrometheusSnapshot() error {
+func (*TestEnvironment) PrometheusSnapshot() error {
 	conn, err := api.NewClient(api.Config{
 		Address: "http://127.0.0.1:9090",
 	})
