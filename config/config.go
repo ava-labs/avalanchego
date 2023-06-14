@@ -630,6 +630,7 @@ func getIPConfig(v *viper.Viper) (node.IPConfig, error) {
 			),
 			IPResolutionFreq: ipResolutionFreq,
 			Nat:              nat.NewNoRouter(),
+			ListenHost:       v.GetString(StakingHostKey),
 		}, nil
 	}
 

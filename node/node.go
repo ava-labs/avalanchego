@@ -12,7 +12,6 @@ import (
 	"net"
 	"os"
 	"path/filepath"
-	goruntime "runtime"
 	"sync"
 	"time"
 
@@ -215,42 +214,33 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 	currentIPPort := n.Config.IPPort.IPPort()
 
 	// Default to binding to all interfaces on the specified port
-	networkType := constants.NetworkType
 	listenAddress := fmt.Sprintf(":%d", currentIPPort.Port)
 
-	// On MacOS, if either loopback address is specified, bind only to that address to minimize
-	// developer friction.
+	// If a listen host is provided, bind only to that address on the specified port.
 	//
-	// - MacOS requires a manually-approved firewall exception [1] for each version of a given binary
-	// that wants to bind to all interfaces (i.e. with an address of `:[port]`). Each compiled
-	// version of avalanchego requires a separate exception to be allowed to bind to all interfaces.
+	// Providing either loopback address - `::1` for ipv6 and `127.0.0.1` for ipv4 - will avoid the
+	// need for a firewall exception on recent MacOS:
 	//
-	// - A firewall exception is not required to bind to a loopback interface, but the only way for
-	// Listen() to bind to loopback for both ipv4 and ipv6 is to bind to all interfaces [2] which
-	// requires an exception.
+	//   - MacOS requires a manually-approved firewall exception [1] for each version of a given
+	//   binary that wants to bind to all interfaces (i.e. with an address of `:[port]`). Each
+	//   compiled version of avalanchego requires a separate exception to be allowed to bind to all
+	//   interfaces.
 	//
-	// - Thus, the only way to start a local avalanche network on MacOS without approving one or more
-	// firewall exceptions for the targeted avalanchego binaries is to bind to loopback for only a
-	// single network type by specifying either `[::1]` (ipv6) or `127.0.0.1` (ipv4).
+	//   - A firewall exception is not required to bind to a loopback interface, but the only way for
+	//   Listen() to bind to loopback for both ipv4 and ipv6 is to bind to all interfaces [2] which
+	//   requires an exception.
+	//
+	//   - Thus, the only way to start a local avalanche network on MacOS without approving one or
+	//   more firewall exceptions for the targeted avalanchego binaries is to bind to loopback for
+	//   only a single network type by specifying either `::1` (ipv6) or `127.0.0.1` (ipv4).
 	//
 	// 1: https://apple.stackexchange.com/questions/393715/do-you-want-the-application-main-to-accept-incoming-network-connections-pop
 	// 2: https://github.com/golang/go/issues/56998
-	//
-	// TODO(marun) Should this be configurable and/or test-only?
-	//
-	if goruntime.GOOS == "darwin" && currentIPPort.IP.IsLoopback() {
-		networkType = "tcp6"
-		if ip4 := currentIPPort.IP.To4(); ip4 != nil {
-			networkType = "tcp4"
-		}
-		n.Log.Warn(
-			fmt.Sprintf("binding only to %s loopback address on MacOS to avoid requiring a firewall exception",
-				networkType,
-			))
-		listenAddress = currentIPPort.IP.String() + listenAddress
+	if len(n.Config.ListenHost) != 0 {
+		listenAddress = net.JoinHostPort(n.Config.ListenHost, fmt.Sprintf("%d", currentIPPort.Port))
 	}
 
-	listener, err := net.Listen(networkType, listenAddress)
+	listener, err := net.Listen(constants.NetworkType, listenAddress)
 	if err != nil {
 		return err
 	}
@@ -385,7 +375,7 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 		n.MetricsRegisterer,
 		n.Log,
 		listener,
-		dialer.NewDialer(networkType, n.Config.NetworkConfig.DialerConfig, n.Log),
+		dialer.NewDialer(constants.NetworkType, n.Config.NetworkConfig.DialerConfig, n.Log),
 		consensusRouter,
 	)
 
