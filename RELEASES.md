@@ -4,6 +4,8 @@
 
 This version is backwards compatible to [v1.10.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0). It is optional, but encouraged. The supported plugin version is `26`.
 
+**Users must specify the `--allowed-hosts-flag` to receive inbound API traffic from non-local hosts.**
+
 ### APIs
 
 - Added health metrics based on tags
@@ -15,6 +17,7 @@ This version is backwards compatible to [v1.10.0](https://github.com/ava-labs/av
   - `avalanche_P_vm_percent_connected_subnet{subnetID="SUBNETID"}`
 - Added percent connected metrics by chain
   - `avalanche_{ChainID}_percent_connected`
+- Removed `avalanche_network_send_queue_portion_full` metric
 
 ### Configs
 
@@ -26,6 +29,7 @@ This version is backwards compatible to [v1.10.0](https://github.com/ava-labs/av
 ### Fixes
 
 - Fixed `platformvm.GetValidatorSet` returning incorrect BLS public keys
+- Fixed IPv6 literal binding with `--http-host`
 - Fixed P2P message log format
 
 ### What's Changed
@@ -72,6 +76,15 @@ This version is backwards compatible to [v1.10.0](https://github.com/ava-labs/av
 - Merkle db iterator by @dboehm-avalabs in https://github.com/ava-labs/avalanchego/pull/1533
 - Fix unreadable message errors by @morrisettjohn in https://github.com/ava-labs/avalanchego/pull/1585
 - Log unexpected errors during GetValidatorSet by @hexfusion in https://github.com/ava-labs/avalanchego/pull/1592
+- `merkleDB` -- add inner heap type to syncWorkHeap by @danlaine in https://github.com/ava-labs/avalanchego/pull/1582
+- `sync` -- explain algorithm in readme by @danlaine in https://github.com/ava-labs/avalanchego/pull/1600
+- Rename license header file to avoid unintended license indexing by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1608
+- `merkledb` and `sync` -- use time based rand seed by @danlaine in https://github.com/ava-labs/avalanchego/pull/1607
+- add `local-prefixes` setting for `goimports` by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/1612
+- snow/engine/snowman: instantiate voter after issuer by @gyuho in https://github.com/ava-labs/avalanchego/pull/1610
+- Update CodeQL to v2 by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1616
+- Remove old networking metric by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1619
+- Fix --http-host flag to support IPv6 by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1620
 
 ### New Contributors
 
