@@ -346,5 +346,10 @@ func (bc *BlockChain) GetLogs(hash common.Hash, number uint64) [][]*types.Log {
 	if ok {
 		return logs
 	}
-	return rawdb.ReadLogs(bc.db, hash, number)
+	block := bc.GetBlockByHash(hash)
+	if block == nil {
+		return nil
+	}
+	logs = bc.collectUnflattenedLogs(block, false)
+	return logs
 }
