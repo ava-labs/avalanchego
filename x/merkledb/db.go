@@ -17,6 +17,8 @@ import (
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -24,7 +26,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 const (

@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
@@ -613,7 +614,9 @@ func Test_MerkleDB_Random_Insert_Ordering(t *testing.T) {
 	}
 
 	for i := 0; i < 3; i++ {
-		r := rand.New(rand.NewSource(int64(i))) // #nosec G404
+		now := time.Now().UnixNano()
+		t.Logf("seed for iter %d: %d", i, now)
+		r := rand.New(rand.NewSource(now)) // #nosec G404
 
 		ops := make([]*testOperation, 0, totalState)
 		allKeys = [][]byte{}
@@ -675,7 +678,9 @@ func Test_MerkleDB_RandomCases(t *testing.T) {
 	require := require.New(t)
 
 	for i := 150; i < 500; i += 10 {
-		r := rand.New(rand.NewSource(int64(i))) // #nosec G404
+		now := time.Now().UnixNano()
+		t.Logf("seed for iter %d: %d", i, now)
+		r := rand.New(rand.NewSource(now)) // #nosec G404
 		runRandDBTest(require, r, generate(require, r, i, .01))
 	}
 }
@@ -683,7 +688,9 @@ func Test_MerkleDB_RandomCases(t *testing.T) {
 func Test_MerkleDB_RandomCases_InitialValues(t *testing.T) {
 	require := require.New(t)
 
-	r := rand.New(rand.NewSource(int64(0))) // #nosec G404
+	now := time.Now().UnixNano()
+	t.Logf("seed: %d", now)
+	r := rand.New(rand.NewSource(now)) // #nosec G404
 	runRandDBTest(require, r, generateInitialValues(require, r, 1000, 2500, 0.0))
 }
 
