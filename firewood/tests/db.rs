@@ -1,13 +1,38 @@
-use firewood::db::{Db, DbConfig, WalConfig};
-use firewood::merkle::TrieHash;
-use std::{collections::VecDeque, fs::remove_dir_all, path::Path};
+use firewood::{
+    db::{Db as PersistedDb, DbConfig, DbError, WalConfig},
+    merkle::TrieHash,
+};
+use std::{
+    collections::VecDeque,
+    fs::remove_dir_all,
+    ops::{Deref, DerefMut},
+    path::Path,
+};
 
+// TODO: use a trait
 macro_rules! kv_dump {
     ($e: ident) => {{
         let mut s = Vec::new();
         $e.kv_dump(&mut s).unwrap();
         String::from_utf8(s).unwrap()
     }};
+}
+
+struct Db<'a, P: AsRef<Path> + ?Sized>(PersistedDb, &'a P);
+
+impl<'a, P: AsRef<Path> + ?Sized> Db<'a, P> {
+    fn new(path: &'a P, cfg: &DbConfig) -> Result<Self, DbError> {
+        PersistedDb::new(path, cfg).map(|db| Self(db, path))
+    }
+}
+
+impl<P: AsRef<Path> + ?Sized> Drop for Db<'_, P> {
+    fn drop(&mut self) {
+        // if you're using absolute paths, you have to clean up after yourself
+        if self.1.as_ref().is_relative() {
+            remove_dir_all(self.1).expect("should be able to remove db-directory");
+        }
+    }
 }
 
 #[test]
@@ -69,7 +94,8 @@ fn test_revisions() {
         key
     };
     for i in 0..10 {
-        let db = Db::new("test_revisions_db", &cfg.clone().truncate(true).build()).unwrap();
+        let db =
+            PersistedDb::new("test_revisions_db", &cfg.clone().truncate(true).build()).unwrap();
         let mut dumped = VecDeque::new();
         let mut hashes: VecDeque<TrieHash> = VecDeque::new();
         for _ in 0..10 {
@@ -182,13 +208,18 @@ fn create_db_issue_proof() {
         println!("Error: {}", e);
         // TODO do type assertion on error
     }
-
-    fwdctl_delete_db("test_db_proof");
 }
 
-// Removes the firewood database on disk
-fn fwdctl_delete_db<P: AsRef<Path>>(path: P) {
-    if let Err(e) = remove_dir_all(path) {
-        eprintln!("failed to delete testing dir: {e}");
+impl<P: AsRef<Path> + ?Sized> Deref for Db<'_, P> {
+    type Target = PersistedDb;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<P: AsRef<Path> + ?Sized> DerefMut for Db<'_, P> {
+    fn deref_mut(&mut self) -> &mut PersistedDb {
+        &mut self.0
     }
 }
