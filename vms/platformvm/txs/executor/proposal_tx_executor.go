@@ -700,24 +700,6 @@ func GetValidator(state state.Chain, subnetID ids.ID, nodeID ids.NodeID) (*state
 	return state.GetPendingValidator(subnetID, nodeID)
 }
 
-// fitsValidationWindow returns true if [delegator]'s period is inside [validator]'s period.
-//
-// A [delegator]'s period is inside if:
-// - [delegator]'s start time is not before [validator]'s start time
-// - [delegator]'s end time is not after [validator]'s end time
-func fitsValidationWindow(
-	validator *state.Staker,
-	delegator *state.Staker,
-) bool {
-	if delegator.StartTime.Before(validator.StartTime) {
-		return false
-	}
-	if delegator.EndTime.After(validator.EndTime) {
-		return false
-	}
-	return true
-}
-
 // overDelegated returns true if [validator] will be overdelegated when adding [delegator].
 //
 // A [validator] would become overdelegated if:
