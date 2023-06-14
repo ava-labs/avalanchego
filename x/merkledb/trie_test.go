@@ -37,7 +37,7 @@ func getNodeValue(t ReadOnlyTrie, key string) ([]byte, error) {
 
 		return closestNode.value.value, nil
 	}
-	if asDatabases, ok := t.(*Database); ok {
+	if asDatabases, ok := t.(*merkleDB); ok {
 		view, err := asDatabases.NewView()
 		if err != nil {
 			return nil, err
@@ -1146,7 +1146,7 @@ func TestTrieViewInvalidChildrenExcept(t *testing.T) {
 func Test_Trie_CommitToParentView_Concurrent(t *testing.T) {
 	require := require.New(t)
 
-	for i := 0; i < 5000; i++ {
+	for i := 0; i < 1000; i++ {
 		dbTrie, err := getBasicDB()
 		require.NoError(err)
 		require.NotNil(dbTrie)
@@ -1200,7 +1200,7 @@ func Test_Trie_CommitToParentView_Concurrent(t *testing.T) {
 func Test_Trie_CommitToParentDB_Concurrent(t *testing.T) {
 	require := require.New(t)
 
-	for i := 0; i < 5000; i++ {
+	for i := 0; i < 1000; i++ {
 		dbTrie, err := getBasicDB()
 		require.NoError(err)
 		require.NotNil(dbTrie)

@@ -91,8 +91,8 @@ func TestContains(t *testing.T) {
 
 	s := NewSet()
 	m.Add(subnetID, s)
-
 	require.False(Contains(m, subnetID, nodeID))
+
 	require.NoError(Add(m, subnetID, nodeID, nil, ids.Empty, 1))
 	require.True(Contains(m, subnetID, nodeID))
 

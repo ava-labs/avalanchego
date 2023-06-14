@@ -476,14 +476,14 @@ func assertChainsEqual(t *testing.T, expected, actual Chain) {
 
 	expectedCurrentStakerIterator, expectedErr := expected.GetCurrentStakerIterator()
 	actualCurrentStakerIterator, actualErr := actual.GetCurrentStakerIterator()
-	require.ErrorIs(t, actualErr, expectedErr)
+	require.Equal(t, expectedErr, actualErr)
 	if expectedErr == nil {
 		assertIteratorsEqual(t, expectedCurrentStakerIterator, actualCurrentStakerIterator)
 	}
 
 	expectedPendingStakerIterator, expectedErr := expected.GetPendingStakerIterator()
 	actualPendingStakerIterator, actualErr := actual.GetPendingStakerIterator()
-	require.ErrorIs(t, actualErr, expectedErr)
+	require.Equal(t, expectedErr, actualErr)
 	if expectedErr == nil {
 		assertIteratorsEqual(t, expectedPendingStakerIterator, actualPendingStakerIterator)
 	}
@@ -500,7 +500,7 @@ func assertChainsEqual(t *testing.T, expected, actual Chain) {
 
 	expectedSubnets, expectedErr := expected.GetSubnets()
 	actualSubnets, actualErr := actual.GetSubnets()
-	require.ErrorIs(t, actualErr, expectedErr)
+	require.Equal(t, expectedErr, actualErr)
 	if expectedErr == nil {
 		require.Equal(t, expectedSubnets, actualSubnets)
 
@@ -509,7 +509,7 @@ func assertChainsEqual(t *testing.T, expected, actual Chain) {
 
 			expectedChains, expectedErr := expected.GetChains(subnetID)
 			actualChains, actualErr := actual.GetChains(subnetID)
-			require.ErrorIs(t, actualErr, expectedErr)
+			require.Equal(t, expectedErr, actualErr)
 			if expectedErr == nil {
 				require.Equal(t, expectedChains, actualChains)
 			}
