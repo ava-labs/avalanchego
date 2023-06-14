@@ -4,7 +4,6 @@
 package txs
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -23,9 +22,7 @@ import (
 var (
 	_ ValidatorTx = (*AddContinuousValidatorTx)(nil)
 
-	errTooRestakeShares     = fmt.Errorf("a staker can only restake at most %d shares of its validation reward", reward.PercentDenominator)
-	errInvalidStakerAuthKey = errors.New("invalid staker authorization key")
-	errInvalidSubnetAuth    = errors.New("invalid subnet auth")
+	errTooRestakeShares = fmt.Errorf("a staker can only restake at most %d shares of its validation reward", reward.PercentDenominator)
 )
 
 type AddContinuousValidatorTx struct {
@@ -33,14 +30,7 @@ type AddContinuousValidatorTx struct {
 	BaseTx `serialize:"true"`
 	// Describes the validator
 	Validator `serialize:"true" json:"validator"`
-
-	// TODO ABENEGIA: will be added in next PR
-	// // ID of the subnet this validator is validating
-	// Subnet ids.ID `serialize:"true" json:"subnetID"`
-
-	// If the [Subnet] is the primary network, [Signer] is the BLS key for this
-	// validator. If the [Subnet] is not the primary network, this value is the
-	// empty signer
+	// [Signer] is the BLS key for this validator.
 	// Note: We do not enforce that the BLS key is unique across all validators.
 	//       This means that validators can share a key if they so choose.
 	//       However, a NodeID does uniquely map to a BLS key
@@ -58,12 +48,6 @@ type AddContinuousValidatorTx struct {
 	// For example, if this validator has DelegationShares=300,000 then they
 	// take 30% of rewards from delegators
 	DelegationShares uint32 `serialize:"true" json:"Delegationshares"`
-	// Who is authorized to manage this validator
-	StakerAuthKey fx.Owner `serialize:"true" json:"stakerAuthorizationKey"`
-	// If the [Subnet] is the primary network, [SubnetAuth] is empty.
-	// If the [Subnet] is not the primary network, [SubnetAuth] is the
-	// auth that will be allowing this validator into the network
-	SubnetAuth verify.Verifiable `serialize:"true" json:"subnetAuthorization"`
 }
 
 // InitCtx sets the FxID fields in the inputs and outputs of this
@@ -77,7 +61,6 @@ func (tx *AddContinuousValidatorTx) InitCtx(ctx *snow.Context) {
 	}
 	tx.ValidatorRewardsOwner.InitCtx(ctx)
 	tx.DelegatorRewardsOwner.InitCtx(ctx)
-	tx.StakerAuthKey.InitCtx(ctx)
 }
 
 func (*AddContinuousValidatorTx) SubnetID() ids.ID {
@@ -141,8 +124,6 @@ func (tx *AddContinuousValidatorTx) SyntacticVerify(ctx *snow.Context) error {
 		tx.Signer,
 		tx.ValidatorRewardsOwner,
 		tx.DelegatorRewardsOwner,
-		tx.StakerAuthKey,
-		tx.SubnetAuth,
 	); err != nil {
 		return fmt.Errorf("failed to verify validator, signer, rewards or staker owners: %w", err)
 	}
@@ -154,24 +135,6 @@ func (tx *AddContinuousValidatorTx) SyntacticVerify(ctx *snow.Context) error {
 			"%w: hasKey=%v != isPrimaryNetwork=%v",
 			errInvalidSigner,
 			hasKey,
-			isPrimaryNetwork,
-		)
-	}
-	_, hasNotStakerAuthKey := tx.StakerAuthKey.(*fx.EmptyOwner)
-	if hasNotStakerAuthKey == isPrimaryNetwork {
-		return fmt.Errorf(
-			"%w: hasStakerAuthKey=%v != isPrimaryNetwork=%v",
-			errInvalidStakerAuthKey,
-			hasNotStakerAuthKey,
-			isPrimaryNetwork,
-		)
-	}
-	_, hasNotSubnetAuth := tx.SubnetAuth.(*verify.EmptyVerifiable)
-	if hasNotSubnetAuth != isPrimaryNetwork {
-		return fmt.Errorf(
-			"%w: hasNotSubnetAuth=%v != isPrimaryNetwork=%v",
-			errInvalidSubnetAuth,
-			hasNotSubnetAuth,
 			isPrimaryNetwork,
 		)
 	}

@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -471,7 +472,7 @@ func (e *StandardTxExecutor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionl
 }
 
 func (e *StandardTxExecutor) AddContinuousValidatorTx(tx *txs.AddContinuousValidatorTx) error {
-	endTime, err := verifyAddContinuousValidatorTx(
+	err := verifyAddContinuousValidatorTx(
 		e.Backend,
 		e.State,
 		e.Tx,
@@ -485,7 +486,7 @@ func (e *StandardTxExecutor) AddContinuousValidatorTx(tx *txs.AddContinuousValid
 		txID      = e.Tx.ID()
 		startTime = e.State.GetTimestamp()
 	)
-	if err := e.addStakerFromStakerTx(tx, startTime, endTime); err != nil {
+	if err := e.addStakerFromStakerTx(tx, startTime, mockable.MaxTime); err != nil {
 		return err
 	}
 

@@ -512,7 +512,7 @@ func TestVerifyAddContinuousValidatorTx(t *testing.T) {
 				tx      = tt.txF()
 			)
 
-			_, err := verifyAddContinuousValidatorTx(backend, state, sTx, tx)
+			err := verifyAddContinuousValidatorTx(backend, state, sTx, tx)
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}

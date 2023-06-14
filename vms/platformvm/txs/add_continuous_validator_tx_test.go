@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
@@ -226,73 +225,9 @@ func TestAddContinuousValidatorTxSyntacticVerify(t *testing.T) {
 					ValidatorRewardsOwner: rewardsOwner,
 					DelegatorRewardsOwner: rewardsOwner,
 					DelegationShares:      reward.PercentDenominator,
-					StakerAuthKey:         rewardsOwner,
-					SubnetAuth:            &verify.EmptyVerifiable{},
 				}
 			},
 			err: errInvalidSigner,
-		},
-		{
-			name: "wrong staker authorization key",
-			txFunc: func(ctrl *gomock.Controller) *AddContinuousValidatorTx {
-				rewardsOwner := fx.NewMockOwner(ctrl)
-				rewardsOwner.EXPECT().Verify().Return(nil).AnyTimes()
-				return &AddContinuousValidatorTx{
-					BaseTx: validBaseTx,
-					Validator: Validator{
-						NodeID: ids.GenerateTestNodeID(),
-						Wght:   1,
-					},
-					Signer: blsPOP,
-					StakeOuts: []*avax.TransferableOutput{
-						{
-							Asset: avax.Asset{
-								ID: ids.GenerateTestID(),
-							},
-							Out: &secp256k1fx.TransferOutput{
-								Amt: 1,
-							},
-						},
-					},
-					ValidatorRewardsOwner: rewardsOwner,
-					DelegatorRewardsOwner: rewardsOwner,
-					DelegationShares:      reward.PercentDenominator,
-					StakerAuthKey:         &fx.EmptyOwner{},
-					SubnetAuth:            &verify.EmptyVerifiable{},
-				}
-			},
-			err: errInvalidStakerAuthKey,
-		},
-		{
-			name: "wrong subnet authorization",
-			txFunc: func(ctrl *gomock.Controller) *AddContinuousValidatorTx {
-				rewardsOwner := fx.NewMockOwner(ctrl)
-				rewardsOwner.EXPECT().Verify().Return(nil).AnyTimes()
-				return &AddContinuousValidatorTx{
-					BaseTx: validBaseTx,
-					Validator: Validator{
-						NodeID: ids.GenerateTestNodeID(),
-						Wght:   1,
-					},
-					Signer: blsPOP,
-					StakeOuts: []*avax.TransferableOutput{
-						{
-							Asset: avax.Asset{
-								ID: ids.GenerateTestID(),
-							},
-							Out: &secp256k1fx.TransferOutput{
-								Amt: 1,
-							},
-						},
-					},
-					ValidatorRewardsOwner: rewardsOwner,
-					DelegatorRewardsOwner: rewardsOwner,
-					DelegationShares:      reward.PercentDenominator,
-					StakerAuthKey:         rewardsOwner,
-					SubnetAuth:            &secp256k1fx.Input{},
-				}
-			},
-			err: errInvalidSubnetAuth,
 		},
 		{
 			name: "invalid stake output",
@@ -320,8 +255,6 @@ func TestAddContinuousValidatorTxSyntacticVerify(t *testing.T) {
 					ValidatorRewardsOwner: rewardsOwner,
 					DelegatorRewardsOwner: rewardsOwner,
 					DelegationShares:      reward.PercentDenominator,
-					StakerAuthKey:         rewardsOwner,
-					SubnetAuth:            &verify.EmptyVerifiable{},
 				}
 			},
 			err: errCustom,
@@ -360,8 +293,6 @@ func TestAddContinuousValidatorTxSyntacticVerify(t *testing.T) {
 					ValidatorRewardsOwner: rewardsOwner,
 					DelegatorRewardsOwner: rewardsOwner,
 					DelegationShares:      reward.PercentDenominator,
-					StakerAuthKey:         rewardsOwner,
-					SubnetAuth:            &verify.EmptyVerifiable{},
 				}
 			},
 			err: math.ErrOverflow,
@@ -399,8 +330,6 @@ func TestAddContinuousValidatorTxSyntacticVerify(t *testing.T) {
 					ValidatorRewardsOwner: rewardsOwner,
 					DelegatorRewardsOwner: rewardsOwner,
 					DelegationShares:      reward.PercentDenominator,
-					StakerAuthKey:         rewardsOwner,
-					SubnetAuth:            &verify.EmptyVerifiable{},
 				}
 			},
 			err: errMultipleStakedAssets,
@@ -439,8 +368,6 @@ func TestAddContinuousValidatorTxSyntacticVerify(t *testing.T) {
 					ValidatorRewardsOwner: rewardsOwner,
 					DelegatorRewardsOwner: rewardsOwner,
 					DelegationShares:      reward.PercentDenominator,
-					StakerAuthKey:         rewardsOwner,
-					SubnetAuth:            &verify.EmptyVerifiable{},
 				}
 			},
 			err: errOutputsNotSorted,
@@ -479,8 +406,6 @@ func TestAddContinuousValidatorTxSyntacticVerify(t *testing.T) {
 					ValidatorRewardsOwner: rewardsOwner,
 					DelegatorRewardsOwner: rewardsOwner,
 					DelegationShares:      reward.PercentDenominator,
-					StakerAuthKey:         rewardsOwner,
-					SubnetAuth:            &verify.EmptyVerifiable{},
 				}
 			},
 			err: errValidatorWeightMismatch,
@@ -518,9 +443,6 @@ func TestAddContinuousValidatorTxSyntacticVerify(t *testing.T) {
 					},
 					ValidatorRewardsOwner: rewardsOwner,
 					DelegatorRewardsOwner: rewardsOwner,
-					DelegationShares:      reward.PercentDenominator,
-					StakerAuthKey:         rewardsOwner,
-					SubnetAuth:            &verify.EmptyVerifiable{},
 				}
 			},
 			err: nil,

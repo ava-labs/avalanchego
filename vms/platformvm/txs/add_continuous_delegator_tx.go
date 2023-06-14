@@ -26,11 +26,6 @@ type AddContinuousDelegatorTx struct {
 	BaseTx `serialize:"true"`
 	// Describes the validator
 	Validator `serialize:"true" json:"validator"`
-
-	// TODO ABENEGIA: will be added in next PR
-	// // ID of the subnet this validator is validating
-	// Subnet ids.ID `serialize:"true" json:"subnetID"`
-
 	// Where to send staked tokens when done validating
 	StakeOuts []*avax.TransferableOutput `serialize:"true" json:"stake"`
 	// Where to send staking rewards when done validating

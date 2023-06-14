@@ -32,9 +32,3 @@ func All(verifiables ...Verifiable) error {
 	}
 	return nil
 }
-
-type EmptyVerifiable struct{}
-
-func (*EmptyVerifiable) Verify() error {
-	return nil
-}
