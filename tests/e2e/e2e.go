@@ -148,7 +148,16 @@ func (te *TestEnvironment) ConfigCluster(
 }
 
 func (te *TestEnvironment) StartPrometheus(prometheusExecPath string) error {
-	cmd := subprocess.NewCmd(prometheusExecPath, fmt.Sprintf("--config.file=%s/prometheus.yaml", te.rootDataDir), "--web.enable-admin-api")
+	// disabled
+	if prometheusExecPath == "" {
+		return nil
+	}
+	cmd := subprocess.NewCmd(
+		prometheusExecPath,
+		fmt.Sprintf("--config.file=%s/prometheus.yaml", te.rootDataDir),
+		"--web.enable-admin-api",
+		"--storage.tsdb.path=/tmp/prometheus-data",
+	)
 	err := cmd.Start()
 	if err != nil {
 		return fmt.Errorf("failed to start prometheus: %w", err)
@@ -158,7 +167,10 @@ func (te *TestEnvironment) StartPrometheus(prometheusExecPath string) error {
 	return nil
 }
 
-func (*TestEnvironment) PrometheusSnapshot() error {
+func (te *TestEnvironment) PrometheusSnapshot() error {
+	if te.prometheusExec == nil {
+		return nil
+	}
 	conn, err := api.NewClient(api.Config{
 		Address: "http://127.0.0.1:9090",
 	})
@@ -177,6 +189,9 @@ func (*TestEnvironment) PrometheusSnapshot() error {
 }
 
 func (te *TestEnvironment) StopMonitoring() error {
+	if te.prometheusExec == nil {
+		return nil
+	}
 	cmd := te.prometheusExec
 	return cmd.Process.Kill()
 }

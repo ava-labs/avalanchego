@@ -105,7 +105,7 @@ var _ = ginkgo.BeforeSuite(func() {
 	err = e2e.Env.StartCluster()
 	gomega.Expect(err).Should(gomega.BeNil())
 
-	// start prometheus server
+	// start prometheus server if the exec path is defined
 	err = e2e.Env.StartPrometheus(networkRunnerPrometheusExecPath)
 	gomega.Expect(err).Should(gomega.BeNil())
 
