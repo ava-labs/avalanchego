@@ -6,10 +6,13 @@ set -o pipefail
 # e.g.,
 # ./scripts/build.sh
 # ./scripts/tests.e2e.sh ./build/avalanchego
+# PROMETHEUS_PATH=/tmp/prometheus ./scripts/tests.e2e.sh ./build/avalanchego
 if ! [[ "$0" =~ scripts/tests.e2e.sh ]]; then
   echo "must be run from repository root"
   exit 255
 fi
+
+
 
 AVALANCHEGO_PATH="${1-}"
 if [[ -z "${AVALANCHEGO_PATH}" ]]; then
@@ -17,6 +20,8 @@ if [[ -z "${AVALANCHEGO_PATH}" ]]; then
   echo "Usage: ${0} [AVALANCHEGO_PATH]" >> /dev/stderr
   exit 255
 fi
+
+PROMETHEUS_PATH="${PROMETHEUS_PATH:-""}" 
 
 # Set the CGO flags to use the portable version of BLST
 #
@@ -35,38 +40,40 @@ GOOS=$(go env GOOS)
 # https://github.com/ava-labs/avalanche-network-runner
 # TODO: migrate to upstream avalanche-network-runner
 NETWORK_RUNNER_VERSION=1.6.0
-DOWNLOAD_ANR_PATH=/tmp/avalanche-network-runner.tar.gz
-DOWNLOAD_ANR_URL="https://github.com/ava-labs/avalanche-network-runner/releases/download/v${NETWORK_RUNNER_VERSION}/avalanche-network-runner_${NETWORK_RUNNER_VERSION}_${GOOS}_${GOARCH}.tar.gz"
+DOWNLOAD_PATH=/tmp/avalanche-network-runner.tar.gz
+DOWNLOAD_URL="https://github.com/ava-labs/avalanche-network-runner/releases/download/v${NETWORK_RUNNER_VERSION}/avalanche-network-runner_${NETWORK_RUNNER_VERSION}_${GOOS}_${GOARCH}.tar.gz"
 
-rm -f ${DOWNLOAD_ANR_PATH}
+rm -f ${DOWNLOAD_PATH}
 rm -f /tmp/avalanche-network-runner
 
-echo "downloading avalanche-network-runner ${NETWORK_RUNNER_VERSION} at ${DOWNLOAD_ANR_URL} to ${DOWNLOAD_ANR_PATH}"
-curl --fail -L ${DOWNLOAD_ANR_URL} -o ${DOWNLOAD_ANR_PATH}
+echo "downloading avalanche-network-runner ${NETWORK_RUNNER_VERSION} at ${DOWNLOAD_URL} to ${DOWNLOAD_PATH}"
+curl --fail -L ${DOWNLOAD_URL} -o ${DOWNLOAD_PATH}
 
 echo "extracting downloaded avalanche-network-runner"
-tar xzvf ${DOWNLOAD_ANR_PATH} -C /tmp
+tar xzvf ${DOWNLOAD_PATH} -C /tmp
 /tmp/avalanche-network-runner -h
 
+# installs prometheus to PROMETHEUS_PATH if it does not already exist.
+function download_prometheus {
+  local version=2.44.0
+  local download_path=/tmp/prometheus.tar.gz
+  local download_url="https://github.com/prometheus/prometheus/releases/download/v${version}/prometheus-${version}.${GOOS}-${GOARCH}.tar.gz"
 
-#################################
-# download prometheus if it doesn't exist
-# https://github.com/prometheus/prometheus
-PROMETHEUS_PATH=/tmp/prometheus
-if [ ! -f "$PROMETHEUS_PATH" ]; then
-  PROMETHEUS_VERSION=2.44.0
-  DOWNLOAD_PROM_PATH=/tmp/prometheus.tar.gz
-  DOWNLOAD_PROM_URL="https://github.com/prometheus/prometheus/releases/download/v${PROMETHEUS_VERSION}/prometheus-${PROMETHEUS_VERSION}.${GOOS}-${GOARCH}.tar.gz"
-  rm -f ${DOWNLOAD_PROM_PATH}
+  if [ ! -f "$PROMETHEUS_PATH" ]; then
+    rm -f ${download_path}
+    echo "downloading prometheus ${version} at ${download_url} to ${download_path}"
+    curl --fail -L ${download_url} -o ${download_path}
 
-  echo "downloading prometheus ${PROMETHEUS_VERSION} at ${DOWNLOAD_PROM_URL} to ${DOWNLOAD_PROM_PATH}"
-  curl --fail -L ${DOWNLOAD_PROM_URL} -o ${DOWNLOAD_PROM_PATH}
+    echo "extracting downloaded prometheus"
+    tar xvf "${download_path}" -C /tmp prometheus-"${version}.${GOOS}-${GOARCH}"/prometheus --strip-components 1
+  fi
 
-  echo "extracting downloaded prometheus"
-  tar xvf "${DOWNLOAD_PROM_PATH}" -C /tmp prometheus-"${PROMETHEUS_VERSION}.${GOOS}-${GOARCH}"/prometheus --strip-components 1
+  /tmp/prometheus --version
+}
+
+if [ -z "${PROMETHEUS_PATH}" ]; then
+  download_prometheus
 fi
-
-/tmp/prometheus --version
 
 GOPATH="$(go env GOPATH)"
 PATH="${GOPATH}/bin:${PATH}"
