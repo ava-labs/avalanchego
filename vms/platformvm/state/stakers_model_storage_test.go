@@ -10,11 +10,12 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/leanovate/gopter"
 	"github.com/leanovate/gopter/commands"
 	"github.com/leanovate/gopter/gen"
+
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 var (

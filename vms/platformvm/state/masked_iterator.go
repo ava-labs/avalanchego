@@ -4,9 +4,10 @@
 package state
 
 import (
+	"golang.org/x/exp/maps"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
-	"golang.org/x/exp/maps"
 )
 
 var _ StakerIterator = (*maskedIterator)(nil)
