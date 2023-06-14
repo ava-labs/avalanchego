@@ -499,7 +499,6 @@ func TestFindNextKeyRandom(t *testing.T) {
 	t.Logf("seed: %d", now)
 	rand := rand.New(rand.NewSource(now)) // #nosec G404
 	require := require.New(t)
-	rand := rand.New(rand.NewSource(1337)) //nolint:gosec
 
 	// Create a "remote" database and "local" database
 	remoteDB, err := merkledb.New(
@@ -1037,6 +1036,8 @@ func generateTrie(t *testing.T, r *rand.Rand, count int) (merkledb.MerkleDB, err
 }
 
 func generateTrieWithMinKeyLen(t *testing.T, r *rand.Rand, count int, minKeyLen int) (merkledb.MerkleDB, [][]byte, error) {
+	require := require.New(t)
+
 	db, err := merkledb.New(
 		context.Background(),
 		memdb.New(),
