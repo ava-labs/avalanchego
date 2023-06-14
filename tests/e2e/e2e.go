@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 	"sync"
 	"time"
@@ -20,7 +21,10 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime/subprocess"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/prometheus/client_golang/api"
+	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
 )
 
 type ClusterType byte
@@ -73,6 +77,10 @@ type TestEnvironment struct {
 	runnerMu     sync.RWMutex
 	runnerCli    runner_sdk.Client
 	runnerGRPCEp string
+
+	prometheusExec *exec.Cmd
+
+	rootDataDir string
 
 	urisMu sync.RWMutex
 	uris   []string
@@ -139,6 +147,39 @@ func (te *TestEnvironment) ConfigCluster(
 	}
 }
 
+func (te *TestEnvironment) StartMonitoring(prometheusExecPath string) error {
+	cmd := subprocess.NewCmd(prometheusExecPath, fmt.Sprintf("--config.file=%s/prometheus.yaml", te.rootDataDir))
+	err := cmd.Start()
+	if err != nil {
+		return fmt.Errorf("failed to start prometheus: %w", err)
+	}
+	te.prometheusExec = cmd
+	return nil
+}
+
+func (te *TestEnvironment) SnapshotMetrics() error {
+	client, err := api.NewClient(api.Config{
+		Address: "http://127.0.0.1:9090",
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create prometheus client: %w", err)
+	}
+	v1api := v1.NewAPI(client)
+
+	v, err := v1api.Snapshot(context.Background(), false)
+	if err != nil {
+		return fmt.Errorf("failed to create prometheus snapshot: %w", err)
+	}
+	tests.Outf("{{green}}metrics snapshot completed %q{{/}}\n", v.Name)
+
+	return nil
+}
+
+func (te *TestEnvironment) StopMonitoring() error {
+	cmd := te.prometheusExec
+	return cmd.Wait()
+}
+
 func (te *TestEnvironment) LoadKeys() error {
 	// load test keys
 	if len(te.testKeysFile) == 0 {
@@ -166,6 +207,7 @@ func (te *TestEnvironment) StartCluster() error {
 			return fmt.Errorf("could not start network-runner: %w", err)
 		}
 		tests.Outf("{{green}}successfully started network-runner: {{/}} %+v\n", resp.ClusterInfo.NodeNames)
+		te.rootDataDir = resp.ClusterInfo.GetRootDataDir()
 
 		// start is async, so wait some time for cluster health
 		time.Sleep(time.Minute)

@@ -33,6 +33,7 @@ var (
 	networkRunnerGRPCEp              string
 	networkRunnerAvalancheGoExecPath string
 	networkRunnerAvalancheGoLogLevel string
+	networkRunnerPrometheusExecPath  string
 
 	uris string
 
@@ -58,6 +59,12 @@ func init() {
 		"network-runner-avalanchego-path",
 		"",
 		"[optional] avalanchego executable path (only required for local network-runner tests)",
+	)
+	flag.StringVar(
+		&networkRunnerPrometheusExecPath,
+		"network-runner-prometheus-path",
+		"",
+		"[optional] prometheus executable path",
 	)
 	flag.StringVar(
 		&networkRunnerAvalancheGoLogLevel,
@@ -98,6 +105,14 @@ var _ = ginkgo.BeforeSuite(func() {
 	err = e2e.Env.StartCluster()
 	gomega.Expect(err).Should(gomega.BeNil())
 
+	// start prometheus metrics collection
+	err = e2e.Env.StartMonitoring(networkRunnerPrometheusExecPath)
+	gomega.Expect(err).Should(gomega.BeNil())
+
+	// take a snapshot of current metrics
+	err = e2e.Env.SnapshotMetrics()
+	gomega.Expect(err).Should(gomega.BeNil())
+
 	// load keys
 	err = e2e.Env.LoadKeys()
 	gomega.Expect(err).Should(gomega.BeNil())
@@ -113,5 +128,7 @@ var _ = ginkgo.BeforeSuite(func() {
 
 var _ = ginkgo.AfterSuite(func() {
 	err := e2e.Env.ShutdownCluster()
+	gomega.Expect(err).Should(gomega.BeNil())
+	err = e2e.Env.StopMonitoring()
 	gomega.Expect(err).Should(gomega.BeNil())
 })

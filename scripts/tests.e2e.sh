@@ -27,25 +27,46 @@ export CGO_CFLAGS="-O -D__BLST_PORTABLE__"
 # clear error due to the default value change in go1.20.
 export CGO_ENABLED=1
 
+GOARCH=$(go env GOARCH)
+GOOS=$(go env GOOS)
+
 #################################
 # download avalanche-network-runner
 # https://github.com/ava-labs/avalanche-network-runner
 # TODO: migrate to upstream avalanche-network-runner
-GOARCH=$(go env GOARCH)
-GOOS=$(go env GOOS)
-NETWORK_RUNNER_VERSION=1.3.5-rc.0
-DOWNLOAD_PATH=/tmp/avalanche-network-runner.tar.gz
-DOWNLOAD_URL="https://github.com/ava-labs/avalanche-network-runner/releases/download/v${NETWORK_RUNNER_VERSION}/avalanche-network-runner_${NETWORK_RUNNER_VERSION}_${GOOS}_${GOARCH}.tar.gz"
+NETWORK_RUNNER_VERSION=1.6.0
+DOWNLOAD_ANR_PATH=/tmp/avalanche-network-runner.tar.gz
+DOWNLOAD_ANR_URL="https://github.com/ava-labs/avalanche-network-runner/releases/download/v${NETWORK_RUNNER_VERSION}/avalanche-network-runner_${NETWORK_RUNNER_VERSION}_${GOOS}_${GOARCH}.tar.gz"
 
-rm -f ${DOWNLOAD_PATH}
+rm -f ${DOWNLOAD_ANR_PATH}
 rm -f /tmp/avalanche-network-runner
 
-echo "downloading avalanche-network-runner ${NETWORK_RUNNER_VERSION} at ${DOWNLOAD_URL} to ${DOWNLOAD_PATH}"
-curl --fail -L ${DOWNLOAD_URL} -o ${DOWNLOAD_PATH}
+echo "downloading avalanche-network-runner ${NETWORK_RUNNER_VERSION} at ${DOWNLOAD_ANR_URL} to ${DOWNLOAD_ANR_PATH}"
+curl --fail -L ${DOWNLOAD_ANR_URL} -o ${DOWNLOAD_ANR_PATH}
 
 echo "extracting downloaded avalanche-network-runner"
-tar xzvf ${DOWNLOAD_PATH} -C /tmp
+tar xzvf ${DOWNLOAD_ANR_PATH} -C /tmp
 /tmp/avalanche-network-runner -h
+
+
+#################################
+# download prometheus if it doesn't exist
+# https://github.com/prometheus/prometheus
+PROMETHEUS_PATH=/tmp/prometheus
+if [ ! -f "$PROMETHEUS_PATH" ]; then
+  PROMETHEUS_VERSION=2.44.0
+  DOWNLOAD_PROM_PATH=/tmp/prometheus.tar.gz
+  DOWNLOAD_PROM_URL="https://github.com/prometheus/prometheus/releases/download/v${PROMETHEUS_VERSION}/prometheus-${PROMETHEUS_VERSION}.${GOOS}-${GOARCH}.tar.gz"
+  rm -f ${DOWNLOAD_PROM_PATH}
+
+  echo "downloading prometheus ${PROMETHEUS_VERSION} at ${DOWNLOAD_PROM_URL} to ${DOWNLOAD_PROM_PATH}"
+  curl --fail -L ${DOWNLOAD_PROM_URL} -o ${DOWNLOAD_PROM_PATH}
+
+  echo "extracting downloaded prometheus"
+  tar xvf "${DOWNLOAD_PROM_PATH}" -C /tmp prometheus-"${PROMETHEUS_VERSION}.${GOOS}-${GOARCH}"/prometheus --strip-components 1
+fi
+
+/tmp/prometheus --version
 
 GOPATH="$(go env GOPATH)"
 PATH="${GOPATH}/bin:${PATH}"
@@ -73,12 +94,13 @@ echo "running e2e tests against the local cluster with ${AVALANCHEGO_PATH}"
 --ginkgo.v \
 --log-level debug \
 --network-runner-grpc-endpoint="0.0.0.0:12342" \
---network-runner-avalanchego-path=${AVALANCHEGO_PATH} \
+--network-runner-avalanchego-path="${AVALANCHEGO_PATH}" \
 --network-runner-avalanchego-log-level="WARN" \
+--network-runner-prometheus-path="${PROMETHEUS_PATH}" \
 --test-keys-file=tests/test.insecure.secp256k1.keys \
 && EXIT_CODE=$? || EXIT_CODE=$?
 
-kill ${PID}
+kill "${PID}"
 
 if [[ ${EXIT_CODE} -gt 0 ]]; then
   echo "FAILURE with exit code ${EXIT_CODE}"
