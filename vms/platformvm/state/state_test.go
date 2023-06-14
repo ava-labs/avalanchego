@@ -540,14 +540,6 @@ func requireEqualPublicKeysValidatorSet(
 
 		actualVdr := actual[nodeID]
 		require.Equal(expectedVdr.NodeID, actualVdr.NodeID)
-		switch {
-		case expectedVdr.PublicKey == actualVdr.PublicKey:
-			continue
-		case expectedVdr.PublicKey == nil && actualVdr.PublicKey != nil:
-			require.FailNow("unexpected BLS key")
-		case expectedVdr.PublicKey != nil && actualVdr.PublicKey == nil:
-			require.FailNow("unexpected BLS key")
-		}
-		require.Equal(expectedVdr.PublicKey.Serialize(), actualVdr.PublicKey.Serialize())
+		require.Equal(expectedVdr.PublicKey, actualVdr.PublicKey)
 	}
 }
