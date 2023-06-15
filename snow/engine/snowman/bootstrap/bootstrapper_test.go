@@ -268,7 +268,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 			return blk0, nil
 		default:
 			require.FailNow(database.ErrNotFound.Error())
-			return nil, nil
+			return nil, database.ErrNotFound
 		}
 	}
 	vm.ParseBlockF = func(_ context.Context, blkBytes []byte) (snowman.Block, error) {
@@ -1136,8 +1136,7 @@ func TestRestartBootstrapping(t *testing.T) {
 
 	require.NoError(bs.Ancestors(context.Background(), peerID, reqID, [][]byte{blkBytes3, blkBytes2}))
 
-	_, ok = requestIDs[blkID1]
-	require.True(ok)
+	require.Contains(requestIDs, blkID1)
 
 	// Remove request, so we can restart bootstrapping via ForceAccepted
 	require.True(bs.OutstandingRequests.RemoveAny(blkID1))

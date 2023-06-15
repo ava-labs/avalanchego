@@ -38,7 +38,8 @@ func (b *BootstrapableTest) Default(cant bool) {
 func (b *BootstrapableTest) Clear() error {
 	if b.ClearF != nil {
 		return b.ClearF()
-	} else if b.CantClear && b.T != nil {
+	}
+	if b.CantClear && b.T != nil {
 		require.FailNow(b.T, errClear.Error())
 	}
 	return errClear
@@ -47,7 +48,8 @@ func (b *BootstrapableTest) Clear() error {
 func (b *BootstrapableTest) ForceAccepted(ctx context.Context, containerIDs []ids.ID) error {
 	if b.ForceAcceptedF != nil {
 		return b.ForceAcceptedF(ctx, containerIDs)
-	} else if b.CantForceAccepted && b.T != nil {
+	}
+	if b.CantForceAccepted && b.T != nil {
 		require.FailNow(b.T, errForceAccepted.Error())
 	}
 	return errForceAccepted
