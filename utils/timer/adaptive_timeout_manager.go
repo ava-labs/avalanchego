@@ -132,9 +132,9 @@ func NewAdaptiveTimeoutManager(
 ) (AdaptiveTimeoutManager, error) {
 	switch {
 	case config.InitialTimeout > config.MaximumTimeout:
-		return nil, fmt.Errorf("%w: initial timeout (%s) > maximum timeout (%s)", errInitialTimeoutAboveMaximum, config.InitialTimeout, config.MaximumTimeout)
+		return nil, fmt.Errorf("%w: (%s) > (%s)", errInitialTimeoutAboveMaximum, config.InitialTimeout, config.MaximumTimeout)
 	case config.InitialTimeout < config.MinimumTimeout:
-		return nil, fmt.Errorf("%w: initial timeout (%s) < minimum timeout (%s)", errInitialTimeoutBelowMinimum, config.InitialTimeout, config.MinimumTimeout)
+		return nil, fmt.Errorf("%w: (%s) < (%s)", errInitialTimeoutBelowMinimum, config.InitialTimeout, config.MinimumTimeout)
 	case config.TimeoutCoefficient < 1:
 		return nil, fmt.Errorf("%w: %f", errTooSmallTimeoutCoefficient, config.TimeoutCoefficient)
 	case config.TimeoutHalflife <= 0:
