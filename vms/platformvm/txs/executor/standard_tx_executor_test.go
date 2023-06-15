@@ -1239,6 +1239,185 @@ func TestStandardTxExecutorStopContinuousValidator(t *testing.T) {
 	require.Equal(val.NextTime, stoppedVal.EndTime)
 }
 
+func TestStandardTxExecutorStopContinuousStakers(t *testing.T) {
+	require := require.New(t)
+	env := newEnvironment(continuousStakingFork)
+	env.ctx.Lock.Lock()
+	defer func() {
+		require.NoError(shutdownEnvironment(env))
+	}()
+
+	var (
+		nodeID            = ids.GenerateTestNodeID()
+		validatorDuration = defaultMaxStakingDuration
+		delegatorDuration = defaultMinStakingDuration
+		dummyStartTime    = time.Unix(0, 0)
+
+		stakerAuthPrivateKey = preFundedKeys[4]
+		addr                 = stakerAuthPrivateKey.PublicKey().Address()
+	)
+
+	blsSK, err := bls.NewSecretKey()
+	require.NoError(err)
+	blsPOP := signer.NewProofOfPossession(blsSK)
+
+	utxosHandler := utxo.NewHandler(env.ctx, env.clk, env.fx)
+	ins, unstakedOuts, stakedOuts, signers, err := utxosHandler.Spend(
+		env.state,
+		[]*secp256k1.PrivateKey{stakerAuthPrivateKey},
+		env.config.MinValidatorStake, // stakeAmount
+		env.config.AddPrimaryNetworkValidatorFee,
+		addr, // changeAddr
+	)
+	require.NoError(err)
+
+	// Add continuous validator
+	uAddValTx := &txs.AddContinuousValidatorTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    env.ctx.NetworkID,
+			BlockchainID: env.ctx.ChainID,
+			Ins:          ins,
+			Outs:         unstakedOuts,
+		}},
+		Validator: txs.Validator{
+			NodeID: nodeID,
+			Start:  uint64(dummyStartTime.Unix()),
+			End:    uint64(dummyStartTime.Add(validatorDuration).Unix()),
+			Wght:   env.config.MinValidatorStake,
+		},
+		Signer: blsPOP,
+		ValidatorAuthKey: &secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{addr},
+		},
+		StakeOuts: stakedOuts,
+		ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
+			Addrs:     []ids.ShortID{addr},
+			Threshold: 1,
+		},
+		ValidatorRewardRestakeShares: 0,
+		DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
+			Addrs:     []ids.ShortID{addr},
+			Threshold: 1,
+		},
+		DelegationShares: 20_000,
+	}
+	addContinuousValTx, err := txs.NewSigned(uAddValTx, txs.Codec, signers)
+	require.NoError(err)
+	require.NoError(addContinuousValTx.SyntacticVerify(env.ctx))
+
+	onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
+	require.NoError(err)
+
+	executor := StandardTxExecutor{
+		Backend: &env.backend,
+		State:   onAcceptState,
+		Tx:      addContinuousValTx,
+	}
+	require.NoError(addContinuousValTx.Unsigned.Visit(&executor))
+
+	// push continuous validator to state
+	onAcceptState.AddTx(addContinuousValTx, status.Committed)
+	require.NoError(onAcceptState.Apply(env.state))
+	require.NoError(env.state.Commit())
+
+	// Check that a current validator is added, recording its relevant times
+	val, err := onAcceptState.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+	require.NoError(err)
+	require.Equal(val.StartTime.Add(val.StakingPeriod), val.NextTime)
+	require.Equal(mockable.MaxTime, val.EndTime)
+
+	// Add continuous delegator
+	ins, unstakedOuts, stakedOuts, signers, err = utxosHandler.Spend(
+		env.state,
+		[]*secp256k1.PrivateKey{stakerAuthPrivateKey},
+		env.config.MinDelegatorStake, // stakeAmount
+		env.config.AddPrimaryNetworkDelegatorFee,
+		addr, // changeAddr
+	)
+	require.NoError(err)
+	uAddDelTx := &txs.AddContinuousDelegatorTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    env.ctx.NetworkID,
+			BlockchainID: env.ctx.ChainID,
+			Ins:          ins,
+			Outs:         unstakedOuts,
+		}},
+		Validator: txs.Validator{
+			NodeID: nodeID,
+			Start:  uint64(dummyStartTime.Unix()),
+			End:    uint64(dummyStartTime.Add(delegatorDuration).Unix()),
+			Wght:   env.config.MinDelegatorStake,
+		},
+		DelegatorAuthKey: &secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{addr},
+		},
+		StakeOuts: stakedOuts,
+		DelegationRewardsOwner: &secp256k1fx.OutputOwners{
+			Addrs:     []ids.ShortID{addr},
+			Threshold: 1,
+		},
+		DelegatorRewardRestakeShares: 0,
+	}
+	addContinuousDelTx, err := txs.NewSigned(uAddDelTx, txs.Codec, signers)
+	require.NoError(err)
+	require.NoError(addContinuousDelTx.SyntacticVerify(env.ctx))
+
+	onAcceptState, err = state.NewDiff(env.state.GetLastAccepted(), env)
+	require.NoError(err)
+
+	executor = StandardTxExecutor{
+		Backend: &env.backend,
+		State:   onAcceptState,
+		Tx:      addContinuousDelTx,
+	}
+	require.NoError(addContinuousDelTx.Unsigned.Visit(&executor))
+
+	// push continuous delegator to state
+	onAcceptState.AddTx(addContinuousDelTx, status.Committed)
+	require.NoError(onAcceptState.Apply(env.state))
+	require.NoError(env.state.Commit())
+
+	// Check that a current delegator is added, recording its relevant times
+	delIt, err := onAcceptState.GetCurrentDelegatorIterator(constants.PrimaryNetworkID, nodeID)
+	require.NoError(err)
+	require.True(delIt.Next())
+	del := delIt.Value()
+	require.Equal(del.StartTime.Add(del.StakingPeriod), del.NextTime)
+	require.Equal(mockable.MaxTime, del.EndTime)
+
+	// stop the continuous validator
+	stopValTx, err := env.txBuilder.NewStopStakerTx(
+		addContinuousValTx.ID(),
+		[]*secp256k1.PrivateKey{stakerAuthPrivateKey},
+		addr,
+	)
+	require.NoError(err)
+
+	onAcceptState, err = state.NewDiff(env.state.GetLastAccepted(), env)
+	require.NoError(err)
+	executor = StandardTxExecutor{
+		Backend: &env.backend,
+		State:   onAcceptState,
+		Tx:      stopValTx,
+	}
+	require.NoError(stopValTx.Unsigned.Visit(&executor))
+
+	// Check that validator and delegator have their end time duly set
+	stoppedVal, err := onAcceptState.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+	require.NoError(err)
+	require.Equal(val.NextTime, stoppedVal.NextTime)
+	require.Equal(val.NextTime, stoppedVal.EndTime)
+
+	delIt, err = onAcceptState.GetCurrentDelegatorIterator(constants.PrimaryNetworkID, nodeID)
+	require.NoError(err)
+	require.True(delIt.Next())
+	stoppedDel := delIt.Value()
+	require.Equal(del.NextTime, stoppedDel.NextTime)
+	require.Equal(stoppedVal.EndTime, stoppedDel.EndTime)
+}
+
 func TestStandardTxExecutorAddContinuousDelegator(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(continuousStakingFork)
