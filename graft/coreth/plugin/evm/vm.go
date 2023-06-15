@@ -1542,7 +1542,7 @@ func (vm *VM) GetSpendableAVAXWithFee(
 		return nil, nil, err
 	}
 
-	initialFee, err := calculateDynamicFee(cost, baseFee)
+	initialFee, err := CalculateDynamicFee(cost, baseFee)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1562,13 +1562,13 @@ func (vm *VM) GetSpendableAVAXWithFee(
 			break
 		}
 
-		prevFee, err := calculateDynamicFee(cost, baseFee)
+		prevFee, err := CalculateDynamicFee(cost, baseFee)
 		if err != nil {
 			return nil, nil, err
 		}
 
 		newCost := cost + EVMInputGas
-		newFee, err := calculateDynamicFee(newCost, baseFee)
+		newFee, err := CalculateDynamicFee(newCost, baseFee)
 		if err != nil {
 			return nil, nil, err
 		}

@@ -172,7 +172,7 @@ func (tx *Tx) BlockFeeContribution(fixedFee bool, avaxAssetID ids.ID, baseFee *b
 	if err != nil {
 		return nil, nil, err
 	}
-	txFee, err := calculateDynamicFee(gasUsed, baseFee)
+	txFee, err := CalculateDynamicFee(gasUsed, baseFee)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -262,7 +262,7 @@ func IsSortedAndUniqueEVMOutputs(outputs []EVMOutput) bool {
 
 // calculates the amount of AVAX that must be burned by an atomic transaction
 // that consumes [cost] at [baseFee].
-func calculateDynamicFee(cost uint64, baseFee *big.Int) (uint64, error) {
+func CalculateDynamicFee(cost uint64, baseFee *big.Int) (uint64, error) {
 	if baseFee == nil {
 		return 0, errNilBaseFee
 	}
