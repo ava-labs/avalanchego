@@ -374,6 +374,12 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 	// Invariant: A [txs.DelegatorTx] does not also implement the
 	//            [txs.ValidatorTx] interface.
 	switch uStakerTx := stakerTx.Unsigned.(type) {
+	// TODO ABENEGIA: if a validator and a delegator terminates at the same time
+	// the delegator will be handled first due to priority. This means that delegator
+	// is shifted before its validator and there may be a few proposal and options blocks
+	// where there is delegator outliving its validator. This is ugly and I wonder if this
+	// should be done. Maybe we should introduce an ad-hoc priority (extending vs stopping)
+	// to properly handle the case. It seems the simplest to me
 	case txs.ValidatorTx:
 		if err := e.rewardValidatorTx(uStakerTx, stakerToRemove, tx); err != nil {
 			return err
