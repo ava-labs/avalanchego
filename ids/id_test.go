@@ -160,7 +160,6 @@ func TestIDString(t *testing.T) {
 }
 
 func TestSortIDs(t *testing.T) {
-	require := require.New(t)
 	ids := []ID{
 		{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
 		{'W', 'a', 'l', 'l', 'e', ' ', 'l', 'a', 'b', 's'},
@@ -172,7 +171,7 @@ func TestSortIDs(t *testing.T) {
 		{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
 		{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
 	}
-	require.Equal(expected, ids)
+	require.Equal(t, expected, ids)
 }
 
 func TestIDMapMarshalling(t *testing.T) {
