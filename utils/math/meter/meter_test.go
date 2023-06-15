@@ -53,8 +53,7 @@ func TestMeters(t *testing.T) {
 }
 
 func NewTest(t *testing.T, factory Factory) {
-	m := factory.New(halflife)
-	require.NotNil(t, m)
+	require.NotNil(t, factory.New(halflife))
 }
 
 func TimeTravelTest(t *testing.T, factory Factory) {
