@@ -712,11 +712,11 @@ func overDelegated(
 ) (bool, error) {
 	maxWeight, err := GetMaxWeight(state, validator, delegator.StartTime, delegator.EndTime)
 	if err != nil {
-		return false, err
+		return true, err
 	}
 	newMaxWeight, err := math.Add64(maxWeight, delegator.Weight)
 	if err != nil {
-		return false, err
+		return true, err
 	}
 	return newMaxWeight > weightLimit, nil
 }
