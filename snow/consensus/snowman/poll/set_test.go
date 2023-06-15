@@ -30,8 +30,7 @@ func TestNewSetErrorOnMetrics(t *testing.T) {
 		Name: "poll_duration",
 	})))
 
-	s := NewSet(factory, log, namespace, registerer)
-	require.NotNil(s)
+	require.NotNil(NewSet(factory, log, namespace, registerer))
 }
 
 func TestCreateAndFinishPollOutOfOrder_NewerFinishesFirst(t *testing.T) {
@@ -53,13 +52,11 @@ func TestCreateAndFinishPollOutOfOrder_NewerFinishesFirst(t *testing.T) {
 	// create two polls for the two vtxs
 	vdrBag := bag.Bag[ids.NodeID]{}
 	vdrBag.Add(vdrs...)
-	added := s.Add(1, vdrBag)
-	require.True(added)
+	require.True(s.Add(1, vdrBag))
 
 	vdrBag = bag.Bag[ids.NodeID]{}
 	vdrBag.Add(vdrs...)
-	added = s.Add(2, vdrBag)
-	require.True(added)
+	require.True(s.Add(2, vdrBag))
 	require.Equal(s.Len(), 2)
 
 	// vote vtx1 for poll 1
@@ -104,13 +101,11 @@ func TestCreateAndFinishPollOutOfOrder_OlderFinishesFirst(t *testing.T) {
 	// create two polls for the two vtxs
 	vdrBag := bag.Bag[ids.NodeID]{}
 	vdrBag.Add(vdrs...)
-	added := s.Add(1, vdrBag)
-	require.True(added)
+	require.True(s.Add(1, vdrBag))
 
 	vdrBag = bag.Bag[ids.NodeID]{}
 	vdrBag.Add(vdrs...)
-	added = s.Add(2, vdrBag)
-	require.True(added)
+	require.True(s.Add(2, vdrBag))
 	require.Equal(s.Len(), 2)
 
 	// vote vtx1 for poll 1
@@ -155,18 +150,15 @@ func TestCreateAndFinishPollOutOfOrder_UnfinishedPollsGaps(t *testing.T) {
 	// create three polls for the two vtxs
 	vdrBag := bag.Bag[ids.NodeID]{}
 	vdrBag.Add(vdrs...)
-	added := s.Add(1, vdrBag)
-	require.True(added)
+	require.True(s.Add(1, vdrBag))
 
 	vdrBag = bag.Bag[ids.NodeID]{}
 	vdrBag.Add(vdrs...)
-	added = s.Add(2, vdrBag)
-	require.True(added)
+	require.True(s.Add(2, vdrBag))
 
 	vdrBag = bag.Bag[ids.NodeID]{}
 	vdrBag.Add(vdrs...)
-	added = s.Add(3, vdrBag)
-	require.True(added)
+	require.True(s.Add(3, vdrBag))
 	require.Equal(s.Len(), 3)
 
 	// vote vtx1 for poll 1
@@ -220,13 +212,17 @@ func TestCreateAndFinishSuccessfulPoll(t *testing.T) {
 	)
 
 	require.Zero(s.Len())
+
 	require.True(s.Add(0, vdrs))
 	require.Equal(1, s.Len())
+
 	require.False(s.Add(0, vdrs))
 	require.Equal(1, s.Len())
+
 	require.Empty(s.Vote(1, vdr1, vtxID))
 	require.Empty(s.Vote(0, vdr1, vtxID))
 	require.Empty(s.Vote(0, vdr1, vtxID))
+
 	results := s.Vote(0, vdr2, vtxID)
 	require.Len(results, 1)
 	list := results[0].List()
@@ -254,13 +250,17 @@ func TestCreateAndFinishFailedPoll(t *testing.T) {
 	)
 
 	require.Zero(s.Len())
+
 	require.True(s.Add(0, vdrs))
 	require.Equal(1, s.Len())
+
 	require.False(s.Add(0, vdrs))
 	require.Equal(1, s.Len())
+
 	require.Empty(s.Drop(1, vdr1))
 	require.Empty(s.Drop(0, vdr1))
 	require.Empty(s.Drop(0, vdr1))
+
 	results := s.Drop(0, vdr2)
 	require.Len(results, 1)
 	require.Empty(results[0].List())
@@ -282,9 +282,9 @@ func TestSetString(t *testing.T) {
 
 	expected := `current polls: (Size = 1)
     RequestID 0:
-        waiting on Bag: (Size = 1)
+        waiting on Bag[ids.NodeID]: (Size = 1)
             NodeID-6HgC8KRBEhXYbF4riJyJFLSHt37UNuRt: 1
-        received Bag: (Size = 0)`
+        received Bag[ids.ID]: (Size = 0)`
 	require.True(s.Add(0, vdrs))
 	require.Equal(expected, s.String())
 }

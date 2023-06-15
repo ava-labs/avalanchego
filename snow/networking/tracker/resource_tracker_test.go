@@ -68,7 +68,7 @@ func TestCPUTracker(t *testing.T) {
 
 	node1Utilization := cpuTracker.Usage(node1, endTime2)
 	node2Utilization := cpuTracker.Usage(node2, endTime2)
-	require.Less(node1Utilization, node2Utilization)
+	require.Greater(node2Utilization, node1Utilization)
 
 	cumulative := cpuTracker.TotalUsage()
 	sum := node1Utilization + node2Utilization
@@ -79,9 +79,9 @@ func TestCPUTracker(t *testing.T) {
 	startTime3 := endTime2
 	endTime3 := startTime3.Add(halflife)
 	newNode1Utilization := cpuTracker.Usage(node1, endTime3)
-	require.Less(newNode1Utilization, node1Utilization)
+	require.Greater(node1Utilization, newNode1Utilization)
 	newCumulative := cpuTracker.TotalUsage()
-	require.Less(newCumulative, cumulative)
+	require.Greater(cumulative, newCumulative)
 
 	startTime4 := endTime3
 	endTime4 := startTime4.Add(halflife)
@@ -91,7 +91,7 @@ func TestCPUTracker(t *testing.T) {
 
 	cumulative = cpuTracker.TotalUsage()
 	sum = node1Utilization + node2Utilization
-	require.Less(cumulative, sum)
+	require.Greater(sum, cumulative)
 }
 
 func TestCPUTrackerTimeUntilCPUUtilization(t *testing.T) {

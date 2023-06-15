@@ -113,9 +113,9 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	onParentAccept.EXPECT().GetDelegateeReward(constants.PrimaryNetworkID, utx.NodeID()).Return(uint64(0), nil).AnyTimes()
 
 	env.mockedState.EXPECT().GetUptime(gomock.Any(), constants.PrimaryNetworkID).Return(
-		time.Duration(1000), /*upDuration*/
-		time.Time{},         /*lastUpdated*/
-		nil,                 /*err*/
+		time.Microsecond, /*upDuration*/
+		time.Time{},      /*lastUpdated*/
+		nil,              /*err*/
 	).AnyTimes()
 
 	// wrong height
@@ -240,9 +240,9 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	onParentAccept.EXPECT().GetPendingStakerIterator().Return(pendingStakersIt, nil).AnyTimes()
 
 	env.mockedState.EXPECT().GetUptime(gomock.Any(), gomock.Any()).Return(
-		time.Duration(1000), /*upDuration*/
-		time.Time{},         /*lastUpdated*/
-		nil,                 /*err*/
+		time.Microsecond, /*upDuration*/
+		time.Time{},      /*lastUpdated*/
+		nil,              /*err*/
 	).AnyTimes()
 
 	// create proposal tx to be included in the proposal block

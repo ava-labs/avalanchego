@@ -510,9 +510,7 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	tx := transactions[0]
 	txID := tx.ID()
 	require.NoError(mempool.Add(tx))
-
-	has := mempool.Has(txID)
-	require.True(has)
+	require.True(mempool.Has(txID))
 
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()

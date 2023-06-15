@@ -77,8 +77,8 @@ func TestBenchlistAdd(t *testing.T) {
 
 	// Still shouldn't be benched due to not enough consecutive failure
 	require.False(b.isBenched(vdrID0))
-	require.Zero(b.benchedQueue.Len())
-	require.Zero(b.benchlistSet.Len())
+	require.Empty(b.benchedQueue)
+	require.Empty(b.benchlistSet)
 	require.Len(b.failureStreaks, 1)
 	fs := b.failureStreaks[vdrID0]
 	require.Equal(threshold-1, fs.consecutive)
@@ -91,8 +91,8 @@ func TestBenchlistAdd(t *testing.T) {
 	// has passed since the first failure
 	b.lock.Lock()
 	require.False(b.isBenched(vdrID0))
-	require.Zero(b.benchedQueue.Len())
-	require.Zero(b.benchlistSet.Len())
+	require.Empty(b.benchedQueue)
+	require.Empty(b.benchlistSet)
 	b.lock.Unlock()
 
 	// Move the time up

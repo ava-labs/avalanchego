@@ -191,14 +191,15 @@ func TestUniqueVertexCacheMiss(t *testing.T) {
 
 		vtxParents, err := vtx.Parents()
 		require.NoError(err)
-		vtxHeight, err := vtx.Height()
-		require.NoError(err)
-		vtxTxs, err := vtx.Txs(context.Background())
-		require.NoError(err)
-
-		require.Equal(height, vtxHeight)
 		require.Len(vtxParents, 1)
 		require.Equal(parentID, vtxParents[0].ID())
+
+		vtxHeight, err := vtx.Height()
+		require.NoError(err)
+		require.Equal(height, vtxHeight)
+
+		vtxTxs, err := vtx.Txs(context.Background())
+		require.NoError(err)
 		require.Len(vtxTxs, 1)
 		require.Equal(txBytes, vtxTxs[0].Bytes())
 	}

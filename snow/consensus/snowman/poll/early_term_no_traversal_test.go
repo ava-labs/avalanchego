@@ -38,8 +38,6 @@ func TestEarlyTermNoTraversalResults(t *testing.T) {
 }
 
 func TestEarlyTermNoTraversalString(t *testing.T) {
-	require := require.New(t)
-
 	alpha := 2
 
 	vtxID := ids.ID{1}
@@ -58,15 +56,16 @@ func TestEarlyTermNoTraversalString(t *testing.T) {
 
 	poll.Vote(vdr1, vtxID)
 
-	expected := `waiting on Bag: (Size = 1)
+	expected := `waiting on Bag[ids.NodeID]: (Size = 1)
     NodeID-BaMPFdqMUQ46BV8iRcwbVfsam55kMqcp: 1
-received Bag: (Size = 1)
+received Bag[ids.ID]: (Size = 1)
     SYXsAycDPUu4z2ZksJD5fh5nTDcH3vCFHnpcVye5XuJ2jArg: 1`
-	require.Equal(expected, poll.String())
+	require.Equal(t, expected, poll.String())
 }
 
 func TestEarlyTermNoTraversalDropsDuplicatedVotes(t *testing.T) {
 	require := require.New(t)
+
 	alpha := 2
 
 	vtxID := ids.ID{1}
@@ -229,7 +228,6 @@ func TestEarlyTermNoTraversalWithWeightedResponses(t *testing.T) {
 }
 
 func TestEarlyTermNoTraversalDropWithWeightedResponses(t *testing.T) {
-	require := require.New(t)
 	alpha := 2
 
 	vdr1 := ids.NodeID{1}
@@ -246,5 +244,5 @@ func TestEarlyTermNoTraversalDropWithWeightedResponses(t *testing.T) {
 	poll := factory.New(vdrs)
 
 	poll.Drop(vdr2)
-	require.True(poll.Finished())
+	require.True(t, poll.Finished())
 }

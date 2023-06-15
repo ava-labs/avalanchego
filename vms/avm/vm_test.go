@@ -1051,8 +1051,6 @@ func TestTxNotCached(t *testing.T) {
 	require.NoError(err)
 
 	registerer := prometheus.NewRegistry()
-	require.NoError(err)
-
 	vm.metrics, err = metrics.New("", registerer)
 	require.NoError(err)
 

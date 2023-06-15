@@ -975,8 +975,6 @@ func TestStandardTxExecutorAddValidator(t *testing.T) {
 
 // Returns a RemoveSubnetValidatorTx that passes syntactic verification.
 func newRemoveSubnetValidatorTx(t *testing.T) (*txs.RemoveSubnetValidatorTx, *txs.Tx) {
-	require := require.New(t)
-
 	t.Helper()
 
 	creds := []verify.Verifiable{
@@ -1031,7 +1029,7 @@ func newRemoveSubnetValidatorTx(t *testing.T) (*txs.RemoveSubnetValidatorTx, *tx
 		Unsigned: unsignedTx,
 		Creds:    creds,
 	}
-	require.NoError(tx.Initialize(txs.Codec))
+	require.NoError(t, tx.Initialize(txs.Codec))
 	return unsignedTx, tx
 }
 
@@ -1332,8 +1330,6 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 
 // Returns a TransformSubnetTx that passes syntactic verification.
 func newTransformSubnetTx(t *testing.T) (*txs.TransformSubnetTx, *txs.Tx) {
-	require := require.New(t)
-
 	t.Helper()
 
 	creds := []verify.Verifiable{
@@ -1400,7 +1396,7 @@ func newTransformSubnetTx(t *testing.T) (*txs.TransformSubnetTx, *txs.Tx) {
 		Unsigned: unsignedTx,
 		Creds:    creds,
 	}
-	require.NoError(tx.Initialize(txs.Codec))
+	require.NoError(t, tx.Initialize(txs.Codec))
 	return unsignedTx, tx
 }
 

@@ -152,7 +152,7 @@ func TestBagString(t *testing.T) {
 
 	bag.AddCount(elt0, 1337)
 
-	expected := "Bag: (Size = 1337)\n" +
+	expected := "Bag[int]: (Size = 1337)\n" +
 		"    123: 1337"
 
 	require.Equal(t, expected, bag.String())

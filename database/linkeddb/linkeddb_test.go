@@ -399,7 +399,7 @@ func TestLinkedDBHeadKey(t *testing.T) {
 	ldb := NewDefault(db)
 
 	_, err := ldb.HeadKey()
-	require.ErrorIs(err, database.ErrNotFound)
+	require.Equal(database.ErrNotFound, err)
 
 	key0 := []byte("hello0")
 	value0 := []byte("world0")
@@ -432,7 +432,7 @@ func TestLinkedDBHead(t *testing.T) {
 	ldb := NewDefault(db)
 
 	_, _, err := ldb.Head()
-	require.ErrorIs(err, database.ErrNotFound)
+	require.Equal(database.ErrNotFound, err)
 
 	key0 := []byte("hello0")
 	value0 := []byte("world0")

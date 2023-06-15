@@ -46,7 +46,7 @@ type SenderTest struct {
 	SendGetAcceptedStateSummaryF func(context.Context, set.Set[ids.NodeID], uint32, []uint64)
 	SendAcceptedStateSummaryF    func(context.Context, ids.NodeID, uint32, []ids.ID)
 	SendGetAcceptedFrontierF     func(context.Context, set.Set[ids.NodeID], uint32)
-	SendAcceptedFrontierF        func(context.Context, ids.NodeID, uint32, []ids.ID)
+	SendAcceptedFrontierF        func(context.Context, ids.NodeID, uint32, ids.ID)
 	SendGetAcceptedF             func(context.Context, set.Set[ids.NodeID], uint32, []ids.ID)
 	SendAcceptedF                func(context.Context, ids.NodeID, uint32, []ids.ID)
 	SendGetF                     func(context.Context, ids.NodeID, uint32, ids.ID)
@@ -55,7 +55,7 @@ type SenderTest struct {
 	SendAncestorsF               func(context.Context, ids.NodeID, uint32, [][]byte)
 	SendPushQueryF               func(context.Context, set.Set[ids.NodeID], uint32, []byte)
 	SendPullQueryF               func(context.Context, set.Set[ids.NodeID], uint32, ids.ID)
-	SendChitsF                   func(context.Context, ids.NodeID, uint32, []ids.ID, []ids.ID)
+	SendChitsF                   func(context.Context, ids.NodeID, uint32, ids.ID, ids.ID)
 	SendGossipF                  func(context.Context, []byte)
 	SendAppRequestF              func(context.Context, set.Set[ids.NodeID], uint32, []byte) error
 	SendAppResponseF             func(context.Context, ids.NodeID, uint32, []byte) error
@@ -92,9 +92,9 @@ func (s *SenderTest) Default(cant bool) {
 	s.CantSendCrossChainAppResponse = cant
 }
 
-// SendGetStateSummaryFrontier calls SendGetStateSummaryFrontierF if it was initialized. If it
-// wasn't initialized and this function shouldn't be called and testing was
-// initialized, then testing will fail.
+// Accept calls AcceptF if it was initialized. If it wasn't initialized and this
+// function shouldn't be called and testing was initialized, then testing will
+// fail.
 func (s *SenderTest) Accept(ctx *snow.ConsensusContext, containerID ids.ID, container []byte) error {
 	if s.AcceptF != nil {
 		return s.AcceptF(ctx, containerID, container)
@@ -108,9 +108,9 @@ func (s *SenderTest) Accept(ctx *snow.ConsensusContext, containerID ids.ID, cont
 	return errAccept
 }
 
-// SendGetStateSummaryFrontier calls SendGetStateSummaryFrontierF if it was initialized. If it
-// wasn't initialized and this function shouldn't be called and testing was
-// initialized, then testing will fail.
+// SendGetStateSummaryFrontier calls SendGetStateSummaryFrontierF if it was
+// initialized. If it wasn't initialized and this function shouldn't be called
+// and testing was initialized, then testing will fail.
 func (s *SenderTest) SendGetStateSummaryFrontier(ctx context.Context, validatorIDs set.Set[ids.NodeID], requestID uint32) {
 	if s.SendGetStateSummaryFrontierF != nil {
 		s.SendGetStateSummaryFrontierF(ctx, validatorIDs, requestID)
@@ -119,9 +119,9 @@ func (s *SenderTest) SendGetStateSummaryFrontier(ctx context.Context, validatorI
 	}
 }
 
-// SendAcceptedFrontier calls SendAcceptedFrontierF if it was initialized. If it
-// wasn't initialized and this function shouldn't be called and testing was
-// initialized, then testing will fail.
+// SendStateSummaryFrontier calls SendStateSummaryFrontierF if it was
+// initialized. If it wasn't initialized and this function shouldn't be called
+// and testing was initialized, then testing will fail.
 func (s *SenderTest) SendStateSummaryFrontier(ctx context.Context, validatorID ids.NodeID, requestID uint32, summary []byte) {
 	if s.SendStateSummaryFrontierF != nil {
 		s.SendStateSummaryFrontierF(ctx, validatorID, requestID, summary)
@@ -130,9 +130,9 @@ func (s *SenderTest) SendStateSummaryFrontier(ctx context.Context, validatorID i
 	}
 }
 
-// SendGetAcceptedStateSummary calls SendGetAcceptedStateSummaryF if it was initialized. If it wasn't
-// initialized and this function shouldn't be called and testing was
-// initialized, then testing will fail.
+// SendGetAcceptedStateSummary calls SendGetAcceptedStateSummaryF if it was
+// initialized. If it wasn't initialized and this function shouldn't be called
+// and testing was initialized, then testing will fail.
 func (s *SenderTest) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, heights []uint64) {
 	if s.SendGetAcceptedStateSummaryF != nil {
 		s.SendGetAcceptedStateSummaryF(ctx, nodeIDs, requestID, heights)
@@ -141,9 +141,9 @@ func (s *SenderTest) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs se
 	}
 }
 
-// SendAcceptedStateSummary calls SendAcceptedStateSummaryF if it was initialized. If it wasn't
-// initialized and this function shouldn't be called and testing was
-// initialized, then testing will fail.
+// SendAcceptedStateSummary calls SendAcceptedStateSummaryF if it was
+// initialized. If it wasn't initialized and this function shouldn't be called
+// and testing was initialized, then testing will fail.
 func (s *SenderTest) SendAcceptedStateSummary(ctx context.Context, validatorID ids.NodeID, requestID uint32, summaryIDs []ids.ID) {
 	if s.SendAcceptedStateSummaryF != nil {
 		s.SendAcceptedStateSummaryF(ctx, validatorID, requestID, summaryIDs)
@@ -166,9 +166,9 @@ func (s *SenderTest) SendGetAcceptedFrontier(ctx context.Context, validatorIDs s
 // SendAcceptedFrontier calls SendAcceptedFrontierF if it was initialized. If it
 // wasn't initialized and this function shouldn't be called and testing was
 // initialized, then testing will fail.
-func (s *SenderTest) SendAcceptedFrontier(ctx context.Context, validatorID ids.NodeID, requestID uint32, containerIDs []ids.ID) {
+func (s *SenderTest) SendAcceptedFrontier(ctx context.Context, validatorID ids.NodeID, requestID uint32, containerID ids.ID) {
 	if s.SendAcceptedFrontierF != nil {
-		s.SendAcceptedFrontierF(ctx, validatorID, requestID, containerIDs)
+		s.SendAcceptedFrontierF(ctx, validatorID, requestID, containerID)
 	} else if s.CantSendAcceptedFrontier && s.T != nil {
 		require.FailNow(s.T, "Unexpectedly called SendAcceptedFrontier")
 	}
@@ -265,9 +265,9 @@ func (s *SenderTest) SendPullQuery(ctx context.Context, vdrs set.Set[ids.NodeID]
 // SendChits calls SendChitsF if it was initialized. If it wasn't initialized
 // and this function shouldn't be called and testing was initialized, then
 // testing will fail.
-func (s *SenderTest) SendChits(ctx context.Context, vdr ids.NodeID, requestID uint32, votes []ids.ID, accepted []ids.ID) {
+func (s *SenderTest) SendChits(ctx context.Context, vdr ids.NodeID, requestID uint32, preferredID ids.ID, acceptedID ids.ID) {
 	if s.SendChitsF != nil {
-		s.SendChitsF(ctx, vdr, requestID, votes, accepted)
+		s.SendChitsF(ctx, vdr, requestID, preferredID, acceptedID)
 	} else if s.CantSendChits && s.T != nil {
 		require.FailNow(s.T, "Unexpectedly called SendChits")
 	}
@@ -284,6 +284,9 @@ func (s *SenderTest) SendGossip(ctx context.Context, container []byte) {
 	}
 }
 
+// SendCrossChainAppRequest calls SendCrossChainAppRequestF if it was
+// initialized. If it wasn't initialized and this function shouldn't be called
+// and testing was initialized, then testing will fail.
 func (s *SenderTest) SendCrossChainAppRequest(ctx context.Context, chainID ids.ID, requestID uint32, appRequestBytes []byte) error {
 	if s.SendCrossChainAppRequestF != nil {
 		s.SendCrossChainAppRequestF(ctx, chainID, requestID, appRequestBytes)
@@ -293,6 +296,9 @@ func (s *SenderTest) SendCrossChainAppRequest(ctx context.Context, chainID ids.I
 	return nil
 }
 
+// SendCrossChainAppResponse calls SendCrossChainAppResponseF if it was
+// initialized. If it wasn't initialized and this function shouldn't be called
+// and testing was initialized, then testing will fail.
 func (s *SenderTest) SendCrossChainAppResponse(ctx context.Context, chainID ids.ID, requestID uint32, appResponseBytes []byte) error {
 	if s.SendCrossChainAppResponseF != nil {
 		s.SendCrossChainAppResponseF(ctx, chainID, requestID, appResponseBytes)

@@ -124,14 +124,14 @@ func TestInitialStateVerifyInvalidOutput(t *testing.T) {
 	require := require.New(t)
 
 	c := linearcodec.NewDefault()
-	require.NoError(c.RegisterType(&avax.TestVerifiable{}))
+	require.NoError(c.RegisterType(&avax.TestState{}))
 	m := codec.NewDefaultManager()
 	require.NoError(m.RegisterCodec(CodecVersion, c))
 	numFxs := 1
 
 	is := InitialState{
 		FxIndex: 0,
-		Outs:    []verify.State{&avax.TestVerifiable{Err: errTest}},
+		Outs:    []verify.State{&avax.TestState{Err: errTest}},
 	}
 	err := is.Verify(m, numFxs)
 	require.ErrorIs(err, errTest)
