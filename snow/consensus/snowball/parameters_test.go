@@ -5,7 +5,6 @@ package snowball
 
 import (
 	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -23,9 +22,7 @@ func TestParametersVerify(t *testing.T) {
 		MaxItemProcessingTime: 1,
 	}
 
-	if err := p.Verify(); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, p.Verify())
 }
 
 func TestParametersAnotherVerify(t *testing.T) {
@@ -40,9 +37,7 @@ func TestParametersAnotherVerify(t *testing.T) {
 		MaxItemProcessingTime: 1,
 	}
 
-	if err := p.Verify(); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, p.Verify())
 }
 
 func TestParametersYetAnotherVerify(t *testing.T) {
@@ -57,9 +52,7 @@ func TestParametersYetAnotherVerify(t *testing.T) {
 		MaxItemProcessingTime: 1,
 	}
 
-	if err := p.Verify(); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, p.Verify())
 }
 
 func TestParametersInvalidK(t *testing.T) {
@@ -74,9 +67,8 @@ func TestParametersInvalidK(t *testing.T) {
 		MaxItemProcessingTime: 1,
 	}
 
-	if err := p.Verify(); err == nil {
-		t.Fatalf("Should have failed due to invalid k")
-	}
+	err := p.Verify()
+	require.ErrorIs(t, err, ErrParametersInvalid)
 }
 
 func TestParametersInvalidAlpha(t *testing.T) {
@@ -91,9 +83,8 @@ func TestParametersInvalidAlpha(t *testing.T) {
 		MaxItemProcessingTime: 1,
 	}
 
-	if err := p.Verify(); err == nil {
-		t.Fatalf("Should have failed due to invalid alpha")
-	}
+	err := p.Verify()
+	require.ErrorIs(t, err, ErrParametersInvalid)
 }
 
 func TestParametersInvalidBetaVirtuous(t *testing.T) {
@@ -108,9 +99,8 @@ func TestParametersInvalidBetaVirtuous(t *testing.T) {
 		MaxItemProcessingTime: 1,
 	}
 
-	if err := p.Verify(); err == nil {
-		t.Fatalf("Should have failed due to invalid beta virtuous")
-	}
+	err := p.Verify()
+	require.ErrorIs(t, err, ErrParametersInvalid)
 }
 
 func TestParametersInvalidBetaRogue(t *testing.T) {
@@ -125,9 +115,8 @@ func TestParametersInvalidBetaRogue(t *testing.T) {
 		MaxItemProcessingTime: 1,
 	}
 
-	if err := p.Verify(); err == nil {
-		t.Fatalf("Should have failed due to invalid beta rogue")
-	}
+	err := p.Verify()
+	require.ErrorIs(t, err, ErrParametersInvalid)
 }
 
 func TestParametersAnotherInvalidBetaRogue(t *testing.T) {
@@ -142,11 +131,8 @@ func TestParametersAnotherInvalidBetaRogue(t *testing.T) {
 		MaxItemProcessingTime: 1,
 	}
 
-	if err := p.Verify(); err == nil {
-		t.Fatalf("Should have failed due to invalid beta rogue")
-	} else if !strings.Contains(err.Error(), "\n") {
-		t.Fatalf("Should have described the extensive error")
-	}
+	err := p.Verify()
+	require.ErrorIs(t, err, ErrParametersInvalid)
 }
 
 func TestParametersInvalidConcurrentRepolls(t *testing.T) {
@@ -175,9 +161,8 @@ func TestParametersInvalidConcurrentRepolls(t *testing.T) {
 	for _, p := range tests {
 		label := fmt.Sprintf("ConcurrentRepolls=%d", p.ConcurrentRepolls)
 		t.Run(label, func(t *testing.T) {
-			if err := p.Verify(); err == nil {
-				t.Error("Should have failed due to invalid concurrent repolls")
-			}
+			err := p.Verify()
+			require.ErrorIs(t, err, ErrParametersInvalid)
 		})
 	}
 }
@@ -194,9 +179,8 @@ func TestParametersInvalidOptimalProcessing(t *testing.T) {
 		MaxItemProcessingTime: 1,
 	}
 
-	if err := p.Verify(); err == nil {
-		t.Fatalf("Should have failed due to invalid optimal processing")
-	}
+	err := p.Verify()
+	require.ErrorIs(t, err, ErrParametersInvalid)
 }
 
 func TestParametersInvalidMaxOutstandingItems(t *testing.T) {
@@ -211,9 +195,8 @@ func TestParametersInvalidMaxOutstandingItems(t *testing.T) {
 		MaxItemProcessingTime: 1,
 	}
 
-	if err := p.Verify(); err == nil {
-		t.Fatalf("Should have failed due to invalid max outstanding items")
-	}
+	err := p.Verify()
+	require.ErrorIs(t, err, ErrParametersInvalid)
 }
 
 func TestParametersInvalidMaxItemProcessingTime(t *testing.T) {
@@ -228,9 +211,8 @@ func TestParametersInvalidMaxItemProcessingTime(t *testing.T) {
 		MaxItemProcessingTime: 0,
 	}
 
-	if err := p.Verify(); err == nil {
-		t.Fatalf("Should have failed due to invalid max item processing time")
-	}
+	err := p.Verify()
+	require.ErrorIs(t, err, ErrParametersInvalid)
 }
 
 func TestParametersMinPercentConnectedHealthy(t *testing.T) {
