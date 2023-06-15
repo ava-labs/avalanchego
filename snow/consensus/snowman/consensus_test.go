@@ -323,7 +323,7 @@ func StatusOrProcessingPreviouslyRejectedTest(t *testing.T, factory Factory) {
 		HeightV: Genesis.HeightV + 1,
 	}
 
-	require.NotEqual(choices.Accepted, block.Status())
+	require.Equal(choices.Rejected, block.Status())
 	require.False(sm.Processing(block.ID()))
 	require.True(sm.Decided(block))
 	require.False(sm.IsPreferred(block))
@@ -390,7 +390,7 @@ func StatusOrProcessingIssuedTest(t *testing.T, factory Factory) {
 	}
 
 	require.NoError(sm.Add(context.Background(), block))
-	require.NotEqual(choices.Accepted, block.Status())
+	require.Equal(choices.Processing, block.Status())
 	require.True(sm.Processing(block.ID()))
 	require.False(sm.Decided(block))
 	require.True(sm.IsPreferred(block))
@@ -1558,10 +1558,8 @@ func ErrorOnAddDuplicateBlockID(t *testing.T, factory Factory) {
 }
 
 func gatherCounterGauge(t *testing.T, reg *prometheus.Registry) map[string]float64 {
-	require := require.New(t)
-
 	ms, err := reg.Gather()
-	require.NoError(err)
+	require.NoError(t, err)
 	mss := make(map[string]float64)
 	for _, mf := range ms {
 		name := mf.GetName()

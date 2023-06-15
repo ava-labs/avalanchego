@@ -21,8 +21,7 @@ func TestRequests(t *testing.T) {
 	_, removed := req.Remove(ids.EmptyNodeID, 0)
 	require.False(removed)
 
-	removed = req.RemoveAny(ids.Empty)
-	require.False(removed)
+	require.False(req.RemoveAny(ids.Empty))
 	require.False(req.Contains(ids.Empty))
 
 	req.Add(ids.EmptyNodeID, 0, ids.Empty)
@@ -62,11 +61,9 @@ func TestRequests(t *testing.T) {
 	req.Add(ids.EmptyNodeID, 0, ids.Empty)
 	require.Equal(1, req.Len())
 
-	removed = req.RemoveAny(ids.Empty)
-	require.True(removed)
+	require.True(req.RemoveAny(ids.Empty))
 	require.Zero(req.Len())
 
-	removed = req.RemoveAny(ids.Empty)
-	require.False(removed)
+	require.False(req.RemoveAny(ids.Empty))
 	require.Zero(req.Len())
 }
