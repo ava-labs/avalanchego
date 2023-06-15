@@ -1558,8 +1558,6 @@ func ErrorOnAddDuplicateBlockID(t *testing.T, factory Factory) {
 }
 
 func gatherCounterGauge(t *testing.T, reg *prometheus.Registry) map[string]float64 {
-	require := require.New(t)
-
 	ms, err := reg.Gather()
 	require.NoError(t, err)
 	mss := make(map[string]float64)
