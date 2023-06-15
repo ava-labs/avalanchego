@@ -35,7 +35,7 @@ func TestOracle_PostForkBlock_ImplementsInterface(t *testing.T) {
 
 	// test
 	_, err := proBlk.Options(context.Background())
-	require.ErrorIs(err, snowman.ErrNotOracle)
+	require.Equal(err, snowman.ErrNotOracle)
 
 	// setup
 	_, _, proVM, _, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks

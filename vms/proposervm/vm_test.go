@@ -9,6 +9,7 @@ import (
 	"crypto"
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -58,6 +59,7 @@ var (
 	errUnverifiedBlock   = errors.New("unverified block")
 	errMarshallingFailed = errors.New("marshalling failed")
 	errTooHigh           = errors.New("too high")
+	errUnexpectedCall    = errors.New("unexpected call")
 )
 
 func init() {
@@ -958,8 +960,8 @@ func TestExpiredBuildBlock(t *testing.T) {
 	require.NoError(proVM.SetPreference(context.Background(), parsedBlock.ID()))
 
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
-		require.FailNow("unexpectedly called build block")
-		return nil, nil
+		require.FailNow(fmt.Errorf("%w: BuildBlock", errUnexpectedCall).Error())
+		return nil, errUnexpectedCall
 	}
 
 	// The first notification will be read from the consensus engine

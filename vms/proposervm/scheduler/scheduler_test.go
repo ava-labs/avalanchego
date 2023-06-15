@@ -24,7 +24,7 @@ func TestDelayFromNew(t *testing.T) {
 	fromVM <- common.PendingTxs
 
 	<-toEngine
-	require.Negative(t, time.Until(startTime))
+	require.LessOrEqual(t, time.Until(startTime), 0)
 }
 
 func TestDelayFromSetTime(t *testing.T) {
@@ -41,7 +41,7 @@ func TestDelayFromSetTime(t *testing.T) {
 	fromVM <- common.PendingTxs
 
 	<-toEngine
-	require.Negative(t, time.Until(startTime))
+	require.LessOrEqual(t, time.Until(startTime), 0)
 }
 
 func TestReceipt(*testing.T) {
