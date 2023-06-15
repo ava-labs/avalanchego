@@ -9,6 +9,7 @@ import (
 	"reflect"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -52,7 +53,7 @@ var (
 	errNotConsortiumMember            = errors.New("address isn't consortium member")
 	errValidatorNotFound              = errors.New("validator not found")
 	errConsortiumMemberHasNode        = errors.New("consortium member already has registered node")
-	errConsortiumSignatureMissing     = errors.New("wrong consortium's member signature")
+	errSignatureMissing               = errors.New("wrong signature")
 	errNodeNotRegistered              = errors.New("no address registered for this node")
 	errNotNodeOwner                   = errors.New("node is registered for another address")
 	errNodeAlreadyRegistered          = errors.New("node is already registered")
@@ -72,6 +73,7 @@ var (
 	errExpiredDepositNotFullyUnlocked = errors.New("unlocked only part of expired deposit")
 	errBurnedDepositUnlock            = errors.New("burned undeposited tokens")
 	errAdminCannotBeDeleted           = errors.New("admin cannot be deleted")
+	errNotSunrisePhase1               = errors.New("not allowed before SunrisePhase1")
 )
 
 type CaminoStandardTxExecutor struct {
@@ -167,7 +169,7 @@ func (e *CaminoStandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error 
 		},
 		e.State,
 	); err != nil {
-		return fmt.Errorf("%w: %s", errConsortiumSignatureMissing, err)
+		return fmt.Errorf("%w: %s", errSignatureMissing, err)
 	}
 
 	// verify validator
@@ -1100,7 +1102,7 @@ func (e *CaminoStandardTxExecutor) RegisterNodeTx(tx *txs.RegisterNodeTx) error 
 		},
 		e.State,
 	); err != nil {
-		return fmt.Errorf("%w: %s", errConsortiumSignatureMissing, err)
+		return fmt.Errorf("%w: %s", errSignatureMissing, err)
 	}
 
 	// verify old nodeID ownership
@@ -1490,27 +1492,61 @@ func addCreds(tx *txs.Tx, creds []verify.Verifiable) {
 }
 
 func (e *CaminoStandardTxExecutor) AddressStateTx(tx *txs.AddressStateTx) error {
-	if err := e.Tx.SyntacticVerify(e.Ctx); err != nil {
+	var err error
+	if err = e.Tx.SyntacticVerify(e.Ctx); err != nil {
 		return err
 	}
 
-	addresses, err := e.Fx.RecoverAddresses(tx, e.Tx.Creds)
-	if err != nil {
-		return fmt.Errorf("%w: %s", errRecoverAddresses, err)
-	}
-
-	if len(addresses) == 0 {
-		return errWrongNumberOfCredentials
-	}
-
-	// Accumulate roles over all signers
 	roles := txs.AddressStateEmpty
-	for address := range addresses {
-		states, err := e.State.GetAddressStates(address)
+	creds := e.Tx.Creds
+
+	if codec.GetUpgradeVersion(tx.UpgradeVersionID) > 0 {
+		if !e.Config.IsSunrisePhase1Activated(e.State.GetTimestamp()) {
+			return errNotSunrisePhase1
+		}
+		if err = e.Backend.Fx.VerifyMultisigPermission(
+			e.Tx.Unsigned,
+			tx.ExecutorAuth,
+			e.Tx.Creds[len(e.Tx.Creds)-1], // executor cred
+			&secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{tx.Executor},
+			},
+			e.State,
+		); err != nil {
+			return fmt.Errorf("%w: %s", errSignatureMissing, err)
+		}
+		creds = e.Tx.Creds[:len(e.Tx.Creds)-1]
+
+		roles, err = e.State.GetAddressStates(tx.Executor)
 		if err != nil {
 			return err
 		}
-		roles |= states
+		if tx.Remove && tx.State == txs.AddressStateBitRoleAdmin && tx.Address == tx.Executor {
+			return errAdminCannotBeDeleted
+		}
+	} else {
+		addresses, err := e.Fx.RecoverAddresses(tx, e.Tx.Creds)
+		if err != nil {
+			return fmt.Errorf("%w: %s", errRecoverAddresses, err)
+		}
+
+		if len(addresses) == 0 {
+			return errWrongNumberOfCredentials
+		}
+
+		// Accumulate roles over all signers
+		checkSelfRemove := tx.Remove && tx.State == txs.AddressStateBitRoleAdmin
+		for address := range addresses {
+			states, err := e.State.GetAddressStates(address)
+			if err != nil {
+				return err
+			}
+			if checkSelfRemove && address == tx.Address {
+				return errAdminCannotBeDeleted
+			}
+			roles |= states
+		}
 	}
 	statesBit := txs.AddressState(1) << tx.State
 
@@ -1527,11 +1563,6 @@ func (e *CaminoStandardTxExecutor) AddressStateTx(tx *txs.AddressStateTx) error 
 	// Calculate new states
 	newStates := states
 	if tx.Remove && (states&statesBit) != 0 {
-		for signerAddresses := range addresses {
-			if signerAddresses == tx.Address && (states&txs.AddressStateRoleAdmin) == 1 {
-				return errAdminCannotBeDeleted
-			}
-		}
 		newStates ^= statesBit
 	} else if !tx.Remove {
 		newStates |= statesBit
@@ -1543,7 +1574,7 @@ func (e *CaminoStandardTxExecutor) AddressStateTx(tx *txs.AddressStateTx) error 
 		e.State,
 		tx.Ins,
 		tx.Outs,
-		e.Tx.Creds,
+		creds,
 		map[ids.ID]uint64{
 			e.Ctx.AVAXAssetID: e.Config.TxFee,
 		},

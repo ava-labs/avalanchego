@@ -6,6 +6,7 @@ package txs
 import (
 	"testing"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -93,13 +94,15 @@ func TestAddressStateTxSyntacticVerify(t *testing.T) {
 		Remove:  false,
 	}
 
-	outputs = append(outputs, lockedOut)
+	lockedOutputs := append([]*avax.TransferableOutput{}, outputs...)
+	lockedOutputs = append(lockedOutputs, lockedOut)
+
 	addressStateTxLocked := &AddressStateTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    ctx.NetworkID,
 			BlockchainID: ctx.ChainID,
 			Ins:          inputs,
-			Outs:         outputs,
+			Outs:         lockedOutputs,
 			Memo:         []byte{1, 2, 3, 4, 5, 6, 7, 8},
 		}},
 		Address: preFundedKeys[0].PublicKey().Address(),
@@ -107,8 +110,23 @@ func TestAddressStateTxSyntacticVerify(t *testing.T) {
 		Remove:  false,
 	}
 
-	outputs[1] = stakedOut
+	lockedOutputs[1] = stakedOut
 	addressStateTxStaked := &AddressStateTx{
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    ctx.NetworkID,
+			BlockchainID: ctx.ChainID,
+			Ins:          inputs,
+			Outs:         lockedOutputs,
+			Memo:         []byte{1, 2, 3, 4, 5, 6, 7, 8},
+		}},
+		Address: preFundedKeys[0].PublicKey().Address(),
+		State:   AddressStateBitRoleAdmin,
+		Remove:  false,
+	}
+
+	executorAuth := secp256k1fx.Input{}
+
+	addressStateTxUpgraded := &AddressStateTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    ctx.NetworkID,
 			BlockchainID: ctx.ChainID,
@@ -116,9 +134,12 @@ func TestAddressStateTxSyntacticVerify(t *testing.T) {
 			Outs:         outputs,
 			Memo:         []byte{1, 2, 3, 4, 5, 6, 7, 8},
 		}},
-		Address: preFundedKeys[0].PublicKey().Address(),
-		State:   AddressStateBitRoleAdmin,
-		Remove:  false,
+		UpgradeVersionID: codec.BuildUpgradeVersionID(1),
+		Address:          preFundedKeys[0].PublicKey().Address(),
+		State:            AddressStateBitRoleAdmin,
+		Remove:           false,
+		Executor:         ids.ShortEmpty,
+		ExecutorAuth:     &executorAuth,
 	}
 
 	// Case: valid tx
@@ -155,4 +176,17 @@ func TestAddressStateTxSyntacticVerify(t *testing.T) {
 	require.NoError(err)
 	err = stx.SyntacticVerify(ctx)
 	require.Error(err)
+
+	// Upgraded / empty executor
+	stx, err = NewSigned(addressStateTxUpgraded, Codec, signers)
+	require.NoError(err)
+	err = stx.SyntacticVerify(ctx)
+	require.Error(err, ErrEmptyAddress)
+
+	// Upgraded / Ok
+	addressStateTxUpgraded.Executor = ids.ShortID{'X'}
+	stx, err = NewSigned(addressStateTxUpgraded, Codec, signers)
+	require.NoError(err)
+	err = stx.SyntacticVerify(ctx)
+	require.NoError(err)
 }

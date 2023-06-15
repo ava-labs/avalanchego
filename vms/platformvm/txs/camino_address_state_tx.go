@@ -6,8 +6,10 @@ package txs
 import (
 	"errors"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
 )
 
@@ -57,6 +59,8 @@ var (
 
 // AddressStateTx is an unsigned AddressStateTx
 type AddressStateTx struct {
+	// We upgrade this struct beginning SP1
+	UpgradeVersionID uint64
 	// Metadata, inputs and outputs
 	BaseTx `serialize:"true"`
 	// The address to add / remove state
@@ -65,6 +69,10 @@ type AddressStateTx struct {
 	State AddressStateBit `serialize:"true" json:"state"`
 	// Remove or add the flag ?
 	Remove bool `serialize:"true" json:"remove"`
+	// The executor of this TX (needs access role)
+	Executor ids.ShortID `serialize:"true" json:"executor" upgradeVersion:"1"`
+	// Signature(s) to authenticate executor
+	ExecutorAuth verify.Verifiable `serialize:"true" json:"executorAuth" upgradeVersion:"1"`
 }
 
 // SyntacticVerify returns nil if [tx] is valid
@@ -78,6 +86,15 @@ func (tx *AddressStateTx) SyntacticVerify(ctx *snow.Context) error {
 		return ErrEmptyAddress
 	case tx.State > AddressStateBitMax || AddressStateValidBits&AddressState(uint64(1)<<tx.State) == 0:
 		return ErrInvalidState
+	}
+
+	if codec.GetUpgradeVersion(tx.UpgradeVersionID) > 0 {
+		if err := tx.ExecutorAuth.Verify(); err != nil {
+			return err
+		}
+		if tx.Executor == ids.ShortEmpty {
+			return ErrEmptyAddress
+		}
 	}
 
 	if err := locked.VerifyNoLocks(tx.Ins, tx.Outs); err != nil {

@@ -4,6 +4,7 @@
 package executor
 
 import (
+	"fmt"
 	"math"
 	"testing"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -266,7 +268,7 @@ func TestCaminoStandardTxExecutorAddValidatorTx(t *testing.T) {
 			preExecute: func(t *testing.T, tx *txs.Tx) {
 				env.state.SetShortIDLink(ids.ShortID(nodeID), state.ShortLinkKeyRegisterNode, &addr1)
 			},
-			expectedErr: errConsortiumSignatureMissing,
+			expectedErr: errSignatureMissing,
 		},
 		// TODO@
 		// "Not enough sigs from msig node owner": {
@@ -298,7 +300,7 @@ func TestCaminoStandardTxExecutorAddValidatorTx(t *testing.T) {
 		// 			},
 		// 		})
 		// 	},
-		// 	expectedErr: errConsortiumSignatureMissing,
+		// 	expectedErr: errSignatureMissing,
 		// },
 	}
 	for name, tt := range tests {
@@ -1629,13 +1631,16 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 	sigIndices := []uint32{0}
 
 	tests := map[string]struct {
-		stateAddress  ids.ShortID
-		targetAddress ids.ShortID
-		txFlag        txs.AddressStateBit
-		existingState txs.AddressState
-		expectedErr   error
-		expectedState txs.AddressState
-		remove        bool
+		UpgradeVersion uint16
+		stateAddress   ids.ShortID
+		targetAddress  ids.ShortID
+		txFlag         txs.AddressStateBit
+		existingState  txs.AddressState
+		expectedErrs   []error
+		expectedState  txs.AddressState
+		remove         bool
+		executor       ids.ShortID
+		executorAuth   *secp256k1fx.Input
 	}{
 		// Bob has Admin role, and he is trying to give himself Admin role (again)
 		"State: Admin, Flag: Admin role, Add, Same Address": {
@@ -1652,7 +1657,7 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 			targetAddress: bob,
 			txFlag:        txs.AddressStateBitRoleKYC,
 			existingState: txs.AddressStateRoleKYC,
-			expectedErr:   errAddrStateNotPermitted,
+			expectedErrs:  []error{errAddrStateNotPermitted, errAddrStateNotPermitted},
 			remove:        false,
 		},
 		// Bob has KYC role, and he is trying to give himself Admin role
@@ -1661,7 +1666,7 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 			targetAddress: bob,
 			txFlag:        txs.AddressStateBitRoleAdmin,
 			existingState: txs.AddressStateRoleKYC,
-			expectedErr:   errAddrStateNotPermitted,
+			expectedErrs:  []error{errAddrStateNotPermitted, errAddrStateNotPermitted},
 			remove:        false,
 		},
 		// Bob has Admin role, and he is trying to give Alice Admin role
@@ -1707,7 +1712,7 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 			txFlag:        txs.AddressStateBitRoleAdmin,
 			existingState: txs.AddressStateRoleAdmin,
 			expectedState: 0,
-			expectedErr:   errAdminCannotBeDeleted,
+			expectedErrs:  []error{errAdminCannotBeDeleted, errAdminCannotBeDeleted},
 			remove:        true,
 		},
 		// Bob has Admin role, and he is trying to give Alice the KYC Verified state
@@ -1761,7 +1766,7 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 			targetAddress: alice,
 			txFlag:        txs.AddressStateBitRoleAdmin,
 			existingState: txs.AddressStateRoleAdmin,
-			expectedErr:   errAddrStateNotPermitted,
+			expectedErrs:  []error{errAddrStateNotPermitted, errAddrStateNotPermitted},
 			remove:        false,
 		},
 		// An Empty Address has Admin role, and he is trying to give Alice Admin role
@@ -1770,7 +1775,7 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 			targetAddress: alice,
 			txFlag:        txs.AddressStateBitRoleAdmin,
 			existingState: txs.AddressStateRoleAdmin,
-			expectedErr:   errAddrStateNotPermitted,
+			expectedErrs:  []error{errAddrStateNotPermitted, errAddrStateNotPermitted},
 			remove:        false,
 		},
 		// Bob has Admin role, and he is trying to give Admin role to an Empty Address
@@ -1779,7 +1784,7 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 			targetAddress: ids.ShortEmpty,
 			txFlag:        txs.AddressStateBitRoleAdmin,
 			existingState: txs.AddressStateRoleAdmin,
-			expectedErr:   txs.ErrEmptyAddress,
+			expectedErrs:  []error{txs.ErrEmptyAddress, txs.ErrEmptyAddress},
 			remove:        false,
 		},
 		// Bob has empty addr state, and he is trying to give Alice Admin role
@@ -1789,7 +1794,7 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 			txFlag:        txs.AddressStateBitRoleAdmin,
 			existingState: txs.AddressStateEmpty,
 			remove:        false,
-			expectedErr:   errAddrStateNotPermitted,
+			expectedErrs:  []error{errAddrStateNotPermitted, errAddrStateNotPermitted},
 		},
 		// Bob has empty addr state, and he is trying to remove Admin role from Alice
 		"State: none, Flag: Admin role, Remove, Different Address": {
@@ -1798,7 +1803,7 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 			txFlag:        txs.AddressStateBitRoleAdmin,
 			existingState: txs.AddressStateEmpty,
 			remove:        true,
-			expectedErr:   errAddrStateNotPermitted,
+			expectedErrs:  []error{errAddrStateNotPermitted, errAddrStateNotPermitted},
 		},
 		// Bob has empty addr state, and he is trying to give Alice KYC role
 		"State: none, Flag: KYC role, Add, Different Address": {
@@ -1807,7 +1812,7 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 			txFlag:        txs.AddressStateBitRoleKYC,
 			existingState: txs.AddressStateEmpty,
 			remove:        false,
-			expectedErr:   errAddrStateNotPermitted,
+			expectedErrs:  []error{errAddrStateNotPermitted, errAddrStateNotPermitted},
 		},
 		// Bob has empty addr state, and he is trying to remove KYC role from Alice
 		"State: none, Flag: KYC role, Remove, Different Address": {
@@ -1816,7 +1821,7 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 			txFlag:        txs.AddressStateBitRoleKYC,
 			existingState: txs.AddressStateEmpty,
 			remove:        true,
-			expectedErr:   errAddrStateNotPermitted,
+			expectedErrs:  []error{errAddrStateNotPermitted, errAddrStateNotPermitted},
 		},
 		// Bob has empty addr state, and he is trying to give Alice KYC Verified state
 		"State: none, Flag: KYC Verified, Add, Different Address": {
@@ -1825,7 +1830,7 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 			txFlag:        txs.AddressStateBitKYCVerified,
 			existingState: txs.AddressStateEmpty,
 			remove:        false,
-			expectedErr:   errAddrStateNotPermitted,
+			expectedErrs:  []error{errAddrStateNotPermitted, errAddrStateNotPermitted},
 		},
 		// Bob has empty addr state, and he is trying to remove KYC Verified state from Alice
 		"State: none, Flag: KYC Verified, Remove, Different Address": {
@@ -1834,7 +1839,33 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 			txFlag:        txs.AddressStateBitKYCVerified,
 			existingState: txs.AddressStateEmpty,
 			remove:        true,
-			expectedErr:   errAddrStateNotPermitted,
+			expectedErrs:  []error{errAddrStateNotPermitted, errAddrStateNotPermitted},
+		},
+		// Bob has KYC role, and he is trying to give Alice KYC Expired state
+		"Upgrade: 1, State: KYC, Flag: KYC Expired, Add, Different Address": {
+			UpgradeVersion: 1,
+			stateAddress:   bob,
+			targetAddress:  alice,
+			txFlag:         txs.AddressStateBitKYCExpired,
+			existingState:  txs.AddressStateRoleKYC,
+			expectedState:  txs.AddressStateKYCExpired,
+			expectedErrs:   []error{errNotSunrisePhase1, nil},
+			remove:         false,
+			executor:       bob,
+			executorAuth:   &secp256k1fx.Input{SigIndices: []uint32{0}},
+		},
+		// Bob has KYC role, alice tries to executor her KYC Expired state
+		"Upgrade: 1, State: KYC, Flag: KYC Expired, wrong executor": {
+			UpgradeVersion: 1,
+			stateAddress:   bob,
+			targetAddress:  alice,
+			txFlag:         txs.AddressStateBitKYCExpired,
+			existingState:  txs.AddressStateRoleKYC,
+			expectedState:  txs.AddressStateKYCExpired,
+			expectedErrs:   []error{errNotSunrisePhase1, errSignatureMissing},
+			remove:         false,
+			executor:       alice,
+			executorAuth:   &secp256k1fx.Input{SigIndices: []uint32{0}},
 		},
 	}
 
@@ -1849,39 +1880,58 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 		},
 	}}
 
-	for name, tt := range tests {
-		t.Run(name, func(t *testing.T) {
-			addressStateTx := &txs.AddressStateTx{
-				BaseTx:  baseTx,
-				Address: tt.targetAddress,
-				State:   tt.txFlag,
-				Remove:  tt.remove,
-			}
+	sunrisePhaseTimes := []time.Time{
+		env.state.GetTimestamp().Add(24 * time.Hour), // SunrisePhases1 not yet active (> chainTime)
+		env.state.GetTimestamp(),                     // SunrisePhase1 active (<= chainTime)
+	}
 
-			tx, err := txs.NewSigned(addressStateTx, txs.Codec, signers)
-			require.NoError(t, err)
+	for phase := 0; phase < 2; phase++ {
+		env.config.SunrisePhase1Time = sunrisePhaseTimes[phase]
+		for name, tt := range tests {
+			t.Run(fmt.Sprintf("Phase %d; %s", phase, name), func(t *testing.T) {
+				addressStateTx := &txs.AddressStateTx{
+					UpgradeVersionID: codec.BuildUpgradeVersionID(tt.UpgradeVersion),
+					BaseTx:           baseTx,
+					Address:          tt.targetAddress,
+					State:            tt.txFlag,
+					Remove:           tt.remove,
+					Executor:         tt.executor,
+					ExecutorAuth:     tt.executorAuth,
+				}
 
-			onAcceptState, err := state.NewCaminoDiff(lastAcceptedID, env)
-			require.NoError(t, err)
+				tx, err := txs.NewSigned(addressStateTx, txs.Codec, signers)
+				require.NoError(t, err)
 
-			executor := CaminoStandardTxExecutor{
-				StandardTxExecutor{
-					Backend: &env.backend,
-					State:   onAcceptState,
-					Tx:      tx,
-				},
-			}
+				if tt.UpgradeVersion > 0 {
+					tx.Creds = append(tx.Creds, tx.Creds[0])
+				}
 
-			executor.State.SetAddressStates(tt.stateAddress, tt.existingState)
+				onAcceptState, err := state.NewCaminoDiff(lastAcceptedID, env)
+				require.NoError(t, err)
 
-			err = addressStateTx.Visit(&executor)
-			require.ErrorIs(t, err, tt.expectedErr)
+				executor := CaminoStandardTxExecutor{
+					StandardTxExecutor{
+						Backend: &env.backend,
+						State:   onAcceptState,
+						Tx:      tx,
+					},
+				}
 
-			if err == nil {
-				targetStates, _ := executor.State.GetAddressStates(tt.targetAddress)
-				require.Equal(t, targetStates, tt.expectedState)
-			}
-		})
+				executor.State.SetAddressStates(tt.stateAddress, tt.existingState)
+
+				err = addressStateTx.Visit(&executor)
+				if len(tt.expectedErrs) > phase {
+					require.ErrorIs(t, err, tt.expectedErrs[phase])
+				} else {
+					require.NoError(t, err)
+				}
+
+				if err == nil {
+					targetStates, _ := executor.State.GetAddressStates(tt.targetAddress)
+					require.Equal(t, targetStates, tt.expectedState)
+				}
+			})
+		}
 	}
 }
 
