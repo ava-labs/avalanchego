@@ -7,6 +7,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leanovate/gopter"
+	"github.com/leanovate/gopter/gen"
+	"github.com/leanovate/gopter/prop"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -16,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
@@ -26,16 +30,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-func TestShiftRewardValidatorOnRewardTxCommit(t *testing.T) {
-	require := require.New(t)
-	env := newEnvironmentNoValidator(latestFork)
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-	}()
+func TestShiftChecksRewardValidator(t *testing.T) {
+	properties := gopter.NewProperties(nil)
 
-	// Add a continuous validator
-	onParentState, err := state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
+	// to reproduce a given scenario do something like this:
+	// parameters := gopter.DefaultTestParametersWithSeed(1685887576153675816)
+	// properties := gopter.NewProperties(parameters)
 
 	var (
 		nodeID            = ids.GenerateTestNodeID()
@@ -47,335 +47,255 @@ func TestShiftRewardValidatorOnRewardTxCommit(t *testing.T) {
 	)
 
 	blsSK, err := bls.NewSecretKey()
-	require.NoError(err)
+	require.NoError(t, err)
 	blsPOP := signer.NewProofOfPossession(blsSK)
 
-	utxosHandler := utxo.NewHandler(env.ctx, env.clk, env.fx)
-	ins, unstakedOuts, stakedOuts, signers, err := utxosHandler.Spend(
-		env.state,
-		preFundedKeys,
-		env.config.MinValidatorStake, // stakeAmount
-		env.config.AddPrimaryNetworkValidatorFee,
-		addr, // changeAddr
-	)
-	require.NoError(err)
+	properties.Property("validator is shift in both commits and aborts", prop.ForAll(
+		func(choices []bool) string {
+			env := newEnvironmentNoValidator(latestFork)
+			defer func() {
+				_ = shutdownEnvironment(env)
+			}()
 
-	// Create the tx
-	continuousValidatorTx := &txs.AddContinuousValidatorTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    env.ctx.NetworkID,
-			BlockchainID: env.ctx.ChainID,
-			Ins:          ins,
-			Outs:         unstakedOuts,
-		}},
-		Validator: txs.Validator{
-			NodeID: nodeID,
-			Start:  uint64(dummyStartTime.Unix()),
-			End:    uint64(dummyStartTime.Add(validatorDuration).Unix()),
-			Wght:   env.config.MinValidatorStake,
-		},
-		Signer: blsPOP,
-		ValidatorAuthKey: &secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{addr},
-		},
-		StakeOuts: stakedOuts,
-		ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
-			Addrs:     []ids.ShortID{addr},
-			Threshold: 1,
-		},
-		ValidatorRewardRestakeShares: 0,
-		DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
-			Addrs:     []ids.ShortID{addr},
-			Threshold: 1,
-		},
-		DelegationShares: 20_000,
-	}
-	addContinuousValTx, err := txs.NewSigned(continuousValidatorTx, txs.Codec, signers)
-	require.NoError(err)
-	require.NoError(addContinuousValTx.SyntacticVerify(env.ctx))
-
-	addValExecutor := StandardTxExecutor{
-		State:   onParentState,
-		Backend: &env.backend,
-		Tx:      addContinuousValTx,
-	}
-	require.NoError(addContinuousValTx.Unsigned.Visit(&addValExecutor))
-	onParentState.AddTx(addContinuousValTx, status.Committed)
-	require.NoError(onParentState.Apply(env.state))
-	require.NoError(env.state.Commit())
-
-	// shift validator ahead a few times
-	for i := 1; i < 10; i++ {
-		continuousValidator, err := env.state.GetCurrentValidator(continuousValidatorTx.SubnetID(), continuousValidatorTx.NodeID())
-		require.NoError(err)
-
-		// advance time
-		chainTime := env.state.GetTimestamp()
-		nextChainTime := chainTime.Add(validatorDuration)
-		env.state.SetTimestamp(nextChainTime)
-
-		// create and execute reward tx
-		tx, err := env.txBuilder.NewRewardValidatorTx(continuousValidator.TxID)
-		require.NoError(err)
-
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
-		require.NoError(err)
-
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		require.NoError(err)
-
-		txExecutor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			Tx:            tx,
-		}
-		require.NoError(tx.Unsigned.Visit(&txExecutor))
-		require.NoError(txExecutor.OnCommitState.Apply(env.state))
-		require.NoError(env.state.Commit())
-
-		onCommitStakerIterator, err := env.state.GetCurrentStakerIterator()
-		require.NoError(err)
-
-		// check that post continuousStakingFork, staker is shifted ahead by its staking period
-		var shiftedValidator *state.Staker
-		for onCommitStakerIterator.Next() {
-			nextStaker := onCommitStakerIterator.Value()
-			if nextStaker.TxID == continuousValidator.TxID {
-				shiftedValidator = nextStaker
-				break
+			// Add a continuous validator
+			onParentState, err := state.NewDiff(lastAcceptedID, env)
+			if err != nil {
+				return err.Error()
 			}
-		}
-		onCommitStakerIterator.Release()
-		require.NotNil(shiftedValidator)
-		require.Equal(continuousValidator.StakingPeriod, shiftedValidator.StakingPeriod)
-		require.Equal(continuousValidator.StartTime.Add(continuousValidator.StakingPeriod), shiftedValidator.StartTime)
-		require.Equal(continuousValidator.NextTime.Add(continuousValidator.StakingPeriod), shiftedValidator.NextTime)
-		require.Equal(continuousValidator.EndTime.Add(continuousValidator.StakingPeriod), shiftedValidator.EndTime)
-	}
 
-	continuousValidator, err := env.state.GetCurrentValidator(continuousValidatorTx.SubnetID(), continuousValidatorTx.NodeID())
-	require.NoError(err)
+			utxosHandler := utxo.NewHandler(env.ctx, env.clk, env.fx)
+			ins, unstakedOuts, stakedOuts, signers, err := utxosHandler.Spend(
+				env.state,
+				preFundedKeys,
+				env.config.MinValidatorStake, // stakeAmount
+				env.config.AddPrimaryNetworkValidatorFee,
+				addr, // changeAddr
+			)
+			if err != nil {
+				return err.Error()
+			}
 
-	// stop the validator
-	stopValidatorTx, err := env.txBuilder.NewStopStakerTx(
-		addContinuousValTx.ID(),
-		[]*secp256k1.PrivateKey{validatorAuthKey},
-		addr,
-	)
-	require.NoError(err)
+			// Create the tx
+			continuousValidatorTx := &txs.AddContinuousValidatorTx{
+				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+					NetworkID:    env.ctx.NetworkID,
+					BlockchainID: env.ctx.ChainID,
+					Ins:          ins,
+					Outs:         unstakedOuts,
+				}},
+				Validator: txs.Validator{
+					NodeID: nodeID,
+					Start:  uint64(dummyStartTime.Unix()),
+					End:    uint64(dummyStartTime.Add(validatorDuration).Unix()),
+					Wght:   env.config.MinValidatorStake,
+				},
+				Signer: blsPOP,
+				ValidatorAuthKey: &secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{addr},
+				},
+				StakeOuts: stakedOuts,
+				ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
+					Addrs:     []ids.ShortID{addr},
+					Threshold: 1,
+				},
+				ValidatorRewardRestakeShares: 0,
+				DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
+					Addrs:     []ids.ShortID{addr},
+					Threshold: 1,
+				},
+				DelegationShares: 20_000,
+			}
+			addContinuousValTx, err := txs.NewSigned(continuousValidatorTx, txs.Codec, signers)
+			if err != nil {
+				return err.Error()
+			}
+			if err := addContinuousValTx.SyntacticVerify(env.ctx); err != nil {
+				return err.Error()
+			}
 
-	diff, err := state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
+			addValExecutor := StandardTxExecutor{
+				State:   onParentState,
+				Backend: &env.backend,
+				Tx:      addContinuousValTx,
+			}
+			if err := addContinuousValTx.Unsigned.Visit(&addValExecutor); err != nil {
+				return err.Error()
+			}
 
-	txExecutor := StandardTxExecutor{
-		State:   diff,
-		Backend: &env.backend,
-		Tx:      stopValidatorTx,
-	}
-	require.NoError(stopValidatorTx.Unsigned.Visit(&txExecutor))
-	require.NoError(txExecutor.State.Apply(env.state))
-	require.NoError(env.state.Commit())
+			onParentState.AddTx(addContinuousValTx, status.Committed)
+			if err := onParentState.Apply(env.state); err != nil {
+				return err.Error()
+			}
+			if err := env.state.Commit(); err != nil {
+				return err.Error()
+			}
 
-	// check that validator is stopped
-	stakersIt, err := env.state.GetCurrentStakerIterator()
-	require.NoError(err)
+			// shift validator ahead a few times
+			for _, choice := range choices {
+				continuousValidator, err := env.state.GetCurrentValidator(
+					continuousValidatorTx.SubnetID(),
+					continuousValidatorTx.NodeID(),
+				)
+				if err != nil {
+					return err.Error()
+				}
 
-	var stoppedValidator *state.Staker
-	for stakersIt.Next() {
-		nextStaker := stakersIt.Value()
-		if nextStaker.TxID == continuousValidator.TxID {
-			stoppedValidator = nextStaker
-			break
-		}
-	}
-	stakersIt.Release()
-	require.NotNil(stoppedValidator)
-	require.Equal(continuousValidator.StakingPeriod, stoppedValidator.StakingPeriod)
-	require.Equal(continuousValidator.StartTime, stoppedValidator.StartTime)
-	require.Equal(continuousValidator.NextTime, stoppedValidator.NextTime)
-	require.Equal(stoppedValidator.NextTime, stoppedValidator.EndTime)
+				// advance time
+				chainTime := env.state.GetTimestamp()
+				nextChainTime := chainTime.Add(validatorDuration)
+				env.state.SetTimestamp(nextChainTime)
+
+				// create and execute reward tx
+				tx, err := env.txBuilder.NewRewardValidatorTx(continuousValidator.TxID)
+				if err != nil {
+					return err.Error()
+				}
+
+				onCommitState, err := state.NewDiff(lastAcceptedID, env)
+				if err != nil {
+					return err.Error()
+				}
+
+				onAbortState, err := state.NewDiff(lastAcceptedID, env)
+				if err != nil {
+					return err.Error()
+				}
+
+				txExecutor := ProposalTxExecutor{
+					OnCommitState: onCommitState,
+					OnAbortState:  onAbortState,
+					Backend:       &env.backend,
+					Tx:            tx,
+				}
+				if err := tx.Unsigned.Visit(&txExecutor); err != nil {
+					return err.Error()
+				}
+
+				if choice {
+					err = txExecutor.OnCommitState.Apply(env.state)
+				} else {
+					err = txExecutor.OnAbortState.Apply(env.state)
+				}
+				if err != nil {
+					return err.Error()
+				}
+				if err := env.state.Commit(); err != nil {
+					return err.Error()
+				}
+
+				stakerIterator, err := env.state.GetCurrentStakerIterator()
+				if err != nil {
+					return err.Error()
+				}
+
+				// check that post continuousStakingFork, staker is shifted ahead by its staking period
+				var shiftedValidator *state.Staker
+				for stakerIterator.Next() {
+					nextStaker := stakerIterator.Value()
+					if nextStaker.TxID == continuousValidator.TxID {
+						shiftedValidator = nextStaker
+						break
+					}
+				}
+				stakerIterator.Release()
+				if shiftedValidator == nil {
+					return "nil shifted validator"
+				}
+				if continuousValidator.StakingPeriod != shiftedValidator.StakingPeriod {
+					return "unexpected staking period for shifted validator"
+				}
+				if !continuousValidator.StartTime.Add(continuousValidator.StakingPeriod).Equal(shiftedValidator.StartTime) {
+					return "unexpected shifted validator start time"
+				}
+				if !continuousValidator.NextTime.Add(continuousValidator.StakingPeriod).Equal(shiftedValidator.NextTime) {
+					return "unexpected shifted validator next time"
+				}
+				if !shiftedValidator.EndTime.Equal(mockable.MaxTime) {
+					return "unexpected shifted validator end time"
+				}
+			}
+
+			continuousValidator, err := env.state.GetCurrentValidator(continuousValidatorTx.SubnetID(), continuousValidatorTx.NodeID())
+			if err != nil {
+				return err.Error()
+			}
+
+			// stop the validator
+			stopValidatorTx, err := env.txBuilder.NewStopStakerTx(
+				addContinuousValTx.ID(),
+				[]*secp256k1.PrivateKey{validatorAuthKey},
+				addr,
+			)
+			if err != nil {
+				return err.Error()
+			}
+
+			diff, err := state.NewDiff(lastAcceptedID, env)
+			if err != nil {
+				return err.Error()
+			}
+
+			txExecutor := StandardTxExecutor{
+				State:   diff,
+				Backend: &env.backend,
+				Tx:      stopValidatorTx,
+			}
+			if err := stopValidatorTx.Unsigned.Visit(&txExecutor); err != nil {
+				return err.Error()
+			}
+			if err := txExecutor.State.Apply(env.state); err != nil {
+				return err.Error()
+			}
+			if err := env.state.Commit(); err != nil {
+				return err.Error()
+			}
+
+			// check that validator is stopped
+			stakersIt, err := env.state.GetCurrentStakerIterator()
+			if err != nil {
+				return err.Error()
+			}
+
+			var stoppedValidator *state.Staker
+			for stakersIt.Next() {
+				nextStaker := stakersIt.Value()
+				if nextStaker.TxID == continuousValidator.TxID {
+					stoppedValidator = nextStaker
+					break
+				}
+			}
+			stakersIt.Release()
+			if stoppedValidator == nil {
+				return "nil shifted validator"
+			}
+			if continuousValidator.StakingPeriod != stoppedValidator.StakingPeriod {
+				return "unexpected staking period for stopped validator"
+			}
+			if !continuousValidator.StartTime.Equal(stoppedValidator.StartTime) {
+				return "unexpected stopped validator start time"
+			}
+			if !continuousValidator.NextTime.Equal(stoppedValidator.NextTime) {
+				return "unexpected stopped validator next time"
+			}
+			if !stoppedValidator.NextTime.Equal(stoppedValidator.EndTime) {
+				return "unexpected stopped validator end time"
+			}
+
+			return ""
+		},
+		gen.SliceOfN(10, gen.Bool()),
+	))
+
+	properties.TestingRun(t)
 }
 
-func TestShiftRewardValidatorOnRewardTxAbort(t *testing.T) {
-	require := require.New(t)
-	env := newEnvironmentNoValidator(latestFork)
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-	}()
+func TestShiftChecksRewardDelegato(t *testing.T) {
+	properties := gopter.NewProperties(nil)
 
-	// Add a continuous validator
-	onParentState, err := state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
-
-	var (
-		nodeID            = ids.GenerateTestNodeID()
-		validatorDuration = defaultMinStakingDuration
-		dummyStartTime    = time.Unix(0, 0)
-
-		validatorAuthKey = preFundedKeys[4]
-		addr             = validatorAuthKey.PublicKey().Address()
-	)
-
-	blsSK, err := bls.NewSecretKey()
-	require.NoError(err)
-	blsPOP := signer.NewProofOfPossession(blsSK)
-
-	utxosHandler := utxo.NewHandler(env.ctx, env.clk, env.fx)
-	ins, unstakedOuts, stakedOuts, signers, err := utxosHandler.Spend(
-		env.state,
-		preFundedKeys,
-		env.config.MinValidatorStake, // stakeAmount
-		env.config.AddPrimaryNetworkValidatorFee,
-		addr, // changeAddr
-	)
-	require.NoError(err)
-
-	// Create the tx
-	continuousValidatorTx := &txs.AddContinuousValidatorTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    env.ctx.NetworkID,
-			BlockchainID: env.ctx.ChainID,
-			Ins:          ins,
-			Outs:         unstakedOuts,
-		}},
-		Validator: txs.Validator{
-			NodeID: nodeID,
-			Start:  uint64(dummyStartTime.Unix()),
-			End:    uint64(dummyStartTime.Add(validatorDuration).Unix()),
-			Wght:   env.config.MinValidatorStake,
-		},
-		Signer: blsPOP,
-		ValidatorAuthKey: &secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{addr},
-		},
-		StakeOuts: stakedOuts,
-		ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
-			Addrs:     []ids.ShortID{addr},
-			Threshold: 1,
-		},
-		ValidatorRewardRestakeShares: 0,
-		DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
-			Addrs:     []ids.ShortID{addr},
-			Threshold: 1,
-		},
-		DelegationShares: 20_000,
-	}
-	addContinuousValTx, err := txs.NewSigned(continuousValidatorTx, txs.Codec, signers)
-	require.NoError(err)
-	require.NoError(addContinuousValTx.SyntacticVerify(env.ctx))
-
-	addValExecutor := StandardTxExecutor{
-		State:   onParentState,
-		Backend: &env.backend,
-		Tx:      addContinuousValTx,
-	}
-	require.NoError(addContinuousValTx.Unsigned.Visit(&addValExecutor))
-	onParentState.AddTx(addContinuousValTx, status.Committed)
-	require.NoError(onParentState.Apply(env.state))
-	require.NoError(env.state.Commit())
-
-	// shift validator ahead a few times
-	for i := 1; i < 10; i++ {
-		continuousValidator, err := env.state.GetCurrentValidator(continuousValidatorTx.SubnetID(), continuousValidatorTx.NodeID())
-		require.NoError(err)
-
-		// advance time
-		chainTime := env.state.GetTimestamp()
-		nextChainTime := chainTime.Add(validatorDuration)
-		env.state.SetTimestamp(nextChainTime)
-
-		// create and execute reward tx
-		tx, err := env.txBuilder.NewRewardValidatorTx(continuousValidator.TxID)
-		require.NoError(err)
-
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
-		require.NoError(err)
-
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		require.NoError(err)
-
-		txExecutor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			Tx:            tx,
-		}
-		require.NoError(tx.Unsigned.Visit(&txExecutor))
-		require.NoError(txExecutor.OnAbortState.Apply(env.state))
-		require.NoError(env.state.Commit())
-
-		onAbortStakerIterator, err := env.state.GetCurrentStakerIterator()
-		require.NoError(err)
-
-		// check that post continuousStakingFork, validator is shifted ahead by its staking period
-		var shiftedValidator *state.Staker
-		for onAbortStakerIterator.Next() {
-			nextStaker := onAbortStakerIterator.Value()
-			if nextStaker.TxID == continuousValidator.TxID {
-				shiftedValidator = nextStaker
-				break
-			}
-		}
-		onAbortStakerIterator.Release()
-		require.NotNil(shiftedValidator)
-		require.Equal(continuousValidator.StakingPeriod, shiftedValidator.StakingPeriod)
-		require.Equal(continuousValidator.StartTime.Add(continuousValidator.StakingPeriod), shiftedValidator.StartTime)
-		require.Equal(continuousValidator.NextTime.Add(continuousValidator.StakingPeriod), shiftedValidator.NextTime)
-		require.Equal(continuousValidator.EndTime.Add(continuousValidator.StakingPeriod), shiftedValidator.EndTime)
-	}
-
-	continuousValidator, err := env.state.GetCurrentValidator(continuousValidatorTx.SubnetID(), continuousValidatorTx.NodeID())
-	require.NoError(err)
-
-	// stop the validator
-	stopValidatorTx, err := env.txBuilder.NewStopStakerTx(
-		addContinuousValTx.ID(),
-		[]*secp256k1.PrivateKey{validatorAuthKey},
-		addr,
-	)
-	require.NoError(err)
-
-	diff, err := state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
-
-	txExecutor := StandardTxExecutor{
-		State:   diff,
-		Backend: &env.backend,
-		Tx:      stopValidatorTx,
-	}
-	require.NoError(stopValidatorTx.Unsigned.Visit(&txExecutor))
-	require.NoError(txExecutor.State.Apply(env.state))
-	require.NoError(env.state.Commit())
-
-	// check that validator is stopped
-	stakersIt, err := env.state.GetCurrentStakerIterator()
-	require.NoError(err)
-
-	var stoppedValidator *state.Staker
-	for stakersIt.Next() {
-		nextStaker := stakersIt.Value()
-		if nextStaker.TxID == continuousValidator.TxID {
-			stoppedValidator = nextStaker
-			break
-		}
-	}
-	stakersIt.Release()
-	require.NotNil(stoppedValidator)
-	require.Equal(continuousValidator.StakingPeriod, stoppedValidator.StakingPeriod)
-	require.Equal(continuousValidator.StartTime, stoppedValidator.StartTime)
-	require.Equal(continuousValidator.NextTime, stoppedValidator.NextTime)
-	require.Equal(stoppedValidator.NextTime, stoppedValidator.EndTime)
-}
-
-func TestShiftRewardDelegatorOnRewardTxCommit(t *testing.T) {
-	require := require.New(t)
-	env := newEnvironmentNoValidator(latestFork)
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-	}()
+	// to reproduce a given scenario do something like this:
+	// parameters := gopter.DefaultTestParametersWithSeed(1685887576153675816)
+	// properties := gopter.NewProperties(parameters)
 
 	var (
 		nodeID            = ids.GenerateTestNodeID()
@@ -388,440 +308,313 @@ func TestShiftRewardDelegatorOnRewardTxCommit(t *testing.T) {
 	)
 
 	blsSK, err := bls.NewSecretKey()
-	require.NoError(err)
+	require.NoError(t, err)
 	blsPOP := signer.NewProofOfPossession(blsSK)
 
-	// Add a continuous validator
-	onParentState, err := state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
+	properties.Property("validator is shift in both commits and aborts", prop.ForAll(
+		func(choices []bool) string {
+			env := newEnvironmentNoValidator(latestFork)
+			defer func() {
+				_ = shutdownEnvironment(env)
+			}()
 
-	utxosHandler := utxo.NewHandler(env.ctx, env.clk, env.fx)
-	ins, unstakedOuts, stakedOuts, signers, err := utxosHandler.Spend(
-		env.state,
-		preFundedKeys,
-		env.config.MinValidatorStake, // stakeAmount
-		env.config.AddPrimaryNetworkValidatorFee,
-		addr, // changeAddr
-	)
-	require.NoError(err)
-
-	continuousValidatorTx := &txs.AddContinuousValidatorTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    env.ctx.NetworkID,
-			BlockchainID: env.ctx.ChainID,
-			Ins:          ins,
-			Outs:         unstakedOuts,
-		}},
-		Validator: txs.Validator{
-			NodeID: nodeID,
-			Start:  uint64(dummyStartTime.Unix()),
-			End:    uint64(dummyStartTime.Add(validatorDuration).Unix()),
-			Wght:   env.config.MinValidatorStake,
-		},
-		Signer: blsPOP,
-		ValidatorAuthKey: &secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{addr},
-		},
-		StakeOuts: stakedOuts,
-		ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
-			Addrs:     []ids.ShortID{addr},
-			Threshold: 1,
-		},
-		ValidatorRewardRestakeShares: 0,
-		DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
-			Addrs:     []ids.ShortID{addr},
-			Threshold: 1,
-		},
-		DelegationShares: 20_000,
-	}
-	addContinuousValTx, err := txs.NewSigned(continuousValidatorTx, txs.Codec, signers)
-	require.NoError(err)
-	require.NoError(addContinuousValTx.SyntacticVerify(env.ctx))
-
-	addValExecutor := StandardTxExecutor{
-		State:   onParentState,
-		Backend: &env.backend,
-		Tx:      addContinuousValTx,
-	}
-	require.NoError(addContinuousValTx.Unsigned.Visit(&addValExecutor))
-	onParentState.AddTx(addContinuousValTx, status.Committed)
-	require.NoError(onParentState.Apply(env.state))
-	require.NoError(env.state.Commit())
-
-	// Create the delegator tx
-	onParentState, err = state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
-
-	ins, unstakedOuts, stakedOuts, signers, err = utxosHandler.Spend(
-		env.state,
-		preFundedKeys,
-		env.config.MinDelegatorStake, // stakeAmount
-		env.config.AddPrimaryNetworkDelegatorFee,
-		addr, // changeAddr
-	)
-	require.NoError(err)
-
-	continuousDelegatorTx := &txs.AddContinuousDelegatorTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    env.ctx.NetworkID,
-			BlockchainID: env.ctx.ChainID,
-			Ins:          ins,
-			Outs:         unstakedOuts,
-		}},
-		Validator: txs.Validator{
-			NodeID: nodeID,
-			Start:  uint64(dummyStartTime.Unix()),
-			End:    uint64(dummyStartTime.Add(delegatorDuration).Unix()),
-			Wght:   env.config.MinDelegatorStake,
-		},
-		DelegatorAuthKey: &secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{addr},
-		},
-		StakeOuts: stakedOuts,
-		DelegationRewardsOwner: &secp256k1fx.OutputOwners{
-			Addrs:     []ids.ShortID{addr},
-			Threshold: 1,
-		},
-		DelegatorRewardRestakeShares: 0,
-	}
-	addContinuousDelTx, err := txs.NewSigned(continuousDelegatorTx, txs.Codec, signers)
-	require.NoError(err)
-	require.NoError(addContinuousDelTx.SyntacticVerify(env.ctx))
-
-	addDelExecutor := StandardTxExecutor{
-		State:   onParentState,
-		Backend: &env.backend,
-		Tx:      addContinuousDelTx,
-	}
-	require.NoError(addContinuousDelTx.Unsigned.Visit(&addDelExecutor))
-	onParentState.AddTx(addContinuousDelTx, status.Committed)
-	require.NoError(onParentState.Apply(env.state))
-	require.NoError(env.state.Commit())
-
-	// shift validator ahead a few times
-	for i := 1; i < int(validatorDuration/delegatorDuration); i++ {
-		delIt, err := env.state.GetCurrentDelegatorIterator(continuousValidatorTx.SubnetID(), continuousValidatorTx.NodeID())
-		require.NoError(err)
-		require.True(delIt.Next())
-		continuousDelegator := delIt.Value()
-
-		// advance time
-		chainTime := env.state.GetTimestamp()
-		nextChainTime := chainTime.Add(delegatorDuration)
-		env.state.SetTimestamp(nextChainTime)
-
-		// create and execute reward tx
-		tx, err := env.txBuilder.NewRewardValidatorTx(continuousDelegator.TxID)
-		require.NoError(err)
-
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
-		require.NoError(err)
-
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		require.NoError(err)
-
-		txExecutor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			Tx:            tx,
-		}
-		require.NoError(tx.Unsigned.Visit(&txExecutor))
-		require.NoError(txExecutor.OnCommitState.Apply(env.state))
-		require.NoError(env.state.Commit())
-
-		onCommitStakerIterator, err := env.state.GetCurrentStakerIterator()
-		require.NoError(err)
-
-		// check that post continuousStakingFork, staker is shifted ahead by its staking period
-		var shiftedDelegator *state.Staker
-		for onCommitStakerIterator.Next() {
-			nextStaker := onCommitStakerIterator.Value()
-			if nextStaker.TxID == continuousDelegator.TxID {
-				shiftedDelegator = nextStaker
-				break
+			// Add a continuous validator
+			onParentState, err := state.NewDiff(lastAcceptedID, env)
+			if err != nil {
+				return err.Error()
 			}
-		}
-		onCommitStakerIterator.Release()
-		require.NotNil(shiftedDelegator)
-		require.Equal(continuousDelegator.StakingPeriod, shiftedDelegator.StakingPeriod)
-		require.Equal(continuousDelegator.StartTime.Add(continuousDelegator.StakingPeriod), shiftedDelegator.StartTime)
-		require.Equal(continuousDelegator.NextTime.Add(continuousDelegator.StakingPeriod), shiftedDelegator.NextTime)
-		require.Equal(continuousDelegator.EndTime.Add(continuousDelegator.StakingPeriod), shiftedDelegator.EndTime)
-	}
 
-	delIt, err := env.state.GetCurrentDelegatorIterator(continuousValidatorTx.SubnetID(), continuousValidatorTx.NodeID())
-	require.NoError(err)
-	require.True(delIt.Next())
-	continuousDelegator := delIt.Value()
-
-	// stop the delegator
-	stopDelegatorTx, err := env.txBuilder.NewStopStakerTx(
-		addContinuousDelTx.ID(),
-		[]*secp256k1.PrivateKey{stakerAuthKey},
-		addr,
-	)
-	require.NoError(err)
-
-	diff, err := state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
-
-	txExecutor := StandardTxExecutor{
-		State:   diff,
-		Backend: &env.backend,
-		Tx:      stopDelegatorTx,
-	}
-	require.NoError(stopDelegatorTx.Unsigned.Visit(&txExecutor))
-	require.NoError(txExecutor.State.Apply(env.state))
-	require.NoError(env.state.Commit())
-
-	// check that staker is stopped
-	stakersIt, err := env.state.GetCurrentStakerIterator()
-	require.NoError(err)
-
-	var stoppedDelegator *state.Staker
-	for stakersIt.Next() {
-		nextStaker := stakersIt.Value()
-		if nextStaker.TxID == continuousDelegator.TxID {
-			stoppedDelegator = nextStaker
-			break
-		}
-	}
-	stakersIt.Release()
-	require.NotNil(stoppedDelegator)
-	require.Equal(continuousDelegator.StakingPeriod, stoppedDelegator.StakingPeriod)
-	require.Equal(continuousDelegator.StartTime, stoppedDelegator.StartTime)
-	require.Equal(continuousDelegator.NextTime, stoppedDelegator.NextTime)
-	require.Equal(stoppedDelegator.NextTime, stoppedDelegator.EndTime)
-}
-
-func TestShiftRewardDelegatorOnRewardTxAbort(t *testing.T) {
-	require := require.New(t)
-	env := newEnvironmentNoValidator(latestFork)
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-	}()
-
-	var (
-		nodeID            = ids.GenerateTestNodeID()
-		validatorDuration = defaultMaxStakingDuration
-		delegatorDuration = defaultMinStakingDuration
-		dummyStartTime    = time.Unix(0, 0)
-
-		stakerAuthKey = preFundedKeys[4]
-		addr          = stakerAuthKey.PublicKey().Address()
-	)
-
-	blsSK, err := bls.NewSecretKey()
-	require.NoError(err)
-	blsPOP := signer.NewProofOfPossession(blsSK)
-
-	// Add a continuous validator
-	onParentState, err := state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
-
-	utxosHandler := utxo.NewHandler(env.ctx, env.clk, env.fx)
-	ins, unstakedOuts, stakedOuts, signers, err := utxosHandler.Spend(
-		env.state,
-		preFundedKeys,
-		env.config.MinValidatorStake, // stakeAmount
-		env.config.AddPrimaryNetworkValidatorFee,
-		addr, // changeAddr
-	)
-	require.NoError(err)
-
-	continuousValidatorTx := &txs.AddContinuousValidatorTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    env.ctx.NetworkID,
-			BlockchainID: env.ctx.ChainID,
-			Ins:          ins,
-			Outs:         unstakedOuts,
-		}},
-		Validator: txs.Validator{
-			NodeID: nodeID,
-			Start:  uint64(dummyStartTime.Unix()),
-			End:    uint64(dummyStartTime.Add(validatorDuration).Unix()),
-			Wght:   env.config.MinValidatorStake,
-		},
-		Signer: blsPOP,
-		ValidatorAuthKey: &secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{addr},
-		},
-		StakeOuts: stakedOuts,
-		ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
-			Addrs:     []ids.ShortID{addr},
-			Threshold: 1,
-		},
-		ValidatorRewardRestakeShares: 0,
-		DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
-			Addrs:     []ids.ShortID{addr},
-			Threshold: 1,
-		},
-		DelegationShares: 20_000,
-	}
-	addContinuousValTx, err := txs.NewSigned(continuousValidatorTx, txs.Codec, signers)
-	require.NoError(err)
-	require.NoError(addContinuousValTx.SyntacticVerify(env.ctx))
-
-	addValExecutor := StandardTxExecutor{
-		State:   onParentState,
-		Backend: &env.backend,
-		Tx:      addContinuousValTx,
-	}
-	require.NoError(addContinuousValTx.Unsigned.Visit(&addValExecutor))
-	onParentState.AddTx(addContinuousValTx, status.Committed)
-	require.NoError(onParentState.Apply(env.state))
-	require.NoError(env.state.Commit())
-
-	// Create the delegator tx
-	onParentState, err = state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
-
-	ins, unstakedOuts, stakedOuts, signers, err = utxosHandler.Spend(
-		env.state,
-		preFundedKeys,
-		env.config.MinDelegatorStake, // stakeAmount
-		env.config.AddPrimaryNetworkDelegatorFee,
-		addr, // changeAddr
-	)
-	require.NoError(err)
-
-	continuousDelegatorTx := &txs.AddContinuousDelegatorTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    env.ctx.NetworkID,
-			BlockchainID: env.ctx.ChainID,
-			Ins:          ins,
-			Outs:         unstakedOuts,
-		}},
-		Validator: txs.Validator{
-			NodeID: nodeID,
-			Start:  uint64(dummyStartTime.Unix()),
-			End:    uint64(dummyStartTime.Add(delegatorDuration).Unix()),
-			Wght:   env.config.MinDelegatorStake,
-		},
-		DelegatorAuthKey: &secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{addr},
-		},
-		StakeOuts: stakedOuts,
-		DelegationRewardsOwner: &secp256k1fx.OutputOwners{
-			Addrs:     []ids.ShortID{addr},
-			Threshold: 1,
-		},
-		DelegatorRewardRestakeShares: 0,
-	}
-	addContinuousDelTx, err := txs.NewSigned(continuousDelegatorTx, txs.Codec, signers)
-	require.NoError(err)
-	require.NoError(addContinuousDelTx.SyntacticVerify(env.ctx))
-
-	addDelExecutor := StandardTxExecutor{
-		State:   onParentState,
-		Backend: &env.backend,
-		Tx:      addContinuousDelTx,
-	}
-	require.NoError(addContinuousDelTx.Unsigned.Visit(&addDelExecutor))
-	onParentState.AddTx(addContinuousDelTx, status.Committed)
-	require.NoError(onParentState.Apply(env.state))
-	require.NoError(env.state.Commit())
-
-	// shift validator ahead a few times
-	for i := 1; i < int(validatorDuration/delegatorDuration); i++ {
-		delIt, err := env.state.GetCurrentDelegatorIterator(continuousValidatorTx.SubnetID(), continuousValidatorTx.NodeID())
-		require.NoError(err)
-		require.True(delIt.Next())
-		continuousDelegator := delIt.Value()
-
-		// advance time
-		chainTime := env.state.GetTimestamp()
-		nextChainTime := chainTime.Add(delegatorDuration)
-		env.state.SetTimestamp(nextChainTime)
-
-		// create and execute reward tx
-		tx, err := env.txBuilder.NewRewardValidatorTx(continuousDelegator.TxID)
-		require.NoError(err)
-
-		onCommitState, err := state.NewDiff(lastAcceptedID, env)
-		require.NoError(err)
-
-		onAbortState, err := state.NewDiff(lastAcceptedID, env)
-		require.NoError(err)
-
-		txExecutor := ProposalTxExecutor{
-			OnCommitState: onCommitState,
-			OnAbortState:  onAbortState,
-			Backend:       &env.backend,
-			Tx:            tx,
-		}
-		require.NoError(tx.Unsigned.Visit(&txExecutor))
-		require.NoError(txExecutor.OnAbortState.Apply(env.state))
-		require.NoError(env.state.Commit())
-
-		onAbortStakerIterator, err := env.state.GetCurrentStakerIterator()
-		require.NoError(err)
-
-		// check that post continuousStakingFork, staker is shifted ahead by its staking period
-		var shiftedDelegator *state.Staker
-		for onAbortStakerIterator.Next() {
-			nextStaker := onAbortStakerIterator.Value()
-			if nextStaker.TxID == continuousDelegator.TxID {
-				shiftedDelegator = nextStaker
-				break
+			utxosHandler := utxo.NewHandler(env.ctx, env.clk, env.fx)
+			ins, unstakedOuts, stakedOuts, signers, err := utxosHandler.Spend(
+				env.state,
+				preFundedKeys,
+				env.config.MinValidatorStake, // stakeAmount
+				env.config.AddPrimaryNetworkValidatorFee,
+				addr, // changeAddr
+			)
+			if err != nil {
+				return err.Error()
 			}
-		}
-		onAbortStakerIterator.Release()
-		require.NotNil(shiftedDelegator)
-		require.Equal(continuousDelegator.StakingPeriod, shiftedDelegator.StakingPeriod)
-		require.Equal(continuousDelegator.StartTime.Add(continuousDelegator.StakingPeriod), shiftedDelegator.StartTime)
-		require.Equal(continuousDelegator.NextTime.Add(continuousDelegator.StakingPeriod), shiftedDelegator.NextTime)
-		require.Equal(continuousDelegator.EndTime.Add(continuousDelegator.StakingPeriod), shiftedDelegator.EndTime)
-	}
 
-	delIt, err := env.state.GetCurrentDelegatorIterator(continuousValidatorTx.SubnetID(), continuousValidatorTx.NodeID())
-	require.NoError(err)
-	require.True(delIt.Next())
-	continuousDelegator := delIt.Value()
+			continuousValidatorTx := &txs.AddContinuousValidatorTx{
+				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+					NetworkID:    env.ctx.NetworkID,
+					BlockchainID: env.ctx.ChainID,
+					Ins:          ins,
+					Outs:         unstakedOuts,
+				}},
+				Validator: txs.Validator{
+					NodeID: nodeID,
+					Start:  uint64(dummyStartTime.Unix()),
+					End:    uint64(dummyStartTime.Add(validatorDuration).Unix()),
+					Wght:   env.config.MinValidatorStake,
+				},
+				Signer: blsPOP,
+				ValidatorAuthKey: &secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{addr},
+				},
+				StakeOuts: stakedOuts,
+				ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
+					Addrs:     []ids.ShortID{addr},
+					Threshold: 1,
+				},
+				ValidatorRewardRestakeShares: 0,
+				DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
+					Addrs:     []ids.ShortID{addr},
+					Threshold: 1,
+				},
+				DelegationShares: 20_000,
+			}
+			addContinuousValTx, err := txs.NewSigned(continuousValidatorTx, txs.Codec, signers)
+			if err != nil {
+				return err.Error()
+			}
+			if err := addContinuousValTx.SyntacticVerify(env.ctx); err != nil {
+				return err.Error()
+			}
 
-	// stop the delegator
-	stopDelegatorTx, err := env.txBuilder.NewStopStakerTx(
-		addContinuousDelTx.ID(),
-		[]*secp256k1.PrivateKey{stakerAuthKey},
-		addr,
-	)
-	require.NoError(err)
+			addValExecutor := StandardTxExecutor{
+				State:   onParentState,
+				Backend: &env.backend,
+				Tx:      addContinuousValTx,
+			}
+			if err := addContinuousValTx.Unsigned.Visit(&addValExecutor); err != nil {
+				return err.Error()
+			}
+			onParentState.AddTx(addContinuousValTx, status.Committed)
+			if err := onParentState.Apply(env.state); err != nil {
+				return err.Error()
+			}
+			if err := env.state.Commit(); err != nil {
+				return err.Error()
+			}
 
-	diff, err := state.NewDiff(lastAcceptedID, env)
-	require.NoError(err)
+			// Create the delegator tx
+			onParentState, err = state.NewDiff(lastAcceptedID, env)
+			if err != nil {
+				return err.Error()
+			}
 
-	txExecutor := StandardTxExecutor{
-		State:   diff,
-		Backend: &env.backend,
-		Tx:      stopDelegatorTx,
-	}
-	require.NoError(stopDelegatorTx.Unsigned.Visit(&txExecutor))
-	require.NoError(txExecutor.State.Apply(env.state))
-	require.NoError(env.state.Commit())
+			ins, unstakedOuts, stakedOuts, signers, err = utxosHandler.Spend(
+				env.state,
+				preFundedKeys,
+				env.config.MinDelegatorStake, // stakeAmount
+				env.config.AddPrimaryNetworkDelegatorFee,
+				addr, // changeAddr
+			)
+			if err != nil {
+				return err.Error()
+			}
 
-	// check that staker is stopped
-	stakersIt, err := env.state.GetCurrentStakerIterator()
-	require.NoError(err)
+			continuousDelegatorTx := &txs.AddContinuousDelegatorTx{
+				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+					NetworkID:    env.ctx.NetworkID,
+					BlockchainID: env.ctx.ChainID,
+					Ins:          ins,
+					Outs:         unstakedOuts,
+				}},
+				Validator: txs.Validator{
+					NodeID: nodeID,
+					Start:  uint64(dummyStartTime.Unix()),
+					End:    uint64(dummyStartTime.Add(delegatorDuration).Unix()),
+					Wght:   env.config.MinDelegatorStake,
+				},
+				DelegatorAuthKey: &secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{addr},
+				},
+				StakeOuts: stakedOuts,
+				DelegationRewardsOwner: &secp256k1fx.OutputOwners{
+					Addrs:     []ids.ShortID{addr},
+					Threshold: 1,
+				},
+				DelegatorRewardRestakeShares: 0,
+			}
+			addContinuousDelTx, err := txs.NewSigned(continuousDelegatorTx, txs.Codec, signers)
+			if err != nil {
+				return err.Error()
+			}
+			if err := addContinuousDelTx.SyntacticVerify(env.ctx); err != nil {
+				return err.Error()
+			}
 
-	var stoppedDelegator *state.Staker
-	for stakersIt.Next() {
-		nextStaker := stakersIt.Value()
-		if nextStaker.TxID == continuousDelegator.TxID {
-			stoppedDelegator = nextStaker
-			break
-		}
-	}
-	stakersIt.Release()
-	require.NotNil(stoppedDelegator)
-	require.Equal(continuousDelegator.StakingPeriod, stoppedDelegator.StakingPeriod)
-	require.Equal(continuousDelegator.StartTime, stoppedDelegator.StartTime)
-	require.Equal(continuousDelegator.NextTime, stoppedDelegator.NextTime)
-	require.Equal(stoppedDelegator.NextTime, stoppedDelegator.EndTime)
+			addDelExecutor := StandardTxExecutor{
+				State:   onParentState,
+				Backend: &env.backend,
+				Tx:      addContinuousDelTx,
+			}
+			if err := addContinuousDelTx.Unsigned.Visit(&addDelExecutor); err != nil {
+				return err.Error()
+			}
+			onParentState.AddTx(addContinuousDelTx, status.Committed)
+			if err := onParentState.Apply(env.state); err != nil {
+				return err.Error()
+			}
+			if err := env.state.Commit(); err != nil {
+				return err.Error()
+			}
+
+			// shift validator ahead a few times
+			for _, choice := range choices {
+				delIt, err := env.state.GetCurrentDelegatorIterator(continuousValidatorTx.SubnetID(), continuousValidatorTx.NodeID())
+				if err != nil {
+					return err.Error()
+				}
+				if !delIt.Next() {
+					return "missing delegator"
+				}
+				continuousDelegator := delIt.Value()
+
+				// advance time
+				chainTime := env.state.GetTimestamp()
+				nextChainTime := chainTime.Add(delegatorDuration)
+				env.state.SetTimestamp(nextChainTime)
+
+				// create and execute reward tx
+				tx, err := env.txBuilder.NewRewardValidatorTx(continuousDelegator.TxID)
+				if err != nil {
+					return err.Error()
+				}
+
+				onCommitState, err := state.NewDiff(lastAcceptedID, env)
+				if err != nil {
+					return err.Error()
+				}
+
+				onAbortState, err := state.NewDiff(lastAcceptedID, env)
+				if err != nil {
+					return err.Error()
+				}
+
+				txExecutor := ProposalTxExecutor{
+					OnCommitState: onCommitState,
+					OnAbortState:  onAbortState,
+					Backend:       &env.backend,
+					Tx:            tx,
+				}
+				if err := tx.Unsigned.Visit(&txExecutor); err != nil {
+					return err.Error()
+				}
+				if choice {
+					err = txExecutor.OnCommitState.Apply(env.state)
+				} else {
+					err = txExecutor.OnAbortState.Apply(env.state)
+				}
+				if err != nil {
+					return err.Error()
+				}
+				if err := env.state.Commit(); err != nil {
+					return err.Error()
+				}
+
+				stakersIt, err := env.state.GetCurrentStakerIterator()
+				if err != nil {
+					return err.Error()
+				}
+
+				// check that post continuousStakingFork, staker is shifted ahead by its staking period
+				var shiftedDelegator *state.Staker
+				for stakersIt.Next() {
+					nextStaker := stakersIt.Value()
+					if nextStaker.TxID == continuousDelegator.TxID {
+						shiftedDelegator = nextStaker
+						break
+					}
+				}
+				stakersIt.Release()
+				if shiftedDelegator == nil {
+					return "nil shifted delegator"
+				}
+				if continuousDelegator.StakingPeriod != shiftedDelegator.StakingPeriod {
+					return "unexpected staking period for shifted delegator"
+				}
+				if !continuousDelegator.StartTime.Add(continuousDelegator.StakingPeriod).Equal(shiftedDelegator.StartTime) {
+					return "unexpected shifted delegator start time"
+				}
+				if !continuousDelegator.NextTime.Add(continuousDelegator.StakingPeriod).Equal(shiftedDelegator.NextTime) {
+					return "unexpected shifted delegator next time"
+				}
+				if !shiftedDelegator.EndTime.Equal(mockable.MaxTime) {
+					return "unexpected shifted delegator end time"
+				}
+			}
+
+			delIt, err := env.state.GetCurrentDelegatorIterator(continuousValidatorTx.SubnetID(), continuousValidatorTx.NodeID())
+			if err != nil {
+				return err.Error()
+			}
+			if !delIt.Next() {
+				return "missing delegator"
+			}
+			continuousDelegator := delIt.Value()
+
+			// stop the delegator
+			stopDelegatorTx, err := env.txBuilder.NewStopStakerTx(
+				addContinuousDelTx.ID(),
+				[]*secp256k1.PrivateKey{stakerAuthKey},
+				addr,
+			)
+			if err != nil {
+				return err.Error()
+			}
+
+			diff, err := state.NewDiff(lastAcceptedID, env)
+			if err != nil {
+				return err.Error()
+			}
+
+			txExecutor := StandardTxExecutor{
+				State:   diff,
+				Backend: &env.backend,
+				Tx:      stopDelegatorTx,
+			}
+			if err := stopDelegatorTx.Unsigned.Visit(&txExecutor); err != nil {
+				return err.Error()
+			}
+			if err := txExecutor.State.Apply(env.state); err != nil {
+				return err.Error()
+			}
+			if err := env.state.Commit(); err != nil {
+				return err.Error()
+			}
+
+			// check that staker is stopped
+			stakersIt, err := env.state.GetCurrentStakerIterator()
+			if err != nil {
+				return err.Error()
+			}
+
+			var stoppedDelegator *state.Staker
+			for stakersIt.Next() {
+				nextStaker := stakersIt.Value()
+				if nextStaker.TxID == continuousDelegator.TxID {
+					stoppedDelegator = nextStaker
+					break
+				}
+			}
+			stakersIt.Release()
+			if stoppedDelegator == nil {
+				return "nil shifted delegator"
+			}
+			if continuousDelegator.StakingPeriod != stoppedDelegator.StakingPeriod {
+				return "unexpected staking period for stopped delegator"
+			}
+			if !continuousDelegator.StartTime.Equal(stoppedDelegator.StartTime) {
+				return "unexpected stopped delegator start time"
+			}
+			if !continuousDelegator.NextTime.Equal(stoppedDelegator.NextTime) {
+				return "unexpected stopped delegator next time"
+			}
+			if !stoppedDelegator.NextTime.Equal(stoppedDelegator.EndTime) {
+				return "unexpected stopped delegator end time"
+			}
+			return ""
+		},
+		gen.SliceOfN(int(validatorDuration/delegatorDuration)-1, gen.Bool()),
+	))
+
+	properties.TestingRun(t)
 }
 
 func TestCortinaForkRewardValidatorTxExecuteOnCommit(t *testing.T) {
