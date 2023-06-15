@@ -118,7 +118,7 @@ func TestHealthCheck(t *testing.T) {
 			// check db HealthCheck
 			_, err := db.HealthCheck(context.Background())
 			if scenario.wantErr {
-				require.NotNil(err)
+				require.Error(err) //nolint:forbidigo
 				require.Contains(err.Error(), scenario.wantErrMsg)
 				return
 			}
@@ -126,11 +126,6 @@ func TestHealthCheck(t *testing.T) {
 
 			// check rpc HealthCheck
 			_, err = baseDB.client.HealthCheck(context.Background())
-			if scenario.wantErr {
-				require.NotNil(err)
-				require.Contains(err.Error(), scenario.wantErrMsg)
-				return
-			}
 			require.NoError(err)
 		})
 	}
