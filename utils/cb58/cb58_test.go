@@ -4,7 +4,6 @@
 package cb58
 
 import (
-	"bytes"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -53,7 +52,7 @@ func TestEncodeDecode(t *testing.T) {
 		bytesResult, err := Decode(strResult)
 		require.NoError(err)
 		// Make sure we got the same bytes back
-		require.True(bytes.Equal(test.bytes, bytesResult))
+		require.Equal(test.bytes, bytesResult)
 	}
 }
 
