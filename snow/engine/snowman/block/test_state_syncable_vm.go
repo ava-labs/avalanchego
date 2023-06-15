@@ -7,6 +7,8 @@ import (
 	"context"
 	"errors"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -40,7 +42,7 @@ func (vm *TestStateSyncableVM) StateSyncEnabled(ctx context.Context) (bool, erro
 		return vm.StateSyncEnabledF(ctx)
 	}
 	if vm.CantStateSyncEnabled && vm.T != nil {
-		vm.T.Fatal(errStateSyncEnabled)
+		require.FailNow(vm.T, errStateSyncEnabled.Error())
 	}
 	return false, errStateSyncEnabled
 }
@@ -50,7 +52,7 @@ func (vm *TestStateSyncableVM) GetOngoingSyncStateSummary(ctx context.Context) (
 		return vm.GetOngoingSyncStateSummaryF(ctx)
 	}
 	if vm.CantStateSyncGetOngoingSummary && vm.T != nil {
-		vm.T.Fatal(errStateSyncGetOngoingSummary)
+		require.FailNow(vm.T, errStateSyncGetOngoingSummary.Error())
 	}
 	return nil, errStateSyncGetOngoingSummary
 }
@@ -60,7 +62,7 @@ func (vm *TestStateSyncableVM) GetLastStateSummary(ctx context.Context) (StateSu
 		return vm.GetLastStateSummaryF(ctx)
 	}
 	if vm.CantGetLastStateSummary && vm.T != nil {
-		vm.T.Fatal(errGetLastStateSummary)
+		require.FailNow(vm.T, errGetLastStateSummary.Error())
 	}
 	return nil, errGetLastStateSummary
 }
@@ -70,7 +72,7 @@ func (vm *TestStateSyncableVM) ParseStateSummary(ctx context.Context, summaryByt
 		return vm.ParseStateSummaryF(ctx, summaryBytes)
 	}
 	if vm.CantParseStateSummary && vm.T != nil {
-		vm.T.Fatal(errParseStateSummary)
+		require.FailNow(vm.T, errParseStateSummary.Error())
 	}
 	return nil, errParseStateSummary
 }
@@ -80,7 +82,7 @@ func (vm *TestStateSyncableVM) GetStateSummary(ctx context.Context, summaryHeigh
 		return vm.GetStateSummaryF(ctx, summaryHeight)
 	}
 	if vm.CantGetStateSummary && vm.T != nil {
-		vm.T.Fatal(errGetStateSummary)
+		require.FailNow(vm.T, errGetStateSummary.Error())
 	}
 	return nil, errGetStateSummary
 }

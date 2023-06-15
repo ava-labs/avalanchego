@@ -6,10 +6,14 @@ package snowball
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/utils/sampler"
 )
 
 func TestSnowballGovernance(t *testing.T) {
+	require := require.New(t)
+
 	numColors := 2
 	numNodes := 100
 	numByzantine := 10
@@ -28,9 +32,7 @@ func TestSnowballGovernance(t *testing.T) {
 	}
 
 	for _, node := range nBitwise.nodes {
-		if node.Preference() != nBitwise.colors[0] {
-			t.Fatalf("Wrong preferences")
-		}
+		require.Equal(nBitwise.colors[0], node.Preference())
 	}
 
 	for i := 0; i < numNodes-numByzantine-numRed; i++ {
@@ -49,8 +51,6 @@ func TestSnowballGovernance(t *testing.T) {
 		if _, ok := node.(*Byzantine); ok {
 			continue
 		}
-		if node.Preference() != nBitwise.colors[0] {
-			t.Fatalf("Wrong preferences")
-		}
+		require.Equal(nBitwise.colors[0], node.Preference())
 	}
 }

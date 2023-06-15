@@ -258,6 +258,7 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.Duration(NetworkHealthMaxOutstandingDurationKey, 5*time.Minute, "Node reports unhealthy if there has been a request outstanding for this duration")
 
 	// Staking
+	fs.String(StakingHostKey, "", "Address of the consensus server") // Bind to all interfaces by default.
 	fs.Uint(StakingPortKey, DefaultStakingPort, "Port of the consensus server")
 	// TODO: Remove this flag in the future
 	fs.Bool(StakingEnabledKey, true, "Enable staking. If enabled, Network TLS is required")
