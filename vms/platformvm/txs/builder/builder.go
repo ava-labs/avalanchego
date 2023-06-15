@@ -627,7 +627,7 @@ func (b *builder) NewStopStakerTx(
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
 
-	stopStakerAuth, subnetSigners, err := b.AuthorizeStopStaking(txID, b.state, keys)
+	stopStakerAuth, subnetSigners, err := b.AuthorizeStopStaking(b.state, txID, keys)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't authorize staker stopping: %w", err)
 	}

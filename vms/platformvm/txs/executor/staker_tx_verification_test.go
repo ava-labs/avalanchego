@@ -406,6 +406,44 @@ func TestVerifyStopContinuousValidatorTx(t *testing.T) {
 			expectedErr: errCustom,
 		},
 		{
+			name: "can't stop non-continuous validator",
+			backendF: func(ctrl *gomock.Controller) *Backend {
+				bootstrapped := &utils.Atomic[bool]{}
+				bootstrapped.Set(true)
+
+				return &Backend{
+					Fx:           nil,
+					FlowChecker:  nil,
+					Config:       &primaryNetworkCfg,
+					Ctx:          snow.DefaultContextTest(),
+					Bootstrapped: bootstrapped,
+				}
+			},
+			stateF: func(ctrl *gomock.Controller) state.Chain {
+				mockState := state.NewMockChain(ctrl)
+				mockState.EXPECT().GetTimestamp().Return(time.Unix(0, 0))
+				currentStakerIter := state.NewMockStakerIterator(ctrl)
+
+				currentStakerIter.EXPECT().Next().Return(true)
+				currentStakerIter.EXPECT().Value().Return(primaryValidator)
+				currentStakerIter.EXPECT().Release()
+				mockState.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil).AnyTimes()
+
+				nonContinuousValidatorTx := txs.Tx{
+					Unsigned: &txs.AddValidatorTx{},
+				}
+				mockState.EXPECT().GetTx(signedPrimaryValidatorTx.ID()).Return(&nonContinuousValidatorTx, status.Committed, nil)
+				return mockState
+			},
+			sTxF: func() *txs.Tx {
+				return &verifiedSignedTx
+			},
+			txF: func() *txs.StopStakerTx {
+				return &verifiedTx
+			},
+			expectedErr: ErrUnauthorizedStakerStopping,
+		},
+		{
 			name: "failed flow check",
 			backendF: func(ctrl *gomock.Controller) *Backend {
 				bootstrapped := &utils.Atomic[bool]{}

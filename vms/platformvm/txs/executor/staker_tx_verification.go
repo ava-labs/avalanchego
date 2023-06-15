@@ -1191,7 +1191,10 @@ func verifyStopStakerTx(
 	defer allStakersIt.Release()
 	for allStakersIt.Next() {
 		staker := allStakersIt.Value()
-		if staker.NodeID == stakerToStop.NodeID && staker.TxID != stakerToStop.TxID {
+		if staker.NodeID != stakerToStop.NodeID {
+			continue
+		}
+		if staker.TxID != stakerToStop.TxID {
 			res = append(res, staker)
 		}
 		if candidateStopTime.Before(staker.NextTime) {

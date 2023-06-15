@@ -37,6 +37,7 @@ var (
 	errLocktimeMismatch             = errors.New("input locktime does not match UTXO locktime")
 	errCantSign                     = errors.New("can't sign")
 	errLockedFundsNotMarkedAsLocked = errors.New("locked funds not marked as locked")
+	errUnauthorizedStakerStopping   = errors.New("unauthorized staker stopping")
 )
 
 // TODO: Stake and Authorize should be replaced by similar methods in the
@@ -82,8 +83,8 @@ type Spender interface {
 	)
 
 	AuthorizeStopStaking(
-		stakerTxID ids.ID,
 		state state.Chain,
+		stakerTxID ids.ID,
 		keys []*secp256k1.PrivateKey,
 	) (
 		verify.Verifiable, // Input that names owners
@@ -444,8 +445,8 @@ func (h *handler) Authorize(
 }
 
 func (h *handler) AuthorizeStopStaking(
-	stakerTxID ids.ID,
 	state state.Chain,
+	stakerTxID ids.ID,
 	keys []*secp256k1.PrivateKey,
 ) (
 	verify.Verifiable, // Input that names owners
@@ -460,20 +461,13 @@ func (h *handler) AuthorizeStopStaking(
 			err,
 		)
 	}
-	var stakerOwner fx.Owner
-	switch uStakerTx := stakerTx.Unsigned.(type) {
-	case txs.ValidatorTx:
-		stakerOwner = uStakerTx.ValidationRewardsOwner()
-	case txs.DelegatorTx:
-		stakerOwner = uStakerTx.RewardsOwner()
-	case *txs.AddSubnetValidatorTx:
-		return nil, nil, errors.New("cannot stop subnet validator")
-	default:
-		return nil, nil, fmt.Errorf(
-			"unhandled staker type: %t",
-			uStakerTx,
-		)
+
+	continuousStakerTx, ok := stakerTx.Unsigned.(txs.ContinuousStaker)
+	if !ok {
+		return nil, nil, errUnauthorizedStakerStopping
 	}
+	stakerOwner := continuousStakerTx.ManagementKey()
+
 	// Make sure the owners of the subnet match the provided keys
 	owner, ok := stakerOwner.(*secp256k1fx.OutputOwners)
 	if !ok {
