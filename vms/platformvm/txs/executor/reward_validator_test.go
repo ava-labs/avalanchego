@@ -290,7 +290,7 @@ func TestShiftChecksRewardValidator(t *testing.T) {
 	properties.TestingRun(t)
 }
 
-func TestShiftChecksRewardDelegato(t *testing.T) {
+func TestShiftChecksRewardDelegator(t *testing.T) {
 	properties := gopter.NewProperties(nil)
 
 	// to reproduce a given scenario do something like this:
@@ -465,6 +465,7 @@ func TestShiftChecksRewardDelegato(t *testing.T) {
 					return "missing delegator"
 				}
 				continuousDelegator := delIt.Value()
+				delIt.Release()
 
 				// advance time
 				chainTime := env.state.GetTimestamp()
@@ -548,6 +549,7 @@ func TestShiftChecksRewardDelegato(t *testing.T) {
 				return "missing delegator"
 			}
 			continuousDelegator := delIt.Value()
+			delIt.Release()
 
 			// stop the delegator
 			stopDelegatorTx, err := env.txBuilder.NewStopStakerTx(
