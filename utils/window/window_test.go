@@ -59,8 +59,8 @@ func TestAdd(t *testing.T) {
 
 			require.Equal(len(test.window)+1, window.Length())
 			oldest, ok := window.Oldest()
-			require.Equal(test.expectedOldest, oldest)
 			require.True(ok)
+			require.Equal(test.expectedOldest, oldest)
 		})
 	}
 }
@@ -89,8 +89,8 @@ func TestTTLAdd(t *testing.T) {
 
 	require.Equal(3, window.Length())
 	oldest, ok := window.Oldest()
-	require.Equal(1, oldest)
 	require.True(ok)
+	require.Equal(1, oldest)
 	// Now we're one second past the ttl of 10 seconds as defined in testTTL,
 	// so all existing elements need to be evicted.
 	clock.Set(epochStart.Add(11 * time.Second))
@@ -101,8 +101,8 @@ func TestTTLAdd(t *testing.T) {
 
 	require.Equal(1, window.Length())
 	oldest, ok = window.Oldest()
-	require.Equal(4, oldest)
 	require.True(ok)
+	require.Equal(4, oldest)
 	// Now we're one second past the ttl of 10 seconds of when [4] was added,
 	// so all existing elements should be evicted.
 	clock.Set(epochStart.Add(22 * time.Second))
@@ -112,8 +112,8 @@ func TestTTLAdd(t *testing.T) {
 	require.Zero(window.Length())
 
 	oldest, ok = window.Oldest()
-	require.Zero(oldest)
 	require.False(ok)
+	require.Zero(oldest)
 }
 
 // TestTTLReadOnly tests that stale elements are still evicted on Length
@@ -171,8 +171,8 @@ func TestTTLOldest(t *testing.T) {
 	window.Add(3)
 
 	oldest, ok := window.Oldest()
-	require.Equal(1, oldest)
 	require.True(ok)
+	require.Equal(1, oldest)
 	require.Equal(3, window.elements.Len())
 
 	// Now we're one second past the ttl of 10 seconds as defined in testTTL,
@@ -181,8 +181,8 @@ func TestTTLOldest(t *testing.T) {
 
 	// Now there shouldn't be any elements in the window
 	oldest, ok = window.Oldest()
-	require.Zero(oldest)
 	require.False(ok)
+	require.Zero(oldest)
 	require.Zero(window.elements.Len())
 }
 
@@ -219,6 +219,6 @@ func TestMaxCapacity(t *testing.T) {
 
 	require.Equal(3, window.Length())
 	oldest, ok := window.Oldest()
-	require.Equal(4, oldest)
 	require.True(ok)
+	require.Equal(4, oldest)
 }
