@@ -68,6 +68,7 @@ const (
 	StateSyncIDsKey                                    = "state-sync-ids"
 	BootstrapIPsKey                                    = "bootstrap-ips"
 	BootstrapIDsKey                                    = "bootstrap-ids"
+	StakingHostKey                                     = "staking-host"
 	StakingPortKey                                     = "staking-port"
 	StakingEnabledKey                                  = "staking-enabled" // TODO: deprecated, remove this
 	StakingEphemeralCertEnabledKey                     = "staking-ephemeral-cert-enabled"
