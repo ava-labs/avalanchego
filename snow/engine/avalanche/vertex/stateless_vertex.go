@@ -23,7 +23,7 @@ const (
 var (
 	errBadVersion       = errors.New("invalid version")
 	errBadEpoch         = errors.New("invalid epoch")
-	errTooManyparentIDs = fmt.Errorf("vertex contains more than %d parentIDs", maxNumParents)
+	errTooManyParentIDs = fmt.Errorf("vertex contains more than %d parentIDs", maxNumParents)
 	errNoOperations     = errors.New("vertex contains no operations")
 	errTooManyTxs       = fmt.Errorf("vertex contains more than %d transactions", maxTxsPerVtx)
 	errInvalidParents   = errors.New("vertex contains non-sorted or duplicated parentIDs")
@@ -115,7 +115,7 @@ func (v innerStatelessVertex) verify() error {
 	case v.Epoch != 0:
 		return errBadEpoch
 	case len(v.ParentIDs) > maxNumParents:
-		return errTooManyparentIDs
+		return errTooManyParentIDs
 	case len(v.Txs) == 0:
 		return errNoOperations
 	case len(v.Txs) > maxTxsPerVtx:
@@ -136,7 +136,7 @@ func (v innerStatelessVertex) verifyStopVertex() error {
 	case v.Epoch != 0:
 		return errBadEpoch
 	case len(v.ParentIDs) > maxNumParents:
-		return errTooManyparentIDs
+		return errTooManyParentIDs
 	case len(v.Txs) != 0:
 		return errTooManyTxs
 	case !utils.IsSortedAndUniqueSortable(v.ParentIDs):
