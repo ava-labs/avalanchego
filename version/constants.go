@@ -112,6 +112,9 @@ var (
 	}
 	BanffDefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
 
+	SunrisePhase1Times       = map[uint32]time.Time{}
+	SunrisePhase1DefaultTime = time.Date(2022, time.May, 1, 0, 0, 0, 0, time.UTC)
+
 	// TODO: update this before release
 	CortinaTimes = map[uint32]time.Time{
 		constants.MainnetID: time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC),
@@ -188,6 +191,13 @@ func GetBanffTime(networkID uint32) time.Time {
 		return upgradeTime
 	}
 	return BanffDefaultTime
+}
+
+func GetSunrisePhase1Time(networkID uint32) time.Time {
+	if upgradeTime, exists := SunrisePhase1Times[networkID]; exists {
+		return upgradeTime
+	}
+	return SunrisePhase1DefaultTime
 }
 
 func GetCortinaTime(networkID uint32) time.Time {
