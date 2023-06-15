@@ -36,7 +36,7 @@ func TestCalculateDynamicFee(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		cost, err := calculateDynamicFee(test.gas, test.baseFee)
+		cost, err := CalculateDynamicFee(test.gas, test.baseFee)
 		if test.expectedErr == nil {
 			if err != nil {
 				t.Fatalf("Unexpectedly failed to calculate dynamic fee: %s", err)

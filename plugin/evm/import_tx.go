@@ -194,7 +194,7 @@ func (utx *UnsignedImportTx) SemanticVerify(
 		if err != nil {
 			return err
 		}
-		txFee, err := calculateDynamicFee(gasUsed, baseFee)
+		txFee, err := CalculateDynamicFee(gasUsed, baseFee)
 		if err != nil {
 			return err
 		}
@@ -375,11 +375,11 @@ func (vm *VM) newImportTxWithUTXOs(
 		}
 		gasUsedWithChange := gasUsedWithoutChange + EVMOutputGas
 
-		txFeeWithoutChange, err = calculateDynamicFee(gasUsedWithoutChange, baseFee)
+		txFeeWithoutChange, err = CalculateDynamicFee(gasUsedWithoutChange, baseFee)
 		if err != nil {
 			return nil, err
 		}
-		txFeeWithChange, err = calculateDynamicFee(gasUsedWithChange, baseFee)
+		txFeeWithChange, err = CalculateDynamicFee(gasUsedWithChange, baseFee)
 		if err != nil {
 			return nil, err
 		}
