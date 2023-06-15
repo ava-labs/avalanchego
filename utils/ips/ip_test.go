@@ -135,7 +135,7 @@ func TestToIPPort(t *testing.T) {
 
 			result, err := ToIPPort(tt.in)
 			require.NoError(err)
-			require.Equal(result, tt.out)
+			require.Equal(tt.out, result)
 		})
 	}
 }
