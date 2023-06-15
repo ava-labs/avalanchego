@@ -26,7 +26,7 @@ func TestLinkedDB(t *testing.T) {
 	require.False(has)
 
 	_, err = ldb.Get(key)
-	require.ErrorIs(err, database.ErrNotFound)
+	require.Equal(database.ErrNotFound, err)
 
 	require.NoError(ldb.Delete(key))
 
@@ -47,7 +47,7 @@ func TestLinkedDB(t *testing.T) {
 	require.False(has)
 
 	_, err = ldb.Get(key)
-	require.ErrorIs(err, database.ErrNotFound)
+	require.Equal(database.ErrNotFound, err)
 
 	iterator := db.NewIterator()
 	require.False(iterator.Next())

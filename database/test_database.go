@@ -495,8 +495,7 @@ func TestBatchReplayPropagateError(t *testing.T, db Database) {
 	gomock.InOrder(
 		mockBatch.EXPECT().Put(key1, value1).Return(io.ErrClosedPipe).Times(1),
 	)
-	err := batch.Replay(mockBatch)
-	require.ErrorIs(err, io.ErrClosedPipe)
+	require.Equal(io.ErrClosedPipe, batch.Replay(mockBatch))
 }
 
 // TestBatchInner tests to make sure that inner can be used to write to the
