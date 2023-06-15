@@ -257,12 +257,10 @@ func TestEngineQuery(t *testing.T) {
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
-		case blk.ID():
-			return nil, errUnknownBlock
-		case blk1.ID():
+		case blk.ID(), blk1.ID():
 			return nil, errUnknownBlock
 		}
-		require.FailNow("Wrong block requested")
+		require.FailNow(errUnknownBlock.Error())
 		return nil, errUnknownBlock
 	}
 
@@ -298,8 +296,8 @@ func TestEngineQuery(t *testing.T) {
 			case blk1.ID():
 				return blk1, nil
 			}
-			require.FailNow("Wrong block requested")
-			return nil, nil
+			require.FailNow(errUnknownBlock.Error())
+			return nil, errUnknownBlock
 		}
 
 		return blk1, nil
@@ -427,8 +425,8 @@ func TestEngineMultipleQuery(t *testing.T) {
 		case blk1.ID():
 			return nil, errUnknownBlock
 		}
-		require.FailNow("Unknown block")
-		return nil, nil
+		require.FailNow(errUnknownBlock.Error())
+		return nil, errUnknownBlock
 	}
 
 	asked := new(bool)
@@ -451,8 +449,8 @@ func TestEngineMultipleQuery(t *testing.T) {
 			case blkID == blk1.ID():
 				return blk1, nil
 			}
-			require.FailNow("Wrong block requested")
-			return nil, nil
+			require.FailNow(errUnknownBlock.Error())
+			return nil, errUnknownBlock
 		}
 
 		return blk1, nil
@@ -548,7 +546,7 @@ func TestEngineAbandonResponse(t *testing.T) {
 		case blkID == blk.ID():
 			return nil, errUnknownBlock
 		}
-		require.FailNow("Wrong block requested")
+		require.FailNow(errUnknownBlock.Error())
 		return nil, errUnknownBlock
 	}
 
@@ -946,7 +944,7 @@ func TestEngineAbandonChit(t *testing.T) {
 		case blk.ID():
 			return nil, errUnknownBlock
 		}
-		require.FailNow("Wrong block requested")
+		require.FailNow(errUnknownBlock.Error())
 		return nil, errUnknownBlock
 	}
 
@@ -1001,7 +999,7 @@ func TestEngineAbandonChitWithUnexpectedPutBlock(t *testing.T) {
 		case blk.ID():
 			return nil, errUnknownBlock
 		}
-		require.FailNow("Wrong block requested")
+		require.FailNow(errUnknownBlock.Error())
 		return nil, errUnknownBlock
 	}
 
@@ -1666,8 +1664,8 @@ func TestEngineDoubleChit(t *testing.T) {
 		case blk.ID():
 			return blk, nil
 		}
-		require.FailNow("Unknown block")
-		return nil, nil
+		require.FailNow(errUnknownBlock.Error())
+		return nil, errUnknownBlock
 	}
 
 	require.Equal(choices.Processing, blk.Status())
@@ -1845,8 +1843,8 @@ func TestEngineReceiveNewRejectedBlock(t *testing.T) {
 		case bytes.Equal(b, pendingBlk.Bytes()):
 			return pendingBlk, nil
 		default:
-			require.FailNow("Unknown block bytes")
-			return nil, nil
+			require.FailNow(errUnknownBlock.Error())
+			return nil, errUnknownBlock
 		}
 	}
 
@@ -1937,8 +1935,8 @@ func TestEngineRejectionAmplification(t *testing.T) {
 		case bytes.Equal(b, pendingBlk.Bytes()):
 			return pendingBlk, nil
 		default:
-			require.FailNow("Unknown block bytes")
-			return nil, nil
+			require.FailNow(errUnknownBlock.Error())
+			return nil, errUnknownBlock
 		}
 	}
 
@@ -2049,8 +2047,8 @@ func TestEngineTransitiveRejectionAmplificationDueToRejectedParent(t *testing.T)
 		case bytes.Equal(b, pendingBlk.Bytes()):
 			return pendingBlk, nil
 		default:
-			require.FailNow("Unknown block bytes")
-			return nil, nil
+			require.FailNow(errUnknownBlock.Error())
+			return nil, errUnknownBlock
 		}
 	}
 
@@ -2137,8 +2135,8 @@ func TestEngineTransitiveRejectionAmplificationDueToInvalidParent(t *testing.T) 
 		case bytes.Equal(b, pendingBlk.Bytes()):
 			return pendingBlk, nil
 		default:
-			require.FailNow("Unknown block bytes")
-			return nil, nil
+			require.FailNow(errUnknownBlock.Error())
+			return nil, errUnknownBlock
 		}
 	}
 
@@ -2215,8 +2213,8 @@ func TestEngineNonPreferredAmplification(t *testing.T) {
 		case bytes.Equal(b, nonPreferredBlk.Bytes()):
 			return nonPreferredBlk, nil
 		default:
-			require.FailNow("Unknown block bytes")
-			return nil, nil
+			require.FailNow(errUnknownBlock.Error())
+			return nil, errUnknownBlock
 		}
 	}
 
@@ -2290,8 +2288,8 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 		case bytes.Equal(b, blk2.Bytes()):
 			return blk2, nil
 		default:
-			require.FailNow("Unknown block bytes")
-			return nil, nil
+			require.FailNow(errUnknownBlock.Error())
+			return nil, errUnknownBlock
 		}
 	}
 
@@ -2475,8 +2473,8 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 		case bytes.Equal(b, blk3.Bytes()):
 			return blk3, nil
 		default:
-			require.FailNow("Unknown block bytes")
-			return nil, nil
+			require.FailNow(errUnknownBlock.Error())
+			return nil, errUnknownBlock
 		}
 	}
 
@@ -2779,8 +2777,8 @@ func TestEngineApplyAcceptedFrontierInQueryFailed(t *testing.T) {
 		case blk.ID():
 			return blk, nil
 		}
-		require.FailNow("unknown block")
-		return nil, nil
+		require.FailNow(errUnknownBlock.Error())
+		return nil, errUnknownBlock
 	}
 
 	require.Equal(choices.Processing, blk.Status())
