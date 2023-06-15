@@ -4,14 +4,14 @@
 package peer
 
 import (
-	"crypto"
-	"crypto/rand"
-	"crypto/x509"
+	"errors"
 
-	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
+
+var errFailedBLSVerification = errors.New("failed bls verification")
 
 // UnsignedIP is used for a validator to claim an IP. The [Timestamp] is used to
 // ensure that the most updated IP claim is tracked by peers for a given
@@ -22,15 +22,18 @@ type UnsignedIP struct {
 }
 
 // Sign this IP with the provided signer and return the signed IP.
-func (ip *UnsignedIP) Sign(signer crypto.Signer) (*SignedIP, error) {
-	sig, err := signer.Sign(
-		rand.Reader,
-		hashing.ComputeHash256(ip.bytes()),
-		crypto.SHA256,
-	)
+func (ip *UnsignedIP) Sign(signer crypto.MultiSigner) (*SignedIP, error) {
+	tlsSig, err := signer.SignTLS(ip.bytes())
+	if err != nil {
+		return nil, err
+	}
+
+	blsSig := signer.SignBLS(ip.bytes())
+
 	return &SignedIP{
-		UnsignedIP: *ip,
-		Signature:  sig,
+		UnsignedIP:   *ip,
+		TLSSignature: tlsSig,
+		BLSSignature: blsSig,
 	}, err
 }
 
@@ -46,13 +49,26 @@ func (ip *UnsignedIP) bytes() []byte {
 // SignedIP is a wrapper of an UnsignedIP with the signature from a signer.
 type SignedIP struct {
 	UnsignedIP
-	Signature []byte
+	TLSSignature []byte
+	BLSSignature []byte
 }
 
-func (ip *SignedIP) Verify(cert *x509.Certificate) error {
-	return cert.CheckSignature(
-		cert.SignatureAlgorithm,
+func (ip *SignedIP) Verify(verifier crypto.MultiVerifier) error {
+	if err := verifier.VerifyTLS(
 		ip.UnsignedIP.bytes(),
-		ip.Signature,
-	)
+		ip.TLSSignature,
+	); err != nil {
+		return err
+	}
+
+	if ok, err := verifier.VerifyBLS(
+		ip.UnsignedIP.bytes(),
+		ip.BLSSignature,
+	); err != nil {
+		return err
+	} else if !ok {
+		return errFailedBLSVerification
+	}
+
+	return nil
 }

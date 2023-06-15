@@ -4,12 +4,11 @@
 package block
 
 import (
-	"crypto"
-	"crypto/rand"
 	"crypto/x509"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -20,15 +19,15 @@ func BuildUnsigned(
 	pChainHeight uint64,
 	blockBytes []byte,
 ) (SignedBlock, error) {
-	var block SignedBlock = &statelessBlock{
+	var block SignedBlock = &statelessCertSignedBlock{
 		StatelessBlock: statelessUnsignedBlock{
 			ParentID:     parentID,
 			Timestamp:    timestamp.Unix(),
 			PChainHeight: pChainHeight,
-			Certificate:  nil,
-			Block:        blockBytes,
 		},
-		timestamp: timestamp,
+		Certificate: nil,
+		InnerBlock:  blockBytes,
+		timestamp:   timestamp,
 	}
 
 	bytes, err := c.Marshal(codecVersion, &block)
@@ -38,32 +37,11 @@ func BuildUnsigned(
 	return block, block.initialize(bytes)
 }
 
-func Build(
-	parentID ids.ID,
-	timestamp time.Time,
-	pChainHeight uint64,
-	cert *x509.Certificate,
-	blockBytes []byte,
-	chainID ids.ID,
-	key crypto.Signer,
-) (SignedBlock, error) {
-	block := &statelessBlock{
-		StatelessBlock: statelessUnsignedBlock{
-			ParentID:     parentID,
-			Timestamp:    timestamp.Unix(),
-			PChainHeight: pChainHeight,
-			Certificate:  cert.Raw,
-			Block:        blockBytes,
-		},
-		timestamp: timestamp,
-		cert:      cert,
-		proposer:  ids.NodeIDFromCert(cert),
-	}
-	var blockIntf SignedBlock = block
-
-	unsignedBytesWithEmptySignature, err := c.Marshal(codecVersion, &blockIntf)
+// blkIDFromBlkWithNoSignature is an helper to calculate block ID for blocks to be built
+func blkIDFromBlkWithNoSignature(blockWithEmptySignature SignedBlock) (ids.ID, error) {
+	unsignedBytesWithEmptySignature, err := c.Marshal(codecVersion, &blockWithEmptySignature)
 	if err != nil {
-		return nil, err
+		return ids.Empty, err
 	}
 
 	// The serialized form of the block is the unsignedBytes followed by the
@@ -72,15 +50,45 @@ func Build(
 	// prefix to get the unsigned bytes.
 	lenUnsignedBytes := len(unsignedBytesWithEmptySignature) - wrappers.IntLen
 	unsignedBytes := unsignedBytesWithEmptySignature[:lenUnsignedBytes]
-	block.id = hashing.ComputeHash256Array(unsignedBytes)
+	return hashing.ComputeHash256Array(unsignedBytes), nil
+}
 
-	header, err := BuildHeader(chainID, parentID, block.id)
+func BuildCertSigned(
+	parentID ids.ID,
+	timestamp time.Time,
+	pChainHeight uint64,
+	cert *x509.Certificate,
+	blockBytes []byte,
+	chainID ids.ID,
+	tlsSigner *crypto.TLSSigner,
+) (SignedBlock, error) {
+	block := &statelessCertSignedBlock{
+		StatelessBlock: statelessUnsignedBlock{
+			ParentID:     parentID,
+			Timestamp:    timestamp.Unix(),
+			PChainHeight: pChainHeight,
+		},
+		Certificate: cert.Raw,
+		InnerBlock:  blockBytes,
+
+		timestamp: timestamp,
+		cert:      cert,
+		proposer:  ids.NodeIDFromCert(cert),
+	}
+
+	var blockIntf SignedBlock = block
+	blkID, err := blkIDFromBlkWithNoSignature(blockIntf)
+	if err != nil {
+		return nil, err
+	}
+	block.id = blkID
+
+	header, err := buildHeader(chainID, parentID, block.id)
 	if err != nil {
 		return nil, err
 	}
 
-	headerHash := hashing.ComputeHash256(header.Bytes())
-	block.Signature, err = key.Sign(rand.Reader, headerHash, crypto.SHA256)
+	block.Signature, err = tlsSigner.Sign(header.Bytes())
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +97,44 @@ func Build(
 	return block, err
 }
 
-func BuildHeader(
+func BuildBlsSigned(
+	parentID ids.ID,
+	timestamp time.Time,
+	pChainHeight uint64,
+	nodeID ids.NodeID,
+	innerBlockBytes []byte,
+	chainID ids.ID,
+	blsSigner crypto.BLSSigner,
+) (SignedBlock, error) {
+	block := &statelessBlsSignedBlock{
+		StatelessBlock: statelessUnsignedBlock{
+			ParentID:     parentID,
+			Timestamp:    timestamp.Unix(),
+			PChainHeight: pChainHeight,
+		},
+		BlockProposer: nodeID,
+		InnerBlock:    innerBlockBytes,
+
+		timestamp: timestamp,
+	}
+	var blockIntf SignedBlock = block
+	blkID, err := blkIDFromBlkWithNoSignature(blockIntf)
+	if err != nil {
+		return nil, err
+	}
+	block.id = blkID
+
+	header, err := buildHeader(chainID, parentID, block.id)
+	if err != nil {
+		return nil, err
+	}
+
+	block.Signature = blsSigner.Sign(header.Bytes())
+	block.bytes, err = c.Marshal(codecVersion, &blockIntf)
+	return block, err
+}
+
+func buildHeader(
 	chainID ids.ID,
 	parentID ids.ID,
 	bodyID ids.ID,

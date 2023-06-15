@@ -4,9 +4,9 @@
 package peer
 
 import (
-	"crypto"
 	"sync"
 
+	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
@@ -15,7 +15,7 @@ import (
 type IPSigner struct {
 	ip     ips.DynamicIPPort
 	clock  mockable.Clock
-	signer crypto.Signer
+	signer crypto.MultiSigner
 
 	// Must be held while accessing [signedIP]
 	signedIPLock sync.RWMutex
@@ -26,7 +26,7 @@ type IPSigner struct {
 
 func NewIPSigner(
 	ip ips.DynamicIPPort,
-	signer crypto.Signer,
+	signer crypto.MultiSigner,
 ) *IPSigner {
 	return &IPSigner{
 		ip:     ip,

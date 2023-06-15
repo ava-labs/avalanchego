@@ -11,10 +11,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
-func equal(require *require.Assertions, chainID ids.ID, want, have SignedBlock) {
+func equal(require *require.Assertions, chainID ids.ID, pk *bls.PublicKey, want, have SignedBlock) {
 	require.Equal(want.ID(), have.ID())
 	require.Equal(want.ParentID(), have.ParentID())
 	require.Equal(want.PChainHeight(), have.PChainHeight())
@@ -22,8 +23,8 @@ func equal(require *require.Assertions, chainID ids.ID, want, have SignedBlock) 
 	require.Equal(want.Block(), have.Block())
 	require.Equal(want.Proposer(), have.Proposer())
 	require.Equal(want.Bytes(), have.Bytes())
-	require.Equal(want.Verify(false, chainID), have.Verify(false, chainID))
-	require.Equal(want.Verify(true, chainID), have.Verify(true, chainID))
+	require.Equal(want.Verify(false, chainID, pk), have.Verify(false, chainID, pk))
+	require.Equal(want.Verify(true, chainID, pk), have.Verify(true, chainID, pk))
 }
 
 func TestVerifyNoCertWithSignature(t *testing.T) {
@@ -37,13 +38,13 @@ func TestVerifyNoCertWithSignature(t *testing.T) {
 	builtBlockIntf, err := BuildUnsigned(parentID, timestamp, pChainHeight, innerBlockBytes)
 	require.NoError(err)
 
-	builtBlock := builtBlockIntf.(*statelessBlock)
+	builtBlock := builtBlockIntf.(*statelessCertSignedBlock)
 	builtBlock.Signature = []byte{0}
 
-	err = builtBlock.Verify(false, ids.Empty)
+	err = builtBlock.Verify(false, ids.Empty, nil)
 	require.ErrorIs(err, errUnexpectedProposer)
 
-	err = builtBlock.Verify(true, ids.Empty)
+	err = builtBlock.Verify(true, ids.Empty, nil)
 	require.ErrorIs(err, errMissingProposer)
 }
 

@@ -4,7 +4,6 @@
 package block
 
 import (
-	"crypto"
 	"encoding/hex"
 	"testing"
 	"time"
@@ -14,31 +13,33 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 )
 
-func TestParse(t *testing.T) {
+func TestParseBlsSigned(t *testing.T) {
 	require := require.New(t)
 
 	parentID := ids.ID{1}
 	timestamp := time.Unix(123, 0)
 	pChainHeight := uint64(2)
+	proposerID := ids.GenerateTestNodeID()
 	innerBlockBytes := []byte{3}
 	chainID := ids.ID{4}
 
-	tlsCert, err := staking.NewTLSCert()
+	sk, err := bls.NewSecretKey()
 	require.NoError(err)
+	blsSigner := crypto.NewBLSSigner(sk)
+	pk := bls.PublicFromSecretKey(sk)
 
-	cert := tlsCert.Leaf
-	key := tlsCert.PrivateKey.(crypto.Signer)
-
-	builtBlock, err := Build(
+	builtBlock, err := BuildBlsSigned(
 		parentID,
 		timestamp,
 		pChainHeight,
-		cert,
+		proposerID,
 		innerBlockBytes,
 		chainID,
-		key,
+		blsSigner,
 	)
 	require.NoError(err)
 
@@ -50,7 +51,44 @@ func TestParse(t *testing.T) {
 	parsedBlock, ok := parsedBlockIntf.(SignedBlock)
 	require.True(ok)
 
-	equal(require, chainID, builtBlock, parsedBlock)
+	equal(require, chainID, pk, builtBlock, parsedBlock)
+}
+
+func TestParseCertSigned(t *testing.T) {
+	require := require.New(t)
+
+	parentID := ids.ID{1}
+	timestamp := time.Unix(123, 0)
+	pChainHeight := uint64(2)
+	innerBlockBytes := []byte{3}
+	chainID := ids.ID{4}
+
+	tlsCert, err := staking.NewTLSCert()
+	require.NoError(err)
+
+	tlsSigner, err := crypto.NewTLSSigner(tlsCert)
+	require.NoError(err)
+
+	builtBlock, err := BuildCertSigned(
+		parentID,
+		timestamp,
+		pChainHeight,
+		tlsCert.Leaf,
+		innerBlockBytes,
+		chainID,
+		&tlsSigner,
+	)
+	require.NoError(err)
+
+	builtBlockBytes := builtBlock.Bytes()
+
+	parsedBlockIntf, err := Parse(builtBlockBytes)
+	require.NoError(err)
+
+	parsedBlock, ok := parsedBlockIntf.(SignedBlock)
+	require.True(ok)
+
+	equal(require, chainID, nil, builtBlock, parsedBlock)
 }
 
 func TestParseDuplicateExtension(t *testing.T) {
@@ -71,7 +109,7 @@ func TestParseHeader(t *testing.T) {
 	parentID := ids.ID{2}
 	bodyID := ids.ID{3}
 
-	builtHeader, err := BuildHeader(
+	builtHeader, err := buildHeader(
 		chainID,
 		parentID,
 		bodyID,
@@ -122,7 +160,7 @@ func TestParseUnsigned(t *testing.T) {
 	parsedBlock, ok := parsedBlockIntf.(SignedBlock)
 	require.True(ok)
 
-	equal(require, ids.Empty, builtBlock, parsedBlock)
+	equal(require, ids.Empty, nil, builtBlock, parsedBlock)
 }
 
 func TestParseGibberish(t *testing.T) {

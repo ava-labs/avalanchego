@@ -6,7 +6,6 @@ package proposervm
 import (
 	"bytes"
 	"context"
-	"crypto"
 	"testing"
 	"time"
 
@@ -20,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
@@ -940,7 +940,6 @@ func initTestRemoteProposerVM(
 	*snowman.TestBlock,
 ) {
 	require := require.New(t)
-
 	coreGenBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
@@ -992,14 +991,19 @@ func initTestRemoteProposerVM(
 		}
 	}
 
-	proVM := New(
+	sk, err := bls.NewSecretKey()
+	require.NoError(err)
+
+	proVM, err := New(
 		coreVM,
 		proBlkStartTime,
 		0,
 		DefaultMinBlockDelay,
-		pTestCert.PrivateKey.(crypto.Signer),
-		pTestCert.Leaf,
+		proBlkStartTime,
+		pTestCert,
+		sk,
 	)
+	require.NoError(err)
 
 	valState := &validators.TestState{
 		T: t,

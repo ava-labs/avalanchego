@@ -21,7 +21,7 @@ func TestState(t *testing.T) {
 	vdb := versiondb.New(db)
 	s := New(vdb)
 
-	testBlockState(a, s)
+	testCertSignedBlockState(a, s)
 	testChainState(a, s)
 }
 
@@ -33,6 +33,6 @@ func TestMeteredState(t *testing.T) {
 	s, err := NewMetered(vdb, "", prometheus.NewRegistry())
 	a.NoError(err)
 
-	testBlockState(a, s)
+	testCertSignedBlockState(a, s)
 	testChainState(a, s)
 }

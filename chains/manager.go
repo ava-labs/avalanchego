@@ -5,7 +5,6 @@ package chains
 
 import (
 	"context"
-	"crypto"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -217,6 +216,7 @@ type ManagerConfig struct {
 
 	ApricotPhase4Time            time.Time
 	ApricotPhase4MinPChainHeight uint64
+	BlsSigningProposerVMTime     time.Time
 
 	// Tracks CPU/disk usage caused by each peer.
 	ResourceTracker timetracker.ResourceTracker
@@ -765,14 +765,19 @@ func (m *manager) createAvalancheChain(
 
 	// Note: vmWrappingProposerVM is the VM that the Snowman engines should be
 	// using.
-	var vmWrappingProposerVM block.ChainVM = proposervm.New(
+	var vmWrappingProposerVM block.ChainVM
+	vmWrappingProposerVM, err = proposervm.New(
 		vmWrappedInsideProposerVM,
 		m.ApricotPhase4Time,
 		m.ApricotPhase4MinPChainHeight,
 		minBlockDelay,
-		m.StakingCert.PrivateKey.(crypto.Signer),
-		m.StakingCert.Leaf,
+		m.BlsSigningProposerVMTime,
+		&m.StakingCert,
+		m.StakingBLSKey,
 	)
+	if err != nil {
+		return nil, err
+	}
 
 	if m.MeterVMEnabled {
 		vmWrappingProposerVM = metervm.NewBlockVM(vmWrappingProposerVM)
@@ -1100,6 +1105,7 @@ func (m *manager) createSnowmanChain(
 		zap.Time("activationTime", m.ApricotPhase4Time),
 		zap.Uint64("minPChainHeight", m.ApricotPhase4MinPChainHeight),
 		zap.Duration("minBlockDelay", minBlockDelay),
+		zap.Time("blsSigningActivationTime", m.BlsSigningProposerVMTime),
 	)
 
 	chainAlias := m.PrimaryAliasOrDefault(ctx.ChainID)
@@ -1107,14 +1113,18 @@ func (m *manager) createSnowmanChain(
 		vm = tracedvm.NewBlockVM(vm, chainAlias, m.Tracer)
 	}
 
-	vm = proposervm.New(
+	vm, err = proposervm.New(
 		vm,
 		m.ApricotPhase4Time,
 		m.ApricotPhase4MinPChainHeight,
 		minBlockDelay,
-		m.StakingCert.PrivateKey.(crypto.Signer),
-		m.StakingCert.Leaf,
+		m.BlsSigningProposerVMTime,
+		&m.StakingCert,
+		m.StakingBLSKey,
 	)
+	if err != nil {
+		return nil, fmt.Errorf("error while creating proposer vm %w", err)
+	}
 
 	if m.MeterVMEnabled {
 		vm = metervm.NewBlockVM(vm)

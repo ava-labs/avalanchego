@@ -5,10 +5,6 @@ package proposervm
 
 import (
 	"context"
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rand"
-	"crypto/x509"
 	"testing"
 	"time"
 
@@ -22,6 +18,9 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 )
@@ -54,10 +53,17 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 	vdrState := validators.NewMockState(ctrl)
 	vdrState.EXPECT().GetMinimumHeight(context.Background()).Return(pChainHeight, nil).AnyTimes()
 	windower := proposer.NewMockWindower(ctrl)
-	windower.EXPECT().Delay(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(time.Duration(0), nil).AnyTimes()
+	windower.EXPECT().DelayAndBlsKey(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(time.Duration(0), nil, nil).AnyTimes()
 
-	pk, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	testCert, err := staking.NewTLSCert()
 	require.NoError(err)
+	tlsSigner, err := crypto.NewTLSSigner(testCert)
+	require.NoError(err)
+
+	sk, err := bls.NewSecretKey()
+	require.NoError(err)
+	blsSigner := crypto.NewBLSSigner(sk)
+
 	vm := &VM{
 		ChainVM:        innerVM,
 		blockBuilderVM: innerBlockBuilderVM,
@@ -65,9 +71,10 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 			ValidatorState: vdrState,
 			Log:            logging.NoLog{},
 		},
-		Windower:          windower,
-		stakingCertLeaf:   &x509.Certificate{},
-		stakingLeafSigner: pk,
+		Windower:    windower,
+		stakingCert: testCert.Leaf,
+		tlsSigner:   &tlsSigner,
+		blsSigner:   blsSigner,
 	}
 
 	blk := &postForkCommonComponents{

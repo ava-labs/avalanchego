@@ -4,7 +4,6 @@
 package block
 
 import (
-	"crypto"
 	"testing"
 	"time"
 
@@ -12,9 +11,49 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 )
 
-func TestBuild(t *testing.T) {
+func TestBuildBlsSigned(t *testing.T) {
+	require := require.New(t)
+
+	parentID := ids.ID{1}
+	timestamp := time.Unix(123, 0)
+	pChainHeight := uint64(2)
+	proposerID := ids.GenerateTestNodeID()
+	innerBlockBytes := []byte{3}
+	chainID := ids.ID{4}
+
+	sk, err := bls.NewSecretKey()
+	require.NoError(err)
+	blsSigner := crypto.NewBLSSigner(sk)
+
+	builtBlock, err := BuildBlsSigned(
+		parentID,
+		timestamp,
+		pChainHeight,
+		proposerID,
+		innerBlockBytes,
+		chainID,
+		blsSigner,
+	)
+	require.NoError(err)
+
+	require.Equal(parentID, builtBlock.ParentID())
+	require.Equal(pChainHeight, builtBlock.PChainHeight())
+	require.Equal(timestamp, builtBlock.Timestamp())
+	require.Equal(innerBlockBytes, builtBlock.Block())
+
+	pk := bls.PublicFromSecretKey(sk)
+	err = builtBlock.Verify(true, chainID, pk)
+	require.NoError(err)
+
+	err = builtBlock.Verify(false, chainID, pk)
+	require.ErrorIs(err, errUnexpectedProposer)
+}
+
+func TestBuildCertSigned(t *testing.T) {
 	require := require.New(t)
 
 	parentID := ids.ID{1}
@@ -26,17 +65,17 @@ func TestBuild(t *testing.T) {
 	tlsCert, err := staking.NewTLSCert()
 	require.NoError(err)
 
-	cert := tlsCert.Leaf
-	key := tlsCert.PrivateKey.(crypto.Signer)
+	tlsSigner, err := crypto.NewTLSSigner(tlsCert)
+	require.NoError(err)
 
-	builtBlock, err := Build(
+	builtBlock, err := BuildCertSigned(
 		parentID,
 		timestamp,
 		pChainHeight,
-		cert,
+		tlsCert.Leaf,
 		innerBlockBytes,
 		chainID,
-		key,
+		&tlsSigner,
 	)
 	require.NoError(err)
 
@@ -45,9 +84,9 @@ func TestBuild(t *testing.T) {
 	require.Equal(timestamp, builtBlock.Timestamp())
 	require.Equal(innerBlockBytes, builtBlock.Block())
 
-	require.NoError(builtBlock.Verify(true, chainID))
+	require.NoError(builtBlock.Verify(true, chainID, nil))
 
-	err = builtBlock.Verify(false, chainID)
+	err = builtBlock.Verify(false, chainID, nil)
 	require.ErrorIs(err, errUnexpectedProposer)
 }
 
@@ -68,9 +107,9 @@ func TestBuildUnsigned(t *testing.T) {
 	require.Equal(innerBlockBytes, builtBlock.Block())
 	require.Equal(ids.EmptyNodeID, builtBlock.Proposer())
 
-	require.NoError(builtBlock.Verify(false, ids.Empty))
+	require.NoError(builtBlock.Verify(false, ids.Empty, nil))
 
-	err = builtBlock.Verify(true, ids.Empty)
+	err = builtBlock.Verify(true, ids.Empty, nil)
 	require.ErrorIs(err, errMissingProposer)
 }
 
@@ -81,7 +120,7 @@ func TestBuildHeader(t *testing.T) {
 	parentID := ids.ID{2}
 	bodyID := ids.ID{3}
 
-	builtHeader, err := BuildHeader(
+	builtHeader, err := buildHeader(
 		chainID,
 		parentID,
 		bodyID,

@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 
@@ -140,7 +141,7 @@ func (p *postForkCommonComponents) Verify(
 
 		childHeight := child.Height()
 		proposerID := child.Proposer()
-		minDelay, err := p.vm.Windower.Delay(ctx, childHeight, parentPChainHeight, proposerID)
+		minDelay, proposerBlsPubKey, err := p.vm.Windower.DelayAndBlsKey(ctx, childHeight, parentPChainHeight, proposerID)
 		if err != nil {
 			return err
 		}
@@ -152,7 +153,7 @@ func (p *postForkCommonComponents) Verify(
 
 		// Verify the signature of the node
 		shouldHaveProposer := delay < proposer.MaxDelay
-		if err := child.SignedBlock.Verify(shouldHaveProposer, p.vm.ctx.ChainID); err != nil {
+		if err := child.SignedBlock.Verify(shouldHaveProposer, p.vm.ctx.ChainID, proposerBlsPubKey); err != nil {
 			return err
 		}
 
@@ -194,10 +195,15 @@ func (p *postForkCommonComponents) buildChild(
 	}
 
 	delay := newTimestamp.Sub(parentTimestamp)
+	var proposerBlsPubKey *bls.PublicKey
 	if delay < proposer.MaxDelay {
-		parentHeight := p.innerBlk.Height()
-		proposerID := p.vm.ctx.NodeID
-		minDelay, err := p.vm.Windower.Delay(ctx, parentHeight+1, parentPChainHeight, proposerID)
+		var (
+			parentHeight = p.innerBlk.Height()
+			proposerID   = p.vm.ctx.NodeID
+			minDelay     time.Duration
+		)
+
+		minDelay, proposerBlsPubKey, err = p.vm.Windower.DelayAndBlsKey(ctx, parentHeight+1, parentPChainHeight, proposerID)
 		if err != nil {
 			return nil, err
 		}
@@ -235,22 +241,47 @@ func (p *postForkCommonComponents) buildChild(
 
 	// Build the child
 	var statelessChild block.SignedBlock
-	if delay >= proposer.MaxDelay {
+	switch {
+	case delay >= proposer.MaxDelay:
 		statelessChild, err = block.BuildUnsigned(
 			parentID,
 			newTimestamp,
 			pChainHeight,
 			innerBlock.Bytes(),
 		)
-	} else {
-		statelessChild, err = block.Build(
+	case p.vm.blsSigner == nil || proposerBlsPubKey == nil:
+		// bls key not specified or not yet registered for this node.
+		// Whether bls signing fork is active or not, sign using tls certificate.
+		statelessChild, err = block.BuildCertSigned(
 			parentID,
 			newTimestamp,
 			pChainHeight,
-			p.vm.stakingCertLeaf,
+			p.vm.stakingCert,
 			innerBlock.Bytes(),
 			p.vm.ctx.ChainID,
-			p.vm.stakingLeafSigner,
+			p.vm.tlsSigner,
+		)
+	case !parentTimestamp.Before(p.vm.blsSigningActivationTime):
+		// bls signing is our prefer way to sign if available
+		statelessChild, err = block.BuildBlsSigned(
+			parentID,
+			newTimestamp,
+			pChainHeight,
+			p.vm.ctx.NodeID,
+			innerBlock.Bytes(),
+			p.vm.ctx.ChainID,
+			p.vm.blsSigner,
+		)
+	default:
+		// bls signing fork not active yet, sign using tls certificate
+		statelessChild, err = block.BuildCertSigned(
+			parentID,
+			newTimestamp,
+			pChainHeight,
+			p.vm.stakingCert,
+			innerBlock.Bytes(),
+			p.vm.ctx.ChainID,
+			p.vm.tlsSigner,
 		)
 	}
 	if err != nil {

@@ -95,11 +95,18 @@ var (
 	}
 	BanffDefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
 
+	// TODO: update this before release
 	CortinaTimes = map[uint32]time.Time{
 		constants.MainnetID: time.Date(2023, time.April, 25, 15, 0, 0, 0, time.UTC),
 		constants.FujiID:    time.Date(2023, time.April, 6, 15, 0, 0, 0, time.UTC),
 	}
 	CortinaDefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
+
+	BlsSigningProposerVMTimes = map[uint32]time.Time{
+		constants.MainnetID: time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC),
+		constants.FujiID:    time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC),
+	}
+	BlsSigningProposerVMDefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
 )
 
 func init() {
@@ -163,6 +170,13 @@ func GetBanffTime(networkID uint32) time.Time {
 		return upgradeTime
 	}
 	return BanffDefaultTime
+}
+
+func GetBlsSigningForProposerVMTime(networkID uint32) time.Time {
+	if upgradeTime, exists := BlsSigningProposerVMTimes[networkID]; exists {
+		return upgradeTime
+	}
+	return BlsSigningProposerVMDefaultTime
 }
 
 func GetCortinaTime(networkID uint32) time.Time {

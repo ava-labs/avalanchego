@@ -4,7 +4,6 @@
 package peer
 
 import (
-	"crypto"
 	"net"
 	"testing"
 	"time"
@@ -26,7 +25,8 @@ func TestIPSigner(t *testing.T) {
 	tlsCert, err := staking.NewTLSCert()
 	require.NoError(err)
 
-	key := tlsCert.PrivateKey.(crypto.Signer)
+	key, err := NewPreBanffSigner(tlsCert)
+	require.NoError(err)
 
 	s := NewIPSigner(dynIP, key)
 
@@ -43,7 +43,7 @@ func TestIPSigner(t *testing.T) {
 	require.NoError(err)
 	require.Equal(dynIP.IPPort(), signedIP2.IPPort)
 	require.Equal(uint64(10), signedIP2.Timestamp)
-	require.Equal(signedIP1.Signature, signedIP2.Signature)
+	require.Equal(signedIP1.TLSSignature, signedIP2.TLSSignature)
 
 	dynIP.SetIP(net.IPv4(1, 2, 3, 4))
 
@@ -51,5 +51,5 @@ func TestIPSigner(t *testing.T) {
 	require.NoError(err)
 	require.Equal(dynIP.IPPort(), signedIP3.IPPort)
 	require.Equal(uint64(11), signedIP3.Timestamp)
-	require.NotEqual(signedIP2.Signature, signedIP3.Signature)
+	require.NotEqual(signedIP2.TLSSignature, signedIP3.TLSSignature)
 }

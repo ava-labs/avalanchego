@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -110,6 +111,9 @@ type peer struct {
 	// the connection object that is used to read/write messages from
 	conn net.Conn
 
+	// [ipVerifier] verifies messages from this peer.
+	ipVerifier crypto.MultiVerifier
+
 	// [cert] is this peer's certificate, specifically the leaf of the
 	// certificate chain they provided.
 	cert *x509.Certificate
@@ -184,6 +188,7 @@ func Start(
 	p := &peer{
 		Config:             config,
 		conn:               conn,
+		ipVerifier:         NewPreBanffVerifier(cert),
 		cert:               cert,
 		id:                 id,
 		messageQueue:       messageQueue,
@@ -503,7 +508,7 @@ func (p *peer) writeMessages() {
 		mySignedIP.IPPort,
 		p.VersionCompatibility.Version().String(),
 		mySignedIP.Timestamp,
-		mySignedIP.Signature,
+		mySignedIP.TLSSignature,
 		p.MySubnets.List(),
 	)
 	if err != nil {
@@ -950,9 +955,10 @@ func (p *peer) handleVersion(msg *p2p.Version) {
 			},
 			Timestamp: msg.MyVersionTime,
 		},
-		Signature: msg.Sig,
+		TLSSignature: msg.Sig,
+		BLSSignature: nil,
 	}
-	if err := p.ip.Verify(p.cert); err != nil {
+	if err := p.ip.Verify(p.ipVerifier); err != nil {
 		p.Log.Debug("signature verification failed",
 			zap.Stringer("nodeID", p.id),
 			zap.Error(err),

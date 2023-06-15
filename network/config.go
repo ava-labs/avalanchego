@@ -4,7 +4,6 @@
 package network
 
 import (
-	"crypto"
 	"crypto/tls"
 	"time"
 
@@ -16,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/compression"
+	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -130,8 +130,8 @@ type Config struct {
 	// Assumes all peers support this compression type.
 	CompressionType compression.Type `json:"compressionType"`
 
-	// TLSKey is this node's TLS key that is used to sign IPs.
-	TLSKey crypto.Signer `json:"-"`
+	// IPSigner is the signer that is used to sign IPs.
+	IPSigner crypto.MultiSigner `json:"-"`
 
 	// TrackedSubnets of the node.
 	TrackedSubnets set.Set[ids.ID] `json:"-"`

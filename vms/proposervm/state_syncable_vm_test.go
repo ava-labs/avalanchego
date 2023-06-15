@@ -5,7 +5,6 @@ package proposervm
 
 import (
 	"context"
-	"crypto"
 	"testing"
 	"time"
 
@@ -19,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/version"
 
 	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
@@ -26,7 +26,6 @@ import (
 
 func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 	require := require.New(t)
-
 	innerVM := &fullVM{
 		TestVM: &block.TestVM{
 			TestVM: common.TestVM{
@@ -74,14 +73,19 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 	dbManager := manager.NewMemDB(version.Semantic1_0_0)
 	dbManager = dbManager.NewPrefixDBManager([]byte{})
 
-	vm := New(
+	sk, err := bls.NewSecretKey()
+	require.NoError(err)
+
+	vm, err := New(
 		innerVM,
-		time.Time{},
-		0,
+		time.Time{}, // fork is active
+		0,           // minimum P-Chain height
 		DefaultMinBlockDelay,
-		pTestCert.PrivateKey.(crypto.Signer),
-		pTestCert.Leaf,
+		time.Time{}, // bls signing allowed
+		pTestCert,
+		sk,
 	)
+	require.NoError(err)
 
 	ctx := snow.DefaultContextTest()
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
@@ -181,14 +185,14 @@ func TestStateSyncGetOngoingSyncStateSummary(t *testing.T) {
 		return innerBlk, nil
 	}
 
-	slb, err := statelessblock.Build(
+	slb, err := statelessblock.BuildBlsSigned(
 		vm.preferred,
 		innerBlk.Timestamp(),
 		100, // pChainHeight,
-		vm.stakingCertLeaf,
+		vm.ctx.NodeID,
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
-		vm.stakingLeafSigner,
+		vm.blsSigner,
 	)
 	require.NoError(err)
 	proBlk := &postForkBlock{
@@ -263,14 +267,14 @@ func TestStateSyncGetLastStateSummary(t *testing.T) {
 		return innerBlk, nil
 	}
 
-	slb, err := statelessblock.Build(
+	slb, err := statelessblock.BuildBlsSigned(
 		vm.preferred,
 		innerBlk.Timestamp(),
 		100, // pChainHeight,
-		vm.stakingCertLeaf,
+		vm.ctx.NodeID,
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
-		vm.stakingLeafSigner,
+		vm.blsSigner,
 	)
 	require.NoError(err)
 	proBlk := &postForkBlock{
@@ -348,14 +352,14 @@ func TestStateSyncGetStateSummary(t *testing.T) {
 		return innerBlk, nil
 	}
 
-	slb, err := statelessblock.Build(
+	slb, err := statelessblock.BuildBlsSigned(
 		vm.preferred,
 		innerBlk.Timestamp(),
 		100, // pChainHeight,
-		vm.stakingCertLeaf,
+		vm.ctx.NodeID,
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
-		vm.stakingLeafSigner,
+		vm.blsSigner,
 	)
 	require.NoError(err)
 	proBlk := &postForkBlock{
@@ -418,14 +422,14 @@ func TestParseStateSummary(t *testing.T) {
 		return innerBlk, nil
 	}
 
-	slb, err := statelessblock.Build(
+	slb, err := statelessblock.BuildBlsSigned(
 		vm.preferred,
 		innerBlk.Timestamp(),
 		100, // pChainHeight,
-		vm.stakingCertLeaf,
+		vm.ctx.NodeID,
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
-		vm.stakingLeafSigner,
+		vm.blsSigner,
 	)
 	require.NoError(err)
 	proBlk := &postForkBlock{
@@ -478,14 +482,14 @@ func TestStateSummaryAccept(t *testing.T) {
 		return innerBlk, nil
 	}
 
-	slb, err := statelessblock.Build(
+	slb, err := statelessblock.BuildBlsSigned(
 		vm.preferred,
 		innerBlk.Timestamp(),
 		100, // pChainHeight,
-		vm.stakingCertLeaf,
+		vm.ctx.NodeID,
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
-		vm.stakingLeafSigner,
+		vm.blsSigner,
 	)
 	require.NoError(err)
 	proBlk := &postForkBlock{
@@ -552,14 +556,14 @@ func TestStateSummaryAcceptOlderBlock(t *testing.T) {
 		return innerBlk, nil
 	}
 
-	slb, err := statelessblock.Build(
+	slb, err := statelessblock.BuildBlsSigned(
 		vm.preferred,
 		innerBlk.Timestamp(),
 		100, // pChainHeight,
-		vm.stakingCertLeaf,
+		vm.ctx.NodeID,
 		innerBlk.Bytes(),
 		vm.ctx.ChainID,
-		vm.stakingLeafSigner,
+		vm.blsSigner,
 	)
 	require.NoError(err)
 	proBlk := &postForkBlock{
