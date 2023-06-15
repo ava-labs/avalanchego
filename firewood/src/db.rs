@@ -829,52 +829,38 @@ impl Db {
         let inner_lock = self.inner.read();
 
         // Find the revision index with the given root hash.
-        let (nback, found) = {
-            let mut nback = 0;
-            let mut found = false;
+        let mut nback = revisions.root_hashes.iter().position(|r| r == &root_hash);
+        let rlen = revisions.root_hashes.len();
 
-            for (i, r) in revisions.root_hashes.iter().enumerate() {
-                if *r == root_hash {
-                    nback = i;
-                    found = true;
-                    break;
-                }
-            }
+        if nback.is_none() && rlen < revisions.max_revisions {
+            let ashes = inner_lock
+                .disk_requester
+                .collect_ash(revisions.max_revisions)
+                .ok()
+                .unwrap();
 
-            if !found {
-                let rlen = revisions.root_hashes.len();
-                if rlen < revisions.max_revisions {
-                    let ashes = inner_lock
-                        .disk_requester
-                        .collect_ash(revisions.max_revisions)
-                        .ok()
-                        .unwrap();
-                    for (i, ash) in ashes.iter().skip(rlen).enumerate() {
-                        // Replay the redo from the wal
-                        let root_hash_store = StoreRevShared::from_ash(
-                            Rc::new(ZeroStore::default()),
-                            &ash.0[&ROOT_HASH_SPACE].redo,
-                        );
-                        // No need the usage of `ShaleStore`, as this is just simple Hash value.
-                        let r = root_hash_store
-                            .get_view(0, TRIE_HASH_LEN as u64)
-                            .unwrap()
-                            .as_deref();
-                        let r = TrieHash(r[..TRIE_HASH_LEN].try_into().unwrap());
-                        if r == root_hash {
-                            nback = i;
-                            found = true;
-                            break;
-                        }
-                    }
-                }
-            }
-            (nback, found)
-        };
-
-        if !found {
-            return None;
+            nback = ashes
+                .iter()
+                .skip(rlen)
+                .map(|ash| {
+                    StoreRevShared::from_ash(
+                        Rc::new(ZeroStore::default()),
+                        &ash.0[&ROOT_HASH_SPACE].redo,
+                    )
+                })
+                .map(|root_hash_store| {
+                    root_hash_store
+                        .get_view(0, TRIE_HASH_LEN as u64)
+                        .unwrap()
+                        .as_deref()
+                })
+                .map(|data| TrieHash(data[..TRIE_HASH_LEN].try_into().unwrap()))
+                .position(|trie_hash| trie_hash == root_hash);
         }
+
+        let Some(nback) = nback else {
+            return None;
+        };
 
         let rlen = revisions.inner.len();
         if rlen < nback {

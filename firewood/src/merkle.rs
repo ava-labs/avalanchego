@@ -12,6 +12,7 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::fmt::{self, Debug};
 use std::io::{Cursor, Read, Write};
+use std::iter;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::OnceLock;
 
@@ -1902,12 +1903,14 @@ impl Merkle {
         key: K,
         root: ObjPtr<Node>,
     ) -> Result<Option<Ref>, MerkleError> {
-        let mut chunks = vec![0];
-        chunks.extend(key.as_ref().iter().copied().flat_map(to_nibble_array));
-
+        // TODO: Make this NonNull<ObjPtr<Node>> or something similar
         if root.is_null() {
             return Ok(None);
         }
+
+        let chunks: Vec<u8> = iter::once(0)
+            .chain(key.as_ref().iter().copied().flat_map(to_nibble_array))
+            .collect();
 
         let mut u_ref = self.get_node(root)?;
         let mut nskip = 0;
