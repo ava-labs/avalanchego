@@ -26,7 +26,6 @@ jobs:
       - name: Build the avalanchego binary
         shell: bash
         run: ./scripts/build.sh
-      # TODO: re-activate this test after there is a compatible tag to use
-      # - name: Run upgrade tests
-      #   shell: bash
-      #   run: scripts/tests.upgrade.sh 1.9.0 ./build/avalanchego
+      - name: Run upgrade tests
+        shell: bash
+        run: scripts/tests.upgrade.sh 1.10.1 ./build/avalanchego

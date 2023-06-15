@@ -4,6 +4,7 @@
 package ips
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"strconv"
@@ -14,22 +15,26 @@ import (
 
 func TestIPPortEqual(t *testing.T) {
 	tests := []struct {
+		ipPort  string
 		ipPort1 IPPort
 		ipPort2 IPPort
 		result  bool
 	}{
 		// Expected equal
 		{
+			`"127.0.0.1:0"`,
 			IPPort{net.ParseIP("127.0.0.1"), 0},
 			IPPort{net.ParseIP("127.0.0.1"), 0},
 			true,
 		},
 		{
+			`"[::1]:0"`,
 			IPPort{net.ParseIP("::1"), 0},
 			IPPort{net.ParseIP("::1"), 0},
 			true,
 		},
 		{
+			`"127.0.0.1:0"`,
 			IPPort{net.ParseIP("127.0.0.1"), 0},
 			IPPort{net.ParseIP("::ffff:127.0.0.1"), 0},
 			true,
@@ -37,16 +42,19 @@ func TestIPPortEqual(t *testing.T) {
 
 		// Expected unequal
 		{
+			`"127.0.0.1:0"`,
 			IPPort{net.ParseIP("127.0.0.1"), 0},
 			IPPort{net.ParseIP("1.2.3.4"), 0},
 			false,
 		},
 		{
+			`"[::1]:0"`,
 			IPPort{net.ParseIP("::1"), 0},
 			IPPort{net.ParseIP("2001::1"), 0},
 			false,
 		},
 		{
+			`"127.0.0.1:0"`,
 			IPPort{net.ParseIP("127.0.0.1"), 0},
 			IPPort{net.ParseIP("127.0.0.1"), 1},
 			false,
@@ -56,8 +64,13 @@ func TestIPPortEqual(t *testing.T) {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			require := require.New(t)
 
-			require.NotNil(tt.ipPort1.IP)
-			require.NotNil(tt.ipPort2.IP)
+			ipPort := IPDesc{}
+			require.NoError(ipPort.UnmarshalJSON([]byte(tt.ipPort)))
+			require.Equal(tt.ipPort1, IPPort(ipPort))
+
+			ipPortJSON, err := json.Marshal(ipPort)
+			require.NoError(err)
+			require.Equal(tt.ipPort, string(ipPortJSON))
 
 			require.Equal(tt.result, tt.ipPort1.Equal(tt.ipPort2))
 		})

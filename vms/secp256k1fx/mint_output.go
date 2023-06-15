@@ -8,6 +8,8 @@ import "github.com/ava-labs/avalanchego/vms/components/verify"
 var _ verify.State = (*MintOutput)(nil)
 
 type MintOutput struct {
+	verify.IsState `json:"-"`
+
 	OutputOwners `serialize:"true"`
 }
 
@@ -18,8 +20,4 @@ func (out *MintOutput) Verify() error {
 	default:
 		return out.OutputOwners.Verify()
 	}
-}
-
-func (out *MintOutput) VerifyState() error {
-	return out.Verify()
 }

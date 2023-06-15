@@ -451,9 +451,7 @@ func TestInitializeNumJobs(t *testing.T) {
 	require.Equal(uint64(2), jobs.state.numJobs)
 
 	require.NoError(jobs.Commit())
-
 	require.NoError(database.Clear(jobs.state.metadataDB, jobs.state.metadataDB))
-
 	require.NoError(jobs.Commit())
 
 	jobs, err = NewWithMissing(db, "", prometheus.NewRegistry())

@@ -8,9 +8,12 @@ import (
 	"errors"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
@@ -33,6 +36,7 @@ type BatchedChainVM interface {
 
 func GetAncestors(
 	ctx context.Context,
+	log logging.Logger,
 	vm Getter, // fetch blocks
 	blkID ids.ID, // first requested block
 	maxBlocksNum int, // max number of blocks to be retrieved
@@ -60,7 +64,7 @@ func GetAncestors(
 	startTime := time.Now()
 	blk, err := vm.GetBlock(ctx, blkID)
 	if err == database.ErrNotFound {
-		// special case ErrNotFound as an empty response: this signals
+		// Special case ErrNotFound as an empty response: this signals
 		// the client to avoid contacting this node for further ancestors
 		// as they may have been pruned or unavailable due to state-sync.
 		return nil, nil
@@ -74,8 +78,17 @@ func GetAncestors(
 	ancestorsBytesLen := len(blk.Bytes()) + wrappers.IntLen // length, in bytes, of all elements of ancestors
 
 	for numFetched := 1; numFetched < maxBlocksNum && time.Since(startTime) < maxBlocksRetrivalTime; numFetched++ {
-		blk, err = vm.GetBlock(ctx, blk.Parent())
+		parentID := blk.Parent()
+		blk, err = vm.GetBlock(ctx, parentID)
+		if err == database.ErrNotFound {
+			// After state sync we may not have the full chain
+			break
+		}
 		if err != nil {
+			log.Error("failed to get block during ancestors lookup",
+				zap.String("parentID", parentID.String()),
+				zap.Error(err),
+			)
 			break
 		}
 		blkBytes := blk.Bytes()
@@ -84,7 +97,7 @@ func GetAncestors(
 		// is repr. by an int.
 		newLen := ancestorsBytesLen + len(blkBytes) + wrappers.IntLen
 		if newLen > maxBlocksSize {
-			// reached maximum response size
+			// Reached maximum response size
 			break
 		}
 		ancestorsBytes = append(ancestorsBytes, blkBytes)

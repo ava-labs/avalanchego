@@ -117,26 +117,15 @@ func TestHealthCheck(t *testing.T) {
 
 			// check db HealthCheck
 			_, err := db.HealthCheck(context.Background())
-			if err == nil {
-				require.False(scenario.wantErr)
-				return
-			}
 			if scenario.wantErr {
-				require.Containsf(err.Error(), scenario.wantErrMsg, "expected error containing %q, got %s", scenario.wantErrMsg, err)
+				require.Error(err) //nolint:forbidigo
+				require.Contains(err.Error(), scenario.wantErrMsg)
 				return
 			}
 			require.NoError(err)
 
 			// check rpc HealthCheck
 			_, err = baseDB.client.HealthCheck(context.Background())
-			if err == nil {
-				require.False(scenario.wantErr)
-				return
-			}
-			if scenario.wantErr {
-				require.Containsf(err.Error(), scenario.wantErrMsg, "expected error containing %q, got %s", scenario.wantErrMsg, err)
-				return
-			}
 			require.NoError(err)
 		})
 	}

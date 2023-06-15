@@ -119,11 +119,9 @@ func TestTarget(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
-
 			tt.setup()
 			target := targeter.TargetUsage(tt.nodeID)
-			require.Equal(tt.expectedTarget, target)
+			require.Equal(t, tt.expectedTarget, target)
 		})
 	}
 }

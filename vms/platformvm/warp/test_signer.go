@@ -53,6 +53,5 @@ func TestSignerVerifies(t *testing.T, s Signer, sk *bls.SecretKey, chainID ids.I
 
 	pk := bls.PublicFromSecretKey(sk)
 	msgBytes := msg.Bytes()
-	valid := bls.Verify(pk, sig, msgBytes)
-	require.True(valid)
+	require.True(bls.Verify(pk, sig, msgBytes))
 }

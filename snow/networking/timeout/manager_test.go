@@ -18,8 +18,6 @@ import (
 )
 
 func TestManagerFire(t *testing.T) {
-	require := require.New(t)
-
 	benchlist := benchlist.NewNoBenchlist()
 	manager, err := NewManager(
 		&timer.AdaptiveTimeoutConfig{
@@ -33,7 +31,7 @@ func TestManagerFire(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 	)
-	require.NoError(err)
+	require.NoError(t, err)
 	go manager.Dispatch()
 
 	wg := sync.WaitGroup{}

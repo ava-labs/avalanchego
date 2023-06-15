@@ -130,14 +130,9 @@ func TestUniqueVertexHeapRemainsUnique(t *testing.T) {
 		HeightV: 2,
 	}
 
-	pushed1 := h.Push(vtx0)
-	pushed2 := h.Push(vtx1)
-	pushed3 := h.Push(vtx2)
-	pushed4 := h.Push(vtx3)
-
+	require.True(h.Push(vtx0))
+	require.True(h.Push(vtx1))
+	require.True(h.Push(vtx2))
+	require.False(h.Push(vtx3))
 	require.Equal(3, h.Len())
-	require.True(pushed1)
-	require.True(pushed2)
-	require.True(pushed3)
-	require.False(pushed4)
 }

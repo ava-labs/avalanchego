@@ -163,8 +163,7 @@ func TestCommitClosed(t *testing.T) {
 
 	require.NoError(db.Put(key1, value1))
 	require.NoError(db.Close())
-	err := db.Commit()
-	require.ErrorIs(err, database.ErrClosed)
+	require.Equal(database.ErrClosed, db.Commit())
 }
 
 func TestCommitClosedWrite(t *testing.T) {
@@ -179,8 +178,7 @@ func TestCommitClosedWrite(t *testing.T) {
 	baseDB.Close()
 
 	require.NoError(db.Put(key1, value1))
-	err := db.Commit()
-	require.ErrorIs(err, database.ErrClosed)
+	require.Equal(database.ErrClosed, db.Commit())
 }
 
 func TestCommitClosedDelete(t *testing.T) {
@@ -194,8 +192,7 @@ func TestCommitClosedDelete(t *testing.T) {
 	baseDB.Close()
 
 	require.NoError(db.Delete(key1))
-	err := db.Commit()
-	require.ErrorIs(err, database.ErrClosed)
+	require.Equal(database.ErrClosed, db.Commit())
 }
 
 func TestAbort(t *testing.T) {
@@ -290,8 +287,7 @@ func TestSetDatabaseClosed(t *testing.T) {
 	db := New(baseDB)
 
 	require.NoError(db.Close())
-	err := db.SetDatabase(memdb.New())
-	require.ErrorIs(err, database.ErrClosed)
+	require.Equal(database.ErrClosed, db.SetDatabase(memdb.New()))
 	require.Nil(db.GetDatabase())
 }
 

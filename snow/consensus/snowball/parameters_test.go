@@ -11,8 +11,6 @@ import (
 )
 
 func TestParametersVerify(t *testing.T) {
-	require := require.New(t)
-
 	p := Parameters{
 		K:                     1,
 		Alpha:                 1,
@@ -24,12 +22,10 @@ func TestParametersVerify(t *testing.T) {
 		MaxItemProcessingTime: 1,
 	}
 
-	require.NoError(p.Verify())
+	require.NoError(t, p.Verify())
 }
 
 func TestParametersAnotherVerify(t *testing.T) {
-	require := require.New(t)
-
 	p := Parameters{
 		K:                     1,
 		Alpha:                 1,
@@ -41,12 +37,10 @@ func TestParametersAnotherVerify(t *testing.T) {
 		MaxItemProcessingTime: 1,
 	}
 
-	require.NoError(p.Verify())
+	require.NoError(t, p.Verify())
 }
 
 func TestParametersYetAnotherVerify(t *testing.T) {
-	require := require.New(t)
-
 	p := Parameters{
 		K:                     1,
 		Alpha:                 1,
@@ -58,7 +52,7 @@ func TestParametersYetAnotherVerify(t *testing.T) {
 		MaxItemProcessingTime: 1,
 	}
 
-	require.NoError(p.Verify())
+	require.NoError(t, p.Verify())
 }
 
 func TestParametersInvalidK(t *testing.T) {
@@ -219,4 +213,33 @@ func TestParametersInvalidMaxItemProcessingTime(t *testing.T) {
 
 	err := p.Verify()
 	require.ErrorIs(t, err, ErrParametersInvalid)
+}
+
+func TestParametersMinPercentConnectedHealthy(t *testing.T) {
+	tests := []struct {
+		name                        string
+		params                      Parameters
+		expectedMinPercentConnected float64
+	}{
+		{
+			name:                        "default",
+			params:                      DefaultParameters,
+			expectedMinPercentConnected: 0.8,
+		},
+		{
+			name: "custom",
+			params: Parameters{
+				K:     60,
+				Alpha: 15,
+			},
+			expectedMinPercentConnected: 0.4,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			minStake := tt.params.MinPercentConnectedHealthy()
+			require.Equal(t, tt.expectedMinPercentConnected, minStake)
+		})
+	}
 }

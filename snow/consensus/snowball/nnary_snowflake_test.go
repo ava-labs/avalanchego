@@ -48,7 +48,6 @@ func TestVirtuousNnarySnowflake(t *testing.T) {
 
 	sb := nnarySnowflake{}
 	sb.Initialize(betaVirtuous, betaRogue, Red)
-
 	require.Equal(Red, sb.Preference())
 	require.False(sb.Finalized())
 

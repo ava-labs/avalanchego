@@ -31,7 +31,7 @@ func TestSetsAndGets(t *testing.T) {
 			Fx: &FxTest{
 				InitializeF: func(vmIntf interface{}) error {
 					vm := vmIntf.(secp256k1fx.VM)
-					return vm.CodecRegistry().RegisterType(&avax.TestVerifiable{})
+					return vm.CodecRegistry().RegisterType(&avax.TestState{})
 				},
 			},
 		}},
@@ -51,7 +51,7 @@ func TestSetsAndGets(t *testing.T) {
 			OutputIndex: 1,
 		},
 		Asset: avax.Asset{ID: ids.Empty},
-		Out:   &avax.TestVerifiable{},
+		Out:   &avax.TestState{},
 	}
 	utxoID := utxo.InputID()
 
@@ -95,8 +95,6 @@ func TestSetsAndGets(t *testing.T) {
 }
 
 func TestFundingNoAddresses(t *testing.T) {
-	require := require.New(t)
-
 	_, _, vm, _ := GenesisVMWithArgs(
 		t,
 		[]*common.Fx{{
@@ -104,7 +102,7 @@ func TestFundingNoAddresses(t *testing.T) {
 			Fx: &FxTest{
 				InitializeF: func(vmIntf interface{}) error {
 					vm := vmIntf.(secp256k1fx.VM)
-					return vm.CodecRegistry().RegisterType(&avax.TestVerifiable{})
+					return vm.CodecRegistry().RegisterType(&avax.TestState{})
 				},
 			},
 		}},
@@ -112,7 +110,7 @@ func TestFundingNoAddresses(t *testing.T) {
 	)
 	ctx := vm.ctx
 	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
+		require.NoError(t, vm.Shutdown(context.Background()))
 		ctx.Lock.Unlock()
 	}()
 
@@ -124,7 +122,7 @@ func TestFundingNoAddresses(t *testing.T) {
 			OutputIndex: 1,
 		},
 		Asset: avax.Asset{ID: ids.Empty},
-		Out:   &avax.TestVerifiable{},
+		Out:   &avax.TestState{},
 	}
 
 	state.AddUTXO(utxo)
