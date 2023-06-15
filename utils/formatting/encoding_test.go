@@ -100,8 +100,6 @@ func TestEncodeNil(t *testing.T) {
 }
 
 func TestDecodeHexInvalid(t *testing.T) {
-	require := require.New(t)
-
 	tests := []struct {
 		inputStr    string
 		expectedErr error
@@ -129,7 +127,7 @@ func TestDecodeHexInvalid(t *testing.T) {
 	}
 	for _, test := range tests {
 		_, err := Decode(Hex, test.inputStr)
-		require.ErrorIs(err, test.expectedErr)
+		require.ErrorIs(t, err, test.expectedErr)
 	}
 }
 
