@@ -759,7 +759,7 @@ func TestHistoryGetChangesToRoot(t *testing.T) {
 
 			got, err := history.getChangesToGetToRoot(tt.rootID, tt.start, tt.end)
 			require.ErrorIs(err, tt.expectedErr)
-			if err != nil {
+			if tt.expectedErr != nil {
 				return
 			}
 			tt.validateFunc(require, got)
