@@ -36,7 +36,7 @@ func TestOracle_PreForkBlkImplementsInterface(t *testing.T) {
 
 	// test
 	_, err := proBlk.Options(context.Background())
-	require.Equal(err, snowman.ErrNotOracle)
+	require.Equal(snowman.ErrNotOracle, err)
 
 	// setup
 	proBlk = preForkBlock{

@@ -518,7 +518,7 @@ func TestBlockVerify_PostForkOption_ParentIsNotOracleWithError(t *testing.T) {
 	require.IsType(&postForkBlock{}, parentBlk)
 	postForkBlk := parentBlk.(*postForkBlock)
 	_, err = postForkBlk.Options(context.Background())
-	require.Equal(err, snowman.ErrNotOracle)
+	require.Equal(snowman.ErrNotOracle, err)
 
 	// Build the child
 	statelessChild, err := block.BuildOption(
