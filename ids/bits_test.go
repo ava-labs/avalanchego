@@ -50,12 +50,10 @@ func TestEqualSubsetEarlyStop(t *testing.T) {
 }
 
 func TestEqualSubsetLateStart(t *testing.T) {
-	require := require.New(t)
-
 	id1 := ID{0x1f, 0xf8}
 	id2 := ID{0x10, 0x08}
 
-	require.True(EqualSubset(4, 12, id1, id2))
+	require.True(t, EqualSubset(4, 12, id1, id2))
 }
 
 func TestEqualSubsetSameByte(t *testing.T) {
