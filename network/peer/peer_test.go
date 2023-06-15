@@ -251,8 +251,7 @@ func TestSend(t *testing.T) {
 	outboundGetMsg, err := mc.Get(ids.Empty, 1, time.Second, ids.Empty, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
 	require.NoError(err)
 
-	sent := peer0.Send(context.Background(), outboundGetMsg)
-	require.True(sent)
+	require.True(peer0.Send(context.Background(), outboundGetMsg))
 
 	inboundGetMsg := <-peer1.inboundMsgChan
 	require.Equal(message.GetOp, inboundGetMsg.Op())
@@ -386,8 +385,7 @@ func sendAndFlush(t *testing.T, sender *testPeer, receiver *testPeer) {
 	mc := newMessageCreator(t)
 	outboundGetMsg, err := mc.Get(ids.Empty, 1, time.Second, ids.Empty, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
 	require.NoError(t, err)
-	sent := sender.Send(context.Background(), outboundGetMsg)
-	require.True(t, sent)
+	require.True(t, sender.Send(context.Background(), outboundGetMsg))
 	inboundGetMsg := <-receiver.inboundMsgChan
 	require.Equal(t, message.GetOp, inboundGetMsg.Op())
 }
