@@ -83,8 +83,7 @@ func TestSetGetWeight(t *testing.T) {
 	s := NewSet()
 
 	nodeID := ids.GenerateTestNodeID()
-	weight := s.GetWeight(nodeID)
-	require.Zero(weight)
+	require.Zero(s.GetWeight(nodeID))
 
 	require.NoError(s.Add(nodeID, nil, ids.Empty, 1))
 
@@ -109,9 +108,7 @@ func TestSetSubsetWeight(t *testing.T) {
 	s := NewSet()
 
 	require.NoError(s.Add(nodeID0, nil, ids.Empty, weight0))
-
 	require.NoError(s.Add(nodeID1, nil, ids.Empty, weight1))
-
 	require.NoError(s.Add(nodeID2, nil, ids.Empty, weight2))
 
 	expectedWeight := weight0 + weight1
@@ -197,18 +194,13 @@ func TestSetContains(t *testing.T) {
 	s := NewSet()
 
 	nodeID := ids.GenerateTestNodeID()
-	contains := s.Contains(nodeID)
-	require.False(contains)
+	require.False(s.Contains(nodeID))
 
 	require.NoError(s.Add(nodeID, nil, ids.Empty, 1))
 
-	contains = s.Contains(nodeID)
-	require.True(contains)
-
+	require.True(s.Contains(nodeID))
 	require.NoError(s.RemoveWeight(nodeID, 1))
-
-	contains = s.Contains(nodeID)
-	require.False(contains)
+	require.False(s.Contains(nodeID))
 }
 
 func TestSetLen(t *testing.T) {
@@ -311,8 +303,7 @@ func TestSetList(t *testing.T) {
 
 	require.NoError(s.RemoveWeight(nodeID1, 1))
 
-	list = s.List()
-	require.Empty(list)
+	require.Empty(s.List())
 }
 
 func TestSetWeight(t *testing.T) {

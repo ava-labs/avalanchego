@@ -37,6 +37,8 @@ func TestNewCPUTracker(t *testing.T) {
 }
 
 func TestCPUTracker(t *testing.T) {
+	require := require.New(t)
+
 	halflife := 5 * time.Second
 
 	ctrl := gomock.NewController(t)
@@ -44,7 +46,7 @@ func TestCPUTracker(t *testing.T) {
 	mockUser.EXPECT().CPUUsage().Return(1.0).Times(3)
 
 	tracker, err := NewResourceTracker(prometheus.NewRegistry(), mockUser, meter.ContinuousFactory{}, time.Second)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	node1 := ids.NodeID{1}
 	node2 := ids.NodeID{2}
@@ -66,28 +68,20 @@ func TestCPUTracker(t *testing.T) {
 
 	node1Utilization := cpuTracker.Usage(node1, endTime2)
 	node2Utilization := cpuTracker.Usage(node2, endTime2)
-	if node1Utilization >= node2Utilization {
-		t.Fatalf("Utilization should have been higher for the more recent spender")
-	}
+	require.Greater(node2Utilization, node1Utilization)
 
 	cumulative := cpuTracker.TotalUsage()
 	sum := node1Utilization + node2Utilization
-	if cumulative != sum {
-		t.Fatalf("Cumulative utilization: %f should have been equal to the sum of the spenders: %f", cumulative, sum)
-	}
+	require.Equal(sum, cumulative)
 
 	mockUser.EXPECT().CPUUsage().Return(.5).Times(3)
 
 	startTime3 := endTime2
 	endTime3 := startTime3.Add(halflife)
 	newNode1Utilization := cpuTracker.Usage(node1, endTime3)
-	if newNode1Utilization >= node1Utilization {
-		t.Fatalf("node CPU utilization should decrease over time")
-	}
+	require.Greater(node1Utilization, newNode1Utilization)
 	newCumulative := cpuTracker.TotalUsage()
-	if newCumulative >= cumulative {
-		t.Fatal("at-large CPU utilization should decrease over time ")
-	}
+	require.Greater(cumulative, newCumulative)
 
 	startTime4 := endTime3
 	endTime4 := startTime4.Add(halflife)
@@ -97,15 +91,15 @@ func TestCPUTracker(t *testing.T) {
 
 	cumulative = cpuTracker.TotalUsage()
 	sum = node1Utilization + node2Utilization
-	if cumulative >= sum {
-		t.Fatal("Sum of CPU usage should exceed cumulative at-large utilization")
-	}
+	require.Greater(sum, cumulative)
 }
 
 func TestCPUTrackerTimeUntilCPUUtilization(t *testing.T) {
+	require := require.New(t)
+
 	halflife := 5 * time.Second
 	tracker, err := NewResourceTracker(prometheus.NewRegistry(), resource.NoUsage, meter.ContinuousFactory{}, halflife)
-	require.NoError(t, err)
+	require.NoError(err)
 	now := time.Now()
 	nodeID := ids.GenerateTestNodeID()
 	// Start the meter
@@ -125,11 +119,11 @@ func TestCPUTrackerTimeUntilCPUUtilization(t *testing.T) {
 	now = now.Add(timeUntilDesiredVal)
 	actualVal := cpuTracker.Usage(nodeID, now)
 	// Make sure the actual/expected are close
-	require.InDelta(t, desiredVal, actualVal, .00001)
+	require.InDelta(desiredVal, actualVal, .00001)
 	// Make sure TimeUntilUsage returns the zero duration if
 	// the value provided >= the current value
-	require.Zero(t, cpuTracker.TimeUntilUsage(nodeID, now, actualVal))
-	require.Zero(t, cpuTracker.TimeUntilUsage(nodeID, now, actualVal+.1))
+	require.Zero(cpuTracker.TimeUntilUsage(nodeID, now, actualVal))
+	require.Zero(cpuTracker.TimeUntilUsage(nodeID, now, actualVal+.1))
 	// Make sure it returns the zero duration if the node isn't known
-	require.Zero(t, cpuTracker.TimeUntilUsage(ids.GenerateTestNodeID(), now, 0.0001))
+	require.Zero(cpuTracker.TimeUntilUsage(ids.GenerateTestNodeID(), now, 0.0001))
 }
