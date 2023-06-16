@@ -23,10 +23,10 @@ func TestLinkedDB(t *testing.T) {
 
 	has, err := ldb.Has(key)
 	require.NoError(err)
-	require.False(has, "db unexpectedly had key %s", key)
+	require.False(has)
 
 	_, err = ldb.Get(key)
-	require.Equal(database.ErrNotFound, err, "Expected db.Get to return a Not Found error.")
+	require.Equal(database.ErrNotFound, err)
 
 	require.NoError(ldb.Delete(key))
 
@@ -34,7 +34,7 @@ func TestLinkedDB(t *testing.T) {
 
 	has, err = ldb.Has(key)
 	require.NoError(err)
-	require.True(has, "db should have had key %s", key)
+	require.True(has)
 
 	v, err := ldb.Get(key)
 	require.NoError(err)
@@ -44,14 +44,13 @@ func TestLinkedDB(t *testing.T) {
 
 	has, err = ldb.Has(key)
 	require.NoError(err)
-	require.False(has, "db unexpectedly had key %s", key)
+	require.False(has)
 
 	_, err = ldb.Get(key)
-	require.Equal(database.ErrNotFound, err, "Expected db.Get to return a Not Found error.")
+	require.Equal(database.ErrNotFound, err)
 
 	iterator := db.NewIterator()
-	next := iterator.Next()
-	require.False(next, "database should be empty")
+	require.False(iterator.Next())
 	iterator.Release()
 }
 
@@ -76,8 +75,7 @@ func TestLinkedDBDuplicatedPut(t *testing.T) {
 	require.NoError(ldb.Delete(key))
 
 	iterator := db.NewIterator()
-	next := iterator.Next()
-	require.False(next, "database should be empty")
+	require.False(iterator.Next())
 	iterator.Release()
 }
 
