@@ -71,7 +71,7 @@ jobs:
           node-version: "18.x"
       - name: NPM Clean Install
         run: npm ci
-        working-directory: ./contract-examples
+        working-directory: ./contracts
       - name: Install AvalancheGo Release
         shell: bash
         run: BASEDIR=/tmp/e2e-test AVALANCHEGO_BUILD_PATH=/tmp/e2e-test/avalanchego ./scripts/install_avalanchego_release.sh

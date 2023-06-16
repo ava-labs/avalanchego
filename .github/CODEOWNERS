@@ -11,6 +11,6 @@
 # Specific directories:
 
 peer/ @anusha-ctrl @ceyonur @darioush @aaronbuchwald
-contract-examples/ @anusha-ctrl @ceyonur @darioush @aaronbuchwald
+contracts/ @anusha-ctrl @ceyonur @darioush @aaronbuchwald
 scripts/ @anusha-ctrl @ceyonur @darioush @aaronbuchwald
 

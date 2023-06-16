@@ -4,7 +4,7 @@ pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./AllowList.sol";
-import "./IFeeManager.sol";
+import "./interfaces/IFeeManager.sol";
 
 address constant FEE_MANAGER_ADDRESS = 0x0200000000000000000000000000000000000003;
 

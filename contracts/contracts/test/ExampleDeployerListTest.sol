@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "../ExampleDeployerList.sol";
-import "../IAllowList.sol";
+import "../interfaces/IAllowList.sol";
 import "../AllowList.sol";
 import "./AllowListTest.sol";
 

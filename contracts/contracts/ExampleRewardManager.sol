@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "./IRewardManager.sol";
+import "./interfaces/IRewardManager.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 address constant REWARD_MANAGER_ADDRESS = 0x0200000000000000000000000000000000000004;

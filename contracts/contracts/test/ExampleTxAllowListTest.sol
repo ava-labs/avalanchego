@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import "../ExampleTxAllowList.sol";
 import "../AllowList.sol";
-import "../IAllowList.sol";
+import "../interfaces/IAllowList.sol";
 import "./AllowListTest.sol";
 
 contract ExampleTxAllowListTest is AllowListTest {

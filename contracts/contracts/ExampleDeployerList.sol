@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "./IAllowList.sol";
+import "./interfaces/IAllowList.sol";
 import "./AllowList.sol";
 
 address constant DEPLOYER_LIST = 0x0200000000000000000000000000000000000000;
@@ -20,5 +20,6 @@ contract ExampleDeployerList is AllowList {
 }
 
 // This is an empty contract that can be used to test contract deployment
-contract Example {}
+contract Example {
 
+}

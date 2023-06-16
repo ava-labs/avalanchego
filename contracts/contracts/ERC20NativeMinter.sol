@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "./AllowList.sol";
-import "./INativeMinter.sol";
+import "./interfaces/INativeMinter.sol";
 
 // Precompiled Native Minter Contract Address
 address constant MINTER_ADDRESS = 0x0200000000000000000000000000000000000001;

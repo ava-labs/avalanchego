@@ -1,5 +1,5 @@
 {
-  "name": "@avalabs/subnet-evm-contract-examples",
+  "name": "@avalabs/subnet-evm-contracts",
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.0.2",
     "@nomiclabs/hardhat-waffle": "^2.0.1",
@@ -20,11 +20,13 @@
   },
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "module": "dist/index.js",
   "repository": {
     "type": "git",
     "url": "https://github.com/ava-labs/subnet-evm.git",
-    "directory": "contract-examples"
+    "directory": "contracts"
   },
   "license": "BSD-3-Clause",
   "scripts": {

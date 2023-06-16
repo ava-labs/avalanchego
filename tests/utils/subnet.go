@@ -23,7 +23,9 @@ import (
 	"github.com/onsi/gomega"
 )
 
-func RunHardhatTests(test string, rpcURI string) {
+// RunTestCMD runs a given test command with the given rpcURI
+// It also waits for the test ping to succeed before running the test command
+func RunTestCMD(testCMD *exec.Cmd, rpcURI string) {
 	log.Info("Sleeping to wait for test ping", "rpcURI", rpcURI)
 	client, err := NewEvmClient(rpcURI, 225, 2)
 	gomega.Expect(err).Should(gomega.BeNil())
@@ -34,11 +36,9 @@ func RunHardhatTests(test string, rpcURI string) {
 
 	err = os.Setenv("RPC_URI", rpcURI)
 	gomega.Expect(err).Should(gomega.BeNil())
-	cmd := exec.Command("npx", "hardhat", "test", fmt.Sprintf("./test/%s.ts", test), "--network", "local")
-	cmd.Dir = "./contract-examples"
-	log.Info("Running hardhat command", "cmd", cmd.String())
+	log.Info("Running test command", "cmd", testCMD.String())
 
-	out, err := cmd.CombinedOutput()
+	out, err := testCMD.CombinedOutput()
 	fmt.Printf("\nCombined output:\n\n%s\n", string(out))
 	if err != nil {
 		fmt.Printf("\nErr: %s\n", err.Error())
@@ -46,6 +46,8 @@ func RunHardhatTests(test string, rpcURI string) {
 	gomega.Expect(err).Should(gomega.BeNil())
 }
 
+// CreateNewSubnet creates a new subnet and Subnet-EVM blockchain with the given genesis file.
+// returns the ID of the new created blockchain.
 func CreateNewSubnet(ctx context.Context, genesisFilePath string) string {
 	kc := secp256k1fx.NewKeychain(genesis.EWOQKey)
 
@@ -97,14 +99,31 @@ func CreateNewSubnet(ctx context.Context, genesisFilePath string) string {
 	return createChainTxID.String()
 }
 
-func ExecuteHardHatTestOnNewBlockchain(ctx context.Context, test string) {
+// GetDefaultChainURI returns the default chain URI for a given blockchainID
+func GetDefaultChainURI(blockchainID string) string {
+	return fmt.Sprintf("%s/ext/bc/%s/rpc", DefaultLocalNodeURI, blockchainID)
+}
+
+// RunDefaultHardhatTests runs the hardhat tests on a new blockchain
+// with default parameters. Default parameters are:
+// 1. Genesis file is located at ./tests/precompile/genesis/<test>.json
+// 2. Hardhat contract environment is located at ./contracts
+// 3. Hardhat test file is located at ./contracts/test/<test>.ts
+// 4. npx is available in the ./contracts directory
+func RunDefaultHardhatTests(ctx context.Context, test string) {
 	log.Info("Executing HardHat tests on a new blockchain", "test", test)
 
 	genesisFilePath := fmt.Sprintf("./tests/precompile/genesis/%s.json", test)
 
 	blockchainID := CreateNewSubnet(ctx, genesisFilePath)
-	chainURI := fmt.Sprintf("%s/ext/bc/%s/rpc", DefaultLocalNodeURI, blockchainID)
-
+	chainURI := GetDefaultChainURI(blockchainID)
 	log.Info("Created subnet successfully", "ChainURI", chainURI)
-	RunHardhatTests(test, chainURI)
+
+	cmdPath := "./contracts"
+	// test path is relative to the cmd path
+	testPath := fmt.Sprintf("./test/%s.ts", test)
+	cmd := exec.Command("npx", "hardhat", "test", testPath, "--network", "local")
+	cmd.Dir = cmdPath
+
+	RunTestCMD(cmd, chainURI)
 }

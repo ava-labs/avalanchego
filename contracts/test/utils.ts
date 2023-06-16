@@ -1,6 +1,6 @@
 import { ethers } from "hardhat"
 import { CallOverrides } from "ethers"
-const assert = require("assert")
+import assert from "assert"
 
 /*
  *

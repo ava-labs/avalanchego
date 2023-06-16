@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "../ExampleRewardManager.sol";
-import "../IRewardManager.sol";
+import "../interfaces/IRewardManager.sol";
 import "./AllowListTest.sol";
 
 address constant BLACKHOLE_ADDRESS = 0x0100000000000000000000000000000000000000;

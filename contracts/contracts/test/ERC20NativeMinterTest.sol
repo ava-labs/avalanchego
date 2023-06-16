@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "../ERC20NativeMinter.sol";
-import "../INativeMinter.sol";
+import "../interfaces/INativeMinter.sol";
 import "./AllowListTest.sol";
 
 // TODO:

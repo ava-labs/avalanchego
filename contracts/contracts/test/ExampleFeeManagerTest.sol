@@ -5,7 +5,7 @@ pragma experimental ABIEncoderV2;
 import "../ExampleFeeManager.sol";
 import "./AllowListTest.sol";
 import "../AllowList.sol";
-import "../IFeeManager.sol";
+import "../interfaces/IFeeManager.sol";
 
 contract ExampleFeeManagerTest is AllowListTest {
   IFeeManager manager = IFeeManager(FEE_MANAGER_ADDRESS);

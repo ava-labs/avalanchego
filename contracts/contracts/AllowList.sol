@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "./IAllowList.sol";
+import "./interfaces/IAllowList.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 // AllowList is a base contract to use AllowList precompile capabilities.
