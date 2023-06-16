@@ -4,7 +4,6 @@
 package avm
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"math/rand"
@@ -12,6 +11,8 @@ import (
 	"time"
 
 	stdjson "encoding/json"
+
+	"github.com/btcsuite/btcd/btcutil/bech32"
 
 	"github.com/golang/mock/gomock"
 
@@ -21,6 +22,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -105,21 +107,17 @@ func setupWithIssuer(t *testing.T, isAVAXAsset bool) ([]byte, *VM, *Service, cha
 // 3) The service that wraps the VM
 // 4) atomic memory to use in tests
 func setupWithKeys(t *testing.T, isAVAXAsset bool) ([]byte, *VM, *Service, *atomic.Memory, *txs.Tx) {
+	require := require.New(t)
+
 	genesisBytes, vm, s, m, tx := setup(t, isAVAXAsset)
 
 	// Import the initially funded private keys
 	user, err := keystore.NewUserFromKeystore(s.vm.ctx.Keystore, username, password)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
-	if err := user.PutKeys(keys...); err != nil {
-		t.Fatalf("Failed to set key for user: %s", err)
-	}
+	require.NoError(user.PutKeys(keys...))
 
-	if err := user.Close(); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(user.Close())
 	return genesisBytes, vm, s, m, tx
 }
 
@@ -127,6 +125,8 @@ func setupWithKeys(t *testing.T, isAVAXAsset bool) ([]byte, *VM, *Service, *atom
 // The size of the sample is between 1 and len(addrs)
 // If len(addrs) == 0, returns nil
 func sampleAddrs(t *testing.T, vm *VM, addrs []ids.ShortID) ([]ids.ShortID, []string) {
+	require := require.New(t)
+
 	sampledAddrs := []ids.ShortID{}
 	sampledAddrsStr := []string{}
 
@@ -135,15 +135,11 @@ func sampleAddrs(t *testing.T, vm *VM, addrs []ids.ShortID) ([]ids.ShortID, []st
 
 	numAddrs := 1 + rand.Intn(len(addrs)) // #nosec G404
 	indices, err := sampler.Sample(numAddrs)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	for _, index := range indices {
 		addr := addrs[index]
 		addrStr, err := vm.FormatLocalAddress(addr)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		sampledAddrs = append(sampledAddrs, addr)
 		sampledAddrsStr = append(sampledAddrsStr, addrStr)
@@ -163,9 +159,7 @@ func verifyTxFeeDeducted(t *testing.T, s *Service, fromAddrs []ids.ShortID, numT
 
 	for _, addr := range addrs { // get balances for all addresses
 		addrStr, err := s.vm.FormatLocalAddress(addr)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		reply := &GetBalanceReply{}
 		err = s.GetBalance(nil,
 			&GetBalanceArgs{
@@ -195,33 +189,25 @@ func verifyTxFeeDeducted(t *testing.T, s *Service, fromAddrs []ids.ShortID, numT
 }
 
 func TestServiceIssueTx(t *testing.T) {
+	require := require.New(t)
+
 	genesisBytes, vm, s, _, _ := setup(t, true)
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
 	}()
 
 	txArgs := &api.FormattedTx{}
 	txReply := &api.JSONTxID{}
 	err := s.IssueTx(nil, txArgs, txReply)
-	if err == nil {
-		t.Fatal("Expected empty transaction to return an error")
-	}
+	require.ErrorIs(err, codec.ErrCantUnpackVersion)
 	tx := NewTx(t, genesisBytes, vm)
 	txArgs.Tx, err = formatting.Encode(formatting.Hex, tx.Bytes())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	txArgs.Encoding = formatting.Hex
 	txReply = &api.JSONTxID{}
-	if err := s.IssueTx(nil, txArgs, txReply); err != nil {
-		t.Fatal(err)
-	}
-	if txReply.TxID != tx.ID() {
-		t.Fatalf("Expected %q, got %q", txReply.TxID, tx.ID())
-	}
+	require.NoError(s.IssueTx(nil, txArgs, txReply))
+	require.Equal(tx.ID(), txReply.TxID)
 }
 
 func TestServiceGetTxStatus(t *testing.T) {
@@ -268,20 +254,18 @@ func TestServiceGetTxStatus(t *testing.T) {
 
 // Test the GetBalance method when argument Strict is true
 func TestServiceGetBalanceStrict(t *testing.T) {
+	require := require.New(t)
+
 	_, vm, s, _, _ := setup(t, true)
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
 	}()
 
 	assetID := ids.GenerateTestID()
 	addr := ids.GenerateTestShortID()
 	addrStr, err := vm.FormatLocalAddress(addr)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	// A UTXO with a 2 out of 2 multisig
 	// where one of the addresses is [addr]
@@ -301,7 +285,7 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 	}
 	// Insert the UTXO
 	vm.state.AddUTXO(twoOfTwoUTXO)
-	require.NoError(t, vm.state.Commit())
+	require.NoError(vm.state.Commit())
 
 	// Check the balance with IncludePartial set to true
 	balanceArgs := &GetBalanceArgs{
@@ -310,10 +294,10 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 		IncludePartial: true,
 	}
 	balanceReply := &GetBalanceReply{}
-	require.NoError(t, s.GetBalance(nil, balanceArgs, balanceReply))
+	require.NoError(s.GetBalance(nil, balanceArgs, balanceReply))
 	// The balance should include the UTXO since it is partly owned by [addr]
-	require.Equal(t, uint64(1337), uint64(balanceReply.Balance))
-	require.Len(t, balanceReply.UTXOIDs, 1, "should have only returned 1 utxoID")
+	require.Equal(uint64(1337), uint64(balanceReply.Balance))
+	require.Len(balanceReply.UTXOIDs, 1)
 
 	// Check the balance with IncludePartial set to false
 	balanceArgs = &GetBalanceArgs{
@@ -321,10 +305,10 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 		AssetID: assetID.String(),
 	}
 	balanceReply = &GetBalanceReply{}
-	require.NoError(t, s.GetBalance(nil, balanceArgs, balanceReply))
+	require.NoError(s.GetBalance(nil, balanceArgs, balanceReply))
 	// The balance should not include the UTXO since it is only partly owned by [addr]
-	require.Zero(t, balanceReply.Balance)
-	require.Empty(t, balanceReply.UTXOIDs)
+	require.Zero(balanceReply.Balance)
+	require.Empty(balanceReply.UTXOIDs)
 
 	// A UTXO with a 1 out of 2 multisig
 	// where one of the addresses is [addr]
@@ -344,7 +328,7 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 	}
 	// Insert the UTXO
 	vm.state.AddUTXO(oneOfTwoUTXO)
-	require.NoError(t, vm.state.Commit())
+	require.NoError(vm.state.Commit())
 
 	// Check the balance with IncludePartial set to true
 	balanceArgs = &GetBalanceArgs{
@@ -353,10 +337,10 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 		IncludePartial: true,
 	}
 	balanceReply = &GetBalanceReply{}
-	require.NoError(t, s.GetBalance(nil, balanceArgs, balanceReply))
+	require.NoError(s.GetBalance(nil, balanceArgs, balanceReply))
 	// The balance should include the UTXO since it is partly owned by [addr]
-	require.Equal(t, uint64(1337+1337), uint64(balanceReply.Balance))
-	require.Len(t, balanceReply.UTXOIDs, 2, "should have only returned 2 utxoIDs")
+	require.Equal(uint64(1337+1337), uint64(balanceReply.Balance))
+	require.Len(balanceReply.UTXOIDs, 2)
 
 	// Check the balance with IncludePartial set to false
 	balanceArgs = &GetBalanceArgs{
@@ -364,10 +348,10 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 		AssetID: assetID.String(),
 	}
 	balanceReply = &GetBalanceReply{}
-	require.NoError(t, s.GetBalance(nil, balanceArgs, balanceReply))
+	require.NoError(s.GetBalance(nil, balanceArgs, balanceReply))
 	// The balance should not include the UTXO since it is only partly owned by [addr]
-	require.Zero(t, balanceReply.Balance)
-	require.Empty(t, balanceReply.UTXOIDs)
+	require.Zero(balanceReply.Balance)
+	require.Empty(balanceReply.UTXOIDs)
 
 	// A UTXO with a 1 out of 1 multisig
 	// but with a locktime in the future
@@ -389,7 +373,7 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 	}
 	// Insert the UTXO
 	vm.state.AddUTXO(futureUTXO)
-	require.NoError(t, vm.state.Commit())
+	require.NoError(vm.state.Commit())
 
 	// Check the balance with IncludePartial set to true
 	balanceArgs = &GetBalanceArgs{
@@ -398,10 +382,10 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 		IncludePartial: true,
 	}
 	balanceReply = &GetBalanceReply{}
-	require.NoError(t, s.GetBalance(nil, balanceArgs, balanceReply))
+	require.NoError(s.GetBalance(nil, balanceArgs, balanceReply))
 	// The balance should include the UTXO since it is partly owned by [addr]
-	require.Equal(t, uint64(1337*3), uint64(balanceReply.Balance))
-	require.Len(t, balanceReply.UTXOIDs, 3, "should have returned 3 utxoIDs")
+	require.Equal(uint64(1337*3), uint64(balanceReply.Balance))
+	require.Len(balanceReply.UTXOIDs, 3)
 
 	// Check the balance with IncludePartial set to false
 	balanceArgs = &GetBalanceArgs{
@@ -409,30 +393,27 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 		AssetID: assetID.String(),
 	}
 	balanceReply = &GetBalanceReply{}
-	require.NoError(t, s.GetBalance(nil, balanceArgs, balanceReply))
+	require.NoError(s.GetBalance(nil, balanceArgs, balanceReply))
 	// The balance should not include the UTXO since it is only partly owned by [addr]
-	require.Zero(t, balanceReply.Balance)
-	require.Empty(t, balanceReply.UTXOIDs)
+	require.Zero(balanceReply.Balance)
+	require.Empty(balanceReply.UTXOIDs)
 }
 
 func TestServiceGetTxs(t *testing.T) {
+	require := require.New(t)
 	_, vm, s, _, _ := setup(t, true)
 	var err error
 	vm.addressTxsIndexer, err = index.NewIndexer(vm.db, vm.ctx.Log, "", prometheus.NewRegistry(), false)
-	require.NoError(t, err)
+	require.NoError(err)
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
 	}()
 
 	assetID := ids.GenerateTestID()
 	addr := ids.GenerateTestShortID()
 	addrStr, err := vm.FormatLocalAddress(addr)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	testTxCount := 25
 	testTxs := setupTestTxsInDB(t, vm.db, addr, assetID, testTxCount)
@@ -444,33 +425,31 @@ func TestServiceGetTxs(t *testing.T) {
 		AssetID:     assetID.String(),
 	}
 	getTxsReply := &GetAddressTxsReply{}
-	require.NoError(t, s.GetAddressTxs(nil, getTxsArgs, getTxsReply))
-	require.Len(t, getTxsReply.TxIDs, 10)
-	require.Equal(t, getTxsReply.TxIDs, testTxs[:10])
+	require.NoError(s.GetAddressTxs(nil, getTxsArgs, getTxsReply))
+	require.Len(getTxsReply.TxIDs, 10)
+	require.Equal(getTxsReply.TxIDs, testTxs[:10])
 
 	// get the second page
 	getTxsArgs.Cursor = getTxsReply.Cursor
 	getTxsReply = &GetAddressTxsReply{}
-	require.NoError(t, s.GetAddressTxs(nil, getTxsArgs, getTxsReply))
-	require.Len(t, getTxsReply.TxIDs, 10)
-	require.Equal(t, getTxsReply.TxIDs, testTxs[10:20])
+	require.NoError(s.GetAddressTxs(nil, getTxsArgs, getTxsReply))
+	require.Len(getTxsReply.TxIDs, 10)
+	require.Equal(getTxsReply.TxIDs, testTxs[10:20])
 }
 
 func TestServiceGetAllBalances(t *testing.T) {
+	require := require.New(t)
+
 	_, vm, s, _, _ := setup(t, true)
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
 	}()
 
 	assetID := ids.GenerateTestID()
 	addr := ids.GenerateTestShortID()
 	addrStr, err := vm.FormatLocalAddress(addr)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	// A UTXO with a 2 out of 2 multisig
 	// where one of the addresses is [addr]
 	twoOfTwoUTXO := &avax.UTXO{
@@ -489,7 +468,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 	}
 	// Insert the UTXO
 	vm.state.AddUTXO(twoOfTwoUTXO)
-	require.NoError(t, vm.state.Commit())
+	require.NoError(vm.state.Commit())
 
 	// Check the balance with IncludePartial set to true
 	balanceArgs := &GetAllBalancesArgs{
@@ -497,19 +476,19 @@ func TestServiceGetAllBalances(t *testing.T) {
 		IncludePartial: true,
 	}
 	reply := &GetAllBalancesReply{}
-	require.NoError(t, s.GetAllBalances(nil, balanceArgs, reply))
+	require.NoError(s.GetAllBalances(nil, balanceArgs, reply))
 	// The balance should include the UTXO since it is partly owned by [addr]
-	require.Len(t, reply.Balances, 1)
-	require.Equal(t, assetID.String(), reply.Balances[0].AssetID)
-	require.Equal(t, uint64(1337), uint64(reply.Balances[0].Balance))
+	require.Len(reply.Balances, 1)
+	require.Equal(assetID.String(), reply.Balances[0].AssetID)
+	require.Equal(uint64(1337), uint64(reply.Balances[0].Balance))
 
 	// Check the balance with IncludePartial set to false
 	balanceArgs = &GetAllBalancesArgs{
 		JSONAddress: api.JSONAddress{Address: addrStr},
 	}
 	reply = &GetAllBalancesReply{}
-	require.NoError(t, s.GetAllBalances(nil, balanceArgs, reply))
-	require.Empty(t, reply.Balances)
+	require.NoError(s.GetAllBalances(nil, balanceArgs, reply))
+	require.Empty(reply.Balances)
 
 	// A UTXO with a 1 out of 2 multisig
 	// where one of the addresses is [addr]
@@ -529,7 +508,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 	}
 	// Insert the UTXO
 	vm.state.AddUTXO(oneOfTwoUTXO)
-	require.NoError(t, vm.state.Commit())
+	require.NoError(vm.state.Commit())
 
 	// Check the balance with IncludePartial set to true
 	balanceArgs = &GetAllBalancesArgs{
@@ -537,20 +516,20 @@ func TestServiceGetAllBalances(t *testing.T) {
 		IncludePartial: true,
 	}
 	reply = &GetAllBalancesReply{}
-	require.NoError(t, s.GetAllBalances(nil, balanceArgs, reply))
+	require.NoError(s.GetAllBalances(nil, balanceArgs, reply))
 	// The balance should include the UTXO since it is partly owned by [addr]
-	require.Len(t, reply.Balances, 1)
-	require.Equal(t, assetID.String(), reply.Balances[0].AssetID)
-	require.Equal(t, uint64(1337*2), uint64(reply.Balances[0].Balance))
+	require.Len(reply.Balances, 1)
+	require.Equal(assetID.String(), reply.Balances[0].AssetID)
+	require.Equal(uint64(1337*2), uint64(reply.Balances[0].Balance))
 
 	// Check the balance with IncludePartial set to false
 	balanceArgs = &GetAllBalancesArgs{
 		JSONAddress: api.JSONAddress{Address: addrStr},
 	}
 	reply = &GetAllBalancesReply{}
-	require.NoError(t, s.GetAllBalances(nil, balanceArgs, reply))
+	require.NoError(s.GetAllBalances(nil, balanceArgs, reply))
 	// The balance should not include the UTXO since it is only partly owned by [addr]
-	require.Empty(t, reply.Balances)
+	require.Empty(reply.Balances)
 
 	// A UTXO with a 1 out of 1 multisig
 	// but with a locktime in the future
@@ -572,7 +551,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 	}
 	// Insert the UTXO
 	vm.state.AddUTXO(futureUTXO)
-	require.NoError(t, vm.state.Commit())
+	require.NoError(vm.state.Commit())
 
 	// Check the balance with IncludePartial set to true
 	balanceArgs = &GetAllBalancesArgs{
@@ -580,20 +559,20 @@ func TestServiceGetAllBalances(t *testing.T) {
 		IncludePartial: true,
 	}
 	reply = &GetAllBalancesReply{}
-	require.NoError(t, s.GetAllBalances(nil, balanceArgs, reply))
+	require.NoError(s.GetAllBalances(nil, balanceArgs, reply))
 	// The balance should include the UTXO since it is partly owned by [addr]
 	// The balance should include the UTXO since it is partly owned by [addr]
-	require.Len(t, reply.Balances, 1)
-	require.Equal(t, assetID.String(), reply.Balances[0].AssetID)
-	require.Equal(t, uint64(1337*3), uint64(reply.Balances[0].Balance))
+	require.Len(reply.Balances, 1)
+	require.Equal(assetID.String(), reply.Balances[0].AssetID)
+	require.Equal(uint64(1337*3), uint64(reply.Balances[0].Balance))
 	// Check the balance with IncludePartial set to false
 	balanceArgs = &GetAllBalancesArgs{
 		JSONAddress: api.JSONAddress{Address: addrStr},
 	}
 	reply = &GetAllBalancesReply{}
-	require.NoError(t, s.GetAllBalances(nil, balanceArgs, reply))
+	require.NoError(s.GetAllBalances(nil, balanceArgs, reply))
 	// The balance should not include the UTXO since it is only partly owned by [addr]
-	require.Empty(t, reply.Balances)
+	require.Empty(reply.Balances)
 
 	// A UTXO for a different asset
 	otherAssetID := ids.GenerateTestID()
@@ -613,7 +592,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 	}
 	// Insert the UTXO
 	vm.state.AddUTXO(otherAssetUTXO)
-	require.NoError(t, vm.state.Commit())
+	require.NoError(vm.state.Commit())
 
 	// Check the balance with IncludePartial set to true
 	balanceArgs = &GetAllBalancesArgs{
@@ -621,24 +600,24 @@ func TestServiceGetAllBalances(t *testing.T) {
 		IncludePartial: true,
 	}
 	reply = &GetAllBalancesReply{}
-	require.NoError(t, s.GetAllBalances(nil, balanceArgs, reply))
+	require.NoError(s.GetAllBalances(nil, balanceArgs, reply))
 	// The balance should include the UTXO since it is partly owned by [addr]
-	require.Len(t, reply.Balances, 2)
+	require.Len(reply.Balances, 2)
 	gotAssetIDs := []string{reply.Balances[0].AssetID, reply.Balances[1].AssetID}
-	require.Contains(t, gotAssetIDs, assetID.String())
-	require.Contains(t, gotAssetIDs, otherAssetID.String())
+	require.Contains(gotAssetIDs, assetID.String())
+	require.Contains(gotAssetIDs, otherAssetID.String())
 	gotBalances := []uint64{uint64(reply.Balances[0].Balance), uint64(reply.Balances[1].Balance)}
-	require.Contains(t, gotBalances, uint64(1337))
-	require.Contains(t, gotBalances, uint64(1337*3))
+	require.Contains(gotBalances, uint64(1337))
+	require.Contains(gotBalances, uint64(1337*3))
 
 	// Check the balance with IncludePartial set to false
 	balanceArgs = &GetAllBalancesArgs{
 		JSONAddress: api.JSONAddress{Address: addrStr},
 	}
 	reply = &GetAllBalancesReply{}
-	require.NoError(t, s.GetAllBalances(nil, balanceArgs, reply))
+	require.NoError(s.GetAllBalances(nil, balanceArgs, reply))
 	// The balance should include the UTXO since it is partly owned by [addr]
-	require.Empty(t, reply.Balances)
+	require.Empty(reply.Balances)
 }
 
 func TestServiceGetTx(t *testing.T) {
@@ -1366,9 +1345,7 @@ func newAvaxBaseTxWithOutputs(t *testing.T, genesisBytes []byte, vm *VM) *txs.Tx
 	avaxTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 	key := keys[0]
 	tx := buildBaseTx(avaxTx, vm, key)
-	if err := tx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, tx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
 	return tx
 }
 
@@ -1376,18 +1353,14 @@ func newAvaxExportTxWithOutputs(t *testing.T, genesisBytes []byte, vm *VM) *txs.
 	avaxTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 	key := keys[0]
 	tx := buildExportTx(avaxTx, vm, key)
-	if err := tx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, tx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
 	return tx
 }
 
 func newAvaxCreateAssetTxWithOutputs(t *testing.T, vm *VM) *txs.Tx {
 	key := keys[0]
 	tx := buildCreateAssetTx(key)
-	if err := vm.parser.InitializeTx(tx); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, vm.parser.InitializeTx(tx))
 	return tx
 }
 
@@ -1609,39 +1582,37 @@ func buildOperationTxWithOp(op ...*txs.Operation) *txs.Tx {
 }
 
 func TestServiceGetNilTx(t *testing.T) {
+	require := require.New(t)
+
 	_, vm, s, _, _ := setup(t, true)
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
 	}()
 
 	reply := api.GetTxReply{}
 	err := s.GetTx(nil, &api.GetTxArgs{}, &reply)
-	require.ErrorIs(t, err, errNilTxID)
+	require.ErrorIs(err, errNilTxID)
 }
 
 func TestServiceGetUnknownTx(t *testing.T) {
+	require := require.New(t)
+
 	_, vm, s, _, _ := setup(t, true)
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
 	}()
 
 	reply := api.GetTxReply{}
 	err := s.GetTx(nil, &api.GetTxArgs{TxID: ids.GenerateTestID()}, &reply)
-	require.ErrorIs(t, err, database.ErrNotFound)
+	require.ErrorIs(err, database.ErrNotFound)
 }
 
 func TestServiceGetUTXOs(t *testing.T) {
 	_, vm, s, m, _ := setup(t, true)
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -1688,9 +1659,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 		}
 
 		utxoBytes, err := codec.Marshal(txs.CodecVersion, utxo)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		utxoID := utxo.InputID()
 		elems[i] = &atomic.Element{
 			Key:   utxoID[:],
@@ -1701,87 +1670,77 @@ func TestServiceGetUTXOs(t *testing.T) {
 		}
 	}
 
-	if err := sm.Apply(map[ids.ID]*atomic.Requests{vm.ctx.ChainID: {PutRequests: elems}}); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, sm.Apply(map[ids.ID]*atomic.Requests{vm.ctx.ChainID: {PutRequests: elems}}))
 
 	hrp := constants.GetHRP(vm.ctx.NetworkID)
 	xAddr, err := vm.FormatLocalAddress(rawAddr)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	pAddr, err := vm.FormatAddress(constants.PlatformChainID, rawAddr)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	unknownChainAddr, err := address.Format("R", hrp, rawAddr.Bytes())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	xEmptyAddr, err := vm.FormatLocalAddress(rawEmptyAddr)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	tests := []struct {
-		label     string
-		count     int
-		shouldErr bool
-		args      *api.GetUTXOsArgs
+		label       string
+		count       int
+		expectedErr error
+		args        *api.GetUTXOsArgs
 	}{
 		{
-			label:     "invalid address: ''",
-			shouldErr: true,
+			label:       "invalid address: ''",
+			expectedErr: address.ErrNoSeparator,
 			args: &api.GetUTXOsArgs{
 				Addresses: []string{""},
 			},
 		},
 		{
-			label:     "invalid address: '-'",
-			shouldErr: true,
+			label:       "invalid address: '-'",
+			expectedErr: bech32.ErrInvalidLength(0),
 			args: &api.GetUTXOsArgs{
 				Addresses: []string{"-"},
 			},
 		},
 		{
-			label:     "invalid address: 'foo'",
-			shouldErr: true,
+			label:       "invalid address: 'foo'",
+			expectedErr: address.ErrNoSeparator,
 			args: &api.GetUTXOsArgs{
 				Addresses: []string{"foo"},
 			},
 		},
 		{
-			label:     "invalid address: 'foo-bar'",
-			shouldErr: true,
+			label:       "invalid address: 'foo-bar'",
+			expectedErr: bech32.ErrInvalidLength(3),
 			args: &api.GetUTXOsArgs{
 				Addresses: []string{"foo-bar"},
 			},
 		},
 		{
-			label:     "invalid address: '<ChainID>'",
-			shouldErr: true,
+			label:       "invalid address: '<ChainID>'",
+			expectedErr: address.ErrNoSeparator,
 			args: &api.GetUTXOsArgs{
 				Addresses: []string{vm.ctx.ChainID.String()},
 			},
 		},
 		{
-			label:     "invalid address: '<ChainID>-'",
-			shouldErr: true,
+			label:       "invalid address: '<ChainID>-'",
+			expectedErr: bech32.ErrInvalidLength(0),
 			args: &api.GetUTXOsArgs{
 				Addresses: []string{fmt.Sprintf("%s-", vm.ctx.ChainID.String())},
 			},
 		},
 		{
-			label:     "invalid address: '<Unknown ID>-<addr>'",
-			shouldErr: true,
+			label:       "invalid address: '<Unknown ID>-<addr>'",
+			expectedErr: ids.ErrNoIDWithAlias,
 			args: &api.GetUTXOsArgs{
 				Addresses: []string{unknownChainAddr},
 			},
 		},
 		{
-			label:     "no addresses",
-			shouldErr: true,
-			args:      &api.GetUTXOsArgs{},
+			label:       "no addresses",
+			expectedErr: errNoAddresses,
+			args:        &api.GetUTXOsArgs{},
 		},
 		{
 			label: "get all X-chain UTXOs",
@@ -1842,9 +1801,9 @@ func TestServiceGetUTXOs(t *testing.T) {
 			},
 		},
 		{
-			label:     "invalid source chain ID",
-			shouldErr: true,
-			count:     numUTXOs,
+			label:       "invalid source chain ID",
+			expectedErr: ids.ErrNoIDWithAlias,
+			count:       numUTXOs,
 			args: &api.GetUTXOsArgs{
 				Addresses: []string{
 					xAddr,
@@ -1863,8 +1822,8 @@ func TestServiceGetUTXOs(t *testing.T) {
 			},
 		},
 		{
-			label:     "get UTXOs from multiple chains",
-			shouldErr: true,
+			label:       "get UTXOs from multiple chains",
+			expectedErr: avax.ErrMismatchedChainIDs,
 			args: &api.GetUTXOsArgs{
 				Addresses: []string{
 					xAddr,
@@ -1873,8 +1832,8 @@ func TestServiceGetUTXOs(t *testing.T) {
 			},
 		},
 		{
-			label:     "get UTXOs for an address on a different chain",
-			shouldErr: true,
+			label:       "get UTXOs for an address on a different chain",
+			expectedErr: avax.ErrMismatchedChainIDs,
 			args: &api.GetUTXOsArgs{
 				Addresses: []string{
 					pAddr,
@@ -1884,57 +1843,44 @@ func TestServiceGetUTXOs(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.label, func(t *testing.T) {
+			require := require.New(t)
 			reply := &api.GetUTXOsReply{}
 			err := s.GetUTXOs(nil, test.args, reply)
-			if err != nil {
-				if !test.shouldErr {
-					t.Fatal(err)
-				}
+			require.ErrorIs(err, test.expectedErr)
+			if test.expectedErr != nil {
 				return
 			}
-			if test.shouldErr {
-				t.Fatal("should have erred")
-			}
-			if test.count != len(reply.UTXOs) {
-				t.Fatalf("Expected %d utxos, got %d", test.count, len(reply.UTXOs))
-			}
+			require.Len(reply.UTXOs, test.count)
 		})
 	}
 }
 
 func TestGetAssetDescription(t *testing.T) {
+	require := require.New(t)
+
 	_, vm, s, _, genesisTx := setup(t, true)
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
 	}()
 
 	avaxAssetID := genesisTx.ID()
 
 	reply := GetAssetDescriptionReply{}
-	err := s.GetAssetDescription(nil, &GetAssetDescriptionArgs{
+	require.NoError(s.GetAssetDescription(nil, &GetAssetDescriptionArgs{
 		AssetID: avaxAssetID.String(),
-	}, &reply)
-	if err != nil {
-		t.Fatal(err)
-	}
+	}, &reply))
 
-	if reply.Name != "AVAX" {
-		t.Fatalf("Wrong name returned from GetAssetDescription %s", reply.Name)
-	}
-	if reply.Symbol != "SYMB" {
-		t.Fatalf("Wrong name returned from GetAssetDescription %s", reply.Symbol)
-	}
+	require.Equal("AVAX", reply.Name)
+	require.Equal("SYMB", reply.Symbol)
 }
 
 func TestGetBalance(t *testing.T) {
+	require := require.New(t)
+
 	_, vm, s, _, genesisTx := setup(t, true)
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -1942,46 +1888,34 @@ func TestGetBalance(t *testing.T) {
 
 	reply := GetBalanceReply{}
 	addrStr, err := vm.FormatLocalAddress(keys[0].PublicKey().Address())
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = s.GetBalance(nil, &GetBalanceArgs{
+	require.NoError(err)
+	require.NoError(s.GetBalance(nil, &GetBalanceArgs{
 		Address: addrStr,
 		AssetID: avaxAssetID.String(),
-	}, &reply)
-	if err != nil {
-		t.Fatal(err)
-	}
+	}, &reply))
 
-	if uint64(reply.Balance) != startBalance {
-		t.Fatalf("Wrong balance returned from GetBalance %d", reply.Balance)
-	}
+	require.Equal(startBalance, uint64(reply.Balance))
 }
 
 func TestCreateFixedCapAsset(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			require := require.New(t)
 			_, vm, s, _, _ := setupWithKeys(t, tc.avaxAsset)
 			defer func() {
-				if err := vm.Shutdown(context.Background()); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(vm.Shutdown(context.Background()))
 				vm.ctx.Lock.Unlock()
 			}()
 
 			reply := AssetIDChangeAddr{}
 			addrStr, err := vm.FormatLocalAddress(keys[0].PublicKey().Address())
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(err)
 
 			changeAddrStr, err := vm.FormatLocalAddress(testChangeAddr)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(err)
 			_, fromAddrsStr := sampleAddrs(t, vm, addrs)
 
-			err = s.CreateFixedCapAsset(nil, &CreateAssetArgs{
+			require.NoError(s.CreateFixedCapAsset(nil, &CreateAssetArgs{
 				JSONSpendHeader: api.JSONSpendHeader{
 					UserPass: api.UserPass{
 						Username: username,
@@ -1997,12 +1931,8 @@ func TestCreateFixedCapAsset(t *testing.T) {
 					Amount:  123456789,
 					Address: addrStr,
 				}},
-			}, &reply)
-			if err != nil {
-				t.Fatal(err)
-			} else if reply.ChangeAddr != changeAddrStr {
-				t.Fatalf("expected change address %s but got %s", changeAddrStr, reply.ChangeAddr)
-			}
+			}, &reply))
+			require.Equal(changeAddrStr, reply.ChangeAddr)
 		})
 	}
 }
@@ -2010,26 +1940,21 @@ func TestCreateFixedCapAsset(t *testing.T) {
 func TestCreateVariableCapAsset(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			require := require.New(t)
 			_, vm, s, _, _ := setupWithKeys(t, tc.avaxAsset)
 			defer func() {
-				if err := vm.Shutdown(context.Background()); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(vm.Shutdown(context.Background()))
 				vm.ctx.Lock.Unlock()
 			}()
 
 			reply := AssetIDChangeAddr{}
 			minterAddrStr, err := vm.FormatLocalAddress(keys[0].PublicKey().Address())
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(err)
 			_, fromAddrsStr := sampleAddrs(t, vm, addrs)
 			changeAddrStr := fromAddrsStr[0]
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(err)
 
-			err = s.CreateVariableCapAsset(nil, &CreateAssetArgs{
+			require.NoError(s.CreateVariableCapAsset(nil, &CreateAssetArgs{
 				JSONSpendHeader: api.JSONSpendHeader{
 					UserPass: api.UserPass{
 						Username: username,
@@ -2048,23 +1973,15 @@ func TestCreateVariableCapAsset(t *testing.T) {
 						},
 					},
 				},
-			}, &reply)
-			if err != nil {
-				t.Fatal(err)
-			} else if reply.ChangeAddr != changeAddrStr {
-				t.Fatalf("expected change address %s but got %s", changeAddrStr, reply.ChangeAddr)
-			}
+			}, &reply))
+			require.Equal(changeAddrStr, reply.ChangeAddr)
 
 			createAssetTx := UniqueTx{
 				vm:   vm,
 				txID: reply.AssetID,
 			}
-			if status := createAssetTx.Status(); status != choices.Processing {
-				t.Fatalf("CreateVariableCapAssetTx status should have been Processing, but was %s", status)
-			}
-			if err := createAssetTx.Accept(context.Background()); err != nil {
-				t.Fatalf("Failed to accept CreateVariableCapAssetTx due to: %s", err)
-			}
+			require.Equal(choices.Processing, createAssetTx.Status())
+			require.NoError(createAssetTx.Accept(context.Background()))
 
 			createdAssetID := reply.AssetID.String()
 			// Test minting of the created variable cap asset
@@ -2081,23 +1998,16 @@ func TestCreateVariableCapAsset(t *testing.T) {
 				To:      minterAddrStr, // Send newly minted tokens to this address
 			}
 			mintReply := &api.JSONTxIDChangeAddr{}
-			if err := s.Mint(nil, mintArgs, mintReply); err != nil {
-				t.Fatalf("Failed to mint variable cap asset due to: %s", err)
-			} else if mintReply.ChangeAddr != changeAddrStr {
-				t.Fatalf("expected change address %s but got %s", changeAddrStr, mintReply.ChangeAddr)
-			}
+			require.NoError(s.Mint(nil, mintArgs, mintReply))
+			require.Equal(changeAddrStr, mintReply.ChangeAddr)
 
 			mintTx := UniqueTx{
 				vm:   vm,
 				txID: mintReply.TxID,
 			}
 
-			if status := mintTx.Status(); status != choices.Processing {
-				t.Fatalf("MintTx status should have been Processing, but was %s", status)
-			}
-			if err := mintTx.Accept(context.Background()); err != nil {
-				t.Fatalf("Failed to accept MintTx due to: %s", err)
-			}
+			require.Equal(choices.Processing, mintTx.Status())
+			require.NoError(mintTx.Accept(context.Background()))
 
 			sendArgs := &SendArgs{
 				JSONSpendHeader: api.JSONSpendHeader{
@@ -2115,11 +2025,8 @@ func TestCreateVariableCapAsset(t *testing.T) {
 				},
 			}
 			sendReply := &api.JSONTxIDChangeAddr{}
-			if err := s.Send(nil, sendArgs, sendReply); err != nil {
-				t.Fatalf("Failed to send newly minted variable cap asset due to: %s", err)
-			} else if sendReply.ChangeAddr != changeAddrStr {
-				t.Fatalf("expected change address to be %s but got %s", changeAddrStr, sendReply.ChangeAddr)
-			}
+			require.NoError(s.Send(nil, sendArgs, sendReply))
+			require.Equal(changeAddrStr, sendReply.ChangeAddr)
 		})
 	}
 }
@@ -2127,11 +2034,10 @@ func TestCreateVariableCapAsset(t *testing.T) {
 func TestNFTWorkflow(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			require := require.New(t)
 			_, vm, s, _, _ := setupWithKeys(t, tc.avaxAsset)
 			defer func() {
-				if err := vm.Shutdown(context.Background()); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(vm.Shutdown(context.Background()))
 				vm.ctx.Lock.Unlock()
 			}()
 
@@ -2139,9 +2045,7 @@ func TestNFTWorkflow(t *testing.T) {
 
 			// Test minting of the created variable cap asset
 			addrStr, err := vm.FormatLocalAddress(keys[0].PublicKey().Address())
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(err)
 
 			createArgs := &CreateNFTAssetArgs{
 				JSONSpendHeader: api.JSONSpendHeader{
@@ -2164,11 +2068,8 @@ func TestNFTWorkflow(t *testing.T) {
 				},
 			}
 			createReply := &AssetIDChangeAddr{}
-			if err := s.CreateNFTAsset(nil, createArgs, createReply); err != nil {
-				t.Fatalf("Failed to mint variable cap asset due to: %s", err)
-			} else if createReply.ChangeAddr != fromAddrsStr[0] {
-				t.Fatalf("expected change address to be %s but got %s", fromAddrsStr[0], createReply.ChangeAddr)
-			}
+			require.NoError(s.CreateNFTAsset(nil, createArgs, createReply))
+			require.Equal(fromAddrsStr[0], createReply.ChangeAddr)
 
 			assetID := createReply.AssetID
 			createNFTTx := UniqueTx{
@@ -2176,19 +2077,12 @@ func TestNFTWorkflow(t *testing.T) {
 				txID: createReply.AssetID,
 			}
 			// Accept the transaction so that we can Mint NFTs for the test
-			if createNFTTx.Status() != choices.Processing {
-				t.Fatalf("CreateNFTTx should have been processing after creating the NFT")
-			}
-			if err := createNFTTx.Accept(context.Background()); err != nil {
-				t.Fatalf("Failed to accept CreateNFT transaction: %s", err)
-			} else if err := verifyTxFeeDeducted(t, s, fromAddrs, 1); err != nil {
-				t.Fatal(err)
-			}
+			require.Equal(choices.Processing, createNFTTx.Status())
+			require.NoError(createNFTTx.Accept(context.Background()))
+			require.NoError(verifyTxFeeDeducted(t, s, fromAddrs, 1))
 
 			payload, err := formatting.Encode(formatting.Hex, []byte{1, 2, 3, 4, 5})
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(err)
 			mintArgs := &MintNFTArgs{
 				JSONSpendHeader: api.JSONSpendHeader{
 					UserPass: api.UserPass{
@@ -2205,24 +2099,17 @@ func TestNFTWorkflow(t *testing.T) {
 			}
 			mintReply := &api.JSONTxIDChangeAddr{}
 
-			if err := s.MintNFT(nil, mintArgs, mintReply); err != nil {
-				t.Fatalf("MintNFT returned an error: %s", err)
-			} else if createReply.ChangeAddr != fromAddrsStr[0] {
-				t.Fatalf("expected change address to be %s but got %s", fromAddrsStr[0], mintReply.ChangeAddr)
-			}
+			require.NoError(s.MintNFT(nil, mintArgs, mintReply))
+			require.Equal(fromAddrsStr[0], createReply.ChangeAddr)
 
 			mintNFTTx := UniqueTx{
 				vm:   vm,
 				txID: mintReply.TxID,
 			}
-			if mintNFTTx.Status() != choices.Processing {
-				t.Fatal("MintNFTTx should have been processing after minting the NFT")
-			}
+			require.Equal(choices.Processing, mintNFTTx.Status())
 
 			// Accept the transaction so that we can send the newly minted NFT
-			if err := mintNFTTx.Accept(context.Background()); err != nil {
-				t.Fatalf("Failed to accept MintNFTTx: %s", err)
-			}
+			require.NoError(mintNFTTx.Accept(context.Background()))
 
 			sendArgs := &SendNFTArgs{
 				JSONSpendHeader: api.JSONSpendHeader{
@@ -2238,29 +2125,24 @@ func TestNFTWorkflow(t *testing.T) {
 				To:      addrStr,
 			}
 			sendReply := &api.JSONTxIDChangeAddr{}
-			if err := s.SendNFT(nil, sendArgs, sendReply); err != nil {
-				t.Fatalf("Failed to send NFT due to: %s", err)
-			} else if sendReply.ChangeAddr != fromAddrsStr[0] {
-				t.Fatalf("expected change address to be %s but got %s", fromAddrsStr[0], sendReply.ChangeAddr)
-			}
+			require.NoError(s.SendNFT(nil, sendArgs, sendReply))
+			require.Equal(fromAddrsStr[0], sendReply.ChangeAddr)
 		})
 	}
 }
 
 func TestImportExportKey(t *testing.T) {
+	require := require.New(t)
+
 	_, vm, s, _, _ := setup(t, true)
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
 	}()
 
 	factory := secp256k1.Factory{}
 	sk, err := factory.NewPrivateKey()
-	if err != nil {
-		t.Fatalf("problem generating private key: %s", err)
-	}
+	require.NoError(err)
 
 	importArgs := &ImportKeyArgs{
 		UserPass: api.UserPass{
@@ -2270,14 +2152,10 @@ func TestImportExportKey(t *testing.T) {
 		PrivateKey: sk,
 	}
 	importReply := &api.JSONAddress{}
-	if err := s.ImportKey(nil, importArgs, importReply); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(s.ImportKey(nil, importArgs, importReply))
 
 	addrStr, err := vm.FormatLocalAddress(sk.PublicKey().Address())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	exportArgs := &ExportKeyArgs{
 		UserPass: api.UserPass{
 			Username: username,
@@ -2286,30 +2164,23 @@ func TestImportExportKey(t *testing.T) {
 		Address: addrStr,
 	}
 	exportReply := &ExportKeyReply{}
-	if err := s.ExportKey(nil, exportArgs, exportReply); err != nil {
-		t.Fatal(err)
-	}
-
-	if !bytes.Equal(sk.Bytes(), exportReply.PrivateKey.Bytes()) {
-		t.Fatal("Unexpected key was found in ExportKeyReply")
-	}
+	require.NoError(s.ExportKey(nil, exportArgs, exportReply))
+	require.Equal(sk.Bytes(), exportReply.PrivateKey.Bytes())
 }
 
 func TestImportAVMKeyNoDuplicates(t *testing.T) {
+	require := require.New(t)
+
 	_, vm, s, _, _ := setup(t, true)
 	ctx := vm.ctx
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(vm.Shutdown(context.Background()))
 		ctx.Lock.Unlock()
 	}()
 
 	factory := secp256k1.Factory{}
 	sk, err := factory.NewPrivateKey()
-	if err != nil {
-		t.Fatalf("problem generating private key: %s", err)
-	}
+	require.NoError(err)
 	args := ImportKeyArgs{
 		UserPass: api.UserPass{
 			Username: username,
@@ -2318,52 +2189,35 @@ func TestImportAVMKeyNoDuplicates(t *testing.T) {
 		PrivateKey: sk,
 	}
 	reply := api.JSONAddress{}
-	if err := s.ImportKey(nil, &args, &reply); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(s.ImportKey(nil, &args, &reply))
 
 	expectedAddress, err := vm.FormatLocalAddress(sk.PublicKey().Address())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
-	if reply.Address != expectedAddress {
-		t.Fatalf("Reply address: %s did not match expected address: %s", reply.Address, expectedAddress)
-	}
+	require.Equal(expectedAddress, reply.Address)
 
 	reply2 := api.JSONAddress{}
-	if err := s.ImportKey(nil, &args, &reply2); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(s.ImportKey(nil, &args, &reply2))
 
-	if reply2.Address != expectedAddress {
-		t.Fatalf("Reply address: %s did not match expected address: %s", reply2.Address, expectedAddress)
-	}
+	require.Equal(expectedAddress, reply2.Address)
 
 	addrsArgs := api.UserPass{
 		Username: username,
 		Password: password,
 	}
 	addrsReply := api.JSONAddresses{}
-	if err := s.ListAddresses(nil, &addrsArgs, &addrsReply); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(s.ListAddresses(nil, &addrsArgs, &addrsReply))
 
-	if len(addrsReply.Addresses) != 1 {
-		t.Fatal("Importing the same key twice created duplicate addresses")
-	}
-
-	if addrsReply.Addresses[0] != expectedAddress {
-		t.Fatal("List addresses returned an incorrect address")
-	}
+	require.Len(addrsReply.Addresses, 1)
+	require.Equal(expectedAddress, addrsReply.Addresses[0])
 }
 
 func TestSend(t *testing.T) {
+	require := require.New(t)
+
 	_, vm, s, _, genesisTx := setupWithKeys(t, true)
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -2371,13 +2225,9 @@ func TestSend(t *testing.T) {
 	addr := keys[0].PublicKey().Address()
 
 	addrStr, err := vm.FormatLocalAddress(addr)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	changeAddrStr, err := vm.FormatLocalAddress(testChangeAddr)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	_, fromAddrsStr := sampleAddrs(t, vm, addrs)
 
 	args := &SendArgs{
@@ -2397,30 +2247,21 @@ func TestSend(t *testing.T) {
 	}
 	reply := &api.JSONTxIDChangeAddr{}
 	vm.timer.Cancel()
-	if err := s.Send(nil, args, reply); err != nil {
-		t.Fatalf("Failed to send transaction: %s", err)
-	} else if reply.ChangeAddr != changeAddrStr {
-		t.Fatalf("expected change address to be %s but got %s", changeAddrStr, reply.ChangeAddr)
-	}
+	require.NoError(s.Send(nil, args, reply))
+	require.Equal(changeAddrStr, reply.ChangeAddr)
 
 	pendingTxs := vm.txs
-	if len(pendingTxs) != 1 {
-		t.Fatalf("Expected to find 1 pending tx after send, but found %d", len(pendingTxs))
-	}
-
-	if reply.TxID != pendingTxs[0].ID() {
-		t.Fatal("Transaction ID returned by Send does not match the transaction found in vm's pending transactions")
-	}
+	require.Len(pendingTxs, 1)
+	require.Equal(pendingTxs[0].ID(), reply.TxID)
 }
 
 func TestSendMultiple(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			require := require.New(t)
 			_, vm, s, _, genesisTx := setupWithKeys(t, tc.avaxAsset)
 			defer func() {
-				if err := vm.Shutdown(context.Background()); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(vm.Shutdown(context.Background()))
 				vm.ctx.Lock.Unlock()
 			}()
 
@@ -2428,13 +2269,9 @@ func TestSendMultiple(t *testing.T) {
 			addr := keys[0].PublicKey().Address()
 
 			addrStr, err := vm.FormatLocalAddress(addr)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(err)
 			changeAddrStr, err := vm.FormatLocalAddress(testChangeAddr)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(err)
 			_, fromAddrsStr := sampleAddrs(t, vm, addrs)
 
 			args := &SendMultipleArgs{
@@ -2461,34 +2298,24 @@ func TestSendMultiple(t *testing.T) {
 			}
 			reply := &api.JSONTxIDChangeAddr{}
 			vm.timer.Cancel()
-			if err := s.SendMultiple(nil, args, reply); err != nil {
-				t.Fatalf("Failed to send transaction: %s", err)
-			} else if reply.ChangeAddr != changeAddrStr {
-				t.Fatalf("expected change address to be %s but got %s", changeAddrStr, reply.ChangeAddr)
-			}
+			require.NoError(s.SendMultiple(nil, args, reply))
+			require.Equal(changeAddrStr, reply.ChangeAddr)
 
 			pendingTxs := vm.txs
-			if len(pendingTxs) != 1 {
-				t.Fatalf("Expected to find 1 pending tx after send, but found %d", len(pendingTxs))
-			}
-
-			if reply.TxID != pendingTxs[0].ID() {
-				t.Fatal("Transaction ID returned by SendMultiple does not match the transaction found in vm's pending transactions")
-			}
-
-			if _, err := vm.GetTx(context.Background(), reply.TxID); err != nil {
-				t.Fatalf("Failed to retrieve created transaction: %s", err)
-			}
+			require.Len(pendingTxs, 1)
+			require.Equal(pendingTxs[0].ID(), reply.TxID)
+			_, err = vm.GetTx(context.Background(), reply.TxID)
+			require.NoError(err)
 		})
 	}
 }
 
 func TestCreateAndListAddresses(t *testing.T) {
+	require := require.New(t)
+
 	_, vm, s, _, _ := setup(t, true)
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
 	}()
 
@@ -2498,9 +2325,7 @@ func TestCreateAndListAddresses(t *testing.T) {
 	}
 	createReply := &api.JSONAddress{}
 
-	if err := s.CreateAddress(nil, createArgs, createReply); err != nil {
-		t.Fatalf("Failed to create address: %s", err)
-	}
+	require.NoError(s.CreateAddress(nil, createArgs, createReply))
 
 	newAddr := createReply.Address
 
@@ -2510,26 +2335,18 @@ func TestCreateAndListAddresses(t *testing.T) {
 	}
 	listReply := &api.JSONAddresses{}
 
-	if err := s.ListAddresses(nil, listArgs, listReply); err != nil {
-		t.Fatalf("Failed to list addresses: %s", err)
-	}
+	require.NoError(s.ListAddresses(nil, listArgs, listReply))
 
-	for _, addr := range listReply.Addresses {
-		if addr == newAddr {
-			return
-		}
-	}
-	t.Fatalf("Failed to find newly created address among %d addresses", len(listReply.Addresses))
+	require.Contains(listReply.Addresses, newAddr)
 }
 
 func TestImport(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			require := require.New(t)
 			_, vm, s, m, genesisTx := setupWithKeys(t, tc.avaxAsset)
 			defer func() {
-				if err := vm.Shutdown(context.Background()); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(vm.Shutdown(context.Background()))
 				vm.ctx.Lock.Unlock()
 			}()
 			assetID := genesisTx.ID()
@@ -2547,26 +2364,20 @@ func TestImport(t *testing.T) {
 				},
 			}
 			utxoBytes, err := vm.parser.Codec().Marshal(txs.CodecVersion, utxo)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(err)
 
 			peerSharedMemory := m.NewSharedMemory(constants.PlatformChainID)
 			utxoID := utxo.InputID()
-			if err := peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{vm.ctx.ChainID: {PutRequests: []*atomic.Element{{
+			require.NoError(peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{vm.ctx.ChainID: {PutRequests: []*atomic.Element{{
 				Key:   utxoID[:],
 				Value: utxoBytes,
 				Traits: [][]byte{
 					addr0.Bytes(),
 				},
-			}}}}); err != nil {
-				t.Fatal(err)
-			}
+			}}}}))
 
 			addrStr, err := vm.FormatLocalAddress(keys[0].PublicKey().Address())
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(err)
 			args := &ImportArgs{
 				UserPass: api.UserPass{
 					Username: username,
@@ -2576,15 +2387,12 @@ func TestImport(t *testing.T) {
 				To:          addrStr,
 			}
 			reply := &api.JSONTxID{}
-			if err := s.Import(nil, args, reply); err != nil {
-				t.Fatalf("Failed to import AVAX due to %s", err)
-			}
+			require.NoError(s.Import(nil, args, reply))
 		})
 	}
 }
 
 func TestServiceGetBlock(t *testing.T) {
-	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -2592,7 +2400,7 @@ func TestServiceGetBlock(t *testing.T) {
 
 	type test struct {
 		name                        string
-		serviceAndExpectedBlockFunc func(ctrl *gomock.Controller) (*Service, interface{})
+		serviceAndExpectedBlockFunc func(t *testing.T, ctrl *gomock.Controller) (*Service, interface{})
 		encoding                    formatting.Encoding
 		expectedErr                 error
 	}
@@ -2600,7 +2408,7 @@ func TestServiceGetBlock(t *testing.T) {
 	tests := []test{
 		{
 			name: "chain not linearized",
-			serviceAndExpectedBlockFunc: func(ctrl *gomock.Controller) (*Service, interface{}) {
+			serviceAndExpectedBlockFunc: func(_ *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
 				return &Service{
 					vm: &VM{
 						ctx: &snow.Context{
@@ -2614,7 +2422,7 @@ func TestServiceGetBlock(t *testing.T) {
 		},
 		{
 			name: "block not found",
-			serviceAndExpectedBlockFunc: func(ctrl *gomock.Controller) (*Service, interface{}) {
+			serviceAndExpectedBlockFunc: func(_ *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
 				manager := executor.NewMockManager(ctrl)
 				manager.EXPECT().GetStatelessBlock(blockID).Return(nil, database.ErrNotFound)
 				return &Service{
@@ -2631,7 +2439,7 @@ func TestServiceGetBlock(t *testing.T) {
 		},
 		{
 			name: "JSON format",
-			serviceAndExpectedBlockFunc: func(ctrl *gomock.Controller) (*Service, interface{}) {
+			serviceAndExpectedBlockFunc: func(_ *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
 				block := blocks.NewMockBlock(ctrl)
 				block.EXPECT().InitCtx(gomock.Any())
 				block.EXPECT().Txs().Return(nil)
@@ -2652,13 +2460,13 @@ func TestServiceGetBlock(t *testing.T) {
 		},
 		{
 			name: "hex format",
-			serviceAndExpectedBlockFunc: func(ctrl *gomock.Controller) (*Service, interface{}) {
+			serviceAndExpectedBlockFunc: func(t *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
 				block := blocks.NewMockBlock(ctrl)
 				blockBytes := []byte("hi mom")
 				block.EXPECT().Bytes().Return(blockBytes)
 
 				expected, err := formatting.Encode(formatting.Hex, blockBytes)
-				require.NoError(err)
+				require.NoError(t, err)
 
 				manager := executor.NewMockManager(ctrl)
 				manager.EXPECT().GetStatelessBlock(blockID).Return(block, nil)
@@ -2676,13 +2484,13 @@ func TestServiceGetBlock(t *testing.T) {
 		},
 		{
 			name: "hexc format",
-			serviceAndExpectedBlockFunc: func(ctrl *gomock.Controller) (*Service, interface{}) {
+			serviceAndExpectedBlockFunc: func(t *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
 				block := blocks.NewMockBlock(ctrl)
 				blockBytes := []byte("hi mom")
 				block.EXPECT().Bytes().Return(blockBytes)
 
 				expected, err := formatting.Encode(formatting.HexC, blockBytes)
-				require.NoError(err)
+				require.NoError(t, err)
 
 				manager := executor.NewMockManager(ctrl)
 				manager.EXPECT().GetStatelessBlock(blockID).Return(block, nil)
@@ -2700,13 +2508,13 @@ func TestServiceGetBlock(t *testing.T) {
 		},
 		{
 			name: "hexnc format",
-			serviceAndExpectedBlockFunc: func(ctrl *gomock.Controller) (*Service, interface{}) {
+			serviceAndExpectedBlockFunc: func(t *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
 				block := blocks.NewMockBlock(ctrl)
 				blockBytes := []byte("hi mom")
 				block.EXPECT().Bytes().Return(blockBytes)
 
 				expected, err := formatting.Encode(formatting.HexNC, blockBytes)
-				require.NoError(err)
+				require.NoError(t, err)
 
 				manager := executor.NewMockManager(ctrl)
 				manager.EXPECT().GetStatelessBlock(blockID).Return(block, nil)
@@ -2726,7 +2534,9 @@ func TestServiceGetBlock(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			service, expected := tt.serviceAndExpectedBlockFunc(ctrl)
+			require := require.New(t)
+
+			service, expected := tt.serviceAndExpectedBlockFunc(t, ctrl)
 
 			args := &api.GetBlockArgs{
 				BlockID:  blockID,
@@ -2735,16 +2545,16 @@ func TestServiceGetBlock(t *testing.T) {
 			reply := &api.GetBlockResponse{}
 			err := service.GetBlock(nil, args, reply)
 			require.ErrorIs(err, tt.expectedErr)
-			if err == nil {
-				require.Equal(tt.encoding, reply.Encoding)
-				require.Equal(expected, reply.Block)
+			if tt.expectedErr != nil {
+				return
 			}
+			require.Equal(tt.encoding, reply.Encoding)
+			require.Equal(expected, reply.Block)
 		})
 	}
 }
 
 func TestServiceGetBlockByHeight(t *testing.T) {
-	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -2753,7 +2563,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 
 	type test struct {
 		name                        string
-		serviceAndExpectedBlockFunc func(ctrl *gomock.Controller) (*Service, interface{})
+		serviceAndExpectedBlockFunc func(t *testing.T, ctrl *gomock.Controller) (*Service, interface{})
 		encoding                    formatting.Encoding
 		expectedErr                 error
 	}
@@ -2761,7 +2571,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 	tests := []test{
 		{
 			name: "chain not linearized",
-			serviceAndExpectedBlockFunc: func(ctrl *gomock.Controller) (*Service, interface{}) {
+			serviceAndExpectedBlockFunc: func(_ *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
 				return &Service{
 					vm: &VM{
 						ctx: &snow.Context{
@@ -2775,7 +2585,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 		},
 		{
 			name: "block height not found",
-			serviceAndExpectedBlockFunc: func(ctrl *gomock.Controller) (*Service, interface{}) {
+			serviceAndExpectedBlockFunc: func(_ *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
 				state := states.NewMockState(ctrl)
 				state.EXPECT().GetBlockID(blockHeight).Return(ids.Empty, database.ErrNotFound)
 
@@ -2795,7 +2605,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 		},
 		{
 			name: "block not found",
-			serviceAndExpectedBlockFunc: func(ctrl *gomock.Controller) (*Service, interface{}) {
+			serviceAndExpectedBlockFunc: func(_ *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
 				state := states.NewMockState(ctrl)
 				state.EXPECT().GetBlockID(blockHeight).Return(blockID, nil)
 
@@ -2816,7 +2626,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 		},
 		{
 			name: "JSON format",
-			serviceAndExpectedBlockFunc: func(ctrl *gomock.Controller) (*Service, interface{}) {
+			serviceAndExpectedBlockFunc: func(_ *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
 				block := blocks.NewMockBlock(ctrl)
 				block.EXPECT().InitCtx(gomock.Any())
 				block.EXPECT().Txs().Return(nil)
@@ -2841,7 +2651,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 		},
 		{
 			name: "hex format",
-			serviceAndExpectedBlockFunc: func(ctrl *gomock.Controller) (*Service, interface{}) {
+			serviceAndExpectedBlockFunc: func(t *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
 				block := blocks.NewMockBlock(ctrl)
 				blockBytes := []byte("hi mom")
 				block.EXPECT().Bytes().Return(blockBytes)
@@ -2850,7 +2660,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 				state.EXPECT().GetBlockID(blockHeight).Return(blockID, nil)
 
 				expected, err := formatting.Encode(formatting.Hex, blockBytes)
-				require.NoError(err)
+				require.NoError(t, err)
 
 				manager := executor.NewMockManager(ctrl)
 				manager.EXPECT().GetStatelessBlock(blockID).Return(block, nil)
@@ -2869,7 +2679,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 		},
 		{
 			name: "hexc format",
-			serviceAndExpectedBlockFunc: func(ctrl *gomock.Controller) (*Service, interface{}) {
+			serviceAndExpectedBlockFunc: func(t *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
 				block := blocks.NewMockBlock(ctrl)
 				blockBytes := []byte("hi mom")
 				block.EXPECT().Bytes().Return(blockBytes)
@@ -2878,7 +2688,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 				state.EXPECT().GetBlockID(blockHeight).Return(blockID, nil)
 
 				expected, err := formatting.Encode(formatting.HexC, blockBytes)
-				require.NoError(err)
+				require.NoError(t, err)
 
 				manager := executor.NewMockManager(ctrl)
 				manager.EXPECT().GetStatelessBlock(blockID).Return(block, nil)
@@ -2897,7 +2707,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 		},
 		{
 			name: "hexnc format",
-			serviceAndExpectedBlockFunc: func(ctrl *gomock.Controller) (*Service, interface{}) {
+			serviceAndExpectedBlockFunc: func(t *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
 				block := blocks.NewMockBlock(ctrl)
 				blockBytes := []byte("hi mom")
 				block.EXPECT().Bytes().Return(blockBytes)
@@ -2906,7 +2716,7 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 				state.EXPECT().GetBlockID(blockHeight).Return(blockID, nil)
 
 				expected, err := formatting.Encode(formatting.HexNC, blockBytes)
-				require.NoError(err)
+				require.NoError(t, err)
 
 				manager := executor.NewMockManager(ctrl)
 				manager.EXPECT().GetStatelessBlock(blockID).Return(block, nil)
@@ -2927,7 +2737,9 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			service, expected := tt.serviceAndExpectedBlockFunc(ctrl)
+			require := require.New(t)
+
+			service, expected := tt.serviceAndExpectedBlockFunc(t, ctrl)
 
 			args := &api.GetBlockByHeightArgs{
 				Height:   json.Uint64(blockHeight),
@@ -2936,16 +2748,16 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 			reply := &api.GetBlockResponse{}
 			err := service.GetBlockByHeight(nil, args, reply)
 			require.ErrorIs(err, tt.expectedErr)
-			if err == nil {
-				require.Equal(tt.encoding, reply.Encoding)
-				require.Equal(expected, reply.Block)
+			if tt.expectedErr != nil {
+				return
 			}
+			require.Equal(tt.encoding, reply.Encoding)
+			require.Equal(expected, reply.Block)
 		})
 	}
 }
 
 func TestServiceGetHeight(t *testing.T) {
-	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -3019,14 +2831,16 @@ func TestServiceGetHeight(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
 			service := tt.serviceFunc(ctrl)
 
 			reply := &api.GetHeightResponse{}
 			err := service.GetHeight(nil, nil, reply)
 			require.ErrorIs(err, tt.expectedErr)
-			if err == nil {
-				require.Equal(json.Uint64(blockHeight), reply.Height)
+			if tt.expectedErr != nil {
+				return
 			}
+			require.Equal(json.Uint64(blockHeight), reply.Height)
 		})
 	}
 }
