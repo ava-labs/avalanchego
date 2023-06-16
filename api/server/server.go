@@ -90,7 +90,7 @@ type server struct {
 	factory logging.Factory
 	// Listens for HTTP traffic on this address
 	listenHost string
-	listenPort uint16
+	listenPort string
 
 	shutdownTimeout time.Duration
 
@@ -154,7 +154,7 @@ func New(
 		log:             log,
 		factory:         factory,
 		listenHost:      host,
-		listenPort:      port,
+		listenPort:      fmt.Sprintf("%d", port),
 		shutdownTimeout: shutdownTimeout,
 		tracingEnabled:  tracingEnabled,
 		tracer:          tracer,
@@ -171,7 +171,7 @@ func New(
 }
 
 func (s *server) Dispatch() error {
-	listenAddress := fmt.Sprintf("%s:%d", s.listenHost, s.listenPort)
+	listenAddress := net.JoinHostPort(s.listenHost, s.listenPort)
 	listener, err := net.Listen("tcp", listenAddress)
 	if err != nil {
 		return err
@@ -193,7 +193,7 @@ func (s *server) Dispatch() error {
 }
 
 func (s *server) DispatchTLS(certBytes, keyBytes []byte) error {
-	listenAddress := fmt.Sprintf("%s:%d", s.listenHost, s.listenPort)
+	listenAddress := net.JoinHostPort(s.listenHost, s.listenPort)
 	cert, err := tls.X509KeyPair(certBytes, keyBytes)
 	if err != nil {
 		return err

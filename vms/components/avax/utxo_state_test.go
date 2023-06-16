@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -43,16 +42,12 @@ func TestUTXOState(t *testing.T) {
 	c := linearcodec.NewDefault()
 	manager := codec.NewDefaultManager()
 
-	errs := wrappers.Errs{}
-	errs.Add(
-		c.RegisterType(&secp256k1fx.MintOutput{}),
-		c.RegisterType(&secp256k1fx.TransferOutput{}),
-		c.RegisterType(&secp256k1fx.Input{}),
-		c.RegisterType(&secp256k1fx.TransferInput{}),
-		c.RegisterType(&secp256k1fx.Credential{}),
-		manager.RegisterCodec(codecVersion, c),
-	)
-	require.NoError(errs.Err)
+	require.NoError(c.RegisterType(&secp256k1fx.MintOutput{}))
+	require.NoError(c.RegisterType(&secp256k1fx.TransferOutput{}))
+	require.NoError(c.RegisterType(&secp256k1fx.Input{}))
+	require.NoError(c.RegisterType(&secp256k1fx.TransferInput{}))
+	require.NoError(c.RegisterType(&secp256k1fx.Credential{}))
+	require.NoError(manager.RegisterCodec(codecVersion, c))
 
 	db := memdb.New()
 	s := NewUTXOState(db, manager)

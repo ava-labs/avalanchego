@@ -6,6 +6,8 @@ package sampler
 import (
 	"fmt"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 // BenchmarkAllWeightedWithoutReplacement
@@ -40,13 +42,11 @@ func WeightedWithoutReplacementPowBenchmark(
 	size int,
 	count int,
 ) {
+	require := require.New(b)
+
 	_, weights, err := CalcWeightedPoW(exponent, size)
-	if err != nil {
-		b.Fatal(err)
-	}
-	if err := s.Initialize(weights); err != nil {
-		b.Fatal(err)
-	}
+	require.NoError(err)
+	require.NoError(s.Initialize(weights))
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
