@@ -6,6 +6,7 @@ use async_trait::async_trait;
 /// and can be sent and shared across threads. References with
 /// lifetimes are not allowed (hence 'static)
 pub trait KeyType: AsRef<[u8]> + Send + Sync + Debug + 'static {}
+impl<T> KeyType for T where T: AsRef<[u8]> + Send + Sync + Debug + 'static {}
 
 /// A ValueType is the same as a [KeyType]. However, these could
 /// be a different type from the [KeyType] on a given API call.
@@ -14,6 +15,7 @@ pub trait KeyType: AsRef<[u8]> + Send + Sync + Debug + 'static {}
 /// API call must be the same, as well as the type of all values
 /// must be the same.
 pub trait ValueType: AsRef<[u8]> + Send + Sync + Debug + 'static {}
+impl<T> ValueType for T where T: AsRef<[u8]> + Send + Sync + Debug + 'static {}
 
 /// The type and size of a single HashKey
 /// These are 256-bit hashes that are used for a variety of reasons:
@@ -60,6 +62,7 @@ pub enum Error {
     /// Key not found
     KeyNotFound,
     IO(std::io::Error),
+    InvalidProposal,
 }
 
 /// A range proof, consisting of a proof of the first key and the last key,
@@ -106,7 +109,7 @@ pub trait Db {
     async fn propose<K: KeyType, V: ValueType>(
         &mut self,
         data: Batch<K, V>,
-    ) -> Result<Self::Proposal, Error>;
+    ) -> Result<Weak<Self::Proposal>, Error>;
 }
 
 /// A view of the database at a specific time. These are wrapped with
@@ -124,7 +127,7 @@ pub trait DbView {
     async fn hash(&self) -> Result<HashKey, Error>;
 
     /// Get the value of a specific key
-    async fn val<K: KeyType, V: ValueType>(&self, key: K) -> Result<V, Error>;
+    async fn val<K: KeyType>(&self, key: K) -> Result<Vec<u8>, Error>;
 
     /// Obtain a proof for a single key
     async fn single_key_proof<K: KeyType, V: ValueType>(&self, key: K) -> Result<Proof<V>, Error>;
