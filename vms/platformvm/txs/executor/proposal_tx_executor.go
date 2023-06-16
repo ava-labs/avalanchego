@@ -409,58 +409,28 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 
 	// here both commit and abort state supplies are correct. We can remove or
 	// shift staker, with the right potential reward in the second case
-	switch stakerTx.Unsigned.(type) {
-	case txs.ValidatorTx:
+	if _, ok := stakerTx.Unsigned.(txs.ValidatorTx); ok {
 		if err := handleValidatorShift(e.OnCommitState, stakerToReward); err != nil {
 			return err
 		}
 		if err := handleValidatorShift(e.OnAbortState, stakerToReward); err != nil {
 			return err
 		}
-	case txs.DelegatorTx:
+	} else { // must be txs.DelegatorTx due to switch check above
 		if err := handleDelegatorShift(e.OnCommitState, stakerToReward); err != nil {
 			return err
 		}
 		if err := handleDelegatorShift(e.OnAbortState, stakerToReward); err != nil {
 			return err
 		}
-
-	default:
-		// Invariant: Permissioned stakers are removed by the advancement of
-		//            time and the current chain timestamp is == this staker's
-		//            EndTime. This means only permissionless stakers should be
-		//            left in the staker set.
-		return ErrShouldBePermissionlessStaker
 	}
 
-	// calculate proposal preference
-	var expectedUptimePercentage float64
-	if stakerToReward.SubnetID != constants.PrimaryNetworkID {
-		transformSubnetIntf, err := e.OnCommitState.GetSubnetTransformation(stakerToReward.SubnetID)
-		if err != nil {
-			return err
-		}
-		transformSubnet, ok := transformSubnetIntf.Unsigned.(*txs.TransformSubnetTx)
-		if !ok {
-			return ErrIsNotTransformSubnetTx
-		}
-
-		expectedUptimePercentage = float64(transformSubnet.UptimeRequirement) / reward.PercentDenominator
-	} else {
-		expectedUptimePercentage = e.Config.UptimePercentage
-	}
-
-	// TODO: calculate subnet uptimes
-	uptime, err := e.Uptimes.CalculateUptimePercentFrom(
-		primaryNetworkValidator.NodeID,
-		constants.PrimaryNetworkID,
-		primaryNetworkValidator.StartTime,
-	)
+	shouldCommit, err := e.calculateProposalPreference(stakerToReward, primaryNetworkValidator)
 	if err != nil {
-		return fmt.Errorf("failed to calculate uptime: %w", err)
+		return err
 	}
 
-	e.PrefersCommit = uptime >= expectedUptimePercentage
+	e.PrefersCommit = shouldCommit
 	return nil
 }
 
@@ -808,4 +778,33 @@ func handleDelegatorShift(
 	updatedSupply := currentSupply + potentialReward
 	baseState.SetCurrentSupply(shiftedStaker.SubnetID, updatedSupply)
 	return nil
+}
+
+func (e *ProposalTxExecutor) calculateProposalPreference(stakerToReward, primaryNetworkValidator *state.Staker) (bool, error) {
+	var expectedUptimePercentage float64
+	if stakerToReward.SubnetID != constants.PrimaryNetworkID {
+		transformSubnetIntf, err := e.OnCommitState.GetSubnetTransformation(stakerToReward.SubnetID)
+		if err != nil {
+			return false, fmt.Errorf("failed to calculate uptime: %w", err)
+		}
+		transformSubnet, ok := transformSubnetIntf.Unsigned.(*txs.TransformSubnetTx)
+		if !ok {
+			return false, fmt.Errorf("failed to calculate uptime: %w", err)
+		}
+
+		expectedUptimePercentage = float64(transformSubnet.UptimeRequirement) / reward.PercentDenominator
+	} else {
+		expectedUptimePercentage = e.Config.UptimePercentage
+	}
+
+	// TODO: calculate subnet uptimes
+	uptime, err := e.Uptimes.CalculateUptimePercentFrom(
+		primaryNetworkValidator.NodeID,
+		constants.PrimaryNetworkID,
+		primaryNetworkValidator.StartTime,
+	)
+	if err != nil {
+		return false, fmt.Errorf("failed to calculate uptime: %w", err)
+	}
+	return uptime >= expectedUptimePercentage, nil
 }
