@@ -407,6 +407,33 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 	}
 	e.OnAbortState.SetCurrentSupply(stakerToReward.SubnetID, newSupply)
 
+	// here both commit and abort state supplies are correct. We can remove or
+	// shift staker, with the right potential reward in the second case
+	switch stakerTx.Unsigned.(type) {
+	case txs.ValidatorTx:
+		if err := handleValidatorShift(e.OnCommitState, stakerToReward); err != nil {
+			return err
+		}
+		if err := handleValidatorShift(e.OnAbortState, stakerToReward); err != nil {
+			return err
+		}
+	case txs.DelegatorTx:
+		if err := handleDelegatorShift(e.OnCommitState, stakerToReward); err != nil {
+			return err
+		}
+		if err := handleDelegatorShift(e.OnAbortState, stakerToReward); err != nil {
+			return err
+		}
+
+	default:
+		// Invariant: Permissioned stakers are removed by the advancement of
+		//            time and the current chain timestamp is == this staker's
+		//            EndTime. This means only permissionless stakers should be
+		//            left in the staker set.
+		return ErrShouldBePermissionlessStaker
+	}
+
+	// calculate proposal preference
 	var expectedUptimePercentage float64
 	if stakerToReward.SubnetID != constants.PrimaryNetworkID {
 		transformSubnetIntf, err := e.OnCommitState.GetSubnetTransformation(stakerToReward.SubnetID)
@@ -449,20 +476,7 @@ func (e *ProposalTxExecutor) rewardValidatorTx(
 		stakeAsset = stake[0].Asset
 	)
 
-	if validator.ShouldRestake() {
-		shiftedStaker := *validator
-		state.ShiftValidatorAheadInPlace(&shiftedStaker)
-		if err := e.OnCommitState.UpdateCurrentValidator(&shiftedStaker); err != nil {
-			return fmt.Errorf("failed updating current validator: %w", err)
-		}
-		if err := e.OnAbortState.UpdateCurrentValidator(&shiftedStaker); err != nil {
-			return fmt.Errorf("failed updating current validator: %w", err)
-		}
-		// staked utxos will be returned only at the end of the staking period.
-	} else {
-		e.OnCommitState.DeleteCurrentValidator(validator)
-		e.OnAbortState.DeleteCurrentValidator(validator)
-
+	if !validator.ShouldRestake() {
 		// Refund the stake only when validator is about to leave
 		// the staking set
 		for i, out := range stake {
@@ -563,6 +577,38 @@ func (e *ProposalTxExecutor) rewardValidatorTx(
 	return nil
 }
 
+func handleValidatorShift(
+	baseState state.Chain,
+	validator *state.Staker,
+) error {
+	if !validator.ShouldRestake() {
+		baseState.DeleteCurrentValidator(validator)
+		return nil
+	}
+
+	shiftedStaker := *validator
+	state.ShiftValidatorAheadInPlace(&shiftedStaker)
+
+	currentSupply, potentialReward, err := calculatePotentialReward(
+		baseState,
+		shiftedStaker.SubnetID,
+		shiftedStaker.StakingPeriod,
+		shiftedStaker.Weight,
+	)
+	if err != nil {
+		return err
+	}
+
+	shiftedStaker.PotentialReward = potentialReward
+	if err := baseState.UpdateCurrentValidator(&shiftedStaker); err != nil {
+		return fmt.Errorf("failed updating current validator: %w", err)
+	}
+
+	updatedSupply := currentSupply + potentialReward
+	baseState.SetCurrentSupply(shiftedStaker.SubnetID, updatedSupply)
+	return nil
+}
+
 func (e *ProposalTxExecutor) rewardDelegatorTx(
 	uDelegatorTx txs.DelegatorTx,
 	delegator *state.Staker,
@@ -575,28 +621,7 @@ func (e *ProposalTxExecutor) rewardDelegatorTx(
 		stakeAsset = stake[0].Asset
 	)
 
-	if delegator.ShouldRestake() {
-		validator, err := e.OnCommitState.GetCurrentValidator(delegator.SubnetID, delegator.NodeID)
-		if err != nil {
-			return fmt.Errorf("could not find validator for subnetID %v, nodeID %v",
-				delegator.SubnetID,
-				delegator.NodeID,
-			)
-		}
-
-		shiftedStaker := *delegator
-		state.ShiftDelegatorAheadInPlace(&shiftedStaker, validator.NextTime)
-		if err := e.OnCommitState.UpdateCurrentDelegator(&shiftedStaker); err != nil {
-			return fmt.Errorf("failed updating current delegator: %w", err)
-		}
-		if err := e.OnAbortState.UpdateCurrentDelegator(&shiftedStaker); err != nil {
-			return fmt.Errorf("failed updating current delegator: %w", err)
-		}
-		// staked utxos will be returned only at the end of the staking period.
-	} else {
-		e.OnCommitState.DeleteCurrentDelegator(delegator)
-		e.OnAbortState.DeleteCurrentDelegator(delegator)
-
+	if !delegator.ShouldRestake() {
 		// Refund the stake only when delegator is about to leave
 		// the staking set
 		for i, out := range stake {
@@ -743,5 +768,44 @@ func (e *ProposalTxExecutor) rewardDelegatorTx(
 			e.OnCommitState.AddRewardUTXO(txID, utxo)
 		}
 	}
+	return nil
+}
+
+func handleDelegatorShift(
+	baseState state.Chain,
+	delegator *state.Staker,
+) error {
+	if !delegator.ShouldRestake() {
+		baseState.DeleteCurrentDelegator(delegator)
+		return nil
+	}
+
+	validator, err := baseState.GetCurrentValidator(delegator.SubnetID, delegator.NodeID)
+	if err != nil {
+		return fmt.Errorf("could not find validator for subnetID %v, nodeID %v",
+			delegator.SubnetID,
+			delegator.NodeID,
+		)
+	}
+	shiftedStaker := *delegator
+	state.ShiftDelegatorAheadInPlace(&shiftedStaker, validator.NextTime)
+
+	currentSupply, potentialReward, err := calculatePotentialReward(
+		baseState,
+		shiftedStaker.SubnetID,
+		shiftedStaker.StakingPeriod,
+		shiftedStaker.Weight,
+	)
+	if err != nil {
+		return err
+	}
+
+	shiftedStaker.PotentialReward = potentialReward
+	if err := baseState.UpdateCurrentDelegator(&shiftedStaker); err != nil {
+		return fmt.Errorf("failed updating current delegator: %w", err)
+	}
+
+	updatedSupply := currentSupply + potentialReward
+	baseState.SetCurrentSupply(shiftedStaker.SubnetID, updatedSupply)
 	return nil
 }

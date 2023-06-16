@@ -576,28 +576,18 @@ func (e *StandardTxExecutor) addStakerFromStakerTx(
 		}
 		staker, err = state.NewPendingStaker(txID, preContinuousStakingStakerTx)
 	} else {
-		var (
-			potentialReward = uint64(0)
-			stakeDuration   = stakerTx.StakingPeriod()
-		)
+		potentialReward := uint64(0)
 		if stakerTx.CurrentPriority() != txs.SubnetPermissionedValidatorCurrentPriority {
-			subnetID := stakerTx.SubnetID()
-			currentSupply, err := e.State.GetCurrentSupply(subnetID)
-			if err != nil {
-				return err
-			}
-
-			rewardCfg, err := e.State.GetRewardConfig(subnetID)
-			if err != nil {
-				return err
-			}
-			rewards := reward.NewCalculator(rewardCfg)
-
-			potentialReward = rewards.Calculate(
-				stakeDuration,
-				stakerTx.Weight(),
-				currentSupply,
+			var (
+				currentSupply uint64
+				subnetID      = stakerTx.SubnetID()
+				stakeDuration = stakerTx.StakingPeriod()
+				stakerWeight  = stakerTx.Weight()
 			)
+			currentSupply, potentialReward, err = calculatePotentialReward(e.State, subnetID, stakeDuration, stakerWeight)
+			if err != nil {
+				return nil
+			}
 
 			updatedSupply := currentSupply + potentialReward
 			e.State.SetCurrentSupply(subnetID, updatedSupply)
@@ -626,4 +616,29 @@ func (e *StandardTxExecutor) addStakerFromStakerTx(
 		e.State.PutPendingDelegator(staker)
 	}
 	return nil
+}
+
+func calculatePotentialReward(
+	baseState state.Chain,
+	subnetID ids.ID,
+	stakingPeriod time.Duration,
+	stakerWeight uint64,
+) (uint64, uint64, error) {
+	currentSupply, err := baseState.GetCurrentSupply(subnetID)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	rewardCfg, err := baseState.GetRewardConfig(subnetID)
+	if err != nil {
+		return 0, 0, err
+	}
+	rewards := reward.NewCalculator(rewardCfg)
+
+	potentialReward := rewards.Calculate(
+		stakingPeriod,
+		stakerWeight,
+		currentSupply,
+	)
+	return currentSupply, potentialReward, nil
 }
