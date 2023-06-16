@@ -1580,6 +1580,7 @@ func TestCaminoRewardValidatorTx(t *testing.T) {
 	require.NoError(t, err)
 }
 
+// TODO @evlekht rewrite test, removal test cases not setting initial state for target, and by this not actually testing removal
 func TestAddAddressStateTxExecutor(t *testing.T) {
 	var (
 		bob   = preFundedKeys[0].PublicKey().Address()
@@ -1636,8 +1637,8 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 		expectedState txs.AddressState
 		remove        bool
 	}{
-		// Bob has Admin State, and he is trying to give himself Admin Role (again)
-		"State: Admin, Flag: Admin, Add, Same Address": {
+		// Bob has Admin role, and he is trying to give himself Admin role (again)
+		"State: Admin, Flag: Admin role, Add, Same Address": {
 			stateAddress:  bob,
 			targetAddress: bob,
 			txFlag:        txs.AddressStateBitRoleAdmin,
@@ -1645,26 +1646,26 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 			expectedState: txs.AddressStateRoleAdmin,
 			remove:        false,
 		},
-		// Bob has KYC State, and he is trying to give himself KYC Role (again)
-		"State: KYC, Flag: KYC, Add, Same Address": {
+		// Bob has KYC role, and he is trying to give himself KYC role (again)
+		"State: KYC, Flag: KYC role, Add, Same Address": {
 			stateAddress:  bob,
 			targetAddress: bob,
 			txFlag:        txs.AddressStateBitRoleKYC,
 			existingState: txs.AddressStateRoleKYC,
-			expectedErr:   errInvalidRoles,
+			expectedErr:   errAddrStateNotPermitted,
 			remove:        false,
 		},
-		// Bob has KYC Role, and he is trying to give himself Admin Role
-		"State: KYC, Flag: Admin, Add, Same Address": {
+		// Bob has KYC role, and he is trying to give himself Admin role
+		"State: KYC, Flag: Admin role, Add, Same Address": {
 			stateAddress:  bob,
 			targetAddress: bob,
 			txFlag:        txs.AddressStateBitRoleAdmin,
 			existingState: txs.AddressStateRoleKYC,
-			expectedErr:   errInvalidRoles,
+			expectedErr:   errAddrStateNotPermitted,
 			remove:        false,
 		},
-		// Bob has Admin State, and he is trying to give Alice Admin Role
-		"State: Admin, Flag: Admin, Add, Different Address": {
+		// Bob has Admin role, and he is trying to give Alice Admin role
+		"State: Admin, Flag: Admin role, Add, Different Address": {
 			stateAddress:  bob,
 			targetAddress: alice,
 			txFlag:        txs.AddressStateBitRoleAdmin,
@@ -1672,8 +1673,8 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 			expectedState: txs.AddressStateRoleAdmin,
 			remove:        false,
 		},
-		// Bob has Admin State, and he is trying to remove from Alice the Admin Role
-		"State: Admin, Flag: Admin, Remove, Different Address": {
+		// Bob has Admin role, and he is trying to remove from Alice the Admin role
+		"State: Admin, Flag: Admin role, Remove, Different Address": {
 			stateAddress:  bob,
 			targetAddress: alice,
 			txFlag:        txs.AddressStateBitRoleAdmin,
@@ -1681,8 +1682,8 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 			expectedState: 0,
 			remove:        true,
 		},
-		// Bob has Admin State, and he is trying to give Alice KYC Role
-		"State: Admin, Flag: kyc, Add, Different Address": {
+		// Bob has Admin role, and he is trying to give Alice KYC Role
+		"State: Admin, Flag: KYC role, Add, Different Address": {
 			stateAddress:  bob,
 			targetAddress: alice,
 			txFlag:        txs.AddressStateBitRoleKYC,
@@ -1690,8 +1691,8 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 			expectedState: txs.AddressStateRoleKYC,
 			remove:        false,
 		},
-		// Bob has Admin State, and he is trying to remove from Alice the KYC Role
-		"State: Admin, Flag: kyc, Remove, Different Address": {
+		// Bob has Admin role, and he is trying to remove from Alice the KYC role
+		"State: Admin, Flag: KYC role, Remove, Different Address": {
 			stateAddress:  bob,
 			targetAddress: alice,
 			txFlag:        txs.AddressStateBitRoleKYC,
@@ -1699,8 +1700,8 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 			expectedState: 0,
 			remove:        true,
 		},
-		// Bob has Admin State, and he is trying to remove it from himself
-		"State: Admin, Flag: admin, Remove, Same Address": {
+		// Bob has Admin role, and he is trying to remove it from himself
+		"State: Admin, Flag: Admin role, Remove, Same Address": {
 			stateAddress:  bob,
 			targetAddress: bob,
 			txFlag:        txs.AddressStateBitRoleAdmin,
@@ -1709,7 +1710,7 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 			expectedErr:   errAdminCannotBeDeleted,
 			remove:        true,
 		},
-		// Bob has Admin State, and he is trying to give Alice the KYC Verified State
+		// Bob has Admin role, and he is trying to give Alice the KYC Verified state
 		"State: Admin, Flag: KYC Verified, Add, Different Address": {
 			stateAddress:  bob,
 			targetAddress: alice,
@@ -1718,7 +1719,7 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 			expectedState: txs.AddressStateKYCVerified,
 			remove:        false,
 		},
-		// Bob has Admin State, and he is trying to give Alice the KYC Expired State
+		// Bob has Admin role, and he is trying to give Alice the KYC Expired state
 		"State: Admin, Flag: KYC Expired, Add, Different Address": {
 			stateAddress:  bob,
 			targetAddress: alice,
@@ -1727,7 +1728,7 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 			expectedState: txs.AddressStateKYCExpired,
 			remove:        false,
 		},
-		// Bob has Admin State, and he is trying to give Alice the Consortium State
+		// Bob has Admin role, and he is trying to give Alice the Consortium state
 		"State: Admin, Flag: Consortium, Add, Different Address": {
 			stateAddress:  bob,
 			targetAddress: alice,
@@ -1736,7 +1737,7 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 			expectedState: txs.AddressStateConsortiumMember,
 			remove:        false,
 		},
-		// Bob has KYC State, and he is trying to give Alice KYC Expired State
+		// Bob has KYC role, and he is trying to give Alice KYC Expired state
 		"State: KYC, Flag: KYC Expired, Add, Different Address": {
 			stateAddress:  bob,
 			targetAddress: alice,
@@ -1745,7 +1746,7 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 			expectedState: txs.AddressStateKYCExpired,
 			remove:        false,
 		},
-		// Bob has KYC State, and he is trying to give Alice KYC Expired State
+		// Bob has KYC role, and he is trying to give Alice KYC Expired state
 		"State: KYC, Flag: KYC Verified, Add, Different Address": {
 			stateAddress:  bob,
 			targetAddress: alice,
@@ -1754,25 +1755,25 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 			expectedState: txs.AddressStateKYCVerified,
 			remove:        false,
 		},
-		// Some Address has Admin State, and he is trying to give Alice Admin Role
+		// Some Address has Admin role, and he is trying to give Alice Admin role
 		"Wrong address": {
 			stateAddress:  ids.GenerateTestShortID(),
 			targetAddress: alice,
 			txFlag:        txs.AddressStateBitRoleAdmin,
 			existingState: txs.AddressStateRoleAdmin,
-			expectedErr:   errInvalidRoles,
+			expectedErr:   errAddrStateNotPermitted,
 			remove:        false,
 		},
-		// An Empty Address has Admin State, and he is trying to give Alice Admin Role
+		// An Empty Address has Admin role, and he is trying to give Alice Admin role
 		"Empty State Address": {
 			stateAddress:  ids.ShortEmpty,
 			targetAddress: alice,
 			txFlag:        txs.AddressStateBitRoleAdmin,
 			existingState: txs.AddressStateRoleAdmin,
-			expectedErr:   errInvalidRoles,
+			expectedErr:   errAddrStateNotPermitted,
 			remove:        false,
 		},
-		// Bob has Admin State, and he is trying to give Admin Role to an Empty Address
+		// Bob has Admin role, and he is trying to give Admin role to an Empty Address
 		"Empty Target Address": {
 			stateAddress:  bob,
 			targetAddress: ids.ShortEmpty,
@@ -1780,6 +1781,60 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 			existingState: txs.AddressStateRoleAdmin,
 			expectedErr:   txs.ErrEmptyAddress,
 			remove:        false,
+		},
+		// Bob has empty addr state, and he is trying to give Alice Admin role
+		"State: none, Flag: Admin role, Add, Different Address": {
+			stateAddress:  bob,
+			targetAddress: alice,
+			txFlag:        txs.AddressStateBitRoleAdmin,
+			existingState: txs.AddressStateEmpty,
+			remove:        false,
+			expectedErr:   errAddrStateNotPermitted,
+		},
+		// Bob has empty addr state, and he is trying to remove Admin role from Alice
+		"State: none, Flag: Admin role, Remove, Different Address": {
+			stateAddress:  bob,
+			targetAddress: alice,
+			txFlag:        txs.AddressStateBitRoleAdmin,
+			existingState: txs.AddressStateEmpty,
+			remove:        true,
+			expectedErr:   errAddrStateNotPermitted,
+		},
+		// Bob has empty addr state, and he is trying to give Alice KYC role
+		"State: none, Flag: KYC role, Add, Different Address": {
+			stateAddress:  bob,
+			targetAddress: alice,
+			txFlag:        txs.AddressStateBitRoleKYC,
+			existingState: txs.AddressStateEmpty,
+			remove:        false,
+			expectedErr:   errAddrStateNotPermitted,
+		},
+		// Bob has empty addr state, and he is trying to remove KYC role from Alice
+		"State: none, Flag: KYC role, Remove, Different Address": {
+			stateAddress:  bob,
+			targetAddress: alice,
+			txFlag:        txs.AddressStateBitRoleKYC,
+			existingState: txs.AddressStateEmpty,
+			remove:        true,
+			expectedErr:   errAddrStateNotPermitted,
+		},
+		// Bob has empty addr state, and he is trying to give Alice KYC Verified state
+		"State: none, Flag: KYC Verified, Add, Different Address": {
+			stateAddress:  bob,
+			targetAddress: alice,
+			txFlag:        txs.AddressStateBitKYCVerified,
+			existingState: txs.AddressStateEmpty,
+			remove:        false,
+			expectedErr:   errAddrStateNotPermitted,
+		},
+		// Bob has empty addr state, and he is trying to remove KYC Verified state from Alice
+		"State: none, Flag: KYC Verified, Remove, Different Address": {
+			stateAddress:  bob,
+			targetAddress: alice,
+			txFlag:        txs.AddressStateBitKYCVerified,
+			existingState: txs.AddressStateEmpty,
+			remove:        true,
+			expectedErr:   errAddrStateNotPermitted,
 		},
 	}
 
@@ -1820,7 +1875,7 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 			executor.State.SetAddressStates(tt.stateAddress, tt.existingState)
 
 			err = addressStateTx.Visit(&executor)
-			require.Equal(t, tt.expectedErr, err)
+			require.ErrorIs(t, err, tt.expectedErr)
 
 			if err == nil {
 				targetStates, _ := executor.State.GetAddressStates(tt.targetAddress)
@@ -4344,11 +4399,6 @@ func TestCaminoStandardTxExecutorSuspendValidator(t *testing.T) {
 	nodeID := stakerToRemove.NodeID
 	consortiumMemberAddress, err := env.state.GetShortIDLink(ids.ShortID(nodeID), state.ShortLinkKeyRegisterNode)
 	require.NoError(t, err)
-	kc := secp256k1fx.NewKeychain(caminoPreFundedKeys...)
-	key, ok := kc.Get(consortiumMemberAddress)
-	require.True(t, ok)
-	consortiumMemberKey, ok := key.(*secp256k1.PrivateKey)
-	require.True(t, ok)
 	require.NoError(t, shutdownCaminoEnvironment(env))
 
 	// other common data
@@ -4375,7 +4425,7 @@ func TestCaminoStandardTxExecutorSuspendValidator(t *testing.T) {
 			generateArgs: func() args {
 				return args{
 					address:    consortiumMemberAddress,
-					keys:       []*secp256k1.PrivateKey{consortiumMemberKey},
+					keys:       []*secp256k1.PrivateKey{caminoPreFundedKeys[0]},
 					changeAddr: outputOwners,
 				}
 			},
@@ -4387,7 +4437,7 @@ func TestCaminoStandardTxExecutorSuspendValidator(t *testing.T) {
 				return args{
 					address:    consortiumMemberAddress,
 					remove:     true,
-					keys:       []*secp256k1.PrivateKey{consortiumMemberKey},
+					keys:       []*secp256k1.PrivateKey{caminoPreFundedKeys[0]},
 					changeAddr: outputOwners,
 				}
 			},
@@ -4417,7 +4467,7 @@ func TestCaminoStandardTxExecutorSuspendValidator(t *testing.T) {
 			caminoGenesisConf := api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
-				InitialAdmin:        consortiumMemberAddress,
+				InitialAdmin:        caminoPreFundedKeys[0].Address(),
 			}
 			env := newCaminoEnvironment( /*postBanff*/ true, false, caminoGenesisConf)
 			env.ctx.Lock.Lock()

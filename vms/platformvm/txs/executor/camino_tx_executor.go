@@ -37,7 +37,7 @@ var (
 	errNodeSignatureMissing           = errors.New("last signature is not nodeID's signature")
 	errWrongLockMode                  = errors.New("this tx can't be used with this caminoGenesis.LockModeBondDeposit")
 	errRecoverAdresses                = errors.New("cannot recover addresses from credentials")
-	errInvalidRoles                   = errors.New("invalid role")
+	errAddrStateNotPermitted          = errors.New("don't have permission to set address state bit")
 	errValidatorExists                = errors.New("node is already a validator")
 	errInvalidSystemTxBody            = errors.New("tx body doesn't match expected one")
 	errRemoveValidatorToEarly         = errors.New("attempting to remove validator before its end time")
@@ -1499,11 +1499,11 @@ func (e *CaminoStandardTxExecutor) AddressStateTx(tx *txs.AddressStateTx) error 
 		}
 		roles |= states
 	}
-	statesBit := txs.AddressState(1) << tx.State // TODO@ check that cast removal is ok
+	statesBit := txs.AddressState(1) << tx.State
 
 	// Verify that roles are allowed to modify tx.State
-	if err := verifyAccess(roles, statesBit); err != nil {
-		return err
+	if !verifyAccess(roles, statesBit) {
+		return fmt.Errorf("%w (addr: %s, bit: %b)", errAddrStateNotPermitted, tx.Address, tx.State)
 	}
 
 	// Get the current state
@@ -1577,17 +1577,15 @@ func (e *CaminoStandardTxExecutor) AddressStateTx(tx *txs.AddressStateTx) error 
 	return nil
 }
 
-func verifyAccess(roles, statesBit txs.AddressState) error {
+// [state] must have only one bit set
+func verifyAccess(roles, state txs.AddressState) bool {
 	switch {
-	case (roles & txs.AddressStateRoleAdmin) != 0:
-	case (txs.AddressStateKYCAll & statesBit) != 0:
-		if (roles & txs.AddressStateRoleKYC) == 0 {
-			return errInvalidRoles
-		}
-	case (txs.AddressStateRoleAll & statesBit) != 0:
-		return errInvalidRoles
+	case roles&txs.AddressStateRoleAdmin != 0: // admin can do anything
+	case txs.AddressStateKYCAll&state != 0 && roles&txs.AddressStateRoleKYC != 0: // kyc role can change kyc status
+	default:
+		return false
 	}
-	return nil
+	return true
 }
 
 func validatorExists(state state.Chain, subnetID ids.ID, nodeID ids.NodeID) error {

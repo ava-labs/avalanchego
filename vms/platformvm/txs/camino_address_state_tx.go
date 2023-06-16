@@ -18,29 +18,34 @@ type (
 
 // AddressState flags, max 63
 const (
-	AddressStateBitRoleAdmin    AddressStateBit = 0
-	AddressStateBitRoleKYC      AddressStateBit = 1
+	// Bits
+
+	AddressStateBitRoleAdmin AddressStateBit = 0
+	AddressStateBitRoleKYC   AddressStateBit = 1
+
 	AddressStateBitKYCVerified  AddressStateBit = 32
 	AddressStateBitKYCExpired   AddressStateBit = 33
 	AddressStateBitConsortium   AddressStateBit = 38
 	AddressStateBitNodeDeferred AddressStateBit = 39
 	AddressStateBitMax          AddressStateBit = 63
 
+	// States
+
 	AddressStateEmpty AddressState = 0
 
-	AddressStateRoleAdmin AddressState = 0b1
-	AddressStateRoleKYC   AddressState = 0b10
-	AddressStateRoleAll   AddressState = 0b11
+	AddressStateRoleAdmin AddressState = AddressState(1) << AddressStateBitRoleAdmin // 0b1
+	AddressStateRoleKYC   AddressState = AddressState(1) << AddressStateBitRoleKYC   // 0b10
+	AddressStateRoleAll   AddressState = AddressStateRoleAdmin | AddressStateRoleKYC // 0b11
 
-	AddressStateKYCVerified AddressState = 0b0100000000000000000000000000000000
-	AddressStateKYCExpired  AddressState = 0b1000000000000000000000000000000000
-	AddressStateKYCAll      AddressState = AddressStateKYCVerified | AddressStateKYCExpired
+	AddressStateKYCVerified AddressState = AddressState(1) << AddressStateBitKYCVerified    // 0b0100000000000000000000000000000000
+	AddressStateKYCExpired  AddressState = AddressState(1) << AddressStateBitKYCExpired     // 0b1000000000000000000000000000000000
+	AddressStateKYCAll      AddressState = AddressStateKYCVerified | AddressStateKYCExpired // 0b1100000000000000000000000000000000
 
-	AddressStateConsortiumMember AddressState = 0b0100000000000000000000000000000000000000
-	AddressStateNodeDeferred     AddressState = 0b1000000000000000000000000000000000000000
-	AddressStateVoteBits         AddressState = 0b1100000000000000000000000000000000000000 // TODO @evlekht rename ?
+	AddressStateConsortiumMember AddressState = AddressState(1) << AddressStateBitConsortium            // 0b0100000000000000000000000000000000000000
+	AddressStateNodeDeferred     AddressState = AddressState(1) << AddressStateBitNodeDeferred          // 0b1000000000000000000000000000000000000000
+	AddressStateVotableBits      AddressState = AddressStateConsortiumMember | AddressStateNodeDeferred // 0b1100000000000000000000000000000000000000
 
-	AddressStateValidBits = AddressStateRoleAll | AddressStateKYCAll | AddressStateVoteBits
+	AddressStateValidBits = AddressStateRoleAll | AddressStateKYCAll | AddressStateVotableBits // 0b1100001100000000000000000000000000000011
 )
 
 var (

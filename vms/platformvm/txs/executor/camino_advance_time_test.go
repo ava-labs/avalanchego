@@ -194,6 +194,7 @@ func TestDeferredStakers(t *testing.T) {
 			caminoGenesisConf := api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
+				InitialAdmin:        caminoPreFundedKeys[0].Address(),
 			}
 			env := newCaminoEnvironment( /*postBanff*/ true, true, caminoGenesisConf)
 			env.ctx.Lock.Lock()
