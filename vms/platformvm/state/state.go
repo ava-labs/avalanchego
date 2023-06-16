@@ -1979,7 +1979,17 @@ func (s *state) writeTXs() error {
 func (s *state) writeRewardUTXOs() error {
 	for txID, utxos := range s.addedRewardUTXOs {
 		delete(s.addedRewardUTXOs, txID)
-		s.rewardUTXOsCache.Put(txID, utxos)
+
+		// following continuous staking fork it's key not to overwrite
+		// utxos from previous staking periods which may already cached.
+		preUtxos, found := s.rewardUTXOsCache.Get(txID)
+		if found {
+			preUtxos = append(preUtxos, utxos...)
+			s.rewardUTXOsCache.Put(txID, preUtxos)
+		} else {
+			s.rewardUTXOsCache.Put(txID, utxos)
+		}
+
 		rawTxDB := prefixdb.New(txID[:], s.rewardUTXODB)
 		txDB := linkeddb.NewDefault(rawTxDB)
 
