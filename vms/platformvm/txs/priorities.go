@@ -34,6 +34,7 @@ const (
 	SubnetPermissionlessValidatorCurrentPriority
 
 	PrimaryNetworkContinuousDelegatorCurrentPriority
+
 	PrimaryNetworkContinuousValidatorCurrentPriority
 
 	// then primary network delegators,

@@ -70,7 +70,7 @@ func (tx *AddContinuousDelegatorTx) ManagementKey() fx.Owner {
 }
 
 func (*AddContinuousDelegatorTx) CurrentPriority() Priority {
-	return PrimaryNetworkDelegatorCurrentPriority
+	return PrimaryNetworkContinuousDelegatorCurrentPriority
 }
 
 func (tx *AddContinuousDelegatorTx) Stake() []*avax.TransferableOutput {

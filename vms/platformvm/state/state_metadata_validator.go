@@ -150,6 +150,11 @@ type validatorState interface {
 		amount uint64,
 	) error
 
+	DeleteDelegateeReward(
+		subnetID ids.ID,
+		vdrID ids.NodeID,
+	) error
+
 	// DeleteValidatorMetadata removes in-memory references to the metadata of
 	// [vdrID] on [subnetID]. If there were staged updates from a prior call to
 	// SetUptime or SetDelegateeReward, the updates will be dropped. This call
@@ -239,6 +244,20 @@ func (m *metadata) SetDelegateeReward(
 		return database.ErrNotFound
 	}
 	metadata.PotentialDelegateeReward = amount
+
+	m.addUpdatedMetadata(vdrID, subnetID)
+	return nil
+}
+
+func (m *metadata) DeleteDelegateeReward(
+	subnetID ids.ID,
+	vdrID ids.NodeID,
+) error {
+	metadata, exists := m.metadata[vdrID][subnetID]
+	if !exists {
+		return database.ErrNotFound
+	}
+	metadata.PotentialDelegateeReward = 0
 
 	m.addUpdatedMetadata(vdrID, subnetID)
 	return nil

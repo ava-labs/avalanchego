@@ -1756,7 +1756,13 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 				}
 
 				s.validatorState.DeleteValidatorMetadata(nodeID, subnetID)
-			case updated, unmodified:
+			case updated:
+				// in current implementation, all delegatee reward are paid back to the user
+				// as soon as the validator is rewarded and shifted. Hence we clean it up.
+				if err := s.validatorState.DeleteDelegateeReward(subnetID, nodeID); err != nil {
+					return fmt.Errorf("failed to delete delegatee reward: %w", err)
+				}
+			case unmodified:
 				// nothing to do
 			default:
 				return ErrUnknownStakerStatus

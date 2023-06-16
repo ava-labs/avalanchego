@@ -534,8 +534,7 @@ func (e *ProposalTxExecutor) rewardValidatorTx(
 		// aborted, because the validator reward is not awarded.
 		onAbortUtxo := &avax.UTXO{
 			UTXOID: avax.UTXOID{
-				TxID: txID,
-
+				TxID:        txID,
 				OutputIndex: uint32(utxosOffset - 1),
 			},
 			Asset: stakeAsset,
@@ -745,6 +744,11 @@ func handleDelegatorShift(
 		return nil
 	}
 
+	// load delegator's validator to make sure to properly shift delegator. A delegator must not
+	// outlive its validator, so delegator's staking time may be shorten up some staking cycles
+	// to guarantee that.
+	// One caveat: a delegator will be shifted before its validator due to staker priority. So there
+	// may be temporary situation when delegator is shifted while validator is not.
 	validator, err := baseState.GetCurrentValidator(delegator.SubnetID, delegator.NodeID)
 	if err != nil {
 		return fmt.Errorf("could not find validator for subnetID %v, nodeID %v",
@@ -752,8 +756,14 @@ func handleDelegatorShift(
 			delegator.NodeID,
 		)
 	}
+
+	timeBound := validator.NextTime
+	if validator.NextTime.Equal(delegator.NextTime) {
+		timeBound = timeBound.Add(validator.StakingPeriod)
+	}
+
 	shiftedStaker := *delegator
-	state.ShiftDelegatorAheadInPlace(&shiftedStaker, validator.NextTime)
+	state.ShiftDelegatorAheadInPlace(&shiftedStaker, timeBound)
 
 	currentSupply, potentialReward, err := calculatePotentialReward(
 		baseState,

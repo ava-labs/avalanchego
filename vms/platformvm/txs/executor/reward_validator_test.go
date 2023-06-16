@@ -4,6 +4,7 @@
 package executor
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -30,6 +31,224 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
+func TestRewardsChecksRewardValidatorAndDelegator(t *testing.T) {
+	properties := gopter.NewProperties(nil)
+
+	// // to reproduce a given scenario do something like this:
+	// parameters := gopter.DefaultTestParametersWithSeed(1686991821130440065)
+	// properties := gopter.NewProperties(parameters)
+
+	var (
+		testKeyfactory secp256k1.Factory
+
+		nodeID   = ids.GenerateTestNodeID()
+		subnetID = constants.PrimaryNetworkID
+
+		stakingPeriod  = defaultMaxStakingDuration
+		dummyStartTime = time.Unix(0, 0)
+
+		validatorStakeKey = preFundedKeys[4]
+		delegatorStakeKey = preFundedKeys[3]
+
+		authKey   = preFundedKeys[2]
+		authOwner = authKey.PublicKey().Address()
+	)
+
+	validatorRewardsKey, err := testKeyfactory.NewPrivateKey()
+	require.NoError(t, err)
+
+	validatorRewardOwner := validatorRewardsKey.PublicKey().Address() // rewards
+	validatorRewardOwners := set.NewSet[ids.ShortID](1)
+	validatorRewardOwners.Add(validatorRewardOwner)
+
+	delegatorRewardsKey, err := testKeyfactory.NewPrivateKey()
+	require.NoError(t, err)
+
+	delegatorRewardOwner := delegatorRewardsKey.PublicKey().Address() // rewards
+	delegatorsRewardOwners := set.NewSet[ids.ShortID](1)
+	delegatorsRewardOwners.Add(delegatorRewardOwner)
+
+	properties.Property("validator and delegator are rewarded or not in commits and aborts", prop.ForAll(
+		func(valCommits, delCommits []bool) string {
+			// make sure the inputs have the same length
+			if len(valCommits) < len(delCommits) {
+				delCommits = delCommits[:len(valCommits)]
+			} else {
+				valCommits = valCommits[:len(delCommits)]
+			}
+
+			env := newEnvironmentNoValidator(latestFork)
+			defer func() {
+				_ = shutdownEnvironment(env)
+			}()
+			env.clk.Set(env.clk.Time().Add(time.Second))
+			env.state.SetTimestamp(env.clk.Time())
+
+			// Add a continuous validator
+			validatorData := txs.Validator{
+				NodeID: nodeID,
+				Start:  uint64(dummyStartTime.Unix()),
+				End:    uint64(dummyStartTime.Add(stakingPeriod).Unix()),
+				Wght:   env.config.MinValidatorStake,
+			}
+			continuousValidatorTx, _, err := addContinuousValidator(
+				env,
+				validatorData,
+				validatorStakeKey,
+				authOwner,
+				validatorRewardOwner,
+			)
+			if err != nil {
+				return err.Error()
+			}
+
+			// Add a continuous delegator with the same start and end time
+			delegatorData := txs.Validator{
+				NodeID: nodeID,
+				Start:  uint64(dummyStartTime.Unix()),
+				End:    uint64(dummyStartTime.Add(stakingPeriod).Unix()),
+				Wght:   env.config.MinDelegatorStake,
+			}
+			_, err = addContinuousDelegator(
+				env,
+				delegatorData,
+				delegatorStakeKey,
+				authOwner,
+				delegatorRewardOwner,
+			)
+			if err != nil {
+				return err.Error()
+			}
+
+			// shift validator and delegator ahead a few times
+			for i := 0; i < len(valCommits); i++ {
+				var (
+					valCommit = valCommits[i]
+					delCommit = delCommits[i]
+				)
+
+				// advance time
+				chainTime := env.state.GetTimestamp()
+				nextChainTime := chainTime.Add(stakingPeriod)
+				env.state.SetTimestamp(nextChainTime)
+
+				continuousValidator, err := env.state.GetCurrentValidator(
+					subnetID,
+					nodeID,
+				)
+				if err != nil {
+					return err.Error()
+				}
+
+				preShiftValidatorRewardBalance, err := avax.GetBalance(env.state, validatorRewardOwners)
+				if err != nil {
+					return err.Error()
+				}
+
+				delIt, err := env.state.GetCurrentDelegatorIterator(subnetID, nodeID)
+				if err != nil {
+					return err.Error()
+				}
+				if !delIt.Next() {
+					return "missing continuous delegator pre shifting"
+				}
+				continuousDelegator := delIt.Value()
+				delIt.Release()
+
+				preShiftDelegatorRewardBalance, err := avax.GetBalance(env.state, delegatorsRewardOwners)
+				if err != nil {
+					return err.Error()
+				}
+
+				// shift delegator first, it's the first by priority
+				if err := issueReward(env, continuousDelegator.TxID, delCommit); err != nil {
+					return err.Error()
+				}
+
+				// then shift validator
+				if err := issueReward(env, continuousValidator.TxID, valCommit); err != nil {
+					return err.Error()
+				}
+
+				// check rewards post shift
+				postShifValidatorRewardBalance, err := avax.GetBalance(env.state, validatorRewardOwners)
+				if err != nil {
+					return err.Error()
+				}
+				postShiftDelegatorRewardBalance, err := avax.GetBalance(env.state, delegatorsRewardOwners)
+				if err != nil {
+					return err.Error()
+				}
+
+				delegatorReward := calculateDelegatorReward(continuousDelegator, continuousValidatorTx.Shares())
+				delegateeReward := continuousDelegator.PotentialReward - delegatorReward
+				switch {
+				case valCommit && delCommit:
+					if postShifValidatorRewardBalance !=
+						preShiftValidatorRewardBalance+continuousValidator.PotentialReward+delegateeReward {
+						return fmt.Sprintf(
+							"unexpected validator balance, valCommit %v, delCommit %v",
+							valCommit, delCommit,
+						)
+					}
+					if postShiftDelegatorRewardBalance != preShiftDelegatorRewardBalance+delegatorReward {
+						return fmt.Sprintf(
+							"unexpected delegator balance, valCommit %v, delCommit %v",
+							valCommit, delCommit,
+						)
+					}
+				case !valCommit && delCommit:
+					if postShifValidatorRewardBalance !=
+						preShiftValidatorRewardBalance+delegateeReward {
+						return fmt.Sprintf(
+							"unexpected validator balance, valCommit %v, delCommit %v",
+							valCommit, delCommit,
+						)
+					}
+					if postShiftDelegatorRewardBalance != preShiftDelegatorRewardBalance+delegatorReward {
+						return fmt.Sprintf(
+							"unexpected delegator balance, valCommit %v, delCommit %v",
+							valCommit, delCommit,
+						)
+					}
+				case valCommit && !delCommit:
+					if postShifValidatorRewardBalance != preShiftValidatorRewardBalance+continuousValidator.PotentialReward {
+						return fmt.Sprintf(
+							"unexpected validator balance, valCommit %v, delCommit %v",
+							valCommit, delCommit,
+						)
+					}
+					if postShiftDelegatorRewardBalance != preShiftDelegatorRewardBalance {
+						return fmt.Sprintf(
+							"unexpected delegator balance, valCommit %v, delCommit %v",
+							valCommit, delCommit,
+						)
+					}
+				case !valCommit && !delCommit:
+					if postShifValidatorRewardBalance != preShiftValidatorRewardBalance {
+						return fmt.Sprintf(
+							"unexpected validator balance, valCommit %v, delCommit %v",
+							valCommit, delCommit,
+						)
+					}
+					if postShiftDelegatorRewardBalance != preShiftDelegatorRewardBalance {
+						return fmt.Sprintf(
+							"unexpected delegator balance, valCommit %v, delCommit %v",
+							valCommit, delCommit,
+						)
+					}
+				}
+			}
+
+			return ""
+		},
+		gen.SliceOf(gen.Bool()), // must have the same length
+		gen.SliceOf(gen.Bool()),
+	))
+
+	properties.TestingRun(t)
+}
+
 func TestRewardsChecksRewardValidator(t *testing.T) {
 	properties := gopter.NewProperties(nil)
 
@@ -38,12 +257,16 @@ func TestRewardsChecksRewardValidator(t *testing.T) {
 	// properties := gopter.NewProperties(parameters)
 
 	var (
-		nodeID            = ids.GenerateTestNodeID()
-		validatorDuration = defaultMinStakingDuration
-		dummyStartTime    = time.Unix(0, 0)
+		testKeyfactory secp256k1.Factory
 
-		validatorAuthKey = preFundedKeys[4]
-		AuthOwner        = validatorAuthKey.PublicKey().Address()
+		nodeID   = ids.GenerateTestNodeID()
+		subnetID = constants.PrimaryNetworkID
+
+		stakingPeriod  = defaultMinStakingDuration
+		dummyStartTime = time.Unix(0, 0)
+
+		authKey   = preFundedKeys[4]
+		authOwner = authKey.PublicKey().Address()
 
 		stakeKey   = preFundedKeys[3] // stake
 		stakeOwner = stakeKey.PublicKey().Address()
@@ -52,7 +275,9 @@ func TestRewardsChecksRewardValidator(t *testing.T) {
 		stopOwner = stopKey.PublicKey().Address()
 	)
 
-	var testKeyfactory secp256k1.Factory
+	stakeOwners := set.NewSet[ids.ShortID](1)
+	stakeOwners.Add(stakeOwner)
+
 	rewardsKey, err := testKeyfactory.NewPrivateKey()
 	require.NoError(t, err)
 
@@ -60,117 +285,33 @@ func TestRewardsChecksRewardValidator(t *testing.T) {
 	rewardOwners := set.NewSet[ids.ShortID](1)
 	rewardOwners.Add(rewardOwner)
 
-	stakeOwners := set.NewSet[ids.ShortID](1)
-	stakeOwners.Add(stakeOwner)
-
-	blsSK, err := bls.NewSecretKey()
-	require.NoError(t, err)
-	blsPOP := signer.NewProofOfPossession(blsSK)
-
 	properties.Property("validator is rewarded or not in commits and aborts", prop.ForAll(
-		func(choices []bool) string {
+		func(commits []bool) string {
 			env := newEnvironmentNoValidator(latestFork)
 			defer func() {
 				_ = shutdownEnvironment(env)
 			}()
 
-			var (
-				validatorWeight = env.config.MinValidatorStake
-				validatorFee    = env.config.AddPrimaryNetworkValidatorFee
-			)
-
-			preCreationStakeBalance, err := avax.GetBalance(env.state, stakeOwners)
-			if err != nil {
-				return err.Error()
+			validatorData := txs.Validator{
+				NodeID: nodeID,
+				Start:  uint64(dummyStartTime.Unix()),
+				End:    uint64(dummyStartTime.Add(stakingPeriod).Unix()),
+				Wght:   env.config.MinValidatorStake,
 			}
-
-			utxosHandler := utxo.NewHandler(env.ctx, env.clk, env.fx)
-			ins, unstakedOuts, stakedOuts, signers, err := utxosHandler.Spend(
-				env.state,
-				[]*secp256k1.PrivateKey{stakeKey},
-				validatorWeight,
-				validatorFee,
-				stakeOwner, // changeAddr
+			_, addContinuousValTxID, err := addContinuousValidator(
+				env,
+				validatorData,
+				stakeKey,
+				authOwner,
+				rewardOwner,
 			)
 			if err != nil {
 				return err.Error()
-			}
-
-			// Create the continuous validator
-			continuousValidatorTx := &txs.AddContinuousValidatorTx{
-				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-					NetworkID:    env.ctx.NetworkID,
-					BlockchainID: env.ctx.ChainID,
-					Ins:          ins,
-					Outs:         unstakedOuts,
-				}},
-				Validator: txs.Validator{
-					NodeID: nodeID,
-					Start:  uint64(dummyStartTime.Unix()),
-					End:    uint64(dummyStartTime.Add(validatorDuration).Unix()),
-					Wght:   validatorWeight,
-				},
-				Signer: blsPOP,
-				ValidatorAuthKey: &secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{AuthOwner},
-				},
-				StakeOuts: stakedOuts,
-				ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
-					Addrs:     rewardOwners.List(),
-					Threshold: 1,
-				},
-				ValidatorRewardRestakeShares: 0,
-				DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
-					Addrs:     rewardOwners.List(),
-					Threshold: 1,
-				},
-				DelegationShares: 20_000,
-			}
-			addContinuousValTx, err := txs.NewSigned(continuousValidatorTx, txs.Codec, signers)
-			if err != nil {
-				return err.Error()
-			}
-			if err := addContinuousValTx.SyntacticVerify(env.ctx); err != nil {
-				return err.Error()
-			}
-
-			onParentState, err := state.NewDiff(lastAcceptedID, env)
-			if err != nil {
-				return err.Error()
-			}
-
-			addValExecutor := StandardTxExecutor{
-				State:   onParentState,
-				Backend: &env.backend,
-				Tx:      addContinuousValTx,
-			}
-			if err := addContinuousValTx.Unsigned.Visit(&addValExecutor); err != nil {
-				return err.Error()
-			}
-
-			onParentState.AddTx(addContinuousValTx, status.Committed)
-			if err := onParentState.Apply(env.state); err != nil {
-				return err.Error()
-			}
-			if err := env.state.Commit(); err != nil {
-				return err.Error()
-			}
-
-			postCreationStakeBalance, err := avax.GetBalance(env.state, stakeOwners)
-			if err != nil {
-				return err.Error()
-			}
-			if postCreationStakeBalance != preCreationStakeBalance-validatorWeight-validatorFee {
-				return "unexpected postCreationStakeBalance"
 			}
 
 			// shift validator ahead a few times
-			for _, pickCommit := range choices {
-				continuousValidator, err := env.state.GetCurrentValidator(
-					continuousValidatorTx.SubnetID(),
-					continuousValidatorTx.NodeID(),
-				)
+			for _, commit := range commits {
+				continuousValidator, err := env.state.GetCurrentValidator(subnetID, nodeID)
 				if err != nil {
 					return err.Error()
 				}
@@ -187,45 +328,11 @@ func TestRewardsChecksRewardValidator(t *testing.T) {
 
 				// advance time
 				chainTime := env.state.GetTimestamp()
-				nextChainTime := chainTime.Add(validatorDuration)
+				nextChainTime := chainTime.Add(stakingPeriod)
 				env.state.SetTimestamp(nextChainTime)
 
 				// create and execute reward tx
-				tx, err := env.txBuilder.NewRewardValidatorTx(continuousValidator.TxID)
-				if err != nil {
-					return err.Error()
-				}
-
-				onCommitState, err := state.NewDiff(lastAcceptedID, env)
-				if err != nil {
-					return err.Error()
-				}
-
-				onAbortState, err := state.NewDiff(lastAcceptedID, env)
-				if err != nil {
-					return err.Error()
-				}
-
-				txExecutor := ProposalTxExecutor{
-					OnCommitState: onCommitState,
-					OnAbortState:  onAbortState,
-					Backend:       &env.backend,
-					Tx:            tx,
-				}
-				if err := tx.Unsigned.Visit(&txExecutor); err != nil {
-					return err.Error()
-				}
-
-				if pickCommit {
-					if err := txExecutor.OnCommitState.Apply(env.state); err != nil {
-						return err.Error()
-					}
-				} else {
-					if err := txExecutor.OnAbortState.Apply(env.state); err != nil {
-						return err.Error()
-					}
-				}
-				if err := env.state.Commit(); err != nil {
+				if err := issueReward(env, continuousValidator.TxID, commit); err != nil {
 					return err.Error()
 				}
 
@@ -244,7 +351,7 @@ func TestRewardsChecksRewardValidator(t *testing.T) {
 					return err.Error()
 				}
 
-				if pickCommit {
+				if commit {
 					if postShiftRewardBalance != preShiftRewardBalance+continuousValidator.PotentialReward {
 						return "unexpected preShiftRewardBalance on commit"
 					}
@@ -267,8 +374,8 @@ func TestRewardsChecksRewardValidator(t *testing.T) {
 			}
 
 			stopValidatorTx, err := env.txBuilder.NewStopStakerTx(
-				addContinuousValTx.ID(),
-				[]*secp256k1.PrivateKey{validatorAuthKey},
+				addContinuousValTxID,
+				[]*secp256k1.PrivateKey{authKey},
 				stopOwner,
 			)
 			if err != nil {
@@ -295,48 +402,18 @@ func TestRewardsChecksRewardValidator(t *testing.T) {
 				return err.Error()
 			}
 
-			stoppedValidator, err := env.state.GetCurrentValidator(
-				continuousValidatorTx.SubnetID(),
-				continuousValidatorTx.NodeID(),
-			)
+			stoppedValidator, err := env.state.GetCurrentValidator(subnetID, nodeID)
 			if err != nil {
 				return err.Error()
 			}
 
 			// advance time to drop the validator
 			chainTime := env.state.GetTimestamp()
-			nextChainTime := chainTime.Add(validatorDuration)
+			nextChainTime := chainTime.Add(stakingPeriod)
 			env.state.SetTimestamp(nextChainTime)
 
 			// create and execute reward tx
-			tx, err := env.txBuilder.NewRewardValidatorTx(stoppedValidator.TxID)
-			if err != nil {
-				return err.Error()
-			}
-
-			onCommitState, err := state.NewDiff(lastAcceptedID, env)
-			if err != nil {
-				return err.Error()
-			}
-
-			onAbortState, err := state.NewDiff(lastAcceptedID, env)
-			if err != nil {
-				return err.Error()
-			}
-
-			rewardTxExecutor := ProposalTxExecutor{
-				OnCommitState: onCommitState,
-				OnAbortState:  onAbortState,
-				Backend:       &env.backend,
-				Tx:            tx,
-			}
-			if err := tx.Unsigned.Visit(&rewardTxExecutor); err != nil {
-				return err.Error()
-			}
-			if err := rewardTxExecutor.OnCommitState.Apply(env.state); err != nil {
-				return err.Error()
-			}
-			if err := env.state.Commit(); err != nil {
+			if err := issueReward(env, stoppedValidator.TxID, true /*commit*/); err != nil {
 				return err.Error()
 			}
 
@@ -373,105 +450,44 @@ func TestShiftChecksRewardValidator(t *testing.T) {
 	// properties := gopter.NewProperties(parameters)
 
 	var (
-		nodeID            = ids.GenerateTestNodeID()
+		nodeID   = ids.GenerateTestNodeID()
+		subnetID = constants.PrimaryNetworkID
+
 		validatorDuration = defaultMinStakingDuration
 		dummyStartTime    = time.Unix(0, 0)
 
-		validatorAuthKey = preFundedKeys[4]
-		addr             = validatorAuthKey.PublicKey().Address()
+		authKey = preFundedKeys[4]
+		addr    = authKey.PublicKey().Address()
 	)
 
-	blsSK, err := bls.NewSecretKey()
-	require.NoError(t, err)
-	blsPOP := signer.NewProofOfPossession(blsSK)
-
 	properties.Property("validator is shift in both commits and aborts", prop.ForAll(
-		func(choices []bool) string {
+		func(commits []bool) string {
 			env := newEnvironmentNoValidator(latestFork)
 			defer func() {
 				_ = shutdownEnvironment(env)
 			}()
 
 			// Add a continuous validator
-			onParentState, err := state.NewDiff(lastAcceptedID, env)
-			if err != nil {
-				return err.Error()
+			validatorData := txs.Validator{
+				NodeID: nodeID,
+				Start:  uint64(dummyStartTime.Unix()),
+				End:    uint64(dummyStartTime.Add(validatorDuration).Unix()),
+				Wght:   env.config.MinValidatorStake,
 			}
-
-			utxosHandler := utxo.NewHandler(env.ctx, env.clk, env.fx)
-			ins, unstakedOuts, stakedOuts, signers, err := utxosHandler.Spend(
-				env.state,
-				preFundedKeys,
-				env.config.MinValidatorStake, // stakeAmount
-				env.config.AddPrimaryNetworkValidatorFee,
-				addr, // changeAddr
+			_, addContinuousValTxID, err := addContinuousValidator(
+				env,
+				validatorData,
+				authKey,
+				addr, // authOwner
+				addr, // rewardOwner
 			)
 			if err != nil {
 				return err.Error()
 			}
 
-			// Create the tx
-			continuousValidatorTx := &txs.AddContinuousValidatorTx{
-				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-					NetworkID:    env.ctx.NetworkID,
-					BlockchainID: env.ctx.ChainID,
-					Ins:          ins,
-					Outs:         unstakedOuts,
-				}},
-				Validator: txs.Validator{
-					NodeID: nodeID,
-					Start:  uint64(dummyStartTime.Unix()),
-					End:    uint64(dummyStartTime.Add(validatorDuration).Unix()),
-					Wght:   env.config.MinValidatorStake,
-				},
-				Signer: blsPOP,
-				ValidatorAuthKey: &secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{addr},
-				},
-				StakeOuts: stakedOuts,
-				ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
-					Addrs:     []ids.ShortID{addr},
-					Threshold: 1,
-				},
-				ValidatorRewardRestakeShares: 0,
-				DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
-					Addrs:     []ids.ShortID{addr},
-					Threshold: 1,
-				},
-				DelegationShares: 20_000,
-			}
-			addContinuousValTx, err := txs.NewSigned(continuousValidatorTx, txs.Codec, signers)
-			if err != nil {
-				return err.Error()
-			}
-			if err := addContinuousValTx.SyntacticVerify(env.ctx); err != nil {
-				return err.Error()
-			}
-
-			addValExecutor := StandardTxExecutor{
-				State:   onParentState,
-				Backend: &env.backend,
-				Tx:      addContinuousValTx,
-			}
-			if err := addContinuousValTx.Unsigned.Visit(&addValExecutor); err != nil {
-				return err.Error()
-			}
-
-			onParentState.AddTx(addContinuousValTx, status.Committed)
-			if err := onParentState.Apply(env.state); err != nil {
-				return err.Error()
-			}
-			if err := env.state.Commit(); err != nil {
-				return err.Error()
-			}
-
 			// shift validator ahead a few times
-			for _, pickCommit := range choices {
-				continuousValidator, err := env.state.GetCurrentValidator(
-					continuousValidatorTx.SubnetID(),
-					continuousValidatorTx.NodeID(),
-				)
+			for _, commit := range commits {
+				continuousValidator, err := env.state.GetCurrentValidator(subnetID, nodeID)
 				if err != nil {
 					return err.Error()
 				}
@@ -482,48 +498,12 @@ func TestShiftChecksRewardValidator(t *testing.T) {
 				env.state.SetTimestamp(nextChainTime)
 
 				// create and execute reward tx
-				tx, err := env.txBuilder.NewRewardValidatorTx(continuousValidator.TxID)
-				if err != nil {
-					return err.Error()
-				}
-
-				onCommitState, err := state.NewDiff(lastAcceptedID, env)
-				if err != nil {
-					return err.Error()
-				}
-
-				onAbortState, err := state.NewDiff(lastAcceptedID, env)
-				if err != nil {
-					return err.Error()
-				}
-
-				txExecutor := ProposalTxExecutor{
-					OnCommitState: onCommitState,
-					OnAbortState:  onAbortState,
-					Backend:       &env.backend,
-					Tx:            tx,
-				}
-				if err := tx.Unsigned.Visit(&txExecutor); err != nil {
-					return err.Error()
-				}
-
-				if pickCommit {
-					err = txExecutor.OnCommitState.Apply(env.state)
-				} else {
-					err = txExecutor.OnAbortState.Apply(env.state)
-				}
-				if err != nil {
-					return err.Error()
-				}
-				if err := env.state.Commit(); err != nil {
+				if err := issueReward(env, continuousValidator.TxID, commit); err != nil {
 					return err.Error()
 				}
 
 				// check that post continuousStakingFork, staker is shifted ahead by its staking period
-				shiftedValidator, err := env.state.GetCurrentValidator(
-					continuousValidatorTx.SubnetID(),
-					continuousValidatorTx.NodeID(),
-				)
+				shiftedValidator, err := env.state.GetCurrentValidator(subnetID, nodeID)
 				if err != nil {
 					return err.Error()
 				}
@@ -542,15 +522,15 @@ func TestShiftChecksRewardValidator(t *testing.T) {
 				}
 			}
 
-			continuousValidator, err := env.state.GetCurrentValidator(continuousValidatorTx.SubnetID(), continuousValidatorTx.NodeID())
+			continuousValidator, err := env.state.GetCurrentValidator(subnetID, nodeID)
 			if err != nil {
 				return err.Error()
 			}
 
 			// stop the validator
 			stopValidatorTx, err := env.txBuilder.NewStopStakerTx(
-				addContinuousValTx.ID(),
-				[]*secp256k1.PrivateKey{validatorAuthKey},
+				addContinuousValTxID,
+				[]*secp256k1.PrivateKey{authKey},
 				addr,
 			)
 			if err != nil {
@@ -578,10 +558,7 @@ func TestShiftChecksRewardValidator(t *testing.T) {
 			}
 
 			// check that validator is stopped
-			stoppedValidator, err := env.state.GetCurrentValidator(
-				continuousValidatorTx.SubnetID(),
-				continuousValidatorTx.NodeID(),
-			)
+			stoppedValidator, err := env.state.GetCurrentValidator(subnetID, nodeID)
 			if err != nil {
 				return err.Error()
 			}
@@ -614,13 +591,15 @@ func TestRewardsChecksRewardDelegator(t *testing.T) {
 	// properties := gopter.NewProperties(parameters)
 
 	var (
-		nodeID             = ids.GenerateTestNodeID()
+		nodeID   = ids.GenerateTestNodeID()
+		subnetID = constants.PrimaryNetworkID
+
 		validationDuration = defaultMaxStakingDuration
 		delegationDuration = defaultMinStakingDuration
 		dummyStartTime     = time.Unix(0, 0)
 
 		delegatorAuthKey = preFundedKeys[4]
-		AuthOwner        = delegatorAuthKey.PublicKey().Address()
+		authOwner        = delegatorAuthKey.PublicKey().Address()
 
 		stakeKey   = preFundedKeys[3] // stake
 		stakeOwner = stakeKey.PublicKey().Address()
@@ -643,164 +622,55 @@ func TestRewardsChecksRewardDelegator(t *testing.T) {
 	stakeOwners := set.NewSet[ids.ShortID](1)
 	stakeOwners.Add(stakeOwner)
 
-	blsSK, err := bls.NewSecretKey()
-	require.NoError(t, err)
-	blsPOP := signer.NewProofOfPossession(blsSK)
-
 	properties.Property("delegator is rewarded or not in commits and aborts", prop.ForAll(
-		func(choices []bool) string {
+		func(commits []bool) string {
 			env := newEnvironmentNoValidator(latestFork)
 			defer func() {
 				_ = shutdownEnvironment(env)
 			}()
 
 			// Add a continuous validator
-			onParentState, err := state.NewDiff(lastAcceptedID, env)
-			if err != nil {
-				return err.Error()
+			validatorData := txs.Validator{
+				NodeID: nodeID,
+				Start:  uint64(dummyStartTime.Unix()),
+				End:    uint64(dummyStartTime.Add(validationDuration).Unix()),
+				Wght:   env.config.MinValidatorStake,
 			}
-
-			utxosHandler := utxo.NewHandler(env.ctx, env.clk, env.fx)
-			ins, unstakedOuts, stakedOuts, signers, err := utxosHandler.Spend(
-				env.state,
-				[]*secp256k1.PrivateKey{validatorKey},
-				env.config.MinValidatorStake,
-				env.config.AddPrimaryNetworkValidatorFee,
+			addContinuousValTx, _, err := addContinuousValidator(
+				env,
+				validatorData,
+				validatorKey,
+				authOwner,
 				validatorOwner,
 			)
 			if err != nil {
 				return err.Error()
 			}
 
-			continuousValidatorTx := &txs.AddContinuousValidatorTx{
-				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-					NetworkID:    env.ctx.NetworkID,
-					BlockchainID: env.ctx.ChainID,
-					Ins:          ins,
-					Outs:         unstakedOuts,
-				}},
-				Validator: txs.Validator{
-					NodeID: nodeID,
-					Start:  uint64(dummyStartTime.Unix()),
-					End:    uint64(dummyStartTime.Add(validationDuration).Unix()),
-					Wght:   env.config.MinValidatorStake,
-				},
-				Signer: blsPOP,
-				ValidatorAuthKey: &secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{validatorOwner},
-				},
-				StakeOuts: stakedOuts,
-				ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
-					Addrs:     []ids.ShortID{validatorOwner},
-					Threshold: 1,
-				},
-				ValidatorRewardRestakeShares: 0,
-				DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
-					Addrs:     []ids.ShortID{validatorOwner},
-					Threshold: 1,
-				},
-				DelegationShares: 20_000,
-			}
-			addContinuousValTx, err := txs.NewSigned(continuousValidatorTx, txs.Codec, signers)
-			if err != nil {
-				return err.Error()
-			}
-			if err := addContinuousValTx.SyntacticVerify(env.ctx); err != nil {
-				return err.Error()
-			}
-
-			addValExecutor := StandardTxExecutor{
-				State:   onParentState,
-				Backend: &env.backend,
-				Tx:      addContinuousValTx,
-			}
-			if err := addContinuousValTx.Unsigned.Visit(&addValExecutor); err != nil {
-				return err.Error()
-			}
-			onParentState.AddTx(addContinuousValTx, status.Committed)
-			if err := onParentState.Apply(env.state); err != nil {
-				return err.Error()
-			}
-			if err := env.state.Commit(); err != nil {
-				return err.Error()
-			}
-
-			// Create the delegator tx
-			var (
-				delegatorWeight = env.config.MinDelegatorStake
-				delegatorFee    = env.config.AddPrimaryNetworkDelegatorFee
-			)
-
+			// Add a continuous delegator
 			preCreationStakeBalance, err := avax.GetBalance(env.state, stakeOwners)
 			if err != nil {
 				return err.Error()
 			}
 
-			utxosHandler = utxo.NewHandler(env.ctx, env.clk, env.fx)
-			ins, unstakedOuts, stakedOuts, signers, err = utxosHandler.Spend(
-				env.state,
-				[]*secp256k1.PrivateKey{stakeKey},
-				delegatorWeight,
-				delegatorFee,
-				stakeOwner, // changeAddr
+			var (
+				delegatorWeight = env.config.MinDelegatorStake
+				delegatorFee    = env.config.AddPrimaryNetworkDelegatorFee
+			)
+			delegatorData := txs.Validator{
+				NodeID: nodeID,
+				Start:  uint64(dummyStartTime.Unix()),
+				End:    uint64(dummyStartTime.Add(delegationDuration).Unix()),
+				Wght:   delegatorWeight,
+			}
+			continuousDelTxID, err := addContinuousDelegator(
+				env,
+				delegatorData,
+				stakeKey,
+				authOwner,
+				rewardOwner,
 			)
 			if err != nil {
-				return err.Error()
-			}
-
-			// Create the continuous validator
-			continuousDelegatorTx := &txs.AddContinuousDelegatorTx{
-				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-					NetworkID:    env.ctx.NetworkID,
-					BlockchainID: env.ctx.ChainID,
-					Ins:          ins,
-					Outs:         unstakedOuts,
-				}},
-				Validator: txs.Validator{
-					NodeID: nodeID,
-					Start:  uint64(dummyStartTime.Unix()),
-					End:    uint64(dummyStartTime.Add(delegationDuration).Unix()),
-					Wght:   delegatorWeight,
-				},
-				DelegatorAuthKey: &secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{AuthOwner},
-				},
-				StakeOuts: stakedOuts,
-				DelegationRewardsOwner: &secp256k1fx.OutputOwners{
-					Addrs:     []ids.ShortID{rewardOwner},
-					Threshold: 1,
-				},
-				DelegatorRewardRestakeShares: 0,
-			}
-			addContinuousDelTx, err := txs.NewSigned(continuousDelegatorTx, txs.Codec, signers)
-			if err != nil {
-				return err.Error()
-			}
-			if err := addContinuousDelTx.SyntacticVerify(env.ctx); err != nil {
-				return err.Error()
-			}
-
-			onParentState, err = state.NewDiff(lastAcceptedID, env)
-			if err != nil {
-				return err.Error()
-			}
-
-			addDelExecutor := StandardTxExecutor{
-				State:   onParentState,
-				Backend: &env.backend,
-				Tx:      addContinuousDelTx,
-			}
-			if err := addContinuousDelTx.Unsigned.Visit(&addDelExecutor); err != nil {
-				return err.Error()
-			}
-
-			onParentState.AddTx(addContinuousDelTx, status.Committed)
-			if err := onParentState.Apply(env.state); err != nil {
-				return err.Error()
-			}
-			if err := env.state.Commit(); err != nil {
 				return err.Error()
 			}
 
@@ -813,8 +683,8 @@ func TestRewardsChecksRewardDelegator(t *testing.T) {
 			}
 
 			// shift validator ahead a few times
-			for _, pickCommit := range choices {
-				delIt, err := env.state.GetCurrentDelegatorIterator(continuousValidatorTx.SubnetID(), continuousValidatorTx.NodeID())
+			for _, commit := range commits {
+				delIt, err := env.state.GetCurrentDelegatorIterator(subnetID, nodeID)
 				if err != nil {
 					return err.Error()
 				}
@@ -840,41 +710,7 @@ func TestRewardsChecksRewardDelegator(t *testing.T) {
 				env.state.SetTimestamp(nextChainTime)
 
 				// create and execute reward tx
-				tx, err := env.txBuilder.NewRewardValidatorTx(continuousDelegator.TxID)
-				if err != nil {
-					return err.Error()
-				}
-
-				onCommitState, err := state.NewDiff(lastAcceptedID, env)
-				if err != nil {
-					return err.Error()
-				}
-
-				onAbortState, err := state.NewDiff(lastAcceptedID, env)
-				if err != nil {
-					return err.Error()
-				}
-
-				txExecutor := ProposalTxExecutor{
-					OnCommitState: onCommitState,
-					OnAbortState:  onAbortState,
-					Backend:       &env.backend,
-					Tx:            tx,
-				}
-				if err := tx.Unsigned.Visit(&txExecutor); err != nil {
-					return err.Error()
-				}
-
-				if pickCommit {
-					if err := txExecutor.OnCommitState.Apply(env.state); err != nil {
-						return err.Error()
-					}
-				} else {
-					if err := txExecutor.OnAbortState.Apply(env.state); err != nil {
-						return err.Error()
-					}
-				}
-				if err := env.state.Commit(); err != nil {
+				if err := issueReward(env, continuousDelegator.TxID, commit); err != nil {
 					return err.Error()
 				}
 
@@ -893,8 +729,8 @@ func TestRewardsChecksRewardDelegator(t *testing.T) {
 					return err.Error()
 				}
 
-				delegatorReward := calculateDelegatorReward(continuousDelegator, continuousValidatorTx.Shares())
-				if pickCommit {
+				delegatorReward := calculateDelegatorReward(continuousDelegator, addContinuousValTx.Shares())
+				if commit {
 					if postShiftRewardBalance != preShiftRewardBalance+delegatorReward {
 						return "unexpected preShiftRewardBalance on commit"
 					}
@@ -917,7 +753,7 @@ func TestRewardsChecksRewardDelegator(t *testing.T) {
 			}
 
 			stopDelegatorTx, err := env.txBuilder.NewStopStakerTx(
-				addContinuousDelTx.ID(),
+				continuousDelTxID,
 				[]*secp256k1.PrivateKey{delegatorAuthKey},
 				stopOwner,
 			)
@@ -945,7 +781,7 @@ func TestRewardsChecksRewardDelegator(t *testing.T) {
 				return err.Error()
 			}
 
-			delIt, err := env.state.GetCurrentDelegatorIterator(continuousValidatorTx.SubnetID(), continuousValidatorTx.NodeID())
+			delIt, err := env.state.GetCurrentDelegatorIterator(subnetID, nodeID)
 			if err != nil {
 				return err.Error()
 			}
@@ -961,34 +797,7 @@ func TestRewardsChecksRewardDelegator(t *testing.T) {
 			env.state.SetTimestamp(nextChainTime)
 
 			// create and execute reward tx
-			tx, err := env.txBuilder.NewRewardValidatorTx(stoppedDelegator.TxID)
-			if err != nil {
-				return err.Error()
-			}
-
-			onCommitState, err := state.NewDiff(lastAcceptedID, env)
-			if err != nil {
-				return err.Error()
-			}
-
-			onAbortState, err := state.NewDiff(lastAcceptedID, env)
-			if err != nil {
-				return err.Error()
-			}
-
-			rewardTxExecutor := ProposalTxExecutor{
-				OnCommitState: onCommitState,
-				OnAbortState:  onAbortState,
-				Backend:       &env.backend,
-				Tx:            tx,
-			}
-			if err := tx.Unsigned.Visit(&rewardTxExecutor); err != nil {
-				return err.Error()
-			}
-			if err := rewardTxExecutor.OnCommitState.Apply(env.state); err != nil {
-				return err.Error()
-			}
-			if err := env.state.Commit(); err != nil {
+			if err := issueReward(env, stoppedDelegator.TxID, true /*commit*/); err != nil {
 				return err.Error()
 			}
 
@@ -1007,7 +816,7 @@ func TestRewardsChecksRewardDelegator(t *testing.T) {
 				return err.Error()
 			}
 
-			delegatorReward := calculateDelegatorReward(stoppedDelegator, continuousValidatorTx.Shares())
+			delegatorReward := calculateDelegatorReward(stoppedDelegator, addContinuousValTx.Shares())
 			if postStopRewardBalance != preStopRewardBalance+delegatorReward {
 				return "unexpected postStopRewardBalance"
 			}
@@ -1027,166 +836,63 @@ func TestShiftChecksRewardDelegator(t *testing.T) {
 	// properties := gopter.NewProperties(parameters)
 
 	var (
-		nodeID            = ids.GenerateTestNodeID()
+		nodeID   = ids.GenerateTestNodeID()
+		subnetID = constants.PrimaryNetworkID
+
 		validatorDuration = defaultMaxStakingDuration
 		delegatorDuration = defaultMinStakingDuration
 		dummyStartTime    = time.Unix(0, 0)
 
-		stakerAuthKey = preFundedKeys[4]
-		addr          = stakerAuthKey.PublicKey().Address()
+		authKey = preFundedKeys[4]
+		addr    = authKey.PublicKey().Address()
 	)
 
-	blsSK, err := bls.NewSecretKey()
-	require.NoError(t, err)
-	blsPOP := signer.NewProofOfPossession(blsSK)
-
 	properties.Property("delegator is shift in both commits and aborts", prop.ForAll(
-		func(choices []bool) string {
+		func(commits []bool) string {
 			env := newEnvironmentNoValidator(latestFork)
 			defer func() {
 				_ = shutdownEnvironment(env)
 			}()
 
 			// Add a continuous validator
-			onParentState, err := state.NewDiff(lastAcceptedID, env)
-			if err != nil {
-				return err.Error()
+			validatorData := txs.Validator{
+				NodeID: nodeID,
+				Start:  uint64(dummyStartTime.Unix()),
+				End:    uint64(dummyStartTime.Add(validatorDuration).Unix()),
+				Wght:   env.config.MinValidatorStake,
 			}
-
-			utxosHandler := utxo.NewHandler(env.ctx, env.clk, env.fx)
-			ins, unstakedOuts, stakedOuts, signers, err := utxosHandler.Spend(
-				env.state,
-				preFundedKeys,
-				env.config.MinValidatorStake, // stakeAmount
-				env.config.AddPrimaryNetworkValidatorFee,
-				addr, // changeAddr
+			_, _, err := addContinuousValidator(
+				env,
+				validatorData,
+				authKey,
+				addr,
+				addr,
 			)
 			if err != nil {
-				return err.Error()
-			}
-
-			continuousValidatorTx := &txs.AddContinuousValidatorTx{
-				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-					NetworkID:    env.ctx.NetworkID,
-					BlockchainID: env.ctx.ChainID,
-					Ins:          ins,
-					Outs:         unstakedOuts,
-				}},
-				Validator: txs.Validator{
-					NodeID: nodeID,
-					Start:  uint64(dummyStartTime.Unix()),
-					End:    uint64(dummyStartTime.Add(validatorDuration).Unix()),
-					Wght:   env.config.MinValidatorStake,
-				},
-				Signer: blsPOP,
-				ValidatorAuthKey: &secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{addr},
-				},
-				StakeOuts: stakedOuts,
-				ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
-					Addrs:     []ids.ShortID{addr},
-					Threshold: 1,
-				},
-				ValidatorRewardRestakeShares: 0,
-				DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
-					Addrs:     []ids.ShortID{addr},
-					Threshold: 1,
-				},
-				DelegationShares: 20_000,
-			}
-			addContinuousValTx, err := txs.NewSigned(continuousValidatorTx, txs.Codec, signers)
-			if err != nil {
-				return err.Error()
-			}
-			if err := addContinuousValTx.SyntacticVerify(env.ctx); err != nil {
-				return err.Error()
-			}
-
-			addValExecutor := StandardTxExecutor{
-				State:   onParentState,
-				Backend: &env.backend,
-				Tx:      addContinuousValTx,
-			}
-			if err := addContinuousValTx.Unsigned.Visit(&addValExecutor); err != nil {
-				return err.Error()
-			}
-			onParentState.AddTx(addContinuousValTx, status.Committed)
-			if err := onParentState.Apply(env.state); err != nil {
-				return err.Error()
-			}
-			if err := env.state.Commit(); err != nil {
 				return err.Error()
 			}
 
 			// Create the delegator tx
-			onParentState, err = state.NewDiff(lastAcceptedID, env)
-			if err != nil {
-				return err.Error()
+			delegatorData := txs.Validator{
+				NodeID: nodeID,
+				Start:  uint64(dummyStartTime.Unix()),
+				End:    uint64(dummyStartTime.Add(delegatorDuration).Unix()),
+				Wght:   env.config.MinDelegatorStake,
 			}
-
-			ins, unstakedOuts, stakedOuts, signers, err = utxosHandler.Spend(
-				env.state,
-				preFundedKeys,
-				env.config.MinDelegatorStake, // stakeAmount
-				env.config.AddPrimaryNetworkDelegatorFee,
-				addr, // changeAddr
+			continuousDelTxID, err := addContinuousDelegator(
+				env,
+				delegatorData,
+				authKey,
+				addr,
+				addr,
 			)
 			if err != nil {
 				return err.Error()
 			}
 
-			continuousDelegatorTx := &txs.AddContinuousDelegatorTx{
-				BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-					NetworkID:    env.ctx.NetworkID,
-					BlockchainID: env.ctx.ChainID,
-					Ins:          ins,
-					Outs:         unstakedOuts,
-				}},
-				Validator: txs.Validator{
-					NodeID: nodeID,
-					Start:  uint64(dummyStartTime.Unix()),
-					End:    uint64(dummyStartTime.Add(delegatorDuration).Unix()),
-					Wght:   env.config.MinDelegatorStake,
-				},
-				DelegatorAuthKey: &secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{addr},
-				},
-				StakeOuts: stakedOuts,
-				DelegationRewardsOwner: &secp256k1fx.OutputOwners{
-					Addrs:     []ids.ShortID{addr},
-					Threshold: 1,
-				},
-				DelegatorRewardRestakeShares: 0,
-			}
-			addContinuousDelTx, err := txs.NewSigned(continuousDelegatorTx, txs.Codec, signers)
-			if err != nil {
-				return err.Error()
-			}
-			if err := addContinuousDelTx.SyntacticVerify(env.ctx); err != nil {
-				return err.Error()
-			}
-
-			addDelExecutor := StandardTxExecutor{
-				State:   onParentState,
-				Backend: &env.backend,
-				Tx:      addContinuousDelTx,
-			}
-			if err := addContinuousDelTx.Unsigned.Visit(&addDelExecutor); err != nil {
-				return err.Error()
-			}
-			onParentState.AddTx(addContinuousDelTx, status.Committed)
-			if err := onParentState.Apply(env.state); err != nil {
-				return err.Error()
-			}
-			if err := env.state.Commit(); err != nil {
-				return err.Error()
-			}
-
 			// shift validator ahead a few times
-			for _, pickCommit := range choices {
-				delIt, err := env.state.GetCurrentDelegatorIterator(continuousValidatorTx.SubnetID(), continuousValidatorTx.NodeID())
+			for _, commit := range commits {
+				delIt, err := env.state.GetCurrentDelegatorIterator(subnetID, nodeID)
 				if err != nil {
 					return err.Error()
 				}
@@ -1202,39 +908,7 @@ func TestShiftChecksRewardDelegator(t *testing.T) {
 				env.state.SetTimestamp(nextChainTime)
 
 				// create and execute reward tx
-				tx, err := env.txBuilder.NewRewardValidatorTx(continuousDelegator.TxID)
-				if err != nil {
-					return err.Error()
-				}
-
-				onCommitState, err := state.NewDiff(lastAcceptedID, env)
-				if err != nil {
-					return err.Error()
-				}
-
-				onAbortState, err := state.NewDiff(lastAcceptedID, env)
-				if err != nil {
-					return err.Error()
-				}
-
-				txExecutor := ProposalTxExecutor{
-					OnCommitState: onCommitState,
-					OnAbortState:  onAbortState,
-					Backend:       &env.backend,
-					Tx:            tx,
-				}
-				if err := tx.Unsigned.Visit(&txExecutor); err != nil {
-					return err.Error()
-				}
-				if pickCommit {
-					err = txExecutor.OnCommitState.Apply(env.state)
-				} else {
-					err = txExecutor.OnAbortState.Apply(env.state)
-				}
-				if err != nil {
-					return err.Error()
-				}
-				if err := env.state.Commit(); err != nil {
+				if err := issueReward(env, continuousDelegator.TxID, commit); err != nil {
 					return err.Error()
 				}
 
@@ -1270,7 +944,7 @@ func TestShiftChecksRewardDelegator(t *testing.T) {
 				}
 			}
 
-			delIt, err := env.state.GetCurrentDelegatorIterator(continuousValidatorTx.SubnetID(), continuousValidatorTx.NodeID())
+			delIt, err := env.state.GetCurrentDelegatorIterator(subnetID, nodeID)
 			if err != nil {
 				return err.Error()
 			}
@@ -1282,8 +956,8 @@ func TestShiftChecksRewardDelegator(t *testing.T) {
 
 			// stop the delegator
 			stopDelegatorTx, err := env.txBuilder.NewStopStakerTx(
-				addContinuousDelTx.ID(),
-				[]*secp256k1.PrivateKey{stakerAuthKey},
+				continuousDelTxID,
+				[]*secp256k1.PrivateKey{authKey},
 				addr,
 			)
 			if err != nil {
@@ -2332,4 +2006,200 @@ func TestBanffForkRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	require.Equal(expectedReward, delReward+vdrReward, "expected total reward to be %d but is %d", expectedReward, delReward+vdrReward)
 
 	require.Equal(env.config.MinValidatorStake, vdrSet.GetWeight(vdrNodeID))
+}
+
+func addContinuousDelegator(
+	env *environment,
+	delegatorData txs.Validator,
+	delegatorStakeKey *secp256k1.PrivateKey,
+	authOwner, delegatorRewardOwner ids.ShortID,
+) (
+	ids.ID, // txID
+	error,
+) {
+	delegatorStakeOwner := delegatorStakeKey.PublicKey().Address()
+
+	utxosHandler := utxo.NewHandler(env.ctx, env.clk, env.fx)
+	ins, unstakedOuts, stakedOuts, signers, err := utxosHandler.Spend(
+		env.state,
+		[]*secp256k1.PrivateKey{delegatorStakeKey},
+		delegatorData.Wght,
+		env.config.AddPrimaryNetworkDelegatorFee,
+		delegatorStakeOwner, // changeAddr
+	)
+	if err != nil {
+		return ids.Empty, err
+	}
+
+	continuousDelegatorTx := &txs.AddContinuousDelegatorTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    env.ctx.NetworkID,
+			BlockchainID: env.ctx.ChainID,
+			Ins:          ins,
+			Outs:         unstakedOuts,
+		}},
+		Validator: delegatorData,
+		DelegatorAuthKey: &secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{authOwner},
+		},
+		StakeOuts: stakedOuts,
+		DelegationRewardsOwner: &secp256k1fx.OutputOwners{
+			Addrs:     []ids.ShortID{delegatorRewardOwner},
+			Threshold: 1,
+		},
+		DelegatorRewardRestakeShares: 0,
+	}
+	addContinuousDelTx, err := txs.NewSigned(continuousDelegatorTx, txs.Codec, signers)
+	if err != nil {
+		return ids.Empty, err
+	}
+	if err := addContinuousDelTx.SyntacticVerify(env.ctx); err != nil {
+		return ids.Empty, err
+	}
+
+	onParentState, err := state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		return ids.Empty, err
+	}
+
+	addDelExecutor := StandardTxExecutor{
+		State:   onParentState,
+		Backend: &env.backend,
+		Tx:      addContinuousDelTx,
+	}
+	if err := addContinuousDelTx.Unsigned.Visit(&addDelExecutor); err != nil {
+		return ids.Empty, err
+	}
+
+	onParentState.AddTx(addContinuousDelTx, status.Committed)
+	if err := onParentState.Apply(env.state); err != nil {
+		return ids.Empty, err
+	}
+	if err := env.state.Commit(); err != nil {
+		return ids.Empty, err
+	}
+
+	return addContinuousDelTx.ID(), nil
+}
+
+func addContinuousValidator(
+	env *environment,
+	validatorData txs.Validator,
+	validatorStakeKey *secp256k1.PrivateKey,
+	authOwner, validatorRewardOwner ids.ShortID,
+) (
+	*txs.AddContinuousValidatorTx,
+	ids.ID, // txID
+	error,
+) {
+	validatorStakeOwner := validatorStakeKey.PublicKey().Address()
+
+	blsSK, err := bls.NewSecretKey()
+	if err != nil {
+		return nil, ids.Empty, err
+	}
+	blsPOP := signer.NewProofOfPossession(blsSK)
+
+	utxosHandler := utxo.NewHandler(env.ctx, env.clk, env.fx)
+	ins, unstakedOuts, stakedOuts, signers, err := utxosHandler.Spend(
+		env.state,
+		[]*secp256k1.PrivateKey{validatorStakeKey},
+		validatorData.Wght,
+		env.config.AddPrimaryNetworkValidatorFee,
+		validatorStakeOwner,
+	)
+	if err != nil {
+		return nil, ids.Empty, err
+	}
+
+	continuousValidatorTx := &txs.AddContinuousValidatorTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    env.ctx.NetworkID,
+			BlockchainID: env.ctx.ChainID,
+			Ins:          ins,
+			Outs:         unstakedOuts,
+		}},
+		Validator: validatorData,
+		Signer:    blsPOP,
+		ValidatorAuthKey: &secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{authOwner},
+		},
+		StakeOuts: stakedOuts,
+		ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
+			Addrs:     []ids.ShortID{validatorRewardOwner},
+			Threshold: 1,
+		},
+		ValidatorRewardRestakeShares: 0,
+		DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
+			Addrs:     []ids.ShortID{validatorRewardOwner},
+			Threshold: 1,
+		},
+		DelegationShares: 20_000,
+	}
+	addContinuousValTx, err := txs.NewSigned(continuousValidatorTx, txs.Codec, signers)
+	if err != nil {
+		return nil, ids.Empty, err
+	}
+	if err := addContinuousValTx.SyntacticVerify(env.ctx); err != nil {
+		return nil, ids.Empty, err
+	}
+
+	onParentState, err := state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		return nil, ids.Empty, err
+	}
+	addValExecutor := StandardTxExecutor{
+		State:   onParentState,
+		Backend: &env.backend,
+		Tx:      addContinuousValTx,
+	}
+	if err := addContinuousValTx.Unsigned.Visit(&addValExecutor); err != nil {
+		return nil, ids.Empty, err
+	}
+	onParentState.AddTx(addContinuousValTx, status.Committed)
+	if err := onParentState.Apply(env.state); err != nil {
+		return nil, ids.Empty, err
+	}
+
+	return continuousValidatorTx, addContinuousValTx.ID(), env.state.Commit()
+}
+
+func issueReward(env *environment, stakerID ids.ID, commit bool) error {
+	tx, err := env.txBuilder.NewRewardValidatorTx(stakerID)
+	if err != nil {
+		return err
+	}
+
+	onCommitState, err := state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		return err
+	}
+
+	onAbortState, err := state.NewDiff(lastAcceptedID, env)
+	if err != nil {
+		return err
+	}
+
+	txExecutor := ProposalTxExecutor{
+		OnCommitState: onCommitState,
+		OnAbortState:  onAbortState,
+		Backend:       &env.backend,
+		Tx:            tx,
+	}
+	if err := tx.Unsigned.Visit(&txExecutor); err != nil {
+		return err
+	}
+
+	if commit {
+		if err := txExecutor.OnCommitState.Apply(env.state); err != nil {
+			return err
+		}
+	} else {
+		if err := txExecutor.OnAbortState.Apply(env.state); err != nil {
+			return err
+		}
+	}
+	return env.state.Commit()
 }

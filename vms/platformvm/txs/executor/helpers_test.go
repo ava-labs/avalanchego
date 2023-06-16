@@ -263,11 +263,6 @@ func defaultState(
 		panic(err)
 	}
 
-	// persist and reload to init a bunch of in-memory stuff
-	state.SetHeight(0)
-	if err := state.Commit(); err != nil {
-		panic(err)
-	}
 	lastAcceptedID = state.GetLastAccepted()
 	return state
 }
