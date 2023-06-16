@@ -19,7 +19,10 @@ import (
 )
 
 var (
-	errNonPositiveHalflife = errors.New("timeout halflife must be positive")
+	errNonPositiveHalflife        = errors.New("timeout halflife must be positive")
+	errInitialTimeoutAboveMaximum = errors.New("initial timeout cannot be greater than maximum timeout")
+	errInitialTimeoutBelowMinimum = errors.New("initial timeout cannot be less than minimum timeout")
+	errTooSmallTimeoutCoefficient = errors.New("timeout coefficient must be >= 1")
 
 	_ heap.Interface         = (*timeoutQueue)(nil)
 	_ AdaptiveTimeoutManager = (*adaptiveTimeoutManager)(nil)
@@ -129,11 +132,11 @@ func NewAdaptiveTimeoutManager(
 ) (AdaptiveTimeoutManager, error) {
 	switch {
 	case config.InitialTimeout > config.MaximumTimeout:
-		return nil, fmt.Errorf("initial timeout (%s) > maximum timeout (%s)", config.InitialTimeout, config.MaximumTimeout)
+		return nil, fmt.Errorf("%w: (%s) > (%s)", errInitialTimeoutAboveMaximum, config.InitialTimeout, config.MaximumTimeout)
 	case config.InitialTimeout < config.MinimumTimeout:
-		return nil, fmt.Errorf("initial timeout (%s) < minimum timeout (%s)", config.InitialTimeout, config.MinimumTimeout)
+		return nil, fmt.Errorf("%w: (%s) < (%s)", errInitialTimeoutBelowMinimum, config.InitialTimeout, config.MinimumTimeout)
 	case config.TimeoutCoefficient < 1:
-		return nil, fmt.Errorf("timeout coefficient must be >= 1 but got %f", config.TimeoutCoefficient)
+		return nil, fmt.Errorf("%w: %f", errTooSmallTimeoutCoefficient, config.TimeoutCoefficient)
 	case config.TimeoutHalflife <= 0:
 		return nil, errNonPositiveHalflife
 	}
