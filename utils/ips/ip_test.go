@@ -100,15 +100,51 @@ func TestToIPPortError(t *testing.T) {
 		out         IPPort
 		expectedErr error
 	}{
-		{"", IPPort{}, errBadIP},
-		{":", IPPort{}, strconv.ErrSyntax},
-		{"abc:", IPPort{}, strconv.ErrSyntax},
-		{":abc", IPPort{}, strconv.ErrSyntax},
-		{"abc:abc", IPPort{}, strconv.ErrSyntax},
-		{"127.0.0.1:", IPPort{}, strconv.ErrSyntax},
-		{":1", IPPort{}, errBadIP},
-		{"::1", IPPort{}, errBadIP},
-		{"::1:42", IPPort{}, errBadIP},
+		{
+			in:          "",
+			out:         IPPort{},
+			expectedErr: errBadIP,
+		},
+		{
+			in:          ":",
+			out:         IPPort{},
+			expectedErr: strconv.ErrSyntax,
+		},
+		{
+			in:          "abc:",
+			out:         IPPort{},
+			expectedErr: strconv.ErrSyntax,
+		},
+		{
+			in:          ":abc",
+			out:         IPPort{},
+			expectedErr: strconv.ErrSyntax,
+		},
+		{
+			in:          "abc:abc",
+			out:         IPPort{},
+			expectedErr: strconv.ErrSyntax,
+		},
+		{
+			in:          "127.0.0.1:",
+			out:         IPPort{},
+			expectedErr: strconv.ErrSyntax,
+		},
+		{
+			in:          ":1",
+			out:         IPPort{},
+			expectedErr: errBadIP,
+		},
+		{
+			in:          "::1",
+			out:         IPPort{},
+			expectedErr: errBadIP,
+		},
+		{
+			in:          "::1:42",
+			out:         IPPort{},
+			expectedErr: errBadIP,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.in, func(t *testing.T) {

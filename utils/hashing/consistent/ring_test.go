@@ -197,8 +197,8 @@ func TestGetMapsToClockwiseNode(t *testing.T) {
 			}
 
 			node, err := ring.Get(test.key)
+			require.NoError(err)
 			require.Equal(test.expectedNode, node)
-			require.Nil(err)
 		})
 	}
 }
@@ -283,9 +283,8 @@ func TestAddCollisionReplacement(t *testing.T) {
 	ring.Add(node2)
 
 	ringMember, err := ring.Get(foo)
-
+	require.NoError(err)
 	require.Equal(node2, ringMember)
-	require.Nil(err)
 }
 
 // Tests that virtual nodes are replicated on Add.
@@ -333,25 +332,25 @@ func TestAddVirtualNodes(t *testing.T) {
 
 	// Gets that should route to node-1
 	node, err := ring.Get(testKey{key: "foo1"})
+	require.NoError(err)
 	require.Equal(node1, node)
-	require.Nil(err)
 	node, err = ring.Get(testKey{key: "foo3"})
+	require.NoError(err)
 	require.Equal(node1, node)
-	require.Nil(err)
 	node, err = ring.Get(testKey{key: "foo5"})
+	require.NoError(err)
 	require.Equal(node1, node)
-	require.Nil(err)
 
 	// Gets that should route to node-2
 	node, err = ring.Get(testKey{key: "foo0"})
+	require.NoError(err)
 	require.Equal(node2, node)
-	require.Nil(err)
 	node, err = ring.Get(testKey{key: "foo2"})
+	require.NoError(err)
 	require.Equal(node2, node)
-	require.Nil(err)
 	node, err = ring.Get(testKey{key: "foo4"})
+	require.NoError(err)
 	require.Equal(node2, node)
-	require.Nil(err)
 }
 
 // Tests that the node routed to changes if an Add results in a key shuffle.
@@ -385,9 +384,8 @@ func TestGetShuffleOnAdd(t *testing.T) {
 	// Ring:
 	// ... -> node-1 -> foo -> ...
 	node, err := ring.Get(foo)
-
+	require.NoError(err)
 	require.Equal(node1, node)
-	require.Nil(err)
 
 	// Add node-2, which results in foo being shuffled from node-1 to node-2.
 	//
@@ -400,9 +398,8 @@ func TestGetShuffleOnAdd(t *testing.T) {
 	// Ring:
 	// ... -> node-1 -> foo -> node-2 -> ...
 	node, err = ring.Get(foo)
-
+	require.NoError(err)
 	require.Equal(node2, node)
-	require.Nil(err)
 }
 
 // Tests that we can iterate around the ring.
@@ -442,13 +439,13 @@ func TestIteration(t *testing.T) {
 	// Ring:
 	// ... -> foo -> node-1 -> node-2 -> ...
 	node, err := ring.Get(foo)
+	require.NoError(err)
 	require.Equal(node1, node)
-	require.Nil(err)
 
 	// iterate by re-using node-1 to get node-2
 	node, err = ring.Get(node)
+	require.NoError(err)
 	require.Equal(node2, node)
-	require.Nil(err)
 }
 
 func setupTest(t *testing.T, virtualNodes int) (Ring, *hashing.MockHasher, *gomock.Controller) {

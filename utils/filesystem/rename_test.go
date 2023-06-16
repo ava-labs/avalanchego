@@ -25,17 +25,17 @@ func TestRenameIfExists(t *testing.T) {
 
 	// rename "a" to "b"
 	renamed, err := RenameIfExists(a, b)
-	require.True(renamed)
 	require.NoError(err)
+	require.True(renamed)
 
 	// rename "b" to "a"
 	renamed, err = RenameIfExists(b, a)
-	require.True(renamed)
 	require.NoError(err)
+	require.True(renamed)
 
 	// remove "a", but rename "a"->"b" should NOT error
 	require.NoError(os.RemoveAll(a))
 	renamed, err = RenameIfExists(a, b)
-	require.False(renamed)
 	require.NoError(err)
+	require.False(renamed)
 }
