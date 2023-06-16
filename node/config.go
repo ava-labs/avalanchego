@@ -64,13 +64,12 @@ type APIConfig struct {
 	APIIndexerConfig `json:"indexerConfig"`
 	IPCConfig        `json:"ipcConfig"`
 
-	AllowInsecureLocalhost bool `json:"allowInsecureLocalhost"`
 	// Enable/Disable APIs
-	AdminAPIEnabled    bool `json:"adminAPIEnabled"`
-	InfoAPIEnabled     bool `json:"infoAPIEnabled"`
-	KeystoreAPIEnabled bool `json:"keystoreAPIEnabled"`
-	MetricsAPIEnabled  bool `json:"metricsAPIEnabled"`
-	HealthAPIEnabled   bool `json:"healthAPIEnabled"`
+	AdminAPIEnabledSecret string `json:"adminAPIEnabledSecret"`
+	InfoAPIEnabled        bool   `json:"infoAPIEnabled"`
+	KeystoreAPIEnabled    bool   `json:"keystoreAPIEnabled"`
+	MetricsAPIEnabled     bool   `json:"metricsAPIEnabled"`
+	HealthAPIEnabled      bool   `json:"healthAPIEnabled"`
 }
 
 type IPConfig struct {

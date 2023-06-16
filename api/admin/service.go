@@ -54,6 +54,7 @@ var (
 )
 
 type Config struct {
+	Secret       string
 	Log          logging.Logger
 	ProfileDir   string
 	LogFactory   logging.Factory
@@ -70,6 +71,18 @@ type Admin struct {
 	profiler profiler.Profiler
 }
 
+type Secret struct {
+	Secret string `json:"secret"`
+}
+
+func (s *Secret) GetSecret() string {
+	return s.Secret
+}
+
+type ISecret interface {
+	GetSecret() string
+}
+
 // NewService returns a new admin API service.
 // All of the fields in [config] must be set.
 func NewService(config Config) (*common.HTTPHandler, error) {
@@ -77,17 +90,26 @@ func NewService(config Config) (*common.HTTPHandler, error) {
 	codec := json.NewCodec()
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-	if err := newServer.RegisterService(&Admin{
+	admin := &Admin{
 		Config:   config,
 		profiler: profiler.New(config.ProfileDir),
-	}, "admin"); err != nil {
+	}
+	if err := newServer.RegisterService(admin, "admin"); err != nil {
 		return nil, err
 	}
+	newServer.RegisterValidateRequestFunc(admin.ValidateRequest)
 	return &common.HTTPHandler{Handler: newServer}, nil
 }
 
+func (a *Admin) ValidateRequest(_ *rpc.RequestInfo, i interface{}) error {
+	if secret, ok := i.(ISecret); !ok || secret.GetSecret() != a.Secret {
+		return errors.New("secret arg missing or wrong")
+	}
+	return nil
+}
+
 // StartCPUProfiler starts a cpu profile writing to the specified file
-func (a *Admin) StartCPUProfiler(_ *http.Request, _ *struct{}, _ *api.EmptyReply) error {
+func (a *Admin) StartCPUProfiler(_ *http.Request, args *Secret, _ *api.EmptyReply) error { //nolint:revive
 	a.Log.Debug("API called",
 		zap.String("service", "admin"),
 		zap.String("method", "startCPUProfiler"),
@@ -97,7 +119,7 @@ func (a *Admin) StartCPUProfiler(_ *http.Request, _ *struct{}, _ *api.EmptyReply
 }
 
 // StopCPUProfiler stops the cpu profile
-func (a *Admin) StopCPUProfiler(_ *http.Request, _ *struct{}, _ *api.EmptyReply) error {
+func (a *Admin) StopCPUProfiler(_ *http.Request, args *Secret, _ *api.EmptyReply) error { //nolint:revive
 	a.Log.Debug("API called",
 		zap.String("service", "admin"),
 		zap.String("method", "stopCPUProfiler"),
@@ -107,7 +129,7 @@ func (a *Admin) StopCPUProfiler(_ *http.Request, _ *struct{}, _ *api.EmptyReply)
 }
 
 // MemoryProfile runs a memory profile writing to the specified file
-func (a *Admin) MemoryProfile(_ *http.Request, _ *struct{}, _ *api.EmptyReply) error {
+func (a *Admin) MemoryProfile(_ *http.Request, args *Secret, _ *api.EmptyReply) error { //nolint:revive
 	a.Log.Debug("API called",
 		zap.String("service", "admin"),
 		zap.String("method", "memoryProfile"),
@@ -117,7 +139,7 @@ func (a *Admin) MemoryProfile(_ *http.Request, _ *struct{}, _ *api.EmptyReply) e
 }
 
 // LockProfile runs a mutex profile writing to the specified file
-func (a *Admin) LockProfile(_ *http.Request, _ *struct{}, _ *api.EmptyReply) error {
+func (a *Admin) LockProfile(_ *http.Request, args *Secret, _ *api.EmptyReply) error { //nolint:revive
 	a.Log.Debug("API called",
 		zap.String("service", "admin"),
 		zap.String("method", "lockProfile"),
@@ -128,6 +150,7 @@ func (a *Admin) LockProfile(_ *http.Request, _ *struct{}, _ *api.EmptyReply) err
 
 // AliasArgs are the arguments for calling Alias
 type AliasArgs struct {
+	Secret
 	Endpoint string `json:"endpoint"`
 	Alias    string `json:"alias"`
 }
@@ -150,6 +173,7 @@ func (a *Admin) Alias(_ *http.Request, args *AliasArgs, _ *api.EmptyReply) error
 
 // AliasChainArgs are the arguments for calling AliasChain
 type AliasChainArgs struct {
+	Secret
 	Chain string `json:"chain"`
 	Alias string `json:"alias"`
 }
@@ -182,6 +206,7 @@ func (a *Admin) AliasChain(_ *http.Request, args *AliasChainArgs, _ *api.EmptyRe
 
 // GetChainAliasesArgs are the arguments for calling GetChainAliases
 type GetChainAliasesArgs struct {
+	Secret
 	Chain string `json:"chain"`
 }
 
@@ -208,7 +233,7 @@ func (a *Admin) GetChainAliases(_ *http.Request, args *GetChainAliasesArgs, repl
 }
 
 // Stacktrace returns the current global stacktrace
-func (a *Admin) Stacktrace(_ *http.Request, _ *struct{}, _ *api.EmptyReply) error {
+func (a *Admin) Stacktrace(_ *http.Request, args *Secret, _ *api.EmptyReply) error { //nolint:revive
 	a.Log.Debug("API called",
 		zap.String("service", "admin"),
 		zap.String("method", "stacktrace"),
@@ -220,6 +245,7 @@ func (a *Admin) Stacktrace(_ *http.Request, _ *struct{}, _ *api.EmptyReply) erro
 
 // See SetLoggerLevel
 type SetLoggerLevelArgs struct {
+	Secret
 	LoggerName   string         `json:"loggerName"`
 	LogLevel     *logging.Level `json:"logLevel"`
 	DisplayLevel *logging.Level `json:"displayLevel"`
@@ -277,6 +303,7 @@ type LogAndDisplayLevels struct {
 
 // See GetLoggerLevel
 type GetLoggerLevelArgs struct {
+	Secret
 	LoggerName string `json:"loggerName"`
 }
 
@@ -319,7 +346,7 @@ func (a *Admin) GetLoggerLevel(_ *http.Request, args *GetLoggerLevelArgs, reply 
 }
 
 // GetConfig returns the config that the node was started with.
-func (a *Admin) GetConfig(_ *http.Request, _ *struct{}, reply *interface{}) error {
+func (a *Admin) GetConfig(_ *http.Request, args *Secret, reply *interface{}) error { //nolint:revive
 	a.Log.Debug("API called",
 		zap.String("service", "admin"),
 		zap.String("method", "getConfig"),
@@ -337,7 +364,7 @@ type LoadVMsReply struct {
 }
 
 // LoadVMs loads any new VMs available to the node and returns the added VMs.
-func (a *Admin) LoadVMs(r *http.Request, _ *struct{}, reply *LoadVMsReply) error {
+func (a *Admin) LoadVMs(r *http.Request, args *Secret, reply *LoadVMsReply) error { //nolint:revive
 	a.Log.Debug("API called",
 		zap.String("service", "admin"),
 		zap.String("method", "loadVMs"),
@@ -366,7 +393,7 @@ type GetNodeSignerReply struct {
 	PublicKey  string `json:"publicKey"`
 }
 
-func (a *Admin) GetNodeSigner(_ *http.Request, _ *struct{}, reply *GetNodeSignerReply) error {
+func (a *Admin) GetNodeSigner(_ *http.Request, args *Secret, reply *GetNodeSignerReply) error { //nolint:revive
 	a.Log.Debug("Admin: GetNodeSigner called")
 
 	config := a.Config.NodeConfig.(*node.Config)

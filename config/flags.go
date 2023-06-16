@@ -224,11 +224,8 @@ func addNodeFlags(fs *flag.FlagSet) {
 			APIAuthPasswordKey))
 	fs.String(APIAuthPasswordKey, "", "Specifies password for API authorization tokens")
 
-	// Admin APIs
-	fs.Bool(HTTPAllowInsecureLocalhost, false, "Allow the admin api to be launched on localhost/127.0.0.1. This is considered to be insecure because of DNS rebinding attack vectors")
-
 	// Enable/Disable APIs
-	fs.Bool(AdminAPIEnabledKey, false, "If true, this node exposes the Admin API")
+	fs.String(AdminAPIEnabledKey, "", "If not empty, this node exposes the Admin API. The secret must be passed for every call")
 	fs.Bool(InfoAPIEnabledKey, true, "If true, this node exposes the Info API")
 	fs.Bool(KeystoreAPIEnabledKey, false, "If true, this node exposes the Keystore API")
 	fs.Bool(MetricsAPIEnabledKey, true, "If true, this node exposes the Metrics API")

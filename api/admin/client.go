@@ -39,38 +39,41 @@ type Client interface {
 	SetLoggerLevel(ctx context.Context, loggerName, logLevel, displayLevel string, options ...rpc.Option) error
 	GetLoggerLevel(ctx context.Context, loggerName string, options ...rpc.Option) (map[string]LogAndDisplayLevels, error)
 	GetConfig(ctx context.Context, options ...rpc.Option) (interface{}, error)
+	GetNodeSigner(ctx context.Context, _ string, options ...rpc.Option) (*GetNodeSignerReply, error)
 }
 
 // Client implementation for the Avalanche Platform Info API Endpoint
 type client struct {
 	requester rpc.EndpointRequester
+	secret    string
 }
 
 // NewClient returns a new Info API Client
-func NewClient(uri string) Client {
+func NewClient(uri string, secret string) Client {
 	return &client{requester: rpc.NewEndpointRequester(
 		uri + "/ext/admin",
-	)}
+	), secret: secret}
 }
 
 func (c *client) StartCPUProfiler(ctx context.Context, options ...rpc.Option) error {
-	return c.requester.SendRequest(ctx, "admin.startCPUProfiler", struct{}{}, &api.EmptyReply{}, options...)
+	return c.requester.SendRequest(ctx, "admin.startCPUProfiler", Secret{c.secret}, &api.EmptyReply{}, options...)
 }
 
 func (c *client) StopCPUProfiler(ctx context.Context, options ...rpc.Option) error {
-	return c.requester.SendRequest(ctx, "admin.stopCPUProfiler", struct{}{}, &api.EmptyReply{}, options...)
+	return c.requester.SendRequest(ctx, "admin.stopCPUProfiler", Secret{c.secret}, &api.EmptyReply{}, options...)
 }
 
 func (c *client) MemoryProfile(ctx context.Context, options ...rpc.Option) error {
-	return c.requester.SendRequest(ctx, "admin.memoryProfile", struct{}{}, &api.EmptyReply{}, options...)
+	return c.requester.SendRequest(ctx, "admin.memoryProfile", Secret{c.secret}, &api.EmptyReply{}, options...)
 }
 
 func (c *client) LockProfile(ctx context.Context, options ...rpc.Option) error {
-	return c.requester.SendRequest(ctx, "admin.lockProfile", struct{}{}, &api.EmptyReply{}, options...)
+	return c.requester.SendRequest(ctx, "admin.lockProfile", Secret{c.secret}, &api.EmptyReply{}, options...)
 }
 
 func (c *client) Alias(ctx context.Context, endpoint, alias string, options ...rpc.Option) error {
 	return c.requester.SendRequest(ctx, "admin.alias", &AliasArgs{
+		Secret:   Secret{c.secret},
 		Endpoint: endpoint,
 		Alias:    alias,
 	}, &api.EmptyReply{}, options...)
@@ -78,26 +81,28 @@ func (c *client) Alias(ctx context.Context, endpoint, alias string, options ...r
 
 func (c *client) AliasChain(ctx context.Context, chain, alias string, options ...rpc.Option) error {
 	return c.requester.SendRequest(ctx, "admin.aliasChain", &AliasChainArgs{
-		Chain: chain,
-		Alias: alias,
+		Secret: Secret{c.secret},
+		Chain:  chain,
+		Alias:  alias,
 	}, &api.EmptyReply{}, options...)
 }
 
 func (c *client) GetChainAliases(ctx context.Context, chain string, options ...rpc.Option) ([]string, error) {
 	res := &GetChainAliasesReply{}
 	err := c.requester.SendRequest(ctx, "admin.getChainAliases", &GetChainAliasesArgs{
-		Chain: chain,
+		Secret: Secret{c.secret},
+		Chain:  chain,
 	}, res, options...)
 	return res.Aliases, err
 }
 
 func (c *client) Stacktrace(ctx context.Context, options ...rpc.Option) error {
-	return c.requester.SendRequest(ctx, "admin.stacktrace", struct{}{}, &api.EmptyReply{}, options...)
+	return c.requester.SendRequest(ctx, "admin.stacktrace", Secret{c.secret}, &api.EmptyReply{}, options...)
 }
 
 func (c *client) LoadVMs(ctx context.Context, options ...rpc.Option) (map[ids.ID][]string, map[ids.ID]string, error) {
 	res := &LoadVMsReply{}
-	err := c.requester.SendRequest(ctx, "admin.loadVMs", struct{}{}, res, options...)
+	err := c.requester.SendRequest(ctx, "admin.loadVMs", Secret{c.secret}, res, options...)
 	return res.NewVMs, res.FailedVMs, err
 }
 
@@ -126,6 +131,7 @@ func (c *client) SetLoggerLevel(
 		}
 	}
 	return c.requester.SendRequest(ctx, "admin.setLoggerLevel", &SetLoggerLevelArgs{
+		Secret:       Secret{c.secret},
 		LoggerName:   loggerName,
 		LogLevel:     &logLevelArg,
 		DisplayLevel: &displayLevelArg,
@@ -139,6 +145,7 @@ func (c *client) GetLoggerLevel(
 ) (map[string]LogAndDisplayLevels, error) {
 	res := &GetLoggerLevelReply{}
 	err := c.requester.SendRequest(ctx, "admin.getLoggerLevel", &GetLoggerLevelArgs{
+		Secret:     Secret{c.secret},
 		LoggerName: loggerName,
 	}, res, options...)
 	return res.LoggerLevels, err
@@ -146,12 +153,12 @@ func (c *client) GetLoggerLevel(
 
 func (c *client) GetConfig(ctx context.Context, options ...rpc.Option) (interface{}, error) {
 	var res interface{}
-	err := c.requester.SendRequest(ctx, "admin.getConfig", struct{}{}, &res, options...)
+	err := c.requester.SendRequest(ctx, "admin.getConfig", Secret{c.secret}, &res, options...)
 	return res, err
 }
 
 func (c *client) GetNodeSigner(ctx context.Context, _ string, options ...rpc.Option) (*GetNodeSignerReply, error) {
 	res := &GetNodeSignerReply{}
-	err := c.requester.SendRequest(ctx, "getNodeSigner", nil, res, options...)
+	err := c.requester.SendRequest(ctx, "getNodeSigner", Secret{c.secret}, res, options...)
 	return res, err
 }
