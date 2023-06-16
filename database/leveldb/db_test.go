@@ -18,9 +18,7 @@ func TestInterface(t *testing.T) {
 	for _, test := range database.Tests {
 		folder := t.TempDir()
 		db, err := New(folder, nil, logging.NoLog{}, "", prometheus.NewRegistry())
-		if err != nil {
-			t.Fatalf("leveldb.New(%q, logging.NoLog{}) errored with %s", folder, err)
-		}
+		require.NoError(t, err)
 
 		defer db.Close()
 
@@ -57,9 +55,7 @@ func BenchmarkInterface(b *testing.B) {
 			folder := b.TempDir()
 
 			db, err := New(folder, nil, logging.NoLog{}, "", prometheus.NewRegistry())
-			if err != nil {
-				b.Fatal(err)
-			}
+			require.NoError(b, err)
 
 			bench(b, db, "leveldb", keys, values)
 

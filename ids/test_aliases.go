@@ -40,8 +40,8 @@ func AliaserAliasesEmptyTest(require *require.Assertions, r AliaserReader, _ Ali
 
 func AliaserAliasesTest(require *require.Assertions, r AliaserReader, w AliaserWriter) {
 	id := ID{'B', 'r', 'u', 'c', 'e', ' ', 'W', 'a', 'y', 'n', 'e'}
-	require.NoError(w.Alias(id, "Batman"))
 
+	require.NoError(w.Alias(id, "Batman"))
 	require.NoError(w.Alias(id, "Dark Knight"))
 
 	aliases, err := r.Aliases(id)
@@ -54,8 +54,8 @@ func AliaserAliasesTest(require *require.Assertions, r AliaserReader, w AliaserW
 func AliaserPrimaryAliasTest(require *require.Assertions, r AliaserReader, w AliaserWriter) {
 	id1 := ID{'J', 'a', 'm', 'e', 's', ' ', 'G', 'o', 'r', 'd', 'o', 'n'}
 	id2 := ID{'B', 'r', 'u', 'c', 'e', ' ', 'W', 'a', 'y', 'n', 'e'}
-	require.NoError(w.Alias(id2, "Batman"))
 
+	require.NoError(w.Alias(id2, "Batman"))
 	require.NoError(w.Alias(id2, "Dark Knight"))
 
 	_, err := r.PrimaryAlias(id1)
@@ -71,6 +71,7 @@ func AliaserPrimaryAliasTest(require *require.Assertions, r AliaserReader, w Ali
 func AliaserAliasClashTest(require *require.Assertions, _ AliaserReader, w AliaserWriter) {
 	id1 := ID{'B', 'r', 'u', 'c', 'e', ' ', 'W', 'a', 'y', 'n', 'e'}
 	id2 := ID{'D', 'i', 'c', 'k', ' ', 'G', 'r', 'a', 'y', 's', 'o', 'n'}
+
 	require.NoError(w.Alias(id1, "Batman"))
 
 	err := w.Alias(id2, "Batman")
@@ -81,8 +82,8 @@ func AliaserAliasClashTest(require *require.Assertions, _ AliaserReader, w Alias
 func AliaserRemoveAliasTest(require *require.Assertions, r AliaserReader, w AliaserWriter) {
 	id1 := ID{'B', 'r', 'u', 'c', 'e', ' ', 'W', 'a', 'y', 'n', 'e'}
 	id2 := ID{'J', 'a', 'm', 'e', 's', ' ', 'G', 'o', 'r', 'd', 'o', 'n'}
-	require.NoError(w.Alias(id1, "Batman"))
 
+	require.NoError(w.Alias(id1, "Batman"))
 	require.NoError(w.Alias(id1, "Dark Knight"))
 
 	w.RemoveAliases(id1)
@@ -92,8 +93,6 @@ func AliaserRemoveAliasTest(require *require.Assertions, r AliaserReader, w Alia
 	require.Error(err) //nolint:forbidigo // currently returns grpc errors too
 
 	require.NoError(w.Alias(id2, "Batman"))
-
 	require.NoError(w.Alias(id2, "Dark Knight"))
-
 	require.NoError(w.Alias(id1, "Dark Night Rises"))
 }

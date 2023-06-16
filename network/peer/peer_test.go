@@ -191,12 +191,10 @@ func makeReadyTestPeers(t *testing.T, trackedSubnets set.Set[ids.ID]) (*testPeer
 	peer0, peer1 := makeTestPeers(t, trackedSubnets)
 
 	require.NoError(peer0.AwaitReady(context.Background()))
-	isReady := peer0.Ready()
-	require.True(isReady)
+	require.True(peer0.Ready())
 
 	require.NoError(peer1.AwaitReady(context.Background()))
-	isReady = peer1.Ready()
-	require.True(isReady)
+	require.True(peer1.Ready())
 
 	return peer0, peer1
 }
@@ -218,8 +216,7 @@ func TestReady(t *testing.T) {
 		),
 	)
 
-	isReady := peer0.Ready()
-	require.False(isReady)
+	require.False(peer0.Ready())
 
 	peer1 := Start(
 		rawPeer1.config,
@@ -235,12 +232,10 @@ func TestReady(t *testing.T) {
 	)
 
 	require.NoError(peer0.AwaitReady(context.Background()))
-	isReady = peer0.Ready()
-	require.True(isReady)
+	require.True(peer0.Ready())
 
 	require.NoError(peer1.AwaitReady(context.Background()))
-	isReady = peer1.Ready()
-	require.True(isReady)
+	require.True(peer1.Ready())
 
 	peer0.StartClose()
 	require.NoError(peer0.AwaitClosed(context.Background()))
@@ -256,8 +251,7 @@ func TestSend(t *testing.T) {
 	outboundGetMsg, err := mc.Get(ids.Empty, 1, time.Second, ids.Empty, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
 	require.NoError(err)
 
-	sent := peer0.Send(context.Background(), outboundGetMsg)
-	require.True(sent)
+	require.True(peer0.Send(context.Background(), outboundGetMsg))
 
 	inboundGetMsg := <-peer1.inboundMsgChan
 	require.Equal(message.GetOp, inboundGetMsg.Op())
@@ -391,8 +385,7 @@ func sendAndFlush(t *testing.T, sender *testPeer, receiver *testPeer) {
 	mc := newMessageCreator(t)
 	outboundGetMsg, err := mc.Get(ids.Empty, 1, time.Second, ids.Empty, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
 	require.NoError(t, err)
-	sent := sender.Send(context.Background(), outboundGetMsg)
-	require.True(t, sent)
+	require.True(t, sender.Send(context.Background(), outboundGetMsg))
 	inboundGetMsg := <-receiver.inboundMsgChan
 	require.Equal(t, message.GetOp, inboundGetMsg.Op())
 }
