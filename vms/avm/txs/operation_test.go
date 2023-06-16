@@ -6,6 +6,8 @@ package txs
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/ids"
@@ -28,18 +30,16 @@ func (o *testOperable) Outs() []verify.State {
 
 func TestOperationVerifyNil(t *testing.T) {
 	op := (*Operation)(nil)
-	if err := op.Verify(); err == nil {
-		t.Fatalf("Should have erred due to nil operation")
-	}
+	err := op.Verify()
+	require.ErrorIs(t, err, ErrNilOperation)
 }
 
 func TestOperationVerifyEmpty(t *testing.T) {
 	op := &Operation{
 		Asset: avax.Asset{ID: ids.Empty},
 	}
-	if err := op.Verify(); err == nil {
-		t.Fatalf("Should have erred due to empty operation")
-	}
+	err := op.Verify()
+	require.ErrorIs(t, err, ErrNilFxOperation)
 }
 
 func TestOperationVerifyUTXOIDsNotSorted(t *testing.T) {
@@ -57,9 +57,8 @@ func TestOperationVerifyUTXOIDsNotSorted(t *testing.T) {
 		},
 		Op: &testOperable{},
 	}
-	if err := op.Verify(); err == nil {
-		t.Fatalf("Should have erred due to unsorted utxoIDs")
-	}
+	err := op.Verify()
+	require.ErrorIs(t, err, ErrNotSortedAndUniqueUTXOIDs)
 }
 
 func TestOperationVerify(t *testing.T) {
@@ -74,21 +73,17 @@ func TestOperationVerify(t *testing.T) {
 		},
 		Op: &testOperable{},
 	}
-	if err := op.Verify(); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, op.Verify())
 }
 
 func TestOperationSorting(t *testing.T) {
+	require := require.New(t)
+
 	c := linearcodec.NewDefault()
-	if err := c.RegisterType(&testOperable{}); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(c.RegisterType(&testOperable{}))
 
 	m := codec.NewDefaultManager()
-	if err := m.RegisterCodec(CodecVersion, c); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(m.RegisterCodec(CodecVersion, c))
 
 	ops := []*Operation{
 		{
@@ -112,13 +107,9 @@ func TestOperationSorting(t *testing.T) {
 			Op: &testOperable{},
 		},
 	}
-	if IsSortedAndUniqueOperations(ops, m) {
-		t.Fatalf("Shouldn't be sorted")
-	}
+	require.False(IsSortedAndUniqueOperations(ops, m))
 	SortOperations(ops, m)
-	if !IsSortedAndUniqueOperations(ops, m) {
-		t.Fatalf("Should be sorted")
-	}
+	require.True(IsSortedAndUniqueOperations(ops, m))
 	ops = append(ops, &Operation{
 		Asset: avax.Asset{ID: ids.Empty},
 		UTXOIDs: []*avax.UTXOID{
@@ -129,14 +120,11 @@ func TestOperationSorting(t *testing.T) {
 		},
 		Op: &testOperable{},
 	})
-	if IsSortedAndUniqueOperations(ops, m) {
-		t.Fatalf("Shouldn't be unique")
-	}
+	require.False(IsSortedAndUniqueOperations(ops, m))
 }
 
 func TestOperationTxNotState(t *testing.T) {
 	intf := interface{}(&OperationTx{})
-	if _, ok := intf.(verify.State); ok {
-		t.Fatalf("shouldn't be marked as state")
-	}
+	_, ok := intf.(verify.State)
+	require.False(t, ok)
 }

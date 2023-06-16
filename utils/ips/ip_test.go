@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -88,37 +89,70 @@ func TestIPPortString(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.result, func(t *testing.T) {
-			if result := tt.ipPort.String(); result != tt.result {
-				t.Errorf("Expected %q, got %q", tt.result, result)
-			}
+			require.Equal(t, tt.result, tt.ipPort.String())
 		})
 	}
 }
 
 func TestToIPPortError(t *testing.T) {
 	tests := []struct {
-		in  string
-		out IPPort
+		in          string
+		out         IPPort
+		expectedErr error
 	}{
-		{"", IPPort{}},
-		{":", IPPort{}},
-		{"abc:", IPPort{}},
-		{":abc", IPPort{}},
-		{"abc:abc", IPPort{}},
-		{"127.0.0.1:", IPPort{}},
-		{":1", IPPort{}},
-		{"::1", IPPort{}},
-		{"::1:42", IPPort{}},
+		{
+			in:          "",
+			out:         IPPort{},
+			expectedErr: errBadIP,
+		},
+		{
+			in:          ":",
+			out:         IPPort{},
+			expectedErr: strconv.ErrSyntax,
+		},
+		{
+			in:          "abc:",
+			out:         IPPort{},
+			expectedErr: strconv.ErrSyntax,
+		},
+		{
+			in:          ":abc",
+			out:         IPPort{},
+			expectedErr: strconv.ErrSyntax,
+		},
+		{
+			in:          "abc:abc",
+			out:         IPPort{},
+			expectedErr: strconv.ErrSyntax,
+		},
+		{
+			in:          "127.0.0.1:",
+			out:         IPPort{},
+			expectedErr: strconv.ErrSyntax,
+		},
+		{
+			in:          ":1",
+			out:         IPPort{},
+			expectedErr: errBadIP,
+		},
+		{
+			in:          "::1",
+			out:         IPPort{},
+			expectedErr: errBadIP,
+		},
+		{
+			in:          "::1:42",
+			out:         IPPort{},
+			expectedErr: errBadIP,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.in, func(t *testing.T) {
+			require := require.New(t)
+
 			result, err := ToIPPort(tt.in)
-			if err == nil {
-				t.Errorf("Unexpected success")
-			}
-			if !tt.out.Equal(result) {
-				t.Errorf("Expected %v, got %v", tt.out, result)
-			}
+			require.ErrorIs(err, tt.expectedErr)
+			require.Equal(tt.out, result)
 		})
 	}
 }
@@ -133,13 +167,11 @@ func TestToIPPort(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.in, func(t *testing.T) {
+			require := require.New(t)
+
 			result, err := ToIPPort(tt.in)
-			if err != nil {
-				t.Errorf("Unexpected error %v", err)
-			}
-			if !tt.out.Equal(result) {
-				t.Errorf("Expected %#v, got %#v", tt.out, result)
-			}
+			require.NoError(err)
+			require.Equal(tt.out, result)
 		})
 	}
 }

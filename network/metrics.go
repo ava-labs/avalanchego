@@ -22,7 +22,6 @@ type metrics struct {
 	numSubnetPeers                  *prometheus.GaugeVec
 	timeSinceLastMsgSent            prometheus.Gauge
 	timeSinceLastMsgReceived        prometheus.Gauge
-	sendQueuePortionFull            prometheus.Gauge
 	sendFailRate                    prometheus.Gauge
 	connected                       prometheus.Counter
 	disconnected                    prometheus.Counter
@@ -70,11 +69,6 @@ func newMetrics(namespace string, registerer prometheus.Registerer, initialSubne
 			Namespace: namespace,
 			Name:      "time_since_last_msg_sent",
 			Help:      "Time (in ns) since the last msg was sent",
-		}),
-		sendQueuePortionFull: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "send_queue_portion_full",
-			Help:      "Percentage of use in Send Queue",
 		}),
 		sendFailRate: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
@@ -154,7 +148,6 @@ func newMetrics(namespace string, registerer prometheus.Registerer, initialSubne
 		registerer.Register(m.numSubnetPeers),
 		registerer.Register(m.timeSinceLastMsgReceived),
 		registerer.Register(m.timeSinceLastMsgSent),
-		registerer.Register(m.sendQueuePortionFull),
 		registerer.Register(m.sendFailRate),
 		registerer.Register(m.connected),
 		registerer.Register(m.disconnected),

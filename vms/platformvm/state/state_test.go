@@ -310,9 +310,10 @@ func TestValidatorWeightDiff(t *testing.T) {
 				errs.Add(op(diff))
 			}
 			require.ErrorIs(errs.Err, tt.expectedErr)
-			if tt.expectedErr == nil {
-				require.Equal(tt.expected, diff)
+			if tt.expectedErr != nil {
+				return
 			}
+			require.Equal(tt.expected, diff)
 		})
 	}
 }

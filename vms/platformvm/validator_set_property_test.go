@@ -71,7 +71,7 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 
 	properties.Property("check GetValidatorSet", prop.ForAll(
 		func(events []uint8) string {
-			vm, subnetID, err := buildVM()
+			vm, subnetID, err := buildVM(t)
 			if err != nil {
 				return fmt.Sprintf("failed building vm: %s", err.Error())
 			}
@@ -706,7 +706,7 @@ func TestTimestampListGenerator(t *testing.T) {
 
 // add a single validator at the end of times,
 // to make sure it won't pollute our tests
-func buildVM() (*VM, ids.ID, error) {
+func buildVM(t *testing.T) (*VM, ids.ID, error) {
 	vdrs := validators.NewManager()
 	primaryVdrs := validators.NewSet()
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
@@ -739,7 +739,7 @@ func buildVM() (*VM, ids.ID, error) {
 	atomicDB := prefixdb.New([]byte{1}, baseDBManager.Current().Database)
 
 	msgChan := make(chan common.Message, 1)
-	ctx := defaultContext()
+	ctx := defaultContext(t)
 
 	m := atomic.NewMemory(atomicDB)
 	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
