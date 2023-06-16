@@ -128,7 +128,7 @@ func newEnvironment(fork activeFork) *environment {
 	return internalNewEnv(fork, false /*noGenesisValidator*/)
 }
 
-func newEnvironmentNoValidator(fork activeFork) *environment { //nolint:golint
+func newEnvironmentNoValidator(fork activeFork) *environment { //nolint:unparam
 	return internalNewEnv(fork, true /*noGenesisValidator*/)
 }
 

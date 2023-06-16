@@ -642,13 +642,8 @@ func (e *ProposalTxExecutor) rewardDelegatorTx(
 
 	// Calculate split of reward between delegator/delegatee
 	// The delegator gives stake to the validatee
-	validatorShares := vdrTx.Shares()
-	delegatorShares := reward.PercentDenominator - uint64(validatorShares)
-	delegatorReward := delegatorShares * (delegator.PotentialReward / reward.PercentDenominator)
 	// Delay rounding as long as possible for small numbers
-	if optimisticReward, err := math.Mul64(delegatorShares, delegator.PotentialReward); err == nil {
-		delegatorReward = optimisticReward / reward.PercentDenominator
-	}
+	delegatorReward := calculateDelegatorReward(delegator, vdrTx.Shares())
 	delegateeReward := delegator.PotentialReward - delegatorReward
 
 	// following Continuous staking fork activation multiple rewards UTXOS
@@ -807,4 +802,14 @@ func (e *ProposalTxExecutor) calculateProposalPreference(stakerToReward, primary
 		return false, fmt.Errorf("failed to calculate uptime: %w", err)
 	}
 	return uptime >= expectedUptimePercentage, nil
+}
+
+func calculateDelegatorReward(delegator *state.Staker, validatorShares uint32) uint64 {
+	delegatorShares := reward.PercentDenominator - uint64(validatorShares)
+	delegatorReward := delegatorShares * (delegator.PotentialReward / reward.PercentDenominator)
+
+	if optimisticReward, err := math.Mul64(delegatorShares, delegator.PotentialReward); err == nil {
+		delegatorReward = optimisticReward / reward.PercentDenominator
+	}
+	return delegatorReward
 }
