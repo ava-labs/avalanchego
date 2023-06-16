@@ -408,15 +408,13 @@ func TestSyntacticVerifierBaseTx(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			require := require.New(t)
-
 			tx := test.txFunc()
 			verifier := &SyntacticVerifier{
 				Backend: backend,
 				Tx:      tx,
 			}
 			err := tx.Unsigned.Visit(verifier)
-			require.ErrorIs(err, test.err)
+			require.ErrorIs(t, err, test.err)
 		})
 	}
 }
@@ -1017,15 +1015,13 @@ func TestSyntacticVerifierCreateAssetTx(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			require := require.New(t)
-
 			tx := test.txFunc()
 			verifier := &SyntacticVerifier{
 				Backend: backend,
 				Tx:      tx,
 			}
 			err := tx.Unsigned.Visit(verifier)
-			require.ErrorIs(err, test.err)
+			require.ErrorIs(t, err, test.err)
 		})
 	}
 }
@@ -1506,15 +1502,13 @@ func TestSyntacticVerifierOperationTx(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			require := require.New(t)
-
 			tx := test.txFunc()
 			verifier := &SyntacticVerifier{
 				Backend: backend,
 				Tx:      tx,
 			}
 			err := tx.Unsigned.Visit(verifier)
-			require.ErrorIs(err, test.err)
+			require.ErrorIs(t, err, test.err)
 		})
 	}
 }
@@ -1906,15 +1900,13 @@ func TestSyntacticVerifierImportTx(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			require := require.New(t)
-
 			tx := test.txFunc()
 			verifier := &SyntacticVerifier{
 				Backend: backend,
 				Tx:      tx,
 			}
 			err := tx.Unsigned.Visit(verifier)
-			require.ErrorIs(err, test.err)
+			require.ErrorIs(t, err, test.err)
 		})
 	}
 }
@@ -2318,15 +2310,13 @@ func TestSyntacticVerifierExportTx(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			require := require.New(t)
-
 			tx := test.txFunc()
 			verifier := &SyntacticVerifier{
 				Backend: backend,
 				Tx:      tx,
 			}
 			err := tx.Unsigned.Visit(verifier)
-			require.ErrorIs(err, test.err)
+			require.ErrorIs(t, err, test.err)
 		})
 	}
 }

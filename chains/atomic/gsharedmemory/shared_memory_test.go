@@ -43,10 +43,10 @@ func TestInterface(t *testing.T) {
 }
 
 func wrapSharedMemory(t *testing.T, sm atomic.SharedMemory, db database.Database) (atomic.SharedMemory, io.Closer) {
+	require := require.New(t)
+
 	listener, err := grpcutils.NewListener()
-	if err != nil {
-		t.Fatalf("Failed to create listener: %s", err)
-	}
+	require.NoError(err)
 	serverCloser := grpcutils.ServerCloser{}
 
 	server := grpcutils.NewServer()
@@ -56,9 +56,7 @@ func wrapSharedMemory(t *testing.T, sm atomic.SharedMemory, db database.Database
 	go grpcutils.Serve(listener, server)
 
 	conn, err := grpcutils.Dial(listener.Addr().String())
-	if err != nil {
-		t.Fatalf("Failed to dial: %s", err)
-	}
+	require.NoError(err)
 
 	rpcsm := NewClient(sharedmemorypb.NewSharedMemoryClient(conn))
 	return rpcsm, conn

@@ -472,47 +472,50 @@ func TestDiffUTXO(t *testing.T) {
 }
 
 func assertChainsEqual(t *testing.T, expected, actual Chain) {
+	require := require.New(t)
+
 	t.Helper()
 
 	expectedCurrentStakerIterator, expectedErr := expected.GetCurrentStakerIterator()
 	actualCurrentStakerIterator, actualErr := actual.GetCurrentStakerIterator()
-	require.Equal(t, expectedErr, actualErr)
+	require.Equal(expectedErr, actualErr)
 	if expectedErr == nil {
 		assertIteratorsEqual(t, expectedCurrentStakerIterator, actualCurrentStakerIterator)
 	}
 
 	expectedPendingStakerIterator, expectedErr := expected.GetPendingStakerIterator()
 	actualPendingStakerIterator, actualErr := actual.GetPendingStakerIterator()
-	require.Equal(t, expectedErr, actualErr)
+	require.Equal(expectedErr, actualErr)
 	if expectedErr == nil {
 		assertIteratorsEqual(t, expectedPendingStakerIterator, actualPendingStakerIterator)
 	}
 
-	require.Equal(t, expected.GetTimestamp(), actual.GetTimestamp())
+	require.Equal(expected.GetTimestamp(), actual.GetTimestamp())
 
 	expectedCurrentSupply, err := expected.GetCurrentSupply(constants.PrimaryNetworkID)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	actualCurrentSupply, err := actual.GetCurrentSupply(constants.PrimaryNetworkID)
-	require.NoError(t, err)
+	require.NoError(err)
 
-	require.Equal(t, expectedCurrentSupply, actualCurrentSupply)
+	require.Equal(expectedCurrentSupply, actualCurrentSupply)
 
 	expectedSubnets, expectedErr := expected.GetSubnets()
 	actualSubnets, actualErr := actual.GetSubnets()
-	require.Equal(t, expectedErr, actualErr)
+	require.Equal(expectedErr, actualErr)
 	if expectedErr == nil {
-		require.Equal(t, expectedSubnets, actualSubnets)
+		require.Equal(expectedSubnets, actualSubnets)
 
 		for _, subnet := range expectedSubnets {
 			subnetID := subnet.ID()
 
 			expectedChains, expectedErr := expected.GetChains(subnetID)
 			actualChains, actualErr := actual.GetChains(subnetID)
-			require.Equal(t, expectedErr, actualErr)
-			if expectedErr == nil {
-				require.Equal(t, expectedChains, actualChains)
+			require.Equal(expectedErr, actualErr)
+			if expectedErr != nil {
+				continue
 			}
+			require.Equal(expectedChains, actualChains)
 		}
 	}
 }

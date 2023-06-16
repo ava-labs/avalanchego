@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -44,12 +43,8 @@ func TestFetchUTXOs(t *testing.T) {
 	c := linearcodec.NewDefault()
 	manager := codec.NewDefaultManager()
 
-	errs := wrappers.Errs{}
-	errs.Add(
-		c.RegisterType(&secp256k1fx.TransferOutput{}),
-		manager.RegisterCodec(codecVersion, c),
-	)
-	require.NoError(errs.Err)
+	require.NoError(c.RegisterType(&secp256k1fx.TransferOutput{}))
+	require.NoError(manager.RegisterCodec(codecVersion, c))
 
 	db := memdb.New()
 	s := NewUTXOState(db, manager)
@@ -81,12 +76,8 @@ func TestGetPaginatedUTXOs(t *testing.T) {
 	c := linearcodec.NewDefault()
 	manager := codec.NewDefaultManager()
 
-	errs := wrappers.Errs{}
-	errs.Add(
-		c.RegisterType(&secp256k1fx.TransferOutput{}),
-		manager.RegisterCodec(codecVersion, c),
-	)
-	require.NoError(errs.Err)
+	require.NoError(c.RegisterType(&secp256k1fx.TransferOutput{}))
+	require.NoError(manager.RegisterCodec(codecVersion, c))
 
 	db := memdb.New()
 	s := NewUTXOState(db, manager)
@@ -158,24 +149,15 @@ func TestGetPaginatedUTXOs(t *testing.T) {
 	var totalUTXOs []*UTXO
 	for i := 0; i <= 10; i++ {
 		fetchedUTXOs, lastAddr, lastIdx, err = GetPaginatedUTXOs(s, addrs, lastAddr, lastIdx, 512)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 
 		totalUTXOs = append(totalUTXOs, fetchedUTXOs...)
 	}
 
-	if len(totalUTXOs) != 2000 {
-		t.Fatalf("Wrong number of utxos. Should have paginated through all. Expected (%d) returned (%d)", 2000, len(totalUTXOs))
-	}
+	require.Len(totalUTXOs, 2000)
 
 	// Fetch all UTXOs
 	notPaginatedUTXOs, err := GetAllUTXOs(s, addrs)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if len(notPaginatedUTXOs) != len(totalUTXOs) {
-		t.Fatalf("Wrong number of utxos. Expected (%d) returned (%d)", len(totalUTXOs), len(notPaginatedUTXOs))
-	}
+	require.NoError(err)
+	require.Len(notPaginatedUTXOs, len(totalUTXOs))
 }
