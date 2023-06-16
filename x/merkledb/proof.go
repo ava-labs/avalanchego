@@ -251,11 +251,16 @@ type RangeProof struct {
 	// they are also in [EndProof].
 	StartProof []ProofNode
 
-	// A proof of the greatest key in [KeyValues], or, if this proof contains
-	// no [KeyValues], just the root.
-	// Empty if the request for this range proof gave no upper bound
-	// on the range to fetch, unless this proof contains no [KeyValues]
-	// and [StartProof] is empty.
+	// If no upper range bound was given, [KeyValues] is empty,
+	// and [StartProof] is non-empty, this is empty.
+	//
+	// If no upper range bound was given, [KeyValues] is empty,
+	// and [StartProof] is empty, this is the root.
+	//
+	// If an upper range bound was given and [KeyValues] is empty,
+	// this is a proof for the upper range bound.
+	//
+	// Otherwise, this is a proof for the largest key in [KeyValues].
 	EndProof []ProofNode
 
 	// This proof proves that the key-value pairs in [KeyValues] are in the trie.

@@ -439,17 +439,23 @@ func (t *trieView) GetRangeProof(
 	// This proof may not contain all key-value pairs in [start, end] due to size limitations.
 	// The end proof we provide should be for the last key-value pair in the proof, not for
 	// the last key-value pair requested, which may not be in this proof.
+	var (
+		endProof *Proof
+		err      error
+	)
 	if len(result.KeyValues) > 0 {
-		end = result.KeyValues[len(result.KeyValues)-1].Key
-	}
-
-	if len(end) > 0 {
-		endProof, err := t.getProof(ctx, end)
+		greatestKey := result.KeyValues[len(result.KeyValues)-1].Key
+		endProof, err = t.getProof(ctx, greatestKey)
 		if err != nil {
 			return nil, err
 		}
-		result.EndProof = endProof.Path
+	} else if len(end) > 0 {
+		endProof, err = t.getProof(ctx, end)
+		if err != nil {
+			return nil, err
+		}
 	}
+	result.EndProof = endProof.Path
 
 	if len(start) > 0 {
 		startProof, err := t.getProof(ctx, start)

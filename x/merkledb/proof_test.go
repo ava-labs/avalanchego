@@ -4,6 +4,7 @@
 package merkledb
 
 import (
+	"bytes"
 	"context"
 	"math/rand"
 	"testing"
@@ -11,9 +12,11 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/set"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
@@ -1605,5 +1608,131 @@ func TestProofProtoUnmarshal(t *testing.T) {
 			err := proof.UnmarshalProto(tt.proof)
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
+	}
+}
+
+func TestRangeProofInvariants(t *testing.T) {
+	require := require.New(t)
+	now := int64(1686944727682037399)
+	t.Logf("seed: %d", now)
+	rand := rand.New(rand.NewSource(now)) // #nosec G404
+
+	var (
+		numKeyValues   = 2048
+		deletePortion  = 0.25
+		numProofs      = 512
+		maxStartKeyLen = 8
+		maxEndKeyLen   = 8
+		maxMaxProofLen = 1024
+	)
+
+	db, err := getBasicDB()
+	require.NoError(err)
+
+	// Insert a bunch of random key values.
+	insertRandomKeyValues(
+		require,
+		rand,
+		[]database.Database{db},
+		numKeyValues,
+		deletePortion,
+	)
+
+	// Generate random range proofs and assert that
+	// the range proof invariants are maintained.
+	for i := 0; i < numProofs; i++ {
+		startKeyLen := rand.Intn(maxStartKeyLen)
+		startKey := make([]byte, startKeyLen)
+
+		endKeyLen := rand.Intn(maxEndKeyLen)
+		endKey := make([]byte, endKeyLen)
+
+		// Make sure we generate a valid range.
+		// If len(endKey) == 0 the only valid [startKey] has length 0.
+		if len(endKey) != 0 {
+			generatedRange := false
+			numIters := 0 // TODO remove
+			for !generatedRange || bytes.Compare(startKey, endKey) > 0 {
+				generatedRange = true
+				numIters++
+				if numIters > 5000 {
+					t.Fatal("could not generate valid range ", i)
+				}
+				_, _ = rand.Read(startKey)
+				_, _ = rand.Read(endKey)
+			}
+		}
+
+		maxProofLen := rand.Intn(maxMaxProofLen) + 1
+
+		rangeProof, err := db.GetRangeProof(
+			context.Background(),
+			startKey,
+			endKey,
+			maxProofLen,
+		)
+		require.NoError(err)
+
+		// Make sure the start proof doesn't contain any nodes
+		// that are in the end proof.
+		endProofKeys := set.Set[path]{}
+		for _, node := range rangeProof.EndProof {
+			path := node.KeyPath.deserialize()
+			endProofKeys.Add(path)
+		}
+
+		for _, node := range rangeProof.StartProof {
+			path := node.KeyPath.deserialize()
+			require.NotContains(endProofKeys, path)
+		}
+
+		// Make sure the EndProof invariant is maintained
+		switch {
+		case len(endKey) == 0:
+			if len(rangeProof.KeyValues) == 0 {
+				if len(rangeProof.StartProof) == 0 {
+					require.Len(rangeProof.EndProof, 1) // Just the root
+				} else {
+					require.Empty(rangeProof.EndProof)
+				}
+			}
+		case len(rangeProof.KeyValues) == 0:
+			require.NotEmpty(rangeProof.EndProof)
+
+			// EndProof should be a proof for upper range bound.
+			value := Nothing[[]byte]()
+			upperRangeBoundVal, err := db.Get(endKey)
+			if err != nil {
+				require.ErrorIs(err, database.ErrNotFound)
+			} else {
+				value = Some(upperRangeBoundVal)
+			}
+
+			proof := Proof{
+				Path:  rangeProof.EndProof,
+				Key:   endKey,
+				Value: value,
+			}
+
+			rootID, err := db.GetMerkleRoot(context.Background())
+			require.NoError(err)
+
+			require.NoError(proof.Verify(context.Background(), rootID))
+		default:
+			require.NotEmpty(rangeProof.EndProof)
+
+			greatestKV := rangeProof.KeyValues[len(rangeProof.KeyValues)-1]
+			// EndProof should be a proof for largest key-value.
+			proof := Proof{
+				Path:  rangeProof.EndProof,
+				Key:   greatestKV.Key,
+				Value: Some(greatestKV.Value),
+			}
+
+			rootID, err := db.GetMerkleRoot(context.Background())
+			require.NoError(err)
+
+			require.NoError(proof.Verify(context.Background(), rootID), i) // TODO remove i
+		}
 	}
 }
