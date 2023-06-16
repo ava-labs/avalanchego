@@ -4401,6 +4401,7 @@ func TestCaminoStandardTxExecutorSuspendValidator(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, shutdownCaminoEnvironment(env))
 
+	initAdmin := caminoPreFundedKeys[0]
 	// other common data
 
 	outputOwners := &secp256k1fx.OutputOwners{
@@ -4421,23 +4422,59 @@ func TestCaminoStandardTxExecutorSuspendValidator(t *testing.T) {
 		expectedErr  error
 		assert       func(*testing.T)
 	}{
+		"Set state to deferred from address with no roles -> ErrAddrStateNotPermitted": {
+			generateArgs: func() args {
+				return args{
+					address:    consortiumMemberAddress,
+					keys:       []*secp256k1.PrivateKey{caminoPreFundedKeys[1]}, // non-admin address
+					changeAddr: outputOwners,
+				}
+			},
+			preExecute:  func(t *testing.T, tx *txs.Tx, state state.State) {},
+			expectedErr: errAddrStateNotPermitted,
+		},
+		"Set state to deferred from kyc address -> ErrAddrStateNotPermitted": {
+			generateArgs: func() args {
+				return args{
+					address:    consortiumMemberAddress,
+					keys:       []*secp256k1.PrivateKey{caminoPreFundedKeys[1]},
+					changeAddr: outputOwners,
+				}
+			},
+			preExecute: func(t *testing.T, tx *txs.Tx, state state.State) {
+				state.SetAddressStates(caminoPreFundedKeys[1].Address(), txs.AddressStateRoleKYC)
+			},
+			expectedErr: errAddrStateNotPermitted,
+		},
 		"Happy path set state to deferred": {
 			generateArgs: func() args {
 				return args{
 					address:    consortiumMemberAddress,
-					keys:       []*secp256k1.PrivateKey{caminoPreFundedKeys[0]},
+					keys:       []*secp256k1.PrivateKey{initAdmin},
 					changeAddr: outputOwners,
 				}
 			},
 			preExecute:  func(t *testing.T, tx *txs.Tx, state state.State) {},
 			expectedErr: nil,
 		},
+		"Remove deferred state from non-admin address -> ErrAddrStateNotPermitted": {
+			generateArgs: func() args {
+				return args{
+					address:    consortiumMemberAddress,
+					remove:     true,
+					keys:       []*secp256k1.PrivateKey{caminoPreFundedKeys[1]}, // non-admin address
+					changeAddr: outputOwners,
+				}
+			},
+			preExecute:  func(t *testing.T, tx *txs.Tx, state state.State) {},
+			expectedErr: errAddrStateNotPermitted,
+		},
 		"Happy path set state to active": {
 			generateArgs: func() args {
 				return args{
 					address:    consortiumMemberAddress,
 					remove:     true,
-					keys:       []*secp256k1.PrivateKey{caminoPreFundedKeys[0]},
+					keys:       []*secp256k1.PrivateKey{initAdmin},
 					changeAddr: outputOwners,
 				}
 			},
@@ -4454,7 +4491,7 @@ func TestCaminoStandardTxExecutorSuspendValidator(t *testing.T) {
 				return args{
 					address:    consortiumMemberAddress,
 					remove:     true,
-					keys:       []*secp256k1.PrivateKey{caminoPreFundedKeys[0]},
+					keys:       []*secp256k1.PrivateKey{initAdmin},
 					changeAddr: outputOwners,
 				}
 			},
@@ -4467,7 +4504,7 @@ func TestCaminoStandardTxExecutorSuspendValidator(t *testing.T) {
 			caminoGenesisConf := api.Camino{
 				VerifyNodeSignature: true,
 				LockModeBondDeposit: true,
-				InitialAdmin:        caminoPreFundedKeys[0].Address(),
+				InitialAdmin:        initAdmin.Address(),
 			}
 			env := newCaminoEnvironment( /*postBanff*/ true, false, caminoGenesisConf)
 			env.ctx.Lock.Lock()

@@ -36,7 +36,7 @@ var (
 
 	errNodeSignatureMissing           = errors.New("last signature is not nodeID's signature")
 	errWrongLockMode                  = errors.New("this tx can't be used with this caminoGenesis.LockModeBondDeposit")
-	errRecoverAdresses                = errors.New("cannot recover addresses from credentials")
+	errRecoverAddresses               = errors.New("cannot recover addresses from credentials")
 	errAddrStateNotPermitted          = errors.New("don't have permission to set address state bit")
 	errValidatorExists                = errors.New("node is already a validator")
 	errInvalidSystemTxBody            = errors.New("tx body doesn't match expected one")
@@ -1483,7 +1483,7 @@ func (e *CaminoStandardTxExecutor) AddressStateTx(tx *txs.AddressStateTx) error 
 
 	addresses, err := e.Fx.RecoverAddresses(tx, e.Tx.Creds)
 	if err != nil {
-		return fmt.Errorf("%w: %s", errRecoverAdresses, err)
+		return fmt.Errorf("%w: %s", errRecoverAddresses, err)
 	}
 
 	if len(addresses) == 0 {
