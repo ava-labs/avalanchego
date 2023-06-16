@@ -167,6 +167,7 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID) error {
 		return ErrProofValueDoesntMatch
 	}
 
+	// Don't bother locking [view] -- nobody else has a reference to it.
 	view, err := getEmptyTrieView(ctx)
 	if err != nil {
 		return err
@@ -175,9 +176,8 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID) error {
 	// Insert all of the proof nodes.
 	// [provenPath] is the path that we are proving exists, or the path
 	// that is where the path we are proving doesn't exist should be.
-	provenPath := proof.Path[len(proof.Path)-1].KeyPath.deserialize()
+	provenPath := Some(proof.Path[len(proof.Path)-1].KeyPath.deserialize())
 
-	// Don't bother locking [db] and [view] -- nobody else has a reference to them.
 	if err = addPathInfo(view, proof.Path, provenPath, provenPath); err != nil {
 		return err
 	}
@@ -358,10 +358,14 @@ func (proof *RangeProof) Verify(
 	// By inserting all children < [start], we prove that there are no keys
 	// > [start] but less than the first key given. That is, the peer who
 	// gave us this proof is not omitting nodes.
-	if err := addPathInfo(view, proof.StartProof, smallestPath, largestPath); err != nil {
+	upperBound := Nothing[path]()
+	if len(end) > 0 {
+		upperBound = Some(largestPath)
+	}
+	if err := addPathInfo(view, proof.StartProof, Some(smallestPath), upperBound); err != nil {
 		return err
 	}
-	if err := addPathInfo(view, proof.EndProof, smallestPath, largestPath); err != nil {
+	if err := addPathInfo(view, proof.EndProof, Some(smallestPath), upperBound); err != nil {
 		return err
 	}
 
@@ -733,19 +737,19 @@ func valueOrHashMatches(value Maybe[[]byte], valueOrHash Maybe[[]byte]) bool {
 }
 
 // Adds each key/value pair in [proofPath] to [t].
-// For each proof node, adds the children that are < [start] or > [end].
-// If [start] is empty, no children are < [start].
-// If [end] is empty, no children are > [end].
+// For each proof node, adds the children that are < [lowerBound] or > [upperBound].
+// If [lowerBound] is empty, no children are < [lowerBound].
+// If [upperBound] is empty, no children are > [upperBound].
 // Assumes [t.lock] is held.
 func addPathInfo(
 	t *trieView,
 	proofPath []ProofNode,
-	startPath path,
-	endPath path,
+	lowerBound Maybe[path],
+	upperBound Maybe[path],
 ) error {
 	var (
-		hasLowerBound = len(startPath) > 0
-		hasUpperBound = len(endPath) > 0
+		hasLowerBound = lowerBound.hasValue
+		hasUpperBound = upperBound.hasValue
 	)
 
 	for i := len(proofPath) - 1; i >= 0; i-- {
@@ -780,8 +784,8 @@ func addPathInfo(
 				compressedPath = existingChild.compressedPath
 			}
 			childPath := keyPath.Append(index) + compressedPath
-			if (hasLowerBound && childPath.Compare(startPath) < 0) ||
-				(hasUpperBound && childPath.Compare(endPath) > 0) {
+			if (hasLowerBound && childPath.Compare(lowerBound.value) < 0) ||
+				(hasUpperBound && childPath.Compare(upperBound.value) > 0) {
 				n.addChildWithoutNode(index, compressedPath, childID)
 			}
 		}

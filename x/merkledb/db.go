@@ -1065,10 +1065,10 @@ func (db *merkleDB) VerifyChangeProof(
 
 	// For all the nodes along the edges of the proof, insert children < [start] and > [largestKey]
 	// into the trie so that we get the expected root ID (if this proof is valid).
-	if err := addPathInfo(view, proof.StartProof, smallestPath, largestPath); err != nil {
+	if err := addPathInfo(view, proof.StartProof, Some(smallestPath), Some(largestPath)); err != nil {
 		return err
 	}
-	if err := addPathInfo(view, proof.EndProof, smallestPath, largestPath); err != nil {
+	if err := addPathInfo(view, proof.EndProof, Some(smallestPath), Some(largestPath)); err != nil {
 		return err
 	}
 

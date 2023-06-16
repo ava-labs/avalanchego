@@ -1613,7 +1613,7 @@ func TestProofProtoUnmarshal(t *testing.T) {
 
 func TestRangeProofInvariants(t *testing.T) {
 	require := require.New(t)
-	now := int64(1686944727682037399)
+	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)
 	rand := rand.New(rand.NewSource(now)) // #nosec G404
 
