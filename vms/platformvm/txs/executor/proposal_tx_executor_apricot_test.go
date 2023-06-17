@@ -93,7 +93,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 		require.NoError(t, target.state.Commit())
 	}
 
-	dummyH := newEnvironment(apricotPhase5Fork)
+	dummyH := newEnvironment(t, apricotPhase5Fork)
 	currentTimestamp := dummyH.state.GetTimestamp()
 
 	type test struct {
@@ -247,7 +247,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
 			require := require.New(t)
-			freshTH := newEnvironment(apricotPhase5Fork)
+			freshTH := newEnvironment(t, apricotPhase5Fork)
 			freshTH.config.ApricotPhase3Time = tt.AP3Time
 			defer func() {
 				require.NoError(shutdownEnvironment(freshTH))
@@ -288,7 +288,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 
 func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(apricotPhase5Fork)
+	env := newEnvironment(t, apricotPhase5Fork)
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
@@ -730,7 +730,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 
 func TestProposalTxExecuteAddValidator(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(apricotPhase5Fork)
+	env := newEnvironment(t, apricotPhase5Fork)
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(shutdownEnvironment(env))

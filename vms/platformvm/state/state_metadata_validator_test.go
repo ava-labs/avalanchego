@@ -289,9 +289,10 @@ func TestParseValidatorMetadata(t *testing.T) {
 			var metadata validatorMetadata
 			err := parseValidatorMetadata(tt.bytes, &metadata)
 			require.ErrorIs(err, tt.expectedErr)
-			if err == nil {
-				require.Equal(tt.expected, &metadata)
+			if tt.expectedErr != nil {
+				return
 			}
+			require.Equal(tt.expected, &metadata)
 		})
 	}
 }

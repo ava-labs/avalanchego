@@ -30,6 +30,5 @@ func TestPrimaryAliasOrDefaultTest(t *testing.T) {
 	require.Equal(res, id1.String())
 
 	expected := "Batman"
-	res = aliaser.PrimaryAliasOrDefault(id2)
-	require.Equal(expected, res)
+	require.Equal(expected, aliaser.PrimaryAliasOrDefault(id2))
 }

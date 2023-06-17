@@ -8,9 +8,12 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"testing"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/chains/atomic"
@@ -124,15 +127,15 @@ func (e *environment) SetState(blkID ids.ID, chainState state.Chain) {
 	e.states[blkID] = chainState
 }
 
-func newEnvironment(fork activeFork) *environment {
-	return internalNewEnv(fork, false /*noGenesisValidator*/)
+func newEnvironment(t *testing.T, fork activeFork) *environment {
+	return internalNewEnv(t, fork, false /*noGenesisValidator*/)
 }
 
-func newEnvironmentNoValidator(fork activeFork) *environment { //nolint:unparam
-	return internalNewEnv(fork, true /*noGenesisValidator*/)
+func newEnvironmentNoValidator(t *testing.T, fork activeFork) *environment { //nolint:unparam
+	return internalNewEnv(t, fork, true /*noGenesisValidator*/)
 }
 
-func internalNewEnv(fork activeFork, noGenesisValidator bool) *environment {
+func internalNewEnv(t *testing.T, fork activeFork, noGenesisValidator bool) *environment {
 	var isBootstrapped utils.Atomic[bool]
 	isBootstrapped.Set(true)
 
@@ -189,15 +192,18 @@ func internalNewEnv(fork activeFork, noGenesisValidator bool) *environment {
 		backend:        backend,
 	}
 
-	addSubnet(env, txBuilder)
+	addSubnet(t, env, txBuilder)
 
 	return env
 }
 
 func addSubnet(
+	t *testing.T,
 	env *environment,
 	txBuilder builder.Builder,
 ) {
+	require := require.New(t)
+
 	// Create a subnet
 	var err error
 	testSubnet1, err = txBuilder.NewCreateSubnetTx(
@@ -210,33 +216,22 @@ func addSubnet(
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
 		preFundedKeys[0].PublicKey().Address(),
 	)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(err)
 
 	// store it
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(err)
 
 	executor := StandardTxExecutor{
 		Backend: &env.backend,
 		State:   stateDiff,
 		Tx:      testSubnet1,
 	}
-	err = testSubnet1.Unsigned.Visit(&executor)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(testSubnet1.Unsigned.Visit(&executor))
 
 	stateDiff.AddTx(testSubnet1, status.Committed)
-	if err := stateDiff.Apply(env.state); err != nil {
-		panic(err)
-	}
-	if err := env.state.Commit(); err != nil {
-		panic(err)
-	}
+	require.NoError(stateDiff.Apply(env.state))
+	require.NoError(env.state.Commit())
 
 	defaultBalance -= env.config.GetCreateSubnetTxFee(env.clk.Time())
 }

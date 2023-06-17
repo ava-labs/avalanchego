@@ -77,7 +77,7 @@ func TestRewardsChecksRewardValidatorAndDelegator(t *testing.T) {
 				valCommits = valCommits[:len(delCommits)]
 			}
 
-			env := newEnvironmentNoValidator(latestFork)
+			env := newEnvironmentNoValidator(t, latestFork)
 			defer func() {
 				_ = shutdownEnvironment(env)
 			}()
@@ -287,7 +287,7 @@ func TestRewardsChecksRewardValidator(t *testing.T) {
 
 	properties.Property("validator is rewarded or not in commits and aborts", prop.ForAll(
 		func(commits []bool) string {
-			env := newEnvironmentNoValidator(latestFork)
+			env := newEnvironmentNoValidator(t, latestFork)
 			defer func() {
 				_ = shutdownEnvironment(env)
 			}()
@@ -462,7 +462,7 @@ func TestShiftChecksRewardValidator(t *testing.T) {
 
 	properties.Property("validator is shift in both commits and aborts", prop.ForAll(
 		func(commits []bool) string {
-			env := newEnvironmentNoValidator(latestFork)
+			env := newEnvironmentNoValidator(t, latestFork)
 			defer func() {
 				_ = shutdownEnvironment(env)
 			}()
@@ -624,7 +624,7 @@ func TestRewardsChecksRewardDelegator(t *testing.T) {
 
 	properties.Property("delegator is rewarded or not in commits and aborts", prop.ForAll(
 		func(commits []bool) string {
-			env := newEnvironmentNoValidator(latestFork)
+			env := newEnvironmentNoValidator(t, latestFork)
 			defer func() {
 				_ = shutdownEnvironment(env)
 			}()
@@ -849,7 +849,7 @@ func TestShiftChecksRewardDelegator(t *testing.T) {
 
 	properties.Property("delegator is shift in both commits and aborts", prop.ForAll(
 		func(commits []bool) string {
-			env := newEnvironmentNoValidator(latestFork)
+			env := newEnvironmentNoValidator(t, latestFork)
 			defer func() {
 				_ = shutdownEnvironment(env)
 			}()
@@ -1024,7 +1024,7 @@ func TestShiftChecksRewardDelegator(t *testing.T) {
 
 func TestCortinaForkRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(cortinaFork)
+	env := newEnvironment(t, cortinaFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
@@ -1133,7 +1133,7 @@ func TestCortinaForkRewardValidatorTxExecuteOnCommit(t *testing.T) {
 
 func TestCortinaStakingForkRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(latestFork)
+	env := newEnvironment(t, latestFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
@@ -1236,7 +1236,7 @@ func TestCortinaStakingForkRewardValidatorTxExecuteOnAbort(t *testing.T) {
 
 func TestCortinaForkRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(banffFork)
+	env := newEnvironment(t, banffFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
@@ -1366,7 +1366,7 @@ func TestCortinaForkRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 
 func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(latestFork)
+	env := newEnvironment(t, latestFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
@@ -1592,7 +1592,7 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 
 func TestCortinaForkRewardDelegatorTxAndValidatorTxExecuteOnCommit(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(latestFork)
+	env := newEnvironment(t, latestFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
@@ -1758,7 +1758,7 @@ func TestCortinaForkRewardDelegatorTxAndValidatorTxExecuteOnCommit(t *testing.T)
 
 func TestCortinaForkRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(latestFork)
+	env := newEnvironment(t, latestFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
@@ -1881,7 +1881,7 @@ func TestCortinaForkRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 
 func TestBanffForkRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(banffFork)
+	env := newEnvironment(t, banffFork)
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
 	}()
