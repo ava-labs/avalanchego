@@ -80,7 +80,8 @@ var (
 	defaultMinStakingDuration = 24 * time.Hour
 	defaultMaxStakingDuration = 365 * 24 * time.Hour
 	defaultGenesisTime        = time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC)
-	defaultValidateStartTime  = defaultGenesisTime
+	latestForkTime            = defaultGenesisTime
+	defaultValidateStartTime  = latestForkTime
 	defaultValidateEndTime    = defaultValidateStartTime.Add(10 * defaultMinStakingDuration)
 
 	defaultMinDelegatorStake = 1 * units.MilliAvax
@@ -145,6 +146,9 @@ func newEnvironment(
 	ctrl *gomock.Controller,
 	fork activeFork,
 ) *environment {
+	// reset latestForkTime to ensure test independence
+	latestForkTime = defaultGenesisTime
+
 	res := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
 		config:         defaultConfig(fork),
@@ -398,7 +402,8 @@ func defaultConfig(fork activeFork) *config.Config {
 }
 
 func defaultClock() *mockable.Clock {
-	now := defaultGenesisTime
+	// make sure local clock is past selected fork
+	now := latestForkTime.Add(time.Second)
 	clk := &mockable.Clock{}
 	clk.Set(now)
 	return clk

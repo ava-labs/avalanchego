@@ -75,6 +75,7 @@ var (
 	defaultGenesisTime        = time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC)
 	defaultValidateStartTime  = defaultGenesisTime
 	defaultValidateEndTime    = defaultValidateStartTime.Add(10 * defaultMinStakingDuration)
+	latestForkTime            = defaultGenesisTime.Add(time.Second)
 
 	defaultMinDelegatorStake = 1 * units.MilliAvax
 	defaultMinValidatorStake = 5 * defaultMinDelegatorStake
@@ -121,6 +122,10 @@ type environment struct {
 
 func newEnvironment(t *testing.T, fork activeFork) *environment { //nolint:unparam
 	require := require.New(t)
+
+	// always reset latestForkTime (a package level variable)
+	// to ensure test independency
+	latestForkTime = defaultGenesisTime.Add(time.Second)
 	res := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
 		config:         defaultConfig(fork),
@@ -139,6 +144,7 @@ func newEnvironment(t *testing.T, fork activeFork) *environment { //nolint:unpar
 
 	rewardsCalc := reward.NewCalculator(res.config.RewardConfig)
 	res.state = defaultState(t, res.config, res.ctx, res.baseDB, rewardsCalc)
+	res.state.SetTimestamp(res.clk.Time())
 
 	res.atomicUTXOs = avax.NewAtomicUTXOManager(res.ctx.SharedMemory, txs.Codec)
 	res.uptimes = uptime.NewManager(res.state)
@@ -350,7 +356,7 @@ func defaultConfig(fork activeFork) *config.Config {
 }
 
 func defaultClock() *mockable.Clock {
-	now := defaultGenesisTime
+	now := latestForkTime
 	clk := &mockable.Clock{}
 	clk.Set(now)
 	return clk

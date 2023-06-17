@@ -165,7 +165,7 @@ func TestCreateChainTxValid(t *testing.T) {
 }
 
 func TestCreateChainTxAP3FeeChange(t *testing.T) {
-	ap3Time := defaultGenesisTime.Add(time.Hour)
+	ap3Time := latestForkTime.Add(time.Hour)
 	tests := []struct {
 		name          string
 		time          time.Time
@@ -174,7 +174,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 	}{
 		{
 			name:          "pre-fork - correctly priced",
-			time:          defaultGenesisTime,
+			time:          latestForkTime,
 			fee:           0,
 			expectedError: nil,
 		},
