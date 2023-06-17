@@ -50,6 +50,8 @@ linters:
     # - lll
 
 linters-settings:
+  goimports:
+    local-prefixes: github.com/ava-labs/avalanchego
   depguard:
     list-type: blacklist
     packages-with-error-message:
@@ -69,6 +71,7 @@ linters-settings:
       - 'require\.ErrorContains$(# ErrorIs should be used instead)?'
       - 'require\.EqualValues$(# Equal should be used instead)?'
       - 'require\.NotEqualValues$(# NotEqual should be used instead)?'
+      - '^(t|b|tb|f)\.(Fatal|Fatalf|Error|Errorf)$(# the require library should be used instead)?'
     exclude_godoc_examples: false
   # https://golangci-lint.run/usage/linters#gosec
   gosec:

@@ -246,8 +246,8 @@ func TestBlockOptions(t *testing.T) {
 
 			blk := tt.blkF()
 			options, err := blk.Options(context.Background())
+			require.ErrorIs(err, tt.expectedErr)
 			if tt.expectedErr != nil {
-				require.ErrorIs(err, tt.expectedErr)
 				return
 			}
 			require.IsType(tt.expectedPreferenceType, options[0].(*Block).Block)

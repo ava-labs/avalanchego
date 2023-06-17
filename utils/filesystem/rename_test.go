@@ -11,29 +11,31 @@ import (
 )
 
 func TestRenameIfExists(t *testing.T) {
+	require := require.New(t)
+
 	t.Parallel()
 
 	f, err := os.CreateTemp(os.TempDir(), "test-rename")
-	require.NoError(t, err)
+	require.NoError(err)
 
 	a := f.Name()
 	b := a + ".2"
 
-	require.NoError(t, f.Close())
+	require.NoError(f.Close())
 
 	// rename "a" to "b"
 	renamed, err := RenameIfExists(a, b)
-	require.True(t, renamed)
-	require.NoError(t, err)
+	require.NoError(err)
+	require.True(renamed)
 
 	// rename "b" to "a"
 	renamed, err = RenameIfExists(b, a)
-	require.True(t, renamed)
-	require.NoError(t, err)
+	require.NoError(err)
+	require.True(renamed)
 
 	// remove "a", but rename "a"->"b" should NOT error
-	require.NoError(t, os.RemoveAll(a))
+	require.NoError(os.RemoveAll(a))
 	renamed, err = RenameIfExists(a, b)
-	require.False(t, renamed)
-	require.NoError(t, err)
+	require.NoError(err)
+	require.False(renamed)
 }
