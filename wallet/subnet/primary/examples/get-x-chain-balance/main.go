@@ -11,6 +11,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/avm"
+	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/wallet/chain/x"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 )
@@ -29,8 +31,11 @@ func main() {
 
 	ctx := context.Background()
 
+	pClient := platformvm.NewClient(uri)
+	xClient := avm.NewClient(uri, "X")
+
 	fetchStartTime := time.Now()
-	_, xCtx, utxos, err := primary.FetchState(ctx, uri, addresses)
+	_, xCtx, utxos, err := primary.FetchState(ctx, uri, pClient, xClient, addresses)
 	if err != nil {
 		log.Fatalf("failed to fetch state: %s\n", err)
 	}

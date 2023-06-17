@@ -48,21 +48,24 @@ func (w *wallet) X() x.Wallet {
 //
 // The wallet manages all UTXOs locally, and performs all tx signing locally.
 func NewWalletFromURI(ctx context.Context, uri string, kc keychain.Keychain) (Wallet, error) {
-	pCTX, xCTX, utxos, err := FetchState(ctx, uri, kc.Addresses())
+	pClient := platformvm.NewClient(uri)
+	xClient := avm.NewClient(uri, "X")
+	pCTX, xCTX, utxos, err := FetchState(ctx, uri, pClient, xClient, kc.Addresses())
 	if err != nil {
 		return nil, err
 	}
-	return NewWalletWithState(uri, pCTX, xCTX, utxos, kc), nil
+	return NewWalletWithState(pClient, xClient, pCTX, xCTX, utxos, kc), nil
 }
 
 // Creates a wallet with pre-loaded/cached P-chain transactions.
 func NewWalletWithTxs(ctx context.Context, uri string, kc keychain.Keychain, preloadTXs ...ids.ID) (Wallet, error) {
-	pCTX, xCTX, utxos, err := FetchState(ctx, uri, kc.Addresses())
+	pClient := platformvm.NewClient(uri)
+	xClient := avm.NewClient(uri, "X")
+	pCTX, xCTX, utxos, err := FetchState(ctx, uri, pClient, xClient, kc.Addresses())
 	if err != nil {
 		return nil, err
 	}
 	pTXs := make(map[ids.ID]*txs.Tx)
-	pClient := platformvm.NewClient(uri)
 	for _, id := range preloadTXs {
 		txBytes, err := pClient.GetTx(ctx, id)
 		if err != nil {
@@ -74,12 +77,13 @@ func NewWalletWithTxs(ctx context.Context, uri string, kc keychain.Keychain, pre
 		}
 		pTXs[id] = tx
 	}
-	return NewWalletWithTxsAndState(uri, pCTX, xCTX, utxos, kc, pTXs), nil
+	return NewWalletWithTxsAndState(pClient, xClient, pCTX, xCTX, utxos, kc, pTXs), nil
 }
 
 // Creates a wallet with pre-loaded/cached P-chain transactions and state.
 func NewWalletWithTxsAndState(
-	uri string,
+	pClient platformvm.Client,
+	xClient avm.Client,
 	pCTX p.Context,
 	xCTX x.Context,
 	utxos UTXOs,
@@ -91,14 +95,12 @@ func NewWalletWithTxsAndState(
 	pBackend := p.NewBackend(pCTX, pUTXOs, pTXs)
 	pBuilder := p.NewBuilder(addrs, pBackend)
 	pSigner := p.NewSigner(kc, pBackend)
-	pClient := platformvm.NewClient(uri)
 
 	xChainID := xCTX.BlockchainID()
 	xUTXOs := NewChainUTXOs(xChainID, utxos)
 	xBackend := x.NewBackend(xCTX, xUTXOs)
 	xBuilder := x.NewBuilder(addrs, xBackend)
 	xSigner := x.NewSigner(kc, xBackend)
-	xClient := avm.NewClient(uri, "X")
 
 	return NewWallet(
 		p.NewWallet(pBuilder, pSigner, pClient, pBackend),
@@ -108,14 +110,15 @@ func NewWalletWithTxsAndState(
 
 // Creates a wallet with pre-fetched state.
 func NewWalletWithState(
-	uri string,
+	pClient platformvm.Client,
+	xClient avm.Client,
 	pCTX p.Context,
 	xCTX x.Context,
 	utxos UTXOs,
 	kc keychain.Keychain,
 ) Wallet {
 	pTXs := make(map[ids.ID]*txs.Tx)
-	return NewWalletWithTxsAndState(uri, pCTX, xCTX, utxos, kc, pTXs)
+	return NewWalletWithTxsAndState(pClient, xClient, pCTX, xCTX, utxos, kc, pTXs)
 }
 
 // Creates a Wallet with the given set of options

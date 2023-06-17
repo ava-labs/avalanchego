@@ -47,9 +47,14 @@ type UTXOClient interface {
 	) ([][]byte, ids.ShortID, ids.ID, error)
 }
 
-func FetchState(ctx context.Context, uri string, addrs set.Set[ids.ShortID]) (p.Context, x.Context, UTXOs, error) {
+func FetchState(
+	ctx context.Context,
+	uri string,
+	pClient platformvm.Client,
+	xClient avm.Client,
+	addrs set.Set[ids.ShortID],
+) (p.Context, x.Context, UTXOs, error) {
 	infoClient := info.NewClient(uri)
-	xClient := avm.NewClient(uri, "X")
 
 	pCTX, err := p.NewContextFromClients(ctx, infoClient, xClient)
 	if err != nil {
@@ -70,7 +75,7 @@ func FetchState(ctx context.Context, uri string, addrs set.Set[ids.ShortID]) (p.
 	}{
 		{
 			id:     constants.PlatformChainID,
-			client: platformvm.NewClient(uri),
+			client: pClient,
 			codec:  txs.Codec,
 		},
 		{

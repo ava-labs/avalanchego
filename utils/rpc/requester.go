@@ -5,7 +5,10 @@ package rpc
 
 import (
 	"context"
+	"net/http"
 	"net/url"
+
+	"golang.org/x/exp/maps"
 )
 
 var _ EndpointRequester = (*avalancheEndpointRequester)(nil)
@@ -15,12 +18,14 @@ type EndpointRequester interface {
 }
 
 type avalancheEndpointRequester struct {
-	uri string
+	uri     string
+	cookies map[string]*http.Cookie
 }
 
 func NewEndpointRequester(uri string) EndpointRequester {
 	return &avalancheEndpointRequester{
-		uri: uri,
+		uri:     uri,
+		cookies: map[string]*http.Cookie{},
 	}
 }
 
@@ -36,12 +41,19 @@ func (e *avalancheEndpointRequester) SendRequest(
 		return err
 	}
 
-	return SendJSONRequest(
+	newCookies, err := SendJSONRequest(
 		ctx,
 		uri,
 		method,
 		params,
 		reply,
+		maps.Values(e.cookies),
 		options...,
 	)
+
+	for _, c := range newCookies {
+		e.cookies[c.Name] = c
+	}
+
+	return err
 }

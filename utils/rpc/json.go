@@ -19,11 +19,12 @@ func SendJSONRequest(
 	method string,
 	params interface{},
 	reply interface{},
+	cookies []*http.Cookie,
 	options ...Option,
-) error {
+) ([]*http.Cookie, error) {
 	requestBodyBytes, err := rpc.EncodeClientRequest(method, params)
 	if err != nil {
-		return fmt.Errorf("failed to encode client params: %w", err)
+		return nil, fmt.Errorf("failed to encode client params: %w", err)
 	}
 
 	ops := NewOptions(options)
@@ -36,28 +37,31 @@ func SendJSONRequest(
 		bytes.NewBuffer(requestBodyBytes),
 	)
 	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
+		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
 	request.Header = ops.headers
 	request.Header.Set("Content-Type", "application/json")
+	for _, c := range cookies {
+		request.AddCookie(c)
+	}
 
 	resp, err := http.DefaultClient.Do(request)
 	if err != nil {
-		return fmt.Errorf("failed to issue request: %w", err)
+		return nil, fmt.Errorf("failed to issue request: %w", err)
 	}
 
 	// Return an error for any non successful status code
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		// Drop any error during close to report the original error
 		_ = resp.Body.Close()
-		return fmt.Errorf("received status code: %d", resp.StatusCode)
+		return nil, fmt.Errorf("received status code: %d", resp.StatusCode)
 	}
 
 	if err := rpc.DecodeClientResponse(resp.Body, reply); err != nil {
 		// Drop any error during close to report the original error
 		_ = resp.Body.Close()
-		return fmt.Errorf("failed to decode client response: %w", err)
+		return nil, fmt.Errorf("failed to decode client response: %w", err)
 	}
-	return resp.Body.Close()
+	return resp.Cookies(), resp.Body.Close()
 }
