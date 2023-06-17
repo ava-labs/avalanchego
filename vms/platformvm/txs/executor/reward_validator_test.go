@@ -180,8 +180,7 @@ func TestRewardsChecksRewardValidatorAndDelegator(t *testing.T) {
 					return err.Error()
 				}
 
-				delegatorReward := calculateDelegatorReward(continuousDelegator, continuousValidatorTx.Shares())
-				delegateeReward := continuousDelegator.PotentialReward - delegatorReward
+				delegatorReward, delegateeReward := calculateDelegatorRewards(continuousDelegator, continuousValidatorTx.Shares())
 				switch {
 				case valCommit && delCommit:
 					if postShifValidatorRewardBalance !=
@@ -729,7 +728,7 @@ func TestRewardsChecksRewardDelegator(t *testing.T) {
 					return err.Error()
 				}
 
-				delegatorReward := calculateDelegatorReward(continuousDelegator, addContinuousValTx.Shares())
+				delegatorReward, _ := calculateDelegatorRewards(continuousDelegator, addContinuousValTx.Shares())
 				if commit {
 					if postShiftRewardBalance != preShiftRewardBalance+delegatorReward {
 						return "unexpected preShiftRewardBalance on commit"
@@ -816,7 +815,7 @@ func TestRewardsChecksRewardDelegator(t *testing.T) {
 				return err.Error()
 			}
 
-			delegatorReward := calculateDelegatorReward(stoppedDelegator, addContinuousValTx.Shares())
+			delegatorReward, _ := calculateDelegatorRewards(stoppedDelegator, addContinuousValTx.Shares())
 			if postStopRewardBalance != preStopRewardBalance+delegatorReward {
 				return "unexpected postStopRewardBalance"
 			}
