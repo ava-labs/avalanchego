@@ -545,9 +545,10 @@ func TestRemoveSubnetValidatorTxSyntacticVerify(t *testing.T) {
 			tx := tt.txFunc(ctrl)
 			err := tx.SyntacticVerify(ctx)
 			require.ErrorIs(err, tt.expectedErr)
-			if tt.expectedErr == nil {
-				require.True(tx.SyntacticallyVerified)
+			if tt.expectedErr != nil {
+				return
 			}
+			require.True(tx.SyntacticallyVerified)
 		})
 	}
 }

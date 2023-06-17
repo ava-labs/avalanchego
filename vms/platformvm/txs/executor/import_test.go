@@ -22,7 +22,7 @@ import (
 )
 
 func TestNewImportTx(t *testing.T) {
-	env := newEnvironment(latestFork)
+	env := newEnvironment(t, latestFork)
 	defer func() {
 		require.NoError(t, shutdownEnvironment(env))
 	}()

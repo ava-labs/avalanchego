@@ -669,7 +669,7 @@ func TestEngineBuildBlock(t *testing.T) {
 	}
 
 	sender.SendPullQueryF = func(_ context.Context, inVdrs set.Set[ids.NodeID], _ uint32, _ ids.ID) {
-		t.Fatalf("should not be sending pulls when we are the block producer")
+		require.FailNow("should not be sending pulls when we are the block producer")
 	}
 
 	pushSent := new(bool)
