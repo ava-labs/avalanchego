@@ -2,22 +2,24 @@ use std::{collections::HashMap, fmt::Debug, sync::Weak};
 
 use async_trait::async_trait;
 
-/// A KeyType is something that can be cast to a u8 reference,
+/// A `KeyType` is something that can be xcast to a u8 reference,
 /// and can be sent and shared across threads. References with
 /// lifetimes are not allowed (hence 'static)
 pub trait KeyType: AsRef<[u8]> + Send + Sync + Debug + 'static {}
+
 impl<T> KeyType for T where T: AsRef<[u8]> + Send + Sync + Debug + 'static {}
 
-/// A ValueType is the same as a [KeyType]. However, these could
-/// be a different type from the [KeyType] on a given API call.
+/// A `ValueType` is the same as a `KeyType`. However, these could
+/// be a different type from the `KeyType` on a given API call.
 /// For example, you might insert {key: "key", value: vec!\[0u8\]}
 /// This also means that the type of all the keys for a single
 /// API call must be the same, as well as the type of all values
 /// must be the same.
 pub trait ValueType: AsRef<[u8]> + Send + Sync + Debug + 'static {}
+
 impl<T> ValueType for T where T: AsRef<[u8]> + Send + Sync + Debug + 'static {}
 
-/// The type and size of a single HashKey
+/// The type and size of a single hash key
 /// These are 256-bit hashes that are used for a variety of reasons:
 ///  - They identify a version of the datastore at a specific point
 ///    in time
@@ -39,6 +41,7 @@ pub type Batch<K, V> = Vec<BatchOp<K, V>>;
 
 /// A convenience implementation to convert a vector of key/value
 /// pairs into a batch of insert operations
+#[must_use]
 pub fn vec_into_batch<K: KeyType, V: ValueType>(value: Vec<(K, V)>) -> Batch<K, V> {
     value
         .into_iter()
@@ -84,6 +87,7 @@ pub struct Proof<V>(pub HashMap<HashKey, V>);
 #[async_trait]
 pub trait Db {
     type Historical: DbView;
+
     type Proposal: DbView + Proposal<Self::Historical>;
 
     /// Get a reference to a specific view based on a hash
@@ -167,6 +171,7 @@ pub trait Proposal<T: DbView>: DbView {
     ///
     /// * A weak reference to a new historical view
     async fn commit(self) -> Result<Weak<T>, Error>;
+
     /// Propose a new revision on top of an existing proposal
     ///
     /// # Arguments
