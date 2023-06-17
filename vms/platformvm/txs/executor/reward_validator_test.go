@@ -242,7 +242,7 @@ func TestRewardsChecksRewardValidatorAndDelegator(t *testing.T) {
 
 			return ""
 		},
-		gen.SliceOf(gen.Bool()), // must have the same length
+		gen.SliceOf(gen.Bool()),
 		gen.SliceOf(gen.Bool()),
 	))
 
@@ -436,7 +436,7 @@ func TestRewardsChecksRewardValidator(t *testing.T) {
 			}
 			return ""
 		},
-		gen.SliceOfN(10, gen.Bool()),
+		gen.SliceOf(gen.Bool()),
 	))
 
 	properties.TestingRun(t)
@@ -577,7 +577,7 @@ func TestShiftChecksRewardValidator(t *testing.T) {
 
 			return ""
 		},
-		gen.SliceOfN(10, gen.Bool()),
+		gen.SliceOf(gen.Bool()),
 	))
 
 	properties.TestingRun(t)
@@ -822,7 +822,7 @@ func TestRewardsChecksRewardDelegator(t *testing.T) {
 			}
 			return ""
 		},
-		gen.SliceOfN(1, gen.Bool()),
+		gen.SliceOf(gen.Bool()),
 	))
 
 	properties.TestingRun(t)
