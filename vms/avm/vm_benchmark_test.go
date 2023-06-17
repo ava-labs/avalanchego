@@ -20,25 +20,21 @@ import (
 
 func BenchmarkLoadUser(b *testing.B) {
 	runLoadUserBenchmark := func(b *testing.B, numKeys int) {
+		require := require.New(b)
+
 		// This will segfault instead of failing gracefully if there's an error
 		_, _, vm, _ := GenesisVM(nil)
 		ctx := vm.ctx
 		defer func() {
-			if err := vm.Shutdown(context.Background()); err != nil {
-				b.Fatal(err)
-			}
+			require.NoError(vm.Shutdown(context.Background()))
 			ctx.Lock.Unlock()
 		}()
 
 		user, err := keystore.NewUserFromKeystore(vm.ctx.Keystore, username, password)
-		if err != nil {
-			b.Fatalf("Failed to get user keystore db: %s", err)
-		}
+		require.NoError(err)
 
 		keys, err := keystore.NewKeys(user, numKeys)
-		if err != nil {
-			b.Fatalf("problem generating private key: %s", err)
-		}
+		require.NoError(err)
 
 		b.ResetTimer()
 
@@ -47,16 +43,13 @@ func BenchmarkLoadUser(b *testing.B) {
 			addrIndex := n % numKeys
 			fromAddrs.Clear()
 			fromAddrs.Add(keys[addrIndex].PublicKey().Address())
-			if _, _, err := vm.LoadUser(username, password, fromAddrs); err != nil {
-				b.Fatalf("Failed to load user: %s", err)
-			}
+			_, _, err := vm.LoadUser(username, password, fromAddrs)
+			require.NoError(err)
 		}
 
 		b.StopTimer()
 
-		if err := user.Close(); err != nil {
-			b.Fatal(err)
-		}
+		require.NoError(user.Close())
 	}
 
 	benchmarkSize := []int{10, 100, 1000, 10000}
@@ -69,12 +62,12 @@ func BenchmarkLoadUser(b *testing.B) {
 
 // GetAllUTXOsBenchmark is a helper func to benchmark the GetAllUTXOs depending on the size
 func GetAllUTXOsBenchmark(b *testing.B, utxoCount int) {
+	require := require.New(b)
+
 	_, _, vm, _ := GenesisVM(b)
 	ctx := vm.ctx
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
-			b.Fatal(err)
-		}
+		require.NoError(vm.Shutdown(context.Background()))
 		ctx.Lock.Unlock()
 	}()
 
@@ -100,7 +93,7 @@ func GetAllUTXOsBenchmark(b *testing.B, utxoCount int) {
 
 		vm.state.AddUTXO(utxo)
 	}
-	require.NoError(b, vm.state.Commit())
+	require.NoError(vm.state.Commit())
 
 	addrsSet := set.Set[ids.ShortID]{}
 	addrsSet.Add(addr)
@@ -110,8 +103,8 @@ func GetAllUTXOsBenchmark(b *testing.B, utxoCount int) {
 	for i := 0; i < b.N; i++ {
 		// Fetch all UTXOs older version
 		notPaginatedUTXOs, err := avax.GetAllUTXOs(vm.state, addrsSet)
-		require.NoError(b, err)
-		require.Len(b, notPaginatedUTXOs, utxoCount)
+		require.NoError(err)
+		require.Len(notPaginatedUTXOs, utxoCount)
 	}
 }
 

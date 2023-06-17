@@ -22,6 +22,8 @@ import (
 )
 
 func TestSetsAndGets(t *testing.T) {
+	require := require.New(t)
+
 	_, _, vm, _ := GenesisVMWithArgs(
 		t,
 		[]*common.Fx{{
@@ -37,9 +39,7 @@ func TestSetsAndGets(t *testing.T) {
 	)
 	ctx := vm.ctx
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(vm.Shutdown(context.Background()))
 		ctx.Lock.Unlock()
 	}()
 
@@ -74,9 +74,7 @@ func TestSetsAndGets(t *testing.T) {
 			},
 		}},
 	}}}
-	if err := tx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0]}}); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(tx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0]}}))
 
 	txID := tx.ID()
 
@@ -85,27 +83,15 @@ func TestSetsAndGets(t *testing.T) {
 	state.AddStatus(txID, choices.Accepted)
 
 	resultUTXO, err := state.GetUTXO(utxoID)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	resultTx, err := state.GetTx(txID)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	resultStatus, err := state.GetStatus(txID)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
-	if resultUTXO.OutputIndex != 1 {
-		t.Fatalf("Wrong UTXO returned")
-	}
-	if resultTx.ID() != tx.ID() {
-		t.Fatalf("Wrong Tx returned")
-	}
-	if resultStatus != choices.Accepted {
-		t.Fatalf("Wrong Status returned")
-	}
+	require.Equal(uint32(1), resultUTXO.OutputIndex)
+	require.Equal(tx.ID(), resultTx.ID())
+	require.Equal(choices.Accepted, resultStatus)
 }
 
 func TestFundingNoAddresses(t *testing.T) {
@@ -124,9 +110,7 @@ func TestFundingNoAddresses(t *testing.T) {
 	)
 	ctx := vm.ctx
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, vm.Shutdown(context.Background()))
 		ctx.Lock.Unlock()
 	}()
 
@@ -146,6 +130,8 @@ func TestFundingNoAddresses(t *testing.T) {
 }
 
 func TestFundingAddresses(t *testing.T) {
+	require := require.New(t)
+
 	_, _, vm, _ := GenesisVMWithArgs(
 		t,
 		[]*common.Fx{{
@@ -161,9 +147,7 @@ func TestFundingAddresses(t *testing.T) {
 	)
 	ctx := vm.ctx
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(vm.Shutdown(context.Background()))
 		ctx.Lock.Unlock()
 	}()
 
@@ -181,17 +165,17 @@ func TestFundingAddresses(t *testing.T) {
 	}
 
 	state.AddUTXO(utxo)
-	require.NoError(t, state.Commit())
+	require.NoError(state.Commit())
 
 	utxos, err := state.UTXOIDs([]byte{0}, ids.Empty, math.MaxInt32)
-	require.NoError(t, err)
-	require.Len(t, utxos, 1)
-	require.Equal(t, utxo.InputID(), utxos[0])
+	require.NoError(err)
+	require.Len(utxos, 1)
+	require.Equal(utxo.InputID(), utxos[0])
 
 	state.DeleteUTXO(utxo.InputID())
-	require.NoError(t, state.Commit())
+	require.NoError(state.Commit())
 
 	utxos, err = state.UTXOIDs([]byte{0}, ids.Empty, math.MaxInt32)
-	require.NoError(t, err)
-	require.Empty(t, utxos)
+	require.NoError(err)
+	require.Empty(utxos)
 }

@@ -28,10 +28,8 @@ var sizes = []int{
 }
 
 func BenchmarkSign(b *testing.B) {
-	require := require.New(b)
-
 	privateKey, err := NewSecretKey()
-	require.NoError(err)
+	require.NoError(b, err)
 	for _, messageSize := range sizes {
 		b.Run(fmt.Sprintf("%d", messageSize), func(b *testing.B) {
 			message := utils.RandomBytes(messageSize)
@@ -46,10 +44,8 @@ func BenchmarkSign(b *testing.B) {
 }
 
 func BenchmarkVerify(b *testing.B) {
-	require := require.New(b)
-
 	privateKey, err := NewSecretKey()
-	require.NoError(err)
+	require.NoError(b, err)
 	publicKey := PublicFromSecretKey(privateKey)
 
 	for _, messageSize := range sizes {
@@ -60,7 +56,7 @@ func BenchmarkVerify(b *testing.B) {
 			b.ResetTimer()
 
 			for n := 0; n < b.N; n++ {
-				require.True(Verify(publicKey, signature, message))
+				require.True(b, Verify(publicKey, signature, message))
 			}
 		})
 	}
@@ -77,11 +73,9 @@ func BenchmarkAggregatePublicKeys(b *testing.B) {
 
 	for _, size := range sizes {
 		b.Run(fmt.Sprintf("%d", size), func(b *testing.B) {
-			require := require.New(b)
-
 			for n := 0; n < b.N; n++ {
 				_, err := AggregatePublicKeys(keys[:size])
-				require.NoError(err)
+				require.NoError(b, err)
 			}
 		})
 	}
