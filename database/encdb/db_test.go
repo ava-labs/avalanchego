@@ -18,9 +18,7 @@ func TestInterface(t *testing.T) {
 	for _, test := range database.Tests {
 		unencryptedDB := memdb.New()
 		db, err := New([]byte(testPassword), unencryptedDB)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
 		test(t, db)
 	}
@@ -43,9 +41,7 @@ func BenchmarkInterface(b *testing.B) {
 		for _, bench := range database.Benchmarks {
 			unencryptedDB := memdb.New()
 			db, err := New([]byte(testPassword), unencryptedDB)
-			if err != nil {
-				b.Fatal(err)
-			}
+			require.NoError(b, err)
 			bench(b, db, "encdb", keys, values)
 		}
 	}
