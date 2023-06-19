@@ -314,9 +314,6 @@ func (vm *VM) onNormalOperationsStarted() error {
 			return err
 		}
 	}
-	if err := vm.state.Commit(); err != nil {
-		return err
-	}
 
 	vm.bootstrapped = true
 	return nil
