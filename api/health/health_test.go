@@ -42,8 +42,7 @@ func awaitHealthy(t *testing.T, r Reporter, healthy bool) {
 }
 
 func awaitLiveness(t *testing.T, r Reporter, liveness bool) {
-	require := require.New(t)
-	require.Eventually(func() bool {
+	require.Eventually(t, func() bool {
 		_, ok := r.Liveness()
 		return ok == liveness
 	}, awaitTimeout, awaitFreq)
@@ -267,7 +266,7 @@ func TestTags(t *testing.T) {
 	require.NoError(h.RegisterHealthCheck("check2", check, "tag1"))
 	require.NoError(h.RegisterHealthCheck("check3", check, "tag2"))
 	require.NoError(h.RegisterHealthCheck("check4", check, "tag1", "tag2"))
-	require.NoError(h.RegisterHealthCheck("check5", check, GlobalTag))
+	require.NoError(h.RegisterHealthCheck("check5", check, ApplicationTag))
 
 	// default checks
 	{
@@ -377,8 +376,8 @@ func TestTags(t *testing.T) {
 		require.Contains(healthResult, "check5")
 		require.True(health)
 
-		// add global tag
-		require.NoError(h.RegisterHealthCheck("check7", check, GlobalTag))
+		// add application tag
+		require.NoError(h.RegisterHealthCheck("check7", check, ApplicationTag))
 
 		awaitHealthy(t, h, false)
 

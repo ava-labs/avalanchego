@@ -487,13 +487,12 @@ func TestBuilderBuildBlock(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
 			builder := tt.builderFunc(ctrl)
 			_, err := builder.BuildBlock(context.Background())
-			require.ErrorIs(err, tt.expectedErr)
+			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
 }
@@ -511,9 +510,7 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	tx := transactions[0]
 	txID := tx.ID()
 	require.NoError(mempool.Add(tx))
-
-	has := mempool.Has(txID)
-	require.True(has)
+	require.True(mempool.Has(txID))
 
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()

@@ -7,6 +7,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
@@ -46,32 +48,28 @@ func setupWS(t *testing.T, isAVAXAsset bool) ([]byte, *VM, *WalletService, *atom
 // 3) The wallet service that wraps the VM
 // 4) atomic memory to use in tests
 func setupWSWithKeys(t *testing.T, isAVAXAsset bool) ([]byte, *VM, *WalletService, *atomic.Memory, *txs.Tx) {
+	require := require.New(t)
+
 	genesisBytes, vm, ws, m, tx := setupWS(t, isAVAXAsset)
 
 	// Import the initially funded private keys
 	user, err := keystore.NewUserFromKeystore(ws.vm.ctx.Keystore, username, password)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
-	if err := user.PutKeys(keys...); err != nil {
-		t.Fatalf("Failed to set key for user: %s", err)
-	}
+	require.NoError(user.PutKeys(keys...))
 
-	if err := user.Close(); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(user.Close())
 	return genesisBytes, vm, ws, m, tx
 }
 
 func TestWalletService_SendMultiple(t *testing.T) {
+	require := require.New(t)
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			_, vm, ws, _, genesisTx := setupWSWithKeys(t, tc.avaxAsset)
 			defer func() {
-				if err := vm.Shutdown(context.Background()); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(vm.Shutdown(context.Background()))
 				vm.ctx.Lock.Unlock()
 			}()
 
@@ -79,13 +77,9 @@ func TestWalletService_SendMultiple(t *testing.T) {
 			addr := keys[0].PublicKey().Address()
 
 			addrStr, err := vm.FormatLocalAddress(addr)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(err)
 			changeAddrStr, err := vm.FormatLocalAddress(testChangeAddr)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(err)
 			_, fromAddrsStr := sampleAddrs(t, vm, addrs)
 
 			args := &SendMultipleArgs{
@@ -112,24 +106,16 @@ func TestWalletService_SendMultiple(t *testing.T) {
 			}
 			reply := &api.JSONTxIDChangeAddr{}
 			vm.timer.Cancel()
-			if err := ws.SendMultiple(nil, args, reply); err != nil {
-				t.Fatalf("Failed to send transaction: %s", err)
-			} else if reply.ChangeAddr != changeAddrStr {
-				t.Fatalf("expected change address to be %s but got %s", changeAddrStr, reply.ChangeAddr)
-			}
+			require.NoError(ws.SendMultiple(nil, args, reply))
+			require.Equal(changeAddrStr, reply.ChangeAddr)
 
 			pendingTxs := vm.txs
-			if len(pendingTxs) != 1 {
-				t.Fatalf("Expected to find 1 pending tx after send, but found %d", len(pendingTxs))
-			}
+			require.Len(pendingTxs, 1)
 
-			if reply.TxID != pendingTxs[0].ID() {
-				t.Fatal("Transaction ID returned by SendMultiple does not match the transaction found in vm's pending transactions")
-			}
+			require.Equal(pendingTxs[0].ID(), reply.TxID)
 
-			if _, err := vm.GetTx(context.Background(), reply.TxID); err != nil {
-				t.Fatalf("Failed to retrieve created transaction: %s", err)
-			}
+			_, err = vm.GetTx(context.Background(), reply.TxID)
+			require.NoError(err)
 		})
 	}
 }

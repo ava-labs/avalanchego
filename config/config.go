@@ -603,18 +603,22 @@ func getIPConfig(v *viper.Viper) (node.IPConfig, error) {
 		return node.IPConfig{}, fmt.Errorf("only one of --%s and --%s can be given", PublicIPKey, PublicIPResolutionServiceKey)
 	}
 
+	// Define default configuration
+	ipConfig := node.IPConfig{
+		IPUpdater:        dynamicip.NewNoUpdater(),
+		IPResolutionFreq: ipResolutionFreq,
+		Nat:              nat.NewNoRouter(),
+		ListenHost:       v.GetString(StakingHostKey),
+	}
+
 	if publicIP != "" {
 		// User specified a specific public IP to use.
 		ip := net.ParseIP(publicIP)
 		if ip == nil {
 			return node.IPConfig{}, fmt.Errorf("invalid IP Address %s", publicIP)
 		}
-		return node.IPConfig{
-			IPPort:           ips.NewDynamicIPPort(ip, stakingPort),
-			IPUpdater:        dynamicip.NewNoUpdater(),
-			IPResolutionFreq: ipResolutionFreq,
-			Nat:              nat.NewNoRouter(),
-		}, nil
+		ipConfig.IPPort = ips.NewDynamicIPPort(ip, stakingPort)
+		return ipConfig, nil
 	}
 	if ipResolutionService != "" {
 		// User specified to use dynamic IP resolution.
@@ -630,18 +634,9 @@ func getIPConfig(v *viper.Viper) (node.IPConfig, error) {
 		if err != nil {
 			return node.IPConfig{}, fmt.Errorf("couldn't resolve public IP: %w", err)
 		}
-		ipPort := ips.NewDynamicIPPort(ip, stakingPort)
-
-		return node.IPConfig{
-			IPPort: ipPort,
-			IPUpdater: dynamicip.NewUpdater(
-				ipPort,
-				resolver,
-				ipResolutionFreq,
-			),
-			IPResolutionFreq: ipResolutionFreq,
-			Nat:              nat.NewNoRouter(),
-		}, nil
+		ipConfig.IPPort = ips.NewDynamicIPPort(ip, stakingPort)
+		ipConfig.IPUpdater = dynamicip.NewUpdater(ipConfig.IPPort, resolver, ipResolutionFreq)
+		return ipConfig, nil
 	}
 
 	// User didn't specify a public IP to use, and they didn't specify a public IP resolution
@@ -651,13 +646,10 @@ func getIPConfig(v *viper.Viper) (node.IPConfig, error) {
 	if err != nil {
 		return node.IPConfig{}, fmt.Errorf("public IP / IP resolution service not given and failed to resolve IP with NAT: %w", err)
 	}
-	return node.IPConfig{
-		Nat:                   nat,
-		AttemptedNATTraversal: true,
-		IPPort:                ips.NewDynamicIPPort(ip, stakingPort),
-		IPUpdater:             dynamicip.NewNoUpdater(),
-		IPResolutionFreq:      ipResolutionFreq,
-	}, nil
+	ipConfig.IPPort = ips.NewDynamicIPPort(ip, stakingPort)
+	ipConfig.Nat = nat
+	ipConfig.AttemptedNATTraversal = true
+	return ipConfig, nil
 }
 
 func getProfilerConfig(v *viper.Viper) (profiler.Config, error) {
@@ -1453,15 +1445,6 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 		return node.Config{}, err
 	}
 
-	// Node health
-	nodeConfig.MinPercentConnectedStakeHealthy = map[ids.ID]float64{
-		constants.PrimaryNetworkID: calcMinConnectedStake(primaryNetworkConfig.ConsensusParameters),
-	}
-
-	for subnetID, config := range subnetConfigs {
-		nodeConfig.MinPercentConnectedStakeHealthy[subnetID] = calcMinConnectedStake(config.ConsensusParameters)
-	}
-
 	// Chain Configs
 	nodeConfig.ChainConfigs, err = getChainConfigs(v)
 	if err != nil {
@@ -1514,15 +1497,6 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 
 	nodeConfig.ProvidedFlags = providedFlags(v)
 	return nodeConfig, nil
-}
-
-// calcMinConnectedStake takes [consensusParams] as input and calculates the
-// expected min connected stake percentage according to alpha and k.
-func calcMinConnectedStake(consensusParams snowball.Parameters) float64 {
-	alpha := consensusParams.Alpha
-	k := consensusParams.K
-	r := float64(alpha) / float64(k)
-	return r*(1-constants.MinConnectedStakeBuffer) + constants.MinConnectedStakeBuffer
 }
 
 func providedFlags(v *viper.Viper) map[string]interface{} {

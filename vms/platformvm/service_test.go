@@ -13,8 +13,6 @@ import (
 
 	stdjson "encoding/json"
 
-	"github.com/golang/mock/gomock"
-
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/api"
@@ -25,7 +23,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -71,7 +68,7 @@ var (
 )
 
 func defaultService(t *testing.T) (*Service, *mutableSharedMemory) {
-	vm, _, mutableSharedMemory := defaultVM()
+	vm, _, mutableSharedMemory := defaultVM(t)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 	ks := keystore.New(logging.NoLog{}, manager.NewMemDB(version.Semantic1_0_0))
@@ -89,32 +86,38 @@ func defaultService(t *testing.T) (*Service, *mutableSharedMemory) {
 
 // Give user [testUsername] control of [testPrivateKey] and keys[0] (which is funded)
 func defaultAddress(t *testing.T, service *Service) {
+	require := require.New(t)
+
 	service.vm.ctx.Lock.Lock()
 	defer service.vm.ctx.Lock.Unlock()
 	user, err := vmkeystore.NewUserFromKeystore(service.vm.ctx.Keystore, testUsername, testPassword)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	pk, err := testKeyFactory.ToPrivateKey(testPrivateKey)
-	require.NoError(t, err)
+	require.NoError(err)
 
-	require.NoError(t, user.PutKeys(pk, keys[0]))
+	require.NoError(user.PutKeys(pk, keys[0]))
 }
 
 func TestAddValidator(t *testing.T) {
+	require := require.New(t)
+
 	expectedJSONString := `{"username":"","password":"","from":null,"changeAddr":"","txID":"11111111111111111111111111111111LpoYY","startTime":"0","endTime":"0","weight":"0","nodeID":"NodeID-111111111111111111116DBWJs","rewardAddress":"","delegationFeeRate":"0.0000"}`
 	args := AddValidatorArgs{}
 	bytes, err := stdjson.Marshal(&args)
-	require.NoError(t, err)
-	require.Equal(t, expectedJSONString, string(bytes))
+	require.NoError(err)
+	require.Equal(expectedJSONString, string(bytes))
 }
 
 func TestCreateBlockchainArgsParsing(t *testing.T) {
+	require := require.New(t)
+
 	jsonString := `{"vmID":"lol","fxIDs":["secp256k1"], "name":"awesome", "username":"bob loblaw", "password":"yeet", "genesisData":"SkB92YpWm4Q2iPnLGCuDPZPgUQMxajqQQuz91oi3xD984f8r"}`
 	args := CreateBlockchainArgs{}
-	require.NoError(t, stdjson.Unmarshal([]byte(jsonString), &args))
+	require.NoError(stdjson.Unmarshal([]byte(jsonString), &args))
 
 	_, err := stdjson.Marshal(args.GenesisData)
-	require.NoError(t, err)
+	require.NoError(err)
 }
 
 func TestExportKey(t *testing.T) {
@@ -337,9 +340,7 @@ func TestGetTx(t *testing.T) {
 
 						commit := options[0].(*blockexecutor.Block)
 						require.IsType(&blocks.BanffCommitBlock{}, commit.Block)
-
 						require.NoError(commit.Verify(context.Background()))
-
 						require.NoError(commit.Accept(context.Background()))
 					}
 				}
@@ -378,7 +379,7 @@ func TestGetBalance(t *testing.T) {
 	}()
 
 	// Ensure GetStake is correct for each of the genesis validators
-	genesis, _ := defaultGenesis()
+	genesis, _ := defaultGenesis(t)
 	for _, utxo := range genesis.UTXOs {
 		request := GetBalanceRequest{
 			Addresses: []string{
@@ -407,7 +408,7 @@ func TestGetStake(t *testing.T) {
 	}()
 
 	// Ensure GetStake is correct for each of the genesis validators
-	genesis, _ := defaultGenesis()
+	genesis, _ := defaultGenesis(t)
 	addrsStrs := []string{}
 	for i, validator := range genesis.Validators {
 		addr := fmt.Sprintf("P-%s", validator.RewardOwner.Addresses[0])
@@ -572,7 +573,7 @@ func TestGetCurrentValidators(t *testing.T) {
 		service.vm.ctx.Lock.Unlock()
 	}()
 
-	genesis, _ := defaultGenesis()
+	genesis, _ := defaultGenesis(t)
 
 	// Call getValidators
 	args := GetCurrentValidatorsArgs{SubnetID: constants.PrimaryNetworkID}
@@ -776,194 +777,6 @@ func TestGetBlock(t *testing.T) {
 			}
 
 			require.Equal(test.encoding, response.Encoding)
-		})
-	}
-}
-
-func TestServiceGetBlockByHeight(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	blockID := ids.GenerateTestID()
-	blockHeight := uint64(1337)
-
-	type test struct {
-		name                        string
-		serviceAndExpectedBlockFunc func(t *testing.T, ctrl *gomock.Controller) (*Service, interface{})
-		encoding                    formatting.Encoding
-		expectedErr                 error
-	}
-
-	tests := []test{
-		{
-			name: "block height not found",
-			serviceAndExpectedBlockFunc: func(_ *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
-				state := state.NewMockState(ctrl)
-				state.EXPECT().GetBlockIDAtHeight(blockHeight).Return(ids.Empty, database.ErrNotFound)
-
-				manager := blockexecutor.NewMockManager(ctrl)
-				return &Service{
-					vm: &VM{
-						state:   state,
-						manager: manager,
-						ctx: &snow.Context{
-							Log: logging.NoLog{},
-						},
-					},
-				}, nil
-			},
-			encoding:    formatting.Hex,
-			expectedErr: database.ErrNotFound,
-		},
-		{
-			name: "block not found",
-			serviceAndExpectedBlockFunc: func(_ *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
-				state := state.NewMockState(ctrl)
-				state.EXPECT().GetBlockIDAtHeight(blockHeight).Return(blockID, nil)
-
-				manager := blockexecutor.NewMockManager(ctrl)
-				manager.EXPECT().GetStatelessBlock(blockID).Return(nil, database.ErrNotFound)
-				return &Service{
-					vm: &VM{
-						state:   state,
-						manager: manager,
-						ctx: &snow.Context{
-							Log: logging.NoLog{},
-						},
-					},
-				}, nil
-			},
-			encoding:    formatting.Hex,
-			expectedErr: database.ErrNotFound,
-		},
-		{
-			name: "JSON format",
-			serviceAndExpectedBlockFunc: func(_ *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
-				block := blocks.NewMockBlock(ctrl)
-				block.EXPECT().InitCtx(gomock.Any())
-
-				state := state.NewMockState(ctrl)
-				state.EXPECT().GetBlockIDAtHeight(blockHeight).Return(blockID, nil)
-
-				manager := blockexecutor.NewMockManager(ctrl)
-				manager.EXPECT().GetStatelessBlock(blockID).Return(block, nil)
-				return &Service{
-					vm: &VM{
-						state:   state,
-						manager: manager,
-						ctx: &snow.Context{
-							Log: logging.NoLog{},
-						},
-					},
-				}, block
-			},
-			encoding:    formatting.JSON,
-			expectedErr: nil,
-		},
-		{
-			name: "hex format",
-			serviceAndExpectedBlockFunc: func(t *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
-				block := blocks.NewMockBlock(ctrl)
-				blockBytes := []byte("hi mom")
-				block.EXPECT().Bytes().Return(blockBytes)
-
-				state := state.NewMockState(ctrl)
-				state.EXPECT().GetBlockIDAtHeight(blockHeight).Return(blockID, nil)
-
-				expected, err := formatting.Encode(formatting.Hex, blockBytes)
-				require.NoError(t, err)
-
-				manager := blockexecutor.NewMockManager(ctrl)
-				manager.EXPECT().GetStatelessBlock(blockID).Return(block, nil)
-				return &Service{
-					vm: &VM{
-						state:   state,
-						manager: manager,
-						ctx: &snow.Context{
-							Log: logging.NoLog{},
-						},
-					},
-				}, expected
-			},
-			encoding:    formatting.Hex,
-			expectedErr: nil,
-		},
-		{
-			name: "hexc format",
-			serviceAndExpectedBlockFunc: func(t *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
-				block := blocks.NewMockBlock(ctrl)
-				blockBytes := []byte("hi mom")
-				block.EXPECT().Bytes().Return(blockBytes)
-
-				state := state.NewMockState(ctrl)
-				state.EXPECT().GetBlockIDAtHeight(blockHeight).Return(blockID, nil)
-
-				expected, err := formatting.Encode(formatting.HexC, blockBytes)
-				require.NoError(t, err)
-
-				manager := blockexecutor.NewMockManager(ctrl)
-				manager.EXPECT().GetStatelessBlock(blockID).Return(block, nil)
-				return &Service{
-					vm: &VM{
-						state:   state,
-						manager: manager,
-						ctx: &snow.Context{
-							Log: logging.NoLog{},
-						},
-					},
-				}, expected
-			},
-			encoding:    formatting.HexC,
-			expectedErr: nil,
-		},
-		{
-			name: "hexnc format",
-			serviceAndExpectedBlockFunc: func(t *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
-				block := blocks.NewMockBlock(ctrl)
-				blockBytes := []byte("hi mom")
-				block.EXPECT().Bytes().Return(blockBytes)
-
-				state := state.NewMockState(ctrl)
-				state.EXPECT().GetBlockIDAtHeight(blockHeight).Return(blockID, nil)
-
-				expected, err := formatting.Encode(formatting.HexNC, blockBytes)
-				require.NoError(t, err)
-
-				manager := blockexecutor.NewMockManager(ctrl)
-				manager.EXPECT().GetStatelessBlock(blockID).Return(block, nil)
-				return &Service{
-					vm: &VM{
-						state:   state,
-						manager: manager,
-						ctx: &snow.Context{
-							Log: logging.NoLog{},
-						},
-					},
-				}, expected
-			},
-			encoding:    formatting.HexNC,
-			expectedErr: nil,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
-
-			service, expected := tt.serviceAndExpectedBlockFunc(t, ctrl)
-
-			args := &api.GetBlockByHeightArgs{
-				Height:   json.Uint64(blockHeight),
-				Encoding: tt.encoding,
-			}
-			reply := &api.GetBlockResponse{}
-			err := service.GetBlockByHeight(nil, args, reply)
-			require.ErrorIs(err, tt.expectedErr)
-			if tt.expectedErr == nil {
-				return
-			}
-			require.Equal(tt.encoding, reply.Encoding)
-			require.Equal(expected, reply.Block)
 		})
 	}
 }

@@ -81,6 +81,12 @@ type IPConfig struct {
 	AttemptedNATTraversal bool `json:"attemptedNATTraversal"`
 	// Tries to perform network address translation
 	Nat nat.Router `json:"-"`
+	// The host portion of the address to listen on. The port to
+	// listen on will be sourced from IPPort.
+	//
+	// - If empty, listen on all interfaces (both ipv4 and ipv6).
+	// - If populated, listen only on the specified address.
+	ListenHost string `json:"listenHost"`
 }
 
 type StakingConfig struct {
@@ -217,10 +223,6 @@ type Config struct {
 	WarningThresholdAvailableDiskSpace uint64 `json:"warningThresholdAvailableDiskSpace"`
 
 	TraceConfig trace.Config `json:"traceConfig"`
-
-	// See comment on [MinPercentConnectedStakeHealthy] in platformvm.Config
-	// TODO: consider moving to subnet config
-	MinPercentConnectedStakeHealthy map[ids.ID]float64 `json:"minPercentConnectedStakeHealthy"`
 
 	// See comment on [UseCurrentHeight] in platformvm.Config
 	UseCurrentHeight bool `json:"useCurrentHeight"`

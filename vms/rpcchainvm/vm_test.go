@@ -118,9 +118,7 @@ func TestVMServerInterface(t *testing.T) {
 	}
 	slices.Sort(gotMethods)
 
-	if !reflect.DeepEqual(gotMethods, wantMethods) {
-		t.Errorf("\ngot: %q\nwant: %q", gotMethods, wantMethods)
-	}
+	require.Equal(t, wantMethods, gotMethods)
 }
 
 func TestRuntimeSubprocessBootstrap(t *testing.T) {
