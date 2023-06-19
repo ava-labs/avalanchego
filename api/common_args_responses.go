@@ -94,6 +94,11 @@ type FormattedBlock struct {
 	Encoding formatting.Encoding `json:"encoding"`
 }
 
+type GetSubnetArgs struct {
+	SubnetID ids.ID              `json:"subnetID"`
+	Encoding formatting.Encoding `json:"encoding"`
+}
+
 type GetTxArgs struct {
 	TxID     ids.ID              `json:"txID"`
 	Encoding formatting.Encoding `json:"encoding"`

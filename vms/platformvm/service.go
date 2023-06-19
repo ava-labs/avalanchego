@@ -62,22 +62,23 @@ const (
 )
 
 var (
-	errMissingDecisionBlock     = errors.New("should have a decision block within the past two blocks")
-	errNoSubnetID               = errors.New("argument 'subnetID' not provided")
-	errNoRewardAddress          = errors.New("argument 'rewardAddress' not provided")
-	errInvalidDelegationRate    = errors.New("argument 'delegationFeeRate' must be between 0 and 100, inclusive")
-	errNoAddresses              = errors.New("no addresses provided")
-	errNoKeys                   = errors.New("user has no keys or funds")
-	errStartTimeTooSoon         = fmt.Errorf("start time must be at least %s in the future", minAddStakerDelay)
-	errStartTimeTooLate         = errors.New("start time is too far in the future")
-	errNamedSubnetCantBePrimary = errors.New("subnet validator attempts to validate primary network")
-	errNoAmount                 = errors.New("argument 'amount' must be > 0")
-	errMissingName              = errors.New("argument 'name' not given")
-	errMissingVMID              = errors.New("argument 'vmID' not given")
-	errMissingBlockchainID      = errors.New("argument 'blockchainID' not given")
-	errMissingPrivateKey        = errors.New("argument 'privateKey' not given")
-	errStartAfterEndTime        = errors.New("start time must be before end time")
-	errStartTimeInThePast       = errors.New("start time in the past")
+	errMissingDecisionBlock      = errors.New("should have a decision block within the past two blocks")
+	errNoSubnetID                = errors.New("argument 'subnetID' not provided")
+	errNoRewardAddress           = errors.New("argument 'rewardAddress' not provided")
+	errInvalidDelegationRate     = errors.New("argument 'delegationFeeRate' must be between 0 and 100, inclusive")
+	errNoAddresses               = errors.New("no addresses provided")
+	errNoKeys                    = errors.New("user has no keys or funds")
+	errStartTimeTooSoon          = fmt.Errorf("start time must be at least %s in the future", minAddStakerDelay)
+	errStartTimeTooLate          = errors.New("start time is too far in the future")
+	errNamedSubnetCantBePrimary  = errors.New("subnet validator attempts to validate primary network")
+	errNoAmount                  = errors.New("argument 'amount' must be > 0")
+	errMissingName               = errors.New("argument 'name' not given")
+	errMissingVMID               = errors.New("argument 'vmID' not given")
+	errMissingBlockchainID       = errors.New("argument 'blockchainID' not given")
+	errMissingPrivateKey         = errors.New("argument 'privateKey' not given")
+	errStartAfterEndTime         = errors.New("start time must be before end time")
+	errStartTimeInThePast        = errors.New("start time in the past")
+	errUnexpectedTransactionType = fmt.Errorf("unexpected transaction type")
 )
 
 // Service defines the API calls that can be made to the platform chain
@@ -525,6 +526,47 @@ type GetSubnetsResponse struct {
 	// Each element is a subnet that exists
 	// Null if there are no subnets other than the primary network
 	Subnets []APISubnet `json:"subnets"`
+}
+
+func (s *Service) GetSubnet(_ *http.Request, args *api.GetSubnetArgs, response *api.GetTxReply) error {
+	s.vm.ctx.Log.Debug("API called",
+		zap.String("service", "platform"),
+		zap.String("method", "getSubnet"),
+	)
+
+	subnetID := args.SubnetID
+
+	var tx *txs.Tx
+	var err error
+	tx, err = s.vm.state.GetSubnetTransformation(subnetID)
+	if err != nil && err != database.ErrNotFound {
+		return fmt.Errorf("couldn't get transformed subnet: %w", err)
+	}
+	if err != nil && err == database.ErrNotFound {
+		// subnet may not be transformed
+		tx, _, err = s.vm.state.GetTx(subnetID)
+		if err != nil {
+			return fmt.Errorf("couldn't get tx: %w", err)
+		}
+		_, ok := tx.Unsigned.(*txs.CreateSubnetTx)
+		if !ok {
+			return fmt.Errorf("%w expected *txs.CreateSubnetTx but got %T", errUnexpectedTransactionType, tx.Unsigned)
+		}
+	}
+
+	txBytes := tx.Bytes()
+	response.Encoding = args.Encoding
+	if args.Encoding == formatting.JSON {
+		tx.Unsigned.InitCtx(s.vm.ctx)
+		response.Tx = tx
+		return nil
+	}
+
+	response.Tx, err = formatting.Encode(args.Encoding, txBytes)
+	if err != nil {
+		return fmt.Errorf("couldn't encode tx as %s: %w", args.Encoding, err)
+	}
+	return nil
 }
 
 // GetSubnets returns the subnets whose ID are in [args.IDs]

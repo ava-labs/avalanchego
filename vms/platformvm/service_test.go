@@ -13,6 +13,7 @@ import (
 
 	stdjson "encoding/json"
 
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/api"
@@ -23,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -242,6 +244,147 @@ func TestGetTxStatus(t *testing.T) {
 	require.NoError(service.GetTxStatus(nil, arg, &resp))
 	require.Equal(status.Committed, resp.Status)
 	require.Zero(resp.Reason)
+}
+
+func TestGetSubnet(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	subnetID := ids.GenerateTestID()
+	factory := secp256k1.Factory{}
+	ownerKey, err := factory.NewPrivateKey()
+	require.NoError(t, err)
+
+	type test struct {
+		name string
+		//verifyRes   func(require *require.Assertions, res *api.GetTxReply, err error)
+		mocked      func(ctrl *gomock.Controller) *Service
+		expectedErr error
+	}
+
+	newService := func(state state.State) *Service {
+		return &Service{
+			vm: &VM{
+				state: state,
+				ctx: &snow.Context{
+					Log: logging.NoLog{},
+				},
+			},
+		}
+	}
+
+	tests := []test{
+		{
+			name: "subnet is transformed",
+			mocked: func(ctrl *gomock.Controller) *Service {
+				mState := state.NewMockState(ctrl)
+				mState.EXPECT().GetSubnetTransformation(subnetID).Return(
+					&txs.Tx{
+						TxID:     subnetID,
+						Unsigned: &txs.TransformSubnetTx{},
+					},
+					nil,
+				)
+				return newService(mState)
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "subnet is not transformed",
+			mocked: func(ctrl *gomock.Controller) *Service {
+				mState := state.NewMockState(ctrl)
+				mState.EXPECT().GetSubnetTransformation(subnetID).Return(
+					nil,
+					database.ErrNotFound,
+				)
+				mState.EXPECT().GetTx(subnetID).Return(
+					&txs.Tx{
+						TxID: subnetID,
+						Unsigned: &txs.CreateSubnetTx{
+							Owner: &secp256k1fx.OutputOwners{
+								Threshold: 1,
+								Addrs:     []ids.ShortID{ownerKey.PublicKey().Address()},
+							},
+						},
+					},
+					status.Status(0),
+					nil,
+				)
+				return newService(mState)
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "unexpected error from getTransformedSubnet",
+			mocked: func(ctrl *gomock.Controller) *Service {
+				mState := state.NewMockState(ctrl)
+				mState.EXPECT().GetSubnetTransformation(subnetID).Return(
+					nil,
+					database.ErrClosed,
+				)
+				return newService(mState)
+			},
+			expectedErr: database.ErrClosed,
+		},
+		{
+			name: "not found",
+			mocked: func(ctrl *gomock.Controller) *Service {
+				mState := state.NewMockState(ctrl)
+				mState.EXPECT().GetSubnetTransformation(subnetID).Return(
+					nil,
+					database.ErrNotFound,
+				)
+				mState.EXPECT().GetTx(subnetID).Return(
+					nil,
+					status.Status(1),
+					database.ErrNotFound,
+				)
+				return newService(mState)
+			},
+			expectedErr: database.ErrNotFound,
+		},
+		{
+			name: "found tx but not related to subnet",
+			mocked: func(ctrl *gomock.Controller) *Service {
+				mState := state.NewMockState(ctrl)
+				mState.EXPECT().GetSubnetTransformation(subnetID).Return(
+					nil,
+					database.ErrNotFound,
+				)
+				mState.EXPECT().GetTx(subnetID).Return(
+					&txs.Tx{
+						TxID: subnetID,
+					},
+					status.Status(0),
+					nil,
+				)
+				return newService(mState)
+			},
+			expectedErr: errUnexpectedTransactionType,
+		},
+	}
+
+	for _, test := range tests {
+		for _, encoding := range encodings {
+			testName := fmt.Sprintf("test '%s - %s'", test.name, encoding.String())
+			t.Run(testName, func(t *testing.T) {
+				require := require.New(t)
+				service := test.mocked(ctrl)
+				var res api.GetTxReply
+				err := service.GetSubnet(nil, &api.GetSubnetArgs{
+					SubnetID: subnetID,
+					Encoding: encoding,
+				},
+					&res,
+				)
+
+				require.ErrorIs(err, test.expectedErr)
+				if test.expectedErr == nil {
+					require.Equal(encoding, res.Encoding)
+				}
+			})
+		}
+	}
 }
 
 // Test issuing and then retrieving a transaction

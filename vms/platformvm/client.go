@@ -255,6 +255,8 @@ type Client interface {
 	GetValidatorsAt(ctx context.Context, subnetID ids.ID, height uint64, options ...rpc.Option) (map[ids.NodeID]uint64, error)
 	// GetBlock returns the block with the given id.
 	GetBlock(ctx context.Context, blockID ids.ID, options ...rpc.Option) ([]byte, error)
+	// GetSubnet returns the byte representation of the transaction corresponding to [subnetID]
+	GetSubnet(ctx context.Context, subnetID ids.ID, options ...rpc.Option) ([]byte, error)
 }
 
 // Client implementation for interacting with the P Chain endpoint
@@ -714,6 +716,18 @@ func (c *client) GetTx(ctx context.Context, txID ids.ID, options ...rpc.Option) 
 	res := &api.FormattedTx{}
 	err := c.requester.SendRequest(ctx, "platform.getTx", &api.GetTxArgs{
 		TxID:     txID,
+		Encoding: formatting.Hex,
+	}, res, options...)
+	if err != nil {
+		return nil, err
+	}
+	return formatting.Decode(res.Encoding, res.Tx)
+}
+
+func (c *client) GetSubnet(ctx context.Context, subnetID ids.ID, options ...rpc.Option) ([]byte, error) {
+	res := &api.FormattedTx{}
+	err := c.requester.SendRequest(ctx, "platform.getSubnet", &api.GetSubnetArgs{
+		SubnetID: subnetID,
 		Encoding: formatting.Hex,
 	}, res, options...)
 	if err != nil {
