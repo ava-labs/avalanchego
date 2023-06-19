@@ -4,10 +4,14 @@
 package states
 
 import (
+	"bytes"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/cache/metercacher"
@@ -16,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/avm/blocks"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
@@ -101,8 +106,8 @@ type State interface {
 	// pending changes to the base database.
 	CommitBatch() (database.Batch, error)
 
-	// Remove rejected and processing Txs from txDB
-	CleanupTxs() error
+	// Remove unneeded state from disk
+	Prune(lock sync.Locker, log logging.Logger) error
 
 	Close() error
 }
@@ -579,52 +584,132 @@ func (s *state) writeStatuses() error {
 	return nil
 }
 
-func (s *state) CleanupTxs() error {
-	iter := s.statusDB.NewIterator()
-	defer iter.Release()
+func (s *state) Prune(lock sync.Locker, log logging.Logger) error {
+	lock.Lock()
+	statusIter := s.statusDB.NewIterator()
+	defer statusIter.Release()
 
-	for iter.Next() {
-		key := iter.Key()
-		val := iter.Value()
+	if !statusIter.Next() {
+		// Database was already re-indexed
+		lock.Unlock()
 
-		txID, err := ids.ToID(key)
-		if err != nil {
+		log.Info("state already pruned")
+
+		return statusIter.Error()
+	}
+
+	startTxIDBytes := statusIter.Key()
+	txIter := s.txDB.NewIteratorWithStart(startTxIDBytes)
+	defer txIter.Release()
+
+	oldStatusCache := s.statusCache
+	oldTxCache := s.txCache
+	s.statusCache = &cache.Empty[ids.ID, *choices.Status]{}
+	s.txCache = &cache.Empty[ids.ID, *txs.Tx]{}
+	lock.Unlock()
+
+	startStatusBytes := statusIter.Value()
+	if err := s.cleanupTx(lock, startTxIDBytes, startStatusBytes, txIter); err != nil {
+		return err
+	}
+
+	i := 1
+	for statusIter.Next() {
+		i++
+
+		txIDBytes := statusIter.Key()
+		statusBytes := statusIter.Value()
+		if err := s.cleanupTx(lock, txIDBytes, statusBytes, txIter); err != nil {
 			return err
 		}
-		tx, err := s.GetTx(txID)
-		if err != nil {
-			return err
-		}
-
-		valStatus, err := database.ParseUInt32(val)
-		if err != nil {
-			return err
-		}
-		txStatus := choices.Status(valStatus)
-
-		if txStatus == choices.Accepted {
-			utxos := tx.Unsigned.InputUTXOs()
-			// remove all the UTXOs consumed by the tx
-			for _, UTXO := range utxos {
-				delete(s.modifiedUTXOs, UTXO.InputID())
-				if err := s.utxoState.DeleteUTXO(UTXO.InputID()); err != nil {
-					return err
-				}
-			}
-		} else {
-			// remove all these transactions from map
-			delete(s.addedTxs, txID)
-			// remove all these transactions from cache
-			s.txCache.Evict(txID)
-			// remove all these transactions from db
-			if err := s.txDB.Delete(key); err != nil {
+		if i%25000 == 0 {
+			lock.Lock()
+			err := s.Commit()
+			lock.Unlock()
+			if err != nil {
 				return err
 			}
-			s.statusCache.Evict(txID)
-			if err := s.statusDB.Delete(key); err != nil {
-				return err
-			}
+
+			log.Info("committing state pruning",
+				zap.Int("count", i),
+			)
 		}
 	}
-	return nil
+
+	lock.Lock()
+	defer lock.Unlock()
+
+	errs := wrappers.Errs{}
+	errs.Add(
+		s.Commit(),
+		statusIter.Error(),
+		txIter.Error(),
+	)
+
+	oldStatusCache.Flush()
+	oldTxCache.Flush()
+	s.statusCache = oldStatusCache
+	s.txCache = oldTxCache
+
+	log.Info("finished state pruning",
+		zap.Int("count", i),
+	)
+
+	return errs.Err
+}
+
+func (s *state) cleanupTx(lock sync.Locker, txIDBytes []byte, statusBytes []byte, txIter database.Iterator) error {
+	if err := skipTo(txIter, txIDBytes); err != nil {
+		return err
+	}
+
+	statusInt, err := database.ParseUInt32(statusBytes)
+	if err != nil {
+		return err
+	}
+
+	status := choices.Status(statusInt)
+
+	if status == choices.Accepted {
+		txBytes := txIter.Value()
+		tx, err := s.parser.ParseGenesisTx(txBytes)
+		if err != nil {
+			return err
+		}
+
+		utxos := tx.Unsigned.InputUTXOs()
+
+		lock.Lock()
+		defer lock.Unlock()
+
+		// remove all the UTXOs consumed by the tx
+		for _, UTXO := range utxos {
+			if err := s.utxoState.DeleteUTXO(UTXO.InputID()); err != nil {
+				return err
+			}
+		}
+	} else {
+		lock.Lock()
+		defer lock.Unlock()
+
+		if err := s.txDB.Delete(txIDBytes); err != nil {
+			return err
+		}
+	}
+	return s.statusDB.Delete(txIDBytes)
+}
+
+func skipTo(iter database.Iterator, targetKey []byte) error {
+	for {
+		if !iter.Next() {
+			return database.ErrNotFound
+		}
+		key := iter.Key()
+		switch bytes.Compare(targetKey, key) {
+		case -1:
+			return database.ErrNotFound
+		case 0:
+			return nil
+		}
+	}
 }

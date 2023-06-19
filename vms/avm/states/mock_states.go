@@ -9,11 +9,13 @@ package states
 
 import (
 	reflect "reflect"
+	sync "sync"
 	time "time"
 
 	database "github.com/ava-labs/avalanchego/database"
 	ids "github.com/ava-labs/avalanchego/ids"
 	choices "github.com/ava-labs/avalanchego/snow/choices"
+	logging "github.com/ava-labs/avalanchego/utils/logging"
 	blocks "github.com/ava-labs/avalanchego/vms/avm/blocks"
 	txs "github.com/ava-labs/avalanchego/vms/avm/txs"
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
@@ -503,6 +505,20 @@ func (mr *MockStateMockRecorder) IsInitialized() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsInitialized", reflect.TypeOf((*MockState)(nil).IsInitialized))
 }
 
+// Prune mocks base method.
+func (m *MockState) Prune(arg0 sync.Locker, arg1 logging.Logger) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Prune", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Prune indicates an expected call of Prune.
+func (mr *MockStateMockRecorder) Prune(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Prune", reflect.TypeOf((*MockState)(nil).Prune), arg0, arg1)
+}
+
 // SetInitialized mocks base method.
 func (m *MockState) SetInitialized() error {
 	m.ctrl.T.Helper()
@@ -764,18 +780,4 @@ func (m *MockDiff) SetTimestamp(arg0 time.Time) {
 func (mr *MockDiffMockRecorder) SetTimestamp(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetTimestamp", reflect.TypeOf((*MockDiff)(nil).SetTimestamp), arg0)
-}
-
-// RemoveRejectedTxs mocks base method.
-func (m *MockState) CleanupTxs() error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CleanupTxs")
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// RemoveRejectedTxs indicates an expected call of RemoveRejectedTxs.
-func (mr *MockStateMockRecorder) RemoveCleanupTxs() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CleanupTxs", reflect.TypeOf((*MockState)(nil).CleanupTxs))
 }

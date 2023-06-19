@@ -314,11 +314,6 @@ func (vm *VM) onNormalOperationsStarted() error {
 			return err
 		}
 	}
-	vm.ctx.Log.Info("Cleaning up Txs starts now %d", zap.String("startTime", time.Now().String()))
-	if err := vm.state.CleanupTxs(); err != nil {
-		return err
-	}
-	vm.ctx.Log.Info("Cleaning up Txs completes at ", zap.String("finishTime", time.Now().String()))
 	if err := vm.state.Commit(); err != nil {
 		return err
 	}
@@ -477,6 +472,16 @@ func (vm *VM) Linearize(_ context.Context, stopVertexID ids.ID, toEngine chan<- 
 	// chainVM has been initialized. Traffic will immediately start being
 	// handled asynchronously.
 	vm.Atomic.Set(vm.network)
+
+	go func() {
+		err := vm.state.Prune(&vm.ctx.Lock, vm.ctx.Log)
+		if err != nil {
+			vm.ctx.Log.Error("state pruning failed",
+				zap.Error(err),
+			)
+		}
+	}()
+
 	return nil
 }
 
