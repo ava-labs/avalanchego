@@ -87,6 +87,10 @@ func (tx *AddContinuousValidatorTx) ManagementKey() fx.Owner {
 	return tx.ValidatorAuthKey
 }
 
+func (tx *AddContinuousValidatorTx) RestakeShares() uint32 {
+	return tx.ValidatorRewardRestakeShares
+}
+
 func (*AddContinuousValidatorTx) CurrentPriority() Priority {
 	return PrimaryNetworkContinuousValidatorCurrentPriority
 }

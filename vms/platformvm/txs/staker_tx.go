@@ -67,4 +67,5 @@ type PreContinuousStakingStaker interface {
 type ContinuousStaker interface {
 	Staker
 	ManagementKey() fx.Owner
+	RestakeShares() uint32
 }

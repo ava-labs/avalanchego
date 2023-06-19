@@ -69,6 +69,10 @@ func (tx *AddContinuousDelegatorTx) ManagementKey() fx.Owner {
 	return tx.DelegatorAuthKey
 }
 
+func (tx *AddContinuousDelegatorTx) RestakeShares() uint32 {
+	return tx.DelegatorRewardRestakeShares
+}
+
 func (*AddContinuousDelegatorTx) CurrentPriority() Priority {
 	return PrimaryNetworkContinuousDelegatorCurrentPriority
 }
