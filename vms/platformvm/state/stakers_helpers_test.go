@@ -56,11 +56,12 @@ func (h *versionsHolder) GetState(blkID ids.ID) (Chain, bool) {
 	return h.baseState, blkID == h.baseState.GetLastAccepted()
 }
 
-func buildChainState() (State, error) {
+func buildChainState(trackedSubnets []ids.ID) (State, error) {
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	baseDB := versiondb.New(baseDBManager.Current().Database)
 
 	cfg := defaultConfig()
+	cfg.TrackedSubnets.Add(trackedSubnets...)
 
 	ctx := snow.DefaultContextTest()
 	ctx.NetworkID = constants.UnitTestID

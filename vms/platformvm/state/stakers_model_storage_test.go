@@ -125,7 +125,7 @@ func (s *sysUnderTest) flushBottomDiff() bool {
 var stakersCommands = &commands.ProtoCommands{
 	NewSystemUnderTestFunc: func(initialState commands.State) commands.SystemUnderTest {
 		model := initialState.(*stakersStorageModel)
-		baseState, err := buildChainState()
+		baseState, err := buildChainState(nil)
 		if err != nil {
 			panic(err)
 		}

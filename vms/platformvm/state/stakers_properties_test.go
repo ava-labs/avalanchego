@@ -19,30 +19,18 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-// TestSimpleStakersOperations checks that State and Diff conform our stakersStorageModel.
-// TestSimpleStakersOperations tests State and Diff in isolation, over simple operations.
+// TestGeneralStakerContainersProperties checks that State and Diff conform our stakersStorageModel.
+// TestGeneralStakerContainersProperties tests State and Diff in isolation, over simple operations.
 // TestStateAndDiffComparisonToStorageModel carries a more involved verification over a production-like
 // mix of State and Diffs.
-func TestSimpleStakersOperations(t *testing.T) {
+func TestGeneralStakerContainersProperties(t *testing.T) {
 	storeCreators := map[string]func() (Stakers, error){
 		"base state": func() (Stakers, error) {
-			return buildChainState()
+			return buildChainState(nil)
 		},
 		"diff": func() (Stakers, error) {
-			baseState, err := buildChainState()
-			if err != nil {
-				return nil, fmt.Errorf("unexpected error while creating chain base state, err %v", err)
-			}
-
-			genesisID := baseState.GetLastAccepted()
-			versions := &versionsHolder{
-				baseState: baseState,
-			}
-			store, err := NewDiff(genesisID, versions)
-			if err != nil {
-				return nil, fmt.Errorf("unexpected error while creating diff, err %v", err)
-			}
-			return store, nil
+			diff, _, err := buildDiffOnTopOfBaseState(nil)
+			return diff, err
 		},
 		"storage model": func() (Stakers, error) { //nolint:golint,unparam
 			return newStakersStorageModel(), nil
@@ -51,13 +39,13 @@ func TestSimpleStakersOperations(t *testing.T) {
 
 	for storeType, storeCreatorF := range storeCreators {
 		t.Run(storeType, func(t *testing.T) {
-			properties := simpleStakerStateProperties(storeCreatorF)
+			properties := generalStakerContainersProperties(storeCreatorF)
 			properties.TestingRun(t)
 		})
 	}
 }
 
-func simpleStakerStateProperties(storeCreatorF func() (Stakers, error)) *gopter.Properties {
+func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *gopter.Properties {
 	properties := gopter.NewProperties(nil)
 
 	properties.Property("add, delete and query current validators", prop.ForAll(
@@ -102,7 +90,7 @@ func simpleStakerStateProperties(storeCreatorF func() (Stakers, error)) *gopter.
 				return err.Error()
 			}
 
-			// delete the staker and show it won't be found anymore
+			// delete the staker and show it's not found anymore
 			store.DeleteCurrentValidator(&s)
 			_, err = store.GetCurrentValidator(s.SubnetID, s.NodeID)
 			if err != database.ErrNotFound {
@@ -160,7 +148,7 @@ func simpleStakerStateProperties(storeCreatorF func() (Stakers, error)) *gopter.
 				return err.Error()
 			}
 
-			// delete the staker and show it won't be found anymore
+			// delete the staker and show it's found anymore
 			store.DeletePendingValidator(&s)
 			_, err = store.GetPendingValidator(s.SubnetID, s.NodeID)
 			if err != database.ErrNotFound {
@@ -420,8 +408,25 @@ func simpleStakerStateProperties(storeCreatorF func() (Stakers, error)) *gopter.
 	return properties
 }
 
-// verify whether store contains exactly the stakers specify in the list.
-// stakers order does not matter. Also stakers get consumes while checking
+func buildDiffOnTopOfBaseState(trackedSubnets []ids.ID) (Diff, State, error) {
+	baseState, err := buildChainState(trackedSubnets)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unexpected error while creating chain base state, err %v", err)
+	}
+
+	genesisID := baseState.GetLastAccepted()
+	versions := &versionsHolder{
+		baseState: baseState,
+	}
+	diff, err := NewDiff(genesisID, versions)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unexpected error while creating diff, err %v", err)
+	}
+	return diff, baseState, nil
+}
+
+// [checkStakersContent] verifies whether store contains exactly the stakers specified in the list.
+// stakers order does not matter. stakers slice gets consumed while checking.
 func checkStakersContent(store Stakers, stakers []Staker, stakersType stakerStatus) error {
 	var (
 		it  StakerIterator

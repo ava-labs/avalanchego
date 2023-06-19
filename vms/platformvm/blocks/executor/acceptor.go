@@ -154,7 +154,11 @@ func (a *acceptor) ApricotAtomicBlock(b *blocks.ApricotAtomicBlock) error {
 
 	// Update the state to reflect the changes made in [onAcceptState].
 	if err := blkState.onAcceptState.Apply(a.state); err != nil {
-		return err
+		return fmt.Errorf(
+			"failed to apply accept state for block %s: %w",
+			blkID,
+			err,
+		)
 	}
 
 	defer a.state.Abort()
@@ -239,9 +243,15 @@ func (a *acceptor) optionBlock(b, parent blocks.Block) error {
 	if !ok {
 		return fmt.Errorf("%w %s", errMissingBlockState, blkID)
 	}
+
 	if err := blkState.onAcceptState.Apply(a.state); err != nil {
-		return err
+		return fmt.Errorf(
+			"failed to apply accept state for block %s: %w",
+			blkID,
+			err,
+		)
 	}
+
 	return a.state.Commit()
 }
 
@@ -280,7 +290,11 @@ func (a *acceptor) standardBlock(b blocks.Block) error {
 
 	// Update the state to reflect the changes made in [onAcceptState].
 	if err := blkState.onAcceptState.Apply(a.state); err != nil {
-		return err
+		return fmt.Errorf(
+			"failed to apply accept state for block %s: %w",
+			blkID,
+			err,
+		)
 	}
 
 	defer a.state.Abort()
