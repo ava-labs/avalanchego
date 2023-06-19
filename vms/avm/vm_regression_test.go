@@ -9,7 +9,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -33,12 +35,16 @@ func TestVerifyFxUsage(t *testing.T) {
 		ctx.Lock.Unlock()
 	}()
 
+	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
+	m := atomic.NewMemory(prefixdb.New([]byte{0}, baseDBManager.Current().Database))
+	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
+
 	genesisBytes := BuildGenesisTest(t)
 	issuer := make(chan common.Message, 1)
 	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
-		manager.NewMemDB(version.Semantic1_0_0),
+		baseDBManager,
 		genesisBytes,
 		nil,
 		nil,
@@ -96,9 +102,7 @@ func TestVerifyFxUsage(t *testing.T) {
 		},
 	}}
 	require.NoError(vm.parser.InitializeTx(createAssetTx))
-
-	_, err := vm.IssueTx(createAssetTx.Bytes())
-	require.NoError(err)
+	issueAndAccept(require, vm, issuer, createAssetTx)
 
 	mintNFTTx := &txs.Tx{Unsigned: &txs.OperationTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
@@ -122,9 +126,7 @@ func TestVerifyFxUsage(t *testing.T) {
 		}},
 	}}
 	require.NoError(mintNFTTx.SignNFTFx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0]}}))
-
-	_, err = vm.IssueTx(mintNFTTx.Bytes())
-	require.NoError(err)
+	issueAndAccept(require, vm, issuer, mintNFTTx)
 
 	spendTx := &txs.Tx{Unsigned: &txs.BaseTx{BaseTx: avax.BaseTx{
 		NetworkID:    constants.UnitTestID,
@@ -144,7 +146,5 @@ func TestVerifyFxUsage(t *testing.T) {
 		}},
 	}}}
 	require.NoError(spendTx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0]}}))
-
-	_, err = vm.IssueTx(spendTx.Bytes())
-	require.NoError(err)
+	issueAndAccept(require, vm, issuer, spendTx)
 }

@@ -119,7 +119,6 @@ type VM struct {
 	uniqueTxs cache.Deduplicator[ids.ID, *UniqueTx]
 
 	txBackend *txexecutor.Backend
-	dagState  *dagState
 
 	// These values are only initialized after the chain has been linearized.
 	blockbuilder.Builder
@@ -267,10 +266,6 @@ func (vm *VM) Initialize(
 		Codec:         vm.parser.Codec(),
 		FeeAssetID:    vm.feeAssetID,
 		Bootstrapped:  false,
-	}
-	vm.dagState = &dagState{
-		Chain: vm.state,
-		vm:    vm,
 	}
 
 	return vm.state.Commit()
@@ -677,7 +672,7 @@ func (vm *VM) onAccept(tx *txs.Tx) error {
 			continue
 		}
 
-		utxo, err := vm.state.GetUTXOFromID(utxoID)
+		utxo, err := vm.state.GetUTXO(utxoID.InputID())
 		if err == database.ErrNotFound {
 			vm.ctx.Log.Debug("dropping utxo from index",
 				zap.Stringer("txID", txID),
