@@ -9,6 +9,7 @@ import (
 
 	stdmath "math"
 
+	"github.com/golang/mock/gomock"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/stretchr/testify/require"
@@ -17,11 +18,12 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -30,8 +32,21 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
+	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+)
+
+type activeFork uint8
+
+const (
+	apricotPhase3Fork     activeFork = 0
+	apricotPhase5Fork     activeFork = 1
+	banffFork             activeFork = 2
+	cortinaFork           activeFork = 3
+	continuousStakingFork activeFork = 4
+	latestFork            activeFork = continuousStakingFork
 )
 
 var (
@@ -43,7 +58,8 @@ var (
 
 func TestStateInitialization(t *testing.T) {
 	require := require.New(t)
-	s, db, err := newUninitializedState()
+	cfg := defaultConfig(latestFork)
+	s, db, err := newUninitializedState(cfg)
 	require.NoError(err)
 	require.NotNil(s)
 
@@ -54,7 +70,7 @@ func TestStateInitialization(t *testing.T) {
 	require.NoError(s.(*state).doneInit())
 	require.NoError(s.Commit())
 
-	s, err = newStateFromDB(db)
+	s, err = newStateFromDB(db, cfg)
 	require.NoError(err)
 
 	shouldInit, err = s.(*state).shouldInit()
@@ -64,7 +80,8 @@ func TestStateInitialization(t *testing.T) {
 
 func TestStateSyncGenesis(t *testing.T) {
 	require := require.New(t)
-	state, err := newInitializedState()
+	cfg := defaultConfig(latestFork)
+	state, _, err := newInitializedState(cfg)
 	require.NoError(err)
 
 	staker, err := state.GetCurrentValidator(constants.PrimaryNetworkID, initialNodeID)
@@ -88,9 +105,169 @@ func TestStateSyncGenesis(t *testing.T) {
 	assertIteratorsEqual(t, EmptyIterator, delegatorIterator)
 }
 
+func TestVariablePeriodDelegatorPersistence(t *testing.T) {
+	require := require.New(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	cfg := defaultConfig(latestFork)
+	initialState, baseDB, err := newInitializedState(cfg)
+	require.NoError(err)
+	ctx := initialState.(*state).ctx
+
+	var (
+		nodeID        = ids.GenerateTestNodeID()
+		preFundedKeys = secp256k1.TestKeys()
+		addr          = preFundedKeys[0].PublicKey().Address()
+
+		startTime       = time.Unix(0, 0)
+		stakingPeriod   = defaultMaxStakingDuration
+		potentialReward = uint64(1234)
+	)
+
+	sk, err := bls.NewSecretKey()
+	require.NoError(err)
+	blsPOP := signer.NewProofOfPossession(sk)
+
+	// Add a continuous validator
+	validatorData := txs.Validator{
+		NodeID: nodeID,
+		Start:  uint64(startTime.Unix()),
+		End:    uint64(startTime.Add(stakingPeriod).Unix()),
+		Wght:   cfg.MinValidatorStake,
+	}
+	uContinuousVal := &txs.AddContinuousValidatorTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    ctx.NetworkID,
+			BlockchainID: ctx.ChainID,
+			Ins:          []*avax.TransferableInput{},
+			Outs:         []*avax.TransferableOutput{},
+		}},
+		Validator: validatorData,
+		Signer:    blsPOP,
+		ValidatorAuthKey: &secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{addr},
+		},
+		StakeOuts: []*avax.TransferableOutput{
+			{
+				Asset: avax.Asset{
+					ID: ids.GenerateTestID(),
+				},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: validatorData.Weight(),
+				},
+			},
+		},
+		ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
+			Addrs:     []ids.ShortID{addr},
+			Threshold: 1,
+		},
+		ValidatorRewardRestakeShares: 0,
+		DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
+			Addrs:     []ids.ShortID{addr},
+			Threshold: 1,
+		},
+		DelegationShares: 20_000,
+	}
+	valTx, err := txs.NewSigned(uContinuousVal, txs.Codec, nil)
+	require.NoError(err)
+	require.NoError(valTx.SyntacticVerify(ctx))
+
+	validator, err := NewCurrentStaker(
+		valTx.ID(),
+		uContinuousVal,
+		startTime,
+		mockable.MaxTime,
+		potentialReward,
+	)
+	require.NoError(err)
+
+	initialState.PutCurrentValidator(validator)
+	initialState.AddTx(valTx, status.Committed)
+	require.NoError(initialState.Commit())
+
+	// add a continuous delegator
+	delegatorData := txs.Validator{
+		NodeID: nodeID,
+		Start:  uint64(startTime.Unix()),
+		End:    uint64(startTime.Add(stakingPeriod).Unix()),
+		Wght:   cfg.MinDelegatorStake,
+	}
+	uContinuousDel := &txs.AddContinuousDelegatorTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    ctx.NetworkID,
+			BlockchainID: ctx.ChainID,
+			Ins:          []*avax.TransferableInput{},
+			Outs:         []*avax.TransferableOutput{},
+		}},
+		Validator: delegatorData,
+		DelegatorAuthKey: &secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{addr},
+		},
+		StakeOuts: []*avax.TransferableOutput{
+			{
+				Asset: avax.Asset{
+					ID: ids.GenerateTestID(),
+				},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: delegatorData.Weight(),
+				},
+			},
+		},
+		DelegationRewardsOwner: &secp256k1fx.OutputOwners{
+			Addrs:     []ids.ShortID{addr},
+			Threshold: 1,
+		},
+		DelegatorRewardRestakeShares: 0,
+	}
+	delTx, err := txs.NewSigned(uContinuousDel, txs.Codec, nil)
+	require.NoError(err)
+	require.NoError(delTx.SyntacticVerify(ctx))
+
+	delegator, err := NewCurrentStaker(
+		delTx.ID(),
+		uContinuousDel,
+		startTime,
+		mockable.MaxTime,
+		potentialReward,
+	)
+	require.NoError(err)
+
+	initialState.PutCurrentDelegator(delegator)
+	initialState.AddTx(delTx, status.Committed)
+	require.NoError(initialState.Commit())
+
+	// shift delegator, without shortening its period, and store it
+	shiftedDelegator := *delegator
+	ShiftDelegatorAheadInPlace(&shiftedDelegator, mockable.MaxTime)
+	require.NoError(initialState.UpdateCurrentDelegator(&shiftedDelegator))
+	require.NoError(initialState.Commit())
+
+	// reset validators and rebuild state
+	cfg = defaultConfig(latestFork)
+	newState, err := newStateFromDB(baseDB, cfg)
+	require.NoError(err)
+	require.NoError(newState.(*state).load())
+
+	// check rebuilt validator and delegator
+	require.NoError(err)
+	retrievedVal, err := newState.GetCurrentValidator(validator.SubnetID, validator.NodeID)
+	require.NoError(err)
+	require.Equal(validator, retrievedVal)
+
+	delIt, err := newState.GetCurrentDelegatorIterator(delegator.SubnetID, delegator.NodeID)
+	require.NoError(err)
+	require.True(delIt.Next())
+	retrievedDel := delIt.Value()
+	require.Equal(&shiftedDelegator, retrievedDel)
+}
+
 func TestGetValidatorWeightDiffs(t *testing.T) {
 	require := require.New(t)
-	stateIntf, err := newInitializedState()
+	cfg := defaultConfig(latestFork)
+	stateIntf, _, err := newInitializedState(cfg)
 	require.NoError(err)
 	state := stateIntf.(*state)
 
@@ -263,7 +440,8 @@ func TestGetValidatorWeightDiffs(t *testing.T) {
 
 func TestGetValidatorPublicKeyDiffs(t *testing.T) {
 	require := require.New(t)
-	stateIntf, err := newInitializedState()
+	cfg := defaultConfig(latestFork)
+	stateIntf, _, err := newInitializedState(cfg)
 	require.NoError(err)
 	state := stateIntf.(*state)
 
@@ -428,112 +606,6 @@ func TestGetValidatorPublicKeyDiffs(t *testing.T) {
 	}
 }
 
-func newInitializedState() (State, error) {
-	s, _, err := newUninitializedState()
-	if err != nil {
-		return nil, err
-	}
-
-	initialValidator := &txs.AddValidatorTx{
-		Validator: txs.Validator{
-			NodeID: initialNodeID,
-			Start:  uint64(initialTime.Unix()),
-			End:    uint64(initialValidatorEndTime.Unix()),
-			Wght:   units.Avax,
-		},
-		StakeOuts: []*avax.TransferableOutput{
-			{
-				Asset: avax.Asset{ID: initialTxID},
-				Out: &secp256k1fx.TransferOutput{
-					Amt: units.Avax,
-				},
-			},
-		},
-		RewardsOwner:     &secp256k1fx.OutputOwners{},
-		DelegationShares: reward.PercentDenominator,
-	}
-	initialValidatorTx := &txs.Tx{Unsigned: initialValidator}
-	if err := initialValidatorTx.Initialize(txs.Codec); err != nil {
-		return nil, err
-	}
-
-	initialChain := &txs.CreateChainTx{
-		SubnetID:   constants.PrimaryNetworkID,
-		ChainName:  "x",
-		VMID:       constants.AVMID,
-		SubnetAuth: &secp256k1fx.Input{},
-	}
-	initialChainTx := &txs.Tx{Unsigned: initialChain}
-	if err := initialChainTx.Initialize(txs.Codec); err != nil {
-		return nil, err
-	}
-
-	genesisBlkID := ids.GenerateTestID()
-	genesisState := &genesis.State{
-		UTXOs: []*avax.UTXO{
-			{
-				UTXOID: avax.UTXOID{
-					TxID:        initialTxID,
-					OutputIndex: 0,
-				},
-				Asset: avax.Asset{ID: initialTxID},
-				Out: &secp256k1fx.TransferOutput{
-					Amt: units.Schmeckle,
-				},
-			},
-		},
-		Validators: []*txs.Tx{
-			initialValidatorTx,
-		},
-		Chains: []*txs.Tx{
-			initialChainTx,
-		},
-		Timestamp:     uint64(initialTime.Unix()),
-		InitialSupply: units.Schmeckle + units.Avax,
-	}
-
-	genesisBlk, err := blocks.NewApricotCommitBlock(genesisBlkID, 0)
-	if err != nil {
-		return nil, err
-	}
-	if err := s.(*state).syncGenesis(genesisBlk, genesisState); err != nil {
-		return nil, err
-	}
-
-	return s, nil
-}
-
-func newUninitializedState() (State, database.Database, error) {
-	db := memdb.New()
-	s, err := newStateFromDB(db)
-	if err != nil {
-		return nil, nil, err
-	}
-	return s, db, nil
-}
-
-func newStateFromDB(db database.Database) (State, error) {
-	vdrs := validators.NewManager()
-	primaryVdrs := validators.NewSet()
-	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
-	return new(
-		db,
-		metrics.Noop,
-		&config.Config{
-			Validators: vdrs,
-		},
-		&snow.Context{},
-		prometheus.NewRegistry(),
-		reward.NewCalculator(reward.Config{
-			MaxConsumptionRate: .12 * reward.PercentDenominator,
-			MinConsumptionRate: .1 * reward.PercentDenominator,
-			MintingPeriod:      365 * 24 * time.Hour,
-			SupplyCap:          720 * units.MegaAvax,
-		}),
-		&utils.Atomic[bool]{},
-	)
-}
-
 func TestValidatorWeightDiff(t *testing.T) {
 	type test struct {
 		name        string
@@ -679,7 +751,8 @@ func TestValidatorWeightDiff(t *testing.T) {
 func TestStateAddRemoveValidator(t *testing.T) {
 	require := require.New(t)
 
-	state, err := newInitializedState()
+	cfg := defaultConfig(latestFork)
+	state, _, err := newInitializedState(cfg)
 	require.NoError(err)
 
 	var (
@@ -854,4 +927,129 @@ func TestStateAddRemoveValidator(t *testing.T) {
 		require.NoError(err)
 		require.Equal(diff.expectedPublicKeyDiff, gotPublicKeyDiffs)
 	}
+}
+
+func defaultGenesis(ctx *snow.Context) (*genesis.State, error) {
+	initialValidator := &txs.AddValidatorTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    ctx.NetworkID,
+			BlockchainID: ctx.ChainID,
+		}},
+		Validator: txs.Validator{
+			NodeID: initialNodeID,
+			Start:  uint64(initialTime.Unix()),
+			End:    uint64(initialValidatorEndTime.Unix()),
+			Wght:   units.Avax,
+		},
+		StakeOuts: []*avax.TransferableOutput{
+			{
+				Asset: avax.Asset{ID: initialTxID},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: units.Avax,
+				},
+			},
+		},
+		RewardsOwner:     &secp256k1fx.OutputOwners{},
+		DelegationShares: reward.PercentDenominator,
+	}
+	initialValidatorTx := &txs.Tx{Unsigned: initialValidator}
+	if err := initialValidatorTx.Initialize(txs.Codec); err != nil {
+		return nil, err
+	}
+
+	initialChain := &txs.CreateChainTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    ctx.NetworkID,
+			BlockchainID: ctx.ChainID,
+		}},
+		SubnetID:   constants.PrimaryNetworkID,
+		ChainName:  "x",
+		VMID:       constants.AVMID,
+		SubnetAuth: &secp256k1fx.Input{},
+	}
+	initialChainTx := &txs.Tx{Unsigned: initialChain}
+	if err := initialChainTx.Initialize(txs.Codec); err != nil {
+		return nil, err
+	}
+
+	return &genesis.State{
+		UTXOs: []*avax.UTXO{
+			{
+				UTXOID: avax.UTXOID{
+					TxID:        initialTxID,
+					OutputIndex: 0,
+				},
+				Asset: avax.Asset{ID: initialTxID},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: units.Schmeckle,
+				},
+			},
+		},
+		Validators: []*txs.Tx{
+			initialValidatorTx,
+		},
+		Chains: []*txs.Tx{
+			initialChainTx,
+		},
+		Timestamp:     uint64(initialTime.Unix()),
+		InitialSupply: units.Schmeckle + units.Avax,
+	}, nil
+}
+
+func defaultCtx() *snow.Context {
+	ctx := snow.DefaultContextTest()
+	ctx.NetworkID = 10
+	ctx.XChainID = xChainID
+	ctx.CChainID = cChainID
+	ctx.AVAXAssetID = avaxAssetID
+	return ctx
+}
+
+func newInitializedState(cfg *config.Config) (State, database.Database, error) {
+	s, baseDB, err := newUninitializedState(cfg)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	genesisState, err := defaultGenesis(s.(*state).ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	genesisBlkID := ids.GenerateTestID()
+	genesisBlk, err := blocks.NewApricotCommitBlock(genesisBlkID, 0)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := s.(*state).syncGenesis(genesisBlk, genesisState); err != nil {
+		return nil, nil, err
+	}
+
+	return s, baseDB, nil
+}
+
+func newUninitializedState(cfg *config.Config) (State, database.Database, error) {
+	db := memdb.New()
+	s, err := newStateFromDB(db, cfg)
+	if err != nil {
+		return nil, nil, err
+	}
+	return s, db, nil
+}
+
+func newStateFromDB(db database.Database, cfg *config.Config) (State, error) {
+	return new(
+		db,
+		metrics.Noop,
+		cfg,
+		defaultCtx(),
+		prometheus.NewRegistry(),
+		reward.NewCalculator(reward.Config{
+			MaxConsumptionRate: .12 * reward.PercentDenominator,
+			MinConsumptionRate: .1 * reward.PercentDenominator,
+			MintingPeriod:      365 * 24 * time.Hour,
+			SupplyCap:          720 * units.MegaAvax,
+		}),
+		&utils.Atomic[bool]{},
+	)
 }
