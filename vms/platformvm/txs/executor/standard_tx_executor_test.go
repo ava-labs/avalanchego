@@ -193,8 +193,8 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 			feeKeys:              []*secp256k1.PrivateKey{preFundedKeys[0]},
 			setup:                nil,
 			AP3Time:              defaultGenesisTime,
-			expectedExecutionErr: ErrOverDelegated,
-			expectedMempoolErr:   ErrOverDelegated,
+			expectedExecutionErr: ErrPeriodMismatch,
+			expectedMempoolErr:   ErrPeriodMismatch,
 		},
 		{
 			description:          fmt.Sprintf("delegator should not be added more than (%s) in the future", MaxFutureStartTime),
@@ -232,8 +232,8 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 			feeKeys:              []*secp256k1.PrivateKey{preFundedKeys[0]},
 			setup:                addMinStakeValidator,
 			AP3Time:              defaultGenesisTime,
-			expectedExecutionErr: ErrOverDelegated,
-			expectedMempoolErr:   ErrOverDelegated,
+			expectedExecutionErr: ErrPeriodMismatch,
+			expectedMempoolErr:   ErrPeriodMismatch,
 		},
 		{
 			description:          "delegator stops before validator",
@@ -245,8 +245,8 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 			feeKeys:              []*secp256k1.PrivateKey{preFundedKeys[0]},
 			setup:                addMinStakeValidator,
 			AP3Time:              defaultGenesisTime,
-			expectedExecutionErr: ErrOverDelegated,
-			expectedMempoolErr:   ErrOverDelegated,
+			expectedExecutionErr: ErrPeriodMismatch,
+			expectedMempoolErr:   ErrPeriodMismatch,
 		},
 		{
 			description:          "valid",
@@ -411,7 +411,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			Tx:      tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		require.ErrorIs(err, ErrValidatorSubset)
+		require.ErrorIs(err, ErrPeriodMismatch)
 	}
 
 	{
@@ -528,7 +528,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			Tx:      tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		require.ErrorIs(err, ErrValidatorSubset)
+		require.ErrorIs(err, ErrPeriodMismatch)
 	}
 
 	{
@@ -554,7 +554,7 @@ func TestStandardTxExecutorAddSubnetValidator(t *testing.T) {
 			Tx:      tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		require.ErrorIs(err, ErrValidatorSubset)
+		require.ErrorIs(err, ErrPeriodMismatch)
 	}
 
 	{

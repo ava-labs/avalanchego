@@ -67,5 +67,5 @@ func (v *Validator) Verify() error {
 // BoundedBy returns true iff staker start and end are a
 // (non-strict) subset of the provided time bound
 func BoundedBy(stakerStart, stakerEnd, lowerBound, upperBound time.Time) bool {
-	return !stakerStart.Before(lowerBound) && !stakerEnd.After(upperBound)
+	return !stakerStart.Before(lowerBound) && !stakerEnd.After(upperBound) && !stakerEnd.Before(stakerStart)
 }

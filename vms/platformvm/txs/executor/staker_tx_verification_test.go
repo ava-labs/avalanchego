@@ -415,7 +415,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			txF: func() *txs.AddPermissionlessValidatorTx {
 				return &verifiedTx
 			},
-			expectedErr: ErrValidatorSubset,
+			expectedErr: ErrPeriodMismatch,
 		},
 		{
 			name: "flow check fails",

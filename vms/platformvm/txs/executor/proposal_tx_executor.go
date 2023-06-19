@@ -700,35 +700,25 @@ func GetValidator(state state.Chain, subnetID ids.ID, nodeID ids.NodeID) (*state
 	return state.GetPendingValidator(subnetID, nodeID)
 }
 
-// canDelegate returns true if [delegator] can be added as a delegator of
-// [validator].
+// overDelegated returns true if [validator] will be overdelegated when adding [delegator].
 //
-// A [delegator] can be added if:
-// - [delegator]'s start time is not before [validator]'s start time
-// - [delegator]'s end time is not after [validator]'s end time
-// - the maximum total weight on [validator] will not exceed [weightLimit]
-func canDelegate(
+// A [validator] would become overdelegated if:
+// - the maximum total weight on [validator] exceeds [weightLimit]
+func overDelegated(
 	state state.Chain,
 	validator *state.Staker,
 	weightLimit uint64,
 	delegator *state.Staker,
 ) (bool, error) {
-	if delegator.StartTime.Before(validator.StartTime) {
-		return false, nil
-	}
-	if delegator.EndTime.After(validator.EndTime) {
-		return false, nil
-	}
-
 	maxWeight, err := GetMaxWeight(state, validator, delegator.StartTime, delegator.EndTime)
 	if err != nil {
-		return false, err
+		return true, err
 	}
 	newMaxWeight, err := math.Add64(maxWeight, delegator.Weight)
 	if err != nil {
-		return false, err
+		return true, err
 	}
-	return newMaxWeight <= weightLimit, nil
+	return newMaxWeight > weightLimit, nil
 }
 
 // GetMaxWeight returns the maximum total weight of the [validator], including
