@@ -491,10 +491,7 @@ func setupTestVM(t *testing.T, ctx *snow.Context, baseDBManager manager.Manager,
 		appSender,
 	))
 
-	vm.batchTimeout = 0
-
 	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
-
 	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
 	return vm
 }

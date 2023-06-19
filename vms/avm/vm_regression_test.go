@@ -61,7 +61,6 @@ func TestVerifyFxUsage(t *testing.T) {
 		},
 		nil,
 	))
-	vm.batchTimeout = 0
 
 	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
 	require.NoError(vm.SetState(context.Background(), snow.NormalOp))

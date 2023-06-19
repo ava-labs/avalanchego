@@ -312,7 +312,6 @@ func GenesisVMWithArgs(tb testing.TB, additionalFxs []*common.Fx, args *BuildGen
 		),
 		nil,
 	))
-	vm.batchTimeout = 0
 
 	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
 	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
@@ -604,7 +603,6 @@ func TestIssueNFT(t *testing.T) {
 		},
 		nil,
 	))
-	vm.batchTimeout = 0
 
 	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
 	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
@@ -735,7 +733,6 @@ func TestIssueProperty(t *testing.T) {
 		},
 		nil,
 	))
-	vm.batchTimeout = 0
 
 	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
 	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
@@ -1314,10 +1311,8 @@ func TestIssueImportTx(t *testing.T) {
 		}},
 		nil,
 	))
-	vm.batchTimeout = 0
 
 	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
-
 	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
 
 	key := keys[0]
@@ -1454,10 +1449,8 @@ func TestForceAcceptImportTx(t *testing.T) {
 		}},
 		nil,
 	))
-	vm.batchTimeout = 0
 
 	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
-
 	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
 
 	key := keys[0]
@@ -1544,7 +1537,6 @@ func TestIssueExportTx(t *testing.T) {
 		}},
 		nil,
 	))
-	vm.batchTimeout = 0
 
 	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
 	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
@@ -1655,10 +1647,8 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 		}},
 		nil,
 	))
-	vm.batchTimeout = 0
 
 	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
-
 	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
 
 	key := keys[0]

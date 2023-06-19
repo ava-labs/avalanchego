@@ -747,7 +747,6 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 		},
 		&common.SenderTest{T: t},
 	))
-	vm.batchTimeout = 0
 
 	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
 	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
@@ -813,7 +812,6 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 		},
 		&common.SenderTest{T: t},
 	))
-	vm.batchTimeout = 0
 
 	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
 	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
@@ -888,7 +886,6 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 		},
 		&common.SenderTest{T: t},
 	))
-	vm.batchTimeout = 0
 
 	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
 	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
@@ -965,7 +962,6 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 		},
 		&common.SenderTest{T: t},
 	))
-	vm.batchTimeout = 0
 
 	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
 	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
@@ -1042,7 +1038,6 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 		},
 		&common.SenderTest{T: t},
 	))
-	vm.batchTimeout = 0
 
 	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
 	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
@@ -1120,7 +1115,6 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 		},
 		&common.SenderTest{T: t},
 	))
-	vm.batchTimeout = 0
 
 	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
 	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
@@ -1196,7 +1190,6 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 		},
 		&common.SenderTest{T: t},
 	))
-	vm.batchTimeout = 0
 
 	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
 	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
