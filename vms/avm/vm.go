@@ -543,6 +543,7 @@ func (vm *VM) IssueTx(b []byte) (ids.ID, error) {
 		return tx.ID(), nil
 	}
 
+	// TODO: After the chain is linearized, remove the following code.
 	tx, err := vm.parseTx(b)
 	if err != nil {
 		return ids.ID{}, err
