@@ -147,6 +147,9 @@ var stakersCommands = &commands.ProtoCommands{
 				baseState.PutPendingDelegator(staker)
 			}
 		}
+		if err := baseState.Commit(); err != nil {
+			panic(err)
+		}
 
 		return newSysUnderTest(baseState)
 	},
@@ -158,8 +161,8 @@ var stakersCommands = &commands.ProtoCommands{
 			panic(err)
 		}
 	},
-	// Note: using gen.Const(newStakersStorageModel()) would not recreated model
-	// among calls. Hence just use a dummy generated with sole purpose of recreating model
+	// a trick to force command regeneration at each sampling.
+	// gen.Const would not allow it
 	InitialStateGen: gen.IntRange(1, 2).Map(
 		func(int) *stakersStorageModel {
 			return newStakersStorageModel()
@@ -207,14 +210,7 @@ func (*putCurrentValidatorCommand) PreCondition(commands.State) bool {
 }
 
 func (*putCurrentValidatorCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
-	model := cmdState.(*stakersStorageModel)
-	sys := res.(*sysUnderTest)
-
-	if checkSystemAndModelContent(model, sys) {
-		return &gopter.PropResult{Status: gopter.PropTrue}
-	}
-
-	return &gopter.PropResult{Status: gopter.PropFalse}
+	return checkSystemAndModelContent(cmdState, res)
 }
 
 func (v *putCurrentValidatorCommand) String() string {
@@ -296,24 +292,20 @@ func (*deleteCurrentValidatorCommand) NextState(cmdState commands.State) command
 }
 
 func (*deleteCurrentValidatorCommand) PreCondition(commands.State) bool {
+	// We allow deleting an un-existing validator
 	return true
 }
 
 func (*deleteCurrentValidatorCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
-	model := cmdState.(*stakersStorageModel)
-	sys := res.(*sysUnderTest)
-
-	if checkSystemAndModelContent(model, sys) {
-		return &gopter.PropResult{Status: gopter.PropTrue}
-	}
-
-	return &gopter.PropResult{Status: gopter.PropFalse}
+	return checkSystemAndModelContent(cmdState, res)
 }
 
 func (*deleteCurrentValidatorCommand) String() string {
 	return "DeleteCurrentValidator"
 }
 
+// a trick to force command regeneration at each sampling.
+// gen.Const would not allow it
 var genDeleteCurrentValidatorCommand = gen.IntRange(1, 2).Map(
 	func(int) commands.Command {
 		return &deleteCurrentValidatorCommand{}
@@ -427,14 +419,7 @@ func (*putCurrentDelegatorCommand) PreCondition(commands.State) bool {
 }
 
 func (*putCurrentDelegatorCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
-	model := cmdState.(*stakersStorageModel)
-	sys := res.(*sysUnderTest)
-
-	if checkSystemAndModelContent(model, sys) {
-		return &gopter.PropResult{Status: gopter.PropTrue}
-	}
-
-	return &gopter.PropResult{Status: gopter.PropFalse}
+	return checkSystemAndModelContent(cmdState, res)
 }
 
 func (v *putCurrentDelegatorCommand) String() string {
@@ -518,20 +503,15 @@ func (*deleteCurrentDelegatorCommand) PreCondition(commands.State) bool {
 }
 
 func (*deleteCurrentDelegatorCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
-	model := cmdState.(*stakersStorageModel)
-	sys := res.(*sysUnderTest)
-
-	if checkSystemAndModelContent(model, sys) {
-		return &gopter.PropResult{Status: gopter.PropTrue}
-	}
-
-	return &gopter.PropResult{Status: gopter.PropFalse}
+	return checkSystemAndModelContent(cmdState, res)
 }
 
 func (*deleteCurrentDelegatorCommand) String() string {
 	return "DeleteCurrentDelegator"
 }
 
+// a trick to force command regeneration at each sampling.
+// gen.Const would not allow it
 var genDeleteCurrentDelegatorCommand = gen.IntRange(1, 2).Map(
 	func(int) commands.Command {
 		return &deleteCurrentDelegatorCommand{}
@@ -556,20 +536,15 @@ func (*addTopDiffCommand) PreCondition(commands.State) bool {
 }
 
 func (*addTopDiffCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
-	model := cmdState.(*stakersStorageModel)
-	sys := res.(*sysUnderTest)
-
-	if checkSystemAndModelContent(model, sys) {
-		return &gopter.PropResult{Status: gopter.PropTrue}
-	}
-
-	return &gopter.PropResult{Status: gopter.PropFalse}
+	return checkSystemAndModelContent(cmdState, res)
 }
 
 func (*addTopDiffCommand) String() string {
 	return "AddTopDiffCommand"
 }
 
+// a trick to force command regeneration at each sampling.
+// gen.Const would not allow it
 var genAddTopDiffCommand = gen.IntRange(1, 2).Map(
 	func(int) commands.Command {
 		return &addTopDiffCommand{}
@@ -594,20 +569,15 @@ func (*applyBottomDiffCommand) PreCondition(commands.State) bool {
 }
 
 func (*applyBottomDiffCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
-	model := cmdState.(*stakersStorageModel)
-	sys := res.(*sysUnderTest)
-
-	if checkSystemAndModelContent(model, sys) {
-		return &gopter.PropResult{Status: gopter.PropTrue}
-	}
-
-	return &gopter.PropResult{Status: gopter.PropFalse}
+	return checkSystemAndModelContent(cmdState, res)
 }
 
 func (*applyBottomDiffCommand) String() string {
 	return "ApplyBottomDiffCommand"
 }
 
+// a trick to force command regeneration at each sampling.
+// gen.Const would not allow it
 var genApplyBottomDiffCommand = gen.IntRange(1, 2).Map(
 	func(int) commands.Command {
 		return &applyBottomDiffCommand{}
@@ -635,37 +605,35 @@ func (*commitBottomStateCommand) PreCondition(commands.State) bool {
 }
 
 func (*commitBottomStateCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
-	model := cmdState.(*stakersStorageModel)
-	sys := res.(*sysUnderTest)
-
-	if checkSystemAndModelContent(model, sys) {
-		return &gopter.PropResult{Status: gopter.PropTrue}
-	}
-
-	return &gopter.PropResult{Status: gopter.PropFalse}
+	return checkSystemAndModelContent(cmdState, res)
 }
 
 func (*commitBottomStateCommand) String() string {
 	return "CommitBottomStateCommand"
 }
 
+// a trick to force command regeneration at each sampling.
+// gen.Const would not allow it
 var genCommitBottomStateCommand = gen.IntRange(1, 2).Map(
 	func(int) commands.Command {
 		return &commitBottomStateCommand{}
 	},
 )
 
-func checkSystemAndModelContent(model *stakersStorageModel, sys *sysUnderTest) bool {
+func checkSystemAndModelContent(cmdState commands.State, res commands.Result) *gopter.PropResult {
+	model := cmdState.(*stakersStorageModel)
+	sys := res.(*sysUnderTest)
+
 	// top view content must always match model content
 	topDiff := sys.getTopChainState()
 
 	modelIt, err := model.GetCurrentStakerIterator()
 	if err != nil {
-		return false
+		return &gopter.PropResult{Status: gopter.PropFalse}
 	}
 	sysIt, err := topDiff.GetCurrentStakerIterator()
 	if err != nil {
-		return false
+		return &gopter.PropResult{Status: gopter.PropFalse}
 	}
 
 	modelStakers := make([]*Staker, 0)
@@ -681,15 +649,15 @@ func checkSystemAndModelContent(model *stakersStorageModel, sys *sysUnderTest) b
 	sysIt.Release()
 
 	if len(modelStakers) != len(sysStakers) {
-		return false
+		return &gopter.PropResult{Status: gopter.PropFalse}
 	}
 
 	for idx, modelStaker := range modelStakers {
 		sysStaker := sysStakers[idx]
 		if modelStaker == nil || sysStaker == nil || !reflect.DeepEqual(modelStaker, sysStaker) {
-			return false
+			return &gopter.PropResult{Status: gopter.PropFalse}
 		}
 	}
 
-	return true
+	return &gopter.PropResult{Status: gopter.PropTrue}
 }
