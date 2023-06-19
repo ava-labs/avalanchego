@@ -25,15 +25,13 @@ import (
 func TestMessage(t *testing.T) {
 	t.Parallel()
 
-	require := require.New(t)
-
 	mb, err := newMsgBuilder(
 		logging.NoLog{},
 		"test",
 		prometheus.NewRegistry(),
 		5*time.Second,
 	)
-	require.NoError(err)
+	require.NoError(t, err)
 
 	testID := ids.GenerateTestID()
 	compressibleContainers := [][]byte{
@@ -43,10 +41,10 @@ func TestMessage(t *testing.T) {
 	}
 
 	testCertRaw, testKeyRaw, err := staking.NewCertAndKeyBytes()
-	require.NoError(err)
+	require.NoError(t, err)
 
 	testTLSCert, err := staking.LoadTLSCertFromBytes(testKeyRaw, testCertRaw)
-	require.NoError(err)
+	require.NoError(t, err)
 
 	nowUnix := time.Now().Unix()
 
@@ -829,7 +827,9 @@ func TestMessage(t *testing.T) {
 	}
 
 	for _, tv := range tests {
-		require.True(t.Run(tv.desc, func(t2 *testing.T) {
+		t.Run(tv.desc, func(t *testing.T) {
+			require := require.New(t)
+
 			encodedMsg, err := mb.createOutbound(tv.msg, tv.compressionType, tv.bypassThrottling)
 			require.NoError(err)
 
@@ -842,7 +842,7 @@ func TestMessage(t *testing.T) {
 			parsedMsg, err := mb.parseInbound(encodedMsg.Bytes(), ids.EmptyNodeID, func() {})
 			require.NoError(err)
 			require.Equal(tv.op, parsedMsg.Op())
-		}))
+		})
 	}
 }
 
