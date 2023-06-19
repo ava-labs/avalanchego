@@ -43,7 +43,9 @@ var (
 
 func TestStateInitialization(t *testing.T) {
 	require := require.New(t)
-	s, db := newUninitializedState(require)
+	s, db, err := newUninitializedState()
+	require.NoError(err)
+	require.NotNil(s)
 
 	shouldInit, err := s.(*state).shouldInit()
 	require.NoError(err)
@@ -52,7 +54,8 @@ func TestStateInitialization(t *testing.T) {
 	require.NoError(s.(*state).doneInit())
 	require.NoError(s.Commit())
 
-	s = newStateFromDB(require, db)
+	s, err = newStateFromDB(db)
+	require.NoError(err)
 
 	shouldInit, err = s.(*state).shouldInit()
 	require.NoError(err)
@@ -61,7 +64,8 @@ func TestStateInitialization(t *testing.T) {
 
 func TestStateSyncGenesis(t *testing.T) {
 	require := require.New(t)
-	state, _ := newInitializedState(require)
+	state, err := newInitializedState()
+	require.NoError(err)
 
 	staker, err := state.GetCurrentValidator(constants.PrimaryNetworkID, initialNodeID)
 	require.NoError(err)
@@ -86,7 +90,8 @@ func TestStateSyncGenesis(t *testing.T) {
 
 func TestGetValidatorWeightDiffs(t *testing.T) {
 	require := require.New(t)
-	stateIntf, _ := newInitializedState(require)
+	stateIntf, err := newInitializedState()
+	require.NoError(err)
 	state := stateIntf.(*state)
 
 	txID0 := ids.GenerateTestID()
@@ -258,7 +263,8 @@ func TestGetValidatorWeightDiffs(t *testing.T) {
 
 func TestGetValidatorPublicKeyDiffs(t *testing.T) {
 	require := require.New(t)
-	stateIntf, _ := newInitializedState(require)
+	stateIntf, err := newInitializedState()
+	require.NoError(err)
 	state := stateIntf.(*state)
 
 	var (
@@ -268,7 +274,6 @@ func TestGetValidatorPublicKeyDiffs(t *testing.T) {
 		sks      = make([]*bls.SecretKey, numNodes)
 		pks      = make([]*bls.PublicKey, numNodes)
 		pkBytes  = make([][]byte, numNodes)
-		err      error
 	)
 	for i := 0; i < numNodes; i++ {
 		txIDs[i] = ids.GenerateTestID()
@@ -423,8 +428,11 @@ func TestGetValidatorPublicKeyDiffs(t *testing.T) {
 	}
 }
 
-func newInitializedState(require *require.Assertions) (State, database.Database) {
-	s, db := newUninitializedState(require)
+func newInitializedState() (State, error) {
+	s, _, err := newUninitializedState()
+	if err != nil {
+		return nil, err
+	}
 
 	initialValidator := &txs.AddValidatorTx{
 		Validator: txs.Validator{
@@ -445,7 +453,9 @@ func newInitializedState(require *require.Assertions) (State, database.Database)
 		DelegationShares: reward.PercentDenominator,
 	}
 	initialValidatorTx := &txs.Tx{Unsigned: initialValidator}
-	require.NoError(initialValidatorTx.Initialize(txs.Codec))
+	if err := initialValidatorTx.Initialize(txs.Codec); err != nil {
+		return nil, err
+	}
 
 	initialChain := &txs.CreateChainTx{
 		SubnetID:   constants.PrimaryNetworkID,
@@ -454,7 +464,9 @@ func newInitializedState(require *require.Assertions) (State, database.Database)
 		SubnetAuth: &secp256k1fx.Input{},
 	}
 	initialChainTx := &txs.Tx{Unsigned: initialChain}
-	require.NoError(initialChainTx.Initialize(txs.Codec))
+	if err := initialChainTx.Initialize(txs.Codec); err != nil {
+		return nil, err
+	}
 
 	genesisBlkID := ids.GenerateTestID()
 	genesisState := &genesis.State{
@@ -481,22 +493,30 @@ func newInitializedState(require *require.Assertions) (State, database.Database)
 	}
 
 	genesisBlk, err := blocks.NewApricotCommitBlock(genesisBlkID, 0)
-	require.NoError(err)
-	require.NoError(s.(*state).syncGenesis(genesisBlk, genesisState))
+	if err != nil {
+		return nil, err
+	}
+	if err := s.(*state).syncGenesis(genesisBlk, genesisState); err != nil {
+		return nil, err
+	}
 
-	return s, db
+	return s, nil
 }
 
-func newUninitializedState(require *require.Assertions) (State, database.Database) {
+func newUninitializedState() (State, database.Database, error) {
 	db := memdb.New()
-	return newStateFromDB(require, db), db
+	s, err := newStateFromDB(db)
+	if err != nil {
+		return nil, nil, err
+	}
+	return s, db, nil
 }
 
-func newStateFromDB(require *require.Assertions, db database.Database) State {
+func newStateFromDB(db database.Database) (State, error) {
 	vdrs := validators.NewManager()
 	primaryVdrs := validators.NewSet()
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
-	state, err := new(
+	return new(
 		db,
 		metrics.Noop,
 		&config.Config{
@@ -512,9 +532,6 @@ func newStateFromDB(require *require.Assertions, db database.Database) State {
 		}),
 		&utils.Atomic[bool]{},
 	)
-	require.NoError(err)
-	require.NotNil(state)
-	return state
 }
 
 func TestValidatorWeightDiff(t *testing.T) {
@@ -662,7 +679,8 @@ func TestValidatorWeightDiff(t *testing.T) {
 func TestStateAddRemoveValidator(t *testing.T) {
 	require := require.New(t)
 
-	state, _ := newInitializedState(require)
+	state, err := newInitializedState()
+	require.NoError(err)
 
 	var (
 		numNodes  = 3

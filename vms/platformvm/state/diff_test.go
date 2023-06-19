@@ -39,7 +39,9 @@ func TestDiffCreation(t *testing.T) {
 	defer ctrl.Finish()
 
 	lastAcceptedID := ids.GenerateTestID()
-	state, _ := newInitializedState(require)
+	state, err := newInitializedState()
+	require.NoError(err)
+
 	versions := NewMockVersions(ctrl)
 	versions.EXPECT().GetState(lastAcceptedID).AnyTimes().Return(state, true)
 
@@ -54,7 +56,9 @@ func TestDiffCurrentSupply(t *testing.T) {
 	defer ctrl.Finish()
 
 	lastAcceptedID := ids.GenerateTestID()
-	state, _ := newInitializedState(require)
+	state, err := newInitializedState()
+	require.NoError(err)
+
 	versions := NewMockVersions(ctrl)
 	versions.EXPECT().GetState(lastAcceptedID).AnyTimes().Return(state, true)
 
