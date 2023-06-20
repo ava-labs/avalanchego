@@ -30,6 +30,6 @@ jobs:
       - name: fuzz_test
         shell: bash
         if: matrix.os == 'self-hosted, linux, ARM64, focal'
-        run: ${{ AVALANCHE_PATH }}/scripts/build_fuzz.sh
+        run: ${{ $AVALANCHE_PATH }}/scripts/build_fuzz.sh
         env:
           AVALANCHE_PATH: ${{ env.AVALANCHE_PATH }}
