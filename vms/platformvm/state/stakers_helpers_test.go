@@ -56,6 +56,16 @@ func (h *versionsHolder) GetState(blkID ids.ID) (Chain, bool) {
 	return h.baseState, blkID == h.baseState.GetLastAccepted()
 }
 
+func buildStateCtx() *snow.Context {
+	ctx := snow.DefaultContextTest()
+	ctx.NetworkID = constants.UnitTestID
+	ctx.XChainID = xChainID
+	ctx.CChainID = cChainID
+	ctx.AVAXAssetID = avaxAssetID
+
+	return ctx
+}
+
 func buildChainState(trackedSubnets []ids.ID) (State, error) {
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	baseDB := versiondb.New(baseDBManager.Current().Database)
@@ -63,11 +73,7 @@ func buildChainState(trackedSubnets []ids.ID) (State, error) {
 	cfg := defaultConfig()
 	cfg.TrackedSubnets.Add(trackedSubnets...)
 
-	ctx := snow.DefaultContextTest()
-	ctx.NetworkID = constants.UnitTestID
-	ctx.XChainID = xChainID
-	ctx.CChainID = cChainID
-	ctx.AVAXAssetID = avaxAssetID
+	ctx := buildStateCtx()
 
 	genesisBytes, err := buildGenesisTest(ctx)
 	if err != nil {
