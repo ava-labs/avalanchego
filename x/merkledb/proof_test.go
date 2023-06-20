@@ -1641,60 +1641,50 @@ func TestProofProtoUnmarshal(t *testing.T) {
 	}
 }
 
-func TestRangeProofInvariants(t *testing.T) {
-	require := require.New(t)
+func FuzzRangeProofInvariants(f *testing.F) {
 	now := time.Now().UnixNano()
-	t.Logf("seed: %d", now)
+	f.Logf("seed: %d", now)
 	rand := rand.New(rand.NewSource(now)) // #nosec G404
 
 	var (
-		numKeyValues   = 2048
-		deletePortion  = 0.25
-		numProofs      = 512
-		maxStartKeyLen = 8
-		maxEndKeyLen   = 8
-		maxMaxProofLen = 1024
+		numKeyValues  = 2048
+		deletePortion = 0.25
 	)
 
 	db, err := getBasicDB()
-	require.NoError(err)
+	require.NoError(f, err)
 
 	// Insert a bunch of random key values.
 	insertRandomKeyValues(
-		require,
+		require.New(f),
 		rand,
 		[]database.Database{db},
 		numKeyValues,
 		deletePortion,
 	)
 
-	// Generate random range proofs and assert that
-	// the range proof invariants are maintained.
-	for i := 0; i < numProofs; i++ {
-		startKeyLen := rand.Intn(maxStartKeyLen)
-		startKey := make([]byte, startKeyLen)
+	f.Fuzz(func(
+		t *testing.T,
+		start []byte,
+		end []byte,
+		maxProofLen uint,
+	) {
+		require := require.New(t)
 
-		endKeyLen := rand.Intn(maxEndKeyLen)
-		endKey := make([]byte, endKeyLen)
-
-		// Make sure we generate a valid range.
-		// If len(endKey) == 0 the only valid [startKey] has length 0.
-		if len(endKey) != 0 {
-			generatedRange := false
-			for !generatedRange || bytes.Compare(startKey, endKey) > 0 {
-				generatedRange = true
-				_, _ = rand.Read(startKey)
-				_, _ = rand.Read(endKey)
-			}
+		// Make sure proof bounds are valid
+		if len(end) != 0 && bytes.Compare(start, end) > 0 {
+			return
 		}
-
-		maxProofLen := rand.Intn(maxMaxProofLen) + 1
+		// Make sure proof length is valid
+		if maxProofLen == 0 {
+			return
+		}
 
 		rangeProof, err := db.GetRangeProof(
 			context.Background(),
-			startKey,
-			endKey,
-			maxProofLen,
+			start,
+			end,
+			int(maxProofLen),
 		)
 		require.NoError(err)
 
@@ -1713,7 +1703,7 @@ func TestRangeProofInvariants(t *testing.T) {
 
 		// Make sure the EndProof invariant is maintained
 		switch {
-		case len(endKey) == 0:
+		case len(end) == 0:
 			if len(rangeProof.KeyValues) == 0 {
 				if len(rangeProof.StartProof) == 0 {
 					require.Len(rangeProof.EndProof, 1) // Just the root
@@ -1727,7 +1717,7 @@ func TestRangeProofInvariants(t *testing.T) {
 
 			// EndProof should be a proof for upper range bound.
 			value := Nothing[[]byte]()
-			upperRangeBoundVal, err := db.Get(endKey)
+			upperRangeBoundVal, err := db.Get(end)
 			if err != nil {
 				require.ErrorIs(err, database.ErrNotFound)
 			} else {
@@ -1736,7 +1726,7 @@ func TestRangeProofInvariants(t *testing.T) {
 
 			proof := Proof{
 				Path:  rangeProof.EndProof,
-				Key:   endKey,
+				Key:   end,
 				Value: value,
 			}
 
@@ -1760,5 +1750,5 @@ func TestRangeProofInvariants(t *testing.T) {
 
 			require.NoError(proof.Verify(context.Background(), rootID))
 		}
-	}
+	})
 }
