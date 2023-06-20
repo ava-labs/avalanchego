@@ -6,6 +6,7 @@ package states
 import (
 	"bytes"
 	"fmt"
+	"math"
 	"sync"
 	"time"
 
@@ -21,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/avm/blocks"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
@@ -615,6 +617,9 @@ func (s *state) Prune(lock sync.Locker, log logging.Logger) error {
 	s.txCache = &cache.Empty[ids.ID, *txs.Tx]{}
 	lock.Unlock()
 
+	startTime := time.Now()
+	startProgress := timer.ProgressFromHash(startTxIDBytes)
+
 	startStatusBytes := statusIter.Value()
 	if err := s.cleanupTx(lock, startTxIDBytes, startStatusBytes, txIter); err != nil {
 		return err
@@ -640,8 +645,15 @@ func (s *state) Prune(lock sync.Locker, log logging.Logger) error {
 				return err
 			}
 
+			progress := timer.ProgressFromHash(txIDBytes)
+			eta := timer.EstimateETA(
+				startTime,
+				progress-startProgress,
+				math.MaxUint64-startProgress,
+			)
 			log.Info("committing state pruning",
 				zap.Int("count", i),
+				zap.Duration("eta", eta),
 			)
 		}
 	}
@@ -665,6 +677,7 @@ func (s *state) Prune(lock sync.Locker, log logging.Logger) error {
 
 	log.Info("finished state pruning",
 		zap.Int("count", i),
+		zap.Duration("duration", time.Since(startTime)),
 	)
 
 	return errs.Err
