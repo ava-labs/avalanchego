@@ -20,7 +20,7 @@ func TestWalletService_SendMultiple(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			env := setup(t, &envConfig{
-				isAVAXAsset: tc.avaxAsset,
+				isCustomFeeAsset: !tc.avaxAsset,
 			})
 			defer func() {
 				require.NoError(env.vm.Shutdown(context.Background()))

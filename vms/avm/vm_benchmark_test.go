@@ -63,9 +63,7 @@ func BenchmarkLoadUser(b *testing.B) {
 func GetAllUTXOsBenchmark(b *testing.B, utxoCount int) {
 	require := require.New(b)
 
-	env := setup(b, &envConfig{
-		isAVAXAsset: true,
-	})
+	env := setup(b, &envConfig{})
 	defer func() {
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()

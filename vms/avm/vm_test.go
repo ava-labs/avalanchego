@@ -26,9 +26,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/utils/formatting"
-	"github.com/ava-labs/avalanchego/utils/formatting/address"
-	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/avm/metrics"
@@ -130,9 +127,7 @@ func TestFxInitializationFailure(t *testing.T) {
 func TestIssueTx(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{
-		isAVAXAsset: true,
-	})
+	env := setup(t, &envConfig{})
 	defer func() {
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
@@ -426,107 +421,38 @@ func TestIssueProperty(t *testing.T) {
 	issueAndAccept(require, vm, issuer, burnPropertyTx)
 }
 
-func setupTxFeeAssets(tb testing.TB) ([]byte, chan common.Message, *VM, *atomic.Memory) {
-	require := require.New(tb)
-
-	addr0Str, _ := address.FormatBech32(constants.UnitTestHRP, addrs[0].Bytes())
-	addr1Str, _ := address.FormatBech32(constants.UnitTestHRP, addrs[1].Bytes())
-	addr2Str, _ := address.FormatBech32(constants.UnitTestHRP, addrs[2].Bytes())
-	assetAlias := "asset1"
-	customArgs := &BuildGenesisArgs{
-		Encoding: formatting.Hex,
-		GenesisData: map[string]AssetDefinition{
-			assetAlias: {
-				Name:   feeAssetName,
-				Symbol: "TST",
-				InitialState: map[string][]interface{}{
-					"fixedCap": {
-						Holder{
-							Amount:  json.Uint64(startBalance),
-							Address: addr0Str,
-						},
-						Holder{
-							Amount:  json.Uint64(startBalance),
-							Address: addr1Str,
-						},
-						Holder{
-							Amount:  json.Uint64(startBalance),
-							Address: addr2Str,
-						},
-					},
-				},
-			},
-			"asset2": {
-				Name:   otherAssetName,
-				Symbol: "OTH",
-				InitialState: map[string][]interface{}{
-					"fixedCap": {
-						Holder{
-							Amount:  json.Uint64(startBalance),
-							Address: addr0Str,
-						},
-						Holder{
-							Amount:  json.Uint64(startBalance),
-							Address: addr1Str,
-						},
-						Holder{
-							Amount:  json.Uint64(startBalance),
-							Address: addr2Str,
-						},
-					},
-				},
-			},
-		},
-	}
-	genesisBytes, issuer, vm, m := GenesisVMWithArgs(tb, nil, customArgs)
-	expectedID, err := vm.Aliaser.Lookup(assetAlias)
-	require.NoError(err)
-	require.Equal(expectedID, vm.feeAssetID)
-	return genesisBytes, issuer, vm, m
-}
-
 func TestIssueTxWithFeeAsset(t *testing.T) {
 	require := require.New(t)
 
-	genesisBytes, issuer, vm, _ := setupTxFeeAssets(t)
-	ctx := vm.ctx
+	env := setup(t, &envConfig{
+		isCustomFeeAsset: true,
+	})
 	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-		ctx.Lock.Unlock()
+		require.NoError(env.vm.Shutdown(context.Background()))
+		env.vm.ctx.Lock.Unlock()
 	}()
+
 	// send first asset
-	newTx := NewTxWithAsset(t, genesisBytes, vm, feeAssetName)
-
-	txID, err := vm.IssueTx(newTx.Bytes())
-	require.NoError(err)
-	require.Equal(txID, newTx.ID())
-
-	ctx.Lock.Unlock()
-
-	msg := <-issuer
-	require.Equal(msg, common.PendingTxs)
-
-	ctx.Lock.Lock()
-	txs := vm.PendingTxs(context.Background())
-	require.Len(txs, 1)
-	t.Log(txs)
+	tx := NewTxWithAsset(t, env.genesisBytes, env.vm, feeAssetName)
+	issueAndAccept(require, env.vm, env.issuer, tx)
 }
 
 func TestIssueTxWithAnotherAsset(t *testing.T) {
 	require := require.New(t)
 
-	genesisBytes, issuer, vm, _ := setupTxFeeAssets(t)
-	ctx := vm.ctx
+	env := setup(t, &envConfig{
+		isCustomFeeAsset: true,
+	})
 	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-		ctx.Lock.Unlock()
+		require.NoError(env.vm.Shutdown(context.Background()))
+		env.vm.ctx.Lock.Unlock()
 	}()
 
 	// send second asset
-	feeAssetCreateTx := GetCreateTxFromGenesisTest(t, genesisBytes, feeAssetName)
-	createTx := GetCreateTxFromGenesisTest(t, genesisBytes, otherAssetName)
+	feeAssetCreateTx := GetCreateTxFromGenesisTest(t, env.genesisBytes, feeAssetName)
+	createTx := GetCreateTxFromGenesisTest(t, env.genesisBytes, otherAssetName)
 
-	newTx := &txs.Tx{Unsigned: &txs.BaseTx{
+	tx := &txs.Tx{Unsigned: &txs.BaseTx{
 		BaseTx: avax.BaseTx{
 			NetworkID:    constants.UnitTestID,
 			BlockchainID: chainID,
@@ -566,26 +492,13 @@ func TestIssueTxWithAnotherAsset(t *testing.T) {
 			},
 		},
 	}}
-	require.NoError(newTx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0]}, {keys[0]}}))
+	require.NoError(tx.SignSECP256K1Fx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0]}, {keys[0]}}))
 
-	txID, err := vm.IssueTx(newTx.Bytes())
-	require.NoError(err)
-	require.Equal(txID, newTx.ID())
-
-	ctx.Lock.Unlock()
-
-	msg := <-issuer
-	require.Equal(msg, common.PendingTxs)
-
-	ctx.Lock.Lock()
-	txs := vm.PendingTxs(context.Background())
-	require.Len(txs, 1)
+	issueAndAccept(require, env.vm, env.issuer, tx)
 }
 
 func TestVMFormat(t *testing.T) {
-	env := setup(t, &envConfig{
-		isAVAXAsset: true,
-	})
+	env := setup(t, &envConfig{})
 	defer func() {
 		require.NoError(t, env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
@@ -610,9 +523,7 @@ func TestVMFormat(t *testing.T) {
 func TestTxCached(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{
-		isAVAXAsset: true,
-	})
+	env := setup(t, &envConfig{})
 	defer func() {
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
@@ -645,9 +556,7 @@ func TestTxCached(t *testing.T) {
 func TestTxNotCached(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, &envConfig{
-		isAVAXAsset: true,
-	})
+	env := setup(t, &envConfig{})
 	defer func() {
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
@@ -1022,7 +931,7 @@ func TestIssueImportTx(t *testing.T) {
 	require.NoError(parsedTx.Verify(context.Background()))
 	require.NoError(parsedTx.Accept(context.Background()))
 
-	assertIndexedTX(t, vm.db, 0, key.PublicKey().Address(), txAssetID.AssetID(), parsedTx.ID())
+	checkIndexedTX(t, vm.db, 0, key.PublicKey().Address(), txAssetID.AssetID(), parsedTx.ID())
 	assertLatestIdx(t, vm.db, key.PublicKey().Address(), avaxID, 1)
 
 	id := utxoID.InputID()
@@ -1331,7 +1240,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 
 	require.NoError(parsedTx.Accept(context.Background()))
 
-	assertIndexedTX(t, vm.db, 0, key.PublicKey().Address(), assetID.AssetID(), parsedTx.ID())
+	checkIndexedTX(t, vm.db, 0, key.PublicKey().Address(), assetID.AssetID(), parsedTx.ID())
 	assertLatestIdx(t, vm.db, key.PublicKey().Address(), assetID.AssetID(), 1)
 
 	_, err = peerSharedMemory.Get(vm.ctx.ChainID, [][]byte{utxoID[:]})
