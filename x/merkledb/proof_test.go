@@ -1681,13 +1681,8 @@ func TestRangeProofInvariants(t *testing.T) {
 		// If len(endKey) == 0 the only valid [startKey] has length 0.
 		if len(endKey) != 0 {
 			generatedRange := false
-			numIters := 0 // TODO remove
 			for !generatedRange || bytes.Compare(startKey, endKey) > 0 {
 				generatedRange = true
-				numIters++
-				if numIters > 5000 {
-					t.Fatal("could not generate valid range ", i)
-				}
 				_, _ = rand.Read(startKey)
 				_, _ = rand.Read(endKey)
 			}
@@ -1762,7 +1757,7 @@ func TestRangeProofInvariants(t *testing.T) {
 			rootID, err := db.GetMerkleRoot(context.Background())
 			require.NoError(err)
 
-			require.NoError(proof.Verify(context.Background(), rootID), i) // TODO remove i
+			require.NoError(proof.Verify(context.Background(), rootID))
 		}
 	}
 }
