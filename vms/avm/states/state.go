@@ -589,6 +589,8 @@ func (s *state) writeStatuses() error {
 
 func (s *state) Prune(lock sync.Locker, log logging.Logger) error {
 	lock.Lock()
+	// It is possible that more txs are added after grabbing this iterator. No
+	// new txs will write a status, so we don't need to check those txs.
 	statusIter := s.statusDB.NewIterator()
 	defer statusIter.Release()
 
@@ -605,6 +607,8 @@ func (s *state) Prune(lock sync.Locker, log logging.Logger) error {
 	txIter := s.txDB.NewIteratorWithStart(startTxIDBytes)
 	defer txIter.Release()
 
+	// While we are pruning the disk, we disable caching of the data we are
+	// modifying. Caching is re-enabled when pruning finishes.
 	oldStatusCache := s.statusCache
 	oldTxCache := s.txCache
 	s.statusCache = &cache.Empty[ids.ID, *choices.Status]{}
@@ -626,6 +630,9 @@ func (s *state) Prune(lock sync.Locker, log logging.Logger) error {
 			return err
 		}
 		if i%pruneCommitLimit == 0 {
+			// We must hold the lock during committing to make sure we don't
+			// attempt to commit to disk while a block is concurrently being
+			// accepted.
 			lock.Lock()
 			err := s.Commit()
 			lock.Unlock()
@@ -649,6 +656,8 @@ func (s *state) Prune(lock sync.Locker, log logging.Logger) error {
 		txIter.Error(),
 	)
 
+	// Make sure we flush the original caches before re-enabling them to prevent
+	// surfacing any stale data.
 	oldStatusCache.Flush()
 	oldTxCache.Flush()
 	s.statusCache = oldStatusCache
@@ -662,6 +671,12 @@ func (s *state) Prune(lock sync.Locker, log logging.Logger) error {
 }
 
 func (s *state) cleanupTx(lock sync.Locker, txIDBytes []byte, statusBytes []byte, txIter database.Iterator) error {
+	// After the linearization, we write txs to disk without statuses to mark
+	// them as accepted. This means that there may be more txs than statuses and
+	// we need to skip over them.
+	//
+	// Note: We do not need to remove UTXOs consumed after the linearization, as
+	// those UTXOs are guaranteed to have already been deleted.
 	if err := skipTo(txIter, txIDBytes); err != nil {
 		return err
 	}
@@ -670,7 +685,6 @@ func (s *state) cleanupTx(lock sync.Locker, txIDBytes []byte, statusBytes []byte
 	if err != nil {
 		return err
 	}
-
 	status := choices.Status(statusInt)
 
 	if status == choices.Accepted {
@@ -682,10 +696,14 @@ func (s *state) cleanupTx(lock sync.Locker, txIDBytes []byte, statusBytes []byte
 
 		utxos := tx.Unsigned.InputUTXOs()
 
+		// Locking is done here to make sure that any concurrent verification is
+		// performed with a valid view of the state.
 		lock.Lock()
 		defer lock.Unlock()
 
-		// remove all the UTXOs consumed by the tx
+		// Remove all the UTXOs consumed by the accepted tx. Technically we only
+		// need to remove UTXOs consumed by operations, but it's easy to just
+		// remove all of them.
 		for _, UTXO := range utxos {
 			if err := s.utxoState.DeleteUTXO(UTXO.InputID()); err != nil {
 				return err
@@ -695,13 +713,20 @@ func (s *state) cleanupTx(lock sync.Locker, txIDBytes []byte, statusBytes []byte
 		lock.Lock()
 		defer lock.Unlock()
 
+		// This tx wasn't accepted, so we can remove it entirely from disk.
 		if err := s.txDB.Delete(txIDBytes); err != nil {
 			return err
 		}
 	}
+	// By removing the status, we will treat the tx as accepted if it is still
+	// on disk.
 	return s.statusDB.Delete(txIDBytes)
 }
 
+// skipTo advances [iter] until its key is equal to [targetKey]. If [iter] does
+// not contain [targetKey] an error will be returned.
+//
+// Note: [iter] will always have [Next()] called at least once.
 func skipTo(iter database.Iterator, targetKey []byte) error {
 	for {
 		if !iter.Next() {
