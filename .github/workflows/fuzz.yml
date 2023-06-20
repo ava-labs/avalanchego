@@ -1,12 +1,6 @@
 name: Run fuzz tests
 
 on:
-  push:
-    tags:
-      - "*"
-    branches:
-      - master
-      - dev
   schedule:
     - cron: "0 0 * * *"
 
