@@ -76,14 +76,16 @@ func TestSetCappedList(t *testing.T) {
 }
 
 func TestSetClear(t *testing.T) {
+	require := require.New(t)
+
 	set := Set[int]{}
 	for i := 0; i < 25; i++ {
 		set.Add(i)
 	}
 	set.Clear()
-	require.Empty(t, set)
+	require.Empty(set)
 	set.Add(1337)
-	require.Len(t, set, 1)
+	require.Len(set, 1)
 }
 
 func TestSetPop(t *testing.T) {

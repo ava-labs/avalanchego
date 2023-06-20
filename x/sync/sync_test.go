@@ -531,6 +531,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 			key := make([]byte, rand.Intn(maxKeyLen))
 			_, _ = rand.Read(key)
 			val := make([]byte, rand.Intn(maxValLen))
+			_, _ = rand.Read(val)
 			require.NoError(db.Put(key, val))
 		}
 	}
@@ -543,6 +544,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 			rangeStart []byte
 			rangeEnd   []byte
 		)
+		// Generate a valid range start and end
 		for rangeStart == nil || bytes.Compare(rangeStart, rangeEnd) == 1 {
 			rangeStart = make([]byte, rand.Intn(maxRangeStartLen)+1)
 			_, _ = rand.Read(rangeStart)
@@ -582,9 +584,8 @@ func TestFindNextKeyRandom(t *testing.T) {
 			id  ids.ID
 		}
 
-		// Set of key prefix/ID pairs proven by the remote database's proof.
+		// Set of key prefix/ID pairs proven by the remote database's end proof.
 		remoteKeyIDs := []keyAndID{}
-
 		for _, node := range remoteProof.EndProof {
 			for childIdx, childID := range node.Children {
 				remoteKeyIDs = append(remoteKeyIDs, keyAndID{
@@ -622,7 +623,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 				firstIdxOutOfRange   = len(keyIDs)
 			)
 			for i, keyID := range keyIDs {
-				if !firstIdxInRangeFound && bytes.Compare(keyID.key.Value, lastReceivedKey) >= 0 {
+				if !firstIdxInRangeFound && bytes.Compare(keyID.key.Value, lastReceivedKey) > 0 {
 					firstIdxInRange = i
 					firstIdxInRangeFound = true
 					continue
@@ -635,14 +636,14 @@ func TestFindNextKeyRandom(t *testing.T) {
 			return firstIdxInRange, firstIdxOutOfRange
 		}
 
-		remoteFirstIdxInRange, remoteFirstIdxOutOfRange := findBounds(remoteKeyIDs)
-		remoteKeyIDs = remoteKeyIDs[remoteFirstIdxInRange:remoteFirstIdxOutOfRange]
+		remoteFirstIdxAfterLastReceived, remoteFirstIdxAfterEnd := findBounds(remoteKeyIDs)
+		remoteKeyIDs = remoteKeyIDs[remoteFirstIdxAfterLastReceived:remoteFirstIdxAfterEnd]
 
-		localFirstIdxInRange, localFirstIdxOutOfRange := findBounds(localKeyIDs)
-		localKeyIDs = localKeyIDs[localFirstIdxInRange:localFirstIdxOutOfRange]
+		localFirstIdxAfterLastReceived, localFirstIdxAfterEnd := findBounds(localKeyIDs)
+		localKeyIDs = localKeyIDs[localFirstIdxAfterLastReceived:localFirstIdxAfterEnd]
 
 		// Find smallest difference between the set of key/ID pairs proven by
-		// the remote/local proofs.
+		// the remote/local proofs for key/ID pairs after the last received key.
 		var (
 			smallestDiffKey merkledb.SerializedPath
 			foundDiff       bool
@@ -654,19 +655,15 @@ func TestFindNextKeyRandom(t *testing.T) {
 				smaller, bigger = localKeyIDs[i], remoteKeyIDs[i]
 			}
 
-			if !smaller.key.Equal(bigger.key) {
+			if !smaller.key.Equal(bigger.key) || smaller.id != bigger.id {
 				smallestDiffKey = smaller.key
-				foundDiff = true
-				break
-			}
-			// The keys are the same. See if the IDs are different.
-			if smaller.id != bigger.id {
-				smallestDiffKey = smaller.key // Keys are same so either is fine
 				foundDiff = true
 				break
 			}
 		}
 		if !foundDiff {
+			// All the keys were equal. The smallest diff is the next key
+			// in the longer of the lists (if they're not same length.)
 			if len(remoteKeyIDs) < len(localKeyIDs) {
 				smallestDiffKey = localKeyIDs[len(remoteKeyIDs)].key
 			} else if len(remoteKeyIDs) > len(localKeyIDs) {
@@ -693,6 +690,8 @@ func TestFindNextKeyRandom(t *testing.T) {
 		require.NoError(err)
 
 		if bytes.Compare(smallestDiffKey.Value, rangeEnd) >= 0 {
+			// The smallest key which differs is after the range end so the
+			// next key to get should be nil because we're done fetching the range.
 			require.Nil(gotFirstDiff)
 		} else {
 			require.Equal(smallestDiffKey.Value, gotFirstDiff)

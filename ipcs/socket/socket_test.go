@@ -6,9 +6,13 @@ package socket
 import (
 	"net"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestSocketSendAndReceive(t *testing.T) {
+	require := require.New(t)
+
 	var (
 		connCh     chan net.Conn
 		socketName = "/tmp/pipe-test.sock"
@@ -19,14 +23,10 @@ func TestSocketSendAndReceive(t *testing.T) {
 	// Create socket and client; wait for client to connect
 	socket := NewSocket(socketName, nil)
 	socket.accept, connCh = newTestAcceptFn(t)
-	if err := socket.Listen(); err != nil {
-		t.Fatal("Failed to listen on socket:", err.Error())
-	}
+	require.NoError(socket.Listen())
 
 	client, err := Dial(socketName)
-	if err != nil {
-		t.Fatal("Failed to dial socket:", err.Error())
-	}
+	require.NoError(err)
 	<-connCh
 
 	// Start sending in the background
@@ -38,22 +38,17 @@ func TestSocketSendAndReceive(t *testing.T) {
 
 	// Receive message and compare it to what was sent
 	receivedMsg, err := client.Recv()
-	if err != nil {
-		t.Fatal("Failed to receive from socket:", err.Error())
-	}
-	if string(receivedMsg) != string(msg) {
-		t.Fatal("Received incorrect message:", string(msg))
-	}
+	require.NoError(err)
+	require.Equal(msg, receivedMsg)
 
 	// Test max message size
 	client.SetMaxMessageSize(msgLen)
-	if _, err := client.Recv(); err != nil {
-		t.Fatal("Failed to receive from socket:", err.Error())
-	}
+	_, err = client.Recv()
+	require.NoError(err)
+
 	client.SetMaxMessageSize(msgLen - 1)
-	if _, err := client.Recv(); err != ErrMessageTooLarge {
-		t.Fatal("Should have received message too large error, got:", err)
-	}
+	_, err = client.Recv()
+	require.ErrorIs(err, ErrMessageTooLarge)
 }
 
 // newTestAcceptFn creates a new acceptFn and a channel that receives all new
@@ -63,9 +58,7 @@ func newTestAcceptFn(t *testing.T) (acceptFn, chan net.Conn) {
 
 	return func(s *Socket, l net.Listener) {
 		conn, err := l.Accept()
-		if err != nil {
-			t.Error(err)
-		}
+		require.NoError(t, err)
 
 		s.connLock.Lock()
 		s.conns[conn] = struct{}{}
