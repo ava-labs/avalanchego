@@ -87,22 +87,15 @@ func TestContains(t *testing.T) {
 	subnetID := ids.GenerateTestID()
 	nodeID := ids.GenerateTestNodeID()
 
-	contains := Contains(m, subnetID, nodeID)
-	require.False(contains)
+	require.False(Contains(m, subnetID, nodeID))
 
 	s := NewSet()
 	m.Add(subnetID, s)
-
-	contains = Contains(m, subnetID, nodeID)
-	require.False(contains)
+	require.False(Contains(m, subnetID, nodeID))
 
 	require.NoError(Add(m, subnetID, nodeID, nil, ids.Empty, 1))
-
-	contains = Contains(m, subnetID, nodeID)
-	require.True(contains)
+	require.True(Contains(m, subnetID, nodeID))
 
 	require.NoError(RemoveWeight(m, subnetID, nodeID, 1))
-
-	contains = Contains(m, subnetID, nodeID)
-	require.False(contains)
+	require.False(Contains(m, subnetID, nodeID))
 }

@@ -6,11 +6,15 @@ package poll
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/bag"
 )
 
 func TestEarlyTermNoTraversalResults(t *testing.T) {
+	require := require.New(t)
+
 	alpha := 1
 
 	vtxID := ids.ID{1}
@@ -24,18 +28,13 @@ func TestEarlyTermNoTraversalResults(t *testing.T) {
 	poll := factory.New(vdrs)
 
 	poll.Vote(vdr1, vtxID)
-	if !poll.Finished() {
-		t.Fatalf("Poll did not terminate after receiving k votes")
-	}
+	require.True(poll.Finished())
 
 	result := poll.Result()
-	if list := result.List(); len(list) != 1 {
-		t.Fatalf("Wrong number of vertices returned")
-	} else if retVtxID := list[0]; retVtxID != vtxID {
-		t.Fatalf("Wrong vertex returned")
-	} else if result.Count(vtxID) != 1 {
-		t.Fatalf("Wrong number of votes returned")
-	}
+	list := result.List()
+	require.Len(list, 1)
+	require.Equal(vtxID, list[0])
+	require.Equal(1, result.Count(vtxID))
 }
 
 func TestEarlyTermNoTraversalString(t *testing.T) {
@@ -61,12 +60,12 @@ func TestEarlyTermNoTraversalString(t *testing.T) {
     NodeID-BaMPFdqMUQ46BV8iRcwbVfsam55kMqcp: 1
 received Bag[ids.ID]: (Size = 1)
     SYXsAycDPUu4z2ZksJD5fh5nTDcH3vCFHnpcVye5XuJ2jArg: 1`
-	if result := poll.String(); expected != result {
-		t.Fatalf("Poll should have returned %s but returned %s", expected, result)
-	}
+	require.Equal(t, expected, poll.String())
 }
 
 func TestEarlyTermNoTraversalDropsDuplicatedVotes(t *testing.T) {
+	require := require.New(t)
+
 	alpha := 2
 
 	vtxID := ids.ID{1}
@@ -84,20 +83,18 @@ func TestEarlyTermNoTraversalDropsDuplicatedVotes(t *testing.T) {
 	poll := factory.New(vdrs)
 
 	poll.Vote(vdr1, vtxID)
-	if poll.Finished() {
-		t.Fatalf("Poll finished after less than alpha votes")
-	}
+	require.False(poll.Finished())
+
 	poll.Vote(vdr1, vtxID)
-	if poll.Finished() {
-		t.Fatalf("Poll finished after getting a duplicated vote")
-	}
+	require.False(poll.Finished())
+
 	poll.Vote(vdr2, vtxID)
-	if !poll.Finished() {
-		t.Fatalf("Poll did not terminate after receiving k votes")
-	}
+	require.True(poll.Finished())
 }
 
 func TestEarlyTermNoTraversalTerminatesEarly(t *testing.T) {
+	require := require.New(t)
+
 	alpha := 3
 
 	vtxID := ids.ID{1}
@@ -121,20 +118,18 @@ func TestEarlyTermNoTraversalTerminatesEarly(t *testing.T) {
 	poll := factory.New(vdrs)
 
 	poll.Vote(vdr1, vtxID)
-	if poll.Finished() {
-		t.Fatalf("Poll finished after less than alpha votes")
-	}
+	require.False(poll.Finished())
+
 	poll.Vote(vdr2, vtxID)
-	if poll.Finished() {
-		t.Fatalf("Poll finished after less than alpha votes")
-	}
+	require.False(poll.Finished())
+
 	poll.Vote(vdr3, vtxID)
-	if !poll.Finished() {
-		t.Fatalf("Poll did not terminate early after receiving alpha votes for one vertex and none for other vertices")
-	}
+	require.True(poll.Finished())
 }
 
 func TestEarlyTermNoTraversalForSharedAncestor(t *testing.T) {
+	require := require.New(t)
+
 	alpha := 4
 
 	vtxA := ids.ID{1}
@@ -164,24 +159,21 @@ func TestEarlyTermNoTraversalForSharedAncestor(t *testing.T) {
 	poll := factory.New(vdrs)
 
 	poll.Vote(vdr1, vtxB)
-	if poll.Finished() {
-		t.Fatalf("Poll finished early after receiving one vote")
-	}
+	require.False(poll.Finished())
+
 	poll.Vote(vdr2, vtxC)
-	if poll.Finished() {
-		t.Fatalf("Poll finished early after receiving two votes")
-	}
+	require.False(poll.Finished())
+
 	poll.Vote(vdr3, vtxD)
-	if poll.Finished() {
-		t.Fatalf("Poll terminated early, when a shared ancestor could have received alpha votes")
-	}
+	require.False(poll.Finished())
+
 	poll.Vote(vdr4, vtxA)
-	if !poll.Finished() {
-		t.Fatalf("Poll did not terminate after receiving all outstanding votes")
-	}
+	require.True(poll.Finished())
 }
 
 func TestEarlyTermNoTraversalWithFastDrops(t *testing.T) {
+	require := require.New(t)
+
 	alpha := 2
 
 	vdr1 := ids.NodeID{1}
@@ -199,16 +191,15 @@ func TestEarlyTermNoTraversalWithFastDrops(t *testing.T) {
 	poll := factory.New(vdrs)
 
 	poll.Drop(vdr1)
-	if poll.Finished() {
-		t.Fatalf("Poll finished early after dropping one vote")
-	}
+	require.False(poll.Finished())
+
 	poll.Drop(vdr2)
-	if !poll.Finished() {
-		t.Fatalf("Poll did not terminate after dropping two votes")
-	}
+	require.True(poll.Finished())
 }
 
 func TestEarlyTermNoTraversalWithWeightedResponses(t *testing.T) {
+	require := require.New(t)
+
 	alpha := 2
 
 	vtxID := ids.ID{1}
@@ -227,18 +218,13 @@ func TestEarlyTermNoTraversalWithWeightedResponses(t *testing.T) {
 	poll := factory.New(vdrs)
 
 	poll.Vote(vdr2, vtxID)
-	if !poll.Finished() {
-		t.Fatalf("Poll did not terminate after receiving two votes")
-	}
+	require.True(poll.Finished())
 
 	result := poll.Result()
-	if list := result.List(); len(list) != 1 {
-		t.Fatalf("Wrong number of vertices returned")
-	} else if retVtxID := list[0]; retVtxID != vtxID {
-		t.Fatalf("Wrong vertex returned")
-	} else if result.Count(vtxID) != 2 {
-		t.Fatalf("Wrong number of votes returned")
-	}
+	list := result.List()
+	require.Len(list, 1)
+	require.Equal(vtxID, list[0])
+	require.Equal(2, result.Count(vtxID))
 }
 
 func TestEarlyTermNoTraversalDropWithWeightedResponses(t *testing.T) {
@@ -258,7 +244,5 @@ func TestEarlyTermNoTraversalDropWithWeightedResponses(t *testing.T) {
 	poll := factory.New(vdrs)
 
 	poll.Drop(vdr2)
-	if !poll.Finished() {
-		t.Fatalf("Poll did not terminate after dropping two votes")
-	}
+	require.True(t, poll.Finished())
 }

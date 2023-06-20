@@ -1089,7 +1089,6 @@ func TestVerifySpendUTXOs(t *testing.T) {
 		h.clk.Set(now)
 
 		t.Run(test.description, func(t *testing.T) {
-			require := require.New(t)
 			err := h.VerifySpendUTXOs(
 				&unsignedTx,
 				test.utxos,
@@ -1098,7 +1097,7 @@ func TestVerifySpendUTXOs(t *testing.T) {
 				test.creds,
 				test.producedAmounts,
 			)
-			require.ErrorIs(err, test.expectedErr)
+			require.ErrorIs(t, err, test.expectedErr)
 		})
 	}
 }

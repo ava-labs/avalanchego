@@ -16,18 +16,16 @@ import (
 
 func TestUTXOIDVerifyNil(t *testing.T) {
 	utxoID := (*UTXOID)(nil)
-
-	if err := utxoID.Verify(); err == nil {
-		t.Fatalf("Should have errored due to a nil utxo ID")
-	}
+	err := utxoID.Verify()
+	require.ErrorIs(t, err, errNilUTXOID)
 }
 
 func TestUTXOID(t *testing.T) {
+	require := require.New(t)
+
 	c := linearcodec.NewDefault()
 	manager := codec.NewDefaultManager()
-	if err := manager.RegisterCodec(codecVersion, c); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(manager.RegisterCodec(codecVersion, c))
 
 	utxoID := UTXOID{
 		TxID: ids.ID{
@@ -39,27 +37,17 @@ func TestUTXOID(t *testing.T) {
 		OutputIndex: 0x20212223,
 	}
 
-	if err := utxoID.Verify(); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(utxoID.Verify())
 
 	bytes, err := manager.Marshal(codecVersion, &utxoID)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	newUTXOID := UTXOID{}
-	if _, err := manager.Unmarshal(bytes, &newUTXOID); err != nil {
-		t.Fatal(err)
-	}
+	_, err = manager.Unmarshal(bytes, &newUTXOID)
+	require.NoError(err)
 
-	if err := newUTXOID.Verify(); err != nil {
-		t.Fatal(err)
-	}
-
-	if utxoID.InputID() != newUTXOID.InputID() {
-		t.Fatalf("Parsing returned the wrong UTXO ID")
-	}
+	require.NoError(newUTXOID.Verify())
+	require.Equal(utxoID.InputID(), newUTXOID.InputID())
 }
 
 func TestUTXOIDLess(t *testing.T) {
@@ -111,8 +99,7 @@ func TestUTXOIDLess(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
-			require.Equal(tt.expected, tt.id1.Less(&tt.id2))
+			require.Equal(t, tt.expected, tt.id1.Less(&tt.id2))
 		})
 	}
 }
@@ -204,12 +191,12 @@ func TestUTXOIDFromString(t *testing.T) {
 
 			retrievedUTXOID, err := UTXOIDFromString(test.expectedStr)
 			require.ErrorIs(err, test.parseErr)
-
-			if err == nil {
-				require.Equal(test.utxoID.InputID(), retrievedUTXOID.InputID())
-				require.Equal(test.utxoID, retrievedUTXOID)
-				require.Equal(test.utxoID.String(), retrievedUTXOID.String())
+			if test.parseErr != nil {
+				return
 			}
+			require.Equal(test.utxoID.InputID(), retrievedUTXOID.InputID())
+			require.Equal(test.utxoID, retrievedUTXOID)
+			require.Equal(test.utxoID.String(), retrievedUTXOID.String())
 		})
 	}
 }
