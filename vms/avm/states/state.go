@@ -32,6 +32,8 @@ const (
 	txCacheSize      = 8192
 	blockIDCacheSize = 8192
 	blockCacheSize   = 2048
+
+	pruneCommitLimit = 25000
 )
 
 var (
@@ -107,6 +109,7 @@ type State interface {
 	CommitBatch() (database.Batch, error)
 
 	// Remove unneeded state from disk
+	// TODO: remove after v1.11.x is activated
 	Prune(lock sync.Locker, log logging.Logger) error
 
 	Close() error
@@ -622,7 +625,7 @@ func (s *state) Prune(lock sync.Locker, log logging.Logger) error {
 		if err := s.cleanupTx(lock, txIDBytes, statusBytes, txIter); err != nil {
 			return err
 		}
-		if i%25000 == 0 {
+		if i%pruneCommitLimit == 0 {
 			lock.Lock()
 			err := s.Commit()
 			lock.Unlock()
