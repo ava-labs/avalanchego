@@ -22,7 +22,7 @@ jobs:
         with:
           go-version: '~1.19.6'
           check-latest: true
-      -name: Set AVALANCHE_PATH
+      - name: Set AVALANCHE_PATH
         if: matrix.os[0] == 'self-hosted' && matrix.os[3] == 'jammy'
         run: |
           echo "AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd ../.. && pwd )" >> $GITHUB_ENV
