@@ -360,11 +360,11 @@ func (proof *RangeProof) Verify(
 	// > [insertChildrenLessThan] but less than the first key given.
 	// That is, the peer who gave us this proof is not omitting nodes.
 	insertChildrenGreaterThan := Nothing[path]()
-	if len(largestKey) > 0 {
+	if len(largestPath) > 0 {
 		insertChildrenGreaterThan = Some(largestPath)
 	}
 	insertChildrenLessThan := Nothing[path]()
-	if len(start) > 0 {
+	if len(smallestPath) > 0 {
 		insertChildrenLessThan = Some(smallestPath)
 	}
 	if err := addPathInfo(
