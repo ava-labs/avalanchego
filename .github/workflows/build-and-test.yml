@@ -25,3 +25,9 @@ jobs:
       - name: build_test
         shell: bash
         run: .github/workflows/build_and_test.sh
+      - name: Set AVALANCHE_PATH #Used in fuzz_test
+        run: echo "AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd ../.. && pwd )" >> $GITHUB_ENV
+      - name: fuzz_test
+        shell: bash
+        if: matrix.os == 'self-hosted, linux, ARM64, focal'
+        run: ${{ AVALANCHE_PATH }}/scripts/build_fuzz.sh

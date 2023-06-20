@@ -15,5 +15,6 @@ if [[ -z $(git status -s) ]]; then
     # TODO: Revise this check once we can reliably build without changes
     # exit 1
 fi
+
+# Note this doesn't run the fuzz tests in scripts/fuzz.sh
 "$AVALANCHE_PATH"/scripts/build_test.sh
-"$AVALANCHE_PATH"/scripts/build_fuzz.sh
