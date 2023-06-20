@@ -4230,75 +4230,81 @@ func TestCaminoStandardTxExecutorRewardsImportTx(t *testing.T) {
 				s.EXPECT().CaminoConfig().Return(caminoStateConf, nil)
 				s.EXPECT().GetTimestamp().Return(blockTime)
 
-				nodeID1 := ids.GenerateTestNodeID()
-				nodeID2 := ids.GenerateTestNodeID()
-				nodeID3 := ids.GenerateTestNodeID()
-				nodeID4 := ids.GenerateTestNodeID()
-				_, validatorAddr1, validatorOwner1 := generateKeyAndOwner(t)
-				_, validatorAddr2, validatorOwner2 := generateKeyAndOwner(t)
-				_, validatorAddr4, validatorOwner4 := generateKeyAndOwner(t)
+				rewardOwner1 := &secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{{1}},
+				}
+				rewardOwner2 := &secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{{2}},
+				}
+				rewardOwner4 := &secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{{4}},
+				}
+
+				staker1 := &state.Staker{TxID: ids.ID{0, 1}, SubnetID: constants.PrimaryNetworkID}
+				staker2 := &state.Staker{TxID: ids.ID{0, 2}, SubnetID: constants.PrimaryNetworkID}
+				staker3 := &state.Staker{TxID: ids.ID{0, 3}, SubnetID: ids.ID{0, 0, 1}}
+				staker4 := &state.Staker{TxID: ids.ID{0, 4}, SubnetID: constants.PrimaryNetworkID}
+				staker5 := &state.Staker{TxID: ids.ID{0, 5}, SubnetID: constants.PrimaryNetworkID}
 
 				currentStakerIterator := state.NewMockStakerIterator(c)
-				currentStakerIterator.EXPECT().Next().Return(true)
-				currentStakerIterator.EXPECT().Value().Return(&state.Staker{
-					NodeID:   nodeID1,
-					SubnetID: constants.PrimaryNetworkID,
-				})
-				currentStakerIterator.EXPECT().Next().Return(true)
-				currentStakerIterator.EXPECT().Value().Return(&state.Staker{
-					NodeID:   nodeID2,
-					SubnetID: constants.PrimaryNetworkID,
-				})
-				currentStakerIterator.EXPECT().Next().Return(true)
-				currentStakerIterator.EXPECT().Value().Return(&state.Staker{
-					NodeID:   nodeID3,
-					SubnetID: ids.GenerateTestID(),
-				})
-				currentStakerIterator.EXPECT().Next().Return(true)
-				currentStakerIterator.EXPECT().Value().Return(&state.Staker{
-					NodeID:   nodeID4,
-					SubnetID: constants.PrimaryNetworkID,
-				})
+				currentStakerIterator.EXPECT().Next().Return(true).Times(5)
+				currentStakerIterator.EXPECT().Value().Return(staker1)
+				currentStakerIterator.EXPECT().Value().Return(staker2)
+				currentStakerIterator.EXPECT().Value().Return(staker3)
+				currentStakerIterator.EXPECT().Value().Return(staker4)
+				currentStakerIterator.EXPECT().Value().Return(staker5)
 				currentStakerIterator.EXPECT().Next().Return(false)
 				currentStakerIterator.EXPECT().Release()
 
 				s.EXPECT().GetCurrentStakerIterator().Return(currentStakerIterator, nil)
-				s.EXPECT().GetShortIDLink(ids.ShortID(nodeID1), state.ShortLinkKeyRegisterNode).Return(validatorAddr1, nil)
-				s.EXPECT().GetShortIDLink(ids.ShortID(nodeID2), state.ShortLinkKeyRegisterNode).Return(validatorAddr2, nil)
-				s.EXPECT().GetShortIDLink(ids.ShortID(nodeID4), state.ShortLinkKeyRegisterNode).Return(validatorAddr4, nil)
+				s.EXPECT().GetTx(staker1.TxID).Return(&txs.Tx{Unsigned: &txs.CaminoAddValidatorTx{AddValidatorTx: txs.AddValidatorTx{
+					RewardsOwner: rewardOwner1,
+				}}}, status.Committed, nil)
+				s.EXPECT().GetTx(staker2.TxID).Return(&txs.Tx{Unsigned: &txs.CaminoAddValidatorTx{AddValidatorTx: txs.AddValidatorTx{
+					RewardsOwner: rewardOwner2,
+				}}}, status.Committed, nil)
+				s.EXPECT().GetTx(staker4.TxID).Return(&txs.Tx{Unsigned: &txs.CaminoAddValidatorTx{AddValidatorTx: txs.AddValidatorTx{
+					RewardsOwner: rewardOwner4,
+				}}}, status.Committed, nil)
+				s.EXPECT().GetTx(staker5.TxID).Return(&txs.Tx{Unsigned: &txs.CaminoAddValidatorTx{AddValidatorTx: txs.AddValidatorTx{
+					RewardsOwner: rewardOwner1, // same as staker1
+				}}}, status.Committed, nil)
 				s.EXPECT().GetNotDistributedValidatorReward().Return(uint64(1), nil) // old
 				s.EXPECT().SetNotDistributedValidatorReward(uint64(2))               // new
-				validatorOwnerID1, err := txs.GetOwnerID(&validatorOwner1)
+				rewardOwnerID1, err := txs.GetOwnerID(rewardOwner1)
 				require.NoError(t, err)
-				validatorOwnerID2, err := txs.GetOwnerID(&validatorOwner2)
+				rewardOwnerID2, err := txs.GetOwnerID(rewardOwner2)
 				require.NoError(t, err)
-				validatorOwnerID4, err := txs.GetOwnerID(&validatorOwner4)
+				rewardOwnerID4, err := txs.GetOwnerID(rewardOwner4)
 				require.NoError(t, err)
 
-				s.EXPECT().GetClaimable(validatorOwnerID1).Return(&state.Claimable{
-					Owner:                &validatorOwner1,
+				s.EXPECT().GetClaimable(rewardOwnerID1).Return(&state.Claimable{
+					Owner:                rewardOwner1,
 					ValidatorReward:      10,
 					ExpiredDepositReward: 100,
 				}, nil)
-				s.EXPECT().GetClaimable(validatorOwnerID2).Return(&state.Claimable{
-					Owner:                &validatorOwner2,
+				s.EXPECT().GetClaimable(rewardOwnerID2).Return(&state.Claimable{
+					Owner:                rewardOwner2,
 					ValidatorReward:      20,
 					ExpiredDepositReward: 200,
 				}, nil)
-				s.EXPECT().GetClaimable(validatorOwnerID4).Return(nil, database.ErrNotFound)
+				s.EXPECT().GetClaimable(rewardOwnerID4).Return(nil, database.ErrNotFound)
 
-				s.EXPECT().SetClaimable(validatorOwnerID1, &state.Claimable{
-					Owner:                &validatorOwner1,
-					ValidatorReward:      11,
+				s.EXPECT().SetClaimable(rewardOwnerID1, &state.Claimable{
+					Owner:                rewardOwner1,
+					ValidatorReward:      12,
 					ExpiredDepositReward: 100,
 				})
-				s.EXPECT().SetClaimable(validatorOwnerID2, &state.Claimable{
-					Owner:                &validatorOwner2,
+				s.EXPECT().SetClaimable(rewardOwnerID2, &state.Claimable{
+					Owner:                rewardOwner2,
 					ValidatorReward:      21,
 					ExpiredDepositReward: 200,
 				})
-				s.EXPECT().SetClaimable(validatorOwnerID4, &state.Claimable{
-					Owner:           &validatorOwner4,
+				s.EXPECT().SetClaimable(rewardOwnerID4, &state.Claimable{
+					Owner:           rewardOwner4,
 					ValidatorReward: 1,
 				})
 
@@ -4316,18 +4322,18 @@ func TestCaminoStandardTxExecutorRewardsImportTx(t *testing.T) {
 				}}}
 			},
 			utxos: []*avax.TimedUTXO{
-				{
+				{ // timed utxo, old enough
 					UTXO:      *generateTestUTXO(ids.ID{1}, ctx.AVAXAssetID, 3, *treasury.Owner, ids.Empty, ids.Empty),
 					Timestamp: uint64(blockTime.Unix()) - atomic.SharedMemorySyncBound,
 				},
-				{
+				{ // not timed utxo
 					UTXO: *generateTestUTXO(ids.ID{2}, ctx.AVAXAssetID, 5, *treasury.Owner, ids.Empty, ids.Empty),
 				},
-				{
-					UTXO:      *generateTestUTXO(ids.ID{3}, ctx.AVAXAssetID, 1, *treasury.Owner, ids.Empty, ids.Empty),
+				{ // timed utxo, old enough
+					UTXO:      *generateTestUTXO(ids.ID{3}, ctx.AVAXAssetID, 2, *treasury.Owner, ids.Empty, ids.Empty),
 					Timestamp: uint64(blockTime.Unix()) - atomic.SharedMemorySyncBound,
 				},
-				{
+				{ // timed utxo, not old enough
 					UTXO:      *generateTestUTXO(ids.ID{4}, ctx.AVAXAssetID, 1, *treasury.Owner, ids.Empty, ids.Empty),
 					Timestamp: uint64(blockTime.Unix()) - atomic.SharedMemorySyncBound + 1,
 				},

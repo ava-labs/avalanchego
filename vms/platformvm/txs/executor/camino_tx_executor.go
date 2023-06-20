@@ -764,10 +764,6 @@ func (e *CaminoStandardTxExecutor) UnlockDepositTx(tx *txs.UnlockDepositTx) erro
 		}
 	}
 
-	if hasExpiredDeposits && len(e.Tx.Creds) > 0 {
-		return errWrongCredentialsNumber
-	}
-
 	produced := uint64(0)
 	for _, output := range tx.Outs {
 		if lockedOut, ok := output.Out.(*locked.Out); ok && lockedOut.DepositTxID != ids.Empty {
@@ -1258,21 +1254,43 @@ func (e *CaminoStandardTxExecutor) RewardsImportTx(tx *txs.RewardsImportTx) erro
 	}
 	defer currentStakerIterator.Release()
 
-	validators := set.Set[ids.ShortID]{}
+	totalRewardFractions := uint64(0)
+	type reward struct {
+		owner     *secp256k1fx.OutputOwners
+		fractions uint64
+	}
+	rewardOwners := map[ids.ID]*reward{}
 	for currentStakerIterator.Next() {
 		staker := currentStakerIterator.Value()
 		if staker.SubnetID != constants.PrimaryNetworkID {
 			continue
 		}
 
-		validatorAddr, err := e.State.GetShortIDLink(
-			ids.ShortID(staker.NodeID),
-			state.ShortLinkKeyRegisterNode,
-		)
+		addValidatorTx, _, err := e.State.GetTx(staker.TxID)
 		if err != nil {
 			return err
 		}
-		validators.Add(validatorAddr)
+		unsignedAddValidatorTx, ok := addValidatorTx.Unsigned.(*txs.CaminoAddValidatorTx)
+		if !ok {
+			return errWrongTxType
+		}
+		txRewardOwner, ok := unsignedAddValidatorTx.RewardsOwner.(*secp256k1fx.OutputOwners)
+		if !ok {
+			return errWrongOwnerType
+		}
+		ownerID, err := txs.GetOwnerID(txRewardOwner)
+		if err != nil {
+			return err
+		}
+		rewardOwner, ok := rewardOwners[ownerID]
+		if !ok {
+			rewardOwner = &reward{
+				owner: txRewardOwner,
+			}
+			rewardOwners[ownerID] = rewardOwner
+		}
+		rewardOwner.fractions++
+		totalRewardFractions++
 	}
 
 	// Set not distributed validator reward
@@ -1295,8 +1313,8 @@ func (e *CaminoStandardTxExecutor) RewardsImportTx(tx *txs.RewardsImportTx) erro
 		return err
 	}
 
-	addedReward := amountToDistribute / uint64(validators.Len())
-	newNotDistributedAmount := amountToDistribute - addedReward*uint64(validators.Len())
+	addedReward := amountToDistribute / totalRewardFractions
+	newNotDistributedAmount := amountToDistribute - addedReward*totalRewardFractions
 
 	if newNotDistributedAmount != notDistributedAmount {
 		e.State.SetNotDistributedValidatorReward(newNotDistributedAmount)
@@ -1305,36 +1323,31 @@ func (e *CaminoStandardTxExecutor) RewardsImportTx(tx *txs.RewardsImportTx) erro
 	// Set claimables
 
 	if addedReward != 0 {
-		for validatorAddr := range validators {
-			owner := &secp256k1fx.OutputOwners{
-				Threshold: 1,
-				Addrs:     []ids.ShortID{validatorAddr},
-			}
-
-			ownerID, err := txs.GetOwnerID(owner)
-			if err != nil {
-				return err
-			}
-
-			claimable, err := e.State.GetClaimable(ownerID)
+		for rewardOwnerID, reward := range rewardOwners {
+			claimable, err := e.State.GetClaimable(rewardOwnerID)
 			if err != nil && err != database.ErrNotFound {
 				return err
 			}
 
 			newClaimable := &state.Claimable{
-				Owner: owner,
+				Owner: reward.owner,
 			}
 			if claimable != nil {
 				newClaimable.ValidatorReward = claimable.ValidatorReward
 				newClaimable.ExpiredDepositReward = claimable.ExpiredDepositReward
 			}
 
-			newClaimable.ValidatorReward, err = math.Add64(newClaimable.ValidatorReward, addedReward)
+			rewardAddedToOwner, err := math.Mul64(addedReward, reward.fractions)
 			if err != nil {
 				return err
 			}
 
-			e.State.SetClaimable(ownerID, newClaimable)
+			newClaimable.ValidatorReward, err = math.Add64(newClaimable.ValidatorReward, rewardAddedToOwner)
+			if err != nil {
+				return err
+			}
+
+			e.State.SetClaimable(rewardOwnerID, newClaimable)
 		}
 	}
 
