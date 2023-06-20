@@ -22,8 +22,6 @@ jobs:
         with:
           go-version: '~1.19.6'
           check-latest: true
-        env:
-          AVALANCHE_PATH: ${{ env.AVALANCHE_PATH}}
       - name: build_test
         shell: bash
         run: .github/workflows/build_and_test.sh
