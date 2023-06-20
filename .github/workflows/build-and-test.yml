@@ -30,4 +30,4 @@ jobs:
         if: matrix.os[0] == 'self-hosted' && matrix.os[3] == 'jammy'
         run: |
           echo "AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd ../.. && pwd )" >> $GITHUB_ENV
-          ${{ env.AVALANCHE_PATH }}/scripts/build_fuzz.sh
+          $AVALANCHE_PATH/scripts/build_fuzz.sh
