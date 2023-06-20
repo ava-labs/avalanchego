@@ -22,14 +22,18 @@ func BenchmarkLoadUser(b *testing.B) {
 	runLoadUserBenchmark := func(b *testing.B, numKeys int) {
 		require := require.New(b)
 
-		_, _, vm, _ := GenesisVMWithArgs(b, nil, nil)
-		ctx := vm.ctx
+		env := setup(b, &envConfig{
+			keystoreUsers: []*user{{
+				username: username,
+				password: password,
+			}},
+		})
 		defer func() {
-			require.NoError(vm.Shutdown(context.Background()))
-			ctx.Lock.Unlock()
+			require.NoError(env.vm.Shutdown(context.Background()))
+			env.vm.ctx.Lock.Unlock()
 		}()
 
-		user, err := keystore.NewUserFromKeystore(vm.ctx.Keystore, username, password)
+		user, err := keystore.NewUserFromKeystore(env.vm.ctx.Keystore, username, password)
 		require.NoError(err)
 
 		keys, err := keystore.NewKeys(user, numKeys)
@@ -42,7 +46,7 @@ func BenchmarkLoadUser(b *testing.B) {
 			addrIndex := n % numKeys
 			fromAddrs.Clear()
 			fromAddrs.Add(keys[addrIndex].PublicKey().Address())
-			_, _, err := vm.LoadUser(username, password, fromAddrs)
+			_, _, err := env.vm.LoadUser(username, password, fromAddrs)
 			require.NoError(err)
 		}
 

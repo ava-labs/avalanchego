@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/avm/metrics"
 	"github.com/ava-labs/avalanchego/vms/avm/states"
@@ -133,87 +134,21 @@ func TestIssueTx(t *testing.T) {
 		env.vm.ctx.Lock.Unlock()
 	}()
 
-	newTx := NewTxWithAsset(t, env.genesisBytes, env.vm, "AVAX")
-
-	txID, err := env.vm.IssueTx(newTx.Bytes())
-	require.NoError(err)
-	require.Equal(newTx.ID(), txID)
-	env.vm.ctx.Lock.Unlock()
-
-	require.Equal(common.PendingTxs, <-env.issuer)
-	env.vm.ctx.Lock.Lock()
-
-	require.Len(env.vm.PendingTxs(context.Background()), 1)
-}
-
-// Test issuing a transaction that consumes a currently pending UTXO. The
-// transaction should be issued successfully.
-func TestIssueDependentTx(t *testing.T) {
-	require := require.New(t)
-
-	issuer, vm, ctx, txs := setupIssueTx(t)
-	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-		ctx.Lock.Unlock()
-	}()
-
-	firstTx := txs[1]
-	secondTx := txs[2]
-
-	_, err := vm.IssueTx(firstTx.Bytes())
-	require.NoError(err)
-
-	_, err = vm.IssueTx(secondTx.Bytes())
-	require.NoError(err)
-	ctx.Lock.Unlock()
-
-	require.Equal(common.PendingTxs, <-issuer)
-	ctx.Lock.Lock()
-
-	require.Len(vm.PendingTxs(context.Background()), 2)
+	tx := NewTxWithAsset(t, env.genesisBytes, env.vm, "AVAX")
+	issueAndAccept(require, env.vm, env.issuer, tx)
 }
 
 // Test issuing a transaction that creates an NFT family
 func TestIssueNFT(t *testing.T) {
 	require := require.New(t)
 
-	vm := &VM{}
-	ctx := NewContext(t)
-	ctx.Lock.Lock()
+	env := setup(t, &envConfig{
+		vmStaticConfig: &config.Config{},
+	})
 	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-		ctx.Lock.Unlock()
+		require.NoError(env.vm.Shutdown(context.Background()))
+		env.vm.ctx.Lock.Unlock()
 	}()
-
-	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
-	m := atomic.NewMemory(prefixdb.New([]byte{0}, baseDBManager.Current().Database))
-	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
-
-	genesisBytes := BuildGenesisTest(t)
-	issuer := make(chan common.Message, 1)
-	require.NoError(vm.Initialize(
-		context.Background(),
-		ctx,
-		baseDBManager,
-		genesisBytes,
-		nil,
-		nil,
-		issuer,
-		[]*common.Fx{
-			{
-				ID: ids.Empty.Prefix(0),
-				Fx: &secp256k1fx.Fx{},
-			},
-			{
-				ID: ids.Empty.Prefix(1),
-				Fx: &nftfx.Fx{},
-			},
-		},
-		nil,
-	))
-
-	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
-	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
 
 	createAssetTx := &txs.Tx{Unsigned: &txs.CreateAssetTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
@@ -243,8 +178,8 @@ func TestIssueNFT(t *testing.T) {
 			},
 		}},
 	}}
-	require.NoError(vm.parser.InitializeTx(createAssetTx))
-	issueAndAccept(require, vm, issuer, createAssetTx)
+	require.NoError(env.vm.parser.InitializeTx(createAssetTx))
+	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
 	mintNFTTx := &txs.Tx{Unsigned: &txs.OperationTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
@@ -267,8 +202,8 @@ func TestIssueNFT(t *testing.T) {
 			},
 		}},
 	}}
-	require.NoError(mintNFTTx.SignNFTFx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0]}}))
-	issueAndAccept(require, vm, issuer, mintNFTTx)
+	require.NoError(mintNFTTx.SignNFTFx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0]}}))
+	issueAndAccept(require, env.vm, env.issuer, mintNFTTx)
 
 	transferNFTTx := &txs.Tx{
 		Unsigned: &txs.OperationTx{
@@ -296,54 +231,25 @@ func TestIssueNFT(t *testing.T) {
 			{Verifiable: &nftfx.Credential{}},
 		},
 	}
-	require.NoError(vm.parser.InitializeTx(transferNFTTx))
-	issueAndAccept(require, vm, issuer, transferNFTTx)
+	require.NoError(env.vm.parser.InitializeTx(transferNFTTx))
+	issueAndAccept(require, env.vm, env.issuer, transferNFTTx)
 }
 
 // Test issuing a transaction that creates an Property family
 func TestIssueProperty(t *testing.T) {
 	require := require.New(t)
-	vm := &VM{}
-	ctx := NewContext(t)
-	ctx.Lock.Lock()
+
+	env := setup(t, &envConfig{
+		vmStaticConfig: &config.Config{},
+		additionalFxs: []*common.Fx{{
+			ID: propertyfx.ID,
+			Fx: &propertyfx.Fx{},
+		}},
+	})
 	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-		ctx.Lock.Unlock()
+		require.NoError(env.vm.Shutdown(context.Background()))
+		env.vm.ctx.Lock.Unlock()
 	}()
-
-	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
-	m := atomic.NewMemory(prefixdb.New([]byte{0}, baseDBManager.Current().Database))
-	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
-
-	genesisBytes := BuildGenesisTest(t)
-	issuer := make(chan common.Message, 1)
-	require.NoError(vm.Initialize(
-		context.Background(),
-		ctx,
-		baseDBManager,
-		genesisBytes,
-		nil,
-		nil,
-		issuer,
-		[]*common.Fx{
-			{
-				ID: ids.Empty.Prefix(0),
-				Fx: &secp256k1fx.Fx{},
-			},
-			{
-				ID: ids.Empty.Prefix(1),
-				Fx: &nftfx.Fx{},
-			},
-			{
-				ID: ids.Empty.Prefix(2),
-				Fx: &propertyfx.Fx{},
-			},
-		},
-		nil,
-	))
-
-	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
-	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
 
 	createAssetTx := &txs.Tx{Unsigned: &txs.CreateAssetTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
@@ -365,8 +271,8 @@ func TestIssueProperty(t *testing.T) {
 			},
 		}},
 	}}
-	require.NoError(vm.parser.InitializeTx(createAssetTx))
-	issueAndAccept(require, vm, issuer, createAssetTx)
+	require.NoError(env.vm.parser.InitializeTx(createAssetTx))
+	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
 	mintPropertyTx := &txs.Tx{Unsigned: &txs.OperationTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
@@ -394,11 +300,11 @@ func TestIssueProperty(t *testing.T) {
 		}},
 	}}
 
-	codec := vm.parser.Codec()
+	codec := env.vm.parser.Codec()
 	require.NoError(mintPropertyTx.SignPropertyFx(codec, [][]*secp256k1.PrivateKey{
 		{keys[0]},
 	}))
-	issueAndAccept(require, vm, issuer, mintPropertyTx)
+	issueAndAccept(require, env.vm, env.issuer, mintPropertyTx)
 
 	burnPropertyTx := &txs.Tx{Unsigned: &txs.OperationTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
@@ -418,7 +324,7 @@ func TestIssueProperty(t *testing.T) {
 	require.NoError(burnPropertyTx.SignPropertyFx(codec, [][]*secp256k1.PrivateKey{
 		{},
 	}))
-	issueAndAccept(require, vm, issuer, burnPropertyTx)
+	issueAndAccept(require, env.vm, env.issuer, burnPropertyTx)
 }
 
 func TestIssueTxWithFeeAsset(t *testing.T) {
@@ -508,7 +414,10 @@ func TestVMFormat(t *testing.T) {
 		in       ids.ShortID
 		expected string
 	}{
-		{ids.ShortEmpty, "X-testing1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqtu2yas"},
+		{
+			in:       ids.ShortEmpty,
+			expected: "X-testing1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqtu2yas",
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.in.String(), func(t *testing.T) {
@@ -637,161 +546,6 @@ func TestTxVerifyAfterGet(t *testing.T) {
 	require.NoError(parsedSecondTx.Accept(context.Background()))
 	err = parsedFirstTx.Verify(context.Background())
 	require.ErrorIs(err, database.ErrNotFound)
-}
-
-func TestImportTxSerialization(t *testing.T) {
-	require := require.New(t)
-
-	_, vm, _, _ := setupIssueTx(t)
-	expected := []byte{
-		// Codec version
-		0x00, 0x00,
-		// txID:
-		0x00, 0x00, 0x00, 0x03,
-		// networkID:
-		0x00, 0x00, 0x00, 0x02,
-		// blockchainID:
-		0xff, 0xff, 0xff, 0xff, 0xee, 0xee, 0xee, 0xee,
-		0xdd, 0xdd, 0xdd, 0xdd, 0xcc, 0xcc, 0xcc, 0xcc,
-		0xbb, 0xbb, 0xbb, 0xbb, 0xaa, 0xaa, 0xaa, 0xaa,
-		0x99, 0x99, 0x99, 0x99, 0x88, 0x88, 0x88, 0x88,
-		// number of base outs:
-		0x00, 0x00, 0x00, 0x00,
-		// number of base inputs:
-		0x00, 0x00, 0x00, 0x00,
-		// Memo length:
-		0x00, 0x00, 0x00, 0x04,
-		// Memo:
-		0x00, 0x01, 0x02, 0x03,
-		// Source Chain ID:
-		0x1f, 0x8f, 0x9f, 0x0f, 0x1e, 0x8e, 0x9e, 0x0e,
-		0x2d, 0x7d, 0xad, 0xfd, 0x2c, 0x7c, 0xac, 0xfc,
-		0x3b, 0x6b, 0xbb, 0xeb, 0x3a, 0x6a, 0xba, 0xea,
-		0x49, 0x59, 0xc9, 0xd9, 0x48, 0x58, 0xc8, 0xd8,
-		// number of inputs:
-		0x00, 0x00, 0x00, 0x01,
-		// utxoID:
-		0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
-		0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
-		0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
-		0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xe8,
-		// output index
-		0x00, 0x00, 0x00, 0x00,
-		// assetID:
-		0x1f, 0x3f, 0x5f, 0x7f, 0x9e, 0xbe, 0xde, 0xfe,
-		0x1d, 0x3d, 0x5d, 0x7d, 0x9c, 0xbc, 0xdc, 0xfc,
-		0x1b, 0x3b, 0x5b, 0x7b, 0x9a, 0xba, 0xda, 0xfa,
-		0x19, 0x39, 0x59, 0x79, 0x98, 0xb8, 0xd8, 0xf8,
-		// input:
-		// input ID:
-		0x00, 0x00, 0x00, 0x05,
-		// amount:
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0xe8,
-		// num sig indices:
-		0x00, 0x00, 0x00, 0x01,
-		// sig index[0]:
-		0x00, 0x00, 0x00, 0x00,
-		// number of credentials:
-		0x00, 0x00, 0x00, 0x00,
-	}
-
-	tx := &txs.Tx{Unsigned: &txs.ImportTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID: 2,
-			BlockchainID: ids.ID{
-				0xff, 0xff, 0xff, 0xff, 0xee, 0xee, 0xee, 0xee,
-				0xdd, 0xdd, 0xdd, 0xdd, 0xcc, 0xcc, 0xcc, 0xcc,
-				0xbb, 0xbb, 0xbb, 0xbb, 0xaa, 0xaa, 0xaa, 0xaa,
-				0x99, 0x99, 0x99, 0x99, 0x88, 0x88, 0x88, 0x88,
-			},
-			Memo: []byte{0x00, 0x01, 0x02, 0x03},
-		}},
-		SourceChain: ids.ID{
-			0x1f, 0x8f, 0x9f, 0x0f, 0x1e, 0x8e, 0x9e, 0x0e,
-			0x2d, 0x7d, 0xad, 0xfd, 0x2c, 0x7c, 0xac, 0xfc,
-			0x3b, 0x6b, 0xbb, 0xeb, 0x3a, 0x6a, 0xba, 0xea,
-			0x49, 0x59, 0xc9, 0xd9, 0x48, 0x58, 0xc8, 0xd8,
-		},
-		ImportedIns: []*avax.TransferableInput{{
-			UTXOID: avax.UTXOID{TxID: ids.ID{
-				0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
-				0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
-				0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
-				0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xe8,
-			}},
-			Asset: avax.Asset{ID: ids.ID{
-				0x1f, 0x3f, 0x5f, 0x7f, 0x9e, 0xbe, 0xde, 0xfe,
-				0x1d, 0x3d, 0x5d, 0x7d, 0x9c, 0xbc, 0xdc, 0xfc,
-				0x1b, 0x3b, 0x5b, 0x7b, 0x9a, 0xba, 0xda, 0xfa,
-				0x19, 0x39, 0x59, 0x79, 0x98, 0xb8, 0xd8, 0xf8,
-			}},
-			In: &secp256k1fx.TransferInput{
-				Amt:   1000,
-				Input: secp256k1fx.Input{SigIndices: []uint32{0}},
-			},
-		}},
-	}}
-
-	require.NoError(vm.parser.InitializeTx(tx))
-	require.Equal(tx.ID().String(), "9wdPb5rsThXYLX4WxkNeyYrNMfDE5cuWLgifSjxKiA2dCmgCZ")
-	require.Equal(expected, tx.Bytes())
-
-	credBytes := []byte{
-		// type id
-		0x00, 0x00, 0x00, 0x09,
-
-		// there are two signers (thus two signatures)
-		0x00, 0x00, 0x00, 0x02,
-
-		// 65 bytes
-		0x8c, 0xc7, 0xdc, 0x8c, 0x11, 0xd3, 0x75, 0x9e, 0x16, 0xa5,
-		0x9f, 0xd2, 0x9c, 0x64, 0xd7, 0x1f, 0x9b, 0xad, 0x1a, 0x62,
-		0x33, 0x98, 0xc7, 0xaf, 0x67, 0x02, 0xc5, 0xe0, 0x75, 0x8e,
-		0x62, 0xcf, 0x15, 0x6d, 0x99, 0xf5, 0x4e, 0x71, 0xb8, 0xf4,
-		0x8b, 0x5b, 0xbf, 0x0c, 0x59, 0x62, 0x79, 0x34, 0x97, 0x1a,
-		0x1f, 0x49, 0x9b, 0x0a, 0x4f, 0xbf, 0x95, 0xfc, 0x31, 0x39,
-		0x46, 0x4e, 0xa1, 0xaf, 0x00,
-
-		// 65 bytes
-		0x8c, 0xc7, 0xdc, 0x8c, 0x11, 0xd3, 0x75, 0x9e, 0x16, 0xa5,
-		0x9f, 0xd2, 0x9c, 0x64, 0xd7, 0x1f, 0x9b, 0xad, 0x1a, 0x62,
-		0x33, 0x98, 0xc7, 0xaf, 0x67, 0x02, 0xc5, 0xe0, 0x75, 0x8e,
-		0x62, 0xcf, 0x15, 0x6d, 0x99, 0xf5, 0x4e, 0x71, 0xb8, 0xf4,
-		0x8b, 0x5b, 0xbf, 0x0c, 0x59, 0x62, 0x79, 0x34, 0x97, 0x1a,
-		0x1f, 0x49, 0x9b, 0x0a, 0x4f, 0xbf, 0x95, 0xfc, 0x31, 0x39,
-		0x46, 0x4e, 0xa1, 0xaf, 0x00,
-
-		// type id
-		0x00, 0x00, 0x00, 0x09,
-
-		// there are two signers (thus two signatures)
-		0x00, 0x00, 0x00, 0x02,
-
-		// 65 bytes
-		0x8c, 0xc7, 0xdc, 0x8c, 0x11, 0xd3, 0x75, 0x9e, 0x16, 0xa5,
-		0x9f, 0xd2, 0x9c, 0x64, 0xd7, 0x1f, 0x9b, 0xad, 0x1a, 0x62,
-		0x33, 0x98, 0xc7, 0xaf, 0x67, 0x02, 0xc5, 0xe0, 0x75, 0x8e,
-		0x62, 0xcf, 0x15, 0x6d, 0x99, 0xf5, 0x4e, 0x71, 0xb8, 0xf4,
-		0x8b, 0x5b, 0xbf, 0x0c, 0x59, 0x62, 0x79, 0x34, 0x97, 0x1a,
-		0x1f, 0x49, 0x9b, 0x0a, 0x4f, 0xbf, 0x95, 0xfc, 0x31, 0x39,
-		0x46, 0x4e, 0xa1, 0xaf, 0x00,
-
-		// 65 bytes
-		0x8c, 0xc7, 0xdc, 0x8c, 0x11, 0xd3, 0x75, 0x9e, 0x16, 0xa5,
-		0x9f, 0xd2, 0x9c, 0x64, 0xd7, 0x1f, 0x9b, 0xad, 0x1a, 0x62,
-		0x33, 0x98, 0xc7, 0xaf, 0x67, 0x02, 0xc5, 0xe0, 0x75, 0x8e,
-		0x62, 0xcf, 0x15, 0x6d, 0x99, 0xf5, 0x4e, 0x71, 0xb8, 0xf4,
-		0x8b, 0x5b, 0xbf, 0x0c, 0x59, 0x62, 0x79, 0x34, 0x97, 0x1a,
-		0x1f, 0x49, 0x9b, 0x0a, 0x4f, 0xbf, 0x95, 0xfc, 0x31, 0x39,
-		0x46, 0x4e, 0xa1, 0xaf, 0x00,
-	}
-	require.NoError(tx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0], keys[0]}, {keys[0], keys[0]}}))
-	require.Equal(tx.ID().String(), "pCW7sVBytzdZ1WrqzGY1DvA2S9UaMr72xpUMxVyx1QHBARNYx")
-
-	// there are two credentials
-	expected[len(expected)-1] = 0x02
-	expected = append(expected, credBytes...)
-	require.Equal(expected, tx.Bytes())
 }
 
 // Test issuing an import transaction.

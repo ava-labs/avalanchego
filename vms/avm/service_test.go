@@ -546,12 +546,10 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 
 	env := setup(t, &envConfig{
 		vmStaticConfig: &config.Config{},
-		additionalFxs: []*common.Fx{
-			{
-				ID: propertyfx.ID,
-				Fx: &propertyfx.Fx{},
-			},
-		},
+		additionalFxs: []*common.Fx{{
+			ID: propertyfx.ID,
+			Fx: &propertyfx.Fx{},
+		}},
 	})
 	defer func() {
 		require.NoError(env.vm.Shutdown(context.Background()))
@@ -582,12 +580,10 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 
 	env := setup(t, &envConfig{
 		vmStaticConfig: &config.Config{},
-		additionalFxs: []*common.Fx{
-			{
-				ID: propertyfx.ID,
-				Fx: &propertyfx.Fx{},
-			},
-		},
+		additionalFxs: []*common.Fx{{
+			ID: propertyfx.ID,
+			Fx: &propertyfx.Fx{},
+		}},
 	})
 	defer func() {
 		require.NoError(env.vm.Shutdown(context.Background()))
@@ -627,12 +623,10 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 
 	env := setup(t, &envConfig{
 		vmStaticConfig: &config.Config{},
-		additionalFxs: []*common.Fx{
-			{
-				ID: propertyfx.ID,
-				Fx: &propertyfx.Fx{},
-			},
-		},
+		additionalFxs: []*common.Fx{{
+			ID: propertyfx.ID,
+			Fx: &propertyfx.Fx{},
+		}},
 	})
 	defer func() {
 		require.NoError(env.vm.Shutdown(context.Background()))
@@ -674,12 +668,10 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 
 	env := setup(t, &envConfig{
 		vmStaticConfig: &config.Config{},
-		additionalFxs: []*common.Fx{
-			{
-				ID: propertyfx.ID,
-				Fx: &propertyfx.Fx{},
-			},
-		},
+		additionalFxs: []*common.Fx{{
+			ID: propertyfx.ID,
+			Fx: &propertyfx.Fx{},
+		}},
 	})
 	defer func() {
 		require.NoError(env.vm.Shutdown(context.Background()))
@@ -721,12 +713,10 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 
 	env := setup(t, &envConfig{
 		vmStaticConfig: &config.Config{},
-		additionalFxs: []*common.Fx{
-			{
-				ID: propertyfx.ID,
-				Fx: &propertyfx.Fx{},
-			},
-		},
+		additionalFxs: []*common.Fx{{
+			ID: propertyfx.ID,
+			Fx: &propertyfx.Fx{},
+		}},
 	})
 	defer func() {
 		require.NoError(env.vm.Shutdown(context.Background()))
@@ -769,12 +759,10 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 
 	env := setup(t, &envConfig{
 		vmStaticConfig: &config.Config{},
-		additionalFxs: []*common.Fx{
-			{
-				ID: propertyfx.ID,
-				Fx: &propertyfx.Fx{},
-			},
-		},
+		additionalFxs: []*common.Fx{{
+			ID: propertyfx.ID,
+			Fx: &propertyfx.Fx{},
+		}},
 	})
 	defer func() {
 		require.NoError(env.vm.Shutdown(context.Background()))
@@ -815,12 +803,10 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 
 	env := setup(t, &envConfig{
 		vmStaticConfig: &config.Config{},
-		additionalFxs: []*common.Fx{
-			{
-				ID: propertyfx.ID,
-				Fx: &propertyfx.Fx{},
-			},
-		},
+		additionalFxs: []*common.Fx{{
+			ID: propertyfx.ID,
+			Fx: &propertyfx.Fx{},
+		}},
 	})
 	defer func() {
 		require.NoError(env.vm.Shutdown(context.Background()))
@@ -1424,13 +1410,11 @@ func TestCreateFixedCapAsset(t *testing.T) {
 
 			env := setup(t, &envConfig{
 				isCustomFeeAsset: !tc.avaxAsset,
-				keystoreUsers: []*user{
-					{
-						username:    username,
-						password:    password,
-						initialKeys: keys,
-					},
-				},
+				keystoreUsers: []*user{{
+					username:    username,
+					password:    password,
+					initialKeys: keys,
+				}},
 			})
 			defer func() {
 				require.NoError(env.vm.Shutdown(context.Background()))
@@ -1474,13 +1458,11 @@ func TestCreateVariableCapAsset(t *testing.T) {
 
 			env := setup(t, &envConfig{
 				isCustomFeeAsset: !tc.avaxAsset,
-				keystoreUsers: []*user{
-					{
-						username:    username,
-						password:    password,
-						initialKeys: keys,
-					},
-				},
+				keystoreUsers: []*user{{
+					username:    username,
+					password:    password,
+					initialKeys: keys,
+				}},
 			})
 			defer func() {
 				require.NoError(env.vm.Shutdown(context.Background()))
@@ -1566,13 +1548,11 @@ func TestNFTWorkflow(t *testing.T) {
 
 			env := setup(t, &envConfig{
 				isCustomFeeAsset: !tc.avaxAsset,
-				keystoreUsers: []*user{
-					{
-						username:    username,
-						password:    password,
-						initialKeys: keys,
-					},
-				},
+				keystoreUsers: []*user{{
+					username:    username,
+					password:    password,
+					initialKeys: keys,
+				}},
 			})
 			defer func() {
 				require.NoError(env.vm.Shutdown(context.Background()))
@@ -1687,12 +1667,10 @@ func TestImportExportKey(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		keystoreUsers: []*user{
-			{
-				username: username,
-				password: password,
-			},
-		},
+		keystoreUsers: []*user{{
+			username: username,
+			password: password,
+		}},
 	})
 	defer func() {
 		require.NoError(env.vm.Shutdown(context.Background()))
@@ -1731,12 +1709,10 @@ func TestImportAVMKeyNoDuplicates(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		keystoreUsers: []*user{
-			{
-				username: username,
-				password: password,
-			},
-		},
+		keystoreUsers: []*user{{
+			username: username,
+			password: password,
+		}},
 	})
 	defer func() {
 		require.NoError(env.vm.Shutdown(context.Background()))
@@ -1781,13 +1757,11 @@ func TestSend(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		keystoreUsers: []*user{
-			{
-				username:    username,
-				password:    password,
-				initialKeys: keys,
-			},
-		},
+		keystoreUsers: []*user{{
+			username:    username,
+			password:    password,
+			initialKeys: keys,
+		}},
 	})
 	defer func() {
 		require.NoError(env.vm.Shutdown(context.Background()))
@@ -1832,13 +1806,11 @@ func TestSendMultiple(t *testing.T) {
 
 			env := setup(t, &envConfig{
 				isCustomFeeAsset: !tc.avaxAsset,
-				keystoreUsers: []*user{
-					{
-						username:    username,
-						password:    password,
-						initialKeys: keys,
-					},
-				},
+				keystoreUsers: []*user{{
+					username:    username,
+					password:    password,
+					initialKeys: keys,
+				}},
 			})
 			defer func() {
 				require.NoError(env.vm.Shutdown(context.Background()))
@@ -1889,12 +1861,10 @@ func TestCreateAndListAddresses(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		keystoreUsers: []*user{
-			{
-				username: username,
-				password: password,
-			},
-		},
+		keystoreUsers: []*user{{
+			username: username,
+			password: password,
+		}},
 	})
 	defer func() {
 		require.NoError(env.vm.Shutdown(context.Background()))
@@ -1928,13 +1898,11 @@ func TestImport(t *testing.T) {
 
 			env := setup(t, &envConfig{
 				isCustomFeeAsset: !tc.avaxAsset,
-				keystoreUsers: []*user{
-					{
-						username:    username,
-						password:    password,
-						initialKeys: keys,
-					},
-				},
+				keystoreUsers: []*user{{
+					username:    username,
+					password:    password,
+					initialKeys: keys,
+				}},
 			})
 			defer func() {
 				require.NoError(env.vm.Shutdown(context.Background()))

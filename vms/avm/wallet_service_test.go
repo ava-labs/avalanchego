@@ -10,8 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/api"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/vms/avm/blocks/executor"
 )
 
 func TestWalletService_SendMultiple(t *testing.T) {
@@ -21,6 +19,11 @@ func TestWalletService_SendMultiple(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			env := setup(t, &envConfig{
 				isCustomFeeAsset: !tc.avaxAsset,
+				keystoreUsers: []*user{{
+					username:    username,
+					password:    password,
+					initialKeys: keys,
+				}},
 			})
 			defer func() {
 				require.NoError(env.vm.Shutdown(context.Background()))
@@ -62,18 +65,7 @@ func TestWalletService_SendMultiple(t *testing.T) {
 			require.NoError(env.walletService.SendMultiple(nil, args, reply))
 			require.Equal(changeAddrStr, reply.ChangeAddr)
 
-			require.Equal(common.PendingTxs, <-env.issuer)
-
-			blkIntf, err := env.vm.BuildBlock(context.Background())
-			require.NoError(err)
-
-			blk := blkIntf.(*executor.Block)
-			txs := blk.Txs()
-			require.Len(txs, 1)
-			require.Equal(txs[0].ID(), reply.TxID)
-
-			require.NoError(blk.Verify(context.Background()))
-			require.NoError(blk.Accept(context.Background()))
+			buildAndAccept(require, env.vm, env.issuer, reply.TxID)
 
 			_, err = env.vm.state.GetTx(reply.TxID)
 			require.NoError(err)
