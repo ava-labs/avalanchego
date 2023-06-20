@@ -455,7 +455,9 @@ func (t *trieView) GetRangeProof(
 			return nil, err
 		}
 	}
-	result.EndProof = endProof.Path
+	if endProof != nil {
+		result.EndProof = endProof.Path
+	}
 
 	if len(start) > 0 {
 		startProof, err := t.getProof(ctx, start)
