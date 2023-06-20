@@ -110,7 +110,16 @@ type State interface {
 	// pending changes to the base database.
 	CommitBatch() (database.Batch, error)
 
-	// Remove unneeded state from disk
+	// Asynchronously removes unneeded state from disk.
+	//
+	// Speicifally, this removes:
+	// - All transaction statuses
+	// - All non-accepted transactions
+	// - All UTXOs that were consumed by accepted transactions
+	//
+	// [lock] is the AVM's context lock and is assumed to be unlocked when this
+	// method is called.
+	//
 	// TODO: remove after v1.11.x is activated
 	Prune(lock sync.Locker, log logging.Logger) error
 
@@ -597,7 +606,8 @@ func (s *state) Prune(lock sync.Locker, log logging.Logger) error {
 	defer statusIter.Release()
 
 	if !statusIter.Next() {
-		// Database was already re-indexed
+		// If there are no statuses on disk, pruning was previously run and
+		// finished.
 		lock.Unlock()
 
 		log.Info("state already pruned")
@@ -611,6 +621,9 @@ func (s *state) Prune(lock sync.Locker, log logging.Logger) error {
 
 	// While we are pruning the disk, we disable caching of the data we are
 	// modifying. Caching is re-enabled when pruning finishes.
+	//
+	// Note: If an unexpected error occurs the caches may never be re-enabled.
+	// That's fine as the node is going to be in an unhealthy state regardless.
 	oldStatusCache := s.statusCache
 	oldTxCache := s.txCache
 	s.statusCache = &cache.Empty[ids.ID, *choices.Status]{}
@@ -683,6 +696,7 @@ func (s *state) Prune(lock sync.Locker, log logging.Logger) error {
 	return errs.Err
 }
 
+// Assumes [lock] is unlocked.
 func (s *state) cleanupTx(lock sync.Locker, txIDBytes []byte, statusBytes []byte, txIter database.Iterator) error {
 	// After the linearization, we write txs to disk without statuses to mark
 	// them as accepted. This means that there may be more txs than statuses and
@@ -693,6 +707,7 @@ func (s *state) cleanupTx(lock sync.Locker, txIDBytes []byte, statusBytes []byte
 	if err := skipTo(txIter, txIDBytes); err != nil {
 		return err
 	}
+	// txIter.Key() is now `txIDBytes`
 
 	statusInt, err := database.ParseUInt32(statusBytes)
 	if err != nil {
@@ -739,16 +754,16 @@ func (s *state) cleanupTx(lock sync.Locker, txIDBytes []byte, statusBytes []byte
 // skipTo advances [iter] until its key is equal to [targetKey]. If [iter] does
 // not contain [targetKey] an error will be returned.
 //
-// Note: [iter] will always have [Next()] called at least once.
+// Note: [iter.Next()] will always be called at least once.
 func skipTo(iter database.Iterator, targetKey []byte) error {
 	for {
 		if !iter.Next() {
-			return database.ErrNotFound
+			return fmt.Errorf("%w: 0x%x", database.ErrNotFound, targetKey)
 		}
 		key := iter.Key()
 		switch bytes.Compare(targetKey, key) {
 		case -1:
-			return database.ErrNotFound
+			return fmt.Errorf("%w: 0x%x", database.ErrNotFound, targetKey)
 		case 0:
 			return nil
 		}
