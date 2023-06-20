@@ -41,6 +41,10 @@ import (
 	keystoreutils "github.com/ava-labs/avalanchego/vms/components/keystore"
 )
 
+type envConfig struct {
+	isAVAXAsset bool
+}
+
 type environment struct {
 	genesisBytes  []byte
 	genesisTx     *txs.Tx
@@ -52,22 +56,21 @@ type environment struct {
 }
 
 // setup the testing environment
-func setup(t *testing.T, isAVAXAsset bool) *environment {
-	require := require.New(t)
+func setup(tb testing.TB, c *envConfig) *environment {
+	require := require.New(tb)
 
 	var (
 		genesisBytes []byte
 		issuer       chan common.Message
 		vm           *VM
 		m            *atomic.Memory
-		genesisTx    *txs.Tx
+		assetName    = "AVAX"
 	)
-	if isAVAXAsset {
-		genesisBytes, issuer, vm, m = GenesisVM(t)
-		genesisTx = GetAVAXTxFromGenesisTest(genesisBytes, t)
+	if c.isAVAXAsset {
+		genesisBytes, issuer, vm, m = GenesisVMWithArgs(tb, nil, nil)
 	} else {
-		genesisBytes, issuer, vm, m = setupTxFeeAssets(t)
-		genesisTx = GetCreateTxFromGenesisTest(t, genesisBytes, feeAssetName)
+		genesisBytes, issuer, vm, m = setupTxFeeAssets(tb)
+		assetName = feeAssetName
 	}
 
 	// Import the initially funded private keys
@@ -79,7 +82,7 @@ func setup(t *testing.T, isAVAXAsset bool) *environment {
 
 	return &environment{
 		genesisBytes: genesisBytes,
-		genesisTx:    genesisTx,
+		genesisTx:    GetCreateTxFromGenesisTest(tb, genesisBytes, assetName),
 		sharedMemory: m,
 		issuer:       issuer,
 		vm:           vm,
@@ -91,10 +94,6 @@ func setup(t *testing.T, isAVAXAsset bool) *environment {
 			pendingTxs: linkedhashmap.New[ids.ID, *txs.Tx](),
 		},
 	}
-}
-
-func GenesisVM(tb testing.TB) ([]byte, chan common.Message, *VM, *atomic.Memory) {
-	return GenesisVMWithArgs(tb, nil, nil)
 }
 
 func GenesisVMWithArgs(tb testing.TB, additionalFxs []*common.Fx, args *BuildGenesisArgs) ([]byte, chan common.Message, *VM, *atomic.Memory) {
@@ -203,7 +202,7 @@ func NewContext(tb testing.TB) *snow.Context {
 
 	genesisBytes := BuildGenesisTest(tb)
 
-	tx := GetAVAXTxFromGenesisTest(genesisBytes, tb)
+	tx := GetCreateTxFromGenesisTest(tb, genesisBytes, "AVAX")
 
 	ctx := snow.DefaultContextTest()
 	ctx.NetworkID = constants.UnitTestID
@@ -265,10 +264,6 @@ func GetCreateTxFromGenesisTest(tb testing.TB, genesisBytes []byte, assetName st
 	}
 	require.NoError(parser.InitializeGenesisTx(tx))
 	return tx
-}
-
-func GetAVAXTxFromGenesisTest(genesisBytes []byte, tb testing.TB) *txs.Tx {
-	return GetCreateTxFromGenesisTest(tb, genesisBytes, "AVAX")
 }
 
 // BuildGenesisTest is the common Genesis builder for most tests
@@ -371,14 +366,10 @@ func BuildGenesisTestWithArgs(tb testing.TB, args *BuildGenesisArgs) []byte {
 	return b
 }
 
-func NewTx(t *testing.T, genesisBytes []byte, vm *VM) *txs.Tx {
-	return NewTxWithAsset(t, genesisBytes, vm, "AVAX")
-}
+func NewTxWithAsset(tb testing.TB, genesisBytes []byte, vm *VM, assetName string) *txs.Tx {
+	require := require.New(tb)
 
-func NewTxWithAsset(t *testing.T, genesisBytes []byte, vm *VM, assetName string) *txs.Tx {
-	require := require.New(t)
-
-	createTx := GetCreateTxFromGenesisTest(t, genesisBytes, assetName)
+	createTx := GetCreateTxFromGenesisTest(tb, genesisBytes, assetName)
 
 	newTx := &txs.Tx{Unsigned: &txs.BaseTx{
 		BaseTx: avax.BaseTx{
@@ -405,13 +396,13 @@ func NewTxWithAsset(t *testing.T, genesisBytes []byte, vm *VM, assetName string)
 	return newTx
 }
 
-func setupIssueTx(t testing.TB) (chan common.Message, *VM, *snow.Context, []*txs.Tx) {
-	require := require.New(t)
+func setupIssueTx(tb testing.TB) (chan common.Message, *VM, *snow.Context, []*txs.Tx) {
+	require := require.New(tb)
 
-	genesisBytes, issuer, vm, _ := GenesisVM(t)
+	genesisBytes, issuer, vm, _ := GenesisVMWithArgs(tb, nil, nil)
 	ctx := vm.ctx
 
-	avaxTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
+	avaxTx := GetCreateTxFromGenesisTest(tb, genesisBytes, "AVAX")
 	key := keys[0]
 	firstTx := &txs.Tx{Unsigned: &txs.BaseTx{
 		BaseTx: avax.BaseTx{
@@ -501,8 +492,8 @@ var (
 // Sample from a set of addresses and return them raw and formatted as strings.
 // The size of the sample is between 1 and len(addrs)
 // If len(addrs) == 0, returns nil
-func sampleAddrs(t *testing.T, vm *VM, addrs []ids.ShortID) ([]ids.ShortID, []string) {
-	require := require.New(t)
+func sampleAddrs(tb testing.TB, vm *VM, addrs []ids.ShortID) ([]ids.ShortID, []string) {
+	require := require.New(tb)
 
 	sampledAddrs := []ids.ShortID{}
 	sampledAddrsStr := []string{}
@@ -526,7 +517,7 @@ func sampleAddrs(t *testing.T, vm *VM, addrs []ids.ShortID) ([]ids.ShortID, []st
 
 // Returns error if [numTxFees] tx fees was not deducted from the addresses in [fromAddrs]
 // relative to their starting balance
-func verifyTxFeeDeducted(t *testing.T, s *Service, fromAddrs []ids.ShortID, numTxFees int) error {
+func verifyTxFeeDeducted(tb testing.TB, s *Service, fromAddrs []ids.ShortID, numTxFees int) error {
 	totalTxFee := uint64(numTxFees) * s.vm.TxFee
 	fromAddrsStartBalance := startBalance * uint64(len(fromAddrs))
 
@@ -536,7 +527,7 @@ func verifyTxFeeDeducted(t *testing.T, s *Service, fromAddrs []ids.ShortID, numT
 
 	for _, addr := range addrs { // get balances for all addresses
 		addrStr, err := s.vm.FormatLocalAddress(addr)
-		require.NoError(t, err)
+		require.NoError(tb, err)
 		reply := &GetBalanceReply{}
 		err = s.GetBalance(nil,
 			&GetBalanceArgs{
@@ -582,5 +573,8 @@ func issueAndAccept(
 
 	txs := vm.PendingTxs(context.Background())
 	require.Len(txs, 1)
-	require.NoError(txs[0].Accept(context.Background()))
+
+	issuedTx := txs[0]
+	require.Equal(txID, issuedTx.ID())
+	require.NoError(issuedTx.Accept(context.Background()))
 }

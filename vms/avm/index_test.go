@@ -44,7 +44,7 @@ func TestIndexTransaction_Ordered(t *testing.T) {
 	issuer := make(chan common.Message, 1)
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	ctx := NewContext(t)
-	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
+	genesisTx := GetCreateTxFromGenesisTest(t, genesisBytes, "AVAX")
 	avaxID := genesisTx.ID()
 	vm := setupTestVM(t, ctx, baseDBManager, genesisBytes, issuer, indexEnabledAvmConfig)
 	defer func() {
@@ -121,7 +121,7 @@ func TestIndexTransaction_MultipleTransactions(t *testing.T) {
 	issuer := make(chan common.Message, 1)
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	ctx := NewContext(t)
-	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
+	genesisTx := GetCreateTxFromGenesisTest(t, genesisBytes, "AVAX")
 
 	avaxID := genesisTx.ID()
 	vm := setupTestVM(t, ctx, baseDBManager, genesisBytes, issuer, indexEnabledAvmConfig)
@@ -197,7 +197,7 @@ func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 	issuer := make(chan common.Message, 1)
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	ctx := NewContext(t)
-	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
+	genesisTx := GetCreateTxFromGenesisTest(t, genesisBytes, "AVAX")
 
 	avaxID := genesisTx.ID()
 	vm := setupTestVM(t, ctx, baseDBManager, genesisBytes, issuer, indexEnabledAvmConfig)
@@ -255,7 +255,7 @@ func TestIndexTransaction_UnorderedWrites(t *testing.T) {
 	issuer := make(chan common.Message, 1)
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	ctx := NewContext(t)
-	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
+	genesisTx := GetCreateTxFromGenesisTest(t, genesisBytes, "AVAX")
 	avaxID := genesisTx.ID()
 	vm := setupTestVM(t, ctx, baseDBManager, genesisBytes, issuer, indexEnabledAvmConfig)
 	defer func() {
@@ -326,7 +326,9 @@ func TestIndexTransaction_UnorderedWrites(t *testing.T) {
 func TestIndexer_Read(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, true)
+	env := setup(t, &envConfig{
+		isAVAXAsset: true,
+	})
 	defer func() {
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()

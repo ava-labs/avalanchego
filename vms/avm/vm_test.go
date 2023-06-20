@@ -130,24 +130,25 @@ func TestFxInitializationFailure(t *testing.T) {
 func TestIssueTx(t *testing.T) {
 	require := require.New(t)
 
-	genesisBytes, issuer, vm, _ := GenesisVM(t)
-	ctx := vm.ctx
+	env := setup(t, &envConfig{
+		isAVAXAsset: true,
+	})
 	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-		ctx.Lock.Unlock()
+		require.NoError(env.vm.Shutdown(context.Background()))
+		env.vm.ctx.Lock.Unlock()
 	}()
 
-	newTx := NewTx(t, genesisBytes, vm)
+	newTx := NewTxWithAsset(t, env.genesisBytes, env.vm, "AVAX")
 
-	txID, err := vm.IssueTx(newTx.Bytes())
+	txID, err := env.vm.IssueTx(newTx.Bytes())
 	require.NoError(err)
 	require.Equal(newTx.ID(), txID)
-	ctx.Lock.Unlock()
+	env.vm.ctx.Lock.Unlock()
 
-	require.Equal(common.PendingTxs, <-issuer)
-	ctx.Lock.Lock()
+	require.Equal(common.PendingTxs, <-env.issuer)
+	env.vm.ctx.Lock.Lock()
 
-	require.Len(vm.PendingTxs(context.Background()), 1)
+	require.Len(env.vm.PendingTxs(context.Background()), 1)
 }
 
 // Test issuing a transaction that consumes a currently pending UTXO. The
@@ -425,8 +426,8 @@ func TestIssueProperty(t *testing.T) {
 	issueAndAccept(require, vm, issuer, burnPropertyTx)
 }
 
-func setupTxFeeAssets(t *testing.T) ([]byte, chan common.Message, *VM, *atomic.Memory) {
-	require := require.New(t)
+func setupTxFeeAssets(tb testing.TB) ([]byte, chan common.Message, *VM, *atomic.Memory) {
+	require := require.New(tb)
 
 	addr0Str, _ := address.FormatBech32(constants.UnitTestHRP, addrs[0].Bytes())
 	addr1Str, _ := address.FormatBech32(constants.UnitTestHRP, addrs[1].Bytes())
@@ -477,7 +478,7 @@ func setupTxFeeAssets(t *testing.T) ([]byte, chan common.Message, *VM, *atomic.M
 			},
 		},
 	}
-	genesisBytes, issuer, vm, m := GenesisVMWithArgs(t, nil, customArgs)
+	genesisBytes, issuer, vm, m := GenesisVMWithArgs(tb, nil, customArgs)
 	expectedID, err := vm.Aliaser.Lookup(assetAlias)
 	require.NoError(err)
 	require.Equal(expectedID, vm.feeAssetID)
@@ -582,10 +583,12 @@ func TestIssueTxWithAnotherAsset(t *testing.T) {
 }
 
 func TestVMFormat(t *testing.T) {
-	_, _, vm, _ := GenesisVM(t)
+	env := setup(t, &envConfig{
+		isAVAXAsset: true,
+	})
 	defer func() {
-		require.NoError(t, vm.Shutdown(context.Background()))
-		vm.ctx.Lock.Unlock()
+		require.NoError(t, env.vm.Shutdown(context.Background()))
+		env.vm.ctx.Lock.Unlock()
 	}()
 
 	tests := []struct {
@@ -597,7 +600,7 @@ func TestVMFormat(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.in.String(), func(t *testing.T) {
 			require := require.New(t)
-			addrStr, err := vm.FormatLocalAddress(test.in)
+			addrStr, err := env.vm.FormatLocalAddress(test.in)
 			require.NoError(err)
 			require.Equal(test.expected, addrStr)
 		})
@@ -607,30 +610,31 @@ func TestVMFormat(t *testing.T) {
 func TestTxCached(t *testing.T) {
 	require := require.New(t)
 
-	genesisBytes, _, vm, _ := GenesisVM(t)
-	ctx := vm.ctx
+	env := setup(t, &envConfig{
+		isAVAXAsset: true,
+	})
 	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-		ctx.Lock.Unlock()
+		require.NoError(env.vm.Shutdown(context.Background()))
+		env.vm.ctx.Lock.Unlock()
 	}()
 
-	newTx := NewTx(t, genesisBytes, vm)
+	newTx := NewTxWithAsset(t, env.genesisBytes, env.vm, "AVAX")
 	txBytes := newTx.Bytes()
 
-	_, err := vm.ParseTx(context.Background(), txBytes)
+	_, err := env.vm.ParseTx(context.Background(), txBytes)
 	require.NoError(err)
 
 	registerer := prometheus.NewRegistry()
 
-	vm.metrics, err = metrics.New("", registerer)
+	env.vm.metrics, err = metrics.New("", registerer)
 	require.NoError(err)
 
 	db := memdb.New()
 	vdb := versiondb.New(db)
-	vm.state, err = states.New(vdb, vm.parser, registerer)
+	env.vm.state, err = states.New(vdb, env.vm.parser, registerer)
 	require.NoError(err)
 
-	_, err = vm.ParseTx(context.Background(), txBytes)
+	_, err = env.vm.ParseTx(context.Background(), txBytes)
 	require.NoError(err)
 
 	count, err := database.Count(vdb)
@@ -641,31 +645,32 @@ func TestTxCached(t *testing.T) {
 func TestTxNotCached(t *testing.T) {
 	require := require.New(t)
 
-	genesisBytes, _, vm, _ := GenesisVM(t)
-	ctx := vm.ctx
+	env := setup(t, &envConfig{
+		isAVAXAsset: true,
+	})
 	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-		ctx.Lock.Unlock()
+		require.NoError(env.vm.Shutdown(context.Background()))
+		env.vm.ctx.Lock.Unlock()
 	}()
 
-	newTx := NewTx(t, genesisBytes, vm)
+	newTx := NewTxWithAsset(t, env.genesisBytes, env.vm, "AVAX")
 	txBytes := newTx.Bytes()
 
-	_, err := vm.ParseTx(context.Background(), txBytes)
+	_, err := env.vm.ParseTx(context.Background(), txBytes)
 	require.NoError(err)
 
 	registerer := prometheus.NewRegistry()
-	vm.metrics, err = metrics.New("", registerer)
+	env.vm.metrics, err = metrics.New("", registerer)
 	require.NoError(err)
 
 	db := memdb.New()
 	vdb := versiondb.New(db)
-	vm.state, err = states.New(vdb, vm.parser, registerer)
+	env.vm.state, err = states.New(vdb, env.vm.parser, registerer)
 	require.NoError(err)
 
-	vm.uniqueTxs.Flush()
+	env.vm.uniqueTxs.Flush()
 
-	_, err = vm.ParseTx(context.Background(), txBytes)
+	_, err = env.vm.ParseTx(context.Background(), txBytes)
 	require.NoError(err)
 
 	count, err := database.Count(vdb)
@@ -895,7 +900,7 @@ func TestIssueImportTx(t *testing.T) {
 	ctx.SharedMemory = m.NewSharedMemory(chainID)
 	peerSharedMemory := m.NewSharedMemory(constants.PlatformChainID)
 
-	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
+	genesisTx := GetCreateTxFromGenesisTest(t, genesisBytes, "AVAX")
 
 	avaxID := genesisTx.ID()
 	platformID := ids.Empty.Prefix(0)
@@ -1067,7 +1072,7 @@ func TestForceAcceptImportTx(t *testing.T) {
 
 	key := keys[0]
 
-	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
+	genesisTx := GetCreateTxFromGenesisTest(t, genesisBytes, "AVAX")
 
 	utxoID := avax.UTXOID{
 		TxID: ids.ID{
@@ -1130,7 +1135,7 @@ func TestIssueExportTx(t *testing.T) {
 	ctx := NewContext(t)
 	ctx.SharedMemory = m.NewSharedMemory(chainID)
 
-	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
+	genesisTx := GetCreateTxFromGenesisTest(t, genesisBytes, "AVAX")
 
 	avaxID := genesisTx.ID()
 
@@ -1232,7 +1237,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	ctx := NewContext(t)
 	ctx.SharedMemory = m.NewSharedMemory(chainID)
 
-	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
+	genesisTx := GetCreateTxFromGenesisTest(t, genesisBytes, "AVAX")
 
 	avaxID := genesisTx.ID()
 	platformID := ids.Empty.Prefix(0)

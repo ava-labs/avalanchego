@@ -51,7 +51,9 @@ import (
 func TestServiceIssueTx(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, true)
+	env := setup(t, &envConfig{
+		isAVAXAsset: true,
+	})
 	defer func() {
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
@@ -62,7 +64,7 @@ func TestServiceIssueTx(t *testing.T) {
 	err := env.service.IssueTx(nil, txArgs, txReply)
 	require.ErrorIs(err, codec.ErrCantUnpackVersion)
 
-	tx := NewTx(t, env.genesisBytes, env.vm)
+	tx := NewTxWithAsset(t, env.genesisBytes, env.vm, "AVAX")
 	txArgs.Tx, err = formatting.Encode(formatting.Hex, tx.Bytes())
 	require.NoError(err)
 	txArgs.Encoding = formatting.Hex
@@ -74,7 +76,9 @@ func TestServiceIssueTx(t *testing.T) {
 func TestServiceGetTxStatus(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, true)
+	env := setup(t, &envConfig{
+		isAVAXAsset: true,
+	})
 	defer func() {
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
@@ -106,7 +110,9 @@ func TestServiceGetTxStatus(t *testing.T) {
 func TestServiceGetBalanceStrict(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, true)
+	env := setup(t, &envConfig{
+		isAVAXAsset: true,
+	})
 	defer func() {
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
@@ -251,7 +257,9 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 
 func TestServiceGetTxs(t *testing.T) {
 	require := require.New(t)
-	env := setup(t, true)
+	env := setup(t, &envConfig{
+		isAVAXAsset: true,
+	})
 	var err error
 	env.vm.addressTxsIndexer, err = index.NewIndexer(env.vm.db, env.vm.ctx.Log, "", prometheus.NewRegistry(), false)
 	require.NoError(err)
@@ -290,7 +298,9 @@ func TestServiceGetTxs(t *testing.T) {
 func TestServiceGetAllBalances(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, true)
+	env := setup(t, &envConfig{
+		isAVAXAsset: true,
+	})
 	defer func() {
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
@@ -472,7 +482,10 @@ func TestServiceGetAllBalances(t *testing.T) {
 
 func TestServiceGetTx(t *testing.T) {
 	require := require.New(t)
-	env := setup(t, true)
+
+	env := setup(t, &envConfig{
+		isAVAXAsset: true,
+	})
 	defer func() {
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
@@ -492,7 +505,9 @@ func TestServiceGetTx(t *testing.T) {
 func TestServiceGetTxJSON_BaseTx(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, true)
+	env := setup(t, &envConfig{
+		isAVAXAsset: true,
+	})
 	defer func() {
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
@@ -520,7 +535,9 @@ func TestServiceGetTxJSON_BaseTx(t *testing.T) {
 func TestServiceGetTxJSON_ExportTx(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, true)
+	env := setup(t, &envConfig{
+		isAVAXAsset: true,
+	})
 	defer func() {
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
@@ -1064,7 +1081,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 }
 
 func newAvaxBaseTxWithOutputs(t *testing.T, genesisBytes []byte, vm *VM) *txs.Tx {
-	avaxTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
+	avaxTx := GetCreateTxFromGenesisTest(t, genesisBytes, "AVAX")
 	key := keys[0]
 	tx := buildBaseTx(avaxTx, vm, key)
 	require.NoError(t, tx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
@@ -1072,7 +1089,7 @@ func newAvaxBaseTxWithOutputs(t *testing.T, genesisBytes []byte, vm *VM) *txs.Tx
 }
 
 func newAvaxExportTxWithOutputs(t *testing.T, genesisBytes []byte, vm *VM) *txs.Tx {
-	avaxTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
+	avaxTx := GetCreateTxFromGenesisTest(t, genesisBytes, "AVAX")
 	key := keys[0]
 	tx := buildExportTx(avaxTx, vm, key)
 	require.NoError(t, tx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
@@ -1306,7 +1323,9 @@ func buildOperationTxWithOp(op ...*txs.Operation) *txs.Tx {
 func TestServiceGetNilTx(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, true)
+	env := setup(t, &envConfig{
+		isAVAXAsset: true,
+	})
 	defer func() {
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
@@ -1320,7 +1339,9 @@ func TestServiceGetNilTx(t *testing.T) {
 func TestServiceGetUnknownTx(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, true)
+	env := setup(t, &envConfig{
+		isAVAXAsset: true,
+	})
 	defer func() {
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
@@ -1332,7 +1353,9 @@ func TestServiceGetUnknownTx(t *testing.T) {
 }
 
 func TestServiceGetUTXOs(t *testing.T) {
-	env := setup(t, true)
+	env := setup(t, &envConfig{
+		isAVAXAsset: true,
+	})
 	defer func() {
 		require.NoError(t, env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
@@ -1584,7 +1607,9 @@ func TestServiceGetUTXOs(t *testing.T) {
 func TestGetAssetDescription(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, true)
+	env := setup(t, &envConfig{
+		isAVAXAsset: true,
+	})
 	defer func() {
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
@@ -1604,7 +1629,9 @@ func TestGetAssetDescription(t *testing.T) {
 func TestGetBalance(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, true)
+	env := setup(t, &envConfig{
+		isAVAXAsset: true,
+	})
 	defer func() {
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
@@ -1627,7 +1654,10 @@ func TestCreateFixedCapAsset(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			require := require.New(t)
-			env := setup(t, tc.avaxAsset)
+
+			env := setup(t, &envConfig{
+				isAVAXAsset: tc.avaxAsset,
+			})
 			defer func() {
 				require.NoError(env.vm.Shutdown(context.Background()))
 				env.vm.ctx.Lock.Unlock()
@@ -1667,7 +1697,10 @@ func TestCreateVariableCapAsset(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			require := require.New(t)
-			env := setup(t, tc.avaxAsset)
+
+			env := setup(t, &envConfig{
+				isAVAXAsset: tc.avaxAsset,
+			})
 			defer func() {
 				require.NoError(env.vm.Shutdown(context.Background()))
 				env.vm.ctx.Lock.Unlock()
@@ -1761,7 +1794,10 @@ func TestNFTWorkflow(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			require := require.New(t)
-			env := setup(t, tc.avaxAsset)
+
+			env := setup(t, &envConfig{
+				isAVAXAsset: tc.avaxAsset,
+			})
 			defer func() {
 				require.NoError(env.vm.Shutdown(context.Background()))
 				env.vm.ctx.Lock.Unlock()
@@ -1860,7 +1896,9 @@ func TestNFTWorkflow(t *testing.T) {
 func TestImportExportKey(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, true)
+	env := setup(t, &envConfig{
+		isAVAXAsset: true,
+	})
 	defer func() {
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
@@ -1897,7 +1935,9 @@ func TestImportExportKey(t *testing.T) {
 func TestImportAVMKeyNoDuplicates(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, true)
+	env := setup(t, &envConfig{
+		isAVAXAsset: true,
+	})
 	defer func() {
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
@@ -2036,7 +2076,9 @@ func TestImportAVMKeyNoDuplicates(t *testing.T) {
 func TestCreateAndListAddresses(t *testing.T) {
 	require := require.New(t)
 
-	env := setup(t, true)
+	env := setup(t, &envConfig{
+		isAVAXAsset: true,
+	})
 	defer func() {
 		require.NoError(env.vm.Shutdown(context.Background()))
 		env.vm.ctx.Lock.Unlock()
@@ -2066,7 +2108,10 @@ func TestImport(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			require := require.New(t)
-			env := setup(t, tc.avaxAsset)
+
+			env := setup(t, &envConfig{
+				isAVAXAsset: tc.avaxAsset,
+			})
 			defer func() {
 				require.NoError(env.vm.Shutdown(context.Background()))
 				env.vm.ctx.Lock.Unlock()
