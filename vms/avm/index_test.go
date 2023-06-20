@@ -326,12 +326,10 @@ func TestIndexTransaction_UnorderedWrites(t *testing.T) {
 func TestIndexer_Read(t *testing.T) {
 	require := require.New(t)
 
-	// setup vm, db etc
-	_, vm, _, _, _ := setup(t, true)
-
+	env := setup(t, true)
 	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-		vm.ctx.Lock.Unlock()
+		require.NoError(env.vm.Shutdown(context.Background()))
+		env.vm.ctx.Lock.Unlock()
 	}()
 
 	// generate test address and asset IDs
@@ -340,14 +338,16 @@ func TestIndexer_Read(t *testing.T) {
 
 	// setup some fake txs under the above generated address and asset IDs
 	testTxCount := 25
-	testTxs := setupTestTxsInDB(t, vm.db, addr, assetID, testTxCount)
+	testTxs := setupTestTxsInDB(t, env.vm.db, addr, assetID, testTxCount)
 	require.Len(testTxs, 25)
 
 	// read the pages, 5 items at a time
-	var cursor uint64
-	var pageSize uint64 = 5
+	var (
+		cursor   uint64
+		pageSize uint64 = 5
+	)
 	for cursor < 25 {
-		txIDs, err := vm.addressTxsIndexer.Read(addr[:], assetID, cursor, pageSize)
+		txIDs, err := env.vm.addressTxsIndexer.Read(addr[:], assetID, cursor, pageSize)
 		require.NoError(err)
 		require.Len(txIDs, 5)
 		require.Equal(txIDs, testTxs[cursor:cursor+pageSize])

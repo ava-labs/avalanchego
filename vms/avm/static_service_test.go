@@ -22,8 +22,6 @@ var addrStrArray = []string{
 	"Jz9ayEDt7dx9hDx45aXALujWmL9ZUuqe7",
 }
 
-var testHRP = constants.NetworkIDToHRP[constants.UnitTestID]
-
 func TestBuildGenesis(t *testing.T) {
 	require := require.New(t)
 
@@ -32,7 +30,7 @@ func TestBuildGenesis(t *testing.T) {
 	for _, addrStr := range addrStrArray {
 		addr, err := ids.ShortFromString(addrStr)
 		require.NoError(err)
-		addrMap[addrStr], err = address.FormatBech32(testHRP, addr[:])
+		addrMap[addrStr], err = address.FormatBech32(constants.UnitTestHRP, addr[:])
 		require.NoError(err)
 	}
 	args := BuildGenesisArgs{

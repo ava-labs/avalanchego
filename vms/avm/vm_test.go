@@ -5,7 +5,6 @@ package avm
 
 import (
 	"context"
-	"errors"
 	"math"
 	"testing"
 
@@ -15,7 +14,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
@@ -26,15 +24,12 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/cb58"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/version"
-	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/avm/metrics"
 	"github.com/ava-labs/avalanchego/vms/avm/states"
@@ -45,389 +40,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
-
-var (
-	chainID      = ids.ID{5, 4, 3, 2, 1}
-	testTxFee    = uint64(1000)
-	startBalance = uint64(50000)
-
-	keys  []*secp256k1.PrivateKey
-	addrs []ids.ShortID // addrs[i] corresponds to keys[i]
-
-	assetID        = ids.ID{1, 2, 3}
-	username       = "bobby"
-	password       = "StrnasfqewiurPasswdn56d" // #nosec G101
-	feeAssetName   = "TEST"
-	otherAssetName = "OTHER"
-
-	errMissing = errors.New("missing")
-)
-
-func init() {
-	factory := secp256k1.Factory{}
-
-	for _, key := range []string{
-		"24jUJ9vZexUM6expyMcT48LBx27k1m7xpraoV62oSQAHdziao5",
-		"2MMvUMsxx6zsHSNXJdFD8yc5XkancvwyKPwpw4xUK3TCGDuNBY",
-		"cxb7KpGWhDMALTjNNSJ7UQkkomPesyWAPUaWRGdyeBNzR6f35",
-	} {
-		keyBytes, _ := cb58.Decode(key)
-		pk, _ := factory.ToPrivateKey(keyBytes)
-		keys = append(keys, pk)
-		addrs = append(addrs, pk.PublicKey().Address())
-	}
-}
-
-func NewContext(tb testing.TB) *snow.Context {
-	require := require.New(tb)
-
-	genesisBytes := BuildGenesisTest(tb)
-
-	tx := GetAVAXTxFromGenesisTest(genesisBytes, tb)
-
-	ctx := snow.DefaultContextTest()
-	ctx.NetworkID = constants.UnitTestID
-	ctx.ChainID = chainID
-	ctx.AVAXAssetID = tx.ID()
-	ctx.XChainID = ids.Empty.Prefix(0)
-	ctx.CChainID = ids.Empty.Prefix(1)
-	aliaser := ctx.BCLookup.(ids.Aliaser)
-
-	require.NoError(aliaser.Alias(chainID, "X"))
-	require.NoError(aliaser.Alias(chainID, chainID.String()))
-	require.NoError(aliaser.Alias(constants.PlatformChainID, "P"))
-	require.NoError(aliaser.Alias(constants.PlatformChainID, constants.PlatformChainID.String()))
-
-	ctx.ValidatorState = &validators.TestState{
-		GetSubnetIDF: func(_ context.Context, chainID ids.ID) (ids.ID, error) {
-			subnetID, ok := map[ids.ID]ids.ID{
-				constants.PlatformChainID: ctx.SubnetID,
-				chainID:                   ctx.SubnetID,
-			}[chainID]
-			if !ok {
-				return ids.Empty, errMissing
-			}
-			return subnetID, nil
-		},
-	}
-	return ctx
-}
-
-// Returns:
-//
-//  1. tx in genesis that creates asset
-//  2. the index of the output
-func GetCreateTxFromGenesisTest(tb testing.TB, genesisBytes []byte, assetName string) *txs.Tx {
-	require := require.New(tb)
-	parser, err := txs.NewParser([]fxs.Fx{
-		&secp256k1fx.Fx{},
-	})
-	require.NoError(err)
-
-	cm := parser.GenesisCodec()
-	genesis := Genesis{}
-	_, err = cm.Unmarshal(genesisBytes, &genesis)
-	require.NoError(err)
-
-	require.NotEmpty(genesis.Txs)
-
-	var assetTx *GenesisAsset
-	for _, tx := range genesis.Txs {
-		if tx.Name == assetName {
-			assetTx = tx
-			break
-		}
-	}
-	require.NotNil(assetTx)
-
-	tx := &txs.Tx{
-		Unsigned: &assetTx.CreateAssetTx,
-	}
-	require.NoError(parser.InitializeGenesisTx(tx))
-	return tx
-}
-
-func GetAVAXTxFromGenesisTest(genesisBytes []byte, tb testing.TB) *txs.Tx {
-	return GetCreateTxFromGenesisTest(tb, genesisBytes, "AVAX")
-}
-
-// BuildGenesisTest is the common Genesis builder for most tests
-func BuildGenesisTest(tb testing.TB) []byte {
-	addr0Str, _ := address.FormatBech32(testHRP, addrs[0].Bytes())
-	addr1Str, _ := address.FormatBech32(testHRP, addrs[1].Bytes())
-	addr2Str, _ := address.FormatBech32(testHRP, addrs[2].Bytes())
-
-	defaultArgs := &BuildGenesisArgs{
-		Encoding: formatting.Hex,
-		GenesisData: map[string]AssetDefinition{
-			"asset1": {
-				Name:   "AVAX",
-				Symbol: "SYMB",
-				InitialState: map[string][]interface{}{
-					"fixedCap": {
-						Holder{
-							Amount:  json.Uint64(startBalance),
-							Address: addr0Str,
-						},
-						Holder{
-							Amount:  json.Uint64(startBalance),
-							Address: addr1Str,
-						},
-						Holder{
-							Amount:  json.Uint64(startBalance),
-							Address: addr2Str,
-						},
-					},
-				},
-			},
-			"asset2": {
-				Name:   "myVarCapAsset",
-				Symbol: "MVCA",
-				InitialState: map[string][]interface{}{
-					"variableCap": {
-						Owners{
-							Threshold: 1,
-							Minters: []string{
-								addr0Str,
-								addr1Str,
-							},
-						},
-						Owners{
-							Threshold: 2,
-							Minters: []string{
-								addr0Str,
-								addr1Str,
-								addr2Str,
-							},
-						},
-					},
-				},
-			},
-			"asset3": {
-				Name: "myOtherVarCapAsset",
-				InitialState: map[string][]interface{}{
-					"variableCap": {
-						Owners{
-							Threshold: 1,
-							Minters: []string{
-								addr0Str,
-							},
-						},
-					},
-				},
-			},
-			"asset4": {
-				Name: "myFixedCapAsset",
-				InitialState: map[string][]interface{}{
-					"fixedCap": {
-						Holder{
-							Amount:  json.Uint64(startBalance),
-							Address: addr0Str,
-						},
-						Holder{
-							Amount:  json.Uint64(startBalance),
-							Address: addr1Str,
-						},
-					},
-				},
-			},
-		},
-	}
-
-	return BuildGenesisTestWithArgs(tb, defaultArgs)
-}
-
-// BuildGenesisTestWithArgs allows building the genesis while injecting different starting points (args)
-func BuildGenesisTestWithArgs(tb testing.TB, args *BuildGenesisArgs) []byte {
-	require := require.New(tb)
-
-	ss := CreateStaticService()
-
-	reply := BuildGenesisReply{}
-	require.NoError(ss.BuildGenesis(nil, args, &reply))
-
-	b, err := formatting.Decode(reply.Encoding, reply.Bytes)
-	require.NoError(err)
-	return b
-}
-
-func GenesisVM(tb testing.TB) ([]byte, chan common.Message, *VM, *atomic.Memory) {
-	return GenesisVMWithArgs(tb, nil, nil)
-}
-
-func GenesisVMWithArgs(tb testing.TB, additionalFxs []*common.Fx, args *BuildGenesisArgs) ([]byte, chan common.Message, *VM, *atomic.Memory) {
-	require := require.New(tb)
-
-	var genesisBytes []byte
-
-	if args != nil {
-		genesisBytes = BuildGenesisTestWithArgs(tb, args)
-	} else {
-		genesisBytes = BuildGenesisTest(tb)
-	}
-
-	ctx := NewContext(tb)
-
-	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
-
-	m := atomic.NewMemory(prefixdb.New([]byte{0}, baseDBManager.Current().Database))
-	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
-
-	// NB: this lock is intentionally left locked when this function returns.
-	// The caller of this function is responsible for unlocking.
-	ctx.Lock.Lock()
-
-	userKeystore, err := keystore.CreateTestKeystore()
-	require.NoError(err)
-	require.NoError(userKeystore.CreateUser(username, password))
-	ctx.Keystore = userKeystore.NewBlockchainKeyStore(ctx.ChainID)
-
-	issuer := make(chan common.Message, 1)
-	vm := &VM{Config: config.Config{
-		TxFee:            testTxFee,
-		CreateAssetTxFee: testTxFee,
-	}}
-	configBytes, err := stdjson.Marshal(Config{IndexTransactions: true})
-	require.NoError(err)
-	require.NoError(vm.Initialize(
-		context.Background(),
-		ctx,
-		baseDBManager.NewPrefixDBManager([]byte{1}),
-		genesisBytes,
-		nil,
-		configBytes,
-		issuer,
-		append(
-			[]*common.Fx{
-				{
-					ID: ids.Empty,
-					Fx: &secp256k1fx.Fx{},
-				},
-				{
-					ID: nftfx.ID,
-					Fx: &nftfx.Fx{},
-				},
-			},
-			additionalFxs...,
-		),
-		nil,
-	))
-
-	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
-	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
-
-	return genesisBytes, issuer, vm, m
-}
-
-func NewTx(t *testing.T, genesisBytes []byte, vm *VM) *txs.Tx {
-	return NewTxWithAsset(t, genesisBytes, vm, "AVAX")
-}
-
-func NewTxWithAsset(t *testing.T, genesisBytes []byte, vm *VM, assetName string) *txs.Tx {
-	require := require.New(t)
-
-	createTx := GetCreateTxFromGenesisTest(t, genesisBytes, assetName)
-
-	newTx := &txs.Tx{Unsigned: &txs.BaseTx{
-		BaseTx: avax.BaseTx{
-			NetworkID:    constants.UnitTestID,
-			BlockchainID: chainID,
-			Ins: []*avax.TransferableInput{{
-				UTXOID: avax.UTXOID{
-					TxID:        createTx.ID(),
-					OutputIndex: 2,
-				},
-				Asset: avax.Asset{ID: createTx.ID()},
-				In: &secp256k1fx.TransferInput{
-					Amt: startBalance,
-					Input: secp256k1fx.Input{
-						SigIndices: []uint32{
-							0,
-						},
-					},
-				},
-			}},
-		},
-	}}
-	require.NoError(newTx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0]}}))
-	return newTx
-}
-
-func setupIssueTx(t testing.TB) (chan common.Message, *VM, *snow.Context, []*txs.Tx) {
-	require := require.New(t)
-
-	genesisBytes, issuer, vm, _ := GenesisVM(t)
-	ctx := vm.ctx
-
-	avaxTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
-	key := keys[0]
-	firstTx := &txs.Tx{Unsigned: &txs.BaseTx{
-		BaseTx: avax.BaseTx{
-			NetworkID:    constants.UnitTestID,
-			BlockchainID: chainID,
-			Ins: []*avax.TransferableInput{{
-				UTXOID: avax.UTXOID{
-					TxID:        avaxTx.ID(),
-					OutputIndex: 2,
-				},
-				Asset: avax.Asset{ID: avaxTx.ID()},
-				In: &secp256k1fx.TransferInput{
-					Amt: startBalance,
-					Input: secp256k1fx.Input{
-						SigIndices: []uint32{
-							0,
-						},
-					},
-				},
-			}},
-			Outs: []*avax.TransferableOutput{{
-				Asset: avax.Asset{ID: avaxTx.ID()},
-				Out: &secp256k1fx.TransferOutput{
-					Amt: startBalance - vm.TxFee,
-					OutputOwners: secp256k1fx.OutputOwners{
-						Threshold: 1,
-						Addrs:     []ids.ShortID{key.PublicKey().Address()},
-					},
-				},
-			}},
-		},
-	}}
-	require.NoError(firstTx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
-
-	secondTx := &txs.Tx{Unsigned: &txs.BaseTx{
-		BaseTx: avax.BaseTx{
-			NetworkID:    constants.UnitTestID,
-			BlockchainID: chainID,
-			Ins: []*avax.TransferableInput{{
-				UTXOID: avax.UTXOID{
-					TxID:        avaxTx.ID(),
-					OutputIndex: 2,
-				},
-				Asset: avax.Asset{ID: avaxTx.ID()},
-				In: &secp256k1fx.TransferInput{
-					Amt: startBalance,
-					Input: secp256k1fx.Input{
-						SigIndices: []uint32{
-							0,
-						},
-					},
-				},
-			}},
-			Outs: []*avax.TransferableOutput{{
-				Asset: avax.Asset{ID: avaxTx.ID()},
-				Out: &secp256k1fx.TransferOutput{
-					Amt: 1,
-					OutputOwners: secp256k1fx.OutputOwners{
-						Threshold: 1,
-						Addrs:     []ids.ShortID{key.PublicKey().Address()},
-					},
-				},
-			}},
-		},
-	}}
-	require.NoError(secondTx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
-	return issuer, vm, ctx, []*txs.Tx{avaxTx, firstTx, secondTx}
-}
 
 func TestInvalidGenesis(t *testing.T) {
 	require := require.New(t)
@@ -816,9 +428,9 @@ func TestIssueProperty(t *testing.T) {
 func setupTxFeeAssets(t *testing.T) ([]byte, chan common.Message, *VM, *atomic.Memory) {
 	require := require.New(t)
 
-	addr0Str, _ := address.FormatBech32(testHRP, addrs[0].Bytes())
-	addr1Str, _ := address.FormatBech32(testHRP, addrs[1].Bytes())
-	addr2Str, _ := address.FormatBech32(testHRP, addrs[2].Bytes())
+	addr0Str, _ := address.FormatBech32(constants.UnitTestHRP, addrs[0].Bytes())
+	addr1Str, _ := address.FormatBech32(constants.UnitTestHRP, addrs[1].Bytes())
+	addr2Str, _ := address.FormatBech32(constants.UnitTestHRP, addrs[2].Bytes())
 	assetAlias := "asset1"
 	customArgs := &BuildGenesisArgs{
 		Encoding: formatting.Hex,
