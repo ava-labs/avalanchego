@@ -8,7 +8,7 @@ permissions:
   contents: read
 
 jobs:
-  test_e2e:
+  fuzz:
     runs-on: ubuntu-latest
     steps:
       - name: Git checkout
