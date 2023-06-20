@@ -152,7 +152,7 @@ func (vm *VM) Initialize(
 	genesisBytes []byte,
 	_ []byte,
 	configBytes []byte,
-	toEngine chan<- common.Message,
+	_ chan<- common.Message,
 	fxs []*common.Fx,
 	appSender common.AppSender,
 ) error {
@@ -454,7 +454,7 @@ func (vm *VM) Linearize(_ context.Context, stopVertexID ids.ID, toEngine chan<- 
 	return nil
 }
 
-func (vm *VM) PendingTxs(context.Context) []snowstorm.Tx {
+func (*VM) PendingTxs(context.Context) []snowstorm.Tx {
 	return nil
 }
 
