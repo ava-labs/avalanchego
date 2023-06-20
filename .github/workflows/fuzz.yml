@@ -3,8 +3,6 @@ name: Run fuzz tests
 on:
   schedule:
     - cron: "0 0 * * *"
-      branches:
-        - dev
 
 permissions:
   contents: read
@@ -15,6 +13,8 @@ jobs:
     steps:
       - name: Git checkout
         uses: actions/checkout@v3
+        with:
+          ref: 'dev'
       - name: Set up Go
         uses: actions/setup-go@v3
         with:
