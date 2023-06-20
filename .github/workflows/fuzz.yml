@@ -3,6 +3,8 @@ name: Run fuzz tests
 on:
   schedule:
     - cron: "0 0 * * *"
+      branches:
+        - dev
 
 permissions:
   contents: read
