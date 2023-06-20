@@ -324,14 +324,19 @@ func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
 	return nil
 }
 
-// ClearPrefix removes all keys in db that begin with prefix
-func ClearPrefix(db ethdb.KeyValueStore, prefix []byte) error {
+// ClearPrefix removes all keys in db that begin with prefix and match an
+// expected key length. [keyLen] should include the length of the prefix.
+func ClearPrefix(db ethdb.KeyValueStore, prefix []byte, keyLen int) error {
 	it := db.NewIterator(prefix, nil)
 	defer it.Release()
 
 	batch := db.NewBatch()
 	for it.Next() {
 		key := common.CopyBytes(it.Key())
+		if len(key) != keyLen {
+			// avoid deleting keys that do not match the expected length
+			continue
+		}
 		if err := batch.Delete(key); err != nil {
 			return err
 		}
