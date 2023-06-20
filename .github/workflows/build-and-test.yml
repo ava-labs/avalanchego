@@ -22,19 +22,14 @@ jobs:
         with:
           go-version: '~1.19.6'
           check-latest: true
-      - name: Set AVALANCHE_PATH # TODO remove?
-        if: matrix.os[0] == 'self-hosted' && matrix.os[3] == 'jammy'
-        run: |
-          echo "AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd ../.. && pwd )" >> $GITHUB_ENV
-      - name: fuzz_test
-        shell: bash
-        if: matrix.os[0] == 'self-hosted' && matrix.os[3] == 'jammy'
-        run: |
-          cd ${{ github.workspace }}
-          ./scripts/build_fuzz.sh
         env:
           AVALANCHE_PATH: ${{ env.AVALANCHE_PATH}}
       - name: build_test
         shell: bash
         run: .github/workflows/build_and_test.sh
-
+      - name: fuzz_test
+        shell: bash
+        if: matrix.os[0] == 'self-hosted' && matrix.os[3] == 'jammy' # Only run on self-hosted jammy
+        run: | # Run each fuzz test 10 seconds
+          cd ${{ github.workspace }}
+          ./scripts/build_fuzz.sh 10
