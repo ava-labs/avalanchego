@@ -1717,6 +1717,7 @@ func TestRangeProofInvariants(t *testing.T) {
 			if len(rangeProof.KeyValues) == 0 {
 				if len(rangeProof.StartProof) == 0 {
 					require.Len(rangeProof.EndProof, 1) // Just the root
+					require.Empty(rangeProof.EndProof[0].KeyPath)
 				} else {
 					require.Empty(rangeProof.EndProof)
 				}
