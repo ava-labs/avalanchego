@@ -1063,12 +1063,31 @@ func (db *merkleDB) VerifyChangeProof(
 		}
 	}
 
-	// For all the nodes along the edges of the proof, insert children < [start] and > [largestKey]
+	// For all the nodes along the edges of the proof, insert children
+	// < [insertChildrenLessThan] and > [insertChildrenGreaterThan]
 	// into the trie so that we get the expected root ID (if this proof is valid).
-	if err := addPathInfo(view, proof.StartProof, Some(smallestPath), Some(largestPath)); err != nil {
+	insertChildrenGreaterThan := Nothing[path]()
+	if len(largestKey) > 0 {
+		insertChildrenGreaterThan = Some(largestPath)
+	}
+	insertChildrenLessThan := Nothing[path]()
+	if len(start) > 0 {
+		insertChildrenLessThan = Some(smallestPath)
+	}
+	if err := addPathInfo(
+		view,
+		proof.StartProof,
+		insertChildrenLessThan,
+		insertChildrenGreaterThan,
+	); err != nil {
 		return err
 	}
-	if err := addPathInfo(view, proof.EndProof, Some(smallestPath), Some(largestPath)); err != nil {
+	if err := addPathInfo(
+		view,
+		proof.EndProof,
+		insertChildrenLessThan,
+		insertChildrenGreaterThan,
+	); err != nil {
 		return err
 	}
 

@@ -305,12 +305,12 @@ func (proof *RangeProof) Verify(
 		return err
 	}
 
-	largestkey := end
+	largestKey := end
 	if len(proof.KeyValues) > 0 {
 		// If [proof] has key-value pairs, we should insert children
-		// greater than [end] to ancestors of the node containing [end]
-		// so that we get the expected root ID.
-		largestkey = proof.KeyValues[len(proof.KeyValues)-1].Key
+		// greater than [largestKey] to ancestors of the node containing
+		// [largestKey] so that we get the expected root ID.
+		largestKey = proof.KeyValues[len(proof.KeyValues)-1].Key
 	}
 
 	// The key-value pairs (allegedly) proven by [proof].
@@ -320,7 +320,7 @@ func (proof *RangeProof) Verify(
 	}
 
 	smallestPath := newPath(start)
-	largestPath := newPath(largestkey)
+	largestPath := newPath(largestKey)
 
 	// Ensure that the start proof is valid and contains values that
 	// match the key/values that were sent.
@@ -353,19 +353,34 @@ func (proof *RangeProof) Verify(
 		}
 	}
 
-	// For all the nodes along the edges of the proof, insert children < [start] and > [end]
+	// For all the nodes along the edges of the proof, insert children
+	// < [insertChildrenLessThan] and > [insertChildrenGreaterThan]
 	// into the trie so that we get the expected root ID (if this proof is valid).
-	// By inserting all children < [start], we prove that there are no keys
-	// > [start] but less than the first key given. That is, the peer who
-	// gave us this proof is not omitting nodes.
-	upperBound := Nothing[path]()
-	if len(end) > 0 {
-		upperBound = Some(largestPath)
+	// By inserting all children < [insertChildrenLessThan], we prove that there are no keys
+	// > [insertChildrenLessThan] but less than the first key given.
+	// That is, the peer who gave us this proof is not omitting nodes.
+	insertChildrenGreaterThan := Nothing[path]()
+	if len(largestKey) > 0 {
+		insertChildrenGreaterThan = Some(largestPath)
 	}
-	if err := addPathInfo(view, proof.StartProof, Some(smallestPath), upperBound); err != nil {
+	insertChildrenLessThan := Nothing[path]()
+	if len(start) > 0 {
+		insertChildrenLessThan = Some(smallestPath)
+	}
+	if err := addPathInfo(
+		view,
+		proof.StartProof,
+		insertChildrenLessThan,
+		insertChildrenGreaterThan,
+	); err != nil {
 		return err
 	}
-	if err := addPathInfo(view, proof.EndProof, Some(smallestPath), upperBound); err != nil {
+	if err := addPathInfo(
+		view,
+		proof.EndProof,
+		insertChildrenLessThan,
+		insertChildrenGreaterThan,
+	); err != nil {
 		return err
 	}
 
@@ -737,19 +752,20 @@ func valueOrHashMatches(value Maybe[[]byte], valueOrHash Maybe[[]byte]) bool {
 }
 
 // Adds each key/value pair in [proofPath] to [t].
-// For each proof node, adds the children that are < [lowerBound] or > [upperBound].
-// If [lowerBound] is empty, no children are < [lowerBound].
-// If [upperBound] is empty, no children are > [upperBound].
+// For each proof node, adds the children that are
+// < [insertChildrenLessThan] or > [insertChildrenGreaterThan].
+// If [insertChildrenLessThan] is Nothing, no children are < [insertChildrenLessThan].
+// If [insertChildrenGreaterThan] is Nothing, no children are > [insertChildrenGreaterThan].
 // Assumes [t.lock] is held.
 func addPathInfo(
 	t *trieView,
 	proofPath []ProofNode,
-	lowerBound Maybe[path],
-	upperBound Maybe[path],
+	insertChildrenLessThan Maybe[path],
+	insertChildrenGreaterThan Maybe[path],
 ) error {
 	var (
-		hasLowerBound = lowerBound.hasValue
-		hasUpperBound = upperBound.hasValue
+		shouldInsertLeftChildren  = insertChildrenLessThan.hasValue
+		shouldInsertRightChildren = insertChildrenGreaterThan.hasValue
 	)
 
 	for i := len(proofPath) - 1; i >= 0; i-- {
@@ -771,21 +787,22 @@ func addPathInfo(
 		// node because we may not know the pre-image of the valueDigest.
 		n.valueDigest = proofNode.ValueOrHash
 
-		if !hasLowerBound && !hasUpperBound {
+		if !shouldInsertLeftChildren && !shouldInsertRightChildren {
 			// No children of proof nodes are outside the range.
 			// No need to add any children to [n].
 			continue
 		}
 
-		// Add [proofNode]'s children which are outside the range [start, end].
+		// Add [proofNode]'s children which are outside the range
+		// [insertChildrenLessThan, insertChildrenGreaterThan].
 		compressedPath := EmptyPath
 		for index, childID := range proofNode.Children {
 			if existingChild, ok := n.children[index]; ok {
 				compressedPath = existingChild.compressedPath
 			}
 			childPath := keyPath.Append(index) + compressedPath
-			if (hasLowerBound && childPath.Compare(lowerBound.value) < 0) ||
-				(hasUpperBound && childPath.Compare(upperBound.value) > 0) {
+			if (shouldInsertLeftChildren && childPath.Compare(insertChildrenLessThan.value) < 0) ||
+				(shouldInsertRightChildren && childPath.Compare(insertChildrenGreaterThan.value) > 0) {
 				n.addChildWithoutNode(index, compressedPath, childID)
 			}
 		}
