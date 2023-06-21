@@ -41,6 +41,16 @@ import (
 	keystoreutils "github.com/ava-labs/avalanchego/vms/components/keystore"
 )
 
+const (
+	testTxFee    uint64 = 1000
+	startBalance uint64 = 50000
+
+	username       = "bobby"
+	password       = "StrnasfqewiurPasswdn56d" //#nosec G101
+	feeAssetName   = "TEST"
+	otherAssetName = "OTHER"
+)
+
 var (
 	testChangeAddr = ids.GenerateTestShortID()
 	testCases      = []struct {
@@ -56,21 +66,12 @@ var (
 			avaxAsset: false,
 		},
 	}
-)
 
-var (
-	chainID      = ids.ID{5, 4, 3, 2, 1}
-	testTxFee    = uint64(1000)
-	startBalance = uint64(50000)
+	chainID = ids.ID{5, 4, 3, 2, 1}
+	assetID = ids.ID{1, 2, 3}
 
 	keys  []*secp256k1.PrivateKey
 	addrs []ids.ShortID // addrs[i] corresponds to keys[i]
-
-	assetID        = ids.ID{1, 2, 3}
-	username       = "bobby"
-	password       = "StrnasfqewiurPasswdn56d" // #nosec G101
-	feeAssetName   = "TEST"
-	otherAssetName = "OTHER"
 
 	errMissing = errors.New("missing")
 )
