@@ -40,7 +40,7 @@ func TestInvalidGenesis(t *testing.T) {
 	require := require.New(t)
 
 	vm := &VM{}
-	ctx := NewContext(t)
+	ctx := newContext(t)
 	ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -65,14 +65,14 @@ func TestInvalidFx(t *testing.T) {
 	require := require.New(t)
 
 	vm := &VM{}
-	ctx := NewContext(t)
+	ctx := newContext(t)
 	ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 		ctx.Lock.Unlock()
 	}()
 
-	genesisBytes := BuildGenesisTest(t)
+	genesisBytes := buildGenesisTest(t)
 	err := vm.Initialize(
 		context.Background(),
 		ctx,                                     // context
@@ -93,14 +93,14 @@ func TestFxInitializationFailure(t *testing.T) {
 	require := require.New(t)
 
 	vm := &VM{}
-	ctx := NewContext(t)
+	ctx := newContext(t)
 	ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 		ctx.Lock.Unlock()
 	}()
 
-	genesisBytes := BuildGenesisTest(t)
+	genesisBytes := buildGenesisTest(t)
 	err := vm.Initialize(
 		context.Background(),
 		ctx,                                     // context
@@ -131,7 +131,7 @@ func TestIssueTx(t *testing.T) {
 		env.vm.ctx.Lock.Unlock()
 	}()
 
-	tx := NewTxWithAsset(t, env.genesisBytes, env.vm, "AVAX")
+	tx := newTx(t, env.genesisBytes, env.vm, "AVAX")
 	issueAndAccept(require, env.vm, env.issuer, tx)
 }
 
@@ -336,7 +336,7 @@ func TestIssueTxWithFeeAsset(t *testing.T) {
 	}()
 
 	// send first asset
-	tx := NewTxWithAsset(t, env.genesisBytes, env.vm, feeAssetName)
+	tx := newTx(t, env.genesisBytes, env.vm, feeAssetName)
 	issueAndAccept(require, env.vm, env.issuer, tx)
 }
 
@@ -352,8 +352,8 @@ func TestIssueTxWithAnotherAsset(t *testing.T) {
 	}()
 
 	// send second asset
-	feeAssetCreateTx := GetCreateTxFromGenesisTest(t, env.genesisBytes, feeAssetName)
-	createTx := GetCreateTxFromGenesisTest(t, env.genesisBytes, otherAssetName)
+	feeAssetCreateTx := getCreateTxFromGenesisTest(t, env.genesisBytes, feeAssetName)
+	createTx := getCreateTxFromGenesisTest(t, env.genesisBytes, otherAssetName)
 
 	tx := &txs.Tx{Unsigned: &txs.BaseTx{
 		BaseTx: avax.BaseTx{
@@ -435,7 +435,7 @@ func TestTxCached(t *testing.T) {
 		env.vm.ctx.Lock.Unlock()
 	}()
 
-	newTx := NewTxWithAsset(t, env.genesisBytes, env.vm, "AVAX")
+	newTx := newTx(t, env.genesisBytes, env.vm, "AVAX")
 	txBytes := newTx.Bytes()
 
 	_, err := env.vm.ParseTx(context.Background(), txBytes)
@@ -468,7 +468,7 @@ func TestTxNotCached(t *testing.T) {
 		env.vm.ctx.Lock.Unlock()
 	}()
 
-	newTx := NewTxWithAsset(t, env.genesisBytes, env.vm, "AVAX")
+	newTx := newTx(t, env.genesisBytes, env.vm, "AVAX")
 	txBytes := newTx.Bytes()
 
 	_, err := env.vm.ParseTx(context.Background(), txBytes)
@@ -691,7 +691,7 @@ func TestIssueImportTx(t *testing.T) {
 
 	peerSharedMemory := env.sharedMemory.NewSharedMemory(constants.PlatformChainID)
 
-	genesisTx := GetCreateTxFromGenesisTest(t, env.genesisBytes, "AVAX")
+	genesisTx := getCreateTxFromGenesisTest(t, env.genesisBytes, "AVAX")
 	avaxID := genesisTx.ID()
 
 	key := keys[0]
@@ -786,7 +786,7 @@ func TestForceAcceptImportTx(t *testing.T) {
 		env.vm.ctx.Lock.Unlock()
 	}()
 
-	genesisTx := GetCreateTxFromGenesisTest(t, env.genesisBytes, "AVAX")
+	genesisTx := getCreateTxFromGenesisTest(t, env.genesisBytes, "AVAX")
 	avaxID := genesisTx.ID()
 
 	key := keys[0]
@@ -861,7 +861,7 @@ func TestIssueExportTx(t *testing.T) {
 		env.vm.ctx.Lock.Unlock()
 	}()
 
-	genesisTx := GetCreateTxFromGenesisTest(t, env.genesisBytes, "AVAX")
+	genesisTx := getCreateTxFromGenesisTest(t, env.genesisBytes, "AVAX")
 	avaxID := genesisTx.ID()
 
 	key := keys[0]
@@ -932,7 +932,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 		env.vm.ctx.Lock.Unlock()
 	}()
 
-	genesisTx := GetCreateTxFromGenesisTest(t, env.genesisBytes, "AVAX")
+	genesisTx := getCreateTxFromGenesisTest(t, env.genesisBytes, "AVAX")
 	avaxID := genesisTx.ID()
 
 	key := keys[0]

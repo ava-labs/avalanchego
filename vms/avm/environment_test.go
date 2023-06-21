@@ -132,8 +132,8 @@ func setup(tb testing.TB, c *envConfig) *environment {
 		genesisArgs = makeDefaultGenesis(tb)
 	}
 
-	genesisBytes := BuildGenesisTestWithArgs(tb, genesisArgs)
-	ctx := NewContext(tb)
+	genesisBytes := buildGenesisTestWithArgs(tb, genesisArgs)
+	ctx := newContext(tb)
 
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 
@@ -209,7 +209,7 @@ func setup(tb testing.TB, c *envConfig) *environment {
 
 	env := &environment{
 		genesisBytes: genesisBytes,
-		genesisTx:    GetCreateTxFromGenesisTest(tb, genesisBytes, assetName),
+		genesisTx:    getCreateTxFromGenesisTest(tb, genesisBytes, assetName),
 		sharedMemory: m,
 		issuer:       issuer,
 		vm:           vm,
@@ -236,11 +236,11 @@ func setup(tb testing.TB, c *envConfig) *environment {
 	return env
 }
 
-func NewContext(tb testing.TB) *snow.Context {
+func newContext(tb testing.TB) *snow.Context {
 	require := require.New(tb)
 
-	genesisBytes := BuildGenesisTest(tb)
-	tx := GetCreateTxFromGenesisTest(tb, genesisBytes, "AVAX")
+	genesisBytes := buildGenesisTest(tb)
+	tx := getCreateTxFromGenesisTest(tb, genesisBytes, "AVAX")
 
 	ctx := snow.DefaultContextTest()
 	ctx.NetworkID = constants.UnitTestID
@@ -274,7 +274,7 @@ func NewContext(tb testing.TB) *snow.Context {
 //
 //  1. tx in genesis that creates asset
 //  2. the index of the output
-func GetCreateTxFromGenesisTest(tb testing.TB, genesisBytes []byte, assetName string) *txs.Tx {
+func getCreateTxFromGenesisTest(tb testing.TB, genesisBytes []byte, assetName string) *txs.Tx {
 	require := require.New(tb)
 
 	parser, err := txs.NewParser([]fxs.Fx{
@@ -304,14 +304,14 @@ func GetCreateTxFromGenesisTest(tb testing.TB, genesisBytes []byte, assetName st
 	return tx
 }
 
-// BuildGenesisTest is the common Genesis builder for most tests
-func BuildGenesisTest(tb testing.TB) []byte {
+// buildGenesisTest is the common Genesis builder for most tests
+func buildGenesisTest(tb testing.TB) []byte {
 	defaultArgs := makeDefaultGenesis(tb)
-	return BuildGenesisTestWithArgs(tb, defaultArgs)
+	return buildGenesisTestWithArgs(tb, defaultArgs)
 }
 
-// BuildGenesisTestWithArgs allows building the genesis while injecting different starting points (args)
-func BuildGenesisTestWithArgs(tb testing.TB, args *BuildGenesisArgs) []byte {
+// buildGenesisTestWithArgs allows building the genesis while injecting different starting points (args)
+func buildGenesisTestWithArgs(tb testing.TB, args *BuildGenesisArgs) []byte {
 	require := require.New(tb)
 
 	ss := CreateStaticService()
@@ -324,10 +324,10 @@ func BuildGenesisTestWithArgs(tb testing.TB, args *BuildGenesisArgs) []byte {
 	return b
 }
 
-func NewTxWithAsset(tb testing.TB, genesisBytes []byte, vm *VM, assetName string) *txs.Tx {
+func newTx(tb testing.TB, genesisBytes []byte, vm *VM, assetName string) *txs.Tx {
 	require := require.New(tb)
 
-	createTx := GetCreateTxFromGenesisTest(tb, genesisBytes, assetName)
+	createTx := getCreateTxFromGenesisTest(tb, genesisBytes, assetName)
 	tx := &txs.Tx{Unsigned: &txs.BaseTx{
 		BaseTx: avax.BaseTx{
 			NetworkID:    constants.UnitTestID,
