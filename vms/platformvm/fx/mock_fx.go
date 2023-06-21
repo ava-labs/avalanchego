@@ -112,7 +112,7 @@ func (mr *MockFxMockRecorder) Initialize(arg0 interface{}) *gomock.Call {
 }
 
 // RecoverAddresses mocks base method.
-func (m *MockFx) RecoverAddresses(arg0 secp256k1fx.UnsignedTx, arg1 []verify.Verifiable) (secp256k1fx.RecoverMap, error) {
+func (m *MockFx) RecoverAddresses(arg0 []byte, arg1 []verify.Verifiable) (secp256k1fx.RecoverMap, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "RecoverAddresses", arg0, arg1)
 	ret0, _ := ret[0].(secp256k1fx.RecoverMap)
@@ -166,6 +166,20 @@ func (m *MockFx) VerifyMultisigTransfer(arg0, arg1, arg2, arg3, arg4 interface{}
 func (mr *MockFxMockRecorder) VerifyMultisigTransfer(arg0, arg1, arg2, arg3, arg4 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyMultisigTransfer", reflect.TypeOf((*MockFx)(nil).VerifyMultisigTransfer), arg0, arg1, arg2, arg3, arg4)
+}
+
+// VerifyMultisigMessage mocks base method.
+func (m *MockFx) VerifyMultisigMessage(arg0 []byte, arg1, arg2, arg3, arg4 interface{}) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "VerifyMultisigMessage", arg0, arg1, arg2, arg3, arg4)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// VerifyMultisigMessage indicates an expected call of VerifyMultisigMessage.
+func (mr *MockFxMockRecorder) VerifyMultisigMessage(arg0, arg1, arg2, arg3, arg4 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyMultisigMessage", reflect.TypeOf((*MockFx)(nil).VerifyMultisigMessage), arg0, arg1, arg2, arg3, arg4)
 }
 
 // VerifyPermission mocks base method.

@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
+	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -469,7 +470,7 @@ func TestDepositsAutoUnlock(t *testing.T) {
 		LockModeBondDeposit: true,
 		DepositOffers:       []*deposit.Offer{depositOffer},
 	}
-	require.NoError(caminoGenesisConf.DepositOffers[0].SetID())
+	require.NoError(genesis.SetDepositOfferID(caminoGenesisConf.DepositOffers[0]))
 
 	vm := newCaminoVM(caminoGenesisConf, []api.UTXO{{
 		Amount:  json.Uint64(depositOffer.MinAmount + defaultTxFee),

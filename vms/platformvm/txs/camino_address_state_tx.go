@@ -1,4 +1,4 @@
-// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
@@ -22,8 +22,10 @@ type (
 const (
 	// Bits
 
-	AddressStateBitRoleAdmin AddressStateBit = 0
-	AddressStateBitRoleKYC   AddressStateBit = 1
+	AddressStateBitRoleAdmin         AddressStateBit = 0
+	AddressStateBitRoleKYC           AddressStateBit = 1
+	AddressStateBitRoleOffersAdmin   AddressStateBit = 2
+	AddressStateBitRoleOffersCreator AddressStateBit = 3
 
 	AddressStateBitKYCVerified  AddressStateBit = 32
 	AddressStateBitKYCExpired   AddressStateBit = 33
@@ -35,9 +37,11 @@ const (
 
 	AddressStateEmpty AddressState = 0
 
-	AddressStateRoleAdmin AddressState = AddressState(1) << AddressStateBitRoleAdmin // 0b1
-	AddressStateRoleKYC   AddressState = AddressState(1) << AddressStateBitRoleKYC   // 0b10
-	AddressStateRoleAll   AddressState = AddressStateRoleAdmin | AddressStateRoleKYC // 0b11
+	AddressStateRoleAdmin         AddressState = AddressState(1) << AddressStateBitRoleAdmin                                                               // 0b1
+	AddressStateRoleKYC           AddressState = AddressState(1) << AddressStateBitRoleKYC                                                                 // 0b10
+	AddressStateRoleOffersAdmin   AddressState = AddressState(1) << AddressStateBitRoleOffersAdmin                                                         // 0b100
+	AddressStateRoleOffersCreator AddressState = AddressState(1) << AddressStateBitRoleOffersCreator                                                       // 0b1000
+	AddressStateRoleAll           AddressState = AddressStateRoleAdmin | AddressStateRoleKYC | AddressStateRoleOffersAdmin | AddressStateRoleOffersCreator // 0b1111
 
 	AddressStateKYCVerified AddressState = AddressState(1) << AddressStateBitKYCVerified    // 0b0100000000000000000000000000000000
 	AddressStateKYCExpired  AddressState = AddressState(1) << AddressStateBitKYCExpired     // 0b1000000000000000000000000000000000
@@ -47,7 +51,7 @@ const (
 	AddressStateNodeDeferred     AddressState = AddressState(1) << AddressStateBitNodeDeferred          // 0b1000000000000000000000000000000000000000
 	AddressStateVotableBits      AddressState = AddressStateConsortiumMember | AddressStateNodeDeferred // 0b1100000000000000000000000000000000000000
 
-	AddressStateValidBits = AddressStateRoleAll | AddressStateKYCAll | AddressStateVotableBits // 0b1100001100000000000000000000000000000011
+	AddressStateValidBits = AddressStateRoleAll | AddressStateKYCAll | AddressStateVotableBits // 0b1100001100000000000000000000000000001111
 )
 
 var (
@@ -60,7 +64,7 @@ var (
 // AddressStateTx is an unsigned AddressStateTx
 type AddressStateTx struct {
 	// We upgrade this struct beginning SP1
-	UpgradeVersionID uint64
+	UpgradeVersionID codec.UpgradeVersionID
 	// Metadata, inputs and outputs
 	BaseTx `serialize:"true"`
 	// The address to add / remove state
@@ -88,7 +92,7 @@ func (tx *AddressStateTx) SyntacticVerify(ctx *snow.Context) error {
 		return ErrInvalidState
 	}
 
-	if codec.GetUpgradeVersion(tx.UpgradeVersionID) > 0 {
+	if tx.UpgradeVersionID.Version() > 0 {
 		if err := tx.ExecutorAuth.Verify(); err != nil {
 			return err
 		}

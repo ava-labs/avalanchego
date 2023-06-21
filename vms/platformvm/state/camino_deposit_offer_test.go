@@ -7,6 +7,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
@@ -279,16 +280,19 @@ func TestGetAllDepositOffers(t *testing.T) {
 }
 
 func TestWriteDepositOffers(t *testing.T) {
-	depositOffer1 := &deposit.Offer{ID: ids.ID{1}}
-	depositOffer2 := &deposit.Offer{ID: ids.ID{2}}
-	depositOffer2modified := &deposit.Offer{ID: ids.ID{2}, MinAmount: 1}
-	depositOffer3 := &deposit.Offer{ID: ids.ID{3}}
-	depositOffer4 := &deposit.Offer{ID: ids.ID{4}}
-	depositOffer2modifiedBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, depositOffer2modified)
+	depositOffer0_1 := &deposit.Offer{ID: ids.ID{1}}
+	depositOffer0_2 := &deposit.Offer{ID: ids.ID{2}}
+	depositOffer0_2modified := &deposit.Offer{ID: ids.ID{2}, MinAmount: 1}
+	depositOffer0_3 := &deposit.Offer{ID: ids.ID{3}}
+	depositOffer0_4 := &deposit.Offer{ID: ids.ID{4}}
+	depositOffer1_5 := &deposit.Offer{ID: ids.ID{5}, UpgradeVersionID: codec.UpgradeVersion1}
+	depositOffer2modifiedBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, depositOffer0_2modified)
 	require.NoError(t, err)
-	depositOffer2Bytes, err := blocks.GenesisCodec.Marshal(blocks.Version, depositOffer2)
+	depositOffer2Bytes, err := blocks.GenesisCodec.Marshal(blocks.Version, depositOffer0_2)
 	require.NoError(t, err)
-	depositOffer3Bytes, err := blocks.GenesisCodec.Marshal(blocks.Version, depositOffer3)
+	depositOffer3Bytes, err := blocks.GenesisCodec.Marshal(blocks.Version, depositOffer0_3)
+	require.NoError(t, err)
+	depositOffer5Bytes, err := blocks.GenesisCodec.Marshal(blocks.Version, depositOffer1_5)
 	require.NoError(t, err)
 	testError := errors.New("test error")
 
@@ -300,11 +304,12 @@ func TestWriteDepositOffers(t *testing.T) {
 		"Fail: db errored on Put": {
 			caminoState: func(c *gomock.Controller) *caminoState {
 				depositOffersDB := database.NewMockDatabase(c)
-				depositOffersDB.EXPECT().Put(depositOffer2.ID[:], depositOffer2Bytes).Return(testError)
+				depositOffersDB.EXPECT().Put(depositOffer0_2.ID[:], depositOffer2Bytes).Return(testError)
+
 				return &caminoState{
 					caminoDiff: &caminoDiff{
 						modifiedDepositOffers: map[ids.ID]*deposit.Offer{
-							depositOffer2.ID: depositOffer2,
+							depositOffer0_2.ID: depositOffer0_2,
 						},
 					},
 					depositOffersDB: depositOffersDB,
@@ -323,11 +328,12 @@ func TestWriteDepositOffers(t *testing.T) {
 		"Fail: db errored on Delete": {
 			caminoState: func(c *gomock.Controller) *caminoState {
 				depositOffersDB := database.NewMockDatabase(c)
-				depositOffersDB.EXPECT().Delete(depositOffer1.ID[:]).Return(testError)
+				depositOffersDB.EXPECT().Delete(depositOffer0_1.ID[:]).Return(testError)
+
 				return &caminoState{
 					caminoDiff: &caminoDiff{
 						modifiedDepositOffers: map[ids.ID]*deposit.Offer{
-							depositOffer1.ID: nil,
+							depositOffer0_1.ID: nil,
 						},
 					},
 					depositOffersDB: depositOffersDB,
@@ -346,20 +352,23 @@ func TestWriteDepositOffers(t *testing.T) {
 		"OK": {
 			caminoState: func(c *gomock.Controller) *caminoState {
 				depositOffersDB := database.NewMockDatabase(c)
-				depositOffersDB.EXPECT().Put(depositOffer2.ID[:], depositOffer2modifiedBytes).Return(nil)
-				depositOffersDB.EXPECT().Put(depositOffer3.ID[:], depositOffer3Bytes).Return(nil)
-				depositOffersDB.EXPECT().Delete(depositOffer4.ID[:]).Return(nil)
+				depositOffersDB.EXPECT().Put(depositOffer0_2.ID[:], depositOffer2modifiedBytes).Return(nil)
+				depositOffersDB.EXPECT().Put(depositOffer0_3.ID[:], depositOffer3Bytes).Return(nil)
+				depositOffersDB.EXPECT().Delete(depositOffer0_4.ID[:]).Return(nil)
+				depositOffersDB.EXPECT().Put(depositOffer1_5.ID[:], depositOffer5Bytes).Return(nil)
+
 				return &caminoState{
 					depositOffers: map[ids.ID]*deposit.Offer{
-						depositOffer1.ID: depositOffer1,
-						depositOffer2.ID: depositOffer2,
-						depositOffer4.ID: depositOffer4,
+						depositOffer0_1.ID: depositOffer0_1,
+						depositOffer0_2.ID: depositOffer0_2,
+						depositOffer0_4.ID: depositOffer0_4,
 					},
 					caminoDiff: &caminoDiff{
 						modifiedDepositOffers: map[ids.ID]*deposit.Offer{
-							depositOffer2.ID: depositOffer2modified,
-							depositOffer3.ID: depositOffer3,
-							depositOffer4.ID: nil,
+							depositOffer0_2.ID: depositOffer0_2modified,
+							depositOffer0_3.ID: depositOffer0_3,
+							depositOffer0_4.ID: nil,
+							depositOffer1_5.ID: depositOffer1_5,
 						},
 					},
 					depositOffersDB: depositOffersDB,
@@ -368,9 +377,10 @@ func TestWriteDepositOffers(t *testing.T) {
 			expectedCaminoState: func(actualCaminoState *caminoState) *caminoState {
 				return &caminoState{
 					depositOffers: map[ids.ID]*deposit.Offer{
-						depositOffer1.ID: depositOffer1,
-						depositOffer2.ID: depositOffer2modified,
-						depositOffer3.ID: depositOffer3,
+						depositOffer0_1.ID: depositOffer0_1,
+						depositOffer0_2.ID: depositOffer0_2modified,
+						depositOffer0_3.ID: depositOffer0_3,
+						depositOffer1_5.ID: depositOffer1_5,
 					},
 					caminoDiff: &caminoDiff{
 						modifiedDepositOffers: map[ids.ID]*deposit.Offer{},
@@ -392,14 +402,19 @@ func TestWriteDepositOffers(t *testing.T) {
 }
 
 func TestLoadDepositOffers(t *testing.T) {
-	depositOffer1 := &deposit.Offer{ID: ids.ID{1}, Memo: []byte("1")}
-	depositOffer2 := &deposit.Offer{ID: ids.ID{2}, Memo: []byte("2")}
-	depositOffer3 := &deposit.Offer{ID: ids.ID{3}, Memo: []byte("3")}
-	depositOffer1Bytes, err := blocks.GenesisCodec.Marshal(blocks.Version, depositOffer1)
+	depositOffer0_1 := &deposit.Offer{ID: ids.ID{1}, Memo: []byte("1")}
+	depositOffer0_2 := &deposit.Offer{ID: ids.ID{2}, Memo: []byte("2")}
+	depositOffer0_3 := &deposit.Offer{ID: ids.ID{3}, Memo: []byte("3")}
+	depositOffer1_4 := &deposit.Offer{
+		UpgradeVersionID: codec.UpgradeVersion1, ID: ids.ID{4}, Memo: []byte("4"),
+	}
+	depositOffer1Bytes, err := blocks.GenesisCodec.Marshal(blocks.Version, depositOffer0_1)
 	require.NoError(t, err)
-	depositOffer2Bytes, err := blocks.GenesisCodec.Marshal(blocks.Version, depositOffer2)
+	depositOffer2Bytes, err := blocks.GenesisCodec.Marshal(blocks.Version, depositOffer0_2)
 	require.NoError(t, err)
-	depositOffer3Bytes, err := blocks.GenesisCodec.Marshal(blocks.Version, depositOffer3)
+	depositOffer3Bytes, err := blocks.GenesisCodec.Marshal(blocks.Version, depositOffer0_3)
+	require.NoError(t, err)
+	depositOffer4Bytes, err := blocks.GenesisCodec.Marshal(blocks.Version, depositOffer1_4)
 	require.NoError(t, err)
 
 	tests := map[string]struct {
@@ -410,19 +425,22 @@ func TestLoadDepositOffers(t *testing.T) {
 		"OK": {
 			caminoState: func(c *gomock.Controller) *caminoState {
 				offersIterator := database.NewMockIterator(c)
-				offersIterator.EXPECT().Next().Return(true).Times(3)
-				offersIterator.EXPECT().Key().Return(depositOffer1.ID[:])
+				offersIterator.EXPECT().Next().Return(true).Times(4)
+				offersIterator.EXPECT().Key().Return(depositOffer0_1.ID[:])
 				offersIterator.EXPECT().Value().Return(depositOffer1Bytes)
-				offersIterator.EXPECT().Key().Return(depositOffer2.ID[:])
+				offersIterator.EXPECT().Key().Return(depositOffer0_2.ID[:])
 				offersIterator.EXPECT().Value().Return(depositOffer2Bytes)
-				offersIterator.EXPECT().Key().Return(depositOffer3.ID[:])
+				offersIterator.EXPECT().Key().Return(depositOffer0_3.ID[:])
 				offersIterator.EXPECT().Value().Return(depositOffer3Bytes)
-				offersIterator.EXPECT().Error().Return(nil)
+				offersIterator.EXPECT().Key().Return(depositOffer1_4.ID[:])
+				offersIterator.EXPECT().Value().Return(depositOffer4Bytes)
 				offersIterator.EXPECT().Next().Return(false)
+				offersIterator.EXPECT().Error().Return(nil)
 				offersIterator.EXPECT().Release()
 
 				depositOffersDB := database.NewMockDatabase(c)
 				depositOffersDB.EXPECT().NewIterator().Return(offersIterator)
+
 				return &caminoState{
 					depositOffers:   map[ids.ID]*deposit.Offer{},
 					depositOffersDB: depositOffersDB,
@@ -432,9 +450,10 @@ func TestLoadDepositOffers(t *testing.T) {
 				return &caminoState{
 					depositOffersDB: actualCaminoState.depositOffersDB,
 					depositOffers: map[ids.ID]*deposit.Offer{
-						depositOffer1.ID: depositOffer1,
-						depositOffer2.ID: depositOffer2,
-						depositOffer3.ID: depositOffer3,
+						depositOffer0_1.ID: depositOffer0_1,
+						depositOffer0_2.ID: depositOffer0_2,
+						depositOffer0_3.ID: depositOffer0_3,
+						depositOffer1_4.ID: depositOffer1_4,
 					},
 				}
 			},

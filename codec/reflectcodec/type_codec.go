@@ -211,7 +211,7 @@ func (c *genericCodec) size(value reflect.Value) (int, bool, error) {
 		if serializedFields.CheckUpgrade {
 			upgradeVersionID := value.Field(0).Uint()
 			if upgradeVersionID&codec.UpgradePrefix == codec.UpgradePrefix {
-				upgradeVersion = codec.GetUpgradeVersion(upgradeVersionID)
+				upgradeVersion = codec.UpgradeVersionID(upgradeVersionID).Version()
 				size += wrappers.LongLen
 			}
 		}
@@ -351,7 +351,7 @@ func (c *genericCodec) marshal(value reflect.Value, p *wrappers.Packer, maxSlice
 		if serializedFields.CheckUpgrade {
 			upgradeVersionID := value.Field(0).Uint()
 			if upgradeVersionID&codec.UpgradePrefix == codec.UpgradePrefix {
-				upgradeVersion = codec.GetUpgradeVersion(upgradeVersionID)
+				upgradeVersion = codec.UpgradeVersionID(upgradeVersionID).Version()
 				p.PackLong(upgradeVersionID)
 				if p.Err != nil {
 					return p.Err
@@ -539,7 +539,7 @@ func (c *genericCodec) unmarshal(p *wrappers.Packer, value reflect.Value, maxSli
 				p.RevertLong()
 			default:
 				value.Field(0).SetUint(upgradeVersionID)
-				upgradeVersion = codec.GetUpgradeVersion(upgradeVersionID)
+				upgradeVersion = codec.UpgradeVersionID(upgradeVersionID).Version()
 				if upgradeVersion > serializedFieldIndices.MaxUpgradeVersion {
 					return fmt.Errorf("incompatible upgrade version: %d", upgradeVersion)
 				}

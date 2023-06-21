@@ -41,6 +41,10 @@ func (*StandardTxExecutor) MultisigAliasTx(*txs.MultisigAliasTx) error {
 	return errWrongTxType
 }
 
+func (*StandardTxExecutor) AddDepositOfferTx(*txs.AddDepositOfferTx) error {
+	return errWrongTxType
+}
+
 // Proposal
 
 func (*ProposalTxExecutor) AddressStateTx(*txs.AddressStateTx) error {
@@ -72,6 +76,10 @@ func (*ProposalTxExecutor) BaseTx(*txs.BaseTx) error {
 }
 
 func (*ProposalTxExecutor) MultisigAliasTx(*txs.MultisigAliasTx) error {
+	return errWrongTxType
+}
+
+func (*ProposalTxExecutor) AddDepositOfferTx(*txs.AddDepositOfferTx) error {
 	return errWrongTxType
 }
 
@@ -109,6 +117,10 @@ func (*AtomicTxExecutor) MultisigAliasTx(*txs.MultisigAliasTx) error {
 	return errWrongTxType
 }
 
+func (*AtomicTxExecutor) AddDepositOfferTx(*txs.AddDepositOfferTx) error {
+	return errWrongTxType
+}
+
 // MemPool
 
 func (v *MempoolTxVerifier) AddressStateTx(tx *txs.AddressStateTx) error {
@@ -140,5 +152,9 @@ func (v *MempoolTxVerifier) BaseTx(tx *txs.BaseTx) error {
 }
 
 func (v *MempoolTxVerifier) MultisigAliasTx(tx *txs.MultisigAliasTx) error {
+	return v.standardTx(tx)
+}
+
+func (v *MempoolTxVerifier) AddDepositOfferTx(tx *txs.AddDepositOfferTx) error {
 	return v.standardTx(tx)
 }

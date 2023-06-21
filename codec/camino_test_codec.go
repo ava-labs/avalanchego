@@ -14,7 +14,7 @@ var VersionTests = []func(c GeneralCodec, t testing.TB){
 }
 
 type UpgradeStruct struct {
-	UpgradeVersionID uint64
+	UpgradeVersionID UpgradeVersionID
 	Field1           uint32 `serialize:"true"`
 	Field2           uint32 `serialize:"true"`
 	Version1         uint32 `serialize:"true" upgradeVersion:"1"`
@@ -22,7 +22,7 @@ type UpgradeStruct struct {
 }
 
 type UpgradeStructOld struct {
-	UpgradeVersionID uint64
+	UpgradeVersionID UpgradeVersionID
 	Field1           uint32 `serialize:"true"`
 	Field2           uint32 `serialize:"true"`
 	Version1         uint32 `serialize:"true" upgradeVersion:"1"`

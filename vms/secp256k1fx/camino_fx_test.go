@@ -1,4 +1,4 @@
-// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package secp256k1fx
@@ -220,7 +220,7 @@ func TestVerifyMultisigCredentials(t *testing.T) {
 				copy(cred.Sigs[i][:], sig)
 			}
 
-			err := fx.verifyMultisigCredentials(tx, tt.in, cred, tt.owners, tt.msig(ctrl))
+			err := fx.verifyMultisigCredentials(tx.Bytes(), tt.in, cred, tt.owners, tt.msig(ctrl))
 			require.ErrorIs(t, err, tt.expectedError)
 		})
 	}

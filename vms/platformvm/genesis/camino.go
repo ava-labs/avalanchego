@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/vms/components/multisig"
 	"github.com/ava-labs/avalanchego/vms/platformvm/deposit"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -26,7 +27,7 @@ type Camino struct {
 
 func (c *Camino) Init() error {
 	for _, offer := range c.DepositOffers {
-		if err := offer.SetID(); err != nil {
+		if err := SetDepositOfferID(offer); err != nil {
 			return err
 		}
 	}
@@ -87,4 +88,14 @@ func (b *Block) Txs() []*txs.Tx {
 	txs = append(txs, b.Validators...)
 	txs = append(txs, b.Deposits...)
 	return append(txs, b.UnlockedUTXOsTxs...)
+}
+
+// Generate deposit offer id from its bytes hash and set it to offer's ID field
+func SetDepositOfferID(offer *deposit.Offer) error {
+	bytes, err := txs.GenesisCodec.Marshal(txs.Version, offer)
+	if err != nil {
+		return err
+	}
+	offer.ID = hashing.ComputeHash256Array(bytes)
+	return nil
 }

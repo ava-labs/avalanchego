@@ -75,7 +75,6 @@ type CaminoDiff interface {
 
 	// Deposit offers
 
-	// precondition: offer.SetID() must be called and return no error
 	SetDepositOffer(offer *deposit.Offer)
 	GetDepositOffer(offerID ids.ID) (*deposit.Offer, error)
 	GetAllDepositOffers() ([]*deposit.Offer, error)

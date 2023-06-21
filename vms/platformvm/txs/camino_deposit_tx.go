@@ -1,4 +1,4 @@
-// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/math"
@@ -18,12 +19,15 @@ import (
 var (
 	_ UnsignedTx = (*DepositTx)(nil)
 
-	errToBigDeposit       = errors.New("to big deposit")
-	errInvalidRewardOwner = errors.New("invalid reward owner")
+	errToBigDeposit          = errors.New("to big deposit")
+	errInvalidRewardOwner    = errors.New("invalid reward owner")
+	errBadOfferOwnerAuth     = errors.New("bad offer owner auth")
+	errBadDepositCreatorAuth = errors.New("bad deposit creator auth")
 )
 
 // DepositTx is an unsigned depositTx
 type DepositTx struct {
+	UpgradeVersionID codec.UpgradeVersionID
 	// Metadata, inputs and outputs
 	BaseTx `serialize:"true"`
 	// ID of active offer that will be used for this deposit
@@ -32,6 +36,13 @@ type DepositTx struct {
 	DepositDuration uint32 `serialize:"true" json:"duration"`
 	// Where to send staking rewards when done validating
 	RewardsOwner fx.Owner `serialize:"true" json:"rewardsOwner"`
+
+	// Address that is authorized to create deposit with given offer. Could be empty, if offer owner is empty.
+	DepositCreatorAddress ids.ShortID `serialize:"true" json:"depositCreator" upgradeVersion:"1"`
+	// Auth for deposit creator address
+	DepositCreatorAuth verify.Verifiable `serialize:"true" json:"depositCreatorAuth" upgradeVersion:"1"`
+	// Auth for deposit offer owner
+	DepositOfferOwnerAuth verify.Verifiable `serialize:"true" json:"ownerAuth" upgradeVersion:"1"`
 
 	depositAmount *uint64
 }
@@ -69,7 +80,7 @@ func (tx *DepositTx) SyntacticVerify(ctx *snow.Context) error {
 	if err := tx.BaseTx.SyntacticVerify(ctx); err != nil {
 		return fmt.Errorf("failed to verify BaseTx: %w", err)
 	}
-	if err := verify.All(tx.RewardsOwner); err != nil {
+	if err := tx.RewardsOwner.Verify(); err != nil {
 		return fmt.Errorf("%w: %s", errInvalidRewardOwner, err)
 	}
 
@@ -84,6 +95,15 @@ func (tx *DepositTx) SyntacticVerify(ctx *snow.Context) error {
 		}
 	}
 	tx.depositAmount = &depositAmount
+
+	if tx.UpgradeVersionID.Version() > 0 {
+		if err := tx.DepositCreatorAuth.Verify(); err != nil {
+			return fmt.Errorf("%w: %s", errBadDepositCreatorAuth, err)
+		}
+		if err := tx.DepositOfferOwnerAuth.Verify(); err != nil {
+			return errBadOfferOwnerAuth
+		}
+	}
 
 	// cache that this is valid
 	tx.SyntacticallyVerified = true

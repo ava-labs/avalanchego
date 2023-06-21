@@ -211,7 +211,7 @@ func TestSyncGenesis(t *testing.T) {
 		},
 	}
 	for _, offer := range depositOffers {
-		require.NoError(offer.SetID())
+		require.NoError(pvm_genesis.SetDepositOfferID(offer))
 	}
 
 	depositTx1, err := txs.NewSigned(&txs.DepositTx{

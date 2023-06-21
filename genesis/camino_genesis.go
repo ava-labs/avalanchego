@@ -570,7 +570,7 @@ func DepositOfferFromConfig(configDepositOffer DepositOffer) (*deposit.Offer, er
 		Memo:                    types.JSONByteSlice(configDepositOffer.Memo),
 		Flags:                   configDepositOffer.Flags,
 	}
-	if err := offer.SetID(); err != nil {
+	if err := genesis.SetDepositOfferID(offer); err != nil {
 		return nil, err
 	}
 	return offer, nil

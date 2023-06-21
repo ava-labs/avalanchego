@@ -9,7 +9,6 @@ import (
 	"reflect"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -35,45 +34,50 @@ var (
 	_ txs.Visitor = (*CaminoStandardTxExecutor)(nil)
 	_ txs.Visitor = (*CaminoProposalTxExecutor)(nil)
 
-	errNodeSignatureMissing           = errors.New("last signature is not nodeID's signature")
-	errWrongLockMode                  = errors.New("this tx can't be used with this caminoGenesis.LockModeBondDeposit")
-	errRecoverAddresses               = errors.New("cannot recover addresses from credentials")
-	errAddrStateNotPermitted          = errors.New("don't have permission to set address state bit")
-	errValidatorExists                = errors.New("node is already a validator")
-	errInvalidSystemTxBody            = errors.New("tx body doesn't match expected one")
-	errRemoveValidatorToEarly         = errors.New("attempting to remove validator before its end time")
-	errRemoveWrongValidator           = errors.New("attempting to remove wrong validator")
-	errDepositOfferNotActiveYet       = errors.New("deposit offer not active yet")
-	errDepositOfferInactive           = errors.New("deposit offer inactive")
-	errDepositToSmall                 = errors.New("deposit amount is less than deposit offer minimum amount")
-	errDepositToBig                   = errors.New("deposit amount is greater than deposit offer available amount")
-	errDepositDurationToSmall         = errors.New("deposit duration is less than deposit offer minmum duration")
-	errDepositDurationToBig           = errors.New("deposit duration is greater than deposit offer maximum duration")
-	errSupplyOverflow                 = errors.New("resulting total supply would be more than allowed maximum")
-	errNotConsortiumMember            = errors.New("address isn't consortium member")
-	errValidatorNotFound              = errors.New("validator not found")
-	errConsortiumMemberHasNode        = errors.New("consortium member already has registered node")
-	errSignatureMissing               = errors.New("wrong signature")
-	errNodeNotRegistered              = errors.New("no address registered for this node")
-	errNotNodeOwner                   = errors.New("node is registered for another address")
-	errNodeAlreadyRegistered          = errors.New("node is already registered")
-	errClaimableCredentialMismatch    = errors.New("claimable credential isn't matching")
-	errDepositNotFound                = errors.New("deposit not found")
-	errWrongCredentialsNumber         = errors.New("unexpected number of credentials")
-	errWrongOwnerType                 = errors.New("wrong owner type")
-	errImportedUTXOMismatch           = errors.New("imported input doesn't match expected utxo")
-	errInputAmountMismatch            = errors.New("utxo amount doesn't match input amount")
-	errInputsUTXOSMismatch            = errors.New("number of inputs is different from number of utxos")
-	errWrongClaimedAmount             = errors.New("claiming more than was available to claim")
-	errNoUnlock                       = errors.New("no tokens unlocked")
-	errAliasCredentialMismatch        = errors.New("alias credential isn't matching")
-	errAliasNotFound                  = errors.New("alias not found on state")
-	errUnlockedMoreThanAvailable      = errors.New("unlocked more deposited tokens than was available for unlock")
-	errMixedDeposits                  = errors.New("tx has expired deposit input and active-deposit/unlocked input")
-	errExpiredDepositNotFullyUnlocked = errors.New("unlocked only part of expired deposit")
-	errBurnedDepositUnlock            = errors.New("burned undeposited tokens")
-	errAdminCannotBeDeleted           = errors.New("admin cannot be deleted")
-	errNotSunrisePhase1               = errors.New("not allowed before SunrisePhase1")
+	errNodeSignatureMissing              = errors.New("last signature is not nodeID's signature")
+	errWrongLockMode                     = errors.New("this tx can't be used with this caminoGenesis.LockModeBondDeposit")
+	errRecoverAddresses                  = errors.New("cannot recover addresses from credentials")
+	errAddrStateNotPermitted             = errors.New("don't have permission to set address state bit")
+	errValidatorExists                   = errors.New("node is already a validator")
+	errInvalidSystemTxBody               = errors.New("tx body doesn't match expected one")
+	errRemoveValidatorToEarly            = errors.New("attempting to remove validator before its end time")
+	errRemoveWrongValidator              = errors.New("attempting to remove wrong validator")
+	errDepositOfferInactive              = errors.New("deposit offer is inactive")
+	errDepositToSmall                    = errors.New("deposit amount is less than deposit offer minimum amount")
+	errDepositToBig                      = errors.New("deposit amount is greater than deposit offer available amount")
+	errDepositDurationToSmall            = errors.New("deposit duration is less than deposit offer minmum duration")
+	errDepositDurationToBig              = errors.New("deposit duration is greater than deposit offer maximum duration")
+	errSupplyOverflow                    = errors.New("resulting total supply would be more than allowed maximum")
+	errNotConsortiumMember               = errors.New("address isn't consortium member")
+	errValidatorNotFound                 = errors.New("validator not found")
+	errConsortiumMemberHasNode           = errors.New("consortium member already has registered node")
+	errSignatureMissing                  = errors.New("wrong signature")
+	errNodeNotRegistered                 = errors.New("no address registered for this node")
+	errNotNodeOwner                      = errors.New("node is registered for another address")
+	errNodeAlreadyRegistered             = errors.New("node is already registered")
+	errClaimableCredentialMismatch       = errors.New("claimable credential isn't matching")
+	errDepositNotFound                   = errors.New("deposit not found")
+	errWrongCredentialsNumber            = errors.New("unexpected number of credentials")
+	errWrongOwnerType                    = errors.New("wrong owner type")
+	errImportedUTXOMismatch              = errors.New("imported input doesn't match expected utxo")
+	errInputAmountMismatch               = errors.New("utxo amount doesn't match input amount")
+	errInputsUTXOSMismatch               = errors.New("number of inputs is different from number of utxos")
+	errWrongClaimedAmount                = errors.New("claiming more than was available to claim")
+	errNoUnlock                          = errors.New("no tokens unlocked")
+	errAliasCredentialMismatch           = errors.New("alias credential isn't matching")
+	errAliasNotFound                     = errors.New("alias not found on state")
+	errUnlockedMoreThanAvailable         = errors.New("unlocked more deposited tokens than was available for unlock")
+	errMixedDeposits                     = errors.New("tx has expired deposit input and active-deposit/unlocked input")
+	errExpiredDepositNotFullyUnlocked    = errors.New("unlocked only part of expired deposit")
+	errBurnedDepositUnlock               = errors.New("burned undeposited tokens")
+	errAdminCannotBeDeleted              = errors.New("admin cannot be deleted")
+	errNotSunrisePhase1                  = errors.New("not allowed before SunrisePhase1")
+	errOfferCreatorCredentialMismatch    = errors.New("offer creator credential isn't matching")
+	errNotOfferCreator                   = errors.New("address isn't allowed to create deposit offers")
+	errDepositCreatorCredentialMismatch  = errors.New("deposit creator credential isn't matching")
+	errOfferPermissionCredentialMismatch = errors.New("offer-usage permission credential isn't matching")
+	errEmptyDepositCreatorAddress        = errors.New("empty deposit creator address, while offer owner isn't empty")
+	errWrongTxUpgradeVersion             = errors.New("wrong tx upgrade version")
 )
 
 type CaminoStandardTxExecutor struct {
@@ -624,14 +628,11 @@ func (e *CaminoStandardTxExecutor) DepositTx(tx *txs.DepositTx) error {
 	}
 
 	depositAmount := tx.DepositAmount()
-	currentChainTime := e.State.GetTimestamp()
+	chainTime := e.State.GetTimestamp()
+	sunrisePhase1 := e.Config.IsSunrisePhase1Activated(chainTime)
 
 	switch {
-	case depositOffer.Flags&deposits.OfferFlagLocked != 0:
-		return errDepositOfferInactive
-	case depositOffer.StartTime().After(currentChainTime):
-		return errDepositOfferNotActiveYet
-	case depositOffer.EndTime().Before(currentChainTime):
+	case !depositOffer.IsActiveAt(uint64(chainTime.Unix())):
 		return errDepositOfferInactive
 	case tx.DepositDuration < depositOffer.MinDuration:
 		return errDepositDurationToSmall
@@ -641,6 +642,68 @@ func (e *CaminoStandardTxExecutor) DepositTx(tx *txs.DepositTx) error {
 		return errDepositToSmall
 	case depositOffer.TotalMaxAmount > 0 && depositAmount > depositOffer.RemainingAmount():
 		return errDepositToBig
+	case !sunrisePhase1 && depositOffer.TotalMaxRewardAmount > 0:
+		return errNotSunrisePhase1
+	}
+
+	deposit := &deposits.Deposit{
+		DepositOfferID: tx.DepositOfferID,
+		Duration:       tx.DepositDuration,
+		Amount:         depositAmount,
+		Start:          uint64(chainTime.Unix()),
+		RewardOwner:    tx.RewardsOwner,
+	}
+	potentialReward := deposit.TotalReward(depositOffer)
+
+	if depositOffer.TotalMaxRewardAmount > 0 && potentialReward > depositOffer.RemainingReward() {
+		return errDepositToBig
+	}
+
+	baseTxCreds := e.Tx.Creds
+	if depositOffer.OwnerAddress != ids.ShortEmpty {
+		if !sunrisePhase1 {
+			return errNotSunrisePhase1
+		}
+
+		if tx.UpgradeVersionID.Version() == 0 {
+			return errWrongTxUpgradeVersion
+		}
+
+		if tx.DepositCreatorAddress == ids.ShortEmpty {
+			return errEmptyDepositCreatorAddress
+		}
+
+		if len(e.Tx.Creds) < 3 {
+			return errWrongCredentialsNumber
+		}
+
+		if err := e.Fx.VerifyMultisigMessage(
+			depositOffer.PermissionMsg(tx.DepositCreatorAddress),
+			tx.DepositOfferOwnerAuth,
+			e.Tx.Creds[len(e.Tx.Creds)-1], // offer usage permission credential created by offer owner
+			&secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{depositOffer.OwnerAddress},
+			},
+			e.State,
+		); err != nil {
+			return fmt.Errorf("%w: %s", errOfferPermissionCredentialMismatch, err)
+		}
+
+		if err := e.Fx.VerifyMultisigPermission(
+			tx,
+			tx.DepositCreatorAuth,
+			e.Tx.Creds[len(e.Tx.Creds)-2], // deposit creator credential
+			&secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{tx.DepositCreatorAddress},
+			},
+			e.State,
+		); err != nil {
+			return fmt.Errorf("%w: %s", errDepositCreatorCredentialMismatch, err)
+		}
+
+		baseTxCreds = e.Tx.Creds[:len(e.Tx.Creds)-2]
 	}
 
 	rewardOwner, ok := tx.RewardsOwner.(*secp256k1fx.OutputOwners)
@@ -661,7 +724,7 @@ func (e *CaminoStandardTxExecutor) DepositTx(tx *txs.DepositTx) error {
 		e.State,
 		tx.Ins,
 		tx.Outs,
-		e.Tx.Creds,
+		baseTxCreds,
 		0,
 		e.Config.TxFee,
 		e.Ctx.AVAXAssetID,
@@ -677,16 +740,6 @@ func (e *CaminoStandardTxExecutor) DepositTx(tx *txs.DepositTx) error {
 		return err
 	}
 
-	deposit := &deposits.Deposit{
-		DepositOfferID: tx.DepositOfferID,
-		Duration:       tx.DepositDuration,
-		Amount:         depositAmount,
-		Start:          uint64(currentChainTime.Unix()),
-		RewardOwner:    tx.RewardsOwner,
-	}
-
-	potentialReward := deposit.TotalReward(depositOffer)
-
 	newSupply, err := math.Add64(currentSupply, potentialReward)
 	if err != nil || newSupply > e.Config.RewardConfig.SupplyCap {
 		return errSupplyOverflow
@@ -696,9 +749,15 @@ func (e *CaminoStandardTxExecutor) DepositTx(tx *txs.DepositTx) error {
 		updatedOffer := *depositOffer
 		updatedOffer.DepositedAmount += depositAmount
 		e.State.SetDepositOffer(&updatedOffer)
+	} else if depositOffer.TotalMaxRewardAmount > 0 {
+		updatedOffer := *depositOffer
+		updatedOffer.RewardedAmount += potentialReward
+		e.State.SetDepositOffer(&updatedOffer)
 	}
 
-	e.State.SetCurrentSupply(constants.PrimaryNetworkID, newSupply)
+	if newSupply != currentSupply {
+		e.State.SetCurrentSupply(constants.PrimaryNetworkID, newSupply)
+	}
 	e.State.AddDeposit(txID, deposit)
 
 	avax.Consume(e.State, tx.Ins)
@@ -1480,6 +1539,103 @@ func (e *CaminoStandardTxExecutor) MultisigAliasTx(tx *txs.MultisigAliasTx) erro
 	return nil
 }
 
+func (e *CaminoStandardTxExecutor) AddDepositOfferTx(tx *txs.AddDepositOfferTx) error {
+	if err := e.Tx.SyntacticVerify(e.Ctx); err != nil {
+		return err
+	}
+
+	chainTime := e.State.GetTimestamp()
+
+	if !e.Config.IsSunrisePhase1Activated(chainTime) {
+		return errNotSunrisePhase1
+	}
+
+	if len(e.Tx.Creds) < 2 {
+		return errWrongCredentialsNumber
+	}
+
+	// verify the flowcheck
+
+	if err := e.FlowChecker.VerifyLock(
+		tx,
+		e.State,
+		tx.Ins,
+		tx.Outs,
+		e.Tx.Creds[:len(e.Tx.Creds)-1], // base tx credentials
+		0,
+		e.Config.TxFee,
+		e.Ctx.AVAXAssetID,
+		locked.StateUnlocked,
+	); err != nil {
+		return fmt.Errorf("%w: %s", errFlowCheckFailed, err)
+	}
+
+	// check role
+
+	depositOfferCreatorAddressState, err := e.State.GetAddressStates(tx.DepositOfferCreatorAddress)
+	if err != nil {
+		return err
+	}
+
+	if depositOfferCreatorAddressState&txs.AddressStateRoleOffersCreator == 0 {
+		return errNotOfferCreator
+	}
+
+	if err := e.Backend.Fx.VerifyMultisigPermission(
+		e.Tx.Unsigned,
+		tx.DepositOfferCreatorAuth,
+		e.Tx.Creds[len(e.Tx.Creds)-1], // offer creator credential
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{tx.DepositOfferCreatorAddress},
+		},
+		e.State,
+	); err != nil {
+		return fmt.Errorf("%w: %s", errOfferCreatorCredentialMismatch, err)
+	}
+
+	// validate offer
+
+	currentSupply, err := e.State.GetCurrentSupply(constants.PrimaryNetworkID)
+	if err != nil {
+		return err
+	}
+
+	allOffers, err := e.State.GetAllDepositOffers()
+	if err != nil {
+		return err
+	}
+
+	availableSupply := e.Config.RewardConfig.SupplyCap - currentSupply
+	chainTimestamp := uint64(chainTime.Unix())
+
+	for _, offer := range allOffers {
+		if offer.IsActiveAt(chainTimestamp) {
+			if offer.TotalMaxAmount != 0 {
+				availableSupply -= offer.MaxRemainingRewardByTotalMaxAmount()
+			} else if offer.TotalMaxRewardAmount != 0 {
+				availableSupply -= offer.RemainingReward()
+			}
+		}
+	}
+
+	if tx.DepositOffer.TotalMaxRewardAmount > availableSupply {
+		return errSupplyOverflow
+	}
+
+	// update state
+
+	txID := e.Tx.ID()
+
+	tx.DepositOffer.ID = txID
+	e.State.SetDepositOffer(tx.DepositOffer)
+
+	avax.Consume(e.State, tx.Ins)
+	avax.Produce(e.State, txID, tx.Outs)
+
+	return nil
+}
+
 func removeCreds(tx *txs.Tx, num int) []verify.Verifiable {
 	newCredsLen := len(tx.Creds) - num
 	removedCreds := tx.Creds[newCredsLen:len(tx.Creds)]
@@ -1500,7 +1656,7 @@ func (e *CaminoStandardTxExecutor) AddressStateTx(tx *txs.AddressStateTx) error 
 	roles := txs.AddressStateEmpty
 	creds := e.Tx.Creds
 
-	if codec.GetUpgradeVersion(tx.UpgradeVersionID) > 0 {
+	if tx.UpgradeVersionID.Version() > 0 {
 		if !e.Config.IsSunrisePhase1Activated(e.State.GetTimestamp()) {
 			return errNotSunrisePhase1
 		}
@@ -1526,7 +1682,7 @@ func (e *CaminoStandardTxExecutor) AddressStateTx(tx *txs.AddressStateTx) error 
 			return errAdminCannotBeDeleted
 		}
 	} else {
-		addresses, err := e.Fx.RecoverAddresses(tx, e.Tx.Creds)
+		addresses, err := e.Fx.RecoverAddresses(tx.Bytes(), e.Tx.Creds)
 		if err != nil {
 			return fmt.Errorf("%w: %s", errRecoverAddresses, err)
 		}
@@ -1626,6 +1782,7 @@ func verifyAccess(roles, state txs.AddressState) bool {
 	switch {
 	case roles&txs.AddressStateRoleAdmin != 0: // admin can do anything
 	case txs.AddressStateKYCAll&state != 0 && roles&txs.AddressStateRoleKYC != 0: // kyc role can change kyc status
+	case txs.AddressStateRoleOffersCreator&state != 0 && roles&txs.AddressStateRoleOffersAdmin != 0: // offers admin can assign offers creator role
 	default:
 		return false
 	}

@@ -4,115 +4,13 @@
 package deposit
 
 import (
-	"errors"
-	"fmt"
 	"math/big"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/math"
-	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
-	"github.com/ava-labs/avalanchego/vms/types"
 )
-
-type OfferFlag uint64
-
-const (
-	interestRateBase        = 365 * 24 * 60 * 60
-	interestRateDenominator = 1_000_000 * interestRateBase
-
-	OfferFlagLocked OfferFlag = 0b1
-)
-
-var bigInterestRateDenominator = (&big.Int{}).SetInt64(interestRateDenominator)
-
-type Offer struct {
-	ID ids.ID `json:"id"`
-
-	InterestRateNominator   uint64              `serialize:"true" json:"interestRateNominator"`   // deposit.Amount * (interestRateNominator / interestRateDenominator) == reward for deposit with 1 year duration
-	Start                   uint64              `serialize:"true" json:"start"`                   // Unix time in seconds, when this offer becomes active (can be used to create new deposits)
-	End                     uint64              `serialize:"true" json:"end"`                     // Unix time in seconds, when this offer becomes inactive (can't be used to create new deposits)
-	MinAmount               uint64              `serialize:"true" json:"minAmount"`               // Minimum amount that can be deposited with this offer
-	TotalMaxAmount          uint64              `serialize:"true" json:"totalMaxAmount"`          // Maximum amount that can be deposited with this offer in total (across all deposits)
-	DepositedAmount         uint64              `serialize:"true" json:"depositedAmount"`         // Amount that was already deposited with this offer
-	MinDuration             uint32              `serialize:"true" json:"minDuration"`             // Minimum duration of deposit created with this offer
-	MaxDuration             uint32              `serialize:"true" json:"maxDuration"`             // Maximum duration of deposit created with this offer
-	UnlockPeriodDuration    uint32              `serialize:"true" json:"unlockPeriodDuration"`    // Duration of period during which tokens deposited with this offer will be unlocked. The unlock period starts at the end of deposit minus unlockPeriodDuration
-	NoRewardsPeriodDuration uint32              `serialize:"true" json:"noRewardsPeriodDuration"` // Duration of period during which rewards won't be accumulated. No rewards period starts at the end of deposit minus unlockPeriodDuration
-	Memo                    types.JSONByteSlice `serialize:"true" json:"memo"`                    // Arbitrary offer memo
-	Flags                   OfferFlag           `serialize:"true" json:"flags"`                   // Bitfield with flags
-}
-
-// Sets offer id from its bytes hash
-func (o *Offer) SetID() error {
-	bytes, err := blocks.GenesisCodec.Marshal(blocks.Version, o)
-	if err != nil {
-		return err
-	}
-	o.ID = hashing.ComputeHash256Array(bytes)
-	return nil
-}
-
-// Time when this offer becomes active
-func (o *Offer) StartTime() time.Time {
-	return time.Unix(int64(o.Start), 0)
-}
-
-// Time when this offer becomes inactive
-func (o *Offer) EndTime() time.Time {
-	return time.Unix(int64(o.End), 0)
-}
-
-func (o *Offer) RemainingAmount() uint64 {
-	return o.TotalMaxAmount - o.DepositedAmount
-}
-
-func (o *Offer) InterestRateFloat64() float64 {
-	return float64(o.InterestRateNominator) / float64(interestRateDenominator)
-}
-
-func (o *Offer) Verify() error {
-	if o.Start >= o.End {
-		return fmt.Errorf(
-			"deposit offer starttime (%v) is not before its endtime (%v)",
-			o.Start,
-			o.End,
-		)
-	}
-
-	if o.MinDuration > o.MaxDuration {
-		return errors.New("deposit minimum duration is greater than maximum duration")
-	}
-
-	if o.MinDuration == 0 {
-		return errors.New("deposit offer has zero minimum duration")
-	}
-
-	if o.MinDuration < o.NoRewardsPeriodDuration {
-		return fmt.Errorf(
-			"deposit offer minimum duration (%v) is less than no-rewards period duration (%v)",
-			o.MinDuration,
-			o.NoRewardsPeriodDuration,
-		)
-	}
-
-	if o.MinDuration < o.UnlockPeriodDuration {
-		return fmt.Errorf(
-			"deposit offer minimum duration (%v) is less than unlock period duration (%v)",
-			o.MinDuration,
-			o.UnlockPeriodDuration,
-		)
-	}
-
-	if len(o.Memo) > avax.MaxMemoSize {
-		return fmt.Errorf("deposit offer memo is larger (%d bytes) than max of %d bytes", len(o.Memo), avax.MaxMemoSize)
-	}
-
-	return nil
-}
 
 type Deposit struct {
 	DepositOfferID      ids.ID   `serialize:"true"` // ID of deposit offer that was used to create this deposit

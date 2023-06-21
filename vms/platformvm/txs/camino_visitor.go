@@ -12,4 +12,5 @@ type CaminoVisitor interface {
 	RewardsImportTx(*RewardsImportTx) error
 	BaseTx(*BaseTx) error
 	MultisigAliasTx(*MultisigAliasTx) error
+	AddDepositOfferTx(*AddDepositOfferTx) error
 }

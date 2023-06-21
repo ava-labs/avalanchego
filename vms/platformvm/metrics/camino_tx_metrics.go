@@ -20,7 +20,8 @@ type caminoTxMetrics struct {
 	numRegisterNodeTxs,
 	numRewardsImportTxs,
 	numBaseTxs,
-	numMultisigAliasTxs prometheus.Counter
+	numMultisigAliasTxs,
+	numAddDepositOfferTxs prometheus.Counter
 }
 
 func newCaminoTxMetrics(
@@ -36,14 +37,15 @@ func newCaminoTxMetrics(
 	m := &caminoTxMetrics{
 		txMetrics: *txm,
 		// Camino specific tx metrics
-		numAddressStateTxs:  newTxMetric(namespace, "add_address_state", registerer, &errs),
-		numDepositTxs:       newTxMetric(namespace, "deposit", registerer, &errs),
-		numUnlockDepositTxs: newTxMetric(namespace, "unlock_deposit", registerer, &errs),
-		numClaimTxs:         newTxMetric(namespace, "claim", registerer, &errs),
-		numRegisterNodeTxs:  newTxMetric(namespace, "register_node", registerer, &errs),
-		numRewardsImportTxs: newTxMetric(namespace, "rewards_import", registerer, &errs),
-		numBaseTxs:          newTxMetric(namespace, "base", registerer, &errs),
-		numMultisigAliasTxs: newTxMetric(namespace, "multisig_alias", registerer, &errs),
+		numAddressStateTxs:    newTxMetric(namespace, "add_address_state", registerer, &errs),
+		numDepositTxs:         newTxMetric(namespace, "deposit", registerer, &errs),
+		numUnlockDepositTxs:   newTxMetric(namespace, "unlock_deposit", registerer, &errs),
+		numClaimTxs:           newTxMetric(namespace, "claim", registerer, &errs),
+		numRegisterNodeTxs:    newTxMetric(namespace, "register_node", registerer, &errs),
+		numRewardsImportTxs:   newTxMetric(namespace, "rewards_import", registerer, &errs),
+		numBaseTxs:            newTxMetric(namespace, "base", registerer, &errs),
+		numMultisigAliasTxs:   newTxMetric(namespace, "multisig_alias", registerer, &errs),
+		numAddDepositOfferTxs: newTxMetric(namespace, "add_deposit_offer", registerer, &errs),
 	}
 	return m, errs.Err
 }
@@ -79,6 +81,10 @@ func (*txMetrics) BaseTx(*txs.BaseTx) error {
 }
 
 func (*txMetrics) MultisigAliasTx(*txs.MultisigAliasTx) error {
+	return nil
+}
+
+func (*txMetrics) AddDepositOfferTx(*txs.AddDepositOfferTx) error {
 	return nil
 }
 
@@ -121,5 +127,10 @@ func (m *caminoTxMetrics) BaseTx(*txs.BaseTx) error {
 
 func (m *caminoTxMetrics) MultisigAliasTx(*txs.MultisigAliasTx) error {
 	m.numMultisigAliasTxs.Inc()
+	return nil
+}
+
+func (m *caminoTxMetrics) AddDepositOfferTx(*txs.AddDepositOfferTx) error {
+	m.numAddDepositOfferTxs.Inc()
 	return nil
 }

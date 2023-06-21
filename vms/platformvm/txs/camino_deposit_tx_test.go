@@ -7,6 +7,7 @@ import (
 	"math"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/locked"
@@ -49,13 +50,63 @@ func TestDepositTxSyntacticVerify(t *testing.T) {
 			},
 			expectedErr: errToBigDeposit,
 		},
-		"OK": {
+		"V1, bad deposit creator auth": {
+			tx: &DepositTx{
+				UpgradeVersionID: codec.UpgradeVersion1,
+				BaseTx: BaseTx{BaseTx: avax.BaseTx{
+					NetworkID:    ctx.NetworkID,
+					BlockchainID: ctx.ChainID,
+				}},
+				RewardsOwner:       &secp256k1fx.OutputOwners{},
+				DepositCreatorAuth: (*secp256k1fx.Input)(nil),
+			},
+			expectedErr: errBadDepositCreatorAuth,
+		},
+		"V1, bad deposit offer owner auth": {
+			tx: &DepositTx{
+				UpgradeVersionID: codec.UpgradeVersion1,
+				BaseTx: BaseTx{BaseTx: avax.BaseTx{
+					NetworkID:    ctx.NetworkID,
+					BlockchainID: ctx.ChainID,
+				}},
+				RewardsOwner:          &secp256k1fx.OutputOwners{},
+				DepositCreatorAuth:    &secp256k1fx.Input{},
+				DepositOfferOwnerAuth: (*secp256k1fx.Input)(nil),
+			},
+			expectedErr: errBadOfferOwnerAuth,
+		},
+		"OK: v0": {
 			tx: &DepositTx{
 				BaseTx: BaseTx{BaseTx: avax.BaseTx{
 					NetworkID:    ctx.NetworkID,
 					BlockchainID: ctx.ChainID,
 				}},
 				RewardsOwner: &secp256k1fx.OutputOwners{},
+			},
+		},
+		"OK: v1": {
+			tx: &DepositTx{
+				UpgradeVersionID: codec.UpgradeVersion1,
+				BaseTx: BaseTx{BaseTx: avax.BaseTx{
+					NetworkID:    ctx.NetworkID,
+					BlockchainID: ctx.ChainID,
+				}},
+				RewardsOwner:          &secp256k1fx.OutputOwners{},
+				DepositCreatorAddress: ids.ShortID{1},
+				DepositCreatorAuth:    &secp256k1fx.Input{},
+				DepositOfferOwnerAuth: &secp256k1fx.Input{},
+			},
+		},
+		"OK: v1, empty creator addr": {
+			tx: &DepositTx{
+				UpgradeVersionID: codec.UpgradeVersion1,
+				BaseTx: BaseTx{BaseTx: avax.BaseTx{
+					NetworkID:    ctx.NetworkID,
+					BlockchainID: ctx.ChainID,
+				}},
+				RewardsOwner:          &secp256k1fx.OutputOwners{},
+				DepositCreatorAuth:    &secp256k1fx.Input{},
+				DepositOfferOwnerAuth: &secp256k1fx.Input{},
 			},
 		},
 	}

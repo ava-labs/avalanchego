@@ -49,6 +49,11 @@ func (i *issuer) MultisigAliasTx(*txs.MultisigAliasTx) error {
 	return nil
 }
 
+func (i *issuer) AddDepositOfferTx(*txs.AddDepositOfferTx) error {
+	i.m.addDecisionTx(i.tx)
+	return nil
+}
+
 // Remover
 
 func (r *remover) AddressStateTx(*txs.AddressStateTx) error {
@@ -87,6 +92,11 @@ func (r *remover) BaseTx(*txs.BaseTx) error {
 }
 
 func (r *remover) MultisigAliasTx(*txs.MultisigAliasTx) error {
+	r.m.removeDecisionTxs([]*txs.Tx{r.tx})
+	return nil
+}
+
+func (r *remover) AddDepositOfferTx(*txs.AddDepositOfferTx) error {
 	r.m.removeDecisionTxs([]*txs.Tx{r.tx})
 	return nil
 }

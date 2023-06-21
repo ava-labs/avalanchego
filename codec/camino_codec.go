@@ -5,10 +5,17 @@ package codec
 
 const UpgradePrefix = uint64(0xFFFFFFFFFFFF0000)
 
-func BuildUpgradeVersionID(version uint16) uint64 {
-	return UpgradePrefix | uint64(version)
+type UpgradeVersionID uint64
+
+const (
+	UpgradeVersion0 UpgradeVersionID = UpgradeVersionID(UpgradePrefix)
+	UpgradeVersion1 UpgradeVersionID = UpgradeVersionID(UpgradePrefix | uint64(1))
+)
+
+func (id UpgradeVersionID) Version() uint16 {
+	return uint16(id & 0xFFFF)
 }
 
-func GetUpgradeVersion(id uint64) uint16 {
-	return uint16(id & 0xFFFF)
+func BuildUpgradeVersionID(version uint16) UpgradeVersionID {
+	return UpgradeVersionID(UpgradePrefix | uint64(version))
 }

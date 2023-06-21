@@ -43,7 +43,7 @@ func TestBuildCaminoGenesis(t *testing.T) {
 		Flags:                   9,
 		Memo:                    []byte("some memo"),
 	}
-	require.NoError(t, depositOffer.SetID())
+	require.NoError(t, genesis.SetDepositOfferID(depositOffer))
 
 	weight := json.Uint64(987654321)
 

@@ -42,6 +42,10 @@ func (b *backendVisitor) MultisigAliasTx(tx *txs.MultisigAliasTx) error {
 	return b.baseTx(&tx.BaseTx)
 }
 
+func (b *backendVisitor) AddDepositOfferTx(tx *txs.AddDepositOfferTx) error {
+	return b.baseTx(&tx.BaseTx)
+}
+
 // signer
 
 func (s *signerVisitor) AddressStateTx(tx *txs.AddressStateTx) error {
@@ -97,6 +101,14 @@ func (s *signerVisitor) BaseTx(tx *txs.BaseTx) error {
 }
 
 func (s *signerVisitor) MultisigAliasTx(tx *txs.MultisigAliasTx) error {
+	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
+	if err != nil {
+		return err
+	}
+	return sign(s.tx, false, txSigners)
+}
+
+func (s *signerVisitor) AddDepositOfferTx(tx *txs.AddDepositOfferTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err

@@ -924,6 +924,9 @@ type APIDepositOffer struct {
 	NoRewardsPeriodDuration uint32              `json:"noRewardsPeriodDuration"` // Duration of period during which rewards won't be accumulated. No rewards period starts at the end of deposit minus unlockPeriodDuration
 	Memo                    types.JSONByteSlice `json:"memo"`                    // Arbitrary offer memo
 	Flags                   utilsjson.Uint64    `json:"flags"`                   // Bitfield with flags
+	TotalMaxRewardAmount    utilsjson.Uint64    `json:"totalMaxRewardAmount"`    // Maximum amount that can be rewarded for all deposits created with this offer in total
+	RewardedAmount          utilsjson.Uint64    `json:"rewardedAmount"`          // Amount that was already rewarded (including potential rewards) for deposits created with this offer
+	OwnerAddress            ids.ShortID         `json:"ownerAddress"`            // Address that can sign deposit-creator permission
 }
 
 type GetAllDepositOffersArgs struct {
@@ -968,5 +971,8 @@ func apiOfferFromOffer(offer *deposit.Offer) *APIDepositOffer {
 		NoRewardsPeriodDuration: offer.NoRewardsPeriodDuration,
 		Memo:                    offer.Memo,
 		Flags:                   utilsjson.Uint64(offer.Flags),
+		TotalMaxRewardAmount:    utilsjson.Uint64(offer.TotalMaxRewardAmount),
+		RewardedAmount:          utilsjson.Uint64(offer.RewardedAmount),
+		OwnerAddress:            offer.OwnerAddress,
 	}
 }

@@ -75,11 +75,11 @@ func (fx *CaminoFx) VerifyTransfer(txIntf, inIntf, credIntf, utxoIntf interface{
 	return fx.Fx.VerifyTransfer(txIntf, inIntf, credIntf, utxoIntf)
 }
 
-func (fx *Fx) RecoverAddresses(utx UnsignedTx, verifies []verify.Verifiable) (RecoverMap, error) {
+func (fx *Fx) RecoverAddresses(msg []byte, verifies []verify.Verifiable) (RecoverMap, error) {
 	ret := make(RecoverMap, len(verifies))
 	visited := make(map[[secp256k1.SignatureLen]byte]bool)
 
-	txHash := hashing.ComputeHash256(utx.Bytes())
+	txHash := hashing.ComputeHash256(msg)
 	for _, v := range verifies {
 		cred, ok := v.(CredentialIntf)
 		if !ok {
@@ -172,7 +172,7 @@ func (fx *Fx) VerifyMultisigTransfer(txIntf, inIntf, credIntf, utxoIntf, msigInt
 		return errors.New("out amount and input differ")
 	}
 
-	return fx.verifyMultisigCredentials(tx, &in.Input, cred, owners, msig)
+	return fx.verifyMultisigCredentials(tx.Bytes(), &in.Input, cred, owners, msig)
 }
 
 func (fx *Fx) VerifyMultisigPermission(txIntf, inIntf, credIntf, ownerIntf, msigIntf interface{}) error {
@@ -202,7 +202,7 @@ func (fx *Fx) VerifyMultisigPermission(txIntf, inIntf, credIntf, ownerIntf, msig
 		return err
 	}
 
-	return fx.verifyMultisigCredentials(tx, in, cred, owners, msig)
+	return fx.verifyMultisigCredentials(tx.Bytes(), in, cred, owners, msig)
 }
 
 func (*Fx) CollectMultisigAliases(ownerIntf, msigIntf interface{}) ([]interface{}, error) {
@@ -218,7 +218,33 @@ func (*Fx) CollectMultisigAliases(ownerIntf, msigIntf interface{}) ([]interface{
 	return collectMultisigAliases(owners, msig)
 }
 
-func (fx *Fx) verifyMultisigCredentials(tx UnsignedTx, in *Input, cred CredentialIntf, owners *OutputOwners, msig AliasGetter) error {
+func (fx *Fx) VerifyMultisigMessage(msg []byte, inIntf, credIntf, ownerIntf, msigIntf interface{}) error {
+	in, ok := inIntf.(*Input)
+	if !ok {
+		return ErrWrongInputType
+	}
+	cred, ok := credIntf.(CredentialIntf)
+	if !ok {
+		return ErrWrongCredentialType
+	}
+	owners, ok := ownerIntf.(*OutputOwners)
+	if !ok {
+		return ErrWrongUTXOType
+	}
+
+	msig, ok := msigIntf.(AliasGetter)
+	if !ok {
+		return ErrNotAliasGetter
+	}
+
+	if err := verify.All(owners, in, cred); err != nil {
+		return err
+	}
+
+	return fx.verifyMultisigCredentials(msg, in, cred, owners, msig)
+}
+
+func (fx *Fx) verifyMultisigCredentials(msg []byte, in *Input, cred CredentialIntf, owners *OutputOwners, msig AliasGetter) error {
 	sigIdxs := cred.SignatureIndices()
 	if sigIdxs == nil {
 		sigIdxs = in.SigIndices
@@ -228,7 +254,7 @@ func (fx *Fx) verifyMultisigCredentials(tx UnsignedTx, in *Input, cred Credentia
 		return ErrInputCredentialSignersMismatch
 	}
 
-	resolved, err := fx.RecoverAddresses(tx, []verify.Verifiable{cred})
+	resolved, err := fx.RecoverAddresses(msg, []verify.Verifiable{cred})
 	if err != nil {
 		return err
 	}
