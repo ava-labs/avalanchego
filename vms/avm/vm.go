@@ -480,16 +480,6 @@ func (vm *VM) ParseTx(_ context.Context, bytes []byte) (snowstorm.Tx, error) {
 	return tx, nil
 }
 
-func (vm *VM) GetTx(_ context.Context, txID ids.ID) (snowstorm.Tx, error) {
-	tx := &UniqueTx{
-		vm:   vm,
-		txID: txID,
-	}
-	// Verify must be called in the case the that tx was flushed from the unique
-	// cache.
-	return tx, tx.verifyWithoutCacheWrites()
-}
-
 /*
  ******************************************************************************
  ********************************** JSON API **********************************
