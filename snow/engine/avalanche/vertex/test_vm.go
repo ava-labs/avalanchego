@@ -15,7 +15,6 @@ import (
 )
 
 var (
-	errPending   = errors.New("unexpectedly called Pending")
 	errLinearize = errors.New("unexpectedly called Linearize")
 
 	_ LinearizableVM = (*TestVM)(nil)
