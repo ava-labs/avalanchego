@@ -98,19 +98,6 @@ type meterTx struct {
 	vm *vertexVM
 }
 
-func (mtx *meterTx) Verify(ctx context.Context) error {
-	start := mtx.vm.clock.Time()
-	err := mtx.Tx.Verify(ctx)
-	end := mtx.vm.clock.Time()
-	duration := float64(end.Sub(start))
-	if err != nil {
-		mtx.vm.vertexMetrics.verifyErr.Observe(duration)
-	} else {
-		mtx.vm.vertexMetrics.verify.Observe(duration)
-	}
-	return err
-}
-
 func (mtx *meterTx) Accept(ctx context.Context) error {
 	start := mtx.vm.clock.Time()
 	err := mtx.Tx.Accept(ctx)

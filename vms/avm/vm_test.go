@@ -564,13 +564,11 @@ func TestTxAcceptAfterParseTx(t *testing.T) {
 	parsedFirstTx, err := env.vm.ParseTx(context.Background(), firstTx.Bytes())
 	require.NoError(err)
 
-	require.NoError(parsedFirstTx.Verify(context.Background()))
 	require.NoError(parsedFirstTx.Accept(context.Background()))
 
 	parsedSecondTx, err := env.vm.ParseTx(context.Background(), secondTx.Bytes())
 	require.NoError(err)
 
-	require.NoError(parsedSecondTx.Verify(context.Background()))
 	require.NoError(parsedSecondTx.Accept(context.Background()))
 
 	firstTxStatus, err := env.vm.state.GetStatus(firstTx.ID())
@@ -737,7 +735,6 @@ func TestForceAcceptImportTx(t *testing.T) {
 	parsedTx, err := env.vm.ParseTx(context.Background(), tx.Bytes())
 	require.NoError(err)
 
-	require.NoError(parsedTx.Verify(context.Background()))
 	require.NoError(parsedTx.Accept(context.Background()))
 
 	assertIndexedTX(t, env.vm.db, 0, key.PublicKey().Address(), txAssetID.AssetID(), tx.ID())

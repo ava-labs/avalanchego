@@ -22,15 +22,6 @@ type tracedTx struct {
 	tracer trace.Tracer
 }
 
-func (t *tracedTx) Verify(ctx context.Context) error {
-	ctx, span := t.tracer.Start(ctx, "tracedTx.Verify", oteltrace.WithAttributes(
-		attribute.Stringer("txID", t.ID()),
-	))
-	defer span.End()
-
-	return t.Tx.Verify(ctx)
-}
-
 func (t *tracedTx) Accept(ctx context.Context) error {
 	ctx, span := t.tracer.Start(ctx, "tracedTx.Accept", oteltrace.WithAttributes(
 		attribute.Stringer("txID", t.ID()),

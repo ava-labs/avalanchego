@@ -96,16 +96,8 @@ func (t *txJob) Execute(ctx context.Context) error {
 		t.numDropped.Inc()
 		return fmt.Errorf("attempting to execute transaction with status %s", status)
 	case choices.Processing:
-		txID := t.tx.ID()
-		if err := t.tx.Verify(ctx); err != nil {
-			t.log.Error("transaction failed verification during bootstrapping",
-				zap.Stringer("txID", txID),
-				zap.Error(err),
-			)
-			return fmt.Errorf("failed to verify transaction in bootstrapping: %w", err)
-		}
-
 		t.numAccepted.Inc()
+		txID := t.tx.ID()
 		t.log.Trace("accepting transaction in bootstrapping",
 			zap.Stringer("txID", txID),
 		)
