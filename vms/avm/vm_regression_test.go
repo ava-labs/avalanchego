@@ -9,15 +9,10 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/database/manager"
-	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -27,44 +22,14 @@ import (
 
 func TestVerifyFxUsage(t *testing.T) {
 	require := require.New(t)
-	vm := &VM{}
-	ctx := NewContext(t)
-	ctx.Lock.Lock()
+
+	env := setup(t, &envConfig{
+		vmStaticConfig: &config.Config{},
+	})
 	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-		ctx.Lock.Unlock()
+		require.NoError(env.vm.Shutdown(context.Background()))
+		env.vm.ctx.Lock.Unlock()
 	}()
-
-	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
-	m := atomic.NewMemory(prefixdb.New([]byte{0}, baseDBManager.Current().Database))
-	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
-
-	genesisBytes := BuildGenesisTest(t)
-	issuer := make(chan common.Message, 1)
-	require.NoError(vm.Initialize(
-		context.Background(),
-		ctx,
-		baseDBManager,
-		genesisBytes,
-		nil,
-		nil,
-		issuer,
-		[]*common.Fx{
-			{
-				ID: ids.Empty.Prefix(0),
-				Fx: &secp256k1fx.Fx{},
-			},
-			{
-				ID: ids.Empty.Prefix(1),
-				Fx: &nftfx.Fx{},
-			},
-		},
-		nil,
-	))
-	vm.batchTimeout = 0
-
-	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
-	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
 
 	createAssetTx := &txs.Tx{Unsigned: &txs.CreateAssetTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
@@ -101,8 +66,8 @@ func TestVerifyFxUsage(t *testing.T) {
 			},
 		},
 	}}
-	require.NoError(vm.parser.InitializeTx(createAssetTx))
-	issueAndAccept(require, vm, issuer, createAssetTx)
+	require.NoError(env.vm.parser.InitializeTx(createAssetTx))
+	issueAndAccept(require, env.vm, env.issuer, createAssetTx)
 
 	mintNFTTx := &txs.Tx{Unsigned: &txs.OperationTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
@@ -125,8 +90,8 @@ func TestVerifyFxUsage(t *testing.T) {
 			},
 		}},
 	}}
-	require.NoError(mintNFTTx.SignNFTFx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0]}}))
-	issueAndAccept(require, vm, issuer, mintNFTTx)
+	require.NoError(mintNFTTx.SignNFTFx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0]}}))
+	issueAndAccept(require, env.vm, env.issuer, mintNFTTx)
 
 	spendTx := &txs.Tx{Unsigned: &txs.BaseTx{BaseTx: avax.BaseTx{
 		NetworkID:    constants.UnitTestID,
@@ -145,6 +110,6 @@ func TestVerifyFxUsage(t *testing.T) {
 			},
 		}},
 	}}}
-	require.NoError(spendTx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0]}}))
-	issueAndAccept(require, vm, issuer, spendTx)
+	require.NoError(spendTx.SignSECP256K1Fx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0]}}))
+	issueAndAccept(require, env.vm, env.issuer, spendTx)
 }
