@@ -2,19 +2,20 @@
 // See the file LICENSE.md for licensing terms.
 
 use crate::proof::Proof;
-
 use enum_as_inner::EnumAsInner;
 use sha3::Digest;
 use shale::{CachedStore, ObjPtr, ObjRef, ShaleError, ShaleStore, Storable};
-
-use std::cmp;
-use std::collections::HashMap;
-use std::error::Error;
-use std::fmt::{self, Debug};
-use std::io::{Cursor, Read, Write};
-use std::iter;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::OnceLock;
+use std::{
+    collections::HashMap,
+    error::Error,
+    fmt::{self, Debug},
+    io::{Cursor, Read, Write},
+    iter,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        OnceLock,
+    },
+};
 
 pub const NBRANCH: usize = 16;
 pub const TRIE_HASH_LEN: usize = 32;
@@ -2054,63 +2055,18 @@ pub fn from_nibbles(nibbles: &[u8]) -> impl Iterator<Item = u8> + '_ {
     nibbles.chunks_exact(2).map(|p| (p[0] << 4) | p[1])
 }
 
-// compare two slices by comparing the bytes. A longer slice is greater
-// than a shorter slice (assuming the leading bytes are equal)
-pub fn compare(a: &[u8], b: &[u8]) -> cmp::Ordering {
-    for (ai, bi) in a.iter().zip(b) {
-        match ai.cmp(bi) {
-            cmp::Ordering::Equal => continue,
-            ord => return ord,
-        }
-    }
-
-    // If every single element was equal, compare length
-    a.len().cmp(&b.len())
-}
-
 #[cfg(test)]
 mod test {
-    use shale::cached::PlainMem;
-
     use super::*;
+    use shale::cached::PlainMem;
     use std::ops::Deref;
+    use test_case::test_case;
 
-    #[test]
-    fn test_to_nibbles() {
-        for (bytes, nibbles) in [
-            (vec![0x12, 0x34, 0x56], vec![0x1, 0x2, 0x3, 0x4, 0x5, 0x6]),
-            (vec![0xc0, 0xff], vec![0xc, 0x0, 0xf, 0xf]),
-        ] {
-            let n: Vec<_> = bytes.into_iter().flat_map(to_nibble_array).collect();
-            assert_eq!(n, nibbles);
-        }
-    }
-
-    #[test]
-    fn test_cmp() {
-        for (bytes_a, bytes_b) in [
-            (vec![0x12, 0x34, 0x56], vec![0x12, 0x34, 0x56]),
-            (vec![0xc0, 0xff], vec![0xc0, 0xff]),
-        ] {
-            let n = compare(&bytes_a, &bytes_b);
-            assert!(n.is_eq());
-        }
-
-        for (bytes_a, bytes_b) in [
-            (vec![0x12, 0x34, 0x56], vec![0x12, 0x34, 0x58]),
-            (vec![0xc0, 0xee], vec![0xc0, 0xff]),
-        ] {
-            let n = compare(&bytes_a, &bytes_b);
-            assert!(n.is_lt());
-        }
-
-        for (bytes_a, bytes_b) in [
-            (vec![0x12, 0x35, 0x56], vec![0x12, 0x34, 0x58]),
-            (vec![0xc0, 0xff, 0x33], vec![0xc0, 0xff]),
-        ] {
-            let n = compare(&bytes_a, &bytes_b);
-            assert!(n.is_gt());
-        }
+    #[test_case(vec![0x12, 0x34, 0x56], vec![0x1, 0x2, 0x3, 0x4, 0x5, 0x6])]
+    #[test_case(vec![0xc0, 0xff], vec![0xc, 0x0, 0xf, 0xf])]
+    fn test_to_nibbles(bytes: Vec<u8>, nibbles: Vec<u8>) {
+        let n: Vec<_> = bytes.into_iter().flat_map(to_nibble_array).collect();
+        assert_eq!(n, nibbles);
     }
 
     const ZERO_HASH: TrieHash = TrieHash([0u8; TRIE_HASH_LEN]);

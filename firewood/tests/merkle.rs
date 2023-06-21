@@ -1,5 +1,4 @@
 use firewood::{
-    merkle::compare,
     merkle_util::*,
     proof::{Proof, ProofError},
 };
@@ -221,7 +220,7 @@ fn test_one_element_proof() -> Result<(), DataStoreError> {
 
     let val = merkle.verify_proof(key, &proof)?;
     assert!(val.is_some());
-    assert!(compare(val.unwrap().as_ref(), "v".as_ref()).is_eq());
+    assert_eq!(&val.unwrap(), b"v");
 
     Ok(())
 }
@@ -239,7 +238,7 @@ fn test_proof() -> Result<(), DataStoreError> {
         assert!(!proof.0.is_empty());
         let val = merkle.verify_proof(key, &proof)?;
         assert!(val.is_some());
-        assert!(compare(val.unwrap().as_ref(), vals[i].as_ref()).is_eq());
+        assert_eq!(val.unwrap(), vals[i]);
     }
 
     Ok(())
@@ -471,20 +470,20 @@ fn test_range_proof_with_non_existent_proof() -> Result<(), ProofError> {
 
         // Short circuit if the decreased key is same with the previous key
         let first = decrease_key(items[start].0);
-        if start != 0 && compare(first.as_ref(), items[start - 1].0.as_ref()).is_eq() {
+        if start != 0 && first.as_ref() == items[start - 1].0.as_ref() {
             continue;
         }
         // Short circuit if the decreased key is underflow
-        if compare(first.as_ref(), items[start].0.as_ref()).is_gt() {
+        if first.as_ref() > items[start].0.as_ref() {
             continue;
         }
         // Short circuit if the increased key is same with the next key
         let last = increase_key(items[end - 1].0);
-        if end != items.len() && compare(last.as_ref(), items[end].0.as_ref()).is_eq() {
+        if end != items.len() && last.as_ref() == items[end].0.as_ref() {
             continue;
         }
         // Short circuit if the increased key is overflow
-        if compare(last.as_ref(), items[end - 1].0.as_ref()).is_lt() {
+        if last.as_ref() < items[end - 1].0.as_ref() {
             continue;
         }
 

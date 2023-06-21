@@ -48,6 +48,7 @@ serial_test = "2.0.0"
 clap = { version = "4.3.1", features = ['derive'] }
 bencher = "0.1.5"
 tempdir = "0.3.7"
+test-case = "3.1.0"
 
 [features]
 # proof API

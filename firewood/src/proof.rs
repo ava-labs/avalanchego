@@ -142,28 +142,23 @@ impl Proof {
         let mut cur_hash = root_hash;
         let proofs_map = &self.0;
         let mut index = 0;
+
         loop {
             let cur_proof = proofs_map
                 .get(&cur_hash)
                 .ok_or(ProofError::ProofNodeMissing)?;
             let (sub_proof, size) = self.locate_subproof(cur_key, cur_proof)?;
             index += size;
-            match sub_proof {
-                Some(p) => {
-                    // Return when reaching the end of the key.
-                    if index == chunks.len() {
-                        return Ok(Some(p.rlp));
-                    }
 
-                    // The trie doesn't contain the key.
-                    if p.hash.is_none() {
-                        return Ok(None);
-                    }
+            match sub_proof {
+                // Return when reaching the end of the key.
+                Some(p) if index == chunks.len() => return Ok(Some(p.rlp)),
+                // The trie doesn't contain the key.
+                Some(SubProof { hash: None, .. }) | None => return Ok(None),
+                Some(p) => {
                     cur_hash = p.hash.unwrap();
                     cur_key = &chunks[index..];
                 }
-                // The trie doesn't contain the key.
-                None => return Ok(None),
             }
         }
     }
@@ -174,8 +169,9 @@ impl Proof {
         buf: &[u8],
     ) -> Result<(Option<SubProof>, usize), ProofError> {
         let rlp = rlp::Rlp::new(buf);
-        let size = rlp.item_count().unwrap();
-        match size {
+
+        // TODO: handle error in match statement instead of unwrapping
+        match rlp.item_count().unwrap() {
             EXT_NODE_SIZE => {
                 let cur_key_path: Vec<_> = rlp
                     .at(0)
@@ -189,6 +185,7 @@ impl Proof {
                 let cur_key = cur_key_path.into_inner();
 
                 let rlp = rlp.at(1).unwrap();
+
                 let data = if rlp.is_data() {
                     rlp.as_val::<Vec<u8>>().unwrap()
                 } else {
@@ -199,6 +196,7 @@ impl Proof {
                 if key.len() < cur_key.len() || key[..cur_key.len()] != cur_key {
                     return Ok((None, 0));
                 }
+
                 if term {
                     Ok((
                         Some(SubProof {
@@ -209,43 +207,47 @@ impl Proof {
                     ))
                 } else {
                     self.generate_subproof(data)
-                        .map(|subproof| (subproof, cur_key.len()))
+                        .map(|subproof| (Some(subproof), cur_key.len()))
                 }
             }
+
+            BRANCH_NODE_SIZE if key.is_empty() => Err(ProofError::NoSuchNode),
+
             BRANCH_NODE_SIZE => {
-                if key.is_empty() {
-                    return Err(ProofError::NoSuchNode);
-                }
                 let index = key[0];
                 let rlp = rlp.at(index as usize).unwrap();
+
                 let data = if rlp.is_data() {
                     rlp.as_val::<Vec<u8>>().unwrap()
                 } else {
                     rlp.as_raw().to_vec()
                 };
-                self.generate_subproof(data).map(|subproof| (subproof, 1))
+
+                self.generate_subproof(data)
+                    .map(|subproof| (Some(subproof), 1))
             }
+
             _ => Err(ProofError::DecodeError),
         }
     }
 
-    fn generate_subproof(&self, data: Vec<u8>) -> Result<Option<SubProof>, ProofError> {
-        let data_len = data.len();
-        match data_len {
+    fn generate_subproof(&self, data: Vec<u8>) -> Result<SubProof, ProofError> {
+        match data.len() {
+            0..=31 => {
+                let sub_hash = sha3::Keccak256::digest(&data).into();
+                Ok(SubProof {
+                    rlp: data,
+                    hash: Some(sub_hash),
+                })
+            }
             32 => {
                 let sub_hash: &[u8] = &data;
                 let sub_hash = sub_hash.try_into().unwrap();
-                Ok(Some(SubProof {
+
+                Ok(SubProof {
                     rlp: data,
                     hash: Some(sub_hash),
-                }))
-            }
-            0..=31 => {
-                let sub_hash = sha3::Keccak256::digest(&data).into();
-                Ok(Some(SubProof {
-                    rlp: data,
-                    hash: Some(sub_hash),
-                }))
+                })
             }
             _ => Err(ProofError::DecodeError),
         }
@@ -268,69 +270,65 @@ impl Proof {
         }
 
         // Ensure the received batch is monotonic increasing and contains no deletions
-        for n in 0..(keys.len() as i32 - 1) {
-            if compare(keys[n as usize].as_ref(), keys[(n + 1) as usize].as_ref()).is_ge() {
-                return Err(ProofError::NonMonotonicIncreaseRange);
-            }
+        if !keys.windows(2).all(|w| w[0].as_ref() < w[1].as_ref()) {
+            return Err(ProofError::NonMonotonicIncreaseRange);
         }
 
-        for v in vals.iter() {
-            if v.as_ref().is_empty() {
-                return Err(ProofError::RangeHasDeletion);
-            }
+        if !vals.iter().all(|v| !v.as_ref().is_empty()) {
+            return Err(ProofError::RangeHasDeletion);
         }
 
         // Use in-memory merkle
         let mut merkle_setup = new_merkle(0x10000, 0x10000);
+
         // Special case, there is no edge proof at all. The given range is expected
         // to be the whole leaf-set in the trie.
         if self.0.is_empty() {
             for (index, k) in keys.iter().enumerate() {
                 merkle_setup.insert(k, vals[index].as_ref().to_vec())?;
             }
+
             let merkle_root = &*merkle_setup.root_hash()?;
-            if merkle_root != &root_hash {
-                return Err(ProofError::InvalidProof);
-            }
-            return Ok(false);
+
+            return if merkle_root == &root_hash {
+                Ok(false)
+            } else {
+                Err(ProofError::InvalidProof)
+            };
         }
+
         // Special case when there is a provided edge proof but zero key/value pairs,
         // ensure there are no more accounts / slots in the trie.
         if keys.is_empty() {
-            if (self.proof_to_path(first_key.as_ref(), root_hash, &mut merkle_setup, true)?)
-                .is_some()
-            {
-                // No more entries should be available.
-                return Err(ProofError::InvalidData);
-            }
-            return Ok(false);
+            let proof_to_path =
+                self.proof_to_path(first_key.as_ref(), root_hash, &mut merkle_setup, true)?;
+            return match proof_to_path {
+                Some(_) => Err(ProofError::InvalidData),
+                None => Ok(false),
+            };
         }
 
         // Special case, there is only one element and two edge keys are same.
         // In this case, we can't construct two edge paths. So handle it here.
-        if keys.len() == 1 && compare(first_key.as_ref(), last_key.as_ref()).is_eq() {
+        if keys.len() == 1 && first_key.as_ref() == last_key.as_ref() {
             let data =
                 self.proof_to_path(first_key.as_ref(), root_hash, &mut merkle_setup, false)?;
 
-            if compare(first_key.as_ref(), keys[0].as_ref()).is_ne() {
+            return if first_key.as_ref() != keys[0].as_ref() {
                 // correct proof but invalid key
-                return Err(ProofError::InvalidEdgeKeys);
-            }
-
-            return data.map_or_else(
-                || Err(ProofError::InvalidData),
-                |d| {
-                    if compare(&d, vals[0].as_ref()).is_ne() {
-                        Err(ProofError::InvalidData)
-                    } else {
-                        Ok(true)
-                    }
-                },
-            );
+                Err(ProofError::InvalidEdgeKeys)
+            } else {
+                match data {
+                    Some(val) if val == vals[0].as_ref() => Ok(true),
+                    None => Ok(false),
+                    _ => Err(ProofError::InvalidData),
+                }
+            };
         }
+
         // Ok, in all other cases, we require two edge paths available.
         // First check the validity of edge keys.
-        if compare(first_key.as_ref(), last_key.as_ref()).is_ge() {
+        if first_key.as_ref() >= last_key.as_ref() {
             return Err(ProofError::InvalidEdgeKeys);
         }
 
@@ -353,22 +351,24 @@ impl Proof {
         // be re-filled(or re-constructed) by the given leaves range.
         let fork_at_root =
             unset_internal(&mut merkle_setup, first_key.as_ref(), last_key.as_ref())?;
+
         // If the fork point is the root, the trie should be empty, start with a new one.
         if fork_at_root {
             merkle_setup = new_merkle(0x100000, 0x100000);
         }
 
-        for (i, _) in keys.iter().enumerate() {
-            merkle_setup.insert(keys[i].as_ref(), vals[i].as_ref().to_vec())?;
+        for (key, val) in keys.iter().zip(vals.iter()) {
+            merkle_setup.insert(key.as_ref(), val.as_ref().to_vec())?;
         }
 
         // Calculate the hash
         let merkle_root = &*merkle_setup.root_hash()?;
-        if merkle_root != &root_hash {
-            return Err(ProofError::InvalidProof);
-        }
 
-        Ok(true)
+        if merkle_root == &root_hash {
+            Ok(true)
+        } else {
+            Err(ProofError::InvalidProof)
+        }
     }
 
     /// proofToPath converts a merkle proof to trie node path. The main purpose of
@@ -395,7 +395,7 @@ impl Proof {
         let mut cur_hash = root_hash;
         let proofs_map = &self.0;
         let mut key_index = 0;
-        let mut branch_index: u8 = 0;
+        let mut branch_index = 0;
 
         loop {
             let cur_proof = proofs_map
@@ -407,26 +407,26 @@ impl Proof {
 
             // Link the child to the parent based on the node type.
             match &u_ref.inner() {
-                NodeType::Branch(n) => {
-                    match n.chd()[branch_index as usize] {
-                        // If the child already resolved, then use the existing node.
-                        Some(node) => {
-                            chd_ptr = node;
-                        }
-                        None => {
-                            // insert the leaf to the empty slot
-                            u_ref
-                                .write(|u| {
-                                    let uu = u.inner_mut().as_branch_mut().unwrap();
-                                    uu.chd_mut()[branch_index as usize] = Some(chd_ptr);
-                                })
-                                .unwrap();
-                        }
-                    };
-                }
+                NodeType::Branch(n) => match n.chd()[branch_index] {
+                    // If the child already resolved, then use the existing node.
+                    Some(node) => {
+                        chd_ptr = node;
+                    }
+                    None => {
+                        // insert the leaf to the empty slot
+                        u_ref
+                            .write(|u| {
+                                let uu = u.inner_mut().as_branch_mut().unwrap();
+                                uu.chd_mut()[branch_index] = Some(chd_ptr);
+                            })
+                            .unwrap();
+                    }
+                },
+
                 NodeType::Extension(_) => {
                     // If the child already resolved, then use the existing node.
                     let node = u_ref.inner().as_extension().unwrap().chd();
+
                     if node.is_null() {
                         u_ref
                             .write(|u| {
@@ -438,6 +438,7 @@ impl Proof {
                         chd_ptr = node;
                     }
                 }
+
                 // We should not hit a leaf node as a parent.
                 _ => return Err(ProofError::InvalidNode(MerkleError::ParentLeafBranch)),
             };
@@ -445,56 +446,66 @@ impl Proof {
             u_ref = merkle
                 .get_node(chd_ptr)
                 .map_err(|_| ProofError::DecodeError)?;
+
             // If the new parent is a branch node, record the index to correctly link the next child to it.
             if u_ref.inner().as_branch().is_some() {
-                branch_index = chunks[key_index];
+                branch_index = chunks[key_index] as usize;
             }
 
             key_index += size;
+
             match sub_proof {
+                // The trie doesn't contain the key. It's possible
+                // the proof is a non-existing proof, but at least
+                // we can prove all resolved nodes are correct, it's
+                // enough for us to prove range.
+                None => {
+                    return allow_non_existent_node
+                        .then_some(None)
+                        .ok_or(ProofError::NodeNotInTrie);
+                }
                 Some(p) => {
                     // Return when reaching the end of the key.
                     if key_index == chunks.len() {
                         cur_key = &chunks[key_index..];
                         let mut data = None;
+
                         // Decode the last subproof to get the value.
-                        if p.hash.is_some() {
-                            let proof = proofs_map
-                                .get(&p.hash.unwrap())
-                                .ok_or(ProofError::ProofNodeMissing)?;
+                        if let Some(p_hash) = p.hash.as_ref() {
+                            let proof =
+                                proofs_map.get(p_hash).ok_or(ProofError::ProofNodeMissing)?;
 
                             chd_ptr = self.decode_node(merkle, cur_key, proof, true)?.0;
 
                             // Link the child to the parent based on the node type.
                             match &u_ref.inner() {
-                                NodeType::Branch(n) => {
-                                    match n.chd()[branch_index as usize] {
-                                        // If the child already resolved, then use the existing node.
-                                        Some(_) => {}
-                                        None => {
-                                            // insert the leaf to the empty slot
-                                            u_ref
-                                                .write(|u| {
-                                                    let uu = u.inner_mut().as_branch_mut().unwrap();
-                                                    uu.chd_mut()[branch_index as usize] =
-                                                        Some(chd_ptr);
-                                                })
-                                                .unwrap();
-                                        }
-                                    };
+                                NodeType::Branch(n) if n.chd()[branch_index].is_none() => {
+                                    // insert the leaf to the empty slot
+                                    u_ref
+                                        .write(|u| {
+                                            let uu = u.inner_mut().as_branch_mut().unwrap();
+                                            uu.chd_mut()[branch_index] = Some(chd_ptr);
+                                        })
+                                        .unwrap();
                                 }
-                                NodeType::Extension(_) => {
-                                    // If the child already resolved, then use the existing node.
-                                    let node = u_ref.inner().as_extension().unwrap().chd();
-                                    if node.is_null() {
-                                        u_ref
-                                            .write(|u| {
-                                                let uu = u.inner_mut().as_extension_mut().unwrap();
-                                                *uu.chd_mut() = chd_ptr;
-                                            })
-                                            .unwrap();
-                                    }
+
+                                // If the child already resolved, then use the existing node.
+                                NodeType::Branch(_) => {}
+
+                                NodeType::Extension(_)
+                                    if u_ref.inner().as_extension().unwrap().chd().is_null() =>
+                                {
+                                    u_ref
+                                        .write(|u| {
+                                            let uu = u.inner_mut().as_extension_mut().unwrap();
+                                            *uu.chd_mut() = chd_ptr;
+                                        })
+                                        .unwrap();
                                 }
+
+                                // If the child already resolved, then use the existing node.
+                                NodeType::Extension(_) => {}
+
                                 // We should not hit a leaf node as a parent.
                                 _ => {
                                     return Err(ProofError::InvalidNode(
@@ -503,10 +514,13 @@ impl Proof {
                                 }
                             };
                         }
+
                         drop(u_ref);
+
                         let c_ref = merkle
                             .get_node(chd_ptr)
                             .map_err(|_| ProofError::DecodeError)?;
+
                         match &c_ref.inner() {
                             NodeType::Branch(n) => {
                                 if let Some(v) = n.value() {
@@ -522,27 +536,21 @@ impl Proof {
                             }
                             _ => (),
                         }
+
                         return Ok(data);
                     }
 
                     // The trie doesn't contain the key.
                     if p.hash.is_none() {
-                        if allow_non_existent_node {
-                            return Ok(None);
-                        }
-                        return Err(ProofError::NodeNotInTrie);
-                    }
+                        return if allow_non_existent_node {
+                            Ok(None)
+                        } else {
+                            Err(ProofError::NodeNotInTrie)
+                        };
+                    };
+
                     cur_hash = p.hash.unwrap();
                     cur_key = &chunks[key_index..];
-                }
-                // The trie doesn't contain the key. It's possible
-                // the proof is a non-existing proof, but at least
-                // we can prove all resolved nodes are correct, it's
-                // enough for us to prove range.
-                None => {
-                    return allow_non_existent_node
-                        .then_some(None)
-                        .ok_or(ProofError::NodeNotInTrie);
                 }
             }
         }
@@ -597,7 +605,7 @@ impl Proof {
                         hash: None,
                     })
                 } else {
-                    self.generate_subproof(data.clone())?
+                    self.generate_subproof(data.clone()).map(Some)?
                 };
 
                 let cur_key_len = cur_key.len();
@@ -663,7 +671,7 @@ impl Proof {
                 let branch_ptr = build_branch_ptr(merkle, value, chd_eth_rlp)?;
                 let subproof = self.generate_subproof(data)?;
 
-                Ok((branch_ptr, subproof, 1))
+                Ok((branch_ptr, Some(subproof), 1))
             }
 
             // RLP length can only be the two cases above.
@@ -748,56 +756,63 @@ fn unset_internal<K: AsRef<[u8]>>(
                 // stop here and the forkpoint is the fullnode.
                 let left_node = n.chd()[left_chunks[index] as usize];
                 let right_node = n.chd()[right_chunks[index] as usize];
-                if left_node.is_none()
-                    || right_node.is_none()
-                    || left_node.unwrap() != right_node.unwrap()
-                {
-                    break;
-                }
+
+                match (left_node.as_ref(), right_node.as_ref()) {
+                    (None, _) | (_, None) => break,
+                    (left, right) if left != right => break,
+                    _ => (),
+                };
+
                 parent = u_ref.as_ptr();
                 u_ref = merkle
                     .get_node(left_node.unwrap())
                     .map_err(|_| ProofError::DecodeError)?;
                 index += 1;
             }
+
             NodeType::Extension(n) => {
                 // If either the key of left proof or right proof doesn't match with
                 // shortnode, stop here and the forkpoint is the shortnode.
                 let cur_key = n.path().clone().into_inner();
-                if left_chunks.len() - index < cur_key.len() {
-                    fork_left = compare(&left_chunks[index..], &cur_key)
-                } else {
-                    fork_left = compare(&left_chunks[index..index + cur_key.len()], &cur_key)
-                }
 
-                if right_chunks.len() - index < cur_key.len() {
-                    fork_right = compare(&right_chunks[index..], &cur_key)
+                fork_left = if left_chunks.len() - index < cur_key.len() {
+                    left_chunks[index..].cmp(&cur_key)
                 } else {
-                    fork_right = compare(&right_chunks[index..index + cur_key.len()], &cur_key)
-                }
+                    left_chunks[index..index + cur_key.len()].cmp(&cur_key)
+                };
+
+                fork_right = if right_chunks.len() - index < cur_key.len() {
+                    right_chunks[index..].cmp(&cur_key)
+                } else {
+                    right_chunks[index..index + cur_key.len()].cmp(&cur_key)
+                };
 
                 if !fork_left.is_eq() || !fork_right.is_eq() {
                     break;
                 }
+
                 parent = u_ref.as_ptr();
                 u_ref = merkle
                     .get_node(n.chd())
                     .map_err(|_| ProofError::DecodeError)?;
                 index += cur_key.len();
             }
+
             NodeType::Leaf(n) => {
                 let cur_key = n.path();
-                if left_chunks.len() - index < cur_key.len() {
-                    fork_left = compare(&left_chunks[index..], cur_key)
-                } else {
-                    fork_left = compare(&left_chunks[index..index + cur_key.len()], cur_key)
-                }
 
-                if right_chunks.len() - index < cur_key.len() {
-                    fork_right = compare(&right_chunks[index..], cur_key)
+                fork_left = if left_chunks.len() - index < cur_key.len() {
+                    left_chunks[index..].cmp(cur_key)
                 } else {
-                    fork_right = compare(&right_chunks[index..index + cur_key.len()], cur_key)
-                }
+                    left_chunks[index..index + cur_key.len()].cmp(cur_key)
+                };
+
+                fork_right = if right_chunks.len() - index < cur_key.len() {
+                    right_chunks[index..].cmp(cur_key)
+                } else {
+                    right_chunks[index..index + cur_key.len()].cmp(cur_key)
+                };
+
                 break;
             }
         }
@@ -818,12 +833,14 @@ fn unset_internal<K: AsRef<[u8]>>(
                     })
                     .unwrap();
             }
+
             let p = u_ref.as_ptr();
             drop(u_ref);
             unset_node_ref(merkle, p, left_node, &left_chunks[index..], 1, false)?;
             unset_node_ref(merkle, p, right_node, &right_chunks[index..], 1, true)?;
             Ok(false)
         }
+
         NodeType::Extension(n) => {
             // There can have these five scenarios:
             // - both proofs are less than the trie path => no valid range
@@ -833,17 +850,21 @@ fn unset_internal<K: AsRef<[u8]>>(
             // - right proof points to the shortnode, but left proof is less
             let node = n.chd();
             let cur_key = n.path().clone().into_inner();
+
             if fork_left.is_lt() && fork_right.is_lt() {
                 return Err(ProofError::EmptyRange);
             }
+
             if fork_left.is_gt() && fork_right.is_gt() {
                 return Err(ProofError::EmptyRange);
             }
+
             if fork_left.is_ne() && fork_right.is_ne() {
                 // The fork point is root node, unset the entire trie
                 if parent.is_null() {
                     return Ok(true);
                 }
+
                 let mut p_ref = merkle
                     .get_node(parent)
                     .map_err(|_| ProofError::NoSuchNode)?;
@@ -854,10 +875,13 @@ fn unset_internal<K: AsRef<[u8]>>(
                         pp.chd_eth_rlp_mut()[left_chunks[index - 1] as usize] = None;
                     })
                     .unwrap();
+
                 return Ok(false);
             }
+
             let p = u_ref.as_ptr();
             drop(u_ref);
+
             // Only one proof points to non-existent key.
             if fork_right.is_ne() {
                 unset_node_ref(
@@ -868,8 +892,10 @@ fn unset_internal<K: AsRef<[u8]>>(
                     cur_key.len(),
                     false,
                 )?;
+
                 return Ok(false);
             }
+
             if fork_left.is_ne() {
                 unset_node_ref(
                     merkle,
@@ -879,20 +905,26 @@ fn unset_internal<K: AsRef<[u8]>>(
                     cur_key.len(),
                     true,
                 )?;
+
                 return Ok(false);
             }
+
             Ok(false)
         }
+
         NodeType::Leaf(_) => {
             if fork_left.is_lt() && fork_right.is_lt() {
                 return Err(ProofError::EmptyRange);
             }
+
             if fork_left.is_gt() && fork_right.is_gt() {
                 return Err(ProofError::EmptyRange);
             }
+
             let mut p_ref = merkle
                 .get_node(parent)
                 .map_err(|_| ProofError::NoSuchNode)?;
+
             if fork_left.is_ne() && fork_right.is_ne() {
                 p_ref
                     .write(|p| match p.inner_mut() {
@@ -924,6 +956,7 @@ fn unset_internal<K: AsRef<[u8]>>(
                     })
                     .unwrap();
             }
+
             Ok(false)
         }
     }
@@ -965,89 +998,79 @@ fn unset_node_ref<K: AsRef<[u8]>>(
 
     match &u_ref.inner() {
         NodeType::Branch(n) => {
-            let node = n.chd()[chunks[index] as usize];
-            if remove_left {
-                for i in 0..chunks[index] {
-                    u_ref
-                        .write(|u| {
-                            let uu = u.inner_mut().as_branch_mut().unwrap();
-                            uu.chd_mut()[i as usize] = None;
-                            uu.chd_eth_rlp_mut()[i as usize] = None;
-                        })
-                        .unwrap();
-                }
+            let child_index = chunks[index] as usize;
+
+            let node = n.chd()[child_index];
+
+            let iter = if remove_left {
+                0..child_index
             } else {
-                for i in chunks[index] + 1..16 {
-                    u_ref
-                        .write(|u| {
-                            let uu = u.inner_mut().as_branch_mut().unwrap();
-                            uu.chd_mut()[i as usize] = None;
-                            uu.chd_eth_rlp_mut()[i as usize] = None;
-                        })
-                        .unwrap();
-                }
+                child_index + 1..16
+            };
+
+            for i in iter {
+                u_ref
+                    .write(|u| {
+                        let uu = u.inner_mut().as_branch_mut().unwrap();
+                        uu.chd_mut()[i] = None;
+                        uu.chd_eth_rlp_mut()[i] = None;
+                    })
+                    .unwrap();
             }
 
             drop(u_ref);
-            return unset_node_ref(merkle, p, node, key, index + 1, remove_left);
+
+            unset_node_ref(merkle, p, node, key, index + 1, remove_left)
         }
+
+        NodeType::Extension(n) if chunks[index..].starts_with(n.path()) => {
+            let node = Some(n.chd());
+            unset_node_ref(merkle, p, node, key, index + n.path().len(), remove_left)
+        }
+
         NodeType::Extension(n) => {
             let cur_key = n.path();
-            let node = n.chd();
-            if !(chunks[index..]).starts_with(cur_key) {
-                let mut p_ref = merkle
-                    .get_node(parent)
-                    .map_err(|_| ProofError::NoSuchNode)?;
-                // Find the fork point, it's an non-existent branch.
-                if remove_left {
-                    if compare(cur_key, &chunks[index..]).is_lt() {
-                        // The key of fork shortnode is less than the path
-                        // (it belongs to the range), unset the entire
-                        // branch. The parent must be a fullnode.
-                        p_ref
-                            .write(|p| {
-                                let pp = p.inner_mut().as_branch_mut().expect("not a branch node");
-                                pp.chd_mut()[chunks[index - 1] as usize] = None;
-                                pp.chd_eth_rlp_mut()[chunks[index - 1] as usize] = None;
-                            })
-                            .unwrap();
-                    }
-                    //else {
-                    // The key of fork shortnode is greater than the
-                    // path(it doesn't belong to the range), keep
-                    // it with the cached hash available.
-                    //}
-                } else if compare(cur_key, &chunks[index..]).is_gt() {
-                    // The key of fork shortnode is greater than the
-                    // path(it belongs to the range), unset the entrie
-                    // branch. The parent must be a fullnode. Otherwise the
-                    // key is not part of the range and should remain in the
-                    // cached hash.
-                    p_ref
-                        .write(|p| {
-                            let pp = p.inner_mut().as_branch_mut().expect("not a branch node");
-                            pp.chd_mut()[chunks[index - 1] as usize] = None;
-                            pp.chd_eth_rlp_mut()[chunks[index - 1] as usize] = None;
-                        })
-                        .unwrap();
-                }
-                return Ok(());
+            let mut p_ref = merkle
+                .get_node(parent)
+                .map_err(|_| ProofError::NoSuchNode)?;
+
+            // Find the fork point, it's a non-existent branch.
+            //
+            // for (true, Ordering::Less)
+            // The key of fork shortnode is less than the path
+            // (it belongs to the range), unset the entire
+            // branch. The parent must be a fullnode.
+            //
+            // for (false, Ordering::Greater)
+            // The key of fork shortnode is greater than the
+            // path(it belongs to the range), unset the entrie
+            // branch. The parent must be a fullnode. Otherwise the
+            // key is not part of the range and should remain in the
+            // cached hash.
+            let should_unset_entire_branch = matches!(
+                (remove_left, cur_key.cmp(&chunks[index..])),
+                (true, Ordering::Less) | (false, Ordering::Greater)
+            );
+
+            if should_unset_entire_branch {
+                p_ref
+                    .write(|p| {
+                        let pp = p.inner_mut().as_branch_mut().expect("not a branch node");
+                        pp.chd_mut()[chunks[index - 1] as usize] = None;
+                        pp.chd_eth_rlp_mut()[chunks[index - 1] as usize] = None;
+                    })
+                    .unwrap();
             }
 
-            return unset_node_ref(
-                merkle,
-                p,
-                Some(node),
-                key,
-                index + cur_key.len(),
-                remove_left,
-            );
+            Ok(())
         }
+
         NodeType::Leaf(n) => {
             let mut p_ref = merkle
                 .get_node(parent)
                 .map_err(|_| ProofError::NoSuchNode)?;
             let cur_key = n.path();
+
             // Similar to branch node, we need to compare the path to see if the node
             // needs to be unset.
             if !(chunks[index..]).starts_with(cur_key) {
@@ -1056,30 +1079,33 @@ fn unset_node_ref<K: AsRef<[u8]>>(
                         p_ref
                             .write(|p| {
                                 let pp = p.inner_mut().as_branch_mut().expect("not a branch node");
-                                pp.chd_mut()[chunks[index - 1] as usize] = None;
-                                pp.chd_eth_rlp_mut()[chunks[index - 1] as usize] = None;
+                                let index = chunks[index - 1] as usize;
+                                pp.chd_mut()[index] = None;
+                                pp.chd_eth_rlp_mut()[index] = None;
                             })
                             .expect("node write failure");
                     }
                     _ => (),
                 }
-                return Ok(());
+            } else {
+                p_ref
+                    .write(|p| match p.inner_mut() {
+                        NodeType::Extension(n) => {
+                            *n.chd_mut() = ObjPtr::null();
+                            *n.chd_eth_rlp_mut() = None;
+                        }
+                        NodeType::Branch(n) => {
+                            let index = chunks[index - 1] as usize;
+
+                            n.chd_mut()[index] = None;
+                            n.chd_eth_rlp_mut()[index] = None;
+                        }
+                        _ => {}
+                    })
+                    .expect("node write failure");
             }
-            p_ref
-                .write(|p| match p.inner_mut() {
-                    NodeType::Extension(n) => {
-                        *n.chd_mut() = ObjPtr::null();
-                        *n.chd_eth_rlp_mut() = None;
-                    }
-                    NodeType::Branch(n) => {
-                        n.chd_mut()[chunks[index - 1] as usize] = None;
-                        n.chd_eth_rlp_mut()[chunks[index - 1] as usize] = None;
-                    }
-                    _ => {}
-                })
-                .expect("node write failure");
+
+            Ok(())
         }
     }
-
-    Ok(())
 }
