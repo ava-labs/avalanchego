@@ -16,5 +16,4 @@ if [[ -z $(git status -s) ]]; then
     # exit 1
 fi
 
-# Note this doesn't run the fuzz tests in scripts/build_fuzz.sh
 "$AVALANCHE_PATH"/scripts/build_test.sh
