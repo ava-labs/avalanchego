@@ -18,8 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
@@ -321,22 +319,12 @@ func TestIndexer(t *testing.T) {
 	require.Equal(expectedVtx, vtxs[0])
 
 	// Accept a tx
-	txID, txBytes := ids.GenerateTestID(), utils.RandomBytes(32)
+	txID := ids.GenerateTestID()
 	expectedTx := Container{
 		ID:        txID,
 		Bytes:     blkBytes,
 		Timestamp: now.UnixNano(),
 	}
-	// Mocked VM knows about this tx now
-	dagVM.EXPECT().GetTx(gomock.Any(), txID).Return(
-		&snowstorm.TestTx{
-			TestDecidable: choices.TestDecidable{
-				IDV:     txID,
-				StatusV: choices.Accepted,
-			},
-			BytesV: txBytes,
-		}, nil,
-	).AnyTimes()
 
 	require.NoError(config.TxAcceptorGroup.Accept(chain2Ctx, txID, blkBytes))
 
