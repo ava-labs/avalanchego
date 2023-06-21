@@ -46,7 +46,6 @@ type TxCachedState struct {
 	unique, verifiedTx, verifiedState bool
 	validity                          error
 
-	inputs     []ids.ID
 	inputUTXOs []*avax.UTXOID
 	utxos      []*avax.UTXO
 	deps       []snowstorm.Tx
@@ -63,7 +62,7 @@ func (tx *UniqueTx) refresh() {
 	if tx.unique {
 		return
 	}
-	unique := tx.vm.DeduplicateTx(tx)
+	unique := tx.vm.uniqueTxs.Deduplicate(tx)
 	prevTx := tx.Tx
 	if unique == tx {
 		tx.vm.metrics.IncTxRefreshMisses()
@@ -226,21 +225,6 @@ func (tx *UniqueTx) Dependencies() ([]snowstorm.Tx, error) {
 		})
 	}
 	return tx.deps, nil
-}
-
-// InputIDs returns the set of utxoIDs this transaction consumes
-func (tx *UniqueTx) InputIDs() []ids.ID {
-	tx.refresh()
-	if tx.Tx == nil || len(tx.inputs) != 0 {
-		return tx.inputs
-	}
-
-	inputUTXOs := tx.InputUTXOs()
-	tx.inputs = make([]ids.ID, len(inputUTXOs))
-	for i, utxo := range inputUTXOs {
-		tx.inputs[i] = utxo.InputID()
-	}
-	return tx.inputs
 }
 
 // InputUTXOs returns the utxos that will be consumed on tx acceptance

@@ -685,8 +685,3 @@ func (vm *VM) onAccept(tx *txs.Tx) error {
 	vm.walletService.decided(txID)
 	return nil
 }
-
-// UniqueTx de-duplicates the transaction.
-func (vm *VM) DeduplicateTx(tx *UniqueTx) *UniqueTx {
-	return vm.uniqueTxs.Deduplicate(tx)
-}
