@@ -319,14 +319,14 @@ func TestIndexer(t *testing.T) {
 	require.Equal(expectedVtx, vtxs[0])
 
 	// Accept a tx
-	txID := ids.GenerateTestID()
+	txID, txBytes := ids.GenerateTestID(), utils.RandomBytes(32)
 	expectedTx := Container{
 		ID:        txID,
-		Bytes:     blkBytes,
+		Bytes:     txBytes,
 		Timestamp: now.UnixNano(),
 	}
 
-	require.NoError(config.TxAcceptorGroup.Accept(chain2Ctx, txID, blkBytes))
+	require.NoError(config.TxAcceptorGroup.Accept(chain2Ctx, txID, txBytes))
 
 	txIdx := idxr.txIndices[chain2Ctx.ChainID]
 	require.NotNil(txIdx)
