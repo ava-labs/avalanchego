@@ -8,8 +8,6 @@ import (
 	"math"
 	"testing"
 
-	stdjson "encoding/json"
-
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/stretchr/testify/require"
@@ -19,10 +17,9 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/memdb"
-	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -496,107 +493,113 @@ func TestTxNotCached(t *testing.T) {
 	require.NotZero(count)
 }
 
-func TestTxVerifyAfterIssueTx(t *testing.T) {
+func TestTxAcceptAfterParseTx(t *testing.T) {
 	require := require.New(t)
 
-	issuer, vm, ctx, issueTxs := setupIssueTx(t)
+	env := setup(t, &envConfig{
+		notLinearized: true,
+	})
 	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-		ctx.Lock.Unlock()
+		require.NoError(env.vm.Shutdown(context.Background()))
+		env.vm.ctx.Lock.Unlock()
 	}()
-	firstTx := issueTxs[1]
-	secondTx := issueTxs[2]
-	parsedSecondTx, err := vm.ParseTx(context.Background(), secondTx.Bytes())
+
+	key := keys[0]
+	firstTx := &txs.Tx{Unsigned: &txs.BaseTx{
+		BaseTx: avax.BaseTx{
+			NetworkID:    constants.UnitTestID,
+			BlockchainID: chainID,
+			Ins: []*avax.TransferableInput{{
+				UTXOID: avax.UTXOID{
+					TxID:        env.genesisTx.ID(),
+					OutputIndex: 2,
+				},
+				Asset: avax.Asset{ID: env.genesisTx.ID()},
+				In: &secp256k1fx.TransferInput{
+					Amt: startBalance,
+					Input: secp256k1fx.Input{
+						SigIndices: []uint32{
+							0,
+						},
+					},
+				},
+			}},
+			Outs: []*avax.TransferableOutput{{
+				Asset: avax.Asset{ID: env.genesisTx.ID()},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: startBalance - env.vm.TxFee,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{key.PublicKey().Address()},
+					},
+				},
+			}},
+		},
+	}}
+	require.NoError(firstTx.SignSECP256K1Fx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
+
+	secondTx := &txs.Tx{Unsigned: &txs.BaseTx{
+		BaseTx: avax.BaseTx{
+			NetworkID:    constants.UnitTestID,
+			BlockchainID: chainID,
+			Ins: []*avax.TransferableInput{{
+				UTXOID: avax.UTXOID{
+					TxID:        firstTx.ID(),
+					OutputIndex: 0,
+				},
+				Asset: avax.Asset{ID: env.genesisTx.ID()},
+				In: &secp256k1fx.TransferInput{
+					Amt: startBalance - env.vm.TxFee,
+					Input: secp256k1fx.Input{
+						SigIndices: []uint32{
+							0,
+						},
+					},
+				},
+			}},
+		},
+	}}
+	require.NoError(secondTx.SignSECP256K1Fx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
+
+	parsedFirstTx, err := env.vm.ParseTx(context.Background(), firstTx.Bytes())
 	require.NoError(err)
+
+	require.NoError(parsedFirstTx.Verify(context.Background()))
+	require.NoError(parsedFirstTx.Accept(context.Background()))
+
+	parsedSecondTx, err := env.vm.ParseTx(context.Background(), secondTx.Bytes())
+	require.NoError(err)
+
 	require.NoError(parsedSecondTx.Verify(context.Background()))
-	_, err = vm.IssueTx(firstTx.Bytes())
-	require.NoError(err)
 	require.NoError(parsedSecondTx.Accept(context.Background()))
-	ctx.Lock.Unlock()
 
-	require.Equal(common.PendingTxs, <-issuer)
-	ctx.Lock.Lock()
-
-	txs := vm.PendingTxs(context.Background())
-	require.Len(txs, 1)
-
-	parsedFirstTx := txs[0]
-	err = parsedFirstTx.Verify(context.Background())
-	require.ErrorIs(err, database.ErrNotFound)
-}
-
-func TestTxVerifyAfterGet(t *testing.T) {
-	require := require.New(t)
-
-	_, vm, ctx, issueTxs := setupIssueTx(t)
-	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-		ctx.Lock.Unlock()
-	}()
-	firstTx := issueTxs[1]
-	secondTx := issueTxs[2]
-
-	parsedSecondTx, err := vm.ParseTx(context.Background(), secondTx.Bytes())
+	firstTxStatus, err := env.vm.state.GetStatus(firstTx.ID())
 	require.NoError(err)
-	require.NoError(parsedSecondTx.Verify(context.Background()))
-	_, err = vm.IssueTx(firstTx.Bytes())
+	require.Equal(choices.Accepted, firstTxStatus)
+
+	secondTxStatus, err := env.vm.state.GetStatus(secondTx.ID())
 	require.NoError(err)
-	parsedFirstTx, err := vm.GetTx(context.Background(), firstTx.ID())
-	require.NoError(err)
-	require.NoError(parsedSecondTx.Accept(context.Background()))
-	err = parsedFirstTx.Verify(context.Background())
-	require.ErrorIs(err, database.ErrNotFound)
+	require.Equal(choices.Accepted, secondTxStatus)
 }
 
 // Test issuing an import transaction.
 func TestIssueImportTx(t *testing.T) {
 	require := require.New(t)
 
-	genesisBytes := BuildGenesisTest(t)
+	env := setup(t, &envConfig{
+		vmStaticConfig: &config.Config{},
+	})
+	defer func() {
+		require.NoError(env.vm.Shutdown(context.Background()))
+		env.vm.ctx.Lock.Unlock()
+	}()
 
-	issuer := make(chan common.Message, 1)
-	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
+	peerSharedMemory := env.sharedMemory.NewSharedMemory(constants.PlatformChainID)
 
-	m := atomic.NewMemory(prefixdb.New([]byte{0}, baseDBManager.Current().Database))
-
-	ctx := NewContext(t)
-	ctx.SharedMemory = m.NewSharedMemory(chainID)
-	peerSharedMemory := m.NewSharedMemory(constants.PlatformChainID)
-
-	genesisTx := GetCreateTxFromGenesisTest(t, genesisBytes, "AVAX")
-
+	genesisTx := GetCreateTxFromGenesisTest(t, env.genesisBytes, "AVAX")
 	avaxID := genesisTx.ID()
-	platformID := ids.Empty.Prefix(0)
-
-	ctx.Lock.Lock()
-
-	avmConfig := Config{
-		IndexTransactions: true,
-	}
-
-	avmConfigBytes, err := stdjson.Marshal(avmConfig)
-	require.NoError(err)
-	vm := &VM{}
-	require.NoError(vm.Initialize(
-		context.Background(),
-		ctx,
-		baseDBManager.NewPrefixDBManager([]byte{1}),
-		genesisBytes,
-		nil,
-		avmConfigBytes,
-		issuer,
-		[]*common.Fx{{
-			ID: ids.Empty,
-			Fx: &secp256k1fx.Fx{},
-		}},
-		nil,
-	))
-
-	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
-	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
 
 	key := keys[0]
-
 	utxoID := avax.UTXOID{
 		TxID: ids.ID{
 			0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
@@ -634,13 +637,9 @@ func TestIssueImportTx(t *testing.T) {
 			},
 		}},
 	}}
-	require.NoError(tx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
-
-	_, err = vm.IssueTx(tx.Bytes())
-	require.ErrorIs(err, database.ErrNotFound)
+	require.NoError(tx.SignSECP256K1Fx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
 
 	// Provide the platform UTXO:
-
 	utxo := &avax.UTXO{
 		UTXOID: utxoID,
 		Asset:  txAssetID,
@@ -653,43 +652,29 @@ func TestIssueImportTx(t *testing.T) {
 		},
 	}
 
-	utxoBytes, err := vm.parser.Codec().Marshal(txs.CodecVersion, utxo)
+	utxoBytes, err := env.vm.parser.Codec().Marshal(txs.CodecVersion, utxo)
 	require.NoError(err)
 
 	inputID := utxo.InputID()
-
-	require.NoError(peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{vm.ctx.ChainID: {PutRequests: []*atomic.Element{{
-		Key:   inputID[:],
-		Value: utxoBytes,
-		Traits: [][]byte{
-			key.PublicKey().Address().Bytes(),
+	require.NoError(peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{
+		env.vm.ctx.ChainID: {
+			PutRequests: []*atomic.Element{{
+				Key:   inputID[:],
+				Value: utxoBytes,
+				Traits: [][]byte{
+					key.PublicKey().Address().Bytes(),
+				},
+			}},
 		},
-	}}}}))
+	}))
 
-	_, err = vm.IssueTx(tx.Bytes())
-	require.NoError(err)
-	ctx.Lock.Unlock()
+	issueAndAccept(require, env.vm, env.issuer, tx)
 
-	require.Equal(common.PendingTxs, <-issuer)
-
-	ctx.Lock.Lock()
-	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-		ctx.Lock.Unlock()
-	}()
-
-	txs := vm.PendingTxs(context.Background())
-	require.Len(txs, 1)
-
-	parsedTx := txs[0]
-	require.NoError(parsedTx.Verify(context.Background()))
-	require.NoError(parsedTx.Accept(context.Background()))
-
-	checkIndexedTX(t, vm.db, 0, key.PublicKey().Address(), txAssetID.AssetID(), parsedTx.ID())
-	assertLatestIdx(t, vm.db, key.PublicKey().Address(), avaxID, 1)
+	checkIndexedTX(t, env.vm.db, 0, key.PublicKey().Address(), txAssetID.AssetID(), tx.ID())
+	assertLatestIdx(t, env.vm.db, key.PublicKey().Address(), avaxID, 1)
 
 	id := utxoID.InputID()
-	_, err = vm.ctx.SharedMemory.Get(platformID, [][]byte{id[:]})
+	_, err = env.vm.ctx.SharedMemory.Get(constants.PlatformChainID, [][]byte{id[:]})
 	require.ErrorIs(err, database.ErrNotFound)
 }
 
@@ -697,46 +682,19 @@ func TestIssueImportTx(t *testing.T) {
 func TestForceAcceptImportTx(t *testing.T) {
 	require := require.New(t)
 
-	genesisBytes := BuildGenesisTest(t)
-
-	issuer := make(chan common.Message, 1)
-	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
-
-	m := atomic.NewMemory(prefixdb.New([]byte{0}, baseDBManager.Current().Database))
-
-	ctx := NewContext(t)
-	ctx.SharedMemory = m.NewSharedMemory(chainID)
-
-	platformID := ids.Empty.Prefix(0)
-
-	vm := &VM{}
-	ctx.Lock.Lock()
+	env := setup(t, &envConfig{
+		vmStaticConfig: &config.Config{},
+		notLinearized:  true,
+	})
 	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-		ctx.Lock.Unlock()
+		require.NoError(env.vm.Shutdown(context.Background()))
+		env.vm.ctx.Lock.Unlock()
 	}()
-	require.NoError(vm.Initialize(
-		context.Background(),
-		ctx,
-		baseDBManager.NewPrefixDBManager([]byte{1}),
-		genesisBytes,
-		nil,
-		nil,
-		issuer,
-		[]*common.Fx{{
-			ID: ids.Empty,
-			Fx: &secp256k1fx.Fx{},
-		}},
-		nil,
-	))
 
-	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
-	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
+	genesisTx := GetCreateTxFromGenesisTest(t, env.genesisBytes, "AVAX")
+	avaxID := genesisTx.ID()
 
 	key := keys[0]
-
-	genesisTx := GetCreateTxFromGenesisTest(t, genesisBytes, "AVAX")
-
 	utxoID := avax.UTXOID{
 		TxID: ids.ID{
 			0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
@@ -746,34 +704,47 @@ func TestForceAcceptImportTx(t *testing.T) {
 		},
 	}
 
+	txAssetID := avax.Asset{ID: avaxID}
 	tx := &txs.Tx{Unsigned: &txs.ImportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    constants.UnitTestID,
 			BlockchainID: chainID,
+			Outs: []*avax.TransferableOutput{{
+				Asset: txAssetID,
+				Out: &secp256k1fx.TransferOutput{
+					Amt: 1000,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+					},
+				},
+			}},
 		}},
 		SourceChain: constants.PlatformChainID,
 		ImportedIns: []*avax.TransferableInput{{
 			UTXOID: utxoID,
-			Asset:  avax.Asset{ID: genesisTx.ID()},
+			Asset:  txAssetID,
 			In: &secp256k1fx.TransferInput{
-				Amt:   1000,
-				Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+				Amt: 1010,
+				Input: secp256k1fx.Input{
+					SigIndices: []uint32{0},
+				},
 			},
 		}},
 	}}
+	require.NoError(tx.SignSECP256K1Fx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
 
-	require.NoError(tx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
-
-	parsedTx, err := vm.ParseTx(context.Background(), tx.Bytes())
+	parsedTx, err := env.vm.ParseTx(context.Background(), tx.Bytes())
 	require.NoError(err)
 
-	err = parsedTx.Verify(context.Background())
-	require.ErrorIs(err, database.ErrNotFound)
-
+	require.NoError(parsedTx.Verify(context.Background()))
 	require.NoError(parsedTx.Accept(context.Background()))
 
+	checkIndexedTX(t, env.vm.db, 0, key.PublicKey().Address(), txAssetID.AssetID(), tx.ID())
+	assertLatestIdx(t, env.vm.db, key.PublicKey().Address(), avaxID, 1)
+
 	id := utxoID.InputID()
-	_, err = vm.ctx.SharedMemory.Get(platformID, [][]byte{id[:]})
+	_, err = env.vm.ctx.SharedMemory.Get(constants.PlatformChainID, [][]byte{id[:]})
 	require.ErrorIs(err, database.ErrNotFound)
 }
 
@@ -785,44 +756,20 @@ func TestImportTxNotState(t *testing.T) {
 	require.False(ok)
 }
 
-// Test issuing an import transaction.
+// Test issuing an export transaction.
 func TestIssueExportTx(t *testing.T) {
 	require := require.New(t)
-	genesisBytes := BuildGenesisTest(t)
 
-	issuer := make(chan common.Message, 1)
-	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
+	env := setup(t, &envConfig{})
+	defer func() {
+		require.NoError(env.vm.Shutdown(context.Background()))
+		env.vm.ctx.Lock.Unlock()
+	}()
 
-	m := atomic.NewMemory(prefixdb.New([]byte{0}, baseDBManager.Current().Database))
-
-	ctx := NewContext(t)
-	ctx.SharedMemory = m.NewSharedMemory(chainID)
-
-	genesisTx := GetCreateTxFromGenesisTest(t, genesisBytes, "AVAX")
-
+	genesisTx := GetCreateTxFromGenesisTest(t, env.genesisBytes, "AVAX")
 	avaxID := genesisTx.ID()
 
-	ctx.Lock.Lock()
-	vm := &VM{}
-	require.NoError(vm.Initialize(
-		context.Background(),
-		ctx,
-		baseDBManager.NewPrefixDBManager([]byte{1}),
-		genesisBytes,
-		nil,
-		nil,
-		issuer, []*common.Fx{{
-			ID: ids.Empty,
-			Fx: &secp256k1fx.Fx{},
-		}},
-		nil,
-	))
-
-	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
-	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
-
 	key := keys[0]
-
 	tx := &txs.Tx{Unsigned: &txs.ExportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    constants.UnitTestID,
@@ -843,7 +790,7 @@ func TestIssueExportTx(t *testing.T) {
 		ExportedOuts: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: avaxID},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: startBalance - vm.TxFee,
+				Amt: startBalance - env.vm.TxFee,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{key.PublicKey().Address()},
@@ -851,31 +798,25 @@ func TestIssueExportTx(t *testing.T) {
 			},
 		}},
 	}}
-	require.NoError(tx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
+	require.NoError(tx.SignSECP256K1Fx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
 
-	_, err := vm.IssueTx(tx.Bytes())
-	require.NoError(err)
-
-	ctx.Lock.Unlock()
-
-	require.Equal(common.PendingTxs, <-issuer)
-
-	ctx.Lock.Lock()
-	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-		ctx.Lock.Unlock()
-	}()
-
-	txs := vm.PendingTxs(context.Background())
-	require.Len(txs, 1)
-
-	parsedTx := txs[0]
-	require.NoError(parsedTx.Verify(context.Background()))
-	require.NoError(parsedTx.Accept(context.Background()))
-
-	peerSharedMemory := m.NewSharedMemory(constants.PlatformChainID)
+	peerSharedMemory := env.sharedMemory.NewSharedMemory(constants.PlatformChainID)
 	utxoBytes, _, _, err := peerSharedMemory.Indexed(
-		vm.ctx.ChainID,
+		env.vm.ctx.ChainID,
+		[][]byte{
+			key.PublicKey().Address().Bytes(),
+		},
+		nil,
+		nil,
+		math.MaxInt32,
+	)
+	require.NoError(err)
+	require.Empty(utxoBytes)
+
+	issueAndAccept(require, env.vm, env.issuer, tx)
+
+	utxoBytes, _, _, err = peerSharedMemory.Indexed(
+		env.vm.ctx.ChainID,
 		[][]byte{
 			key.PublicKey().Address().Bytes(),
 		},
@@ -890,49 +831,16 @@ func TestIssueExportTx(t *testing.T) {
 func TestClearForceAcceptedExportTx(t *testing.T) {
 	require := require.New(t)
 
-	genesisBytes := BuildGenesisTest(t)
+	env := setup(t, &envConfig{})
+	defer func() {
+		require.NoError(env.vm.Shutdown(context.Background()))
+		env.vm.ctx.Lock.Unlock()
+	}()
 
-	issuer := make(chan common.Message, 1)
-	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
-
-	m := atomic.NewMemory(prefixdb.New([]byte{0}, baseDBManager.Current().Database))
-
-	ctx := NewContext(t)
-	ctx.SharedMemory = m.NewSharedMemory(chainID)
-
-	genesisTx := GetCreateTxFromGenesisTest(t, genesisBytes, "AVAX")
-
+	genesisTx := GetCreateTxFromGenesisTest(t, env.genesisBytes, "AVAX")
 	avaxID := genesisTx.ID()
-	platformID := ids.Empty.Prefix(0)
-
-	ctx.Lock.Lock()
-
-	avmConfig := Config{
-		IndexTransactions: true,
-	}
-	avmConfigBytes, err := stdjson.Marshal(avmConfig)
-	require.NoError(err)
-	vm := &VM{}
-	require.NoError(vm.Initialize(
-		context.Background(),
-		ctx,
-		baseDBManager.NewPrefixDBManager([]byte{1}),
-		genesisBytes,
-		nil,
-		avmConfigBytes,
-		issuer,
-		[]*common.Fx{{
-			ID: ids.Empty,
-			Fx: &secp256k1fx.Fx{},
-		}},
-		nil,
-	))
-
-	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
-	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
 
 	key := keys[0]
-
 	assetID := avax.Asset{ID: avaxID}
 	tx := &txs.Tx{Unsigned: &txs.ExportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
@@ -954,7 +862,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 		ExportedOuts: []*avax.TransferableOutput{{
 			Asset: assetID,
 			Out: &secp256k1fx.TransferOutput{
-				Amt: startBalance - vm.TxFee,
+				Amt: startBalance - env.vm.TxFee,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{key.PublicKey().Address()},
@@ -962,26 +870,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 			},
 		}},
 	}}
-	require.NoError(tx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
-
-	_, err = vm.IssueTx(tx.Bytes())
-	require.NoError(err)
-
-	ctx.Lock.Unlock()
-
-	require.Equal(common.PendingTxs, <-issuer)
-
-	ctx.Lock.Lock()
-	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-		ctx.Lock.Unlock()
-	}()
-
-	txs := vm.PendingTxs(context.Background())
-	require.Len(txs, 1)
-
-	parsedTx := txs[0]
-	require.NoError(parsedTx.Verify(context.Background()))
+	require.NoError(tx.SignSECP256K1Fx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
 
 	utxo := avax.UTXOID{
 		TxID:        tx.ID(),
@@ -989,14 +878,21 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	}
 	utxoID := utxo.InputID()
 
-	peerSharedMemory := m.NewSharedMemory(platformID)
-	require.NoError(peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{vm.ctx.ChainID: {RemoveRequests: [][]byte{utxoID[:]}}}))
+	peerSharedMemory := env.sharedMemory.NewSharedMemory(constants.PlatformChainID)
+	require.NoError(peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{
+		env.vm.ctx.ChainID: {
+			RemoveRequests: [][]byte{utxoID[:]},
+		},
+	}))
 
-	require.NoError(parsedTx.Accept(context.Background()))
-
-	checkIndexedTX(t, vm.db, 0, key.PublicKey().Address(), assetID.AssetID(), parsedTx.ID())
-	assertLatestIdx(t, vm.db, key.PublicKey().Address(), assetID.AssetID(), 1)
-
-	_, err = peerSharedMemory.Get(vm.ctx.ChainID, [][]byte{utxoID[:]})
+	_, err := peerSharedMemory.Get(env.vm.ctx.ChainID, [][]byte{utxoID[:]})
 	require.ErrorIs(err, database.ErrNotFound)
+
+	issueAndAccept(require, env.vm, env.issuer, tx)
+
+	_, err = peerSharedMemory.Get(env.vm.ctx.ChainID, [][]byte{utxoID[:]})
+	require.ErrorIs(err, database.ErrNotFound)
+
+	checkIndexedTX(t, env.vm.db, 0, key.PublicKey().Address(), assetID.AssetID(), tx.ID())
+	assertLatestIdx(t, env.vm.db, key.PublicKey().Address(), assetID.AssetID(), 1)
 }
