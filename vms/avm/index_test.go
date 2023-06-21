@@ -63,7 +63,7 @@ func TestIndexTransaction_Ordered(t *testing.T) {
 
 	// for each tx check its indexed at right index
 	for i, tx := range txs {
-		checkIndexedTX(t, env.vm.db, uint64(i), addr, txAssetID.ID, tx.ID())
+		assertIndexedTX(t, env.vm.db, uint64(i), addr, txAssetID.ID, tx.ID())
 	}
 	assertLatestIdx(t, env.vm.db, addr, txAssetID.ID, 5)
 }
@@ -107,7 +107,7 @@ func TestIndexTransaction_MultipleTransactions(t *testing.T) {
 
 	// for each *UniqueTx check its indexed at right index for the right address
 	for addr, tx := range addressTxMap {
-		checkIndexedTX(t, env.vm.db, 0, addr, txAssetID.ID, tx.ID())
+		assertIndexedTX(t, env.vm.db, 0, addr, txAssetID.ID, tx.ID())
 		assertLatestIdx(t, env.vm.db, addr, txAssetID.ID, 1)
 	}
 }
@@ -148,7 +148,7 @@ func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 	// issue transaction
 	issueAndAccept(require, env.vm, env.issuer, tx)
 
-	checkIndexedTX(t, env.vm.db, 0, addr, txAssetID.ID, tx.ID())
+	assertIndexedTX(t, env.vm.db, 0, addr, txAssetID.ID, tx.ID())
 	assertLatestIdx(t, env.vm.db, addr, txAssetID.ID, 1)
 }
 
@@ -297,7 +297,7 @@ func assertLatestIdx(t *testing.T, db database.Database, sourceAddress ids.Short
 	require.Equal(expectedIdxBytes, idxBytes)
 }
 
-func checkIndexedTX(t *testing.T, db database.Database, index uint64, sourceAddress ids.ShortID, assetID ids.ID, transactionID ids.ID) {
+func assertIndexedTX(t *testing.T, db database.Database, index uint64, sourceAddress ids.ShortID, assetID ids.ID, transactionID ids.ID) {
 	require := require.New(t)
 
 	addressDB := prefixdb.New(sourceAddress[:], db)
