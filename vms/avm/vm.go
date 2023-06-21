@@ -454,10 +454,6 @@ func (vm *VM) Linearize(_ context.Context, stopVertexID ids.ID, toEngine chan<- 
 	return nil
 }
 
-func (*VM) PendingTxs(context.Context) []snowstorm.Tx {
-	return nil
-}
-
 func (vm *VM) ParseTx(_ context.Context, bytes []byte) (snowstorm.Tx, error) {
 	rawTx, err := vm.parser.ParseTx(bytes)
 	if err != nil {

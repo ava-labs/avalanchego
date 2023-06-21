@@ -77,14 +77,6 @@ func (vm *vertexVM) Initialize(
 	)
 }
 
-func (vm *vertexVM) PendingTxs(ctx context.Context) []snowstorm.Tx {
-	start := vm.clock.Time()
-	txs := vm.LinearizableVMWithEngine.PendingTxs(ctx)
-	end := vm.clock.Time()
-	vm.vertexMetrics.pending.Observe(float64(end.Sub(start)))
-	return txs
-}
-
 func (vm *vertexVM) ParseTx(ctx context.Context, b []byte) (snowstorm.Tx, error) {
 	start := vm.clock.Time()
 	tx, err := vm.LinearizableVMWithEngine.ParseTx(ctx, b)

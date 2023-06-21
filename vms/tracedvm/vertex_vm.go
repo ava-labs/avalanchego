@@ -60,13 +60,6 @@ func (vm *vertexVM) Initialize(
 	)
 }
 
-func (vm *vertexVM) PendingTxs(ctx context.Context) []snowstorm.Tx {
-	ctx, span := vm.tracer.Start(ctx, "vertexVM.PendingTxs")
-	defer span.End()
-
-	return vm.LinearizableVMWithEngine.PendingTxs(ctx)
-}
-
 func (vm *vertexVM) ParseTx(ctx context.Context, txBytes []byte) (snowstorm.Tx, error) {
 	ctx, span := vm.tracer.Start(ctx, "vertexVM.ParseTx", oteltrace.WithAttributes(
 		attribute.Int("txLen", len(txBytes)),
