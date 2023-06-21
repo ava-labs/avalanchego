@@ -30,4 +30,4 @@ jobs:
         if: matrix.os[0] == 'self-hosted' && matrix.os[3] == 'jammy' # Only run on self-hosted jammy
         run: | # Run each fuzz test 10 seconds
           cd ${{ github.workspace }}
-          ./scripts/build_fuzz.sh 10
+          ./scripts/build_fuzz.sh 15
