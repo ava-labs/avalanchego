@@ -3,9 +3,7 @@
 
 package snowstorm
 
-import (
-	"github.com/ava-labs/avalanchego/snow/choices"
-)
+import "github.com/ava-labs/avalanchego/snow/choices"
 
 var _ Tx = (*TestTx)(nil)
 
