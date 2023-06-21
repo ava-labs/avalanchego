@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"time"
 
 	stdjson "encoding/json"
 
@@ -32,6 +33,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
@@ -55,6 +57,8 @@ import (
 )
 
 const (
+	batchTimeout       = time.Second
+	batchSize          = 30
 	assetToFxCacheSize = 1024
 	txDeduplicatorSize = 8192
 )
@@ -106,6 +110,12 @@ type VM struct {
 	// Asset ID --> Bit set with fx IDs the asset supports
 	assetToFxCache *cache.LRU[ids.ID, set.Bits64]
 
+	// Transaction issuing
+	timer        *timer.Timer
+	batchTimeout time.Duration
+	txs          []snowstorm.Tx
+	toEngine     chan<- common.Message
+
 	baseDB database.Database
 	db     *versiondb.Database
 
@@ -152,7 +162,7 @@ func (vm *VM) Initialize(
 	genesisBytes []byte,
 	_ []byte,
 	configBytes []byte,
-	_ chan<- common.Message,
+	toEngine chan<- common.Message,
 	fxs []*common.Fx,
 	appSender common.AppSender,
 ) error {
@@ -187,6 +197,7 @@ func (vm *VM) Initialize(
 
 	db := dbManager.Current().Database
 	vm.ctx = ctx
+	vm.toEngine = toEngine
 	vm.appSender = appSender
 	vm.baseDB = db
 	vm.db = versiondb.New(db)
@@ -236,6 +247,15 @@ func (vm *VM) Initialize(
 	if err := vm.initGenesis(genesisBytes); err != nil {
 		return err
 	}
+
+	vm.timer = timer.NewTimer(func() {
+		ctx.Lock.Lock()
+		defer ctx.Lock.Unlock()
+
+		vm.FlushTxs()
+	})
+	go ctx.Log.RecoverAndPanic(vm.timer.Dispatch)
+	vm.batchTimeout = batchTimeout
 
 	vm.uniqueTxs = &cache.EvictableLRU[ids.ID, *UniqueTx]{
 		Size: txDeduplicatorSize,
@@ -319,9 +339,15 @@ func (vm *VM) SetState(_ context.Context, state snow.State) error {
 }
 
 func (vm *VM) Shutdown(context.Context) error {
-	if vm.state == nil {
+	if vm.timer == nil {
 		return nil
 	}
+
+	// There is a potential deadlock if the timer is about to execute a timeout.
+	// So, the lock must be released before stopping the timer.
+	vm.ctx.Lock.Unlock()
+	vm.timer.Stop()
+	vm.ctx.Lock.Lock()
 
 	errs := wrappers.Errs{}
 	errs.Add(
@@ -454,34 +480,16 @@ func (vm *VM) Linearize(_ context.Context, stopVertexID ids.ID, toEngine chan<- 
 	return nil
 }
 
-func (*VM) PendingTxs(context.Context) []snowstorm.Tx {
-	return nil
+func (vm *VM) PendingTxs(context.Context) []snowstorm.Tx {
+	vm.timer.Cancel()
+
+	txs := vm.txs
+	vm.txs = nil
+	return txs
 }
 
-func (vm *VM) ParseTx(_ context.Context, bytes []byte) (snowstorm.Tx, error) {
-	rawTx, err := vm.parser.ParseTx(bytes)
-	if err != nil {
-		return nil, err
-	}
-
-	tx := &UniqueTx{
-		TxCachedState: &TxCachedState{
-			Tx: rawTx,
-		},
-		vm:   vm,
-		txID: rawTx.ID(),
-	}
-	if err := tx.SyntacticVerify(); err != nil {
-		return nil, err
-	}
-
-	if tx.Status() == choices.Unknown {
-		vm.state.AddTx(tx.Tx)
-		tx.setStatus(choices.Processing)
-		return tx, vm.state.Commit()
-	}
-
-	return tx, nil
+func (vm *VM) ParseTx(_ context.Context, b []byte) (snowstorm.Tx, error) {
+	return vm.parseTx(b)
 }
 
 func (vm *VM) GetTx(_ context.Context, txID ids.ID) (snowstorm.Tx, error) {
@@ -505,27 +513,60 @@ func (vm *VM) GetTx(_ context.Context, txID ids.ID) (snowstorm.Tx, error) {
 // either accepted or rejected with the appropriate status. This function will
 // go out of scope when the transaction is removed from memory.
 func (vm *VM) IssueTx(b []byte) (ids.ID, error) {
-	if !vm.bootstrapped || vm.Builder == nil {
+	if !vm.bootstrapped {
 		return ids.ID{}, errBootstrapping
 	}
 
-	tx, err := vm.parser.ParseTx(b)
-	if err != nil {
-		vm.ctx.Log.Debug("failed to parse tx",
-			zap.Error(err),
-		)
-		return ids.ID{}, err
+	// If the chain has been linearized, issue the tx to the network.
+	if vm.Builder != nil {
+		tx, err := vm.parser.ParseTx(b)
+		if err != nil {
+			vm.ctx.Log.Debug("failed to parse tx",
+				zap.Error(err),
+			)
+			return ids.ID{}, err
+		}
+
+		err = vm.network.IssueTx(context.TODO(), tx)
+		if err != nil {
+			vm.ctx.Log.Debug("failed to add tx to mempool",
+				zap.Error(err),
+			)
+			return ids.ID{}, err
+		}
+
+		return tx.ID(), nil
 	}
 
-	err = vm.network.IssueTx(context.TODO(), tx)
+	// TODO: After the chain is linearized, remove the following code.
+	tx, err := vm.parseTx(b)
 	if err != nil {
-		vm.ctx.Log.Debug("failed to add tx to mempool",
-			zap.Error(err),
-		)
 		return ids.ID{}, err
 	}
-
+	if err := tx.verifyWithoutCacheWrites(); err != nil {
+		return ids.ID{}, err
+	}
+	vm.issueTx(tx)
 	return tx.ID(), nil
+}
+
+/*
+ ******************************************************************************
+ ********************************** Timer API *********************************
+ ******************************************************************************
+ */
+
+// FlushTxs into consensus
+func (vm *VM) FlushTxs() {
+	vm.timer.Cancel()
+	if len(vm.txs) != 0 {
+		select {
+		case vm.toEngine <- common.PendingTxs:
+		default:
+			vm.ctx.Log.Debug("dropping message to engine due to contention")
+			vm.timer.SetTimeoutIn(vm.batchTimeout)
+		}
+	}
 }
 
 /*
@@ -594,6 +635,42 @@ func (vm *VM) initState(tx *txs.Tx) {
 	vm.state.AddStatus(txID, choices.Accepted)
 	for _, utxo := range tx.UTXOs() {
 		vm.state.AddUTXO(utxo)
+	}
+}
+
+func (vm *VM) parseTx(bytes []byte) (*UniqueTx, error) {
+	rawTx, err := vm.parser.ParseTx(bytes)
+	if err != nil {
+		return nil, err
+	}
+
+	tx := &UniqueTx{
+		TxCachedState: &TxCachedState{
+			Tx: rawTx,
+		},
+		vm:   vm,
+		txID: rawTx.ID(),
+	}
+	if err := tx.SyntacticVerify(); err != nil {
+		return nil, err
+	}
+
+	if tx.Status() == choices.Unknown {
+		vm.state.AddTx(tx.Tx)
+		tx.setStatus(choices.Processing)
+		return tx, vm.state.Commit()
+	}
+
+	return tx, nil
+}
+
+func (vm *VM) issueTx(tx snowstorm.Tx) {
+	vm.txs = append(vm.txs, tx)
+	switch {
+	case len(vm.txs) == batchSize:
+		vm.FlushTxs()
+	case len(vm.txs) == 1:
+		vm.timer.SetTimeoutIn(vm.batchTimeout)
 	}
 }
 
