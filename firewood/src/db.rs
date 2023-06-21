@@ -179,7 +179,7 @@ impl<T> SubUniverse<T> {
 }
 
 impl SubUniverse<StoreRevShared> {
-    fn to_mem_store_r(&self) -> SubUniverse<Rc<dyn MemStoreR>> {
+    fn to_mem_store_r(&self) -> SubUniverse<Rc<impl MemStoreR>> {
         SubUniverse {
             meta: self.meta.inner().clone(),
             payload: self.payload.inner().clone(),
@@ -187,7 +187,7 @@ impl SubUniverse<StoreRevShared> {
     }
 }
 
-impl SubUniverse<Rc<dyn MemStoreR>> {
+impl<T: MemStoreR + 'static> SubUniverse<Rc<T>> {
     fn rewind(
         &self,
         meta_writes: &[SpaceWrite],
@@ -201,7 +201,7 @@ impl SubUniverse<Rc<dyn MemStoreR>> {
 }
 
 impl SubUniverse<Rc<CachedSpace>> {
-    fn to_mem_store_r(&self) -> SubUniverse<Rc<dyn MemStoreR>> {
+    fn to_mem_store_r(&self) -> SubUniverse<Rc<impl MemStoreR>> {
         SubUniverse {
             meta: self.meta.clone(),
             payload: self.payload.clone(),
@@ -282,7 +282,7 @@ struct Universe<T> {
 }
 
 impl Universe<StoreRevShared> {
-    fn to_mem_store_r(&self) -> Universe<Rc<dyn MemStoreR>> {
+    fn to_mem_store_r(&self) -> Universe<Rc<impl MemStoreR>> {
         Universe {
             merkle: self.merkle.to_mem_store_r(),
             blob: self.blob.to_mem_store_r(),
@@ -291,7 +291,7 @@ impl Universe<StoreRevShared> {
 }
 
 impl Universe<Rc<CachedSpace>> {
-    fn to_mem_store_r(&self) -> Universe<Rc<dyn MemStoreR>> {
+    fn to_mem_store_r(&self) -> Universe<Rc<impl MemStoreR>> {
         Universe {
             merkle: self.merkle.to_mem_store_r(),
             blob: self.blob.to_mem_store_r(),
@@ -299,7 +299,7 @@ impl Universe<Rc<CachedSpace>> {
     }
 }
 
-impl Universe<Rc<dyn MemStoreR>> {
+impl<T: MemStoreR + 'static> Universe<Rc<T>> {
     fn rewind(
         &self,
         merkle_meta_writes: &[SpaceWrite],
@@ -872,15 +872,20 @@ impl Db {
                 }
 
                 let u = match revisions.inner.back() {
-                    Some(u) => u.to_mem_store_r(),
-                    None => inner_lock.data_cache.to_mem_store_r(),
+                    Some(u) => u.to_mem_store_r().rewind(
+                        &ash.0[&MERKLE_META_SPACE].undo,
+                        &ash.0[&MERKLE_PAYLOAD_SPACE].undo,
+                        &ash.0[&BLOB_META_SPACE].undo,
+                        &ash.0[&BLOB_PAYLOAD_SPACE].undo,
+                    ),
+                    None => inner_lock.data_cache.to_mem_store_r().rewind(
+                        &ash.0[&MERKLE_META_SPACE].undo,
+                        &ash.0[&MERKLE_PAYLOAD_SPACE].undo,
+                        &ash.0[&BLOB_META_SPACE].undo,
+                        &ash.0[&BLOB_PAYLOAD_SPACE].undo,
+                    ),
                 };
-                revisions.inner.push_back(u.rewind(
-                    &ash.0[&MERKLE_META_SPACE].undo,
-                    &ash.0[&MERKLE_PAYLOAD_SPACE].undo,
-                    &ash.0[&BLOB_META_SPACE].undo,
-                    &ash.0[&BLOB_PAYLOAD_SPACE].undo,
-                ));
+                revisions.inner.push_back(u);
             }
         }
 
