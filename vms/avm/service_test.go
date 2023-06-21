@@ -188,6 +188,26 @@ func verifyTxFeeDeducted(t *testing.T, s *Service, fromAddrs []ids.ShortID, numT
 	return nil
 }
 
+// issueAndAccept expects the context lock to be held
+func issueAndAccept(
+	require *require.Assertions,
+	vm *VM,
+	issuer <-chan common.Message,
+	tx *txs.Tx,
+) {
+	txID, err := vm.IssueTx(tx.Bytes())
+	require.NoError(err)
+	require.Equal(tx.ID(), txID)
+
+	vm.ctx.Lock.Unlock()
+	require.Equal(common.PendingTxs, <-issuer)
+	vm.ctx.Lock.Lock()
+
+	txs := vm.PendingTxs(context.Background())
+	require.Len(txs, 1)
+	require.NoError(txs[0].Accept(context.Background()))
+}
+
 func TestServiceIssueTx(t *testing.T) {
 	require := require.New(t)
 
@@ -235,17 +255,7 @@ func TestServiceGetTxStatus(t *testing.T) {
 	require.NoError(s.GetTxStatus(nil, statusArgs, statusReply))
 	require.Equal(choices.Unknown, statusReply.Status)
 
-	_, err = vm.IssueTx(newTx.Bytes())
-	require.NoError(err)
-	ctx.Lock.Unlock()
-
-	msg := <-issuer
-	require.Equal(common.PendingTxs, msg)
-	ctx.Lock.Lock()
-
-	txs := vm.PendingTxs(context.Background())
-	require.Len(txs, 1)
-	require.NoError(txs[0].Accept(context.Background()))
+	issueAndAccept(require, vm, issuer, newTx)
 
 	statusReply = &GetTxStatusReply{}
 	require.NoError(s.GetTxStatus(nil, statusArgs, statusReply))
@@ -650,23 +660,11 @@ func TestServiceGetTxJSON_BaseTx(t *testing.T) {
 	}()
 
 	newTx := newAvaxBaseTxWithOutputs(t, genesisBytes, vm)
-
-	txID, err := vm.IssueTx(newTx.Bytes())
-	require.NoError(err)
-	require.Equal(newTx.ID(), txID)
-	ctx.Lock.Unlock()
-
-	msg := <-issuer
-	require.Equal(common.PendingTxs, msg)
-	ctx.Lock.Lock()
-
-	txs := vm.PendingTxs(context.Background())
-	require.Len(txs, 1)
-	require.NoError(txs[0].Accept(context.Background()))
+	issueAndAccept(require, vm, issuer, newTx)
 
 	reply := api.GetTxReply{}
 	require.NoError(s.GetTx(nil, &api.GetTxArgs{
-		TxID:     txID,
+		TxID:     newTx.ID(),
 		Encoding: formatting.JSON,
 	}, &reply))
 
@@ -691,23 +689,11 @@ func TestServiceGetTxJSON_ExportTx(t *testing.T) {
 	}()
 
 	newTx := newAvaxExportTxWithOutputs(t, genesisBytes, vm)
-
-	txID, err := vm.IssueTx(newTx.Bytes())
-	require.NoError(err)
-	require.Equal(newTx.ID(), txID)
-	ctx.Lock.Unlock()
-
-	msg := <-issuer
-	require.Equal(common.PendingTxs, msg)
-
-	ctx.Lock.Lock()
-	txs := vm.PendingTxs(context.Background())
-	require.Len(txs, 1)
-	require.NoError(txs[0].Accept(context.Background()))
+	issueAndAccept(require, vm, issuer, newTx)
 
 	reply := api.GetTxReply{}
 	require.NoError(s.GetTx(nil, &api.GetTxArgs{
-		TxID:     txID,
+		TxID:     newTx.ID(),
 		Encoding: formatting.JSON,
 	}, &reply))
 
@@ -767,23 +753,12 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
 
 	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, vm)
-	txID, err := vm.IssueTx(createAssetTx.Bytes())
-	require.NoError(err)
-	require.Equal(createAssetTx.ID(), txID)
-	ctx.Lock.Unlock()
-
-	msg := <-issuer
-	require.Equal(common.PendingTxs, msg)
-	ctx.Lock.Lock()
-
-	txs := vm.PendingTxs(context.Background())
-	require.Len(txs, 1)
-	require.NoError(txs[0].Accept(context.Background()))
+	issueAndAccept(require, vm, issuer, createAssetTx)
 
 	reply := api.GetTxReply{}
 	s := &Service{vm: vm}
 	require.NoError(s.GetTx(nil, &api.GetTxArgs{
-		TxID:     txID,
+		TxID:     createAssetTx.ID(),
 		Encoding: formatting.JSON,
 	}, &reply))
 
@@ -845,30 +820,16 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 
 	key := keys[0]
 	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, vm)
-	_, err := vm.IssueTx(createAssetTx.Bytes())
-	require.NoError(err)
+	issueAndAccept(require, vm, issuer, createAssetTx)
 
 	mintNFTTx := buildOperationTxWithOp(buildNFTxMintOp(createAssetTx, key, 2, 1))
 	require.NoError(mintNFTTx.SignNFTFx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
-
-	txID, err := vm.IssueTx(mintNFTTx.Bytes())
-	require.NoError(err)
-	require.Equal(mintNFTTx.ID(), txID)
-	ctx.Lock.Unlock()
-
-	msg := <-issuer
-	require.Equal(common.PendingTxs, msg)
-	ctx.Lock.Lock()
-
-	txs := vm.PendingTxs(context.Background())
-	require.Len(txs, 2)
-	require.NoError(txs[0].Accept(context.Background()))
-	require.NoError(txs[1].Accept(context.Background()))
+	issueAndAccept(require, vm, issuer, mintNFTTx)
 
 	reply := api.GetTxReply{}
 	s := &Service{vm: vm}
 	require.NoError(s.GetTx(nil, &api.GetTxArgs{
-		TxID:     txID,
+		TxID:     mintNFTTx.ID(),
 		Encoding: formatting.JSON,
 	}, &reply))
 
@@ -934,33 +895,19 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 
 	key := keys[0]
 	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, vm)
-	_, err := vm.IssueTx(createAssetTx.Bytes())
-	require.NoError(err)
+	issueAndAccept(require, vm, issuer, createAssetTx)
 
 	mintOp1 := buildNFTxMintOp(createAssetTx, key, 2, 1)
 	mintOp2 := buildNFTxMintOp(createAssetTx, key, 3, 2)
 	mintNFTTx := buildOperationTxWithOp(mintOp1, mintOp2)
 
 	require.NoError(mintNFTTx.SignNFTFx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}, {key}}))
-
-	txID, err := vm.IssueTx(mintNFTTx.Bytes())
-	require.NoError(err)
-	require.Equal(mintNFTTx.ID(), txID)
-	ctx.Lock.Unlock()
-
-	msg := <-issuer
-	require.Equal(common.PendingTxs, msg)
-	ctx.Lock.Lock()
-
-	txs := vm.PendingTxs(context.Background())
-	require.Len(txs, 2)
-	require.NoError(txs[0].Accept(context.Background()))
-	require.NoError(txs[1].Accept(context.Background()))
+	issueAndAccept(require, vm, issuer, mintNFTTx)
 
 	reply := api.GetTxReply{}
 	s := &Service{vm: vm}
 	require.NoError(s.GetTx(nil, &api.GetTxArgs{
-		TxID:     txID,
+		TxID:     mintNFTTx.ID(),
 		Encoding: formatting.JSON,
 	}, &reply))
 
@@ -1025,30 +972,16 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 
 	key := keys[0]
 	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, vm)
-	_, err := vm.IssueTx(createAssetTx.Bytes())
-	require.NoError(err)
+	issueAndAccept(require, vm, issuer, createAssetTx)
 
 	mintSecpOpTx := buildOperationTxWithOp(buildSecpMintOp(createAssetTx, key, 0))
 	require.NoError(mintSecpOpTx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
-
-	txID, err := vm.IssueTx(mintSecpOpTx.Bytes())
-	require.NoError(err)
-	require.Equal(mintSecpOpTx.ID(), txID)
-	ctx.Lock.Unlock()
-
-	msg := <-issuer
-	require.Equal(common.PendingTxs, msg)
-	ctx.Lock.Lock()
-
-	txs := vm.PendingTxs(context.Background())
-	require.Len(txs, 2)
-	require.NoError(txs[0].Accept(context.Background()))
-	require.NoError(txs[1].Accept(context.Background()))
+	issueAndAccept(require, vm, issuer, mintSecpOpTx)
 
 	reply := api.GetTxReply{}
 	s := &Service{vm: vm}
 	require.NoError(s.GetTx(nil, &api.GetTxArgs{
-		TxID:     txID,
+		TxID:     mintSecpOpTx.ID(),
 		Encoding: formatting.JSON,
 	}, &reply))
 
@@ -1116,33 +1049,19 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 
 	key := keys[0]
 	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, vm)
-	_, err := vm.IssueTx(createAssetTx.Bytes())
-	require.NoError(err)
+	issueAndAccept(require, vm, issuer, createAssetTx)
 
 	op1 := buildSecpMintOp(createAssetTx, key, 0)
 	op2 := buildSecpMintOp(createAssetTx, key, 1)
 	mintSecpOpTx := buildOperationTxWithOp(op1, op2)
 
 	require.NoError(mintSecpOpTx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}, {key}}))
-
-	txID, err := vm.IssueTx(mintSecpOpTx.Bytes())
-	require.NoError(err)
-	require.Equal(mintSecpOpTx.ID(), txID)
-	ctx.Lock.Unlock()
-
-	msg := <-issuer
-	require.Equal(common.PendingTxs, msg)
-	ctx.Lock.Lock()
-
-	txs := vm.PendingTxs(context.Background())
-	require.Len(txs, 2)
-	require.NoError(txs[0].Accept(context.Background()))
-	require.NoError(txs[1].Accept(context.Background()))
+	issueAndAccept(require, vm, issuer, mintSecpOpTx)
 
 	reply := api.GetTxReply{}
 	s := &Service{vm: vm}
 	require.NoError(s.GetTx(nil, &api.GetTxArgs{
-		TxID:     txID,
+		TxID:     mintSecpOpTx.ID(),
 		Encoding: formatting.JSON,
 	}, &reply))
 
@@ -1208,30 +1127,16 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 
 	key := keys[0]
 	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, vm)
-	_, err := vm.IssueTx(createAssetTx.Bytes())
-	require.NoError(err)
+	issueAndAccept(require, vm, issuer, createAssetTx)
 
 	mintPropertyFxOpTx := buildOperationTxWithOp(buildPropertyFxMintOp(createAssetTx, key, 4))
 	require.NoError(mintPropertyFxOpTx.SignPropertyFx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
-
-	txID, err := vm.IssueTx(mintPropertyFxOpTx.Bytes())
-	require.NoError(err)
-	require.Equal(mintPropertyFxOpTx.ID(), txID)
-	ctx.Lock.Unlock()
-
-	msg := <-issuer
-	require.Equal(common.PendingTxs, msg)
-	ctx.Lock.Lock()
-
-	txs := vm.PendingTxs(context.Background())
-	require.Len(txs, 2)
-	require.NoError(txs[0].Accept(context.Background()))
-	require.NoError(txs[1].Accept(context.Background()))
+	issueAndAccept(require, vm, issuer, mintPropertyFxOpTx)
 
 	reply := api.GetTxReply{}
 	s := &Service{vm: vm}
 	require.NoError(s.GetTx(nil, &api.GetTxArgs{
-		TxID:     txID,
+		TxID:     mintPropertyFxOpTx.ID(),
 		Encoding: formatting.JSON,
 	}, &reply))
 
@@ -1298,33 +1203,19 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 
 	key := keys[0]
 	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, vm)
-	_, err := vm.IssueTx(createAssetTx.Bytes())
-	require.NoError(err)
+	issueAndAccept(require, vm, issuer, createAssetTx)
 
 	op1 := buildPropertyFxMintOp(createAssetTx, key, 4)
 	op2 := buildPropertyFxMintOp(createAssetTx, key, 5)
 	mintPropertyFxOpTx := buildOperationTxWithOp(op1, op2)
 
 	require.NoError(mintPropertyFxOpTx.SignPropertyFx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}, {key}}))
-
-	txID, err := vm.IssueTx(mintPropertyFxOpTx.Bytes())
-	require.NoError(err)
-	require.Equal(mintPropertyFxOpTx.ID(), txID)
-	ctx.Lock.Unlock()
-
-	msg := <-issuer
-	require.Equal(common.PendingTxs, msg)
-	ctx.Lock.Lock()
-
-	txs := vm.PendingTxs(context.Background())
-	require.Len(txs, 2)
-	require.NoError(txs[0].Accept(context.Background()))
-	require.NoError(txs[1].Accept(context.Background()))
+	issueAndAccept(require, vm, issuer, mintPropertyFxOpTx)
 
 	reply := api.GetTxReply{}
 	s := &Service{vm: vm}
 	require.NoError(s.GetTx(nil, &api.GetTxArgs{
-		TxID:     txID,
+		TxID:     mintPropertyFxOpTx.ID(),
 		Encoding: formatting.JSON,
 	}, &reply))
 

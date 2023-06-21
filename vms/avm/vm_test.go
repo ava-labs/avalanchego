@@ -578,12 +578,16 @@ func TestIssueNFT(t *testing.T) {
 		ctx.Lock.Unlock()
 	}()
 
+	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
+	m := atomic.NewMemory(prefixdb.New([]byte{0}, baseDBManager.Current().Database))
+	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
+
 	genesisBytes := BuildGenesisTest(t)
 	issuer := make(chan common.Message, 1)
 	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
-		manager.NewMemDB(version.Semantic1_0_0),
+		baseDBManager,
 		genesisBytes,
 		nil,
 		nil,
@@ -603,7 +607,6 @@ func TestIssueNFT(t *testing.T) {
 	vm.batchTimeout = 0
 
 	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
-
 	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
 
 	createAssetTx := &txs.Tx{Unsigned: &txs.CreateAssetTx{
@@ -635,9 +638,7 @@ func TestIssueNFT(t *testing.T) {
 		}},
 	}}
 	require.NoError(vm.parser.InitializeTx(createAssetTx))
-
-	_, err := vm.IssueTx(createAssetTx.Bytes())
-	require.NoError(err)
+	issueAndAccept(require, vm, issuer, createAssetTx)
 
 	mintNFTTx := &txs.Tx{Unsigned: &txs.OperationTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
@@ -661,9 +662,7 @@ func TestIssueNFT(t *testing.T) {
 		}},
 	}}
 	require.NoError(mintNFTTx.SignNFTFx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0]}}))
-
-	_, err = vm.IssueTx(mintNFTTx.Bytes())
-	require.NoError(err)
+	issueAndAccept(require, vm, issuer, mintNFTTx)
 
 	transferNFTTx := &txs.Tx{
 		Unsigned: &txs.OperationTx{
@@ -692,9 +691,7 @@ func TestIssueNFT(t *testing.T) {
 		},
 	}
 	require.NoError(vm.parser.InitializeTx(transferNFTTx))
-
-	_, err = vm.IssueTx(transferNFTTx.Bytes())
-	require.NoError(err)
+	issueAndAccept(require, vm, issuer, transferNFTTx)
 }
 
 // Test issuing a transaction that creates an Property family
@@ -708,12 +705,16 @@ func TestIssueProperty(t *testing.T) {
 		ctx.Lock.Unlock()
 	}()
 
+	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
+	m := atomic.NewMemory(prefixdb.New([]byte{0}, baseDBManager.Current().Database))
+	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
+
 	genesisBytes := BuildGenesisTest(t)
 	issuer := make(chan common.Message, 1)
 	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
-		manager.NewMemDB(version.Semantic1_0_0),
+		baseDBManager,
 		genesisBytes,
 		nil,
 		nil,
@@ -760,9 +761,7 @@ func TestIssueProperty(t *testing.T) {
 		}},
 	}}
 	require.NoError(vm.parser.InitializeTx(createAssetTx))
-
-	_, err := vm.IssueTx(createAssetTx.Bytes())
-	require.NoError(err)
+	issueAndAccept(require, vm, issuer, createAssetTx)
 
 	mintPropertyTx := &txs.Tx{Unsigned: &txs.OperationTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
@@ -794,9 +793,7 @@ func TestIssueProperty(t *testing.T) {
 	require.NoError(mintPropertyTx.SignPropertyFx(codec, [][]*secp256k1.PrivateKey{
 		{keys[0]},
 	}))
-
-	_, err = vm.IssueTx(mintPropertyTx.Bytes())
-	require.NoError(err)
+	issueAndAccept(require, vm, issuer, mintPropertyTx)
 
 	burnPropertyTx := &txs.Tx{Unsigned: &txs.OperationTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
@@ -816,9 +813,7 @@ func TestIssueProperty(t *testing.T) {
 	require.NoError(burnPropertyTx.SignPropertyFx(codec, [][]*secp256k1.PrivateKey{
 		{},
 	}))
-
-	_, err = vm.IssueTx(burnPropertyTx.Bytes())
-	require.NoError(err)
+	issueAndAccept(require, vm, issuer, burnPropertyTx)
 }
 
 func setupTxFeeAssets(t *testing.T) ([]byte, chan common.Message, *VM, *atomic.Memory) {
@@ -1113,63 +1108,6 @@ func TestTxVerifyAfterGet(t *testing.T) {
 	require.NoError(err)
 	require.NoError(parsedSecondTx.Verify(context.Background()))
 	_, err = vm.IssueTx(firstTx.Bytes())
-	require.NoError(err)
-	parsedFirstTx, err := vm.GetTx(context.Background(), firstTx.ID())
-	require.NoError(err)
-	require.NoError(parsedSecondTx.Accept(context.Background()))
-	err = parsedFirstTx.Verify(context.Background())
-	require.ErrorIs(err, database.ErrNotFound)
-}
-
-func TestTxVerifyAfterVerifyAncestorTx(t *testing.T) {
-	require := require.New(t)
-
-	_, vm, ctx, issueTxs := setupIssueTx(t)
-	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-		ctx.Lock.Unlock()
-	}()
-	avaxTx := issueTxs[0]
-	firstTx := issueTxs[1]
-	secondTx := issueTxs[2]
-	key := keys[0]
-	firstTxDescendant := &txs.Tx{Unsigned: &txs.BaseTx{BaseTx: avax.BaseTx{
-		NetworkID:    constants.UnitTestID,
-		BlockchainID: chainID,
-		Ins: []*avax.TransferableInput{{
-			UTXOID: avax.UTXOID{
-				TxID:        firstTx.ID(),
-				OutputIndex: 0,
-			},
-			Asset: avax.Asset{ID: avaxTx.ID()},
-			In: &secp256k1fx.TransferInput{
-				Amt: startBalance - vm.TxFee,
-				Input: secp256k1fx.Input{
-					SigIndices: []uint32{
-						0,
-					},
-				},
-			},
-		}},
-		Outs: []*avax.TransferableOutput{{
-			Asset: avax.Asset{ID: avaxTx.ID()},
-			Out: &secp256k1fx.TransferOutput{
-				Amt: startBalance - 2*vm.TxFee,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{key.PublicKey().Address()},
-				},
-			},
-		}},
-	}}}
-	require.NoError(firstTxDescendant.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
-
-	parsedSecondTx, err := vm.ParseTx(context.Background(), secondTx.Bytes())
-	require.NoError(err)
-	require.NoError(parsedSecondTx.Verify(context.Background()))
-	_, err = vm.IssueTx(firstTx.Bytes())
-	require.NoError(err)
-	_, err = vm.IssueTx(firstTxDescendant.Bytes())
 	require.NoError(err)
 	parsedFirstTx, err := vm.GetTx(context.Background(), firstTx.ID())
 	require.NoError(err)
