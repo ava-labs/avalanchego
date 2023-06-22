@@ -110,6 +110,11 @@ type trieView struct {
 	committed bool
 
 	estimatedSize int
+
+	mockedNodes map[path]*node
+
+	touchedNodesLock sync.Mutex
+	touchedNodes     map[path]*node
 }
 
 // NewView returns a new view on top of this one.
@@ -173,6 +178,8 @@ func newTrieView(
 		changes:               newChangeSummary(estimatedSize),
 		estimatedSize:         estimatedSize,
 		unappliedValueChanges: make(map[path]Maybe[[]byte], estimatedSize),
+
+		touchedNodes: make(map[path]*node),
 	}, nil
 }
 
@@ -199,6 +206,8 @@ func newTrieViewWithChanges(
 		changes:               changes,
 		estimatedSize:         estimatedSize,
 		unappliedValueChanges: make(map[path]Maybe[[]byte], estimatedSize),
+
+		touchedNodes: make(map[path]*node),
 	}, nil
 }
 
@@ -1270,5 +1279,61 @@ func (t *trieView) getNodeWithID(id ids.ID, key path) (*node, error) {
 func (t *trieView) getParentTrie() TrieView {
 	t.validityTrackingLock.RLock()
 	defer t.validityTrackingLock.RUnlock()
-	return t.parentTrie
+
+	return &trieViewIntercepter{
+		TrieView:     t.parentTrie,
+		mockedNodes:  t.mockedNodes,
+		lock:         &t.touchedNodesLock,
+		touchedNodes: t.touchedNodes,
+	}
+}
+
+type trieViewIntercepter struct {
+	TrieView
+
+	mockedNodes map[path]*node
+
+	lock         sync.Locker
+	touchedNodes map[path]*node
+}
+
+func (i *trieViewIntercepter) getValue(key path, lock bool) ([]byte, error) {
+	if i.mockedNodes != nil {
+		// This should end up calling getEditableNode
+		p, err := i.TrieView.GetProof(context.TODO(), key.Serialize().Value)
+		if err != nil {
+			return nil, err
+		}
+
+		if p.Value.hasValue {
+			return p.Value.value, nil
+		}
+		return nil, database.ErrNotFound
+	}
+
+	if lock {
+		// This should end up calling getEditableNode
+		_, err := i.TrieView.GetProof(context.TODO(), key.Serialize().Value)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return i.TrieView.getValue(key, lock)
+}
+
+func (i *trieViewIntercepter) getEditableNode(key path) (*node, error) {
+	if mockedNode, ok := i.mockedNodes[key]; ok {
+		return mockedNode.clone(), nil
+	}
+
+	toKeep, err := i.TrieView.getEditableNode(key)
+	if err != nil {
+		return nil, err
+	}
+	i.lock.Lock()
+	i.touchedNodes[key] = toKeep
+	i.lock.Unlock()
+
+	return i.TrieView.getEditableNode(key)
 }
