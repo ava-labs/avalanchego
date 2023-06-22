@@ -23,6 +23,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 
+	"github.com/ava-labs/coreth/eth/filters"
 	"github.com/ava-labs/coreth/internal/ethapi"
 	"github.com/ava-labs/coreth/metrics"
 	"github.com/ava-labs/coreth/plugin/evm/message"
@@ -737,6 +738,23 @@ func TestIssueAtomicTxs(t *testing.T) {
 		t.Fatal(err)
 	} else if lastAcceptedID != blk.ID() {
 		t.Fatalf("Expected last accepted blockID to be the accepted block: %s, but found %s", blk.ID(), lastAcceptedID)
+	}
+	vm.blockChain.DrainAcceptorQueue()
+	filterAPI := filters.NewFilterAPI(filters.NewFilterSystem(vm.eth.APIBackend, filters.Config{
+		Timeout: 5 * time.Minute,
+	}))
+	blockHash := common.Hash(blk.ID())
+	logs, err := filterAPI.GetLogs(context.Background(), filters.FilterCriteria{
+		BlockHash: &blockHash,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(logs) != 0 {
+		t.Fatalf("Expected log length to be 0, but found %d", len(logs))
+	}
+	if logs == nil {
+		t.Fatal("Expected logs to be non-nil")
 	}
 
 	exportTx, err := vm.newExportTx(vm.ctx.AVAXAssetID, importAmount-(2*params.AvalancheAtomicTxFee), vm.ctx.XChainID, testShortIDAddrs[0], initialBaseFee, []*secp256k1.PrivateKey{testKeys[0]})
