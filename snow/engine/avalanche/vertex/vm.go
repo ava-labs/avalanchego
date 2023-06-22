@@ -58,9 +58,6 @@ type DAGVM interface {
 	block.ChainVM
 	Getter
 
-	// Return any transactions that have not been sent to consensus yet
-	PendingTxs(ctx context.Context) []snowstorm.Tx
-
 	// Convert a stream of bytes to a transaction or return an error
 	ParseTx(ctx context.Context, txBytes []byte) (snowstorm.Tx, error)
 }
