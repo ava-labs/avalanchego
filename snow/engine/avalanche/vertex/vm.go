@@ -56,14 +56,7 @@ type LinearizableVM interface {
 // implement
 type DAGVM interface {
 	block.ChainVM
-	Getter
 
 	// Convert a stream of bytes to a transaction or return an error
 	ParseTx(ctx context.Context, txBytes []byte) (snowstorm.Tx, error)
-}
-
-// Getter defines the functionality for fetching a tx/block by its ID.
-type Getter interface {
-	// Retrieve a transaction that was submitted previously
-	GetTx(ctx context.Context, txID ids.ID) (snowstorm.Tx, error)
 }
