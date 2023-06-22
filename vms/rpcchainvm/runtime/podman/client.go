@@ -13,9 +13,19 @@ import (
 var _ Container = (*Client)(nil)
 
 type Container interface {
-	Start(ctx context.Context, id string)
+	// Start attempts to Start a container.
+	Start(ctx context.Context, id string) error
+
+	// Stop attempts to Stop a container.
+	Stop(ctx context.Context, id string) error
+
+	// Pull attempts to pull a container image.
 	Pull(ctx context.Context, image string) error
+
+	// Exists returns true if a container id exists.
 	Exists(ctx context.Context, id string) (bool, error)
+
+	// WaitForStatus will block until container meets the expected container status.
 	WaitForStatus(ctx context.Context, id string, status define.ContainerStatus) (int32, error)
 }
 
@@ -25,23 +35,25 @@ func NewClient() *Client {
 	return &Client{}
 }
 
-// Start attempts to Start a container.
-func (c *Client) Start(ctx context.Context, id string) {
+func (c *Client) Start(ctx context.Context, id string) error {
 	// TODO
+	return nil
 }
 
-// Pull attempts to pull a container image.
+func (c *Client) Stop(ctx context.Context, id string) error {
+	// TODO
+	return nil
+}
+
 func (c *Client) Pull(ctx context.Context, image string) error {
 	_, err := images.Pull(ctx, image, &images.PullOptions{})
 	return err
 }
 
-// Exists returns true if a container id exists.
 func (c *Client) Exists(ctx context.Context, id string) (bool, error) {
 	return exists(ctx, id)
 }
 
-// WaitForStatus will block until container meets the expected container status.
 func (c *Client) WaitForStatus(ctx context.Context, id string, status define.ContainerStatus) (int32, error) {
 	return containers.Wait(ctx, id, &containers.WaitOptions{
 		Condition: []define.ContainerStatus{status},
