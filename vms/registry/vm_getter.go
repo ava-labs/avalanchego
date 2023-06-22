@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/filesystem"
@@ -20,6 +21,7 @@ var (
 	_ VMGetter = (*vmGetter)(nil)
 
 	errInvalidVMID = errors.New("invalid vmID")
+	podSuffix      = "_pod"
 )
 
 // VMGetter defines functionality to get the plugins on the node.
@@ -66,16 +68,27 @@ func (getter *vmGetter) Get() (map[ids.ID]vms.Factory, map[ids.ID]vms.Factory, e
 			continue
 		}
 
+		isPod := false
 		nameWithExtension := file.Name()
+		fmt.Printf("nameWithExtension: %s\n", nameWithExtension)
+
+		// check the name of the file if it includes _pod.yml then we create a podman VM factory
+		// otherwise create the currently used factory
+
 		// Strip any extension from the file. This is to support windows .exe
 		// files.
 		name := nameWithExtension[:len(nameWithExtension)-len(filepath.Ext(nameWithExtension))]
+		fmt.Printf("name: %s\n", name)
 
 		// Skip hidden files.
 		if len(name) == 0 {
 			continue
 		}
 
+		if strings.HasSuffix(name, podSuffix) {
+			isPod = true
+			name = strings.TrimSuffix(name, podSuffix)
+		}
 		vmID, err := getter.config.Manager.Lookup(name)
 		if err != nil {
 			// there is no alias with plugin name, try to use full vmID.
@@ -99,11 +112,16 @@ func (getter *vmGetter) Get() (map[ids.ID]vms.Factory, map[ids.ID]vms.Factory, e
 			return nil, nil, err
 		}
 
-		unregisteredVMs[vmID] = rpcchainvm.NewFactory(
-			filepath.Join(getter.config.PluginDirectory, file.Name()),
-			getter.config.CPUTracker,
-			getter.config.RuntimeTracker,
-		)
+		if !isPod {
+			unregisteredVMs[vmID] = rpcchainvm.NewFactory(
+				filepath.Join(getter.config.PluginDirectory, file.Name()),
+				getter.config.CPUTracker,
+				getter.config.RuntimeTracker,
+			)
+		} else {
+			// TODO: use the container implementation here
+			fmt.Printf("Attempt to use the container implementation to create a VM Factory for: %s\n", file.Name())
+		}
 	}
 	return registeredVMs, unregisteredVMs, nil
 }
