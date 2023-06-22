@@ -10,8 +10,16 @@ import (
 	"github.com/containers/podman/v4/pkg/bindings/images"
 )
 
-type Client struct {
+
+var _ Container = (*Client)(nil)
+
+type Container interface {
+	Start(ctx context.Context, id string)
+	// extend
 }
+
+type Client struct {}
+
 
 func NewClient() *Client {
 	return &Client{}
