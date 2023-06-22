@@ -111,10 +111,11 @@ type trieView struct {
 
 	estimatedSize int
 
-	mockedNodes map[path]*node
-
-	touchedNodesLock sync.Mutex
-	touchedNodes     map[path]*node
+	enableIntercepter bool
+	mockedNodes       map[path]*node
+	mockedMerkleRoot  ids.ID
+	touchedNodesLock  sync.Locker
+	touchedNodes      map[path]*node
 }
 
 // NewView returns a new view on top of this one.
@@ -178,8 +179,6 @@ func newTrieView(
 		changes:               newChangeSummary(estimatedSize),
 		estimatedSize:         estimatedSize,
 		unappliedValueChanges: make(map[path]Maybe[[]byte], estimatedSize),
-
-		touchedNodes: make(map[path]*node),
 	}, nil
 }
 
@@ -206,8 +205,6 @@ func newTrieViewWithChanges(
 		changes:               changes,
 		estimatedSize:         estimatedSize,
 		unappliedValueChanges: make(map[path]Maybe[[]byte], estimatedSize),
-
-		touchedNodes: make(map[path]*node),
 	}, nil
 }
 
@@ -1280,51 +1277,59 @@ func (t *trieView) getParentTrie() TrieView {
 	t.validityTrackingLock.RLock()
 	defer t.validityTrackingLock.RUnlock()
 
+	if !t.enableIntercepter {
+		return t.parentTrie
+	}
+
 	return &trieViewIntercepter{
-		TrieView:     t.parentTrie,
-		mockedNodes:  t.mockedNodes,
-		lock:         &t.touchedNodesLock,
-		touchedNodes: t.touchedNodes,
+		TrieView:         t.parentTrie,
+		mockedNodes:      t.mockedNodes,
+		mockedMerkleRoot: t.mockedMerkleRoot,
+		lock:             t.touchedNodesLock,
+		touchedNodes:     t.touchedNodes,
 	}
 }
 
 type trieViewIntercepter struct {
 	TrieView
 
-	mockedNodes map[path]*node
+	mockedNodes      map[path]*node
+	mockedMerkleRoot ids.ID
 
 	lock         sync.Locker
 	touchedNodes map[path]*node
 }
 
-func (i *trieViewIntercepter) getValue(key path, lock bool) ([]byte, error) {
+func (i *trieViewIntercepter) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
 	if i.mockedNodes != nil {
-		// This should end up calling getEditableNode
-		p, err := i.TrieView.GetProof(context.TODO(), key.Serialize().Value)
-		if err != nil {
-			return nil, err
-		}
+		return i.mockedMerkleRoot, nil
+	}
+	return i.TrieView.GetMerkleRoot(ctx)
+}
 
-		if p.Value.hasValue {
-			return p.Value.value, nil
-		}
-		return nil, database.ErrNotFound
+func (i *trieViewIntercepter) getValue(key path, _ bool) ([]byte, error) {
+	// This should end up calling getEditableNode
+	p, err := i.TrieView.GetProof(context.TODO(), key.Serialize().Value)
+	if err != nil {
+		return nil, err
 	}
 
-	if lock {
-		// This should end up calling getEditableNode
-		_, err := i.TrieView.GetProof(context.TODO(), key.Serialize().Value)
-		if err != nil {
-			return nil, err
-		}
+	if p.Value.hasValue {
+		return p.Value.value, nil
 	}
-
-	return i.TrieView.getValue(key, lock)
+	return nil, database.ErrNotFound
 }
 
 func (i *trieViewIntercepter) getEditableNode(key path) (*node, error) {
-	if mockedNode, ok := i.mockedNodes[key]; ok {
-		return mockedNode.clone(), nil
+	if i.mockedNodes != nil {
+		if mockedNode, ok := i.mockedNodes[key]; ok {
+			return mockedNode.clone(), nil
+		}
+		// TODO: this is not really safe here - as it results in us assuming
+		// that all nodes that aren't provided do not exist.
+		//
+		// We should be depending on an exclusion proof here.
+		return nil, database.ErrNotFound
 	}
 
 	toKeep, err := i.TrieView.getEditableNode(key)
