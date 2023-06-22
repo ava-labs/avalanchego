@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/ids"
 )
@@ -77,15 +78,21 @@ type proofNode struct {
 }
 
 func testIntercepter(require *require.Assertions, db *merkleDB, changes []KeyChange) {
-	startRootID, startRoot, proof, endRootID := build(require, db, changes)
-	verify(require, startRootID, startRoot, proof, changes, endRootID)
+	startRootID, startRoot, valueProofs, pathProofs, endRootID := build(require, db, changes)
+	verify(require, startRootID, startRoot, valueProofs, pathProofs, changes, endRootID)
 }
 
 func build(
 	require *require.Assertions,
 	db *merkleDB,
 	changes []KeyChange,
-) (ids.ID, []byte, []proofNode, ids.ID) {
+) (
+	ids.ID,
+	[]byte,
+	[]*Proof,
+	[]*PathProof,
+	ids.ID,
+) {
 	ctx := context.Background()
 	startRootID, err := db.GetMerkleRoot(ctx)
 	require.NoError(err)
@@ -93,70 +100,81 @@ func build(
 	startRootBytes, err := db.root.marshal()
 	require.NoError(err)
 
-	viewIntf1, err := db.NewView()
+	viewIntf, err := db.NewView()
 	require.NoError(err)
+	view := viewIntf.(*trieView)
 
 	var lock sync.Mutex
-	touchedNodes := make(map[path]*node)
-	view1 := viewIntf1.(*trieView)
-	view1.enableIntercepter = true
-	view1.touchedNodesLock = &lock
-	view1.touchedNodes = touchedNodes
-
-	viewIntf2, err := db.NewView()
-	require.NoError(err)
-
-	view2 := viewIntf2.(*trieView)
-	view2.enableIntercepter = true
-	view2.touchedNodesLock = &lock
-	view2.touchedNodes = touchedNodes
+	view.proverIntercepter = &trieViewProverIntercepter{
+		lock:   &lock,
+		values: make(map[path]*Proof),
+		nodes:  make(map[path]*PathProof),
+	}
 	for _, change := range changes {
 		if change.Value.IsNothing() {
-			require.NoError(view2.Remove(ctx, change.Key))
+			require.NoError(view.Remove(ctx, change.Key))
 		} else {
-			require.NoError(view2.Insert(ctx, change.Key, change.Value.Value()))
+			require.NoError(view.Insert(ctx, change.Key, change.Value.Value()))
 		}
 	}
 
-	expectedNewRoot, err := view2.GetMerkleRoot(ctx)
+	expectedNewRoot, err := view.GetMerkleRoot(ctx)
 	require.NoError(err)
 
-	proof := make([]proofNode, 0, len(touchedNodes))
-	for _, node := range touchedNodes {
-		b, err := node.marshal()
-		require.NoError(err)
+	valueProofs := maps.Values(view.proverIntercepter.values)
+	pathProofs := maps.Values(view.proverIntercepter.nodes)
 
-		proof = append(proof, proofNode{
-			key:  []byte(node.key),
-			node: b,
-		})
-	}
-
-	return startRootID, startRootBytes, proof, expectedNewRoot
+	return startRootID, startRootBytes, valueProofs, pathProofs, expectedNewRoot
 }
 
 func verify(
 	require *require.Assertions,
 	startRootID ids.ID,
 	startRootBytes []byte,
-	proof []proofNode,
+	valueProofs []*Proof,
+	pathProofs []*PathProof,
 	changes []KeyChange,
 	expectedRootID ids.ID,
 ) {
 	startRoot, err := parseNode(RootPath, startRootBytes)
 	require.NoError(err)
 
-	touchedNodesFromProof := make(map[path]*node)
-	for _, node := range proof {
-		key := path(node.key)
-		n, err := parseNode(key, node.node)
-		require.NoError(err)
-		require.NoError(n.calculateID(&mockMetrics{}))
-
-		touchedNodesFromProof[key] = n
+	ctx := context.Background()
+	for _, proof := range valueProofs {
+		require.NoError(proof.Verify(ctx, startRootID))
+	}
+	for _, proof := range pathProofs {
+		require.NoError(proof.Verify(ctx, startRootID))
 	}
 
-	parentView := &trieView{
+	values := make(map[path]Maybe[[]byte])
+	for _, proof := range valueProofs {
+		values[newPath(proof.Key)] = proof.Value
+	}
+
+	nodes := make(map[path]Maybe[*node])
+	for _, proof := range pathProofs {
+		key := proof.KeyPath.deserialize()
+		lastNode := proof.Path[len(proof.Path)-1]
+
+		if !lastNode.KeyPath.Equal(proof.KeyPath) {
+			nodes[key] = Nothing[*node]()
+			continue
+		}
+
+		n := &node{
+			dbNode: dbNode{
+				value:    proof.Value,
+				children: lastNode.Children,
+			},
+			key:         key,
+			valueDigest: lastNode.ValueOrHash,
+		}
+
+		nodes[key] = Some(n)
+	}
+
+	view := &trieView{
 		root: startRoot,
 		db: &merkleDB{
 			metrics: &mockMetrics{},
@@ -167,20 +185,12 @@ func verify(
 		estimatedSize:         1,
 		unappliedValueChanges: make(map[path]Maybe[[]byte], 1),
 
-		enableIntercepter: true,
-		mockedNodes:       touchedNodesFromProof,
-		mockedMerkleRoot:  startRootID,
+		verifierIntercepter: &trieViewVerifierIntercepter{
+			values: values,
+			nodes:  nodes,
+		},
 	}
 
-	viewIntf, err := parentView.NewView()
-	require.NoError(err)
-
-	view := viewIntf.(*trieView)
-	view.enableIntercepter = true
-	view.mockedNodes = touchedNodesFromProof
-	view.mockedMerkleRoot = startRootID
-
-	ctx := context.Background()
 	for _, change := range changes {
 		if change.Value.IsNothing() {
 			require.NoError(view.Remove(ctx, change.Key))

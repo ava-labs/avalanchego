@@ -192,6 +192,117 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID) error {
 	return nil
 }
 
+// An inclusion/exclustion proof of a path.
+type PathProof struct {
+	// Nodes in the proof path from root --> target key
+	// (or node that would be where key is if it doesn't exist).
+	// Must always be non-empty (i.e. have the root node).
+	Path     []ProofNode
+	Children []ProofNode
+
+	// This is a proof that [KeyPath] exists/doesn't exist.
+	KeyPath SerializedPath
+
+	// Nothing if [KeyPath] isn't in the trie or if the node does not have a
+	// value.
+	Value Maybe[[]byte]
+}
+
+// Returns nil if the trie given in [proof] has root [expectedRootID].
+// That is, this is a valid proof that [proof.Key] exists/doesn't exist
+// in the trie with root [expectedRootID].
+func (proof *PathProof) Verify(ctx context.Context, expectedRootID ids.ID) error {
+	// Make sure the proof is well-formed.
+	if len(proof.Path) == 0 {
+		return ErrNoProof
+	}
+	if err := verifyProofPath(proof.Path, proof.KeyPath.deserialize()); err != nil {
+		return err
+	}
+
+	// Confirm that the last proof node's value matches the claimed proof value
+	lastNode := proof.Path[len(proof.Path)-1]
+
+	// If the last proof node's key is [proof.Key] (i.e. this is an inclusion proof)
+	// then the value of the last proof node must match [proof.Value].
+	// Note odd length keys can never match the [proof.Key] since it's bytes,
+	// and thus an even number of nibbles.
+	if !lastNode.KeyPath.hasOddLength() &&
+		proof.KeyPath.Equal(lastNode.KeyPath) &&
+		!valueOrHashMatches(proof.Value, lastNode.ValueOrHash) {
+		return ErrProofValueDoesntMatch
+	}
+
+	// If the last proof node has an odd length or a different key than [proof.Key]
+	// then this is an exclusion proof and should prove that [proof.Key] isn't in the trie..
+	// Note odd length keys can never match the [proof.Key] since it's bytes,
+	// and thus an even number of nibbles.
+	if (lastNode.KeyPath.hasOddLength() || !proof.KeyPath.Equal(lastNode.KeyPath)) &&
+		!proof.Value.IsNothing() {
+		return ErrProofValueDoesntMatch
+	}
+
+	if len(lastNode.Children) != len(proof.Children) {
+		return errors.New("missing children")
+	}
+
+	j := 0
+	for i := byte(0); i < NodeBranchFactor; i++ {
+		expectedHash, ok := lastNode.Children[i]
+		if !ok {
+			continue
+		}
+
+		c := proof.Children[j]
+		childrenToHash := make(map[byte]child)
+		for b, childHash := range c.Children {
+			childrenToHash[b] = child{
+				// note: compressed path isn't used in encodeHashValues
+				id: childHash,
+			}
+		}
+		childBytes, err := codec.encodeHashValues(version, &hashValues{
+			Children: childrenToHash,
+			Value:    c.ValueOrHash,
+			Key:      c.KeyPath,
+		})
+		if err != nil {
+			return err
+		}
+
+		childHash := hashing.ComputeHash256Array(childBytes)
+		if childHash != expectedHash {
+			return errors.New("wrong child")
+		}
+
+		j++
+	}
+
+	view, err := getEmptyTrieView(ctx)
+	if err != nil {
+		return err
+	}
+
+	// Insert all of the proof nodes.
+	// [provenPath] is the path that we are proving exists, or the path
+	// that is where the path we are proving doesn't exist should be.
+	provenPath := proof.Path[len(proof.Path)-1].KeyPath.deserialize()
+
+	// Don't bother locking [db] and [view] -- nobody else has a reference to them.
+	if err = addPathInfo(view, proof.Path, provenPath, provenPath); err != nil {
+		return err
+	}
+
+	gotRootID, err := view.GetMerkleRoot(ctx)
+	if err != nil {
+		return err
+	}
+	if expectedRootID != gotRootID {
+		return fmt.Errorf("%w:[%s], expected:[%s]", ErrInvalidProof, gotRootID, expectedRootID)
+	}
+	return nil
+}
+
 func (proof *Proof) ToProto() *pb.Proof {
 	value := &pb.MaybeBytes{}
 	if !proof.Value.IsNothing() {

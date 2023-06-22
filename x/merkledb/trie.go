@@ -22,6 +22,7 @@ type ProofGetter interface {
 	// GetProof generates a proof of the value associated with a particular key,
 	// or a proof of its absence from the trie
 	GetProof(ctx context.Context, bytesPath []byte) (*Proof, error)
+	GetPathProof(ctx context.Context, bytesPath path) (*PathProof, error)
 }
 
 type ReadOnlyTrie interface {

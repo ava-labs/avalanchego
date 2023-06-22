@@ -472,6 +472,27 @@ func (db *merkleDB) getProof(ctx context.Context, key []byte) (*Proof, error) {
 	return view.getProof(ctx, key)
 }
 
+func (db *merkleDB) GetPathProof(ctx context.Context, key path) (*PathProof, error) {
+	db.commitLock.RLock()
+	defer db.commitLock.RUnlock()
+
+	return db.getPathProof(ctx, key)
+}
+
+// Assumes [db.commitLock] is read locked.
+func (db *merkleDB) getPathProof(ctx context.Context, key path) (*PathProof, error) {
+	if db.closed {
+		return nil, database.ErrClosed
+	}
+
+	view, err := db.newUntrackedView(defaultPreallocationSize)
+	if err != nil {
+		return nil, err
+	}
+	// Don't need to lock [view] because nobody else has a reference to it.
+	return view.getPathProof(ctx, key)
+}
+
 // GetRangeProof returns a proof for the key/value pairs in this trie within the range
 // [start, end].
 func (db *merkleDB) GetRangeProof(

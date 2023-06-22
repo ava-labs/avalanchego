@@ -111,11 +111,8 @@ type trieView struct {
 
 	estimatedSize int
 
-	enableIntercepter bool
-	mockedNodes       map[path]*node
-	mockedMerkleRoot  ids.ID
-	touchedNodesLock  sync.Locker
-	touchedNodes      map[path]*node
+	verifierIntercepter *trieViewVerifierIntercepter
+	proverIntercepter   *trieViewProverIntercepter
 }
 
 // NewView returns a new view on top of this one.
@@ -339,6 +336,29 @@ func (t *trieView) GetProof(ctx context.Context, key []byte) (*Proof, error) {
 	return t.getProof(ctx, key)
 }
 
+// GetProof returns a proof that [bytesPath] is in or not in trie [t].
+func (t *trieView) GetPathProof(ctx context.Context, key path) (*PathProof, error) {
+	_, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.GetPathProof")
+	defer span.End()
+
+	t.lock.RLock()
+	defer t.lock.RUnlock()
+
+	// only need full lock if nodes ids need to be calculated
+	// looped to ensure that the value didn't change after the lock was released
+	for t.needsRecalculation {
+		t.lock.RUnlock()
+		t.lock.Lock()
+		if err := t.calculateNodeIDs(ctx); err != nil {
+			return nil, err
+		}
+		t.lock.Unlock()
+		t.lock.RLock()
+	}
+
+	return t.getPathProof(ctx, key)
+}
+
 // Returns a proof that [bytesPath] is in or not in trie [t].
 // Assumes [t.lock] is held.
 func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
@@ -375,6 +395,56 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 	// If there is a child at the index where the node would be
 	// if it existed, include that child in the proof.
 	nextIndex := keyPath[len(closestNode.key)]
+	child, ok := closestNode.children[nextIndex]
+	if !ok {
+		return proof, nil
+	}
+
+	childPath := closestNode.key + path(nextIndex) + child.compressedPath
+	childNode, err := t.getNodeFromParent(closestNode, childPath)
+	if err != nil {
+		return nil, err
+	}
+	proof.Path = append(proof.Path, childNode.asProofNode())
+	if t.isInvalid() {
+		return nil, ErrInvalid
+	}
+	return proof, nil
+}
+
+// Returns a proof that [bytesPath] is in or not in trie [t].
+// Assumes [t.lock] is held.
+func (t *trieView) getPathProof(ctx context.Context, key path) (*PathProof, error) {
+	_, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.getPathProof")
+	defer span.End()
+
+	proof := &PathProof{
+		KeyPath: key.Serialize(),
+	}
+
+	// Get the node at the given path, or the node closest to it.
+	proofPath, err := t.getPathTo(key)
+	if err != nil {
+		return nil, err
+	}
+
+	// From root --> node from left --> right.
+	proof.Path = make([]ProofNode, len(proofPath), len(proofPath)+1)
+	for i, node := range proofPath {
+		proof.Path[i] = node.asProofNode()
+	}
+
+	closestNode := proofPath[len(proofPath)-1]
+	if closestNode.key.Compare(key) == 0 {
+		// There is a node with the given [key].
+		proof.Value = Clone(closestNode.value)
+		return proof, nil
+	}
+
+	// There is no node with the given [key].
+	// If there is a child at the index where the node would be
+	// if it existed, include that child in the proof.
+	nextIndex := key[len(closestNode.key)]
 	child, ok := closestNode.children[nextIndex]
 	if !ok {
 		return proof, nil
@@ -1277,42 +1347,66 @@ func (t *trieView) getParentTrie() TrieView {
 	t.validityTrackingLock.RLock()
 	defer t.validityTrackingLock.RUnlock()
 
-	if !t.enableIntercepter {
+	switch {
+	case t.proverIntercepter != nil:
+		proverIntercepter := *t.proverIntercepter
+		proverIntercepter.TrieView = t.parentTrie
+		return &proverIntercepter
+	case t.verifierIntercepter != nil:
+		verifierIntercepter := *t.verifierIntercepter
+		verifierIntercepter.TrieView = t.parentTrie
+		return &verifierIntercepter
+	default:
 		return t.parentTrie
 	}
-
-	return &trieViewIntercepter{
-		TrieView:         t.parentTrie,
-		mockedNodes:      t.mockedNodes,
-		mockedMerkleRoot: t.mockedMerkleRoot,
-		lock:             t.touchedNodesLock,
-		touchedNodes:     t.touchedNodes,
-	}
 }
 
-type trieViewIntercepter struct {
+type trieViewVerifierIntercepter struct {
 	TrieView
 
-	mockedNodes      map[path]*node
-	mockedMerkleRoot ids.ID
-
-	lock         sync.Locker
-	touchedNodes map[path]*node
+	values map[path]Maybe[[]byte]
+	nodes  map[path]Maybe[*node]
 }
 
-func (i *trieViewIntercepter) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
-	if i.mockedNodes != nil {
-		return i.mockedMerkleRoot, nil
+func (i *trieViewVerifierIntercepter) getValue(key path, lock bool) ([]byte, error) {
+	value, ok := i.values[key]
+	if !ok {
+		return i.TrieView.getValue(key, lock)
 	}
-	return i.TrieView.GetMerkleRoot(ctx)
+	if value.IsNothing() {
+		return nil, database.ErrNotFound
+	}
+	return value.Value(), nil
 }
 
-func (i *trieViewIntercepter) getValue(key path, _ bool) ([]byte, error) {
-	// This should end up calling getEditableNode
+func (i *trieViewVerifierIntercepter) getEditableNode(key path) (*node, error) {
+	n, ok := i.nodes[key]
+	if !ok {
+		return i.TrieView.getEditableNode(key)
+	}
+	if n.IsNothing() {
+		return nil, database.ErrNotFound
+	}
+	return n.Value().clone(), nil
+}
+
+type trieViewProverIntercepter struct {
+	TrieView
+
+	lock   sync.Locker
+	values map[path]*Proof
+	nodes  map[path]*PathProof
+}
+
+func (i *trieViewProverIntercepter) getValue(key path, _ bool) ([]byte, error) {
 	p, err := i.TrieView.GetProof(context.TODO(), key.Serialize().Value)
 	if err != nil {
 		return nil, err
 	}
+
+	i.lock.Lock()
+	i.values[key] = p
+	i.lock.Unlock()
 
 	if p.Value.hasValue {
 		return p.Value.value, nil
@@ -1320,24 +1414,14 @@ func (i *trieViewIntercepter) getValue(key path, _ bool) ([]byte, error) {
 	return nil, database.ErrNotFound
 }
 
-func (i *trieViewIntercepter) getEditableNode(key path) (*node, error) {
-	if i.mockedNodes != nil {
-		if mockedNode, ok := i.mockedNodes[key]; ok {
-			return mockedNode.clone(), nil
-		}
-		// TODO: this is not really safe here - as it results in us assuming
-		// that all nodes that aren't provided do not exist.
-		//
-		// We should be depending on an exclusion proof here.
-		return nil, database.ErrNotFound
-	}
-
-	toKeep, err := i.TrieView.getEditableNode(key)
+func (i *trieViewProverIntercepter) getEditableNode(key path) (*node, error) {
+	p, err := i.TrieView.GetPathProof(context.TODO(), key)
 	if err != nil {
 		return nil, err
 	}
+
 	i.lock.Lock()
-	i.touchedNodes[key] = toKeep
+	i.nodes[key] = p
 	i.lock.Unlock()
 
 	return i.TrieView.getEditableNode(key)
