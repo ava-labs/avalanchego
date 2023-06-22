@@ -1,9 +1,12 @@
 package podman
 
 import (
+	"bytes"
+	"context"
 	"fmt"
 	"testing"
 
+	"github.com/containers/podman/v4/pkg/bindings"
 	"github.com/containers/podman/v4/pkg/bindings/kube"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
@@ -25,14 +28,11 @@ spec:
     - containerPort: 80
       hostPort: 8000`
 
-
 // go test -v -timeout 30s -run ^TestSchedulePod$ github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime/podman
 func TestSchedulePod(t *testing.T) {
 	require := require.New(t)
 	obj, _, err := scheme.Codecs.UniversalDeserializer().Decode([]byte(podYamlBytes), nil, nil)
-	if err != nil {
-		fmt.Printf("%#v", err)
-	}
+	require.NoError(err)
 
 	// ensure valid pod spec from bytes
 	pod, ok := obj.(*v1.Pod)
@@ -46,11 +46,16 @@ func TestSchedulePod(t *testing.T) {
 		},
 	)
 
-		fmt.Printf("%#v\n", pod)
+	fmt.Printf("%#v\n", pod)
 
-	// TODO: need a socket and a client
+	socket, err := getSocketPath()
+	require.NoError(err)
 
-	// kube.PlayWithBody() fix me :)
+	ctx, err := bindings.NewConnection(context.Background(), socket)
+	require.NoError(err)
 
+	//  reader := bytes.NewReader(pod.)
+
+	kube.PlayWithBody(ctx)
 
 }

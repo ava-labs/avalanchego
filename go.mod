@@ -16,6 +16,7 @@ require (
 	github.com/ava-labs/coreth v0.12.4-rc.0
 	github.com/ava-labs/ledger-avalanche/go v0.0.0-20230105152938-00a24d05a8c7
 	github.com/btcsuite/btcd/btcutil v1.1.3
+	github.com/containers/common v0.52.0
 	github.com/containers/podman/v4 v4.5.1
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.1.0
 	github.com/golang-jwt/jwt/v4 v4.5.0
@@ -39,6 +40,7 @@ require (
 	github.com/prometheus/client_model v0.3.0
 	github.com/rs/cors v1.8.3
 	github.com/shirou/gopsutil v3.21.11+incompatible
+	github.com/sirupsen/logrus v1.9.0
 	github.com/spaolacci/murmur3 v1.1.0
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.15.0
@@ -63,6 +65,8 @@ require (
 	google.golang.org/grpc v1.55.0
 	google.golang.org/protobuf v1.30.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
+	k8s.io/api v0.26.2
+	k8s.io/client-go v0.26.2
 )
 
 require (
@@ -90,18 +94,20 @@ require (
 	github.com/containerd/containerd v1.7.0 // indirect
 	github.com/containerd/stargz-snapshotter/estargz v0.14.3 // indirect
 	github.com/containers/buildah v1.30.0 // indirect
-	github.com/containers/common v0.52.0 // indirect
 	github.com/containers/image/v5 v5.25.0 // indirect
 	github.com/containers/libtrust v0.0.0-20230121012942-c1716e8a8d01 // indirect
 	github.com/containers/ocicrypt v1.1.7 // indirect
 	github.com/containers/psgo v1.8.0 // indirect
 	github.com/containers/storage v1.46.1 // indirect
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
+	github.com/coreos/stream-metadata-go v0.4.1 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
 	github.com/cyberphone/json-canonicalization v0.0.0-20220623050100-57a0ce2678a7 // indirect
 	github.com/cyphar/filepath-securejoin v0.2.3 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/deckarep/golang-set/v2 v2.1.0 // indirect
+	github.com/digitalocean/go-libvirt v0.0.0-20201209184759-e2a69bcd5bd1 // indirect
+	github.com/digitalocean/go-qemu v0.0.0-20210326154740-ac9e0b687001 // indirect
 	github.com/disiqueira/gotree/v3 v3.0.2 // indirect
 	github.com/dlclark/regexp2 v1.7.0 // indirect
 	github.com/docker/distribution v2.8.1+incompatible // indirect
@@ -139,6 +145,7 @@ require (
 	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/google/go-containerregistry v0.13.0 // indirect
 	github.com/google/go-intervals v0.0.2 // indirect
+	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/pprof v0.0.0-20210407192527-94a9f03dee38 // indirect
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/gorilla/schema v1.2.0 // indirect
@@ -200,7 +207,6 @@ require (
 	github.com/sigstore/fulcio v1.2.0 // indirect
 	github.com/sigstore/rekor v1.1.0 // indirect
 	github.com/sigstore/sigstore v1.6.0 // indirect
-	github.com/sirupsen/logrus v1.9.0 // indirect
 	github.com/spf13/afero v1.9.3 // indirect
 	github.com/spf13/cast v1.5.0 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
@@ -237,10 +243,16 @@ require (
 	golang.org/x/text v0.9.0 // indirect
 	golang.org/x/tools v0.7.0 // indirect
 	gopkg.in/go-jose/go-jose.v2 v2.6.1 // indirect
+	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/square/go-jose.v2 v2.6.0 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
+	k8s.io/apimachinery v0.26.2 // indirect
+	k8s.io/klog/v2 v2.90.1 // indirect
+	k8s.io/utils v0.0.0-20230220204549-a5ecb0141aa5 // indirect
+	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
+	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
