@@ -1395,8 +1395,10 @@ func (bc *BlockChain) collectUnflattenedLogs(b *types.Block, removed bool) [][]*
 	receipts := rawdb.ReadRawReceipts(bc.db, b.Hash(), b.NumberU64())
 	receipts.DeriveFields(bc.chainConfig, b.Hash(), b.NumberU64(), b.Time(), b.BaseFee(), b.Transactions())
 
-	var logs [][]*types.Log
-	for _, receipt := range receipts {
+	// Note: gross but this needs to be initialized here because returning nil will be treated specially as an incorrect
+	// error case downstream.
+	logs := make([][]*types.Log, len(receipts))
+	for i, receipt := range receipts {
 		receiptLogs := make([]*types.Log, len(receipt.Logs))
 		for i, log := range receipt.Logs {
 			l := *log
@@ -1405,7 +1407,7 @@ func (bc *BlockChain) collectUnflattenedLogs(b *types.Block, removed bool) [][]*
 			}
 			receiptLogs[i] = &l
 		}
-		logs = append(logs, receiptLogs)
+		logs[i] = receiptLogs
 	}
 	return logs
 }
