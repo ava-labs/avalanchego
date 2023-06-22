@@ -1,13 +1,11 @@
 package podman
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"testing"
 
 	"github.com/containers/podman/v4/pkg/bindings"
-	"github.com/containers/podman/v4/pkg/bindings/kube"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -22,7 +20,7 @@ metadata:
   name: demo-pod
 spec:
   containers:
-  - image: quay.io/libpod/alpine_nginx:latest
+  - image: registry.fedoraproject.org/fedora:latest
     name: demo
     ports:
     - containerPort: 80
@@ -54,8 +52,15 @@ func TestSchedulePod(t *testing.T) {
 	ctx, err := bindings.NewConnection(context.Background(), socket)
 	require.NoError(err)
 
-	//  reader := bytes.NewReader(pod.)
+	rawImage := pod.Spec.Containers[0].Image
+	client := NewClient()
+	images, err := client.Pull(ctx, rawImage)
+	require.NoError(err)
+	require.Equal(1, len(images))
 
-	kube.PlayWithBody(ctx)
+	id, err := client.Start(ctx, rawImage)
+	require.NoError(err)
 
+	err = client.Stop(ctx, id)
+	require.NoError(err)
 }

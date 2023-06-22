@@ -16,7 +16,6 @@ require (
 	github.com/ava-labs/coreth v0.12.4-rc.0
 	github.com/ava-labs/ledger-avalanche/go v0.0.0-20230105152938-00a24d05a8c7
 	github.com/btcsuite/btcd/btcutil v1.1.3
-	github.com/containers/common v0.52.0
 	github.com/containers/podman/v4 v4.5.1
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.1.0
 	github.com/golang-jwt/jwt/v4 v4.5.0
@@ -40,7 +39,6 @@ require (
 	github.com/prometheus/client_model v0.3.0
 	github.com/rs/cors v1.8.3
 	github.com/shirou/gopsutil v3.21.11+incompatible
-	github.com/sirupsen/logrus v1.9.0
 	github.com/spaolacci/murmur3 v1.1.0
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.15.0
@@ -69,6 +67,8 @@ require (
 	k8s.io/client-go v0.26.2
 )
 
+replace github.com/containers/podman/v4 => github.com/hexfusion/podman/v4 v4.5.2
+
 require (
 	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
 	github.com/BurntSushi/toml v1.2.1 // indirect
@@ -94,6 +94,7 @@ require (
 	github.com/containerd/containerd v1.7.0 // indirect
 	github.com/containerd/stargz-snapshotter/estargz v0.14.3 // indirect
 	github.com/containers/buildah v1.30.0 // indirect
+	github.com/containers/common v0.52.0 // indirect
 	github.com/containers/image/v5 v5.25.0 // indirect
 	github.com/containers/libtrust v0.0.0-20230121012942-c1716e8a8d01 // indirect
 	github.com/containers/ocicrypt v1.1.7 // indirect
@@ -106,8 +107,6 @@ require (
 	github.com/cyphar/filepath-securejoin v0.2.3 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/deckarep/golang-set/v2 v2.1.0 // indirect
-	github.com/digitalocean/go-libvirt v0.0.0-20201209184759-e2a69bcd5bd1 // indirect
-	github.com/digitalocean/go-qemu v0.0.0-20210326154740-ac9e0b687001 // indirect
 	github.com/disiqueira/gotree/v3 v3.0.2 // indirect
 	github.com/dlclark/regexp2 v1.7.0 // indirect
 	github.com/docker/distribution v2.8.1+incompatible // indirect
@@ -207,6 +206,7 @@ require (
 	github.com/sigstore/fulcio v1.2.0 // indirect
 	github.com/sigstore/rekor v1.1.0 // indirect
 	github.com/sigstore/sigstore v1.6.0 // indirect
+	github.com/sirupsen/logrus v1.9.0 // indirect
 	github.com/spf13/afero v1.9.3 // indirect
 	github.com/spf13/cast v1.5.0 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
