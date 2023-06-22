@@ -654,6 +654,13 @@ func (s *state) Prune(lock sync.Locker, log logging.Logger) error {
 	i := 1
 	for statusIter.Next() {
 		txIDBytes := statusIter.Key()
+		statusBytes := statusIter.Value()
+		if err := s.cleanupTx(lock, txIDBytes, statusBytes, txIter); err != nil {
+			return err
+		}
+
+		i++
+
 		if i%pruneCommitLimit == 0 {
 			// We must hold the lock during committing to make sure we don't
 			// attempt to commit to disk while a block is concurrently being
@@ -714,13 +721,6 @@ func (s *state) Prune(lock sync.Locker, log logging.Logger) error {
 			txIter = s.txDB.NewIteratorWithStart(txIDBytes)
 			lock.Unlock()
 		}
-
-		statusBytes := statusIter.Value()
-		if err := s.cleanupTx(lock, txIDBytes, statusBytes, txIter); err != nil {
-			return err
-		}
-
-		i++
 	}
 
 	lock.Lock()
