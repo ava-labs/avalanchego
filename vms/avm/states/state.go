@@ -6,9 +6,10 @@ package states
 import (
 	"bytes"
 	"fmt"
-	"math"
 	"sync"
 	"time"
+
+	stdmath "math"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -22,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/avm/blocks"
@@ -35,7 +37,9 @@ const (
 	blockIDCacheSize = 8192
 	blockCacheSize   = 2048
 
-	pruneCommitLimit = 25000
+	pruneCommitLimit           = 1024
+	pruneCommitSleepMultiplier = 5
+	pruneUpdateFrequency       = 30 * time.Second
 )
 
 var (
@@ -148,9 +152,10 @@ type state struct {
 	utxoDB        database.Database
 	utxoState     avax.UTXOState
 
-	addedStatuses map[ids.ID]choices.Status
-	statusCache   cache.Cacher[ids.ID, *choices.Status] // cache of id -> choices.Status. If the entry is nil, it is not in the database
-	statusDB      database.Database
+	statusesPruned bool
+	addedStatuses  map[ids.ID]choices.Status
+	statusCache    cache.Cacher[ids.ID, *choices.Status] // cache of id -> choices.Status. If the entry is nil, it is not in the database
+	statusDB       database.Database
 
 	addedTxs map[ids.ID]*txs.Tx            // map of txID -> *txs.Tx
 	txCache  cache.Cacher[ids.ID, *txs.Tx] // cache of txID -> *txs.Tx. If the entry is nil, it is not in the database
@@ -424,6 +429,10 @@ func (s *state) SetTimestamp(t time.Time) {
 
 // TODO: remove status support
 func (s *state) GetStatus(id ids.ID) (choices.Status, error) {
+	if s.statusesPruned {
+		return choices.Unknown, database.ErrNotFound
+	}
+
 	if status, exists := s.addedStatuses[id]; exists {
 		return status, nil
 	}
@@ -596,7 +605,12 @@ func (s *state) Prune(lock sync.Locker, log logging.Logger) error {
 	// It is possible that more txs are added after grabbing this iterator. No
 	// new txs will write a status, so we don't need to check those txs.
 	statusIter := s.statusDB.NewIterator()
-	defer statusIter.Release()
+	// Releasing is done using a closure to ensure that updating statusIter will
+	// result in having the most recent iterator released when executing the
+	// deferred function.
+	defer func() {
+		statusIter.Release()
+	}()
 
 	if !statusIter.Next() {
 		// If there are no statuses on disk, pruning was previously run and
@@ -610,20 +624,26 @@ func (s *state) Prune(lock sync.Locker, log logging.Logger) error {
 
 	startTxIDBytes := statusIter.Key()
 	txIter := s.txDB.NewIteratorWithStart(startTxIDBytes)
-	defer txIter.Release()
+	// Releasing is done using a closure to ensure that updating statusIter will
+	// result in having the most recent iterator released when executing the
+	// deferred function.
+	defer func() {
+		txIter.Release()
+	}()
 
 	// While we are pruning the disk, we disable caching of the data we are
 	// modifying. Caching is re-enabled when pruning finishes.
 	//
-	// Note: If an unexpected error occurs the caches may never be re-enabled.
+	// Note: If an unexpected error occurs the caches are never re-enabled.
 	// That's fine as the node is going to be in an unhealthy state regardless.
-	oldStatusCache := s.statusCache
 	oldTxCache := s.txCache
 	s.statusCache = &cache.Empty[ids.ID, *choices.Status]{}
 	s.txCache = &cache.Empty[ids.ID, *txs.Tx]{}
 	lock.Unlock()
 
 	startTime := time.Now()
+	lastCommit := startTime
+	lastUpdate := startTime
 	startProgress := timer.ProgressFromHash(startTxIDBytes)
 
 	startStatusBytes := statusIter.Value()
@@ -633,35 +653,74 @@ func (s *state) Prune(lock sync.Locker, log logging.Logger) error {
 
 	i := 1
 	for statusIter.Next() {
-		i++
-
 		txIDBytes := statusIter.Key()
-		statusBytes := statusIter.Value()
-		if err := s.cleanupTx(lock, txIDBytes, statusBytes, txIter); err != nil {
-			return err
-		}
 		if i%pruneCommitLimit == 0 {
 			// We must hold the lock during committing to make sure we don't
 			// attempt to commit to disk while a block is concurrently being
 			// accepted.
 			lock.Lock()
-			err := s.Commit()
+			errs := wrappers.Errs{}
+			errs.Add(
+				s.Commit(),
+				statusIter.Error(),
+				txIter.Error(),
+			)
 			lock.Unlock()
-			if err != nil {
-				return err
+			if errs.Errored() {
+				return errs.Err
 			}
 
-			progress := timer.ProgressFromHash(txIDBytes)
-			eta := timer.EstimateETA(
-				startTime,
-				progress-startProgress,
-				math.MaxUint64-startProgress,
+			// We release the iterators here to allow the underlying database to
+			// clean up deleted state.
+			statusIter.Release()
+			txIter.Release()
+
+			now := time.Now()
+			if now.Sub(lastUpdate) > pruneUpdateFrequency {
+				lastUpdate = now
+
+				progress := timer.ProgressFromHash(txIDBytes)
+				eta := timer.EstimateETA(
+					startTime,
+					progress-startProgress,
+					stdmath.MaxUint64-startProgress,
+				)
+				log.Info("committing state pruning",
+					zap.Int("count", i),
+					zap.Duration("eta", eta),
+				)
+			}
+
+			// We take the minimum here because it's possible that the node is
+			// currently bootstrapping. This would mean that grabbing the lock
+			// could take an extremely long period of time; which we should not
+			// delay processing for.
+			pruneDuration := now.Sub(lastCommit)
+			sleepDuration := math.Min(
+				pruneCommitSleepMultiplier*pruneDuration,
+				10*time.Second,
 			)
-			log.Info("committing state pruning",
-				zap.Int("count", i),
-				zap.Duration("eta", eta),
-			)
+			time.Sleep(sleepDuration)
+
+			// Make sure not to include the sleep duration into the next prune
+			// duration.
+			lastCommit = time.Now()
+
+			// We shouldn't need to grab the lock here, but doing so ensures
+			// that we see a consistent view across both the statusDB and the
+			// txDB.
+			lock.Lock()
+			statusIter = s.statusDB.NewIteratorWithStart(txIDBytes)
+			txIter = s.txDB.NewIteratorWithStart(txIDBytes)
+			lock.Unlock()
 		}
+
+		statusBytes := statusIter.Value()
+		if err := s.cleanupTx(lock, txIDBytes, statusBytes, txIter); err != nil {
+			return err
+		}
+
+		i++
 	}
 
 	lock.Lock()
@@ -674,11 +733,10 @@ func (s *state) Prune(lock sync.Locker, log logging.Logger) error {
 		txIter.Error(),
 	)
 
-	// Make sure we flush the original caches before re-enabling them to prevent
+	// Make sure we flush the original cache before re-enabling it to prevent
 	// surfacing any stale data.
-	oldStatusCache.Flush()
 	oldTxCache.Flush()
-	s.statusCache = oldStatusCache
+	s.statusesPruned = true
 	s.txCache = oldTxCache
 
 	log.Info("finished state pruning",
