@@ -15,7 +15,6 @@ import (
 )
 
 var (
-	errPending   = errors.New("unexpectedly called Pending")
 	errLinearize = errors.New("unexpectedly called Linearize")
 
 	_ LinearizableVM = (*TestVM)(nil)
@@ -24,18 +23,16 @@ var (
 type TestVM struct {
 	block.TestVM
 
-	CantLinearize, CantPendingTxs, CantParse, CantGet bool
+	CantLinearize, CantParse, CantGet bool
 
-	LinearizeF  func(context.Context, ids.ID) error
-	PendingTxsF func(context.Context) []snowstorm.Tx
-	ParseTxF    func(context.Context, []byte) (snowstorm.Tx, error)
-	GetTxF      func(context.Context, ids.ID) (snowstorm.Tx, error)
+	LinearizeF func(context.Context, ids.ID) error
+	ParseTxF   func(context.Context, []byte) (snowstorm.Tx, error)
+	GetTxF     func(context.Context, ids.ID) (snowstorm.Tx, error)
 }
 
 func (vm *TestVM) Default(cant bool) {
 	vm.TestVM.Default(cant)
 
-	vm.CantPendingTxs = cant
 	vm.CantParse = cant
 	vm.CantGet = cant
 }
@@ -48,16 +45,6 @@ func (vm *TestVM) Linearize(ctx context.Context, stopVertexID ids.ID) error {
 		require.FailNow(vm.T, errLinearize.Error())
 	}
 	return errLinearize
-}
-
-func (vm *TestVM) PendingTxs(ctx context.Context) []snowstorm.Tx {
-	if vm.PendingTxsF != nil {
-		return vm.PendingTxsF(ctx)
-	}
-	if vm.CantPendingTxs && vm.T != nil {
-		require.FailNow(vm.T, errPending.Error())
-	}
-	return nil
 }
 
 func (vm *TestVM) ParseTx(ctx context.Context, b []byte) (snowstorm.Tx, error) {

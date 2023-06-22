@@ -334,20 +334,6 @@ func (mr *MockLinearizableVMMockRecorder) ParseTx(arg0, arg1 interface{}) *gomoc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ParseTx", reflect.TypeOf((*MockLinearizableVM)(nil).ParseTx), arg0, arg1)
 }
 
-// PendingTxs mocks base method.
-func (m *MockLinearizableVM) PendingTxs(arg0 context.Context) []snowstorm.Tx {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PendingTxs", arg0)
-	ret0, _ := ret[0].([]snowstorm.Tx)
-	return ret0
-}
-
-// PendingTxs indicates an expected call of PendingTxs.
-func (mr *MockLinearizableVMMockRecorder) PendingTxs(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PendingTxs", reflect.TypeOf((*MockLinearizableVM)(nil).PendingTxs), arg0)
-}
-
 // SetPreference mocks base method.
 func (m *MockLinearizableVM) SetPreference(arg0 context.Context, arg1 ids.ID) error {
 	m.ctrl.T.Helper()

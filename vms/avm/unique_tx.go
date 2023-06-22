@@ -324,7 +324,7 @@ func (tx *UniqueTx) SemanticVerify() error {
 
 	return tx.Unsigned.Visit(&executor.SemanticVerifier{
 		Backend: tx.vm.txBackend,
-		State:   tx.vm.dagState,
+		State:   tx.vm.state,
 		Tx:      tx.Tx,
 	})
 }
