@@ -20,15 +20,15 @@ type trieViewVerifierIntercepter struct {
 	TrieView
 
 	rootID ids.ID
-	values map[path]Maybe[[]byte]
-	nodes  map[path]Maybe[*Node]
+	values map[Path]Maybe[[]byte]
+	nodes  map[Path]Maybe[*Node]
 }
 
 func (i *trieViewVerifierIntercepter) GetMerkleRoot(context.Context) (ids.ID, error) {
 	return i.rootID, nil
 }
 
-func (i *trieViewVerifierIntercepter) getValue(key path, lock bool) ([]byte, error) {
+func (i *trieViewVerifierIntercepter) getValue(key Path, lock bool) ([]byte, error) {
 	value, ok := i.values[key]
 	if !ok {
 		return i.TrieView.getValue(key, lock)
@@ -39,7 +39,7 @@ func (i *trieViewVerifierIntercepter) getValue(key path, lock bool) ([]byte, err
 	return value.Value(), nil
 }
 
-func (i *trieViewVerifierIntercepter) getEditableNode(key path) (*Node, error) {
+func (i *trieViewVerifierIntercepter) getEditableNode(key Path) (*Node, error) {
 	n, ok := i.nodes[key]
 	if !ok {
 		return i.TrieView.getEditableNode(key)
@@ -54,11 +54,11 @@ type trieViewProverIntercepter struct {
 	TrieView
 
 	lock   sync.Locker
-	values map[path]*Proof
-	nodes  map[path]*PathProof
+	values map[Path]*Proof
+	nodes  map[Path]*PathProof
 }
 
-func (i *trieViewProverIntercepter) getValue(key path, _ bool) ([]byte, error) {
+func (i *trieViewProverIntercepter) getValue(key Path, _ bool) ([]byte, error) {
 	p, err := i.TrieView.GetProof(context.TODO(), key.Serialize().Value)
 	if err != nil {
 		return nil, err
@@ -74,7 +74,7 @@ func (i *trieViewProverIntercepter) getValue(key path, _ bool) ([]byte, error) {
 	return nil, database.ErrNotFound
 }
 
-func (i *trieViewProverIntercepter) getEditableNode(key path) (*Node, error) {
+func (i *trieViewProverIntercepter) getEditableNode(key Path) (*Node, error) {
 	p, err := i.TrieView.GetPathProof(context.TODO(), key)
 	if err != nil {
 		return nil, err

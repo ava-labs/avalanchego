@@ -746,10 +746,10 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 	startRoot, err := db.GetMerkleRoot(context.Background())
 	require.NoError(err)
 
-	values := make(map[path][]byte) // tracks content of the trie
+	values := make(map[Path][]byte) // tracks content of the trie
 	currentBatch := db.NewBatch()
-	currentValues := make(map[path][]byte)
-	deleteValues := make(map[path]struct{})
+	currentValues := make(map[Path][]byte)
+	deleteValues := make(map[Path]struct{})
 	pastRoots := []ids.ID{}
 
 	for i, step := range rt {
@@ -822,8 +822,8 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 					pastRoots = pastRoots[len(pastRoots)-300:]
 				}
 			}
-			currentValues = map[path][]byte{}
-			deleteValues = map[path]struct{}{}
+			currentValues = map[Path][]byte{}
+			deleteValues = map[Path]struct{}{}
 			currentBatch = db.NewBatch()
 		case opGet:
 			v, err := db.Get(step.key)

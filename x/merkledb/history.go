@@ -53,15 +53,15 @@ type changeSummaryAndIndex struct {
 type changeSummary struct {
 	rootID ids.ID
 	// key is path prefix
-	nodes map[path]*change[*Node]
+	nodes map[Path]*change[*Node]
 	// key is full path
-	values map[path]*change[Maybe[[]byte]]
+	values map[Path]*change[Maybe[[]byte]]
 }
 
 func newChangeSummary(estimatedSize int) *changeSummary {
 	return &changeSummary{
-		nodes:  make(map[path]*change[*Node], estimatedSize),
-		values: make(map[path]*change[Maybe[[]byte]], estimatedSize),
+		nodes:  make(map[Path]*change[*Node], estimatedSize),
+		values: make(map[Path]*change[Maybe[[]byte]], estimatedSize),
 	}
 }
 
@@ -128,7 +128,7 @@ func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start, end []b
 	// Keep changes sorted so the largest can be removed in order to stay within the maxLength limit.
 	sortedKeys := btree.NewG(
 		2,
-		func(a, b path) bool {
+		func(a, b Path) bool {
 			return a.Compare(b) < 0
 		},
 	)

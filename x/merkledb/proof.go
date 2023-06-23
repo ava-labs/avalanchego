@@ -448,7 +448,7 @@ func (proof *RangeProof) Verify(
 	}
 
 	// The key-value pairs (allegedly) proven by [proof].
-	keyValues := make(map[path][]byte, len(proof.KeyValues))
+	keyValues := make(map[Path][]byte, len(proof.KeyValues))
 	for _, keyValue := range proof.KeyValues {
 		keyValues[newPath(keyValue.Key)] = keyValue.Value
 	}
@@ -567,7 +567,7 @@ func (proof *RangeProof) UnmarshalProto(pbProof *pb.RangeProof) error {
 
 // Verify that all non-intermediate nodes in [proof] which have keys
 // in [[start], [end]] have the value given for that key in [keysValues].
-func verifyAllRangeProofKeyValuesPresent(proof []ProofNode, start, end path, keysValues map[path][]byte) error {
+func verifyAllRangeProofKeyValuesPresent(proof []ProofNode, start, end Path, keysValues map[Path][]byte) error {
 	for i := 0; i < len(proof); i++ {
 		var (
 			node     = proof[i]
@@ -711,9 +711,9 @@ func verifyAllChangeProofKeyValuesPresent(
 	ctx context.Context,
 	db MerkleDB,
 	proof []ProofNode,
-	start path,
-	end path,
-	keysValues map[path]Maybe[[]byte],
+	start Path,
+	end Path,
+	keysValues map[Path]Maybe[[]byte],
 ) error {
 	for i := 0; i < len(proof); i++ {
 		var (
@@ -808,7 +808,7 @@ func verifyKeyValues(kvs []KeyValue, start, end []byte) error {
 //   - Each key in [proof] is a strict prefix of [keyBytes], except possibly the last.
 //   - If the last element in [proof] is [keyBytes], this is an inclusion proof.
 //     Otherwise, this is an exclusion proof and [keyBytes] must not be in [proof].
-func verifyProofPath(proof []ProofNode, keyPath path) error {
+func verifyProofPath(proof []ProofNode, keyPath Path) error {
 	provenKey := keyPath.Serialize()
 
 	// loop over all but the last node since it will not have the prefix in exclusion proofs
@@ -874,8 +874,8 @@ func valueOrHashMatches(value Maybe[[]byte], valueOrHash Maybe[[]byte]) bool {
 func addPathInfo(
 	t *trieView,
 	proofPath []ProofNode,
-	startPath path,
-	endPath path,
+	startPath Path,
+	endPath Path,
 ) error {
 	var (
 		hasLowerBound = len(startPath) > 0
@@ -932,7 +932,7 @@ func addPathInfo(
 func addSimplePathInfo(
 	t *trieView,
 	proofPath []ProofNode,
-	key path,
+	key Path,
 ) error {
 	for i := len(proofPath) - 1; i >= 0; i-- {
 		proofNode := proofPath[i]

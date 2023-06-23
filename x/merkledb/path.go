@@ -10,7 +10,7 @@ import (
 	"unsafe"
 )
 
-const EmptyPath path = ""
+const EmptyPath Path = ""
 
 // SerializedPath contains a path from the trie.
 // The trie branch factor is 16, so the path may contain an odd number of nibbles.
@@ -28,7 +28,7 @@ func (s SerializedPath) Equal(other SerializedPath) bool {
 	return s.NibbleLength == other.NibbleLength && bytes.Equal(s.Value, other.Value)
 }
 
-func (s SerializedPath) Deserialize() path {
+func (s SerializedPath) Deserialize() Path {
 	result := newPath(s.Value)
 	// trim the last nibble if the path has an odd length
 	return result[:len(result)-s.NibbleLength&1]
@@ -83,18 +83,18 @@ func (s SerializedPath) AppendNibble(nibble byte) SerializedPath {
 	return SerializedPath{Value: value, NibbleLength: s.NibbleLength + 1}
 }
 
-type path string
+type Path string
 
 // Returns:
 // * 0 if [p] == [other].
 // * -1 if [p] < [other].
 // * 1 if [p] > [other].
-func (p path) Compare(other path) int {
+func (p Path) Compare(other Path) int {
 	return strings.Compare(string(p), string(other))
 }
 
 // Invariant: The returned value must not be modified.
-func (p path) Bytes() []byte {
+func (p Path) Bytes() []byte {
 	// avoid copying during the conversion
 	// "safe" because we never edit the value, only used as DB key
 	buf := *(*[]byte)(unsafe.Pointer(&p))
@@ -103,17 +103,17 @@ func (p path) Bytes() []byte {
 }
 
 // Returns true iff [p] begins with [prefix].
-func (p path) HasPrefix(prefix path) bool {
+func (p Path) HasPrefix(prefix Path) bool {
 	return strings.HasPrefix(string(p), string(prefix))
 }
 
 // Append [val] to [p].
-func (p path) Append(val byte) path {
-	return p + path(val)
+func (p Path) Append(val byte) Path {
+	return p + Path(val)
 }
 
 // Returns the serialized representation of [p].
-func (p path) Serialize() SerializedPath {
+func (p Path) Serialize() SerializedPath {
 	// need half the number of bytes as nibbles
 	// add one so there is a byte for the odd nibble if it exists
 	// the extra nibble gets rounded down if even length
@@ -141,7 +141,7 @@ func (p path) Serialize() SerializedPath {
 	return result
 }
 
-func newPath(p []byte) path {
+func newPath(p []byte) Path {
 	// create new buffer with double the length of the input since each byte gets split into two nibbles
 	buffer := make([]byte, 2*len(p))
 
@@ -155,5 +155,5 @@ func newPath(p []byte) path {
 	}
 
 	// avoid copying during the conversion
-	return *(*path)(unsafe.Pointer(&buffer))
+	return *(*Path)(unsafe.Pointer(&buffer))
 }

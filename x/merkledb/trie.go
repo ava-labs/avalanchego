@@ -27,7 +27,7 @@ type ProofGetter interface {
 type ReadOnlyTrie interface {
 	MerkleRootGetter
 	ProofGetter
-	GetPathProof(ctx context.Context, bytesPath path) (*PathProof, error)
+	GetPathProof(ctx context.Context, bytesPath Path) (*PathProof, error)
 
 	// GetValue gets the value associated with the specified key
 	// database.ErrNotFound if the key is not present
@@ -39,10 +39,10 @@ type ReadOnlyTrie interface {
 
 	// get the value associated with the key in path form
 	// database.ErrNotFound if the key is not present
-	getValue(key path, lock bool) ([]byte, error)
+	getValue(key Path, lock bool) ([]byte, error)
 
 	// get an editable copy of the node with the given key path
-	getEditableNode(key path) (*Node, error)
+	getEditableNode(key Path) (*Node, error)
 
 	// GetRangeProof generates a proof of up to maxLength smallest key/values with keys between start and end
 	GetRangeProof(ctx context.Context, start, end []byte, maxLength int) (*RangeProof, error)

@@ -147,7 +147,7 @@ type merkleDB struct {
 	metadataDB database.Database
 
 	// If a value is nil, the corresponding key isn't in the trie.
-	nodeCache         onEvictCache[path, *Node]
+	nodeCache         onEvictCache[Path, *Node]
 	onEvictionErr     utils.Atomic[error]
 	evictionBatchSize int
 
@@ -187,7 +187,7 @@ func newDatabase(
 
 	// Note: trieDB.OnEviction is responsible for writing intermediary nodes to
 	// disk as they are evicted from the cache.
-	trieDB.nodeCache = newOnEvictCache[path](config.NodeCacheSize, trieDB.onEviction)
+	trieDB.nodeCache = newOnEvictCache[Path](config.NodeCacheSize, trieDB.onEviction)
 
 	root, err := trieDB.initializeRootIfNeeded()
 	if err != nil {
@@ -197,8 +197,8 @@ func newDatabase(
 	// add current root to history (has no changes)
 	trieDB.history.record(&changeSummary{
 		rootID: root,
-		values: map[path]*change[Maybe[[]byte]]{},
-		nodes:  map[path]*change[*Node]{},
+		values: map[Path]*change[Maybe[[]byte]]{},
+		nodes:  map[Path]*change[*Node]{},
 	})
 
 	shutdownType, err := trieDB.metadataDB.Get(cleanShutdownKey)
@@ -255,7 +255,7 @@ func (db *merkleDB) rebuild(ctx context.Context) error {
 		}
 
 		key := it.Key()
-		path := path(key)
+		path := Path(key)
 		value := it.Value()
 		n, err := ParseNode(path, value)
 		if err != nil {
@@ -400,7 +400,7 @@ func (db *merkleDB) GetValue(ctx context.Context, key []byte) ([]byte, error) {
 
 // getValueCopy returns a copy of the value for the given [key].
 // Returns database.ErrNotFound if it doesn't exist.
-func (db *merkleDB) getValueCopy(key path, lock bool) ([]byte, error) {
+func (db *merkleDB) getValueCopy(key Path, lock bool) ([]byte, error) {
 	val, err := db.getValue(key, lock)
 	if err != nil {
 		return nil, err
@@ -412,7 +412,7 @@ func (db *merkleDB) getValueCopy(key path, lock bool) ([]byte, error) {
 // Returns database.ErrNotFound if it doesn't exist.
 // If [lock], [db.lock]'s read lock is acquired.
 // Otherwise, assumes [db.lock] is already held.
-func (db *merkleDB) getValue(key path, lock bool) ([]byte, error) {
+func (db *merkleDB) getValue(key Path, lock bool) ([]byte, error) {
 	if lock {
 		db.lock.RLock()
 		defer db.lock.RUnlock()
@@ -472,7 +472,7 @@ func (db *merkleDB) getProof(ctx context.Context, key []byte) (*Proof, error) {
 	return view.getProof(ctx, key)
 }
 
-func (db *merkleDB) GetPathProof(ctx context.Context, key path) (*PathProof, error) {
+func (db *merkleDB) GetPathProof(ctx context.Context, key Path) (*PathProof, error) {
 	db.commitLock.RLock()
 	defer db.commitLock.RUnlock()
 
@@ -480,7 +480,7 @@ func (db *merkleDB) GetPathProof(ctx context.Context, key path) (*PathProof, err
 }
 
 // Assumes [db.commitLock] is read locked.
-func (db *merkleDB) getPathProof(ctx context.Context, key path) (*PathProof, error) {
+func (db *merkleDB) getPathProof(ctx context.Context, key Path) (*PathProof, error) {
 	if db.closed {
 		return nil, database.ErrClosed
 	}
@@ -582,7 +582,7 @@ func (db *merkleDB) GetChangeProof(
 	// values modified between [startRootID] to [endRootID] sorted in increasing
 	// order.
 	changedKeys := maps.Keys(changes.values)
-	slices.SortFunc(changedKeys, func(i, j path) bool {
+	slices.SortFunc(changedKeys, func(i, j Path) bool {
 		return i.Compare(j) < 0
 	})
 
@@ -1036,7 +1036,7 @@ func (db *merkleDB) VerifyChangeProof(
 		return err
 	}
 
-	keyValues := make(map[path]Maybe[[]byte], len(proof.KeyChanges))
+	keyValues := make(map[Path]Maybe[[]byte], len(proof.KeyChanges))
 	for _, keyValue := range proof.KeyChanges {
 		keyValues[newPath(keyValue.Key)] = keyValue.Value
 	}
@@ -1211,7 +1211,7 @@ func (db *merkleDB) getKeysNotInSet(start, end []byte, keySet set.Set[string]) (
 // This copy may be edited by the caller without affecting the database state.
 // Returns database.ErrNotFound if the node doesn't exist.
 // Assumes [db.lock] isn't held.
-func (db *merkleDB) getEditableNode(key path) (*Node, error) {
+func (db *merkleDB) getEditableNode(key Path) (*Node, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
@@ -1226,7 +1226,7 @@ func (db *merkleDB) getEditableNode(key path) (*Node, error) {
 // Editing the returned node affects the database state.
 // Returns database.ErrNotFound if the node doesn't exist.
 // Assumes [db.lock] is read locked.
-func (db *merkleDB) getNode(key path) (*Node, error) {
+func (db *merkleDB) getNode(key Path) (*Node, error) {
 	if db.closed {
 		return nil, database.ErrClosed
 	}
@@ -1343,14 +1343,14 @@ func (db *merkleDB) prepareRangeProofView(start []byte, proof *RangeProof) (*tri
 }
 
 // Non-nil error is fatal -- [db] will close.
-func (db *merkleDB) putNodeInCache(key path, n *Node) error {
+func (db *merkleDB) putNodeInCache(key Path, n *Node) error {
 	// TODO Cache metrics
 	// Note that this may cause a node to be evicted from the cache,
 	// which will call [OnEviction].
 	return db.nodeCache.Put(key, n)
 }
 
-func (db *merkleDB) getNodeInCache(key path) (*Node, bool) {
+func (db *merkleDB) getNodeInCache(key Path) (*Node, bool) {
 	// TODO Cache metrics
 	if node, ok := db.nodeCache.Get(key); ok {
 		return node, true

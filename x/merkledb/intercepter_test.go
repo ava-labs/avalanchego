@@ -129,8 +129,8 @@ func build(
 	var lock sync.Mutex
 	view.proverIntercepter = &trieViewProverIntercepter{
 		lock:   &lock,
-		values: make(map[path]*Proof),
-		nodes:  make(map[path]*PathProof),
+		values: make(map[Path]*Proof),
+		nodes:  make(map[Path]*PathProof),
 	}
 	for _, key := range reads {
 		_, _ = view.GetValue(ctx, key)
@@ -169,12 +169,12 @@ func verify(
 		require.NoError(proof.Verify(ctx, startRootID))
 	}
 
-	values := make(map[path]Maybe[[]byte])
+	values := make(map[Path]Maybe[[]byte])
 	for _, proof := range valueProofs {
 		values[newPath(proof.Key)] = proof.Value
 	}
 
-	nodes := make(map[path]Maybe[*Node])
+	nodes := make(map[Path]Maybe[*Node])
 	for _, proof := range pathProofs {
 		key := proof.KeyPath.Deserialize()
 		nodes[key] = proof.ToNode()
@@ -192,7 +192,7 @@ func verify(
 		parentTrie:            nil,
 		changes:               newChangeSummary(1),
 		estimatedSize:         1,
-		unappliedValueChanges: make(map[path]Maybe[[]byte], 1),
+		unappliedValueChanges: make(map[Path]Maybe[[]byte], 1),
 
 		verifierIntercepter: &trieViewVerifierIntercepter{
 			rootID: startRootID,
