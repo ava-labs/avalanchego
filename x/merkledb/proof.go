@@ -178,7 +178,7 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID) error {
 	provenPath := proof.Path[len(proof.Path)-1].KeyPath.deserialize()
 
 	// Don't bother locking [db] and [view] -- nobody else has a reference to them.
-	if err = addPathInfo(view, proof.Path, provenPath, provenPath); err != nil {
+	if err = addSimplePathInfo(view, proof.Path, provenPath); err != nil {
 		return err
 	}
 
@@ -777,6 +777,51 @@ func addPathInfo(
 			childPath := keyPath.Append(index) + compressedPath
 			if (hasLowerBound && childPath.Compare(startPath) < 0) ||
 				(hasUpperBound && childPath.Compare(endPath) > 0) {
+				n.addChildWithoutNode(index, compressedPath, childID)
+			}
+		}
+	}
+
+	return nil
+}
+
+// Adds each key/value pair in [proofPath] to [t].
+// For each proof node, adds the children that are < [start] or > [end].
+// If [start] is empty, no children are < [start].
+// If [end] is empty, no children are > [end].
+// Assumes [t.lock] is held.
+func addSimplePathInfo(
+	t *trieView,
+	proofPath []ProofNode,
+	key path,
+) error {
+	for i := len(proofPath) - 1; i >= 0; i-- {
+		proofNode := proofPath[i]
+		keyPath := proofNode.KeyPath.deserialize()
+
+		if len(keyPath)&1 == 1 && !proofNode.ValueOrHash.IsNothing() {
+			// a value cannot have an odd number of nibbles in its key
+			return ErrOddLengthWithValue
+		}
+
+		// load the node associated with the key or create a new one
+		// pass nothing because we are going to overwrite the value digest below
+		n, err := t.insertIntoTrie(keyPath, Nothing[[]byte]())
+		if err != nil {
+			return err
+		}
+		// We overwrite the valueDigest to be the hash provided in the proof
+		// node because we may not know the pre-image of the valueDigest.
+		n.valueDigest = proofNode.ValueOrHash
+
+		// Add [proofNode]'s children which are outside the range [start, end].
+		compressedPath := EmptyPath
+		for index, childID := range proofNode.Children {
+			if existingChild, ok := n.children[index]; ok {
+				compressedPath = existingChild.compressedPath
+			}
+			childPath := keyPath.Append(index) + compressedPath
+			if !key.HasPrefix(childPath) {
 				n.addChildWithoutNode(index, compressedPath, childID)
 			}
 		}
