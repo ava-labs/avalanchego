@@ -189,7 +189,7 @@ func FuzzCodecSerializedPath(f *testing.F) {
 			require.Len(bufBytes, numRead)
 			require.Equal(b[:numRead], bufBytes)
 
-			clonedGot := got.deserialize().Serialize()
+			clonedGot := got.Deserialize().Serialize()
 			require.Equal(got, clonedGot)
 		},
 	)

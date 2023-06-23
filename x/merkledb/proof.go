@@ -175,7 +175,7 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID) error {
 	// Insert all of the proof nodes.
 	// [provenPath] is the path that we are proving exists, or the path
 	// that is where the path we are proving doesn't exist should be.
-	provenPath := proof.Path[len(proof.Path)-1].KeyPath.deserialize()
+	provenPath := proof.Path[len(proof.Path)-1].KeyPath.Deserialize()
 
 	// Don't bother locking [db] and [view] -- nobody else has a reference to them.
 	if err = addSimplePathInfo(view, proof.Path, provenPath); err != nil {
@@ -263,7 +263,7 @@ func (proof *PathProof) Verify(ctx context.Context, expectedRootID ids.ID) error
 	if len(proof.Path) == 0 {
 		return ErrNoProof
 	}
-	if err := verifyProofPath(proof.Path, proof.KeyPath.deserialize()); err != nil {
+	if err := verifyProofPath(proof.Path, proof.KeyPath.Deserialize()); err != nil {
 		return err
 	}
 
@@ -333,7 +333,7 @@ func (proof *PathProof) Verify(ctx context.Context, expectedRootID ids.ID) error
 	// Insert all of the proof nodes.
 	// [provenPath] is the path that we are proving exists, or the path
 	// that is where the path we are proving doesn't exist should be.
-	provenPath := proof.Path[len(proof.Path)-1].KeyPath.deserialize()
+	provenPath := proof.Path[len(proof.Path)-1].KeyPath.Deserialize()
 
 	// Don't bother locking [db] and [view] -- nobody else has a reference to them.
 	if err = addSimplePathInfo(view, proof.Path, provenPath); err != nil {
@@ -350,8 +350,8 @@ func (proof *PathProof) Verify(ctx context.Context, expectedRootID ids.ID) error
 	return nil
 }
 
-func (proof *PathProof) toNode() Maybe[*Node] {
-	key := proof.KeyPath.deserialize()
+func (proof *PathProof) ToNode() Maybe[*Node] {
+	key := proof.KeyPath.Deserialize()
 	lastNode := proof.Path[len(proof.Path)-1]
 
 	if !lastNode.KeyPath.Equal(proof.KeyPath) {
@@ -362,7 +362,7 @@ func (proof *PathProof) toNode() Maybe[*Node] {
 	for _, c := range proof.Children {
 		index := c.KeyPath.NibbleVal(len(key))
 		children[index] = child{
-			compressedPath: c.KeyPath.deserialize()[len(key)+1:],
+			compressedPath: c.KeyPath.Deserialize()[len(key)+1:],
 			id:             lastNode.Children[index],
 		}
 	}
@@ -572,7 +572,7 @@ func verifyAllRangeProofKeyValuesPresent(proof []ProofNode, start, end path, key
 		var (
 			node     = proof[i]
 			nodeKey  = node.KeyPath
-			nodePath = nodeKey.deserialize()
+			nodePath = nodeKey.Deserialize()
 		)
 
 		// Skip odd length keys since they cannot have a value (enforced by [verifyProofPath]).
@@ -719,7 +719,7 @@ func verifyAllChangeProofKeyValuesPresent(
 		var (
 			node     = proof[i]
 			nodeKey  = node.KeyPath
-			nodePath = nodeKey.deserialize()
+			nodePath = nodeKey.Deserialize()
 		)
 
 		// Check the value of any node with a key that is within the range.
@@ -884,7 +884,7 @@ func addPathInfo(
 
 	for i := len(proofPath) - 1; i >= 0; i-- {
 		proofNode := proofPath[i]
-		keyPath := proofNode.KeyPath.deserialize()
+		keyPath := proofNode.KeyPath.Deserialize()
 
 		if len(keyPath)&1 == 1 && !proofNode.ValueOrHash.IsNothing() {
 			// a value cannot have an odd number of nibbles in its key
@@ -936,7 +936,7 @@ func addSimplePathInfo(
 ) error {
 	for i := len(proofPath) - 1; i >= 0; i-- {
 		proofNode := proofPath[i]
-		keyPath := proofNode.KeyPath.deserialize()
+		keyPath := proofNode.KeyPath.Deserialize()
 
 		if len(keyPath)&1 == 1 && !proofNode.ValueOrHash.IsNothing() {
 			// a value cannot have an odd number of nibbles in its key

@@ -268,7 +268,7 @@ func Test_Trie_WriteToDB(t *testing.T) {
 	rawBytes, err := dbTrie.nodeDB.Get(p.Bytes())
 	require.NoError(err)
 
-	node, err := parseNode(p, rawBytes)
+	node, err := ParseNode(p, rawBytes)
 	require.NoError(err)
 	require.Equal([]byte("value"), node.value.value)
 }

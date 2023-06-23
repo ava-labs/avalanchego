@@ -58,7 +58,7 @@ func newNode(parent *Node, key path) *Node {
 }
 
 // Parse [nodeBytes] to a node and set its key to [key].
-func parseNode(key path, nodeBytes []byte) (*Node, error) {
+func ParseNode(key path, nodeBytes []byte) (*Node, error) {
 	n := dbNode{}
 	if _, err := Codec.decodeDBNode(nodeBytes, &n); err != nil {
 		return nil, err

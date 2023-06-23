@@ -361,7 +361,7 @@ func (c *codecImpl) decodeDBNode(b []byte, n *dbNode) (uint16, error) {
 			return 0, err
 		}
 		n.children[byte(index)] = child{
-			compressedPath: compressedPath.deserialize(),
+			compressedPath: compressedPath.Deserialize(),
 			id:             childID,
 		}
 	}

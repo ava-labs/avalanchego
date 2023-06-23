@@ -257,7 +257,7 @@ func (db *merkleDB) rebuild(ctx context.Context) error {
 		key := it.Key()
 		path := path(key)
 		value := it.Value()
-		n, err := parseNode(path, value)
+		n, err := ParseNode(path, value)
 		if err != nil {
 			return err
 		}
@@ -1128,7 +1128,7 @@ func (db *merkleDB) initializeRootIfNeeded() (ids.ID, error) {
 	nodeBytes, err := db.nodeDB.Get(rootKey)
 	if err == nil {
 		// Root already exists, so parse it and set the in-mem copy
-		db.root, err = parseNode(RootPath, nodeBytes)
+		db.root, err = ParseNode(RootPath, nodeBytes)
 		if err != nil {
 			return ids.Empty, err
 		}
@@ -1255,7 +1255,7 @@ func (db *merkleDB) getNode(key path) (*Node, error) {
 		return nil, err
 	}
 
-	node, err := parseNode(key, rawBytes)
+	node, err := ParseNode(key, rawBytes)
 	if err != nil {
 		return nil, err
 	}

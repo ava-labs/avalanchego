@@ -28,7 +28,7 @@ func (s SerializedPath) Equal(other SerializedPath) bool {
 	return s.NibbleLength == other.NibbleLength && bytes.Equal(s.Value, other.Value)
 }
 
-func (s SerializedPath) deserialize() path {
+func (s SerializedPath) Deserialize() path {
 	result := newPath(s.Value)
 	// trim the last nibble if the path has an odd length
 	return result[:len(result)-s.NibbleLength&1]

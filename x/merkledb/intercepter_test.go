@@ -176,11 +176,11 @@ func verify(
 
 	nodes := make(map[path]Maybe[*Node])
 	for _, proof := range pathProofs {
-		key := proof.KeyPath.deserialize()
-		nodes[key] = proof.toNode()
+		key := proof.KeyPath.Deserialize()
+		nodes[key] = proof.ToNode()
 	}
 
-	startRoot, err := parseNode(RootPath, startRootBytes)
+	startRoot, err := ParseNode(RootPath, startRootBytes)
 	require.NoError(err)
 
 	view := &trieView{

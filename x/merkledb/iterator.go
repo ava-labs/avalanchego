@@ -42,7 +42,7 @@ func (i *iterator) Next() bool {
 	}
 	for i.nodeIter.Next() {
 		i.db.metrics.IOKeyRead()
-		n, err := parseNode(path(i.nodeIter.Key()), i.nodeIter.Value())
+		n, err := ParseNode(path(i.nodeIter.Key()), i.nodeIter.Value())
 		if err != nil {
 			i.err = err
 			return false
