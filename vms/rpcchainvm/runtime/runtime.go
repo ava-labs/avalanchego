@@ -13,6 +13,9 @@ const (
 	// Address of the runtime engine server.
 	EngineAddressKey = "AVALANCHE_VM_RUNTIME_ENGINE_ADDR"
 
+	// EngineDialDimeout is the timeout for the engine to connect to the server before it shuts down.
+	EngineDialTimeoutKey = "AVALANCHE_ENGINE_TIMEOUT"
+
 	// Duration before handshake timeout during bootstrap.
 	DefaultHandshakeTimeout = 5 * time.Second
 

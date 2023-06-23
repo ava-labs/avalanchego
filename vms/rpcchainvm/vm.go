@@ -26,7 +26,7 @@ import (
 	runtimepb "github.com/ava-labs/avalanchego/proto/pb/vm/runtime"
 )
 
-const defaultRuntimeDialTimeout = 5 * time.Second
+const defaultDialTimeout = 5 * time.Second
 
 // The address of the Runtime server is expected to be passed via ENV `runtime.EngineAddressKey`.
 // This address is used by the Runtime client to send Initialize RPC to server.
@@ -78,7 +78,15 @@ func Serve(ctx context.Context, vm block.ChainVM, opts ...grpcutils.ServerOption
 		return fmt.Errorf("failed to create new listener: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, defaultRuntimeDialTimeout)
+	dialTimeout := defaultDialTimeout
+	if dialTimeoutStr, exists := os.LookupEnv(runtime.EngineDialTimeoutKey); exists {
+		parsedDialTimeout, err := time.ParseDuration(dialTimeoutStr)
+		if err != nil {
+			return fmt.Errorf("failed to parse engine dial timeout: %w", err)
+		}
+		dialTimeout = parsedDialTimeout
+	}
+	ctx, cancel := context.WithTimeout(ctx, dialTimeout)
 	defer cancel()
 	err = client.Initialize(ctx, version.RPCChainVMProtocol, listener.Addr().String())
 	if err != nil {
