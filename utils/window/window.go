@@ -72,9 +72,6 @@ func (w *window[T]) Add(value T) {
 
 // Oldest returns the oldest element in the window.
 func (w *window[T]) Oldest() (T, bool) {
-	w.lock.Lock()
-	defer w.lock.Unlock()
-
 	oldest, ok := w.elements.PeekLeft()
 	if !ok {
 		return utils.Zero[T](), false
@@ -84,9 +81,6 @@ func (w *window[T]) Oldest() (T, bool) {
 
 // Length returns the number of elements in the window.
 func (w *window[T]) Length() int {
-	w.lock.Lock()
-	defer w.lock.Unlock()
-
 	return w.elements.Len()
 }
 

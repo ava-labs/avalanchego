@@ -113,10 +113,6 @@ func TestTTLAdd(t *testing.T) {
 	require.True(ok)
 	require.Equal(4, oldest)
 
-	// Now we're one second past the ttl of 10 seconds of when [4] was added,
-	// so all existing elements should be evicted.
-	clock.Set(epochStart.Add(22 * time.Second))
-
 	// Now the window is still containing 4:
 	// [4, 5]
 	clock.Set(epochStart.Add(20 * time.Second))
