@@ -289,7 +289,7 @@ func (proof *PathProof) Verify(ctx context.Context, expectedRootID ids.ID) error
 	provenPath := proof.Path[len(proof.Path)-1].KeyPath.deserialize()
 
 	// Don't bother locking [db] and [view] -- nobody else has a reference to them.
-	if err = addPathInfo(view, proof.Path, provenPath, provenPath); err != nil {
+	if err = addSimplePathInfo(view, proof.Path, provenPath); err != nil {
 		return err
 	}
 
