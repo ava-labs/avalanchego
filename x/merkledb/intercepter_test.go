@@ -72,11 +72,6 @@ func Test_Intercepter_non_empty_initial_db_with_delete(t *testing.T) {
 	})
 }
 
-type proofNode struct {
-	key  []byte
-	node []byte
-}
-
 func testIntercepter(require *require.Assertions, db *merkleDB, changes []KeyChange) {
 	startRootID, startRoot, valueProofs, pathProofs, endRootID := build(require, db, changes)
 	verify(require, startRootID, startRoot, valueProofs, pathProofs, changes, endRootID)
@@ -155,23 +150,7 @@ func verify(
 	nodes := make(map[path]Maybe[*node])
 	for _, proof := range pathProofs {
 		key := proof.KeyPath.deserialize()
-		lastNode := proof.Path[len(proof.Path)-1]
-
-		if !lastNode.KeyPath.Equal(proof.KeyPath) {
-			nodes[key] = Nothing[*node]()
-			continue
-		}
-
-		n := &node{
-			dbNode: dbNode{
-				value:    proof.Value,
-				children: lastNode.Children,
-			},
-			key:         key,
-			valueDigest: lastNode.ValueOrHash,
-		}
-
-		nodes[key] = Some(n)
+		nodes[key] = proof.toNode()
 	}
 
 	view := &trieView{
@@ -186,6 +165,7 @@ func verify(
 		unappliedValueChanges: make(map[path]Maybe[[]byte], 1),
 
 		verifierIntercepter: &trieViewVerifierIntercepter{
+			rootID: startRootID,
 			values: values,
 			nodes:  nodes,
 		},

@@ -303,6 +303,34 @@ func (proof *PathProof) Verify(ctx context.Context, expectedRootID ids.ID) error
 	return nil
 }
 
+func (proof *PathProof) toNode() Maybe[*node] {
+	key := proof.KeyPath.deserialize()
+	lastNode := proof.Path[len(proof.Path)-1]
+
+	if !lastNode.KeyPath.Equal(proof.KeyPath) {
+		return Nothing[*node]()
+	}
+
+	children := make(map[byte]child)
+	for _, c := range proof.Children {
+		index := c.KeyPath.NibbleVal(len(key))
+		children[index] = child{
+			compressedPath: c.KeyPath.deserialize()[len(key)+1:],
+			id:             lastNode.Children[index],
+		}
+	}
+
+	n := &node{
+		dbNode: dbNode{
+			value:    proof.Value,
+			children: children,
+		},
+		key: key,
+	}
+	n.setValueDigest()
+	return Some(n)
+}
+
 func (proof *Proof) ToProto() *pb.Proof {
 	value := &pb.MaybeBytes{}
 	if !proof.Value.IsNothing() {

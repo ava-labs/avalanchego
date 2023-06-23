@@ -437,6 +437,21 @@ func (t *trieView) getPathProof(ctx context.Context, key path) (*PathProof, erro
 	closestNode := proofPath[len(proofPath)-1]
 	if closestNode.key.Compare(key) == 0 {
 		// There is a node with the given [key].
+
+		for nextIndex := byte(0); nextIndex < NodeBranchFactor; nextIndex++ {
+			child, ok := closestNode.children[nextIndex]
+			if !ok {
+				continue
+			}
+
+			childPath := closestNode.key + path(nextIndex) + child.compressedPath
+			childNode, err := t.getNodeFromParent(closestNode, childPath)
+			if err != nil {
+				return nil, err
+			}
+			proof.Children = append(proof.Children, childNode.asProofNode())
+		}
+
 		proof.Value = Clone(closestNode.value)
 		return proof, nil
 	}
@@ -1364,8 +1379,13 @@ func (t *trieView) getParentTrie() TrieView {
 type trieViewVerifierIntercepter struct {
 	TrieView
 
+	rootID ids.ID
 	values map[path]Maybe[[]byte]
 	nodes  map[path]Maybe[*node]
+}
+
+func (i *trieViewVerifierIntercepter) GetMerkleRoot(context.Context) (ids.ID, error) {
+	return i.rootID, nil
 }
 
 func (i *trieViewVerifierIntercepter) getValue(key path, lock bool) ([]byte, error) {
