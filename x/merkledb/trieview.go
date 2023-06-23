@@ -15,6 +15,7 @@ import (
 
 	oteltrace "go.opentelemetry.io/otel/trace"
 
+	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 	"golang.org/x/sync/errgroup"
 
@@ -1355,6 +1356,22 @@ func (t *trieView) getNodeWithID(id ids.ID, key Path) (*Node, error) {
 		parentTrieNode.id = id
 	}
 	return parentTrieNode, nil
+}
+
+func (t *trieView) SetIntercepter() {
+	var lock sync.Mutex
+	t.proverIntercepter = &trieViewProverIntercepter{
+		lock:   &lock,
+		values: make(map[Path]*Proof),
+		nodes:  make(map[Path]*PathProof),
+	}
+}
+
+func (t *trieView) GetInterceptedProofs() ([]*Proof, []*PathProof) {
+	t.proverIntercepter.lock.Lock()
+	defer t.proverIntercepter.lock.Unlock()
+
+	return maps.Values(t.proverIntercepter.values), maps.Values(t.proverIntercepter.nodes)
 }
 
 // Get the parent trie of the view

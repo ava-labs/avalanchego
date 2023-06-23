@@ -69,6 +69,9 @@ type Trie interface {
 type TrieView interface {
 	Trie
 
+	SetIntercepter()
+	GetInterceptedProofs() ([]*Proof, []*PathProof)
+
 	// CommitToDB takes the changes of this trie and commits them down the view stack
 	// until all changes in the stack commit to the database
 	// Takes the DB commit lock

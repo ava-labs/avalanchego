@@ -1357,3 +1357,9 @@ func (db *merkleDB) getNodeInCache(key Path) (*Node, bool) {
 	}
 	return nil, false
 }
+
+func (*merkleDB) SetIntercepter() {}
+
+func (*merkleDB) GetInterceptedProofs() ([]*Proof, []*PathProof) {
+	return nil, nil
+}

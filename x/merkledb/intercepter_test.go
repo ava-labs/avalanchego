@@ -5,11 +5,9 @@ package merkledb
 
 import (
 	"context"
-	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/ids"
 )
@@ -122,16 +120,10 @@ func build(
 	startRootBytes, err := db.root.marshal()
 	require.NoError(err)
 
-	viewIntf, err := db.NewView()
+	view, err := db.NewView()
 	require.NoError(err)
-	view := viewIntf.(*trieView)
 
-	var lock sync.Mutex
-	view.proverIntercepter = &trieViewProverIntercepter{
-		lock:   &lock,
-		values: make(map[Path]*Proof),
-		nodes:  make(map[Path]*PathProof),
-	}
+	view.SetIntercepter()
 	for _, key := range reads {
 		_, _ = view.GetValue(ctx, key)
 	}
@@ -146,8 +138,7 @@ func build(
 	expectedNewRoot, err := view.GetMerkleRoot(ctx)
 	require.NoError(err)
 
-	valueProofs := maps.Values(view.proverIntercepter.values)
-	pathProofs := maps.Values(view.proverIntercepter.nodes)
+	valueProofs, pathProofs := view.GetInterceptedProofs()
 
 	return startRootID, startRootBytes, valueProofs, pathProofs, expectedNewRoot
 }
