@@ -269,7 +269,7 @@ func (c *codecImpl) DecodePathProof(b []byte, proof *PathProof) (uint16, error) 
 	if proof == nil {
 		return 0, errDecodeNil
 	}
-	if minProofLen > len(b) {
+	if minPathProofLen > len(b) {
 		return 0, io.ErrUnexpectedEOF
 	}
 
