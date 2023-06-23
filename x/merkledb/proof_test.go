@@ -62,8 +62,6 @@ func Test_Proof_Simple(t *testing.T) {
 	expectedRoot, err := db.GetMerkleRoot(ctx)
 	require.NoError(err)
 
-	writeBasicBatch(t, db)
-
 	proof, err := db.GetProof(ctx, []byte{})
 	require.NoError(err)
 
