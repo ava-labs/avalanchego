@@ -161,9 +161,6 @@ func verify(
 	changes []KeyChange,
 	expectedRootID ids.ID,
 ) {
-	startRoot, err := parseNode(RootPath, startRootBytes)
-	require.NoError(err)
-
 	ctx := context.Background()
 	for _, proof := range valueProofs {
 		require.NoError(proof.Verify(ctx, startRootID))
@@ -182,6 +179,9 @@ func verify(
 		key := proof.KeyPath.deserialize()
 		nodes[key] = proof.toNode()
 	}
+
+	startRoot, err := parseNode(RootPath, startRootBytes)
+	require.NoError(err)
 
 	view := &trieView{
 		root: startRoot,
