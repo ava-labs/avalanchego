@@ -230,7 +230,7 @@ func verify(
 	)
 	require.NoError(err)
 
-	view.SetState(values, nodes)
+	view.SetTemporaryState(values, nodes)
 
 	for _, change := range changes {
 		if change.Value.IsNothing() {

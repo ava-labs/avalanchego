@@ -24,9 +24,11 @@ var (
 type trieViewVerifierIntercepter struct {
 	StatelessView
 
-	rootID ids.ID
-	values map[Path]Maybe[[]byte]
-	nodes  map[Path]Maybe[*Node]
+	rootID     ids.ID
+	tempValues map[Path]Maybe[[]byte]
+	permValues map[Path]Maybe[[]byte]
+	tempNodes  map[Path]Maybe[*Node]
+	permNodes  map[Path]Maybe[*Node]
 }
 
 func (i *trieViewVerifierIntercepter) GetMerkleRoot(context.Context) (ids.ID, error) {
@@ -34,31 +36,49 @@ func (i *trieViewVerifierIntercepter) GetMerkleRoot(context.Context) (ids.ID, er
 }
 
 func (i *trieViewVerifierIntercepter) getValue(key Path, maxLookback int) ([]byte, error) {
-	value, ok := i.values[key]
-	if !ok {
-		if i.StatelessView == nil || maxLookback == 0 {
-			return nil, fmt.Errorf("%w: %q", ErrMissingProof, key)
+	value, ok := i.tempValues[key]
+	if ok {
+		if value.IsNothing() {
+			return nil, database.ErrNotFound
 		}
-		return i.StatelessView.getValue(key, maxLookback-1)
+		return value.Value(), nil
 	}
-	if value.IsNothing() {
-		return nil, database.ErrNotFound
+
+	value, ok = i.permValues[key]
+	if ok {
+		if value.IsNothing() {
+			return nil, database.ErrNotFound
+		}
+		return value.Value(), nil
 	}
-	return value.Value(), nil
+
+	if i.StatelessView == nil || maxLookback == 0 {
+		return nil, fmt.Errorf("%w: %q", ErrMissingProof, key)
+	}
+	return i.StatelessView.getValue(key, maxLookback-1)
 }
 
 func (i *trieViewVerifierIntercepter) getEditableNode(key Path, maxLookback int) (*Node, error) {
-	n, ok := i.nodes[key]
-	if !ok {
-		if i.StatelessView == nil || maxLookback == 0 {
-			return nil, fmt.Errorf("%w: %q", ErrMissingPathProof, key)
+	n, ok := i.tempNodes[key]
+	if ok {
+		if n.IsNothing() {
+			return nil, database.ErrNotFound
 		}
-		return i.StatelessView.getEditableNode(key, maxLookback-1)
+		return n.Value().clone(), nil
 	}
-	if n.IsNothing() {
-		return nil, database.ErrNotFound
+
+	n, ok = i.permNodes[key]
+	if ok {
+		if n.IsNothing() {
+			return nil, database.ErrNotFound
+		}
+		return n.Value().clone(), nil
 	}
-	return n.Value().clone(), nil
+
+	if i.StatelessView == nil || maxLookback == 0 {
+		return nil, fmt.Errorf("%w: %q", ErrMissingPathProof, key)
+	}
+	return i.StatelessView.getEditableNode(key, maxLookback-1)
 }
 
 type trieViewProverIntercepter struct {

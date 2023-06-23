@@ -27,7 +27,8 @@ type StatelessView interface {
 	NewStatelessView(estimatedChanges int) StatelessView
 
 	SetBase()
-	SetState(values map[Path]Maybe[[]byte], nodes map[Path]Maybe[*Node])
+	SetTemporaryState(values map[Path]Maybe[[]byte], nodes map[Path]Maybe[*Node])
+	AddPermanentState(values map[Path]Maybe[[]byte], nodes map[Path]Maybe[*Node])
 	GetRoot() ([]byte, error)
 
 	// GetValue gets the value associated with the specified key
@@ -124,7 +125,9 @@ func NewBaseStatelessView(
 		unappliedValueChanges: make(map[Path]Maybe[[]byte], estimatedSize),
 
 		verifierIntercepter: &trieViewVerifierIntercepter{
-			rootID: root.id,
+			rootID:     root.id,
+			permValues: make(map[Path]Maybe[[]byte]),
+			permNodes:  make(map[Path]Maybe[*Node]),
 		},
 	}, nil
 }
@@ -162,12 +165,24 @@ func (t *statelessView) SetBase() {
 	t.parentTrie = nil
 }
 
-func (t *statelessView) SetState(values map[Path]Maybe[[]byte], nodes map[Path]Maybe[*Node]) {
+func (t *statelessView) SetTemporaryState(values map[Path]Maybe[[]byte], nodes map[Path]Maybe[*Node]) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	t.verifierIntercepter.values = values
-	t.verifierIntercepter.nodes = nodes
+	t.verifierIntercepter.tempValues = values
+	t.verifierIntercepter.tempNodes = nodes
+}
+
+func (t *statelessView) AddPermanentState(values map[Path]Maybe[[]byte], nodes map[Path]Maybe[*Node]) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	for p, value := range values {
+		t.verifierIntercepter.permValues[p] = value
+	}
+	for p, node := range nodes {
+		t.verifierIntercepter.permNodes[p] = node
+	}
 }
 
 func (t *statelessView) GetRoot() ([]byte, error) {
