@@ -153,7 +153,9 @@ func (t *statelessView) NewStatelessView(estimatedChanges int) StatelessView {
 		unappliedValueChanges: make(map[Path]Maybe[[]byte], estimatedChanges),
 
 		verifierIntercepter: &trieViewVerifierIntercepter{
-			rootID: t.root.id,
+			rootID:     t.root.id,
+			permValues: make(map[Path]Maybe[[]byte]),
+			permNodes:  make(map[Path]Maybe[*Node]),
 		},
 	}
 }
