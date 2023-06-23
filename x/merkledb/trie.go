@@ -64,14 +64,14 @@ type Trie interface {
 
 	// Insert a key/value pair into the Trie
 	Insert(ctx context.Context, key, value []byte) error
-}
-
-type TrieView interface {
-	Trie
 
 	SetIntercepter()
 	GetInterceptedProofs() ([]*Proof, []*PathProof)
 	GetRoot() ([]byte, error)
+}
+
+type TrieView interface {
+	Trie
 
 	// CommitToDB takes the changes of this trie and commits them down the view stack
 	// until all changes in the stack commit to the database
