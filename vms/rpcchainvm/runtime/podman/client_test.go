@@ -8,7 +8,7 @@ import (
 
 	"github.com/containers/podman/v4/pkg/bindings"
 	"github.com/containers/podman/v4/pkg/bindings/kube"
-	"gopkg.in/yaml.v2"
+	"github.com/ghodss/yaml"
 
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
@@ -33,7 +33,7 @@ spec:
 // go test -v -timeout 30s -run ^TestSchedulePod$ github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime/podman
 func TestSchedulePod(t *testing.T) {
 	require := require.New(t)
-	obj, _, err := scheme.Codecs.UniversalDeserializer().Decode([]byte(podYamlBytes), nil, nil)
+	obj, kind, err := scheme.Codecs.UniversalDeserializer().Decode([]byte(podYamlBytes), nil, nil)
 	require.NoError(err)
 
 	// ensure valid pod spec from bytes
@@ -48,10 +48,12 @@ func TestSchedulePod(t *testing.T) {
 		},
 	)
 
+	require.Equal(kind.Kind, "Pod")
+
 	podBytes, err := yaml.Marshal(&pod)
 	require.NoError(err)
 
-	fmt.Printf("%#v\n", pod)
+	fmt.Printf("%#v\n", fmt.Sprint(string(podBytes)))
 
 	socket, err := getSocketPath()
 	require.NoError(err)

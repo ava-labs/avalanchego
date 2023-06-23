@@ -18,6 +18,7 @@ require (
 	github.com/btcsuite/btcd/btcutil v1.1.3
 	github.com/containers/podman/v4 v4.5.1
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.1.0
+	github.com/ghodss/yaml v1.0.0
 	github.com/golang-jwt/jwt/v4 v4.5.0
 	github.com/golang/mock v1.6.0
 	github.com/google/btree v1.1.2
@@ -101,7 +102,6 @@ require (
 	github.com/containers/psgo v1.8.0 // indirect
 	github.com/containers/storage v1.46.1 // indirect
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
-	github.com/coreos/stream-metadata-go v0.4.1 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
 	github.com/cyberphone/json-canonicalization v0.0.0-20220623050100-57a0ce2678a7 // indirect
 	github.com/cyphar/filepath-securejoin v0.2.3 // indirect
