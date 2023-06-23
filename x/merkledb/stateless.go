@@ -635,7 +635,18 @@ func (t *statelessView) insertIntoTrie(
 		existingChildEntry.id,
 	)
 
-	return nodeWithValue, t.recordNodeChange(branchNode)
+	t.needsRecalculation = true
+
+	if existing, ok := t.changes.nodes[branchNode.key]; ok {
+		existing.after = branchNode
+		return nodeWithValue, nil
+	}
+
+	t.changes.nodes[key] = &change[*Node]{
+		before: nil,
+		after:  branchNode,
+	}
+	return nodeWithValue, nil
 }
 
 // Records that a node has been changed.
