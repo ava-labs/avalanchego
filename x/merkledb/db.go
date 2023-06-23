@@ -39,7 +39,7 @@ var (
 	_ TrieView = (*merkleDB)(nil)
 	_ MerkleDB = (*merkleDB)(nil)
 
-	codec, version = newCodec()
+	Codec, Version = newCodec()
 
 	rootKey                 []byte
 	nodePrefix              = []byte("node")
@@ -147,7 +147,7 @@ type merkleDB struct {
 	metadataDB database.Database
 
 	// If a value is nil, the corresponding key isn't in the trie.
-	nodeCache         onEvictCache[path, *node]
+	nodeCache         onEvictCache[path, *Node]
 	onEvictionErr     utils.Atomic[error]
 	evictionBatchSize int
 
@@ -163,7 +163,7 @@ type merkleDB struct {
 	tracer trace.Tracer
 
 	// The root of this trie.
-	root *node
+	root *Node
 
 	// Valid children of this trie.
 	childViews []*trieView
@@ -198,7 +198,7 @@ func newDatabase(
 	trieDB.history.record(&changeSummary{
 		rootID: root,
 		values: map[path]*change[Maybe[[]byte]]{},
-		nodes:  map[path]*change[*node]{},
+		nodes:  map[path]*change[*Node]{},
 	})
 
 	shutdownType, err := trieDB.metadataDB.Get(cleanShutdownKey)
@@ -767,7 +767,7 @@ func (db *merkleDB) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 // the movement of [node] from [db.nodeCache] to [db.nodeDB] is atomic.
 // As soon as [db.nodeCache] no longer has [node], [db.nodeDB] does.
 // Non-nil error is fatal -- causes [db] to close.
-func (db *merkleDB) onEviction(n *node) error {
+func (db *merkleDB) onEviction(n *Node) error {
 	// the evicted node isn't an intermediary node, so skip writing.
 	if n == nil || n.hasValue() {
 		return nil
@@ -812,7 +812,7 @@ func (db *merkleDB) onEviction(n *node) error {
 }
 
 // Writes [n] to [batch]. Assumes [n] is non-nil.
-func writeNodeToBatch(batch database.Batch, n *node) error {
+func writeNodeToBatch(batch database.Batch, n *Node) error {
 	nodeBytes, err := n.marshal()
 	if err != nil {
 		return err
@@ -1211,7 +1211,7 @@ func (db *merkleDB) getKeysNotInSet(start, end []byte, keySet set.Set[string]) (
 // This copy may be edited by the caller without affecting the database state.
 // Returns database.ErrNotFound if the node doesn't exist.
 // Assumes [db.lock] isn't held.
-func (db *merkleDB) getEditableNode(key path) (*node, error) {
+func (db *merkleDB) getEditableNode(key path) (*Node, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
@@ -1226,7 +1226,7 @@ func (db *merkleDB) getEditableNode(key path) (*node, error) {
 // Editing the returned node affects the database state.
 // Returns database.ErrNotFound if the node doesn't exist.
 // Assumes [db.lock] is read locked.
-func (db *merkleDB) getNode(key path) (*node, error) {
+func (db *merkleDB) getNode(key path) (*Node, error) {
 	if db.closed {
 		return nil, database.ErrClosed
 	}
@@ -1343,14 +1343,14 @@ func (db *merkleDB) prepareRangeProofView(start []byte, proof *RangeProof) (*tri
 }
 
 // Non-nil error is fatal -- [db] will close.
-func (db *merkleDB) putNodeInCache(key path, n *node) error {
+func (db *merkleDB) putNodeInCache(key path, n *Node) error {
 	// TODO Cache metrics
 	// Note that this may cause a node to be evicted from the cache,
 	// which will call [OnEviction].
 	return db.nodeCache.Put(key, n)
 }
 
-func (db *merkleDB) getNodeInCache(key path) (*node, bool) {
+func (db *merkleDB) getNodeInCache(key path) (*Node, bool) {
 	// TODO Cache metrics
 	if node, ok := db.nodeCache.Get(key); ok {
 		return node, true

@@ -416,10 +416,10 @@ func (mr *MockMerkleDBMockRecorder) VerifyChangeProof(arg0, arg1, arg2, arg3, ar
 }
 
 // getEditableNode mocks base method.
-func (m *MockMerkleDB) getEditableNode(arg0 path) (*node, error) {
+func (m *MockMerkleDB) getEditableNode(arg0 path) (*Node, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "getEditableNode", arg0)
-	ret0, _ := ret[0].(*node)
+	ret0, _ := ret[0].(*Node)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

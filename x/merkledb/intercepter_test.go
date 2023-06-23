@@ -174,7 +174,7 @@ func verify(
 		values[newPath(proof.Key)] = proof.Value
 	}
 
-	nodes := make(map[path]Maybe[*node])
+	nodes := make(map[path]Maybe[*Node])
 	for _, proof := range pathProofs {
 		key := proof.KeyPath.deserialize()
 		nodes[key] = proof.toNode()

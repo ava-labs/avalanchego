@@ -100,7 +100,7 @@ type trieView struct {
 	db *merkleDB
 
 	// The root of the trie represented by this view.
-	root *node
+	root *Node
 
 	// True if the IDs of nodes in this view need to be recalculated.
 	needsRecalculation bool
@@ -162,7 +162,7 @@ func (t *trieView) NewPreallocatedView(
 func newTrieView(
 	db *merkleDB,
 	parentTrie TrieView,
-	root *node,
+	root *Node,
 	estimatedSize int,
 ) (*trieView, error) {
 	if root == nil {
@@ -260,13 +260,13 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 
 // Calculates the ID of all descendants of [n] which need to be recalculated,
 // and then calculates the ID of [n] itself.
-func (t *trieView) calculateNodeIDsHelper(ctx context.Context, n *node, eg *errgroup.Group) error {
+func (t *trieView) calculateNodeIDsHelper(ctx context.Context, n *Node, eg *errgroup.Group) error {
 	var (
 		// We use [wg] to wait until all descendants of [n] have been updated.
 		// Note we can't wait on [eg] because [eg] may have started goroutines
 		// that aren't calculating IDs for descendants of [n].
 		wg              sync.WaitGroup
-		updatedChildren = make(chan *node, len(n.children))
+		updatedChildren = make(chan *Node, len(n.children))
 	)
 
 	for childIndex, child := range n.children {
@@ -622,7 +622,7 @@ func (t *trieView) commitChanges(ctx context.Context, trieToCommit *trieView) er
 		if existing, ok := t.changes.nodes[key]; ok {
 			existing.after = nodeChange.after
 		} else {
-			t.changes.nodes[key] = &change[*node]{
+			t.changes.nodes[key] = &change[*Node]{
 				before: nodeChange.before,
 				after:  nodeChange.after,
 			}
@@ -966,7 +966,7 @@ func (t *trieView) applyChangedValuesToTrie(ctx context.Context) error {
 // * [node] has a value.
 // * [node] has children.
 // Assumes [t.lock] is held.
-func (t *trieView) compressNodePath(parent, node *node) error {
+func (t *trieView) compressNodePath(parent, node *Node) error {
 	// don't collapse into this node if it's the root, doesn't have 1 child, or has a value
 	if len(node.children) != 1 || node.hasValue() {
 		return nil
@@ -996,7 +996,7 @@ func (t *trieView) compressNodePath(parent, node *node) error {
 // Stops when a node with a value or children is reached.
 // Assumes [nodePath] is a path from the root to a node.
 // Assumes [t.lock] is held.
-func (t *trieView) deleteEmptyNodes(nodePath []*node) error {
+func (t *trieView) deleteEmptyNodes(nodePath []*Node) error {
 	node := nodePath[len(nodePath)-1]
 	nextParentIndex := len(nodePath) - 2
 
@@ -1028,12 +1028,12 @@ func (t *trieView) deleteEmptyNodes(nodePath []*node) error {
 // given [key], if it's in the trie, or the node with the largest prefix of
 // the [key] if it isn't in the trie.
 // Always returns at least the root node.
-func (t *trieView) getPathTo(key path) ([]*node, error) {
+func (t *trieView) getPathTo(key path) ([]*Node, error) {
 	var (
 		// all paths start at the root
 		currentNode     = t.root
 		matchedKeyIndex = 0
-		nodes           = []*node{t.root}
+		nodes           = []*Node{t.root}
 	)
 
 	// while the entire path hasn't been matched
@@ -1076,7 +1076,7 @@ func getLengthOfCommonPrefix(first, second path) int {
 // Get a copy of the node matching the passed key from the trie
 // Used by views to get nodes from their ancestors
 // assumes that [t.needsRecalculation] is false
-func (t *trieView) getEditableNode(key path) (*node, error) {
+func (t *trieView) getEditableNode(key path) (*Node, error) {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
@@ -1104,7 +1104,7 @@ func (t *trieView) getEditableNode(key path) (*node, error) {
 func (t *trieView) insertIntoTrie(
 	key path,
 	value Maybe[[]byte],
-) (*node, error) {
+) (*Node, error) {
 	// find the node that most closely matches [key]
 	pathToNode, err := t.getPathTo(key)
 	if err != nil {
@@ -1198,13 +1198,13 @@ func (t *trieView) insertIntoTrie(
 
 // Records that a node has been changed.
 // Assumes [t.lock] is held.
-func (t *trieView) recordNodeChange(after *node) error {
+func (t *trieView) recordNodeChange(after *Node) error {
 	return t.recordKeyChange(after.key, after)
 }
 
 // Records that the node associated with the given key has been deleted.
 // Assumes [t.lock] is held.
-func (t *trieView) recordNodeDeleted(after *node) error {
+func (t *trieView) recordNodeDeleted(after *Node) error {
 	// don't delete the root.
 	if len(after.key) == 0 {
 		return t.recordKeyChange(after.key, after)
@@ -1214,7 +1214,7 @@ func (t *trieView) recordNodeDeleted(after *node) error {
 
 // Records that the node associated with the given key has been changed.
 // Assumes [t.lock] is held.
-func (t *trieView) recordKeyChange(key path, after *node) error {
+func (t *trieView) recordKeyChange(key path, after *Node) error {
 	t.needsRecalculation = true
 
 	if existing, ok := t.changes.nodes[key]; ok {
@@ -1230,7 +1230,7 @@ func (t *trieView) recordKeyChange(key path, after *node) error {
 		before = nil
 	}
 
-	t.changes.nodes[key] = &change[*node]{
+	t.changes.nodes[key] = &change[*Node]{
 		before: before,
 		after:  after,
 	}
@@ -1319,7 +1319,7 @@ func (t *trieView) removeFromTrie(key path) error {
 // uses the [parent] node to initialize the child node's ID.
 // Returns database.ErrNotFound if the child doesn't exist.
 // Assumes [t.lock] write or read lock is held.
-func (t *trieView) getNodeFromParent(parent *node, key path) (*node, error) {
+func (t *trieView) getNodeFromParent(parent *Node, key path) (*Node, error) {
 	// confirm the child exists and get its ID before attempting to load it
 	if child, exists := parent.children[key[len(parent.key)]]; exists {
 		return t.getNodeWithID(child.id, key)
@@ -1333,7 +1333,7 @@ func (t *trieView) getNodeFromParent(parent *node, key path) (*node, error) {
 // sets the node's ID to [id].
 // Returns database.ErrNotFound if the node doesn't exist.
 // Assumes [t.lock] write or read lock is held.
-func (t *trieView) getNodeWithID(id ids.ID, key path) (*node, error) {
+func (t *trieView) getNodeWithID(id ids.ID, key path) (*Node, error) {
 	// check for the key within the changed nodes
 	if nodeChange, isChanged := t.changes.nodes[key]; isChanged {
 		t.db.metrics.ViewNodeCacheHit()

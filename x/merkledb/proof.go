@@ -308,7 +308,7 @@ func (proof *PathProof) Verify(ctx context.Context, expectedRootID ids.ID) error
 				id: childHash,
 			}
 		}
-		childBytes, err := codec.encodeHashValues(version, &hashValues{
+		childBytes, err := Codec.encodeHashValues(Version, &hashValues{
 			Children: childrenToHash,
 			Value:    c.ValueOrHash,
 			Key:      c.KeyPath,
@@ -350,12 +350,12 @@ func (proof *PathProof) Verify(ctx context.Context, expectedRootID ids.ID) error
 	return nil
 }
 
-func (proof *PathProof) toNode() Maybe[*node] {
+func (proof *PathProof) toNode() Maybe[*Node] {
 	key := proof.KeyPath.deserialize()
 	lastNode := proof.Path[len(proof.Path)-1]
 
 	if !lastNode.KeyPath.Equal(proof.KeyPath) {
-		return Nothing[*node]()
+		return Nothing[*Node]()
 	}
 
 	children := make(map[byte]child)
@@ -367,7 +367,7 @@ func (proof *PathProof) toNode() Maybe[*node] {
 		}
 	}
 
-	n := &node{
+	n := &Node{
 		dbNode: dbNode{
 			value:    proof.Value,
 			children: children,

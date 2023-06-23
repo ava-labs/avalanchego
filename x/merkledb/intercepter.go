@@ -21,7 +21,7 @@ type trieViewVerifierIntercepter struct {
 
 	rootID ids.ID
 	values map[path]Maybe[[]byte]
-	nodes  map[path]Maybe[*node]
+	nodes  map[path]Maybe[*Node]
 }
 
 func (i *trieViewVerifierIntercepter) GetMerkleRoot(context.Context) (ids.ID, error) {
@@ -39,7 +39,7 @@ func (i *trieViewVerifierIntercepter) getValue(key path, lock bool) ([]byte, err
 	return value.Value(), nil
 }
 
-func (i *trieViewVerifierIntercepter) getEditableNode(key path) (*node, error) {
+func (i *trieViewVerifierIntercepter) getEditableNode(key path) (*Node, error) {
 	n, ok := i.nodes[key]
 	if !ok {
 		return i.TrieView.getEditableNode(key)
@@ -74,7 +74,7 @@ func (i *trieViewProverIntercepter) getValue(key path, _ bool) ([]byte, error) {
 	return nil, database.ErrNotFound
 }
 
-func (i *trieViewProverIntercepter) getEditableNode(key path) (*node, error) {
+func (i *trieViewProverIntercepter) getEditableNode(key path) (*Node, error) {
 	p, err := i.TrieView.GetPathProof(context.TODO(), key)
 	if err != nil {
 		return nil, err

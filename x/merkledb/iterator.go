@@ -10,7 +10,7 @@ var _ database.Iterator = (*iterator)(nil)
 type iterator struct {
 	db       *merkleDB
 	nodeIter database.Iterator
-	current  *node
+	current  *Node
 	err      error
 }
 

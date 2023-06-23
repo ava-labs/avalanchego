@@ -53,14 +53,14 @@ type changeSummaryAndIndex struct {
 type changeSummary struct {
 	rootID ids.ID
 	// key is path prefix
-	nodes map[path]*change[*node]
+	nodes map[path]*change[*Node]
 	// key is full path
 	values map[path]*change[Maybe[[]byte]]
 }
 
 func newChangeSummary(estimatedSize int) *changeSummary {
 	return &changeSummary{
-		nodes:  make(map[path]*change[*node], estimatedSize),
+		nodes:  make(map[path]*change[*Node], estimatedSize),
 		values: make(map[path]*change[Maybe[[]byte]], estimatedSize),
 	}
 }
@@ -222,7 +222,7 @@ func (th *trieHistory) getChangesToGetToRoot(rootID ids.ID, start, end []byte) (
 				return false
 			}
 			for key, changedNode := range item.nodes {
-				combinedChanges.nodes[key] = &change[*node]{
+				combinedChanges.nodes[key] = &change[*Node]{
 					after: changedNode.before,
 				}
 			}

@@ -31,7 +31,8 @@ const (
 	minKeyValueLen       = 2 * minByteSliceLen
 	minKeyChangeLen      = minByteSliceLen + minMaybeByteSliceLen
 	minProofNodeLen      = minSerializedPathLen + minMaybeByteSliceLen + minVarIntLen
-	minProofLen          = minCodecVersionLen + minProofPathLen + minByteSliceLen
+	minProofLen          = minCodecVersionLen + minProofPathLen + minByteSliceLen + minMaybeByteSliceLen
+	minPathProofLen      = minCodecVersionLen + 2*minProofPathLen + minSerializedPathLen + minMaybeByteSliceLen
 	minChangeProofLen    = minCodecVersionLen + boolLen + 2*minProofPathLen + minVarIntLen
 	minRangeProofLen     = minCodecVersionLen + 2*minProofPathLen + minVarIntLen
 	minDBNodeLen         = minCodecVersionLen + minMaybeByteSliceLen + minVarIntLen
@@ -41,44 +42,51 @@ const (
 )
 
 var (
-	_ encoderDecoder = (*codecImpl)(nil)
+	_ EncoderDecoder = (*codecImpl)(nil)
 
 	trueBytes  = []byte{trueByte}
 	falseBytes = []byte{falseByte}
 
-	errUnknownVersion       = errors.New("unknown codec version")
-	errEncodeNil            = errors.New("can't encode nil pointer or interface")
-	errDecodeNil            = errors.New("can't decode nil")
-	errNegativeNumChildren  = errors.New("number of children is negative")
-	errTooManyChildren      = fmt.Errorf("length of children list is larger than branching factor of %d", NodeBranchFactor)
-	errChildIndexTooLarge   = fmt.Errorf("invalid child index. Must be less than branching factor of %d", NodeBranchFactor)
-	errNegativeNibbleLength = errors.New("nibble length is negative")
-	errIntTooLarge          = errors.New("integer too large to be decoded")
-	errLeadingZeroes        = errors.New("varint has leading zeroes")
-	errInvalidBool          = errors.New("decoded bool is neither true nor false")
-	errNonZeroNibblePadding = errors.New("nibbles should be padded with 0s")
-	errExtraSpace           = errors.New("trailing buffer space")
-	errNegativeSliceLength  = errors.New("negative slice length")
-	errInvalidCodecVersion  = errors.New("invalid codec version")
+	errUnknownVersion         = errors.New("unknown codec version")
+	errEncodeNil              = errors.New("can't encode nil pointer or interface")
+	errDecodeNil              = errors.New("can't decode nil")
+	errNegativeNumChildren    = errors.New("number of children is negative")
+	errTooManyChildren        = fmt.Errorf("length of children list is larger than branching factor of %d", NodeBranchFactor)
+	errChildIndexTooLarge     = fmt.Errorf("invalid child index. Must be less than branching factor of %d", NodeBranchFactor)
+	errNegativeNibbleLength   = errors.New("nibble length is negative")
+	errIntTooLarge            = errors.New("integer too large to be decoded")
+	errLeadingZeroes          = errors.New("varint has leading zeroes")
+	errInvalidBool            = errors.New("decoded bool is neither true nor false")
+	errNonZeroNibblePadding   = errors.New("nibbles should be padded with 0s")
+	errExtraSpace             = errors.New("trailing buffer space")
+	errNegativeSliceLength    = errors.New("negative slice length")
+	errInvalidCodecVersion    = errors.New("invalid codec version")
+	errNegativeProofPathNodes = errors.New("negative proof path nodes")
 )
 
-// encoderDecoder defines the interface needed by merkleDB to marshal
+// EncoderDecoder defines the interface needed by merkleDB to marshal
 // and unmarshal relevant types.
-type encoderDecoder interface {
-	encoder
-	decoder
+type EncoderDecoder interface {
+	Encoder
+	Decoder
 }
 
-type encoder interface {
+type Encoder interface {
 	encodeDBNode(version uint16, n *dbNode) ([]byte, error)
 	encodeHashValues(version uint16, hv *hashValues) ([]byte, error)
+
+	EncodeProof(version uint16, proof *Proof) ([]byte, error)
+	EncodePathProof(version uint16, proof *PathProof) ([]byte, error)
 }
 
-type decoder interface {
+type Decoder interface {
 	decodeDBNode(bytes []byte, n *dbNode) (uint16, error)
+
+	DecodeProof(bytes []byte, proof *Proof) (uint16, error)
+	DecodePathProof(bytes []byte, proof *PathProof) (uint16, error)
 }
 
-func newCodec() (encoderDecoder, uint16) {
+func newCodec() (EncoderDecoder, uint16) {
 	return &codecImpl{
 		varIntPool: sync.Pool{
 			New: func() interface{} {
@@ -90,6 +98,59 @@ func newCodec() (encoderDecoder, uint16) {
 
 type codecImpl struct {
 	varIntPool sync.Pool
+}
+
+func (c *codecImpl) EncodeProof(version uint16, proof *Proof) ([]byte, error) {
+	if proof == nil {
+		return nil, errEncodeNil
+	}
+
+	if version != codecVersion {
+		return nil, fmt.Errorf("%w: %d", errUnknownVersion, version)
+	}
+
+	buf := &bytes.Buffer{}
+	if err := c.encodeInt(buf, int(version)); err != nil {
+		return nil, err
+	}
+	if err := c.encodeProofPath(buf, proof.Path); err != nil {
+		return nil, err
+	}
+	if err := c.encodeByteSlice(buf, proof.Key); err != nil {
+		return nil, err
+	}
+	if err := c.encodeMaybeByteSlice(buf, proof.Value); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func (c *codecImpl) EncodePathProof(version uint16, proof *PathProof) ([]byte, error) {
+	if proof == nil {
+		return nil, errEncodeNil
+	}
+
+	if version != codecVersion {
+		return nil, fmt.Errorf("%w: %d", errUnknownVersion, version)
+	}
+
+	buf := &bytes.Buffer{}
+	if err := c.encodeInt(buf, int(version)); err != nil {
+		return nil, err
+	}
+	if err := c.encodeProofPath(buf, proof.Path); err != nil {
+		return nil, err
+	}
+	if err := c.encodeProofPath(buf, proof.Children); err != nil {
+		return nil, err
+	}
+	if err := c.encodeSerializedPath(proof.KeyPath, buf); err != nil {
+		return nil, err
+	}
+	if err := c.encodeMaybeByteSlice(buf, proof.Value); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }
 
 func (c *codecImpl) encodeDBNode(version uint16, n *dbNode) ([]byte, error) {
@@ -168,6 +229,77 @@ func (c *codecImpl) encodeHashValues(version uint16, hv *hashValues) ([]byte, er
 	}
 
 	return buf.Bytes(), nil
+}
+
+func (c *codecImpl) DecodeProof(b []byte, proof *Proof) (uint16, error) {
+	if proof == nil {
+		return 0, errDecodeNil
+	}
+	if minProofLen > len(b) {
+		return 0, io.ErrUnexpectedEOF
+	}
+
+	var (
+		err error
+		src = bytes.NewReader(b)
+	)
+	gotCodecVersion, err := c.decodeInt(src)
+	if err != nil {
+		return 0, err
+	}
+	if codecVersion != gotCodecVersion {
+		return 0, fmt.Errorf("%w: %d", errInvalidCodecVersion, gotCodecVersion)
+	}
+	if proof.Path, err = c.decodeProofPath(src); err != nil {
+		return 0, err
+	}
+	if proof.Key, err = c.decodeByteSlice(src); err != nil {
+		return 0, err
+	}
+	if proof.Value, err = c.decodeMaybeByteSlice(src); err != nil {
+		return 0, err
+	}
+	if src.Len() != 0 {
+		return 0, errExtraSpace
+	}
+	return codecVersion, nil
+}
+
+func (c *codecImpl) DecodePathProof(b []byte, proof *PathProof) (uint16, error) {
+	if proof == nil {
+		return 0, errDecodeNil
+	}
+	if minProofLen > len(b) {
+		return 0, io.ErrUnexpectedEOF
+	}
+
+	var (
+		err error
+		src = bytes.NewReader(b)
+	)
+	gotCodecVersion, err := c.decodeInt(src)
+	if err != nil {
+		return 0, err
+	}
+	if codecVersion != gotCodecVersion {
+		return 0, fmt.Errorf("%w: %d", errInvalidCodecVersion, gotCodecVersion)
+	}
+	if proof.Path, err = c.decodeProofPath(src); err != nil {
+		return 0, err
+	}
+	if proof.Children, err = c.decodeProofPath(src); err != nil {
+		return 0, err
+	}
+	if proof.KeyPath, err = c.decodeSerializedPath(src); err != nil {
+		return 0, err
+	}
+	if proof.Value, err = c.decodeMaybeByteSlice(src); err != nil {
+		return 0, err
+	}
+	if src.Len() != 0 {
+		return 0, errExtraSpace
+	}
+	return codecVersion, nil
 }
 
 func (c *codecImpl) decodeDBNode(b []byte, n *dbNode) (uint16, error) {
@@ -401,6 +533,125 @@ func (*codecImpl) decodeID(src *bytes.Reader) (ids.ID, error) {
 		return id, err
 	}
 	return id, nil
+}
+
+// Assumes a proof path has > 0 nodes.
+func (c *codecImpl) decodeProofPath(src *bytes.Reader) ([]ProofNode, error) {
+	if minProofPathLen > src.Len() {
+		return nil, io.ErrUnexpectedEOF
+	}
+
+	numProofNodes, err := c.decodeInt(src)
+	if err != nil {
+		return nil, err
+	}
+	if numProofNodes < 0 {
+		return nil, errNegativeProofPathNodes
+	}
+	if numProofNodes > src.Len()/minProofNodeLen {
+		return nil, io.ErrUnexpectedEOF
+	}
+	result := make([]ProofNode, numProofNodes)
+	for i := 0; i < numProofNodes; i++ {
+		if result[i], err = c.decodeProofNode(src); err != nil {
+			return nil, err
+		}
+	}
+	return result, nil
+}
+
+// Invariant: len(path) > 0.
+func (c *codecImpl) encodeProofPath(dst io.Writer, path []ProofNode) error {
+	if err := c.encodeInt(dst, len(path)); err != nil {
+		return err
+	}
+	for _, proofNode := range path {
+		if err := c.encodeProofNode(proofNode, dst); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *codecImpl) decodeProofNode(src *bytes.Reader) (ProofNode, error) {
+	if minProofNodeLen > src.Len() {
+		return ProofNode{}, io.ErrUnexpectedEOF
+	}
+
+	var (
+		result ProofNode
+		err    error
+	)
+	if result.KeyPath, err = c.decodeSerializedPath(src); err != nil {
+		return result, err
+	}
+	if result.ValueOrHash, err = c.decodeMaybeByteSlice(src); err != nil {
+		return result, err
+	}
+	numChildren, err := c.decodeInt(src)
+	if err != nil {
+		return result, err
+	}
+	switch {
+	case numChildren < 0:
+		return result, errNegativeNumChildren
+	case numChildren > NodeBranchFactor:
+		return result, errTooManyChildren
+	case numChildren > src.Len()/minProofNodeChildLen:
+		return result, io.ErrUnexpectedEOF
+	}
+
+	result.Children = make(map[byte]ids.ID, numChildren)
+	previousChild := -1
+	for addedEntries := 0; addedEntries < numChildren; addedEntries++ {
+		index, err := c.decodeInt(src)
+		if err != nil {
+			return result, err
+		}
+		if index <= previousChild || index >= NodeBranchFactor {
+			return result, errChildIndexTooLarge
+		}
+		previousChild = index
+
+		childID, err := c.decodeID(src)
+		if err != nil {
+			return result, err
+		}
+		result.Children[byte(index)] = childID
+	}
+	return result, nil
+}
+
+func (c *codecImpl) encodeProofNode(pn ProofNode, dst io.Writer) error {
+	if err := c.encodeSerializedPath(pn.KeyPath, dst); err != nil {
+		return err
+	}
+	if err := c.encodeMaybeByteSlice(dst, pn.ValueOrHash); err != nil {
+		return err
+	}
+	if err := c.encodeInt(dst, len(pn.Children)); err != nil {
+		return err
+	}
+	// ensure this is in order
+	childrenCount := 0
+	for index := byte(0); index < NodeBranchFactor; index++ {
+		childID, ok := pn.Children[index]
+		if !ok {
+			continue
+		}
+		childrenCount++
+		if err := c.encodeInt(dst, int(index)); err != nil {
+			return err
+		}
+		if _, err := dst.Write(childID[:]); err != nil {
+			return err
+		}
+	}
+	// there are children present with index >= NodeBranchFactor
+	if childrenCount != len(pn.Children) {
+		return errChildIndexTooLarge
+	}
+	return nil
 }
 
 func (c *codecImpl) encodeSerializedPath(s SerializedPath, dst io.Writer) error {
