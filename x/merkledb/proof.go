@@ -141,7 +141,7 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID) error {
 	if len(proof.Path) == 0 {
 		return ErrNoProof
 	}
-	if err := verifyProofPath(proof.Path, newPath(proof.Key)); err != nil {
+	if err := verifyProofPath(proof.Path, NewPath(proof.Key)); err != nil {
 		return err
 	}
 
@@ -450,11 +450,11 @@ func (proof *RangeProof) Verify(
 	// The key-value pairs (allegedly) proven by [proof].
 	keyValues := make(map[Path][]byte, len(proof.KeyValues))
 	for _, keyValue := range proof.KeyValues {
-		keyValues[newPath(keyValue.Key)] = keyValue.Value
+		keyValues[NewPath(keyValue.Key)] = keyValue.Value
 	}
 
-	smallestPath := newPath(start)
-	largestPath := newPath(largestkey)
+	smallestPath := NewPath(start)
+	largestPath := NewPath(largestkey)
 
 	// Ensure that the start proof is valid and contains values that
 	// match the key/values that were sent.
@@ -482,7 +482,7 @@ func (proof *RangeProof) Verify(
 
 	// Insert all key-value pairs into the trie.
 	for _, kv := range proof.KeyValues {
-		if _, err := view.insertIntoTrie(newPath(kv.Key), Some(kv.Value)); err != nil {
+		if _, err := view.insertIntoTrie(NewPath(kv.Key), Some(kv.Value)); err != nil {
 			return err
 		}
 	}

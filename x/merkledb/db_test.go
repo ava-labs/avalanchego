@@ -47,7 +47,7 @@ func Test_MerkleDB_Get_Safety(t *testing.T) {
 
 	val, err := db.Get([]byte{0})
 	require.NoError(err)
-	n, err := db.getNode(newPath([]byte{0}))
+	n, err := db.getNode(NewPath([]byte{0}))
 	require.NoError(err)
 	val[0] = 1
 
@@ -757,12 +757,12 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 		switch step.op {
 		case opUpdate:
 			require.NoError(currentBatch.Put(step.key, step.value))
-			currentValues[newPath(step.key)] = step.value
-			delete(deleteValues, newPath(step.key))
+			currentValues[NewPath(step.key)] = step.value
+			delete(deleteValues, NewPath(step.key))
 		case opDelete:
 			require.NoError(currentBatch.Delete(step.key))
-			deleteValues[newPath(step.key)] = struct{}{}
-			delete(currentValues, newPath(step.key))
+			deleteValues[NewPath(step.key)] = struct{}{}
+			delete(currentValues, NewPath(step.key))
 		case opGenerateRangeProof:
 			root, err := db.GetMerkleRoot(context.Background())
 			require.NoError(err)
@@ -830,7 +830,7 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 			if err != nil {
 				require.ErrorIs(err, database.ErrNotFound)
 			}
-			want := values[newPath(step.key)]
+			want := values[NewPath(step.key)]
 			require.True(bytes.Equal(want, v)) // Use bytes.Equal so nil treated equal to []byte{}
 			trieValue, err := getNodeValue(db, string(step.key))
 			if err != nil {

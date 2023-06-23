@@ -171,7 +171,7 @@ func verify(
 
 	values := make(map[Path]Maybe[[]byte])
 	for _, proof := range valueProofs {
-		values[newPath(proof.Key)] = proof.Value
+		values[NewPath(proof.Key)] = proof.Value
 	}
 
 	nodes := make(map[Path]Maybe[*Node])

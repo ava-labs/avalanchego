@@ -384,7 +384,7 @@ func (db *merkleDB) GetValues(ctx context.Context, keys [][]byte) ([][]byte, []e
 	values := make([][]byte, len(keys))
 	errors := make([]error, len(keys))
 	for i, key := range keys {
-		values[i], errors[i] = db.getValueCopy(newPath(key), false /*lock*/)
+		values[i], errors[i] = db.getValueCopy(NewPath(key), false /*lock*/)
 	}
 	return values, errors
 }
@@ -395,7 +395,7 @@ func (db *merkleDB) GetValue(ctx context.Context, key []byte) ([]byte, error) {
 	_, span := db.tracer.Start(ctx, "MerkleDB.GetValue")
 	defer span.End()
 
-	return db.getValueCopy(newPath(key), true /*lock*/)
+	return db.getValueCopy(NewPath(key), true /*lock*/)
 }
 
 // getValueCopy returns a copy of the value for the given [key].
@@ -690,7 +690,7 @@ func (db *merkleDB) Has(k []byte) (bool, error) {
 		return false, database.ErrClosed
 	}
 
-	_, err := db.getValue(newPath(k), false /*lock*/)
+	_, err := db.getValue(NewPath(k), false /*lock*/)
 	if err == database.ErrNotFound {
 		return false, nil
 	}
@@ -741,21 +741,21 @@ func (db *merkleDB) NewIterator() database.Iterator {
 
 func (db *merkleDB) NewIteratorWithStart(start []byte) database.Iterator {
 	return &iterator{
-		nodeIter: db.nodeDB.NewIteratorWithStart(newPath(start).Bytes()),
+		nodeIter: db.nodeDB.NewIteratorWithStart(NewPath(start).Bytes()),
 		db:       db,
 	}
 }
 
 func (db *merkleDB) NewIteratorWithPrefix(prefix []byte) database.Iterator {
 	return &iterator{
-		nodeIter: db.nodeDB.NewIteratorWithPrefix(newPath(prefix).Bytes()),
+		nodeIter: db.nodeDB.NewIteratorWithPrefix(NewPath(prefix).Bytes()),
 		db:       db,
 	}
 }
 
 func (db *merkleDB) NewIteratorWithStartAndPrefix(start, prefix []byte) database.Iterator {
-	startBytes := newPath(start).Bytes()
-	prefixBytes := newPath(prefix).Bytes()
+	startBytes := NewPath(start).Bytes()
+	prefixBytes := NewPath(prefix).Bytes()
 	return &iterator{
 		nodeIter: db.nodeDB.NewIteratorWithStartAndPrefix(startBytes, prefixBytes),
 		db:       db,
@@ -1012,7 +1012,7 @@ func (db *merkleDB) VerifyChangeProof(
 		return err
 	}
 
-	smallestPath := newPath(start)
+	smallestPath := NewPath(start)
 
 	// Make sure the start proof, if given, is well-formed.
 	if err := verifyProofPath(proof.StartProof, smallestPath); err != nil {
@@ -1029,7 +1029,7 @@ func (db *merkleDB) VerifyChangeProof(
 		// so that we get the expected root ID.
 		largestKey = proof.KeyChanges[len(proof.KeyChanges)-1].Key
 	}
-	largestPath := newPath(largestKey)
+	largestPath := NewPath(largestKey)
 
 	// Make sure the end proof, if given, is well-formed.
 	if err := verifyProofPath(proof.EndProof, largestPath); err != nil {
@@ -1038,7 +1038,7 @@ func (db *merkleDB) VerifyChangeProof(
 
 	keyValues := make(map[Path]Maybe[[]byte], len(proof.KeyChanges))
 	for _, keyValue := range proof.KeyChanges {
-		keyValues[newPath(keyValue.Key)] = keyValue.Value
+		keyValues[NewPath(keyValue.Key)] = keyValue.Value
 	}
 
 	// want to prevent commit writes to DB, but not prevent db reads
@@ -1076,10 +1076,10 @@ func (db *merkleDB) VerifyChangeProof(
 	// Insert the key-value pairs into the trie.
 	for _, kv := range proof.KeyChanges {
 		if kv.Value.IsNothing() {
-			if err := view.removeFromTrie(newPath(kv.Key)); err != nil {
+			if err := view.removeFromTrie(NewPath(kv.Key)); err != nil {
 				return err
 			}
-		} else if _, err := view.insertIntoTrie(newPath(kv.Key), kv.Value); err != nil {
+		} else if _, err := view.insertIntoTrie(NewPath(kv.Key), kv.Value); err != nil {
 			return err
 		}
 	}

@@ -14,7 +14,7 @@ func Test_Node_Marshal(t *testing.T) {
 	root := newNode(nil, EmptyPath)
 	require.NotNil(t, root)
 
-	fullpath := newPath([]byte("key"))
+	fullpath := NewPath([]byte("key"))
 	childNode := newNode(root, fullpath)
 	childNode.setValue(Some([]byte("value")))
 	require.NotNil(t, childNode)
@@ -24,7 +24,7 @@ func Test_Node_Marshal(t *testing.T) {
 
 	data, err := root.marshal()
 	require.NoError(t, err)
-	rootParsed, err := ParseNode(newPath([]byte("")), data)
+	rootParsed, err := ParseNode(NewPath([]byte("")), data)
 	require.NoError(t, err)
 	require.Len(t, rootParsed.children, 1)
 
@@ -39,7 +39,7 @@ func Test_Node_Marshal_Errors(t *testing.T) {
 	root := newNode(nil, EmptyPath)
 	require.NotNil(t, root)
 
-	fullpath := newPath([]byte{255})
+	fullpath := NewPath([]byte{255})
 	childNode1 := newNode(root, fullpath)
 	childNode1.setValue(Some([]byte("value1")))
 	require.NotNil(t, childNode1)
@@ -47,7 +47,7 @@ func Test_Node_Marshal_Errors(t *testing.T) {
 	require.NoError(t, childNode1.calculateID(&mockMetrics{}))
 	root.addChild(childNode1)
 
-	fullpath = newPath([]byte{237})
+	fullpath = NewPath([]byte{237})
 	childNode2 := newNode(root, fullpath)
 	childNode2.setValue(Some([]byte("value2")))
 	require.NotNil(t, childNode2)
@@ -60,7 +60,7 @@ func Test_Node_Marshal_Errors(t *testing.T) {
 
 	for i := 1; i < len(data); i++ {
 		broken := data[:i]
-		_, err = ParseNode(newPath([]byte("")), broken)
+		_, err = ParseNode(NewPath([]byte("")), broken)
 		require.ErrorIs(t, err, io.ErrUnexpectedEOF)
 	}
 }

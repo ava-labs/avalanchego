@@ -29,7 +29,7 @@ func (s SerializedPath) Equal(other SerializedPath) bool {
 }
 
 func (s SerializedPath) Deserialize() Path {
-	result := newPath(s.Value)
+	result := NewPath(s.Value)
 	// trim the last nibble if the path has an odd length
 	return result[:len(result)-s.NibbleLength&1]
 }
@@ -141,7 +141,7 @@ func (p Path) Serialize() SerializedPath {
 	return result
 }
 
-func newPath(p []byte) Path {
+func NewPath(p []byte) Path {
 	// create new buffer with double the length of the input since each byte gets split into two nibbles
 	buffer := make([]byte, 2*len(p))
 

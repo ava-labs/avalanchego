@@ -288,10 +288,10 @@ func Test_Proof(t *testing.T) {
 
 	require.Len(proof.Path, 3)
 
-	require.Equal(newPath([]byte("key1")).Serialize(), proof.Path[2].KeyPath)
+	require.Equal(NewPath([]byte("key1")).Serialize(), proof.Path[2].KeyPath)
 	require.Equal(Some([]byte("value1")), proof.Path[2].ValueOrHash)
 
-	require.Equal(newPath([]byte{}).Serialize(), proof.Path[0].KeyPath)
+	require.Equal(NewPath([]byte{}).Serialize(), proof.Path[0].KeyPath)
 	require.True(proof.Path[0].ValueOrHash.IsNothing())
 
 	expectedRootID, err := trie.GetMerkleRoot(context.Background())
@@ -391,10 +391,10 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 				},
 				StartProof: []ProofNode{
 					{
-						KeyPath: newPath([]byte{2}).Serialize(),
+						KeyPath: NewPath([]byte{2}).Serialize(),
 					},
 					{
-						KeyPath: newPath([]byte{1}).Serialize(),
+						KeyPath: NewPath([]byte{1}).Serialize(),
 					},
 				},
 			},
@@ -410,13 +410,13 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 				},
 				StartProof: []ProofNode{
 					{
-						KeyPath: newPath([]byte{1}).Serialize(),
+						KeyPath: NewPath([]byte{1}).Serialize(),
 					},
 					{
-						KeyPath: newPath([]byte{1, 2, 3}).Serialize(), // Not a prefix of [1, 2]
+						KeyPath: NewPath([]byte{1, 2, 3}).Serialize(), // Not a prefix of [1, 2]
 					},
 					{
-						KeyPath: newPath([]byte{1, 2, 3, 4}).Serialize(),
+						KeyPath: NewPath([]byte{1, 2, 3, 4}).Serialize(),
 					},
 				},
 			},
@@ -432,10 +432,10 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 				},
 				EndProof: []ProofNode{
 					{
-						KeyPath: newPath([]byte{2}).Serialize(),
+						KeyPath: NewPath([]byte{2}).Serialize(),
 					},
 					{
-						KeyPath: newPath([]byte{1}).Serialize(),
+						KeyPath: NewPath([]byte{1}).Serialize(),
 					},
 				},
 			},
@@ -451,13 +451,13 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 				},
 				EndProof: []ProofNode{
 					{
-						KeyPath: newPath([]byte{1}).Serialize(),
+						KeyPath: NewPath([]byte{1}).Serialize(),
 					},
 					{
-						KeyPath: newPath([]byte{1, 2, 3}).Serialize(), // Not a prefix of [1, 2]
+						KeyPath: NewPath([]byte{1, 2, 3}).Serialize(), // Not a prefix of [1, 2]
 					},
 					{
-						KeyPath: newPath([]byte{1, 2, 3, 4}).Serialize(),
+						KeyPath: NewPath([]byte{1, 2, 3, 4}).Serialize(),
 					},
 				},
 			},
@@ -548,9 +548,9 @@ func Test_RangeProof_NilStart(t *testing.T) {
 	require.Equal([]byte("value1"), proof.KeyValues[0].Value)
 	require.Equal([]byte("value2"), proof.KeyValues[1].Value)
 
-	require.Equal(newPath([]byte("key2")).Serialize(), proof.EndProof[2].KeyPath)
+	require.Equal(NewPath([]byte("key2")).Serialize(), proof.EndProof[2].KeyPath)
 	require.Equal(SerializedPath{Value: []uint8{0x6b, 0x65, 0x79, 0x30}, NibbleLength: 7}, proof.EndProof[1].KeyPath)
-	require.Equal(newPath([]byte("")).Serialize(), proof.EndProof[0].KeyPath)
+	require.Equal(NewPath([]byte("")).Serialize(), proof.EndProof[0].KeyPath)
 
 	require.NoError(proof.Verify(
 		context.Background(),
@@ -622,11 +622,11 @@ func Test_RangeProof_EmptyValues(t *testing.T) {
 	require.Empty(proof.KeyValues[2].Value)
 
 	require.Len(proof.StartProof, 1)
-	require.Equal(newPath([]byte("key1")).Serialize(), proof.StartProof[0].KeyPath)
+	require.Equal(NewPath([]byte("key1")).Serialize(), proof.StartProof[0].KeyPath)
 
 	require.Len(proof.EndProof, 3)
-	require.Equal(newPath([]byte("key2")).Serialize(), proof.EndProof[2].KeyPath)
-	require.Equal(newPath([]byte{}).Serialize(), proof.EndProof[0].KeyPath)
+	require.Equal(NewPath([]byte("key2")).Serialize(), proof.EndProof[2].KeyPath)
+	require.Equal(NewPath([]byte{}).Serialize(), proof.EndProof[0].KeyPath)
 
 	require.NoError(proof.Verify(
 		context.Background(),
@@ -974,8 +974,8 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 			proof: &ChangeProof{
 				HadRootsInHistory: true,
 				StartProof: []ProofNode{
-					{KeyPath: newPath([]byte{2}).Serialize()},
-					{KeyPath: newPath([]byte{2, 3}).Serialize()},
+					{KeyPath: NewPath([]byte{2}).Serialize()},
+					{KeyPath: NewPath([]byte{2, 3}).Serialize()},
 				},
 			},
 			start:       []byte{1, 2, 3},
@@ -987,8 +987,8 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 			proof: &ChangeProof{
 				HadRootsInHistory: true,
 				StartProof: []ProofNode{
-					{KeyPath: newPath([]byte{1}).Serialize()},
-					{KeyPath: newPath([]byte{2, 3}).Serialize()},
+					{KeyPath: NewPath([]byte{1}).Serialize()},
+					{KeyPath: NewPath([]byte{2, 3}).Serialize()},
 				},
 			},
 			start:       []byte{1, 2, 3},
@@ -1003,8 +1003,8 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 					{Key: []byte{1, 2}, Value: Some([]byte{0})},
 				},
 				EndProof: []ProofNode{
-					{KeyPath: newPath([]byte{2}).Serialize()},
-					{KeyPath: newPath([]byte{2, 3}).Serialize()},
+					{KeyPath: NewPath([]byte{2}).Serialize()},
+					{KeyPath: NewPath([]byte{2, 3}).Serialize()},
 				},
 			},
 			start:       nil,
@@ -1019,8 +1019,8 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 					{Key: []byte{1, 2, 3}},
 				},
 				EndProof: []ProofNode{
-					{KeyPath: newPath([]byte{1}).Serialize()},
-					{KeyPath: newPath([]byte{2, 3}).Serialize()},
+					{KeyPath: NewPath([]byte{1}).Serialize()},
+					{KeyPath: NewPath([]byte{2, 3}).Serialize()},
 				},
 			},
 			start:       nil,
@@ -1142,9 +1142,9 @@ func TestVerifyProofPath(t *testing.T) {
 		{
 			name: "non-increasing keys",
 			path: []ProofNode{
-				{KeyPath: newPath([]byte{1}).Serialize()},
-				{KeyPath: newPath([]byte{1, 2}).Serialize()},
-				{KeyPath: newPath([]byte{1, 3}).Serialize()},
+				{KeyPath: NewPath([]byte{1}).Serialize()},
+				{KeyPath: NewPath([]byte{1, 2}).Serialize()},
+				{KeyPath: NewPath([]byte{1, 3}).Serialize()},
 			},
 			proofKey:    []byte{1, 2, 3},
 			expectedErr: ErrNonIncreasingProofNodes,
@@ -1152,10 +1152,10 @@ func TestVerifyProofPath(t *testing.T) {
 		{
 			name: "invalid key",
 			path: []ProofNode{
-				{KeyPath: newPath([]byte{1}).Serialize()},
-				{KeyPath: newPath([]byte{1, 2}).Serialize()},
-				{KeyPath: newPath([]byte{1, 2, 4}).Serialize()},
-				{KeyPath: newPath([]byte{1, 2, 3}).Serialize()},
+				{KeyPath: NewPath([]byte{1}).Serialize()},
+				{KeyPath: NewPath([]byte{1, 2}).Serialize()},
+				{KeyPath: NewPath([]byte{1, 2, 4}).Serialize()},
+				{KeyPath: NewPath([]byte{1, 2, 3}).Serialize()},
 			},
 			proofKey:    []byte{1, 2, 3},
 			expectedErr: ErrProofNodeNotForKey,
@@ -1163,9 +1163,9 @@ func TestVerifyProofPath(t *testing.T) {
 		{
 			name: "extra node inclusion proof",
 			path: []ProofNode{
-				{KeyPath: newPath([]byte{1}).Serialize()},
-				{KeyPath: newPath([]byte{1, 2}).Serialize()},
-				{KeyPath: newPath([]byte{1, 2, 3}).Serialize()},
+				{KeyPath: NewPath([]byte{1}).Serialize()},
+				{KeyPath: NewPath([]byte{1, 2}).Serialize()},
+				{KeyPath: NewPath([]byte{1, 2, 3}).Serialize()},
 			},
 			proofKey:    []byte{1, 2},
 			expectedErr: ErrProofNodeNotForKey,
@@ -1173,9 +1173,9 @@ func TestVerifyProofPath(t *testing.T) {
 		{
 			name: "extra node exclusion proof",
 			path: []ProofNode{
-				{KeyPath: newPath([]byte{1}).Serialize()},
-				{KeyPath: newPath([]byte{1, 3}).Serialize()},
-				{KeyPath: newPath([]byte{1, 3, 4}).Serialize()},
+				{KeyPath: NewPath([]byte{1}).Serialize()},
+				{KeyPath: NewPath([]byte{1, 3}).Serialize()},
+				{KeyPath: NewPath([]byte{1, 3, 4}).Serialize()},
 			},
 			proofKey:    []byte{1, 2},
 			expectedErr: ErrProofNodeNotForKey,
@@ -1183,9 +1183,9 @@ func TestVerifyProofPath(t *testing.T) {
 		{
 			name: "happy path exclusion proof",
 			path: []ProofNode{
-				{KeyPath: newPath([]byte{1}).Serialize()},
-				{KeyPath: newPath([]byte{1, 2}).Serialize()},
-				{KeyPath: newPath([]byte{1, 2, 4}).Serialize()},
+				{KeyPath: NewPath([]byte{1}).Serialize()},
+				{KeyPath: NewPath([]byte{1, 2}).Serialize()},
+				{KeyPath: NewPath([]byte{1, 2, 4}).Serialize()},
 			},
 			proofKey:    []byte{1, 2, 3},
 			expectedErr: nil,
@@ -1193,9 +1193,9 @@ func TestVerifyProofPath(t *testing.T) {
 		{
 			name: "happy path inclusion proof",
 			path: []ProofNode{
-				{KeyPath: newPath([]byte{1}).Serialize()},
-				{KeyPath: newPath([]byte{1, 2}).Serialize()},
-				{KeyPath: newPath([]byte{1, 2, 3}).Serialize()},
+				{KeyPath: NewPath([]byte{1}).Serialize()},
+				{KeyPath: NewPath([]byte{1, 2}).Serialize()},
+				{KeyPath: NewPath([]byte{1, 2, 3}).Serialize()},
 			},
 			proofKey:    []byte{1, 2, 3},
 			expectedErr: nil,
@@ -1203,10 +1203,10 @@ func TestVerifyProofPath(t *testing.T) {
 		{
 			name: "repeat nodes",
 			path: []ProofNode{
-				{KeyPath: newPath([]byte{1}).Serialize()},
-				{KeyPath: newPath([]byte{1}).Serialize()},
-				{KeyPath: newPath([]byte{1, 2}).Serialize()},
-				{KeyPath: newPath([]byte{1, 2, 3}).Serialize()},
+				{KeyPath: NewPath([]byte{1}).Serialize()},
+				{KeyPath: NewPath([]byte{1}).Serialize()},
+				{KeyPath: NewPath([]byte{1, 2}).Serialize()},
+				{KeyPath: NewPath([]byte{1, 2, 3}).Serialize()},
 			},
 			proofKey:    []byte{1, 2, 3},
 			expectedErr: ErrNonIncreasingProofNodes,
@@ -1214,10 +1214,10 @@ func TestVerifyProofPath(t *testing.T) {
 		{
 			name: "repeat nodes 2",
 			path: []ProofNode{
-				{KeyPath: newPath([]byte{1}).Serialize()},
-				{KeyPath: newPath([]byte{1, 2}).Serialize()},
-				{KeyPath: newPath([]byte{1, 2}).Serialize()},
-				{KeyPath: newPath([]byte{1, 2, 3}).Serialize()},
+				{KeyPath: NewPath([]byte{1}).Serialize()},
+				{KeyPath: NewPath([]byte{1, 2}).Serialize()},
+				{KeyPath: NewPath([]byte{1, 2}).Serialize()},
+				{KeyPath: NewPath([]byte{1, 2, 3}).Serialize()},
 			},
 			proofKey:    []byte{1, 2, 3},
 			expectedErr: ErrNonIncreasingProofNodes,
@@ -1225,10 +1225,10 @@ func TestVerifyProofPath(t *testing.T) {
 		{
 			name: "repeat nodes 3",
 			path: []ProofNode{
-				{KeyPath: newPath([]byte{1}).Serialize()},
-				{KeyPath: newPath([]byte{1, 2}).Serialize()},
-				{KeyPath: newPath([]byte{1, 2, 3}).Serialize()},
-				{KeyPath: newPath([]byte{1, 2, 3}).Serialize()},
+				{KeyPath: NewPath([]byte{1}).Serialize()},
+				{KeyPath: NewPath([]byte{1, 2}).Serialize()},
+				{KeyPath: NewPath([]byte{1, 2, 3}).Serialize()},
+				{KeyPath: NewPath([]byte{1, 2, 3}).Serialize()},
 			},
 			proofKey:    []byte{1, 2, 3},
 			expectedErr: ErrProofNodeNotForKey,
@@ -1236,8 +1236,8 @@ func TestVerifyProofPath(t *testing.T) {
 		{
 			name: "oddLength key with value",
 			path: []ProofNode{
-				{KeyPath: newPath([]byte{1}).Serialize()},
-				{KeyPath: newPath([]byte{1, 2}).Serialize()},
+				{KeyPath: NewPath([]byte{1}).Serialize()},
+				{KeyPath: NewPath([]byte{1, 2}).Serialize()},
 				{KeyPath: SerializedPath{Value: []byte{1, 2, 240}, NibbleLength: 5}, ValueOrHash: Some([]byte{1})},
 			},
 			proofKey:    []byte{1, 2, 3},
@@ -1247,7 +1247,7 @@ func TestVerifyProofPath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := verifyProofPath(tt.path, newPath(tt.proofKey))
+			err := verifyProofPath(tt.path, NewPath(tt.proofKey))
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
