@@ -635,18 +635,7 @@ func (t *statelessView) insertIntoTrie(
 		existingChildEntry.id,
 	)
 
-	t.needsRecalculation = true
-
-	if existing, ok := t.changes.nodes[branchNode.key]; ok {
-		existing.after = branchNode
-		return nodeWithValue, nil
-	}
-
-	t.changes.nodes[key] = &change[*Node]{
-		before: nil,
-		after:  branchNode,
-	}
-	return nodeWithValue, nil
+	return nodeWithValue, t.recordNodeChange(branchNode)
 }
 
 // Records that a node has been changed.
@@ -670,29 +659,8 @@ func (t *statelessView) recordNodeDeleted(after *Node) error {
 func (t *statelessView) recordKeyChange(key Path, after *Node) error {
 	t.needsRecalculation = true
 
-	if existing, ok := t.changes.nodes[key]; ok {
-		existing.after = after
-		return nil
-	}
-
-	var before *Node
-	if key == RootPath {
-		before = t.root.clone()
-	} else {
-		// get the node from the parent trie and store a local copy
-		var err error
-		before, err = t.getParentTrie().getEditableNode(key, t.maxLookback)
-		if err != nil {
-			if err != database.ErrNotFound {
-				return err
-			}
-			before = nil
-		}
-	}
-
 	t.changes.nodes[key] = &change[*Node]{
-		before: before,
-		after:  after,
+		after: after,
 	}
 	return nil
 }
@@ -708,31 +676,8 @@ func (t *statelessView) recordValueChange(key Path, value Maybe[[]byte]) error {
 	// into a trie nodes later
 	t.unappliedValueChanges[key] = value
 
-	// update the existing change if it exists
-	if existing, ok := t.changes.values[key]; ok {
-		existing.after = value
-		return nil
-	}
-
-	// grab the before value
-	var beforeMaybe Maybe[[]byte]
-	if key == RootPath {
-		beforeMaybe = t.root.value
-	} else {
-		before, err := t.getParentTrie().getValue(key, t.maxLookback)
-		switch err {
-		case nil:
-			beforeMaybe = Some(before)
-		case database.ErrNotFound:
-			beforeMaybe = Nothing[[]byte]()
-		default:
-			return err
-		}
-	}
-
 	t.changes.values[key] = &change[Maybe[[]byte]]{
-		before: beforeMaybe,
-		after:  value,
+		after: value,
 	}
 	return nil
 }
