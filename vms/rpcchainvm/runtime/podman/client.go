@@ -2,6 +2,9 @@ package podman
 
 import (
 	"context"
+	"fmt"
+	"os"
+
 	"github.com/containers/podman/v4/libpod/define"
 	"github.com/containers/podman/v4/pkg/bindings/containers"
 	"github.com/containers/podman/v4/pkg/bindings/images"
@@ -68,7 +71,9 @@ func exists(ctx context.Context, id string) (bool, error) {
 }
 
 func getSocketPath() (string, error) {
-	// TODO: make this configurable, hardcode for macos for now
-	socket := "unix:" + "/Users/hao.hao/.local/share/containers/podman/machine/qemu/podman.sock"
-	return socket, nil
+	sockDir := os.Getenv("XDG_RUNTIME_DIR")
+	if sockDir == "" {
+		return "", fmt.Errorf("failed to find rootless socket")
+	}
+	return fmt.Sprintf("unix:%s/podman/podman.sock", sockDir), nil
 }
