@@ -33,13 +33,13 @@ func (i *trieViewVerifierIntercepter) GetMerkleRoot(context.Context) (ids.ID, er
 	return i.rootID, nil
 }
 
-func (i *trieViewVerifierIntercepter) getValue(key Path, lock bool) ([]byte, error) {
+func (i *trieViewVerifierIntercepter) getValue(key Path, maxLookback int) ([]byte, error) {
 	value, ok := i.values[key]
 	if !ok {
-		if i.StatelessView == nil {
+		if i.StatelessView == nil || maxLookback == 0 {
 			return nil, fmt.Errorf("%w: %q", ErrMissingProof, key)
 		}
-		return i.StatelessView.getValue(key, lock)
+		return i.StatelessView.getValue(key, maxLookback-1)
 	}
 	if value.IsNothing() {
 		return nil, database.ErrNotFound
@@ -47,13 +47,13 @@ func (i *trieViewVerifierIntercepter) getValue(key Path, lock bool) ([]byte, err
 	return value.Value(), nil
 }
 
-func (i *trieViewVerifierIntercepter) getEditableNode(key Path) (*Node, error) {
+func (i *trieViewVerifierIntercepter) getEditableNode(key Path, maxLookback int) (*Node, error) {
 	n, ok := i.nodes[key]
 	if !ok {
-		if i.StatelessView == nil {
+		if i.StatelessView == nil || maxLookback == 0 {
 			return nil, fmt.Errorf("%w: %q", ErrMissingPathProof, key)
 		}
-		return i.StatelessView.getEditableNode(key)
+		return i.StatelessView.getEditableNode(key, maxLookback-1)
 	}
 	if n.IsNothing() {
 		return nil, database.ErrNotFound

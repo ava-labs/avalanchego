@@ -7,6 +7,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -219,24 +221,16 @@ func verify(
 		nodes[key] = proof.ToNode()
 	}
 
-	startRoot, err := ParseNode(RootPath, startRootBytes)
+	view, err := NewBaseStatelessView(
+		startRootBytes,
+		prometheus.NewRegistry(),
+		newNoopTracer(),
+		1,
+		0,
+	)
 	require.NoError(err)
 
-	view := &statelessView{
-		root:                  startRoot,
-		metrics:               &mockMetrics{},
-		tracer:                newNoopTracer(),
-		parentTrie:            nil,
-		changes:               newChangeSummary(1),
-		estimatedSize:         1,
-		unappliedValueChanges: make(map[Path]Maybe[[]byte], 1),
-
-		verifierIntercepter: &trieViewVerifierIntercepter{
-			rootID: startRootID,
-			values: values,
-			nodes:  nodes,
-		},
-	}
+	view.SetState(values, nodes)
 
 	for _, change := range changes {
 		if change.Value.IsNothing() {

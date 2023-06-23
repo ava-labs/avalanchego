@@ -46,10 +46,10 @@ type StatelessView interface {
 
 	// get the value associated with the key in path form
 	// database.ErrNotFound if the key is not present
-	getValue(key Path, lock bool) ([]byte, error)
+	getValue(key Path, maxLookback int) ([]byte, error)
 
 	// get an editable copy of the node with the given key path
-	getEditableNode(key Path) (*Node, error)
+	getEditableNode(key Path, maxLookback int) (*Node, error)
 }
 
 // Editable view of a trie, collects changes on top of a parent trie.
@@ -86,6 +86,7 @@ type statelessView struct {
 	needsRecalculation bool
 
 	estimatedSize int
+	maxLookback   int
 
 	verifierIntercepter *trieViewVerifierIntercepter
 }
@@ -95,6 +96,7 @@ func NewBaseStatelessView(
 	reg prometheus.Registerer,
 	tracer trace.Tracer,
 	estimatedSize int,
+	maxLookback int,
 ) (StatelessView, error) {
 	metrics, err := newMetrics("statelessDB", reg)
 	if err != nil {
@@ -118,6 +120,7 @@ func NewBaseStatelessView(
 		parentTrie:            nil,
 		changes:               newChangeSummary(estimatedSize),
 		estimatedSize:         estimatedSize,
+		maxLookback:           maxLookback,
 		unappliedValueChanges: make(map[Path]Maybe[[]byte], estimatedSize),
 
 		verifierIntercepter: &trieViewVerifierIntercepter{
@@ -143,6 +146,7 @@ func (t *statelessView) NewStatelessView(estimatedChanges int) StatelessView {
 		parentTrie:            t,
 		changes:               newChangeSummary(estimatedChanges),
 		estimatedSize:         estimatedChanges,
+		maxLookback:           t.maxLookback,
 		unappliedValueChanges: make(map[Path]Maybe[[]byte], estimatedChanges),
 
 		verifierIntercepter: &trieViewVerifierIntercepter{
@@ -294,7 +298,7 @@ func (t *statelessView) GetValues(_ context.Context, keys [][]byte) ([][]byte, [
 	valueErrors := make([]error, len(keys))
 
 	for i, key := range keys {
-		results[i], valueErrors[i] = t.getValueCopy(NewPath(key), false)
+		results[i], valueErrors[i] = t.getValueCopy(NewPath(key), t.maxLookback)
 	}
 	return results, valueErrors
 }
@@ -302,24 +306,22 @@ func (t *statelessView) GetValues(_ context.Context, keys [][]byte) ([][]byte, [
 // GetValue returns the value for the given [key].
 // Returns database.ErrNotFound if it doesn't exist.
 func (t *statelessView) GetValue(_ context.Context, key []byte) ([]byte, error) {
-	return t.getValueCopy(NewPath(key), true)
+	return t.getValueCopy(NewPath(key), t.maxLookback)
 }
 
 // getValueCopy returns a copy of the value for the given [key].
 // Returns database.ErrNotFound if it doesn't exist.
-func (t *statelessView) getValueCopy(key Path, lock bool) ([]byte, error) {
-	val, err := t.getValue(key, lock)
+func (t *statelessView) getValueCopy(key Path, maxLookback int) ([]byte, error) {
+	val, err := t.getValue(key, maxLookback)
 	if err != nil {
 		return nil, err
 	}
 	return slices.Clone(val), nil
 }
 
-func (t *statelessView) getValue(key Path, lock bool) ([]byte, error) {
-	if lock {
-		t.lock.RLock()
-		defer t.lock.RUnlock()
-	}
+func (t *statelessView) getValue(key Path, maxLookback int) ([]byte, error) {
+	t.lock.RLock()
+	defer t.lock.RUnlock()
 
 	if change, ok := t.changes.values[key]; ok {
 		t.metrics.ViewValueCacheHit()
@@ -339,7 +341,7 @@ func (t *statelessView) getValue(key Path, lock bool) ([]byte, error) {
 	}
 
 	// if we don't have local copy of the key, then grab a copy from the parent trie
-	value, err := t.getParentTrie().getValue(key, true /*lock*/)
+	value, err := t.getParentTrie().getValue(key, maxLookback)
 	if err != nil {
 		return nil, err
 	}
@@ -486,7 +488,7 @@ func (t *statelessView) getPathTo(key Path) ([]*Node, error) {
 
 		// grab the next node along the path
 		var err error
-		currentNode, err = t.getNodeWithID(nextChildEntry.id, key[:matchedKeyIndex])
+		currentNode, err = t.getNodeWithID(nextChildEntry.id, key[:matchedKeyIndex], t.maxLookback)
 		if err != nil {
 			return nil, err
 		}
@@ -500,12 +502,12 @@ func (t *statelessView) getPathTo(key Path) ([]*Node, error) {
 // Get a copy of the node matching the passed key from the trie
 // Used by views to get nodes from their ancestors
 // assumes that [t.needsRecalculation] is false
-func (t *statelessView) getEditableNode(key Path) (*Node, error) {
+func (t *statelessView) getEditableNode(key Path, maxLookback int) (*Node, error) {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
 	// grab the node in question
-	n, err := t.getNodeWithID(ids.Empty, key)
+	n, err := t.getNodeWithID(ids.Empty, key, maxLookback)
 	if err != nil {
 		return nil, err
 	}
@@ -643,7 +645,7 @@ func (t *statelessView) recordKeyChange(key Path, after *Node) error {
 	} else {
 		// get the node from the parent trie and store a local copy
 		var err error
-		before, err = t.getParentTrie().getEditableNode(key)
+		before, err = t.getParentTrie().getEditableNode(key, t.maxLookback)
 		if err != nil {
 			if err != database.ErrNotFound {
 				return err
@@ -681,7 +683,7 @@ func (t *statelessView) recordValueChange(key Path, value Maybe[[]byte]) error {
 	if key == RootPath {
 		beforeMaybe = t.root.value
 	} else {
-		before, err := t.getParentTrie().getValue(key, true /*lock*/)
+		before, err := t.getParentTrie().getValue(key, t.maxLookback)
 		switch err {
 		case nil:
 			beforeMaybe = Some(before)
@@ -748,7 +750,7 @@ func (t *statelessView) removeFromTrie(key Path) error {
 func (t *statelessView) getNodeFromParent(parent *Node, key Path) (*Node, error) {
 	// confirm the child exists and get its ID before attempting to load it
 	if child, exists := parent.children[key[len(parent.key)]]; exists {
-		return t.getNodeWithID(child.id, key)
+		return t.getNodeWithID(child.id, key, t.maxLookback)
 	}
 
 	return nil, database.ErrNotFound
@@ -759,7 +761,7 @@ func (t *statelessView) getNodeFromParent(parent *Node, key Path) (*Node, error)
 // sets the node's ID to [id].
 // Returns database.ErrNotFound if the node doesn't exist.
 // Assumes [t.lock] write or read lock is held.
-func (t *statelessView) getNodeWithID(id ids.ID, key Path) (*Node, error) {
+func (t *statelessView) getNodeWithID(id ids.ID, key Path, maxLookback int) (*Node, error) {
 	// check for the key within the changed nodes
 	if nodeChange, isChanged := t.changes.nodes[key]; isChanged {
 		t.metrics.ViewNodeCacheHit()
@@ -775,7 +777,7 @@ func (t *statelessView) getNodeWithID(id ids.ID, key Path) (*Node, error) {
 	} else {
 		// get the node from the parent trie and store a local copy
 		var err error
-		parentTrieNode, err = t.getParentTrie().getEditableNode(key)
+		parentTrieNode, err = t.getParentTrie().getEditableNode(key, maxLookback)
 		if err != nil {
 			return nil, err
 		}
