@@ -7,6 +7,8 @@ import (
 	"context"
 	"sync"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"golang.org/x/exp/slices"
 	"golang.org/x/sync/errgroup"
 
@@ -20,10 +22,13 @@ var _ StatelessView = (*statelessView)(nil)
 type StatelessView interface {
 	MerkleRootGetter
 
-	// NewPreallocatedView returns a new view on top of this Trie with space allocated for changes
-	NewStatelessView(estimatedChanges int) (StatelessView, error)
+	// NewPreallocatedView returns a new view on top of this Trie with space
+	// allocated for changes
+	NewStatelessView(estimatedChanges int) StatelessView
 
 	SetBase()
+	SetState(values map[Path]Maybe[[]byte], nodes map[Path]Maybe[*Node])
+	GetRoot() ([]byte, error)
 
 	// GetValue gets the value associated with the specified key
 	// database.ErrNotFound if the key is not present
@@ -85,26 +90,39 @@ type statelessView struct {
 	verifierIntercepter *trieViewVerifierIntercepter
 }
 
-// Creates a new view with the given [parentTrie].
-func newStatelessView(
-	metrics merkleMetrics,
+func NewBaseStatelessView(
+	rootBytes []byte,
+	reg prometheus.Registerer,
 	tracer trace.Tracer,
-	parentTrie StatelessView,
-	root *Node,
 	estimatedSize int,
-) (*statelessView, error) {
-	if root == nil {
-		return nil, ErrNoValidRoot
+) (StatelessView, error) {
+	metrics, err := newMetrics("statelessDB", reg)
+	if err != nil {
+		return nil, err
+	}
+
+	root, err := ParseNode(RootPath, rootBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	err = root.calculateID(metrics)
+	if err != nil {
+		return nil, err
 	}
 
 	return &statelessView{
 		root:                  root,
 		metrics:               metrics,
 		tracer:                tracer,
-		parentTrie:            parentTrie,
+		parentTrie:            nil,
 		changes:               newChangeSummary(estimatedSize),
 		estimatedSize:         estimatedSize,
 		unappliedValueChanges: make(map[Path]Maybe[[]byte], estimatedSize),
+
+		verifierIntercepter: &trieViewVerifierIntercepter{
+			rootID: root.id,
+		},
 	}, nil
 }
 
@@ -114,13 +132,23 @@ func newStatelessView(
 // be set to the parent of the current view.
 // Otherwise, adds the new view to [t.childViews].
 // Assumes [t.lock] is not held.
-func (t *statelessView) NewStatelessView(
-	estimatedChanges int,
-) (StatelessView, error) {
+func (t *statelessView) NewStatelessView(estimatedChanges int) StatelessView {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
-	return newStatelessView(t.metrics, t.tracer, t, t.root.clone(), estimatedChanges)
+	return &statelessView{
+		root:                  t.root.clone(),
+		metrics:               t.metrics,
+		tracer:                t.tracer,
+		parentTrie:            t,
+		changes:               newChangeSummary(estimatedChanges),
+		estimatedSize:         estimatedChanges,
+		unappliedValueChanges: make(map[Path]Maybe[[]byte], estimatedChanges),
+
+		verifierIntercepter: &trieViewVerifierIntercepter{
+			rootID: t.root.id,
+		},
+	}
 }
 
 func (t *statelessView) SetBase() {
@@ -128,6 +156,21 @@ func (t *statelessView) SetBase() {
 	defer t.lock.Unlock()
 
 	t.parentTrie = nil
+}
+
+func (t *statelessView) SetState(values map[Path]Maybe[[]byte], nodes map[Path]Maybe[*Node]) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	t.verifierIntercepter.values = values
+	t.verifierIntercepter.nodes = nodes
+}
+
+func (t *statelessView) GetRoot() ([]byte, error) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	return t.root.marshal()
 }
 
 // Recalculates the node IDs for all changed nodes in the trie.

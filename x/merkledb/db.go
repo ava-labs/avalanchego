@@ -1363,3 +1363,10 @@ func (*merkleDB) SetIntercepter() {}
 func (*merkleDB) GetInterceptedProofs() ([]*Proof, []*PathProof) {
 	return nil, nil
 }
+
+func (db *merkleDB) GetRoot() ([]byte, error) {
+	db.lock.Lock()
+	defer db.lock.Unlock()
+
+	return db.root.marshal()
+}

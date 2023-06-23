@@ -71,6 +71,7 @@ type TrieView interface {
 
 	SetIntercepter()
 	GetInterceptedProofs() ([]*Proof, []*PathProof)
+	GetRoot() ([]byte, error)
 
 	// CommitToDB takes the changes of this trie and commits them down the view stack
 	// until all changes in the stack commit to the database

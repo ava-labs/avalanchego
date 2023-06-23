@@ -1373,6 +1373,13 @@ func (t *trieView) GetInterceptedProofs() ([]*Proof, []*PathProof) {
 	return maps.Values(t.proverIntercepter.values), maps.Values(t.proverIntercepter.nodes)
 }
 
+func (t *trieView) GetRoot() ([]byte, error) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	return t.root.marshal()
+}
+
 // Get the parent trie of the view
 func (t *trieView) getParentTrie() TrieView {
 	t.validityTrackingLock.RLock()
