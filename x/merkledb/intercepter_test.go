@@ -174,7 +174,7 @@ func verify(
 	startRoot, err := ParseNode(RootPath, startRootBytes)
 	require.NoError(err)
 
-	view := &trieView{
+	view := &statelessView{
 		root: startRoot,
 		db: &merkleDB{
 			metrics: &mockMetrics{},

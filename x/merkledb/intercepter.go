@@ -12,12 +12,12 @@ import (
 )
 
 var (
-	_ TrieView = (*trieViewVerifierIntercepter)(nil)
-	_ TrieView = (*trieViewProverIntercepter)(nil)
+	_ StatelessView = (*trieViewVerifierIntercepter)(nil)
+	_ TrieView      = (*trieViewProverIntercepter)(nil)
 )
 
 type trieViewVerifierIntercepter struct {
-	TrieView
+	StatelessView
 
 	rootID ids.ID
 	values map[Path]Maybe[[]byte]
@@ -31,7 +31,7 @@ func (i *trieViewVerifierIntercepter) GetMerkleRoot(context.Context) (ids.ID, er
 func (i *trieViewVerifierIntercepter) getValue(key Path, lock bool) ([]byte, error) {
 	value, ok := i.values[key]
 	if !ok {
-		return i.TrieView.getValue(key, lock)
+		return i.StatelessView.getValue(key, lock)
 	}
 	if value.IsNothing() {
 		return nil, database.ErrNotFound
@@ -42,7 +42,7 @@ func (i *trieViewVerifierIntercepter) getValue(key Path, lock bool) ([]byte, err
 func (i *trieViewVerifierIntercepter) getEditableNode(key Path) (*Node, error) {
 	n, ok := i.nodes[key]
 	if !ok {
-		return i.TrieView.getEditableNode(key)
+		return i.StatelessView.getEditableNode(key)
 	}
 	if n.IsNothing() {
 		return nil, database.ErrNotFound

@@ -112,8 +112,7 @@ type trieView struct {
 
 	estimatedSize int
 
-	verifierIntercepter *trieViewVerifierIntercepter
-	proverIntercepter   *trieViewProverIntercepter
+	proverIntercepter *trieViewProverIntercepter
 }
 
 // NewView returns a new view on top of this one.
@@ -1384,10 +1383,6 @@ func (t *trieView) getParentTrie() TrieView {
 		proverIntercepter := *t.proverIntercepter
 		proverIntercepter.TrieView = t.parentTrie
 		return &proverIntercepter
-	case t.verifierIntercepter != nil:
-		verifierIntercepter := *t.verifierIntercepter
-		verifierIntercepter.TrieView = t.parentTrie
-		return &verifierIntercepter
 	default:
 		return t.parentTrie
 	}
