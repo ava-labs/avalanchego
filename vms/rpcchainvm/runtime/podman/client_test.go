@@ -1,11 +1,15 @@
 package podman
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"testing"
 
 	"github.com/containers/podman/v4/pkg/bindings"
+	"github.com/containers/podman/v4/pkg/bindings/kube"
+	"gopkg.in/yaml.v2"
+
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -44,23 +48,22 @@ func TestSchedulePod(t *testing.T) {
 		},
 	)
 
+	podBytes, err := yaml.Marshal(&pod)
+	require.NoError(err)
+
 	fmt.Printf("%#v\n", pod)
 
 	socket, err := getSocketPath()
 	require.NoError(err)
 
+	fmt.Printf("%#v\n", socket)
 	ctx, err := bindings.NewConnection(context.Background(), socket)
 	require.NoError(err)
 
-	rawImage := pod.Spec.Containers[0].Image
-	client := NewClient()
-	images, err := client.Pull(ctx, rawImage)
-	require.NoError(err)
-	require.Equal(1, len(images))
-
-	id, err := client.Start(ctx, rawImage)
+	report, err := kube.PlayWithBody(ctx, bytes.NewReader(podBytes), &kube.PlayOptions{})
 	require.NoError(err)
 
-	err = client.Stop(ctx, id)
-	require.NoError(err)
+	fmt.Printf("%#v\n", report)
+
+
 }
