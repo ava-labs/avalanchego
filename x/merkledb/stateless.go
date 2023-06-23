@@ -23,6 +23,8 @@ type StatelessView interface {
 	// NewPreallocatedView returns a new view on top of this Trie with space allocated for changes
 	NewStatelessView(estimatedChanges int) (StatelessView, error)
 
+	SetBase()
+
 	// GetValue gets the value associated with the specified key
 	// database.ErrNotFound if the key is not present
 	GetValue(ctx context.Context, key []byte) ([]byte, error)
@@ -119,6 +121,13 @@ func (t *statelessView) NewStatelessView(
 	defer t.lock.RUnlock()
 
 	return newStatelessView(t.metrics, t.tracer, t, t.root.clone(), estimatedChanges)
+}
+
+func (t *statelessView) SetBase() {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	t.parentTrie = nil
 }
 
 // Recalculates the node IDs for all changed nodes in the trie.

@@ -5,6 +5,8 @@ package merkledb
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -14,6 +16,9 @@ import (
 var (
 	_ StatelessView = (*trieViewVerifierIntercepter)(nil)
 	_ TrieView      = (*trieViewProverIntercepter)(nil)
+
+	ErrMissingProof     = errors.New("missing proof value")
+	ErrMissingPathProof = errors.New("missing path proof value")
 )
 
 type trieViewVerifierIntercepter struct {
@@ -31,6 +36,9 @@ func (i *trieViewVerifierIntercepter) GetMerkleRoot(context.Context) (ids.ID, er
 func (i *trieViewVerifierIntercepter) getValue(key Path, lock bool) ([]byte, error) {
 	value, ok := i.values[key]
 	if !ok {
+		if i.StatelessView == nil {
+			return nil, fmt.Errorf("%w: %q", ErrMissingProof, key)
+		}
 		return i.StatelessView.getValue(key, lock)
 	}
 	if value.IsNothing() {
@@ -42,6 +50,9 @@ func (i *trieViewVerifierIntercepter) getValue(key Path, lock bool) ([]byte, err
 func (i *trieViewVerifierIntercepter) getEditableNode(key Path) (*Node, error) {
 	n, ok := i.nodes[key]
 	if !ok {
+		if i.StatelessView == nil {
+			return nil, fmt.Errorf("%w: %q", ErrMissingPathProof, key)
+		}
 		return i.StatelessView.getEditableNode(key)
 	}
 	if n.IsNothing() {
