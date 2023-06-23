@@ -1052,8 +1052,6 @@ func (t *trieView) insertIntoTrie(
 		)
 		newNode.setValue(value)
 		return newNode, t.recordNodeChange(newNode)
-	} else if err != nil {
-		return nil, err
 	}
 
 	// if we have reached this point, then the [fullpath] we are trying to insert and
