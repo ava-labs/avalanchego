@@ -78,7 +78,7 @@ var (
 	errMissingPrivateKey         = errors.New("argument 'privateKey' not given")
 	errStartAfterEndTime         = errors.New("start time must be before end time")
 	errStartTimeInThePast        = errors.New("start time in the past")
-	errUnexpectedTransactionType = fmt.Errorf("unexpected transaction type")
+	errUnexpectedTransactionType = errors.New("unexpected transaction type")
 )
 
 // Service defines the API calls that can be made to the platform chain
