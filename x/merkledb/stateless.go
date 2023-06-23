@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/trace"
 )
 
 var _ StatelessView = (*statelessView)(nil)
@@ -67,17 +68,15 @@ type statelessView struct {
 	// A Nothing value indicates that the key has been removed.
 	unappliedValueChanges map[Path]Maybe[[]byte]
 
-	db *merkleDB
+	metrics merkleMetrics
+
+	tracer trace.Tracer
 
 	// The root of the trie represented by this view.
 	root *Node
 
 	// True if the IDs of nodes in this view need to be recalculated.
 	needsRecalculation bool
-
-	// If true, this view has been committed and cannot be edited.
-	// Calls to Insert and Remove will return ErrCommitted.
-	committed bool
 
 	estimatedSize int
 
@@ -86,7 +85,8 @@ type statelessView struct {
 
 // Creates a new view with the given [parentTrie].
 func newStatelessView(
-	db *merkleDB,
+	metrics merkleMetrics,
+	tracer trace.Tracer,
 	parentTrie StatelessView,
 	root *Node,
 	estimatedSize int,
@@ -97,7 +97,8 @@ func newStatelessView(
 
 	return &statelessView{
 		root:                  root,
-		db:                    db,
+		metrics:               metrics,
+		tracer:                tracer,
 		parentTrie:            parentTrie,
 		changes:               newChangeSummary(estimatedSize),
 		estimatedSize:         estimatedSize,
@@ -117,25 +118,20 @@ func (t *statelessView) NewStatelessView(
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
-	return newStatelessView(t.db, t, t.root.clone(), estimatedChanges)
+	return newStatelessView(t.metrics, t.tracer, t, t.root.clone(), estimatedChanges)
 }
 
 // Recalculates the node IDs for all changed nodes in the trie.
 // Assumes [t.lock] is held.
 func (t *statelessView) calculateNodeIDs(ctx context.Context) error {
-	switch {
-	case !t.needsRecalculation:
+	if !t.needsRecalculation {
 		return nil
-	case t.committed:
-		// Note that this should never happen. If a view is committed, it should
-		// never be edited, so [t.needsRecalculation] should always be false.
-		return ErrCommitted
 	}
 
 	// We wait to create the span until after checking that we need to actually
 	// calculateNodeIDs to make traces more useful (otherwise there may be a span
 	// per key modified even though IDs are not re-calculated).
-	ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.calculateNodeIDs")
+	ctx, span := t.tracer.Start(ctx, "MerkleDB.statelessView.calculateNodeIDs")
 	defer span.End()
 
 	// ensure that the view under this one is up-to-date before potentially pulling in nodes from it
@@ -148,7 +144,7 @@ func (t *statelessView) calculateNodeIDs(ctx context.Context) error {
 		return err
 	}
 
-	_, helperSpan := t.db.tracer.Start(ctx, "MerkleDB.trieview.calculateNodeIDsHelper")
+	_, helperSpan := t.tracer.Start(ctx, "MerkleDB.statelessView.calculateNodeIDsHelper")
 	defer helperSpan.End()
 
 	// [eg] limits the number of goroutines we start.
@@ -218,165 +214,7 @@ func (t *statelessView) calculateNodeIDsHelper(ctx context.Context, n *Node, eg 
 	}
 
 	// The IDs [n]'s descendants are up to date so we can calculate [n]'s ID.
-	return n.calculateID(t.db.metrics)
-}
-
-// GetProof returns a proof that [bytesPath] is in or not in trie [t].
-func (t *statelessView) GetProof(ctx context.Context, key []byte) (*Proof, error) {
-	_, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.GetProof")
-	defer span.End()
-
-	t.lock.RLock()
-	defer t.lock.RUnlock()
-
-	// only need full lock if nodes ids need to be calculated
-	// looped to ensure that the value didn't change after the lock was released
-	for t.needsRecalculation {
-		t.lock.RUnlock()
-		t.lock.Lock()
-		if err := t.calculateNodeIDs(ctx); err != nil {
-			return nil, err
-		}
-		t.lock.Unlock()
-		t.lock.RLock()
-	}
-
-	return t.getProof(ctx, key)
-}
-
-// GetProof returns a proof that [bytesPath] is in or not in trie [t].
-func (t *statelessView) GetPathProof(ctx context.Context, key Path) (*PathProof, error) {
-	_, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.GetPathProof")
-	defer span.End()
-
-	t.lock.RLock()
-	defer t.lock.RUnlock()
-
-	// only need full lock if nodes ids need to be calculated
-	// looped to ensure that the value didn't change after the lock was released
-	for t.needsRecalculation {
-		t.lock.RUnlock()
-		t.lock.Lock()
-		if err := t.calculateNodeIDs(ctx); err != nil {
-			return nil, err
-		}
-		t.lock.Unlock()
-		t.lock.RLock()
-	}
-
-	return t.getPathProof(ctx, key)
-}
-
-// Returns a proof that [bytesPath] is in or not in trie [t].
-// Assumes [t.lock] is held.
-func (t *statelessView) getProof(ctx context.Context, key []byte) (*Proof, error) {
-	_, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.getProof")
-	defer span.End()
-
-	proof := &Proof{
-		Key: key,
-	}
-
-	// Get the node at the given path, or the node closest to it.
-	keyPath := NewPath(key)
-
-	proofPath, err := t.getPathTo(keyPath)
-	if err != nil {
-		return nil, err
-	}
-
-	// From root --> node from left --> right.
-	proof.Path = make([]ProofNode, len(proofPath), len(proofPath)+1)
-	for i, node := range proofPath {
-		proof.Path[i] = node.asProofNode()
-	}
-
-	closestNode := proofPath[len(proofPath)-1]
-
-	if closestNode.key.Compare(keyPath) == 0 {
-		// There is a node with the given [key].
-		proof.Value = Clone(closestNode.value)
-		return proof, nil
-	}
-
-	// There is no node with the given [key].
-	// If there is a child at the index where the node would be
-	// if it existed, include that child in the proof.
-	nextIndex := keyPath[len(closestNode.key)]
-	child, ok := closestNode.children[nextIndex]
-	if !ok {
-		return proof, nil
-	}
-
-	childPath := closestNode.key + Path(nextIndex) + child.compressedPath
-	childNode, err := t.getNodeFromParent(closestNode, childPath)
-	if err != nil {
-		return nil, err
-	}
-	proof.Path = append(proof.Path, childNode.asProofNode())
-	return proof, nil
-}
-
-// Returns a proof that [bytesPath] is in or not in trie [t].
-// Assumes [t.lock] is held.
-func (t *statelessView) getPathProof(ctx context.Context, key Path) (*PathProof, error) {
-	_, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.getPathProof")
-	defer span.End()
-
-	proof := &PathProof{
-		KeyPath: key.Serialize(),
-	}
-
-	// Get the node at the given path, or the node closest to it.
-	proofPath, err := t.getPathTo(key)
-	if err != nil {
-		return nil, err
-	}
-
-	// From root --> node from left --> right.
-	proof.Path = make([]ProofNode, len(proofPath), len(proofPath)+1)
-	for i, node := range proofPath {
-		proof.Path[i] = node.asProofNode()
-	}
-
-	closestNode := proofPath[len(proofPath)-1]
-	if closestNode.key.Compare(key) == 0 {
-		// There is a node with the given [key].
-
-		for nextIndex := byte(0); nextIndex < NodeBranchFactor; nextIndex++ {
-			child, ok := closestNode.children[nextIndex]
-			if !ok {
-				continue
-			}
-
-			childPath := closestNode.key + Path(nextIndex) + child.compressedPath
-			childNode, err := t.getNodeFromParent(closestNode, childPath)
-			if err != nil {
-				return nil, err
-			}
-			proof.Children = append(proof.Children, childNode.asProofNode())
-		}
-
-		proof.Value = Clone(closestNode.value)
-		return proof, nil
-	}
-
-	// There is no node with the given [key].
-	// If there is a child at the index where the node would be
-	// if it existed, include that child in the proof.
-	nextIndex := key[len(closestNode.key)]
-	child, ok := closestNode.children[nextIndex]
-	if !ok {
-		return proof, nil
-	}
-
-	childPath := closestNode.key + Path(nextIndex) + child.compressedPath
-	childNode, err := t.getNodeFromParent(closestNode, childPath)
-	if err != nil {
-		return nil, err
-	}
-	proof.Path = append(proof.Path, childNode.asProofNode())
-	return proof, nil
+	return n.calculateID(t.metrics)
 }
 
 // GetMerkleRoot returns the ID of the root of this trie.
@@ -432,13 +270,13 @@ func (t *statelessView) getValue(key Path, lock bool) ([]byte, error) {
 	}
 
 	if change, ok := t.changes.values[key]; ok {
-		t.db.metrics.ViewValueCacheHit()
+		t.metrics.ViewValueCacheHit()
 		if change.after.IsNothing() {
 			return nil, database.ErrNotFound
 		}
 		return change.after.value, nil
 	}
-	t.db.metrics.ViewValueCacheMiss()
+	t.metrics.ViewValueCacheMiss()
 
 	// if we don't have local copy of the key, then grab a copy from the parent trie
 	value, err := t.getParentTrie().getValue(key, true /*lock*/)
@@ -460,10 +298,6 @@ func (t *statelessView) Insert(_ context.Context, key []byte, value []byte) erro
 // Assumes [t.lock] is held.
 // Assumes [t.validityTrackingLock] isn't held.
 func (t *statelessView) insert(key []byte, value []byte) error {
-	if t.committed {
-		return ErrCommitted
-	}
-
 	valCopy := slices.Clone(value)
 	return t.recordValueChange(NewPath(key), Some(valCopy))
 }
@@ -473,22 +307,12 @@ func (t *statelessView) Remove(_ context.Context, key []byte) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	return t.remove(key)
-}
-
-// Assumes [t.lock] is held.
-// Assumes [t.validityTrackingLock] isn't held.
-func (t *statelessView) remove(key []byte) error {
-	if t.committed {
-		return ErrCommitted
-	}
-
 	return t.recordValueChange(NewPath(key), Nothing[[]byte]())
 }
 
 // Assumes [t.lock] is held.
 func (t *statelessView) applyChangedValuesToTrie(ctx context.Context) error {
-	_, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.applyChangedValuesToTrie")
+	_, span := t.tracer.Start(ctx, "MerkleDB.statelessView.applyChangedValuesToTrie")
 	defer span.End()
 
 	unappliedValues := t.unappliedValueChanges
@@ -867,7 +691,7 @@ func (t *statelessView) getNodeFromParent(parent *Node, key Path) (*Node, error)
 func (t *statelessView) getNodeWithID(id ids.ID, key Path) (*Node, error) {
 	// check for the key within the changed nodes
 	if nodeChange, isChanged := t.changes.nodes[key]; isChanged {
-		t.db.metrics.ViewNodeCacheHit()
+		t.metrics.ViewNodeCacheHit()
 		if nodeChange.after == nil {
 			return nil, database.ErrNotFound
 		}

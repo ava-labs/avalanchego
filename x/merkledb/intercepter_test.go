@@ -175,11 +175,9 @@ func verify(
 	require.NoError(err)
 
 	view := &statelessView{
-		root: startRoot,
-		db: &merkleDB{
-			metrics: &mockMetrics{},
-			tracer:  newNoopTracer(),
-		},
+		root:                  startRoot,
+		metrics:               &mockMetrics{},
+		tracer:                newNoopTracer(),
 		parentTrie:            nil,
 		changes:               newChangeSummary(1),
 		estimatedSize:         1,
