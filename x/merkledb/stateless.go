@@ -330,6 +330,14 @@ func (t *statelessView) getValue(key Path, lock bool) ([]byte, error) {
 	}
 	t.metrics.ViewValueCacheMiss()
 
+	// grab the before value
+	if key == RootPath {
+		if t.root.value.IsNothing() {
+			return nil, database.ErrNotFound
+		}
+		return t.root.value.value, nil
+	}
+
 	// if we don't have local copy of the key, then grab a copy from the parent trie
 	value, err := t.getParentTrie().getValue(key, true /*lock*/)
 	if err != nil {
@@ -629,12 +637,19 @@ func (t *statelessView) recordKeyChange(key Path, after *Node) error {
 		return nil
 	}
 
-	before, err := t.getParentTrie().getEditableNode(key)
-	if err != nil {
-		if err != database.ErrNotFound {
-			return err
+	var before *Node
+	if key == RootPath {
+		before = t.root.clone()
+	} else {
+		// get the node from the parent trie and store a local copy
+		var err error
+		before, err = t.getParentTrie().getEditableNode(key)
+		if err != nil {
+			if err != database.ErrNotFound {
+				return err
+			}
+			before = nil
 		}
-		before = nil
 	}
 
 	t.changes.nodes[key] = &change[*Node]{
@@ -663,14 +678,18 @@ func (t *statelessView) recordValueChange(key Path, value Maybe[[]byte]) error {
 
 	// grab the before value
 	var beforeMaybe Maybe[[]byte]
-	before, err := t.getParentTrie().getValue(key, true /*lock*/)
-	switch err {
-	case nil:
-		beforeMaybe = Some(before)
-	case database.ErrNotFound:
-		beforeMaybe = Nothing[[]byte]()
-	default:
-		return err
+	if key == RootPath {
+		beforeMaybe = t.root.value
+	} else {
+		before, err := t.getParentTrie().getValue(key, true /*lock*/)
+		switch err {
+		case nil:
+			beforeMaybe = Some(before)
+		case database.ErrNotFound:
+			beforeMaybe = Nothing[[]byte]()
+		default:
+			return err
+		}
 	}
 
 	t.changes.values[key] = &change[Maybe[[]byte]]{
@@ -750,10 +769,16 @@ func (t *statelessView) getNodeWithID(id ids.ID, key Path) (*Node, error) {
 		return nodeChange.after, nil
 	}
 
-	// get the node from the parent trie and store a local copy
-	parentTrieNode, err := t.getParentTrie().getEditableNode(key)
-	if err != nil {
-		return nil, err
+	var parentTrieNode *Node
+	if key == RootPath {
+		parentTrieNode = t.root.clone()
+	} else {
+		// get the node from the parent trie and store a local copy
+		var err error
+		parentTrieNode, err = t.getParentTrie().getEditableNode(key)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// only need to initialize the id if it's from the parent trie.

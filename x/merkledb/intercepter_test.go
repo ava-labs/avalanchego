@@ -91,6 +91,54 @@ func Test_Intercepter_non_empty_initial_db_with_delete(t *testing.T) {
 	)
 }
 
+func Test_Intercepter_root_special(t *testing.T) {
+	require := require.New(t)
+
+	db, err := getBasicDB()
+	require.NoError(err)
+
+	require.NoError(db.Put([]byte{0}, []byte{2}))
+
+	startRootID, startRoot, valueProofs, pathProofs, _ := build(require, db, nil, []KeyChange{
+		{
+			Key:   []byte{0},
+			Value: Nothing[[]byte](),
+		},
+		{
+			Key:   []byte{1},
+			Value: Some([]byte{1, 2}),
+		},
+	})
+	_, _, _, _, endRootID := build(require, db, nil, []KeyChange{
+		{
+			Key:   []byte{0},
+			Value: Nothing[[]byte](),
+		},
+		{
+			Key:   []byte{1},
+			Value: Some([]byte{1, 2}),
+		},
+		{
+			Key:   []byte{},
+			Value: Some([]byte{2}),
+		},
+	})
+	verify(require, startRootID, startRoot, valueProofs, pathProofs, []KeyChange{
+		{
+			Key:   []byte{0},
+			Value: Nothing[[]byte](),
+		},
+		{
+			Key:   []byte{1},
+			Value: Some([]byte{1, 2}),
+		},
+		{
+			Key:   []byte{},
+			Value: Some([]byte{2}),
+		},
+	}, endRootID)
+}
+
 func testIntercepter(
 	require *require.Assertions,
 	db *merkleDB,
