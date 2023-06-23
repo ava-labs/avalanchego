@@ -289,40 +289,42 @@ func (proof *PathProof) Verify(ctx context.Context, expectedRootID ids.ID) error
 		return ErrProofValueDoesntMatch
 	}
 
-	if len(lastNode.Children) != len(proof.Children) {
-		return errors.New("missing children")
-	}
-
-	j := 0
-	for i := byte(0); i < NodeBranchFactor; i++ {
-		expectedHash, ok := lastNode.Children[i]
-		if !ok {
-			continue
+	if proof.KeyPath.Equal(lastNode.KeyPath) {
+		if len(lastNode.Children) != len(proof.Children) {
+			return errors.New("missing children")
 		}
 
-		c := proof.Children[j]
-		childrenToHash := make(map[byte]child)
-		for b, childHash := range c.Children {
-			childrenToHash[b] = child{
-				// note: compressed path isn't used in encodeHashValues
-				id: childHash,
+		j := 0
+		for i := byte(0); i < NodeBranchFactor; i++ {
+			expectedHash, ok := lastNode.Children[i]
+			if !ok {
+				continue
 			}
-		}
-		childBytes, err := Codec.encodeHashValues(Version, &hashValues{
-			Children: childrenToHash,
-			Value:    c.ValueOrHash,
-			Key:      c.KeyPath,
-		})
-		if err != nil {
-			return err
-		}
 
-		childHash := hashing.ComputeHash256Array(childBytes)
-		if childHash != expectedHash {
-			return errors.New("wrong child")
-		}
+			c := proof.Children[j]
+			childrenToHash := make(map[byte]child)
+			for b, childHash := range c.Children {
+				childrenToHash[b] = child{
+					// note: compressed path isn't used in encodeHashValues
+					id: childHash,
+				}
+			}
+			childBytes, err := Codec.encodeHashValues(Version, &hashValues{
+				Children: childrenToHash,
+				Value:    c.ValueOrHash,
+				Key:      c.KeyPath,
+			})
+			if err != nil {
+				return err
+			}
 
-		j++
+			childHash := hashing.ComputeHash256Array(childBytes)
+			if childHash != expectedHash {
+				return errors.New("wrong child")
+			}
+
+			j++
+		}
 	}
 
 	view, err := getEmptyTrieView(ctx)

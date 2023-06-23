@@ -5,6 +5,7 @@ package merkledb
 
 import (
 	"context"
+	"encoding/hex"
 	"math/rand"
 	"testing"
 	"time"
@@ -66,6 +67,23 @@ func Test_Proof_Simple(t *testing.T) {
 	require.NoError(err)
 
 	require.NoError(proof.Verify(ctx, expectedRoot))
+}
+
+func Test_PathProof_Regression(t *testing.T) {
+	require := require.New(t)
+
+	rootID, err := ids.FromString("2qH4B6EWydQvrymdXmvXvvJH6YyajoY7ZyLk69BEJk5HA2BRmA")
+	require.NoError(err)
+
+	proofBytes, err := hex.DecodeString("000400000200888727de894fc905b0060efe598119bbdeb11be6091f6fab5d8e9c5b8fc4361002000004000b7c9a63a67507d8d86bc2ba6216221794a057d8319f73cf31e3d2436a947fc10272ec18f297683fb1d6bd7bc5ac6163d7ea7e423634d9f8575b8fd3ea5f6dc48e00840103000000000000000000000000000000000000000000000000000000000000000000")
+	require.NoError(err)
+
+	proof := &PathProof{}
+	_, err = Codec.DecodePathProof(proofBytes, proof)
+	require.NoError(err)
+
+	ctx := context.Background()
+	require.NoError(proof.Verify(ctx, rootID))
 }
 
 func Test_Proof_Verify_Bad_Data(t *testing.T) {
