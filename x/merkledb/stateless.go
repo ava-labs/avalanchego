@@ -52,40 +52,9 @@ type statelessView struct {
 	// Only use to lock current trieView or ancestors of the current trieView
 	lock sync.RWMutex
 
-	// Controls the trie's validity related fields.
-	// Must be held while reading/writing [childViews], [invalidated], and [parentTrie].
-	// Only use to lock current trieView or descendants of the current trieView
-	// DO NOT grab the [lock] or [validityTrackingLock] of this trie or any ancestor trie while this is held.
-	validityTrackingLock sync.RWMutex
-
-	// If true, this view has been invalidated and can't be used.
-	//
-	// Invariant: This view is marked as invalid before any of its ancestors change.
-	// Since we ensure that all subviews are marked invalid before making an invalidating change
-	// then if we are still valid at the end of the function, then no corrupting changes could have
-	// occurred during execution.
-	// Namely, if we have a method with:
-	//
-	// *Code Accessing Ancestor State*
-	//
-	// if t.isInvalid() {
-	//     return ErrInvalid
-	//  }
-	// return [result]
-	//
-	// If the invalidated check passes, then we're guaranteed that no ancestor changes occurred
-	// during the code that accessed ancestor state and the result of that work is still valid
-	//
-	// [validityTrackingLock] must be held when reading/writing this field.
-	invalidated bool
-
 	// the uncommitted parent trie of this view
 	// [validityTrackingLock] must be held when reading/writing this field.
 	parentTrie StatelessView
-
-	// The valid children of this trie.
-	// [validityTrackingLock] must be held when reading/writing this field.
-	childViews []*statelessView
 
 	// Changes made to this view.
 	// May include nodes that haven't been updated
@@ -148,32 +117,13 @@ func (t *statelessView) NewStatelessView(
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
-	if t.isInvalid() {
-		return nil, ErrInvalid
-	}
-
-	newView, err := newStatelessView(t.db, t, t.root.clone(), estimatedChanges)
-	if err != nil {
-		return nil, err
-	}
-
-	t.validityTrackingLock.Lock()
-	defer t.validityTrackingLock.Unlock()
-
-	if t.invalidated {
-		return nil, ErrInvalid
-	}
-	t.childViews = append(t.childViews, newView)
-
-	return newView, nil
+	return newStatelessView(t.db, t, t.root.clone(), estimatedChanges)
 }
 
 // Recalculates the node IDs for all changed nodes in the trie.
 // Assumes [t.lock] is held.
 func (t *statelessView) calculateNodeIDs(ctx context.Context) error {
 	switch {
-	case t.isInvalid():
-		return ErrInvalid
 	case !t.needsRecalculation:
 		return nil
 	case t.committed:
@@ -212,11 +162,6 @@ func (t *statelessView) calculateNodeIDs(ctx context.Context) error {
 	}
 	t.needsRecalculation = false
 	t.changes.rootID = t.root.id
-
-	// ensure no ancestor changes occurred during execution
-	if t.isInvalid() {
-		return ErrInvalid
-	}
 
 	return nil
 }
@@ -369,9 +314,6 @@ func (t *statelessView) getProof(ctx context.Context, key []byte) (*Proof, error
 		return nil, err
 	}
 	proof.Path = append(proof.Path, childNode.asProofNode())
-	if t.isInvalid() {
-		return nil, ErrInvalid
-	}
 	return proof, nil
 }
 
@@ -434,18 +376,7 @@ func (t *statelessView) getPathProof(ctx context.Context, key Path) (*PathProof,
 		return nil, err
 	}
 	proof.Path = append(proof.Path, childNode.asProofNode())
-	if t.isInvalid() {
-		return nil, ErrInvalid
-	}
 	return proof, nil
-}
-
-// Assumes [t.validityTrackingLock] isn't held.
-func (t *statelessView) isInvalid() bool {
-	t.validityTrackingLock.RLock()
-	defer t.validityTrackingLock.RUnlock()
-
-	return t.invalidated
 }
 
 // GetMerkleRoot returns the ID of the root of this trie.
@@ -500,10 +431,6 @@ func (t *statelessView) getValue(key Path, lock bool) ([]byte, error) {
 		defer t.lock.RUnlock()
 	}
 
-	if t.isInvalid() {
-		return nil, ErrInvalid
-	}
-
 	if change, ok := t.changes.values[key]; ok {
 		t.db.metrics.ViewValueCacheHit()
 		if change.after.IsNothing() {
@@ -517,11 +444,6 @@ func (t *statelessView) getValue(key Path, lock bool) ([]byte, error) {
 	value, err := t.getParentTrie().getValue(key, true /*lock*/)
 	if err != nil {
 		return nil, err
-	}
-
-	// ensure no ancestor changes occurred during execution
-	if t.isInvalid() {
-		return nil, ErrInvalid
 	}
 
 	return value, nil
@@ -541,22 +463,9 @@ func (t *statelessView) insert(key []byte, value []byte) error {
 	if t.committed {
 		return ErrCommitted
 	}
-	if t.isInvalid() {
-		return ErrInvalid
-	}
 
 	valCopy := slices.Clone(value)
-
-	if err := t.recordValueChange(NewPath(key), Some(valCopy)); err != nil {
-		return err
-	}
-
-	// ensure no ancestor changes occurred during execution
-	if t.isInvalid() {
-		return ErrInvalid
-	}
-
-	return nil
+	return t.recordValueChange(NewPath(key), Some(valCopy))
 }
 
 // Remove will delete the value associated with [key] from this trie.
@@ -574,20 +483,7 @@ func (t *statelessView) remove(key []byte) error {
 		return ErrCommitted
 	}
 
-	if t.isInvalid() {
-		return ErrInvalid
-	}
-
-	if err := t.recordValueChange(NewPath(key), Nothing[[]byte]()); err != nil {
-		return err
-	}
-
-	// ensure no ancestor changes occurred during execution
-	if t.isInvalid() {
-		return ErrInvalid
-	}
-
-	return nil
+	return t.recordValueChange(NewPath(key), Nothing[[]byte]())
 }
 
 // Assumes [t.lock] is held.
@@ -724,19 +620,10 @@ func (t *statelessView) getEditableNode(key Path) (*Node, error) {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
-	if t.isInvalid() {
-		return nil, ErrInvalid
-	}
-
 	// grab the node in question
 	n, err := t.getNodeWithID(ids.Empty, key)
 	if err != nil {
 		return nil, err
-	}
-
-	// ensure no ancestor changes occurred during execution
-	if t.isInvalid() {
-		return nil, ErrInvalid
 	}
 
 	// return a clone of the node, so it can be edited without affecting this trie
@@ -1003,9 +890,6 @@ func (t *statelessView) getNodeWithID(id ids.ID, key Path) (*Node, error) {
 
 // Get the parent trie of the view
 func (t *statelessView) getParentTrie() StatelessView {
-	t.validityTrackingLock.RLock()
-	defer t.validityTrackingLock.RUnlock()
-
 	verifierIntercepter := *t.verifierIntercepter
 	verifierIntercepter.StatelessView = t.parentTrie
 	return &verifierIntercepter
