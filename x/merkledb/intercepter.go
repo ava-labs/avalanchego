@@ -9,8 +9,11 @@ import (
 	"fmt"
 	"sync"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 var (
@@ -24,6 +27,7 @@ var (
 type trieViewVerifierIntercepter struct {
 	StatelessView
 
+	log        logging.Logger
 	rootID     ids.ID
 	tempValues map[Path]Maybe[[]byte]
 	permValues map[Path]Maybe[[]byte]
@@ -53,8 +57,20 @@ func (i *trieViewVerifierIntercepter) getValue(key Path, maxLookback int) ([]byt
 	}
 
 	if i.StatelessView == nil || maxLookback == 0 {
+		i.log.Warn("missing proof",
+			zap.Stringer("parentRootID", i.rootID),
+			zap.String("key", string(key)),
+			zap.Int("maxLookback", maxLookback),
+			zap.Error(ErrMissingProof),
+		)
 		return nil, fmt.Errorf("%w: %q", ErrMissingProof, key)
 	}
+	i.log.Debug("looking into parent for proof",
+		zap.Stringer("parentRootID", i.rootID),
+		zap.String("key", string(key)),
+		zap.Int("maxLookback", maxLookback),
+		zap.Error(ErrMissingProof),
+	)
 	return i.StatelessView.getValue(key, maxLookback-1)
 }
 
@@ -76,8 +92,20 @@ func (i *trieViewVerifierIntercepter) getEditableNode(key Path, maxLookback int)
 	}
 
 	if i.StatelessView == nil || maxLookback == 0 {
+		i.log.Warn("missing proof",
+			zap.Stringer("parentRootID", i.rootID),
+			zap.String("key", string(key)),
+			zap.Int("maxLookback", maxLookback),
+			zap.Error(ErrMissingPathProof),
+		)
 		return nil, fmt.Errorf("%w: %q", ErrMissingPathProof, key)
 	}
+	i.log.Debug("looking into parent for proof",
+		zap.Stringer("parentRootID", i.rootID),
+		zap.String("key", string(key)),
+		zap.Int("maxLookback", maxLookback),
+		zap.Error(ErrMissingPathProof),
+	)
 	return i.StatelessView.getEditableNode(key, maxLookback-1)
 }
 

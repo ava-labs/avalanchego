@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/trace"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 var _ StatelessView = (*statelessView)(nil)
@@ -76,6 +77,8 @@ type statelessView struct {
 	// A Nothing value indicates that the key has been removed.
 	unappliedValueChanges map[Path]Maybe[[]byte]
 
+	log logging.Logger
+
 	metrics merkleMetrics
 
 	tracer trace.Tracer
@@ -94,6 +97,7 @@ type statelessView struct {
 
 func NewBaseStatelessView(
 	rootBytes []byte,
+	log logging.Logger,
 	reg prometheus.Registerer,
 	tracer trace.Tracer,
 	estimatedSize int,
@@ -116,6 +120,7 @@ func NewBaseStatelessView(
 
 	return &statelessView{
 		root:                  root,
+		log:                   log,
 		metrics:               metrics,
 		tracer:                tracer,
 		parentTrie:            nil,
@@ -125,6 +130,7 @@ func NewBaseStatelessView(
 		unappliedValueChanges: make(map[Path]Maybe[[]byte], estimatedSize),
 
 		verifierIntercepter: &trieViewVerifierIntercepter{
+			log:        log,
 			rootID:     root.id,
 			permValues: make(map[Path]Maybe[[]byte]),
 			permNodes:  make(map[Path]Maybe[*Node]),
@@ -144,6 +150,7 @@ func (t *statelessView) NewStatelessView(estimatedChanges int) StatelessView {
 
 	return &statelessView{
 		root:                  t.root.clone(),
+		log:                   t.log,
 		metrics:               t.metrics,
 		tracer:                t.tracer,
 		parentTrie:            t,
@@ -153,6 +160,7 @@ func (t *statelessView) NewStatelessView(estimatedChanges int) StatelessView {
 		unappliedValueChanges: make(map[Path]Maybe[[]byte], estimatedChanges),
 
 		verifierIntercepter: &trieViewVerifierIntercepter{
+			log:        t.log,
 			rootID:     t.root.id,
 			permValues: make(map[Path]Maybe[[]byte]),
 			permNodes:  make(map[Path]Maybe[*Node]),

@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 func Test_Intercepter_empty_db(t *testing.T) {
@@ -223,6 +224,7 @@ func verify(
 
 	view, err := NewBaseStatelessView(
 		startRootBytes,
+		logging.NoLog{},
 		prometheus.NewRegistry(),
 		newNoopTracer(),
 		1,
