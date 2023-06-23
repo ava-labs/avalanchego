@@ -20,16 +20,23 @@ func Test_Intercepter_empty_db(t *testing.T) {
 	db, err := getBasicDB()
 	require.NoError(err)
 
-	testIntercepter(require, db, []KeyChange{
-		{
-			Key:   []byte{0},
-			Value: Some([]byte{0, 1, 2}),
+	testIntercepter(
+		require,
+		db,
+		[][]byte{
+			{2},
 		},
-		{
-			Key:   []byte{1},
-			Value: Some([]byte{1, 2}),
+		[]KeyChange{
+			{
+				Key:   []byte{0},
+				Value: Some([]byte{0, 1, 2}),
+			},
+			{
+				Key:   []byte{1},
+				Value: Some([]byte{1, 2}),
+			},
 		},
-	})
+	)
 }
 
 func Test_Intercepter_non_empty_initial_db(t *testing.T) {
@@ -40,16 +47,23 @@ func Test_Intercepter_non_empty_initial_db(t *testing.T) {
 
 	require.NoError(db.Put([]byte{0}, []byte{2}))
 
-	testIntercepter(require, db, []KeyChange{
-		{
-			Key:   []byte{0},
-			Value: Some([]byte{0, 1, 2}),
+	testIntercepter(
+		require,
+		db,
+		[][]byte{
+			{2},
 		},
-		{
-			Key:   []byte{1},
-			Value: Some([]byte{1, 2}),
+		[]KeyChange{
+			{
+				Key:   []byte{0},
+				Value: Some([]byte{0, 1, 2}),
+			},
+			{
+				Key:   []byte{1},
+				Value: Some([]byte{1, 2}),
+			},
 		},
-	})
+	)
 }
 
 func Test_Intercepter_non_empty_initial_db_with_delete(t *testing.T) {
@@ -60,26 +74,39 @@ func Test_Intercepter_non_empty_initial_db_with_delete(t *testing.T) {
 
 	require.NoError(db.Put([]byte{0}, []byte{2}))
 
-	testIntercepter(require, db, []KeyChange{
-		{
-			Key:   []byte{0},
-			Value: Nothing[[]byte](),
+	testIntercepter(
+		require,
+		db,
+		[][]byte{
+			{2},
 		},
-		{
-			Key:   []byte{1},
-			Value: Some([]byte{1, 2}),
+		[]KeyChange{
+			{
+				Key:   []byte{0},
+				Value: Nothing[[]byte](),
+			},
+			{
+				Key:   []byte{1},
+				Value: Some([]byte{1, 2}),
+			},
 		},
-	})
+	)
 }
 
-func testIntercepter(require *require.Assertions, db *merkleDB, changes []KeyChange) {
-	startRootID, startRoot, valueProofs, pathProofs, endRootID := build(require, db, changes)
+func testIntercepter(
+	require *require.Assertions,
+	db *merkleDB,
+	reads [][]byte,
+	changes []KeyChange,
+) {
+	startRootID, startRoot, valueProofs, pathProofs, endRootID := build(require, db, reads, changes)
 	verify(require, startRootID, startRoot, valueProofs, pathProofs, changes, endRootID)
 }
 
 func build(
 	require *require.Assertions,
 	db *merkleDB,
+	reads [][]byte,
 	changes []KeyChange,
 ) (
 	ids.ID,
@@ -104,6 +131,9 @@ func build(
 		lock:   &lock,
 		values: make(map[path]*Proof),
 		nodes:  make(map[path]*PathProof),
+	}
+	for _, key := range reads {
+		_, _ = view.GetValue(ctx, key)
 	}
 	for _, change := range changes {
 		if change.Value.IsNothing() {
