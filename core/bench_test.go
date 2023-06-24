@@ -32,6 +32,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/subnet-evm/consensus/dummy"
+	"github.com/ava-labs/subnet-evm/constants"
 	"github.com/ava-labs/subnet-evm/core/rawdb"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/core/vm"
@@ -157,11 +158,17 @@ func benchInsertChain(b *testing.B, disk bool, gen func(int, *BlockGen)) {
 	// Generate a chain of b.N blocks using the supplied block
 	// generator function.
 	gspec := Genesis{
-		Config: params.TestChainConfig,
-		Alloc:  GenesisAlloc{benchRootAddr: {Balance: benchRootFunds}},
+		Config:   params.TestChainConfig,
+		Alloc:    GenesisAlloc{benchRootAddr: {Balance: benchRootFunds}},
+		Coinbase: constants.BlackholeAddr,
 	}
 	genesis := gspec.MustCommit(db)
-	chain, _, _ := GenerateChain(gspec.Config, genesis, dummy.NewFaker(), db, b.N, 10, gen)
+	chain, _, _ := GenerateChain(gspec.Config, genesis, dummy.NewFaker(), db, b.N, 10, func(i int, bg *BlockGen) {
+		bg.SetCoinbase(constants.BlackholeAddr)
+		if gen != nil {
+			gen(i, bg)
+		}
+	})
 
 	// Time the insertion of the new chain.
 	// State and blocks are stored in the same DB.
@@ -217,7 +224,7 @@ func makeChainForBench(db ethdb.Database, full bool, count uint64) {
 	var hash common.Hash
 	for n := uint64(0); n < count; n++ {
 		header := &types.Header{
-			Coinbase:    common.Address{},
+			Coinbase:    constants.BlackholeAddr,
 			Number:      big.NewInt(int64(n)),
 			ParentHash:  hash,
 			Difficulty:  big.NewInt(1),
