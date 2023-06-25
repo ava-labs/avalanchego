@@ -536,20 +536,17 @@ func (s *Service) GetSubnet(_ *http.Request, args *api.GetSubnetArgs, response *
 
 	subnetID := args.SubnetID
 
-	var tx *txs.Tx
-	var err error
-	tx, err = s.vm.state.GetSubnetTransformation(subnetID)
+	tx, err := s.vm.state.GetSubnetTransformation(subnetID)
 	if err != nil && err != database.ErrNotFound {
 		return fmt.Errorf("couldn't get transformed subnet: %w", err)
 	}
-	if err != nil && err == database.ErrNotFound {
+	if err == database.ErrNotFound {
 		// subnet may not be transformed
 		tx, _, err = s.vm.state.GetTx(subnetID)
 		if err != nil {
 			return fmt.Errorf("couldn't get tx: %w", err)
 		}
-		_, ok := tx.Unsigned.(*txs.CreateSubnetTx)
-		if !ok {
+		if _, ok := tx.Unsigned.(*txs.CreateSubnetTx); !ok {
 			return fmt.Errorf("%w expected *txs.CreateSubnetTx but got %T", errUnexpectedTransactionType, tx.Unsigned)
 		}
 	}
