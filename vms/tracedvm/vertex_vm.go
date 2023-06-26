@@ -11,7 +11,6 @@ import (
 	oteltrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/ava-labs/avalanchego/database/manager"
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
@@ -60,13 +59,6 @@ func (vm *vertexVM) Initialize(
 	)
 }
 
-func (vm *vertexVM) PendingTxs(ctx context.Context) []snowstorm.Tx {
-	ctx, span := vm.tracer.Start(ctx, "vertexVM.PendingTxs")
-	defer span.End()
-
-	return vm.LinearizableVMWithEngine.PendingTxs(ctx)
-}
-
 func (vm *vertexVM) ParseTx(ctx context.Context, txBytes []byte) (snowstorm.Tx, error) {
 	ctx, span := vm.tracer.Start(ctx, "vertexVM.ParseTx", oteltrace.WithAttributes(
 		attribute.Int("txLen", len(txBytes)),
@@ -74,19 +66,6 @@ func (vm *vertexVM) ParseTx(ctx context.Context, txBytes []byte) (snowstorm.Tx, 
 	defer span.End()
 
 	tx, err := vm.LinearizableVMWithEngine.ParseTx(ctx, txBytes)
-	return &tracedTx{
-		Tx:     tx,
-		tracer: vm.tracer,
-	}, err
-}
-
-func (vm *vertexVM) GetTx(ctx context.Context, txID ids.ID) (snowstorm.Tx, error) {
-	ctx, span := vm.tracer.Start(ctx, "vertexVM.GetTx", oteltrace.WithAttributes(
-		attribute.Stringer("txID", txID),
-	))
-	defer span.End()
-
-	tx, err := vm.LinearizableVMWithEngine.GetTx(ctx, txID)
 	return &tracedTx{
 		Tx:     tx,
 		tracer: vm.tracer,
