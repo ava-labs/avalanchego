@@ -24,7 +24,7 @@ tokio = { version = "1.28.1", features = ["fs", "io-util", "sync"] }
 [dev-dependencies]
 hex = "0.4.3"
 rand = "0.8.5"
-indexmap = "1.9.1"
+indexmap = "2.0.0"
 tokio = { version = "1.28.1", features = ["tokio-macros", "rt", "macros"] }
 
 [lib]
