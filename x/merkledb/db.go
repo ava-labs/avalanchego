@@ -1063,9 +1063,10 @@ func (db *merkleDB) VerifyChangeProof(
 		}
 	}
 
-	// For all the nodes along the edges of the proof, insert children
-	// < [insertChildrenLessThan] and > [insertChildrenGreaterThan]
-	// into the trie so that we get the expected root ID (if this proof is valid).
+	// For all the nodes along the edges of the proof, insert the children whose
+	// keys are less than [insertChildrenLessThan] or whose keys are greater
+	// than [insertChildrenGreaterThan] into the trie so that we get the
+	// expected root ID (if this proof is valid).
 	insertChildrenLessThan := Nothing[path]()
 	if len(smallestPath) > 0 {
 		insertChildrenLessThan = Some(smallestPath)
