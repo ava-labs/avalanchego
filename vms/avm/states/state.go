@@ -113,7 +113,7 @@ type State interface {
 
 	// Asynchronously removes unneeded state from disk.
 	//
-	// Speicifally, this removes:
+	// Specifically, this removes:
 	// - All transaction statuses
 	// - All non-accepted transactions
 	// - All UTXOs that were consumed by accepted transactions
