@@ -107,12 +107,12 @@ func (wh *syncWorkHeap) MergeInsert(item *syncWorkItem) {
 		searchItem,
 		func(beforeItem *heapItem) bool {
 			if item.LocalRootID == beforeItem.workItem.LocalRootID {
-				beforeIsNothing := beforeItem.workItem.start.IsNothing()
+				beforeIsNothing := beforeItem.workItem.end.IsNothing()
 				itemIsNothing := item.start.IsNothing()
 
 				bothNothing := beforeIsNothing && itemIsNothing
 				bothHaveValue := !beforeIsNothing && !itemIsNothing
-				valuesMatch := bothHaveValue && bytes.Equal(beforeItem.workItem.start.Value(), item.start.Value())
+				valuesMatch := bothHaveValue && bytes.Equal(beforeItem.workItem.end.Value(), item.start.Value())
 
 				if bothNothing || valuesMatch {
 					// [beforeItem.start, beforeItem.end] and [item.start, item.end] are
@@ -133,11 +133,11 @@ func (wh *syncWorkHeap) MergeInsert(item *syncWorkItem) {
 		func(afterItem *heapItem) bool {
 			if item.LocalRootID == afterItem.workItem.LocalRootID {
 				afterIsNothing := afterItem.workItem.start.IsNothing()
-				itemIsNothing := item.start.IsNothing()
+				itemIsNothing := item.end.IsNothing()
 
 				bothNothing := afterIsNothing && itemIsNothing
 				bothHaveValue := !afterIsNothing && !itemIsNothing
-				valuesMatch := bothHaveValue && bytes.Equal(afterItem.workItem.start.Value(), item.start.Value())
+				valuesMatch := bothHaveValue && bytes.Equal(afterItem.workItem.start.Value(), item.end.Value())
 
 				if bothNothing || valuesMatch {
 					// [item.start, item.end] and [afterItem.start, afterItem.end] are merged into

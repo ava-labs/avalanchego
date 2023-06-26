@@ -232,9 +232,11 @@ func Test_SyncWorkHeap_Merge_Insert(t *testing.T) {
 	syncHeap := newSyncWorkHeap()
 
 	syncHeap.MergeInsert(&syncWorkItem{start: merkledb.Nothing[[]byte](), end: merkledb.Some([]byte{63})})
+	// Ranges are [,63]
 	require.Equal(t, 1, syncHeap.Len())
 
 	syncHeap.MergeInsert(&syncWorkItem{start: merkledb.Some([]byte{127}), end: merkledb.Some([]byte{192})})
+	// Ranges are [,63] and [127,192]
 	require.Equal(t, 2, syncHeap.Len())
 
 	syncHeap.MergeInsert(&syncWorkItem{start: merkledb.Some([]byte{193}), end: merkledb.Nothing[[]byte]()})
