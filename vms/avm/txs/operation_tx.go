@@ -56,7 +56,7 @@ func (t *OperationTx) InputIDs() set.Set[ids.ID] {
 
 // ConsumedAssetIDs returns the IDs of the assets this transaction consumes
 func (t *OperationTx) ConsumedAssetIDs() set.Set[ids.ID] {
-	assets := t.AssetIDs()
+	assets := t.BaseTx.AssetIDs()
 	for _, op := range t.Ops {
 		if len(op.UTXOIDs) > 0 {
 			assets.Add(op.AssetID())

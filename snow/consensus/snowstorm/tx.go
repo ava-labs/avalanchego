@@ -4,12 +4,9 @@
 package snowstorm
 
 import (
-<<<<<<< Updated upstream
 	"context"
 
-=======
 	"github.com/ava-labs/avalanchego/ids"
->>>>>>> Stashed changes
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
