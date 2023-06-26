@@ -2175,7 +2175,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 				}
 			},
 			chaintime:   offer.StartTime(),
-			expectedErr: []error{errDepositDurationToSmall, errDepositDurationToSmall},
+			expectedErr: []error{errDepositDurationTooSmall, errDepositDurationTooSmall},
 		},
 		"Deposit duration is too big": {
 			state: func(c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
@@ -2197,7 +2197,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 				}
 			},
 			chaintime:   offer.StartTime(),
-			expectedErr: []error{errDepositDurationToBig, errDepositDurationToBig},
+			expectedErr: []error{errDepositDurationTooBig, errDepositDurationTooBig},
 		},
 		"Deposit amount is too small": {
 			state: func(c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
@@ -2222,7 +2222,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 				}
 			},
 			chaintime:   offer.StartTime(),
-			expectedErr: []error{errDepositToSmall, errDepositToSmall},
+			expectedErr: []error{errDepositTooSmall, errDepositTooSmall},
 		},
 		"Deposit amount is too big (offer.TotalMaxAmount)": {
 			state: func(c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
@@ -2248,7 +2248,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 				}
 			},
 			chaintime:   offerWithMaxAmount.StartTime(),
-			expectedErr: []error{errDepositToBig, errDepositToBig},
+			expectedErr: []error{errDepositTooBig, errDepositTooBig},
 		},
 		"Deposit amount is too big (offer.TotalMaxRewardAmount)": {
 			state: func(c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
@@ -2274,7 +2274,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 				}
 			},
 			chaintime:   offerWithMaxRewardAmount.StartTime(),
-			expectedErr: []error{errNotSunrisePhase1, errDepositToBig},
+			expectedErr: []error{errNotSunrisePhase1, errDepositTooBig},
 		},
 		"UTXO not found": {
 			state: func(c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
@@ -5582,7 +5582,7 @@ func TestCaminoStandardTxExecutorAddDepositOfferTx(t *testing.T) {
 				s := state.NewMockDiff(c)
 				s.EXPECT().GetTimestamp().Return(time.Unix(100, 0))
 				expectVerifyLock(s, utx.Ins, []*avax.UTXO{feeUTXO}, []ids.ShortID{feeOwnerAddr}, nil)
-				s.EXPECT().GetAddressStates(utx.DepositOfferCreatorAddress).Return(txs.AddressStateRoleOffersCreator, nil)
+				s.EXPECT().GetAddressStates(utx.DepositOfferCreatorAddress).Return(txs.AddressStateOffersCreator, nil)
 				expectVerifyMultisigPermission(s, []ids.ShortID{utx.DepositOfferCreatorAddress}, nil)
 				return s
 			},
@@ -5606,7 +5606,7 @@ func TestCaminoStandardTxExecutorAddDepositOfferTx(t *testing.T) {
 				s := state.NewMockDiff(c)
 				s.EXPECT().GetTimestamp().Return(chainTime)
 				expectVerifyLock(s, utx.Ins, []*avax.UTXO{feeUTXO}, []ids.ShortID{feeOwnerAddr}, nil)
-				s.EXPECT().GetAddressStates(utx.DepositOfferCreatorAddress).Return(txs.AddressStateRoleOffersCreator, nil)
+				s.EXPECT().GetAddressStates(utx.DepositOfferCreatorAddress).Return(txs.AddressStateOffersCreator, nil)
 				expectVerifyMultisigPermission(s, []ids.ShortID{utx.DepositOfferCreatorAddress}, nil)
 				s.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).
 					Return(cfg.RewardConfig.SupplyCap-offer1.TotalMaxRewardAmount+1, nil)
@@ -5676,7 +5676,7 @@ func TestCaminoStandardTxExecutorAddDepositOfferTx(t *testing.T) {
 				s := state.NewMockDiff(c)
 				s.EXPECT().GetTimestamp().Return(chainTime)
 				expectVerifyLock(s, utx.Ins, []*avax.UTXO{feeUTXO}, []ids.ShortID{feeOwnerAddr}, nil)
-				s.EXPECT().GetAddressStates(utx.DepositOfferCreatorAddress).Return(txs.AddressStateRoleOffersCreator, nil)
+				s.EXPECT().GetAddressStates(utx.DepositOfferCreatorAddress).Return(txs.AddressStateOffersCreator, nil)
 				expectVerifyMultisigPermission(s, []ids.ShortID{utx.DepositOfferCreatorAddress}, nil)
 				s.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).Return(currentSupply, nil)
 				s.EXPECT().GetAllDepositOffers().Return(existingOffers, nil)
@@ -5701,7 +5701,7 @@ func TestCaminoStandardTxExecutorAddDepositOfferTx(t *testing.T) {
 				s := state.NewMockDiff(c)
 				s.EXPECT().GetTimestamp().Return(time.Time{})
 				expectVerifyLock(s, utx.Ins, []*avax.UTXO{feeUTXO}, []ids.ShortID{feeOwnerAddr}, nil)
-				s.EXPECT().GetAddressStates(utx.DepositOfferCreatorAddress).Return(txs.AddressStateRoleOffersCreator, nil)
+				s.EXPECT().GetAddressStates(utx.DepositOfferCreatorAddress).Return(txs.AddressStateOffersCreator, nil)
 				expectVerifyMultisigPermission(s, []ids.ShortID{utx.DepositOfferCreatorAddress}, nil)
 				s.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).
 					Return(cfg.RewardConfig.SupplyCap-offer1.TotalMaxRewardAmount, nil)

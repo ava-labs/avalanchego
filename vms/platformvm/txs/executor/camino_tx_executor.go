@@ -43,10 +43,10 @@ var (
 	errRemoveValidatorToEarly            = errors.New("attempting to remove validator before its end time")
 	errRemoveWrongValidator              = errors.New("attempting to remove wrong validator")
 	errDepositOfferInactive              = errors.New("deposit offer is inactive")
-	errDepositToSmall                    = errors.New("deposit amount is less than deposit offer minimum amount")
-	errDepositToBig                      = errors.New("deposit amount is greater than deposit offer available amount")
-	errDepositDurationToSmall            = errors.New("deposit duration is less than deposit offer minmum duration")
-	errDepositDurationToBig              = errors.New("deposit duration is greater than deposit offer maximum duration")
+	errDepositTooSmall                   = errors.New("deposit amount is less than deposit offer minimum amount")
+	errDepositTooBig                     = errors.New("deposit amount is greater than deposit offer available amount")
+	errDepositDurationTooSmall           = errors.New("deposit duration is less than deposit offer minmum duration")
+	errDepositDurationTooBig             = errors.New("deposit duration is greater than deposit offer maximum duration")
 	errSupplyOverflow                    = errors.New("resulting total supply would be more than allowed maximum")
 	errNotConsortiumMember               = errors.New("address isn't consortium member")
 	errValidatorNotFound                 = errors.New("validator not found")
@@ -635,13 +635,13 @@ func (e *CaminoStandardTxExecutor) DepositTx(tx *txs.DepositTx) error {
 	case !depositOffer.IsActiveAt(uint64(chainTime.Unix())):
 		return errDepositOfferInactive
 	case tx.DepositDuration < depositOffer.MinDuration:
-		return errDepositDurationToSmall
+		return errDepositDurationTooSmall
 	case tx.DepositDuration > depositOffer.MaxDuration:
-		return errDepositDurationToBig
+		return errDepositDurationTooBig
 	case depositAmount < depositOffer.MinAmount:
-		return errDepositToSmall
+		return errDepositTooSmall
 	case depositOffer.TotalMaxAmount > 0 && depositAmount > depositOffer.RemainingAmount():
-		return errDepositToBig
+		return errDepositTooBig
 	case !sunrisePhase1 && depositOffer.TotalMaxRewardAmount > 0:
 		return errNotSunrisePhase1
 	}
@@ -656,7 +656,7 @@ func (e *CaminoStandardTxExecutor) DepositTx(tx *txs.DepositTx) error {
 	potentialReward := deposit.TotalReward(depositOffer)
 
 	if depositOffer.TotalMaxRewardAmount > 0 && potentialReward > depositOffer.RemainingReward() {
-		return errDepositToBig
+		return errDepositTooBig
 	}
 
 	baseTxCreds := e.Tx.Creds
@@ -1577,7 +1577,7 @@ func (e *CaminoStandardTxExecutor) AddDepositOfferTx(tx *txs.AddDepositOfferTx) 
 		return err
 	}
 
-	if depositOfferCreatorAddressState&txs.AddressStateRoleOffersCreator == 0 {
+	if depositOfferCreatorAddressState&txs.AddressStateOffersCreator == 0 {
 		return errNotOfferCreator
 	}
 
@@ -1782,7 +1782,7 @@ func verifyAccess(roles, state txs.AddressState) bool {
 	switch {
 	case roles&txs.AddressStateRoleAdmin != 0: // admin can do anything
 	case txs.AddressStateKYCAll&state != 0 && roles&txs.AddressStateRoleKYC != 0: // kyc role can change kyc status
-	case txs.AddressStateRoleOffersCreator&state != 0 && roles&txs.AddressStateRoleOffersAdmin != 0: // offers admin can assign offers creator role
+	case txs.AddressStateOffersCreator&state != 0 && roles&txs.AddressStateRoleOffersAdmin != 0: // offers admin can assign offers creator role
 	default:
 		return false
 	}

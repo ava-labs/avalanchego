@@ -19,7 +19,7 @@ import (
 var (
 	_ UnsignedTx = (*DepositTx)(nil)
 
-	errToBigDeposit          = errors.New("to big deposit")
+	errTooBigDeposit         = errors.New("to big deposit")
 	errInvalidRewardOwner    = errors.New("invalid reward owner")
 	errBadOfferOwnerAuth     = errors.New("bad offer owner auth")
 	errBadDepositCreatorAuth = errors.New("bad deposit creator auth")
@@ -89,7 +89,7 @@ func (tx *DepositTx) SyntacticVerify(ctx *snow.Context) error {
 		if lockedOut, ok := out.Out.(*locked.Out); ok && lockedOut.IsNewlyLockedWith(locked.StateDeposited) {
 			newDepositAmount, err := math.Add64(depositAmount, lockedOut.Amount())
 			if err != nil {
-				return fmt.Errorf("%w: %s", errToBigDeposit, err)
+				return fmt.Errorf("%w: %s", errTooBigDeposit, err)
 			}
 			depositAmount = newDepositAmount
 		}

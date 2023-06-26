@@ -911,7 +911,8 @@ func (s *CaminoService) apiOwnerFromSECP(secpOwner *secp256k1fx.OutputOwners) (*
 }
 
 type APIDepositOffer struct {
-	ID                      ids.ID              `json:"id"`
+	UpgradeVersion          uint16              `json:"upgradeVersion"`          // codec upgrade version
+	ID                      ids.ID              `json:"id"`                      // offer id
 	InterestRateNominator   utilsjson.Uint64    `json:"interestRateNominator"`   // deposit.Amount * (interestRateNominator / interestRateDenominator) == reward for deposit with 1 year duration
 	Start                   utilsjson.Uint64    `json:"start"`                   // Unix time in seconds, when this offer becomes active (can be used to create new deposits)
 	End                     utilsjson.Uint64    `json:"end"`                     // Unix time in seconds, when this offer becomes inactive (can't be used to create new deposits)
@@ -958,6 +959,7 @@ func (s *CaminoService) GetAllDepositOffers(_ *http.Request, args *GetAllDeposit
 
 func apiOfferFromOffer(offer *deposit.Offer) *APIDepositOffer {
 	return &APIDepositOffer{
+		UpgradeVersion:          offer.UpgradeVersionID.Version(),
 		ID:                      offer.ID,
 		InterestRateNominator:   utilsjson.Uint64(offer.InterestRateNominator),
 		Start:                   utilsjson.Uint64(offer.Start),

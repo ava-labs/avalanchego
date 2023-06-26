@@ -48,7 +48,7 @@ func TestDepositTxSyntacticVerify(t *testing.T) {
 				}},
 				RewardsOwner: &secp256k1fx.OutputOwners{},
 			},
-			expectedErr: errToBigDeposit,
+			expectedErr: errTooBigDeposit,
 		},
 		"V1, bad deposit creator auth": {
 			tx: &DepositTx{

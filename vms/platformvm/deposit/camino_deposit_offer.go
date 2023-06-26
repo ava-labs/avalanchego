@@ -28,7 +28,8 @@ var (
 	errWrongLimitValues           = errors.New("can only use either TotalMaxAmount or TotalMaxRewardAmount")
 	errDepositedMoreThanMaxAmount = errors.New("offer deposited amount is more than offer total max amount")
 	errRewardedMoreThanMaxAmount  = errors.New("offer deposits total reward amount is more than offer total max reward amount")
-	errMinAmountToSmall           = errors.New("offer minAmount is to small")
+	errMinAmountTooSmall          = errors.New("offer minAmount is too small")
+	errMinAmountTooBig            = errors.New("offer minAmount is too big")
 	errWrongRewardValues          = errors.New("offer interest rate and total max reward amount must both be zero or not zero")
 )
 
@@ -77,13 +78,13 @@ func (o *Offer) RemainingAmount() uint64 {
 
 // Returns maximum possible amount that could be deposited with this offer. Return 0 if o.TotalMaxRewardAmount is 0.
 func (o *Offer) MaxRemainingAmountByReward() uint64 {
-	// rewardsPeriodDuration = deposit.Duration - offer.NoRewardsPeriodDuration
+	// maxRewardsPeriodDuration = offer.MaxDuration - offer.NoRewardsPeriodDuration
 	// using MaxDuration, cause its the case, where most reward per deposit amount is issued
-	bigRewardsPeriodDuration := (&big.Int{}).SetUint64(uint64(o.MaxDuration - o.NoRewardsPeriodDuration))
+	maxRewardsPeriodDuration := (&big.Int{}).SetUint64(uint64(o.MaxDuration - o.NoRewardsPeriodDuration))
 
-	// depositAmount := remainingRewardAmount * interestRateBase / (offer.InterestRate * rewardsPeriodDuration)
+	// maxDepositAmount = remainingRewardAmount * interestRateBase / (offer.InterestRate * rewardsPeriodDuration)
 	denominator := (&big.Int{}).SetUint64(o.InterestRateNominator)
-	denominator.Mul(denominator, bigRewardsPeriodDuration)
+	denominator.Mul(denominator, maxRewardsPeriodDuration)
 
 	nominator := (&big.Int{}).SetUint64(o.RemainingReward())
 	nominator.Mul(nominator, bigInterestRateDenominator)
@@ -148,11 +149,29 @@ func (o *Offer) Verify() error {
 
 	// version-specific checks
 	if o.UpgradeVersionID.Version() > 0 {
+		if o.TotalMaxRewardAmount != 0 {
+			// maxRewardsPeriodDuration = offer.MaxDuration - offer.NoRewardsPeriodDuration
+			// using MaxDuration, cause its the case, where most reward per deposit amount is issued
+			maxRewardsPeriodDuration := (&big.Int{}).SetUint64(uint64(o.MaxDuration - o.NoRewardsPeriodDuration))
+
+			// maxDepositAmount = offer.TotalMaxRewardAmount * interestRateBase / (offer.InterestRate * rewardsPeriodDuration)
+			denominator := (&big.Int{}).SetUint64(o.InterestRateNominator)
+			denominator.Mul(denominator, maxRewardsPeriodDuration)
+
+			nominator := (&big.Int{}).SetUint64(o.TotalMaxRewardAmount)
+			nominator.Mul(nominator, bigInterestRateDenominator)
+
+			maxDepositAmount := nominator.Div(nominator, denominator).Uint64()
+			if o.MinAmount > maxDepositAmount {
+				return errMinAmountTooBig
+			}
+		}
+
 		switch {
 		case o.TotalMaxAmount != 0 && o.TotalMaxRewardAmount != 0:
 			return errWrongLimitValues
 		case o.MinAmount < OfferMinDepositAmount:
-			return errMinAmountToSmall
+			return errMinAmountTooSmall
 		case o.TotalMaxRewardAmount == 0 && o.InterestRateNominator != 0 ||
 			o.TotalMaxRewardAmount != 0 && o.InterestRateNominator == 0:
 			return errWrongRewardValues
