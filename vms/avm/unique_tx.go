@@ -189,7 +189,7 @@ func (tx *UniqueTx) Status() choices.Status {
 // Dependencies returns the set of transactions this transaction builds on
 func (tx *UniqueTx) Dependencies() ([]snowstorm.Tx, error) {
 	tx.refresh()
-	if tx.Tx == nil || len(tx.deps) != 0 {
+	if len(tx.deps) != 0 {
 		return tx.deps, nil
 	}
 
