@@ -727,11 +727,14 @@ func TestFindNextKeyRandom(t *testing.T) {
 		)
 		require.NoError(err)
 
-		if bytes.Compare(smallestDiffKey.Value, rangeEnd) >= 0 {
+		switch {
+		case bytes.Compare(smallestDiffKey.Value, rangeEnd) >= 0:
 			// The smallest key which differs is after the range end so the
 			// next key to get should be nil because we're done fetching the range.
 			require.True(gotFirstDiff.IsNothing())
-		} else {
+		case len(smallestDiffKey.Value) == 0:
+			require.True(gotFirstDiff.IsNothing())
+		default:
 			require.Equal(merkledb.Some(smallestDiffKey.Value), gotFirstDiff)
 		}
 	}
