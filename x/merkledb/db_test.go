@@ -770,17 +770,6 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 			if len(pastRoots) > 0 {
 				root = pastRoots[r.Intn(len(pastRoots))]
 			}
-			key := Nothing[[]byte]()
-			if len(step.key) > 0 {
-				key = Some(step.key)
-			}
-			value := Nothing[[]byte]()
-			if len(step.value) > 0 {
-				value = Some(step.value)
-			}
-			rangeProof, err := db.GetRangeProofAtRoot(context.Background(), root, key, value, 100)
-			require.NoError(err)
-
 			startKey := Nothing[[]byte]()
 			if len(step.key) > 0 {
 				startKey = Some(step.key)
@@ -789,6 +778,9 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 			if len(step.value) > 0 {
 				endKey = Some(step.value)
 			}
+			rangeProof, err := db.GetRangeProofAtRoot(context.Background(), root, startKey, endKey, 100)
+			require.NoError(err)
+
 			require.NoError(rangeProof.Verify(
 				context.Background(),
 				startKey,
@@ -803,16 +795,16 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 				root = pastRoots[r.Intn(len(pastRoots))]
 			}
 
-			start := Nothing[[]byte]()
+			startKey := Nothing[[]byte]()
 			if len(step.key) > 0 {
-				start = Some(step.key)
+				startKey = Some(step.key)
 			}
-			end := Nothing[[]byte]()
+			endKey := Nothing[[]byte]()
 			if len(step.value) > 0 {
-				end = Some(step.value)
+				endKey = Some(step.value)
 			}
 
-			changeProof, err := db.GetChangeProof(context.Background(), startRoot, root, start, end, 100)
+			changeProof, err := db.GetChangeProof(context.Background(), startRoot, root, startKey, endKey, 100)
 			if startRoot == root {
 				require.ErrorIs(err, errSameRoot)
 				continue
@@ -823,8 +815,8 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 			require.NoError(changeProofDB.VerifyChangeProof(
 				context.Background(),
 				changeProof,
-				start,
-				end,
+				startKey,
+				endKey,
 				root,
 			))
 			require.LessOrEqual(len(changeProof.KeyChanges), 100)
