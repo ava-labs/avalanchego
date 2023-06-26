@@ -238,8 +238,8 @@ func (th *trieHistory) getChangesToGetToRoot(rootID ids.ID, start, end Maybe[[]b
 			}
 
 			for key, valueChange := range item.values {
-				if (start.hasValue || key.Compare(startPath) >= 0) &&
-					(end.hasValue || key.Compare(endPath) <= 0) {
+				if (!start.hasValue || key.Compare(startPath) >= 0) &&
+					(!end.hasValue || key.Compare(endPath) <= 0) {
 					if existing, ok := combinedChanges.values[key]; ok {
 						existing.after = valueChange.before
 					} else {
