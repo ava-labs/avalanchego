@@ -153,11 +153,14 @@ func (s *NetworkServer) HandleChangeProofRequest(
 	requestID uint32,
 	req *pb.SyncGetChangeProofRequest,
 ) error {
+
 	if req.BytesLimit == 0 ||
 		req.KeyLimit == 0 ||
 		len(req.StartRootHash) != hashing.HashLen ||
 		len(req.EndRootHash) != hashing.HashLen ||
-		(!req.EndKey.IsNothing && bytes.Compare(req.StartKey.Value, req.EndKey.Value) > 0) { // TODO check validity of maybeBytes
+		(req.EndKey != nil && req.EndKey.IsNothing && len(req.EndKey.Value) > 0) ||
+		(req.StartKey != nil && req.StartKey.IsNothing && len(req.StartKey.Value) > 0) ||
+		(req.StartKey != nil && req.EndKey != nil && !req.EndKey.IsNothing && bytes.Compare(req.StartKey.Value, req.EndKey.Value) > 0) {
 		s.log.Debug(
 			"dropping invalid change proof request",
 			zap.Stringer("nodeID", nodeID),
@@ -188,11 +191,11 @@ func (s *NetworkServer) HandleChangeProofRequest(
 			return err
 		}
 		startKey := merkledb.Nothing[[]byte]()
-		if !req.StartKey.IsNothing {
+		if req.StartKey != nil && !req.StartKey.IsNothing {
 			startKey = merkledb.Some(req.StartKey.Value)
 		}
 		endKey := merkledb.Nothing[[]byte]()
-		if !req.EndKey.IsNothing {
+		if req.EndKey != nil && !req.EndKey.IsNothing {
 			endKey = merkledb.Some(req.EndKey.Value)
 		}
 
@@ -246,7 +249,9 @@ func (s *NetworkServer) HandleRangeProofRequest(
 	if req.BytesLimit == 0 ||
 		req.KeyLimit == 0 ||
 		len(req.RootHash) != hashing.HashLen ||
-		(!req.EndKey.IsNothing && bytes.Compare(req.StartKey.Value, req.EndKey.Value) > 0) { // TODO check validity of Maybe
+		(req.EndKey != nil && req.EndKey.IsNothing && len(req.EndKey.Value) > 0) ||
+		(req.StartKey != nil && req.StartKey.IsNothing && len(req.StartKey.Value) > 0) ||
+		(req.StartKey != nil && req.EndKey != nil && !req.EndKey.IsNothing && bytes.Compare(req.StartKey.Value, req.EndKey.Value) > 0) {
 		s.log.Debug(
 			"dropping invalid range proof request",
 			zap.Stringer("nodeID", nodeID),
@@ -271,11 +276,11 @@ func (s *NetworkServer) HandleRangeProofRequest(
 			return err
 		}
 		startKey := merkledb.Nothing[[]byte]()
-		if !req.StartKey.IsNothing {
+		if req.StartKey != nil && !req.StartKey.IsNothing {
 			startKey = merkledb.Some(req.StartKey.Value)
 		}
 		endKey := merkledb.Nothing[[]byte]()
-		if !req.EndKey.IsNothing {
+		if req.EndKey != nil && !req.EndKey.IsNothing {
 			endKey = merkledb.Some(req.EndKey.Value)
 		}
 		rangeProof, err := s.db.GetRangeProofAtRoot(ctx, root, startKey, endKey, int(keyLimit))

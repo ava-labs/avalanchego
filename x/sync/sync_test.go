@@ -243,7 +243,7 @@ func Test_Sync_FindNextKey_InSync(t *testing.T) {
 		lastKey := proof.KeyValues[len(proof.KeyValues)-1].Key
 		nextKey, err := syncer.findNextKey(context.Background(), merkledb.Some(lastKey), merkledb.Nothing[[]byte](), proof.EndProof)
 		require.NoError(err)
-		require.Nil(nextKey)
+		require.True(nextKey.IsNothing())
 
 		// add an extra value to sync db past the last key returned
 		newKey := midPoint(lastKey, nil)
@@ -277,7 +277,7 @@ func Test_Sync_FindNextKey_InSync(t *testing.T) {
 		require.NoError(err)
 
 		// next key would be after the end of the range, so it returns nil instead
-		require.Nil(nextKey)
+		require.True(nextKey.IsNothing())
 	}
 }
 
@@ -318,11 +318,11 @@ func Test_Sync_FindNextKey_Deleted(t *testing.T) {
 
 	nextKey, err := syncer.findNextKey(context.Background(), merkledb.Some([]byte{0x12}), merkledb.Some([]byte{0x20}), noExtraNodeProof.Path)
 	require.NoError(err)
-	require.Equal([]byte{0x13}, nextKey)
+	require.Equal(merkledb.Some([]byte{0x13}), nextKey)
 
 	nextKey, err = syncer.findNextKey(context.Background(), merkledb.Some([]byte{0x11}), merkledb.Some([]byte{0x20}), extraNodeProof.Path)
 	require.NoError(err)
-	require.Equal([]byte{0x13}, nextKey)
+	require.Equal(merkledb.Some([]byte{0x13}), nextKey)
 }
 
 func Test_Sync_FindNextKey_BranchInLocal(t *testing.T) {
@@ -354,7 +354,7 @@ func Test_Sync_FindNextKey_BranchInLocal(t *testing.T) {
 
 	nextKey, err := syncer.findNextKey(context.Background(), merkledb.Some([]byte{0x11, 0x11}), merkledb.Some([]byte{0x20}), proof.Path)
 	require.NoError(err)
-	require.Equal([]byte{0x12}, nextKey)
+	require.Equal(merkledb.Some([]byte{0x12}), nextKey)
 }
 
 func Test_Sync_FindNextKey_BranchInReceived(t *testing.T) {
@@ -387,7 +387,7 @@ func Test_Sync_FindNextKey_BranchInReceived(t *testing.T) {
 
 	nextKey, err := syncer.findNextKey(context.Background(), merkledb.Some([]byte{0x11, 0x11}), merkledb.Some([]byte{0x20}), proof.Path)
 	require.NoError(err)
-	require.Equal([]byte{0x12}, nextKey)
+	require.Equal(merkledb.Some([]byte{0x12}), nextKey)
 }
 
 func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
@@ -512,7 +512,7 @@ func Test_Sync_FindNextKey_DifferentChild(t *testing.T) {
 
 		nextKey, err := syncer.findNextKey(context.Background(), merkledb.Some(proof.KeyValues[len(proof.KeyValues)-1].Key), merkledb.Nothing[[]byte](), proof.EndProof)
 		require.NoError(err)
-		require.Equal(nextKey, lastKey)
+		require.Equal(nextKey, merkledb.Some(lastKey))
 	}
 }
 
@@ -730,9 +730,9 @@ func TestFindNextKeyRandom(t *testing.T) {
 		if bytes.Compare(smallestDiffKey.Value, rangeEnd) >= 0 {
 			// The smallest key which differs is after the range end so the
 			// next key to get should be nil because we're done fetching the range.
-			require.Nil(gotFirstDiff)
+			require.True(gotFirstDiff.IsNothing())
 		} else {
-			require.Equal(smallestDiffKey.Value, gotFirstDiff)
+			require.Equal(merkledb.Some(smallestDiffKey.Value), gotFirstDiff)
 		}
 	}
 }
