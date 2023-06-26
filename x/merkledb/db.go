@@ -476,7 +476,7 @@ func (db *merkleDB) getProof(ctx context.Context, key []byte) (*Proof, error) {
 // [start, end].
 func (db *merkleDB) GetRangeProof(
 	ctx context.Context,
-	start,
+	start Maybe[[]byte],
 	end Maybe[[]byte],
 	maxLength int,
 ) (*RangeProof, error) {
@@ -531,7 +531,7 @@ func (db *merkleDB) GetChangeProof(
 	end Maybe[[]byte],
 	maxLength int,
 ) (*ChangeProof, error) {
-	if end.hasValue && start.hasValue && bytes.Compare(start.value, end.value) == 1 {
+	if start.hasValue && end.hasValue && bytes.Compare(start.value, end.value) == 1 {
 		return nil, ErrStartAfterEnd
 	}
 	if startRootID == endRootID {
@@ -958,7 +958,7 @@ func (db *merkleDB) VerifyChangeProof(
 	end Maybe[[]byte],
 	expectedEndRootID ids.ID,
 ) error {
-	if end.hasValue && start.hasValue && bytes.Compare(start.value, end.value) > 0 {
+	if start.hasValue && end.hasValue && bytes.Compare(start.value, end.value) > 0 {
 		return ErrStartAfterEnd
 	}
 
