@@ -153,7 +153,6 @@ func (s *NetworkServer) HandleChangeProofRequest(
 	requestID uint32,
 	req *pb.SyncGetChangeProofRequest,
 ) error {
-
 	if req.BytesLimit == 0 ||
 		req.KeyLimit == 0 ||
 		len(req.StartRootHash) != hashing.HashLen ||
