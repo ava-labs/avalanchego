@@ -63,11 +63,11 @@ var errEmptyEventsList = errors.New("empty events list")
 // GetValidatorSet returns the correct primary and subnet validators data, with
 // the right BLS key version at all relevant heights.
 func TestGetValidatorsSetProperty(t *testing.T) {
-	properties := gopter.NewProperties(nil)
+	// properties := gopter.NewProperties(nil)
 
 	// to reproduce a given scenario do something like this:
-	// parameters := gopter.DefaultTestParametersWithSeed(1685887576153675816)
-	// properties := gopter.NewProperties(parameters)
+	parameters := gopter.DefaultTestParametersWithSeed(1687755832230771000)
+	properties := gopter.NewProperties(parameters)
 
 	properties.Property("check GetValidatorSet", prop.ForAll(
 		func(events []uint8) string {
@@ -188,6 +188,7 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 					if err != nil {
 						return fmt.Sprintf("failed GetValidatorSet: %s", err.Error())
 					}
+
 					if !reflect.DeepEqual(validatorsSet, res) {
 						return fmt.Sprintf("failed validators set comparison: %s", err.Error())
 					}
@@ -252,7 +253,7 @@ func takeValidatorsSnapshotAtCurrentHeight(vm *VM, validatorsSetByHeightAndSubne
 
 		validatorsSet[v.NodeID] = &validators.GetValidatorOutput{
 			NodeID:    v.NodeID,
-			PublicKey: blsKey,
+			PublicKey: validators.NewPublicKey(blsKey),
 			Weight:    v.Weight,
 		}
 	}

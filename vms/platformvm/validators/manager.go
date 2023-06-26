@@ -223,7 +223,7 @@ func (m *manager) makePrimaryNetworkValidatorSet(
 	for _, vdr := range currentValidatorList {
 		validatorSet[vdr.NodeID] = &validators.GetValidatorOutput{
 			NodeID:    vdr.NodeID,
-			PublicKey: vdr.PublicKey,
+			PublicKey: validators.NewPublicKey(vdr.PublicKey),
 			Weight:    vdr.Weight,
 		}
 	}
@@ -248,7 +248,7 @@ func (m *manager) makePrimaryNetworkValidatorSet(
 			if vdr, ok := validatorSet[nodeID]; ok {
 				// The validator's public key was removed at this block, so it
 				// was in the validator set before.
-				vdr.PublicKey = pk
+				vdr.PublicKey = validators.NewPublicKey(pk)
 			}
 		}
 	}

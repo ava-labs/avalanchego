@@ -101,7 +101,7 @@ func TestVM_GetValidatorSet(t *testing.T) {
 			expectedVdrSet: map[ids.NodeID]*validators.GetValidatorOutput{
 				testValidators[0].NodeID: {
 					NodeID:    testValidators[0].NodeID,
-					PublicKey: testValidators[0].PublicKey,
+					PublicKey: validators.NewPublicKey(testValidators[0].PublicKey),
 					Weight:    testValidators[0].Weight,
 				},
 			},
@@ -146,17 +146,17 @@ func TestVM_GetValidatorSet(t *testing.T) {
 			expectedVdrSet: map[ids.NodeID]*validators.GetValidatorOutput{
 				testValidators[0].NodeID: {
 					NodeID:    testValidators[0].NodeID,
-					PublicKey: testValidators[0].PublicKey,
+					PublicKey: validators.NewPublicKey(testValidators[0].PublicKey),
 					Weight:    testValidators[0].Weight + 1,
 				},
 				testValidators[1].NodeID: {
 					NodeID:    testValidators[1].NodeID,
-					PublicKey: testValidators[1].PublicKey,
+					PublicKey: validators.NewPublicKey(testValidators[1].PublicKey),
 					Weight:    testValidators[1].Weight - 1,
 				},
 				testValidators[2].NodeID: {
 					NodeID:    testValidators[2].NodeID,
-					PublicKey: testValidators[2].PublicKey,
+					PublicKey: validators.NewPublicKey(testValidators[2].PublicKey),
 					Weight:    testValidators[2].Weight,
 				},
 			},
@@ -218,12 +218,12 @@ func TestVM_GetValidatorSet(t *testing.T) {
 			expectedVdrSet: map[ids.NodeID]*validators.GetValidatorOutput{
 				testValidators[0].NodeID: {
 					NodeID:    testValidators[0].NodeID,
-					PublicKey: testValidators[0].PublicKey,
+					PublicKey: validators.NewPublicKey(testValidators[0].PublicKey),
 					Weight:    testValidators[0].Weight + 2,
 				},
 				testValidators[1].NodeID: {
 					NodeID:    testValidators[1].NodeID,
-					PublicKey: testValidators[1].PublicKey,
+					PublicKey: validators.NewPublicKey(testValidators[1].PublicKey),
 					Weight:    testValidators[1].Weight - 2,
 				},
 			},
@@ -266,12 +266,12 @@ func TestVM_GetValidatorSet(t *testing.T) {
 			expectedVdrSet: map[ids.NodeID]*validators.GetValidatorOutput{
 				testValidators[0].NodeID: {
 					NodeID:    testValidators[0].NodeID,
-					PublicKey: testValidators[0].PublicKey,
+					PublicKey: validators.NewPublicKey(testValidators[0].PublicKey),
 					Weight:    testValidators[0].Weight + 1,
 				},
 				testValidators[1].NodeID: {
 					NodeID:    testValidators[1].NodeID,
-					PublicKey: testValidators[1].PublicKey,
+					PublicKey: validators.NewPublicKey(testValidators[1].PublicKey),
 					Weight:    testValidators[1].Weight - 1,
 				},
 				testValidators[2].NodeID: {
@@ -320,12 +320,12 @@ func TestVM_GetValidatorSet(t *testing.T) {
 			expectedVdrSet: map[ids.NodeID]*validators.GetValidatorOutput{
 				testValidators[0].NodeID: {
 					NodeID:    testValidators[0].NodeID,
-					PublicKey: testValidators[0].PublicKey,
+					PublicKey: validators.NewPublicKey(testValidators[0].PublicKey),
 					Weight:    testValidators[0].Weight + 1,
 				},
 				testValidators[1].NodeID: {
 					NodeID:    testValidators[1].NodeID,
-					PublicKey: testValidators[1].PublicKey,
+					PublicKey: validators.NewPublicKey(testValidators[1].PublicKey),
 					Weight:    testValidators[1].Weight - 1,
 				},
 				testValidators[2].NodeID: {
@@ -357,7 +357,7 @@ func TestVM_GetValidatorSet(t *testing.T) {
 			expectedVdrSet: map[ids.NodeID]*validators.GetValidatorOutput{
 				testValidators[0].NodeID: {
 					NodeID:    testValidators[0].NodeID,
-					PublicKey: testValidators[0].PublicKey,
+					PublicKey: validators.NewPublicKey(testValidators[0].PublicKey),
 					Weight:    testValidators[0].Weight,
 				},
 			},

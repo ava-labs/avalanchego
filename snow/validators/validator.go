@@ -35,6 +35,10 @@ type GetValidatorOutput struct {
 }
 
 func NewPublicKey(key *bls.PublicKey) *PublicKey {
+	if key == nil {
+		return nil
+	}
+
 	return &PublicKey{
 		key:   key,
 		bytes: nil,
@@ -51,8 +55,6 @@ func NewPublicKeyFromBytes(bytes []byte) *PublicKey {
 }
 
 // PublicKey lazily serializes/deserializes the validator's key.
-// At least one of (key, bytes) must be provided.
-// This data structure is NOT thread-safe.
 type PublicKey struct {
 	key   *bls.PublicKey
 	bytes []byte

@@ -44,6 +44,10 @@ import (
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
 )
 
+var (
+	errUnexpectedBLSKey = errors.New("unexpected BLS key")
+)
+
 func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t)
@@ -2131,8 +2135,23 @@ func checkValidatorBlsKeyIsSet(
 	if !found {
 		return database.ErrNotFound
 	}
-	if val.PublicKey != expectedBlsKey {
-		return errors.New("unexpected BLS key")
+
+	if val.PublicKey == nil && expectedBlsKey == nil {
+		return nil
+	}
+
+	gotPublicKey, err := val.PublicKey.Key()
+	if err != nil {
+		return err
+	}
+
+	wantPublicKey, err := validators.NewPublicKey(expectedBlsKey).Key()
+	if err != nil {
+		return err
+	}
+
+	if gotPublicKey != wantPublicKey {
+		return errUnexpectedBLSKey
 	}
 
 	return nil
