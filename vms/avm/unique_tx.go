@@ -17,18 +17,15 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/executor"
-	"github.com/ava-labs/avalanchego/vms/components/avax"
-)
-
-var (
-	errMissingUTXO = errors.New("missing utxo")
-	errUnknownTx   = errors.New("transaction is unknown")
-	errRejectedTx  = errors.New("transaction is rejected")
 )
 
 var (
 	_ snowstorm.Tx            = (*UniqueTx)(nil)
 	_ cache.Evictable[ids.ID] = (*UniqueTx)(nil)
+
+	errMissingUTXO = errors.New("missing utxo")
+	errUnknownTx   = errors.New("transaction is unknown")
+	errRejectedTx  = errors.New("transaction is rejected")
 )
 
 // UniqueTx provides a de-duplication service for txs. This only provides a
@@ -46,10 +43,7 @@ type TxCachedState struct {
 	unique, verifiedTx, verifiedState bool
 	validity                          error
 
-	inputs     []ids.ID
-	inputUTXOs []*avax.UTXOID
-	utxos      []*avax.UTXO
-	deps       []snowstorm.Tx
+	deps []snowstorm.Tx
 
 	status choices.Status
 }
@@ -63,7 +57,7 @@ func (tx *UniqueTx) refresh() {
 	if tx.unique {
 		return
 	}
-	unique := tx.vm.DeduplicateTx(tx)
+	unique := tx.vm.uniqueTxs.Deduplicate(tx)
 	prevTx := tx.Tx
 	if unique == tx {
 		tx.vm.metrics.IncTxRefreshMisses()
@@ -200,7 +194,7 @@ func (tx *UniqueTx) Dependencies() ([]snowstorm.Tx, error) {
 	}
 
 	txIDs := set.Set[ids.ID]{}
-	for _, in := range tx.InputUTXOs() {
+	for _, in := range tx.Unsigned.InputUTXOs() {
 		if in.Symbolic() {
 			continue
 		}
@@ -226,41 +220,6 @@ func (tx *UniqueTx) Dependencies() ([]snowstorm.Tx, error) {
 		})
 	}
 	return tx.deps, nil
-}
-
-// InputIDs returns the set of utxoIDs this transaction consumes
-func (tx *UniqueTx) InputIDs() []ids.ID {
-	tx.refresh()
-	if tx.Tx == nil || len(tx.inputs) != 0 {
-		return tx.inputs
-	}
-
-	inputUTXOs := tx.InputUTXOs()
-	tx.inputs = make([]ids.ID, len(inputUTXOs))
-	for i, utxo := range inputUTXOs {
-		tx.inputs[i] = utxo.InputID()
-	}
-	return tx.inputs
-}
-
-// InputUTXOs returns the utxos that will be consumed on tx acceptance
-func (tx *UniqueTx) InputUTXOs() []*avax.UTXOID {
-	tx.refresh()
-	if tx.Tx == nil || len(tx.inputUTXOs) != 0 {
-		return tx.inputUTXOs
-	}
-	tx.inputUTXOs = tx.Tx.Unsigned.InputUTXOs()
-	return tx.inputUTXOs
-}
-
-// UTXOs returns the utxos that will be added to the UTXO set on tx acceptance
-func (tx *UniqueTx) UTXOs() []*avax.UTXO {
-	tx.refresh()
-	if tx.Tx == nil || len(tx.utxos) != 0 {
-		return tx.utxos
-	}
-	tx.utxos = tx.Tx.UTXOs()
-	return tx.utxos
 }
 
 // Bytes returns the binary representation of this transaction
