@@ -6,6 +6,8 @@ package cache
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/ids"
 )
 
@@ -23,50 +25,32 @@ func (e *evictable[_]) Evict() {
 }
 
 func TestEvictableLRU(t *testing.T) {
+	require := require.New(t)
+
 	cache := EvictableLRU[ids.ID, *evictable[ids.ID]]{}
 
 	expectedValue1 := &evictable[ids.ID]{id: ids.ID{1}}
-	if returnedValue := cache.Deduplicate(expectedValue1); returnedValue != expectedValue1 {
-		t.Fatalf("Returned unknown value")
-	} else if expectedValue1.evicted != 0 {
-		t.Fatalf("Value was evicted unexpectedly")
-	} else if returnedValue := cache.Deduplicate(expectedValue1); returnedValue != expectedValue1 {
-		t.Fatalf("Returned unknown value")
-	} else if expectedValue1.evicted != 0 {
-		t.Fatalf("Value was evicted unexpectedly")
-	}
+	require.Equal(expectedValue1, cache.Deduplicate(expectedValue1))
+	require.Zero(expectedValue1.evicted)
+	require.Equal(expectedValue1, cache.Deduplicate(expectedValue1))
+	require.Zero(expectedValue1.evicted)
 
 	expectedValue2 := &evictable[ids.ID]{id: ids.ID{2}}
 	returnedValue := cache.Deduplicate(expectedValue2)
-	switch {
-	case returnedValue != expectedValue2:
-		t.Fatalf("Returned unknown value")
-	case expectedValue1.evicted != 1:
-		t.Fatalf("Value should have been evicted")
-	case expectedValue2.evicted != 0:
-		t.Fatalf("Value was evicted unexpectedly")
-	}
+	require.Equal(expectedValue2, returnedValue)
+	require.Equal(1, expectedValue1.evicted)
+	require.Zero(expectedValue2.evicted)
 
 	cache.Size = 2
 
 	expectedValue3 := &evictable[ids.ID]{id: ids.ID{2}}
 	returnedValue = cache.Deduplicate(expectedValue3)
-	switch {
-	case returnedValue != expectedValue2:
-		t.Fatalf("Returned unknown value")
-	case expectedValue1.evicted != 1:
-		t.Fatalf("Value should have been evicted")
-	case expectedValue2.evicted != 0:
-		t.Fatalf("Value was evicted unexpectedly")
-	}
+	require.Equal(expectedValue2, returnedValue)
+	require.Equal(1, expectedValue1.evicted)
+	require.Zero(expectedValue2.evicted)
 
 	cache.Flush()
-	switch {
-	case expectedValue1.evicted != 1:
-		t.Fatalf("Value should have been evicted")
-	case expectedValue2.evicted != 1:
-		t.Fatalf("Value should have been evicted")
-	case expectedValue3.evicted != 0:
-		t.Fatalf("Value was evicted unexpectedly")
-	}
+	require.Equal(1, expectedValue1.evicted)
+	require.Equal(1, expectedValue2.evicted)
+	require.Zero(expectedValue3.evicted)
 }

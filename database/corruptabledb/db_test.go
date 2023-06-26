@@ -55,8 +55,7 @@ func TestCorruption(t *testing.T) {
 			corruptableBatch := db.NewBatch()
 			require.NotNil(t, corruptableBatch)
 
-			err := corruptableBatch.Put(key, value)
-			require.NoError(t, err)
+			require.NoError(t, corruptableBatch.Put(key, value))
 
 			return corruptableBatch.Write()
 		},
@@ -72,7 +71,7 @@ func TestCorruption(t *testing.T) {
 	for name, testFn := range tests {
 		t.Run(name, func(tt *testing.T) {
 			err := testFn(corruptableDB)
-			require.ErrorIsf(tt, err, errTest, "not received the corruption error")
+			require.ErrorIs(tt, err, errTest)
 		})
 	}
 }

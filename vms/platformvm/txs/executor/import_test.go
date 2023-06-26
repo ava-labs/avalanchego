@@ -22,7 +22,7 @@ import (
 )
 
 func TestNewImportTx(t *testing.T) {
-	env := newEnvironment(false /*=postBanff*/, false /*=postCortina*/)
+	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/)
 	defer func() {
 		require.NoError(t, shutdownEnvironment(env))
 	}()
@@ -72,7 +72,7 @@ func TestNewImportTx(t *testing.T) {
 			require.NoError(t, err)
 
 			inputID := utxo.InputID()
-			err = peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{
+			require.NoError(t, peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{
 				env.ctx.ChainID: {
 					PutRequests: []*atomic.Element{
 						{
@@ -84,9 +84,7 @@ func TestNewImportTx(t *testing.T) {
 						},
 					},
 				},
-			},
-			)
-			require.NoError(t, err)
+			}))
 		}
 
 		return sm
@@ -168,7 +166,8 @@ func TestNewImportTx(t *testing.T) {
 
 			unsignedTx := tx.Unsigned.(*txs.ImportTx)
 			require.NotEmpty(unsignedTx.ImportedInputs)
-			require.Equal(len(tx.Creds), len(unsignedTx.Ins)+len(unsignedTx.ImportedInputs), "should have the same number of credentials as inputs")
+			numInputs := len(unsignedTx.Ins) + len(unsignedTx.ImportedInputs)
+			require.Equal(len(tx.Creds), numInputs, "should have the same number of credentials as inputs")
 
 			totalIn := uint64(0)
 			for _, in := range unsignedTx.Ins {
@@ -198,8 +197,7 @@ func TestNewImportTx(t *testing.T) {
 				StateVersions: env,
 				Tx:            tx,
 			}
-			err = tx.Unsigned.Visit(&verifier)
-			require.NoError(err)
+			require.NoError(tx.Unsigned.Visit(&verifier))
 		})
 	}
 }

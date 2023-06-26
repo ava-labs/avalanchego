@@ -25,8 +25,7 @@ func TestIndex(t *testing.T) {
 	pageSize := uint64(64)
 	require := require.New(t)
 	codec := codec.NewDefaultManager()
-	err := codec.RegisterCodec(codecVersion, linearcodec.NewDefault())
-	require.NoError(err)
+	require.NoError(codec.RegisterCodec(codecVersion, linearcodec.NewDefault()))
 	baseDB := memdb.New()
 	db := versiondb.New(baseDB)
 	ctx := snow.DefaultConsensusContextTest()
@@ -44,13 +43,12 @@ func TestIndex(t *testing.T) {
 	// Accept each container and after each, make assertions
 	i := uint64(0)
 	for containerID, containerBytes := range containers {
-		err = idx.Accept(ctx, containerID, containerBytes)
-		require.NoError(err)
+		require.NoError(idx.Accept(ctx, containerID, containerBytes))
 
 		lastAcceptedIndex, ok := idx.lastAcceptedIndex()
 		require.True(ok)
-		require.EqualValues(i, lastAcceptedIndex)
-		require.EqualValues(i+1, idx.nextAcceptedIndex)
+		require.Equal(i, lastAcceptedIndex)
+		require.Equal(i+1, idx.nextAcceptedIndex)
 
 		gotContainer, err := idx.GetContainerByID(containerID)
 		require.NoError(err)
@@ -58,7 +56,7 @@ func TestIndex(t *testing.T) {
 
 		gotIndex, err := idx.GetIndex(containerID)
 		require.NoError(err)
-		require.EqualValues(i, gotIndex)
+		require.Equal(i, gotIndex)
 
 		gotContainer, err = idx.GetContainerByIndex(i)
 		require.NoError(err)
@@ -104,9 +102,9 @@ func TestIndex(t *testing.T) {
 	for _, container := range containersList {
 		require.False(sawContainers.Contains(container.ID)) // Should only see this container once
 		require.Contains(containers, container.ID)
-		require.EqualValues(containers[container.ID], container.Bytes)
+		require.Equal(containers[container.ID], container.Bytes)
 		// Timestamps should be non-decreasing
-		require.True(container.Timestamp >= lastTimestamp)
+		require.GreaterOrEqual(container.Timestamp, lastTimestamp)
 		lastTimestamp = container.Timestamp
 		sawContainers.Add(container.ID)
 	}
@@ -116,8 +114,7 @@ func TestIndexGetContainerByRangeMaxPageSize(t *testing.T) {
 	// Setup
 	require := require.New(t)
 	codec := codec.NewDefaultManager()
-	err := codec.RegisterCodec(codecVersion, linearcodec.NewDefault())
-	require.NoError(err)
+	require.NoError(codec.RegisterCodec(codecVersion, linearcodec.NewDefault()))
 	db := memdb.New()
 	ctx := snow.DefaultConsensusContextTest()
 	indexIntf, err := newIndex(db, logging.NoLog{}, codec, mockable.Clock{})
@@ -126,8 +123,7 @@ func TestIndexGetContainerByRangeMaxPageSize(t *testing.T) {
 
 	// Insert [MaxFetchedByRange] + 1 containers
 	for i := uint64(0); i < MaxFetchedByRange+1; i++ {
-		err = idx.Accept(ctx, ids.GenerateTestID(), utils.RandomBytes(32))
-		require.NoError(err)
+		require.NoError(idx.Accept(ctx, ids.GenerateTestID(), utils.RandomBytes(32)))
 	}
 
 	// Page size too large
@@ -150,16 +146,15 @@ func TestIndexGetContainerByRangeMaxPageSize(t *testing.T) {
 	containers, err = idx.GetContainerRange(MaxFetchedByRange-1, MaxFetchedByRange)
 	require.NoError(err)
 	require.Len(containers, 2)
-	require.EqualValues(containers[1], containers2[MaxFetchedByRange-1])
-	require.EqualValues(containers[0], containers2[MaxFetchedByRange-2])
+	require.Equal(containers[1], containers2[MaxFetchedByRange-1])
+	require.Equal(containers[0], containers2[MaxFetchedByRange-2])
 }
 
 func TestDontIndexSameContainerTwice(t *testing.T) {
 	// Setup
 	require := require.New(t)
 	codec := codec.NewDefaultManager()
-	err := codec.RegisterCodec(codecVersion, linearcodec.NewDefault())
-	require.NoError(err)
+	require.NoError(codec.RegisterCodec(codecVersion, linearcodec.NewDefault()))
 	db := memdb.New()
 	ctx := snow.DefaultConsensusContextTest()
 	idx, err := newIndex(db, logging.NoLog{}, codec, mockable.Clock{})
@@ -173,5 +168,5 @@ func TestDontIndexSameContainerTwice(t *testing.T) {
 	require.ErrorIs(err, errNoContainerAtIndex)
 	gotContainer, err := idx.GetContainerByID(containerID)
 	require.NoError(err)
-	require.EqualValues(gotContainer.Bytes, []byte{1, 2, 3}, "should not have accepted same container twice")
+	require.Equal([]byte{1, 2, 3}, gotContainer.Bytes)
 }

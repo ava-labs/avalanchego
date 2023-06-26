@@ -961,8 +961,7 @@ func TestBlockReject(t *testing.T) {
 			defer ctrl.Finish()
 
 			b := tt.blockFunc(ctrl)
-			err := b.Reject(context.Background())
-			require.NoError(err)
+			require.NoError(b.Reject(context.Background()))
 			require.True(b.rejected)
 			_, ok := b.manager.blkIDToState[b.ID()]
 			require.False(ok)

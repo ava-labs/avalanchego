@@ -51,23 +51,19 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	env.sender.SendAppGossipF = func(context.Context, []byte) error {
 		return nil
 	}
-	err := env.Builder.AddUnverifiedTx(tx)
-	require.NoError(err)
-
-	has := env.mempool.Has(txID)
-	require.True(has)
+	require.NoError(env.Builder.AddUnverifiedTx(tx))
+	require.True(env.mempool.Has(txID))
 
 	// show that build block include that tx and removes it from mempool
 	blkIntf, err := env.Builder.BuildBlock(context.Background())
 	require.NoError(err)
 
-	blk, ok := blkIntf.(*blockexecutor.Block)
-	require.True(ok)
+	require.IsType(&blockexecutor.Block{}, blkIntf)
+	blk := blkIntf.(*blockexecutor.Block)
 	require.Len(blk.Txs(), 1)
 	require.Equal(txID, blk.Txs()[0].ID())
 
-	has = env.mempool.Has(txID)
-	require.False(has)
+	require.False(env.mempool.Has(txID))
 }
 
 func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
@@ -678,7 +674,7 @@ func TestBuildBlock(t *testing.T) {
 				return
 			}
 			require.NoError(err)
-			require.EqualValues(tt.expectedBlkF(require), gotBlk)
+			require.Equal(tt.expectedBlkF(require), gotBlk)
 		})
 	}
 }

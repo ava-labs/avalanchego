@@ -90,7 +90,7 @@ type server struct {
 	factory logging.Factory
 	// Listens for HTTP traffic on this address
 	listenHost string
-	listenPort uint16
+	listenPort string
 
 	shutdownTimeout time.Duration
 
@@ -119,6 +119,7 @@ func New(
 	namespace string,
 	registerer prometheus.Registerer,
 	httpConfig HTTPConfig,
+	allowedHosts []string,
 	wrappers ...Wrapper,
 ) (Server, error) {
 	m, err := newMetrics(namespace, registerer)
@@ -127,10 +128,11 @@ func New(
 	}
 
 	router := newRouter()
+	allowedHostsHandler := filterInvalidHosts(router, allowedHosts)
 	corsHandler := cors.New(cors.Options{
 		AllowedOrigins:   allowedOrigins,
 		AllowCredentials: true,
-	}).Handler(router)
+	}).Handler(allowedHostsHandler)
 	gzipHandler := gziphandler.GzipHandler(corsHandler)
 	var handler http.Handler = http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
@@ -152,7 +154,7 @@ func New(
 		log:             log,
 		factory:         factory,
 		listenHost:      host,
-		listenPort:      port,
+		listenPort:      fmt.Sprintf("%d", port),
 		shutdownTimeout: shutdownTimeout,
 		tracingEnabled:  tracingEnabled,
 		tracer:          tracer,
@@ -169,7 +171,7 @@ func New(
 }
 
 func (s *server) Dispatch() error {
-	listenAddress := fmt.Sprintf("%s:%d", s.listenHost, s.listenPort)
+	listenAddress := net.JoinHostPort(s.listenHost, s.listenPort)
 	listener, err := net.Listen("tcp", listenAddress)
 	if err != nil {
 		return err
@@ -191,7 +193,7 @@ func (s *server) Dispatch() error {
 }
 
 func (s *server) DispatchTLS(certBytes, keyBytes []byte) error {
-	listenAddress := fmt.Sprintf("%s:%d", s.listenHost, s.listenPort)
+	listenAddress := net.JoinHostPort(s.listenHost, s.listenPort)
 	cert, err := tls.X509KeyPair(certBytes, keyBytes)
 	if err != nil {
 		return err
@@ -377,9 +379,7 @@ func lockMiddleware(
 func rejectMiddleware(handler http.Handler, ctx *snow.ConsensusContext) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { // If chain isn't done bootstrapping, ignore API calls
 		if ctx.State.Get().State != snow.NormalOp {
-			w.WriteHeader(http.StatusServiceUnavailable)
-			// Doesn't matter if there's an error while writing. They'll get the StatusServiceUnavailable code.
-			_, _ = w.Write([]byte("API call rejected because chain is not done bootstrapping"))
+			http.Error(w, "API call rejected because chain is not done bootstrapping", http.StatusServiceUnavailable)
 		} else {
 			handler.ServeHTTP(w, r)
 		}

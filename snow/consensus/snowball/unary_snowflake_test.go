@@ -5,17 +5,20 @@ package snowball
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func UnarySnowflakeStateTest(t *testing.T, sf *unarySnowflake, expectedConfidence int, expectedFinalized bool) {
-	if confidence := sf.confidence; confidence != expectedConfidence {
-		t.Fatalf("Wrong confidence. Expected %d got %d", expectedConfidence, confidence)
-	} else if finalized := sf.Finalized(); finalized != expectedFinalized {
-		t.Fatalf("Wrong finalized status. Expected %v got %v", expectedFinalized, finalized)
-	}
+	require := require.New(t)
+
+	require.Equal(expectedConfidence, sf.confidence)
+	require.Equal(expectedFinalized, sf.Finalized())
 }
 
 func TestUnarySnowflake(t *testing.T) {
+	require := require.New(t)
+
 	beta := 2
 
 	sf := &unarySnowflake{}
@@ -31,10 +34,8 @@ func TestUnarySnowflake(t *testing.T) {
 	UnarySnowflakeStateTest(t, sf, 1, false)
 
 	sfCloneIntf := sf.Clone()
-	sfClone, ok := sfCloneIntf.(*unarySnowflake)
-	if !ok {
-		t.Fatalf("Unexpected clone type")
-	}
+	require.IsType(&unarySnowflake{}, sfCloneIntf)
+	sfClone := sfCloneIntf.(*unarySnowflake)
 
 	UnarySnowflakeStateTest(t, sfClone, 1, false)
 
@@ -44,17 +45,12 @@ func TestUnarySnowflake(t *testing.T) {
 
 	binarySnowflake.RecordSuccessfulPoll(1)
 
-	if binarySnowflake.Finalized() {
-		t.Fatalf("Should not have finalized")
-	}
+	require.False(binarySnowflake.Finalized())
 
 	binarySnowflake.RecordSuccessfulPoll(1)
 
-	if binarySnowflake.Preference() != 1 {
-		t.Fatalf("Wrong preference")
-	} else if !binarySnowflake.Finalized() {
-		t.Fatalf("Should have finalized")
-	}
+	require.Equal(1, binarySnowflake.Preference())
+	require.True(binarySnowflake.Finalized())
 
 	sf.RecordSuccessfulPoll()
 	UnarySnowflakeStateTest(t, sf, 2, true)

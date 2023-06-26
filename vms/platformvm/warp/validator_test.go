@@ -146,7 +146,7 @@ func TestGetCanonicalValidatorSet(t *testing.T) {
 			require.Equal(tt.expectedWeight, weight)
 
 			// These are pointers so have to test equality like this
-			require.Equal(len(tt.expectedVdrs), len(vdrs))
+			require.Len(vdrs, len(tt.expectedVdrs))
 			for i, expectedVdr := range tt.expectedVdrs {
 				gotVdr := vdrs[i]
 				expectedPK, err := expectedVdr.PublicKey.Key()
@@ -246,9 +246,10 @@ func TestFilterValidators(t *testing.T) {
 
 			vdrs, err := FilterValidators(tt.indices, tt.vdrs)
 			require.ErrorIs(err, tt.expectedErr)
-			if err == nil {
-				require.Equal(tt.expectedVdrs, vdrs)
+			if tt.expectedErr != nil {
+				return
 			}
+			require.Equal(tt.expectedVdrs, vdrs)
 		})
 	}
 }
@@ -300,9 +301,10 @@ func TestSumWeight(t *testing.T) {
 
 			sum, err := SumWeight(tt.vdrs)
 			require.ErrorIs(err, tt.expectedErr)
-			if err == nil {
-				require.Equal(tt.expectedSum, sum)
+			if tt.expectedErr != nil {
+				return
 			}
+			require.Equal(tt.expectedSum, sum)
 		})
 	}
 }

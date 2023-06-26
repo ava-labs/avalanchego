@@ -95,18 +95,20 @@ func (v *versions) GetState(blkID ids.ID) (Chain, bool) {
 }
 
 func TestState(t *testing.T) {
+	require := require.New(t)
+
 	db := memdb.New()
 	vdb := versiondb.New(db)
 	s, err := New(vdb, parser, prometheus.NewRegistry())
-	require.NoError(t, err)
+	require.NoError(err)
 
 	s.AddUTXO(populatedUTXO)
 	s.AddTx(populatedTx)
 	s.AddBlock(populatedBlk)
-	require.NoError(t, s.Commit())
+	require.NoError(s.Commit())
 
 	s, err = New(vdb, parser, prometheus.NewRegistry())
-	require.NoError(t, err)
+	require.NoError(err)
 
 	ChainUTXOTest(t, s)
 	ChainTxTest(t, s)
@@ -114,15 +116,17 @@ func TestState(t *testing.T) {
 }
 
 func TestDiff(t *testing.T) {
+	require := require.New(t)
+
 	db := memdb.New()
 	vdb := versiondb.New(db)
 	s, err := New(vdb, parser, prometheus.NewRegistry())
-	require.NoError(t, err)
+	require.NoError(err)
 
 	s.AddUTXO(populatedUTXO)
 	s.AddTx(populatedTx)
 	s.AddBlock(populatedBlk)
-	require.NoError(t, s.Commit())
+	require.NoError(s.Commit())
 
 	parentID := ids.GenerateTestID()
 	d, err := NewDiff(parentID, &versions{
@@ -130,7 +134,7 @@ func TestDiff(t *testing.T) {
 			parentID: s,
 		},
 	})
-	require.NoError(t, err)
+	require.NoError(err)
 
 	ChainUTXOTest(t, d)
 	ChainTxTest(t, d)
@@ -281,8 +285,7 @@ func TestInitializeChainState(t *testing.T) {
 
 	stopVertexID := ids.GenerateTestID()
 	genesisTimestamp := version.CortinaDefaultTime
-	err = s.InitializeChainState(stopVertexID, genesisTimestamp)
-	require.NoError(err)
+	require.NoError(s.InitializeChainState(stopVertexID, genesisTimestamp))
 
 	lastAcceptedID := s.GetLastAccepted()
 	genesis, err := s.GetBlock(lastAcceptedID)
@@ -301,11 +304,9 @@ func TestInitializeChainState(t *testing.T) {
 
 	s.AddBlock(childBlock)
 	s.SetLastAccepted(childBlock.ID())
-	err = s.Commit()
-	require.NoError(err)
+	require.NoError(s.Commit())
 
-	err = s.InitializeChainState(stopVertexID, genesisTimestamp)
-	require.NoError(err)
+	require.NoError(s.InitializeChainState(stopVertexID, genesisTimestamp))
 
 	lastAcceptedID = s.GetLastAccepted()
 	lastAccepted, err := s.GetBlock(lastAcceptedID)

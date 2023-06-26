@@ -6,11 +6,12 @@ package builder
 import (
 	"context"
 	"errors"
-	"fmt"
 	"testing"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/chains/atomic"
@@ -34,7 +35,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/utils/window"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -53,14 +53,10 @@ import (
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
 	txbuilder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
 	txexecutor "github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
+	pvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
 )
 
-const (
-	testNetworkID                 = 10 // To be used in tests
-	defaultWeight                 = 10000
-	maxRecentlyAcceptedWindowSize = 256
-	recentlyAcceptedWindowTTL     = 5 * time.Minute
-)
+const defaultWeight = 10000
 
 var (
 	defaultMinStakingDuration = 24 * time.Hour
@@ -109,6 +105,8 @@ type environment struct {
 }
 
 func newEnvironment(t *testing.T) *environment {
+	require := require.New(t)
+
 	res := &environment{
 		isBootstrapped: &utils.Atomic[bool]{},
 		config:         defaultConfig(),
@@ -123,10 +121,10 @@ func newEnvironment(t *testing.T) *environment {
 	res.ctx.Lock.Lock()
 	defer res.ctx.Lock.Unlock()
 
-	res.fx = defaultFx(res.clk, res.ctx.Log, res.isBootstrapped.Get())
+	res.fx = defaultFx(t, res.clk, res.ctx.Log, res.isBootstrapped.Get())
 
 	rewardsCalc := reward.NewCalculator(res.config.RewardConfig)
-	res.state = defaultState(res.config, res.ctx, res.baseDB, rewardsCalc)
+	res.state = defaultState(t, res.config, res.ctx, res.baseDB, rewardsCalc)
 
 	res.atomicUTXOs = avax.NewAtomicUTXOManager(res.ctx.SharedMemory, txs.Codec)
 	res.uptimes = uptime.NewManager(res.state)
@@ -155,30 +153,20 @@ func newEnvironment(t *testing.T) *environment {
 	}
 
 	registerer := prometheus.NewRegistry()
-	window := window.New[ids.ID](
-		window.Config{
-			Clock:   res.clk,
-			MaxSize: maxRecentlyAcceptedWindowSize,
-			TTL:     recentlyAcceptedWindowTTL,
-		},
-	)
 	res.sender = &common.SenderTest{T: t}
 
-	metrics, err := metrics.New("", registerer, res.config.TrackedSubnets)
-	if err != nil {
-		panic(fmt.Errorf("failed to create metrics: %w", err))
-	}
+	metrics, err := metrics.New("", registerer)
+	require.NoError(err)
 
 	res.mempool, err = mempool.NewMempool("mempool", registerer, res)
-	if err != nil {
-		panic(fmt.Errorf("failed to create mempool: %w", err))
-	}
+	require.NoError(err)
+
 	res.blkManager = blockexecutor.NewManager(
 		res.mempool,
 		metrics,
 		res.state,
 		&res.backend,
-		window,
+		pvalidators.TestManager,
 	)
 
 	res.Builder = New(
@@ -191,12 +179,14 @@ func newEnvironment(t *testing.T) *environment {
 	)
 
 	res.Builder.SetPreference(genesisID)
-	addSubnet(res)
+	addSubnet(t, res)
 
 	return res
 }
 
-func addSubnet(env *environment) {
+func addSubnet(t *testing.T, env *environment) {
+	require := require.New(t)
+
 	// Create a subnet
 	var err error
 	testSubnet1, err = env.txBuilder.NewCreateSubnetTx(
@@ -209,40 +199,34 @@ func addSubnet(env *environment) {
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
 		preFundedKeys[0].PublicKey().Address(),
 	)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(err)
 
 	// store it
 	genesisID := env.state.GetLastAccepted()
 	stateDiff, err := state.NewDiff(genesisID, env.blkManager)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(err)
 
 	executor := txexecutor.StandardTxExecutor{
 		Backend: &env.backend,
 		State:   stateDiff,
 		Tx:      testSubnet1,
 	}
-	err = testSubnet1.Unsigned.Visit(&executor)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(testSubnet1.Unsigned.Visit(&executor))
 
 	stateDiff.AddTx(testSubnet1, status.Committed)
-	if err := stateDiff.Apply(env.state); err != nil {
-		panic(err)
-	}
+	require.NoError(stateDiff.Apply(env.state))
 }
 
 func defaultState(
+	t *testing.T,
 	cfg *config.Config,
 	ctx *snow.Context,
 	db database.Database,
 	rewards reward.Calculator,
 ) state.State {
-	genesisBytes := buildGenesisTest(ctx)
+	require := require.New(t)
+
+	genesisBytes := buildGenesisTest(t, ctx)
 	state, err := state.New(
 		db,
 		genesisBytes,
@@ -253,20 +237,11 @@ func defaultState(
 		rewards,
 		&utils.Atomic[bool]{},
 	)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(err)
 
 	// persist and reload to init a bunch of in-memory stuff
 	state.SetHeight(0)
-	if err := state.Commit(); err != nil {
-		panic(err)
-	}
-	state.SetHeight( /*height*/ 0)
-	if err := state.Commit(); err != nil {
-		panic(err)
-	}
-
+	require.NoError(state.Commit())
 	return state
 }
 
@@ -332,9 +307,9 @@ func defaultConfig() *config.Config {
 
 func defaultClock() *mockable.Clock {
 	// set time after Banff fork (and before default nextStakerTime)
-	clk := mockable.Clock{}
+	clk := &mockable.Clock{}
 	clk.Set(defaultGenesisTime)
-	return &clk
+	return clk
 }
 
 type fxVMInt struct {
@@ -355,33 +330,30 @@ func (fvi *fxVMInt) Logger() logging.Logger {
 	return fvi.log
 }
 
-func defaultFx(clk *mockable.Clock, log logging.Logger, isBootstrapped bool) fx.Fx {
+func defaultFx(t *testing.T, clk *mockable.Clock, log logging.Logger, isBootstrapped bool) fx.Fx {
+	require := require.New(t)
+
 	fxVMInt := &fxVMInt{
 		registry: linearcodec.NewDefault(),
 		clk:      clk,
 		log:      log,
 	}
 	res := &secp256k1fx.Fx{}
-	if err := res.Initialize(fxVMInt); err != nil {
-		panic(err)
-	}
+	require.NoError(res.Initialize(fxVMInt))
 	if isBootstrapped {
-		if err := res.Bootstrapped(); err != nil {
-			panic(err)
-		}
+		require.NoError(res.Bootstrapped())
 	}
 	return res
 }
 
-func buildGenesisTest(ctx *snow.Context) []byte {
+func buildGenesisTest(t *testing.T, ctx *snow.Context) []byte {
+	require := require.New(t)
+
 	genesisUTXOs := make([]api.UTXO, len(preFundedKeys))
-	hrp := constants.NetworkIDToHRP[testNetworkID]
 	for i, key := range preFundedKeys {
 		id := key.PublicKey().Address()
-		addr, err := address.FormatBech32(hrp, id.Bytes())
-		if err != nil {
-			panic(err)
-		}
+		addr, err := address.FormatBech32(constants.UnitTestHRP, id.Bytes())
+		require.NoError(err)
 		genesisUTXOs[i] = api.UTXO{
 			Amount:  json.Uint64(defaultBalance),
 			Address: addr,
@@ -391,10 +363,8 @@ func buildGenesisTest(ctx *snow.Context) []byte {
 	genesisValidators := make([]api.PermissionlessValidator, len(preFundedKeys))
 	for i, key := range preFundedKeys {
 		nodeID := ids.NodeID(key.PublicKey().Address())
-		addr, err := address.FormatBech32(hrp, nodeID.Bytes())
-		if err != nil {
-			panic(err)
-		}
+		addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
+		require.NoError(err)
 		genesisValidators[i] = api.PermissionlessValidator{
 			Staker: api.Staker{
 				StartTime: json.Uint64(defaultValidateStartTime.Unix()),
@@ -414,7 +384,7 @@ func buildGenesisTest(ctx *snow.Context) []byte {
 	}
 
 	buildGenesisArgs := api.BuildGenesisArgs{
-		NetworkID:     json.Uint32(testNetworkID),
+		NetworkID:     json.Uint32(constants.UnitTestID),
 		AvaxAssetID:   ctx.AVAXAssetID,
 		UTXOs:         genesisUTXOs,
 		Validators:    genesisValidators,
@@ -426,14 +396,10 @@ func buildGenesisTest(ctx *snow.Context) []byte {
 
 	buildGenesisResponse := api.BuildGenesisReply{}
 	platformvmSS := api.StaticService{}
-	if err := platformvmSS.BuildGenesis(nil, &buildGenesisArgs, &buildGenesisResponse); err != nil {
-		panic(fmt.Errorf("problem while building platform chain's genesis state: %w", err))
-	}
+	require.NoError(platformvmSS.BuildGenesis(nil, &buildGenesisArgs, &buildGenesisResponse))
 
 	genesisBytes, err := formatting.Decode(buildGenesisResponse.Encoding, buildGenesisResponse.Bytes)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(err)
 
 	return genesisBytes
 }
