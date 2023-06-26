@@ -1028,8 +1028,8 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 func TestVerifyKeyValues(t *testing.T) {
 	type test struct {
 		name        string
-		start       []byte
-		end         []byte
+		start       Maybe[[]byte]
+		end         Maybe[[]byte]
 		kvs         []KeyValue
 		expectedErr error
 	}
@@ -1037,15 +1037,15 @@ func TestVerifyKeyValues(t *testing.T) {
 	tests := []test{
 		{
 			name:        "empty",
-			start:       nil,
-			end:         nil,
+			start:       Nothing[[]byte](),
+			end:         Nothing[[]byte](),
 			kvs:         nil,
 			expectedErr: nil,
 		},
 		{
 			name:  "1 key",
-			start: nil,
-			end:   nil,
+			start: Nothing[[]byte](),
+			end:   Nothing[[]byte](),
 			kvs: []KeyValue{
 				{Key: []byte{0}},
 			},
@@ -1053,8 +1053,8 @@ func TestVerifyKeyValues(t *testing.T) {
 		},
 		{
 			name:  "non-increasing keys",
-			start: nil,
-			end:   nil,
+			start: Nothing[[]byte](),
+			end:   Nothing[[]byte](),
 			kvs: []KeyValue{
 				{Key: []byte{0}},
 				{Key: []byte{0}},
@@ -1063,8 +1063,8 @@ func TestVerifyKeyValues(t *testing.T) {
 		},
 		{
 			name:  "key before start",
-			start: []byte{1, 2},
-			end:   nil,
+			start: Some([]byte{1, 2}),
+			end:   Nothing[[]byte](),
 			kvs: []KeyValue{
 				{Key: []byte{1}},
 				{Key: []byte{1, 2}},
@@ -1073,8 +1073,8 @@ func TestVerifyKeyValues(t *testing.T) {
 		},
 		{
 			name:  "key after end",
-			start: nil,
-			end:   []byte{1, 2},
+			start: Nothing[[]byte](),
+			end:   Some([]byte{1, 2}),
 			kvs: []KeyValue{
 				{Key: []byte{1}},
 				{Key: []byte{1, 2}},
@@ -1084,8 +1084,8 @@ func TestVerifyKeyValues(t *testing.T) {
 		},
 		{
 			name:  "happy path",
-			start: nil,
-			end:   []byte{1, 2, 3},
+			start: Nothing[[]byte](),
+			end:   Some([]byte{1, 2, 3}),
 			kvs: []KeyValue{
 				{Key: []byte{1}},
 				{Key: []byte{1, 2}},
