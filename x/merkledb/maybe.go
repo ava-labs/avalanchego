@@ -7,6 +7,7 @@ import "golang.org/x/exp/slices"
 
 // Maybe T = Some T | Nothing.
 // A data wrapper that allows values to be something [Some T] or nothing [Nothing].
+// Invariant: If [hasValue] is false, then [value] is the zero value of type T.
 // Maybe is used to wrap types:
 // * That can't be represented by nil.
 // * That use nil as a valid value instead of an indicator of a missing value.

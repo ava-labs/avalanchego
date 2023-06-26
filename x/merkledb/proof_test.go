@@ -148,14 +148,14 @@ func Test_RangeProof_Extra_Value(t *testing.T) {
 	require.NoError(err)
 	require.Equal([]byte{2}, val)
 
-	proof, err := db.GetRangeProof(context.Background(), []byte{1}, []byte{5, 5}, 10)
+	proof, err := db.GetRangeProof(context.Background(), Some([]byte{1}), Some([]byte{5, 5}), 10)
 	require.NoError(err)
 	require.NotNil(proof)
 
 	require.NoError(proof.Verify(
 		context.Background(),
-		[]byte{1},
-		[]byte{5, 5},
+		Some([]byte{1}),
+		Some([]byte{5, 5}),
 		db.root.id,
 	))
 
@@ -163,8 +163,8 @@ func Test_RangeProof_Extra_Value(t *testing.T) {
 
 	err = proof.Verify(
 		context.Background(),
-		[]byte{1},
-		[]byte{5, 5},
+		Some([]byte{1}),
+		Some([]byte{5, 5}),
 		db.root.id,
 	)
 	require.ErrorIs(err, ErrInvalidProof)
@@ -221,13 +221,13 @@ func Test_RangeProof_Verify_Bad_Data(t *testing.T) {
 			require.NoError(err)
 			writeBasicBatch(t, db)
 
-			proof, err := db.GetRangeProof(context.Background(), []byte{2}, []byte{3, 0}, 50)
+			proof, err := db.GetRangeProof(context.Background(), Some([]byte{2}), Some([]byte{3, 0}), 50)
 			require.NoError(err)
 			require.NotNil(proof)
 
 			tt.malform(proof)
 
-			err = proof.Verify(context.Background(), []byte{2}, []byte{3, 0}, db.getMerkleRoot())
+			err = proof.Verify(context.Background(), Some([]byte{2}), Some([]byte{3, 0}), db.getMerkleRoot())
 			require.ErrorIs(err, tt.expectedErr)
 		})
 	}
@@ -242,10 +242,10 @@ func Test_RangeProof_MaxLength(t *testing.T) {
 	trie, err := dbTrie.NewView()
 	require.NoError(err)
 
-	_, err = trie.GetRangeProof(context.Background(), nil, nil, -1)
+	_, err = trie.GetRangeProof(context.Background(), Nothing[[]byte](), Nothing[[]byte](), -1)
 	require.ErrorIs(err, ErrInvalidMaxLength)
 
-	_, err = trie.GetRangeProof(context.Background(), nil, nil, 0)
+	_, err = trie.GetRangeProof(context.Background(), Nothing[[]byte](), Nothing[[]byte](), 0)
 	require.ErrorIs(err, ErrInvalidMaxLength)
 }
 
@@ -291,8 +291,8 @@ func Test_Proof(t *testing.T) {
 func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 	type test struct {
 		name        string
-		start       []byte
-		end         []byte
+		start       Maybe[[]byte]
+		end         Maybe[[]byte]
 		proof       *RangeProof
 		expectedErr error
 	}
@@ -300,22 +300,22 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 	tests := []test{
 		{
 			name:        "start > end",
-			start:       []byte{1},
-			end:         []byte{0},
+			start:       Some([]byte{1}),
+			end:         Some([]byte{0}),
 			proof:       &RangeProof{},
 			expectedErr: ErrStartAfterEnd,
 		},
 		{
 			name:        "empty", // Also tests start can be > end if end is nil
-			start:       []byte{1},
-			end:         nil,
+			start:       Some([]byte{1}),
+			end:         Nothing[[]byte](),
 			proof:       &RangeProof{},
 			expectedErr: ErrNoMerkleProof,
 		},
 		{
 			name:  "should just be root",
-			start: nil,
-			end:   nil,
+			start: Nothing[[]byte](),
+			end:   Nothing[[]byte](),
 			proof: &RangeProof{
 				EndProof: []ProofNode{{}, {}},
 			},
@@ -323,8 +323,8 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 		},
 		{
 			name:  "no end proof",
-			start: []byte{1},
-			end:   []byte{1},
+			start: Some([]byte{1}),
+			end:   Some([]byte{1}),
 			proof: &RangeProof{
 				KeyValues: []KeyValue{{Key: []byte{1}, Value: []byte{1}}},
 			},
@@ -332,8 +332,8 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 		},
 		{
 			name:  "unsorted key values",
-			start: []byte{1},
-			end:   nil,
+			start: Some([]byte{1}),
+			end:   Nothing[[]byte](),
 			proof: &RangeProof{
 				KeyValues: []KeyValue{
 					{Key: []byte{1}, Value: []byte{1}},
@@ -344,8 +344,8 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 		},
 		{
 			name:  "key lower than start",
-			start: []byte{1},
-			end:   nil,
+			start: Some([]byte{1}),
+			end:   Nothing[[]byte](),
 			proof: &RangeProof{
 				KeyValues: []KeyValue{
 					{Key: []byte{0}, Value: []byte{0}},
@@ -355,8 +355,8 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 		},
 		{
 			name:  "key greater than end",
-			start: []byte{1},
-			end:   []byte{1},
+			start: Some([]byte{1}),
+			end:   Some([]byte{1}),
 			proof: &RangeProof{
 				KeyValues: []KeyValue{
 					{Key: []byte{2}, Value: []byte{0}},
@@ -367,8 +367,8 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 		},
 		{
 			name:  "start proof nodes in wrong order",
-			start: []byte{1, 2},
-			end:   nil,
+			start: Some([]byte{1, 2}),
+			end:   Nothing[[]byte](),
 			proof: &RangeProof{
 				KeyValues: []KeyValue{
 					{Key: []byte{1, 2}, Value: []byte{1}},
@@ -386,8 +386,8 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 		},
 		{
 			name:  "start proof has node for wrong key",
-			start: []byte{1, 2},
-			end:   nil,
+			start: Some([]byte{1, 2}),
+			end:   Nothing[[]byte](),
 			proof: &RangeProof{
 				KeyValues: []KeyValue{
 					{Key: []byte{1, 2}, Value: []byte{1}},
@@ -408,8 +408,8 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 		},
 		{
 			name:  "end proof nodes in wrong order",
-			start: nil,
-			end:   []byte{1, 2},
+			start: Nothing[[]byte](),
+			end:   Some([]byte{1, 2}),
 			proof: &RangeProof{
 				KeyValues: []KeyValue{
 					{Key: []byte{1, 2}, Value: []byte{1}},
@@ -427,8 +427,8 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 		},
 		{
 			name:  "end proof has node for wrong key",
-			start: nil,
-			end:   []byte{1, 2},
+			start: Nothing[[]byte](),
+			end:   Some([]byte{1, 2}),
 			proof: &RangeProof{
 				KeyValues: []KeyValue{
 					{Key: []byte{1, 2}, Value: []byte{1}},
@@ -464,7 +464,7 @@ func Test_RangeProof(t *testing.T) {
 	require.NoError(err)
 	writeBasicBatch(t, db)
 
-	proof, err := db.GetRangeProof(context.Background(), []byte{1}, []byte{3, 5}, 10)
+	proof, err := db.GetRangeProof(context.Background(), Some([]byte{1}), Some([]byte{3, 5}), 10)
 	require.NoError(err)
 	require.NotNil(proof)
 	require.Len(proof.KeyValues, 3)
@@ -486,8 +486,8 @@ func Test_RangeProof(t *testing.T) {
 
 	require.NoError(proof.Verify(
 		context.Background(),
-		[]byte{1},
-		[]byte{3, 5},
+		Some([]byte{1}),
+		Some([]byte{3, 5}),
 		db.root.id,
 	))
 }
@@ -499,7 +499,7 @@ func Test_RangeProof_BadBounds(t *testing.T) {
 	require.NoError(err)
 
 	// non-nil start/end
-	proof, err := db.GetRangeProof(context.Background(), []byte{4}, []byte{3}, 50)
+	proof, err := db.GetRangeProof(context.Background(), Some([]byte{4}), Some([]byte{3}), 50)
 	require.ErrorIs(err, ErrStartAfterEnd)
 	require.Nil(proof)
 }
@@ -520,7 +520,7 @@ func Test_RangeProof_NilStart(t *testing.T) {
 	require.NoError(err)
 	require.Equal([]byte("value1"), val)
 
-	proof, err := db.GetRangeProof(context.Background(), nil, []byte("key35"), 2)
+	proof, err := db.GetRangeProof(context.Background(), Nothing[[]byte](), Some([]byte("key35")), 2)
 	require.NoError(err)
 	require.NotNil(proof)
 
@@ -538,8 +538,8 @@ func Test_RangeProof_NilStart(t *testing.T) {
 
 	require.NoError(proof.Verify(
 		context.Background(),
-		nil,
-		[]byte("key35"),
+		Nothing[[]byte](),
+		Some([]byte("key35")),
 		db.root.id,
 	))
 }
@@ -552,7 +552,7 @@ func Test_RangeProof_NilEnd(t *testing.T) {
 	writeBasicBatch(t, db)
 	require.NoError(err)
 
-	proof, err := db.GetRangeProof(context.Background(), []byte{1}, nil, 2)
+	proof, err := db.GetRangeProof(context.Background(), Some([]byte{1}), Nothing[[]byte](), 2)
 	require.NoError(err)
 	require.NotNil(proof)
 
@@ -572,8 +572,8 @@ func Test_RangeProof_NilEnd(t *testing.T) {
 
 	require.NoError(proof.Verify(
 		context.Background(),
-		[]byte{1},
-		nil,
+		Some([]byte{1}),
+		Nothing[[]byte](),
 		db.root.id,
 	))
 }
@@ -593,7 +593,7 @@ func Test_RangeProof_EmptyValues(t *testing.T) {
 	require.NoError(err)
 	require.Equal([]byte("value1"), val)
 
-	proof, err := db.GetRangeProof(context.Background(), []byte("key1"), []byte("key2"), 10)
+	proof, err := db.GetRangeProof(context.Background(), Some([]byte("key1")), Some([]byte("key2")), 10)
 	require.NoError(err)
 	require.NotNil(proof)
 
@@ -614,8 +614,8 @@ func Test_RangeProof_EmptyValues(t *testing.T) {
 
 	require.NoError(proof.Verify(
 		context.Background(),
-		[]byte("key1"),
-		[]byte("key2"),
+		Some([]byte("key1")),
+		Some([]byte("key2")),
 		db.root.id,
 	))
 }
@@ -628,12 +628,12 @@ func Test_ChangeProof_Missing_History_For_EndRoot(t *testing.T) {
 	startRoot, err := db.GetMerkleRoot(context.Background())
 	require.NoError(err)
 
-	proof, err := db.GetChangeProof(context.Background(), startRoot, ids.Empty, nil, nil, 50)
+	proof, err := db.GetChangeProof(context.Background(), startRoot, ids.Empty, Nothing[[]byte](), Nothing[[]byte](), 50)
 	require.NoError(err)
 	require.NotNil(proof)
 	require.False(proof.HadRootsInHistory)
 
-	require.NoError(db.VerifyChangeProof(context.Background(), proof, nil, nil, db.getMerkleRoot()))
+	require.NoError(db.VerifyChangeProof(context.Background(), proof, Nothing[[]byte](), Nothing[[]byte](), db.getMerkleRoot()))
 }
 
 func Test_ChangeProof_BadBounds(t *testing.T) {
@@ -651,7 +651,7 @@ func Test_ChangeProof_BadBounds(t *testing.T) {
 	require.NoError(err)
 
 	// non-nil start/end
-	proof, err := db.GetChangeProof(context.Background(), startRoot, endRoot, []byte("key4"), []byte("key3"), 50)
+	proof, err := db.GetChangeProof(context.Background(), startRoot, endRoot, Some([]byte("key4")), Some([]byte("key3")), 50)
 	require.ErrorIs(err, ErrStartAfterEnd)
 	require.Nil(proof)
 }
@@ -707,36 +707,36 @@ func Test_ChangeProof_Verify(t *testing.T) {
 	require.NoError(err)
 
 	// non-nil start/end
-	proof, err := db.GetChangeProof(context.Background(), startRoot, endRoot, []byte("key21"), []byte("key30"), 50)
+	proof, err := db.GetChangeProof(context.Background(), startRoot, endRoot, Some([]byte("key21")), Some([]byte("key30")), 50)
 	require.NoError(err)
 	require.NotNil(proof)
 
-	require.NoError(dbClone.VerifyChangeProof(context.Background(), proof, []byte("key21"), []byte("key30"), db.getMerkleRoot()))
+	require.NoError(dbClone.VerifyChangeProof(context.Background(), proof, Some([]byte("key21")), Some([]byte("key30")), db.getMerkleRoot()))
 
 	// low maxLength
-	proof, err = db.GetChangeProof(context.Background(), startRoot, endRoot, nil, nil, 5)
+	proof, err = db.GetChangeProof(context.Background(), startRoot, endRoot, Nothing[[]byte](), Nothing[[]byte](), 5)
 	require.NoError(err)
 	require.NotNil(proof)
 
-	require.NoError(dbClone.VerifyChangeProof(context.Background(), proof, nil, nil, db.getMerkleRoot()))
+	require.NoError(dbClone.VerifyChangeProof(context.Background(), proof, Nothing[[]byte](), Nothing[[]byte](), db.getMerkleRoot()))
 
 	// nil start/end
-	proof, err = db.GetChangeProof(context.Background(), startRoot, endRoot, nil, nil, 50)
+	proof, err = db.GetChangeProof(context.Background(), startRoot, endRoot, Nothing[[]byte](), Nothing[[]byte](), 50)
 	require.NoError(err)
 	require.NotNil(proof)
 
-	require.NoError(dbClone.VerifyChangeProof(context.Background(), proof, nil, nil, endRoot))
+	require.NoError(dbClone.VerifyChangeProof(context.Background(), proof, Nothing[[]byte](), Nothing[[]byte](), endRoot))
 	require.NoError(dbClone.CommitChangeProof(context.Background(), proof))
 
 	newRoot, err := dbClone.GetMerkleRoot(context.Background())
 	require.NoError(err)
 	require.Equal(endRoot, newRoot)
 
-	proof, err = db.GetChangeProof(context.Background(), startRoot, endRoot, []byte("key20"), []byte("key30"), 50)
+	proof, err = db.GetChangeProof(context.Background(), startRoot, endRoot, Some([]byte("key20")), Some([]byte("key30")), 50)
 	require.NoError(err)
 	require.NotNil(proof)
 
-	require.NoError(dbClone.VerifyChangeProof(context.Background(), proof, []byte("key20"), []byte("key30"), db.getMerkleRoot()))
+	require.NoError(dbClone.VerifyChangeProof(context.Background(), proof, Some([]byte("key20")), Some([]byte("key30")), db.getMerkleRoot()))
 }
 
 func Test_ChangeProof_Verify_Bad_Data(t *testing.T) {
@@ -794,13 +794,13 @@ func Test_ChangeProof_Verify_Bad_Data(t *testing.T) {
 			dbClone, err := getBasicDB()
 			require.NoError(err)
 
-			proof, err := db.GetChangeProof(context.Background(), startRoot, endRoot, []byte{2}, []byte{3, 0}, 50)
+			proof, err := db.GetChangeProof(context.Background(), startRoot, endRoot, Some([]byte{2}), Some([]byte{3, 0}), 50)
 			require.NoError(err)
 			require.NotNil(proof)
 
 			tt.malform(proof)
 
-			err = dbClone.VerifyChangeProof(context.Background(), proof, []byte{2}, []byte{3, 0}, db.getMerkleRoot())
+			err = dbClone.VerifyChangeProof(context.Background(), proof, Some([]byte{2}), Some([]byte{3, 0}), db.getMerkleRoot())
 			require.ErrorIs(err, tt.expectedErr)
 		})
 	}
@@ -810,8 +810,8 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 	type test struct {
 		name        string
 		proof       *ChangeProof
-		start       []byte
-		end         []byte
+		start       Maybe[[]byte]
+		end         Maybe[[]byte]
 		expectedErr error
 	}
 
@@ -819,8 +819,8 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 		{
 			name:        "start after end",
 			proof:       nil,
-			start:       []byte{1},
-			end:         []byte{0},
+			start:       Some([]byte{1}),
+			end:         Some([]byte{0}),
 			expectedErr: ErrStartAfterEnd,
 		},
 		{
@@ -829,8 +829,8 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 				HadRootsInHistory: false,
 				KeyChanges:        []KeyChange{{Key: []byte{1}, Value: Some([]byte{1})}},
 			},
-			start:       []byte{0},
-			end:         nil, // Also tests start can be after end if end is nil
+			start:       Some([]byte{0}),
+			end:         Nothing[[]byte](), // Also tests start can be after end if end is nil
 			expectedErr: ErrDataInMissingRootProof,
 		},
 		{
@@ -839,8 +839,8 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 				HadRootsInHistory: false,
 				KeyChanges:        []KeyChange{{Key: []byte{1}}},
 			},
-			start:       nil,
-			end:         nil,
+			start:       Nothing[[]byte](),
+			end:         Nothing[[]byte](),
 			expectedErr: ErrDataInMissingRootProof,
 		},
 		{
@@ -849,8 +849,8 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 				HadRootsInHistory: false,
 				StartProof:        []ProofNode{{}},
 			},
-			start:       nil,
-			end:         nil,
+			start:       Nothing[[]byte](),
+			end:         Nothing[[]byte](),
 			expectedErr: ErrDataInMissingRootProof,
 		},
 		{
@@ -859,8 +859,8 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 				HadRootsInHistory: false,
 				EndProof:          []ProofNode{{}},
 			},
-			start:       nil,
-			end:         nil,
+			start:       Nothing[[]byte](),
+			end:         Nothing[[]byte](),
 			expectedErr: ErrDataInMissingRootProof,
 		},
 		{
@@ -868,8 +868,8 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 			proof: &ChangeProof{
 				HadRootsInHistory: false,
 			},
-			start:       nil,
-			end:         nil,
+			start:       Nothing[[]byte](),
+			end:         Nothing[[]byte](),
 			expectedErr: nil,
 		},
 		{
@@ -877,8 +877,8 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 			proof: &ChangeProof{
 				HadRootsInHistory: true,
 			},
-			start:       nil,
-			end:         nil,
+			start:       Nothing[[]byte](),
+			end:         Nothing[[]byte](),
 			expectedErr: ErrNoMerkleProof,
 		},
 		{
@@ -887,8 +887,8 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 				HadRootsInHistory: true,
 				StartProof:        []ProofNode{{}},
 			},
-			start:       nil,
-			end:         []byte{1},
+			start:       Nothing[[]byte](),
+			end:         Some([]byte{1}),
 			expectedErr: ErrNoEndProof,
 		},
 		{
@@ -897,8 +897,8 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 				HadRootsInHistory: true,
 				KeyChanges:        []KeyChange{{Key: []byte{1}}},
 			},
-			start:       []byte{1},
-			end:         nil,
+			start:       Some([]byte{1}),
+			end:         Nothing[[]byte](),
 			expectedErr: ErrNoStartProof,
 		},
 		{
@@ -910,8 +910,8 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 					{Key: []byte{0}},
 				},
 			},
-			start:       nil,
-			end:         nil,
+			start:       Nothing[[]byte](),
+			end:         Nothing[[]byte](),
 			expectedErr: ErrNonIncreasingValues,
 		},
 		{
@@ -923,8 +923,8 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 					{Key: []byte{0}},
 				},
 			},
-			start:       []byte{1},
-			end:         nil,
+			start:       Some([]byte{1}),
+			end:         Nothing[[]byte](),
 			expectedErr: ErrStateFromOutsideOfRange,
 		},
 		{
@@ -936,8 +936,8 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 					{Key: []byte{2}},
 				},
 			},
-			start:       nil,
-			end:         []byte{1},
+			start:       Nothing[[]byte](),
+			end:         Some([]byte{1}),
 			expectedErr: ErrStateFromOutsideOfRange,
 		},
 		{
@@ -949,8 +949,8 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 					{Key: []byte{1}},
 				},
 			},
-			start:       nil,
-			end:         nil,
+			start:       Nothing[[]byte](),
+			end:         Nothing[[]byte](),
 			expectedErr: ErrNonIncreasingValues,
 		},
 		{
@@ -962,8 +962,8 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 					{KeyPath: newPath([]byte{2, 3}).Serialize()},
 				},
 			},
-			start:       []byte{1, 2, 3},
-			end:         nil,
+			start:       Some([]byte{1, 2, 3}),
+			end:         Nothing[[]byte](),
 			expectedErr: ErrProofNodeNotForKey,
 		},
 		{
@@ -975,8 +975,8 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 					{KeyPath: newPath([]byte{2, 3}).Serialize()},
 				},
 			},
-			start:       []byte{1, 2, 3},
-			end:         nil,
+			start:       Some([]byte{1, 2, 3}),
+			end:         Nothing[[]byte](),
 			expectedErr: ErrNonIncreasingProofNodes,
 		},
 		{
@@ -991,8 +991,8 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 					{KeyPath: newPath([]byte{2, 3}).Serialize()},
 				},
 			},
-			start:       nil,
-			end:         nil,
+			start:       Nothing[[]byte](),
+			end:         Nothing[[]byte](),
 			expectedErr: ErrProofNodeNotForKey,
 		},
 		{
@@ -1007,8 +1007,8 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 					{KeyPath: newPath([]byte{2, 3}).Serialize()},
 				},
 			},
-			start:       nil,
-			end:         nil,
+			start:       Nothing[[]byte](),
+			end:         Nothing[[]byte](),
 			expectedErr: ErrNonIncreasingProofNodes,
 		},
 	}
@@ -1665,19 +1665,29 @@ func FuzzRangeProofInvariants(f *testing.F) {
 
 	f.Fuzz(func(
 		t *testing.T,
-		start []byte,
-		end []byte,
+		startBytes []byte,
+		endBytes []byte,
 		maxProofLen uint,
 	) {
 		require := require.New(t)
 
 		// Make sure proof bounds are valid
-		if len(end) != 0 && bytes.Compare(start, end) > 0 {
+		if len(endBytes) != 0 && bytes.Compare(startBytes, endBytes) > 0 {
 			return
 		}
 		// Make sure proof length is valid
 		if maxProofLen == 0 {
 			return
+		}
+
+		start := Nothing[[]byte]()
+		if len(startBytes) > 0 {
+			start = Some(startBytes)
+		}
+
+		end := Nothing[[]byte]()
+		if len(endBytes) > 0 {
+			end = Some(endBytes)
 		}
 
 		rangeProof, err := db.GetRangeProof(
@@ -1703,7 +1713,7 @@ func FuzzRangeProofInvariants(f *testing.F) {
 
 		// Make sure the EndProof invariant is maintained
 		switch {
-		case len(end) == 0:
+		case len(endBytes) == 0:
 			if len(rangeProof.KeyValues) == 0 {
 				if len(rangeProof.StartProof) == 0 {
 					require.Len(rangeProof.EndProof, 1) // Just the root
@@ -1717,7 +1727,7 @@ func FuzzRangeProofInvariants(f *testing.F) {
 
 			// EndProof should be a proof for upper range bound.
 			value := Nothing[[]byte]()
-			upperRangeBoundVal, err := db.Get(end)
+			upperRangeBoundVal, err := db.Get(endBytes)
 			if err != nil {
 				require.ErrorIs(err, database.ErrNotFound)
 			} else {
@@ -1726,7 +1736,7 @@ func FuzzRangeProofInvariants(f *testing.F) {
 
 			proof := Proof{
 				Path:  rangeProof.EndProof,
-				Key:   end,
+				Key:   endBytes,
 				Value: value,
 			}
 

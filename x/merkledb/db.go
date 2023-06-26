@@ -59,8 +59,8 @@ type ChangeProofer interface {
 		ctx context.Context,
 		startRootID ids.ID,
 		endRootID ids.ID,
-		start []byte,
-		end []byte,
+		start Maybe[[]byte],
+		end Maybe[[]byte],
 		maxLength int,
 	) (*ChangeProof, error)
 
@@ -81,8 +81,8 @@ type ChangeProofer interface {
 	VerifyChangeProof(
 		ctx context.Context,
 		proof *ChangeProof,
-		start []byte,
-		end []byte,
+		start Maybe[[]byte],
+		end Maybe[[]byte],
 		expectedEndRootID ids.ID,
 	) error
 
@@ -96,8 +96,8 @@ type RangeProofer interface {
 	GetRangeProofAtRoot(
 		ctx context.Context,
 		rootID ids.ID,
-		start,
-		end []byte,
+		start Maybe[[]byte],
+		end Maybe[[]byte],
 		maxLength int,
 	) (*RangeProof, error)
 
@@ -477,7 +477,7 @@ func (db *merkleDB) getProof(ctx context.Context, key []byte) (*Proof, error) {
 func (db *merkleDB) GetRangeProof(
 	ctx context.Context,
 	start,
-	end []byte,
+	end Maybe[[]byte],
 	maxLength int,
 ) (*RangeProof, error) {
 	db.commitLock.RLock()
@@ -491,8 +491,7 @@ func (db *merkleDB) GetRangeProof(
 func (db *merkleDB) GetRangeProofAtRoot(
 	ctx context.Context,
 	rootID ids.ID,
-	start,
-	end []byte,
+	start, end Maybe[[]byte],
 	maxLength int,
 ) (*RangeProof, error) {
 	db.commitLock.RLock()
@@ -505,8 +504,7 @@ func (db *merkleDB) GetRangeProofAtRoot(
 func (db *merkleDB) getRangeProofAtRoot(
 	ctx context.Context,
 	rootID ids.ID,
-	start,
-	end []byte,
+	start, end Maybe[[]byte],
 	maxLength int,
 ) (*RangeProof, error) {
 	if db.closed {
@@ -527,11 +525,11 @@ func (db *merkleDB) GetChangeProof(
 	ctx context.Context,
 	startRootID ids.ID,
 	endRootID ids.ID,
-	start []byte,
-	end []byte,
+	start Maybe[[]byte],
+	end Maybe[[]byte],
 	maxLength int,
 ) (*ChangeProof, error) {
-	if len(end) > 0 && bytes.Compare(start, end) == 1 {
+	if end.hasValue && start.hasValue && bytes.Compare(start.value, end.value) == 1 {
 		return nil, ErrStartAfterEnd
 	}
 	if startRootID == endRootID {
@@ -581,7 +579,7 @@ func (db *merkleDB) GetChangeProof(
 
 	largestKey := end
 	if len(result.KeyChanges) > 0 {
-		largestKey = result.KeyChanges[len(result.KeyChanges)-1].Key
+		largestKey = Some(result.KeyChanges[len(result.KeyChanges)-1].Key)
 	}
 
 	// Since we hold [db.commitlock] we must still have sufficient
@@ -591,16 +589,16 @@ func (db *merkleDB) GetChangeProof(
 		return nil, err
 	}
 
-	if len(largestKey) > 0 {
-		endProof, err := historicalView.getProof(ctx, largestKey)
+	if largestKey.hasValue {
+		endProof, err := historicalView.getProof(ctx, largestKey.value)
 		if err != nil {
 			return nil, err
 		}
 		result.EndProof = endProof.Path
 	}
 
-	if len(start) > 0 {
-		startProof, err := historicalView.getProof(ctx, start)
+	if start.hasValue {
+		startProof, err := historicalView.getProof(ctx, start.value)
 		if err != nil {
 			return nil, err
 		}
@@ -954,11 +952,11 @@ func (*merkleDB) CommitToDB(context.Context) error {
 func (db *merkleDB) VerifyChangeProof(
 	ctx context.Context,
 	proof *ChangeProof,
-	start []byte,
-	end []byte,
+	start Maybe[[]byte],
+	end Maybe[[]byte],
 	expectedEndRootID ids.ID,
 ) error {
-	if len(end) > 0 && bytes.Compare(start, end) > 0 {
+	if end.hasValue && start.hasValue && bytes.Compare(start.value, end.value) > 0 {
 		return ErrStartAfterEnd
 	}
 
@@ -975,10 +973,10 @@ func (db *merkleDB) VerifyChangeProof(
 	switch {
 	case proof.Empty():
 		return ErrNoMerkleProof
-	case len(end) > 0 && len(proof.EndProof) == 0:
+	case end.hasValue && len(proof.EndProof) == 0:
 		// We requested an end proof but didn't get one.
 		return ErrNoEndProof
-	case len(start) > 0 && len(proof.StartProof) == 0 && len(proof.EndProof) == 0:
+	case start.hasValue && len(proof.StartProof) == 0 && len(proof.EndProof) == 0:
 		// We requested a start proof but didn't get one.
 		// Note that we also have to check that [proof.EndProof] is empty
 		// to handle the case that the start proof is empty because all
@@ -987,11 +985,14 @@ func (db *merkleDB) VerifyChangeProof(
 	}
 
 	// Make sure the key-value pairs are sorted and in [start, end].
-	if err := verifyKeyChanges(proof.KeyChanges, start, end); err != nil {
+	if err := verifyKeyChanges(proof.KeyChanges, start.value, end.value); err != nil { // TODO fix this by passing Maybes
 		return err
 	}
 
-	smallestPath := newPath(start)
+	var smallestPath path
+	if start.hasValue {
+		smallestPath = newPath(start.value)
+	}
 
 	// Make sure the start proof, if given, is well-formed.
 	if err := verifyProofPath(proof.StartProof, smallestPath); err != nil {
@@ -1006,9 +1007,15 @@ func (db *merkleDB) VerifyChangeProof(
 		// If [proof] has key-value pairs, we should insert children
 		// greater than [end] to ancestors of the node containing [end]
 		// so that we get the expected root ID.
-		largestKey = proof.KeyChanges[len(proof.KeyChanges)-1].Key
+		largestKey = Some(proof.KeyChanges[len(proof.KeyChanges)-1].Key)
 	}
-	largestPath := newPath(largestKey)
+
+	var largestPath path
+	if largestKey.hasValue {
+		largestPath = newPath(largestKey.value)
+	}
+
+	// := newPath(largestKey) TODO remove
 
 	// Make sure the end proof, if given, is well-formed.
 	if err := verifyProofPath(proof.EndProof, largestPath); err != nil {
@@ -1166,8 +1173,8 @@ func (db *merkleDB) initializeRootIfNeeded() (ids.ID, error) {
 // Assumes [db.commitLock] is read locked.
 func (db *merkleDB) getHistoricalViewForRange(
 	rootID ids.ID,
-	start []byte,
-	end []byte,
+	start Maybe[[]byte],
+	end Maybe[[]byte],
 ) (*trieView, error) {
 	currentRootID := db.getMerkleRoot()
 

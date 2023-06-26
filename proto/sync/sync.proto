@@ -54,8 +54,8 @@ message Proof {
 message SyncGetChangeProofRequest {
   bytes start_root_hash = 1;
   bytes end_root_hash = 2;
-  bytes start_key = 3;
-  bytes end_key = 4;
+  MaybeBytes start_key = 3;
+  MaybeBytes end_key = 4;
   uint32 key_limit = 5;
   uint32 bytes_limit = 6;
 }
@@ -70,15 +70,15 @@ message SyncGetChangeProofResponse {
 message GetChangeProofRequest {
   bytes start_root_hash = 1;
   bytes end_root_hash = 2;
-  bytes start_key = 3;
-  bytes end_key = 4;
+  MaybeBytes start_key = 3;
+  MaybeBytes end_key = 4;
   uint32 key_limit = 5;
 }
 
 message VerifyChangeProofRequest {
   ChangeProof proof = 1;
-  bytes start_key = 2;
-  bytes end_key = 3;
+  MaybeBytes start_key = 2;
+  MaybeBytes end_key = 3;
   bytes expected_root_hash = 4;
 }
 
@@ -95,16 +95,16 @@ message CommitChangeProofRequest {
 // the response. GetRangeProof in the SyncableDB service doesn't.
 message SyncGetRangeProofRequest {
   bytes root_hash = 1;
-  bytes start_key = 2;
-  bytes end_key = 3;
+  MaybeBytes start_key = 2;
+  MaybeBytes end_key = 3;
   uint32 key_limit = 4;
   uint32 bytes_limit = 5;
 }
 
 message GetRangeProofRequest {
   bytes root_hash = 1;
-  bytes start_key = 2;
-  bytes end_key = 3;
+  MaybeBytes start_key = 2;
+  MaybeBytes end_key = 3;
   uint32 key_limit = 4;
 }
 

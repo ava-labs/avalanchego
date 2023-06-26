@@ -71,8 +71,12 @@ func Test_Server_GetRangeProof(t *testing.T) {
 				RootHash:   smallTrieRoot[:],
 				KeyLimit:   defaultRequestKeyLimit,
 				BytesLimit: defaultRequestByteSizeLimit,
-				StartKey:   []byte{1},
-				EndKey:     []byte{0},
+				StartKey: &pb.MaybeBytes{
+					Value: []byte{1},
+				},
+				EndKey: &pb.MaybeBytes{
+					Value: []byte{0},
+				},
 			},
 			proofNil: true,
 		},
@@ -219,8 +223,12 @@ func Test_Server_GetChangeProof(t *testing.T) {
 				EndRootHash:   endRoot[:],
 				KeyLimit:      defaultRequestKeyLimit,
 				BytesLimit:    defaultRequestByteSizeLimit,
-				StartKey:      []byte{1},
-				EndKey:        []byte{0},
+				StartKey: &pb.MaybeBytes{
+					Value: []byte{1},
+				},
+				EndKey: &pb.MaybeBytes{
+					Value: []byte{0},
+				},
 			},
 			proofNil: true,
 		},

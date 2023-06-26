@@ -285,23 +285,23 @@ type RangeProof struct {
 //     pairs and start/end proofs.
 func (proof *RangeProof) Verify(
 	ctx context.Context,
-	start []byte,
-	end []byte,
+	start Maybe[[]byte],
+	end Maybe[[]byte],
 	expectedRootID ids.ID,
 ) error {
 	switch {
-	case len(end) > 0 && bytes.Compare(start, end) > 0:
+	case end.hasValue && start.hasValue && bytes.Compare(start.value, end.value) > 0:
 		return ErrStartAfterEnd
 	case len(proof.KeyValues) == 0 && len(proof.StartProof) == 0 && len(proof.EndProof) == 0:
 		return ErrNoMerkleProof
-	case len(start) == 0 && len(end) == 0 && len(proof.KeyValues) == 0 && len(proof.EndProof) != 1:
+	case start.IsNothing() && end.IsNothing() && len(proof.KeyValues) == 0 && len(proof.EndProof) != 1:
 		return ErrShouldJustBeRoot
-	case len(proof.EndProof) == 0 && len(end) > 0:
+	case len(proof.EndProof) == 0 && end.hasValue:
 		return ErrNoEndProof
 	}
 
 	// Make sure the key-value pairs are sorted and in [start, end].
-	if err := verifyKeyValues(proof.KeyValues, start, end); err != nil {
+	if err := verifyKeyValues(proof.KeyValues, start.value, end.value); err != nil { // TODO fix by passing maybes
 		return err
 	}
 
@@ -310,7 +310,7 @@ func (proof *RangeProof) Verify(
 		// If [proof] has key-value pairs, we should insert children
 		// greater than [largestKey] to ancestors of the node containing
 		// [largestKey] so that we get the expected root ID.
-		largestKey = proof.KeyValues[len(proof.KeyValues)-1].Key
+		largestKey = Some(proof.KeyValues[len(proof.KeyValues)-1].Key)
 	}
 
 	// The key-value pairs (allegedly) proven by [proof].
@@ -319,8 +319,8 @@ func (proof *RangeProof) Verify(
 		keyValues[newPath(keyValue.Key)] = keyValue.Value
 	}
 
-	smallestPath := newPath(start)
-	largestPath := newPath(largestKey)
+	smallestPath := newPath(start.value)     // TODO fix this
+	largestPath := newPath(largestKey.value) // TODO fix this
 
 	// Ensure that the start proof is valid and contains values that
 	// match the key/values that were sent.
@@ -494,10 +494,10 @@ type ChangeProof struct {
 	// Note that this may not be an entire proof -- nodes are omitted if
 	// they are also in [EndProof].
 	StartProof []ProofNode
-	// A proof that the largest key in [KeyValues] and [DeletedKeys]
-	// does/doesn't exist in the trie with the requested start root.
+	// A proof that the largest key in [KeyValues] does/doesn't exist
+	// in the trie with the requested start root.
 	// Empty iff no upper bound on the requested range was given
-	// and [KeyValues] and [DeletedKeys] are empty.
+	// and [KeyValues] is are empty.
 	EndProof []ProofNode
 	// A subset of key-values that were added, removed, or had their values modified
 	// between the requested start root (exclusive) and the requested

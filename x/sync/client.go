@@ -108,7 +108,16 @@ func (c *client) GetChangeProof(ctx context.Context, req *pb.SyncGetChangeProofR
 			return nil, err
 		}
 
-		if err := db.VerifyChangeProof(ctx, &changeProof, req.StartKey, req.EndKey, endRoot); err != nil {
+		startKey := merkledb.Nothing[[]byte]()
+		if req.StartKey != nil && !req.StartKey.IsNothing {
+			startKey = merkledb.Some(req.StartKey.Value)
+		}
+		endKey := merkledb.Nothing[[]byte]()
+		if req.EndKey != nil && !req.EndKey.IsNothing {
+			endKey = merkledb.Some(req.EndKey.Value)
+		}
+
+		if err := db.VerifyChangeProof(ctx, &changeProof, startKey, endKey, endRoot); err != nil {
 			return nil, fmt.Errorf("%s due to %w", errInvalidRangeProof, err)
 		}
 		return &changeProof, nil
@@ -154,10 +163,19 @@ func (c *client) GetRangeProof(ctx context.Context, req *pb.SyncGetRangeProofReq
 			return nil, err
 		}
 
+		startKey := merkledb.Nothing[[]byte]()
+		if req.StartKey != nil && !req.StartKey.IsNothing {
+			startKey = merkledb.Some(req.StartKey.Value)
+		}
+		endKey := merkledb.Nothing[[]byte]()
+		if req.EndKey != nil && !req.EndKey.IsNothing {
+			endKey = merkledb.Some(req.EndKey.Value)
+		}
+
 		if err := rangeProof.Verify(
 			ctx,
-			req.StartKey,
-			req.EndKey,
+			startKey,
+			endKey,
 			root,
 		); err != nil {
 			return nil, fmt.Errorf("%s due to %w", errInvalidRangeProof, err)

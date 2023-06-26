@@ -52,12 +52,21 @@ func (s *SyncableDBServer) GetChangeProof(
 	if err != nil {
 		return nil, err
 	}
+
+	startKey := merkledb.Nothing[[]byte]()
+	if req.StartKey != nil && !req.StartKey.IsNothing {
+		startKey = merkledb.Some(req.StartKey.Value)
+	}
+	endKey := merkledb.Nothing[[]byte]()
+	if req.EndKey != nil && !req.EndKey.IsNothing {
+		endKey = merkledb.Some(req.EndKey.Value)
+	}
 	changeProof, err := s.db.GetChangeProof(
 		ctx,
 		startRootID,
 		endRootID,
-		req.StartKey,
-		req.EndKey,
+		startKey,
+		endKey,
 		int(req.KeyLimit),
 	)
 	if err != nil {
@@ -82,7 +91,16 @@ func (s *SyncableDBServer) VerifyChangeProof(
 
 	// TODO there's probably a better way to do this.
 	var errString string
-	if err := s.db.VerifyChangeProof(ctx, &proof, req.StartKey, req.EndKey, rootID); err != nil {
+
+	startKey := merkledb.Nothing[[]byte]()
+	if req.StartKey != nil && !req.StartKey.IsNothing {
+		startKey = merkledb.Some(req.StartKey.Value)
+	}
+	endKey := merkledb.Nothing[[]byte]()
+	if req.EndKey != nil && !req.EndKey.IsNothing {
+		endKey = merkledb.Some(req.EndKey.Value)
+	}
+	if err := s.db.VerifyChangeProof(ctx, &proof, startKey, endKey, rootID); err != nil {
 		errString = err.Error()
 	}
 	return &pb.VerifyChangeProofResponse{
@@ -126,7 +144,16 @@ func (s *SyncableDBServer) GetRangeProof(
 		return nil, err
 	}
 
-	proof, err := s.db.GetRangeProofAtRoot(ctx, rootID, req.StartKey, req.EndKey, int(req.KeyLimit))
+	startKey := merkledb.Nothing[[]byte]()
+	if req.StartKey != nil && !req.StartKey.IsNothing {
+		startKey = merkledb.Some(req.StartKey.Value)
+	}
+	endKey := merkledb.Nothing[[]byte]()
+	if req.EndKey != nil && !req.EndKey.IsNothing {
+		endKey = merkledb.Some(req.EndKey.Value)
+	}
+
+	proof, err := s.db.GetRangeProofAtRoot(ctx, rootID, startKey, endKey, int(req.KeyLimit))
 	if err != nil {
 		return nil, err
 	}

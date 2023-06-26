@@ -38,16 +38,22 @@ func (c *SyncableDBClient) GetChangeProof(
 	ctx context.Context,
 	startRootID ids.ID,
 	endRootID ids.ID,
-	startKey []byte,
-	endKey []byte,
+	startKey merkledb.Maybe[[]byte],
+	endKey merkledb.Maybe[[]byte],
 	keyLimit int,
 ) (*merkledb.ChangeProof, error) {
 	resp, err := c.client.GetChangeProof(ctx, &pb.GetChangeProofRequest{
 		StartRootHash: startRootID[:],
 		EndRootHash:   endRootID[:],
-		StartKey:      startKey,
-		EndKey:        endKey,
-		KeyLimit:      uint32(keyLimit),
+		StartKey: &pb.MaybeBytes{
+			Value:     startKey.Value(),
+			IsNothing: startKey.IsNothing(),
+		},
+		EndKey: &pb.MaybeBytes{
+			Value:     endKey.Value(),
+			IsNothing: endKey.IsNothing(),
+		},
+		KeyLimit: uint32(keyLimit),
 	})
 	if err != nil {
 		return nil, err
@@ -62,14 +68,20 @@ func (c *SyncableDBClient) GetChangeProof(
 func (c *SyncableDBClient) VerifyChangeProof(
 	ctx context.Context,
 	proof *merkledb.ChangeProof,
-	startKey []byte,
-	endKey []byte,
+	startKey merkledb.Maybe[[]byte],
+	endKey merkledb.Maybe[[]byte],
 	expectedRootID ids.ID,
 ) error {
 	resp, err := c.client.VerifyChangeProof(ctx, &pb.VerifyChangeProofRequest{
-		Proof:            proof.ToProto(),
-		StartKey:         startKey,
-		EndKey:           endKey,
+		Proof: proof.ToProto(),
+		StartKey: &pb.MaybeBytes{
+			Value:     startKey.Value(),
+			IsNothing: startKey.IsNothing(),
+		},
+		EndKey: &pb.MaybeBytes{
+			Value:     endKey.Value(),
+			IsNothing: endKey.IsNothing(),
+		},
 		ExpectedRootHash: expectedRootID[:],
 	})
 	if err != nil {
@@ -108,14 +120,20 @@ func (c *SyncableDBClient) GetProof(ctx context.Context, key []byte) (*merkledb.
 func (c *SyncableDBClient) GetRangeProofAtRoot(
 	ctx context.Context,
 	rootID ids.ID,
-	startKey []byte,
-	endKey []byte,
+	startKey merkledb.Maybe[[]byte],
+	endKey merkledb.Maybe[[]byte],
 	keyLimit int,
 ) (*merkledb.RangeProof, error) {
 	resp, err := c.client.GetRangeProof(ctx, &pb.GetRangeProofRequest{
 		RootHash: rootID[:],
-		StartKey: startKey,
-		EndKey:   endKey,
+		StartKey: &pb.MaybeBytes{
+			Value:     startKey.Value(),
+			IsNothing: startKey.IsNothing(),
+		},
+		EndKey: &pb.MaybeBytes{
+			Value:     endKey.Value(),
+			IsNothing: endKey.IsNothing(),
+		},
 		KeyLimit: uint32(keyLimit),
 	})
 	if err != nil {

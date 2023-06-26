@@ -1395,7 +1395,7 @@ func Test_Trie_ConcurrentInsertAndRangeProof(t *testing.T) {
 
 	require.Eventually(
 		func() bool {
-			rangeProof, err := newTrie.GetRangeProof(context.Background(), []byte("key1"), []byte("key3"), 3)
+			rangeProof, err := newTrie.GetRangeProof(context.Background(), Some([]byte("key1")), Some([]byte("key3")), 3)
 			require.NoError(err)
 			require.NotNil(rangeProof)
 

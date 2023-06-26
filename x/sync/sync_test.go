@@ -46,7 +46,23 @@ func (client *mockClient) GetChangeProof(ctx context.Context, request *pb.SyncGe
 	if err != nil {
 		return nil, err
 	}
-	return client.db.GetChangeProof(ctx, startRoot, endRoot, request.StartKey, request.EndKey, int(request.KeyLimit))
+	startKey := merkledb.Nothing[[]byte]()
+	if request.StartKey != nil && !request.StartKey.IsNothing {
+		startKey = merkledb.Some(request.StartKey.Value)
+	}
+	endKey := merkledb.Nothing[[]byte]()
+	if request.EndKey != nil && !request.EndKey.IsNothing {
+		endKey = merkledb.Some(request.EndKey.Value)
+	}
+
+	return client.db.GetChangeProof(
+		ctx,
+		startRoot,
+		endRoot,
+		startKey,
+		endKey,
+		int(request.KeyLimit),
+	)
 }
 
 func (client *mockClient) GetRangeProof(ctx context.Context, request *pb.SyncGetRangeProofRequest) (*merkledb.RangeProof, error) {
@@ -54,7 +70,15 @@ func (client *mockClient) GetRangeProof(ctx context.Context, request *pb.SyncGet
 	if err != nil {
 		return nil, err
 	}
-	return client.db.GetRangeProofAtRoot(ctx, root, request.StartKey, request.EndKey, int(request.KeyLimit))
+	startKey := merkledb.Nothing[[]byte]()
+	if request.StartKey != nil && !request.StartKey.IsNothing {
+		startKey = merkledb.Some(request.StartKey.Value)
+	}
+	endKey := merkledb.Nothing[[]byte]()
+	if request.EndKey != nil && !request.EndKey.IsNothing {
+		endKey = merkledb.Some(request.EndKey.Value)
+	}
+	return client.db.GetRangeProofAtRoot(ctx, root, startKey, endKey, int(request.KeyLimit))
 }
 
 func Test_Creation(t *testing.T) {
@@ -212,7 +236,7 @@ func Test_Sync_FindNextKey_InSync(t *testing.T) {
 		require.NoError(syncer.StartSyncing(context.Background()))
 		require.NoError(syncer.Wait(context.Background()))
 
-		proof, err := dbToSync.GetRangeProof(context.Background(), nil, nil, 500)
+		proof, err := dbToSync.GetRangeProof(context.Background(), merkledb.Nothing[[]byte](), merkledb.Nothing[[]byte](), 500)
 		require.NoError(err)
 
 		// the two dbs should be in sync, so next key should be nil
@@ -397,7 +421,7 @@ func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 		require.NoError(syncer.StartSyncing(context.Background()))
 		require.NoError(syncer.Wait(context.Background()))
 
-		proof, err := dbToSync.GetRangeProof(context.Background(), nil, nil, 500)
+		proof, err := dbToSync.GetRangeProof(context.Background(), merkledb.Nothing[[]byte](), merkledb.Nothing[[]byte](), 500)
 		require.NoError(err)
 
 		// add an extra value to local db
@@ -417,7 +441,7 @@ func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 
 		require.NoError(dbToSync.Put(midpoint, []byte{1}))
 
-		proof, err = dbToSync.GetRangeProof(context.Background(), nil, lastKey, 500)
+		proof, err = dbToSync.GetRangeProof(context.Background(), merkledb.Nothing[[]byte](), merkledb.Some(lastKey), 500)
 		require.NoError(err)
 
 		// next key at prefix of newly added point
@@ -473,7 +497,7 @@ func Test_Sync_FindNextKey_DifferentChild(t *testing.T) {
 		require.NoError(syncer.StartSyncing(context.Background()))
 		require.NoError(syncer.Wait(context.Background()))
 
-		proof, err := dbToSync.GetRangeProof(context.Background(), nil, nil, 100)
+		proof, err := dbToSync.GetRangeProof(context.Background(), merkledb.Nothing[[]byte](), merkledb.Nothing[[]byte](), 100)
 		require.NoError(err)
 		lastKey := proof.KeyValues[len(proof.KeyValues)-1].Key
 
@@ -483,7 +507,7 @@ func Test_Sync_FindNextKey_DifferentChild(t *testing.T) {
 
 		require.NoError(dbToSync.Put(lastKey, []byte{2}))
 
-		proof, err = dbToSync.GetRangeProof(context.Background(), nil, proof.KeyValues[len(proof.KeyValues)-1].Key, 100)
+		proof, err = dbToSync.GetRangeProof(context.Background(), merkledb.Nothing[[]byte](), merkledb.Some(proof.KeyValues[len(proof.KeyValues)-1].Key), 100)
 		require.NoError(err)
 
 		nextKey, err := syncer.findNextKey(context.Background(), proof.KeyValues[len(proof.KeyValues)-1].Key, nil, proof.EndProof)

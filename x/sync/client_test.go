@@ -191,8 +191,10 @@ func TestGetRangeProof(t *testing.T) {
 		"full response from near end of trie to end of trie (less than leaf limit)": {
 			db: largeTrieDB,
 			request: &pb.SyncGetRangeProofRequest{
-				RootHash:   largeTrieRoot[:],
-				StartKey:   largeTrieKeys[len(largeTrieKeys)-30], // Set start 30 keys from the end of the large trie
+				RootHash: largeTrieRoot[:],
+				StartKey: &pb.MaybeBytes{
+					Value: largeTrieKeys[len(largeTrieKeys)-30], // Set start 30 keys from the end of the large trie
+				},
 				KeyLimit:   defaultRequestKeyLimit,
 				BytesLimit: defaultRequestByteSizeLimit,
 			},
@@ -201,9 +203,13 @@ func TestGetRangeProof(t *testing.T) {
 		"full response for intermediate range of trie (less than leaf limit)": {
 			db: largeTrieDB,
 			request: &pb.SyncGetRangeProofRequest{
-				RootHash:   largeTrieRoot[:],
-				StartKey:   largeTrieKeys[1000], // Set the range for 1000 leafs in an intermediate range of the trie
-				EndKey:     largeTrieKeys[1099], // (inclusive range)
+				RootHash: largeTrieRoot[:],
+				StartKey: &pb.MaybeBytes{
+					Value: largeTrieKeys[1000], // Set the range for 1000 leafs in an intermediate range of the trie
+				},
+				EndKey: &pb.MaybeBytes{
+					Value: largeTrieKeys[1099], // (inclusive range)
+				},
 				KeyLimit:   defaultRequestKeyLimit,
 				BytesLimit: defaultRequestByteSizeLimit,
 			},
@@ -232,7 +238,7 @@ func TestGetRangeProof(t *testing.T) {
 				start := response.KeyValues[1].Key
 				rootID, err := largeTrieDB.GetMerkleRoot(context.Background())
 				require.NoError(t, err)
-				proof, err := largeTrieDB.GetRangeProofAtRoot(context.Background(), rootID, start, nil, defaultRequestKeyLimit)
+				proof, err := largeTrieDB.GetRangeProofAtRoot(context.Background(), rootID, merkledb.Some(start), merkledb.Nothing[[]byte](), defaultRequestKeyLimit)
 				require.NoError(t, err)
 				response.KeyValues = proof.KeyValues
 				response.StartProof = proof.StartProof
