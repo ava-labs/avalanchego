@@ -9,6 +9,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
@@ -38,9 +39,6 @@ type TxCachedState struct {
 	*txs.Tx
 
 	unique bool
-
-	deps []snowstorm.Tx
-
 	status choices.Status
 }
 
@@ -91,7 +89,6 @@ func (tx *UniqueTx) refresh() {
 func (tx *UniqueTx) Evict() {
 	// Lock is already held here
 	tx.unique = false
-	tx.deps = nil
 }
 
 func (tx *UniqueTx) setStatus(status choices.Status) {
@@ -149,7 +146,6 @@ func (tx *UniqueTx) Accept(context.Context) error {
 		return fmt.Errorf("error committing accepted state changes while processing tx %s: %w", txID, err)
 	}
 
-	tx.deps = nil // Needed to prevent a memory leak
 	return tx.vm.metrics.MarkTxAccepted(tx.Tx)
 }
 
@@ -164,10 +160,10 @@ func (tx *UniqueTx) Status() choices.Status {
 }
 
 // Dependencies returns the set of transactions this transaction builds on
-func (tx *UniqueTx) Dependencies() ([]snowstorm.Tx, error) {
+func (tx *UniqueTx) MissingDependencies() (set.Set[ids.ID], error) {
 	tx.refresh()
-	if tx.Tx == nil || len(tx.deps) != 0 {
-		return tx.deps, nil
+	if tx.Tx == nil {
+		return nil, database.ErrNotFound
 	}
 
 	txIDs := set.Set[ids.ID]{}
@@ -176,27 +172,29 @@ func (tx *UniqueTx) Dependencies() ([]snowstorm.Tx, error) {
 			continue
 		}
 		txID, _ := in.InputSource()
-		if txIDs.Contains(txID) {
-			continue
-		}
-		txIDs.Add(txID)
-		tx.deps = append(tx.deps, &UniqueTx{
+		inputTx := &UniqueTx{
 			vm:   tx.vm,
 			txID: txID,
-		})
+		}
+		if inputTx.Status() != choices.Accepted {
+			txIDs.Add(txID)
+		}
 	}
 	consumedIDs := tx.Tx.Unsigned.ConsumedAssetIDs()
 	for assetID := range tx.Tx.Unsigned.AssetIDs() {
-		if consumedIDs.Contains(assetID) || txIDs.Contains(assetID) {
+		if consumedIDs.Contains(assetID) {
 			continue
 		}
-		txIDs.Add(assetID)
-		tx.deps = append(tx.deps, &UniqueTx{
+
+		inputTx := &UniqueTx{
 			vm:   tx.vm,
 			txID: assetID,
-		})
+		}
+		if inputTx.Status() != choices.Accepted {
+			txIDs.Add(assetID)
+		}
 	}
-	return tx.deps, nil
+	return txIDs, nil
 }
 
 // Bytes returns the binary representation of this transaction

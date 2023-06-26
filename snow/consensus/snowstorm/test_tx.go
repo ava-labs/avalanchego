@@ -3,11 +3,15 @@
 
 package snowstorm
 
+<<<<<<< Updated upstream
 import (
 	"context"
 
 	"github.com/ava-labs/avalanchego/snow/choices"
 )
+=======
+import "github.com/ava-labs/avalanchego/snow/choices"
+>>>>>>> Stashed changes
 
 var _ Tx = (*TestTx)(nil)
 
