@@ -644,7 +644,7 @@ func (proof *ChangeProof) Empty() bool {
 // If [start] is nil, there is no lower bound on acceptable keys.
 // If [end] is nil, there is no upper bound on acceptable keys.
 // If [kvs] is empty, returns nil.
-func verifyKeyChanges(kvs []KeyChange, start, end []byte) error {
+func verifyKeyChanges(kvs []KeyChange, start, end Maybe[[]byte]) error {
 	if len(kvs) == 0 {
 		return nil
 	}
@@ -657,8 +657,8 @@ func verifyKeyChanges(kvs []KeyChange, start, end []byte) error {
 	}
 
 	// ensure that the keys are within the range [start, end]
-	if (len(start) > 0 && bytes.Compare(kvs[0].Key, start) < 0) ||
-		(len(end) > 0 && bytes.Compare(kvs[len(kvs)-1].Key, end) > 0) {
+	if (start.hasValue && bytes.Compare(kvs[0].Key, start.value) < 0) ||
+		(end.hasValue && bytes.Compare(kvs[len(kvs)-1].Key, end.value) > 0) {
 		return ErrStateFromOutsideOfRange
 	}
 

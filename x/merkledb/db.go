@@ -491,7 +491,8 @@ func (db *merkleDB) GetRangeProof(
 func (db *merkleDB) GetRangeProofAtRoot(
 	ctx context.Context,
 	rootID ids.ID,
-	start, end Maybe[[]byte],
+	start Maybe[[]byte],
+	end Maybe[[]byte],
 	maxLength int,
 ) (*RangeProof, error) {
 	db.commitLock.RLock()
@@ -504,7 +505,8 @@ func (db *merkleDB) GetRangeProofAtRoot(
 func (db *merkleDB) getRangeProofAtRoot(
 	ctx context.Context,
 	rootID ids.ID,
-	start, end Maybe[[]byte],
+	start Maybe[[]byte],
+	end Maybe[[]byte],
 	maxLength int,
 ) (*RangeProof, error) {
 	if db.closed {
@@ -985,7 +987,7 @@ func (db *merkleDB) VerifyChangeProof(
 	}
 
 	// Make sure the key-value pairs are sorted and in [start, end].
-	if err := verifyKeyChanges(proof.KeyChanges, start.value, end.value); err != nil { // TODO fix this by passing Maybes
+	if err := verifyKeyChanges(proof.KeyChanges, start, end); err != nil {
 		return err
 	}
 
