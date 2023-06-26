@@ -68,7 +68,7 @@ var (
 )
 
 func defaultService(t *testing.T) (*Service, *mutableSharedMemory) {
-	vm, _, mutableSharedMemory := defaultVM()
+	vm, _, mutableSharedMemory := defaultVM(t)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 	ks := keystore.New(logging.NoLog{}, manager.NewMemDB(version.Semantic1_0_0))
@@ -86,32 +86,38 @@ func defaultService(t *testing.T) (*Service, *mutableSharedMemory) {
 
 // Give user [testUsername] control of [testPrivateKey] and keys[0] (which is funded)
 func defaultAddress(t *testing.T, service *Service) {
+	require := require.New(t)
+
 	service.vm.ctx.Lock.Lock()
 	defer service.vm.ctx.Lock.Unlock()
 	user, err := vmkeystore.NewUserFromKeystore(service.vm.ctx.Keystore, testUsername, testPassword)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	pk, err := testKeyFactory.ToPrivateKey(testPrivateKey)
-	require.NoError(t, err)
+	require.NoError(err)
 
-	require.NoError(t, user.PutKeys(pk, keys[0]))
+	require.NoError(user.PutKeys(pk, keys[0]))
 }
 
 func TestAddValidator(t *testing.T) {
+	require := require.New(t)
+
 	expectedJSONString := `{"username":"","password":"","from":null,"changeAddr":"","txID":"11111111111111111111111111111111LpoYY","startTime":"0","endTime":"0","weight":"0","nodeID":"NodeID-111111111111111111116DBWJs","rewardAddress":"","delegationFeeRate":"0.0000"}`
 	args := AddValidatorArgs{}
 	bytes, err := stdjson.Marshal(&args)
-	require.NoError(t, err)
-	require.Equal(t, expectedJSONString, string(bytes))
+	require.NoError(err)
+	require.Equal(expectedJSONString, string(bytes))
 }
 
 func TestCreateBlockchainArgsParsing(t *testing.T) {
+	require := require.New(t)
+
 	jsonString := `{"vmID":"lol","fxIDs":["secp256k1"], "name":"awesome", "username":"bob loblaw", "password":"yeet", "genesisData":"SkB92YpWm4Q2iPnLGCuDPZPgUQMxajqQQuz91oi3xD984f8r"}`
 	args := CreateBlockchainArgs{}
-	require.NoError(t, stdjson.Unmarshal([]byte(jsonString), &args))
+	require.NoError(stdjson.Unmarshal([]byte(jsonString), &args))
 
 	_, err := stdjson.Marshal(args.GenesisData)
-	require.NoError(t, err)
+	require.NoError(err)
 }
 
 func TestExportKey(t *testing.T) {
@@ -334,9 +340,7 @@ func TestGetTx(t *testing.T) {
 
 						commit := options[0].(*blockexecutor.Block)
 						require.IsType(&blocks.BanffCommitBlock{}, commit.Block)
-
 						require.NoError(commit.Verify(context.Background()))
-
 						require.NoError(commit.Accept(context.Background()))
 					}
 				}
@@ -375,7 +379,7 @@ func TestGetBalance(t *testing.T) {
 	}()
 
 	// Ensure GetStake is correct for each of the genesis validators
-	genesis, _ := defaultGenesis()
+	genesis, _ := defaultGenesis(t)
 	for _, utxo := range genesis.UTXOs {
 		request := GetBalanceRequest{
 			Addresses: []string{
@@ -404,7 +408,7 @@ func TestGetStake(t *testing.T) {
 	}()
 
 	// Ensure GetStake is correct for each of the genesis validators
-	genesis, _ := defaultGenesis()
+	genesis, _ := defaultGenesis(t)
 	addrsStrs := []string{}
 	for i, validator := range genesis.Validators {
 		addr := fmt.Sprintf("P-%s", validator.RewardOwner.Addresses[0])
@@ -569,7 +573,7 @@ func TestGetCurrentValidators(t *testing.T) {
 		service.vm.ctx.Lock.Unlock()
 	}()
 
-	genesis, _ := defaultGenesis()
+	genesis, _ := defaultGenesis(t)
 
 	// Call getValidators
 	args := GetCurrentValidatorsArgs{SubnetID: constants.PrimaryNetworkID}

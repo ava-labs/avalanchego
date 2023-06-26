@@ -22,9 +22,10 @@ import (
 )
 
 func TestSetsAndGets(t *testing.T) {
-	_, _, vm, _ := GenesisVMWithArgs(
-		t,
-		[]*common.Fx{{
+	require := require.New(t)
+
+	env := setup(t, &envConfig{
+		additionalFxs: []*common.Fx{{
 			ID: ids.GenerateTestID(),
 			Fx: &FxTest{
 				InitializeF: func(vmIntf interface{}) error {
@@ -33,17 +34,11 @@ func TestSetsAndGets(t *testing.T) {
 				},
 			},
 		}},
-		nil,
-	)
-	ctx := vm.ctx
+	})
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
-			t.Fatal(err)
-		}
-		ctx.Lock.Unlock()
+		require.NoError(env.vm.Shutdown(context.Background()))
+		env.vm.ctx.Lock.Unlock()
 	}()
-
-	state := vm.state
 
 	utxo := &avax.UTXO{
 		UTXOID: avax.UTXOID{
@@ -74,44 +69,29 @@ func TestSetsAndGets(t *testing.T) {
 			},
 		}},
 	}}}
-	if err := tx.SignSECP256K1Fx(vm.parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0]}}); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(tx.SignSECP256K1Fx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{keys[0]}}))
 
 	txID := tx.ID()
 
-	state.AddUTXO(utxo)
-	state.AddTx(tx)
-	state.AddStatus(txID, choices.Accepted)
+	env.vm.state.AddUTXO(utxo)
+	env.vm.state.AddTx(tx)
+	env.vm.state.AddStatus(txID, choices.Accepted)
 
-	resultUTXO, err := state.GetUTXO(utxoID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	resultTx, err := state.GetTx(txID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	resultStatus, err := state.GetStatus(txID)
-	if err != nil {
-		t.Fatal(err)
-	}
+	resultUTXO, err := env.vm.state.GetUTXO(utxoID)
+	require.NoError(err)
+	resultTx, err := env.vm.state.GetTx(txID)
+	require.NoError(err)
+	resultStatus, err := env.vm.state.GetStatus(txID)
+	require.NoError(err)
 
-	if resultUTXO.OutputIndex != 1 {
-		t.Fatalf("Wrong UTXO returned")
-	}
-	if resultTx.ID() != tx.ID() {
-		t.Fatalf("Wrong Tx returned")
-	}
-	if resultStatus != choices.Accepted {
-		t.Fatalf("Wrong Status returned")
-	}
+	require.Equal(uint32(1), resultUTXO.OutputIndex)
+	require.Equal(tx.ID(), resultTx.ID())
+	require.Equal(choices.Accepted, resultStatus)
 }
 
 func TestFundingNoAddresses(t *testing.T) {
-	_, _, vm, _ := GenesisVMWithArgs(
-		t,
-		[]*common.Fx{{
+	env := setup(t, &envConfig{
+		additionalFxs: []*common.Fx{{
 			ID: ids.GenerateTestID(),
 			Fx: &FxTest{
 				InitializeF: func(vmIntf interface{}) error {
@@ -120,17 +100,11 @@ func TestFundingNoAddresses(t *testing.T) {
 				},
 			},
 		}},
-		nil,
-	)
-	ctx := vm.ctx
+	})
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
-			t.Fatal(err)
-		}
-		ctx.Lock.Unlock()
+		require.NoError(t, env.vm.Shutdown(context.Background()))
+		env.vm.ctx.Lock.Unlock()
 	}()
-
-	state := vm.state
 
 	utxo := &avax.UTXO{
 		UTXOID: avax.UTXOID{
@@ -141,14 +115,15 @@ func TestFundingNoAddresses(t *testing.T) {
 		Out:   &avax.TestState{},
 	}
 
-	state.AddUTXO(utxo)
-	state.DeleteUTXO(utxo.InputID())
+	env.vm.state.AddUTXO(utxo)
+	env.vm.state.DeleteUTXO(utxo.InputID())
 }
 
 func TestFundingAddresses(t *testing.T) {
-	_, _, vm, _ := GenesisVMWithArgs(
-		t,
-		[]*common.Fx{{
+	require := require.New(t)
+
+	env := setup(t, &envConfig{
+		additionalFxs: []*common.Fx{{
 			ID: ids.GenerateTestID(),
 			Fx: &FxTest{
 				InitializeF: func(vmIntf interface{}) error {
@@ -157,17 +132,11 @@ func TestFundingAddresses(t *testing.T) {
 				},
 			},
 		}},
-		nil,
-	)
-	ctx := vm.ctx
+	})
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
-			t.Fatal(err)
-		}
-		ctx.Lock.Unlock()
+		require.NoError(env.vm.Shutdown(context.Background()))
+		env.vm.ctx.Lock.Unlock()
 	}()
-
-	state := vm.state
 
 	utxo := &avax.UTXO{
 		UTXOID: avax.UTXOID{
@@ -180,18 +149,18 @@ func TestFundingAddresses(t *testing.T) {
 		},
 	}
 
-	state.AddUTXO(utxo)
-	require.NoError(t, state.Commit())
+	env.vm.state.AddUTXO(utxo)
+	require.NoError(env.vm.state.Commit())
 
-	utxos, err := state.UTXOIDs([]byte{0}, ids.Empty, math.MaxInt32)
-	require.NoError(t, err)
-	require.Len(t, utxos, 1)
-	require.Equal(t, utxo.InputID(), utxos[0])
+	utxos, err := env.vm.state.UTXOIDs([]byte{0}, ids.Empty, math.MaxInt32)
+	require.NoError(err)
+	require.Len(utxos, 1)
+	require.Equal(utxo.InputID(), utxos[0])
 
-	state.DeleteUTXO(utxo.InputID())
-	require.NoError(t, state.Commit())
+	env.vm.state.DeleteUTXO(utxo.InputID())
+	require.NoError(env.vm.state.Commit())
 
-	utxos, err = state.UTXOIDs([]byte{0}, ids.Empty, math.MaxInt32)
-	require.NoError(t, err)
-	require.Empty(t, utxos)
+	utxos, err = env.vm.state.UTXOIDs([]byte{0}, ids.Empty, math.MaxInt32)
+	require.NoError(err)
+	require.Empty(utxos)
 }

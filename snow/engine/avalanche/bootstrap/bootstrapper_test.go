@@ -169,7 +169,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 			return vtx2, nil
 		default:
 			require.FailNow(errUnknownVertex.Error())
-			panic(errUnknownVertex)
+			return nil, errUnknownVertex
 		}
 	}
 
@@ -183,7 +183,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 			return vtx2, nil
 		default:
 			require.FailNow(errParsedUnknownVertex.Error())
-			panic(errParsedUnknownVertex)
+			return nil, errParsedUnknownVertex
 		}
 	}
 
@@ -275,7 +275,7 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 			return nil, errUnknownVertex
 		default:
 			require.FailNow(errUnknownVertex.Error())
-			panic(errUnknownVertex)
+			return nil, errUnknownVertex
 		}
 	}
 
@@ -302,7 +302,7 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 			return vtx2, nil
 		default:
 			require.FailNow(errParsedUnknownVertex.Error())
-			panic(errParsedUnknownVertex)
+			return nil, errParsedUnknownVertex
 		}
 	}
 
@@ -322,7 +322,7 @@ func TestBootstrapperByzantineResponses(t *testing.T) {
 			return vtx0, nil
 		default:
 			require.FailNow(errUnknownVertex.Error())
-			panic(errUnknownVertex)
+			return nil, errUnknownVertex
 		}
 	}
 
@@ -354,8 +354,6 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 
 	config, peerID, sender, manager, vm := newConfig(t)
 
-	utxos := []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
-
 	txID0 := ids.GenerateTestID()
 	txID1 := ids.GenerateTestID()
 
@@ -369,7 +367,6 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 		},
 		BytesV: txBytes0,
 	}
-	tx0.InputIDsV = append(tx0.InputIDsV, utxos[0])
 
 	// Depends on tx0
 	tx1 := &snowstorm.TestTx{
@@ -380,7 +377,6 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 		DependenciesV: []snowstorm.Tx{tx0},
 		BytesV:        txBytes1,
 	}
-	tx1.InputIDsV = append(tx1.InputIDsV, utxos[1])
 
 	vtxID0 := ids.GenerateTestID()
 	vtxID1 := ids.GenerateTestID()
@@ -443,7 +439,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 			return vtx0, nil
 		default:
 			require.FailNow(errParsedUnknownVertex.Error())
-			panic(errParsedUnknownVertex)
+			return nil, errParsedUnknownVertex
 		}
 	}
 	manager.GetVtxF = func(_ context.Context, vtxID ids.ID) (avalanche.Vertex, error) {
@@ -454,7 +450,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 			return nil, errUnknownVertex
 		default:
 			require.FailNow(errUnknownVertex.Error())
-			panic(errUnknownVertex)
+			return nil, errUnknownVertex
 		}
 	}
 
@@ -477,7 +473,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 			return vtx0, nil
 		default:
 			require.FailNow(errParsedUnknownVertex.Error())
-			panic(errParsedUnknownVertex)
+			return nil, errParsedUnknownVertex
 		}
 	}
 
@@ -570,7 +566,7 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 			return vtx2, nil
 		default:
 			require.FailNow(errUnknownVertex.Error())
-			panic(errUnknownVertex)
+			return nil, errUnknownVertex
 		}
 	}
 	manager.ParseVtxF = func(_ context.Context, vtxBytes []byte) (avalanche.Vertex, error) {
@@ -585,7 +581,7 @@ func TestBootstrapperIncompleteAncestors(t *testing.T) {
 			return vtx2, nil
 		default:
 			require.FailNow(errParsedUnknownVertex.Error())
-			panic(errParsedUnknownVertex)
+			return nil, errParsedUnknownVertex
 		}
 	}
 	reqIDPtr := new(uint32)
@@ -687,7 +683,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 			return nil, errUnknownVertex
 		default:
 			require.FailNow(errUnknownVertex.Error())
-			panic(errUnknownVertex)
+			return nil, errUnknownVertex
 		}
 	}
 	manager.ParseVtxF = func(_ context.Context, vtxBytes []byte) (avalanche.Vertex, error) {
@@ -702,7 +698,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 			return vtx1, nil
 		default:
 			require.FailNow(errUnknownVertex.Error())
-			panic(errUnknownVertex)
+			return nil, errUnknownVertex
 		}
 	}
 
@@ -817,7 +813,7 @@ func TestBootstrapperAcceptsAncestorsParents(t *testing.T) {
 			}
 		default:
 			require.FailNow(errUnknownVertex.Error())
-			panic(errUnknownVertex)
+			return nil, errUnknownVertex
 		}
 		return nil, errUnknownVertex
 	}
@@ -837,7 +833,7 @@ func TestBootstrapperAcceptsAncestorsParents(t *testing.T) {
 			return vtx2, nil
 		default:
 			require.FailNow(errUnknownVertex.Error())
-			panic(errUnknownVertex)
+			return nil, errUnknownVertex
 		}
 	}
 
@@ -997,7 +993,7 @@ func TestRestartBootstrapping(t *testing.T) {
 			}
 		default:
 			require.FailNow(errUnknownVertex.Error())
-			panic(errUnknownVertex)
+			return nil, errUnknownVertex
 		}
 		return nil, errUnknownVertex
 	}
@@ -1029,7 +1025,7 @@ func TestRestartBootstrapping(t *testing.T) {
 			return vtx5, nil
 		default:
 			require.FailNow(errUnknownVertex.Error())
-			panic(errUnknownVertex)
+			return nil, errUnknownVertex
 		}
 	}
 
