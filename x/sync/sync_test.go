@@ -576,10 +576,19 @@ func TestFindNextKeyRandom(t *testing.T) {
 			_, _ = rand.Read(rangeEnd)
 		}
 
+		startKey := merkledb.Nothing[[]byte]()
+		if len(rangeStart) > 0 {
+			startKey = merkledb.Some(rangeStart)
+		}
+		endKey := merkledb.Nothing[[]byte]()
+		if len(rangeEnd) > 0 {
+			endKey = merkledb.Some(rangeEnd)
+		}
+
 		remoteProof, err := remoteDB.GetRangeProof(
 			context.Background(),
-			rangeStart,
-			rangeEnd,
+			startKey,
+			endKey,
 			rand.Intn(maxProofLen)+1,
 		)
 		require.NoError(err)
@@ -878,7 +887,15 @@ func Test_Sync_Error_During_Sync(t *testing.T) {
 			require.NoError(err)
 			endRoot, err := ids.ToID(request.EndRootHash)
 			require.NoError(err)
-			return dbToSync.GetChangeProof(ctx, startRoot, endRoot, request.StartKey, request.EndKey, int(request.KeyLimit))
+			startKey := merkledb.Nothing[[]byte]()
+			if !request.StartKey.IsNothing {
+				startKey = merkledb.Some(request.StartKey.Value)
+			}
+			endKey := merkledb.Nothing[[]byte]()
+			if !request.EndKey.IsNothing {
+				endKey = merkledb.Some(request.EndKey.Value)
+			}
+			return dbToSync.GetChangeProof(ctx, startRoot, endRoot, startKey, endKey, int(request.KeyLimit))
 		},
 	).AnyTimes()
 
@@ -957,7 +974,15 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 				<-updatedRootChan
 				root, err := ids.ToID(request.RootHash)
 				require.NoError(err)
-				return dbToSync.GetRangeProofAtRoot(ctx, root, request.StartKey, request.EndKey, int(request.KeyLimit))
+				startKey := merkledb.Nothing[[]byte]()
+				if !request.StartKey.IsNothing {
+					startKey = merkledb.Some(request.StartKey.Value)
+				}
+				endKey := merkledb.Nothing[[]byte]()
+				if !request.EndKey.IsNothing {
+					endKey = merkledb.Some(request.EndKey.Value)
+				}
+				return dbToSync.GetRangeProofAtRoot(ctx, root, startKey, endKey, int(request.KeyLimit))
 			},
 		).AnyTimes()
 		client.EXPECT().GetChangeProof(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
@@ -967,7 +992,15 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 				require.NoError(err)
 				endRoot, err := ids.ToID(request.EndRootHash)
 				require.NoError(err)
-				return dbToSync.GetChangeProof(ctx, startRoot, endRoot, request.StartKey, request.EndKey, int(request.KeyLimit))
+				startKey := merkledb.Nothing[[]byte]()
+				if !request.StartKey.IsNothing {
+					startKey = merkledb.Some(request.StartKey.Value)
+				}
+				endKey := merkledb.Nothing[[]byte]()
+				if !request.EndKey.IsNothing {
+					endKey = merkledb.Some(request.EndKey.Value)
+				}
+				return dbToSync.GetChangeProof(ctx, startRoot, endRoot, startKey, endKey, int(request.KeyLimit))
 			},
 		).AnyTimes()
 

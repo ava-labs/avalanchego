@@ -246,7 +246,7 @@ func (s *NetworkServer) HandleRangeProofRequest(
 	if req.BytesLimit == 0 ||
 		req.KeyLimit == 0 ||
 		len(req.RootHash) != hashing.HashLen ||
-		(len(req.EndKey) > 0 && bytes.Compare(req.StartKey, req.EndKey) > 0) {
+		(!req.EndKey.IsNothing && bytes.Compare(req.StartKey.Value, req.EndKey.Value) > 0) { // TODO check validity of Maybe
 		s.log.Debug(
 			"dropping invalid range proof request",
 			zap.Stringer("nodeID", nodeID),
@@ -270,7 +270,15 @@ func (s *NetworkServer) HandleRangeProofRequest(
 		if err != nil {
 			return err
 		}
-		rangeProof, err := s.db.GetRangeProofAtRoot(ctx, root, req.StartKey, req.EndKey, int(keyLimit))
+		startKey := merkledb.Nothing[[]byte]()
+		if !req.StartKey.IsNothing {
+			startKey = merkledb.Some(req.StartKey.Value)
+		}
+		endKey := merkledb.Nothing[[]byte]()
+		if !req.EndKey.IsNothing {
+			endKey = merkledb.Some(req.EndKey.Value)
+		}
+		rangeProof, err := s.db.GetRangeProofAtRoot(ctx, root, startKey, endKey, int(keyLimit))
 		if err != nil {
 			// handle expected errors so clients cannot cause servers to spam warning logs.
 			if errors.Is(err, merkledb.ErrRootIDNotPresent) {
