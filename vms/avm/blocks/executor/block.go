@@ -251,7 +251,21 @@ func (b *Block) Accept(context.Context) error {
 	if err := b.manager.backend.Ctx.SharedMemory.Apply(blkState.atomicRequests, batch); err != nil {
 		return fmt.Errorf("failed to apply state diff to shared memory: %w", err)
 	}
-	return b.manager.metrics.MarkBlockAccepted(b)
+
+	if err := b.manager.metrics.MarkBlockAccepted(b); err != nil {
+		return err
+	}
+
+	txChecksum, utxoChecksum := b.manager.state.Checksums()
+	b.manager.backend.Ctx.Log.Info(
+		"accepting block",
+		zap.Stringer("blkID", blkID),
+		zap.Uint64("height", b.Height()),
+		zap.Stringer("parentID", b.Parent()),
+		zap.Stringer("txChecksum", txChecksum),
+		zap.Stringer("utxoChecksum", utxoChecksum),
+	)
+	return nil
 }
 
 func (b *Block) Reject(context.Context) error {

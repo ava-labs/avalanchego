@@ -4,6 +4,8 @@
 package states
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
 	"time"
 
@@ -98,6 +100,8 @@ type State interface {
 	// pending changes to the base database.
 	CommitBatch() (database.Batch, error)
 
+	Checksums() (ids.ID, ids.ID)
+
 	Close() error
 }
 
@@ -130,9 +134,10 @@ type state struct {
 	statusCache   cache.Cacher[ids.ID, *choices.Status] // cache of id -> choices.Status. If the entry is nil, it is not in the database
 	statusDB      database.Database
 
-	addedTxs map[ids.ID]*txs.Tx            // map of txID -> *txs.Tx
-	txCache  cache.Cacher[ids.ID, *txs.Tx] // cache of txID -> *txs.Tx. If the entry is nil, it is not in the database
-	txDB     database.Database
+	addedTxs   map[ids.ID]*txs.Tx            // map of txID -> *txs.Tx
+	txCache    cache.Cacher[ids.ID, *txs.Tx] // cache of txID -> *txs.Tx. If the entry is nil, it is not in the database
+	txDB       database.Database
+	txChecksum ids.ID
 
 	addedBlockIDs map[uint64]ids.ID            // map of height -> blockID
 	blockIDCache  cache.Cacher[uint64, ids.ID] // cache of height -> blockID. If the entry is ids.Empty, it is not in the database
@@ -197,7 +202,11 @@ func New(
 	}
 
 	utxoState, err := avax.NewMeteredUTXOState(utxoDB, parser.Codec(), metrics)
-	return &state{
+	if err != nil {
+		return nil, err
+	}
+
+	s := &state{
 		parser: parser,
 		db:     db,
 
@@ -222,7 +231,8 @@ func New(
 		blockDB:     blockDB,
 
 		singletonDB: singletonDB,
-	}, err
+	}
+	return s, s.initTxChecksum()
 }
 
 func (s *state) GetUTXO(utxoID ids.ID) (*avax.UTXO, error) {
@@ -504,6 +514,10 @@ func (s *state) writeTxs() error {
 		txID := txID
 		txBytes := tx.Bytes()
 
+		if _, ok := s.addedStatuses[txID]; !ok {
+			s.updateTxChecksum(txID)
+		}
+
 		delete(s.addedTxs, txID)
 		s.txCache.Put(txID, tx)
 		if err := s.txDB.Put(txID[:], txBytes); err != nil {
@@ -561,6 +575,10 @@ func (s *state) writeStatuses() error {
 		id := id
 		status := status
 
+		if status == choices.Accepted {
+			s.updateTxChecksum(id)
+		}
+
 		delete(s.addedStatuses, id)
 		s.statusCache.Put(id, &status)
 		if err := database.PutUInt32(s.statusDB, id[:], uint32(status)); err != nil {
@@ -568,4 +586,59 @@ func (s *state) writeStatuses() error {
 		}
 	}
 	return nil
+}
+
+func (s *state) Checksums() (ids.ID, ids.ID) {
+	return s.txChecksum, s.utxoState.Checksum()
+}
+
+func (s *state) initTxChecksum() error {
+	txIt := s.txDB.NewIterator()
+	defer txIt.Release()
+	statusIt := s.statusDB.NewIterator()
+	defer statusIt.Release()
+
+	statusHasNext := statusIt.Next()
+	for txIt.Next() {
+		txIDBytes := txIt.Key()
+		if statusHasNext { // if status was exhausted, everything is accepted
+			statusIDBytes := statusIt.Key()
+			if bytes.Equal(txIDBytes, statusIDBytes) { // if the status key doesn't match this was marked as accepted
+				statusInt, err := database.ParseUInt32(statusIt.Value())
+				if err != nil {
+					return err
+				}
+
+				statusHasNext = statusIt.Next() // we processed the txID, so move on to the next status
+
+				if choices.Status(statusInt) != choices.Accepted { // the status isn't accepted, so we skip the txID
+					continue
+				}
+			}
+		}
+
+		txID, err := ids.ToID(txIDBytes)
+		if err != nil {
+			return err
+		}
+
+		s.updateTxChecksum(txID)
+	}
+
+	if statusHasNext {
+		return errors.New("dangling tx status")
+	}
+
+	errs := wrappers.Errs{}
+	errs.Add(
+		txIt.Error(),
+		statusIt.Error(),
+	)
+	return errs.Err
+}
+
+func (s *state) updateTxChecksum(modifiedID ids.ID) {
+	for i, b := range modifiedID {
+		s.txChecksum[i] ^= b
+	}
 }

@@ -47,7 +47,8 @@ func TestFetchUTXOs(t *testing.T) {
 	require.NoError(manager.RegisterCodec(codecVersion, c))
 
 	db := memdb.New()
-	s := NewUTXOState(db, manager)
+	s, err := NewUTXOState(db, manager)
+	require.NoError(err)
 
 	require.NoError(s.PutUTXO(utxo))
 
@@ -80,7 +81,8 @@ func TestGetPaginatedUTXOs(t *testing.T) {
 	require.NoError(manager.RegisterCodec(codecVersion, c))
 
 	db := memdb.New()
-	s := NewUTXOState(db, manager)
+	s, err := NewUTXOState(db, manager)
+	require.NoError(err)
 
 	// Create 1000 UTXOs each on addr0, addr1, and addr2.
 	for i := 0; i < 1000; i++ {
@@ -140,13 +142,10 @@ func TestGetPaginatedUTXOs(t *testing.T) {
 
 	var (
 		fetchedUTXOs []*UTXO
-		err          error
+		lastAddr     = ids.ShortEmpty
+		lastIdx      = ids.Empty
+		totalUTXOs   []*UTXO
 	)
-
-	lastAddr := ids.ShortEmpty
-	lastIdx := ids.Empty
-
-	var totalUTXOs []*UTXO
 	for i := 0; i <= 10; i++ {
 		fetchedUTXOs, lastAddr, lastIdx, err = GetPaginatedUTXOs(s, addrs, lastAddr, lastIdx, 512)
 		require.NoError(err)

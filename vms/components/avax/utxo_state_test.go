@@ -50,9 +50,10 @@ func TestUTXOState(t *testing.T) {
 	require.NoError(manager.RegisterCodec(codecVersion, c))
 
 	db := memdb.New()
-	s := NewUTXOState(db, manager)
+	s, err := NewUTXOState(db, manager)
+	require.NoError(err)
 
-	_, err := s.GetUTXO(utxoID)
+	_, err = s.GetUTXO(utxoID)
 	require.Equal(database.ErrNotFound, err)
 
 	_, err = s.GetUTXO(utxoID)
@@ -77,7 +78,8 @@ func TestUTXOState(t *testing.T) {
 
 	require.NoError(s.PutUTXO(utxo))
 
-	s = NewUTXOState(db, manager)
+	s, err = NewUTXOState(db, manager)
+	require.NoError(err)
 
 	readUTXO, err = s.GetUTXO(utxoID)
 	require.NoError(err)
