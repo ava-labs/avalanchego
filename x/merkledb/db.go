@@ -1066,13 +1066,13 @@ func (db *merkleDB) VerifyChangeProof(
 	// For all the nodes along the edges of the proof, insert children
 	// < [insertChildrenLessThan] and > [insertChildrenGreaterThan]
 	// into the trie so that we get the expected root ID (if this proof is valid).
-	insertChildrenGreaterThan := Nothing[path]()
-	if len(largestPath) > 0 {
-		insertChildrenGreaterThan = Some(largestPath)
-	}
 	insertChildrenLessThan := Nothing[path]()
 	if len(smallestPath) > 0 {
 		insertChildrenLessThan = Some(smallestPath)
+	}
+	insertChildrenGreaterThan := Nothing[path]()
+	if len(largestPath) > 0 {
+		insertChildrenGreaterThan = Some(largestPath)
 	}
 	if err := addPathInfo(
 		view,

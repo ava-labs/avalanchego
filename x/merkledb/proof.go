@@ -359,13 +359,13 @@ func (proof *RangeProof) Verify(
 	// By inserting all children < [insertChildrenLessThan], we prove that there are no keys
 	// > [insertChildrenLessThan] but less than the first key given.
 	// That is, the peer who gave us this proof is not omitting nodes.
-	insertChildrenGreaterThan := Nothing[path]()
-	if len(largestPath) > 0 {
-		insertChildrenGreaterThan = Some(largestPath)
-	}
 	insertChildrenLessThan := Nothing[path]()
 	if len(smallestPath) > 0 {
 		insertChildrenLessThan = Some(smallestPath)
+	}
+	insertChildrenGreaterThan := Nothing[path]()
+	if len(largestPath) > 0 {
+		insertChildrenGreaterThan = Some(largestPath)
 	}
 	if err := addPathInfo(
 		view,
