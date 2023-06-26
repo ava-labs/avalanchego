@@ -1017,8 +1017,6 @@ func (db *merkleDB) VerifyChangeProof(
 		largestPath = newPath(largestKey.value)
 	}
 
-	// := newPath(largestKey) TODO remove
-
 	// Make sure the end proof, if given, is well-formed.
 	if err := verifyProofPath(proof.EndProof, largestPath); err != nil {
 		return err

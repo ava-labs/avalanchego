@@ -301,7 +301,7 @@ func (proof *RangeProof) Verify(
 	}
 
 	// Make sure the key-value pairs are sorted and in [start, end].
-	if err := verifyKeyValues(proof.KeyValues, start.value, end.value); err != nil { // TODO fix by passing maybes
+	if err := verifyKeyValues(proof.KeyValues, start, end); err != nil {
 		return err
 	}
 
@@ -319,8 +319,14 @@ func (proof *RangeProof) Verify(
 		keyValues[newPath(keyValue.Key)] = keyValue.Value
 	}
 
-	smallestPath := newPath(start.value)     // TODO fix this
-	largestPath := newPath(largestKey.value) // TODO fix this
+	var smallestPath path
+	if start.hasValue {
+		smallestPath = newPath(start.value)
+	}
+	var largestPath path
+	if largestKey.hasValue {
+		largestPath = newPath(largestKey.value)
+	}
 
 	// Ensure that the start proof is valid and contains values that
 	// match the key/values that were sent.
@@ -671,15 +677,15 @@ func verifyKeyChanges(kvs []KeyChange, start, end Maybe[[]byte]) error {
 // If [start] is nil, there is no lower bound on acceptable keys.
 // If [end] is nil, there is no upper bound on acceptable keys.
 // If [kvs] is empty, returns nil.
-func verifyKeyValues(kvs []KeyValue, start, end []byte) error {
-	hasLowerBound := len(start) > 0
-	hasUpperBound := len(end) > 0
+func verifyKeyValues(kvs []KeyValue, start, end Maybe[[]byte]) error {
+	hasLowerBound := start.hasValue
+	hasUpperBound := end.hasValue
 	for i := 0; i < len(kvs); i++ {
 		if i < len(kvs)-1 && bytes.Compare(kvs[i].Key, kvs[i+1].Key) >= 0 {
 			return ErrNonIncreasingValues
 		}
-		if (hasLowerBound && bytes.Compare(kvs[i].Key, start) < 0) ||
-			(hasUpperBound && bytes.Compare(kvs[i].Key, end) > 0) {
+		if (hasLowerBound && bytes.Compare(kvs[i].Key, start.value) < 0) ||
+			(hasUpperBound && bytes.Compare(kvs[i].Key, end.value) > 0) {
 			return ErrStateFromOutsideOfRange
 		}
 	}
