@@ -114,7 +114,7 @@ func (tx *UniqueTx) Key() ids.ID {
 // Accept is called when the transaction was finalized as accepted by consensus
 func (tx *UniqueTx) Accept(context.Context) error {
 	if s := tx.Status(); s != choices.Processing {
-		return fmt.Errorf("transaction has invalid status: %s", s)
+		return fmt.Errorf("%w: %s", errTxNotProcessing, s)
 	}
 
 	if err := tx.vm.onAccept(tx.Tx); err != nil {
@@ -207,8 +207,8 @@ func (tx *UniqueTx) Bytes() []byte {
 
 // Verify the validity of this transaction
 func (tx *UniqueTx) Verify(context.Context) error {
-	if tx.Status() != choices.Processing {
-		return errTxNotProcessing
+	if s := tx.Status(); s != choices.Processing {
+		return fmt.Errorf("%w: %s", errTxNotProcessing, s)
 	}
 	return tx.Unsigned.Visit(&executor.SemanticVerifier{
 		Backend: tx.vm.txBackend,
