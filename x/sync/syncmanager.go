@@ -49,14 +49,14 @@ const (
 // [LocalRootID] is the ID of the root of this range in our database.
 // If we have no local root for this range, [LocalRootID] is ids.Empty.
 type syncWorkItem struct {
-	start       []byte
-	end         []byte
+	start       merkledb.Maybe[[]byte]
+	end         merkledb.Maybe[[]byte]
 	priority    priority
 	LocalRootID ids.ID
 }
 
 // TODO danlaine look into using a sync.Pool for syncWorkItems
-func newWorkItem(localRootID ids.ID, start, end []byte, priority priority) *syncWorkItem {
+func newWorkItem(localRootID ids.ID, start, end merkledb.Maybe[[]byte], priority priority) *syncWorkItem {
 	return &syncWorkItem{
 		LocalRootID: localRootID,
 		start:       start,
@@ -146,7 +146,7 @@ func (m *StateSyncManager) StartSyncing(ctx context.Context) error {
 
 	// Add work item to fetch the entire key range.
 	// Note that this will be the first work item to be processed.
-	m.unprocessedWork.Insert(newWorkItem(ids.Empty, nil, nil, lowPriority))
+	m.unprocessedWork.Insert(newWorkItem(ids.Empty, merkledb.Nothing[[]byte](), merkledb.Nothing[[]byte](), lowPriority))
 
 	m.syncing = true
 	ctx, m.cancelCtx = context.WithCancel(ctx)
@@ -264,10 +264,16 @@ func (m *StateSyncManager) getAndApplyChangeProof(ctx context.Context, workItem 
 		&pb.SyncGetChangeProofRequest{
 			StartRootHash: workItem.LocalRootID[:],
 			EndRootHash:   rootID[:],
-			StartKey:      workItem.start,
-			EndKey:        workItem.end,
-			KeyLimit:      defaultRequestKeyLimit,
-			BytesLimit:    defaultRequestByteSizeLimit,
+			StartKey: &pb.MaybeBytes{
+				Value:     workItem.start.Value(),
+				IsNothing: workItem.start.IsNothing(),
+			},
+			EndKey: &pb.MaybeBytes{
+				Value:     workItem.end.Value(),
+				IsNothing: workItem.end.IsNothing(),
+			},
+			KeyLimit:   defaultRequestKeyLimit,
+			BytesLimit: defaultRequestByteSizeLimit,
 		},
 		m.config.SyncDB,
 	)
@@ -299,7 +305,7 @@ func (m *StateSyncManager) getAndApplyChangeProof(ctx context.Context, workItem 
 			m.setError(err)
 			return
 		}
-		largestHandledKey = changeProof.KeyChanges[len(changeProof.KeyChanges)-1].Key
+		largestHandledKey = merkledb.Some(changeProof.KeyChanges[len(changeProof.KeyChanges)-1].Key) // TODO is this right?
 	}
 
 	m.completeWorkItem(ctx, workItem, largestHandledKey, rootID, changeProof.EndProof)
@@ -311,9 +317,15 @@ func (m *StateSyncManager) getAndApplyRangeProof(ctx context.Context, workItem *
 	rootID := m.getTargetRoot()
 	proof, err := m.config.Client.GetRangeProof(ctx,
 		&pb.SyncGetRangeProofRequest{
-			RootHash:   rootID[:],
-			StartKey:   workItem.start,
-			EndKey:     workItem.end,
+			RootHash: rootID[:],
+			StartKey: &pb.MaybeBytes{
+				Value:     workItem.start.Value(),
+				IsNothing: workItem.start.IsNothing(),
+			},
+			EndKey: &pb.MaybeBytes{
+				Value:     workItem.end.Value(),
+				IsNothing: workItem.end.IsNothing(),
+			},
 			KeyLimit:   defaultRequestKeyLimit,
 			BytesLimit: defaultRequestByteSizeLimit,
 		},
@@ -332,31 +344,42 @@ func (m *StateSyncManager) getAndApplyRangeProof(ctx context.Context, workItem *
 
 	largestHandledKey := workItem.end
 	if len(proof.KeyValues) > 0 {
+		var startKey []byte
+		if !workItem.start.IsNothing() {
+			startKey = workItem.start.Value()
+		}
+
 		// Add all the key-value pairs we got to the database.
-		if err := m.config.SyncDB.CommitRangeProof(ctx, workItem.start, proof); err != nil {
+		if err := m.config.SyncDB.CommitRangeProof(ctx, startKey, proof); err != nil {
 			m.setError(err)
 			return
 		}
 
-		largestHandledKey = proof.KeyValues[len(proof.KeyValues)-1].Key
+		largestHandledKey = merkledb.Some(proof.KeyValues[len(proof.KeyValues)-1].Key) // TODO is this right?
 	}
 
 	m.completeWorkItem(ctx, workItem, largestHandledKey, rootID, proof.EndProof)
 }
 
 // findNextKey attempts to find the first key larger than the lastReceivedKey that is different in the local merkle vs the merkle that is being synced.
-// Returns the first key with a difference in the range (lastReceivedKey, rangeEnd), or nil if no difference was found in the range
+// Returns the first key with a difference in the range (lastReceivedKey, rangeEnd), or Nothing if no difference was found in the range
 func (m *StateSyncManager) findNextKey(
 	ctx context.Context,
-	lastReceivedKey []byte,
-	rangeEnd []byte,
+	lastReceivedKey merkledb.Maybe[[]byte],
+	rangeEnd merkledb.Maybe[[]byte],
 	receivedProofNodes []merkledb.ProofNode,
-) ([]byte, error) {
+) (merkledb.Maybe[[]byte], error) {
 	// We want the first key larger than the lastReceivedKey.
 	// This is done by taking two proofs for the same key (one that was just received as part of a proof, and one from the local db)
 	// and traversing them from the deepest key to the shortest key.
 	// For each node in these proofs, compare if the children of that node exist or have the same id in the other proof.
-	proofKeyPath := merkledb.SerializedPath{Value: lastReceivedKey, NibbleLength: 2 * len(lastReceivedKey)}
+	var proofKeyPath merkledb.SerializedPath
+	if !lastReceivedKey.IsNothing() {
+		proofKeyPath = merkledb.SerializedPath{
+			Value:        lastReceivedKey.Value(),
+			NibbleLength: 2 * len(lastReceivedKey.Value()),
+		}
+	}
 
 	// If the received proof is an exclusion proof, the last node may be for a key that is after the lastReceivedKey.
 	// If the last received node's key is after the lastReceivedKey, it can be removed to obtain a valid proof for a prefix of the lastReceivedKey
@@ -369,7 +392,7 @@ func (m *StateSyncManager) findNextKey(
 	// get a proof for the same key as the received proof from the local db
 	localProofOfKey, err := m.config.SyncDB.GetProof(ctx, proofKeyPath.Value)
 	if err != nil {
-		return nil, err
+		return merkledb.Nothing[[]byte](), err
 	}
 	localProofNodes := localProofOfKey.Path
 
@@ -448,18 +471,23 @@ func (m *StateSyncManager) findNextKey(
 	// If the nextKey is before or equal to the lastReceivedKey
 	// then we couldn't find a better answer than the lastReceivedKey.
 	// Set the nextKey to lastReceivedKey + 0, which is the first key in the open range (lastReceivedKey, rangeEnd)
-	if nextKey != nil && bytes.Compare(nextKey, lastReceivedKey) <= 0 {
-		nextKey = lastReceivedKey
+	if nextKey != nil && (lastReceivedKey.IsNothing() ||
+		bytes.Compare(nextKey, lastReceivedKey.Value()) <= 0) {
+		nextKey = lastReceivedKey.Value() // TODO is this right?
 		nextKey = append(nextKey, 0)
 	}
 
-	// If the nextKey is larger than the end of the range, return nil to signal that there is no next key in range
-	if len(rangeEnd) > 0 && bytes.Compare(nextKey, rangeEnd) >= 0 {
-		return nil, nil
+	// If the nextKey is larger than the end of the range, return Nothing to signal that there is no next key in range
+	if !rangeEnd.IsNothing() && bytes.Compare(nextKey, rangeEnd.Value()) >= 0 {
+		return merkledb.Nothing[[]byte](), nil
 	}
 
 	// the nextKey is within the open range (lastReceivedKey, rangeEnd), so return it
-	return nextKey, nil
+	maybeNextKey := merkledb.Nothing[[]byte]()
+	if len(nextKey) > 0 {
+		maybeNextKey = merkledb.Some(nextKey)
+	}
+	return maybeNextKey, nil
 }
 
 // findChildDifference returns the first child index that is different between node 1 and node 2 if one exists and
@@ -582,9 +610,24 @@ func (m *StateSyncManager) setError(err error) {
 
 // Mark the range [start, end] as synced up to [rootID].
 // Assumes [m.workLock] is not held.
-func (m *StateSyncManager) completeWorkItem(ctx context.Context, workItem *syncWorkItem, largestHandledKey []byte, rootID ids.ID, proofOfLargestKey []merkledb.ProofNode) {
+func (m *StateSyncManager) completeWorkItem(
+	ctx context.Context,
+	workItem *syncWorkItem,
+	largestHandledKey merkledb.Maybe[[]byte],
+	rootID ids.ID,
+	proofOfLargestKey []merkledb.ProofNode,
+) {
 	// if the last key is equal to the end, then the full range is completed
-	if !bytes.Equal(largestHandledKey, workItem.end) {
+	largestHandledKeyIsNothing := largestHandledKey.IsNothing()
+	largestHandledKeyValue := largestHandledKey.Value()
+	workItemEndIsNothing := workItem.end.IsNothing()
+	workItemEndValue := workItem.end.Value()
+
+	bothNothing := largestHandledKeyIsNothing && workItemEndIsNothing
+	bothHaveValue := !largestHandledKeyIsNothing && !workItemEndIsNothing
+	valuesMatch := bytes.Equal(largestHandledKeyValue, workItemEndValue)
+
+	if !(bothNothing || (bothHaveValue && valuesMatch)) {
 		// find the next key to start querying by comparing the proofs for the last completed key
 		nextStartKey, err := m.findNextKey(ctx, largestHandledKey, workItem.end, proofOfLargestKey)
 		if err != nil {
@@ -593,7 +636,7 @@ func (m *StateSyncManager) completeWorkItem(ctx context.Context, workItem *syncW
 		}
 
 		// nextStartKey being nil indicates that the entire range has been completed
-		if nextStartKey == nil {
+		if nextStartKey.IsNothing() {
 			largestHandledKey = workItem.end
 		} else {
 			// the full range wasn't completed, so enqueue a new work item for the range [nextStartKey, workItem.end]
@@ -603,10 +646,9 @@ func (m *StateSyncManager) completeWorkItem(ctx context.Context, workItem *syncW
 	}
 
 	// completed the range [workItem.start, lastKey], log and record in the completed work heap
-	m.config.Log.Info("completed range",
-		zap.Binary("start", workItem.start),
-		zap.Binary("end", largestHandledKey),
-	)
+	m.config.Log.Info("completed range") // zap.Binary("start", workItem.start), TODO fix
+	// zap.Binary("end", largestHandledKey), TODO fix
+
 	if m.getTargetRoot() == rootID {
 		m.workLock.Lock()
 		defer m.workLock.Unlock()
@@ -637,7 +679,20 @@ func (m *StateSyncManager) enqueueWork(item *syncWorkItem) {
 
 	// Split the remaining range into to 2.
 	// Find the middle point.
-	mid := midPoint(item.start, item.end)
+	var start []byte
+	if !item.start.IsNothing() {
+		start = item.start.Value()
+	}
+	var end []byte
+	if !item.end.IsNothing() {
+		end = item.end.Value()
+	}
+	midBytes := midPoint(start, end)
+
+	mid := merkledb.Nothing[[]byte]()
+	if len(midBytes) > 0 {
+		mid = merkledb.Some(midBytes)
+	}
 
 	// first item gets higher priority than the second to encourage finished ranges to grow
 	// rather than start a new range that is not contiguous with existing completed ranges

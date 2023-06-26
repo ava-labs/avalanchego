@@ -241,7 +241,7 @@ func Test_Sync_FindNextKey_InSync(t *testing.T) {
 
 		// the two dbs should be in sync, so next key should be nil
 		lastKey := proof.KeyValues[len(proof.KeyValues)-1].Key
-		nextKey, err := syncer.findNextKey(context.Background(), lastKey, nil, proof.EndProof)
+		nextKey, err := syncer.findNextKey(context.Background(), merkledb.Some(lastKey), merkledb.Nothing[[]byte](), proof.EndProof)
 		require.NoError(err)
 		require.Nil(nextKey)
 
@@ -273,7 +273,7 @@ func Test_Sync_FindNextKey_InSync(t *testing.T) {
 			// both nibbles were 0, so move onto the next byte
 		}
 
-		nextKey, err = syncer.findNextKey(context.Background(), lastKey, endPointBeforeNewKey, proof.EndProof)
+		nextKey, err = syncer.findNextKey(context.Background(), merkledb.Some(lastKey), merkledb.Some(endPointBeforeNewKey), proof.EndProof)
 		require.NoError(err)
 
 		// next key would be after the end of the range, so it returns nil instead
@@ -316,11 +316,11 @@ func Test_Sync_FindNextKey_Deleted(t *testing.T) {
 	// there is now another value in the range that needs to be sync'ed
 	require.NoError(db.Put([]byte{0x13}, []byte{3}))
 
-	nextKey, err := syncer.findNextKey(context.Background(), []byte{0x12}, []byte{0x20}, noExtraNodeProof.Path)
+	nextKey, err := syncer.findNextKey(context.Background(), merkledb.Some([]byte{0x12}), merkledb.Some([]byte{0x20}), noExtraNodeProof.Path)
 	require.NoError(err)
 	require.Equal([]byte{0x13}, nextKey)
 
-	nextKey, err = syncer.findNextKey(context.Background(), []byte{0x11}, []byte{0x20}, extraNodeProof.Path)
+	nextKey, err = syncer.findNextKey(context.Background(), merkledb.Some([]byte{0x11}), merkledb.Some([]byte{0x20}), extraNodeProof.Path)
 	require.NoError(err)
 	require.Equal([]byte{0x13}, nextKey)
 }
@@ -352,7 +352,7 @@ func Test_Sync_FindNextKey_BranchInLocal(t *testing.T) {
 	require.NoError(err)
 	require.NoError(db.Put([]byte{0x12}, []byte{4}))
 
-	nextKey, err := syncer.findNextKey(context.Background(), []byte{0x11, 0x11}, []byte{0x20}, proof.Path)
+	nextKey, err := syncer.findNextKey(context.Background(), merkledb.Some([]byte{0x11, 0x11}), merkledb.Some([]byte{0x20}), proof.Path)
 	require.NoError(err)
 	require.Equal([]byte{0x12}, nextKey)
 }
@@ -385,7 +385,7 @@ func Test_Sync_FindNextKey_BranchInReceived(t *testing.T) {
 	require.NoError(err)
 	require.NoError(db.Delete([]byte{0x12}))
 
-	nextKey, err := syncer.findNextKey(context.Background(), []byte{0x11, 0x11}, []byte{0x20}, proof.Path)
+	nextKey, err := syncer.findNextKey(context.Background(), merkledb.Some([]byte{0x11, 0x11}), merkledb.Some([]byte{0x20}), proof.Path)
 	require.NoError(err)
 	require.Equal([]byte{0x12}, nextKey)
 }
@@ -431,11 +431,11 @@ func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 		require.NoError(db.Put(midpoint, []byte{1}))
 
 		// next key at prefix of newly added point
-		nextKey, err := syncer.findNextKey(context.Background(), lastKey, nil, proof.EndProof)
+		nextKey, err := syncer.findNextKey(context.Background(), merkledb.Some(lastKey), merkledb.Nothing[[]byte](), proof.EndProof)
 		require.NoError(err)
 		require.NotNil(nextKey)
 
-		require.True(isPrefix(midpoint, nextKey))
+		require.True(isPrefix(midpoint, nextKey.Value()))
 
 		require.NoError(db.Delete(midpoint))
 
@@ -445,12 +445,12 @@ func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 		require.NoError(err)
 
 		// next key at prefix of newly added point
-		nextKey, err = syncer.findNextKey(context.Background(), lastKey, nil, proof.EndProof)
+		nextKey, err = syncer.findNextKey(context.Background(), merkledb.Some(lastKey), merkledb.Nothing[[]byte](), proof.EndProof)
 		require.NoError(err)
 		require.NotNil(nextKey)
 
 		// deal with odd length key
-		require.True(isPrefix(midpoint, nextKey))
+		require.True(isPrefix(midpoint, nextKey.Value()))
 	}
 }
 
@@ -510,7 +510,7 @@ func Test_Sync_FindNextKey_DifferentChild(t *testing.T) {
 		proof, err = dbToSync.GetRangeProof(context.Background(), merkledb.Nothing[[]byte](), merkledb.Some(proof.KeyValues[len(proof.KeyValues)-1].Key), 100)
 		require.NoError(err)
 
-		nextKey, err := syncer.findNextKey(context.Background(), proof.KeyValues[len(proof.KeyValues)-1].Key, nil, proof.EndProof)
+		nextKey, err := syncer.findNextKey(context.Background(), merkledb.Some(proof.KeyValues[len(proof.KeyValues)-1].Key), merkledb.Nothing[[]byte](), proof.EndProof)
 		require.NoError(err)
 		require.Equal(nextKey, lastKey)
 	}
@@ -714,10 +714,15 @@ func TestFindNextKeyRandom(t *testing.T) {
 		})
 		require.NoError(err)
 
+		maybeLastReceivedKey := merkledb.Nothing[[]byte]()
+		if len(lastReceivedKey) > 0 {
+			maybeLastReceivedKey = merkledb.Some(lastReceivedKey)
+		}
+
 		gotFirstDiff, err := syncer.findNextKey(
 			context.Background(),
-			lastReceivedKey,
-			rangeEnd,
+			maybeLastReceivedKey,
+			endKey,
 			remoteProof.EndProof,
 		)
 		require.NoError(err)
@@ -1057,8 +1062,8 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 	// Populate [m.processWork] to ensure that UpdateSyncTarget
 	// moves the work to [m.unprocessedWork].
 	item := &syncWorkItem{
-		start:       []byte{1},
-		end:         []byte{2},
+		start:       merkledb.Some([]byte{1}),
+		end:         merkledb.Some([]byte{2}),
 		LocalRootID: ids.GenerateTestID(),
 	}
 	m.processedWork.Insert(item)

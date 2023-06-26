@@ -40,7 +40,15 @@ func newSyncWorkHeap() *syncWorkHeap {
 		sortedItems: btree.NewG(
 			2,
 			func(a, b *heapItem) bool {
-				return bytes.Compare(a.workItem.start, b.workItem.start) < 0
+				aNothing := a.workItem.start.IsNothing()
+				bNothing := b.workItem.start.IsNothing()
+				if aNothing {
+					return !bNothing
+				}
+				if bNothing {
+					return false
+				}
+				return bytes.Compare(a.workItem.start.Value(), b.workItem.start.Value()) < 0
 			},
 		),
 	}
@@ -98,13 +106,22 @@ func (wh *syncWorkHeap) MergeInsert(item *syncWorkItem) {
 	wh.sortedItems.DescendLessOrEqual(
 		searchItem,
 		func(beforeItem *heapItem) bool {
-			if item.LocalRootID == beforeItem.workItem.LocalRootID && bytes.Equal(beforeItem.workItem.end, item.start) {
-				// [beforeItem.start, beforeItem.end] and [item.start, item.end] are
-				// merged into [beforeItem.start, item.end]
-				beforeItem.workItem.end = item.end
-				beforeItem.workItem.priority = math.Max(item.priority, beforeItem.workItem.priority)
-				heap.Fix(&wh.innerHeap, beforeItem.heapIndex)
-				mergedBefore = beforeItem
+			if item.LocalRootID == beforeItem.workItem.LocalRootID {
+				beforeIsNothing := beforeItem.workItem.start.IsNothing()
+				itemIsNothing := item.start.IsNothing()
+
+				bothNothing := beforeIsNothing && itemIsNothing
+				bothHaveValue := !beforeIsNothing && !itemIsNothing
+				valuesMatch := bothHaveValue && bytes.Equal(beforeItem.workItem.start.Value(), item.start.Value())
+
+				if bothNothing || valuesMatch {
+					// [beforeItem.start, beforeItem.end] and [item.start, item.end] are
+					// merged into [beforeItem.start, item.end]
+					beforeItem.workItem.end = item.end
+					beforeItem.workItem.priority = math.Max(item.priority, beforeItem.workItem.priority)
+					heap.Fix(&wh.innerHeap, beforeItem.heapIndex)
+					mergedBefore = beforeItem
+				}
 			}
 			return false
 		})
@@ -114,13 +131,22 @@ func (wh *syncWorkHeap) MergeInsert(item *syncWorkItem) {
 	wh.sortedItems.AscendGreaterOrEqual(
 		searchItem,
 		func(afterItem *heapItem) bool {
-			if item.LocalRootID == afterItem.workItem.LocalRootID && bytes.Equal(afterItem.workItem.start, item.end) {
-				// [item.start, item.end] and [afterItem.start, afterItem.end] are merged into
-				// [item.start, afterItem.end].
-				afterItem.workItem.start = item.start
-				afterItem.workItem.priority = math.Max(item.priority, afterItem.workItem.priority)
-				heap.Fix(&wh.innerHeap, afterItem.heapIndex)
-				mergedAfter = afterItem
+			if item.LocalRootID == afterItem.workItem.LocalRootID {
+				afterIsNothing := afterItem.workItem.start.IsNothing()
+				itemIsNothing := item.start.IsNothing()
+
+				bothNothing := afterIsNothing && itemIsNothing
+				bothHaveValue := !afterIsNothing && !itemIsNothing
+				valuesMatch := bothHaveValue && bytes.Equal(afterItem.workItem.start.Value(), item.start.Value())
+
+				if bothNothing || valuesMatch {
+					// [item.start, item.end] and [afterItem.start, afterItem.end] are merged into
+					// [item.start, afterItem.end].
+					afterItem.workItem.start = item.start
+					afterItem.workItem.priority = math.Max(item.priority, afterItem.workItem.priority)
+					heap.Fix(&wh.innerHeap, afterItem.heapIndex)
+					mergedAfter = afterItem
+				}
 			}
 			return false
 		})
