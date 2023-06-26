@@ -354,8 +354,6 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 
 	config, peerID, sender, manager, vm := newConfig(t)
 
-	utxos := []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
-
 	txID0 := ids.GenerateTestID()
 	txID1 := ids.GenerateTestID()
 
@@ -369,7 +367,6 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 		},
 		BytesV: txBytes0,
 	}
-	tx0.InputIDsV = append(tx0.InputIDsV, utxos[0])
 
 	// Depends on tx0
 	tx1 := &snowstorm.TestTx{
@@ -380,7 +377,6 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 		DependenciesV: []snowstorm.Tx{tx0},
 		BytesV:        txBytes1,
 	}
-	tx1.InputIDsV = append(tx1.InputIDsV, utxos[1])
 
 	vtxID0 := ids.GenerateTestID()
 	vtxID1 := ids.GenerateTestID()
