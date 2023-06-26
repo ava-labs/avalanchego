@@ -1,13 +1,11 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowball
 
-import (
-	"fmt"
-)
+import "fmt"
 
-var _ BinarySnowflake = &binarySnowflake{}
+var _ BinarySnowflake = (*binarySnowflake)(nil)
 
 // binarySnowflake is the implementation of a binary snowflake instance
 type binarySnowflake struct {
@@ -49,9 +47,13 @@ func (sf *binarySnowflake) RecordSuccessfulPoll(choice int) {
 	sf.binarySlush.RecordSuccessfulPoll(choice)
 }
 
-func (sf *binarySnowflake) RecordUnsuccessfulPoll() { sf.confidence = 0 }
+func (sf *binarySnowflake) RecordUnsuccessfulPoll() {
+	sf.confidence = 0
+}
 
-func (sf *binarySnowflake) Finalized() bool { return sf.finalized }
+func (sf *binarySnowflake) Finalized() bool {
+	return sf.finalized
+}
 
 func (sf *binarySnowflake) String() string {
 	return fmt.Sprintf("SF(Confidence = %d, Finalized = %v, %s)",

@@ -1,15 +1,16 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package syncer
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"math"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -18,13 +19,20 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 
 	safeMath "github.com/ava-labs/avalanchego/utils/math"
 )
 
+var (
+	errInvalidSummary = errors.New("invalid summary")
+	errEmptySummary   = errors.New("empty summary")
+	errUnknownSummary = errors.New("unknown summary")
+)
+
 func TestStateSyncerIsEnabledIfVMSupportsStateSyncing(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	// Build state syncer
 	sender := &common.SenderTest{T: t}
@@ -38,15 +46,17 @@ func TestStateSyncerIsEnabledIfVMSupportsStateSyncing(t *testing.T) {
 		TestVM: common.TestVM{T: t},
 	}
 	dummyGetter, err := getter.New(nonStateSyncableVM, *commonCfg)
-	assert.NoError(err)
+	require.NoError(err)
 
 	cfg, err := NewConfig(*commonCfg, nil, dummyGetter, nonStateSyncableVM)
-	assert.NoError(err)
-	syncer := New(cfg, func(lastReqID uint32) error { return nil })
+	require.NoError(err)
+	syncer := New(cfg, func(context.Context, uint32) error {
+		return nil
+	})
 
-	enabled, err := syncer.IsEnabled()
-	assert.NoError(err)
-	assert.False(enabled)
+	enabled, err := syncer.IsEnabled(context.Background())
+	require.NoError(err)
+	require.False(enabled)
 
 	// State syncableVM case
 	commonCfg.Ctx = snow.DefaultConsensusContextTest() // reset metrics
@@ -60,27 +70,33 @@ func TestStateSyncerIsEnabledIfVMSupportsStateSyncing(t *testing.T) {
 		},
 	}
 	dummyGetter, err = getter.New(fullVM, *commonCfg)
-	assert.NoError(err)
+	require.NoError(err)
 
 	cfg, err = NewConfig(*commonCfg, nil, dummyGetter, fullVM)
-	assert.NoError(err)
-	syncer = New(cfg, func(lastReqID uint32) error { return nil })
+	require.NoError(err)
+	syncer = New(cfg, func(context.Context, uint32) error {
+		return nil
+	})
 
 	// test: VM does not support state syncing
-	fullVM.StateSyncEnabledF = func() (bool, error) { return false, nil }
-	enabled, err = syncer.IsEnabled()
-	assert.NoError(err)
-	assert.False(enabled)
+	fullVM.StateSyncEnabledF = func(context.Context) (bool, error) {
+		return false, nil
+	}
+	enabled, err = syncer.IsEnabled(context.Background())
+	require.NoError(err)
+	require.False(enabled)
 
 	// test: VM does support state syncing
-	fullVM.StateSyncEnabledF = func() (bool, error) { return true, nil }
-	enabled, err = syncer.IsEnabled()
-	assert.NoError(err)
-	assert.True(enabled)
+	fullVM.StateSyncEnabledF = func(context.Context) (bool, error) {
+		return true, nil
+	}
+	enabled, err = syncer.IsEnabled(context.Background())
+	require.NoError(err)
+	require.True(enabled)
 }
 
 func TestStateSyncingStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	vdrs := buildTestPeers(t)
 	alpha := vdrs.Weight()
@@ -92,7 +108,6 @@ func TestStateSyncingStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 
 	commonCfg := common.Config{
 		Ctx:            snow.DefaultConsensusContextTest(),
-		Validators:     vdrs,
 		Beacons:        vdrs,
 		SampleK:        vdrs.Len(),
 		Alpha:          alpha,
@@ -101,35 +116,35 @@ func TestStateSyncingStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 	syncer, _, sender := buildTestsObjects(t, &commonCfg)
 
 	sender.CantSendGetStateSummaryFrontier = true
-	sender.SendGetStateSummaryFrontierF = func(ss ids.NodeIDSet, u uint32) {}
+	sender.SendGetStateSummaryFrontierF = func(context.Context, set.Set[ids.NodeID], uint32) {}
 	startReqID := uint32(0)
 
 	// attempt starting bootstrapper with no stake connected. Bootstrapper should stall.
-	assert.False(commonCfg.StartupTracker.ShouldStart())
-	assert.NoError(syncer.Start(startReqID))
-	assert.False(syncer.started)
+	require.False(commonCfg.StartupTracker.ShouldStart())
+	require.NoError(syncer.Start(context.Background(), startReqID))
+	require.False(syncer.started)
 
 	// attempt starting bootstrapper with not enough stake connected. Bootstrapper should stall.
 	vdr0 := ids.GenerateTestNodeID()
-	assert.NoError(vdrs.AddWeight(vdr0, startupAlpha/2))
-	assert.NoError(syncer.Connected(vdr0, version.CurrentApp))
+	require.NoError(vdrs.Add(vdr0, nil, ids.Empty, startupAlpha/2))
+	require.NoError(syncer.Connected(context.Background(), vdr0, version.CurrentApp))
 
-	assert.False(commonCfg.StartupTracker.ShouldStart())
-	assert.NoError(syncer.Start(startReqID))
-	assert.False(syncer.started)
+	require.False(commonCfg.StartupTracker.ShouldStart())
+	require.NoError(syncer.Start(context.Background(), startReqID))
+	require.False(syncer.started)
 
 	// finally attempt starting bootstrapper with enough stake connected. Frontiers should be requested.
 	vdr := ids.GenerateTestNodeID()
-	assert.NoError(vdrs.AddWeight(vdr, startupAlpha))
-	assert.NoError(syncer.Connected(vdr, version.CurrentApp))
+	require.NoError(vdrs.Add(vdr, nil, ids.Empty, startupAlpha))
+	require.NoError(syncer.Connected(context.Background(), vdr, version.CurrentApp))
 
-	assert.True(commonCfg.StartupTracker.ShouldStart())
-	assert.NoError(syncer.Start(startReqID))
-	assert.True(syncer.started)
+	require.True(commonCfg.StartupTracker.ShouldStart())
+	require.NoError(syncer.Start(context.Background(), startReqID))
+	require.True(syncer.started)
 }
 
 func TestStateSyncLocalSummaryIsIncludedAmongFrontiersIfAvailable(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	vdrs := buildTestPeers(t)
 	startupAlpha := (3*vdrs.Weight() + 3) / 4
@@ -154,24 +169,24 @@ func TestStateSyncLocalSummaryIsIncludedAmongFrontiersIfAvailable(t *testing.T) 
 		BytesV:  summaryBytes,
 	}
 	fullVM.CantStateSyncGetOngoingSummary = true
-	fullVM.GetOngoingSyncStateSummaryF = func() (block.StateSummary, error) {
+	fullVM.GetOngoingSyncStateSummaryF = func(context.Context) (block.StateSummary, error) {
 		return localSummary, nil
 	}
 
 	// Connect enough stake to start syncer
 	for _, vdr := range vdrs.List() {
-		assert.NoError(syncer.Connected(vdr.ID(), version.CurrentApp))
+		require.NoError(syncer.Connected(context.Background(), vdr.NodeID, version.CurrentApp))
 	}
 
-	assert.True(syncer.locallyAvailableSummary == localSummary)
+	require.Equal(localSummary, syncer.locallyAvailableSummary)
 	ws, ok := syncer.weightedSummaries[summaryID]
-	assert.True(ok)
-	assert.True(bytes.Equal(ws.summary.Bytes(), summaryBytes))
-	assert.Zero(ws.weight)
+	require.True(ok)
+	require.True(bytes.Equal(ws.summary.Bytes(), summaryBytes))
+	require.Zero(ws.weight)
 }
 
 func TestStateSyncNotFoundOngoingSummaryIsNotIncludedAmongFrontiers(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	vdrs := buildTestPeers(t)
 	startupAlpha := (3*vdrs.Weight() + 3) / 4
@@ -191,21 +206,21 @@ func TestStateSyncNotFoundOngoingSummaryIsNotIncludedAmongFrontiers(t *testing.T
 
 	// mock VM to simulate a no summary returned
 	fullVM.CantStateSyncGetOngoingSummary = true
-	fullVM.GetOngoingSyncStateSummaryF = func() (block.StateSummary, error) {
+	fullVM.GetOngoingSyncStateSummaryF = func(context.Context) (block.StateSummary, error) {
 		return nil, database.ErrNotFound
 	}
 
 	// Connect enough stake to start syncer
 	for _, vdr := range vdrs.List() {
-		assert.NoError(syncer.Connected(vdr.ID(), version.CurrentApp))
+		require.NoError(syncer.Connected(context.Background(), vdr.NodeID, version.CurrentApp))
 	}
 
-	assert.Nil(syncer.locallyAvailableSummary)
-	assert.Empty(syncer.weightedSummaries)
+	require.Nil(syncer.locallyAvailableSummary)
+	require.Empty(syncer.weightedSummaries)
 }
 
 func TestBeaconsAreReachedForFrontiersUponStartup(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	vdrs := buildTestPeers(t)
 	startupAlpha := (3*vdrs.Weight() + 3) / 4
@@ -224,30 +239,30 @@ func TestBeaconsAreReachedForFrontiersUponStartup(t *testing.T) {
 	syncer, _, sender := buildTestsObjects(t, &commonCfg)
 
 	// set sender to track nodes reached out
-	contactedFrontiersProviders := ids.NewNodeIDSet(3)
+	contactedFrontiersProviders := set.NewSet[ids.NodeID](3)
 	sender.CantSendGetStateSummaryFrontier = true
-	sender.SendGetStateSummaryFrontierF = func(ss ids.NodeIDSet, u uint32) {
+	sender.SendGetStateSummaryFrontierF = func(_ context.Context, ss set.Set[ids.NodeID], _ uint32) {
 		contactedFrontiersProviders.Union(ss)
 	}
 
 	// Connect enough stake to start syncer
 	for _, vdr := range vdrs.List() {
-		assert.NoError(syncer.Connected(vdr.ID(), version.CurrentApp))
+		require.NoError(syncer.Connected(context.Background(), vdr.NodeID, version.CurrentApp))
 	}
 
 	// check that vdrs are reached out for frontiers
-	assert.True(len(contactedFrontiersProviders) == safeMath.Min(vdrs.Len(), common.MaxOutstandingBroadcastRequests))
+	require.Len(contactedFrontiersProviders, safeMath.Min(vdrs.Len(), common.MaxOutstandingBroadcastRequests))
 	for beaconID := range contactedFrontiersProviders {
 		// check that beacon is duly marked as reached out
-		assert.True(syncer.pendingSeeders.Contains(beaconID))
+		require.True(syncer.pendingSeeders.Contains(beaconID))
 	}
 
 	// check that, obviously, no summary is yet registered
-	assert.True(len(syncer.weightedSummaries) == 0)
+	require.Empty(syncer.weightedSummaries)
 }
 
 func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	vdrs := buildTestPeers(t)
 	startupAlpha := (3*vdrs.Weight() + 3) / 4
@@ -268,7 +283,7 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 	// set sender to track nodes reached out
 	contactedFrontiersProviders := make(map[ids.NodeID]uint32) // nodeID -> reqID map
 	sender.CantSendGetStateSummaryFrontier = true
-	sender.SendGetStateSummaryFrontierF = func(ss ids.NodeIDSet, reqID uint32) {
+	sender.SendGetStateSummaryFrontierF = func(_ context.Context, ss set.Set[ids.NodeID], reqID uint32) {
 		for nodeID := range ss {
 			contactedFrontiersProviders[nodeID] = reqID
 		}
@@ -276,16 +291,16 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 
 	// Connect enough stake to start syncer
 	for _, vdr := range vdrs.List() {
-		assert.NoError(syncer.Connected(vdr.ID(), version.CurrentApp))
+		require.NoError(syncer.Connected(context.Background(), vdr.NodeID, version.CurrentApp))
 	}
 
 	initiallyReachedOutBeaconsSize := len(contactedFrontiersProviders)
-	assert.True(initiallyReachedOutBeaconsSize > 0)
-	assert.True(initiallyReachedOutBeaconsSize <= common.MaxOutstandingBroadcastRequests)
+	require.True(initiallyReachedOutBeaconsSize > 0)
+	require.True(initiallyReachedOutBeaconsSize <= common.MaxOutstandingBroadcastRequests)
 
 	// mock VM to simulate a valid summary is returned
 	fullVM.CantParseStateSummary = true
-	fullVM.ParseStateSummaryF = func(summaryBytes []byte) (block.StateSummary, error) {
+	fullVM.ParseStateSummaryF = func(_ context.Context, summaryBytes []byte) (block.StateSummary, error) {
 		return &block.TestStateSummary{
 			HeightV: key,
 			IDV:     summaryID,
@@ -298,46 +313,49 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 	responsiveBeaconReqID := contactedFrontiersProviders[responsiveBeaconID]
 
 	// check a response with wrong request ID is dropped
-	assert.NoError(syncer.StateSummaryFrontier(
+	require.NoError(syncer.StateSummaryFrontier(
+		context.Background(),
 		responsiveBeaconID,
 		math.MaxInt32,
 		summaryBytes,
 	))
-	assert.True(syncer.pendingSeeders.Contains(responsiveBeaconID)) // responsiveBeacon still pending
-	assert.True(len(syncer.weightedSummaries) == 0)
+	require.Contains(syncer.pendingSeeders, responsiveBeaconID) // responsiveBeacon still pending
+	require.Empty(syncer.weightedSummaries)
 
 	// check a response from unsolicited node is dropped
 	unsolicitedNodeID := ids.GenerateTestNodeID()
-	assert.NoError(syncer.StateSummaryFrontier(
+	require.NoError(syncer.StateSummaryFrontier(
+		context.Background(),
 		unsolicitedNodeID,
 		responsiveBeaconReqID,
 		summaryBytes,
 	))
-	assert.True(len(syncer.weightedSummaries) == 0)
+	require.Empty(syncer.weightedSummaries)
 
 	// check a valid response is duly recorded
-	assert.NoError(syncer.StateSummaryFrontier(
+	require.NoError(syncer.StateSummaryFrontier(
+		context.Background(),
 		responsiveBeaconID,
 		responsiveBeaconReqID,
 		summaryBytes,
 	))
 
 	// responsiveBeacon not pending anymore
-	assert.False(syncer.pendingSeeders.Contains(responsiveBeaconID))
+	require.NotContains(syncer.pendingSeeders, responsiveBeaconID)
 
 	// valid summary is recorded
 	ws, ok := syncer.weightedSummaries[summaryID]
-	assert.True(ok)
-	assert.True(bytes.Equal(ws.summary.Bytes(), summaryBytes))
+	require.True(ok)
+	require.True(bytes.Equal(ws.summary.Bytes(), summaryBytes))
 
 	// other listed vdrs are reached for data
-	assert.True(
+	require.True(
 		len(contactedFrontiersProviders) > initiallyReachedOutBeaconsSize ||
 			len(contactedFrontiersProviders) == vdrs.Len())
 }
 
 func TestMalformedStateSummaryFrontiersAreDropped(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	vdrs := buildTestPeers(t)
 	startupAlpha := (3*vdrs.Weight() + 3) / 4
@@ -358,7 +376,7 @@ func TestMalformedStateSummaryFrontiersAreDropped(t *testing.T) {
 	// set sender to track nodes reached out
 	contactedFrontiersProviders := make(map[ids.NodeID]uint32) // nodeID -> reqID map
 	sender.CantSendGetStateSummaryFrontier = true
-	sender.SendGetStateSummaryFrontierF = func(ss ids.NodeIDSet, reqID uint32) {
+	sender.SendGetStateSummaryFrontierF = func(_ context.Context, ss set.Set[ids.NodeID], reqID uint32) {
 		for nodeID := range ss {
 			contactedFrontiersProviders[nodeID] = reqID
 		}
@@ -366,20 +384,20 @@ func TestMalformedStateSummaryFrontiersAreDropped(t *testing.T) {
 
 	// Connect enough stake to start syncer
 	for _, vdr := range vdrs.List() {
-		assert.NoError(syncer.Connected(vdr.ID(), version.CurrentApp))
+		require.NoError(syncer.Connected(context.Background(), vdr.NodeID, version.CurrentApp))
 	}
 
 	initiallyReachedOutBeaconsSize := len(contactedFrontiersProviders)
-	assert.True(initiallyReachedOutBeaconsSize > 0)
-	assert.True(initiallyReachedOutBeaconsSize <= common.MaxOutstandingBroadcastRequests)
+	require.True(initiallyReachedOutBeaconsSize > 0)
+	require.True(initiallyReachedOutBeaconsSize <= common.MaxOutstandingBroadcastRequests)
 
 	// mock VM to simulate an invalid summary is returned
 	summary := []byte{'s', 'u', 'm', 'm', 'a', 'r', 'y'}
 	isSummaryDecoded := false
 	fullVM.CantParseStateSummary = true
-	fullVM.ParseStateSummaryF = func(summaryBytes []byte) (block.StateSummary, error) {
+	fullVM.ParseStateSummaryF = func(context.Context, []byte) (block.StateSummary, error) {
 		isSummaryDecoded = true
-		return nil, errors.New("invalid state summary")
+		return nil, errInvalidSummary
 	}
 
 	// pick one of the vdrs that have been reached out
@@ -387,28 +405,29 @@ func TestMalformedStateSummaryFrontiersAreDropped(t *testing.T) {
 	responsiveBeaconReqID := contactedFrontiersProviders[responsiveBeaconID]
 
 	// response is valid, but invalid summary is not recorded
-	assert.NoError(syncer.StateSummaryFrontier(
+	require.NoError(syncer.StateSummaryFrontier(
+		context.Background(),
 		responsiveBeaconID,
 		responsiveBeaconReqID,
 		summary,
 	))
 
 	// responsiveBeacon not pending anymore
-	assert.False(syncer.pendingSeeders.Contains(responsiveBeaconID))
+	require.NotContains(syncer.pendingSeeders, responsiveBeaconID)
 
 	// invalid summary is not recorded
-	assert.True(isSummaryDecoded)
-	assert.True(len(syncer.weightedSummaries) == 0)
+	require.True(isSummaryDecoded)
+	require.Empty(syncer.weightedSummaries)
 
 	// even in case of invalid summaries, other listed vdrs
 	// are reached for data
-	assert.True(
+	require.True(
 		len(contactedFrontiersProviders) > initiallyReachedOutBeaconsSize ||
 			len(contactedFrontiersProviders) == vdrs.Len())
 }
 
 func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	vdrs := buildTestPeers(t)
 	startupAlpha := (3*vdrs.Weight() + 3) / 4
@@ -429,7 +448,7 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 	// set sender to track nodes reached out
 	contactedFrontiersProviders := make(map[ids.NodeID]uint32) // nodeID -> reqID map
 	sender.CantSendGetStateSummaryFrontier = true
-	sender.SendGetStateSummaryFrontierF = func(ss ids.NodeIDSet, reqID uint32) {
+	sender.SendGetStateSummaryFrontierF = func(_ context.Context, ss set.Set[ids.NodeID], reqID uint32) {
 		for nodeID := range ss {
 			contactedFrontiersProviders[nodeID] = reqID
 		}
@@ -437,42 +456,43 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 
 	// Connect enough stake to start syncer
 	for _, vdr := range vdrs.List() {
-		assert.NoError(syncer.Connected(vdr.ID(), version.CurrentApp))
+		require.NoError(syncer.Connected(context.Background(), vdr.NodeID, version.CurrentApp))
 	}
 
 	initiallyReachedOutBeaconsSize := len(contactedFrontiersProviders)
-	assert.True(initiallyReachedOutBeaconsSize > 0)
-	assert.True(initiallyReachedOutBeaconsSize <= common.MaxOutstandingBroadcastRequests)
+	require.True(initiallyReachedOutBeaconsSize > 0)
+	require.True(initiallyReachedOutBeaconsSize <= common.MaxOutstandingBroadcastRequests)
 
 	// pick one of the vdrs that have been reached out
 	unresponsiveBeaconID := pickRandomFrom(contactedFrontiersProviders)
 	unresponsiveBeaconReqID := contactedFrontiersProviders[unresponsiveBeaconID]
 
 	fullVM.CantParseStateSummary = true
-	fullVM.ParseStateSummaryF = func(summaryBytes []byte) (block.StateSummary, error) {
-		assert.True(len(summaryBytes) == 0)
-		return nil, errors.New("empty summary")
+	fullVM.ParseStateSummaryF = func(_ context.Context, summaryBytes []byte) (block.StateSummary, error) {
+		require.Empty(summaryBytes)
+		return nil, errEmptySummary
 	}
 
 	// assume timeout is reached and vdrs is marked as unresponsive
-	assert.NoError(syncer.GetStateSummaryFrontierFailed(
+	require.NoError(syncer.GetStateSummaryFrontierFailed(
+		context.Background(),
 		unresponsiveBeaconID,
 		unresponsiveBeaconReqID,
 	))
 
 	// unresponsiveBeacon not pending anymore
-	assert.False(syncer.pendingSeeders.Contains(unresponsiveBeaconID))
-	assert.True(syncer.failedSeeders.Contains(unresponsiveBeaconID))
+	require.NotContains(syncer.pendingSeeders, unresponsiveBeaconID)
+	require.Contains(syncer.failedSeeders, unresponsiveBeaconID)
 
 	// even in case of timeouts, other listed vdrs
 	// are reached for data
-	assert.True(
+	require.True(
 		len(contactedFrontiersProviders) > initiallyReachedOutBeaconsSize ||
 			len(contactedFrontiersProviders) == vdrs.Len())
 
 	// mock VM to simulate a valid but late summary is returned
 	fullVM.CantParseStateSummary = true
-	fullVM.ParseStateSummaryF = func(summaryBytes []byte) (block.StateSummary, error) {
+	fullVM.ParseStateSummaryF = func(_ context.Context, summaryBytes []byte) (block.StateSummary, error) {
 		return &block.TestStateSummary{
 			HeightV: key,
 			IDV:     summaryID,
@@ -481,18 +501,19 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 	}
 
 	// check a valid but late response is not recorded
-	assert.NoError(syncer.StateSummaryFrontier(
+	require.NoError(syncer.StateSummaryFrontier(
+		context.Background(),
 		unresponsiveBeaconID,
 		unresponsiveBeaconReqID,
 		summaryBytes,
 	))
 
 	// late summary is not recorded
-	assert.True(len(syncer.weightedSummaries) == 0)
+	require.Empty(syncer.weightedSummaries)
 }
 
 func TestStateSyncIsRestartedIfTooManyFrontierSeedersTimeout(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	vdrs := buildTestPeers(t)
 	startupAlpha := (3*vdrs.Weight() + 3) / 4
@@ -515,7 +536,7 @@ func TestStateSyncIsRestartedIfTooManyFrontierSeedersTimeout(t *testing.T) {
 	// set sender to track nodes reached out
 	contactedFrontiersProviders := make(map[ids.NodeID]uint32) // nodeID -> reqID map
 	sender.CantSendGetStateSummaryFrontier = true
-	sender.SendGetStateSummaryFrontierF = func(ss ids.NodeIDSet, reqID uint32) {
+	sender.SendGetStateSummaryFrontierF = func(_ context.Context, ss set.Set[ids.NodeID], reqID uint32) {
 		for nodeID := range ss {
 			contactedFrontiersProviders[nodeID] = reqID
 		}
@@ -523,7 +544,7 @@ func TestStateSyncIsRestartedIfTooManyFrontierSeedersTimeout(t *testing.T) {
 
 	// mock VM to simulate a valid summary is returned
 	fullVM.CantParseStateSummary = true
-	fullVM.ParseStateSummaryF = func(b []byte) (block.StateSummary, error) {
+	fullVM.ParseStateSummaryF = func(_ context.Context, b []byte) (block.StateSummary, error) {
 		switch {
 		case bytes.Equal(b, summaryBytes):
 			return &block.TestStateSummary{
@@ -532,15 +553,15 @@ func TestStateSyncIsRestartedIfTooManyFrontierSeedersTimeout(t *testing.T) {
 				BytesV:  summaryBytes,
 			}, nil
 		case bytes.Equal(b, nil):
-			return nil, errors.New("Empty Summary")
+			return nil, errEmptySummary
 		default:
-			return nil, errors.New("unexpected Summary")
+			return nil, errUnknownSummary
 		}
 	}
 
 	contactedVoters := make(map[ids.NodeID]uint32) // nodeID -> reqID map
 	sender.CantSendGetAcceptedStateSummary = true
-	sender.SendGetAcceptedStateSummaryF = func(ss ids.NodeIDSet, reqID uint32, sl []uint64) {
+	sender.SendGetAcceptedStateSummaryF = func(_ context.Context, ss set.Set[ids.NodeID], reqID uint32, _ []uint64) {
 		for nodeID := range ss {
 			contactedVoters[nodeID] = reqID
 		}
@@ -548,26 +569,28 @@ func TestStateSyncIsRestartedIfTooManyFrontierSeedersTimeout(t *testing.T) {
 
 	// Connect enough stake to start syncer
 	for _, vdr := range vdrs.List() {
-		assert.NoError(syncer.Connected(vdr.ID(), version.CurrentApp))
+		require.NoError(syncer.Connected(context.Background(), vdr.NodeID, version.CurrentApp))
 	}
-	assert.True(syncer.pendingSeeders.Len() != 0)
+	require.True(syncer.pendingSeeders.Len() != 0)
 
 	// let just one node respond and all others timeout
 	maxResponses := 1
 	reachedSeedersCount := syncer.Config.SampleK
 	for reachedSeedersCount >= 0 {
 		beaconID, found := syncer.pendingSeeders.Peek()
-		assert.True(found)
+		require.True(found)
 		reqID := contactedFrontiersProviders[beaconID]
 
 		if maxResponses > 0 {
-			assert.NoError(syncer.StateSummaryFrontier(
+			require.NoError(syncer.StateSummaryFrontier(
+				context.Background(),
 				beaconID,
 				reqID,
 				summaryBytes,
 			))
 		} else {
-			assert.NoError(syncer.GetStateSummaryFrontierFailed(
+			require.NoError(syncer.GetStateSummaryFrontierFailed(
+				context.Background(),
 				beaconID,
 				reqID,
 			))
@@ -577,14 +600,14 @@ func TestStateSyncIsRestartedIfTooManyFrontierSeedersTimeout(t *testing.T) {
 	}
 
 	// check that some frontier seeders are reached again for the frontier
-	assert.True(syncer.pendingSeeders.Len() > 0)
+	require.NotEmpty(syncer.pendingSeeders)
 
 	// check that no vote requests are issued
-	assert.True(len(contactedVoters) == 0)
+	require.Empty(contactedVoters)
 }
 
 func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	vdrs := buildTestPeers(t)
 	startupAlpha := (3*vdrs.Weight() + 3) / 4
@@ -605,7 +628,7 @@ func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
 	// set sender to track nodes reached out
 	contactedFrontiersProviders := make(map[ids.NodeID]uint32) // nodeID -> reqID map
 	sender.CantSendGetStateSummaryFrontier = true
-	sender.SendGetStateSummaryFrontierF = func(ss ids.NodeIDSet, reqID uint32) {
+	sender.SendGetStateSummaryFrontierF = func(_ context.Context, ss set.Set[ids.NodeID], reqID uint32) {
 		for nodeID := range ss {
 			contactedFrontiersProviders[nodeID] = reqID
 		}
@@ -613,8 +636,8 @@ func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
 
 	// mock VM to simulate a valid summary is returned
 	fullVM.CantParseStateSummary = true
-	fullVM.ParseStateSummaryF = func(b []byte) (block.StateSummary, error) {
-		assert.True(bytes.Equal(b, summaryBytes))
+	fullVM.ParseStateSummaryF = func(_ context.Context, b []byte) (block.StateSummary, error) {
+		require.True(bytes.Equal(b, summaryBytes))
 		return &block.TestStateSummary{
 			HeightV: key,
 			IDV:     summaryID,
@@ -624,7 +647,7 @@ func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
 
 	contactedVoters := make(map[ids.NodeID]uint32) // nodeID -> reqID map
 	sender.CantSendGetAcceptedStateSummary = true
-	sender.SendGetAcceptedStateSummaryF = func(ss ids.NodeIDSet, reqID uint32, sl []uint64) {
+	sender.SendGetAcceptedStateSummaryF = func(_ context.Context, ss set.Set[ids.NodeID], reqID uint32, _ []uint64) {
 		for nodeID := range ss {
 			contactedVoters[nodeID] = reqID
 		}
@@ -632,32 +655,33 @@ func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
 
 	// Connect enough stake to start syncer
 	for _, vdr := range vdrs.List() {
-		assert.NoError(syncer.Connected(vdr.ID(), version.CurrentApp))
+		require.NoError(syncer.Connected(context.Background(), vdr.NodeID, version.CurrentApp))
 	}
-	assert.True(syncer.pendingSeeders.Len() != 0)
+	require.True(syncer.pendingSeeders.Len() != 0)
 
 	// let all contacted vdrs respond
 	for syncer.pendingSeeders.Len() != 0 {
 		beaconID, found := syncer.pendingSeeders.Peek()
-		assert.True(found)
+		require.True(found)
 		reqID := contactedFrontiersProviders[beaconID]
 
-		assert.NoError(syncer.StateSummaryFrontier(
+		require.NoError(syncer.StateSummaryFrontier(
+			context.Background(),
 			beaconID,
 			reqID,
 			summaryBytes,
 		))
 	}
-	assert.False(syncer.pendingSeeders.Len() != 0)
+	require.False(syncer.pendingSeeders.Len() != 0)
 
 	// check that vote requests are issued
 	initiallyContactedVotersSize := len(contactedVoters)
-	assert.True(initiallyContactedVotersSize > 0)
-	assert.True(initiallyContactedVotersSize <= common.MaxOutstandingBroadcastRequests)
+	require.True(initiallyContactedVotersSize > 0)
+	require.True(initiallyContactedVotersSize <= common.MaxOutstandingBroadcastRequests)
 }
 
 func TestUnRequestedVotesAreDropped(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	vdrs := buildTestPeers(t)
 	startupAlpha := (3*vdrs.Weight() + 3) / 4
@@ -678,7 +702,7 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 	// set sender to track nodes reached out
 	contactedFrontiersProviders := make(map[ids.NodeID]uint32) // nodeID -> reqID map
 	sender.CantSendGetStateSummaryFrontier = true
-	sender.SendGetStateSummaryFrontierF = func(ss ids.NodeIDSet, reqID uint32) {
+	sender.SendGetStateSummaryFrontierF = func(_ context.Context, ss set.Set[ids.NodeID], reqID uint32) {
 		for nodeID := range ss {
 			contactedFrontiersProviders[nodeID] = reqID
 		}
@@ -686,7 +710,7 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 
 	// mock VM to simulate a valid summary is returned
 	fullVM.CantParseStateSummary = true
-	fullVM.ParseStateSummaryF = func(summaryBytes []byte) (block.StateSummary, error) {
+	fullVM.ParseStateSummaryF = func(_ context.Context, summaryBytes []byte) (block.StateSummary, error) {
 		return &block.TestStateSummary{
 			HeightV: key,
 			IDV:     summaryID,
@@ -696,7 +720,7 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 
 	contactedVoters := make(map[ids.NodeID]uint32) // nodeID -> reqID map
 	sender.CantSendGetAcceptedStateSummary = true
-	sender.SendGetAcceptedStateSummaryF = func(ss ids.NodeIDSet, reqID uint32, sl []uint64) {
+	sender.SendGetAcceptedStateSummaryF = func(_ context.Context, ss set.Set[ids.NodeID], reqID uint32, _ []uint64) {
 		for nodeID := range ss {
 			contactedVoters[nodeID] = reqID
 		}
@@ -704,77 +728,80 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 
 	// Connect enough stake to start syncer
 	for _, vdr := range vdrs.List() {
-		assert.NoError(syncer.Connected(vdr.ID(), version.CurrentApp))
+		require.NoError(syncer.Connected(context.Background(), vdr.NodeID, version.CurrentApp))
 	}
-	assert.True(syncer.pendingSeeders.Len() != 0)
+	require.True(syncer.pendingSeeders.Len() != 0)
 
 	// let all contacted vdrs respond
 	for syncer.pendingSeeders.Len() != 0 {
 		beaconID, found := syncer.pendingSeeders.Peek()
-		assert.True(found)
+		require.True(found)
 		reqID := contactedFrontiersProviders[beaconID]
 
-		assert.NoError(syncer.StateSummaryFrontier(
+		require.NoError(syncer.StateSummaryFrontier(
+			context.Background(),
 			beaconID,
 			reqID,
 			summaryBytes,
 		))
 	}
-	assert.False(syncer.pendingSeeders.Len() != 0)
+	require.False(syncer.pendingSeeders.Len() != 0)
 
 	// check that vote requests are issued
 	initiallyContactedVotersSize := len(contactedVoters)
-	assert.True(initiallyContactedVotersSize > 0)
-	assert.True(initiallyContactedVotersSize <= common.MaxOutstandingBroadcastRequests)
+	require.True(initiallyContactedVotersSize > 0)
+	require.True(initiallyContactedVotersSize <= common.MaxOutstandingBroadcastRequests)
 
 	_, found := syncer.weightedSummaries[summaryID]
-	assert.True(found)
+	require.True(found)
 
 	// pick one of the voters that have been reached out
 	responsiveVoterID := pickRandomFrom(contactedVoters)
 	responsiveVoterReqID := contactedVoters[responsiveVoterID]
 
 	// check a response with wrong request ID is dropped
-	assert.NoError(syncer.AcceptedStateSummary(
+	require.NoError(syncer.AcceptedStateSummary(
+		context.Background(),
 		responsiveVoterID,
 		math.MaxInt32,
 		[]ids.ID{summaryID},
 	))
 
 	// responsiveVoter still pending
-	assert.True(syncer.pendingVoters.Contains(responsiveVoterID))
-	assert.True(syncer.weightedSummaries[summaryID].weight == 0)
+	require.Contains(syncer.pendingVoters, responsiveVoterID)
+	require.Zero(syncer.weightedSummaries[summaryID].weight)
 
 	// check a response from unsolicited node is dropped
 	unsolicitedVoterID := ids.GenerateTestNodeID()
-	assert.NoError(syncer.AcceptedStateSummary(
+	require.NoError(syncer.AcceptedStateSummary(
+		context.Background(),
 		unsolicitedVoterID,
 		responsiveVoterReqID,
 		[]ids.ID{summaryID},
 	))
-	assert.True(syncer.weightedSummaries[summaryID].weight == 0)
+	require.Zero(syncer.weightedSummaries[summaryID].weight)
 
 	// check a valid response is duly recorded
-	assert.NoError(syncer.AcceptedStateSummary(
+	require.NoError(syncer.AcceptedStateSummary(
+		context.Background(),
 		responsiveVoterID,
 		responsiveVoterReqID,
 		[]ids.ID{summaryID},
 	))
 
 	// responsiveBeacon not pending anymore
-	assert.False(syncer.pendingSeeders.Contains(responsiveVoterID))
-	voterWeight, found := vdrs.GetWeight(responsiveVoterID)
-	assert.True(found)
-	assert.True(syncer.weightedSummaries[summaryID].weight == voterWeight)
+	require.NotContains(syncer.pendingSeeders, responsiveVoterID)
+	voterWeight := vdrs.GetWeight(responsiveVoterID)
+	require.Equal(voterWeight, syncer.weightedSummaries[summaryID].weight)
 
 	// other listed voters are reached out
-	assert.True(
+	require.True(
 		len(contactedVoters) > initiallyContactedVotersSize ||
 			len(contactedVoters) == vdrs.Len())
 }
 
 func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	vdrs := buildTestPeers(t)
 	startupAlpha := (3*vdrs.Weight() + 3) / 4
@@ -795,7 +822,7 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 	// set sender to track nodes reached out
 	contactedFrontiersProviders := make(map[ids.NodeID]uint32) // nodeID -> reqID map
 	sender.CantSendGetStateSummaryFrontier = true
-	sender.SendGetStateSummaryFrontierF = func(ss ids.NodeIDSet, reqID uint32) {
+	sender.SendGetStateSummaryFrontierF = func(_ context.Context, ss set.Set[ids.NodeID], reqID uint32) {
 		for nodeID := range ss {
 			contactedFrontiersProviders[nodeID] = reqID
 		}
@@ -803,7 +830,7 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 
 	// mock VM to simulate a valid summary is returned
 	fullVM.CantParseStateSummary = true
-	fullVM.ParseStateSummaryF = func(summaryBytes []byte) (block.StateSummary, error) {
+	fullVM.ParseStateSummaryF = func(_ context.Context, summaryBytes []byte) (block.StateSummary, error) {
 		return &block.TestStateSummary{
 			HeightV: key,
 			IDV:     summaryID,
@@ -813,7 +840,7 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 
 	contactedVoters := make(map[ids.NodeID]uint32) // nodeID -> reqID map
 	sender.CantSendGetAcceptedStateSummary = true
-	sender.SendGetAcceptedStateSummaryF = func(ss ids.NodeIDSet, reqID uint32, sl []uint64) {
+	sender.SendGetAcceptedStateSummaryF = func(_ context.Context, ss set.Set[ids.NodeID], reqID uint32, _ []uint64) {
 		for nodeID := range ss {
 			contactedVoters[nodeID] = reqID
 		}
@@ -821,63 +848,66 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 
 	// Connect enough stake to start syncer
 	for _, vdr := range vdrs.List() {
-		assert.NoError(syncer.Connected(vdr.ID(), version.CurrentApp))
+		require.NoError(syncer.Connected(context.Background(), vdr.NodeID, version.CurrentApp))
 	}
-	assert.True(syncer.pendingSeeders.Len() != 0)
+	require.True(syncer.pendingSeeders.Len() != 0)
 
 	// let all contacted vdrs respond
 	for syncer.pendingSeeders.Len() != 0 {
 		beaconID, found := syncer.pendingSeeders.Peek()
-		assert.True(found)
+		require.True(found)
 		reqID := contactedFrontiersProviders[beaconID]
 
-		assert.NoError(syncer.StateSummaryFrontier(
+		require.NoError(syncer.StateSummaryFrontier(
+			context.Background(),
 			beaconID,
 			reqID,
 			summaryBytes,
 		))
 	}
-	assert.False(syncer.pendingSeeders.Len() != 0)
+	require.False(syncer.pendingSeeders.Len() != 0)
 
 	// check that vote requests are issued
 	initiallyContactedVotersSize := len(contactedVoters)
-	assert.True(initiallyContactedVotersSize > 0)
-	assert.True(initiallyContactedVotersSize <= common.MaxOutstandingBroadcastRequests)
+	require.True(initiallyContactedVotersSize > 0)
+	require.True(initiallyContactedVotersSize <= common.MaxOutstandingBroadcastRequests)
 
 	_, found := syncer.weightedSummaries[summaryID]
-	assert.True(found)
+	require.True(found)
 
 	// pick one of the voters that have been reached out
 	responsiveVoterID := pickRandomFrom(contactedVoters)
 	responsiveVoterReqID := contactedVoters[responsiveVoterID]
 
 	// check a response for unRequested summary is dropped
-	assert.NoError(syncer.AcceptedStateSummary(
+	require.NoError(syncer.AcceptedStateSummary(
+		context.Background(),
 		responsiveVoterID,
 		responsiveVoterReqID,
 		[]ids.ID{unknownSummaryID},
 	))
 	_, found = syncer.weightedSummaries[unknownSummaryID]
-	assert.False(found)
+	require.False(found)
 
 	// check that responsiveVoter cannot cast another vote
-	assert.False(syncer.pendingSeeders.Contains(responsiveVoterID))
-	assert.NoError(syncer.AcceptedStateSummary(
+	require.NotContains(syncer.pendingSeeders, responsiveVoterID)
+	require.NoError(syncer.AcceptedStateSummary(
+		context.Background(),
 		responsiveVoterID,
 		responsiveVoterReqID,
 		[]ids.ID{summaryID},
 	))
-	assert.True(syncer.weightedSummaries[summaryID].weight == 0)
+	require.Zero(syncer.weightedSummaries[summaryID].weight)
 
 	// other listed voters are reached out, even in the face of vote
 	// on unknown summary
-	assert.True(
+	require.True(
 		len(contactedVoters) > initiallyContactedVotersSize ||
 			len(contactedVoters) == vdrs.Len())
 }
 
 func TestStateSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	vdrs := buildTestPeers(t)
 	startupAlpha := (3*vdrs.Weight() + 3) / 4
@@ -898,7 +928,7 @@ func TestStateSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 	// set sender to track nodes reached out
 	contactedFrontiersProviders := make(map[ids.NodeID]uint32) // nodeID -> reqID map
 	sender.CantSendGetStateSummaryFrontier = true
-	sender.SendGetStateSummaryFrontierF = func(ss ids.NodeIDSet, reqID uint32) {
+	sender.SendGetStateSummaryFrontierF = func(_ context.Context, ss set.Set[ids.NodeID], reqID uint32) {
 		for nodeID := range ss {
 			contactedFrontiersProviders[nodeID] = reqID
 		}
@@ -919,20 +949,20 @@ func TestStateSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 	}
 
 	fullVM.CantParseStateSummary = true
-	fullVM.ParseStateSummaryF = func(b []byte) (block.StateSummary, error) {
+	fullVM.ParseStateSummaryF = func(_ context.Context, b []byte) (block.StateSummary, error) {
 		switch {
 		case bytes.Equal(b, summaryBytes):
 			return summary, nil
 		case bytes.Equal(b, minoritySummaryBytes):
 			return minoritySummary, nil
 		default:
-			return nil, errors.New("unknown state summary")
+			return nil, errUnknownSummary
 		}
 	}
 
 	contactedVoters := make(map[ids.NodeID]uint32) // nodeID -> reqID map
 	sender.CantSendGetAcceptedStateSummary = true
-	sender.SendGetAcceptedStateSummaryF = func(ss ids.NodeIDSet, reqID uint32, sl []uint64) {
+	sender.SendGetAcceptedStateSummaryF = func(_ context.Context, ss set.Set[ids.NodeID], reqID uint32, _ []uint64) {
 		for nodeID := range ss {
 			contactedVoters[nodeID] = reqID
 		}
@@ -940,9 +970,9 @@ func TestStateSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 
 	// Connect enough stake to start syncer
 	for _, vdr := range vdrs.List() {
-		assert.NoError(syncer.Connected(vdr.ID(), version.CurrentApp))
+		require.NoError(syncer.Connected(context.Background(), vdr.NodeID, version.CurrentApp))
 	}
-	assert.True(syncer.pendingSeeders.Len() != 0)
+	require.True(syncer.pendingSeeders.Len() != 0)
 
 	// let all contacted vdrs respond with majority or minority summaries
 	for {
@@ -951,64 +981,67 @@ func TestStateSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 			break
 		}
 		beaconID, found := syncer.pendingSeeders.Peek()
-		assert.True(found)
+		require.True(found)
 		reqID := contactedFrontiersProviders[beaconID]
 
 		if reachedSeeders%2 == 0 {
-			assert.NoError(syncer.StateSummaryFrontier(
+			require.NoError(syncer.StateSummaryFrontier(
+				context.Background(),
 				beaconID,
 				reqID,
 				summaryBytes,
 			))
 		} else {
-			assert.NoError(syncer.StateSummaryFrontier(
+			require.NoError(syncer.StateSummaryFrontier(
+				context.Background(),
 				beaconID,
 				reqID,
 				minoritySummaryBytes,
 			))
 		}
 	}
-	assert.False(syncer.pendingSeeders.Len() != 0)
+	require.False(syncer.pendingSeeders.Len() != 0)
 
 	majoritySummaryCalled := false
 	minoritySummaryCalled := false
-	summary.AcceptF = func() (bool, error) {
+	summary.AcceptF = func(context.Context) (block.StateSyncMode, error) {
 		majoritySummaryCalled = true
-		return true, nil
+		return block.StateSyncStatic, nil
 	}
-	minoritySummary.AcceptF = func() (bool, error) {
+	minoritySummary.AcceptF = func(context.Context) (block.StateSyncMode, error) {
 		minoritySummaryCalled = true
-		return true, nil
+		return block.StateSyncStatic, nil
 	}
 
 	// let a majority of voters return summaryID, and a minority return minoritySummaryID. The rest timeout.
 	cumulatedWeight := uint64(0)
 	for syncer.pendingVoters.Len() != 0 {
 		voterID, found := syncer.pendingVoters.Peek()
-		assert.True(found)
+		require.True(found)
 		reqID := contactedVoters[voterID]
 
 		switch {
 		case cumulatedWeight < commonCfg.Alpha/2:
-			assert.NoError(syncer.AcceptedStateSummary(
+			require.NoError(syncer.AcceptedStateSummary(
+				context.Background(),
 				voterID,
 				reqID,
 				[]ids.ID{summaryID, minoritySummaryID},
 			))
-			bw, _ := vdrs.GetWeight(voterID)
-			cumulatedWeight += bw
+			cumulatedWeight += vdrs.GetWeight(voterID)
 
 		case cumulatedWeight < commonCfg.Alpha:
-			assert.NoError(syncer.AcceptedStateSummary(
+			require.NoError(syncer.AcceptedStateSummary(
+				context.Background(),
 				voterID,
 				reqID,
 				[]ids.ID{summaryID},
 			))
-			bw, _ := vdrs.GetWeight(voterID)
-			cumulatedWeight += bw
+			cumulatedWeight += vdrs.GetWeight(voterID)
 
 		default:
-			assert.NoError(syncer.GetAcceptedStateSummaryFailed(
+			require.NoError(syncer.GetAcceptedStateSummaryFailed(
+				context.Background(),
 				voterID,
 				reqID,
 			))
@@ -1016,12 +1049,12 @@ func TestStateSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 	}
 
 	// check that finally summary is passed to VM
-	assert.True(majoritySummaryCalled)
-	assert.False(minoritySummaryCalled)
+	require.True(majoritySummaryCalled)
+	require.False(minoritySummaryCalled)
 }
 
 func TestVotingIsRestartedIfMajorityIsNotReachedDueToTimeouts(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	vdrs := buildTestPeers(t)
 	startupAlpha := (3*vdrs.Weight() + 3) / 4
@@ -1044,7 +1077,7 @@ func TestVotingIsRestartedIfMajorityIsNotReachedDueToTimeouts(t *testing.T) {
 	// set sender to track nodes reached out
 	contactedFrontiersProviders := make(map[ids.NodeID]uint32) // nodeID -> reqID map
 	sender.CantSendGetStateSummaryFrontier = true
-	sender.SendGetStateSummaryFrontierF = func(ss ids.NodeIDSet, reqID uint32) {
+	sender.SendGetStateSummaryFrontierF = func(_ context.Context, ss set.Set[ids.NodeID], reqID uint32) {
 		for nodeID := range ss {
 			contactedFrontiersProviders[nodeID] = reqID
 		}
@@ -1058,13 +1091,13 @@ func TestVotingIsRestartedIfMajorityIsNotReachedDueToTimeouts(t *testing.T) {
 		T:       t,
 	}
 	fullVM.CantParseStateSummary = true
-	fullVM.ParseStateSummaryF = func(summaryBytes []byte) (block.StateSummary, error) {
+	fullVM.ParseStateSummaryF = func(context.Context, []byte) (block.StateSummary, error) {
 		return minoritySummary, nil
 	}
 
 	contactedVoters := make(map[ids.NodeID]uint32) // nodeID -> reqID map
 	sender.CantSendGetAcceptedStateSummary = true
-	sender.SendGetAcceptedStateSummaryF = func(ss ids.NodeIDSet, reqID uint32, sl []uint64) {
+	sender.SendGetAcceptedStateSummaryF = func(_ context.Context, ss set.Set[ids.NodeID], reqID uint32, _ []uint64) {
 		for nodeID := range ss {
 			contactedVoters[nodeID] = reqID
 		}
@@ -1072,47 +1105,49 @@ func TestVotingIsRestartedIfMajorityIsNotReachedDueToTimeouts(t *testing.T) {
 
 	// Connect enough stake to start syncer
 	for _, vdr := range vdrs.List() {
-		assert.NoError(syncer.Connected(vdr.ID(), version.CurrentApp))
+		require.NoError(syncer.Connected(context.Background(), vdr.NodeID, version.CurrentApp))
 	}
-	assert.True(syncer.pendingSeeders.Len() != 0)
+	require.True(syncer.pendingSeeders.Len() != 0)
 
 	// let all contacted vdrs respond
 	for syncer.pendingSeeders.Len() != 0 {
 		beaconID, found := syncer.pendingSeeders.Peek()
-		assert.True(found)
+		require.True(found)
 		reqID := contactedFrontiersProviders[beaconID]
 
-		assert.NoError(syncer.StateSummaryFrontier(
+		require.NoError(syncer.StateSummaryFrontier(
+			context.Background(),
 			beaconID,
 			reqID,
 			summaryBytes,
 		))
 	}
-	assert.False(syncer.pendingSeeders.Len() != 0)
+	require.False(syncer.pendingSeeders.Len() != 0)
 
 	minoritySummaryCalled := false
-	minoritySummary.AcceptF = func() (bool, error) {
+	minoritySummary.AcceptF = func(context.Context) (block.StateSyncMode, error) {
 		minoritySummaryCalled = true
-		return true, nil
+		return block.StateSyncStatic, nil
 	}
 
 	// Let a majority of voters timeout.
 	timedOutWeight := uint64(0)
 	for syncer.pendingVoters.Len() != 0 {
 		voterID, found := syncer.pendingVoters.Peek()
-		assert.True(found)
+		require.True(found)
 		reqID := contactedVoters[voterID]
 
 		// vdr carries the largest weight by far. Make sure it fails
 		if timedOutWeight <= commonCfg.Alpha {
-			assert.NoError(syncer.GetAcceptedStateSummaryFailed(
+			require.NoError(syncer.GetAcceptedStateSummaryFailed(
+				context.Background(),
 				voterID,
 				reqID,
 			))
-			bw, _ := vdrs.GetWeight(voterID)
-			timedOutWeight += bw
+			timedOutWeight += vdrs.GetWeight(voterID)
 		} else {
-			assert.NoError(syncer.AcceptedStateSummary(
+			require.NoError(syncer.AcceptedStateSummary(
+				context.Background(),
 				voterID,
 				reqID,
 				[]ids.ID{summaryID},
@@ -1121,15 +1156,15 @@ func TestVotingIsRestartedIfMajorityIsNotReachedDueToTimeouts(t *testing.T) {
 	}
 
 	// No state summary is passed to VM
-	assert.False(minoritySummaryCalled)
+	require.False(minoritySummaryCalled)
 
 	// instead the whole process is restared
-	assert.False(syncer.pendingVoters.Len() != 0) // no voters reached
-	assert.True(syncer.pendingSeeders.Len() != 0) // frontiers providers reached again
+	require.False(syncer.pendingVoters.Len() != 0) // no voters reached
+	require.True(syncer.pendingSeeders.Len() != 0) // frontiers providers reached again
 }
 
 func TestStateSyncIsStoppedIfEnoughVotesAreCastedWithNoClearMajority(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	vdrs := buildTestPeers(t)
 	startupAlpha := (3*vdrs.Weight() + 3) / 4
@@ -1150,7 +1185,7 @@ func TestStateSyncIsStoppedIfEnoughVotesAreCastedWithNoClearMajority(t *testing.
 	// set sender to track nodes reached out
 	contactedFrontiersProviders := make(map[ids.NodeID]uint32) // nodeID -> reqID map
 	sender.CantSendGetStateSummaryFrontier = true
-	sender.SendGetStateSummaryFrontierF = func(ss ids.NodeIDSet, reqID uint32) {
+	sender.SendGetStateSummaryFrontierF = func(_ context.Context, ss set.Set[ids.NodeID], reqID uint32) {
 		for nodeID := range ss {
 			contactedFrontiersProviders[nodeID] = reqID
 		}
@@ -1171,20 +1206,20 @@ func TestStateSyncIsStoppedIfEnoughVotesAreCastedWithNoClearMajority(t *testing.
 	}
 
 	fullVM.CantParseStateSummary = true
-	fullVM.ParseStateSummaryF = func(b []byte) (block.StateSummary, error) {
+	fullVM.ParseStateSummaryF = func(_ context.Context, b []byte) (block.StateSummary, error) {
 		switch {
 		case bytes.Equal(b, summaryBytes):
 			return minoritySummary1, nil
 		case bytes.Equal(b, minoritySummaryBytes):
 			return minoritySummary2, nil
 		default:
-			return nil, errors.New("unknown state summary")
+			return nil, errUnknownSummary
 		}
 	}
 
 	contactedVoters := make(map[ids.NodeID]uint32) // nodeID -> reqID map
 	sender.CantSendGetAcceptedStateSummary = true
-	sender.SendGetAcceptedStateSummaryF = func(ss ids.NodeIDSet, reqID uint32, sl []uint64) {
+	sender.SendGetAcceptedStateSummaryF = func(_ context.Context, ss set.Set[ids.NodeID], reqID uint32, _ []uint64) {
 		for nodeID := range ss {
 			contactedVoters[nodeID] = reqID
 		}
@@ -1192,9 +1227,9 @@ func TestStateSyncIsStoppedIfEnoughVotesAreCastedWithNoClearMajority(t *testing.
 
 	// Connect enough stake to start syncer
 	for _, vdr := range vdrs.List() {
-		assert.NoError(syncer.Connected(vdr.ID(), version.CurrentApp))
+		require.NoError(syncer.Connected(context.Background(), vdr.NodeID, version.CurrentApp))
 	}
-	assert.True(syncer.pendingSeeders.Len() != 0)
+	require.True(syncer.pendingSeeders.Len() != 0)
 
 	// let all contacted vdrs respond with majority or minority summaries
 	for {
@@ -1203,38 +1238,40 @@ func TestStateSyncIsStoppedIfEnoughVotesAreCastedWithNoClearMajority(t *testing.
 			break
 		}
 		beaconID, found := syncer.pendingSeeders.Peek()
-		assert.True(found)
+		require.True(found)
 		reqID := contactedFrontiersProviders[beaconID]
 
 		if reachedSeeders%2 == 0 {
-			assert.NoError(syncer.StateSummaryFrontier(
+			require.NoError(syncer.StateSummaryFrontier(
+				context.Background(),
 				beaconID,
 				reqID,
 				summaryBytes,
 			))
 		} else {
-			assert.NoError(syncer.StateSummaryFrontier(
+			require.NoError(syncer.StateSummaryFrontier(
+				context.Background(),
 				beaconID,
 				reqID,
 				minoritySummaryBytes,
 			))
 		}
 	}
-	assert.False(syncer.pendingSeeders.Len() != 0)
+	require.False(syncer.pendingSeeders.Len() != 0)
 
 	majoritySummaryCalled := false
 	minoritySummaryCalled := false
-	minoritySummary1.AcceptF = func() (bool, error) {
+	minoritySummary1.AcceptF = func(context.Context) (block.StateSyncMode, error) {
 		majoritySummaryCalled = true
-		return true, nil
+		return block.StateSyncStatic, nil
 	}
-	minoritySummary2.AcceptF = func() (bool, error) {
+	minoritySummary2.AcceptF = func(context.Context) (block.StateSyncMode, error) {
 		minoritySummaryCalled = true
-		return true, nil
+		return block.StateSyncStatic, nil
 	}
 
 	stateSyncFullyDone := false
-	syncer.onDoneStateSyncing = func(lastReqID uint32) error {
+	syncer.onDoneStateSyncing = func(context.Context, uint32) error {
 		stateSyncFullyDone = true
 		return nil
 	}
@@ -1244,38 +1281,38 @@ func TestStateSyncIsStoppedIfEnoughVotesAreCastedWithNoClearMajority(t *testing.
 	votingWeightStake := uint64(0)
 	for syncer.pendingVoters.Len() != 0 {
 		voterID, found := syncer.pendingVoters.Peek()
-		assert.True(found)
+		require.True(found)
 		reqID := contactedVoters[voterID]
 
 		switch {
 		case votingWeightStake < commonCfg.Alpha/2:
-			assert.NoError(syncer.AcceptedStateSummary(
+			require.NoError(syncer.AcceptedStateSummary(
+				context.Background(),
 				voterID,
 				reqID,
 				[]ids.ID{minoritySummary1.ID(), minoritySummary2.ID()},
 			))
-			bw, _ := vdrs.GetWeight(voterID)
-			votingWeightStake += bw
+			votingWeightStake += vdrs.GetWeight(voterID)
 
 		default:
-			assert.NoError(syncer.AcceptedStateSummary(
+			require.NoError(syncer.AcceptedStateSummary(
+				context.Background(),
 				voterID,
 				reqID,
 				[]ids.ID{{'u', 'n', 'k', 'n', 'o', 'w', 'n', 'I', 'D'}},
 			))
-			bw, _ := vdrs.GetWeight(voterID)
-			votingWeightStake += bw
+			votingWeightStake += vdrs.GetWeight(voterID)
 		}
 	}
 
 	// check that finally summary is passed to VM
-	assert.False(majoritySummaryCalled)
-	assert.False(minoritySummaryCalled)
-	assert.True(stateSyncFullyDone) // no restart, just move to boostrapping
+	require.False(majoritySummaryCalled)
+	require.False(minoritySummaryCalled)
+	require.True(stateSyncFullyDone) // no restart, just move to boostrapping
 }
 
 func TestStateSyncIsDoneOnceVMNotifies(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	vdrs := buildTestPeers(t)
 	startupAlpha := (3*vdrs.Weight() + 3) / 4
@@ -1297,12 +1334,12 @@ func TestStateSyncIsDoneOnceVMNotifies(t *testing.T) {
 	_ = fullVM
 
 	stateSyncFullyDone := false
-	syncer.onDoneStateSyncing = func(lastReqID uint32) error {
+	syncer.onDoneStateSyncing = func(context.Context, uint32) error {
 		stateSyncFullyDone = true
 		return nil
 	}
 
 	// Any Put response before StateSyncDone is received from VM is dropped
-	assert.NoError(syncer.Notify(common.StateSyncDone))
-	assert.True(stateSyncFullyDone)
+	require.NoError(syncer.Notify(context.Background(), common.StateSyncDone))
+	require.True(stateSyncFullyDone)
 }

@@ -12,7 +12,6 @@ DOCKERHUB_REPO="avaplatform/avalanchego"
 
 DOCKER="${DOCKER:-docker}"
 SCRIPT_DIRPATH=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)
-ROOT_DIRPATH="$(dirname "${SCRIPT_DIRPATH}")"
 
 AVA_LABS_RELATIVE_PATH="src/github.com/ava-labs"
 EXISTING_GOPATH="$GOPATH"

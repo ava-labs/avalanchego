@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package math
@@ -11,7 +11,7 @@ import (
 
 var (
 	_ AveragerHeap   = averagerHeap{}
-	_ heap.Interface = &averagerHeapBackend{}
+	_ heap.Interface = (*averagerHeapBackend)(nil)
 )
 
 // AveragerHeap maintains a heap of the averagers.
@@ -111,7 +111,9 @@ func (h averagerHeap) Len() int {
 	return len(h.b.entries)
 }
 
-func (h *averagerHeapBackend) Len() int { return len(h.entries) }
+func (h *averagerHeapBackend) Len() int {
+	return len(h.entries)
+}
 
 func (h *averagerHeapBackend) Less(i, j int) bool {
 	if h.isMaxHeap {
@@ -136,6 +138,7 @@ func (h *averagerHeapBackend) Push(x interface{}) {
 func (h *averagerHeapBackend) Pop() interface{} {
 	newLen := len(h.entries) - 1
 	e := h.entries[newLen]
+	h.entries[newLen] = nil
 	delete(h.nodeIDToEntry, e.nodeID)
 	h.entries = h.entries[:newLen]
 	return e

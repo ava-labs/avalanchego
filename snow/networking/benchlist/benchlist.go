@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package benchlist
@@ -12,16 +12,19 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-var _ heap.Interface = &benchedQueue{}
+var _ heap.Interface = (*benchedQueue)(nil)
 
 // If a peer consistently does not respond to queries, it will
 // increase latencies on the network whenever that peer is polled.
@@ -45,15 +48,21 @@ type Benchlist interface {
 // Data about a validator who is benched
 type benchData struct {
 	benchedUntil time.Time
-	validatorID  ids.NodeID
+	nodeID       ids.NodeID
 	index        int
 }
 
 // Each element is a benched validator
 type benchedQueue []*benchData
 
-func (bq benchedQueue) Len() int           { return len(bq) }
-func (bq benchedQueue) Less(i, j int) bool { return bq[i].benchedUntil.Before(bq[j].benchedUntil) }
+func (bq benchedQueue) Len() int {
+	return len(bq)
+}
+
+func (bq benchedQueue) Less(i, j int) bool {
+	return bq[i].benchedUntil.Before(bq[j].benchedUntil)
+}
+
 func (bq benchedQueue) Swap(i, j int) {
 	bq[i], bq[j] = bq[j], bq[i]
 	bq[i].index = i
@@ -109,7 +118,7 @@ type benchlist struct {
 	failureStreaks map[ids.NodeID]failureStreak
 
 	// IDs of validators that are currently benched
-	benchlistSet ids.NodeIDSet
+	benchlistSet set.Set[ids.NodeID]
 
 	// Min heap containing benched validators and their endtimes
 	// Pop() returns the next validator to leave
@@ -148,7 +157,7 @@ func NewBenchlist(
 		chainID:                chainID,
 		log:                    log,
 		failureStreaks:         make(map[ids.NodeID]failureStreak),
-		benchlistSet:           ids.NodeIDSet{},
+		benchlistSet:           set.Set[ids.NodeID]{},
 		benchable:              benchable,
 		vdrs:                   validators,
 		threshold:              threshold,
@@ -182,22 +191,19 @@ func (b *benchlist) update() {
 
 // Remove [validator] from the benchlist
 // Assumes [b.lock] is held
-func (b *benchlist) remove(validator *benchData) {
+func (b *benchlist) remove(node *benchData) {
 	// Update state
-	id := validator.validatorID
-	b.log.Debug("removing validator %s from benchlist", id)
-	heap.Remove(&b.benchedQueue, validator.index)
+	id := node.nodeID
+	b.log.Debug("removing node from benchlist",
+		zap.Stringer("nodeID", id),
+	)
+	heap.Remove(&b.benchedQueue, node.index)
 	b.benchlistSet.Remove(id)
 	b.benchable.Unbenched(b.chainID, id)
 
 	// Update metrics
 	b.metrics.numBenched.Set(float64(b.benchedQueue.Len()))
-	benchedStake, err := b.vdrs.SubsetWeight(b.benchlistSet)
-	if err != nil {
-		// This should never happen
-		b.log.Error("couldn't get benched stake: %s", err)
-		return
-	}
+	benchedStake := b.vdrs.SubsetWeight(b.benchlistSet)
 	b.metrics.weightBenched.Set(float64(benchedStake))
 }
 
@@ -284,24 +290,20 @@ func (b *benchlist) RegisterFailure(nodeID ids.NodeID) {
 // Assumes [b.lock] is held
 // Assumes [nodeID] is not already benched
 func (b *benchlist) bench(nodeID ids.NodeID) {
-	benchedStake, err := b.vdrs.SubsetWeight(b.benchlistSet)
-	if err != nil {
-		// This should never happen
-		b.log.Error("couldn't get benched stake: %s. Resetting benchlist", err)
-		return
-	}
-
-	validatorStake, isVdr := b.vdrs.GetWeight(nodeID)
-	if !isVdr {
+	validatorStake := b.vdrs.GetWeight(nodeID)
+	if validatorStake == 0 {
 		// We might want to bench a non-validator because they don't respond to
 		// my Get requests, but we choose to only bench validators.
 		return
 	}
 
+	benchedStake := b.vdrs.SubsetWeight(b.benchlistSet)
 	newBenchedStake, err := safemath.Add64(benchedStake, validatorStake)
 	if err != nil {
 		// This should never happen
-		b.log.Error("overflow calculating new benched stake with validator %s", nodeID)
+		b.log.Error("overflow calculating new benched stake",
+			zap.Stringer("nodeID", nodeID),
+		)
 		return
 	}
 
@@ -309,11 +311,11 @@ func (b *benchlist) bench(nodeID ids.NodeID) {
 	maxBenchedStake := float64(totalStake) * b.maxPortion
 
 	if float64(newBenchedStake) > maxBenchedStake {
-		b.log.Debug(
-			"not benching %s because benched stake (%f) would exceed max (%f)",
-			nodeID,
-			float64(newBenchedStake),
-			maxBenchedStake,
+		b.log.Debug("not benching node",
+			zap.String("reason", "benched stake would exceed max"),
+			zap.Stringer("nodeID", nodeID),
+			zap.Float64("benchedStake", float64(newBenchedStake)),
+			zap.Float64("maxBenchedStake", maxBenchedStake),
 		)
 		return
 	}
@@ -336,13 +338,12 @@ func (b *benchlist) bench(nodeID ids.NodeID) {
 
 	heap.Push(
 		&b.benchedQueue,
-		&benchData{validatorID: nodeID, benchedUntil: benchedUntil},
+		&benchData{nodeID: nodeID, benchedUntil: benchedUntil},
 	)
-	b.log.Debug(
-		"benching validator %s for %s after %d consecutive failed queries.",
-		nodeID,
-		benchedUntil.Sub(now),
-		b.threshold,
+	b.log.Debug("benching validator after consecutive failed queries",
+		zap.Stringer("nodeID", nodeID),
+		zap.Duration("benchDuration", benchedUntil.Sub(now)),
+		zap.Int("numFailedQueries", b.threshold),
 	)
 
 	// Set [b.timer] to fire when next validator should leave bench

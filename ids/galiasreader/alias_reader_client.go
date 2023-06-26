@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package galiasreader
@@ -11,7 +11,7 @@ import (
 	aliasreaderpb "github.com/ava-labs/avalanchego/proto/pb/aliasreader"
 )
 
-var _ ids.AliaserReader = &Client{}
+var _ ids.AliaserReader = (*Client)(nil)
 
 // Client implements alias lookups that talk over RPC.
 type Client struct {

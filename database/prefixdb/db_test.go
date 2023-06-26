@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package prefixdb
@@ -19,6 +19,12 @@ func TestInterface(t *testing.T) {
 		test(t, New([]byte("ld"), New([]byte("wor"), db)))
 		test(t, NewNested([]byte("wor"), New([]byte("ld"), db)))
 		test(t, NewNested([]byte("ld"), New([]byte("wor"), db)))
+	}
+}
+
+func FuzzInterface(f *testing.F) {
+	for _, test := range database.FuzzTests {
+		test(f, New([]byte(""), memdb.New()))
 	}
 }
 

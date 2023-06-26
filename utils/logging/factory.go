@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package logging
@@ -12,10 +12,12 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
+	"golang.org/x/exp/maps"
+
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
-var _ Factory = &factory{}
+var _ Factory = (*factory)(nil)
 
 // Factory creates new instances of different types of Logger
 type Factory interface {
@@ -89,7 +91,7 @@ func (f *factory) makeLogger(config Config) (Logger, error) {
 	fileCore := NewWrappedCore(config.LogLevel, rw, fileEnc)
 	prefix := config.LogFormat.WrapPrefix(config.MsgPrefix)
 
-	l := NewLogger(config.Assertions, prefix, consoleCore, fileCore)
+	l := NewLogger(prefix, consoleCore, fileCore)
 	f.loggers[config.LoggerName] = logWrapper{
 		logger:       l,
 		displayLevel: consoleCore.AtomicLevel,
@@ -167,11 +169,7 @@ func (f *factory) GetLoggerNames() []string {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
 
-	names := make([]string, 0, len(f.loggers))
-	for name := range f.loggers {
-		names = append(names, name)
-	}
-	return names
+	return maps.Keys(f.loggers)
 }
 
 func (f *factory) Close() {

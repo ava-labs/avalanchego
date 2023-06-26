@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package version
@@ -14,10 +14,11 @@ var (
 )
 
 func init() {
-	format := "%s [database=%s"
+	format := "%s [database=%s, rpcchainvm=%d"
 	args := []interface{}{
 		CurrentApp,
 		CurrentDatabase,
+		RPCChainVMProtocol,
 	}
 	if GitCommit != "" {
 		format += ", commit=%s"

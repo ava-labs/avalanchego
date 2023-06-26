@@ -1,28 +1,25 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package versiondb
 
 import (
-	"sort"
+	"context"
 	"strings"
 	"sync"
 
+	"golang.org/x/exp/maps"
+	"golang.org/x/exp/slices"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
-	"github.com/ava-labs/avalanchego/database/nodb"
-	"github.com/ava-labs/avalanchego/utils"
-)
-
-const (
-	iterativeDeleteThreshold = 512
 )
 
 var (
-	_ database.Database = &Database{}
-	_ Commitable        = &Database{}
-	_ database.Batch    = &batch{}
-	_ database.Iterator = &iterator{}
+	_ database.Database = (*Database)(nil)
+	_ Commitable        = (*Database)(nil)
+	_ database.Batch    = (*batch)(nil)
+	_ database.Iterator = (*iterator)(nil)
 )
 
 // Commitable defines the interface that specifies that something may be
@@ -80,7 +77,7 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 		if val.delete {
 			return nil, database.ErrNotFound
 		}
-		return utils.CopyBytes(val.value), nil
+		return slices.Clone(val.value), nil
 	}
 	return db.db.Get(key)
 }
@@ -92,7 +89,7 @@ func (db *Database) Put(key, value []byte) error {
 	if db.mem == nil {
 		return database.ErrClosed
 	}
-	db.mem[string(key)] = valueDelete{value: value}
+	db.mem[string(key)] = valueDelete{value: slices.Clone(value)}
 	return nil
 }
 
@@ -107,7 +104,9 @@ func (db *Database) Delete(key []byte) error {
 	return nil
 }
 
-func (db *Database) NewBatch() database.Batch { return &batch{db: db} }
+func (db *Database) NewBatch() database.Batch {
+	return &batch{db: db}
+}
 
 func (db *Database) NewIterator() database.Iterator {
 	return db.NewIteratorWithStartAndPrefix(nil, nil)
@@ -126,7 +125,9 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 	defer db.lock.RUnlock()
 
 	if db.mem == nil {
-		return &nodb.Iterator{Err: database.ErrClosed}
+		return &database.IteratorError{
+			Err: database.ErrClosed,
+		}
 	}
 
 	startString := string(start)
@@ -137,7 +138,7 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 			keys = append(keys, key)
 		}
 	}
-	sort.Strings(keys) // Keys need to be in sorted order
+	slices.Sort(keys) // Keys need to be in sorted order
 	values := make([]valueDelete, len(keys))
 	for i, key := range keys {
 		values[i] = db.mem[key]
@@ -209,15 +210,7 @@ func (db *Database) Abort() {
 }
 
 func (db *Database) abort() {
-	// If there are a lot of keys, clear the map by just allocating a new one
-	if len(db.mem) > iterativeDeleteThreshold {
-		db.mem = make(map[string]valueDelete, memdb.DefaultSize)
-		return
-	}
-	// If there aren't many keys, clear the map iteratively
-	for key := range db.mem {
-		delete(db.mem, key)
-	}
+	maps.Clear(db.mem)
 }
 
 // CommitBatch returns a batch that contains all uncommitted puts/deletes.
@@ -272,41 +265,21 @@ func (db *Database) isClosed() bool {
 	return db.db == nil
 }
 
-func (db *Database) HealthCheck() (interface{}, error) {
+func (db *Database) HealthCheck(ctx context.Context) (interface{}, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
 	if db.mem == nil {
 		return nil, database.ErrClosed
 	}
-	return db.db.HealthCheck()
-}
-
-type keyValue struct {
-	key    []byte
-	value  []byte
-	delete bool
+	return db.db.HealthCheck(ctx)
 }
 
 type batch struct {
-	db     *Database
-	writes []keyValue
-	size   int
-}
+	database.BatchOps
 
-func (b *batch) Put(key, value []byte) error {
-	b.writes = append(b.writes, keyValue{utils.CopyBytes(key), utils.CopyBytes(value), false})
-	b.size += len(key) + len(value)
-	return nil
+	db *Database
 }
-
-func (b *batch) Delete(key []byte) error {
-	b.writes = append(b.writes, keyValue{utils.CopyBytes(key), nil, true})
-	b.size += len(key)
-	return nil
-}
-
-func (b *batch) Size() int { return b.size }
 
 func (b *batch) Write() error {
 	b.db.lock.Lock()
@@ -316,39 +289,18 @@ func (b *batch) Write() error {
 		return database.ErrClosed
 	}
 
-	for _, kv := range b.writes {
-		b.db.mem[string(kv.key)] = valueDelete{
-			value:  kv.value,
-			delete: kv.delete,
+	for _, op := range b.Ops {
+		b.db.mem[string(op.Key)] = valueDelete{
+			value:  op.Value,
+			delete: op.Delete,
 		}
 	}
 	return nil
 }
 
-func (b *batch) Reset() {
-	if cap(b.writes) > len(b.writes)*database.MaxExcessCapacityFactor {
-		b.writes = make([]keyValue, 0, cap(b.writes)/database.CapacityReductionFactor)
-	} else {
-		b.writes = b.writes[:0]
-	}
-	b.size = 0
+func (b *batch) Inner() database.Batch {
+	return b
 }
-
-func (b *batch) Replay(w database.KeyValueWriterDeleter) error {
-	for _, kv := range b.writes {
-		if kv.delete {
-			if err := w.Delete(kv.key); err != nil {
-				return err
-			}
-		} else if err := w.Put(kv.key, kv.value); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// Inner returns itself
-func (b *batch) Inner() database.Batch { return b }
 
 // iterator walks over both the in memory database and the underlying database
 // at the same time.
@@ -455,9 +407,13 @@ func (it *iterator) Error() error {
 	return it.Iterator.Error()
 }
 
-func (it *iterator) Key() []byte { return it.key }
+func (it *iterator) Key() []byte {
+	return it.key
+}
 
-func (it *iterator) Value() []byte { return it.value }
+func (it *iterator) Value() []byte {
+	return it.value
+}
 
 func (it *iterator) Release() {
 	it.key = nil

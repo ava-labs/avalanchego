@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 // Package state manages the meta-data required by consensus for an avalanche
@@ -6,6 +6,7 @@
 package state
 
 import (
+	"context"
 	"errors"
 	"time"
 
@@ -15,10 +16,10 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 const (
@@ -31,27 +32,27 @@ var (
 	errWrongChainID  = errors.New("wrong ChainID in vertex")
 )
 
-var _ vertex.Manager = &Serializer{}
+var _ vertex.Manager = (*Serializer)(nil)
 
 // Serializer manages the state of multiple vertices
 type Serializer struct {
 	SerializerConfig
 	versionDB *versiondb.Database
 	state     *prefixedState
-	edge      ids.Set
+	edge      set.Set[ids.ID]
 }
 
 type SerializerConfig struct {
-	ChainID             ids.ID
-	VM                  vertex.DAGVM
-	DB                  database.Database
-	Log                 logging.Logger
-	XChainMigrationTime time.Time
+	ChainID     ids.ID
+	VM          vertex.DAGVM
+	DB          database.Database
+	Log         logging.Logger
+	CortinaTime time.Time
 }
 
 func NewSerializer(config SerializerConfig) vertex.Manager {
 	versionDB := versiondb.New(config.DB)
-	dbCache := &cache.LRU{Size: dbCacheSize}
+	dbCache := &cache.LRU[ids.ID, any]{Size: dbCacheSize}
 	s := Serializer{
 		SerializerConfig: config,
 		versionDB:        versionDB,
@@ -70,22 +71,13 @@ func NewSerializer(config SerializerConfig) vertex.Manager {
 	return &s
 }
 
-func (s *Serializer) ParseVtx(b []byte) (avalanche.Vertex, error) {
-	return newUniqueVertex(s, b)
+func (s *Serializer) ParseVtx(ctx context.Context, b []byte) (avalanche.Vertex, error) {
+	return newUniqueVertex(ctx, s, b)
 }
 
-func (s *Serializer) BuildVtx(parentIDs []ids.ID, txs []snowstorm.Tx) (avalanche.Vertex, error) {
-	return s.buildVtx(parentIDs, txs, false)
-}
-
-func (s *Serializer) BuildStopVtx(parentIDs []ids.ID) (avalanche.Vertex, error) {
-	return s.buildVtx(parentIDs, nil, true)
-}
-
-func (s *Serializer) buildVtx(
+func (s *Serializer) BuildStopVtx(
+	ctx context.Context,
 	parentIDs []ids.ID,
-	txs []snowstorm.Tx,
-	stopVtx bool,
 ) (avalanche.Vertex, error) {
 	height := uint64(0)
 	for _, parentID := range parentIDs {
@@ -98,31 +90,14 @@ func (s *Serializer) buildVtx(
 		if err != nil {
 			return nil, err
 		}
-		height = math.Max64(height, childHeight)
+		height = math.Max(height, childHeight)
 	}
 
-	var (
-		vtx vertex.StatelessVertex
-		err error
+	vtx, err := vertex.BuildStopVertex(
+		s.ChainID,
+		height,
+		parentIDs,
 	)
-	if !stopVtx {
-		txBytes := make([][]byte, len(txs))
-		for i, tx := range txs {
-			txBytes[i] = tx.Bytes()
-		}
-		vtx, err = vertex.Build(
-			s.ChainID,
-			height,
-			parentIDs,
-			txBytes,
-		)
-	} else {
-		vtx, err = vertex.BuildStopVertex(
-			s.ChainID,
-			height,
-			parentIDs,
-		)
-	}
 	if err != nil {
 		return nil, err
 	}
@@ -133,14 +108,16 @@ func (s *Serializer) buildVtx(
 	}
 	// setVertex handles the case where this vertex already exists even
 	// though we just made it
-	return uVtx, uVtx.setVertex(vtx)
+	return uVtx, uVtx.setVertex(ctx, vtx)
 }
 
-func (s *Serializer) GetVtx(vtxID ids.ID) (avalanche.Vertex, error) {
+func (s *Serializer) GetVtx(_ context.Context, vtxID ids.ID) (avalanche.Vertex, error) {
 	return s.getUniqueVertex(vtxID)
 }
 
-func (s *Serializer) Edge() []ids.ID { return s.edge.List() }
+func (s *Serializer) Edge(context.Context) []ids.ID {
+	return s.edge.List()
+}
 
 func (s *Serializer) parseVertex(b []byte) (vertex.StatelessVertex, error) {
 	vtx, err := vertex.Parse(b)
@@ -164,8 +141,8 @@ func (s *Serializer) getUniqueVertex(vtxID ids.ID) (*uniqueVertex, error) {
 	return vtx, nil
 }
 
-func (s *Serializer) StopVertexAccepted() (bool, error) {
-	edge := s.Edge()
+func (s *Serializer) StopVertexAccepted(ctx context.Context) (bool, error) {
+	edge := s.Edge(ctx)
 	if len(edge) != 1 {
 		return false, nil
 	}

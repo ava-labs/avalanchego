@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avax
@@ -6,23 +6,24 @@ package avax
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 func TestFetchUTXOs(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	txID := ids.GenerateTestID()
 	assetID := ids.GenerateTestID()
 	addr := ids.GenerateTestShortID()
-	addrs := ids.ShortSet{}
+	addrs := set.Set[ids.ShortID]{}
 	addrs.Add(addr)
 	utxo := &UTXO{
 		UTXOID: UTXOID{
@@ -48,34 +49,33 @@ func TestFetchUTXOs(t *testing.T) {
 		c.RegisterType(&secp256k1fx.TransferOutput{}),
 		manager.RegisterCodec(codecVersion, c),
 	)
-	assert.NoError(errs.Err)
+	require.NoError(errs.Err)
 
 	db := memdb.New()
 	s := NewUTXOState(db, manager)
 
-	err := s.PutUTXO(utxo)
-	assert.NoError(err)
+	require.NoError(s.PutUTXO(utxo))
 
 	utxos, err := GetAllUTXOs(s, addrs)
-	assert.NoError(err)
-	assert.Len(utxos, 1)
-	assert.Equal(utxo, utxos[0])
+	require.NoError(err)
+	require.Len(utxos, 1)
+	require.Equal(utxo, utxos[0])
 
 	balance, err := GetBalance(s, addrs)
-	assert.NoError(err)
-	assert.EqualValues(12345, balance)
+	require.NoError(err)
+	require.Equal(uint64(12345), balance)
 }
 
 // TestGetPaginatedUTXOs tests
 // - Pagination when the total UTXOs exceed maxUTXOsToFetch (512)
 // - Fetching all UTXOs when they exceed maxUTXOsToFetch (512)
 func TestGetPaginatedUTXOs(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	addr0 := ids.GenerateTestShortID()
 	addr1 := ids.GenerateTestShortID()
 	addr2 := ids.GenerateTestShortID()
-	addrs := ids.ShortSet{}
+	addrs := set.Set[ids.ShortID]{}
 	addrs.Add(addr0, addr1)
 
 	c := linearcodec.NewDefault()
@@ -86,7 +86,7 @@ func TestGetPaginatedUTXOs(t *testing.T) {
 		c.RegisterType(&secp256k1fx.TransferOutput{}),
 		manager.RegisterCodec(codecVersion, c),
 	)
-	assert.NoError(errs.Err)
+	require.NoError(errs.Err)
 
 	db := memdb.New()
 	s := NewUTXOState(db, manager)
@@ -110,8 +110,7 @@ func TestGetPaginatedUTXOs(t *testing.T) {
 				},
 			},
 		}
-		err := s.PutUTXO(utxo0)
-		assert.NoError(err)
+		require.NoError(s.PutUTXO(utxo0))
 
 		utxo1 := &UTXO{
 			UTXOID: UTXOID{
@@ -128,8 +127,7 @@ func TestGetPaginatedUTXOs(t *testing.T) {
 				},
 			},
 		}
-		err = s.PutUTXO(utxo1)
-		assert.NoError(err)
+		require.NoError(s.PutUTXO(utxo1))
 
 		utxo2 := &UTXO{
 			UTXOID: UTXOID{
@@ -146,8 +144,7 @@ func TestGetPaginatedUTXOs(t *testing.T) {
 				},
 			},
 		}
-		err = s.PutUTXO(utxo2)
-		assert.NoError(err)
+		require.NoError(s.PutUTXO(utxo2))
 	}
 
 	var (

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package compression
@@ -6,17 +6,19 @@ package compression
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNoCompressor(t *testing.T) {
+	require := require.New(t)
+
 	data := []byte{1, 2, 3}
 	compressor := NewNoCompressor()
 	compressedBytes, err := compressor.Compress(data)
-	assert.NoError(t, err)
-	assert.EqualValues(t, data, compressedBytes)
+	require.NoError(err)
+	require.Equal(data, compressedBytes)
 
 	decompressedBytes, err := compressor.Decompress(compressedBytes)
-	assert.NoError(t, err)
-	assert.EqualValues(t, data, decompressedBytes)
+	require.NoError(err)
+	require.Equal(data, decompressedBytes)
 }

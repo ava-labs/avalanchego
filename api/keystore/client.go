@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package keystore
@@ -11,9 +11,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
 
-var _ Client = &client{}
+var _ Client = (*client)(nil)
 
 // Client interface for Avalanche Keystore API Endpoint
+//
+// Deprecated: The Keystore API is deprecated. Dedicated wallets should be used
+// instead.
 type Client interface {
 	CreateUser(context.Context, api.UserPass, ...rpc.Option) error
 	// Returns the usernames of all keystore users
@@ -31,20 +34,21 @@ type client struct {
 	requester rpc.EndpointRequester
 }
 
+// Deprecated: The Keystore API is deprecated. Dedicated wallets should be used
+// instead.
 func NewClient(uri string) Client {
 	return &client{requester: rpc.NewEndpointRequester(
-		uri+"/ext/keystore",
-		"keystore",
+		uri + "/ext/keystore",
 	)}
 }
 
 func (c *client) CreateUser(ctx context.Context, user api.UserPass, options ...rpc.Option) error {
-	return c.requester.SendRequest(ctx, "createUser", &user, &api.EmptyReply{}, options...)
+	return c.requester.SendRequest(ctx, "keystore.createUser", &user, &api.EmptyReply{}, options...)
 }
 
 func (c *client) ListUsers(ctx context.Context, options ...rpc.Option) ([]string, error) {
 	res := &ListUsersReply{}
-	err := c.requester.SendRequest(ctx, "listUsers", struct{}{}, res, options...)
+	err := c.requester.SendRequest(ctx, "keystore.listUsers", struct{}{}, res, options...)
 	return res.Users, err
 }
 
@@ -52,7 +56,7 @@ func (c *client) ExportUser(ctx context.Context, user api.UserPass, options ...r
 	res := &ExportUserReply{
 		Encoding: formatting.Hex,
 	}
-	err := c.requester.SendRequest(ctx, "exportUser", &user, res, options...)
+	err := c.requester.SendRequest(ctx, "keystore.exportUser", &user, res, options...)
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +69,7 @@ func (c *client) ImportUser(ctx context.Context, user api.UserPass, account []by
 		return err
 	}
 
-	return c.requester.SendRequest(ctx, "importUser", &ImportUserArgs{
+	return c.requester.SendRequest(ctx, "keystore.importUser", &ImportUserArgs{
 		UserPass: user,
 		User:     accountStr,
 		Encoding: formatting.Hex,
@@ -73,5 +77,5 @@ func (c *client) ImportUser(ctx context.Context, user api.UserPass, account []by
 }
 
 func (c *client) DeleteUser(ctx context.Context, user api.UserPass, options ...rpc.Option) error {
-	return c.requester.SendRequest(ctx, "deleteUser", &user, &api.EmptyReply{}, options...)
+	return c.requester.SendRequest(ctx, "keystore.deleteUser", &user, &api.EmptyReply{}, options...)
 }

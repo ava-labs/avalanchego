@@ -1,29 +1,18 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowstorm
 
 import (
+	"context"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 )
 
-// Whitelister defines the interface for specifying whitelisted operations.
-type Whitelister interface {
-	// Returns [true] if the underlying instance does implement whitelisted
-	// conflicts.
-	HasWhitelist() bool
-
-	// Whitelist returns the set of transaction IDs that are explicitly
-	// whitelisted. Transactions that are not explicitly whitelisted are
-	// considered conflicting.
-	Whitelist() (ids.Set, error)
-}
-
 // Tx consumes state.
 type Tx interface {
 	choices.Decidable
-	Whitelister
 
 	// Dependencies is a list of transactions upon which this transaction
 	// depends. Each element of Dependencies must be verified before Verify is
@@ -46,7 +35,7 @@ type Tx interface {
 	//
 	// It is guaranteed that when Verify is called, all the dependencies of
 	// this transaction have already been successfully verified.
-	Verify() error
+	Verify(context.Context) error
 
 	// Bytes returns the binary representation of this transaction.
 	//

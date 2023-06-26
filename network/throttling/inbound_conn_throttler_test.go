@@ -1,16 +1,17 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package throttling
 
 import (
+	"context"
 	"net"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-var _ net.Listener = &MockListener{}
+var _ net.Listener = (*MockListener)(nil)
 
 type MockListener struct {
 	t         *testing.T
@@ -44,15 +45,20 @@ func (ml *MockListener) Addr() net.Addr {
 }
 
 func TestInboundConnThrottlerClose(t *testing.T) {
+	require := require.New(t)
+
 	closed := false
 	l := &MockListener{
-		t:        t,
-		OnCloseF: func() error { closed = true; return nil },
+		t: t,
+		OnCloseF: func() error {
+			closed = true
+			return nil
+		},
 	}
 	wrappedL := NewThrottledListener(l, 1)
-	err := wrappedL.Close()
-	assert.NoError(t, err)
-	assert.True(t, closed)
+	require.NoError(wrappedL.Close())
+	require.True(closed)
+
 	select {
 	case <-wrappedL.(*throttledListener).ctx.Done():
 	default:
@@ -60,19 +66,22 @@ func TestInboundConnThrottlerClose(t *testing.T) {
 	}
 
 	// Accept() should return an error because the context is cancelled
-	_, err = wrappedL.Accept()
-	assert.Error(t, err)
+	_, err := wrappedL.Accept()
+	require.ErrorIs(err, context.Canceled)
 }
 
 func TestInboundConnThrottlerAddr(t *testing.T) {
 	addrCalled := false
 	l := &MockListener{
-		t:       t,
-		OnAddrF: func() net.Addr { addrCalled = true; return nil },
+		t: t,
+		OnAddrF: func() net.Addr {
+			addrCalled = true
+			return nil
+		},
 	}
 	wrappedL := NewThrottledListener(l, 1)
 	_ = wrappedL.Addr()
-	assert.True(t, addrCalled)
+	require.True(t, addrCalled)
 }
 
 func TestInboundConnThrottlerAccept(t *testing.T) {
@@ -86,6 +95,6 @@ func TestInboundConnThrottlerAccept(t *testing.T) {
 	}
 	wrappedL := NewThrottledListener(l, 1)
 	_, err := wrappedL.Accept()
-	assert.NoError(t, err)
-	assert.True(t, acceptCalled)
+	require.NoError(t, err)
+	require.True(t, acceptCalled)
 }

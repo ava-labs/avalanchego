@@ -1,55 +1,53 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowball
 
-import (
-	"testing"
-)
+import "testing"
 
 func TestBinarySnowflake(t *testing.T) {
-	Blue := 0
-	Red := 1
+	blue := 0
+	red := 1
 
 	beta := 2
 
 	sf := binarySnowflake{}
-	sf.Initialize(beta, Red)
+	sf.Initialize(beta, red)
 
-	if pref := sf.Preference(); pref != Red {
-		t.Fatalf("Wrong preference. Expected %d got %d", Red, pref)
+	if pref := sf.Preference(); pref != red {
+		t.Fatalf("Wrong preference. Expected %d got %d", red, pref)
 	} else if sf.Finalized() {
 		t.Fatalf("Finalized too early")
 	}
 
-	sf.RecordSuccessfulPoll(Blue)
+	sf.RecordSuccessfulPoll(blue)
 
-	if pref := sf.Preference(); pref != Blue {
-		t.Fatalf("Wrong preference. Expected %d got %d", Blue, pref)
+	if pref := sf.Preference(); pref != blue {
+		t.Fatalf("Wrong preference. Expected %d got %d", blue, pref)
 	} else if sf.Finalized() {
 		t.Fatalf("Finalized too early")
 	}
 
-	sf.RecordSuccessfulPoll(Red)
+	sf.RecordSuccessfulPoll(red)
 
-	if pref := sf.Preference(); pref != Red {
-		t.Fatalf("Wrong preference. Expected %d got %d", Red, pref)
+	if pref := sf.Preference(); pref != red {
+		t.Fatalf("Wrong preference. Expected %d got %d", red, pref)
 	} else if sf.Finalized() {
 		t.Fatalf("Finalized too early")
 	}
 
-	sf.RecordSuccessfulPoll(Blue)
+	sf.RecordSuccessfulPoll(blue)
 
-	if pref := sf.Preference(); pref != Blue {
-		t.Fatalf("Wrong preference. Expected %d got %d", Blue, pref)
+	if pref := sf.Preference(); pref != blue {
+		t.Fatalf("Wrong preference. Expected %d got %d", blue, pref)
 	} else if sf.Finalized() {
 		t.Fatalf("Finalized too early")
 	}
 
-	sf.RecordSuccessfulPoll(Blue)
+	sf.RecordSuccessfulPoll(blue)
 
-	if pref := sf.Preference(); pref != Blue {
-		t.Fatalf("Wrong preference. Expected %d got %d", Blue, pref)
+	if pref := sf.Preference(); pref != blue {
+		t.Fatalf("Wrong preference. Expected %d got %d", blue, pref)
 	} else if !sf.Finalized() {
 		t.Fatalf("Didn't finalized correctly")
 	}

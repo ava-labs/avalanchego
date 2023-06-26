@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sampler
@@ -27,10 +27,7 @@ func BenchmarkAllUniform(b *testing.B) {
 }
 
 func UniformBenchmark(b *testing.B, s Uniform, size uint64, toSample int) {
-	err := s.Initialize(size)
-	if err != nil {
-		b.Fatal(err)
-	}
+	s.Initialize(size)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

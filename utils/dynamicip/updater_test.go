@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package dynamicip
@@ -9,29 +9,30 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/stretchr/testify/assert"
 )
 
-var _ Resolver = &mockResolver{}
+var _ Resolver = (*mockResolver)(nil)
 
 type mockResolver struct {
-	onResolve func() (net.IP, error)
+	onResolve func(context.Context) (net.IP, error)
 }
 
-func (r *mockResolver) Resolve() (net.IP, error) {
-	return r.onResolve()
+func (r *mockResolver) Resolve(ctx context.Context) (net.IP, error) {
+	return r.onResolve(ctx)
 }
 
 func TestNewUpdater(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	originalIP := net.IPv4zero
 	originalPort := 9651
 	dynamicIP := ips.NewDynamicIPPort(originalIP, uint16(originalPort))
 	newIP := net.IPv4(1, 2, 3, 4)
 	resolver := &mockResolver{
-		onResolve: func() (net.IP, error) {
+		onResolve: func(context.Context) (net.IP, error) {
 			return newIP, nil
 		},
 	}
@@ -43,16 +44,16 @@ func TestNewUpdater(t *testing.T) {
 	)
 
 	// Assert NewUpdater returns expected type
-	assert.IsType(&updater{}, updaterIntf)
-
+	require.IsType(&updater{}, updaterIntf)
 	updater := updaterIntf.(*updater)
 
 	// Assert fields set
-	assert.Equal(dynamicIP, updater.dynamicIP)
-	assert.Equal(resolver, updater.resolver)
-	assert.NotNil(updater.stopChan)
-	assert.NotNil(updater.doneChan)
-	assert.Equal(updateFreq, updater.updateFreq)
+	require.Equal(dynamicIP, updater.dynamicIP)
+	require.Equal(resolver, updater.resolver)
+	require.NotNil(updater.rootCtx)
+	require.NotNil(updater.rootCtxCancel)
+	require.NotNil(updater.doneChan)
+	require.Equal(updateFreq, updater.updateFreq)
 
 	// Start updating the IP address
 	go updaterIntf.Dispatch(logging.NoLog{})
@@ -62,8 +63,10 @@ func TestNewUpdater(t *testing.T) {
 		IP:   newIP,
 		Port: uint16(originalPort),
 	}
-	assert.Eventually(
-		func() bool { return expectedIP.Equal(dynamicIP.IPPort()) },
+	require.Eventually(
+		func() bool {
+			return expectedIP.Equal(dynamicIP.IPPort())
+		},
 		5*time.Second,
 		updateFreq,
 	)
@@ -75,15 +78,14 @@ func TestNewUpdater(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), stopTimeout)
 	defer cancel()
 	select {
-	case _, open := <-updater.stopChan:
-		assert.False(open)
+	case <-updater.rootCtx.Done():
 	case <-ctx.Done():
-		assert.FailNow("timeout waiting for stopChan to close")
+		require.FailNow("timeout waiting for root context cancellation")
 	}
 	select {
 	case _, open := <-updater.doneChan:
-		assert.False(open)
+		require.False(open)
 	case <-ctx.Done():
-		assert.FailNow("timeout waiting for doneChan to close")
+		require.FailNow("timeout waiting for doneChan to close")
 	}
 }

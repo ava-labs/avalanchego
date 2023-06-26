@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package metrics
@@ -6,18 +6,19 @@ package metrics
 import (
 	"errors"
 	"fmt"
-	"sort"
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
 
 	dto "github.com/prometheus/client_model/go"
+
+	"golang.org/x/exp/slices"
 )
 
 var (
-	errDuplicatedPrefix = errors.New("duplicated prefix")
+	_ MultiGatherer = (*multiGatherer)(nil)
 
-	_ MultiGatherer = &multiGatherer{}
+	errReregisterGatherer = errors.New("attempt to register existing gatherer")
 )
 
 // MultiGatherer extends the Gatherer interface by allowing additional gatherers
@@ -76,18 +77,16 @@ func (g *multiGatherer) Register(namespace string, gatherer prometheus.Gatherer)
 	g.lock.Lock()
 	defer g.lock.Unlock()
 
-	if _, exists := g.gatherers[namespace]; exists {
-		return errDuplicatedPrefix
+	if existingGatherer, exists := g.gatherers[namespace]; exists {
+		return fmt.Errorf("%w for namespace %q failed; existing: %#v", errReregisterGatherer, namespace, existingGatherer)
 	}
 
 	g.gatherers[namespace] = gatherer
 	return nil
 }
 
-type sortMetricsData []*dto.MetricFamily
-
-func (m sortMetricsData) Less(i, j int) bool { return *m[i].Name < *m[j].Name }
-func (m sortMetricsData) Len() int           { return len(m) }
-func (m sortMetricsData) Swap(i, j int)      { m[j], m[i] = m[i], m[j] }
-
-func sortMetrics(m []*dto.MetricFamily) { sort.Sort(sortMetricsData(m)) }
+func sortMetrics(m []*dto.MetricFamily) {
+	slices.SortFunc(m, func(i, j *dto.MetricFamily) bool {
+		return *i.Name < *j.Name
+	})
+}

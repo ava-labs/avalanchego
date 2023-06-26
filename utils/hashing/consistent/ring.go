@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package consistent
@@ -7,13 +7,14 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/google/btree"
+
+	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
 var (
-	_ Ring       = &hashRing{}
-	_ btree.Item = &ringItem{}
+	_ Ring                     = (*hashRing)(nil)
+	_ btree.LessFunc[ringItem] = ringItem.Less
 
 	errEmptyRing = errors.New("ring doesn't have any members")
 )
@@ -45,66 +46,66 @@ var (
 //
 // As an example, assume we have a ring that supports hashes from 1-12.
 //
-//                   12
-//             11          1
+//	           12
+//	     11          1
 //
-//         10                  2
+//	 10                  2
 //
-//        9                      3
+//	9                      3
 //
-//         8                   4
+//	 8                   4
 //
-//             7           5
-//                   6
+//	     7           5
+//	           6
 //
 // Add node 1 (n1). Let h(n1) = 12.
 // First, we compute the hash the node, and insert it into its corresponding
 // location on the ring.
 //
-//                   12 (n1)
-//             11          1
+//	           12 (n1)
+//	     11          1
 //
-//         10                  2
+//	 10                  2
 //
-//        9                      3
+//	9                      3
 //
-//         8                   4
+//	 8                   4
 //
-//             7           5
-//                   6
+//	     7           5
+//	           6
 //
 // Now, to see which node a key (k1) should map to, we hash the key and search
 // for its closest clockwise neighbor.
 // Let h(k1) = 3. Here, we see that since n1 is the closest neighbor, as there
 // are no other nodes in the ring.
 //
-//                   12 (n1)
-//             11          1
+//	           12 (n1)
+//	     11          1
 //
-//         10                  2
+//	 10                  2
 //
-//        9                      3 (k1)
+//	9                      3 (k1)
 //
-//         8                   4
+//	 8                   4
 //
-//             7           5
-//                   6
+//	     7           5
+//	           6
 //
 // Now, let's insert another node (n2), such that h(n2) = 6.
 // Here we observe that k1 has shuffled to n2, as n2 is the closest clockwise
 // neighbor to k1.
 //
-//                   12 (n1)
-//             11          1
+//	           12 (n1)
+//	     11          1
 //
-//         10                  2
+//	 10                  2
 //
-//        9                      3 (k1)
+//	9                      3 (k1)
 //
-//         8                   4
+//	 8                   4
 //
-//             7           5
-//                   6 (n2)
+//	     7           5
+//	           6 (n2)
 //
 // Other optimizations can be made to help reduce blast radius of failures and
 // the variance in keys (hot shards). One such optimization is introducing
@@ -154,7 +155,7 @@ type hashRing struct {
 	virtualNodes int
 
 	lock sync.RWMutex
-	ring *btree.BTree
+	ring *btree.BTreeG[ringItem]
 }
 
 // RingConfig configures settings for a Ring.
@@ -172,7 +173,7 @@ func NewHashRing(config RingConfig) Ring {
 	return &hashRing{
 		hasher:       config.Hasher,
 		virtualNodes: config.VirtualNodes,
-		ring:         btree.New(config.Degree),
+		ring:         btree.NewG(config.Degree, ringItem.Less),
 	}
 }
 
@@ -200,8 +201,7 @@ func (h *hashRing) get(key Hashable) (Hashable, error) {
 			hash:  hash,
 			value: key,
 		},
-		func(itemIntf btree.Item) bool {
-			item := itemIntf.(ringItem)
+		func(item ringItem) bool {
 			if hash < item.hash {
 				result = item.value
 				return false
@@ -213,7 +213,8 @@ func (h *hashRing) get(key Hashable) (Hashable, error) {
 	// If found nothing ascending the tree, we need to wrap around the ring to
 	// the left-most (min) node.
 	if result == nil {
-		result = h.ring.Min().(ringItem).value
+		min, _ := h.ring.Min()
+		result = min.value
 	}
 	return result, nil
 }
@@ -260,9 +261,7 @@ func (h *hashRing) remove(key Hashable) bool {
 		item := ringItem{
 			hash: virtualNodeHash,
 		}
-		if h.ring.Delete(item) != nil {
-			removed = true
-		}
+		_, removed = h.ring.Delete(item)
 	}
 	return removed
 }
@@ -278,4 +277,6 @@ type ringItem struct {
 	value Hashable
 }
 
-func (r ringItem) Less(than btree.Item) bool { return r.hash < than.(ringItem).hash }
+func (r ringItem) Less(than ringItem) bool {
+	return r.hash < than.hash
+}

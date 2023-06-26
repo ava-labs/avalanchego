@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package cb58
@@ -7,7 +7,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // Test encoding bytes to a string and decoding back to bytes
@@ -48,7 +48,7 @@ func TestEncodeDecode(t *testing.T) {
 			t.Fatal(err)
 		}
 		// Make sure the string repr. is what we expected
-		assert.Equal(t, test.str, strResult)
+		require.Equal(t, test.str, strResult)
 		// Decode the string
 		bytesResult, err := Decode(strResult)
 		if err != nil {
@@ -59,4 +59,20 @@ func TestEncodeDecode(t *testing.T) {
 			t.Fatal("bytes not symmetric")
 		}
 	}
+}
+
+func FuzzEncodeDecode(f *testing.F) {
+	f.Fuzz(func(t *testing.T, data []byte) {
+		require := require.New(t)
+
+		// Encode bytes to string
+		dataStr, err := Encode(data)
+		require.NoError(err)
+
+		// Decode string to bytes
+		gotData, err := Decode(dataStr)
+		require.NoError(err)
+
+		require.Equal(data, gotData)
+	})
 }

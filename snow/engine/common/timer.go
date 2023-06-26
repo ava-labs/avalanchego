@@ -1,11 +1,9 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package common
 
-import (
-	"time"
-)
+import "time"
 
 // Timer describes the standard interface for specifying a timeout
 type Timer interface {

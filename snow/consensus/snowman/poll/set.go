@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package poll
@@ -8,11 +8,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
-
 	"github.com/prometheus/client_golang/prometheus"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/bag"
+	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/metric"
 )
@@ -41,7 +43,7 @@ type set struct {
 	durPolls metric.Averager
 	factory  Factory
 	// maps requestID -> poll
-	polls linkedhashmap.LinkedHashmap
+	polls linkedhashmap.LinkedHashmap[uint32, pollHolder]
 }
 
 // NewSet returns a new empty set of polls
@@ -57,7 +59,9 @@ func NewSet(
 		Help:      "Number of pending network polls",
 	})
 	if err := reg.Register(numPolls); err != nil {
-		log.Error("failed to register polls statistics due to %s", err)
+		log.Error("failed to register polls statistics",
+			zap.Error(err),
+		)
 	}
 
 	durPolls, err := metric.NewAverager(
@@ -67,7 +71,9 @@ func NewSet(
 		reg,
 	)
 	if err != nil {
-		log.Error("failed to register poll_duration statistics due to %s", err)
+		log.Error("failed to register poll_duration statistics",
+			zap.Error(err),
+		)
 	}
 
 	return &set{
@@ -75,22 +81,26 @@ func NewSet(
 		numPolls: numPolls,
 		durPolls: durPolls,
 		factory:  factory,
-		polls:    linkedhashmap.New(),
+		polls:    linkedhashmap.New[uint32, pollHolder](),
 	}
 }
 
 // Add to the current set of polls
 // Returns true if the poll was registered correctly and the network sample
-//         should be made.
-func (s *set) Add(requestID uint32, vdrs ids.NodeIDBag) bool {
+// should be made.
+func (s *set) Add(requestID uint32, vdrs bag.Bag[ids.NodeID]) bool {
 	if _, exists := s.polls.Get(requestID); exists {
-		s.log.Debug("dropping poll due to duplicated requestID: %d", requestID)
+		s.log.Debug("dropping poll",
+			zap.String("reason", "duplicated request"),
+			zap.Uint32("requestID", requestID),
+		)
 		return false
 	}
 
-	s.log.Verbo("creating poll with requestID %d and validators %s",
-		requestID,
-		&vdrs)
+	s.log.Verbo("creating poll",
+		zap.Uint32("requestID", requestID),
+		zap.Stringer("validators", &vdrs),
+	)
 
 	s.polls.Put(requestID, poll{
 		Poll:  s.factory.New(vdrs), // create the new poll
@@ -102,22 +112,24 @@ func (s *set) Add(requestID uint32, vdrs ids.NodeIDBag) bool {
 
 // Vote registers the connections response to a query for [id]. If there was no
 // query, or the response has already be registered, nothing is performed.
-func (s *set) Vote(requestID uint32, vdr ids.NodeID, vote ids.ID) []ids.Bag {
-	pollHolderIntf, exists := s.polls.Get(requestID)
+func (s *set) Vote(requestID uint32, vdr ids.NodeID, vote ids.ID) []bag.Bag[ids.ID] {
+	holder, exists := s.polls.Get(requestID)
 	if !exists {
-		s.log.Verbo("dropping vote from %s to an unknown poll with requestID: %d",
-			vdr,
-			requestID)
+		s.log.Verbo("dropping vote",
+			zap.String("reason", "unknown poll"),
+			zap.Stringer("validator", vdr),
+			zap.Uint32("requestID", requestID),
+		)
 		return nil
 	}
 
-	holder := pollHolderIntf.(pollHolder)
 	p := holder.GetPoll()
 
-	s.log.Verbo("processing vote from %s in the poll with requestID: %d with the vote %s",
-		vdr,
-		requestID,
-		vote)
+	s.log.Verbo("processing vote",
+		zap.Stringer("validator", vdr),
+		zap.Uint32("requestID", requestID),
+		zap.Stringer("vote", vote),
+	)
 
 	p.Vote(vdr, vote)
 	if !p.Finished() {
@@ -128,13 +140,13 @@ func (s *set) Vote(requestID uint32, vdr ids.NodeID, vote ids.ID) []ids.Bag {
 }
 
 // processFinishedPolls checks for other dependent finished polls and returns them all if finished
-func (s *set) processFinishedPolls() []ids.Bag {
-	var results []ids.Bag
+func (s *set) processFinishedPolls() []bag.Bag[ids.ID] {
+	var results []bag.Bag[ids.ID]
 
 	// iterate from oldest to newest
 	iter := s.polls.NewIterator()
 	for iter.Next() {
-		holder := iter.Value().(pollHolder)
+		holder := iter.Value()
 		p := holder.GetPoll()
 		if !p.Finished() {
 			// since we're iterating from oldest to newest, if the next poll has not finished,
@@ -142,7 +154,10 @@ func (s *set) processFinishedPolls() []ids.Bag {
 			break
 		}
 
-		s.log.Verbo("poll with requestID %d finished as %s", iter.Key(), holder.GetPoll())
+		s.log.Verbo("poll finished",
+			zap.Uint32("requestID", iter.Key()),
+			zap.Stringer("poll", holder.GetPoll()),
+		)
 		s.durPolls.Observe(float64(time.Since(holder.StartTime())))
 		s.numPolls.Dec() // decrease the metrics
 
@@ -157,21 +172,23 @@ func (s *set) processFinishedPolls() []ids.Bag {
 
 // Drop registers the connections response to a query for [id]. If there was no
 // query, or the response has already be registered, nothing is performed.
-func (s *set) Drop(requestID uint32, vdr ids.NodeID) []ids.Bag {
-	pollHolderIntf, exists := s.polls.Get(requestID)
+func (s *set) Drop(requestID uint32, vdr ids.NodeID) []bag.Bag[ids.ID] {
+	holder, exists := s.polls.Get(requestID)
 	if !exists {
-		s.log.Verbo("dropping vote from %s to an unknown poll with requestID: %d",
-			vdr,
-			requestID)
+		s.log.Verbo("dropping vote",
+			zap.String("reason", "unknown poll"),
+			zap.Stringer("validator", vdr),
+			zap.Uint32("requestID", requestID),
+		)
 		return nil
 	}
 
-	s.log.Verbo("processing dropped vote from %s in the poll with requestID: %d",
-		vdr,
-		requestID)
+	s.log.Verbo("processing dropped vote",
+		zap.Stringer("validator", vdr),
+		zap.Uint32("requestID", requestID),
+	)
 
-	pollHolder := pollHolderIntf.(pollHolder)
-	poll := pollHolder.GetPoll()
+	poll := holder.GetPoll()
 
 	poll.Drop(vdr)
 	if !poll.Finished() {
@@ -182,7 +199,9 @@ func (s *set) Drop(requestID uint32, vdr ids.NodeID) []ids.Bag {
 }
 
 // Len returns the number of outstanding polls
-func (s *set) Len() int { return s.polls.Len() }
+func (s *set) Len() int {
+	return s.polls.Len()
+}
 
 func (s *set) String() string {
 	sb := strings.Builder{}

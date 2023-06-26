@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package peer
@@ -7,15 +7,20 @@ import (
 	"context"
 	"sync"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/network/throttling"
+	"github.com/ava-labs/avalanchego/utils/buffer"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
+const initialQueueSize = 64
+
 var (
-	_ MessageQueue = &throttledMessageQueue{}
-	_ MessageQueue = &blockingMessageQueue{}
+	_ MessageQueue = (*throttledMessageQueue)(nil)
+	_ MessageQueue = (*blockingMessageQueue)(nil)
 )
 
 type SendFailedCallback interface {
@@ -24,7 +29,9 @@ type SendFailedCallback interface {
 
 type SendFailedFunc func(message.OutboundMessage)
 
-func (f SendFailedFunc) SendFailed(msg message.OutboundMessage) { f(msg) }
+func (f SendFailedFunc) SendFailed(msg message.OutboundMessage) {
+	f(msg)
+}
 
 type MessageQueue interface {
 	// Push attempts to add the message to the queue. If the context is
@@ -62,7 +69,7 @@ type throttledMessageQueue struct {
 
 	// queue of the messages
 	// [cond.L] must be held while accessing [queue].
-	queue []message.OutboundMessage
+	queue buffer.Deque[message.OutboundMessage]
 }
 
 func NewThrottledMessageQueue(
@@ -76,16 +83,18 @@ func NewThrottledMessageQueue(
 		id:                   id,
 		log:                  log,
 		outboundMsgThrottler: outboundMsgThrottler,
-
-		cond: sync.NewCond(&sync.Mutex{}),
+		cond:                 sync.NewCond(&sync.Mutex{}),
+		queue:                buffer.NewUnboundedDeque[message.OutboundMessage](initialQueueSize),
 	}
 }
 
 func (q *throttledMessageQueue) Push(ctx context.Context, msg message.OutboundMessage) bool {
 	if err := ctx.Err(); err != nil {
 		q.log.Debug(
-			"dropping %s message to %s due to a context error: %s",
-			msg.Op(), q.id, err,
+			"dropping outgoing message",
+			zap.Stringer("messageOp", msg.Op()),
+			zap.Stringer("nodeID", q.id),
+			zap.Error(err),
 		)
 		q.onFailed.SendFailed(msg)
 		return false
@@ -94,8 +103,10 @@ func (q *throttledMessageQueue) Push(ctx context.Context, msg message.OutboundMe
 	// Acquire space on the outbound message queue, or drop [msg] if we can't.
 	if !q.outboundMsgThrottler.Acquire(msg, q.id) {
 		q.log.Debug(
-			"dropping %s message to %s due to rate-limiting",
-			msg.Op(), q.id,
+			"dropping outgoing message",
+			zap.String("reason", "rate-limiting"),
+			zap.Stringer("messageOp", msg.Op()),
+			zap.Stringer("nodeID", q.id),
 		)
 		q.onFailed.SendFailed(msg)
 		return false
@@ -110,15 +121,17 @@ func (q *throttledMessageQueue) Push(ctx context.Context, msg message.OutboundMe
 
 	if q.closed {
 		q.log.Debug(
-			"dropping %s message to %s due to a closed queue",
-			msg.Op(), q.id,
+			"dropping outgoing message",
+			zap.String("reason", "closed queue"),
+			zap.Stringer("messageOp", msg.Op()),
+			zap.Stringer("nodeID", q.id),
 		)
 		q.outboundMsgThrottler.Release(msg, q.id)
 		q.onFailed.SendFailed(msg)
 		return false
 	}
 
-	q.queue = append(q.queue, msg)
+	q.queue.PushRight(msg)
 	q.cond.Signal()
 	return true
 }
@@ -131,7 +144,7 @@ func (q *throttledMessageQueue) Pop() (message.OutboundMessage, bool) {
 		if q.closed {
 			return nil, false
 		}
-		if len(q.queue) > 0 {
+		if q.queue.Len() > 0 {
 			// There is a message
 			break
 		}
@@ -146,7 +159,7 @@ func (q *throttledMessageQueue) PopNow() (message.OutboundMessage, bool) {
 	q.cond.L.Lock()
 	defer q.cond.L.Unlock()
 
-	if len(q.queue) == 0 {
+	if q.closed || q.queue.Len() == 0 {
 		// There isn't a message
 		return nil, false
 	}
@@ -155,9 +168,7 @@ func (q *throttledMessageQueue) PopNow() (message.OutboundMessage, bool) {
 }
 
 func (q *throttledMessageQueue) pop() message.OutboundMessage {
-	msg := q.queue[0]
-	q.queue[0] = nil
-	q.queue = q.queue[1:]
+	msg, _ := q.queue.PopLeft()
 
 	q.outboundMsgThrottler.Release(msg, q.id)
 	return msg
@@ -167,9 +178,14 @@ func (q *throttledMessageQueue) Close() {
 	q.cond.L.Lock()
 	defer q.cond.L.Unlock()
 
+	if q.closed {
+		return
+	}
+
 	q.closed = true
 
-	for _, msg := range q.queue {
+	for q.queue.Len() > 0 {
+		msg, _ := q.queue.PopLeft()
 		q.outboundMsgThrottler.Release(msg, q.id)
 		q.onFailed.SendFailed(msg)
 	}
@@ -212,15 +228,17 @@ func (q *blockingMessageQueue) Push(ctx context.Context, msg message.OutboundMes
 	select {
 	case <-q.closing:
 		q.log.Debug(
-			"dropping %s message due to a closed queue",
-			msg.Op(),
+			"dropping message",
+			zap.String("reason", "closed queue"),
+			zap.Stringer("messageOp", msg.Op()),
 		)
 		q.onFailed.SendFailed(msg)
 		return false
 	case <-ctxDone:
 		q.log.Debug(
-			"dropping %s message due to a cancelled context",
-			msg.Op(),
+			"dropping message",
+			zap.String("reason", "cancelled context"),
+			zap.Stringer("messageOp", msg.Op()),
 		)
 		q.onFailed.SendFailed(msg)
 		return false
@@ -232,15 +250,17 @@ func (q *blockingMessageQueue) Push(ctx context.Context, msg message.OutboundMes
 		return true
 	case <-ctxDone:
 		q.log.Debug(
-			"dropping %s message due to a cancelled context",
-			msg.Op(),
+			"dropping message",
+			zap.String("reason", "cancelled context"),
+			zap.Stringer("messageOp", msg.Op()),
 		)
 		q.onFailed.SendFailed(msg)
 		return false
 	case <-q.closing:
 		q.log.Debug(
-			"dropping %s message due to a closed queue",
-			msg.Op(),
+			"dropping message",
+			zap.String("reason", "closed queue"),
+			zap.Stringer("messageOp", msg.Op()),
 		)
 		q.onFailed.SendFailed(msg)
 		return false

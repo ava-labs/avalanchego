@@ -1,0 +1,355 @@
+syntax = "proto3";
+
+package p2p;
+
+// Reference: https://developers.google.com/protocol-buffers/docs/proto3
+option go_package = "github.com/ava-labs/avalanchego/proto/pb/p2p";
+
+// Represents peer-to-peer messages.
+// Only one type can be non-null.
+message Message {
+  // NOTES
+  // Use "oneof" for each message type and set rest to null if not used.
+  // That is because when the compression is enabled, we don't want to include uncompressed fields.
+  oneof message {
+    // Gzip-compressed bytes of a "p2p.Message" whose "oneof" "message" field is
+    // NOT compressed_* BUT one of the message types (e.g. ping, pong, etc.).
+    // This field is only set if the message type supports compression.
+    bytes compressed_gzip = 1;
+
+    // zstd-compressed bytes of a "p2p.Message" whose "oneof" "message" field is
+    // NOT compressed_* BUT one of the message types (e.g. ping, pong, etc.).
+    // This field is only set if the message type supports compression.
+    bytes compressed_zstd = 2;
+
+    // Fields lower than 10 are reserved for other compression algorithms.
+    // TODO: support COMPRESS_SNAPPY
+
+    // Network messages:
+    Ping ping = 11;
+    Pong pong = 12;
+    Version version = 13;
+    PeerList peer_list = 14;
+
+    // State-sync messages:
+    GetStateSummaryFrontier get_state_summary_frontier = 15;
+    StateSummaryFrontier state_summary_frontier = 16;
+    GetAcceptedStateSummary get_accepted_state_summary = 17;
+    AcceptedStateSummary accepted_state_summary = 18;
+
+    // Bootstrapping messages:
+    GetAcceptedFrontier get_accepted_frontier = 19;
+    AcceptedFrontier accepted_frontier = 20;
+    GetAccepted get_accepted = 21;
+    Accepted accepted = 22;
+    GetAncestors get_ancestors = 23;
+    Ancestors ancestors = 24;
+
+    // Consensus messages:
+    Get get = 25;
+    Put put = 26;
+    PushQuery push_query = 27;
+    PullQuery pull_query = 28;
+    Chits chits = 29;
+
+    // App messages:
+    AppRequest app_request = 30;
+    AppResponse app_response = 31;
+    AppGossip app_gossip = 32;
+
+    PeerListAck peer_list_ack = 33;
+  }
+}
+
+// Message that a node sends to its peers in order to periodically check
+// responsivness and report the local node's uptime measurements of the peer.
+//
+// On receiving a "ping", the peer should respond with a "pong".
+message Ping {
+  // uptime is the primary network uptime percentage.
+  uint32 uptime = 1;
+  // subnet_uptimes contains subnet uptime percentages.
+  repeated SubnetUptime subnet_uptimes = 2;
+}
+
+// Contains subnet id and the related observed subnet uptime of the message
+// receiver (remote peer).
+message SubnetUptime {
+  bytes subnet_id = 1;
+  uint32 uptime = 2;
+}
+
+// Contains the uptime percentage of the message receiver (remote peer)
+// from the sender's point of view, in response to "ping" message.
+// Uptimes are expected to be provided as integers ranging in [0, 100].
+message Pong {
+  // Deprecated: remove all these fields in the future, but keep the message.
+  // uptime is the primary network uptime percentage.
+  uint32 uptime = 1;
+  // subnet_uptimes contains subnet uptime percentages.
+  repeated SubnetUptime subnet_uptimes = 2;
+}
+
+// The first outbound message that the local node sends to its remote peer
+// when the connection is established. In order for the local node to be
+// tracked as a valid peer by the remote peer, the fields must be valid.
+// For instance, the network ID must be matched and timestamp should be in-sync.
+// Otherwise, the remote peer closes the connection.
+// ref. "avalanchego/network/peer#handleVersion"
+// ref. https://pkg.go.dev/github.com/ava-labs/avalanchego/network#Network "Dispatch"
+message Version {
+  uint32 network_id = 1;
+  uint64 my_time = 2;
+  bytes ip_addr = 3;
+  uint32 ip_port = 4;
+  string my_version = 5;
+  uint64 my_version_time = 6;
+  bytes sig = 7;
+  repeated bytes tracked_subnets = 8;
+}
+
+// ref. https://pkg.go.dev/github.com/ava-labs/avalanchego/utils/ips#ClaimedIPPort
+message ClaimedIpPort {
+  bytes x509_certificate = 1;
+  bytes ip_addr = 2;
+  uint32 ip_port = 3;
+  uint64 timestamp = 4;
+  bytes signature = 5;
+  bytes tx_id = 6;
+}
+
+// Message that contains a list of peer information (IP, certs, etc.)
+// in response to "version" message, and sent periodically to a set of
+// validators.
+// ref. "avalanchego/network/network#Dispatch.runtTimers"
+//
+// On receiving "peer_list", the engine starts/updates the tracking information
+// of the remote peer.
+message PeerList {
+  repeated ClaimedIpPort claimed_ip_ports = 1;
+}
+
+// "peer_ack" is sent in response to a "peer_list" message. The "tx_id" should
+// correspond to a "tx_id" in the "peer_list" message. The sender should set
+// "timestamp" to be the latest known timestamp of a signed IP corresponding to
+// the nodeID of "tx_id".
+//
+// Upon receipt, the "tx_id" and "timestamp" will determine if the receiptent
+// can forgo future gossip of the node's IP to the sender of this message.
+message PeerAck {
+  bytes tx_id = 1;
+  uint64 timestamp = 2;
+}
+
+// Message that responds to a peer_list message containing the AddValidatorTxIDs
+// from the peer_list message that we currently have in our validator set.
+message PeerListAck {
+  reserved 1; // deprecated; used to be tx_ids
+
+  repeated PeerAck peer_acks = 2;
+}
+
+message GetStateSummaryFrontier {
+  bytes chain_id = 1;
+  uint32 request_id = 2;
+  uint64 deadline = 3;
+}
+
+message StateSummaryFrontier {
+  bytes chain_id = 1;
+  uint32 request_id = 2;
+  bytes summary = 3;
+}
+
+message GetAcceptedStateSummary {
+  bytes chain_id = 1;
+  uint32 request_id = 2;
+  uint64 deadline = 3;
+  repeated uint64 heights = 4;
+}
+
+message AcceptedStateSummary {
+  bytes chain_id = 1;
+  uint32 request_id = 2;
+  repeated bytes summary_ids = 3;
+}
+
+enum EngineType {
+  ENGINE_TYPE_UNSPECIFIED = 0;
+  ENGINE_TYPE_AVALANCHE = 1;
+  ENGINE_TYPE_SNOWMAN = 2;
+}
+
+// Message to request for the accepted frontier of the "remote" peer.
+// For instance, the accepted frontier of X-chain DAG is the set of
+// accepted vertices that do not have any accepted descendants (i.e., frontier).
+//
+// During bootstrap, the local node sends out "get_accepted_frontier" to validators
+// (see "avalanchego/snow/engine/common/bootstrapper.Startup").
+// And the expected response is "accepted_frontier".
+//
+// See "snow/engine/common/bootstrapper.go#AcceptedFrontier".
+message GetAcceptedFrontier {
+  bytes chain_id = 1;
+  uint32 request_id = 2;
+  uint64 deadline = 3;
+  EngineType engine_type = 4;
+}
+
+// Message that contains the list of accepted frontier in response to
+// "get_accepted_frontier". For instance, on receiving "get_accepted_frontier",
+// the X-chain engine responds with the accepted frontier of X-chain DAG.
+//
+// See "snow/engine/common/bootstrapper.go#AcceptedFrontier".
+message AcceptedFrontier {
+  reserved 4; // Until Cortina upgrade is activated
+
+  bytes chain_id = 1;
+  uint32 request_id = 2;
+  bytes container_id = 3;
+}
+
+// Message to request for the accepted blocks/vertices of the "remote" peer.
+// The local node sends out this message during bootstrap, following "get_accepted_frontier".
+// Basically, sending the list of the accepted frontier and expects the response of
+// the accepted IDs from the remote peer.
+//
+// See "avalanchego/snow/engine/common/bootstrapper.Startup" and "sendGetAccepted".
+// See "snow/engine/common/bootstrapper.go#AcceptedFrontier".
+message GetAccepted {
+  bytes chain_id = 1;
+  uint32 request_id = 2;
+  uint64 deadline = 3;
+  repeated bytes container_ids = 4;
+  EngineType engine_type = 5;
+}
+
+// Message that contains the list of accepted block/vertex IDs in response to
+// "get_accepted". For instance, on receiving "get_accepted" that contains
+// the sender's accepted frontier IDs, the X-chain engine responds only with
+// the accepted vertex IDs of the X-chain DAG.
+//
+// See "snow/engine/avalanche#GetAccepted" and "SendAccepted".
+// See "snow/engine/common/bootstrapper.go#Accepted".
+message Accepted {
+  reserved 4; // Until Cortina upgrade is activated
+
+  bytes chain_id = 1;
+  uint32 request_id = 2;
+  repeated bytes container_ids = 3;
+}
+
+// Message that requests for the ancestors (parents) of the specified container ID.
+// The engine bootstrapper sends this message to fetch all accepted containers
+// in its transitive path.
+//
+// On receiving "get_ancestors", it responds with the ancestors' container bytes
+// in "ancestors" message.
+message GetAncestors {
+  bytes chain_id = 1;
+  uint32 request_id = 2;
+  uint64 deadline = 3;
+  bytes container_id = 4;
+  EngineType engine_type = 5;
+}
+
+// Message that contains the container bytes of the ancestors
+// in response to "get_ancestors".
+//
+// On receiving "ancestors", the engine parses the containers and queues them
+// to be accepted once we've received the entire chain history.
+message Ancestors {
+  reserved 4; // Until Cortina upgrade is activated
+
+  bytes chain_id = 1;
+  uint32 request_id = 2;
+  repeated bytes containers = 3;
+}
+
+// Message that requests for the container data.
+//
+// On receiving "get", the engine looks up the container from the storage.
+// If the container is found, it sends out the container data in "put" message.
+message Get {
+  bytes chain_id = 1;
+  uint32 request_id = 2;
+  uint64 deadline = 3;
+  bytes container_id = 4;
+  EngineType engine_type = 5;
+}
+
+// Message that contains the container ID and its bytes in response to "get".
+//
+// On receiving "put", the engine parses the container and tries to issue it to consensus.
+message Put {
+  bytes chain_id = 1;
+  uint32 request_id = 2;
+  bytes container = 3;
+  EngineType engine_type = 4;
+}
+
+// Message that contains a preferred container ID and its container bytes
+// in order to query other peers for their preferences of the container.
+// For example, when a new container is issued, the engine sends out
+// "push_query" and "pull_query" queries to ask other peers their preferences.
+// See "avalanchego/snow/engine/common#SendMixedQuery".
+//
+// On receiving the "push_query", the engine parses the incoming container
+// and tries to issue the container and all of its parents to the consensus,
+// and calls "pull_query" handler to send "chits" for voting.
+message PushQuery {
+  bytes chain_id = 1;
+  uint32 request_id = 2;
+  uint64 deadline = 3;
+  bytes container = 4;
+  EngineType engine_type = 5;
+}
+
+// Message that contains a preferred container ID to query other peers
+// for their preferences of the container.
+// For example, when a new container is issued, the engine sends out
+// "push_query" and "pull_query" queries to ask other peers their preferences.
+// See "avalanchego/snow/engine/common#SendMixedQuery".
+message PullQuery {
+  bytes chain_id = 1;
+  uint32 request_id = 2;
+  uint64 deadline = 3;
+  bytes container_id = 4;
+  EngineType engine_type = 5;
+}
+
+// Message that contains the votes/preferences of the node. It is sent in
+// response to a "push_query" or "pull_query" request.
+//
+// Upon receiving "chits", the engine will attempt to issue the preferred block
+// into consensus. If the referenced block is not locally available, the engine
+// will respond with a "get" message to fetch the missing block from the remote
+// peer.
+message Chits {
+  reserved 5; // Until Cortina upgrade is activated
+
+  bytes chain_id = 1;
+  uint32 request_id = 2;
+  // Represents the current preferred block.
+  bytes preferred_id = 3;
+  // Represents the last accepted block.
+  bytes accepted_id = 4;
+}
+
+message AppRequest {
+  bytes chain_id = 1;
+  uint32 request_id = 2;
+  uint64 deadline = 3;
+  bytes app_bytes = 4;
+}
+
+message AppResponse {
+  bytes chain_id = 1;
+  uint32 request_id = 2;
+  bytes app_bytes = 3;
+}
+
+message AppGossip {
+  bytes chain_id = 1;
+  bytes app_bytes = 2;
+}

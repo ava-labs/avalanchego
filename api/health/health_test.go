@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package health
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -12,264 +13,382 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 const (
-	checkFreq = time.Millisecond
-	awaitFreq = 50 * time.Microsecond
+	checkFreq    = time.Millisecond
+	awaitFreq    = 50 * time.Microsecond
+	awaitTimeout = 30 * time.Second
 )
 
-func awaitReadiness(r Reporter) {
-	for {
-		_, ready := r.Readiness()
-		if ready {
-			return
-		}
-		time.Sleep(awaitFreq)
-	}
+var errUnhealthy = errors.New("unhealthy")
+
+func awaitReadiness(t *testing.T, r Reporter, ready bool) {
+	require.Eventually(t, func() bool {
+		_, ok := r.Readiness()
+		return ok == ready
+	}, awaitTimeout, awaitFreq)
 }
 
-func awaitHealthy(r Reporter, healthy bool) {
-	for {
+func awaitHealthy(t *testing.T, r Reporter, healthy bool) {
+	require.Eventually(t, func() bool {
 		_, ok := r.Health()
-		if ok == healthy {
-			return
-		}
-		time.Sleep(awaitFreq)
-	}
+		return ok == healthy
+	}, awaitTimeout, awaitFreq)
 }
 
-func awaitLiveness(r Reporter, liveness bool) {
-	for {
+func awaitLiveness(t *testing.T, r Reporter, liveness bool) {
+	require := require.New(t)
+	require.Eventually(func() bool {
 		_, ok := r.Liveness()
-		if ok == liveness {
-			return
-		}
-		time.Sleep(awaitFreq)
-	}
+		return ok == liveness
+	}, awaitTimeout, awaitFreq)
 }
 
 func TestDuplicatedRegistations(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
-	check := CheckerFunc(func() (interface{}, error) {
+	check := CheckerFunc(func(context.Context) (interface{}, error) {
 		return "", nil
 	})
 
 	h, err := New(logging.NoLog{}, prometheus.NewRegistry())
-	assert.NoError(err)
+	require.NoError(err)
 
+	require.NoError(h.RegisterReadinessCheck("check", check))
 	err = h.RegisterReadinessCheck("check", check)
-	assert.NoError(err)
-	err = h.RegisterReadinessCheck("check", check)
-	assert.ErrorIs(err, errDuplicateCheck)
+	require.ErrorIs(err, errDuplicateCheck)
 
+	require.NoError(h.RegisterHealthCheck("check", check))
 	err = h.RegisterHealthCheck("check", check)
-	assert.NoError(err)
-	err = h.RegisterHealthCheck("check", check)
-	assert.ErrorIs(err, errDuplicateCheck)
+	require.ErrorIs(err, errDuplicateCheck)
 
+	require.NoError(h.RegisterLivenessCheck("check", check))
 	err = h.RegisterLivenessCheck("check", check)
-	assert.NoError(err)
-	err = h.RegisterLivenessCheck("check", check)
-	assert.ErrorIs(err, errDuplicateCheck)
+	require.ErrorIs(err, errDuplicateCheck)
 }
 
 func TestDefaultFailing(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
-	check := CheckerFunc(func() (interface{}, error) {
+	check := CheckerFunc(func(context.Context) (interface{}, error) {
 		return "", nil
 	})
 
 	h, err := New(logging.NoLog{}, prometheus.NewRegistry())
-	assert.NoError(err)
+	require.NoError(err)
 
 	{
-		err = h.RegisterReadinessCheck("check", check)
-		assert.NoError(err)
+		require.NoError(h.RegisterReadinessCheck("check", check))
 
 		readinessResult, readiness := h.Readiness()
-		assert.Len(readinessResult, 1)
-		assert.Contains(readinessResult, "check")
-		assert.Equal(notYetRunResult, readinessResult["check"])
-		assert.False(readiness)
+		require.Len(readinessResult, 1)
+		require.Contains(readinessResult, "check")
+		require.Equal(notYetRunResult, readinessResult["check"])
+		require.False(readiness)
 	}
 
 	{
-		err = h.RegisterHealthCheck("check", check)
-		assert.NoError(err)
+		require.NoError(h.RegisterHealthCheck("check", check))
 
 		healthResult, health := h.Health()
-		assert.Len(healthResult, 1)
-		assert.Contains(healthResult, "check")
-		assert.Equal(notYetRunResult, healthResult["check"])
-		assert.False(health)
+		require.Len(healthResult, 1)
+		require.Contains(healthResult, "check")
+		require.Equal(notYetRunResult, healthResult["check"])
+		require.False(health)
 	}
 
 	{
-		err = h.RegisterLivenessCheck("check", check)
-		assert.NoError(err)
+		require.NoError(h.RegisterLivenessCheck("check", check))
 
 		livenessResult, liveness := h.Liveness()
-		assert.Len(livenessResult, 1)
-		assert.Contains(livenessResult, "check")
-		assert.Equal(notYetRunResult, livenessResult["check"])
-		assert.False(liveness)
+		require.Len(livenessResult, 1)
+		require.Contains(livenessResult, "check")
+		require.Equal(notYetRunResult, livenessResult["check"])
+		require.False(liveness)
 	}
 }
 
 func TestPassingChecks(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
-	check := CheckerFunc(func() (interface{}, error) {
+	check := CheckerFunc(func(context.Context) (interface{}, error) {
 		return "", nil
 	})
 
 	h, err := New(logging.NoLog{}, prometheus.NewRegistry())
-	assert.NoError(err)
+	require.NoError(err)
 
-	err = h.RegisterReadinessCheck("check", check)
-	assert.NoError(err)
-	err = h.RegisterHealthCheck("check", check)
-	assert.NoError(err)
-	err = h.RegisterLivenessCheck("check", check)
-	assert.NoError(err)
+	require.NoError(h.RegisterReadinessCheck("check", check))
+	require.NoError(h.RegisterHealthCheck("check", check))
+	require.NoError(h.RegisterLivenessCheck("check", check))
 
-	h.Start(checkFreq)
+	h.Start(context.Background(), checkFreq)
 	defer h.Stop()
 
 	{
-		awaitReadiness(h)
+		awaitReadiness(t, h, true)
 
 		readinessResult, readiness := h.Readiness()
-		assert.Len(readinessResult, 1)
-		assert.Contains(readinessResult, "check")
+		require.Len(readinessResult, 1)
+		require.Contains(readinessResult, "check")
 
 		result := readinessResult["check"]
-		assert.Equal("", result.Details)
-		assert.Nil(result.Error)
-		assert.Zero(result.ContiguousFailures)
-		assert.True(readiness)
+		require.Equal("", result.Details)
+		require.Nil(result.Error)
+		require.Zero(result.ContiguousFailures)
+		require.True(readiness)
 	}
 
 	{
-		awaitHealthy(h, true)
+		awaitHealthy(t, h, true)
 
 		healthResult, health := h.Health()
-		assert.Len(healthResult, 1)
-		assert.Contains(healthResult, "check")
+		require.Len(healthResult, 1)
+		require.Contains(healthResult, "check")
 
 		result := healthResult["check"]
-		assert.Equal("", result.Details)
-		assert.Nil(result.Error)
-		assert.Zero(result.ContiguousFailures)
-		assert.True(health)
+		require.Equal("", result.Details)
+		require.Nil(result.Error)
+		require.Zero(result.ContiguousFailures)
+		require.True(health)
 	}
 
 	{
-		awaitLiveness(h, true)
+		awaitLiveness(t, h, true)
 
 		livenessResult, liveness := h.Liveness()
-		assert.Len(livenessResult, 1)
-		assert.Contains(livenessResult, "check")
+		require.Len(livenessResult, 1)
+		require.Contains(livenessResult, "check")
 
 		result := livenessResult["check"]
-		assert.Equal("", result.Details)
-		assert.Nil(result.Error)
-		assert.Zero(result.ContiguousFailures)
-		assert.True(liveness)
+		require.Equal("", result.Details)
+		require.Nil(result.Error)
+		require.Zero(result.ContiguousFailures)
+		require.True(liveness)
 	}
 }
 
 func TestPassingThenFailingChecks(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
-	var (
-		shouldCheckErr utils.AtomicBool
-		checkErr       = errors.New("unhealthy")
-	)
-	check := CheckerFunc(func() (interface{}, error) {
-		if shouldCheckErr.GetValue() {
-			return checkErr.Error(), checkErr
+	var shouldCheckErr utils.Atomic[bool]
+	check := CheckerFunc(func(context.Context) (interface{}, error) {
+		if shouldCheckErr.Get() {
+			return errUnhealthy.Error(), errUnhealthy
 		}
 		return "", nil
 	})
 
 	h, err := New(logging.NoLog{}, prometheus.NewRegistry())
-	assert.NoError(err)
+	require.NoError(err)
 
-	err = h.RegisterReadinessCheck("check", check)
-	assert.NoError(err)
-	err = h.RegisterHealthCheck("check", check)
-	assert.NoError(err)
-	err = h.RegisterLivenessCheck("check", check)
-	assert.NoError(err)
+	require.NoError(h.RegisterReadinessCheck("check", check))
+	require.NoError(h.RegisterHealthCheck("check", check))
+	require.NoError(h.RegisterLivenessCheck("check", check))
 
-	h.Start(checkFreq)
+	h.Start(context.Background(), checkFreq)
 	defer h.Stop()
 
-	awaitReadiness(h)
-	awaitHealthy(h, true)
-	awaitLiveness(h, true)
+	awaitReadiness(t, h, true)
+	awaitHealthy(t, h, true)
+	awaitLiveness(t, h, true)
 
 	{
 		_, readiness := h.Readiness()
-		assert.True(readiness)
+		require.True(readiness)
 
 		_, health := h.Health()
-		assert.True(health)
+		require.True(health)
 
 		_, liveness := h.Liveness()
-		assert.True(liveness)
+		require.True(liveness)
 	}
 
-	shouldCheckErr.SetValue(true)
+	shouldCheckErr.Set(true)
 
-	awaitHealthy(h, false)
-	awaitLiveness(h, false)
+	awaitHealthy(t, h, false)
+	awaitLiveness(t, h, false)
 
 	{
 		// Notice that Readiness is a monotonic check - so it still reports
 		// ready.
 		_, readiness := h.Readiness()
-		assert.True(readiness)
+		require.True(readiness)
 
 		_, health := h.Health()
-		assert.False(health)
+		require.False(health)
 
 		_, liveness := h.Liveness()
-		assert.False(liveness)
+		require.False(liveness)
 	}
 }
 
 func TestDeadlockRegression(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	h, err := New(logging.NoLog{}, prometheus.NewRegistry())
-	assert.NoError(err)
+	require.NoError(err)
 
 	var lock sync.Mutex
-	check := CheckerFunc(func() (interface{}, error) {
+	check := CheckerFunc(func(context.Context) (interface{}, error) {
 		lock.Lock()
 		time.Sleep(time.Nanosecond)
 		lock.Unlock()
 		return "", nil
 	})
 
-	h.Start(time.Nanosecond)
+	h.Start(context.Background(), time.Nanosecond)
 	defer h.Stop()
 
-	for i := 0; i < 1000; i++ {
+	for i := 0; i < 100; i++ {
 		lock.Lock()
-		err = h.RegisterHealthCheck(fmt.Sprintf("check-%d", i), check)
+		require.NoError(h.RegisterHealthCheck(fmt.Sprintf("check-%d", i), check))
 		lock.Unlock()
-		assert.NoError(err)
 	}
 
-	awaitHealthy(h, true)
+	awaitHealthy(t, h, true)
+}
+
+func TestTags(t *testing.T) {
+	require := require.New(t)
+
+	check := CheckerFunc(func(context.Context) (interface{}, error) {
+		return "", nil
+	})
+
+	h, err := New(logging.NoLog{}, prometheus.NewRegistry())
+	require.NoError(err)
+	require.NoError(h.RegisterHealthCheck("check1", check))
+	require.NoError(h.RegisterHealthCheck("check2", check, "tag1"))
+	require.NoError(h.RegisterHealthCheck("check3", check, "tag2"))
+	require.NoError(h.RegisterHealthCheck("check4", check, "tag1", "tag2"))
+	require.NoError(h.RegisterHealthCheck("check5", check, ApplicationTag))
+
+	// default checks
+	{
+		healthResult, health := h.Health()
+		require.Len(healthResult, 5)
+		require.Contains(healthResult, "check1")
+		require.Contains(healthResult, "check2")
+		require.Contains(healthResult, "check3")
+		require.Contains(healthResult, "check4")
+		require.Contains(healthResult, "check5")
+		require.False(health)
+
+		healthResult, health = h.Health("tag1")
+		require.Len(healthResult, 3)
+		require.Contains(healthResult, "check2")
+		require.Contains(healthResult, "check4")
+		require.Contains(healthResult, "check5")
+		require.False(health)
+
+		healthResult, health = h.Health("tag1", "tag2")
+		require.Len(healthResult, 4)
+		require.Contains(healthResult, "check2")
+		require.Contains(healthResult, "check3")
+		require.Contains(healthResult, "check4")
+		require.Contains(healthResult, "check5")
+		require.False(health)
+
+		healthResult, health = h.Health("nonExistentTag")
+		require.Len(healthResult, 1)
+		require.Contains(healthResult, "check5")
+		require.False(health)
+
+		healthResult, health = h.Health("tag1", "tag2", "nonExistentTag")
+		require.Len(healthResult, 4)
+		require.Contains(healthResult, "check2")
+		require.Contains(healthResult, "check3")
+		require.Contains(healthResult, "check4")
+		require.Contains(healthResult, "check5")
+		require.False(health)
+	}
+
+	h.Start(context.Background(), checkFreq)
+
+	awaitHealthy(t, h, true)
+
+	{
+		healthResult, health := h.Health()
+		require.Len(healthResult, 5)
+		require.Contains(healthResult, "check1")
+		require.Contains(healthResult, "check2")
+		require.Contains(healthResult, "check3")
+		require.Contains(healthResult, "check4")
+		require.Contains(healthResult, "check5")
+		require.True(health)
+
+		healthResult, health = h.Health("tag1")
+		require.Len(healthResult, 3)
+		require.Contains(healthResult, "check2")
+		require.Contains(healthResult, "check4")
+		require.Contains(healthResult, "check5")
+		require.True(health)
+
+		healthResult, health = h.Health("tag1", "tag2")
+		require.Len(healthResult, 4)
+		require.Contains(healthResult, "check2")
+		require.Contains(healthResult, "check3")
+		require.Contains(healthResult, "check4")
+		require.Contains(healthResult, "check5")
+		require.True(health)
+
+		healthResult, health = h.Health("nonExistentTag")
+		require.Len(healthResult, 1)
+		require.Contains(healthResult, "check5")
+		require.True(health)
+
+		healthResult, health = h.Health("tag1", "tag2", "nonExistentTag")
+		require.Len(healthResult, 4)
+		require.Contains(healthResult, "check2")
+		require.Contains(healthResult, "check3")
+		require.Contains(healthResult, "check4")
+		require.Contains(healthResult, "check5")
+		require.True(health)
+	}
+
+	// stop the health check
+	h.Stop()
+
+	{
+		// now we'll add a new check which is unhealthy by default (notYetRunResult)
+		require.NoError(h.RegisterHealthCheck("check6", check, "tag1"))
+
+		awaitHealthy(t, h, false)
+
+		healthResult, health := h.Health("tag1")
+		require.Len(healthResult, 4)
+		require.Contains(healthResult, "check2")
+		require.Contains(healthResult, "check4")
+		require.Contains(healthResult, "check5")
+		require.Contains(healthResult, "check6")
+		require.Equal(notYetRunResult, healthResult["check6"])
+		require.False(health)
+
+		healthResult, health = h.Health("tag2")
+		require.Len(healthResult, 3)
+		require.Contains(healthResult, "check3")
+		require.Contains(healthResult, "check4")
+		require.Contains(healthResult, "check5")
+		require.True(health)
+
+		// add application tag
+		require.NoError(h.RegisterHealthCheck("check7", check, ApplicationTag))
+
+		awaitHealthy(t, h, false)
+
+		healthResult, health = h.Health("tag2")
+		require.Len(healthResult, 4)
+		require.Contains(healthResult, "check3")
+		require.Contains(healthResult, "check4")
+		require.Contains(healthResult, "check5")
+		require.Contains(healthResult, "check7")
+		require.Equal(notYetRunResult, healthResult["check7"])
+		require.False(health)
+	}
 }

@@ -1,31 +1,34 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avm
 
 import (
+	"context"
 	"errors"
 	"fmt"
+
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
+	"github.com/ava-labs/avalanchego/vms/avm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
 
 var (
-	errAssetIDMismatch = errors.New("asset IDs in the input don't match the utxo")
-	errWrongAssetID    = errors.New("asset ID must be AVAX in the atomic tx")
-	errMissingUTXO     = errors.New("missing utxo")
-	errUnknownTx       = errors.New("transaction is unknown")
-	errRejectedTx      = errors.New("transaction is rejected")
+	errMissingUTXO = errors.New("missing utxo")
+	errUnknownTx   = errors.New("transaction is unknown")
+	errRejectedTx  = errors.New("transaction is rejected")
 )
 
 var (
-	_ snowstorm.Tx    = &UniqueTx{}
-	_ cache.Evictable = &UniqueTx{}
+	_ snowstorm.Tx            = (*UniqueTx)(nil)
+	_ cache.Evictable[ids.ID] = (*UniqueTx)(nil)
 )
 
 // UniqueTx provides a de-duplication service for txs. This only provides a
@@ -52,7 +55,7 @@ type TxCachedState struct {
 }
 
 func (tx *UniqueTx) refresh() {
-	tx.vm.numTxRefreshes.Inc()
+	tx.vm.metrics.IncTxRefreshes()
 
 	if tx.TxCachedState == nil {
 		tx.TxCachedState = &TxCachedState{}
@@ -63,7 +66,7 @@ func (tx *UniqueTx) refresh() {
 	unique := tx.vm.DeduplicateTx(tx)
 	prevTx := tx.Tx
 	if unique == tx {
-		tx.vm.numTxRefreshMisses.Inc()
+		tx.vm.metrics.IncTxRefreshMisses()
 
 		// If no one was in the cache, make sure that there wasn't an
 		// intermediate object whose state I must reflect
@@ -72,7 +75,7 @@ func (tx *UniqueTx) refresh() {
 		}
 		tx.unique = true
 	} else {
-		tx.vm.numTxRefreshHits.Inc()
+		tx.vm.metrics.IncTxRefreshHits()
 
 		// If someone is in the cache, they must be up to date
 
@@ -101,117 +104,85 @@ func (tx *UniqueTx) Evict() {
 	tx.deps = nil
 }
 
-func (tx *UniqueTx) setStatus(status choices.Status) error {
+func (tx *UniqueTx) setStatus(status choices.Status) {
 	tx.refresh()
-	if tx.status == status {
-		return nil
+	if tx.status != status {
+		tx.status = status
+		tx.vm.state.AddStatus(tx.ID(), status)
 	}
-	tx.status = status
-	return tx.vm.state.PutStatus(tx.ID(), status)
 }
 
 // ID returns the wrapped txID
-func (tx *UniqueTx) ID() ids.ID       { return tx.txID }
-func (tx *UniqueTx) Key() interface{} { return tx.txID }
+func (tx *UniqueTx) ID() ids.ID {
+	return tx.txID
+}
+
+func (tx *UniqueTx) Key() ids.ID {
+	return tx.txID
+}
 
 // Accept is called when the transaction was finalized as accepted by consensus
-func (tx *UniqueTx) Accept() error {
+func (tx *UniqueTx) Accept(context.Context) error {
 	if s := tx.Status(); s != choices.Processing {
 		return fmt.Errorf("transaction has invalid status: %s", s)
 	}
 
-	txID := tx.ID()
-	defer tx.vm.db.Abort()
-
-	// Fetch the input UTXOs
-	inputUTXOIDs := tx.InputUTXOs()
-	inputUTXOs := make([]*avax.UTXO, 0, len(inputUTXOIDs))
-	for _, utxoID := range inputUTXOIDs {
-		// Don't bother fetching the input UTXO if its symbolic
-		if utxoID.Symbolic() {
-			continue
-		}
-
-		utxo, err := tx.vm.getUTXO(utxoID)
-		if err != nil {
-			// should never happen because the UTXO was previously verified to
-			// exist
-			return fmt.Errorf("error finding UTXO %s: %w", utxoID, err)
-		}
-		inputUTXOs = append(inputUTXOs, utxo)
+	if err := tx.vm.onAccept(tx.Tx); err != nil {
+		return err
 	}
 
-	outputUTXOs := tx.UTXOs()
-	// index input and output UTXOs
-	if err := tx.vm.addressTxsIndexer.Accept(tx.ID(), inputUTXOs, outputUTXOs); err != nil {
-		return fmt.Errorf("error indexing tx: %w", err)
+	executor := &executor.Executor{
+		Codec: tx.vm.txBackend.Codec,
+		State: tx.vm.state,
+		Tx:    tx.Tx,
 	}
-
-	// Remove spent utxos
-	for _, utxo := range inputUTXOIDs {
-		if utxo.Symbolic() {
-			// If the UTXO is symbolic, it can't be spent
-			continue
-		}
-		utxoID := utxo.InputID()
-		if err := tx.vm.state.DeleteUTXO(utxoID); err != nil {
-			return fmt.Errorf("couldn't delete UTXO %s: %w", utxoID, err)
-		}
-	}
-	// Add new utxos
-	for _, utxo := range outputUTXOs {
-		if err := tx.vm.state.PutUTXO(utxo); err != nil {
-			return fmt.Errorf("couldn't put UTXO %s: %w", utxo.InputID(), err)
-		}
-	}
-
-	if err := tx.setStatus(choices.Accepted); err != nil {
-		return fmt.Errorf("couldn't set status of tx %s: %w", txID, err)
-	}
-
-	commitBatch, err := tx.vm.db.CommitBatch()
+	err := tx.Tx.Unsigned.Visit(executor)
 	if err != nil {
+		return fmt.Errorf("error staging accepted state changes: %w", err)
+	}
+
+	tx.setStatus(choices.Accepted)
+
+	commitBatch, err := tx.vm.state.CommitBatch()
+	if err != nil {
+		txID := tx.ID()
 		return fmt.Errorf("couldn't create commitBatch while processing tx %s: %w", txID, err)
 	}
 
-	err = tx.Tx.Unsigned.Visit(&executeTx{
-		tx:           tx.Tx,
-		batch:        commitBatch,
-		sharedMemory: tx.vm.ctx.SharedMemory,
-		parser:       tx.vm.parser,
-	})
+	defer tx.vm.state.Abort()
+	err = tx.vm.ctx.SharedMemory.Apply(
+		executor.AtomicRequests,
+		commitBatch,
+	)
 	if err != nil {
-		return fmt.Errorf("ExecuteWithSideEffects erred while processing tx %s: %w", txID, err)
+		txID := tx.ID()
+		return fmt.Errorf("error committing accepted state changes while processing tx %s: %w", txID, err)
 	}
 
-	tx.vm.pubsub.Publish(NewPubSubFilterer(tx.Tx))
-	tx.vm.walletService.decided(txID)
-
 	tx.deps = nil // Needed to prevent a memory leak
-	return nil
+	return tx.vm.metrics.MarkTxAccepted(tx.Tx)
 }
 
 // Reject is called when the transaction was finalized as rejected by consensus
-func (tx *UniqueTx) Reject() error {
-	defer tx.vm.db.Abort()
-
-	if err := tx.setStatus(choices.Rejected); err != nil {
-		tx.vm.ctx.Log.Error("Failed to reject tx %s due to %s", tx.txID, err)
-		return err
-	}
+func (tx *UniqueTx) Reject(context.Context) error {
+	tx.setStatus(choices.Rejected)
 
 	txID := tx.ID()
-	tx.vm.ctx.Log.Debug("Rejecting Tx: %s", txID)
+	tx.vm.ctx.Log.Debug("rejecting tx",
+		zap.Stringer("txID", txID),
+	)
 
-	if err := tx.vm.db.Commit(); err != nil {
-		tx.vm.ctx.Log.Error("Failed to commit reject %s due to %s", tx.txID, err)
+	if err := tx.vm.state.Commit(); err != nil {
+		tx.vm.ctx.Log.Error("failed to commit reject",
+			zap.Stringer("txID", tx.txID),
+			zap.Error(err),
+		)
 		return err
 	}
 
 	tx.vm.walletService.decided(txID)
 
 	tx.deps = nil // Needed to prevent a memory leak
-
 	return nil
 }
 
@@ -228,7 +199,7 @@ func (tx *UniqueTx) Dependencies() ([]snowstorm.Tx, error) {
 		return tx.deps, nil
 	}
 
-	txIDs := ids.Set{}
+	txIDs := set.Set[ids.ID]{}
 	for _, in := range tx.InputUTXOs() {
 		if in.Symbolic() {
 			continue
@@ -272,16 +243,6 @@ func (tx *UniqueTx) InputIDs() []ids.ID {
 	return tx.inputs
 }
 
-// Whitelist is not supported by this transaction type, so [false] is returned.
-func (tx *UniqueTx) HasWhitelist() bool {
-	return false
-}
-
-// Whitelist is not supported by this transaction type, so [false] is returned.
-func (tx *UniqueTx) Whitelist() (ids.Set, error) {
-	return nil, nil
-}
-
 // InputUTXOs returns the utxos that will be consumed on tx acceptance
 func (tx *UniqueTx) InputUTXOs() []*avax.UTXOID {
 	tx.refresh()
@@ -322,7 +283,7 @@ func (tx *UniqueTx) verifyWithoutCacheWrites() error {
 }
 
 // Verify the validity of this transaction
-func (tx *UniqueTx) Verify() error {
+func (tx *UniqueTx) Verify(context.Context) error {
 	if err := tx.verifyWithoutCacheWrites(); err != nil {
 		return err
 	}
@@ -344,29 +305,26 @@ func (tx *UniqueTx) SyntacticVerify() error {
 	}
 
 	tx.verifiedTx = true
-	tx.validity = tx.Tx.SyntacticVerify(
-		tx.vm.ctx,
-		tx.vm.parser.Codec(),
-		tx.vm.feeAssetID,
-		tx.vm.TxFee,
-		tx.vm.CreateAssetTxFee,
-		len(tx.vm.fxs),
-	)
+	tx.validity = tx.Tx.Unsigned.Visit(&executor.SyntacticVerifier{
+		Backend: tx.vm.txBackend,
+		Tx:      tx.Tx,
+	})
 	return tx.validity
 }
 
 // SemanticVerify the validity of this transaction
 func (tx *UniqueTx) SemanticVerify() error {
-	// SyntacticVerify sets the error on validity and is checked in the next
-	// statement
-	_ = tx.SyntacticVerify()
+	if err := tx.SyntacticVerify(); err != nil {
+		return err
+	}
 
 	if tx.validity != nil || tx.verifiedState {
 		return tx.validity
 	}
 
-	return tx.Unsigned.Visit(&txSemanticVerify{
-		tx: tx.Tx,
-		vm: tx.vm,
+	return tx.Unsigned.Visit(&executor.SemanticVerifier{
+		Backend: tx.vm.txBackend,
+		State:   tx.vm.dagState,
+		Tx:      tx.Tx,
 	})
 }

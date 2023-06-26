@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package router
 
 import (
+	"context"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -11,10 +12,12 @@ import (
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
+	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/handler"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 // Router routes consensus messages to the Handler of the consensus
@@ -26,18 +29,18 @@ type Router interface {
 	Initialize(
 		nodeID ids.NodeID,
 		log logging.Logger,
-		msgCreator message.Creator,
 		timeouts timeout.Manager,
 		shutdownTimeout time.Duration,
-		criticalChains ids.Set,
-		whiteListedSubnets ids.Set,
+		criticalChains set.Set[ids.ID],
+		sybilProtectionEnabled bool,
+		trackedSubnets set.Set[ids.ID],
 		onFatal func(exitCode int),
 		healthConfig HealthConfig,
 		metricsNamespace string,
 		metricsRegisterer prometheus.Registerer,
 	) error
-	Shutdown()
-	AddChain(chain handler.Handler)
+	Shutdown(context.Context)
+	AddChain(ctx context.Context, chain handler.Handler)
 	health.Checker
 }
 
@@ -46,9 +49,13 @@ type InternalHandler interface {
 	benchlist.Benchable
 
 	RegisterRequest(
+		ctx context.Context,
 		nodeID ids.NodeID,
-		chainID ids.ID,
+		sourceChainID ids.ID,
+		destinationChainID ids.ID,
 		requestID uint32,
 		op message.Op,
+		failedMsg message.InboundMessage,
+		engineType p2p.EngineType,
 	)
 }

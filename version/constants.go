@@ -1,20 +1,27 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package version
 
 import (
+	"encoding/json"
 	"time"
+
+	_ "embed"
 
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
+
+// RPCChainVMProtocol should be bumped anytime changes are made which require
+// the plugin vm to upgrade to latest avalanchego release to be compatible.
+const RPCChainVMProtocol uint = 26
 
 // These are globals that describe network upgrades and node versions
 var (
 	Current = &Semantic{
 		Major: 1,
-		Minor: 7,
-		Patch: 16,
+		Minor: 10,
+		Patch: 3,
 	}
 	CurrentApp = &Application{
 		Major: Current.Major,
@@ -23,22 +30,12 @@ var (
 	}
 	MinimumCompatibleVersion = &Application{
 		Major: 1,
-		Minor: 7,
+		Minor: 10,
 		Patch: 0,
 	}
 	PrevMinimumCompatibleVersion = &Application{
 		Major: 1,
-		Minor: 6,
-		Patch: 0,
-	}
-	MinimumUnmaskedVersion = &Application{
-		Major: 1,
-		Minor: 1,
-		Patch: 0,
-	}
-	PrevMinimumUnmaskedVersion = &Application{
-		Major: 1,
-		Minor: 0,
+		Minor: 9,
 		Patch: 0,
 	}
 
@@ -56,23 +53,12 @@ var (
 		Patch: 0,
 	}
 
-	ApricotPhase0Times = map[uint32]time.Time{
-		constants.MainnetID: time.Date(2020, time.December, 8, 3, 0, 0, 0, time.UTC),
-		constants.FujiID:    time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC),
-	}
-	ApricotPhase0DefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
-
-	ApricotPhase1Times = map[uint32]time.Time{
-		constants.MainnetID: time.Date(2021, time.March, 31, 14, 0, 0, 0, time.UTC),
-		constants.FujiID:    time.Date(2021, time.March, 26, 14, 0, 0, 0, time.UTC),
-	}
-	ApricotPhase1DefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
-
-	ApricotPhase2Times = map[uint32]time.Time{
-		constants.MainnetID: time.Date(2021, time.May, 10, 11, 0, 0, 0, time.UTC),
-		constants.FujiID:    time.Date(2021, time.May, 5, 14, 0, 0, 0, time.UTC),
-	}
-	ApricotPhase2DefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
+	//go:embed compatibility.json
+	rpcChainVMProtocolCompatibilityBytes []byte
+	// RPCChainVMProtocolCompatibility maps RPCChainVMProtocol versions to the
+	// set of avalanchego versions that supported that version. This is not used
+	// by avalanchego, but is useful for downstream libraries.
+	RPCChainVMProtocolCompatibility map[uint][]*Semantic
 
 	ApricotPhase3Times = map[uint32]time.Time{
 		constants.MainnetID: time.Date(2021, time.August, 24, 14, 0, 0, 0, time.UTC),
@@ -97,33 +83,44 @@ var (
 	}
 	ApricotPhase5DefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
 
-	// FIXME: update this before release
-	XChainMigrationTimes = map[uint32]time.Time{
-		constants.MainnetID: time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC),
-		constants.FujiID:    time.Date(10000, time.December, 1, 0, 0, 0, 0, time.UTC),
+	ApricotPhase6Times = map[uint32]time.Time{
+		constants.MainnetID: time.Date(2022, time.September, 6, 20, 0, 0, 0, time.UTC),
+		constants.FujiID:    time.Date(2022, time.September, 6, 20, 0, 0, 0, time.UTC),
 	}
-	XChainMigrationDefaultTime = time.Date(2022, time.January, 1, 1, 0, 0, 0, time.UTC)
+	ApricotPhase6DefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
+
+	BanffTimes = map[uint32]time.Time{
+		constants.MainnetID: time.Date(2022, time.October, 18, 16, 0, 0, 0, time.UTC),
+		constants.FujiID:    time.Date(2022, time.October, 3, 14, 0, 0, 0, time.UTC),
+	}
+	BanffDefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
+
+	CortinaTimes = map[uint32]time.Time{
+		constants.MainnetID: time.Date(2023, time.April, 25, 15, 0, 0, 0, time.UTC),
+		constants.FujiID:    time.Date(2023, time.April, 6, 15, 0, 0, 0, time.UTC),
+	}
+	CortinaDefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
 )
 
-func GetApricotPhase0Time(networkID uint32) time.Time {
-	if upgradeTime, exists := ApricotPhase0Times[networkID]; exists {
-		return upgradeTime
+func init() {
+	var parsedRPCChainVMCompatibility map[uint][]string
+	err := json.Unmarshal(rpcChainVMProtocolCompatibilityBytes, &parsedRPCChainVMCompatibility)
+	if err != nil {
+		panic(err)
 	}
-	return ApricotPhase0DefaultTime
-}
 
-func GetApricotPhase1Time(networkID uint32) time.Time {
-	if upgradeTime, exists := ApricotPhase1Times[networkID]; exists {
-		return upgradeTime
+	RPCChainVMProtocolCompatibility = make(map[uint][]*Semantic)
+	for rpcChainVMProtocol, versionStrings := range parsedRPCChainVMCompatibility {
+		versions := make([]*Semantic, len(versionStrings))
+		for i, versionString := range versionStrings {
+			version, err := Parse(versionString)
+			if err != nil {
+				panic(err)
+			}
+			versions[i] = version
+		}
+		RPCChainVMProtocolCompatibility[rpcChainVMProtocol] = versions
 	}
-	return ApricotPhase1DefaultTime
-}
-
-func GetApricotPhase2Time(networkID uint32) time.Time {
-	if upgradeTime, exists := ApricotPhase2Times[networkID]; exists {
-		return upgradeTime
-	}
-	return ApricotPhase2DefaultTime
 }
 
 func GetApricotPhase3Time(networkID uint32) time.Time {
@@ -154,21 +151,32 @@ func GetApricotPhase5Time(networkID uint32) time.Time {
 	return ApricotPhase5DefaultTime
 }
 
-func GetXChainMigrationTime(networkID uint32) time.Time {
-	if upgradeTime, exists := XChainMigrationTimes[networkID]; exists {
+func GetApricotPhase6Time(networkID uint32) time.Time {
+	if upgradeTime, exists := ApricotPhase6Times[networkID]; exists {
 		return upgradeTime
 	}
-	return XChainMigrationDefaultTime
+	return ApricotPhase6DefaultTime
+}
+
+func GetBanffTime(networkID uint32) time.Time {
+	if upgradeTime, exists := BanffTimes[networkID]; exists {
+		return upgradeTime
+	}
+	return BanffDefaultTime
+}
+
+func GetCortinaTime(networkID uint32) time.Time {
+	if upgradeTime, exists := CortinaTimes[networkID]; exists {
+		return upgradeTime
+	}
+	return CortinaDefaultTime
 }
 
 func GetCompatibility(networkID uint32) Compatibility {
 	return NewCompatibility(
 		CurrentApp,
 		MinimumCompatibleVersion,
-		GetApricotPhase5Time(networkID),
+		GetCortinaTime(networkID),
 		PrevMinimumCompatibleVersion,
-		MinimumUnmaskedVersion,
-		GetApricotPhase0Time(networkID),
-		PrevMinimumUnmaskedVersion,
 	)
 }

@@ -1,21 +1,24 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowball
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/bag"
 )
 
 var (
-	_ Factory   = &FlatFactory{}
-	_ Consensus = &Flat{}
+	_ Factory   = (*FlatFactory)(nil)
+	_ Consensus = (*Flat)(nil)
 )
 
 // FlatFactory implements Factory by returning a flat struct
 type FlatFactory struct{}
 
-func (FlatFactory) New() Consensus { return &Flat{} }
+func (FlatFactory) New() Consensus {
+	return &Flat{}
+}
 
 // Flat is a naive implementation of a multi-choice snowball instance
 type Flat struct {
@@ -31,12 +34,12 @@ func (f *Flat) Initialize(params Parameters, choice ids.ID) {
 	f.params = params
 }
 
-func (f *Flat) Parameters() Parameters { return f.params }
-
-func (f *Flat) RecordPoll(votes ids.Bag) {
+func (f *Flat) RecordPoll(votes bag.Bag[ids.ID]) bool {
 	if pollMode, numVotes := votes.Mode(); numVotes >= f.params.Alpha {
 		f.RecordSuccessfulPoll(pollMode)
-	} else {
-		f.RecordUnsuccessfulPoll()
+		return true
 	}
+
+	f.RecordUnsuccessfulPoll()
+	return false
 }

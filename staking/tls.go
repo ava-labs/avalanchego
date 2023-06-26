@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package staking
@@ -80,7 +80,10 @@ func LoadTLSCertFromBytes(keyBytes, certBytes []byte) (*tls.Certificate, error) 
 	}
 
 	cert.Leaf, err = x509.ParseCertificate(cert.Certificate[0])
-	return &cert, err
+	if err != nil {
+		return nil, fmt.Errorf("failed parsing cert: %w", err)
+	}
+	return &cert, nil
 }
 
 func LoadTLSCertFromFiles(keyPath, certPath string) (*tls.Certificate, error) {
@@ -89,7 +92,10 @@ func LoadTLSCertFromFiles(keyPath, certPath string) (*tls.Certificate, error) {
 		return nil, err
 	}
 	cert.Leaf, err = x509.ParseCertificate(cert.Certificate[0])
-	return &cert, err
+	if err != nil {
+		return nil, fmt.Errorf("failed parsing cert: %w", err)
+	}
+	return &cert, nil
 }
 
 func NewTLSCert() (*tls.Certificate, error) {

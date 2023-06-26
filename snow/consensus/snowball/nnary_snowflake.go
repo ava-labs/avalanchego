@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowball
@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-var _ NnarySnowflake = &nnarySnowflake{}
+var _ NnarySnowflake = (*nnarySnowflake)(nil)
 
 // nnarySnowflake is the implementation of a snowflake instance with an
 // unbounded number of choices
@@ -43,11 +43,13 @@ func (sf *nnarySnowflake) Initialize(betaVirtuous, betaRogue int, choice ids.ID)
 	sf.betaRogue = betaRogue
 }
 
-func (sf *nnarySnowflake) Add(choice ids.ID) { sf.rogue = sf.rogue || choice != sf.preference }
+func (sf *nnarySnowflake) Add(choice ids.ID) {
+	sf.rogue = sf.rogue || choice != sf.preference
+}
 
 func (sf *nnarySnowflake) RecordSuccessfulPoll(choice ids.ID) {
 	if sf.finalized {
-		return // This instace is already decided.
+		return // This instance is already decided.
 	}
 
 	if preference := sf.Preference(); preference == choice {
@@ -63,9 +65,13 @@ func (sf *nnarySnowflake) RecordSuccessfulPoll(choice ids.ID) {
 	sf.nnarySlush.RecordSuccessfulPoll(choice)
 }
 
-func (sf *nnarySnowflake) RecordUnsuccessfulPoll() { sf.confidence = 0 }
+func (sf *nnarySnowflake) RecordUnsuccessfulPoll() {
+	sf.confidence = 0
+}
 
-func (sf *nnarySnowflake) Finalized() bool { return sf.finalized }
+func (sf *nnarySnowflake) Finalized() bool {
+	return sf.finalized
+}
 
 func (sf *nnarySnowflake) String() string {
 	return fmt.Sprintf("SF(Confidence = %d, Finalized = %v, %s)",

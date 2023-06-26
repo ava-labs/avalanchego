@@ -1,10 +1,11 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowman
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 type AncestorTree interface {
@@ -18,13 +19,13 @@ type AncestorTree interface {
 
 type ancestorTree struct {
 	childToParent    map[ids.ID]ids.ID
-	parentToChildren map[ids.ID]ids.Set
+	parentToChildren map[ids.ID]set.Set[ids.ID]
 }
 
 func NewAncestorTree() AncestorTree {
 	return &ancestorTree{
 		childToParent:    make(map[ids.ID]ids.ID),
-		parentToChildren: make(map[ids.ID]ids.Set),
+		parentToChildren: make(map[ids.ID]set.Set[ids.ID]),
 	}
 }
 

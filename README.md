@@ -16,17 +16,19 @@ The minimum recommended hardware specification for nodes connected to Mainnet is
 
 - CPU: Equivalent of 8 AWS vCPU
 - RAM: 16 GiB
-- Storage: 1TB 
-- OS: Ubuntu 18.04/20.04 or macOS >= 10.15 (Catalina)
+- Storage: 1 TiB
+- OS: Ubuntu 20.04/22.04 or macOS >= 12
 - Network: Reliable IPv4 or IPv6 network connection, with an open public port.
 
 If you plan to build AvalancheGo from source, you will also need the following software:
 
-- [Go](https://golang.org/doc/install) version >= 1.17.9
+- [Go](https://golang.org/doc/install) version >= 1.19.6
 - [gcc](https://gcc.gnu.org/)
 - g++
 
-### Native Install
+### Building From Source
+
+#### Clone The Repository
 
 Clone the AvalancheGo repository:
 
@@ -35,17 +37,21 @@ git clone git@github.com:ava-labs/avalanchego.git
 cd avalanchego
 ```
 
-This will clone and checkout to `master` branch.
+This will clone and checkout the `master` branch.
 
-#### Building the Avalanche Executable
+#### Building AvalancheGo
 
-Build Avalanche using the build script:
+Build AvalancheGo by running the build script:
 
 ```sh
 ./scripts/build.sh
 ```
 
-The Avalanche binary, named `avalanchego`, is in the `build` directory.
+The `avalanchego` binary is now in the `build` directory. To run:
+
+```sh
+./build/avalanchego
+```
 
 ### Binary Repository
 
@@ -53,29 +59,20 @@ Install AvalancheGo using an `apt` repository.
 
 #### Adding the APT Repository
 
-If you have already added the APT repository, you do not need to add it again.
+If you already have the APT repository added, you do not need to add it again.
 
-To add the repository on Ubuntu 18.04 (Bionic), run:
-
-```sh
-sudo su -
-wget -O - https://downloads.avax.network/avalanchego.gpg.key | apt-key add -
-echo "deb https://downloads.avax.network/apt bionic main" > /etc/apt/sources.list.d/avalanche.list
-exit
-```
-
-To add the repository on Ubuntu 20.04 (Focal), run:
+To add the repository on Ubuntu, run:
 
 ```sh
 sudo su -
-wget -O - https://downloads.avax.network/avalanchego.gpg.key | apt-key add -
-echo "deb https://downloads.avax.network/apt focal main" > /etc/apt/sources.list.d/avalanche.list
+wget -qO - https://downloads.avax.network/avalanchego.gpg.key | tee /etc/apt/trusted.gpg.d/avalanchego.asc
+source /etc/os-release && echo "deb https://downloads.avax.network/apt $UBUNTU_CODENAME main" > /etc/apt/sources.list.d/avalanche.list
 exit
 ```
 
 #### Installing the Latest Version
 
-After adding the APT repository, install avalanchego by running:
+After adding the APT repository, install `avalanchego` by running:
 
 ```sh
 sudo apt update
@@ -90,9 +87,9 @@ The Avalanche binary to be executed is named `avalanchego`.
 
 ### Docker Install
 
-Make sure docker is installed on the machine - so commands like `docker run` etc. are available.
+Make sure Docker is installed on the machine - so commands like `docker run` etc. are available.
 
-Building the docker image of latest avalanchego branch can be done by running:
+Building the Docker image of latest `avalanchego` branch can be done by running:
 
 ```sh
 ./scripts/build_image.sh
@@ -104,7 +101,7 @@ To check the built image, run:
 docker image ls
 ```
 
-The image should be tagged as `avaplatform/avalanchego:xxxxxxxx`, where `xxxxxxxx` is the shortened commit of the Avalanche source it was built from. To run the avalanche node, run:
+The image should be tagged as `avaplatform/avalanchego:xxxxxxxx`, where `xxxxxxxx` is the shortened commit of the Avalanche source it was built from. To run the Avalanche node, run:
 
 ```sh
 docker run -ti -p 9650:9650 -p 9651:9651 avaplatform/avalanchego:xxxxxxxx /avalanchego/build/avalanchego
@@ -138,7 +135,7 @@ See [this tutorial.](https://docs.avax.network/build/tutorials/platform/create-a
 
 ## Bootstrapping
 
-A node needs to catch up to the latest network state before it can participate in consensus and serve API calls. This process, called bootstrapping, currently takes several days for a new node connected to Mainnet.
+A node needs to catch up to the latest network state before it can participate in consensus and serve API calls. This process (called bootstrapping) currently takes several days for a new node connected to Mainnet.
 
 A node will not [report healthy](https://docs.avax.network/build/avalanchego-apis/health) until it is done bootstrapping.
 
@@ -148,7 +145,7 @@ The bottleneck during bootstrapping is typically database IO. Using a more power
 
 ## Generating Code
 
-Avalanchego uses multiple tools to generate efficient and boilerplate code.
+AvalancheGo uses multiple tools to generate efficient and boilerplate code.
 
 ### Running protobuf codegen
 
@@ -156,7 +153,7 @@ To regenerate the protobuf go code, run `scripts/protobuf_codegen.sh` from the r
 
 This should only be necessary when upgrading protobuf versions or modifying .proto definition files.
 
-To use this script, you must have [buf](https://docs.buf.build/installation) (v1.4.0), protoc-gen-go (v1.28.0) and protoc-gen-go-grpc (v1.2.0) installed.
+To use this script, you must have [buf](https://docs.buf.build/installation) (v1.11.0), protoc-gen-go (v1.28.0) and protoc-gen-go-grpc (v1.2.0) installed.
 
 To install the buf dependencies:
 
@@ -188,6 +185,31 @@ For more information, refer to the [GRPC Golang Quick Start Guide](https://grpc.
 docker build -t avalanche:protobuf_codegen -f api/Dockerfile.buf .
 docker run -t -i -v $(pwd):/opt/avalanche -w/opt/avalanche avalanche:protobuf_codegen bash -c "scripts/protobuf_codegen.sh"
 ```
+
+### Running mock codegen
+
+To regenerate the [gomock](https://github.com/golang/mock) code, run `scripts/mock.gen.sh` from the root of the repo.
+
+This should only be necessary when modifying exported interfaces or after modifying `scripts/mock.mockgen.txt`.
+
+## Versioning
+
+### Version Semantics
+
+AvalancheGo is first and foremost a client for the Avalanche network. The versioning of AvalancheGo follows that of the Avalanche network.
+
+- `v0.x.x` indicates a development network version.
+- `v1.x.x` indicates a production network version.
+- `vx.[Upgrade].x` indicates the number of network upgrades that have occurred.
+- `vx.x.[Patch]` indicates the number of client upgrades that have occurred since the last network upgrade.
+
+### Library Compatibility Guarantees
+
+Because AvalancheGo's version denotes the network version, it is expected that interfaces exported by AvalancheGo's packages may change in `Patch` version updates.
+
+### API Compatibility Guarantees
+
+APIs exposed when running AvalancheGo will maintain backwards compatibility, unless the functionality is explicitly deprecated and announced when removed.
 
 ## Supported Platforms
 
@@ -223,4 +245,4 @@ To officially support a new platform, one must satisfy the following requirement
 
 **We and our community welcome responsible disclosures.**
 
-If you've discovered a security vulnerability, please report it via our [bug bounty program](https://hackenproof.com/avalanche/). Valid reports will be eligible for a reward (terms and conditions apply).
+Please refer to our [Security Policy](SECURITY.md) and [Security Advisories](https://github.com/ava-labs/avalanchego/security/advisories).

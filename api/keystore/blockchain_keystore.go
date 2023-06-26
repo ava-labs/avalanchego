@@ -1,15 +1,18 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package keystore
 
 import (
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/encdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-var _ BlockchainKeystore = &blockchainKeystore{}
+var _ BlockchainKeystore = (*blockchainKeystore)(nil)
 
 type BlockchainKeystore interface {
 	// Get a database that is able to read and write unencrypted values from the
@@ -28,13 +31,21 @@ type blockchainKeystore struct {
 }
 
 func (bks *blockchainKeystore) GetDatabase(username, password string) (*encdb.Database, error) {
-	bks.ks.log.Debug("Keystore: GetDatabase called with %s from %s", username, bks.blockchainID)
+	bks.ks.log.Warn("deprecated keystore called",
+		zap.String("method", "getDatabase"),
+		logging.UserString("username", username),
+		zap.Stringer("blockchainID", bks.blockchainID),
+	)
 
 	return bks.ks.GetDatabase(bks.blockchainID, username, password)
 }
 
 func (bks *blockchainKeystore) GetRawDatabase(username, password string) (database.Database, error) {
-	bks.ks.log.Debug("Keystore: GetRawDatabase called with %s from %s", username, bks.blockchainID)
+	bks.ks.log.Warn("deprecated keystore called",
+		zap.String("method", "getRawDatabase"),
+		logging.UserString("username", username),
+		zap.Stringer("blockchainID", bks.blockchainID),
+	)
 
 	return bks.ks.GetRawDatabase(bks.blockchainID, username, password)
 }

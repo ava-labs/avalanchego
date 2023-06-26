@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowball
@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-var _ NnarySlush = &nnarySlush{}
+var _ NnarySlush = (*nnarySlush)(nil)
 
 // nnarySlush is the implementation of a slush instance with an unbounded number
 // of choices
@@ -20,10 +20,18 @@ type nnarySlush struct {
 	preference ids.ID
 }
 
-func (sl *nnarySlush) Initialize(choice ids.ID) { sl.preference = choice }
+func (sl *nnarySlush) Initialize(choice ids.ID) {
+	sl.preference = choice
+}
 
-func (sl *nnarySlush) Preference() ids.ID { return sl.preference }
+func (sl *nnarySlush) Preference() ids.ID {
+	return sl.preference
+}
 
-func (sl *nnarySlush) RecordSuccessfulPoll(choice ids.ID) { sl.preference = choice }
+func (sl *nnarySlush) RecordSuccessfulPoll(choice ids.ID) {
+	sl.preference = choice
+}
 
-func (sl *nnarySlush) String() string { return fmt.Sprintf("SL(Preference = %s)", sl.preference) }
+func (sl *nnarySlush) String() string {
+	return fmt.Sprintf("SL(Preference = %s)", sl.preference)
+}

@@ -1,0 +1,10 @@
+---
+ava_user: avalanche
+ava_group: admin
+ava_uid: 1014
+network: mainnet
+db_dir: /data/avalanchego
+log_dir: /var/log/avalanchego
+config_dir: /etc/avalanchego
+repo_url: https://github.com/ava-labs/avalanchego
+repo_folder: /tmp/avalanchego

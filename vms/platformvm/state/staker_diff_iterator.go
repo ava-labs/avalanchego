@@ -1,16 +1,18 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
 
 import (
 	"container/heap"
+
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 var (
-	_ StakerDiffIterator = &stakerDiffIterator{}
-	_ StakerIterator     = &mutableStakerIterator{}
-	_ heap.Interface     = &mutableStakerIterator{}
+	_ StakerDiffIterator = (*stakerDiffIterator)(nil)
+	_ StakerIterator     = (*mutableStakerIterator)(nil)
+	_ heap.Interface     = (*mutableStakerIterator)(nil)
 )
 
 // StakerDiffIterator is an iterator that iterates over the events that will be
@@ -20,11 +22,11 @@ var (
 // existing staker and addition of a new staker from the pending set.
 //
 // The ordering of operations is:
-// - Staker operations are performed in order of their [NextTime].
-// - If operations have the same [NextTime], stakers are first added to the
-//   current staker set, then removed.
-// - Further ties are broken by *Staker.Less(), returning the lesser staker
-//   first.
+//   - Staker operations are performed in order of their [NextTime].
+//   - If operations have the same [NextTime], stakers are first added to the
+//     current staker set, then removed.
+//   - Further ties are broken by *Staker.Less(), returning the lesser staker
+//     first.
 type StakerDiffIterator interface {
 	Next() bool
 	// Returns:
@@ -104,7 +106,7 @@ func (it *stakerDiffIterator) advancePending() {
 
 	toRemove := *it.modifiedStaker
 	toRemove.NextTime = toRemove.EndTime
-	toRemove.Priority = PendingToCurrentPriorities[toRemove.Priority]
+	toRemove.Priority = txs.PendingToCurrentPriorities[toRemove.Priority]
 	it.currentIteratorExhausted = false
 	it.currentIterator.Add(&toRemove)
 }

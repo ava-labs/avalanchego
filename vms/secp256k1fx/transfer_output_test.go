@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package secp256k1fx
@@ -6,7 +6,7 @@ package secp256k1fx
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
@@ -15,7 +15,7 @@ import (
 )
 
 func TestOutputAmount(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	out := TransferOutput{
 		Amt: 1,
 		OutputOwners: OutputOwners{
@@ -26,11 +26,11 @@ func TestOutputAmount(t *testing.T) {
 			},
 		},
 	}
-	assert.Equal(uint64(1), out.Amount())
+	require.Equal(uint64(1), out.Amount())
 }
 
 func TestOutputVerify(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	out := TransferOutput{
 		Amt: 1,
 		OutputOwners: OutputOwners{
@@ -41,17 +41,18 @@ func TestOutputVerify(t *testing.T) {
 			},
 		},
 	}
-	assert.NoError(out.Verify())
+	require.NoError(out.Verify())
 }
 
 func TestOutputVerifyNil(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	out := (*TransferOutput)(nil)
-	assert.ErrorIs(out.Verify(), errNilOutput)
+	err := out.Verify()
+	require.ErrorIs(err, ErrNilOutput)
 }
 
 func TestOutputVerifyNoValue(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	out := TransferOutput{
 		Amt: 0,
 		OutputOwners: OutputOwners{
@@ -62,11 +63,12 @@ func TestOutputVerifyNoValue(t *testing.T) {
 			},
 		},
 	}
-	assert.ErrorIs(out.Verify(), errNoValueOutput)
+	err := out.Verify()
+	require.ErrorIs(err, ErrNoValueOutput)
 }
 
 func TestOutputVerifyUnspendable(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	out := TransferOutput{
 		Amt: 1,
 		OutputOwners: OutputOwners{
@@ -77,11 +79,12 @@ func TestOutputVerifyUnspendable(t *testing.T) {
 			},
 		},
 	}
-	assert.ErrorIs(out.Verify(), errOutputUnspendable)
+	err := out.Verify()
+	require.ErrorIs(err, ErrOutputUnspendable)
 }
 
 func TestOutputVerifyUnoptimized(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	out := TransferOutput{
 		Amt: 1,
 		OutputOwners: OutputOwners{
@@ -92,11 +95,12 @@ func TestOutputVerifyUnoptimized(t *testing.T) {
 			},
 		},
 	}
-	assert.ErrorIs(out.Verify(), errOutputUnoptimized)
+	err := out.Verify()
+	require.ErrorIs(err, ErrOutputUnoptimized)
 }
 
 func TestOutputVerifyUnsorted(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	out := TransferOutput{
 		Amt: 1,
 		OutputOwners: OutputOwners{
@@ -108,11 +112,12 @@ func TestOutputVerifyUnsorted(t *testing.T) {
 			},
 		},
 	}
-	assert.ErrorIs(out.Verify(), errAddrsNotSortedUnique)
+	err := out.Verify()
+	require.ErrorIs(err, ErrAddrsNotSortedUnique)
 }
 
 func TestOutputVerifyDuplicated(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	out := TransferOutput{
 		Amt: 1,
 		OutputOwners: OutputOwners{
@@ -124,14 +129,15 @@ func TestOutputVerifyDuplicated(t *testing.T) {
 			},
 		},
 	}
-	assert.ErrorIs(out.Verify(), errAddrsNotSortedUnique)
+	err := out.Verify()
+	require.ErrorIs(err, ErrAddrsNotSortedUnique)
 }
 
 func TestOutputSerialize(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	c := linearcodec.NewDefault()
 	m := codec.NewDefaultManager()
-	assert.NoError(m.RegisterCodec(0, c))
+	require.NoError(m.RegisterCodec(0, c))
 
 	expected := []byte{
 		// Codec version
@@ -172,15 +178,15 @@ func TestOutputSerialize(t *testing.T) {
 			},
 		},
 	}
-	assert.NoError(out.Verify())
+	require.NoError(out.Verify())
 
 	result, err := m.Marshal(0, &out)
-	assert.NoError(err)
-	assert.Equal(expected, result)
+	require.NoError(err)
+	require.Equal(expected, result)
 }
 
 func TestOutputAddresses(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	out := TransferOutput{
 		Amt: 12345,
 		OutputOwners: OutputOwners{
@@ -200,16 +206,16 @@ func TestOutputAddresses(t *testing.T) {
 			},
 		},
 	}
-	assert.NoError(out.Verify())
-	assert.Equal([][]byte{
+	require.NoError(out.Verify())
+	require.Equal([][]byte{
 		out.Addrs[0].Bytes(),
 		out.Addrs[1].Bytes(),
 	}, out.Addresses())
 }
 
 func TestTransferOutputState(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	intf := interface{}(&TransferOutput{})
 	_, ok := intf.(verify.State)
-	assert.True(ok)
+	require.True(ok)
 }

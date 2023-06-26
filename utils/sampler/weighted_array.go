@@ -1,19 +1,26 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sampler
 
 import (
-	"sort"
-
-	safemath "github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/math"
 )
 
-var _ Weighted = &weightedArray{}
+var (
+	_ Weighted                             = (*weightedArray)(nil)
+	_ utils.Sortable[weightedArrayElement] = weightedArrayElement{}
+)
 
 type weightedArrayElement struct {
 	cumulativeWeight uint64
 	index            int
+}
+
+// Note that this sorts in order of decreasing weight.
+func (e weightedArrayElement) Less(other weightedArrayElement) bool {
+	return e.cumulativeWeight > other.cumulativeWeight
 }
 
 // Sampling is performed by executing a modified binary search over the provided
@@ -45,7 +52,7 @@ func (s *weightedArray) Initialize(weights []uint64) error {
 	}
 
 	// Optimize so that the array is closer to the uniform distribution
-	sortWeightedArray(s.arr)
+	utils.Sort(s.arr)
 
 	maxIndex := len(s.arr) - 1
 	oneIfOdd := 1 & maxIndex
@@ -58,7 +65,7 @@ func (s *weightedArray) Initialize(weights []uint64) error {
 
 	cumulativeWeight := uint64(0)
 	for i := 0; i < len(s.arr); i++ {
-		newWeight, err := safemath.Add64(
+		newWeight, err := math.Add64(
 			cumulativeWeight,
 			s.arr[i].cumulativeWeight,
 		)
@@ -74,7 +81,7 @@ func (s *weightedArray) Initialize(weights []uint64) error {
 
 func (s *weightedArray) Sample(value uint64) (int, error) {
 	if len(s.arr) == 0 || s.arr[len(s.arr)-1].cumulativeWeight <= value {
-		return 0, errOutOfRange
+		return 0, ErrOutOfRange
 	}
 	minIndex := 0
 	maxIndex := len(s.arr) - 1
@@ -113,22 +120,4 @@ func (s *weightedArray) Sample(value uint64) (int, error) {
 
 		index = int(lookupMass/float64(valueRange)) + minIndex
 	}
-}
-
-type innerSortWeightedArray []weightedArrayElement
-
-func (lst innerSortWeightedArray) Less(i, j int) bool {
-	return lst[i].cumulativeWeight > lst[j].cumulativeWeight
-}
-
-func (lst innerSortWeightedArray) Len() int {
-	return len(lst)
-}
-
-func (lst innerSortWeightedArray) Swap(i, j int) {
-	lst[j], lst[i] = lst[i], lst[j]
-}
-
-func sortWeightedArray(lst []weightedArrayElement) {
-	sort.Sort(innerSortWeightedArray(lst))
 }

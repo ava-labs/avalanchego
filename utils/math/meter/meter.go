@@ -1,11 +1,9 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package meter
 
-import (
-	"time"
-)
+import "time"
 
 // Meter tracks a continuous exponential moving average of the % of time this
 // meter has been running.

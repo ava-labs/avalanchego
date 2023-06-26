@@ -1,11 +1,14 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package getter
 
 import (
+	"context"
 	"errors"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -14,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var errUnknownVertex = errors.New("unknown vertex")
@@ -21,7 +25,7 @@ var errUnknownVertex = errors.New("unknown vertex")
 func testSetup(t *testing.T) (*vertex.TestManager, *common.SenderTest, common.Config) {
 	peers := validators.NewSet()
 	peer := ids.GenerateTestNodeID()
-	if err := peers.AddWeight(peer, 1); err != nil {
+	if err := peers.Add(peer, nil, ids.Empty, 1); err != nil {
 		t.Fatal(err)
 	}
 
@@ -30,20 +34,23 @@ func testSetup(t *testing.T) (*vertex.TestManager, *common.SenderTest, common.Co
 	sender.CantSendGetAcceptedFrontier = false
 
 	isBootstrapped := false
-	subnet := &common.SubnetTest{
-		T:               t,
-		IsBootstrappedF: func() bool { return isBootstrapped },
-		BootstrappedF:   func(ids.ID) { isBootstrapped = true },
+	bootstrapTracker := &common.BootstrapTrackerTest{
+		T: t,
+		IsBootstrappedF: func() bool {
+			return isBootstrapped
+		},
+		BootstrappedF: func(ids.ID) {
+			isBootstrapped = true
+		},
 	}
 
 	commonConfig := common.Config{
 		Ctx:                            snow.DefaultConsensusContextTest(),
-		Validators:                     peers,
 		Beacons:                        peers,
 		SampleK:                        peers.Len(),
 		Alpha:                          peers.Weight()/2 + 1,
 		Sender:                         sender,
-		Subnet:                         subnet,
+		BootstrapTracker:               bootstrapTracker,
 		Timer:                          &common.TimerTest{},
 		AncestorsMaxContainersSent:     2000,
 		AncestorsMaxContainersReceived: 2000,
@@ -57,54 +64,34 @@ func testSetup(t *testing.T) (*vertex.TestManager, *common.SenderTest, common.Co
 }
 
 func TestAcceptedFrontier(t *testing.T) {
+	require := require.New(t)
+
 	manager, sender, config := testSetup(t)
 
-	vtxID0 := ids.GenerateTestID()
-	vtxID1 := ids.GenerateTestID()
-	vtxID2 := ids.GenerateTestID()
+	vtxID := ids.GenerateTestID()
 
 	bsIntf, err := New(manager, config)
-	if err != nil {
-		t.Fatal(err)
-	}
-	bs, ok := bsIntf.(*getter)
-	if !ok {
-		t.Fatal("Unexpected get handler")
-	}
+	require.NoError(err)
+	require.IsType(&getter{}, bsIntf)
+	bs := bsIntf.(*getter)
 
-	manager.EdgeF = func() []ids.ID {
+	manager.EdgeF = func(context.Context) []ids.ID {
 		return []ids.ID{
-			vtxID0,
-			vtxID1,
+			vtxID,
 		}
 	}
 
-	var accepted []ids.ID
-	sender.SendAcceptedFrontierF = func(_ ids.NodeID, _ uint32, frontier []ids.ID) {
-		accepted = frontier
+	var accepted ids.ID
+	sender.SendAcceptedFrontierF = func(_ context.Context, _ ids.NodeID, _ uint32, containerID ids.ID) {
+		accepted = containerID
 	}
-
-	if err := bs.GetAcceptedFrontier(ids.EmptyNodeID, 0); err != nil {
-		t.Fatal(err)
-	}
-
-	acceptedSet := ids.Set{}
-	acceptedSet.Add(accepted...)
-
-	manager.EdgeF = nil
-
-	if !acceptedSet.Contains(vtxID0) {
-		t.Fatalf("Vtx should be accepted")
-	}
-	if !acceptedSet.Contains(vtxID1) {
-		t.Fatalf("Vtx should be accepted")
-	}
-	if acceptedSet.Contains(vtxID2) {
-		t.Fatalf("Vtx shouldn't be accepted")
-	}
+	require.NoError(bs.GetAcceptedFrontier(context.Background(), ids.EmptyNodeID, 0))
+	require.Equal(vtxID, accepted)
 }
 
 func TestFilterAccepted(t *testing.T) {
+	require := require.New(t)
+
 	manager, sender, config := testSetup(t)
 
 	vtxID0 := ids.GenerateTestID()
@@ -124,14 +111,12 @@ func TestFilterAccepted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	bs, ok := bsIntf.(*getter)
-	if !ok {
-		t.Fatal("Unexpected get handler")
-	}
+	require.IsType(&getter{}, bsIntf)
+	bs := bsIntf.(*getter)
 
 	vtxIDs := []ids.ID{vtxID0, vtxID1, vtxID2}
 
-	manager.GetVtxF = func(vtxID ids.ID) (avalanche.Vertex, error) {
+	manager.GetVtxF = func(_ context.Context, vtxID ids.ID) (avalanche.Vertex, error) {
 		switch vtxID {
 		case vtxID0:
 			return vtx0, nil
@@ -145,15 +130,15 @@ func TestFilterAccepted(t *testing.T) {
 	}
 
 	var accepted []ids.ID
-	sender.SendAcceptedF = func(_ ids.NodeID, _ uint32, frontier []ids.ID) {
+	sender.SendAcceptedF = func(_ context.Context, _ ids.NodeID, _ uint32, frontier []ids.ID) {
 		accepted = frontier
 	}
 
-	if err := bs.GetAccepted(ids.EmptyNodeID, 0, vtxIDs); err != nil {
+	if err := bs.GetAccepted(context.Background(), ids.EmptyNodeID, 0, vtxIDs); err != nil {
 		t.Fatal(err)
 	}
 
-	acceptedSet := ids.Set{}
+	acceptedSet := set.Set[ids.ID]{}
 	acceptedSet.Add(accepted...)
 
 	manager.GetVtxF = nil

@@ -1,13 +1,11 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
 
-import (
-	"github.com/ava-labs/avalanchego/ids"
-)
+import "github.com/ava-labs/avalanchego/ids"
 
-var _ StakerIterator = &maskedIterator{}
+var _ StakerIterator = (*maskedIterator)(nil)
 
 type maskedIterator struct {
 	parentIterator StakerIterator

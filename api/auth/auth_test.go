@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package auth
@@ -14,9 +14,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang-jwt/jwt"
+	jwt "github.com/golang-jwt/jwt/v4"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/password"
@@ -25,7 +25,8 @@ import (
 var (
 	testPassword              = "password!@#$%$#@!"
 	hashedPassword            = password.Hash{}
-	unAuthorizedResponseRegex = "^{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"(.*)\"},\"id\":1}"
+	unAuthorizedResponseRegex = `^{"jsonrpc":"2.0","error":{"code":-32600,"message":"(.*)"},"id":1}`
+	errTest                   = errors.New("non-nil error")
 )
 
 func init() {
@@ -38,16 +39,20 @@ func init() {
 var dummyHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
 
 func TestNewTokenWrongPassword(t *testing.T) {
+	require := require.New(t)
+
 	auth := NewFromHash(logging.NoLog{}, "auth", hashedPassword)
 
 	_, err := auth.NewToken("", defaultTokenLifespan, []string{"endpoint1, endpoint2"})
-	assert.Error(t, err, "should have failed because password is wrong")
+	require.ErrorIs(err, password.ErrEmptyPassword)
 
 	_, err = auth.NewToken("notThePassword", defaultTokenLifespan, []string{"endpoint1, endpoint2"})
-	assert.Error(t, err, "should have failed because password is wrong")
+	require.ErrorIs(err, errWrongPassword)
 }
 
 func TestNewTokenHappyPath(t *testing.T) {
+	require := require.New(t)
+
 	auth := NewFromHash(logging.NoLog{}, "auth", hashedPassword).(*auth)
 
 	now := time.Now()
@@ -56,7 +61,7 @@ func TestNewTokenHappyPath(t *testing.T) {
 	// Make a token
 	endpoints := []string{"endpoint1", "endpoint2", "endpoint3"}
 	tokenStr, err := auth.NewToken(testPassword, defaultTokenLifespan, endpoints)
-	assert.NoError(t, err)
+	require.NoError(err)
 
 	// Parse the token
 	token, err := jwt.ParseWithClaims(tokenStr, &endpointClaims{}, func(*jwt.Token) (interface{}, error) {
@@ -64,23 +69,25 @@ func TestNewTokenHappyPath(t *testing.T) {
 		defer auth.lock.RUnlock()
 		return auth.password.Password[:], nil
 	})
-	assert.NoError(t, err, "couldn't parse new token")
+	require.NoError(err)
 
-	claims, ok := token.Claims.(*endpointClaims)
-	assert.True(t, ok, "expected auth token's claims to be type endpointClaims but is different type")
-	assert.ElementsMatch(t, endpoints, claims.Endpoints, "token has wrong endpoint claims")
+	require.IsType(&endpointClaims{}, token.Claims)
+	claims := token.Claims.(*endpointClaims)
+	require.Equal(endpoints, claims.Endpoints)
 
-	shouldExpireAt := now.Add(defaultTokenLifespan).Unix()
-	assert.Equal(t, shouldExpireAt, claims.ExpiresAt, "token expiration time is wrong")
+	shouldExpireAt := jwt.NewNumericDate(now.Add(defaultTokenLifespan))
+	require.Equal(shouldExpireAt, claims.ExpiresAt)
 }
 
 func TestTokenHasWrongSig(t *testing.T) {
+	require := require.New(t)
+
 	auth := NewFromHash(logging.NoLog{}, "auth", hashedPassword).(*auth)
 
 	// Make a token
 	endpoints := []string{"endpoint1", "endpoint2", "endpoint3"}
 	tokenStr, err := auth.NewToken(testPassword, defaultTokenLifespan, endpoints)
-	assert.NoError(t, err)
+	require.NoError(err)
 
 	// Try to parse the token using the wrong password
 	_, err = jwt.ParseWithClaims(tokenStr, &endpointClaims{}, func(*jwt.Token) (interface{}, error) {
@@ -88,7 +95,7 @@ func TestTokenHasWrongSig(t *testing.T) {
 		defer auth.lock.RUnlock()
 		return []byte(""), nil
 	})
-	assert.Error(t, err, "should have failed because password is wrong")
+	require.ErrorIs(err, jwt.ErrSignatureInvalid)
 
 	// Try to parse the token using the wrong password
 	_, err = jwt.ParseWithClaims(tokenStr, &endpointClaims{}, func(*jwt.Token) (interface{}, error) {
@@ -96,94 +103,100 @@ func TestTokenHasWrongSig(t *testing.T) {
 		defer auth.lock.RUnlock()
 		return []byte("notThePassword"), nil
 	})
-	assert.Error(t, err, "should have failed because password is wrong")
+	require.ErrorIs(err, jwt.ErrSignatureInvalid)
 }
 
 func TestChangePassword(t *testing.T) {
+	require := require.New(t)
+
 	auth := NewFromHash(logging.NoLog{}, "auth", hashedPassword).(*auth)
 
 	password2 := "fejhkefjhefjhefhje" // #nosec G101
 	var err error
 
 	err = auth.ChangePassword("", password2)
-	assert.Error(t, err, "should have failed because old password is wrong")
+	require.ErrorIs(err, errWrongPassword)
 
 	err = auth.ChangePassword("notThePassword", password2)
-	assert.Error(t, err, "should have failed because old password is wrong")
+	require.ErrorIs(err, errWrongPassword)
 
 	err = auth.ChangePassword(testPassword, "")
-	assert.Error(t, err, "should have failed because new password is empty")
+	require.ErrorIs(err, password.ErrEmptyPassword)
 
-	err = auth.ChangePassword(testPassword, password2)
-	assert.NoError(t, err, "should have succeeded")
-	assert.True(t, auth.password.Check(password2), "password should have been changed")
+	require.NoError(auth.ChangePassword(testPassword, password2))
+	require.True(auth.password.Check(password2))
 
 	password3 := "ufwhwohwfohawfhwdwd" // #nosec G101
 
 	err = auth.ChangePassword(testPassword, password3)
-	assert.Error(t, err, "should have failed because old password is wrong")
+	require.ErrorIs(err, errWrongPassword)
 
-	err = auth.ChangePassword(password2, password3)
-	assert.NoError(t, err, "should have succeeded")
+	require.NoError(auth.ChangePassword(password2, password3))
 }
 
 func TestRevokeToken(t *testing.T) {
+	require := require.New(t)
+
 	auth := NewFromHash(logging.NoLog{}, "auth", hashedPassword).(*auth)
 
 	// Make a token
 	endpoints := []string{"/ext/info", "/ext/bc/X", "/ext/metrics"}
 	tokenStr, err := auth.NewToken(testPassword, defaultTokenLifespan, endpoints)
-	assert.NoError(t, err)
+	require.NoError(err)
 
-	err = auth.RevokeToken(tokenStr, testPassword)
-	assert.NoError(t, err, "should have succeeded")
-	assert.Len(t, auth.revoked, 1, "revoked token list is incorrect")
+	require.NoError(auth.RevokeToken(tokenStr, testPassword))
+	require.Len(auth.revoked, 1)
 }
 
 func TestWrapHandlerHappyPath(t *testing.T) {
+	require := require.New(t)
+
 	auth := NewFromHash(logging.NoLog{}, "auth", hashedPassword)
 
 	// Make a token
 	endpoints := []string{"/ext/info", "/ext/bc/X", "/ext/metrics"}
 	tokenStr, err := auth.NewToken(testPassword, defaultTokenLifespan, endpoints)
-	assert.NoError(t, err)
+	require.NoError(err)
 
 	wrappedHandler := auth.WrapHandler(dummyHandler)
 
 	for _, endpoint := range endpoints {
-		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("http://127.0.0.1:9650%s", endpoint), strings.NewReader(""))
-		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", tokenStr))
+		req := httptest.NewRequest(http.MethodPost, "http://127.0.0.1:9650"+endpoint, strings.NewReader(""))
+		req.Header.Add("Authorization", "Bearer "+tokenStr)
 		rr := httptest.NewRecorder()
 		wrappedHandler.ServeHTTP(rr, req)
-		assert.Equal(t, http.StatusOK, rr.Code)
+		require.Equal(http.StatusOK, rr.Code)
 	}
 }
 
 func TestWrapHandlerRevokedToken(t *testing.T) {
+	require := require.New(t)
+
 	auth := NewFromHash(logging.NoLog{}, "auth", hashedPassword)
 
 	// Make a token
 	endpoints := []string{"/ext/info", "/ext/bc/X", "/ext/metrics"}
 	tokenStr, err := auth.NewToken(testPassword, defaultTokenLifespan, endpoints)
-	assert.NoError(t, err)
+	require.NoError(err)
 
-	err = auth.RevokeToken(tokenStr, testPassword)
-	assert.NoError(t, err)
+	require.NoError(auth.RevokeToken(tokenStr, testPassword))
 
 	wrappedHandler := auth.WrapHandler(dummyHandler)
 
 	for _, endpoint := range endpoints {
-		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("http://127.0.0.1:9650%s", endpoint), strings.NewReader(""))
-		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", tokenStr))
+		req := httptest.NewRequest(http.MethodPost, "http://127.0.0.1:9650"+endpoint, strings.NewReader(""))
+		req.Header.Add("Authorization", "Bearer "+tokenStr)
 		rr := httptest.NewRecorder()
 		wrappedHandler.ServeHTTP(rr, req)
-		assert.Equal(t, http.StatusUnauthorized, rr.Code)
-		assert.Contains(t, rr.Body.String(), errTokenRevoked.Error())
-		assert.Regexp(t, unAuthorizedResponseRegex, rr.Body.String())
+		require.Equal(http.StatusUnauthorized, rr.Code)
+		require.Contains(rr.Body.String(), errTokenRevoked.Error())
+		require.Regexp(unAuthorizedResponseRegex, rr.Body.String())
 	}
 }
 
 func TestWrapHandlerExpiredToken(t *testing.T) {
+	require := require.New(t)
+
 	auth := NewFromHash(logging.NoLog{}, "auth", hashedPassword).(*auth)
 
 	auth.clock.Set(time.Now().Add(-2 * defaultTokenLifespan))
@@ -191,22 +204,24 @@ func TestWrapHandlerExpiredToken(t *testing.T) {
 	// Make a token that expired well in the past
 	endpoints := []string{"/ext/info", "/ext/bc/X", "/ext/metrics"}
 	tokenStr, err := auth.NewToken(testPassword, defaultTokenLifespan, endpoints)
-	assert.NoError(t, err)
+	require.NoError(err)
 
 	wrappedHandler := auth.WrapHandler(dummyHandler)
 
 	for _, endpoint := range endpoints {
-		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("http://127.0.0.1:9650%s", endpoint), strings.NewReader(""))
-		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", tokenStr))
+		req := httptest.NewRequest(http.MethodPost, "http://127.0.0.1:9650"+endpoint, strings.NewReader(""))
+		req.Header.Add("Authorization", "Bearer "+tokenStr)
 		rr := httptest.NewRecorder()
 		wrappedHandler.ServeHTTP(rr, req)
-		assert.Equal(t, http.StatusUnauthorized, rr.Code)
-		assert.Contains(t, rr.Body.String(), "expired")
-		assert.Regexp(t, unAuthorizedResponseRegex, rr.Body.String())
+		require.Equal(http.StatusUnauthorized, rr.Code)
+		require.Contains(rr.Body.String(), "expired")
+		require.Regexp(unAuthorizedResponseRegex, rr.Body.String())
 	}
 }
 
 func TestWrapHandlerNoAuthToken(t *testing.T) {
+	require := require.New(t)
+
 	auth := NewFromHash(logging.NoLog{}, "auth", hashedPassword)
 
 	endpoints := []string{"/ext/info", "/ext/bc/X", "/ext/metrics"}
@@ -215,132 +230,138 @@ func TestWrapHandlerNoAuthToken(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("http://127.0.0.1:9650%s", endpoint), strings.NewReader(""))
 		rr := httptest.NewRecorder()
 		wrappedHandler.ServeHTTP(rr, req)
-		assert.Equal(t, http.StatusUnauthorized, rr.Code)
-		assert.Contains(t, rr.Body.String(), errNoToken.Error())
-		assert.Regexp(t, unAuthorizedResponseRegex, rr.Body.String())
+		require.Equal(http.StatusUnauthorized, rr.Code)
+		require.Contains(rr.Body.String(), errNoToken.Error())
+		require.Regexp(unAuthorizedResponseRegex, rr.Body.String())
 	}
 }
 
 func TestWrapHandlerUnauthorizedEndpoint(t *testing.T) {
+	require := require.New(t)
+
 	auth := NewFromHash(logging.NoLog{}, "auth", hashedPassword)
 
 	// Make a token
 	endpoints := []string{"/ext/info"}
 	tokenStr, err := auth.NewToken(testPassword, defaultTokenLifespan, endpoints)
-	assert.NoError(t, err)
+	require.NoError(err)
 
 	unauthorizedEndpoints := []string{"/ext/bc/X", "/ext/metrics", "", "/foo", "/ext/info/foo"}
 
 	wrappedHandler := auth.WrapHandler(dummyHandler)
 	for _, endpoint := range unauthorizedEndpoints {
-		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("http://127.0.0.1:9650%s", endpoint), strings.NewReader(""))
-		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", tokenStr))
+		req := httptest.NewRequest(http.MethodPost, "http://127.0.0.1:9650"+endpoint, strings.NewReader(""))
+		req.Header.Add("Authorization", "Bearer "+tokenStr)
 		rr := httptest.NewRecorder()
 		wrappedHandler.ServeHTTP(rr, req)
-		assert.Equal(t, http.StatusUnauthorized, rr.Code)
-		assert.Contains(t, rr.Body.String(), errTokenInsufficientPermission.Error())
-		assert.Regexp(t, unAuthorizedResponseRegex, rr.Body.String())
+		require.Equal(http.StatusUnauthorized, rr.Code)
+		require.Contains(rr.Body.String(), errTokenInsufficientPermission.Error())
+		require.Regexp(unAuthorizedResponseRegex, rr.Body.String())
 	}
 }
 
 func TestWrapHandlerAuthEndpoint(t *testing.T) {
+	require := require.New(t)
+
 	auth := NewFromHash(logging.NoLog{}, "auth", hashedPassword)
 
 	// Make a token
 	endpoints := []string{"/ext/info", "/ext/bc/X", "/ext/metrics", "", "/foo", "/ext/info/foo"}
 	tokenStr, err := auth.NewToken(testPassword, defaultTokenLifespan, endpoints)
-	assert.NoError(t, err)
+	require.NoError(err)
 
 	wrappedHandler := auth.WrapHandler(dummyHandler)
 	req := httptest.NewRequest(http.MethodPost, "http://127.0.0.1:9650/ext/auth", strings.NewReader(""))
-	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", tokenStr))
+	req.Header.Add("Authorization", "Bearer "+tokenStr)
 	rr := httptest.NewRecorder()
 	wrappedHandler.ServeHTTP(rr, req)
-	assert.Equal(t, http.StatusOK, rr.Code)
+	require.Equal(http.StatusOK, rr.Code)
 }
 
 func TestWrapHandlerAccessAll(t *testing.T) {
+	require := require.New(t)
+
 	auth := NewFromHash(logging.NoLog{}, "auth", hashedPassword)
 
 	// Make a token that allows access to all endpoints
 	endpoints := []string{"/ext/info", "/ext/bc/X", "/ext/metrics", "", "/foo", "/ext/foo/info"}
 	tokenStr, err := auth.NewToken(testPassword, defaultTokenLifespan, []string{"*"})
-	assert.NoError(t, err)
+	require.NoError(err)
 
 	wrappedHandler := auth.WrapHandler(dummyHandler)
 	for _, endpoint := range endpoints {
-		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("http://127.0.0.1:9650%s", endpoint), strings.NewReader(""))
-		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", tokenStr))
+		req := httptest.NewRequest(http.MethodPost, "http://127.0.0.1:9650"+endpoint, strings.NewReader(""))
+		req.Header.Add("Authorization", "Bearer "+tokenStr)
 		rr := httptest.NewRecorder()
 		wrappedHandler.ServeHTTP(rr, req)
-		assert.Equal(t, http.StatusOK, rr.Code)
+		require.Equal(http.StatusOK, rr.Code)
 	}
 }
 
 func TestWriteUnauthorizedResponse(t *testing.T) {
+	require := require.New(t)
+
 	rr := httptest.NewRecorder()
-	writeUnauthorizedResponse(rr, errors.New("example err"))
-	assert.Equal(t, http.StatusUnauthorized, rr.Code)
-	assert.Equal(t, "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"example err\"},\"id\":1}\n", rr.Body.String())
+	writeUnauthorizedResponse(rr, errTest)
+	require.Equal(http.StatusUnauthorized, rr.Code)
+	require.Equal(`{"jsonrpc":"2.0","error":{"code":-32600,"message":"non-nil error"},"id":1}`+"\n", rr.Body.String())
 }
 
 func TestWrapHandlerMutatedRevokedToken(t *testing.T) {
+	require := require.New(t)
+
 	auth := NewFromHash(logging.NoLog{}, "auth", hashedPassword)
 
 	// Make a token
 	endpoints := []string{"/ext/info", "/ext/bc/X", "/ext/metrics"}
 	tokenStr, err := auth.NewToken(testPassword, defaultTokenLifespan, endpoints)
-	assert.NoError(t, err)
+	require.NoError(err)
 
-	err = auth.RevokeToken(tokenStr, testPassword)
-	assert.NoError(t, err)
+	require.NoError(auth.RevokeToken(tokenStr, testPassword))
 
 	wrappedHandler := auth.WrapHandler(dummyHandler)
 
 	for _, endpoint := range endpoints {
-		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("http://127.0.0.1:9650%s", endpoint), strings.NewReader(""))
-		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", tokenStr+"="))
+		req := httptest.NewRequest(http.MethodPost, "http://127.0.0.1:9650"+endpoint, strings.NewReader(""))
+		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s=", tokenStr)) // The appended = at the end looks like padding
 		rr := httptest.NewRecorder()
 		wrappedHandler.ServeHTTP(rr, req)
-		assert.Equal(t, http.StatusUnauthorized, rr.Code)
-		assert.Contains(t, rr.Body.String(), errTokenRevoked.Error())
-		assert.Regexp(t, unAuthorizedResponseRegex, rr.Body.String())
+		require.Equal(http.StatusUnauthorized, rr.Code)
 	}
 }
 
 func TestWrapHandlerInvalidSigningMethod(t *testing.T) {
+	require := require.New(t)
+
 	auth := NewFromHash(logging.NoLog{}, "auth", hashedPassword).(*auth)
 
 	// Make a token
 	endpoints := []string{"/ext/info", "/ext/bc/X", "/ext/metrics"}
 	idBytes := [tokenIDByteLen]byte{}
-	if _, err := rand.Read(idBytes[:]); err != nil {
-		t.Fatal(err)
-	}
-	id := base64.URLEncoding.EncodeToString(idBytes[:])
+	_, err := rand.Read(idBytes[:])
+	require.NoError(err)
+	id := base64.RawURLEncoding.EncodeToString(idBytes[:])
 
 	claims := endpointClaims{
-		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: auth.clock.Time().Add(defaultTokenLifespan).Unix(),
-			Id:        id,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(auth.clock.Time().Add(defaultTokenLifespan)),
+			ID:        id,
 		},
 		Endpoints: endpoints,
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS512, &claims)
 	tokenStr, err := token.SignedString(auth.password.Password[:])
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	wrappedHandler := auth.WrapHandler(dummyHandler)
 
 	for _, endpoint := range endpoints {
-		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("http://127.0.0.1:9650%s", endpoint), strings.NewReader(""))
-		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", tokenStr+"="))
+		req := httptest.NewRequest(http.MethodPost, "http://127.0.0.1:9650"+endpoint, strings.NewReader(""))
+		req.Header.Add("Authorization", "Bearer "+tokenStr)
 		rr := httptest.NewRecorder()
 		wrappedHandler.ServeHTTP(rr, req)
-		assert.Equal(t, http.StatusUnauthorized, rr.Code)
-		assert.Contains(t, rr.Body.String(), errInvalidSigningMethod.Error())
-		assert.Regexp(t, unAuthorizedResponseRegex, rr.Body.String())
+		require.Equal(http.StatusUnauthorized, rr.Code)
+		require.Contains(rr.Body.String(), errInvalidSigningMethod.Error())
+		require.Regexp(unAuthorizedResponseRegex, rr.Body.String())
 	}
 }

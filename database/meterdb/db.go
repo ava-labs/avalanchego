@@ -1,9 +1,11 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package meterdb
 
 import (
+	"context"
+
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -11,9 +13,9 @@ import (
 )
 
 var (
-	_ database.Database = &Database{}
-	_ database.Batch    = &batch{}
-	_ database.Iterator = &iterator{}
+	_ database.Database = (*Database)(nil)
+	_ database.Batch    = (*batch)(nil)
+	_ database.Iterator = (*iterator)(nil)
 )
 
 // Database tracks the amount of time each operation takes and how many bytes
@@ -130,9 +132,9 @@ func (db *Database) Close() error {
 	return err
 }
 
-func (db *Database) HealthCheck() (interface{}, error) {
+func (db *Database) HealthCheck(ctx context.Context) (interface{}, error) {
 	start := db.clock.Time()
-	result, err := db.db.HealthCheck()
+	result, err := db.db.HealthCheck(ctx)
 	end := db.clock.Time()
 	db.healthCheck.Observe(float64(end.Sub(start)))
 	return result, err

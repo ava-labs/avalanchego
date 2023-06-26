@@ -1,11 +1,9 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package formatting
 
-import (
-	"fmt"
-)
+import "fmt"
 
 // PrefixedStringer extends a stringer that adds a prefix
 type PrefixedStringer interface {

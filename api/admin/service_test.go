@@ -1,23 +1,21 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package admin
 
 import (
-	"errors"
+	"net/http"
 	"testing"
 
 	"github.com/golang/mock/gomock"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/registry"
 )
-
-var errOops = errors.New("oops")
 
 type loadVMsTest struct {
 	admin          *Admin
@@ -49,6 +47,8 @@ func initLoadVMsTest(t *testing.T) *loadVMsTest {
 
 // Tests behavior for LoadVMs if everything succeeds.
 func TestLoadVMsSuccess(t *testing.T) {
+	require := require.New(t)
+
 	resources := initLoadVMsTest(t)
 	defer resources.ctrl.Finish()
 
@@ -57,7 +57,7 @@ func TestLoadVMsSuccess(t *testing.T) {
 
 	newVMs := []ids.ID{id1, id2}
 	failedVMs := map[ids.ID]error{
-		ids.GenerateTestID(): errors.New("failed for some reason"),
+		ids.GenerateTestID(): errTest,
 	}
 	// every vm is at least aliased to itself.
 	alias1 := []string{id1.String(), "vm1-alias-1", "vm1-alias-2"}
@@ -68,36 +68,37 @@ func TestLoadVMsSuccess(t *testing.T) {
 		id2: alias2[1:],
 	}
 
-	resources.mockLog.EXPECT().Debug(gomock.Any()).Times(1)
-	resources.mockVMRegistry.EXPECT().ReloadWithReadLock().Times(1).Return(newVMs, failedVMs, nil)
+	resources.mockLog.EXPECT().Debug(gomock.Any(), gomock.Any()).Times(1)
+	resources.mockVMRegistry.EXPECT().ReloadWithReadLock(gomock.Any()).Times(1).Return(newVMs, failedVMs, nil)
 	resources.mockVMManager.EXPECT().Aliases(id1).Times(1).Return(alias1, nil)
 	resources.mockVMManager.EXPECT().Aliases(id2).Times(1).Return(alias2, nil)
 
 	// execute test
 	reply := LoadVMsReply{}
-	err := resources.admin.LoadVMs(nil, nil, &reply)
-
-	assert.Equal(t, expectedVMRegistry, reply.NewVMs)
-	assert.Equal(t, err, nil)
+	require.NoError(resources.admin.LoadVMs(&http.Request{}, nil, &reply))
+	require.Equal(expectedVMRegistry, reply.NewVMs)
 }
 
 // Tests behavior for LoadVMs if we fail to reload vms.
 func TestLoadVMsReloadFails(t *testing.T) {
+	require := require.New(t)
+
 	resources := initLoadVMsTest(t)
 	defer resources.ctrl.Finish()
 
-	resources.mockLog.EXPECT().Debug(gomock.Any()).Times(1)
+	resources.mockLog.EXPECT().Debug(gomock.Any(), gomock.Any()).Times(1)
 	// Reload fails
-	resources.mockVMRegistry.EXPECT().ReloadWithReadLock().Times(1).Return(nil, nil, errOops)
+	resources.mockVMRegistry.EXPECT().ReloadWithReadLock(gomock.Any()).Times(1).Return(nil, nil, errTest)
 
 	reply := LoadVMsReply{}
-	err := resources.admin.LoadVMs(nil, nil, &reply)
-
-	assert.Equal(t, err, errOops)
+	err := resources.admin.LoadVMs(&http.Request{}, nil, &reply)
+	require.ErrorIs(err, errTest)
 }
 
 // Tests behavior for LoadVMs if we fail to fetch our aliases
 func TestLoadVMsGetAliasesFails(t *testing.T) {
+	require := require.New(t)
+
 	resources := initLoadVMsTest(t)
 	defer resources.ctrl.Finish()
 
@@ -105,18 +106,17 @@ func TestLoadVMsGetAliasesFails(t *testing.T) {
 	id2 := ids.GenerateTestID()
 	newVMs := []ids.ID{id1, id2}
 	failedVMs := map[ids.ID]error{
-		ids.GenerateTestID(): errors.New("failed for some reason"),
+		ids.GenerateTestID(): errTest,
 	}
 	// every vm is at least aliased to itself.
 	alias1 := []string{id1.String(), "vm1-alias-1", "vm1-alias-2"}
 
-	resources.mockLog.EXPECT().Debug(gomock.Any()).Times(1)
-	resources.mockVMRegistry.EXPECT().ReloadWithReadLock().Times(1).Return(newVMs, failedVMs, nil)
+	resources.mockLog.EXPECT().Debug(gomock.Any(), gomock.Any()).Times(1)
+	resources.mockVMRegistry.EXPECT().ReloadWithReadLock(gomock.Any()).Times(1).Return(newVMs, failedVMs, nil)
 	resources.mockVMManager.EXPECT().Aliases(id1).Times(1).Return(alias1, nil)
-	resources.mockVMManager.EXPECT().Aliases(id2).Times(1).Return(nil, errOops)
+	resources.mockVMManager.EXPECT().Aliases(id2).Times(1).Return(nil, errTest)
 
 	reply := LoadVMsReply{}
-	err := resources.admin.LoadVMs(nil, nil, &reply)
-
-	assert.Equal(t, err, errOops)
+	err := resources.admin.LoadVMs(&http.Request{}, nil, &reply)
+	require.ErrorIs(err, errTest)
 }

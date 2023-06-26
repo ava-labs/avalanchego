@@ -1,11 +1,9 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package common
 
-import (
-	"net/http"
-)
+import "net/http"
 
 // LockOption allows the vm to specify their lock option based on their endpoint
 type LockOption uint32

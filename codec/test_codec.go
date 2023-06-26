@@ -1,23 +1,20 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package codec
 
 import (
-	"bytes"
 	"math"
-	"reflect"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-
-	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/stretchr/testify/require"
 )
 
 var Tests = []func(c GeneralCodec, t testing.TB){
 	TestStruct,
 	TestRegisterStructTwice,
 	TestUInt32,
+	TestUIntPtr,
 	TestSlice,
 	TestMaxSizeSlice,
 	TestBool,
@@ -36,6 +33,11 @@ var Tests = []func(c GeneralCodec, t testing.TB){
 	TestNilSliceSerialization,
 	TestEmptySliceSerialization,
 	TestSliceWithEmptySerialization,
+	TestSliceWithEmptySerializationOutOfMemory,
+	TestSliceTooLarge,
+	TestNegativeNumbers,
+	TestTooLargeUnmarshal,
+	TestUnmarshalInvalidInterface,
 	TestRestrictedSlice,
 	TestExtraSpace,
 	TestSliceLengthOverflow,
@@ -49,8 +51,8 @@ var MultipleTagsTests = []func(c GeneralCodec, t testing.TB){
 // for the sake of testing
 
 var (
-	_ Foo = &MyInnerStruct{}
-	_ Foo = &MyInnerStruct2{}
+	_ Foo = (*MyInnerStruct)(nil)
+	_ Foo = (*MyInnerStruct2)(nil)
 )
 
 type Foo interface {
@@ -61,7 +63,7 @@ type MyInnerStruct struct {
 	Str string `serialize:"true"`
 }
 
-func (m *MyInnerStruct) Foo() int {
+func (*MyInnerStruct) Foo() int {
 	return 1
 }
 
@@ -69,7 +71,7 @@ type MyInnerStruct2 struct {
 	Bool bool `serialize:"true"`
 }
 
-func (m *MyInnerStruct2) Foo() int {
+func (*MyInnerStruct2) Foo() int {
 	return 2
 }
 
@@ -102,6 +104,8 @@ type myStruct struct {
 
 // Test marshaling/unmarshaling a complicated struct
 func TestStruct(codec GeneralCodec, t testing.TB) {
+	require := require.New(t)
+
 	temp := Foo(&MyInnerStruct{})
 	myStructInstance := myStruct{
 		InnerStruct:  MyInnerStruct{"hello"},
@@ -110,7 +114,7 @@ func TestStruct(codec GeneralCodec, t testing.TB) {
 		Member2:      2,
 		MySlice:      []byte{1, 2, 3, 4},
 		MySlice2:     []string{"one", "two", "three"},
-		MySlice3:     []MyInnerStruct{{"a"}, {"b"}, {"c"}},
+		MySlice3:     []MyInnerStruct{{"abc"}, {"ab"}, {"c"}},
 		MySlice4:     []*MyInnerStruct2{{true}, {}},
 		MySlice5:     []Foo{&MyInnerStruct2{true}, &MyInnerStruct2{}},
 		MyArray:      [4]byte{5, 6, 7, 8},
@@ -129,249 +133,205 @@ func TestStruct(codec GeneralCodec, t testing.TB) {
 	}
 
 	manager := NewDefaultManager()
-	errs := wrappers.Errs{}
-	errs.Add(
-		codec.RegisterType(&MyInnerStruct{}), // Register the types that may be unmarshaled into interfaces
-		codec.RegisterType(&MyInnerStruct2{}),
-		manager.RegisterCodec(0, codec),
-	)
-	if errs.Errored() {
-		t.Fatal(errs.Err)
-	}
+	// Register the types that may be unmarshaled into interfaces
+	require.NoError(codec.RegisterType(&MyInnerStruct{}))
+	require.NoError(codec.RegisterType(&MyInnerStruct2{}))
+	require.NoError(manager.RegisterCodec(0, codec))
 
 	myStructBytes, err := manager.Marshal(0, myStructInstance)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
+
+	bytesLen, err := manager.Size(0, myStructInstance)
+	require.NoError(err)
+	require.Equal(len(myStructBytes), bytesLen)
 
 	myStructUnmarshaled := &myStruct{}
 	version, err := manager.Unmarshal(myStructBytes, myStructUnmarshaled)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if version != 0 {
-		t.Fatalf("wrong version returned. Expected %d ; Returned %d", 0, version)
-	}
+	require.NoError(err)
 
-	if !reflect.DeepEqual(*myStructUnmarshaled, myStructInstance) {
-		t.Fatal("should be same")
-	}
+	require.Zero(version)
+	require.Equal(myStructInstance, *myStructUnmarshaled)
 }
 
 func TestRegisterStructTwice(codec GeneralCodec, t testing.TB) {
-	var _ GeneralCodec = codec
+	require := require.New(t)
 
-	errs := wrappers.Errs{}
-	errs.Add(
-		codec.RegisterType(&MyInnerStruct{}),
-		codec.RegisterType(&MyInnerStruct{}), // Register the same struct twice
-	)
-	if !errs.Errored() {
-		t.Fatal("Registering the same struct twice should have caused an error")
-	}
+	require.NoError(codec.RegisterType(&MyInnerStruct{}))
+	err := codec.RegisterType(&MyInnerStruct{})
+	require.ErrorIs(err, ErrDuplicateType)
 }
 
 func TestUInt32(codec GeneralCodec, t testing.TB) {
-	var _ GeneralCodec = codec
+	require := require.New(t)
 
 	number := uint32(500)
 
 	manager := NewDefaultManager()
-	if err := manager.RegisterCodec(0, codec); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(manager.RegisterCodec(0, codec))
 
 	bytes, err := manager.Marshal(0, number)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
+
+	bytesLen, err := manager.Size(0, number)
+	require.NoError(err)
+	require.Equal(len(bytes), bytesLen)
 
 	var numberUnmarshaled uint32
 	version, err := manager.Unmarshal(bytes, &numberUnmarshaled)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if version != 0 {
-		t.Fatalf("wrong version returned. Expected %d ; Returned %d", 0, version)
-	}
+	require.NoError(err)
+	require.Zero(version)
+	require.Equal(number, numberUnmarshaled)
+}
 
-	if number != numberUnmarshaled {
-		t.Fatal("expected marshaled and unmarshaled values to match")
-	}
+func TestUIntPtr(codec GeneralCodec, t testing.TB) {
+	require := require.New(t)
+
+	manager := NewDefaultManager()
+
+	require.NoError(manager.RegisterCodec(0, codec))
+
+	number := uintptr(500)
+	_, err := manager.Marshal(0, number)
+	require.ErrorIs(err, ErrUnsupportedType)
 }
 
 func TestSlice(codec GeneralCodec, t testing.TB) {
-	var _ GeneralCodec = codec
+	require := require.New(t)
 
 	mySlice := []bool{true, false, true, true}
 	manager := NewDefaultManager()
-	if err := manager.RegisterCodec(0, codec); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(manager.RegisterCodec(0, codec))
 
 	bytes, err := manager.Marshal(0, mySlice)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
+
+	bytesLen, err := manager.Size(0, mySlice)
+	require.NoError(err)
+	require.Equal(len(bytes), bytesLen)
 
 	var sliceUnmarshaled []bool
 	version, err := manager.Unmarshal(bytes, &sliceUnmarshaled)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if version != 0 {
-		t.Fatalf("wrong version returned. Expected %d ; Returned %d", 0, version)
-	}
-
-	if !reflect.DeepEqual(mySlice, sliceUnmarshaled) {
-		t.Fatal("expected marshaled and unmarshaled values to match")
-	}
+	require.NoError(err)
+	require.Zero(version)
+	require.Equal(mySlice, sliceUnmarshaled)
 }
 
 // Test marshalling/unmarshalling largest possible slice
 func TestMaxSizeSlice(codec GeneralCodec, t testing.TB) {
-	var _ GeneralCodec = codec
+	require := require.New(t)
 
 	mySlice := make([]string, math.MaxUint16)
 	mySlice[0] = "first!"
 	mySlice[math.MaxUint16-1] = "last!"
 	manager := NewDefaultManager()
-	if err := manager.RegisterCodec(0, codec); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(manager.RegisterCodec(0, codec))
+
 	bytes, err := manager.Marshal(0, mySlice)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
+
+	bytesLen, err := manager.Size(0, mySlice)
+	require.NoError(err)
+	require.Equal(len(bytes), bytesLen)
 
 	var sliceUnmarshaled []string
 	version, err := manager.Unmarshal(bytes, &sliceUnmarshaled)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if version != 0 {
-		t.Fatalf("wrong version returned. Expected %d ; Returned %d", 0, version)
-	}
-
-	if !reflect.DeepEqual(mySlice, sliceUnmarshaled) {
-		t.Fatal("expected marshaled and unmarshaled values to match")
-	}
+	require.NoError(err)
+	require.Zero(version)
+	require.Equal(mySlice, sliceUnmarshaled)
 }
 
 // Test marshalling a bool
 func TestBool(codec GeneralCodec, t testing.TB) {
-	var _ GeneralCodec = codec
+	require := require.New(t)
 
 	myBool := true
 	manager := NewDefaultManager()
-	if err := manager.RegisterCodec(0, codec); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(manager.RegisterCodec(0, codec))
+
 	bytes, err := manager.Marshal(0, myBool)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
+
+	bytesLen, err := manager.Size(0, myBool)
+	require.NoError(err)
+	require.Equal(len(bytes), bytesLen)
 
 	var boolUnmarshaled bool
 	version, err := manager.Unmarshal(bytes, &boolUnmarshaled)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if version != 0 {
-		t.Fatalf("wrong version returned. Expected %d ; Returned %d", 0, version)
-	}
-
-	if !reflect.DeepEqual(myBool, boolUnmarshaled) {
-		t.Fatal("expected marshaled and unmarshaled values to match")
-	}
+	require.NoError(err)
+	require.Zero(version)
+	require.Equal(myBool, boolUnmarshaled)
 }
 
 // Test marshalling an array
 func TestArray(codec GeneralCodec, t testing.TB) {
-	var _ GeneralCodec = codec
+	require := require.New(t)
 
 	myArr := [5]uint64{5, 6, 7, 8, 9}
 	manager := NewDefaultManager()
-	if err := manager.RegisterCodec(0, codec); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(manager.RegisterCodec(0, codec))
+
 	bytes, err := manager.Marshal(0, myArr)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
+
+	bytesLen, err := manager.Size(0, myArr)
+	require.NoError(err)
+	require.Equal(len(bytes), bytesLen)
 
 	var myArrUnmarshaled [5]uint64
 	version, err := manager.Unmarshal(bytes, &myArrUnmarshaled)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if version != 0 {
-		t.Fatalf("wrong version returned. Expected %d ; Returned %d", 0, version)
-	}
-
-	if !reflect.DeepEqual(myArr, myArrUnmarshaled) {
-		t.Fatal("expected marshaled and unmarshaled values to match")
-	}
+	require.NoError(err)
+	require.Zero(version)
+	require.Equal(myArr, myArrUnmarshaled)
 }
 
 // Test marshalling a really big array
 func TestBigArray(codec GeneralCodec, t testing.TB) {
-	var _ GeneralCodec = codec
+	require := require.New(t)
 
 	myArr := [30000]uint64{5, 6, 7, 8, 9}
 	manager := NewDefaultManager()
-	if err := manager.RegisterCodec(0, codec); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(manager.RegisterCodec(0, codec))
+
 	bytes, err := manager.Marshal(0, myArr)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
+
+	bytesLen, err := manager.Size(0, myArr)
+	require.NoError(err)
+	require.Equal(len(bytes), bytesLen)
 
 	var myArrUnmarshaled [30000]uint64
 	version, err := manager.Unmarshal(bytes, &myArrUnmarshaled)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if version != 0 {
-		t.Fatalf("wrong version returned. Expected %d ; Returned %d", 0, version)
-	}
-
-	if !reflect.DeepEqual(myArr, myArrUnmarshaled) {
-		t.Fatal("expected marshaled and unmarshaled values to match")
-	}
+	require.NoError(err)
+	require.Zero(version)
+	require.Equal(myArr, myArrUnmarshaled)
 }
 
 // Test marshalling a pointer to a struct
 func TestPointerToStruct(codec GeneralCodec, t testing.TB) {
-	var _ GeneralCodec = codec
+	require := require.New(t)
 
 	myPtr := &MyInnerStruct{Str: "Hello!"}
 	manager := NewDefaultManager()
-	if err := manager.RegisterCodec(0, codec); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(manager.RegisterCodec(0, codec))
+
 	bytes, err := manager.Marshal(0, myPtr)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
+
+	bytesLen, err := manager.Size(0, myPtr)
+	require.NoError(err)
+	require.Equal(len(bytes), bytesLen)
 
 	var myPtrUnmarshaled *MyInnerStruct
 	version, err := manager.Unmarshal(bytes, &myPtrUnmarshaled)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if version != 0 {
-		t.Fatalf("wrong version returned. Expected %d ; Returned %d", 0, version)
-	}
-
-	if !reflect.DeepEqual(myPtr, myPtrUnmarshaled) {
-		t.Fatal("expected marshaled and unmarshaled values to match")
-	}
+	require.NoError(err)
+	require.Zero(version)
+	require.Equal(myPtr, myPtrUnmarshaled)
 }
 
 // Test marshalling a slice of structs
 func TestSliceOfStruct(codec GeneralCodec, t testing.TB) {
+	require := require.New(t)
+
 	mySlice := []MyInnerStruct3{
 		{
 			Str: "One",
@@ -384,64 +344,53 @@ func TestSliceOfStruct(codec GeneralCodec, t testing.TB) {
 			F:   &MyInnerStruct{"Six"},
 		},
 	}
-	if err := codec.RegisterType(&MyInnerStruct{}); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(codec.RegisterType(&MyInnerStruct{}))
+
 	manager := NewDefaultManager()
-	if err := manager.RegisterCodec(0, codec); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(manager.RegisterCodec(0, codec))
+
 	bytes, err := manager.Marshal(0, mySlice)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
+
+	bytesLen, err := manager.Size(0, mySlice)
+	require.NoError(err)
+	require.Equal(len(bytes), bytesLen)
 
 	var mySliceUnmarshaled []MyInnerStruct3
 	version, err := manager.Unmarshal(bytes, &mySliceUnmarshaled)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if version != 0 {
-		t.Fatalf("wrong version returned. Expected %d ; Returned %d", 0, version)
-	}
-
-	if !reflect.DeepEqual(mySlice, mySliceUnmarshaled) {
-		t.Fatal("expected marshaled and unmarshaled values to match")
-	}
+	require.NoError(err)
+	require.Zero(version)
+	require.Equal(mySlice, mySliceUnmarshaled)
 }
 
 // Test marshalling an interface
 func TestInterface(codec GeneralCodec, t testing.TB) {
-	if err := codec.RegisterType(&MyInnerStruct2{}); err != nil {
-		t.Fatal(err)
-	}
+	require := require.New(t)
+
+	require.NoError(codec.RegisterType(&MyInnerStruct2{}))
+
 	manager := NewDefaultManager()
-	if err := manager.RegisterCodec(0, codec); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(manager.RegisterCodec(0, codec))
 
 	var f Foo = &MyInnerStruct2{true}
 	bytes, err := manager.Marshal(0, &f)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
+
+	bytesLen, err := manager.Size(0, &f)
+	require.NoError(err)
+	require.Equal(len(bytes), bytesLen)
 
 	var unmarshaledFoo Foo
 	version, err := manager.Unmarshal(bytes, &unmarshaledFoo)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if version != 0 {
-		t.Fatalf("wrong version returned. Expected %d ; Returned %d", 0, version)
-	}
-
-	if !reflect.DeepEqual(f, unmarshaledFoo) {
-		t.Fatal("expected unmarshaled value to match original")
-	}
+	require.NoError(err)
+	require.Zero(version)
+	require.Equal(f, unmarshaledFoo)
 }
 
 // Test marshalling a slice of interfaces
 func TestSliceOfInterface(codec GeneralCodec, t testing.TB) {
+	require := require.New(t)
+
 	mySlice := []Foo{
 		&MyInnerStruct{
 			Str: "Hello",
@@ -450,34 +399,29 @@ func TestSliceOfInterface(codec GeneralCodec, t testing.TB) {
 			Str: ", World!",
 		},
 	}
-	if err := codec.RegisterType(&MyInnerStruct{}); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(codec.RegisterType(&MyInnerStruct{}))
+
 	manager := NewDefaultManager()
-	if err := manager.RegisterCodec(0, codec); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(manager.RegisterCodec(0, codec))
+
 	bytes, err := manager.Marshal(0, mySlice)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
+
+	bytesLen, err := manager.Size(0, mySlice)
+	require.NoError(err)
+	require.Equal(len(bytes), bytesLen)
 
 	var mySliceUnmarshaled []Foo
 	version, err := manager.Unmarshal(bytes, &mySliceUnmarshaled)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if version != 0 {
-		t.Fatalf("wrong version returned. Expected %d ; Returned %d", 0, version)
-	}
-
-	if !reflect.DeepEqual(mySlice, mySliceUnmarshaled) {
-		t.Fatal("expected marshaled and unmarshaled values to match")
-	}
+	require.NoError(err)
+	require.Zero(version)
+	require.Equal(mySlice, mySliceUnmarshaled)
 }
 
 // Test marshalling an array of interfaces
 func TestArrayOfInterface(codec GeneralCodec, t testing.TB) {
+	require := require.New(t)
+
 	myArray := [2]Foo{
 		&MyInnerStruct{
 			Str: "Hello",
@@ -486,96 +430,76 @@ func TestArrayOfInterface(codec GeneralCodec, t testing.TB) {
 			Str: ", World!",
 		},
 	}
-	if err := codec.RegisterType(&MyInnerStruct{}); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(codec.RegisterType(&MyInnerStruct{}))
+
 	manager := NewDefaultManager()
-	if err := manager.RegisterCodec(0, codec); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(manager.RegisterCodec(0, codec))
+
 	bytes, err := manager.Marshal(0, myArray)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
+
+	bytesLen, err := manager.Size(0, myArray)
+	require.NoError(err)
+	require.Equal(len(bytes), bytesLen)
 
 	var myArrayUnmarshaled [2]Foo
 	version, err := manager.Unmarshal(bytes, &myArrayUnmarshaled)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if version != 0 {
-		t.Fatalf("wrong version returned. Expected %d ; Returned %d", 0, version)
-	}
-
-	if !reflect.DeepEqual(myArray, myArrayUnmarshaled) {
-		t.Fatal("expected marshaled and unmarshaled values to match")
-	}
+	require.NoError(err)
+	require.Zero(version)
+	require.Equal(myArray, myArrayUnmarshaled)
 }
 
 // Test marshalling a pointer to an interface
 func TestPointerToInterface(codec GeneralCodec, t testing.TB) {
+	require := require.New(t)
+
 	var myinnerStruct Foo = &MyInnerStruct{Str: "Hello!"}
 	myPtr := &myinnerStruct
 
-	if err := codec.RegisterType(&MyInnerStruct{}); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(codec.RegisterType(&MyInnerStruct{}))
+
 	manager := NewDefaultManager()
-	if err := manager.RegisterCodec(0, codec); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(manager.RegisterCodec(0, codec))
 
 	bytes, err := manager.Marshal(0, &myPtr)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
+
+	bytesLen, err := manager.Size(0, &myPtr)
+	require.NoError(err)
+	require.Equal(len(bytes), bytesLen)
 
 	var myPtrUnmarshaled *Foo
 	version, err := manager.Unmarshal(bytes, &myPtrUnmarshaled)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if version != 0 {
-		t.Fatalf("wrong version returned. Expected %d ; Returned %d", 0, version)
-	}
-
-	if !reflect.DeepEqual(myPtr, myPtrUnmarshaled) {
-		t.Fatal("expected marshaled and unmarshaled values to match")
-	}
+	require.NoError(err)
+	require.Zero(version)
+	require.Equal(myPtr, myPtrUnmarshaled)
 }
 
 // Test marshalling a string
 func TestString(codec GeneralCodec, t testing.TB) {
-	var _ GeneralCodec = codec
+	require := require.New(t)
 
 	myString := "Ayy"
 	manager := NewDefaultManager()
-	if err := manager.RegisterCodec(0, codec); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(manager.RegisterCodec(0, codec))
 
 	bytes, err := manager.Marshal(0, myString)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
+
+	bytesLen, err := manager.Size(0, myString)
+	require.NoError(err)
+	require.Equal(len(bytes), bytesLen)
 
 	var stringUnmarshaled string
 	version, err := manager.Unmarshal(bytes, &stringUnmarshaled)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if version != 0 {
-		t.Fatalf("wrong version returned. Expected %d ; Returned %d", 0, version)
-	}
-
-	if !reflect.DeepEqual(myString, stringUnmarshaled) {
-		t.Fatal("expected marshaled and unmarshaled values to match")
-	}
+	require.NoError(err)
+	require.Zero(version)
+	require.Equal(myString, stringUnmarshaled)
 }
 
 // Ensure a nil slice is unmarshaled to slice with length 0
 func TestNilSlice(codec GeneralCodec, t testing.TB) {
-	var _ GeneralCodec = codec
+	require := require.New(t)
 
 	type structWithSlice struct {
 		Slice []byte `serialize:"true"`
@@ -583,37 +507,30 @@ func TestNilSlice(codec GeneralCodec, t testing.TB) {
 
 	myStruct := structWithSlice{Slice: nil}
 	manager := NewDefaultManager()
-	if err := manager.RegisterCodec(0, codec); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(manager.RegisterCodec(0, codec))
 
 	bytes, err := manager.Marshal(0, myStruct)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
+
+	bytesLen, err := manager.Size(0, myStruct)
+	require.NoError(err)
+	require.Equal(len(bytes), bytesLen)
 
 	var structUnmarshaled structWithSlice
 	version, err := manager.Unmarshal(bytes, &structUnmarshaled)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if version != 0 {
-		t.Fatalf("wrong version returned. Expected %d ; Returned %d", 0, version)
-	}
-
-	if len(structUnmarshaled.Slice) != 0 {
-		t.Fatal("expected slice to have length 0")
-	}
+	require.NoError(err)
+	require.Zero(version)
+	require.Empty(structUnmarshaled.Slice)
 }
 
 // Ensure that trying to serialize a struct with an unexported member
 // that has `serialize:"true"` returns error
 func TestSerializeUnexportedField(codec GeneralCodec, t testing.TB) {
-	var _ GeneralCodec = codec
+	require := require.New(t)
 
 	type s struct {
 		ExportedField   string `serialize:"true"`
-		unexportedField string `serialize:"true"`
+		unexportedField string `serialize:"true"` //nolint:revive
 	}
 
 	myS := s{
@@ -622,17 +539,17 @@ func TestSerializeUnexportedField(codec GeneralCodec, t testing.TB) {
 	}
 
 	manager := NewDefaultManager()
-	if err := manager.RegisterCodec(0, codec); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(manager.RegisterCodec(0, codec))
 
-	if _, err := manager.Marshal(0, myS); err == nil {
-		t.Fatalf("expected err but got none")
-	}
+	_, err := manager.Marshal(0, myS)
+	require.ErrorIs(err, ErrUnexportedField)
+
+	_, err = manager.Size(0, myS)
+	require.ErrorIs(err, ErrUnexportedField)
 }
 
 func TestSerializeOfNoSerializeField(codec GeneralCodec, t testing.TB) {
-	var _ GeneralCodec = codec
+	require := require.New(t)
 
 	type s struct {
 		SerializedField   string `serialize:"true"`
@@ -645,108 +562,83 @@ func TestSerializeOfNoSerializeField(codec GeneralCodec, t testing.TB) {
 		UnmarkedField:     "No declared serialize",
 	}
 	manager := NewDefaultManager()
-	if err := manager.RegisterCodec(0, codec); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(manager.RegisterCodec(0, codec))
 
 	marshalled, err := manager.Marshal(0, myS)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
+
+	bytesLen, err := manager.Size(0, myS)
+	require.NoError(err)
+	require.Equal(len(marshalled), bytesLen)
 
 	unmarshalled := s{}
 	version, err := manager.Unmarshal(marshalled, &unmarshalled)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if version != 0 {
-		t.Fatalf("wrong version returned. Expected %d ; Returned %d", 0, version)
-	}
+	require.NoError(err)
+	require.Zero(version)
 
 	expectedUnmarshalled := s{SerializedField: "Serialize me"}
-	if !reflect.DeepEqual(unmarshalled, expectedUnmarshalled) {
-		t.Fatalf("Got %#v, expected %#v", unmarshalled, expectedUnmarshalled)
-	}
+	require.Equal(expectedUnmarshalled, unmarshalled)
 }
 
 // Test marshalling of nil slice
 func TestNilSliceSerialization(codec GeneralCodec, t testing.TB) {
-	var _ GeneralCodec = codec
+	require := require.New(t)
 
 	type simpleSliceStruct struct {
 		Arr []uint32 `serialize:"true"`
 	}
 
 	manager := NewDefaultManager()
-	if err := manager.RegisterCodec(0, codec); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(manager.RegisterCodec(0, codec))
 
 	val := &simpleSliceStruct{}
 	expected := []byte{0, 0, 0, 0, 0, 0} // 0 for codec version, then nil slice marshaled as 0 length slice
 	result, err := manager.Marshal(0, val)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(expected, result) {
-		t.Fatalf("\nExpected: 0x%x\nResult:   0x%x", expected, result)
-	}
+	require.NoError(err)
+	require.Equal(expected, result)
+
+	bytesLen, err := manager.Size(0, val)
+	require.NoError(err)
+	require.Equal(len(result), bytesLen)
 
 	valUnmarshaled := &simpleSliceStruct{}
 	version, err := manager.Unmarshal(result, &valUnmarshaled)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if version != 0 {
-		t.Fatalf("wrong version returned. Expected %d ; Returned %d", 0, version)
-	}
-
-	if len(valUnmarshaled.Arr) != 0 {
-		t.Fatal("should be 0 length")
-	}
+	require.NoError(err)
+	require.Zero(version)
+	require.Empty(valUnmarshaled.Arr)
 }
 
 // Test marshaling a slice that has 0 elements (but isn't nil)
 func TestEmptySliceSerialization(codec GeneralCodec, t testing.TB) {
-	var _ GeneralCodec = codec
+	require := require.New(t)
 
 	type simpleSliceStruct struct {
 		Arr []uint32 `serialize:"true"`
 	}
 
 	manager := NewDefaultManager()
-	if err := manager.RegisterCodec(0, codec); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(manager.RegisterCodec(0, codec))
 
 	val := &simpleSliceStruct{Arr: make([]uint32, 0, 1)}
 	expected := []byte{0, 0, 0, 0, 0, 0} // 0 for codec version (uint16) and 0 for size (uint32)
 	result, err := manager.Marshal(0, val)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
+	require.Equal(expected, result)
 
-	if !bytes.Equal(expected, result) {
-		t.Fatalf("\nExpected: 0x%x\nResult:   0x%x", expected, result)
-	}
+	bytesLen, err := manager.Size(0, val)
+	require.NoError(err)
+	require.Equal(len(result), bytesLen)
 
 	valUnmarshaled := &simpleSliceStruct{}
 	version, err := manager.Unmarshal(result, &valUnmarshaled)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if version != 0 {
-		t.Fatalf("wrong version returned. Expected %d ; Returned %d", 0, version)
-	}
-
-	if !reflect.DeepEqual(valUnmarshaled, val) {
-		t.Fatal("should be same")
-	}
+	require.NoError(err)
+	require.Zero(version)
+	require.Equal(val, valUnmarshaled)
 }
 
 // Test marshaling slice that is not nil and not empty
 func TestSliceWithEmptySerialization(codec GeneralCodec, t testing.TB) {
-	var _ GeneralCodec = codec
+	require := require.New(t)
 
 	type emptyStruct struct{}
 
@@ -755,38 +647,29 @@ func TestSliceWithEmptySerialization(codec GeneralCodec, t testing.TB) {
 	}
 
 	manager := NewDefaultManager()
-	if err := manager.RegisterCodec(0, codec); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(manager.RegisterCodec(0, codec))
 
 	val := &nestedSliceStruct{
 		Arr: make([]emptyStruct, 1000),
 	}
 	expected := []byte{0x00, 0x00, 0x00, 0x00, 0x03, 0xE8} // codec version (0x00, 0x00) then 1000 for numElts
 	result, err := manager.Marshal(0, val)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(expected, result) {
-		t.Fatalf("\nExpected: 0x%x\nResult:   0x%x", expected, result)
-	}
+	require.NoError(err)
+	require.Equal(expected, result)
+
+	bytesLen, err := manager.Size(0, val)
+	require.NoError(err)
+	require.Equal(len(result), bytesLen)
 
 	unmarshaled := nestedSliceStruct{}
 	version, err := manager.Unmarshal(expected, &unmarshaled)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if version != 0 {
-		t.Fatalf("wrong version returned. Expected %d ; Returned %d", 0, version)
-	}
-
-	if len(unmarshaled.Arr) != 1000 {
-		t.Fatalf("Should have created a slice of length %d", 1000)
-	}
+	require.NoError(err)
+	require.Zero(version)
+	require.Len(unmarshaled.Arr, 1000)
 }
 
 func TestSliceWithEmptySerializationOutOfMemory(codec GeneralCodec, t testing.TB) {
-	var _ GeneralCodec = codec
+	require := require.New(t)
 
 	type emptyStruct struct{}
 
@@ -795,42 +678,34 @@ func TestSliceWithEmptySerializationOutOfMemory(codec GeneralCodec, t testing.TB
 	}
 
 	manager := NewDefaultManager()
-	if err := manager.RegisterCodec(0, codec); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(manager.RegisterCodec(0, codec))
 
 	val := &nestedSliceStruct{
 		Arr: make([]emptyStruct, math.MaxInt32),
 	}
-	bytes, err := manager.Marshal(0, val)
-	if err == nil {
-		t.Fatal("should have failed due to slice length too large")
-	}
+	_, err := manager.Marshal(0, val)
+	require.ErrorIs(err, ErrMaxSliceLenExceeded)
 
-	unmarshaled := nestedSliceStruct{}
-	if _, err := manager.Unmarshal(bytes, &unmarshaled); err == nil {
-		t.Fatalf("Should have errored due to excess memory requested")
-	}
+	bytesLen, err := manager.Size(0, val)
+	require.NoError(err)
+	require.Equal(6, bytesLen) // 2 byte codec version + 4 byte length prefix
 }
 
 func TestSliceTooLarge(codec GeneralCodec, t testing.TB) {
-	var _ GeneralCodec = codec
+	require := require.New(t)
 
 	manager := NewDefaultManager()
-	if err := manager.RegisterCodec(0, codec); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(manager.RegisterCodec(0, codec))
 
 	val := []struct{}{}
 	b := []byte{0x00, 0x00, 0xff, 0xff, 0xff, 0xff}
-	if _, err := manager.Unmarshal(b, &val); err == nil {
-		t.Fatalf("Should have errored due to memory usage")
-	}
+	_, err := manager.Unmarshal(b, &val)
+	require.ErrorIs(err, ErrMaxSliceLenExceeded)
 }
 
 // Ensure serializing structs with negative number members works
 func TestNegativeNumbers(codec GeneralCodec, t testing.TB) {
-	var _ GeneralCodec = codec
+	require := require.New(t)
 
 	type s struct {
 		MyInt8  int8  `serialize:"true"`
@@ -840,35 +715,26 @@ func TestNegativeNumbers(codec GeneralCodec, t testing.TB) {
 	}
 
 	manager := NewDefaultManager()
-	if err := manager.RegisterCodec(0, codec); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(manager.RegisterCodec(0, codec))
 
 	myS := s{-1, -2, -3, -4}
 	bytes, err := manager.Marshal(0, myS)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
+
+	bytesLen, err := manager.Size(0, myS)
+	require.NoError(err)
+	require.Equal(len(bytes), bytesLen)
 
 	mySUnmarshaled := s{}
 	version, err := manager.Unmarshal(bytes, &mySUnmarshaled)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if version != 0 {
-		t.Fatalf("wrong version returned. Expected %d ; Returned %d", 0, version)
-	}
-
-	if !reflect.DeepEqual(myS, mySUnmarshaled) {
-		t.Log(mySUnmarshaled)
-		t.Log(myS)
-		t.Fatal("expected marshaled and unmarshaled structs to be the same")
-	}
+	require.NoError(err)
+	require.Zero(version)
+	require.Equal(myS, mySUnmarshaled)
 }
 
 // Ensure deserializing structs with too many bytes errors correctly
 func TestTooLargeUnmarshal(codec GeneralCodec, t testing.TB) {
-	var _ GeneralCodec = codec
+	require := require.New(t)
 
 	type inner struct {
 		B uint16 `serialize:"true"`
@@ -876,15 +742,11 @@ func TestTooLargeUnmarshal(codec GeneralCodec, t testing.TB) {
 	bytes := []byte{0, 0, 0, 0}
 
 	manager := NewManager(3)
-	if err := manager.RegisterCodec(0, codec); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(manager.RegisterCodec(0, codec))
 
 	s := inner{}
 	_, err := manager.Unmarshal(bytes, &s)
-	if err == nil {
-		t.Fatalf("Should have errored due to too many bytes provided")
-	}
+	require.ErrorIs(err, ErrUnmarshalTooBig)
 }
 
 type outerInterface interface {
@@ -897,48 +759,39 @@ type outer struct {
 
 type innerInterface struct{}
 
-func (it *innerInterface) ToInt() int { return 0 }
+func (*innerInterface) ToInt() int {
+	return 0
+}
 
 type innerNoInterface struct{}
 
 // Ensure deserializing structs into the wrong interface errors gracefully
 func TestUnmarshalInvalidInterface(codec GeneralCodec, t testing.TB) {
-	var _ GeneralCodec = codec
+	require := require.New(t)
 
 	manager := NewDefaultManager()
-	errs := wrappers.Errs{}
-	errs.Add(
-		codec.RegisterType(&innerInterface{}),
-		codec.RegisterType(&innerNoInterface{}),
-		manager.RegisterCodec(0, codec),
-	)
-	if errs.Errored() {
-		t.Fatal(errs.Err)
-	}
+	require.NoError(codec.RegisterType(&innerInterface{}))
+	require.NoError(codec.RegisterType(&innerNoInterface{}))
+	require.NoError(manager.RegisterCodec(0, codec))
 
 	{
 		bytes := []byte{0, 0, 0, 0, 0, 0}
 		s := outer{}
 		version, err := manager.Unmarshal(bytes, &s)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if version != 0 {
-			t.Fatalf("wrong version returned. Expected %d ; Returned %d", 0, version)
-		}
+		require.NoError(err)
+		require.Zero(version)
 	}
 	{
 		bytes := []byte{0, 0, 0, 0, 0, 1}
 		s := outer{}
-		if _, err := manager.Unmarshal(bytes, &s); err == nil {
-			t.Fatalf("should have errored")
-		}
+		_, err := manager.Unmarshal(bytes, &s)
+		require.ErrorIs(err, ErrDoesNotImplementInterface)
 	}
 }
 
 // Ensure deserializing slices that have been length restricted errors correctly
 func TestRestrictedSlice(codec GeneralCodec, t testing.TB) {
-	var _ GeneralCodec = codec
+	require := require.New(t)
 
 	type inner struct {
 		Bytes []byte `serialize:"true" len:"2"`
@@ -946,41 +799,34 @@ func TestRestrictedSlice(codec GeneralCodec, t testing.TB) {
 	bytes := []byte{0, 0, 0, 0, 0, 3, 0, 1, 2}
 
 	manager := NewDefaultManager()
-	if err := manager.RegisterCodec(0, codec); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(manager.RegisterCodec(0, codec))
 
 	s := inner{}
-	if _, err := manager.Unmarshal(bytes, &s); err == nil {
-		t.Fatalf("Should have errored due to large of a slice")
-	}
+	_, err := manager.Unmarshal(bytes, &s)
+	require.ErrorIs(err, ErrMaxSliceLenExceeded)
 
 	s.Bytes = []byte{0, 1, 2}
-	if _, err := manager.Marshal(0, s); err == nil {
-		t.Fatalf("Should have errored due to large of a slice")
-	}
+	_, err = manager.Marshal(0, s)
+	require.ErrorIs(err, ErrMaxSliceLenExceeded)
 }
 
 // Test unmarshaling something with extra data
 func TestExtraSpace(codec GeneralCodec, t testing.TB) {
-	var _ GeneralCodec = codec
+	require := require.New(t)
 
 	manager := NewDefaultManager()
-	if err := manager.RegisterCodec(0, codec); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(manager.RegisterCodec(0, codec))
 
-	byteSlice := []byte{0x00, 0x00, 0x01, 0x02} // codec version 0x0000 then 0x01 for b then 0x02 as extra data.
+	// codec version 0x0000 then 0x01 for b then 0x02 as extra data.
+	byteSlice := []byte{0x00, 0x00, 0x01, 0x02}
 	var b byte
 	_, err := manager.Unmarshal(byteSlice, &b)
-	if err == nil {
-		t.Fatalf("Should have errored due to too many bytes being passed in")
-	}
+	require.ErrorIs(err, ErrExtraSpace)
 }
 
 // Ensure deserializing slices that have been length restricted errors correctly
 func TestSliceLengthOverflow(codec GeneralCodec, t testing.TB) {
-	var _ GeneralCodec = codec
+	require := require.New(t)
 
 	type inner struct {
 		Vals []uint32 `serialize:"true" len:"2"`
@@ -993,14 +839,11 @@ func TestSliceLengthOverflow(codec GeneralCodec, t testing.TB) {
 	}
 
 	manager := NewDefaultManager()
-	if err := manager.RegisterCodec(0, codec); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(manager.RegisterCodec(0, codec))
 
 	s := inner{}
-	if _, err := manager.Unmarshal(bytes, &s); err == nil {
-		t.Fatalf("Should have errored due to large of a slice")
-	}
+	_, err := manager.Unmarshal(bytes, &s)
+	require.ErrorIs(err, ErrMaxSliceLenExceeded)
 }
 
 type MultipleVersionsStruct struct {
@@ -1013,8 +856,6 @@ type MultipleVersionsStruct struct {
 }
 
 func TestMultipleTags(codec GeneralCodec, t testing.TB) {
-	var _ GeneralCodec = codec
-
 	// received codec is expected to have both v1 and v2 registered as tags
 	inputs := MultipleVersionsStruct{
 		BothTags:    "both Tags",
@@ -1027,25 +868,22 @@ func TestMultipleTags(codec GeneralCodec, t testing.TB) {
 
 	manager := NewDefaultManager()
 	for _, codecVersion := range []uint16{0, 1, 2022} {
-		if err := manager.RegisterCodec(codecVersion, codec); err != nil {
-			t.Fatal(err)
-		}
+		require := require.New(t)
+
+		require.NoError(manager.RegisterCodec(codecVersion, codec))
 
 		bytes, err := manager.Marshal(codecVersion, inputs)
-		if err != nil {
-			t.Fatalf("Could not marshal struct")
-		}
+		require.NoError(err)
 
 		output := MultipleVersionsStruct{}
-		if _, err := manager.Unmarshal(bytes, &output); err != nil {
-			t.Fatalf("Could not unmarshal struct")
-		}
+		_, err = manager.Unmarshal(bytes, &output)
+		require.NoError(err)
 
-		assert.True(t, inputs.BothTags == output.BothTags)
-		assert.True(t, inputs.SingleTag1 == output.SingleTag1)
-		assert.True(t, inputs.SingleTag2 == output.SingleTag2)
-		assert.True(t, inputs.EitherTags1 == output.EitherTags1)
-		assert.True(t, inputs.EitherTags2 == output.EitherTags2)
-		assert.True(t, len(output.NoTags) == 0)
+		require.Equal(inputs.BothTags, output.BothTags)
+		require.Equal(inputs.SingleTag1, output.SingleTag1)
+		require.Equal(inputs.SingleTag2, output.SingleTag2)
+		require.Equal(inputs.EitherTags1, output.EitherTags1)
+		require.Equal(inputs.EitherTags2, output.EitherTags2)
+		require.Empty(output.NoTags)
 	}
 }

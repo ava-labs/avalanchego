@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package throttling
@@ -10,7 +10,7 @@ import (
 	"golang.org/x/time/rate"
 )
 
-var _ net.Listener = &throttledListener{}
+var _ net.Listener = (*throttledListener)(nil)
 
 // Wraps [listener] and returns a net.Listener that will accept at most
 // [maxConnsPerSec] connections per second.

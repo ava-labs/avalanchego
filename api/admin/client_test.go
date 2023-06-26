@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package admin
@@ -8,13 +8,15 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
+
+var errTest = errors.New("non-nil error")
 
 // SuccessResponseTest defines the expected result of an API call that returns SuccessResponse
 type SuccessResponseTest struct {
@@ -28,7 +30,7 @@ func GetSuccessResponseTests() []SuccessResponseTest {
 			Err: nil,
 		},
 		{
-			Err: errors.New("Non-nil error"),
+			Err: errTest,
 		},
 	}
 }
@@ -46,7 +48,7 @@ func NewMockClient(response interface{}, err error) rpc.EndpointRequester {
 	}
 }
 
-func (mc *mockClient) SendRequest(ctx context.Context, method string, params interface{}, reply interface{}, options ...rpc.Option) error {
+func (mc *mockClient) SendRequest(_ context.Context, _ string, _ interface{}, reply interface{}, _ ...rpc.Option) error {
 	if mc.err != nil {
 		return mc.err
 	}
@@ -74,140 +76,114 @@ func (mc *mockClient) SendRequest(ctx context.Context, method string, params int
 }
 
 func TestStartCPUProfiler(t *testing.T) {
+	require := require.New(t)
+
 	tests := GetSuccessResponseTests()
 
 	for _, test := range tests {
 		mockClient := client{requester: NewMockClient(&api.EmptyReply{}, test.Err)}
 		err := mockClient.StartCPUProfiler(context.Background())
-		// if there is error as expected, the test passes
-		if err != nil && test.Err != nil {
-			continue
-		}
-		if err != nil {
-			t.Fatalf("Unexpected error: %s", err)
-		}
+		require.ErrorIs(err, test.Err)
 	}
 }
 
 func TestStopCPUProfiler(t *testing.T) {
+	require := require.New(t)
+
 	tests := GetSuccessResponseTests()
 
 	for _, test := range tests {
 		mockClient := client{requester: NewMockClient(&api.EmptyReply{}, test.Err)}
 		err := mockClient.StopCPUProfiler(context.Background())
-		// if there is error as expected, the test passes
-		if err != nil && test.Err != nil {
-			continue
-		}
-		if err != nil {
-			t.Fatalf("Unexpected error: %s", err)
-		}
+		require.ErrorIs(err, test.Err)
 	}
 }
 
 func TestMemoryProfile(t *testing.T) {
+	require := require.New(t)
+
 	tests := GetSuccessResponseTests()
 
 	for _, test := range tests {
 		mockClient := client{requester: NewMockClient(&api.EmptyReply{}, test.Err)}
 		err := mockClient.MemoryProfile(context.Background())
-		// if there is error as expected, the test passes
-		if err != nil && test.Err != nil {
-			continue
-		}
-		if err != nil {
-			t.Fatalf("Unexpected error: %s", err)
-		}
+		require.ErrorIs(err, test.Err)
 	}
 }
 
 func TestLockProfile(t *testing.T) {
+	require := require.New(t)
+
 	tests := GetSuccessResponseTests()
 
 	for _, test := range tests {
 		mockClient := client{requester: NewMockClient(&api.EmptyReply{}, test.Err)}
 		err := mockClient.LockProfile(context.Background())
-		// if there is error as expected, the test passes
-		if err != nil && test.Err != nil {
-			continue
-		}
-		if err != nil {
-			t.Fatalf("Unexpected error: %s", err)
-		}
+		require.ErrorIs(err, test.Err)
 	}
 }
 
 func TestAlias(t *testing.T) {
+	require := require.New(t)
+
 	tests := GetSuccessResponseTests()
 
 	for _, test := range tests {
 		mockClient := client{requester: NewMockClient(&api.EmptyReply{}, test.Err)}
 		err := mockClient.Alias(context.Background(), "alias", "alias2")
-		// if there is error as expected, the test passes
-		if err != nil && test.Err != nil {
-			continue
-		}
-		if err != nil {
-			t.Fatalf("Unexpected error: %s", err)
-		}
+		require.ErrorIs(err, test.Err)
 	}
 }
 
 func TestAliasChain(t *testing.T) {
+	require := require.New(t)
+
 	tests := GetSuccessResponseTests()
 
 	for _, test := range tests {
 		mockClient := client{requester: NewMockClient(&api.EmptyReply{}, test.Err)}
 		err := mockClient.AliasChain(context.Background(), "chain", "chain-alias")
-		// if there is error as expected, the test passes
-		if err != nil && test.Err != nil {
-			continue
-		}
-		if err != nil {
-			t.Fatalf("Unexpected error: %s", err)
-		}
+		require.ErrorIs(err, test.Err)
 	}
 }
 
 func TestGetChainAliases(t *testing.T) {
 	t.Run("successful", func(t *testing.T) {
+		require := require.New(t)
+
 		expectedReply := []string{"alias1", "alias2"}
 		mockClient := client{requester: NewMockClient(&GetChainAliasesReply{
 			Aliases: expectedReply,
 		}, nil)}
 
 		reply, err := mockClient.GetChainAliases(context.Background(), "chain")
-		assert.NoError(t, err)
-		assert.ElementsMatch(t, expectedReply, reply)
+		require.NoError(err)
+		require.Equal(expectedReply, reply)
 	})
 
 	t.Run("failure", func(t *testing.T) {
-		mockClient := client{requester: NewMockClient(&GetChainAliasesReply{}, errors.New("some error"))}
-
+		mockClient := client{requester: NewMockClient(&GetChainAliasesReply{}, errTest)}
 		_, err := mockClient.GetChainAliases(context.Background(), "chain")
-
-		assert.EqualError(t, err, "some error")
+		require.ErrorIs(t, err, errTest)
 	})
 }
 
 func TestStacktrace(t *testing.T) {
+	require := require.New(t)
+
 	tests := GetSuccessResponseTests()
 
 	for _, test := range tests {
 		mockClient := client{requester: NewMockClient(&api.EmptyReply{}, test.Err)}
 		err := mockClient.Stacktrace(context.Background())
-		// if there is error as expected, the test passes
-		if err != nil && test.Err != nil {
-			continue
-		}
-		if err != nil {
-			t.Fatalf("Unexpected error: %s", err)
-		}
+		require.ErrorIs(err, test.Err)
 	}
 }
 
 func TestReloadInstalledVMs(t *testing.T) {
 	t.Run("successful", func(t *testing.T) {
+		require := require.New(t)
+
 		expectedNewVMs := map[ids.ID][]string{
 			ids.GenerateTestID(): {"foo"},
 			ids.GenerateTestID(): {"bar"},
@@ -222,77 +198,68 @@ func TestReloadInstalledVMs(t *testing.T) {
 		}, nil)}
 
 		loadedVMs, failedVMs, err := mockClient.LoadVMs(context.Background())
-		assert.NoError(t, err)
-		assert.Equal(t, expectedNewVMs, loadedVMs)
-		assert.Equal(t, expectedFailedVMs, failedVMs)
+		require.NoError(err)
+		require.Equal(expectedNewVMs, loadedVMs)
+		require.Equal(expectedFailedVMs, failedVMs)
 	})
 
 	t.Run("failure", func(t *testing.T) {
-		mockClient := client{requester: NewMockClient(&LoadVMsReply{}, errors.New("some error"))}
-
+		mockClient := client{requester: NewMockClient(&LoadVMsReply{}, errTest)}
 		_, _, err := mockClient.LoadVMs(context.Background())
-
-		assert.EqualError(t, err, "some error")
+		require.ErrorIs(t, err, errTest)
 	})
 }
 
 func TestSetLoggerLevel(t *testing.T) {
 	type test struct {
-		name            string
-		logLevel        string
-		displayLevel    string
-		serviceErr      bool
-		clientShouldErr bool
+		name         string
+		logLevel     string
+		displayLevel string
+		serviceErr   error
+		clientErr    error
 	}
 	tests := []test{
 		{
-			name:            "Happy path",
-			logLevel:        "INFO",
-			displayLevel:    "INFO",
-			serviceErr:      false,
-			clientShouldErr: false,
+			name:         "Happy path",
+			logLevel:     "INFO",
+			displayLevel: "INFO",
+			serviceErr:   nil,
+			clientErr:    nil,
 		},
 		{
-			name:            "Service errors",
-			logLevel:        "INFO",
-			displayLevel:    "INFO",
-			serviceErr:      true,
-			clientShouldErr: true,
+			name:         "Service errors",
+			logLevel:     "INFO",
+			displayLevel: "INFO",
+			serviceErr:   errTest,
+			clientErr:    errTest,
 		},
 		{
-			name:            "Invalid log level",
-			logLevel:        "invalid",
-			displayLevel:    "INFO",
-			serviceErr:      false,
-			clientShouldErr: true,
+			name:         "Invalid log level",
+			logLevel:     "invalid",
+			displayLevel: "INFO",
+			serviceErr:   nil,
+			clientErr:    logging.ErrUnknownLevel,
 		},
 		{
-			name:            "Invalid display level",
-			logLevel:        "INFO",
-			displayLevel:    "invalid",
-			serviceErr:      false,
-			clientShouldErr: true,
+			name:         "Invalid display level",
+			logLevel:     "INFO",
+			displayLevel: "invalid",
+			serviceErr:   nil,
+			clientErr:    logging.ErrUnknownLevel,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert := assert.New(t)
-			var err error
-			if tt.serviceErr {
-				err = errors.New("some error")
+			c := client{
+				requester: NewMockClient(&api.EmptyReply{}, tt.serviceErr),
 			}
-			mockClient := client{requester: NewMockClient(&api.EmptyReply{}, err)}
-			err = mockClient.SetLoggerLevel(
+			err := c.SetLoggerLevel(
 				context.Background(),
 				"",
 				tt.logLevel,
 				tt.displayLevel,
 			)
-			if tt.clientShouldErr {
-				assert.Error(err)
-			} else {
-				assert.NoError(err)
-			}
+			require.ErrorIs(t, err, tt.clientErr)
 		})
 	}
 }
@@ -302,8 +269,8 @@ func TestGetLoggerLevel(t *testing.T) {
 		name            string
 		loggerName      string
 		serviceResponse map[string]LogAndDisplayLevels
-		serviceErr      bool
-		clientShouldErr bool
+		serviceErr      error
+		clientErr       error
 	}
 	tests := []test{
 		{
@@ -312,35 +279,38 @@ func TestGetLoggerLevel(t *testing.T) {
 			serviceResponse: map[string]LogAndDisplayLevels{
 				"foo": {LogLevel: logging.Info, DisplayLevel: logging.Info},
 			},
-			serviceErr:      false,
-			clientShouldErr: false,
+			serviceErr: nil,
+			clientErr:  nil,
 		},
 		{
 			name:            "service errors",
 			loggerName:      "foo",
 			serviceResponse: nil,
-			serviceErr:      true,
-			clientShouldErr: true,
+			serviceErr:      errTest,
+			clientErr:       errTest,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert := assert.New(t)
-			var err error
-			if tt.serviceErr {
-				err = errors.New("some error")
+			require := require.New(t)
+
+			c := client{
+				requester: NewMockClient(
+					&GetLoggerLevelReply{
+						LoggerLevels: tt.serviceResponse,
+					},
+					tt.serviceErr,
+				),
 			}
-			mockClient := client{requester: NewMockClient(&GetLoggerLevelReply{LoggerLevels: tt.serviceResponse}, err)}
-			res, err := mockClient.GetLoggerLevel(
+			res, err := c.GetLoggerLevel(
 				context.Background(),
 				tt.loggerName,
 			)
-			if tt.clientShouldErr {
-				assert.Error(err)
+			require.ErrorIs(err, tt.clientErr)
+			if tt.clientErr != nil {
 				return
 			}
-			assert.NoError(err)
-			assert.EqualValues(tt.serviceResponse, res)
+			require.Equal(tt.serviceResponse, res)
 		})
 	}
 }
@@ -348,40 +318,38 @@ func TestGetLoggerLevel(t *testing.T) {
 func TestGetConfig(t *testing.T) {
 	type test struct {
 		name             string
-		serviceErr       bool
-		clientShouldErr  bool
+		serviceErr       error
+		clientErr        error
 		expectedResponse interface{}
 	}
 	var resp interface{} = "response"
 	tests := []test{
 		{
 			name:             "Happy path",
-			serviceErr:       false,
-			clientShouldErr:  false,
+			serviceErr:       nil,
+			clientErr:        nil,
 			expectedResponse: &resp,
 		},
 		{
 			name:             "service errors",
-			serviceErr:       true,
-			clientShouldErr:  true,
+			serviceErr:       errTest,
+			clientErr:        errTest,
 			expectedResponse: nil,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert := assert.New(t)
-			var err error
-			if tt.serviceErr {
-				err = errors.New("some error")
+			require := require.New(t)
+
+			c := client{
+				requester: NewMockClient(tt.expectedResponse, tt.serviceErr),
 			}
-			mockClient := client{requester: NewMockClient(tt.expectedResponse, err)}
-			res, err := mockClient.GetConfig(context.Background())
-			if tt.clientShouldErr {
-				assert.Error(err)
+			res, err := c.GetConfig(context.Background())
+			require.ErrorIs(err, tt.clientErr)
+			if tt.clientErr != nil {
 				return
 			}
-			assert.NoError(err)
-			assert.EqualValues("response", res)
+			require.Equal(resp, res)
 		})
 	}
 }

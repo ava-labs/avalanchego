@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package server
@@ -10,11 +10,14 @@ import (
 	"sync"
 
 	"github.com/gorilla/mux"
+
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var (
 	errUnknownBaseURL  = errors.New("unknown base url")
 	errUnknownEndpoint = errors.New("unknown endpoint")
+	errAlreadyReserved = errors.New("route is either already aliased or already maps to a handle")
 )
 
 type router struct {
@@ -22,7 +25,7 @@ type router struct {
 	router *mux.Router
 
 	routeLock      sync.Mutex
-	reservedRoutes map[string]bool                    // Reserves routes so that there can't be alias that conflict
+	reservedRoutes set.Set[string]                    // Reserves routes so that there can't be alias that conflict
 	aliases        map[string][]string                // Maps a route to a set of reserved routes
 	routes         map[string]map[string]http.Handler // Maps routes to a handler
 }
@@ -30,7 +33,7 @@ type router struct {
 func newRouter() *router {
 	return &router{
 		router:         mux.NewRouter(),
-		reservedRoutes: make(map[string]bool),
+		reservedRoutes: set.Set[string]{},
 		aliases:        make(map[string][]string),
 		routes:         make(map[string]map[string]http.Handler),
 	}
@@ -68,8 +71,8 @@ func (r *router) AddRouter(base, endpoint string, handler http.Handler) error {
 }
 
 func (r *router) addRouter(base, endpoint string, handler http.Handler) error {
-	if r.reservedRoutes[base] {
-		return fmt.Errorf("couldn't route to %s as that route is either aliased or already maps to a handler", base)
+	if r.reservedRoutes.Contains(base) {
+		return fmt.Errorf("%w: %s", errAlreadyReserved, base)
 	}
 
 	return r.forceAddRouter(base, endpoint, handler)
@@ -87,12 +90,13 @@ func (r *router) forceAddRouter(base, endpoint string, handler http.Handler) err
 
 	endpoints[endpoint] = handler
 	r.routes[base] = endpoints
+
 	// Name routes based on their URL for easy retrieval in the future
-	if route := r.router.Handle(url, handler); route != nil {
-		route.Name(url)
-	} else {
+	route := r.router.Handle(url, handler)
+	if route == nil {
 		return fmt.Errorf("failed to create new route for %s", url)
 	}
+	route.Name(url)
 
 	var err error
 	if aliases, exists := r.aliases[base]; exists {
@@ -112,13 +116,13 @@ func (r *router) AddAlias(base string, aliases ...string) error {
 	defer r.routeLock.Unlock()
 
 	for _, alias := range aliases {
-		if r.reservedRoutes[alias] {
-			return fmt.Errorf("couldn't alias to %s as that route is either already aliased or already maps to a handler", alias)
+		if r.reservedRoutes.Contains(alias) {
+			return fmt.Errorf("%w: %s", errAlreadyReserved, alias)
 		}
 	}
 
 	for _, alias := range aliases {
-		r.reservedRoutes[alias] = true
+		r.reservedRoutes.Add(alias)
 	}
 
 	r.aliases[base] = append(r.aliases[base], aliases...)

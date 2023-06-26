@@ -1,11 +1,9 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package address
 
-import (
-	"github.com/ava-labs/avalanchego/ids"
-)
+import "github.com/ava-labs/avalanchego/ids"
 
 func ParseToID(addrStr string) (ids.ShortID, error) {
 	_, _, addrBytes, err := Parse(addrStr)

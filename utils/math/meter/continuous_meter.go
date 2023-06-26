@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package meter
@@ -11,8 +11,8 @@ import (
 var (
 	convertEToBase2 = math.Log(2)
 
-	_ Factory = &ContinuousFactory{}
-	_ Meter   = &continuousMeter{}
+	_ Factory = (*ContinuousFactory)(nil)
+	_ Meter   = (*continuousMeter)(nil)
 )
 
 // ContinuousFactory implements the Factory interface by returning a continuous

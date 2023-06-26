@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package propertyfx
@@ -98,4 +98,6 @@ func (fx *Fx) VerifyTransferOperation(tx secp256k1fx.UnsignedTx, op *BurnOperati
 	return fx.VerifyCredentials(tx, &op.Input, &cred.Credential, &out.OutputOwners)
 }
 
-func (fx *Fx) VerifyTransfer(_, _, _, _ interface{}) error { return errCantTransfer }
+func (*Fx) VerifyTransfer(_, _, _, _ interface{}) error {
+	return errCantTransfer
+}

@@ -1,7 +1,11 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package health
+
+import "context"
+
+var _ Checker = CheckerFunc(nil)
 
 // Checker can have its health checked
 type Checker interface {
@@ -9,9 +13,11 @@ type Checker interface {
 	// error
 	//
 	// It is expected that the results are json marshallable.
-	HealthCheck() (interface{}, error)
+	HealthCheck(context.Context) (interface{}, error)
 }
 
-type CheckerFunc func() (interface{}, error)
+type CheckerFunc func(context.Context) (interface{}, error)
 
-func (f CheckerFunc) HealthCheck() (interface{}, error) { return f() }
+func (f CheckerFunc) HealthCheck(ctx context.Context) (interface{}, error) {
+	return f(ctx)
+}

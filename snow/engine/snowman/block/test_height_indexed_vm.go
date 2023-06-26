@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package block
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -14,7 +15,7 @@ var (
 	errVerifyHeightIndex  = errors.New("unexpectedly called VerifyHeightIndex")
 	errGetBlockIDAtHeight = errors.New("unexpectedly called GetBlockIDAtHeight")
 
-	_ HeightIndexedChainVM = &TestHeightIndexedVM{}
+	_ HeightIndexedChainVM = (*TestHeightIndexedVM)(nil)
 )
 
 // TestBatchedVM is a BatchedVM that is useful for testing.
@@ -24,13 +25,13 @@ type TestHeightIndexedVM struct {
 	CantVerifyHeightIndex  bool
 	CantGetBlockIDAtHeight bool
 
-	VerifyHeightIndexF  func() error
-	GetBlockIDAtHeightF func(height uint64) (ids.ID, error)
+	VerifyHeightIndexF  func(context.Context) error
+	GetBlockIDAtHeightF func(ctx context.Context, height uint64) (ids.ID, error)
 }
 
-func (vm *TestHeightIndexedVM) VerifyHeightIndex() error {
+func (vm *TestHeightIndexedVM) VerifyHeightIndex(ctx context.Context) error {
 	if vm.VerifyHeightIndexF != nil {
-		return vm.VerifyHeightIndexF()
+		return vm.VerifyHeightIndexF(ctx)
 	}
 	if vm.CantVerifyHeightIndex && vm.T != nil {
 		vm.T.Fatal(errVerifyHeightIndex)
@@ -38,9 +39,9 @@ func (vm *TestHeightIndexedVM) VerifyHeightIndex() error {
 	return errVerifyHeightIndex
 }
 
-func (vm *TestHeightIndexedVM) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
+func (vm *TestHeightIndexedVM) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, error) {
 	if vm.GetBlockIDAtHeightF != nil {
-		return vm.GetBlockIDAtHeightF(height)
+		return vm.GetBlockIDAtHeightF(ctx, height)
 	}
 	if vm.CantGetBlockIDAtHeight && vm.T != nil {
 		vm.T.Fatal(errGetAncestor)

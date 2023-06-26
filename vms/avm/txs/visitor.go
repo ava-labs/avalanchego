@@ -1,11 +1,11 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
 
 import "github.com/ava-labs/avalanchego/vms/components/avax"
 
-var _ Visitor = &utxoGetter{}
+var _ Visitor = (*utxoGetter)(nil)
 
 // Allow vm to execute custom logic against the underlying transaction types.
 type Visitor interface {

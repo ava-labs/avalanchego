@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package x
@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
-var _ Builder = &builderWithOptions{}
+var _ Builder = (*builderWithOptions)(nil)
 
 type builderWithOptions struct {
 	Builder
@@ -22,10 +22,10 @@ type builderWithOptions struct {
 // NewBuilderWithOptions returns a new transaction builder that will use the
 // given options by default.
 //
-// - [builder] is the builder that will be called to perform the underlying
-//   opterations.
-// - [options] will be provided to the builder in addition to the options
-//   provided in the method calls.
+//   - [builder] is the builder that will be called to perform the underlying
+//     operations.
+//   - [options] will be provided to the builder in addition to the options
+//     provided in the method calls.
 func NewBuilderWithOptions(builder Builder, options ...common.Option) Builder {
 	return &builderWithOptions{
 		Builder: builder,

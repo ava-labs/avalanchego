@@ -1,30 +1,46 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avax
 
-import "github.com/ava-labs/avalanchego/snow"
+import (
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
+)
 
-type TestVerifiable struct{ Err error }
+var (
+	_ verify.State    = (*TestState)(nil)
+	_ TransferableOut = (*TestTransferable)(nil)
+	_ Addressable     = (*TestAddressable)(nil)
+)
 
-func (v *TestVerifiable) InitCtx(ctx *snow.Context) {}
-func (v *TestVerifiable) Verify() error             { return v.Err }
+type TestState struct {
+	verify.IsState `json:"-"`
 
-func (v *TestVerifiable) VerifyState() error { return v.Err }
+	Err error
+}
+
+func (*TestState) InitCtx(*snow.Context) {}
+
+func (v *TestState) Verify() error {
+	return v.Err
+}
 
 type TestTransferable struct {
-	TestVerifiable
+	TestState
 
 	Val uint64 `serialize:"true"`
 }
 
-func (t *TestTransferable) InitCtx(*snow.Context) {
-	// no op
+func (*TestTransferable) InitCtx(*snow.Context) {}
+
+func (t *TestTransferable) Amount() uint64 {
+	return t.Val
 }
 
-func (t *TestTransferable) Amount() uint64 { return t.Val }
-
-func (t *TestTransferable) Cost() (uint64, error) { return 0, nil }
+func (*TestTransferable) Cost() (uint64, error) {
+	return 0, nil
+}
 
 type TestAddressable struct {
 	TestTransferable `serialize:"true"`
@@ -32,4 +48,6 @@ type TestAddressable struct {
 	Addrs [][]byte `serialize:"true"`
 }
 
-func (a *TestAddressable) Addresses() [][]byte { return a.Addrs }
+func (a *TestAddressable) Addresses() [][]byte {
+	return a.Addrs
+}

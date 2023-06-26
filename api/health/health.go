@@ -1,18 +1,30 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package health
 
 import (
-	"encoding/json"
+	"context"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-var _ Health = &health{}
+const (
+	// AllTag is automatically added to every registered check.
+	AllTag = "all"
+	// ApplicationTag checks will act as if they specified every tag that has
+	// been registered.
+	// Registering a health check with this tag will ensure that it is always
+	// included in all health query results.
+	ApplicationTag = "application"
+)
+
+var _ Health = (*health)(nil)
 
 // Health defines the full health service interface for registering, reporting
 // and refreshing health checks.
@@ -20,22 +32,27 @@ type Health interface {
 	Registerer
 	Reporter
 
-	Start(freq time.Duration)
+	// Start running periodic health checks at the specified frequency.
+	// Repeated calls to Start will be no-ops.
+	Start(ctx context.Context, freq time.Duration)
+
+	// Stop running periodic health checks. Stop should only be called after
+	// Start. Once Stop returns, no more health checks will be executed.
 	Stop()
 }
 
 // Registerer defines how to register new components to check the health of.
 type Registerer interface {
-	RegisterReadinessCheck(name string, checker Checker) error
-	RegisterHealthCheck(name string, checker Checker) error
-	RegisterLivenessCheck(name string, checker Checker) error
+	RegisterReadinessCheck(name string, checker Checker, tags ...string) error
+	RegisterHealthCheck(name string, checker Checker, tags ...string) error
+	RegisterLivenessCheck(name string, checker Checker, tags ...string) error
 }
 
 // Reporter returns the current health status.
 type Reporter interface {
-	Readiness() (map[string]Result, bool)
-	Health() (map[string]Result, bool)
-	Liveness() (map[string]Result, bool)
+	Readiness(tags ...string) (map[string]Result, bool)
+	Health(tags ...string) (map[string]Result, bool)
+	Liveness(tags ...string) (map[string]Result, bool)
 }
 
 type health struct {
@@ -46,17 +63,17 @@ type health struct {
 }
 
 func New(log logging.Logger, registerer prometheus.Registerer) (Health, error) {
-	readinessWorker, err := newWorker("readiness", registerer)
+	readinessWorker, err := newWorker(log, "readiness", registerer)
 	if err != nil {
 		return nil, err
 	}
 
-	healthWorker, err := newWorker("health", registerer)
+	healthWorker, err := newWorker(log, "health", registerer)
 	if err != nil {
 		return nil, err
 	}
 
-	livenessWorker, err := newWorker("liveness", registerer)
+	livenessWorker, err := newWorker(log, "liveness", registerer)
 	return &health{
 		log:       log,
 		readiness: readinessWorker,
@@ -65,64 +82,55 @@ func New(log logging.Logger, registerer prometheus.Registerer) (Health, error) {
 	}, err
 }
 
-func (h *health) RegisterReadinessCheck(name string, checker Checker) error {
-	return h.readiness.RegisterMonotonicCheck(name, checker)
+func (h *health) RegisterReadinessCheck(name string, checker Checker, tags ...string) error {
+	return h.readiness.RegisterMonotonicCheck(name, checker, tags...)
 }
 
-func (h *health) RegisterHealthCheck(name string, checker Checker) error {
-	return h.health.RegisterCheck(name, checker)
+func (h *health) RegisterHealthCheck(name string, checker Checker, tags ...string) error {
+	return h.health.RegisterCheck(name, checker, tags...)
 }
 
-func (h *health) RegisterLivenessCheck(name string, checker Checker) error {
-	return h.liveness.RegisterCheck(name, checker)
+func (h *health) RegisterLivenessCheck(name string, checker Checker, tags ...string) error {
+	return h.liveness.RegisterCheck(name, checker, tags...)
 }
 
-func (h *health) Readiness() (map[string]Result, bool) {
-	results, healthy := h.readiness.Results()
-	if healthy {
-		return results, healthy
+func (h *health) Readiness(tags ...string) (map[string]Result, bool) {
+	results, healthy := h.readiness.Results(tags...)
+	if !healthy {
+		h.log.Warn("failing check",
+			zap.String("namespace", "readiness"),
+			zap.Reflect("reason", results),
+		)
 	}
-	resultsJSON, err := json.Marshal(results)
-	if err == nil {
-		h.log.Warn("Failing readiness check: %s", string(resultsJSON))
-	} else {
-		h.log.Error("Failed to marshal failing readiness check: %s", err)
-	}
-	return results, false
+	return results, healthy
 }
 
-func (h *health) Health() (map[string]Result, bool) {
-	results, healthy := h.health.Results()
-	if healthy {
-		return results, healthy
+func (h *health) Health(tags ...string) (map[string]Result, bool) {
+	results, healthy := h.health.Results(tags...)
+	if !healthy {
+		h.log.Warn("failing check",
+			zap.String("namespace", "health"),
+			zap.Reflect("reason", results),
+		)
 	}
-	resultsJSON, err := json.Marshal(results)
-	if err == nil {
-		h.log.Warn("Failing health check: %s", string(resultsJSON))
-	} else {
-		h.log.Error("Failed to marshal failing health check: %s", err)
-	}
-	return results, false
+	return results, healthy
 }
 
-func (h *health) Liveness() (map[string]Result, bool) {
-	results, healthy := h.liveness.Results()
-	if healthy {
-		return results, healthy
+func (h *health) Liveness(tags ...string) (map[string]Result, bool) {
+	results, healthy := h.liveness.Results(tags...)
+	if !healthy {
+		h.log.Warn("failing check",
+			zap.String("namespace", "liveness"),
+			zap.Reflect("reason", results),
+		)
 	}
-	resultsJSON, err := json.Marshal(results)
-	if err == nil {
-		h.log.Warn("Failing liveness check: %s", string(resultsJSON))
-	} else {
-		h.log.Error("Failed to marshal failing liveness check: %s", err)
-	}
-	return results, false
+	return results, healthy
 }
 
-func (h *health) Start(freq time.Duration) {
-	h.readiness.Start(freq)
-	h.health.Start(freq)
-	h.liveness.Start(freq)
+func (h *health) Start(ctx context.Context, freq time.Duration) {
+	h.readiness.Start(ctx, freq)
+	h.health.Start(ctx, freq)
+	h.liveness.Start(ctx, freq)
 }
 
 func (h *health) Stop() {

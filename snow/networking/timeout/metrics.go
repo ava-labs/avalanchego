@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package timeout
@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
@@ -131,7 +133,9 @@ func (cm *chainMetrics) observe(nodeID ids.NodeID, op message.Op, latency time.D
 
 	observer, err := msg.GetMetricWith(labels)
 	if err != nil {
-		cm.ctx.Log.Warn("failed to get observer with validatorID label due to %s", err)
+		cm.ctx.Log.Warn("failed to get observer with validatorID",
+			zap.Error(err),
+		)
 		return
 	}
 	observer.Observe(lat)

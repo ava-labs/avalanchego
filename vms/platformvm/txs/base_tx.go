@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package txs
@@ -9,6 +9,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -26,24 +28,30 @@ type BaseTx struct {
 	avax.BaseTx `serialize:"true"`
 
 	// true iff this transaction has already passed syntactic verification
-	SyntacticallyVerified bool
+	SyntacticallyVerified bool `json:"-"`
 
 	unsignedBytes []byte // Unsigned byte representation of this data
 }
 
-func (tx *BaseTx) Initialize(unsignedBytes []byte) { tx.unsignedBytes = unsignedBytes }
+func (tx *BaseTx) SetBytes(unsignedBytes []byte) {
+	tx.unsignedBytes = unsignedBytes
+}
 
-func (tx *BaseTx) Bytes() []byte { return tx.unsignedBytes }
+func (tx *BaseTx) Bytes() []byte {
+	return tx.unsignedBytes
+}
 
-func (tx *BaseTx) InputIDs() ids.Set {
-	inputIDs := ids.NewSet(len(tx.Ins))
+func (tx *BaseTx) InputIDs() set.Set[ids.ID] {
+	inputIDs := set.NewSet[ids.ID](len(tx.Ins))
 	for _, in := range tx.Ins {
 		inputIDs.Add(in.InputID())
 	}
 	return inputIDs
 }
 
-func (tx *BaseTx) Outputs() []*avax.TransferableOutput { return tx.Outs }
+func (tx *BaseTx) Outputs() []*avax.TransferableOutput {
+	return tx.Outs
+}
 
 // InitCtx sets the FxID fields in the inputs and outputs of this [BaseTx]. Also
 // sets the [ctx] to the given [vm.ctx] so that the addresses can be json
@@ -82,7 +90,7 @@ func (tx *BaseTx) SyntacticVerify(ctx *snow.Context) error {
 	switch {
 	case !avax.IsSortedTransferableOutputs(tx.Outs, Codec):
 		return errOutputsNotSorted
-	case !avax.IsSortedAndUniqueTransferableInputs(tx.Ins):
+	case !utils.IsSortedAndUniqueSortable(tx.Ins):
 		return errInputsNotSortedUnique
 	default:
 		return nil

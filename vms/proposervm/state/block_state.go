@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package state
@@ -17,14 +17,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
-const (
-	blockCacheSize = 8192
-)
+const blockCacheSize = 8192
 
 var (
 	errBlockWrongVersion = errors.New("wrong version")
 
-	_ BlockState = &blockState{}
+	_ BlockState = (*blockState)(nil)
 )
 
 type BlockState interface {
@@ -35,7 +33,7 @@ type BlockState interface {
 type blockState struct {
 	// Caches BlockID -> Block. If the Block is nil, that means the block is not
 	// in storage.
-	blkCache cache.Cacher
+	blkCache cache.Cacher[ids.ID, *blockWrapper]
 
 	db database.Database
 }
@@ -49,16 +47,16 @@ type blockWrapper struct {
 
 func NewBlockState(db database.Database) BlockState {
 	return &blockState{
-		blkCache: &cache.LRU{Size: blockCacheSize},
+		blkCache: &cache.LRU[ids.ID, *blockWrapper]{Size: blockCacheSize},
 		db:       db,
 	}
 }
 
 func NewMeteredBlockState(db database.Database, namespace string, metrics prometheus.Registerer) (BlockState, error) {
-	blkCache, err := metercacher.New(
+	blkCache, err := metercacher.New[ids.ID, *blockWrapper](
 		fmt.Sprintf("%s_block_cache", namespace),
 		metrics,
-		&cache.LRU{Size: blockCacheSize},
+		&cache.LRU[ids.ID, *blockWrapper]{Size: blockCacheSize},
 	)
 
 	return &blockState{
@@ -68,12 +66,8 @@ func NewMeteredBlockState(db database.Database, namespace string, metrics promet
 }
 
 func (s *blockState) GetBlock(blkID ids.ID) (block.Block, choices.Status, error) {
-	if blkIntf, found := s.blkCache.Get(blkID); found {
-		if blkIntf == nil {
-			return nil, choices.Unknown, database.ErrNotFound
-		}
-		blk, ok := blkIntf.(*blockWrapper)
-		if !ok {
+	if blk, found := s.blkCache.Get(blkID); found {
+		if blk == nil {
 			return nil, choices.Unknown, database.ErrNotFound
 		}
 		return blk.block, blk.Status, nil

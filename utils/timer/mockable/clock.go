@@ -1,11 +1,9 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package mockable
 
-import (
-	"time"
-)
+import "time"
 
 // MaxTime was taken from https://stackoverflow.com/questions/25065055/what-is-the-maximum-time-time-in-go/32620397#32620397
 var MaxTime = time.Unix(1<<63-62135596801, 0) // 0 is used because we drop the nano-seconds

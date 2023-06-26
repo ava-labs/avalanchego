@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package linearcodec
@@ -19,10 +19,10 @@ const (
 )
 
 var (
-	_ Codec              = &linearCodec{}
-	_ codec.Codec        = &linearCodec{}
-	_ codec.Registry     = &linearCodec{}
-	_ codec.GeneralCodec = &linearCodec{}
+	_ Codec              = (*linearCodec)(nil)
+	_ codec.Codec        = (*linearCodec)(nil)
+	_ codec.Registry     = (*linearCodec)(nil)
+	_ codec.GeneralCodec = (*linearCodec)(nil)
 )
 
 // Codec marshals and unmarshals
@@ -55,7 +55,9 @@ func New(tagNames []string, maxSliceLen uint32) Codec {
 }
 
 // NewDefault is a convenience constructor; it returns a new codec with reasonable default values
-func NewDefault() Codec { return New([]string{reflectcodec.DefaultTagName}, defaultMaxSliceLength) }
+func NewDefault() Codec {
+	return New([]string{reflectcodec.DefaultTagName}, defaultMaxSliceLength)
+}
 
 // NewCustomMaxLength is a convenience constructor; it returns a new codec with custom max length and default tags
 func NewCustomMaxLength(maxSliceLen uint32) Codec {
@@ -77,13 +79,18 @@ func (c *linearCodec) RegisterType(val interface{}) error {
 
 	valType := reflect.TypeOf(val)
 	if _, exists := c.typeToTypeID[valType]; exists {
-		return fmt.Errorf("type %v has already been registered", valType)
+		return fmt.Errorf("%w: %v", codec.ErrDuplicateType, valType)
 	}
 
 	c.typeIDToType[c.nextTypeID] = valType
 	c.typeToTypeID[valType] = c.nextTypeID
 	c.nextTypeID++
 	return nil
+}
+
+func (*linearCodec) PrefixSize(reflect.Type) int {
+	// see PackPrefix implementation
+	return wrappers.IntLen
 }
 
 func (c *linearCodec) PackPrefix(p *wrappers.Packer, valueType reflect.Type) error {
@@ -113,7 +120,11 @@ func (c *linearCodec) UnpackPrefix(p *wrappers.Packer, valueType reflect.Type) (
 	}
 	// Ensure type actually does implement the interface
 	if !implementingType.Implements(valueType) {
-		return reflect.Value{}, fmt.Errorf("couldn't unmarshal interface: %s does not implement interface %s", implementingType, valueType)
+		return reflect.Value{}, fmt.Errorf("couldn't unmarshal interface: %s %w %s",
+			implementingType,
+			codec.ErrDoesNotImplementInterface,
+			valueType,
+		)
 	}
 	return reflect.New(implementingType).Elem(), nil // instance of the proper type
 }

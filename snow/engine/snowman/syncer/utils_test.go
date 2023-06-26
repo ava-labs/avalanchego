@@ -1,12 +1,13 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package syncer
 
 import (
+	"context"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -59,7 +60,7 @@ func buildTestPeers(t *testing.T) validators.Set {
 	vdrs := validators.NewSet()
 	for idx := 0; idx < 2*common.MaxOutstandingBroadcastRequests; idx++ {
 		beaconID := ids.GenerateTestNodeID()
-		assert.NoError(t, vdrs.AddWeight(beaconID, uint64(1)))
+		require.NoError(t, vdrs.Add(beaconID, nil, ids.Empty, 1))
 	}
 	return vdrs
 }
@@ -81,16 +82,18 @@ func buildTestsObjects(t *testing.T, commonCfg *common.Config) (
 		},
 	}
 	dummyGetter, err := getter.New(fullVM, *commonCfg)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	cfg, err := NewConfig(*commonCfg, nil, dummyGetter, fullVM)
-	assert.NoError(t, err)
-	commonSyncer := New(cfg, func(lastReqID uint32) error { return nil })
-	syncer, ok := commonSyncer.(*stateSyncer)
-	assert.True(t, ok)
-	assert.True(t, syncer.stateSyncVM != nil)
+	require.NoError(t, err)
+	commonSyncer := New(cfg, func(context.Context, uint32) error {
+		return nil
+	})
+	require.IsType(t, &stateSyncer{}, commonSyncer)
+	syncer := commonSyncer.(*stateSyncer)
+	require.NotNil(t, syncer.stateSyncVM)
 
-	fullVM.GetOngoingSyncStateSummaryF = func() (block.StateSummary, error) {
+	fullVM.GetOngoingSyncStateSummaryF = func(context.Context) (block.StateSummary, error) {
 		return nil, database.ErrNotFound
 	}
 

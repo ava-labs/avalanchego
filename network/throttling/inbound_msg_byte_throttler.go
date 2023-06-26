@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package throttling
@@ -7,6 +7,10 @@ import (
 	"context"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
@@ -14,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 // See inbound_msg_throttler.go
@@ -37,7 +40,7 @@ func newInboundMsgByteThrottler(
 			nodeToVdrBytesUsed:     make(map[ids.NodeID]uint64),
 			nodeToAtLargeBytesUsed: make(map[ids.NodeID]uint64),
 		},
-		waitingToAcquire:   linkedhashmap.New(),
+		waitingToAcquire:   linkedhashmap.New[uint64, *msgMetadata](),
 		nodeToWaitingMsgID: make(map[ids.NodeID]uint64),
 	}
 	return t, t.metrics.initialize(namespace, registerer)
@@ -65,7 +68,7 @@ type inboundMsgByteThrottler struct {
 	// Node ID --> Msg ID for a message this node is waiting to acquire
 	nodeToWaitingMsgID map[ids.NodeID]uint64
 	// Msg ID --> *msgMetadata
-	waitingToAcquire linkedhashmap.LinkedHashmap
+	waitingToAcquire linkedhashmap.LinkedHashmap[uint64, *msgMetadata]
 	// Invariant: The node is only waiting on a single message at a time
 	//
 	// Invariant: waitingToAcquire.Get(nodeToWaitingMsgIDs[nodeID])
@@ -95,17 +98,16 @@ func (t *inboundMsgByteThrottler) Acquire(ctx context.Context, msgSize uint64, n
 
 	// If there is already a message waiting, log the error but continue
 	if existingID, exists := t.nodeToWaitingMsgID[nodeID]; exists {
-		t.log.Error(
-			"attempting to wait on new message from node %s while waiting for message %s",
-			nodeID,
-			existingID,
+		t.log.Error("node already waiting on message",
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint64("messageID", existingID),
 		)
 		t.lock.Unlock()
 		return t.metrics.awaitingRelease.Dec
 	}
 
 	// Take as many bytes as we can from the at-large allocation.
-	atLargeBytesUsed := math.Min64(
+	atLargeBytesUsed := math.Min(
 		// only give as many bytes as needed
 		metadata.bytesNeeded,
 		// don't exceed per-node limit
@@ -120,15 +122,17 @@ func (t *inboundMsgByteThrottler) Acquire(ctx context.Context, msgSize uint64, n
 		t.nodeToAtLargeBytesUsed[nodeID] += atLargeBytesUsed
 		if metadata.bytesNeeded == 0 { // If we acquired enough bytes, return
 			t.lock.Unlock()
-			return func() { t.release(metadata, nodeID) }
+			return func() {
+				t.release(metadata, nodeID)
+			}
 		}
 	}
 
 	// Take as many bytes as we can from [nodeID]'s validator allocation.
 	// Calculate [nodeID]'s validator allocation size based on its weight
 	vdrAllocationSize := uint64(0)
-	weight, isVdr := t.vdrs.GetWeight(nodeID)
-	if isVdr && weight != 0 {
+	weight := t.vdrs.GetWeight(nodeID)
+	if weight != 0 {
 		vdrAllocationSize = uint64(float64(t.maxVdrBytes) * float64(weight) / float64(t.vdrs.Weight()))
 	}
 	vdrBytesAlreadyUsed := t.nodeToVdrBytesUsed[nodeID]
@@ -141,7 +145,7 @@ func (t *inboundMsgByteThrottler) Acquire(ctx context.Context, msgSize uint64, n
 	} else {
 		vdrBytesAllowed -= vdrBytesAlreadyUsed
 	}
-	vdrBytesUsed := math.Min64(t.remainingVdrBytes, metadata.bytesNeeded, vdrBytesAllowed)
+	vdrBytesUsed := math.Min(t.remainingVdrBytes, metadata.bytesNeeded, vdrBytesAllowed)
 	if vdrBytesUsed > 0 {
 		// Mark that [nodeID] used [vdrBytesUsed] from its validator allocation
 		t.nodeToVdrBytesUsed[nodeID] += vdrBytesUsed
@@ -150,7 +154,9 @@ func (t *inboundMsgByteThrottler) Acquire(ctx context.Context, msgSize uint64, n
 		metadata.bytesNeeded -= vdrBytesUsed
 		if metadata.bytesNeeded == 0 { // If we acquired enough bytes, return
 			t.lock.Unlock()
-			return func() { t.release(metadata, nodeID) }
+			return func() {
+				t.release(metadata, nodeID)
+			}
 		}
 	}
 
@@ -202,7 +208,7 @@ func (t *inboundMsgByteThrottler) release(metadata *msgMetadata, nodeID ids.Node
 	// or messages from [nodeID] currently waiting to acquire bytes.
 	vdrBytesUsed := t.nodeToVdrBytesUsed[nodeID]
 	releasedBytes := metadata.msgSize - metadata.bytesNeeded
-	vdrBytesToReturn := math.Min64(releasedBytes, vdrBytesUsed)
+	vdrBytesToReturn := math.Min(releasedBytes, vdrBytesUsed)
 
 	// [atLargeBytesToReturn] is the number of bytes from [msgSize]
 	// that will be given to the at-large allocation or a message
@@ -222,10 +228,10 @@ func (t *inboundMsgByteThrottler) release(metadata *msgMetadata, nodeID ids.Node
 		// waiting messages or we exhaust the bytes.
 		iter := t.waitingToAcquire.NewIterator()
 		for t.remainingAtLargeBytes > 0 && iter.Next() {
-			msg := iter.Value().(*msgMetadata)
+			msg := iter.Value()
 			// From the at-large allocation, take the maximum number of bytes
 			// without exceeding the per-node limit on taking from at-large pool.
-			atLargeBytesGiven := math.Min64(
+			atLargeBytesGiven := math.Min(
 				// don't give [msg] too many bytes
 				msg.bytesNeeded,
 				// don't exceed per-node limit
@@ -255,11 +261,10 @@ func (t *inboundMsgByteThrottler) release(metadata *msgMetadata, nodeID ids.Node
 	// Get the message from [nodeID], if any, waiting to acquire
 	msgID, ok := t.nodeToWaitingMsgID[nodeID]
 	if vdrBytesToReturn > 0 && ok {
-		msgIntf, exists := t.waitingToAcquire.Get(msgID)
+		msg, exists := t.waitingToAcquire.Get(msgID)
 		if exists {
 			// Give [msg] all the bytes we can
-			msg := msgIntf.(*msgMetadata)
-			bytesToGive := math.Min64(msg.bytesNeeded, vdrBytesToReturn)
+			bytesToGive := math.Min(msg.bytesNeeded, vdrBytesToReturn)
 			msg.bytesNeeded -= bytesToGive
 			vdrBytesToReturn -= bytesToGive
 			if msg.bytesNeeded == 0 {
@@ -270,7 +275,10 @@ func (t *inboundMsgByteThrottler) release(metadata *msgMetadata, nodeID ids.Node
 			}
 		} else {
 			// This should never happen
-			t.log.Warn("couldn't find message %s from %s", msgID, nodeID)
+			t.log.Warn("couldn't find message",
+				zap.Stringer("nodeID", nodeID),
+				zap.Uint64("messageID", msgID),
+			)
 		}
 	}
 	if vdrBytesToReturn > 0 {

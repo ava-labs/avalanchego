@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package p
@@ -11,11 +11,12 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-var _ Backend = &backend{}
+var _ Backend = (*backend)(nil)
 
 type ChainUTXOs interface {
 	AddUTXO(ctx stdcontext.Context, destinationChainID ids.ID, utxo *avax.UTXO) error
@@ -84,7 +85,7 @@ func (b *backend) addUTXOs(ctx stdcontext.Context, destinationChainID ids.ID, ut
 	return nil
 }
 
-func (b *backend) removeUTXOs(ctx stdcontext.Context, sourceChain ids.ID, utxoIDs ids.Set) error {
+func (b *backend) removeUTXOs(ctx stdcontext.Context, sourceChain ids.ID, utxoIDs set.Set[ids.ID]) error {
 	for utxoID := range utxoIDs {
 		if err := b.RemoveUTXO(ctx, sourceChain, utxoID); err != nil {
 			return err

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package atomic
@@ -7,10 +7,11 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/stretchr/testify/assert"
 )
 
 // SharedMemoryTests is a list of all shared memory tests
@@ -28,24 +29,22 @@ var SharedMemoryTests = []func(t *testing.T, chainID0, chainID1 ids.ID, sm0, sm1
 }
 
 func TestSharedMemoryPutAndGet(t *testing.T, chainID0, chainID1 ids.ID, sm0, sm1 SharedMemory, _ database.Database) {
-	assert := assert.New(t)
+	require := require.New(t)
 
-	err := sm0.Apply(map[ids.ID]*Requests{chainID1: {PutRequests: []*Element{{
+	require.NoError(sm0.Apply(map[ids.ID]*Requests{chainID1: {PutRequests: []*Element{{
 		Key:   []byte{0},
 		Value: []byte{1},
-	}}}})
-
-	assert.NoError(err)
+	}}}}))
 
 	values, err := sm1.Get(chainID0, [][]byte{{0}})
-	assert.NoError(err)
-	assert.Equal([][]byte{{1}}, values, "wrong values returned")
+	require.NoError(err)
+	require.Equal([][]byte{{1}}, values, "wrong values returned")
 }
 
 // TestSharedMemoryLargePutGetAndRemove tests to make sure that the interface
 // can support large values.
 func TestSharedMemoryLargePutGetAndRemove(t *testing.T, chainID0, chainID1 ids.ID, sm0, sm1 SharedMemory, _ database.Database) {
-	assert := assert.New(t)
+	require := require.New(t)
 	rand.Seed(0)
 
 	totalSize := 16 * units.MiB  // 16 MiB
@@ -54,7 +53,7 @@ func TestSharedMemoryLargePutGetAndRemove(t *testing.T, chainID0, chainID1 ids.I
 
 	b := make([]byte, totalSize)
 	_, err := rand.Read(b) // #nosec G404
-	assert.NoError(err)
+	require.NoError(err)
 
 	elems := []*Element{}
 	keys := [][]byte{}
@@ -72,85 +71,80 @@ func TestSharedMemoryLargePutGetAndRemove(t *testing.T, chainID0, chainID1 ids.I
 		keys = append(keys, key)
 	}
 
-	err = sm0.Apply(map[ids.ID]*Requests{
+	require.NoError(sm0.Apply(map[ids.ID]*Requests{
 		chainID1: {
 			PutRequests: elems,
 		},
-	})
-	assert.NoError(err)
+	}))
 
 	values, err := sm1.Get(
 		chainID0,
 		keys,
 	)
-	assert.NoError(err)
+	require.NoError(err)
 	for i, value := range values {
-		assert.Equal(elems[i].Value, value)
+		require.Equal(elems[i].Value, value)
 	}
 
-	err = sm1.Apply(map[ids.ID]*Requests{
+	require.NoError(sm1.Apply(map[ids.ID]*Requests{
 		chainID0: {
 			RemoveRequests: keys,
 		},
-	})
-
-	assert.NoError(err)
+	}))
 }
 
 func TestSharedMemoryIndexed(t *testing.T, chainID0, chainID1 ids.ID, sm0, sm1 SharedMemory, _ database.Database) {
-	assert := assert.New(t)
+	require := require.New(t)
 
-	err := sm0.Apply(map[ids.ID]*Requests{chainID1: {PutRequests: []*Element{{
+	require.NoError(sm0.Apply(map[ids.ID]*Requests{chainID1: {PutRequests: []*Element{{
 		Key:   []byte{0},
 		Value: []byte{1},
 		Traits: [][]byte{
 			{2},
 			{3},
 		},
-	}}}})
-	assert.NoError(err)
+	}}}}))
 
-	err = sm0.Apply(map[ids.ID]*Requests{chainID1: {PutRequests: []*Element{{
+	require.NoError(sm0.Apply(map[ids.ID]*Requests{chainID1: {PutRequests: []*Element{{
 		Key:   []byte{4},
 		Value: []byte{5},
 		Traits: [][]byte{
 			{2},
 			{3},
 		},
-	}}}})
-	assert.NoError(err)
+	}}}}))
 
 	values, _, _, err := sm0.Indexed(chainID1, [][]byte{{2}}, nil, nil, 1)
-	assert.NoError(err)
-	assert.Empty(values, "wrong indexed values returned")
+	require.NoError(err)
+	require.Empty(values, "wrong indexed values returned")
 
 	values, _, _, err = sm1.Indexed(chainID0, [][]byte{{2}}, nil, nil, 0)
-	assert.NoError(err)
-	assert.Empty(values, "wrong indexed values returned")
+	require.NoError(err)
+	require.Empty(values, "wrong indexed values returned")
 
 	values, _, _, err = sm1.Indexed(chainID0, [][]byte{{2}}, nil, nil, 1)
-	assert.NoError(err)
-	assert.Equal([][]byte{{5}}, values, "wrong indexed values returned")
+	require.NoError(err)
+	require.Equal([][]byte{{5}}, values, "wrong indexed values returned")
 
 	values, _, _, err = sm1.Indexed(chainID0, [][]byte{{2}}, nil, nil, 2)
-	assert.NoError(err)
-	assert.Equal([][]byte{{5}, {1}}, values, "wrong indexed values returned")
+	require.NoError(err)
+	require.Equal([][]byte{{5}, {1}}, values, "wrong indexed values returned")
 
 	values, _, _, err = sm1.Indexed(chainID0, [][]byte{{2}}, nil, nil, 3)
-	assert.NoError(err)
-	assert.Equal([][]byte{{5}, {1}}, values, "wrong indexed values returned")
+	require.NoError(err)
+	require.Equal([][]byte{{5}, {1}}, values, "wrong indexed values returned")
 
 	values, _, _, err = sm1.Indexed(chainID0, [][]byte{{3}}, nil, nil, 3)
-	assert.NoError(err)
-	assert.Equal([][]byte{{5}, {1}}, values, "wrong indexed values returned")
+	require.NoError(err)
+	require.Equal([][]byte{{5}, {1}}, values, "wrong indexed values returned")
 
 	values, _, _, err = sm1.Indexed(chainID0, [][]byte{{2}, {3}}, nil, nil, 3)
-	assert.NoError(err)
-	assert.Equal([][]byte{{5}, {1}}, values, "wrong indexed values returned")
+	require.NoError(err)
+	require.Equal([][]byte{{5}, {1}}, values, "wrong indexed values returned")
 }
 
 func TestSharedMemoryLargeIndexed(t *testing.T, chainID0, chainID1 ids.ID, sm0, sm1 SharedMemory, _ database.Database) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	totalSize := 8 * units.MiB   // 8 MiB
 	elementSize := 1 * units.KiB // 1 KiB
@@ -158,7 +152,7 @@ func TestSharedMemoryLargeIndexed(t *testing.T, chainID0, chainID1 ids.ID, sm0, 
 
 	b := make([]byte, totalSize)
 	_, err := rand.Read(b) // #nosec G404
-	assert.NoError(err)
+	require.NoError(err)
 
 	elems := []*Element{}
 	allTraits := [][]byte{}
@@ -182,16 +176,16 @@ func TestSharedMemoryLargeIndexed(t *testing.T, chainID0, chainID1 ids.ID, sm0, 
 		})
 	}
 
-	err = sm0.Apply(map[ids.ID]*Requests{chainID1: {PutRequests: elems}})
-	assert.NoError(err)
+	require.NoError(sm0.Apply(map[ids.ID]*Requests{chainID1: {PutRequests: elems}}))
 
 	values, _, _, err := sm1.Indexed(chainID0, allTraits, nil, nil, len(elems)+1)
-	assert.NoError(err)
-	assert.Len(values, len(elems), "wrong number of values returned")
+	require.NoError(err)
+	require.Len(values, len(elems), "wrong number of values returned")
 }
 
 func TestSharedMemoryCantDuplicatePut(t *testing.T, _, chainID1 ids.ID, sm0, _ SharedMemory, _ database.Database) {
-	assert := assert.New(t)
+	require := require.New(t)
+
 	err := sm0.Apply(map[ids.ID]*Requests{chainID1: {PutRequests: []*Element{
 		{
 			Key:   []byte{0},
@@ -202,97 +196,92 @@ func TestSharedMemoryCantDuplicatePut(t *testing.T, _, chainID1 ids.ID, sm0, _ S
 			Value: []byte{2},
 		},
 	}}})
-	assert.Error(err, "shouldn't be able to write duplicated keys")
+	// TODO: require error to be errDuplicatedOperation
+	require.Error(err) //nolint:forbidigo // currently returns grpc errors too
+
+	require.NoError(sm0.Apply(map[ids.ID]*Requests{chainID1: {PutRequests: []*Element{{
+		Key:   []byte{0},
+		Value: []byte{1},
+	}}}}))
+
 	err = sm0.Apply(map[ids.ID]*Requests{chainID1: {PutRequests: []*Element{{
 		Key:   []byte{0},
 		Value: []byte{1},
 	}}}})
-	assert.NoError(err)
-	err = sm0.Apply(map[ids.ID]*Requests{chainID1: {PutRequests: []*Element{{
-		Key:   []byte{0},
-		Value: []byte{1},
-	}}}})
-	assert.Error(err, "shouldn't be able to write duplicated keys")
+	// TODO: require error to be errDuplicatedOperation
+	require.Error(err) //nolint:forbidigo // currently returns grpc errors too
 }
 
 func TestSharedMemoryCantDuplicateRemove(t *testing.T, _, chainID1 ids.ID, sm0, _ SharedMemory, _ database.Database) {
-	assert := assert.New(t)
-	err := sm0.Apply(map[ids.ID]*Requests{chainID1: {RemoveRequests: [][]byte{{0}}}})
-	assert.NoError(err)
+	require := require.New(t)
 
-	err = sm0.Apply(map[ids.ID]*Requests{chainID1: {RemoveRequests: [][]byte{{0}}}})
-	assert.Error(err, "shouldn't be able to remove duplicated keys")
+	require.NoError(sm0.Apply(map[ids.ID]*Requests{chainID1: {RemoveRequests: [][]byte{{0}}}}))
+
+	err := sm0.Apply(map[ids.ID]*Requests{chainID1: {RemoveRequests: [][]byte{{0}}}})
+	// TODO: require error to be errDuplicatedOperation
+	require.Error(err) //nolint:forbidigo // currently returns grpc errors too
 }
 
 func TestSharedMemoryCommitOnPut(t *testing.T, _, chainID1 ids.ID, sm0, _ SharedMemory, db database.Database) {
-	assert := assert.New(t)
+	require := require.New(t)
 
-	err := db.Put([]byte{1}, []byte{2})
-	assert.NoError(err)
+	require.NoError(db.Put([]byte{1}, []byte{2}))
 
 	batch := db.NewBatch()
 
-	err = batch.Put([]byte{0}, []byte{1})
-	assert.NoError(err)
+	require.NoError(batch.Put([]byte{0}, []byte{1}))
 
-	err = batch.Delete([]byte{1})
-	assert.NoError(err)
+	require.NoError(batch.Delete([]byte{1}))
 
-	err = sm0.Apply(
+	require.NoError(sm0.Apply(
 		map[ids.ID]*Requests{chainID1: {PutRequests: []*Element{{
 			Key:   []byte{0},
 			Value: []byte{1},
 		}}}},
 		batch,
-	)
-	assert.NoError(err)
+	))
 
 	val, err := db.Get([]byte{0})
-	assert.NoError(err)
-	assert.Equal([]byte{1}, val)
+	require.NoError(err)
+	require.Equal([]byte{1}, val)
 
 	has, err := db.Has([]byte{1})
-	assert.NoError(err)
-	assert.False(has)
+	require.NoError(err)
+	require.False(has)
 }
 
 func TestSharedMemoryCommitOnRemove(t *testing.T, _, chainID1 ids.ID, sm0, _ SharedMemory, db database.Database) {
-	assert := assert.New(t)
+	require := require.New(t)
 
-	err := db.Put([]byte{1}, []byte{2})
-	assert.NoError(err)
+	require.NoError(db.Put([]byte{1}, []byte{2}))
 
 	batch := db.NewBatch()
 
-	err = batch.Put([]byte{0}, []byte{1})
-	assert.NoError(err)
+	require.NoError(batch.Put([]byte{0}, []byte{1}))
 
-	err = batch.Delete([]byte{1})
-	assert.NoError(err)
+	require.NoError(batch.Delete([]byte{1}))
 
-	err = sm0.Apply(
+	require.NoError(sm0.Apply(
 		map[ids.ID]*Requests{chainID1: {RemoveRequests: [][]byte{{0}}}},
 		batch,
-	)
-	assert.NoError(err)
+	))
 
 	val, err := db.Get([]byte{0})
-	assert.NoError(err)
-	assert.Equal([]byte{1}, val)
+	require.NoError(err)
+	require.Equal([]byte{1}, val)
 
 	has, err := db.Has([]byte{1})
-	assert.NoError(err)
-	assert.False(has)
+	require.NoError(err)
+	require.False(has)
 }
 
 // TestPutAndRemoveBatch tests to make sure multiple put and remove requests work properly
-func TestPutAndRemoveBatch(t *testing.T, chainID0, chainID1 ids.ID, _, sm1 SharedMemory, db database.Database) {
-	assert := assert.New(t)
+func TestPutAndRemoveBatch(t *testing.T, chainID0, _ ids.ID, _, sm1 SharedMemory, db database.Database) {
+	require := require.New(t)
 
 	batch := db.NewBatch()
 
-	err := batch.Put([]byte{0}, []byte{1})
-	assert.NoError(err)
+	require.NoError(batch.Put([]byte{0}, []byte{1}))
 
 	batchChainsAndInputs := make(map[ids.ID]*Requests)
 
@@ -306,19 +295,17 @@ func TestPutAndRemoveBatch(t *testing.T, chainID0, chainID1 ids.ID, _, sm1 Share
 		RemoveRequests: byteArr,
 	}
 
-	err = sm1.Apply(batchChainsAndInputs, batch)
-
-	assert.NoError(err)
+	require.NoError(sm1.Apply(batchChainsAndInputs, batch))
 
 	val, err := db.Get([]byte{0})
-	assert.NoError(err)
-	assert.Equal([]byte{1}, val)
+	require.NoError(err)
+	require.Equal([]byte{1}, val)
 }
 
 // TestSharedMemoryLargeBatchSize tests to make sure that the interface can
 // support large batches.
 func TestSharedMemoryLargeBatchSize(t *testing.T, _, chainID1 ids.ID, sm0, _ SharedMemory, db database.Database) {
-	assert := assert.New(t)
+	require := require.New(t)
 	rand.Seed(0)
 
 	totalSize := 8 * units.MiB   // 8 MiB
@@ -327,10 +314,10 @@ func TestSharedMemoryLargeBatchSize(t *testing.T, _, chainID1 ids.ID, sm0, _ Sha
 
 	bytes := make([]byte, totalSize)
 	_, err := rand.Read(bytes) // #nosec G404
-	assert.NoError(err)
+	require.NoError(err)
 
 	batch := db.NewBatch()
-	assert.NotNil(batch)
+	require.NotNil(batch)
 
 	initialBytes := bytes
 	for len(bytes) > pairSize {
@@ -340,32 +327,27 @@ func TestSharedMemoryLargeBatchSize(t *testing.T, _, chainID1 ids.ID, sm0, _ Sha
 		value := bytes[:elementSize]
 		bytes = bytes[elementSize:]
 
-		err := batch.Put(key, value)
-		assert.NoError(err)
+		require.NoError(batch.Put(key, value))
 	}
 
-	err = db.Put([]byte{1}, []byte{2})
-	assert.NoError(err)
+	require.NoError(db.Put([]byte{1}, []byte{2}))
 
-	err = batch.Put([]byte{0}, []byte{1})
-	assert.NoError(err)
+	require.NoError(batch.Put([]byte{0}, []byte{1}))
 
-	err = batch.Delete([]byte{1})
-	assert.NoError(err)
+	require.NoError(batch.Delete([]byte{1}))
 
-	err = sm0.Apply(
+	require.NoError(sm0.Apply(
 		map[ids.ID]*Requests{chainID1: {RemoveRequests: [][]byte{{0}}}},
 		batch,
-	)
-	assert.NoError(err)
+	))
 
 	val, err := db.Get([]byte{0})
-	assert.NoError(err)
-	assert.Equal([]byte{1}, val)
+	require.NoError(err)
+	require.Equal([]byte{1}, val)
 
 	has, err := db.Has([]byte{1})
-	assert.NoError(err)
-	assert.False(has)
+	require.NoError(err)
+	require.False(has)
 
 	batch.Reset()
 
@@ -374,16 +356,13 @@ func TestSharedMemoryLargeBatchSize(t *testing.T, _, chainID1 ids.ID, sm0, _ Sha
 		key := bytes[:elementSize]
 		bytes = bytes[pairSize:]
 
-		err := batch.Delete(key)
-		assert.NoError(err)
+		require.NoError(batch.Delete(key))
 	}
 
-	err = sm0.Apply(
+	require.NoError(sm0.Apply(
 		map[ids.ID]*Requests{chainID1: {RemoveRequests: [][]byte{{1}}}},
 		batch,
-	)
-
-	assert.NoError(err)
+	))
 
 	batch.Reset()
 
@@ -392,8 +371,7 @@ func TestSharedMemoryLargeBatchSize(t *testing.T, _, chainID1 ids.ID, sm0, _ Sha
 		key := bytes[:elementSize]
 		bytes = bytes[pairSize:]
 
-		err := batch.Delete(key)
-		assert.NoError(err)
+		require.NoError(batch.Delete(key))
 	}
 
 	batchChainsAndInputs := make(map[ids.ID]*Requests)
@@ -408,9 +386,8 @@ func TestSharedMemoryLargeBatchSize(t *testing.T, _, chainID1 ids.ID, sm0, _ Sha
 		RemoveRequests: byteArr,
 	}
 
-	err = sm0.Apply(
+	require.NoError(sm0.Apply(
 		batchChainsAndInputs,
 		batch,
-	)
-	assert.NoError(err)
+	))
 }

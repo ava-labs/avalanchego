@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package nftfx
@@ -22,10 +22,12 @@ const (
 var (
 	errNilTransferOutput              = errors.New("nil transfer output")
 	errPayloadTooLarge                = errors.New("payload too large")
-	_                    verify.State = &TransferOutput{}
+	_                    verify.State = (*TransferOutput)(nil)
 )
 
 type TransferOutput struct {
+	verify.IsState `json:"-"`
+
 	GroupID                  uint32              `serialize:"true" json:"groupID"`
 	Payload                  types.JSONByteSlice `serialize:"true" json:"payload"`
 	secp256k1fx.OutputOwners `serialize:"true"`
@@ -33,7 +35,7 @@ type TransferOutput struct {
 
 // MarshalJSON marshals Amt and the embedded OutputOwners struct
 // into a JSON readable format
-// If OutputOwners cannot be serialised then this will return error
+// If OutputOwners cannot be serialized then this will return error
 func (out *TransferOutput) MarshalJSON() ([]byte, error) {
 	result, err := out.OutputOwners.Fields()
 	if err != nil {
@@ -55,5 +57,3 @@ func (out *TransferOutput) Verify() error {
 		return out.OutputOwners.Verify()
 	}
 }
-
-func (out *TransferOutput) VerifyState() error { return out.Verify() }

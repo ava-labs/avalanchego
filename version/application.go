@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package version
@@ -12,7 +12,7 @@ import (
 var (
 	errDifferentMajor = errors.New("different major version")
 
-	_ fmt.Stringer = &Semantic{}
+	_ fmt.Stringer = (*Semantic)(nil)
 )
 
 type Application struct {

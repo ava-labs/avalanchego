@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sender
@@ -9,6 +9,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
+	"github.com/ava-labs/avalanchego/subnets"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var (
@@ -22,8 +24,8 @@ type ExternalSenderTest struct {
 
 	CantSend, CantGossip bool
 
-	SendF   func(msg message.OutboundMessage, nodeIDs ids.NodeIDSet, subnetID ids.ID, validatorOnly bool) ids.NodeIDSet
-	GossipF func(msg message.OutboundMessage, subnetID ids.ID, validatorOnly bool, numValidatorsToSend, numNonValidatorsToSend, numPeersToSend int) ids.NodeIDSet
+	SendF   func(msg message.OutboundMessage, nodeIDs set.Set[ids.NodeID], subnetID ids.ID, allower subnets.Allower) set.Set[ids.NodeID]
+	GossipF func(msg message.OutboundMessage, subnetID ids.ID, numValidatorsToSend, numNonValidatorsToSend, numPeersToSend int, allower subnets.Allower) set.Set[ids.NodeID]
 }
 
 // Default set the default callable value to [cant]
@@ -34,12 +36,12 @@ func (s *ExternalSenderTest) Default(cant bool) {
 
 func (s *ExternalSenderTest) Send(
 	msg message.OutboundMessage,
-	nodeIDs ids.NodeIDSet,
+	nodeIDs set.Set[ids.NodeID],
 	subnetID ids.ID,
-	validatorOnly bool,
-) ids.NodeIDSet {
+	allower subnets.Allower,
+) set.Set[ids.NodeID] {
 	if s.SendF != nil {
-		return s.SendF(msg, nodeIDs, subnetID, validatorOnly)
+		return s.SendF(msg, nodeIDs, subnetID, allower)
 	}
 	if s.CantSend {
 		if s.TB != nil {
@@ -56,13 +58,13 @@ func (s *ExternalSenderTest) Send(
 func (s *ExternalSenderTest) Gossip(
 	msg message.OutboundMessage,
 	subnetID ids.ID,
-	validatorOnly bool,
 	numValidatorsToSend int,
 	numNonValidatorsToSend int,
 	numPeersToSend int,
-) ids.NodeIDSet {
+	allower subnets.Allower,
+) set.Set[ids.NodeID] {
 	if s.GossipF != nil {
-		return s.GossipF(msg, subnetID, validatorOnly, numValidatorsToSend, numNonValidatorsToSend, numPeersToSend)
+		return s.GossipF(msg, subnetID, numValidatorsToSend, numNonValidatorsToSend, numPeersToSend, allower)
 	}
 	if s.CantGossip {
 		if s.TB != nil {

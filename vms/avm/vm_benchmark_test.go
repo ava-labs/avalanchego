@@ -1,14 +1,18 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avm
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/keystore"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -20,7 +24,7 @@ func BenchmarkLoadUser(b *testing.B) {
 		_, _, vm, _ := GenesisVM(nil)
 		ctx := vm.ctx
 		defer func() {
-			if err := vm.Shutdown(); err != nil {
+			if err := vm.Shutdown(context.Background()); err != nil {
 				b.Fatal(err)
 			}
 			ctx.Lock.Unlock()
@@ -38,7 +42,7 @@ func BenchmarkLoadUser(b *testing.B) {
 
 		b.ResetTimer()
 
-		fromAddrs := ids.ShortSet{}
+		fromAddrs := set.Set[ids.ShortID]{}
 		for n := 0; n < b.N; n++ {
 			addrIndex := n % numKeys
 			fromAddrs.Clear()
@@ -68,7 +72,7 @@ func GetAllUTXOsBenchmark(b *testing.B, utxoCount int) {
 	_, _, vm, _ := GenesisVM(b)
 	ctx := vm.ctx
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
+		if err := vm.Shutdown(context.Background()); err != nil {
 			b.Fatal(err)
 		}
 		ctx.Lock.Unlock()
@@ -94,31 +98,20 @@ func GetAllUTXOsBenchmark(b *testing.B, utxoCount int) {
 			},
 		}
 
-		if err := vm.state.PutUTXO(utxo); err != nil {
-			b.Fatal(err)
-		}
+		vm.state.AddUTXO(utxo)
 	}
+	require.NoError(b, vm.state.Commit())
 
-	addrsSet := ids.ShortSet{}
+	addrsSet := set.Set[ids.ShortID]{}
 	addrsSet.Add(addr)
-
-	var (
-		err               error
-		notPaginatedUTXOs []*avax.UTXO
-	)
 
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
 		// Fetch all UTXOs older version
-		notPaginatedUTXOs, err = avax.GetAllUTXOs(vm.state, addrsSet)
-		if err != nil {
-			b.Fatal(err)
-		}
-
-		if len(notPaginatedUTXOs) != utxoCount {
-			b.Fatalf("Wrong number of utxos. Expected (%d) returned (%d)", utxoCount, len(notPaginatedUTXOs))
-		}
+		notPaginatedUTXOs, err := avax.GetAllUTXOs(vm.state, addrsSet)
+		require.NoError(b, err)
+		require.Len(b, notPaginatedUTXOs, utxoCount)
 	}
 }
 

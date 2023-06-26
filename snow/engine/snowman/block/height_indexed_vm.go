@@ -1,8 +1,10 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
+
 package block
 
 import (
+	"context"
 	"errors"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -21,9 +23,14 @@ type HeightIndexedChainVM interface {
 	// - ErrIndexIncomplete if the height index is not currently available.
 	// - Any other non-standard error that may have occurred when verifying the
 	//   index.
-	VerifyHeightIndex() error
+	VerifyHeightIndex(context.Context) error
 
-	// GetBlockIDAtHeight returns the ID of the block that was accepted with
-	// [height].
-	GetBlockIDAtHeight(height uint64) (ids.ID, error)
+	// GetBlockIDAtHeight returns:
+	// - The ID of the block that was accepted with [height].
+	// - database.ErrNotFound if the [height] index is unknown.
+	//
+	// Note: A returned value of [database.ErrNotFound] typically means that the
+	//       underlying VM was state synced and does not have access to the
+	//       blockID at [height].
+	GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, error)
 }

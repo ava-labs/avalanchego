@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package fx
@@ -9,7 +9,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-var _ Fx = &secp256k1fx.Fx{}
+var (
+	_ Fx    = (*secp256k1fx.Fx)(nil)
+	_ Owner = (*secp256k1fx.OutputOwners)(nil)
+	_ Owned = (*secp256k1fx.TransferOutput)(nil)
+)
 
 // Fx is the interface a feature extension must implement to support the
 // Platform Chain.
@@ -40,6 +44,8 @@ type Fx interface {
 }
 
 type Owner interface {
+	verify.IsNotState
+
 	verify.Verifiable
 	snow.ContextInitializable
 }

@@ -1,10 +1,12 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowball
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func UnarySnowflakeStateTest(t *testing.T, sf *unarySnowflake, expectedConfidence int, expectedFinalized bool) {
@@ -16,6 +18,8 @@ func UnarySnowflakeStateTest(t *testing.T, sf *unarySnowflake, expectedConfidenc
 }
 
 func TestUnarySnowflake(t *testing.T) {
+	require := require.New(t)
+
 	beta := 2
 
 	sf := &unarySnowflake{}
@@ -31,10 +35,8 @@ func TestUnarySnowflake(t *testing.T) {
 	UnarySnowflakeStateTest(t, sf, 1, false)
 
 	sfCloneIntf := sf.Clone()
-	sfClone, ok := sfCloneIntf.(*unarySnowflake)
-	if !ok {
-		t.Fatalf("Unexpected clone type")
-	}
+	require.IsType(&unarySnowflake{}, sfCloneIntf)
+	sfClone := sfCloneIntf.(*unarySnowflake)
 
 	UnarySnowflakeStateTest(t, sfClone, 1, false)
 

@@ -1,136 +1,110 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package cache
 
 import (
-	"container/list"
 	"sync"
+
+	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 )
 
-const minCacheSize = 32
-
-var _ Cacher = &LRU{}
-
-type entry struct {
-	Key   interface{}
-	Value interface{}
-}
+var _ Cacher[struct{}, struct{}] = (*LRU[struct{}, struct{}])(nil)
 
 // LRU is a key value store with bounded size. If the size is attempted to be
 // exceeded, then an element is removed from the cache before the insertion is
 // done, based on evicting the least recently used value.
-type LRU struct {
-	lock      sync.Mutex
-	entryMap  map[interface{}]*list.Element
-	entryList *list.List
-	Size      int
+type LRU[K comparable, V any] struct {
+	lock     sync.Mutex
+	elements linkedhashmap.LinkedHashmap[K, V]
+	// If set to < 0, will be set internally to 1.
+	Size int
 }
 
-func (c *LRU) Put(key, value interface{}) {
+func (c *LRU[K, V]) Put(key K, value V) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	c.put(key, value)
 }
 
-func (c *LRU) Get(key interface{}) (interface{}, bool) {
+func (c *LRU[K, V]) Get(key K) (V, bool) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	return c.get(key)
 }
 
-func (c *LRU) Evict(key interface{}) {
+func (c *LRU[K, _]) Evict(key K) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	c.evict(key)
 }
 
-func (c *LRU) Flush() {
+func (c *LRU[_, _]) Flush() {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	c.flush()
 }
 
-func (c *LRU) init() {
-	if c.entryMap == nil {
-		c.entryMap = make(map[interface{}]*list.Element, minCacheSize)
+func (c *LRU[_, _]) PortionFilled() float64 {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	return c.portionFilled()
+}
+
+func (c *LRU[K, V]) put(key K, value V) {
+	c.resize()
+
+	if c.elements.Len() == c.Size {
+		oldestKey, _, _ := c.elements.Oldest()
+		c.elements.Delete(oldestKey)
 	}
-	if c.entryList == nil {
-		c.entryList = list.New()
+	c.elements.Put(key, value)
+}
+
+func (c *LRU[K, V]) get(key K) (V, bool) {
+	c.resize()
+
+	val, ok := c.elements.Get(key)
+	if !ok {
+		return utils.Zero[V](), false
+	}
+	c.elements.Put(key, val) // Mark [k] as MRU.
+	return val, true
+}
+
+func (c *LRU[K, _]) evict(key K) {
+	c.resize()
+
+	c.elements.Delete(key)
+}
+
+func (c *LRU[K, V]) flush() {
+	c.elements = linkedhashmap.New[K, V]()
+}
+
+func (c *LRU[_, _]) portionFilled() float64 {
+	return float64(c.elements.Len()) / float64(c.Size)
+}
+
+// Initializes [c.elements] if it's nil.
+// Sets [c.size] to 1 if it's <= 0.
+// Removes oldest elements to make number of elements
+// in the cache == [c.size] if necessary.
+func (c *LRU[K, V]) resize() {
+	if c.elements == nil {
+		c.elements = linkedhashmap.New[K, V]()
 	}
 	if c.Size <= 0 {
 		c.Size = 1
 	}
-}
-
-func (c *LRU) resize() {
-	for c.entryList.Len() > c.Size {
-		e := c.entryList.Front()
-		c.entryList.Remove(e)
-
-		val := e.Value.(*entry)
-		delete(c.entryMap, val.Key)
+	for c.elements.Len() > c.Size {
+		oldestKey, _, _ := c.elements.Oldest()
+		c.elements.Delete(oldestKey)
 	}
-}
-
-func (c *LRU) put(key, value interface{}) {
-	c.init()
-	c.resize()
-
-	if e, ok := c.entryMap[key]; !ok {
-		if c.entryList.Len() >= c.Size {
-			e = c.entryList.Front()
-			c.entryList.MoveToBack(e)
-
-			val := e.Value.(*entry)
-			delete(c.entryMap, val.Key)
-			val.Key = key
-			val.Value = value
-		} else {
-			e = c.entryList.PushBack(&entry{
-				Key:   key,
-				Value: value,
-			})
-		}
-		c.entryMap[key] = e
-	} else {
-		c.entryList.MoveToBack(e)
-
-		val := e.Value.(*entry)
-		val.Value = value
-	}
-}
-
-func (c *LRU) get(key interface{}) (interface{}, bool) {
-	c.init()
-	c.resize()
-
-	if e, ok := c.entryMap[key]; ok {
-		c.entryList.MoveToBack(e)
-
-		val := e.Value.(*entry)
-		return val.Value, true
-	}
-	return struct{}{}, false
-}
-
-func (c *LRU) evict(key interface{}) {
-	c.init()
-	c.resize()
-
-	if e, ok := c.entryMap[key]; ok {
-		c.entryList.Remove(e)
-		delete(c.entryMap, key)
-	}
-}
-
-func (c *LRU) flush() {
-	c.init()
-
-	c.entryMap = make(map[interface{}]*list.Element, minCacheSize)
-	c.entryList = list.New()
 }

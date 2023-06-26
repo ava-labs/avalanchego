@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package scheduler
@@ -46,7 +46,7 @@ func TestDelayFromSetTime(t *testing.T) {
 	}
 }
 
-func TestReceipt(t *testing.T) {
+func TestReceipt(*testing.T) {
 	toEngine := make(chan common.Message, 10)
 	now := time.Now()
 	startTime := now.Add(50 * time.Millisecond)

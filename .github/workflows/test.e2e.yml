@@ -2,7 +2,10 @@ name: Test e2e
 
 on:
   push:
+    tags:
+      - "*"
     branches:
+      - master
       - dev
   pull_request:
 
@@ -16,15 +19,13 @@ jobs:
       - name: Git checkout
         uses: actions/checkout@v3
       - name: Set up Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v3
         with:
-          go-version: 1.17.9
-      - name: Build the avalanchego binaries
+          go-version: '~1.19.6'
+          check-latest: true
+      - name: Build the avalanchego binary
         shell: bash
-        run: ./scripts/build.sh
+        run: ./scripts/build.sh -r
       - name: Run e2e tests
         shell: bash
         run: scripts/tests.e2e.sh ./build/avalanchego
-      - name: Run e2e tests for whitelist vtx
-        shell: bash
-        run: ENABLE_WHITELIST_VTX_TESTS=true ./scripts/tests.e2e.sh ./build/avalanchego

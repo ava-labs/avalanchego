@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package throttling
@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // Test that the DialThrottler returned by NewDialThrottler works
@@ -21,8 +21,7 @@ func TestDialThrottler(t *testing.T) {
 		acquiredChan := make(chan struct{}, 1)
 		// Should return immediately because < 5 taken this second
 		go func() {
-			err := throttler.Acquire(context.Background())
-			assert.NoError(t, err)
+			require.NoError(t, throttler.Acquire(context.Background()))
 			acquiredChan <- struct{}{}
 		}()
 		select {
@@ -36,14 +35,12 @@ func TestDialThrottler(t *testing.T) {
 	acquiredChan := make(chan struct{}, 1)
 	go func() {
 		// Should block because 5 already taken within last second
-		err := throttler.Acquire(context.Background())
-		assert.NoError(t, err)
+		require.NoError(t, throttler.Acquire(context.Background()))
 		acquiredChan <- struct{}{}
 	}()
 
 	select {
 	case <-time.After(25 * time.Millisecond):
-		break
 	case <-acquiredChan:
 		t.Fatal("should not have been able to acquire immediately")
 	}
@@ -69,8 +66,7 @@ func TestDialThrottlerCancel(t *testing.T) {
 		acquiredChan := make(chan struct{}, 1)
 		// Should return immediately because < 5 taken this second
 		go func() {
-			err := throttler.Acquire(context.Background())
-			assert.NoError(t, err)
+			require.NoError(t, throttler.Acquire(context.Background()))
 			acquiredChan <- struct{}{}
 		}()
 		select {
@@ -87,7 +83,7 @@ func TestDialThrottlerCancel(t *testing.T) {
 		// Should block because 5 already taken within last second
 		err := throttler.Acquire(ctx)
 		// Should error because we call cancel() below
-		assert.Error(t, err)
+		require.ErrorIs(t, err, context.Canceled)
 		acquiredChan <- struct{}{}
 	}()
 
@@ -96,7 +92,7 @@ func TestDialThrottlerCancel(t *testing.T) {
 	select {
 	case <-acquiredChan:
 	case <-time.After(10 * time.Millisecond):
-		t.Fatal("Acquire should have returned immediately upon context cancelation")
+		t.Fatal("Acquire should have returned immediately upon context cancellation")
 	}
 	close(acquiredChan)
 }
@@ -106,8 +102,7 @@ func TestNoDialThrottler(t *testing.T) {
 	throttler := NewNoDialThrottler()
 	for i := 0; i < 250; i++ {
 		startTime := time.Now()
-		err := throttler.Acquire(context.Background()) // Should always immediately return
-		assert.NoError(t, err)
-		assert.WithinDuration(t, time.Now(), startTime, 25*time.Millisecond)
+		require.NoError(t, throttler.Acquire(context.Background())) // Should always immediately return
+		require.WithinDuration(t, time.Now(), startTime, 25*time.Millisecond)
 	}
 }

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package peer
@@ -8,9 +8,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/sampler"
 )
 
-var _ Set = &set{}
+var _ Set = (*peerSet)(nil)
 
-func NoPrecondition(Peer) bool { return true }
+func NoPrecondition(Peer) bool {
+	return true
+}
 
 // Set contains a group of peers.
 type Set interface {
@@ -37,7 +39,7 @@ type Set interface {
 	Len() int
 
 	// Sample attempts to return a random slice of peers with length [n]. The
-	// slice will not inclide any duplicates. Only peers that cause the
+	// slice will not include any duplicates. Only peers that cause the
 	// [precondition] to return true will be returned in the slice.
 	Sample(n int, precondition func(Peer) bool) []Peer
 
@@ -49,7 +51,7 @@ type Set interface {
 	Info(nodeIDs []ids.NodeID) []Info
 }
 
-type set struct {
+type peerSet struct {
 	peersMap   map[ids.NodeID]int // nodeID -> peer's index in peersSlice
 	peersSlice []Peer             // invariant: len(peersSlice) == len(peersMap)
 }
@@ -59,12 +61,12 @@ type set struct {
 // Only [Add] and [Remove] require exclusion on the data structure. The
 // remaining methods are safe for concurrent use.
 func NewSet() Set {
-	return &set{
+	return &peerSet{
 		peersMap: make(map[ids.NodeID]int),
 	}
 }
 
-func (s *set) Add(peer Peer) {
+func (s *peerSet) Add(peer Peer) {
 	nodeID := peer.ID()
 	index, ok := s.peersMap[nodeID]
 	if !ok {
@@ -75,7 +77,7 @@ func (s *set) Add(peer Peer) {
 	}
 }
 
-func (s *set) GetByID(nodeID ids.NodeID) (Peer, bool) {
+func (s *peerSet) GetByID(nodeID ids.NodeID) (Peer, bool) {
 	index, ok := s.peersMap[nodeID]
 	if !ok {
 		return nil, false
@@ -83,14 +85,14 @@ func (s *set) GetByID(nodeID ids.NodeID) (Peer, bool) {
 	return s.peersSlice[index], true
 }
 
-func (s *set) GetByIndex(index int) (Peer, bool) {
+func (s *peerSet) GetByIndex(index int) (Peer, bool) {
 	if index < 0 || index >= len(s.peersSlice) {
 		return nil, false
 	}
 	return s.peersSlice[index], true
 }
 
-func (s *set) Remove(nodeID ids.NodeID) {
+func (s *peerSet) Remove(nodeID ids.NodeID) {
 	index, ok := s.peersMap[nodeID]
 	if !ok {
 		return
@@ -108,19 +110,17 @@ func (s *set) Remove(nodeID ids.NodeID) {
 	s.peersSlice = s.peersSlice[:lastIndex]
 }
 
-func (s *set) Len() int {
+func (s *peerSet) Len() int {
 	return len(s.peersSlice)
 }
 
-func (s *set) Sample(n int, precondition func(Peer) bool) []Peer {
+func (s *peerSet) Sample(n int, precondition func(Peer) bool) []Peer {
 	if n <= 0 {
 		return nil
 	}
 
 	sampler := sampler.NewUniform()
-	// It is impossible for the sampler to report an error here. Since
-	// [len(s.peersSlice)] <= MaxInt64.
-	_ = sampler.Initialize(uint64(len(s.peersSlice)))
+	sampler.Initialize(uint64(len(s.peersSlice)))
 
 	peers := make([]Peer, 0, n)
 	for len(peers) < n {
@@ -138,7 +138,7 @@ func (s *set) Sample(n int, precondition func(Peer) bool) []Peer {
 	return peers
 }
 
-func (s *set) AllInfo() []Info {
+func (s *peerSet) AllInfo() []Info {
 	peerInfo := make([]Info, len(s.peersSlice))
 	for i, peer := range s.peersSlice {
 		peerInfo[i] = peer.Info()
@@ -146,7 +146,7 @@ func (s *set) AllInfo() []Info {
 	return peerInfo
 }
 
-func (s *set) Info(nodeIDs []ids.NodeID) []Info {
+func (s *peerSet) Info(nodeIDs []ids.NodeID) []Info {
 	peerInfo := make([]Info, 0, len(nodeIDs))
 	for _, nodeID := range nodeIDs {
 		if peer, ok := s.GetByID(nodeID); ok {

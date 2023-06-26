@@ -46,19 +46,15 @@ message WriteHeaderRequest {
 }
 
 message HijackResponse {
-  // reserved for backward compatibility
-  // avalanchego <=v1.7.9 used the fields "1, 6, 7, 8" as an id to
-  // identify the gRPC server address which served the Conn, Reader
-  // and Writer services via the now removed service broker
-  reserved 1, 6 to 8;
-  string local_network = 2;
+  // local_network is the name of the network (for example, "tcp", "udp")
+  string local_network = 1;
   // local_string is string form of address
-  string local_string = 3;
+  string local_string = 2;
   // remote_network is the name of the network (for example, "tcp", "udp")
-  string remote_network = 4;
+  string remote_network = 3;
   // remote_string is string form of address
-  string remote_string = 5;
+  string remote_string = 4;
   // server_addr is the address of the gRPC server serving the Conn, Reader
   // and Writer services which facilitate Hijacking
-  string server_addr = 9;
+  string server_addr = 5;
 }

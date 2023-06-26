@@ -1,15 +1,16 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package getter
 
 import (
+	"context"
 	"errors"
 	"testing"
 
 	"github.com/golang/mock/gomock"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -19,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var errUnknownBlock = errors.New("unknown block")
@@ -46,27 +48,30 @@ func testSetup(
 	sender.Default(true)
 
 	isBootstrapped := false
-	subnet := &common.SubnetTest{
-		T:               t,
-		IsBootstrappedF: func() bool { return isBootstrapped },
-		BootstrappedF:   func(ids.ID) { isBootstrapped = true },
+	bootstrapTracker := &common.BootstrapTrackerTest{
+		T: t,
+		IsBootstrappedF: func() bool {
+			return isBootstrapped
+		},
+		BootstrappedF: func(ids.ID) {
+			isBootstrapped = true
+		},
 	}
 
 	sender.CantSendGetAcceptedFrontier = false
 
 	peer := ids.GenerateTestNodeID()
-	if err := peers.AddWeight(peer, 1); err != nil {
+	if err := peers.Add(peer, nil, ids.Empty, 1); err != nil {
 		t.Fatal(err)
 	}
 
 	commonConfig := common.Config{
 		Ctx:                            ctx,
-		Validators:                     peers,
 		Beacons:                        peers,
 		SampleK:                        peers.Len(),
 		Alpha:                          peers.Weight()/2 + 1,
 		Sender:                         sender,
-		Subnet:                         subnet,
+		BootstrapTracker:               bootstrapTracker,
 		Timer:                          &common.TimerTest{},
 		AncestorsMaxContainersSent:     2000,
 		AncestorsMaxContainersReceived: 2000,
@@ -77,6 +82,8 @@ func testSetup(
 }
 
 func TestAcceptedFrontier(t *testing.T) {
+	require := require.New(t)
+
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -93,36 +100,26 @@ func TestAcceptedFrontier(t *testing.T) {
 		BytesV:  []byte{1, 2, 3},
 	}
 	vm.CantLastAccepted = false
-	vm.LastAcceptedF = func() (ids.ID, error) { return blkID, nil }
-	vm.GetBlockF = func(bID ids.ID) (snowman.Block, error) {
-		assert.Equal(t, blkID, bID)
+	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
+		return blkID, nil
+	}
+	vm.GetBlockF = func(_ context.Context, bID ids.ID) (snowman.Block, error) {
+		require.Equal(blkID, bID)
 		return dummyBlk, nil
 	}
 
 	bsIntf, err := New(vm, config)
-	if err != nil {
-		t.Fatal(err)
-	}
-	bs, ok := bsIntf.(*getter)
-	if !ok {
-		t.Fatal("Unexpected get handler")
+	require.NoError(err)
+	require.IsType(&getter{}, bsIntf)
+	bs := bsIntf.(*getter)
+
+	var accepted ids.ID
+	sender.SendAcceptedFrontierF = func(_ context.Context, _ ids.NodeID, _ uint32, containerID ids.ID) {
+		accepted = containerID
 	}
 
-	var accepted []ids.ID
-	sender.SendAcceptedFrontierF = func(_ ids.NodeID, _ uint32, frontier []ids.ID) {
-		accepted = frontier
-	}
-
-	if err := bs.GetAcceptedFrontier(ids.EmptyNodeID, 0); err != nil {
-		t.Fatal(err)
-	}
-
-	if len(accepted) != 1 {
-		t.Fatalf("Only one block should be accepted")
-	}
-	if accepted[0] != blkID {
-		t.Fatalf("Blk should be accepted")
-	}
+	require.NoError(bs.GetAcceptedFrontier(context.Background(), ids.EmptyNodeID, 0))
+	require.Equal(blkID, accepted)
 }
 
 func TestFilterAccepted(t *testing.T) {
@@ -145,9 +142,11 @@ func TestFilterAccepted(t *testing.T) {
 	}}
 
 	vm.CantLastAccepted = false
-	vm.LastAcceptedF = func() (ids.ID, error) { return blk1.ID(), nil }
-	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
-		assert.Equal(t, blk1.ID(), blkID)
+	vm.LastAcceptedF = func(context.Context) (ids.ID, error) {
+		return blk1.ID(), nil
+	}
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+		require.Equal(t, blk1.ID(), blkID)
 		return blk1, nil
 	}
 
@@ -155,13 +154,11 @@ func TestFilterAccepted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	bs, ok := bsIntf.(*getter)
-	if !ok {
-		t.Fatal("Unexpected get handler")
-	}
+	require.IsType(t, &getter{}, bsIntf)
+	bs := bsIntf.(*getter)
 
 	blkIDs := []ids.ID{blkID0, blkID1, blkID2}
-	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case blkID0:
 			return blk0, nil
@@ -175,15 +172,15 @@ func TestFilterAccepted(t *testing.T) {
 	}
 
 	var accepted []ids.ID
-	sender.SendAcceptedF = func(_ ids.NodeID, _ uint32, frontier []ids.ID) {
+	sender.SendAcceptedF = func(_ context.Context, _ ids.NodeID, _ uint32, frontier []ids.ID) {
 		accepted = frontier
 	}
 
-	if err := bs.GetAccepted(ids.EmptyNodeID, 0, blkIDs); err != nil {
+	if err := bs.GetAccepted(context.Background(), ids.EmptyNodeID, 0, blkIDs); err != nil {
 		t.Fatal(err)
 	}
 
-	acceptedSet := ids.Set{}
+	acceptedSet := set.Set[ids.ID]{}
 	acceptedSet.Add(accepted...)
 
 	if acceptedSet.Len() != 2 {

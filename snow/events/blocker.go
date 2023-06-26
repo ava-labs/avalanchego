@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package events
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -14,7 +15,10 @@ const (
 	minBlockerSize = 16
 )
 
-// Blocker tracks objects that are blocked
+// Blocker tracks Blockable events.
+// Blocker is used to track events that require their dependencies to be
+// fulfilled before them. Once a Blockable event is registered, it will be
+// notified once any of its dependencies are fulfilled or abandoned.
 type Blocker map[ids.ID][]Blockable
 
 func (b *Blocker) init() {
@@ -31,39 +35,39 @@ func (b *Blocker) Len() int {
 
 // Fulfill notifies all objects blocking on the event whose ID is <id> that
 // the event has happened
-func (b *Blocker) Fulfill(id ids.ID) {
+func (b *Blocker) Fulfill(ctx context.Context, id ids.ID) {
 	b.init()
 
 	blocking := (*b)[id]
 	delete(*b, id)
 
 	for _, pending := range blocking {
-		pending.Fulfill(id)
+		pending.Fulfill(ctx, id)
 	}
 }
 
 // Abandon notifies all objects blocking on the event whose ID is <id> that
 // the event has been abandoned
-func (b *Blocker) Abandon(id ids.ID) {
+func (b *Blocker) Abandon(ctx context.Context, id ids.ID) {
 	b.init()
 
 	blocking := (*b)[id]
 	delete(*b, id)
 
 	for _, pending := range blocking {
-		pending.Abandon(id)
+		pending.Abandon(ctx, id)
 	}
 }
 
 // Register a new Blockable and its dependencies
-func (b *Blocker) Register(pending Blockable) {
+func (b *Blocker) Register(ctx context.Context, pending Blockable) {
 	b.init()
 
 	for pendingID := range pending.Dependencies() {
 		(*b)[pendingID] = append((*b)[pendingID], pending)
 	}
 
-	pending.Update()
+	pending.Update(ctx)
 }
 
 // PrefixedString returns the same value as the String function, with all the
@@ -71,18 +75,18 @@ func (b *Blocker) Register(pending Blockable) {
 func (b *Blocker) PrefixedString(prefix string) string {
 	b.init()
 
-	s := strings.Builder{}
-
-	s.WriteString(fmt.Sprintf("Blocking on %d IDs:", len(*b)))
-
+	sb := strings.Builder{}
+	sb.WriteString(fmt.Sprintf("Blocking on %d IDs:", len(*b)))
 	for key, value := range *b {
-		s.WriteString(fmt.Sprintf("\n%sID[%s]: %d",
+		sb.WriteString(fmt.Sprintf("\n%sID[%s]: %d",
 			prefix,
 			key,
-			len(value)))
+			len(value),
+		))
 	}
-
-	return strings.TrimSuffix(s.String(), "\n")
+	return strings.TrimSuffix(sb.String(), "\n")
 }
 
-func (b *Blocker) String() string { return b.PrefixedString("") }
+func (b *Blocker) String() string {
+	return b.PrefixedString("")
+}

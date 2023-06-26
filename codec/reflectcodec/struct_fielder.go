@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package reflectcodec
@@ -8,6 +8,8 @@ import (
 	"reflect"
 	"strconv"
 	"sync"
+
+	"github.com/ava-labs/avalanchego/codec"
 )
 
 const (
@@ -18,7 +20,7 @@ const (
 	TagValue = "true"
 )
 
-var _ StructFielder = &structFielder{}
+var _ StructFielder = (*structFielder)(nil)
 
 type FieldDesc struct {
 	Index       int
@@ -91,7 +93,10 @@ func (s *structFielder) GetSerializedFields(t reflect.Type) ([]FieldDesc, error)
 			continue
 		}
 		if !field.IsExported() { // Can only marshal exported fields
-			return nil, fmt.Errorf("can't marshal un-exported field %s", field.Name)
+			return nil, fmt.Errorf("can not marshal %w: %s",
+				codec.ErrUnexportedField,
+				field.Name,
+			)
 		}
 		sliceLenField := field.Tag.Get(SliceLenTagName)
 		maxSliceLen := s.maxSliceLen

@@ -1,20 +1,26 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package verify
 
 import "github.com/ava-labs/avalanchego/snow"
 
-// Verifiable can be verified
 type Verifiable interface {
 	Verify() error
 }
 
-// State that can be verified
 type State interface {
 	snow.ContextInitializable
 	Verifiable
-	VerifyState() error
+	IsState
+}
+
+type IsState interface {
+	isState()
+}
+
+type IsNotState interface {
+	isState() error
 }
 
 // All returns nil if all the verifiables were verified with no errors

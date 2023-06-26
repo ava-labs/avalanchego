@@ -1,11 +1,9 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package timer
 
-import (
-	"time"
-)
+import "time"
 
 // EstimateETA attempts to estimate the remaining time for a job to finish given
 // the [startTime] and it's current progress.

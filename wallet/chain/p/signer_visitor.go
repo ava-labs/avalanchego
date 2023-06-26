@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package p
@@ -12,7 +12,8 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/crypto/keychain"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -22,7 +23,7 @@ import (
 )
 
 var (
-	_ txs.Visitor = &signerVisitor{}
+	_ txs.Visitor = (*signerVisitor)(nil)
 
 	errUnsupportedTxType     = errors.New("unsupported tx type")
 	errUnknownInputType      = errors.New("unknown input type")
@@ -31,26 +32,31 @@ var (
 	errUnknownSubnetAuthType = errors.New("unknown subnet auth type")
 	errInvalidUTXOSigIndex   = errors.New("invalid UTXO signature index")
 
-	emptySig [crypto.SECP256K1RSigLen]byte
+	emptySig [secp256k1.SignatureLen]byte
 )
 
 // signerVisitor handles signing transactions for the signer
 type signerVisitor struct {
-	kc      *secp256k1fx.Keychain
+	kc      keychain.Keychain
 	backend SignerBackend
 	ctx     stdcontext.Context
 	tx      *txs.Tx
 }
 
-func (*signerVisitor) AdvanceTimeTx(*txs.AdvanceTimeTx) error         { return errUnsupportedTxType }
-func (*signerVisitor) RewardValidatorTx(*txs.RewardValidatorTx) error { return errUnsupportedTxType }
+func (*signerVisitor) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
+	return errUnsupportedTxType
+}
+
+func (*signerVisitor) RewardValidatorTx(*txs.RewardValidatorTx) error {
+	return errUnsupportedTxType
+}
 
 func (s *signerVisitor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {
 		return err
 	}
-	return s.sign(s.tx, txSigners)
+	return sign(s.tx, false, txSigners)
 }
 
 func (s *signerVisitor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
@@ -58,12 +64,12 @@ func (s *signerVisitor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error
 	if err != nil {
 		return err
 	}
-	subnetAuthSigners, err := s.getSubnetSigners(tx.Validator.Subnet, tx.SubnetAuth)
+	subnetAuthSigners, err := s.getSubnetSigners(tx.SubnetValidator.Subnet, tx.SubnetAuth)
 	if err != nil {
 		return err
 	}
 	txSigners = append(txSigners, subnetAuthSigners)
-	return s.sign(s.tx, txSigners)
+	return sign(s.tx, false, txSigners)
 }
 
 func (s *signerVisitor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
@@ -71,7 +77,7 @@ func (s *signerVisitor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	if err != nil {
 		return err
 	}
-	return s.sign(s.tx, txSigners)
+	return sign(s.tx, false, txSigners)
 }
 
 func (s *signerVisitor) CreateChainTx(tx *txs.CreateChainTx) error {
@@ -84,7 +90,7 @@ func (s *signerVisitor) CreateChainTx(tx *txs.CreateChainTx) error {
 		return err
 	}
 	txSigners = append(txSigners, subnetAuthSigners)
-	return s.sign(s.tx, txSigners)
+	return sign(s.tx, false, txSigners)
 }
 
 func (s *signerVisitor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
@@ -92,7 +98,7 @@ func (s *signerVisitor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	if err != nil {
 		return err
 	}
-	return s.sign(s.tx, txSigners)
+	return sign(s.tx, false, txSigners)
 }
 
 func (s *signerVisitor) ImportTx(tx *txs.ImportTx) error {
@@ -105,7 +111,7 @@ func (s *signerVisitor) ImportTx(tx *txs.ImportTx) error {
 		return err
 	}
 	txSigners = append(txSigners, txImportSigners...)
-	return s.sign(s.tx, txSigners)
+	return sign(s.tx, false, txSigners)
 }
 
 func (s *signerVisitor) ExportTx(tx *txs.ExportTx) error {
@@ -113,18 +119,65 @@ func (s *signerVisitor) ExportTx(tx *txs.ExportTx) error {
 	if err != nil {
 		return err
 	}
-	return s.sign(s.tx, txSigners)
+	return sign(s.tx, false, txSigners)
 }
 
-func (s *signerVisitor) getSigners(sourceChainID ids.ID, ins []*avax.TransferableInput) ([][]*crypto.PrivateKeySECP256K1R, error) {
-	txSigners := make([][]*crypto.PrivateKeySECP256K1R, len(ins))
+func (s *signerVisitor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
+	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
+	if err != nil {
+		return err
+	}
+	subnetAuthSigners, err := s.getSubnetSigners(tx.Subnet, tx.SubnetAuth)
+	if err != nil {
+		return err
+	}
+	txSigners = append(txSigners, subnetAuthSigners)
+	return sign(s.tx, true, txSigners)
+}
+
+func (s *signerVisitor) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
+	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
+	if err != nil {
+		return err
+	}
+	subnetAuthSigners, err := s.getSubnetSigners(tx.Subnet, tx.SubnetAuth)
+	if err != nil {
+		return err
+	}
+	txSigners = append(txSigners, subnetAuthSigners)
+	return sign(s.tx, true, txSigners)
+}
+
+func (s *signerVisitor) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
+	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
+	if err != nil {
+		return err
+	}
+	return sign(s.tx, true, txSigners)
+}
+
+func (s *signerVisitor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
+	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
+	if err != nil {
+		return err
+	}
+	return sign(s.tx, true, txSigners)
+}
+
+func (s *signerVisitor) getSigners(sourceChainID ids.ID, ins []*avax.TransferableInput) ([][]keychain.Signer, error) {
+	txSigners := make([][]keychain.Signer, len(ins))
 	for credIndex, transferInput := range ins {
-		input, ok := transferInput.In.(*secp256k1fx.TransferInput)
+		inIntf := transferInput.In
+		if stakeableIn, ok := inIntf.(*stakeable.LockIn); ok {
+			inIntf = stakeableIn.TransferableIn
+		}
+
+		input, ok := inIntf.(*secp256k1fx.TransferInput)
 		if !ok {
 			return nil, errUnknownInputType
 		}
 
-		inputSigners := make([]*crypto.PrivateKeySECP256K1R, len(input.SigIndices))
+		inputSigners := make([]keychain.Signer, len(input.SigIndices))
 		txSigners[credIndex] = inputSigners
 
 		utxoID := transferInput.InputID()
@@ -166,7 +219,7 @@ func (s *signerVisitor) getSigners(sourceChainID ids.ID, ins []*avax.Transferabl
 	return txSigners, nil
 }
 
-func (s *signerVisitor) getSubnetSigners(subnetID ids.ID, subnetAuth verify.Verifiable) ([]*crypto.PrivateKeySECP256K1R, error) {
+func (s *signerVisitor) getSubnetSigners(subnetID ids.ID, subnetAuth verify.Verifiable) ([]keychain.Signer, error) {
 	subnetInput, ok := subnetAuth.(*secp256k1fx.Input)
 	if !ok {
 		return nil, errUnknownSubnetAuthType
@@ -190,7 +243,7 @@ func (s *signerVisitor) getSubnetSigners(subnetID ids.ID, subnetAuth verify.Veri
 		return nil, errUnknownOwnerType
 	}
 
-	authSigners := make([]*crypto.PrivateKeySECP256K1R, len(subnetInput.SigIndices))
+	authSigners := make([]keychain.Signer, len(subnetInput.SigIndices))
 	for sigIndex, addrIndex := range subnetInput.SigIndices {
 		if addrIndex >= uint32(len(owner.Addrs)) {
 			return nil, errInvalidUTXOSigIndex
@@ -208,7 +261,8 @@ func (s *signerVisitor) getSubnetSigners(subnetID ids.ID, subnetAuth verify.Veri
 	return authSigners, nil
 }
 
-func (s *signerVisitor) sign(tx *txs.Tx, txSigners [][]*crypto.PrivateKeySECP256K1R) error {
+// TODO: remove [signHash] after the ledger supports signing all transactions.
+func sign(tx *txs.Tx, signHash bool, txSigners [][]keychain.Signer) error {
 	unsignedBytes, err := txs.Codec.Marshal(txs.Version, &tx.Unsigned)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal unsigned tx: %w", err)
@@ -219,7 +273,7 @@ func (s *signerVisitor) sign(tx *txs.Tx, txSigners [][]*crypto.PrivateKeySECP256
 		tx.Creds = make([]verify.Verifiable, expectedLen)
 	}
 
-	sigCache := make(map[ids.ShortID][crypto.SECP256K1RSigLen]byte)
+	sigCache := make(map[ids.ShortID][secp256k1.SignatureLen]byte)
 	for credIndex, inputSigners := range txSigners {
 		credIntf := tx.Creds[credIndex]
 		if credIntf == nil {
@@ -232,7 +286,7 @@ func (s *signerVisitor) sign(tx *txs.Tx, txSigners [][]*crypto.PrivateKeySECP256
 			return errUnknownCredentialType
 		}
 		if expectedLen := len(inputSigners); expectedLen != len(cred.Sigs) {
-			cred.Sigs = make([][crypto.SECP256K1RSigLen]byte, expectedLen)
+			cred.Sigs = make([][secp256k1.SignatureLen]byte, expectedLen)
 		}
 
 		for sigIndex, signer := range inputSigners {
@@ -241,7 +295,7 @@ func (s *signerVisitor) sign(tx *txs.Tx, txSigners [][]*crypto.PrivateKeySECP256
 				// transaction. However, we can attempt to partially sign it.
 				continue
 			}
-			addr := signer.PublicKey().Address()
+			addr := signer.Address()
 			if sig := cred.Sigs[sigIndex]; sig != emptySig {
 				// If this signature has already been populated, we can just
 				// copy the needed signature for the future.
@@ -256,7 +310,12 @@ func (s *signerVisitor) sign(tx *txs.Tx, txSigners [][]*crypto.PrivateKeySECP256
 				continue
 			}
 
-			sig, err := signer.SignHash(unsignedHash)
+			var sig []byte
+			if signHash {
+				sig, err = signer.SignHash(unsignedHash)
+			} else {
+				sig, err = signer.Sign(unsignedBytes)
+			}
 			if err != nil {
 				return fmt.Errorf("problem signing tx: %w", err)
 			}
@@ -269,6 +328,6 @@ func (s *signerVisitor) sign(tx *txs.Tx, txSigners [][]*crypto.PrivateKeySECP256
 	if err != nil {
 		return fmt.Errorf("couldn't marshal tx: %w", err)
 	}
-	tx.Initialize(unsignedBytes, signedBytes)
+	tx.SetBytes(unsignedBytes, signedBytes)
 	return nil
 }

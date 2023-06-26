@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package config
@@ -15,18 +15,19 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
+	"github.com/ava-labs/avalanchego/subnets"
 )
 
 func TestGetChainConfigsFromFiles(t *testing.T) {
 	tests := map[string]struct {
-		configs    map[string]string
-		upgrades   map[string]string
-		errMessage string
-		expected   map[string]chains.ChainConfig
+		configs  map[string]string
+		upgrades map[string]string
+		expected map[string]chains.ChainConfig
 	}{
 		"no chain configs": {
 			configs:  map[string]string{},
@@ -39,11 +40,11 @@ func TestGetChainConfigsFromFiles(t *testing.T) {
 			expected: func() map[string]chains.ChainConfig {
 				m := map[string]chains.ChainConfig{}
 				id1, err := ids.FromString("yH8D7ThNJkxmtkuv2jgBa4P1Rn3Qpr4pPr7QYNfcdoS6k6HWp")
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				m[id1.String()] = chains.ChainConfig{Config: []byte("hello"), Upgrade: []byte("helloUpgrades")}
 
 				id2, err := ids.FromString("2JVSBoinj9C2J33VntvzYtVJNZdN2NKiwwKjcumHUWEb5DbBrm")
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				m[id2.String()] = chains.ChainConfig{Config: []byte("world"), Upgrade: []byte(nil)}
 
 				return m
@@ -64,7 +65,7 @@ func TestGetChainConfigsFromFiles(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			assert := assert.New(t)
+			require := require.New(t)
 			root := t.TempDir()
 			configJSON := fmt.Sprintf(`{%q: %q}`, ChainConfigDirKey, root)
 			configFile := setupConfigJSON(t, root, configJSON)
@@ -82,62 +83,57 @@ func TestGetChainConfigsFromFiles(t *testing.T) {
 			v := setupViper(configFile)
 
 			// Parse config
-			assert.Equal(root, v.GetString(ChainConfigDirKey))
+			require.Equal(root, v.GetString(ChainConfigDirKey))
 			chainConfigs, err := getChainConfigs(v)
-			if len(test.errMessage) > 0 {
-				assert.Error(err)
-				if err != nil {
-					assert.Contains(err.Error(), test.errMessage)
-				}
-			} else {
-				assert.NoError(err)
-			}
-			assert.Equal(test.expected, chainConfigs)
+			require.NoError(err)
+			require.Equal(test.expected, chainConfigs)
 		})
 	}
 }
 
 func TestGetChainConfigsDirNotExist(t *testing.T) {
 	tests := map[string]struct {
-		structure  string
-		file       map[string]string
-		errMessage string
-		expected   map[string]chains.ChainConfig
+		structure   string
+		file        map[string]string
+		expectedErr error
+		expected    map[string]chains.ChainConfig
 	}{
 		"cdir not exist": {
-			structure:  "/",
-			file:       map[string]string{"config.ex": "noeffect"},
-			errMessage: "cannot read directory",
-			expected:   nil,
+			structure:   "/",
+			file:        map[string]string{"config.ex": "noeffect"},
+			expectedErr: errCannotReadDirectory,
+			expected:    nil,
 		},
 		"cdir is file ": {
-			structure:  "/",
-			file:       map[string]string{"cdir": "noeffect"},
-			errMessage: "cannot read directory",
-			expected:   nil,
+			structure:   "/",
+			file:        map[string]string{"cdir": "noeffect"},
+			expectedErr: errCannotReadDirectory,
+			expected:    nil,
 		},
 		"chain subdir not exist": {
-			structure: "/cdir/",
-			file:      map[string]string{"config.ex": "noeffect"},
-			expected:  map[string]chains.ChainConfig{},
+			structure:   "/cdir/",
+			file:        map[string]string{"config.ex": "noeffect"},
+			expectedErr: nil,
+			expected:    map[string]chains.ChainConfig{},
 		},
 		"full structure": {
-			structure: "/cdir/C/",
-			file:      map[string]string{"config.ex": "hello"},
-			expected:  map[string]chains.ChainConfig{"C": {Config: []byte("hello"), Upgrade: []byte(nil)}},
+			structure:   "/cdir/C/",
+			file:        map[string]string{"config.ex": "hello"},
+			expectedErr: nil,
+			expected:    map[string]chains.ChainConfig{"C": {Config: []byte("hello"), Upgrade: []byte(nil)}},
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			assert := assert.New(t)
+			require := require.New(t)
 			root := t.TempDir()
 			chainConfigDir := filepath.Join(root, "cdir")
 			configJSON := fmt.Sprintf(`{%q: %q}`, ChainConfigDirKey, chainConfigDir)
 			configFile := setupConfigJSON(t, root, configJSON)
 
 			dirToCreate := filepath.Join(root, test.structure)
-			assert.NoError(os.MkdirAll(dirToCreate, 0o700))
+			require.NoError(os.MkdirAll(dirToCreate, 0o700))
 
 			for key, value := range test.file {
 				setupFile(t, dirToCreate, key, value)
@@ -145,44 +141,37 @@ func TestGetChainConfigsDirNotExist(t *testing.T) {
 			v := setupViper(configFile)
 
 			// Parse config
-			assert.Equal(chainConfigDir, v.GetString(ChainConfigDirKey))
+			require.Equal(chainConfigDir, v.GetString(ChainConfigDirKey))
 
 			// don't read with getConfigFromViper since it's very slow.
 			chainConfigs, err := getChainConfigs(v)
-			switch {
-			case len(test.errMessage) > 0:
-				assert.Error(err)
-				assert.Contains(err.Error(), test.errMessage)
-			default:
-				assert.NoError(err)
-				assert.Equal(test.expected, chainConfigs)
-			}
+			require.ErrorIs(err, test.expectedErr)
+			require.Equal(test.expected, chainConfigs)
 		})
 	}
 }
 
 func TestSetChainConfigDefaultDir(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	root := t.TempDir()
 	// changes internal package variable, since using defaultDir (under user home) is risky.
 	defaultChainConfigDir = filepath.Join(root, "cdir")
 	configFilePath := setupConfigJSON(t, root, "{}")
 
 	v := setupViper(configFilePath)
-	assert.Equal(defaultChainConfigDir, v.GetString(ChainConfigDirKey))
+	require.Equal(defaultChainConfigDir, v.GetString(ChainConfigDirKey))
 
 	chainsDir := filepath.Join(defaultChainConfigDir, "C")
 	setupFile(t, chainsDir, chainConfigFileName+".ex", "helloworld")
 	chainConfigs, err := getChainConfigs(v)
-	assert.NoError(err)
+	require.NoError(err)
 	expected := map[string]chains.ChainConfig{"C": {Config: []byte("helloworld"), Upgrade: []byte(nil)}}
-	assert.Equal(expected, chainConfigs)
+	require.Equal(expected, chainConfigs)
 }
 
 func TestGetChainConfigsFromFlags(t *testing.T) {
 	tests := map[string]struct {
 		fullConfigs map[string]chains.ChainConfig
-		errMessage  string
 		expected    map[string]chains.ChainConfig
 	}{
 		"no chain configs": {
@@ -193,11 +182,11 @@ func TestGetChainConfigsFromFlags(t *testing.T) {
 			fullConfigs: func() map[string]chains.ChainConfig {
 				m := map[string]chains.ChainConfig{}
 				id1, err := ids.FromString("yH8D7ThNJkxmtkuv2jgBa4P1Rn3Qpr4pPr7QYNfcdoS6k6HWp")
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				m[id1.String()] = chains.ChainConfig{Config: []byte("hello"), Upgrade: []byte("helloUpgrades")}
 
 				id2, err := ids.FromString("2JVSBoinj9C2J33VntvzYtVJNZdN2NKiwwKjcumHUWEb5DbBrm")
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				m[id2.String()] = chains.ChainConfig{Config: []byte("world"), Upgrade: []byte(nil)}
 
 				return m
@@ -205,11 +194,11 @@ func TestGetChainConfigsFromFlags(t *testing.T) {
 			expected: func() map[string]chains.ChainConfig {
 				m := map[string]chains.ChainConfig{}
 				id1, err := ids.FromString("yH8D7ThNJkxmtkuv2jgBa4P1Rn3Qpr4pPr7QYNfcdoS6k6HWp")
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				m[id1.String()] = chains.ChainConfig{Config: []byte("hello"), Upgrade: []byte("helloUpgrades")}
 
 				id2, err := ids.FromString("2JVSBoinj9C2J33VntvzYtVJNZdN2NKiwwKjcumHUWEb5DbBrm")
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				m[id2.String()] = chains.ChainConfig{Config: []byte("world"), Upgrade: []byte(nil)}
 
 				return m
@@ -232,9 +221,9 @@ func TestGetChainConfigsFromFlags(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			assert := assert.New(t)
+			require := require.New(t)
 			jsonMaps, err := json.Marshal(test.fullConfigs)
-			assert.NoError(err)
+			require.NoError(err)
 			encodedFileContent := base64.StdEncoding.EncodeToString(jsonMaps)
 
 			// build viper config
@@ -243,29 +232,22 @@ func TestGetChainConfigsFromFlags(t *testing.T) {
 
 			// Parse config
 			chainConfigs, err := getChainConfigs(v)
-			if len(test.errMessage) > 0 {
-				assert.Error(err)
-				if err != nil {
-					assert.Contains(err.Error(), test.errMessage)
-				}
-			} else {
-				assert.NoError(err)
-			}
-			assert.Equal(test.expected, chainConfigs)
+			require.NoError(err)
+			require.Equal(test.expected, chainConfigs)
 		})
 	}
 }
 
 func TestGetVMAliasesFromFile(t *testing.T) {
 	tests := map[string]struct {
-		givenJSON  string
-		expected   map[ids.ID][]string
-		errMessage string
+		givenJSON   string
+		expected    map[ids.ID][]string
+		expectedErr error
 	}{
 		"wrong vm id": {
-			givenJSON:  `{"wrongVmId": ["vm1","vm2"]}`,
-			expected:   nil,
-			errMessage: "problem unmarshaling vmAliases",
+			givenJSON:   `{"wrongVmId": ["vm1","vm2"]}`,
+			expected:    nil,
+			expectedErr: errUnmarshalling,
 		},
 		"vm id": {
 			givenJSON: `{"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": ["vm1","vm2"],
@@ -278,13 +260,13 @@ func TestGetVMAliasesFromFile(t *testing.T) {
 				m[id2] = []string{"vm3", "vm4"}
 				return m
 			}(),
-			errMessage: "",
+			expectedErr: nil,
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			assert := assert.New(t)
+			require := require.New(t)
 			root := t.TempDir()
 			aliasPath := filepath.Join(root, "aliases.json")
 			configJSON := fmt.Sprintf(`{%q: %q}`, VMAliasesFileKey, aliasPath)
@@ -292,27 +274,22 @@ func TestGetVMAliasesFromFile(t *testing.T) {
 			setupFile(t, root, "aliases.json", test.givenJSON)
 			v := setupViper(configFilePath)
 			vmAliases, err := getVMAliases(v)
-			if len(test.errMessage) > 0 {
-				assert.Error(err)
-				assert.Contains(err.Error(), test.errMessage)
-			} else {
-				assert.NoError(err)
-				assert.Equal(test.expected, vmAliases)
-			}
+			require.ErrorIs(err, test.expectedErr)
+			require.Equal(test.expected, vmAliases)
 		})
 	}
 }
 
 func TestGetVMAliasesFromFlag(t *testing.T) {
 	tests := map[string]struct {
-		givenJSON  string
-		expected   map[ids.ID][]string
-		errMessage string
+		givenJSON   string
+		expected    map[ids.ID][]string
+		expectedErr error
 	}{
 		"wrong vm id": {
-			givenJSON:  `{"wrongVmId": ["vm1","vm2"]}`,
-			expected:   nil,
-			errMessage: "problem unmarshaling vmAliases",
+			givenJSON:   `{"wrongVmId": ["vm1","vm2"]}`,
+			expected:    nil,
+			expectedErr: errUnmarshalling,
 		},
 		"vm id": {
 			givenJSON: `{"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": ["vm1","vm2"],
@@ -325,13 +302,13 @@ func TestGetVMAliasesFromFlag(t *testing.T) {
 				m[id2] = []string{"vm3", "vm4"}
 				return m
 			}(),
-			errMessage: "",
+			expectedErr: nil,
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			assert := assert.New(t)
+			require := require.New(t)
 			encodedFileContent := base64.StdEncoding.EncodeToString([]byte(test.givenJSON))
 
 			// build viper config
@@ -339,39 +316,34 @@ func TestGetVMAliasesFromFlag(t *testing.T) {
 			v.Set(VMAliasesContentKey, encodedFileContent)
 
 			vmAliases, err := getVMAliases(v)
-			if len(test.errMessage) > 0 {
-				assert.Error(err)
-				assert.Contains(err.Error(), test.errMessage)
-			} else {
-				assert.NoError(err)
-				assert.Equal(test.expected, vmAliases)
-			}
+			require.ErrorIs(err, test.expectedErr)
+			require.Equal(test.expected, vmAliases)
 		})
 	}
 }
 
 func TestGetVMAliasesDefaultDir(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	root := t.TempDir()
 	// changes internal package variable, since using defaultDir (under user home) is risky.
 	defaultVMAliasFilePath = filepath.Join(root, "aliases.json")
 	configFilePath := setupConfigJSON(t, root, "{}")
 
 	v := setupViper(configFilePath)
-	assert.Equal(defaultVMAliasFilePath, v.GetString(VMAliasesFileKey))
+	require.Equal(defaultVMAliasFilePath, v.GetString(VMAliasesFileKey))
 
 	setupFile(t, root, "aliases.json", `{"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": ["vm1","vm2"]}`)
 	vmAliases, err := getVMAliases(v)
-	assert.NoError(err)
+	require.NoError(err)
 
 	expected := map[ids.ID][]string{}
 	id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
 	expected[id] = []string{"vm1", "vm2"}
-	assert.Equal(expected, vmAliases)
+	require.Equal(expected, vmAliases)
 }
 
 func TestGetVMAliasesDirNotExists(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 	root := t.TempDir()
 	aliasPath := "/not/exists"
 	// set it explicitly
@@ -379,140 +351,147 @@ func TestGetVMAliasesDirNotExists(t *testing.T) {
 	configFilePath := setupConfigJSON(t, root, configJSON)
 	v := setupViper(configFilePath)
 	vmAliases, err := getVMAliases(v)
-	assert.Nil(vmAliases)
-	assert.Error(err)
-	assert.Contains(err.Error(), "vm alias file does not exist")
+	require.ErrorIs(err, errFileDoesNotExist)
+	require.Nil(vmAliases)
 
 	// do not set it explicitly
 	configJSON = "{}"
 	configFilePath = setupConfigJSON(t, root, configJSON)
 	v = setupViper(configFilePath)
 	vmAliases, err = getVMAliases(v)
-	assert.Nil(vmAliases)
-	assert.NoError(err)
+	require.Nil(vmAliases)
+	require.NoError(err)
 }
 
 func TestGetSubnetConfigsFromFile(t *testing.T) {
+	subnetID, err := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
+	require.NoError(t, err)
+
 	tests := map[string]struct {
-		givenJSON  string
-		testF      func(*assert.Assertions, map[ids.ID]chains.SubnetConfig)
-		errMessage string
-		fileName   string
+		fileName    string
+		givenJSON   string
+		testF       func(*require.Assertions, map[ids.ID]subnets.Config)
+		expectedErr error
 	}{
 		"wrong config": {
 			fileName:  "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
 			givenJSON: `thisisnotjson`,
-			testF: func(assert *assert.Assertions, given map[ids.ID]chains.SubnetConfig) {
-				assert.Nil(given)
+			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
+				require.Nil(given)
 			},
-			errMessage: "couldn't read subnet configs",
+			expectedErr: errUnmarshalling,
 		},
-		"subnet is not whitelisted": {
+		"subnet is not tracked": {
 			fileName:  "Gmt4fuNsGJAd2PX86LBvycGaBpgCYKbuULdCLZs3SEs1Jx1LU.json",
 			givenJSON: `{"validatorOnly": true}`,
-			testF: func(assert *assert.Assertions, given map[ids.ID]chains.SubnetConfig) {
-				assert.Empty(given)
+			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
+				require.Empty(given)
 			},
+			expectedErr: nil,
 		},
 		"wrong extension": {
 			fileName:  "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.yaml",
 			givenJSON: `{"validatorOnly": true}`,
-			testF: func(assert *assert.Assertions, given map[ids.ID]chains.SubnetConfig) {
-				assert.Empty(given)
+			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
+				require.Empty(given)
 			},
+			expectedErr: nil,
 		},
 		"invalid consensus parameters": {
 			fileName:  "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
 			givenJSON: `{"consensusParameters":{"k": 111, "alpha":1234} }`,
-			testF: func(assert *assert.Assertions, given map[ids.ID]chains.SubnetConfig) {
-				assert.Nil(given)
+			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
+				require.Nil(given)
 			},
-			errMessage: "fails the condition that: alpha <= k",
+			expectedErr: snowball.ErrParametersInvalid,
 		},
 		"correct config": {
 			fileName:  "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
-			givenJSON: `{"validatorOnly": true, "consensusParameters":{"parents": 111, "alpha":16} }`,
-			testF: func(assert *assert.Assertions, given map[ids.ID]chains.SubnetConfig) {
+			givenJSON: `{"validatorOnly": true, "consensusParameters":{"alpha":16} }`,
+			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
 				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
 				config, ok := given[id]
-				assert.True(ok)
+				require.True(ok)
 
-				assert.Equal(true, config.ValidatorOnly)
-				assert.Equal(111, config.ConsensusParameters.Parents)
-				assert.Equal(16, config.ConsensusParameters.Alpha)
+				require.Equal(true, config.ValidatorOnly)
+				require.Equal(16, config.ConsensusParameters.Alpha)
 				// must still respect defaults
-				assert.Equal(20, config.ConsensusParameters.K)
+				require.Equal(20, config.ConsensusParameters.K)
 			},
-			errMessage: "",
+			expectedErr: nil,
 		},
 		"gossip config": {
 			fileName:  "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
 			givenJSON: `{"appGossipNonValidatorSize": 100 }`,
-			testF: func(assert *assert.Assertions, given map[ids.ID]chains.SubnetConfig) {
+			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
 				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
 				config, ok := given[id]
-				assert.True(ok)
-				assert.Equal(uint(100), config.AppGossipNonValidatorSize)
+				require.True(ok)
+				require.Equal(uint(100), config.GossipConfig.AppGossipNonValidatorSize)
 				// must still respect defaults
-				assert.Equal(20, config.ConsensusParameters.K)
-				assert.Equal(uint(10), config.AppGossipValidatorSize)
+				require.Equal(20, config.ConsensusParameters.K)
+				require.Equal(uint(10), config.GossipConfig.AppGossipValidatorSize)
 			},
-			errMessage: "",
+			expectedErr: nil,
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			assert := assert.New(t)
+			require := require.New(t)
+
 			root := t.TempDir()
 			subnetPath := filepath.Join(root, "subnets")
+
 			configJSON := fmt.Sprintf(`{%q: %q}`, SubnetConfigDirKey, subnetPath)
 			configFilePath := setupConfigJSON(t, root, configJSON)
-			subnetID, err := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
-			assert.NoError(err)
+
 			setupFile(t, subnetPath, test.fileName, test.givenJSON)
+
 			v := setupViper(configFilePath)
 			subnetConfigs, err := getSubnetConfigs(v, []ids.ID{subnetID})
-			if len(test.errMessage) > 0 {
-				assert.Error(err)
-				assert.Contains(err.Error(), test.errMessage)
-			} else {
-				assert.NoError(err)
-				test.testF(assert, subnetConfigs)
+			require.ErrorIs(err, test.expectedErr)
+			if test.expectedErr == nil {
+				test.testF(require, subnetConfigs)
 			}
 		})
 	}
 }
 
 func TestGetSubnetConfigsFromFlags(t *testing.T) {
+	subnetID, err := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
+	require.NoError(t, err)
+
 	tests := map[string]struct {
-		givenJSON  string
-		testF      func(*assert.Assertions, map[ids.ID]chains.SubnetConfig)
-		errMessage string
+		givenJSON   string
+		testF       func(*require.Assertions, map[ids.ID]subnets.Config)
+		expectedErr error
 	}{
 		"no configs": {
 			givenJSON: `{}`,
-			testF: func(assert *assert.Assertions, given map[ids.ID]chains.SubnetConfig) {
-				assert.Empty(given)
+			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
+				require.Empty(given)
 			},
-			errMessage: "",
+			expectedErr: nil,
 		},
 		"entry with no config": {
 			givenJSON: `{"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i":{}}`,
-			testF: func(assert *assert.Assertions, given map[ids.ID]chains.SubnetConfig) {
-				assert.True(len(given) == 1)
+			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
+				require.Len(given, 1)
 				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
 				config, ok := given[id]
-				assert.True(ok)
+				require.True(ok)
 				// should respect defaults
-				assert.Equal(20, config.ConsensusParameters.K)
+				require.Equal(20, config.ConsensusParameters.K)
 			},
+			expectedErr: nil,
 		},
-		"subnet is not whitelisted": {
+		"subnet is not tracked": {
 			givenJSON: `{"Gmt4fuNsGJAd2PX86LBvycGaBpgCYKbuULdCLZs3SEs1Jx1LU":{"validatorOnly":true}}`,
-			testF: func(assert *assert.Assertions, given map[ids.ID]chains.SubnetConfig) {
-				assert.Empty(given)
+			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
+				require.Empty(given)
 			},
+			expectedErr: nil,
 		},
 		"invalid consensus parameters": {
 			givenJSON: `{
@@ -523,43 +502,40 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 					}
 				}
 			}`,
-			testF: func(assert *assert.Assertions, given map[ids.ID]chains.SubnetConfig) {
-				assert.Empty(given)
+			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
+				require.Empty(given)
 			},
-			errMessage: "fails the condition that: alpha <= k",
+			expectedErr: snowball.ErrParametersInvalid,
 		},
 		"correct config": {
 			givenJSON: `{
 				"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": {
 					"consensusParameters": {
 						"k": 30,
-						"alpha": 20,
-						"parents": 111
+						"alpha": 20
 					},
 					"validatorOnly": true
 				}
 			}`,
-			testF: func(assert *assert.Assertions, given map[ids.ID]chains.SubnetConfig) {
+			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
 				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
 				config, ok := given[id]
-				assert.True(ok)
-				assert.Equal(true, config.ValidatorOnly)
-				assert.Equal(111, config.ConsensusParameters.Parents)
-				assert.Equal(20, config.ConsensusParameters.Alpha)
-				assert.Equal(30, config.ConsensusParameters.K)
+				require.True(ok)
+				require.Equal(true, config.ValidatorOnly)
+				require.Equal(20, config.ConsensusParameters.Alpha)
+				require.Equal(30, config.ConsensusParameters.K)
 				// must still respect defaults
-				assert.Equal(uint(10), config.AppGossipValidatorSize)
-				assert.Equal(1024, config.ConsensusParameters.MaxOutstandingItems)
+				require.Equal(uint(10), config.GossipConfig.AppGossipValidatorSize)
+				require.Equal(256, config.ConsensusParameters.MaxOutstandingItems)
 			},
-			errMessage: "",
+			expectedErr: nil,
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			assert := assert.New(t)
-			subnetID, err := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
-			assert.NoError(err)
+			require := require.New(t)
+
 			encodedFileContent := base64.StdEncoding.EncodeToString([]byte(test.givenJSON))
 
 			// build viper config
@@ -567,12 +543,9 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 			v.Set(SubnetConfigContentKey, encodedFileContent)
 
 			subnetConfigs, err := getSubnetConfigs(v, []ids.ID{subnetID})
-			if len(test.errMessage) > 0 {
-				assert.Error(err)
-				assert.Contains(err.Error(), test.errMessage)
-			} else {
-				assert.NoError(err)
-				test.testF(assert, subnetConfigs)
+			require.ErrorIs(err, test.expectedErr)
+			if test.expectedErr == nil {
+				test.testF(require, subnetConfigs)
 			}
 		})
 	}
@@ -581,24 +554,22 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 // setups config json file and writes content
 func setupConfigJSON(t *testing.T, rootPath string, value string) string {
 	configFilePath := filepath.Join(rootPath, "config.json")
-	assert.NoError(t, os.WriteFile(configFilePath, []byte(value), 0o600))
+	require.NoError(t, os.WriteFile(configFilePath, []byte(value), 0o600))
 	return configFilePath
 }
 
 // setups file creates necessary path and writes value to it.
 func setupFile(t *testing.T, path string, fileName string, value string) {
-	assert.NoError(t, os.MkdirAll(path, 0o700))
+	require.NoError(t, os.MkdirAll(path, 0o700))
 	filePath := filepath.Join(path, fileName)
-	assert.NoError(t, os.WriteFile(filePath, []byte(value), 0o600))
+	require.NoError(t, os.WriteFile(filePath, []byte(value), 0o600))
 }
 
 func setupViperFlags() *viper.Viper {
 	v := viper.New()
 	fs := BuildFlagSet()
-	pflag.CommandLine = pflag.NewFlagSet(os.Args[0], pflag.PanicOnError) // flags are now reset
-	pflag.CommandLine.AddGoFlagSet(fs)
 	pflag.Parse()
-	if err := v.BindPFlags(pflag.CommandLine); err != nil {
+	if err := v.BindPFlags(fs); err != nil {
 		log.Fatal(err)
 	}
 	return v
@@ -606,17 +577,8 @@ func setupViperFlags() *viper.Viper {
 
 func setupViper(configFilePath string) *viper.Viper {
 	v := setupViperFlags()
-	// need to set it since in tests executable dir is somewhere /var/tmp/ (or wherever is designated by go)
-	// thus it searches buildDir in /var/tmp/
-	// but actual buildDir resides under project_root/build
-	currentPath, err := os.Getwd()
-	if err != nil {
-		log.Fatal(err)
-	}
-	v.Set(BuildDirKey, filepath.Join(currentPath, "..", "build"))
 	v.SetConfigFile(configFilePath)
-	err = v.ReadInConfig()
-	if err != nil {
+	if err := v.ReadInConfig(); err != nil {
 		log.Fatal(err)
 	}
 	return v

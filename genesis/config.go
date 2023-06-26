@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package genesis
@@ -7,16 +7,23 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+)
 
-	safemath "github.com/ava-labs/avalanchego/utils/math"
+var (
+	_ utils.Sortable[Allocation] = Allocation{}
+
+	errInvalidGenesisJSON = errors.New("could not unmarshal genesis JSON")
 )
 
 type LockedAmount struct {
@@ -44,6 +51,11 @@ func (a Allocation) Unparse(networkID uint32) (UnparsedAllocation, error) {
 	)
 	ua.AVAXAddr = avaxAddr
 	return ua, err
+}
+
+func (a Allocation) Less(other Allocation) bool {
+	return a.InitialAmount < other.InitialAmount ||
+		(a.InitialAmount == other.InitialAmount && a.AVAXAddr.Less(other.AVAXAddr))
 }
 
 type Staker struct {
@@ -126,12 +138,12 @@ func (c Config) Unparse() (UnparsedConfig, error) {
 func (c *Config) InitialSupply() (uint64, error) {
 	initialSupply := uint64(0)
 	for _, allocation := range c.Allocations {
-		newInitialSupply, err := safemath.Add64(initialSupply, allocation.InitialAmount)
+		newInitialSupply, err := math.Add64(initialSupply, allocation.InitialAmount)
 		if err != nil {
 			return 0, err
 		}
 		for _, unlock := range allocation.UnlockSchedule {
-			newInitialSupply, err = safemath.Add64(newInitialSupply, unlock.Amount)
+			newInitialSupply, err = math.Add64(newInitialSupply, unlock.Amount)
 			if err != nil {
 				return 0, err
 			}
@@ -223,7 +235,7 @@ func GetConfigContent(genesisContent string) (*Config, error) {
 func parseGenesisJSONBytesToConfig(bytes []byte) (*Config, error) {
 	var unparsedConfig UnparsedConfig
 	if err := json.Unmarshal(bytes, &unparsedConfig); err != nil {
-		return nil, fmt.Errorf("could not unmarshal JSON: %w", err)
+		return nil, fmt.Errorf("%w: %s", errInvalidGenesisJSON, err)
 	}
 
 	config, err := unparsedConfig.Parse()
