@@ -22,8 +22,9 @@ var (
 	_ snowstorm.Tx            = (*UniqueTx)(nil)
 	_ cache.Evictable[ids.ID] = (*UniqueTx)(nil)
 
-	errTxNotProcessing  = errors.New("transaction is not processing")
-	errUnexpectedReject = errors.New("attempting to reject transaction")
+	errTxNotProcessing      = errors.New("transaction is not processing")
+	errUnexpectedReject     = errors.New("attempting to reject transaction")
+	errUnexpectedDependency = errors.New("registering unexpected dependency")
 )
 
 // UniqueTx provides a de-duplication service for txs. This only provides a
@@ -186,13 +187,7 @@ func (tx *UniqueTx) MissingDependencies() (set.Set[ids.ID], error) {
 			continue
 		}
 
-		inputTx := &UniqueTx{
-			vm:   tx.vm,
-			txID: assetID,
-		}
-		if inputTx.Status() != choices.Accepted {
-			txIDs.Add(assetID)
-		}
+		return nil, errUnexpectedDependency
 	}
 	return txIDs, nil
 }
