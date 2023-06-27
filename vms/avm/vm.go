@@ -460,15 +460,20 @@ func (vm *VM) ParseTx(_ context.Context, bytes []byte) (snowstorm.Tx, error) {
 		return nil, err
 	}
 
+	err = rawTx.Unsigned.Visit(&txexecutor.SyntacticVerifier{
+		Backend: vm.txBackend,
+		Tx:      rawTx,
+	})
+	if err != nil {
+		return nil, err
+	}
+
 	tx := &UniqueTx{
 		TxCachedState: &TxCachedState{
 			Tx: rawTx,
 		},
 		vm:   vm,
 		txID: rawTx.ID(),
-	}
-	if err := tx.SyntacticVerify(); err != nil {
-		return nil, err
 	}
 
 	if tx.Status() == choices.Unknown {
