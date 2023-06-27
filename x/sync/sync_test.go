@@ -773,7 +773,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 		switch {
 		case bytes.Compare(smallestDiffKey.Value, rangeEnd) >= 0:
 			// The smallest key which differs is after the range end so the
-			// next key to get should be nil because we're done fetching the range.
+			// next key to get should be Nothing because we're done fetching the range.
 			require.True(gotFirstDiff.IsNothing())
 		case len(smallestDiffKey.Value) == 0:
 			require.True(gotFirstDiff.IsNothing())
