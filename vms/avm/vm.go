@@ -441,14 +441,14 @@ func (vm *VM) Linearize(_ context.Context, stopVertexID ids.ID, toEngine chan<- 
 }
 
 func (vm *VM) ParseTx(_ context.Context, bytes []byte) (snowstorm.Tx, error) {
-	rawTx, err := vm.parser.ParseTx(bytes)
+	tx, err := vm.parser.ParseTx(bytes)
 	if err != nil {
 		return nil, err
 	}
 
-	err = rawTx.Unsigned.Visit(&txexecutor.SyntacticVerifier{
+	err = tx.Unsigned.Visit(&txexecutor.SyntacticVerifier{
 		Backend: vm.txBackend,
-		Tx:      rawTx,
+		Tx:      tx,
 	})
 	if err != nil {
 		return nil, err
@@ -456,7 +456,7 @@ func (vm *VM) ParseTx(_ context.Context, bytes []byte) (snowstorm.Tx, error) {
 
 	return &Tx{
 		vm: vm,
-		tx: rawTx,
+		tx: tx,
 	}, nil
 }
 
