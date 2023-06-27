@@ -275,6 +275,8 @@ func (s *state) DeleteUTXO(utxoID ids.ID) {
 	s.modifiedUTXOs[utxoID] = nil
 }
 
+// TODO: After v1.11.x has activated we can rename [getTx] to [GetTx] and delete
+// [getStatus].
 func (s *state) GetTx(txID ids.ID) (*txs.Tx, error) {
 	tx, err := s.getTx(txID)
 	if err != nil {
