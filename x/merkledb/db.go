@@ -472,8 +472,9 @@ func (db *merkleDB) getProof(ctx context.Context, key []byte) (*Proof, error) {
 	return view.getProof(ctx, key)
 }
 
-// GetRangeProof returns a proof for the key/value pairs in this trie within the range
-// [start, end].
+// GetRangeProof returns a proof for the key/value pairs in this trie within the range [start, end].
+// If [start] is Nothing, there's no lower bound on the range.
+// If [end] is Nothing, there's no upper bound on the range.
 func (db *merkleDB) GetRangeProof(
 	ctx context.Context,
 	start Maybe[[]byte],
