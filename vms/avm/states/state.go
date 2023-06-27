@@ -114,6 +114,7 @@ type State interface {
 	// Returns a batch of unwritten changes that, when written, will commit all
 	// pending changes to the base database.
 	CommitBatch() (database.Batch, error)
+
 	// Asynchronously removes unneeded state from disk.
 	//
 	// Specifically, this removes:
