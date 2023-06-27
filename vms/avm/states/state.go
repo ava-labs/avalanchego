@@ -99,8 +99,8 @@ type State interface {
 
 	// DeleteStatus removes the status entry from storage.
 	//
-	// TODO: Remove DeleteStatus after v1.11 has activated an we can assume all
-	// nodes have pruned their statuses from disk.
+	// TODO: Remove DeleteStatus after v1.11.x has activated and we can assume
+	// all nodes have pruned their statuses from disk.
 	DeleteStatus(id ids.ID)
 
 	// Discard uncommitted changes to the database.
