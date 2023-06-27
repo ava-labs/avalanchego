@@ -8,8 +8,6 @@ import (
 	"errors"
 	"fmt"
 
-	"go.uber.org/zap"
-
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -23,9 +21,8 @@ var (
 	_ snowstorm.Tx            = (*UniqueTx)(nil)
 	_ cache.Evictable[ids.ID] = (*UniqueTx)(nil)
 
-	errMissingUTXO = errors.New("missing utxo")
-	errUnknownTx   = errors.New("transaction is unknown")
-	errRejectedTx  = errors.New("transaction is rejected")
+	errTxNotProcessing  = errors.New("transaction is not processing")
+	errUnexpectedReject = errors.New("attempting to reject transaction")
 )
 
 // UniqueTx provides a de-duplication service for txs. This only provides a
@@ -40,11 +37,7 @@ type UniqueTx struct {
 type TxCachedState struct {
 	*txs.Tx
 
-	unique, verifiedTx, verifiedState bool
-	validity                          error
-
-	deps []snowstorm.Tx
-
+	unique bool
 	status choices.Status
 }
 
@@ -95,7 +88,6 @@ func (tx *UniqueTx) refresh() {
 func (tx *UniqueTx) Evict() {
 	// Lock is already held here
 	tx.unique = false
-	tx.deps = nil
 }
 
 func (tx *UniqueTx) setStatus(status choices.Status) {
@@ -118,7 +110,7 @@ func (tx *UniqueTx) Key() ids.ID {
 // Accept is called when the transaction was finalized as accepted by consensus
 func (tx *UniqueTx) Accept(context.Context) error {
 	if s := tx.Status(); s != choices.Processing {
-		return fmt.Errorf("transaction has invalid status: %s", s)
+		return fmt.Errorf("%w: %s", errTxNotProcessing, s)
 	}
 
 	if err := tx.vm.onAccept(tx.Tx); err != nil {
@@ -153,31 +145,11 @@ func (tx *UniqueTx) Accept(context.Context) error {
 		return fmt.Errorf("error committing accepted state changes while processing tx %s: %w", txID, err)
 	}
 
-	tx.deps = nil // Needed to prevent a memory leak
 	return tx.vm.metrics.MarkTxAccepted(tx.Tx)
 }
 
-// Reject is called when the transaction was finalized as rejected by consensus
-func (tx *UniqueTx) Reject(context.Context) error {
-	tx.setStatus(choices.Rejected)
-
-	txID := tx.ID()
-	tx.vm.ctx.Log.Debug("rejecting tx",
-		zap.Stringer("txID", txID),
-	)
-
-	if err := tx.vm.state.Commit(); err != nil {
-		tx.vm.ctx.Log.Error("failed to commit reject",
-			zap.Stringer("txID", tx.txID),
-			zap.Error(err),
-		)
-		return err
-	}
-
-	tx.vm.walletService.decided(txID)
-
-	tx.deps = nil // Needed to prevent a memory leak
-	return nil
+func (*UniqueTx) Reject(context.Context) error {
+	return errUnexpectedReject
 }
 
 // Status returns the current status of this transaction
@@ -186,40 +158,25 @@ func (tx *UniqueTx) Status() choices.Status {
 	return tx.status
 }
 
-// Dependencies returns the set of transactions this transaction builds on
-func (tx *UniqueTx) Dependencies() ([]snowstorm.Tx, error) {
+// MissingDependencies returns the set of transactions that are not currently
+// accepted, but must be accepted before this transaction should be accepted.
+func (tx *UniqueTx) MissingDependencies() (set.Set[ids.ID], error) {
 	tx.refresh()
-	if tx.Tx == nil || len(tx.deps) != 0 {
-		return tx.deps, nil
-	}
-
 	txIDs := set.Set[ids.ID]{}
 	for _, in := range tx.Unsigned.InputUTXOs() {
 		if in.Symbolic() {
 			continue
 		}
 		txID, _ := in.InputSource()
-		if txIDs.Contains(txID) {
-			continue
-		}
-		txIDs.Add(txID)
-		tx.deps = append(tx.deps, &UniqueTx{
+		inputTx := &UniqueTx{
 			vm:   tx.vm,
 			txID: txID,
-		})
-	}
-	consumedIDs := tx.Tx.Unsigned.ConsumedAssetIDs()
-	for assetID := range tx.Tx.Unsigned.AssetIDs() {
-		if consumedIDs.Contains(assetID) || txIDs.Contains(assetID) {
-			continue
 		}
-		txIDs.Add(assetID)
-		tx.deps = append(tx.deps, &UniqueTx{
-			vm:   tx.vm,
-			txID: assetID,
-		})
+		if inputTx.Status() != choices.Accepted {
+			txIDs.Add(txID)
+		}
 	}
-	return tx.deps, nil
+	return txIDs, nil
 }
 
 // Bytes returns the binary representation of this transaction
@@ -228,59 +185,11 @@ func (tx *UniqueTx) Bytes() []byte {
 	return tx.Tx.Bytes()
 }
 
-func (tx *UniqueTx) verifyWithoutCacheWrites() error {
-	switch status := tx.Status(); status {
-	case choices.Unknown:
-		return errUnknownTx
-	case choices.Accepted:
-		return nil
-	case choices.Rejected:
-		return errRejectedTx
-	default:
-		return tx.SemanticVerify()
-	}
-}
-
 // Verify the validity of this transaction
 func (tx *UniqueTx) Verify(context.Context) error {
-	if err := tx.verifyWithoutCacheWrites(); err != nil {
-		return err
+	if s := tx.Status(); s != choices.Processing {
+		return fmt.Errorf("%w: %s", errTxNotProcessing, s)
 	}
-
-	tx.verifiedState = true
-	return nil
-}
-
-// SyntacticVerify verifies that this transaction is well formed
-func (tx *UniqueTx) SyntacticVerify() error {
-	tx.refresh()
-
-	if tx.Tx == nil {
-		return errUnknownTx
-	}
-
-	if tx.verifiedTx {
-		return tx.validity
-	}
-
-	tx.verifiedTx = true
-	tx.validity = tx.Tx.Unsigned.Visit(&executor.SyntacticVerifier{
-		Backend: tx.vm.txBackend,
-		Tx:      tx.Tx,
-	})
-	return tx.validity
-}
-
-// SemanticVerify the validity of this transaction
-func (tx *UniqueTx) SemanticVerify() error {
-	if err := tx.SyntacticVerify(); err != nil {
-		return err
-	}
-
-	if tx.validity != nil || tx.verifiedState {
-		return tx.validity
-	}
-
 	return tx.Unsigned.Visit(&executor.SemanticVerifier{
 		Backend: tx.vm.txBackend,
 		State:   tx.vm.state,

@@ -6,7 +6,9 @@ package snowstorm
 import (
 	"context"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var _ Tx = (*TestTx)(nil)
@@ -15,13 +17,13 @@ var _ Tx = (*TestTx)(nil)
 type TestTx struct {
 	choices.TestDecidable
 
-	DependenciesV    []Tx
+	DependenciesV    set.Set[ids.ID]
 	DependenciesErrV error
 	VerifyV          error
 	BytesV           []byte
 }
 
-func (t *TestTx) Dependencies() ([]Tx, error) {
+func (t *TestTx) MissingDependencies() (set.Set[ids.ID], error) {
 	return t.DependenciesV, t.DependenciesErrV
 }
 
