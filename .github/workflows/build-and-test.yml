@@ -28,6 +28,6 @@ jobs:
       - name: fuzz_test
         shell: bash
         if: matrix.os == 'ubuntu-22.04' # Only run on Ubuntu 22.04
-        run: | # Run each fuzz test 10 seconds
+        run: | # Run each fuzz test 15 seconds
           cd ${{ github.workspace }}
           ./scripts/build_fuzz.sh 15
