@@ -153,13 +153,15 @@ func (s *NetworkServer) HandleChangeProofRequest(
 	requestID uint32,
 	req *pb.SyncGetChangeProofRequest,
 ) error {
-	if req.BytesLimit == 0 ||
-		req.KeyLimit == 0 ||
-		len(req.StartRootHash) != hashing.HashLen ||
-		len(req.EndRootHash) != hashing.HashLen ||
-		(req.EndKey != nil && req.EndKey.IsNothing && len(req.EndKey.Value) > 0) ||
-		(req.StartKey != nil && req.StartKey.IsNothing && len(req.StartKey.Value) > 0) ||
-		(req.StartKey != nil && req.EndKey != nil && !req.EndKey.IsNothing && bytes.Compare(req.StartKey.Value, req.EndKey.Value) > 0) {
+	invalid := req.BytesLimit == 0
+	invalid = invalid || req.KeyLimit == 0
+	invalid = invalid || len(req.StartRootHash) != hashing.HashLen
+	invalid = invalid || len(req.EndRootHash) != hashing.HashLen
+	invalid = invalid || (req.EndKey != nil && req.EndKey.IsNothing && len(req.EndKey.Value) > 0)
+	invalid = invalid || (req.StartKey != nil && req.StartKey.IsNothing && len(req.StartKey.Value) > 0)
+	invalid = invalid || (req.StartKey != nil && req.EndKey != nil &&
+		!req.EndKey.IsNothing && bytes.Compare(req.StartKey.Value, req.EndKey.Value) > 0)
+	if invalid {
 		s.log.Debug(
 			"dropping invalid change proof request",
 			zap.Stringer("nodeID", nodeID),
@@ -245,12 +247,14 @@ func (s *NetworkServer) HandleRangeProofRequest(
 	requestID uint32,
 	req *pb.SyncGetRangeProofRequest,
 ) error {
-	if req.BytesLimit == 0 ||
-		req.KeyLimit == 0 ||
-		len(req.RootHash) != hashing.HashLen ||
-		(req.EndKey != nil && req.EndKey.IsNothing && len(req.EndKey.Value) > 0) ||
-		(req.StartKey != nil && req.StartKey.IsNothing && len(req.StartKey.Value) > 0) ||
-		(req.StartKey != nil && req.EndKey != nil && !req.EndKey.IsNothing && bytes.Compare(req.StartKey.Value, req.EndKey.Value) > 0) {
+	invalid := req.BytesLimit == 0
+	invalid = invalid || req.KeyLimit == 0
+	invalid = invalid || len(req.RootHash) != hashing.HashLen
+	invalid = invalid || (req.EndKey != nil && req.EndKey.IsNothing && len(req.EndKey.Value) > 0)
+	invalid = invalid || (req.StartKey != nil && req.StartKey.IsNothing && len(req.StartKey.Value) > 0)
+	invalid = invalid || (req.StartKey != nil && req.EndKey != nil &&
+		!req.EndKey.IsNothing && bytes.Compare(req.StartKey.Value, req.EndKey.Value) > 0)
+	if invalid {
 		s.log.Debug(
 			"dropping invalid range proof request",
 			zap.Stringer("nodeID", nodeID),
