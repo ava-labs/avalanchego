@@ -294,9 +294,9 @@ func (proof *RangeProof) Verify(
 		return ErrStartAfterEnd
 	case len(proof.KeyValues) == 0 && len(proof.StartProof) == 0 && len(proof.EndProof) == 0:
 		return ErrNoMerkleProof
-	case start.IsNothing() && end.IsNothing() && len(proof.KeyValues) == 0 && len(proof.EndProof) != 1:
+	case !start.hasValue && !end.hasValue && len(proof.KeyValues) == 0 && len(proof.EndProof) != 1:
 		return ErrShouldJustBeRoot
-	case len(proof.EndProof) == 0 && end.hasValue:
+	case end.hasValue && len(proof.EndProof) == 0:
 		return ErrNoEndProof
 	}
 
@@ -647,8 +647,8 @@ func (proof *ChangeProof) Empty() bool {
 // Returns nil iff both hold:
 // 1. [kvs] is sorted by key in increasing order.
 // 2. All keys in [kvs] are in the range [start, end].
-// If [start] is nil, there is no lower bound on acceptable keys.
-// If [end] is nil, there is no upper bound on acceptable keys.
+// If [start] is Nothing, there is no lower bound on acceptable keys.
+// If [end] is Nothing, there is no upper bound on acceptable keys.
 // If [kvs] is empty, returns nil.
 func verifyKeyChanges(kvs []KeyChange, start, end Maybe[[]byte]) error {
 	if len(kvs) == 0 {
@@ -674,8 +674,8 @@ func verifyKeyChanges(kvs []KeyChange, start, end Maybe[[]byte]) error {
 // Returns nil iff both hold:
 // 1. [kvs] is sorted by key in increasing order.
 // 2. All keys in [kvs] are in the range [start, end].
-// If [start] is nil, there is no lower bound on acceptable keys.
-// If [end] is nil, there is no upper bound on acceptable keys.
+// If [start] is Nothing, there is no lower bound on acceptable keys.
+// If [end] is Nothing, there is no upper bound on acceptable keys.
 // If [kvs] is empty, returns nil.
 func verifyKeyValues(kvs []KeyValue, start, end Maybe[[]byte]) error {
 	hasLowerBound := start.hasValue
