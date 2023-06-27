@@ -383,7 +383,8 @@ func (m *StateSyncManager) findNextKey(
 		// We try to find the next key to fetch by looking at the end proof.
 		// If the end proof is empty, we have no information to use.
 		// Start fetching from the next key after [lastReceivedKey].
-		nextKey := append(lastReceivedKey, 0)
+		nextKey := lastReceivedKey
+		nextKey = append(nextKey, 0)
 		return merkledb.Some(nextKey), nil
 	}
 
@@ -496,7 +497,8 @@ func (m *StateSyncManager) findNextKey(
 	// then we couldn't find a better answer than the lastReceivedKey.
 	// Set the nextKey to lastReceivedKey + 0, which is the first key in the open range (lastReceivedKey, rangeEnd)
 	if nextKey != nil && bytes.Compare(nextKey, lastReceivedKey) <= 0 {
-		nextKey = append(lastReceivedKey, 0)
+		nextKey = lastReceivedKey
+		nextKey = append(nextKey, 0)
 	}
 
 	// If the nextKey is larger than the end of the range, return Nothing to signal that there is no next key in range
