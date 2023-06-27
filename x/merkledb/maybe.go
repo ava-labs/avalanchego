@@ -40,6 +40,7 @@ func (m Maybe[T]) IsNothing() bool {
 }
 
 // Returns the value of [m].
+// If [m.IsNothing()], returns the zero value of type T.
 func (m Maybe[T]) Value() T {
 	return m.value
 }
