@@ -164,11 +164,11 @@ func (c *client) GetRangeProof(ctx context.Context, req *pb.SyncGetRangeProofReq
 		}
 
 		startKey := merkledb.Nothing[[]byte]()
-		if req.StartKey != nil && !req.StartKey.IsNothing {
+		if !req.StartKey.IsNothing {
 			startKey = merkledb.Some(req.StartKey.Value)
 		}
 		endKey := merkledb.Nothing[[]byte]()
-		if req.EndKey != nil && !req.EndKey.IsNothing {
+		if !req.EndKey.IsNothing {
 			endKey = merkledb.Some(req.EndKey.Value)
 		}
 

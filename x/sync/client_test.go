@@ -153,7 +153,13 @@ func TestGetRangeProof(t *testing.T) {
 		"proof restricted by BytesLimit": {
 			db: smallTrieDB,
 			request: &pb.SyncGetRangeProofRequest{
-				RootHash:   smallTrieRoot[:],
+				RootHash: smallTrieRoot[:],
+				StartKey: &pb.MaybeBytes{
+					IsNothing: true,
+				},
+				EndKey: &pb.MaybeBytes{
+					IsNothing: true,
+				},
 				KeyLimit:   defaultRequestKeyLimit,
 				BytesLimit: 10000,
 			},
@@ -161,7 +167,13 @@ func TestGetRangeProof(t *testing.T) {
 		"full response for small (single request) trie": {
 			db: smallTrieDB,
 			request: &pb.SyncGetRangeProofRequest{
-				RootHash:   smallTrieRoot[:],
+				RootHash: smallTrieRoot[:],
+				StartKey: &pb.MaybeBytes{
+					IsNothing: true,
+				},
+				EndKey: &pb.MaybeBytes{
+					IsNothing: true,
+				},
 				KeyLimit:   defaultRequestKeyLimit,
 				BytesLimit: defaultRequestByteSizeLimit,
 			},
@@ -170,7 +182,13 @@ func TestGetRangeProof(t *testing.T) {
 		"too many leaves in response": {
 			db: smallTrieDB,
 			request: &pb.SyncGetRangeProofRequest{
-				RootHash:   smallTrieRoot[:],
+				RootHash: smallTrieRoot[:],
+				StartKey: &pb.MaybeBytes{
+					IsNothing: true,
+				},
+				EndKey: &pb.MaybeBytes{
+					IsNothing: true,
+				},
 				KeyLimit:   defaultRequestKeyLimit,
 				BytesLimit: defaultRequestByteSizeLimit,
 			},
@@ -182,7 +200,13 @@ func TestGetRangeProof(t *testing.T) {
 		"partial response to request for entire trie (full leaf limit)": {
 			db: largeTrieDB,
 			request: &pb.SyncGetRangeProofRequest{
-				RootHash:   largeTrieRoot[:],
+				RootHash: largeTrieRoot[:],
+				StartKey: &pb.MaybeBytes{
+					IsNothing: true,
+				},
+				EndKey: &pb.MaybeBytes{
+					IsNothing: true,
+				},
 				KeyLimit:   defaultRequestKeyLimit,
 				BytesLimit: defaultRequestByteSizeLimit,
 			},
@@ -194,6 +218,9 @@ func TestGetRangeProof(t *testing.T) {
 				RootHash: largeTrieRoot[:],
 				StartKey: &pb.MaybeBytes{
 					Value: largeTrieKeys[len(largeTrieKeys)-30], // Set start 30 keys from the end of the large trie
+				},
+				EndKey: &pb.MaybeBytes{
+					IsNothing: true,
 				},
 				KeyLimit:   defaultRequestKeyLimit,
 				BytesLimit: defaultRequestByteSizeLimit,
@@ -218,7 +245,13 @@ func TestGetRangeProof(t *testing.T) {
 		"removed first key in response": {
 			db: largeTrieDB,
 			request: &pb.SyncGetRangeProofRequest{
-				RootHash:   largeTrieRoot[:],
+				RootHash: largeTrieRoot[:],
+				StartKey: &pb.MaybeBytes{
+					IsNothing: true,
+				},
+				EndKey: &pb.MaybeBytes{
+					IsNothing: true,
+				},
 				KeyLimit:   defaultRequestKeyLimit,
 				BytesLimit: defaultRequestByteSizeLimit,
 			},
@@ -230,7 +263,13 @@ func TestGetRangeProof(t *testing.T) {
 		"removed first key in response and replaced proof": {
 			db: largeTrieDB,
 			request: &pb.SyncGetRangeProofRequest{
-				RootHash:   largeTrieRoot[:],
+				RootHash: largeTrieRoot[:],
+				StartKey: &pb.MaybeBytes{
+					IsNothing: true,
+				},
+				EndKey: &pb.MaybeBytes{
+					IsNothing: true,
+				},
 				KeyLimit:   defaultRequestKeyLimit,
 				BytesLimit: defaultRequestByteSizeLimit,
 			},
@@ -249,7 +288,13 @@ func TestGetRangeProof(t *testing.T) {
 		"removed last key in response": {
 			db: largeTrieDB,
 			request: &pb.SyncGetRangeProofRequest{
-				RootHash:   largeTrieRoot[:],
+				RootHash: largeTrieRoot[:],
+				StartKey: &pb.MaybeBytes{
+					IsNothing: true,
+				},
+				EndKey: &pb.MaybeBytes{
+					IsNothing: true,
+				},
 				KeyLimit:   defaultRequestKeyLimit,
 				BytesLimit: defaultRequestByteSizeLimit,
 			},
@@ -261,7 +306,13 @@ func TestGetRangeProof(t *testing.T) {
 		"removed key from middle of response": {
 			db: largeTrieDB,
 			request: &pb.SyncGetRangeProofRequest{
-				RootHash:   largeTrieRoot[:],
+				RootHash: largeTrieRoot[:],
+				StartKey: &pb.MaybeBytes{
+					IsNothing: true,
+				},
+				EndKey: &pb.MaybeBytes{
+					IsNothing: true,
+				},
 				KeyLimit:   defaultRequestKeyLimit,
 				BytesLimit: defaultRequestByteSizeLimit,
 			},
@@ -273,7 +324,13 @@ func TestGetRangeProof(t *testing.T) {
 		"all proof keys removed from response": {
 			db: largeTrieDB,
 			request: &pb.SyncGetRangeProofRequest{
-				RootHash:   largeTrieRoot[:],
+				RootHash: largeTrieRoot[:],
+				StartKey: &pb.MaybeBytes{
+					IsNothing: true,
+				},
+				EndKey: &pb.MaybeBytes{
+					IsNothing: true,
+				},
 				KeyLimit:   defaultRequestKeyLimit,
 				BytesLimit: defaultRequestByteSizeLimit,
 			},
@@ -639,7 +696,13 @@ func TestRangeProofRetries(t *testing.T) {
 
 	maxRequests := 4
 	request := &pb.SyncGetRangeProofRequest{
-		RootHash:   root[:],
+		RootHash: root[:],
+		StartKey: &pb.MaybeBytes{
+			IsNothing: true,
+		},
+		EndKey: &pb.MaybeBytes{
+			IsNothing: true,
+		},
 		KeyLimit:   uint32(keyCount),
 		BytesLimit: defaultRequestByteSizeLimit,
 	}
