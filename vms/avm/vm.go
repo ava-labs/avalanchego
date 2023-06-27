@@ -460,15 +460,20 @@ func (vm *VM) ParseTx(_ context.Context, bytes []byte) (snowstorm.Tx, error) {
 		return nil, err
 	}
 
+	err = rawTx.Unsigned.Visit(&txexecutor.SyntacticVerifier{
+		Backend: vm.txBackend,
+		Tx:      rawTx,
+	})
+	if err != nil {
+		return nil, err
+	}
+
 	tx := &UniqueTx{
 		TxCachedState: &TxCachedState{
 			Tx: rawTx,
 		},
 		vm:   vm,
 		txID: rawTx.ID(),
-	}
-	if err := tx.SyntacticVerify(); err != nil {
-		return nil, err
 	}
 
 	if tx.Status() == choices.Unknown {
@@ -684,9 +689,4 @@ func (vm *VM) onAccept(tx *txs.Tx) error {
 	vm.pubsub.Publish(NewPubSubFilterer(tx))
 	vm.walletService.decided(txID)
 	return nil
-}
-
-// UniqueTx de-duplicates the transaction.
-func (vm *VM) DeduplicateTx(tx *UniqueTx) *UniqueTx {
-	return vm.uniqueTxs.Deduplicate(tx)
 }

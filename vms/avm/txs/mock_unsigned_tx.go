@@ -40,20 +40,6 @@ func (m *MockUnsignedTx) EXPECT() *MockUnsignedTxMockRecorder {
 	return m.recorder
 }
 
-// AssetIDs mocks base method.
-func (m *MockUnsignedTx) AssetIDs() set.Set[ids.ID] {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AssetIDs")
-	ret0, _ := ret[0].(set.Set[ids.ID])
-	return ret0
-}
-
-// AssetIDs indicates an expected call of AssetIDs.
-func (mr *MockUnsignedTxMockRecorder) AssetIDs() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AssetIDs", reflect.TypeOf((*MockUnsignedTx)(nil).AssetIDs))
-}
-
 // Bytes mocks base method.
 func (m *MockUnsignedTx) Bytes() []byte {
 	m.ctrl.T.Helper()
@@ -66,20 +52,6 @@ func (m *MockUnsignedTx) Bytes() []byte {
 func (mr *MockUnsignedTxMockRecorder) Bytes() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Bytes", reflect.TypeOf((*MockUnsignedTx)(nil).Bytes))
-}
-
-// ConsumedAssetIDs mocks base method.
-func (m *MockUnsignedTx) ConsumedAssetIDs() set.Set[ids.ID] {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ConsumedAssetIDs")
-	ret0, _ := ret[0].(set.Set[ids.ID])
-	return ret0
-}
-
-// ConsumedAssetIDs indicates an expected call of ConsumedAssetIDs.
-func (mr *MockUnsignedTxMockRecorder) ConsumedAssetIDs() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConsumedAssetIDs", reflect.TypeOf((*MockUnsignedTx)(nil).ConsumedAssetIDs))
 }
 
 // InitCtx mocks base method.
