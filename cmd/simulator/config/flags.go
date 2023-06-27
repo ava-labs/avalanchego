@@ -26,6 +26,7 @@ const (
 	KeyDirKey         = "key-dir"
 	VersionKey        = "version"
 	TimeoutKey        = "timeout"
+	BatchSizeKey      = "batch-size"
 )
 
 var (
@@ -42,6 +43,7 @@ type Config struct {
 	TxsPerWorker uint64        `json:"txs-per-worker"`
 	KeyDir       string        `json:"key-dir"`
 	Timeout      time.Duration `json:"timeout"`
+	BatchSize    uint64        `json:"batch-size"`
 }
 
 func BuildConfig(v *viper.Viper) (Config, error) {
@@ -53,6 +55,7 @@ func BuildConfig(v *viper.Viper) (Config, error) {
 		TxsPerWorker: v.GetUint64(TxsPerWorkerKey),
 		KeyDir:       v.GetString(KeyDirKey),
 		Timeout:      v.GetDuration(TimeoutKey),
+		BatchSize:    v.GetUint64(BatchSizeKey),
 	}
 	if len(c.Endpoints) == 0 {
 		return c, ErrNoEndpoints
@@ -114,4 +117,5 @@ func addSimulatorFlags(fs *pflag.FlagSet) {
 	fs.String(KeyDirKey, ".simulator/keys", "Specify the directory to save private keys in (INSECURE: only use for testing)")
 	fs.Duration(TimeoutKey, 5*time.Minute, "Specify the timeout for the simulator to complete (0 indicates no timeout)")
 	fs.String(LogLevelKey, "info", "Specify the log level to use in the simulator")
+	fs.Uint64(BatchSizeKey, 100, "Specify the batchsize for the worker to issue and confirm txs")
 }

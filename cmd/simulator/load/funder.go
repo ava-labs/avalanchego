@@ -10,6 +10,7 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/subnet-evm/cmd/simulator/key"
+	"github.com/ava-labs/subnet-evm/cmd/simulator/txs"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/ethclient"
 	"github.com/ava-labs/subnet-evm/params"
@@ -80,7 +81,7 @@ func DistributeFunds(ctx context.Context, client ethclient.Client, keys []*key.K
 	signer := types.LatestSignerForChainID(chainID)
 
 	// Generate a sequence of transactions to distribute the required funds.
-	log.Info("Generating distribution transactions")
+	log.Info("Generating distribution transactions...")
 	i := 0
 	txGenerator := func(key *ecdsa.PrivateKey, nonce uint64) (*types.Transaction, error) {
 		tx, err := types.SignNewTx(key, signer, &types.DynamicFeeTx{
@@ -99,17 +100,18 @@ func DistributeFunds(ctx context.Context, client ethclient.Client, keys []*key.K
 		i++
 		return tx, nil
 	}
-	txs, err := GenerateTxSequence(ctx, txGenerator, client, maxFundsKey.PrivKey, uint64(len(needFundsAddrs)))
+
+	numTxs := uint64(len(needFundsAddrs))
+	txSequence, err := txs.GenerateTxSequence(ctx, txGenerator, client, maxFundsKey.PrivKey, numTxs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate fund distribution sequence from %s of length %d", maxFundsKey.Address, len(needFundsAddrs))
 	}
+	worker := NewSingleAddressTxWorker(ctx, client, maxFundsKey.Address)
+	txFunderAgent := txs.NewIssueNAgent[*types.Transaction](txSequence, worker, numTxs)
 
-	log.Info("Executing distribution transactions...")
-	worker := NewWorker(client, maxFundsKey.Address, txs)
-	if err := worker.Execute(ctx); err != nil {
+	if err := txFunderAgent.Execute(ctx); err != nil {
 		return nil, err
 	}
-
 	for _, addr := range needFundsAddrs {
 		balance, err := client.BalanceAt(ctx, addr, nil)
 		if err != nil {

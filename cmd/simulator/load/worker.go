@@ -10,102 +10,74 @@ import (
 
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/ethclient"
+	"github.com/ava-labs/subnet-evm/interfaces"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 )
 
-type Worker struct {
-	client  ethclient.Client
-	address common.Address
-	txs     []*types.Transaction
+type singleAddressTxWorker struct {
+	client ethclient.Client
+
+	acceptedNonce uint64
+	address       common.Address
+
+	sub      interfaces.Subscription
+	newHeads chan *types.Header
 }
 
-// NewWorker creates a new worker that will issue the sequence of transactions from the given address
-//
-// Assumes that all transactions are from the same address, ordered by nonce, and this worker has exclusive access
-// to issuance of transactions from the underlying private key.
-func NewWorker(client ethclient.Client, address common.Address, txs []*types.Transaction) *Worker {
-	return &Worker{
-		client:  client,
-		address: address,
-		txs:     txs,
-	}
-}
-
-func (w *Worker) ExecuteTxsFromAddress(ctx context.Context) error {
-	log.Info("Executing txs", "numTxs", len(w.txs))
-	for i, tx := range w.txs {
-		start := time.Now()
-		err := w.client.SendTransaction(ctx, tx)
-		if err != nil {
-			return fmt.Errorf("failed to issue tx %d: %w", i, err)
-		}
-		log.Info("execute tx", "tx", tx.Hash(), "nonce", tx.Nonce(), "duration", time.Since(start))
-	}
-	return nil
-}
-
-// AwaitTxs awaits for the nonce of the last transaction issued by the worker to be confirmed or
-// rejected by the network.
-//
-// Assumes that a non-zero number of transactions were already generated and that they were issued
-// by this worker.
-func (w *Worker) AwaitTxs(ctx context.Context) error {
-	nonce := w.txs[len(w.txs)-1].Nonce()
-
+// NewSingleAddressTxWorker creates and returns a singleAddressTxWorker
+func NewSingleAddressTxWorker(ctx context.Context, client ethclient.Client, address common.Address) *singleAddressTxWorker {
 	newHeads := make(chan *types.Header)
-	defer close(newHeads)
+	tw := &singleAddressTxWorker{
+		client:   client,
+		address:  address,
+		newHeads: newHeads,
+	}
 
-	sub, err := w.client.SubscribeNewHead(ctx, newHeads)
+	sub, err := client.SubscribeNewHead(ctx, newHeads)
 	if err != nil {
 		log.Debug("failed to subscribe new heads, falling back to polling", "err", err)
 	} else {
-		defer sub.Unsubscribe()
+		tw.sub = sub
 	}
+
+	return tw
+}
+
+func (tw *singleAddressTxWorker) IssueTx(ctx context.Context, tx *types.Transaction) error {
+	return tw.client.SendTransaction(ctx, tx)
+}
+
+func (tw *singleAddressTxWorker) ConfirmTx(ctx context.Context, tx *types.Transaction) error {
+	txNonce := tx.Nonce()
 
 	for {
+		// If the is less than what has already been accepted, the transaction is confirmed
+		if txNonce < tw.acceptedNonce {
+			return nil
+		}
+
 		select {
-		case <-newHeads:
+		case <-tw.newHeads:
 		case <-time.After(time.Second):
 		case <-ctx.Done():
-			return fmt.Errorf("failed to await nonce: %w", ctx.Err())
+			return fmt.Errorf("failed to await tx %s nonce %d: %w", tx.Hash(), txNonce, ctx.Err())
 		}
 
-		currentNonce, err := w.client.NonceAt(ctx, w.address, nil)
+		// Update the worker's accepted nonce, so we can check on the next iteration
+		// if the transaction has been accepted.
+		acceptedNonce, err := tw.client.NonceAt(ctx, tw.address, nil)
 		if err != nil {
-			log.Warn("failed to get nonce", "err", err)
+			return fmt.Errorf("failed to await tx %s nonce %d: %w", tx.Hash(), txNonce, err)
 		}
-		if currentNonce >= nonce {
-			return nil
-		} else {
-			log.Info("fetched nonce", "awaiting", nonce, "currentNonce", currentNonce)
-		}
+		tw.acceptedNonce = acceptedNonce
 	}
 }
 
-// ConfirmAllTransactions iterates over every transaction of this worker and confirms it
-// via eth_getTransactionByHash
-func (w *Worker) ConfirmAllTransactions(ctx context.Context) error {
-	for i, tx := range w.txs {
-		_, isPending, err := w.client.TransactionByHash(ctx, tx.Hash())
-		if err != nil {
-			return fmt.Errorf("failed to confirm tx at index %d: %s", i, tx.Hash())
-		}
-		if isPending {
-			return fmt.Errorf("failed to confirm tx at index %d: pending", i)
-		}
+func (tw *singleAddressTxWorker) Close(ctx context.Context) error {
+	if tw.sub != nil {
+		tw.sub.Unsubscribe()
 	}
-	log.Info("Confirmed all transactions")
+	close(tw.newHeads)
 	return nil
-}
-
-// Execute issues and confirms all transactions for the worker.
-func (w *Worker) Execute(ctx context.Context) error {
-	if err := w.ExecuteTxsFromAddress(ctx); err != nil {
-		return err
-	}
-	if err := w.AwaitTxs(ctx); err != nil {
-		return err
-	}
-	return w.ConfirmAllTransactions(ctx)
 }
