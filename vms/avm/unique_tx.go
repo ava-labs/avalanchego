@@ -158,7 +158,8 @@ func (tx *UniqueTx) Status() choices.Status {
 	return tx.status
 }
 
-// Dependencies returns the set of transactions this transaction builds on
+// MissingDependencies returns the set of transactions that are not currently
+// accepted, but must be accepted before this transaction should be accepted.
 func (tx *UniqueTx) MissingDependencies() (set.Set[ids.ID], error) {
 	tx.refresh()
 	txIDs := set.Set[ids.ID]{}
