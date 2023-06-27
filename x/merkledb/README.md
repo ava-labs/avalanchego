@@ -20,17 +20,17 @@ To reduce the depth of nodes in the trie, a `Merkle Node` utilizes path compress
 
 ```
 +-----------------------------------+
-| Merkle Node                       | 
+| Merkle Node                       |
 |                                   |
 | ID: 0x0131                        |  an id representing the current node, derived from the node's value and all children ids
 | Key: 0x91                         |  prefix of the key path, representing the location of the node in the trie
 | Value: 0x00                       |  the value, if one exists, that is stored at the key path (pathPrefix + compressedPath)
-| Children:                         |  a map of children node ids for any nodes in the trie that have this node's key path as a prefix 
+| Children:                         |  a map of children node ids for any nodes in the trie that have this node's key path as a prefix
 |   0: [:0x00542F]                  |  child 0 represents a node with key 0x910 with ID 0x00542F
 |   1: [0x432:0xA0561C]             |  child 1 represents a node with key 0x911432 with ID 0xA0561C
 |   ...                             |
 |   15: [0x9A67B:0x02FB093]         |  child 15 represents a node with key 0x91F9A67B with ID 0x02FB093
-+-----------------------------------+ 
++-----------------------------------+
 ```
 
 ## Design choices
@@ -51,7 +51,7 @@ A `trieView` is built atop another trie, and that trie could change at any point
 ### Locking
 
 `Database` has a `RWMutex` named `lock`. Its read operations don't store data in a map, so a read lock suffices for read operations.
-`Database` has a `Mutex` named `commitLock`.  It enforces that only a single view/batch is attempting to commit to the database at one time.  `lock` is insufficient because there is a period of view preparation where read access should still be allowed, followed by a period where a full write lock is needed.  The `commitLock` ensures that only a single goroutine makes the transition from read->write.
+`Database` has a `Mutex` named `commitLock`.  It enforces that only a single view/batch is attempting to commit to the database at one time.  `lock` is insufficient because there is a period of view preparation where read access should still be allowed, followed by a period where a full write lock is needed.  The `commitLock` ensures that only a single goroutine makes the transition from read => write.
 
 A `trieView` is built atop another trie, which may be the underlying `Database` or another `trieView`.
 It's important to guarantee atomicity/consistency of trie operations.
@@ -64,8 +64,8 @@ The `Commit` function also grabs the `Database`'s `commitLock` lock. This is the
 
 In some of `Database`'s methods, we create a `trieView` and call unexported methods on it without locking it.
 We do so because the exported counterpart of the method read locks the `Database`, which is already locked.
-This pattern is safe because the `Database` is locked, so no data under the view is changing, and nobody else has a reference to the view, so there can't be any concurrent access.  
+This pattern is safe because the `Database` is locked, so no data under the view is changing, and nobody else has a reference to the view, so there can't be any concurrent access.
 
 To prevent deadlocks, `trieView` and `Database` never acquire the `lock` of any descendant views that are built atop it.
 That is, locking is always done from a view down to the underlying `Database`, never the other way around.
-The `validityTrackingLock` goes the opposite way.  Views can validityTrackingLock their children, but not their ancestors. Because of this, any function that takes the `validityTrackingLock` should avoid taking the `lock` as this will likely trigger a deadlock.  Keeping `lock` solely in the ancestor direction and `validityTrackingLock` solely in the descendant direction prevents deadlocks from occurring.  
+The `validityTrackingLock` goes the opposite way.  Views can validityTrackingLock their children, but not their ancestors. Because of this, any function that takes the `validityTrackingLock` should avoid taking the `lock` as this will likely trigger a deadlock.  Keeping `lock` solely in the ancestor direction and `validityTrackingLock` solely in the descendant direction prevents deadlocks from occurring.

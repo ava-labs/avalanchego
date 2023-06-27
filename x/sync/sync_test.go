@@ -430,6 +430,49 @@ func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 	}
 }
 
+func TestFindNextKeyEmptyEndProof(t *testing.T) {
+	require := require.New(t)
+	now := time.Now().UnixNano()
+	t.Logf("seed: %d", now)
+	r := rand.New(rand.NewSource(now)) // #nosec G404
+
+	db, err := merkledb.New(
+		context.Background(),
+		memdb.New(),
+		newDefaultDBConfig(),
+	)
+	require.NoError(err)
+
+	syncer, err := NewStateSyncManager(StateSyncConfig{
+		SyncDB:                db,
+		Client:                &mockClient{db: nil},
+		TargetRoot:            ids.Empty,
+		SimultaneousWorkLimit: 5,
+		Log:                   logging.NoLog{},
+	})
+	require.NoError(err)
+	require.NotNil(syncer)
+
+	for i := 0; i < 100; i++ {
+		lastReceivedKeyLen := r.Intn(16)
+		lastReceivedKey := make([]byte, lastReceivedKeyLen)
+		_, _ = r.Read(lastReceivedKey) // #nosec G404
+
+		rangeEndLen := r.Intn(16)
+		rangeEnd := make([]byte, rangeEndLen)
+		_, _ = r.Read(rangeEnd) // #nosec G404
+
+		nextKey, err := syncer.findNextKey(
+			context.Background(),
+			lastReceivedKey,
+			rangeEnd,
+			nil, /* endProof */
+		)
+		require.NoError(err)
+		require.Equal(append(lastReceivedKey, 0), nextKey)
+	}
+}
+
 func isPrefix(data []byte, prefix []byte) bool {
 	if prefix[len(prefix)-1]%16 == 0 {
 		index := 0
