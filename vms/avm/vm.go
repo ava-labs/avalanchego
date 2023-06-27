@@ -290,19 +290,6 @@ func (vm *VM) onNormalOperationsStarted() error {
 		}
 	}
 
-	txID, err := ids.FromString("2JPwx3rbUy877CWYhtXpfPVS5tD8KfnbiF5pxMRu6jCaq5dnME")
-	if err != nil {
-		return err
-	}
-	utxoID := avax.UTXOID{
-		TxID:        txID,
-		OutputIndex: 192,
-	}
-	vm.state.DeleteUTXO(utxoID.InputID())
-	if err := vm.state.Commit(); err != nil {
-		return err
-	}
-
 	vm.bootstrapped = true
 	return nil
 }
@@ -451,11 +438,29 @@ func (vm *VM) Linearize(_ context.Context, stopVertexID ids.ID, toEngine chan<- 
 	// chainVM has been initialized. Traffic will immediately start being
 	// handled asynchronously.
 	vm.Atomic.Set(vm.network)
+
+	go func() {
+		err := vm.state.Prune(&vm.ctx.Lock, vm.ctx.Log)
+		if err != nil {
+			vm.ctx.Log.Error("state pruning failed",
+				zap.Error(err),
+			)
+		}
+	}()
+
 	return nil
 }
 
 func (vm *VM) ParseTx(_ context.Context, bytes []byte) (snowstorm.Tx, error) {
 	rawTx, err := vm.parser.ParseTx(bytes)
+	if err != nil {
+		return nil, err
+	}
+
+	err = rawTx.Unsigned.Visit(&txexecutor.SyntacticVerifier{
+		Backend: vm.txBackend,
+		Tx:      rawTx,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -466,9 +471,6 @@ func (vm *VM) ParseTx(_ context.Context, bytes []byte) (snowstorm.Tx, error) {
 		},
 		vm:   vm,
 		txID: rawTx.ID(),
-	}
-	if err := tx.SyntacticVerify(); err != nil {
-		return nil, err
 	}
 
 	if tx.Status() == choices.Unknown {

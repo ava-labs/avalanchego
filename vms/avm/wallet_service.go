@@ -4,6 +4,7 @@
 package avm
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -21,6 +22,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
+
+var errMissingUTXO = errors.New("missing utxo")
 
 type WalletService struct {
 	vm         *VM
