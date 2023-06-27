@@ -9,8 +9,6 @@
     "@types/node": "^16.7.1",
     "avalanche": "^3.8.5",
     "chai": "^4.3.4",
-    "ethereum-waffle": "^4.0.10",
-    "ethereumjs-tx": "^2.1.2",
     "ethers": "^5.4.5",
     "hardhat": "2.15.0",
     "prettier": "^2.5.1",
