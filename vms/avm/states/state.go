@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/avm/blocks"
@@ -96,11 +97,8 @@ type State interface {
 	// called during startup.
 	InitializeChainState(stopVertexID ids.ID, genesisTimestamp time.Time) error
 
-	// TODO: deprecate statuses. We should only persist accepted state
-	// Status returns a status from storage.
-	GetStatus(id ids.ID) (choices.Status, error)
-	// AddStatus saves a status in storage.
-	AddStatus(id ids.ID, status choices.Status)
+	// DeleteStatus removes the status entry from storage.
+	DeleteStatus(id ids.ID)
 
 	// Discard uncommitted changes to the database.
 	Abort()
@@ -153,10 +151,10 @@ type state struct {
 	utxoDB        database.Database
 	utxoState     avax.UTXOState
 
-	statusesPruned bool
-	addedStatuses  map[ids.ID]choices.Status
-	statusCache    cache.Cacher[ids.ID, *choices.Status] // cache of id -> choices.Status. If the entry is nil, it is not in the database
-	statusDB       database.Database
+	statusesPruned  bool
+	removedStatuses set.Set[ids.ID]
+	statusCache     cache.Cacher[ids.ID, *choices.Status] // cache of id -> choices.Status. If the entry is nil, it is not in the database
+	statusDB        database.Database
 
 	addedTxs map[ids.ID]*txs.Tx            // map of txID -> *txs.Tx
 	txCache  cache.Cacher[ids.ID, *txs.Tx] // cache of txID -> *txs.Tx. If the entry is nil, it is not in the database
@@ -233,9 +231,8 @@ func New(
 		utxoDB:        utxoDB,
 		utxoState:     utxoState,
 
-		addedStatuses: make(map[ids.ID]choices.Status),
-		statusCache:   statusCache,
-		statusDB:      statusDB,
+		statusCache: statusCache,
+		statusDB:    statusDB,
 
 		addedTxs: make(map[ids.ID]*txs.Tx),
 		txCache:  txCache,
@@ -276,6 +273,66 @@ func (s *state) DeleteUTXO(utxoID ids.ID) {
 }
 
 func (s *state) GetTx(txID ids.ID) (*txs.Tx, error) {
+	tx, err := s.getTx(txID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Before the linearization, transactions were persisted before they were
+	// marked as Accepted. However, this function aims to only return accepted
+	// transactions.
+	status, err := s.getStatus(txID)
+	if err == database.ErrNotFound {
+		// If the status wasn't persisted, then the transaction was written
+		// after the linearization, and is accepted.
+		return tx, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	// If the status was persisted, then the transaction was written before the
+	// linearization. If it wasn't marked as accepted, then we treat it as if it
+	// doesn't exist.
+	if status != choices.Accepted {
+		return nil, database.ErrNotFound
+	}
+	return tx, nil
+}
+
+func (s *state) getStatus(id ids.ID) (choices.Status, error) {
+	if s.statusesPruned {
+		return choices.Unknown, database.ErrNotFound
+	}
+
+	if s.removedStatuses.Contains(id) {
+		return choices.Unknown, database.ErrNotFound
+	}
+	if status, found := s.statusCache.Get(id); found {
+		if status == nil {
+			return choices.Unknown, database.ErrNotFound
+		}
+		return *status, nil
+	}
+
+	val, err := database.GetUInt32(s.statusDB, id[:])
+	if err == database.ErrNotFound {
+		s.statusCache.Put(id, nil)
+		return choices.Unknown, database.ErrNotFound
+	}
+	if err != nil {
+		return choices.Unknown, err
+	}
+
+	status := choices.Status(val)
+	if err := status.Valid(); err != nil {
+		return choices.Unknown, err
+	}
+	s.statusCache.Put(id, &status)
+	return status, nil
+}
+
+func (s *state) getTx(txID ids.ID) (*txs.Tx, error) {
 	if tx, exists := s.addedTxs[txID]; exists {
 		return tx, nil
 	}
@@ -428,42 +485,8 @@ func (s *state) SetTimestamp(t time.Time) {
 	s.timestamp = t
 }
 
-// TODO: remove status support
-func (s *state) GetStatus(id ids.ID) (choices.Status, error) {
-	if s.statusesPruned {
-		return choices.Unknown, database.ErrNotFound
-	}
-
-	if status, exists := s.addedStatuses[id]; exists {
-		return status, nil
-	}
-	if status, found := s.statusCache.Get(id); found {
-		if status == nil {
-			return choices.Unknown, database.ErrNotFound
-		}
-		return *status, nil
-	}
-
-	val, err := database.GetUInt32(s.statusDB, id[:])
-	if err == database.ErrNotFound {
-		s.statusCache.Put(id, nil)
-		return choices.Unknown, database.ErrNotFound
-	}
-	if err != nil {
-		return choices.Unknown, err
-	}
-
-	status := choices.Status(val)
-	if err := status.Valid(); err != nil {
-		return choices.Unknown, err
-	}
-	s.statusCache.Put(id, &status)
-	return status, nil
-}
-
-// TODO: remove status support
-func (s *state) AddStatus(id ids.ID, status choices.Status) {
-	s.addedStatuses[id] = status
+func (s *state) DeleteStatus(id ids.ID) {
+	s.removedStatuses.Add(id)
 }
 
 func (s *state) Commit() error {
@@ -588,14 +611,13 @@ func (s *state) writeMetadata() error {
 }
 
 func (s *state) writeStatuses() error {
-	for id, status := range s.addedStatuses {
+	for id := range s.removedStatuses {
 		id := id
-		status := status
 
-		delete(s.addedStatuses, id)
-		s.statusCache.Put(id, &status)
-		if err := database.PutUInt32(s.statusDB, id[:], uint32(status)); err != nil {
-			return fmt.Errorf("failed to add status: %w", err)
+		s.removedStatuses.Remove(id)
+		s.statusCache.Put(id, nil)
+		if err := s.statusDB.Delete(id[:]); err != nil {
+			return fmt.Errorf("failed to delete status: %w", err)
 		}
 	}
 	return nil
