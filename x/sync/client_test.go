@@ -466,16 +466,28 @@ func TestGetChangeProof(t *testing.T) {
 			request: &pb.SyncGetChangeProofRequest{
 				StartRootHash: startRoot[:],
 				EndRootHash:   endRoot[:],
-				KeyLimit:      defaultRequestKeyLimit,
-				BytesLimit:    10000,
+				StartKey: &pb.MaybeBytes{
+					IsNothing: true,
+				},
+				EndKey: &pb.MaybeBytes{
+					IsNothing: true,
+				},
+				KeyLimit:   defaultRequestKeyLimit,
+				BytesLimit: 10000,
 			},
 		},
 		"full response for small (single request) trie": {
 			request: &pb.SyncGetChangeProofRequest{
 				StartRootHash: startRoot[:],
 				EndRootHash:   endRoot[:],
-				KeyLimit:      defaultRequestKeyLimit,
-				BytesLimit:    defaultRequestByteSizeLimit,
+				StartKey: &pb.MaybeBytes{
+					IsNothing: true,
+				},
+				EndKey: &pb.MaybeBytes{
+					IsNothing: true,
+				},
+				KeyLimit:   defaultRequestKeyLimit,
+				BytesLimit: defaultRequestByteSizeLimit,
 			},
 			expectedResponseLen: defaultRequestKeyLimit,
 		},
@@ -483,8 +495,14 @@ func TestGetChangeProof(t *testing.T) {
 			request: &pb.SyncGetChangeProofRequest{
 				StartRootHash: startRoot[:],
 				EndRootHash:   endRoot[:],
-				KeyLimit:      defaultRequestKeyLimit,
-				BytesLimit:    defaultRequestByteSizeLimit,
+				StartKey: &pb.MaybeBytes{
+					IsNothing: true,
+				},
+				EndKey: &pb.MaybeBytes{
+					IsNothing: true,
+				},
+				KeyLimit:   defaultRequestKeyLimit,
+				BytesLimit: defaultRequestByteSizeLimit,
 			},
 			modifyResponse: func(response *merkledb.ChangeProof) {
 				response.KeyChanges = append(response.KeyChanges, make([]merkledb.KeyChange, defaultRequestKeyLimit)...)
@@ -495,8 +513,14 @@ func TestGetChangeProof(t *testing.T) {
 			request: &pb.SyncGetChangeProofRequest{
 				StartRootHash: startRoot[:],
 				EndRootHash:   endRoot[:],
-				KeyLimit:      defaultRequestKeyLimit,
-				BytesLimit:    defaultRequestByteSizeLimit,
+				StartKey: &pb.MaybeBytes{
+					IsNothing: true,
+				},
+				EndKey: &pb.MaybeBytes{
+					IsNothing: true,
+				},
+				KeyLimit:   defaultRequestKeyLimit,
+				BytesLimit: defaultRequestByteSizeLimit,
 			},
 			expectedResponseLen: defaultRequestKeyLimit,
 		},
@@ -504,8 +528,14 @@ func TestGetChangeProof(t *testing.T) {
 			request: &pb.SyncGetChangeProofRequest{
 				StartRootHash: startRoot[:],
 				EndRootHash:   endRoot[:],
-				KeyLimit:      defaultRequestKeyLimit,
-				BytesLimit:    defaultRequestByteSizeLimit,
+				StartKey: &pb.MaybeBytes{
+					IsNothing: true,
+				},
+				EndKey: &pb.MaybeBytes{
+					IsNothing: true,
+				},
+				KeyLimit:   defaultRequestKeyLimit,
+				BytesLimit: defaultRequestByteSizeLimit,
 			},
 			modifyResponse: func(response *merkledb.ChangeProof) {
 				response.KeyChanges = response.KeyChanges[1:]
@@ -516,8 +546,14 @@ func TestGetChangeProof(t *testing.T) {
 			request: &pb.SyncGetChangeProofRequest{
 				StartRootHash: startRoot[:],
 				EndRootHash:   endRoot[:],
-				KeyLimit:      defaultRequestKeyLimit,
-				BytesLimit:    defaultRequestByteSizeLimit,
+				StartKey: &pb.MaybeBytes{
+					IsNothing: true,
+				},
+				EndKey: &pb.MaybeBytes{
+					IsNothing: true,
+				},
+				KeyLimit:   defaultRequestKeyLimit,
+				BytesLimit: defaultRequestByteSizeLimit,
 			},
 			modifyResponse: func(response *merkledb.ChangeProof) {
 				response.KeyChanges = response.KeyChanges[:len(response.KeyChanges)-2]
@@ -528,8 +564,14 @@ func TestGetChangeProof(t *testing.T) {
 			request: &pb.SyncGetChangeProofRequest{
 				StartRootHash: startRoot[:],
 				EndRootHash:   endRoot[:],
-				KeyLimit:      defaultRequestKeyLimit,
-				BytesLimit:    defaultRequestByteSizeLimit,
+				StartKey: &pb.MaybeBytes{
+					IsNothing: true,
+				},
+				EndKey: &pb.MaybeBytes{
+					IsNothing: true,
+				},
+				KeyLimit:   defaultRequestKeyLimit,
+				BytesLimit: defaultRequestByteSizeLimit,
 			},
 			modifyResponse: func(response *merkledb.ChangeProof) {
 				response.KeyChanges = append(response.KeyChanges[:100], response.KeyChanges[101:]...)
@@ -540,8 +582,14 @@ func TestGetChangeProof(t *testing.T) {
 			request: &pb.SyncGetChangeProofRequest{
 				StartRootHash: startRoot[:],
 				EndRootHash:   endRoot[:],
-				KeyLimit:      defaultRequestKeyLimit,
-				BytesLimit:    defaultRequestByteSizeLimit,
+				StartKey: &pb.MaybeBytes{
+					IsNothing: true,
+				},
+				EndKey: &pb.MaybeBytes{
+					IsNothing: true,
+				},
+				KeyLimit:   defaultRequestKeyLimit,
+				BytesLimit: defaultRequestByteSizeLimit,
 			},
 			modifyResponse: func(response *merkledb.ChangeProof) {
 				response.StartProof = nil
