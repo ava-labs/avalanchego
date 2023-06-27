@@ -6,7 +6,6 @@ package snowstorm
 import (
 	"context"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 )
 
@@ -18,17 +17,12 @@ type TestTx struct {
 
 	DependenciesV    []Tx
 	DependenciesErrV error
-	InputIDsV        []ids.ID
 	VerifyV          error
 	BytesV           []byte
 }
 
 func (t *TestTx) Dependencies() ([]Tx, error) {
 	return t.DependenciesV, t.DependenciesErrV
-}
-
-func (t *TestTx) InputIDs() []ids.ID {
-	return t.InputIDsV
 }
 
 func (t *TestTx) Verify(context.Context) error {
