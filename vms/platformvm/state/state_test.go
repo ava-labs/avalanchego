@@ -511,6 +511,7 @@ func newStateFromDB(require *require.Assertions, db database.Database) State {
 			SupplyCap:          720 * units.MegaAvax,
 		}),
 		&utils.Atomic[bool]{},
+		false,
 	)
 	require.NoError(err)
 	require.NotNil(state)

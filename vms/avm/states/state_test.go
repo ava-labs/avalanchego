@@ -99,7 +99,7 @@ func TestState(t *testing.T) {
 
 	db := memdb.New()
 	vdb := versiondb.New(db)
-	s, err := New(vdb, parser, prometheus.NewRegistry())
+	s, err := New(vdb, parser, prometheus.NewRegistry(), false)
 	require.NoError(err)
 
 	s.AddUTXO(populatedUTXO)
@@ -107,7 +107,7 @@ func TestState(t *testing.T) {
 	s.AddBlock(populatedBlk)
 	require.NoError(s.Commit())
 
-	s, err = New(vdb, parser, prometheus.NewRegistry())
+	s, err = New(vdb, parser, prometheus.NewRegistry(), false)
 	require.NoError(err)
 
 	ChainUTXOTest(t, s)
@@ -120,7 +120,7 @@ func TestDiff(t *testing.T) {
 
 	db := memdb.New()
 	vdb := versiondb.New(db)
-	s, err := New(vdb, parser, prometheus.NewRegistry())
+	s, err := New(vdb, parser, prometheus.NewRegistry(), false)
 	require.NoError(err)
 
 	s.AddUTXO(populatedUTXO)
@@ -280,7 +280,7 @@ func TestInitializeChainState(t *testing.T) {
 
 	db := memdb.New()
 	vdb := versiondb.New(db)
-	s, err := New(vdb, parser, prometheus.NewRegistry())
+	s, err := New(vdb, parser, prometheus.NewRegistry(), false)
 	require.NoError(err)
 
 	stopVertexID := ids.GenerateTestID()

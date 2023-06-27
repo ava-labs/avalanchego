@@ -164,10 +164,9 @@ type state struct {
 	statusCache     cache.Cacher[ids.ID, *choices.Status] // cache of id -> choices.Status. If the entry is nil, it is not in the database
 	statusDB        database.Database
 
-	addedTxs   map[ids.ID]*txs.Tx            // map of txID -> *txs.Tx
-	txCache    cache.Cacher[ids.ID, *txs.Tx] // cache of txID -> *txs.Tx. If the entry is nil, it is not in the database
-	txDB       database.Database
-	txChecksum ids.ID
+	addedTxs map[ids.ID]*txs.Tx            // map of txID -> *txs.Tx
+	txCache  cache.Cacher[ids.ID, *txs.Tx] // cache of txID -> *txs.Tx. If the entry is nil, it is not in the database
+	txDB     database.Database
 
 	addedBlockIDs map[uint64]ids.ID            // map of height -> blockID
 	blockIDCache  cache.Cacher[uint64, ids.ID] // cache of height -> blockID. If the entry is ids.Empty, it is not in the database
@@ -181,12 +180,16 @@ type state struct {
 	lastAccepted, persistedLastAccepted ids.ID
 	timestamp, persistedTimestamp       time.Time
 	singletonDB                         database.Database
+
+	trackChecksum bool
+	txChecksum    ids.ID
 }
 
 func New(
 	db *versiondb.Database,
 	parser blocks.Parser,
 	metrics prometheus.Registerer,
+	trackChecksums bool,
 ) (State, error) {
 	utxoDB := prefixdb.New(utxoPrefix, db)
 	statusDB := prefixdb.New(statusPrefix, db)
@@ -231,7 +234,7 @@ func New(
 		return nil, err
 	}
 
-	utxoState, err := avax.NewMeteredUTXOState(utxoDB, parser.Codec(), metrics)
+	utxoState, err := avax.NewMeteredUTXOState(utxoDB, parser.Codec(), metrics, trackChecksums)
 	if err != nil {
 		return nil, err
 	}
@@ -260,6 +263,8 @@ func New(
 		blockDB:     blockDB,
 
 		singletonDB: singletonDB,
+
+		trackChecksum: trackChecksums,
 	}
 	return s, s.initTxChecksum()
 }
@@ -867,6 +872,10 @@ func (s *state) Checksums() (ids.ID, ids.ID) {
 }
 
 func (s *state) initTxChecksum() error {
+	if !s.trackChecksum {
+		return nil
+	}
+
 	txIt := s.txDB.NewIterator()
 	defer txIt.Release()
 	statusIt := s.statusDB.NewIterator()
@@ -912,6 +921,9 @@ func (s *state) initTxChecksum() error {
 }
 
 func (s *state) updateTxChecksum(modifiedID ids.ID) {
+	if !s.trackChecksum {
+		return
+	}
 	for i, b := range modifiedID {
 		s.txChecksum[i] ^= b
 	}

@@ -78,10 +78,15 @@ type utxoState struct {
 	indexDB    database.Database
 	indexCache cache.Cacher[string, linkeddb.LinkedDB]
 
-	checksum ids.ID
+	trackChecksum bool
+	checksum      ids.ID
 }
 
-func NewUTXOState(db database.Database, codec codec.Manager) (UTXOState, error) {
+func NewUTXOState(
+	db database.Database,
+	codec codec.Manager,
+	trackChecksum bool,
+) (UTXOState, error) {
 	s := &utxoState{
 		codec: codec,
 
@@ -90,11 +95,18 @@ func NewUTXOState(db database.Database, codec codec.Manager) (UTXOState, error) 
 
 		indexDB:    prefixdb.New(indexPrefix, db),
 		indexCache: &cache.LRU[string, linkeddb.LinkedDB]{Size: indexCacheSize},
+
+		trackChecksum: trackChecksum,
 	}
 	return s, s.initChecksum()
 }
 
-func NewMeteredUTXOState(db database.Database, codec codec.Manager, metrics prometheus.Registerer) (UTXOState, error) {
+func NewMeteredUTXOState(
+	db database.Database,
+	codec codec.Manager,
+	metrics prometheus.Registerer,
+	trackChecksum bool,
+) (UTXOState, error) {
 	utxoCache, err := metercacher.New[ids.ID, *UTXO](
 		"utxo_cache",
 		metrics,
@@ -123,6 +135,8 @@ func NewMeteredUTXOState(db database.Database, codec codec.Manager, metrics prom
 
 		indexDB:    prefixdb.New(indexPrefix, db),
 		indexCache: indexCache,
+
+		trackChecksum: trackChecksum,
 	}
 	return s, s.initChecksum()
 }
@@ -250,6 +264,10 @@ func (s *utxoState) getIndexDB(addr []byte) linkeddb.LinkedDB {
 }
 
 func (s *utxoState) initChecksum() error {
+	if !s.trackChecksum {
+		return nil
+	}
+
 	it := s.utxoDB.NewIterator()
 	defer it.Release()
 
@@ -264,6 +282,10 @@ func (s *utxoState) initChecksum() error {
 }
 
 func (s *utxoState) updateChecksum(modifiedID ids.ID) {
+	if !s.trackChecksum {
+		return
+	}
+
 	for i, b := range modifiedID {
 		s.checksum[i] ^= b
 	}

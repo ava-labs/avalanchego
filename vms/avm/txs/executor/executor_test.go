@@ -42,7 +42,7 @@ func TestBaseTxExecutor(t *testing.T) {
 	db := memdb.New()
 	vdb := versiondb.New(db)
 	registerer := prometheus.NewRegistry()
-	state, err := states.New(vdb, parser, registerer)
+	state, err := states.New(vdb, parser, registerer, false)
 	require.NoError(err)
 
 	utxoID := avax.UTXOID{
@@ -147,7 +147,7 @@ func TestCreateAssetTxExecutor(t *testing.T) {
 	db := memdb.New()
 	vdb := versiondb.New(db)
 	registerer := prometheus.NewRegistry()
-	state, err := states.New(vdb, parser, registerer)
+	state, err := states.New(vdb, parser, registerer, false)
 	require.NoError(err)
 
 	utxoID := avax.UTXOID{
@@ -290,7 +290,7 @@ func TestOperationTxExecutor(t *testing.T) {
 	db := memdb.New()
 	vdb := versiondb.New(db)
 	registerer := prometheus.NewRegistry()
-	state, err := states.New(vdb, parser, registerer)
+	state, err := states.New(vdb, parser, registerer, false)
 	require.NoError(err)
 
 	outputOwners := secp256k1fx.OutputOwners{

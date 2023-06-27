@@ -227,6 +227,7 @@ func defaultState(
 		metrics.Noop,
 		rewards,
 		&utils.Atomic[bool]{},
+		false,
 	)
 	if err != nil {
 		panic(err)

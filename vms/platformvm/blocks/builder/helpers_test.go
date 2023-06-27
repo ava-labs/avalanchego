@@ -236,6 +236,7 @@ func defaultState(
 		metrics.Noop,
 		rewards,
 		&utils.Atomic[bool]{},
+		false,
 	)
 	require.NoError(err)
 

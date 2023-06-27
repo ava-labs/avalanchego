@@ -662,6 +662,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 		metrics.Noop,
 		reward.NewCalculator(vm.Config.RewardConfig),
 		&utils.Atomic[bool]{},
+		false,
 	)
 	require.NoError(err)
 	vm.state = is
@@ -971,6 +972,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		metrics.Noop,
 		reward.NewCalculator(vm.Config.RewardConfig),
 		&utils.Atomic[bool]{},
+		false,
 	)
 	require.NoError(err)
 	vm.state = is
