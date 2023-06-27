@@ -1,5 +1,9 @@
 # Release Notes
 
+## [v0.12.4](https://github.com/ava-labs/coreth/releases/tag/v0.12.4)
+
+- Fix regression in `eth_getLogs` serving request for blocks containing no Ethereum transactions
+
 ## [v0.12.3](https://github.com/ava-labs/coreth/releases/tag/v0.12.3)
 
 - Migrate go-ethereum changes through v1.11.4
