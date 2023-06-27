@@ -489,6 +489,8 @@ func (db *merkleDB) GetRangeProof(
 
 // GetRangeProofAtRoot returns a proof for the key/value pairs in this trie within the range
 // [start, end] when the root of the trie was [rootID].
+// If [start] is Nothing, there's no lower bound on the range.
+// If [end] is Nothing, there's no upper bound on the range.
 func (db *merkleDB) GetRangeProofAtRoot(
 	ctx context.Context,
 	rootID ids.ID,
@@ -1171,6 +1173,8 @@ func (db *merkleDB) initializeRootIfNeeded() (ids.ID, error) {
 }
 
 // Returns a view of the trie as it was when it had root [rootID] for keys within range [start, end].
+// If [start] is Nothing, there's no lower bound on the range.
+// If [end] is Nothing, there's no upper bound on the range.
 // Assumes [db.commitLock] is read locked.
 func (db *merkleDB) getHistoricalViewForRange(
 	rootID ids.ID,
