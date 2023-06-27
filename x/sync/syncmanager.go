@@ -512,7 +512,6 @@ func (m *StateSyncManager) findNextKey(
 
 	// the nextKey is within the open range (lastReceivedKey, rangeEnd), so return it
 	return merkledb.Some(nextKey), nil
-
 }
 
 // findChildDifference returns the first child index that is different between node 1 and node 2 if one exists and
