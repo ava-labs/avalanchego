@@ -52,6 +52,25 @@ func Test_Proof_Empty(t *testing.T) {
 	require.ErrorIs(t, err, ErrNoProof)
 }
 
+func Test_Proof_Simple(t *testing.T) {
+	require := require.New(t)
+
+	db, err := getBasicDB()
+	require.NoError(err)
+
+	ctx := context.Background()
+	require.NoError(db.Insert(ctx, []byte{}, []byte{1}))
+	require.NoError(db.Insert(ctx, []byte{0}, []byte{2}))
+
+	expectedRoot, err := db.GetMerkleRoot(ctx)
+	require.NoError(err)
+
+	proof, err := db.GetProof(ctx, []byte{})
+	require.NoError(err)
+
+	require.NoError(proof.Verify(ctx, expectedRoot))
+}
+
 func Test_Proof_Verify_Bad_Data(t *testing.T) {
 	type test struct {
 		name        string
