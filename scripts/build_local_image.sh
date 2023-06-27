@@ -15,5 +15,5 @@ full_commit_hash="$(git --git-dir="$AVALANCHE_PATH/.git" rev-parse HEAD)"
 commit_hash="${full_commit_hash::8}"
 
 echo "Building Docker Image with tags: $avalanchego_dockerhub_repo:$commit_hash , $avalanchego_dockerhub_repo:$current_branch"
-docker build --build-arg ARCH="$arch" -t "$avalanchego_dockerhub_repo:$commit_hash" \
+docker build -t "$avalanchego_dockerhub_repo:$commit_hash" \
         -t "$avalanchego_dockerhub_repo:$current_branch" "$AVALANCHE_PATH" -f "$AVALANCHE_PATH/Dockerfile"
