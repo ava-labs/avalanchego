@@ -636,7 +636,18 @@ func (m *StateSyncManager) setError(err error) {
 	go m.Close()
 }
 
-// Mark the range [start, end] as synced up to [rootID].
+// Mark that we've fetched all the key-value pairs in the range
+// [workItem.start, largestHandledKey] for the trie with root [rootID].
+//
+// If [workItem.start] is Nothing, then we've fetched all the key-value
+// pairs up to and including [largestHandledKey].
+//
+// If [largestHandledKey] is Nothing, then we've fetched all the key-value
+// pairs at and after [workItem.start].
+//
+// [proofOfLargestKey] is the end proof for the range/change proof
+// that gave us the range up to and including [largestHandledKey].
+//
 // Assumes [m.workLock] is not held.
 func (m *StateSyncManager) completeWorkItem(
 	ctx context.Context,
