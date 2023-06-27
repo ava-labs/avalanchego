@@ -645,18 +645,19 @@ func (m *StateSyncManager) completeWorkItem(
 	rootID ids.ID,
 	proofOfLargestKey []merkledb.ProofNode,
 ) {
-	// if the last key is equal to the end, then the full range is completed
-	largestHandledKeyIsNothing := largestHandledKey.IsNothing()
-	largestHandledKeyValue := largestHandledKey.Value()
-	workItemEndIsNothing := workItem.end.IsNothing()
-	workItemEndValue := workItem.end.Value()
+	var (
+		largestHandledKeyIsNothing = largestHandledKey.IsNothing()
+		largestHandledKeyValue     = largestHandledKey.Value()
+		workItemEndIsNothing       = workItem.end.IsNothing()
+		workItemEndValue           = workItem.end.Value()
+		bothNothing                = largestHandledKeyIsNothing && workItemEndIsNothing
+		bothHaveValue              = !largestHandledKeyIsNothing && !workItemEndIsNothing
+		valuesMatch                = bothHaveValue && bytes.Equal(largestHandledKeyValue, workItemEndValue)
+	)
 
-	bothNothing := largestHandledKeyIsNothing && workItemEndIsNothing
-	bothHaveValue := !largestHandledKeyIsNothing && !workItemEndIsNothing
-	valuesMatch := bytes.Equal(largestHandledKeyValue, workItemEndValue)
-
-	if !(bothNothing || (bothHaveValue && valuesMatch)) {
-		// find the next key to start querying by comparing the proofs for the last completed key
+	if !bothNothing && !valuesMatch {
+		// The largest handled key isn't equal to the end of the work item.
+		// Find the start of the next key range to fetch.
 		nextStartKey, err := m.findNextKey(ctx, largestHandledKey, workItem.end, proofOfLargestKey)
 		if err != nil {
 			m.setError(err)
