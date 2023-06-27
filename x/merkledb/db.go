@@ -994,10 +994,7 @@ func (db *merkleDB) VerifyChangeProof(
 		return err
 	}
 
-	var smallestPath path
-	if start.hasValue {
-		smallestPath = newPath(start.value)
-	}
+	smallestPath := newPath(start.value)
 
 	// Make sure the start proof, if given, is well-formed.
 	if err := verifyProofPath(proof.StartProof, smallestPath); err != nil {
@@ -1015,10 +1012,7 @@ func (db *merkleDB) VerifyChangeProof(
 		largestKey = Some(proof.KeyChanges[len(proof.KeyChanges)-1].Key)
 	}
 
-	var largestPath path
-	if largestKey.hasValue {
-		largestPath = newPath(largestKey.value)
-	}
+	largestPath := newPath(largestKey.value)
 
 	// Make sure the end proof, if given, is well-formed.
 	if err := verifyProofPath(proof.EndProof, largestPath); err != nil {

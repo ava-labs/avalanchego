@@ -319,14 +319,8 @@ func (proof *RangeProof) Verify(
 		keyValues[newPath(keyValue.Key)] = keyValue.Value
 	}
 
-	var smallestPath path
-	if start.hasValue {
-		smallestPath = newPath(start.value)
-	}
-	var largestPath path
-	if largestKey.hasValue {
-		largestPath = newPath(largestKey.value)
-	}
+	smallestPath := newPath(start.value)
+	largestPath := newPath(largestKey.value)
 
 	// Ensure that the start proof is valid and contains values that
 	// match the key/values that were sent.

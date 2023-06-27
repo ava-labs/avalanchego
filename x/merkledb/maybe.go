@@ -18,7 +18,8 @@ import (
 // For more info see https://en.wikipedia.org/wiki/Option_type
 type Maybe[T any] struct {
 	hasValue bool
-	value    T
+	// If [hasValue] is false, [value] is the zero value of type T.
+	value T
 }
 
 // Returns a new Maybe[T] with the value val.
