@@ -355,6 +355,8 @@ func (m *StateSyncManager) getAndApplyRangeProof(ctx context.Context, workItem *
 //
 // [endProof] is the end proof of the last proof received.
 // Namely it's an inclusion/exclusion proof for [lastReceivedKey].
+//
+// Invariant: [lastReceivedKey] < [rangeEnd].
 func (m *StateSyncManager) findNextKey(
 	ctx context.Context,
 	lastReceivedKey []byte,
@@ -364,7 +366,8 @@ func (m *StateSyncManager) findNextKey(
 	if len(endProof) == 0 {
 		// We try to find the next key to fetch by looking at the end proof.
 		// If the end proof is empty, we have no information to use.
-		return lastReceivedKey, nil
+		// Start fetching from the next key after [lastReceivedKey].
+		return append(lastReceivedKey, 0), nil
 	}
 
 	// We want the first key larger than the [lastReceivedKey].
@@ -472,9 +475,9 @@ func (m *StateSyncManager) findNextKey(
 		}
 	}
 
-	// If the nextKey is before or equal to the lastReceivedKey
-	// then we couldn't find a better answer than the lastReceivedKey.
-	// Set the nextKey to lastReceivedKey + 0, which is the first key in
+	// If the nextKey is before or equal to the [lastReceivedKey]
+	// then we couldn't find a better answer than the [lastReceivedKey].
+	// Set the nextKey to [lastReceivedKey] + 0, which is the first key in
 	// the open range (lastReceivedKey, rangeEnd).
 	if nextKey != nil && bytes.Compare(nextKey, lastReceivedKey) <= 0 {
 		nextKey = lastReceivedKey

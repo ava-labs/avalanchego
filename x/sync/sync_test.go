@@ -469,7 +469,7 @@ func TestFindNextKeyEmptyEndProof(t *testing.T) {
 			nil, /* endProof */
 		)
 		require.NoError(err)
-		require.Equal(lastReceivedKey, nextKey)
+		require.Equal(append(lastReceivedKey, 0), nextKey)
 	}
 }
 
