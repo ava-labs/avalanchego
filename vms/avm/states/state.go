@@ -39,6 +39,7 @@ const (
 
 	pruneCommitLimit           = 1024
 	pruneCommitSleepMultiplier = 5
+	pruneCommitSleepCap        = 10 * time.Second
 	pruneUpdateFrequency       = 30 * time.Second
 )
 
@@ -651,7 +652,7 @@ func (s *state) Prune(lock sync.Locker, log logging.Logger) error {
 		return err
 	}
 
-	i := 1
+	numPruned := 1
 	for statusIter.Next() {
 		txIDBytes := statusIter.Key()
 		statusBytes := statusIter.Value()
@@ -659,9 +660,9 @@ func (s *state) Prune(lock sync.Locker, log logging.Logger) error {
 			return err
 		}
 
-		i++
+		numPruned++
 
-		if i%pruneCommitLimit == 0 {
+		if numPruned%pruneCommitLimit == 0 {
 			// We must hold the lock during committing to make sure we don't
 			// attempt to commit to disk while a block is concurrently being
 			// accepted.
@@ -693,7 +694,7 @@ func (s *state) Prune(lock sync.Locker, log logging.Logger) error {
 					stdmath.MaxUint64-startProgress,
 				)
 				log.Info("committing state pruning",
-					zap.Int("count", i),
+					zap.Int("numPruned", numPruned),
 					zap.Duration("eta", eta),
 				)
 			}
@@ -705,7 +706,7 @@ func (s *state) Prune(lock sync.Locker, log logging.Logger) error {
 			pruneDuration := now.Sub(lastCommit)
 			sleepDuration := math.Min(
 				pruneCommitSleepMultiplier*pruneDuration,
-				10*time.Second,
+				pruneCommitSleepCap,
 			)
 			time.Sleep(sleepDuration)
 
@@ -740,7 +741,7 @@ func (s *state) Prune(lock sync.Locker, log logging.Logger) error {
 	s.txCache = oldTxCache
 
 	log.Info("finished state pruning",
-		zap.Int("count", i),
+		zap.Int("numPruned", numPruned),
 		zap.Duration("duration", time.Since(startTime)),
 	)
 
