@@ -71,11 +71,11 @@ func (client *mockClient) GetRangeProof(ctx context.Context, request *pb.SyncGet
 		return nil, err
 	}
 	startKey := merkledb.Nothing[[]byte]()
-	if request.StartKey != nil && !request.StartKey.IsNothing {
+	if !request.StartKey.IsNothing {
 		startKey = merkledb.Some(request.StartKey.Value)
 	}
 	endKey := merkledb.Nothing[[]byte]()
-	if request.EndKey != nil && !request.EndKey.IsNothing {
+	if !request.EndKey.IsNothing {
 		endKey = merkledb.Some(request.EndKey.Value)
 	}
 	return client.db.GetRangeProofAtRoot(ctx, root, startKey, endKey, int(request.KeyLimit))
