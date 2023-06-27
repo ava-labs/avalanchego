@@ -9,7 +9,6 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/cache"
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
@@ -22,9 +21,8 @@ var (
 	_ snowstorm.Tx            = (*UniqueTx)(nil)
 	_ cache.Evictable[ids.ID] = (*UniqueTx)(nil)
 
-	errTxNotProcessing      = errors.New("transaction is not processing")
-	errUnexpectedReject     = errors.New("attempting to reject transaction")
-	errUnexpectedDependency = errors.New("registering unexpected dependency")
+	errTxNotProcessing  = errors.New("transaction is not processing")
+	errUnexpectedReject = errors.New("attempting to reject transaction")
 )
 
 // UniqueTx provides a de-duplication service for txs. This only provides a
@@ -163,10 +161,6 @@ func (tx *UniqueTx) Status() choices.Status {
 // Dependencies returns the set of transactions this transaction builds on
 func (tx *UniqueTx) MissingDependencies() (set.Set[ids.ID], error) {
 	tx.refresh()
-	if tx.Tx == nil {
-		return nil, database.ErrNotFound
-	}
-
 	txIDs := set.Set[ids.ID]{}
 	for _, in := range tx.Unsigned.InputUTXOs() {
 		if in.Symbolic() {
@@ -180,14 +174,6 @@ func (tx *UniqueTx) MissingDependencies() (set.Set[ids.ID], error) {
 		if inputTx.Status() != choices.Accepted {
 			txIDs.Add(txID)
 		}
-	}
-	consumedIDs := tx.Tx.Unsigned.ConsumedAssetIDs()
-	for assetID := range tx.Tx.Unsigned.AssetIDs() {
-		if consumedIDs.Contains(assetID) {
-			continue
-		}
-
-		return nil, errUnexpectedDependency
 	}
 	return txIDs, nil
 }
