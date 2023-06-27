@@ -3,7 +3,11 @@
 
 package merkledb
 
-import "golang.org/x/exp/slices"
+import (
+	"fmt"
+
+	"golang.org/x/exp/slices"
+)
 
 // Maybe T = Some T | Nothing.
 // A data wrapper that allows values to be something [Some T] or nothing [Nothing].
@@ -38,6 +42,13 @@ func (m Maybe[T]) IsNothing() bool {
 // Returns the value of [m].
 func (m Maybe[T]) Value() T {
 	return m.value
+}
+
+func (m Maybe[T]) String() string {
+	if !m.hasValue {
+		return fmt.Sprintf("Nothing[%T]", m.value)
+	}
+	return fmt.Sprintf("Some[%T]{%v}", m.value, m.value)
 }
 
 func Clone(m Maybe[[]byte]) Maybe[[]byte] {

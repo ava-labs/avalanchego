@@ -493,25 +493,26 @@ func (m *StateSyncManager) findNextKey(
 		}
 	}
 
-	// If the nextKey is before or equal to the lastReceivedKey
-	// then we couldn't find a better answer than the lastReceivedKey.
-	// Set the nextKey to lastReceivedKey + 0, which is the first key in the open range (lastReceivedKey, rangeEnd)
+	// If the [nextKey] is before or equal to the [lastReceivedKey]
+	// then we couldn't find a better answer than the [lastReceivedKey].
+	// Set the nextKey to [lastReceivedKey] + 0, which is the first key in the open range (lastReceivedKey, rangeEnd)
 	if nextKey != nil && bytes.Compare(nextKey, lastReceivedKey) <= 0 {
 		nextKey = lastReceivedKey
 		nextKey = append(nextKey, 0)
 	}
 
-	// If the nextKey is larger than the end of the range, return Nothing to signal that there is no next key in range
+	// If the [nextKey] is larger than the end of the range, return Nothing to signal that there is no next key in range
 	if !rangeEnd.IsNothing() && bytes.Compare(nextKey, rangeEnd.Value()) >= 0 {
 		return merkledb.Nothing[[]byte](), nil
 	}
 
-	// the nextKey is within the open range (lastReceivedKey, rangeEnd), so return it
-	maybeNextKey := merkledb.Nothing[[]byte]()
-	if len(nextKey) > 0 {
-		maybeNextKey = merkledb.Some(nextKey)
+	if len(nextKey) == 0 {
+		return merkledb.Nothing[[]byte](), nil
 	}
-	return maybeNextKey, nil
+
+	// the nextKey is within the open range (lastReceivedKey, rangeEnd), so return it
+	return merkledb.Some(nextKey), nil
+
 }
 
 // findChildDifference returns the first child index that is different between node 1 and node 2 if one exists and
@@ -687,9 +688,10 @@ func (m *StateSyncManager) completeWorkItem(
 	}
 
 	// completed the range [workItem.start, lastKey], log and record in the completed work heap
-	m.config.Log.Info("completed range") // zap.Binary("start", workItem.start), TODO fix
-	// zap.Binary("end", largestHandledKey), TODO fix
-
+	m.config.Log.Info("completed range",
+		zap.Stringer("start", workItem.start),
+		zap.Stringer("end", largestHandledKey),
+	)
 	if m.getTargetRoot() == rootID {
 		m.workLock.Lock()
 		defer m.workLock.Unlock()
