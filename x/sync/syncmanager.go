@@ -305,7 +305,7 @@ func (m *StateSyncManager) getAndApplyChangeProof(ctx context.Context, workItem 
 			m.setError(err)
 			return
 		}
-		largestHandledKey = merkledb.Some(changeProof.KeyChanges[len(changeProof.KeyChanges)-1].Key) // TODO is this right?
+		largestHandledKey = merkledb.Some(changeProof.KeyChanges[len(changeProof.KeyChanges)-1].Key)
 	}
 
 	m.completeWorkItem(ctx, workItem, largestHandledKey, rootID, changeProof.EndProof)
@@ -361,32 +361,31 @@ func (m *StateSyncManager) getAndApplyRangeProof(ctx context.Context, workItem *
 	m.completeWorkItem(ctx, workItem, largestHandledKey, rootID, proof.EndProof)
 }
 
-// findNextKey returns the start of the key range that should be fetched next.
-// Returns nil if there are no more keys to fetch  up to [rangeEnd].
-//
-// If the last proof received contained at least one key-value pair, then
-// [lastReceivedKey] is the greatest key in the key-value pairs received.
-// Otherwise it's the end of the range for the last proof received.
+// findNextKey returns the start of the key range that should be fetched next
+// given that we just received a range/change proof that proved a range of
+// key-value pairs ending at [lastReceivedKey].
 //
 // [rangeEnd] is the end of the range that we want to fetch.
 //
+// Returns Nothing if there are no more keys to fetch in [lastReceivedKey, rangeEnd].
+//
 // [endProof] is the end proof of the last proof received.
-// Namely it's an inclusion/exclusion proof for [lastReceivedKey].
 //
 // Invariant: [lastReceivedKey] < [rangeEnd].
+// If [rangeEnd] is Nothing it's considered > [lastReceivedKey].
 func (m *StateSyncManager) findNextKey(
 	ctx context.Context,
-	lastReceivedKey merkledb.Maybe[[]byte],
+	lastReceivedKey []byte,
 	rangeEnd merkledb.Maybe[[]byte],
 	endProof []merkledb.ProofNode,
 ) (merkledb.Maybe[[]byte], error) {
-	// TODO fix
-	// if len(endProof) == 0 {
-	// 	// We try to find the next key to fetch by looking at the end proof.
-	// 	// If the end proof is empty, we have no information to use.
-	// 	// Start fetching from the next key after [lastReceivedKey].
-	// 	return append(lastReceivedKey, 0), nil
-	// }
+	if len(endProof) == 0 {
+		// We try to find the next key to fetch by looking at the end proof.
+		// If the end proof is empty, we have no information to use.
+		// Start fetching from the next key after [lastReceivedKey].
+		nextKey := append(lastReceivedKey, 0)
+		return merkledb.Some(nextKey), nil
+	}
 
 	// We want the first key larger than the [lastReceivedKey].
 	// This is done by taking two proofs for the same key
@@ -394,12 +393,9 @@ func (m *StateSyncManager) findNextKey(
 	// and traversing them from the longest key to the shortest key.
 	// For each node in these proofs, compare if the children of that node exist
 	// or have the same ID in the other proof.
-	var proofKeyPath merkledb.SerializedPath
-	if !lastReceivedKey.IsNothing() {
-		proofKeyPath = merkledb.SerializedPath{
-			Value:        lastReceivedKey.Value(),
-			NibbleLength: 2 * len(lastReceivedKey.Value()),
-		}
+	proofKeyPath := merkledb.SerializedPath{
+		Value:        lastReceivedKey,
+		NibbleLength: 2 * len(lastReceivedKey),
 	}
 
 	// If the received proof is an exclusion proof, the last node may be for a
@@ -499,10 +495,8 @@ func (m *StateSyncManager) findNextKey(
 	// If the nextKey is before or equal to the lastReceivedKey
 	// then we couldn't find a better answer than the lastReceivedKey.
 	// Set the nextKey to lastReceivedKey + 0, which is the first key in the open range (lastReceivedKey, rangeEnd)
-	if nextKey != nil && (lastReceivedKey.IsNothing() ||
-		bytes.Compare(nextKey, lastReceivedKey.Value()) <= 0) {
-		nextKey = lastReceivedKey.Value() // TODO is this right?
-		nextKey = append(nextKey, 0)
+	if nextKey != nil && bytes.Compare(nextKey, lastReceivedKey) <= 0 {
+		nextKey = append(lastReceivedKey, 0)
 	}
 
 	// If the nextKey is larger than the end of the range, return Nothing to signal that there is no next key in range
@@ -669,7 +663,11 @@ func (m *StateSyncManager) completeWorkItem(
 	if !(bothNothing || valuesMatch) {
 		// The largest handled key isn't equal to the end of the work item.
 		// Find the start of the next key range to fetch.
-		nextStartKey, err := m.findNextKey(ctx, largestHandledKey, workItem.end, proofOfLargestKey)
+		if largestHandledKey.IsNothing() {
+			panic("here")
+		}
+
+		nextStartKey, err := m.findNextKey(ctx, largestHandledKey.Value(), workItem.end, proofOfLargestKey)
 		if err != nil {
 			m.setError(err)
 			return
