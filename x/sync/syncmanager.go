@@ -663,10 +663,11 @@ func (m *StateSyncManager) completeWorkItem(
 	if !(bothNothing || valuesMatch) {
 		// The largest handled key isn't equal to the end of the work item.
 		// Find the start of the next key range to fetch.
-		if largestHandledKey.IsNothing() {
-			panic("here")
-		}
-
+		// Note that [largestHandledKey] can't be Nothing.
+		// Proof: Suppose it is. That means that we got a range/change proof that proved up to the
+		// greatest key-value pair in the database. That means we requested a proof with no upper
+		// bound. That is, [workItem.end] is Nothing. Since we're here, [bothNothing] is false,
+		// which means [workItem.end] isn't Nothing. Contradiction.
 		nextStartKey, err := m.findNextKey(ctx, largestHandledKey.Value(), workItem.end, proofOfLargestKey)
 		if err != nil {
 			m.setError(err)
