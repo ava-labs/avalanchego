@@ -355,7 +355,7 @@ func (m *StateSyncManager) getAndApplyRangeProof(ctx context.Context, workItem *
 			return
 		}
 
-		largestHandledKey = merkledb.Some(proof.KeyValues[len(proof.KeyValues)-1].Key) // TODO is this right?
+		largestHandledKey = merkledb.Some(proof.KeyValues[len(proof.KeyValues)-1].Key)
 	}
 
 	m.completeWorkItem(ctx, workItem, largestHandledKey, rootID, proof.EndProof)
@@ -666,7 +666,7 @@ func (m *StateSyncManager) completeWorkItem(
 		valuesMatch                = bothHaveValue && bytes.Equal(largestHandledKeyValue, workItemEndValue)
 	)
 
-	if !bothNothing && !valuesMatch {
+	if !(bothNothing || valuesMatch) {
 		// The largest handled key isn't equal to the end of the work item.
 		// Find the start of the next key range to fetch.
 		nextStartKey, err := m.findNextKey(ctx, largestHandledKey, workItem.end, proofOfLargestKey)
