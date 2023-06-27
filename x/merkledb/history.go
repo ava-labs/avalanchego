@@ -80,6 +80,8 @@ func newTrieHistory(maxHistoryLookback int) *trieHistory {
 
 // Returns up to [maxLength] key-value pair changes with keys in [start, end] that
 // occurred between [startRoot] and [endRoot].
+// If [start] is Nothing, there's no lower bound on the range.
+// If [end] is Nothing, there's no upper bound on the range.
 func (th *trieHistory) getValueChanges(
 	startRoot ids.ID,
 	endRoot ids.ID,
@@ -140,7 +142,7 @@ func (th *trieHistory) getValueChanges(
 	)
 
 	// Note [startPath] and [endPath] are only used
-	// if [start.hasValue] and [endhasValue] respectively.
+	// if [start.hasValue] and [end.hasValue] respectively.
 	startPath := newPath(start.value)
 	endPath := newPath(end.value)
 
@@ -206,8 +208,8 @@ func (th *trieHistory) getValueChanges(
 
 // Returns the changes to go from the current trie state back to the requested [rootID]
 // for the keys in [start, end].
-// If [start] is nil, all keys are considered > [start].
-// If  [end] is nil, all keys are considered < [end].
+// If [start] is Nothing, all keys are considered > [start].
+// If [end] is Nothing, all keys are considered < [end].
 func (th *trieHistory) getChangesToGetToRoot(rootID ids.ID, start, end Maybe[[]byte]) (*changeSummary, error) {
 	// [lastRootChange] is the last change in the history resulting in [rootID].
 	lastRootChange, ok := th.lastChanges[rootID]
@@ -216,8 +218,8 @@ func (th *trieHistory) getChangesToGetToRoot(rootID ids.ID, start, end Maybe[[]b
 	}
 
 	var (
-		// Note that [startPath] and [endPath] are used
-		// iff start.hasValue or end.hasValue respectively.
+		// Note that [startPath] and [endPath] are only used
+		// if [start.hasValue] and [end.hasValue] respectively.
 		startPath       = newPath(start.value)
 		endPath         = newPath(end.value)
 		combinedChanges = newChangeSummary(defaultPreallocationSize)
