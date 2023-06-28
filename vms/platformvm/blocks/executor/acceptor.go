@@ -223,6 +223,7 @@ func (a *acceptor) proposalBlock(b blocks.Block, blockType string) {
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
 		zap.Stringer("parentID", b.Parent()),
+		zap.Stringer("utxoChecksum", a.state.Checksum()),
 	)
 }
 
