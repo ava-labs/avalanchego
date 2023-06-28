@@ -5,7 +5,6 @@ package state
 
 import (
 	"fmt"
-	"math"
 	"reflect"
 	"sync/atomic"
 	"testing"
@@ -14,7 +13,13 @@ import (
 	"github.com/leanovate/gopter/commands"
 	"github.com/leanovate/gopter/gen"
 
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
+	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -29,6 +34,9 @@ var (
 	_ commands.Command = (*addTopDiffCommand)(nil)
 	_ commands.Command = (*applyBottomDiffCommand)(nil)
 	_ commands.Command = (*commitBottomStateCommand)(nil)
+	_ commands.Command = (*rebuildStateCommand)(nil)
+
+	commandsCtx = buildStateCtx()
 )
 
 // TestStateAndDiffComparisonToStorageModel verifies that a production-like
@@ -53,13 +61,15 @@ func TestStateAndDiffComparisonToStorageModel(t *testing.T) {
 
 type sysUnderTest struct {
 	diffBlkIDSeed uint64
+	baseDB        database.Database
 	baseState     State
 	sortedDiffIDs []ids.ID
 	diffsMap      map[ids.ID]Diff
 }
 
-func newSysUnderTest(baseState State) *sysUnderTest {
+func newSysUnderTest(baseDB database.Database, baseState State) *sysUnderTest {
 	sys := &sysUnderTest{
+		baseDB:        baseDB,
 		baseState:     baseState,
 		diffsMap:      map[ids.ID]Diff{},
 		sortedDiffIDs: []ids.ID{},
@@ -127,7 +137,10 @@ func (s *sysUnderTest) flushBottomDiff() bool {
 var stakersCommands = &commands.ProtoCommands{
 	NewSystemUnderTestFunc: func(initialState commands.State) commands.SystemUnderTest {
 		model := initialState.(*stakersStorageModel)
-		baseState, err := buildChainState(nil)
+
+		baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
+		baseDB := versiondb.New(baseDBManager.Current().Database)
+		baseState, err := buildChainState(baseDB, nil)
 		if err != nil {
 			panic(err)
 		}
@@ -153,7 +166,7 @@ var stakersCommands = &commands.ProtoCommands{
 			panic(err)
 		}
 
-		return newSysUnderTest(baseState)
+		return newSysUnderTest(baseDB, baseState)
 	},
 	DestroySystemUnderTestFunc: func(sut commands.SystemUnderTest) {
 		// retrieve base state and close it
@@ -187,24 +200,37 @@ var stakersCommands = &commands.ProtoCommands{
 			genAddTopDiffCommand,
 			genApplyBottomDiffCommand,
 			genCommitBottomStateCommand,
+			genRebuildStateCommand,
 		)
 	},
 }
 
 // PutCurrentValidator section
-type putCurrentValidatorCommand Staker
+type putCurrentValidatorCommand txs.Tx
 
 func (v *putCurrentValidatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
-	staker := (*Staker)(v)
+	sTx := (*txs.Tx)(v)
 	sys := sut.(*sysUnderTest)
+
+	currentVal, err := NewCurrentStaker(sTx.ID(), sTx.Unsigned.(txs.Staker), uint64(1000))
+	if err != nil {
+		return sys // state checks later on should spot missing validator
+	}
+
 	topChainState := sys.getTopChainState()
-	topChainState.PutCurrentValidator(staker)
+	topChainState.PutCurrentValidator(currentVal)
+	topChainState.AddTx(sTx, status.Committed)
 	return sys
 }
 
 func (v *putCurrentValidatorCommand) NextState(cmdState commands.State) commands.State {
-	staker := (*Staker)(v)
-	cmdState.(*stakersStorageModel).PutCurrentValidator(staker)
+	sTx := (*txs.Tx)(v)
+	currentVal, err := NewCurrentStaker(sTx.ID(), sTx.Unsigned.(txs.Staker), uint64(1000))
+	if err != nil {
+		return cmdState // state checks later on should spot missing validator
+	}
+
+	cmdState.(*stakersStorageModel).PutCurrentValidator(currentVal)
 	return cmdState
 }
 
@@ -218,13 +244,25 @@ func (*putCurrentValidatorCommand) PostCondition(cmdState commands.State, res co
 }
 
 func (v *putCurrentValidatorCommand) String() string {
+	stakerTx := v.Unsigned.(txs.StakerTx)
 	return fmt.Sprintf("PutCurrentValidator(subnetID: %v, nodeID: %v, txID: %v, priority: %v, unixStartTime: %v, duration: %v)",
-		v.SubnetID, v.NodeID, v.TxID, v.Priority, v.StartTime, v.EndTime.Sub(v.StartTime))
+		stakerTx.SubnetID(),
+		stakerTx.NodeID(),
+		v.TxID,
+		stakerTx.CurrentPriority(),
+		stakerTx.StartTime().Unix(),
+		stakerTx.EndTime().Sub(stakerTx.StartTime()),
+	)
 }
 
-var genPutCurrentValidatorCommand = stakerGenerator(currentValidator, nil, nil, math.MaxUint64).Map(
-	func(staker Staker) commands.Command {
-		cmd := (*putCurrentValidatorCommand)(&staker)
+var genPutCurrentValidatorCommand = addPermissionlessValidatorTxGenerator(commandsCtx, nil, nil, &signer.Empty{}).Map(
+	func(nonInitTx *txs.Tx) commands.Command {
+		sTx, err := txs.NewSigned(nonInitTx.Unsigned, txs.Codec, nil)
+		if err != nil {
+			panic(fmt.Errorf("failed signing tx, %w", err))
+		}
+
+		cmd := (*putCurrentValidatorCommand)(sTx)
 		return cmd
 	},
 )
@@ -436,21 +474,21 @@ var genDeleteCurrentValidatorCommand = gen.IntRange(1, 2).Map(
 )
 
 // PutCurrentDelegator section
-type putCurrentDelegatorCommand Staker
+type putCurrentDelegatorCommand txs.Tx
 
 func (v *putCurrentDelegatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
-	candidateDelegator := (*Staker)(v)
+	candidateDelegator := (*txs.Tx)(v)
 	sys := sut.(*sysUnderTest)
-	err := addCurrentDelegatorInSystem(sys, candidateDelegator)
+	err := addCurrentDelegatorInSystem(sys, candidateDelegator.Unsigned)
 	if err != nil {
 		panic(err)
 	}
 	return sys
 }
 
-func addCurrentDelegatorInSystem(sys *sysUnderTest, candidateDelegator *Staker) error {
+func addCurrentDelegatorInSystem(sys *sysUnderTest, candidateDelegatorTx txs.UnsignedTx) error {
 	// 1. check if there is a current validator, already inserted. If not return
-	// 2. Update candidateDelegator attributes to make it delegator of selected validator
+	// 2. Update candidateDelegatorTx attributes to make it delegator of selected validator
 	// 3. Add delegator to picked validator
 	chain := sys.getTopChainState()
 
@@ -480,25 +518,36 @@ func addCurrentDelegatorInSystem(sys *sysUnderTest, candidateDelegator *Staker) 
 	stakerIt.Release() // release before modifying stakers collection
 
 	// 2. Add a delegator to it
-	delegator := candidateDelegator
-	delegator.SubnetID = validator.SubnetID
-	delegator.NodeID = validator.NodeID
+	addPermissionlessDelTx := candidateDelegatorTx.(*txs.AddPermissionlessDelegatorTx)
+	addPermissionlessDelTx.Subnet = validator.SubnetID
+	addPermissionlessDelTx.Validator.NodeID = validator.NodeID
+
+	signedTx, err := txs.NewSigned(addPermissionlessDelTx, txs.Codec, nil)
+	if err != nil {
+		return fmt.Errorf("failed signing tx, %w", err)
+	}
+
+	delegator, err := NewCurrentStaker(signedTx.ID(), signedTx.Unsigned.(txs.Staker), uint64(1000))
+	if err != nil {
+		return fmt.Errorf("failed generating staker, %w", err)
+	}
 
 	chain.PutCurrentDelegator(delegator)
+	chain.AddTx(signedTx, status.Committed)
 	return nil
 }
 
 func (v *putCurrentDelegatorCommand) NextState(cmdState commands.State) commands.State {
-	candidateDelegator := (*Staker)(v)
+	candidateDelegator := (*txs.Tx)(v)
 	model := cmdState.(*stakersStorageModel)
-	err := addCurrentDelegatorInModel(model, candidateDelegator)
+	err := addCurrentDelegatorInModel(model, candidateDelegator.Unsigned)
 	if err != nil {
 		panic(err)
 	}
 	return cmdState
 }
 
-func addCurrentDelegatorInModel(model *stakersStorageModel, candidateDelegator *Staker) error {
+func addCurrentDelegatorInModel(model *stakersStorageModel, candidateDelegatorTx txs.UnsignedTx) error {
 	// 1. check if there is a current validator, already inserted. If not return
 	// 2. Update candidateDelegator attributes to make it delegator of selected validator
 	// 3. Add delegator to picked validator
@@ -529,9 +578,19 @@ func addCurrentDelegatorInModel(model *stakersStorageModel, candidateDelegator *
 	stakerIt.Release() // release before modifying stakers collection
 
 	// 2. Add a delegator to it
-	delegator := candidateDelegator
-	delegator.SubnetID = validator.SubnetID
-	delegator.NodeID = validator.NodeID
+	addPermissionlessDelTx := candidateDelegatorTx.(*txs.AddPermissionlessDelegatorTx)
+	addPermissionlessDelTx.Subnet = validator.SubnetID
+	addPermissionlessDelTx.Validator.NodeID = validator.NodeID
+
+	signedTx, err := txs.NewSigned(addPermissionlessDelTx, txs.Codec, nil)
+	if err != nil {
+		return fmt.Errorf("failed signing tx, %w", err)
+	}
+
+	delegator, err := NewCurrentStaker(signedTx.ID(), signedTx.Unsigned.(txs.Staker), uint64(1000))
+	if err != nil {
+		return fmt.Errorf("failed generating staker, %w", err)
+	}
 
 	model.PutCurrentDelegator(delegator)
 	return nil
@@ -546,13 +605,24 @@ func (*putCurrentDelegatorCommand) PostCondition(cmdState commands.State, res co
 }
 
 func (v *putCurrentDelegatorCommand) String() string {
-	return fmt.Sprintf("PutCurrentDelegator(subnetID: %v, nodeID: %v, txID: %v, priority: %v, unixStartTime: %v, duration: %v)",
-		v.SubnetID, v.NodeID, v.TxID, v.Priority, v.StartTime, v.EndTime.Sub(v.StartTime))
+	stakerTx := v.Unsigned.(txs.StakerTx)
+	return fmt.Sprintf("putCurrentDelegator(subnetID: %v, nodeID: %v, txID: %v, priority: %v, unixStartTime: %v, duration: %v)",
+		stakerTx.SubnetID(),
+		stakerTx.NodeID(),
+		v.TxID,
+		stakerTx.CurrentPriority(),
+		stakerTx.StartTime().Unix(),
+		stakerTx.EndTime().Sub(stakerTx.StartTime()))
 }
 
-var genPutCurrentDelegatorCommand = stakerGenerator(currentDelegator, nil, nil, 1000).Map(
-	func(staker Staker) commands.Command {
-		cmd := (*putCurrentDelegatorCommand)(&staker)
+var genPutCurrentDelegatorCommand = addPermissionlessDelegatorTxGenerator(commandsCtx, nil, nil, 1000).Map(
+	func(nonInitTx *txs.Tx) commands.Command {
+		sTx, err := txs.NewSigned(nonInitTx.Unsigned, txs.Codec, nil)
+		if err != nil {
+			panic(fmt.Errorf("failed signing tx, %w", err))
+		}
+
+		cmd := (*putCurrentDelegatorCommand)(sTx)
 		return cmd
 	},
 )
@@ -858,6 +928,60 @@ func (*commitBottomStateCommand) String() string {
 var genCommitBottomStateCommand = gen.IntRange(1, 2).Map(
 	func(int) commands.Command {
 		return &commitBottomStateCommand{}
+	},
+)
+
+// rebuildStateCommand section
+type rebuildStateCommand struct{}
+
+func (*rebuildStateCommand) Run(sut commands.SystemUnderTest) commands.Result {
+	sys := sut.(*sysUnderTest)
+
+	// 1. Persist all outstanding changes
+	for sys.flushBottomDiff() {
+		err := sys.baseState.Commit()
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	if err := sys.baseState.Commit(); err != nil {
+		panic(err)
+	}
+
+	// 2. Rebuild the state from the db
+	baseState, err := buildChainState(sys.baseDB, nil)
+	if err != nil {
+		panic(err)
+	}
+	sys.baseState = baseState
+	sys.diffsMap = map[ids.ID]Diff{}
+	sys.sortedDiffIDs = []ids.ID{}
+
+	return sys
+}
+
+func (*rebuildStateCommand) NextState(cmdState commands.State) commands.State {
+	return cmdState // model has no diffs
+}
+
+func (*rebuildStateCommand) PreCondition(commands.State) bool {
+	return true
+}
+
+func (*rebuildStateCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
+	return checkSystemAndModelContent(cmdState, res)
+}
+
+func (*rebuildStateCommand) String() string {
+	return "RebuildStateCommand"
+}
+
+// a trick to force command regeneration at each sampling.
+// gen.Const would not allow it
+var genRebuildStateCommand = gen.IntRange(1, 2).Map(
+	func(int) commands.Command {
+		return &rebuildStateCommand{}
 	},
 )
 
