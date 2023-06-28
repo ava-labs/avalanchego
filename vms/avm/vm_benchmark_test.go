@@ -22,15 +22,18 @@ func BenchmarkLoadUser(b *testing.B) {
 	runLoadUserBenchmark := func(b *testing.B, numKeys int) {
 		require := require.New(b)
 
-		// This will segfault instead of failing gracefully if there's an error
-		_, _, vm, _ := GenesisVM(nil)
-		ctx := vm.ctx
+		env := setup(b, &envConfig{
+			keystoreUsers: []*user{{
+				username: username,
+				password: password,
+			}},
+		})
 		defer func() {
-			require.NoError(vm.Shutdown(context.Background()))
-			ctx.Lock.Unlock()
+			require.NoError(env.vm.Shutdown(context.Background()))
+			env.vm.ctx.Lock.Unlock()
 		}()
 
-		user, err := keystore.NewUserFromKeystore(vm.ctx.Keystore, username, password)
+		user, err := keystore.NewUserFromKeystore(env.vm.ctx.Keystore, username, password)
 		require.NoError(err)
 
 		keys, err := keystore.NewKeys(user, numKeys)
@@ -43,7 +46,7 @@ func BenchmarkLoadUser(b *testing.B) {
 			addrIndex := n % numKeys
 			fromAddrs.Clear()
 			fromAddrs.Add(keys[addrIndex].PublicKey().Address())
-			_, _, err := vm.LoadUser(username, password, fromAddrs)
+			_, _, err := env.vm.LoadUser(username, password, fromAddrs)
 			require.NoError(err)
 		}
 
@@ -52,7 +55,7 @@ func BenchmarkLoadUser(b *testing.B) {
 		require.NoError(user.Close())
 	}
 
-	benchmarkSize := []int{10, 100, 1000, 10000}
+	benchmarkSize := []int{10, 100, 1000, 5000}
 	for _, numKeys := range benchmarkSize {
 		b.Run(fmt.Sprintf("NumKeys=%d", numKeys), func(b *testing.B) {
 			runLoadUserBenchmark(b, numKeys)
@@ -64,11 +67,10 @@ func BenchmarkLoadUser(b *testing.B) {
 func GetAllUTXOsBenchmark(b *testing.B, utxoCount int) {
 	require := require.New(b)
 
-	_, _, vm, _ := GenesisVM(b)
-	ctx := vm.ctx
+	env := setup(b, &envConfig{})
 	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-		ctx.Lock.Unlock()
+		require.NoError(env.vm.Shutdown(context.Background()))
+		env.vm.ctx.Lock.Unlock()
 	}()
 
 	addr := ids.GenerateTestShortID()
@@ -91,9 +93,9 @@ func GetAllUTXOsBenchmark(b *testing.B, utxoCount int) {
 			},
 		}
 
-		vm.state.AddUTXO(utxo)
+		env.vm.state.AddUTXO(utxo)
 	}
-	require.NoError(vm.state.Commit())
+	require.NoError(env.vm.state.Commit())
 
 	addrsSet := set.Set[ids.ShortID]{}
 	addrsSet.Add(addr)
@@ -102,7 +104,7 @@ func GetAllUTXOsBenchmark(b *testing.B, utxoCount int) {
 
 	for i := 0; i < b.N; i++ {
 		// Fetch all UTXOs older version
-		notPaginatedUTXOs, err := avax.GetAllUTXOs(vm.state, addrsSet)
+		notPaginatedUTXOs, err := avax.GetAllUTXOs(env.vm.state, addrsSet)
 		require.NoError(err)
 		require.Len(notPaginatedUTXOs, utxoCount)
 	}
@@ -113,9 +115,18 @@ func BenchmarkGetUTXOs(b *testing.B) {
 		name      string
 		utxoCount int
 	}{
-		{"100", 100},
-		{"10k", 10000},
-		{"100k", 100000},
+		{
+			name:      "100",
+			utxoCount: 100,
+		},
+		{
+			name:      "10k",
+			utxoCount: 10_000,
+		},
+		{
+			name:      "100k",
+			utxoCount: 100_000,
+		},
 	}
 
 	for _, count := range tests {
