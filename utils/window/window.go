@@ -30,7 +30,7 @@ type window[T any] struct {
 	maxSize int
 
 	// mutex for synchronization
-	lock sync.Mutex
+	lock sync.RWMutex
 	// elements in the window
 	elements buffer.Deque[node[T]]
 }
@@ -58,25 +58,22 @@ func (w *window[T]) Add(value T) {
 	w.lock.Lock()
 	defer w.lock.Unlock()
 
-	w.removeStaleNodes()
-	if w.elements.Len() >= w.maxSize {
-		_, _ = w.elements.PopLeft()
-	}
-
 	// add the new block id
 	w.elements.PushRight(node[T]{
 		value:     value,
 		entryTime: w.clock.Time(),
 	})
+
+	w.removeStaleNodes()
+	if w.elements.Len() > w.maxSize {
+		_, _ = w.elements.PopLeft()
+	}
 }
 
 // Oldest returns the oldest element in the window.
 func (w *window[T]) Oldest() (T, bool) {
-	w.lock.Lock()
-	defer w.lock.Unlock()
-
-	w.removeStaleNodes()
-
+	w.lock.RLock()
+	defer w.lock.RUnlock()
 	oldest, ok := w.elements.PeekLeft()
 	if !ok {
 		return utils.Zero[T](), false
@@ -86,10 +83,8 @@ func (w *window[T]) Oldest() (T, bool) {
 
 // Length returns the number of elements in the window.
 func (w *window[T]) Length() int {
-	w.lock.Lock()
-	defer w.lock.Unlock()
-
-	w.removeStaleNodes()
+	w.lock.RLock()
+	defer w.lock.RUnlock()
 	return w.elements.Len()
 }
 
@@ -98,9 +93,13 @@ func (w *window[T]) removeStaleNodes() {
 	// If we're beyond the expiry threshold, removeStaleNodes this node from our
 	// window. Nodes are guaranteed to be strictly increasing in entry time,
 	// so we can break this loop once we find the first non-stale one.
+	newest, ok := w.elements.PeekRight()
+	if !ok {
+		return
+	}
 	for {
 		oldest, ok := w.elements.PeekLeft()
-		if !ok || w.clock.Time().Sub(oldest.entryTime) <= w.ttl {
+		if !ok || newest.entryTime.Sub(oldest.entryTime) <= w.ttl {
 			return
 		}
 		_, _ = w.elements.PopLeft()
