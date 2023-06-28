@@ -7,8 +7,9 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"sort"
 	"time"
+
+	"golang.org/x/exp/slices"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
@@ -272,7 +273,9 @@ func (a *atomicTxRepository) write(height uint64, txs []*Tx, bonus bool) error {
 		// with txs initialized from the txID index.
 		copyTxs := make([]*Tx, len(txs))
 		copy(copyTxs, txs)
-		sort.Slice(copyTxs, func(i, j int) bool { return copyTxs[i].ID().Hex() < copyTxs[j].ID().Hex() })
+		slices.SortFunc(copyTxs, func(i, j *Tx) bool {
+			return i.Less(j)
+		})
 		txs = copyTxs
 	}
 	heightBytes := make([]byte, wrappers.LongLen)
@@ -452,6 +455,6 @@ func getAtomicRepositoryRepairHeights(bonusBlocks map[uint64]ids.ID, canonicalBl
 			repairHeights = append(repairHeights, height)
 		}
 	}
-	sort.Slice(repairHeights, func(i, j int) bool { return repairHeights[i] < repairHeights[j] })
+	slices.Sort(repairHeights)
 	return repairHeights
 }
