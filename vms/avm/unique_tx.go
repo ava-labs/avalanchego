@@ -38,9 +38,6 @@ type TxCachedState struct {
 	*txs.Tx
 
 	unique bool
-
-	deps []snowstorm.Tx
-
 	status choices.Status
 }
 
@@ -91,7 +88,6 @@ func (tx *UniqueTx) refresh() {
 func (tx *UniqueTx) Evict() {
 	// Lock is already held here
 	tx.unique = false
-	tx.deps = nil
 }
 
 func (tx *UniqueTx) setStatus(status choices.Status) {
@@ -149,7 +145,6 @@ func (tx *UniqueTx) Accept(context.Context) error {
 		return fmt.Errorf("error committing accepted state changes while processing tx %s: %w", txID, err)
 	}
 
-	tx.deps = nil // Needed to prevent a memory leak
 	return tx.vm.metrics.MarkTxAccepted(tx.Tx)
 }
 
@@ -163,40 +158,25 @@ func (tx *UniqueTx) Status() choices.Status {
 	return tx.status
 }
 
-// Dependencies returns the set of transactions this transaction builds on
-func (tx *UniqueTx) Dependencies() ([]snowstorm.Tx, error) {
+// MissingDependencies returns the set of transactions that are not currently
+// accepted, but must be accepted before this transaction should be accepted.
+func (tx *UniqueTx) MissingDependencies() (set.Set[ids.ID], error) {
 	tx.refresh()
-	if tx.Tx == nil || len(tx.deps) != 0 {
-		return tx.deps, nil
-	}
-
 	txIDs := set.Set[ids.ID]{}
 	for _, in := range tx.Unsigned.InputUTXOs() {
 		if in.Symbolic() {
 			continue
 		}
 		txID, _ := in.InputSource()
-		if txIDs.Contains(txID) {
-			continue
-		}
-		txIDs.Add(txID)
-		tx.deps = append(tx.deps, &UniqueTx{
+		inputTx := &UniqueTx{
 			vm:   tx.vm,
 			txID: txID,
-		})
-	}
-	consumedIDs := tx.Tx.Unsigned.ConsumedAssetIDs()
-	for assetID := range tx.Tx.Unsigned.AssetIDs() {
-		if consumedIDs.Contains(assetID) || txIDs.Contains(assetID) {
-			continue
 		}
-		txIDs.Add(assetID)
-		tx.deps = append(tx.deps, &UniqueTx{
-			vm:   tx.vm,
-			txID: assetID,
-		})
+		if inputTx.Status() != choices.Accepted {
+			txIDs.Add(txID)
+		}
 	}
-	return tx.deps, nil
+	return txIDs, nil
 }
 
 // Bytes returns the binary representation of this transaction
