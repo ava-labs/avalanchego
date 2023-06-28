@@ -534,7 +534,7 @@ func (db *merkleDB) GetChangeProof(
 	end Maybe[[]byte],
 	maxLength int,
 ) (*ChangeProof, error) {
-	if start.hasValue && end.hasValue && bytes.Compare(start.value, end.value) == 1 {
+	if end.hasValue && bytes.Compare(start.value, end.value) == 1 {
 		return nil, ErrStartAfterEnd
 	}
 	if startRootID == endRootID {
@@ -961,7 +961,7 @@ func (db *merkleDB) VerifyChangeProof(
 	end Maybe[[]byte],
 	expectedEndRootID ids.ID,
 ) error {
-	if start.hasValue && end.hasValue && bytes.Compare(start.value, end.value) > 0 {
+	if end.hasValue && bytes.Compare(start.value, end.value) > 0 {
 		return ErrStartAfterEnd
 	}
 
