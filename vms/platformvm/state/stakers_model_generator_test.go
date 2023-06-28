@@ -30,10 +30,14 @@ const (
 	permissionedDelegator
 )
 
-// TODO ABENEGIA: complete
-// stakerTxGenerator helps creating random yet reproducible Staker objects,
-// which can be used in our property tests. stakerTxGenerator takes care of
-// enforcing some Staker invariants on each and every random sample.
+// stakerTxGenerator helps creating random yet reproducible txs.StakerTx,
+// which can be used in our property tests. stakerTxGenerator returns txs.StakerTx
+// as the Unsigned attribute of a txs.Tx just to work around the inability of
+// generators to return interface. The holding txs.Tx signing is deferred to tests
+// to allow them modifying stakers parameters without breaking txID.
+// A full txs.StakerTx is returned, instead of a Staker object, in order to extend
+// property testing to stakers reload (which starts from the transaction). The tx is filled
+// just enough to rebuild staker state (inputs/outputs utxos are neglected).
 // TestGeneratedStakersValidity documents and verifies the enforced invariants.
 func stakerTxGenerator(
 	ctx *snow.Context,
@@ -63,13 +67,13 @@ func addPermissionlessValidatorTxGenerator(
 	nodeID *ids.NodeID,
 	blsSigner signer.Signer,
 ) gopter.Gen {
-	return validatorTxGenerator(nodeID, math.MaxUint64).FlatMap(
+	return stakerDataGenerator(nodeID, math.MaxUint64).FlatMap(
 		func(v interface{}) gopter.Gen {
 			genStakerSubnetID := genID
 			if subnetID != nil {
 				genStakerSubnetID = gen.Const(*subnetID)
 			}
-			validatorTx := v.(txs.Validator)
+			stakerData := v.(txs.Validator)
 
 			specificGen := gen.StructPtr(reflect.TypeOf(&txs.AddPermissionlessValidatorTx{}), map[string]gopter.Gen{
 				"BaseTx": gen.Const(txs.BaseTx{
@@ -80,7 +84,7 @@ func addPermissionlessValidatorTxGenerator(
 						Outs:         []*avax.TransferableOutput{},
 					},
 				}),
-				"Validator": gen.Const(validatorTx),
+				"Validator": gen.Const(stakerData),
 				"Subnet":    genStakerSubnetID,
 				"Signer":    gen.Const(blsSigner),
 				"StakeOuts": gen.Const([]*avax.TransferableOutput{
@@ -89,7 +93,7 @@ func addPermissionlessValidatorTxGenerator(
 							ID: ctx.AVAXAssetID,
 						},
 						Out: &secp256k1fx.TransferOutput{
-							Amt: validatorTx.Weight(),
+							Amt: stakerData.Weight(),
 						},
 					},
 				}),
@@ -132,9 +136,9 @@ func addValidatorTxGenerator(
 	ctx *snow.Context,
 	nodeID *ids.NodeID,
 ) gopter.Gen {
-	return validatorTxGenerator(nodeID, math.MaxUint64).FlatMap(
+	return stakerDataGenerator(nodeID, math.MaxUint64).FlatMap(
 		func(v interface{}) gopter.Gen {
-			validatorTx := v.(txs.Validator)
+			stakerData := v.(txs.Validator)
 
 			specificGen := gen.StructPtr(reflect.TypeOf(&txs.AddValidatorTx{}), map[string]gopter.Gen{
 				"BaseTx": gen.Const(txs.BaseTx{
@@ -145,14 +149,14 @@ func addValidatorTxGenerator(
 						Outs:         []*avax.TransferableOutput{},
 					},
 				}),
-				"Validator": gen.Const(validatorTx),
+				"Validator": gen.Const(stakerData),
 				"StakeOuts": gen.Const([]*avax.TransferableOutput{
 					{
 						Asset: avax.Asset{
 							ID: ctx.AVAXAssetID,
 						},
 						Out: &secp256k1fx.TransferOutput{
-							Amt: validatorTx.Weight(),
+							Amt: stakerData.Weight(),
 						},
 					},
 				}),
@@ -192,15 +196,15 @@ func addPermissionlessDelegatorTxGenerator(
 	nodeID *ids.NodeID,
 	maxWeight uint64, // helps avoiding overflows in delegator tests
 ) gopter.Gen {
-	return validatorTxGenerator(nodeID, maxWeight).FlatMap(
+	return stakerDataGenerator(nodeID, maxWeight).FlatMap(
 		func(v interface{}) gopter.Gen {
 			genStakerSubnetID := genID
 			if subnetID != nil {
 				genStakerSubnetID = gen.Const(*subnetID)
 			}
 
-			validatorTx := v.(txs.Validator)
-			specificGen := gen.StructPtr(reflect.TypeOf(txs.AddPermissionlessDelegatorTx{}), map[string]gopter.Gen{
+			stakerData := v.(txs.Validator)
+			delGen := gen.StructPtr(reflect.TypeOf(txs.AddPermissionlessDelegatorTx{}), map[string]gopter.Gen{
 				"BaseTx": gen.Const(txs.BaseTx{
 					BaseTx: avax.BaseTx{
 						NetworkID:    ctx.NetworkID,
@@ -209,7 +213,7 @@ func addPermissionlessDelegatorTxGenerator(
 						Outs:         []*avax.TransferableOutput{},
 					},
 				}),
-				"Validator": gen.Const(validatorTx),
+				"Validator": gen.Const(stakerData),
 				"Subnet":    genStakerSubnetID,
 				"StakeOuts": gen.Const([]*avax.TransferableOutput{
 					{
@@ -217,7 +221,7 @@ func addPermissionlessDelegatorTxGenerator(
 							ID: ctx.AVAXAssetID,
 						},
 						Out: &secp256k1fx.TransferOutput{
-							Amt: validatorTx.Weight(),
+							Amt: stakerData.Weight(),
 						},
 					},
 				}),
@@ -228,7 +232,7 @@ func addPermissionlessDelegatorTxGenerator(
 				),
 			})
 
-			return specificGen.FlatMap(
+			return delGen.FlatMap(
 				func(v interface{}) gopter.Gen {
 					stakerTx := v.(*txs.AddPermissionlessDelegatorTx)
 
@@ -255,10 +259,10 @@ func addDelegatorTxGenerator(
 	nodeID *ids.NodeID,
 	maxWeight uint64, // helps avoiding overflows in delegator tests
 ) gopter.Gen {
-	return validatorTxGenerator(nodeID, maxWeight).FlatMap(
+	return stakerDataGenerator(nodeID, maxWeight).FlatMap(
 		func(v interface{}) gopter.Gen {
-			validatorTx := v.(txs.Validator)
-			specificGen := gen.StructPtr(reflect.TypeOf(txs.AddDelegatorTx{}), map[string]gopter.Gen{
+			stakerData := v.(txs.Validator)
+			delGen := gen.StructPtr(reflect.TypeOf(txs.AddDelegatorTx{}), map[string]gopter.Gen{
 				"BaseTx": gen.Const(txs.BaseTx{
 					BaseTx: avax.BaseTx{
 						NetworkID:    ctx.NetworkID,
@@ -267,14 +271,14 @@ func addDelegatorTxGenerator(
 						Outs:         []*avax.TransferableOutput{},
 					},
 				}),
-				"Validator": gen.Const(validatorTx),
+				"Validator": gen.Const(stakerData),
 				"StakeOuts": gen.Const([]*avax.TransferableOutput{
 					{
 						Asset: avax.Asset{
 							ID: ctx.AVAXAssetID,
 						},
 						Out: &secp256k1fx.TransferOutput{
-							Amt: validatorTx.Weight(),
+							Amt: stakerData.Weight(),
 						},
 					},
 				}),
@@ -285,7 +289,7 @@ func addDelegatorTxGenerator(
 				),
 			})
 
-			return specificGen.FlatMap(
+			return delGen.FlatMap(
 				func(v interface{}) gopter.Gen {
 					stakerTx := v.(*txs.AddDelegatorTx)
 
@@ -307,13 +311,13 @@ func addDelegatorTxGenerator(
 	)
 }
 
-func validatorTxGenerator(
+func stakerDataGenerator(
 	nodeID *ids.NodeID,
 	maxWeight uint64, // helps avoiding overflows in delegator tests
 ) gopter.Gen {
-	return genStakerMicroData().FlatMap(
+	return genStakerTimeData().FlatMap(
 		func(v interface{}) gopter.Gen {
-			macro := v.(stakerMicroData)
+			macro := v.(stakerTimeData)
 
 			genStakerNodeID := genNodeID
 			if nodeID != nil {
@@ -327,19 +331,19 @@ func validatorTxGenerator(
 				"Wght":   gen.UInt64Range(1, maxWeight),
 			})
 		},
-		reflect.TypeOf(stakerMicroData{}),
+		reflect.TypeOf(stakerTimeData{}),
 	)
 }
 
-// stakerMicroData holds seed attributes to generate stakerMacroData
-type stakerMicroData struct {
+// stakerTimeData holds seed attributes to generate a random-yet-reproducible txs.Validator
+type stakerTimeData struct {
 	StartTime time.Time
 	Duration  int64
 }
 
-// genStakerMicroData is the helper to generate stakerMicroData
-func genStakerMicroData() gopter.Gen {
-	return gen.Struct(reflect.TypeOf(&stakerMicroData{}), map[string]gopter.Gen{
+// genStakerTimeData is the helper to generate stakerMicroData
+func genStakerTimeData() gopter.Gen {
+	return gen.Struct(reflect.TypeOf(&stakerTimeData{}), map[string]gopter.Gen{
 		"StartTime": gen.Time(),
 		"Duration":  gen.Int64Range(1, 365*24),
 	})
