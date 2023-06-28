@@ -80,7 +80,8 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 				panic(fmt.Errorf("failed signing tx in tx generator, %w", err))
 			}
 
-			staker, err := NewCurrentStaker(signedTx.ID(), signedTx.Unsigned.(txs.StakerTx), uint64(100))
+			stakerTx := signedTx.Unsigned.(txs.StakerTx)
+			staker, err := NewCurrentStaker(signedTx.ID(), stakerTx, stakerTx.StartTime(), uint64(100))
 			if err != nil {
 				return err.Error()
 			}
@@ -149,7 +150,8 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 				panic(fmt.Errorf("failed signing tx in tx generator, %w", err))
 			}
 
-			staker, err := NewCurrentStaker(signedTx.ID(), signedTx.Unsigned.(txs.StakerTx), uint64(100))
+			stakerTx := signedTx.Unsigned.(txs.StakerTx)
+			staker, err := NewCurrentStaker(signedTx.ID(), stakerTx, stakerTx.StartTime(), uint64(100))
 			if err != nil {
 				return err.Error()
 			}
@@ -295,7 +297,8 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 				panic(fmt.Errorf("failed signing tx in tx generator, %w", err))
 			}
 
-			val, err := NewCurrentStaker(signedValTx.ID(), signedValTx.Unsigned.(txs.StakerTx), uint64(1000))
+			stakerTx := signedValTx.Unsigned.(txs.StakerTx)
+			val, err := NewCurrentStaker(signedValTx.ID(), stakerTx, stakerTx.StartTime(), uint64(1000))
 			if err != nil {
 				return err.Error()
 			}
@@ -307,7 +310,8 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 					panic(fmt.Errorf("failed signing tx in tx generator, %w", err))
 				}
 
-				del, err := NewCurrentStaker(signedDelTx.ID(), signedDelTx.Unsigned.(txs.StakerTx), uint64(1000))
+				stakerTx := signedDelTx.Unsigned.(txs.StakerTx)
+				del, err := NewCurrentStaker(signedDelTx.ID(), stakerTx, stakerTx.StartTime(), uint64(1000))
 				if err != nil {
 					return err.Error()
 				}
@@ -446,8 +450,8 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 				if err != nil {
 					panic(fmt.Errorf("failed signing tx in tx generator, %w", err))
 				}
-
-				del, err := NewCurrentStaker(signedDelTx.ID(), signedDelTx.Unsigned.(txs.StakerTx), uint64(1000))
+				stakerTx := signedDelTx.Unsigned.(txs.StakerTx)
+				del, err := NewCurrentStaker(signedDelTx.ID(), stakerTx, stakerTx.StartTime(), uint64(1000))
 				if err != nil {
 					return err.Error()
 				}
@@ -539,7 +543,8 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 				panic(fmt.Errorf("failed signing tx in tx generator, %w", err))
 			}
 
-			val, err := NewCurrentStaker(signedValTx.ID(), signedValTx.Unsigned.(txs.StakerTx), uint64(1000))
+			stakerTx := signedValTx.Unsigned.(txs.StakerTx)
+			val, err := NewCurrentStaker(signedValTx.ID(), stakerTx, stakerTx.StartTime(), uint64(1000))
 			if err != nil {
 				return err.Error()
 			}
@@ -551,7 +556,8 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 					panic(fmt.Errorf("failed signing tx in tx generator, %w", err))
 				}
 
-				del, err := NewCurrentStaker(signedDelTx.ID(), signedDelTx.Unsigned.(txs.StakerTx), uint64(1000))
+				stakerTx := signedDelTx.Unsigned.(txs.StakerTx)
+				del, err := NewCurrentStaker(signedDelTx.ID(), stakerTx, stakerTx.StartTime(), uint64(1000))
 				if err != nil {
 					return err.Error()
 				}
@@ -696,7 +702,8 @@ func TestStateStakersProperties(t *testing.T) {
 				panic(fmt.Errorf("failed signing tx in tx generator, %w", err))
 			}
 
-			val, err := NewCurrentStaker(signedValTx.ID(), signedValTx.Unsigned.(txs.StakerTx), uint64(1000))
+			stakerTx := signedValTx.Unsigned.(txs.StakerTx)
+			val, err := NewCurrentStaker(signedValTx.ID(), stakerTx, stakerTx.StartTime(), uint64(1000))
 			if err != nil {
 				return err.Error()
 			}
@@ -725,7 +732,8 @@ func TestStateStakersProperties(t *testing.T) {
 				panic(fmt.Errorf("failed signing tx in tx generator, %w", err))
 			}
 
-			val, err := NewCurrentStaker(signedValTx.ID(), signedValTx.Unsigned.(txs.StakerTx), uint64(1000))
+			stakerTx := signedValTx.Unsigned.(txs.StakerTx)
+			val, err := NewCurrentStaker(signedValTx.ID(), stakerTx, stakerTx.StartTime(), uint64(1000))
 			if err != nil {
 				return err.Error()
 			}
@@ -756,7 +764,8 @@ func TestStateStakersProperties(t *testing.T) {
 				panic(fmt.Errorf("failed signing tx in tx generator, %w", err))
 			}
 
-			val, err := NewCurrentStaker(signedValTx.ID(), signedValTx.Unsigned.(txs.StakerTx), uint64(1000))
+			stakerTx := signedValTx.Unsigned.(txs.StakerTx)
+			val, err := NewCurrentStaker(signedValTx.ID(), stakerTx, stakerTx.StartTime(), uint64(1000))
 			if err != nil {
 				return err.Error()
 			}
@@ -789,7 +798,8 @@ func TestStateStakersProperties(t *testing.T) {
 				panic(fmt.Errorf("failed signing tx in tx generator, %w", err))
 			}
 
-			val, err := NewCurrentStaker(signedValTx.ID(), signedValTx.Unsigned.(txs.StakerTx), uint64(1000))
+			stakerTx := signedValTx.Unsigned.(txs.StakerTx)
+			val, err := NewCurrentStaker(signedValTx.ID(), stakerTx, stakerTx.StartTime(), uint64(1000))
 			if err != nil {
 				return err.Error()
 			}
@@ -799,7 +809,8 @@ func TestStateStakersProperties(t *testing.T) {
 				panic(fmt.Errorf("failed signing tx in tx generator, %w", err))
 			}
 
-			del, err := NewCurrentStaker(signedValTx.ID(), signedDelTx.Unsigned.(txs.StakerTx), uint64(1000))
+			stakerTx = signedDelTx.Unsigned.(txs.StakerTx)
+			del, err := NewCurrentStaker(signedValTx.ID(), stakerTx, stakerTx.StartTime(), uint64(1000))
 			if err != nil {
 				return err.Error()
 			}
@@ -836,7 +847,8 @@ func TestDiffStakersProperties(t *testing.T) {
 				panic(fmt.Errorf("failed signing tx in tx generator, %w", err))
 			}
 
-			val, err := NewCurrentStaker(signedValTx.ID(), signedValTx.Unsigned.(txs.StakerTx), uint64(1000))
+			stakerTx := signedValTx.Unsigned.(txs.StakerTx)
+			val, err := NewCurrentStaker(signedValTx.ID(), stakerTx, stakerTx.StartTime(), uint64(1000))
 			if err != nil {
 				return err.Error()
 			}
@@ -863,7 +875,8 @@ func TestDiffStakersProperties(t *testing.T) {
 				panic(fmt.Errorf("failed signing tx in tx generator, %w", err))
 			}
 
-			val, err := NewCurrentStaker(signedValTx.ID(), signedValTx.Unsigned.(txs.StakerTx), uint64(1000))
+			stakerTx := signedValTx.Unsigned.(txs.StakerTx)
+			val, err := NewCurrentStaker(signedValTx.ID(), stakerTx, stakerTx.StartTime(), uint64(1000))
 			if err != nil {
 				return err.Error()
 			}
@@ -892,7 +905,8 @@ func TestDiffStakersProperties(t *testing.T) {
 				panic(fmt.Errorf("failed signing tx in tx generator, %w", err))
 			}
 
-			del, err := NewCurrentStaker(signedDelTx.ID(), signedDelTx.Unsigned.(txs.StakerTx), uint64(1000))
+			stakerTx := signedDelTx.Unsigned.(txs.StakerTx)
+			del, err := NewCurrentStaker(signedDelTx.ID(), stakerTx, stakerTx.StartTime(), uint64(1000))
 			if err != nil {
 				return err.Error()
 			}
@@ -919,7 +933,8 @@ func TestDiffStakersProperties(t *testing.T) {
 				panic(fmt.Errorf("failed signing tx in tx generator, %w", err))
 			}
 
-			del, err := NewCurrentStaker(signedDelTx.ID(), signedDelTx.Unsigned.(txs.StakerTx), uint64(1000))
+			stakerTx := signedDelTx.Unsigned.(txs.StakerTx)
+			del, err := NewCurrentStaker(signedDelTx.ID(), stakerTx, stakerTx.StartTime(), uint64(1000))
 			if err != nil {
 				return err.Error()
 			}
@@ -958,7 +973,8 @@ func TestValidatorSetOperations(t *testing.T) {
 				panic(fmt.Errorf("failed signing tx in tx generator, %w", err))
 			}
 
-			val, err := NewCurrentStaker(signedValTx.ID(), signedValTx.Unsigned.(txs.StakerTx), uint64(1000))
+			stakerTx := signedValTx.Unsigned.(txs.StakerTx)
+			val, err := NewCurrentStaker(signedValTx.ID(), stakerTx, stakerTx.StartTime(), uint64(1000))
 			if err != nil {
 				return err.Error()
 			}
@@ -1009,7 +1025,8 @@ func TestValidatorSetOperations(t *testing.T) {
 				panic(fmt.Errorf("failed signing tx in tx generator, %w", err))
 			}
 
-			val, err := NewCurrentStaker(signedValTx.ID(), signedValTx.Unsigned.(txs.StakerTx), uint64(1000))
+			stakerTx := signedValTx.Unsigned.(txs.StakerTx)
+			val, err := NewCurrentStaker(signedValTx.ID(), stakerTx, stakerTx.StartTime(), uint64(1000))
 			if err != nil {
 				return err.Error()
 			}
@@ -1067,7 +1084,8 @@ func TestValidatorSetOperations(t *testing.T) {
 				panic(fmt.Errorf("failed signing tx in tx generator, %w", err))
 			}
 
-			mainVal, err := NewCurrentStaker(signedMainValTx.ID(), signedMainValTx.Unsigned.(txs.StakerTx), uint64(1000))
+			stakerTx := signedMainValTx.Unsigned.(txs.StakerTx)
+			mainVal, err := NewCurrentStaker(signedMainValTx.ID(), stakerTx, stakerTx.StartTime(), uint64(1000))
 			if err != nil {
 				return err.Error()
 			}
@@ -1077,7 +1095,8 @@ func TestValidatorSetOperations(t *testing.T) {
 				panic(fmt.Errorf("failed signing tx in tx generator, %w", err))
 			}
 
-			companionVal, err := NewCurrentStaker(signedCompanionValTx.ID(), signedCompanionValTx.Unsigned.(txs.StakerTx), uint64(1000))
+			stakerTx = signedCompanionValTx.Unsigned.(txs.StakerTx)
+			companionVal, err := NewCurrentStaker(signedCompanionValTx.ID(), stakerTx, stakerTx.StartTime(), uint64(1000))
 			if err != nil {
 				return err.Error()
 			}

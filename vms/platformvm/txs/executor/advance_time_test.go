@@ -475,9 +475,11 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	)
 	require.NoError(err)
 
+	stakerTx := tx.Unsigned.(txs.StakerTx)
 	staker, err := state.NewCurrentStaker(
 		tx.ID(),
-		tx.Unsigned.(*txs.AddSubnetValidatorTx),
+		stakerTx,
+		stakerTx.StartTime(),
 		0,
 	)
 	require.NoError(err)

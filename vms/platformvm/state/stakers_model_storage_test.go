@@ -212,7 +212,8 @@ func (v *putCurrentValidatorCommand) Run(sut commands.SystemUnderTest) commands.
 	sTx := (*txs.Tx)(v)
 	sys := sut.(*sysUnderTest)
 
-	currentVal, err := NewCurrentStaker(sTx.ID(), sTx.Unsigned.(txs.Staker), uint64(1000))
+	stakerTx := sTx.Unsigned.(txs.StakerTx)
+	currentVal, err := NewCurrentStaker(sTx.ID(), stakerTx, stakerTx.StartTime(), uint64(1000))
 	if err != nil {
 		return sys // state checks later on should spot missing validator
 	}
@@ -225,7 +226,8 @@ func (v *putCurrentValidatorCommand) Run(sut commands.SystemUnderTest) commands.
 
 func (v *putCurrentValidatorCommand) NextState(cmdState commands.State) commands.State {
 	sTx := (*txs.Tx)(v)
-	currentVal, err := NewCurrentStaker(sTx.ID(), sTx.Unsigned.(txs.Staker), uint64(1000))
+	stakerTx := sTx.Unsigned.(txs.StakerTx)
+	currentVal, err := NewCurrentStaker(sTx.ID(), stakerTx, stakerTx.StartTime(), uint64(1000))
 	if err != nil {
 		return cmdState // state checks later on should spot missing validator
 	}
@@ -527,7 +529,8 @@ func addCurrentDelegatorInSystem(sys *sysUnderTest, candidateDelegatorTx txs.Uns
 		return fmt.Errorf("failed signing tx, %w", err)
 	}
 
-	delegator, err := NewCurrentStaker(signedTx.ID(), signedTx.Unsigned.(txs.Staker), uint64(1000))
+	stakerTx := signedTx.Unsigned.(txs.StakerTx)
+	delegator, err := NewCurrentStaker(signedTx.ID(), stakerTx, stakerTx.StartTime(), uint64(1000))
 	if err != nil {
 		return fmt.Errorf("failed generating staker, %w", err)
 	}
@@ -587,7 +590,8 @@ func addCurrentDelegatorInModel(model *stakersStorageModel, candidateDelegatorTx
 		return fmt.Errorf("failed signing tx, %w", err)
 	}
 
-	delegator, err := NewCurrentStaker(signedTx.ID(), signedTx.Unsigned.(txs.Staker), uint64(1000))
+	stakerTx := signedTx.Unsigned.(txs.StakerTx)
+	delegator, err := NewCurrentStaker(signedTx.ID(), stakerTx, stakerTx.StartTime(), uint64(1000))
 	if err != nil {
 		return fmt.Errorf("failed generating staker, %w", err)
 	}

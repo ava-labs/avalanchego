@@ -101,7 +101,8 @@ func TestMaskIteratorProperties(t *testing.T) {
 					panic(fmt.Errorf("failed signing tx in tx generator, %w", err))
 				}
 
-				staker, err := NewCurrentStaker(signedTx.ID(), signedTx.Unsigned.(txs.StakerTx), uint64(100))
+				stakerTx := signedTx.Unsigned.(txs.StakerTx)
+				staker, err := NewCurrentStaker(signedTx.ID(), stakerTx, stakerTx.StartTime(), uint64(100))
 				if err != nil {
 					return err.Error()
 				}
@@ -141,7 +142,8 @@ func TestMaskIteratorProperties(t *testing.T) {
 					panic(fmt.Errorf("failed signing tx in tx generator, %w", err))
 				}
 
-				staker, err := NewCurrentStaker(signedTx.ID(), signedTx.Unsigned.(txs.StakerTx), uint64(100))
+				stakerTx := signedTx.Unsigned.(txs.StakerTx)
+				staker, err := NewCurrentStaker(signedTx.ID(), stakerTx, stakerTx.StartTime(), uint64(100))
 				if err != nil {
 					return err.Error()
 				}
@@ -180,7 +182,8 @@ func TestMaskIteratorProperties(t *testing.T) {
 					panic(fmt.Errorf("failed signing tx in tx generator, %w", err))
 				}
 
-				staker, err := NewCurrentStaker(signedTx.ID(), signedTx.Unsigned.(txs.StakerTx), uint64(100))
+				stakerTx := signedTx.Unsigned.(txs.StakerTx)
+				staker, err := NewCurrentStaker(signedTx.ID(), stakerTx, stakerTx.StartTime(), uint64(100))
 				if err != nil {
 					return err.Error()
 				}
