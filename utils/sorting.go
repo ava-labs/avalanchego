@@ -5,7 +5,6 @@ package utils
 
 import (
 	"bytes"
-	"sort"
 
 	"golang.org/x/exp/constraints"
 	"golang.org/x/exp/slices"
@@ -21,9 +20,7 @@ type Sortable[T any] interface {
 
 // Sorts the elements of [s].
 func Sort[T Sortable[T]](s []T) {
-	slices.SortFunc(s, func(i, j T) bool {
-		return i.Less(j)
-	})
+	slices.SortFunc(s, T.Less)
 }
 
 // Sorts the elements of [s] based on their hashes.
@@ -55,7 +52,7 @@ func IsSortedBytes[T ~[]byte](s []T) bool {
 }
 
 // Returns true iff the elements in [s] are unique and sorted.
-func IsSortedAndUniqueSortable[T Sortable[T]](s []T) bool {
+func IsSortedAndUnique[T Sortable[T]](s []T) bool {
 	for i := 0; i < len(s)-1; i++ {
 		if !s[i].Less(s[i+1]) {
 			return false
@@ -100,19 +97,6 @@ func IsUnique[T comparable](s []T) bool {
 			return false
 		}
 		asMap[elt] = struct{}{}
-	}
-	return true
-}
-
-// IsSortedAndUnique returns true if the elements in the data are unique and
-// sorted.
-//
-// Deprecated: Use one of the other [IsSortedAndUnique...] functions instead.
-func IsSortedAndUnique(data sort.Interface) bool {
-	for i := 0; i < data.Len()-1; i++ {
-		if !data.Less(i, i+1) {
-			return false
-		}
 	}
 	return true
 }
