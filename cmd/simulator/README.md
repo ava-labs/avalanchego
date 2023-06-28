@@ -35,7 +35,7 @@ To start a single node network, follow the instructions from the AvalancheGo [RE
 Once you've built AvalancheGo, open the AvalancheGo directory in a separate terminal window and run a single node non-staking network with the following command:
 
 ```bash
-./build/avalanchego --staking-enabled=false --network-id=local
+./build/avalanchego --sybil-protection-enabled=false --network-id=local
 ```
 
 WARNING:

@@ -56,14 +56,14 @@ func (a issueNAgent[T]) Execute(ctx context.Context) error {
 
 	for {
 		var (
-			txs  = make([]T, 0, a.n)
-			tx   T
-			done bool
+			txs = make([]T, 0, a.n)
+			tx  T
+			ok  bool
 		)
 		for i := uint64(0); i < a.n; i++ {
 			select {
-			case tx, done = <-txChan:
-				if done {
+			case tx, ok = <-txChan:
+				if !ok {
 					return a.worker.Close(ctx)
 				}
 			case <-ctx.Done():

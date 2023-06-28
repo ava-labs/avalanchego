@@ -117,7 +117,7 @@ func DistributeFunds(ctx context.Context, client ethclient.Client, keys []*key.K
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch balance for addr %s: %w", addr, err)
 		}
-		log.Info("Funded address has balance", "balance", balance)
+		log.Info("Funded address has balance", "addr", addr, "balance", balance)
 	}
 	fundedKeys = append(fundedKeys, needFundsKeys...)
 	return fundedKeys, nil
