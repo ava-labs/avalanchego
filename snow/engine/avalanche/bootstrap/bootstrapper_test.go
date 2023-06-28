@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
 	"github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var (
@@ -32,6 +33,20 @@ var (
 	errParsedUnknownVertex = errors.New("parsed unknown vertex")
 	errUnknownTx           = errors.New("unknown tx")
 )
+
+type testTx struct {
+	snowstorm.Tx
+
+	tx *snowstorm.TestTx
+}
+
+func (t *testTx) Accept(ctx context.Context) error {
+	if err := t.Tx.Accept(ctx); err != nil {
+		return err
+	}
+	t.tx.DependenciesV = nil
+	return nil
+}
 
 func newConfig(t *testing.T) (Config, ids.NodeID, *common.SenderTest, *vertex.TestManager, *vertex.TestVM) {
 	require := require.New(t)
@@ -360,7 +375,7 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 	txBytes0 := []byte{0}
 	txBytes1 := []byte{1}
 
-	tx0 := &snowstorm.TestTx{
+	innerTx0 := &snowstorm.TestTx{
 		TestDecidable: choices.TestDecidable{
 			IDV:     txID0,
 			StatusV: choices.Processing,
@@ -374,8 +389,15 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 			IDV:     txID1,
 			StatusV: choices.Processing,
 		},
-		DependenciesV: []snowstorm.Tx{tx0},
-		BytesV:        txBytes1,
+		DependenciesV: set.Set[ids.ID]{
+			innerTx0.IDV: struct{}{},
+		},
+		BytesV: txBytes1,
+	}
+
+	tx0 := &testTx{
+		Tx: innerTx0,
+		tx: tx1,
 	}
 
 	vtxID0 := ids.GenerateTestID()

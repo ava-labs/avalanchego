@@ -78,7 +78,12 @@ func (g *multiGatherer) Register(namespace string, gatherer prometheus.Gatherer)
 	defer g.lock.Unlock()
 
 	if existingGatherer, exists := g.gatherers[namespace]; exists {
-		return fmt.Errorf("%w for namespace %q failed; existing: %#v", errReregisterGatherer, namespace, existingGatherer)
+		return fmt.Errorf("%w for namespace %q; existing: %#v; new: %#v",
+			errReregisterGatherer,
+			namespace,
+			existingGatherer,
+			gatherer,
+		)
 	}
 
 	g.gatherers[namespace] = gatherer

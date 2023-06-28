@@ -397,7 +397,7 @@ func (t *trieView) GetRangeProof(
 	ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.GetRangeProof")
 	defer span.End()
 
-	if start.hasValue && end.hasValue && bytes.Compare(start.value, end.value) == 1 {
+	if end.hasValue && bytes.Compare(start.value, end.value) == 1 {
 		return nil, ErrStartAfterEnd
 	}
 
