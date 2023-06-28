@@ -133,9 +133,5 @@ func ShiftStakerAheadInPlace(s *Staker) {
 	)
 	s.StartTime = currEndTime
 	s.EndTime = currEndTime.Add(duration)
-	if s.NextTime == currEndTime {
-		s.NextTime = s.EndTime
-	} else {
-		s.NextTime = s.StartTime
-	}
+	s.NextTime = s.EndTime
 }
