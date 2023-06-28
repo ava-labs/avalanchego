@@ -10,8 +10,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/chains"
-	"github.com/ava-labs/avalanchego/database/manager"
-	"github.com/ava-labs/avalanchego/database/versiondb"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/uptime"
@@ -21,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
@@ -66,10 +64,7 @@ func buildStateCtx() *snow.Context {
 	return ctx
 }
 
-func buildChainState(trackedSubnets []ids.ID) (State, error) {
-	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
-	baseDB := versiondb.New(baseDBManager.Current().Database)
-
+func buildChainState(baseDB database.Database, trackedSubnets []ids.ID) (State, error) {
 	cfg := defaultConfig()
 	cfg.TrackedSubnets.Add(trackedSubnets...)
 

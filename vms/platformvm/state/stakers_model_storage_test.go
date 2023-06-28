@@ -13,8 +13,13 @@ import (
 	"github.com/leanovate/gopter/commands"
 	"github.com/leanovate/gopter/gen"
 
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
+	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -27,6 +32,7 @@ var (
 	_ commands.Command = (*addTopDiffCommand)(nil)
 	_ commands.Command = (*applyBottomDiffCommand)(nil)
 	_ commands.Command = (*commitBottomStateCommand)(nil)
+	_ commands.Command = (*rebuildStateCommand)(nil)
 
 	commandsCtx = buildStateCtx()
 )
@@ -53,13 +59,15 @@ func TestStateAndDiffComparisonToStorageModel(t *testing.T) {
 
 type sysUnderTest struct {
 	diffBlkIDSeed uint64
+	baseDB        database.Database
 	baseState     State
 	sortedDiffIDs []ids.ID
 	diffsMap      map[ids.ID]Diff
 }
 
-func newSysUnderTest(baseState State) *sysUnderTest {
+func newSysUnderTest(baseDB database.Database, baseState State) *sysUnderTest {
 	sys := &sysUnderTest{
+		baseDB:        baseDB,
 		baseState:     baseState,
 		diffsMap:      map[ids.ID]Diff{},
 		sortedDiffIDs: []ids.ID{},
@@ -127,7 +135,10 @@ func (s *sysUnderTest) flushBottomDiff() bool {
 var stakersCommands = &commands.ProtoCommands{
 	NewSystemUnderTestFunc: func(initialState commands.State) commands.SystemUnderTest {
 		model := initialState.(*stakersStorageModel)
-		baseState, err := buildChainState(nil)
+
+		baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
+		baseDB := versiondb.New(baseDBManager.Current().Database)
+		baseState, err := buildChainState(baseDB, nil)
 		if err != nil {
 			panic(err)
 		}
@@ -153,7 +164,7 @@ var stakersCommands = &commands.ProtoCommands{
 			panic(err)
 		}
 
-		return newSysUnderTest(baseState)
+		return newSysUnderTest(baseDB, baseState)
 	},
 	DestroySystemUnderTestFunc: func(sut commands.SystemUnderTest) {
 		// retrieve base state and close it
@@ -185,6 +196,7 @@ var stakersCommands = &commands.ProtoCommands{
 			genAddTopDiffCommand,
 			genApplyBottomDiffCommand,
 			genCommitBottomStateCommand,
+			genRebuildStateCommand,
 		)
 	},
 }
@@ -203,6 +215,7 @@ func (v *putCurrentValidatorCommand) Run(sut commands.SystemUnderTest) commands.
 
 	topChainState := sys.getTopChainState()
 	topChainState.PutCurrentValidator(currentVal)
+	topChainState.AddTx(sTx, status.Committed)
 	return sys
 }
 
@@ -229,7 +242,13 @@ func (*putCurrentValidatorCommand) PostCondition(cmdState commands.State, res co
 func (v *putCurrentValidatorCommand) String() string {
 	stakerTx := v.Unsigned.(txs.StakerTx)
 	return fmt.Sprintf("PutCurrentValidator(subnetID: %v, nodeID: %v, txID: %v, priority: %v, unixStartTime: %v, duration: %v)",
-		stakerTx.SubnetID(), stakerTx.NodeID(), v.TxID, stakerTx.CurrentPriority(), stakerTx.StartTime().Unix(), stakerTx.EndTime().Sub(stakerTx.StartTime()))
+		stakerTx.SubnetID(),
+		stakerTx.NodeID(),
+		v.TxID,
+		stakerTx.CurrentPriority(),
+		stakerTx.StartTime().Unix(),
+		stakerTx.EndTime().Sub(stakerTx.StartTime()),
+	)
 }
 
 var genPutCurrentValidatorCommand = addPermissionlessValidatorTxGenerator(commandsCtx, nil, nil, &signer.Empty{}).Map(
@@ -391,6 +410,7 @@ func addCurrentDelegatorInSystem(sys *sysUnderTest, candidateDelegatorTx txs.Uns
 	}
 
 	chain.PutCurrentDelegator(delegator)
+	chain.AddTx(signedTx, status.Committed)
 	return nil
 }
 
@@ -667,6 +687,60 @@ func (*commitBottomStateCommand) String() string {
 var genCommitBottomStateCommand = gen.IntRange(1, 2).Map(
 	func(int) commands.Command {
 		return &commitBottomStateCommand{}
+	},
+)
+
+// rebuildStateCommand section
+type rebuildStateCommand struct{}
+
+func (*rebuildStateCommand) Run(sut commands.SystemUnderTest) commands.Result {
+	sys := sut.(*sysUnderTest)
+
+	// 1. Persist all outstanding changes
+	for sys.flushBottomDiff() {
+		err := sys.baseState.Commit()
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	if err := sys.baseState.Commit(); err != nil {
+		panic(err)
+	}
+
+	// 2. Rebuild the state from the db
+	baseState, err := buildChainState(sys.baseDB, nil)
+	if err != nil {
+		panic(err)
+	}
+	sys.baseState = baseState
+	sys.diffsMap = map[ids.ID]Diff{}
+	sys.sortedDiffIDs = []ids.ID{}
+
+	return sys
+}
+
+func (*rebuildStateCommand) NextState(cmdState commands.State) commands.State {
+	return cmdState // model has no diffs
+}
+
+func (*rebuildStateCommand) PreCondition(commands.State) bool {
+	return true
+}
+
+func (*rebuildStateCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
+	return checkSystemAndModelContent(cmdState, res)
+}
+
+func (*rebuildStateCommand) String() string {
+	return "RebuildStateCommand"
+}
+
+// a trick to force command regeneration at each sampling.
+// gen.Const would not allow it
+var genRebuildStateCommand = gen.IntRange(1, 2).Map(
+	func(int) commands.Command {
+		return &rebuildStateCommand{}
 	},
 )
 

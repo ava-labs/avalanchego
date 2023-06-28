@@ -317,7 +317,7 @@ func stakerDataGenerator(
 ) gopter.Gen {
 	return genStakerTimeData().FlatMap(
 		func(v interface{}) gopter.Gen {
-			macro := v.(stakerTimeData)
+			stakerData := v.(stakerTimeData)
 
 			genStakerNodeID := genNodeID
 			if nodeID != nil {
@@ -326,8 +326,8 @@ func stakerDataGenerator(
 
 			return gen.Struct(reflect.TypeOf(txs.Validator{}), map[string]gopter.Gen{
 				"NodeID": genStakerNodeID,
-				"Start":  gen.Const(uint64(macro.StartTime.Unix())),
-				"End":    gen.Const(uint64(macro.StartTime.Add(time.Duration(macro.Duration)).Unix())),
+				"Start":  gen.Const(uint64(stakerData.StartTime.Unix())),
+				"End":    gen.Const(uint64(stakerData.StartTime.Add(time.Duration(stakerData.Duration)).Unix())),
 				"Wght":   gen.UInt64Range(1, maxWeight),
 			})
 		},
