@@ -30,6 +30,8 @@ var (
 type UTXOState interface {
 	UTXOReader
 	UTXOWriter
+
+	// Checksum returns the current UTXOChecksum.
 	Checksum() ids.ID
 }
 

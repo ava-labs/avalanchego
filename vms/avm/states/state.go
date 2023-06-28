@@ -122,7 +122,8 @@ type State interface {
 	// TODO: remove after v1.11.x is activated
 	Prune(lock sync.Locker, log logging.Logger) error
 
-	Checksums() (ids.ID, ids.ID)
+	// Checksums returns the current TxChecksum and UTXOChecksum.
+	Checksums() (txChecksum ids.ID, utxoChecksum ids.ID)
 
 	Close() error
 }
@@ -376,7 +377,9 @@ func (s *state) getTx(txID ids.ID) (*txs.Tx, error) {
 }
 
 func (s *state) AddTx(tx *txs.Tx) {
-	s.addedTxs[tx.ID()] = tx
+	txID := tx.ID()
+	s.updateTxChecksum(txID)
+	s.addedTxs[txID] = tx
 }
 
 func (s *state) GetBlockID(height uint64) (ids.ID, error) {
@@ -565,8 +568,6 @@ func (s *state) writeTxs() error {
 	for txID, tx := range s.addedTxs {
 		txID := txID
 		txBytes := tx.Bytes()
-
-		s.updateTxChecksum(txID)
 
 		delete(s.addedTxs, txID)
 		s.txCache.Put(txID, tx)
