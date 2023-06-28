@@ -103,20 +103,28 @@ func TestTTLAdd(t *testing.T) {
 	oldest, ok = window.Oldest()
 	require.True(ok)
 	require.Equal(4, oldest)
-	// Now we're one second past the ttl of 10 seconds of when [4] was added,
-	// so all existing elements should be evicted.
-	clock.Set(epochStart.Add(22 * time.Second))
+	// Now we're one second before the ttl of 10 seconds of when [4] was added,
+	// no element should be evicted
+	// [4, 5]
+	clock.Set(epochStart.Add(20 * time.Second))
+	window.Add(5)
+	require.Equal(2, window.Length())
+	oldest, ok = window.Oldest()
+	require.True(ok)
+	require.Equal(4, oldest)
 
-	// Now the window should look like this:
-	// []
-	require.Zero(window.Length())
+	// Now the window is still containing 4:
+	// [4, 5]
+	clock.Set(epochStart.Add(20 * time.Second))
+	// we only evict on Add method because the window is calculated in the last element added
+	require.Equal(2, window.Length())
 
 	oldest, ok = window.Oldest()
-	require.False(ok)
-	require.Zero(oldest)
+	require.True(ok)
+	require.Equal(4, oldest)
 }
 
-// TestTTLReadOnly tests that stale elements are still evicted on Length
+// TestTTLReadOnly tests that elements are not evicted on Length
 func TestTTLLength(t *testing.T) {
 	require := require.New(t)
 
@@ -144,10 +152,10 @@ func TestTTLLength(t *testing.T) {
 	clock.Set(epochStart.Add(11 * time.Second))
 
 	// No more elements should be present in the window.
-	require.Zero(window.Length())
+	require.Equal(3, window.Length())
 }
 
-// TestTTLReadOnly tests that stale elements are still evicted on calling Oldest
+// TestTTLReadOnly tests that stale elements are not evicted on calling Oldest
 func TestTTLOldest(t *testing.T) {
 	require := require.New(t)
 
@@ -176,14 +184,14 @@ func TestTTLOldest(t *testing.T) {
 	require.Equal(3, window.elements.Len())
 
 	// Now we're one second past the ttl of 10 seconds as defined in testTTL,
-	// so all existing elements need to be evicted.
+	// so all existing elements shoud still exist.
 	clock.Set(epochStart.Add(11 * time.Second))
 
-	// Now there shouldn't be any elements in the window
+	// Now there should be three elements in the window
 	oldest, ok = window.Oldest()
-	require.False(ok)
-	require.Zero(oldest)
-	require.Zero(window.elements.Len())
+	require.True(ok)
+	require.Equal(1, oldest)
+	require.Equal(3, window.elements.Len())
 }
 
 // Tests that we bound the amount of elements in the window
