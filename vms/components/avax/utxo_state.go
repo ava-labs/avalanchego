@@ -175,8 +175,9 @@ func (s *utxoState) PutUTXO(utxo *UTXO) error {
 	}
 
 	utxoID := utxo.InputID()
-	s.utxoCache.Put(utxoID, utxo)
 	s.updateChecksum(utxoID)
+
+	s.utxoCache.Put(utxoID, utxo)
 	if err := s.utxoDB.Put(utxoID[:], utxoBytes); err != nil {
 		return err
 	}
@@ -205,8 +206,9 @@ func (s *utxoState) DeleteUTXO(utxoID ids.ID) error {
 		return err
 	}
 
-	s.utxoCache.Put(utxoID, nil)
 	s.updateChecksum(utxoID)
+
+	s.utxoCache.Put(utxoID, nil)
 	if err := s.utxoDB.Delete(utxoID[:]); err != nil {
 		return err
 	}
