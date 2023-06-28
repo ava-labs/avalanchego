@@ -28,10 +28,9 @@ func TestIDXOR(t *testing.T) {
 	require := require.New(t)
 
 	id1 := ID{1}
-	id2 := ID{2}
 	id3 := ID{3}
 
-	require.Equal(id2, id1.XOR(id3))
+	require.Equal(ID{2}, id1.XOR(id3))
 	require.Equal(ID{1}, id1)
 }
 
