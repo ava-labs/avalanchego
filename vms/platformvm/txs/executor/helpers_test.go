@@ -52,7 +52,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-const defaultWeight = 5 * units.MilliAvax
+const (
+	defaultWeight = 5 * units.MilliAvax
+	trackChecksum = false
+)
 
 var (
 	defaultMinStakingDuration = 24 * time.Hour
@@ -227,6 +230,7 @@ func defaultState(
 		metrics.Noop,
 		rewards,
 		&utils.Atomic[bool]{},
+		trackChecksum,
 	)
 	if err != nil {
 		panic(err)

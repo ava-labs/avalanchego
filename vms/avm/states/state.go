@@ -5,6 +5,7 @@ package states
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -54,6 +55,8 @@ var (
 	isInitializedKey = []byte{0x00}
 	timestampKey     = []byte{0x01}
 	lastAcceptedKey  = []byte{0x02}
+
+	errStatusWithoutTx = errors.New("unexpected status without transactions")
 
 	_ State = (*state)(nil)
 )
@@ -119,6 +122,9 @@ type State interface {
 	// TODO: remove after v1.11.x is activated
 	Prune(lock sync.Locker, log logging.Logger) error
 
+	// Checksums returns the current TxChecksum and UTXOChecksum.
+	Checksums() (txChecksum ids.ID, utxoChecksum ids.ID)
+
 	Close() error
 }
 
@@ -167,12 +173,16 @@ type state struct {
 	lastAccepted, persistedLastAccepted ids.ID
 	timestamp, persistedTimestamp       time.Time
 	singletonDB                         database.Database
+
+	trackChecksum bool
+	txChecksum    ids.ID
 }
 
 func New(
 	db *versiondb.Database,
 	parser blocks.Parser,
 	metrics prometheus.Registerer,
+	trackChecksums bool,
 ) (State, error) {
 	utxoDB := prefixdb.New(utxoPrefix, db)
 	statusDB := prefixdb.New(statusPrefix, db)
@@ -217,8 +227,12 @@ func New(
 		return nil, err
 	}
 
-	utxoState, err := avax.NewMeteredUTXOState(utxoDB, parser.Codec(), metrics)
-	return &state{
+	utxoState, err := avax.NewMeteredUTXOState(utxoDB, parser.Codec(), metrics, trackChecksums)
+	if err != nil {
+		return nil, err
+	}
+
+	s := &state{
 		parser: parser,
 		db:     db,
 
@@ -242,7 +256,10 @@ func New(
 		blockDB:     blockDB,
 
 		singletonDB: singletonDB,
-	}, err
+
+		trackChecksum: trackChecksums,
+	}
+	return s, s.initTxChecksum()
 }
 
 func (s *state) GetUTXO(utxoID ids.ID) (*avax.UTXO, error) {
@@ -360,7 +377,9 @@ func (s *state) getTx(txID ids.ID) (*txs.Tx, error) {
 }
 
 func (s *state) AddTx(tx *txs.Tx) {
-	s.addedTxs[tx.ID()] = tx
+	txID := tx.ID()
+	s.updateTxChecksum(txID)
+	s.addedTxs[txID] = tx
 }
 
 func (s *state) GetBlockID(height uint64) (ids.ID, error) {
@@ -825,4 +844,65 @@ func skipTo(iter database.Iterator, targetKey []byte) error {
 			return nil
 		}
 	}
+}
+
+func (s *state) Checksums() (ids.ID, ids.ID) {
+	return s.txChecksum, s.utxoState.Checksum()
+}
+
+func (s *state) initTxChecksum() error {
+	if !s.trackChecksum {
+		return nil
+	}
+
+	txIt := s.txDB.NewIterator()
+	defer txIt.Release()
+	statusIt := s.statusDB.NewIterator()
+	defer statusIt.Release()
+
+	statusHasNext := statusIt.Next()
+	for txIt.Next() {
+		txIDBytes := txIt.Key()
+		if statusHasNext { // if status was exhausted, everything is accepted
+			statusIDBytes := statusIt.Key()
+			if bytes.Equal(txIDBytes, statusIDBytes) { // if the status key doesn't match this was marked as accepted
+				statusInt, err := database.ParseUInt32(statusIt.Value())
+				if err != nil {
+					return err
+				}
+
+				statusHasNext = statusIt.Next() // we processed the txID, so move on to the next status
+
+				if choices.Status(statusInt) != choices.Accepted { // the status isn't accepted, so we skip the txID
+					continue
+				}
+			}
+		}
+
+		txID, err := ids.ToID(txIDBytes)
+		if err != nil {
+			return err
+		}
+
+		s.updateTxChecksum(txID)
+	}
+
+	if statusHasNext {
+		return errStatusWithoutTx
+	}
+
+	errs := wrappers.Errs{}
+	errs.Add(
+		txIt.Error(),
+		statusIt.Error(),
+	)
+	return errs.Err
+}
+
+func (s *state) updateTxChecksum(modifiedID ids.ID) {
+	if !s.trackChecksum {
+		return
+	}
+
+	s.txChecksum = s.txChecksum.XOR(modifiedID)
 }

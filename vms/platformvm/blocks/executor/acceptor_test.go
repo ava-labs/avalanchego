@@ -50,6 +50,8 @@ func TestAcceptorVisitProposalBlock(t *testing.T) {
 	blkID := blk.ID()
 
 	s := state.NewMockState(ctrl)
+	s.EXPECT().Checksum().Return(ids.Empty).Times(1)
+
 	acceptor := &acceptor{
 		backend: &backend{
 			ctx: &snow.Context{
@@ -152,6 +154,7 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 	s.EXPECT().Abort().Times(1)
 	onAcceptState.EXPECT().Apply(s).Times(1)
 	sharedMemory.EXPECT().Apply(atomicRequests, batch).Return(nil).Times(1)
+	s.EXPECT().Checksum().Return(ids.Empty).Times(1)
 
 	require.NoError(acceptor.ApricotAtomicBlock(blk))
 }
@@ -241,6 +244,7 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 	s.EXPECT().Abort().Times(1)
 	onAcceptState.EXPECT().Apply(s).Times(1)
 	sharedMemory.EXPECT().Apply(atomicRequests, batch).Return(nil).Times(1)
+	s.EXPECT().Checksum().Return(ids.Empty).Times(1)
 
 	require.NoError(acceptor.BanffStandardBlock(blk))
 	require.True(calledOnAcceptFunc)
@@ -332,6 +336,7 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 
 		onAcceptState.EXPECT().Apply(s).Times(1),
 		s.EXPECT().Commit().Return(nil).Times(1),
+		s.EXPECT().Checksum().Return(ids.Empty).Times(1),
 	)
 
 	require.NoError(acceptor.ApricotCommitBlock(blk))
@@ -424,6 +429,7 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 
 		onAcceptState.EXPECT().Apply(s).Times(1),
 		s.EXPECT().Commit().Return(nil).Times(1),
+		s.EXPECT().Checksum().Return(ids.Empty).Times(1),
 	)
 
 	require.NoError(acceptor.ApricotAbortBlock(blk))

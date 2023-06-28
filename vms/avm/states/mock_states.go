@@ -275,6 +275,21 @@ func (mr *MockStateMockRecorder) AddUTXO(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddUTXO", reflect.TypeOf((*MockState)(nil).AddUTXO), arg0)
 }
 
+// Checksums mocks base method.
+func (m *MockState) Checksums() (ids.ID, ids.ID) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Checksums")
+	ret0, _ := ret[0].(ids.ID)
+	ret1, _ := ret[1].(ids.ID)
+	return ret0, ret1
+}
+
+// Checksums indicates an expected call of Checksums.
+func (mr *MockStateMockRecorder) Checksums() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Checksums", reflect.TypeOf((*MockState)(nil).Checksums))
+}
+
 // Close mocks base method.
 func (m *MockState) Close() error {
 	m.ctrl.T.Helper()
