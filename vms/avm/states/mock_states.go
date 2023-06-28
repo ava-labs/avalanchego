@@ -9,11 +9,13 @@ package states
 
 import (
 	reflect "reflect"
+	sync "sync"
 	time "time"
 
 	database "github.com/ava-labs/avalanchego/database"
 	ids "github.com/ava-labs/avalanchego/ids"
 	choices "github.com/ava-labs/avalanchego/snow/choices"
+	logging "github.com/ava-labs/avalanchego/utils/logging"
 	blocks "github.com/ava-labs/avalanchego/vms/avm/blocks"
 	txs "github.com/ava-labs/avalanchego/vms/avm/txs"
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
@@ -177,21 +179,6 @@ func (m *MockChain) GetUTXO(arg0 ids.ID) (*avax.UTXO, error) {
 func (mr *MockChainMockRecorder) GetUTXO(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUTXO", reflect.TypeOf((*MockChain)(nil).GetUTXO), arg0)
-}
-
-// GetUTXOFromID mocks base method.
-func (m *MockChain) GetUTXOFromID(arg0 *avax.UTXOID) (*avax.UTXO, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetUTXOFromID", arg0)
-	ret0, _ := ret[0].(*avax.UTXO)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetUTXOFromID indicates an expected call of GetUTXOFromID.
-func (mr *MockChainMockRecorder) GetUTXOFromID(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUTXOFromID", reflect.TypeOf((*MockChain)(nil).GetUTXOFromID), arg0)
 }
 
 // SetLastAccepted mocks base method.
@@ -459,21 +446,6 @@ func (mr *MockStateMockRecorder) GetUTXO(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUTXO", reflect.TypeOf((*MockState)(nil).GetUTXO), arg0)
 }
 
-// GetUTXOFromID mocks base method.
-func (m *MockState) GetUTXOFromID(arg0 *avax.UTXOID) (*avax.UTXO, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetUTXOFromID", arg0)
-	ret0, _ := ret[0].(*avax.UTXO)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetUTXOFromID indicates an expected call of GetUTXOFromID.
-func (mr *MockStateMockRecorder) GetUTXOFromID(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUTXOFromID", reflect.TypeOf((*MockState)(nil).GetUTXOFromID), arg0)
-}
-
 // InitializeChainState mocks base method.
 func (m *MockState) InitializeChainState(arg0 ids.ID, arg1 time.Time) error {
 	m.ctrl.T.Helper()
@@ -501,6 +473,20 @@ func (m *MockState) IsInitialized() (bool, error) {
 func (mr *MockStateMockRecorder) IsInitialized() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsInitialized", reflect.TypeOf((*MockState)(nil).IsInitialized))
+}
+
+// Prune mocks base method.
+func (m *MockState) Prune(arg0 sync.Locker, arg1 logging.Logger) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Prune", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Prune indicates an expected call of Prune.
+func (mr *MockStateMockRecorder) Prune(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Prune", reflect.TypeOf((*MockState)(nil).Prune), arg0, arg1)
 }
 
 // SetInitialized mocks base method.
@@ -725,21 +711,6 @@ func (m *MockDiff) GetUTXO(arg0 ids.ID) (*avax.UTXO, error) {
 func (mr *MockDiffMockRecorder) GetUTXO(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUTXO", reflect.TypeOf((*MockDiff)(nil).GetUTXO), arg0)
-}
-
-// GetUTXOFromID mocks base method.
-func (m *MockDiff) GetUTXOFromID(arg0 *avax.UTXOID) (*avax.UTXO, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetUTXOFromID", arg0)
-	ret0, _ := ret[0].(*avax.UTXO)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetUTXOFromID indicates an expected call of GetUTXOFromID.
-func (mr *MockDiffMockRecorder) GetUTXOFromID(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUTXOFromID", reflect.TypeOf((*MockDiff)(nil).GetUTXOFromID), arg0)
 }
 
 // SetLastAccepted mocks base method.
