@@ -9,10 +9,15 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/coreth/params"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ethereum/go-ethereum/common"
+
+	"github.com/ava-labs/coreth/params"
+
+	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 )
 
 func TestCalculateDynamicFee(t *testing.T) {
@@ -178,5 +183,159 @@ func executeTxTest(t *testing.T, test atomicTxTest) {
 
 	if test.checkState != nil {
 		test.checkState(t, vm)
+	}
+}
+
+func TestEVMOutputLess(t *testing.T) {
+	type test struct {
+		name     string
+		a, b     EVMOutput
+		expected bool
+	}
+
+	tests := []test{
+		{
+			name: "first address less",
+			a: EVMOutput{
+				Address: common.BytesToAddress([]byte{0x01}),
+				AssetID: ids.ID{1},
+			},
+			b: EVMOutput{
+				Address: common.BytesToAddress([]byte{0x02}),
+				AssetID: ids.ID{0},
+			},
+			expected: true,
+		},
+		{
+			name: "first address greater",
+			a: EVMOutput{
+				Address: common.BytesToAddress([]byte{0x02}),
+				AssetID: ids.ID{0},
+			},
+			b: EVMOutput{
+				Address: common.BytesToAddress([]byte{0x01}),
+				AssetID: ids.ID{1},
+			},
+			expected: false,
+		},
+		{
+			name: "first address greater; assetIDs equal",
+			a: EVMOutput{
+				Address: common.BytesToAddress([]byte{0x02}),
+				AssetID: ids.ID{},
+			},
+			b: EVMOutput{
+				Address: common.BytesToAddress([]byte{0x01}),
+				AssetID: ids.ID{},
+			},
+			expected: false,
+		},
+		{
+			name: "addresses equal; first assetID less",
+			a: EVMOutput{
+				Address: common.BytesToAddress([]byte{0x01}),
+				AssetID: ids.ID{0},
+			},
+			b: EVMOutput{
+				Address: common.BytesToAddress([]byte{0x01}),
+				AssetID: ids.ID{1},
+			},
+			expected: true,
+		},
+		{
+			name:     "equal",
+			a:        EVMOutput{},
+			b:        EVMOutput{},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.expected, tt.a.Less(tt.b))
+		})
+	}
+}
+
+func TestEVMInputLess(t *testing.T) {
+	type test struct {
+		name     string
+		a, b     EVMInput
+		expected bool
+	}
+
+	tests := []test{
+		{
+			name: "first address less",
+			a: EVMInput{
+				Address: common.BytesToAddress([]byte{0x01}),
+				AssetID: ids.ID{1},
+			},
+			b: EVMInput{
+				Address: common.BytesToAddress([]byte{0x02}),
+				AssetID: ids.ID{0},
+			},
+			expected: true,
+		},
+		{
+			name: "first address greater",
+			a: EVMInput{
+				Address: common.BytesToAddress([]byte{0x02}),
+				AssetID: ids.ID{0},
+			},
+			b: EVMInput{
+				Address: common.BytesToAddress([]byte{0x01}),
+				AssetID: ids.ID{1},
+			},
+			expected: false,
+		},
+		{
+			name: "first address greater; assetIDs equal",
+			a: EVMInput{
+				Address: common.BytesToAddress([]byte{0x02}),
+				AssetID: ids.ID{},
+			},
+			b: EVMInput{
+				Address: common.BytesToAddress([]byte{0x01}),
+				AssetID: ids.ID{},
+			},
+			expected: false,
+		},
+		{
+			name: "addresses equal; first assetID less",
+			a: EVMInput{
+				Address: common.BytesToAddress([]byte{0x01}),
+				AssetID: ids.ID{0},
+			},
+			b: EVMInput{
+				Address: common.BytesToAddress([]byte{0x01}),
+				AssetID: ids.ID{1},
+			},
+			expected: true,
+		},
+		{
+			name: "addresses equal; first assetID greater",
+			a: EVMInput{
+				Address: common.BytesToAddress([]byte{0x01}),
+				AssetID: ids.ID{1},
+			},
+			b: EVMInput{
+				Address: common.BytesToAddress([]byte{0x01}),
+				AssetID: ids.ID{0},
+			},
+			expected: false,
+		},
+		{
+			name:     "equal",
+			a:        EVMInput{},
+			b:        EVMInput{},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.expected, tt.a.Less(tt.b))
+		})
 	}
 }

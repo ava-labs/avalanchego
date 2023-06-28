@@ -116,7 +116,7 @@ func TestImportTxVerify(t *testing.T) {
 
 	// Sort the inputs and outputs to ensure the transaction is canonical
 	utils.Sort(importTx.ImportedInputs)
-	SortEVMOutputs(importTx.Outs)
+	utils.Sort(importTx.Outs)
 
 	tests := map[string]atomicTxVerifyTest{
 		"nil tx": {

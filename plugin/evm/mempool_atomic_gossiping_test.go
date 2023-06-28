@@ -168,7 +168,7 @@ func createImportTx(t *testing.T, vm *VM, txID ids.ID, feeAmount uint64) *Tx {
 
 	// Sort the inputs and outputs to ensure the transaction is canonical
 	utils.Sort(importTx.ImportedInputs)
-	SortEVMOutputs(importTx.Outs)
+	utils.Sort(importTx.Outs)
 
 	tx := &Tx{UnsignedAtomicTx: importTx}
 	// Sign with the correct key
