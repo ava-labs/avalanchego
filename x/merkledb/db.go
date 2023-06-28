@@ -1004,15 +1004,15 @@ func (db *merkleDB) VerifyChangeProof(
 	// Find the greatest key in [proof.KeyChanges]
 	// Note that [proof.EndProof] is a proof for this key.
 	// [largestPath] is also used when we add children of proof nodes to [trie] below.
-	largestKey := end
+	largestKey := end.value
 	if len(proof.KeyChanges) > 0 {
 		// If [proof] has key-value pairs, we should insert children
 		// greater than [end] to ancestors of the node containing [end]
 		// so that we get the expected root ID.
-		largestKey = Some(proof.KeyChanges[len(proof.KeyChanges)-1].Key)
+		largestKey = proof.KeyChanges[len(proof.KeyChanges)-1].Key
 	}
 
-	largestPath := newPath(largestKey.value)
+	largestPath := newPath(largestKey)
 
 	// Make sure the end proof, if given, is well-formed.
 	if err := verifyProofPath(proof.EndProof, largestPath); err != nil {
