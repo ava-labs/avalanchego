@@ -107,7 +107,7 @@ func defaultConfig() *config.Config {
 		RewardConfig: reward.Config{
 			MaxConsumptionRate: .12 * reward.PercentDenominator,
 			MinConsumptionRate: .10 * reward.PercentDenominator,
-			MintingPeriod:      365 * 24 * time.Hour,
+			MintingPeriod:      defaultMaxStakingDuration,
 			SupplyCap:          720 * units.MegaAvax,
 		},
 		ApricotPhase3Time: defaultValidateEndTime,

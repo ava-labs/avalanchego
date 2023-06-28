@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/leanovate/gopter"
 	"github.com/leanovate/gopter/prop"
 
@@ -23,13 +22,14 @@ var (
 )
 
 // TestGeneratedStakersValidity tests the staker generator itself.
-// It documents and verifies theinvariants enforced by the staker generator.
+// It documents and verifies the invariants enforced by the staker generator.
 func TestGeneratedStakersValidity(t *testing.T) {
 	properties := gopter.NewProperties(nil)
 
 	ctx := buildStateCtx()
 	subnetID := ids.GenerateTestID()
 	nodeID := ids.GenerateTestNodeID()
+	maxDelegatorWeight := uint64(2023)
 
 	properties.Property("AddValidatorTx generator checks", prop.ForAll(
 		func(nonInitTx *txs.Tx) string {
@@ -106,6 +106,11 @@ func TestGeneratedStakersValidity(t *testing.T) {
 					currentDel.StartTime, currentDel.EndTime, currentDel)
 			}
 
+			if currentDel.Weight > maxDelegatorWeight {
+				return fmt.Sprintf("delegator weight %v above maximum %v, staker %v",
+					currentDel.Weight, maxDelegatorWeight, currentDel)
+			}
+
 			pendingDel, err := NewPendingStaker(signedTx.ID(), addDelTx)
 			if err != nil {
 				return err.Error()
@@ -116,9 +121,14 @@ func TestGeneratedStakersValidity(t *testing.T) {
 					pendingDel.StartTime, pendingDel.EndTime, pendingDel)
 			}
 
+			if pendingDel.Weight > maxDelegatorWeight {
+				return fmt.Sprintf("delegator weight %v above maximum %v, staker %v",
+					pendingDel.Weight, maxDelegatorWeight, pendingDel)
+			}
+
 			return ""
 		},
-		addDelegatorTxGenerator(ctx, &nodeID, math.MaxUint64),
+		addDelegatorTxGenerator(ctx, &nodeID, maxDelegatorWeight),
 	))
 
 	properties.Property("addPermissionlessValidatorTx generator checks", prop.ForAll(
@@ -204,6 +214,11 @@ func TestGeneratedStakersValidity(t *testing.T) {
 					currentDel.StartTime, currentDel.EndTime, currentDel)
 			}
 
+			if currentDel.Weight > maxDelegatorWeight {
+				return fmt.Sprintf("delegator weight %v above maximum %v, staker %v",
+					currentDel.Weight, maxDelegatorWeight, currentDel)
+			}
+
 			pendingDel, err := NewPendingStaker(signedTx.ID(), addDelTx)
 			if err != nil {
 				return err.Error()
@@ -214,9 +229,14 @@ func TestGeneratedStakersValidity(t *testing.T) {
 					pendingDel.StartTime, pendingDel.EndTime, pendingDel)
 			}
 
+			if pendingDel.Weight > maxDelegatorWeight {
+				return fmt.Sprintf("delegator weight %v above maximum %v, staker %v",
+					pendingDel.Weight, maxDelegatorWeight, pendingDel)
+			}
+
 			return ""
 		},
-		addPermissionlessDelegatorTxGenerator(ctx, &subnetID, &nodeID, math.MaxUint64),
+		addPermissionlessDelegatorTxGenerator(ctx, &subnetID, &nodeID, maxDelegatorWeight),
 	))
 
 	properties.TestingRun(t)
