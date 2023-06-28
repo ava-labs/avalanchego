@@ -54,26 +54,6 @@ func (t *OperationTx) InputIDs() set.Set[ids.ID] {
 	return inputs
 }
 
-// ConsumedAssetIDs returns the IDs of the assets this transaction consumes
-func (t *OperationTx) ConsumedAssetIDs() set.Set[ids.ID] {
-	assets := t.AssetIDs()
-	for _, op := range t.Ops {
-		if len(op.UTXOIDs) > 0 {
-			assets.Add(op.AssetID())
-		}
-	}
-	return assets
-}
-
-// AssetIDs returns the IDs of the assets this transaction depends on
-func (t *OperationTx) AssetIDs() set.Set[ids.ID] {
-	assets := t.BaseTx.AssetIDs()
-	for _, op := range t.Ops {
-		assets.Add(op.AssetID())
-	}
-	return assets
-}
-
 // NumCredentials returns the number of expected credentials
 func (t *OperationTx) NumCredentials() int {
 	return t.BaseTx.NumCredentials() + len(t.Ops)
