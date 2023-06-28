@@ -903,7 +903,6 @@ func (s *state) updateTxChecksum(modifiedID ids.ID) {
 	if !s.trackChecksum {
 		return
 	}
-	for i, b := range modifiedID {
-		s.txChecksum[i] ^= b
-	}
+
+	s.txChecksum = s.txChecksum.XOR(modifiedID)
 }
