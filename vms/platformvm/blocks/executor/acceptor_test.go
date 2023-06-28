@@ -50,6 +50,8 @@ func TestAcceptorVisitProposalBlock(t *testing.T) {
 	blkID := blk.ID()
 
 	s := state.NewMockState(ctrl)
+	s.EXPECT().Checksum().Return(ids.Empty).Times(1)
+
 	acceptor := &acceptor{
 		backend: &backend{
 			ctx: &snow.Context{
