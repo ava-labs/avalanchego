@@ -20,7 +20,9 @@ type Sortable[T any] interface {
 
 // Sorts the elements of [s].
 func Sort[T Sortable[T]](s []T) {
-	slices.SortFunc(s, T.Less)
+	slices.SortFunc(s, func(i, j T) bool {
+		return i.Less(j)
+	})
 }
 
 // Sorts the elements of [s] based on their hashes.
