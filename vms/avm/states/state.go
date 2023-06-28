@@ -96,12 +96,6 @@ type State interface {
 	// called during startup.
 	InitializeChainState(stopVertexID ids.ID, genesisTimestamp time.Time) error
 
-	// TODO: deprecate statuses. We should only persist accepted state
-	// Status returns a status from storage.
-	GetStatus(id ids.ID) (choices.Status, error)
-	// AddStatus saves a status in storage.
-	AddStatus(id ids.ID, status choices.Status)
-
 	// Discard uncommitted changes to the database.
 	Abort()
 
@@ -154,7 +148,6 @@ type state struct {
 	utxoState     avax.UTXOState
 
 	statusesPruned bool
-	addedStatuses  map[ids.ID]choices.Status
 	statusCache    cache.Cacher[ids.ID, *choices.Status] // cache of id -> choices.Status. If the entry is nil, it is not in the database
 	statusDB       database.Database
 
@@ -233,9 +226,8 @@ func New(
 		utxoDB:        utxoDB,
 		utxoState:     utxoState,
 
-		addedStatuses: make(map[ids.ID]choices.Status),
-		statusCache:   statusCache,
-		statusDB:      statusDB,
+		statusCache: statusCache,
+		statusDB:    statusDB,
 
 		addedTxs: make(map[ids.ID]*txs.Tx),
 		txCache:  txCache,
@@ -275,7 +267,69 @@ func (s *state) DeleteUTXO(utxoID ids.ID) {
 	s.modifiedUTXOs[utxoID] = nil
 }
 
+// TODO: After v1.11.x has activated we can rename [getTx] to [GetTx] and delete
+// [getStatus].
 func (s *state) GetTx(txID ids.ID) (*txs.Tx, error) {
+	tx, err := s.getTx(txID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Before the linearization, transactions were persisted before they were
+	// marked as Accepted. However, this function aims to only return accepted
+	// transactions.
+	status, err := s.getStatus(txID)
+	if err == database.ErrNotFound {
+		// If the status wasn't persisted, then the transaction was written
+		// after the linearization, and is accepted.
+		return tx, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	// If the status was persisted, then the transaction was written before the
+	// linearization. If it wasn't marked as accepted, then we treat it as if it
+	// doesn't exist.
+	if status != choices.Accepted {
+		return nil, database.ErrNotFound
+	}
+	return tx, nil
+}
+
+func (s *state) getStatus(id ids.ID) (choices.Status, error) {
+	if s.statusesPruned {
+		return choices.Unknown, database.ErrNotFound
+	}
+
+	if _, ok := s.addedTxs[id]; ok {
+		return choices.Unknown, database.ErrNotFound
+	}
+	if status, found := s.statusCache.Get(id); found {
+		if status == nil {
+			return choices.Unknown, database.ErrNotFound
+		}
+		return *status, nil
+	}
+
+	val, err := database.GetUInt32(s.statusDB, id[:])
+	if err == database.ErrNotFound {
+		s.statusCache.Put(id, nil)
+		return choices.Unknown, database.ErrNotFound
+	}
+	if err != nil {
+		return choices.Unknown, err
+	}
+
+	status := choices.Status(val)
+	if err := status.Valid(); err != nil {
+		return choices.Unknown, err
+	}
+	s.statusCache.Put(id, &status)
+	return status, nil
+}
+
+func (s *state) getTx(txID ids.ID) (*txs.Tx, error) {
 	if tx, exists := s.addedTxs[txID]; exists {
 		return tx, nil
 	}
@@ -428,44 +482,6 @@ func (s *state) SetTimestamp(t time.Time) {
 	s.timestamp = t
 }
 
-// TODO: remove status support
-func (s *state) GetStatus(id ids.ID) (choices.Status, error) {
-	if s.statusesPruned {
-		return choices.Unknown, database.ErrNotFound
-	}
-
-	if status, exists := s.addedStatuses[id]; exists {
-		return status, nil
-	}
-	if status, found := s.statusCache.Get(id); found {
-		if status == nil {
-			return choices.Unknown, database.ErrNotFound
-		}
-		return *status, nil
-	}
-
-	val, err := database.GetUInt32(s.statusDB, id[:])
-	if err == database.ErrNotFound {
-		s.statusCache.Put(id, nil)
-		return choices.Unknown, database.ErrNotFound
-	}
-	if err != nil {
-		return choices.Unknown, err
-	}
-
-	status := choices.Status(val)
-	if err := status.Valid(); err != nil {
-		return choices.Unknown, err
-	}
-	s.statusCache.Put(id, &status)
-	return status, nil
-}
-
-// TODO: remove status support
-func (s *state) AddStatus(id ids.ID, status choices.Status) {
-	s.addedStatuses[id] = status
-}
-
 func (s *state) Commit() error {
 	defer s.Abort()
 	batch, err := s.CommitBatch()
@@ -508,7 +524,6 @@ func (s *state) write() error {
 		s.writeBlockIDs(),
 		s.writeBlocks(),
 		s.writeMetadata(),
-		s.writeStatuses(),
 	)
 	return errs.Err
 }
@@ -537,8 +552,12 @@ func (s *state) writeTxs() error {
 
 		delete(s.addedTxs, txID)
 		s.txCache.Put(txID, tx)
+		s.statusCache.Put(txID, nil)
 		if err := s.txDB.Put(txID[:], txBytes); err != nil {
 			return fmt.Errorf("failed to add tx: %w", err)
+		}
+		if err := s.statusDB.Delete(txID[:]); err != nil {
+			return fmt.Errorf("failed to delete status: %w", err)
 		}
 	}
 	return nil
@@ -583,20 +602,6 @@ func (s *state) writeMetadata() error {
 			return fmt.Errorf("failed to write last accepted: %w", err)
 		}
 		s.persistedLastAccepted = s.lastAccepted
-	}
-	return nil
-}
-
-func (s *state) writeStatuses() error {
-	for id, status := range s.addedStatuses {
-		id := id
-		status := status
-
-		delete(s.addedStatuses, id)
-		s.statusCache.Put(id, &status)
-		if err := database.PutUInt32(s.statusDB, id[:], uint32(status)); err != nil {
-			return fmt.Errorf("failed to add status: %w", err)
-		}
 	}
 	return nil
 }
