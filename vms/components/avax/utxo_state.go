@@ -290,7 +290,5 @@ func (s *utxoState) updateChecksum(modifiedID ids.ID) {
 		return
 	}
 
-	for i, b := range modifiedID {
-		s.checksum[i] ^= b
-	}
+	s.checksum = s.checksum.XOR(modifiedID)
 }
