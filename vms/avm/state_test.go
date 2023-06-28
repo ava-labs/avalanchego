@@ -74,7 +74,6 @@ func TestSetsAndGets(t *testing.T) {
 
 	env.vm.state.AddUTXO(utxo)
 	env.vm.state.AddTx(tx)
-	env.vm.state.DeleteStatus(txID)
 
 	resultUTXO, err := env.vm.state.GetUTXO(utxoID)
 	require.NoError(err)

@@ -563,7 +563,6 @@ func (vm *VM) initState(tx *txs.Tx) {
 		zap.Stringer("txID", txID),
 	)
 	vm.state.AddTx(tx)
-	vm.state.DeleteStatus(txID)
 	for _, utxo := range tx.UTXOs() {
 		vm.state.AddUTXO(utxo)
 	}
