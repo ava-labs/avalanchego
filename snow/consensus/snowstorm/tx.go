@@ -8,26 +8,16 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 // Tx consumes state.
 type Tx interface {
 	choices.Decidable
 
-	// Dependencies is a list of transactions upon which this transaction
-	// depends. Each element of Dependencies must be verified before Verify is
-	// called on this transaction.
-	//
-	// Similarly, each element of Dependencies must be accepted before this
-	// transaction is accepted.
-	Dependencies() ([]Tx, error)
-
-	// InputIDs is a set where each element is the ID of a piece of state that
-	// will be consumed if this transaction is accepted.
-	//
-	// In the context of a UTXO-based payments system, for example, this would
-	// be the IDs of the UTXOs consumed by this transaction
-	InputIDs() []ids.ID
+	// MissingDependencies returns the set of transactions that must be accepted
+	// before this transaction is accepted.
+	MissingDependencies() (set.Set[ids.ID], error)
 
 	// Verify that the state transition this transaction would make if it were
 	// accepted is valid. If the state transition is invalid, a non-nil error
