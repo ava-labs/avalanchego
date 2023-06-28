@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -75,18 +74,14 @@ func TestSetsAndGets(t *testing.T) {
 
 	env.vm.state.AddUTXO(utxo)
 	env.vm.state.AddTx(tx)
-	env.vm.state.AddStatus(txID, choices.Accepted)
 
 	resultUTXO, err := env.vm.state.GetUTXO(utxoID)
 	require.NoError(err)
 	resultTx, err := env.vm.state.GetTx(txID)
 	require.NoError(err)
-	resultStatus, err := env.vm.state.GetStatus(txID)
-	require.NoError(err)
 
 	require.Equal(uint32(1), resultUTXO.OutputIndex)
 	require.Equal(tx.ID(), resultTx.ID())
-	require.Equal(choices.Accepted, resultStatus)
 }
 
 func TestFundingNoAddresses(t *testing.T) {
