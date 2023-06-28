@@ -56,11 +56,9 @@ func (tx *Tx) Accept(context.Context) error {
 
 	tx.vm.state.AddTx(tx.tx)
 
-	txID := tx.ID()
-	tx.vm.state.DeleteStatus(txID)
-
 	commitBatch, err := tx.vm.state.CommitBatch()
 	if err != nil {
+		txID := tx.tx.ID()
 		return fmt.Errorf("couldn't create commitBatch while processing tx %s: %w", txID, err)
 	}
 
@@ -70,6 +68,7 @@ func (tx *Tx) Accept(context.Context) error {
 		commitBatch,
 	)
 	if err != nil {
+		txID := tx.tx.ID()
 		return fmt.Errorf("error committing accepted state changes while processing tx %s: %w", txID, err)
 	}
 

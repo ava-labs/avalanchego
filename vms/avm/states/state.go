@@ -24,7 +24,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
-	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/avm/blocks"
@@ -97,12 +96,6 @@ type State interface {
 	// called during startup.
 	InitializeChainState(stopVertexID ids.ID, genesisTimestamp time.Time) error
 
-	// DeleteStatus removes the status entry from storage.
-	//
-	// TODO: Remove DeleteStatus after v1.11.x has activated and we can assume
-	// all nodes have pruned their statuses from disk.
-	DeleteStatus(id ids.ID)
-
 	// Discard uncommitted changes to the database.
 	Abort()
 
@@ -154,10 +147,9 @@ type state struct {
 	utxoDB        database.Database
 	utxoState     avax.UTXOState
 
-	statusesPruned  bool
-	removedStatuses set.Set[ids.ID]
-	statusCache     cache.Cacher[ids.ID, *choices.Status] // cache of id -> choices.Status. If the entry is nil, it is not in the database
-	statusDB        database.Database
+	statusesPruned bool
+	statusCache    cache.Cacher[ids.ID, *choices.Status] // cache of id -> choices.Status. If the entry is nil, it is not in the database
+	statusDB       database.Database
 
 	addedTxs map[ids.ID]*txs.Tx            // map of txID -> *txs.Tx
 	txCache  cache.Cacher[ids.ID, *txs.Tx] // cache of txID -> *txs.Tx. If the entry is nil, it is not in the database
@@ -310,7 +302,7 @@ func (s *state) getStatus(id ids.ID) (choices.Status, error) {
 		return choices.Unknown, database.ErrNotFound
 	}
 
-	if s.removedStatuses.Contains(id) {
+	if _, ok := s.addedTxs[id]; ok {
 		return choices.Unknown, database.ErrNotFound
 	}
 	if status, found := s.statusCache.Get(id); found {
@@ -490,10 +482,6 @@ func (s *state) SetTimestamp(t time.Time) {
 	s.timestamp = t
 }
 
-func (s *state) DeleteStatus(id ids.ID) {
-	s.removedStatuses.Add(id)
-}
-
 func (s *state) Commit() error {
 	defer s.Abort()
 	batch, err := s.CommitBatch()
@@ -536,7 +524,6 @@ func (s *state) write() error {
 		s.writeBlockIDs(),
 		s.writeBlocks(),
 		s.writeMetadata(),
-		s.writeStatuses(),
 	)
 	return errs.Err
 }
@@ -565,8 +552,12 @@ func (s *state) writeTxs() error {
 
 		delete(s.addedTxs, txID)
 		s.txCache.Put(txID, tx)
+		s.statusCache.Put(txID, nil)
 		if err := s.txDB.Put(txID[:], txBytes); err != nil {
 			return fmt.Errorf("failed to add tx: %w", err)
+		}
+		if err := s.statusDB.Delete(txID[:]); err != nil {
+			return fmt.Errorf("failed to delete status: %w", err)
 		}
 	}
 	return nil
@@ -611,19 +602,6 @@ func (s *state) writeMetadata() error {
 			return fmt.Errorf("failed to write last accepted: %w", err)
 		}
 		s.persistedLastAccepted = s.lastAccepted
-	}
-	return nil
-}
-
-func (s *state) writeStatuses() error {
-	for id := range s.removedStatuses {
-		id := id
-
-		s.removedStatuses.Remove(id)
-		s.statusCache.Put(id, nil)
-		if err := s.statusDB.Delete(id[:]); err != nil {
-			return fmt.Errorf("failed to delete status: %w", err)
-		}
 	}
 	return nil
 }

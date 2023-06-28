@@ -318,18 +318,6 @@ func (mr *MockStateMockRecorder) CommitBatch() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CommitBatch", reflect.TypeOf((*MockState)(nil).CommitBatch))
 }
 
-// DeleteStatus mocks base method.
-func (m *MockState) DeleteStatus(arg0 ids.ID) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "DeleteStatus", arg0)
-}
-
-// DeleteStatus indicates an expected call of DeleteStatus.
-func (mr *MockStateMockRecorder) DeleteStatus(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteStatus", reflect.TypeOf((*MockState)(nil).DeleteStatus), arg0)
-}
-
 // DeleteUTXO mocks base method.
 func (m *MockState) DeleteUTXO(arg0 ids.ID) {
 	m.ctrl.T.Helper()
