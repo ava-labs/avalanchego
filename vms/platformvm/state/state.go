@@ -1637,7 +1637,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 					PotentialDelegateeReward: 0,
 				}
 
-				metadataBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, metadata)
+				metadataBytes, err := validatorMetadataCodec.Marshal(validatorMetadataCodecV0, metadata)
 				if err != nil {
 					return fmt.Errorf("failed to serialize current validator: %w", err)
 				}
