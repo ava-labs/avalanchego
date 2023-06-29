@@ -107,7 +107,7 @@ func Test_Completion(t *testing.T) {
 		})
 		require.NoError(err)
 		require.NotNil(syncer)
-		require.NoError(syncer.StartSyncing(context.Background()))
+		require.NoError(syncer.Start(context.Background()))
 		require.NoError(syncer.Wait(context.Background()))
 		syncer.workLock.Lock()
 		require.Zero(syncer.unprocessedWork.Len())
@@ -209,7 +209,7 @@ func Test_Sync_FindNextKey_InSync(t *testing.T) {
 		require.NoError(err)
 		require.NotNil(syncer)
 
-		require.NoError(syncer.StartSyncing(context.Background()))
+		require.NoError(syncer.Start(context.Background()))
 		require.NoError(syncer.Wait(context.Background()))
 
 		proof, err := dbToSync.GetRangeProof(context.Background(), nil, nil, 500)
@@ -394,7 +394,7 @@ func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 		require.NoError(err)
 		require.NotNil(syncer)
 
-		require.NoError(syncer.StartSyncing(context.Background()))
+		require.NoError(syncer.Start(context.Background()))
 		require.NoError(syncer.Wait(context.Background()))
 
 		proof, err := dbToSync.GetRangeProof(context.Background(), nil, nil, 500)
@@ -513,7 +513,7 @@ func Test_Sync_FindNextKey_DifferentChild(t *testing.T) {
 		})
 		require.NoError(err)
 		require.NotNil(syncer)
-		require.NoError(syncer.StartSyncing(context.Background()))
+		require.NoError(syncer.Start(context.Background()))
 		require.NoError(syncer.Wait(context.Background()))
 
 		proof, err := dbToSync.GetRangeProof(context.Background(), nil, nil, 100)
@@ -769,7 +769,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 		})
 		require.NoError(err)
 		require.NotNil(syncer)
-		require.NoError(syncer.StartSyncing(context.Background()))
+		require.NoError(syncer.Start(context.Background()))
 
 		require.NoError(syncer.Wait(context.Background()))
 		require.NoError(syncer.Error())
@@ -828,7 +828,7 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 		})
 		require.NoError(err)
 		require.NotNil(syncer)
-		require.NoError(syncer.StartSyncing(context.Background()))
+		require.NoError(syncer.Start(context.Background()))
 
 		// Wait until we've processed some work
 		// before updating the sync target.
@@ -854,7 +854,7 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 		require.NoError(err)
 		require.NotNil(newSyncer)
 
-		require.NoError(newSyncer.StartSyncing(context.Background()))
+		require.NoError(newSyncer.Start(context.Background()))
 		require.NoError(newSyncer.Error())
 		require.NoError(newSyncer.Wait(context.Background()))
 
@@ -911,7 +911,7 @@ func Test_Sync_Error_During_Sync(t *testing.T) {
 	require.NoError(err)
 	require.NotNil(syncer)
 
-	require.NoError(syncer.StartSyncing(context.Background()))
+	require.NoError(syncer.Start(context.Background()))
 
 	err = syncer.Wait(context.Background())
 	require.ErrorIs(err, errInvalidRangeProof)
@@ -1000,7 +1000,7 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 		require.NoError(err)
 		require.NotNil(syncer)
 
-		require.NoError(syncer.StartSyncing(context.Background()))
+		require.NoError(syncer.Start(context.Background()))
 
 		// Wait until we've processed some work
 		// before updating the sync target.

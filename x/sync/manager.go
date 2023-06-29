@@ -136,7 +136,7 @@ func NewManager(config ManagerConfig) (*Manager, error) {
 	return m, nil
 }
 
-func (m *Manager) StartSyncing(ctx context.Context) error {
+func (m *Manager) Start(ctx context.Context) error {
 	m.workLock.Lock()
 	defer m.workLock.Unlock()
 
