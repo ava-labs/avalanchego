@@ -109,7 +109,7 @@ Its byte representation (in hex) is: `0x01020204000210579EB3718A7E437D2DDCE931AC
 
 The node's key is empty (its the root) and has value `0x02`.
 It has two children.
-The first is at child index `0`, has compressed path `0x01` and ID (in hex) `579eb3718a7e437d2ddce931ac7cc05a0bc695a9c2084f5df12fb96ad0fa3266`.
+The first is at child index `0`, has compressed path `0x01` and ID (in hex) `0x579eb3718a7e437d2ddce931ac7cc05a0bc695a9c2084f5df12fb96ad0fa3266`.
 The second is at child index `14`, has compressed path `0x0F0F0F` and ID (in hex) `0x9845893c4f9d92c4e097fcf2589bc9d6882b1f18d1c2fc91d7df1d3fcbdb4238`.
 
 ```
