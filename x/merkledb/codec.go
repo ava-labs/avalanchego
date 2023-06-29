@@ -20,11 +20,10 @@ const (
 	trueByte             = 1
 	falseByte            = 0
 	minVarIntLen         = 1
-	boolLen              = 1
+	minMaybeByteSliceLen = 1
 	idLen                = hashing.HashLen
 	minSerializedPathLen = minVarIntLen
 	minByteSliceLen      = minVarIntLen
-	minMaybeByteSliceLen = boolLen
 	minDBNodeLen         = minMaybeByteSliceLen + minVarIntLen
 	minChildLen          = minVarIntLen + minSerializedPathLen + idLen
 )
