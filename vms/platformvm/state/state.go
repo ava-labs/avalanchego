@@ -1675,12 +1675,11 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 				if err != nil {
 					return fmt.Errorf("failed to serialize validator metadata: %w", err)
 				}
-
 				if err = validatorDB.Put(staker.TxID[:], metadataBytes); err != nil {
 					return fmt.Errorf("failed to write validator metadata to list: %w", err)
 				}
-
 				s.validatorState.LoadValidatorMetadata(nodeID, subnetID, metadata)
+
 			case deleted:
 				staker := validatorDiff.validator.staker
 				weightDiff.Amount = staker.Weight
@@ -1719,15 +1718,19 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 				}
 
 				metadata.StakerStartTime = staker.StartTime.Unix()
+				metadata.lastUpdated = staker.StartTime
+				metadata.LastUpdated = uint64(metadata.StakerStartTime)
 				metadata.UpdatedWeight = staker.Weight
 
 				metadataBytes, err = stakersMetadataCodec.Marshal(stakerMetadataCodecV1, metadata)
 				if err != nil {
 					return fmt.Errorf("failed to serialize validator metadata: %w", err)
 				}
-
 				if err = validatorDB.Put(staker.TxID[:], metadataBytes); err != nil {
 					return fmt.Errorf("failed to write validator metadata to list: %w", err)
+				}
+				if err := s.validatorState.UpdateValidatorMetadata(nodeID, subnetID, metadata); err != nil {
+					return fmt.Errorf("failed updating validator metadata: %w", err)
 				}
 
 			case unmodified:

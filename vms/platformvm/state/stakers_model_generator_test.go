@@ -345,7 +345,7 @@ type stakerTimeData struct {
 func genStakerTimeData() gopter.Gen {
 	return gen.Struct(reflect.TypeOf(&stakerTimeData{}), map[string]gopter.Gen{
 		"StartTime": gen.Time(),
-		"Duration":  gen.Int64Range(1, 365*24),
+		"Duration":  gen.Int64Range(int64(time.Hour), int64(365*24*time.Hour)),
 	})
 }
 

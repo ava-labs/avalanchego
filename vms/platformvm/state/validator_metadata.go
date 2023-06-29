@@ -4,6 +4,7 @@
 package state
 
 import (
+	"fmt"
 	"math"
 	"time"
 
@@ -151,6 +152,12 @@ type validatorState interface {
 		amount uint64,
 	) error
 
+	UpdateValidatorMetadata(
+		vdrID ids.NodeID,
+		subnetID ids.ID,
+		uptime *validatorMetadata,
+	) error
+
 	// DeleteValidatorMetadata removes in-memory references to the metadata of
 	// [vdrID] on [subnetID]. If there were staged updates from a prior call to
 	// SetUptime or SetDelegateeReward, the updates will be dropped. This call
@@ -240,6 +247,21 @@ func (m *metadata) SetDelegateeReward(
 		return database.ErrNotFound
 	}
 	metadata.PotentialDelegateeReward = amount
+
+	m.addUpdatedMetadata(vdrID, subnetID)
+	return nil
+}
+
+func (m *metadata) UpdateValidatorMetadata(
+	vdrID ids.NodeID,
+	subnetID ids.ID,
+	uptime *validatorMetadata,
+) error {
+	subnetMetadata, ok := m.metadata[vdrID]
+	if !ok {
+		return fmt.Errorf("missing metadata for node %v", vdrID)
+	}
+	subnetMetadata[subnetID] = uptime
 
 	m.addUpdatedMetadata(vdrID, subnetID)
 	return nil

@@ -13,12 +13,14 @@ import (
 	"github.com/leanovate/gopter"
 	"github.com/leanovate/gopter/gen"
 	"github.com/leanovate/gopter/prop"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	bls "github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -1030,6 +1032,7 @@ func TestValidatorSetOperations(t *testing.T) {
 			diff.PutCurrentValidator(val)
 
 			updatedStaker := *val
+			ShiftStakerAheadInPlace(&updatedStaker, updatedStaker.EndTime)
 			IncreaseStakerWeightInPlace(&updatedStaker, updatedStaker.Weight*2)
 			err = diff.UpdateCurrentValidator(&updatedStaker)
 			if err != nil {
@@ -1132,6 +1135,118 @@ func TestValidatorSetOperations(t *testing.T) {
 		},
 		stakerTxGenerator(ctx, permissionlessValidator, &trackedSubnet, nil, &signer.Empty{}, math.MaxUint64),
 		stakerTxGenerator(ctx, permissionlessDelegator, &trackedSubnet, nil, &signer.Empty{}, math.MaxUint64),
+	))
+
+	properties.TestingRun(t)
+}
+
+// TestValidatorSetOperations verifies that validators set is duly updated
+// upon different stakers operations
+func TestValidatorUptimesOperations(t *testing.T) {
+	properties := gopter.NewProperties(nil)
+	ctx := buildStateCtx()
+	sk1, err := bls.NewSecretKey()
+	require.NoError(t, err)
+	sig := signer.NewProofOfPossession(sk1)
+
+	properties.Property("staker start time is updated following shift", prop.ForAll(
+		func(nonInitValTx *txs.Tx) string {
+			diff, baseState, err := buildDiffOnTopOfBaseState([]ids.ID{})
+			if err != nil {
+				return fmt.Sprintf("unexpected error while creating diff, err %v", err)
+			}
+
+			signedValTx, err := txs.NewSigned(nonInitValTx.Unsigned, txs.Codec, nil)
+			if err != nil {
+				panic(fmt.Errorf("failed signing tx in tx generator, %w", err))
+			}
+
+			stakerTx := signedValTx.Unsigned.(txs.StakerTx)
+			val, err := NewCurrentStaker(signedValTx.ID(), stakerTx, uint64(1000))
+			if err != nil {
+				return err.Error()
+			}
+
+			// 1. Insert the validator
+			var (
+				subnetID = val.SubnetID
+				nodeID   = val.NodeID
+			)
+			diff.PutCurrentValidator(val)
+			err = diff.Apply(baseState)
+			if err != nil {
+				return fmt.Sprintf("could not apply diff, err %v", err)
+			}
+			err = baseState.Commit()
+			if err != nil {
+				return fmt.Sprintf("could not commit state, err %v", err)
+			}
+
+			// Check start time
+			startTime, err := baseState.GetStartTime(nodeID, subnetID)
+			if err != nil {
+				return fmt.Sprintf("could not get validator start time, err %v", err)
+			}
+			if !startTime.Equal(val.StartTime) {
+				return fmt.Sprintf("wrong start time, expected %v, got %v", val.StartTime, startTime)
+			}
+
+			// Check uptimes
+			_, lastUpdated, err := baseState.GetUptime(nodeID, subnetID)
+			if err != nil {
+				return fmt.Sprintf("could not get validator uptime, err %v", err)
+			}
+			if !lastUpdated.Equal(val.StartTime) {
+				return fmt.Sprintf("wrong start time, expected %v, got %v", val.StartTime, startTime)
+			}
+
+			// 2. Shift the validator
+			updatedStaker := *val
+			ShiftStakerAheadInPlace(&updatedStaker, updatedStaker.EndTime)
+			IncreaseStakerWeightInPlace(&updatedStaker, updatedStaker.Weight*2)
+
+			diff, err = NewDiff(baseState.GetLastAccepted(), &versionsHolder{
+				baseState: baseState,
+			})
+			if err != nil {
+				return fmt.Sprintf("unexpected error while creating diff, err %v", err)
+			}
+
+			err = diff.UpdateCurrentValidator(&updatedStaker)
+			if err != nil {
+				return fmt.Sprintf("could not update current validator, err %v", err)
+			}
+
+			err = diff.Apply(baseState)
+			if err != nil {
+				return fmt.Sprintf("could not apply diff, err %v", err)
+			}
+			err = baseState.Commit()
+			if err != nil {
+				return fmt.Sprintf("could not commit state, err %v", err)
+			}
+
+			// Check start time
+			startTime, err = baseState.GetStartTime(nodeID, subnetID)
+			if err != nil {
+				return fmt.Sprintf("could not get validator start time, err %v", err)
+			}
+			if !startTime.Equal(updatedStaker.StartTime) {
+				return fmt.Sprintf("wrong start time, expected %v, got %v", updatedStaker.StartTime, startTime)
+			}
+
+			// Check uptimes
+			_, lastUpdated, err = baseState.GetUptime(nodeID, subnetID)
+			if err != nil {
+				return fmt.Sprintf("could not get validator uptime, err %v", err)
+			}
+			if !lastUpdated.Equal(updatedStaker.StartTime) {
+				return fmt.Sprintf("wrong updated start time, expected %v, got %v", val.StartTime, startTime)
+			}
+
+			return ""
+		},
+		stakerTxGenerator(ctx, permissionlessValidator, &constants.PrimaryNetworkID, nil, sig, math.MaxUint64),
 	))
 
 	properties.TestingRun(t)
