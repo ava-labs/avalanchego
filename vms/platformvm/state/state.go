@@ -1165,6 +1165,9 @@ func (s *state) loadCurrentStakers() error {
 		if err != nil {
 			return err
 		}
+		if metadata.UpdatedWeight != 0 {
+			staker.Weight = metadata.UpdatedWeight
+		}
 
 		validator := s.currentStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 		validator.validator = staker
@@ -1214,6 +1217,10 @@ func (s *state) loadCurrentStakers() error {
 		if err != nil {
 			return err
 		}
+		if metadata.UpdatedWeight != 0 {
+			staker.Weight = metadata.UpdatedWeight
+		}
+
 		validator := s.currentStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 		validator.validator = staker
 
@@ -1660,7 +1667,9 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 					LastUpdated:              uint64(staker.StartTime.Unix()),
 					PotentialReward:          staker.PotentialReward,
 					PotentialDelegateeReward: 0,
-					StakerStartTime:          staker.StartTime.Unix(),
+
+					StakerStartTime: staker.StartTime.Unix(),
+					UpdatedWeight:   staker.Weight,
 				}
 
 				// Let's start using V1 as soon as we deploy code. No need to
@@ -1713,6 +1722,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 				}
 
 				metadata.StakerStartTime = staker.StartTime.Unix()
+				metadata.UpdatedWeight = staker.Weight
 
 				metadataBytes, err = stakersMetadataCodec.Marshal(stakerMetadataCodecV1, metadata)
 				if err != nil {

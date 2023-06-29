@@ -27,6 +27,7 @@ var (
 	_ Versions         = (*sysUnderTest)(nil)
 	_ commands.Command = (*putCurrentValidatorCommand)(nil)
 	_ commands.Command = (*shiftCurrentValidatorCommand)(nil)
+	_ commands.Command = (*increaseWeightCurrentValidatorCommand)(nil)
 	_ commands.Command = (*deleteCurrentValidatorCommand)(nil)
 	_ commands.Command = (*putCurrentDelegatorCommand)(nil)
 	_ commands.Command = (*shiftCurrentDelegatorCommand)(nil)
@@ -37,6 +38,7 @@ var (
 	_ commands.Command = (*rebuildStateCommand)(nil)
 
 	commandsCtx = buildStateCtx()
+	extraWeight = uint64(100)
 )
 
 // TestStateAndDiffComparisonToStorageModel verifies that a production-like
@@ -52,7 +54,7 @@ func TestStateAndDiffComparisonToStorageModel(t *testing.T) {
 	properties := gopter.NewProperties(nil)
 
 	// // to reproduce a given scenario do something like this:
-	// parameters := gopter.DefaultTestParametersWithSeed(1688023565997624380)
+	// parameters := gopter.DefaultTestParametersWithSeed(1688032690701689530)
 	// properties := gopter.NewProperties(parameters)
 
 	properties.Property("state comparison to storage model", commands.Prop(stakersCommands))
@@ -190,7 +192,8 @@ var stakersCommands = &commands.ProtoCommands{
 	GenCommandFunc: func(state commands.State) gopter.Gen {
 		return gen.OneGenOf(
 			genPutCurrentValidatorCommand,
-			genUpdateCurrentValidatorCommand,
+			genShiftCurrentValidatorCommand,
+			genIncreaseWeightCurrentValidatorCommand,
 			genDeleteCurrentValidatorCommand,
 
 			genPutCurrentDelegatorCommand,
@@ -269,7 +272,7 @@ var genPutCurrentValidatorCommand = addPermissionlessValidatorTxGenerator(comman
 	},
 )
 
-// UpdateCurrentValidator section
+// ShiftCurrentValidator section
 type shiftCurrentValidatorCommand struct{}
 
 func (*shiftCurrentValidatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
@@ -382,9 +385,128 @@ func (*shiftCurrentValidatorCommand) String() string {
 	return "shiftCurrentValidatorCommand"
 }
 
-var genUpdateCurrentValidatorCommand = gen.IntRange(1, 2).Map(
+var genShiftCurrentValidatorCommand = gen.IntRange(1, 2).Map(
 	func(int) commands.Command {
 		return &shiftCurrentValidatorCommand{}
+	},
+)
+
+// increaseWeightCurrentValidator section
+type increaseWeightCurrentValidatorCommand struct{}
+
+func (*increaseWeightCurrentValidatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
+	sys := sut.(*sysUnderTest)
+	err := increaseWeightCurrentValidatorInSystem(sys)
+	if err != nil {
+		panic(err)
+	}
+	return sys
+}
+
+func increaseWeightCurrentValidatorInSystem(sys *sysUnderTest) error {
+	// 1. check if there is a staker, already inserted. If not return
+	// 2. Add diff layer on top (to test update across diff layers)
+	// 3. query the staker
+	// 4. increase staker weight and update the staker
+
+	chain := sys.getTopChainState()
+
+	// 1. check if there is a staker, already inserted. If not return
+	stakerIt, err := chain.GetCurrentStakerIterator()
+	if err != nil {
+		return err
+	}
+
+	var (
+		found  bool
+		staker *Staker
+	)
+	for !found && stakerIt.Next() {
+		staker = stakerIt.Value()
+		if staker.Priority == txs.SubnetPermissionedValidatorCurrentPriority ||
+			staker.Priority == txs.SubnetPermissionlessValidatorCurrentPriority ||
+			staker.Priority == txs.PrimaryNetworkValidatorCurrentPriority {
+			found = true
+			break
+		}
+	}
+	if !found {
+		stakerIt.Release()
+		return nil // no current validator to update
+	}
+	stakerIt.Release()
+
+	// 2. Add diff layer on top
+	sys.addDiffOnTop()
+	chain = sys.getTopChainState()
+
+	// 3. query the staker
+	staker, err = chain.GetCurrentValidator(staker.SubnetID, staker.NodeID)
+	if err != nil {
+		return err
+	}
+
+	// 4. increase staker weight and update the staker
+	updatedStaker := *staker
+	updatedStaker.Weight += extraWeight
+	return chain.UpdateCurrentValidator(&updatedStaker)
+}
+
+func (*increaseWeightCurrentValidatorCommand) NextState(cmdState commands.State) commands.State {
+	model := cmdState.(*stakersStorageModel)
+
+	err := increaseWeightCurrentValidatorInModel(model)
+	if err != nil {
+		panic(err)
+	}
+	return cmdState
+}
+
+func increaseWeightCurrentValidatorInModel(model *stakersStorageModel) error {
+	stakerIt, err := model.GetCurrentStakerIterator()
+	if err != nil {
+		return err
+	}
+
+	var (
+		found  bool
+		staker *Staker
+	)
+	for !found && stakerIt.Next() {
+		staker = stakerIt.Value()
+		if staker.Priority == txs.SubnetPermissionedValidatorCurrentPriority ||
+			staker.Priority == txs.SubnetPermissionlessValidatorCurrentPriority ||
+			staker.Priority == txs.PrimaryNetworkValidatorCurrentPriority {
+			found = true
+			break
+		}
+	}
+	if !found {
+		stakerIt.Release()
+		return nil // no current validator to update
+	}
+	stakerIt.Release()
+
+	updatedStaker := *staker
+	updatedStaker.Weight += extraWeight
+	return model.UpdateCurrentValidator(&updatedStaker)
+}
+
+func (*increaseWeightCurrentValidatorCommand) PreCondition(commands.State) bool {
+	return true
+}
+
+func (*increaseWeightCurrentValidatorCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
+	return checkSystemAndModelContent(cmdState, res)
+}
+
+func (*increaseWeightCurrentValidatorCommand) String() string {
+	return "increaseWeightCurrentValidatorCommand"
+}
+
+var genIncreaseWeightCurrentValidatorCommand = gen.IntRange(1, 2).Map(
+	func(int) commands.Command {
+		return &increaseWeightCurrentValidatorCommand{}
 	},
 )
 
