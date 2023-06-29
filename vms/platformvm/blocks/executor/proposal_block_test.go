@@ -1098,7 +1098,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 	staker, err = state.NewCurrentStaker(
 		addStaker0.ID(),
 		stakerTx,
-		staker.StartTime,
+		stakerTx.StartTime(),
 		0,
 	)
 	require.NoError(err)
