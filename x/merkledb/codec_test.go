@@ -205,13 +205,12 @@ func FuzzCodecDBNodeCanonical(f *testing.F) {
 
 			codec := codec.(*codecImpl)
 			node := &dbNode{}
-			got, err := codec.decodeDBNode(b, node)
-			if err != nil {
+			if err := codec.decodeDBNode(b, node); err != nil {
 				return
 			}
 
 			// Encoding [node] should be the same as [b].
-			buf, err := codec.encodeDBNode(got, node)
+			buf, err := codec.encodeDBNode(node)
 			require.NoError(err)
 			require.Equal(b, buf)
 		},
@@ -264,19 +263,17 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 				children: children,
 			}
 
-			nodeBytes, err := codec.encodeDBNode(version, &node)
+			nodeBytes, err := codec.encodeDBNode(&node)
 			require.NoError(err)
 
 			var gotNode dbNode
-			gotVersion, err := codec.decodeDBNode(nodeBytes, &gotNode)
-			require.NoError(err)
-			require.Equal(version, gotVersion)
+			require.NoError(codec.decodeDBNode(nodeBytes, &gotNode))
 
 			nilEmptySlices(&node)
 			nilEmptySlices(&gotNode)
 			require.Equal(node, gotNode)
 
-			nodeBytes2, err := codec.encodeDBNode(version, &gotNode)
+			nodeBytes2, err := codec.encodeDBNode(&gotNode)
 			require.NoError(err)
 			require.Equal(nodeBytes, nodeBytes2)
 		},
@@ -286,14 +283,14 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 func TestCodec_DecodeDBNode(t *testing.T) {
 	require := require.New(t)
 
-	_, err := codec.decodeDBNode([]byte{1}, nil)
+	err := codec.decodeDBNode([]byte{1}, nil)
 	require.ErrorIs(err, errDecodeNil)
 
 	var (
 		parsedDBNode  dbNode
 		tooShortBytes = make([]byte, minDBNodeLen-1)
 	)
-	_, err = codec.decodeDBNode(tooShortBytes, &parsedDBNode)
+	err = codec.decodeDBNode(tooShortBytes, &parsedDBNode)
 	require.ErrorIs(err, io.ErrUnexpectedEOF)
 
 	proof := dbNode{
@@ -301,7 +298,7 @@ func TestCodec_DecodeDBNode(t *testing.T) {
 		children: map[byte]child{},
 	}
 
-	nodeBytes, err := codec.encodeDBNode(version, &proof)
+	nodeBytes, err := codec.encodeDBNode(&proof)
 	require.NoError(err)
 
 	// Remove num children (0) from end
@@ -310,7 +307,7 @@ func TestCodec_DecodeDBNode(t *testing.T) {
 	// Put num children -1 at end
 	require.NoError(codec.(*codecImpl).encodeInt(proofBytesBuf, -1))
 
-	_, err = codec.decodeDBNode(proofBytesBuf.Bytes(), &parsedDBNode)
+	err = codec.decodeDBNode(proofBytesBuf.Bytes(), &parsedDBNode)
 	require.ErrorIs(err, errNegativeNumChildren)
 
 	// Remove num children from end
@@ -320,6 +317,6 @@ func TestCodec_DecodeDBNode(t *testing.T) {
 	// Put num children NodeBranchFactor+1 at end
 	require.NoError(codec.(*codecImpl).encodeInt(proofBytesBuf, NodeBranchFactor+1))
 
-	_, err = codec.decodeDBNode(proofBytesBuf.Bytes(), &parsedDBNode)
+	err = codec.decodeDBNode(proofBytesBuf.Bytes(), &parsedDBNode)
 	require.ErrorIs(err, errTooManyChildren)
 }
