@@ -1045,7 +1045,7 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 	item := &syncWorkItem{
 		start:       []byte{1},
 		end:         []byte{2},
-		LocalRootID: ids.GenerateTestID(),
+		localRootID: ids.GenerateTestID(),
 	}
 	m.processedWork.Insert(item)
 
