@@ -17,26 +17,14 @@ import (
 )
 
 const (
-	codecVersion         = 0
 	trueByte             = 1
 	falseByte            = 0
 	minVarIntLen         = 1
-	boolLen              = 1
+	minMaybeByteSliceLen = 1
 	idLen                = hashing.HashLen
-	minCodecVersionLen   = minVarIntLen
 	minSerializedPathLen = minVarIntLen
 	minByteSliceLen      = minVarIntLen
-	minMaybeByteSliceLen = boolLen
-	minProofPathLen      = minVarIntLen
-	minKeyValueLen       = 2 * minByteSliceLen
-	minKeyChangeLen      = minByteSliceLen + minMaybeByteSliceLen
-	minProofNodeLen      = minSerializedPathLen + minMaybeByteSliceLen + minVarIntLen
-	minProofLen          = minCodecVersionLen + minProofPathLen + minByteSliceLen
-	minChangeProofLen    = minCodecVersionLen + boolLen + 2*minProofPathLen + minVarIntLen
-	minRangeProofLen     = minCodecVersionLen + 2*minProofPathLen + minVarIntLen
-	minDBNodeLen         = minCodecVersionLen + minMaybeByteSliceLen + minVarIntLen
-	minHashValuesLen     = minCodecVersionLen + minVarIntLen + minMaybeByteSliceLen + minSerializedPathLen
-	minProofNodeChildLen = minVarIntLen + idLen
+	minDBNodeLen         = minMaybeByteSliceLen + minVarIntLen
 	minChildLen          = minVarIntLen + minSerializedPathLen + idLen
 )
 
@@ -46,7 +34,6 @@ var (
 	trueBytes  = []byte{trueByte}
 	falseBytes = []byte{falseByte}
 
-	errUnknownVersion       = errors.New("unknown codec version")
 	errEncodeNil            = errors.New("can't encode nil pointer or interface")
 	errDecodeNil            = errors.New("can't decode nil")
 	errNegativeNumChildren  = errors.New("number of children is negative")
@@ -59,7 +46,6 @@ var (
 	errNonZeroNibblePadding = errors.New("nibbles should be padded with 0s")
 	errExtraSpace           = errors.New("trailing buffer space")
 	errNegativeSliceLength  = errors.New("negative slice length")
-	errInvalidCodecVersion  = errors.New("invalid codec version")
 )
 
 // encoderDecoder defines the interface needed by merkleDB to marshal
@@ -70,41 +56,34 @@ type encoderDecoder interface {
 }
 
 type encoder interface {
-	encodeDBNode(version uint16, n *dbNode) ([]byte, error)
-	encodeHashValues(version uint16, hv *hashValues) ([]byte, error)
+	encodeDBNode(n *dbNode) ([]byte, error)
+	encodeHashValues(hv *hashValues) ([]byte, error)
 }
 
 type decoder interface {
-	decodeDBNode(bytes []byte, n *dbNode) (uint16, error)
+	decodeDBNode(bytes []byte, n *dbNode) error
 }
 
-func newCodec() (encoderDecoder, uint16) {
+func newCodec() encoderDecoder {
 	return &codecImpl{
 		varIntPool: sync.Pool{
 			New: func() interface{} {
 				return make([]byte, binary.MaxVarintLen64)
 			},
 		},
-	}, codecVersion
+	}
 }
 
 type codecImpl struct {
 	varIntPool sync.Pool
 }
 
-func (c *codecImpl) encodeDBNode(version uint16, n *dbNode) ([]byte, error) {
+func (c *codecImpl) encodeDBNode(n *dbNode) ([]byte, error) {
 	if n == nil {
 		return nil, errEncodeNil
 	}
 
-	if version != codecVersion {
-		return nil, fmt.Errorf("%w: %d", errUnknownVersion, version)
-	}
-
 	buf := &bytes.Buffer{}
-	if err := c.encodeInt(buf, int(version)); err != nil {
-		return nil, err
-	}
 	if err := c.encodeMaybeByteSlice(buf, n.value); err != nil {
 		return nil, err
 	}
@@ -129,20 +108,12 @@ func (c *codecImpl) encodeDBNode(version uint16, n *dbNode) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func (c *codecImpl) encodeHashValues(version uint16, hv *hashValues) ([]byte, error) {
+func (c *codecImpl) encodeHashValues(hv *hashValues) ([]byte, error) {
 	if hv == nil {
 		return nil, errEncodeNil
 	}
 
-	if version != codecVersion {
-		return nil, fmt.Errorf("%w: %d", errUnknownVersion, version)
-	}
-
 	buf := &bytes.Buffer{}
-
-	if err := c.encodeInt(buf, int(version)); err != nil {
-		return nil, err
-	}
 
 	length := len(hv.Children)
 	if err := c.encodeInt(buf, length); err != nil {
@@ -170,12 +141,12 @@ func (c *codecImpl) encodeHashValues(version uint16, hv *hashValues) ([]byte, er
 	return buf.Bytes(), nil
 }
 
-func (c *codecImpl) decodeDBNode(b []byte, n *dbNode) (uint16, error) {
+func (c *codecImpl) decodeDBNode(b []byte, n *dbNode) error {
 	if n == nil {
-		return 0, errDecodeNil
+		return errDecodeNil
 	}
 	if minDBNodeLen > len(b) {
-		return 0, io.ErrUnexpectedEOF
+		return io.ErrUnexpectedEOF
 	}
 
 	var (
@@ -183,29 +154,21 @@ func (c *codecImpl) decodeDBNode(b []byte, n *dbNode) (uint16, error) {
 		err error
 	)
 
-	gotCodecVersion, err := c.decodeInt(src)
-	if err != nil {
-		return 0, err
-	}
-	if codecVersion != gotCodecVersion {
-		return 0, fmt.Errorf("%w: %d", errInvalidCodecVersion, gotCodecVersion)
-	}
-
 	if n.value, err = c.decodeMaybeByteSlice(src); err != nil {
-		return 0, err
+		return err
 	}
 
 	numChildren, err := c.decodeInt(src)
 	if err != nil {
-		return 0, err
+		return err
 	}
 	switch {
 	case numChildren < 0:
-		return 0, errNegativeNumChildren
+		return errNegativeNumChildren
 	case numChildren > NodeBranchFactor:
-		return 0, errTooManyChildren
+		return errTooManyChildren
 	case numChildren > src.Len()/minChildLen:
-		return 0, io.ErrUnexpectedEOF
+		return io.ErrUnexpectedEOF
 	}
 
 	n.children = make(map[byte]child, NodeBranchFactor)
@@ -213,20 +176,20 @@ func (c *codecImpl) decodeDBNode(b []byte, n *dbNode) (uint16, error) {
 	for i := 0; i < numChildren; i++ {
 		var index int
 		if index, err = c.decodeInt(src); err != nil {
-			return 0, err
+			return err
 		}
 		if index <= previousChild || index > NodeBranchFactor-1 {
-			return 0, errChildIndexTooLarge
+			return errChildIndexTooLarge
 		}
 		previousChild = index
 
 		var compressedPath SerializedPath
 		if compressedPath, err = c.decodeSerializedPath(src); err != nil {
-			return 0, err
+			return err
 		}
 		var childID ids.ID
 		if childID, err = c.decodeID(src); err != nil {
-			return 0, err
+			return err
 		}
 		n.children[byte(index)] = child{
 			compressedPath: compressedPath.deserialize(),
@@ -234,9 +197,9 @@ func (c *codecImpl) decodeDBNode(b []byte, n *dbNode) (uint16, error) {
 		}
 	}
 	if src.Len() != 0 {
-		return 0, errExtraSpace
+		return errExtraSpace
 	}
-	return codecVersion, err
+	return err
 }
 
 func (*codecImpl) encodeBool(dst io.Writer, value bool) error {
