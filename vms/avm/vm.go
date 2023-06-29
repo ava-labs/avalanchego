@@ -24,7 +24,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/pubsub"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
@@ -54,10 +53,7 @@ import (
 	txexecutor "github.com/ava-labs/avalanchego/vms/avm/txs/executor"
 )
 
-const (
-	assetToFxCacheSize = 1024
-	txDeduplicatorSize = 8192
-)
+const assetToFxCacheSize = 1024
 
 var (
 	errIncompatibleFx            = errors.New("incompatible feature extension")
@@ -116,8 +112,6 @@ type VM struct {
 
 	addressTxsIndexer index.AddressTxsIndexer
 
-	uniqueTxs cache.Deduplicator[ids.ID, *UniqueTx]
-
 	txBackend *txexecutor.Backend
 
 	// These values are only initialized after the chain has been linearized.
@@ -143,6 +137,7 @@ func (*VM) Disconnected(context.Context, ids.NodeID) error {
 type Config struct {
 	IndexTransactions    bool `json:"index-transactions"`
 	IndexAllowIncomplete bool `json:"index-allow-incomplete"`
+	ChecksumsEnabled     bool `json:"checksums-enabled"`
 }
 
 func (vm *VM) Initialize(
@@ -226,7 +221,12 @@ func (vm *VM) Initialize(
 	vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(ctx.SharedMemory, codec)
 	vm.Spender = utxo.NewSpender(&vm.clock, codec)
 
-	state, err := states.New(vm.db, vm.parser, vm.registerer)
+	state, err := states.New(
+		vm.db,
+		vm.parser,
+		vm.registerer,
+		avmConfig.ChecksumsEnabled,
+	)
 	if err != nil {
 		return err
 	}
@@ -237,9 +237,6 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	vm.uniqueTxs = &cache.EvictableLRU[ids.ID, *UniqueTx]{
-		Size: txDeduplicatorSize,
-	}
 	vm.walletService.vm = vm
 	vm.walletService.pendingTxs = linkedhashmap.New[ids.ID, *txs.Tx]()
 
@@ -288,19 +285,6 @@ func (vm *VM) onNormalOperationsStarted() error {
 		if err := fx.Fx.Bootstrapped(); err != nil {
 			return err
 		}
-	}
-
-	txID, err := ids.FromString("2JPwx3rbUy877CWYhtXpfPVS5tD8KfnbiF5pxMRu6jCaq5dnME")
-	if err != nil {
-		return err
-	}
-	utxoID := avax.UTXOID{
-		TxID:        txID,
-		OutputIndex: 192,
-	}
-	vm.state.DeleteUTXO(utxoID.InputID())
-	if err := vm.state.Commit(); err != nil {
-		return err
 	}
 
 	vm.bootstrapped = true
@@ -424,9 +408,7 @@ func (vm *VM) Linearize(_ context.Context, stopVertexID ids.ID, toEngine chan<- 
 	vm.chainManager = blockexecutor.NewManager(
 		mempool,
 		vm.metrics,
-		&chainState{
-			State: vm.state,
-		},
+		vm.state,
 		vm.txBackend,
 		&vm.clock,
 		vm.onAccept,
@@ -451,33 +433,37 @@ func (vm *VM) Linearize(_ context.Context, stopVertexID ids.ID, toEngine chan<- 
 	// chainVM has been initialized. Traffic will immediately start being
 	// handled asynchronously.
 	vm.Atomic.Set(vm.network)
+
+	go func() {
+		err := vm.state.Prune(&vm.ctx.Lock, vm.ctx.Log)
+		if err != nil {
+			vm.ctx.Log.Error("state pruning failed",
+				zap.Error(err),
+			)
+		}
+	}()
+
 	return nil
 }
 
 func (vm *VM) ParseTx(_ context.Context, bytes []byte) (snowstorm.Tx, error) {
-	rawTx, err := vm.parser.ParseTx(bytes)
+	tx, err := vm.parser.ParseTx(bytes)
 	if err != nil {
 		return nil, err
 	}
 
-	tx := &UniqueTx{
-		TxCachedState: &TxCachedState{
-			Tx: rawTx,
-		},
-		vm:   vm,
-		txID: rawTx.ID(),
-	}
-	if err := tx.SyntacticVerify(); err != nil {
+	err = tx.Unsigned.Visit(&txexecutor.SyntacticVerifier{
+		Backend: vm.txBackend,
+		Tx:      tx,
+	})
+	if err != nil {
 		return nil, err
 	}
 
-	if tx.Status() == choices.Unknown {
-		vm.state.AddTx(tx.Tx)
-		tx.setStatus(choices.Processing)
-		return tx, vm.state.Commit()
-	}
-
-	return tx, nil
+	return &Tx{
+		vm: vm,
+		tx: tx,
+	}, nil
 }
 
 /*
@@ -577,7 +563,6 @@ func (vm *VM) initState(tx *txs.Tx) {
 		zap.Stringer("txID", txID),
 	)
 	vm.state.AddTx(tx)
-	vm.state.AddStatus(txID, choices.Accepted)
 	for _, utxo := range tx.UTXOs() {
 		vm.state.AddUTXO(utxo)
 	}
@@ -684,9 +669,4 @@ func (vm *VM) onAccept(tx *txs.Tx) error {
 	vm.pubsub.Publish(NewPubSubFilterer(tx))
 	vm.walletService.decided(txID)
 	return nil
-}
-
-// UniqueTx de-duplicates the transaction.
-func (vm *VM) DeduplicateTx(tx *UniqueTx) *UniqueTx {
-	return vm.uniqueTxs.Deduplicate(tx)
 }

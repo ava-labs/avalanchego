@@ -9,11 +9,12 @@ package states
 
 import (
 	reflect "reflect"
+	sync "sync"
 	time "time"
 
 	database "github.com/ava-labs/avalanchego/database"
 	ids "github.com/ava-labs/avalanchego/ids"
-	choices "github.com/ava-labs/avalanchego/snow/choices"
+	logging "github.com/ava-labs/avalanchego/utils/logging"
 	blocks "github.com/ava-labs/avalanchego/vms/avm/blocks"
 	txs "github.com/ava-labs/avalanchego/vms/avm/txs"
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
@@ -250,18 +251,6 @@ func (mr *MockStateMockRecorder) AddBlock(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddBlock", reflect.TypeOf((*MockState)(nil).AddBlock), arg0)
 }
 
-// AddStatus mocks base method.
-func (m *MockState) AddStatus(arg0 ids.ID, arg1 choices.Status) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "AddStatus", arg0, arg1)
-}
-
-// AddStatus indicates an expected call of AddStatus.
-func (mr *MockStateMockRecorder) AddStatus(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddStatus", reflect.TypeOf((*MockState)(nil).AddStatus), arg0, arg1)
-}
-
 // AddTx mocks base method.
 func (m *MockState) AddTx(arg0 *txs.Tx) {
 	m.ctrl.T.Helper()
@@ -284,6 +273,21 @@ func (m *MockState) AddUTXO(arg0 *avax.UTXO) {
 func (mr *MockStateMockRecorder) AddUTXO(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddUTXO", reflect.TypeOf((*MockState)(nil).AddUTXO), arg0)
+}
+
+// Checksums mocks base method.
+func (m *MockState) Checksums() (ids.ID, ids.ID) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Checksums")
+	ret0, _ := ret[0].(ids.ID)
+	ret1, _ := ret[1].(ids.ID)
+	return ret0, ret1
+}
+
+// Checksums indicates an expected call of Checksums.
+func (mr *MockStateMockRecorder) Checksums() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Checksums", reflect.TypeOf((*MockState)(nil).Checksums))
 }
 
 // Close mocks base method.
@@ -385,21 +389,6 @@ func (mr *MockStateMockRecorder) GetLastAccepted() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLastAccepted", reflect.TypeOf((*MockState)(nil).GetLastAccepted))
 }
 
-// GetStatus mocks base method.
-func (m *MockState) GetStatus(arg0 ids.ID) (choices.Status, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetStatus", arg0)
-	ret0, _ := ret[0].(choices.Status)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetStatus indicates an expected call of GetStatus.
-func (mr *MockStateMockRecorder) GetStatus(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStatus", reflect.TypeOf((*MockState)(nil).GetStatus), arg0)
-}
-
 // GetTimestamp mocks base method.
 func (m *MockState) GetTimestamp() time.Time {
 	m.ctrl.T.Helper()
@@ -471,6 +460,20 @@ func (m *MockState) IsInitialized() (bool, error) {
 func (mr *MockStateMockRecorder) IsInitialized() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsInitialized", reflect.TypeOf((*MockState)(nil).IsInitialized))
+}
+
+// Prune mocks base method.
+func (m *MockState) Prune(arg0 sync.Locker, arg1 logging.Logger) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Prune", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Prune indicates an expected call of Prune.
+func (mr *MockStateMockRecorder) Prune(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Prune", reflect.TypeOf((*MockState)(nil).Prune), arg0, arg1)
 }
 
 // SetInitialized mocks base method.
