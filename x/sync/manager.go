@@ -25,8 +25,8 @@ const (
 )
 
 var (
-	ErrAlreadyStarted             = errors.New("cannot start a StateSyncManager that has already been started")
-	ErrAlreadyClosed              = errors.New("StateSyncManager is closed")
+	ErrAlreadyStarted             = errors.New("cannot start a Manager that has already been started")
+	ErrAlreadyClosed              = errors.New("Manager is closed")
 	ErrNoClientProvided           = errors.New("client is a required field of the sync config")
 	ErrNoDatabaseProvided         = errors.New("sync database is a required field of the sync config")
 	ErrNoLogProvided              = errors.New("log is a required field of the sync config")
@@ -113,7 +113,7 @@ type ManagerConfig struct {
 	TargetRoot            ids.ID
 }
 
-func NewStateSyncManager(config ManagerConfig) (*Manager, error) {
+func NewManager(config ManagerConfig) (*Manager, error) {
 	switch {
 	case config.Client == nil:
 		return nil, ErrNoClientProvided
