@@ -15,14 +15,14 @@ import (
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
-var _ pb.SyncableDBServer = (*DBServer)(nil)
+var _ pb.DBServer = (*DBServer)(nil)
 
 func NewDBServer(db sync.DB) *DBServer {
 	return &DBServer{db: db}
 }
 
 type DBServer struct {
-	pb.UnsafeSyncableDBServer
+	pb.UnsafeDBServer
 
 	db sync.DB
 }

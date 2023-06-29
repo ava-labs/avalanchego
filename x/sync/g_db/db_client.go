@@ -18,12 +18,12 @@ import (
 
 var _ sync.DB = (*DBClient)(nil)
 
-func NewDBClient(client pb.SyncableDBClient) *DBClient {
+func NewDBClient(client pb.DBClient) *DBClient {
 	return &DBClient{client: client}
 }
 
 type DBClient struct {
-	client pb.SyncableDBClient
+	client pb.DBClient
 }
 
 func (c *DBClient) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
