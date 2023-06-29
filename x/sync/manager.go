@@ -68,7 +68,7 @@ func newWorkItem(localRootID ids.ID, start, end []byte, priority priority) *work
 type Manager struct {
 	// Must be held when accessing [config.TargetRoot].
 	syncTargetLock sync.RWMutex
-	config         StateSyncConfig
+	config         ManagerConfig
 
 	workLock sync.Mutex
 	// The number of work items currently being processed.
@@ -105,19 +105,19 @@ type Manager struct {
 	closeOnce sync.Once
 }
 
-type StateSyncConfig struct {
-	SyncDB                DB
+type ManagerConfig struct {
+	DB                    DB
 	Client                Client
 	SimultaneousWorkLimit int
 	Log                   logging.Logger
 	TargetRoot            ids.ID
 }
 
-func NewStateSyncManager(config StateSyncConfig) (*Manager, error) {
+func NewStateSyncManager(config ManagerConfig) (*Manager, error) {
 	switch {
 	case config.Client == nil:
 		return nil, ErrNoClientProvided
-	case config.SyncDB == nil:
+	case config.DB == nil:
 		return nil, ErrNoDatabaseProvided
 	case config.Log == nil:
 		return nil, ErrNoLogProvided
@@ -269,7 +269,7 @@ func (m *Manager) getAndApplyChangeProof(ctx context.Context, work *workItem) {
 			KeyLimit:      defaultRequestKeyLimit,
 			BytesLimit:    defaultRequestByteSizeLimit,
 		},
-		m.config.SyncDB,
+		m.config.DB,
 	)
 	if err != nil {
 		m.setError(err)
@@ -295,7 +295,7 @@ func (m *Manager) getAndApplyChangeProof(ctx context.Context, work *workItem) {
 	largestHandledKey := work.end
 	// if the proof wasn't empty, apply changes to the sync DB
 	if len(changeProof.KeyChanges) > 0 {
-		if err := m.config.SyncDB.CommitChangeProof(ctx, changeProof); err != nil {
+		if err := m.config.DB.CommitChangeProof(ctx, changeProof); err != nil {
 			m.setError(err)
 			return
 		}
@@ -333,7 +333,7 @@ func (m *Manager) getAndApplyRangeProof(ctx context.Context, work *workItem) {
 	largestHandledKey := work.end
 	if len(proof.KeyValues) > 0 {
 		// Add all the key-value pairs we got to the database.
-		if err := m.config.SyncDB.CommitRangeProof(ctx, work.start, proof); err != nil {
+		if err := m.config.DB.CommitRangeProof(ctx, work.start, proof); err != nil {
 			m.setError(err)
 			return
 		}
@@ -392,7 +392,7 @@ func (m *Manager) findNextKey(
 	}
 
 	// get a proof for the same key as the received proof from the local db
-	localProofOfKey, err := m.config.SyncDB.GetProof(ctx, proofKeyPath.Value)
+	localProofOfKey, err := m.config.DB.GetProof(ctx, proofKeyPath.Value)
 	if err != nil {
 		return nil, err
 	}
@@ -542,7 +542,7 @@ func (m *Manager) Wait(ctx context.Context) error {
 		return err
 	}
 
-	root, err := m.config.SyncDB.GetMerkleRoot(ctx)
+	root, err := m.config.DB.GetMerkleRoot(ctx)
 	if err != nil {
 		m.config.Log.Info("completed with error", zap.Error(err))
 		return err

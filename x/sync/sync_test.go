@@ -67,8 +67,8 @@ func Test_Creation(t *testing.T) {
 	)
 	require.NoError(err)
 
-	syncer, err := NewStateSyncManager(StateSyncConfig{
-		SyncDB:                db,
+	syncer, err := NewStateSyncManager(ManagerConfig{
+		DB:                    db,
 		Client:                &mockClient{},
 		TargetRoot:            ids.Empty,
 		SimultaneousWorkLimit: 5,
@@ -98,8 +98,8 @@ func Test_Completion(t *testing.T) {
 			newDefaultDBConfig(),
 		)
 		require.NoError(err)
-		syncer, err := NewStateSyncManager(StateSyncConfig{
-			SyncDB:                db,
+		syncer, err := NewStateSyncManager(ManagerConfig{
+			DB:                    db,
 			Client:                &mockClient{db: emptyDB},
 			TargetRoot:            emptyRoot,
 			SimultaneousWorkLimit: 5,
@@ -199,8 +199,8 @@ func Test_Sync_FindNextKey_InSync(t *testing.T) {
 			newDefaultDBConfig(),
 		)
 		require.NoError(err)
-		syncer, err := NewStateSyncManager(StateSyncConfig{
-			SyncDB:                db,
+		syncer, err := NewStateSyncManager(ManagerConfig{
+			DB:                    db,
 			Client:                &mockClient{db: dbToSync},
 			TargetRoot:            syncRoot,
 			SimultaneousWorkLimit: 5,
@@ -272,8 +272,8 @@ func Test_Sync_FindNextKey_Deleted(t *testing.T) {
 	syncRoot, err := db.GetMerkleRoot(context.Background())
 	require.NoError(err)
 
-	syncer, err := NewStateSyncManager(StateSyncConfig{
-		SyncDB:                db,
+	syncer, err := NewStateSyncManager(ManagerConfig{
+		DB:                    db,
 		Client:                &mockClient{db: nil},
 		TargetRoot:            syncRoot,
 		SimultaneousWorkLimit: 5,
@@ -318,8 +318,8 @@ func Test_Sync_FindNextKey_BranchInLocal(t *testing.T) {
 	proof, err := db.GetProof(context.Background(), []byte{0x11, 0x11})
 	require.NoError(err)
 
-	syncer, err := NewStateSyncManager(StateSyncConfig{
-		SyncDB:                db,
+	syncer, err := NewStateSyncManager(ManagerConfig{
+		DB:                    db,
 		Client:                &mockClient{db: nil},
 		TargetRoot:            syncRoot,
 		SimultaneousWorkLimit: 5,
@@ -351,8 +351,8 @@ func Test_Sync_FindNextKey_BranchInReceived(t *testing.T) {
 	proof, err := db.GetProof(context.Background(), []byte{0x11, 0x11})
 	require.NoError(err)
 
-	syncer, err := NewStateSyncManager(StateSyncConfig{
-		SyncDB:                db,
+	syncer, err := NewStateSyncManager(ManagerConfig{
+		DB:                    db,
 		Client:                &mockClient{db: nil},
 		TargetRoot:            syncRoot,
 		SimultaneousWorkLimit: 5,
@@ -384,8 +384,8 @@ func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 			newDefaultDBConfig(),
 		)
 		require.NoError(err)
-		syncer, err := NewStateSyncManager(StateSyncConfig{
-			SyncDB:                db,
+		syncer, err := NewStateSyncManager(ManagerConfig{
+			DB:                    db,
 			Client:                &mockClient{db: dbToSync},
 			TargetRoot:            syncRoot,
 			SimultaneousWorkLimit: 5,
@@ -443,8 +443,8 @@ func TestFindNextKeyEmptyEndProof(t *testing.T) {
 	)
 	require.NoError(err)
 
-	syncer, err := NewStateSyncManager(StateSyncConfig{
-		SyncDB:                db,
+	syncer, err := NewStateSyncManager(ManagerConfig{
+		DB:                    db,
 		Client:                &mockClient{db: nil},
 		TargetRoot:            ids.Empty,
 		SimultaneousWorkLimit: 5,
@@ -504,8 +504,8 @@ func Test_Sync_FindNextKey_DifferentChild(t *testing.T) {
 			newDefaultDBConfig(),
 		)
 		require.NoError(err)
-		syncer, err := NewStateSyncManager(StateSyncConfig{
-			SyncDB:                db,
+		syncer, err := NewStateSyncManager(ManagerConfig{
+			DB:                    db,
 			Client:                &mockClient{db: dbToSync},
 			TargetRoot:            syncRoot,
 			SimultaneousWorkLimit: 5,
@@ -715,8 +715,8 @@ func TestFindNextKeyRandom(t *testing.T) {
 		}
 
 		// Get the actual value from the syncer
-		syncer, err := NewStateSyncManager(StateSyncConfig{
-			SyncDB:                localDB,
+		syncer, err := NewStateSyncManager(ManagerConfig{
+			DB:                    localDB,
 			Client:                &mockClient{db: nil},
 			TargetRoot:            ids.GenerateTestID(),
 			SimultaneousWorkLimit: 5,
@@ -760,8 +760,8 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 			newDefaultDBConfig(),
 		)
 		require.NoError(err)
-		syncer, err := NewStateSyncManager(StateSyncConfig{
-			SyncDB:                db,
+		syncer, err := NewStateSyncManager(ManagerConfig{
+			DB:                    db,
 			Client:                &mockClient{db: dbToSync},
 			TargetRoot:            syncRoot,
 			SimultaneousWorkLimit: 5,
@@ -819,8 +819,8 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 		)
 		require.NoError(err)
 
-		syncer, err := NewStateSyncManager(StateSyncConfig{
-			SyncDB:                db,
+		syncer, err := NewStateSyncManager(ManagerConfig{
+			DB:                    db,
 			Client:                &mockClient{db: dbToSync},
 			TargetRoot:            syncRoot,
 			SimultaneousWorkLimit: 5,
@@ -844,8 +844,8 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 		)
 		syncer.Close()
 
-		newSyncer, err := NewStateSyncManager(StateSyncConfig{
-			SyncDB:                db,
+		newSyncer, err := NewStateSyncManager(ManagerConfig{
+			DB:                    db,
 			Client:                &mockClient{db: dbToSync},
 			TargetRoot:            syncRoot,
 			SimultaneousWorkLimit: 5,
@@ -901,8 +901,8 @@ func Test_Sync_Error_During_Sync(t *testing.T) {
 		},
 	).AnyTimes()
 
-	syncer, err := NewStateSyncManager(StateSyncConfig{
-		SyncDB:                db,
+	syncer, err := NewStateSyncManager(ManagerConfig{
+		DB:                    db,
 		Client:                client,
 		TargetRoot:            syncRoot,
 		SimultaneousWorkLimit: 5,
@@ -990,8 +990,8 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 			},
 		).AnyTimes()
 
-		syncer, err := NewStateSyncManager(StateSyncConfig{
-			SyncDB:                db,
+		syncer, err := NewStateSyncManager(ManagerConfig{
+			DB:                    db,
 			Client:                client,
 			TargetRoot:            firstSyncRoot,
 			SimultaneousWorkLimit: 5,
@@ -1031,8 +1031,8 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	m, err := NewStateSyncManager(StateSyncConfig{
-		SyncDB:                merkledb.NewMockMerkleDB(ctrl), // Not used
+	m, err := NewStateSyncManager(ManagerConfig{
+		DB:                    merkledb.NewMockMerkleDB(ctrl), // Not used
 		Client:                NewMockClient(ctrl),            // Not used
 		TargetRoot:            ids.Empty,
 		SimultaneousWorkLimit: 5,
