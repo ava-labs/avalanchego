@@ -44,8 +44,6 @@ The node serialization format is as follows:
 
 ```
 +----------------------------------------------------+
-| Codec version (varint)                             |
-+----------------------------------------------------+
 | Value existence flag (1 byte)                      |
 +----------------------------------------------------+
 | Value length (varint) (optional)                   |
@@ -75,7 +73,6 @@ The node serialization format is as follows:
 ```
 
 Where:
-* `Codec version` is the version of the serialization format. It's currently `0`.
 * `Value existence flag` is `1` if this node has a value, otherwise `0`.
 * `Value length` is the length of the value, if it exists (i.e. if `Value existince flag` is `1`.) Otherwise not serialized.
 * `Value` is the value, if it exists (i.e. if `Value existince flag` is `1`.) Otherwise not serialized.
@@ -108,7 +105,7 @@ Since a node can have up to 16 children, there can be up to 16 such blocks of ch
 
 Let's take a look at an example node. 
 
-Its byte representation (in hex) is: `0x04000210579EB3718A7E437D2DDCE931AC7CC05A0BC695A9C2084F5DF12FB96AD0FA32660E06FFF09845893C4F9D92C4E097FCF2589BC9D6882B1F18D1C2FC91D7DF1D3FCBDB4238`
+Its byte representation (in hex) is: `0x01020204000210579EB3718A7E437D2DDCE931AC7CC05A0BC695A9C2084F5DF12FB96AD0FA32660E06FFF09845893C4F9D92C4E097FCF2589BC9D6882B1F18D1C2FC91D7DF1D3FCBDB4238`
 
 The node's key is empty (its the root) and has value `0x02`.
 It has two children.
@@ -116,9 +113,6 @@ The first is at child index `0`, has compressed path `0x01` and ID (in hex) `579
 The second is at child index `14`, has compressed path `0x0F0F0F` and ID (in hex) `0x9845893c4f9d92c4e097fcf2589bc9d6882b1f18d1c2fc91d7df1d3fcbdb4238`.
 
 ```
-+--------------------------------------------------------------------+
-| Codec version                                                      |
-| 0x00                                                               |
 +--------------------------------------------------------------------+
 | Value existence flag (1 byte)                                      |
 | 0x01                                                               |
@@ -169,8 +163,6 @@ Specifically, we encode these values in the following way:
 
 ```
 +----------------------------------------------------+
-| Codec version (varint)                             |
-+----------------------------------------------------+
 | Number of children (varint)                        |
 +----------------------------------------------------+
 | Child index (varint)                               |
@@ -196,7 +188,6 @@ Specifically, we encode these values in the following way:
 ```
 
 Where:
-* `Codec version` is the version of the serialization format. It's currently `0`.
 * `Number of children` is the number of children this node has.
 * `Child index` is the index of a child node within the list of the node's children.
 * `Child ID` is the child node's ID.
