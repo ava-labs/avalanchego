@@ -55,7 +55,7 @@ type workItem struct {
 	LocalRootID ids.ID
 }
 
-// TODO danlaine look into using a sync.Pool for syncWorkItems
+// TODO danlaine look into using a sync.Pool for workItems
 func newWorkItem(localRootID ids.ID, start, end []byte, priority priority) *workItem {
 	return &workItem{
 		LocalRootID: localRootID,
@@ -230,7 +230,7 @@ func (m *StateSyncManager) close() {
 
 // Processes [item] by fetching and applying a change or range proof.
 // Assumes [m.workLock] is not held.
-func (m *StateSyncManager) doWork(ctx context.Context, item *workItem) {
+func (m *StateSyncManager) doWork(ctx context.Context, work *workItem) {
 	defer func() {
 		m.workLock.Lock()
 		defer m.workLock.Unlock()
@@ -239,12 +239,12 @@ func (m *StateSyncManager) doWork(ctx context.Context, item *workItem) {
 		m.unprocessedWorkCond.Signal()
 	}()
 
-	if item.LocalRootID == ids.Empty {
+	if work.LocalRootID == ids.Empty {
 		// the keys in this range have not been downloaded, so get all key/values
-		m.getAndApplyRangeProof(ctx, item)
+		m.getAndApplyRangeProof(ctx, work)
 	} else {
 		// the keys in this range have already been downloaded, but the root changed, so get all changes
-		m.getAndApplyChangeProof(ctx, item)
+		m.getAndApplyChangeProof(ctx, work)
 	}
 }
 
@@ -654,7 +654,7 @@ func (m *StateSyncManager) completeWorkItem(ctx context.Context, work *workItem,
 // If there are sufficiently few unprocessed/processing work items,
 // splits the range into two items and queues them both.
 // Assumes [m.workLock] is not held.
-func (m *StateSyncManager) enqueueWork(item *workItem) {
+func (m *StateSyncManager) enqueueWork(work *workItem) {
 	m.workLock.Lock()
 	defer func() {
 		m.workLock.Unlock()
@@ -663,18 +663,18 @@ func (m *StateSyncManager) enqueueWork(item *workItem) {
 
 	if m.processingWorkItems+m.unprocessedWork.Len() > 2*m.config.SimultaneousWorkLimit {
 		// There are too many work items already, don't split the range
-		m.unprocessedWork.Insert(item)
+		m.unprocessedWork.Insert(work)
 		return
 	}
 
 	// Split the remaining range into to 2.
 	// Find the middle point.
-	mid := midPoint(item.start, item.end)
+	mid := midPoint(work.start, work.end)
 
 	// first item gets higher priority than the second to encourage finished ranges to grow
 	// rather than start a new range that is not contiguous with existing completed ranges
-	first := newWorkItem(item.LocalRootID, item.start, mid, medPriority)
-	second := newWorkItem(item.LocalRootID, mid, item.end, lowPriority)
+	first := newWorkItem(work.LocalRootID, work.start, mid, medPriority)
+	second := newWorkItem(work.LocalRootID, mid, work.end, lowPriority)
 
 	m.unprocessedWork.Insert(first)
 	m.unprocessedWork.Insert(second)
