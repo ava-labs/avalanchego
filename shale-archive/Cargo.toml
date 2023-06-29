@@ -1,0 +1,23 @@
+[package]
+name = "shale-archive"
+version = "0.0.3"
+edition = "2021"
+description = "Useful abstraction and light-weight implemenation for a key-value store."
+license = "MIT"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+hex = "0.4.3"
+lru = "0.10.0"
+thiserror = "1.0.38"
+
+[dev-dependencies]
+criterion = { version = "0.5.1", features = ["html_reports"] }
+pprof = { version = "0.11.1", features = ["flamegraph"] }
+sha3 = "0.10.7"
+rand = "0.8.5"
+
+[[bench]]
+name = "shale-bench"
+harness = false

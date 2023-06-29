@@ -1,17 +1,19 @@
 use firewood::{
+    merkle::Node,
     merkle_util::*,
     proof::{Proof, ProofError},
 };
-
+use firewood_shale::{cached::DynamicMem, compact::CompactSpace};
+use rand::Rng;
 use std::collections::HashMap;
 
-use rand::Rng;
+type Store = CompactSpace<Node, DynamicMem>;
 
 fn merkle_build_test<K: AsRef<[u8]> + std::cmp::Ord + Clone, V: AsRef<[u8]> + Clone>(
     items: Vec<(K, V)>,
     meta_size: u64,
     compact_size: u64,
-) -> Result<MerkleSetup, DataStoreError> {
+) -> Result<MerkleSetup<Store>, DataStoreError> {
     let mut merkle = new_merkle(meta_size, compact_size);
     for (k, v) in items.iter() {
         merkle.insert(k, v.as_ref().to_vec())?;

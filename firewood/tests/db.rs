@@ -1,7 +1,9 @@
 use firewood::{
     db::{Db as PersistedDb, DbConfig, DbError, WalConfig},
-    merkle::TrieHash,
+    merkle::{Node, TrieHash},
+    storage::StoreRevMut,
 };
+use firewood_shale::compact::CompactSpace;
 use std::{
     collections::VecDeque,
     fs::remove_dir_all,
@@ -18,7 +20,9 @@ macro_rules! kv_dump {
     }};
 }
 
-struct Db<'a, P: AsRef<Path> + ?Sized>(PersistedDb, &'a P);
+type Store = CompactSpace<Node, StoreRevMut>;
+
+struct Db<'a, P: AsRef<Path> + ?Sized>(PersistedDb<Store>, &'a P);
 
 impl<'a, P: AsRef<Path> + ?Sized> Db<'a, P> {
     fn new(path: &'a P, cfg: &DbConfig) -> Result<Self, DbError> {
@@ -119,7 +123,7 @@ fn test_revisions() {
             dumped
                 .iter()
                 .zip(hashes.iter().cloned())
-                .map(|(data, hash)| (data, db.get_revision(hash, None).unwrap()))
+                .map(|(data, hash)| (data, db.get_revision(&hash, None).unwrap()))
                 .map(|(data, rev)| (data, kv_dump!(rev)))
                 .for_each(|(b, a)| {
                     if &a != b {
@@ -133,7 +137,7 @@ fn test_revisions() {
         dumped
             .iter()
             .zip(hashes.iter().cloned())
-            .map(|(data, hash)| (data, db.get_revision(hash, None).unwrap()))
+            .map(|(data, hash)| (data, db.get_revision(&hash, None).unwrap()))
             .map(|(data, rev)| (data, kv_dump!(rev)))
             .for_each(|(b, a)| {
                 if &a != b {
@@ -188,7 +192,7 @@ fn create_db_issue_proof() {
     }
     wb.commit();
 
-    let rev = db.get_revision(root_hash, None).unwrap();
+    let rev = db.get_revision(&root_hash, None).unwrap();
     let key = "doe".as_bytes();
     let root_hash = rev.kv_root_hash();
 
@@ -211,7 +215,7 @@ fn create_db_issue_proof() {
 }
 
 impl<P: AsRef<Path> + ?Sized> Deref for Db<'_, P> {
-    type Target = PersistedDb;
+    type Target = PersistedDb<Store>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -219,7 +223,7 @@ impl<P: AsRef<Path> + ?Sized> Deref for Db<'_, P> {
 }
 
 impl<P: AsRef<Path> + ?Sized> DerefMut for Db<'_, P> {
-    fn deref_mut(&mut self) -> &mut PersistedDb {
+    fn deref_mut(&mut self) -> &mut PersistedDb<Store> {
         &mut self.0
     }
 }

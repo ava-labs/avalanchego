@@ -1,17 +1,17 @@
-use crate::{CachedStore, CachedView, SendSyncDerefMut, SpaceId};
-use std::{
-    borrow::BorrowMut,
-    fmt::Debug,
-    ops::{Deref, DerefMut},
-    sync::{Arc, RwLock},
-};
+use std::borrow::BorrowMut;
+use std::cell::{RefCell, UnsafeCell};
+use std::fmt::Debug;
+use std::ops::{Deref, DerefMut};
+use std::rc::Rc;
+
+use crate::{CachedStore, CachedView, SpaceId};
 
 /// Purely volatile, vector-based implementation for [CachedStore]. This is good for testing or trying
 /// out stuff (persistent data structures) built on [ShaleStore] in memory, without having to write
 /// your own [CachedStore] implementation.
 #[derive(Debug)]
 pub struct PlainMem {
-    space: Arc<RwLock<Vec<u8>>>,
+    space: Rc<RefCell<Vec<u8>>>,
     id: SpaceId,
 }
 
@@ -19,7 +19,7 @@ impl PlainMem {
     pub fn new(size: u64, id: SpaceId) -> Self {
         let mut space: Vec<u8> = Vec::new();
         space.resize(size as usize, 0);
-        let space = Arc::new(RwLock::new(space));
+        let space = Rc::new(RefCell::new(space));
         Self { space, id }
     }
 }
@@ -32,7 +32,7 @@ impl CachedStore for PlainMem {
     ) -> Option<Box<dyn CachedView<DerefReturn = Vec<u8>>>> {
         let offset = offset as usize;
         let length = length as usize;
-        if offset + length > self.space.read().unwrap().len() {
+        if offset + length > self.space.borrow().len() {
             None
         } else {
             Some(Box::new(PlainMemView {
@@ -46,7 +46,7 @@ impl CachedStore for PlainMem {
         }
     }
 
-    fn get_shared(&self) -> Box<dyn SendSyncDerefMut<Target = dyn CachedStore>> {
+    fn get_shared(&self) -> Box<dyn DerefMut<Target = dyn CachedStore>> {
         Box::new(PlainMemShared(Self {
             space: self.space.clone(),
             id: self.id,
@@ -56,7 +56,7 @@ impl CachedStore for PlainMem {
     fn write(&mut self, offset: u64, change: &[u8]) {
         let offset = offset as usize;
         let length = change.len();
-        let mut vect = self.space.deref().write().unwrap();
+        let mut vect = self.space.deref().borrow_mut();
         vect.as_mut_slice()[offset..offset + length].copy_from_slice(change);
     }
 
@@ -91,7 +91,7 @@ impl CachedView for PlainMemView {
     type DerefReturn = Vec<u8>;
 
     fn as_deref(&self) -> Self::DerefReturn {
-        self.mem.space.read().unwrap()[self.offset..self.offset + self.length].to_vec()
+        self.mem.space.borrow()[self.offset..self.offset + self.length].to_vec()
     }
 }
 
@@ -100,14 +100,20 @@ impl CachedView for PlainMemView {
 /// not enough.
 #[derive(Debug)]
 pub struct DynamicMem {
-    space: Arc<RwLock<Vec<u8>>>,
+    space: Rc<UnsafeCell<Vec<u8>>>,
     id: SpaceId,
 }
 
 impl DynamicMem {
     pub fn new(size: u64, id: SpaceId) -> Self {
-        let space = Arc::new(RwLock::new(vec![0; size as usize]));
+        let space = Rc::new(UnsafeCell::new(vec![0; size as usize]));
         Self { space, id }
+    }
+
+    #[allow(clippy::mut_from_ref)]
+    // TODO: Refactor this usage.
+    fn get_space_mut(&self) -> &mut Vec<u8> {
+        unsafe { &mut *self.space.get() }
     }
 }
 
@@ -120,13 +126,10 @@ impl CachedStore for DynamicMem {
         let offset = offset as usize;
         let length = length as usize;
         let size = offset + length;
-        let mut space = self.space.write().unwrap();
-
         // Increase the size if the request range exceeds the current limit.
-        if size > space.len() {
-            space.resize(size, 0);
+        if size > self.get_space_mut().len() {
+            self.get_space_mut().resize(size, 0);
         }
-
         Some(Box::new(DynamicMemView {
             offset,
             length,
@@ -137,7 +140,7 @@ impl CachedStore for DynamicMem {
         }))
     }
 
-    fn get_shared(&self) -> Box<dyn SendSyncDerefMut<Target = dyn CachedStore>> {
+    fn get_shared(&self) -> Box<dyn DerefMut<Target = dyn CachedStore>> {
         Box::new(DynamicMemShared(Self {
             space: self.space.clone(),
             id: self.id,
@@ -148,14 +151,11 @@ impl CachedStore for DynamicMem {
         let offset = offset as usize;
         let length = change.len();
         let size = offset + length;
-
-        let mut space = self.space.write().unwrap();
-
         // Increase the size if the request range exceeds the current limit.
-        if size > space.len() {
-            space.resize(size, 0);
+        if size > self.get_space_mut().len() {
+            self.get_space_mut().resize(size, 0);
         }
-        space[offset..offset + length].copy_from_slice(change)
+        self.get_space_mut()[offset..offset + length].copy_from_slice(change)
     }
 
     fn id(&self) -> SpaceId {
@@ -171,6 +171,13 @@ struct DynamicMemView {
 }
 
 struct DynamicMemShared(DynamicMem);
+
+impl Deref for DynamicMemView {
+    type Target = [u8];
+    fn deref(&self) -> &[u8] {
+        &self.mem.get_space_mut()[self.offset..self.offset + self.length]
+    }
+}
 
 impl Deref for DynamicMemShared {
     type Target = dyn CachedStore;
@@ -189,7 +196,7 @@ impl CachedView for DynamicMemView {
     type DerefReturn = Vec<u8>;
 
     fn as_deref(&self) -> Self::DerefReturn {
-        self.mem.space.read().unwrap()[self.offset..self.offset + self.length].to_vec()
+        self.mem.get_space_mut()[self.offset..self.offset + self.length].to_vec()
     }
 }
 

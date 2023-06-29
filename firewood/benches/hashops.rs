@@ -2,9 +2,14 @@
 use std::ops::Deref;
 
 use bencher::{benchmark_group, benchmark_main, Bencher};
-use firewood::merkle::{Merkle, TrieHash, TRIE_HASH_LEN};
+use firewood::{
+    merkle::{Merkle, Node, TrieHash, TRIE_HASH_LEN},
+    storage::StoreRevMut,
+};
 use firewood_shale::{
-    cached::PlainMem, compact::CompactSpaceHeader, CachedStore, ObjPtr, Storable, StoredView,
+    cached::PlainMem,
+    compact::{CompactSpace, CompactSpaceHeader},
+    CachedStore, ObjPtr, Storable, StoredView,
 };
 use rand::{distributions::Alphanumeric, Rng, SeedableRng};
 
@@ -48,7 +53,7 @@ fn bench_insert(b: &mut Bencher) {
     .unwrap();
     let mut merkle = Merkle::new(Box::new(store));
     let mut root = ObjPtr::null();
-    Merkle::init_root(&mut root, merkle.get_store()).unwrap();
+    Merkle::<CompactSpace<Node, StoreRevMut>>::init_root(&mut root, merkle.get_store()).unwrap();
     let mut rng = rand::rngs::StdRng::seed_from_u64(1234);
     const KEY_LEN: usize = 4;
     b.iter(|| {

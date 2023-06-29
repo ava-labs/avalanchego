@@ -206,21 +206,21 @@ impl BranchNode {
         (only_chd, has_chd)
     }
 
-    fn calc_eth_rlp<T: ValueTransformer>(&self, store: &dyn ShaleStore<Node>) -> Vec<u8> {
+    fn calc_eth_rlp<T: ValueTransformer, S: ShaleStore<Node>>(&self, store: &S) -> Vec<u8> {
         let mut stream = rlp::RlpStream::new_list(17);
         for (i, c) in self.chd.iter().enumerate() {
             match c {
                 Some(c) => {
                     let mut c_ref = store.get_item(*c).unwrap();
-                    if c_ref.get_eth_rlp_long::<T>(store) {
-                        stream.append(&&(*c_ref.get_root_hash::<T>(store))[..]);
+                    if c_ref.get_eth_rlp_long::<T, S>(store) {
+                        stream.append(&&(*c_ref.get_root_hash::<T, S>(store))[..]);
                         // See struct docs for ordering requirements
                         if c_ref.lazy_dirty.load(Ordering::Relaxed) {
                             c_ref.write(|_| {}).unwrap();
                             c_ref.lazy_dirty.store(false, Ordering::Relaxed)
                         }
                     } else {
-                        let c_rlp = &c_ref.get_eth_rlp::<T>(store);
+                        let c_rlp = &c_ref.get_eth_rlp::<T, S>(store);
                         stream.append_raw(c_rlp, 1);
                     }
                 }
@@ -321,19 +321,19 @@ impl Debug for ExtNode {
 }
 
 impl ExtNode {
-    fn calc_eth_rlp<T: ValueTransformer>(&self, store: &dyn ShaleStore<Node>) -> Vec<u8> {
+    fn calc_eth_rlp<T: ValueTransformer, S: ShaleStore<Node>>(&self, store: &S) -> Vec<u8> {
         let mut stream = rlp::RlpStream::new_list(2);
         if !self.1.is_null() {
             let mut r = store.get_item(self.1).unwrap();
             stream.append(&from_nibbles(&self.0.encode(false)).collect::<Vec<_>>());
-            if r.get_eth_rlp_long::<T>(store) {
-                stream.append(&&(*r.get_root_hash::<T>(store))[..]);
+            if r.get_eth_rlp_long::<T, S>(store) {
+                stream.append(&&(*r.get_root_hash::<T, S>(store))[..]);
                 if r.lazy_dirty.load(Ordering::Relaxed) {
                     r.write(|_| {}).unwrap();
                     r.lazy_dirty.store(false, Ordering::Relaxed);
                 }
             } else {
-                stream.append_raw(r.get_eth_rlp::<T>(store), 1);
+                stream.append_raw(r.get_eth_rlp::<T, S>(store), 1);
             }
         } else {
             // Check if there is already a caclucated rlp for the child, which
@@ -422,11 +422,11 @@ pub enum NodeType {
 }
 
 impl NodeType {
-    fn calc_eth_rlp<T: ValueTransformer>(&self, store: &dyn ShaleStore<Node>) -> Vec<u8> {
+    fn calc_eth_rlp<T: ValueTransformer, S: ShaleStore<Node>>(&self, store: &S) -> Vec<u8> {
         match &self {
             NodeType::Leaf(n) => n.calc_eth_rlp::<T>(),
-            NodeType::Extension(n) => n.calc_eth_rlp::<T>(store),
-            NodeType::Branch(n) => n.calc_eth_rlp::<T>(store),
+            NodeType::Extension(n) => n.calc_eth_rlp::<T, S>(store),
+            NodeType::Branch(n) => n.calc_eth_rlp::<T, S>(store),
         }
     }
 }
@@ -454,22 +454,22 @@ impl Node {
         })
     }
 
-    fn get_eth_rlp<T: ValueTransformer>(&self, store: &dyn ShaleStore<Node>) -> &[u8] {
+    fn get_eth_rlp<T: ValueTransformer, S: ShaleStore<Node>>(&self, store: &S) -> &[u8] {
         self.eth_rlp
-            .get_or_init(|| self.inner.calc_eth_rlp::<T>(store))
+            .get_or_init(|| self.inner.calc_eth_rlp::<T, S>(store))
     }
 
-    fn get_root_hash<T: ValueTransformer>(&self, store: &dyn ShaleStore<Node>) -> &TrieHash {
+    fn get_root_hash<T: ValueTransformer, S: ShaleStore<Node>>(&self, store: &S) -> &TrieHash {
         self.root_hash.get_or_init(|| {
             self.lazy_dirty.store(true, Ordering::Relaxed);
-            TrieHash(sha3::Keccak256::digest(self.get_eth_rlp::<T>(store)).into())
+            TrieHash(sha3::Keccak256::digest(self.get_eth_rlp::<T, S>(store)).into())
         })
     }
 
-    fn get_eth_rlp_long<T: ValueTransformer>(&self, store: &dyn ShaleStore<Node>) -> bool {
+    fn get_eth_rlp_long<T: ValueTransformer, S: ShaleStore<Node>>(&self, store: &S) -> bool {
         *self.eth_rlp_long.get_or_init(|| {
             self.lazy_dirty.store(true, Ordering::Relaxed);
-            self.get_eth_rlp::<T>(store).len() >= TRIE_HASH_LEN
+            self.get_eth_rlp::<T, S>(store).len() >= TRIE_HASH_LEN
         })
     }
 
@@ -842,12 +842,11 @@ macro_rules! write_node {
     };
 }
 
-#[derive(Debug)]
-pub struct Merkle {
-    store: Box<dyn ShaleStore<Node>>,
+pub struct Merkle<S> {
+    store: Box<S>,
 }
 
-impl Merkle {
+impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
     pub fn get_node(&self, ptr: ObjPtr<Node>) -> Result<ObjRef<Node>, MerkleError> {
         self.store.get_item(ptr).map_err(MerkleError::Shale)
     }
@@ -859,8 +858,8 @@ impl Merkle {
     }
 }
 
-impl Merkle {
-    pub fn new(store: Box<dyn ShaleStore<Node>>) -> Self {
+impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
+    pub fn new(store: Box<S>) -> Self {
         Self { store }
     }
 
@@ -910,7 +909,7 @@ impl Merkle {
             .chd[0];
         Ok(if let Some(root) = root {
             let mut node = self.get_node(root)?;
-            let res = node.get_root_hash::<T>(self.store.as_ref()).clone();
+            let res = node.get_root_hash::<T, S>(self.store.as_ref()).clone();
             if node.lazy_dirty.load(Ordering::Relaxed) {
                 node.write(|_| {}).unwrap();
                 node.lazy_dirty.store(false, Ordering::Relaxed);
@@ -1748,7 +1747,7 @@ impl Merkle {
         &mut self,
         key: K,
         root: ObjPtr<Node>,
-    ) -> Result<Option<RefMut>, MerkleError> {
+    ) -> Result<Option<RefMut<S>>, MerkleError> {
         let mut chunks = vec![0];
         chunks.extend(key.as_ref().iter().copied().flat_map(to_nibble_array));
         let mut parents = Vec::new();
@@ -1892,7 +1891,7 @@ impl Merkle {
         // Get the hashes of the nodes.
         for node in nodes {
             let node = self.get_node(node)?;
-            let rlp = <&[u8]>::clone(&node.get_eth_rlp::<T>(self.store.as_ref()));
+            let rlp = <&[u8]>::clone(&node.get_eth_rlp::<T, S>(self.store.as_ref()));
             let hash: [u8; TRIE_HASH_LEN] = sha3::Keccak256::digest(rlp).into();
             proofs.insert(hash, rlp.to_vec());
         }
@@ -1969,10 +1968,10 @@ impl Merkle {
 
 pub struct Ref<'a>(ObjRef<'a, Node>);
 
-pub struct RefMut<'a> {
+pub struct RefMut<'a, S> {
     ptr: ObjPtr<Node>,
     parents: Vec<(ObjPtr<Node>, u8)>,
-    merkle: &'a mut Merkle,
+    merkle: &'a mut Merkle<S>,
 }
 
 impl<'a> std::ops::Deref for Ref<'a> {
@@ -1986,8 +1985,8 @@ impl<'a> std::ops::Deref for Ref<'a> {
     }
 }
 
-impl<'a> RefMut<'a> {
-    fn new(ptr: ObjPtr<Node>, parents: Vec<(ObjPtr<Node>, u8)>, merkle: &'a mut Merkle) -> Self {
+impl<'a, S: ShaleStore<Node> + Send + Sync> RefMut<'a, S> {
+    fn new(ptr: ObjPtr<Node>, parents: Vec<(ObjPtr<Node>, u8)>, merkle: &'a mut Merkle<S>) -> Self {
         Self {
             ptr,
             parents,

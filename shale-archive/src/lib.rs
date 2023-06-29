@@ -1,4 +1,5 @@
 use std::any::type_name;
+use std::cell::UnsafeCell;
 use std::collections::{HashMap, HashSet};
 use std::fmt::{self, Debug, Display, Formatter};
 use std::hash::Hash;
@@ -6,12 +7,13 @@ use std::hash::Hasher;
 use std::marker::PhantomData;
 use std::num::NonZeroUsize;
 use std::ops::{Deref, DerefMut};
-use std::sync::{Arc, RwLock, RwLockWriteGuard};
+use std::rc::Rc;
 
 use thiserror::Error;
 
 pub mod cached;
 pub mod compact;
+pub mod util;
 
 #[derive(Debug, Error)]
 #[non_exhaustive]
@@ -66,15 +68,11 @@ pub trait CachedView {
     fn as_deref(&self) -> Self::DerefReturn;
 }
 
-pub trait SendSyncDerefMut: DerefMut + Send + Sync {}
-
-impl<T: Send + Sync + DerefMut> SendSyncDerefMut for T {}
-
 /// In-memory store that offers access to intervals from a linear byte space, which is usually
 /// backed by a cached/memory-mapped pool of the accessed intervals from the underlying linear
 /// persistent store. Reads could trigger disk reads to bring data into memory, but writes will
 /// *only* be visible in memory (it does not write back to the disk).
-pub trait CachedStore: Debug + Send + Sync {
+pub trait CachedStore: Debug {
     /// Returns a handle that pins the `length` of bytes starting from `offset` and makes them
     /// directly accessible.
     fn get_view(
@@ -83,7 +81,7 @@ pub trait CachedStore: Debug + Send + Sync {
         length: u64,
     ) -> Option<Box<dyn CachedView<DerefReturn = Vec<u8>>>>;
     /// Returns a handle that allows shared access to the store.
-    fn get_shared(&self) -> Box<dyn SendSyncDerefMut<Target = dyn CachedStore>>;
+    fn get_shared(&self) -> Box<dyn DerefMut<Target = dyn CachedStore>>;
     /// Write the `change` to the portion of the linear space starting at `offset`. The change
     /// should be immediately visible to all `CachedView` associated to this linear space.
     fn write(&mut self, offset: u64, change: &[u8]);
@@ -153,9 +151,7 @@ impl<T: ?Sized> ObjPtr<T> {
 /// A addressed, typed, and read-writable handle for the stored item in [ShaleStore]. The object
 /// represents the decoded/mapped data. The implementation of [ShaleStore] could use [ObjCache] to
 /// turn a `TypedView` into an [ObjRef].
-pub trait TypedView<T: ?Sized + Send + Sync>:
-    std::fmt::Debug + Deref<Target = T> + Send + Sync
-{
+pub trait TypedView<T: ?Sized>: std::fmt::Debug + Deref<Target = T> {
     /// Get the offset of the initial byte in the linear space.
     fn get_offset(&self) -> u64;
     /// Access it as a [CachedStore] object.
@@ -181,17 +177,19 @@ pub trait TypedView<T: ?Sized + Send + Sync>:
 /// headers/metadata at bootstrap or part of [ShaleStore] implementation) stored at a given [ObjPtr]
 /// . Users of [ShaleStore] implementation, however, will only use [ObjRef] for safeguarded access.
 #[derive(Debug)]
-pub struct Obj<T: ?Sized + Send + Sync> {
+pub struct Obj<T: ?Sized> {
     value: Box<dyn TypedView<T>>,
     dirty: Option<u64>,
 }
 
-impl<T: ?Sized + Send + Sync> Obj<T> {
+impl<T: ?Sized> Obj<T> {
     #[inline(always)]
     pub fn as_ptr(&self) -> ObjPtr<T> {
         ObjPtr::<T>::new(self.value.get_offset())
     }
+}
 
+impl<T: ?Sized> Obj<T> {
     /// Write to the underlying object. Returns `Some(())` on success.
     #[inline]
     pub fn write(&mut self, modify: impl FnOnce(&mut T)) -> Result<(), ObjWriteError> {
@@ -230,13 +228,13 @@ impl<T: ?Sized + Send + Sync> Obj<T> {
     }
 }
 
-impl<T: ?Sized + Send + Sync> Drop for Obj<T> {
+impl<T: ?Sized> Drop for Obj<T> {
     fn drop(&mut self) {
         self.flush_dirty()
     }
 }
 
-impl<T: ?Sized + Send + Sync> Deref for Obj<T> {
+impl<T> Deref for Obj<T> {
     type Target = T;
     fn deref(&self) -> &T {
         &self.value
@@ -244,13 +242,14 @@ impl<T: ?Sized + Send + Sync> Deref for Obj<T> {
 }
 
 /// User handle that offers read & write access to the stored [ShaleStore] item.
-pub struct ObjRef<'a, T: Send + Sync> {
+#[derive(Debug)]
+pub struct ObjRef<'a, T> {
     inner: Option<Obj<T>>,
     cache: ObjCache<T>,
     _life: PhantomData<&'a mut ()>,
 }
 
-impl<'a, T: Send + Sync> ObjRef<'a, T> {
+impl<'a, T> ObjRef<'a, T> {
     pub fn to_longlive(mut self) -> ObjRef<'static, T> {
         ObjRef {
             inner: self.inner.take(),
@@ -264,24 +263,24 @@ impl<'a, T: Send + Sync> ObjRef<'a, T> {
         let inner = self.inner.as_mut().unwrap();
         inner.write(modify)?;
 
-        self.cache.lock().dirty.insert(inner.as_ptr());
+        self.cache.get_inner_mut().dirty.insert(inner.as_ptr());
 
         Ok(())
     }
 }
 
-impl<'a, T: Send + Sync> Deref for ObjRef<'a, T> {
+impl<'a, T> Deref for ObjRef<'a, T> {
     type Target = Obj<T>;
     fn deref(&self) -> &Obj<T> {
         self.inner.as_ref().unwrap()
     }
 }
 
-impl<'a, T: Send + Sync> Drop for ObjRef<'a, T> {
+impl<'a, T> Drop for ObjRef<'a, T> {
     fn drop(&mut self) {
         let mut inner = self.inner.take().unwrap();
         let ptr = inner.as_ptr();
-        let mut cache = self.cache.lock();
+        let cache = self.cache.get_inner_mut();
         match cache.pinned.remove(&ptr) {
             Some(true) => {
                 inner.dirty = None;
@@ -295,7 +294,7 @@ impl<'a, T: Send + Sync> Drop for ObjRef<'a, T> {
 
 /// A persistent item storage backed by linear logical space. New items can be created and old
 /// items could be retrieved or dropped.
-pub trait ShaleStore<T: Send + Sync> {
+pub trait ShaleStore<T: Send + Sync>: Debug {
     /// Dereference [ObjPtr] to a unique handle that allows direct access to the item in memory.
     fn get_item(&'_ self, ptr: ObjPtr<T>) -> Result<ObjRef<'_, T>, ShaleError>;
     /// Allocate a new item.
@@ -327,9 +326,9 @@ pub fn to_dehydrated(item: &dyn Storable) -> Result<Vec<u8>, ShaleError> {
 }
 
 /// Reference implementation of [TypedView]. It takes any type that implements [Storable]
-pub struct StoredView<T> {
+pub struct StoredView<T: Storable> {
     decoded: T,
-    mem: Box<dyn SendSyncDerefMut<Target = dyn CachedStore>>,
+    mem: Box<dyn DerefMut<Target = dyn CachedStore>>,
     offset: u64,
     len_limit: u64,
 }
@@ -357,7 +356,7 @@ impl<T: Storable> Deref for StoredView<T> {
     }
 }
 
-impl<T: Storable + Debug + Send + Sync> TypedView<T> for StoredView<T> {
+impl<T: Storable + Debug> TypedView<T> for StoredView<T> {
     fn get_offset(&self) -> u64 {
         self.offset
     }
@@ -391,7 +390,7 @@ impl<T: Storable + Debug + Send + Sync> TypedView<T> for StoredView<T> {
     }
 }
 
-impl<T: Storable + Debug + Send + Sync + 'static> StoredView<T> {
+impl<T: Storable + Debug + 'static> StoredView<T> {
     #[inline(always)]
     fn new<U: CachedStore>(offset: u64, len_limit: u64, space: &U) -> Result<Self, ShaleError> {
         let decoded = T::hydrate(offset, space)?;
@@ -444,7 +443,7 @@ impl<T: Storable + Debug + Send + Sync + 'static> StoredView<T> {
     }
 }
 
-impl<T: Storable + Send + Sync> StoredView<T> {
+impl<T: Storable> StoredView<T> {
     fn new_from_slice(
         offset: u64,
         len_limit: u64,
@@ -459,7 +458,7 @@ impl<T: Storable + Send + Sync> StoredView<T> {
         })
     }
 
-    pub fn slice<U: Storable + Debug + Send + Sync + 'static>(
+    pub fn slice<U: Storable + Debug + 'static>(
         s: &Obj<T>,
         offset: u64,
         length: u64,
@@ -516,72 +515,56 @@ impl<T> Storable for ObjPtr<T> {
     }
 }
 
-pub struct ObjCacheInner<T: ?Sized + Send + Sync> {
+struct ObjCacheInner<T: ?Sized> {
     cached: lru::LruCache<ObjPtr<T>, Obj<T>>,
     pinned: HashMap<ObjPtr<T>, bool>,
     dirty: HashSet<ObjPtr<T>>,
 }
 
 /// [ObjRef] pool that is used by [ShaleStore] implementation to construct [ObjRef]s.
-pub struct ObjCache<T: ?Sized + Send + Sync>(Arc<RwLock<ObjCacheInner<T>>>);
+#[derive(Debug)]
+pub struct ObjCache<T: ?Sized>(Rc<UnsafeCell<ObjCacheInner<T>>>);
 
-impl<T: Send + Sync> ObjCache<T> {
+impl<T> ObjCache<T> {
     pub fn new(capacity: usize) -> Self {
-        Self(Arc::new(RwLock::new(ObjCacheInner {
+        Self(Rc::new(UnsafeCell::new(ObjCacheInner {
             cached: lru::LruCache::new(NonZeroUsize::new(capacity).expect("non-zero cache size")),
             pinned: HashMap::new(),
             dirty: HashSet::new(),
         })))
     }
 
-    fn lock(&self) -> RwLockWriteGuard<ObjCacheInner<T>> {
-        self.0.write().unwrap()
+    #[inline(always)]
+    #[allow(clippy::mut_from_ref)]
+    // TODO: Refactor this function
+    fn get_inner_mut(&self) -> &mut ObjCacheInner<T> {
+        unsafe { &mut *self.0.get() }
     }
 
     #[inline(always)]
-    pub fn get<'a>(
-        &self,
-        inner: &mut ObjCacheInner<T>,
-        ptr: ObjPtr<T>,
-    ) -> Result<Option<ObjRef<'a, T>>, ShaleError> {
+    pub fn get(&'_ self, ptr: ObjPtr<T>) -> Result<Option<ObjRef<'_, T>>, ShaleError> {
+        let inner = &mut self.get_inner_mut();
         if let Some(r) = inner.cached.pop(&ptr) {
-            // insert and set to `false` if you can
-            // When using `get` in parallel, one should not `write` to the same address
-            inner
-                .pinned
-                .entry(ptr)
-                .and_modify(|is_pinned| *is_pinned = false)
-                .or_insert(false);
-
-            // return if inner.pinned.insert(ptr, false).is_some() {
-            //     Err(ShaleError::InvalidObj {
-            //         addr: ptr.addr(),
-            //         obj_type: type_name::<T>(),
-            //         error: "address already in use",
-            //     })
-            // } else {
-            //     Ok(Some(ObjRef {
-            //         inner: Some(r),
-            //         cache: Self(self.0.clone()),
-            //         _life: PhantomData,
-            //     }))
-            // };
-
-            // always return instead of the code above
+            if inner.pinned.insert(ptr, false).is_some() {
+                return Err(ShaleError::InvalidObj {
+                    addr: ptr.addr(),
+                    obj_type: type_name::<T>(),
+                    error: "address already in use",
+                });
+            }
             return Ok(Some(ObjRef {
                 inner: Some(r),
                 cache: Self(self.0.clone()),
                 _life: PhantomData,
             }));
         }
-
         Ok(None)
     }
 
     #[inline(always)]
-    pub fn put<'a>(&self, inner: Obj<T>) -> ObjRef<'a, T> {
+    pub fn put(&'_ self, inner: Obj<T>) -> ObjRef<'_, T> {
         let ptr = inner.as_ptr();
-        self.lock().pinned.insert(ptr, false);
+        self.get_inner_mut().pinned.insert(ptr, false);
         ObjRef {
             inner: Some(inner),
             cache: Self(self.0.clone()),
@@ -591,7 +574,7 @@ impl<T: Send + Sync> ObjCache<T> {
 
     #[inline(always)]
     pub fn pop(&self, ptr: ObjPtr<T>) {
-        let mut inner = self.lock();
+        let inner = self.get_inner_mut();
         if let Some(f) = inner.pinned.get_mut(&ptr) {
             *f = true
         }
@@ -602,7 +585,7 @@ impl<T: Send + Sync> ObjCache<T> {
     }
 
     pub fn flush_dirty(&self) -> Option<()> {
-        let mut inner = self.lock();
+        let inner = self.get_inner_mut();
         if !inner.pinned.is_empty() {
             return None;
         }

@@ -1,8 +1,8 @@
 use super::{CachedStore, Obj, ObjPtr, ObjRef, ShaleError, ShaleStore, Storable, StoredView};
+use std::cell::UnsafeCell;
 use std::fmt::Debug;
 use std::io::{Cursor, Write};
-use std::ops::DerefMut;
-use std::sync::{Arc, RwLock};
+use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct CompactHeader {
@@ -293,16 +293,16 @@ impl std::ops::DerefMut for U64Field {
     }
 }
 
-struct CompactSpaceInner<T: Send + Sync, M> {
-    meta_space: Arc<M>,
-    compact_space: Arc<M>,
+struct CompactSpaceInner<T: Storable, M: CachedStore> {
+    meta_space: Rc<M>,
+    compact_space: Rc<M>,
     header: CompactSpaceHeaderSliced,
     obj_cache: super::ObjCache<T>,
     alloc_max_walk: u64,
     regn_nbit: u64,
 }
 
-impl<T: Storable + Send + Sync, M: CachedStore> CompactSpaceInner<T, M> {
+impl<T: Storable, M: CachedStore> CompactSpaceInner<T, M> {
     fn get_descriptor(
         &self,
         ptr: ObjPtr<CompactDescriptor>,
@@ -310,7 +310,7 @@ impl<T: Storable + Send + Sync, M: CachedStore> CompactSpaceInner<T, M> {
         StoredView::ptr_to_obj(self.meta_space.as_ref(), ptr, CompactDescriptor::MSIZE)
     }
 
-    fn get_data_ref<U: Storable + Debug + Send + Sync + 'static>(
+    fn get_data_ref<U: Storable + Debug + 'static>(
         &self,
         ptr: ObjPtr<U>,
         len_limit: u64,
@@ -562,21 +562,22 @@ impl<T: Storable + Send + Sync, M: CachedStore> CompactSpaceInner<T, M> {
     }
 }
 
-pub struct CompactSpace<T: Send + Sync, M> {
-    inner: RwLock<CompactSpaceInner<T, M>>,
+#[derive(Debug)]
+pub struct CompactSpace<T: Storable, M: CachedStore> {
+    inner: UnsafeCell<CompactSpaceInner<T, M>>,
 }
 
-impl<T: Storable + Send + Sync, M: CachedStore> CompactSpace<T, M> {
+impl<T: Storable, M: CachedStore> CompactSpace<T, M> {
     pub fn new(
-        meta_space: Arc<M>,
-        compact_space: Arc<M>,
+        meta_space: Rc<M>,
+        compact_space: Rc<M>,
         header: Obj<CompactSpaceHeader>,
         obj_cache: super::ObjCache<T>,
         alloc_max_walk: u64,
         regn_nbit: u64,
     ) -> Result<Self, ShaleError> {
         let cs = CompactSpace {
-            inner: RwLock::new(CompactSpaceInner {
+            inner: UnsafeCell::new(CompactSpaceInner {
                 meta_space,
                 compact_space,
                 header: CompactSpaceHeader::into_fields(header)?,
@@ -589,71 +590,53 @@ impl<T: Storable + Send + Sync, M: CachedStore> CompactSpace<T, M> {
     }
 }
 
-impl<T: Storable + Send + Sync + Debug + 'static, M: CachedStore + Send + Sync> ShaleStore<T>
+impl<T: Storable + Send + Sync + Debug + 'static, M: CachedStore> ShaleStore<T>
     for CompactSpace<T, M>
 {
-    fn put_item<'a>(&'a self, item: T, extra: u64) -> Result<ObjRef<'a, T>, ShaleError> {
+    fn put_item(&'_ self, item: T, extra: u64) -> Result<ObjRef<'_, T>, ShaleError> {
         let size = item.dehydrated_len() + extra;
-        let ptr: ObjPtr<T> = {
-            let mut inner = self.inner.write().unwrap();
-            let addr = if let Some(addr) = inner.alloc_from_freed(size)? {
+        let inner = unsafe { &mut *self.inner.get() };
+        let ptr: ObjPtr<T> =
+            ObjPtr::new_from_addr(if let Some(addr) = inner.alloc_from_freed(size)? {
                 addr
             } else {
                 inner.alloc_new(size)?
-            };
-
-            ObjPtr::new_from_addr(addr)
-        };
-        let inner = self.inner.read().unwrap();
-
-        let mut u: ObjRef<'a, T> = inner.obj_cache.put(StoredView::item_to_obj(
+            });
+        let mut u = inner.obj_cache.put(StoredView::item_to_obj(
             inner.compact_space.as_ref(),
             ptr.addr(),
             size,
             item,
         )?);
-
         u.write(|_| {}).unwrap();
-
         Ok(u)
     }
 
     fn free_item(&mut self, ptr: ObjPtr<T>) -> Result<(), ShaleError> {
-        let mut inner = self.inner.write().unwrap();
+        let inner = self.inner.get_mut();
         inner.obj_cache.pop(ptr);
         inner.free(ptr.addr())
     }
 
-    fn get_item(&self, ptr: ObjPtr<T>) -> Result<ObjRef<'_, T>, ShaleError> {
-        let inner = {
-            let inner = self.inner.read().unwrap();
-            let obj_ref = inner
-                .obj_cache
-                .get(inner.obj_cache.lock().deref_mut(), ptr)?;
-
-            if let Some(obj_ref) = obj_ref {
-                return Ok(obj_ref);
-            }
-
-            inner
-        };
-
+    fn get_item(&'_ self, ptr: ObjPtr<T>) -> Result<ObjRef<'_, T>, ShaleError> {
+        let inner = unsafe { &*self.inner.get() };
+        if let Some(r) = inner.obj_cache.get(ptr)? {
+            return Ok(r);
+        }
         if ptr.addr() < CompactSpaceHeader::MSIZE {
             return Err(ShaleError::InvalidAddressLength {
                 expected: CompactSpaceHeader::MSIZE,
                 found: ptr.addr(),
             });
         }
-
-        let payload_size = inner
-            .get_header(ObjPtr::new(ptr.addr() - CompactHeader::MSIZE))?
-            .payload_size;
-
-        Ok(inner.obj_cache.put(inner.get_data_ref(ptr, payload_size)?))
+        let h = inner.get_header(ObjPtr::new(ptr.addr() - CompactHeader::MSIZE))?;
+        Ok(inner
+            .obj_cache
+            .put(inner.get_data_ref(ptr, h.payload_size)?))
     }
 
     fn flush_dirty(&self) -> Option<()> {
-        let mut inner = self.inner.write().unwrap();
+        let inner = unsafe { &mut *self.inner.get() };
         inner.header.flush_dirty();
         inner.obj_cache.flush_dirty()
     }
@@ -726,8 +709,8 @@ mod tests {
         );
         let compact_header =
             StoredView::ptr_to_obj(&dm, compact_header, CompactHeader::MSIZE).unwrap();
-        let mem_meta = Arc::new(dm);
-        let mem_payload = Arc::new(DynamicMem::new(COMPACT_SIZE, 0x1));
+        let mem_meta = Rc::new(dm);
+        let mem_payload = Rc::new(DynamicMem::new(COMPACT_SIZE, 0x1));
 
         let cache: ObjCache<Hash> = ObjCache::new(1);
         let space =
@@ -745,21 +728,21 @@ mod tests {
         // not cached
         assert!(obj_ref
             .cache
-            .lock()
+            .get_inner_mut()
             .cached
             .get(&ObjPtr::new_from_addr(4113))
             .is_none());
         // pinned
         assert!(obj_ref
             .cache
-            .lock()
+            .get_inner_mut()
             .pinned
             .get(&ObjPtr::new_from_addr(4113))
             .is_some());
         // dirty
         assert!(obj_ref
             .cache
-            .lock()
+            .get_inner_mut()
             .dirty
             .get(&ObjPtr::new_from_addr(4113))
             .is_some());

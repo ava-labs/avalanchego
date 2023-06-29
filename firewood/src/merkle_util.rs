@@ -1,12 +1,16 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use crate::merkle::*;
-use crate::proof::{Proof, ProofError};
-use shale::cached::DynamicMem;
-use shale::{compact::CompactSpaceHeader, CachedStore, ObjPtr, StoredView};
-use std::rc::Rc;
-
+use crate::{
+    merkle::*,
+    proof::{Proof, ProofError},
+};
+use shale::{
+    cached::DynamicMem,
+    compact::{CompactSpace, CompactSpaceHeader},
+    CachedStore, ObjPtr, ShaleStore, StoredView,
+};
+use std::sync::Arc;
 use thiserror::Error;
 
 #[derive(Error, Debug, PartialEq)]
@@ -31,12 +35,12 @@ pub enum DataStoreError {
     ProofEmptyKeyValuesError,
 }
 
-pub struct MerkleSetup {
+pub struct MerkleSetup<S> {
     root: ObjPtr<Node>,
-    merkle: Merkle,
+    merkle: Merkle<S>,
 }
 
-impl MerkleSetup {
+impl<S: ShaleStore<Node> + Send + Sync> MerkleSetup<S> {
     pub fn insert<K: AsRef<[u8]>>(&mut self, key: K, val: Vec<u8>) -> Result<(), DataStoreError> {
         self.merkle
             .insert(key, val, self.root)
@@ -55,7 +59,7 @@ impl MerkleSetup {
             .map_err(|_err| DataStoreError::GetError)
     }
 
-    pub fn get_mut<K: AsRef<[u8]>>(&mut self, key: K) -> Result<Option<RefMut>, DataStoreError> {
+    pub fn get_mut<K: AsRef<[u8]>>(&mut self, key: K) -> Result<Option<RefMut<S>>, DataStoreError> {
         self.merkle
             .get_mut(key, self.root)
             .map_err(|_err| DataStoreError::GetError)
@@ -65,7 +69,7 @@ impl MerkleSetup {
         self.root
     }
 
-    pub fn get_merkle_mut(&mut self) -> &mut Merkle {
+    pub fn get_merkle_mut(&mut self) -> &mut Merkle<S> {
         &mut self.merkle
     }
 
@@ -113,7 +117,10 @@ impl MerkleSetup {
     }
 }
 
-pub fn new_merkle(meta_size: u64, compact_size: u64) -> MerkleSetup {
+pub fn new_merkle(
+    meta_size: u64,
+    compact_size: u64,
+) -> MerkleSetup<CompactSpace<Node, DynamicMem>> {
     const RESERVED: u64 = 0x1000;
     assert!(meta_size > RESERVED);
     assert!(compact_size > RESERVED);
@@ -126,15 +133,15 @@ pub fn new_merkle(meta_size: u64, compact_size: u64) -> MerkleSetup {
     );
     let compact_header =
         StoredView::ptr_to_obj(&dm, compact_header, shale::compact::CompactHeader::MSIZE).unwrap();
-    let mem_meta = Rc::new(dm);
-    let mem_payload = Rc::new(DynamicMem::new(compact_size, 0x1));
+    let mem_meta = Arc::new(dm);
+    let mem_payload = Arc::new(DynamicMem::new(compact_size, 0x1));
 
     let cache = shale::ObjCache::new(1);
     let space =
         shale::compact::CompactSpace::new(mem_meta, mem_payload, compact_header, cache, 10, 16)
             .expect("CompactSpace init fail");
     let mut root = ObjPtr::null();
-    Merkle::init_root(&mut root, &space).unwrap();
+    Merkle::<CompactSpace<Node, DynamicMem>>::init_root(&mut root, &space).unwrap();
     MerkleSetup {
         root,
         merkle: Merkle::new(Box::new(space)),

@@ -1,26 +1,22 @@
 // TODO: try to get rid of the use `RefCell` in this file
-pub mod buffer;
-
-use std::cell::{RefCell, RefMut};
-use std::collections::HashMap;
-use std::fmt::{self, Debug};
-use std::num::NonZeroUsize;
-use std::ops::{Deref, DerefMut};
-use std::path::PathBuf;
-use std::rc::Rc;
-use std::sync::Arc;
-
-use shale::{CachedStore, CachedView, SpaceId};
-
+use self::buffer::DiskBufferRequester;
+use crate::file::File;
 use nix::fcntl::{flock, FlockArg};
+use parking_lot::RwLock;
+use shale::{CachedStore, CachedView, SendSyncDerefMut, SpaceId};
+use std::{
+    collections::HashMap,
+    fmt::{self, Debug},
+    num::NonZeroUsize,
+    ops::{Deref, DerefMut},
+    path::PathBuf,
+    sync::Arc,
+};
 use thiserror::Error;
-use tokio::sync::mpsc::error::SendError;
-use tokio::sync::oneshot::error::RecvError;
+use tokio::sync::{mpsc::error::SendError, oneshot::error::RecvError};
 use typed_builder::TypedBuilder;
 
-use crate::file::File;
-
-use self::buffer::DiskBufferRequester;
+pub mod buffer;
 
 pub(crate) const PAGE_SIZE_NBIT: u64 = 12;
 pub(crate) const PAGE_SIZE: u64 = 1 << PAGE_SIZE_NBIT;
@@ -48,7 +44,7 @@ impl<T> From<std::io::Error> for StoreError<T> {
     }
 }
 
-pub trait MemStoreR: Debug {
+pub trait MemStoreR: Debug + Send + Sync {
     /// Returns a slice of bytes from memory.
     fn get_slice(&self, offset: u64, length: u64) -> Option<Vec<u8>>;
     fn id(&self) -> SpaceId;
@@ -90,26 +86,35 @@ pub struct AshRecord(pub HashMap<SpaceId, Ash>);
 
 impl growthring::wal::Record for AshRecord {
     fn serialize(&self) -> growthring::wal::WalBytes {
-        let mut bytes = Vec::new();
-        bytes.extend((self.0.len() as u64).to_le_bytes());
-        for (space_id, w) in self.0.iter() {
-            bytes.extend((*space_id).to_le_bytes());
-            bytes.extend(
-                (u32::try_from(w.undo.len()).expect("size of undo shoud be a `u32`")).to_le_bytes(),
-            );
+        let len_bytes = (self.0.len() as u64).to_le_bytes();
+        let ash_record_bytes = self
+            .0
+            .iter()
+            .map(|(space_id, w)| {
+                let space_id_bytes = space_id.to_le_bytes();
+                let undo_len = u32::try_from(w.undo.len()).expect("size of undo shoud be a `u32`");
+                let ash_bytes = w.iter().flat_map(|(undo, redo)| {
+                    let undo_data_len = u64::try_from(undo.data.len())
+                        .expect("length of undo data shoud be a `u64`");
 
-            for (sw_undo, sw_redo) in w.iter() {
-                bytes.extend(sw_undo.offset.to_le_bytes());
-                bytes.extend(
-                    (u64::try_from(sw_undo.data.len())
-                        .expect("length of undo data shoud be a `u64`"))
-                    .to_le_bytes(),
-                );
-                bytes.extend(&*sw_undo.data);
-                bytes.extend(&*sw_redo.data);
-            }
-        }
-        bytes.into()
+                    undo.offset
+                        .to_le_bytes()
+                        .into_iter()
+                        .chain(undo_data_len.to_le_bytes().into_iter())
+                        .chain(undo.data.iter().copied())
+                        .chain(redo.data.iter().copied())
+                });
+
+                (space_id_bytes, undo_len, ash_bytes)
+            })
+            .flat_map(|(space_id_bytes, undo_len, ash_bytes)| {
+                space_id_bytes
+                    .into_iter()
+                    .chain(undo_len.to_le_bytes().into_iter())
+                    .chain(ash_bytes)
+            });
+
+        len_bytes.into_iter().chain(ash_record_bytes).collect()
     }
 }
 
@@ -263,7 +268,7 @@ impl StoreDelta {
 }
 
 pub struct StoreRev {
-    base_space: RefCell<Rc<dyn MemStoreR>>,
+    base_space: RwLock<Arc<dyn MemStoreR>>,
     delta: StoreDelta,
 }
 
@@ -279,7 +284,7 @@ impl fmt::Debug for StoreRev {
 
 impl MemStoreR for StoreRev {
     fn get_slice(&self, offset: u64, length: u64) -> Option<Vec<u8>> {
-        let base_space = self.base_space.borrow();
+        let base_space = self.base_space.read();
         let mut start = offset;
         let end = start + length;
         let delta = &self.delta;
@@ -334,30 +339,30 @@ impl MemStoreR for StoreRev {
     }
 
     fn id(&self) -> SpaceId {
-        self.base_space.borrow().id()
+        self.base_space.read().id()
     }
 }
 
 #[derive(Clone, Debug)]
-pub struct StoreRevShared(Rc<StoreRev>);
+pub struct StoreRevShared(Arc<StoreRev>);
 
 impl StoreRevShared {
-    pub fn from_ash(base_space: Rc<dyn MemStoreR>, writes: &[SpaceWrite]) -> Self {
+    pub fn from_ash(base_space: Arc<dyn MemStoreR>, writes: &[SpaceWrite]) -> Self {
         let delta = StoreDelta::new(base_space.as_ref(), writes);
-        let base_space = RefCell::new(base_space);
-        Self(Rc::new(StoreRev { base_space, delta }))
+        let base_space = RwLock::new(base_space);
+        Self(Arc::new(StoreRev { base_space, delta }))
     }
 
-    pub fn from_delta(base_space: Rc<dyn MemStoreR>, delta: StoreDelta) -> Self {
-        let base_space = RefCell::new(base_space);
-        Self(Rc::new(StoreRev { base_space, delta }))
+    pub fn from_delta(base_space: Arc<dyn MemStoreR>, delta: StoreDelta) -> Self {
+        let base_space = RwLock::new(base_space);
+        Self(Arc::new(StoreRev { base_space, delta }))
     }
 
-    pub fn set_base_space(&mut self, base_space: Rc<dyn MemStoreR>) {
-        *self.0.base_space.borrow_mut() = base_space
+    pub fn set_base_space(&mut self, base_space: Arc<dyn MemStoreR>) {
+        *self.0.base_space.write() = base_space
     }
 
-    pub fn inner(&self) -> &Rc<StoreRev> {
+    pub fn inner(&self) -> &Arc<StoreRev> {
         &self.0
     }
 }
@@ -372,7 +377,7 @@ impl CachedStore for StoreRevShared {
         Some(Box::new(StoreRef { data }))
     }
 
-    fn get_shared(&self) -> Box<dyn DerefMut<Target = dyn CachedStore>> {
+    fn get_shared(&self) -> Box<dyn SendSyncDerefMut<Target = dyn CachedStore>> {
         Box::new(StoreShared(self.clone()))
     }
 
@@ -432,37 +437,36 @@ struct StoreRevMutDelta {
 /// `base space`. The `deltas` tracks both `undo` and `redo` to be able to rewind or reapply
 /// the changes.
 pub struct StoreRevMut {
-    base_space: Rc<dyn MemStoreR>,
-    deltas: Rc<RefCell<StoreRevMutDelta>>,
+    base_space: Arc<dyn MemStoreR>,
+    deltas: Arc<RwLock<StoreRevMutDelta>>,
 }
 
 impl StoreRevMut {
-    pub fn new(base_space: Rc<dyn MemStoreR>) -> Self {
+    pub fn new(base_space: Arc<dyn MemStoreR>) -> Self {
         Self {
             base_space,
             deltas: Default::default(),
         }
     }
 
-    fn get_page_mut(&self, pid: u64) -> RefMut<[u8]> {
-        let mut deltas = self.deltas.borrow_mut();
-        if deltas.pages.get(&pid).is_none() {
-            let page = Box::new(
+    fn get_page_mut<'a>(&self, deltas: &'a mut StoreRevMutDelta, pid: u64) -> &'a mut [u8] {
+        let page = deltas.pages.entry(pid).or_insert_with(|| {
+            Box::new(
                 self.base_space
                     .get_slice(pid << PAGE_SIZE_NBIT, PAGE_SIZE)
                     .unwrap()
                     .try_into()
                     .unwrap(),
-            );
-            deltas.pages.insert(pid, page);
-        }
-        RefMut::map(deltas, |e| &mut e.pages.get_mut(&pid).unwrap()[..])
+            )
+        });
+
+        page.as_mut()
     }
 
     pub fn take_delta(&self) -> (StoreDelta, Ash) {
         let mut pages = Vec::new();
         let deltas = std::mem::replace(
-            &mut *self.deltas.borrow_mut(),
+            &mut *self.deltas.write(),
             StoreRevMutDelta {
                 pages: HashMap::new(),
                 plain: Ash::new(),
@@ -490,7 +494,7 @@ impl CachedStore for StoreRevMut {
             let s_off = (offset & PAGE_MASK) as usize;
             let e_pid = end >> PAGE_SIZE_NBIT;
             let e_off = (end & PAGE_MASK) as usize;
-            let deltas = &self.deltas.borrow().pages;
+            let deltas = &self.deltas.read().pages;
             if s_pid == e_pid {
                 match deltas.get(&s_pid) {
                     Some(p) => p[s_off..e_off + 1].to_vec(),
@@ -524,7 +528,7 @@ impl CachedStore for StoreRevMut {
         Some(Box::new(StoreRef { data }))
     }
 
-    fn get_shared(&self) -> Box<dyn DerefMut<Target = dyn CachedStore>> {
+    fn get_shared(&self) -> Box<dyn SendSyncDerefMut<Target = dyn CachedStore>> {
         Box::new(StoreShared(self.clone()))
     }
 
@@ -539,33 +543,36 @@ impl CachedStore for StoreRevMut {
         let redo: Box<[u8]> = change.into();
 
         if s_pid == e_pid {
-            let slice = &mut self.get_page_mut(s_pid)[s_off..e_off + 1];
+            let mut deltas = self.deltas.write();
+            let slice = &mut self.get_page_mut(deltas.deref_mut(), s_pid)[s_off..e_off + 1];
             undo.extend(&*slice);
             slice.copy_from_slice(change)
         } else {
             let len = PAGE_SIZE as usize - s_off;
 
             {
-                let slice = &mut self.get_page_mut(s_pid)[s_off..];
+                let mut deltas = self.deltas.write();
+                let slice = &mut self.get_page_mut(deltas.deref_mut(), s_pid)[s_off..];
                 undo.extend(&*slice);
                 slice.copy_from_slice(&change[..len]);
             }
 
             change = &change[len..];
 
+            let mut deltas = self.deltas.write();
             for p in s_pid + 1..e_pid {
-                let mut slice = self.get_page_mut(p);
+                let slice = self.get_page_mut(deltas.deref_mut(), p);
                 undo.extend(&*slice);
                 slice.copy_from_slice(&change[..PAGE_SIZE as usize]);
                 change = &change[PAGE_SIZE as usize..];
             }
 
-            let slice = &mut self.get_page_mut(e_pid)[..e_off + 1];
+            let slice = &mut self.get_page_mut(deltas.deref_mut(), e_pid)[..e_off + 1];
             undo.extend(&*slice);
             slice.copy_from_slice(change);
         }
 
-        let plain = &mut self.deltas.borrow_mut().plain;
+        let plain = &mut self.deltas.write().plain;
         assert!(undo.len() == redo.len());
         plain.undo.push(SpaceWrite {
             offset,
@@ -581,11 +588,11 @@ impl CachedStore for StoreRevMut {
 
 #[derive(Clone, Debug)]
 /// A zero-filled in memory store which can serve as a plain base to overlay deltas on top.
-pub struct ZeroStore(Rc<()>);
+pub struct ZeroStore(Arc<()>);
 
 impl Default for ZeroStore {
     fn default() -> Self {
-        Self(Rc::new(()))
+        Self(Arc::new(()))
     }
 }
 
@@ -620,7 +627,7 @@ fn test_from_ash() {
             println!("[0x{l:x}, 0x{r:x})");
             writes.push(SpaceWrite { offset: l, data });
         }
-        let z = Rc::new(ZeroStore::default());
+        let z = Arc::new(ZeroStore::default());
         let rev = StoreRevShared::from_ash(z, &writes);
         println!("{rev:?}");
         assert_eq!(
@@ -658,7 +665,7 @@ struct CachedSpaceInner {
 
 #[derive(Clone, Debug)]
 pub struct CachedSpace {
-    inner: Rc<RefCell<CachedSpaceInner>>,
+    inner: Arc<RwLock<CachedSpaceInner>>,
     space_id: SpaceId,
 }
 
@@ -670,7 +677,7 @@ impl CachedSpace {
         let space_id = cfg.space_id;
         let files = Arc::new(FilePool::new(cfg)?);
         Ok(Self {
-            inner: Rc::new(RefCell::new(CachedSpaceInner {
+            inner: Arc::new(RwLock::new(CachedSpaceInner {
                 cached_pages: lru::LruCache::new(
                     NonZeroUsize::new(cfg.ncached_pages).expect("non-zero cache size"),
                 ),
@@ -683,14 +690,14 @@ impl CachedSpace {
     }
 
     pub fn clone_files(&self) -> Arc<FilePool> {
-        self.inner.borrow().files.clone()
+        self.inner.read().files.clone()
     }
 
     /// Apply `delta` to the store and return the StoreDelta that can undo this change.
     pub fn update(&self, delta: &StoreDelta) -> Option<StoreDelta> {
         let mut pages = Vec::new();
         for DeltaPage(pid, page) in &delta.0 {
-            let data = self.inner.borrow_mut().pin_page(self.space_id, *pid).ok()?;
+            let data = self.inner.write().pin_page(self.space_id, *pid).ok()?;
             // save the original data
             pages.push(DeltaPage(*pid, Box::new(data.try_into().unwrap())));
             // apply the change
@@ -788,11 +795,7 @@ impl PageRef {
     fn new(pid: u64, store: &CachedSpace) -> Option<Self> {
         Some(Self {
             pid,
-            data: store
-                .inner
-                .borrow_mut()
-                .pin_page(store.space_id, pid)
-                .ok()?,
+            data: store.inner.write().pin_page(store.space_id, pid).ok()?,
             store: store.clone(),
         })
     }
@@ -800,7 +803,7 @@ impl PageRef {
 
 impl Drop for PageRef {
     fn drop(&mut self) {
-        self.store.inner.borrow_mut().unpin_page(self.pid);
+        self.store.inner.write().unpin_page(self.pid);
     }
 }
 
@@ -860,17 +863,18 @@ impl FilePool {
 
     fn get_file(&self, fid: u64) -> Result<Arc<File>, StoreError<std::io::Error>> {
         let mut files = self.files.lock();
-        let file_size = 1 << self.file_nbit;
-        Ok(match files.get(&fid) {
+
+        let file = match files.get(&fid) {
             Some(f) => f.clone(),
             None => {
-                files.put(
-                    fid,
-                    Arc::new(File::new(fid, file_size, self.rootdir.clone())?),
-                );
-                files.peek(&fid).unwrap().clone()
+                let file_size = 1 << self.file_nbit;
+                let file = Arc::new(File::new(fid, file_size, &self.rootdir)?);
+                files.put(fid, file.clone());
+                file
             }
-        })
+        };
+
+        Ok(file)
     }
 
     fn get_file_nbit(&self) -> u64 {

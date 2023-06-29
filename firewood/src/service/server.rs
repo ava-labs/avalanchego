@@ -39,8 +39,8 @@ pub struct FirewoodService {}
 impl FirewoodService {
     pub fn new(mut receiver: Receiver<Request>, owned_path: PathBuf, cfg: DbConfig) -> Self {
         let db = Db::new(owned_path, &cfg).unwrap();
-        let mut active_batch: Option<crate::db::WriteBatch> = None;
-        let mut revs = HashMap::<RevId, crate::db::Revision>::new();
+        let mut active_batch = None;
+        let mut revs = HashMap::new();
         let lastid = AtomicU32::new(0);
         loop {
             let msg = match receiver.blocking_recv() {
@@ -59,7 +59,7 @@ impl FirewoodService {
                     respond_to,
                 } => {
                     let id: RevId = lastid.fetch_add(1, Ordering::Relaxed);
-                    let msg = match db.get_revision(root_hash, cfg) {
+                    let msg = match db.get_revision(&root_hash, cfg) {
                         Some(rev) => {
                             revs.insert(id, rev);
                             Some(id)

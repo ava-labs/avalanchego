@@ -648,7 +648,7 @@ mod tests {
         disk_requester.init_wal("wal", root_db_path);
 
         // create a new state cache which tracks on disk state.
-        let state_cache = Rc::new(
+        let state_cache = Arc::new(
             CachedSpace::new(
                 &StoreConfig::builder()
                     .ncached_pages(1)
@@ -664,7 +664,7 @@ mod tests {
 
         // add an in memory cached space. this will allow us to write to the
         // disk buffer then later persist the change to disk.
-        disk_requester.reg_cached_space(state_cache.id(), state_cache.inner.borrow().files.clone());
+        disk_requester.reg_cached_space(state_cache.id(), state_cache.inner.read().files.clone());
 
         // memory mapped store
         let mut mut_store = StoreRevMut::new(state_cache);
@@ -736,7 +736,7 @@ mod tests {
         disk_requester.init_wal("wal", root_db_path);
 
         // create a new state cache which tracks on disk state.
-        let state_cache = Rc::new(
+        let state_cache = Arc::new(
             CachedSpace::new(
                 &StoreConfig::builder()
                     .ncached_pages(1)
@@ -796,7 +796,7 @@ mod tests {
 
         // replay the redo from the wal
         let shared_store = StoreRevShared::from_ash(
-            Rc::new(ZeroStore::default()),
+            Arc::new(ZeroStore::default()),
             &ashes[0].0[&STATE_SPACE].redo,
         );
         let view = shared_store.get_view(0, hash.len() as u64).unwrap();
@@ -819,7 +819,7 @@ mod tests {
 
     fn create_batches(rev_mut: &StoreRevMut) -> (Vec<BufferWrite>, AshRecord) {
         let deltas = std::mem::replace(
-            &mut *rev_mut.deltas.borrow_mut(),
+            &mut *rev_mut.deltas.write(),
             StoreRevMutDelta {
                 pages: HashMap::new(),
                 plain: Ash::new(),

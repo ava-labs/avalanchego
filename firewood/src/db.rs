@@ -1,35 +1,39 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use std::collections::VecDeque;
-use std::error::Error;
-use std::fmt;
-use std::io::{Cursor, Write};
-use std::path::Path;
-use std::rc::Rc;
-use std::sync::Arc;
-use std::thread::JoinHandle;
-
-use bytemuck::{cast_slice, AnyBitPattern};
-use metered::{metered, HitCount};
-use parking_lot::{Mutex, RwLock};
-#[cfg(feature = "eth")]
-use primitive_types::U256;
-use shale::ShaleError;
-use shale::{compact::CompactSpaceHeader, CachedStore, ObjPtr, SpaceId, Storable, StoredView};
-use typed_builder::TypedBuilder;
-
 #[cfg(feature = "eth")]
 use crate::account::{Account, AccountRlp, Blob, BlobStash};
-use crate::file;
-use crate::merkle::{IdTrans, Merkle, MerkleError, Node, TrieHash, TRIE_HASH_LEN};
-use crate::proof::{Proof, ProofError};
-use crate::storage::buffer::{BufferWrite, DiskBuffer, DiskBufferRequester};
 pub use crate::storage::{buffer::DiskBufferConfig, WalConfig};
 use crate::storage::{
     AshRecord, CachedSpace, MemStoreR, SpaceWrite, StoreConfig, StoreDelta, StoreRevMut,
     StoreRevShared, ZeroStore, PAGE_SIZE_NBIT,
 };
+use crate::{
+    file,
+    merkle::{IdTrans, Merkle, MerkleError, Node, TrieHash, TRIE_HASH_LEN},
+    proof::{Proof, ProofError},
+    storage::buffer::{BufferWrite, DiskBuffer, DiskBufferRequester},
+};
+use bytemuck::{cast_slice, AnyBitPattern};
+use metered::{metered, HitCount};
+use parking_lot::{Mutex, RwLock};
+#[cfg(feature = "eth")]
+use primitive_types::U256;
+use shale::compact::CompactSpace;
+use shale::ShaleStore;
+use shale::{
+    compact::CompactSpaceHeader, CachedStore, ObjPtr, ShaleError, SpaceId, Storable, StoredView,
+};
+use std::{
+    collections::VecDeque,
+    error::Error,
+    fmt,
+    io::{Cursor, Write},
+    path::Path,
+    sync::Arc,
+    thread::JoinHandle,
+};
+use typed_builder::TypedBuilder;
 
 const MERKLE_META_SPACE: SpaceId = 0x0;
 const MERKLE_PAYLOAD_SPACE: SpaceId = 0x1;
@@ -179,7 +183,7 @@ impl<T> SubUniverse<T> {
 }
 
 impl SubUniverse<StoreRevShared> {
-    fn to_mem_store_r(&self) -> SubUniverse<Rc<impl MemStoreR>> {
+    fn to_mem_store_r(&self) -> SubUniverse<Arc<impl MemStoreR>> {
         SubUniverse {
             meta: self.meta.inner().clone(),
             payload: self.payload.inner().clone(),
@@ -187,7 +191,7 @@ impl SubUniverse<StoreRevShared> {
     }
 }
 
-impl<T: MemStoreR + 'static> SubUniverse<Rc<T>> {
+impl<T: MemStoreR + 'static> SubUniverse<Arc<T>> {
     fn rewind(
         &self,
         meta_writes: &[SpaceWrite],
@@ -200,8 +204,8 @@ impl<T: MemStoreR + 'static> SubUniverse<Rc<T>> {
     }
 }
 
-impl SubUniverse<Rc<CachedSpace>> {
-    fn to_mem_store_r(&self) -> SubUniverse<Rc<impl MemStoreR>> {
+impl SubUniverse<Arc<CachedSpace>> {
+    fn to_mem_store_r(&self) -> SubUniverse<Arc<impl MemStoreR>> {
         SubUniverse {
             meta: self.meta.clone(),
             payload: self.payload.clone(),
@@ -210,7 +214,7 @@ impl SubUniverse<Rc<CachedSpace>> {
 }
 
 fn get_sub_universe_from_deltas(
-    sub_universe: &SubUniverse<Rc<CachedSpace>>,
+    sub_universe: &SubUniverse<Arc<CachedSpace>>,
     meta_delta: StoreDelta,
     payload_delta: StoreDelta,
 ) -> SubUniverse<StoreRevShared> {
@@ -221,7 +225,7 @@ fn get_sub_universe_from_deltas(
 }
 
 fn get_sub_universe_from_empty_delta(
-    sub_universe: &SubUniverse<Rc<CachedSpace>>,
+    sub_universe: &SubUniverse<Arc<CachedSpace>>,
 ) -> SubUniverse<StoreRevShared> {
     get_sub_universe_from_deltas(sub_universe, StoreDelta::default(), StoreDelta::default())
 }
@@ -282,7 +286,7 @@ struct Universe<T> {
 }
 
 impl Universe<StoreRevShared> {
-    fn to_mem_store_r(&self) -> Universe<Rc<impl MemStoreR>> {
+    fn to_mem_store_r(&self) -> Universe<Arc<impl MemStoreR>> {
         Universe {
             merkle: self.merkle.to_mem_store_r(),
             blob: self.blob.to_mem_store_r(),
@@ -290,8 +294,8 @@ impl Universe<StoreRevShared> {
     }
 }
 
-impl Universe<Rc<CachedSpace>> {
-    fn to_mem_store_r(&self) -> Universe<Rc<impl MemStoreR>> {
+impl Universe<Arc<CachedSpace>> {
+    fn to_mem_store_r(&self) -> Universe<Arc<impl MemStoreR>> {
         Universe {
             merkle: self.merkle.to_mem_store_r(),
             blob: self.blob.to_mem_store_r(),
@@ -299,7 +303,7 @@ impl Universe<Rc<CachedSpace>> {
     }
 }
 
-impl<T: MemStoreR + 'static> Universe<Rc<T>> {
+impl<T: MemStoreR + 'static> Universe<Arc<T>> {
     fn rewind(
         &self,
         merkle_meta_writes: &[SpaceWrite],
@@ -317,14 +321,14 @@ impl<T: MemStoreR + 'static> Universe<Rc<T>> {
 }
 
 /// Some readable version of the DB.
-pub struct DbRev {
+pub struct DbRev<S> {
     header: shale::Obj<DbHeader>,
-    merkle: Merkle,
+    merkle: Merkle<S>,
     #[cfg(feature = "eth")]
-    blob: BlobStash,
+    blob: BlobStash<S>,
 }
 
-impl DbRev {
+impl<S: ShaleStore<Node> + Send + Sync> DbRev<S> {
     fn flush_dirty(&mut self) -> Option<()> {
         self.header.flush_dirty();
         self.merkle.flush_dirty()?;
@@ -334,11 +338,11 @@ impl DbRev {
     }
 
     #[cfg(feature = "eth")]
-    fn borrow_split(&mut self) -> (&mut shale::Obj<DbHeader>, &mut Merkle, &mut BlobStash) {
+    fn borrow_split(&mut self) -> (&mut shale::Obj<DbHeader>, &mut Merkle<S>, &mut BlobStash<S>) {
         (&mut self.header, &mut self.merkle, &mut self.blob)
     }
     #[cfg(not(feature = "eth"))]
-    fn borrow_split(&mut self) -> (&mut shale::Obj<DbHeader>, &mut Merkle) {
+    fn borrow_split(&mut self) -> (&mut shale::Obj<DbHeader>, &mut Merkle<S>) {
         (&mut self.header, &mut self.merkle)
     }
 
@@ -395,7 +399,7 @@ impl DbRev {
 }
 
 #[cfg(feature = "eth")]
-impl DbRev {
+impl<S: ShaleStore<Node> + Send + Sync> DbRev<S> {
     /// Get nonce of the account.
     pub fn get_nonce<K: AsRef<[u8]>>(&self, key: K) -> Result<u64, DbError> {
         Ok(self.get_account(key)?.nonce)
@@ -468,16 +472,16 @@ impl DbRev {
     }
 }
 
-struct DbInner {
-    latest: DbRev,
+struct DbInner<S> {
+    latest: DbRev<S>,
     disk_requester: DiskBufferRequester,
     disk_thread: Option<JoinHandle<()>>,
-    data_staging: Universe<Rc<StoreRevMut>>,
-    data_cache: Universe<Rc<CachedSpace>>,
+    data_staging: Universe<Arc<StoreRevMut>>,
+    data_cache: Universe<Arc<CachedSpace>>,
     root_hash_staging: StoreRevMut,
 }
 
-impl Drop for DbInner {
+impl<S> Drop for DbInner<S> {
     fn drop(&mut self) {
         self.disk_requester.shutdown();
         self.disk_thread.take().map(JoinHandle::join);
@@ -485,8 +489,8 @@ impl Drop for DbInner {
 }
 
 /// Firewood database handle.
-pub struct Db {
-    inner: Arc<RwLock<DbInner>>,
+pub struct Db<S> {
+    inner: Arc<RwLock<DbInner<S>>>,
     revisions: Arc<Mutex<DbRevInner>>,
     payload_regn_nbit: u64,
     rev_cfg: DbRevConfig,
@@ -500,8 +504,8 @@ pub struct DbRevInner {
     base: Universe<StoreRevShared>,
 }
 
-#[metered(registry = DbMetrics, visibility = pub)]
-impl Db {
+// #[metered(registry = DbMetrics, visibility = pub)]
+impl Db<CompactSpace<Node, StoreRevMut>> {
     /// Open a database.
     pub fn new<P: AsRef<Path>>(db_path: P, cfg: &DbConfig) -> Result<Self, DbError> {
         // TODO: make sure all fds are released at the end
@@ -543,8 +547,16 @@ impl Db {
                 wal_block_nbit: cfg.wal.block_nbit,
                 root_hash_file_nbit: cfg.root_hash_file_nbit,
             };
-            nix::sys::uio::pwrite(fd0, &shale::util::get_raw_bytes(&header), 0)
-                .map_err(DbError::System)?;
+
+            let header_bytes = unsafe {
+                std::slice::from_raw_parts(
+                    &header as *const DbParams as *const u8,
+                    std::mem::size_of::<DbParams>(),
+                )
+                .to_vec()
+            };
+
+            nix::sys::uio::pwrite(fd0, &header_bytes, 0).map_err(DbError::System)?;
         }
 
         // read DbParams
@@ -567,7 +579,7 @@ impl Db {
             disk_buffer.run()
         }));
 
-        let root_hash_cache = Rc::new(
+        let root_hash_cache = Arc::new(
             CachedSpace::new(
                 &StoreConfig::builder()
                     .ncached_pages(cfg.root_hash_ncached_pages)
@@ -584,7 +596,7 @@ impl Db {
         // setup disk buffer
         let data_cache = Universe {
             merkle: SubUniverse::new(
-                Rc::new(
+                Arc::new(
                     CachedSpace::new(
                         &StoreConfig::builder()
                             .ncached_pages(cfg.meta_ncached_pages)
@@ -597,7 +609,7 @@ impl Db {
                     )
                     .unwrap(),
                 ),
-                Rc::new(
+                Arc::new(
                     CachedSpace::new(
                         &StoreConfig::builder()
                             .ncached_pages(cfg.payload_ncached_pages)
@@ -612,7 +624,7 @@ impl Db {
                 ),
             ),
             blob: SubUniverse::new(
-                Rc::new(
+                Arc::new(
                     CachedSpace::new(
                         &StoreConfig::builder()
                             .ncached_pages(cfg.meta_ncached_pages)
@@ -625,7 +637,7 @@ impl Db {
                     )
                     .unwrap(),
                 ),
-                Rc::new(
+                Arc::new(
                     CachedSpace::new(
                         &StoreConfig::builder()
                             .ncached_pages(cfg.payload_ncached_pages)
@@ -653,21 +665,6 @@ impl Db {
             disk_requester.reg_cached_space(cached_space.id(), cached_space.clone_files());
         });
 
-        let mut data_staging = Universe {
-            merkle: SubUniverse::new(
-                Rc::new(StoreRevMut::new(data_cache.merkle.meta.clone())),
-                Rc::new(StoreRevMut::new(data_cache.merkle.payload.clone())),
-            ),
-            blob: SubUniverse::new(
-                Rc::new(StoreRevMut::new(data_cache.blob.meta.clone())),
-                Rc::new(StoreRevMut::new(data_cache.blob.payload.clone())),
-            ),
-        };
-        let root_hash_staging = StoreRevMut::new(root_hash_cache);
-
-        // recover from Wal
-        disk_requester.init_wal("wal", db_path);
-
         // set up the storage layout
 
         let db_header: ObjPtr<DbHeader> = ObjPtr::new_from_addr(offset);
@@ -677,22 +674,23 @@ impl Db {
         assert!(offset <= SPACE_RESERVED);
         let blob_payload_header: ObjPtr<CompactSpaceHeader> = ObjPtr::new_from_addr(0);
 
+        let mut data_staging_merkle_meta = StoreRevMut::new(data_cache.merkle.meta.clone());
+        let mut data_staging_blob_meta = StoreRevMut::new(data_cache.blob.meta.clone());
+
         if reset {
             // initialize space headers
-            let initializer = Rc::<StoreRevMut>::make_mut(&mut data_staging.merkle.meta);
-            initializer.write(
+            data_staging_merkle_meta.write(
                 merkle_payload_header.addr(),
                 &shale::to_dehydrated(&shale::compact::CompactSpaceHeader::new(
                     SPACE_RESERVED,
                     SPACE_RESERVED,
                 ))?,
             );
-            initializer.write(
+            data_staging_merkle_meta.write(
                 db_header.addr(),
                 &shale::to_dehydrated(&DbHeader::new_empty())?,
             );
-            let initializer = Rc::<StoreRevMut>::make_mut(&mut data_staging.blob.meta);
-            initializer.write(
+            data_staging_blob_meta.write(
                 blob_payload_header.addr(),
                 &shale::to_dehydrated(&shale::compact::CompactSpaceHeader::new(
                     SPACE_RESERVED,
@@ -700,6 +698,21 @@ impl Db {
                 ))?,
             );
         }
+
+        let data_staging = Universe {
+            merkle: SubUniverse::new(
+                Arc::new(data_staging_merkle_meta),
+                Arc::new(StoreRevMut::new(data_cache.merkle.payload.clone())),
+            ),
+            blob: SubUniverse::new(
+                Arc::new(data_staging_blob_meta),
+                Arc::new(StoreRevMut::new(data_cache.blob.payload.clone())),
+            ),
+        };
+        let root_hash_staging = StoreRevMut::new(root_hash_cache);
+
+        // recover from Wal
+        disk_requester.init_wal("wal", db_path);
 
         let (mut db_header_ref, merkle_payload_header_ref, _blob_payload_header_ref) = {
             let merkle_meta_ref = data_staging.merkle.meta.as_ref();
@@ -749,8 +762,14 @@ impl Db {
             db_header_ref
                 .write(|r| {
                     err = (|| {
-                        Merkle::init_root(&mut r.acc_root, &merkle_space)?;
-                        Merkle::init_root(&mut r.kv_root, &merkle_space)
+                        Merkle::<CompactSpace<Node, StoreRevMut>>::init_root(
+                            &mut r.acc_root,
+                            &merkle_space,
+                        )?;
+                        Merkle::<CompactSpace<Node, StoreRevMut>>::init_root(
+                            &mut r.kv_root,
+                            &merkle_space,
+                        )
                     })();
                 })
                 .unwrap();
@@ -791,45 +810,22 @@ impl Db {
         })
     }
 
-    /// Create a write batch.
-    pub fn new_writebatch(&self) -> WriteBatch {
-        WriteBatch {
-            m: Arc::clone(&self.inner),
-            r: Arc::clone(&self.revisions),
-            committed: false,
-        }
-    }
-
-    /// Dump the Trie of the latest generic key-value storage.
-    pub fn kv_dump(&self, w: &mut dyn Write) -> Result<(), DbError> {
-        self.inner.read().latest.kv_dump(w)
-    }
-    /// Get root hash of the latest generic key-value storage.
-    pub fn kv_root_hash(&self) -> Result<TrieHash, DbError> {
-        self.inner.read().latest.kv_root_hash()
-    }
-
-    /// Get a value in the kv store associated with a particular key.
-    #[measure([HitCount])]
-    pub fn kv_get<K: AsRef<[u8]>>(&self, key: K) -> Result<Vec<u8>, DbError> {
-        self.inner
-            .read()
-            .latest
-            .kv_get(key)
-            .ok_or(DbError::KeyNotFound)
-    }
     /// Get a handle that grants the access to any committed state of the entire DB,
     /// with a given root hash. If the given root hash matches with more than one
     /// revisions, we use the most recent one as the trie are the same.
     ///
     /// If no revision with matching root hash found, returns None.
-    #[measure([HitCount])]
-    pub fn get_revision(&self, root_hash: TrieHash, cfg: Option<DbRevConfig>) -> Option<Revision> {
+    // #[measure([HitCount])]
+    pub fn get_revision(
+        &self,
+        root_hash: &TrieHash,
+        cfg: Option<DbRevConfig>,
+    ) -> Option<Revision<CompactSpace<Node, StoreRevShared>>> {
         let mut revisions = self.revisions.lock();
         let inner_lock = self.inner.read();
 
         // Find the revision index with the given root hash.
-        let mut nback = revisions.root_hashes.iter().position(|r| r == &root_hash);
+        let mut nback = revisions.root_hashes.iter().position(|r| r == root_hash);
         let rlen = revisions.root_hashes.len();
 
         if nback.is_none() && rlen < revisions.max_revisions {
@@ -844,7 +840,7 @@ impl Db {
                 .skip(rlen)
                 .map(|ash| {
                     StoreRevShared::from_ash(
-                        Rc::new(ZeroStore::default()),
+                        Arc::new(ZeroStore::default()),
                         &ash.0[&ROOT_HASH_SPACE].redo,
                     )
                 })
@@ -855,7 +851,7 @@ impl Db {
                         .as_deref()
                 })
                 .map(|data| TrieHash(data[..TRIE_HASH_LEN].try_into().unwrap()))
-                .position(|trie_hash| trie_hash == root_hash);
+                .position(|trie_hash| &trie_hash == root_hash);
         }
 
         let Some(nback) = nback else {
@@ -931,8 +927,8 @@ impl Db {
         };
 
         let merkle_space = shale::compact::CompactSpace::new(
-            Rc::new(space.merkle.meta.clone()),
-            Rc::new(space.merkle.payload.clone()),
+            Arc::new(space.merkle.meta.clone()),
+            Arc::new(space.merkle.payload.clone()),
             merkle_payload_header_ref,
             shale::ObjCache::new(cfg.as_ref().unwrap_or(&self.rev_cfg).merkle_ncached_objs),
             0,
@@ -942,14 +938,15 @@ impl Db {
 
         #[cfg(feature = "eth")]
         let blob_space = shale::compact::CompactSpace::new(
-            Rc::new(space.blob.meta.clone()),
-            Rc::new(space.blob.payload.clone()),
+            Arc::new(space.blob.meta.clone()),
+            Arc::new(space.blob.payload.clone()),
             blob_payload_header_ref,
             shale::ObjCache::new(cfg.as_ref().unwrap_or(&self.rev_cfg).blob_ncached_objs),
             0,
             self.payload_regn_nbit,
         )
         .unwrap();
+
         Some(Revision {
             rev: DbRev {
                 header: db_header_ref,
@@ -959,12 +956,44 @@ impl Db {
             },
         })
     }
+}
+
+#[metered(registry = DbMetrics, visibility = pub)]
+impl<S: ShaleStore<Node> + Send + Sync> Db<S> {
+    /// Create a write batch.
+    pub fn new_writebatch(&self) -> WriteBatch<S> {
+        WriteBatch {
+            m: Arc::clone(&self.inner),
+            r: Arc::clone(&self.revisions),
+            committed: false,
+        }
+    }
+
+    /// Dump the Trie of the latest generic key-value storage.
+    pub fn kv_dump(&self, w: &mut dyn Write) -> Result<(), DbError> {
+        self.inner.read().latest.kv_dump(w)
+    }
+    /// Get root hash of the latest generic key-value storage.
+    pub fn kv_root_hash(&self) -> Result<TrieHash, DbError> {
+        self.inner.read().latest.kv_root_hash()
+    }
+
+    /// Get a value in the kv store associated with a particular key.
+    #[measure(HitCount)]
+    pub fn kv_get<K: AsRef<[u8]>>(&self, key: K) -> Result<Vec<u8>, DbError> {
+        self.inner
+            .read()
+            .latest
+            .kv_get(key)
+            .ok_or(DbError::KeyNotFound)
+    }
+
     pub fn metrics(&self) -> Arc<DbMetrics> {
         self.metrics.clone()
     }
 }
 #[cfg(feature = "eth")]
-impl Db {
+impl<S: ShaleStore<Node> + Send + Sync> Db<S> {
     /// Dump the Trie of the latest entire account model storage.
     pub fn dump(&self, w: &mut dyn Write) -> Result<(), DbError> {
         self.inner.read().latest.dump(w)
@@ -1007,13 +1036,13 @@ impl Db {
 }
 
 /// Lock protected handle to a readable version of the DB.
-pub struct Revision {
-    rev: DbRev,
+pub struct Revision<S> {
+    rev: DbRev<S>,
 }
 
-impl std::ops::Deref for Revision {
-    type Target = DbRev;
-    fn deref(&self) -> &DbRev {
+impl<S> std::ops::Deref for Revision<S> {
+    type Target = DbRev<S>;
+    fn deref(&self) -> &DbRev<S> {
         &self.rev
     }
 }
@@ -1021,13 +1050,13 @@ impl std::ops::Deref for Revision {
 /// An atomic batch of changes made to the DB. Each operation on a [WriteBatch] will move itself
 /// because when an error occurs, the write batch will be automatically aborted so that the DB
 /// remains clean.
-pub struct WriteBatch {
-    m: Arc<RwLock<DbInner>>,
+pub struct WriteBatch<S> {
+    m: Arc<RwLock<DbInner<S>>>,
     r: Arc<Mutex<DbRevInner>>,
     committed: bool,
 }
 
-impl WriteBatch {
+impl<S: ShaleStore<Node> + Send + Sync> WriteBatch<S> {
     /// Insert an item to the generic key-value storage.
     pub fn kv_insert<K: AsRef<[u8]>>(self, key: K, val: Vec<u8>) -> Result<Self, DbError> {
         let mut rev = self.m.write();
@@ -1196,11 +1225,11 @@ impl WriteBatch {
 }
 
 #[cfg(feature = "eth")]
-impl WriteBatch {
+impl<S: ShaleStore<Node> + Send + Sync> WriteBatch<S> {
     fn change_account(
         &mut self,
         key: &[u8],
-        modify: impl FnOnce(&mut Account, &mut BlobStash) -> Result<(), DbError>,
+        modify: impl FnOnce(&mut Account, &mut BlobStash<S>) -> Result<(), DbError>,
     ) -> Result<(), DbError> {
         let mut rev = self.m.write();
         let (header, merkle, blob) = rev.latest.borrow_split();
@@ -1341,7 +1370,7 @@ impl WriteBatch {
     }
 }
 
-impl Drop for WriteBatch {
+impl<S> Drop for WriteBatch<S> {
     fn drop(&mut self) {
         if !self.committed {
             // drop the staging changes

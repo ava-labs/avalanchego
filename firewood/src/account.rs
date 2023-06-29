@@ -132,12 +132,12 @@ pub enum BlobError {
     Shale(ShaleError),
 }
 
-pub struct BlobStash {
-    store: Box<dyn ShaleStore<Blob>>,
+pub struct BlobStash<T> {
+    store: Box<T>,
 }
 
-impl BlobStash {
-    pub fn new(store: Box<dyn ShaleStore<Blob>>) -> Self {
+impl<T: ShaleStore<Blob> + Send + Sync> BlobStash<T> {
+    pub fn new(store: Box<T>) -> Self {
         Self { store }
     }
 

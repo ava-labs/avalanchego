@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use sha3::Digest;
 use shale::ObjPtr;
 use shale::ShaleError;
+use shale::ShaleStore;
 
 use std::cmp::Ordering;
 use std::collections::HashMap;
@@ -376,11 +377,11 @@ impl Proof {
     /// necessary nodes will be resolved and leave the remaining as hashnode.
     ///
     /// The given edge proof is allowed to be an existent or non-existent proof.
-    fn proof_to_path<K: AsRef<[u8]>>(
+    fn proof_to_path<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync>(
         &self,
         key: K,
         root_hash: [u8; 32],
-        merkle_setup: &mut MerkleSetup,
+        merkle_setup: &mut MerkleSetup<S>,
         allow_non_existent_node: bool,
     ) -> Result<Option<Vec<u8>>, ProofError> {
         // Start with the sentinel root
@@ -562,9 +563,9 @@ impl Proof {
     ///
     /// * `end_node` - A boolean indicates whether this is the end node to decode, thus no `key`
     ///                to be present.
-    fn decode_node(
+    fn decode_node<S: ShaleStore<Node> + Send + Sync>(
         &self,
-        merkle: &Merkle,
+        merkle: &Merkle<S>,
         key: &[u8],
         buf: &[u8],
         end_node: bool,
@@ -683,8 +684,8 @@ impl Proof {
 struct CurKey(Vec<u8>);
 struct Data(Vec<u8>);
 
-fn get_ext_ptr(
-    merkle: &Merkle,
+fn get_ext_ptr<S: ShaleStore<Node> + Send + Sync>(
+    merkle: &Merkle<S>,
     term: bool,
     Data(data): Data,
     CurKey(cur_key): CurKey,
@@ -701,8 +702,8 @@ fn get_ext_ptr(
         .map_err(|_| ProofError::DecodeError)
 }
 
-fn build_branch_ptr(
-    merkle: &Merkle,
+fn build_branch_ptr<S: ShaleStore<Node> + Send + Sync>(
+    merkle: &Merkle<S>,
     value: Option<Vec<u8>>,
     chd_eth_rlp: [Option<Vec<u8>>; NBRANCH],
 ) -> Result<ObjPtr<Node>, ProofError> {
@@ -729,8 +730,8 @@ fn build_branch_ptr(
 //
 // The return value indicates if the fork point is root node. If so, unset the
 // entire trie.
-fn unset_internal<K: AsRef<[u8]>>(
-    merkle_setup: &mut MerkleSetup,
+fn unset_internal<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync>(
+    merkle_setup: &mut MerkleSetup<S>,
     left: K,
     right: K,
 ) -> Result<bool, ProofError> {
@@ -974,8 +975,8 @@ fn unset_internal<K: AsRef<[u8]>>(
 //     keep the entire branch and return.
 //   - the fork point is a shortnode, the shortnode is excluded in the range,
 //     unset the entire branch.
-fn unset_node_ref<K: AsRef<[u8]>>(
-    merkle: &Merkle,
+fn unset_node_ref<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync>(
+    merkle: &Merkle<S>,
     parent: ObjPtr<Node>,
     node: Option<ObjPtr<Node>>,
     key: K,
