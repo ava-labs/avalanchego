@@ -28,6 +28,9 @@ type window[T any] struct {
 	ttl time.Duration
 	// max amount of elements allowed in the window
 	maxSize int
+	// min amount of elements required in the window before allowing removal
+	// based on time
+	minSize int
 
 	// mutex for synchronization
 	lock sync.RWMutex
@@ -39,6 +42,7 @@ type window[T any] struct {
 type Config struct {
 	Clock   *mockable.Clock
 	MaxSize int
+	MinSize int
 	TTL     time.Duration
 }
 
@@ -48,6 +52,7 @@ func New[T any](config Config) Window[T] {
 		clock:    config.Clock,
 		ttl:      config.TTL,
 		maxSize:  config.MaxSize,
+		minSize:  config.MinSize,
 		elements: buffer.NewUnboundedDeque[node[T]](config.MaxSize + 1),
 	}
 }
@@ -74,6 +79,7 @@ func (w *window[T]) Add(value T) {
 func (w *window[T]) Oldest() (T, bool) {
 	w.lock.RLock()
 	defer w.lock.RUnlock()
+
 	oldest, ok := w.elements.PeekLeft()
 	if !ok {
 		return utils.Zero[T](), false
@@ -85,6 +91,7 @@ func (w *window[T]) Oldest() (T, bool) {
 func (w *window[T]) Length() int {
 	w.lock.RLock()
 	defer w.lock.RUnlock()
+
 	return w.elements.Len()
 }
 
@@ -97,7 +104,7 @@ func (w *window[T]) removeStaleNodes() {
 	if !ok {
 		return
 	}
-	for {
+	for w.elements.Len() > w.minSize {
 		oldest, ok := w.elements.PeekLeft()
 		if !ok || newest.entryTime.Sub(oldest.entryTime) <= w.ttl {
 			return
