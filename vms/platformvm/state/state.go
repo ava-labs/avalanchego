@@ -81,10 +81,11 @@ var (
 	chainPrefix                         = []byte("chain")
 	singletonPrefix                     = []byte("singleton")
 
-	timestampKey     = []byte("timestamp")
-	currentSupplyKey = []byte("current supply")
-	lastAcceptedKey  = []byte("last accepted")
-	initializedKey   = []byte("initialized")
+	timestampKey      = []byte("timestamp")
+	currentSupplyKey  = []byte("current supply")
+	lastAcceptedKey   = []byte("last accepted")
+	heightsIndexedKey = []byte("heights indexed")
+	initializedKey    = []byte("initialized")
 )
 
 // Chain collects all methods to manage the state of the chain for block
@@ -233,7 +234,8 @@ func (b *stateBlk) Size() int {
  *   |-- initializedKey -> nil
  *   |-- timestampKey -> timestamp
  *   |-- currentSupplyKey -> currentSupply
- *   '-- lastAcceptedKey -> lastAccepted
+ *   |-- lastAcceptedKey -> lastAccepted
+ *   '-- heightsIndexKey -> startIndexHeight + endIndexHeight
  */
 type state struct {
 	validatorState
@@ -317,7 +319,13 @@ type state struct {
 	currentSupply, persistedCurrentSupply uint64
 	// [lastAccepted] is the most recently accepted block.
 	lastAccepted, persistedLastAccepted ids.ID
+	indexedHeights                      *heightRange
 	singletonDB                         database.Database
+}
+
+type heightRange struct {
+	Start uint64 `serialize:"true"`
+	End   uint64 `serialize:"true"`
 }
 
 type ValidatorWeightDiff struct {
@@ -953,7 +961,9 @@ func (s *state) ApplyValidatorWeightDiffs(
 	defer diffIter.Release()
 
 	prevHeight := startHeight + 1
-	for diffIter.Next() {
+	// TODO: Remove the index continuity checks once we are guaranteed nodes can
+	// not rollback to not support the new indexing mechanism.
+	for diffIter.Next() && s.indexedHeights != nil && s.indexedHeights.Start <= endHeight {
 		_, parsedHeight, nodeID, err := parseWeightKey(diffIter.Key())
 		if err != nil {
 			return err
@@ -1186,6 +1196,33 @@ func (s *state) loadMetadata() error {
 	}
 	s.persistedLastAccepted = lastAccepted
 	s.lastAccepted = lastAccepted
+
+	// Lookup the most recently indexed range on disk. If we haven't started
+	// indexing the weights, then we keep the indexed heights as nil.
+	indexedHeightsBytes, err := s.singletonDB.Get(heightsIndexedKey)
+	if err == database.ErrNotFound {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	indexedHeights := &heightRange{}
+	_, err = blocks.GenesisCodec.Unmarshal(indexedHeightsBytes, indexedHeights)
+	if err != nil {
+		return err
+	}
+
+	// If the indexed range is not up to date, then we will act as if the range
+	// doesn't exist.
+	lastAcceptedBlock, _, err := s.GetStatelessBlock(lastAccepted)
+	if err != nil {
+		return err
+	}
+	if indexedHeights.End != lastAcceptedBlock.Height() {
+		return nil
+	}
+	s.indexedHeights = indexedHeights
 	return nil
 }
 
@@ -1467,7 +1504,7 @@ func (s *state) write(updateValidators bool, height uint64) error {
 		s.writeTransformedSubnets(),
 		s.writeSubnetSupplies(),
 		s.writeChains(),
-		s.writeMetadata(),
+		s.writeMetadata(height),
 	)
 	return errs.Err
 }
@@ -2052,7 +2089,7 @@ func (s *state) writeChains() error {
 	return nil
 }
 
-func (s *state) writeMetadata() error {
+func (s *state) writeMetadata(height uint64) error {
 	if !s.persistedTimestamp.Equal(s.timestamp) {
 		if err := database.PutTimestamp(s.singletonDB, timestampKey, s.timestamp); err != nil {
 			return fmt.Errorf("failed to write timestamp: %w", err)
@@ -2070,6 +2107,21 @@ func (s *state) writeMetadata() error {
 			return fmt.Errorf("failed to write last accepted: %w", err)
 		}
 		s.persistedLastAccepted = s.lastAccepted
+	}
+
+	if s.indexedHeights == nil {
+		s.indexedHeights = &heightRange{
+			Start: height,
+		}
+	}
+	s.indexedHeights.End = height
+
+	indexedHeightsBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, s.indexedHeights)
+	if err != nil {
+		return err
+	}
+	if err := s.singletonDB.Put(heightsIndexedKey, indexedHeightsBytes); err != nil {
+		return fmt.Errorf("failed to write indexed range: %w", err)
 	}
 	return nil
 }
