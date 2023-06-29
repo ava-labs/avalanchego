@@ -25,16 +25,8 @@ const (
 	minSerializedPathLen = minVarIntLen
 	minByteSliceLen      = minVarIntLen
 	minMaybeByteSliceLen = boolLen
-	minProofPathLen      = minVarIntLen
-	minKeyValueLen       = 2 * minByteSliceLen
-	minKeyChangeLen      = minByteSliceLen + minMaybeByteSliceLen
 	minProofNodeLen      = minSerializedPathLen + minMaybeByteSliceLen + minVarIntLen
-	minProofLen          = minProofPathLen + minByteSliceLen
-	minChangeProofLen    = boolLen + 2*minProofPathLen + minVarIntLen
-	minRangeProofLen     = 2*minProofPathLen + minVarIntLen
 	minDBNodeLen         = minMaybeByteSliceLen + minVarIntLen
-	minHashValuesLen     = minVarIntLen + minMaybeByteSliceLen + minSerializedPathLen
-	minProofNodeChildLen = minVarIntLen + idLen
 	minChildLen          = minVarIntLen + minSerializedPathLen + idLen
 )
 
