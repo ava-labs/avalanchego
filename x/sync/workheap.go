@@ -15,7 +15,7 @@ import (
 var _ heap.Interface = (*innerHeap)(nil)
 
 type heapItem struct {
-	workItem  *syncWorkItem
+	workItem  *workItem
 	heapIndex int
 }
 
@@ -52,7 +52,7 @@ func (wh *workHeap) Close() {
 }
 
 // Adds a new [item] into the heap. Will not merge items, unlike MergeInsert.
-func (wh *workHeap) Insert(item *syncWorkItem) {
+func (wh *workHeap) Insert(item *workItem) {
 	if wh.closed {
 		return
 	}
@@ -65,7 +65,7 @@ func (wh *workHeap) Insert(item *syncWorkItem) {
 
 // Pops and returns a work item from the heap.
 // Returns nil if no work is available or the heap is closed.
-func (wh *workHeap) GetWork() *syncWorkItem {
+func (wh *workHeap) GetWork() *workItem {
 	if wh.closed || wh.Len() == 0 {
 		return nil
 	}
@@ -81,14 +81,14 @@ func (wh *workHeap) GetWork() *syncWorkItem {
 // into a single work item with range [0,20].
 // e.g. if the heap contains work items [0,10] and [20,30],
 // and we add [10,20], we will merge them into [0,30].
-func (wh *workHeap) MergeInsert(item *syncWorkItem) {
+func (wh *workHeap) MergeInsert(item *workItem) {
 	if wh.closed {
 		return
 	}
 
 	var mergedBefore, mergedAfter *heapItem
 	searchItem := &heapItem{
-		workItem: &syncWorkItem{
+		workItem: &workItem{
 			start: item.start,
 		},
 	}
