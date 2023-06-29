@@ -46,8 +46,8 @@ const (
 // Signifies that we should sync the range [start, end].
 // nil [start] means there is no lower bound.
 // nil [end] means there is no upper bound.
-// [LocalRootID] is the ID of the root of this range in our database.
-// If we have no local root for this range, [LocalRootID] is ids.Empty.
+// [localRootID] is the ID of the root of this range in our database.
+// If we have no local root for this range, [localRootID] is ids.Empty.
 type syncWorkItem struct {
 	start       []byte
 	end         []byte
