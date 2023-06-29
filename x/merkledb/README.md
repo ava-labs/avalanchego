@@ -104,6 +104,60 @@ However, the `Child index` values must be strictly increasing. For example, the 
 
 Since a node can have up to 16 children, there can be up to 16 such blocks of children data.
 
+### Example
+
+Let's take a look at an example node. 
+
+Its byte representation (in hex) is: `0x04000210579EB3718A7E437D2DDCE931AC7CC05A0BC695A9C2084F5DF12FB96AD0FA32660E06FFF09845893C4F9D92C4E097FCF2589BC9D6882B1F18D1C2FC91D7DF1D3FCBDB4238`
+
+The node's key is empty (its the root) and has value `0x02`.
+It has two children.
+The first is at child index `0`, has compressed path `0x01` and ID (in hex) `579eb3718a7e437d2ddce931ac7cc05a0bc695a9c2084f5df12fb96ad0fa3266`.
+The second is at child index `14`, has compressed path `0x0F0F0F` and ID (in hex) `0x9845893c4f9d92c4e097fcf2589bc9d6882b1f18d1c2fc91d7df1d3fcbdb4238`.
+
+```
++--------------------------------------------------------------------+
+| Codec version                                                      |
+| 0x00                                                               |
++--------------------------------------------------------------------+
+| Value existence flag (1 byte)                                      |
+| 0x01                                                               |
++--------------------------------------------------------------------+
+| Value length (varint) (optional)                                   |
+| 0x02                                                               |
++--------------------------------------------------------------------+
+| Value (variable length bytes) (optional)                           |
+| 0x02                                                               |
++--------------------------------------------------------------------+
+| Number of children (varint)                                        |
+| 0x04                                                               |
++--------------------------------------------------------------------+
+| Child index (varint)                                               |
+| 0x00                                                               |
++--------------------------------------------------------------------+
+| Child compressed path length (varint)                              |
+| 0x02                                                               |
++--------------------------------------------------------------------+
+| Child compressed path (variable length bytes)                      |
+| 0x10                                                               |
++--------------------------------------------------------------------+
+| Child ID (32 bytes)                                                |
+| 0x579EB3718A7E437D2DDCE931AC7CC05A0BC695A9C2084F5DF12FB96AD0FA3266 |
++--------------------------------------------------------------------+
+| Child index (varint)                                               |
+| 0x0E                                                               |
++--------------------------------------------------------------------+
+| Child compressed path length (varint)                              |
+| 0x06                                                               |
++--------------------------------------------------------------------+
+| Child compressed path (variable length bytes)                      |
+| 0xFFF0                                                             |
++--------------------------------------------------------------------+
+| Child ID (32 bytes)                                                |
+| 0x9845893C4F9D92C4E097FCF2589BC9D6882B1F18D1C2FC91D7DF1D3FCBDB4238 |
++--------------------------------------------------------------------+
+```
+
 ### Node Hashing
 
 Each node must have a unique ID that identifies it. This ID is calculated by hashing the following values:
