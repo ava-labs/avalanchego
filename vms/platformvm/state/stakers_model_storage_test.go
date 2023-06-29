@@ -31,6 +31,7 @@ var (
 	_ commands.Command = (*deleteCurrentValidatorCommand)(nil)
 	_ commands.Command = (*putCurrentDelegatorCommand)(nil)
 	_ commands.Command = (*shiftCurrentDelegatorCommand)(nil)
+	_ commands.Command = (*increaseWeightCurrentDelegatorCommand)(nil)
 	_ commands.Command = (*deleteCurrentDelegatorCommand)(nil)
 	_ commands.Command = (*addTopDiffCommand)(nil)
 	_ commands.Command = (*applyBottomDiffCommand)(nil)
@@ -54,7 +55,7 @@ func TestStateAndDiffComparisonToStorageModel(t *testing.T) {
 	properties := gopter.NewProperties(nil)
 
 	// // to reproduce a given scenario do something like this:
-	// parameters := gopter.DefaultTestParametersWithSeed(1688032690701689530)
+	// parameters := gopter.DefaultTestParametersWithSeed(1688035434636398670)
 	// properties := gopter.NewProperties(parameters)
 
 	properties.Property("state comparison to storage model", commands.Prop(stakersCommands))
@@ -197,7 +198,8 @@ var stakersCommands = &commands.ProtoCommands{
 			genDeleteCurrentValidatorCommand,
 
 			genPutCurrentDelegatorCommand,
-			genUpdateCurrentDelegatorCommand,
+			genShiftCurrentDelegatorCommand,
+			genIncreaseWeightCurrentDelegatorCommand,
 			genDeleteCurrentDelegatorCommand,
 
 			genAddTopDiffCommand,
@@ -857,9 +859,119 @@ func (*shiftCurrentDelegatorCommand) String() string {
 	return "shiftCurrentDelegator"
 }
 
-var genUpdateCurrentDelegatorCommand = gen.IntRange(1, 2).Map(
+var genShiftCurrentDelegatorCommand = gen.IntRange(1, 2).Map(
 	func(int) commands.Command {
 		return &shiftCurrentDelegatorCommand{}
+	},
+)
+
+// IncreaseWeightCurrentDelegator section
+type increaseWeightCurrentDelegatorCommand struct{}
+
+func (*increaseWeightCurrentDelegatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
+	sys := sut.(*sysUnderTest)
+	err := increaseWeightCurrentDelegatorInSystem(sys)
+	if err != nil {
+		panic(err)
+	}
+	return sys
+}
+
+func increaseWeightCurrentDelegatorInSystem(sys *sysUnderTest) error {
+	// 1. check if there is a staker, already inserted. If not return
+	// 2. Add diff layer on top (to test update across diff layers)
+	// 3. increase delegator weight and update the staker
+
+	chain := sys.getTopChainState()
+
+	// 1. check if there is a delegator, already inserted. If not return
+	stakerIt, err := chain.GetCurrentStakerIterator()
+	if err != nil {
+		return err
+	}
+
+	var (
+		found     = false
+		delegator *Staker
+	)
+	for !found && stakerIt.Next() {
+		delegator = stakerIt.Value()
+		if delegator.Priority == txs.SubnetPermissionlessDelegatorCurrentPriority ||
+			delegator.Priority == txs.PrimaryNetworkDelegatorCurrentPriority {
+			found = true
+			break
+		}
+	}
+	if !found {
+		stakerIt.Release()
+		return nil // no current validator to update
+	}
+	stakerIt.Release()
+
+	// 2. Add diff layer on top
+	sys.addDiffOnTop()
+	chain = sys.getTopChainState()
+
+	// 3. increase delegator weight and update the staker
+	updatedDelegator := *delegator
+	updatedDelegator.Weight += extraWeight
+	return chain.UpdateCurrentDelegator(&updatedDelegator)
+}
+
+func (*increaseWeightCurrentDelegatorCommand) NextState(cmdState commands.State) commands.State {
+	model := cmdState.(*stakersStorageModel)
+
+	err := increaseWeightCurrentDelegatorInModel(model)
+	if err != nil {
+		panic(err)
+	}
+	return cmdState
+}
+
+func increaseWeightCurrentDelegatorInModel(model *stakersStorageModel) error {
+	stakerIt, err := model.GetCurrentStakerIterator()
+	if err != nil {
+		return err
+	}
+
+	var (
+		found     = false
+		delegator *Staker
+	)
+	for !found && stakerIt.Next() {
+		delegator = stakerIt.Value()
+		if delegator.Priority == txs.SubnetPermissionlessDelegatorCurrentPriority ||
+			delegator.Priority == txs.PrimaryNetworkDelegatorCurrentPriority {
+			found = true
+			break
+		}
+	}
+	if !found {
+		stakerIt.Release()
+		return nil // no current validator to update
+	}
+	stakerIt.Release()
+
+	updatedDelegator := *delegator
+	updatedDelegator.Weight += extraWeight
+	return model.UpdateCurrentDelegator(&updatedDelegator)
+}
+
+func (*increaseWeightCurrentDelegatorCommand) PreCondition(commands.State) bool {
+	return true
+}
+
+func (*increaseWeightCurrentDelegatorCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
+	return checkSystemAndModelContent(cmdState, res)
+}
+
+func (*increaseWeightCurrentDelegatorCommand) String() string {
+	return "increaseWeightCurrentDelegator"
+}
+
+var genIncreaseWeightCurrentDelegatorCommand = gen.IntRange(1, 2).Map(
+	func(int) commands.Command {
+		return &increaseWeightCurrentDelegatorCommand{}
 	},
 )
 
