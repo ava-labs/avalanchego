@@ -76,7 +76,7 @@ type StateSyncManager struct {
 	// [workLock] must be held when accessing [processingWorkItems].
 	processingWorkItems int
 	// [workLock] must be held while accessing [unprocessedWork].
-	unprocessedWork *syncWorkHeap
+	unprocessedWork *workHeap
 	// Signalled when:
 	// - An item is added to [unprocessedWork].
 	// - An item is added to [processedWork].
@@ -84,7 +84,7 @@ type StateSyncManager struct {
 	// [workLock] is its inner lock.
 	unprocessedWorkCond sync.Cond
 	// [workLock] must be held while accessing [processedWork].
-	processedWork *syncWorkHeap
+	processedWork *workHeap
 
 	// When this is closed:
 	// - [closed] is true.
@@ -128,8 +128,8 @@ func NewStateSyncManager(config StateSyncConfig) (*StateSyncManager, error) {
 	m := &StateSyncManager{
 		config:          config,
 		syncDoneChan:    make(chan struct{}),
-		unprocessedWork: newSyncWorkHeap(),
-		processedWork:   newSyncWorkHeap(),
+		unprocessedWork: newWorkHeap(),
+		processedWork:   newWorkHeap(),
 	}
 	m.unprocessedWorkCond.L = &m.workLock
 
