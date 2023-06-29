@@ -40,7 +40,7 @@ var (
 	_ TrieView = (*merkleDB)(nil)
 	_ MerkleDB = (*merkleDB)(nil)
 
-	codec, version = newCodec()
+	codec = newCodec()
 
 	rootKey                 []byte
 	nodePrefix              = []byte("node")
