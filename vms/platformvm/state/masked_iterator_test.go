@@ -102,7 +102,7 @@ func TestMaskIteratorProperties(t *testing.T) {
 				}
 
 				stakerTx := signedTx.Unsigned.(txs.StakerTx)
-				staker, err := NewCurrentStaker(signedTx.ID(), stakerTx, stakerTx.StartTime(), uint64(100))
+				staker, err := NewCurrentStaker(signedTx.ID(), stakerTx, uint64(100))
 				if err != nil {
 					return err.Error()
 				}
@@ -143,7 +143,7 @@ func TestMaskIteratorProperties(t *testing.T) {
 				}
 
 				stakerTx := signedTx.Unsigned.(txs.StakerTx)
-				staker, err := NewCurrentStaker(signedTx.ID(), stakerTx, stakerTx.StartTime(), uint64(100))
+				staker, err := NewCurrentStaker(signedTx.ID(), stakerTx, uint64(100))
 				if err != nil {
 					return err.Error()
 				}
@@ -183,7 +183,7 @@ func TestMaskIteratorProperties(t *testing.T) {
 				}
 
 				stakerTx := signedTx.Unsigned.(txs.StakerTx)
-				staker, err := NewCurrentStaker(signedTx.ID(), stakerTx, stakerTx.StartTime(), uint64(100))
+				staker, err := NewCurrentStaker(signedTx.ID(), stakerTx, uint64(100))
 				if err != nil {
 					return err.Error()
 				}
@@ -278,7 +278,7 @@ func buildMaskedIterator(parentStakers []*Staker, deletedIndexes []int, updatedI
 	updatedStakers := make(map[ids.ID]*Staker)
 	for _, idx := range updatedIndexes {
 		s := parentStakers[idx]
-		ShiftStakerAheadInPlace(s)
+		ShiftStakerAheadInPlace(s, s.EndTime)
 		updatedStakers[s.TxID] = s
 	}
 

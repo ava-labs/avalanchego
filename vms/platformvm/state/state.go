@@ -1053,7 +1053,7 @@ func (s *state) syncGenesis(genesisBlk blocks.Block, genesis *genesis.State) err
 			return err
 		}
 
-		staker, err := NewCurrentStaker(vdrTx.ID(), tx, tx.StartTime(), potentialReward)
+		staker, err := NewCurrentStaker(vdrTx.ID(), tx, potentialReward)
 		if err != nil {
 			return err
 		}
@@ -1156,15 +1156,11 @@ func (s *state) loadCurrentStakers() error {
 			return err
 		}
 
-		staker, err := NewCurrentStaker(
-			txID,
-			stakerTx,
-			time.Unix(metadata.StakerStartTime, 0),
-			metadata.PotentialReward,
-		)
+		staker, err := NewCurrentStaker(txID, stakerTx, metadata.PotentialReward)
 		if err != nil {
 			return err
 		}
+		ShiftStakerAheadInPlace(staker, time.Unix(metadata.StakerStartTime, 0))
 		if metadata.UpdatedWeight != 0 {
 			staker.Weight = metadata.UpdatedWeight
 		}
@@ -1208,15 +1204,11 @@ func (s *state) loadCurrentStakers() error {
 			return err
 		}
 
-		staker, err := NewCurrentStaker(
-			txID,
-			stakerTx,
-			time.Unix(metadata.StakerStartTime, 0),
-			metadata.PotentialReward,
-		)
+		staker, err := NewCurrentStaker(txID, stakerTx, metadata.PotentialReward)
 		if err != nil {
 			return err
 		}
+		ShiftStakerAheadInPlace(staker, time.Unix(metadata.StakerStartTime, 0))
 		if metadata.UpdatedWeight != 0 {
 			staker.Weight = metadata.UpdatedWeight
 		}
@@ -1262,15 +1254,11 @@ func (s *state) loadCurrentStakers() error {
 				return err
 			}
 
-			staker, err := NewCurrentStaker(
-				txID,
-				stakerTx,
-				time.Unix(metadata.StakerStartTime, 0),
-				metadata.PotentialReward,
-			)
+			staker, err := NewCurrentStaker(txID, stakerTx, metadata.PotentialReward)
 			if err != nil {
 				return err
 			}
+			ShiftStakerAheadInPlace(staker, time.Unix(metadata.StakerStartTime, 0))
 			if metadata.UpdatedWeight != 0 {
 				staker.Weight = metadata.UpdatedWeight
 			}
@@ -1671,6 +1659,9 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 					PotentialReward:          staker.PotentialReward,
 					PotentialDelegateeReward: 0,
 
+					// a staker update may change its times and weight wrt those
+					// specified in the tx creating the staker. We store these data
+					// to properly reconstruct staker data.
 					StakerStartTime: staker.StartTime.Unix(),
 					UpdatedWeight:   staker.Weight,
 				}

@@ -218,7 +218,7 @@ func (v *putCurrentValidatorCommand) Run(sut commands.SystemUnderTest) commands.
 	sys := sut.(*sysUnderTest)
 
 	stakerTx := sTx.Unsigned.(txs.StakerTx)
-	currentVal, err := NewCurrentStaker(sTx.ID(), stakerTx, stakerTx.StartTime(), uint64(1000))
+	currentVal, err := NewCurrentStaker(sTx.ID(), stakerTx, uint64(1000))
 	if err != nil {
 		return sys // state checks later on should spot missing validator
 	}
@@ -232,7 +232,7 @@ func (v *putCurrentValidatorCommand) Run(sut commands.SystemUnderTest) commands.
 func (v *putCurrentValidatorCommand) NextState(cmdState commands.State) commands.State {
 	sTx := (*txs.Tx)(v)
 	stakerTx := sTx.Unsigned.(txs.StakerTx)
-	currentVal, err := NewCurrentStaker(sTx.ID(), stakerTx, stakerTx.StartTime(), uint64(1000))
+	currentVal, err := NewCurrentStaker(sTx.ID(), stakerTx, uint64(1000))
 	if err != nil {
 		return cmdState // state checks later on should spot missing validator
 	}
@@ -331,7 +331,7 @@ func shiftCurrentValidatorInSystem(sys *sysUnderTest) error {
 
 	// 4. shift staker times and update the staker
 	updatedStaker := *staker
-	ShiftStakerAheadInPlace(&updatedStaker)
+	ShiftStakerAheadInPlace(&updatedStaker, updatedStaker.EndTime)
 	return chain.UpdateCurrentValidator(&updatedStaker)
 }
 
@@ -371,7 +371,7 @@ func shiftCurrentValidatorInModel(model *stakersStorageModel) error {
 	stakerIt.Release()
 
 	updatedStaker := *staker
-	ShiftStakerAheadInPlace(&updatedStaker)
+	ShiftStakerAheadInPlace(&updatedStaker, updatedStaker.EndTime)
 	return model.UpdateCurrentValidator(&updatedStaker)
 }
 
@@ -653,8 +653,7 @@ func addCurrentDelegatorInSystem(sys *sysUnderTest, candidateDelegatorTx txs.Uns
 		return fmt.Errorf("failed signing tx, %w", err)
 	}
 
-	stakerTx := signedTx.Unsigned.(txs.StakerTx)
-	delegator, err := NewCurrentStaker(signedTx.ID(), stakerTx, stakerTx.StartTime(), uint64(1000))
+	delegator, err := NewCurrentStaker(signedTx.ID(), signedTx.Unsigned.(txs.Staker), uint64(1000))
 	if err != nil {
 		return fmt.Errorf("failed generating staker, %w", err)
 	}
@@ -714,8 +713,7 @@ func addCurrentDelegatorInModel(model *stakersStorageModel, candidateDelegatorTx
 		return fmt.Errorf("failed signing tx, %w", err)
 	}
 
-	stakerTx := signedTx.Unsigned.(txs.StakerTx)
-	delegator, err := NewCurrentStaker(signedTx.ID(), stakerTx, stakerTx.StartTime(), uint64(1000))
+	delegator, err := NewCurrentStaker(signedTx.ID(), signedTx.Unsigned.(txs.Staker), uint64(1000))
 	if err != nil {
 		return fmt.Errorf("failed generating staker, %w", err)
 	}
@@ -804,7 +802,7 @@ func shiftCurrentDelegatorInSystem(sys *sysUnderTest) error {
 
 	// 3. Shift delegator times and update the staker
 	updatedDelegator := *delegator
-	ShiftStakerAheadInPlace(&updatedDelegator)
+	ShiftStakerAheadInPlace(&updatedDelegator, updatedDelegator.EndTime)
 	return chain.UpdateCurrentDelegator(&updatedDelegator)
 }
 
@@ -843,7 +841,7 @@ func shiftCurrentDelegatorInModel(model *stakersStorageModel) error {
 	stakerIt.Release()
 
 	updatedDelegator := *delegator
-	ShiftStakerAheadInPlace(&updatedDelegator)
+	ShiftStakerAheadInPlace(&updatedDelegator, updatedDelegator.EndTime)
 	return model.UpdateCurrentDelegator(&updatedDelegator)
 }
 
