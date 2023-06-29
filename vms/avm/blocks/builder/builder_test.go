@@ -40,6 +40,8 @@ import (
 	txexecutor "github.com/ava-labs/avalanchego/vms/avm/txs/executor"
 )
 
+const trackChecksums = false
+
 var (
 	errTest = errors.New("test error")
 	chainID = ids.GenerateTestID()
@@ -530,7 +532,7 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	baseDB := versiondb.New(baseDBManager.Current().Database)
 
-	state, err := states.New(baseDB, parser, registerer)
+	state, err := states.New(baseDB, parser, registerer, trackChecksums)
 	require.NoError(err)
 
 	clk := &mockable.Clock{}

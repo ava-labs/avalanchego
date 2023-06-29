@@ -56,7 +56,10 @@ import (
 	pvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
 )
 
-const defaultWeight = 10000
+const (
+	defaultWeight = 10000
+	trackChecksum = false
+)
 
 var (
 	defaultMinStakingDuration = 24 * time.Hour
@@ -235,6 +238,7 @@ func defaultState(
 		metrics.Noop,
 		rewards,
 		&utils.Atomic[bool]{},
+		trackChecksum,
 	)
 	require.NoError(err)
 

@@ -5,6 +5,7 @@ package states
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -55,6 +56,8 @@ var (
 	timestampKey     = []byte{0x01}
 	lastAcceptedKey  = []byte{0x02}
 
+	errStatusWithoutTx = errors.New("unexpected status without transactions")
+
 	_ State = (*state)(nil)
 )
 
@@ -96,12 +99,6 @@ type State interface {
 	// called during startup.
 	InitializeChainState(stopVertexID ids.ID, genesisTimestamp time.Time) error
 
-	// TODO: deprecate statuses. We should only persist accepted state
-	// Status returns a status from storage.
-	GetStatus(id ids.ID) (choices.Status, error)
-	// AddStatus saves a status in storage.
-	AddStatus(id ids.ID, status choices.Status)
-
 	// Discard uncommitted changes to the database.
 	Abort()
 
@@ -124,6 +121,9 @@ type State interface {
 	//
 	// TODO: remove after v1.11.x is activated
 	Prune(lock sync.Locker, log logging.Logger) error
+
+	// Checksums returns the current TxChecksum and UTXOChecksum.
+	Checksums() (txChecksum ids.ID, utxoChecksum ids.ID)
 
 	Close() error
 }
@@ -154,7 +154,6 @@ type state struct {
 	utxoState     avax.UTXOState
 
 	statusesPruned bool
-	addedStatuses  map[ids.ID]choices.Status
 	statusCache    cache.Cacher[ids.ID, *choices.Status] // cache of id -> choices.Status. If the entry is nil, it is not in the database
 	statusDB       database.Database
 
@@ -174,12 +173,16 @@ type state struct {
 	lastAccepted, persistedLastAccepted ids.ID
 	timestamp, persistedTimestamp       time.Time
 	singletonDB                         database.Database
+
+	trackChecksum bool
+	txChecksum    ids.ID
 }
 
 func New(
 	db *versiondb.Database,
 	parser blocks.Parser,
 	metrics prometheus.Registerer,
+	trackChecksums bool,
 ) (State, error) {
 	utxoDB := prefixdb.New(utxoPrefix, db)
 	statusDB := prefixdb.New(statusPrefix, db)
@@ -224,8 +227,12 @@ func New(
 		return nil, err
 	}
 
-	utxoState, err := avax.NewMeteredUTXOState(utxoDB, parser.Codec(), metrics)
-	return &state{
+	utxoState, err := avax.NewMeteredUTXOState(utxoDB, parser.Codec(), metrics, trackChecksums)
+	if err != nil {
+		return nil, err
+	}
+
+	s := &state{
 		parser: parser,
 		db:     db,
 
@@ -233,9 +240,8 @@ func New(
 		utxoDB:        utxoDB,
 		utxoState:     utxoState,
 
-		addedStatuses: make(map[ids.ID]choices.Status),
-		statusCache:   statusCache,
-		statusDB:      statusDB,
+		statusCache: statusCache,
+		statusDB:    statusDB,
 
 		addedTxs: make(map[ids.ID]*txs.Tx),
 		txCache:  txCache,
@@ -250,7 +256,10 @@ func New(
 		blockDB:     blockDB,
 
 		singletonDB: singletonDB,
-	}, err
+
+		trackChecksum: trackChecksums,
+	}
+	return s, s.initTxChecksum()
 }
 
 func (s *state) GetUTXO(utxoID ids.ID) (*avax.UTXO, error) {
@@ -275,7 +284,69 @@ func (s *state) DeleteUTXO(utxoID ids.ID) {
 	s.modifiedUTXOs[utxoID] = nil
 }
 
+// TODO: After v1.11.x has activated we can rename [getTx] to [GetTx] and delete
+// [getStatus].
 func (s *state) GetTx(txID ids.ID) (*txs.Tx, error) {
+	tx, err := s.getTx(txID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Before the linearization, transactions were persisted before they were
+	// marked as Accepted. However, this function aims to only return accepted
+	// transactions.
+	status, err := s.getStatus(txID)
+	if err == database.ErrNotFound {
+		// If the status wasn't persisted, then the transaction was written
+		// after the linearization, and is accepted.
+		return tx, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	// If the status was persisted, then the transaction was written before the
+	// linearization. If it wasn't marked as accepted, then we treat it as if it
+	// doesn't exist.
+	if status != choices.Accepted {
+		return nil, database.ErrNotFound
+	}
+	return tx, nil
+}
+
+func (s *state) getStatus(id ids.ID) (choices.Status, error) {
+	if s.statusesPruned {
+		return choices.Unknown, database.ErrNotFound
+	}
+
+	if _, ok := s.addedTxs[id]; ok {
+		return choices.Unknown, database.ErrNotFound
+	}
+	if status, found := s.statusCache.Get(id); found {
+		if status == nil {
+			return choices.Unknown, database.ErrNotFound
+		}
+		return *status, nil
+	}
+
+	val, err := database.GetUInt32(s.statusDB, id[:])
+	if err == database.ErrNotFound {
+		s.statusCache.Put(id, nil)
+		return choices.Unknown, database.ErrNotFound
+	}
+	if err != nil {
+		return choices.Unknown, err
+	}
+
+	status := choices.Status(val)
+	if err := status.Valid(); err != nil {
+		return choices.Unknown, err
+	}
+	s.statusCache.Put(id, &status)
+	return status, nil
+}
+
+func (s *state) getTx(txID ids.ID) (*txs.Tx, error) {
 	if tx, exists := s.addedTxs[txID]; exists {
 		return tx, nil
 	}
@@ -306,7 +377,9 @@ func (s *state) GetTx(txID ids.ID) (*txs.Tx, error) {
 }
 
 func (s *state) AddTx(tx *txs.Tx) {
-	s.addedTxs[tx.ID()] = tx
+	txID := tx.ID()
+	s.updateTxChecksum(txID)
+	s.addedTxs[txID] = tx
 }
 
 func (s *state) GetBlockID(height uint64) (ids.ID, error) {
@@ -428,44 +501,6 @@ func (s *state) SetTimestamp(t time.Time) {
 	s.timestamp = t
 }
 
-// TODO: remove status support
-func (s *state) GetStatus(id ids.ID) (choices.Status, error) {
-	if s.statusesPruned {
-		return choices.Unknown, database.ErrNotFound
-	}
-
-	if status, exists := s.addedStatuses[id]; exists {
-		return status, nil
-	}
-	if status, found := s.statusCache.Get(id); found {
-		if status == nil {
-			return choices.Unknown, database.ErrNotFound
-		}
-		return *status, nil
-	}
-
-	val, err := database.GetUInt32(s.statusDB, id[:])
-	if err == database.ErrNotFound {
-		s.statusCache.Put(id, nil)
-		return choices.Unknown, database.ErrNotFound
-	}
-	if err != nil {
-		return choices.Unknown, err
-	}
-
-	status := choices.Status(val)
-	if err := status.Valid(); err != nil {
-		return choices.Unknown, err
-	}
-	s.statusCache.Put(id, &status)
-	return status, nil
-}
-
-// TODO: remove status support
-func (s *state) AddStatus(id ids.ID, status choices.Status) {
-	s.addedStatuses[id] = status
-}
-
 func (s *state) Commit() error {
 	defer s.Abort()
 	batch, err := s.CommitBatch()
@@ -508,7 +543,6 @@ func (s *state) write() error {
 		s.writeBlockIDs(),
 		s.writeBlocks(),
 		s.writeMetadata(),
-		s.writeStatuses(),
 	)
 	return errs.Err
 }
@@ -537,8 +571,12 @@ func (s *state) writeTxs() error {
 
 		delete(s.addedTxs, txID)
 		s.txCache.Put(txID, tx)
+		s.statusCache.Put(txID, nil)
 		if err := s.txDB.Put(txID[:], txBytes); err != nil {
 			return fmt.Errorf("failed to add tx: %w", err)
+		}
+		if err := s.statusDB.Delete(txID[:]); err != nil {
+			return fmt.Errorf("failed to delete status: %w", err)
 		}
 	}
 	return nil
@@ -583,20 +621,6 @@ func (s *state) writeMetadata() error {
 			return fmt.Errorf("failed to write last accepted: %w", err)
 		}
 		s.persistedLastAccepted = s.lastAccepted
-	}
-	return nil
-}
-
-func (s *state) writeStatuses() error {
-	for id, status := range s.addedStatuses {
-		id := id
-		status := status
-
-		delete(s.addedStatuses, id)
-		s.statusCache.Put(id, &status)
-		if err := database.PutUInt32(s.statusDB, id[:], uint32(status)); err != nil {
-			return fmt.Errorf("failed to add status: %w", err)
-		}
 	}
 	return nil
 }
@@ -820,4 +844,65 @@ func skipTo(iter database.Iterator, targetKey []byte) error {
 			return nil
 		}
 	}
+}
+
+func (s *state) Checksums() (ids.ID, ids.ID) {
+	return s.txChecksum, s.utxoState.Checksum()
+}
+
+func (s *state) initTxChecksum() error {
+	if !s.trackChecksum {
+		return nil
+	}
+
+	txIt := s.txDB.NewIterator()
+	defer txIt.Release()
+	statusIt := s.statusDB.NewIterator()
+	defer statusIt.Release()
+
+	statusHasNext := statusIt.Next()
+	for txIt.Next() {
+		txIDBytes := txIt.Key()
+		if statusHasNext { // if status was exhausted, everything is accepted
+			statusIDBytes := statusIt.Key()
+			if bytes.Equal(txIDBytes, statusIDBytes) { // if the status key doesn't match this was marked as accepted
+				statusInt, err := database.ParseUInt32(statusIt.Value())
+				if err != nil {
+					return err
+				}
+
+				statusHasNext = statusIt.Next() // we processed the txID, so move on to the next status
+
+				if choices.Status(statusInt) != choices.Accepted { // the status isn't accepted, so we skip the txID
+					continue
+				}
+			}
+		}
+
+		txID, err := ids.ToID(txIDBytes)
+		if err != nil {
+			return err
+		}
+
+		s.updateTxChecksum(txID)
+	}
+
+	if statusHasNext {
+		return errStatusWithoutTx
+	}
+
+	errs := wrappers.Errs{}
+	errs.Add(
+		txIt.Error(),
+		statusIt.Error(),
+	)
+	return errs.Err
+}
+
+func (s *state) updateTxChecksum(modifiedID ids.ID) {
+	if !s.trackChecksum {
+		return
+	}
+
+	s.txChecksum = s.txChecksum.XOR(modifiedID)
 }
