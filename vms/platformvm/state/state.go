@@ -1839,7 +1839,10 @@ func writeCurrentDelegatorDiff(
 			if err := currentDelegatorList.Delete(delegator.TxID[:]); err != nil {
 				return fmt.Errorf("failed to delete current staker: %w", err)
 			}
-		case updated, unmodified:
+		case updated:
+			// TODO ABENEGIA
+
+		case unmodified:
 			// nothing to do
 		default:
 			return ErrUnknownStakerStatus
