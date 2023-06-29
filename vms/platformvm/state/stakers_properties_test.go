@@ -9,6 +9,7 @@ import (
 	"math"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/leanovate/gopter"
 	"github.com/leanovate/gopter/gen"
@@ -1171,15 +1172,22 @@ func TestValidatorUptimesOperations(t *testing.T) {
 			var (
 				subnetID = val.SubnetID
 				nodeID   = val.NodeID
+				duration = 24 * time.Hour
 			)
 			diff.PutCurrentValidator(val)
 			err = diff.Apply(baseState)
 			if err != nil {
 				return fmt.Sprintf("could not apply diff, err %v", err)
 			}
+
 			err = baseState.Commit()
 			if err != nil {
 				return fmt.Sprintf("could not commit state, err %v", err)
+			}
+
+			err = baseState.SetUptime(nodeID, subnetID, duration, val.StartTime)
+			if err != nil {
+				return fmt.Sprintf("could not set uptime, err %v", err)
 			}
 
 			// Check start time
@@ -1192,12 +1200,15 @@ func TestValidatorUptimesOperations(t *testing.T) {
 			}
 
 			// Check uptimes
-			_, lastUpdated, err := baseState.GetUptime(nodeID, subnetID)
+			uptime, lastUpdated, err := baseState.GetUptime(nodeID, subnetID)
 			if err != nil {
 				return fmt.Sprintf("could not get validator uptime, err %v", err)
 			}
 			if !lastUpdated.Equal(val.StartTime) {
 				return fmt.Sprintf("wrong start time, expected %v, got %v", val.StartTime, startTime)
+			}
+			if uptime != duration {
+				return fmt.Sprintf("wrong uptime, expected %v, got %v", uptime, duration)
 			}
 
 			// 2. Shift the validator
@@ -1232,16 +1243,19 @@ func TestValidatorUptimesOperations(t *testing.T) {
 				return fmt.Sprintf("could not get validator start time, err %v", err)
 			}
 			if !startTime.Equal(updatedStaker.StartTime) {
-				return fmt.Sprintf("wrong start time, expected %v, got %v", updatedStaker.StartTime, startTime)
+				return fmt.Sprintf("wrong updated start time, expected %v, got %v", updatedStaker.StartTime, startTime)
 			}
 
 			// Check uptimes
-			_, lastUpdated, err = baseState.GetUptime(nodeID, subnetID)
+			uptime, lastUpdated, err = baseState.GetUptime(nodeID, subnetID)
 			if err != nil {
 				return fmt.Sprintf("could not get validator uptime, err %v", err)
 			}
 			if !lastUpdated.Equal(updatedStaker.StartTime) {
 				return fmt.Sprintf("wrong updated start time, expected %v, got %v", val.StartTime, startTime)
+			}
+			if uptime != 0 {
+				return fmt.Sprintf("wrong uptime, expected %v, got %v", uptime, 0)
 			}
 
 			return ""
