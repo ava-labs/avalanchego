@@ -82,6 +82,7 @@ func buildChainState(baseDB database.Database, trackedSubnets []ids.ID) (State, 
 		metrics.Noop,
 		rewardsCalc,
 		&utils.Atomic[bool]{},
+		trackChecksum,
 	)
 }
 

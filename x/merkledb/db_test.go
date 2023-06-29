@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/units"
 )
 
 const minCacheSize = 1000
@@ -974,4 +975,38 @@ func generateInitialValues(require *require.Assertions, r *rand.Rand, initialVal
 func generate(require *require.Assertions, r *rand.Rand, size int, percentChanceToFullHash float64) randTest {
 	var allKeys [][]byte
 	return generateWithKeys(require, allKeys, r, size, percentChanceToFullHash)
+}
+
+// Inserts [n] random key/value pairs into each database.
+// Deletes [deletePortion] of the key/value pairs after insertion.
+func insertRandomKeyValues(
+	require *require.Assertions,
+	rand *rand.Rand,
+	dbs []database.Database,
+	numKeyValues int,
+	deletePortion float64,
+) {
+	maxKeyLen := units.KiB
+	maxValLen := 4 * units.KiB
+
+	require.GreaterOrEqual(deletePortion, float64(0))
+	require.LessOrEqual(deletePortion, float64(1))
+	for i := 0; i < numKeyValues; i++ {
+		keyLen := rand.Intn(maxKeyLen)
+		key := make([]byte, keyLen)
+		_, _ = rand.Read(key)
+
+		valueLen := rand.Intn(maxValLen)
+		value := make([]byte, valueLen)
+		_, _ = rand.Read(value)
+		for _, db := range dbs {
+			require.NoError(db.Put(key, value))
+		}
+
+		if rand.Float64() < deletePortion {
+			for _, db := range dbs {
+				require.NoError(db.Delete(key))
+			}
+		}
+	}
 }
