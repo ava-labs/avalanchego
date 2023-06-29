@@ -126,7 +126,7 @@ func ShiftStakerAheadInPlace(s *Staker, newStartTime time.Time) {
 	if s.Priority.IsPending() {
 		return // never shift pending stakers. Consider erroring here.
 	}
-	if newStartTime.Before(s.StartTime) {
+	if !newStartTime.After(s.StartTime) {
 		return // never shift stakers backward. Consider erroring here.
 	}
 
