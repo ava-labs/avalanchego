@@ -16,7 +16,7 @@ import (
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
-var _ sync.SyncableDB = (*SyncableDBClient)(nil)
+var _ sync.DB = (*SyncableDBClient)(nil)
 
 func NewSyncableDBClient(client pb.SyncableDBClient) *SyncableDBClient {
 	return &SyncableDBClient{client: client}

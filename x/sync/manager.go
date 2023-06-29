@@ -106,7 +106,7 @@ type StateSyncManager struct {
 }
 
 type StateSyncConfig struct {
-	SyncDB                SyncableDB
+	SyncDB                DB
 	Client                Client
 	SimultaneousWorkLimit int
 	Log                   logging.Logger

@@ -17,14 +17,14 @@ import (
 
 var _ pb.SyncableDBServer = (*SyncableDBServer)(nil)
 
-func NewSyncableDBServer(db sync.SyncableDB) *SyncableDBServer {
+func NewSyncableDBServer(db sync.DB) *SyncableDBServer {
 	return &SyncableDBServer{db: db}
 }
 
 type SyncableDBServer struct {
 	pb.UnsafeSyncableDBServer
 
-	db sync.SyncableDB
+	db sync.DB
 }
 
 func (s *SyncableDBServer) GetMerkleRoot(
