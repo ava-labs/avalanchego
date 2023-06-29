@@ -25,7 +25,6 @@ const (
 	minSerializedPathLen = minVarIntLen
 	minByteSliceLen      = minVarIntLen
 	minMaybeByteSliceLen = boolLen
-	minProofNodeLen      = minSerializedPathLen + minMaybeByteSliceLen + minVarIntLen
 	minDBNodeLen         = minMaybeByteSliceLen + minVarIntLen
 	minChildLen          = minVarIntLen + minSerializedPathLen + idLen
 )
