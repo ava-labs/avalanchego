@@ -292,10 +292,7 @@ func (s *Service) GetTxStatus(_ *http.Request, args *api.JSONTxID, reply *GetTxS
 		return errNilTxID
 	}
 
-	chainState := &chainState{
-		State: s.vm.state,
-	}
-	_, err := chainState.GetTx(args.TxID)
+	_, err := s.vm.state.GetTx(args.TxID)
 	switch err {
 	case nil:
 		reply.Status = choices.Accepted
@@ -319,10 +316,7 @@ func (s *Service) GetTx(_ *http.Request, args *api.GetTxArgs, reply *api.GetTxRe
 		return errNilTxID
 	}
 
-	chainState := &chainState{
-		State: s.vm.state,
-	}
-	tx, err := chainState.GetTx(args.TxID)
+	tx, err := s.vm.state.GetTx(args.TxID)
 	if err != nil {
 		return err
 	}
@@ -470,10 +464,7 @@ func (s *Service) GetAssetDescription(_ *http.Request, args *GetAssetDescription
 		return err
 	}
 
-	chainState := &chainState{
-		State: s.vm.state,
-	}
-	tx, err := chainState.GetTx(assetID)
+	tx, err := s.vm.state.GetTx(assetID)
 	if err != nil {
 		return err
 	}
