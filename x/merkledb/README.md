@@ -33,6 +33,136 @@ To reduce the depth of nodes in the trie, a `Merkle Node` utilizes path compress
 +-----------------------------------+
 ```
 
+## Serialization
+
+### Node
+
+Nodes are persisted in an underlying database. In order to persist nodes, we must first serialize them.
+Serialization is done by the `encoder` interface defined in `codec.go`.
+
+The node serialization format is as follows:
+
+```
++----------------------------------------------------+
+| Codec version (varint)                             |
++----------------------------------------------------+
+| Value existence flag (1 byte)                      |
++----------------------------------------------------+
+| Value length (varint) (optional)                   |
++----------------------------------------------------+
+| Value (variable length bytes) (optional)           |
++----------------------------------------------------+
+| Number of children (varint)                        |
++----------------------------------------------------+
+| Child index (varint)                               |
++----------------------------------------------------+
+| Child compressed path length (varint)              |
++----------------------------------------------------+
+| Child compressed path (variable length bytes)      |
++----------------------------------------------------+
+| Child ID (32 bytes)                                |
++----------------------------------------------------+
+| Child index (varint)                               |
++----------------------------------------------------+
+| Child compressed path length (varint)              |
++----------------------------------------------------+
+| Child compressed path (variable length bytes)      |
++----------------------------------------------------+
+| Child ID (32 bytes)                                |
++----------------------------------------------------+
+|...                                                 |
++----------------------------------------------------+
+```
+
+Where:
+* `Codec version` is the version of the serialization format. It's currently `0`.
+* `Value existence flag` is `1` if this node has a value, otherwise `0`.
+* `Value length` is the length of the value, if it exists (i.e. if `Value existince flag` is `1`.) Otherwise not serialized.
+* `Value` is the value, if it exists (i.e. if `Value existince flag` is `1`.) Otherwise not serialized.
+* `Number of children` is the number of children this node has.
+* `Child index` is the index of a child node within the list of the node's children.
+* `Child compressed path length` is the length of the child node's compressed path.
+* `Child compressed path` is the child node's compressed path.
+* `Child ID` is the child node's ID.
+
+For each child of the node, we have an additional:
+
+```
++----------------------------------------------------+
+| Child index (varint)                               |
++----------------------------------------------------+
+| Child compressed path length (varint)              |
++----------------------------------------------------+
+| Child compressed path (variable length bytes)      |
++----------------------------------------------------+
+| Child ID (32 bytes)                                |
++----------------------------------------------------+
+```
+
+Note that the `Child index` are not necessarily sequential. For example, if a node has 3 children, the `Child index` values could be `0`, `2`, and `15`. 
+However, the `Child index` values must be strictly increasing. For example, the `Child index` values cannot be `0`, `0`, and `1`, or `1`, `0`.
+
+Since a node can have up to 16 children, there can be up to 16 such blocks of children data.
+
+### Node Hashing
+
+Each node must have a unique ID that identifies it. This ID is calculated by hashing the following values:
+* The node's children
+* The node's value digest
+* The node's key
+
+Specifically, we encode these values in the following way:
+
+```
++----------------------------------------------------+
+| Codec version (varint)                             |
++----------------------------------------------------+
+| Number of children (varint)                        |
++----------------------------------------------------+
+| Child index (varint)                               |
++----------------------------------------------------+
+| Child ID (32 bytes)                                |
++----------------------------------------------------+
+| Child index (varint)                               |
++----------------------------------------------------+
+| Child ID (32 bytes)                                |
++----------------------------------------------------+
+|...                                                 |
++----------------------------------------------------+
+| Value existence flag (1 byte)                      |
++----------------------------------------------------+
+| Value length (varint) (optional)                   |
++----------------------------------------------------+
+| Value (variable length bytes) (optional)           |
++----------------------------------------------------+
+| Key length (varint)                                |
++----------------------------------------------------+
+| Key (variable length bytes)                        |
++----------------------------------------------------+
+```
+
+Where:
+* `Codec version` is the version of the serialization format. It's currently `0`.
+* `Number of children` is the number of children this node has.
+* `Child index` is the index of a child node within the list of the node's children.
+* `Child ID` is the child node's ID.
+* `Value existence flag` is `1` if this node has a value, otherwise `0`.
+* `Value length` is the length of the value, if it exists (i.e. if `Value existince flag` is `1`.) Otherwise not serialized.
+* `Value` is the value, if it exists (i.e. if `Value existince flag` is `1`.) Otherwise not serialized.
+* `Key length` is the number of nibbles in this node's key.
+* `Key` is the node's key.
+
+Note that, as with the node serialization format, the `Child index` values aren't necessarily sequential, but they are unique and strictly increasing.
+Also like the node serialization format, there can be up to 16 blocks of children data.
+However, note that child compressed paths are not included in the node ID calculation.
+
+Once this is encoded, we `sha256` hash the resulting bytes to get the node's ID.
+
+## Encoding Varints and Bytes
+
+Varints are encoded with `binary.PutVarint` from the standard library's `binary/encoding` package.
+Bytes are encoded by simply copying them onto the buffer.
+
 ## Design choices
 
 ### []byte copying
