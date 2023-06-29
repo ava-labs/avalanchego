@@ -1030,7 +1030,7 @@ func TestValidatorSetOperations(t *testing.T) {
 			diff.PutCurrentValidator(val)
 
 			updatedStaker := *val
-			updatedStaker.Weight *= 2
+			IncreaseStakerWeightInPlace(&updatedStaker, updatedStaker.Weight*2)
 			err = diff.UpdateCurrentValidator(&updatedStaker)
 			if err != nil {
 				return fmt.Sprintf("could not update current validator, err %v", err)

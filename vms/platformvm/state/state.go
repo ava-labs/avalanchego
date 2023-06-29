@@ -1166,9 +1166,7 @@ func (s *state) loadCurrentStakers() error {
 			return err
 		}
 		ShiftStakerAheadInPlace(staker, time.Unix(metadata.StakerStartTime, 0))
-		if metadata.UpdatedWeight != 0 {
-			staker.Weight = metadata.UpdatedWeight
-		}
+		IncreaseStakerWeightInPlace(staker, metadata.UpdatedWeight)
 
 		validator := s.currentStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 		validator.validator = staker
@@ -1214,9 +1212,7 @@ func (s *state) loadCurrentStakers() error {
 			return err
 		}
 		ShiftStakerAheadInPlace(staker, time.Unix(metadata.StakerStartTime, 0))
-		if metadata.UpdatedWeight != 0 {
-			staker.Weight = metadata.UpdatedWeight
-		}
+		IncreaseStakerWeightInPlace(staker, metadata.UpdatedWeight)
 
 		validator := s.currentStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 		validator.validator = staker
@@ -1264,9 +1260,7 @@ func (s *state) loadCurrentStakers() error {
 				return err
 			}
 			ShiftStakerAheadInPlace(staker, time.Unix(metadata.StakerStartTime, 0))
-			if metadata.UpdatedWeight != 0 {
-				staker.Weight = metadata.UpdatedWeight
-			}
+			IncreaseStakerWeightInPlace(staker, metadata.UpdatedWeight)
 
 			validator := s.currentStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 			if validator.sortedDelegators == nil {

@@ -450,7 +450,7 @@ func increaseWeightCurrentValidatorInSystem(sys *sysUnderTest) error {
 
 	// 4. increase staker weight and update the staker
 	updatedStaker := *staker
-	updatedStaker.Weight += extraWeight
+	IncreaseStakerWeightInPlace(&updatedStaker, updatedStaker.Weight+extraWeight)
 	return chain.UpdateCurrentValidator(&updatedStaker)
 }
 
@@ -490,7 +490,7 @@ func increaseWeightCurrentValidatorInModel(model *stakersStorageModel) error {
 	stakerIt.Release()
 
 	updatedStaker := *staker
-	updatedStaker.Weight += extraWeight
+	IncreaseStakerWeightInPlace(&updatedStaker, updatedStaker.Weight+extraWeight)
 	return model.UpdateCurrentValidator(&updatedStaker)
 }
 
@@ -912,7 +912,7 @@ func increaseWeightCurrentDelegatorInSystem(sys *sysUnderTest) error {
 
 	// 3. increase delegator weight and update the staker
 	updatedDelegator := *delegator
-	updatedDelegator.Weight += extraWeight
+	IncreaseStakerWeightInPlace(&updatedDelegator, updatedDelegator.Weight+extraWeight)
 	return chain.UpdateCurrentDelegator(&updatedDelegator)
 }
 
@@ -951,7 +951,7 @@ func increaseWeightCurrentDelegatorInModel(model *stakersStorageModel) error {
 	stakerIt.Release()
 
 	updatedDelegator := *delegator
-	updatedDelegator.Weight += extraWeight
+	IncreaseStakerWeightInPlace(&updatedDelegator, updatedDelegator.Weight+extraWeight)
 	return model.UpdateCurrentDelegator(&updatedDelegator)
 }
 

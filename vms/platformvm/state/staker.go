@@ -135,3 +135,13 @@ func ShiftStakerAheadInPlace(s *Staker, newStartTime time.Time) {
 	s.EndTime = newStartTime.Add(duration)
 	s.NextTime = s.EndTime
 }
+
+func IncreaseStakerWeightInPlace(s *Staker, newStakerWeight uint64) {
+	if s.Priority.IsPending() {
+		return // never shift pending stakers. Consider erroring here.
+	}
+	if newStakerWeight <= s.Weight {
+		return // only increase staker weight. Consider erroring here.
+	}
+	s.Weight = newStakerWeight
+}
