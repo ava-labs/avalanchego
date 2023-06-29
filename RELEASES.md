@@ -6,6 +6,8 @@ This version is backwards compatible to [v1.10.0](https://github.com/ava-labs/av
 
 The plugin version is unchanged at `26` and compatible with versions `v1.10.1 - v1.10.3`.
 
+**The first startup of the X-Chain will perform a pruning operation. This pruning runs in the background and does not impact restart time.**
+
 ### APIs
 
 - Removed `avalanche_X_vm_avalanche_metervm_pending_txs_count` metric
