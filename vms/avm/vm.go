@@ -137,6 +137,7 @@ func (*VM) Disconnected(context.Context, ids.NodeID) error {
 type Config struct {
 	IndexTransactions    bool `json:"index-transactions"`
 	IndexAllowIncomplete bool `json:"index-allow-incomplete"`
+	ChecksumsEnabled     bool `json:"checksums-enabled"`
 }
 
 func (vm *VM) Initialize(
@@ -220,7 +221,12 @@ func (vm *VM) Initialize(
 	vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(ctx.SharedMemory, codec)
 	vm.Spender = utxo.NewSpender(&vm.clock, codec)
 
-	state, err := states.New(vm.db, vm.parser, vm.registerer)
+	state, err := states.New(
+		vm.db,
+		vm.parser,
+		vm.registerer,
+		avmConfig.ChecksumsEnabled,
+	)
 	if err != nil {
 		return err
 	}
