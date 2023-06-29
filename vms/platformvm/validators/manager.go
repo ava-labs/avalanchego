@@ -27,8 +27,9 @@ import (
 
 const (
 	validatorSetsCacheSize        = 64
-	maxRecentlyAcceptedWindowSize = 256
-	recentlyAcceptedWindowTTL     = 5 * time.Minute
+	maxRecentlyAcceptedWindowSize = 64
+	minRecentlyAcceptedWindowSize = 16
+	recentlyAcceptedWindowTTL     = 2 * time.Minute
 )
 
 var (
@@ -66,6 +67,7 @@ func NewManager(
 			window.Config{
 				Clock:   clk,
 				MaxSize: maxRecentlyAcceptedWindowSize,
+				MinSize: minRecentlyAcceptedWindowSize,
 				TTL:     recentlyAcceptedWindowTTL,
 			},
 		),

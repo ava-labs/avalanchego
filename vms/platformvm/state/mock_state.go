@@ -169,6 +169,20 @@ func (mr *MockStateMockRecorder) ApplyValidatorWeightDiffs(arg0, arg1, arg2, arg
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ApplyValidatorWeightDiffs", reflect.TypeOf((*MockState)(nil).ApplyValidatorWeightDiffs), arg0, arg1, arg2, arg3)
 }
 
+// Checksum mocks base method.
+func (m *MockState) Checksum() ids.ID {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Checksum")
+	ret0, _ := ret[0].(ids.ID)
+	return ret0
+}
+
+// Checksum indicates an expected call of Checksum.
+func (mr *MockStateMockRecorder) Checksum() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Checksum", reflect.TypeOf((*MockState)(nil).Checksum))
+}
+
 // Close mocks base method.
 func (m *MockState) Close() error {
 	m.ctrl.T.Helper()

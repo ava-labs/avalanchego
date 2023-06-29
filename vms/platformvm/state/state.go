@@ -161,6 +161,8 @@ type State interface {
 	// pending changes to the base database.
 	CommitBatch() (database.Batch, error)
 
+	Checksum() ids.ID
+
 	Close() error
 }
 
@@ -370,6 +372,7 @@ func New(
 	metrics metrics.Metrics,
 	rewards reward.Calculator,
 	bootstrapped *utils.Atomic[bool],
+	trackChecksums bool,
 ) (State, error) {
 	s, err := newState(
 		db,
@@ -379,6 +382,7 @@ func New(
 		metricsReg,
 		rewards,
 		bootstrapped,
+		trackChecksums,
 	)
 	if err != nil {
 		return nil, err
@@ -402,6 +406,7 @@ func newState(
 	metricsReg prometheus.Registerer,
 	rewards reward.Calculator,
 	bootstrapped *utils.Atomic[bool],
+	trackChecksums bool,
 ) (*state, error) {
 	blockCache, err := metercacher.New(
 		"block_cache",
@@ -453,7 +458,7 @@ func newState(
 	}
 
 	utxoDB := prefixdb.New(utxoPrefix, baseDB)
-	utxoState, err := avax.NewMeteredUTXOState(utxoDB, txs.GenesisCodec, metricsReg)
+	utxoState, err := avax.NewMeteredUTXOState(utxoDB, txs.GenesisCodec, metricsReg, trackChecksums)
 	if err != nil {
 		return nil, err
 	}
@@ -1571,6 +1576,10 @@ func (s *state) Commit() error {
 
 func (s *state) Abort() {
 	s.baseDB.Abort()
+}
+
+func (s *state) Checksum() ids.ID {
+	return s.utxoState.Checksum()
 }
 
 func (s *state) CommitBatch() (database.Batch, error) {
