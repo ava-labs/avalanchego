@@ -90,7 +90,7 @@ type Manager struct {
 	// - [closed] is true.
 	// - [cancelCtx] was called.
 	// - [workToBeDone] and [completedWork] are closed.
-	syncDoneChan chan struct{}
+	doneChan chan struct{}
 
 	errLock sync.Mutex
 	// If non-nil, there was a fatal error.
@@ -127,7 +127,7 @@ func NewStateSyncManager(config ManagerConfig) (*Manager, error) {
 
 	m := &Manager{
 		config:          config,
-		syncDoneChan:    make(chan struct{}),
+		doneChan:        make(chan struct{}),
 		unprocessedWork: newWorkHeap(),
 		processedWork:   newWorkHeap(),
 	}
@@ -224,7 +224,7 @@ func (m *Manager) close() {
 		m.processedWork.Close()
 
 		// signal all code waiting on the sync to complete
-		close(m.syncDoneChan)
+		close(m.doneChan)
 	})
 }
 
@@ -277,7 +277,7 @@ func (m *Manager) getAndApplyChangeProof(ctx context.Context, work *workItem) {
 	}
 
 	select {
-	case <-m.syncDoneChan:
+	case <-m.doneChan:
 		// If we're closed, don't apply the proof.
 		return
 	default:
@@ -324,7 +324,7 @@ func (m *Manager) getAndApplyRangeProof(ctx context.Context, work *workItem) {
 	}
 
 	select {
-	case <-m.syncDoneChan:
+	case <-m.doneChan:
 		// If we're closed, don't apply the proof.
 		return
 	default:
@@ -532,7 +532,7 @@ func (m *Manager) Error() error {
 // If [ctx] is canceled, returns [ctx].Err().
 func (m *Manager) Wait(ctx context.Context) error {
 	select {
-	case <-m.syncDoneChan:
+	case <-m.doneChan:
 	case <-ctx.Done():
 		return ctx.Err()
 	}
@@ -560,7 +560,7 @@ func (m *Manager) UpdateSyncTarget(syncTargetRoot ids.ID) error {
 	defer m.workLock.Unlock()
 
 	select {
-	case <-m.syncDoneChan:
+	case <-m.doneChan:
 		return ErrAlreadyClosed
 	default:
 	}
