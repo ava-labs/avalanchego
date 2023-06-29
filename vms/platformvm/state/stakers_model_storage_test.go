@@ -26,10 +26,10 @@ import (
 var (
 	_ Versions         = (*sysUnderTest)(nil)
 	_ commands.Command = (*putCurrentValidatorCommand)(nil)
-	_ commands.Command = (*updateCurrentValidatorCommand)(nil)
+	_ commands.Command = (*shiftCurrentValidatorCommand)(nil)
 	_ commands.Command = (*deleteCurrentValidatorCommand)(nil)
 	_ commands.Command = (*putCurrentDelegatorCommand)(nil)
-	_ commands.Command = (*updateCurrentDelegatorCommand)(nil)
+	_ commands.Command = (*shiftCurrentDelegatorCommand)(nil)
 	_ commands.Command = (*deleteCurrentDelegatorCommand)(nil)
 	_ commands.Command = (*addTopDiffCommand)(nil)
 	_ commands.Command = (*applyBottomDiffCommand)(nil)
@@ -270,18 +270,18 @@ var genPutCurrentValidatorCommand = addPermissionlessValidatorTxGenerator(comman
 )
 
 // UpdateCurrentValidator section
-type updateCurrentValidatorCommand struct{}
+type shiftCurrentValidatorCommand struct{}
 
-func (*updateCurrentValidatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
+func (*shiftCurrentValidatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
 	sys := sut.(*sysUnderTest)
-	err := updateCurrentValidatorInSystem(sys)
+	err := shiftCurrentValidatorInSystem(sys)
 	if err != nil {
 		panic(err)
 	}
 	return sys
 }
 
-func updateCurrentValidatorInSystem(sys *sysUnderTest) error {
+func shiftCurrentValidatorInSystem(sys *sysUnderTest) error {
 	// 1. check if there is a staker, already inserted. If not return
 	// 2. Add diff layer on top (to test update across diff layers)
 	// 3. query the staker
@@ -330,17 +330,17 @@ func updateCurrentValidatorInSystem(sys *sysUnderTest) error {
 	return chain.UpdateCurrentValidator(&updatedStaker)
 }
 
-func (*updateCurrentValidatorCommand) NextState(cmdState commands.State) commands.State {
+func (*shiftCurrentValidatorCommand) NextState(cmdState commands.State) commands.State {
 	model := cmdState.(*stakersStorageModel)
 
-	err := updateCurrentValidatorInModel(model)
+	err := shiftCurrentValidatorInModel(model)
 	if err != nil {
 		panic(err)
 	}
 	return cmdState
 }
 
-func updateCurrentValidatorInModel(model *stakersStorageModel) error {
+func shiftCurrentValidatorInModel(model *stakersStorageModel) error {
 	stakerIt, err := model.GetCurrentStakerIterator()
 	if err != nil {
 		return err
@@ -370,21 +370,21 @@ func updateCurrentValidatorInModel(model *stakersStorageModel) error {
 	return model.UpdateCurrentValidator(&updatedStaker)
 }
 
-func (*updateCurrentValidatorCommand) PreCondition(commands.State) bool {
+func (*shiftCurrentValidatorCommand) PreCondition(commands.State) bool {
 	return true
 }
 
-func (*updateCurrentValidatorCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
+func (*shiftCurrentValidatorCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
 	return checkSystemAndModelContent(cmdState, res)
 }
 
-func (*updateCurrentValidatorCommand) String() string {
-	return "updateCurrentValidatorCommand"
+func (*shiftCurrentValidatorCommand) String() string {
+	return "shiftCurrentValidatorCommand"
 }
 
 var genUpdateCurrentValidatorCommand = gen.IntRange(1, 2).Map(
 	func(int) commands.Command {
-		return &updateCurrentValidatorCommand{}
+		return &shiftCurrentValidatorCommand{}
 	},
 )
 
@@ -632,18 +632,18 @@ var genPutCurrentDelegatorCommand = addPermissionlessDelegatorTxGenerator(comman
 )
 
 // UpdateCurrentDelegator section
-type updateCurrentDelegatorCommand struct{}
+type shiftCurrentDelegatorCommand struct{}
 
-func (*updateCurrentDelegatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
+func (*shiftCurrentDelegatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
 	sys := sut.(*sysUnderTest)
-	err := updateCurrentDelegatorInSystem(sys)
+	err := shiftCurrentDelegatorInSystem(sys)
 	if err != nil {
 		panic(err)
 	}
 	return sys
 }
 
-func updateCurrentDelegatorInSystem(sys *sysUnderTest) error {
+func shiftCurrentDelegatorInSystem(sys *sysUnderTest) error {
 	// 1. check if there is a staker, already inserted. If not return
 	// 2. Add diff layer on top (to test update across diff layers)
 	// 3. Shift staker times and update the staker
@@ -684,17 +684,17 @@ func updateCurrentDelegatorInSystem(sys *sysUnderTest) error {
 	return chain.UpdateCurrentDelegator(&updatedDelegator)
 }
 
-func (*updateCurrentDelegatorCommand) NextState(cmdState commands.State) commands.State {
+func (*shiftCurrentDelegatorCommand) NextState(cmdState commands.State) commands.State {
 	model := cmdState.(*stakersStorageModel)
 
-	err := updateCurrentDelegatorInModel(model)
+	err := shiftCurrentDelegatorInModel(model)
 	if err != nil {
 		panic(err)
 	}
 	return cmdState
 }
 
-func updateCurrentDelegatorInModel(model *stakersStorageModel) error {
+func shiftCurrentDelegatorInModel(model *stakersStorageModel) error {
 	stakerIt, err := model.GetCurrentStakerIterator()
 	if err != nil {
 		return err
@@ -723,21 +723,21 @@ func updateCurrentDelegatorInModel(model *stakersStorageModel) error {
 	return model.UpdateCurrentDelegator(&updatedDelegator)
 }
 
-func (*updateCurrentDelegatorCommand) PreCondition(commands.State) bool {
+func (*shiftCurrentDelegatorCommand) PreCondition(commands.State) bool {
 	return true
 }
 
-func (*updateCurrentDelegatorCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
+func (*shiftCurrentDelegatorCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
 	return checkSystemAndModelContent(cmdState, res)
 }
 
-func (*updateCurrentDelegatorCommand) String() string {
-	return "updateCurrentDelegator"
+func (*shiftCurrentDelegatorCommand) String() string {
+	return "shiftCurrentDelegator"
 }
 
 var genUpdateCurrentDelegatorCommand = gen.IntRange(1, 2).Map(
 	func(int) commands.Command {
-		return &updateCurrentDelegatorCommand{}
+		return &shiftCurrentDelegatorCommand{}
 	},
 )
 
