@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"time"
 
@@ -55,6 +56,8 @@ var (
 	_ block.StateSyncableVM      = (*VM)(nil)
 
 	dbPrefix = []byte("proposervm")
+
+	errPreforkBlockAfterFork = errors.New("prefork block fetched after fork")
 )
 
 type VM struct {
@@ -219,7 +222,27 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	return vm.setLastAcceptedMetadata(ctx)
+	if err := vm.setLastAcceptedMetadata(ctx); err != nil {
+		return err
+	}
+
+	forkHeight, err := vm.GetForkHeight()
+	switch err {
+	case nil:
+		chainCtx.Log.Info("initialized proposervm",
+			zap.String("state", "after fork"),
+			zap.Uint64("forkHeight", forkHeight),
+			zap.Uint64("lastAcceptedHeight", vm.lastAcceptedHeight),
+			zap.Time("lastAcceptedTime", vm.lastAcceptedTime),
+		)
+	case database.ErrNotFound:
+		chainCtx.Log.Info("initialized proposervm",
+			zap.String("state", "before fork"),
+		)
+	default:
+		return err
+	}
+	return nil
 }
 
 // shutdown ops then propagate shutdown to innerVM
@@ -653,7 +676,24 @@ func (vm *VM) getBlock(ctx context.Context, id ids.ID) (Block, error) {
 	if blk, err := vm.getPostForkBlock(ctx, id); err == nil {
 		return blk, nil
 	}
-	return vm.getPreForkBlock(ctx, id)
+	blk, err := vm.getPreForkBlock(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	forkHeight, err := vm.GetForkHeight()
+	if err == database.ErrNotFound {
+		return blk, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	blkHeight := blk.Height()
+	if blkHeight >= forkHeight {
+		return nil, errPreforkBlockAfterFork
+	}
+	return blk, nil
 }
 
 func (vm *VM) getPostForkBlock(ctx context.Context, blkID ids.ID) (PostForkBlock, error) {
