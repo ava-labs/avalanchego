@@ -29,7 +29,8 @@ import (
 )
 
 const (
-	RootPath = EmptyPath
+	DefaultEvictionBatchSize = 100
+	RootPath                 = EmptyPath
 	// TODO: name better
 	rebuildViewSizeFractionOfCacheSize = 50
 	minRebuildViewSizePerCommit        = 1000
@@ -39,7 +40,7 @@ var (
 	_ TrieView = (*merkleDB)(nil)
 	_ MerkleDB = (*merkleDB)(nil)
 
-	codec, version = newCodec()
+	codec = newCodec()
 
 	rootKey                 []byte
 	nodePrefix              = []byte("node")
@@ -1063,12 +1064,32 @@ func (db *merkleDB) VerifyChangeProof(
 		}
 	}
 
-	// For all the nodes along the edges of the proof, insert children < [start] and > [largestKey]
-	// into the trie so that we get the expected root ID (if this proof is valid).
-	if err := addPathInfo(view, proof.StartProof, smallestPath, largestPath); err != nil {
+	// For all the nodes along the edges of the proof, insert the children whose
+	// keys are less than [insertChildrenLessThan] or whose keys are greater
+	// than [insertChildrenGreaterThan] into the trie so that we get the
+	// expected root ID (if this proof is valid).
+	insertChildrenLessThan := Nothing[path]()
+	if len(smallestPath) > 0 {
+		insertChildrenLessThan = Some(smallestPath)
+	}
+	insertChildrenGreaterThan := Nothing[path]()
+	if len(largestPath) > 0 {
+		insertChildrenGreaterThan = Some(largestPath)
+	}
+	if err := addPathInfo(
+		view,
+		proof.StartProof,
+		insertChildrenLessThan,
+		insertChildrenGreaterThan,
+	); err != nil {
 		return err
 	}
-	if err := addPathInfo(view, proof.EndProof, smallestPath, largestPath); err != nil {
+	if err := addPathInfo(
+		view,
+		proof.EndProof,
+		insertChildrenLessThan,
+		insertChildrenGreaterThan,
+	); err != nil {
 		return err
 	}
 

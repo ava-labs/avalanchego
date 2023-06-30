@@ -120,7 +120,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]},
 			setup:         nil,
 			AP3Time:       defaultGenesisTime,
-			expectedErr:   ErrOverDelegated,
+			expectedErr:   ErrPeriodMismatch,
 		},
 		{
 			description:   fmt.Sprintf("delegator should not be added more than (%s) in the future", MaxFutureStartTime),
@@ -156,7 +156,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]},
 			setup:         addMinStakeValidator,
 			AP3Time:       defaultGenesisTime,
-			expectedErr:   ErrOverDelegated,
+			expectedErr:   ErrPeriodMismatch,
 		},
 		{
 			description:   "delegator stops before validator",
@@ -168,7 +168,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]},
 			setup:         addMinStakeValidator,
 			AP3Time:       defaultGenesisTime,
-			expectedErr:   ErrOverDelegated,
+			expectedErr:   ErrPeriodMismatch,
 		},
 		{
 			description:   "valid",
@@ -324,7 +324,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		require.ErrorIs(err, ErrValidatorSubset)
+		require.ErrorIs(err, ErrPeriodMismatch)
 	}
 
 	{
@@ -453,7 +453,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		require.ErrorIs(err, ErrValidatorSubset)
+		require.ErrorIs(err, ErrPeriodMismatch)
 	}
 
 	{
@@ -483,7 +483,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		require.ErrorIs(err, ErrValidatorSubset)
+		require.ErrorIs(err, ErrPeriodMismatch)
 	}
 
 	{

@@ -556,7 +556,7 @@ func handleValidatorShift(
 	}
 
 	shiftedStaker := *validator
-	state.ShiftValidatorAheadInPlace(&shiftedStaker)
+	state.ShiftStakerAheadInPlace(&shiftedStaker, shiftedStaker.NextTime)
 
 	currentSupply, potentialReward, err := calculatePotentialReward(
 		baseState,
@@ -756,13 +756,18 @@ func handleDelegatorShift(
 		)
 	}
 
+	shiftedStaker := *delegator
+	state.ShiftStakerAheadInPlace(&shiftedStaker, shiftedStaker.NextTime)
+
 	timeBound := validator.NextTime
 	if validator.NextTime.Equal(delegator.NextTime) {
 		timeBound = timeBound.Add(validator.StakingPeriod)
 	}
 
-	shiftedStaker := *delegator
-	state.ShiftDelegatorAheadInPlace(&shiftedStaker, timeBound)
+	if shiftedStaker.NextTime.After(timeBound) {
+		stakingPeriod := timeBound.Sub(shiftedStaker.NextTime)
+		state.UpdateStakingPeriodInPlace(&shiftedStaker, stakingPeriod)
+	}
 
 	currentSupply, potentialReward, err := calculatePotentialReward(
 		baseState,

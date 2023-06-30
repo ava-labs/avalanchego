@@ -61,6 +61,7 @@ type activeFork uint8
 
 const (
 	defaultWeight = 10000
+	trackChecksum = false
 
 	apricotPhase3Fork     activeFork = 0
 	apricotPhase5Fork     activeFork = 1
@@ -253,6 +254,7 @@ func defaultState(
 		metrics.Noop,
 		rewards,
 		&utils.Atomic[bool]{},
+		trackChecksum,
 	)
 	require.NoError(err)
 

@@ -33,6 +33,7 @@ var (
 	ErrNotValidator                             = errors.New("isn't a current or pending validator")
 	ErrRemovePermissionlessValidator            = errors.New("attempting to remove permissionless validator")
 	ErrStakeOverflow                            = errors.New("validator stake exceeds limit")
+	ErrPeriodMismatch                           = errors.New("proposed staking period is not inside dependant staking period")
 	ErrOverDelegated                            = errors.New("validator would be over delegated")
 	ErrIsNotTransformSubnetTx                   = errors.New("is not a transform subnet tx")
 	ErrTimestampNotBeforeStartTime              = errors.New("chain timestamp not before start time")
@@ -249,7 +250,7 @@ func verifyAddSubnetValidatorTx(
 		primaryNetworkValidator.StartTime,
 		primaryNetworkValidator.EndTime,
 	) {
-		return ErrValidatorSubset
+		return ErrPeriodMismatch
 	}
 
 	baseTxCreds, err := verifyPoASubnetAuthorization(backend, chainState, sTx, tx.SubnetValidator.Subnet, tx.SubnetAuth)
@@ -439,11 +440,19 @@ func verifyAddDelegatorTx(
 		return nil, err
 	}
 
-	canDelegate, err := canDelegate(chainState, primaryNetworkValidator, maximumWeight, newStaker)
+	if !txs.BoundedBy(
+		newStaker.StartTime,
+		newStaker.EndTime,
+		primaryNetworkValidator.StartTime,
+		primaryNetworkValidator.EndTime,
+	) {
+		return nil, ErrPeriodMismatch
+	}
+	overDelegated, err := overDelegated(chainState, primaryNetworkValidator, maximumWeight, newStaker)
 	if err != nil {
 		return nil, err
 	}
-	if !canDelegate {
+	if overDelegated {
 		return nil, ErrOverDelegated
 	}
 
@@ -592,7 +601,7 @@ func verifyAddPermissionlessValidatorTx(
 			primaryNetworkValidator.StartTime,
 			primaryNetworkValidator.EndTime,
 		) {
-			return ErrValidatorSubset
+			return ErrPeriodMismatch
 		}
 
 		txFee = backend.Config.AddSubnetValidatorFee
@@ -772,11 +781,19 @@ func verifyAddPermissionlessDelegatorTx(
 		return err
 	}
 
-	canDelegate, err := canDelegate(chainState, validator, maximumWeight, newStaker)
+	if !txs.BoundedBy(
+		newStaker.StartTime,
+		newStaker.EndTime,
+		validator.StartTime,
+		validator.EndTime,
+	) {
+		return ErrPeriodMismatch
+	}
+	overDelegated, err := overDelegated(chainState, validator, maximumWeight, newStaker)
 	if err != nil {
 		return err
 	}
-	if !canDelegate {
+	if overDelegated {
 		return ErrOverDelegated
 	}
 
@@ -1084,11 +1101,19 @@ func verifyAddContinuousDelegatorTx(
 		return time.Time{}, err
 	}
 
-	canDelegate, err := canDelegate(chainState, validator, maximumWeight, newStaker)
+	if !txs.BoundedBy(
+		newStaker.StartTime,
+		newStaker.NextTime,
+		validator.StartTime,
+		validator.NextTime,
+	) {
+		return time.Time{}, ErrPeriodMismatch
+	}
+	overDelegated, err := overDelegated(chainState, validator, maximumWeight, newStaker)
 	if err != nil {
 		return time.Time{}, err
 	}
-	if !canDelegate {
+	if overDelegated {
 		return time.Time{}, ErrOverDelegated
 	}
 

@@ -4,7 +4,7 @@
 package state
 
 import (
-	"math"
+	"fmt"
 	"reflect"
 	"sort"
 	"testing"
@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 func TestMaskedIterator(t *testing.T) {
@@ -86,13 +87,35 @@ func TestMaskedIterator(t *testing.T) {
 
 func TestMaskIteratorProperties(t *testing.T) {
 	properties := gopter.NewProperties(nil)
+	startTime := time.Now().Truncate(time.Second)
 
 	properties.Property("Mask iterator output must be sorted", prop.ForAll(
-		func(parentStakers []Staker, indexes []int, counts []int) string {
+		func(nonInitParentStakerTxs []*txs.Tx, indexes []int, counts []int) string {
 			deletedCount := counts[0]
 			updatedCount := counts[1]
 			deletedIndexes := indexes[0:deletedCount]
 			updatedIndexes := indexes[deletedCount : deletedCount+updatedCount]
+
+			parentStakers := make([]*Staker, 0, len(nonInitParentStakerTxs))
+			for _, nonInitParentStakerTx := range nonInitParentStakerTxs {
+				signedTx, err := txs.NewSigned(nonInitParentStakerTx.Unsigned, txs.Codec, nil)
+				if err != nil {
+					panic(fmt.Errorf("failed signing tx in tx generator, %w", err))
+				}
+
+				stakerTx := signedTx.Unsigned.(txs.StakerTx)
+				staker, err := NewCurrentStaker(
+					signedTx.ID(),
+					stakerTx,
+					startTime,
+					mockable.MaxTime,
+					uint64(100),
+				)
+				if err != nil {
+					return err.Error()
+				}
+				parentStakers = append(parentStakers, staker)
+			}
 
 			_, _, maskedIt := buildMaskedIterator(parentStakers, deletedIndexes, updatedIndexes)
 
@@ -114,11 +137,32 @@ func TestMaskIteratorProperties(t *testing.T) {
 	))
 
 	properties.Property("Masked stakers must not be in the output", prop.ForAll(
-		func(parentStakers []Staker, indexes []int, counts []int) string {
+		func(nonInitParentStakerTxs []*txs.Tx, indexes []int, counts []int) string {
 			deletedCount := counts[0]
 			updatedCount := counts[1]
 			deletedIndexes := indexes[0:deletedCount]
 			updatedIndexes := indexes[deletedCount : deletedCount+updatedCount]
+
+			parentStakers := make([]*Staker, 0, len(nonInitParentStakerTxs))
+			for _, nonInitParentStakerTx := range nonInitParentStakerTxs {
+				signedTx, err := txs.NewSigned(nonInitParentStakerTx.Unsigned, txs.Codec, nil)
+				if err != nil {
+					panic(fmt.Errorf("failed signing tx in tx generator, %w", err))
+				}
+
+				stakerTx := signedTx.Unsigned.(txs.StakerTx)
+				staker, err := NewCurrentStaker(
+					signedTx.ID(),
+					stakerTx,
+					startTime,
+					mockable.MaxTime,
+					uint64(100),
+				)
+				if err != nil {
+					return err.Error()
+				}
+				parentStakers = append(parentStakers, staker)
+			}
 
 			deleted, _, maskedIt := buildMaskedIterator(parentStakers, deletedIndexes, updatedIndexes)
 
@@ -139,11 +183,32 @@ func TestMaskIteratorProperties(t *testing.T) {
 	))
 
 	properties.Property("Updated stakers must be returned instead of their parent version", prop.ForAll(
-		func(parentStakers []Staker, indexes []int, counts []int) string {
+		func(nonInitParentStakerTxs []*txs.Tx, indexes []int, counts []int) string {
 			deletedCount := counts[0]
 			updatedCount := counts[1]
 			deletedIndexes := indexes[0:deletedCount]
 			updatedIndexes := indexes[deletedCount : deletedCount+updatedCount]
+
+			parentStakers := make([]*Staker, 0, len(nonInitParentStakerTxs))
+			for _, nonInitParentStakerTx := range nonInitParentStakerTxs {
+				signedTx, err := txs.NewSigned(nonInitParentStakerTx.Unsigned, txs.Codec, nil)
+				if err != nil {
+					panic(fmt.Errorf("failed signing tx in tx generator, %w", err))
+				}
+
+				stakerTx := signedTx.Unsigned.(txs.StakerTx)
+				staker, err := NewCurrentStaker(
+					signedTx.ID(),
+					stakerTx,
+					startTime,
+					mockable.MaxTime,
+					uint64(100),
+				)
+				if err != nil {
+					return err.Error()
+				}
+				parentStakers = append(parentStakers, staker)
+			}
 
 			_, updated, maskedIt := buildMaskedIterator(parentStakers, deletedIndexes, updatedIndexes)
 
@@ -198,9 +263,10 @@ func indexPermutationGenerator(sliceLen int) gopter.Gen {
 
 func maskedIteratorTestGenerator() []gopter.Gen {
 	parentStakersCount := 10
+	ctx := buildStateCtx()
 
 	return []gopter.Gen{
-		gen.SliceOfN(parentStakersCount, stakerGenerator(anyPriority, nil, nil, math.MaxUint64)),
+		gen.SliceOfN(parentStakersCount, addValidatorTxGenerator(ctx, nil)),
 		indexPermutationGenerator(parentStakersCount),
 		gen.SliceOfN(2, gen.IntRange(0, parentStakersCount)).SuchThat(func(v interface{}) bool {
 			nums := v.([]int)
@@ -211,14 +277,14 @@ func maskedIteratorTestGenerator() []gopter.Gen {
 	}
 }
 
-func buildMaskedIterator(parentStakers []Staker, deletedIndexes []int, updatedIndexes []int) (
+func buildMaskedIterator(parentStakers []*Staker, deletedIndexes []int, updatedIndexes []int) (
 	map[ids.ID]*Staker, // deletedStakers
 	map[ids.ID]*Staker, // updatedStakers
 	StakerIterator,
 ) {
 	parentTree := btree.NewG(defaultTreeDegree, (*Staker).Less)
 	for idx := range parentStakers {
-		s := &parentStakers[idx]
+		s := parentStakers[idx]
 		parentTree.ReplaceOrInsert(s)
 	}
 	parentIt := NewTreeIterator(parentTree)
@@ -226,18 +292,14 @@ func buildMaskedIterator(parentStakers []Staker, deletedIndexes []int, updatedIn
 	deletedStakers := make(map[ids.ID]*Staker)
 	for _, idx := range deletedIndexes {
 		s := parentStakers[idx]
-		deletedStakers[s.TxID] = &s
+		deletedStakers[s.TxID] = s
 	}
 
 	updatedStakers := make(map[ids.ID]*Staker)
 	for _, idx := range updatedIndexes {
 		s := parentStakers[idx]
-		if s.Priority.IsValidator() {
-			ShiftValidatorAheadInPlace(&s)
-		} else {
-			ShiftDelegatorAheadInPlace(&s, mockable.MaxTime)
-		}
-		updatedStakers[s.TxID] = &s
+		ShiftStakerAheadInPlace(s, s.NextTime)
+		updatedStakers[s.TxID] = s
 	}
 
 	return deletedStakers, updatedStakers, NewMaskedIterator(parentIt, deletedStakers, updatedStakers)

@@ -23,6 +23,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
+const trackChecksums = false
+
 var (
 	parser             blocks.Parser
 	populatedUTXO      *avax.UTXO
@@ -99,7 +101,7 @@ func TestState(t *testing.T) {
 
 	db := memdb.New()
 	vdb := versiondb.New(db)
-	s, err := New(vdb, parser, prometheus.NewRegistry())
+	s, err := New(vdb, parser, prometheus.NewRegistry(), trackChecksums)
 	require.NoError(err)
 
 	s.AddUTXO(populatedUTXO)
@@ -107,7 +109,7 @@ func TestState(t *testing.T) {
 	s.AddBlock(populatedBlk)
 	require.NoError(s.Commit())
 
-	s, err = New(vdb, parser, prometheus.NewRegistry())
+	s, err = New(vdb, parser, prometheus.NewRegistry(), trackChecksums)
 	require.NoError(err)
 
 	ChainUTXOTest(t, s)
@@ -120,7 +122,7 @@ func TestDiff(t *testing.T) {
 
 	db := memdb.New()
 	vdb := versiondb.New(db)
-	s, err := New(vdb, parser, prometheus.NewRegistry())
+	s, err := New(vdb, parser, prometheus.NewRegistry(), trackChecksums)
 	require.NoError(err)
 
 	s.AddUTXO(populatedUTXO)
@@ -280,7 +282,7 @@ func TestInitializeChainState(t *testing.T) {
 
 	db := memdb.New()
 	vdb := versiondb.New(db)
-	s, err := New(vdb, parser, prometheus.NewRegistry())
+	s, err := New(vdb, parser, prometheus.NewRegistry(), trackChecksums)
 	require.NoError(err)
 
 	stopVertexID := ids.GenerateTestID()

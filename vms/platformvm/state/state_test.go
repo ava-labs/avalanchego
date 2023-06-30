@@ -41,6 +41,8 @@ import (
 type activeFork uint8
 
 const (
+	trackChecksum = false
+
 	apricotPhase3Fork     activeFork = 0
 	apricotPhase5Fork     activeFork = 1
 	banffFork             activeFork = 2
@@ -241,7 +243,7 @@ func TestVariablePeriodDelegatorPersistence(t *testing.T) {
 
 	// shift delegator, without shortening its period, and store it
 	shiftedDelegator := *delegator
-	ShiftDelegatorAheadInPlace(&shiftedDelegator, mockable.MaxTime)
+	ShiftStakerAheadInPlace(&shiftedDelegator, delegator.NextTime)
 	require.NoError(initialState.UpdateCurrentDelegator(&shiftedDelegator))
 	require.NoError(initialState.Commit())
 
@@ -1051,5 +1053,6 @@ func newStateFromDB(db database.Database, cfg *config.Config) (State, error) {
 			SupplyCap:          720 * units.MegaAvax,
 		}),
 		&utils.Atomic[bool]{},
+		trackChecksum,
 	)
 }

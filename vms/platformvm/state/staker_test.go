@@ -147,9 +147,9 @@ func TestNewCurrentStakerPreContinuousStakingFork(t *testing.T) {
 	publicKey := bls.PublicFromSecretKey(sk)
 	subnetID := ids.GenerateTestID()
 	weight := uint64(12345)
-	startTime := time.Now().Truncate(time.Second)
-	endTime := time.Now().Truncate(time.Second)
-	duration := endTime.Sub(startTime)
+	startTime := time.Now()
+	duration := time.Hour
+	endTime := startTime.Add(duration)
 	potentialReward := uint64(54321)
 	currentPriority := txs.SubnetPermissionedValidatorCurrentPriority
 
@@ -298,7 +298,7 @@ func TestShiftValidator(t *testing.T) {
 	}
 	require.True(staker.NextTime.Before(staker.EndTime))
 
-	ShiftValidatorAheadInPlace(staker)
+	ShiftStakerAheadInPlace(staker, staker.NextTime)
 	require.Equal(start.Add(stakingPeriod), staker.StartTime)
 	require.Equal(stakingPeriod, staker.StakingPeriod)
 	require.Equal(start.Add(2*stakingPeriod), staker.NextTime)
@@ -318,7 +318,7 @@ func TestShiftValidator(t *testing.T) {
 	require.False(staker.NextTime.After(staker.EndTime)) // invariant
 
 	for i := 1; i < periods; i++ {
-		ShiftValidatorAheadInPlace(staker)
+		ShiftStakerAheadInPlace(staker, staker.NextTime)
 		require.Equal(start.Add(time.Duration(i)*stakingPeriod), staker.StartTime)
 		require.Equal(stakingPeriod, staker.StakingPeriod)
 		require.Equal(start.Add(time.Duration(i+1)*stakingPeriod), staker.NextTime)
@@ -329,7 +329,7 @@ func TestShiftValidator(t *testing.T) {
 
 	// staker reached end of life, shift must be ineffective
 	cpy := *staker
-	ShiftValidatorAheadInPlace(&cpy)
+	ShiftStakerAheadInPlace(&cpy, cpy.NextTime)
 	require.Equal(staker, &cpy)
 }
 
@@ -356,8 +356,8 @@ func TestShiftDelegator(t *testing.T) {
 	require.True(staker.NextTime.Before(staker.EndTime))
 
 	cappedDuration := staker.StakingPeriod / 2
-	cappedNextTime := staker.NextTime.Add(cappedDuration)
-	ShiftDelegatorAheadInPlace(staker, cappedNextTime)
+	ShiftStakerAheadInPlace(staker, staker.NextTime)
+	UpdateStakingPeriodInPlace(staker, cappedDuration)
 	require.Equal(start.Add(stakingPeriod), staker.StartTime)
 	require.Equal(stakingPeriod, staker.StakingPeriod)
 	require.Equal(start.Add(stakingPeriod).Add(cappedDuration), staker.NextTime)
@@ -377,7 +377,7 @@ func TestShiftDelegator(t *testing.T) {
 	require.False(staker.NextTime.After(staker.EndTime)) // invariant
 
 	for i := 1; i < periods; i++ {
-		ShiftDelegatorAheadInPlace(staker, mockable.MaxTime)
+		ShiftStakerAheadInPlace(staker, staker.NextTime)
 		require.Equal(start.Add(time.Duration(i)*stakingPeriod), staker.StartTime)
 		require.Equal(stakingPeriod, staker.StakingPeriod)
 		require.Equal(start.Add(time.Duration(i+1)*stakingPeriod), staker.NextTime)
@@ -388,7 +388,7 @@ func TestShiftDelegator(t *testing.T) {
 
 	// staker reached end of life, shift must be ineffective
 	cpy := *staker
-	ShiftDelegatorAheadInPlace(&cpy, mockable.MaxTime)
+	ShiftStakerAheadInPlace(&cpy, staker.NextTime)
 	require.Equal(staker, &cpy)
 }
 

@@ -1370,7 +1370,7 @@ func TestVerifyAddContinuousDelegatorTx(t *testing.T) {
 				tx.Validator.End = uint64(dummyTime.Add(excessiveStakingPeriod).Unix())
 				return &tx
 			},
-			expectedErr: ErrOverDelegated,
+			expectedErr: ErrPeriodMismatch,
 		},
 		{
 			name: "delegator wouls break validator max weight",
@@ -2351,7 +2351,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			txF: func() *txs.AddPermissionlessValidatorTx {
 				return &verifiedTx
 			},
-			expectedErr: ErrValidatorSubset,
+			expectedErr: ErrPeriodMismatch,
 		},
 		{
 			name: "flow check fails",

@@ -165,41 +165,19 @@ func NewPendingStaker(txID ids.ID, staker txs.PreContinuousStakingStaker) (*Stak
 	}, nil
 }
 
-// ShiftStakerAheadInPlace moves staker times ahead.
-func ShiftValidatorAheadInPlace(s *Staker) {
-	if !s.Priority.IsValidator() {
-		return // wrong function use. This sucks
-	}
-	if !s.Priority.IsValidator() || s.Priority.IsPending() {
-		return // never shift pending stakers
-	}
-	if !s.ShouldRestake() {
-		return // can't shift, staker reached EOL
-	}
-
-	s.StartTime = s.NextTime
-	s.NextTime = s.NextTime.Add(s.StakingPeriod)
-}
-
-// ShiftStakerAheadInPlace moves staker times ahead.
-func ShiftDelegatorAheadInPlace(s *Staker, nextTimeCap time.Time) {
-	if !s.Priority.IsDelegator() {
-		return // wrong function use. This sucks
-	}
+func ShiftStakerAheadInPlace(s *Staker, newStartTime time.Time) {
 	if s.Priority.IsPending() {
-		return // never shift pending stakers
+		return // never shift pending stakers. Consider erroring here.
+	}
+	if !newStartTime.After(s.StartTime) {
+		return // never shift stakers backward. Consider erroring here.
 	}
 	if !s.ShouldRestake() {
 		return // can't shift, staker reached EOL
 	}
 
-	s.StartTime = s.NextTime
-
-	nextTime := s.NextTime.Add(s.StakingPeriod)
-	if nextTime.After(nextTimeCap) {
-		nextTime = nextTimeCap
-	}
-	s.NextTime = nextTime
+	s.StartTime = newStartTime
+	s.NextTime = newStartTime.Add(s.StakingPeriod)
 }
 
 func (s *Staker) ShouldRestake() bool {
@@ -215,4 +193,26 @@ func MarkStakerForRemovalInPlaceBeforeTime(s *Staker, stopTime time.Time) {
 	for ; end.Before(stopTime); end = end.Add(s.StakingPeriod) {
 	}
 	s.EndTime = end
+}
+
+func IncreaseStakerWeightInPlace(s *Staker, newStakerWeight uint64) {
+	if s.Priority.IsPending() {
+		return // never shift pending stakers. Consider erroring here.
+	}
+	if newStakerWeight <= s.Weight {
+		return // only increase staker weight. Consider erroring here.
+	}
+
+	s.Weight = newStakerWeight
+}
+
+func UpdateStakingPeriodInPlace(s *Staker, newStakingPeriod time.Duration) {
+	if s.Priority.IsPending() {
+		return // never shift pending stakers. Consider erroring here.
+	}
+	if newStakingPeriod <= 0 {
+		return // Never shorten staking period to zero. Consider erroring here.
+	}
+
+	s.NextTime = s.StartTime.Add(newStakingPeriod)
 }

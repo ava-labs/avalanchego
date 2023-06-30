@@ -17,7 +17,7 @@ const defaultWeight = 10000
 // each key controls an address that has [defaultBalance] AVAX at genesis
 var keys = secp256k1.TestKeys()
 
-func TestValidatorBoundedBy(t *testing.T) {
+func TestBoundedBy(t *testing.T) {
 	require := require.New(t)
 
 	// case 1: a starts, a finishes, b starts, b finishes
