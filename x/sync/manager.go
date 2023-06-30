@@ -46,19 +46,19 @@ const (
 // Signifies that we should sync the range [start, end].
 // nil [start] means there is no lower bound.
 // nil [end] means there is no upper bound.
-// [LocalRootID] is the ID of the root of this range in our database.
-// If we have no local root for this range, [LocalRootID] is ids.Empty.
+// [localRootID] is the ID of the root of this range in our database.
+// If we have no local root for this range, [localRootID] is ids.Empty.
 type workItem struct {
 	start       []byte
 	end         []byte
 	priority    priority
-	LocalRootID ids.ID
+	localRootID ids.ID
 }
 
 // TODO danlaine look into using a sync.Pool for workItems
 func newWorkItem(localRootID ids.ID, start, end []byte, priority priority) *workItem {
 	return &workItem{
-		LocalRootID: localRootID,
+		localRootID: localRootID,
 		start:       start,
 		end:         end,
 		priority:    priority,
@@ -169,16 +169,14 @@ func (m *Manager) sync(ctx context.Context) {
 	m.workLock.Lock()
 	for {
 		// Invariant: [m.workLock] is held here.
-		if ctx.Err() != nil { // [m] is closed.
+		switch {
+		case ctx.Err() != nil:
 			return // [m.workLock] released by defer.
-		}
-		if m.processingWorkItems >= m.config.SimultaneousWorkLimit {
+		case m.processingWorkItems >= m.config.SimultaneousWorkLimit:
 			// We're already processing the maximum number of work items.
 			// Wait until one of them finishes.
 			m.unprocessedWorkCond.Wait()
-			continue
-		}
-		if m.unprocessedWork.Len() == 0 {
+		case m.unprocessedWork.Len() == 0:
 			if m.processingWorkItems == 0 {
 				// There's no work to do, and there are no work items being processed
 				// which could cause work to be added, so we're done.
@@ -189,15 +187,15 @@ func (m *Manager) sync(ctx context.Context) {
 			// Close() will be called, which will broadcast on [m.unprocessedWorkCond],
 			// which will cause Wait() to return, and this goroutine to exit.
 			m.unprocessedWorkCond.Wait()
-			continue
+		default:
+			m.processingWorkItems++
+			work := m.unprocessedWork.GetWork()
+			// TODO danlaine: We won't release [m.workLock] until
+			// we've started a goroutine for each available work item.
+			// We can't apply proofs we receive until we release [m.workLock].
+			// Is this OK? Is it possible we end up with too many goroutines?
+			go m.doWork(ctx, work)
 		}
-		m.processingWorkItems++
-		work := m.unprocessedWork.GetWork()
-		// TODO danlaine: We won't release [m.workLock] until
-		// we've started a goroutine for each available work item.
-		// We can't apply proofs we receive until we release [m.workLock].
-		// Is this OK? Is it possible we end up with too many goroutines?
-		go m.doWork(ctx, work)
 	}
 }
 
@@ -205,6 +203,7 @@ func (m *Manager) sync(ctx context.Context) {
 func (m *Manager) Close() {
 	m.workLock.Lock()
 	defer m.workLock.Unlock()
+
 	m.close()
 }
 
@@ -239,7 +238,7 @@ func (m *Manager) doWork(ctx context.Context, work *workItem) {
 		m.unprocessedWorkCond.Signal()
 	}()
 
-	if work.LocalRootID == ids.Empty {
+	if work.localRootID == ids.Empty {
 		// the keys in this range have not been downloaded, so get all key/values
 		m.getAndApplyRangeProof(ctx, work)
 	} else {
@@ -251,19 +250,19 @@ func (m *Manager) doWork(ctx context.Context, work *workItem) {
 // Fetch and apply the change proof given by [work].
 // Assumes [m.workLock] is not held.
 func (m *Manager) getAndApplyChangeProof(ctx context.Context, work *workItem) {
-	rootID := m.getTargetRoot()
+	targetRootID := m.getTargetRoot()
 
-	if work.LocalRootID == rootID {
+	if work.localRootID == targetRootID {
 		// Start root is the same as the end root, so we're done.
-		m.completeWorkItem(ctx, work, work.end, rootID, nil)
+		m.completeWorkItem(ctx, work, work.end, targetRootID, nil)
 		return
 	}
 
 	changeProof, err := m.config.Client.GetChangeProof(
 		ctx,
 		&pb.SyncGetChangeProofRequest{
-			StartRootHash: work.LocalRootID[:],
-			EndRootHash:   rootID[:],
+			StartRootHash: work.localRootID[:],
+			EndRootHash:   targetRootID[:],
 			StartKey:      work.start,
 			EndKey:        work.end,
 			KeyLimit:      defaultRequestKeyLimit,
@@ -287,7 +286,7 @@ func (m *Manager) getAndApplyChangeProof(ctx context.Context, work *workItem) {
 	// Add this range as a fresh uncompleted work item to the work heap.
 	// TODO danlaine send range proof instead of failure notification
 	if !changeProof.HadRootsInHistory {
-		work.LocalRootID = ids.Empty
+		work.localRootID = ids.Empty
 		m.enqueueWork(work)
 		return
 	}
@@ -302,16 +301,16 @@ func (m *Manager) getAndApplyChangeProof(ctx context.Context, work *workItem) {
 		largestHandledKey = changeProof.KeyChanges[len(changeProof.KeyChanges)-1].Key
 	}
 
-	m.completeWorkItem(ctx, work, largestHandledKey, rootID, changeProof.EndProof)
+	m.completeWorkItem(ctx, work, largestHandledKey, targetRootID, changeProof.EndProof)
 }
 
 // Fetch and apply the range proof given by [work].
 // Assumes [m.workLock] is not held.
 func (m *Manager) getAndApplyRangeProof(ctx context.Context, work *workItem) {
-	rootID := m.getTargetRoot()
+	targetRootID := m.getTargetRoot()
 	proof, err := m.config.Client.GetRangeProof(ctx,
 		&pb.SyncGetRangeProofRequest{
-			RootHash:   rootID[:],
+			RootHash:   targetRootID[:],
 			StartKey:   work.start,
 			EndKey:     work.end,
 			KeyLimit:   defaultRequestKeyLimit,
@@ -341,7 +340,7 @@ func (m *Manager) getAndApplyRangeProof(ctx context.Context, work *workItem) {
 		largestHandledKey = proof.KeyValues[len(proof.KeyValues)-1].Key
 	}
 
-	m.completeWorkItem(ctx, work, largestHandledKey, rootID, proof.EndProof)
+	m.completeWorkItem(ctx, work, largestHandledKey, targetRootID, proof.EndProof)
 }
 
 // findNextKey returns the start of the key range that should be fetched next.
@@ -494,30 +493,6 @@ func (m *Manager) findNextKey(
 	return nextKey, nil
 }
 
-// findChildDifference returns the first child index that is different between node 1 and node 2 if one exists and
-// a bool indicating if any difference was found
-func findChildDifference(node1, node2 *merkledb.ProofNode, startIndex byte) (byte, bool) {
-	var (
-		child1, child2 ids.ID
-		ok1, ok2       bool
-	)
-	for childIndex := startIndex; childIndex < merkledb.NodeBranchFactor; childIndex++ {
-		if node1 != nil {
-			child1, ok1 = node1.Children[childIndex]
-		}
-		if node2 != nil {
-			child2, ok2 = node2.Children[childIndex]
-		}
-		// if one node has a child and the other doesn't or the children ids don't match,
-		// return the current child index as the first difference
-		if (ok1 || ok2) && child1 != child2 {
-			return childIndex, true
-		}
-	}
-	// there were no differences found
-	return 0, false
-}
-
 func (m *Manager) Error() error {
 	m.errLock.Lock()
 	defer m.errLock.Unlock()
@@ -547,9 +522,9 @@ func (m *Manager) Wait(ctx context.Context) error {
 		m.config.Log.Info("completed with error", zap.Error(err))
 		return err
 	}
-	if m.getTargetRoot() != root {
+	if targetRootID := m.getTargetRoot(); targetRootID != root {
 		// This should never happen.
-		return fmt.Errorf("%w: expected %s, got %s", ErrFinishedWithUnexpectedRoot, m.getTargetRoot(), root)
+		return fmt.Errorf("%w: expected %s, got %s", ErrFinishedWithUnexpectedRoot, targetRootID, root)
 	}
 	m.config.Log.Info("completed", zap.String("new root", root.String()))
 	return nil
@@ -629,7 +604,7 @@ func (m *Manager) completeWorkItem(ctx context.Context, work *workItem, largestH
 			largestHandledKey = work.end
 		} else {
 			// the full range wasn't completed, so enqueue a new work item for the range [nextStartKey, workItem.end]
-			m.enqueueWork(newWorkItem(work.LocalRootID, nextStartKey, work.end, work.priority))
+			m.enqueueWork(newWorkItem(work.localRootID, nextStartKey, work.end, work.priority))
 			largestHandledKey = nextStartKey
 		}
 	}
@@ -673,8 +648,8 @@ func (m *Manager) enqueueWork(work *workItem) {
 
 	// first item gets higher priority than the second to encourage finished ranges to grow
 	// rather than start a new range that is not contiguous with existing completed ranges
-	first := newWorkItem(work.LocalRootID, work.start, mid, medPriority)
-	second := newWorkItem(work.LocalRootID, mid, work.end, lowPriority)
+	first := newWorkItem(work.localRootID, work.start, mid, medPriority)
+	second := newWorkItem(work.localRootID, mid, work.end, lowPriority)
 
 	m.unprocessedWork.Insert(first)
 	m.unprocessedWork.Insert(second)
@@ -744,4 +719,28 @@ func midPoint(start, end []byte) []byte {
 		midpoint = midpoint[0:length]
 	}
 	return midpoint
+}
+
+// findChildDifference returns the first child index that is different between node 1 and node 2 if one exists and
+// a bool indicating if any difference was found
+func findChildDifference(node1, node2 *merkledb.ProofNode, startIndex byte) (byte, bool) {
+	var (
+		child1, child2 ids.ID
+		ok1, ok2       bool
+	)
+	for childIndex := startIndex; childIndex < merkledb.NodeBranchFactor; childIndex++ {
+		if node1 != nil {
+			child1, ok1 = node1.Children[childIndex]
+		}
+		if node2 != nil {
+			child2, ok2 = node2.Children[childIndex]
+		}
+		// if one node has a child and the other doesn't or the children ids don't match,
+		// return the current child index as the first difference
+		if (ok1 || ok2) && child1 != child2 {
+			return childIndex, true
+		}
+	}
+	// there were no differences found
+	return 0, false
 }
