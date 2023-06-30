@@ -106,9 +106,9 @@ func (s *NetworkServer) AppRequest(
 	var err error
 	switch req := req.GetMessage().(type) {
 	case *pb.Request_ChangeProofRequest:
-		err = s.HandleChangeProofRequest(ctx, nodeID, requestID, req.ChangeProofRequest)
+		err = s.handleChangeProofRequest(ctx, nodeID, requestID, req.ChangeProofRequest)
 	case *pb.Request_RangeProofRequest:
-		err = s.HandleRangeProofRequest(ctx, nodeID, requestID, req.RangeProofRequest)
+		err = s.handleRangeProofRequest(ctx, nodeID, requestID, req.RangeProofRequest)
 	default:
 		s.log.Debug(
 			"unknown AppRequest type",
@@ -133,7 +133,7 @@ func (s *NetworkServer) AppRequest(
 }
 
 // Generates a change proof and sends it to [nodeID].
-func (s *NetworkServer) HandleChangeProofRequest(
+func (s *NetworkServer) handleChangeProofRequest(
 	ctx context.Context,
 	nodeID ids.NodeID,
 	requestID uint32,
@@ -214,7 +214,7 @@ func (s *NetworkServer) HandleChangeProofRequest(
 
 // Generates a range proof and sends it to [nodeID].
 // TODO danlaine how should we handle context cancellation?
-func (s *NetworkServer) HandleRangeProofRequest(
+func (s *NetworkServer) handleRangeProofRequest(
 	ctx context.Context,
 	nodeID ids.NodeID,
 	requestID uint32,
