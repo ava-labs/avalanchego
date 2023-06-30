@@ -1167,6 +1167,7 @@ func (s *state) loadCurrentStakers() error {
 		}
 		ShiftStakerAheadInPlace(staker, time.Unix(metadata.StakerStartTime, 0))
 		IncreaseStakerWeightInPlace(staker, metadata.UpdatedWeight)
+		UpdateStakingPeriodInPlace(staker, time.Duration(metadata.StakerStakingPeriod))
 
 		validator := s.currentStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 		validator.validator = staker
@@ -1213,6 +1214,7 @@ func (s *state) loadCurrentStakers() error {
 		}
 		ShiftStakerAheadInPlace(staker, time.Unix(metadata.StakerStartTime, 0))
 		IncreaseStakerWeightInPlace(staker, metadata.UpdatedWeight)
+		UpdateStakingPeriodInPlace(staker, time.Duration(metadata.StakerStakingPeriod))
 
 		validator := s.currentStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 		validator.validator = staker
@@ -1261,6 +1263,7 @@ func (s *state) loadCurrentStakers() error {
 			}
 			ShiftStakerAheadInPlace(staker, time.Unix(metadata.StakerStartTime, 0))
 			IncreaseStakerWeightInPlace(staker, metadata.UpdatedWeight)
+			UpdateStakingPeriodInPlace(staker, time.Duration(metadata.StakerStakingPeriod))
 
 			validator := s.currentStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 			if validator.sortedDelegators == nil {
@@ -1665,8 +1668,9 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 					// a staker update may change its times and weight wrt those
 					// specified in the tx creating the staker. We store these data
 					// to properly reconstruct staker data.
-					StakerStartTime: staker.StartTime.Unix(),
-					UpdatedWeight:   staker.Weight,
+					StakerStartTime:     staker.StartTime.Unix(),
+					StakerStakingPeriod: int64(staker.EndTime.Sub(staker.StartTime)),
+					UpdatedWeight:       staker.Weight,
 				}
 
 				// Let's start using V1 as soon as we deploy code. No need to
@@ -1717,8 +1721,9 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 					return err
 				}
 
-				metadata.StakerStartTime = staker.StartTime.Unix()
 				metadata.lastUpdated = staker.StartTime
+				metadata.StakerStartTime = staker.StartTime.Unix()
+				metadata.StakerStakingPeriod = int64(staker.EndTime.Sub(staker.StartTime))
 				metadata.LastUpdated = uint64(metadata.StakerStartTime)
 				metadata.UpdatedWeight = staker.Weight
 
@@ -1830,9 +1835,10 @@ func writeCurrentDelegatorDiff(
 			// Let's start using V1 as soon as we deploy code. No need to
 			// wait till Continuous staking fork activation to do that.
 			metadata := &delegatorMetadata{
-				PotentialReward: delegator.PotentialReward,
-				StakerStartTime: delegator.StartTime.Unix(),
-				UpdatedWeight:   delegator.Weight,
+				PotentialReward:     delegator.PotentialReward,
+				StakerStartTime:     delegator.StartTime.Unix(),
+				StakerStakingPeriod: int64(delegator.EndTime.Sub(delegator.StartTime)),
+				UpdatedWeight:       delegator.Weight,
 			}
 			metadataBytes, err := stakersMetadataCodec.Marshal(stakerMetadataCodecV1, metadata)
 			if err != nil {
@@ -1863,6 +1869,7 @@ func writeCurrentDelegatorDiff(
 			}
 
 			metadata.StakerStartTime = delegator.StartTime.Unix()
+			metadata.StakerStakingPeriod = int64(delegator.EndTime.Sub(delegator.StartTime))
 			metadata.UpdatedWeight = delegator.Weight
 
 			metadataBytes, err = stakersMetadataCodec.Marshal(stakerMetadataCodecV1, metadata)

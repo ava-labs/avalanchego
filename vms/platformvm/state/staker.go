@@ -143,5 +143,18 @@ func IncreaseStakerWeightInPlace(s *Staker, newStakerWeight uint64) {
 	if newStakerWeight <= s.Weight {
 		return // only increase staker weight. Consider erroring here.
 	}
+
 	s.Weight = newStakerWeight
+}
+
+func UpdateStakingPeriodInPlace(s *Staker, newStakingPeriod time.Duration) {
+	if s.Priority.IsPending() {
+		return // never shift pending stakers. Consider erroring here.
+	}
+	if newStakingPeriod <= 0 {
+		return // Never shorten staking period to zero. Consider erroring here.
+	}
+
+	s.NextTime = s.StartTime.Add(newStakingPeriod)
+	s.EndTime = s.NextTime
 }
