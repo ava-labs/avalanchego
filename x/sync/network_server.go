@@ -14,7 +14,6 @@ import (
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -131,19 +130,6 @@ func (s *NetworkServer) AppRequest(
 		)
 	}
 	return nil
-}
-
-// isTimeout returns true if err is a timeout from a context cancellation
-// or a context cancellation over grpc.
-func isTimeout(err error) bool {
-	// handle grpc wrapped DeadlineExceeded
-	if e, ok := status.FromError(err); ok {
-		if e.Code() == codes.DeadlineExceeded {
-			return true
-		}
-	}
-	// otherwise, check for context.DeadlineExceeded directly
-	return errors.Is(err, context.DeadlineExceeded)
 }
 
 // Generates a change proof and sends it to [nodeID].
@@ -289,4 +275,17 @@ func (s *NetworkServer) HandleRangeProofRequest(
 		keyLimit = uint32(len(rangeProof.KeyValues)) / 2
 	}
 	return ErrMinProofSizeIsTooLarge
+}
+
+// isTimeout returns true if err is a timeout from a context cancellation
+// or a context cancellation over grpc.
+func isTimeout(err error) bool {
+	// handle grpc wrapped DeadlineExceeded
+	if e, ok := status.FromError(err); ok {
+		if e.Code() == codes.DeadlineExceeded {
+			return true
+		}
+	}
+	// otherwise, check for context.DeadlineExceeded directly
+	return errors.Is(err, context.DeadlineExceeded)
 }
