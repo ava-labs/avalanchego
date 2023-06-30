@@ -1110,7 +1110,7 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 	item := &workItem{
 		start:       merkledb.Some([]byte{1}),
 		end:         merkledb.Some([]byte{2}),
-		LocalRootID: ids.GenerateTestID(),
+		localRootID: ids.GenerateTestID(),
 	}
 	m.processedWork.Insert(item)
 

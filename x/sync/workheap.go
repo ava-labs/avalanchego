@@ -106,7 +106,7 @@ func (wh *workHeap) MergeInsert(item *workItem) {
 	wh.sortedItems.DescendLessOrEqual(
 		searchItem,
 		func(beforeItem *heapItem) bool {
-			if item.LocalRootID == beforeItem.workItem.LocalRootID {
+			if item.localRootID == beforeItem.workItem.localRootID {
 				beforeIsNothing := beforeItem.workItem.end.IsNothing()
 				itemIsNothing := item.start.IsNothing()
 
@@ -131,7 +131,7 @@ func (wh *workHeap) MergeInsert(item *workItem) {
 	wh.sortedItems.AscendGreaterOrEqual(
 		searchItem,
 		func(afterItem *heapItem) bool {
-			if item.LocalRootID == afterItem.workItem.LocalRootID {
+			if item.localRootID == afterItem.workItem.localRootID {
 				afterIsNothing := afterItem.workItem.start.IsNothing()
 				itemIsNothing := item.end.IsNothing()
 
