@@ -169,16 +169,14 @@ func (m *Manager) sync(ctx context.Context) {
 	m.workLock.Lock()
 	for {
 		// Invariant: [m.workLock] is held here.
-		if ctx.Err() != nil { // [m] is closed.
+		switch {
+		case ctx.Err() != nil:
 			return // [m.workLock] released by defer.
-		}
-		if m.processingWorkItems >= m.config.SimultaneousWorkLimit {
+		case m.processingWorkItems >= m.config.SimultaneousWorkLimit:
 			// We're already processing the maximum number of work items.
 			// Wait until one of them finishes.
 			m.unprocessedWorkCond.Wait()
-			continue
-		}
-		if m.unprocessedWork.Len() == 0 {
+		case m.unprocessedWork.Len() == 0:
 			if m.processingWorkItems == 0 {
 				// There's no work to do, and there are no work items being processed
 				// which could cause work to be added, so we're done.
@@ -189,15 +187,15 @@ func (m *Manager) sync(ctx context.Context) {
 			// Close() will be called, which will broadcast on [m.unprocessedWorkCond],
 			// which will cause Wait() to return, and this goroutine to exit.
 			m.unprocessedWorkCond.Wait()
-			continue
+		default:
+			m.processingWorkItems++
+			work := m.unprocessedWork.GetWork()
+			// TODO danlaine: We won't release [m.workLock] until
+			// we've started a goroutine for each available work item.
+			// We can't apply proofs we receive until we release [m.workLock].
+			// Is this OK? Is it possible we end up with too many goroutines?
+			go m.doWork(ctx, work)
 		}
-		m.processingWorkItems++
-		work := m.unprocessedWork.GetWork()
-		// TODO danlaine: We won't release [m.workLock] until
-		// we've started a goroutine for each available work item.
-		// We can't apply proofs we receive until we release [m.workLock].
-		// Is this OK? Is it possible we end up with too many goroutines?
-		go m.doWork(ctx, work)
 	}
 }
 
