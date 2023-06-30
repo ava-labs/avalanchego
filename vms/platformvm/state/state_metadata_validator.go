@@ -4,6 +4,7 @@
 package state
 
 import (
+	"fmt"
 	"math"
 	"time"
 
@@ -61,7 +62,10 @@ type validatorMetadata struct {
 	LastUpdated              uint64        `v0:"true"` // Unix time in seconds
 	PotentialReward          uint64        `v0:"true"`
 	PotentialDelegateeReward uint64        `v0:"true"`
-	StakerStartTime          int64         `v1:"true"`
+
+	StakerStartTime     int64  `v1:"true"`
+	StakerStakingPeriod int64  `v1:"true"`
+	UpdatedWeight       uint64 `v1:"true"`
 
 	txID        ids.ID
 	lastUpdated time.Time
@@ -147,6 +151,12 @@ type validatorState interface {
 		subnetID ids.ID,
 		vdrID ids.NodeID,
 		amount uint64,
+	) error
+
+	UpdateValidatorMetadata(
+		vdrID ids.NodeID,
+		subnetID ids.ID,
+		uptime *validatorMetadata,
 	) error
 
 	// DeleteValidatorMetadata removes in-memory references to the metadata of
@@ -238,6 +248,21 @@ func (m *metadata) SetDelegateeReward(
 		return database.ErrNotFound
 	}
 	metadata.PotentialDelegateeReward = amount
+
+	m.addUpdatedMetadata(vdrID, subnetID)
+	return nil
+}
+
+func (m *metadata) UpdateValidatorMetadata(
+	vdrID ids.NodeID,
+	subnetID ids.ID,
+	uptime *validatorMetadata,
+) error {
+	subnetMetadata, ok := m.metadata[vdrID]
+	if !ok {
+		return fmt.Errorf("missing metadata for node %v", vdrID)
+	}
+	subnetMetadata[subnetID] = uptime
 
 	m.addUpdatedMetadata(vdrID, subnetID)
 	return nil

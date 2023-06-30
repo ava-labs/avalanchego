@@ -152,6 +152,8 @@ type State interface {
 	// pending changes to the base database.
 	CommitBatch() (database.Batch, error)
 
+	Checksum() ids.ID
+
 	Close() error
 }
 
@@ -366,6 +368,7 @@ func New(
 	metrics metrics.Metrics,
 	rewards reward.Calculator,
 	bootstrapped *utils.Atomic[bool],
+	trackChecksums bool,
 ) (State, error) {
 	s, err := new(
 		db,
@@ -375,6 +378,7 @@ func New(
 		metricsReg,
 		rewards,
 		bootstrapped,
+		trackChecksums,
 	)
 	if err != nil {
 		return nil, err
@@ -398,6 +402,7 @@ func new(
 	metricsReg prometheus.Registerer,
 	rewards reward.Calculator,
 	bootstrapped *utils.Atomic[bool],
+	trackChecksums bool,
 ) (*state, error) {
 	blockCache, err := metercacher.New(
 		"block_cache",
@@ -464,7 +469,7 @@ func new(
 	}
 
 	utxoDB := prefixdb.New(utxoPrefix, baseDB)
-	utxoState, err := avax.NewMeteredUTXOState(utxoDB, txs.GenesisCodec, metricsReg)
+	utxoState, err := avax.NewMeteredUTXOState(utxoDB, txs.GenesisCodec, metricsReg, trackChecksums)
 	if err != nil {
 		return nil, err
 	}
@@ -1199,6 +1204,8 @@ func (s *state) loadCurrentStakers() error {
 		if err != nil {
 			return err
 		}
+		IncreaseStakerWeightInPlace(staker, metadata.UpdatedWeight)
+		UpdateStakingPeriodInPlace(staker, time.Duration(metadata.StakerStakingPeriod))
 
 		validator := s.currentStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 		validator.validator = staker
@@ -1251,6 +1258,10 @@ func (s *state) loadCurrentStakers() error {
 		if err != nil {
 			return err
 		}
+		ShiftStakerAheadInPlace(staker, time.Unix(metadata.StakerStartTime, 0))
+		IncreaseStakerWeightInPlace(staker, metadata.UpdatedWeight)
+		UpdateStakingPeriodInPlace(staker, time.Duration(metadata.StakerStakingPeriod))
+
 		validator := s.currentStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 		validator.validator = staker
 
@@ -1305,6 +1316,8 @@ func (s *state) loadCurrentStakers() error {
 			if err != nil {
 				return err
 			}
+			IncreaseStakerWeightInPlace(staker, metadata.UpdatedWeight)
+			UpdateStakingPeriodInPlace(staker, time.Duration(metadata.StakerStakingPeriod))
 
 			validator := s.currentStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 			if validator.sortedDelegators == nil {
@@ -1578,6 +1591,10 @@ func (s *state) Abort() {
 	s.baseDB.Abort()
 }
 
+func (s *state) Checksum() ids.ID {
+	return s.utxoState.Checksum()
+}
+
 func (s *state) CommitBatch() (database.Batch, error) {
 	// updateValidators is set to true here so that the validator manager is
 	// kept up to date with the last accepted state.
@@ -1701,21 +1718,26 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 					LastUpdated:              uint64(staker.StartTime.Unix()),
 					PotentialReward:          staker.PotentialReward,
 					PotentialDelegateeReward: 0,
-					StakerStartTime:          staker.StartTime.Unix(),
+
+					// a staker update may change its times and weight wrt those
+					// specified in the tx creating the staker. We store these data
+					// to properly reconstruct staker data.
+					StakerStartTime:     staker.StartTime.Unix(),
+					StakerStakingPeriod: int64(staker.EndTime.Sub(staker.StartTime)),
+					UpdatedWeight:       staker.Weight,
 				}
 
 				// Let's start using V1 as soon as we deploy code. No need to
 				// wait till Continuous staking fork activation to do that.
 				metadataBytes, err := stakersMetadataCodec.Marshal(stakerMetadataCodecV1, metadata)
 				if err != nil {
-					return fmt.Errorf("failed to serialize current validator: %w", err)
+					return fmt.Errorf("failed to serialize validator metadata: %w", err)
 				}
-
 				if err = validatorDB.Put(staker.TxID[:], metadataBytes); err != nil {
-					return fmt.Errorf("failed to write current validator to list: %w", err)
+					return fmt.Errorf("failed to write validator metadata to list: %w", err)
 				}
-
 				s.validatorState.LoadValidatorMetadata(nodeID, subnetID, metadata)
+
 			case deleted:
 				staker := validatorDiff.validator.staker
 				weightDiff.Amount = staker.Weight
@@ -1737,7 +1759,40 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 				}
 
 				s.validatorState.DeleteValidatorMetadata(nodeID, subnetID)
-			case updated, unmodified:
+			case updated:
+				// load current metadata and duly update them, following staker update
+				staker := validatorDiff.validator.staker
+
+				metadataBytes, err := validatorDB.Get(staker.TxID[:])
+				if err != nil {
+					return fmt.Errorf("failed to get metadata of updated validator: %w", err)
+				}
+
+				metadata := &validatorMetadata{
+					txID: staker.TxID,
+				}
+				if err := parseValidatorMetadata(metadataBytes, metadata); err != nil {
+					return err
+				}
+
+				metadata.lastUpdated = staker.StartTime
+				metadata.StakerStartTime = staker.StartTime.Unix()
+				metadata.StakerStakingPeriod = int64(staker.EndTime.Sub(staker.StartTime))
+				metadata.LastUpdated = uint64(metadata.StakerStartTime)
+				metadata.UpdatedWeight = staker.Weight
+
+				metadataBytes, err = stakersMetadataCodec.Marshal(stakerMetadataCodecV1, metadata)
+				if err != nil {
+					return fmt.Errorf("failed to serialize validator metadata: %w", err)
+				}
+				if err = validatorDB.Put(staker.TxID[:], metadataBytes); err != nil {
+					return fmt.Errorf("failed to write validator metadata to list: %w", err)
+				}
+				if err := s.validatorState.UpdateValidatorMetadata(nodeID, subnetID, metadata); err != nil {
+					return fmt.Errorf("failed updating validator metadata: %w", err)
+				}
+
+			case unmodified:
 				// nothing to do
 			default:
 				return ErrUnknownStakerStatus
@@ -1834,8 +1889,10 @@ func writeCurrentDelegatorDiff(
 			// Let's start using V1 as soon as we deploy code. No need to
 			// wait till Continuous staking fork activation to do that.
 			metadata := &delegatorMetadata{
-				PotentialReward: delegator.PotentialReward,
-				StakerStartTime: delegator.StartTime.Unix(),
+				PotentialReward:     delegator.PotentialReward,
+				StakerStartTime:     delegator.StartTime.Unix(),
+				StakerStakingPeriod: int64(delegator.EndTime.Sub(delegator.StartTime)),
+				UpdatedWeight:       delegator.Weight,
 			}
 			metadataBytes, err := stakersMetadataCodec.Marshal(stakerMetadataCodecV1, metadata)
 			if err != nil {
@@ -1853,7 +1910,32 @@ func writeCurrentDelegatorDiff(
 			if err := currentDelegatorList.Delete(delegator.TxID[:]); err != nil {
 				return fmt.Errorf("failed to delete current staker: %w", err)
 			}
-		case updated, unmodified:
+		case updated:
+			// load current metadata and duly update them, following staker update
+			metadataBytes, err := currentDelegatorList.Get(delegator.TxID[:])
+			if err != nil {
+				return fmt.Errorf("failed to get metadata of updated delegator: %w", err)
+			}
+
+			metadata := &delegatorMetadata{}
+			if err := parseDelegatorMetadata(metadataBytes, metadata); err != nil {
+				return err
+			}
+
+			metadata.StakerStartTime = delegator.StartTime.Unix()
+			metadata.StakerStakingPeriod = int64(delegator.EndTime.Sub(delegator.StartTime))
+			metadata.UpdatedWeight = delegator.Weight
+
+			metadataBytes, err = stakersMetadataCodec.Marshal(stakerMetadataCodecV1, metadata)
+			if err != nil {
+				return fmt.Errorf("failed to serialize delegator metadata: %w", err)
+			}
+
+			if err = currentDelegatorList.Put(delegator.TxID[:], metadataBytes); err != nil {
+				return fmt.Errorf("failed to write delegator metadata to list: %w", err)
+			}
+
+		case unmodified:
 			// nothing to do
 		default:
 			return ErrUnknownStakerStatus

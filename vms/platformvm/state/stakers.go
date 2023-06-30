@@ -194,10 +194,21 @@ func (v *baseStakers) UpdateValidator(staker *Staker) error {
 	v.stakers.ReplaceOrInsert(staker)
 
 	validatorDiff := getOrCreateDiff(v.validatorDiffs, staker.SubnetID, staker.NodeID)
-	validatorDiff.validator = stakerAndStatus{
-		staker: staker,
-		status: updated,
+	if validatorDiff.validator.status == added {
+		// validator was added and is being immediately updated.
+		// This should not currently happen, but for sake of generality,
+		// we mark it as added as we do for diffs.
+		validatorDiff.validator = stakerAndStatus{
+			staker: staker,
+			status: added,
+		}
+	} else {
+		validatorDiff.validator = stakerAndStatus{
+			staker: staker,
+			status: updated,
+		}
 	}
+
 	return nil
 }
 

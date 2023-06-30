@@ -73,6 +73,7 @@ const (
 	latestFork            activeFork = continuousStakingFork
 
 	defaultWeight = 10000
+	trackChecksum = false
 )
 
 var (
@@ -299,6 +300,7 @@ func defaultState(
 		metrics.Noop,
 		rewards,
 		&utils.Atomic[bool]{},
+		trackChecksum,
 	)
 	if err != nil {
 		panic(err)

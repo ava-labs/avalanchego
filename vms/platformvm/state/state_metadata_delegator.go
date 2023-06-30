@@ -7,7 +7,10 @@ import "github.com/ava-labs/avalanchego/database"
 
 type delegatorMetadata struct {
 	PotentialReward uint64 `v0:"true"` // originally not parsed via codec but using ad-hoc utility
-	StakerStartTime int64  `v1:"true"`
+
+	StakerStartTime     int64  `v1:"true"`
+	StakerStakingPeriod int64  `v1:"true"`
+	UpdatedWeight       uint64 `v1:"true"`
 }
 
 func parseDelegatorMetadata(bytes []byte, metadata *delegatorMetadata) error {

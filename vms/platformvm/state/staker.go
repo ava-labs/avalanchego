@@ -133,20 +133,39 @@ func NewPendingStaker(txID ids.ID, staker txs.PreContinuousStakingStaker) (*Stak
 	}, nil
 }
 
-func ShiftStakerAheadInPlace(s *Staker) {
+func ShiftStakerAheadInPlace(s *Staker, newStartTime time.Time) {
 	if s.Priority.IsPending() {
-		return // never shift pending stakers
+		return // never shift pending stakers. Consider erroring here.
+	}
+	if !newStartTime.After(s.StartTime) {
+		return // never shift stakers backward. Consider erroring here.
 	}
 
-	var (
-		currEndTime = s.EndTime
-		duration    = s.EndTime.Sub(s.StartTime)
-	)
-	s.StartTime = currEndTime
-	s.EndTime = currEndTime.Add(duration)
-	if s.NextTime == currEndTime {
-		s.NextTime = s.EndTime
-	} else {
-		s.NextTime = s.StartTime
+	duration := s.EndTime.Sub(s.StartTime)
+	s.StartTime = newStartTime
+	s.EndTime = newStartTime.Add(duration)
+	s.NextTime = s.EndTime
+}
+
+func IncreaseStakerWeightInPlace(s *Staker, newStakerWeight uint64) {
+	if s.Priority.IsPending() {
+		return // never shift pending stakers. Consider erroring here.
 	}
+	if newStakerWeight <= s.Weight {
+		return // only increase staker weight. Consider erroring here.
+	}
+
+	s.Weight = newStakerWeight
+}
+
+func UpdateStakingPeriodInPlace(s *Staker, newStakingPeriod time.Duration) {
+	if s.Priority.IsPending() {
+		return // never shift pending stakers. Consider erroring here.
+	}
+	if newStakingPeriod <= 0 {
+		return // Never shorten staking period to zero. Consider erroring here.
+	}
+
+	s.NextTime = s.StartTime.Add(newStakingPeriod)
+	s.EndTime = s.NextTime
 }

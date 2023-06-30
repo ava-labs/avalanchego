@@ -10,8 +10,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/chains"
-	"github.com/ava-labs/avalanchego/database/manager"
-	"github.com/ava-labs/avalanchego/database/versiondb"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/uptime"
@@ -21,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
@@ -53,18 +51,21 @@ func (h *versionsHolder) GetState(blkID ids.ID) (Chain, bool) {
 	return h.baseState, blkID == h.baseState.GetLastAccepted()
 }
 
-func buildChainState(trackedSubnets []ids.ID) (State, error) {
-	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
-	baseDB := versiondb.New(baseDBManager.Current().Database)
-
-	cfg := defaultConfig()
-	cfg.TrackedSubnets.Add(trackedSubnets...)
-
+func buildStateCtx() *snow.Context {
 	ctx := snow.DefaultContextTest()
 	ctx.NetworkID = constants.UnitTestID
 	ctx.XChainID = xChainID
 	ctx.CChainID = cChainID
 	ctx.AVAXAssetID = avaxAssetID
+
+	return ctx
+}
+
+func buildChainState(baseDB database.Database, trackedSubnets []ids.ID) (State, error) {
+	cfg := defaultConfig()
+	cfg.TrackedSubnets.Add(trackedSubnets...)
+
+	ctx := buildStateCtx()
 
 	genesisBytes, err := buildGenesisTest(ctx)
 	if err != nil {
@@ -81,6 +82,7 @@ func buildChainState(trackedSubnets []ids.ID) (State, error) {
 		metrics.Noop,
 		rewardsCalc,
 		&utils.Atomic[bool]{},
+		trackChecksum,
 	)
 }
 
@@ -103,7 +105,7 @@ func defaultConfig() *config.Config {
 		RewardConfig: reward.Config{
 			MaxConsumptionRate: .12 * reward.PercentDenominator,
 			MinConsumptionRate: .10 * reward.PercentDenominator,
-			MintingPeriod:      365 * 24 * time.Hour,
+			MintingPeriod:      defaultMaxStakingDuration,
 			SupplyCap:          720 * units.MegaAvax,
 		},
 		ApricotPhase3Time:     defaultValidateEndTime,
