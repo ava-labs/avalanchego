@@ -78,12 +78,14 @@ var (
 	blockStateValidationTimer   = metrics.NewRegisteredCounter("chain/block/validations/state", nil)
 	blockWriteTimer             = metrics.NewRegisteredCounter("chain/block/writes", nil)
 
-	acceptorQueueGauge           = metrics.NewRegisteredGauge("chain/acceptor/queue/size", nil)
-	acceptorWorkTimer            = metrics.NewRegisteredCounter("chain/acceptor/work", nil)
-	acceptorWorkCount            = metrics.NewRegisteredCounter("chain/acceptor/work/count", nil)
-	processedBlockGasUsedCounter = metrics.NewRegisteredCounter("chain/block/gas/used/processed", nil)
-	acceptedBlockGasUsedCounter  = metrics.NewRegisteredCounter("chain/block/gas/used/accepted", nil)
-	badBlockCounter              = metrics.NewRegisteredCounter("chain/block/bad/count", nil)
+	acceptorQueueGauge            = metrics.NewRegisteredGauge("chain/acceptor/queue/size", nil)
+	acceptorWorkTimer             = metrics.NewRegisteredCounter("chain/acceptor/work", nil)
+	acceptorWorkCount             = metrics.NewRegisteredCounter("chain/acceptor/work/count", nil)
+	lastAcceptedBlockBaseFeeGauge = metrics.NewRegisteredGauge("chain/block/fee/basefee", nil)
+	blockTotalFeesGauge           = metrics.NewRegisteredGauge("chain/block/fee/total", nil)
+	processedBlockGasUsedCounter  = metrics.NewRegisteredCounter("chain/block/gas/used/processed", nil)
+	acceptedBlockGasUsedCounter   = metrics.NewRegisteredCounter("chain/block/gas/used/accepted", nil)
+	badBlockCounter               = metrics.NewRegisteredCounter("chain/block/bad/count", nil)
 
 	txUnindexTimer      = metrics.NewRegisteredCounter("chain/txs/unindex", nil)
 	acceptedTxsCounter  = metrics.NewRegisteredCounter("chain/txs/accepted", nil)
@@ -1053,7 +1055,45 @@ func (bc *BlockChain) Accept(block *types.Block) error {
 	bc.addAcceptorQueue(block)
 	acceptedBlockGasUsedCounter.Inc(int64(block.GasUsed()))
 	acceptedTxsCounter.Inc(int64(len(block.Transactions())))
+	if baseFee := block.BaseFee(); baseFee != nil {
+		lastAcceptedBlockBaseFeeGauge.Update(baseFee.Int64())
+	}
+	total, err := TotalFees(block, bc.GetReceiptsByHash(block.Hash()))
+	if err != nil {
+		log.Error(fmt.Sprintf("TotalFees error: %s", err))
+	} else {
+		blockTotalFeesGauge.Update(total.Int64())
+	}
 	return nil
+}
+
+// TotalFees computes total consumed fees in wei. Block transactions and receipts have to have the same order.
+func TotalFees(block *types.Block, receipts []*types.Receipt) (*big.Int, error) {
+	baseFee := block.BaseFee()
+	feesWei := new(big.Int)
+	if len(block.Transactions()) != len(receipts) {
+		return nil, errors.New("mismatch between total number of transactions and receipts")
+	}
+	for i, tx := range block.Transactions() {
+		var minerFee *big.Int
+		if baseFee == nil {
+			// legacy block, no baseFee
+			minerFee = tx.GasPrice()
+		} else {
+			minerFee = new(big.Int).Add(baseFee, tx.EffectiveGasTipValue(baseFee))
+		}
+		feesWei.Add(feesWei, new(big.Int).Mul(new(big.Int).SetUint64(receipts[i].GasUsed), minerFee))
+	}
+	return feesWei, nil
+}
+
+// TotalFees computes total consumed fees in ether. Block transactions and receipts have to have the same order.
+func TotalFeesFloat(block *types.Block, receipts []*types.Receipt) (*big.Float, error) {
+	total, err := TotalFees(block, receipts)
+	if err != nil {
+		return nil, err
+	}
+	return new(big.Float).Quo(new(big.Float).SetInt(total), new(big.Float).SetInt(big.NewInt(params.Ether))), nil
 }
 
 func (bc *BlockChain) Reject(block *types.Block) error {

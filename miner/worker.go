@@ -368,8 +368,13 @@ func (w *worker) handleResult(env *environment, block *types.Block, createdAt ti
 		logs = append(logs, receipt.Logs...)
 	}
 
+	totalFees, err := core.TotalFeesFloat(block, receipts)
+	if err != nil {
+		log.Error("TotalFeesFloat error: %s", err)
+	}
+
 	log.Info("Commit new mining work", "number", block.Number(), "hash", hash, "timestamp", block.Time(), "uncles", 0, "txs", env.tcount,
-		"gas", block.GasUsed(), "fees", totalFees(block, receipts), "elapsed", common.PrettyDuration(time.Since(env.start)))
+		"gas", block.GasUsed(), "fees", totalFees, "elapsed", common.PrettyDuration(time.Since(env.start)))
 
 	// Note: the miner no longer emits a NewMinedBlock event. Instead the caller
 	// is responsible for running any additional verification and then inserting
@@ -385,15 +390,6 @@ func copyReceipts(receipts []*types.Receipt) []*types.Receipt {
 		result[i] = &cpy
 	}
 	return result
-}
-
-// totalFees computes total consumed fees in ETH. Block transactions and receipts have to have the same order.
-func totalFees(block *types.Block, receipts []*types.Receipt) *big.Float {
-	feesWei := new(big.Int)
-	for i, tx := range block.Transactions() {
-		feesWei.Add(feesWei, new(big.Int).Mul(new(big.Int).SetUint64(receipts[i].GasUsed), tx.GasPrice()))
-	}
-	return new(big.Float).Quo(new(big.Float).SetInt(feesWei), new(big.Float).SetInt(big.NewInt(params.Ether)))
 }
 
 // enforcePredicates takes a set of pending transactions (grouped by sender, and ordered by nonce)
