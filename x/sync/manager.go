@@ -203,6 +203,7 @@ func (m *Manager) sync(ctx context.Context) {
 func (m *Manager) Close() {
 	m.workLock.Lock()
 	defer m.workLock.Unlock()
+
 	m.close()
 }
 
@@ -249,11 +250,11 @@ func (m *Manager) doWork(ctx context.Context, work *workItem) {
 // Fetch and apply the change proof given by [work].
 // Assumes [m.workLock] is not held.
 func (m *Manager) getAndApplyChangeProof(ctx context.Context, work *workItem) {
-	rootID := m.getTargetRoot()
+	targetRootID := m.getTargetRoot()
 
-	if work.LocalRootID == rootID {
+	if work.LocalRootID == targetRootID {
 		// Start root is the same as the end root, so we're done.
-		m.completeWorkItem(ctx, work, work.end, rootID, nil)
+		m.completeWorkItem(ctx, work, work.end, targetRootID, nil)
 		return
 	}
 
@@ -261,7 +262,7 @@ func (m *Manager) getAndApplyChangeProof(ctx context.Context, work *workItem) {
 		ctx,
 		&pb.SyncGetChangeProofRequest{
 			StartRootHash: work.LocalRootID[:],
-			EndRootHash:   rootID[:],
+			EndRootHash:   targetRootID[:],
 			StartKey:      work.start,
 			EndKey:        work.end,
 			KeyLimit:      defaultRequestKeyLimit,
@@ -300,16 +301,16 @@ func (m *Manager) getAndApplyChangeProof(ctx context.Context, work *workItem) {
 		largestHandledKey = changeProof.KeyChanges[len(changeProof.KeyChanges)-1].Key
 	}
 
-	m.completeWorkItem(ctx, work, largestHandledKey, rootID, changeProof.EndProof)
+	m.completeWorkItem(ctx, work, largestHandledKey, targetRootID, changeProof.EndProof)
 }
 
 // Fetch and apply the range proof given by [work].
 // Assumes [m.workLock] is not held.
 func (m *Manager) getAndApplyRangeProof(ctx context.Context, work *workItem) {
-	rootID := m.getTargetRoot()
+	targetRootID := m.getTargetRoot()
 	proof, err := m.config.Client.GetRangeProof(ctx,
 		&pb.SyncGetRangeProofRequest{
-			RootHash:   rootID[:],
+			RootHash:   targetRootID[:],
 			StartKey:   work.start,
 			EndKey:     work.end,
 			KeyLimit:   defaultRequestKeyLimit,
@@ -339,7 +340,7 @@ func (m *Manager) getAndApplyRangeProof(ctx context.Context, work *workItem) {
 		largestHandledKey = proof.KeyValues[len(proof.KeyValues)-1].Key
 	}
 
-	m.completeWorkItem(ctx, work, largestHandledKey, rootID, proof.EndProof)
+	m.completeWorkItem(ctx, work, largestHandledKey, targetRootID, proof.EndProof)
 }
 
 // findNextKey returns the start of the key range that should be fetched next.
@@ -545,9 +546,9 @@ func (m *Manager) Wait(ctx context.Context) error {
 		m.config.Log.Info("completed with error", zap.Error(err))
 		return err
 	}
-	if m.getTargetRoot() != root {
+	if targetRootID := m.getTargetRoot(); targetRootID != root {
 		// This should never happen.
-		return fmt.Errorf("%w: expected %s, got %s", ErrFinishedWithUnexpectedRoot, m.getTargetRoot(), root)
+		return fmt.Errorf("%w: expected %s, got %s", ErrFinishedWithUnexpectedRoot, targetRootID, root)
 	}
 	m.config.Log.Info("completed", zap.String("new root", root.String()))
 	return nil
