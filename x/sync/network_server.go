@@ -14,7 +14,6 @@ import (
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -144,42 +143,6 @@ func (s *NetworkServer) AppRequest(
 	return nil
 }
 
-// isTimeout returns true if err is a timeout from a context cancellation
-// or a context cancellation over grpc.
-func isTimeout(err error) bool {
-	// handle grpc wrapped DeadlineExceeded
-	if e, ok := status.FromError(err); ok {
-		if e.Code() == codes.DeadlineExceeded {
-			return true
-		}
-	}
-	// otherwise, check for context.DeadlineExceeded directly
-	return errors.Is(err, context.DeadlineExceeded)
-}
-
-// Returns nil iff [req] is well-formed.
-func validateChangeProofRequest(req *pb.SyncGetChangeProofRequest) error {
-	switch {
-	case req.BytesLimit == 0:
-		return errInvalidBytesLimit
-	case req.KeyLimit == 0:
-		return errInvalidKeyLimit
-	case len(req.StartRootHash) != hashing.HashLen:
-		return errInvalidStartRootHash
-	case len(req.EndRootHash) != hashing.HashLen:
-		return errInvalidEndRootHash
-	case req.StartKey != nil && req.StartKey.IsNothing && len(req.StartKey.Value) > 0:
-		return errInvalidStartKey
-	case req.EndKey != nil && req.EndKey.IsNothing && len(req.EndKey.Value) > 0:
-		return errInvalidEndKey
-	case req.StartKey != nil && req.EndKey != nil &&
-		!req.EndKey.IsNothing && bytes.Compare(req.StartKey.Value, req.EndKey.Value) > 0:
-		return errInvalidBounds
-	default:
-		return nil
-	}
-}
-
 // Generates a change proof and sends it to [nodeID].
 func (s *NetworkServer) HandleChangeProofRequest(
 	ctx context.Context,
@@ -266,27 +229,6 @@ func (s *NetworkServer) HandleChangeProofRequest(
 	return ErrMinProofSizeIsTooLarge
 }
 
-// Returns nil iff [req] is well-formed.
-func validateRangeProofRequest(req *pb.SyncGetRangeProofRequest) error {
-	switch {
-	case req.BytesLimit == 0:
-		return errInvalidBytesLimit
-	case req.KeyLimit == 0:
-		return errInvalidKeyLimit
-	case len(req.RootHash) != hashing.HashLen:
-		return errInvalidRootHash
-	case req.StartKey != nil && req.StartKey.IsNothing && len(req.StartKey.Value) > 0:
-		return errInvalidStartKey
-	case req.EndKey != nil && req.EndKey.IsNothing && len(req.EndKey.Value) > 0:
-		return errInvalidEndKey
-	case req.StartKey != nil && req.EndKey != nil &&
-		!req.EndKey.IsNothing && bytes.Compare(req.StartKey.Value, req.EndKey.Value) > 0:
-		return errInvalidBounds
-	default:
-		return nil
-	}
-}
-
 // Generates a range proof and sends it to [nodeID].
 // TODO danlaine how should we handle context cancellation?
 func (s *NetworkServer) HandleRangeProofRequest(
@@ -356,4 +298,61 @@ func (s *NetworkServer) HandleRangeProofRequest(
 		keyLimit = uint32(len(rangeProof.KeyValues)) / 2
 	}
 	return ErrMinProofSizeIsTooLarge
+}
+
+// isTimeout returns true if err is a timeout from a context cancellation
+// or a context cancellation over grpc.
+func isTimeout(err error) bool {
+	// handle grpc wrapped DeadlineExceeded
+	if e, ok := status.FromError(err); ok {
+		if e.Code() == codes.DeadlineExceeded {
+			return true
+		}
+	}
+	// otherwise, check for context.DeadlineExceeded directly
+	return errors.Is(err, context.DeadlineExceeded)
+}
+
+// Returns nil iff [req] is well-formed.
+func validateChangeProofRequest(req *pb.SyncGetChangeProofRequest) error {
+	switch {
+	case req.BytesLimit == 0:
+		return errInvalidBytesLimit
+	case req.KeyLimit == 0:
+		return errInvalidKeyLimit
+	case len(req.StartRootHash) != hashing.HashLen:
+		return errInvalidStartRootHash
+	case len(req.EndRootHash) != hashing.HashLen:
+		return errInvalidEndRootHash
+	case req.StartKey != nil && req.StartKey.IsNothing && len(req.StartKey.Value) > 0:
+		return errInvalidStartKey
+	case req.EndKey != nil && req.EndKey.IsNothing && len(req.EndKey.Value) > 0:
+		return errInvalidEndKey
+	case req.StartKey != nil && req.EndKey != nil &&
+		!req.EndKey.IsNothing && bytes.Compare(req.StartKey.Value, req.EndKey.Value) > 0:
+		return errInvalidBounds
+	default:
+		return nil
+	}
+}
+
+// Returns nil iff [req] is well-formed.
+func validateRangeProofRequest(req *pb.SyncGetRangeProofRequest) error {
+	switch {
+	case req.BytesLimit == 0:
+		return errInvalidBytesLimit
+	case req.KeyLimit == 0:
+		return errInvalidKeyLimit
+	case len(req.RootHash) != hashing.HashLen:
+		return errInvalidRootHash
+	case req.StartKey != nil && req.StartKey.IsNothing && len(req.StartKey.Value) > 0:
+		return errInvalidStartKey
+	case req.EndKey != nil && req.EndKey.IsNothing && len(req.EndKey.Value) > 0:
+		return errInvalidEndKey
+	case req.StartKey != nil && req.EndKey != nil &&
+		!req.EndKey.IsNothing && bytes.Compare(req.StartKey.Value, req.EndKey.Value) > 0:
+		return errInvalidBounds
+	default:
+		return nil
+	}
 }
