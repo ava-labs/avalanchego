@@ -229,11 +229,17 @@ func (m *manager) makePrimaryNetworkValidatorSet(
 		}
 	}
 
-	// Rebuild primary network validators at [height]
+	// Rebuild primary network validators at [targetHeight]
+	//
+	// Note: Since we are attempting to generate the validator set at
+	// [targetHeight], we want to apply the diffs from
+	// (targetHeight, currentHeight]. Because the state interface is implemented
+	// to be inclusive, we apply diffs in [targetHeight + 1, currentHeight].
+	lastDiffHeight := targetHeight + 1
 	err := m.state.ApplyValidatorWeightDiffs(
 		validatorSet,
 		currentHeight,
-		targetHeight+1,
+		lastDiffHeight,
 		constants.PlatformChainID,
 	)
 	if err != nil {
@@ -243,7 +249,7 @@ func (m *manager) makePrimaryNetworkValidatorSet(
 	err = m.state.ApplyValidatorPublicKeyDiffs(
 		validatorSet,
 		currentHeight,
-		targetHeight+1,
+		lastDiffHeight,
 	)
 	return validatorSet, err
 }
@@ -274,10 +280,16 @@ func (m *manager) makeSubnetValidatorSet(
 	}
 
 	// Rebuild subnet validators at [targetHeight]
+	//
+	// Note: Since we are attempting to generate the validator set at
+	// [targetHeight], we want to apply the diffs from
+	// (targetHeight, currentHeight]. Because the state interface is implemented
+	// to be inclusive, we apply diffs in [targetHeight + 1, currentHeight].
+	lastDiffHeight := targetHeight + 1
 	err := m.state.ApplyValidatorWeightDiffs(
 		subnetValidatorSet,
 		currentHeight,
-		targetHeight+1,
+		lastDiffHeight,
 		subnetID,
 	)
 	if err != nil {
@@ -310,7 +322,7 @@ func (m *manager) makeSubnetValidatorSet(
 	err = m.state.ApplyValidatorPublicKeyDiffs(
 		subnetValidatorSet,
 		currentHeight,
-		targetHeight+1,
+		lastDiffHeight,
 	)
 	return subnetValidatorSet, err
 }

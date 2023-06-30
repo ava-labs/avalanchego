@@ -968,6 +968,8 @@ func (s *state) ApplyValidatorWeightDiffs(
 		if err != nil {
 			return err
 		}
+		// If the parsedHeight is less than our target endHeight, then we have
+		// fully processed the diffs from startHeight through endHeight.
 		if parsedHeight < endHeight {
 			return diffIter.Error()
 		}
@@ -1075,6 +1077,8 @@ func (s *state) ApplyValidatorPublicKeyDiffs(
 		if err != nil {
 			return err
 		}
+		// If the parsedHeight is less than our target endHeight, then we have
+		// fully processed the diffs from startHeight through endHeight.
 		if parsedHeight < endHeight {
 			break
 		}
