@@ -1706,6 +1706,12 @@ func (e *CaminoStandardTxExecutor) AddressStateTx(tx *txs.AddressStateTx) error 
 	}
 	statesBit := txs.AddressState(1) << tx.State
 
+	// Check for SunrisePhase1 Bits if we time has not passed yet
+	if (statesBit&txs.AddressStateSunrisePhase1Bits) != 0 &&
+		!e.Config.IsSunrisePhase1Activated(e.State.GetTimestamp()) {
+		return errAddrStateNotPermitted
+	}
+
 	// Verify that roles are allowed to modify tx.State
 	if !verifyAccess(roles, statesBit) {
 		return fmt.Errorf("%w (addr: %s, bit: %b)", errAddrStateNotPermitted, tx.Address, tx.State)

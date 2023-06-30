@@ -35,7 +35,7 @@ var (
 	Current = &Semantic{
 		Major: 0,
 		Minor: 4,
-		Patch: 10,
+		Patch: 11,
 	}
 	CurrentApp = &Application{
 		Major: Current.Major,
@@ -45,7 +45,7 @@ var (
 	MinimumCompatibleVersion = &Application{
 		Major: 0,
 		Minor: 4,
-		Patch: 9,
+		Patch: 11,
 	}
 	PrevMinimumCompatibleVersion = &Application{
 		Major: 0,
@@ -112,7 +112,9 @@ var (
 	}
 	BanffDefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
 
-	SunrisePhase1Times       = map[uint32]time.Time{}
+	SunrisePhase1Times = map[uint32]time.Time{
+		constants.KopernikusID: time.Date(2023, time.July, 3, 12, 0, 0, 0, time.UTC),
+	}
 	SunrisePhase1DefaultTime = time.Date(2022, time.May, 1, 0, 0, 0, 0, time.UTC)
 
 	// TODO: update this before release
@@ -211,7 +213,7 @@ func GetCompatibility(networkID uint32) Compatibility {
 	return NewCompatibility(
 		CurrentApp,
 		MinimumCompatibleVersion,
-		GetBanffTime(networkID),
+		GetSunrisePhase1Time(networkID).Add(-time.Minute),
 		PrevMinimumCompatibleVersion,
 	)
 }

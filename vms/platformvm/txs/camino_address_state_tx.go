@@ -53,6 +53,8 @@ const (
 	AddressStateOffersCreator AddressState = AddressState(1) << AddressStateBitOffersCreator // 0b100000000000000000000000000000000000000000000000000
 
 	AddressStateValidBits = AddressStateRoleAll | AddressStateKYCAll | AddressStateVotableBits | AddressStateOffersCreator // 0b100000000001100001100000000000000000000000000000111
+
+	AddressStateSunrisePhase1Bits = AddressStateRoleOffersAdmin | AddressStateOffersCreator
 )
 
 var (
