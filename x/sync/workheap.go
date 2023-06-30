@@ -15,7 +15,7 @@ import (
 var _ heap.Interface = (*innerHeap)(nil)
 
 type heapItem struct {
-	workItem  *syncWorkItem
+	workItem  *workItem
 	heapIndex int
 }
 
@@ -25,7 +25,7 @@ type innerHeap []*heapItem
 // Note that work item ranges never overlap.
 // Supports range merging and priority updating.
 // Not safe for concurrent use.
-type syncWorkHeap struct {
+type workHeap struct {
 	// Max heap of items by priority.
 	// i.e. heap.Pop returns highest priority item.
 	innerHeap innerHeap
@@ -35,8 +35,8 @@ type syncWorkHeap struct {
 	closed      bool
 }
 
-func newSyncWorkHeap() *syncWorkHeap {
-	return &syncWorkHeap{
+func newWorkHeap() *workHeap {
+	return &workHeap{
 		sortedItems: btree.NewG(
 			2,
 			func(a, b *heapItem) bool {
@@ -47,12 +47,12 @@ func newSyncWorkHeap() *syncWorkHeap {
 }
 
 // Marks the heap as closed.
-func (wh *syncWorkHeap) Close() {
+func (wh *workHeap) Close() {
 	wh.closed = true
 }
 
 // Adds a new [item] into the heap. Will not merge items, unlike MergeInsert.
-func (wh *syncWorkHeap) Insert(item *syncWorkItem) {
+func (wh *workHeap) Insert(item *workItem) {
 	if wh.closed {
 		return
 	}
@@ -65,7 +65,7 @@ func (wh *syncWorkHeap) Insert(item *syncWorkItem) {
 
 // Pops and returns a work item from the heap.
 // Returns nil if no work is available or the heap is closed.
-func (wh *syncWorkHeap) GetWork() *syncWorkItem {
+func (wh *workHeap) GetWork() *workItem {
 	if wh.closed || wh.Len() == 0 {
 		return nil
 	}
@@ -81,14 +81,14 @@ func (wh *syncWorkHeap) GetWork() *syncWorkItem {
 // into a single work item with range [0,20].
 // e.g. if the heap contains work items [0,10] and [20,30],
 // and we add [10,20], we will merge them into [0,30].
-func (wh *syncWorkHeap) MergeInsert(item *syncWorkItem) {
+func (wh *workHeap) MergeInsert(item *workItem) {
 	if wh.closed {
 		return
 	}
 
 	var mergedBefore, mergedAfter *heapItem
 	searchItem := &heapItem{
-		workItem: &syncWorkItem{
+		workItem: &workItem{
 			start: item.start,
 		},
 	}
@@ -98,7 +98,7 @@ func (wh *syncWorkHeap) MergeInsert(item *syncWorkItem) {
 	wh.sortedItems.DescendLessOrEqual(
 		searchItem,
 		func(beforeItem *heapItem) bool {
-			if item.LocalRootID == beforeItem.workItem.LocalRootID && bytes.Equal(beforeItem.workItem.end, item.start) {
+			if item.localRootID == beforeItem.workItem.localRootID && bytes.Equal(beforeItem.workItem.end, item.start) {
 				// [beforeItem.start, beforeItem.end] and [item.start, item.end] are
 				// merged into [beforeItem.start, item.end]
 				beforeItem.workItem.end = item.end
@@ -114,7 +114,7 @@ func (wh *syncWorkHeap) MergeInsert(item *syncWorkItem) {
 	wh.sortedItems.AscendGreaterOrEqual(
 		searchItem,
 		func(afterItem *heapItem) bool {
-			if item.LocalRootID == afterItem.workItem.LocalRootID && bytes.Equal(afterItem.workItem.start, item.end) {
+			if item.localRootID == afterItem.workItem.localRootID && bytes.Equal(afterItem.workItem.start, item.end) {
 				// [item.start, item.end] and [afterItem.start, afterItem.end] are merged into
 				// [item.start, afterItem.end].
 				afterItem.workItem.start = item.start
@@ -145,13 +145,13 @@ func (wh *syncWorkHeap) MergeInsert(item *syncWorkItem) {
 }
 
 // Deletes [item] from the heap.
-func (wh *syncWorkHeap) remove(item *heapItem) {
+func (wh *workHeap) remove(item *heapItem) {
 	heap.Remove(&wh.innerHeap, item.heapIndex)
 
 	wh.sortedItems.Delete(item)
 }
 
-func (wh *syncWorkHeap) Len() int {
+func (wh *workHeap) Len() int {
 	return wh.innerHeap.Len()
 }
 
