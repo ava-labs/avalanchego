@@ -493,30 +493,6 @@ func (m *Manager) findNextKey(
 	return nextKey, nil
 }
 
-// findChildDifference returns the first child index that is different between node 1 and node 2 if one exists and
-// a bool indicating if any difference was found
-func findChildDifference(node1, node2 *merkledb.ProofNode, startIndex byte) (byte, bool) {
-	var (
-		child1, child2 ids.ID
-		ok1, ok2       bool
-	)
-	for childIndex := startIndex; childIndex < merkledb.NodeBranchFactor; childIndex++ {
-		if node1 != nil {
-			child1, ok1 = node1.Children[childIndex]
-		}
-		if node2 != nil {
-			child2, ok2 = node2.Children[childIndex]
-		}
-		// if one node has a child and the other doesn't or the children ids don't match,
-		// return the current child index as the first difference
-		if (ok1 || ok2) && child1 != child2 {
-			return childIndex, true
-		}
-	}
-	// there were no differences found
-	return 0, false
-}
-
 func (m *Manager) Error() error {
 	m.errLock.Lock()
 	defer m.errLock.Unlock()
@@ -743,4 +719,28 @@ func midPoint(start, end []byte) []byte {
 		midpoint = midpoint[0:length]
 	}
 	return midpoint
+}
+
+// findChildDifference returns the first child index that is different between node 1 and node 2 if one exists and
+// a bool indicating if any difference was found
+func findChildDifference(node1, node2 *merkledb.ProofNode, startIndex byte) (byte, bool) {
+	var (
+		child1, child2 ids.ID
+		ok1, ok2       bool
+	)
+	for childIndex := startIndex; childIndex < merkledb.NodeBranchFactor; childIndex++ {
+		if node1 != nil {
+			child1, ok1 = node1.Children[childIndex]
+		}
+		if node2 != nil {
+			child2, ok2 = node2.Children[childIndex]
+		}
+		// if one node has a child and the other doesn't or the children ids don't match,
+		// return the current child index as the first difference
+		if (ok1 || ok2) && child1 != child2 {
+			return childIndex, true
+		}
+	}
+	// there were no differences found
+	return 0, false
 }
