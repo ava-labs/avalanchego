@@ -20,7 +20,7 @@ func Test_WorkHeap_InnerHeap(t *testing.T) {
 			start:       []byte{1},
 			end:         []byte{2},
 			priority:    lowPriority,
-			LocalRootID: ids.GenerateTestID(),
+			localRootID: ids.GenerateTestID(),
 		},
 	}
 
@@ -29,7 +29,7 @@ func Test_WorkHeap_InnerHeap(t *testing.T) {
 			start:       []byte{3},
 			end:         []byte{4},
 			priority:    medPriority,
-			LocalRootID: ids.GenerateTestID(),
+			localRootID: ids.GenerateTestID(),
 		},
 	}
 
@@ -38,7 +38,7 @@ func Test_WorkHeap_InnerHeap(t *testing.T) {
 			start:       []byte{5},
 			end:         []byte{6},
 			priority:    highPriority,
-			LocalRootID: ids.GenerateTestID(),
+			localRootID: ids.GenerateTestID(),
 		},
 	}
 
@@ -116,19 +116,19 @@ func Test_WorkHeap_Insert_GetWork(t *testing.T) {
 		start:       []byte{4},
 		end:         []byte{5},
 		priority:    lowPriority,
-		LocalRootID: ids.GenerateTestID(),
+		localRootID: ids.GenerateTestID(),
 	}
 	mediumPriorityItem := &workItem{
 		start:       []byte{0},
 		end:         []byte{1},
 		priority:    medPriority,
-		LocalRootID: ids.GenerateTestID(),
+		localRootID: ids.GenerateTestID(),
 	}
 	highPriorityItem := &workItem{
 		start:       []byte{2},
 		end:         []byte{3},
 		priority:    highPriority,
-		LocalRootID: ids.GenerateTestID(),
+		localRootID: ids.GenerateTestID(),
 	}
 	h.Insert(highPriorityItem)
 	h.Insert(mediumPriorityItem)
@@ -170,21 +170,21 @@ func Test_WorkHeap_remove(t *testing.T) {
 		start:       []byte{0},
 		end:         []byte{1},
 		priority:    lowPriority,
-		LocalRootID: ids.GenerateTestID(),
+		localRootID: ids.GenerateTestID(),
 	}
 
 	mediumPriorityItem := &workItem{
 		start:       []byte{2},
 		end:         []byte{3},
 		priority:    medPriority,
-		LocalRootID: ids.GenerateTestID(),
+		localRootID: ids.GenerateTestID(),
 	}
 
 	highPriorityItem := &workItem{
 		start:       []byte{4},
 		end:         []byte{5},
 		priority:    highPriority,
-		LocalRootID: ids.GenerateTestID(),
+		localRootID: ids.GenerateTestID(),
 	}
 
 	h.Insert(lowPriorityItem)

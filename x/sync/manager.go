@@ -46,19 +46,19 @@ const (
 // Signifies that we should sync the range [start, end].
 // nil [start] means there is no lower bound.
 // nil [end] means there is no upper bound.
-// [LocalRootID] is the ID of the root of this range in our database.
-// If we have no local root for this range, [LocalRootID] is ids.Empty.
+// [localRootID] is the ID of the root of this range in our database.
+// If we have no local root for this range, [localRootID] is ids.Empty.
 type workItem struct {
 	start       []byte
 	end         []byte
 	priority    priority
-	LocalRootID ids.ID
+	localRootID ids.ID
 }
 
 // TODO danlaine look into using a sync.Pool for workItems
 func newWorkItem(localRootID ids.ID, start, end []byte, priority priority) *workItem {
 	return &workItem{
-		LocalRootID: localRootID,
+		localRootID: localRootID,
 		start:       start,
 		end:         end,
 		priority:    priority,
@@ -239,7 +239,7 @@ func (m *Manager) doWork(ctx context.Context, work *workItem) {
 		m.unprocessedWorkCond.Signal()
 	}()
 
-	if work.LocalRootID == ids.Empty {
+	if work.localRootID == ids.Empty {
 		// the keys in this range have not been downloaded, so get all key/values
 		m.getAndApplyRangeProof(ctx, work)
 	} else {
@@ -253,7 +253,7 @@ func (m *Manager) doWork(ctx context.Context, work *workItem) {
 func (m *Manager) getAndApplyChangeProof(ctx context.Context, work *workItem) {
 	rootID := m.getTargetRoot()
 
-	if work.LocalRootID == rootID {
+	if work.localRootID == rootID {
 		// Start root is the same as the end root, so we're done.
 		m.completeWorkItem(ctx, work, work.end, rootID, nil)
 		return
@@ -262,7 +262,7 @@ func (m *Manager) getAndApplyChangeProof(ctx context.Context, work *workItem) {
 	changeProof, err := m.config.Client.GetChangeProof(
 		ctx,
 		&pb.SyncGetChangeProofRequest{
-			StartRootHash: work.LocalRootID[:],
+			StartRootHash: work.localRootID[:],
 			EndRootHash:   rootID[:],
 			StartKey:      work.start,
 			EndKey:        work.end,
@@ -287,7 +287,7 @@ func (m *Manager) getAndApplyChangeProof(ctx context.Context, work *workItem) {
 	// Add this range as a fresh uncompleted work item to the work heap.
 	// TODO danlaine send range proof instead of failure notification
 	if !changeProof.HadRootsInHistory {
-		work.LocalRootID = ids.Empty
+		work.localRootID = ids.Empty
 		m.enqueueWork(work)
 		return
 	}
@@ -629,7 +629,7 @@ func (m *Manager) completeWorkItem(ctx context.Context, work *workItem, largestH
 			largestHandledKey = work.end
 		} else {
 			// the full range wasn't completed, so enqueue a new work item for the range [nextStartKey, workItem.end]
-			m.enqueueWork(newWorkItem(work.LocalRootID, nextStartKey, work.end, work.priority))
+			m.enqueueWork(newWorkItem(work.localRootID, nextStartKey, work.end, work.priority))
 			largestHandledKey = nextStartKey
 		}
 	}
@@ -673,8 +673,8 @@ func (m *Manager) enqueueWork(work *workItem) {
 
 	// first item gets higher priority than the second to encourage finished ranges to grow
 	// rather than start a new range that is not contiguous with existing completed ranges
-	first := newWorkItem(work.LocalRootID, work.start, mid, medPriority)
-	second := newWorkItem(work.LocalRootID, mid, work.end, lowPriority)
+	first := newWorkItem(work.localRootID, work.start, mid, medPriority)
+	second := newWorkItem(work.localRootID, mid, work.end, lowPriority)
 
 	m.unprocessedWork.Insert(first)
 	m.unprocessedWork.Insert(second)
