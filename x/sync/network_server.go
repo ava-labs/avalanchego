@@ -56,11 +56,11 @@ var (
 
 type NetworkServer struct {
 	appSender common.AppSender // Used to respond to peer requests via AppResponse.
-	db        SyncableDB
+	db        DB
 	log       logging.Logger
 }
 
-func NewNetworkServer(appSender common.AppSender, db SyncableDB, log logging.Logger) *NetworkServer {
+func NewNetworkServer(appSender common.AppSender, db DB, log logging.Logger) *NetworkServer {
 	return &NetworkServer{
 		appSender: appSender,
 		db:        db,

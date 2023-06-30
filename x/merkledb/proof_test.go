@@ -25,11 +25,7 @@ func getBasicDB() (*merkleDB, error) {
 	return newDatabase(
 		context.Background(),
 		memdb.New(),
-		Config{
-			Tracer:        newNoopTracer(),
-			HistoryLength: 1000,
-			NodeCacheSize: 1000,
-		},
+		newDefaultConfig(),
 		&mockMetrics{},
 	)
 }

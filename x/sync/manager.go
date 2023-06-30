@@ -25,8 +25,8 @@ const (
 )
 
 var (
-	ErrAlreadyStarted             = errors.New("cannot start a StateSyncManager that has already been started")
-	ErrAlreadyClosed              = errors.New("StateSyncManager is closed")
+	ErrAlreadyStarted             = errors.New("cannot start a Manager that has already been started")
+	ErrAlreadyClosed              = errors.New("Manager is closed")
 	ErrNoClientProvided           = errors.New("client is a required field of the sync config")
 	ErrNoDatabaseProvided         = errors.New("sync database is a required field of the sync config")
 	ErrNoLogProvided              = errors.New("log is a required field of the sync config")
@@ -48,16 +48,16 @@ const (
 // nil [end] means there is no upper bound.
 // [LocalRootID] is the ID of the root of this range in our database.
 // If we have no local root for this range, [LocalRootID] is ids.Empty.
-type syncWorkItem struct {
+type workItem struct {
 	start       merkledb.Maybe[[]byte]
 	end         merkledb.Maybe[[]byte]
 	priority    priority
 	LocalRootID ids.ID
 }
 
-// TODO danlaine look into using a sync.Pool for syncWorkItems
-func newWorkItem(localRootID ids.ID, start, end merkledb.Maybe[[]byte], priority priority) *syncWorkItem {
-	return &syncWorkItem{
+// TODO danlaine look into using a sync.Pool for workItems
+func newWorkItem(localRootID ids.ID, start, end merkledb.Maybe[[]byte], priority priority) *workItem {
+	return &workItem{
 		LocalRootID: localRootID,
 		start:       start,
 		end:         end,
@@ -65,10 +65,10 @@ func newWorkItem(localRootID ids.ID, start, end merkledb.Maybe[[]byte], priority
 	}
 }
 
-type StateSyncManager struct {
+type Manager struct {
 	// Must be held when accessing [config.TargetRoot].
 	syncTargetLock sync.RWMutex
-	config         StateSyncConfig
+	config         ManagerConfig
 
 	workLock sync.Mutex
 	// The number of work items currently being processed.
@@ -76,7 +76,7 @@ type StateSyncManager struct {
 	// [workLock] must be held when accessing [processingWorkItems].
 	processingWorkItems int
 	// [workLock] must be held while accessing [unprocessedWork].
-	unprocessedWork *syncWorkHeap
+	unprocessedWork *workHeap
 	// Signalled when:
 	// - An item is added to [unprocessedWork].
 	// - An item is added to [processedWork].
@@ -84,13 +84,13 @@ type StateSyncManager struct {
 	// [workLock] is its inner lock.
 	unprocessedWorkCond sync.Cond
 	// [workLock] must be held while accessing [processedWork].
-	processedWork *syncWorkHeap
+	processedWork *workHeap
 
 	// When this is closed:
 	// - [closed] is true.
 	// - [cancelCtx] was called.
 	// - [workToBeDone] and [completedWork] are closed.
-	syncDoneChan chan struct{}
+	doneChan chan struct{}
 
 	errLock sync.Mutex
 	// If non-nil, there was a fatal error.
@@ -105,19 +105,19 @@ type StateSyncManager struct {
 	closeOnce sync.Once
 }
 
-type StateSyncConfig struct {
-	SyncDB                SyncableDB
+type ManagerConfig struct {
+	DB                    DB
 	Client                Client
 	SimultaneousWorkLimit int
 	Log                   logging.Logger
 	TargetRoot            ids.ID
 }
 
-func NewStateSyncManager(config StateSyncConfig) (*StateSyncManager, error) {
+func NewManager(config ManagerConfig) (*Manager, error) {
 	switch {
 	case config.Client == nil:
 		return nil, ErrNoClientProvided
-	case config.SyncDB == nil:
+	case config.DB == nil:
 		return nil, ErrNoDatabaseProvided
 	case config.Log == nil:
 		return nil, ErrNoLogProvided
@@ -125,18 +125,18 @@ func NewStateSyncManager(config StateSyncConfig) (*StateSyncManager, error) {
 		return nil, ErrZeroWorkLimit
 	}
 
-	m := &StateSyncManager{
+	m := &Manager{
 		config:          config,
-		syncDoneChan:    make(chan struct{}),
-		unprocessedWork: newSyncWorkHeap(),
-		processedWork:   newSyncWorkHeap(),
+		doneChan:        make(chan struct{}),
+		unprocessedWork: newWorkHeap(),
+		processedWork:   newWorkHeap(),
 	}
 	m.unprocessedWorkCond.L = &m.workLock
 
 	return m, nil
 }
 
-func (m *StateSyncManager) StartSyncing(ctx context.Context) error {
+func (m *Manager) Start(ctx context.Context) error {
 	m.workLock.Lock()
 	defer m.workLock.Unlock()
 
@@ -158,7 +158,7 @@ func (m *StateSyncManager) StartSyncing(ctx context.Context) error {
 // sync awaits signal on [m.unprocessedWorkCond], which indicates that there
 // is work to do or syncing completes.  If there is work, sync will dispatch a goroutine to do
 // the work.
-func (m *StateSyncManager) sync(ctx context.Context) {
+func (m *Manager) sync(ctx context.Context) {
 	defer func() {
 		// Invariant: [m.workLock] is held when this goroutine begins.
 		m.close()
@@ -192,17 +192,17 @@ func (m *StateSyncManager) sync(ctx context.Context) {
 			continue
 		}
 		m.processingWorkItems++
-		workItem := m.unprocessedWork.GetWork()
+		work := m.unprocessedWork.GetWork()
 		// TODO danlaine: We won't release [m.workLock] until
 		// we've started a goroutine for each available work item.
 		// We can't apply proofs we receive until we release [m.workLock].
 		// Is this OK? Is it possible we end up with too many goroutines?
-		go m.doWork(ctx, workItem)
+		go m.doWork(ctx, work)
 	}
 }
 
 // Close will stop the syncing process
-func (m *StateSyncManager) Close() {
+func (m *Manager) Close() {
 	m.workLock.Lock()
 	defer m.workLock.Unlock()
 	m.close()
@@ -210,7 +210,7 @@ func (m *StateSyncManager) Close() {
 
 // close is called when there is a fatal error or sync is complete.
 // [workLock] must be held
-func (m *StateSyncManager) close() {
+func (m *Manager) close() {
 	m.closeOnce.Do(func() {
 		// Don't process any more work items.
 		// Drop currently processing work items.
@@ -224,13 +224,13 @@ func (m *StateSyncManager) close() {
 		m.processedWork.Close()
 
 		// signal all code waiting on the sync to complete
-		close(m.syncDoneChan)
+		close(m.doneChan)
 	})
 }
 
 // Processes [item] by fetching and applying a change or range proof.
 // Assumes [m.workLock] is not held.
-func (m *StateSyncManager) doWork(ctx context.Context, item *syncWorkItem) {
+func (m *Manager) doWork(ctx context.Context, work *workItem) {
 	defer func() {
 		m.workLock.Lock()
 		defer m.workLock.Unlock()
@@ -239,43 +239,43 @@ func (m *StateSyncManager) doWork(ctx context.Context, item *syncWorkItem) {
 		m.unprocessedWorkCond.Signal()
 	}()
 
-	if item.LocalRootID == ids.Empty {
+	if work.LocalRootID == ids.Empty {
 		// the keys in this range have not been downloaded, so get all key/values
-		m.getAndApplyRangeProof(ctx, item)
+		m.getAndApplyRangeProof(ctx, work)
 	} else {
 		// the keys in this range have already been downloaded, but the root changed, so get all changes
-		m.getAndApplyChangeProof(ctx, item)
+		m.getAndApplyChangeProof(ctx, work)
 	}
 }
 
-// Fetch and apply the change proof given by [workItem].
+// Fetch and apply the change proof given by [work].
 // Assumes [m.workLock] is not held.
-func (m *StateSyncManager) getAndApplyChangeProof(ctx context.Context, workItem *syncWorkItem) {
+func (m *Manager) getAndApplyChangeProof(ctx context.Context, work *workItem) {
 	rootID := m.getTargetRoot()
 
-	if workItem.LocalRootID == rootID {
+	if work.LocalRootID == rootID {
 		// Start root is the same as the end root, so we're done.
-		m.completeWorkItem(ctx, workItem, workItem.end, rootID, nil)
+		m.completeWorkItem(ctx, work, work.end, rootID, nil)
 		return
 	}
 
 	changeProof, err := m.config.Client.GetChangeProof(
 		ctx,
 		&pb.SyncGetChangeProofRequest{
-			StartRootHash: workItem.LocalRootID[:],
+			StartRootHash: work.LocalRootID[:],
 			EndRootHash:   rootID[:],
 			StartKey: &pb.MaybeBytes{
-				Value:     workItem.start.Value(),
-				IsNothing: workItem.start.IsNothing(),
+				Value:     work.start.Value(),
+				IsNothing: work.start.IsNothing(),
 			},
 			EndKey: &pb.MaybeBytes{
-				Value:     workItem.end.Value(),
-				IsNothing: workItem.end.IsNothing(),
+				Value:     work.end.Value(),
+				IsNothing: work.end.IsNothing(),
 			},
 			KeyLimit:   defaultRequestKeyLimit,
 			BytesLimit: defaultRequestByteSizeLimit,
 		},
-		m.config.SyncDB,
+		m.config.DB,
 	)
 	if err != nil {
 		m.setError(err)
@@ -283,7 +283,7 @@ func (m *StateSyncManager) getAndApplyChangeProof(ctx context.Context, workItem 
 	}
 
 	select {
-	case <-m.syncDoneChan:
+	case <-m.doneChan:
 		// If we're closed, don't apply the proof.
 		return
 	default:
@@ -293,38 +293,38 @@ func (m *StateSyncManager) getAndApplyChangeProof(ctx context.Context, workItem 
 	// Add this range as a fresh uncompleted work item to the work heap.
 	// TODO danlaine send range proof instead of failure notification
 	if !changeProof.HadRootsInHistory {
-		workItem.LocalRootID = ids.Empty
-		m.enqueueWork(workItem)
+		work.LocalRootID = ids.Empty
+		m.enqueueWork(work)
 		return
 	}
 
-	largestHandledKey := workItem.end
+	largestHandledKey := work.end
 	// if the proof wasn't empty, apply changes to the sync DB
 	if len(changeProof.KeyChanges) > 0 {
-		if err := m.config.SyncDB.CommitChangeProof(ctx, changeProof); err != nil {
+		if err := m.config.DB.CommitChangeProof(ctx, changeProof); err != nil {
 			m.setError(err)
 			return
 		}
 		largestHandledKey = merkledb.Some(changeProof.KeyChanges[len(changeProof.KeyChanges)-1].Key)
 	}
 
-	m.completeWorkItem(ctx, workItem, largestHandledKey, rootID, changeProof.EndProof)
+	m.completeWorkItem(ctx, work, largestHandledKey, rootID, changeProof.EndProof)
 }
 
-// Fetch and apply the range proof given by [workItem].
+// Fetch and apply the range proof given by [work].
 // Assumes [m.workLock] is not held.
-func (m *StateSyncManager) getAndApplyRangeProof(ctx context.Context, workItem *syncWorkItem) {
+func (m *Manager) getAndApplyRangeProof(ctx context.Context, work *workItem) {
 	rootID := m.getTargetRoot()
 	proof, err := m.config.Client.GetRangeProof(ctx,
 		&pb.SyncGetRangeProofRequest{
 			RootHash: rootID[:],
 			StartKey: &pb.MaybeBytes{
-				Value:     workItem.start.Value(),
-				IsNothing: workItem.start.IsNothing(),
+				Value:     work.start.Value(),
+				IsNothing: work.start.IsNothing(),
 			},
 			EndKey: &pb.MaybeBytes{
-				Value:     workItem.end.Value(),
-				IsNothing: workItem.end.IsNothing(),
+				Value:     work.end.Value(),
+				IsNothing: work.end.IsNothing(),
 			},
 			KeyLimit:   defaultRequestKeyLimit,
 			BytesLimit: defaultRequestByteSizeLimit,
@@ -336,21 +336,21 @@ func (m *StateSyncManager) getAndApplyRangeProof(ctx context.Context, workItem *
 	}
 
 	select {
-	case <-m.syncDoneChan:
+	case <-m.doneChan:
 		// If we're closed, don't apply the proof.
 		return
 	default:
 	}
 
-	largestHandledKey := workItem.end
+	largestHandledKey := work.end
 	if len(proof.KeyValues) > 0 {
 		var startKey []byte
-		if !workItem.start.IsNothing() {
-			startKey = workItem.start.Value()
+		if !work.start.IsNothing() {
+			startKey = work.start.Value()
 		}
 
 		// Add all the key-value pairs we got to the database.
-		if err := m.config.SyncDB.CommitRangeProof(ctx, startKey, proof); err != nil {
+		if err := m.config.DB.CommitRangeProof(ctx, startKey, proof); err != nil {
 			m.setError(err)
 			return
 		}
@@ -358,7 +358,7 @@ func (m *StateSyncManager) getAndApplyRangeProof(ctx context.Context, workItem *
 		largestHandledKey = merkledb.Some(proof.KeyValues[len(proof.KeyValues)-1].Key)
 	}
 
-	m.completeWorkItem(ctx, workItem, largestHandledKey, rootID, proof.EndProof)
+	m.completeWorkItem(ctx, work, largestHandledKey, rootID, proof.EndProof)
 }
 
 // findNextKey returns the start of the key range that should be fetched next
@@ -373,7 +373,7 @@ func (m *StateSyncManager) getAndApplyRangeProof(ctx context.Context, workItem *
 //
 // Invariant: [lastReceivedKey] < [rangeEnd].
 // If [rangeEnd] is Nothing it's considered > [lastReceivedKey].
-func (m *StateSyncManager) findNextKey(
+func (m *Manager) findNextKey(
 	ctx context.Context,
 	lastReceivedKey []byte,
 	rangeEnd merkledb.Maybe[[]byte],
@@ -410,7 +410,7 @@ func (m *StateSyncManager) findNextKey(
 	}
 
 	// get a proof for the same key as the received proof from the local db
-	localProofOfKey, err := m.config.SyncDB.GetProof(ctx, proofKeyPath.Value)
+	localProofOfKey, err := m.config.DB.GetProof(ctx, proofKeyPath.Value)
 	if err != nil {
 		return merkledb.Nothing[[]byte](), err
 	}
@@ -538,7 +538,7 @@ func findChildDifference(node1, node2 *merkledb.ProofNode, startIndex byte) (byt
 	return 0, false
 }
 
-func (m *StateSyncManager) Error() error {
+func (m *Manager) Error() error {
 	m.errLock.Lock()
 	defer m.errLock.Unlock()
 
@@ -550,9 +550,9 @@ func (m *StateSyncManager) Error() error {
 // - sync fatally errored.
 // - [ctx] is canceled.
 // If [ctx] is canceled, returns [ctx].Err().
-func (m *StateSyncManager) Wait(ctx context.Context) error {
+func (m *Manager) Wait(ctx context.Context) error {
 	select {
-	case <-m.syncDoneChan:
+	case <-m.doneChan:
 	case <-ctx.Done():
 		return ctx.Err()
 	}
@@ -562,7 +562,7 @@ func (m *StateSyncManager) Wait(ctx context.Context) error {
 		return err
 	}
 
-	root, err := m.config.SyncDB.GetMerkleRoot(ctx)
+	root, err := m.config.DB.GetMerkleRoot(ctx)
 	if err != nil {
 		m.config.Log.Info("completed with error", zap.Error(err))
 		return err
@@ -575,12 +575,12 @@ func (m *StateSyncManager) Wait(ctx context.Context) error {
 	return nil
 }
 
-func (m *StateSyncManager) UpdateSyncTarget(syncTargetRoot ids.ID) error {
+func (m *Manager) UpdateSyncTarget(syncTargetRoot ids.ID) error {
 	m.workLock.Lock()
 	defer m.workLock.Unlock()
 
 	select {
-	case <-m.syncDoneChan:
+	case <-m.doneChan:
 		return ErrAlreadyClosed
 	default:
 	}
@@ -613,7 +613,7 @@ func (m *StateSyncManager) UpdateSyncTarget(syncTargetRoot ids.ID) error {
 	return nil
 }
 
-func (m *StateSyncManager) getTargetRoot() ids.ID {
+func (m *Manager) getTargetRoot() ids.ID {
 	m.syncTargetLock.RLock()
 	defer m.syncTargetLock.RUnlock()
 
@@ -621,7 +621,7 @@ func (m *StateSyncManager) getTargetRoot() ids.ID {
 }
 
 // Record that there was a fatal error and begin shutting down.
-func (m *StateSyncManager) setError(err error) {
+func (m *Manager) setError(err error) {
 	m.errLock.Lock()
 	defer m.errLock.Unlock()
 
@@ -645,9 +645,9 @@ func (m *StateSyncManager) setError(err error) {
 // that gave us the range up to and including [largestHandledKey].
 //
 // Assumes [m.workLock] is not held.
-func (m *StateSyncManager) completeWorkItem(
+func (m *Manager) completeWorkItem(
 	ctx context.Context,
-	workItem *syncWorkItem,
+	work *workItem,
 	largestHandledKey merkledb.Maybe[[]byte],
 	rootID ids.ID,
 	proofOfLargestKey []merkledb.ProofNode,
@@ -655,8 +655,8 @@ func (m *StateSyncManager) completeWorkItem(
 	var (
 		largestHandledKeyIsNothing = largestHandledKey.IsNothing()
 		largestHandledKeyValue     = largestHandledKey.Value()
-		workItemEndIsNothing       = workItem.end.IsNothing()
-		workItemEndValue           = workItem.end.Value()
+		workItemEndIsNothing       = work.end.IsNothing()
+		workItemEndValue           = work.end.Value()
 		bothNothing                = largestHandledKeyIsNothing && workItemEndIsNothing
 		bothHaveValue              = !largestHandledKeyIsNothing && !workItemEndIsNothing
 		valuesMatch                = bothHaveValue && bytes.Equal(largestHandledKeyValue, workItemEndValue)
@@ -670,7 +670,7 @@ func (m *StateSyncManager) completeWorkItem(
 		// greatest key-value pair in the database. That means we requested a proof with no upper
 		// bound. That is, [workItem.end] is Nothing. Since we're here, [bothNothing] is false,
 		// which means [workItem.end] isn't Nothing. Contradiction.
-		nextStartKey, err := m.findNextKey(ctx, largestHandledKey.Value(), workItem.end, proofOfLargestKey)
+		nextStartKey, err := m.findNextKey(ctx, largestHandledKey.Value(), work.end, proofOfLargestKey)
 		if err != nil {
 			m.setError(err)
 			return
@@ -678,27 +678,27 @@ func (m *StateSyncManager) completeWorkItem(
 
 		// nextStartKey being nil indicates that the entire range has been completed
 		if nextStartKey.IsNothing() {
-			largestHandledKey = workItem.end
+			largestHandledKey = work.end
 		} else {
 			// the full range wasn't completed, so enqueue a new work item for the range [nextStartKey, workItem.end]
-			m.enqueueWork(newWorkItem(workItem.LocalRootID, nextStartKey, workItem.end, workItem.priority))
+			m.enqueueWork(newWorkItem(work.LocalRootID, nextStartKey, work.end, work.priority))
 			largestHandledKey = nextStartKey
 		}
 	}
 
-	// completed the range [workItem.start, lastKey], log and record in the completed work heap
+	// completed the range [work.start, lastKey], log and record in the completed work heap
 	m.config.Log.Info("completed range",
-		zap.Stringer("start", workItem.start),
+		zap.Stringer("start", work.start),
 		zap.Stringer("end", largestHandledKey),
 	)
 	if m.getTargetRoot() == rootID {
 		m.workLock.Lock()
 		defer m.workLock.Unlock()
 
-		m.processedWork.MergeInsert(newWorkItem(rootID, workItem.start, largestHandledKey, workItem.priority))
+		m.processedWork.MergeInsert(newWorkItem(rootID, work.start, largestHandledKey, work.priority))
 	} else {
 		// the root has changed, so reinsert with high priority
-		m.enqueueWork(newWorkItem(rootID, workItem.start, largestHandledKey, highPriority))
+		m.enqueueWork(newWorkItem(rootID, work.start, largestHandledKey, highPriority))
 	}
 }
 
@@ -706,7 +706,7 @@ func (m *StateSyncManager) completeWorkItem(
 // If there are sufficiently few unprocessed/processing work items,
 // splits the range into two items and queues them both.
 // Assumes [m.workLock] is not held.
-func (m *StateSyncManager) enqueueWork(item *syncWorkItem) {
+func (m *Manager) enqueueWork(work *workItem) {
 	m.workLock.Lock()
 	defer func() {
 		m.workLock.Unlock()
@@ -715,19 +715,19 @@ func (m *StateSyncManager) enqueueWork(item *syncWorkItem) {
 
 	if m.processingWorkItems+m.unprocessedWork.Len() > 2*m.config.SimultaneousWorkLimit {
 		// There are too many work items already, don't split the range
-		m.unprocessedWork.Insert(item)
+		m.unprocessedWork.Insert(work)
 		return
 	}
 
 	// Split the remaining range into to 2.
 	// Find the middle point.
 	var start []byte
-	if !item.start.IsNothing() {
-		start = item.start.Value()
+	if !work.start.IsNothing() {
+		start = work.start.Value()
 	}
 	var end []byte
-	if !item.end.IsNothing() {
-		end = item.end.Value()
+	if !work.end.IsNothing() {
+		end = work.end.Value()
 	}
 	midBytes := midPoint(start, end)
 
@@ -738,8 +738,8 @@ func (m *StateSyncManager) enqueueWork(item *syncWorkItem) {
 
 	// first item gets higher priority than the second to encourage finished ranges to grow
 	// rather than start a new range that is not contiguous with existing completed ranges
-	first := newWorkItem(item.LocalRootID, item.start, mid, medPriority)
-	second := newWorkItem(item.LocalRootID, mid, item.end, lowPriority)
+	first := newWorkItem(work.LocalRootID, work.start, mid, medPriority)
+	second := newWorkItem(work.LocalRootID, mid, work.end, lowPriority)
 
 	m.unprocessedWork.Insert(first)
 	m.unprocessedWork.Insert(second)
