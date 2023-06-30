@@ -253,6 +253,8 @@ type manager struct {
 
 	// snowman++ related interface to allow validators retrieval
 	validatorState validators.State
+
+	customBeacons validators.Set
 }
 
 // New returns a new Manager
@@ -538,6 +540,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 			ctx,
 			chainParams.GenesisData,
 			vdrs,
+			m.customBeacons,
 			vm,
 			fxs,
 			sb,
@@ -546,16 +549,11 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 			return nil, fmt.Errorf("error while creating new avalanche vm %w", err)
 		}
 	case block.ChainVM:
-		beacons := vdrs
-		if chainParams.ID == constants.PlatformChainID {
-			beacons = chainParams.CustomBeacons
-		}
-
 		chain, err = m.createSnowmanChain(
 			ctx,
 			chainParams.GenesisData,
 			vdrs,
-			beacons,
+			m.customBeacons,
 			vm,
 			fxs,
 			sb,
@@ -584,6 +582,7 @@ func (m *manager) createAvalancheChain(
 	ctx *snow.ConsensusContext,
 	genesisData []byte,
 	vdrs validators.Set,
+	beacons validators.Set,
 	vm vertex.LinearizableVMWithEngine,
 	fxs []*common.Fx,
 	sb subnets.Subnet,
@@ -799,7 +798,7 @@ func (m *manager) createAvalancheChain(
 		appSender:    snowmanMessageSender,
 	}
 
-	bootstrapWeight := vdrs.Weight()
+	bootstrapWeight := beacons.Weight()
 
 	consensusParams := sb.Config().ConsensusParameters
 	sampleK := consensusParams.K
@@ -831,11 +830,11 @@ func (m *manager) createAvalancheChain(
 
 	connectedBeacons := tracker.NewPeers()
 	startupTracker := tracker.NewStartup(connectedBeacons, (3*bootstrapWeight+3)/4)
-	vdrs.RegisterCallbackListener(startupTracker)
+	beacons.RegisterCallbackListener(startupTracker)
 
 	snowmanCommonCfg := common.Config{
 		Ctx:                            ctx,
-		Beacons:                        vdrs,
+		Beacons:                        beacons,
 		SampleK:                        sampleK,
 		Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
 		StartupTracker:                 startupTracker,
@@ -900,7 +899,7 @@ func (m *manager) createAvalancheChain(
 
 	avalancheCommonCfg := common.Config{
 		Ctx:                            ctx,
-		Beacons:                        vdrs,
+		Beacons:                        beacons,
 		SampleK:                        sampleK,
 		StartupTracker:                 startupTracker,
 		Alpha:                          bootstrapWeight/2 + 1, // must be > 50%
@@ -1326,6 +1325,8 @@ func (m *manager) registerBootstrappedHealthChecks() error {
 
 // Starts chain creation loop to process queued chains
 func (m *manager) StartChainCreator(platformParams ChainParameters) error {
+	m.customBeacons = platformParams.CustomBeacons
+
 	// Get the Primary Network's subnet config. If it wasn't registered, then we
 	// throw a fatal error.
 	sbConfig, ok := m.SubnetConfigs[constants.PrimaryNetworkID]
