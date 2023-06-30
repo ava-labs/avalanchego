@@ -28,11 +28,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/math"
-	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/execconfig"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -41,14 +41,7 @@ import (
 )
 
 const (
-	blockCacheSize               = 64 * units.MiB
-	txCacheSize                  = 128 * units.MiB
-	transformedSubnetTxCacheSize = 4 * units.MiB
-
-	validatorDiffsCacheSize = 2048
-	rewardUTXOsCacheSize    = 2048
-	chainCacheSize          = 2048
-	chainDBCacheSize        = 2048
+	chainDBCacheSize = 2048
 )
 
 var (
@@ -361,6 +354,7 @@ func New(
 	genesisBytes []byte,
 	metricsReg prometheus.Registerer,
 	cfg *config.Config,
+	execCfg *execconfig.Config,
 	ctx *snow.Context,
 	metrics metrics.Metrics,
 	rewards reward.Calculator,
@@ -371,6 +365,7 @@ func New(
 		db,
 		metrics,
 		cfg,
+		execCfg,
 		ctx,
 		metricsReg,
 		rewards,
@@ -395,6 +390,7 @@ func new(
 	db database.Database,
 	metrics metrics.Metrics,
 	cfg *config.Config,
+	execCfg *execconfig.Config,
 	ctx *snow.Context,
 	metricsReg prometheus.Registerer,
 	rewards reward.Calculator,
@@ -404,7 +400,7 @@ func new(
 	blockCache, err := metercacher.New(
 		"block_cache",
 		metricsReg,
-		cache.NewSizedLRU[ids.ID, *stateBlk](blockCacheSize),
+		cache.NewSizedLRU[ids.ID, *stateBlk](execCfg.BlockCacheSize),
 	)
 	if err != nil {
 		return nil, err
@@ -430,7 +426,7 @@ func new(
 	validatorWeightDiffsCache, err := metercacher.New[string, map[ids.NodeID]*ValidatorWeightDiff](
 		"validator_weight_diffs_cache",
 		metricsReg,
-		&cache.LRU[string, map[ids.NodeID]*ValidatorWeightDiff]{Size: validatorDiffsCacheSize},
+		&cache.LRU[string, map[ids.NodeID]*ValidatorWeightDiff]{Size: execCfg.ValidatorDiffsCacheSize},
 	)
 	if err != nil {
 		return nil, err
@@ -440,7 +436,7 @@ func new(
 	validatorPublicKeyDiffsCache, err := metercacher.New[uint64, map[ids.NodeID]*bls.PublicKey](
 		"validator_pub_key_diffs_cache",
 		metricsReg,
-		&cache.LRU[uint64, map[ids.NodeID]*bls.PublicKey]{Size: validatorDiffsCacheSize},
+		&cache.LRU[uint64, map[ids.NodeID]*bls.PublicKey]{Size: execCfg.ValidatorDiffsCacheSize},
 	)
 	if err != nil {
 		return nil, err
@@ -449,7 +445,7 @@ func new(
 	txCache, err := metercacher.New(
 		"tx_cache",
 		metricsReg,
-		cache.NewSizedLRU[ids.ID, *txAndStatus](txCacheSize),
+		cache.NewSizedLRU[ids.ID, *txAndStatus](execCfg.TxCacheSize),
 	)
 	if err != nil {
 		return nil, err
@@ -459,7 +455,7 @@ func new(
 	rewardUTXOsCache, err := metercacher.New[ids.ID, []*avax.UTXO](
 		"reward_utxos_cache",
 		metricsReg,
-		&cache.LRU[ids.ID, []*avax.UTXO]{Size: rewardUTXOsCacheSize},
+		&cache.LRU[ids.ID, []*avax.UTXO]{Size: execCfg.RewardUTXOsCacheSize},
 	)
 	if err != nil {
 		return nil, err
@@ -476,7 +472,7 @@ func new(
 	transformedSubnetCache, err := metercacher.New(
 		"transformed_subnet_cache",
 		metricsReg,
-		cache.NewSizedLRU[ids.ID, *txs.Tx](transformedSubnetTxCacheSize),
+		cache.NewSizedLRU[ids.ID, *txs.Tx](execCfg.TransformedSubnetTxCacheSize),
 	)
 	if err != nil {
 		return nil, err
@@ -485,7 +481,7 @@ func new(
 	supplyCache, err := metercacher.New[ids.ID, *uint64](
 		"supply_cache",
 		metricsReg,
-		&cache.LRU[ids.ID, *uint64]{Size: chainCacheSize},
+		&cache.LRU[ids.ID, *uint64]{Size: execCfg.ChainCacheSize},
 	)
 	if err != nil {
 		return nil, err
@@ -494,7 +490,7 @@ func new(
 	chainCache, err := metercacher.New[ids.ID, []*txs.Tx](
 		"chain_cache",
 		metricsReg,
-		&cache.LRU[ids.ID, []*txs.Tx]{Size: chainCacheSize},
+		&cache.LRU[ids.ID, []*txs.Tx]{Size: execCfg.ChainCacheSize},
 	)
 	if err != nil {
 		return nil, err
@@ -503,7 +499,7 @@ func new(
 	chainDBCache, err := metercacher.New[ids.ID, linkeddb.LinkedDB](
 		"chain_db_cache",
 		metricsReg,
-		&cache.LRU[ids.ID, linkeddb.LinkedDB]{Size: chainDBCacheSize},
+		&cache.LRU[ids.ID, linkeddb.LinkedDB]{Size: execCfg.ChainDBCacheSize},
 	)
 	if err != nil {
 		return nil, err
