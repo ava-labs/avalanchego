@@ -40,6 +40,8 @@ import (
 	txexecutor "github.com/ava-labs/avalanchego/vms/avm/txs/executor"
 )
 
+const trackChecksums = false
+
 var (
 	errTest = errors.New("test error")
 	chainID = ids.GenerateTestID()
@@ -487,13 +489,12 @@ func TestBuilderBuildBlock(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
 			builder := tt.builderFunc(ctrl)
 			_, err := builder.BuildBlock(context.Background())
-			require.ErrorIs(err, tt.expectedErr)
+			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
 }
@@ -511,9 +512,7 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	tx := transactions[0]
 	txID := tx.ID()
 	require.NoError(mempool.Add(tx))
-
-	has := mempool.Has(txID)
-	require.True(has)
+	require.True(mempool.Has(txID))
 
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -533,7 +532,7 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	baseDB := versiondb.New(baseDBManager.Current().Database)
 
-	state, err := states.New(baseDB, parser, registerer)
+	state, err := states.New(baseDB, parser, registerer, trackChecksums)
 	require.NoError(err)
 
 	clk := &mockable.Clock{}

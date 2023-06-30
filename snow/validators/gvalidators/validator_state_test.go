@@ -30,6 +30,8 @@ type testState struct {
 }
 
 func setupState(t testing.TB, ctrl *gomock.Controller) *testState {
+	require := require.New(t)
+
 	t.Helper()
 
 	state := &testState{
@@ -37,9 +39,7 @@ func setupState(t testing.TB, ctrl *gomock.Controller) *testState {
 	}
 
 	listener, err := grpcutils.NewListener()
-	if err != nil {
-		t.Fatalf("Failed to create listener: %s", err)
-	}
+	require.NoError(err)
 	serverCloser := grpcutils.ServerCloser{}
 
 	server := grpcutils.NewServer()
@@ -49,9 +49,7 @@ func setupState(t testing.TB, ctrl *gomock.Controller) *testState {
 	go grpcutils.Serve(listener, server)
 
 	conn, err := grpcutils.Dial(listener.Addr().String())
-	if err != nil {
-		t.Fatalf("Failed to dial: %s", err)
-	}
+	require.NoError(err)
 
 	state.client = NewClient(pb.NewValidatorStateClient(conn))
 	state.closeFn = func() {

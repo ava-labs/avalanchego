@@ -4,6 +4,7 @@
 package avax
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -13,7 +14,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-var _ AddressManager = (*addressManager)(nil)
+var (
+	_ AddressManager = (*addressManager)(nil)
+
+	ErrMismatchedChainIDs = errors.New("mismatched chainIDs")
+)
 
 type AddressManager interface {
 	// ParseLocalAddress takes in an address for this chain and produces the ID
@@ -49,7 +54,8 @@ func (a *addressManager) ParseLocalAddress(addrStr string) (ids.ShortID, error) 
 	}
 	if chainID != a.ctx.ChainID {
 		return ids.ShortID{}, fmt.Errorf(
-			"expected chainID to be %q but was %q",
+			"%w: expected %q but got %q",
+			ErrMismatchedChainIDs,
 			a.ctx.ChainID,
 			chainID,
 		)

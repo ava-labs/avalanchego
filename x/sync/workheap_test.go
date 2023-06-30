@@ -12,33 +12,33 @@ import (
 )
 
 // Tests heap.Interface methods Push, Pop, Swap, Len, Less.
-func Test_SyncWorkHeap_InnerHeap(t *testing.T) {
+func Test_WorkHeap_InnerHeap(t *testing.T) {
 	require := require.New(t)
 
 	lowPriorityItem := &heapItem{
-		workItem: &syncWorkItem{
+		workItem: &workItem{
 			start:       []byte{1},
 			end:         []byte{2},
 			priority:    lowPriority,
-			LocalRootID: ids.GenerateTestID(),
+			localRootID: ids.GenerateTestID(),
 		},
 	}
 
 	mediumPriorityItem := &heapItem{
-		workItem: &syncWorkItem{
+		workItem: &workItem{
 			start:       []byte{3},
 			end:         []byte{4},
 			priority:    medPriority,
-			LocalRootID: ids.GenerateTestID(),
+			localRootID: ids.GenerateTestID(),
 		},
 	}
 
 	highPriorityItem := &heapItem{
-		workItem: &syncWorkItem{
+		workItem: &workItem{
 			start:       []byte{5},
 			end:         []byte{6},
 			priority:    highPriority,
-			LocalRootID: ids.GenerateTestID(),
+			localRootID: ids.GenerateTestID(),
 		},
 	}
 
@@ -108,27 +108,27 @@ func Test_SyncWorkHeap_InnerHeap(t *testing.T) {
 }
 
 // Tests Insert and GetWork
-func Test_SyncWorkHeap_Insert_GetWork(t *testing.T) {
+func Test_WorkHeap_Insert_GetWork(t *testing.T) {
 	require := require.New(t)
-	h := newSyncWorkHeap()
+	h := newWorkHeap()
 
-	lowPriorityItem := &syncWorkItem{
+	lowPriorityItem := &workItem{
 		start:       []byte{4},
 		end:         []byte{5},
 		priority:    lowPriority,
-		LocalRootID: ids.GenerateTestID(),
+		localRootID: ids.GenerateTestID(),
 	}
-	mediumPriorityItem := &syncWorkItem{
+	mediumPriorityItem := &workItem{
 		start:       []byte{0},
 		end:         []byte{1},
 		priority:    medPriority,
-		LocalRootID: ids.GenerateTestID(),
+		localRootID: ids.GenerateTestID(),
 	}
-	highPriorityItem := &syncWorkItem{
+	highPriorityItem := &workItem{
 		start:       []byte{2},
 		end:         []byte{3},
 		priority:    highPriority,
-		LocalRootID: ids.GenerateTestID(),
+		localRootID: ids.GenerateTestID(),
 	}
 	h.Insert(highPriorityItem)
 	h.Insert(mediumPriorityItem)
@@ -136,7 +136,7 @@ func Test_SyncWorkHeap_Insert_GetWork(t *testing.T) {
 	require.Equal(3, h.Len())
 
 	// Ensure [sortedItems] is in right order.
-	got := []*syncWorkItem{}
+	got := []*workItem{}
 	h.sortedItems.Ascend(
 		func(i *heapItem) bool {
 			got = append(got, i.workItem)
@@ -144,7 +144,7 @@ func Test_SyncWorkHeap_Insert_GetWork(t *testing.T) {
 		},
 	)
 	require.Equal(
-		[]*syncWorkItem{mediumPriorityItem, highPriorityItem, lowPriorityItem},
+		[]*workItem{mediumPriorityItem, highPriorityItem, lowPriorityItem},
 		got,
 	)
 
@@ -161,30 +161,30 @@ func Test_SyncWorkHeap_Insert_GetWork(t *testing.T) {
 	require.Zero(h.Len())
 }
 
-func Test_SyncWorkHeap_remove(t *testing.T) {
+func Test_WorkHeap_remove(t *testing.T) {
 	require := require.New(t)
 
-	h := newSyncWorkHeap()
+	h := newWorkHeap()
 
-	lowPriorityItem := &syncWorkItem{
+	lowPriorityItem := &workItem{
 		start:       []byte{0},
 		end:         []byte{1},
 		priority:    lowPriority,
-		LocalRootID: ids.GenerateTestID(),
+		localRootID: ids.GenerateTestID(),
 	}
 
-	mediumPriorityItem := &syncWorkItem{
+	mediumPriorityItem := &workItem{
 		start:       []byte{2},
 		end:         []byte{3},
 		priority:    medPriority,
-		LocalRootID: ids.GenerateTestID(),
+		localRootID: ids.GenerateTestID(),
 	}
 
-	highPriorityItem := &syncWorkItem{
+	highPriorityItem := &workItem{
 		start:       []byte{4},
 		end:         []byte{5},
 		priority:    highPriority,
-		LocalRootID: ids.GenerateTestID(),
+		localRootID: ids.GenerateTestID(),
 	}
 
 	h.Insert(lowPriorityItem)
@@ -226,46 +226,46 @@ func Test_SyncWorkHeap_remove(t *testing.T) {
 	require.Zero(h.sortedItems.Len())
 }
 
-func Test_SyncWorkHeap_Merge_Insert(t *testing.T) {
+func Test_WorkHeap_Merge_Insert(t *testing.T) {
 	// merge with range before
-	syncHeap := newSyncWorkHeap()
+	syncHeap := newWorkHeap()
 
-	syncHeap.MergeInsert(&syncWorkItem{start: nil, end: []byte{63}})
+	syncHeap.MergeInsert(&workItem{start: nil, end: []byte{63}})
 	require.Equal(t, 1, syncHeap.Len())
 
-	syncHeap.MergeInsert(&syncWorkItem{start: []byte{127}, end: []byte{192}})
+	syncHeap.MergeInsert(&workItem{start: []byte{127}, end: []byte{192}})
 	require.Equal(t, 2, syncHeap.Len())
 
-	syncHeap.MergeInsert(&syncWorkItem{start: []byte{193}, end: nil})
+	syncHeap.MergeInsert(&workItem{start: []byte{193}, end: nil})
 	require.Equal(t, 3, syncHeap.Len())
 
-	syncHeap.MergeInsert(&syncWorkItem{start: []byte{63}, end: []byte{126}, priority: lowPriority})
+	syncHeap.MergeInsert(&workItem{start: []byte{63}, end: []byte{126}, priority: lowPriority})
 	require.Equal(t, 3, syncHeap.Len())
 
 	// merge with range after
-	syncHeap = newSyncWorkHeap()
+	syncHeap = newWorkHeap()
 
-	syncHeap.MergeInsert(&syncWorkItem{start: nil, end: []byte{63}})
+	syncHeap.MergeInsert(&workItem{start: nil, end: []byte{63}})
 	require.Equal(t, 1, syncHeap.Len())
 
-	syncHeap.MergeInsert(&syncWorkItem{start: []byte{127}, end: []byte{192}})
+	syncHeap.MergeInsert(&workItem{start: []byte{127}, end: []byte{192}})
 	require.Equal(t, 2, syncHeap.Len())
 
-	syncHeap.MergeInsert(&syncWorkItem{start: []byte{193}, end: nil})
+	syncHeap.MergeInsert(&workItem{start: []byte{193}, end: nil})
 	require.Equal(t, 3, syncHeap.Len())
 
-	syncHeap.MergeInsert(&syncWorkItem{start: []byte{64}, end: []byte{127}, priority: lowPriority})
+	syncHeap.MergeInsert(&workItem{start: []byte{64}, end: []byte{127}, priority: lowPriority})
 	require.Equal(t, 3, syncHeap.Len())
 
 	// merge both sides at the same time
-	syncHeap = newSyncWorkHeap()
+	syncHeap = newWorkHeap()
 
-	syncHeap.MergeInsert(&syncWorkItem{start: nil, end: []byte{63}})
+	syncHeap.MergeInsert(&workItem{start: nil, end: []byte{63}})
 	require.Equal(t, 1, syncHeap.Len())
 
-	syncHeap.MergeInsert(&syncWorkItem{start: []byte{127}, end: nil})
+	syncHeap.MergeInsert(&workItem{start: []byte{127}, end: nil})
 	require.Equal(t, 2, syncHeap.Len())
 
-	syncHeap.MergeInsert(&syncWorkItem{start: []byte{63}, end: []byte{127}, priority: lowPriority})
+	syncHeap.MergeInsert(&workItem{start: []byte{63}, end: []byte{127}, priority: lowPriority})
 	require.Equal(t, 1, syncHeap.Len())
 }

@@ -44,9 +44,11 @@ import (
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
 )
 
+const trackChecksum = false
+
 func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM()
+	vm, _, _ := defaultVM(t)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -206,7 +208,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			vm, _, _ := defaultVM()
+			vm, _, _ := defaultVM(t)
 			vm.ApricotPhase3Time = test.ap3Time
 
 			vm.ctx.Lock.Lock()
@@ -340,7 +342,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 // panic.
 func TestUnverifiedParentPanicRegression(t *testing.T) {
 	require := require.New(t)
-	_, genesisBytes := defaultGenesis()
+	_, genesisBytes := defaultGenesis(t)
 
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	atomicDB := prefixdb.New([]byte{1}, baseDBManager.Current().Database)
@@ -358,7 +360,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 		BanffTime:              banffForkTime,
 	}}
 
-	ctx := defaultContext()
+	ctx := defaultContext(t)
 	ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -467,7 +469,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	require := require.New(t)
 
-	vm, baseDB, mutableSharedMemory := defaultVM()
+	vm, baseDB, mutableSharedMemory := defaultVM(t)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -662,6 +664,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 		metrics.Noop,
 		reward.NewCalculator(vm.Config.RewardConfig),
 		&utils.Atomic[bool]{},
+		trackChecksum,
 	)
 	require.NoError(err)
 	vm.state = is
@@ -682,7 +685,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	require := require.New(t)
 
-	vm, baseDB, mutableSharedMemory := defaultVM()
+	vm, baseDB, mutableSharedMemory := defaultVM(t)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -971,6 +974,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		metrics.Noop,
 		reward.NewCalculator(vm.Config.RewardConfig),
 		&utils.Atomic[bool]{},
+		trackChecksum,
 	)
 	require.NoError(err)
 	vm.state = is
@@ -1000,7 +1004,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	require := require.New(t)
 
-	vm, _, _ := defaultVM()
+	vm, _, _ := defaultVM(t)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -1146,7 +1150,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 	delegator2EndTime := delegator2StartTime.Add(3 * defaultMinStakingDuration)
 	delegator2Stake := defaultMaxValidatorStake - validatorStake
 
-	vm, _, _ := defaultVM()
+	vm, _, _ := defaultVM(t)
 
 	vm.ctx.Lock.Lock()
 	defer func() {
@@ -1230,7 +1234,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 	validatorStartTime := banffForkTime.Add(executor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 
-	vm, _, _ := defaultVM()
+	vm, _, _ := defaultVM(t)
 
 	vm.ctx.Lock.Lock()
 	defer func() {
@@ -1347,7 +1351,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 	validatorStartTime := banffForkTime.Add(executor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 
-	vm, _, _ := defaultVM()
+	vm, _, _ := defaultVM(t)
 
 	vm.ctx.Lock.Lock()
 	defer func() {
@@ -1404,8 +1408,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 	subnetValidators := validators.NewSet()
 	require.NoError(vm.state.ValidatorSet(createSubnetTx.ID(), subnetValidators))
 
-	added := vm.Validators.Add(createSubnetTx.ID(), subnetValidators)
-	require.True(added)
+	require.True(vm.Validators.Add(createSubnetTx.ID(), subnetValidators))
 
 	addSubnetValidatorTx, err := vm.txBuilder.NewAddSubnetValidatorTx(
 		defaultMaxValidatorStake,
@@ -1454,7 +1457,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 	// setup
 	require := require.New(t)
-	vm, _, _ := defaultVM()
+	vm, _, _ := defaultVM(t)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -1736,7 +1739,7 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 
 	// setup
 	require := require.New(t)
-	vm, _, _ := defaultVM()
+	vm, _, _ := defaultVM(t)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -1896,7 +1899,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 
 	// setup
 	require := require.New(t)
-	vm, _, _ := defaultVM()
+	vm, _, _ := defaultVM(t)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))

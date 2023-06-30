@@ -7,86 +7,37 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/api"
-	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
-	"github.com/ava-labs/avalanchego/vms/avm/txs"
-	"github.com/ava-labs/avalanchego/vms/components/keystore"
 )
 
-// Returns:
-// 1) genesis bytes of vm
-// 2) the VM
-// 3) The wallet service that wraps the VM
-// 4) atomic memory to use in tests
-func setupWS(t *testing.T, isAVAXAsset bool) ([]byte, *VM, *WalletService, *atomic.Memory, *txs.Tx) {
-	var genesisBytes []byte
-	var vm *VM
-	var m *atomic.Memory
-	var genesisTx *txs.Tx
-	if isAVAXAsset {
-		genesisBytes, _, vm, m = GenesisVM(t)
-		genesisTx = GetAVAXTxFromGenesisTest(genesisBytes, t)
-	} else {
-		genesisBytes, _, vm, m = setupTxFeeAssets(t)
-		genesisTx = GetCreateTxFromGenesisTest(t, genesisBytes, feeAssetName)
-	}
-
-	ws := &WalletService{
-		vm:         vm,
-		pendingTxs: linkedhashmap.New[ids.ID, *txs.Tx](),
-	}
-	return genesisBytes, vm, ws, m, genesisTx
-}
-
-// Returns:
-// 1) genesis bytes of vm
-// 2) the VM
-// 3) The wallet service that wraps the VM
-// 4) atomic memory to use in tests
-func setupWSWithKeys(t *testing.T, isAVAXAsset bool) ([]byte, *VM, *WalletService, *atomic.Memory, *txs.Tx) {
-	genesisBytes, vm, ws, m, tx := setupWS(t, isAVAXAsset)
-
-	// Import the initially funded private keys
-	user, err := keystore.NewUserFromKeystore(ws.vm.ctx.Keystore, username, password)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := user.PutKeys(keys...); err != nil {
-		t.Fatalf("Failed to set key for user: %s", err)
-	}
-
-	if err := user.Close(); err != nil {
-		t.Fatal(err)
-	}
-	return genesisBytes, vm, ws, m, tx
-}
-
 func TestWalletService_SendMultiple(t *testing.T) {
+	require := require.New(t)
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, vm, ws, _, genesisTx := setupWSWithKeys(t, tc.avaxAsset)
+			env := setup(t, &envConfig{
+				isCustomFeeAsset: !tc.avaxAsset,
+				keystoreUsers: []*user{{
+					username:    username,
+					password:    password,
+					initialKeys: keys,
+				}},
+			})
 			defer func() {
-				if err := vm.Shutdown(context.Background()); err != nil {
-					t.Fatal(err)
-				}
-				vm.ctx.Lock.Unlock()
+				require.NoError(env.vm.Shutdown(context.Background()))
+				env.vm.ctx.Lock.Unlock()
 			}()
 
-			assetID := genesisTx.ID()
+			assetID := env.genesisTx.ID()
 			addr := keys[0].PublicKey().Address()
 
-			addrStr, err := vm.FormatLocalAddress(addr)
-			if err != nil {
-				t.Fatal(err)
-			}
-			changeAddrStr, err := vm.FormatLocalAddress(testChangeAddr)
-			if err != nil {
-				t.Fatal(err)
-			}
-			_, fromAddrsStr := sampleAddrs(t, vm, addrs)
+			addrStr, err := env.vm.FormatLocalAddress(addr)
+			require.NoError(err)
+			changeAddrStr, err := env.vm.FormatLocalAddress(testChangeAddr)
+			require.NoError(err)
+			_, fromAddrsStr := sampleAddrs(t, env.vm, addrs)
 
 			args := &SendMultipleArgs{
 				JSONSpendHeader: api.JSONSpendHeader{
@@ -111,25 +62,13 @@ func TestWalletService_SendMultiple(t *testing.T) {
 				},
 			}
 			reply := &api.JSONTxIDChangeAddr{}
-			vm.timer.Cancel()
-			if err := ws.SendMultiple(nil, args, reply); err != nil {
-				t.Fatalf("Failed to send transaction: %s", err)
-			} else if reply.ChangeAddr != changeAddrStr {
-				t.Fatalf("expected change address to be %s but got %s", changeAddrStr, reply.ChangeAddr)
-			}
+			require.NoError(env.walletService.SendMultiple(nil, args, reply))
+			require.Equal(changeAddrStr, reply.ChangeAddr)
 
-			pendingTxs := vm.txs
-			if len(pendingTxs) != 1 {
-				t.Fatalf("Expected to find 1 pending tx after send, but found %d", len(pendingTxs))
-			}
+			buildAndAccept(require, env.vm, env.issuer, reply.TxID)
 
-			if reply.TxID != pendingTxs[0].ID() {
-				t.Fatal("Transaction ID returned by SendMultiple does not match the transaction found in vm's pending transactions")
-			}
-
-			if _, err := vm.GetTx(context.Background(), reply.TxID); err != nil {
-				t.Fatalf("Failed to retrieve created transaction: %s", err)
-			}
+			_, err = env.vm.state.GetTx(reply.TxID)
+			require.NoError(err)
 		})
 	}
 }
