@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package gsyncabledb
+package gdb
 
 import (
 	"context"
@@ -15,19 +15,19 @@ import (
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
-var _ pb.SyncableDBServer = (*SyncableDBServer)(nil)
+var _ pb.DBServer = (*DBServer)(nil)
 
-func NewSyncableDBServer(db sync.SyncableDB) *SyncableDBServer {
-	return &SyncableDBServer{db: db}
+func NewDBServer(db sync.DB) *DBServer {
+	return &DBServer{db: db}
 }
 
-type SyncableDBServer struct {
-	pb.UnsafeSyncableDBServer
+type DBServer struct {
+	pb.UnsafeDBServer
 
-	db sync.SyncableDB
+	db sync.DB
 }
 
-func (s *SyncableDBServer) GetMerkleRoot(
+func (s *DBServer) GetMerkleRoot(
 	ctx context.Context,
 	_ *emptypb.Empty,
 ) (*pb.GetMerkleRootResponse, error) {
@@ -40,7 +40,7 @@ func (s *SyncableDBServer) GetMerkleRoot(
 	}, nil
 }
 
-func (s *SyncableDBServer) GetChangeProof(
+func (s *DBServer) GetChangeProof(
 	ctx context.Context,
 	req *pb.GetChangeProofRequest,
 ) (*pb.ChangeProof, error) {
@@ -66,7 +66,7 @@ func (s *SyncableDBServer) GetChangeProof(
 	return changeProof.ToProto(), nil
 }
 
-func (s *SyncableDBServer) VerifyChangeProof(
+func (s *DBServer) VerifyChangeProof(
 	ctx context.Context,
 	req *pb.VerifyChangeProofRequest,
 ) (*pb.VerifyChangeProofResponse, error) {
@@ -90,7 +90,7 @@ func (s *SyncableDBServer) VerifyChangeProof(
 	}, nil
 }
 
-func (s *SyncableDBServer) CommitChangeProof(
+func (s *DBServer) CommitChangeProof(
 	ctx context.Context,
 	req *pb.CommitChangeProofRequest,
 ) (*emptypb.Empty, error) {
@@ -103,7 +103,7 @@ func (s *SyncableDBServer) CommitChangeProof(
 	return &emptypb.Empty{}, err
 }
 
-func (s *SyncableDBServer) GetProof(
+func (s *DBServer) GetProof(
 	ctx context.Context,
 	req *pb.GetProofRequest,
 ) (*pb.GetProofResponse, error) {
@@ -117,7 +117,7 @@ func (s *SyncableDBServer) GetProof(
 	}, nil
 }
 
-func (s *SyncableDBServer) GetRangeProof(
+func (s *DBServer) GetRangeProof(
 	ctx context.Context,
 	req *pb.GetRangeProofRequest,
 ) (*pb.GetRangeProofResponse, error) {
@@ -154,7 +154,7 @@ func (s *SyncableDBServer) GetRangeProof(
 	return protoProof, nil
 }
 
-func (s *SyncableDBServer) CommitRangeProof(
+func (s *DBServer) CommitRangeProof(
 	ctx context.Context,
 	req *pb.CommitRangeProofRequest,
 ) (*emptypb.Empty, error) {

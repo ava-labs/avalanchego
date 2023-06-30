@@ -820,8 +820,9 @@ func getEmptyTrieView(ctx context.Context) (*trieView, error) {
 		ctx,
 		memdb.New(),
 		Config{
-			Tracer:        tracer,
-			NodeCacheSize: verificationCacheSize,
+			EvictionBatchSize: DefaultEvictionBatchSize,
+			Tracer:            tracer,
+			NodeCacheSize:     verificationCacheSize,
 		},
 		&mockMetrics{},
 	)
