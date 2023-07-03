@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"sync/atomic"
 	"time"
 
@@ -23,7 +24,9 @@ import (
 )
 
 const (
-	failedRequestSleepInterval = 10 * time.Millisecond
+	initialRetryWait = 10 * time.Millisecond
+	maxRetryWait     = time.Second
+	retryWaitFactor  = 1.5 // Larger --> timeout grows more quickly
 
 	epsilon = 1e-6 // small amount to add to time to avoid division by 0
 )
@@ -211,6 +214,11 @@ func getAndParse[T any](
 			lastErr = err
 		}
 
+		retryWait := initialRetryWait * time.Duration(math.Pow(retryWaitFactor, float64(attempt)))
+		if retryWait > maxRetryWait || retryWait < 0 { // Handle overflows with negative check.
+			retryWait = maxRetryWait
+		}
+
 		select {
 		case <-ctx.Done():
 			if lastErr != nil {
@@ -221,7 +229,7 @@ func getAndParse[T any](
 				)
 			}
 			return nil, ctx.Err()
-		case <-time.After(failedRequestSleepInterval):
+		case <-time.After(retryWait):
 		}
 	}
 }
