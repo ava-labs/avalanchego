@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -39,7 +40,10 @@ type Staker struct {
 	NodeID    ids.NodeID
 	PublicKey *bls.PublicKey
 	SubnetID  ids.ID
-	Weight    uint64
+
+	// Following ContinuousStakingFork, weight can change across staking cycles, due to
+	// restaking of a fraction of rewards accrued by the staker
+	Weight uint64
 
 	// StartTime is the time this staker enters the current validators set.
 	// Pre ContinuousStakingFork, StartTime is set by the Add*Tx creating the staker.
@@ -105,19 +109,32 @@ func (s *Staker) Less(than *Staker) bool {
 	return bytes.Compare(s.TxID[:], than.TxID[:]) == -1
 }
 
+// Following the introduction of continuous staking, this is not necessarily
+// equal to s.StakingPeriod, which is the staking period set upon creation.
+func (s *Staker) CurrentStakingPeriod() time.Duration {
+	return s.NextTime.Sub(s.StartTime)
+}
+
+// Continuous stakers have their NextTime set prior to EndTime. NextTime is always
+// a finite time, while EndTime is mockable.MaxTime for continuous stakers not yet stopped
+// and a finite time for continuous stakers required to stop at some time in the future.
+func (s *Staker) ShouldRestake() bool {
+	return s.NextTime.Before(s.EndTime)
+}
+
 func NewCurrentStaker(
 	txID ids.ID,
-	staker txs.Staker,
+	stakerTx txs.Staker,
 	startTime time.Time,
 	endTime time.Time,
 	potentialReward uint64,
 ) (*Staker, error) {
-	publicKey, _, err := staker.PublicKey()
+	publicKey, _, err := stakerTx.PublicKey()
 	if err != nil {
 		return nil, err
 	}
 
-	stakingPeriod := staker.StakingPeriod()
+	stakingPeriod := stakerTx.StakingPeriod()
 	nextTime := startTime.Add(stakingPeriod)
 	if nextTime.After(endTime) {
 		// delegators may be sometimes shorten up to avoid
@@ -127,44 +144,20 @@ func NewCurrentStaker(
 
 	return &Staker{
 		TxID:            txID,
-		NodeID:          staker.NodeID(),
+		NodeID:          stakerTx.NodeID(),
 		PublicKey:       publicKey,
-		SubnetID:        staker.SubnetID(),
-		Weight:          staker.Weight(),
+		SubnetID:        stakerTx.SubnetID(),
+		Weight:          stakerTx.Weight(),
 		StartTime:       startTime,
 		StakingPeriod:   stakingPeriod,
 		EndTime:         endTime,
 		PotentialReward: potentialReward,
 		NextTime:        nextTime,
-		Priority:        staker.CurrentPriority(),
+		Priority:        stakerTx.CurrentPriority(),
 	}, nil
 }
 
-func NewPendingStaker(txID ids.ID, staker txs.PreContinuousStakingStaker) (*Staker, error) {
-	publicKey, _, err := staker.PublicKey()
-	if err != nil {
-		return nil, err
-	}
-	var (
-		startTime = staker.StartTime()
-		endTime   = staker.EndTime()
-		duration  = endTime.Sub(startTime)
-	)
-
-	return &Staker{
-		TxID:          txID,
-		NodeID:        staker.NodeID(),
-		PublicKey:     publicKey,
-		SubnetID:      staker.SubnetID(),
-		Weight:        staker.Weight(),
-		StartTime:     startTime,
-		EndTime:       endTime,
-		StakingPeriod: duration,
-		NextTime:      startTime,
-		Priority:      staker.PendingPriority(),
-	}, nil
-}
-
+// ShiftStakerAheadInPlace should be called only if a.ShouldRestake is true
 func ShiftStakerAheadInPlace(s *Staker, newStartTime time.Time) {
 	if s.Priority.IsPending() {
 		return // never shift pending stakers. Consider erroring here.
@@ -176,17 +169,30 @@ func ShiftStakerAheadInPlace(s *Staker, newStartTime time.Time) {
 		return // can't shift, staker reached EOL
 	}
 
+	currentStakingPeriod := s.CurrentStakingPeriod()
 	s.StartTime = newStartTime
-	s.NextTime = newStartTime.Add(s.StakingPeriod)
+	s.NextTime = newStartTime.Add(currentStakingPeriod)
 }
 
-func (s *Staker) ShouldRestake() bool {
-	return s.NextTime.Before(s.EndTime)
+// Note that UpdateStakingPeriodInPlace does not modify s.StakingPeriod which is required
+// to hold the default staking period, as defined in the tx creating the staker object
+func UpdateStakingPeriodInPlace(s *Staker, newStakingPeriod time.Duration) {
+	if s.Priority.IsPending() {
+		return // never shift pending stakers. Consider erroring here.
+	}
+	if newStakingPeriod <= 0 {
+		return // Never shorten staking period to zero. Consider erroring here.
+	}
+
+	s.NextTime = s.StartTime.Add(newStakingPeriod)
 }
 
 func MarkStakerForRemovalInPlaceBeforeTime(s *Staker, stopTime time.Time) {
 	if !stopTime.Before(s.EndTime) {
 		return
+	}
+	if stopTime.Equal(mockable.MaxTime) {
+		s.EndTime = mockable.MaxTime // used in loading on staker from disk upon startup
 	}
 
 	end := s.NextTime
@@ -206,13 +212,27 @@ func IncreaseStakerWeightInPlace(s *Staker, newStakerWeight uint64) {
 	s.Weight = newStakerWeight
 }
 
-func UpdateStakingPeriodInPlace(s *Staker, newStakingPeriod time.Duration) {
-	if s.Priority.IsPending() {
-		return // never shift pending stakers. Consider erroring here.
+func NewPendingStaker(txID ids.ID, stakerTx txs.PreContinuousStakingStaker) (*Staker, error) {
+	publicKey, _, err := stakerTx.PublicKey()
+	if err != nil {
+		return nil, err
 	}
-	if newStakingPeriod <= 0 {
-		return // Never shorten staking period to zero. Consider erroring here.
-	}
+	var (
+		startTime = stakerTx.StartTime()
+		endTime   = stakerTx.EndTime()
+		duration  = endTime.Sub(startTime)
+	)
 
-	s.NextTime = s.StartTime.Add(newStakingPeriod)
+	return &Staker{
+		TxID:          txID,
+		NodeID:        stakerTx.NodeID(),
+		PublicKey:     publicKey,
+		SubnetID:      stakerTx.SubnetID(),
+		Weight:        stakerTx.Weight(),
+		StartTime:     startTime,
+		EndTime:       endTime,
+		StakingPeriod: duration,
+		NextTime:      startTime,
+		Priority:      stakerTx.PendingPriority(),
+	}, nil
 }

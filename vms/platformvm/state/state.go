@@ -1210,8 +1210,8 @@ func (s *state) loadCurrentStakers() error {
 		if err != nil {
 			return err
 		}
-		IncreaseStakerWeightInPlace(staker, metadata.UpdatedWeight)
 		UpdateStakingPeriodInPlace(staker, time.Duration(metadata.StakerStakingPeriod))
+		IncreaseStakerWeightInPlace(staker, metadata.UpdatedWeight)
 
 		validator := s.currentStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 		validator.validator = staker
@@ -1270,9 +1270,8 @@ func (s *state) loadCurrentStakers() error {
 		if err != nil {
 			return err
 		}
-		ShiftStakerAheadInPlace(staker, time.Unix(metadata.StakerStartTime, 0))
-		IncreaseStakerWeightInPlace(staker, metadata.UpdatedWeight)
 		UpdateStakingPeriodInPlace(staker, time.Duration(metadata.StakerStakingPeriod))
+		IncreaseStakerWeightInPlace(staker, metadata.UpdatedWeight)
 
 		validator := s.currentStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 		validator.validator = staker
@@ -1334,8 +1333,8 @@ func (s *state) loadCurrentStakers() error {
 			if err != nil {
 				return err
 			}
-			IncreaseStakerWeightInPlace(staker, metadata.UpdatedWeight)
 			UpdateStakingPeriodInPlace(staker, time.Duration(metadata.StakerStakingPeriod))
+			IncreaseStakerWeightInPlace(staker, metadata.UpdatedWeight)
 
 			validator := s.currentStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 			if validator.sortedDelegators == nil {
@@ -1741,7 +1740,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 					// specified in the tx creating the staker. We store these data
 					// to properly reconstruct staker data.
 					StakerStartTime:     staker.StartTime.Unix(),
-					StakerStakingPeriod: int64(staker.EndTime.Sub(staker.StartTime)),
+					StakerStakingPeriod: int64(staker.CurrentStakingPeriod()),
 					StakerEndTime:       staker.EndTime.Unix(),
 					UpdatedWeight:       staker.Weight,
 				}
@@ -1796,7 +1795,8 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 
 				metadata.lastUpdated = staker.StartTime
 				metadata.StakerStartTime = staker.StartTime.Unix()
-				metadata.StakerStakingPeriod = int64(staker.EndTime.Sub(staker.StartTime))
+				metadata.StakerStakingPeriod = int64(staker.CurrentStakingPeriod())
+				metadata.StakerEndTime = staker.EndTime.Unix()
 				metadata.LastUpdated = uint64(metadata.StakerStartTime)
 				metadata.UpdatedWeight = staker.Weight
 
@@ -1917,7 +1917,8 @@ func writeCurrentDelegatorDiff(
 			metadata := &delegatorMetadata{
 				PotentialReward:     delegator.PotentialReward,
 				StakerStartTime:     delegator.StartTime.Unix(),
-				StakerStakingPeriod: int64(delegator.EndTime.Sub(delegator.StartTime)),
+				StakerStakingPeriod: int64(delegator.CurrentStakingPeriod()),
+				StakerEndTime:       delegator.EndTime.Unix(),
 				UpdatedWeight:       delegator.Weight,
 			}
 			metadataBytes, err := stakersMetadataCodec.Marshal(stakerMetadataCodecV1, metadata)
@@ -1949,7 +1950,8 @@ func writeCurrentDelegatorDiff(
 			}
 
 			metadata.StakerStartTime = delegator.StartTime.Unix()
-			metadata.StakerStakingPeriod = int64(delegator.EndTime.Sub(delegator.StartTime))
+			metadata.StakerStakingPeriod = int64(delegator.CurrentStakingPeriod())
+			metadata.StakerEndTime = delegator.EndTime.Unix()
 			metadata.UpdatedWeight = delegator.Weight
 
 			metadataBytes, err = stakersMetadataCodec.Marshal(stakerMetadataCodecV1, metadata)

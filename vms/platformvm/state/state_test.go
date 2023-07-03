@@ -247,7 +247,7 @@ func TestVariablePeriodDelegatorPersistence(t *testing.T) {
 	require.NoError(initialState.UpdateCurrentDelegator(&shiftedDelegator))
 	require.NoError(initialState.Commit())
 
-	// reset validators and rebuild state
+	// rebuild state
 	cfg = defaultConfig(latestFork)
 	newState, err := newStateFromDB(baseDB, cfg)
 	require.NoError(err)

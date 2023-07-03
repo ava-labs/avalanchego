@@ -60,7 +60,7 @@ func TestStateAndDiffComparisonToStorageModel(t *testing.T) {
 	properties := gopter.NewProperties(nil)
 
 	// // to reproduce a given scenario do something like this:
-	// parameters := gopter.DefaultTestParametersWithSeed(1688121928651346121)
+	// parameters := gopter.DefaultTestParametersWithSeed(1688421320499338648)
 	// properties := gopter.NewProperties(parameters)
 
 	properties.Property("state comparison to storage model", commands.Prop(stakersCommands))
@@ -469,11 +469,7 @@ func updateStakingPeriodCurrentValidatorInSystem(sys *sysUnderTest) error {
 	// 4. modify staker period and update the staker
 	updatedStaker := *staker
 	stakingPeriod := staker.EndTime.Sub(staker.StartTime)
-	if stakingPeriod%2 == 0 {
-		stakingPeriod -= 30 * time.Minute
-	} else {
-		stakingPeriod = 3*stakingPeriod + 1
-	}
+	stakingPeriod = pickNewStakingPeriod(stakingPeriod)
 	UpdateStakingPeriodInPlace(&updatedStaker, stakingPeriod)
 	return chain.UpdateCurrentValidator(&updatedStaker)
 }
@@ -515,11 +511,7 @@ func updateStakingPeriodCurrentValidatorInModel(model *stakersStorageModel) erro
 
 	updatedStaker := *staker
 	stakingPeriod := staker.EndTime.Sub(staker.StartTime)
-	if stakingPeriod%2 == 0 {
-		stakingPeriod -= 30 * time.Minute
-	} else {
-		stakingPeriod = 3*stakingPeriod + 1
-	}
+	stakingPeriod = pickNewStakingPeriod(stakingPeriod)
 	UpdateStakingPeriodInPlace(&updatedStaker, stakingPeriod)
 	return model.UpdateCurrentValidator(&updatedStaker)
 }
@@ -966,11 +958,7 @@ func updateStakingPeriodCurrentDelegatorInSystem(sys *sysUnderTest) error {
 	// 3. update delegator staking period and update the staker
 	updatedDelegator := *delegator
 	stakingPeriod := delegator.EndTime.Sub(delegator.StartTime)
-	if stakingPeriod%2 == 0 {
-		stakingPeriod -= 30 * time.Minute
-	} else {
-		stakingPeriod = 3*stakingPeriod + 1
-	}
+	stakingPeriod = pickNewStakingPeriod(stakingPeriod)
 	UpdateStakingPeriodInPlace(&updatedDelegator, stakingPeriod)
 	return chain.UpdateCurrentDelegator(&updatedDelegator)
 }
@@ -1011,11 +999,7 @@ func updateStakingPeriodCurrentDelegatorInModel(model *stakersStorageModel) erro
 
 	updatedDelegator := *delegator
 	stakingPeriod := delegator.EndTime.Sub(delegator.StartTime)
-	if stakingPeriod%2 == 0 {
-		stakingPeriod -= 30 * time.Minute
-	} else {
-		stakingPeriod = 3*stakingPeriod + 1
-	}
+	stakingPeriod = pickNewStakingPeriod(stakingPeriod)
 	UpdateStakingPeriodInPlace(&updatedDelegator, stakingPeriod)
 	return model.UpdateCurrentDelegator(&updatedDelegator)
 }
@@ -1546,4 +1530,15 @@ func checkSystemAndModelContent(cmdState commands.State, res commands.Result) *g
 	}
 
 	return &gopter.PropResult{Status: gopter.PropTrue}
+}
+
+// pickNewStakingPeriod is just a way to randomly change period in a reproducible way
+func pickNewStakingPeriod(stakingPeriod time.Duration) time.Duration {
+	if stakingPeriod%2 == 0 {
+		stakingPeriod -= 30 * time.Minute
+	} else {
+		stakingPeriod += 30 * time.Minute
+	}
+
+	return stakingPeriod
 }
