@@ -163,7 +163,6 @@ func (c *networkClient) getRequestHandler(requestID uint32) (ResponseHandler, bo
 	}
 	// mark message as processed, release activeRequests slot
 	delete(c.outstandingRequestHandlers, requestID)
-	c.activeRequests.Release(1)
 	return handler, true
 }
 
@@ -181,6 +180,7 @@ func (c *networkClient) RequestAny(
 	if err := c.activeRequests.Acquire(ctx, 1); err != nil {
 		return nil, ids.EmptyNodeID, ErrAcquiringSemaphore
 	}
+	defer c.activeRequests.Release(1)
 
 	c.lock.Lock()
 	if nodeID, ok := c.peers.GetAnyPeer(minVersion); ok {
@@ -189,7 +189,6 @@ func (c *networkClient) RequestAny(
 	}
 
 	c.lock.Unlock()
-	c.activeRequests.Release(1)
 	return nil, ids.EmptyNodeID, fmt.Errorf(
 		"no peers found matching version %s out of %d peers",
 		minVersion, c.peers.Size(),
@@ -209,6 +208,7 @@ func (c *networkClient) Request(
 	if err := c.activeRequests.Acquire(ctx, 1); err != nil {
 		return nil, ErrAcquiringSemaphore
 	}
+	defer c.activeRequests.Release(1)
 
 	c.lock.Lock()
 	return c.request(ctx, nodeID, request)
@@ -240,8 +240,6 @@ func (c *networkClient) request(
 
 	// Send an app request to the peer.
 	if err := c.appSender.SendAppRequest(ctx, nodeIDs, requestID, request); err != nil {
-		// On failure, release the activeRequests slot and mark the message as processed.
-		c.activeRequests.Release(1)
 		c.lock.Unlock()
 		return nil, err
 	}
