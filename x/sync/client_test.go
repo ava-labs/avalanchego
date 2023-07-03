@@ -58,8 +58,8 @@ func sendRangeRequest(
 	handler := NewNetworkServer(sender, db, logging.NoLog{})
 	clientNodeID, serverNodeID := ids.GenerateTestNodeID(), ids.GenerateTestNodeID()
 	networkClient := NewNetworkClient(sender, clientNodeID, 1, logging.NoLog{})
-	require.NoError(networkClient.Connected(context.Background(), serverNodeID, version.CurrentApp))
-	client := NewClient(&ClientConfig{
+	require.NoError(networkClient.connected(context.Background(), serverNodeID, version.CurrentApp))
+	client := NewClient(&clientConfig{
 		NetworkClient: networkClient,
 		Metrics:       &mockMetrics{},
 		Log:           logging.NoLog{},
@@ -114,7 +114,7 @@ func sendRangeRequest(
 			// reserialize the response and pass it to the client to complete the handling.
 			responseBytes, err := proto.Marshal(response.ToProto())
 			require.NoError(err)
-			require.NoError(networkClient.AppResponse(context.Background(), serverNodeID, requestID, responseBytes))
+			require.NoError(networkClient.appResponse(context.Background(), serverNodeID, requestID, responseBytes))
 			return nil
 		},
 	).AnyTimes()
@@ -318,8 +318,8 @@ func sendChangeRequest(
 	handler := NewNetworkServer(sender, db, logging.NoLog{})
 	clientNodeID, serverNodeID := ids.GenerateTestNodeID(), ids.GenerateTestNodeID()
 	networkClient := NewNetworkClient(sender, clientNodeID, 1, logging.NoLog{})
-	require.NoError(networkClient.Connected(context.Background(), serverNodeID, version.CurrentApp))
-	client := NewClient(&ClientConfig{
+	require.NoError(networkClient.connected(context.Background(), serverNodeID, version.CurrentApp))
+	client := NewClient(&clientConfig{
 		NetworkClient: networkClient,
 		Metrics:       &mockMetrics{},
 		Log:           logging.NoLog{},
@@ -380,7 +380,7 @@ func sendChangeRequest(
 				},
 			})
 			require.NoError(err)
-			require.NoError(networkClient.AppResponse(context.Background(), serverNodeID, requestID, responseBytes))
+			require.NoError(networkClient.appResponse(context.Background(), serverNodeID, requestID, responseBytes))
 			return nil
 		},
 	).AnyTimes()
