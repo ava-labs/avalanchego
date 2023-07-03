@@ -20,7 +20,7 @@ import (
 
 func TestVerifyWithChainConfig(t *testing.T) {
 	admins := []common.Address{{1}}
-	baseConfig := *SubnetEVMDefaultChainConfig
+	baseConfig := *TestChainConfig
 	config := &baseConfig
 	config.GenesisPrecompiles = Precompiles{
 		txallowlist.ConfigKey: txallowlist.NewConfig(big.NewInt(2), nil, nil),
@@ -65,7 +65,7 @@ func TestVerifyWithChainConfig(t *testing.T) {
 
 func TestVerifyWithChainConfigAtNilTimestamp(t *testing.T) {
 	admins := []common.Address{{0}}
-	baseConfig := *SubnetEVMDefaultChainConfig
+	baseConfig := *TestChainConfig
 	config := &baseConfig
 	config.PrecompileUpgrades = []PrecompileUpgrade{
 		// this does NOT enable the precompile, so it should be upgradeable.
@@ -185,7 +185,7 @@ func TestVerifyPrecompileUpgrades(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			baseConfig := *SubnetEVMDefaultChainConfig
+			baseConfig := *TestChainConfig
 			config := &baseConfig
 			config.PrecompileUpgrades = tt.upgrades
 
@@ -229,7 +229,7 @@ func TestVerifyPrecompiles(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			baseConfig := *SubnetEVMDefaultChainConfig
+			baseConfig := *TestChainConfig
 			config := &baseConfig
 			config.GenesisPrecompiles = tt.precompiles
 
@@ -245,7 +245,7 @@ func TestVerifyPrecompiles(t *testing.T) {
 
 func TestVerifyRequiresSortedTimestamps(t *testing.T) {
 	admins := []common.Address{{1}}
-	baseConfig := *SubnetEVMDefaultChainConfig
+	baseConfig := *TestChainConfig
 	config := &baseConfig
 	config.PrecompileUpgrades = []PrecompileUpgrade{
 		{
@@ -263,7 +263,7 @@ func TestVerifyRequiresSortedTimestamps(t *testing.T) {
 
 func TestGetPrecompileConfig(t *testing.T) {
 	require := require.New(t)
-	baseConfig := *SubnetEVMDefaultChainConfig
+	baseConfig := *TestChainConfig
 	config := &baseConfig
 	config.GenesisPrecompiles = Precompiles{
 		deployerallowlist.ConfigKey: deployerallowlist.NewConfig(big.NewInt(10), nil, nil),

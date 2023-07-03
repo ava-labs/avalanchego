@@ -238,13 +238,13 @@ func TestStatefulPrecompilesConfigure(t *testing.T) {
 // regression test for precompile activation after header block
 func TestPrecompileActivationAfterHeaderBlock(t *testing.T) {
 	db := rawdb.NewMemoryDatabase()
-
+	copyCfg := *params.TestChainConfig
 	customg := Genesis{
-		Config: params.SubnetEVMDefaultChainConfig,
+		Config: &copyCfg,
 		Alloc: GenesisAlloc{
 			{1}: {Balance: big.NewInt(1), Storage: map[common.Hash]common.Hash{{1}: {1}}},
 		},
-		GasLimit: params.SubnetEVMDefaultChainConfig.FeeConfig.GasLimit.Uint64(),
+		GasLimit: params.TestChainConfig.FeeConfig.GasLimit.Uint64(),
 	}
 	genesis := customg.MustCommit(db)
 	bc, _ := NewBlockChain(db, DefaultCacheConfig, customg.Config, dummy.NewFullFaker(), vm.Config{}, common.Hash{})

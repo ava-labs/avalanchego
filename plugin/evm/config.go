@@ -197,9 +197,6 @@ type Config struct {
 	// identical state with the pre-upgrade ruleset.
 	SkipUpgradeCheck bool `json:"skip-upgrade-check"`
 
-	// SkipSubnetEVMUpgradeCheck disables checking that SubnetEVM Upgrade is enabled at genesis
-	SkipSubnetEVMUpgradeCheck bool `json:"skip-subnet-evm-upgrade-check"`
-
 	// AcceptedCacheSize is the depth to keep in the accepted headers cache and the
 	// accepted logs cache at the accepted tip.
 	//
