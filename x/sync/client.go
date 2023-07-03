@@ -232,13 +232,15 @@ func getAndParse[T any](
 // Returns the peer's NodeID and response.
 // It's safe to call this method multiple times concurrently.
 func (c *client) get(ctx context.Context, request []byte) (ids.NodeID, []byte, error) {
-	c.metrics.RequestMade()
 	var (
 		response  []byte
 		nodeID    ids.NodeID
 		err       error
 		startTime = time.Now()
 	)
+
+	c.metrics.RequestMade()
+
 	if len(c.stateSyncNodes) == 0 {
 		response, nodeID, err = c.networkClient.RequestAny(ctx, c.stateSyncMinVersion, request)
 	} else {
