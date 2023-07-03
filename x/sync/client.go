@@ -189,23 +189,11 @@ func getAndParse[T any](
 	parseFn func(context.Context, []byte) (*T, error),
 ) (*T, error) {
 	var (
-		// TODO is reporting the last error worth the code complexity?
 		lastErr  error
 		response *T
 	)
 	// Loop until the context is cancelled or we get a valid response.
-	for attempt := 0; ; attempt++ {
-		// If the context has finished, return the context error early.
-		if err := ctx.Err(); err != nil {
-			if lastErr != nil {
-				return nil, fmt.Errorf(
-					"request failed after %d attempts with last error %w and ctx error %s",
-					attempt, lastErr, err,
-				)
-			}
-			return nil, err
-		}
-
+	for attempt := 1; ; attempt++ {
 		nodeID, responseBytes, err := client.get(ctx, request)
 		if err == nil {
 			if response, err = parseFn(ctx, responseBytes); err == nil {
@@ -218,19 +206,22 @@ func getAndParse[T any](
 			zap.Int("attempt", attempt),
 			zap.Error(err),
 		)
-
+		// if [err] is being propagated from [ctx], avoid overwriting [lastErr].
 		if err != ctx.Err() {
-			// Don't overwrite [lastErr] if it's context cancelation.
 			lastErr = err
+		}
 
-			// Wait before retrying.
-			select {
-			case <-ctx.Done():
-				// Return error at top of loop.
-				// Don't do it here to avoid duplicate code.
-			case <-time.After(failedRequestSleepInterval):
-				// TODO should we randomize this?
+		select {
+		case <-ctx.Done():
+			if lastErr != nil {
+				// prefer reporting [lastErr] if it's not nil.
+				return nil, fmt.Errorf(
+					"request failed after %d attempts with last error %w and ctx error %s",
+					attempt, lastErr, ctx.Err(),
+				)
 			}
+			return nil, ctx.Err()
+		case <-time.After(failedRequestSleepInterval):
 		}
 	}
 }
