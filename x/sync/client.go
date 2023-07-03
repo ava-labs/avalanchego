@@ -199,7 +199,7 @@ func getAndParse[T any](
 		if err := ctx.Err(); err != nil {
 			if lastErr != nil {
 				return nil, fmt.Errorf(
-					"request failed after %d attempts with last error %s and ctx error %w",
+					"request failed after %d attempts with last error %w and ctx error %s",
 					attempt, lastErr, err,
 				)
 			}
