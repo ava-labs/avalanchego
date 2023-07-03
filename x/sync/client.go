@@ -195,7 +195,7 @@ func getAndParse[T any](ctx context.Context, client *client, request []byte, par
 			}
 			return nil, err
 		}
-		responseBytes, nodeID, err := client.get(ctx, request)
+		nodeID, responseBytes, err := client.get(ctx, request)
 		if err == nil {
 			if response, err = parseFn(ctx, responseBytes); err == nil {
 				return response, nil
@@ -219,7 +219,7 @@ func getAndParse[T any](ctx context.Context, client *client, request []byte, par
 // or [ctx] expires.
 // Returns the peer's NodeID and response.
 // It's safe to call this method multiple times concurrently.
-func (c *client) get(ctx context.Context, request []byte) ([]byte, ids.NodeID, error) {
+func (c *client) get(ctx context.Context, request []byte) (ids.NodeID, []byte, error) {
 	c.metrics.RequestMade()
 	var (
 		response  []byte
@@ -239,11 +239,11 @@ func (c *client) get(ctx context.Context, request []byte) ([]byte, ids.NodeID, e
 	if err != nil {
 		c.metrics.RequestFailed()
 		c.networkClient.TrackBandwidth(nodeID, 0)
-		return response, nodeID, err
+		return nodeID, response, err
 	}
 
 	bandwidth := float64(len(response)) / (time.Since(startTime).Seconds() + epsilon)
 	c.networkClient.TrackBandwidth(nodeID, bandwidth)
 	c.metrics.RequestSucceeded()
-	return response, nodeID, nil
+	return nodeID, response, nil
 }
