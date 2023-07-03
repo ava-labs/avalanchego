@@ -56,14 +56,20 @@ type NetworkClient interface {
 }
 
 type networkClient struct {
-	lock                       sync.Mutex                 // lock for mutating state of this Network struct
-	myNodeID                   ids.NodeID                 // NodeID of this node
-	requestID                  uint32                     // requestID counter used to track outbound requests
-	outstandingRequestHandlers map[uint32]ResponseHandler // requestID => handler for the response/failure
-	activeRequests             *semaphore.Weighted        // controls maximum number of active outbound requests
-	peers                      *peerTracker               // tracking of peers & bandwidth
-	appSender                  common.AppSender           // AppSender for sending messages
-	log                        logging.Logger
+	lock sync.Mutex
+	log  logging.Logger
+	// This node's ID
+	myNodeID ids.NodeID
+	// requestID counter used to track outbound requests
+	requestID uint32
+	// requestID => handler for the response/failure
+	outstandingRequestHandlers map[uint32]ResponseHandler
+	// controls maximum number of active outbound requests
+	activeRequests *semaphore.Weighted
+	// tracking of peers & bandwidth usage
+	peers *peerTracker
+	// For sending messages to peers
+	appSender common.AppSender
 }
 
 func NewNetworkClient(
@@ -82,9 +88,14 @@ func NewNetworkClient(
 	}
 }
 
-// Always returns nil because the engine considers errors returned from this function as fatal,
-// this function always returns nil.
-func (c *networkClient) AppResponse(_ context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
+// Always returns nil because the engine considers errors
+// returned from this function as fatal.
+func (c *networkClient) AppResponse(
+	_ context.Context,
+	nodeID ids.NodeID,
+	requestID uint32,
+	response []byte,
+) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
@@ -97,7 +108,8 @@ func (c *networkClient) AppResponse(_ context.Context, nodeID ids.NodeID, reques
 
 	handler, exists := c.getRequestHandler(requestID)
 	if !exists {
-		// Should never happen since the engine should be managing outstanding requests
+		// Should never happen since the engine
+		// should be managing outstanding requests
 		c.log.Error(
 			"received response to unknown request",
 			zap.Stringer("nodeID", nodeID),
@@ -110,13 +122,13 @@ func (c *networkClient) AppResponse(_ context.Context, nodeID ids.NodeID, reques
 	return nil
 }
 
-// AppRequestFailed can be called by the avalanchego -> VM in following cases:
-// - node is benched
-// - failed to send message to [nodeID] due to a network issue
-// - timeout
-// As the engine considers errors returned from this function as fatal,
-// this function always returns nil.
-func (c *networkClient) AppRequestFailed(_ context.Context, nodeID ids.NodeID, requestID uint32) error {
+// Always returns nil because the engine considers errors
+// returned from this function as fatal.
+func (c *networkClient) AppRequestFailed(
+	_ context.Context,
+	nodeID ids.NodeID,
+	requestID uint32,
+) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
@@ -128,7 +140,8 @@ func (c *networkClient) AppRequestFailed(_ context.Context, nodeID ids.NodeID, r
 
 	handler, exists := c.getRequestHandler(requestID)
 	if !exists {
-		// Should never happen since the engine should be managing outstanding requests
+		// Should never happen since the engine
+		// should be managing outstanding requests
 		c.log.Error(
 			"received request failed to unknown request",
 			zap.Stringer("nodeID", nodeID),
@@ -177,14 +190,22 @@ func (c *networkClient) RequestAny(
 
 	c.lock.Unlock()
 	c.activeRequests.Release(1)
-	return nil, ids.EmptyNodeID, fmt.Errorf("no peers found matching version %s out of %d peers", minVersion, c.peers.Size())
+	return nil, ids.EmptyNodeID, fmt.Errorf(
+		"no peers found matching version %s out of %d peers",
+		minVersion, c.peers.Size(),
+	)
 }
 
-// Sends [request] to [nodeID] and registers a handler for the response/failure.
-// If the limit on active requests is reached, this function blocks until
-// a slot becomes available.
-func (c *networkClient) Request(ctx context.Context, nodeID ids.NodeID, request []byte) ([]byte, error) {
-	// Take a slot from total [activeRequests] and block until a slot becomes available.
+// Sends [request] to [nodeID] and returns the response.
+// Blocks until the number of outstanding requests is
+// below the limit before sending the request.
+func (c *networkClient) Request(
+	ctx context.Context,
+	nodeID ids.NodeID,
+	request []byte,
+) ([]byte, error) {
+	// Take a slot from total [activeRequests]
+	// and block until a slot becomes available.
 	if err := c.activeRequests.Acquire(ctx, 1); err != nil {
 		return nil, ErrAcquiringSemaphore
 	}
@@ -194,21 +215,25 @@ func (c *networkClient) Request(ctx context.Context, nodeID ids.NodeID, request 
 }
 
 // Sends [request] to [nodeID] and returns the response.
-// Blocks until a response is received or the request fails.
-// Assumes [nodeID] is never [c.myNodeID] since we guarantee [c.myNodeID] will not be added to [c.peers].
+// Returns an error if the request failed or [ctx] is canceled.
+// Blocks until a response is received or the [ctx] is canceled fails.
 // Releases active requests semaphore if there was an error in sending the request.
-// Returns an error if [appSender] is unable to make the request.
+// Assumes [nodeID] is never [c.myNodeID] since we guarantee
+// [c.myNodeID] will not be added to [c.peers].
 // Assumes [c.lock] is held and unlocks [c.lock] before returning.
-func (c *networkClient) request(ctx context.Context, nodeID ids.NodeID, request []byte) ([]byte, error) {
-	c.log.Debug("sending request to peer", zap.Stringer("nodeID", nodeID), zap.Int("requestLen", len(request)))
+func (c *networkClient) request(
+	ctx context.Context,
+	nodeID ids.NodeID,
+	request []byte,
+) ([]byte, error) {
+	c.log.Debug("sending request to peer",
+		zap.Stringer("nodeID", nodeID),
+		zap.Int("requestLen", len(request)),
+	)
 	c.peers.TrackPeer(nodeID)
 
-	// generate requestID
 	requestID := c.requestID
 	c.requestID++
-
-	handler := newResponseHandler()
-	c.outstandingRequestHandlers[requestID] = handler
 
 	nodeIDs := set.NewSet[ids.NodeID](1)
 	nodeIDs.Add(nodeID)
@@ -217,10 +242,12 @@ func (c *networkClient) request(ctx context.Context, nodeID ids.NodeID, request 
 	if err := c.appSender.SendAppRequest(ctx, nodeIDs, requestID, request); err != nil {
 		// On failure, release the activeRequests slot and mark the message as processed.
 		c.activeRequests.Release(1)
-		delete(c.outstandingRequestHandlers, requestID)
 		c.lock.Unlock()
 		return nil, err
 	}
+
+	handler := newResponseHandler()
+	c.outstandingRequestHandlers[requestID] = handler
 
 	c.lock.Unlock() // unlock so response can be received
 
@@ -237,13 +264,19 @@ func (c *networkClient) request(ctx context.Context, nodeID ids.NodeID, request 
 	c.log.Debug("received response from peer",
 		zap.Stringer("nodeID", nodeID),
 		zap.Uint32("requestID", requestID),
-		zap.Int("responseLen", len(response)))
+		zap.Int("responseLen", len(response)),
+	)
 	return response, nil
 }
 
-// Connected adds the given nodeID to the peer list so that it can receive messages.
+// Connected adds the given [nodeID] to the peer
+// list so that it can receive messages.
 // If [nodeID] is [c.myNodeID], this is a no-op.
-func (c *networkClient) Connected(_ context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error {
+func (c *networkClient) Connected(
+	_ context.Context,
+	nodeID ids.NodeID,
+	nodeVersion *version.Application,
+) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
@@ -258,10 +291,14 @@ func (c *networkClient) Connected(_ context.Context, nodeID ids.NodeID, nodeVers
 }
 
 // Disconnected removes given [nodeID] from the peer list.
-// TODO danlaine: should this be a no-op if [nodeID] is [c.myNodeID]?
 func (c *networkClient) Disconnected(_ context.Context, nodeID ids.NodeID) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
+
+	if nodeID == c.myNodeID {
+		c.log.Debug("skipping deregistering self as peer")
+		return nil
+	}
 
 	c.log.Debug("disconnecting peer", zap.Stringer("nodeID", nodeID))
 	c.peers.Disconnected(nodeID)
