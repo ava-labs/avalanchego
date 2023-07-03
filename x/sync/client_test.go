@@ -59,7 +59,7 @@ func sendRangeRequest(
 	clientNodeID, serverNodeID := ids.GenerateTestNodeID(), ids.GenerateTestNodeID()
 	networkClient := NewNetworkClient(sender, clientNodeID, 1, logging.NoLog{})
 	require.NoError(networkClient.connected(context.Background(), serverNodeID, version.CurrentApp))
-	client := NewClient(&clientConfig{
+	client := NewClient(&ClientConfig{
 		NetworkClient: networkClient,
 		Metrics:       &mockMetrics{},
 		Log:           logging.NoLog{},
@@ -319,7 +319,7 @@ func sendChangeRequest(
 	clientNodeID, serverNodeID := ids.GenerateTestNodeID(), ids.GenerateTestNodeID()
 	networkClient := NewNetworkClient(sender, clientNodeID, 1, logging.NoLog{})
 	require.NoError(networkClient.connected(context.Background(), serverNodeID, version.CurrentApp))
-	client := NewClient(&clientConfig{
+	client := NewClient(&ClientConfig{
 		NetworkClient: networkClient,
 		Metrics:       &mockMetrics{},
 		Log:           logging.NoLog{},
