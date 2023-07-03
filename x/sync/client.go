@@ -216,9 +216,10 @@ func getAndParse[T any](ctx context.Context, client *client, request []byte, par
 }
 
 // get sends [request] to an arbitrary peer and blocks until the node receives a response
-// or [ctx] expires. Returns the raw response from the peer, the peer's NodeID, and an
-// error if the request timed out. Thread safe.
-func (c *client) get(ctx context.Context, requestBytes []byte) ([]byte, ids.NodeID, error) {
+// or [ctx] expires.
+// Returns the peer's NodeID and response.
+// It's safe to call this method multiple times concurrently.
+func (c *client) get(ctx context.Context, request []byte) ([]byte, ids.NodeID, error) {
 	c.metrics.RequestMade()
 	var (
 		response  []byte
@@ -227,13 +228,13 @@ func (c *client) get(ctx context.Context, requestBytes []byte) ([]byte, ids.Node
 		startTime = time.Now()
 	)
 	if len(c.stateSyncNodes) == 0 {
-		response, nodeID, err = c.networkClient.RequestAny(ctx, c.stateSyncMinVersion, requestBytes)
+		response, nodeID, err = c.networkClient.RequestAny(ctx, c.stateSyncMinVersion, request)
 	} else {
 		// get the next nodeID using the nodeIdx offset. If we're out of nodes, loop back to 0
 		// we do this every attempt to ensure we get a different node each time if possible.
 		nodeIdx := atomic.AddUint32(&c.stateSyncNodeIdx, 1)
 		nodeID = c.stateSyncNodes[nodeIdx%uint32(len(c.stateSyncNodes))]
-		response, err = c.networkClient.Request(ctx, nodeID, requestBytes)
+		response, err = c.networkClient.Request(ctx, nodeID, request)
 	}
 	if err != nil {
 		c.metrics.RequestFailed()
