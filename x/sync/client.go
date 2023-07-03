@@ -181,7 +181,12 @@ func (c *client) GetRangeProof(ctx context.Context, req *pb.SyncGetRangeProofReq
 // [parseFn] is called with the raw response. If [parseFn] returns an error or the request
 // times out, this function will retry the request to a different peer until [ctx] expires.
 // If [parseFn] returns a nil error, the result is returned from getAndParse.
-func getAndParse[T any](ctx context.Context, client *client, request []byte, parseFn func(context.Context, []byte) (*T, error)) (*T, error) {
+func getAndParse[T any](
+	ctx context.Context,
+	client *client,
+	request []byte,
+	parseFn func(context.Context, []byte) (*T, error),
+) (*T, error) {
 	var (
 		lastErr  error
 		response *T
@@ -191,10 +196,16 @@ func getAndParse[T any](ctx context.Context, client *client, request []byte, par
 		// If the context has finished, return the context error early.
 		if err := ctx.Err(); err != nil {
 			if lastErr != nil {
-				return nil, fmt.Errorf("request failed after %d attempts with last error %w and ctx error %s", attempt, lastErr, err)
+				return nil, fmt.Errorf(
+					"request failed after %d attempts with last error %s and ctx error %w",
+					attempt,
+					lastErr,
+					err,
+				)
 			}
 			return nil, err
 		}
+
 		nodeID, responseBytes, err := client.get(ctx, request)
 		if err == nil {
 			if response, err = parseFn(ctx, responseBytes); err == nil {
@@ -205,18 +216,26 @@ func getAndParse[T any](ctx context.Context, client *client, request []byte, par
 		client.log.Debug("request failed, retrying",
 			zap.Stringer("nodeID", nodeID),
 			zap.Int("attempt", attempt),
-			zap.Error(err))
+			zap.Error(err),
+		)
 
 		if err != ctx.Err() {
-			// if [err] is being propagated from [ctx], avoid overwriting [lastErr].
+			// Don't overwrite [lastErr] if it's context cancelation.
 			lastErr = err
-			time.Sleep(failedRequestSleepInterval)
+
+			select {
+			case <-ctx.Done():
+				// Return error at top of loop.
+				// Don't do it here to avoid duplicate code.
+			case <-time.After(failedRequestSleepInterval):
+				// TODO should we randomize this?
+			}
 		}
 	}
 }
 
 // get sends [request] to an arbitrary peer and blocks until the node receives a response
-// or [ctx] expires.
+// or [ctx] is canceled.
 // Returns the peer's NodeID and response.
 // It's safe to call this method multiple times concurrently.
 func (c *client) get(ctx context.Context, request []byte) (ids.NodeID, []byte, error) {
