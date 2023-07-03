@@ -152,7 +152,7 @@ func (m *manager) GetValidatorSet(
 		return nil, database.ErrNotFound
 	}
 
-	return m.getValidatorSetFrom(lastAcceptedHeight, height, subnetID)
+	return m.getValidatorSetFrom(ctx, lastAcceptedHeight, height, subnetID)
 }
 
 // getValidatorSetFrom fetches the validator set of [subnetID] at [targetHeight]
@@ -160,6 +160,7 @@ func (m *manager) GetValidatorSet(
 //
 // Invariant: [m.cfg.Validators] contains the validator set at [currentHeight].
 func (m *manager) getValidatorSetFrom(
+	ctx context.Context,
 	currentHeight uint64,
 	targetHeight uint64,
 	subnetID ids.ID,
@@ -186,9 +187,9 @@ func (m *manager) getValidatorSetFrom(
 		err          error
 	)
 	if subnetID == constants.PrimaryNetworkID {
-		validatorSet, err = m.makePrimaryNetworkValidatorSet(currentHeight, targetHeight)
+		validatorSet, err = m.makePrimaryNetworkValidatorSet(ctx, currentHeight, targetHeight)
 	} else {
-		validatorSet, err = m.makeSubnetValidatorSet(currentHeight, targetHeight, subnetID)
+		validatorSet, err = m.makeSubnetValidatorSet(ctx, currentHeight, targetHeight, subnetID)
 	}
 	if err != nil {
 		return nil, err
@@ -205,6 +206,7 @@ func (m *manager) getValidatorSetFrom(
 }
 
 func (m *manager) makePrimaryNetworkValidatorSet(
+	ctx context.Context,
 	currentHeight uint64,
 	targetHeight uint64,
 ) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
@@ -237,6 +239,7 @@ func (m *manager) makePrimaryNetworkValidatorSet(
 	// to be inclusive, we apply diffs in [targetHeight + 1, currentHeight].
 	lastDiffHeight := targetHeight + 1
 	err := m.state.ApplyValidatorWeightDiffs(
+		ctx,
 		validatorSet,
 		currentHeight,
 		lastDiffHeight,
@@ -247,6 +250,7 @@ func (m *manager) makePrimaryNetworkValidatorSet(
 	}
 
 	err = m.state.ApplyValidatorPublicKeyDiffs(
+		ctx,
 		validatorSet,
 		currentHeight,
 		lastDiffHeight,
@@ -255,6 +259,7 @@ func (m *manager) makePrimaryNetworkValidatorSet(
 }
 
 func (m *manager) makeSubnetValidatorSet(
+	ctx context.Context,
 	currentHeight uint64,
 	targetHeight uint64,
 	subnetID ids.ID,
@@ -287,6 +292,7 @@ func (m *manager) makeSubnetValidatorSet(
 	// to be inclusive, we apply diffs in [targetHeight + 1, currentHeight].
 	lastDiffHeight := targetHeight + 1
 	err := m.state.ApplyValidatorWeightDiffs(
+		ctx,
 		subnetValidatorSet,
 		currentHeight,
 		lastDiffHeight,
@@ -320,6 +326,7 @@ func (m *manager) makeSubnetValidatorSet(
 	}
 
 	err = m.state.ApplyValidatorPublicKeyDiffs(
+		ctx,
 		subnetValidatorSet,
 		currentHeight,
 		lastDiffHeight,

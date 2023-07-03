@@ -4,6 +4,7 @@
 package state
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -135,6 +136,7 @@ type State interface {
 
 	// startHeight > endHeight
 	ApplyValidatorWeightDiffs(
+		ctx context.Context,
 		validators map[ids.NodeID]*validators.GetValidatorOutput,
 		startHeight uint64,
 		endHeight uint64,
@@ -145,6 +147,7 @@ type State interface {
 	// that left the Primary Network validator set.
 	// startHeight > endHeight
 	ApplyValidatorPublicKeyDiffs(
+		ctx context.Context,
 		validators map[ids.NodeID]*validators.GetValidatorOutput,
 		startHeight uint64,
 		endHeight uint64,
@@ -949,6 +952,7 @@ func (s *state) ValidatorSet(subnetID ids.ID, vdrs validators.Set) error {
 }
 
 func (s *state) ApplyValidatorWeightDiffs(
+	ctx context.Context,
 	validators map[ids.NodeID]*validators.GetValidatorOutput,
 	startHeight uint64,
 	endHeight uint64,
@@ -964,6 +968,10 @@ func (s *state) ApplyValidatorWeightDiffs(
 	// TODO: Remove the index continuity checks once we are guaranteed nodes can
 	// not rollback to not support the new indexing mechanism.
 	for diffIter.Next() && s.indexedHeights != nil && s.indexedHeights.Start <= endHeight {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+
 		_, parsedHeight, nodeID, err := parseWeightKey(diffIter.Key())
 		if err != nil {
 			return err
@@ -990,6 +998,10 @@ func (s *state) ApplyValidatorWeightDiffs(
 	// TODO: Remove this once it is assumed that all subnet validators have
 	// adopted the new indexing.
 	for height := prevHeight - 1; height >= endHeight; height-- {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+
 		prefixStruct := heightWithSubnet{
 			Height:   height,
 			SubnetID: subnetID,
@@ -1063,6 +1075,7 @@ func applyWeightDiff(
 }
 
 func (s *state) ApplyValidatorPublicKeyDiffs(
+	ctx context.Context,
 	validators map[ids.NodeID]*validators.GetValidatorOutput,
 	startHeight uint64,
 	endHeight uint64,
@@ -1073,6 +1086,10 @@ func (s *state) ApplyValidatorPublicKeyDiffs(
 	defer diffIter.Release()
 
 	for diffIter.Next() {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+
 		parsedHeight, nodeID, err := parseBLSKey(diffIter.Key())
 		if err != nil {
 			return err
@@ -1603,6 +1620,13 @@ func (s *state) AddStatelessBlock(block blocks.Block, status choices.Status) {
 }
 
 func (s *state) SetHeight(height uint64) {
+	if s.indexedHeights == nil {
+		s.indexedHeights = &heightRange{
+			Start: height,
+		}
+	}
+
+	s.indexedHeights.End = height
 	s.currentHeight = height
 }
 
@@ -2113,19 +2137,17 @@ func (s *state) writeMetadata(height uint64) error {
 		s.persistedLastAccepted = s.lastAccepted
 	}
 
-	if s.indexedHeights == nil {
-		s.indexedHeights = &heightRange{
-			Start: height,
+	if s.indexedHeights != nil {
+		s.indexedHeights.End = height
+
+		indexedHeightsBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, s.indexedHeights)
+		if err != nil {
+			return err
+		}
+		if err := s.singletonDB.Put(heightsIndexedKey, indexedHeightsBytes); err != nil {
+			return fmt.Errorf("failed to write indexed range: %w", err)
 		}
 	}
-	s.indexedHeights.End = height
 
-	indexedHeightsBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, s.indexedHeights)
-	if err != nil {
-		return err
-	}
-	if err := s.singletonDB.Put(heightsIndexedKey, indexedHeightsBytes); err != nil {
-		return fmt.Errorf("failed to write indexed range: %w", err)
-	}
 	return nil
 }

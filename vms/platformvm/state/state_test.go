@@ -4,6 +4,7 @@
 package state
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -481,6 +482,7 @@ func TestStateAddRemoveValidator(t *testing.T) {
 
 			primaryValidatorSet := copyValidatorSet(diff.expectedPrimaryValidatorSet)
 			require.NoError(state.ApplyValidatorWeightDiffs(
+				context.Background(),
 				primaryValidatorSet,
 				currentHeight,
 				prevHeight+1,
@@ -489,6 +491,7 @@ func TestStateAddRemoveValidator(t *testing.T) {
 			requireEqualWeightsValidatorSet(require, prevDiff.expectedPrimaryValidatorSet, primaryValidatorSet)
 
 			require.NoError(state.ApplyValidatorPublicKeyDiffs(
+				context.Background(),
 				primaryValidatorSet,
 				currentHeight,
 				prevHeight+1,
@@ -497,6 +500,7 @@ func TestStateAddRemoveValidator(t *testing.T) {
 
 			subnetValidatorSet := copyValidatorSet(diff.expectedSubnetValidatorSet)
 			require.NoError(state.ApplyValidatorWeightDiffs(
+				context.Background(),
 				subnetValidatorSet,
 				currentHeight,
 				prevHeight+1,

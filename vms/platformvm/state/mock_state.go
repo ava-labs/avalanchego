@@ -8,6 +8,7 @@
 package state
 
 import (
+	context "context"
 	reflect "reflect"
 	time "time"
 
@@ -142,31 +143,31 @@ func (mr *MockStateMockRecorder) AddUTXO(arg0 interface{}) *gomock.Call {
 }
 
 // ApplyValidatorPublicKeyDiffs mocks base method.
-func (m *MockState) ApplyValidatorPublicKeyDiffs(arg0 map[ids.NodeID]*validators.GetValidatorOutput, arg1, arg2 uint64) error {
+func (m *MockState) ApplyValidatorPublicKeyDiffs(arg0 context.Context, arg1 map[ids.NodeID]*validators.GetValidatorOutput, arg2, arg3 uint64) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ApplyValidatorPublicKeyDiffs", arg0, arg1, arg2)
+	ret := m.ctrl.Call(m, "ApplyValidatorPublicKeyDiffs", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // ApplyValidatorPublicKeyDiffs indicates an expected call of ApplyValidatorPublicKeyDiffs.
-func (mr *MockStateMockRecorder) ApplyValidatorPublicKeyDiffs(arg0, arg1, arg2 interface{}) *gomock.Call {
+func (mr *MockStateMockRecorder) ApplyValidatorPublicKeyDiffs(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ApplyValidatorPublicKeyDiffs", reflect.TypeOf((*MockState)(nil).ApplyValidatorPublicKeyDiffs), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ApplyValidatorPublicKeyDiffs", reflect.TypeOf((*MockState)(nil).ApplyValidatorPublicKeyDiffs), arg0, arg1, arg2, arg3)
 }
 
 // ApplyValidatorWeightDiffs mocks base method.
-func (m *MockState) ApplyValidatorWeightDiffs(arg0 map[ids.NodeID]*validators.GetValidatorOutput, arg1, arg2 uint64, arg3 ids.ID) error {
+func (m *MockState) ApplyValidatorWeightDiffs(arg0 context.Context, arg1 map[ids.NodeID]*validators.GetValidatorOutput, arg2, arg3 uint64, arg4 ids.ID) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ApplyValidatorWeightDiffs", arg0, arg1, arg2, arg3)
+	ret := m.ctrl.Call(m, "ApplyValidatorWeightDiffs", arg0, arg1, arg2, arg3, arg4)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // ApplyValidatorWeightDiffs indicates an expected call of ApplyValidatorWeightDiffs.
-func (mr *MockStateMockRecorder) ApplyValidatorWeightDiffs(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+func (mr *MockStateMockRecorder) ApplyValidatorWeightDiffs(arg0, arg1, arg2, arg3, arg4 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ApplyValidatorWeightDiffs", reflect.TypeOf((*MockState)(nil).ApplyValidatorWeightDiffs), arg0, arg1, arg2, arg3)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ApplyValidatorWeightDiffs", reflect.TypeOf((*MockState)(nil).ApplyValidatorWeightDiffs), arg0, arg1, arg2, arg3, arg4)
 }
 
 // Checksum mocks base method.
