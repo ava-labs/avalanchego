@@ -18,7 +18,7 @@ message Request {
 // Note this service definition only exists for use in tests.
 // A database shouldn't expose this over the internet, as it
 // allows for reading/writing to the database.
-service SyncableDB {
+service DB {
   rpc GetMerkleRoot(google.protobuf.Empty) returns (GetMerkleRootResponse);
 
   rpc GetProof(GetProofRequest) returns (GetProofResponse);
@@ -50,7 +50,7 @@ message Proof {
 }
 
 // For use in sync client, which has a restriction on the size of
-// the response. GetChangeProof in the SyncableDB service doesn't.
+// the response. GetChangeProof in the DB service doesn't.
 message SyncGetChangeProofRequest {
   bytes start_root_hash = 1;
   bytes end_root_hash = 2;
@@ -92,7 +92,7 @@ message CommitChangeProofRequest {
 }
 
 // For use in sync client, which has a restriction on the size of
-// the response. GetRangeProof in the SyncableDB service doesn't.
+// the response. GetRangeProof in the DB service doesn't.
 message SyncGetRangeProofRequest {
   bytes root_hash = 1;
   bytes start_key = 2;
