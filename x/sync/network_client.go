@@ -82,8 +82,7 @@ func NewNetworkClient(
 	}
 }
 
-// AppResponse is called when this node receives a response from a peer.
-// As the engine considers errors returned from this function as fatal,
+// Always returns nil because the engine considers errors returned from this function as fatal,
 // this function always returns nil.
 func (c *networkClient) AppResponse(_ context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
 	c.lock.Lock()
@@ -142,7 +141,7 @@ func (c *networkClient) AppRequestFailed(_ context.Context, nodeID ids.NodeID, r
 }
 
 // Returns the handler for [requestID] and marks the request as fulfilled.
-// This is called by either [AppResponse] or [AppRequestFailed].
+// Returns false if there's no outstanding request with [requestID].
 // Assumes [c.lock] is held.
 func (c *networkClient) getRequestHandler(requestID uint32) (ResponseHandler, bool) {
 	handler, exists := c.outstandingRequestHandlers[requestID]
@@ -156,10 +155,9 @@ func (c *networkClient) getRequestHandler(requestID uint32) (ResponseHandler, bo
 }
 
 // RequestAny synchronously sends [request] to a randomly chosen peer with a
-// node version greater than or equal to [minVersion]. If [minVersion] is nil,
+// version greater than or equal to [minVersion]. If [minVersion] is nil,
 // the request is sent to any peer regardless of their version.
-// If the limit on active requests is reached, this function blocks until
-// a slot becomes available.
+// May block until the number of outstanding requests decreases.
 // Returns the node's response and the ID of the node.
 func (c *networkClient) RequestAny(
 	ctx context.Context,
@@ -195,8 +193,7 @@ func (c *networkClient) Request(ctx context.Context, nodeID ids.NodeID, request 
 	return c.request(ctx, nodeID, request)
 }
 
-// Sends [request] to [nodeID] and adds the response handler to [c.outstandingRequestHandlers]
-// so that it can be invoked upon response/failure.
+// Sends [request] to [nodeID] and returns the response.
 // Blocks until a response is received or the request fails.
 // Assumes [nodeID] is never [c.myNodeID] since we guarantee [c.myNodeID] will not be added to [c.peers].
 // Releases active requests semaphore if there was an error in sending the request.
