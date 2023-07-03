@@ -26,7 +26,7 @@ import (
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
-var _ Client = (*mockClient)(nil)
+var _ client = (*mockClient)(nil)
 
 func newNoopTracer() trace.Tracer {
 	tracer, _ := trace.New(trace.Config{Enabled: false})
