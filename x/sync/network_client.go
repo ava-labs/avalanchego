@@ -27,20 +27,20 @@ const minRequestHandlingDuration = 100 * time.Millisecond
 var (
 	_ networkClient = (*networkClientImpl)(nil)
 
-	ErrAcquiringSemaphore = errors.New("error acquiring semaphore")
-	ErrRequestFailed      = errors.New("request failed")
+	errAcquiringSemaphore = errors.New("error acquiring semaphore")
+	errRequestFailed      = errors.New("request failed")
 )
 
 // networkClient defines ability to send request / response through the Network
 type networkClient interface {
 	// requestAny synchronously sends request to an arbitrary peer with a
 	// node version greater than or equal to minVersion.
-	// Returns response bytes, the ID of the chosen peer, and ErrRequestFailed if
+	// Returns response bytes, the ID of the chosen peer, and errRequestFailed if
 	// the request should be retried.
 	requestAny(ctx context.Context, minVersion *version.Application, request []byte) ([]byte, ids.NodeID, error)
 
 	// request synchronously sends request to the selected nodeID.
-	// Returns response bytes, and ErrRequestFailed if the request should be retried.
+	// Returns response bytes, and errRequestFailed if the request should be retried.
 	request(ctx context.Context, nodeID ids.NodeID, request []byte) ([]byte, error)
 
 	// trackBandwidth should be called for each valid response with the bandwidth
@@ -178,7 +178,7 @@ func (c *networkClientImpl) requestAny(
 ) ([]byte, ids.NodeID, error) {
 	// Take a slot from total [activeRequests] and block until a slot becomes available.
 	if err := c.activeRequests.Acquire(ctx, 1); err != nil {
-		return nil, ids.EmptyNodeID, ErrAcquiringSemaphore
+		return nil, ids.EmptyNodeID, errAcquiringSemaphore
 	}
 	defer c.activeRequests.Release(1)
 
@@ -207,7 +207,7 @@ func (c *networkClientImpl) request(
 	// Take a slot from total [activeRequests]
 	// and block until a slot becomes available.
 	if err := c.activeRequests.Acquire(ctx, 1); err != nil {
-		return nil, ErrAcquiringSemaphore
+		return nil, errAcquiringSemaphore
 	}
 	defer c.activeRequests.Release(1)
 
@@ -258,7 +258,7 @@ func (c *networkClientImpl) get(
 	case response = <-handler.responseChan:
 	}
 	if handler.failed {
-		return nil, ErrRequestFailed
+		return nil, errRequestFailed
 	}
 
 	c.log.Debug("received response from peer",
