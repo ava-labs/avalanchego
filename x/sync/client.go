@@ -26,7 +26,7 @@ import (
 const (
 	initialRetryWait = 10 * time.Millisecond
 	maxRetryWait     = time.Second
-	retryWaitFactor  = 1.5
+	retryWaitFactor  = 1.5 // Larger --> timeout grows more quickly
 
 	epsilon = 1e-6 // small amount to add to time to avoid division by 0
 )
