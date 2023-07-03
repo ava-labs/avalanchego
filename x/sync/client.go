@@ -188,6 +188,7 @@ func getAndParse[T any](
 	parseFn func(context.Context, []byte) (*T, error),
 ) (*T, error) {
 	var (
+		// TODO is reporting the last error worth the code complexity?
 		lastErr  error
 		response *T
 	)
@@ -198,9 +199,7 @@ func getAndParse[T any](
 			if lastErr != nil {
 				return nil, fmt.Errorf(
 					"request failed after %d attempts with last error %s and ctx error %w",
-					attempt,
-					lastErr,
-					err,
+					attempt, lastErr, err,
 				)
 			}
 			return nil, err
@@ -223,6 +222,7 @@ func getAndParse[T any](
 			// Don't overwrite [lastErr] if it's context cancelation.
 			lastErr = err
 
+			// Wait before retrying.
 			select {
 			case <-ctx.Done():
 				// Return error at top of loop.
@@ -234,8 +234,8 @@ func getAndParse[T any](
 	}
 }
 
-// get sends [request] to an arbitrary peer and blocks until the node receives a response
-// or [ctx] is canceled.
+// get sends [request] to an arbitrary peer and blocks
+// until the node receives a response or [ctx] is canceled.
 // Returns the peer's NodeID and response.
 // It's safe to call this method multiple times concurrently.
 func (c *client) get(ctx context.Context, request []byte) (ids.NodeID, []byte, error) {
@@ -249,8 +249,9 @@ func (c *client) get(ctx context.Context, request []byte) (ids.NodeID, []byte, e
 	if len(c.stateSyncNodes) == 0 {
 		response, nodeID, err = c.networkClient.RequestAny(ctx, c.stateSyncMinVersion, request)
 	} else {
-		// get the next nodeID using the nodeIdx offset. If we're out of nodes, loop back to 0
-		// we do this every attempt to ensure we get a different node each time if possible.
+		// Get the next nodeID to query using the [nodeIdx] offset.
+		// If we're out of nodes, loop back to 0.
+		// We do this try to query a different node each time if possible.
 		nodeIdx := atomic.AddUint32(&c.stateSyncNodeIdx, 1)
 		nodeID = c.stateSyncNodes[nodeIdx%uint32(len(c.stateSyncNodes))]
 		response, err = c.networkClient.Request(ctx, nodeID, request)
