@@ -110,7 +110,7 @@ func (c *networkClient) AppResponse(
 	if !exists {
 		// Should never happen since the engine
 		// should be managing outstanding requests
-		c.log.Error(
+		c.log.Warn(
 			"received response to unknown request",
 			zap.Stringer("nodeID", nodeID),
 			zap.Uint32("requestID", requestID),
@@ -142,7 +142,7 @@ func (c *networkClient) AppRequestFailed(
 	if !exists {
 		// Should never happen since the engine
 		// should be managing outstanding requests
-		c.log.Error(
+		c.log.Warn(
 			"received request failed to unknown request",
 			zap.Stringer("nodeID", nodeID),
 			zap.Uint32("requestID", requestID),
