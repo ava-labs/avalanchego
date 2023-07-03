@@ -461,7 +461,7 @@ func (h *handler) VerifySpend(
 		utxos[index] = utxo
 	}
 
-	return h.VerifySpendUTXOs(nil, tx, utxos, ins, outs, creds, unlockedProduced)
+	return h.VerifySpendUTXOs(utxoDB, tx, utxos, ins, outs, creds, unlockedProduced)
 }
 
 func (h *handler) VerifySpendUTXOs(

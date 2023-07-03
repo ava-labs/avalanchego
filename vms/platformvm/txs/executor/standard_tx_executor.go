@@ -176,7 +176,7 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 		copy(ins[len(tx.Ins):], tx.ImportedInputs)
 
 		if err := e.FlowChecker.VerifySpendUTXOs(
-			nil,
+			e.State,
 			tx,
 			utxos,
 			ins,

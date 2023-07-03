@@ -762,7 +762,7 @@ func (s *CaminoService) GetDeposits(_ *http.Request, args *GetDepositsArgs, repl
 	return nil
 }
 
-// GetHeight returns the height of the last accepted block
+// GetLastAcceptedBlock returns the last accepted block
 func (s *CaminoService) GetLastAcceptedBlock(r *http.Request, _ *struct{}, reply *api.GetBlockResponse) error {
 	s.vm.ctx.Log.Debug("Platform: GetLastAcceptedBlock called")
 
@@ -779,6 +779,37 @@ func (s *CaminoService) GetLastAcceptedBlock(r *http.Request, _ *struct{}, reply
 	block.InitCtx(s.vm.ctx)
 	reply.Encoding = formatting.JSON
 	reply.Block = block
+	return nil
+}
+
+type GetBlockAtHeight struct {
+	Height uint32 `json:"height"`
+}
+
+// GetBlockAtHeight returns block at given height
+func (s *CaminoService) GetBlockAtHeight(r *http.Request, args *GetBlockAtHeight, reply *api.GetBlockResponse) error {
+	s.vm.ctx.Log.Debug("Platform: GetBlockAtHeight called")
+
+	ctx := r.Context()
+	blockID, err := s.vm.LastAccepted(ctx)
+	if err != nil {
+		return fmt.Errorf("couldn't get last accepted block ID: %w", err)
+	}
+
+	for {
+		block, err := s.vm.manager.GetStatelessBlock(blockID)
+		if err != nil {
+			return fmt.Errorf("couldn't get block with id %s: %w", blockID, err)
+		}
+		if block.Height() == uint64(args.Height) {
+			block.InitCtx(s.vm.ctx)
+			reply.Encoding = formatting.JSON
+			reply.Block = block
+			break
+		}
+		blockID = block.Parent()
+	}
+
 	return nil
 }
 

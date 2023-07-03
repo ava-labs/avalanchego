@@ -132,7 +132,7 @@ func (h *caminoHandler) VerifySpendUTXOs(
 			locked.StateUnlocked,
 		)
 	}
-	return h.handler.VerifySpendUTXOs(nil, tx, utxos, ins, outs, creds, unlockedProduced)
+	return h.handler.VerifySpendUTXOs(utxoDB, tx, utxos, ins, outs, creds, unlockedProduced)
 }
 
 func (h *caminoHandler) toAVAXBurnedAmount(unlockedProduced map[ids.ID]uint64) (uint64, error) {
