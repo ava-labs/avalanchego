@@ -184,6 +184,7 @@ func (c *networkClient) RequestAny(
 
 	c.lock.Lock()
 	if nodeID, ok := c.peers.GetAnyPeer(minVersion); ok {
+		// Note [c.request] releases [c.lock].
 		response, err := c.request(ctx, nodeID, request)
 		return response, nodeID, err
 	}
@@ -211,6 +212,7 @@ func (c *networkClient) Request(
 	defer c.activeRequests.Release(1)
 
 	c.lock.Lock()
+	// Note [c.request] releases [c.lock].
 	return c.request(ctx, nodeID, request)
 }
 
