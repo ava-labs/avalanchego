@@ -177,10 +177,11 @@ func (c *client) GetRangeProof(ctx context.Context, req *pb.SyncGetRangeProofReq
 	return getAndParse(ctx, c, reqBytes, parseFn)
 }
 
-// getAndParse uses [client] to send [request] to an arbitrary peer. If the peer responds,
-// [parseFn] is called with the raw response. If [parseFn] returns an error or the request
-// times out, this function will retry the request to a different peer until [ctx] expires.
-// If [parseFn] returns a nil error, the result is returned from getAndParse.
+// getAndParse uses [client] to send [request] to an arbitrary peer.
+// Returns the response to the request.
+// [parseFn] parses the raw response.
+// If the request is unsuccessful or the response can't be parsed,
+// retries the request to a different peer until [ctx] expires.
 func getAndParse[T any](
 	ctx context.Context,
 	client *client,
@@ -235,7 +236,8 @@ func getAndParse[T any](
 }
 
 // get sends [request] to an arbitrary peer and blocks
-// until the node receives a response or [ctx] is canceled.
+// until the node receives a response, failure notification
+// or [ctx] is canceled.
 // Returns the peer's NodeID and response.
 // It's safe to call this method multiple times concurrently.
 func (c *client) get(ctx context.Context, request []byte) (ids.NodeID, []byte, error) {
