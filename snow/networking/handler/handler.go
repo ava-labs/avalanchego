@@ -195,6 +195,21 @@ func (h *handler) SetOnStopped(onStopped func()) {
 }
 
 func (h *handler) selectStartingGear(ctx context.Context) (common.Engine, error) {
+	if h.ctx.ChainID == h.ctx.XChainID {
+		engines := h.engineManager.Get(p2p.EngineType_ENGINE_TYPE_SNOWMAN)
+		if engines == nil {
+			return nil, errors.New("no snowman engines found for X-chain")
+		}
+		if engines.Bootstrapper == nil {
+			return nil, errors.New("no snowman bootstrapper engine found for X-chain")
+		}
+		h.ctx.Log.Info("wiping X-chain bootstrapping state")
+		if err := engines.Bootstrapper.Clear(); err != nil {
+			return nil, fmt.Errorf("resetting X-chain bootstrapper DB failed: %w", err)
+		}
+		h.ctx.Log.Info("finished wiping X-chain bootstrapping state")
+	}
+
 	state := h.ctx.State.Get()
 	engines := h.engineManager.Get(state.Type)
 	if engines == nil {
