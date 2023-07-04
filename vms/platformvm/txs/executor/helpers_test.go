@@ -41,7 +41,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
-	"github.com/ava-labs/avalanchego/vms/platformvm/execconfig"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -222,7 +221,7 @@ func defaultState(
 	rewards reward.Calculator,
 ) state.State {
 	genesisBytes := buildGenesisTest(ctx)
-	execCfg, _ := execconfig.GetExecutionConfig(nil)
+	execCfg, _ := config.GetExecutionConfig(nil)
 	state, err := state.New(
 		db,
 		genesisBytes,

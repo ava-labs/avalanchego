@@ -32,16 +32,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
-	"github.com/ava-labs/avalanchego/vms/platformvm/execconfig"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-)
-
-const (
-	chainDBCacheSize = 2048
 )
 
 var (
@@ -354,7 +349,7 @@ func New(
 	genesisBytes []byte,
 	metricsReg prometheus.Registerer,
 	cfg *config.Config,
-	execCfg *execconfig.Config,
+	execCfg *config.ExecutionConfig,
 	ctx *snow.Context,
 	metrics metrics.Metrics,
 	rewards reward.Calculator,
@@ -390,7 +385,7 @@ func new(
 	db database.Database,
 	metrics metrics.Metrics,
 	cfg *config.Config,
-	execCfg *execconfig.Config,
+	execCfg *config.ExecutionConfig,
 	ctx *snow.Context,
 	metricsReg prometheus.Registerer,
 	rewards reward.Calculator,

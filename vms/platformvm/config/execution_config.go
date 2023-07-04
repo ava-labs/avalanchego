@@ -1,4 +1,7 @@
-package execconfig
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
+package config
 
 import (
 	"encoding/json"
@@ -17,7 +20,8 @@ const (
 	chainDBCacheSize        = 2048
 )
 
-type Config struct {
+// ExecutionConfig provides execution parameters of PlatformVM
+type ExecutionConfig struct {
 	BlockCacheSize               int `json:"blockCacheSize"`
 	TxCacheSize                  int `json:"txCacheSize"`
 	TransformedSubnetTxCacheSize int `json:"transformedSubnetTxCacheSize"`
@@ -27,8 +31,11 @@ type Config struct {
 	ChainDBCacheSize             int `json:"chainDBCacheSize"`
 }
 
-func GetExecutionConfig(b []byte) (*Config, error) {
-	ec := &Config{
+// GetExecutionConfig returns an ExecutionConfig
+// input is unmarshalled into an ExecutionConfig previously
+// initialized with default values
+func GetExecutionConfig(b []byte) (*ExecutionConfig, error) {
+	ec := &ExecutionConfig{
 		BlockCacheSize:               blockCacheSize,
 		TxCacheSize:                  txCacheSize,
 		TransformedSubnetTxCacheSize: transformedSubnetTxCacheSize,

@@ -1,4 +1,7 @@
-package execconfig
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
+package config
 
 import (
 	"testing"
@@ -12,7 +15,7 @@ func TestExecutionConfigUnmarshal(t *testing.T) {
 		b := []byte(`{}`)
 		ec, err := GetExecutionConfig(b)
 		require.NoError(err)
-		expected := Config{
+		expected := ExecutionConfig{
 			BlockCacheSize:               blockCacheSize,
 			TxCacheSize:                  txCacheSize,
 			TransformedSubnetTxCacheSize: transformedSubnetTxCacheSize,
@@ -29,7 +32,7 @@ func TestExecutionConfigUnmarshal(t *testing.T) {
 		b := []byte(``)
 		ec, err := GetExecutionConfig(b)
 		require.NoError(err)
-		expected := Config{
+		expected := ExecutionConfig{
 			BlockCacheSize:               blockCacheSize,
 			TxCacheSize:                  txCacheSize,
 			TransformedSubnetTxCacheSize: transformedSubnetTxCacheSize,
@@ -46,7 +49,7 @@ func TestExecutionConfigUnmarshal(t *testing.T) {
 		b := []byte(`{"blockCacheSize":1}`)
 		ec, err := GetExecutionConfig(b)
 		require.NoError(err)
-		expected := Config{
+		expected := ExecutionConfig{
 			BlockCacheSize:               1,
 			TxCacheSize:                  txCacheSize,
 			TransformedSubnetTxCacheSize: transformedSubnetTxCacheSize,
