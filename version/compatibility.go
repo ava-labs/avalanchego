@@ -1,3 +1,13 @@
+// Copyright (C) 2023, Chain4Travel AG. All rights reserved.
+//
+// This file is a derived work, based on ava-labs code whose
+// original notices appear below.
+//
+// It is distributed under the same license conditions as the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********************************************************
 // Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -57,9 +67,9 @@ func (c *compatibility) Version() *Application {
 }
 
 func (c *compatibility) Compatible(peer *Application) error {
-	if err := c.version.Compatible(peer); err != nil {
-		return err
-	}
+	// if err := c.version.Compatible(peer); err != nil {
+	// 	return err
+	// }
 
 	if !peer.Before(c.minCompatable) {
 		// The peer is at least the minimum compatible version.

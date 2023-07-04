@@ -1849,7 +1849,7 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 			txFlag:         txs.AddressStateBitKYCExpired,
 			existingState:  txs.AddressStateRoleKYC,
 			expectedState:  txs.AddressStateKYCExpired,
-			expectedErrs:   []error{errNotSunrisePhase1, nil},
+			expectedErrs:   []error{errNotAthensPhase, nil},
 			remove:         false,
 			executor:       bob,
 			executorAuth:   &secp256k1fx.Input{SigIndices: []uint32{0}},
@@ -1862,7 +1862,7 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 			txFlag:         txs.AddressStateBitKYCExpired,
 			existingState:  txs.AddressStateRoleKYC,
 			expectedState:  txs.AddressStateKYCExpired,
-			expectedErrs:   []error{errNotSunrisePhase1, errSignatureMissing},
+			expectedErrs:   []error{errNotAthensPhase, errSignatureMissing},
 			remove:         false,
 			executor:       alice,
 			executorAuth:   &secp256k1fx.Input{SigIndices: []uint32{0}},
@@ -1880,13 +1880,13 @@ func TestAddAddressStateTxExecutor(t *testing.T) {
 		},
 	}}
 
-	sunrisePhaseTimes := []time.Time{
-		env.state.GetTimestamp().Add(24 * time.Hour), // SunrisePhases1 not yet active (> chainTime)
-		env.state.GetTimestamp(),                     // SunrisePhase1 active (<= chainTime)
+	athensPhaseTimes := []time.Time{
+		env.state.GetTimestamp().Add(24 * time.Hour), // AthensPhase not yet active (> chainTime)
+		env.state.GetTimestamp(),                     // AthensPhase active (<= chainTime)
 	}
 
 	for phase := 0; phase < 2; phase++ {
-		env.config.SunrisePhase1Time = sunrisePhaseTimes[phase]
+		env.config.AthensPhaseTime = athensPhaseTimes[phase]
 		for name, tt := range tests {
 			t.Run(fmt.Sprintf("Phase %d; %s", phase, name), func(t *testing.T) {
 				addressStateTx := &txs.AddressStateTx{
@@ -1996,13 +1996,13 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 		{
 			name: "SunrisePhase0",
 			prepare: func(env *caminoEnvironment, chaintime time.Time) {
-				env.config.SunrisePhase1Time = chaintime.Add(1 * time.Second)
+				env.config.AthensPhaseTime = chaintime.Add(1 * time.Second)
 			},
 		},
 		{
-			name: "SunrisePhase1",
+			name: "AthensPhase",
 			prepare: func(env *caminoEnvironment, chaintime time.Time) {
-				env.config.SunrisePhase1Time = chaintime
+				env.config.AthensPhaseTime = chaintime
 			},
 		},
 	}
@@ -2274,7 +2274,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 				}
 			},
 			chaintime:   offerWithMaxRewardAmount.StartTime(),
-			expectedErr: []error{errNotSunrisePhase1, errDepositTooBig},
+			expectedErr: []error{errNotAthensPhase, errDepositTooBig},
 		},
 		"UTXO not found": {
 			state: func(c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
@@ -2342,7 +2342,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
 				s.EXPECT().GetDepositOffer(utx.DepositOfferID).Return(offerWithOwner, nil)
 				s.EXPECT().GetTimestamp().Return(offerWithOwner.StartTime())
-				if phaseIndex > 0 { // if sunrise1
+				if phaseIndex > 0 { // if Athens
 					expectVerifyMultisigPermission(s, []ids.ShortID{offerWithOwner.OwnerAddress}, nil)
 				}
 				return s
@@ -2381,7 +2381,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 				copy(cred.Sigs[0][:], sig)
 				return cred
 			},
-			expectedErr: []error{errNotSunrisePhase1, errOfferPermissionCredentialMismatch},
+			expectedErr: []error{errNotAthensPhase, errOfferPermissionCredentialMismatch},
 		},
 		"Owned offer, bad offer permission credential (wrong offer owner key)": {
 			state: func(c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
@@ -2389,7 +2389,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
 				s.EXPECT().GetDepositOffer(utx.DepositOfferID).Return(offerWithOwner, nil)
 				s.EXPECT().GetTimestamp().Return(offerWithOwner.StartTime())
-				if phaseIndex > 0 { // if sunrise1
+				if phaseIndex > 0 { // if Athens
 					expectVerifyMultisigPermission(s, []ids.ShortID{offerWithOwner.OwnerAddress}, nil)
 				}
 				return s
@@ -2428,7 +2428,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 				copy(cred.Sigs[0][:], sig)
 				return cred
 			},
-			expectedErr: []error{errNotSunrisePhase1, errOfferPermissionCredentialMismatch},
+			expectedErr: []error{errNotAthensPhase, errOfferPermissionCredentialMismatch},
 		},
 		"Owned offer, bad offer permission credential (wrong offer owner auth)": {
 			state: func(c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
@@ -2436,7 +2436,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
 				s.EXPECT().GetDepositOffer(utx.DepositOfferID).Return(offerWithOwner, nil)
 				s.EXPECT().GetTimestamp().Return(offerWithOwner.StartTime())
-				if phaseIndex > 0 { // if sunrise1
+				if phaseIndex > 0 { // if Athens
 					expectVerifyMultisigPermission(s, []ids.ShortID{offerWithOwner.OwnerAddress}, nil)
 				}
 				return s
@@ -2475,7 +2475,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 				copy(cred.Sigs[0][:], sig)
 				return cred
 			},
-			expectedErr: []error{errNotSunrisePhase1, errOfferPermissionCredentialMismatch},
+			expectedErr: []error{errNotAthensPhase, errOfferPermissionCredentialMismatch},
 		},
 		"Owned offer, bad deposit creator credential (wrong key)": {
 			state: func(c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
@@ -2483,7 +2483,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
 				s.EXPECT().GetDepositOffer(utx.DepositOfferID).Return(offerWithOwner, nil)
 				s.EXPECT().GetTimestamp().Return(offerWithOwner.StartTime())
-				if phaseIndex > 0 { // if sunrise1
+				if phaseIndex > 0 { // if Athens
 					expectVerifyMultisigPermission(s, []ids.ShortID{offerWithOwner.OwnerAddress, utx.DepositCreatorAddress}, nil)
 				}
 				return s
@@ -2522,7 +2522,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 				copy(cred.Sigs[0][:], sig)
 				return cred
 			},
-			expectedErr: []error{errNotSunrisePhase1, errDepositCreatorCredentialMismatch},
+			expectedErr: []error{errNotAthensPhase, errDepositCreatorCredentialMismatch},
 		},
 		"Owned offer, bad deposit creator credential (wrong auth)": {
 			state: func(c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
@@ -2530,7 +2530,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
 				s.EXPECT().GetDepositOffer(utx.DepositOfferID).Return(offerWithOwner, nil)
 				s.EXPECT().GetTimestamp().Return(offerWithOwner.StartTime())
-				if phaseIndex > 0 { // if sunrise1
+				if phaseIndex > 0 { // if Athens
 					expectVerifyMultisigPermission(s, []ids.ShortID{offerWithOwner.OwnerAddress, utx.DepositCreatorAddress}, nil)
 				}
 				return s
@@ -2569,7 +2569,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 				copy(cred.Sigs[0][:], sig)
 				return cred
 			},
-			expectedErr: []error{errNotSunrisePhase1, errDepositCreatorCredentialMismatch},
+			expectedErr: []error{errNotAthensPhase, errDepositCreatorCredentialMismatch},
 		},
 		"Supply overflow": {
 			state: func(c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
@@ -2965,7 +2965,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 			},
 			chaintime:   offerWithMaxRewardAmount.StartTime(),
 			signers:     [][]*secp256k1.PrivateKey{{feeOwnerKey}, {utxoOwnerKey}},
-			expectedErr: []error{errNotSunrisePhase1},
+			expectedErr: []error{errNotAthensPhase},
 		},
 		"OK|Fail: deposit offer with owner": {
 			state: func(c *gomock.Controller, utx *txs.DepositTx, txID ids.ID, cfg *config.Config, phaseIndex int) *state.MockDiff {
@@ -2973,7 +2973,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 				s.EXPECT().CaminoConfig().Return(&state.CaminoConfig{LockModeBondDeposit: true}, nil)
 				s.EXPECT().GetDepositOffer(utx.DepositOfferID).Return(offerWithOwner, nil)
 				s.EXPECT().GetTimestamp().Return(offerWithOwner.StartTime())
-				if phaseIndex > 0 { // if sunrise1
+				if phaseIndex > 0 { // if Athens
 					expectVerifyMultisigPermission(s, []ids.ShortID{offerWithOwner.OwnerAddress, utx.DepositCreatorAddress}, nil)
 					expectVerifyLock(s, utx.Ins,
 						[]*avax.UTXO{feeUTXO, unlockedUTXO1},
@@ -3031,7 +3031,7 @@ func TestCaminoStandardTxExecutorDepositTx(t *testing.T) {
 				copy(cred.Sigs[0][:], sig)
 				return cred
 			},
-			expectedErr: []error{errNotSunrisePhase1},
+			expectedErr: []error{errNotAthensPhase},
 		},
 	}
 	for name, tt := range tests {
@@ -5537,10 +5537,10 @@ func TestCaminoStandardTxExecutorAddDepositOfferTx(t *testing.T) {
 		signers     [][]*secp256k1.PrivateKey
 		expectedErr error
 	}{
-		"Not SunrisePhase1": {
+		"Not AthensPhase": {
 			state: func(c *gomock.Controller, utx *txs.AddDepositOfferTx, txID ids.ID, cfg *config.Config) *state.MockDiff {
 				s := state.NewMockDiff(c)
-				s.EXPECT().GetTimestamp().Return(cfg.SunrisePhase1Time.Add(-1 * time.Second))
+				s.EXPECT().GetTimestamp().Return(cfg.AthensPhaseTime.Add(-1 * time.Second))
 				return s
 			},
 			utx: func() *txs.AddDepositOfferTx {
@@ -5554,7 +5554,7 @@ func TestCaminoStandardTxExecutorAddDepositOfferTx(t *testing.T) {
 			signers: [][]*secp256k1.PrivateKey{
 				{feeOwnerKey}, {offerCreatorKey},
 			},
-			expectedErr: errNotSunrisePhase1,
+			expectedErr: errNotAthensPhase,
 		},
 		"Not offer creator": {
 			state: func(c *gomock.Controller, utx *txs.AddDepositOfferTx, txID ids.ID, cfg *config.Config) *state.MockDiff {

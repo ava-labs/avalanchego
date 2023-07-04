@@ -1011,14 +1011,14 @@ func apiOfferFromOffer(offer *deposit.Offer) *APIDepositOffer {
 }
 
 type GetUpgradePhasesReply struct {
-	SunrisePhase utilsjson.Uint32 `json:"sunrisePhase"`
+	AthensPhase utilsjson.Uint32 `json:"athensPhase"`
 }
 
 func (s *CaminoService) GetUpgradePhases(_ *http.Request, _ *struct{}, response *GetUpgradePhasesReply) error {
 	s.vm.ctx.Log.Debug("Platform: GetUpgradePhases called")
 
-	if s.vm.Config.IsSunrisePhase1Activated(s.vm.state.GetTimestamp()) {
-		response.SunrisePhase = 1
+	if s.vm.Config.IsAthensPhaseActivated(s.vm.state.GetTimestamp()) {
+		response.AthensPhase = 1
 	}
 	return nil
 }

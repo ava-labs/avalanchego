@@ -71,7 +71,7 @@ var (
 	errExpiredDepositNotFullyUnlocked    = errors.New("unlocked only part of expired deposit")
 	errBurnedDepositUnlock               = errors.New("burned undeposited tokens")
 	errAdminCannotBeDeleted              = errors.New("admin cannot be deleted")
-	errNotSunrisePhase1                  = errors.New("not allowed before SunrisePhase1")
+	errNotAthensPhase                    = errors.New("not allowed before AthensPhase")
 	errOfferCreatorCredentialMismatch    = errors.New("offer creator credential isn't matching")
 	errNotOfferCreator                   = errors.New("address isn't allowed to create deposit offers")
 	errDepositCreatorCredentialMismatch  = errors.New("deposit creator credential isn't matching")
@@ -629,7 +629,7 @@ func (e *CaminoStandardTxExecutor) DepositTx(tx *txs.DepositTx) error {
 
 	depositAmount := tx.DepositAmount()
 	chainTime := e.State.GetTimestamp()
-	sunrisePhase1 := e.Config.IsSunrisePhase1Activated(chainTime)
+	athensPhase := e.Config.IsAthensPhaseActivated(chainTime)
 
 	switch {
 	case !depositOffer.IsActiveAt(uint64(chainTime.Unix())):
@@ -642,8 +642,8 @@ func (e *CaminoStandardTxExecutor) DepositTx(tx *txs.DepositTx) error {
 		return errDepositTooSmall
 	case depositOffer.TotalMaxAmount > 0 && depositAmount > depositOffer.RemainingAmount():
 		return errDepositTooBig
-	case !sunrisePhase1 && depositOffer.TotalMaxRewardAmount > 0:
-		return errNotSunrisePhase1
+	case !athensPhase && depositOffer.TotalMaxRewardAmount > 0:
+		return errNotAthensPhase
 	}
 
 	deposit := &deposits.Deposit{
@@ -661,8 +661,8 @@ func (e *CaminoStandardTxExecutor) DepositTx(tx *txs.DepositTx) error {
 
 	baseTxCreds := e.Tx.Creds
 	if depositOffer.OwnerAddress != ids.ShortEmpty {
-		if !sunrisePhase1 {
-			return errNotSunrisePhase1
+		if !athensPhase {
+			return errNotAthensPhase
 		}
 
 		if tx.UpgradeVersionID.Version() == 0 {
@@ -1546,8 +1546,8 @@ func (e *CaminoStandardTxExecutor) AddDepositOfferTx(tx *txs.AddDepositOfferTx) 
 
 	chainTime := e.State.GetTimestamp()
 
-	if !e.Config.IsSunrisePhase1Activated(chainTime) {
-		return errNotSunrisePhase1
+	if !e.Config.IsAthensPhaseActivated(chainTime) {
+		return errNotAthensPhase
 	}
 
 	if len(e.Tx.Creds) < 2 {
@@ -1657,8 +1657,8 @@ func (e *CaminoStandardTxExecutor) AddressStateTx(tx *txs.AddressStateTx) error 
 	creds := e.Tx.Creds
 
 	if tx.UpgradeVersionID.Version() > 0 {
-		if !e.Config.IsSunrisePhase1Activated(e.State.GetTimestamp()) {
-			return errNotSunrisePhase1
+		if !e.Config.IsAthensPhaseActivated(e.State.GetTimestamp()) {
+			return errNotAthensPhase
 		}
 		if err = e.Backend.Fx.VerifyMultisigPermission(
 			e.Tx.Unsigned,
@@ -1706,9 +1706,9 @@ func (e *CaminoStandardTxExecutor) AddressStateTx(tx *txs.AddressStateTx) error 
 	}
 	statesBit := txs.AddressState(1) << tx.State
 
-	// Check for SunrisePhase1 Bits if we time has not passed yet
-	if (statesBit&txs.AddressStateSunrisePhase1Bits) != 0 &&
-		!e.Config.IsSunrisePhase1Activated(e.State.GetTimestamp()) {
+	// Check for AthensPhase Bits if we time has not passed yet
+	if (statesBit&txs.AddressStateAthensPhaseBits) != 0 &&
+		!e.Config.IsAthensPhaseActivated(e.State.GetTimestamp()) {
 		return errAddrStateNotPermitted
 	}
 

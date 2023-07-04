@@ -1,4 +1,4 @@
-// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
 //
 // This file is a derived work, based on ava-labs code whose
 // original notices appear below.
@@ -109,8 +109,8 @@ type Config struct {
 	// Time of the Banff network upgrade
 	BanffTime time.Time
 
-	// Time of the SP1 network upgrade
-	SunrisePhase1Time time.Time
+	// Time of the Athens Phase network upgrade
+	AthensPhaseTime time.Time
 
 	// Subnet ID --> Minimum portion of the subnet's stake this node must be
 	// connected to in order to report healthy.
@@ -145,8 +145,8 @@ func (c *Config) IsBanffActivated(timestamp time.Time) bool {
 	return !timestamp.Before(c.BanffTime)
 }
 
-func (c *Config) IsSunrisePhase1Activated(timestamp time.Time) bool {
-	return !timestamp.Before(c.SunrisePhase1Time)
+func (c *Config) IsAthensPhaseActivated(timestamp time.Time) bool {
+	return !timestamp.Before(c.AthensPhaseTime)
 }
 
 func (c *Config) GetCreateBlockchainTxFee(timestamp time.Time) uint64 {

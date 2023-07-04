@@ -1,4 +1,4 @@
-// Copyright (C) 2022, Chain4Travel AG. All rights reserved.
+// Copyright (C) 2022-2023, Chain4Travel AG. All rights reserved.
 //
 // This file is a derived work, based on ava-labs code whose
 // original notices appear below.
@@ -33,9 +33,9 @@ var (
 	GitVersion string = "unknown"
 
 	Current = &Semantic{
-		Major: 0,
-		Minor: 4,
-		Patch: 11,
+		Major: 1,
+		Minor: 0,
+		Patch: 0,
 	}
 	CurrentApp = &Application{
 		Major: Current.Major,
@@ -43,9 +43,9 @@ var (
 		Patch: Current.Patch,
 	}
 	MinimumCompatibleVersion = &Application{
-		Major: 0,
-		Minor: 4,
-		Patch: 11,
+		Major: 1,
+		Minor: 0,
+		Patch: 0,
 	}
 	PrevMinimumCompatibleVersion = &Application{
 		Major: 0,
@@ -112,10 +112,12 @@ var (
 	}
 	BanffDefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
 
-	SunrisePhase1Times = map[uint32]time.Time{
-		constants.KopernikusID: time.Date(2023, time.July, 3, 12, 0, 0, 0, time.UTC),
+	AthensPhaseTimes = map[uint32]time.Time{
+		constants.KopernikusID: time.Date(2023, time.July, 4, 13, 0, 0, 0, time.UTC),
+		constants.ColumbusID:   time.Date(2023, time.July, 7, 8, 0, 0, 0, time.UTC),
+		constants.CaminoID:     time.Date(2023, time.July, 17, 8, 0, 0, 0, time.UTC),
 	}
-	SunrisePhase1DefaultTime = time.Date(2022, time.May, 1, 0, 0, 0, 0, time.UTC)
+	AthensPhaseDefaultTime = time.Date(2023, time.July, 1, 8, 0, 0, 0, time.UTC)
 
 	// TODO: update this before release
 	CortinaTimes = map[uint32]time.Time{
@@ -195,11 +197,11 @@ func GetBanffTime(networkID uint32) time.Time {
 	return BanffDefaultTime
 }
 
-func GetSunrisePhase1Time(networkID uint32) time.Time {
-	if upgradeTime, exists := SunrisePhase1Times[networkID]; exists {
+func GetAthensPhaseTime(networkID uint32) time.Time {
+	if upgradeTime, exists := AthensPhaseTimes[networkID]; exists {
 		return upgradeTime
 	}
-	return SunrisePhase1DefaultTime
+	return AthensPhaseDefaultTime
 }
 
 func GetCortinaTime(networkID uint32) time.Time {
@@ -213,7 +215,7 @@ func GetCompatibility(networkID uint32) Compatibility {
 	return NewCompatibility(
 		CurrentApp,
 		MinimumCompatibleVersion,
-		GetSunrisePhase1Time(networkID).Add(-time.Minute),
+		GetAthensPhaseTime(networkID).Add(-time.Minute),
 		PrevMinimumCompatibleVersion,
 	)
 }

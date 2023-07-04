@@ -54,7 +54,7 @@ const (
 
 	AddressStateValidBits = AddressStateRoleAll | AddressStateKYCAll | AddressStateVotableBits | AddressStateOffersCreator // 0b100000000001100001100000000000000000000000000000111
 
-	AddressStateSunrisePhase1Bits = AddressStateRoleOffersAdmin | AddressStateOffersCreator
+	AddressStateAthensPhaseBits = AddressStateRoleOffersAdmin | AddressStateOffersCreator
 )
 
 var (
