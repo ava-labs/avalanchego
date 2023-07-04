@@ -1273,6 +1273,11 @@ func TestValidatorSetOperations(t *testing.T) {
 // upon different stakers operations
 func TestValidatorUptimesOperations(t *testing.T) {
 	properties := gopter.NewProperties(nil)
+
+	// // to reproduce a given scenario do something like this:
+	// parameters := gopter.DefaultTestParametersWithSeed(1688500811831135777)
+	// properties := gopter.NewProperties(parameters)
+
 	ctx := buildStateCtx()
 	startTime := time.Now().Truncate(time.Second)
 

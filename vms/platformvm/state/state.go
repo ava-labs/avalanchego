@@ -1714,13 +1714,12 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 		for nodeID, validatorDiff := range validatorDiffs {
 			// Copy [nodeID] so it doesn't get overwritten next iteration.
 			nodeID := nodeID
+			weightDiff := &ValidatorWeightDiff{}
 
-			weightDiff := &ValidatorWeightDiff{
-				Decrease: validatorDiff.validator.status == deleted,
-			}
 			switch validatorDiff.validator.status {
 			case added:
 				staker := validatorDiff.validator.staker
+				weightDiff.Decrease = false
 				weightDiff.Amount = staker.Weight
 
 				// The validator is being added.
@@ -1758,6 +1757,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 
 			case deleted:
 				staker := validatorDiff.validator.staker
+				weightDiff.Decrease = true
 				weightDiff.Amount = staker.Weight
 
 				// Invariant: Only the Primary Network contains non-nil
@@ -1791,6 +1791,14 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 				}
 				if err := parseValidatorMetadata(metadataBytes, metadata); err != nil {
 					return err
+				}
+
+				if staker.Weight >= metadata.UpdatedWeight {
+					weightDiff.Decrease = false
+					weightDiff.Amount = staker.Weight - metadata.UpdatedWeight
+				} else {
+					weightDiff.Decrease = true
+					weightDiff.Amount = metadata.UpdatedWeight - staker.Weight
 				}
 
 				metadata.lastUpdated = staker.StartTime

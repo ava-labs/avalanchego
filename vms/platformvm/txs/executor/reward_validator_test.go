@@ -35,7 +35,7 @@ func TestRewardsChecksRewardValidatorAndDelegator(t *testing.T) {
 	properties := gopter.NewProperties(nil)
 
 	// // to reproduce a given scenario do something like this:
-	// parameters := gopter.DefaultTestParametersWithSeed(1686991821130440065)
+	// parameters := gopter.DefaultTestParametersWithSeed(1688496172877207398)
 	// properties := gopter.NewProperties(parameters)
 
 	var (
@@ -69,7 +69,7 @@ func TestRewardsChecksRewardValidatorAndDelegator(t *testing.T) {
 	delegatorsRewardOwners.Add(delegatorRewardOwner)
 
 	properties.Property("validator and delegator are rewarded or not in commits and aborts", prop.ForAll(
-		func(valCommits, delCommits []bool) string {
+		func(valCommits, delCommits []bool, valRestakeFraction, delRestakeFraction uint32) string {
 			// make sure the inputs have the same length
 			if len(valCommits) < len(delCommits) {
 				delCommits = delCommits[:len(valCommits)]
@@ -94,6 +94,7 @@ func TestRewardsChecksRewardValidatorAndDelegator(t *testing.T) {
 			continuousValidatorTx, _, err := addContinuousValidator(
 				env,
 				validatorData,
+				valRestakeFraction,
 				validatorStakeKey,
 				authOwner,
 				validatorRewardOwner,
@@ -109,9 +110,10 @@ func TestRewardsChecksRewardValidatorAndDelegator(t *testing.T) {
 				End:    uint64(dummyStartTime.Add(stakingPeriod).Unix()),
 				Wght:   env.config.MinDelegatorStake,
 			}
-			_, err = addContinuousDelegator(
+			continuousDelegatorTx, _, err := addContinuousDelegator(
 				env,
 				delegatorData,
+				delRestakeFraction,
 				delegatorStakeKey,
 				authOwner,
 				delegatorRewardOwner,
@@ -180,17 +182,21 @@ func TestRewardsChecksRewardValidatorAndDelegator(t *testing.T) {
 					return err.Error()
 				}
 
-				delegatorReward, delegateeReward := calculateDelegatorRewards(continuousDelegator, continuousValidatorTx.Shares())
+				delegatorReward, delegateeReward := splitAmountByShares(continuousDelegator.PotentialReward, continuousValidatorTx.Shares())
+				delegatorRewardPaidBack, _ := splitAmountByShares(delegatorReward, continuousDelegatorTx.RestakeShares())
+
+				validatorRewardPaidBack, _ := splitAmountByShares(continuousValidator.PotentialReward, continuousValidatorTx.RestakeShares())
+				delegateeRewardPaidBack, _ := splitAmountByShares(delegateeReward, continuousValidatorTx.RestakeShares())
 				switch {
 				case valCommit && delCommit:
 					if postShifValidatorRewardBalance !=
-						preShiftValidatorRewardBalance+continuousValidator.PotentialReward+delegateeReward {
+						preShiftValidatorRewardBalance+validatorRewardPaidBack+delegateeRewardPaidBack {
 						return fmt.Sprintf(
 							"unexpected validator balance, valCommit %v, delCommit %v",
 							valCommit, delCommit,
 						)
 					}
-					if postShiftDelegatorRewardBalance != preShiftDelegatorRewardBalance+delegatorReward {
+					if postShiftDelegatorRewardBalance != preShiftDelegatorRewardBalance+delegatorRewardPaidBack {
 						return fmt.Sprintf(
 							"unexpected delegator balance, valCommit %v, delCommit %v",
 							valCommit, delCommit,
@@ -198,20 +204,20 @@ func TestRewardsChecksRewardValidatorAndDelegator(t *testing.T) {
 					}
 				case !valCommit && delCommit:
 					if postShifValidatorRewardBalance !=
-						preShiftValidatorRewardBalance+delegateeReward {
+						preShiftValidatorRewardBalance+delegateeRewardPaidBack {
 						return fmt.Sprintf(
 							"unexpected validator balance, valCommit %v, delCommit %v",
 							valCommit, delCommit,
 						)
 					}
-					if postShiftDelegatorRewardBalance != preShiftDelegatorRewardBalance+delegatorReward {
+					if postShiftDelegatorRewardBalance != preShiftDelegatorRewardBalance+delegatorRewardPaidBack {
 						return fmt.Sprintf(
 							"unexpected delegator balance, valCommit %v, delCommit %v",
 							valCommit, delCommit,
 						)
 					}
 				case valCommit && !delCommit:
-					if postShifValidatorRewardBalance != preShiftValidatorRewardBalance+continuousValidator.PotentialReward {
+					if postShifValidatorRewardBalance != preShiftValidatorRewardBalance+validatorRewardPaidBack {
 						return fmt.Sprintf(
 							"unexpected validator balance, valCommit %v, delCommit %v",
 							valCommit, delCommit,
@@ -243,6 +249,8 @@ func TestRewardsChecksRewardValidatorAndDelegator(t *testing.T) {
 		},
 		gen.SliceOf(gen.Bool()),
 		gen.SliceOf(gen.Bool()),
+		gen.UInt32Range(0, reward.PercentDenominator), // validator restake fraction
+		gen.UInt32Range(0, reward.PercentDenominator), // delegator restake fraction
 	))
 
 	properties.TestingRun(t)
@@ -251,8 +259,8 @@ func TestRewardsChecksRewardValidatorAndDelegator(t *testing.T) {
 func TestRewardsChecksRewardValidator(t *testing.T) {
 	properties := gopter.NewProperties(nil)
 
-	// to reproduce a given scenario do something like this:
-	// parameters := gopter.DefaultTestParametersWithSeed(1685887576153675816)
+	// // to reproduce a given scenario do something like this:
+	// parameters := gopter.DefaultTestParametersWithSeed(1688488893961826076)
 	// properties := gopter.NewProperties(parameters)
 
 	var (
@@ -285,7 +293,7 @@ func TestRewardsChecksRewardValidator(t *testing.T) {
 	rewardOwners.Add(rewardOwner)
 
 	properties.Property("validator is rewarded or not in commits and aborts", prop.ForAll(
-		func(commits []bool) string {
+		func(commits []bool, restakeFraction uint32) string {
 			env := newEnvironmentNoValidator(t, latestFork)
 			defer func() {
 				_ = shutdownEnvironment(env)
@@ -297,9 +305,10 @@ func TestRewardsChecksRewardValidator(t *testing.T) {
 				End:    uint64(dummyStartTime.Add(stakingPeriod).Unix()),
 				Wght:   env.config.MinValidatorStake,
 			}
-			_, addContinuousValTxID, err := addContinuousValidator(
+			uAddContinuousValTx, addContinuousValTxID, err := addContinuousValidator(
 				env,
 				validatorData,
+				restakeFraction,
 				stakeKey,
 				authOwner,
 				rewardOwner,
@@ -351,13 +360,12 @@ func TestRewardsChecksRewardValidator(t *testing.T) {
 				}
 
 				if commit {
-					if postShiftRewardBalance != preShiftRewardBalance+continuousValidator.PotentialReward {
-						return "unexpected preShiftRewardBalance on commit"
+					rewardPaidBack, _ := splitAmountByShares(continuousValidator.PotentialReward, uAddContinuousValTx.RestakeShares())
+					if postShiftRewardBalance != preShiftRewardBalance+rewardPaidBack {
+						return "unexpected postShiftRewardBalance on commit"
 					}
-				} else {
-					if postShiftRewardBalance != preShiftRewardBalance {
-						return "unexpected preShiftRewardBalance on abort"
-					}
+				} else if postShiftRewardBalance != preShiftRewardBalance {
+					return "unexpected postShiftRewardBalance on abort"
 				}
 			}
 
@@ -436,6 +444,7 @@ func TestRewardsChecksRewardValidator(t *testing.T) {
 			return ""
 		},
 		gen.SliceOf(gen.Bool()),
+		gen.UInt32Range(0, reward.PercentDenominator), // validator restake fraction
 	))
 
 	properties.TestingRun(t)
@@ -460,7 +469,7 @@ func TestShiftChecksRewardValidator(t *testing.T) {
 	)
 
 	properties.Property("validator is shift in both commits and aborts", prop.ForAll(
-		func(commits []bool) string {
+		func(commits []bool, restakeFraction uint32) string {
 			env := newEnvironmentNoValidator(t, latestFork)
 			defer func() {
 				_ = shutdownEnvironment(env)
@@ -476,6 +485,7 @@ func TestShiftChecksRewardValidator(t *testing.T) {
 			_, addContinuousValTxID, err := addContinuousValidator(
 				env,
 				validatorData,
+				restakeFraction,
 				authKey,
 				addr, // authOwner
 				addr, // rewardOwner
@@ -577,6 +587,7 @@ func TestShiftChecksRewardValidator(t *testing.T) {
 			return ""
 		},
 		gen.SliceOf(gen.Bool()),
+		gen.UInt32Range(0, reward.PercentDenominator), // validator restake fraction
 	))
 
 	properties.TestingRun(t)
@@ -622,7 +633,7 @@ func TestRewardsChecksRewardDelegator(t *testing.T) {
 	stakeOwners.Add(stakeOwner)
 
 	properties.Property("delegator is rewarded or not in commits and aborts", prop.ForAll(
-		func(commits []bool) string {
+		func(commits []bool, restakeFraction uint32) string {
 			env := newEnvironmentNoValidator(t, latestFork)
 			defer func() {
 				_ = shutdownEnvironment(env)
@@ -638,6 +649,7 @@ func TestRewardsChecksRewardDelegator(t *testing.T) {
 			addContinuousValTx, _, err := addContinuousValidator(
 				env,
 				validatorData,
+				0, // restakeFraction
 				validatorKey,
 				authOwner,
 				validatorOwner,
@@ -662,9 +674,10 @@ func TestRewardsChecksRewardDelegator(t *testing.T) {
 				End:    uint64(dummyStartTime.Add(delegationDuration).Unix()),
 				Wght:   delegatorWeight,
 			}
-			continuousDelTxID, err := addContinuousDelegator(
+			continuousDelTx, continuousDelTxID, err := addContinuousDelegator(
 				env,
 				delegatorData,
+				restakeFraction,
 				stakeKey,
 				authOwner,
 				rewardOwner,
@@ -728,14 +741,15 @@ func TestRewardsChecksRewardDelegator(t *testing.T) {
 					return err.Error()
 				}
 
-				delegatorReward, _ := calculateDelegatorRewards(continuousDelegator, addContinuousValTx.Shares())
+				delegatorReward, _ := splitAmountByShares(continuousDelegator.PotentialReward, addContinuousValTx.Shares())
+				rewardToBeRepaid, _ := splitAmountByShares(delegatorReward, continuousDelTx.RestakeShares())
 				if commit {
-					if postShiftRewardBalance != preShiftRewardBalance+delegatorReward {
-						return "unexpected preShiftRewardBalance on commit"
+					if postShiftRewardBalance != preShiftRewardBalance+rewardToBeRepaid {
+						return "unexpected postShiftRewardBalance on commit"
 					}
 				} else {
 					if postShiftRewardBalance != preShiftRewardBalance {
-						return "unexpected preShiftRewardBalance on abort"
+						return "unexpected postShiftRewardBalance on abort"
 					}
 				}
 			}
@@ -815,13 +829,15 @@ func TestRewardsChecksRewardDelegator(t *testing.T) {
 				return err.Error()
 			}
 
-			delegatorReward, _ := calculateDelegatorRewards(stoppedDelegator, addContinuousValTx.Shares())
+			delegatorReward, _ := splitAmountByShares(stoppedDelegator.PotentialReward, addContinuousValTx.Shares())
 			if postStopRewardBalance != preStopRewardBalance+delegatorReward {
 				return "unexpected postStopRewardBalance"
 			}
 			return ""
 		},
 		gen.SliceOf(gen.Bool()),
+		gen.UInt32Range(0, reward.PercentDenominator), // delegator restake fraction
+
 	))
 
 	properties.TestingRun(t)
@@ -847,7 +863,7 @@ func TestShiftChecksRewardDelegator(t *testing.T) {
 	)
 
 	properties.Property("delegator is shift in both commits and aborts", prop.ForAll(
-		func(commits []bool) string {
+		func(commits []bool, restakeFraction uint32) string {
 			env := newEnvironmentNoValidator(t, latestFork)
 			defer func() {
 				_ = shutdownEnvironment(env)
@@ -863,6 +879,7 @@ func TestShiftChecksRewardDelegator(t *testing.T) {
 			_, _, err := addContinuousValidator(
 				env,
 				validatorData,
+				restakeFraction,
 				authKey,
 				addr,
 				addr,
@@ -878,9 +895,10 @@ func TestShiftChecksRewardDelegator(t *testing.T) {
 				End:    uint64(dummyStartTime.Add(delegatorDuration).Unix()),
 				Wght:   env.config.MinDelegatorStake,
 			}
-			continuousDelTxID, err := addContinuousDelegator(
+			_, continuousDelTxID, err := addContinuousDelegator(
 				env,
 				delegatorData,
+				restakeFraction,
 				authKey,
 				addr,
 				addr,
@@ -1016,6 +1034,7 @@ func TestShiftChecksRewardDelegator(t *testing.T) {
 			return ""
 		},
 		gen.SliceOfN(int(validatorDuration/delegatorDuration)-1, gen.Bool()),
+		gen.UInt32Range(0, reward.PercentDenominator), // delegator restake fraction
 	))
 
 	properties.TestingRun(t)
@@ -2010,9 +2029,11 @@ func TestBanffForkRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 func addContinuousDelegator(
 	env *environment,
 	delegatorData txs.Validator,
+	restakeFraction uint32,
 	delegatorStakeKey *secp256k1.PrivateKey,
 	authOwner, delegatorRewardOwner ids.ShortID,
 ) (
+	*txs.AddContinuousDelegatorTx,
 	ids.ID, // txID
 	error,
 ) {
@@ -2027,7 +2048,7 @@ func addContinuousDelegator(
 		delegatorStakeOwner, // changeAddr
 	)
 	if err != nil {
-		return ids.Empty, err
+		return nil, ids.Empty, err
 	}
 
 	continuousDelegatorTx := &txs.AddContinuousDelegatorTx{
@@ -2047,19 +2068,19 @@ func addContinuousDelegator(
 			Addrs:     []ids.ShortID{delegatorRewardOwner},
 			Threshold: 1,
 		},
-		DelegatorRewardRestakeShares: 0,
+		DelegatorRewardRestakeShares: restakeFraction,
 	}
 	addContinuousDelTx, err := txs.NewSigned(continuousDelegatorTx, txs.Codec, signers)
 	if err != nil {
-		return ids.Empty, err
+		return nil, ids.Empty, err
 	}
 	if err := addContinuousDelTx.SyntacticVerify(env.ctx); err != nil {
-		return ids.Empty, err
+		return nil, ids.Empty, err
 	}
 
 	onParentState, err := state.NewDiff(lastAcceptedID, env)
 	if err != nil {
-		return ids.Empty, err
+		return nil, ids.Empty, err
 	}
 
 	addDelExecutor := StandardTxExecutor{
@@ -2068,23 +2089,24 @@ func addContinuousDelegator(
 		Tx:      addContinuousDelTx,
 	}
 	if err := addContinuousDelTx.Unsigned.Visit(&addDelExecutor); err != nil {
-		return ids.Empty, err
+		return nil, ids.Empty, err
 	}
 
 	onParentState.AddTx(addContinuousDelTx, status.Committed)
 	if err := onParentState.Apply(env.state); err != nil {
-		return ids.Empty, err
+		return nil, ids.Empty, err
 	}
 	if err := env.state.Commit(); err != nil {
-		return ids.Empty, err
+		return nil, ids.Empty, err
 	}
 
-	return addContinuousDelTx.ID(), nil
+	return continuousDelegatorTx, addContinuousDelTx.ID(), nil
 }
 
 func addContinuousValidator(
 	env *environment,
 	validatorData txs.Validator,
+	restakeFraction uint32,
 	validatorStakeKey *secp256k1.PrivateKey,
 	authOwner, validatorRewardOwner ids.ShortID,
 ) (
@@ -2130,7 +2152,7 @@ func addContinuousValidator(
 			Addrs:     []ids.ShortID{validatorRewardOwner},
 			Threshold: 1,
 		},
-		ValidatorRewardRestakeShares: 0,
+		ValidatorRewardRestakeShares: restakeFraction,
 		DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
 			Addrs:     []ids.ShortID{validatorRewardOwner},
 			Threshold: 1,
