@@ -44,8 +44,6 @@ import (
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
 )
 
-const trackChecksum = false
-
 func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t)
@@ -666,7 +664,6 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 		metrics.Noop,
 		reward.NewCalculator(vm.Config.RewardConfig),
 		&utils.Atomic[bool]{},
-		trackChecksum,
 	)
 	require.NoError(err)
 	vm.state = is
@@ -978,7 +975,6 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		metrics.Noop,
 		reward.NewCalculator(vm.Config.RewardConfig),
 		&utils.Atomic[bool]{},
-		trackChecksum,
 	)
 	require.NoError(err)
 	vm.state = is

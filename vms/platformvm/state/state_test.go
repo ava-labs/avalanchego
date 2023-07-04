@@ -34,8 +34,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-const trackChecksum = false
-
 var (
 	initialTxID             = ids.GenerateTestID()
 	initialNodeID           = ids.GenerateTestNodeID()
@@ -515,7 +513,6 @@ func newStateFromDB(require *require.Assertions, db database.Database) State {
 			SupplyCap:          720 * units.MegaAvax,
 		}),
 		&utils.Atomic[bool]{},
-		trackChecksum,
 	)
 	require.NoError(err)
 	require.NotNil(state)

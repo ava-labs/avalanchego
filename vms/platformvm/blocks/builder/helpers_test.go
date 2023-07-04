@@ -241,7 +241,6 @@ func defaultState(
 		metrics.Noop,
 		rewards,
 		&utils.Atomic[bool]{},
-		trackChecksum,
 	)
 	require.NoError(err)
 

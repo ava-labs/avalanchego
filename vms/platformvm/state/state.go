@@ -354,7 +354,6 @@ func New(
 	metrics metrics.Metrics,
 	rewards reward.Calculator,
 	bootstrapped *utils.Atomic[bool],
-	trackChecksums bool,
 ) (State, error) {
 	s, err := new(
 		db,
@@ -365,7 +364,6 @@ func New(
 		metricsReg,
 		rewards,
 		bootstrapped,
-		trackChecksums,
 	)
 	if err != nil {
 		return nil, err
@@ -390,7 +388,6 @@ func new(
 	metricsReg prometheus.Registerer,
 	rewards reward.Calculator,
 	bootstrapped *utils.Atomic[bool],
-	trackChecksums bool,
 ) (*state, error) {
 	blockCache, err := metercacher.New(
 		"block_cache",
@@ -457,7 +454,7 @@ func new(
 	}
 
 	utxoDB := prefixdb.New(utxoPrefix, baseDB)
-	utxoState, err := avax.NewMeteredUTXOState(utxoDB, txs.GenesisCodec, metricsReg, trackChecksums)
+	utxoState, err := avax.NewMeteredUTXOState(utxoDB, txs.GenesisCodec, metricsReg, execCfg.ChecksumsEnabled)
 	if err != nil {
 		return nil, err
 	}

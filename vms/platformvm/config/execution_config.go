@@ -18,17 +18,19 @@ const (
 	rewardUTXOsCacheSize    = 2048
 	chainCacheSize          = 2048
 	chainDBCacheSize        = 2048
+	checksumsEnabled        = false
 )
 
 // ExecutionConfig provides execution parameters of PlatformVM
 type ExecutionConfig struct {
-	BlockCacheSize               int `json:"blockCacheSize"`
-	TxCacheSize                  int `json:"txCacheSize"`
-	TransformedSubnetTxCacheSize int `json:"transformedSubnetTxCacheSize"`
-	ValidatorDiffsCacheSize      int `json:"validatorDiffsCacheSize"`
-	RewardUTXOsCacheSize         int `json:"rewardUTXOsCacheSize"`
-	ChainCacheSize               int `json:"chainCacheSize"`
-	ChainDBCacheSize             int `json:"chainDBCacheSize"`
+	BlockCacheSize               int  `json:"blockCacheSize"`
+	TxCacheSize                  int  `json:"txCacheSize"`
+	TransformedSubnetTxCacheSize int  `json:"transformedSubnetTxCacheSize"`
+	ValidatorDiffsCacheSize      int  `json:"validatorDiffsCacheSize"`
+	RewardUTXOsCacheSize         int  `json:"rewardUTXOsCacheSize"`
+	ChainCacheSize               int  `json:"chainCacheSize"`
+	ChainDBCacheSize             int  `json:"chainDBCacheSize"`
+	ChecksumsEnabled             bool `json:"checksums-enabled"`
 }
 
 // GetExecutionConfig returns an ExecutionConfig
@@ -43,6 +45,7 @@ func GetExecutionConfig(b []byte) (*ExecutionConfig, error) {
 		RewardUTXOsCacheSize:         rewardUTXOsCacheSize,
 		ChainCacheSize:               chainCacheSize,
 		ChainDBCacheSize:             chainDBCacheSize,
+		ChecksumsEnabled:             checksumsEnabled,
 	}
 
 	// if bytes are empty keep default values

@@ -8,8 +8,6 @@ import (
 	"errors"
 	"fmt"
 
-	stdjson "encoding/json"
-
 	"github.com/gorilla/rpc/v2"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -92,10 +90,6 @@ type VM struct {
 	manager   blockexecutor.Manager
 }
 
-type Config struct {
-	ChecksumsEnabled bool `json:"checksums-enabled"`
-}
-
 // Initialize this blockchain.
 // [vm.ChainManager] and [vm.vdrMgr] must be set before this function is called.
 func (vm *VM) Initialize(
@@ -110,16 +104,6 @@ func (vm *VM) Initialize(
 	appSender common.AppSender,
 ) error {
 	chainCtx.Log.Verbo("initializing platform chain")
-
-	platformConfig := Config{}
-	if len(configBytes) > 0 {
-		if err := stdjson.Unmarshal(configBytes, &platformConfig); err != nil {
-			return err
-		}
-		chainCtx.Log.Info("VM config initialized",
-			zap.Reflect("config", platformConfig),
-		)
-	}
 
 	registerer := prometheus.NewRegistry()
 	if err := chainCtx.Metrics.Register(registerer); err != nil {
@@ -158,7 +142,6 @@ func (vm *VM) Initialize(
 		vm.metrics,
 		rewards,
 		&vm.bootstrapped,
-		platformConfig.ChecksumsEnabled,
 	)
 	if err != nil {
 		return err
