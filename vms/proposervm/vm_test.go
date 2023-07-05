@@ -17,7 +17,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -2291,10 +2290,7 @@ func TestVMInnerBlkMarkedAcceptedRegression(t *testing.T) {
 	}
 
 	wrappedInnerBlock, err := proVM.GetBlock(context.Background(), innerBlock.ID())
-	if err != nil {
-		require.ErrorIs(err, database.ErrNotFound)
-		return
-	}
+	require.NoError(err)
 	require.Equal(choices.Rejected, wrappedInnerBlock.Status())
 }
 
