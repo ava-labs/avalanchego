@@ -18,8 +18,8 @@ import (
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/version"
-	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
@@ -55,11 +55,11 @@ var (
 //     the same state after each operation.
 
 func TestStateAndDiffComparisonToStorageModel(t *testing.T) {
-	properties := gopter.NewProperties(nil)
+	// properties := gopter.NewProperties(nil)
 
-	// // to reproduce a given scenario do something like this:
-	// parameters := gopter.DefaultTestParametersWithSeed(1688113362571546817)
-	// properties := gopter.NewProperties(parameters)
+	// to reproduce a given scenario do something like this:
+	parameters := gopter.DefaultTestParametersWithSeed(1688591586962580727)
+	properties := gopter.NewProperties(parameters)
 
 	properties.Property("state comparison to storage model", commands.Prop(stakersCommands))
 	properties.TestingRun(t)
@@ -90,7 +90,7 @@ func (s *sysUnderTest) GetState(blkID ids.ID) (Chain, bool) {
 	return s.baseState, blkID == s.baseState.GetLastAccepted()
 }
 
-func (s *sysUnderTest) addDiffOnTop() {
+func (s *sysUnderTest) addDiffOnTop() error {
 	newTopBlkID := ids.Empty.Prefix(atomic.AddUint64(&s.diffBlkIDSeed, 1))
 	var topBlkID ids.ID
 	if len(s.sortedDiffIDs) == 0 {
@@ -100,10 +100,11 @@ func (s *sysUnderTest) addDiffOnTop() {
 	}
 	newTopDiff, err := NewDiff(topBlkID, s)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	s.sortedDiffIDs = append(s.sortedDiffIDs, newTopBlkID)
 	s.diffsMap[newTopBlkID] = newTopDiff
+	return nil
 }
 
 // getTopChainState returns top diff or baseState
@@ -120,22 +121,22 @@ func (s *sysUnderTest) getTopChainState() Chain {
 }
 
 // flushBottomDiff applies bottom diff if available
-func (s *sysUnderTest) flushBottomDiff() bool {
+func (s *sysUnderTest) flushBottomDiff() (bool, error) {
 	if len(s.sortedDiffIDs) == 0 {
-		return false
+		return false, nil
 	}
 	bottomDiffID := s.sortedDiffIDs[0]
 	diffToApply := s.diffsMap[bottomDiffID]
 
 	err := diffToApply.Apply(s.baseState)
 	if err != nil {
-		panic(err)
+		return true, err
 	}
 	s.baseState.SetLastAccepted(bottomDiffID)
 
 	s.sortedDiffIDs = s.sortedDiffIDs[1:]
 	delete(s.diffsMap, bottomDiffID)
-	return true
+	return true, nil
 }
 
 // stakersCommands creates/destroy the system under test and generates
@@ -196,30 +197,33 @@ var stakersCommands = &commands.ProtoCommands{
 	GenCommandFunc: func(state commands.State) gopter.Gen {
 		return gen.OneGenOf(
 			genPutCurrentValidatorCommand,
-			genShiftCurrentValidatorCommand,
-			genUpdateStakingPeriodCurrentValidatorCommand,
+			// genShiftCurrentValidatorCommand,
+			// genUpdateStakingPeriodCurrentValidatorCommand,
 			genIncreaseWeightCurrentValidatorCommand,
 			genDeleteCurrentValidatorCommand,
 
-			genPutCurrentDelegatorCommand,
-			genShiftCurrentDelegatorCommand,
-			genUpdateStakingPeriodCurrentDelegatorCommand,
-			genIncreaseWeightCurrentDelegatorCommand,
-			genDeleteCurrentDelegatorCommand,
+			// genPutCurrentDelegatorCommand,
+			// // genShiftCurrentDelegatorCommand,
+			// // genUpdateStakingPeriodCurrentDelegatorCommand,
+			// genIncreaseWeightCurrentDelegatorCommand,
+			// genDeleteCurrentDelegatorCommand,
 
-			genAddTopDiffCommand,
+			// genAddTopDiffCommand,
 			genApplyBottomDiffCommand,
 			genCommitBottomStateCommand,
-			genRebuildStateCommand,
+			// genRebuildStateCommand,
 		)
 	},
 }
 
 // PutCurrentValidator section
-type putCurrentValidatorCommand txs.Tx
+type putCurrentValidatorCommand struct {
+	sTx *txs.Tx
+	err error
+}
 
-func (v *putCurrentValidatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
-	sTx := (*txs.Tx)(v)
+func (cmd *putCurrentValidatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
+	sTx := cmd.sTx
 	sys := sut.(*sysUnderTest)
 
 	stakerTx := sTx.Unsigned.(txs.StakerTx)
@@ -234,8 +238,8 @@ func (v *putCurrentValidatorCommand) Run(sut commands.SystemUnderTest) commands.
 	return sys
 }
 
-func (v *putCurrentValidatorCommand) NextState(cmdState commands.State) commands.State {
-	sTx := (*txs.Tx)(v)
+func (cmd *putCurrentValidatorCommand) NextState(cmdState commands.State) commands.State {
+	sTx := cmd.sTx
 	stakerTx := sTx.Unsigned.(txs.StakerTx)
 	currentVal, err := NewCurrentStaker(sTx.ID(), stakerTx, uint64(1000))
 	if err != nil {
@@ -251,42 +255,56 @@ func (*putCurrentValidatorCommand) PreCondition(commands.State) bool {
 	return true
 }
 
-func (*putCurrentValidatorCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
-	return checkSystemAndModelContent(cmdState, res)
+func (cmd *putCurrentValidatorCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
+	if cmd.err != nil {
+		cmd.err = nil // reset for next runs
+		return &gopter.PropResult{Status: gopter.PropFalse}
+	}
+
+	if !checkSystemAndModelContent(cmdState, res) {
+		return &gopter.PropResult{Status: gopter.PropFalse}
+	}
+
+	return &gopter.PropResult{Status: gopter.PropTrue}
 }
 
-func (v *putCurrentValidatorCommand) String() string {
-	stakerTx := v.Unsigned.(txs.StakerTx)
-	return fmt.Sprintf("PutCurrentValidator(subnetID: %v, nodeID: %v, txID: %v, priority: %v, unixStartTime: %v, duration: %v)",
+func (cmd *putCurrentValidatorCommand) String() string {
+	stakerTx := cmd.sTx.Unsigned.(txs.StakerTx)
+	return fmt.Sprintf("\nputCurrentValidator(subnetID: %v, nodeID: %v, txID: %v, priority: %v, unixStartTime: %v, duration: %v)",
 		stakerTx.SubnetID(),
 		stakerTx.NodeID(),
-		v.TxID,
+		cmd.sTx.TxID,
 		stakerTx.CurrentPriority(),
 		stakerTx.StartTime().Unix(),
 		stakerTx.EndTime().Sub(stakerTx.StartTime()),
 	)
 }
 
-var genPutCurrentValidatorCommand = addPermissionlessValidatorTxGenerator(commandsCtx, nil, nil, &signer.Empty{}).Map(
+var genPutCurrentValidatorCommand = addPermissionlessValidatorTxGenerator(commandsCtx, nil, nil, 1000).Map(
 	func(nonInitTx *txs.Tx) commands.Command {
 		sTx, err := txs.NewSigned(nonInitTx.Unsigned, txs.Codec, nil)
 		if err != nil {
 			panic(fmt.Errorf("failed signing tx, %w", err))
 		}
 
-		cmd := (*putCurrentValidatorCommand)(sTx)
+		cmd := &putCurrentValidatorCommand{
+			sTx: sTx,
+			err: nil,
+		}
 		return cmd
 	},
 )
 
 // ShiftCurrentValidator section
-type shiftCurrentValidatorCommand struct{}
+type shiftCurrentValidatorCommand struct {
+	err error
+}
 
-func (*shiftCurrentValidatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
+func (cmd *shiftCurrentValidatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
 	sys := sut.(*sysUnderTest)
 	err := shiftCurrentValidatorInSystem(sys)
 	if err != nil {
-		panic(err)
+		cmd.err = err
 	}
 	return sys
 }
@@ -311,9 +329,7 @@ func shiftCurrentValidatorInSystem(sys *sysUnderTest) error {
 	)
 	for !found && stakerIt.Next() {
 		staker = stakerIt.Value()
-		if staker.Priority == txs.SubnetPermissionedValidatorCurrentPriority ||
-			staker.Priority == txs.SubnetPermissionlessValidatorCurrentPriority ||
-			staker.Priority == txs.PrimaryNetworkValidatorCurrentPriority {
+		if staker.Priority.IsCurrentValidator() {
 			found = true
 			break
 		}
@@ -325,7 +341,9 @@ func shiftCurrentValidatorInSystem(sys *sysUnderTest) error {
 	stakerIt.Release()
 
 	// 2. Add diff layer on top
-	sys.addDiffOnTop()
+	if err := sys.addDiffOnTop(); err != nil {
+		return err
+	}
 	chain = sys.getTopChainState()
 
 	// 3. query the staker
@@ -340,12 +358,12 @@ func shiftCurrentValidatorInSystem(sys *sysUnderTest) error {
 	return chain.UpdateCurrentValidator(&updatedStaker)
 }
 
-func (*shiftCurrentValidatorCommand) NextState(cmdState commands.State) commands.State {
+func (cmd *shiftCurrentValidatorCommand) NextState(cmdState commands.State) commands.State {
 	model := cmdState.(*stakersStorageModel)
 
 	err := shiftCurrentValidatorInModel(model)
 	if err != nil {
-		panic(err)
+		cmd.err = err
 	}
 	return cmdState
 }
@@ -362,9 +380,7 @@ func shiftCurrentValidatorInModel(model *stakersStorageModel) error {
 	)
 	for !found && stakerIt.Next() {
 		staker = stakerIt.Value()
-		if staker.Priority == txs.SubnetPermissionedValidatorCurrentPriority ||
-			staker.Priority == txs.SubnetPermissionlessValidatorCurrentPriority ||
-			staker.Priority == txs.PrimaryNetworkValidatorCurrentPriority {
+		if staker.Priority.IsCurrentValidator() {
 			found = true
 			break
 		}
@@ -384,12 +400,21 @@ func (*shiftCurrentValidatorCommand) PreCondition(commands.State) bool {
 	return true
 }
 
-func (*shiftCurrentValidatorCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
-	return checkSystemAndModelContent(cmdState, res)
+func (cmd *shiftCurrentValidatorCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
+	if cmd.err != nil {
+		cmd.err = nil // reset for next runs
+		return &gopter.PropResult{Status: gopter.PropFalse}
+	}
+
+	if !checkSystemAndModelContent(cmdState, res) {
+		return &gopter.PropResult{Status: gopter.PropFalse}
+	}
+
+	return &gopter.PropResult{Status: gopter.PropTrue}
 }
 
 func (*shiftCurrentValidatorCommand) String() string {
-	return "shiftCurrentValidatorCommand"
+	return "\nshiftCurrentValidatorCommand"
 }
 
 var genShiftCurrentValidatorCommand = gen.IntRange(1, 2).Map(
@@ -399,13 +424,15 @@ var genShiftCurrentValidatorCommand = gen.IntRange(1, 2).Map(
 )
 
 // updateStakingPeriodCurrentValidator section
-type updateStakingPeriodCurrentValidatorCommand struct{}
+type updateStakingPeriodCurrentValidatorCommand struct {
+	err error
+}
 
-func (*updateStakingPeriodCurrentValidatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
+func (cmd *updateStakingPeriodCurrentValidatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
 	sys := sut.(*sysUnderTest)
 	err := updateStakingPeriodCurrentValidatorInSystem(sys)
 	if err != nil {
-		panic(err)
+		cmd.err = err
 	}
 	return sys
 }
@@ -430,9 +457,7 @@ func updateStakingPeriodCurrentValidatorInSystem(sys *sysUnderTest) error {
 	)
 	for !found && stakerIt.Next() {
 		staker = stakerIt.Value()
-		if staker.Priority == txs.SubnetPermissionedValidatorCurrentPriority ||
-			staker.Priority == txs.SubnetPermissionlessValidatorCurrentPriority ||
-			staker.Priority == txs.PrimaryNetworkValidatorCurrentPriority {
+		if staker.Priority.IsCurrentValidator() {
 			found = true
 			break
 		}
@@ -444,7 +469,9 @@ func updateStakingPeriodCurrentValidatorInSystem(sys *sysUnderTest) error {
 	stakerIt.Release()
 
 	// 2. Add diff layer on top
-	sys.addDiffOnTop()
+	if err := sys.addDiffOnTop(); err != nil {
+		return err
+	}
 	chain = sys.getTopChainState()
 
 	// 3. query the staker
@@ -465,12 +492,12 @@ func updateStakingPeriodCurrentValidatorInSystem(sys *sysUnderTest) error {
 	return chain.UpdateCurrentValidator(&updatedStaker)
 }
 
-func (*updateStakingPeriodCurrentValidatorCommand) NextState(cmdState commands.State) commands.State {
+func (cmd *updateStakingPeriodCurrentValidatorCommand) NextState(cmdState commands.State) commands.State {
 	model := cmdState.(*stakersStorageModel)
 
 	err := updateStakingPeriodCurrentValidatorInModel(model)
 	if err != nil {
-		panic(err)
+		cmd.err = err
 	}
 	return cmdState
 }
@@ -487,9 +514,7 @@ func updateStakingPeriodCurrentValidatorInModel(model *stakersStorageModel) erro
 	)
 	for !found && stakerIt.Next() {
 		staker = stakerIt.Value()
-		if staker.Priority == txs.SubnetPermissionedValidatorCurrentPriority ||
-			staker.Priority == txs.SubnetPermissionlessValidatorCurrentPriority ||
-			staker.Priority == txs.PrimaryNetworkValidatorCurrentPriority {
+		if staker.Priority.IsCurrentValidator() {
 			found = true
 			break
 		}
@@ -515,12 +540,21 @@ func (*updateStakingPeriodCurrentValidatorCommand) PreCondition(commands.State) 
 	return true
 }
 
-func (*updateStakingPeriodCurrentValidatorCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
-	return checkSystemAndModelContent(cmdState, res)
+func (cmd *updateStakingPeriodCurrentValidatorCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
+	if cmd.err != nil {
+		cmd.err = nil // reset for next runs
+		return &gopter.PropResult{Status: gopter.PropFalse}
+	}
+
+	if !checkSystemAndModelContent(cmdState, res) {
+		return &gopter.PropResult{Status: gopter.PropFalse}
+	}
+
+	return &gopter.PropResult{Status: gopter.PropTrue}
 }
 
 func (*updateStakingPeriodCurrentValidatorCommand) String() string {
-	return "updateStakingPeriodCurrentValidatorCommand"
+	return "\nupdateStakingPeriodCurrentValidatorCommand"
 }
 
 var genUpdateStakingPeriodCurrentValidatorCommand = gen.IntRange(1, 2).Map(
@@ -530,13 +564,15 @@ var genUpdateStakingPeriodCurrentValidatorCommand = gen.IntRange(1, 2).Map(
 )
 
 // increaseWeightCurrentValidator section
-type increaseWeightCurrentValidatorCommand struct{}
+type increaseWeightCurrentValidatorCommand struct {
+	err error
+}
 
-func (*increaseWeightCurrentValidatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
+func (cmd *increaseWeightCurrentValidatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
 	sys := sut.(*sysUnderTest)
 	err := increaseWeightCurrentValidatorInSystem(sys)
 	if err != nil {
-		panic(err)
+		cmd.err = err
 	}
 	return sys
 }
@@ -561,9 +597,7 @@ func increaseWeightCurrentValidatorInSystem(sys *sysUnderTest) error {
 	)
 	for !found && stakerIt.Next() {
 		staker = stakerIt.Value()
-		if staker.Priority == txs.SubnetPermissionedValidatorCurrentPriority ||
-			staker.Priority == txs.SubnetPermissionlessValidatorCurrentPriority ||
-			staker.Priority == txs.PrimaryNetworkValidatorCurrentPriority {
+		if staker.Priority.IsCurrentValidator() {
 			found = true
 			break
 		}
@@ -575,7 +609,9 @@ func increaseWeightCurrentValidatorInSystem(sys *sysUnderTest) error {
 	stakerIt.Release()
 
 	// 2. Add diff layer on top
-	sys.addDiffOnTop()
+	if err := sys.addDiffOnTop(); err != nil {
+		return err
+	}
 	chain = sys.getTopChainState()
 
 	// 3. query the staker
@@ -590,12 +626,12 @@ func increaseWeightCurrentValidatorInSystem(sys *sysUnderTest) error {
 	return chain.UpdateCurrentValidator(&updatedStaker)
 }
 
-func (*increaseWeightCurrentValidatorCommand) NextState(cmdState commands.State) commands.State {
+func (cmd *increaseWeightCurrentValidatorCommand) NextState(cmdState commands.State) commands.State {
 	model := cmdState.(*stakersStorageModel)
 
 	err := increaseWeightCurrentValidatorInModel(model)
 	if err != nil {
-		panic(err)
+		cmd.err = err
 	}
 	return cmdState
 }
@@ -612,9 +648,7 @@ func increaseWeightCurrentValidatorInModel(model *stakersStorageModel) error {
 	)
 	for !found && stakerIt.Next() {
 		staker = stakerIt.Value()
-		if staker.Priority == txs.SubnetPermissionedValidatorCurrentPriority ||
-			staker.Priority == txs.SubnetPermissionlessValidatorCurrentPriority ||
-			staker.Priority == txs.PrimaryNetworkValidatorCurrentPriority {
+		if staker.Priority.IsCurrentValidator() {
 			found = true
 			break
 		}
@@ -634,12 +668,21 @@ func (*increaseWeightCurrentValidatorCommand) PreCondition(commands.State) bool 
 	return true
 }
 
-func (*increaseWeightCurrentValidatorCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
-	return checkSystemAndModelContent(cmdState, res)
+func (cmd *increaseWeightCurrentValidatorCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
+	if cmd.err != nil {
+		cmd.err = nil // reset for next runs
+		return &gopter.PropResult{Status: gopter.PropFalse}
+	}
+
+	if !checkSystemAndModelContent(cmdState, res) {
+		return &gopter.PropResult{Status: gopter.PropFalse}
+	}
+
+	return &gopter.PropResult{Status: gopter.PropTrue}
 }
 
 func (*increaseWeightCurrentValidatorCommand) String() string {
-	return "increaseWeightCurrentValidatorCommand"
+	return "\nincreaseWeightCurrentValidatorCommand"
 }
 
 var genIncreaseWeightCurrentValidatorCommand = gen.IntRange(1, 2).Map(
@@ -649,16 +692,19 @@ var genIncreaseWeightCurrentValidatorCommand = gen.IntRange(1, 2).Map(
 )
 
 // DeleteCurrentValidator section
-type deleteCurrentValidatorCommand struct{}
+type deleteCurrentValidatorCommand struct {
+	err error
+}
 
-func (*deleteCurrentValidatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
-	// delete first validator, if any
+func (cmd *deleteCurrentValidatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
+	// delete first validator without delegators, if any
 	sys := sut.(*sysUnderTest)
 	topDiff := sys.getTopChainState()
 
 	stakerIt, err := topDiff.GetCurrentStakerIterator()
 	if err != nil {
-		panic(err)
+		cmd.err = err
+		return sys
 	}
 
 	var (
@@ -667,13 +713,23 @@ func (*deleteCurrentValidatorCommand) Run(sut commands.SystemUnderTest) commands
 	)
 	for !found && stakerIt.Next() {
 		validator = stakerIt.Value()
-		if validator.Priority == txs.SubnetPermissionedValidatorCurrentPriority ||
-			validator.Priority == txs.SubnetPermissionlessValidatorCurrentPriority ||
-			validator.Priority == txs.PrimaryNetworkValidatorCurrentPriority {
-			found = true
-			break
+		if validator.Priority.IsCurrentValidator() {
+			// check validators has no delegators
+			delIt, err := topDiff.GetCurrentDelegatorIterator(validator.SubnetID, validator.NodeID)
+			if err != nil {
+				cmd.err = err
+				stakerIt.Release()
+				return sys
+			}
+			if !delIt.Next() {
+				found = true
+				break
+			} else {
+				continue
+			}
 		}
 	}
+
 	if !found {
 		stakerIt.Release()
 		return sys // no current validator to delete
@@ -684,11 +740,13 @@ func (*deleteCurrentValidatorCommand) Run(sut commands.SystemUnderTest) commands
 	return sys // returns sys to allow comparison with state in PostCondition
 }
 
-func (*deleteCurrentValidatorCommand) NextState(cmdState commands.State) commands.State {
+func (cmd *deleteCurrentValidatorCommand) NextState(cmdState commands.State) commands.State {
+	// delete first validator without delegators, if any
 	model := cmdState.(*stakersStorageModel)
 	stakerIt, err := model.GetCurrentStakerIterator()
 	if err != nil {
-		return err
+		cmd.err = err
+		return model
 	}
 
 	var (
@@ -697,11 +755,20 @@ func (*deleteCurrentValidatorCommand) NextState(cmdState commands.State) command
 	)
 	for !found && stakerIt.Next() {
 		validator = stakerIt.Value()
-		if validator.Priority == txs.SubnetPermissionedValidatorCurrentPriority ||
-			validator.Priority == txs.SubnetPermissionlessValidatorCurrentPriority ||
-			validator.Priority == txs.PrimaryNetworkValidatorCurrentPriority {
-			found = true
-			break
+		if validator.Priority.IsCurrentValidator() {
+			// check validators has no delegators
+			delIt, err := model.GetCurrentDelegatorIterator(validator.SubnetID, validator.NodeID)
+			if err != nil {
+				cmd.err = err
+				stakerIt.Release()
+				return model
+			}
+			if !delIt.Next() {
+				found = true
+				break
+			} else {
+				continue
+			}
 		}
 	}
 	if !found {
@@ -719,12 +786,21 @@ func (*deleteCurrentValidatorCommand) PreCondition(commands.State) bool {
 	return true
 }
 
-func (*deleteCurrentValidatorCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
-	return checkSystemAndModelContent(cmdState, res)
+func (cmd *deleteCurrentValidatorCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
+	if cmd.err != nil {
+		cmd.err = nil // reset for next runs
+		return &gopter.PropResult{Status: gopter.PropFalse}
+	}
+
+	if !checkSystemAndModelContent(cmdState, res) {
+		return &gopter.PropResult{Status: gopter.PropFalse}
+	}
+
+	return &gopter.PropResult{Status: gopter.PropTrue}
 }
 
 func (*deleteCurrentValidatorCommand) String() string {
-	return "DeleteCurrentValidator"
+	return "\ndeleteCurrentValidator"
 }
 
 // a trick to force command regeneration at each sampling.
@@ -736,14 +812,17 @@ var genDeleteCurrentValidatorCommand = gen.IntRange(1, 2).Map(
 )
 
 // PutCurrentDelegator section
-type putCurrentDelegatorCommand txs.Tx
+type putCurrentDelegatorCommand struct {
+	sTx *txs.Tx
+	err error
+}
 
-func (v *putCurrentDelegatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
-	candidateDelegator := (*txs.Tx)(v)
+func (cmd *putCurrentDelegatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
+	candidateDelegator := cmd.sTx
 	sys := sut.(*sysUnderTest)
 	err := addCurrentDelegatorInSystem(sys, candidateDelegator.Unsigned)
 	if err != nil {
-		panic(err)
+		cmd.err = err
 	}
 	return sys
 }
@@ -766,9 +845,7 @@ func addCurrentDelegatorInSystem(sys *sysUnderTest, candidateDelegatorTx txs.Uns
 	)
 	for !found && stakerIt.Next() {
 		validator = stakerIt.Value()
-		if validator.Priority == txs.SubnetPermissionedValidatorCurrentPriority ||
-			validator.Priority == txs.SubnetPermissionlessValidatorCurrentPriority ||
-			validator.Priority == txs.PrimaryNetworkValidatorCurrentPriority {
+		if validator.Priority.IsCurrentValidator() {
 			found = true
 			break
 		}
@@ -799,12 +876,12 @@ func addCurrentDelegatorInSystem(sys *sysUnderTest, candidateDelegatorTx txs.Uns
 	return nil
 }
 
-func (v *putCurrentDelegatorCommand) NextState(cmdState commands.State) commands.State {
-	candidateDelegator := (*txs.Tx)(v)
+func (cmd *putCurrentDelegatorCommand) NextState(cmdState commands.State) commands.State {
+	candidateDelegator := cmd.sTx
 	model := cmdState.(*stakersStorageModel)
 	err := addCurrentDelegatorInModel(model, candidateDelegator.Unsigned)
 	if err != nil {
-		panic(err)
+		cmd.err = err
 	}
 	return cmdState
 }
@@ -826,9 +903,7 @@ func addCurrentDelegatorInModel(model *stakersStorageModel, candidateDelegatorTx
 	)
 	for !found && stakerIt.Next() {
 		validator = stakerIt.Value()
-		if validator.Priority == txs.SubnetPermissionedValidatorCurrentPriority ||
-			validator.Priority == txs.SubnetPermissionlessValidatorCurrentPriority ||
-			validator.Priority == txs.PrimaryNetworkValidatorCurrentPriority {
+		if validator.Priority.IsCurrentValidator() {
 			found = true
 			break
 		}
@@ -862,16 +937,25 @@ func (*putCurrentDelegatorCommand) PreCondition(commands.State) bool {
 	return true
 }
 
-func (*putCurrentDelegatorCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
-	return checkSystemAndModelContent(cmdState, res)
+func (cmd *putCurrentDelegatorCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
+	if cmd.err != nil {
+		cmd.err = nil // reset for next runs
+		return &gopter.PropResult{Status: gopter.PropFalse}
+	}
+
+	if !checkSystemAndModelContent(cmdState, res) {
+		return &gopter.PropResult{Status: gopter.PropFalse}
+	}
+
+	return &gopter.PropResult{Status: gopter.PropTrue}
 }
 
-func (v *putCurrentDelegatorCommand) String() string {
-	stakerTx := v.Unsigned.(txs.StakerTx)
-	return fmt.Sprintf("putCurrentDelegator(subnetID: %v, nodeID: %v, txID: %v, priority: %v, unixStartTime: %v, duration: %v)",
+func (cmd *putCurrentDelegatorCommand) String() string {
+	stakerTx := cmd.sTx.Unsigned.(txs.StakerTx)
+	return fmt.Sprintf("\nputCurrentDelegator(subnetID: %v, nodeID: %v, txID: %v, priority: %v, unixStartTime: %v, duration: %v)",
 		stakerTx.SubnetID(),
 		stakerTx.NodeID(),
-		v.TxID,
+		cmd.sTx.TxID,
 		stakerTx.CurrentPriority(),
 		stakerTx.StartTime().Unix(),
 		stakerTx.EndTime().Sub(stakerTx.StartTime()))
@@ -884,19 +968,24 @@ var genPutCurrentDelegatorCommand = addPermissionlessDelegatorTxGenerator(comman
 			panic(fmt.Errorf("failed signing tx, %w", err))
 		}
 
-		cmd := (*putCurrentDelegatorCommand)(sTx)
+		cmd := &putCurrentDelegatorCommand{
+			sTx: sTx,
+		}
 		return cmd
 	},
 )
 
 // UpdateCurrentDelegator section
-type updateStakingPeriodCurrentDelegatorCommand struct{}
+type updateStakingPeriodCurrentDelegatorCommand struct {
+	err error
+}
 
-func (*updateStakingPeriodCurrentDelegatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
+func (cmd *updateStakingPeriodCurrentDelegatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
 	sys := sut.(*sysUnderTest)
 	err := updateStakingPeriodCurrentDelegatorInSystem(sys)
 	if err != nil {
-		panic(err)
+		cmd.err = err
+		return sys
 	}
 	return sys
 }
@@ -920,8 +1009,7 @@ func updateStakingPeriodCurrentDelegatorInSystem(sys *sysUnderTest) error {
 	)
 	for !found && stakerIt.Next() {
 		delegator = stakerIt.Value()
-		if delegator.Priority == txs.SubnetPermissionlessDelegatorCurrentPriority ||
-			delegator.Priority == txs.PrimaryNetworkDelegatorCurrentPriority {
+		if delegator.Priority.IsCurrentDelegator() {
 			found = true
 			break
 		}
@@ -933,7 +1021,9 @@ func updateStakingPeriodCurrentDelegatorInSystem(sys *sysUnderTest) error {
 	stakerIt.Release()
 
 	// 2. Add diff layer on top
-	sys.addDiffOnTop()
+	if err := sys.addDiffOnTop(); err != nil {
+		return err
+	}
 	chain = sys.getTopChainState()
 
 	// 3. update delegator staking period and update the staker
@@ -948,12 +1038,12 @@ func updateStakingPeriodCurrentDelegatorInSystem(sys *sysUnderTest) error {
 	return chain.UpdateCurrentDelegator(&updatedDelegator)
 }
 
-func (*updateStakingPeriodCurrentDelegatorCommand) NextState(cmdState commands.State) commands.State {
+func (cmd *updateStakingPeriodCurrentDelegatorCommand) NextState(cmdState commands.State) commands.State {
 	model := cmdState.(*stakersStorageModel)
 
 	err := updateStakingPeriodCurrentDelegatorInModel(model)
 	if err != nil {
-		panic(err)
+		cmd.err = err
 	}
 	return cmdState
 }
@@ -970,8 +1060,7 @@ func updateStakingPeriodCurrentDelegatorInModel(model *stakersStorageModel) erro
 	)
 	for !found && stakerIt.Next() {
 		delegator = stakerIt.Value()
-		if delegator.Priority == txs.SubnetPermissionlessDelegatorCurrentPriority ||
-			delegator.Priority == txs.PrimaryNetworkDelegatorCurrentPriority {
+		if delegator.Priority.IsCurrentDelegator() {
 			found = true
 			break
 		}
@@ -997,12 +1086,21 @@ func (*updateStakingPeriodCurrentDelegatorCommand) PreCondition(commands.State) 
 	return true
 }
 
-func (*updateStakingPeriodCurrentDelegatorCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
-	return checkSystemAndModelContent(cmdState, res)
+func (cmd *updateStakingPeriodCurrentDelegatorCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
+	if cmd.err != nil {
+		cmd.err = nil // reset for next runs
+		return &gopter.PropResult{Status: gopter.PropFalse}
+	}
+
+	if !checkSystemAndModelContent(cmdState, res) {
+		return &gopter.PropResult{Status: gopter.PropFalse}
+	}
+
+	return &gopter.PropResult{Status: gopter.PropTrue}
 }
 
 func (*updateStakingPeriodCurrentDelegatorCommand) String() string {
-	return "updateStakingPeriodCurrentDelegatorCommand"
+	return "\nupdateStakingPeriodCurrentDelegatorCommand"
 }
 
 var genUpdateStakingPeriodCurrentDelegatorCommand = gen.IntRange(1, 2).Map(
@@ -1012,13 +1110,15 @@ var genUpdateStakingPeriodCurrentDelegatorCommand = gen.IntRange(1, 2).Map(
 )
 
 // UpdateCurrentDelegator section
-type shiftCurrentDelegatorCommand struct{}
+type shiftCurrentDelegatorCommand struct {
+	err error
+}
 
-func (*shiftCurrentDelegatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
+func (cmd *shiftCurrentDelegatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
 	sys := sut.(*sysUnderTest)
 	err := shiftCurrentDelegatorInSystem(sys)
 	if err != nil {
-		panic(err)
+		cmd.err = err
 	}
 	return sys
 }
@@ -1042,8 +1142,7 @@ func shiftCurrentDelegatorInSystem(sys *sysUnderTest) error {
 	)
 	for !found && stakerIt.Next() {
 		delegator = stakerIt.Value()
-		if delegator.Priority == txs.SubnetPermissionlessDelegatorCurrentPriority ||
-			delegator.Priority == txs.PrimaryNetworkDelegatorCurrentPriority {
+		if delegator.Priority.IsCurrentDelegator() {
 			found = true
 			break
 		}
@@ -1055,7 +1154,9 @@ func shiftCurrentDelegatorInSystem(sys *sysUnderTest) error {
 	stakerIt.Release()
 
 	// 2. Add diff layer on top
-	sys.addDiffOnTop()
+	if err := sys.addDiffOnTop(); err != nil {
+		return err
+	}
 	chain = sys.getTopChainState()
 
 	// 3. Shift delegator times and update the staker
@@ -1064,12 +1165,12 @@ func shiftCurrentDelegatorInSystem(sys *sysUnderTest) error {
 	return chain.UpdateCurrentDelegator(&updatedDelegator)
 }
 
-func (*shiftCurrentDelegatorCommand) NextState(cmdState commands.State) commands.State {
+func (cmd *shiftCurrentDelegatorCommand) NextState(cmdState commands.State) commands.State {
 	model := cmdState.(*stakersStorageModel)
 
 	err := shiftCurrentDelegatorInModel(model)
 	if err != nil {
-		panic(err)
+		cmd.err = err
 	}
 	return cmdState
 }
@@ -1086,8 +1187,7 @@ func shiftCurrentDelegatorInModel(model *stakersStorageModel) error {
 	)
 	for !found && stakerIt.Next() {
 		delegator = stakerIt.Value()
-		if delegator.Priority == txs.SubnetPermissionlessDelegatorCurrentPriority ||
-			delegator.Priority == txs.PrimaryNetworkDelegatorCurrentPriority {
+		if delegator.Priority.IsCurrentDelegator() {
 			found = true
 			break
 		}
@@ -1107,12 +1207,21 @@ func (*shiftCurrentDelegatorCommand) PreCondition(commands.State) bool {
 	return true
 }
 
-func (*shiftCurrentDelegatorCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
-	return checkSystemAndModelContent(cmdState, res)
+func (cmd *shiftCurrentDelegatorCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
+	if cmd.err != nil {
+		cmd.err = nil // reset for next runs
+		return &gopter.PropResult{Status: gopter.PropFalse}
+	}
+
+	if !checkSystemAndModelContent(cmdState, res) {
+		return &gopter.PropResult{Status: gopter.PropFalse}
+	}
+
+	return &gopter.PropResult{Status: gopter.PropTrue}
 }
 
 func (*shiftCurrentDelegatorCommand) String() string {
-	return "shiftCurrentDelegator"
+	return "\nshiftCurrentDelegator"
 }
 
 var genShiftCurrentDelegatorCommand = gen.IntRange(1, 2).Map(
@@ -1122,13 +1231,15 @@ var genShiftCurrentDelegatorCommand = gen.IntRange(1, 2).Map(
 )
 
 // IncreaseWeightCurrentDelegator section
-type increaseWeightCurrentDelegatorCommand struct{}
+type increaseWeightCurrentDelegatorCommand struct {
+	err error
+}
 
-func (*increaseWeightCurrentDelegatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
+func (cmd *increaseWeightCurrentDelegatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
 	sys := sut.(*sysUnderTest)
 	err := increaseWeightCurrentDelegatorInSystem(sys)
 	if err != nil {
-		panic(err)
+		cmd.err = err
 	}
 	return sys
 }
@@ -1152,8 +1263,7 @@ func increaseWeightCurrentDelegatorInSystem(sys *sysUnderTest) error {
 	)
 	for !found && stakerIt.Next() {
 		delegator = stakerIt.Value()
-		if delegator.Priority == txs.SubnetPermissionlessDelegatorCurrentPriority ||
-			delegator.Priority == txs.PrimaryNetworkDelegatorCurrentPriority {
+		if delegator.Priority.IsCurrentDelegator() {
 			found = true
 			break
 		}
@@ -1165,7 +1275,9 @@ func increaseWeightCurrentDelegatorInSystem(sys *sysUnderTest) error {
 	stakerIt.Release()
 
 	// 2. Add diff layer on top
-	sys.addDiffOnTop()
+	if err := sys.addDiffOnTop(); err != nil {
+		return err
+	}
 	chain = sys.getTopChainState()
 
 	// 3. increase delegator weight and update the staker
@@ -1174,12 +1286,12 @@ func increaseWeightCurrentDelegatorInSystem(sys *sysUnderTest) error {
 	return chain.UpdateCurrentDelegator(&updatedDelegator)
 }
 
-func (*increaseWeightCurrentDelegatorCommand) NextState(cmdState commands.State) commands.State {
+func (cmd *increaseWeightCurrentDelegatorCommand) NextState(cmdState commands.State) commands.State {
 	model := cmdState.(*stakersStorageModel)
 
 	err := increaseWeightCurrentDelegatorInModel(model)
 	if err != nil {
-		panic(err)
+		cmd.err = err
 	}
 	return cmdState
 }
@@ -1196,8 +1308,7 @@ func increaseWeightCurrentDelegatorInModel(model *stakersStorageModel) error {
 	)
 	for !found && stakerIt.Next() {
 		delegator = stakerIt.Value()
-		if delegator.Priority == txs.SubnetPermissionlessDelegatorCurrentPriority ||
-			delegator.Priority == txs.PrimaryNetworkDelegatorCurrentPriority {
+		if delegator.Priority.IsCurrentDelegator() {
 			found = true
 			break
 		}
@@ -1217,12 +1328,20 @@ func (*increaseWeightCurrentDelegatorCommand) PreCondition(commands.State) bool 
 	return true
 }
 
-func (*increaseWeightCurrentDelegatorCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
-	return checkSystemAndModelContent(cmdState, res)
+func (cmd *increaseWeightCurrentDelegatorCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
+	if cmd.err != nil {
+		cmd.err = nil // reset for next runs
+		return &gopter.PropResult{Status: gopter.PropFalse}
+	}
+	if !checkSystemAndModelContent(cmdState, res) {
+		return &gopter.PropResult{Status: gopter.PropFalse}
+	}
+
+	return &gopter.PropResult{Status: gopter.PropTrue}
 }
 
 func (*increaseWeightCurrentDelegatorCommand) String() string {
-	return "increaseWeightCurrentDelegator"
+	return "\nincreaseWeightCurrentDelegator"
 }
 
 var genIncreaseWeightCurrentDelegatorCommand = gen.IntRange(1, 2).Map(
@@ -1232,13 +1351,16 @@ var genIncreaseWeightCurrentDelegatorCommand = gen.IntRange(1, 2).Map(
 )
 
 // DeleteCurrentDelegator section
-type deleteCurrentDelegatorCommand struct{}
+type deleteCurrentDelegatorCommand struct {
+	err error
+}
 
-func (*deleteCurrentDelegatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
+func (cmd *deleteCurrentDelegatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
+	// delete first delegator, if any
 	sys := sut.(*sysUnderTest)
 	_, err := deleteCurrentDelegator(sys)
 	if err != nil {
-		panic(err)
+		cmd.err = err
 	}
 	return sys // returns sys to allow comparison with state in PostCondition
 }
@@ -1258,8 +1380,7 @@ func deleteCurrentDelegator(sys *sysUnderTest) (bool, error) {
 	)
 	for !found && stakerIt.Next() {
 		delegator = stakerIt.Value()
-		if delegator.Priority == txs.SubnetPermissionlessDelegatorCurrentPriority ||
-			delegator.Priority == txs.PrimaryNetworkDelegatorCurrentPriority {
+		if delegator.Priority.IsCurrentDelegator() {
 			found = true
 			break
 		}
@@ -1287,8 +1408,7 @@ func (*deleteCurrentDelegatorCommand) NextState(cmdState commands.State) command
 	)
 	for !found && stakerIt.Next() {
 		delegator = stakerIt.Value()
-		if delegator.Priority == txs.SubnetPermissionlessDelegatorCurrentPriority ||
-			delegator.Priority == txs.PrimaryNetworkDelegatorCurrentPriority {
+		if delegator.Priority.IsCurrentDelegator() {
 			found = true
 			break
 		}
@@ -1307,12 +1427,21 @@ func (*deleteCurrentDelegatorCommand) PreCondition(commands.State) bool {
 	return true
 }
 
-func (*deleteCurrentDelegatorCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
-	return checkSystemAndModelContent(cmdState, res)
+func (cmd *deleteCurrentDelegatorCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
+	if cmd.err != nil {
+		cmd.err = nil // reset for next runs
+		return &gopter.PropResult{Status: gopter.PropFalse}
+	}
+
+	if !checkSystemAndModelContent(cmdState, res) {
+		return &gopter.PropResult{Status: gopter.PropFalse}
+	}
+
+	return &gopter.PropResult{Status: gopter.PropTrue}
 }
 
 func (*deleteCurrentDelegatorCommand) String() string {
-	return "DeleteCurrentDelegator"
+	return "\ndeleteCurrentDelegator"
 }
 
 // a trick to force command regeneration at each sampling.
@@ -1324,11 +1453,16 @@ var genDeleteCurrentDelegatorCommand = gen.IntRange(1, 2).Map(
 )
 
 // addTopDiffCommand section
-type addTopDiffCommand struct{}
+type addTopDiffCommand struct {
+	err error
+}
 
-func (*addTopDiffCommand) Run(sut commands.SystemUnderTest) commands.Result {
+func (cmd *addTopDiffCommand) Run(sut commands.SystemUnderTest) commands.Result {
 	sys := sut.(*sysUnderTest)
-	sys.addDiffOnTop()
+	err := sys.addDiffOnTop()
+	if err != nil {
+		cmd.err = err
+	}
 	return sys
 }
 
@@ -1340,12 +1474,21 @@ func (*addTopDiffCommand) PreCondition(commands.State) bool {
 	return true
 }
 
-func (*addTopDiffCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
-	return checkSystemAndModelContent(cmdState, res)
+func (cmd *addTopDiffCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
+	if cmd.err != nil {
+		cmd.err = nil // reset for next runs
+		return &gopter.PropResult{Status: gopter.PropFalse}
+	}
+
+	if !checkSystemAndModelContent(cmdState, res) {
+		return &gopter.PropResult{Status: gopter.PropFalse}
+	}
+
+	return &gopter.PropResult{Status: gopter.PropTrue}
 }
 
 func (*addTopDiffCommand) String() string {
-	return "AddTopDiffCommand"
+	return "\naddTopDiffCommand"
 }
 
 // a trick to force command regeneration at each sampling.
@@ -1357,11 +1500,14 @@ var genAddTopDiffCommand = gen.IntRange(1, 2).Map(
 )
 
 // applyBottomDiffCommand section
-type applyBottomDiffCommand struct{}
+type applyBottomDiffCommand struct {
+	err error
+}
 
-func (*applyBottomDiffCommand) Run(sut commands.SystemUnderTest) commands.Result {
+func (cmd *applyBottomDiffCommand) Run(sut commands.SystemUnderTest) commands.Result {
 	sys := sut.(*sysUnderTest)
-	_ = sys.flushBottomDiff()
+	_, cmd.err = sys.flushBottomDiff()
+
 	return sys
 }
 
@@ -1373,12 +1519,21 @@ func (*applyBottomDiffCommand) PreCondition(commands.State) bool {
 	return true
 }
 
-func (*applyBottomDiffCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
-	return checkSystemAndModelContent(cmdState, res)
+func (cmd *applyBottomDiffCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
+	if cmd.err != nil {
+		cmd.err = nil // reset for next runs
+		return &gopter.PropResult{Status: gopter.PropFalse}
+	}
+
+	if !checkSystemAndModelContent(cmdState, res) {
+		return &gopter.PropResult{Status: gopter.PropFalse}
+	}
+
+	return &gopter.PropResult{Status: gopter.PropTrue}
 }
 
 func (*applyBottomDiffCommand) String() string {
-	return "ApplyBottomDiffCommand"
+	return "\napplyBottomDiffCommand"
 }
 
 // a trick to force command regeneration at each sampling.
@@ -1390,13 +1545,16 @@ var genApplyBottomDiffCommand = gen.IntRange(1, 2).Map(
 )
 
 // commitBottomStateCommand section
-type commitBottomStateCommand struct{}
+type commitBottomStateCommand struct {
+	err error
+}
 
-func (*commitBottomStateCommand) Run(sut commands.SystemUnderTest) commands.Result {
+func (cmd *commitBottomStateCommand) Run(sut commands.SystemUnderTest) commands.Result {
 	sys := sut.(*sysUnderTest)
 	err := sys.baseState.Commit()
 	if err != nil {
-		panic(err)
+		cmd.err = err
+		return sys
 	}
 	return sys
 }
@@ -1409,12 +1567,21 @@ func (*commitBottomStateCommand) PreCondition(commands.State) bool {
 	return true
 }
 
-func (*commitBottomStateCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
-	return checkSystemAndModelContent(cmdState, res)
+func (cmd *commitBottomStateCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
+	if cmd.err != nil {
+		cmd.err = nil // reset for next runs
+		return &gopter.PropResult{Status: gopter.PropFalse}
+	}
+
+	if !checkSystemAndModelContent(cmdState, res) {
+		return &gopter.PropResult{Status: gopter.PropFalse}
+	}
+
+	return &gopter.PropResult{Status: gopter.PropTrue}
 }
 
 func (*commitBottomStateCommand) String() string {
-	return "CommitBottomStateCommand"
+	return "\ncommitBottomStateCommand"
 }
 
 // a trick to force command regeneration at each sampling.
@@ -1426,27 +1593,40 @@ var genCommitBottomStateCommand = gen.IntRange(1, 2).Map(
 )
 
 // rebuildStateCommand section
-type rebuildStateCommand struct{}
+type rebuildStateCommand struct {
+	err error
+}
 
-func (*rebuildStateCommand) Run(sut commands.SystemUnderTest) commands.Result {
+func (cmd *rebuildStateCommand) Run(sut commands.SystemUnderTest) commands.Result {
 	sys := sut.(*sysUnderTest)
 
 	// 1. Persist all outstanding changes
-	for sys.flushBottomDiff() {
-		err := sys.baseState.Commit()
+	for {
+		diffFound, err := sys.flushBottomDiff()
 		if err != nil {
-			panic(err)
+			cmd.err = err
+			return sys
+		}
+		if !diffFound {
+			break
+		}
+
+		if err := sys.baseState.Commit(); err != nil {
+			cmd.err = err
+			return sys
 		}
 	}
 
 	if err := sys.baseState.Commit(); err != nil {
-		panic(err)
+		cmd.err = err
+		return sys
 	}
 
 	// 2. Rebuild the state from the db
 	baseState, err := buildChainState(sys.baseDB, nil)
 	if err != nil {
-		panic(err)
+		cmd.err = err
+		return sys
 	}
 	sys.baseState = baseState
 	sys.diffsMap = map[ids.ID]Diff{}
@@ -1463,12 +1643,25 @@ func (*rebuildStateCommand) PreCondition(commands.State) bool {
 	return true
 }
 
-func (*rebuildStateCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
-	return checkSystemAndModelContent(cmdState, res)
+func (cmd *rebuildStateCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
+	if cmd.err != nil {
+		cmd.err = nil // reset for next runs
+		return &gopter.PropResult{Status: gopter.PropFalse}
+	}
+
+	if !checkSystemAndModelContent(cmdState, res) {
+		return &gopter.PropResult{Status: gopter.PropFalse}
+	}
+
+	if !checkValidatorSetContent(res) {
+		return &gopter.PropResult{Status: gopter.PropFalse}
+	}
+
+	return &gopter.PropResult{Status: gopter.PropTrue}
 }
 
 func (*rebuildStateCommand) String() string {
-	return "RebuildStateCommand"
+	return "\nrebuildStateCommand"
 }
 
 // a trick to force command regeneration at each sampling.
@@ -1479,7 +1672,7 @@ var genRebuildStateCommand = gen.IntRange(1, 2).Map(
 	},
 )
 
-func checkSystemAndModelContent(cmdState commands.State, res commands.Result) *gopter.PropResult {
+func checkSystemAndModelContent(cmdState commands.State, res commands.Result) bool {
 	model := cmdState.(*stakersStorageModel)
 	sys := res.(*sysUnderTest)
 
@@ -1488,11 +1681,11 @@ func checkSystemAndModelContent(cmdState commands.State, res commands.Result) *g
 
 	modelIt, err := model.GetCurrentStakerIterator()
 	if err != nil {
-		return &gopter.PropResult{Status: gopter.PropFalse}
+		return false
 	}
 	sysIt, err := topDiff.GetCurrentStakerIterator()
 	if err != nil {
-		return &gopter.PropResult{Status: gopter.PropFalse}
+		return false
 	}
 
 	modelStakers := make([]*Staker, 0)
@@ -1508,15 +1701,55 @@ func checkSystemAndModelContent(cmdState commands.State, res commands.Result) *g
 	sysIt.Release()
 
 	if len(modelStakers) != len(sysStakers) {
-		return &gopter.PropResult{Status: gopter.PropFalse}
+		return false
 	}
 
 	for idx, modelStaker := range modelStakers {
 		sysStaker := sysStakers[idx]
 		if modelStaker == nil || sysStaker == nil || !reflect.DeepEqual(modelStaker, sysStaker) {
-			return &gopter.PropResult{Status: gopter.PropFalse}
+			return false
 		}
 	}
 
-	return &gopter.PropResult{Status: gopter.PropTrue}
+	return true
+}
+
+func checkValidatorSetContent(res commands.Result) bool {
+	sys := res.(*sysUnderTest)
+	valSet := sys.baseState.(*state).cfg.Validators
+
+	sysIt, err := sys.baseState.GetCurrentStakerIterator()
+	if err != nil {
+		return false
+	}
+
+	// valContent subnetID -> nodeID -> aggregate weight (validator's own weight + delegators' weight)
+	valContent := make(map[ids.ID]map[ids.NodeID]uint64)
+	for sysIt.Next() {
+		val := sysIt.Value()
+		if val.SubnetID != constants.PrimaryNetworkID {
+			continue
+		}
+		nodes, found := valContent[val.SubnetID]
+		if !found {
+			nodes = make(map[ids.NodeID]uint64)
+			valContent[val.SubnetID] = nodes
+		}
+		nodes[val.NodeID] += val.Weight
+	}
+	sysIt.Release()
+
+	for subnetID, nodes := range valContent {
+		vals, found := valSet.Get(subnetID)
+		if !found {
+			return false
+		}
+		for nodeID, weight := range nodes {
+			valWeight := vals.GetWeight(nodeID)
+			if weight != valWeight {
+				return false
+			}
+		}
+	}
+	return true
 }

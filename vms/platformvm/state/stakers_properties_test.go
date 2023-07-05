@@ -14,16 +14,13 @@ import (
 	"github.com/leanovate/gopter"
 	"github.com/leanovate/gopter/gen"
 	"github.com/leanovate/gopter/prop"
-	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	bls "github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/version"
-	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -137,7 +134,7 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 
 			return ""
 		},
-		stakerTxGenerator(ctx, permissionedValidator, &constants.PrimaryNetworkID, nil, &signer.Empty{}, math.MaxUint64),
+		stakerTxGenerator(ctx, permissionedValidator, &constants.PrimaryNetworkID, nil, math.MaxUint64),
 	))
 
 	properties.Property("update current validators", prop.ForAll(
@@ -213,7 +210,7 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 			currIT.Release()
 			return ""
 		},
-		stakerTxGenerator(ctx, permissionedValidator, &constants.PrimaryNetworkID, nil, &signer.Empty{}, math.MaxUint64),
+		stakerTxGenerator(ctx, permissionedValidator, &constants.PrimaryNetworkID, nil, math.MaxUint64),
 	))
 
 	properties.Property("add, delete and query pending validators", prop.ForAll(
@@ -281,7 +278,7 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 
 			return ""
 		},
-		stakerTxGenerator(ctx, permissionedValidator, &constants.PrimaryNetworkID, nil, &signer.Empty{}, math.MaxUint64),
+		stakerTxGenerator(ctx, permissionedValidator, &constants.PrimaryNetworkID, nil, math.MaxUint64),
 	))
 
 	var (
@@ -422,7 +419,6 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 			permissionlessValidator,
 			&subnetID,
 			&nodeID,
-			&signer.Empty{},
 			math.MaxUint64,
 		),
 		gen.SliceOfN(10,
@@ -430,7 +426,6 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 				permissionlessDelegator,
 				&subnetID,
 				&nodeID,
-				&signer.Empty{},
 				1000,
 			),
 		),
@@ -526,7 +521,6 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 				permissionlessDelegator,
 				&subnetID,
 				&nodeID,
-				&signer.Empty{},
 				1000,
 			),
 		),
@@ -665,7 +659,6 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 			permissionlessValidator,
 			&subnetID,
 			&nodeID,
-			&signer.Empty{},
 			math.MaxUint64,
 		),
 		gen.SliceOfN(10,
@@ -673,7 +666,6 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 				permissionlessDelegator,
 				&subnetID,
 				&nodeID,
-				&signer.Empty{},
 				1000,
 			),
 		),
@@ -714,7 +706,7 @@ func TestStateStakersProperties(t *testing.T) {
 
 			return ""
 		},
-		stakerTxGenerator(ctx, permissionlessValidator, nil, nil, &signer.Empty{}, math.MaxUint64),
+		stakerTxGenerator(ctx, permissionlessValidator, nil, nil, math.MaxUint64),
 	))
 
 	properties.Property("cannot update deleted validator", prop.ForAll(
@@ -746,7 +738,7 @@ func TestStateStakersProperties(t *testing.T) {
 
 			return ""
 		},
-		stakerTxGenerator(ctx, permissionlessValidator, nil, nil, &signer.Empty{}, math.MaxUint64),
+		stakerTxGenerator(ctx, permissionlessValidator, nil, nil, math.MaxUint64),
 	))
 
 	properties.Property("cannot update delegator from unknown subnetID/nodeID", prop.ForAll(
@@ -776,7 +768,7 @@ func TestStateStakersProperties(t *testing.T) {
 
 			return ""
 		},
-		stakerTxGenerator(ctx, permissionlessDelegator, nil, nil, &signer.Empty{}, 1000),
+		stakerTxGenerator(ctx, permissionlessDelegator, nil, nil, 1000),
 	))
 
 	var (
@@ -822,8 +814,8 @@ func TestStateStakersProperties(t *testing.T) {
 
 			return ""
 		},
-		stakerTxGenerator(ctx, permissionlessValidator, &subnetID, &nodeID, &signer.Empty{}, math.MaxUint64),
-		stakerTxGenerator(ctx, permissionlessDelegator, &subnetID, &nodeID, &signer.Empty{}, 1000),
+		stakerTxGenerator(ctx, permissionlessValidator, &subnetID, &nodeID, math.MaxUint64),
+		stakerTxGenerator(ctx, permissionlessDelegator, &subnetID, &nodeID, 1000),
 	))
 
 	properties.TestingRun(t)
@@ -859,7 +851,7 @@ func TestDiffStakersProperties(t *testing.T) {
 
 			return ""
 		},
-		stakerTxGenerator(ctx, permissionlessValidator, nil, nil, &signer.Empty{}, math.MaxUint64),
+		stakerTxGenerator(ctx, permissionlessValidator, nil, nil, math.MaxUint64),
 	))
 
 	properties.Property("updating deleted validator should err", prop.ForAll(
@@ -889,7 +881,7 @@ func TestDiffStakersProperties(t *testing.T) {
 
 			return ""
 		},
-		stakerTxGenerator(ctx, permissionlessValidator, nil, nil, &signer.Empty{}, math.MaxUint64),
+		stakerTxGenerator(ctx, permissionlessValidator, nil, nil, math.MaxUint64),
 	))
 
 	properties.Property("updating unknown delegator should not err", prop.ForAll(
@@ -917,7 +909,7 @@ func TestDiffStakersProperties(t *testing.T) {
 
 			return ""
 		},
-		stakerTxGenerator(ctx, permissionlessDelegator, nil, nil, &signer.Empty{}, math.MaxUint64),
+		stakerTxGenerator(ctx, permissionlessDelegator, nil, nil, math.MaxUint64),
 	))
 
 	properties.Property("updating deleted delegator should err", prop.ForAll(
@@ -947,7 +939,7 @@ func TestDiffStakersProperties(t *testing.T) {
 
 			return ""
 		},
-		stakerTxGenerator(ctx, permissionlessDelegator, nil, nil, &signer.Empty{}, math.MaxUint64),
+		stakerTxGenerator(ctx, permissionlessDelegator, nil, nil, math.MaxUint64),
 	))
 
 	properties.TestingRun(t)
@@ -1009,7 +1001,7 @@ func TestValidatorSetOperations(t *testing.T) {
 
 			return ""
 		},
-		stakerTxGenerator(ctx, permissionlessValidator, &trackedSubnet, nil, &signer.Empty{}, math.MaxUint64),
+		stakerTxGenerator(ctx, permissionlessValidator, &trackedSubnet, nil, math.MaxUint64),
 	))
 
 	properties.Property("validator is updated upon staker update", prop.ForAll(
@@ -1069,7 +1061,7 @@ func TestValidatorSetOperations(t *testing.T) {
 
 			return ""
 		},
-		stakerTxGenerator(ctx, permissionlessValidator, &trackedSubnet, nil, &signer.Empty{}, math.MaxUint64),
+		stakerTxGenerator(ctx, permissionlessValidator, &trackedSubnet, nil, math.MaxUint64),
 	))
 
 	properties.Property("validator is deleted upon staker delete", prop.ForAll(
@@ -1134,8 +1126,8 @@ func TestValidatorSetOperations(t *testing.T) {
 
 			return ""
 		},
-		stakerTxGenerator(ctx, permissionlessValidator, &trackedSubnet, nil, &signer.Empty{}, math.MaxUint64),
-		stakerTxGenerator(ctx, permissionlessDelegator, &trackedSubnet, nil, &signer.Empty{}, math.MaxUint64),
+		stakerTxGenerator(ctx, permissionlessValidator, &trackedSubnet, nil, math.MaxUint64),
+		stakerTxGenerator(ctx, permissionlessDelegator, &trackedSubnet, nil, math.MaxUint64),
 	))
 
 	properties.TestingRun(t)
@@ -1146,9 +1138,10 @@ func TestValidatorSetOperations(t *testing.T) {
 func TestValidatorUptimesOperations(t *testing.T) {
 	properties := gopter.NewProperties(nil)
 	ctx := buildStateCtx()
-	sk1, err := bls.NewSecretKey()
-	require.NoError(t, err)
-	sig := signer.NewProofOfPossession(sk1)
+
+	// // to reproduce a given scenario do something like this:
+	// parameters := gopter.DefaultTestParametersWithSeed(1688585045068172845)
+	// properties := gopter.NewProperties(parameters)
 
 	properties.Property("staker start time is updated following shift", prop.ForAll(
 		func(nonInitValTx *txs.Tx) string {
@@ -1214,7 +1207,7 @@ func TestValidatorUptimesOperations(t *testing.T) {
 			// 2. Shift the validator
 			updatedStaker := *val
 			ShiftStakerAheadInPlace(&updatedStaker, updatedStaker.EndTime)
-			IncreaseStakerWeightInPlace(&updatedStaker, updatedStaker.Weight*2)
+			IncreaseStakerWeightInPlace(&updatedStaker, updatedStaker.Weight/2)
 
 			diff, err = NewDiff(baseState.GetLastAccepted(), &versionsHolder{
 				baseState: baseState,
@@ -1260,7 +1253,7 @@ func TestValidatorUptimesOperations(t *testing.T) {
 
 			return ""
 		},
-		stakerTxGenerator(ctx, permissionlessValidator, &constants.PrimaryNetworkID, nil, sig, math.MaxUint64),
+		stakerTxGenerator(ctx, permissionlessValidator, &constants.PrimaryNetworkID, nil, math.MaxUint64),
 	))
 
 	properties.TestingRun(t)
