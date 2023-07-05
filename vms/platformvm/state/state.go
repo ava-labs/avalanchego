@@ -1526,6 +1526,11 @@ func (s *state) CommitBatch() (database.Batch, error) {
 
 func (s *state) writeBlocks() error {
 	for blkID, stateBlk := range s.addedBlocks {
+		// We don't write rejected blocks to disk.
+		if stateBlk.Status == choices.Rejected {
+			continue
+		}
+
 		var (
 			blkID = blkID
 			stBlk = stateBlk
