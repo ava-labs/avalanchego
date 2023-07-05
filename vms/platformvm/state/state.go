@@ -1526,22 +1526,8 @@ func (s *state) CommitBatch() (database.Batch, error) {
 	return s.baseDB.CommitBatch()
 }
 
-func (s *state) cleanupBlk(blkID ids.ID) {
-	delete(s.addedBlocks, blkID)
-	// Note: Evict is used rather than Put here because stBlk may end up
-	// referencing additional data (because of shared byte slices) that
-	// would not be properly accounted for in the cache sizing.
-	s.blockCache.Evict(blkID)
-}
-
 func (s *state) writeBlocks() error {
 	for blkID, stateBlk := range s.addedBlocks {
-		// We don't write rejected blocks to disk.
-		if stateBlk.Status == choices.Rejected {
-			s.cleanupBlk(blkID)
-			continue
-		}
-
 		var (
 			blkID = blkID
 			stBlk = stateBlk
@@ -1553,7 +1539,11 @@ func (s *state) writeBlocks() error {
 			return fmt.Errorf("failed to marshal block %s to store: %w", blkID, err)
 		}
 
-		s.cleanupBlk(blkID)
+		delete(s.addedBlocks, blkID)
+		// Note: Evict is used rather than Put here because stBlk may end up
+		// referencing additional data (because of shared byte slices) that
+		// would not be properly accounted for in the cache sizing.
+		s.blockCache.Evict(blkID)
 		if err := s.blockDB.Put(blkID[:], blockBytes); err != nil {
 			return fmt.Errorf("failed to write block %s: %w", blkID, err)
 		}
