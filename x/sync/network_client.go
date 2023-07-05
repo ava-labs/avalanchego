@@ -37,7 +37,7 @@ type networkClient interface {
 	// node version greater than or equal to minVersion.
 	// Returns response bytes, the ID of the chosen peer, and errRequestFailed if
 	// the request should be retried.
-	requestAny(ctx context.Context, minVersion *version.Application, request []byte) ([]byte, ids.NodeID, error)
+	requestAny(ctx context.Context, minVersion *version.Application, request []byte) (ids.NodeID, []byte, error)
 
 	// request synchronously sends request to the selected nodeID.
 	// Returns response bytes, and errRequestFailed if the request should be retried.
@@ -175,10 +175,10 @@ func (c *networkClientImpl) requestAny(
 	ctx context.Context,
 	minVersion *version.Application,
 	request []byte,
-) ([]byte, ids.NodeID, error) {
+) (ids.NodeID, []byte, error) {
 	// Take a slot from total [activeRequests] and block until a slot becomes available.
 	if err := c.activeRequests.Acquire(ctx, 1); err != nil {
-		return nil, ids.EmptyNodeID, errAcquiringSemaphore
+		return ids.EmptyNodeID, nil, errAcquiringSemaphore
 	}
 	defer c.activeRequests.Release(1)
 
@@ -186,7 +186,7 @@ func (c *networkClientImpl) requestAny(
 	nodeID, ok := c.peers.GetAnyPeer(minVersion)
 	if !ok {
 		c.lock.Unlock()
-		return nil, ids.EmptyNodeID, fmt.Errorf(
+		return ids.EmptyNodeID, nil, fmt.Errorf(
 			"no peers found matching version %s out of %d peers",
 			minVersion, c.peers.Size(),
 		)
@@ -194,7 +194,7 @@ func (c *networkClientImpl) requestAny(
 
 	// Note [c.get] releases [c.lock].
 	response, err := c.get(ctx, nodeID, request)
-	return response, nodeID, err
+	return nodeID, response, err
 }
 
 // Sends [request] to [nodeID] and returns the response.

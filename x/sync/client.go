@@ -249,7 +249,7 @@ func (c *clientImpl) get(ctx context.Context, request []byte) (ids.NodeID, []byt
 	c.metrics.RequestMade()
 
 	if len(c.stateSyncNodes) == 0 {
-		response, nodeID, err = c.networkClient.requestAny(ctx, c.stateSyncMinVersion, request)
+		nodeID, response, err = c.networkClient.requestAny(ctx, c.stateSyncMinVersion, request)
 	} else {
 		// Get the next nodeID to query using the [nodeIdx] offset.
 		// If we're out of nodes, loop back to 0.
