@@ -38,60 +38,87 @@ func newDefaultDBConfig() merkledb.Config {
 	}
 }
 
-func sendRangeRequest(
+// Create a client and send a range proof request to a server
+// whose underlying database is [serverDB].
+// The server's response is modified with [modifyResponse] before
+// being returned to the server.
+// The client makes at most [maxAttempts] attempts to fulfill
+// the request before returning an error.
+func sendRangeProofRequest(
 	t *testing.T,
-	db DB,
+	serverDB DB,
 	request *pb.SyncGetRangeProofRequest,
-	maxAttempts uint32,
+	maxAttempts int,
 	modifyResponse func(*merkledb.RangeProof),
 ) (*merkledb.RangeProof, error) {
 	t.Helper()
-
-	var wg sync.WaitGroup
-	defer wg.Wait() // wait for goroutines spawned
 
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	sender := common.NewMockSender(ctrl)
-	handler := NewNetworkServer(sender, db, logging.NoLog{})
-	clientNodeID, serverNodeID := ids.GenerateTestNodeID(), ids.GenerateTestNodeID()
-	networkClient := NewNetworkClient(sender, clientNodeID, 1, logging.NoLog{})
-	require.NoError(networkClient.connected(context.Background(), serverNodeID, version.CurrentApp))
-	client := NewClient(&ClientConfig{
-		NetworkClient: networkClient,
-		Metrics:       &mockMetrics{},
-		Log:           logging.NoLog{},
-	})
+	var (
+		// Number of calls from the client to the server so far.
+		numAttempts int
 
-	ctx, cancel := context.WithCancel(context.Background())
-	deadline := time.Now().Add(1 * time.Hour) // enough time to complete a request
-	defer cancel()                            // avoid leaking a goroutine
+		// Sends messages from server to client.
+		sender = common.NewMockSender(ctrl)
 
-	expectedSendNodeIDs := set.NewSet[ids.NodeID](1)
-	expectedSendNodeIDs.Add(serverNodeID)
-	sender.EXPECT().SendAppRequest(
-		gomock.Any(),        // ctx
-		expectedSendNodeIDs, // {serverNodeID}
-		gomock.Any(),        // requestID
-		gomock.Any(),        // requestBytes
+		// Server the range proof.
+		server = NewNetworkServer(sender, serverDB, logging.NoLog{})
+
+		clientNodeID, serverNodeID = ids.GenerateTestNodeID(), ids.GenerateTestNodeID()
+
+		// "Sends" the request from the client to the server and
+		// "receives" the response from the server. In reality,
+		// it just invokes the server's method and receives
+		// the response on [serverResponseChan].
+		networkClient = NewMocknetworkClient(ctrl)
+
+		serverResponseChan = make(chan []byte, 1)
+
+		// The client fetching a range proof.
+		client = NewClient(&ClientConfig{
+			NetworkClient: networkClient,
+			Metrics:       &mockMetrics{},
+			Log:           logging.NoLog{},
+		})
+
+		// The context used in client.GetRangeProof.
+		// Canceled after the first response is received because
+		// the client will keep sending requests until its context
+		// expires or it succeeds.
+		ctx, cancel = context.WithCancel(context.Background())
+	)
+
+	networkClient.EXPECT().requestAny(
+		gomock.Any(), // ctx
+		gomock.Any(), // min version
+		gomock.Any(), // request
 	).DoAndReturn(
-		func(ctx context.Context, _ set.Set[ids.NodeID], requestID uint32, requestBytes []byte) error {
-			// limit the number of attempts to [maxAttempts] by cancelling the context if needed.
-			if requestID >= maxAttempts {
-				cancel()
-				return ctx.Err()
+		func(_ context.Context, _ *version.Application, request []byte) (ids.NodeID, []byte, error) {
+			go func() {
+				// Get response from server
+				require.NoError(server.AppRequest(context.Background(), clientNodeID, 0, time.Now().Add(time.Hour), request))
+			}()
+
+			// Wait for response from server
+			serverResponse := <-serverResponseChan
+
+			numAttempts++
+
+			if numAttempts >= maxAttempts {
+				defer cancel()
 			}
 
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				require.NoError(handler.AppRequest(ctx, clientNodeID, requestID, deadline, requestBytes))
-			}() // should be on a goroutine so the test can make progress.
-			return nil
+			return serverNodeID, serverResponse, nil
 		},
 	).AnyTimes()
+
+	// Handle bandwidth tracking calls from client.
+	networkClient.EXPECT().trackBandwidth(gomock.Any(), gomock.Any()).AnyTimes()
+
+	// The server should expect to "send" a response to the client.
 	sender.EXPECT().SendAppResponse(
 		gomock.Any(), // ctx
 		clientNodeID,
@@ -114,7 +141,9 @@ func sendRangeRequest(
 			// reserialize the response and pass it to the client to complete the handling.
 			responseBytes, err := proto.Marshal(response.ToProto())
 			require.NoError(err)
-			require.NoError(networkClient.appResponse(context.Background(), serverNodeID, requestID, responseBytes))
+
+			serverResponseChan <- responseBytes
+
 			return nil
 		},
 	).AnyTimes()
@@ -282,7 +311,7 @@ func TestGetRangeProof(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			require := require.New(t)
-			proof, err := sendRangeRequest(t, test.db, test.request, 1, test.modifyResponse)
+			proof, err := sendRangeProofRequest(t, test.db, test.request, 1, test.modifyResponse)
 			require.ErrorIs(err, test.expectedErr)
 			if test.expectedErr != nil {
 				return
@@ -598,7 +627,7 @@ func TestRangeProofRetries(t *testing.T) {
 			response.KeyValues = nil
 		}
 	}
-	proof, err := sendRangeRequest(t, db, request, uint32(maxRequests), modifyResponse)
+	proof, err := sendRangeProofRequest(t, db, request, maxRequests, modifyResponse)
 	require.NoError(err)
 	require.Len(proof.KeyValues, keyCount)
 
