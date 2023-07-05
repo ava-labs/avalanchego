@@ -257,7 +257,7 @@ func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uin
 		zap.Stringer("nodeID", nodeID),
 		zap.Uint32("requestID", requestID))
 
-	added, err := t.issueFromByID(ctx, nodeID, blkID)
+	issued, err := t.issueFromByID(ctx, nodeID, blkID)
 	if err != nil {
 		return err
 	}
@@ -270,13 +270,19 @@ func (t *Transitive) Chits(ctx context.Context, nodeID ids.NodeID, requestID uin
 		response:  blkID,
 	}
 
-	// Wait until [blkID] has been issued to consensus before applying this chit.
-	if !added {
+	if !issued {
+		// Wait until [blkID] has been issued to consensus before applying this chit.
 		v.deps.Add(blkID)
-	}
+		t.blocked.Register(ctx, v)
+		t.metrics.numBlockers.Set(float64(t.blocked.Len()))
+	} else {
+		// if a block has been added in "issueFrom",
+		// the block has already been "Abandon"ed,
+		// so "Register" here will be no-op except "Update"
 
-	t.blocked.Register(ctx, v)
-	t.metrics.numBlockers.Set(float64(t.blocked.Len()))
+		// no need to block, the block has already been issued
+		v.Update(ctx)
+	}
 	return t.buildBlocks(ctx)
 }
 
