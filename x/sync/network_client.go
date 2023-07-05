@@ -183,17 +183,18 @@ func (c *networkClientImpl) requestAny(
 	defer c.activeRequests.Release(1)
 
 	c.lock.Lock()
-	if nodeID, ok := c.peers.GetAnyPeer(minVersion); ok {
-		// Note [c.request] releases [c.lock].
-		response, err := c.get(ctx, nodeID, request)
-		return response, nodeID, err
+	nodeID, ok := c.peers.GetAnyPeer(minVersion)
+	if !ok {
+		c.lock.Unlock()
+		return nil, ids.EmptyNodeID, fmt.Errorf(
+			"no peers found matching version %s out of %d peers",
+			minVersion, c.peers.Size(),
+		)
 	}
 
-	c.lock.Unlock()
-	return nil, ids.EmptyNodeID, fmt.Errorf(
-		"no peers found matching version %s out of %d peers",
-		minVersion, c.peers.Size(),
-	)
+	// Note [c.request] releases [c.lock].
+	response, err := c.request(ctx, nodeID, request)
+	return response, nodeID, err
 }
 
 // Sends [request] to [nodeID] and returns the response.
