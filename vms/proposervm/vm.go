@@ -704,16 +704,13 @@ func (vm *VM) getForkHeight() (uint64, error) {
 			return 805732, nil // https://subnets.avax.network/p-chain/block/805732
 		case constants.FujiID:
 			return 47529, nil // https://subnets-test.avax.network/p-chain/block/47529
-		default:
-			return 0, database.ErrNotFound
 		}
 	case mainnetXChainID:
 		return 1, nil // https://subnets.avax.network/x-chain/block/1
 	case fujiXChainID:
 		return 1, nil // https://subnets-test.avax.network/x-chain/block/1
-	default:
-		return vm.GetForkHeight()
 	}
+	return vm.GetForkHeight()
 }
 
 func (vm *VM) getPostForkBlock(ctx context.Context, blkID ids.ID) (PostForkBlock, error) {
