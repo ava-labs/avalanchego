@@ -34,7 +34,7 @@ var (
 
 // networkClient defines ability to send request / response through the Network
 type networkClient interface {
-	// requestAny synchronously sends [request] to a randomly chosen peer with a
+	// Synchronously sends [request] to a randomly chosen peer with a
 	// version greater than or equal to [minVersion]. If [minVersion] is nil,
 	// the request is sent to any peer regardless of their version.
 	// May block until the number of outstanding requests decreases.
@@ -50,15 +50,24 @@ type networkClient interface {
 	// below the limit before sending the request.
 	request(ctx context.Context, nodeID ids.NodeID, request []byte) ([]byte, error)
 
-	// trackBandwidth should be called for each valid response with the bandwidth
+	// Should be called for each valid response with the bandwidth
 	// (length of response divided by request time), and with 0 if the response is invalid.
 	trackBandwidth(nodeID ids.NodeID, bandwidth float64)
 
-	// The following declarations allow this interface to be embedded in the VM
-	// to handle incoming responses from peers.
+	// Always returns nil because the engine considers errors
+	// returned from this function as fatal.
 	appResponse(context.Context, ids.NodeID, uint32, []byte) error
+
+	// Always returns nil because the engine considers errors
+	// returned from this function as fatal.
 	appRequestFailed(context.Context, ids.NodeID, uint32) error
+
+	// Adds the given [nodeID] to the peer
+	// list so that it can receive messages.
+	// If [nodeID] is this node's ID, this is a no-op.
 	connected(context.Context, ids.NodeID, *version.Application) error
+
+	// Removes given [nodeID] from the peer list.
 	disconnected(context.Context, ids.NodeID) error
 }
 
@@ -95,8 +104,6 @@ func NewNetworkClient(
 	}
 }
 
-// Always returns nil because the engine considers errors
-// returned from this function as fatal.
 func (c *networkClientImpl) appResponse(
 	_ context.Context,
 	nodeID ids.NodeID,
@@ -129,8 +136,6 @@ func (c *networkClientImpl) appResponse(
 	return nil
 }
 
-// Always returns nil because the engine considers errors
-// returned from this function as fatal.
 func (c *networkClientImpl) appRequestFailed(
 	_ context.Context,
 	nodeID ids.NodeID,
@@ -271,9 +276,6 @@ func (c *networkClientImpl) get(
 	return response, nil
 }
 
-// connected adds the given [nodeID] to the peer
-// list so that it can receive messages.
-// If [nodeID] is [c.myNodeID], this is a no-op.
 func (c *networkClientImpl) connected(
 	_ context.Context,
 	nodeID ids.NodeID,
@@ -292,7 +294,6 @@ func (c *networkClientImpl) connected(
 	return nil
 }
 
-// disconnected removes given [nodeID] from the peer list.
 func (c *networkClientImpl) disconnected(_ context.Context, nodeID ids.NodeID) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
