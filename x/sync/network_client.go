@@ -192,8 +192,8 @@ func (c *networkClientImpl) requestAny(
 		)
 	}
 
-	// Note [c.request] releases [c.lock].
-	response, err := c.request(ctx, nodeID, request)
+	// Note [c.get] releases [c.lock].
+	response, err := c.get(ctx, nodeID, request)
 	return response, nodeID, err
 }
 
