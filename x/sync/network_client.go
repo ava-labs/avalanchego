@@ -27,20 +27,27 @@ const minRequestHandlingDuration = 100 * time.Millisecond
 var (
 	_ networkClient = (*networkClientImpl)(nil)
 
-	errAcquiringSemaphore = errors.New("error acquiring semaphore")
-	errRequestFailed      = errors.New("request failed")
+	errAcquiringSemaphore   = errors.New("error acquiring semaphore")
+	errRequestFailed        = errors.New("request failed")
+	errAppRequestSendFailed = errors.New("failed to send AppRequest")
 )
 
 // networkClient defines ability to send request / response through the Network
 type networkClient interface {
-	// requestAny synchronously sends request to an arbitrary peer with a
-	// node version greater than or equal to minVersion.
-	// Returns response bytes, the ID of the chosen peer, and errRequestFailed if
-	// the request should be retried.
+	// requestAny synchronously sends [request] to a randomly chosen peer with a
+	// version greater than or equal to [minVersion]. If [minVersion] is nil,
+	// the request is sent to any peer regardless of their version.
+	// May block until the number of outstanding requests decreases.
+	// Returns the node's response and the ID of the node.
+	// Returns [errAppRequestSendFailed] if we failed to send an AppRequest.
+	// This should be treated as fatal.
 	requestAny(ctx context.Context, minVersion *version.Application, request []byte) (ids.NodeID, []byte, error)
 
-	// request synchronously sends request to the selected nodeID.
-	// Returns response bytes, and errRequestFailed if the request should be retried.
+	// Sends [request] to [nodeID] and returns the response.
+	// Returns [errAppRequestSendFailed] if we failed to send an AppRequest.
+	// This should be treated as fatal.
+	// Blocks until the number of outstanding requests is
+	// below the limit before sending the request.
 	request(ctx context.Context, nodeID ids.NodeID, request []byte) ([]byte, error)
 
 	// trackBandwidth should be called for each valid response with the bandwidth
@@ -166,11 +173,6 @@ func (c *networkClientImpl) getRequestHandler(requestID uint32) (ResponseHandler
 	return handler, true
 }
 
-// requestAny synchronously sends [request] to a randomly chosen peer with a
-// version greater than or equal to [minVersion]. If [minVersion] is nil,
-// the request is sent to any peer regardless of their version.
-// May block until the number of outstanding requests decreases.
-// Returns the node's response and the ID of the node.
 func (c *networkClientImpl) requestAny(
 	ctx context.Context,
 	minVersion *version.Application,
@@ -197,9 +199,6 @@ func (c *networkClientImpl) requestAny(
 	return nodeID, response, err
 }
 
-// Sends [request] to [nodeID] and returns the response.
-// Blocks until the number of outstanding requests is
-// below the limit before sending the request.
 func (c *networkClientImpl) request(
 	ctx context.Context,
 	nodeID ids.NodeID,
@@ -218,7 +217,9 @@ func (c *networkClientImpl) request(
 }
 
 // Sends [get] to [nodeID] and returns the response.
-// Returns an error if the get failed or [ctx] is canceled.
+// Returns an error if the request failed or [ctx] is canceled.
+// Returns [errAppRequestSendFailed] if we failed to send an AppRequest.
+// This should be treated as fatal.
 // Blocks until a response is received or the [ctx] is canceled fails.
 // Releases active requests semaphore if there was an error in sending the get.
 // Assumes [nodeID] is never [c.myNodeID] since we guarantee
@@ -244,7 +245,7 @@ func (c *networkClientImpl) get(
 	// Send an app request to the peer.
 	if err := c.appSender.SendAppRequest(ctx, nodeIDs, requestID, request); err != nil {
 		c.lock.Unlock()
-		return nil, err
+		return nil, fmt.Errorf("%w: %s", errAppRequestSendFailed, err)
 	}
 
 	handler := newResponseHandler()
