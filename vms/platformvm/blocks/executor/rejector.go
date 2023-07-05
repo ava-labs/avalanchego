@@ -77,5 +77,5 @@ func (r *rejector) rejectBlock(b blocks.Block, blockType string) error {
 		}
 	}
 
-	return nil
+	return r.state.Commit()
 }
