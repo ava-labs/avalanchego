@@ -148,8 +148,13 @@ func (v *baseStakers) DeleteValidator(staker *Staker) {
 	v.pruneValidator(staker.SubnetID, staker.NodeID)
 
 	validatorDiff := v.getOrCreateValidatorDiff(staker.SubnetID, staker.NodeID)
-	validatorDiff.validatorStatus = deleted
-	validatorDiff.validator = staker
+	if validatorDiff.validatorStatus == added {
+		validatorDiff.validatorStatus = unmodified
+		validatorDiff.validator = nil
+	} else {
+		validatorDiff.validatorStatus = deleted
+		validatorDiff.validator = staker
+	}
 
 	v.stakers.Delete(staker)
 }
@@ -190,10 +195,19 @@ func (v *baseStakers) DeleteDelegator(staker *Staker) {
 	v.pruneValidator(staker.SubnetID, staker.NodeID)
 
 	validatorDiff := v.getOrCreateValidatorDiff(staker.SubnetID, staker.NodeID)
-	if validatorDiff.deletedDelegators == nil {
-		validatorDiff.deletedDelegators = make(map[ids.ID]*Staker)
+	found := false
+	if validatorDiff.addedDelegators != nil {
+		if _, found = validatorDiff.addedDelegators.Get(staker); found {
+			// delegator to be removed was just added. Wipe it up here
+			validatorDiff.addedDelegators.Delete(staker)
+		}
 	}
-	validatorDiff.deletedDelegators[staker.TxID] = staker
+	if !found {
+		if validatorDiff.deletedDelegators == nil {
+			validatorDiff.deletedDelegators = make(map[ids.ID]*Staker)
+		}
+		validatorDiff.deletedDelegators[staker.TxID] = staker
+	}
 
 	v.stakers.Delete(staker)
 }

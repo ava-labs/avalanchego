@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/version"
-	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -69,7 +68,8 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 				panic(fmt.Errorf("failed signing tx in tx generator, %w", err))
 			}
 
-			staker, err := NewCurrentStaker(signedTx.ID(), signedTx.Unsigned.(txs.StakerTx), uint64(100))
+			stakerTx := signedTx.Unsigned.(txs.StakerTx)
+			staker, err := NewCurrentStaker(signedTx.ID(), stakerTx, uint64(100))
 			if err != nil {
 				return err.Error()
 			}
@@ -122,7 +122,7 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 
 			return ""
 		},
-		stakerTxGenerator(ctx, permissionedValidator, &constants.PrimaryNetworkID, nil, &signer.Empty{}, math.MaxUint64),
+		stakerTxGenerator(ctx, permissionedValidator, &constants.PrimaryNetworkID, nil, math.MaxUint64),
 	))
 
 	properties.Property("add, delete and query pending validators", prop.ForAll(
@@ -190,7 +190,7 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 
 			return ""
 		},
-		stakerTxGenerator(ctx, permissionedValidator, &constants.PrimaryNetworkID, nil, &signer.Empty{}, math.MaxUint64),
+		stakerTxGenerator(ctx, permissionedValidator, &constants.PrimaryNetworkID, nil, math.MaxUint64),
 	))
 
 	var (
@@ -331,7 +331,6 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 			permissionlessValidator,
 			&subnetID,
 			&nodeID,
-			&signer.Empty{},
 			math.MaxUint64,
 		),
 		gen.SliceOfN(10,
@@ -339,7 +338,6 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 				permissionlessDelegator,
 				&subnetID,
 				&nodeID,
-				&signer.Empty{},
 				1000,
 			),
 		),
@@ -478,7 +476,6 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 			permissionlessValidator,
 			&subnetID,
 			&nodeID,
-			&signer.Empty{},
 			math.MaxUint64,
 		),
 		gen.SliceOfN(10,
@@ -486,7 +483,6 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 				permissionlessDelegator,
 				&subnetID,
 				&nodeID,
-				&signer.Empty{},
 				1000,
 			),
 		),

@@ -17,19 +17,23 @@ func TestMaskedIterator(t *testing.T) {
 	stakers := []*Staker{
 		{
 			TxID:     ids.GenerateTestID(),
+			Weight:   0, // just to simplify debugging
 			NextTime: time.Unix(0, 0),
 		},
 		{
 			TxID:     ids.GenerateTestID(),
-			NextTime: time.Unix(1, 0),
+			Weight:   10, // just to simplify debugging
+			NextTime: time.Unix(10, 0),
 		},
 		{
 			TxID:     ids.GenerateTestID(),
-			NextTime: time.Unix(2, 0),
+			Weight:   20, // just to simplify debugging
+			NextTime: time.Unix(20, 0),
 		},
 		{
 			TxID:     ids.GenerateTestID(),
-			NextTime: time.Unix(3, 0),
+			Weight:   30, // just to simplify debugging
+			NextTime: time.Unix(30, 0),
 		},
 	}
 	maskedStakers := map[ids.ID]*Staker{
