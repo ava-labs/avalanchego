@@ -325,16 +325,17 @@ func (v *baseStakers) UpdateDelegator(staker *Staker) error {
 func (v *baseStakers) DeleteDelegator(staker *Staker) {
 	validator, found := v.getValidator(staker.SubnetID, staker.NodeID)
 	if !found {
-		// deleting an non-existing staker. Nothing to do.
+		// deleting delegator of an already removed validator. Nothing to do.
 		return
 	}
 
 	// for sake of generality, we assume we could delete an updated version
 	// of the delegator. We explicitly remove the currently stored
 	// version of the staker to handle this case.
-	delegatorToDelete := staker
-	if stored, found := validator.delegators[staker.TxID]; found {
-		delegatorToDelete = stored
+	delegatorToDelete, found := validator.delegators[staker.TxID]
+	if !found {
+		// deleting a non-existing delegator. Nothing to do
+		return
 	}
 	delete(validator.delegators, delegatorToDelete.TxID)
 	if validator.sortedDelegators != nil {
@@ -350,7 +351,7 @@ func (v *baseStakers) DeleteDelegator(staker *Staker) {
 		}
 	} else {
 		validatorDiff.delegators[delegatorToDelete.TxID] = stakerAndStatus{
-			staker: staker,
+			staker: delegatorToDelete,
 			status: deleted,
 		}
 	}

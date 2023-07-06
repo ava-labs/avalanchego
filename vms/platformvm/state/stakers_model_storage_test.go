@@ -56,8 +56,8 @@ var (
 func TestStateAndDiffComparisonToStorageModel(t *testing.T) {
 	properties := gopter.NewProperties(nil)
 
-	// to reproduce a given scenario do something like this:
-	// parameters := gopter.DefaultTestParametersWithSeed(1680269995295922009)
+	// // to reproduce a given scenario do something like this:
+	// parameters := gopter.DefaultTestParametersWithSeed(1688641048828490074)
 	// properties := gopter.NewProperties(parameters)
 
 	properties.Property("state comparison to storage model", commands.Prop(stakersCommands))
@@ -150,6 +150,10 @@ func (cmd *putCurrentValidatorCommand) Run(sut commands.SystemUnderTest) command
 	sTx := cmd.sTx
 	sys := sut.(*sysUnderTest)
 
+	if err := sys.checkThereIsADiff(); err != nil {
+		return sys // state checks later on should spot missing validator
+	}
+
 	stakerTx := sTx.Unsigned.(txs.StakerTx)
 	currentVal, err := NewCurrentStaker(sTx.ID(), stakerTx, uint64(1000))
 	if err != nil {
@@ -226,6 +230,11 @@ type shiftCurrentValidatorCommand struct {
 
 func (cmd *shiftCurrentValidatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
 	sys := sut.(*sysUnderTest)
+
+	if err := sys.checkThereIsADiff(); err != nil {
+		return sys // state checks later on should spot missing validator
+	}
+
 	err := shiftCurrentValidatorInSystem(sys)
 	if err != nil {
 		cmd.err = err
@@ -235,9 +244,8 @@ func (cmd *shiftCurrentValidatorCommand) Run(sut commands.SystemUnderTest) comma
 
 func shiftCurrentValidatorInSystem(sys *sysUnderTest) error {
 	// 1. check if there is a staker, already inserted. If not return
-	// 2. Add diff layer on top (to test update across diff layers)
-	// 3. query the staker
-	// 4. shift staker times and update the staker
+	// 2. query the staker
+	// 3. shift staker times and update the staker
 
 	chain := sys.getTopChainState()
 
@@ -264,10 +272,6 @@ func shiftCurrentValidatorInSystem(sys *sysUnderTest) error {
 	}
 	stakerIt.Release()
 
-	// 2. Add diff layer on top
-	if err := sys.addDiffOnTop(); err != nil {
-		return err
-	}
 	chain = sys.getTopChainState()
 
 	// 3. query the staker
@@ -354,6 +358,11 @@ type updateStakingPeriodCurrentValidatorCommand struct {
 
 func (cmd *updateStakingPeriodCurrentValidatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
 	sys := sut.(*sysUnderTest)
+
+	if err := sys.checkThereIsADiff(); err != nil {
+		return sys // state checks later on should spot missing validator
+	}
+
 	err := updateStakingPeriodCurrentValidatorInSystem(sys)
 	if err != nil {
 		cmd.err = err
@@ -363,9 +372,8 @@ func (cmd *updateStakingPeriodCurrentValidatorCommand) Run(sut commands.SystemUn
 
 func updateStakingPeriodCurrentValidatorInSystem(sys *sysUnderTest) error {
 	// 1. check if there is a staker, already inserted. If not return
-	// 2. Add diff layer on top (to test update across diff layers)
-	// 3. query the staker
-	// 4. modify staker period and update the staker
+	// 2. query the staker
+	// 3. modify staker period and update the staker
 
 	chain := sys.getTopChainState()
 
@@ -392,19 +400,15 @@ func updateStakingPeriodCurrentValidatorInSystem(sys *sysUnderTest) error {
 	}
 	stakerIt.Release()
 
-	// 2. Add diff layer on top
-	if err := sys.addDiffOnTop(); err != nil {
-		return err
-	}
 	chain = sys.getTopChainState()
 
-	// 3. query the staker
+	// 2. query the staker
 	staker, err = chain.GetCurrentValidator(staker.SubnetID, staker.NodeID)
 	if err != nil {
 		return err
 	}
 
-	// 4. modify staker period and update the staker
+	// 3. modify staker period and update the staker
 	updatedStaker := *staker
 	stakingPeriod := staker.EndTime.Sub(staker.StartTime)
 	if stakingPeriod%2 == 0 {
@@ -494,6 +498,11 @@ type increaseWeightCurrentValidatorCommand struct {
 
 func (cmd *increaseWeightCurrentValidatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
 	sys := sut.(*sysUnderTest)
+
+	if err := sys.checkThereIsADiff(); err != nil {
+		return sys // state checks later on should spot missing validator
+	}
+
 	err := increaseWeightCurrentValidatorInSystem(sys)
 	if err != nil {
 		cmd.err = err
@@ -503,9 +512,8 @@ func (cmd *increaseWeightCurrentValidatorCommand) Run(sut commands.SystemUnderTe
 
 func increaseWeightCurrentValidatorInSystem(sys *sysUnderTest) error {
 	// 1. check if there is a staker, already inserted. If not return
-	// 2. Add diff layer on top (to test update across diff layers)
-	// 3. query the staker
-	// 4. increase staker weight and update the staker
+	// 2. query the staker
+	// 3. increase staker weight and update the staker
 
 	chain := sys.getTopChainState()
 
@@ -532,19 +540,15 @@ func increaseWeightCurrentValidatorInSystem(sys *sysUnderTest) error {
 	}
 	stakerIt.Release()
 
-	// 2. Add diff layer on top
-	if err := sys.addDiffOnTop(); err != nil {
-		return err
-	}
 	chain = sys.getTopChainState()
 
-	// 3. query the staker
+	// 2. query the staker
 	staker, err = chain.GetCurrentValidator(staker.SubnetID, staker.NodeID)
 	if err != nil {
 		return err
 	}
 
-	// 4. increase staker weight and update the staker
+	// 3. increase staker weight and update the staker
 	updatedStaker := *staker
 	IncreaseStakerWeightInPlace(&updatedStaker, updatedStaker.Weight+extraWeight)
 	return chain.UpdateCurrentValidator(&updatedStaker)
@@ -623,6 +627,11 @@ type deleteCurrentValidatorCommand struct {
 func (cmd *deleteCurrentValidatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
 	// delete first validator without delegators, if any
 	sys := sut.(*sysUnderTest)
+
+	if err := sys.checkThereIsADiff(); err != nil {
+		return sys // state checks later on should spot missing validator
+	}
+
 	topDiff := sys.getTopChainState()
 
 	stakerIt, err := topDiff.GetCurrentStakerIterator()
@@ -744,6 +753,11 @@ type putCurrentDelegatorCommand struct {
 func (cmd *putCurrentDelegatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
 	candidateDelegator := cmd.sTx
 	sys := sut.(*sysUnderTest)
+
+	if err := sys.checkThereIsADiff(); err != nil {
+		return sys // state checks later on should spot missing validator
+	}
+
 	err := addCurrentDelegatorInSystem(sys, candidateDelegator.Unsigned)
 	if err != nil {
 		cmd.err = err
@@ -906,6 +920,11 @@ type updateStakingPeriodCurrentDelegatorCommand struct {
 
 func (cmd *updateStakingPeriodCurrentDelegatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
 	sys := sut.(*sysUnderTest)
+
+	if err := sys.checkThereIsADiff(); err != nil {
+		return sys // state checks later on should spot missing validator
+	}
+
 	err := updateStakingPeriodCurrentDelegatorInSystem(sys)
 	if err != nil {
 		cmd.err = err
@@ -916,8 +935,7 @@ func (cmd *updateStakingPeriodCurrentDelegatorCommand) Run(sut commands.SystemUn
 
 func updateStakingPeriodCurrentDelegatorInSystem(sys *sysUnderTest) error {
 	// 1. check if there is a staker, already inserted. If not return
-	// 2. Add diff layer on top (to test update across diff layers)
-	// 3. update staking period and update the staker
+	// 2. update staking period and update the staker
 
 	chain := sys.getTopChainState()
 
@@ -944,10 +962,6 @@ func updateStakingPeriodCurrentDelegatorInSystem(sys *sysUnderTest) error {
 	}
 	stakerIt.Release()
 
-	// 2. Add diff layer on top
-	if err := sys.addDiffOnTop(); err != nil {
-		return err
-	}
 	chain = sys.getTopChainState()
 
 	// 3. update delegator staking period and update the staker
@@ -1040,6 +1054,11 @@ type shiftCurrentDelegatorCommand struct {
 
 func (cmd *shiftCurrentDelegatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
 	sys := sut.(*sysUnderTest)
+
+	if err := sys.checkThereIsADiff(); err != nil {
+		return sys // state checks later on should spot missing validator
+	}
+
 	err := shiftCurrentDelegatorInSystem(sys)
 	if err != nil {
 		cmd.err = err
@@ -1049,8 +1068,7 @@ func (cmd *shiftCurrentDelegatorCommand) Run(sut commands.SystemUnderTest) comma
 
 func shiftCurrentDelegatorInSystem(sys *sysUnderTest) error {
 	// 1. check if there is a staker, already inserted. If not return
-	// 2. Add diff layer on top (to test update across diff layers)
-	// 3. Shift staker times and update the staker
+	// 2. Shift staker times and update the staker
 
 	chain := sys.getTopChainState()
 
@@ -1077,13 +1095,9 @@ func shiftCurrentDelegatorInSystem(sys *sysUnderTest) error {
 	}
 	stakerIt.Release()
 
-	// 2. Add diff layer on top
-	if err := sys.addDiffOnTop(); err != nil {
-		return err
-	}
 	chain = sys.getTopChainState()
 
-	// 3. Shift delegator times and update the staker
+	// 2. Shift delegator times and update the staker
 	updatedDelegator := *delegator
 	ShiftStakerAheadInPlace(&updatedDelegator, updatedDelegator.EndTime)
 	return chain.UpdateCurrentDelegator(&updatedDelegator)
@@ -1161,6 +1175,11 @@ type increaseWeightCurrentDelegatorCommand struct {
 
 func (cmd *increaseWeightCurrentDelegatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
 	sys := sut.(*sysUnderTest)
+
+	if err := sys.checkThereIsADiff(); err != nil {
+		return sys // state checks later on should spot missing validator
+	}
+
 	err := increaseWeightCurrentDelegatorInSystem(sys)
 	if err != nil {
 		cmd.err = err
@@ -1170,8 +1189,7 @@ func (cmd *increaseWeightCurrentDelegatorCommand) Run(sut commands.SystemUnderTe
 
 func increaseWeightCurrentDelegatorInSystem(sys *sysUnderTest) error {
 	// 1. check if there is a staker, already inserted. If not return
-	// 2. Add diff layer on top (to test update across diff layers)
-	// 3. increase delegator weight and update the staker
+	// 2. increase delegator weight and update the staker
 
 	chain := sys.getTopChainState()
 
@@ -1198,13 +1216,9 @@ func increaseWeightCurrentDelegatorInSystem(sys *sysUnderTest) error {
 	}
 	stakerIt.Release()
 
-	// 2. Add diff layer on top
-	if err := sys.addDiffOnTop(); err != nil {
-		return err
-	}
 	chain = sys.getTopChainState()
 
-	// 3. increase delegator weight and update the staker
+	// 2. increase delegator weight and update the staker
 	updatedDelegator := *delegator
 	IncreaseStakerWeightInPlace(&updatedDelegator, updatedDelegator.Weight+extraWeight)
 	return chain.UpdateCurrentDelegator(&updatedDelegator)
@@ -1282,6 +1296,11 @@ type deleteCurrentDelegatorCommand struct {
 func (cmd *deleteCurrentDelegatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
 	// delete first delegator, if any
 	sys := sut.(*sysUnderTest)
+
+	if err := sys.checkThereIsADiff(); err != nil {
+		return sys // state checks later on should spot missing validator
+	}
+
 	_, err := deleteCurrentDelegator(sys)
 	if err != nil {
 		cmd.err = err
@@ -1710,4 +1729,13 @@ func (s *sysUnderTest) flushBottomDiff() (bool, error) {
 	s.sortedDiffIDs = s.sortedDiffIDs[1:]
 	delete(s.diffsMap, bottomDiffID)
 	return true, nil
+}
+
+// getTopChainState returns top diff or baseState
+func (s *sysUnderTest) checkThereIsADiff() error {
+	if len(s.sortedDiffIDs) != 0 {
+		return nil // there is a diff
+	}
+
+	return s.addDiffOnTop()
 }
