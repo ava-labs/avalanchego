@@ -174,6 +174,7 @@ func initTestProposerVM(
 	}
 
 	ctx := snow.DefaultContextTest()
+	ctx.ChainID = ids.ID{1}
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
 	ctx.ValidatorState = valState
 
@@ -2254,6 +2255,43 @@ func TestVMInnerBlkCacheDeduplicationRegression(t *testing.T) {
 		choices.Accepted,
 		cachedXBlock.Status(),
 	)
+}
+
+func TestVMInnerBlkMarkedAcceptedRegression(t *testing.T) {
+	require := require.New(t)
+	forkTime := time.Unix(0, 0)
+	coreVM, _, proVM, gBlock, _ := initTestProposerVM(t, forkTime, 0)
+
+	// create an inner block and wrap it in an postForkBlock.
+	innerBlock := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		BytesV:     []byte{1},
+		ParentV:    gBlock.ID(),
+		HeightV:    gBlock.Height() + 1,
+		TimestampV: gBlock.Timestamp(),
+	}
+
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return innerBlock, nil
+	}
+	outerBlock, err := proVM.BuildBlock(context.Background())
+	require.NoError(err)
+	coreVM.BuildBlockF = nil
+
+	require.NoError(outerBlock.Verify(context.Background()))
+	require.NoError(outerBlock.Accept(context.Background()))
+
+	coreVM.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
+		require.Equal(innerBlock.ID(), id)
+		return innerBlock, nil
+	}
+
+	wrappedInnerBlock, err := proVM.GetBlock(context.Background(), innerBlock.ID())
+	require.NoError(err)
+	require.Equal(choices.Rejected, wrappedInnerBlock.Status())
 }
 
 type blockWithVerifyContext struct {
