@@ -30,8 +30,7 @@ var (
 	_ commands.Command = (*putCurrentDelegatorCommand)(nil)
 	_ commands.Command = (*deleteCurrentDelegatorCommand)(nil)
 	_ commands.Command = (*addTopDiffCommand)(nil)
-	_ commands.Command = (*applyBottomDiffCommand)(nil)
-	_ commands.Command = (*commitBottomStateCommand)(nil)
+	_ commands.Command = (*applyAndCommitBottomDiffCommand)(nil)
 	_ commands.Command = (*rebuildStateCommand)(nil)
 
 	commandsCtx = buildStateCtx()
@@ -195,18 +194,20 @@ var stakersCommands = &commands.ProtoCommands{
 			genDeleteCurrentDelegatorCommand,
 
 			genAddTopDiffCommand,
-			genApplyBottomDiffCommand,
-			genCommitBottomStateCommand,
+			genApplyAndCommitBottomDiffCommand,
 			genRebuildStateCommand,
 		)
 	},
 }
 
 // PutCurrentValidator section
-type putCurrentValidatorCommand txs.Tx
+type putCurrentValidatorCommand struct {
+	sTx *txs.Tx
+	err error
+}
 
-func (v *putCurrentValidatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
-	sTx := (*txs.Tx)(v)
+func (cmd *putCurrentValidatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
+	sTx := cmd.sTx
 	sys := sut.(*sysUnderTest)
 
 	stakerTx := sTx.Unsigned.(txs.StakerTx)
@@ -221,8 +222,8 @@ func (v *putCurrentValidatorCommand) Run(sut commands.SystemUnderTest) commands.
 	return sys
 }
 
-func (v *putCurrentValidatorCommand) NextState(cmdState commands.State) commands.State {
-	sTx := (*txs.Tx)(v)
+func (cmd *putCurrentValidatorCommand) NextState(cmdState commands.State) commands.State {
+	sTx := cmd.sTx
 	stakerTx := sTx.Unsigned.(txs.StakerTx)
 	currentVal, err := NewCurrentStaker(sTx.ID(), stakerTx, uint64(1000))
 	if err != nil {
@@ -238,7 +239,12 @@ func (*putCurrentValidatorCommand) PreCondition(commands.State) bool {
 	return true
 }
 
-func (*putCurrentValidatorCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
+func (cmd *putCurrentValidatorCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
+	if cmd.err != nil {
+		cmd.err = nil // reset for next runs
+		return &gopter.PropResult{Status: gopter.PropFalse}
+	}
+
 	if !checkSystemAndModelContent(cmdState, res) {
 		return &gopter.PropResult{Status: gopter.PropFalse}
 	}
@@ -246,12 +252,12 @@ func (*putCurrentValidatorCommand) PostCondition(cmdState commands.State, res co
 	return &gopter.PropResult{Status: gopter.PropTrue}
 }
 
-func (v *putCurrentValidatorCommand) String() string {
-	stakerTx := v.Unsigned.(txs.StakerTx)
-	return fmt.Sprintf("PutCurrentValidator(subnetID: %v, nodeID: %v, txID: %v, priority: %v, unixStartTime: %v, duration: %v)",
+func (cmd *putCurrentValidatorCommand) String() string {
+	stakerTx := cmd.sTx.Unsigned.(txs.StakerTx)
+	return fmt.Sprintf("\nputCurrentValidator(subnetID: %v, nodeID: %v, txID: %v, priority: %v, unixStartTime: %v, duration: %v)",
 		stakerTx.SubnetID(),
 		stakerTx.NodeID(),
-		v.TxID,
+		cmd.sTx.TxID,
 		stakerTx.CurrentPriority(),
 		stakerTx.StartTime().Unix(),
 		stakerTx.EndTime().Sub(stakerTx.StartTime()),
@@ -265,7 +271,10 @@ var genPutCurrentValidatorCommand = addPermissionlessValidatorTxGenerator(comman
 			panic(fmt.Errorf("failed signing tx, %w", err))
 		}
 
-		cmd := (*putCurrentValidatorCommand)(sTx)
+		cmd := &putCurrentValidatorCommand{
+			sTx: sTx,
+			err: nil,
+		}
 		return cmd
 	},
 )
@@ -379,7 +388,7 @@ func (cmd *deleteCurrentValidatorCommand) PostCondition(cmdState commands.State,
 }
 
 func (*deleteCurrentValidatorCommand) String() string {
-	return "DeleteCurrentValidator"
+	return "\ndeleteCurrentValidator"
 }
 
 // a trick to force command regeneration at each sampling.
@@ -392,16 +401,16 @@ var genDeleteCurrentValidatorCommand = gen.IntRange(1, 2).Map(
 
 // PutCurrentDelegator section
 type putCurrentDelegatorCommand struct {
-	sTx txs.Tx
+	sTx *txs.Tx
 	err error
 }
 
-func (v *putCurrentDelegatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
-	candidateDelegator := v.sTx
+func (cmd *putCurrentDelegatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
+	candidateDelegator := cmd.sTx
 	sys := sut.(*sysUnderTest)
 	err := addCurrentDelegatorInSystem(sys, candidateDelegator.Unsigned)
 	if err != nil {
-		v.err = err
+		cmd.err = err
 	}
 	return sys
 }
@@ -455,12 +464,12 @@ func addCurrentDelegatorInSystem(sys *sysUnderTest, candidateDelegatorTx txs.Uns
 	return nil
 }
 
-func (v *putCurrentDelegatorCommand) NextState(cmdState commands.State) commands.State {
-	candidateDelegator := v.sTx
+func (cmd *putCurrentDelegatorCommand) NextState(cmdState commands.State) commands.State {
+	candidateDelegator := cmd.sTx
 	model := cmdState.(*stakersStorageModel)
 	err := addCurrentDelegatorInModel(model, candidateDelegator.Unsigned)
 	if err != nil {
-		v.err = err
+		cmd.err = err
 	}
 	return cmdState
 }
@@ -516,9 +525,9 @@ func (*putCurrentDelegatorCommand) PreCondition(commands.State) bool {
 	return true
 }
 
-func (v *putCurrentDelegatorCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
-	if v.err != nil {
-		v.err = nil // reset for next runs
+func (cmd *putCurrentDelegatorCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
+	if cmd.err != nil {
+		cmd.err = nil // reset for next runs
 		return &gopter.PropResult{Status: gopter.PropFalse}
 	}
 
@@ -529,12 +538,12 @@ func (v *putCurrentDelegatorCommand) PostCondition(cmdState commands.State, res 
 	return &gopter.PropResult{Status: gopter.PropTrue}
 }
 
-func (v *putCurrentDelegatorCommand) String() string {
-	stakerTx := v.sTx.Unsigned.(txs.StakerTx)
-	return fmt.Sprintf("PutCurrentDelegator(subnetID: %v, nodeID: %v, txID: %v, priority: %v, unixStartTime: %v, duration: %v)",
+func (cmd *putCurrentDelegatorCommand) String() string {
+	stakerTx := cmd.sTx.Unsigned.(txs.StakerTx)
+	return fmt.Sprintf("\nputCurrentDelegator(subnetID: %v, nodeID: %v, txID: %v, priority: %v, unixStartTime: %v, duration: %v)",
 		stakerTx.SubnetID(),
 		stakerTx.NodeID(),
-		v.sTx.TxID,
+		cmd.sTx.TxID,
 		stakerTx.CurrentPriority(),
 		stakerTx.StartTime().Unix(),
 		stakerTx.EndTime().Sub(stakerTx.StartTime()))
@@ -548,7 +557,7 @@ var genPutCurrentDelegatorCommand = addPermissionlessDelegatorTxGenerator(comman
 		}
 
 		cmd := &putCurrentDelegatorCommand{
-			sTx: *sTx,
+			sTx: sTx,
 		}
 		return cmd
 	},
@@ -562,12 +571,20 @@ type deleteCurrentDelegatorCommand struct {
 func (cmd *deleteCurrentDelegatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
 	// delete first delegator, if any
 	sys := sut.(*sysUnderTest)
+	_, err := deleteCurrentDelegator(sys)
+	if err != nil {
+		cmd.err = err
+	}
+	return sys // returns sys to allow comparison with state in PostCondition
+}
+
+func deleteCurrentDelegator(sys *sysUnderTest) (bool, error) {
+	// delete first validator, if any
 	topDiff := sys.getTopChainState()
 
 	stakerIt, err := topDiff.GetCurrentStakerIterator()
 	if err != nil {
-		cmd.err = err
-		return sys
+		return false, err
 	}
 
 	var (
@@ -583,12 +600,12 @@ func (cmd *deleteCurrentDelegatorCommand) Run(sut commands.SystemUnderTest) comm
 	}
 	if !found {
 		stakerIt.Release()
-		return sys // no current validator to delete
+		return false, nil // no current validator to delete
 	}
 	stakerIt.Release() // release before modifying stakers collection
 
 	topDiff.DeleteCurrentDelegator(delegator)
-	return sys // returns sys to allow comparison with state in PostCondition
+	return true, nil
 }
 
 func (*deleteCurrentDelegatorCommand) NextState(cmdState commands.State) commands.State {
@@ -637,7 +654,7 @@ func (cmd *deleteCurrentDelegatorCommand) PostCondition(cmdState commands.State,
 }
 
 func (*deleteCurrentDelegatorCommand) String() string {
-	return "DeleteCurrentDelegator"
+	return "\ndeleteCurrentDelegator"
 }
 
 // a trick to force command regeneration at each sampling.
@@ -684,7 +701,7 @@ func (cmd *addTopDiffCommand) PostCondition(cmdState commands.State, res command
 }
 
 func (*addTopDiffCommand) String() string {
-	return "AddTopDiffCommand"
+	return "\naddTopDiffCommand"
 }
 
 // a trick to force command regeneration at each sampling.
@@ -695,75 +712,35 @@ var genAddTopDiffCommand = gen.IntRange(1, 2).Map(
 	},
 )
 
-// applyBottomDiffCommand section
-type applyBottomDiffCommand struct {
+// applyAndCommitBottomDiffCommand section
+type applyAndCommitBottomDiffCommand struct {
 	err error
 }
 
-func (cmd *applyBottomDiffCommand) Run(sut commands.SystemUnderTest) commands.Result {
+func (cmd *applyAndCommitBottomDiffCommand) Run(sut commands.SystemUnderTest) commands.Result {
 	sys := sut.(*sysUnderTest)
-	_, cmd.err = sys.flushBottomDiff()
-
-	return sys
-}
-
-func (*applyBottomDiffCommand) NextState(cmdState commands.State) commands.State {
-	return cmdState // model has no diffs
-}
-
-func (*applyBottomDiffCommand) PreCondition(commands.State) bool {
-	return true
-}
-
-func (cmd *applyBottomDiffCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
-	if cmd.err != nil {
-		cmd.err = nil // reset for next runs
-		return &gopter.PropResult{Status: gopter.PropFalse}
-	}
-
-	if !checkSystemAndModelContent(cmdState, res) {
-		return &gopter.PropResult{Status: gopter.PropFalse}
-	}
-
-	return &gopter.PropResult{Status: gopter.PropTrue}
-}
-
-func (*applyBottomDiffCommand) String() string {
-	return "ApplyBottomDiffCommand"
-}
-
-// a trick to force command regeneration at each sampling.
-// gen.Const would not allow it
-var genApplyBottomDiffCommand = gen.IntRange(1, 2).Map(
-	func(int) commands.Command {
-		return &applyBottomDiffCommand{}
-	},
-)
-
-// commitBottomStateCommand section
-type commitBottomStateCommand struct {
-	err error
-}
-
-func (cmd *commitBottomStateCommand) Run(sut commands.SystemUnderTest) commands.Result {
-	sys := sut.(*sysUnderTest)
-	err := sys.baseState.Commit()
-	if err != nil {
+	if _, err := sys.flushBottomDiff(); err != nil {
 		cmd.err = err
 		return sys
 	}
+
+	if err := sys.baseState.Commit(); err != nil {
+		cmd.err = err
+		return sys
+	}
+
 	return sys
 }
 
-func (*commitBottomStateCommand) NextState(cmdState commands.State) commands.State {
+func (*applyAndCommitBottomDiffCommand) NextState(cmdState commands.State) commands.State {
 	return cmdState // model has no diffs
 }
 
-func (*commitBottomStateCommand) PreCondition(commands.State) bool {
+func (*applyAndCommitBottomDiffCommand) PreCondition(commands.State) bool {
 	return true
 }
 
-func (cmd *commitBottomStateCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
+func (cmd *applyAndCommitBottomDiffCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
 	if cmd.err != nil {
 		cmd.err = nil // reset for next runs
 		return &gopter.PropResult{Status: gopter.PropFalse}
@@ -776,15 +753,15 @@ func (cmd *commitBottomStateCommand) PostCondition(cmdState commands.State, res 
 	return &gopter.PropResult{Status: gopter.PropTrue}
 }
 
-func (*commitBottomStateCommand) String() string {
-	return "CommitBottomStateCommand"
+func (*applyAndCommitBottomDiffCommand) String() string {
+	return "\napplyAndCommitBottomDiffCommand"
 }
 
 // a trick to force command regeneration at each sampling.
 // gen.Const would not allow it
-var genCommitBottomStateCommand = gen.IntRange(1, 2).Map(
+var genApplyAndCommitBottomDiffCommand = gen.IntRange(1, 2).Map(
 	func(int) commands.Command {
-		return &commitBottomStateCommand{}
+		return &applyAndCommitBottomDiffCommand{}
 	},
 )
 
@@ -857,7 +834,7 @@ func (cmd *rebuildStateCommand) PostCondition(cmdState commands.State, res comma
 }
 
 func (*rebuildStateCommand) String() string {
-	return "RebuildStateCommand"
+	return "\nrebuildStateCommand"
 }
 
 // a trick to force command regeneration at each sampling.
