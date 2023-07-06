@@ -184,6 +184,8 @@ func (c *clientImpl) GetRangeProof(ctx context.Context, req *pb.SyncGetRangeProo
 // [parseFn] parses the raw response.
 // If the request is unsuccessful or the response can't be parsed,
 // retries the request to a different peer until [ctx] expires.
+// Returns [errAppRequestSendFailed] if we fail to send an AppRequest.
+// This should be treated as a fatal error.
 func getAndParse[T any](
 	ctx context.Context,
 	client *clientImpl,
