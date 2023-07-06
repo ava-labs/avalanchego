@@ -100,16 +100,16 @@ func ExampleWallet() {
 	log.Printf("issued X->P import %s in %s\n", importTxID, time.Since(importStartTime))
 
 	createSubnetStartTime := time.Now()
-	createSubnetTxID, err := pWallet.IssueCreateSubnetTx(owner)
+	createSubnetTx, err := pWallet.IssueCreateSubnetTx(owner)
 	if err != nil {
 		log.Fatalf("failed to issue create subnet transaction with: %s\n", err)
 		return
 	}
-	log.Printf("issued create subnet transaction %s in %s\n", createSubnetTxID, time.Since(createSubnetStartTime))
+	log.Printf("issued create subnet transaction %s in %s\n", createSubnetTx.ID(), time.Since(createSubnetStartTime))
 
 	transformSubnetStartTime := time.Now()
 	transformSubnetTxID, err := pWallet.IssueTransformSubnetTx(
-		createSubnetTxID,
+		createSubnetTx.ID(),
 		createAssetTxID,
 		50*units.MegaAvax,
 		100*units.MegaAvax,
@@ -140,7 +140,7 @@ func ExampleWallet() {
 				End:    uint64(startTime.Add(5 * time.Second).Unix()),
 				Wght:   25 * units.MegaAvax,
 			},
-			Subnet: createSubnetTxID,
+			Subnet: createSubnetTx.ID(),
 		},
 		&signer.Empty{},
 		createAssetTxID,
@@ -163,7 +163,7 @@ func ExampleWallet() {
 				End:    uint64(startTime.Add(5 * time.Second).Unix()),
 				Wght:   25 * units.MegaAvax,
 			},
-			Subnet: createSubnetTxID,
+			Subnet: createSubnetTx.ID(),
 		},
 		createAssetTxID,
 		&secp256k1fx.OutputOwners{},
