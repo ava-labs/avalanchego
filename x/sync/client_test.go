@@ -656,3 +656,46 @@ func TestRangeProofRetries(t *testing.T) {
 
 	require.Equal(responseCount, maxRequests) // check the client performed retries.
 }
+
+// Test that a failure to send an AppRequest is propagated
+// and returned by GetRangeProof and GetChangeProof.
+func TestAppRequestSendFailed(t *testing.T) {
+	require := require.New(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	networkClient := NewMocknetworkClient(ctrl)
+
+	client := NewClient(
+		&ClientConfig{
+			NetworkClient: networkClient,
+			Log:           logging.NoLog{},
+			Metrics:       &mockMetrics{},
+		},
+	)
+
+	// Mock failure to send app request
+	networkClient.EXPECT().requestAny(
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any(),
+	).Return(ids.NodeID{}, nil, errAppRequestSendFailed).Times(2)
+
+	networkClient.EXPECT().trackBandwidth(
+		gomock.Any(),
+		gomock.Any(),
+	).Times(2)
+
+	_, err := client.GetChangeProof(
+		context.Background(),
+		&pb.SyncGetChangeProofRequest{},
+		nil, // database is unused
+	)
+	require.ErrorIs(err, errAppRequestSendFailed)
+
+	_, err = client.GetRangeProof(
+		context.Background(),
+		&pb.SyncGetRangeProofRequest{},
+	)
+	require.ErrorIs(err, errAppRequestSendFailed)
+}
