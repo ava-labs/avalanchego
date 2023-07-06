@@ -52,7 +52,13 @@ var (
 //  2. applying the sequence to both our stakersStorageModel and the production-like system.
 //  3. checking that both stakersStorageModel and the production-like system have
 //     the same state after each operation.
-
+//
+// The following invariants are required for stakers state to properly work:
+//  1. No stakers add/update/delete ops are performed directly on baseState, but on at least a diff
+//  2. Any number of stakers ops can be carried out on a single diff
+//  3. Diffs work in FIFO fashion: they are added on top of current state and only
+//     bottom diff is applied to base state.
+//  4. The bottom diff applied to base state is immediately committed.
 func TestStateAndDiffComparisonToStorageModel(t *testing.T) {
 	properties := gopter.NewProperties(nil)
 
