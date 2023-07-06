@@ -19,7 +19,6 @@ func SendJSONRequest(
 	method string,
 	params interface{},
 	reply interface{},
-	cookies []*http.Cookie,
 	options ...Option,
 ) ([]*http.Cookie, error) {
 	requestBodyBytes, err := rpc.EncodeClientRequest(method, params)
@@ -42,7 +41,7 @@ func SendJSONRequest(
 
 	request.Header = ops.headers
 	request.Header.Set("Content-Type", "application/json")
-	for _, c := range cookies {
+	for _, c := range ops.cookies {
 		request.AddCookie(c)
 	}
 

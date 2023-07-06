@@ -7,8 +7,6 @@ import (
 	"context"
 	"net/http"
 	"net/url"
-
-	"golang.org/x/exp/maps"
 )
 
 var _ EndpointRequester = (*avalancheEndpointRequester)(nil)
@@ -41,13 +39,16 @@ func (e *avalancheEndpointRequester) SendRequest(
 		return err
 	}
 
+	for _, c := range e.cookies {
+		options = append(options, WithCookie(c))
+	}
+
 	newCookies, err := SendJSONRequest(
 		ctx,
 		uri,
 		method,
 		params,
 		reply,
-		maps.Values(e.cookies),
 		options...,
 	)
 
