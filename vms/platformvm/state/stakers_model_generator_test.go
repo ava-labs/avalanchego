@@ -5,7 +5,6 @@ package state
 
 import (
 	"fmt"
-	"math"
 	"reflect"
 	"time"
 
@@ -14,11 +13,14 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	blst "github.com/supranational/blst/bindings/go"
 )
 
 type generatorPriorityType uint8
@@ -44,16 +46,15 @@ func stakerTxGenerator(
 	priority generatorPriorityType,
 	subnetID *ids.ID,
 	nodeID *ids.NodeID,
-	blsSigner signer.Signer,
 	maxWeight uint64, // helps avoiding overflows in delegator tests
 ) gopter.Gen {
 	switch priority {
 	case permissionedValidator:
-		return addValidatorTxGenerator(ctx, nodeID)
+		return addValidatorTxGenerator(ctx, nodeID, maxWeight)
 	case permissionedDelegator:
 		return addDelegatorTxGenerator(ctx, nodeID, maxWeight)
 	case permissionlessValidator:
-		return addPermissionlessValidatorTxGenerator(ctx, subnetID, nodeID, blsSigner)
+		return addPermissionlessValidatorTxGenerator(ctx, subnetID, nodeID, maxWeight)
 	case permissionlessDelegator:
 		return addPermissionlessDelegatorTxGenerator(ctx, subnetID, nodeID, maxWeight)
 	default:
@@ -65,14 +66,26 @@ func addPermissionlessValidatorTxGenerator(
 	ctx *snow.Context,
 	subnetID *ids.ID,
 	nodeID *ids.NodeID,
-	blsSigner signer.Signer,
+	maxWeight uint64,
 ) gopter.Gen {
-	return stakerDataGenerator(nodeID, math.MaxUint64).FlatMap(
+	return stakerDataGenerator(nodeID, maxWeight).FlatMap(
 		func(v interface{}) gopter.Gen {
-			genStakerSubnetID := genID
+			genStakerSubnetID := subnetIDGen
 			if subnetID != nil {
 				genStakerSubnetID = gen.Const(*subnetID)
 			}
+
+			// always return a non-empty bls key here. Will drop it
+			// below, in txs.Tx generator if needed.
+			fullBlsKeyGen := gen.SliceOfN(32, gen.UInt8()).FlatMap(
+				func(v interface{}) gopter.Gen {
+					bytes := v.([]byte)
+					sk1 := blst.KeyGen(bytes)
+					return gen.Const(signer.NewProofOfPossession(sk1))
+				},
+				reflect.TypeOf(&signer.ProofOfPossession{}),
+			)
+
 			stakerData := v.(txs.Validator)
 
 			specificGen := gen.StructPtr(reflect.TypeOf(&txs.AddPermissionlessValidatorTx{}), map[string]gopter.Gen{
@@ -86,7 +99,7 @@ func addPermissionlessValidatorTxGenerator(
 				}),
 				"Validator": gen.Const(stakerData),
 				"Subnet":    genStakerSubnetID,
-				"Signer":    gen.Const(blsSigner),
+				"Signer":    fullBlsKeyGen,
 				"StakeOuts": gen.Const([]*avax.TransferableOutput{
 					{
 						Asset: avax.Asset{
@@ -114,6 +127,11 @@ func addPermissionlessValidatorTxGenerator(
 				func(v interface{}) gopter.Gen {
 					stakerTx := v.(*txs.AddPermissionlessValidatorTx)
 
+					// drop Signer if needed
+					if stakerTx.Subnet != constants.PlatformChainID {
+						stakerTx.Signer = &signer.Empty{}
+					}
+
 					if err := stakerTx.SyntacticVerify(ctx); err != nil {
 						panic(fmt.Errorf("failed syntax verification in tx generator, %w", err))
 					}
@@ -135,8 +153,9 @@ func addPermissionlessValidatorTxGenerator(
 func addValidatorTxGenerator(
 	ctx *snow.Context,
 	nodeID *ids.NodeID,
+	maxWeight uint64,
 ) gopter.Gen {
-	return stakerDataGenerator(nodeID, math.MaxUint64).FlatMap(
+	return stakerDataGenerator(nodeID, maxWeight).FlatMap(
 		func(v interface{}) gopter.Gen {
 			stakerData := v.(txs.Validator)
 
@@ -198,7 +217,7 @@ func addPermissionlessDelegatorTxGenerator(
 ) gopter.Gen {
 	return stakerDataGenerator(nodeID, maxWeight).FlatMap(
 		func(v interface{}) gopter.Gen {
-			genStakerSubnetID := genID
+			genStakerSubnetID := subnetIDGen
 			if subnetID != nil {
 				genStakerSubnetID = gen.Const(*subnetID)
 			}
@@ -354,16 +373,25 @@ const (
 	lengthNodeID = 20
 )
 
-// genID is the helper generator for ids.ID objects
-var genID = gen.SliceOfN(lengthID, gen.UInt8()).FlatMap(
-	func(v interface{}) gopter.Gen {
-		byteSlice := v.([]byte)
-		var byteArray [lengthID]byte
-		copy(byteArray[:], byteSlice)
-		return gen.Const(ids.ID(byteArray))
+// subnetIDGen is the helper generator for subnetID, duly skewed towards primary network
+var subnetIDGen = gen.Weighted([]gen.WeightedGen{
+	{
+		Weight: 50,
+		Gen:    gen.Const(constants.PrimaryNetworkID),
 	},
-	reflect.TypeOf([]byte{}),
-)
+	{
+		Weight: 50,
+		Gen: gen.SliceOfN(lengthID, gen.UInt8()).FlatMap(
+			func(v interface{}) gopter.Gen {
+				byteSlice := v.([]byte)
+				var byteArray [lengthID]byte
+				copy(byteArray[:], byteSlice)
+				return gen.Const(ids.ID(byteArray))
+			},
+			reflect.TypeOf([]byte{}),
+		),
+	},
+})
 
 // genNodeID is the helper generator for ids.NodeID objects
 var genNodeID = gen.SliceOfN(lengthNodeID, gen.UInt8()).FlatMap(

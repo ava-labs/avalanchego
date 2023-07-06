@@ -5,6 +5,7 @@ package state
 
 import (
 	"fmt"
+	"math"
 	"reflect"
 	"sort"
 	"testing"
@@ -266,7 +267,7 @@ func maskedIteratorTestGenerator() []gopter.Gen {
 	ctx := buildStateCtx()
 
 	return []gopter.Gen{
-		gen.SliceOfN(parentStakersCount, addValidatorTxGenerator(ctx, nil)),
+		gen.SliceOfN(parentStakersCount, addValidatorTxGenerator(ctx, nil, math.MaxUint64)),
 		indexPermutationGenerator(parentStakersCount),
 		gen.SliceOfN(2, gen.IntRange(0, parentStakersCount)).SuchThat(func(v interface{}) bool {
 			nums := v.([]int)

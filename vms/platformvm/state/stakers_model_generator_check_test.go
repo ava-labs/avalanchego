@@ -6,6 +6,7 @@ package state
 import (
 	"errors"
 	"fmt"
+	"math"
 	"testing"
 	"time"
 
@@ -14,7 +15,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -82,7 +82,7 @@ func TestGeneratedStakersValidity(t *testing.T) {
 
 			return ""
 		},
-		addValidatorTxGenerator(ctx, &nodeID),
+		addValidatorTxGenerator(ctx, &nodeID, math.MaxUint64),
 	))
 
 	properties.Property("AddDelegatorTx generator checks", prop.ForAll(
@@ -198,7 +198,7 @@ func TestGeneratedStakersValidity(t *testing.T) {
 
 			return ""
 		},
-		addPermissionlessValidatorTxGenerator(ctx, &subnetID, &nodeID, &signer.Empty{}),
+		addPermissionlessValidatorTxGenerator(ctx, &subnetID, &nodeID, math.MaxUint64),
 	))
 
 	properties.Property("addPermissionlessDelegatorTx generator checks", prop.ForAll(
