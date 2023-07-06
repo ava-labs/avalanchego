@@ -6,8 +6,6 @@ package rpc
 import (
 	"net/http"
 	"net/url"
-
-	"golang.org/x/exp/maps"
 )
 
 type Option func(*Options)
@@ -15,14 +13,13 @@ type Option func(*Options)
 type Options struct {
 	headers     http.Header
 	queryParams url.Values
-	cookies     map[string]*http.Cookie
+	cookies     []*http.Cookie
 }
 
 func NewOptions(ops []Option) *Options {
 	o := &Options{
 		headers:     http.Header{},
 		queryParams: url.Values{},
-		cookies:     map[string]*http.Cookie{},
 	}
 	o.applyOptions(ops)
 	return o
@@ -43,7 +40,7 @@ func (o *Options) QueryParams() url.Values {
 }
 
 func (o *Options) Cookies() []*http.Cookie {
-	return maps.Values(o.cookies)
+	return o.cookies
 }
 
 func WithHeader(key, val string) Option {
@@ -60,6 +57,6 @@ func WithQueryParam(key, val string) Option {
 
 func WithCookie(c *http.Cookie) Option {
 	return func(o *Options) {
-		o.cookies[c.Name] = c
+		o.cookies = append(o.cookies, c)
 	}
 }
