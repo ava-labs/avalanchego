@@ -250,11 +250,13 @@ func (cmd *deleteCurrentValidatorCommand) Run(sut commands.SystemUnderTest) comm
 				stakerIt.Release()
 				return sys
 			}
-			if !delIt.Next() {
-				found = true
+
+			found := !delIt.Next()
+			delIt.Release()
+			if !found {
 				break
 			} else {
-				continue
+				continue // checks next validator
 			}
 		}
 	}
@@ -292,11 +294,13 @@ func (cmd *deleteCurrentValidatorCommand) NextState(cmdState commands.State) com
 				stakerIt.Release()
 				return model
 			}
-			if !delIt.Next() {
-				found = true
+
+			found := !delIt.Next()
+			delIt.Release()
+			if !found {
 				break
 			} else {
-				continue
+				continue // checks next validator
 			}
 		}
 	}
