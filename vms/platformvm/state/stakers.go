@@ -226,16 +226,26 @@ func (v *baseStakers) DeleteValidator(staker *Staker) {
 	validator.validator = nil
 	v.pruneValidator(subnetID, nodeID)
 
-	// for sake of generality, we assume we could delete an updated version
+	// for sake of generality, we assume we could insert and immediately delete
+	// a validator.validator. We need to handle this case separately to avoid
+	// messing validators set.
+	// Also, for sake of generality, we assume we could delete an updated version
 	// of validator.validator. We explicitly remove the currently stored
 	// version of the staker to handle this case.
-	v.stakers.Delete(storedStaker)
-
 	validatorDiff := getOrCreateDiff(v.validatorDiffs, subnetID, nodeID)
-	validatorDiff.validator = stakerAndStatus{
-		staker: storedStaker,
-		status: deleted,
+	if validatorDiff.validator.status == added {
+		validatorDiff.validator = stakerAndStatus{
+			staker: nil,
+			status: unmodified,
+		}
+	} else {
+		validatorDiff.validator = stakerAndStatus{
+			staker: storedStaker,
+			status: deleted,
+		}
 	}
+
+	v.stakers.Delete(storedStaker)
 }
 
 func (v *baseStakers) GetDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) StakerIterator {
@@ -315,16 +325,17 @@ func (v *baseStakers) UpdateDelegator(staker *Staker) error {
 func (v *baseStakers) DeleteDelegator(staker *Staker) {
 	validator, found := v.getValidator(staker.SubnetID, staker.NodeID)
 	if !found {
-		// deleting an non-existing staker. Nothing to do.
+		// deleting delegator of an already removed validator. Nothing to do.
 		return
 	}
 
 	// for sake of generality, we assume we could delete an updated version
 	// of the delegator. We explicitly remove the currently stored
 	// version of the staker to handle this case.
-	delegatorToDelete := staker
-	if stored, found := validator.delegators[staker.TxID]; found {
-		delegatorToDelete = stored
+	delegatorToDelete, found := validator.delegators[staker.TxID]
+	if !found {
+		// deleting a non-existing delegator. Nothing to do
+		return
 	}
 	delete(validator.delegators, delegatorToDelete.TxID)
 	if validator.sortedDelegators != nil {
@@ -333,9 +344,16 @@ func (v *baseStakers) DeleteDelegator(staker *Staker) {
 	v.pruneValidator(delegatorToDelete.SubnetID, delegatorToDelete.NodeID)
 
 	validatorDiff := getOrCreateDiff(v.validatorDiffs, delegatorToDelete.SubnetID, delegatorToDelete.NodeID)
-	validatorDiff.delegators[delegatorToDelete.TxID] = stakerAndStatus{
-		staker: delegatorToDelete,
-		status: deleted,
+	if _, found := validatorDiff.delegators[delegatorToDelete.TxID]; found {
+		validatorDiff.delegators[delegatorToDelete.TxID] = stakerAndStatus{
+			staker: nil,
+			status: unmodified,
+		}
+	} else {
+		validatorDiff.delegators[delegatorToDelete.TxID] = stakerAndStatus{
+			staker: delegatorToDelete,
+			status: deleted,
+		}
 	}
 
 	v.stakers.Delete(delegatorToDelete)
