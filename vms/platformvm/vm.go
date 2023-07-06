@@ -152,13 +152,14 @@ func (vm *VM) Initialize(
 		vm.metrics,
 		rewards,
 		&vm.bootstrapped,
+		vm.Tracer,
 		platformConfig.ChecksumsEnabled,
 	)
 	if err != nil {
 		return err
 	}
 
-	validatorManager := pvalidators.NewManager(chainCtx.Log, vm.Config, vm.state, vm.metrics, &vm.clock)
+	validatorManager := pvalidators.NewManager(chainCtx.Log, vm.Config, vm.state, vm.metrics, &vm.clock, vm.Tracer)
 	vm.State = validatorManager
 	vm.atomicUtxosManager = avax.NewAtomicUTXOManager(chainCtx.SharedMemory, txs.Codec)
 	utxoHandler := utxo.NewHandler(vm.ctx, &vm.clock, vm.fx)

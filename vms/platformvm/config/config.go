@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -20,6 +21,8 @@ import (
 type Config struct {
 	// The node's chain manager
 	Chains chains.Manager
+
+	Tracer trace.Tracer
 
 	// Node's validator set maps subnetID -> validators of the subnet
 	//

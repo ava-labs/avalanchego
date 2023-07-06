@@ -808,6 +808,7 @@ func (n *Node) initVMs() error {
 		vmRegisterer.Register(context.TODO(), constants.PlatformVMID, &platformvm.Factory{
 			Config: platformconfig.Config{
 				Chains:                        n.chainManager,
+				Tracer:                        n.tracer,
 				Validators:                    vdrs,
 				UptimeLockedCalculator:        n.uptimeCalculator,
 				SybilProtectionEnabled:        n.Config.SybilProtectionEnabled,

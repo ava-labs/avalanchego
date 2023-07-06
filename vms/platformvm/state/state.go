@@ -13,6 +13,10 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"go.opentelemetry.io/otel/attribute"
+
+	oteltrace "go.opentelemetry.io/otel/trace"
+
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/cache/metercacher"
 	"github.com/ava-labs/avalanchego/database"
@@ -24,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
@@ -248,6 +253,7 @@ type state struct {
 	metrics      metrics.Metrics
 	rewards      reward.Calculator
 	bootstrapped *utils.Atomic[bool]
+	tracer       trace.Tracer
 
 	baseDB *versiondb.Database
 
@@ -383,6 +389,7 @@ func New(
 	metrics metrics.Metrics,
 	rewards reward.Calculator,
 	bootstrapped *utils.Atomic[bool],
+	tracer trace.Tracer,
 	trackChecksums bool,
 ) (State, error) {
 	s, err := newState(
@@ -393,6 +400,7 @@ func New(
 		metricsReg,
 		rewards,
 		bootstrapped,
+		tracer,
 		trackChecksums,
 	)
 	if err != nil {
@@ -417,6 +425,7 @@ func newState(
 	metricsReg prometheus.Registerer,
 	rewards reward.Calculator,
 	bootstrapped *utils.Atomic[bool],
+	tracer trace.Tracer,
 	trackChecksums bool,
 ) (*state, error) {
 	blockCache, err := metercacher.New(
@@ -520,6 +529,7 @@ func newState(
 		metrics:      metrics,
 		rewards:      rewards,
 		bootstrapped: bootstrapped,
+		tracer:       tracer,
 		baseDB:       baseDB,
 
 		addedBlocks: make(map[ids.ID]stateBlk),
@@ -958,11 +968,25 @@ func (s *state) ApplyValidatorWeightDiffs(
 	endHeight uint64,
 	subnetID ids.ID,
 ) error {
+	ctx, span := s.tracer.Start(ctx, "ApplyValidatorWeightDiffs", oteltrace.WithAttributes(
+		attribute.Int64("startHeight", int64(startHeight)),
+		attribute.Int64("endHeight", int64(endHeight)),
+		attribute.Stringer("subnetID", subnetID),
+	))
+	defer span.End()
+
 	diffIter := s.flatValidatorWeightDiffsDB.NewIteratorWithStartAndPrefix(
 		getStartWeightKey(subnetID, startHeight),
 		subnetID[:],
 	)
 	defer diffIter.Release()
+
+	ctx, span = s.tracer.Start(ctx, "iterateValidatorWeightDiffs", oteltrace.WithAttributes(
+		attribute.Int64("startHeight", int64(startHeight)),
+		attribute.Int64("endHeight", int64(endHeight)),
+		attribute.Stringer("subnetID", subnetID),
+	))
+	defer span.End()
 
 	prevHeight := startHeight + 1
 	// TODO: Remove the index continuity checks once we are guaranteed nodes can
@@ -984,16 +1008,22 @@ func (s *state) ApplyValidatorWeightDiffs(
 
 		prevHeight = parsedHeight
 
-		weightDiff := ValidatorWeightDiff{}
-		_, err = blocks.GenesisCodec.Unmarshal(diffIter.Value(), &weightDiff)
+		weightDiff, err := parseWeightValue(diffIter.Value())
 		if err != nil {
 			return err
 		}
 
-		if err := applyWeightDiff(validators, nodeID, &weightDiff); err != nil {
+		if err := applyWeightDiff(validators, nodeID, weightDiff); err != nil {
 			return err
 		}
 	}
+
+	ctx, span = s.tracer.Start(ctx, "iterateOldValidatorWeightDiffs", oteltrace.WithAttributes(
+		attribute.Int64("startHeight", int64(startHeight)),
+		attribute.Int64("endHeight", int64(endHeight)),
+		attribute.Stringer("subnetID", subnetID),
+	))
+	defer span.End()
 
 	// TODO: Remove this once it is assumed that all subnet validators have
 	// adopted the new indexing.
@@ -1080,10 +1110,22 @@ func (s *state) ApplyValidatorPublicKeyDiffs(
 	startHeight uint64,
 	endHeight uint64,
 ) error {
+	ctx, span := s.tracer.Start(ctx, "ApplyValidatorPublicKeyDiffs", oteltrace.WithAttributes(
+		attribute.Int64("startHeight", int64(startHeight)),
+		attribute.Int64("endHeight", int64(endHeight)),
+	))
+	defer span.End()
+
 	diffIter := s.flatValidatorPublicKeyDiffsDB.NewIteratorWithStart(
 		getStartBLSKey(startHeight),
 	)
 	defer diffIter.Release()
+
+	ctx, span = s.tracer.Start(ctx, "iterateValidatorPublicKeyDiffs", oteltrace.WithAttributes(
+		attribute.Int64("startHeight", int64(startHeight)),
+		attribute.Int64("endHeight", int64(endHeight)),
+	))
+	defer span.End()
 
 	for diffIter.Next() {
 		if err := ctx.Err(); err != nil {
@@ -1525,7 +1567,7 @@ func (s *state) write(updateValidators bool, height uint64) error {
 		s.writeTransformedSubnets(),
 		s.writeSubnetSupplies(),
 		s.writeChains(),
-		s.writeMetadata(height),
+		s.writeMetadata(),
 	)
 	return errs.Err
 }
@@ -1837,21 +1879,19 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 				continue
 			}
 
-			// TODO: consider removing the use of the codec here.
-			weightDiffBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, weightDiff)
-			if err != nil {
-				return fmt.Errorf("failed to serialize validator weight diff: %w", err)
-			}
-
 			err = s.flatValidatorWeightDiffsDB.Put(
 				getWeightKey(subnetID, height, nodeID),
-				weightDiffBytes,
+				getWeightValue(weightDiff),
 			)
 			if err != nil {
 				return err
 			}
 
 			// TODO: Remove this once we no longer support version rollbacks.
+			weightDiffBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, weightDiff)
+			if err != nil {
+				return fmt.Errorf("failed to serialize validator weight diff: %w", err)
+			}
 			if err := weightDiffDB.Put(nodeID[:], weightDiffBytes); err != nil {
 				return err
 			}
@@ -2117,7 +2157,7 @@ func (s *state) writeChains() error {
 	return nil
 }
 
-func (s *state) writeMetadata(height uint64) error {
+func (s *state) writeMetadata() error {
 	if !s.persistedTimestamp.Equal(s.timestamp) {
 		if err := database.PutTimestamp(s.singletonDB, timestampKey, s.timestamp); err != nil {
 			return fmt.Errorf("failed to write timestamp: %w", err)
@@ -2138,8 +2178,6 @@ func (s *state) writeMetadata(height uint64) error {
 	}
 
 	if s.indexedHeights != nil {
-		s.indexedHeights.End = height
-
 		indexedHeightsBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, s.indexedHeights)
 		if err != nil {
 			return err

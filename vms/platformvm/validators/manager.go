@@ -9,12 +9,17 @@ import (
 	"fmt"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
+
+	oteltrace "go.opentelemetry.io/otel/trace"
+
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -55,6 +60,7 @@ func NewManager(
 	state state.State,
 	metrics metrics.Metrics,
 	clk *mockable.Clock,
+	tracer trace.Tracer,
 ) Manager {
 	return &manager{
 		log:     log,
@@ -62,6 +68,7 @@ func NewManager(
 		state:   state,
 		metrics: metrics,
 		clk:     clk,
+		tracer:  tracer,
 		caches:  make(map[ids.ID]cache.Cacher[uint64, map[ids.NodeID]*validators.GetValidatorOutput]),
 		recentlyAccepted: window.New[ids.ID](
 			window.Config{
@@ -80,6 +87,7 @@ type manager struct {
 	state   state.State
 	metrics metrics.Metrics
 	clk     *mockable.Clock
+	tracer  trace.Tracer
 
 	// Maps caches for each subnet that is currently tracked.
 	// Key: Subnet ID
@@ -130,7 +138,10 @@ func (m *manager) GetMinimumHeight(ctx context.Context) (uint64, error) {
 	return blk.Height() - 1, nil
 }
 
-func (m *manager) GetCurrentHeight(context.Context) (uint64, error) {
+func (m *manager) GetCurrentHeight(ctx context.Context) (uint64, error) {
+	_, span := m.tracer.Start(ctx, "GetCurrentHeight")
+	defer span.End()
+
 	lastAcceptedID := m.state.GetLastAccepted()
 	lastAccepted, _, err := m.state.GetStatelessBlock(lastAcceptedID)
 	if err != nil {
@@ -144,6 +155,12 @@ func (m *manager) GetValidatorSet(
 	height uint64,
 	subnetID ids.ID,
 ) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+	ctx, span := m.tracer.Start(ctx, "GetValidatorSet", oteltrace.WithAttributes(
+		attribute.Int64("height", int64(height)),
+		attribute.Stringer("subnetID", subnetID),
+	))
+	defer span.End()
+
 	lastAcceptedHeight, err := m.GetCurrentHeight(ctx)
 	if err != nil {
 		return nil, err
@@ -165,6 +182,12 @@ func (m *manager) getValidatorSetFrom(
 	targetHeight uint64,
 	subnetID ids.ID,
 ) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+	ctx, span := m.tracer.Start(ctx, "getValidatorSetFrom", oteltrace.WithAttributes(
+		attribute.Int64("currentHeight", int64(currentHeight)),
+		attribute.Int64("targetHeight", int64(targetHeight)),
+	))
+	defer span.End()
+
 	validatorSetsCache, exists := m.caches[subnetID]
 	if !exists {
 		validatorSetsCache = &cache.LRU[uint64, map[ids.NodeID]*validators.GetValidatorOutput]{Size: validatorSetsCacheSize}
@@ -174,10 +197,10 @@ func (m *manager) getValidatorSetFrom(
 		}
 	}
 
-	if validatorSet, ok := validatorSetsCache.Get(targetHeight); ok {
-		m.metrics.IncValidatorSetsCached()
-		return validatorSet, nil
-	}
+	// if validatorSet, ok := validatorSetsCache.Get(targetHeight); ok {
+	// 	m.metrics.IncValidatorSetsCached()
+	// 	return validatorSet, nil
+	// }
 
 	// get the start time to track metrics
 	startTime := m.clk.Time()
@@ -198,9 +221,9 @@ func (m *manager) getValidatorSetFrom(
 	// cache the validator set
 	validatorSetsCache.Put(targetHeight, validatorSet)
 
-	endTime := m.clk.Time()
+	duration := m.clk.Time().Sub(startTime)
 	m.metrics.IncValidatorSetsCreated()
-	m.metrics.AddValidatorSetsDuration(endTime.Sub(startTime))
+	m.metrics.AddValidatorSetsDuration(duration)
 	m.metrics.AddValidatorSetsHeightDiff(currentHeight - targetHeight)
 	return validatorSet, nil
 }
@@ -210,6 +233,12 @@ func (m *manager) makePrimaryNetworkValidatorSet(
 	currentHeight uint64,
 	targetHeight uint64,
 ) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+	ctx, span := m.tracer.Start(ctx, "makePrimaryNetworkValidatorSet", oteltrace.WithAttributes(
+		attribute.Int64("currentHeight", int64(currentHeight)),
+		attribute.Int64("targetHeight", int64(targetHeight)),
+	))
+	defer span.End()
+
 	currentValidators, ok := m.cfg.Validators.Get(constants.PrimaryNetworkID)
 	if !ok {
 		// This should never happen

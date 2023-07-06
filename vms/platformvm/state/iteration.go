@@ -18,14 +18,18 @@ const (
 	weightKeyHeightOffset = hashing.HashLen
 	weightKeyNodeIDOffset = weightKeyHeightOffset + database.Uint64Size
 
+	weightValueLength = 1 + database.Uint64Size
+	weightValueTrue   = 0x01
+
 	startBLSKeyLength  = database.Uint64Size
 	blsKeyLength       = startBLSKeyLength + hashing.AddrLen
 	blsKeyNodeIDOffset = database.Uint64Size
 )
 
 var (
-	errUnexpectedWeightKeyLength = fmt.Errorf("expected weight key length %d", weightKeyLength)
-	errUnexpectedBLSKeyLength    = fmt.Errorf("expected bls key length %d", blsKeyLength)
+	errUnexpectedWeightKeyLength   = fmt.Errorf("expected weight key length %d", weightKeyLength)
+	errUnexpectedWeightValueLength = fmt.Errorf("expected weight value length %d", weightValueLength)
+	errUnexpectedBLSKeyLength      = fmt.Errorf("expected bls key length %d", blsKeyLength)
 )
 
 // getStartWeightKey is used to determine the starting key when iterating.
@@ -53,7 +57,7 @@ func getWeightKey(subnetID ids.ID, height uint64, nodeID ids.NodeID) []byte {
 
 func parseWeightKey(key []byte) (ids.ID, uint64, ids.NodeID, error) {
 	if len(key) != weightKeyLength {
-		return ids.Empty, 0, ids.EmptyNodeID, errUnexpectedWeightKeyLength
+		return ids.Empty, 0, ids.EmptyNodeID, errUnexpectedWeightValueLength
 	}
 	var (
 		subnetID ids.ID
@@ -65,6 +69,25 @@ func parseWeightKey(key []byte) (ids.ID, uint64, ids.NodeID, error) {
 	height := ^binary.BigEndian.Uint64(key[weightKeyHeightOffset:])
 	copy(nodeID[:], key[weightKeyNodeIDOffset:])
 	return subnetID, height, nodeID, nil
+}
+
+func getWeightValue(diff *ValidatorWeightDiff) []byte {
+	value := make([]byte, weightValueLength)
+	if diff.Decrease {
+		value[0] = weightValueTrue
+	}
+	binary.BigEndian.PutUint64(value[1:], diff.Amount)
+	return value
+}
+
+func parseWeightValue(value []byte) (*ValidatorWeightDiff, error) {
+	if len(value) != weightValueLength {
+		return nil, errUnexpectedWeightKeyLength
+	}
+	return &ValidatorWeightDiff{
+		Decrease: value[0] == weightValueTrue,
+		Amount:   binary.BigEndian.Uint64(value[1:]),
+	}, nil
 }
 
 // getStartBLSKey is used to determine the starting key when iterating.

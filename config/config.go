@@ -1266,6 +1266,9 @@ func getTraceConfig(v *viper.Viper) (trace.Config, error) {
 			Endpoint: endpoint,
 			Insecure: v.GetBool(TracingInsecureKey),
 			// TODO add support for headers
+			Headers: map[string]string{
+				"uptrace-dsn": "http://project2_secret_token@localhost:14317/2",
+			},
 		},
 		Enabled:         true,
 		TraceSampleRate: v.GetFloat64(TracingSampleRateKey),
