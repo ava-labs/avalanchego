@@ -29,7 +29,8 @@ import (
 )
 
 const (
-	RootPath = EmptyPath
+	DefaultEvictionBatchSize = 100
+	RootPath                 = EmptyPath
 	// TODO: name better
 	rebuildViewSizeFractionOfCacheSize = 50
 	minRebuildViewSizePerCommit        = 1000
@@ -39,7 +40,7 @@ var (
 	_ TrieView = (*merkleDB)(nil)
 	_ MerkleDB = (*merkleDB)(nil)
 
-	codec, version = newCodec()
+	codec = newCodec()
 
 	rootKey                 []byte
 	nodePrefix              = []byte("node")
