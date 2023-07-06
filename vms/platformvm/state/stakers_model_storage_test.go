@@ -37,8 +37,7 @@ var (
 	_ commands.Command = (*increaseWeightCurrentDelegatorCommand)(nil)
 	_ commands.Command = (*deleteCurrentDelegatorCommand)(nil)
 	_ commands.Command = (*addTopDiffCommand)(nil)
-	_ commands.Command = (*applyBottomDiffCommand)(nil)
-	_ commands.Command = (*commitBottomStateCommand)(nil)
+	_ commands.Command = (*applyAndCommitBottomDiffCommand)(nil)
 	_ commands.Command = (*rebuildStateCommand)(nil)
 
 	commandsCtx = buildStateCtx()
@@ -209,8 +208,7 @@ var stakersCommands = &commands.ProtoCommands{
 			genDeleteCurrentDelegatorCommand,
 
 			genAddTopDiffCommand,
-			genApplyBottomDiffCommand,
-			genCommitBottomStateCommand,
+			genApplyAndCommitBottomDiffCommand,
 			genRebuildStateCommand,
 		)
 	},
@@ -1499,75 +1497,35 @@ var genAddTopDiffCommand = gen.IntRange(1, 2).Map(
 	},
 )
 
-// applyBottomDiffCommand section
-type applyBottomDiffCommand struct {
+// applyAndCommitBottomDiffCommand section
+type applyAndCommitBottomDiffCommand struct {
 	err error
 }
 
-func (cmd *applyBottomDiffCommand) Run(sut commands.SystemUnderTest) commands.Result {
+func (cmd *applyAndCommitBottomDiffCommand) Run(sut commands.SystemUnderTest) commands.Result {
 	sys := sut.(*sysUnderTest)
-	_, cmd.err = sys.flushBottomDiff()
-
-	return sys
-}
-
-func (*applyBottomDiffCommand) NextState(cmdState commands.State) commands.State {
-	return cmdState // model has no diffs
-}
-
-func (*applyBottomDiffCommand) PreCondition(commands.State) bool {
-	return true
-}
-
-func (cmd *applyBottomDiffCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
-	if cmd.err != nil {
-		cmd.err = nil // reset for next runs
-		return &gopter.PropResult{Status: gopter.PropFalse}
-	}
-
-	if !checkSystemAndModelContent(cmdState, res) {
-		return &gopter.PropResult{Status: gopter.PropFalse}
-	}
-
-	return &gopter.PropResult{Status: gopter.PropTrue}
-}
-
-func (*applyBottomDiffCommand) String() string {
-	return "\napplyBottomDiffCommand"
-}
-
-// a trick to force command regeneration at each sampling.
-// gen.Const would not allow it
-var genApplyBottomDiffCommand = gen.IntRange(1, 2).Map(
-	func(int) commands.Command {
-		return &applyBottomDiffCommand{}
-	},
-)
-
-// commitBottomStateCommand section
-type commitBottomStateCommand struct {
-	err error
-}
-
-func (cmd *commitBottomStateCommand) Run(sut commands.SystemUnderTest) commands.Result {
-	sys := sut.(*sysUnderTest)
-	err := sys.baseState.Commit()
-	if err != nil {
+	if _, err := sys.flushBottomDiff(); err != nil {
 		cmd.err = err
 		return sys
 	}
+
+	if err := sys.baseState.Commit(); err != nil {
+		cmd.err = err
+		return sys
+	}
+
 	return sys
 }
 
-func (*commitBottomStateCommand) NextState(cmdState commands.State) commands.State {
+func (*applyAndCommitBottomDiffCommand) NextState(cmdState commands.State) commands.State {
 	return cmdState // model has no diffs
 }
 
-func (*commitBottomStateCommand) PreCondition(commands.State) bool {
+func (*applyAndCommitBottomDiffCommand) PreCondition(commands.State) bool {
 	return true
 }
 
-func (cmd *commitBottomStateCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
+func (cmd *applyAndCommitBottomDiffCommand) PostCondition(cmdState commands.State, res commands.Result) *gopter.PropResult {
 	if cmd.err != nil {
 		cmd.err = nil // reset for next runs
 		return &gopter.PropResult{Status: gopter.PropFalse}
@@ -1580,15 +1538,15 @@ func (cmd *commitBottomStateCommand) PostCondition(cmdState commands.State, res 
 	return &gopter.PropResult{Status: gopter.PropTrue}
 }
 
-func (*commitBottomStateCommand) String() string {
-	return "\ncommitBottomStateCommand"
+func (*applyAndCommitBottomDiffCommand) String() string {
+	return "\napplyAndCommitBottomDiffCommand"
 }
 
 // a trick to force command regeneration at each sampling.
 // gen.Const would not allow it
-var genCommitBottomStateCommand = gen.IntRange(1, 2).Map(
+var genApplyAndCommitBottomDiffCommand = gen.IntRange(1, 2).Map(
 	func(int) commands.Command {
-		return &commitBottomStateCommand{}
+		return &applyAndCommitBottomDiffCommand{}
 	},
 )
 
