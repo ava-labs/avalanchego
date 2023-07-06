@@ -180,18 +180,17 @@ func TestInvalidByzantineProposerOracleParent(t *testing.T) {
 	require.NoError(opts[0].Verify(context.Background()))
 	require.NoError(opts[1].Verify(context.Background()))
 
-	yBlock, err := proVM.ParseBlock(context.Background(), xBlock.opts[0].Bytes())
-	if err != nil {
-		// It's okay for this block not to be parsed
-		return
-	}
-	err = yBlock.Verify(context.Background())
+	wrappedXBlock, err := proVM.ParseBlock(context.Background(), xBlock.Bytes())
+	require.NoError(err)
+
+	err = wrappedXBlock.Verify(context.Background())
 	require.ErrorIs(err, errUnexpectedBlockType)
 
 	require.NoError(aBlock.Accept(context.Background()))
 
-	err = yBlock.Verify(context.Background())
-	require.ErrorIs(err, errUnexpectedBlockType)
+	// Because the wrappedXBlock never passed verification and is now rejected,
+	// the consensus engine will never verify any of its children.
+	require.Equal(choices.Rejected, wrappedXBlock.Status())
 }
 
 // Ensure that a byzantine node issuing an invalid PostForkBlock (B) when the
@@ -222,11 +221,6 @@ func TestInvalidByzantineProposerPreForkParent(t *testing.T) {
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return xBlock, nil
 	}
-
-	aBlock, err := proVM.BuildBlock(context.Background())
-	require.NoError(err)
-
-	coreVM.BuildBlockF = nil
 
 	yBlockBytes := []byte{2}
 	yBlock := &snowman.TestBlock{
@@ -265,31 +259,24 @@ func TestInvalidByzantineProposerPreForkParent(t *testing.T) {
 		}
 	}
 
-	bStatelessBlock, err := block.BuildUnsigned(
-		xBlock.ID(),
-		yBlock.Timestamp(),
-		0,
-		yBlockBytes,
-	)
+	aBlock, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
-
-	bBlock, err := proVM.ParseBlock(context.Background(), bStatelessBlock.Bytes())
-	if err != nil {
-		// If there was an error parsing, then this is fine.
-		return
-	}
+	coreVM.BuildBlockF = nil
 
 	require.NoError(aBlock.Verify(context.Background()))
 
+	wrappedXBlock, err := proVM.ParseBlock(context.Background(), xBlock.Bytes())
+	require.NoError(err)
+
 	// If there wasn't an error parsing - verify must return an error
-	err = bBlock.Verify(context.Background())
+	err = wrappedXBlock.Verify(context.Background())
 	require.ErrorIs(err, errUnexpectedBlockType)
 
 	require.NoError(aBlock.Accept(context.Background()))
 
-	// If there wasn't an error parsing - verify must return an error
-	err = bBlock.Verify(context.Background())
-	require.ErrorIs(err, errUnexpectedBlockType)
+	// Because the wrappedXBlock never passed verification and is now rejected,
+	// the consensus engine will never verify any of its children.
+	require.Equal(choices.Rejected, wrappedXBlock.Status())
 }
 
 // Ensure that a byzantine node issuing an invalid OptionBlock (B) which

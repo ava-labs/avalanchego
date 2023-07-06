@@ -54,88 +54,14 @@ var (
 //     the same state after each operation.
 
 func TestStateAndDiffComparisonToStorageModel(t *testing.T) {
-	// properties := gopter.NewProperties(nil)
+	properties := gopter.NewProperties(nil)
 
 	// to reproduce a given scenario do something like this:
-	parameters := gopter.DefaultTestParametersWithSeed(1688591586962580727)
-	properties := gopter.NewProperties(parameters)
+	// parameters := gopter.DefaultTestParametersWithSeed(1680269995295922009)
+	// properties := gopter.NewProperties(parameters)
 
 	properties.Property("state comparison to storage model", commands.Prop(stakersCommands))
 	properties.TestingRun(t)
-}
-
-type sysUnderTest struct {
-	diffBlkIDSeed uint64
-	baseDB        database.Database
-	baseState     State
-	sortedDiffIDs []ids.ID
-	diffsMap      map[ids.ID]Diff
-}
-
-func newSysUnderTest(baseDB database.Database, baseState State) *sysUnderTest {
-	sys := &sysUnderTest{
-		baseDB:        baseDB,
-		baseState:     baseState,
-		diffsMap:      map[ids.ID]Diff{},
-		sortedDiffIDs: []ids.ID{},
-	}
-	return sys
-}
-
-func (s *sysUnderTest) GetState(blkID ids.ID) (Chain, bool) {
-	if state, found := s.diffsMap[blkID]; found {
-		return state, found
-	}
-	return s.baseState, blkID == s.baseState.GetLastAccepted()
-}
-
-func (s *sysUnderTest) addDiffOnTop() error {
-	newTopBlkID := ids.Empty.Prefix(atomic.AddUint64(&s.diffBlkIDSeed, 1))
-	var topBlkID ids.ID
-	if len(s.sortedDiffIDs) == 0 {
-		topBlkID = s.baseState.GetLastAccepted()
-	} else {
-		topBlkID = s.sortedDiffIDs[len(s.sortedDiffIDs)-1]
-	}
-	newTopDiff, err := NewDiff(topBlkID, s)
-	if err != nil {
-		return err
-	}
-	s.sortedDiffIDs = append(s.sortedDiffIDs, newTopBlkID)
-	s.diffsMap[newTopBlkID] = newTopDiff
-	return nil
-}
-
-// getTopChainState returns top diff or baseState
-func (s *sysUnderTest) getTopChainState() Chain {
-	var topChainStateID ids.ID
-	if len(s.sortedDiffIDs) != 0 {
-		topChainStateID = s.sortedDiffIDs[len(s.sortedDiffIDs)-1]
-	} else {
-		topChainStateID = s.baseState.GetLastAccepted()
-	}
-
-	topChainState, _ := s.GetState(topChainStateID)
-	return topChainState
-}
-
-// flushBottomDiff applies bottom diff if available
-func (s *sysUnderTest) flushBottomDiff() (bool, error) {
-	if len(s.sortedDiffIDs) == 0 {
-		return false, nil
-	}
-	bottomDiffID := s.sortedDiffIDs[0]
-	diffToApply := s.diffsMap[bottomDiffID]
-
-	err := diffToApply.Apply(s.baseState)
-	if err != nil {
-		return true, err
-	}
-	s.baseState.SetLastAccepted(bottomDiffID)
-
-	s.sortedDiffIDs = s.sortedDiffIDs[1:]
-	delete(s.diffsMap, bottomDiffID)
-	return true, nil
 }
 
 // stakersCommands creates/destroy the system under test and generates
@@ -1710,4 +1636,78 @@ func checkValidatorSetContent(res commands.Result) bool {
 		}
 	}
 	return true
+}
+
+type sysUnderTest struct {
+	diffBlkIDSeed uint64
+	baseDB        database.Database
+	baseState     State
+	sortedDiffIDs []ids.ID
+	diffsMap      map[ids.ID]Diff
+}
+
+func newSysUnderTest(baseDB database.Database, baseState State) *sysUnderTest {
+	sys := &sysUnderTest{
+		baseDB:        baseDB,
+		baseState:     baseState,
+		diffsMap:      map[ids.ID]Diff{},
+		sortedDiffIDs: []ids.ID{},
+	}
+	return sys
+}
+
+func (s *sysUnderTest) GetState(blkID ids.ID) (Chain, bool) {
+	if state, found := s.diffsMap[blkID]; found {
+		return state, found
+	}
+	return s.baseState, blkID == s.baseState.GetLastAccepted()
+}
+
+func (s *sysUnderTest) addDiffOnTop() error {
+	newTopBlkID := ids.Empty.Prefix(atomic.AddUint64(&s.diffBlkIDSeed, 1))
+	var topBlkID ids.ID
+	if len(s.sortedDiffIDs) == 0 {
+		topBlkID = s.baseState.GetLastAccepted()
+	} else {
+		topBlkID = s.sortedDiffIDs[len(s.sortedDiffIDs)-1]
+	}
+	newTopDiff, err := NewDiff(topBlkID, s)
+	if err != nil {
+		return err
+	}
+	s.sortedDiffIDs = append(s.sortedDiffIDs, newTopBlkID)
+	s.diffsMap[newTopBlkID] = newTopDiff
+	return nil
+}
+
+// getTopChainState returns top diff or baseState
+func (s *sysUnderTest) getTopChainState() Chain {
+	var topChainStateID ids.ID
+	if len(s.sortedDiffIDs) != 0 {
+		topChainStateID = s.sortedDiffIDs[len(s.sortedDiffIDs)-1]
+	} else {
+		topChainStateID = s.baseState.GetLastAccepted()
+	}
+
+	topChainState, _ := s.GetState(topChainStateID)
+	return topChainState
+}
+
+// flushBottomDiff applies bottom diff if available
+func (s *sysUnderTest) flushBottomDiff() (bool, error) {
+	if len(s.sortedDiffIDs) == 0 {
+		return false, nil
+	}
+	bottomDiffID := s.sortedDiffIDs[0]
+	diffToApply := s.diffsMap[bottomDiffID]
+
+	err := diffToApply.Apply(s.baseState)
+	if err != nil {
+		return true, err
+	}
+	s.baseState.SetLastAccepted(bottomDiffID)
+
+	s.sortedDiffIDs = s.sortedDiffIDs[1:]
+	delete(s.diffsMap, bottomDiffID)
+	return true, nil
 }
