@@ -23,6 +23,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
+const (
+	pending stakerStatus = 0
+	current stakerStatus = 1
+)
+
 // TestGeneralStakerContainersProperties checks that State and Diff conform our stakersStorageModel.
 // TestGeneralStakerContainersProperties tests State and Diff in isolation, over simple operations.
 // TestStateAndDiffComparisonToStorageModel carries a more involved verification over a production-like

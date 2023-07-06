@@ -44,12 +44,18 @@ var (
 //  2. applying the sequence to both our stakersStorageModel and the production-like system.
 //  3. checking that both stakersStorageModel and the production-like system have
 //     the same state after each operation.
-
+//
+// The following invariants are required for stakers state to properly work:
+//  1. No stakers add/update/delete ops are performed directly on baseState, but on at least a diff
+//  2. Any number of stakers ops can be carried out on a single diff
+//  3. Diffs work in FIFO fashion: they are added on top of current state and only
+//     bottom diff is applied to base state.
+//  4. The bottom diff applied to base state is immediately committed.
 func TestStateAndDiffComparisonToStorageModel(t *testing.T) {
 	properties := gopter.NewProperties(nil)
 
-	// to reproduce a given scenario do something like this:
-	// parameters := gopter.DefaultTestParametersWithSeed(1680269995295922009)
+	// // to reproduce a given scenario do something like this:
+	// parameters := gopter.DefaultTestParametersWithSeed(1688641048828490074)
 	// properties := gopter.NewProperties(parameters)
 
 	properties.Property("state comparison to storage model", commands.Prop(stakersCommands))
@@ -136,6 +142,10 @@ func (cmd *putCurrentValidatorCommand) Run(sut commands.SystemUnderTest) command
 	sTx := cmd.sTx
 	sys := sut.(*sysUnderTest)
 
+	if err := sys.checkThereIsADiff(); err != nil {
+		return sys // state checks later on should spot missing validator
+	}
+
 	stakerTx := sTx.Unsigned.(txs.StakerTx)
 	currentVal, err := NewCurrentStaker(sTx.ID(), stakerTx, uint64(1000))
 	if err != nil {
@@ -213,6 +223,11 @@ type deleteCurrentValidatorCommand struct {
 func (cmd *deleteCurrentValidatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
 	// delete first validator without delegators, if any
 	sys := sut.(*sysUnderTest)
+
+	if err := sys.checkThereIsADiff(); err != nil {
+		return sys // state checks later on should spot missing validator
+	}
+
 	topDiff := sys.getTopChainState()
 
 	stakerIt, err := topDiff.GetCurrentStakerIterator()
@@ -334,6 +349,11 @@ type putCurrentDelegatorCommand struct {
 func (cmd *putCurrentDelegatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
 	candidateDelegator := cmd.sTx
 	sys := sut.(*sysUnderTest)
+
+	if err := sys.checkThereIsADiff(); err != nil {
+		return sys // state checks later on should spot missing validator
+	}
+
 	err := addCurrentDelegatorInSystem(sys, candidateDelegator.Unsigned)
 	if err != nil {
 		cmd.err = err
@@ -497,6 +517,11 @@ type deleteCurrentDelegatorCommand struct {
 func (cmd *deleteCurrentDelegatorCommand) Run(sut commands.SystemUnderTest) commands.Result {
 	// delete first delegator, if any
 	sys := sut.(*sysUnderTest)
+
+	if err := sys.checkThereIsADiff(); err != nil {
+		return sys // state checks later on should spot missing validator
+	}
+
 	_, err := deleteCurrentDelegator(sys)
 	if err != nil {
 		cmd.err = err
@@ -925,4 +950,13 @@ func (s *sysUnderTest) flushBottomDiff() (bool, error) {
 	s.sortedDiffIDs = s.sortedDiffIDs[1:]
 	delete(s.diffsMap, bottomDiffID)
 	return true, nil
+}
+
+// getTopChainState returns top diff or baseState
+func (s *sysUnderTest) checkThereIsADiff() error {
+	if len(s.sortedDiffIDs) != 0 {
+		return nil // there is a diff
+	}
+
+	return s.addDiffOnTop()
 }

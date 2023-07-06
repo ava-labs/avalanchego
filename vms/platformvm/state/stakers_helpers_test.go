@@ -39,9 +39,6 @@ var (
 	defaultValidateStartTime  = defaultGenesisTime
 	defaultValidateEndTime    = defaultValidateStartTime.Add(10 * defaultMinStakingDuration)
 	defaultTxFee              = uint64(100)
-
-	pending stakerStatus = 0
-	current stakerStatus = 1
 )
 
 type stakerStatus int
