@@ -95,7 +95,7 @@ upstream.
 This milestone will focus on additional code cleanup, including supporting
 concurrent access to a specific revision, as well as cleaning up the basic
 reader and writer interfaces to have consistent read/write semantics.
-- [ ] Concurrent readers of pinned revisions while allowing additional batches
+- [x] Concurrent readers of pinned revisions while allowing additional batches
 to commit, to support parallel reads for the past consistent states. The revisions
 are uniquely identified by root hashes.
 - [x] Pin a reader to a specific revision, so that future commits or other
