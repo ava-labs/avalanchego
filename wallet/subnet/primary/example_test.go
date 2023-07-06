@@ -49,7 +49,7 @@ func ExampleWallet() {
 
 	// Create a custom asset to send to the P-chain.
 	createAssetStartTime := time.Now()
-	createAssetTxID, err := xWallet.IssueCreateAssetTx(
+	createAssetTx, err := xWallet.IssueCreateAssetTx(
 		"RnM",
 		"RNM",
 		9,
@@ -66,16 +66,16 @@ func ExampleWallet() {
 		log.Fatalf("failed to create new X-chain asset with: %s\n", err)
 		return
 	}
-	log.Printf("created X-chain asset %s in %s\n", createAssetTxID, time.Since(createAssetStartTime))
+	log.Printf("created X-chain asset %s in %s\n", createAssetTx.ID(), time.Since(createAssetStartTime))
 
 	// Send 100 MegaAvax to the P-chain.
 	exportStartTime := time.Now()
-	exportTxID, err := xWallet.IssueExportTx(
+	exportTx, err := xWallet.IssueExportTx(
 		constants.PlatformChainID,
 		[]*avax.TransferableOutput{
 			{
 				Asset: avax.Asset{
-					ID: createAssetTxID,
+					ID: createAssetTx.ID(),
 				},
 				Out: &secp256k1fx.TransferOutput{
 					Amt:          100 * units.MegaAvax,
@@ -88,7 +88,7 @@ func ExampleWallet() {
 		log.Fatalf("failed to issue X->P export transaction with: %s\n", err)
 		return
 	}
-	log.Printf("issued X->P export %s in %s\n", exportTxID, time.Since(exportStartTime))
+	log.Printf("issued X->P export %s in %s\n", exportTx.ID(), time.Since(exportStartTime))
 
 	// Import the 100 MegaAvax from the X-chain into the P-chain.
 	importStartTime := time.Now()
@@ -110,7 +110,7 @@ func ExampleWallet() {
 	transformSubnetStartTime := time.Now()
 	transformSubnetTxID, err := pWallet.IssueTransformSubnetTx(
 		createSubnetTx.ID(),
-		createAssetTxID,
+		createAssetTx.ID(),
 		50*units.MegaAvax,
 		100*units.MegaAvax,
 		reward.PercentDenominator,
@@ -143,7 +143,7 @@ func ExampleWallet() {
 			Subnet: createSubnetTx.ID(),
 		},
 		&signer.Empty{},
-		createAssetTxID,
+		createAssetTx.ID(),
 		&secp256k1fx.OutputOwners{},
 		&secp256k1fx.OutputOwners{},
 		reward.PercentDenominator,
@@ -165,7 +165,7 @@ func ExampleWallet() {
 			},
 			Subnet: createSubnetTx.ID(),
 		},
-		createAssetTxID,
+		createAssetTx.ID(),
 		&secp256k1fx.OutputOwners{},
 	)
 	if err != nil {
