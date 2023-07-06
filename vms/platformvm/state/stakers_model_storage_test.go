@@ -197,21 +197,21 @@ var stakersCommands = &commands.ProtoCommands{
 	GenCommandFunc: func(state commands.State) gopter.Gen {
 		return gen.OneGenOf(
 			genPutCurrentValidatorCommand,
-			// genShiftCurrentValidatorCommand,
-			// genUpdateStakingPeriodCurrentValidatorCommand,
+			genShiftCurrentValidatorCommand,
+			genUpdateStakingPeriodCurrentValidatorCommand,
 			genIncreaseWeightCurrentValidatorCommand,
 			genDeleteCurrentValidatorCommand,
 
-			// genPutCurrentDelegatorCommand,
-			// // genShiftCurrentDelegatorCommand,
-			// // genUpdateStakingPeriodCurrentDelegatorCommand,
-			// genIncreaseWeightCurrentDelegatorCommand,
-			// genDeleteCurrentDelegatorCommand,
+			genPutCurrentDelegatorCommand,
+			genShiftCurrentDelegatorCommand,
+			genUpdateStakingPeriodCurrentDelegatorCommand,
+			genIncreaseWeightCurrentDelegatorCommand,
+			genDeleteCurrentDelegatorCommand,
 
-			// genAddTopDiffCommand,
+			genAddTopDiffCommand,
 			genApplyBottomDiffCommand,
 			genCommitBottomStateCommand,
-			// genRebuildStateCommand,
+			genRebuildStateCommand,
 		)
 	},
 }

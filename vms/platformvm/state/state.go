@@ -1643,13 +1643,15 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 		for nodeID, validatorDiff := range validatorDiffs {
 			// Copy [nodeID] so it doesn't get overwritten next iteration.
 			nodeID := nodeID
+			validator := validatorDiff.validator.staker
 			weightDiff := &ValidatorWeightDiff{}
 
 			switch validatorDiff.validator.status {
 			case added:
-				validator := validatorDiff.validator.staker
-				weightDiff.Decrease = false
-				weightDiff.Amount = validator.Weight
+				weightDiff = &ValidatorWeightDiff{
+					Decrease: false,
+					Amount:   validator.Weight,
+				}
 
 				// The validator is being added.
 				//
@@ -1684,9 +1686,10 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 				s.validatorState.LoadValidatorMetadata(nodeID, subnetID, metadata)
 
 			case deleted:
-				validator := validatorDiff.validator.staker
-				weightDiff.Decrease = true
-				weightDiff.Amount = validator.Weight
+				weightDiff = &ValidatorWeightDiff{
+					Decrease: true,
+					Amount:   validator.Weight,
+				}
 
 				// Invariant: Only the Primary Network contains non-nil
 				//            public keys.
@@ -1707,8 +1710,6 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 				s.validatorState.DeleteValidatorMetadata(nodeID, subnetID)
 			case updated:
 				// load current metadata and duly update them, following validator update
-				validator := validatorDiff.validator.staker
-
 				metadataBytes, err := validatorDB.Get(validator.TxID[:])
 				if err != nil {
 					return fmt.Errorf("failed to get metadata of updated validator: %w", err)
