@@ -1797,11 +1797,11 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 				// build weight diff by comparing current weight with previously stored one
 				switch {
 				case validator.Weight > metadata.UpdatedWeight:
-					if err := weightDiff.Add(false, validator.Weight); err != nil {
+					if err := weightDiff.Add(false, validator.Weight-metadata.UpdatedWeight); err != nil {
 						return fmt.Errorf("failed to increase node weight diff: %w", err)
 					}
 				case validator.Weight < metadata.UpdatedWeight:
-					if err := weightDiff.Add(true, validator.Weight); err != nil {
+					if err := weightDiff.Add(true, metadata.UpdatedWeight-validator.Weight); err != nil {
 						return fmt.Errorf("failed to decrease node weight diff: %w", err)
 					}
 				default:
@@ -1965,11 +1965,11 @@ func writeCurrentDelegatorDiff(
 
 			switch {
 			case delegator.Weight > metadata.UpdatedWeight:
-				if err := weightDiff.Add(false, delegator.Weight); err != nil {
+				if err := weightDiff.Add(false, delegator.Weight-metadata.UpdatedWeight); err != nil {
 					return fmt.Errorf("failed to increase node weight diff: %w", err)
 				}
 			case delegator.Weight < metadata.UpdatedWeight:
-				if err := weightDiff.Add(true, delegator.Weight); err != nil {
+				if err := weightDiff.Add(true, metadata.UpdatedWeight-delegator.Weight); err != nil {
 					return fmt.Errorf("failed to decrease node weight diff: %w", err)
 				}
 			default:
