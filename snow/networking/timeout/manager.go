@@ -64,8 +64,7 @@ type Manager interface {
 	// Does not modify the timeout.
 	RemoveRequest(requestID ids.RequestID)
 
-	// TODO ABENEGIA: currently used to avoid goroutine leakage in UTs
-	// make it safe and use it in prod code
+	// Stops the manager.
 	Stop()
 }
 

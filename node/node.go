@@ -125,6 +125,9 @@ type Node struct {
 	// Build and parse messages, for both network layer and chain manager
 	msgCreator message.Creator
 
+	// Manages network timeouts
+	timeoutManager timeout.Manager
+
 	// Manages creation of blockchains and routing messages to them
 	chainManager chains.Manager
 
@@ -698,8 +701,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		cChainID,
 	)
 
-	// Manages network timeouts
-	timeoutManager, err := timeout.NewManager(
+	n.timeoutManager, err = timeout.NewManager(
 		&n.Config.AdaptiveTimeoutConfig,
 		n.benchlistManager,
 		"requests",
@@ -708,13 +710,13 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	if err != nil {
 		return err
 	}
-	go n.Log.RecoverAndPanic(timeoutManager.Dispatch)
+	go n.Log.RecoverAndPanic(n.timeoutManager.Dispatch)
 
 	// Routes incoming messages from peers to the appropriate chain
 	err = n.Config.ConsensusRouter.Initialize(
 		n.ID,
 		n.Log,
-		timeoutManager,
+		n.timeoutManager,
 		n.Config.ConsensusShutdownTimeout,
 		criticalChains,
 		n.Config.SybilProtectionEnabled,
@@ -752,7 +754,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		XChainID:                                xChainID,
 		CChainID:                                cChainID,
 		CriticalChains:                          criticalChains,
-		TimeoutManager:                          timeoutManager,
+		TimeoutManager:                          n.timeoutManager,
 		Health:                                  n.health,
 		RetryBootstrap:                          n.Config.RetryBootstrap,
 		RetryBootstrapWarnFrequency:             n.Config.RetryBootstrapWarnFrequency,
@@ -1442,6 +1444,7 @@ func (n *Node) shutdown() {
 			)
 		}
 	}
+	n.timeoutManager.Stop()
 	if n.chainManager != nil {
 		n.chainManager.Shutdown()
 	}

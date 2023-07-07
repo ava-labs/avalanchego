@@ -2338,6 +2338,9 @@ func TestVMInnerBlkMarkedAcceptedRegression(t *testing.T) {
 	require := require.New(t)
 	forkTime := time.Unix(0, 0)
 	coreVM, _, proVM, gBlock, _ := initTestProposerVM(t, forkTime, 0)
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	// create an inner block and wrap it in an postForkBlock.
 	innerBlock := &snowman.TestBlock{
