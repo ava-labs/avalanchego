@@ -5,6 +5,7 @@ package timeout
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -92,6 +93,7 @@ type manager struct {
 	tm           timer.AdaptiveTimeoutManager
 	benchlistMgr benchlist.Manager
 	metrics      metrics
+	stopOnce     sync.Once
 }
 
 func (m *manager) Dispatch() {
@@ -159,5 +161,7 @@ func (m *manager) RegisterRequestToUnreachableValidator() {
 }
 
 func (m *manager) Stop() {
-	m.tm.Stop()
+	m.stopOnce.Do(func() {
+		m.tm.Stop()
+	})
 }

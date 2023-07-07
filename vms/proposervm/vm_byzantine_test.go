@@ -35,6 +35,9 @@ func TestInvalidByzantineProposerParent(t *testing.T) {
 
 	forkTime := time.Unix(0, 0) // enable ProBlks
 	coreVM, _, proVM, gBlock, _ := initTestProposerVM(t, forkTime, 0)
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	xBlock := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -102,6 +105,9 @@ func TestInvalidByzantineProposerOracleParent(t *testing.T) {
 
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
 	proVM.Set(coreGenBlk.Timestamp())
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	xBlockID := ids.GenerateTestID()
 	xBlock := &TestOptionsBlock{
@@ -208,6 +214,9 @@ func TestInvalidByzantineProposerPreForkParent(t *testing.T) {
 
 	forkTime := time.Unix(0, 0) // enable ProBlks
 	coreVM, _, proVM, gBlock, _ := initTestProposerVM(t, forkTime, 0)
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	xBlock := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -306,6 +315,9 @@ func TestBlockVerify_PostForkOption_FaultyParent(t *testing.T) {
 
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
 	proVM.Set(coreGenBlk.Timestamp())
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	xBlock := &TestOptionsBlock{
 		TestBlock: snowman.TestBlock{
@@ -402,6 +414,9 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
 	proVM.Set(coreGenBlk.Timestamp())
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	// create an Oracle pre-fork block X
 	xBlockID := ids.GenerateTestID()
@@ -585,6 +600,9 @@ func TestGetBlock_MutatedSignature(t *testing.T) {
 	require := require.New(t)
 
 	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	// Make sure that we will be sampled to perform the proposals.
 	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {

@@ -41,6 +41,9 @@ func TestBlockVerify_PostForkOption_ParentChecks(t *testing.T) {
 
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
 	proVM.Set(coreGenBlk.Timestamp())
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	// create post fork oracle block ...
 	oracleCoreBlk := &TestOptionsBlock{
@@ -154,6 +157,9 @@ func TestBlockVerify_PostForkOption_CoreBlockVerifyIsCalledOnce(t *testing.T) {
 	// Verify an option once; then show that another verify call would not call coreBlk.Verify()
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
 	proVM.Set(coreGenBlk.Timestamp())
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	// create post fork oracle block ...
 	oracleCoreBlk := &TestOptionsBlock{
@@ -253,6 +259,9 @@ func TestBlockAccept_PostForkOption_SetsLastAcceptedBlock(t *testing.T) {
 
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
 	proVM.Set(coreGenBlk.Timestamp())
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	// create post fork oracle block ...
 	oracleCoreBlk := &TestOptionsBlock{
@@ -360,6 +369,9 @@ func TestBlockReject_InnerBlockIsNotRejected(t *testing.T) {
 
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
 	proVM.Set(coreGenBlk.Timestamp())
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	// create post fork oracle block ...
 	oracleCoreBlk := &TestOptionsBlock{
@@ -459,6 +471,9 @@ func TestBlockVerify_PostForkOption_ParentIsNotOracleWithError(t *testing.T) {
 	// Verify an option once; then show that another verify call would not call coreBlk.Verify()
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
 	proVM.Set(coreGenBlk.Timestamp())
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	coreBlk := &TestOptionsBlock{
 		TestBlock: snowman.TestBlock{
@@ -541,6 +556,9 @@ func TestOptionTimestampValidity(t *testing.T) {
 	require := require.New(t)
 
 	coreVM, _, proVM, coreGenBlk, db := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	coreOracleBlkID := ids.GenerateTestID()
 	coreOracleBlk := &TestOptionsBlock{
@@ -643,9 +661,8 @@ func TestOptionTimestampValidity(t *testing.T) {
 	require.NoError(option.Accept(context.Background()))
 
 	// Restart the node.
-
 	ctx := proVM.ctx
-	proVM = New(
+	restartedProVM := New(
 		coreVM,
 		time.Time{},
 		0,
@@ -700,7 +717,7 @@ func TestOptionTimestampValidity(t *testing.T) {
 		}
 	}
 
-	require.NoError(proVM.Initialize(
+	require.NoError(restartedProVM.Initialize(
 		context.Background(),
 		ctx,
 		db,
@@ -711,8 +728,11 @@ func TestOptionTimestampValidity(t *testing.T) {
 		nil,
 		nil,
 	))
+	defer func() {
+		require.NoError(restartedProVM.Shutdown(context.Background()))
+	}()
 
-	statefulOptionBlock, err := proVM.ParseBlock(context.Background(), option.Bytes())
+	statefulOptionBlock, err := restartedProVM.ParseBlock(context.Background(), option.Bytes())
 	require.NoError(err)
 
 	require.Equal(choices.Accepted, statefulOptionBlock.Status())
