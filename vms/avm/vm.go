@@ -393,7 +393,7 @@ func (vm *VM) GetBlockIDAtHeight(_ context.Context, height uint64) (ids.ID, erro
 	return vm.state.GetBlockIDAtHeight(height)
 }
 
-func (vm *VM) VerifyHeightIndex(context.Context) error {
+func (*VM) VerifyHeightIndex(context.Context) error {
 	return nil
 }
 
