@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package gsyncabledb
+package gdb
 
 import (
 	"context"
@@ -16,17 +16,17 @@ import (
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
-var _ sync.SyncableDB = (*SyncableDBClient)(nil)
+var _ sync.DB = (*DBClient)(nil)
 
-func NewSyncableDBClient(client pb.SyncableDBClient) *SyncableDBClient {
-	return &SyncableDBClient{client: client}
+func NewDBClient(client pb.DBClient) *DBClient {
+	return &DBClient{client: client}
 }
 
-type SyncableDBClient struct {
-	client pb.SyncableDBClient
+type DBClient struct {
+	client pb.DBClient
 }
 
-func (c *SyncableDBClient) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
+func (c *DBClient) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
 	resp, err := c.client.GetMerkleRoot(ctx, &emptypb.Empty{})
 	if err != nil {
 		return ids.ID{}, err
@@ -34,7 +34,7 @@ func (c *SyncableDBClient) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
 	return ids.ToID(resp.RootHash)
 }
 
-func (c *SyncableDBClient) GetChangeProof(
+func (c *DBClient) GetChangeProof(
 	ctx context.Context,
 	startRootID ids.ID,
 	endRootID ids.ID,
@@ -59,7 +59,7 @@ func (c *SyncableDBClient) GetChangeProof(
 	return &proof, nil
 }
 
-func (c *SyncableDBClient) VerifyChangeProof(
+func (c *DBClient) VerifyChangeProof(
 	ctx context.Context,
 	proof *merkledb.ChangeProof,
 	startKey []byte,
@@ -83,14 +83,14 @@ func (c *SyncableDBClient) VerifyChangeProof(
 	return errors.New(resp.Error)
 }
 
-func (c *SyncableDBClient) CommitChangeProof(ctx context.Context, proof *merkledb.ChangeProof) error {
+func (c *DBClient) CommitChangeProof(ctx context.Context, proof *merkledb.ChangeProof) error {
 	_, err := c.client.CommitChangeProof(ctx, &pb.CommitChangeProofRequest{
 		Proof: proof.ToProto(),
 	})
 	return err
 }
 
-func (c *SyncableDBClient) GetProof(ctx context.Context, key []byte) (*merkledb.Proof, error) {
+func (c *DBClient) GetProof(ctx context.Context, key []byte) (*merkledb.Proof, error) {
 	resp, err := c.client.GetProof(ctx, &pb.GetProofRequest{
 		Key: key,
 	})
@@ -105,7 +105,7 @@ func (c *SyncableDBClient) GetProof(ctx context.Context, key []byte) (*merkledb.
 	return &proof, nil
 }
 
-func (c *SyncableDBClient) GetRangeProofAtRoot(
+func (c *DBClient) GetRangeProofAtRoot(
 	ctx context.Context,
 	rootID ids.ID,
 	startKey []byte,
@@ -129,7 +129,7 @@ func (c *SyncableDBClient) GetRangeProofAtRoot(
 	return &proof, nil
 }
 
-func (c *SyncableDBClient) CommitRangeProof(
+func (c *DBClient) CommitRangeProof(
 	ctx context.Context,
 	startKey []byte,
 	proof *merkledb.RangeProof,
