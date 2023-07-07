@@ -62,6 +62,10 @@ type Manager interface {
 	// Mark that we no longer expect a response to this request we sent.
 	// Does not modify the timeout.
 	RemoveRequest(requestID ids.RequestID)
+
+	// TODO ABENEGIA: currently used to avoid goroutine leakage in UTs
+	// make it safe and use it in prod code
+	Stop()
 }
 
 func NewManager(
@@ -152,4 +156,8 @@ func (m *manager) RemoveRequest(requestID ids.RequestID) {
 
 func (m *manager) RegisterRequestToUnreachableValidator() {
 	m.tm.ObserveLatency(m.TimeoutDuration())
+}
+
+func (m *manager) Stop() {
+	m.tm.Stop()
 }

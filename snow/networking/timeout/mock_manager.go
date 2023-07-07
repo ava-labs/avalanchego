@@ -128,6 +128,18 @@ func (mr *MockManagerMockRecorder) RemoveRequest(arg0 interface{}) *gomock.Call 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveRequest", reflect.TypeOf((*MockManager)(nil).RemoveRequest), arg0)
 }
 
+// Stop mocks base method.
+func (m *MockManager) Stop() {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "Stop")
+}
+
+// Stop indicates an expected call of Stop.
+func (mr *MockManagerMockRecorder) Stop() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Stop", reflect.TypeOf((*MockManager)(nil).Stop))
+}
+
 // TimeoutDuration mocks base method.
 func (m *MockManager) TimeoutDuration() time.Duration {
 	m.ctrl.T.Helper()
