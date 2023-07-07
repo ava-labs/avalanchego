@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
-	"github.com/ava-labs/subnet-evm/utils"
+	predicateutils "github.com/ava-labs/subnet-evm/utils/predicate"
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -49,7 +49,7 @@ func checkPrecompilePredicates(rules params.Rules, predicateContext *precompilec
 			return fmt.Errorf("predicate %s failed verification for tx %s: specified %s in access list multiple times", address, tx.Hash(), address)
 		}
 		precompileAddressChecks[address] = struct{}{}
-		predicateBytes := utils.HashSliceToBytes(accessTuple.StorageKeys)
+		predicateBytes := predicateutils.HashSliceToBytes(accessTuple.StorageKeys)
 		if err := predicater.VerifyPredicate(predicateContext, predicateBytes); err != nil {
 			return fmt.Errorf("predicate %s failed verification for tx %s: %w", address, tx.Hash(), err)
 		}
@@ -77,7 +77,7 @@ func checkProposerPrecompilePredicates(rules params.Rules, predicateContext *pre
 			return fmt.Errorf("predicate %s failed verification for tx %s: specified %s in access list multiple times", address, tx.Hash(), address)
 		}
 		precompileAddressChecks[address] = struct{}{}
-		predicateBytes := utils.HashSliceToBytes(accessTuple.StorageKeys)
+		predicateBytes := predicateutils.HashSliceToBytes(accessTuple.StorageKeys)
 		if err := predicater.VerifyPredicate(predicateContext, predicateBytes); err != nil {
 			return fmt.Errorf("predicate %s failed verification for tx %s: %w", address, tx.Hash(), err)
 		}

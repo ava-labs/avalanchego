@@ -40,7 +40,7 @@ import (
 	"github.com/ava-labs/subnet-evm/metrics"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/trie"
-	"github.com/ava-labs/subnet-evm/utils"
+	predicateutils "github.com/ava-labs/subnet-evm/utils/predicate"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
@@ -1109,7 +1109,7 @@ func (s *StateDB) preparePredicateStorageSlots(rules params.Rules, list types.Ac
 		if !rules.PredicateExists(el.Address) {
 			continue
 		}
-		s.predicateStorageSlots[el.Address] = utils.HashSliceToBytes(el.StorageKeys)
+		s.predicateStorageSlots[el.Address] = predicateutils.HashSliceToBytes(el.StorageKeys)
 	}
 }
 

@@ -37,7 +37,7 @@ import (
 	"github.com/ava-labs/subnet-evm/core/vm"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/precompile/contracts/txallowlist"
-	"github.com/ava-labs/subnet-evm/utils"
+	predicateutils "github.com/ava-labs/subnet-evm/utils/predicate"
 	"github.com/ava-labs/subnet-evm/vmerrs"
 	"github.com/ethereum/go-ethereum/common"
 	commonMath "github.com/ethereum/go-ethereum/common/math"
@@ -219,13 +219,13 @@ func accessListGas(rules params.Rules, accessList types.AccessList) (uint64, err
 func applyPredicateGas(rules params.Rules, accessTuple types.AccessTuple) (uint64, error) {
 	predicate, ok := rules.PredicatePrecompiles[accessTuple.Address]
 	if ok {
-		return predicate.PredicateGas(utils.HashSliceToBytes(accessTuple.StorageKeys))
+		return predicate.PredicateGas(predicateutils.HashSliceToBytes(accessTuple.StorageKeys))
 	}
 	proposerPredicate, ok := rules.ProposerPredicates[accessTuple.Address]
 	if !ok {
 		return 0, nil
 	}
-	return proposerPredicate.PredicateGas(utils.HashSliceToBytes(accessTuple.StorageKeys))
+	return proposerPredicate.PredicateGas(predicateutils.HashSliceToBytes(accessTuple.StorageKeys))
 }
 
 // NewStateTransition initialises and returns a new state transition object.
