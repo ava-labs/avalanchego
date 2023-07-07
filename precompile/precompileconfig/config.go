@@ -46,6 +46,7 @@ type PrecompilePredicateContext struct {
 // will not maintain backwards compatibility of this interface and your code should not
 // rely on this. Designed for use only by precompiles that ship with subnet-evm.
 type PrecompilePredicater interface {
+	PredicateGas(storageSlots []byte) (uint64, error)
 	VerifyPredicate(predicateContext *PrecompilePredicateContext, storageSlots []byte) error
 }
 
@@ -68,6 +69,7 @@ type ProposerPredicateContext struct {
 // will not maintain backwards compatibility of this interface and your code should not
 // rely on this. Designed for use only by precompiles that ship with subnet-evm.
 type ProposerPredicater interface {
+	PredicateGas(storageSlots []byte) (uint64, error)
 	VerifyPredicate(proposerPredicateContext *ProposerPredicateContext, storageSlots []byte) error
 }
 

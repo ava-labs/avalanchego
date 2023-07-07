@@ -22,19 +22,35 @@ var (
 )
 
 type mockPredicater struct {
-	predicateFunc func(*precompileconfig.PrecompilePredicateContext, []byte) error
+	predicateFunc    func(*precompileconfig.PrecompilePredicateContext, []byte) error
+	predicateGasFunc func([]byte) (uint64, error)
 }
 
 func (m *mockPredicater) VerifyPredicate(predicateContext *precompileconfig.PrecompilePredicateContext, b []byte) error {
 	return m.predicateFunc(predicateContext, b)
 }
 
+func (m *mockPredicater) PredicateGas(b []byte) (uint64, error) {
+	if m.predicateGasFunc == nil {
+		return 0, nil
+	}
+	return m.predicateGasFunc(b)
+}
+
 type mockProposerPredicater struct {
-	predicateFunc func(*precompileconfig.ProposerPredicateContext, []byte) error
+	predicateFunc    func(*precompileconfig.ProposerPredicateContext, []byte) error
+	predicateGasFunc func([]byte) (uint64, error)
 }
 
 func (m *mockProposerPredicater) VerifyPredicate(predicateContext *precompileconfig.ProposerPredicateContext, b []byte) error {
 	return m.predicateFunc(predicateContext, b)
+}
+
+func (m *mockProposerPredicater) PredicateGas(b []byte) (uint64, error) {
+	if m.predicateGasFunc == nil {
+		return 0, nil
+	}
+	return m.predicateGasFunc(b)
 }
 
 type predicateCheckTest struct {
@@ -42,6 +58,7 @@ type predicateCheckTest struct {
 	predicater            precompileconfig.PrecompilePredicater
 	proposerPredicater    precompileconfig.ProposerPredicater
 	accessList            types.AccessList
+	gas                   uint64
 	emptyProposerBlockCtx bool
 	expectedErr           error
 }
@@ -49,9 +66,11 @@ type predicateCheckTest struct {
 func TestCheckPredicate(t *testing.T) {
 	for name, test := range map[string]predicateCheckTest{
 		"no predicates, no access list passes": {
+			gas:         53000,
 			expectedErr: nil,
 		},
 		"no predicates, with access list passes": {
+			gas: 57300,
 			accessList: types.AccessList([]types.AccessTuple{
 				{
 					Address: common.HexToAddress("0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC"),
@@ -64,23 +83,51 @@ func TestCheckPredicate(t *testing.T) {
 		},
 		"proposer predicate, no access list passes": {
 			address:            common.HexToAddress("0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC"),
+			gas:                53000,
 			proposerPredicater: &mockProposerPredicater{predicateFunc: func(*precompileconfig.ProposerPredicateContext, []byte) error { return nil }},
 			expectedErr:        nil,
 		},
 		"predicate, no access list passes": {
 			address:     common.HexToAddress("0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC"),
+			gas:         53000,
 			predicater:  &mockPredicater{predicateFunc: func(*precompileconfig.PrecompilePredicateContext, []byte) error { return nil }},
 			expectedErr: nil,
 		},
 		"predicate with valid access list passes": {
 			address: common.HexToAddress("0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC"),
-			predicater: &mockPredicater{predicateFunc: func(_ *precompileconfig.PrecompilePredicateContext, b []byte) error {
-				if bytes.Equal(b, common.Hash{1}.Bytes()) {
+			gas:     53000,
+			predicater: &mockPredicater{
+				predicateFunc: func(_ *precompileconfig.PrecompilePredicateContext, b []byte) error {
+					if !bytes.Equal(b, common.Hash{1}.Bytes()) {
+						return fmt.Errorf("unexpected bytes: 0x%x", b)
+					}
 					return nil
-				} else {
-					return fmt.Errorf("unexpected bytes: 0x%x", b)
-				}
-			}},
+				},
+			},
+			accessList: types.AccessList([]types.AccessTuple{
+				{
+					Address: common.HexToAddress("0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC"),
+					StorageKeys: []common.Hash{
+						{1},
+					},
+				},
+			}),
+			expectedErr: nil,
+		},
+		"predicate with valid access list and non-empty PredicateGas passes": {
+			address: common.HexToAddress("0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC"),
+			gas:     153000,
+			predicater: &mockPredicater{
+				predicateFunc: func(_ *precompileconfig.PrecompilePredicateContext, b []byte) error {
+					if !bytes.Equal(b, common.Hash{1}.Bytes()) {
+						return fmt.Errorf("unexpected bytes: 0x%x", b)
+					}
+					return nil
+				},
+				predicateGasFunc: func(b []byte) (uint64, error) {
+					return 100_000, nil
+				},
+			},
 			accessList: types.AccessList([]types.AccessTuple{
 				{
 					Address: common.HexToAddress("0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC"),
@@ -93,13 +140,39 @@ func TestCheckPredicate(t *testing.T) {
 		},
 		"proposer predicate with valid access list passes": {
 			address: common.HexToAddress("0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC"),
-			proposerPredicater: &mockProposerPredicater{predicateFunc: func(_ *precompileconfig.ProposerPredicateContext, b []byte) error {
-				if bytes.Equal(b, common.Hash{1}.Bytes()) {
+			gas:     53000,
+			proposerPredicater: &mockProposerPredicater{
+				predicateFunc: func(_ *precompileconfig.ProposerPredicateContext, b []byte) error {
+					if !bytes.Equal(b, common.Hash{1}.Bytes()) {
+						return fmt.Errorf("unexpected bytes: 0x%x", b)
+					}
 					return nil
-				} else {
-					return fmt.Errorf("unexpected bytes: 0x%x", b)
-				}
-			}},
+				},
+			},
+			accessList: types.AccessList([]types.AccessTuple{
+				{
+					Address: common.HexToAddress("0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC"),
+					StorageKeys: []common.Hash{
+						{1},
+					},
+				},
+			}),
+			expectedErr: nil,
+		},
+		"proposer predicate with valid access list and non-empty PredicateGas passes": {
+			address: common.HexToAddress("0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC"),
+			gas:     153000,
+			proposerPredicater: &mockProposerPredicater{
+				predicateFunc: func(_ *precompileconfig.ProposerPredicateContext, b []byte) error {
+					if !bytes.Equal(b, common.Hash{1}.Bytes()) {
+						return fmt.Errorf("unexpected bytes: 0x%x", b)
+					}
+					return nil
+				},
+				predicateGasFunc: func(b []byte) (uint64, error) {
+					return 100_000, nil
+				},
+			},
 			accessList: types.AccessList([]types.AccessTuple{
 				{
 					Address: common.HexToAddress("0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC"),
@@ -112,13 +185,15 @@ func TestCheckPredicate(t *testing.T) {
 		},
 		"predicate with invalid access list errors": {
 			address: common.HexToAddress("0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC"),
-			predicater: &mockPredicater{predicateFunc: func(_ *precompileconfig.PrecompilePredicateContext, b []byte) error {
-				if bytes.Equal(b, common.Hash{1}.Bytes()) {
+			gas:     53000,
+			predicater: &mockPredicater{
+				predicateFunc: func(_ *precompileconfig.PrecompilePredicateContext, b []byte) error {
+					if !bytes.Equal(b, common.Hash{1}.Bytes()) {
+						return fmt.Errorf("unexpected bytes: 0x%x", b)
+					}
 					return nil
-				} else {
-					return fmt.Errorf("unexpected bytes: 0x%x", b)
-				}
-			}},
+				},
+			},
 			accessList: types.AccessList([]types.AccessTuple{
 				{
 					Address: common.HexToAddress("0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC"),
@@ -131,13 +206,15 @@ func TestCheckPredicate(t *testing.T) {
 		},
 		"proposer predicate with invalid access list errors": {
 			address: common.HexToAddress("0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC"),
-			proposerPredicater: &mockProposerPredicater{predicateFunc: func(_ *precompileconfig.ProposerPredicateContext, b []byte) error {
-				if bytes.Equal(b, common.Hash{1}.Bytes()) {
+			gas:     53000,
+			proposerPredicater: &mockProposerPredicater{
+				predicateFunc: func(_ *precompileconfig.ProposerPredicateContext, b []byte) error {
+					if !bytes.Equal(b, common.Hash{1}.Bytes()) {
+						return fmt.Errorf("unexpected bytes: 0x%x", b)
+					}
 					return nil
-				} else {
-					return fmt.Errorf("unexpected bytes: 0x%x", b)
-				}
-			}},
+				},
+			},
 			accessList: types.AccessList([]types.AccessTuple{
 				{
 					Address: common.HexToAddress("0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC"),
@@ -150,12 +227,14 @@ func TestCheckPredicate(t *testing.T) {
 		},
 		"proposer predicate with empty proposer block ctx passes": {
 			address:               common.HexToAddress("0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC"),
+			gas:                   53000,
 			proposerPredicater:    &mockProposerPredicater{predicateFunc: func(_ *precompileconfig.ProposerPredicateContext, b []byte) error { return nil }},
 			emptyProposerBlockCtx: true,
 		},
 	} {
 		test := test
 		t.Run(name, func(t *testing.T) {
+			require := require.New(t)
 			// Create the rules from TestChainConfig and update the predicates based on the test params
 			rules := params.TestChainConfig.AvalancheRules(common.Big0, common.Big0)
 			if test.proposerPredicater != nil {
@@ -168,6 +247,7 @@ func TestCheckPredicate(t *testing.T) {
 			// Specify only the access list, since this test should not depend on any other values
 			tx := types.NewTx(&types.DynamicFeeTx{
 				AccessList: test.accessList,
+				Gas:        test.gas,
 			})
 			predicateContext := &precompileconfig.ProposerPredicateContext{}
 			if !test.emptyProposerBlockCtx {
@@ -175,10 +255,13 @@ func TestCheckPredicate(t *testing.T) {
 			}
 			err := CheckPredicates(rules, predicateContext, tx)
 			if test.expectedErr == nil {
-				require.NoError(t, err)
+				require.NoError(err)
 			} else {
-				require.ErrorContains(t, err, test.expectedErr.Error())
+				require.ErrorContains(err, test.expectedErr.Error())
 			}
+			intrinsicGas, err := IntrinsicGas(tx.Data(), tx.AccessList(), true, rules)
+			require.NoError(err)
+			require.Equal(tx.Gas(), intrinsicGas) // Require test specifies exact amount of gas consumed
 		})
 	}
 }

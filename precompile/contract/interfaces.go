@@ -44,7 +44,9 @@ type StateDB interface {
 	Exist(common.Address) bool
 
 	AddLog(addr common.Address, topics []common.Hash, data []byte, blockNumber uint64)
+	GetLogData() [][]byte
 	GetPredicateStorageSlots(address common.Address) ([]byte, bool)
+	SetPredicateStorageSlots(address common.Address, predicate []byte)
 
 	Suicide(common.Address) bool
 	Finalise(deleteEmptyObjects bool)

@@ -254,6 +254,18 @@ func (s *StateDB) Logs() []*types.Log {
 	return logs
 }
 
+// GetLogData returns the underlying data from each log included in the StateDB
+// Test helper function.
+func (s *StateDB) GetLogData() [][]byte {
+	var logData [][]byte
+	for _, lgs := range s.logs {
+		for _, log := range lgs {
+			logData = append(logData, common.CopyBytes(log.Data))
+		}
+	}
+	return logData
+}
+
 // AddPreimage records a SHA3 preimage seen by the VM.
 func (s *StateDB) AddPreimage(hash common.Hash, preimage []byte) {
 	if _, ok := s.preimages[hash]; !ok {
@@ -1144,4 +1156,9 @@ func (s *StateDB) SlotInAccessList(addr common.Address, slot common.Hash) (addre
 func (s *StateDB) GetPredicateStorageSlots(address common.Address) ([]byte, bool) {
 	storageSlots, exists := s.predicateStorageSlots[address]
 	return storageSlots, exists
+}
+
+// SetPredicateStorageSlots sets the predicate storage slots for the given address
+func (s *StateDB) SetPredicateStorageSlots(address common.Address, predicate []byte) {
+	s.predicateStorageSlots[address] = predicate
 }

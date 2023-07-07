@@ -264,11 +264,7 @@ func RunPrecompileWithAllowListTests(t *testing.T, module modules.Module, newSta
 		tests[name] = test
 	}
 
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			test.Run(t, module, newStateDB(t))
-		})
-	}
+	testutils.RunPrecompileTests(t, module, newStateDB, tests)
 }
 
 func BenchPrecompileWithAllowList(b *testing.B, module modules.Module, newStateDB func(t testing.TB) contract.StateDB, contractTests map[string]testutils.PrecompileTest) {

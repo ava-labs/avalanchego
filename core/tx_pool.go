@@ -263,9 +263,10 @@ type TxPool struct {
 	signer      types.Signer
 	mu          sync.RWMutex
 
-	istanbul bool // Fork indicator whether we are in the istanbul stage.
-	eip2718  bool // Fork indicator whether we are using EIP-2718 type transactions.
-	eip1559  bool // Fork indicator whether we are using EIP-1559 type transactions.
+	// mu lock must be held to access rules
+	rules   params.Rules // Rules for the currentHead
+	eip2718 bool         // Fork indicator whether we are using EIP-2718 type transactions.
+	eip1559 bool         // Fork indicator whether we are using EIP-1559 type transactions.
 
 	currentHead *types.Header
 	// [currentState] is the state of the blockchain head. It is reset whenever
@@ -761,7 +762,7 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 	// Transactor should have enough funds to cover the costs
 
 	// Ensure the transaction has more gas than the basic tx fee.
-	intrGas, err := IntrinsicGas(tx.Data(), tx.AccessList(), tx.To() == nil, true, pool.istanbul)
+	intrGas, err := IntrinsicGas(tx.Data(), tx.AccessList(), tx.To() == nil, pool.rules)
 	if err != nil {
 		return err
 	}
@@ -1462,9 +1463,9 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 
 	// Update all fork indicator by next pending block number.
 	next := new(big.Int).Add(newHead.Number, big.NewInt(1))
-	pool.istanbul = pool.chainconfig.IsIstanbul(next)
+	pool.rules = pool.chainconfig.AvalancheRules(next, new(big.Int).SetUint64(newHead.Time))
 
-	isSubnetEVM := pool.chainconfig.IsSubnetEVM(new(big.Int).SetUint64(newHead.Time))
+	isSubnetEVM := pool.rules.IsSubnetEVM
 	pool.eip2718 = isSubnetEVM
 	pool.eip1559 = isSubnetEVM
 }
