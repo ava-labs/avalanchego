@@ -84,6 +84,8 @@ func TestHeaderInsertion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer chain.Stop()
+
 	// chain A: G->A1->A2...A128
 	chainA, _, _ := GenerateChain(params.TestChainConfig, types.NewBlockWithHeader(genesis.Header()), dummy.NewFaker(), db, 128, 10, func(i int, b *BlockGen) {
 		b.SetCoinbase(common.Address{0: byte(10), 19: byte(i)})

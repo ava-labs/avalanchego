@@ -128,6 +128,7 @@ func checkBlockChainState(
 	if err != nil {
 		t.Fatalf("Failed to create new blockchain instance: %s", err)
 	}
+	defer newBlockChain.Stop()
 
 	for i := uint64(1); i <= lastAcceptedBlock.NumberU64(); i++ {
 		block := bc.GetBlockByNumber(i)

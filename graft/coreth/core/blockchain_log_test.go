@@ -74,6 +74,7 @@ func TestEmitLogsCorrectness(t *testing.T) {
 
 	chain, err := NewBlockChain(rawdb.NewMemoryDatabase(), DefaultCacheConfig, gspec, engine, vm.Config{}, common.Hash{}, false)
 	require.NoError(err)
+	defer chain.Stop()
 
 	// Create Log Subscriber
 	logsCh := make(chan []*types.Log, 10)
