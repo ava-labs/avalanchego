@@ -71,227 +71,238 @@ func generalStakerContainersProperties(storeCreatorF func() (Stakers, error)) *g
 	startTime := time.Now().Truncate(time.Second)
 
 	properties.Property("add, delete and query current validators", prop.ForAll(
-		func(nonInitTx *txs.Tx) string {
-			store, err := storeCreatorF()
-			if err != nil {
-				return fmt.Sprintf("unexpected error while creating staker store, err %v", err)
-			}
+		func(nonInitContValTx, nonInitElasticValTx, nonInitPermissionedValTx *txs.Tx) string {
+			for _, nonInitTx := range []*txs.Tx{nonInitContValTx, nonInitElasticValTx, nonInitPermissionedValTx} {
+				store, err := storeCreatorF()
+				if err != nil {
+					return fmt.Sprintf("unexpected error while creating staker store, err %v", err)
+				}
 
-			signedTx, err := txs.NewSigned(nonInitTx.Unsigned, txs.Codec, nil)
-			if err != nil {
-				panic(fmt.Errorf("failed signing tx in tx generator, %w", err))
-			}
+				signedTx, err := txs.NewSigned(nonInitTx.Unsigned, txs.Codec, nil)
+				if err != nil {
+					panic(fmt.Errorf("failed signing tx in tx generator, %w", err))
+				}
 
-			stakerTx := signedTx.Unsigned.(txs.StakerTx)
-			staker, err := NewCurrentStaker(
-				signedTx.ID(),
-				stakerTx,
-				startTime,
-				mockable.MaxTime,
-				uint64(100),
-			)
-			if err != nil {
-				return err.Error()
-			}
+				stakerTx := signedTx.Unsigned.(txs.StakerTx)
+				staker, err := NewCurrentStaker(
+					signedTx.ID(),
+					stakerTx,
+					startTime,
+					mockable.MaxTime,
+					uint64(100),
+				)
+				if err != nil {
+					return err.Error()
+				}
 
-			// no staker before insertion
-			_, err = store.GetCurrentValidator(staker.SubnetID, staker.NodeID)
-			if err != database.ErrNotFound {
-				return fmt.Sprintf("unexpected error %v, got %v", database.ErrNotFound, err)
-			}
-			err = checkStakersContent(store, []*Staker{}, current)
-			if err != nil {
-				return err.Error()
-			}
+				// no staker before insertion
+				_, err = store.GetCurrentValidator(staker.SubnetID, staker.NodeID)
+				if err != database.ErrNotFound {
+					return fmt.Sprintf("unexpected error %v, got %v", database.ErrNotFound, err)
+				}
+				err = checkStakersContent(store, []*Staker{}, current)
+				if err != nil {
+					return err.Error()
+				}
 
-			// it's fine deleting unknown validator
-			store.DeleteCurrentValidator(staker)
-			_, err = store.GetCurrentValidator(staker.SubnetID, staker.NodeID)
-			if err != database.ErrNotFound {
-				return fmt.Sprintf("unexpected error %v, got %v", database.ErrNotFound, err)
-			}
-			err = checkStakersContent(store, []*Staker{}, current)
-			if err != nil {
-				return err.Error()
-			}
+				// it's fine deleting unknown validator
+				store.DeleteCurrentValidator(staker)
+				_, err = store.GetCurrentValidator(staker.SubnetID, staker.NodeID)
+				if err != database.ErrNotFound {
+					return fmt.Sprintf("unexpected error %v, got %v", database.ErrNotFound, err)
+				}
+				err = checkStakersContent(store, []*Staker{}, current)
+				if err != nil {
+					return err.Error()
+				}
 
-			// insert the staker and show it can be found
-			store.PutCurrentValidator(staker)
-			retrievedStaker, err := store.GetCurrentValidator(staker.SubnetID, staker.NodeID)
-			if err != nil {
-				return fmt.Sprintf("expected no error, got %v", err)
-			}
-			if !reflect.DeepEqual(staker, retrievedStaker) {
-				return fmt.Sprintf("wrong staker retrieved expected %v, got %v", staker, retrievedStaker)
-			}
-			err = checkStakersContent(store, []*Staker{staker}, current)
-			if err != nil {
-				return err.Error()
-			}
+				// insert the staker and show it can be found
+				store.PutCurrentValidator(staker)
+				retrievedStaker, err := store.GetCurrentValidator(staker.SubnetID, staker.NodeID)
+				if err != nil {
+					return fmt.Sprintf("expected no error, got %v", err)
+				}
+				if !reflect.DeepEqual(staker, retrievedStaker) {
+					return fmt.Sprintf("wrong staker retrieved expected %v, got %v", staker, retrievedStaker)
+				}
+				err = checkStakersContent(store, []*Staker{staker}, current)
+				if err != nil {
+					return err.Error()
+				}
 
-			// delete the staker and show it's not found anymore
-			store.DeleteCurrentValidator(staker)
-			_, err = store.GetCurrentValidator(staker.SubnetID, staker.NodeID)
-			if err != database.ErrNotFound {
-				return fmt.Sprintf("unexpected error %v, got %v", database.ErrNotFound, err)
-			}
-			err = checkStakersContent(store, []*Staker{}, current)
-			if err != nil {
-				return err.Error()
+				// delete the staker and show it's not found anymore
+				store.DeleteCurrentValidator(staker)
+				_, err = store.GetCurrentValidator(staker.SubnetID, staker.NodeID)
+				if err != database.ErrNotFound {
+					return fmt.Sprintf("unexpected error %v, got %v", database.ErrNotFound, err)
+				}
+				err = checkStakersContent(store, []*Staker{}, current)
+				if err != nil {
+					return err.Error()
+				}
 			}
 
 			return ""
 		},
+		stakerTxGenerator(ctx, continuousValidator, &constants.PrimaryNetworkID, nil, math.MaxUint64),
+		stakerTxGenerator(ctx, permissionlessValidator, &constants.PrimaryNetworkID, nil, math.MaxUint64),
 		stakerTxGenerator(ctx, permissionedValidator, &constants.PrimaryNetworkID, nil, math.MaxUint64),
 	))
 
 	properties.Property("update current validators", prop.ForAll(
-		func(nonInitTx *txs.Tx) string {
-			// insert stakers first, then update StartTime/EndTime and update the staker
-			store, err := storeCreatorF()
-			if err != nil {
-				return fmt.Sprintf("unexpected error while creating staker store, err %v", err)
-			}
+		func(nonInitContValTx, nonInitElasticValTx, nonInitPermissionedValTx *txs.Tx) string {
+			for _, nonInitTx := range []*txs.Tx{nonInitContValTx, nonInitElasticValTx, nonInitPermissionedValTx} {
+				// insert stakers first, then update StartTime/EndTime and update the staker
+				store, err := storeCreatorF()
+				if err != nil {
+					return fmt.Sprintf("unexpected error while creating staker store, err %v", err)
+				}
 
-			signedTx, err := txs.NewSigned(nonInitTx.Unsigned, txs.Codec, nil)
-			if err != nil {
-				panic(fmt.Errorf("failed signing tx in tx generator, %w", err))
-			}
+				signedTx, err := txs.NewSigned(nonInitTx.Unsigned, txs.Codec, nil)
+				if err != nil {
+					panic(fmt.Errorf("failed signing tx in tx generator, %w", err))
+				}
 
-			stakerTx := signedTx.Unsigned.(txs.StakerTx)
-			staker, err := NewCurrentStaker(
-				signedTx.ID(),
-				stakerTx,
-				startTime,
-				mockable.MaxTime,
-				uint64(100),
-			)
-			if err != nil {
-				return err.Error()
-			}
+				stakerTx := signedTx.Unsigned.(txs.StakerTx)
+				staker, err := NewCurrentStaker(
+					signedTx.ID(),
+					stakerTx,
+					startTime,
+					mockable.MaxTime,
+					uint64(100),
+				)
+				if err != nil {
+					return err.Error()
+				}
 
-			store.PutCurrentValidator(staker)
-			retrievedStaker, err := store.GetCurrentValidator(staker.SubnetID, staker.NodeID)
-			if err != nil {
-				return fmt.Sprintf("expected no error, got %v", err)
-			}
-			if !reflect.DeepEqual(staker, retrievedStaker) {
-				return fmt.Sprintf("wrong staker retrieved expected %v, got %v", staker, retrievedStaker)
-			}
+				store.PutCurrentValidator(staker)
+				retrievedStaker, err := store.GetCurrentValidator(staker.SubnetID, staker.NodeID)
+				if err != nil {
+					return fmt.Sprintf("expected no error, got %v", err)
+				}
+				if !reflect.DeepEqual(staker, retrievedStaker) {
+					return fmt.Sprintf("wrong staker retrieved expected %v, got %v", staker, retrievedStaker)
+				}
 
-			currIT, err := store.GetCurrentStakerIterator()
-			if err != nil {
-				return fmt.Sprintf("unexpected failure in staker iterator creation, error %v", err)
-			}
-			if !currIT.Next() {
-				return errNonEmptyIteratorExpected.Error()
-			}
-			if !reflect.DeepEqual(currIT.Value(), retrievedStaker) {
-				return fmt.Sprintf("wrong staker retrieved expected %v, got %v", staker, retrievedStaker)
-			}
-			currIT.Release()
+				currIT, err := store.GetCurrentStakerIterator()
+				if err != nil {
+					return fmt.Sprintf("unexpected failure in staker iterator creation, error %v", err)
+				}
+				if !currIT.Next() {
+					return errNonEmptyIteratorExpected.Error()
+				}
+				if !reflect.DeepEqual(currIT.Value(), retrievedStaker) {
+					return fmt.Sprintf("wrong staker retrieved expected %v, got %v", staker, retrievedStaker)
+				}
+				currIT.Release()
 
-			// update staker times as expected. We copy the updated staker
-			// to avoid in-place modification of stakers already stored in store,
-			// as it must be done in prod code.
-			updatedValidator := *staker
-			ShiftStakerAheadInPlace(&updatedValidator, updatedValidator.NextTime)
+				// update staker times as expected. We copy the updated staker
+				// to avoid in-place modification of stakers already stored in store,
+				// as it must be done in prod code.
+				updatedValidator := *staker
+				ShiftStakerAheadInPlace(&updatedValidator, updatedValidator.NextTime)
 
-			err = store.UpdateCurrentValidator(&updatedValidator)
-			if err != nil {
-				return fmt.Sprintf("expected no error in updating, got %v", err)
-			}
+				err = store.UpdateCurrentValidator(&updatedValidator)
+				if err != nil {
+					return fmt.Sprintf("expected no error in updating, got %v", err)
+				}
 
-			// show that queries return updated staker, not original one
-			retrievedStaker, err = store.GetCurrentValidator(updatedValidator.SubnetID, updatedValidator.NodeID)
-			if err != nil {
-				return fmt.Sprintf("expected no error, got %v", err)
-			}
-			if !reflect.DeepEqual(&updatedValidator, retrievedStaker) {
-				return fmt.Sprintf("wrong staker retrieved expected %v, got %v", &updatedValidator, retrievedStaker)
-			}
+				// show that queries return updated staker, not original one
+				retrievedStaker, err = store.GetCurrentValidator(updatedValidator.SubnetID, updatedValidator.NodeID)
+				if err != nil {
+					return fmt.Sprintf("expected no error, got %v", err)
+				}
+				if !reflect.DeepEqual(&updatedValidator, retrievedStaker) {
+					return fmt.Sprintf("wrong staker retrieved expected %v, got %v", &updatedValidator, retrievedStaker)
+				}
 
-			currIT, err = store.GetCurrentStakerIterator()
-			if err != nil {
-				return fmt.Sprintf("unexpected failure in staker iterator creation, error %v", err)
+				currIT, err = store.GetCurrentStakerIterator()
+				if err != nil {
+					return fmt.Sprintf("unexpected failure in staker iterator creation, error %v", err)
+				}
+				if !currIT.Next() {
+					return errNonEmptyIteratorExpected.Error()
+				}
+				if !reflect.DeepEqual(currIT.Value(), retrievedStaker) {
+					return fmt.Sprintf("wrong staker retrieved expected %v, got %v", currIT.Value(), retrievedStaker)
+				}
+				currIT.Release()
 			}
-			if !currIT.Next() {
-				return errNonEmptyIteratorExpected.Error()
-			}
-			if !reflect.DeepEqual(currIT.Value(), retrievedStaker) {
-				return fmt.Sprintf("wrong staker retrieved expected %v, got %v", currIT.Value(), retrievedStaker)
-			}
-			currIT.Release()
 			return ""
 		},
+		stakerTxGenerator(ctx, continuousValidator, &constants.PrimaryNetworkID, nil, math.MaxUint64),
+		stakerTxGenerator(ctx, permissionlessValidator, &constants.PrimaryNetworkID, nil, math.MaxUint64),
 		stakerTxGenerator(ctx, permissionedValidator, &constants.PrimaryNetworkID, nil, math.MaxUint64),
 	))
 
 	properties.Property("add, delete and query pending validators", prop.ForAll(
-		func(nonInitTx *txs.Tx) string {
-			store, err := storeCreatorF()
-			if err != nil {
-				return fmt.Sprintf("unexpected error while creating staker store, err %v", err)
-			}
+		func(nonInitElasticValTx, nonInitPermissionedValTx *txs.Tx) string {
+			for _, nonInitTx := range []*txs.Tx{nonInitElasticValTx, nonInitPermissionedValTx} {
+				store, err := storeCreatorF()
+				if err != nil {
+					return fmt.Sprintf("unexpected error while creating staker store, err %v", err)
+				}
 
-			signedTx, err := txs.NewSigned(nonInitTx.Unsigned, txs.Codec, nil)
-			if err != nil {
-				panic(fmt.Errorf("failed signing tx in tx generator, %w", err))
-			}
+				signedTx, err := txs.NewSigned(nonInitTx.Unsigned, txs.Codec, nil)
+				if err != nil {
+					panic(fmt.Errorf("failed signing tx in tx generator, %w", err))
+				}
 
-			staker, err := NewPendingStaker(signedTx.ID(), signedTx.Unsigned.(txs.PreContinuousStakingStaker))
-			if err != nil {
-				return err.Error()
-			}
+				staker, err := NewPendingStaker(signedTx.ID(), signedTx.Unsigned.(txs.PreContinuousStakingStaker))
+				if err != nil {
+					return err.Error()
+				}
 
-			// no staker before insertion
-			_, err = store.GetPendingValidator(staker.SubnetID, staker.NodeID)
-			if err != database.ErrNotFound {
-				return fmt.Sprintf("unexpected error %v, got %v", database.ErrNotFound, err)
-			}
-			err = checkStakersContent(store, []*Staker{}, pending)
-			if err != nil {
-				return err.Error()
-			}
+				// no staker before insertion
+				_, err = store.GetPendingValidator(staker.SubnetID, staker.NodeID)
+				if err != database.ErrNotFound {
+					return fmt.Sprintf("unexpected error %v, got %v", database.ErrNotFound, err)
+				}
+				err = checkStakersContent(store, []*Staker{}, pending)
+				if err != nil {
+					return err.Error()
+				}
 
-			// it's fine deleting unknown validator
-			store.DeletePendingValidator(staker)
-			_, err = store.GetPendingValidator(staker.SubnetID, staker.NodeID)
-			if err != database.ErrNotFound {
-				return fmt.Sprintf("unexpected error %v, got %v", database.ErrNotFound, err)
-			}
-			err = checkStakersContent(store, []*Staker{}, pending)
-			if err != nil {
-				return err.Error()
-			}
+				// it's fine deleting unknown validator
+				store.DeletePendingValidator(staker)
+				_, err = store.GetPendingValidator(staker.SubnetID, staker.NodeID)
+				if err != database.ErrNotFound {
+					return fmt.Sprintf("unexpected error %v, got %v", database.ErrNotFound, err)
+				}
+				err = checkStakersContent(store, []*Staker{}, pending)
+				if err != nil {
+					return err.Error()
+				}
 
-			// insert the staker and show it can be found
-			store.PutPendingValidator(staker)
-			retrievedStaker, err := store.GetPendingValidator(staker.SubnetID, staker.NodeID)
-			if err != nil {
-				return fmt.Sprintf("expected no error, got %v", err)
-			}
-			if !reflect.DeepEqual(staker, retrievedStaker) {
-				return fmt.Sprintf("wrong staker retrieved expected %v, got %v", staker, retrievedStaker)
-			}
-			err = checkStakersContent(store, []*Staker{staker}, pending)
-			if err != nil {
-				return err.Error()
-			}
+				// insert the staker and show it can be found
+				store.PutPendingValidator(staker)
+				retrievedStaker, err := store.GetPendingValidator(staker.SubnetID, staker.NodeID)
+				if err != nil {
+					return fmt.Sprintf("expected no error, got %v", err)
+				}
+				if !reflect.DeepEqual(staker, retrievedStaker) {
+					return fmt.Sprintf("wrong staker retrieved expected %v, got %v", staker, retrievedStaker)
+				}
+				err = checkStakersContent(store, []*Staker{staker}, pending)
+				if err != nil {
+					return err.Error()
+				}
 
-			// delete the staker and show it's found anymore
-			store.DeletePendingValidator(staker)
-			_, err = store.GetPendingValidator(staker.SubnetID, staker.NodeID)
-			if err != database.ErrNotFound {
-				return fmt.Sprintf("unexpected error %v, got %v", database.ErrNotFound, err)
-			}
-			err = checkStakersContent(store, []*Staker{}, pending)
-			if err != nil {
-				return err.Error()
+				// delete the staker and show it's found anymore
+				store.DeletePendingValidator(staker)
+				_, err = store.GetPendingValidator(staker.SubnetID, staker.NodeID)
+				if err != database.ErrNotFound {
+					return fmt.Sprintf("unexpected error %v, got %v", database.ErrNotFound, err)
+				}
+				err = checkStakersContent(store, []*Staker{}, pending)
+				if err != nil {
+					return err.Error()
+				}
 			}
 
 			return ""
 		},
+		stakerTxGenerator(ctx, permissionlessValidator, &constants.PrimaryNetworkID, nil, math.MaxUint64),
 		stakerTxGenerator(ctx, permissionedValidator, &constants.PrimaryNetworkID, nil, math.MaxUint64),
 	))
 

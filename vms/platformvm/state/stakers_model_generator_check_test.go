@@ -14,13 +14,15 @@ import (
 	"github.com/leanovate/gopter/prop"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 var (
-	errNotAStakerTx = errors.New("tx is not a stakerTx")
-	errWrongNodeID  = errors.New("unexpected nodeID")
+	errNotAStakerTx  = errors.New("tx is not a stakerTx")
+	errWrongNodeID   = errors.New("unexpected nodeID")
+	errWrongSubnetID = errors.New("unexpected subnetID")
 )
 
 // TestGeneratedStakersValidity tests the staker generator itself.
@@ -146,7 +148,7 @@ func TestGeneratedStakersValidity(t *testing.T) {
 		addDelegatorTxGenerator(ctx, &nodeID, maxDelegatorWeight),
 	))
 
-	properties.Property("addPermissionlessValidatorTx generator checks", prop.ForAll(
+	properties.Property("AddPermissionlessValidatorTx generator checks", prop.ForAll(
 		func(nonInitTx *txs.Tx) string {
 			signedTx, err := txs.NewSigned(nonInitTx.Unsigned, txs.Codec, nil)
 			if err != nil {
@@ -167,7 +169,7 @@ func TestGeneratedStakersValidity(t *testing.T) {
 			}
 
 			if subnetID != addValTx.SubnetID() {
-				return "subnet not duly set"
+				return errWrongSubnetID.Error()
 			}
 
 			currentVal, err := NewCurrentStaker(
@@ -201,7 +203,7 @@ func TestGeneratedStakersValidity(t *testing.T) {
 		addPermissionlessValidatorTxGenerator(ctx, &subnetID, &nodeID, math.MaxUint64),
 	))
 
-	properties.Property("addPermissionlessDelegatorTx generator checks", prop.ForAll(
+	properties.Property("AddPermissionlessDelegatorTx generator checks", prop.ForAll(
 		func(nonInitTx *txs.Tx) string {
 			signedTx, err := txs.NewSigned(nonInitTx.Unsigned, txs.Codec, nil)
 			if err != nil {
@@ -222,7 +224,7 @@ func TestGeneratedStakersValidity(t *testing.T) {
 			}
 
 			if subnetID != addDelTx.SubnetID() {
-				return "subnet not duly set"
+				return errWrongSubnetID.Error()
 			}
 
 			currentDel, err := NewCurrentStaker(
@@ -264,6 +266,101 @@ func TestGeneratedStakersValidity(t *testing.T) {
 			return ""
 		},
 		addPermissionlessDelegatorTxGenerator(ctx, &subnetID, &nodeID, maxDelegatorWeight),
+	))
+
+	properties.Property("AddContinuousValidatorTx generator checks", prop.ForAll(
+		func(nonInitTx *txs.Tx) string {
+			signedTx, err := txs.NewSigned(nonInitTx.Unsigned, txs.Codec, nil)
+			if err != nil {
+				panic(fmt.Errorf("failed signing tx, %w", err))
+			}
+
+			if err := signedTx.SyntacticVerify(ctx); err != nil {
+				return err.Error()
+			}
+
+			addValTx, ok := signedTx.Unsigned.(*txs.AddContinuousValidatorTx)
+			if !ok {
+				return errNotAStakerTx.Error()
+			}
+
+			if nodeID != addValTx.NodeID() {
+				return errWrongNodeID.Error()
+			}
+
+			if constants.PrimaryNetworkID != addValTx.SubnetID() {
+				return errWrongSubnetID.Error()
+			}
+
+			currentVal, err := NewCurrentStaker(
+				signedTx.ID(),
+				addValTx,
+				startTime,
+				mockable.MaxTime,
+				uint64(100),
+			)
+			if err != nil {
+				return err.Error()
+			}
+
+			if currentVal.EndTime.Before(currentVal.StartTime) {
+				return fmt.Sprintf("startTime %v not before endTime %v, staker %v",
+					currentVal.StartTime, currentVal.EndTime, currentVal)
+			}
+
+			return ""
+		},
+		addContinuousValidatorTxGenerator(ctx, &nodeID, math.MaxUint64),
+	))
+
+	properties.Property("AddContinuousDelegatorTx generator checks", prop.ForAll(
+		func(nonInitTx *txs.Tx) string {
+			signedTx, err := txs.NewSigned(nonInitTx.Unsigned, txs.Codec, nil)
+			if err != nil {
+				panic(fmt.Errorf("failed signing tx, %w", err))
+			}
+
+			if err := signedTx.SyntacticVerify(ctx); err != nil {
+				return err.Error()
+			}
+
+			addDelTx, ok := signedTx.Unsigned.(*txs.AddContinuousDelegatorTx)
+			if !ok {
+				return errNotAStakerTx.Error()
+			}
+
+			if nodeID != addDelTx.NodeID() {
+				return errWrongNodeID.Error()
+			}
+
+			if constants.PrimaryNetworkID != addDelTx.SubnetID() {
+				return errWrongSubnetID.Error()
+			}
+
+			currentDel, err := NewCurrentStaker(
+				signedTx.ID(),
+				addDelTx,
+				startTime,
+				startTime.Add(addDelTx.StakingPeriod()),
+				uint64(100),
+			)
+			if err != nil {
+				return err.Error()
+			}
+
+			if currentDel.EndTime.Before(currentDel.StartTime) {
+				return fmt.Sprintf("startTime %v not before endTime %v, staker %v",
+					currentDel.StartTime, currentDel.EndTime, currentDel)
+			}
+
+			if currentDel.Weight > maxDelegatorWeight {
+				return fmt.Sprintf("delegator weight %v above maximum %v, staker %v",
+					currentDel.Weight, maxDelegatorWeight, currentDel)
+			}
+
+			return ""
+		},
+		addContinuousDelegatorTxGenerator(ctx, &nodeID, maxDelegatorWeight),
 	))
 
 	properties.TestingRun(t)
