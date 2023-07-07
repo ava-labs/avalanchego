@@ -199,6 +199,10 @@ func (cmd *putCurrentValidatorCommand) PostCondition(cmdState commands.State, re
 		return &gopter.PropResult{Status: gopter.PropFalse}
 	}
 
+	if !checkValidatorSetContent(res) {
+		return &gopter.PropResult{Status: gopter.PropFalse}
+	}
+
 	return &gopter.PropResult{Status: gopter.PropTrue}
 }
 
@@ -650,24 +654,27 @@ func (cmd *deleteCurrentValidatorCommand) Run(sut commands.SystemUnderTest) comm
 		found     = false
 		validator *Staker
 	)
-	for !found && stakerIt.Next() {
+	for stakerIt.Next() {
 		validator = stakerIt.Value()
-		if validator.Priority.IsCurrentValidator() {
-			// check validators has no delegators
-			delIt, err := topDiff.GetCurrentDelegatorIterator(validator.SubnetID, validator.NodeID)
-			if err != nil {
-				cmd.err = err
-				stakerIt.Release()
-				return sys
-			}
+		if !validator.Priority.IsCurrentValidator() {
+			continue // checks next validator
+		}
 
-			found := !delIt.Next()
-			delIt.Release()
-			if !found {
-				break
-			} else {
-				continue // checks next validator
-			}
+		// check validator has no delegators
+		delIt, err := topDiff.GetCurrentDelegatorIterator(validator.SubnetID, validator.NodeID)
+		if err != nil {
+			cmd.err = err
+			stakerIt.Release()
+			return sys
+		}
+
+		hadDelegator := delIt.Next()
+		delIt.Release()
+		if !hadDelegator {
+			found = true
+			break // found
+		} else {
+			continue // checks next validator
 		}
 	}
 
@@ -687,33 +694,37 @@ func (cmd *deleteCurrentValidatorCommand) NextState(cmdState commands.State) com
 	stakerIt, err := model.GetCurrentStakerIterator()
 	if err != nil {
 		cmd.err = err
-		return model
+		return cmdState
 	}
 
 	var (
 		found     = false
 		validator *Staker
 	)
-	for !found && stakerIt.Next() {
+	for stakerIt.Next() {
 		validator = stakerIt.Value()
-		if validator.Priority.IsCurrentValidator() {
-			// check validators has no delegators
-			delIt, err := model.GetCurrentDelegatorIterator(validator.SubnetID, validator.NodeID)
-			if err != nil {
-				cmd.err = err
-				stakerIt.Release()
-				return model
-			}
+		if !validator.Priority.IsCurrentValidator() {
+			continue // checks next validator
+		}
 
-			found := !delIt.Next()
-			delIt.Release()
-			if !found {
-				break
-			} else {
-				continue // checks next validator
-			}
+		// check validator has no delegators
+		delIt, err := model.GetCurrentDelegatorIterator(validator.SubnetID, validator.NodeID)
+		if err != nil {
+			cmd.err = err
+			stakerIt.Release()
+			return cmdState
+		}
+
+		hadDelegator := delIt.Next()
+		delIt.Release()
+		if !hadDelegator {
+			found = true
+			break // found
+		} else {
+			continue // checks next validator
 		}
 	}
+
 	if !found {
 		stakerIt.Release()
 		return cmdState // no current validator to add delegator to
@@ -736,6 +747,10 @@ func (cmd *deleteCurrentValidatorCommand) PostCondition(cmdState commands.State,
 	}
 
 	if !checkSystemAndModelContent(cmdState, res) {
+		return &gopter.PropResult{Status: gopter.PropFalse}
+	}
+
+	if !checkValidatorSetContent(res) {
 		return &gopter.PropResult{Status: gopter.PropFalse}
 	}
 
@@ -892,6 +907,10 @@ func (cmd *putCurrentDelegatorCommand) PostCondition(cmdState commands.State, re
 	}
 
 	if !checkSystemAndModelContent(cmdState, res) {
+		return &gopter.PropResult{Status: gopter.PropFalse}
+	}
+
+	if !checkValidatorSetContent(res) {
 		return &gopter.PropResult{Status: gopter.PropFalse}
 	}
 
@@ -1390,6 +1409,10 @@ func (cmd *deleteCurrentDelegatorCommand) PostCondition(cmdState commands.State,
 		return &gopter.PropResult{Status: gopter.PropFalse}
 	}
 
+	if !checkValidatorSetContent(res) {
+		return &gopter.PropResult{Status: gopter.PropFalse}
+	}
+
 	return &gopter.PropResult{Status: gopter.PropTrue}
 }
 
@@ -1434,6 +1457,10 @@ func (cmd *addTopDiffCommand) PostCondition(cmdState commands.State, res command
 	}
 
 	if !checkSystemAndModelContent(cmdState, res) {
+		return &gopter.PropResult{Status: gopter.PropFalse}
+	}
+
+	if !checkValidatorSetContent(res) {
 		return &gopter.PropResult{Status: gopter.PropFalse}
 	}
 
@@ -1487,6 +1514,10 @@ func (cmd *applyAndCommitBottomDiffCommand) PostCondition(cmdState commands.Stat
 	}
 
 	if !checkSystemAndModelContent(cmdState, res) {
+		return &gopter.PropResult{Status: gopter.PropFalse}
+	}
+
+	if !checkValidatorSetContent(res) {
 		return &gopter.PropResult{Status: gopter.PropFalse}
 	}
 
@@ -1627,6 +1658,8 @@ func checkSystemAndModelContent(cmdState commands.State, res commands.Result) bo
 	return true
 }
 
+// checkValidatorSetContent compares ValidatorsSet with P-chain base-state data and
+// makes sure they are coherent.
 func checkValidatorSetContent(res commands.Result) bool {
 	sys := res.(*sysUnderTest)
 	valSet := sys.baseState.(*state).cfg.Validators
@@ -1741,7 +1774,9 @@ func (s *sysUnderTest) flushBottomDiff() (bool, error) {
 	return true, nil
 }
 
-// getTopChainState returns top diff or baseState
+// checkThereIsADiff must be called before any stakers op. It makes
+// sure that ops are carried out on at least a diff, as it happens
+// in production code.
 func (s *sysUnderTest) checkThereIsADiff() error {
 	if len(s.sortedDiffIDs) != 0 {
 		return nil // there is a diff
