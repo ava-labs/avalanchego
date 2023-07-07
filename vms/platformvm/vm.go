@@ -105,13 +105,17 @@ func (vm *VM) Initialize(
 ) error {
 	chainCtx.Log.Verbo("initializing platform chain")
 
+	execConfig, err := config.GetExecutionConfig(configBytes)
+	if err != nil {
+		return err
+	}
+
 	registerer := prometheus.NewRegistry()
 	if err := chainCtx.Metrics.Register(registerer); err != nil {
 		return err
 	}
 
 	// Initialize metrics as soon as possible
-	var err error
 	vm.metrics, err = metrics.New("", registerer)
 	if err != nil {
 		return fmt.Errorf("failed to initialize metrics: %w", err)
@@ -128,10 +132,6 @@ func (vm *VM) Initialize(
 
 	rewards := reward.NewCalculator(vm.RewardConfig)
 
-	execConfig, err := config.GetExecutionConfig(configBytes)
-	if err != nil {
-		return err
-	}
 	vm.state, err = state.New(
 		vm.dbManager.Current().Database,
 		genesisBytes,
