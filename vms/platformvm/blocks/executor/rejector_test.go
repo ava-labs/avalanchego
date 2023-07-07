@@ -141,7 +141,6 @@ func TestRejectBlock(t *testing.T) {
 			for _, tx := range blk.Txs() {
 				mempool.EXPECT().Add(tx).Return(nil).Times(1)
 			}
-			state.EXPECT().Commit().Return(nil).Times(1)
 
 			require.NoError(tt.rejectFunc(rejector, blk))
 			// Make sure block and its parent are removed from the state map.
