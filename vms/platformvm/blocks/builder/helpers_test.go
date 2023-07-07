@@ -409,6 +409,8 @@ func buildGenesisTest(t *testing.T, ctx *snow.Context) []byte {
 }
 
 func shutdownEnvironment(env *environment) error {
+	env.Builder.Shutdown() // avoids leaking timer goroutine
+
 	if env.isBootstrapped.Get() {
 		primaryValidatorSet, exist := env.config.Validators.Get(constants.PrimaryNetworkID)
 		if !exist {
