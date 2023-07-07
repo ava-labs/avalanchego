@@ -37,6 +37,28 @@ func (b *preForkBlock) acceptInnerBlk(ctx context.Context) error {
 	return b.Block.Accept(ctx)
 }
 
+func (b *preForkBlock) Status() choices.Status {
+	forkHeight, err := b.vm.getForkHeight()
+	if err == database.ErrNotFound {
+		return b.Block.Status()
+	}
+	if err != nil {
+		// TODO: Once `Status()` can return an error, we should return the error
+		// here.
+		b.vm.ctx.Log.Error("unexpected error looking up fork height",
+			zap.Error(err),
+		)
+		return b.Block.Status()
+	}
+
+	// The fork has occurred earlier than this block, so preForkBlocks are all
+	// invalid.
+	if b.Height() >= forkHeight {
+		return choices.Rejected
+	}
+	return b.Block.Status()
+}
+
 func (b *preForkBlock) Verify(ctx context.Context) error {
 	parent, err := b.vm.getPreForkBlock(ctx, b.Block.Parent())
 	if err != nil {
@@ -79,10 +101,6 @@ func (b *preForkBlock) verifyPreForkChild(ctx context.Context, child *preForkBlo
 			return err
 		}
 
-		if err := b.verifyIsPreForkBlock(); err != nil {
-			return err
-		}
-
 		b.vm.ctx.Log.Debug("allowing pre-fork block after the fork time",
 			zap.String("reason", "parent is an oracle block"),
 			zap.Stringer("blkID", b.ID()),
@@ -95,10 +113,6 @@ func (b *preForkBlock) verifyPreForkChild(ctx context.Context, child *preForkBlo
 // This method only returns nil once (during the transition)
 func (b *preForkBlock) verifyPostForkChild(ctx context.Context, child *postForkBlock) error {
 	if err := verifyIsNotOracleBlock(ctx, b.Block); err != nil {
-		return err
-	}
-
-	if err := b.verifyIsPreForkBlock(); err != nil {
 		return err
 	}
 
@@ -231,27 +245,4 @@ func (b *preForkBlock) buildChild(ctx context.Context) (Block, error) {
 
 func (*preForkBlock) pChainHeight(context.Context) (uint64, error) {
 	return 0, nil
-}
-
-func (b *preForkBlock) verifyIsPreForkBlock() error {
-	if status := b.Status(); status == choices.Accepted {
-		_, err := b.vm.GetLastAccepted()
-		if err == nil {
-			// If this block is accepted and it was a preForkBlock, then there
-			// shouldn't have been an accepted postForkBlock yet. If there was
-			// an accepted postForkBlock, then this block wasn't a preForkBlock.
-			return errUnexpectedBlockType
-		}
-		if err != database.ErrNotFound {
-			// If an unexpected error was returned - propagate that that
-			// error.
-			return err
-		}
-	} else if _, contains := b.vm.Tree.Get(b.Block); contains {
-		// If this block is a preForkBlock, then it's inner block shouldn't have
-		// been registered into the inner block tree. If this block was
-		// registered into the inner block tree, then it wasn't a preForkBlock.
-		return errUnexpectedBlockType
-	}
-	return nil
 }
