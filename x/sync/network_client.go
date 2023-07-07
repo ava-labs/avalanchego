@@ -217,7 +217,7 @@ func (c *networkClientImpl) request(
 	return c.get(ctx, nodeID, request)
 }
 
-// Sends [get] to [nodeID] and returns the response.
+// Sends [request] to [nodeID] and returns the response.
 // Returns an error if the get failed or [ctx] is canceled.
 // Blocks until a response is received or the [ctx] is canceled fails.
 // Releases active requests semaphore if there was an error in sending the get.
