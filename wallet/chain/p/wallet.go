@@ -475,12 +475,7 @@ func (w *wallet) IssueUnsignedTx(
 		return nil, err
 	}
 
-	err = w.IssueTx(tx, options...)
-	if err != nil {
-		return nil, err
-	}
-
-	return tx, err
+	return tx, w.IssueTx(tx, options...)
 }
 
 func (w *wallet) IssueTx(
