@@ -123,7 +123,8 @@ func (bc *testBlockChain) SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent)
 }
 
 func (bc *testBlockChain) SenderCacher() *core.TxSenderCacher {
-	return core.NewTxSenderCacher(1)
+	// Zero threads avoids starting goroutines.
+	return core.NewTxSenderCacher(0)
 }
 
 func transaction(nonce uint64, gaslimit uint64, key *ecdsa.PrivateKey) *types.Transaction {
