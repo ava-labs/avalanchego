@@ -30,11 +30,7 @@ type handlerStats struct {
 	signatureProcessingTime metrics.Timer
 }
 
-func NewStats(enabled bool) SignatureRequestHandlerStats {
-	if !enabled {
-		return &MockSignatureRequestHandlerStats{}
-	}
-
+func NewStats() SignatureRequestHandlerStats {
 	return &handlerStats{
 		signatureRequest:        metrics.GetOrRegisterCounter("signature_request_count", nil),
 		signatureHit:            metrics.GetOrRegisterCounter("signature_request_hit", nil),

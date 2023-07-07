@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/subnet-evm/plugin/evm/message"
 	"github.com/ava-labs/subnet-evm/warp"
 	"github.com/ava-labs/subnet-evm/warp/handlers/stats"
@@ -54,7 +55,16 @@ func (s *signatureRequestHandler) OnSignatureRequest(ctx context.Context, nodeID
 	if err != nil {
 		log.Debug("Unknown warp signature requested", "messageID", signatureRequest.MessageID)
 		s.stats.IncSignatureMiss()
-		return nil, nil
+
+		// Return empty response because the message was not found in backend,
+		// instead of returning nil, which would drop message response.
+		emptyResponse := message.SignatureResponse{Signature: [bls.SignatureLen]byte{}}
+		emptyResponseBytes, err := s.codec.Marshal(message.Version, &emptyResponse)
+		if err != nil {
+			log.Warn("could not marshal SignatureResponse, dropping request", "nodeID", nodeID, "requestID", requestID, "err", err)
+			return nil, nil
+		}
+		return emptyResponseBytes, nil
 	}
 
 	s.stats.IncSignatureHit()
