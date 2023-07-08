@@ -14,7 +14,7 @@ thiserror = "1.0.38"
 
 [dev-dependencies]
 criterion = { version = "0.5.1", features = ["html_reports"] }
-pprof = { version = "0.11.1", features = ["flamegraph"] }
+pprof = { version = "0.12.0", features = ["flamegraph"] }
 sha3 = "0.10.7"
 rand = "0.8.5"
 
