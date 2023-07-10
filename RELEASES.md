@@ -24,6 +24,7 @@ The plugin version is unchanged at `26` and compatible with versions `v1.10.1 - 
 
 ### Fixes
 
+- Fixed `proposervm` `preForkBlock.Status()` response after the fork has occurred
 - Fixed C-chain logs collection error when no receipts occur in a block
 - Fixed merkledb's `findNextKey` when an empty end proof is provided
 - Fixed 0 length key issues with proof generation and verification
@@ -66,6 +67,17 @@ The plugin version is unchanged at `26` and compatible with versions `v1.10.1 - 
 - `merkledb` -- rewrite and test range proof invariants; fix proof generation/veriifcation bugs by @danlaine in https://github.com/ava-labs/avalanchego/pull/1629
 - Add minimum proposer window length by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1667
 - CI -- only run fuzz tests on ubuntu by @danlaine in https://github.com/ava-labs/avalanchego/pull/1636
+- `MerkleDB` -- remove codec version by @danlaine in https://github.com/ava-labs/avalanchego/pull/1671
+- `MerkleDB` -- use default config in all tests by @danlaine in https://github.com/ava-labs/avalanchego/pull/1590
+- `sync` -- reduce stuttering by @danlaine in https://github.com/ava-labs/avalanchego/pull/1672
+- `Sync` -- unexport field by @danlaine in https://github.com/ava-labs/avalanchego/pull/1673
+- `sync` -- nits and cleanup by @danlaine in https://github.com/ava-labs/avalanchego/pull/1674
+- `sync` -- remove unused code by @danlaine in https://github.com/ava-labs/avalanchego/pull/1676
+- Mark preForkBlocks after the fork as Rejected by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1683
+- `merkledb` -- fix comment by @danlaine in https://github.com/ava-labs/avalanchego/pull/1675
+- `MerkleDB` -- document codec by @danlaine in https://github.com/ava-labs/avalanchego/pull/1670
+- `sync` -- client cleanup by @danlaine in https://github.com/ava-labs/avalanchego/pull/1680
+- Update buf version to v1.23.1 by @aaronbuchwald in https://github.com/ava-labs/avalanchego/pull/1685
 
 ### New Contributors
 
