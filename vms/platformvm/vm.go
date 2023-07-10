@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 
 	stdjson "encoding/json"
 
@@ -159,7 +160,8 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	validatorManager := pvalidators.NewManager(chainCtx.Log, vm.Config, vm.state, vm.metrics, &vm.clock, vm.Tracer)
+	var acceptLock sync.RWMutex
+	validatorManager := pvalidators.NewManager(chainCtx.Log, vm.Config, &acceptLock, vm.state, vm.metrics, &vm.clock, vm.Tracer)
 	vm.State = validatorManager
 	vm.atomicUtxosManager = avax.NewAtomicUTXOManager(chainCtx.SharedMemory, txs.Codec)
 	utxoHandler := utxo.NewHandler(vm.ctx, &vm.clock, vm.fx)
@@ -197,6 +199,7 @@ func (vm *VM) Initialize(
 	vm.manager = blockexecutor.NewManager(
 		mempool,
 		vm.metrics,
+		&acceptLock,
 		vm.state,
 		txExecutorBackend,
 		validatorManager,

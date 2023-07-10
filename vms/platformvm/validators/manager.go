@@ -58,19 +58,21 @@ type Manager interface {
 func NewManager(
 	log logging.Logger,
 	cfg config.Config,
+	acceptLock *sync.RWMutex,
 	state state.State,
 	metrics metrics.Metrics,
 	clk *mockable.Clock,
 	tracer trace.Tracer,
 ) Manager {
 	return &manager{
-		log:     log,
-		cfg:     cfg,
-		state:   state,
-		metrics: metrics,
-		clk:     clk,
-		tracer:  tracer,
-		caches:  make(map[ids.ID]cache.Cacher[uint64, map[ids.NodeID]*validators.GetValidatorOutput]),
+		log:        log,
+		cfg:        cfg,
+		acceptLock: acceptLock,
+		state:      state,
+		metrics:    metrics,
+		clk:        clk,
+		tracer:     tracer,
+		caches:     make(map[ids.ID]cache.Cacher[uint64, map[ids.NodeID]*validators.GetValidatorOutput]),
 		recentlyAccepted: window.New[ids.ID](
 			window.Config{
 				Clock:   clk,
@@ -83,12 +85,13 @@ func NewManager(
 }
 
 type manager struct {
-	log     logging.Logger
-	cfg     config.Config
-	state   state.State
-	metrics metrics.Metrics
-	clk     *mockable.Clock
-	tracer  trace.Tracer
+	log        logging.Logger
+	cfg        config.Config
+	acceptLock *sync.RWMutex
+	state      state.State
+	metrics    metrics.Metrics
+	clk        *mockable.Clock
+	tracer     trace.Tracer
 
 	// Maps caches for each subnet that is currently tracked.
 	// Key: Subnet ID
@@ -122,6 +125,9 @@ func (m *manager) GetMinimumHeight(ctx context.Context) (uint64, error) {
 		return m.GetCurrentHeight(ctx)
 	}
 
+	m.acceptLock.RLock()
+	defer m.acceptLock.Unlock()
+
 	oldest, ok := m.recentlyAccepted.Oldest()
 	if !ok {
 		return m.GetCurrentHeight(ctx)
@@ -141,6 +147,13 @@ func (m *manager) GetMinimumHeight(ctx context.Context) (uint64, error) {
 }
 
 func (m *manager) GetCurrentHeight(ctx context.Context) (uint64, error) {
+	m.acceptLock.RLock()
+	defer m.acceptLock.RUnlock()
+
+	return m.getCurrentHeight(ctx)
+}
+
+func (m *manager) getCurrentHeight(ctx context.Context) (uint64, error) {
 	_, span := m.tracer.Start(ctx, "GetCurrentHeight")
 	defer span.End()
 
@@ -170,22 +183,18 @@ func (m *manager) GetValidatorSet(
 	// 	return validatorSet, nil
 	// }
 
-	currentHeight, err := m.GetCurrentHeight(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if currentHeight < targetHeight {
-		return nil, database.ErrNotFound
-	}
-
 	// get the start time to track metrics
 	startTime := m.clk.Time()
 
-	var validatorSet map[ids.NodeID]*validators.GetValidatorOutput
+	var (
+		validatorSet  map[ids.NodeID]*validators.GetValidatorOutput
+		currentHeight uint64
+		err           error
+	)
 	if subnetID == constants.PrimaryNetworkID {
-		validatorSet, err = m.makePrimaryNetworkValidatorSet(ctx, currentHeight, targetHeight)
+		validatorSet, currentHeight, err = m.makePrimaryNetworkValidatorSet(ctx, targetHeight)
 	} else {
-		validatorSet, err = m.makeSubnetValidatorSet(ctx, currentHeight, targetHeight, subnetID)
+		validatorSet, currentHeight, err = m.makeSubnetValidatorSet(ctx, targetHeight, subnetID)
 	}
 	if err != nil {
 		return nil, err
@@ -231,27 +240,20 @@ func (m *manager) getValidatorSetCache(subnetID ids.ID) cache.Cacher[uint64, map
 
 func (m *manager) makePrimaryNetworkValidatorSet(
 	ctx context.Context,
-	currentHeight uint64,
 	targetHeight uint64,
-) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+) (map[ids.NodeID]*validators.GetValidatorOutput, uint64, error) {
 	ctx, span := m.tracer.Start(ctx, "makePrimaryNetworkValidatorSet", oteltrace.WithAttributes(
-		attribute.Int64("currentHeight", int64(currentHeight)),
 		attribute.Int64("targetHeight", int64(targetHeight)),
 	))
 	defer span.End()
 
-	currentValidators, ok := m.cfg.Validators.Get(constants.PrimaryNetworkID)
-	if !ok {
-		// This should never happen
-		m.log.Error(ErrMissingValidatorSet.Error(),
-			zap.Stringer("subnetID", constants.PrimaryNetworkID),
-		)
-		return nil, ErrMissingValidatorSet
+	validatorSet, currentHeight, err := m.getCurrentPrimaryValidatorSet(ctx)
+	if err != nil {
+		return nil, 0, err
 	}
-
-	// Node ID --> Validator information for the node validating the Primary
-	// Network.
-	validatorSet := currentValidators.Map()
+	if currentHeight < targetHeight {
+		return nil, 0, database.ErrNotFound
+	}
 
 	// Rebuild primary network validators at [targetHeight]
 	//
@@ -260,7 +262,7 @@ func (m *manager) makePrimaryNetworkValidatorSet(
 	// (targetHeight, currentHeight]. Because the state interface is implemented
 	// to be inclusive, we apply diffs in [targetHeight + 1, currentHeight].
 	lastDiffHeight := targetHeight + 1
-	err := m.state.ApplyValidatorWeightDiffs(
+	err = m.state.ApplyValidatorWeightDiffs(
 		ctx,
 		validatorSet,
 		currentHeight,
@@ -268,7 +270,7 @@ func (m *manager) makePrimaryNetworkValidatorSet(
 		constants.PlatformChainID,
 	)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	err = m.state.ApplyValidatorPublicKeyDiffs(
@@ -277,25 +279,40 @@ func (m *manager) makePrimaryNetworkValidatorSet(
 		currentHeight,
 		lastDiffHeight,
 	)
-	return validatorSet, err
+	return validatorSet, currentHeight, err
+}
+
+func (m *manager) getCurrentPrimaryValidatorSet(
+	ctx context.Context,
+) (map[ids.NodeID]*validators.GetValidatorOutput, uint64, error) {
+	m.acceptLock.RLock()
+	defer m.acceptLock.RUnlock()
+
+	currentValidators, ok := m.cfg.Validators.Get(constants.PrimaryNetworkID)
+	if !ok {
+		// This should never happen
+		m.log.Error(ErrMissingValidatorSet.Error(),
+			zap.Stringer("subnetID", constants.PrimaryNetworkID),
+		)
+		return nil, 0, ErrMissingValidatorSet
+	}
+
+	currentHeight, err := m.getCurrentHeight(ctx)
+	return currentValidators.Map(), currentHeight, err
 }
 
 func (m *manager) makeSubnetValidatorSet(
 	ctx context.Context,
-	currentHeight uint64,
 	targetHeight uint64,
 	subnetID ids.ID,
-) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-	currentValidators, ok := m.cfg.Validators.Get(subnetID)
-	if !ok {
-		currentValidators = validators.NewSet()
-		if err := m.state.ValidatorSet(subnetID, currentValidators); err != nil {
-			return nil, err
-		}
+) (map[ids.NodeID]*validators.GetValidatorOutput, uint64, error) {
+	subnetValidatorSet, primaryValidatorSet, currentHeight, err := m.getCurrentValidatorSets(ctx, subnetID)
+	if err != nil {
+		return nil, 0, err
 	}
-
-	// Node ID --> Validator information for the node validating the Subnet.
-	subnetValidatorSet := currentValidators.Map()
+	if currentHeight < targetHeight {
+		return nil, 0, database.ErrNotFound
+	}
 
 	// Rebuild subnet validators at [targetHeight]
 	//
@@ -304,7 +321,7 @@ func (m *manager) makeSubnetValidatorSet(
 	// (targetHeight, currentHeight]. Because the state interface is implemented
 	// to be inclusive, we apply diffs in [targetHeight + 1, currentHeight].
 	lastDiffHeight := targetHeight + 1
-	err := m.state.ApplyValidatorWeightDiffs(
+	err = m.state.ApplyValidatorWeightDiffs(
 		ctx,
 		subnetValidatorSet,
 		currentHeight,
@@ -312,27 +329,18 @@ func (m *manager) makeSubnetValidatorSet(
 		subnetID,
 	)
 	if err != nil {
-		return nil, err
-	}
-
-	currentPrimaryValidators, ok := m.cfg.Validators.Get(constants.PrimaryNetworkID)
-	if !ok {
-		// This should never happen
-		m.log.Error(ErrMissingValidatorSet.Error(),
-			zap.Stringer("subnetID", constants.PrimaryNetworkID),
-		)
-		return nil, ErrMissingValidatorSet
+		return nil, 0, err
 	}
 
 	for nodeID, vdr := range subnetValidatorSet {
-		primaryVdr, ok := currentPrimaryValidators.Get(nodeID)
+		primaryVdr, ok := primaryValidatorSet[nodeID]
 		if !ok {
 			// This should never happen
 			m.log.Error(ErrMissingValidator.Error(),
 				zap.Stringer("subnetID", subnetID),
 				zap.Stringer("nodeID", vdr.NodeID),
 			)
-			return nil, ErrMissingValidator
+			return nil, 0, ErrMissingValidator
 		}
 
 		vdr.PublicKey = primaryVdr.PublicKey
@@ -344,13 +352,44 @@ func (m *manager) makeSubnetValidatorSet(
 		currentHeight,
 		lastDiffHeight,
 	)
-	return subnetValidatorSet, err
+	return subnetValidatorSet, currentHeight, err
+}
+
+func (m *manager) getCurrentValidatorSets(
+	ctx context.Context,
+	subnetID ids.ID,
+) (map[ids.NodeID]*validators.GetValidatorOutput, map[ids.NodeID]*validators.GetValidatorOutput, uint64, error) {
+	m.acceptLock.RLock()
+	defer m.acceptLock.RUnlock()
+
+	currentSubnetValidators, ok := m.cfg.Validators.Get(subnetID)
+	if !ok {
+		currentSubnetValidators = validators.NewSet()
+		if err := m.state.ValidatorSet(subnetID, currentSubnetValidators); err != nil {
+			return nil, nil, 0, err
+		}
+	}
+
+	currentPrimaryValidators, ok := m.cfg.Validators.Get(constants.PrimaryNetworkID)
+	if !ok {
+		// This should never happen
+		m.log.Error(ErrMissingValidatorSet.Error(),
+			zap.Stringer("subnetID", constants.PrimaryNetworkID),
+		)
+		return nil, nil, 0, ErrMissingValidatorSet
+	}
+
+	currentHeight, err := m.getCurrentHeight(ctx)
+	return currentSubnetValidators.Map(), currentPrimaryValidators.Map(), currentHeight, err
 }
 
 func (m *manager) GetSubnetID(_ context.Context, chainID ids.ID) (ids.ID, error) {
 	if chainID == constants.PlatformChainID {
 		return constants.PrimaryNetworkID, nil
 	}
+
+	m.acceptLock.RLock()
+	defer m.acceptLock.Unlock()
 
 	chainTx, _, err := m.state.GetTx(chainID)
 	if err != nil {
