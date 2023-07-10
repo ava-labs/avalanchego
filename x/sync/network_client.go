@@ -33,26 +33,33 @@ var (
 
 // networkClient defines ability to send request / response through the Network
 type networkClient interface {
-	// requestAny synchronously sends request to an arbitrary peer with a
+	// RequestAny synchronously sends request to an arbitrary peer with a
 	// node version greater than or equal to minVersion.
 	// Returns response bytes, the ID of the chosen peer, and errRequestFailed if
 	// the request should be retried.
-	requestAny(ctx context.Context, minVersion *version.Application, request []byte) (ids.NodeID, []byte, error)
+	RequestAny(ctx context.Context, minVersion *version.Application, request []byte) (ids.NodeID, []byte, error)
 
-	// request synchronously sends request to the selected nodeID.
-	// Returns response bytes, and errRequestFailed if the request should be retried.
-	request(ctx context.Context, nodeID ids.NodeID, request []byte) ([]byte, error)
+	// Request synchronously sends Request to the selected nodeID.
+	// Returns response bytes, and errRequestFailed if the Request should be retried.
+	Request(ctx context.Context, nodeID ids.NodeID, request []byte) ([]byte, error)
 
-	// trackBandwidth should be called for each valid response with the bandwidth
+	// TrackBandwidth should be called for each valid response with the bandwidth
 	// (length of response divided by request time), and with 0 if the response is invalid.
-	trackBandwidth(nodeID ids.NodeID, bandwidth float64)
+	TrackBandwidth(nodeID ids.NodeID, bandwidth float64)
+}
 
+type Handlers interface {
 	// The following declarations allow this interface to be embedded in the VM
 	// to handle incoming responses from peers.
-	appResponse(context.Context, ids.NodeID, uint32, []byte) error
-	appRequestFailed(context.Context, ids.NodeID, uint32) error
-	connected(context.Context, ids.NodeID, *version.Application) error
-	disconnected(context.Context, ids.NodeID) error
+	AppResponse(context.Context, ids.NodeID, uint32, []byte) error
+	AppRequestFailed(context.Context, ids.NodeID, uint32) error
+	Connected(context.Context, ids.NodeID, *version.Application) error
+	Disconnected(context.Context, ids.NodeID) error
+}
+
+type networkClientHandler interface {
+	Handlers
+	networkClient
 }
 
 type networkClientImpl struct {
@@ -77,7 +84,7 @@ func NewNetworkClient(
 	myNodeID ids.NodeID,
 	maxActiveRequests int64,
 	log logging.Logger,
-) networkClient {
+) networkClientHandler {
 	return &networkClientImpl{
 		appSender:                  appSender,
 		myNodeID:                   myNodeID,
@@ -90,7 +97,7 @@ func NewNetworkClient(
 
 // Always returns nil because the engine considers errors
 // returned from this function as fatal.
-func (c *networkClientImpl) appResponse(
+func (c *networkClientImpl) AppResponse(
 	_ context.Context,
 	nodeID ids.NodeID,
 	requestID uint32,
@@ -124,7 +131,7 @@ func (c *networkClientImpl) appResponse(
 
 // Always returns nil because the engine considers errors
 // returned from this function as fatal.
-func (c *networkClientImpl) appRequestFailed(
+func (c *networkClientImpl) AppRequestFailed(
 	_ context.Context,
 	nodeID ids.NodeID,
 	requestID uint32,
@@ -166,12 +173,12 @@ func (c *networkClientImpl) getRequestHandler(requestID uint32) (ResponseHandler
 	return handler, true
 }
 
-// requestAny synchronously sends [request] to a randomly chosen peer with a
+// RequestAny synchronously sends [request] to a randomly chosen peer with a
 // version greater than or equal to [minVersion]. If [minVersion] is nil,
 // the request is sent to any peer regardless of their version.
 // May block until the number of outstanding requests decreases.
 // Returns the node's response and the ID of the node.
-func (c *networkClientImpl) requestAny(
+func (c *networkClientImpl) RequestAny(
 	ctx context.Context,
 	minVersion *version.Application,
 	request []byte,
@@ -197,10 +204,10 @@ func (c *networkClientImpl) requestAny(
 	return nodeID, response, err
 }
 
-// Sends [request] to [nodeID] and returns the response.
+// Sends [Request] to [nodeID] and returns the response.
 // Blocks until the number of outstanding requests is
-// below the limit before sending the request.
-func (c *networkClientImpl) request(
+// below the limit before sending the Request.
+func (c *networkClientImpl) Request(
 	ctx context.Context,
 	nodeID ids.NodeID,
 	request []byte,
@@ -270,10 +277,10 @@ func (c *networkClientImpl) get(
 	return response, nil
 }
 
-// connected adds the given [nodeID] to the peer
+// Connected adds the given [nodeID] to the peer
 // list so that it can receive messages.
 // If [nodeID] is [c.myNodeID], this is a no-op.
-func (c *networkClientImpl) connected(
+func (c *networkClientImpl) Connected(
 	_ context.Context,
 	nodeID ids.NodeID,
 	nodeVersion *version.Application,
@@ -291,8 +298,8 @@ func (c *networkClientImpl) connected(
 	return nil
 }
 
-// disconnected removes given [nodeID] from the peer list.
-func (c *networkClientImpl) disconnected(_ context.Context, nodeID ids.NodeID) error {
+// Disconnected removes given [nodeID] from the peer list.
+func (c *networkClientImpl) Disconnected(_ context.Context, nodeID ids.NodeID) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
@@ -316,7 +323,7 @@ func (c *networkClientImpl) Shutdown() {
 	c.peers = newPeerTracker(c.log)
 }
 
-func (c *networkClientImpl) trackBandwidth(nodeID ids.NodeID, bandwidth float64) {
+func (c *networkClientImpl) TrackBandwidth(nodeID ids.NodeID, bandwidth float64) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 

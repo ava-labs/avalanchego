@@ -249,23 +249,23 @@ func (c *clientImpl) get(ctx context.Context, request []byte) (ids.NodeID, []byt
 	c.metrics.RequestMade()
 
 	if len(c.stateSyncNodes) == 0 {
-		nodeID, response, err = c.networkClient.requestAny(ctx, c.stateSyncMinVersion, request)
+		nodeID, response, err = c.networkClient.RequestAny(ctx, c.stateSyncMinVersion, request)
 	} else {
 		// Get the next nodeID to query using the [nodeIdx] offset.
 		// If we're out of nodes, loop back to 0.
 		// We do this try to query a different node each time if possible.
 		nodeIdx := atomic.AddUint32(&c.stateSyncNodeIdx, 1)
 		nodeID = c.stateSyncNodes[nodeIdx%uint32(len(c.stateSyncNodes))]
-		response, err = c.networkClient.request(ctx, nodeID, request)
+		response, err = c.networkClient.Request(ctx, nodeID, request)
 	}
 	if err != nil {
 		c.metrics.RequestFailed()
-		c.networkClient.trackBandwidth(nodeID, 0)
+		c.networkClient.TrackBandwidth(nodeID, 0)
 		return nodeID, response, err
 	}
 
 	bandwidth := float64(len(response)) / (time.Since(startTime).Seconds() + epsilon)
-	c.networkClient.trackBandwidth(nodeID, bandwidth)
+	c.networkClient.TrackBandwidth(nodeID, bandwidth)
 	c.metrics.RequestSucceeded()
 	return nodeID, response, nil
 }
