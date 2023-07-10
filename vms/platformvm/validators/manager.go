@@ -19,15 +19,17 @@ import (
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/window"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
-	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -55,11 +57,41 @@ type Manager interface {
 	OnAcceptedBlockID(blkID ids.ID)
 }
 
+type State interface {
+	GetTx(txID ids.ID) (*txs.Tx, status.Status, error)
+
+	GetLastAccepted() ids.ID
+	GetStatelessBlock(blockID ids.ID) (blocks.Block, choices.Status, error)
+
+	// ValidatorSet adds all the validators and delegators of [subnetID] into
+	// [vdrs].
+	ValidatorSet(subnetID ids.ID, vdrs validators.Set) error
+
+	// startHeight > endHeight
+	ApplyValidatorWeightDiffs(
+		ctx context.Context,
+		validators map[ids.NodeID]*validators.GetValidatorOutput,
+		startHeight uint64,
+		endHeight uint64,
+		subnetID ids.ID,
+	) error
+
+	// Returns a map of node ID --> BLS Public Key for all validators
+	// that left the Primary Network validator set.
+	// startHeight > endHeight
+	ApplyValidatorPublicKeyDiffs(
+		ctx context.Context,
+		validators map[ids.NodeID]*validators.GetValidatorOutput,
+		startHeight uint64,
+		endHeight uint64,
+	) error
+}
+
 func NewManager(
 	log logging.Logger,
 	cfg config.Config,
 	acceptLock *sync.RWMutex,
-	state state.State,
+	state State,
 	metrics metrics.Metrics,
 	clk *mockable.Clock,
 	tracer trace.Tracer,
@@ -88,7 +120,7 @@ type manager struct {
 	log        logging.Logger
 	cfg        config.Config
 	acceptLock *sync.RWMutex
-	state      state.State
+	state      State
 	metrics    metrics.Metrics
 	clk        *mockable.Clock
 	tracer     trace.Tracer
