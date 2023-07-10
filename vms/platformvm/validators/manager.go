@@ -121,16 +121,16 @@ type manager struct {
 // described above and we will always return the last accepted block height
 // as the minimum.
 func (m *manager) GetMinimumHeight(ctx context.Context) (uint64, error) {
-	if m.cfg.UseCurrentHeight {
-		return m.GetCurrentHeight(ctx)
-	}
-
 	m.acceptLock.RLock()
 	defer m.acceptLock.RUnlock()
 
+	if m.cfg.UseCurrentHeight {
+		return m.getCurrentHeight(ctx)
+	}
+
 	oldest, ok := m.recentlyAccepted.Oldest()
 	if !ok {
-		return m.GetCurrentHeight(ctx)
+		return m.getCurrentHeight(ctx)
 	}
 
 	blk, _, err := m.state.GetStatelessBlock(oldest)
