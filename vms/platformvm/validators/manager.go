@@ -126,7 +126,7 @@ func (m *manager) GetMinimumHeight(ctx context.Context) (uint64, error) {
 	}
 
 	m.acceptLock.RLock()
-	defer m.acceptLock.Unlock()
+	defer m.acceptLock.RUnlock()
 
 	oldest, ok := m.recentlyAccepted.Oldest()
 	if !ok {
@@ -389,7 +389,7 @@ func (m *manager) GetSubnetID(_ context.Context, chainID ids.ID) (ids.ID, error)
 	}
 
 	m.acceptLock.RLock()
-	defer m.acceptLock.Unlock()
+	defer m.acceptLock.RUnlock()
 
 	chainTx, _, err := m.state.GetTx(chainID)
 	if err != nil {

@@ -2546,6 +2546,9 @@ type GetValidatorsAtReply struct {
 // GetValidatorsAt returns the weights of the validator set of a provided subnet
 // at the specified height.
 func (s *Service) GetValidatorsAt(r *http.Request, args *GetValidatorsAtArgs, reply *GetValidatorsAtReply) error {
+	s.vm.ctx.Lock.Unlock()
+	defer s.vm.ctx.Lock.Lock()
+
 	height := uint64(args.Height)
 	s.vm.ctx.Log.Debug("API called",
 		zap.String("service", "platform"),
