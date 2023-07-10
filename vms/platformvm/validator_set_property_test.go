@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -189,7 +190,7 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 						return fmt.Sprintf("failed GetValidatorSet: %s", err.Error())
 					}
 					if !reflect.DeepEqual(validatorsSet, res) {
-						return fmt.Sprintf("failed validators set comparison: %s", err.Error())
+						return "failed validators set comparison"
 					}
 				}
 			}
@@ -711,9 +712,15 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 	primaryVdrs := validators.NewSet()
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 
+	tracer, err := trace.New(trace.Config{})
+	if err != nil {
+		return nil, ids.Empty, err
+	}
+
 	forkTime := defaultGenesisTime
 	vm := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
+		Tracer:                 tracer,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		SybilProtectionEnabled: true,
 		Validators:             vdrs,

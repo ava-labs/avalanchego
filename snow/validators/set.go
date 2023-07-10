@@ -70,6 +70,9 @@ type Set interface {
 	// Len returns the number of validators currently in the set.
 	Len() int
 
+	// Map of the validators in this group
+	Map() map[ids.NodeID]*GetValidatorOutput
+
 	// List all the validators in this group
 	List() []*Validator
 
@@ -316,6 +319,21 @@ func (s *vdrSet) Len() int {
 
 func (s *vdrSet) len() int {
 	return len(s.vdrSlice)
+}
+
+func (s *vdrSet) Map() map[ids.NodeID]*GetValidatorOutput {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	set := make(map[ids.NodeID]*GetValidatorOutput, len(s.vdrSlice))
+	for _, vdr := range s.vdrSlice {
+		set[vdr.NodeID] = &GetValidatorOutput{
+			NodeID:    vdr.NodeID,
+			PublicKey: vdr.PublicKey,
+			Weight:    vdr.Weight,
+		}
+	}
+	return set
 }
 
 func (s *vdrSet) List() []*Validator {

@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
@@ -160,6 +161,10 @@ func newStateFromDB(require *require.Assertions, db database.Database) State {
 	vdrs := validators.NewManager()
 	primaryVdrs := validators.NewSet()
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
+
+	tracer, err := trace.New(trace.Config{})
+	require.NoError(err)
+
 	state, err := newState(
 		db,
 		metrics.Noop,
@@ -175,6 +180,7 @@ func newStateFromDB(require *require.Assertions, db database.Database) State {
 			SupplyCap:          720 * units.MegaAvax,
 		}),
 		&utils.Atomic[bool]{},
+		tracer,
 		trackChecksum,
 	)
 	require.NoError(err)

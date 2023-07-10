@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
@@ -653,6 +654,9 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 		require.Equal(choices.Accepted, status)
 	}
 
+	tracer, err := trace.New(trace.Config{})
+	require.NoError(err)
+
 	// Force a reload of the state from the database.
 	vm.Config.Validators = validators.NewManager()
 	vm.Config.Validators.Add(constants.PrimaryNetworkID, validators.NewSet())
@@ -665,6 +669,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 		metrics.Noop,
 		reward.NewCalculator(vm.Config.RewardConfig),
 		&utils.Atomic[bool]{},
+		tracer,
 		trackChecksum,
 	)
 	require.NoError(err)
@@ -963,6 +968,9 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		require.Equal(choices.Accepted, status)
 	}
 
+	tracer, err := trace.New(trace.Config{})
+	require.NoError(err)
+
 	// Force a reload of the state from the database.
 	vm.Config.Validators = validators.NewManager()
 	vm.Config.Validators.Add(constants.PrimaryNetworkID, validators.NewSet())
@@ -975,6 +983,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		metrics.Noop,
 		reward.NewCalculator(vm.Config.RewardConfig),
 		&utils.Atomic[bool]{},
+		tracer,
 		trackChecksum,
 	)
 	require.NoError(err)

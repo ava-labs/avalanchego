@@ -37,6 +37,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/subnets"
+	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
@@ -301,8 +302,13 @@ func defaultVM(t *testing.T) (*VM, database.Database, *mutableSharedMemory) {
 	vdrs := validators.NewManager()
 	primaryVdrs := validators.NewSet()
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
+
+	tracer, err := trace.New(trace.Config{})
+	require.NoError(err)
+
 	vm := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
+		Tracer:                 tracer,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		SybilProtectionEnabled: true,
 		Validators:             vdrs,
@@ -361,7 +367,6 @@ func defaultVM(t *testing.T) (*VM, database.Database, *mutableSharedMemory) {
 	// Create a subnet and store it in testSubnet1
 	// Note: following Banff activation, block acceptance will move
 	// chain time ahead
-	var err error
 	testSubnet1, err = vm.txBuilder.NewCreateSubnetTx(
 		2, // threshold; 2 sigs from keys[0], keys[1], keys[2] needed to add validator to this subnet
 		// control keys are keys[0], keys[1], keys[2]
