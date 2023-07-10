@@ -6,6 +6,7 @@ package builder
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -168,6 +169,7 @@ func newEnvironment(t *testing.T) *environment {
 	res.blkManager = blockexecutor.NewManager(
 		res.mempool,
 		metrics,
+		&sync.RWMutex{},
 		res.state,
 		&res.backend,
 		pvalidators.TestManager,

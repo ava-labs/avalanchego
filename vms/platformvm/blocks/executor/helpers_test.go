@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -203,6 +204,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 		res.blkManager = NewManager(
 			res.mempool,
 			metrics,
+			&sync.RWMutex{},
 			res.state,
 			res.backend,
 			pvalidators.TestManager,
@@ -212,6 +214,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 		res.blkManager = NewManager(
 			res.mempool,
 			metrics,
+			&sync.RWMutex{},
 			res.mockedState,
 			res.backend,
 			pvalidators.TestManager,
