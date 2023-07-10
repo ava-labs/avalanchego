@@ -81,7 +81,7 @@ func NewMessageMetrics(
 
 type Metrics struct {
 	Log            logging.Logger
-	ClocksSkew     prometheus.Gauge
+	ClockSkew      metric.Averager
 	FailedToParse  prometheus.Counter
 	MessageMetrics map[message.Op]*MessageMetrics
 }
@@ -93,11 +93,6 @@ func NewMetrics(
 ) (*Metrics, error) {
 	m := &Metrics{
 		Log: log,
-		ClocksSkew: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "clocks_skew",
-			Help:      fmt.Sprintf("sum of all peer clocks skew"),
-		}),
 		FailedToParse: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "msgs_failed_to_parse",
@@ -113,6 +108,14 @@ func NewMetrics(
 	for _, op := range message.ExternalOps {
 		m.MessageMetrics[op] = NewMessageMetrics(op, namespace, registerer, &errs)
 	}
+
+	m.ClockSkew = metric.NewAveragerWithErrs(
+		namespace,
+		"clock_skew",
+		fmt.Sprintf("clock skew at %s message reception", message.VersionOp.String()),
+		registerer,
+		&errs,
+	)
 	return m, errs.Err
 }
 
