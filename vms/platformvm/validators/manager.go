@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -92,7 +93,8 @@ type manager struct {
 	// Maps caches for each subnet that is currently tracked.
 	// Key: Subnet ID
 	// Value: cache mapping height -> validator set map
-	caches map[ids.ID]cache.Cacher[uint64, map[ids.NodeID]*validators.GetValidatorOutput]
+	cachesLock sync.RWMutex
+	caches     map[ids.ID]cache.Cacher[uint64, map[ids.NodeID]*validators.GetValidatorOutput]
 
 	// sliding window of blocks that were recently accepted
 	recentlyAccepted window.Window[ids.ID]
@@ -152,63 +154,34 @@ func (m *manager) GetCurrentHeight(ctx context.Context) (uint64, error) {
 
 func (m *manager) GetValidatorSet(
 	ctx context.Context,
-	height uint64,
+	targetHeight uint64,
 	subnetID ids.ID,
 ) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 	ctx, span := m.tracer.Start(ctx, "GetValidatorSet", oteltrace.WithAttributes(
-		attribute.Int64("height", int64(height)),
+		attribute.Int64("height", int64(targetHeight)),
 		attribute.Stringer("subnetID", subnetID),
 	))
 	defer span.End()
 
-	lastAcceptedHeight, err := m.GetCurrentHeight(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if lastAcceptedHeight < height {
-		return nil, database.ErrNotFound
-	}
-
-	return m.getValidatorSetFrom(ctx, lastAcceptedHeight, height, subnetID)
-}
-
-// getValidatorSetFrom fetches the validator set of [subnetID] at [targetHeight]
-// or builds it starting from [currentHeight].
-//
-// Invariant: [m.cfg.Validators] contains the validator set at [currentHeight].
-func (m *manager) getValidatorSetFrom(
-	ctx context.Context,
-	currentHeight uint64,
-	targetHeight uint64,
-	subnetID ids.ID,
-) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-	ctx, span := m.tracer.Start(ctx, "getValidatorSetFrom", oteltrace.WithAttributes(
-		attribute.Int64("currentHeight", int64(currentHeight)),
-		attribute.Int64("targetHeight", int64(targetHeight)),
-	))
-	defer span.End()
-
-	validatorSetsCache, exists := m.caches[subnetID]
-	if !exists {
-		validatorSetsCache = &cache.LRU[uint64, map[ids.NodeID]*validators.GetValidatorOutput]{Size: validatorSetsCacheSize}
-		// Only cache tracked subnets
-		if subnetID == constants.PrimaryNetworkID || m.cfg.TrackedSubnets.Contains(subnetID) {
-			m.caches[subnetID] = validatorSetsCache
-		}
-	}
+	validatorSetsCache := m.getValidatorSetCache(subnetID)
 
 	// if validatorSet, ok := validatorSetsCache.Get(targetHeight); ok {
 	// 	m.metrics.IncValidatorSetsCached()
 	// 	return validatorSet, nil
 	// }
 
+	currentHeight, err := m.GetCurrentHeight(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if currentHeight < targetHeight {
+		return nil, database.ErrNotFound
+	}
+
 	// get the start time to track metrics
 	startTime := m.clk.Time()
 
-	var (
-		validatorSet map[ids.NodeID]*validators.GetValidatorOutput
-		err          error
-	)
+	var validatorSet map[ids.NodeID]*validators.GetValidatorOutput
 	if subnetID == constants.PrimaryNetworkID {
 		validatorSet, err = m.makePrimaryNetworkValidatorSet(ctx, currentHeight, targetHeight)
 	} else {
@@ -226,6 +199,34 @@ func (m *manager) getValidatorSetFrom(
 	m.metrics.AddValidatorSetsDuration(duration)
 	m.metrics.AddValidatorSetsHeightDiff(currentHeight - targetHeight)
 	return validatorSet, nil
+}
+
+func (m *manager) getValidatorSetCache(subnetID ids.ID) cache.Cacher[uint64, map[ids.NodeID]*validators.GetValidatorOutput] {
+	// Only cache tracked subnets
+	if subnetID != constants.PrimaryNetworkID && !m.cfg.TrackedSubnets.Contains(subnetID) {
+		return &cache.Empty[uint64, map[ids.NodeID]*validators.GetValidatorOutput]{}
+	}
+
+	m.cachesLock.RLock()
+	validatorSetsCache, exists := m.caches[subnetID]
+	m.cachesLock.RUnlock()
+	if exists {
+		return validatorSetsCache
+	}
+
+	m.cachesLock.Lock()
+	defer m.cachesLock.Unlock()
+
+	validatorSetsCache, exists = m.caches[subnetID]
+	if exists {
+		return validatorSetsCache
+	}
+
+	validatorSetsCache = &cache.LRU[uint64, map[ids.NodeID]*validators.GetValidatorOutput]{
+		Size: validatorSetsCacheSize,
+	}
+	m.caches[subnetID] = validatorSetsCache
+	return validatorSetsCache
 }
 
 func (m *manager) makePrimaryNetworkValidatorSet(
