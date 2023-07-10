@@ -57,7 +57,7 @@ func getWeightKey(subnetID ids.ID, height uint64, nodeID ids.NodeID) []byte {
 
 func parseWeightKey(key []byte) (ids.ID, uint64, ids.NodeID, error) {
 	if len(key) != weightKeyLength {
-		return ids.Empty, 0, ids.EmptyNodeID, errUnexpectedWeightValueLength
+		return ids.Empty, 0, ids.EmptyNodeID, errUnexpectedWeightKeyLength
 	}
 	var (
 		subnetID ids.ID
@@ -82,7 +82,7 @@ func getWeightValue(diff *ValidatorWeightDiff) []byte {
 
 func parseWeightValue(value []byte) (*ValidatorWeightDiff, error) {
 	if len(value) != weightValueLength {
-		return nil, errUnexpectedWeightKeyLength
+		return nil, errUnexpectedWeightValueLength
 	}
 	return &ValidatorWeightDiff{
 		Decrease: value[0] == weightValueTrue,
