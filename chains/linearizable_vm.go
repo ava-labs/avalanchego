@@ -62,7 +62,17 @@ func (vm *initializeOnLinearizeVM) Linearize(ctx context.Context, stopVertexID i
 // channel to the VM that is being linearized.
 type linearizeOnInitializeVM struct {
 	vertex.LinearizableVMWithEngine
+	hVM          block.HeightIndexedChainVM
 	stopVertexID ids.ID
+}
+
+func NewLinearizeOnInitializeVM(vm vertex.LinearizableVMWithEngine, stopVertexID ids.ID) *linearizeOnInitializeVM {
+	hVM, _ := vm.(block.HeightIndexedChainVM)
+	return &linearizeOnInitializeVM{
+		LinearizableVMWithEngine: vm,
+		hVM:                      hVM,
+		stopVertexID:             stopVertexID,
+	}
 }
 
 func (vm *linearizeOnInitializeVM) Initialize(
@@ -77,4 +87,20 @@ func (vm *linearizeOnInitializeVM) Initialize(
 	_ common.AppSender,
 ) error {
 	return vm.Linearize(ctx, vm.stopVertexID, toEngine)
+}
+
+func (vm *linearizeOnInitializeVM) VerifyHeightIndex(ctx context.Context) error {
+	if vm.hVM == nil {
+		return block.ErrHeightIndexedVMNotImplemented
+	}
+
+	return vm.hVM.VerifyHeightIndex(ctx)
+}
+
+func (vm *linearizeOnInitializeVM) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, error) {
+	if vm.hVM == nil {
+		return ids.Empty, block.ErrHeightIndexedVMNotImplemented
+	}
+
+	return vm.hVM.GetBlockIDAtHeight(ctx, height)
 }
