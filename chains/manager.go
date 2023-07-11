@@ -754,7 +754,7 @@ func (m *manager) createAvalancheChain(
 
 	chainAlias := m.PrimaryAliasOrDefault(ctx.ChainID)
 
-	untracedVMWrappedInsideProposerVM := NewLinearizeOnInitializeVM(vm, ids.Empty)
+	untracedVMWrappedInsideProposerVM := NewLinearizeOnInitializeVM(vm)
 
 	var vmWrappedInsideProposerVM block.ChainVM = untracedVMWrappedInsideProposerVM
 	if m.TracingEnabled {

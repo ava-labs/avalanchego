@@ -17,8 +17,9 @@ import (
 )
 
 var (
-	_ vertex.LinearizableVM = (*initializeOnLinearizeVM)(nil)
-	_ block.ChainVM         = (*linearizeOnInitializeVM)(nil)
+	_ vertex.LinearizableVM      = (*initializeOnLinearizeVM)(nil)
+	_ block.ChainVM              = (*linearizeOnInitializeVM)(nil)
+	_ block.HeightIndexedChainVM = (*linearizeOnInitializeVM)(nil)
 )
 
 // initializeOnLinearizeVM transforms the consensus engine's call to Linearize
@@ -66,12 +67,11 @@ type linearizeOnInitializeVM struct {
 	stopVertexID ids.ID
 }
 
-func NewLinearizeOnInitializeVM(vm vertex.LinearizableVMWithEngine, stopVertexID ids.ID) *linearizeOnInitializeVM {
+func NewLinearizeOnInitializeVM(vm vertex.LinearizableVMWithEngine) *linearizeOnInitializeVM {
 	hVM, _ := vm.(block.HeightIndexedChainVM)
 	return &linearizeOnInitializeVM{
 		LinearizableVMWithEngine: vm,
 		hVM:                      hVM,
-		stopVertexID:             stopVertexID,
 	}
 }
 
