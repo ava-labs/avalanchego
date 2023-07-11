@@ -103,6 +103,14 @@ type Chain interface {
 	GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error)
 	AddRewardUTXO(txID ids.ID, utxo *avax.UTXO)
 
+	// SetDelegateeReward sets the accrued delegation rewards for [nodeID] on
+	// [subnetID] to [amount].
+	SetDelegateeReward(subnetID ids.ID, nodeID ids.NodeID, amount uint64) error
+
+	// GetDelegateeReward returns the accrued delegation rewards for [nodeID] on
+	// [subnetID].
+	GetDelegateeReward(subnetID ids.ID, nodeID ids.NodeID) (uint64, error)
+
 	GetSubnets() ([]*txs.Tx, error)
 	AddSubnet(createSubnetTx *txs.Tx)
 
