@@ -9,6 +9,16 @@ use async_trait::async_trait;
 
 use crate::v2::api::{self, Batch, KeyType, ValueType};
 
+#[cfg_attr(doc, aquamarine::aquamarine)]
+/// ```mermaid
+/// graph LR
+///     RevRootHash --> DBRevID
+///     RevHeight --> DBRevID
+///     DBRevID -- Identify --> DbRev
+///     Db/Proposal -- propose with batch --> Proposal
+///     Proposal -- translate --> DbRev
+///     DB -- commit proposal --> DB
+/// ```
 #[derive(Debug, Default)]
 pub struct Db {
     latest_cache: Mutex<Option<Arc<DbView>>>,
