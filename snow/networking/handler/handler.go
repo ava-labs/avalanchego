@@ -309,6 +309,7 @@ func (h *handler) Stop(ctx context.Context) {
 		// we check the value of [h.closing] after the call to [Signal].
 		h.syncMessageQueue.Shutdown()
 		h.asyncMessageQueue.Shutdown()
+		h.asyncMessagePool.Shutdown() // TODO ABENEGIA: WRONG. We must ensure send is not called after Shutdown
 		close(h.closingChan)
 
 		// TODO: switch this to use a [context.Context] with a cancel function.

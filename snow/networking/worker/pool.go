@@ -12,7 +12,7 @@ type Request func()
 type Pool interface {
 	// Send the request to the worker pool.
 	//
-	// Send should never be called after [Shutdown] is called.
+	// Send can be safely called after [Shutdown] but it won't carry out the request.
 	Send(Request)
 
 	// Shutdown the worker pool.
@@ -29,11 +29,15 @@ type pool struct {
 
 	shutdownOnce sync.Once
 	shutdownWG   sync.WaitGroup
+
+	// close to signal the workers to stop working
+	quit chan struct{}
 }
 
 func NewPool(size int) Pool {
 	p := &pool{
 		requests: make(chan Request),
+		quit:     make(chan struct{}),
 	}
 	p.shutdownWG.Add(size)
 	for w := 0; w < size; w++ {
@@ -45,18 +49,27 @@ func NewPool(size int) Pool {
 func (p *pool) runWorker() {
 	defer p.shutdownWG.Done()
 
-	for request := range p.requests {
-		request()
+	for {
+		select {
+		case <-p.quit:
+			return // stop worker
+		case request := <-p.requests:
+			request()
+		}
 	}
 }
 
 func (p *pool) Shutdown() {
 	p.shutdownOnce.Do(func() {
+		close(p.quit)
 		close(p.requests)
 	})
 	p.shutdownWG.Wait()
 }
 
 func (p *pool) Send(msg Request) {
-	p.requests <- msg
+	select {
+	case p.requests <- msg:
+	case <-p.quit:
+	}
 }
