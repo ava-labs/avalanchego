@@ -850,7 +850,6 @@ func (p *peer) handleVersion(msg *p2p.Version) {
 	myTime := p.Clock.Unix()
 	clockDifference := math.Abs(float64(msg.MyTime) - float64(myTime))
 
-	// add clock skew to metric
 	p.Metrics.ClockSkew.Observe(clockDifference)
 
 	if clockDifference > p.MaxClockDifference.Seconds() {
