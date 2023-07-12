@@ -377,6 +377,7 @@ func TestRouterTimeout(t *testing.T) {
 		calledQueryFailed,
 		calledAppRequestFailed,
 		calledCrossChainAppRequestFailed bool
+
 		wg = sync.WaitGroup{}
 	)
 
