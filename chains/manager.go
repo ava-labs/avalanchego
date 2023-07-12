@@ -758,9 +758,6 @@ func (m *manager) createAvalancheChain(
 	untracedVMWrappedInsideProposerVM := NewLinearizeOnInitializeVM(vm)
 
 	var vmWrappedInsideProposerVM block.ChainVM = untracedVMWrappedInsideProposerVM
-	if m.MeterVMEnabled {
-		vmWrappedInsideProposerVM = metervm.NewBlockVM(vmWrappedInsideProposerVM)
-	}
 	if m.TracingEnabled {
 		vmWrappedInsideProposerVM = tracedvm.NewBlockVM(vmWrappedInsideProposerVM, chainAlias, m.Tracer)
 	}
