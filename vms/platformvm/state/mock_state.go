@@ -83,15 +83,15 @@ func (mr *MockStateMockRecorder) AddRewardUTXO(arg0, arg1 interface{}) *gomock.C
 }
 
 // AddStatelessBlock mocks base method.
-func (m *MockState) AddStatelessBlock(arg0 blocks.Block, arg1 choices.Status) {
+func (m *MockState) AddStatelessBlock(arg0 blocks.Block) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "AddStatelessBlock", arg0, arg1)
+	m.ctrl.Call(m, "AddStatelessBlock", arg0)
 }
 
 // AddStatelessBlock indicates an expected call of AddStatelessBlock.
-func (mr *MockStateMockRecorder) AddStatelessBlock(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockStateMockRecorder) AddStatelessBlock(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddStatelessBlock", reflect.TypeOf((*MockState)(nil).AddStatelessBlock), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddStatelessBlock", reflect.TypeOf((*MockState)(nil).AddStatelessBlock), arg0)
 }
 
 // AddSubnet mocks base method.
