@@ -112,7 +112,7 @@ func NewMetrics(
 	m.ClockSkew = metric.NewAveragerWithErrs(
 		namespace,
 		"clock_skew",
-		fmt.Sprintf("clock skew during peer handshake", message.VersionOp.String()),
+		"clock skew during peer handshake",
 		registerer,
 		&errs,
 	)
