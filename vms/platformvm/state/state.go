@@ -46,6 +46,7 @@ const (
 	transformedSubnetTxCacheSize = 4 * units.MiB
 
 	validatorDiffsCacheSize = 2048
+	blockIDCacheSize        = 2048
 	rewardUTXOsCacheSize    = 2048
 	chainCacheSize          = 2048
 	chainDBCacheSize        = 2048
@@ -61,6 +62,7 @@ var (
 	errValidatorSetAlreadyPopulated = errors.New("validator set already populated")
 	errDuplicateValidatorSet        = errors.New("duplicate validator set")
 
+	blockIDPrefix                 = []byte("blockID")
 	blockPrefix                   = []byte("block")
 	validatorsPrefix              = []byte("validators")
 	currentPrefix                 = []byte("current")
@@ -128,6 +130,8 @@ type State interface {
 
 	// Invariant: [block] is an accepted block.
 	AddStatelessBlock(block blocks.Block)
+
+	GetBlockIDAtHeight(height uint64) (ids.ID, error)
 
 	// ValidatorSet adds all the validators and delegators of [subnetID] into
 	// [vdrs].
@@ -206,6 +210,8 @@ func (b *stateBlk) Size() int {
  * |   '-. height
  * |     '-. list
  * |       '-- nodeID -> public key
+ * |-. blockIDs
+ * | '-- height -> blockID
  * |-. blocks
  * | '-- blockID -> block bytes
  * |-. txs
@@ -245,11 +251,13 @@ type state struct {
 
 	currentHeight uint64
 
-	addedBlocks map[ids.ID]stateBlk // map of blockID -> Block
-	// cache of blockID -> Block
-	// If the block isn't known, nil is cached.
-	blockCache cache.Cacher[ids.ID, *stateBlk]
-	blockDB    database.Database
+	addedBlockIDs map[uint64]ids.ID            // map of height -> blockID
+	blockIDCache  cache.Cacher[uint64, ids.ID] // cache of height -> blockID. If the entry is ids.Empty, it is not in the database
+	blockIDDB     database.Database
+
+	addedBlocks map[ids.ID]stateBlk             // map of blockID -> Block
+	blockCache  cache.Cacher[ids.ID, *stateBlk] // cache of blockID -> Block. If the entry is nil, it is not in the database
+	blockDB     database.Database
 
 	validatorsDB                 database.Database
 	currentValidatorsDB          database.Database
@@ -403,6 +411,15 @@ func new(
 	bootstrapped *utils.Atomic[bool],
 	trackChecksums bool,
 ) (*state, error) {
+	blockIDCache, err := metercacher.New[uint64, ids.ID](
+		"block_id_cache",
+		metricsReg,
+		&cache.LRU[uint64, ids.ID]{Size: blockIDCacheSize},
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	blockCache, err := metercacher.New(
 		"block_cache",
 		metricsReg,
@@ -520,6 +537,10 @@ func new(
 		rewards:      rewards,
 		bootstrapped: bootstrapped,
 		baseDB:       baseDB,
+
+		addedBlockIDs: make(map[uint64]ids.ID),
+		blockIDCache:  blockIDCache,
+		blockIDDB:     prefixdb.New(blockIDPrefix, baseDB),
 
 		addedBlocks: make(map[ids.ID]stateBlk),
 		blockCache:  blockCache,
@@ -1391,6 +1412,7 @@ func (s *state) initValidatorSets() error {
 func (s *state) write(updateValidators bool, height uint64) error {
 	errs := wrappers.Errs{}
 	errs.Add(
+		s.writeBlockIDs(),
 		s.writeBlocks(),
 		s.writeCurrentStakers(updateValidators, height),
 		s.writePendingStakers(),
@@ -1430,6 +1452,7 @@ func (s *state) Close() error {
 		s.chainDB.Close(),
 		s.singletonDB.Close(),
 		s.blockDB.Close(),
+		s.blockIDDB.Close(),
 	)
 	return errs.Err
 }
@@ -1489,7 +1512,9 @@ func (s *state) init(genesisBytes []byte) error {
 }
 
 func (s *state) AddStatelessBlock(block blocks.Block) {
-	s.addedBlocks[block.ID()] = stateBlk{
+	blkID := block.ID()
+	s.addedBlockIDs[block.Height()] = blkID
+	s.addedBlocks[blkID] = stateBlk{
 		Blk:    block,
 		Bytes:  block.Bytes(),
 		Status: choices.Accepted,
@@ -1524,6 +1549,19 @@ func (s *state) CommitBatch() (database.Batch, error) {
 		return nil, err
 	}
 	return s.baseDB.CommitBatch()
+}
+
+func (s *state) writeBlockIDs() error {
+	for height, blkID := range s.addedBlockIDs {
+		heightKey := database.PackUInt64(height)
+
+		delete(s.addedBlockIDs, height)
+		s.blockIDCache.Put(height, blkID)
+		if err := database.PutID(s.blockIDDB, heightKey, blkID); err != nil {
+			return fmt.Errorf("failed to add blockID: %w", err)
+		}
+	}
+	return nil
 }
 
 func (s *state) writeBlocks() error {
@@ -1583,6 +1621,33 @@ func (s *state) GetStatelessBlock(blockID ids.ID) (blocks.Block, choices.Status,
 
 	s.blockCache.Put(blockID, &blkState)
 	return blkState.Blk, blkState.Status, nil
+}
+
+func (s *state) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
+	if blkID, exists := s.addedBlockIDs[height]; exists {
+		return blkID, nil
+	}
+	if blkID, cached := s.blockIDCache.Get(height); cached {
+		if blkID == ids.Empty {
+			return ids.Empty, database.ErrNotFound
+		}
+
+		return blkID, nil
+	}
+
+	heightKey := database.PackUInt64(height)
+
+	blkID, err := database.GetID(s.blockIDDB, heightKey)
+	if err == database.ErrNotFound {
+		s.blockIDCache.Put(height, ids.Empty)
+		return ids.Empty, database.ErrNotFound
+	}
+	if err != nil {
+		return ids.Empty, err
+	}
+
+	s.blockIDCache.Put(height, blkID)
+	return blkID, nil
 }
 
 func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error {
