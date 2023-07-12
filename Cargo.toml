@@ -3,7 +3,6 @@ members = [
   "firewood-growth-ring",
   "firewood-libaio",
   "firewood-shale",
-  "shale-archive",
   "firewood",
   "fwdctl",
 ]
