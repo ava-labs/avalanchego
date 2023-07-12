@@ -9,7 +9,7 @@ license = "MIT"
 
 [dependencies]
 hex = "0.4.3"
-lru = "0.10.0"
+lru = "0.11.0"
 thiserror = "1.0.38"
 
 [dev-dependencies]
