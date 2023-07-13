@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/proposervm/indexer"
@@ -54,8 +55,25 @@ var (
 	_ block.HeightIndexedChainVM = (*VM)(nil)
 	_ block.StateSyncableVM      = (*VM)(nil)
 
+	// TODO: remove after the X-chain supports height indexing.
+	mainnetXChainID ids.ID
+	fujiXChainID    ids.ID
+
 	dbPrefix = []byte("proposervm")
 )
+
+func init() {
+	var err error
+	mainnetXChainID, err = ids.FromString("2oYMBNV4eNHyqk2fjjV5nVQLDbtmNJzq5s3qs3Lo6ftnC6FByM")
+	if err != nil {
+		panic(err)
+	}
+
+	fujiXChainID, err = ids.FromString("2JVSBoinj9C2J33VntvzYtVJNZdN2NKiwwKjcumHUWEb5DbBrm")
+	if err != nil {
+		panic(err)
+	}
+}
 
 type VM struct {
 	block.ChainVM
@@ -219,7 +237,26 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	return vm.setLastAcceptedMetadata(ctx)
+	if err := vm.setLastAcceptedMetadata(ctx); err != nil {
+		return err
+	}
+
+	forkHeight, err := vm.getForkHeight()
+	switch err {
+	case nil:
+		chainCtx.Log.Info("initialized proposervm",
+			zap.String("state", "after fork"),
+			zap.Uint64("forkHeight", forkHeight),
+			zap.Uint64("lastAcceptedHeight", vm.lastAcceptedHeight),
+		)
+	case database.ErrNotFound:
+		chainCtx.Log.Info("initialized proposervm",
+			zap.String("state", "before fork"),
+		)
+	default:
+		return err
+	}
+	return nil
 }
 
 // shutdown ops then propagate shutdown to innerVM
@@ -654,6 +691,26 @@ func (vm *VM) getBlock(ctx context.Context, id ids.ID) (Block, error) {
 		return blk, nil
 	}
 	return vm.getPreForkBlock(ctx, id)
+}
+
+// TODO: remove after the P-chain and X-chain support height indexing.
+func (vm *VM) getForkHeight() (uint64, error) {
+	// The fork block can be easily identified with the provided links because
+	// the `Parent Hash` is equal to the `Proposer Parent ID`.
+	switch vm.ctx.ChainID {
+	case constants.PlatformChainID:
+		switch vm.ctx.NetworkID {
+		case constants.MainnetID:
+			return 805732, nil // https://subnets.avax.network/p-chain/block/805732
+		case constants.FujiID:
+			return 47529, nil // https://subnets-test.avax.network/p-chain/block/47529
+		}
+	case mainnetXChainID:
+		return 1, nil // https://subnets.avax.network/x-chain/block/1
+	case fujiXChainID:
+		return 1, nil // https://subnets-test.avax.network/x-chain/block/1
+	}
+	return vm.GetForkHeight()
 }
 
 func (vm *VM) getPostForkBlock(ctx context.Context, blkID ids.ID) (PostForkBlock, error) {
