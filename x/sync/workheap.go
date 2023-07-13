@@ -43,11 +43,15 @@ func newWorkHeap() *workHeap {
 				aNothing := a.workItem.start.IsNothing()
 				bNothing := b.workItem.start.IsNothing()
 				if aNothing {
+					// [a] is Nothing, so if [b] is Nothing they're equal.
+					// Otherwise, [b] is greater.
 					return !bNothing
 				}
 				if bNothing {
+					// [a] and [b] are both Nothing so they're equal.
 					return false
 				}
+				// [a] and [b] both contain values. Compare the values.
 				return bytes.Compare(a.workItem.start.Value(), b.workItem.start.Value()) < 0
 			},
 		),
