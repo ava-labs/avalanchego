@@ -113,7 +113,8 @@ func (p *pool) Shutdown() {
 
 	p.shutdownOnce.Do(func() {
 		close(p.quit)
-		close(p.requests)
+		// We don't close requests channel to avoid panics
+		// upon sending request over a closed channel.
 	})
 	p.shutdownWG.Wait()
 }
