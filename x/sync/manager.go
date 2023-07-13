@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"go.uber.org/zap"
+	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -416,13 +417,13 @@ func (m *Manager) findNextKey(
 		localProofNodes = localProofNodes[:len(localProofNodes)-1]
 	}
 
-	var nextKey []byte
+	nextKey := merkledb.Nothing[[]byte]()
 
 	localProofNodeIndex := len(localProofNodes) - 1
 	receivedProofNodeIndex := len(endProof) - 1
 
 	// traverse the two proofs from the deepest nodes up to the root until a difference is found
-	for localProofNodeIndex >= 0 && receivedProofNodeIndex >= 0 && nextKey == nil {
+	for localProofNodeIndex >= 0 && receivedProofNodeIndex >= 0 && nextKey.IsNothing() {
 		localProofNode := localProofNodes[localProofNodeIndex]
 		receivedProofNode := endProof[receivedProofNodeIndex]
 
@@ -482,7 +483,7 @@ func (m *Manager) findNextKey(
 
 		// determine if there are any differences in the children for the deepest unhandled node of the two proofs
 		if childIndex, hasDifference := findChildDifference(deepestNode, deepestNodeFromOtherProof, startingChildNibble); hasDifference {
-			nextKey = deepestNode.KeyPath.AppendNibble(childIndex).Value
+			nextKey = merkledb.Some(deepestNode.KeyPath.AppendNibble(childIndex).Value)
 			break
 		}
 	}
@@ -490,22 +491,18 @@ func (m *Manager) findNextKey(
 	// If the [nextKey] is before or equal to the [lastReceivedKey]
 	// then we couldn't find a better answer than the [lastReceivedKey].
 	// Set the nextKey to [lastReceivedKey] + 0, which is the first key in the open range (lastReceivedKey, rangeEnd)
-	if nextKey != nil && bytes.Compare(nextKey, lastReceivedKey) <= 0 {
-		nextKey = lastReceivedKey
-		nextKey = append(nextKey, 0)
+	if !nextKey.IsNothing() && bytes.Compare(nextKey.Value(), lastReceivedKey) <= 0 {
+		nextKeyVal := slices.Clone(lastReceivedKey)
+		nextKeyVal = append(nextKeyVal, 0)
+		nextKey = merkledb.Some(nextKeyVal)
 	}
 
 	// If the [nextKey] is larger than the end of the range, return Nothing to signal that there is no next key in range
-	if !rangeEnd.IsNothing() && bytes.Compare(nextKey, rangeEnd.Value()) >= 0 {
+	if !rangeEnd.IsNothing() && bytes.Compare(nextKey.Value(), rangeEnd.Value()) >= 0 {
 		return merkledb.Nothing[[]byte](), nil
 	}
 
-	if len(nextKey) == 0 {
-		return merkledb.Nothing[[]byte](), nil
-	}
-
-	// the nextKey is within the open range (lastReceivedKey, rangeEnd), so return it
-	return merkledb.Some(nextKey), nil
+	return nextKey, nil
 }
 
 func (m *Manager) Error() error {
