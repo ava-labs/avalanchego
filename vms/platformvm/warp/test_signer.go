@@ -23,7 +23,7 @@ func TestSignerWrongChainID(t *testing.T, s Signer, _ *bls.SecretKey, _ ids.ID) 
 	require := require.New(t)
 
 	msg, err := NewUnsignedMessage(
-		ids.GenerateTestID(),
+		12345,
 		ids.GenerateTestID(),
 		[]byte("payload"),
 	)
@@ -39,8 +39,8 @@ func TestSignerVerifies(t *testing.T, s Signer, sk *bls.SecretKey, chainID ids.I
 	require := require.New(t)
 
 	msg, err := NewUnsignedMessage(
+		12345,
 		chainID,
-		ids.GenerateTestID(),
 		[]byte("payload"),
 	)
 	require.NoError(err)

@@ -16,7 +16,7 @@ func TestUnsignedMessage(t *testing.T) {
 	require := require.New(t)
 
 	msg, err := NewUnsignedMessage(
-		ids.GenerateTestID(),
+		12345,
 		ids.GenerateTestID(),
 		[]byte("payload"),
 	)

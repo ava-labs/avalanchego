@@ -172,8 +172,8 @@ func TestSignatureVerification(t *testing.T) {
 			quorumDen: 2,
 			msgF: func(require *require.Assertions) *Message {
 				unsignedMsg, err := NewUnsignedMessage(
+					12345,
 					sourceChainID,
-					ids.Empty,
 					nil,
 				)
 				require.NoError(err)
@@ -199,8 +199,8 @@ func TestSignatureVerification(t *testing.T) {
 			quorumDen: 2,
 			msgF: func(require *require.Assertions) *Message {
 				unsignedMsg, err := NewUnsignedMessage(
+					12345,
 					sourceChainID,
-					ids.Empty,
 					nil,
 				)
 				require.NoError(err)
@@ -259,8 +259,8 @@ func TestSignatureVerification(t *testing.T) {
 			quorumDen: 2,
 			msgF: func(require *require.Assertions) *Message {
 				unsignedMsg, err := NewUnsignedMessage(
+					12345,
 					sourceChainID,
-					ids.Empty,
 					[]byte{1, 2, 3},
 				)
 				require.NoError(err)
@@ -289,8 +289,8 @@ func TestSignatureVerification(t *testing.T) {
 			quorumDen: 2,
 			msgF: func(require *require.Assertions) *Message {
 				unsignedMsg, err := NewUnsignedMessage(
+					12345,
 					sourceChainID,
-					ids.Empty,
 					[]byte{1, 2, 3},
 				)
 				require.NoError(err)
@@ -322,8 +322,8 @@ func TestSignatureVerification(t *testing.T) {
 			quorumDen: 1,
 			msgF: func(require *require.Assertions) *Message {
 				unsignedMsg, err := NewUnsignedMessage(
+					12345,
 					sourceChainID,
-					ids.Empty,
 					[]byte{1, 2, 3},
 				)
 				require.NoError(err)
@@ -366,8 +366,8 @@ func TestSignatureVerification(t *testing.T) {
 			quorumDen: 2,
 			msgF: func(require *require.Assertions) *Message {
 				unsignedMsg, err := NewUnsignedMessage(
+					12345,
 					sourceChainID,
-					ids.Empty,
 					[]byte{1, 2, 3},
 				)
 				require.NoError(err)
@@ -400,8 +400,8 @@ func TestSignatureVerification(t *testing.T) {
 			quorumDen: 2,
 			msgF: func(require *require.Assertions) *Message {
 				unsignedMsg, err := NewUnsignedMessage(
+					12345,
 					sourceChainID,
-					ids.Empty,
 					[]byte{1, 2, 3},
 				)
 				require.NoError(err)
@@ -435,8 +435,8 @@ func TestSignatureVerification(t *testing.T) {
 			quorumDen: 5,
 			msgF: func(require *require.Assertions) *Message {
 				unsignedMsg, err := NewUnsignedMessage(
+					12345,
 					sourceChainID,
-					ids.Empty,
 					[]byte{1, 2, 3},
 				)
 				require.NoError(err)
@@ -479,8 +479,8 @@ func TestSignatureVerification(t *testing.T) {
 			quorumDen: 5,
 			msgF: func(require *require.Assertions) *Message {
 				unsignedMsg, err := NewUnsignedMessage(
+					12345,
 					sourceChainID,
-					ids.Empty,
 					[]byte{1, 2, 3},
 				)
 				require.NoError(err)
@@ -519,8 +519,8 @@ func TestSignatureVerification(t *testing.T) {
 			quorumDen: 5,
 			msgF: func(require *require.Assertions) *Message {
 				unsignedMsg, err := NewUnsignedMessage(
+					12345,
 					sourceChainID,
-					ids.Empty,
 					[]byte{1, 2, 3},
 				)
 				require.NoError(err)
@@ -564,8 +564,8 @@ func TestSignatureVerification(t *testing.T) {
 			quorumDen: 2,
 			msgF: func(require *require.Assertions) *Message {
 				unsignedMsg, err := NewUnsignedMessage(
+					12345,
 					sourceChainID,
-					ids.Empty,
 					[]byte{1, 2, 3},
 				)
 				require.NoError(err)
@@ -608,8 +608,8 @@ func TestSignatureVerification(t *testing.T) {
 			quorumDen: 3,
 			msgF: func(require *require.Assertions) *Message {
 				unsignedMsg, err := NewUnsignedMessage(
+					12345,
 					sourceChainID,
-					ids.Empty,
 					[]byte{1, 2, 3},
 				)
 				require.NoError(err)
@@ -668,8 +668,8 @@ func TestSignatureVerification(t *testing.T) {
 			quorumDen: 3,
 			msgF: func(require *require.Assertions) *Message {
 				unsignedMsg, err := NewUnsignedMessage(
+					12345,
 					sourceChainID,
-					ids.Empty,
 					[]byte{1, 2, 3},
 				)
 				require.NoError(err)
@@ -729,8 +729,8 @@ func TestSignatureVerification(t *testing.T) {
 			quorumDen: 3,
 			msgF: func(require *require.Assertions) *Message {
 				unsignedMsg, err := NewUnsignedMessage(
+					12345,
 					sourceChainID,
-					ids.Empty,
 					[]byte{1, 2, 3},
 				)
 				require.NoError(err)
