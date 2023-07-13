@@ -546,7 +546,6 @@ func TestOptionTimestampValidity(t *testing.T) {
 	require := require.New(t)
 
 	coreVM, _, proVM, coreGenBlk, db := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
-	defer require.NoError(proVM.Shutdown(context.Background()))
 
 	coreOracleBlkID := ids.GenerateTestID()
 	coreOracleBlk := &TestOptionsBlock{
@@ -647,10 +646,11 @@ func TestOptionTimestampValidity(t *testing.T) {
 	require.Equal(expectedTime, option.Timestamp())
 
 	require.NoError(option.Accept(context.Background()))
+	require.NoError(proVM.Shutdown(context.Background()))
 
 	// Restart the node.
 	ctx := proVM.ctx
-	restartedProVM := New(
+	proVM = New(
 		coreVM,
 		time.Time{},
 		0,
@@ -705,7 +705,7 @@ func TestOptionTimestampValidity(t *testing.T) {
 		}
 	}
 
-	require.NoError(restartedProVM.Initialize(
+	require.NoError(proVM.Initialize(
 		context.Background(),
 		ctx,
 		db,
@@ -716,9 +716,9 @@ func TestOptionTimestampValidity(t *testing.T) {
 		nil,
 		nil,
 	))
-	defer require.NoError(restartedProVM.Shutdown(context.Background()))
+	defer require.NoError(proVM.Shutdown(context.Background()))
 
-	statefulOptionBlock, err := restartedProVM.ParseBlock(context.Background(), option.Bytes())
+	statefulOptionBlock, err := proVM.ParseBlock(context.Background(), option.Bytes())
 	require.NoError(err)
 
 	require.Equal(choices.Accepted, statefulOptionBlock.Status())

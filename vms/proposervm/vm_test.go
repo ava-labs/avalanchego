@@ -1200,7 +1200,6 @@ func TestInnerVMRollback(t *testing.T) {
 		nil,
 		nil,
 	))
-	defer require.NoError(proVM.Shutdown(context.Background()))
 
 	require.NoError(proVM.SetState(context.Background(), snow.NormalOp))
 
@@ -1262,11 +1261,11 @@ func TestInnerVMRollback(t *testing.T) {
 	require.NoError(err)
 
 	require.Equal(choices.Accepted, fetchedBlock.Status())
+	require.NoError(proVM.Shutdown(context.Background()))
 
 	// Restart the node and have the inner VM rollback state.
 	coreBlk.StatusV = choices.Processing
-
-	restartedProVM := New(
+	proVM = New(
 		coreVM,
 		time.Time{},
 		0,
@@ -1275,7 +1274,7 @@ func TestInnerVMRollback(t *testing.T) {
 		pTestCert.Leaf,
 	)
 
-	require.NoError(restartedProVM.Initialize(
+	require.NoError(proVM.Initialize(
 		context.Background(),
 		ctx,
 		dbManager,
@@ -1286,14 +1285,14 @@ func TestInnerVMRollback(t *testing.T) {
 		nil,
 		nil,
 	))
-	defer require.NoError(restartedProVM.Shutdown(context.Background()))
+	defer require.NoError(proVM.Shutdown(context.Background()))
 
-	lastAcceptedID, err := restartedProVM.LastAccepted(context.Background())
+	lastAcceptedID, err := proVM.LastAccepted(context.Background())
 	require.NoError(err)
 
 	require.Equal(coreGenBlk.IDV, lastAcceptedID)
 
-	parsedBlock, err = restartedProVM.ParseBlock(context.Background(), statelessBlock.Bytes())
+	parsedBlock, err = proVM.ParseBlock(context.Background(), statelessBlock.Bytes())
 	require.NoError(err)
 
 	require.Equal(choices.Processing, parsedBlock.Status())
