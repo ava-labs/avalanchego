@@ -696,20 +696,7 @@ func (m *Manager) enqueueWork(work *workItem) {
 
 	// Split the remaining range into to 2.
 	// Find the middle point.
-	var start []byte
-	if !work.start.IsNothing() {
-		start = work.start.Value()
-	}
-	var end []byte
-	if !work.end.IsNothing() {
-		end = work.end.Value()
-	}
-	midBytes := midPoint(start, end)
-
-	mid := merkledb.Nothing[[]byte]()
-	if len(midBytes) > 0 {
-		mid = merkledb.Some(midBytes)
-	}
+	mid := midPoint(work.start, work.end)
 
 	// first item gets higher priority than the second to encourage finished ranges to grow
 	// rather than start a new range that is not contiguous with existing completed ranges
@@ -721,15 +708,18 @@ func (m *Manager) enqueueWork(work *workItem) {
 }
 
 // find the midpoint between two keys
-// nil on start is treated as all 0's
-// nil on end is treated as all 255's
-func midPoint(start, end []byte) []byte {
+// Nothing/nil [start] is treated as all 0's
+// Nothing/nil [end] is treated as all 255's
+func midPoint(startMaybe, endMaybe merkledb.Maybe[[]byte]) merkledb.Maybe[[]byte] {
+	start := startMaybe.Value()
+	end := endMaybe.Value()
+
 	length := len(start)
 	if len(end) > length {
 		length = len(end)
 	}
 	if length == 0 {
-		return []byte{127}
+		return merkledb.Some([]byte{127})
 	}
 
 	// This check deals with cases where the end has a 255(or is nil which is treated as all 255s) and the start key ends 255.
@@ -783,7 +773,7 @@ func midPoint(start, end []byte) []byte {
 	} else {
 		midpoint = midpoint[0:length]
 	}
-	return midpoint
+	return merkledb.Some(midpoint)
 }
 
 // findChildDifference returns the first child index that is different between node 1 and node 2 if one exists and
