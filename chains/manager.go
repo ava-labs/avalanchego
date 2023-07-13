@@ -755,6 +755,7 @@ func (m *manager) createAvalancheChain(
 
 	chainAlias := m.PrimaryAliasOrDefault(ctx.ChainID)
 
+	// Note: this does not use [dagVM] to ensure we use the [vm]'s height index.
 	untracedVMWrappedInsideProposerVM := NewLinearizeOnInitializeVM(vm)
 
 	var vmWrappedInsideProposerVM block.ChainVM = untracedVMWrappedInsideProposerVM
