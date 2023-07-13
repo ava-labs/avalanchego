@@ -9,7 +9,6 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
@@ -299,7 +298,7 @@ func (a *acceptor) commonAccept(b blocks.Block) error {
 	a.backend.lastAccepted = blkID
 	a.state.SetLastAccepted(blkID)
 	a.state.SetHeight(b.Height())
-	a.state.AddStatelessBlock(b, choices.Accepted)
+	a.state.AddStatelessBlock(b)
 	a.validators.OnAcceptedBlockID(blkID)
 	return nil
 }
