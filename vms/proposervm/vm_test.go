@@ -214,9 +214,7 @@ func TestBuildBlockTimestampAreRoundedToSeconds(t *testing.T) {
 
 	// given the same core block, BuildBlock returns the same proposer block
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
-	defer func() {
-		require.NoError(proVM.Shutdown(context.Background()))
-	}()
+	defer require.NoError(proVM.Shutdown(context.Background()))
 
 	skewedTimestamp := time.Now().Truncate(time.Second).Add(time.Millisecond)
 	proVM.Set(skewedTimestamp)
@@ -247,9 +245,7 @@ func TestBuildBlockIsIdempotent(t *testing.T) {
 
 	// given the same core block, BuildBlock returns the same proposer block
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
-	defer func() {
-		require.NoError(proVM.Shutdown(context.Background()))
-	}()
+	defer require.NoError(proVM.Shutdown(context.Background()))
 
 	coreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -280,9 +276,7 @@ func TestFirstProposerBlockIsBuiltOnTopOfGenesis(t *testing.T) {
 
 	// setup
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
-	defer func() {
-		require.NoError(proVM.Shutdown(context.Background()))
-	}()
+	defer require.NoError(proVM.Shutdown(context.Background()))
 
 	coreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -314,9 +308,7 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 	require := require.New(t)
 
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
-	defer func() {
-		require.NoError(proVM.Shutdown(context.Background()))
-	}()
+	defer require.NoError(proVM.Shutdown(context.Background()))
 
 	// add two proBlks...
 	coreBlk1 := &snowman.TestBlock{
@@ -409,9 +401,7 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 	require := require.New(t)
 
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
-	defer func() {
-		require.NoError(proVM.Shutdown(context.Background()))
-	}()
+	defer require.NoError(proVM.Shutdown(context.Background()))
 
 	coreBlk1 := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -505,9 +495,7 @@ func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
 	require := require.New(t)
 
 	coreVM, _, proVM, _, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
-	defer func() {
-		require.NoError(proVM.Shutdown(context.Background()))
-	}()
+	defer require.NoError(proVM.Shutdown(context.Background()))
 
 	innerBlk := &snowman.TestBlock{
 		BytesV:     []byte{1},
@@ -544,9 +532,7 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 	require := require.New(t)
 
 	coreVM, _, proVM, gencoreBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
-	defer func() {
-		require.NoError(proVM.Shutdown(context.Background()))
-	}()
+	defer require.NoError(proVM.Shutdown(context.Background()))
 
 	// create two Proposer blocks at the same height
 	innerBlk := &snowman.TestBlock{
@@ -615,9 +601,7 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 	require := require.New(t)
 
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
-	defer func() {
-		require.NoError(proVM.Shutdown(context.Background()))
-	}()
+	defer require.NoError(proVM.Shutdown(context.Background()))
 
 	// one block is built from this proVM
 	localcoreBlk := &snowman.TestBlock{
@@ -683,9 +667,7 @@ func TestPreFork_Initialize(t *testing.T) {
 	require := require.New(t)
 
 	_, _, proVM, coreGenBlk, _ := initTestProposerVM(t, mockable.MaxTime, 0) // disable ProBlks
-	defer func() {
-		require.NoError(proVM.Shutdown(context.Background()))
-	}()
+	defer require.NoError(proVM.Shutdown(context.Background()))
 
 	// checks
 	blkID, err := proVM.LastAccepted(context.Background())
@@ -702,9 +684,7 @@ func TestPreFork_BuildBlock(t *testing.T) {
 	require := require.New(t)
 
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, mockable.MaxTime, 0) // disable ProBlks
-	defer func() {
-		require.NoError(proVM.Shutdown(context.Background()))
-	}()
+	defer require.NoError(proVM.Shutdown(context.Background()))
 
 	coreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -741,9 +721,7 @@ func TestPreFork_ParseBlock(t *testing.T) {
 
 	// setup
 	coreVM, _, proVM, _, _ := initTestProposerVM(t, mockable.MaxTime, 0) // disable ProBlks
-	defer func() {
-		require.NoError(proVM.Shutdown(context.Background()))
-	}()
+	defer require.NoError(proVM.Shutdown(context.Background()))
 
 	coreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -776,9 +754,7 @@ func TestPreFork_SetPreference(t *testing.T) {
 	require := require.New(t)
 
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, mockable.MaxTime, 0) // disable ProBlks
-	defer func() {
-		require.NoError(proVM.Shutdown(context.Background()))
-	}()
+	defer require.NoError(proVM.Shutdown(context.Background()))
 
 	coreBlk0 := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -934,9 +910,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 		nil,
 		nil,
 	))
-	defer func() {
-		require.NoError(proVM.Shutdown(context.Background()))
-	}()
+	defer require.NoError(proVM.Shutdown(context.Background()))
 
 	// Initialize shouldn't be called again
 	coreVM.InitializeF = nil
@@ -1043,9 +1017,7 @@ func TestInnerBlockDeduplication(t *testing.T) {
 	require := require.New(t)
 
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // disable ProBlks
-	defer func() {
-		require.NoError(proVM.Shutdown(context.Background()))
-	}()
+	defer require.NoError(proVM.Shutdown(context.Background()))
 
 	coreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -1228,9 +1200,7 @@ func TestInnerVMRollback(t *testing.T) {
 		nil,
 		nil,
 	))
-	defer func() {
-		require.NoError(proVM.Shutdown(context.Background()))
-	}()
+	defer require.NoError(proVM.Shutdown(context.Background()))
 
 	require.NoError(proVM.SetState(context.Background(), snow.NormalOp))
 
@@ -1316,9 +1286,7 @@ func TestInnerVMRollback(t *testing.T) {
 		nil,
 		nil,
 	))
-	defer func() {
-		require.NoError(restartedProVM.Shutdown(context.Background()))
-	}()
+	defer require.NoError(restartedProVM.Shutdown(context.Background()))
 
 	lastAcceptedID, err := restartedProVM.LastAccepted(context.Background())
 	require.NoError(err)
@@ -1335,9 +1303,7 @@ func TestBuildBlockDuringWindow(t *testing.T) {
 	require := require.New(t)
 
 	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
-	defer func() {
-		require.NoError(proVM.Shutdown(context.Background()))
-	}()
+	defer require.NoError(proVM.Shutdown(context.Background()))
 
 	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 		return map[ids.NodeID]*validators.GetValidatorOutput{
@@ -1439,9 +1405,7 @@ func TestTwoForks_OneIsAccepted(t *testing.T) {
 
 	forkTime := time.Unix(0, 0)
 	coreVM, _, proVM, gBlock, _ := initTestProposerVM(t, forkTime, 0)
-	defer func() {
-		require.NoError(proVM.Shutdown(context.Background()))
-	}()
+	defer require.NoError(proVM.Shutdown(context.Background()))
 
 	// create pre-fork block X and post-fork block A
 	xBlock := &snowman.TestBlock{
@@ -1535,9 +1499,7 @@ func TestTooFarAdvanced(t *testing.T) {
 
 	forkTime := time.Unix(0, 0)
 	coreVM, _, proVM, gBlock, _ := initTestProposerVM(t, forkTime, 0)
-	defer func() {
-		require.NoError(proVM.Shutdown(context.Background()))
-	}()
+	defer require.NoError(proVM.Shutdown(context.Background()))
 
 	xBlock := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -1626,9 +1588,7 @@ func TestTwoOptions_OneIsAccepted(t *testing.T) {
 
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
 	proVM.Set(coreGenBlk.Timestamp())
-	defer func() {
-		require.NoError(proVM.Shutdown(context.Background()))
-	}()
+	defer require.NoError(proVM.Shutdown(context.Background()))
 
 	xBlockID := ids.GenerateTestID()
 	xBlock := &TestOptionsBlock{
@@ -1701,9 +1661,7 @@ func TestLaggedPChainHeight(t *testing.T) {
 
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
 	proVM.Set(coreGenBlk.Timestamp())
-	defer func() {
-		require.NoError(proVM.Shutdown(context.Background()))
-	}()
+	defer require.NoError(proVM.Shutdown(context.Background()))
 
 	innerBlock := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -1803,9 +1761,7 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 		pTestCert.PrivateKey.(crypto.Signer),
 		pTestCert.Leaf,
 	)
-	defer func() {
-		require.NoError(proVM.Shutdown(context.Background()))
-	}()
+	defer require.NoError(proVM.Shutdown(context.Background()))
 
 	valState := &validators.TestState{
 		T: t,
@@ -2014,9 +1970,7 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 		pTestCert.PrivateKey.(crypto.Signer),
 		pTestCert.Leaf,
 	)
-	defer func() {
-		require.NoError(proVM.Shutdown(context.Background()))
-	}()
+	defer require.NoError(proVM.Shutdown(context.Background()))
 
 	valState := &validators.TestState{
 		T: t,
@@ -2206,9 +2160,7 @@ func TestVMInnerBlkCache(t *testing.T) {
 		nil,
 		nil,
 	))
-	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-	}()
+	defer require.NoError(vm.Shutdown(context.Background()))
 
 	state := state.NewMockState(ctrl) // mock state
 	vm.State = state
@@ -2262,9 +2214,7 @@ func TestVMInnerBlkCacheDeduplicationRegression(t *testing.T) {
 	require := require.New(t)
 	forkTime := time.Unix(0, 0)
 	coreVM, _, proVM, gBlock, _ := initTestProposerVM(t, forkTime, 0)
-	defer func() {
-		require.NoError(proVM.Shutdown(context.Background()))
-	}()
+	defer require.NoError(proVM.Shutdown(context.Background()))
 
 	// create pre-fork block X and post-fork block A
 	xBlock := &snowman.TestBlock{
@@ -2338,9 +2288,7 @@ func TestVMInnerBlkMarkedAcceptedRegression(t *testing.T) {
 	require := require.New(t)
 	forkTime := time.Unix(0, 0)
 	coreVM, _, proVM, gBlock, _ := initTestProposerVM(t, forkTime, 0)
-	defer func() {
-		require.NoError(proVM.Shutdown(context.Background()))
-	}()
+	defer require.NoError(proVM.Shutdown(context.Background()))
 
 	// create an inner block and wrap it in an postForkBlock.
 	innerBlock := &snowman.TestBlock{
@@ -2429,9 +2377,7 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 		nil,
 		nil,
 	))
-	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-	}()
+	defer require.NoError(vm.Shutdown(context.Background()))
 
 	{
 		pChainHeight := uint64(0)
