@@ -104,7 +104,7 @@ type RangeProofer interface {
 
 	// CommitRangeProof commits the key/value pairs within the [proof] to the db.
 	// [start] is the smallest key in the range this [proof] covers.
-	CommitRangeProof(ctx context.Context, start []byte, proof *RangeProof) error
+	CommitRangeProof(ctx context.Context, start Maybe[[]byte], proof *RangeProof) error
 }
 
 type MerkleDB interface {
@@ -305,7 +305,7 @@ func (db *merkleDB) CommitChangeProof(ctx context.Context, proof *ChangeProof) e
 	return view.commitToDB(ctx)
 }
 
-func (db *merkleDB) CommitRangeProof(ctx context.Context, start []byte, proof *RangeProof) error {
+func (db *merkleDB) CommitRangeProof(ctx context.Context, start Maybe[[]byte], proof *RangeProof) error {
 	db.commitLock.Lock()
 	defer db.commitLock.Unlock()
 
@@ -1193,17 +1193,17 @@ func (db *merkleDB) getHistoricalViewForRange(
 // Returns all keys in range [start, end] that aren't in [keySet].
 // If [start] is nil, then the range has no lower bound.
 // If [end] is nil, then the range has no upper bound.
-func (db *merkleDB) getKeysNotInSet(start, end []byte, keySet set.Set[string]) ([][]byte, error) {
+func (db *merkleDB) getKeysNotInSet(start, end Maybe[[]byte], keySet set.Set[string]) ([][]byte, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	it := db.NewIteratorWithStart(start)
+	it := db.NewIteratorWithStart(start.value)
 	defer it.Release()
 
 	keysNotInSet := make([][]byte, 0, keySet.Len())
 	for it.Next() {
 		key := it.Key()
-		if len(end) != 0 && bytes.Compare(key, end) > 0 {
+		if !end.IsNothing() && bytes.Compare(key, end.value) > 0 {
 			break
 		}
 		if !keySet.Contains(string(key)) {
@@ -1318,7 +1318,7 @@ func (db *merkleDB) prepareChangeProofView(proof *ChangeProof) (*trieView, error
 // Returns a new view atop [db] with the key/value pairs in [proof.KeyValues] added and
 // any existing key-value pairs in the proof's range but not in the proof removed.
 // Assumes [db.commitLock] is locked.
-func (db *merkleDB) prepareRangeProofView(start []byte, proof *RangeProof) (*trieView, error) {
+func (db *merkleDB) prepareRangeProofView(start Maybe[[]byte], proof *RangeProof) (*trieView, error) {
 	// Don't need to lock [view] because nobody else has a reference to it.
 	view, err := db.newUntrackedView(len(proof.KeyValues))
 	if err != nil {
@@ -1332,9 +1332,9 @@ func (db *merkleDB) prepareRangeProofView(start []byte, proof *RangeProof) (*tri
 		}
 	}
 
-	var largestKey []byte
+	largestKey := Nothing[[]byte]()
 	if len(proof.KeyValues) > 0 {
-		largestKey = proof.KeyValues[len(proof.KeyValues)-1].Key
+		largestKey = Some(proof.KeyValues[len(proof.KeyValues)-1].Key)
 	}
 	keysToDelete, err := db.getKeysNotInSet(start, largestKey, keys)
 	if err != nil {

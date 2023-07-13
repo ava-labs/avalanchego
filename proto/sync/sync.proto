@@ -113,7 +113,7 @@ message GetRangeProofResponse {
 }
 
 message CommitRangeProofRequest {
-  bytes start_key = 1;
+  MaybeBytes start_key = 1;
   RangeProof range_proof = 2;
 }
 

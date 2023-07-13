@@ -343,13 +343,8 @@ func (m *Manager) getAndApplyRangeProof(ctx context.Context, work *workItem) {
 
 	largestHandledKey := work.end
 	if len(proof.KeyValues) > 0 {
-		var startKey []byte
-		if !work.start.IsNothing() {
-			startKey = work.start.Value()
-		}
-
 		// Add all the key-value pairs we got to the database.
-		if err := m.config.DB.CommitRangeProof(ctx, startKey, proof); err != nil {
+		if err := m.config.DB.CommitRangeProof(ctx, work.start, proof); err != nil {
 			m.setError(err)
 			return
 		}

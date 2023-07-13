@@ -68,7 +68,7 @@ func (mr *MockMerkleDBMockRecorder) CommitChangeProof(arg0, arg1 interface{}) *g
 }
 
 // CommitRangeProof mocks base method.
-func (m *MockMerkleDB) CommitRangeProof(arg0 context.Context, arg1 []byte, arg2 *RangeProof) error {
+func (m *MockMerkleDB) CommitRangeProof(arg0 context.Context, arg1 Maybe[[]uint8], arg2 *RangeProof) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CommitRangeProof", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)

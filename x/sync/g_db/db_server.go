@@ -190,6 +190,11 @@ func (s *DBServer) CommitRangeProof(
 		return nil, err
 	}
 
-	err := s.db.CommitRangeProof(ctx, req.StartKey, &proof)
+	startKey := merkledb.Nothing[[]byte]()
+	if req.StartKey != nil && !req.StartKey.IsNothing {
+		startKey = merkledb.Some(req.StartKey.Value)
+	}
+
+	err := s.db.CommitRangeProof(ctx, startKey, &proof)
 	return &emptypb.Empty{}, err
 }

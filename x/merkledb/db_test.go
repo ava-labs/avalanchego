@@ -265,7 +265,7 @@ func Test_MerkleDB_Commit_Proof_To_Empty_Trie(t *testing.T) {
 	freshDB, err := getBasicDB()
 	require.NoError(err)
 
-	require.NoError(freshDB.CommitRangeProof(context.Background(), []byte("key1"), proof))
+	require.NoError(freshDB.CommitRangeProof(context.Background(), Some([]byte("key1")), proof))
 
 	value, err := freshDB.Get([]byte("key2"))
 	require.NoError(err)
@@ -301,7 +301,7 @@ func Test_MerkleDB_Commit_Proof_To_Filled_Trie(t *testing.T) {
 	require.NoError(batch.Put([]byte("key25"), []byte("5")))
 	require.NoError(batch.Write())
 
-	require.NoError(freshDB.CommitRangeProof(context.Background(), []byte("key1"), proof))
+	require.NoError(freshDB.CommitRangeProof(context.Background(), Some([]byte("key1")), proof))
 
 	value, err := freshDB.Get([]byte("key2"))
 	require.NoError(err)

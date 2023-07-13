@@ -652,7 +652,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 		// in the actual syncer.
 		require.NoError(localDB.CommitRangeProof(
 			context.Background(),
-			rangeStart,
+			startKey,
 			remoteProof,
 		))
 
