@@ -37,6 +37,7 @@ type scheduler struct {
 	newBuildBlockTime chan time.Time
 
 	shutdown utils.Atomic[bool]
+	quit     chan (struct{})
 }
 
 func New(log logging.Logger, toEngine chan<- common.Message) (Scheduler, chan<- common.Message) {
@@ -46,6 +47,7 @@ func New(log logging.Logger, toEngine chan<- common.Message) (Scheduler, chan<- 
 		fromVM:            vmToEngine,
 		toEngine:          toEngine,
 		newBuildBlockTime: make(chan time.Time),
+		quit:              make(chan struct{}),
 	}, vmToEngine
 }
 
@@ -54,16 +56,13 @@ func (s *scheduler) Dispatch(buildBlockTime time.Time) {
 waitloop:
 	for {
 		select {
+		case <-s.quit:
+			return // s.Close called
 		case <-timer.C: // It's time to tell the engine to try to build a block
-		case buildBlockTime, ok := <-s.newBuildBlockTime:
+		case buildBlockTime := <-s.newBuildBlockTime:
 			// Stop the timer and clear [timer.C] if needed
 			if !timer.Stop() {
 				<-timer.C
-			}
-
-			if !ok {
-				// s.Close() was called
-				return
 			}
 
 			// The time at which we should notify the engine that it should try
@@ -74,6 +73,8 @@ waitloop:
 
 		for {
 			select {
+			case <-s.quit:
+				return // s.Close called
 			case msg := <-s.fromVM:
 				// Give the engine the message from the VM asking the engine to
 				// build a block
@@ -87,15 +88,9 @@ waitloop:
 						zap.Stringer("messageString", msg),
 					)
 				}
-			case buildBlockTime, ok := <-s.newBuildBlockTime:
+			case buildBlockTime := <-s.newBuildBlockTime:
 				// The time at which we should notify the engine that it should
 				// try to build a block has changed
-				if !ok {
-					// s.Close() was called
-					return
-				}
-				// We know [timer.C] was drained in the first select statement
-				// so its safe to call [timer.Reset]
 				timer.Reset(time.Until(buildBlockTime))
 				continue waitloop
 			}
@@ -112,6 +107,9 @@ func (s *scheduler) SetBuildBlockTime(t time.Time) {
 }
 
 func (s *scheduler) Close() {
+	if s.shutdown.Get() {
+		return // do it only once
+	}
 	s.shutdown.Set(true)
-	close(s.newBuildBlockTime)
+	close(s.quit)
 }
