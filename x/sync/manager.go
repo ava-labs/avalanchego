@@ -622,17 +622,7 @@ func (m *Manager) completeWorkItem(
 	rootID ids.ID,
 	proofOfLargestKey []merkledb.ProofNode,
 ) {
-	var (
-		largestHandledKeyIsNothing = largestHandledKey.IsNothing()
-		largestHandledKeyValue     = largestHandledKey.Value()
-		workItemEndIsNothing       = work.end.IsNothing()
-		workItemEndValue           = work.end.Value()
-		bothNothing                = largestHandledKeyIsNothing && workItemEndIsNothing
-		bothHaveValue              = !largestHandledKeyIsNothing && !workItemEndIsNothing
-		valuesMatch                = bothHaveValue && bytes.Equal(largestHandledKeyValue, workItemEndValue)
-	)
-
-	if !(bothNothing || valuesMatch) {
+	if !merkledb.MaybeBytesEquals(largestHandledKey, work.end) {
 		// The largest handled key isn't equal to the end of the work item.
 		// Find the start of the next key range to fetch.
 		// Note that [largestHandledKey] can't be Nothing.

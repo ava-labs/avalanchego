@@ -4,6 +4,7 @@
 package merkledb
 
 import (
+	"bytes"
 	"fmt"
 
 	"golang.org/x/exp/slices"
@@ -58,4 +59,20 @@ func Clone(m Maybe[[]byte]) Maybe[[]byte] {
 		return Nothing[[]byte]()
 	}
 	return Some(slices.Clone(m.value))
+}
+
+// Return true iff [a] and [b] are equal.
+func MaybeBytesEquals(a, b Maybe[[]byte]) bool {
+	aNothing := a.IsNothing()
+	bNothing := b.IsNothing()
+
+	if aNothing {
+		return bNothing
+	}
+
+	if bNothing {
+		return false
+	}
+
+	return bytes.Equal(a.Value(), b.Value())
 }

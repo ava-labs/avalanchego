@@ -8,6 +8,7 @@ import (
 	"container/heap"
 
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/x/merkledb"
 
 	"github.com/google/btree"
 )
@@ -111,14 +112,7 @@ func (wh *workHeap) MergeInsert(item *workItem) {
 		searchItem,
 		func(beforeItem *heapItem) bool {
 			if item.localRootID == beforeItem.workItem.localRootID {
-				beforeIsNothing := beforeItem.workItem.end.IsNothing()
-				itemIsNothing := item.start.IsNothing()
-
-				bothNothing := beforeIsNothing && itemIsNothing
-				bothHaveValue := !beforeIsNothing && !itemIsNothing
-				valuesMatch := bothHaveValue && bytes.Equal(beforeItem.workItem.end.Value(), item.start.Value())
-
-				if bothNothing || valuesMatch {
+				if merkledb.MaybeBytesEquals(item.start, beforeItem.workItem.end) {
 					// [beforeItem.start, beforeItem.end] and [item.start, item.end] are
 					// merged into [beforeItem.start, item.end]
 					beforeItem.workItem.end = item.end
@@ -136,14 +130,7 @@ func (wh *workHeap) MergeInsert(item *workItem) {
 		searchItem,
 		func(afterItem *heapItem) bool {
 			if item.localRootID == afterItem.workItem.localRootID {
-				afterIsNothing := afterItem.workItem.start.IsNothing()
-				itemIsNothing := item.end.IsNothing()
-
-				bothNothing := afterIsNothing && itemIsNothing
-				bothHaveValue := !afterIsNothing && !itemIsNothing
-				valuesMatch := bothHaveValue && bytes.Equal(afterItem.workItem.start.Value(), item.end.Value())
-
-				if bothNothing || valuesMatch {
+				if merkledb.MaybeBytesEquals(item.end, afterItem.workItem.start) {
 					// [item.start, item.end] and [afterItem.start, afterItem.end] are merged into
 					// [item.start, afterItem.end].
 					afterItem.workItem.start = item.start

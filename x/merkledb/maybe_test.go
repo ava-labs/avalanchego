@@ -48,3 +48,53 @@ func TestMaybeString(t *testing.T) {
 		require.Equal("Nothing[int]", m.String())
 	}
 }
+
+func TestMaybeBytesEquals(t *testing.T) {
+	type test struct {
+		name     string
+		a        Maybe[[]byte]
+		b        Maybe[[]byte]
+		expected bool
+	}
+
+	tests := []test{
+		{
+			name:     "a and b are both nothing",
+			a:        Nothing[[]byte](),
+			b:        Nothing[[]byte](),
+			expected: true,
+		},
+		{
+			name:     "a is nothing and b is something",
+			a:        Nothing[[]byte](),
+			b:        Some([]byte{1, 2, 3}),
+			expected: false,
+		},
+		{
+			name:     "a is something and b is nothing",
+			a:        Some([]byte{1, 2, 3}),
+			b:        Nothing[[]byte](),
+			expected: false,
+		},
+		{
+			name:     "a and b are the same something",
+			a:        Some([]byte{1, 2, 3}),
+			b:        Some([]byte{1, 2, 3}),
+			expected: true,
+		},
+		{
+			name:     "a and b are different somethings",
+			a:        Some([]byte{1, 2, 3}),
+			b:        Some([]byte{1, 2, 4}),
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+
+			require.Equal(tt.expected, MaybeBytesEquals(tt.a, tt.b))
+		})
+	}
+}
