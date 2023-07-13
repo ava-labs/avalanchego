@@ -910,7 +910,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 		nil,
 		nil,
 	))
-	defer require.NoError(proVM.Shutdown(context.Background()))
+	defer proVM.Scheduler.Close()
 
 	// Initialize shouldn't be called again
 	coreVM.InitializeF = nil
@@ -1761,7 +1761,6 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 		pTestCert.PrivateKey.(crypto.Signer),
 		pTestCert.Leaf,
 	)
-	defer require.NoError(proVM.Shutdown(context.Background()))
 
 	valState := &validators.TestState{
 		T: t,
@@ -1811,6 +1810,7 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 		nil,
 		nil,
 	))
+	defer require.NoError(proVM.Shutdown(context.Background()))
 
 	// Initialize shouldn't be called again
 	coreVM.InitializeF = nil
@@ -1970,7 +1970,6 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 		pTestCert.PrivateKey.(crypto.Signer),
 		pTestCert.Leaf,
 	)
-	defer require.NoError(proVM.Shutdown(context.Background()))
 
 	valState := &validators.TestState{
 		T: t,
@@ -2020,6 +2019,7 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 		nil,
 		nil,
 	))
+	defer require.NoError(proVM.Shutdown(context.Background()))
 
 	// Initialize shouldn't be called again
 	coreVM.InitializeF = nil
