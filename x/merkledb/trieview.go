@@ -425,7 +425,7 @@ func (t *trieView) GetRangeProof(
 			KeyValues: make([]KeyValue, 0, initKeyValuesSize),
 		}
 		it           = t.NewIteratorWithStart(start.value)
-		endIsNothing = end.IsNothing()
+		endIsNothing = !end.hasValue
 	)
 	for it.Next() && len(result.KeyValues) < maxLength && (endIsNothing || bytes.Compare(it.Key(), end.value) <= 0) {
 		// clone the value to prevent editing of the values stored within the trie
