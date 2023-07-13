@@ -9,6 +9,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -34,6 +35,8 @@ type scheduler struct {
 	// from telling the engine to call its VM's BuildBlock method until the
 	// given time
 	newBuildBlockTime chan time.Time
+
+	shutdown utils.Atomic[bool]
 }
 
 func New(log logging.Logger, toEngine chan<- common.Message) (Scheduler, chan<- common.Message) {
@@ -101,9 +104,14 @@ waitloop:
 }
 
 func (s *scheduler) SetBuildBlockTime(t time.Time) {
+	if s.shutdown.Get() {
+		return
+	}
+
 	s.newBuildBlockTime <- t
 }
 
 func (s *scheduler) Close() {
+	s.shutdown.Set(true)
 	close(s.newBuildBlockTime)
 }
