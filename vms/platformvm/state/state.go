@@ -125,7 +125,9 @@ type State interface {
 	SetLastAccepted(blkID ids.ID)
 
 	GetStatelessBlock(blockID ids.ID) (blocks.Block, choices.Status, error)
-	AddStatelessBlock(block blocks.Block, status choices.Status)
+
+	// Invariant: [block] is an accepted block.
+	AddStatelessBlock(block blocks.Block)
 
 	// ValidatorSet adds all the validators and delegators of [subnetID] into
 	// [vdrs].
@@ -1023,7 +1025,7 @@ func (s *state) syncGenesis(genesisBlk blocks.Block, genesis *genesis.State) err
 	s.SetLastAccepted(genesisBlkID)
 	s.SetTimestamp(time.Unix(int64(genesis.Timestamp), 0))
 	s.SetCurrentSupply(constants.PrimaryNetworkID, genesis.InitialSupply)
-	s.AddStatelessBlock(genesisBlk, choices.Accepted)
+	s.AddStatelessBlock(genesisBlk)
 
 	// Persist UTXOs that exist at genesis
 	for _, utxo := range genesis.UTXOs {
@@ -1486,11 +1488,11 @@ func (s *state) init(genesisBytes []byte) error {
 	return s.Commit()
 }
 
-func (s *state) AddStatelessBlock(block blocks.Block, status choices.Status) {
+func (s *state) AddStatelessBlock(block blocks.Block) {
 	s.addedBlocks[block.ID()] = stateBlk{
 		Blk:    block,
 		Bytes:  block.Bytes(),
-		Status: status,
+		Status: choices.Accepted,
 	}
 }
 
