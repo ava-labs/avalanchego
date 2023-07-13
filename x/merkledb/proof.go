@@ -290,7 +290,7 @@ func (proof *RangeProof) Verify(
 	expectedRootID ids.ID,
 ) error {
 	switch {
-	case end.hasValue && bytes.Compare(start.value, end.value) > 0:
+	case start.hasValue && end.hasValue && bytes.Compare(start.value, end.value) > 0:
 		return ErrStartAfterEnd
 	case len(proof.KeyValues) == 0 && len(proof.StartProof) == 0 && len(proof.EndProof) == 0:
 		return ErrNoMerkleProof
