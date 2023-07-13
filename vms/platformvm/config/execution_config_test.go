@@ -48,7 +48,7 @@ func TestExecutionConfigUnmarshal(t *testing.T) {
 
 	t.Run("mix default and extracted values from json", func(t *testing.T) {
 		require := require.New(t)
-		b := []byte(`{"blockCacheSize":1}`)
+		b := []byte(`{"block-cache-size":1}`)
 		ec, err := GetExecutionConfig(b)
 		require.NoError(err)
 		expected := ExecutionConfig{
@@ -67,13 +67,13 @@ func TestExecutionConfigUnmarshal(t *testing.T) {
 	t.Run("all values extracted from json", func(t *testing.T) {
 		require := require.New(t)
 		b := []byte(`{
-			"blockCacheSize":1,
-			"txCacheSize":2,
-			"transformedSubnetTxCacheSize":3,
-			"validatorDiffsCacheSize": 4,
-			"rewardUTXOsCacheSize": 5,
-			"chainCacheSize": 6,
-			"chainDBCacheSize": 7,
+			"block-cache-size":1,
+			"tx-cache-size":2,
+			"transformed-subnet-tx-cache-size":3,
+			"validator-diffs-cache-size": 4,
+			"reward-utxos-cache-size": 5,
+			"chain-cache-size": 6,
+			"chain-db-cache-size": 7,
 			"checksums-enabled": true
 		}`)
 		ec, err := GetExecutionConfig(b)

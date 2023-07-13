@@ -23,13 +23,13 @@ const (
 
 // ExecutionConfig provides execution parameters of PlatformVM
 type ExecutionConfig struct {
-	BlockCacheSize               int  `json:"blockCacheSize"`
-	TxCacheSize                  int  `json:"txCacheSize"`
-	TransformedSubnetTxCacheSize int  `json:"transformedSubnetTxCacheSize"`
-	ValidatorDiffsCacheSize      int  `json:"validatorDiffsCacheSize"`
-	RewardUTXOsCacheSize         int  `json:"rewardUTXOsCacheSize"`
-	ChainCacheSize               int  `json:"chainCacheSize"`
-	ChainDBCacheSize             int  `json:"chainDBCacheSize"`
+	BlockCacheSize               int  `json:"block-cache-size"`
+	TxCacheSize                  int  `json:"tx-cache-size"`
+	TransformedSubnetTxCacheSize int  `json:"transformed-subnet-tx-cache-size"`
+	ValidatorDiffsCacheSize      int  `json:"validator-diffs-cache-size"`
+	RewardUTXOsCacheSize         int  `json:"reward-utxos-cache-size"`
+	ChainCacheSize               int  `json:"chain-cache-size"`
+	ChainDBCacheSize             int  `json:"chain-db-cache-size"`
 	ChecksumsEnabled             bool `json:"checksums-enabled"`
 }
 
