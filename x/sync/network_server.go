@@ -328,7 +328,7 @@ func validateChangeProofRequest(req *pb.SyncGetChangeProofRequest) error {
 		return errInvalidStartKey
 	case req.EndKey != nil && req.EndKey.IsNothing && len(req.EndKey.Value) > 0:
 		return errInvalidEndKey
-	case req.StartKey != nil && req.EndKey != nil &&
+	case req.StartKey != nil && req.EndKey != nil && !req.StartKey.IsNothing &&
 		!req.EndKey.IsNothing && bytes.Compare(req.StartKey.Value, req.EndKey.Value) > 0:
 		return errInvalidBounds
 	default:
@@ -349,7 +349,7 @@ func validateRangeProofRequest(req *pb.SyncGetRangeProofRequest) error {
 		return errInvalidStartKey
 	case req.EndKey != nil && req.EndKey.IsNothing && len(req.EndKey.Value) > 0:
 		return errInvalidEndKey
-	case req.StartKey != nil && req.EndKey != nil &&
+	case req.StartKey != nil && req.EndKey != nil && !req.StartKey.IsNothing &&
 		!req.EndKey.IsNothing && bytes.Compare(req.StartKey.Value, req.EndKey.Value) > 0:
 		return errInvalidBounds
 	default:
