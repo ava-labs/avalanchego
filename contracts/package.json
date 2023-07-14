@@ -28,7 +28,7 @@
   },
   "license": "BSD-3-Clause",
   "scripts": {
-    "build": "rm -rf dist/ && tsc -b",
+    "build": "rm -rf dist/ && tsc -b && npx hardhat compile --network local",
     "compile": "npx hardhat compile",
     "console": "npx hardhat console",
     "test": "npx hardhat test",
@@ -41,6 +41,6 @@
   },
   "engines": {
     "npm": ">6.0.0",
-    "node": ">=18.16.0"
+    "node": ">=18.15.0"
   }
 }

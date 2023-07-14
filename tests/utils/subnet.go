@@ -104,20 +104,15 @@ func GetDefaultChainURI(blockchainID string) string {
 	return fmt.Sprintf("%s/ext/bc/%s/rpc", DefaultLocalNodeURI, blockchainID)
 }
 
-// RunDefaultHardhatTests runs the hardhat tests on a new blockchain
+// RunDefaultHardhatTests runs the hardhat tests on a given blockchain ID
 // with default parameters. Default parameters are:
-// 1. Genesis file is located at ./tests/precompile/genesis/<test>.json
-// 2. Hardhat contract environment is located at ./contracts
-// 3. Hardhat test file is located at ./contracts/test/<test>.ts
-// 4. npx is available in the ./contracts directory
-func RunDefaultHardhatTests(ctx context.Context, test string) {
-	log.Info("Executing HardHat tests on a new blockchain", "test", test)
-
-	genesisFilePath := fmt.Sprintf("./tests/precompile/genesis/%s.json", test)
-
-	blockchainID := CreateNewSubnet(ctx, genesisFilePath)
+// 1. Hardhat contract environment is located at ./contracts
+// 2. Hardhat test file is located at ./contracts/test/<test>.ts
+// 3. npx is available in the ./contracts directory
+func RunDefaultHardhatTests(ctx context.Context, blockchainID string, test string) {
 	chainURI := GetDefaultChainURI(blockchainID)
-	log.Info("Created subnet successfully", "ChainURI", chainURI)
+	log.Info("Executing HardHat tests on a new blockchain", "blockchainID", blockchainID, "test", test)
+	log.Info("Using subnet", "ChainURI", chainURI)
 
 	cmdPath := "./contracts"
 	// test path is relative to the cmd path

@@ -4,6 +4,7 @@
 package precompile
 
 import (
+	"os"
 	"testing"
 
 	ginkgo "github.com/onsi/ginkgo/v2"
@@ -19,6 +20,9 @@ func init() {
 }
 
 func TestE2E(t *testing.T) {
+	if basePath := os.Getenv("TEST_SOURCE_ROOT"); basePath != "" {
+		os.Chdir(basePath)
+	}
 	gomega.RegisterFailHandler(ginkgo.Fail)
 	ginkgo.RunSpecs(t, "subnet-evm precompile ginkgo test suite")
 }
