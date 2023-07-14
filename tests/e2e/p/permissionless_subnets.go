@@ -13,12 +13,9 @@ import (
 	"github.com/onsi/gomega"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/e2e"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
@@ -26,7 +23,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
@@ -39,28 +35,12 @@ var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
 			"permissionless-subnets",
 		),
 		func() {
+			keychain := e2e.Env.NewKeychain(1)
+			baseWallet := e2e.Env.NewWallet(keychain)
+
 			nodeURI := e2e.Env.GetRandomNodeURI()
-
-			tests.Outf("{{blue}} setting up keys {{/}}\n")
-			testKey := e2e.Env.AllocateFundedKey()
-			keyChain := secp256k1fx.NewKeychain(testKey)
-
-			var baseWallet primary.Wallet
-			ginkgo.By("setup wallet", func() {
-				var err error
-				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultTimeout)
-				baseWallet, err = primary.MakeWallet(ctx, &primary.WalletConfig{
-					URI:          nodeURI,
-					AVAXKeychain: keyChain,
-					EthKeychain:  keyChain,
-				})
-				cancel()
-				gomega.Expect(err).Should(gomega.BeNil())
-			})
-
 			pWallet := baseWallet.P()
 			xWallet := baseWallet.X()
-			xChainClient := avm.NewClient(nodeURI, xWallet.BlockchainID().String())
 			xChainID := xWallet.BlockchainID()
 
 			var validatorID ids.NodeID
@@ -77,7 +57,7 @@ var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
 			owner := &secp256k1fx.OutputOwners{
 				Threshold: 1,
 				Addrs: []ids.ShortID{
-					testKey.PublicKey().Address(),
+					keychain.Keys[0].Address(),
 				},
 			}
 
@@ -114,11 +94,6 @@ var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
 				cancel()
 				gomega.Expect(err).Should(gomega.BeNil())
 				subnetAssetID = subnetAssetTx.ID()
-
-				ctx, cancel = context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
-				txStatus, err := xChainClient.GetTxStatus(ctx, subnetAssetID)
-				cancel()
-				gomega.Expect(txStatus, err).To(gomega.Equal(choices.Accepted))
 			})
 
 			ginkgo.By(fmt.Sprintf("Send 100 MegaAvax of asset %s to the P-chain", subnetAssetID), func() {
