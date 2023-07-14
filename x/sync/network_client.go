@@ -312,7 +312,6 @@ func (c *networkClient) Shutdown() {
 	defer c.lock.Unlock()
 
 	// reset peers
-	// TODO danlaine: should we call [Disconnected] on each peer?
 	c.peers = newPeerTracker(c.log)
 }
 

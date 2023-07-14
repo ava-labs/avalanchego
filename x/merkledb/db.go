@@ -566,7 +566,6 @@ func (db *merkleDB) GetChangeProof(
 		return i.Compare(j) < 0
 	})
 
-	// TODO: sync.pool these buffers
 	result.KeyChanges = make([]KeyChange, 0, len(changedKeys))
 
 	for _, key := range changedKeys {
