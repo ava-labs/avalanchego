@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -62,6 +63,7 @@ var (
 	errBootstrapping             = errors.New("chain is currently bootstrapping")
 
 	_ vertex.LinearizableVMWithEngine = (*VM)(nil)
+	_ block.HeightIndexedChainVM      = (*VM)(nil)
 )
 
 type VM struct {
@@ -385,6 +387,14 @@ func (vm *VM) SetPreference(_ context.Context, blkID ids.ID) error {
 
 func (vm *VM) LastAccepted(context.Context) (ids.ID, error) {
 	return vm.chainManager.LastAccepted(), nil
+}
+
+func (vm *VM) GetBlockIDAtHeight(_ context.Context, height uint64) (ids.ID, error) {
+	return vm.state.GetBlockIDAtHeight(height)
+}
+
+func (*VM) VerifyHeightIndex(context.Context) error {
+	return nil
 }
 
 /*
