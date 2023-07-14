@@ -107,19 +107,19 @@ func (mr *MockChainMockRecorder) GetBlock(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlock", reflect.TypeOf((*MockChain)(nil).GetBlock), arg0)
 }
 
-// GetBlockID mocks base method.
-func (m *MockChain) GetBlockID(arg0 uint64) (ids.ID, error) {
+// GetBlockIDAtHeight mocks base method.
+func (m *MockChain) GetBlockIDAtHeight(arg0 uint64) (ids.ID, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetBlockID", arg0)
+	ret := m.ctrl.Call(m, "GetBlockIDAtHeight", arg0)
 	ret0, _ := ret[0].(ids.ID)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetBlockID indicates an expected call of GetBlockID.
-func (mr *MockChainMockRecorder) GetBlockID(arg0 interface{}) *gomock.Call {
+// GetBlockIDAtHeight indicates an expected call of GetBlockIDAtHeight.
+func (mr *MockChainMockRecorder) GetBlockIDAtHeight(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlockID", reflect.TypeOf((*MockChain)(nil).GetBlockID), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlockIDAtHeight", reflect.TypeOf((*MockChain)(nil).GetBlockIDAtHeight), arg0)
 }
 
 // GetLastAccepted mocks base method.
@@ -360,19 +360,19 @@ func (mr *MockStateMockRecorder) GetBlock(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlock", reflect.TypeOf((*MockState)(nil).GetBlock), arg0)
 }
 
-// GetBlockID mocks base method.
-func (m *MockState) GetBlockID(arg0 uint64) (ids.ID, error) {
+// GetBlockIDAtHeight mocks base method.
+func (m *MockState) GetBlockIDAtHeight(arg0 uint64) (ids.ID, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetBlockID", arg0)
+	ret := m.ctrl.Call(m, "GetBlockIDAtHeight", arg0)
 	ret0, _ := ret[0].(ids.ID)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetBlockID indicates an expected call of GetBlockID.
-func (mr *MockStateMockRecorder) GetBlockID(arg0 interface{}) *gomock.Call {
+// GetBlockIDAtHeight indicates an expected call of GetBlockIDAtHeight.
+func (mr *MockStateMockRecorder) GetBlockIDAtHeight(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlockID", reflect.TypeOf((*MockState)(nil).GetBlockID), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlockIDAtHeight", reflect.TypeOf((*MockState)(nil).GetBlockIDAtHeight), arg0)
 }
 
 // GetLastAccepted mocks base method.
@@ -627,19 +627,19 @@ func (mr *MockDiffMockRecorder) GetBlock(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlock", reflect.TypeOf((*MockDiff)(nil).GetBlock), arg0)
 }
 
-// GetBlockID mocks base method.
-func (m *MockDiff) GetBlockID(arg0 uint64) (ids.ID, error) {
+// GetBlockIDAtHeight mocks base method.
+func (m *MockDiff) GetBlockIDAtHeight(arg0 uint64) (ids.ID, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetBlockID", arg0)
+	ret := m.ctrl.Call(m, "GetBlockIDAtHeight", arg0)
 	ret0, _ := ret[0].(ids.ID)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetBlockID indicates an expected call of GetBlockID.
-func (mr *MockDiffMockRecorder) GetBlockID(arg0 interface{}) *gomock.Call {
+// GetBlockIDAtHeight indicates an expected call of GetBlockIDAtHeight.
+func (mr *MockDiffMockRecorder) GetBlockIDAtHeight(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlockID", reflect.TypeOf((*MockDiff)(nil).GetBlockID), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlockIDAtHeight", reflect.TypeOf((*MockDiff)(nil).GetBlockIDAtHeight), arg0)
 }
 
 // GetLastAccepted mocks base method.
