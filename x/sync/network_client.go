@@ -25,53 +25,56 @@ import (
 const minRequestHandlingDuration = 100 * time.Millisecond
 
 var (
-	_ networkClient = (*networkClientImpl)(nil)
+	_ NetworkClient = (*networkClient)(nil)
 
 	errAcquiringSemaphore   = errors.New("error acquiring semaphore")
 	errRequestFailed        = errors.New("request failed")
 	errAppRequestSendFailed = errors.New("failed to send AppRequest")
 )
 
-// networkClient defines ability to send request / response through the Network
-type networkClient interface {
-	// Synchronously sends [request] to a randomly chosen peer with a
-	// version greater than or equal to [minVersion]. If [minVersion] is nil,
-	// the request is sent to any peer regardless of their version.
-	// May block until the number of outstanding requests decreases.
-	// Returns the node's response and the ID of the node.
-	// Returns [errAppRequestSendFailed] if we failed to send an AppRequest.
-	// This should be treated as fatal.
-	requestAny(ctx context.Context, minVersion *version.Application, request []byte) (ids.NodeID, []byte, error)
+// NetworkClient defines ability to send request / response through the Network
+type NetworkClient interface {
+	// RequestAny synchronously sends request to an arbitrary peer with a
+	// node version greater than or equal to minVersion.
+	// Returns response bytes, the ID of the chosen peer, and ErrRequestFailed if
+	// the request should be retried.
+	RequestAny(
+		ctx context.Context,
+		minVersion *version.Application,
+		request []byte,
+	) (ids.NodeID, []byte, error)
 
 	// Sends [request] to [nodeID] and returns the response.
-	// Returns [errAppRequestSendFailed] if we failed to send an AppRequest.
-	// This should be treated as fatal.
 	// Blocks until the number of outstanding requests is
 	// below the limit before sending the request.
-	request(ctx context.Context, nodeID ids.NodeID, request []byte) ([]byte, error)
+	Request(
+		ctx context.Context,
+		nodeID ids.NodeID,
+		request []byte,
+	) ([]byte, error)
 
-	// Should be called for each valid response with the bandwidth
+	// TrackBandwidth should be called for each valid response with the bandwidth
 	// (length of response divided by request time), and with 0 if the response is invalid.
-	trackBandwidth(nodeID ids.NodeID, bandwidth float64)
+	TrackBandwidth(nodeID ids.NodeID, bandwidth float64)
 
 	// Always returns nil because the engine considers errors
 	// returned from this function as fatal.
-	appResponse(context.Context, ids.NodeID, uint32, []byte) error
+	AppResponse(context.Context, ids.NodeID, uint32, []byte) error
 
 	// Always returns nil because the engine considers errors
 	// returned from this function as fatal.
-	appRequestFailed(context.Context, ids.NodeID, uint32) error
+	AppRequestFailed(context.Context, ids.NodeID, uint32) error
 
 	// Adds the given [nodeID] to the peer
 	// list so that it can receive messages.
 	// If [nodeID] is this node's ID, this is a no-op.
-	connected(context.Context, ids.NodeID, *version.Application) error
+	Connected(context.Context, ids.NodeID, *version.Application) error
 
 	// Removes given [nodeID] from the peer list.
-	disconnected(context.Context, ids.NodeID) error
+	Disconnected(context.Context, ids.NodeID) error
 }
 
-type networkClientImpl struct {
+type networkClient struct {
 	lock sync.Mutex
 	log  logging.Logger
 	// This node's ID
@@ -93,8 +96,8 @@ func NewNetworkClient(
 	myNodeID ids.NodeID,
 	maxActiveRequests int64,
 	log logging.Logger,
-) networkClient {
-	return &networkClientImpl{
+) NetworkClient {
+	return &networkClient{
 		appSender:                  appSender,
 		myNodeID:                   myNodeID,
 		outstandingRequestHandlers: make(map[uint32]ResponseHandler),
@@ -104,7 +107,7 @@ func NewNetworkClient(
 	}
 }
 
-func (c *networkClientImpl) appResponse(
+func (c *networkClient) AppResponse(
 	_ context.Context,
 	nodeID ids.NodeID,
 	requestID uint32,
@@ -136,7 +139,7 @@ func (c *networkClientImpl) appResponse(
 	return nil
 }
 
-func (c *networkClientImpl) appRequestFailed(
+func (c *networkClient) AppRequestFailed(
 	_ context.Context,
 	nodeID ids.NodeID,
 	requestID uint32,
@@ -168,7 +171,7 @@ func (c *networkClientImpl) appRequestFailed(
 // Returns the handler for [requestID] and marks the request as fulfilled.
 // Returns false if there's no outstanding request with [requestID].
 // Assumes [c.lock] is held.
-func (c *networkClientImpl) getRequestHandler(requestID uint32) (ResponseHandler, bool) {
+func (c *networkClient) getRequestHandler(requestID uint32) (ResponseHandler, bool) {
 	handler, exists := c.outstandingRequestHandlers[requestID]
 	if !exists {
 		return nil, false
@@ -178,7 +181,7 @@ func (c *networkClientImpl) getRequestHandler(requestID uint32) (ResponseHandler
 	return handler, true
 }
 
-func (c *networkClientImpl) requestAny(
+func (c *networkClient) RequestAny(
 	ctx context.Context,
 	minVersion *version.Application,
 	request []byte,
@@ -199,12 +202,12 @@ func (c *networkClientImpl) requestAny(
 		)
 	}
 
-	// Note [c.get] releases [c.lock].
-	response, err := c.get(ctx, nodeID, request)
+	// Note [c.request] releases [c.lock].
+	response, err := c.request(ctx, nodeID, request)
 	return nodeID, response, err
 }
 
-func (c *networkClientImpl) request(
+func (c *networkClient) Request(
 	ctx context.Context,
 	nodeID ids.NodeID,
 	request []byte,
@@ -218,19 +221,17 @@ func (c *networkClientImpl) request(
 
 	c.lock.Lock()
 	// Note [c.request] releases [c.lock].
-	return c.get(ctx, nodeID, request)
+	return c.request(ctx, nodeID, request)
 }
 
-// Sends [get] to [nodeID] and returns the response.
+// Sends [request] to [nodeID] and returns the response.
 // Returns an error if the request failed or [ctx] is canceled.
-// Returns [errAppRequestSendFailed] if we failed to send an AppRequest.
-// This should be treated as fatal.
 // Blocks until a response is received or the [ctx] is canceled fails.
-// Releases active requests semaphore if there was an error in sending the get.
+// Releases active requests semaphore if there was an error in sending the request.
 // Assumes [nodeID] is never [c.myNodeID] since we guarantee
 // [c.myNodeID] will not be added to [c.peers].
 // Assumes [c.lock] is held and unlocks [c.lock] before returning.
-func (c *networkClientImpl) get(
+func (c *networkClient) request(
 	ctx context.Context,
 	nodeID ids.NodeID,
 	request []byte,
@@ -276,7 +277,7 @@ func (c *networkClientImpl) get(
 	return response, nil
 }
 
-func (c *networkClientImpl) connected(
+func (c *networkClient) Connected(
 	_ context.Context,
 	nodeID ids.NodeID,
 	nodeVersion *version.Application,
@@ -294,7 +295,7 @@ func (c *networkClientImpl) connected(
 	return nil
 }
 
-func (c *networkClientImpl) disconnected(_ context.Context, nodeID ids.NodeID) error {
+func (c *networkClient) Disconnected(_ context.Context, nodeID ids.NodeID) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
@@ -308,8 +309,7 @@ func (c *networkClientImpl) disconnected(_ context.Context, nodeID ids.NodeID) e
 	return nil
 }
 
-// Shutdown disconnects all peers
-func (c *networkClientImpl) Shutdown() {
+func (c *networkClient) Shutdown() {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
@@ -318,7 +318,7 @@ func (c *networkClientImpl) Shutdown() {
 	c.peers = newPeerTracker(c.log)
 }
 
-func (c *networkClientImpl) trackBandwidth(nodeID ids.NodeID, bandwidth float64) {
+func (c *networkClient) TrackBandwidth(nodeID ids.NodeID, bandwidth float64) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 

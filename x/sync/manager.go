@@ -107,7 +107,7 @@ type Manager struct {
 
 type ManagerConfig struct {
 	DB                    DB
-	Client                client
+	Client                Client
 	SimultaneousWorkLimit int
 	Log                   logging.Logger
 	TargetRoot            ids.ID

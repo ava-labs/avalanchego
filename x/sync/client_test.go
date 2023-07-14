@@ -71,7 +71,7 @@ func sendRangeProofRequest(
 		// "receives" the response from the server. In reality,
 		// it just invokes the server's method and receives
 		// the response on [serverResponseChan].
-		networkClient = NewMocknetworkClient(ctrl)
+		networkClient = NewMockNetworkClient(ctrl)
 
 		serverResponseChan = make(chan []byte, 1)
 
@@ -91,7 +91,7 @@ func sendRangeProofRequest(
 
 	defer cancel()
 
-	networkClient.EXPECT().requestAny(
+	networkClient.EXPECT().RequestAny(
 		gomock.Any(), // ctx
 		gomock.Any(), // min version
 		gomock.Any(), // request
@@ -116,7 +116,7 @@ func sendRangeProofRequest(
 	).AnyTimes()
 
 	// Handle bandwidth tracking calls from client.
-	networkClient.EXPECT().trackBandwidth(gomock.Any(), gomock.Any()).AnyTimes()
+	networkClient.EXPECT().TrackBandwidth(gomock.Any(), gomock.Any()).AnyTimes()
 
 	// The server should expect to "send" a response to the client.
 	sender.EXPECT().SendAppResponse(
@@ -356,7 +356,7 @@ func sendChangeProofRequest(
 		// "receives" the response from the server. In reality,
 		// it just invokes the server's method and receives
 		// the response on [serverResponseChan].
-		networkClient = NewMocknetworkClient(ctrl)
+		networkClient = NewMockNetworkClient(ctrl)
 
 		serverResponseChan = make(chan []byte, 1)
 
@@ -376,7 +376,7 @@ func sendChangeProofRequest(
 
 	defer cancel() // avoid leaking a goroutine
 
-	networkClient.EXPECT().requestAny(
+	networkClient.EXPECT().RequestAny(
 		gomock.Any(), // ctx
 		gomock.Any(), // min version
 		gomock.Any(), // request
@@ -401,7 +401,7 @@ func sendChangeProofRequest(
 	).AnyTimes()
 
 	// Handle bandwidth tracking calls from client.
-	networkClient.EXPECT().trackBandwidth(gomock.Any(), gomock.Any()).AnyTimes()
+	networkClient.EXPECT().TrackBandwidth(gomock.Any(), gomock.Any()).AnyTimes()
 
 	// The server should expect to "send" a response to the client.
 	sender.EXPECT().SendAppResponse(
@@ -664,7 +664,7 @@ func TestAppRequestSendFailed(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	networkClient := NewMocknetworkClient(ctrl)
+	networkClient := NewMockNetworkClient(ctrl)
 
 	client := NewClient(
 		&ClientConfig{
@@ -675,13 +675,13 @@ func TestAppRequestSendFailed(t *testing.T) {
 	)
 
 	// Mock failure to send app request
-	networkClient.EXPECT().requestAny(
+	networkClient.EXPECT().RequestAny(
 		gomock.Any(),
 		gomock.Any(),
 		gomock.Any(),
 	).Return(ids.NodeID{}, nil, errAppRequestSendFailed).Times(2)
 
-	networkClient.EXPECT().trackBandwidth(
+	networkClient.EXPECT().TrackBandwidth(
 		gomock.Any(),
 		gomock.Any(),
 	).Times(2)

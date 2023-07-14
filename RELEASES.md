@@ -1,5 +1,93 @@
 # Release Notes
 
+## [v1.10.4](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.4)
+
+This version is backwards compatible to [v1.10.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0). It is optional, but encouraged.
+
+The plugin version is unchanged at `26` and compatible with versions `v1.10.1 - v1.10.3`.
+
+**The first startup of the X-Chain will perform a pruning operation. This pruning runs in the background and does not impact restart time.**
+
+### APIs
+
+- Removed `avalanche_X_vm_avalanche_metervm_pending_txs_count` metric
+- Removed `avalanche_X_vm_avalanche_metervm_pending_txs_sum` metric
+- Removed `avalanche_X_vm_avalanche_metervm_get_tx_count` metric
+- Removed `avalanche_X_vm_avalanche_metervm_get_tx_sum` metric
+- Removed `avalanche_X_vm_avalanche_metervm_get_tx_err_count` metric
+- Removed `avalanche_X_vm_avalanche_metervm_get_tx_err_sum` metric
+
+### Configs
+
+- Added `--staking-host` to allow binding only on a specific address for staking
+- Added `checksums-enabled` to the X-chain and P-chain configs
+
+### Fixes
+
+- Fixed `proposervm` `preForkBlock.Status()` response after the fork has occurred
+- Fixed C-chain logs collection error when no receipts occur in a block
+- Fixed merkledb's `findNextKey` when an empty end proof is provided
+- Fixed 0 length key issues with proof generation and verification
+- Fixed Docker execution on non-amd64 architectures
+
+### What's Changed
+
+- e2e: Support testing on MacOS without requiring firewall exceptions by @marun in https://github.com/ava-labs/avalanchego/pull/1613
+- Reduce resource log level by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1622
+- Improve `snow/` tests with `require` by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/1503
+- Improve `x/` tests with `require` by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/1454
+- `sync` -- fix `TestFindNextKeyRandom` by @danlaine in https://github.com/ava-labs/avalanchego/pull/1624
+- Improve `vms/` tests with `require` by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/1505
+- Improve `database/` tests with `require` by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/1506
+- Ban usage of `t.Fatal` and `t.Error` by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/1453
+- chore: fix typo in binary_snowflake.go by @eltociear in https://github.com/ava-labs/avalanchego/pull/1630
+- Discriminate window fit err msg from overdelegated error msg by @felipemadero in https://github.com/ava-labs/avalanchego/pull/1606
+- Remove MaxConnectionAge gRPC StreamID overflow mitigation by @hexfusion in https://github.com/ava-labs/avalanchego/pull/1388
+- add fuzzing action by @danlaine in https://github.com/ava-labs/avalanchego/pull/1635
+- Remove dagState and GetUTXOFromID by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1632
+- Update all AVM tests for post-linearization by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1631
+- Remove PendingTxs from the DAGVM interface by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1641
+- Remove GetTx from the DAGVM interface by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1642
+- Bump coreth v0.12.4 by @aaronbuchwald in https://github.com/ava-labs/avalanchego/pull/1646
+- [x/merkledb] Remove useless `err` check by @patrick-ogrady in https://github.com/ava-labs/avalanchego/pull/1650
+- [x/merkledb] Trailing whitespace removal on README by @patrick-ogrady in https://github.com/ava-labs/avalanchego/pull/1649
+- Remove unneeded functions from UniqueTx by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1643
+- Simplify tx verification by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1654
+- `merkledb` --  fix `findNextKey` by @danlaine in https://github.com/ava-labs/avalanchego/pull/1653
+- Cleanup X-chain UniqueTx Dependencies by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1656
+- Prune X-chain State by @coffeeavax in https://github.com/ava-labs/avalanchego/pull/1427
+- Support building docker image on ARM64 by @dshiell in https://github.com/ava-labs/avalanchego/pull/1103
+- remove goreleaser by @danlaine in https://github.com/ava-labs/avalanchego/pull/1660
+- Fix Dockerfile on non amd64 platforms by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/1661
+- Improve metrics error message by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1663
+- Remove X-chain UniqueTx by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1662
+- Add state checksums by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1658
+- Modify proposervm window by @najeal in https://github.com/ava-labs/avalanchego/pull/1638
+- sorting nit by @danlaine in https://github.com/ava-labs/avalanchego/pull/1665
+- `merkledb` -- rewrite and test range proof invariants; fix proof generation/veriifcation bugs by @danlaine in https://github.com/ava-labs/avalanchego/pull/1629
+- Add minimum proposer window length by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1667
+- CI -- only run fuzz tests on ubuntu by @danlaine in https://github.com/ava-labs/avalanchego/pull/1636
+- `MerkleDB` -- remove codec version by @danlaine in https://github.com/ava-labs/avalanchego/pull/1671
+- `MerkleDB` -- use default config in all tests by @danlaine in https://github.com/ava-labs/avalanchego/pull/1590
+- `sync` -- reduce stuttering by @danlaine in https://github.com/ava-labs/avalanchego/pull/1672
+- `Sync` -- unexport field by @danlaine in https://github.com/ava-labs/avalanchego/pull/1673
+- `sync` -- nits and cleanup by @danlaine in https://github.com/ava-labs/avalanchego/pull/1674
+- `sync` -- remove unused code by @danlaine in https://github.com/ava-labs/avalanchego/pull/1676
+- Mark preForkBlocks after the fork as Rejected by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1683
+- `merkledb` -- fix comment by @danlaine in https://github.com/ava-labs/avalanchego/pull/1675
+- `MerkleDB` -- document codec by @danlaine in https://github.com/ava-labs/avalanchego/pull/1670
+- `sync` -- client cleanup by @danlaine in https://github.com/ava-labs/avalanchego/pull/1680
+- Update buf version to v1.23.1 by @aaronbuchwald in https://github.com/ava-labs/avalanchego/pull/1685
+
+### New Contributors
+
+- @eltociear made their first contribution in https://github.com/ava-labs/avalanchego/pull/1630
+- @felipemadero made their first contribution in https://github.com/ava-labs/avalanchego/pull/1606
+- @dshiell made their first contribution in https://github.com/ava-labs/avalanchego/pull/1103
+- @najeal made their first contribution in https://github.com/ava-labs/avalanchego/pull/1638
+
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.10.3...v1.10.4
+
 ## [v1.10.3](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.3)
 
 This version is backwards compatible to [v1.10.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0). It is optional, but encouraged. The supported plugin version is `26`.

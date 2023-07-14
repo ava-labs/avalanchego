@@ -32,16 +32,16 @@ const (
 )
 
 var (
-	_ client = (*clientImpl)(nil)
+	_ Client = (*client)(nil)
 
 	errInvalidRangeProof = errors.New("failed to verify range proof")
 	errTooManyKeys       = errors.New("response contains more than requested keys")
 	errTooManyBytes      = errors.New("response contains more than requested bytes")
 )
 
-// client synchronously fetches data from the network to fulfill state sync requests.
+// Client synchronously fetches data from the network to fulfill state sync requests.
 // Repeatedly retries failed requests until the context is canceled.
-type client interface {
+type Client interface {
 	// GetRangeProof synchronously sends the given request, returning a parsed StateResponse or error
 	// Note: this verifies the response including the range proof.
 	GetRangeProof(ctx context.Context, request *pb.SyncGetRangeProofRequest) (*merkledb.RangeProof, error)
@@ -51,8 +51,8 @@ type client interface {
 	GetChangeProof(ctx context.Context, request *pb.SyncGetChangeProofRequest, verificationDB DB) (*merkledb.ChangeProof, error)
 }
 
-type clientImpl struct {
-	networkClient       networkClient
+type client struct {
+	networkClient       NetworkClient
 	stateSyncNodes      []ids.NodeID
 	stateSyncNodeIdx    uint32
 	stateSyncMinVersion *version.Application
@@ -61,15 +61,15 @@ type clientImpl struct {
 }
 
 type ClientConfig struct {
-	NetworkClient       networkClient
+	NetworkClient       NetworkClient
 	StateSyncNodeIDs    []ids.NodeID
 	StateSyncMinVersion *version.Application
 	Log                 logging.Logger
 	Metrics             SyncMetrics
 }
 
-func NewClient(config *ClientConfig) client {
-	return &clientImpl{
+func NewClient(config *ClientConfig) Client {
+	return &client{
 		networkClient:       config.NetworkClient,
 		stateSyncNodes:      config.StateSyncNodeIDs,
 		stateSyncMinVersion: config.StateSyncMinVersion,
@@ -81,7 +81,7 @@ func NewClient(config *ClientConfig) client {
 // GetChangeProof synchronously retrieves the change proof given by [req].
 // Upon failure, retries until the context is expired.
 // The returned change proof is verified.
-func (c *clientImpl) GetChangeProof(ctx context.Context, req *pb.SyncGetChangeProofRequest, db DB) (*merkledb.ChangeProof, error) {
+func (c *client) GetChangeProof(ctx context.Context, req *pb.SyncGetChangeProofRequest, db DB) (*merkledb.ChangeProof, error) {
 	parseFn := func(ctx context.Context, responseBytes []byte) (*merkledb.ChangeProof, error) {
 		if len(responseBytes) > int(req.BytesLimit) {
 			return nil, fmt.Errorf("%w: (%d) > %d)", errTooManyBytes, len(responseBytes), req.BytesLimit)
@@ -130,7 +130,7 @@ func (c *clientImpl) GetChangeProof(ctx context.Context, req *pb.SyncGetChangePr
 // GetRangeProof synchronously retrieves the range proof given by [req].
 // Upon failure, retries until the context is expired.
 // The returned range proof is verified.
-func (c *clientImpl) GetRangeProof(ctx context.Context, req *pb.SyncGetRangeProofRequest) (*merkledb.RangeProof, error) {
+func (c *client) GetRangeProof(ctx context.Context, req *pb.SyncGetRangeProofRequest) (*merkledb.RangeProof, error) {
 	parseFn := func(ctx context.Context, responseBytes []byte) (*merkledb.RangeProof, error) {
 		if len(responseBytes) > int(req.BytesLimit) {
 			return nil, fmt.Errorf("%w: (%d) > %d)", errTooManyBytes, len(responseBytes), req.BytesLimit)
@@ -188,7 +188,7 @@ func (c *clientImpl) GetRangeProof(ctx context.Context, req *pb.SyncGetRangeProo
 // This should be treated as a fatal error.
 func getAndParse[T any](
 	ctx context.Context,
-	client *clientImpl,
+	client *client,
 	request []byte,
 	parseFn func(context.Context, []byte) (*T, error),
 ) (*T, error) {
@@ -247,7 +247,7 @@ func getAndParse[T any](
 // Returns [errAppRequestSendFailed] if we failed to send an AppRequest.
 // This should be treated as fatal.
 // It's safe to call this method multiple times concurrently.
-func (c *clientImpl) get(ctx context.Context, request []byte) (ids.NodeID, []byte, error) {
+func (c *client) get(ctx context.Context, request []byte) (ids.NodeID, []byte, error) {
 	var (
 		response  []byte
 		nodeID    ids.NodeID
@@ -258,23 +258,23 @@ func (c *clientImpl) get(ctx context.Context, request []byte) (ids.NodeID, []byt
 	c.metrics.RequestMade()
 
 	if len(c.stateSyncNodes) == 0 {
-		nodeID, response, err = c.networkClient.requestAny(ctx, c.stateSyncMinVersion, request)
+		nodeID, response, err = c.networkClient.RequestAny(ctx, c.stateSyncMinVersion, request)
 	} else {
 		// Get the next nodeID to query using the [nodeIdx] offset.
 		// If we're out of nodes, loop back to 0.
 		// We do this try to query a different node each time if possible.
 		nodeIdx := atomic.AddUint32(&c.stateSyncNodeIdx, 1)
 		nodeID = c.stateSyncNodes[nodeIdx%uint32(len(c.stateSyncNodes))]
-		response, err = c.networkClient.request(ctx, nodeID, request)
+		response, err = c.networkClient.Request(ctx, nodeID, request)
 	}
 	if err != nil {
 		c.metrics.RequestFailed()
-		c.networkClient.trackBandwidth(nodeID, 0)
+		c.networkClient.TrackBandwidth(nodeID, 0)
 		return nodeID, response, err
 	}
 
 	bandwidth := float64(len(response)) / (time.Since(startTime).Seconds() + epsilon)
-	c.networkClient.trackBandwidth(nodeID, bandwidth)
+	c.networkClient.TrackBandwidth(nodeID, bandwidth)
 	c.metrics.RequestSucceeded()
 	return nodeID, response, nil
 }
