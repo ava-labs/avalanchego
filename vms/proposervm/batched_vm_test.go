@@ -30,7 +30,9 @@ func TestCoreVMNotRemote(t *testing.T) {
 	// if coreVM is not remote VM, a specific error is returned
 	require := require.New(t)
 	_, _, proVM, _, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
-	defer require.NoError(proVM.Shutdown(context.Background()))
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	blkID := ids.Empty
 	maxBlocksNum := 1000               // a high value to get all built blocks
@@ -53,7 +55,9 @@ func TestCoreVMNotRemote(t *testing.T) {
 func TestGetAncestorsPreForkOnly(t *testing.T) {
 	require := require.New(t)
 	coreVM, proRemoteVM, coreGenBlk := initTestRemoteProposerVM(t, mockable.MaxTime) // disable ProBlks
-	defer require.NoError(proRemoteVM.Shutdown(context.Background()))
+	defer func() {
+		require.NoError(proRemoteVM.Shutdown(context.Background()))
+	}()
 
 	// Build some prefork blocks....
 	coreBlk1 := &snowman.TestBlock{
@@ -197,7 +201,9 @@ func TestGetAncestorsPreForkOnly(t *testing.T) {
 func TestGetAncestorsPostForkOnly(t *testing.T) {
 	require := require.New(t)
 	coreVM, proRemoteVM, coreGenBlk := initTestRemoteProposerVM(t, time.Time{}) // enable ProBlks
-	defer require.NoError(proRemoteVM.Shutdown(context.Background()))
+	defer func() {
+		require.NoError(proRemoteVM.Shutdown(context.Background()))
+	}()
 
 	// Build some post-Fork blocks....
 	coreBlk1 := &snowman.TestBlock{
@@ -353,7 +359,9 @@ func TestGetAncestorsAtSnomanPlusPlusFork(t *testing.T) {
 
 	// enable ProBlks in next future
 	coreVM, proRemoteVM, coreGenBlk := initTestRemoteProposerVM(t, forkTime)
-	defer require.NoError(proRemoteVM.Shutdown(context.Background()))
+	defer func() {
+		require.NoError(proRemoteVM.Shutdown(context.Background()))
+	}()
 
 	// Build some prefork blocks....
 	proRemoteVM.Set(preForkTime)
@@ -551,7 +559,9 @@ func TestGetAncestorsAtSnomanPlusPlusFork(t *testing.T) {
 func TestBatchedParseBlockPreForkOnly(t *testing.T) {
 	require := require.New(t)
 	coreVM, proRemoteVM, coreGenBlk := initTestRemoteProposerVM(t, mockable.MaxTime) // disable ProBlks
-	defer require.NoError(proRemoteVM.Shutdown(context.Background()))
+	defer func() {
+		require.NoError(proRemoteVM.Shutdown(context.Background()))
+	}()
 
 	// Build some prefork blocks....
 	coreBlk1 := &snowman.TestBlock{
@@ -670,7 +680,9 @@ func TestBatchedParseBlockPreForkOnly(t *testing.T) {
 func TestBatchedParseBlockPostForkOnly(t *testing.T) {
 	require := require.New(t)
 	coreVM, proRemoteVM, coreGenBlk := initTestRemoteProposerVM(t, time.Time{}) // enable ProBlks
-	defer require.NoError(proRemoteVM.Shutdown(context.Background()))
+	defer func() {
+		require.NoError(proRemoteVM.Shutdown(context.Background()))
+	}()
 
 	// Build some post-Fork blocks....
 	coreBlk1 := &snowman.TestBlock{
@@ -783,7 +795,9 @@ func TestBatchedParseBlockAtSnomanPlusPlusFork(t *testing.T) {
 
 	// enable ProBlks in next future
 	coreVM, proRemoteVM, coreGenBlk := initTestRemoteProposerVM(t, forkTime)
-	defer require.NoError(proRemoteVM.Shutdown(context.Background()))
+	defer func() {
+		require.NoError(proRemoteVM.Shutdown(context.Background()))
+	}()
 
 	// Build some prefork blocks....
 	proRemoteVM.Set(preForkTime)
