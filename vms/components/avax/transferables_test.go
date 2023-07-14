@@ -213,9 +213,9 @@ func TestTransferableInputSorting(t *testing.T) {
 		},
 	}
 
-	require.False(utils.IsSortedAndUniqueSortable(ins))
+	require.False(utils.IsSortedAndUnique(ins))
 	utils.Sort(ins)
-	require.True(utils.IsSortedAndUniqueSortable(ins))
+	require.True(utils.IsSortedAndUnique(ins))
 
 	ins = append(ins, &TransferableInput{
 		UTXOID: UTXOID{
@@ -226,7 +226,7 @@ func TestTransferableInputSorting(t *testing.T) {
 		In:    &TestTransferable{},
 	})
 
-	require.False(utils.IsSortedAndUniqueSortable(ins))
+	require.False(utils.IsSortedAndUnique(ins))
 }
 
 func TestTransferableInputSerialization(t *testing.T) {
