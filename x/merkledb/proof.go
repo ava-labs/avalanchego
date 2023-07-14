@@ -672,17 +672,23 @@ func verifyKeyChanges(kvs []KeyChange, start, end Maybe[[]byte]) error {
 // If [end] is Nothing, there is no upper bound on acceptable keys.
 // If [kvs] is empty, returns nil.
 func verifyKeyValues(kvs []KeyValue, start, end Maybe[[]byte]) error {
-	hasLowerBound := start.hasValue
-	hasUpperBound := end.hasValue
-	for i := 0; i < len(kvs); i++ {
-		if i < len(kvs)-1 && bytes.Compare(kvs[i].Key, kvs[i+1].Key) >= 0 {
+	if len(kvs) == 0 {
+		return nil
+	}
+
+	// ensure that the keys are in increasing order
+	for i := 0; i < len(kvs)-1; i++ {
+		if bytes.Compare(kvs[i].Key, kvs[i+1].Key) >= 0 {
 			return ErrNonIncreasingValues
 		}
-		if (hasLowerBound && bytes.Compare(kvs[i].Key, start.value) < 0) ||
-			(hasUpperBound && bytes.Compare(kvs[i].Key, end.value) > 0) {
-			return ErrStateFromOutsideOfRange
-		}
 	}
+
+	// ensure that the keys are within the range [start, end]
+	if (start.hasValue && bytes.Compare(kvs[0].Key, start.value) < 0) ||
+		(end.hasValue && bytes.Compare(kvs[len(kvs)-1].Key, end.value) > 0) {
+		return ErrStateFromOutsideOfRange
+	}
+
 	return nil
 }
 
