@@ -10,6 +10,8 @@ import (
 
 	"github.com/google/btree"
 
+	"go.uber.org/zap"
+
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -28,6 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -147,6 +150,12 @@ type State interface {
 
 	// Discard uncommitted changes to the database.
 	Abort()
+
+	// Asynchronously removes rejected blocks from disk and indexes accepted blocks
+	// by height.
+	//
+	// TODO: remove after v1.11.x is activated
+	PruneAndIndex() error
 
 	// Commit changes to the base database.
 	Commit() error
@@ -2046,5 +2055,87 @@ func (s *state) writeMetadata() error {
 		}
 		s.persistedLastAccepted = s.lastAccepted
 	}
+	return nil
+}
+
+func (s *state) PruneAndIndex() error {
+	lastAcceptedBlk, _, err := s.GetStatelessBlock(s.lastAccepted)
+	if err != nil {
+		return fmt.Errorf("failed to get last accepted block from local disk: %w", err)
+	}
+
+	lastAcceptedHeight := lastAcceptedBlk.Height()
+	lastAcceptedHeightKey := database.PackUInt64(lastAcceptedHeight)
+	if _, err := database.GetID(s.blockIDDB, lastAcceptedHeightKey); err == nil {
+		// If the last accepted block is in [s.blockIDDB], we have previously
+		// run this function.
+		return nil
+	}
+
+	// It is possible that new blocks are added after grabbing this iterator. New
+	// blocks are guaranteed to be accepted and height-indexed, so we don't need to
+	// check them.
+	blockIterator := s.blockDB.NewIterator()
+	defer blockIterator.Release()
+
+	s.ctx.Log.Info("populating platformvm block height index")
+	var (
+		startTime  = time.Now()
+		lastUpdate = startTime
+	)
+
+	for indexed := uint64(0); blockIterator.Next(); {
+		blkBytes := blockIterator.Value()
+
+		// Note: stored blocks are verified, so it's safe to unmarshal them with
+		// GenesisCodec
+		blkState := stateBlk{}
+		if _, err := blocks.GenesisCodec.Unmarshal(blkBytes, &blkState); err != nil {
+			return err
+		}
+
+		if blkState.Status == choices.Rejected {
+			// Delete the block from disk as we no longer persist rejected blocks.
+			if err := s.blockDB.Delete(blockIterator.Key()); err != nil {
+				return fmt.Errorf("failed to delete block: %w", err)
+			}
+
+			// If the block is rejected, it should not be included in the height index.
+			continue
+		}
+
+		blkState.Blk, err = blocks.Parse(blocks.GenesisCodec, blkState.Bytes)
+		if err != nil {
+			return err
+		}
+
+		blkHeight := blkState.Blk.Height()
+		blkID := blkState.Blk.ID()
+
+		heightKey := database.PackUInt64(blkHeight)
+		if err := database.PutID(s.blockIDDB, heightKey, blkID); err != nil {
+			return fmt.Errorf("failed to add blockID: %w", err)
+		}
+
+		indexed++
+
+		if time.Since(lastUpdate) > 5*time.Second {
+			eta := timer.EstimateETA(startTime, indexed, lastAcceptedHeight+1)
+			s.ctx.Log.Info("populating platformvm block height index",
+				zap.Uint64("progress", indexed),
+				zap.Uint64("end", lastAcceptedHeight+1),
+				zap.Duration("eta", eta),
+			)
+			lastUpdate = time.Now()
+		}
+	}
+
+	if err := s.Commit(); err != nil {
+		return err
+	}
+
+	s.ctx.Log.Info("populated platformvm block height index",
+		zap.Duration("elapsed", time.Since(startTime)),
+	)
 	return nil
 }
