@@ -134,7 +134,7 @@ func (v *SyntacticVerifier) CreateAssetTx(tx *txs.CreateAssetTx) error {
 			return err
 		}
 	}
-	if !utils.IsSortedAndUniqueSortable(tx.States) {
+	if !utils.IsSortedAndUnique(tx.States) {
 		return errInitialStatesNotSortedUnique
 	}
 
