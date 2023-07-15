@@ -129,7 +129,7 @@ type State interface {
 	GetLastAccepted() ids.ID
 	SetLastAccepted(blkID ids.ID)
 
-	GetStatelessBlock(blockID ids.ID) (blocks.Block, choices.Status, error)
+	GetStatelessBlock(blockID ids.ID) (blocks.Block, error)
 
 	// Invariant: [block] is an accepted block.
 	AddStatelessBlock(block blocks.Block)
@@ -169,6 +169,7 @@ type State interface {
 	Close() error
 }
 
+// TODO: remove after v1.11.x is activated
 type stateBlk struct {
 	Blk    blocks.Block
 	Bytes  []byte         `serialize:"true"`
@@ -264,8 +265,8 @@ type state struct {
 	blockIDCache  cache.Cacher[uint64, ids.ID] // cache of height -> blockID. If the entry is ids.Empty, it is not in the database
 	blockIDDB     database.Database
 
-	addedBlocks map[ids.ID]stateBlk             // map of blockID -> Block
-	blockCache  cache.Cacher[ids.ID, *stateBlk] // cache of blockID -> Block. If the entry is nil, it is not in the database
+	addedBlocks map[ids.ID]blocks.Block            // map of blockID -> Block
+	blockCache  cache.Cacher[ids.ID, blocks.Block] // cache of blockID -> Block. If the entry is nil, it is not in the database
 	blockDB     database.Database
 
 	validatorsDB                 database.Database
@@ -429,10 +430,10 @@ func new(
 		return nil, err
 	}
 
-	blockCache, err := metercacher.New(
+	blockCache, err := metercacher.New[ids.ID, blocks.Block](
 		"block_cache",
 		metricsReg,
-		cache.NewSizedLRU[ids.ID, *stateBlk](blockCacheSize),
+		&cache.LRU[ids.ID, blocks.Block]{Size: blockCacheSize},
 	)
 	if err != nil {
 		return nil, err
@@ -551,7 +552,7 @@ func new(
 		blockIDCache:  blockIDCache,
 		blockIDDB:     prefixdb.New(blockIDPrefix, baseDB),
 
-		addedBlocks: make(map[ids.ID]stateBlk),
+		addedBlocks: make(map[ids.ID]blocks.Block),
 		blockCache:  blockCache,
 		blockDB:     prefixdb.New(blockPrefix, baseDB),
 
@@ -1523,11 +1524,7 @@ func (s *state) init(genesisBytes []byte) error {
 func (s *state) AddStatelessBlock(block blocks.Block) {
 	blkID := block.ID()
 	s.addedBlockIDs[block.Height()] = blkID
-	s.addedBlocks[blkID] = stateBlk{
-		Blk:    block,
-		Bytes:  block.Bytes(),
-		Status: choices.Accepted,
-	}
+	s.addedBlocks[blkID] = block
 }
 
 func (s *state) SetHeight(height uint64) {
@@ -1574,62 +1571,47 @@ func (s *state) writeBlockIDs() error {
 }
 
 func (s *state) writeBlocks() error {
-	for blkID, stateBlk := range s.addedBlocks {
-		var (
-			blkID = blkID
-			stBlk = stateBlk
-		)
-
-		// Note: blocks to be stored are verified, so it's safe to marshal them with GenesisCodec
-		blockBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, &stBlk)
-		if err != nil {
-			return fmt.Errorf("failed to marshal block %s to store: %w", blkID, err)
-		}
+	for blkID, blk := range s.addedBlocks {
+		blkID := blkID
+		blkBytes := blk.Bytes()
 
 		delete(s.addedBlocks, blkID)
-		// Note: Evict is used rather than Put here because stBlk may end up
-		// referencing additional data (because of shared byte slices) that
-		// would not be properly accounted for in the cache sizing.
-		s.blockCache.Evict(blkID)
-		if err := s.blockDB.Put(blkID[:], blockBytes); err != nil {
+		s.blockCache.Put(blkID, blk)
+		if err := s.blockDB.Put(blkID[:], blkBytes); err != nil {
 			return fmt.Errorf("failed to write block %s: %w", blkID, err)
 		}
 	}
 	return nil
 }
 
-func (s *state) GetStatelessBlock(blockID ids.ID) (blocks.Block, choices.Status, error) {
-	if blk, ok := s.addedBlocks[blockID]; ok {
-		return blk.Blk, blk.Status, nil
+func (s *state) GetStatelessBlock(blockID ids.ID) (blocks.Block, error) {
+	if blk, exists := s.addedBlocks[blockID]; exists {
+		return blk, nil
 	}
-	if blkState, ok := s.blockCache.Get(blockID); ok {
-		if blkState == nil {
-			return nil, choices.Processing, database.ErrNotFound
+	if blk, cached := s.blockCache.Get(blockID); cached {
+		if blk == nil {
+			return nil, database.ErrNotFound
 		}
-		return blkState.Blk, blkState.Status, nil
+
+		return blk, nil
 	}
 
 	blkBytes, err := s.blockDB.Get(blockID[:])
 	if err == database.ErrNotFound {
 		s.blockCache.Put(blockID, nil)
-		return nil, choices.Processing, database.ErrNotFound // status does not matter here
-	} else if err != nil {
-		return nil, choices.Processing, err // status does not matter here
+		return nil, database.ErrNotFound
 	}
-
-	// Note: stored blocks are verified, so it's safe to unmarshal them with GenesisCodec
-	blkState := stateBlk{}
-	if _, err := blocks.GenesisCodec.Unmarshal(blkBytes, &blkState); err != nil {
-		return nil, choices.Processing, err // status does not matter here
-	}
-
-	blkState.Blk, err = blocks.Parse(blocks.GenesisCodec, blkState.Bytes)
 	if err != nil {
-		return nil, choices.Processing, err
+		return nil, err
 	}
 
-	s.blockCache.Put(blockID, &blkState)
-	return blkState.Blk, blkState.Status, nil
+	blk, _, _, err := parseStoredBlock(blkBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	s.blockCache.Put(blockID, blk)
+	return blk, nil
 }
 
 func (s *state) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
@@ -2058,8 +2040,32 @@ func (s *state) writeMetadata() error {
 	return nil
 }
 
+// Returns the block, status of the block, and whether it is a [stateBlk].
+// Invariant: blkBytes is safe to parse with blocks.GenesisCodec
+//
+// TODO: Cleanup after v1.11.x is activated
+func parseStoredBlock(blkBytes []byte) (blocks.Block, choices.Status, bool, error) {
+	blk, err := blocks.Parse(blocks.GenesisCodec, blkBytes)
+	if err == nil {
+		return blk, choices.Processing, false, nil // status does not matter
+	}
+
+	// Fallback to [stateBlk], we have not finished pruning.
+	blkState := stateBlk{}
+	if _, err := blocks.GenesisCodec.Unmarshal(blkBytes, &blkState); err != nil {
+		return nil, choices.Processing, false, err // status does not matter
+	}
+
+	blkState.Blk, err = blocks.Parse(blocks.GenesisCodec, blkState.Bytes)
+	if err != nil {
+		return nil, choices.Processing, false, err // status does not matter
+	}
+
+	return blkState.Blk, blkState.Status, true, nil
+}
+
 func (s *state) PruneAndIndex() error {
-	lastAcceptedBlk, _, err := s.GetStatelessBlock(s.lastAccepted)
+	lastAcceptedBlk, err := s.GetStatelessBlock(s.lastAccepted)
 	if err != nil {
 		return fmt.Errorf("failed to get last accepted block from local disk: %w", err)
 	}
@@ -2087,34 +2093,30 @@ func (s *state) PruneAndIndex() error {
 	for indexed := uint64(0); blockIterator.Next(); {
 		blkBytes := blockIterator.Value()
 
-		// Note: stored blocks are verified, so it's safe to unmarshal them with
-		// GenesisCodec
-		blkState := stateBlk{}
-		if _, err := blocks.GenesisCodec.Unmarshal(blkBytes, &blkState); err != nil {
-			return err
-		}
-
-		if blkState.Status == choices.Rejected {
-			// Delete the block from disk as we no longer persist rejected blocks.
-			if err := s.blockDB.Delete(blockIterator.Key()); err != nil {
-				return fmt.Errorf("failed to delete block: %w", err)
-			}
-
-			// If the block is rejected, it should not be included in the height index.
-			continue
-		}
-
-		blkState.Blk, err = blocks.Parse(blocks.GenesisCodec, blkState.Bytes)
+		blk, status, isStateBlk, err := parseStoredBlock(blkBytes)
 		if err != nil {
 			return err
 		}
 
-		blkHeight := blkState.Blk.Height()
-		blkID := blkState.Blk.ID()
+		if status != choices.Accepted {
+			// We no longer persist any non-accepted blocks to disk.
+			if err := s.blockDB.Delete(blockIterator.Key()); err != nil {
+				return fmt.Errorf("failed to delete block: %w", err)
+			}
+		}
+
+		blkHeight := blk.Height()
+		blkID := blk.ID()
 
 		heightKey := database.PackUInt64(blkHeight)
 		if err := database.PutID(s.blockIDDB, heightKey, blkID); err != nil {
 			return fmt.Errorf("failed to add blockID: %w", err)
+		}
+
+		if isStateBlk {
+			if err := s.blockDB.Put(blkID[:], blkBytes); err != nil {
+				return fmt.Errorf("failed to write block: %w", err)
+			}
 		}
 
 		indexed++
