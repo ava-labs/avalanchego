@@ -2047,18 +2047,18 @@ func (s *state) writeMetadata() error {
 func parseStoredBlock(blkBytes []byte) (blocks.Block, choices.Status, bool, error) {
 	blk, err := blocks.Parse(blocks.GenesisCodec, blkBytes)
 	if err == nil {
-		return blk, choices.Processing, false, nil // status does not matter
+		return blk, choices.Accepted, false, nil
 	}
 
 	// Fallback to [stateBlk], we have not finished pruning.
 	blkState := stateBlk{}
 	if _, err := blocks.GenesisCodec.Unmarshal(blkBytes, &blkState); err != nil {
-		return nil, choices.Processing, false, err // status does not matter
+		return nil, choices.Processing, false, err
 	}
 
 	blkState.Blk, err = blocks.Parse(blocks.GenesisCodec, blkState.Bytes)
 	if err != nil {
-		return nil, choices.Processing, false, err // status does not matter
+		return nil, choices.Processing, false, err
 	}
 
 	return blkState.Blk, blkState.Status, true, nil
