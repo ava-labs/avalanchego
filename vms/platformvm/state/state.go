@@ -1605,9 +1605,13 @@ func (s *state) GetStatelessBlock(blockID ids.ID) (blocks.Block, error) {
 		return nil, err
 	}
 
-	blk, _, _, err := parseStoredBlock(blkBytes)
+	blk, status, _, err := parseStoredBlock(blkBytes)
 	if err != nil {
 		return nil, err
+	}
+
+	if status != choices.Accepted {
+		return nil, database.ErrNotFound
 	}
 
 	s.blockCache.Put(blockID, blk)
