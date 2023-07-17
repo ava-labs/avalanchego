@@ -148,6 +148,9 @@ type merkleDB struct {
 	metadataDB database.Database
 
 	// If a value is nil, the corresponding key isn't in the trie.
+	// Note that a call to Put may cause a node to be evicted
+	// from the cache, which will call [OnEviction].
+	// A non-nil error returned from Put is considered fatal.
 	nodeCache         onEvictCache[path, *node]
 	onEvictionErr     utils.Atomic[error]
 	evictionBatchSize int
@@ -923,7 +926,7 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 	db.root = rootChange.after
 
 	for key, nodeChange := range changes.nodes {
-		if err := db.putNodeInCache(key, nodeChange.after); err != nil {
+		if err := db.nodeCache.Put(key, nodeChange.after); err != nil {
 			return err
 		}
 	}
@@ -1233,7 +1236,7 @@ func (db *merkleDB) getNode(key path) (*node, error) {
 		return db.root, nil
 	}
 
-	if n, isCached := db.getNodeInCache(key); isCached {
+	if n, isCached := db.nodeCache.Get(key); isCached {
 		db.metrics.DBNodeCacheHit()
 		if n == nil {
 			return nil, database.ErrNotFound
@@ -1247,7 +1250,7 @@ func (db *merkleDB) getNode(key path) (*node, error) {
 	if err != nil {
 		if err == database.ErrNotFound {
 			// Cache the miss.
-			if err := db.putNodeInCache(key, nil); err != nil {
+			if err := db.nodeCache.Put(key, nil); err != nil {
 				return nil, err
 			}
 		}
@@ -1259,7 +1262,7 @@ func (db *merkleDB) getNode(key path) (*node, error) {
 		return nil, err
 	}
 
-	err = db.putNodeInCache(key, node)
+	err = db.nodeCache.Put(key, node)
 	return node, err
 }
 
@@ -1339,20 +1342,4 @@ func (db *merkleDB) prepareRangeProofView(start []byte, proof *RangeProof) (*tri
 		}
 	}
 	return view, nil
-}
-
-// Non-nil error is fatal -- [db] will close.
-func (db *merkleDB) putNodeInCache(key path, n *node) error {
-	// TODO Cache metrics
-	// Note that this may cause a node to be evicted from the cache,
-	// which will call [OnEviction].
-	return db.nodeCache.Put(key, n)
-}
-
-func (db *merkleDB) getNodeInCache(key path) (*node, bool) {
-	// TODO Cache metrics
-	if node, ok := db.nodeCache.Get(key); ok {
-		return node, true
-	}
-	return nil, false
 }
