@@ -15,7 +15,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -183,11 +182,11 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	env.blkManager.(*manager).lastAccepted = parentID
 	env.mockedState.EXPECT().GetLastAccepted().Return(parentID).AnyTimes()
 	env.mockedState.EXPECT().GetStatelessBlock(gomock.Any()).DoAndReturn(
-		func(blockID ids.ID) (blocks.Block, choices.Status, error) {
+		func(blockID ids.ID) (blocks.Block, error) {
 			if blockID == parentID {
-				return banffParentBlk, choices.Accepted, nil
+				return banffParentBlk, nil
 			}
-			return nil, choices.Rejected, database.ErrNotFound
+			return nil, database.ErrNotFound
 		}).AnyTimes()
 
 	// setup state to validate proposal block transaction
