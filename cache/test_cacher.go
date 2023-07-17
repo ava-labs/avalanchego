@@ -13,7 +13,9 @@ import (
 
 const TestIntSize = 8
 
-func TestIntSizeFunc(int64) int { return TestIntSize }
+func TestIntSizeFunc(int64) int {
+	return TestIntSize
+}
 
 // CacherTests is a list of all Cacher tests
 var CacherTests = []struct {
