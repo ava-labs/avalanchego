@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/tests/e2e"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -70,10 +69,9 @@ var _ = ginkgo.Describe("[Banff]", func() {
 				},
 			}
 
-			var assetTx *txs.Tx
+			var assetID ids.ID
 			ginkgo.By("create new X-chain asset", func() {
-				var err error
-				assetTx, err = xWallet.IssueCreateAssetTx(
+				assetTx, err := xWallet.IssueCreateAssetTx(
 					"RnM",
 					"RNM",
 					9,
@@ -87,8 +85,9 @@ var _ = ginkgo.Describe("[Banff]", func() {
 					},
 				)
 				gomega.Expect(err).Should(gomega.BeNil())
+				assetID = assetTx.ID()
 
-				tests.Outf("{{green}}created new X-chain asset{{/}}: %s\n", assetTx.ID())
+				tests.Outf("{{green}}created new X-chain asset{{/}}: %s\n", assetID)
 			})
 
 			ginkgo.By("export new X-chain asset to P-chain", func() {
@@ -97,7 +96,7 @@ var _ = ginkgo.Describe("[Banff]", func() {
 					[]*avax.TransferableOutput{
 						{
 							Asset: avax.Asset{
-								ID: assetTx.ID(),
+								ID: assetID,
 							},
 							Out: &secp256k1fx.TransferOutput{
 								Amt:          100 * units.Schmeckle,
@@ -124,7 +123,7 @@ var _ = ginkgo.Describe("[Banff]", func() {
 					[]*avax.TransferableOutput{
 						{
 							Asset: avax.Asset{
-								ID: assetTx.ID(),
+								ID: assetID,
 							},
 							Out: &secp256k1fx.TransferOutput{
 								Amt:          100 * units.Schmeckle,
