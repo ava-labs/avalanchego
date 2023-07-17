@@ -124,7 +124,7 @@ type State interface {
 	GetLastAccepted() ids.ID
 	SetLastAccepted(blkID ids.ID)
 
-	GetStatelessBlock(blockID ids.ID) (blocks.Block, choices.Status, error)
+	GetStatelessBlock(blockID ids.ID) (blocks.Block, error)
 
 	// Invariant: [block] is an accepted block.
 	AddStatelessBlock(block blocks.Block)
@@ -1551,38 +1551,46 @@ func (s *state) writeBlocks() error {
 	return nil
 }
 
-func (s *state) GetStatelessBlock(blockID ids.ID) (blocks.Block, choices.Status, error) {
-	if blk, ok := s.addedBlocks[blockID]; ok {
-		return blk.Blk, blk.Status, nil
+func (s *state) GetStatelessBlock(blockID ids.ID) (blocks.Block, error) {
+	if blkState, ok := s.addedBlocks[blockID]; ok {
+		if blkState.Status != choices.Accepted {
+			return nil, database.ErrNotFound
+		}
+
+		return blkState.Blk, nil
 	}
 	if blkState, ok := s.blockCache.Get(blockID); ok {
-		if blkState == nil {
-			return nil, choices.Processing, database.ErrNotFound
+		if blkState == nil || blkState.Status != choices.Accepted {
+			return nil, database.ErrNotFound
 		}
-		return blkState.Blk, blkState.Status, nil
+		return blkState.Blk, nil
 	}
 
 	blkBytes, err := s.blockDB.Get(blockID[:])
 	if err == database.ErrNotFound {
 		s.blockCache.Put(blockID, nil)
-		return nil, choices.Processing, database.ErrNotFound // status does not matter here
+		return nil, database.ErrNotFound
 	} else if err != nil {
-		return nil, choices.Processing, err // status does not matter here
+		return nil, err
 	}
 
 	// Note: stored blocks are verified, so it's safe to unmarshal them with GenesisCodec
 	blkState := stateBlk{}
 	if _, err := blocks.GenesisCodec.Unmarshal(blkBytes, &blkState); err != nil {
-		return nil, choices.Processing, err // status does not matter here
+		return nil, err
 	}
 
 	blkState.Blk, err = blocks.Parse(blocks.GenesisCodec, blkState.Bytes)
 	if err != nil {
-		return nil, choices.Processing, err
+		return nil, err
+	}
+
+	if blkState.Status != choices.Accepted {
+		return nil, database.ErrNotFound
 	}
 
 	s.blockCache.Put(blockID, &blkState)
-	return blkState.Blk, blkState.Status, nil
+	return blkState.Blk, nil
 }
 
 func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error {
