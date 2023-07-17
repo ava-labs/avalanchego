@@ -1580,14 +1580,14 @@ func (s *state) GetStatelessBlock(blockID ids.ID) (blocks.Block, error) {
 		return nil, err
 	}
 
-	blkState.Blk, err = blocks.Parse(blocks.GenesisCodec, blkState.Bytes)
-	if err != nil {
-		return nil, err
-	}
-
 	if blkState.Status != choices.Accepted {
 		s.blockCache.Put(blockID, nil)
 		return nil, database.ErrNotFound
+	}
+
+	blkState.Blk, err = blocks.Parse(blocks.GenesisCodec, blkState.Bytes)
+	if err != nil {
+		return nil, err
 	}
 
 	s.blockCache.Put(blockID, &blkState)
