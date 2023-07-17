@@ -74,6 +74,10 @@ func TestPrestateWithDiffModeTracer(t *testing.T) {
 	testPrestateDiffTracer("prestateTracer", "prestate_tracer_with_diff_mode", t)
 }
 
+func TestPrestateWithDiffModeANTTracer(t *testing.T) {
+	testPrestateDiffTracer("prestateTracer", "prestate_tracer_ant", t)
+}
+
 func testPrestateDiffTracer(tracerName string, dirPath string, t *testing.T) {
 	files, err := os.ReadDir(filepath.Join("testdata", dirPath))
 	if err != nil {
@@ -110,14 +114,16 @@ func testPrestateDiffTracer(tracerName string, dirPath string, t *testing.T) {
 					GasPrice: tx.GasPrice(),
 				}
 				context = vm.BlockContext{
-					CanTransfer: core.CanTransfer,
-					Transfer:    core.Transfer,
-					Coinbase:    test.Context.Miner,
-					BlockNumber: blockNumber,
-					Time:        uint64(test.Context.Time),
-					Difficulty:  (*big.Int)(test.Context.Difficulty),
-					GasLimit:    uint64(test.Context.GasLimit),
-					BaseFee:     test.Genesis.BaseFee,
+					CanTransfer:       core.CanTransfer,
+					CanTransferMC:     core.CanTransferMC,
+					Transfer:          core.Transfer,
+					TransferMultiCoin: core.TransferMultiCoin,
+					Coinbase:          test.Context.Miner,
+					BlockNumber:       blockNumber,
+					Time:              uint64(test.Context.Time),
+					Difficulty:        (*big.Int)(test.Context.Difficulty),
+					GasLimit:          uint64(test.Context.GasLimit),
+					BaseFee:           test.Genesis.BaseFee,
 				}
 				_, statedb = tests.MakePreState(rawdb.NewMemoryDatabase(), test.Genesis.Alloc, false)
 			)
