@@ -288,6 +288,14 @@ func (t *prestateTracer) lookupAccount(addr common.Address) {
 // it to the prestate of the given contract. It assumes `lookupAccount`
 // has been performed on the contract before.
 func (t *prestateTracer) lookupStorage(addr common.Address, key common.Hash) {
+	// lookupStorage assumes that lookupAccount has already been called.
+	// This assumption is violated for some historical blocks by the NativeAssetCall
+	// precompile. To fix this, we perform an extra call to lookupAccount here to ensure
+	// that the pre-state account is populated before attempting to read from the Storage
+	// map. When the invariant is maintained properly (since de-activation of the precompile),
+	// lookupAccount is a no-op. When the invariant is broken by the precompile, this avoids
+	// the panic and correctly captures the account prestate before the next opcode is executed.
+	t.lookupAccount(addr)
 	if _, ok := t.pre[addr].Storage[key]; ok {
 		return
 	}
