@@ -69,7 +69,7 @@ func (b *backend) GetBlock(blkID ids.ID) (blocks.Block, error) {
 		return blk.statelessBlock, nil
 	}
 	// The block isn't in memory. Check the database.
-	statelessBlk, _, err := b.state.GetStatelessBlock(blkID)
+	statelessBlk, err := b.state.GetStatelessBlock(blkID)
 	return statelessBlk, err
 }
 
