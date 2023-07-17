@@ -230,10 +230,11 @@ RECEIVER  NEW BALANCE (AFTER) : %21d AVAX
 				gomega.Expect(senderCurBalX).Should(gomega.Equal(senderNewBal))
 				gomega.Expect(receiverCurBalX).Should(gomega.Equal(receiverNewBal))
 
+				txID := tx.ID()
 				for _, u := range rpcEps {
 					xc := avm.NewClient(u, "X")
 					ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
-					status, err := xc.ConfirmTx(ctx, tx.ID(), 2*time.Second)
+					status, err := xc.ConfirmTx(ctx, txID, 2*time.Second)
 					cancel()
 					gomega.Expect(err).Should(gomega.BeNil())
 					gomega.Expect(status).Should(gomega.Equal(choices.Accepted))
@@ -242,7 +243,7 @@ RECEIVER  NEW BALANCE (AFTER) : %21d AVAX
 				for _, u := range rpcEps {
 					xc := avm.NewClient(u, "X")
 					ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
-					status, err := xc.ConfirmTx(ctx, tx.ID(), 2*time.Second)
+					status, err := xc.ConfirmTx(ctx, txID, 2*time.Second)
 					cancel()
 					gomega.Expect(err).Should(gomega.BeNil())
 					gomega.Expect(status).Should(gomega.Equal(choices.Accepted))

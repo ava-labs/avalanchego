@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/avm"
-	avmtxs "github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
@@ -78,28 +77,28 @@ var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
 				},
 			}
 
-			var subnetTx *txs.Tx
+			var subnetID ids.ID
 			ginkgo.By("create a permissioned subnet", func() {
-				var err error
 				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
-				subnetTx, err = pWallet.IssueCreateSubnetTx(
+				subnetTx, err := pWallet.IssueCreateSubnetTx(
 					owner,
 					common.WithContext(ctx),
 				)
 				cancel()
-				gomega.Expect(subnetTx.ID(), err).Should(gomega.Not(gomega.Equal(constants.PrimaryNetworkID)))
+
+				subnetID = subnetTx.ID()
+				gomega.Expect(subnetID, err).Should(gomega.Not(gomega.Equal(constants.PrimaryNetworkID)))
 
 				ctx, cancel = context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
-				txStatus, err := pChainClient.GetTxStatus(ctx, subnetTx.ID())
+				txStatus, err := pChainClient.GetTxStatus(ctx, subnetID)
 				cancel()
 				gomega.Expect(txStatus.Status, err).To(gomega.Equal(status.Committed))
 			})
 
-			var subnetAssetTx *avmtxs.Tx
+			var subnetAssetID ids.ID
 			ginkgo.By("create a custom asset for the permissionless subnet", func() {
-				var err error
 				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultWalletCreationTimeout)
-				subnetAssetTx, err = xWallet.IssueCreateAssetTx(
+				subnetAssetTx, err := xWallet.IssueCreateAssetTx(
 					"RnM",
 					"RNM",
 					9,
@@ -115,21 +114,22 @@ var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
 				)
 				cancel()
 				gomega.Expect(err).Should(gomega.BeNil())
+				subnetAssetID = subnetAssetTx.ID()
 
 				ctx, cancel = context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
-				txStatus, err := xChainClient.GetTxStatus(ctx, subnetAssetTx.ID())
+				txStatus, err := xChainClient.GetTxStatus(ctx, subnetAssetID)
 				cancel()
 				gomega.Expect(txStatus, err).To(gomega.Equal(choices.Accepted))
 			})
 
-			ginkgo.By(fmt.Sprintf("Send 100 MegaAvax of asset %s to the P-chain", subnetAssetTx.ID()), func() {
+			ginkgo.By(fmt.Sprintf("Send 100 MegaAvax of asset %s to the P-chain", subnetAssetID), func() {
 				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultWalletCreationTimeout)
 				exportTx, err := xWallet.IssueExportTx(
 					constants.PlatformChainID,
 					[]*avax.TransferableOutput{
 						{
 							Asset: avax.Asset{
-								ID: subnetAssetTx.ID(),
+								ID: subnetAssetID,
 							},
 							Out: &secp256k1fx.TransferOutput{
 								Amt:          100 * units.MegaAvax,
@@ -148,7 +148,7 @@ var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
 				gomega.Expect(txStatus, err).To(gomega.Equal(choices.Accepted))
 			})
 
-			ginkgo.By(fmt.Sprintf("Import the 100 MegaAvax of asset %s from the X-chain into the P-chain", subnetAssetTx.ID()), func() {
+			ginkgo.By(fmt.Sprintf("Import the 100 MegaAvax of asset %s from the X-chain into the P-chain", subnetAssetID), func() {
 				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultWalletCreationTimeout)
 				importTx, err := pWallet.IssueImportTx(
 					xChainID,
@@ -167,8 +167,8 @@ var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
 			ginkgo.By("make subnet permissionless", func() {
 				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
 				transformSubnetTx, err := pWallet.IssueTransformSubnetTx(
-					subnetTx.ID(),
-					subnetAssetTx.ID(),
+					subnetID,
+					subnetAssetID,
 					50*units.MegaAvax,
 					100*units.MegaAvax,
 					reward.PercentDenominator,
@@ -203,10 +203,10 @@ var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
 							End:    uint64(validatorStartTime.Add(5 * time.Second).Unix()),
 							Wght:   25 * units.MegaAvax,
 						},
-						Subnet: subnetTx.ID(),
+						Subnet: subnetID,
 					},
 					&signer.Empty{},
-					subnetAssetTx.ID(),
+					subnetAssetID,
 					&secp256k1fx.OutputOwners{},
 					&secp256k1fx.OutputOwners{},
 					reward.PercentDenominator,
@@ -232,9 +232,9 @@ var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
 							End:    uint64(delegatorStartTime.Add(5 * time.Second).Unix()),
 							Wght:   25 * units.MegaAvax,
 						},
-						Subnet: subnetTx.ID(),
+						Subnet: subnetID,
 					},
-					subnetAssetTx.ID(),
+					subnetAssetID,
 					&secp256k1fx.OutputOwners{},
 					common.WithContext(ctx),
 				)

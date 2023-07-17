@@ -66,7 +66,8 @@ func ExampleWallet() {
 		log.Fatalf("failed to create new X-chain asset with: %s\n", err)
 		return
 	}
-	log.Printf("created X-chain asset %s in %s\n", createAssetTx.ID(), time.Since(createAssetStartTime))
+	createAssetTxID := createAssetTx.ID()
+	log.Printf("created X-chain asset %s in %s\n", createAssetTxID, time.Since(createAssetStartTime))
 
 	// Send 100 MegaAvax to the P-chain.
 	exportStartTime := time.Now()
@@ -75,7 +76,7 @@ func ExampleWallet() {
 		[]*avax.TransferableOutput{
 			{
 				Asset: avax.Asset{
-					ID: createAssetTx.ID(),
+					ID: createAssetTxID,
 				},
 				Out: &secp256k1fx.TransferOutput{
 					Amt:          100 * units.MegaAvax,
@@ -88,7 +89,8 @@ func ExampleWallet() {
 		log.Fatalf("failed to issue X->P export transaction with: %s\n", err)
 		return
 	}
-	log.Printf("issued X->P export %s in %s\n", exportTx.ID(), time.Since(exportStartTime))
+	exportTxID := exportTx.ID()
+	log.Printf("issued X->P export %s in %s\n", exportTxID, time.Since(exportStartTime))
 
 	// Import the 100 MegaAvax from the X-chain into the P-chain.
 	importStartTime := time.Now()
@@ -97,7 +99,8 @@ func ExampleWallet() {
 		log.Fatalf("failed to issue X->P import transaction with: %s\n", err)
 		return
 	}
-	log.Printf("issued X->P import %s in %s\n", importTx.ID(), time.Since(importStartTime))
+	importTxID := importTx.ID()
+	log.Printf("issued X->P import %s in %s\n", importTxID, time.Since(importStartTime))
 
 	createSubnetStartTime := time.Now()
 	createSubnetTx, err := pWallet.IssueCreateSubnetTx(owner)
@@ -105,12 +108,13 @@ func ExampleWallet() {
 		log.Fatalf("failed to issue create subnet transaction with: %s\n", err)
 		return
 	}
-	log.Printf("issued create subnet transaction %s in %s\n", createSubnetTx.ID(), time.Since(createSubnetStartTime))
+	createSubnetTxID := createSubnetTx.ID()
+	log.Printf("issued create subnet transaction %s in %s\n", createSubnetTxID, time.Since(createSubnetStartTime))
 
 	transformSubnetStartTime := time.Now()
 	transformSubnetTx, err := pWallet.IssueTransformSubnetTx(
-		createSubnetTx.ID(),
-		createAssetTx.ID(),
+		createSubnetTxID,
+		createAssetTxID,
 		50*units.MegaAvax,
 		100*units.MegaAvax,
 		reward.PercentDenominator,
@@ -128,7 +132,8 @@ func ExampleWallet() {
 		log.Fatalf("failed to issue transform subnet transaction with: %s\n", err)
 		return
 	}
-	log.Printf("issued transform subnet transaction %s in %s\n", transformSubnetTx.ID(), time.Since(transformSubnetStartTime))
+	transformSubnetTxID := transformSubnetTx.ID()
+	log.Printf("issued transform subnet transaction %s in %s\n", transformSubnetTxID, time.Since(transformSubnetStartTime))
 
 	addPermissionlessValidatorStartTime := time.Now()
 	startTime := time.Now().Add(time.Minute)
@@ -140,7 +145,7 @@ func ExampleWallet() {
 				End:    uint64(startTime.Add(5 * time.Second).Unix()),
 				Wght:   25 * units.MegaAvax,
 			},
-			Subnet: createSubnetTx.ID(),
+			Subnet: createSubnetTxID,
 		},
 		&signer.Empty{},
 		createAssetTx.ID(),
@@ -152,7 +157,8 @@ func ExampleWallet() {
 		log.Fatalf("failed to issue add subnet validator with: %s\n", err)
 		return
 	}
-	log.Printf("issued add subnet validator transaction %s in %s\n", addSubnetValidatorTx.ID(), time.Since(addPermissionlessValidatorStartTime))
+	addSubnetValidatorTxID := addSubnetValidatorTx.ID()
+	log.Printf("issued add subnet validator transaction %s in %s\n", addSubnetValidatorTxID, time.Since(addPermissionlessValidatorStartTime))
 
 	addPermissionlessDelegatorStartTime := time.Now()
 	addSubnetDelegatorTx, err := pWallet.IssueAddPermissionlessDelegatorTx(
@@ -163,14 +169,15 @@ func ExampleWallet() {
 				End:    uint64(startTime.Add(5 * time.Second).Unix()),
 				Wght:   25 * units.MegaAvax,
 			},
-			Subnet: createSubnetTx.ID(),
+			Subnet: createSubnetTxID,
 		},
-		createAssetTx.ID(),
+		createAssetTxID,
 		&secp256k1fx.OutputOwners{},
 	)
 	if err != nil {
 		log.Fatalf("failed to issue add subnet delegator with: %s\n", err)
 		return
 	}
-	log.Printf("issued add subnet validator delegator %s in %s\n", addSubnetDelegatorTx.ID(), time.Since(addPermissionlessDelegatorStartTime))
+	addSubnetDelegatorTxID := addSubnetDelegatorTx.ID()
+	log.Printf("issued add subnet validator delegator %s in %s\n", addSubnetDelegatorTxID, time.Since(addPermissionlessDelegatorStartTime))
 }
