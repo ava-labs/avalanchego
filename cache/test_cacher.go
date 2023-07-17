@@ -13,7 +13,7 @@ import (
 
 const TestIntSize = 8
 
-var TestIntSizeFunc = func(int64) int { return TestIntSize }
+func TestIntSizeFunc(int64) int { return TestIntSize }
 
 // CacherTests is a list of all Cacher tests
 var CacherTests = []struct {
@@ -32,7 +32,7 @@ func TestBasic(t *testing.T, cache Cacher[ids.ID, int64]) {
 	require.False(found)
 
 	expectedValue1 := int64(1)
-	cache.Put(id1, 1)
+	cache.Put(id1, expectedValue1)
 	value, found := cache.Get(id1)
 	require.True(found)
 	require.Equal(expectedValue1, value)

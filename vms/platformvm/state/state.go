@@ -160,7 +160,7 @@ type stateBlk struct {
 	Status choices.Status `serialize:"true"`
 }
 
-var stateBlkSizeFunc = func(b *stateBlk) int {
+func stateBlkSizeFunc(b *stateBlk) int {
 	if b == nil {
 		return wrappers.LongLen
 	}
@@ -349,7 +349,7 @@ type txAndStatus struct {
 	status status.Status
 }
 
-var txAndStatusSizeFunc = func(t *txAndStatus) int {
+func txAndStatusSizeFunc(t *txAndStatus) int {
 	if t == nil {
 		return wrappers.LongLen
 	}
