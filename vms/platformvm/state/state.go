@@ -160,13 +160,6 @@ type stateBlk struct {
 	Status choices.Status `serialize:"true"`
 }
 
-func stateBlkSizeFunc(b *stateBlk) int {
-	if b == nil {
-		return wrappers.LongLen
-	}
-	return len(b.Bytes) + wrappers.IntLen + wrappers.LongLen
-}
-
 /*
  * VMDB
  * |-. validators
@@ -243,11 +236,9 @@ type state struct {
 
 	currentHeight uint64
 
-	addedBlocks map[ids.ID]stateBlk // map of blockID -> Block
-	// cache of blockID -> Block
-	// If the block isn't known, nil is cached.
-	blockCache cache.Cacher[ids.ID, *stateBlk]
-	blockDB    database.Database
+	addedBlocks map[ids.ID]blocks.Block            // map of blockID -> Block
+	blockCache  cache.Cacher[ids.ID, blocks.Block] // cache of blockID -> Block. If the entry is nil, it is not in the database
+	blockDB     database.Database
 
 	validatorsDB                 database.Database
 	currentValidatorsDB          database.Database
@@ -401,10 +392,16 @@ func new(
 	bootstrapped *utils.Atomic[bool],
 	trackChecksums bool,
 ) (*state, error) {
-	blockCache, err := metercacher.New(
+	blockCache, err := metercacher.New[ids.ID, blocks.Block](
 		"block_cache",
 		metricsReg,
-		cache.NewSizedLRU[ids.ID, *stateBlk](blockCacheSize, stateBlkSizeFunc),
+		cache.NewSizedLRU[ids.ID, blocks.Block](blockCacheSize, func(b blocks.Block) int {
+			if b == nil {
+				return wrappers.LongLen
+			}
+
+			return wrappers.LongLen + len(b.Bytes())
+		}),
 	)
 	if err != nil {
 		return nil, err
@@ -519,7 +516,7 @@ func new(
 		bootstrapped: bootstrapped,
 		baseDB:       baseDB,
 
-		addedBlocks: make(map[ids.ID]stateBlk),
+		addedBlocks: make(map[ids.ID]blocks.Block),
 		blockCache:  blockCache,
 		blockDB:     prefixdb.New(blockPrefix, baseDB),
 
@@ -1487,11 +1484,7 @@ func (s *state) init(genesisBytes []byte) error {
 }
 
 func (s *state) AddStatelessBlock(block blocks.Block) {
-	s.addedBlocks[block.ID()] = stateBlk{
-		Blk:    block,
-		Bytes:  block.Bytes(),
-		Status: choices.Accepted,
-	}
+	s.addedBlocks[block.ID()] = block
 }
 
 func (s *state) SetHeight(height uint64) {
@@ -1525,11 +1518,14 @@ func (s *state) CommitBatch() (database.Batch, error) {
 }
 
 func (s *state) writeBlocks() error {
-	for blkID, stateBlk := range s.addedBlocks {
-		var (
-			blkID = blkID
-			stBlk = stateBlk
-		)
+	for blkID, blk := range s.addedBlocks {
+		blkID := blkID
+
+		stBlk := stateBlk{
+			Blk:    blk,
+			Bytes:  blk.Bytes(),
+			Status: choices.Accepted,
+		}
 
 		// Note: blocks to be stored are verified, so it's safe to marshal them with GenesisCodec
 		blockBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, &stBlk)
@@ -1538,10 +1534,7 @@ func (s *state) writeBlocks() error {
 		}
 
 		delete(s.addedBlocks, blkID)
-		// Note: Evict is used rather than Put here because stBlk may end up
-		// referencing additional data (because of shared byte slices) that
-		// would not be properly accounted for in the cache sizing.
-		s.blockCache.Evict(blkID)
+		s.blockCache.Put(blkID, blk)
 		if err := s.blockDB.Put(blkID[:], blockBytes); err != nil {
 			return fmt.Errorf("failed to write block %s: %w", blkID, err)
 		}
@@ -1550,25 +1543,23 @@ func (s *state) writeBlocks() error {
 }
 
 func (s *state) GetStatelessBlock(blockID ids.ID) (blocks.Block, error) {
-	if blkState, ok := s.addedBlocks[blockID]; ok {
-		if blkState.Status != choices.Accepted {
+	if blk, exists := s.addedBlocks[blockID]; exists {
+		return blk, nil
+	}
+	if blk, cached := s.blockCache.Get(blockID); cached {
+		if blk == nil {
 			return nil, database.ErrNotFound
 		}
 
-		return blkState.Blk, nil
-	}
-	if blkState, ok := s.blockCache.Get(blockID); ok {
-		if blkState == nil || blkState.Status != choices.Accepted {
-			return nil, database.ErrNotFound
-		}
-		return blkState.Blk, nil
+		return blk, nil
 	}
 
 	blkBytes, err := s.blockDB.Get(blockID[:])
 	if err == database.ErrNotFound {
 		s.blockCache.Put(blockID, nil)
 		return nil, database.ErrNotFound
-	} else if err != nil {
+	}
+	if err != nil {
 		return nil, err
 	}
 
@@ -1588,7 +1579,7 @@ func (s *state) GetStatelessBlock(blockID ids.ID) (blocks.Block, error) {
 		return nil, err
 	}
 
-	s.blockCache.Put(blockID, &blkState)
+	s.blockCache.Put(blockID, blkState.Blk)
 	return blkState.Blk, nil
 }
 
