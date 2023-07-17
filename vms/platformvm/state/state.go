@@ -160,7 +160,7 @@ type stateBlk struct {
 	Status choices.Status `serialize:"true"`
 }
 
-func stateBlkSizeFunc(b *stateBlk) int {
+func stateBlkSize(b *stateBlk) int {
 	if b == nil {
 		return wrappers.LongLen
 	}
@@ -349,7 +349,7 @@ type txAndStatus struct {
 	status status.Status
 }
 
-func txAndStatusSizeFunc(t *txAndStatus) int {
+func txAndStatusSize(t *txAndStatus) int {
 	if t == nil {
 		return wrappers.LongLen
 	}
@@ -404,7 +404,7 @@ func new(
 	blockCache, err := metercacher.New(
 		"block_cache",
 		metricsReg,
-		cache.NewSizedLRU[ids.ID, *stateBlk](blockCacheSize, stateBlkSizeFunc),
+		cache.NewSizedLRU[ids.ID, *stateBlk](blockCacheSize, stateBlkSize),
 	)
 	if err != nil {
 		return nil, err
@@ -449,7 +449,7 @@ func new(
 	txCache, err := metercacher.New(
 		"tx_cache",
 		metricsReg,
-		cache.NewSizedLRU[ids.ID, *txAndStatus](txCacheSize, txAndStatusSizeFunc),
+		cache.NewSizedLRU[ids.ID, *txAndStatus](txCacheSize, txAndStatusSize),
 	)
 	if err != nil {
 		return nil, err
@@ -476,7 +476,7 @@ func new(
 	transformedSubnetCache, err := metercacher.New(
 		"transformed_subnet_cache",
 		metricsReg,
-		cache.NewSizedLRU[ids.ID, *txs.Tx](transformedSubnetTxCacheSize, func(tx *txs.Tx) int { return tx.Size() }),
+		cache.NewSizedLRU[ids.ID, *txs.Tx](transformedSubnetTxCacheSize, (*txs.Tx).Size),
 	)
 	if err != nil {
 		return nil, err
