@@ -306,15 +306,6 @@ func (c *networkClient) Disconnected(_ context.Context, nodeID ids.NodeID) error
 	return nil
 }
 
-// Shutdown disconnects all peers
-func (c *networkClient) Shutdown() {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	// reset peers
-	c.peers = newPeerTracker(c.log)
-}
-
 func (c *networkClient) TrackBandwidth(nodeID ids.NodeID, bandwidth float64) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
