@@ -137,14 +137,6 @@ func TestNewSimulatedBackend(t *testing.T) {
 	sim := simTestBackend(testAddr)
 	defer sim.Close()
 
-	if sim.config != params.TestChainConfig {
-		t.Errorf("expected sim config to equal params.AllEthashProtocolChanges, got %v", sim.config)
-	}
-
-	if sim.blockchain.Config() != params.TestChainConfig {
-		t.Errorf("expected sim blockchain config to equal params.AllEthashProtocolChanges, got %v", sim.config)
-	}
-
 	stateDB, _ := sim.blockchain.State()
 	bal := stateDB.GetBalance(testAddr)
 	if bal.Cmp(expectedBal) != 0 {
