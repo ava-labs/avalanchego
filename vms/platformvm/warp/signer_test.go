@@ -17,9 +17,10 @@ func TestSigner(t *testing.T) {
 		sk, err := bls.NewSecretKey()
 		require.NoError(t, err)
 
+		networkID := uint32(12345)
 		chainID := ids.GenerateTestID()
-		s := NewSigner(sk, chainID)
+		s := NewSigner(sk, networkID, chainID)
 
-		test(t, s, sk, chainID)
+		test(t, s, sk, networkID, chainID)
 	}
 }
