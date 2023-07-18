@@ -52,9 +52,7 @@ const (
 )
 
 var (
-	_ State              = (*state)(nil)
-	_ cache.SizedElement = (*stateBlk)(nil)
-	_ cache.SizedElement = (*txAndStatus)(nil)
+	_ State = (*state)(nil)
 
 	ErrDelegatorSubset              = errors.New("delegator's time range must be a subset of the validator's time range")
 	errMissingValidatorSet          = errors.New("missing validator set")
@@ -162,7 +160,7 @@ type stateBlk struct {
 	Status choices.Status `serialize:"true"`
 }
 
-func (b *stateBlk) Size() int {
+func stateBlkSize(b *stateBlk) int {
 	if b == nil {
 		return wrappers.LongLen
 	}
@@ -351,7 +349,7 @@ type txAndStatus struct {
 	status status.Status
 }
 
-func (t *txAndStatus) Size() int {
+func txAndStatusSize(t *txAndStatus) int {
 	if t == nil {
 		return wrappers.LongLen
 	}
@@ -406,7 +404,7 @@ func new(
 	blockCache, err := metercacher.New(
 		"block_cache",
 		metricsReg,
-		cache.NewSizedLRU[ids.ID, *stateBlk](blockCacheSize),
+		cache.NewSizedLRU[ids.ID, *stateBlk](blockCacheSize, stateBlkSize),
 	)
 	if err != nil {
 		return nil, err
@@ -451,7 +449,7 @@ func new(
 	txCache, err := metercacher.New(
 		"tx_cache",
 		metricsReg,
-		cache.NewSizedLRU[ids.ID, *txAndStatus](txCacheSize),
+		cache.NewSizedLRU[ids.ID, *txAndStatus](txCacheSize, txAndStatusSize),
 	)
 	if err != nil {
 		return nil, err
@@ -478,7 +476,7 @@ func new(
 	transformedSubnetCache, err := metercacher.New(
 		"transformed_subnet_cache",
 		metricsReg,
-		cache.NewSizedLRU[ids.ID, *txs.Tx](transformedSubnetTxCacheSize),
+		cache.NewSizedLRU[ids.ID, *txs.Tx](transformedSubnetTxCacheSize, (*txs.Tx).Size),
 	)
 	if err != nil {
 		return nil, err
