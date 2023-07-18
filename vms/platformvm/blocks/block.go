@@ -9,7 +9,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -45,14 +44,4 @@ func initialize(blk Block) error {
 		return fmt.Errorf("couldn't marshal block: %w", err)
 	}
 	return blk.initialize(bytes)
-}
-
-// Size returns the codec marshalled byte size of [blk]. [wrappers.LongLen] is
-// added to account for the pointer overhead.
-func Size(blk Block) int {
-	if blk == nil {
-		return wrappers.LongLen
-	}
-
-	return wrappers.LongLen + len(blk.Bytes())
 }

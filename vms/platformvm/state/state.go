@@ -347,6 +347,14 @@ func txAndStatusSize(t *txAndStatus) int {
 	return t.tx.Size() + wrappers.IntLen + wrappers.LongLen
 }
 
+func blockSize(blk blocks.Block) int {
+	if blk == nil {
+		return wrappers.LongLen
+	}
+
+	return wrappers.LongLen + len(blk.Bytes())
+}
+
 func New(
 	db database.Database,
 	genesisBytes []byte,
@@ -395,7 +403,7 @@ func new(
 	blockCache, err := metercacher.New[ids.ID, blocks.Block](
 		"block_cache",
 		metricsReg,
-		cache.NewSizedLRU[ids.ID, blocks.Block](blockCacheSize, blocks.Size),
+		cache.NewSizedLRU[ids.ID, blocks.Block](blockCacheSize, blockSize),
 	)
 	if err != nil {
 		return nil, err
