@@ -1528,7 +1528,7 @@ func (s *state) writeBlocks() error {
 		}
 
 		delete(s.addedBlocks, blkID)
-		// Note: Evict is used rather than Put here because stBlk may end up
+		// Note: Evict is used rather than Put here because blk may end up
 		// referencing additional data (because of shared byte slices) that
 		// would not be properly accounted for in the cache sizing.
 		s.blockCache.Evict(blkID)
