@@ -594,7 +594,7 @@ func (db *merkleDB) GetChangeProof(
 		return nil, err
 	}
 
-	if len(largestKey) > 0 {
+	if len(result.KeyChanges) > 0 || len(end) > 0 {
 		endProof, err := historicalView.getProof(ctx, largestKey)
 		if err != nil {
 			return nil, err
