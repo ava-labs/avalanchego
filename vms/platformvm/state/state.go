@@ -1564,19 +1564,6 @@ func (s *state) CommitBatch() (database.Batch, error) {
 	return s.baseDB.CommitBatch()
 }
 
-func (s *state) writeBlockIDs() error {
-	for height, blkID := range s.addedBlockIDs {
-		heightKey := database.PackUInt64(height)
-
-		delete(s.addedBlockIDs, height)
-		s.blockIDCache.Put(height, blkID)
-		if err := database.PutID(s.blockIDDB, heightKey, blkID); err != nil {
-			return fmt.Errorf("failed to add blockID: %w", err)
-		}
-	}
-	return nil
-}
-
 func (s *state) writeBlocks() error {
 	for blkID, blk := range s.addedBlocks {
 		blkID := blkID
@@ -1589,6 +1576,19 @@ func (s *state) writeBlocks() error {
 		s.blockCache.Evict(blkID)
 		if err := s.blockDB.Put(blkID[:], blkBytes); err != nil {
 			return fmt.Errorf("failed to write block %s: %w", blkID, err)
+		}
+	}
+	return nil
+}
+
+func (s *state) writeBlockIDs() error {
+	for height, blkID := range s.addedBlockIDs {
+		heightKey := database.PackUInt64(height)
+
+		delete(s.addedBlockIDs, height)
+		s.blockIDCache.Put(height, blkID)
+		if err := database.PutID(s.blockIDDB, heightKey, blkID); err != nil {
+			return fmt.Errorf("failed to add blockID: %w", err)
 		}
 	}
 	return nil
