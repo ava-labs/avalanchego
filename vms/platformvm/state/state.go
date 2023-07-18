@@ -1621,6 +1621,7 @@ func (s *state) GetStatelessBlock(blockID ids.ID) (blocks.Block, error) {
 	}
 
 	if status != choices.Accepted {
+		s.blockCache.Put(blockID, nil)
 		return nil, database.ErrNotFound
 	}
 
