@@ -47,8 +47,8 @@ func initialize(blk Block) error {
 	return blk.initialize(bytes)
 }
 
-// Size returns the codec marshalled byte size of [blk]. The Block type ID is
-// serialized as a long.
+// Size returns the codec marshalled byte size of [blk]. [wrappers.LongLen] is
+// added to account for the pointer overhead.
 func Size(blk Block) int {
 	if blk == nil {
 		return wrappers.LongLen
