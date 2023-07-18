@@ -11,33 +11,29 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-const TestSizedIntSize = 8
+const TestIntSize = 8
 
-type TestSizedInt struct {
-	i int64
-}
-
-func (TestSizedInt) Size() int {
-	return TestSizedIntSize
+func TestIntSizeFunc(int64) int {
+	return TestIntSize
 }
 
 // CacherTests is a list of all Cacher tests
 var CacherTests = []struct {
 	Size int
-	Func func(t *testing.T, c Cacher[ids.ID, TestSizedInt])
+	Func func(t *testing.T, c Cacher[ids.ID, int64])
 }{
 	{Size: 1, Func: TestBasic},
 	{Size: 2, Func: TestEviction},
 }
 
-func TestBasic(t *testing.T, cache Cacher[ids.ID, TestSizedInt]) {
+func TestBasic(t *testing.T, cache Cacher[ids.ID, int64]) {
 	require := require.New(t)
 
 	id1 := ids.ID{1}
 	_, found := cache.Get(id1)
 	require.False(found)
 
-	expectedValue1 := TestSizedInt{i: 1}
+	expectedValue1 := int64(1)
 	cache.Put(id1, expectedValue1)
 	value, found := cache.Get(id1)
 	require.True(found)
@@ -55,7 +51,7 @@ func TestBasic(t *testing.T, cache Cacher[ids.ID, TestSizedInt]) {
 
 	id2 := ids.ID{2}
 
-	expectedValue2 := TestSizedInt{i: 2}
+	expectedValue2 := int64(2)
 	cache.Put(id2, expectedValue2)
 	_, found = cache.Get(id1)
 	require.False(found)
@@ -65,16 +61,16 @@ func TestBasic(t *testing.T, cache Cacher[ids.ID, TestSizedInt]) {
 	require.Equal(expectedValue2, value)
 }
 
-func TestEviction(t *testing.T, cache Cacher[ids.ID, TestSizedInt]) {
+func TestEviction(t *testing.T, cache Cacher[ids.ID, int64]) {
 	require := require.New(t)
 
 	id1 := ids.ID{1}
 	id2 := ids.ID{2}
 	id3 := ids.ID{3}
 
-	expectedValue1 := TestSizedInt{i: 1}
-	expectedValue2 := TestSizedInt{i: 2}
-	expectedValue3 := TestSizedInt{i: 3}
+	expectedValue1 := int64(1)
+	expectedValue2 := int64(2)
+	expectedValue3 := int64(3)
 
 	cache.Put(id1, expectedValue1)
 	cache.Put(id2, expectedValue2)
