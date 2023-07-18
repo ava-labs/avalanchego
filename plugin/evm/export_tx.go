@@ -118,7 +118,7 @@ func (utx *UnsignedExportTx) Verify(
 	if !avax.IsSortedTransferableOutputs(utx.ExportedOutputs, Codec) {
 		return errOutputsNotSorted
 	}
-	if rules.IsApricotPhase1 && !utils.IsSortedAndUniqueSortable(utx.Ins) {
+	if rules.IsApricotPhase1 && !utils.IsSortedAndUnique(utx.Ins) {
 		return errInputsNotSortedUnique
 	}
 
