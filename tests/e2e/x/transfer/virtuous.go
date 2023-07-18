@@ -199,7 +199,7 @@ RECEIVER  NEW BALANCE (AFTER) : %21d AVAX
 				)
 
 				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
-				txID, err := wallets[fromIdx].X().IssueBaseTx(
+				tx, err := wallets[fromIdx].X().IssueBaseTx(
 					[]*avax.TransferableOutput{{
 						Asset: avax.Asset{
 							ID: avaxAssetID,
@@ -230,6 +230,7 @@ RECEIVER  NEW BALANCE (AFTER) : %21d AVAX
 				gomega.Expect(senderCurBalX).Should(gomega.Equal(senderNewBal))
 				gomega.Expect(receiverCurBalX).Should(gomega.Equal(receiverNewBal))
 
+				txID := tx.ID()
 				for _, u := range rpcEps {
 					xc := avm.NewClient(u, "X")
 					ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)

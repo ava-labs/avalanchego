@@ -53,7 +53,7 @@ func main() {
 	avaxAssetID := pWallet.AVAXAssetID()
 
 	addValidatorStartTime := time.Now()
-	addValidatorTxID, err := pWallet.IssueAddPermissionlessValidatorTx(
+	addValidatorTx, err := pWallet.IssueAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{Validator: txs.Validator{
 			NodeID: nodeID,
 			Start:  uint64(startTime.Unix()),
@@ -75,5 +75,5 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to issue add permissionless validator transaction: %s\n", err)
 	}
-	log.Printf("added new primary network validator %s with %s in %s\n", nodeID, addValidatorTxID, time.Since(addValidatorStartTime))
+	log.Printf("added new primary network validator %s with %s in %s\n", nodeID, addValidatorTx.ID(), time.Since(addValidatorStartTime))
 }
