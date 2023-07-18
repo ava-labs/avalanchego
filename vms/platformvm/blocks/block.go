@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -44,4 +45,12 @@ func initialize(blk Block) error {
 		return fmt.Errorf("couldn't marshal block: %w", err)
 	}
 	return blk.initialize(bytes)
+}
+
+func Size(blk Block) int {
+	if blk == nil {
+		return wrappers.LongLen
+	}
+
+	return wrappers.LongLen + len(blk.Bytes())
 }
