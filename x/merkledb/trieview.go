@@ -391,7 +391,8 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 // [maxLength] must be > 0.
 func (t *trieView) GetRangeProof(
 	ctx context.Context,
-	start, end Maybe[[]byte],
+	start Maybe[[]byte],
+	end Maybe[[]byte],
 	maxLength int,
 ) (*RangeProof, error) {
 	ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.GetRangeProof")

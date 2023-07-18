@@ -644,7 +644,7 @@ func (proof *ChangeProof) Empty() bool {
 // If [start] is Nothing, there is no lower bound on acceptable keys.
 // If [end] is Nothing, there is no upper bound on acceptable keys.
 // If [kvs] is empty, returns nil.
-func verifyKeyChanges(kvs []KeyChange, start, end Maybe[[]byte]) error {
+func verifyKeyChanges(kvs []KeyChange, start Maybe[[]byte], end Maybe[[]byte]) error {
 	if len(kvs) == 0 {
 		return nil
 	}
@@ -671,7 +671,7 @@ func verifyKeyChanges(kvs []KeyChange, start, end Maybe[[]byte]) error {
 // If [start] is Nothing, there is no lower bound on acceptable keys.
 // If [end] is Nothing, there is no upper bound on acceptable keys.
 // If [kvs] is empty, returns nil.
-func verifyKeyValues(kvs []KeyValue, start, end Maybe[[]byte]) error {
+func verifyKeyValues(kvs []KeyValue, start Maybe[[]byte], end Maybe[[]byte]) error {
 	if len(kvs) == 0 {
 		return nil
 	}

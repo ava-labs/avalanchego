@@ -47,7 +47,7 @@ type ReadOnlyTrie interface {
 	// keys in range [start, end].
 	// If [start] is Nothing, there's no lower bound on the range.
 	// If [end] is Nothing, there's no upper bound on the range.
-	GetRangeProof(ctx context.Context, start, end Maybe[[]byte], maxLength int) (*RangeProof, error)
+	GetRangeProof(ctx context.Context, start Maybe[[]byte], end Maybe[[]byte], maxLength int) (*RangeProof, error)
 
 	database.Iteratee
 }

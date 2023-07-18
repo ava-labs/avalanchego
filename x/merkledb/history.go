@@ -208,7 +208,7 @@ func (th *trieHistory) getValueChanges(
 // for the keys in [start, end].
 // If [start] is Nothing, all keys are considered > [start].
 // If [end] is Nothing, all keys are considered < [end].
-func (th *trieHistory) getChangesToGetToRoot(rootID ids.ID, start, end Maybe[[]byte]) (*changeSummary, error) {
+func (th *trieHistory) getChangesToGetToRoot(rootID ids.ID, start Maybe[[]byte], end Maybe[[]byte]) (*changeSummary, error) {
 	// [lastRootChange] is the last change in the history resulting in [rootID].
 	lastRootChange, ok := th.lastChanges[rootID]
 	if !ok {
