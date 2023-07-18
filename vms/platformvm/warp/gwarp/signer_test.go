@@ -17,11 +17,12 @@ import (
 )
 
 type testSigner struct {
-	client  *Client
-	server  warp.Signer
-	sk      *bls.SecretKey
-	chainID ids.ID
-	closeFn func()
+	client    *Client
+	server    warp.Signer
+	sk        *bls.SecretKey
+	networkID uint32
+	chainID   ids.ID
+	closeFn   func()
 }
 
 func setupSigner(t testing.TB) *testSigner {
@@ -30,12 +31,14 @@ func setupSigner(t testing.TB) *testSigner {
 	sk, err := bls.NewSecretKey()
 	require.NoError(err)
 
+	networkID := uint32(12345)
 	chainID := ids.GenerateTestID()
 
 	s := &testSigner{
-		server:  warp.NewSigner(sk, chainID),
-		sk:      sk,
-		chainID: chainID,
+		server:    warp.NewSigner(sk, networkID, chainID),
+		sk:        sk,
+		networkID: networkID,
+		chainID:   chainID,
 	}
 
 	listener, err := grpcutils.NewListener()
@@ -63,7 +66,7 @@ func setupSigner(t testing.TB) *testSigner {
 func TestInterface(t *testing.T) {
 	for _, test := range warp.SignerTests {
 		s := setupSigner(t)
-		test(t, s.client, s.sk, s.chainID)
+		test(t, s.client, s.sk, s.networkID, s.chainID)
 		s.closeFn()
 	}
 }
