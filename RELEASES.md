@@ -2,7 +2,10 @@
 
 ## [v0.12.4](https://github.com/ava-labs/coreth/releases/tag/v0.12.4)
 
+- Fix API handler crash for `lookupState` in `prestate` tracer
+- Fix API handler crash for LOG edge cases in the `callTracer`
 - Fix regression in `eth_getLogs` serving request for blocks containing no Ethereum transactions
+- Export `CalculateDynamicFee`
 
 ## [v0.12.3](https://github.com/ava-labs/coreth/releases/tag/v0.12.3)
 
