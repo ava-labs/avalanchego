@@ -1265,7 +1265,7 @@ func getTraceConfig(v *viper.Viper) (trace.Config, error) {
 			Type:     exporterType,
 			Endpoint: endpoint,
 			Insecure: v.GetBool(TracingInsecureKey),
-			// TODO add support for headers
+			Headers:  v.GetStringMapString(TracingHeadersKey),
 		},
 		Enabled:         true,
 		TraceSampleRate: v.GetFloat64(TracingSampleRateKey),

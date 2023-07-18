@@ -55,7 +55,6 @@ type workItem struct {
 	localRootID ids.ID
 }
 
-// TODO danlaine look into using a sync.Pool for workItems
 func newWorkItem(localRootID ids.ID, start, end []byte, priority priority) *workItem {
 	return &workItem{
 		localRootID: localRootID,
@@ -190,10 +189,6 @@ func (m *Manager) sync(ctx context.Context) {
 		default:
 			m.processingWorkItems++
 			work := m.unprocessedWork.GetWork()
-			// TODO danlaine: We won't release [m.workLock] until
-			// we've started a goroutine for each available work item.
-			// We can't apply proofs we receive until we release [m.workLock].
-			// Is this OK? Is it possible we end up with too many goroutines?
 			go m.doWork(ctx, work)
 		}
 	}

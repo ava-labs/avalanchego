@@ -54,7 +54,7 @@ func main() {
 	pWallet := wallet.P()
 
 	addValidatorStartTime := time.Now()
-	addValidatorTxID, err := pWallet.IssueAddSubnetValidatorTx(&txs.SubnetValidator{
+	addValidatorTx, err := pWallet.IssueAddSubnetValidatorTx(&txs.SubnetValidator{
 		Validator: txs.Validator{
 			NodeID: nodeID,
 			Start:  uint64(startTime.Unix()),
@@ -66,5 +66,5 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to issue add subnet validator transaction: %s\n", err)
 	}
-	log.Printf("added new subnet validator %s to %s with %s in %s\n", nodeID, subnetID, addValidatorTxID, time.Since(addValidatorStartTime))
+	log.Printf("added new subnet validator %s to %s with %s in %s\n", nodeID, subnetID, addValidatorTx.ID(), time.Since(addValidatorStartTime))
 }
