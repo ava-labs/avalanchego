@@ -233,4 +233,8 @@ type Config struct {
 	// ChainDataDir is the root path for per-chain directories where VMs can
 	// write arbitrary data.
 	ChainDataDir string `json:"chainDataDir"`
+
+	// Path to write runtime state to (including uri, bootstrap
+	// address and pid). If empty, runtime state will not be written.
+	RuntimeStatePath string `json:"runtimeStatePath"`
 }

@@ -369,6 +369,8 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.Float64(TracingSampleRateKey, 0.1, "The fraction of traces to sample. If >= 1, always sample. If <= 0, never sample")
 	fs.StringToString(TracingHeadersKey, map[string]string{}, "The headers to provide the trace indexer")
 	// TODO add flag to take in headers to send from exporter
+
+	fs.String(RuntimeStatePathKey, "", "The path to write runtime state to (including uri, bootstrap address and pid). If empty, runtime state will not be written.")
 }
 
 // BuildFlagSet returns a complete set of flags for avalanchego

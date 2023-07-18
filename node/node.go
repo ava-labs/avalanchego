@@ -6,6 +6,7 @@ package node
 import (
 	"context"
 	"crypto"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -144,6 +145,11 @@ type Node struct {
 	networkNamespace string
 	Net              network.Network
 
+	// The bootstrap address will optionally be written to a runtime state
+	// file to enable other nodes to be configured to use this node as a
+	// beacon.
+	bootstrapAddress string
+
 	// tlsKeyLogWriterCloser is a debug file handle that writes all the TLS
 	// session keys. This value should only be non-nil during debugging.
 	tlsKeyLogWriterCloser io.WriteCloser
@@ -253,6 +259,9 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 			zap.Stringer("currentNodeIP", ipPort),
 		)
 	}
+
+	// Record the bound address to enable inclusion in runtime state file.
+	n.bootstrapAddress = listener.Addr().String()
 
 	tlsKey, ok := n.Config.StakingTLSCert.PrivateKey.(crypto.Signer)
 	if !ok {
@@ -374,6 +383,60 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 	return err
 }
 
+type NodeRuntimeState struct {
+	// The process id of the node
+	PID int
+	// URI to access the node API
+	// Format: [https|http]://[host]:[port]
+	URI string
+	// Address other nodes can use for bootstrapping
+	// Format: [host]:[port]
+	BootstrapAddress string
+}
+
+// Write runtime state to the configured path. Supports the use of
+// dynamically chosen network ports with local network orchestration.
+func (n *Node) writeRuntimeState() {
+	n.Log.Info("attempting to write runtime state to configured path", zap.String("path", n.Config.RuntimeStatePath))
+
+	uri := ""
+
+	// Wait until the API Server URI is available.
+	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	defer cancel()
+	for {
+		select {
+		case <-ctx.Done():
+			n.Log.Error("failed to retrieve API Server URI before timeout")
+			return
+		default:
+			uri = n.APIServer.GetURI()
+		}
+		if len(uri) > 0 {
+			break
+		}
+		time.Sleep(time.Millisecond * 200)
+	}
+
+	// Write the runtime state to disk
+	runtimeState := &NodeRuntimeState{
+		PID:              os.Getpid(),
+		URI:              uri,
+		BootstrapAddress: n.bootstrapAddress, // Set by network initialization
+	}
+	bytes, err := json.MarshalIndent(runtimeState, "", "  ")
+	if err != nil {
+		n.Log.Error("failed to marshal runtime state", zap.Error(err))
+		return
+	}
+	if err := os.WriteFile(n.Config.RuntimeStatePath, bytes, perms.ReadWrite); err != nil {
+		n.Log.Error("failed to write runtime state", zap.Error(err))
+		return
+	}
+
+	n.Log.Info("wrote runtime state")
+}
+
 // Dispatch starts the node's servers.
 // Returns when the node exits.
 func (n *Node) Dispatch() error {
@@ -399,6 +462,10 @@ func (n *Node) Dispatch() error {
 		// If node is already shutting down, this does nothing.
 		n.Shutdown(1)
 	})
+
+	if len(n.Config.RuntimeStatePath) > 0 {
+		go n.writeRuntimeState()
+	}
 
 	// Add state sync nodes to the peer network
 	for i, peerIP := range n.Config.StateSyncIPs {
@@ -429,6 +496,17 @@ func (n *Node) Dispatch() error {
 
 	// Wait until the node is done shutting down before returning
 	n.DoneShuttingDown.Wait()
+
+	if len(n.Config.RuntimeStatePath) > 0 {
+		// Attempt to remove the runtime state path
+		if err := os.Remove(n.Config.RuntimeStatePath); err != nil && !os.IsNotExist(err) {
+			n.Log.Error("removal of runtime state file failed",
+				zap.String("path", n.Config.RuntimeStatePath),
+				zap.Error(err),
+			)
+		}
+	}
+
 	return err
 }
 
