@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 )
 
@@ -17,10 +18,9 @@ func TestSigner(t *testing.T) {
 		sk, err := bls.NewSecretKey()
 		require.NoError(t, err)
 
-		networkID := uint32(12345)
 		chainID := ids.GenerateTestID()
-		s := NewSigner(sk, networkID, chainID)
+		s := NewSigner(sk, constants.UnitTestID, chainID)
 
-		test(t, s, sk, networkID, chainID)
+		test(t, s, sk, constants.UnitTestID, chainID)
 	}
 }

@@ -10,13 +10,14 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
 func TestUnsignedMessage(t *testing.T) {
 	require := require.New(t)
 
 	msg, err := NewUnsignedMessage(
-		12345,
+		constants.UnitTestID,
 		ids.GenerateTestID(),
 		[]byte("payload"),
 	)
