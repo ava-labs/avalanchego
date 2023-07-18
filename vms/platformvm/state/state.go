@@ -45,6 +45,8 @@ const (
 	txCacheSize                  = 128 * units.MiB
 	transformedSubnetTxCacheSize = 4 * units.MiB
 
+	pointerOverhead = wrappers.LongLen
+
 	validatorDiffsCacheSize = 2048
 	rewardUTXOsCacheSize    = 2048
 	chainCacheSize          = 2048
@@ -340,19 +342,26 @@ type txAndStatus struct {
 	status status.Status
 }
 
+func txSize(tx *txs.Tx) int {
+	if tx == nil {
+		return pointerOverhead
+	}
+	return len(tx.Bytes()) + pointerOverhead
+}
+
 func txAndStatusSize(t *txAndStatus) int {
 	if t == nil {
-		return wrappers.LongLen
+		return pointerOverhead
 	}
-	return t.tx.Size() + wrappers.IntLen + wrappers.LongLen
+	return len(t.tx.Bytes()) + wrappers.IntLen + pointerOverhead
 }
 
 func blockSize(blk blocks.Block) int {
 	if blk == nil {
-		return wrappers.LongLen
+		return pointerOverhead
 	}
 
-	return wrappers.LongLen + len(blk.Bytes())
+	return len(blk.Bytes()) + pointerOverhead
 }
 
 func New(
@@ -475,7 +484,7 @@ func new(
 	transformedSubnetCache, err := metercacher.New(
 		"transformed_subnet_cache",
 		metricsReg,
-		cache.NewSizedLRU[ids.ID, *txs.Tx](transformedSubnetTxCacheSize, (*txs.Tx).Size),
+		cache.NewSizedLRU[ids.ID, *txs.Tx](transformedSubnetTxCacheSize, txSize),
 	)
 	if err != nil {
 		return nil, err
