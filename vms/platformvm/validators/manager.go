@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -61,7 +60,7 @@ type State interface {
 	GetTx(txID ids.ID) (*txs.Tx, status.Status, error)
 
 	GetLastAccepted() ids.ID
-	GetStatelessBlock(blockID ids.ID) (blocks.Block, choices.Status, error)
+	GetStatelessBlock(blockID ids.ID) (blocks.Block, error)
 
 	// ValidatorSet adds all the validators and delegators of [subnetID] into
 	// [vdrs].
@@ -165,7 +164,7 @@ func (m *manager) GetMinimumHeight(ctx context.Context) (uint64, error) {
 		return m.getCurrentHeight(ctx)
 	}
 
-	blk, _, err := m.state.GetStatelessBlock(oldest)
+	blk, err := m.state.GetStatelessBlock(oldest)
 	if err != nil {
 		return 0, err
 	}
@@ -190,7 +189,7 @@ func (m *manager) getCurrentHeight(ctx context.Context) (uint64, error) {
 	defer span.End()
 
 	lastAcceptedID := m.state.GetLastAccepted()
-	lastAccepted, _, err := m.state.GetStatelessBlock(lastAcceptedID)
+	lastAccepted, err := m.state.GetStatelessBlock(lastAcceptedID)
 	if err != nil {
 		return 0, err
 	}

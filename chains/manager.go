@@ -683,11 +683,12 @@ func (m *manager) createAvalancheChain(
 		return nil, fmt.Errorf("error while fetching chain config: %w", err)
 	}
 
+	dagVM := vm
 	if m.MeterVMEnabled {
-		vm = metervm.NewVertexVM(vm)
+		dagVM = metervm.NewVertexVM(dagVM)
 	}
 	if m.TracingEnabled {
-		vm = tracedvm.NewVertexVM(vm, m.Tracer)
+		dagVM = tracedvm.NewVertexVM(dagVM, m.Tracer)
 	}
 
 	// Handles serialization/deserialization of vertices and also the
@@ -695,7 +696,7 @@ func (m *manager) createAvalancheChain(
 	vtxManager := state.NewSerializer(
 		state.SerializerConfig{
 			ChainID:     ctx.ChainID,
-			VM:          vm,
+			VM:          dagVM,
 			DB:          vertexDB,
 			Log:         ctx.Log,
 			CortinaTime: version.GetCortinaTime(ctx.NetworkID),
@@ -726,7 +727,7 @@ func (m *manager) createAvalancheChain(
 	// snowmanMessageSender here is where the metrics will be placed. Because we
 	// end up using this sender after the linearization, we pass in
 	// snowmanMessageSender here.
-	err = vm.Initialize(
+	err = dagVM.Initialize(
 		context.TODO(),
 		ctx.Context,
 		vmDBManager,
@@ -754,9 +755,8 @@ func (m *manager) createAvalancheChain(
 
 	chainAlias := m.PrimaryAliasOrDefault(ctx.ChainID)
 
-	untracedVMWrappedInsideProposerVM := &linearizeOnInitializeVM{
-		LinearizableVMWithEngine: vm,
-	}
+	// Note: this does not use [dagVM] to ensure we use the [vm]'s height index.
+	untracedVMWrappedInsideProposerVM := NewLinearizeOnInitializeVM(vm)
 
 	var vmWrappedInsideProposerVM block.ChainVM = untracedVMWrappedInsideProposerVM
 	if m.TracingEnabled {
@@ -784,7 +784,7 @@ func (m *manager) createAvalancheChain(
 	// Note: linearizableVM is the VM that the Avalanche engines should be
 	// using.
 	linearizableVM := &initializeOnLinearizeVM{
-		DAGVM:          vm,
+		DAGVM:          dagVM,
 		vmToInitialize: vmWrappingProposerVM,
 		vmToLinearize:  untracedVMWrappedInsideProposerVM,
 
@@ -972,7 +972,7 @@ func (m *manager) createAvalancheChain(
 	return &chain{
 		Name:    chainAlias,
 		Context: ctx,
-		VM:      vm,
+		VM:      dagVM,
 		Handler: h,
 	}, nil
 }

@@ -211,7 +211,7 @@ func NewManagerFromDBs(dbs []*VersionedDatabase) (Manager, error) {
 		return nil, errNoDBs
 	}
 	utils.Sort(dbs)
-	sortedAndUnique := utils.IsSortedAndUniqueSortable(dbs)
+	sortedAndUnique := utils.IsSortedAndUnique(dbs)
 	if !sortedAndUnique {
 		return nil, errNonSortedAndUniqueDBs
 	}
