@@ -17,9 +17,9 @@ source "$AVALANCHE_PATH"/scripts/constants.sh
 # https://github.com/ava-labs/avalanche-network-runner
 GOARCH=$(go env GOARCH)
 GOOS=$(go env GOOS)
-NETWORK_RUNNER_VERSION=1.7.0
+NETWORK_RUNNER_VERSION=1.6.0
 anr_workdir=${ANR_WORKDIR:-"/tmp"}
-DOWNLOAD_PATH=${anr_workdir}/avalanche-network-runner.tar.gz
+DOWNLOAD_PATH=${anr_workdir}/avalanche-network-runner-v${NETWORK_RUNNER_VERSION}.tar.gz
 DOWNLOAD_URL="https://github.com/ava-labs/avalanche-network-runner/releases/download/v${NETWORK_RUNNER_VERSION}/avalanche-network-runner_${NETWORK_RUNNER_VERSION}_${GOOS}_${GOARCH}.tar.gz"
 echo "Installing avalanche-network-runner ${NETWORK_RUNNER_VERSION} to ${anr_workdir}/avalanche-network-runner"
 
