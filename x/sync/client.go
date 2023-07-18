@@ -112,11 +112,11 @@ func (c *client) GetChangeProof(ctx context.Context, req *pb.SyncGetChangeProofR
 		}
 
 		startKey := merkledb.Nothing[[]byte]()
-		if !req.StartKey.IsNothing {
+		if req.StartKey != nil && !req.StartKey.IsNothing {
 			startKey = merkledb.Some(req.StartKey.Value)
 		}
 		endKey := merkledb.Nothing[[]byte]()
-		if !req.EndKey.IsNothing {
+		if req.EndKey != nil && !req.EndKey.IsNothing {
 			endKey = merkledb.Some(req.EndKey.Value)
 		}
 
