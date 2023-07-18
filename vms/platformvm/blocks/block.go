@@ -47,7 +47,7 @@ func initialize(blk Block) error {
 	return blk.initialize(bytes)
 }
 
-func BlockSize(blk Block) int {
+func Size(blk Block) int {
 	if blk == nil {
 		return wrappers.LongLen
 	}

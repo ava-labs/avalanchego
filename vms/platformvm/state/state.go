@@ -395,7 +395,7 @@ func new(
 	blockCache, err := metercacher.New[ids.ID, blocks.Block](
 		"block_cache",
 		metricsReg,
-		cache.NewSizedLRU[ids.ID, blocks.Block](blockCacheSize, blocks.BlockSize),
+		cache.NewSizedLRU[ids.ID, blocks.Block](blockCacheSize, blocks.Size),
 	)
 	if err != nil {
 		return nil, err
@@ -1528,7 +1528,10 @@ func (s *state) writeBlocks() error {
 		}
 
 		delete(s.addedBlocks, blkID)
-		s.blockCache.Put(blkID, blk)
+		// Note: Evict is used rather than Put here because stBlk may end up
+		// referencing additional data (because of shared byte slices) that
+		// would not be properly accounted for in the cache sizing.
+		s.blockCache.Evict(blkID)
 		if err := s.blockDB.Put(blkID[:], blockBytes); err != nil {
 			return fmt.Errorf("failed to write block %s: %w", blkID, err)
 		}
