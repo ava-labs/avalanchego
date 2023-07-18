@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/core/rawdb"
 	"github.com/ava-labs/subnet-evm/core/types"
+	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -64,8 +65,9 @@ func (b *Block) Accept(context.Context) error {
 
 	// Call Accept for relevant precompile logs. This should apply DB operations to the VM's versionDB
 	// to be committed atomically with marking this block as accepted.
+	rules := b.vm.chainConfig.AvalancheRules(b.ethBlock.Number(), b.ethBlock.Timestamp())
 	sharedMemoryWriter := NewSharedMemoryWriter()
-	if err := b.handlePrecompileAccept(sharedMemoryWriter); err != nil {
+	if err := b.handlePrecompileAccept(&rules, sharedMemoryWriter); err != nil {
 		return err
 	}
 	if err := vm.acceptedBlockDB.Put(lastAcceptedKey, b.id[:]); err != nil {
@@ -89,8 +91,7 @@ func (b *Block) Accept(context.Context) error {
 // contract.Accepter
 // This function assumes that the Accept function will ONLY operate on state maintained in the VM's versiondb.
 // This ensures that any DB operations are performed atomically with marking the block as accepted.
-func (b *Block) handlePrecompileAccept(sharedMemoryWriter *sharedMemoryWriter) error {
-	rules := b.vm.chainConfig.AvalancheRules(b.ethBlock.Number(), b.ethBlock.Timestamp())
+func (b *Block) handlePrecompileAccept(rules *params.Rules, sharedMemoryWriter *sharedMemoryWriter) error {
 	// Short circuit early if there are no precompile accepters to execute
 	if len(rules.AccepterPrecompiles) == 0 {
 		return nil
@@ -103,20 +104,18 @@ func (b *Block) handlePrecompileAccept(sharedMemoryWriter *sharedMemoryWriter) e
 	if len(receipts) == 0 && b.ethBlock.ReceiptHash() != types.EmptyRootHash {
 		return fmt.Errorf("failed to fetch receipts for accepted block with non-empty root hash (%s) (Block: %s, Height: %d)", b.ethBlock.ReceiptHash(), b.ethBlock.Hash(), b.ethBlock.NumberU64())
 	}
-
-	for txIndex, receipt := range receipts {
-		for _, log := range receipt.Logs {
+	acceptCtx := &precompileconfig.AcceptContext{
+		SnowCtx:      b.vm.ctx,
+		SharedMemory: sharedMemoryWriter,
+		Warp:         b.vm.warpBackend,
+	}
+	for _, receipt := range receipts {
+		for logIdx, log := range receipt.Logs {
 			accepter, ok := rules.AccepterPrecompiles[log.Address]
 			if !ok {
 				continue
 			}
-
-			acceptCtx := &precompileconfig.AcceptContext{
-				SnowCtx:      b.vm.ctx,
-				SharedMemory: sharedMemoryWriter,
-				Warp:         b.vm.warpBackend,
-			}
-			if err := accepter.Accept(acceptCtx, log.TxHash, txIndex, log.Topics, log.Data); err != nil {
+			if err := accepter.Accept(acceptCtx, log.TxHash, logIdx, log.Topics, log.Data); err != nil {
 				return err
 			}
 		}
