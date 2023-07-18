@@ -10,26 +10,24 @@ import (
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 )
 
-var _ Cacher[struct{}, SizedElement] = (*sizedLRU[struct{}, SizedElement])(nil)
-
-type SizedElement interface {
-	Size() int
-}
+var _ Cacher[struct{}, any] = (*sizedLRU[struct{}, any])(nil)
 
 // sizedLRU is a key value store with bounded size. If the size is attempted to
 // be exceeded, then elements are removed from the cache until the bound is
 // honored, based on evicting the least recently used value.
-type sizedLRU[K comparable, V SizedElement] struct {
+type sizedLRU[K comparable, V any] struct {
 	lock        sync.Mutex
 	elements    linkedhashmap.LinkedHashmap[K, V]
 	maxSize     int
 	currentSize int
+	size        func(V) int
 }
 
-func NewSizedLRU[K comparable, V SizedElement](maxSize int) Cacher[K, V] {
+func NewSizedLRU[K comparable, V any](maxSize int, size func(V) int) Cacher[K, V] {
 	return &sizedLRU[K, V]{
 		elements: linkedhashmap.New[K, V](),
 		maxSize:  maxSize,
+		size:     size,
 	}
 }
 
@@ -69,21 +67,21 @@ func (c *sizedLRU[_, _]) PortionFilled() float64 {
 }
 
 func (c *sizedLRU[K, V]) put(key K, value V) {
-	valueSize := value.Size()
+	valueSize := c.size(value)
 	if valueSize > c.maxSize {
 		c.flush()
 		return
 	}
 
 	if oldValue, ok := c.elements.Get(key); ok {
-		c.currentSize -= oldValue.Size()
+		c.currentSize -= c.size(oldValue)
 	}
 
 	// Remove elements until the size of elements in the cache <= [c.maxSize].
 	for c.currentSize > c.maxSize-valueSize {
 		oldestKey, value, _ := c.elements.Oldest()
 		c.elements.Delete(oldestKey)
-		c.currentSize -= value.Size()
+		c.currentSize -= c.size(value)
 	}
 
 	c.elements.Put(key, value)
@@ -103,7 +101,7 @@ func (c *sizedLRU[K, V]) get(key K) (V, bool) {
 func (c *sizedLRU[K, _]) evict(key K) {
 	if value, ok := c.elements.Get(key); ok {
 		c.elements.Delete(key)
-		c.currentSize -= value.Size()
+		c.currentSize -= c.size(value)
 	}
 }
 
