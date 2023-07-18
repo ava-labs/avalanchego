@@ -340,7 +340,7 @@ type txAndStatus struct {
 	status status.Status
 }
 
-func txAndStatusSizeFunc(t *txAndStatus) int {
+func txAndStatusSize(t *txAndStatus) int {
 	if t == nil {
 		return wrappers.LongLen
 	}
@@ -446,7 +446,7 @@ func new(
 	txCache, err := metercacher.New(
 		"tx_cache",
 		metricsReg,
-		cache.NewSizedLRU[ids.ID, *txAndStatus](txCacheSize, txAndStatusSizeFunc),
+		cache.NewSizedLRU[ids.ID, *txAndStatus](txCacheSize, txAndStatusSize),
 	)
 	if err != nil {
 		return nil, err
@@ -473,7 +473,7 @@ func new(
 	transformedSubnetCache, err := metercacher.New(
 		"transformed_subnet_cache",
 		metricsReg,
-		cache.NewSizedLRU[ids.ID, *txs.Tx](transformedSubnetTxCacheSize, func(tx *txs.Tx) int { return tx.Size() }),
+		cache.NewSizedLRU[ids.ID, *txs.Tx](transformedSubnetTxCacheSize, (*txs.Tx).Size),
 	)
 	if err != nil {
 		return nil, err
