@@ -1471,6 +1471,8 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 
 	nodeConfig.ChainDataDir = GetExpandedArg(v, ChainDataDirKey)
 
+	nodeConfig.RuntimeStatePath = v.GetString(RuntimeStatePathKey)
+
 	nodeConfig.ProvidedFlags = providedFlags(v)
 	return nodeConfig, nil
 }

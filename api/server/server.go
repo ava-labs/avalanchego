@@ -68,6 +68,10 @@ type Server interface {
 	Dispatch() error
 	// DispatchTLS starts the API server with the provided TLS certificate
 	DispatchTLS(certBytes, keyBytes []byte) error
+	// Return the uri used to access the api server. Set by the
+	// Dispatch and DispatchTLS methods after binding a listener, so
+	// may need to be called until a non-empty value is returned.
+	GetURI() string
 	// RegisterChain registers the API endpoints associated with this chain.
 	// That is, add <route, handler> pairs to server so that API calls can be
 	// made to the VM.
@@ -103,6 +107,12 @@ type server struct {
 	router *router
 
 	srv *http.Server
+
+	// Synchronizes access to uri across this type's Dispatch*() methods
+	// and another goroutine calling GetURI().
+	uriLock sync.RWMutex
+	// URI (https://host:port) to access the api server.
+	uri string
 }
 
 // New returns an instance of a Server.
@@ -170,12 +180,28 @@ func New(
 	}, nil
 }
 
+// Retrieve the uri used to access the server.
+func (s *server) GetURI() string {
+	s.uriLock.RLock()
+	defer s.uriLock.RUnlock()
+	return s.uri
+}
+
+// Set the uri used to access the server.
+func (s *server) setURI(uri string) {
+	s.uriLock.Lock()
+	defer s.uriLock.Unlock()
+	s.uri = uri
+}
+
 func (s *server) Dispatch() error {
 	listenAddress := net.JoinHostPort(s.listenHost, s.listenPort)
 	listener, err := net.Listen("tcp", listenAddress)
 	if err != nil {
 		return err
 	}
+
+	s.setURI("http://" + listener.Addr().String())
 
 	ipPort, err := ips.ToIPPort(listener.Addr().String())
 	if err != nil {
@@ -207,6 +233,8 @@ func (s *server) DispatchTLS(certBytes, keyBytes []byte) error {
 	if err != nil {
 		return err
 	}
+
+	s.setURI("https://" + listener.Addr().String())
 
 	ipPort, err := ips.ToIPPort(listener.Addr().String())
 	if err != nil {
