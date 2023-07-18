@@ -111,8 +111,12 @@ func GetDefaultChainURI(blockchainID string) string {
 // 3. npx is available in the ./contracts directory
 func RunDefaultHardhatTests(ctx context.Context, blockchainID string, test string) {
 	chainURI := GetDefaultChainURI(blockchainID)
-	log.Info("Executing HardHat tests on a new blockchain", "blockchainID", blockchainID, "test", test)
-	log.Info("Using subnet", "ChainURI", chainURI)
+	log.Info(
+		"Executing HardHat tests on a new blockchain",
+		"blockchainID", blockchainID,
+		"test", test,
+		"ChainURI", chainURI,
+	)
 
 	cmdPath := "./contracts"
 	// test path is relative to the cmd path
