@@ -9,21 +9,22 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 )
 
 // SignerTests is a list of all signer tests
-var SignerTests = []func(t *testing.T, s Signer, sk *bls.SecretKey, chainID ids.ID){
+var SignerTests = []func(t *testing.T, s Signer, sk *bls.SecretKey, networkID uint32, chainID ids.ID){
 	TestSignerWrongChainID,
 	TestSignerVerifies,
 }
 
 // Test that using a random SourceChainID results in an error
-func TestSignerWrongChainID(t *testing.T, s Signer, _ *bls.SecretKey, _ ids.ID) {
+func TestSignerWrongChainID(t *testing.T, s Signer, _ *bls.SecretKey, _ uint32, _ ids.ID) {
 	require := require.New(t)
 
 	msg, err := NewUnsignedMessage(
-		ids.GenerateTestID(),
+		constants.UnitTestID,
 		ids.GenerateTestID(),
 		[]byte("payload"),
 	)
@@ -34,13 +35,29 @@ func TestSignerWrongChainID(t *testing.T, s Signer, _ *bls.SecretKey, _ ids.ID) 
 	require.Error(err) //nolint:forbidigo // currently returns grpc errors too
 }
 
-// Test that a signature generated with the signer verifies correctly
-func TestSignerVerifies(t *testing.T, s Signer, sk *bls.SecretKey, chainID ids.ID) {
+// Test that using a different networkID results in an error
+func TestSignerWrongNetworkID(t *testing.T, s Signer, _ *bls.SecretKey, networkID uint32, blockchainID ids.ID) {
 	require := require.New(t)
 
 	msg, err := NewUnsignedMessage(
+		networkID+1,
+		blockchainID,
+		[]byte("payload"),
+	)
+	require.NoError(err)
+
+	_, err = s.Sign(msg)
+	// TODO: require error to be errWrongNetworkID
+	require.Error(err) //nolint:forbidigo // currently returns grpc errors too
+}
+
+// Test that a signature generated with the signer verifies correctly
+func TestSignerVerifies(t *testing.T, s Signer, sk *bls.SecretKey, networkID uint32, chainID ids.ID) {
+	require := require.New(t)
+
+	msg, err := NewUnsignedMessage(
+		networkID,
 		chainID,
-		ids.GenerateTestID(),
 		[]byte("payload"),
 	)
 	require.NoError(err)

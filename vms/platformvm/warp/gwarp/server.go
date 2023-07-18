@@ -29,14 +29,9 @@ func (s *Server) Sign(_ context.Context, unsignedMsg *pb.SignRequest) (*pb.SignR
 		return nil, err
 	}
 
-	destinationChainID, err := ids.ToID(unsignedMsg.DestinationChainId)
-	if err != nil {
-		return nil, err
-	}
-
 	msg, err := warp.NewUnsignedMessage(
+		unsignedMsg.NetworkId,
 		sourceChainID,
-		destinationChainID,
 		unsignedMsg.Payload,
 	)
 	if err != nil {
