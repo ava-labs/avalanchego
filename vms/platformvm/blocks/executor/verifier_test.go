@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -482,7 +481,7 @@ func TestVerifyUnverifiedParent(t *testing.T) {
 
 	// Set expectations for dependencies.
 	s.EXPECT().GetTimestamp().Return(time.Now()).Times(1)
-	s.EXPECT().GetStatelessBlock(parentID).Return(nil, choices.Unknown, database.ErrNotFound).Times(1)
+	s.EXPECT().GetStatelessBlock(parentID).Return(nil, database.ErrNotFound).Times(1)
 
 	// Verify the block.
 	err = blk.Visit(verifier)
