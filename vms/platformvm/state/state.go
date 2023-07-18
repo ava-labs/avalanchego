@@ -360,7 +360,6 @@ func blockSize(blk blocks.Block) int {
 	if blk == nil {
 		return pointerOverhead
 	}
-
 	return len(blk.Bytes()) + pointerOverhead
 }
 
