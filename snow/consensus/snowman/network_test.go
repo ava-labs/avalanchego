@@ -92,8 +92,8 @@ func (n *Network) AddNode(sm Consensus) error {
 	return nil
 }
 
-func (n *Network) Finalized() bool {
-	return len(n.running) == 0
+func (n *Network) NumProcessing() int {
+	return len(n.running) - 1
 }
 
 func (n *Network) Round() error {
@@ -118,7 +118,7 @@ func (n *Network) Round() error {
 	}
 
 	// If this node has been finalized, remove it from the poller
-	if running.Finalized() {
+	if running.NumProcessing() == 1 {
 		newSize := len(n.running) - 1
 		n.running[runningInd] = n.running[newSize]
 		n.running = n.running[:newSize]

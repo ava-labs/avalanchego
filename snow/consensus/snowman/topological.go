@@ -309,10 +309,6 @@ func (ts *Topological) RecordPoll(ctx context.Context, voteBag bag.Bag[ids.ID]) 
 	return nil
 }
 
-func (ts *Topological) Finalized() bool {
-	return len(ts.blocks) == 1
-}
-
 // HealthCheck returns information about the consensus health.
 func (ts *Topological) HealthCheck(context.Context) (interface{}, error) {
 	numOutstandingBlks := ts.Latency.NumProcessing()
@@ -508,7 +504,7 @@ func (ts *Topological) vote(ctx context.Context, voteStack []votes) (ids.ID, err
 		pollSuccessful = parentBlock.sb.RecordPoll(vote.votes) || pollSuccessful
 
 		// Only accept when you are finalized and the head.
-		if parentBlock.sb.Finalized() && ts.head == vote.parentID {
+		if parentBlock.sb.NumProcessing() == 1 && ts.head == vote.parentID {
 			if err := ts.acceptPreferredChild(ctx, parentBlock); err != nil {
 				return ids.ID{}, err
 			}

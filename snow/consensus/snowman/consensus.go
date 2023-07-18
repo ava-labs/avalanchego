@@ -59,5 +59,4 @@ type Consensus interface {
 	// Finalized returns true if all decisions that have been added have been
 	// finalized. Note, it is possible that after returning finalized, a new
 	// decision may be added such that this instance is no longer finalized.
-	Finalized() bool
 }
