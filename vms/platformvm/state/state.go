@@ -1567,7 +1567,10 @@ func (s *state) writeBlocks() error {
 		blkBytes := blk.Bytes()
 
 		delete(s.addedBlocks, blkID)
-		s.blockCache.Put(blkID, blk)
+		// Note: Evict is used rather than Put here because blk may end up
+		// referencing additional data (because of shared byte slices) that
+		// would not be properly accounted for in the cache sizing.
+		s.blockCache.Evict(blkID)
 		if err := s.blockDB.Put(blkID[:], blkBytes); err != nil {
 			return fmt.Errorf("failed to write block %s: %w", blkID, err)
 		}
