@@ -3,8 +3,6 @@
 
 package sync
 
-import "time"
-
 // TODO danlaine: We create a new response handler for every request.
 // Look into making a struct to handle requests/responses that uses a sync pool
 // to avoid allocations.
@@ -45,10 +43,4 @@ func (h *responseHandler) OnResponse(response []byte) {
 func (h *responseHandler) OnFailure() {
 	h.failed = true
 	close(h.responseChan)
-}
-
-type responseHandlerAndTime struct {
-	handler ResponseHandler
-	// The time the request was made.
-	requestTime time.Time
 }

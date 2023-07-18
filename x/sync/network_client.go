@@ -59,7 +59,7 @@ type networkClient struct {
 	// requestID counter used to track outbound requests
 	requestID uint32
 	// requestID => handler for the response/failure
-	outstandingRequestHandlers map[uint32]responseHandlerAndTime
+	outstandingRequestHandlers map[uint32]ResponseHandler
 	// controls maximum number of active outbound requests
 	activeRequests *semaphore.Weighted
 	// tracking of peers & bandwidth usage
@@ -77,7 +77,7 @@ func NewNetworkClient(
 	return &networkClient{
 		appSender:                  appSender,
 		myNodeID:                   myNodeID,
-		outstandingRequestHandlers: make(map[uint32]responseHandlerAndTime),
+		outstandingRequestHandlers: make(map[uint32]ResponseHandler),
 		activeRequests:             semaphore.NewWeighted(maxActiveRequests),
 		peers:                      newPeerTracker(log),
 		log:                        log,
@@ -102,7 +102,7 @@ func (c *networkClient) AppResponse(
 		zap.Int("responseLen", len(response)),
 	)
 
-	handler, requestTime, exists := c.getRequestHandler(requestID)
+	handler, exists := c.getRequestHandler(requestID)
 	if !exists {
 		// Should never happen since the engine
 		// should be managing outstanding requests
@@ -114,8 +114,6 @@ func (c *networkClient) AppResponse(
 		)
 		return nil
 	}
-	bandwidth := float64(len(response)) / (time.Since(requestTime).Seconds() + epsilon)
-	c.peers.TrackBandwidth(nodeID, bandwidth)
 
 	handler.OnResponse(response)
 
@@ -138,7 +136,7 @@ func (c *networkClient) AppRequestFailed(
 		zap.Uint32("requestID", requestID),
 	)
 
-	handler, _, exists := c.getRequestHandler(requestID)
+	handler, exists := c.getRequestHandler(requestID)
 	if !exists {
 		// Should never happen since the engine
 		// should be managing outstanding requests
@@ -149,23 +147,21 @@ func (c *networkClient) AppRequestFailed(
 		)
 		return nil
 	}
-	c.peers.TrackBandwidth(nodeID, 0)
 	handler.OnFailure()
 	return nil
 }
 
 // Returns the handler for [requestID] and marks the request as fulfilled.
-// Also returns the time the request was made.
 // Returns false if there's no outstanding request with [requestID].
 // Assumes [c.lock] is held.
-func (c *networkClient) getRequestHandler(requestID uint32) (ResponseHandler, time.Time, bool) {
-	handlerAndTime, exists := c.outstandingRequestHandlers[requestID]
+func (c *networkClient) getRequestHandler(requestID uint32) (ResponseHandler, bool) {
+	handler, exists := c.outstandingRequestHandlers[requestID]
 	if !exists {
-		return nil, time.Time{}, false
+		return nil, false
 	}
 	// mark message as processed, release activeRequests slot
 	delete(c.outstandingRequestHandlers, requestID)
-	return handlerAndTime.handler, handlerAndTime.requestTime, true
+	return handler, true
 }
 
 // RequestAny synchronously sends [request] to a randomly chosen peer with a
@@ -250,10 +246,7 @@ func (c *networkClient) request(
 	}
 
 	handler := newResponseHandler()
-	c.outstandingRequestHandlers[requestID] = responseHandlerAndTime{
-		handler:     handler,
-		requestTime: time.Now(),
-	}
+	c.outstandingRequestHandlers[requestID] = handler
 
 	var (
 		response  []byte
