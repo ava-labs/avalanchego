@@ -1581,19 +1581,6 @@ func (s *state) writeBlocks() error {
 	return nil
 }
 
-func (s *state) writeBlockIDs() error {
-	for height, blkID := range s.addedBlockIDs {
-		heightKey := database.PackUInt64(height)
-
-		delete(s.addedBlockIDs, height)
-		s.blockIDCache.Put(height, blkID)
-		if err := database.PutID(s.blockIDDB, heightKey, blkID); err != nil {
-			return fmt.Errorf("failed to add blockID: %w", err)
-		}
-	}
-	return nil
-}
-
 func (s *state) GetStatelessBlock(blockID ids.ID) (blocks.Block, error) {
 	if blk, exists := s.addedBlocks[blockID]; exists {
 		return blk, nil
@@ -1627,6 +1614,19 @@ func (s *state) GetStatelessBlock(blockID ids.ID) (blocks.Block, error) {
 
 	s.blockCache.Put(blockID, blk)
 	return blk, nil
+}
+
+func (s *state) writeBlockIDs() error {
+	for height, blkID := range s.addedBlockIDs {
+		heightKey := database.PackUInt64(height)
+
+		delete(s.addedBlockIDs, height)
+		s.blockIDCache.Put(height, blkID)
+		if err := database.PutID(s.blockIDDB, heightKey, blkID); err != nil {
+			return fmt.Errorf("failed to add blockID: %w", err)
+		}
+	}
+	return nil
 }
 
 func (s *state) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
