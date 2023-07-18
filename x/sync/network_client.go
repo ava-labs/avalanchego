@@ -250,20 +250,20 @@ func (c *networkClient) request(
 		response  []byte
 		startTime = time.Now()
 	)
-	defer func() {
-		elapsed := time.Since(startTime).Seconds()
-		bandwidth := float64(len(response))/elapsed + epsilon
-		c.peers.TrackBandwidth(nodeID, bandwidth)
-	}()
 
 	c.lock.Unlock() // unlock so response can be received
 
 	select {
 	case <-ctx.Done():
+		c.peers.TrackBandwidth(nodeID, 0)
 		return nil, ctx.Err()
 	case response = <-handler.responseChan:
+		elapsedSeconds := time.Since(startTime).Seconds()
+		bandwidth := float64(len(response))/elapsedSeconds + epsilon
+		c.peers.TrackBandwidth(nodeID, bandwidth)
 	}
 	if handler.failed {
+		c.peers.TrackBandwidth(nodeID, 0)
 		return nil, ErrRequestFailed
 	}
 
