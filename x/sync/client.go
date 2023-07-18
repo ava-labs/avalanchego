@@ -241,10 +241,9 @@ func getAndParse[T any](
 // It's safe to call this method multiple times concurrently.
 func (c *client) get(ctx context.Context, request []byte) (ids.NodeID, []byte, error) {
 	var (
-		response  []byte
-		nodeID    ids.NodeID
-		err       error
-		startTime = time.Now()
+		response []byte
+		nodeID   ids.NodeID
+		err      error
 	)
 
 	c.metrics.RequestMade()
@@ -261,12 +260,9 @@ func (c *client) get(ctx context.Context, request []byte) (ids.NodeID, []byte, e
 	}
 	if err != nil {
 		c.metrics.RequestFailed()
-		c.networkClient.TrackBandwidth(nodeID, 0)
 		return nodeID, response, err
 	}
 
-	bandwidth := float64(len(response)) / (time.Since(startTime).Seconds() + epsilon)
-	c.networkClient.TrackBandwidth(nodeID, bandwidth)
 	c.metrics.RequestSucceeded()
 	return nodeID, response, nil
 }
