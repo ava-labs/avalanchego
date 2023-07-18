@@ -114,9 +114,7 @@ func (c *networkClient) AppResponse(
 		)
 		return nil
 	}
-
 	handler.OnResponse(response)
-
 	return nil
 }
 
