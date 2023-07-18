@@ -310,13 +310,3 @@ func (c *networkClient) Disconnected(_ context.Context, nodeID ids.NodeID) error
 	c.peers.Disconnected(nodeID)
 	return nil
 }
-
-// Shutdown disconnects all peers
-func (c *networkClient) Shutdown() {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	// reset peers
-	// TODO danlaine: should we call [Disconnected] on each peer?
-	c.peers = newPeerTracker(c.log)
-}

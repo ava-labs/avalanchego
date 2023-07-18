@@ -46,12 +46,12 @@ func main() {
 	pWallet := wallet.P()
 
 	removeValidatorStartTime := time.Now()
-	removeValidatorTxID, err := pWallet.IssueRemoveSubnetValidatorTx(
+	removeValidatorTx, err := pWallet.IssueRemoveSubnetValidatorTx(
 		nodeID,
 		subnetID,
 	)
 	if err != nil {
 		log.Fatalf("failed to issue remove subnet validator transaction: %s\n", err)
 	}
-	log.Printf("removed subnet validator %s from %s with %s in %s\n", nodeID, subnetID, removeValidatorTxID, time.Since(removeValidatorStartTime))
+	log.Printf("removed subnet validator %s from %s with %s in %s\n", nodeID, subnetID, removeValidatorTx.ID(), time.Since(removeValidatorStartTime))
 }
