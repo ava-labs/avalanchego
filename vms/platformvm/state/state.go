@@ -395,13 +395,7 @@ func new(
 	blockCache, err := metercacher.New[ids.ID, blocks.Block](
 		"block_cache",
 		metricsReg,
-		cache.NewSizedLRU[ids.ID, blocks.Block](blockCacheSize, func(b blocks.Block) int {
-			if b == nil {
-				return wrappers.LongLen
-			}
-
-			return wrappers.LongLen + len(b.Bytes())
-		}),
+		cache.NewSizedLRU[ids.ID, blocks.Block](blockCacheSize, blocks.BlockSize),
 	)
 	if err != nil {
 		return nil, err
