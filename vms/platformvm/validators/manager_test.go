@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -424,7 +423,7 @@ func TestVM_GetValidatorSet(t *testing.T) {
 			mockTip.EXPECT().Height().Return(tt.lastAcceptedHeight)
 			mockTipID := ids.GenerateTestID()
 			mockState.EXPECT().GetLastAccepted().Return(mockTipID)
-			mockState.EXPECT().GetStatelessBlock(mockTipID).Return(mockTip, choices.Accepted, nil)
+			mockState.EXPECT().GetStatelessBlock(mockTipID).Return(mockTip, nil)
 
 			// Compute validator set at previous height
 			gotVdrSet, err := validatorSet.GetValidatorSet(context.Background(), tt.height, tt.subnetID)

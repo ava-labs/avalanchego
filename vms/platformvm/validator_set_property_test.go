@@ -217,7 +217,7 @@ func takeValidatorsSnapshotAtCurrentHeight(vm *VM, validatorsSetByHeightAndSubne
 	}
 
 	lastBlkID := vm.state.GetLastAccepted()
-	lastBlk, _, err := vm.state.GetStatelessBlock(lastBlkID)
+	lastBlk, err := vm.state.GetStatelessBlock(lastBlkID)
 	if err != nil {
 		return err
 	}
