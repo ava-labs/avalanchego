@@ -14,6 +14,7 @@ var (
 	_ Signer = (*signer)(nil)
 
 	errWrongSourceChainID = errors.New("wrong SourceChainID")
+	errWrongNetworkID     = errors.New("wrong networkID")
 )
 
 type Signer interface {
@@ -25,21 +26,26 @@ type Signer interface {
 	Sign(msg *UnsignedMessage) ([]byte, error)
 }
 
-func NewSigner(sk *bls.SecretKey, chainID ids.ID) Signer {
+func NewSigner(sk *bls.SecretKey, networkID uint32, chainID ids.ID) Signer {
 	return &signer{
-		sk:      sk,
-		chainID: chainID,
+		sk:        sk,
+		networkID: networkID,
+		chainID:   chainID,
 	}
 }
 
 type signer struct {
-	sk      *bls.SecretKey
-	chainID ids.ID
+	sk        *bls.SecretKey
+	networkID uint32
+	chainID   ids.ID
 }
 
 func (s *signer) Sign(msg *UnsignedMessage) ([]byte, error) {
 	if msg.SourceChainID != s.chainID {
 		return nil, errWrongSourceChainID
+	}
+	if msg.NetworkID != s.networkID {
+		return nil, errWrongNetworkID
 	}
 
 	msgBytes := msg.Bytes()
