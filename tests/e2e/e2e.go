@@ -324,7 +324,7 @@ func (te *TestEnvironment) RestoreInitialState(switchOffNetworkFirst bool) error
 		gomega.Expect(err).Should(gomega.BeNil())
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	_, err := te.GetRunnerClient().LoadSnapshot(ctx, te.snapshotName)
 	cancel()
 	if err != nil {
