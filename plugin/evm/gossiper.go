@@ -34,6 +34,10 @@ const (
 	// [txsGossipInterval] is how often we attempt to gossip newly seen
 	// transactions to other nodes.
 	txsGossipInterval = 500 * time.Millisecond
+
+	// [minGossipBatchInterval] is the minimum amount of time that must pass
+	// before our last gossip to peers.
+	minGossipBatchInterval = 50 * time.Millisecond
 )
 
 // Gossiper handles outgoing gossip of transactions
@@ -323,7 +327,7 @@ func (n *pushGossiper) sendTxs(txs []*types.Transaction) error {
 }
 
 func (n *pushGossiper) gossipTxs(force bool) (int, error) {
-	if (!force && time.Since(n.lastGossiped) < txsGossipInterval) || len(n.txsToGossip) == 0 {
+	if (!force && time.Since(n.lastGossiped) < minGossipBatchInterval) || len(n.txsToGossip) == 0 {
 		return 0, nil
 	}
 	n.lastGossiped = time.Now()
