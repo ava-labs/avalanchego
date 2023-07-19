@@ -58,10 +58,10 @@ func (b *Block) Status() choices.Status {
 		return choices.Processing
 	}
 	// Block isn't in memory. Check in the database.
-	_, status, err := b.manager.state.GetStatelessBlock(blkID)
+	_, err := b.manager.state.GetStatelessBlock(blkID)
 	switch err {
 	case nil:
-		return status
+		return choices.Accepted
 
 	case database.ErrNotFound:
 		// choices.Unknown means we don't have the bytes of the block.
