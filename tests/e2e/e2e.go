@@ -156,7 +156,7 @@ func (te *TestEnvironment) StartCluster() error {
 	switch te.clusterType {
 	case StandAlone:
 		tests.Outf("{{magenta}}starting network-runner with %q{{/}}\n", te.avalancheGoExecPath)
-		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		resp, err := te.GetRunnerClient().Start(ctx, te.avalancheGoExecPath,
 			runner_sdk.WithNumNodes(5),
 			runner_sdk.WithGlobalNodeConfig(fmt.Sprintf(`{"log-level":"%s"}`, te.avalancheGoLogLevel)),

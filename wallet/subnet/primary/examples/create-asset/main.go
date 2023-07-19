@@ -45,7 +45,7 @@ func main() {
 	}
 
 	createAssetStartTime := time.Now()
-	createAssetTxID, err := xWallet.IssueCreateAssetTx(
+	createAssetTx, err := xWallet.IssueCreateAssetTx(
 		"HI",
 		"HI",
 		1,
@@ -61,5 +61,5 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to issue create asset transaction: %s\n", err)
 	}
-	log.Printf("created new asset %s in %s\n", createAssetTxID, time.Since(createAssetStartTime))
+	log.Printf("created new asset %s in %s\n", createAssetTx.ID(), time.Since(createAssetStartTime))
 }

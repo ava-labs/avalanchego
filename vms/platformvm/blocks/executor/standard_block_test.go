@@ -324,7 +324,7 @@ func TestBanffStandardBlockUpdatePrimaryNetworkStakers(t *testing.T) {
 
 	// build standard block moving ahead chain time
 	preferredID := env.state.GetLastAccepted()
-	parentBlk, _, err := env.state.GetStatelessBlock(preferredID)
+	parentBlk, err := env.state.GetStatelessBlock(preferredID)
 	require.NoError(err)
 	statelessStandardBlock, err := blocks.NewBanffStandardBlock(
 		pendingValidatorStartTime,
@@ -542,7 +542,7 @@ func TestBanffStandardBlockUpdateStakers(t *testing.T) {
 
 				// build standard block moving ahead chain time
 				preferredID := env.state.GetLastAccepted()
-				parentBlk, _, err := env.state.GetStatelessBlock(preferredID)
+				parentBlk, err := env.state.GetStatelessBlock(preferredID)
 				require.NoError(err)
 				statelessStandardBlock, err := blocks.NewBanffStandardBlock(
 					newTime,
@@ -659,7 +659,7 @@ func TestBanffStandardBlockRemoveSubnetValidator(t *testing.T) {
 	env.clk.Set(subnetVdr1EndTime)
 	// build standard block moving ahead chain time
 	preferredID := env.state.GetLastAccepted()
-	parentBlk, _, err := env.state.GetStatelessBlock(preferredID)
+	parentBlk, err := env.state.GetStatelessBlock(preferredID)
 	require.NoError(err)
 	statelessStandardBlock, err := blocks.NewBanffStandardBlock(
 		subnetVdr1EndTime,
@@ -730,7 +730,7 @@ func TestBanffStandardBlockTrackedSubnet(t *testing.T) {
 
 			// build standard block moving ahead chain time
 			preferredID := env.state.GetLastAccepted()
-			parentBlk, _, err := env.state.GetStatelessBlock(preferredID)
+			parentBlk, err := env.state.GetStatelessBlock(preferredID)
 			require.NoError(err)
 			statelessStandardBlock, err := blocks.NewBanffStandardBlock(
 				subnetVdr1StartTime,
@@ -774,7 +774,7 @@ func TestBanffStandardBlockDelegatorStakerWeight(t *testing.T) {
 
 	// build standard block moving ahead chain time
 	preferredID := env.state.GetLastAccepted()
-	parentBlk, _, err := env.state.GetStatelessBlock(preferredID)
+	parentBlk, err := env.state.GetStatelessBlock(preferredID)
 	require.NoError(err)
 	statelessStandardBlock, err := blocks.NewBanffStandardBlock(
 		pendingValidatorStartTime,
@@ -826,7 +826,7 @@ func TestBanffStandardBlockDelegatorStakerWeight(t *testing.T) {
 
 	// Advance Time
 	preferredID = env.state.GetLastAccepted()
-	parentBlk, _, err = env.state.GetStatelessBlock(preferredID)
+	parentBlk, err = env.state.GetStatelessBlock(preferredID)
 	require.NoError(err)
 	statelessStandardBlock, err = blocks.NewBanffStandardBlock(
 		pendingDelegatorStartTime,

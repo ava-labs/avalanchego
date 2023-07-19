@@ -118,7 +118,7 @@ func (m *manager) GetMinimumHeight(ctx context.Context) (uint64, error) {
 		return m.GetCurrentHeight(ctx)
 	}
 
-	blk, _, err := m.state.GetStatelessBlock(oldest)
+	blk, err := m.state.GetStatelessBlock(oldest)
 	if err != nil {
 		return 0, err
 	}
@@ -133,7 +133,7 @@ func (m *manager) GetMinimumHeight(ctx context.Context) (uint64, error) {
 
 func (m *manager) GetCurrentHeight(context.Context) (uint64, error) {
 	lastAcceptedID := m.state.GetLastAccepted()
-	lastAccepted, _, err := m.state.GetStatelessBlock(lastAcceptedID)
+	lastAccepted, err := m.state.GetStatelessBlock(lastAcceptedID)
 	if err != nil {
 		return 0, err
 	}
