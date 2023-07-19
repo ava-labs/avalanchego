@@ -208,4 +208,5 @@ const (
 	TracingInsecureKey                                 = "tracing-insecure"
 	TracingSampleRateKey                               = "tracing-sample-rate"
 	TracingExporterTypeKey                             = "tracing-exporter-type"
+	TracingHeadersKey                                  = "tracing-headers"
 )
