@@ -468,11 +468,9 @@ func (m *Manager) findNextKey(
 
 	// If the nextKey is before or equal to the [lastReceivedKey]
 	// then we couldn't find a better answer than the [lastReceivedKey].
-	// Set the nextKey to [lastReceivedKey] + 0, which is the first key in
-	// the open range (lastReceivedKey, rangeEnd).
+	// Set the nextKey to [lastReceivedKey]
 	if nextKey != nil && bytes.Compare(nextKey, lastReceivedKey) <= 0 {
 		nextKey = lastReceivedKey
-		nextKey = append(nextKey, 0)
 	}
 
 	// If the nextKey is larger than the end of the range,
@@ -637,6 +635,10 @@ func (m *Manager) enqueueWork(work *workItem) {
 	// Split the remaining range into to 2.
 	// Find the middle point.
 	mid := midPoint(work.start, work.end)
+
+	if bytes.Equal(work.start, mid) {
+		m.unprocessedWork.Insert(work)
+	}
 
 	// first item gets higher priority than the second to encourage finished ranges to grow
 	// rather than start a new range that is not contiguous with existing completed ranges
