@@ -358,10 +358,7 @@ func (m *Manager) findNextKey(
 	endProof []merkledb.ProofNode,
 ) ([]byte, error) {
 	if len(endProof) == 0 {
-		// We try to find the next key to fetch by looking at the end proof.
-		// If the end proof is empty, we have no information to use.
-		// Start fetching from the next key after [lastReceivedKey].
-		return append(lastReceivedKey, 0), nil
+		return nil, nil
 	}
 
 	// We want the first key larger than the [lastReceivedKey].

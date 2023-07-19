@@ -130,11 +130,11 @@ func (wh *workHeap) MergeInsert(item *workItem) {
 	if mergedBefore != nil && mergedAfter != nil {
 		// combine the two ranges
 		mergedBefore.workItem.end = mergedAfter.workItem.end
-		// remove the second range since it is now covered by the first
-		wh.remove(mergedAfter)
 		// update the priority
 		mergedBefore.workItem.priority = math.Max(mergedBefore.workItem.priority, mergedAfter.workItem.priority)
 		heap.Fix(&wh.innerHeap, mergedBefore.heapIndex)
+		// remove the second range since it is now covered by the first
+		wh.remove(mergedAfter)
 	}
 
 	// nothing was merged, so add new item to the heap
@@ -177,6 +177,7 @@ func (h *innerHeap) Pop() interface{} {
 	item := old[n-1]
 	old[n-1] = nil
 	*h = old[0 : n-1]
+	item.heapIndex = -1
 	return item
 }
 
