@@ -42,6 +42,8 @@ The plugin version is updated to `27` all plugins must update to be compatible.
 - Cleanup anr scripts by @ceyonur in https://github.com/ava-labs/avalanchego/pull/1714
 - remove TrackBandwidth from NetworkClient by @danlaine in https://github.com/ava-labs/avalanchego/pull/1716
 - Bump network start timeout by @marun in https://github.com/ava-labs/avalanchego/pull/1730
+- e2e: Ensure e2e.test is built with portable BLST by @marun in https://github.com/ava-labs/avalanchego/pull/1734
+- e2e: Increase all ANR timeouts to 2m to ensure CI reliability. by @marun in https://github.com/ava-labs/avalanchego/pull/1733
 
 ### New Contributors
 
