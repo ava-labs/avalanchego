@@ -9,9 +9,6 @@ AVALANCHE_PATH=$(
   cd .. && pwd
 )
 
-# Load the constants
-source "$AVALANCHE_PATH"/scripts/constants.sh
-
 #################################
 # download avalanche-network-runner
 # https://github.com/ava-labs/avalanche-network-runner
