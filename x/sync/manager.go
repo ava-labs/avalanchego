@@ -638,6 +638,7 @@ func (m *Manager) enqueueWork(work *workItem) {
 
 	if bytes.Equal(work.start, mid) {
 		m.unprocessedWork.Insert(work)
+		return
 	}
 
 	// first item gets higher priority than the second to encourage finished ranges to grow
