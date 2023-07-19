@@ -263,6 +263,8 @@ func (vm *VM) Initialize(
 func (vm *VM) Shutdown(ctx context.Context) error {
 	vm.onShutdown()
 
+	vm.Scheduler.Close()
+
 	if err := vm.db.Commit(); err != nil {
 		return err
 	}

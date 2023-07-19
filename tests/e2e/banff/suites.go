@@ -71,8 +71,7 @@ var _ = ginkgo.Describe("[Banff]", func() {
 
 			var assetID ids.ID
 			ginkgo.By("create new X-chain asset", func() {
-				var err error
-				assetID, err = xWallet.IssueCreateAssetTx(
+				assetTx, err := xWallet.IssueCreateAssetTx(
 					"RnM",
 					"RNM",
 					9,
@@ -86,12 +85,13 @@ var _ = ginkgo.Describe("[Banff]", func() {
 					},
 				)
 				gomega.Expect(err).Should(gomega.BeNil())
+				assetID = assetTx.ID()
 
 				tests.Outf("{{green}}created new X-chain asset{{/}}: %s\n", assetID)
 			})
 
 			ginkgo.By("export new X-chain asset to P-chain", func() {
-				txID, err := xWallet.IssueExportTx(
+				tx, err := xWallet.IssueExportTx(
 					constants.PlatformChainID,
 					[]*avax.TransferableOutput{
 						{
@@ -107,18 +107,18 @@ var _ = ginkgo.Describe("[Banff]", func() {
 				)
 				gomega.Expect(err).Should(gomega.BeNil())
 
-				tests.Outf("{{green}}issued X-chain export{{/}}: %s\n", txID)
+				tests.Outf("{{green}}issued X-chain export{{/}}: %s\n", tx.ID())
 			})
 
 			ginkgo.By("import new asset from X-chain on the P-chain", func() {
-				txID, err := pWallet.IssueImportTx(xChainID, owner)
+				tx, err := pWallet.IssueImportTx(xChainID, owner)
 				gomega.Expect(err).Should(gomega.BeNil())
 
-				tests.Outf("{{green}}issued P-chain import{{/}}: %s\n", txID)
+				tests.Outf("{{green}}issued P-chain import{{/}}: %s\n", tx.ID())
 			})
 
 			ginkgo.By("export asset from P-chain to the X-chain", func() {
-				txID, err := pWallet.IssueExportTx(
+				tx, err := pWallet.IssueExportTx(
 					xChainID,
 					[]*avax.TransferableOutput{
 						{
@@ -134,14 +134,14 @@ var _ = ginkgo.Describe("[Banff]", func() {
 				)
 				gomega.Expect(err).Should(gomega.BeNil())
 
-				tests.Outf("{{green}}issued P-chain export{{/}}: %s\n", txID)
+				tests.Outf("{{green}}issued P-chain export{{/}}: %s\n", tx.ID())
 			})
 
 			ginkgo.By("import asset from P-chain on the X-chain", func() {
-				txID, err := xWallet.IssueImportTx(constants.PlatformChainID, owner)
+				tx, err := xWallet.IssueImportTx(constants.PlatformChainID, owner)
 				gomega.Expect(err).Should(gomega.BeNil())
 
-				tests.Outf("{{green}}issued X-chain import{{/}}: %s\n", txID)
+				tests.Outf("{{green}}issued X-chain import{{/}}: %s\n", tx.ID())
 			})
 		})
 })

@@ -43,10 +43,6 @@ type NetworkClient interface {
 	// Returns response bytes, and ErrRequestFailed if the request should be retried.
 	Request(ctx context.Context, nodeID ids.NodeID, request []byte) ([]byte, error)
 
-	// TrackBandwidth should be called for each valid response with the bandwidth
-	// (length of response divided by request time), and with 0 if the response is invalid.
-	TrackBandwidth(nodeID ids.NodeID, bandwidth float64)
-
 	// The following declarations allow this interface to be embedded in the VM
 	// to handle incoming responses from peers.
 	AppResponse(context.Context, ids.NodeID, uint32, []byte) error
@@ -250,15 +246,24 @@ func (c *networkClient) request(
 	handler := newResponseHandler()
 	c.outstandingRequestHandlers[requestID] = handler
 
+	var (
+		response  []byte
+		startTime = time.Now()
+	)
+
 	c.lock.Unlock() // unlock so response can be received
 
-	var response []byte
 	select {
 	case <-ctx.Done():
+		c.peers.TrackBandwidth(nodeID, 0)
 		return nil, ctx.Err()
 	case response = <-handler.responseChan:
+		elapsedSeconds := time.Since(startTime).Seconds()
+		bandwidth := float64(len(response))/elapsedSeconds + epsilon
+		c.peers.TrackBandwidth(nodeID, bandwidth)
 	}
 	if handler.failed {
+		c.peers.TrackBandwidth(nodeID, 0)
 		return nil, ErrRequestFailed
 	}
 
@@ -304,21 +309,4 @@ func (c *networkClient) Disconnected(_ context.Context, nodeID ids.NodeID) error
 	c.log.Debug("disconnecting peer", zap.Stringer("nodeID", nodeID))
 	c.peers.Disconnected(nodeID)
 	return nil
-}
-
-// Shutdown disconnects all peers
-func (c *networkClient) Shutdown() {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	// reset peers
-	// TODO danlaine: should we call [Disconnected] on each peer?
-	c.peers = newPeerTracker(c.log)
-}
-
-func (c *networkClient) TrackBandwidth(nodeID ids.NodeID, bandwidth float64) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	c.peers.TrackBandwidth(nodeID, bandwidth)
 }
