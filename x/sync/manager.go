@@ -636,7 +636,8 @@ func (m *Manager) enqueueWork(work *workItem) {
 	// Find the middle point.
 	mid := midPoint(work.start, work.end)
 
-	if bytes.Equal(work.start, mid) {
+	// the midpoint isn't meaningfully splitting the range, so just reinsert the whole range
+	if bytes.Equal(mid, work.start) || bytes.Equal(mid, work.end) {
 		m.unprocessedWork.Insert(work)
 		return
 	}
