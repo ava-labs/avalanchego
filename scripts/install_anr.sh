@@ -14,7 +14,7 @@ AVALANCHE_PATH=$(
 # https://github.com/ava-labs/avalanche-network-runner
 GOARCH=$(go env GOARCH)
 GOOS=$(go env GOOS)
-NETWORK_RUNNER_VERSION=1.3.9
+NETWORK_RUNNER_VERSION=1.7.0
 anr_workdir=${ANR_WORKDIR:-"/tmp"}
 DOWNLOAD_PATH=${anr_workdir}/avalanche-network-runner-v${NETWORK_RUNNER_VERSION}.tar.gz
 DOWNLOAD_URL="https://github.com/ava-labs/avalanche-network-runner/releases/download/v${NETWORK_RUNNER_VERSION}/avalanche-network-runner_${NETWORK_RUNNER_VERSION}_${GOOS}_${GOARCH}.tar.gz"
