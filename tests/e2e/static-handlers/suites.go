@@ -114,7 +114,7 @@ var _ = ginkgo.Describe("[StaticHandlers]", func() {
 			uris := e2e.Env.GetURIs()
 			gomega.Expect(uris).ShouldNot(gomega.BeEmpty())
 			staticClient := avm.NewStaticClient(uris[0])
-			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultTimeout)
 			resp, err := staticClient.BuildGenesis(ctx, &avmArgs)
 			cancel()
 			gomega.Expect(err).Should(gomega.BeNil())
@@ -188,7 +188,7 @@ var _ = ginkgo.Describe("[StaticHandlers]", func() {
 		gomega.Expect(uris).ShouldNot(gomega.BeEmpty())
 
 		staticClient := api.NewStaticClient(uris[0])
-		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultTimeout)
 		resp, err := staticClient.BuildGenesis(ctx, &buildGenesisArgs)
 		cancel()
 		gomega.Expect(err).Should(gomega.BeNil())

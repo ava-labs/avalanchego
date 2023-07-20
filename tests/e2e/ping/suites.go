@@ -6,7 +6,6 @@ package ping
 
 import (
 	"context"
-	"time"
 
 	"github.com/ava-labs/avalanchego/tests/e2e"
 
@@ -30,7 +29,7 @@ var _ = ginkgo.Describe("[Ping]", func() {
 			runnerCli := e2e.Env.GetRunnerClient()
 			gomega.Expect(runnerCli).ShouldNot(gomega.BeNil())
 
-			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultTimeout)
 			_, err := runnerCli.Ping(ctx)
 			cancel()
 			gomega.Expect(err).Should(gomega.BeNil())
