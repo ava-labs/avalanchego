@@ -468,9 +468,11 @@ func (m *Manager) findNextKey(
 
 	// If the nextKey is before or equal to the [lastReceivedKey]
 	// then we couldn't find a better answer than the [lastReceivedKey].
-	// Set the nextKey to [lastReceivedKey]
+	// Set the nextKey to [lastReceivedKey] + 0, which is the first key in
+	// the open range (lastReceivedKey, rangeEnd).
 	if nextKey != nil && bytes.Compare(nextKey, lastReceivedKey) <= 0 {
 		nextKey = lastReceivedKey
+		nextKey = append(nextKey, 0)
 	}
 
 	// If the nextKey is larger than the end of the range,
