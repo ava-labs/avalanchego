@@ -30,7 +30,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/math"
-	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -89,6 +88,7 @@ var (
 	currentSupplyKey = []byte("current supply")
 	lastAcceptedKey  = []byte("last accepted")
 	initializedKey   = []byte("initialized")
+	prunedKey        = []byte("pruned")
 )
 
 // Chain collects all methods to manage the state of the chain for block
@@ -234,6 +234,7 @@ type stateBlk struct {
  * |     '-- txID -> nil
  * '-. singletons
  *   |-- initializedKey -> nil
+ *   |-- prunedKey -> nil
  *   |-- timestampKey -> timestamp
  *   |-- currentSupplyKey -> currentSupply
  *   '-- lastAcceptedKey -> lastAccepted
@@ -685,6 +686,15 @@ func (s *state) shouldInit() (bool, error) {
 
 func (s *state) doneInit() error {
 	return s.singletonDB.Put(initializedKey, nil)
+}
+
+func (s *state) shouldPrune() (bool, error) {
+	has, err := s.singletonDB.Has(prunedKey)
+	return !has, err
+}
+
+func (s *state) donePrune() error {
+	return s.singletonDB.Put(prunedKey, nil)
 }
 
 func (s *state) GetSubnets() ([]*txs.Tx, error) {
@@ -1429,7 +1439,6 @@ func (s *state) initValidatorSets() error {
 func (s *state) write(updateValidators bool, height uint64) error {
 	errs := wrappers.Errs{}
 	errs.Add(
-		s.writeBlockIDs(),
 		s.writeBlocks(),
 		s.writeCurrentStakers(updateValidators, height),
 		s.writePendingStakers(),
@@ -1568,6 +1577,14 @@ func (s *state) writeBlocks() error {
 	for blkID, blk := range s.addedBlocks {
 		blkID := blkID
 		blkBytes := blk.Bytes()
+		blkHeight := blk.Height()
+		heightKey := database.PackUInt64(blkHeight)
+
+		delete(s.addedBlockIDs, blkHeight)
+		s.blockIDCache.Put(blkHeight, blkID)
+		if err := database.PutID(s.blockIDDB, heightKey, blkID); err != nil {
+			return fmt.Errorf("failed to add blockID: %w", err)
+		}
 
 		delete(s.addedBlocks, blkID)
 		// Note: Evict is used rather than Put here because blk may end up
@@ -1614,19 +1631,6 @@ func (s *state) GetStatelessBlock(blockID ids.ID) (blocks.Block, error) {
 
 	s.blockCache.Put(blockID, blk)
 	return blk, nil
-}
-
-func (s *state) writeBlockIDs() error {
-	for height, blkID := range s.addedBlockIDs {
-		heightKey := database.PackUInt64(height)
-
-		delete(s.addedBlockIDs, height)
-		s.blockIDCache.Put(height, blkID)
-		if err := database.PutID(s.blockIDDB, heightKey, blkID); err != nil {
-			return fmt.Errorf("failed to add blockID: %w", err)
-		}
-	}
-	return nil
 }
 
 func (s *state) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
@@ -2080,16 +2084,14 @@ func parseStoredBlock(blkBytes []byte) (blocks.Block, choices.Status, bool, erro
 }
 
 func (s *state) PruneAndIndex() error {
-	lastAcceptedBlk, err := s.GetStatelessBlock(s.lastAccepted)
+	shouldPrune, err := s.shouldPrune()
 	if err != nil {
-		return fmt.Errorf("failed to get last accepted block from local disk: %w", err)
+		return fmt.Errorf(
+			"failed to check if the database should be pruned: %w",
+			err,
+		)
 	}
-
-	lastAcceptedHeight := lastAcceptedBlk.Height()
-	lastAcceptedHeightKey := database.PackUInt64(lastAcceptedHeight)
-	if _, err := database.GetID(s.blockIDDB, lastAcceptedHeightKey); err == nil {
-		// If the last accepted block is in [s.blockIDDB], we have previously
-		// run this function.
+	if !shouldPrune {
 		return nil
 	}
 
@@ -2099,13 +2101,9 @@ func (s *state) PruneAndIndex() error {
 	blockIterator := s.blockDB.NewIterator()
 	defer blockIterator.Release()
 
-	s.ctx.Log.Info("populating platformvm block height index")
-	var (
-		startTime  = time.Now()
-		lastUpdate = startTime
-	)
-
-	for indexed := uint64(0); blockIterator.Next(); {
+	s.ctx.Log.Info("starting platformvm state prune")
+	startTime := time.Now()
+	for blockIterator.Next() {
 		blkBytes := blockIterator.Value()
 
 		blk, status, isStateBlk, err := parseStoredBlock(blkBytes)
@@ -2114,10 +2112,13 @@ func (s *state) PruneAndIndex() error {
 		}
 
 		if status != choices.Accepted {
-			// We no longer persist any non-accepted blocks to disk.
+			// Remove non-accepted blocks from disk.
 			if err := s.blockDB.Delete(blockIterator.Key()); err != nil {
 				return fmt.Errorf("failed to delete block: %w", err)
 			}
+
+			// We don't index the height of non-accepted blocks.
+			continue
 		}
 
 		blkHeight := blk.Height()
@@ -2133,18 +2134,6 @@ func (s *state) PruneAndIndex() error {
 				return fmt.Errorf("failed to write block: %w", err)
 			}
 		}
-
-		indexed++
-
-		if time.Since(lastUpdate) > 5*time.Second {
-			eta := timer.EstimateETA(startTime, indexed, lastAcceptedHeight+1)
-			s.ctx.Log.Info("populating platformvm block height index",
-				zap.Uint64("progress", indexed),
-				zap.Uint64("end", lastAcceptedHeight+1),
-				zap.Duration("eta", eta),
-			)
-			lastUpdate = time.Now()
-		}
 	}
 
 	if err := s.Commit(); err != nil {
@@ -2154,5 +2143,5 @@ func (s *state) PruneAndIndex() error {
 	s.ctx.Log.Info("populated platformvm block height index",
 		zap.Duration("elapsed", time.Since(startTime)),
 	)
-	return nil
+	return s.donePrune()
 }
