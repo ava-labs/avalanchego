@@ -2539,11 +2539,6 @@ type GetValidatorsAtArgs struct {
 	SubnetID ids.ID      `json:"subnetID"`
 }
 
-// GetValidatorsAtReply is the response from GetValidatorsAt
-type GetValidatorsAtReply struct {
-	Validators map[ids.NodeID]*validators.GetValidatorOutput
-}
-
 type jsonGetValidatorOutput struct {
 	PublicKey *string     `json:"publicKey"`
 	Weight    json.Uint64 `json:"weight"`
@@ -2592,16 +2587,20 @@ func (v *GetValidatorsAtReply) UnmarshalJSON(b []byte) error {
 			if err != nil {
 				return err
 			}
-			pk, err := bls.PublicKeyFromBytes(pkBytes)
+			vdr.PublicKey, err = bls.PublicKeyFromBytes(pkBytes)
 			if err != nil {
 				return err
 			}
-			vdr.PublicKey = pk
 		}
 
 		v.Validators[nodeID] = vdr
 	}
 	return nil
+}
+
+// GetValidatorsAtReply is the response from GetValidatorsAt
+type GetValidatorsAtReply struct {
+	Validators map[ids.NodeID]*validators.GetValidatorOutput
 }
 
 // GetValidatorsAt returns the weights of the validator set of a provided subnet
