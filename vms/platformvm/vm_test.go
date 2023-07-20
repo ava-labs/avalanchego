@@ -158,11 +158,6 @@ func defaultContext(t *testing.T) *snow.Context {
 			return subnetID, nil
 		},
 	}
-
-	// NB: this lock is intentionally left locked when this function returns.
-	// The caller of this function is responsible for unlocking.
-	ctx.Lock.Lock()
-
 	return ctx
 }
 
@@ -340,6 +335,8 @@ func defaultVM(t *testing.T) (*VM, database.Database, *mutableSharedMemory) {
 	}
 	ctx.SharedMemory = msm
 
+	ctx.Lock.Lock()
+	defer ctx.Lock.Unlock()
 	_, genesisBytes := defaultGenesis(t)
 	appSender := &common.SenderTest{}
 	appSender.CantSendAppGossip = true
@@ -387,6 +384,7 @@ func defaultVM(t *testing.T) (*VM, database.Database, *mutableSharedMemory) {
 func TestGenesis(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t)
+	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
@@ -447,6 +445,7 @@ func TestGenesis(t *testing.T) {
 func TestAddValidatorCommit(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t)
+	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
@@ -492,6 +491,7 @@ func TestAddValidatorCommit(t *testing.T) {
 func TestInvalidAddValidatorCommit(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t)
+	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
@@ -545,6 +545,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 func TestAddValidatorReject(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t)
+	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
@@ -588,6 +589,7 @@ func TestAddValidatorReject(t *testing.T) {
 func TestAddValidatorInvalidNotReissued(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t)
+	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
@@ -621,6 +623,7 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 func TestAddSubnetValidatorAccept(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t)
+	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
@@ -666,6 +669,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 func TestAddSubnetValidatorReject(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t)
+	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
@@ -710,6 +714,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 func TestRewardValidatorAccept(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t)
+	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
@@ -804,6 +809,7 @@ func TestRewardValidatorAccept(t *testing.T) {
 func TestRewardValidatorReject(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t)
+	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
@@ -894,6 +900,7 @@ func TestRewardValidatorReject(t *testing.T) {
 func TestRewardValidatorPreferred(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t)
+	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
@@ -985,6 +992,7 @@ func TestRewardValidatorPreferred(t *testing.T) {
 func TestUnneededBuildBlock(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t)
+	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
@@ -997,6 +1005,7 @@ func TestUnneededBuildBlock(t *testing.T) {
 func TestCreateChain(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t)
+	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
@@ -1047,6 +1056,7 @@ func TestCreateChain(t *testing.T) {
 func TestCreateSubnet(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t)
+	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
@@ -1157,6 +1167,7 @@ func TestCreateSubnet(t *testing.T) {
 func TestAtomicImport(t *testing.T) {
 	require := require.New(t)
 	vm, baseDB, mutableSharedMemory := defaultVM(t)
+	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
@@ -1243,6 +1254,7 @@ func TestAtomicImport(t *testing.T) {
 func TestOptimisticAtomicImport(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t)
+	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
@@ -1331,6 +1343,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 
 	initialClkTime := banffForkTime.Add(time.Second)
 	firstVM.clock.Set(initialClkTime)
+	firstCtx.Lock.Lock()
 
 	firstMsgChan := make(chan common.Message, 1)
 	require.NoError(firstVM.Initialize(
@@ -1407,13 +1420,13 @@ func TestRestartFullyAccepted(t *testing.T) {
 	}}
 
 	secondCtx := defaultContext(t)
+	secondCtx.SharedMemory = msm
+	secondVM.clock.Set(initialClkTime)
+	secondCtx.Lock.Lock()
 	defer func() {
 		require.NoError(secondVM.Shutdown(context.Background()))
 		secondCtx.Lock.Unlock()
 	}()
-
-	secondCtx.SharedMemory = msm
-	secondVM.clock.Set(initialClkTime)
 
 	secondDB := db.NewPrefixDBManager([]byte{})
 	secondMsgChan := make(chan common.Message, 1)
@@ -1473,6 +1486,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	consensusCtx := snow.DefaultConsensusContextTest()
 	consensusCtx.Context = ctx
+	ctx.Lock.Lock()
 
 	msgChan := make(chan common.Message, 1)
 	require.NoError(vm.Initialize(
@@ -1782,6 +1796,7 @@ func TestUnverifiedParent(t *testing.T) {
 	initialClkTime := banffForkTime.Add(time.Second)
 	vm.clock.Set(initialClkTime)
 	ctx := defaultContext(t)
+	ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 		ctx.Lock.Unlock()
@@ -1872,6 +1887,7 @@ func TestUnverifiedParent(t *testing.T) {
 
 func TestMaxStakeAmount(t *testing.T) {
 	vm, _, _ := defaultVM(t)
+	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(t, vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
@@ -1938,6 +1954,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	}}
 
 	firstCtx := defaultContext(t)
+	firstCtx.Lock.Lock()
 
 	firstMsgChan := make(chan common.Message, 1)
 	require.NoError(firstVM.Initialize(
@@ -1978,6 +1995,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	}}
 
 	secondCtx := defaultContext(t)
+	secondCtx.Lock.Lock()
 	defer func() {
 		require.NoError(secondVM.Shutdown(context.Background()))
 		secondCtx.Lock.Unlock()
@@ -2109,10 +2127,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	}}
 
 	ctx := defaultContext(t)
-	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-		ctx.Lock.Unlock()
-	}()
+	ctx.Lock.Lock()
 
 	msgChan := make(chan common.Message, 1)
 	appSender := &common.SenderTest{T: t}
@@ -2127,6 +2142,11 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 		nil,
 		appSender,
 	))
+
+	defer func() {
+		require.NoError(vm.Shutdown(context.Background()))
+		ctx.Lock.Unlock()
+	}()
 
 	initialClkTime := banffForkTime.Add(time.Second)
 	vm.clock.Set(initialClkTime)
@@ -2201,8 +2221,11 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 
 	vm, _, _ := defaultVM(t)
+
+	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
+
 		vm.ctx.Lock.Unlock()
 	}()
 
