@@ -655,7 +655,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	// Force a reload of the state from the database.
 	vm.Config.Validators = validators.NewManager()
 	vm.Config.Validators.Add(constants.PrimaryNetworkID, validators.NewSet())
-	is, err := state.New(
+	newState, err := state.New(
 		vm.dbManager.Current().Database,
 		nil,
 		prometheus.NewRegistry(),
@@ -667,17 +667,16 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 		trackChecksum,
 	)
 	require.NoError(err)
-	vm.state = is
 
 	// Verify that new validator is now in the current validator set.
 	{
-		_, err := vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+		_, err := newState.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 		require.NoError(err)
 
-		_, err = vm.state.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
+		_, err = newState.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
 		require.ErrorIs(err, database.ErrNotFound)
 
-		currentTimestamp := vm.state.GetTimestamp()
+		currentTimestamp := newState.GetTimestamp()
 		require.Equal(newValidatorStartTime.Unix(), currentTimestamp.Unix())
 	}
 }
@@ -965,7 +964,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	// Force a reload of the state from the database.
 	vm.Config.Validators = validators.NewManager()
 	vm.Config.Validators.Add(constants.PrimaryNetworkID, validators.NewSet())
-	is, err := state.New(
+	newState, err := state.New(
 		vm.dbManager.Current().Database,
 		nil,
 		prometheus.NewRegistry(),
@@ -977,26 +976,25 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 		trackChecksum,
 	)
 	require.NoError(err)
-	vm.state = is
 
 	// Verify that validators are in the current validator set with the correct
 	// reward calculated.
 	{
-		staker0, err := vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID0)
+		staker0, err := newState.GetCurrentValidator(constants.PrimaryNetworkID, nodeID0)
 		require.NoError(err)
 		require.Equal(uint64(60000000), staker0.PotentialReward)
 
-		staker1, err := vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID1)
+		staker1, err := newState.GetCurrentValidator(constants.PrimaryNetworkID, nodeID1)
 		require.NoError(err)
 		require.Equal(uint64(59999999), staker1.PotentialReward)
 
-		_, err = vm.state.GetPendingValidator(constants.PrimaryNetworkID, nodeID0)
+		_, err = newState.GetPendingValidator(constants.PrimaryNetworkID, nodeID0)
 		require.ErrorIs(err, database.ErrNotFound)
 
-		_, err = vm.state.GetPendingValidator(constants.PrimaryNetworkID, nodeID1)
+		_, err = newState.GetPendingValidator(constants.PrimaryNetworkID, nodeID1)
 		require.ErrorIs(err, database.ErrNotFound)
 
-		currentTimestamp := vm.state.GetTimestamp()
+		currentTimestamp := newState.GetTimestamp()
 		require.Equal(newValidatorStartTime1.Unix(), currentTimestamp.Unix())
 	}
 }
