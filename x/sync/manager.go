@@ -641,9 +641,9 @@ func (m *Manager) enqueueWork(work *workItem) {
 	// Find the middle point.
 	mid := midPoint(work.start, work.end)
 
-	if bytes.Equal(work.start, mid) {
+	if bytes.Equal(work.start, mid) || bytes.Equal(mid, work.end) {
 		// The range is too small to split.
-		// If we didn't have this case we would add work items
+		// If we didn't have this check we would add work items
 		// [start, start] and [start, end]. Since start <= end, this would
 		// violate the invariant of [m.unprocessedWork] and [m.processedWork]
 		// that there are no overlapping ranges.
