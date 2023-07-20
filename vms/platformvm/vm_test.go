@@ -158,6 +158,11 @@ func defaultContext(t *testing.T) *snow.Context {
 			return subnetID, nil
 		},
 	}
+
+	// NB: this lock is intentionally left locked when this function returns.
+	// The caller of this function is responsible for unlocking.
+	ctx.Lock.Lock()
+
 	return ctx
 }
 
@@ -335,9 +340,6 @@ func defaultVM(t *testing.T) (*VM, database.Database, *mutableSharedMemory) {
 	}
 	ctx.SharedMemory = msm
 
-	// NB: this lock is intentionally left locked when this function returns.
-	// The caller of this function is responsible for unlocking.
-	ctx.Lock.Lock()
 	_, genesisBytes := defaultGenesis(t)
 	appSender := &common.SenderTest{}
 	appSender.CantSendAppGossip = true
@@ -1329,7 +1331,6 @@ func TestRestartFullyAccepted(t *testing.T) {
 
 	initialClkTime := banffForkTime.Add(time.Second)
 	firstVM.clock.Set(initialClkTime)
-	firstCtx.Lock.Lock()
 
 	firstMsgChan := make(chan common.Message, 1)
 	require.NoError(firstVM.Initialize(
@@ -1406,13 +1407,13 @@ func TestRestartFullyAccepted(t *testing.T) {
 	}}
 
 	secondCtx := defaultContext(t)
-	secondCtx.SharedMemory = msm
-	secondVM.clock.Set(initialClkTime)
-	secondCtx.Lock.Lock()
 	defer func() {
 		require.NoError(secondVM.Shutdown(context.Background()))
 		secondCtx.Lock.Unlock()
 	}()
+
+	secondCtx.SharedMemory = msm
+	secondVM.clock.Set(initialClkTime)
 
 	secondDB := db.NewPrefixDBManager([]byte{})
 	secondMsgChan := make(chan common.Message, 1)
@@ -1472,7 +1473,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	consensusCtx := snow.DefaultConsensusContextTest()
 	consensusCtx.Context = ctx
-	ctx.Lock.Lock()
 
 	msgChan := make(chan common.Message, 1)
 	require.NoError(vm.Initialize(
@@ -1782,7 +1782,6 @@ func TestUnverifiedParent(t *testing.T) {
 	initialClkTime := banffForkTime.Add(time.Second)
 	vm.clock.Set(initialClkTime)
 	ctx := defaultContext(t)
-	ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 		ctx.Lock.Unlock()
@@ -1939,7 +1938,6 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	}}
 
 	firstCtx := defaultContext(t)
-	firstCtx.Lock.Lock()
 
 	firstMsgChan := make(chan common.Message, 1)
 	require.NoError(firstVM.Initialize(
@@ -1980,7 +1978,6 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	}}
 
 	secondCtx := defaultContext(t)
-	secondCtx.Lock.Lock()
 	defer func() {
 		require.NoError(secondVM.Shutdown(context.Background()))
 		secondCtx.Lock.Unlock()
@@ -2112,7 +2109,10 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	}}
 
 	ctx := defaultContext(t)
-	ctx.Lock.Lock()
+	defer func() {
+		require.NoError(vm.Shutdown(context.Background()))
+		ctx.Lock.Unlock()
+	}()
 
 	msgChan := make(chan common.Message, 1)
 	appSender := &common.SenderTest{T: t}
@@ -2127,11 +2127,6 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 		nil,
 		appSender,
 	))
-
-	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
-		ctx.Lock.Unlock()
-	}()
 
 	initialClkTime := banffForkTime.Add(time.Second)
 	vm.clock.Set(initialClkTime)

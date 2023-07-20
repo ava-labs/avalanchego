@@ -357,7 +357,6 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 	}}
 
 	ctx := defaultContext(t)
-	ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 		ctx.Lock.Unlock()

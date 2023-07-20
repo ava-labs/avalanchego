@@ -740,12 +740,11 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 
 	msgChan := make(chan common.Message, 1)
 	ctx := defaultContext(t)
+	defer ctx.Lock.Unlock()
 
 	m := atomic.NewMemory(atomicDB)
 	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
 
-	ctx.Lock.Lock()
-	defer ctx.Lock.Unlock()
 	appSender := &common.SenderTest{}
 	appSender.CantSendAppGossip = true
 	appSender.SendAppGossipF = func(context.Context, []byte) error {
