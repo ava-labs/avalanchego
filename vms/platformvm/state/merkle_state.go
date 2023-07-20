@@ -31,6 +31,8 @@ import (
 const (
 	HistoryLength = int(256)    // from HyperSDK
 	NodeCacheSize = int(65_536) // from HyperSDK
+
+	utxoCacheSize = 8192 // from avax/utxo_state.go
 )
 
 var (
@@ -38,19 +40,22 @@ var (
 
 	errNotYetImplemented = errors.New("not yet implemented")
 
-	merkleStatePrefix = []byte{0x0}
-	merkleBlockPrefix = []byte{0x1}
-	merkleTxPrefix    = []byte{0x2}
+	merkleStatePrefix      = []byte{0x0}
+	merkleBlockPrefix      = []byte{0x1}
+	merkleTxPrefix         = []byte{0x2}
+	merkleIndexUTXOsPrefix = []byte{0x3} // to serve UTXOIDs(addr)
 
 	// merkle db sections
-	metadataSectionPrefix      = []byte("m")
-	merkleChainTimeKey         = append(metadataSectionPrefix, []byte("t")...)
-	merkleLastAcceptedBlkIDKey = append(metadataSectionPrefix, []byte("b")...)
-	merkleSuppliesPrefix       = append(metadataSectionPrefix, []byte("s")...)
+	metadataSectionPrefix      = []byte{0x0}
+	merkleChainTimeKey         = append(metadataSectionPrefix, []byte{0x0}...)
+	merkleLastAcceptedBlkIDKey = append(metadataSectionPrefix, []byte{0x1}...)
+	merkleSuppliesPrefix       = append(metadataSectionPrefix, []byte{0x2}...)
 
-	permissionedSubnetSectionPrefix = []byte("s")
-	elasticSubnetSectionPrefix      = []byte("e")
-	chainsSectionPrefix             = []byte("c")
+	permissionedSubnetSectionPrefix = []byte{0x1}
+	elasticSubnetSectionPrefix      = []byte{0x2}
+	chainsSectionPrefix             = []byte{0x3}
+	utxosSectionPrefix              = []byte{0x4}
+	rewardUtxosSectionPrefix        = []byte{0x5}
 )
 
 func NewMerkleState(
@@ -58,10 +63,11 @@ func NewMerkleState(
 	metricsReg prometheus.Registerer,
 ) (Chain, error) {
 	var (
-		baseDB       = versiondb.New(rawDB)
-		baseMerkleDB = prefixdb.New(merkleStatePrefix, baseDB)
-		blockDB      = prefixdb.New(merkleBlockPrefix, baseDB)
-		txDB         = prefixdb.New(merkleTxPrefix, baseDB)
+		baseDB         = versiondb.New(rawDB)
+		baseMerkleDB   = prefixdb.New(merkleStatePrefix, baseDB)
+		blockDB        = prefixdb.New(merkleBlockPrefix, baseDB)
+		txDB           = prefixdb.New(merkleTxPrefix, baseDB)
+		indexedUTXOsDB = prefixdb.New(merkleIndexUTXOsPrefix, baseDB)
 	)
 
 	ctx := context.TODO()
@@ -78,6 +84,15 @@ func NewMerkleState(
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed creating merkleDB: %w", err)
+	}
+
+	rewardUTXOsCache, err := metercacher.New[ids.ID, []*avax.UTXO](
+		"reward_utxos_cache",
+		metricsReg,
+		&cache.LRU[ids.ID, []*avax.UTXO]{Size: rewardUTXOsCacheSize},
+	)
+	if err != nil {
+		return nil, err
 	}
 
 	suppliesCache, err := metercacher.New[ids.ID, *uint64](
@@ -126,17 +141,20 @@ func NewMerkleState(
 	}
 
 	res := &merkleState{
-		baseDB:       baseDB,
-		baseMerkleDB: baseMerkleDB,
-		merkleDB:     merkleDB,
-		blockDB:      blockDB,
-		txDB:         txDB,
+		baseDB:         baseDB,
+		baseMerkleDB:   baseMerkleDB,
+		merkleDB:       merkleDB,
+		blockDB:        blockDB,
+		txDB:           txDB,
+		indexedUTXOsDB: indexedUTXOsDB,
 
 		currentStakers: newBaseStakers(),
 		pendingStakers: newBaseStakers(),
 
-		ordinaryUTXOs: make(map[ids.ID]*avax.UTXO),
-		rewardUTXOs:   make(map[ids.ID][]*avax.UTXO),
+		modifiedUTXOs:    make(map[ids.ID]*avax.UTXO),
+		utxoCache:        &cache.LRU[ids.ID, *avax.UTXO]{Size: utxoCacheSize},
+		addedRewardUTXOs: make(map[ids.ID][]*avax.UTXO),
+		rewardUTXOsCache: rewardUTXOsCache,
 
 		supplies:      make(map[ids.ID]uint64),
 		suppliesCache: suppliesCache,
@@ -159,11 +177,12 @@ func NewMerkleState(
 }
 
 type merkleState struct {
-	baseDB       *versiondb.Database
-	baseMerkleDB database.Database
-	merkleDB     merkledb.MerkleDB // meklelized state
-	blockDB      database.Database
-	txDB         database.Database
+	baseDB         *versiondb.Database
+	baseMerkleDB   database.Database
+	merkleDB       merkledb.MerkleDB // meklelized state
+	blockDB        database.Database
+	txDB           database.Database
+	indexedUTXOsDB database.Database
 
 	// stakers section (missing Delegatee piece)
 	// TODO: Consider moving delegatee to UTXOs section
@@ -171,8 +190,11 @@ type merkleState struct {
 	pendingStakers *baseStakers
 
 	// UTXOs section
-	ordinaryUTXOs map[ids.ID]*avax.UTXO   // map of UTXO ID -> *UTXO
-	rewardUTXOs   map[ids.ID][]*avax.UTXO // map of txID -> []*UTXO
+	modifiedUTXOs map[ids.ID]*avax.UTXO            // map of UTXO ID -> *UTXO
+	utxoCache     cache.Cacher[ids.ID, *avax.UTXO] // UTXO ID -> *UTXO. If the *UTXO is nil the UTXO doesn't exist
+
+	addedRewardUTXOs map[ids.ID][]*avax.UTXO            // map of txID -> []*UTXO
+	rewardUTXOsCache cache.Cacher[ids.ID, []*avax.UTXO] // txID -> []*UTXO
 
 	// Metadata section
 	chainTime          time.Time
@@ -269,37 +291,107 @@ func (*merkleState) SetDelegateeReward( /*subnetID*/ ids.ID /*vdrID*/, ids.NodeI
 
 // UTXOs section
 func (ms *merkleState) GetUTXO(utxoID ids.ID) (*avax.UTXO, error) {
-	if utxo, exists := ms.ordinaryUTXOs[utxoID]; exists {
+	if utxo, exists := ms.modifiedUTXOs[utxoID]; exists {
 		if utxo == nil {
 			return nil, database.ErrNotFound
 		}
 		return utxo, nil
 	}
-	return nil, fmt.Errorf("utxos not stored: %w", errNotYetImplemented)
+	if utxo, found := ms.utxoCache.Get(utxoID); found {
+		if utxo == nil {
+			return nil, database.ErrNotFound
+		}
+		return utxo, nil
+	}
+
+	key := make([]byte, 0, len(utxosSectionPrefix)+len(utxoID))
+	copy(key, utxosSectionPrefix)
+	key = append(key, utxoID[:]...)
+
+	switch bytes, err := ms.merkleDB.Get(key); err {
+	case nil:
+		utxo := &avax.UTXO{}
+		if _, err := txs.GenesisCodec.Unmarshal(bytes, utxo); err != nil {
+			return nil, err
+		}
+		ms.utxoCache.Put(utxoID, utxo)
+		return utxo, nil
+
+	case database.ErrNotFound:
+		ms.utxoCache.Put(utxoID, nil)
+		return nil, database.ErrNotFound
+
+	default:
+		return nil, err
+	}
 }
 
-func (*merkleState) UTXOIDs( /*addr*/ []byte /*start*/, ids.ID /*limit*/, int) ([]ids.ID, error) {
-	return nil, fmt.Errorf("utxos iteration not yet implemented: %w", errNotYetImplemented)
+func (ms *merkleState) UTXOIDs(addr []byte, start ids.ID, limit int) ([]ids.ID, error) {
+	startKey := make([]byte, 0, len(addr)+len(start))
+	copy(startKey, addr)
+	startKey = append(startKey, start[:]...)
+
+	iter := ms.indexedUTXOsDB.NewIteratorWithStart(startKey)
+	defer iter.Release()
+
+	utxoIDs := []ids.ID(nil)
+	for len(utxoIDs) < limit && iter.Next() {
+		utxoID, err := ids.ToID(iter.Key())
+		if err != nil {
+			return nil, err
+		}
+		if utxoID == start {
+			continue
+		}
+
+		start = ids.Empty
+		utxoIDs = append(utxoIDs, utxoID)
+	}
+	return utxoIDs, iter.Error()
 }
 
 func (ms *merkleState) AddUTXO(utxo *avax.UTXO) {
-	ms.ordinaryUTXOs[utxo.InputID()] = utxo
+	ms.modifiedUTXOs[utxo.InputID()] = utxo
 }
 
 func (ms *merkleState) DeleteUTXO(utxoID ids.ID) {
-	ms.ordinaryUTXOs[utxoID] = nil
+	ms.modifiedUTXOs[utxoID] = nil
 }
 
 func (ms *merkleState) GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error) {
-	if utxos, exists := ms.rewardUTXOs[txID]; exists {
+	if utxos, exists := ms.addedRewardUTXOs[txID]; exists {
+		return utxos, nil
+	}
+	if utxos, exists := ms.rewardUTXOsCache.Get(txID); exists {
 		return utxos, nil
 	}
 
-	return nil, fmt.Errorf("reward utxos not stored: %w", errNotYetImplemented)
+	utxos := make([]*avax.UTXO, 0)
+
+	prefix := make([]byte, 0, len(rewardUtxosSectionPrefix)+len(txID))
+	copy(prefix, rewardUtxosSectionPrefix)
+	prefix = append(prefix, txID[:]...)
+
+	it := ms.merkleDB.NewIteratorWithPrefix(prefix)
+	defer it.Release()
+
+	for it.Next() {
+		utxo := &avax.UTXO{}
+		if _, err := txs.Codec.Unmarshal(it.Value(), utxo); err != nil {
+			return nil, err
+		}
+		utxos = append(utxos, utxo)
+	}
+	if err := it.Error(); err != nil {
+		return nil, err
+	}
+
+	ms.rewardUTXOsCache.Put(txID, utxos)
+	return utxos, nil
 }
 
 func (ms *merkleState) AddRewardUTXO(txID ids.ID, utxo *avax.UTXO) {
-	ms.rewardUTXOs[txID] = append(ms.rewardUTXOs[txID], utxo)
+	ms.addedRewardUTXOs[txID] = append(ms.addedRewardUTXOs[txID], utxo)
 }
 
 // METADATA Section
@@ -328,8 +420,34 @@ func (ms *merkleState) GetCurrentSupply(subnetID ids.ID) (uint64, error) {
 	if ok {
 		return supply, nil
 	}
+	cachedSupply, ok := ms.suppliesCache.Get(subnetID)
+	if ok {
+		if cachedSupply == nil {
+			return 0, database.ErrNotFound
+		}
+		return *cachedSupply, nil
+	}
 
-	return supply, fmt.Errorf("supply not stored: %w", errNotYetImplemented)
+	key := make([]byte, 0, len(merkleSuppliesPrefix)+len(subnetID[:]))
+	copy(key, merkleSuppliesPrefix)
+	key = append(key, subnetID[:]...)
+
+	switch supplyBytes, err := ms.merkleDB.Get(key); err {
+	case nil:
+		supply, err := database.ParseUInt64(supplyBytes)
+		if err != nil {
+			return 0, fmt.Errorf("failed parsing supply: %w", err)
+		}
+		ms.suppliesCache.Put(subnetID, &supply)
+		return supply, nil
+
+	case database.ErrNotFound:
+		ms.suppliesCache.Put(subnetID, nil)
+		return 0, database.ErrNotFound
+
+	default:
+		return 0, err
+	}
 }
 
 func (ms *merkleState) SetCurrentSupply(subnetID ids.ID, cs uint64) {
@@ -629,6 +747,8 @@ func (ms *merkleState) writeMerkleState() error {
 		ms.writePermissionedSubnets(view, ctx),
 		ms.writeElasticSubnets(view, ctx),
 		ms.writeChains(view, ctx),
+		ms.writeUTXOs(view, ctx),
+		ms.writeRewardUTXOs(view, ctx),
 	)
 	if errs.Err != nil {
 		return err
@@ -702,12 +822,15 @@ func (ms *merkleState) writeElasticSubnets(view merkledb.TrieView, ctx context.C
 
 func (ms *merkleState) writeChains(view merkledb.TrieView, ctx context.Context) error {
 	for subnetID, chains := range ms.addedChains {
+		prefixKey := make([]byte, 0, len(chainsSectionPrefix)+len(subnetID[:]))
+		copy(prefixKey, chainsSectionPrefix)
+		prefixKey = append(prefixKey, subnetID[:]...)
+
 		for _, chainTx := range chains {
 			chainID := chainTx.ID()
 
-			key := make([]byte, 0, len(chainsSectionPrefix)+len(subnetID[:]))
-			copy(key, chainsSectionPrefix)
-			key = append(key, subnetID[:]...)
+			key := make([]byte, 0, len(prefixKey)+len(chainID))
+			copy(key, prefixKey)
 			key = append(key, chainID[:]...)
 
 			if err := view.Insert(ctx, key, chainTx.Bytes()); err != nil {
@@ -715,6 +838,82 @@ func (ms *merkleState) writeChains(view merkledb.TrieView, ctx context.Context) 
 			}
 		}
 		delete(ms.addedChains, subnetID)
+	}
+	return nil
+}
+
+func (ms *merkleState) writeUTXOs(view merkledb.TrieView, ctx context.Context) error {
+	for utxoID, utxo := range ms.modifiedUTXOs {
+		delete(ms.modifiedUTXOs, utxoID)
+
+		key := make([]byte, 0, len(utxosSectionPrefix)+len(utxoID))
+		copy(key, utxosSectionPrefix)
+		key = append(key, utxoID[:]...)
+
+		if utxo == nil { // delete the UTXO
+			switch _, err := ms.GetUTXO(utxoID); err {
+			case nil:
+				ms.utxoCache.Put(utxoID, nil)
+				if err := view.Remove(ctx, key); err != nil {
+					return err
+				}
+
+				// store the index
+				if err := ms.writeUTXOsIndex(utxo, false /*insertUtxo*/); err != nil {
+					return err
+				}
+
+			case database.ErrNotFound:
+				return nil
+
+			default:
+				return err
+			}
+			continue
+		}
+
+		// insert the UTXO
+		utxoBytes, err := txs.GenesisCodec.Marshal(txs.Version, utxo)
+		if err != nil {
+			return err
+		}
+		if err := view.Insert(ctx, key, utxoBytes); err != nil {
+			return err
+		}
+
+		// store the index
+		if err := ms.writeUTXOsIndex(utxo, true /*insertUtxo*/); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (ms *merkleState) writeRewardUTXOs(view merkledb.TrieView, ctx context.Context) error {
+	for txID, utxos := range ms.addedRewardUTXOs {
+		delete(ms.addedRewardUTXOs, txID)
+		ms.rewardUTXOsCache.Put(txID, utxos)
+
+		prefix := make([]byte, 0, len(rewardUtxosSectionPrefix)+len(txID))
+		copy(prefix, rewardUtxosSectionPrefix)
+		prefix = append(prefix, txID[:]...)
+
+		for _, utxo := range utxos {
+			utxoID := utxo.InputID()
+
+			key := make([]byte, 0, len(prefix)+len(utxoID))
+			copy(key, prefix)
+			key = append(key, utxoID[:]...)
+
+			utxoBytes, err := txs.GenesisCodec.Marshal(txs.Version, utxo)
+			if err != nil {
+				return fmt.Errorf("failed to serialize reward UTXO: %w", err)
+			}
+
+			if err := view.Insert(ctx, key, utxoBytes); err != nil {
+				return fmt.Errorf("failed to add reward UTXO: %w", err)
+			}
+		}
 	}
 	return nil
 }
@@ -759,6 +958,32 @@ func (ms *merkleState) writeTXs() error {
 		ms.txCache.Evict(txID)
 		if err := ms.txDB.Put(txID[:], txBytes); err != nil {
 			return fmt.Errorf("failed to add tx: %w", err)
+		}
+	}
+	return nil
+}
+
+func (ms *merkleState) writeUTXOsIndex(utxo *avax.UTXO, insertUtxo bool) error {
+	utxoID := utxo.InputID()
+	addressable, ok := utxo.Out.(avax.Addressable)
+	if !ok {
+		return nil
+	}
+	addresses := addressable.Addresses()
+
+	for _, addr := range addresses {
+		key := make([]byte, 0, len(addr)+len(utxoID))
+		copy(key, addr)
+		key = append(key, utxoID[:]...)
+
+		if insertUtxo {
+			if err := ms.indexedUTXOsDB.Put(key, nil); err != nil {
+				return err
+			}
+		} else {
+			if err := ms.indexedUTXOsDB.Delete(key); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
