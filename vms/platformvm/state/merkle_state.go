@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
@@ -44,6 +45,7 @@ var (
 	merkleBlockPrefix      = []byte{0x1}
 	merkleTxPrefix         = []byte{0x2}
 	merkleIndexUTXOsPrefix = []byte{0x3} // to serve UTXOIDs(addr)
+	merkleUptimesPrefix    = []byte{0x4}
 
 	// merkle db sections
 	metadataSectionPrefix      = []byte{0x0}
@@ -68,6 +70,7 @@ func NewMerkleState(
 		blockDB        = prefixdb.New(merkleBlockPrefix, baseDB)
 		txDB           = prefixdb.New(merkleTxPrefix, baseDB)
 		indexedUTXOsDB = prefixdb.New(merkleIndexUTXOsPrefix, baseDB)
+		localUptimesDB = prefixdb.New(merkleUptimesPrefix, baseDB)
 	)
 
 	ctx := context.TODO()
@@ -141,12 +144,9 @@ func NewMerkleState(
 	}
 
 	res := &merkleState{
-		baseDB:         baseDB,
-		baseMerkleDB:   baseMerkleDB,
-		merkleDB:       merkleDB,
-		blockDB:        blockDB,
-		txDB:           txDB,
-		indexedUTXOsDB: indexedUTXOsDB,
+		baseDB:       baseDB,
+		baseMerkleDB: baseMerkleDB,
+		merkleDB:     merkleDB,
 
 		currentStakers: newBaseStakers(),
 		pendingStakers: newBaseStakers(),
@@ -169,20 +169,25 @@ func NewMerkleState(
 
 		addedTxs: make(map[ids.ID]*txAndStatus),
 		txCache:  txCache,
+		txDB:     txDB,
 
 		addedBlocks: make(map[ids.ID]blocks.Block),
 		blockCache:  blockCache,
+		blockDB:     blockDB,
+
+		indexedUTXOsDB: indexedUTXOsDB,
+
+		localUptimesCache:    make(map[ids.NodeID]map[ids.ID]*uptimes),
+		modifiedLocalUptimes: make(map[ids.NodeID]set.Set[ids.ID]),
+		localUptimesDB:       localUptimesDB,
 	}
 	return res, nil
 }
 
 type merkleState struct {
-	baseDB         *versiondb.Database
-	baseMerkleDB   database.Database
-	merkleDB       merkledb.MerkleDB // meklelized state
-	blockDB        database.Database
-	txDB           database.Database
-	indexedUTXOsDB database.Database
+	baseDB       *versiondb.Database
+	baseMerkleDB database.Database
+	merkleDB     merkledb.MerkleDB // meklelized state
 
 	// stakers section (missing Delegatee piece)
 	// TODO: Consider moving delegatee to UTXOs section
@@ -218,10 +223,26 @@ type merkleState struct {
 	// a limited windows to support APIs
 	addedTxs map[ids.ID]*txAndStatus            // map of txID -> {*txs.Tx, Status}
 	txCache  cache.Cacher[ids.ID, *txAndStatus] // txID -> {*txs.Tx, Status}. If the entry is nil, it isn't in the database
+	txDB     database.Database
 
 	// Blocks section
 	addedBlocks map[ids.ID]blocks.Block            // map of blockID -> Block
 	blockCache  cache.Cacher[ids.ID, blocks.Block] // cache of blockID -> Block. If the entry is nil, it is not in the database
+	blockDB     database.Database
+
+	indexedUTXOsDB database.Database
+
+	localUptimesCache    map[ids.NodeID]map[ids.ID]*uptimes // vdrID -> subnetID -> metadata
+	modifiedLocalUptimes map[ids.NodeID]set.Set[ids.ID]     // vdrID -> subnetIDs
+	localUptimesDB       database.Database
+}
+
+type uptimes struct {
+	Duration    time.Duration `serialize:"true"`
+	LastUpdated uint64        `serialize:"true"` // Unix time in seconds
+
+	// txID        ids.ID // TODO ABENEGIA: is it needed by delegators and not validators?
+	lastUpdated time.Time
 }
 
 // STAKERS section
@@ -651,32 +672,66 @@ func (ms *merkleState) AddStatelessBlock(block blocks.Block) {
 }
 
 // UPTIMES SECTION
-func (*merkleState) GetUptime(
-	/*nodeID*/ ids.NodeID,
-	/*subnetID*/ ids.ID,
-) (upDuration time.Duration, lastUpdated time.Time, err error) {
-	return 0, time.Time{}, fmt.Errorf("MerkleDB GetUptime: %w", errNotYetImplemented)
+func (ms *merkleState) GetUptime(vdrID ids.NodeID, subnetID ids.ID) (upDuration time.Duration, lastUpdated time.Time, err error) {
+	nodeUptimes, exists := ms.localUptimesCache[vdrID]
+	if !exists {
+		return 0, time.Time{}, database.ErrNotFound
+	}
+	uptime, exists := nodeUptimes[subnetID]
+	if !exists {
+		return 0, time.Time{}, database.ErrNotFound
+	}
+
+	return uptime.Duration, uptime.lastUpdated, nil
 }
 
-func (*merkleState) SetUptime(
-	/*nodeID*/ ids.NodeID,
-	/*subnetID*/ ids.ID,
-	/*upDuration*/ time.Duration,
-	/*lastUpdated*/ time.Time,
-) error {
-	return fmt.Errorf("MerkleDB SetUptime: %w", errNotYetImplemented)
+func (ms *merkleState) SetUptime(vdrID ids.NodeID, subnetID ids.ID, upDuration time.Duration, lastUpdated time.Time) error {
+	nodeUptimes, exists := ms.localUptimesCache[vdrID]
+	if !exists {
+		nodeUptimes = map[ids.ID]*uptimes{}
+		ms.localUptimesCache[vdrID] = nodeUptimes
+	}
+
+	nodeUptimes[subnetID].Duration = upDuration
+	nodeUptimes[subnetID].lastUpdated = lastUpdated
+
+	// track diff
+	updatedNodeUptimes, ok := ms.modifiedLocalUptimes[vdrID]
+	if !ok {
+		updatedNodeUptimes = set.Set[ids.ID]{}
+		ms.modifiedLocalUptimes[vdrID] = updatedNodeUptimes
+	}
+	updatedNodeUptimes.Add(subnetID)
+	return nil
 }
 
-func (*merkleState) GetStartTime(
-	/*nodeID*/ ids.NodeID,
-	/*subnetID*/ ids.ID,
-) (startTime time.Time, err error) {
-	return time.Time{}, fmt.Errorf("MerkleDB GetStartTime: %w", errNotYetImplemented)
+func (ms *merkleState) GetStartTime(nodeID ids.NodeID, subnetID ids.ID) (time.Time, error) {
+	staker, err := ms.currentStakers.GetValidator(subnetID, nodeID)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return staker.StartTime, nil
 }
 
 // VALIDATORS Section
-func (*merkleState) ValidatorSet( /*subnetID*/ ids.ID /*vdrs*/, validators.Set) error {
-	return fmt.Errorf("MerkleDB ValidatorSet: %w", errNotYetImplemented)
+func (ms *merkleState) ValidatorSet(subnetID ids.ID, vdrs validators.Set) error {
+	for nodeID, validator := range ms.currentStakers.validators[subnetID] {
+		staker := validator.validator
+		if err := vdrs.Add(nodeID, staker.PublicKey, staker.TxID, staker.Weight); err != nil {
+			return err
+		}
+
+		delegatorIterator := NewTreeIterator(validator.delegators)
+		for delegatorIterator.Next() {
+			staker := delegatorIterator.Value()
+			if err := vdrs.AddWeight(nodeID, staker.Weight); err != nil {
+				delegatorIterator.Release()
+				return err
+			}
+		}
+		delegatorIterator.Release()
+	}
+	return nil
 }
 
 func (*merkleState) GetValidatorWeightDiffs( /*height*/ uint64 /*subnetID*/, ids.ID) (map[ids.NodeID]*ValidatorWeightDiff, error) {
@@ -704,7 +759,7 @@ func (ms *merkleState) Commit() error {
 func (ms *merkleState) CommitBatch() (database.Batch, error) {
 	// updateValidators is set to true here so that the validator manager is
 	// kept up to date with the last accepted state.
-	if err := ms.write(true /*=updateValidators*/, ms.lastAcceptedHeight); err != nil {
+	if err := ms.write(true /*updateValidators*/, ms.lastAcceptedHeight); err != nil {
 		return nil, err
 	}
 	return ms.baseDB.CommitBatch()
@@ -717,6 +772,9 @@ func (*merkleState) Checksum() ids.ID {
 func (ms *merkleState) Close() error {
 	errs := wrappers.Errs{}
 	errs.Add(
+		ms.localUptimesDB.Close(),
+		ms.indexedUTXOsDB.Close(),
+		ms.txDB.Close(),
 		ms.blockDB.Close(),
 		ms.merkleDB.Close(),
 		ms.baseMerkleDB.Close(),
@@ -730,6 +788,7 @@ func (ms *merkleState) write( /*updateValidators*/ bool /*height*/, uint64) erro
 		ms.writeMerkleState(),
 		ms.writeBlocks(),
 		ms.writeTXs(),
+		ms.writelocalUptimes(),
 	)
 	return errs.Err
 }
@@ -985,6 +1044,29 @@ func (ms *merkleState) writeUTXOsIndex(utxo *avax.UTXO, insertUtxo bool) error {
 				return err
 			}
 		}
+	}
+	return nil
+}
+
+func (ms *merkleState) writelocalUptimes() error {
+	for vdrID, updatedSubnets := range ms.modifiedLocalUptimes {
+		for subnetID := range updatedSubnets {
+			key := make([]byte, 0, len(vdrID)+len(subnetID))
+			copy(key, vdrID[:])
+			key = append(key, subnetID[:]...)
+
+			uptimes := ms.localUptimesCache[vdrID][subnetID]
+			uptimes.LastUpdated = uint64(uptimes.lastUpdated.Unix())
+			uptimeBytes, err := txs.GenesisCodec.Marshal(txs.Version, uptimes)
+			if err != nil {
+				return err
+			}
+
+			if err := ms.localUptimesDB.Put(key, uptimeBytes); err != nil {
+				return fmt.Errorf("failed to add local uptimes: %w", err)
+			}
+		}
+		delete(ms.modifiedLocalUptimes, vdrID)
 	}
 	return nil
 }
