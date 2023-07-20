@@ -58,9 +58,10 @@ upstream.
 
 ## Termimology
 
-* `Revision` - A point-in-time state/version of the trie. This represents the entire
-  trie, including all `Key`/`Value`s at that point in time, and all `Node`s.
-* `View` - This is a synonym for a `Revision`.
+* `Revision` - A historical point-in-time state/version of the trie. This
+   represents the entire trie, including all `Key`/`Value`s at that point
+   in time, and all `Node`s.
+* `View` - This is the interface to read from a `Revision` or a `Proposal`.
 * `Node` - A node is a portion of a trie. A trie consists of nodes that are linked
   together. Nodes can point to other nodes and/or contain `Key`/`Value` pairs.
 * `Hash` - In this context, this refers to the merkle hash for a specific node.
