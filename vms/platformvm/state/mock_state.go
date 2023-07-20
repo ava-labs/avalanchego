@@ -9,12 +9,14 @@ package state
 
 import (
 	reflect "reflect"
+	sync "sync"
 	time "time"
 
 	database "github.com/ava-labs/avalanchego/database"
 	ids "github.com/ava-labs/avalanchego/ids"
 	validators "github.com/ava-labs/avalanchego/snow/validators"
 	bls "github.com/ava-labs/avalanchego/utils/crypto/bls"
+	logging "github.com/ava-labs/avalanchego/utils/logging"
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
 	blocks "github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	status "github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -589,17 +591,17 @@ func (mr *MockStateMockRecorder) GetValidatorWeightDiffs(arg0, arg1 interface{})
 }
 
 // PruneAndIndex mocks base method.
-func (m *MockState) PruneAndIndex() error {
+func (m *MockState) PruneAndIndex(arg0 sync.Locker, arg1 logging.Logger) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PruneAndIndex")
+	ret := m.ctrl.Call(m, "PruneAndIndex", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // PruneAndIndex indicates an expected call of PruneAndIndex.
-func (mr *MockStateMockRecorder) PruneAndIndex() *gomock.Call {
+func (mr *MockStateMockRecorder) PruneAndIndex(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PruneAndIndex", reflect.TypeOf((*MockState)(nil).PruneAndIndex))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PruneAndIndex", reflect.TypeOf((*MockState)(nil).PruneAndIndex), arg0, arg1)
 }
 
 // PutCurrentDelegator mocks base method.

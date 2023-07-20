@@ -6,6 +6,7 @@ package state
 import (
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/google/btree"
@@ -29,6 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -160,7 +162,7 @@ type State interface {
 	// by height.
 	//
 	// TODO: remove after v1.11.x is activated
-	PruneAndIndex() error
+	PruneAndIndex(sync.Locker, logging.Logger) error
 
 	// Commit changes to the base database.
 	Commit() error
@@ -2088,8 +2090,8 @@ func parseStoredBlock(blkBytes []byte) (blocks.Block, choices.Status, bool, erro
 	return blkState.Blk, blkState.Status, true, nil
 }
 
-func (s *state) PruneAndIndex() error {
-	s.ctx.Lock.Lock()
+func (s *state) PruneAndIndex(lock sync.Locker, log logging.Logger) error {
+	lock.Lock()
 	// We use a singleton to check if this method has been run before.
 	shouldPrune, err := s.shouldPrune()
 	if err != nil {
@@ -2119,9 +2121,9 @@ func (s *state) PruneAndIndex() error {
 	// Note: If an unexpected error occurs the caches are never re-enabled.
 	// That's fine as the node is going to be in an unhealthy state regardless.
 	s.blockIDCache = &cache.Empty[uint64, ids.ID]{}
-	s.ctx.Lock.Unlock()
+	lock.Unlock()
 
-	s.ctx.Log.Info("starting state pruning and indexing")
+	log.Info("starting state pruning and indexing")
 
 	startTime := time.Now()
 	lastCommit := startTime
@@ -2169,13 +2171,13 @@ func (s *state) PruneAndIndex() error {
 			// We must hold the lock during committing to make sure we don't
 			// attempt to commit to disk while a block is concurrently being
 			// accepted.
-			s.ctx.Lock.Lock()
+			lock.Lock()
 			errs := wrappers.Errs{}
 			errs.Add(
 				s.Commit(),
 				blockIterator.Error(),
 			)
-			s.ctx.Lock.Unlock()
+			lock.Unlock()
 			if errs.Errored() {
 				return errs.Err
 			}
@@ -2188,7 +2190,7 @@ func (s *state) PruneAndIndex() error {
 			if now.Sub(lastUpdate) > pruneUpdateFrequency {
 				lastUpdate = now
 
-				s.ctx.Log.Info("committing state pruning",
+				log.Info("committing state pruning",
 					zap.Int("numPruned", numPruned),
 				)
 			}
@@ -2218,8 +2220,8 @@ func (s *state) PruneAndIndex() error {
 	// We must hold the lock during committing to make sure we don't
 	// attempt to commit to disk while a block is concurrently being
 	// accepted.
-	s.ctx.Lock.Lock()
-	defer s.ctx.Lock.Unlock()
+	lock.Lock()
+	defer lock.Unlock()
 
 	errs := wrappers.Errs{}
 	errs.Add(
@@ -2227,7 +2229,7 @@ func (s *state) PruneAndIndex() error {
 		blockIterator.Error(),
 	)
 
-	s.ctx.Log.Info("finished state pruning and indexing",
+	log.Info("finished state pruning and indexing",
 		zap.Int("numPruned", numPruned),
 		zap.Duration("duration", time.Since(startTime)),
 	)

@@ -226,7 +226,7 @@ func (vm *VM) Initialize(
 	}
 
 	go func() {
-		err := vm.state.PruneAndIndex()
+		err := vm.state.PruneAndIndex(&vm.ctx.Lock, vm.ctx.Log)
 		if err != nil {
 			vm.ctx.Log.Error("state pruning and height indexing failed",
 				zap.Error(err),
