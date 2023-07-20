@@ -2130,7 +2130,7 @@ func (s *state) PruneAndIndex(lock sync.Locker, log logging.Logger) error {
 	lastUpdate := startTime
 	numPruned := 0
 
-	for blockIterator.Next() {
+	for len(blockIterator.Value()) != 0 {
 		blkBytes := blockIterator.Value()
 
 		blk, status, isStateBlk, err := parseStoredBlock(blkBytes)
@@ -2182,7 +2182,7 @@ func (s *state) PruneAndIndex(lock sync.Locker, log logging.Logger) error {
 				return errs.Err
 			}
 
-			// We release the iterators here to allow the underlying database to
+			// We release the iterator here to allow the underlying database to
 			// clean up deleted state.
 			blockIterator.Release()
 
@@ -2210,9 +2210,6 @@ func (s *state) PruneAndIndex(lock sync.Locker, log logging.Logger) error {
 			// duration.
 			lastCommit = time.Now()
 
-			// We shouldn't need to grab the lock here, but doing so ensures
-			// that we see a consistent view across both the statusDB and the
-			// txDB.
 			blockIterator = s.blockDB.NewIteratorWithStart(blkBytes)
 		}
 	}
@@ -2237,6 +2234,5 @@ func (s *state) PruneAndIndex(lock sync.Locker, log logging.Logger) error {
 	if errs.Errored() {
 		return errs.Err
 	}
-
 	return s.donePrune()
 }
