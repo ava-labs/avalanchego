@@ -37,6 +37,7 @@ type Signature interface {
 	Verify(
 		ctx context.Context,
 		msg *UnsignedMessage,
+		networkID uint32,
 		pChainState validators.State,
 		pChainHeight uint64,
 		quorumNum uint64,
@@ -67,11 +68,16 @@ func (s *BitSetSignature) NumSigners() (int, error) {
 func (s *BitSetSignature) Verify(
 	ctx context.Context,
 	msg *UnsignedMessage,
+	networkID uint32,
 	pChainState validators.State,
 	pChainHeight uint64,
 	quorumNum uint64,
 	quorumDen uint64,
 ) error {
+	if msg.NetworkID != networkID {
+		return errWrongNetworkID
+	}
+
 	subnetID, err := pChainState.GetSubnetID(ctx, msg.SourceChainID)
 	if err != nil {
 		return err

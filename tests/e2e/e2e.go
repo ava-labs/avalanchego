@@ -37,7 +37,7 @@ const (
 	// Enough for test/custom networks.
 	DefaultConfirmTxTimeout = 20 * time.Second
 
-	DefaultShutdownTimeout = 2 * time.Minute
+	DefaultTimeout = 2 * time.Minute
 )
 
 // Env is the global struct containing all we need to test
@@ -116,7 +116,7 @@ func (te *TestEnvironment) ConfigCluster(
 			return fmt.Errorf("could not setup network-runner client: %w", err)
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
 		presp, err := te.GetRunnerClient().Ping(ctx)
 		cancel()
 		if err != nil {
@@ -156,7 +156,7 @@ func (te *TestEnvironment) StartCluster() error {
 	switch te.clusterType {
 	case StandAlone:
 		tests.Outf("{{magenta}}starting network-runner with %q{{/}}\n", te.avalancheGoExecPath)
-		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
 		resp, err := te.GetRunnerClient().Start(ctx, te.avalancheGoExecPath,
 			runner_sdk.WithNumNodes(5),
 			runner_sdk.WithGlobalNodeConfig(fmt.Sprintf(`{"log-level":"%s"}`, te.avalancheGoLogLevel)),
@@ -167,10 +167,7 @@ func (te *TestEnvironment) StartCluster() error {
 		}
 		tests.Outf("{{green}}successfully started network-runner: {{/}} %+v\n", resp.ClusterInfo.NodeNames)
 
-		// start is async, so wait some time for cluster health
-		time.Sleep(time.Minute)
-
-		ctx, cancel = context.WithTimeout(context.Background(), 2*time.Minute)
+		ctx, cancel = context.WithTimeout(context.Background(), DefaultTimeout)
 		_, err = te.GetRunnerClient().Health(ctx)
 		cancel()
 		if err != nil {
@@ -188,7 +185,7 @@ func (te *TestEnvironment) StartCluster() error {
 }
 
 func (te *TestEnvironment) refreshURIs() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
 	uriSlice, err := te.GetRunnerClient().URIs(ctx)
 	cancel()
 	if err != nil {
@@ -284,7 +281,7 @@ func (te *TestEnvironment) ShutdownCluster() error {
 	}
 
 	tests.Outf("{{red}}shutting down network-runner cluster{{/}}\n")
-	ctx, cancel := context.WithTimeout(context.Background(), DefaultShutdownTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
 	_, err := runnerCli.Stop(ctx)
 	cancel()
 	if err != nil {
@@ -303,7 +300,7 @@ func (te *TestEnvironment) SnapInitialState() error {
 		return nil // initial state snapshot already captured
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
 	_, err := te.runnerCli.SaveSnapshot(ctx, te.snapshotName)
 	cancel()
 	if err != nil {
@@ -318,13 +315,13 @@ func (te *TestEnvironment) RestoreInitialState(switchOffNetworkFirst bool) error
 	defer te.snapMu.Unlock()
 
 	if switchOffNetworkFirst {
-		ctx, cancel := context.WithTimeout(context.Background(), DefaultShutdownTimeout)
+		ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
 		_, err := te.GetRunnerClient().Stop(ctx)
 		cancel()
 		gomega.Expect(err).Should(gomega.BeNil())
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
 	_, err := te.GetRunnerClient().LoadSnapshot(ctx, te.snapshotName)
 	cancel()
 	if err != nil {
@@ -332,7 +329,7 @@ func (te *TestEnvironment) RestoreInitialState(switchOffNetworkFirst bool) error
 	}
 
 	// make sure cluster goes back to health before moving on
-	ctx, cancel = context.WithTimeout(context.Background(), DefaultShutdownTimeout)
+	ctx, cancel = context.WithTimeout(context.Background(), DefaultTimeout)
 	_, err = te.GetRunnerClient().Health(ctx)
 	cancel()
 	if err != nil {
