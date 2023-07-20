@@ -1,8 +1,7 @@
 use std::{
-    borrow::Borrow,
     collections::BTreeMap,
     fmt::Debug,
-    sync::{Arc, Mutex, RwLock, Weak},
+    sync::{Arc, Mutex, Weak},
 };
 
 use async_trait::async_trait;
@@ -39,40 +38,27 @@ impl api::Db for Db {
     }
 
     async fn propose<K: KeyType, V: ValueType>(
-        &mut self,
+        self: Arc<Self>,
         data: Batch<K, V>,
-    ) -> Result<Weak<Proposal>, api::Error> {
+    ) -> Result<Arc<Proposal>, api::Error> {
         let mut dbview_latest_cache_guard = self.latest_cache.lock().unwrap();
 
         if dbview_latest_cache_guard.is_none() {
             // TODO: actually get the latest dbview
-            *dbview_latest_cache_guard = Some(Arc::new(DbView {
-                proposals: RwLock::new(vec![]),
-            }));
+            *dbview_latest_cache_guard = Some(Arc::new(DbView {}));
         };
 
-        let mut proposal_guard = dbview_latest_cache_guard
-            .as_ref()
-            .unwrap()
-            .proposals
-            .write()
-            .unwrap();
-
-        let proposal = Arc::new(Proposal::new(
+        let proposal = Proposal::new(
             ProposalBase::View(dbview_latest_cache_guard.clone().unwrap()),
             data,
-        ));
+        );
 
-        proposal_guard.push(proposal.clone());
-
-        Ok(Arc::downgrade(&proposal))
+        Ok(Arc::new(proposal))
     }
 }
 
 #[derive(Debug)]
-pub struct DbView {
-    proposals: RwLock<Vec<Arc<Proposal>>>,
-}
+pub struct DbView;
 
 #[async_trait]
 impl api::DbView for DbView {
@@ -117,7 +103,6 @@ enum KeyOp<V: ValueType> {
 pub struct Proposal {
     base: ProposalBase,
     delta: BTreeMap<Vec<u8>, KeyOp<Vec<u8>>>,
-    children: RwLock<Vec<Arc<Proposal>>>,
 }
 
 impl Clone for Proposal {
@@ -125,7 +110,6 @@ impl Clone for Proposal {
         Self {
             base: self.base.clone(),
             delta: self.delta.clone(),
-            children: RwLock::new(vec![]),
         }
     }
 }
@@ -142,11 +126,7 @@ impl Proposal {
             })
             .collect();
 
-        Self {
-            base,
-            delta,
-            children: RwLock::new(vec![]),
-        }
+        Self { base, delta }
     }
 }
 
@@ -191,35 +171,19 @@ impl api::DbView for Proposal {
 
 #[async_trait]
 impl api::Proposal<DbView> for Proposal {
+    type Proposal = Proposal;
+
     async fn propose<K: KeyType, V: ValueType>(
-        &self,
+        self: Arc<Self>,
         data: Batch<K, V>,
-    ) -> Result<Weak<Self>, api::Error> {
+    ) -> Result<Arc<Self::Proposal>, api::Error> {
         // find the Arc for this base proposal from the parent
-        let children_guard = match &self.base {
-            ProposalBase::Proposal(p) => p.children.read().unwrap(),
-            ProposalBase::View(v) => v.proposals.read().unwrap(),
-        };
+        let proposal = Proposal::new(ProposalBase::Proposal(self), data);
 
-        let arc = children_guard
-            .iter()
-            .find(|&c| std::ptr::eq(c.borrow() as *const _, self as *const _));
-
-        if arc.is_none() {
-            return Err(api::Error::InvalidProposal);
-        }
-
-        let proposal = Arc::new(Proposal::new(
-            ProposalBase::Proposal(arc.unwrap().clone()),
-            data,
-        ));
-
-        self.children.write().unwrap().push(proposal.clone());
-
-        Ok(Arc::downgrade(&proposal))
+        Ok(Arc::new(proposal))
     }
 
-    async fn commit(self) -> Result<Weak<DbView>, api::Error> {
+    async fn commit(self) -> Result<DbView, api::Error> {
         todo!()
     }
 }
@@ -235,7 +199,6 @@ impl std::ops::Add for Proposal {
         let proposal = Proposal {
             base: self.base,
             delta,
-            children: RwLock::new(Vec::new()),
         };
 
         Arc::new(proposal)
@@ -253,7 +216,6 @@ impl std::ops::Add for &Proposal {
         let proposal = Proposal {
             base: self.base.clone(),
             delta,
-            children: RwLock::new(Vec::new()),
         };
 
         Arc::new(proposal)
@@ -270,7 +232,7 @@ mod test {
 
     #[tokio::test]
     async fn test_basic_proposal() -> Result<(), crate::v2::api::Error> {
-        let mut db = Db::default();
+        let db = Arc::new(Db::default());
 
         let batch = vec![
             BatchOp::Put {
@@ -280,7 +242,7 @@ mod test {
             BatchOp::Delete { key: b"z" },
         ];
 
-        let proposal = db.propose(batch).await?.upgrade().unwrap();
+        let proposal = db.propose(batch).await?;
 
         assert_eq!(proposal.val(b"k").await.unwrap(), b"v");
 
@@ -294,7 +256,7 @@ mod test {
 
     #[tokio::test]
     async fn test_nested_proposal() -> Result<(), crate::v2::api::Error> {
-        let mut db = Db::default();
+        let db = Arc::new(Db::default());
 
         // create proposal1 which adds key "k" with value "v" and deletes "z"
         let batch = vec![
@@ -305,17 +267,16 @@ mod test {
             BatchOp::Delete { key: b"z" },
         ];
 
-        let proposal1 = db.propose(batch).await?.upgrade().unwrap();
+        let proposal1 = db.propose(batch).await?;
 
         // create proposal2 which adds key "z" with value "undo"
         let proposal2 = proposal1
+            .clone()
             .propose(vec![BatchOp::Put {
                 key: b"z",
                 value: "undo",
             }])
-            .await?
-            .upgrade()
-            .unwrap();
+            .await?;
         // both proposals still have (k,v)
         assert_eq!(proposal1.val(b"k").await.unwrap(), b"v");
         assert_eq!(proposal2.val(b"k").await.unwrap(), b"v");

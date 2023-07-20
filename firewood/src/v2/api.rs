@@ -1,4 +1,8 @@
-use std::{collections::HashMap, fmt::Debug, sync::Weak};
+use std::{
+    collections::HashMap,
+    fmt::Debug,
+    sync::{Arc, Weak},
+};
 
 use async_trait::async_trait;
 
@@ -111,9 +115,9 @@ pub trait Db {
     ///            [BatchOp::Delete] operations to apply
     ///
     async fn propose<K: KeyType, V: ValueType>(
-        &mut self,
+        self: Arc<Self>,
         data: Batch<K, V>,
-    ) -> Result<Weak<Self::Proposal>, Error>;
+    ) -> Result<Arc<Self::Proposal>, Error>;
 }
 
 /// A view of the database at a specific time. These are wrapped with
@@ -165,12 +169,14 @@ pub trait DbView {
 /// obtain proofs.
 #[async_trait]
 pub trait Proposal<T: DbView>: DbView {
+    type Proposal: DbView + Proposal<T>;
+
     /// Commit this revision
     ///
     /// # Return value
     ///
     /// * A weak reference to a new historical view
-    async fn commit(self) -> Result<Weak<T>, Error>;
+    async fn commit(self) -> Result<T, Error>;
 
     /// Propose a new revision on top of an existing proposal
     ///
@@ -183,7 +189,7 @@ pub trait Proposal<T: DbView>: DbView {
     /// A weak reference to a new proposal
     ///
     async fn propose<K: KeyType, V: ValueType>(
-        &self,
+        self: Arc<Self>,
         data: Batch<K, V>,
-    ) -> Result<Weak<Self>, Error>;
+    ) -> Result<Arc<Self::Proposal>, Error>;
 }
