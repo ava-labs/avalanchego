@@ -497,7 +497,7 @@ type ChangeProof struct {
 	// A proof that the largest key in [KeyValues] and [DeletedKeys]
 	// does/doesn't exist in the trie with the requested start root.
 	// Empty iff no upper bound on the requested range was given
-	// and [KeyValues] and [DeletedKeys] are empty.
+	// and [KeyChanges] is empty.
 	EndProof []ProofNode
 	// A subset of key-values that were added, removed, or had their values modified
 	// between the requested start root (exclusive) and the requested
