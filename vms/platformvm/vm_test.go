@@ -335,8 +335,9 @@ func defaultVM(t *testing.T) (*VM, database.Database, *mutableSharedMemory) {
 	}
 	ctx.SharedMemory = msm
 
+	// NB: this lock is intentionally left locked when this function returns.
+	// The caller of this function is responsible for unlocking.
 	ctx.Lock.Lock()
-	defer ctx.Lock.Unlock()
 	_, genesisBytes := defaultGenesis(t)
 	appSender := &common.SenderTest{}
 	appSender.CantSendAppGossip = true
@@ -384,7 +385,6 @@ func defaultVM(t *testing.T) (*VM, database.Database, *mutableSharedMemory) {
 func TestGenesis(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t)
-	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
@@ -445,7 +445,6 @@ func TestGenesis(t *testing.T) {
 func TestAddValidatorCommit(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t)
-	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
@@ -491,7 +490,6 @@ func TestAddValidatorCommit(t *testing.T) {
 func TestInvalidAddValidatorCommit(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t)
-	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
@@ -545,7 +543,6 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 func TestAddValidatorReject(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t)
-	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
@@ -589,7 +586,6 @@ func TestAddValidatorReject(t *testing.T) {
 func TestAddValidatorInvalidNotReissued(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t)
-	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
@@ -623,7 +619,6 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 func TestAddSubnetValidatorAccept(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t)
-	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
@@ -669,7 +664,6 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 func TestAddSubnetValidatorReject(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t)
-	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
@@ -714,7 +708,6 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 func TestRewardValidatorAccept(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t)
-	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
@@ -809,7 +802,6 @@ func TestRewardValidatorAccept(t *testing.T) {
 func TestRewardValidatorReject(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t)
-	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
@@ -900,7 +892,6 @@ func TestRewardValidatorReject(t *testing.T) {
 func TestRewardValidatorPreferred(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t)
-	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
@@ -992,7 +983,6 @@ func TestRewardValidatorPreferred(t *testing.T) {
 func TestUnneededBuildBlock(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t)
-	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
@@ -1005,7 +995,6 @@ func TestUnneededBuildBlock(t *testing.T) {
 func TestCreateChain(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t)
-	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
@@ -1056,7 +1045,6 @@ func TestCreateChain(t *testing.T) {
 func TestCreateSubnet(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t)
-	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
@@ -1167,7 +1155,6 @@ func TestCreateSubnet(t *testing.T) {
 func TestAtomicImport(t *testing.T) {
 	require := require.New(t)
 	vm, baseDB, mutableSharedMemory := defaultVM(t)
-	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
@@ -1254,7 +1241,6 @@ func TestAtomicImport(t *testing.T) {
 func TestOptimisticAtomicImport(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t)
-	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
@@ -1887,7 +1873,6 @@ func TestUnverifiedParent(t *testing.T) {
 
 func TestMaxStakeAmount(t *testing.T) {
 	vm, _, _ := defaultVM(t)
-	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(t, vm.Shutdown(context.Background()))
 		vm.ctx.Lock.Unlock()
@@ -2221,11 +2206,8 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 
 	vm, _, _ := defaultVM(t)
-
-	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
-
 		vm.ctx.Lock.Unlock()
 	}()
 
