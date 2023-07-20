@@ -54,6 +54,11 @@ const (
 	rewardUTXOsCacheSize    = 2048
 	chainCacheSize          = 2048
 	chainDBCacheSize        = 2048
+
+	pruneCommitLimit           = 1024
+	pruneCommitSleepMultiplier = 5
+	pruneCommitSleepCap        = 10 * time.Second
+	pruneUpdateFrequency       = 30 * time.Second
 )
 
 var (
@@ -2084,6 +2089,8 @@ func parseStoredBlock(blkBytes []byte) (blocks.Block, choices.Status, bool, erro
 }
 
 func (s *state) PruneAndIndex() error {
+	s.ctx.Lock.Lock()
+	// We use a singleton to check if this method has been run before.
 	shouldPrune, err := s.shouldPrune()
 	if err != nil {
 		return fmt.Errorf(
@@ -2099,10 +2106,28 @@ func (s *state) PruneAndIndex() error {
 	// blocks are guaranteed to be accepted and height-indexed, so we don't need to
 	// check them.
 	blockIterator := s.blockDB.NewIterator()
-	defer blockIterator.Release()
+	// Releasing is done using a closure to ensure that updating blockIterator will
+	// result in having the most recent iterator released when executing the
+	// deferred function.
+	defer func() {
+		blockIterator.Release()
+	}()
 
-	s.ctx.Log.Info("starting platformvm state prune")
+	// While we are pruning the disk, we disable caching of the data we are
+	// modifying. Caching is re-enabled when pruning finishes.
+	//
+	// Note: If an unexpected error occurs the caches are never re-enabled.
+	// That's fine as the node is going to be in an unhealthy state regardless.
+	s.blockIDCache = &cache.Empty[uint64, ids.ID]{}
+	s.ctx.Lock.Unlock()
+
+	s.ctx.Log.Info("starting state pruning and indexing")
+
 	startTime := time.Now()
+	lastCommit := startTime
+	lastUpdate := startTime
+	numPruned := 0
+
 	for blockIterator.Next() {
 		blkBytes := blockIterator.Value()
 
@@ -2124,26 +2149,92 @@ func (s *state) PruneAndIndex() error {
 		blkHeight := blk.Height()
 		blkID := blk.ID()
 
+		// Populate the map of height -> blockID.
 		heightKey := database.PackUInt64(blkHeight)
 		if err := database.PutID(s.blockIDDB, heightKey, blkID); err != nil {
 			return fmt.Errorf("failed to add blockID: %w", err)
 		}
 
+		// Since we only store accepted blocks on disk, we only need to store a map of
+		// ids.ID to Block.
 		if isStateBlk {
 			if err := s.blockDB.Put(blkID[:], blkBytes); err != nil {
 				return fmt.Errorf("failed to write block: %w", err)
 			}
 		}
+
+		numPruned++
+
+		if numPruned%pruneCommitLimit == 0 {
+			// We must hold the lock during committing to make sure we don't
+			// attempt to commit to disk while a block is concurrently being
+			// accepted.
+			s.ctx.Lock.Lock()
+			errs := wrappers.Errs{}
+			errs.Add(
+				s.Commit(),
+				blockIterator.Error(),
+			)
+			s.ctx.Lock.Unlock()
+			if errs.Errored() {
+				return errs.Err
+			}
+
+			// We release the iterators here to allow the underlying database to
+			// clean up deleted state.
+			blockIterator.Release()
+
+			now := time.Now()
+			if now.Sub(lastUpdate) > pruneUpdateFrequency {
+				lastUpdate = now
+
+				s.ctx.Log.Info("committing state pruning",
+					zap.Int("numPruned", numPruned),
+				)
+			}
+
+			// We take the minimum here because it's possible that the node is
+			// currently bootstrapping. This would mean that grabbing the lock
+			// could take an extremely long period of time; which we should not
+			// delay processing for.
+			pruneDuration := now.Sub(lastCommit)
+			sleepDuration := math.Min(
+				pruneCommitSleepMultiplier*pruneDuration,
+				pruneCommitSleepCap,
+			)
+			time.Sleep(sleepDuration)
+
+			// Make sure not to include the sleep duration into the next prune
+			// duration.
+			lastCommit = time.Now()
+
+			// We shouldn't need to grab the lock here, but doing so ensures
+			// that we see a consistent view across both the statusDB and the
+			// txDB.
+			blockIterator = s.blockDB.NewIteratorWithStart(blkBytes)
+		}
 	}
 
+	// We must hold the lock during committing to make sure we don't
+	// attempt to commit to disk while a block is concurrently being
+	// accepted.
 	s.ctx.Lock.Lock()
-	if err := s.Commit(); err != nil {
-		return err
-	}
-	s.ctx.Lock.Unlock()
+	defer s.ctx.Lock.Unlock()
 
-	s.ctx.Log.Info("populated platformvm block height index",
-		zap.Duration("elapsed", time.Since(startTime)),
+	errs := wrappers.Errs{}
+	errs.Add(
+		s.Commit(),
+		blockIterator.Error(),
 	)
+
+	s.ctx.Log.Info("finished state pruning and indexing",
+		zap.Int("numPruned", numPruned),
+		zap.Duration("duration", time.Since(startTime)),
+	)
+
+	if errs.Errored() {
+		return errs.Err
+	}
+
 	return s.donePrune()
 }
