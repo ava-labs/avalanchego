@@ -2120,6 +2120,7 @@ func (s *state) PruneAndIndex(lock sync.Locker, log logging.Logger) error {
 	//
 	// Note: If an unexpected error occurs the caches are never re-enabled.
 	// That's fine as the node is going to be in an unhealthy state regardless.
+	oldBlockIDCache := s.blockIDCache
 	s.blockIDCache = &cache.Empty[uint64, ids.ID]{}
 	lock.Unlock()
 
@@ -2225,6 +2226,11 @@ func (s *state) PruneAndIndex(lock sync.Locker, log logging.Logger) error {
 		s.Commit(),
 		blockIterator.Error(),
 	)
+
+	// Make sure we flush the original cache before re-enabling it to prevent
+	// surfacing any stale data.
+	oldBlockIDCache.Flush()
+	s.blockIDCache = oldBlockIDCache
 
 	log.Info("finished state pruning and indexing",
 		zap.Int("numPruned", numPruned),
