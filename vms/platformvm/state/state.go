@@ -2136,9 +2136,11 @@ func (s *state) PruneAndIndex() error {
 		}
 	}
 
+	s.ctx.Lock.Lock()
 	if err := s.Commit(); err != nil {
 		return err
 	}
+	s.ctx.Lock.Unlock()
 
 	s.ctx.Log.Info("populated platformvm block height index",
 		zap.Duration("elapsed", time.Since(startTime)),
