@@ -2095,12 +2095,14 @@ func (s *state) PruneAndIndex(lock sync.Locker, log logging.Logger) error {
 	// We use a singleton to check if this method has been run before.
 	shouldPrune, err := s.shouldPrune()
 	if err != nil {
+		lock.Unlock()
 		return fmt.Errorf(
 			"failed to check if the database should be pruned: %w",
 			err,
 		)
 	}
 	if !shouldPrune {
+		lock.Unlock()
 		return nil
 	}
 
@@ -2240,5 +2242,11 @@ func (s *state) PruneAndIndex(lock sync.Locker, log logging.Logger) error {
 	if errs.Errored() {
 		return errs.Err
 	}
-	return s.donePrune()
+
+	errs.Add(
+		s.donePrune(),
+		s.Commit(),
+	)
+
+	return errs.Err
 }
