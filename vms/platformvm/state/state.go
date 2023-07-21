@@ -2128,10 +2128,13 @@ func (s *state) PruneAndIndex(lock sync.Locker, log logging.Logger) error {
 
 	log.Info("starting state pruning and indexing")
 
-	startTime := time.Now()
-	lastCommit := startTime
-	lastUpdate := startTime
-	numPruned := 0
+	var (
+		startTime  = time.Now()
+		lastCommit = startTime
+		lastUpdate = startTime
+		numPruned  = 0
+		numIndexed = 0
+	)
 
 	for blockIterator.Next() {
 		blkBytes := blockIterator.Value()
@@ -2146,6 +2149,8 @@ func (s *state) PruneAndIndex(lock sync.Locker, log logging.Logger) error {
 			if err := s.blockDB.Delete(blockIterator.Key()); err != nil {
 				return fmt.Errorf("failed to delete block: %w", err)
 			}
+
+			numPruned++
 
 			// We don't index the height of non-accepted blocks.
 			continue
@@ -2168,9 +2173,9 @@ func (s *state) PruneAndIndex(lock sync.Locker, log logging.Logger) error {
 			}
 		}
 
-		numPruned++
+		numIndexed++
 
-		if numPruned%pruneCommitLimit == 0 {
+		if numIndexed%pruneCommitLimit == 0 {
 			// We must hold the lock during committing to make sure we don't
 			// attempt to commit to disk while a block is concurrently being
 			// accepted.
@@ -2193,8 +2198,9 @@ func (s *state) PruneAndIndex(lock sync.Locker, log logging.Logger) error {
 			if now.Sub(lastUpdate) > pruneUpdateFrequency {
 				lastUpdate = now
 
-				log.Info("committing state pruning",
+				log.Info("committing state pruning and indexing",
 					zap.Int("numPruned", numPruned),
+					zap.Int("numIndexed", numIndexed),
 				)
 			}
 
@@ -2236,6 +2242,7 @@ func (s *state) PruneAndIndex(lock sync.Locker, log logging.Logger) error {
 
 	log.Info("finished state pruning and indexing",
 		zap.Int("numPruned", numPruned),
+		zap.Int("numIndexed", numIndexed),
 		zap.Duration("duration", time.Since(startTime)),
 	)
 
