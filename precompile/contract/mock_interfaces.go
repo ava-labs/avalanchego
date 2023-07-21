@@ -8,7 +8,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/subnet-evm/commontype"
-	"github.com/ethereum/go-ethereum/common"
 )
 
 // TODO: replace with gomock library
@@ -52,10 +51,6 @@ func (m *mockAccessibleState) GetStateDB() StateDB { return m.state }
 func (m *mockAccessibleState) GetBlockContext() BlockContext { return m.blockContext }
 
 func (m *mockAccessibleState) GetSnowContext() *snow.Context { return m.snowContext }
-
-func (m *mockAccessibleState) CallFromPrecompile(caller common.Address, addr common.Address, input []byte, gas uint64, value *big.Int) (ret []byte, leftOverGas uint64, err error) {
-	return nil, 0, nil
-}
 
 type mockChainState struct {
 	feeConfig            commontype.FeeConfig
