@@ -58,6 +58,8 @@ var (
 	chainsSectionPrefix             = []byte{0x3}
 	utxosSectionPrefix              = []byte{0x4}
 	rewardUtxosSectionPrefix        = []byte{0x5}
+	currentStakersSectionPrefix     = []byte{0x6}
+	pendingStakersSectionPrefix     = []byte{0x7}
 )
 
 func NewMerkleState(
@@ -325,9 +327,7 @@ func (ms *merkleState) GetUTXO(utxoID ids.ID) (*avax.UTXO, error) {
 		return utxo, nil
 	}
 
-	key := make([]byte, 0, len(utxosSectionPrefix)+len(utxoID))
-	copy(key, utxosSectionPrefix)
-	key = append(key, utxoID[:]...)
+	key := merkleUtxoIDKey(utxoID)
 
 	switch bytes, err := ms.merkleDB.Get(key); err {
 	case nil:
@@ -348,11 +348,9 @@ func (ms *merkleState) GetUTXO(utxoID ids.ID) (*avax.UTXO, error) {
 }
 
 func (ms *merkleState) UTXOIDs(addr []byte, start ids.ID, limit int) ([]ids.ID, error) {
-	startKey := make([]byte, 0, len(addr)+len(start))
-	copy(startKey, addr)
-	startKey = append(startKey, start[:]...)
+	key := merkleUtxoIndexKey(addr, start)
 
-	iter := ms.indexedUTXOsDB.NewIteratorWithStart(startKey)
+	iter := ms.indexedUTXOsDB.NewIteratorWithStart(key)
 	defer iter.Release()
 
 	utxoIDs := []ids.ID(nil)
@@ -389,9 +387,7 @@ func (ms *merkleState) GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error) {
 
 	utxos := make([]*avax.UTXO, 0)
 
-	prefix := make([]byte, 0, len(rewardUtxosSectionPrefix)+len(txID))
-	copy(prefix, rewardUtxosSectionPrefix)
-	prefix = append(prefix, txID[:]...)
+	prefix := merkleRewardUtxosIDPrefix(txID)
 
 	it := ms.merkleDB.NewIteratorWithPrefix(prefix)
 	defer it.Release()
@@ -449,9 +445,7 @@ func (ms *merkleState) GetCurrentSupply(subnetID ids.ID) (uint64, error) {
 		return *cachedSupply, nil
 	}
 
-	key := make([]byte, 0, len(merkleSuppliesPrefix)+len(subnetID[:]))
-	copy(key, merkleSuppliesPrefix)
-	key = append(key, subnetID[:]...)
+	key := merkleSuppliesKey(subnetID)
 
 	switch supplyBytes, err := ms.merkleDB.Get(key); err {
 	case nil:
@@ -519,11 +513,9 @@ func (ms *merkleState) GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error)
 		return tx, nil
 	}
 
-	subnetIDKey := make([]byte, 0, len(elasticSubnetSectionPrefix)+len(subnetID[:]))
-	copy(subnetIDKey, merkleSuppliesPrefix)
-	subnetIDKey = append(subnetIDKey, subnetID[:]...)
+	key := merkleElasticSubnetKey(subnetID)
 
-	transformSubnetTxID, err := database.GetID(ms.merkleDB, subnetIDKey)
+	transformSubnetTxID, err := database.GetID(ms.merkleDB, key)
 	switch err {
 	case nil:
 		transformSubnetTx, _, err := ms.GetTx(transformSubnetTxID)
@@ -554,9 +546,7 @@ func (ms *merkleState) GetChains(subnetID ids.ID) ([]*txs.Tx, error) {
 	}
 	chains := make([]*txs.Tx, 0)
 
-	prefix := make([]byte, 0, len(chainsSectionPrefix)+len(subnetID[:]))
-	copy(prefix, chainsSectionPrefix)
-	prefix = append(prefix, subnetID[:]...)
+	prefix := merkleChainPrefix(subnetID)
 
 	chainDBIt := ms.merkleDB.NewIteratorWithPrefix(prefix)
 	defer chainDBIt.Release()
@@ -783,17 +773,135 @@ func (ms *merkleState) Close() error {
 }
 
 func (ms *merkleState) write( /*updateValidators*/ bool /*height*/, uint64) error {
+	currentData, err := ms.processCurrentStakers()
+	if err != nil {
+		return err
+	}
+	pendingData, err := ms.processPendingStakers()
+	if err != nil {
+		return err
+	}
+
 	errs := wrappers.Errs{}
 	errs.Add(
-		ms.writeMerkleState(),
+		ms.writeMerkleState(currentData, pendingData),
 		ms.writeBlocks(),
 		ms.writeTXs(),
-		ms.writelocalUptimes(),
+		ms.writeLocalUptimes(),
 	)
 	return errs.Err
 }
 
-func (ms *merkleState) writeMerkleState() error {
+type stakersData struct {
+	TxBytes         []byte `serialize:"true"`
+	IsCurrent       bool   `serialize:"true"`
+	PotentialReward uint64 `serialize:"true"`
+}
+
+func (ms *merkleState) processCurrentStakers() (map[ids.ID]*stakersData, error) {
+	output := make(map[ids.ID]*stakersData)
+	for subnetID, subnetValidatorDiffs := range ms.currentStakers.validatorDiffs {
+		delete(ms.currentStakers.validatorDiffs, subnetID)
+		for _, validatorDiff := range subnetValidatorDiffs {
+			switch validatorDiff.validatorStatus {
+			case added:
+				var (
+					txID            = validatorDiff.validator.TxID
+					potentialReward = validatorDiff.validator.PotentialReward
+				)
+				tx, _, err := ms.GetTx(txID)
+				if err != nil {
+					return nil, fmt.Errorf("failed loading current validator tx, %w", err)
+				}
+				output[txID] = &stakersData{
+					TxBytes:         tx.Bytes(),
+					IsCurrent:       false,
+					PotentialReward: potentialReward,
+				}
+			case deleted:
+				txID := validatorDiff.validator.TxID
+				output[txID] = &stakersData{
+					TxBytes: nil,
+				}
+			}
+
+			addedDelegatorIterator := NewTreeIterator(validatorDiff.addedDelegators)
+			defer addedDelegatorIterator.Release()
+			for addedDelegatorIterator.Next() {
+				staker := addedDelegatorIterator.Value()
+				tx, _, err := ms.GetTx(staker.TxID)
+				if err != nil {
+					return nil, fmt.Errorf("failed loading current delegator tx, %w", err)
+				}
+				output[staker.TxID] = &stakersData{
+					TxBytes:         tx.Bytes(),
+					IsCurrent:       false,
+					PotentialReward: staker.PotentialReward,
+				}
+			}
+
+			for _, staker := range validatorDiff.deletedDelegators {
+				txID := staker.TxID
+				output[txID] = &stakersData{
+					TxBytes: nil,
+				}
+			}
+		}
+	}
+	return output, nil
+}
+
+func (ms *merkleState) processPendingStakers() (map[ids.ID]*stakersData, error) {
+	output := make(map[ids.ID]*stakersData)
+	for subnetID, subnetValidatorDiffs := range ms.pendingStakers.validatorDiffs {
+		delete(ms.pendingStakers.validatorDiffs, subnetID)
+		for _, validatorDiff := range subnetValidatorDiffs {
+			switch validatorDiff.validatorStatus {
+			case added:
+				txID := validatorDiff.validator.TxID
+				tx, _, err := ms.GetTx(txID)
+				if err != nil {
+					return nil, fmt.Errorf("failed loading pending validator tx, %w", err)
+				}
+				output[txID] = &stakersData{
+					TxBytes:         tx.Bytes(),
+					IsCurrent:       false,
+					PotentialReward: 0,
+				}
+			case deleted:
+				txID := validatorDiff.validator.TxID
+				output[txID] = &stakersData{
+					TxBytes: nil,
+				}
+			}
+
+			addedDelegatorIterator := NewTreeIterator(validatorDiff.addedDelegators)
+			defer addedDelegatorIterator.Release()
+			for addedDelegatorIterator.Next() {
+				staker := addedDelegatorIterator.Value()
+				tx, _, err := ms.GetTx(staker.TxID)
+				if err != nil {
+					return nil, fmt.Errorf("failed loading pending delegator tx, %w", err)
+				}
+				output[staker.TxID] = &stakersData{
+					TxBytes:         tx.Bytes(),
+					IsCurrent:       false,
+					PotentialReward: 0,
+				}
+			}
+
+			for _, staker := range validatorDiff.deletedDelegators {
+				txID := staker.TxID
+				output[txID] = &stakersData{
+					TxBytes: nil,
+				}
+			}
+		}
+	}
+	return output, nil
+}
+
+func (ms *merkleState) writeMerkleState(currentData, pendingData map[ids.ID]*stakersData) error {
 	errs := wrappers.Errs{}
 	view, err := ms.merkleDB.NewView()
 	if err != nil {
@@ -806,6 +914,8 @@ func (ms *merkleState) writeMerkleState() error {
 		ms.writePermissionedSubnets(view, ctx),
 		ms.writeElasticSubnets(view, ctx),
 		ms.writeChains(view, ctx),
+		ms.writeCurrentStakers(view, ctx, currentData),
+		ms.writePendingStakers(view, ctx, pendingData),
 		ms.writeUTXOs(view, ctx),
 		ms.writeRewardUTXOs(view, ctx),
 	)
@@ -837,9 +947,7 @@ func (ms *merkleState) writeMetadata(view merkledb.TrieView, ctx context.Context
 		delete(ms.supplies, subnetID)
 		ms.suppliesCache.Put(subnetID, &supply)
 
-		key := make([]byte, 0, len(merkleSuppliesPrefix)+len(subnetID[:]))
-		copy(key, merkleSuppliesPrefix)
-		key = append(key, subnetID[:]...)
+		key := merkleSuppliesKey(subnetID)
 		if err := view.Insert(ctx, key, database.PackUInt64(supply)); err != nil {
 			return fmt.Errorf("failed to write subnet %v supply: %w", subnetID, err)
 		}
@@ -849,12 +957,7 @@ func (ms *merkleState) writeMetadata(view merkledb.TrieView, ctx context.Context
 
 func (ms *merkleState) writePermissionedSubnets(view merkledb.TrieView, ctx context.Context) error {
 	for _, subnetTx := range ms.addedPermissionedSubnets {
-		subnetID := subnetTx.ID()
-
-		key := make([]byte, 0, len(permissionedSubnetSectionPrefix)+len(subnetID[:]))
-		copy(key, permissionedSubnetSectionPrefix)
-		key = append(key, subnetID[:]...)
-
+		key := merklePermissionedSubnetKey(subnetTx.ID())
 		if err := view.Insert(ctx, key, subnetTx.Bytes()); err != nil {
 			return fmt.Errorf("failed to write subnetTx: %w", err)
 		}
@@ -865,12 +968,7 @@ func (ms *merkleState) writePermissionedSubnets(view merkledb.TrieView, ctx cont
 
 func (ms *merkleState) writeElasticSubnets(view merkledb.TrieView, ctx context.Context) error {
 	for _, subnetTx := range ms.addedElasticSubnets {
-		subnetID := subnetTx.ID()
-
-		key := make([]byte, 0, len(elasticSubnetSectionPrefix)+len(subnetID[:]))
-		copy(key, elasticSubnetSectionPrefix)
-		key = append(key, subnetID[:]...)
-
+		key := merkleElasticSubnetKey(subnetTx.ID())
 		if err := view.Insert(ctx, key, subnetTx.Bytes()); err != nil {
 			return fmt.Errorf("failed to write subnetTx: %w", err)
 		}
@@ -881,17 +979,8 @@ func (ms *merkleState) writeElasticSubnets(view merkledb.TrieView, ctx context.C
 
 func (ms *merkleState) writeChains(view merkledb.TrieView, ctx context.Context) error {
 	for subnetID, chains := range ms.addedChains {
-		prefixKey := make([]byte, 0, len(chainsSectionPrefix)+len(subnetID[:]))
-		copy(prefixKey, chainsSectionPrefix)
-		prefixKey = append(prefixKey, subnetID[:]...)
-
 		for _, chainTx := range chains {
-			chainID := chainTx.ID()
-
-			key := make([]byte, 0, len(prefixKey)+len(chainID))
-			copy(key, prefixKey)
-			key = append(key, chainID[:]...)
-
+			key := merkleChainKey(subnetID, chainTx.ID())
 			if err := view.Insert(ctx, key, chainTx.Bytes()); err != nil {
 				return fmt.Errorf("failed to write chain: %w", err)
 			}
@@ -901,14 +990,40 @@ func (ms *merkleState) writeChains(view merkledb.TrieView, ctx context.Context) 
 	return nil
 }
 
+func (*merkleState) writeCurrentStakers(view merkledb.TrieView, ctx context.Context, currentData map[ids.ID]*stakersData) error {
+	for stakerTxID, data := range currentData {
+		key := merkleCurrentStakersKey(stakerTxID)
+
+		dataBytes, err := txs.GenesisCodec.Marshal(txs.Version, data)
+		if err != nil {
+			return fmt.Errorf("failed to serialize current stakers data, stakerTxID%v : %w", stakerTxID, err)
+		}
+		if err := view.Insert(ctx, key, dataBytes); err != nil {
+			return fmt.Errorf("failed to write current stakers data, stakerTxID%v : %w", stakerTxID, err)
+		}
+	}
+	return nil
+}
+
+func (*merkleState) writePendingStakers(view merkledb.TrieView, ctx context.Context, pendingData map[ids.ID]*stakersData) error {
+	for stakerTxID, data := range pendingData {
+		key := merklePendingStakersKey(stakerTxID)
+
+		dataBytes, err := txs.GenesisCodec.Marshal(txs.Version, data)
+		if err != nil {
+			return fmt.Errorf("failed to serialize pending stakers data, stakerTxID%v : %w", stakerTxID, err)
+		}
+		if err := view.Insert(ctx, key, dataBytes); err != nil {
+			return fmt.Errorf("failed to write pending stakers data, stakerTxID%v : %w", stakerTxID, err)
+		}
+	}
+	return nil
+}
+
 func (ms *merkleState) writeUTXOs(view merkledb.TrieView, ctx context.Context) error {
 	for utxoID, utxo := range ms.modifiedUTXOs {
 		delete(ms.modifiedUTXOs, utxoID)
-
-		key := make([]byte, 0, len(utxosSectionPrefix)+len(utxoID))
-		copy(key, utxosSectionPrefix)
-		key = append(key, utxoID[:]...)
-
+		key := merkleUtxoIDKey(utxoID)
 		if utxo == nil { // delete the UTXO
 			switch _, err := ms.GetUTXO(utxoID); err {
 			case nil:
@@ -952,23 +1067,13 @@ func (ms *merkleState) writeRewardUTXOs(view merkledb.TrieView, ctx context.Cont
 	for txID, utxos := range ms.addedRewardUTXOs {
 		delete(ms.addedRewardUTXOs, txID)
 		ms.rewardUTXOsCache.Put(txID, utxos)
-
-		prefix := make([]byte, 0, len(rewardUtxosSectionPrefix)+len(txID))
-		copy(prefix, rewardUtxosSectionPrefix)
-		prefix = append(prefix, txID[:]...)
-
 		for _, utxo := range utxos {
-			utxoID := utxo.InputID()
-
-			key := make([]byte, 0, len(prefix)+len(utxoID))
-			copy(key, prefix)
-			key = append(key, utxoID[:]...)
-
 			utxoBytes, err := txs.GenesisCodec.Marshal(txs.Version, utxo)
 			if err != nil {
 				return fmt.Errorf("failed to serialize reward UTXO: %w", err)
 			}
 
+			key := merkleRewardUtxoIDKey(txID, utxo.InputID())
 			if err := view.Insert(ctx, key, utxoBytes); err != nil {
 				return fmt.Errorf("failed to add reward UTXO: %w", err)
 			}
@@ -1023,7 +1128,6 @@ func (ms *merkleState) writeTXs() error {
 }
 
 func (ms *merkleState) writeUTXOsIndex(utxo *avax.UTXO, insertUtxo bool) error {
-	utxoID := utxo.InputID()
 	addressable, ok := utxo.Out.(avax.Addressable)
 	if !ok {
 		return nil
@@ -1031,9 +1135,7 @@ func (ms *merkleState) writeUTXOsIndex(utxo *avax.UTXO, insertUtxo bool) error {
 	addresses := addressable.Addresses()
 
 	for _, addr := range addresses {
-		key := make([]byte, 0, len(addr)+len(utxoID))
-		copy(key, addr)
-		key = append(key, utxoID[:]...)
+		key := merkleUtxoIndexKey(addr, utxo.InputID())
 
 		if insertUtxo {
 			if err := ms.indexedUTXOsDB.Put(key, nil); err != nil {
@@ -1048,12 +1150,10 @@ func (ms *merkleState) writeUTXOsIndex(utxo *avax.UTXO, insertUtxo bool) error {
 	return nil
 }
 
-func (ms *merkleState) writelocalUptimes() error {
+func (ms *merkleState) writeLocalUptimes() error {
 	for vdrID, updatedSubnets := range ms.modifiedLocalUptimes {
 		for subnetID := range updatedSubnets {
-			key := make([]byte, 0, len(vdrID)+len(subnetID))
-			copy(key, vdrID[:])
-			key = append(key, subnetID[:]...)
+			key := merkleLocalUptimesKey(vdrID, subnetID)
 
 			uptimes := ms.localUptimesCache[vdrID][subnetID]
 			uptimes.LastUpdated = uint64(uptimes.lastUpdated.Unix())
