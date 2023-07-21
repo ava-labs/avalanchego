@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"math/rand"
 	"testing"
 	"time"
@@ -24,7 +25,9 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
@@ -779,4 +782,37 @@ func TestGetBlock(t *testing.T) {
 			require.Equal(test.encoding, response.Encoding)
 		})
 	}
+}
+
+func TestGetValidatorsAtReplyMarshalling(t *testing.T) {
+	require := require.New(t)
+
+	reply := &GetValidatorsAtReply{
+		Validators: make(map[ids.NodeID]*validators.GetValidatorOutput),
+	}
+
+	{
+		reply.Validators[ids.EmptyNodeID] = &validators.GetValidatorOutput{
+			NodeID:    ids.EmptyNodeID,
+			PublicKey: nil,
+			Weight:    0,
+		}
+	}
+	{
+		nodeID := ids.GenerateTestNodeID()
+		sk, err := bls.NewSecretKey()
+		require.NoError(err)
+		reply.Validators[nodeID] = &validators.GetValidatorOutput{
+			NodeID:    nodeID,
+			PublicKey: bls.PublicFromSecretKey(sk),
+			Weight:    math.MaxUint64,
+		}
+	}
+
+	replyJSON, err := reply.MarshalJSON()
+	require.NoError(err)
+
+	var parsedReply GetValidatorsAtReply
+	require.NoError(parsedReply.UnmarshalJSON(replyJSON))
+	require.Equal(reply, &parsedReply)
 }
