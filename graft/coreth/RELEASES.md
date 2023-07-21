@@ -1,5 +1,7 @@
 # Release Notes
 
+## [v0.12.5](https://github.com/ava-labs/coreth/releases/tag/v0.12.5)
+
 ## [v0.12.4](https://github.com/ava-labs/coreth/releases/tag/v0.12.4)
 
 - Fix API handler crash for `lookupState` in `prestate` tracer
