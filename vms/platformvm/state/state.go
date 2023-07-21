@@ -557,7 +557,7 @@ func new(
 		return nil, err
 	}
 
-	return &state{
+	s := &state{
 		validatorState: newValidatorState(),
 
 		cfg:          cfg,
@@ -631,7 +631,27 @@ func new(
 		chainDBCache: chainDBCache,
 
 		singletonDB: prefixdb.New(singletonPrefix, baseDB),
-	}, nil
+	}
+
+	// Before we start accepting new blocks, we check if the pruning process needs
+	// to be run.
+	//
+	// TODO: Cleanup after v1.11.x is activated
+	shouldPrune, err := s.shouldPrune()
+	if err != nil {
+		return nil, err
+	}
+	if shouldPrune {
+		if err := s.singletonDB.Delete(prunedKey); err != nil {
+			return nil, fmt.Errorf("failed to check if prunedKey is in singletonDB: %w", err)
+		}
+
+		if err := s.Commit(); err != nil {
+			return nil, fmt.Errorf("failed to commit to baseDB: %w", err)
+		}
+	}
+
+	return s, nil
 }
 
 func (s *state) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
@@ -701,7 +721,29 @@ func (s *state) doneInit() error {
 
 func (s *state) shouldPrune() (bool, error) {
 	has, err := s.singletonDB.Has(prunedKey)
-	return !has, err
+	if err != nil {
+		return true, err
+	}
+
+	// If [prunedKey] is not in [singletonDB], [PruneAndIndex()] did not finish
+	// execution.
+	if !has {
+		return true, nil
+	}
+
+	// To ensure the db was not modified since we last ran [PruneAndIndex()], we
+	// must verify that [s.lastAccepted] is height indexed.
+	blk, err := s.GetStatelessBlock(s.lastAccepted)
+	if err != nil {
+		return true, err
+	}
+
+	_, err = s.GetBlockIDAtHeight(blk.Height())
+	if err == database.ErrNotFound {
+		return true, nil
+	}
+
+	return false, err
 }
 
 func (s *state) donePrune() error {
@@ -2104,7 +2146,6 @@ func parseStoredBlock(blkBytes []byte) (blocks.Block, choices.Status, bool, erro
 
 func (s *state) PruneAndIndex(lock sync.Locker, log logging.Logger) error {
 	lock.Lock()
-	// We use a singleton to check if this method has been run before.
 	shouldPrune, err := s.shouldPrune()
 	if err != nil {
 		lock.Unlock()
