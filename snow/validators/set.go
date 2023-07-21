@@ -70,11 +70,8 @@ type Set interface {
 	// Len returns the number of validators currently in the set.
 	Len() int
 
-	// Map of the validators in this group
+	// Map of the validators in this set
 	Map() map[ids.NodeID]*GetValidatorOutput
-
-	// List all the validators in this group
-	List() []*Validator
 
 	// Weight returns the cumulative weight of all validators in the set.
 	Weight() uint64
@@ -334,22 +331,6 @@ func (s *vdrSet) Map() map[ids.NodeID]*GetValidatorOutput {
 		}
 	}
 	return set
-}
-
-func (s *vdrSet) List() []*Validator {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-
-	return s.list()
-}
-
-func (s *vdrSet) list() []*Validator {
-	list := make([]*Validator, len(s.vdrSlice))
-	for i, vdr := range s.vdrSlice {
-		copiedVdr := *vdr
-		list[i] = &copiedVdr
-	}
-	return list
 }
 
 func (s *vdrSet) Sample(size int) ([]ids.NodeID, error) {
