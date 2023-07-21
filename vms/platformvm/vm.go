@@ -93,7 +93,7 @@ type VM struct {
 	manager   blockexecutor.Manager
 
 	// TODO: Remove after v1.11.x is activated
-	pruned bool
+	pruned utils.Atomic[bool]
 }
 
 type Config struct {
@@ -237,7 +237,7 @@ func (vm *VM) Initialize(
 			)
 		}
 
-		vm.pruned = true
+		vm.pruned.Set(true)
 	}()
 
 	return nil
@@ -485,7 +485,7 @@ func (vm *VM) Logger() logging.Logger {
 }
 
 func (vm *VM) VerifyHeightIndex(_ context.Context) error {
-	if vm.pruned {
+	if vm.pruned.Get() {
 		return nil
 	}
 
