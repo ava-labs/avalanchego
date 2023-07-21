@@ -69,7 +69,7 @@ type ChangeProofer interface {
 
 	// Returns nil iff all of the following hold:
 	//   - [start] <= [end].
-	//   - [proof] is non-empty iff [proof.HadRootsInHistory].
+	//   - [proof] is non-empty.
 	//   - All keys in [proof.KeyValues] and [proof.DeletedKeys] are in [start, end].
 	//     If [start] is empty, all keys are considered > [start].
 	//     If [end] is empty, all keys are considered < [end].
