@@ -144,8 +144,6 @@ type State interface {
 
 	GetBlockIDAtHeight(height uint64) (ids.ID, error)
 
-	GetBlockID(height uint64) (ids.ID, error)
-
 	// ValidatorSet adds all the validators and delegators of [subnetID] into
 	// [vdrs].
 	ValidatorSet(subnetID ids.ID, vdrs validators.Set) error
@@ -1165,7 +1163,6 @@ func (s *state) load() error {
 		s.loadCurrentValidators(),
 		s.loadPendingValidators(),
 		s.initValidatorSets(),
-		s.populateBlockHeightIndex(), // Must be called after loadMetadata
 	)
 	return errs.Err
 }
@@ -1461,7 +1458,6 @@ func (s *state) initValidatorSets() error {
 func (s *state) write(updateValidators bool, height uint64) error {
 	errs := wrappers.Errs{}
 	errs.Add(
-		s.writeBlockIDs(),
 		s.writeBlocks(),
 		s.writeCurrentStakers(updateValidators, height),
 		s.writePendingStakers(),
@@ -1596,19 +1592,6 @@ func (s *state) CommitBatch() (database.Batch, error) {
 	return s.baseDB.CommitBatch()
 }
 
-func (s *state) writeBlockIDs() error {
-	for height, blkID := range s.addedBlockIDs {
-		heightKey := database.PackUInt64(height)
-
-		delete(s.addedBlockIDs, height)
-		s.blockIDCache.Put(height, blkID)
-		if err := database.PutID(s.blockIDDB, heightKey, blkID); err != nil {
-			return fmt.Errorf("failed to add blockID: %w", err)
-		}
-	}
-	return nil
-}
-
 func (s *state) writeBlocks() error {
 	for blkID, blk := range s.addedBlocks {
 		blkID := blkID
@@ -1670,33 +1653,6 @@ func (s *state) GetStatelessBlock(blockID ids.ID) (blocks.Block, error) {
 }
 
 func (s *state) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
-	if blkID, exists := s.addedBlockIDs[height]; exists {
-		return blkID, nil
-	}
-	if blkID, cached := s.blockIDCache.Get(height); cached {
-		if blkID == ids.Empty {
-			return ids.Empty, database.ErrNotFound
-		}
-
-		return blkID, nil
-	}
-
-	heightKey := database.PackUInt64(height)
-
-	blkID, err := database.GetID(s.blockIDDB, heightKey)
-	if err == database.ErrNotFound {
-		s.blockIDCache.Put(height, ids.Empty)
-		return ids.Empty, database.ErrNotFound
-	}
-	if err != nil {
-		return ids.Empty, err
-	}
-
-	s.blockIDCache.Put(height, blkID)
-	return blkID, nil
-}
-
-func (s *state) GetBlockID(height uint64) (ids.ID, error) {
 	if blkID, exists := s.addedBlockIDs[height]; exists {
 		return blkID, nil
 	}
