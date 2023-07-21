@@ -697,7 +697,24 @@ func (s *state) doneInit() error {
 
 func (s *state) shouldPrune() (bool, error) {
 	has, err := s.singletonDB.Has(prunedKey)
-	return !has, err
+	if err != nil {
+		return true, nil
+	}
+	if has {
+		return true, nil
+	}
+
+	blk, err := s.GetStatelessBlock(s.lastAccepted)
+	if err != nil {
+		return true, nil
+	}
+
+	_, err = s.GetBlockIDAtHeight(blk.Height())
+	if err == database.ErrNotFound {
+		return true, nil
+	}
+
+	return false, err
 }
 
 func (s *state) donePrune() error {
@@ -2092,7 +2109,6 @@ func parseStoredBlock(blkBytes []byte) (blocks.Block, choices.Status, bool, erro
 
 func (s *state) PruneAndIndex(lock sync.Locker, log logging.Logger) error {
 	lock.Lock()
-	// We use a singleton to check if this method has been run before.
 	shouldPrune, err := s.shouldPrune()
 	if err != nil {
 		lock.Unlock()
@@ -2135,6 +2151,10 @@ func (s *state) PruneAndIndex(lock sync.Locker, log logging.Logger) error {
 		numPruned  = 0
 		numIndexed = 0
 	)
+
+	if err := s.donePrune(); err != nil {
+		return err
+	}
 
 	for blockIterator.Next() {
 		blkBytes := blockIterator.Value()
@@ -2221,10 +2241,6 @@ func (s *state) PruneAndIndex(lock sync.Locker, log logging.Logger) error {
 
 			blockIterator = s.blockDB.NewIteratorWithStart(blkID[:])
 		}
-	}
-
-	if err := s.donePrune(); err != nil {
-		return err
 	}
 
 	// We must hold the lock during committing to make sure we don't
