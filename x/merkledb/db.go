@@ -958,22 +958,9 @@ func (db *merkleDB) VerifyChangeProof(
 	end []byte,
 	expectedEndRootID ids.ID,
 ) error {
-	if len(end) > 0 && bytes.Compare(start, end) > 0 {
-		return ErrStartAfterEnd
-	}
-
-	// TODO remove
-	// if !proof.HadRootsInHistory {
-	// 	// The node we requested the proof from didn't have sufficient
-	// 	// history to fulfill this request.
-	// 	if !proof.Empty() {
-	// 		// cannot have any changes if the root was missing
-	// 		return ErrDataInMissingRootProof
-	// 	}
-	// 	return nil
-	// }
-
 	switch {
+	case len(end) > 0 && bytes.Compare(start, end) > 0:
+		return ErrStartAfterEnd
 	case proof.Empty():
 		return ErrNoMerkleProof
 	case len(end) > 0 && len(proof.EndProof) == 0:
