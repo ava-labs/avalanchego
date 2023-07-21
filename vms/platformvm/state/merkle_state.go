@@ -5,7 +5,6 @@ package state
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -19,11 +18,13 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/trace"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
+	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/x/merkledb"
@@ -39,13 +40,13 @@ const (
 var (
 	_ State = (*merkleState)(nil)
 
-	errNotYetImplemented = errors.New("not yet implemented")
-
 	merkleStatePrefix      = []byte{0x0}
 	merkleBlockPrefix      = []byte{0x1}
 	merkleTxPrefix         = []byte{0x2}
 	merkleIndexUTXOsPrefix = []byte{0x3} // to serve UTXOIDs(addr)
-	merkleUptimesPrefix    = []byte{0x4}
+	merkleUptimesPrefix    = []byte{0x4} // locally measured uptimes
+	merkleWeightDiffPrefix = []byte{0x5} // non-merklelized validators weight diff. TODO: should we merklelize them?
+	merkleBlsKeyDiffPrefix = []byte{0x6}
 
 	// merkle db sections
 	metadataSectionPrefix      = []byte{0x0}
@@ -64,16 +65,19 @@ var (
 )
 
 func NewMerkleState(
+	cfg *config.Config,
 	rawDB database.Database,
 	metricsReg prometheus.Registerer,
 ) (Chain, error) {
 	var (
-		baseDB         = versiondb.New(rawDB)
-		baseMerkleDB   = prefixdb.New(merkleStatePrefix, baseDB)
-		blockDB        = prefixdb.New(merkleBlockPrefix, baseDB)
-		txDB           = prefixdb.New(merkleTxPrefix, baseDB)
-		indexedUTXOsDB = prefixdb.New(merkleIndexUTXOsPrefix, baseDB)
-		localUptimesDB = prefixdb.New(merkleUptimesPrefix, baseDB)
+		baseDB            = versiondb.New(rawDB)
+		baseMerkleDB      = prefixdb.New(merkleStatePrefix, baseDB)
+		blockDB           = prefixdb.New(merkleBlockPrefix, baseDB)
+		txDB              = prefixdb.New(merkleTxPrefix, baseDB)
+		indexedUTXOsDB    = prefixdb.New(merkleIndexUTXOsPrefix, baseDB)
+		localUptimesDB    = prefixdb.New(merkleUptimesPrefix, baseDB)
+		localWeightDiffDB = prefixdb.New(merkleWeightDiffPrefix, baseDB)
+		localBlsKeyDiffDB = prefixdb.New(merkleBlsKeyDiffPrefix, baseDB)
 	)
 
 	ctx := context.TODO()
@@ -146,7 +150,26 @@ func NewMerkleState(
 		return nil, err
 	}
 
+	validatorWeightDiffsCache, err := metercacher.New[heightWithSubnet, map[ids.NodeID]*ValidatorWeightDiff](
+		"validator_weight_diffs_cache",
+		metricsReg,
+		&cache.LRU[heightWithSubnet, map[ids.NodeID]*ValidatorWeightDiff]{Size: validatorDiffsCacheSize},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	validatorBlsKeyDiffsCache, err := metercacher.New[uint64, map[ids.NodeID]*bls.PublicKey](
+		"validator_pub_key_diffs_cache",
+		metricsReg,
+		&cache.LRU[uint64, map[ids.NodeID]*bls.PublicKey]{Size: validatorDiffsCacheSize},
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	res := &merkleState{
+		cfg:          cfg,
 		baseDB:       baseDB,
 		baseMerkleDB: baseMerkleDB,
 		merkleDB:     merkleDB,
@@ -186,11 +209,19 @@ func NewMerkleState(
 		localUptimesCache:    make(map[ids.NodeID]map[ids.ID]*uptimes),
 		modifiedLocalUptimes: make(map[ids.NodeID]set.Set[ids.ID]),
 		localUptimesDB:       localUptimesDB,
+
+		validatorWeightDiffsCache: validatorWeightDiffsCache,
+		localWeightDiffDB:         localWeightDiffDB,
+
+		validatorBlsKeyDiffsCache: validatorBlsKeyDiffsCache,
+		localBlsKeyDiffDB:         localBlsKeyDiffDB,
 	}
 	return res, nil
 }
 
 type merkleState struct {
+	cfg *config.Config
+
 	baseDB       *versiondb.Database
 	baseMerkleDB database.Database
 	merkleDB     merkledb.MerkleDB // meklelized state
@@ -244,6 +275,12 @@ type merkleState struct {
 	localUptimesCache    map[ids.NodeID]map[ids.ID]*uptimes // vdrID -> subnetID -> metadata
 	modifiedLocalUptimes map[ids.NodeID]set.Set[ids.ID]     // vdrID -> subnetIDs
 	localUptimesDB       database.Database
+
+	validatorWeightDiffsCache cache.Cacher[heightWithSubnet, map[ids.NodeID]*ValidatorWeightDiff] // heightWithSubnet -> map[ids.NodeID]*ValidatorWeightDiff
+	localWeightDiffDB         database.Database
+
+	validatorBlsKeyDiffsCache cache.Cacher[uint64, map[ids.NodeID]*bls.PublicKey] // cache of height -> map[ids.NodeID]*bls.PublicKey
+	localBlsKeyDiffDB         database.Database
 }
 
 type uptimes struct {
@@ -753,12 +790,62 @@ func (ms *merkleState) ValidatorSet(subnetID ids.ID, vdrs validators.Set) error 
 	return nil
 }
 
-func (*merkleState) GetValidatorWeightDiffs( /*height*/ uint64 /*subnetID*/, ids.ID) (map[ids.NodeID]*ValidatorWeightDiff, error) {
-	return nil, fmt.Errorf("MerkleDB GetValidatorWeightDiffs: %w", errNotYetImplemented)
+// TODO: very inefficient implementation until ValidatorDiff optimization is merged in
+func (ms *merkleState) GetValidatorWeightDiffs(height uint64, subnetID ids.ID) (map[ids.NodeID]*ValidatorWeightDiff, error) {
+	cacheKey := heightWithSubnet{
+		Height:   height,
+		SubnetID: subnetID,
+	}
+	if weightDiffs, ok := ms.validatorWeightDiffsCache.Get(cacheKey); ok {
+		return weightDiffs, nil
+	}
+
+	// here check in the db
+	res := make(map[ids.NodeID]*ValidatorWeightDiff)
+	iter := ms.localWeightDiffDB.NewIteratorWithPrefix(subnetID[:])
+	defer iter.Release()
+	for iter.Next() {
+		keyBytes := iter.Key()
+		_, nodeID, retrievedHeight := splitMerkleWeightDiffKey(keyBytes)
+		if retrievedHeight != height {
+			continue // loop them all, we'll worry about efficiency after correctness
+		}
+
+		val := &ValidatorWeightDiff{}
+		if _, err := blocks.GenesisCodec.Unmarshal(iter.Value(), val); err != nil {
+			return nil, err
+		}
+
+		res[nodeID] = val
+	}
+	return res, iter.Error()
 }
 
-func (*merkleState) GetValidatorPublicKeyDiffs( /*height*/ uint64) (map[ids.NodeID]*bls.PublicKey, error) {
-	return nil, fmt.Errorf("MerkleDB GetValidatorPublicKeyDiffs: %w", errNotYetImplemented)
+// TODO: very inefficient implementation until ValidatorDiff optimization is merged in
+func (ms *merkleState) GetValidatorPublicKeyDiffs(height uint64) (map[ids.NodeID]*bls.PublicKey, error) {
+	if weightDiffs, ok := ms.validatorBlsKeyDiffsCache.Get(height); ok {
+		return weightDiffs, nil
+	}
+
+	// here check in the db
+	res := make(map[ids.NodeID]*bls.PublicKey)
+	iter := ms.localBlsKeyDiffDB.NewIterator()
+	defer iter.Release()
+	for iter.Next() {
+		keyBytes := iter.Key()
+		nodeID, retrievedHeight := splitMerkleBlsKeyDiffKey(keyBytes)
+		if retrievedHeight != height {
+			continue // loop them all, we'll worry about efficiency after correctness
+		}
+
+		pkBytes := iter.Value()
+		val, err := bls.PublicKeyFromBytes(pkBytes)
+		if err != nil {
+			return nil, err
+		}
+		res[nodeID] = val
+	}
+	return res, iter.Error()
 }
 
 // DB Operations
@@ -801,8 +888,8 @@ func (ms *merkleState) Close() error {
 	return errs.Err
 }
 
-func (ms *merkleState) write( /*updateValidators*/ bool /*height*/, uint64) error {
-	currentData, err := ms.processCurrentStakers()
+func (ms *merkleState) write(updateValidators bool, height uint64) error {
+	currentData, weightDiffs, blsKeyDiffs, valSetDiff, err := ms.processCurrentStakers()
 	if err != nil {
 		return err
 	}
@@ -817,6 +904,9 @@ func (ms *merkleState) write( /*updateValidators*/ bool /*height*/, uint64) erro
 		ms.writeBlocks(),
 		ms.writeTXs(),
 		ms.writeLocalUptimes(),
+		ms.writeWeightDiffs(height, weightDiffs),
+		ms.writeBlsKeyDiffs(height, blsKeyDiffs),
+		ms.updateValidatorSet(updateValidators, valSetDiff, weightDiffs),
 	)
 	return errs.Err
 }
@@ -827,30 +917,72 @@ type stakersData struct {
 	PotentialReward uint64 `serialize:"true"`
 }
 
-func (ms *merkleState) processCurrentStakers() (map[ids.ID]*stakersData, error) {
-	output := make(map[ids.ID]*stakersData)
+type weightDiffKey struct {
+	subnetID ids.ID
+	nodeID   ids.NodeID
+}
+
+func (ms *merkleState) processCurrentStakers() (
+	map[ids.ID]*stakersData,
+	map[weightDiffKey]*ValidatorWeightDiff,
+	map[ids.NodeID]*bls.PublicKey,
+	map[weightDiffKey]*diffValidator,
+	error,
+) {
+	var (
+		outputStakers = make(map[ids.ID]*stakersData)
+		outputWeights = make(map[weightDiffKey]*ValidatorWeightDiff)
+		outputBlsKey  = make(map[ids.NodeID]*bls.PublicKey)
+		outputValSet  = make(map[weightDiffKey]*diffValidator)
+	)
+
 	for subnetID, subnetValidatorDiffs := range ms.currentStakers.validatorDiffs {
 		delete(ms.currentStakers.validatorDiffs, subnetID)
-		for _, validatorDiff := range subnetValidatorDiffs {
+		for nodeID, validatorDiff := range subnetValidatorDiffs {
+			weightKey := weightDiffKey{
+				subnetID: subnetID,
+				nodeID:   nodeID,
+			}
+			outputValSet[weightKey] = validatorDiff
+
 			switch validatorDiff.validatorStatus {
 			case added:
 				var (
 					txID            = validatorDiff.validator.TxID
 					potentialReward = validatorDiff.validator.PotentialReward
+					weight          = validatorDiff.validator.Weight
 				)
 				tx, _, err := ms.GetTx(txID)
 				if err != nil {
-					return nil, fmt.Errorf("failed loading current validator tx, %w", err)
+					return nil, nil, nil, nil, fmt.Errorf("failed loading current validator tx, %w", err)
 				}
-				output[txID] = &stakersData{
+
+				outputStakers[txID] = &stakersData{
 					TxBytes:         tx.Bytes(),
 					IsCurrent:       false,
 					PotentialReward: potentialReward,
 				}
+				outputWeights[weightKey] = &ValidatorWeightDiff{
+					Decrease: false,
+					Amount:   weight,
+				}
+
 			case deleted:
-				txID := validatorDiff.validator.TxID
-				output[txID] = &stakersData{
+				var (
+					txID   = validatorDiff.validator.TxID
+					weight = validatorDiff.validator.Weight
+					blkKey = validatorDiff.validator.PublicKey
+				)
+
+				outputStakers[txID] = &stakersData{
 					TxBytes: nil,
+				}
+				outputWeights[weightKey] = &ValidatorWeightDiff{
+					Decrease: true,
+					Amount:   weight,
+				}
+				if blkKey != nil {
+					outputBlsKey[nodeID] = blkKey
 				}
 			}
 
@@ -860,24 +992,32 @@ func (ms *merkleState) processCurrentStakers() (map[ids.ID]*stakersData, error) 
 				staker := addedDelegatorIterator.Value()
 				tx, _, err := ms.GetTx(staker.TxID)
 				if err != nil {
-					return nil, fmt.Errorf("failed loading current delegator tx, %w", err)
+					return nil, nil, nil, nil, fmt.Errorf("failed loading current delegator tx, %w", err)
 				}
-				output[staker.TxID] = &stakersData{
+
+				outputStakers[staker.TxID] = &stakersData{
 					TxBytes:         tx.Bytes(),
 					IsCurrent:       false,
 					PotentialReward: staker.PotentialReward,
+				}
+				if err := outputWeights[weightKey].Add(false, staker.Weight); err != nil {
+					return nil, nil, nil, nil, fmt.Errorf("failed to increase node weight diff: %w", err)
 				}
 			}
 
 			for _, staker := range validatorDiff.deletedDelegators {
 				txID := staker.TxID
-				output[txID] = &stakersData{
+
+				outputStakers[txID] = &stakersData{
 					TxBytes: nil,
+				}
+				if err := outputWeights[weightKey].Add(true, staker.Weight); err != nil {
+					return nil, nil, nil, nil, fmt.Errorf("failed to decrease node weight diff: %w", err)
 				}
 			}
 		}
 	}
-	return output, nil
+	return outputStakers, outputWeights, outputBlsKey, outputValSet, nil
 }
 
 func (ms *merkleState) processPendingStakers() (map[ids.ID]*stakersData, error) {
@@ -1213,6 +1353,94 @@ func (ms *merkleState) writeLocalUptimes() error {
 			}
 		}
 		delete(ms.modifiedLocalUptimes, vdrID)
+	}
+	return nil
+}
+
+func (ms *merkleState) writeWeightDiffs(height uint64, weightDiffs map[weightDiffKey]*ValidatorWeightDiff) error {
+	for weightKey, weightDiff := range weightDiffs {
+		if weightDiff.Amount == 0 {
+			// No weight change to record; go to next validator.
+			continue
+		}
+
+		key := merkleWeightDiffKey(weightKey.subnetID, weightKey.nodeID, height)
+		weightDiffBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, weightDiff)
+		if err != nil {
+			return fmt.Errorf("failed to serialize validator weight diff: %w", err)
+		}
+
+		if err := ms.localWeightDiffDB.Put(key, weightDiffBytes); err != nil {
+			return fmt.Errorf("failed to add weight diffs: %w", err)
+		}
+
+		// update the cache
+		cacheKey := heightWithSubnet{
+			Height:   height,
+			SubnetID: weightKey.subnetID,
+		}
+		cacheValue := map[ids.NodeID]*ValidatorWeightDiff{
+			weightKey.nodeID: weightDiff,
+		}
+		ms.validatorWeightDiffsCache.Put(cacheKey, cacheValue)
+	}
+	return nil
+}
+
+func (ms *merkleState) writeBlsKeyDiffs(height uint64, blsKeyDiffs map[ids.NodeID]*bls.PublicKey) error {
+	for nodeID, blsKey := range blsKeyDiffs {
+		key := merkleBlsKeytDiffKey(nodeID, height)
+		blsKeyBytes := bls.PublicKeyToBytes(blsKey)
+
+		if err := ms.localBlsKeyDiffDB.Put(key, blsKeyBytes); err != nil {
+			return fmt.Errorf("failed to add bls key diffs: %w", err)
+		}
+	}
+	return nil
+}
+
+func (ms *merkleState) updateValidatorSet(
+	updateValidators bool,
+	valSetDiff map[weightDiffKey]*diffValidator,
+	weightDiffs map[weightDiffKey]*ValidatorWeightDiff,
+) error {
+	if !updateValidators {
+		return nil
+	}
+
+	for weightKey, weightDiff := range weightDiffs {
+		var (
+			subnetID      = weightKey.subnetID
+			nodeID        = weightKey.nodeID
+			validatorDiff = valSetDiff[weightKey]
+			err           error
+		)
+
+		// We only track the current validator set of tracked subnets.
+		if subnetID != constants.PrimaryNetworkID && !ms.cfg.TrackedSubnets.Contains(subnetID) {
+			continue
+		}
+
+		if weightDiff.Decrease {
+			err = validators.RemoveWeight(ms.cfg.Validators, subnetID, nodeID, weightDiff.Amount)
+		} else {
+			if validatorDiff.validatorStatus == added {
+				staker := validatorDiff.validator
+				err = validators.Add(
+					ms.cfg.Validators,
+					subnetID,
+					nodeID,
+					staker.PublicKey,
+					staker.TxID,
+					weightDiff.Amount,
+				)
+			} else {
+				err = validators.AddWeight(ms.cfg.Validators, subnetID, nodeID, weightDiff.Amount)
+			}
+		}
+		if err != nil {
+			return fmt.Errorf("failed to update validator weight: %w", err)
+		}
 	}
 	return nil
 }

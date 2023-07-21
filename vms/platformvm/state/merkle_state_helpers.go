@@ -3,7 +3,10 @@
 
 package state
 
-import "github.com/ava-labs/avalanchego/ids"
+import (
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/ids"
+)
 
 func merkleSuppliesKey(subnetID ids.ID) []byte {
 	key := make([]byte, 0, len(merkleSuppliesPrefix)+len(subnetID[:]))
@@ -98,4 +101,53 @@ func merkleDelegateeRewardsKey(nodeID ids.NodeID, subnetID ids.ID) []byte {
 	key = append(key, nodeID[:]...)
 	key = append(key, subnetID[:]...)
 	return key
+}
+
+func merkleWeightDiffKey(subnetID ids.ID, nodeID ids.NodeID, height uint64) []byte {
+	key := make([]byte, 0, len(nodeID)+len(subnetID)) // missing height part
+	key = append(key, subnetID[:]...)
+	key = append(key, nodeID[:]...)
+	key = append(key, database.PackUInt64(height)...)
+	return key
+}
+
+// TODO: remove when ValidatorDiff optimization is merged in
+func splitMerkleWeightDiffKey(key []byte) (ids.ID, ids.NodeID, uint64) {
+	subnetIDLenght := 32
+	nodeIDLenght := 20
+
+	subnetID := ids.Empty
+	copy(subnetID[:], key[0:subnetIDLenght])
+
+	nodeID := ids.EmptyNodeID
+	copy(nodeID[:], key[subnetIDLenght:subnetIDLenght+nodeIDLenght])
+
+	height, err := database.ParseUInt64(key[subnetIDLenght+nodeIDLenght:])
+	if err != nil {
+		panic("failed splitting MerkleWeightDiffKey")
+	}
+
+	return subnetID, nodeID, height
+}
+
+func merkleBlsKeytDiffKey(nodeID ids.NodeID, height uint64) []byte {
+	key := make([]byte, 0, len(nodeID)) // missing height part
+	key = append(key, nodeID[:]...)
+	key = append(key, database.PackUInt64(height)...)
+	return key
+}
+
+// TODO: remove when ValidatorDiff optimization is merged in
+func splitMerkleBlsKeyDiffKey(key []byte) (ids.NodeID, uint64) {
+	nodeIDLenght := 20
+
+	nodeID := ids.EmptyNodeID
+	copy(nodeID[:], key[0:nodeIDLenght])
+
+	height, err := database.ParseUInt64(key[nodeIDLenght:])
+	if err != nil {
+		panic("failed splitting MerkleWeightDiffKey")
+	}
+
+	return nodeID, height
 }
