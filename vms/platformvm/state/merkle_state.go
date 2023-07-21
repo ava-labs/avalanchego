@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/trace"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -26,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -69,11 +71,13 @@ var (
 
 func NewMerkleState(
 	rawDB database.Database,
+	metrics metrics.Metrics,
 	genesisBytes []byte,
 	cfg *config.Config,
 	ctx *snow.Context,
 	metricsReg prometheus.Registerer,
 	rewards reward.Calculator,
+	bootstrapped *utils.Atomic[bool],
 ) (Chain, error) {
 	var (
 		baseDB            = versiondb.New(rawDB)
@@ -178,7 +182,9 @@ func NewMerkleState(
 	res := &merkleState{
 		cfg:          cfg,
 		ctx:          ctx,
+		metrics:      metrics,
 		rewards:      rewards,
+		bootstrapped: bootstrapped,
 		baseDB:       baseDB,
 		baseMerkleDB: baseMerkleDB,
 		merkleDB:     merkleDB,
@@ -237,9 +243,11 @@ func NewMerkleState(
 }
 
 type merkleState struct {
-	cfg     *config.Config
-	ctx     *snow.Context
-	rewards reward.Calculator
+	cfg          *config.Config
+	ctx          *snow.Context
+	metrics      metrics.Metrics
+	rewards      reward.Calculator
+	bootstrapped *utils.Atomic[bool]
 
 	baseDB       *versiondb.Database
 	singletonDB  database.Database
@@ -301,13 +309,6 @@ type merkleState struct {
 
 	validatorBlsKeyDiffsCache cache.Cacher[uint64, map[ids.NodeID]*bls.PublicKey] // cache of height -> map[ids.NodeID]*bls.PublicKey
 	localBlsKeyDiffDB         database.Database
-}
-type uptimes struct {
-	Duration    time.Duration `serialize:"true"`
-	LastUpdated uint64        `serialize:"true"` // Unix time in seconds
-
-	// txID        ids.ID // TODO ABENEGIA: is it needed by delegators and not validators?
-	lastUpdated time.Time
 }
 
 // STAKERS section
@@ -824,18 +825,20 @@ func (ms *merkleState) GetValidatorWeightDiffs(height uint64, subnetID ids.ID) (
 	iter := ms.localWeightDiffDB.NewIteratorWithPrefix(subnetID[:])
 	defer iter.Release()
 	for iter.Next() {
-		keyBytes := iter.Key()
-		_, nodeID, retrievedHeight := splitMerkleWeightDiffKey(keyBytes)
-		if retrievedHeight != height {
-			continue // loop them all, we'll worry about efficiency after correctness
-		}
-
-		val := &ValidatorWeightDiff{}
-		if _, err := blocks.GenesisCodec.Unmarshal(iter.Value(), val); err != nil {
+		_, nodeID, retrievedHeight, err := splitMerkleWeightDiffKey(iter.Key())
+		switch {
+		case err != nil:
 			return nil, err
-		}
+		case retrievedHeight != height:
+			continue // loop them all, we'll worry about efficiency after correctness
+		default:
+			val := &ValidatorWeightDiff{}
+			if _, err := blocks.GenesisCodec.Unmarshal(iter.Value(), val); err != nil {
+				return nil, err
+			}
 
-		res[nodeID] = val
+			res[nodeID] = val
+		}
 	}
 	return res, iter.Error()
 }
@@ -851,18 +854,20 @@ func (ms *merkleState) GetValidatorPublicKeyDiffs(height uint64) (map[ids.NodeID
 	iter := ms.localBlsKeyDiffDB.NewIterator()
 	defer iter.Release()
 	for iter.Next() {
-		keyBytes := iter.Key()
-		nodeID, retrievedHeight := splitMerkleBlsKeyDiffKey(keyBytes)
-		if retrievedHeight != height {
-			continue // loop them all, we'll worry about efficiency after correctness
-		}
-
-		pkBytes := iter.Value()
-		val, err := bls.PublicKeyFromBytes(pkBytes)
-		if err != nil {
+		nodeID, retrievedHeight, err := splitMerkleBlsKeyDiffKey(iter.Key())
+		switch {
+		case err != nil:
 			return nil, err
+		case retrievedHeight != height:
+			continue // loop them all, we'll worry about efficiency after correctness
+		default:
+			pkBytes := iter.Value()
+			val, err := bls.PublicKeyFromBytes(pkBytes)
+			if err != nil {
+				return nil, err
+			}
+			res[nodeID] = val
 		}
-		res[nodeID] = val
 	}
 	return res, iter.Error()
 }
@@ -930,17 +935,6 @@ func (ms *merkleState) write(updateValidators bool, height uint64) error {
 	return errs.Err
 }
 
-type stakersData struct {
-	TxBytes         []byte `serialize:"true"`
-	IsCurrent       bool   `serialize:"true"`
-	PotentialReward uint64 `serialize:"true"`
-}
-
-type weightDiffKey struct {
-	subnetID ids.ID
-	nodeID   ids.NodeID
-}
-
 func (ms *merkleState) processCurrentStakers() (
 	map[ids.ID]*stakersData,
 	map[weightDiffKey]*ValidatorWeightDiff,
@@ -978,7 +972,6 @@ func (ms *merkleState) processCurrentStakers() (
 
 				outputStakers[txID] = &stakersData{
 					TxBytes:         tx.Bytes(),
-					IsCurrent:       false,
 					PotentialReward: potentialReward,
 				}
 				outputWeights[weightKey] = &ValidatorWeightDiff{
@@ -1016,7 +1009,6 @@ func (ms *merkleState) processCurrentStakers() (
 
 				outputStakers[staker.TxID] = &stakersData{
 					TxBytes:         tx.Bytes(),
-					IsCurrent:       false,
 					PotentialReward: staker.PotentialReward,
 				}
 				if err := outputWeights[weightKey].Add(false, staker.Weight); err != nil {
@@ -1053,7 +1045,6 @@ func (ms *merkleState) processPendingStakers() (map[ids.ID]*stakersData, error) 
 				}
 				output[txID] = &stakersData{
 					TxBytes:         tx.Bytes(),
-					IsCurrent:       false,
 					PotentialReward: 0,
 				}
 			case deleted:
@@ -1073,7 +1064,6 @@ func (ms *merkleState) processPendingStakers() (map[ids.ID]*stakersData, error) 
 				}
 				output[staker.TxID] = &stakersData{
 					TxBytes:         tx.Bytes(),
-					IsCurrent:       false,
 					PotentialReward: 0,
 				}
 			}
