@@ -698,7 +698,7 @@ func (s *state) doneInit() error {
 func (s *state) shouldPrune() (bool, error) {
 	has, err := s.singletonDB.Has(prunedKey)
 	if err != nil {
-		return true, nil
+		return true, err
 	}
 	if has {
 		return true, nil
@@ -706,7 +706,7 @@ func (s *state) shouldPrune() (bool, error) {
 
 	blk, err := s.GetStatelessBlock(s.lastAccepted)
 	if err != nil {
-		return true, nil
+		return true, err
 	}
 
 	_, err = s.GetBlockIDAtHeight(blk.Height())
