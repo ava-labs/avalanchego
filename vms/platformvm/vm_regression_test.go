@@ -4,6 +4,7 @@
 package platformvm
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"testing"
@@ -1687,26 +1688,26 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 			nodeID,
 			constants.PrimaryNetworkID,
 			height,
-			uPrimaryTx.Signer.Key()),
-		)
+			uPrimaryTx.Signer.Key(),
+		))
 	}
 	for height := primaryEndHeight; height < primaryRestartHeight; height++ {
-		require.ErrorIs(checkValidatorBlsKeyIsSet(
+		err := checkValidatorBlsKeyIsSet(
 			vm.State,
 			nodeID,
 			constants.PrimaryNetworkID,
 			primaryEndHeight,
-			uPrimaryTx.Signer.Key()),
-			database.ErrNotFound,
+			uPrimaryTx.Signer.Key(),
 		)
+		require.ErrorIs(err, database.ErrNotFound)
 	}
 	require.NoError(checkValidatorBlsKeyIsSet(
 		vm.State,
 		nodeID,
 		constants.PrimaryNetworkID,
 		primaryRestartHeight,
-		uPrimaryRestartTx.Signer.Key()),
-	)
+		uPrimaryRestartTx.Signer.Key(),
+	))
 
 	for height := subnetStartHeight; height < subnetEndHeight; height++ {
 		require.NoError(checkValidatorBlsKeyIsSet(
@@ -1714,19 +1715,19 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 			nodeID,
 			subnetID,
 			height,
-			uPrimaryTx.Signer.Key()),
-		)
+			uPrimaryTx.Signer.Key(),
+		))
 	}
 
 	for height := subnetEndHeight; height <= primaryRestartHeight; height++ {
-		require.ErrorIs(checkValidatorBlsKeyIsSet(
+		err := checkValidatorBlsKeyIsSet(
 			vm.State,
 			nodeID,
 			subnetID,
 			primaryEndHeight,
-			uPrimaryTx.Signer.Key()),
-			database.ErrNotFound,
+			uPrimaryTx.Signer.Key(),
 		)
+		require.ErrorIs(err, database.ErrNotFound)
 	}
 }
 
@@ -1884,8 +1885,8 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 			nodeID,
 			constants.PrimaryNetworkID,
 			height,
-			emptySigner.Key()),
-		)
+			emptySigner.Key(),
+		))
 	}
 }
 
@@ -2086,8 +2087,8 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 			nodeID,
 			constants.PrimaryNetworkID,
 			height,
-			emptySigner.Key()),
-		)
+			emptySigner.Key(),
+		))
 	}
 	for height := subnetStartHeight; height < subnetEndHeight; height++ {
 		require.NoError(checkValidatorBlsKeyIsSet(
@@ -2095,8 +2096,8 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 			nodeID,
 			subnetID,
 			height,
-			emptySigner.Key()),
-		)
+			emptySigner.Key(),
+		))
 	}
 }
 
@@ -2130,12 +2131,18 @@ func checkValidatorBlsKeyIsSet(
 	}
 
 	val, found := vals[nodeID]
-	if !found {
+	switch {
+	case !found:
 		return database.ErrNotFound
-	}
-	if val.PublicKey != expectedBlsKey {
+	case expectedBlsKey == val.PublicKey:
+		return nil
+	case expectedBlsKey == nil && val.PublicKey != nil:
 		return errors.New("unexpected BLS key")
+	case expectedBlsKey != nil && val.PublicKey == nil:
+		return errors.New("missing BLS key")
+	case !bytes.Equal(expectedBlsKey.Serialize(), val.PublicKey.Serialize()):
+		return errors.New("incorrect BLS key")
+	default:
+		return nil
 	}
-
-	return nil
 }
