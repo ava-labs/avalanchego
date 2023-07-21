@@ -56,6 +56,7 @@ import (
 
 var (
 	_ block.ChainVM              = (*VM)(nil)
+	_ block.HeightIndexedChainVM = (*VM)(nil)
 	_ secp256k1fx.VM             = (*VM)(nil)
 	_ validators.State           = (*VM)(nil)
 	_ validators.SubnetConnector = (*VM)(nil)
@@ -476,4 +477,12 @@ func (vm *VM) Clock() *mockable.Clock {
 
 func (vm *VM) Logger() logging.Logger {
 	return vm.ctx.Log
+}
+
+func (vm *VM) VerifyHeightIndex(ctx context.Context) error {
+	return vm.state.VerifyHeightIndex()
+}
+
+func (vm *VM) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, error) {
+	return vm.state.GetBlockIDAtHeight(height)
 }

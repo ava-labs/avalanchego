@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
@@ -163,6 +164,8 @@ type State interface {
 	//
 	// TODO: remove after v1.11.x is activated
 	PruneAndIndex(sync.Locker, logging.Logger) error
+
+	VerifyHeightIndex() error
 
 	// Commit changes to the base database.
 	Commit() error
@@ -702,6 +705,14 @@ func (s *state) shouldPrune() (bool, error) {
 
 func (s *state) donePrune() error {
 	return s.singletonDB.Put(prunedKey, nil)
+}
+
+func (s *state) VerifyHeightIndex() error {
+	shouldPrune, err := s.shouldPrune()
+	if err != nil || shouldPrune {
+		return block.ErrIndexIncomplete
+	}
+	return nil
 }
 
 func (s *state) GetSubnets() ([]*txs.Tx, error) {
