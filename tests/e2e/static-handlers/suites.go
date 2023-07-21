@@ -30,7 +30,6 @@ var _ = ginkgo.Describe("[StaticHandlers]", func() {
 		// use this for filtering tests by labels
 		// ref. https://onsi.github.io/ginkgo/#spec-labels
 		ginkgo.Label(
-			"require-network-runner",
 			"static-handlers",
 		),
 		func() {
@@ -111,9 +110,7 @@ var _ = ginkgo.Describe("[StaticHandlers]", func() {
 					},
 				},
 			}
-			uris := e2e.Env.GetURIs()
-			gomega.Expect(uris).ShouldNot(gomega.BeEmpty())
-			staticClient := avm.NewStaticClient(uris[0])
+			staticClient := avm.NewStaticClient(e2e.Env.GetRandomNodeURI())
 			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 			resp, err := staticClient.BuildGenesis(ctx, &avmArgs)
 			cancel()
@@ -184,10 +181,7 @@ var _ = ginkgo.Describe("[StaticHandlers]", func() {
 			Encoding:      formatting.Hex,
 		}
 
-		uris := e2e.Env.GetURIs()
-		gomega.Expect(uris).ShouldNot(gomega.BeEmpty())
-
-		staticClient := api.NewStaticClient(uris[0])
+		staticClient := api.NewStaticClient(e2e.Env.GetRandomNodeURI())
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		resp, err := staticClient.BuildGenesis(ctx, &buildGenesisArgs)
 		cancel()
