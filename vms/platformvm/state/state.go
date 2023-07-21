@@ -158,8 +158,8 @@ type State interface {
 	// Discard uncommitted changes to the database.
 	Abort()
 
-	// Asynchronously removes rejected blocks from disk and indexes accepted blocks
-	// by height.
+	// Removes rejected blocks from disk and indexes accepted blocks by height. This
+	// function supports being (and is recommended to be) called asynchronously.
 	//
 	// TODO: remove after v1.11.x is activated
 	PruneAndIndex(sync.Locker, logging.Logger) error
@@ -2069,7 +2069,7 @@ func (s *state) writeMetadata() error {
 // Returns the block, status of the block, and whether it is a [stateBlk].
 // Invariant: blkBytes is safe to parse with blocks.GenesisCodec
 //
-// TODO: Cleanup after v1.11.x is activated
+// TODO: Remove after v1.11.x is activated
 func parseStoredBlock(blkBytes []byte) (blocks.Block, choices.Status, bool, error) {
 	blk, err := blocks.Parse(blocks.GenesisCodec, blkBytes)
 	if err == nil {
@@ -2219,8 +2219,12 @@ func (s *state) PruneAndIndex(lock sync.Locker, log logging.Logger) error {
 			// duration.
 			lastCommit = time.Now()
 
-			blockIterator = s.blockDB.NewIteratorWithStart(blkBytes)
+			blockIterator = s.blockDB.NewIteratorWithStart(blkID[:])
 		}
+	}
+
+	if err := s.donePrune(); err != nil {
+		return err
 	}
 
 	// We must hold the lock during committing to make sure we don't
@@ -2244,15 +2248,6 @@ func (s *state) PruneAndIndex(lock sync.Locker, log logging.Logger) error {
 		zap.Int("numPruned", numPruned),
 		zap.Int("numIndexed", numIndexed),
 		zap.Duration("duration", time.Since(startTime)),
-	)
-
-	if errs.Errored() {
-		return errs.Err
-	}
-
-	errs.Add(
-		s.donePrune(),
-		s.Commit(),
 	)
 
 	return errs.Err
