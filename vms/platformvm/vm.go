@@ -91,6 +91,9 @@ type VM struct {
 
 	txBuilder txbuilder.Builder
 	manager   blockexecutor.Manager
+
+	// TODO: Remove after v1.11.x is activated
+	pruned bool
 }
 
 type Config struct {
@@ -233,6 +236,8 @@ func (vm *VM) Initialize(
 				zap.Error(err),
 			)
 		}
+
+		vm.pruned = true
 	}()
 
 	return nil
@@ -480,7 +485,11 @@ func (vm *VM) Logger() logging.Logger {
 }
 
 func (vm *VM) VerifyHeightIndex(_ context.Context) error {
-	return vm.state.VerifyHeightIndex()
+	if vm.pruned {
+		return nil
+	}
+
+	return block.ErrIndexIncomplete
 }
 
 func (vm *VM) GetBlockIDAtHeight(_ context.Context, height uint64) (ids.ID, error) {
