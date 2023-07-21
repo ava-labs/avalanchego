@@ -479,10 +479,10 @@ func (vm *VM) Logger() logging.Logger {
 	return vm.ctx.Log
 }
 
-func (vm *VM) VerifyHeightIndex(ctx context.Context) error {
+func (vm *VM) VerifyHeightIndex(_ context.Context) error {
 	return vm.state.VerifyHeightIndex()
 }
 
-func (vm *VM) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, error) {
+func (vm *VM) GetBlockIDAtHeight(_ context.Context, height uint64) (ids.ID, error) {
 	return vm.state.GetBlockIDAtHeight(height)
 }

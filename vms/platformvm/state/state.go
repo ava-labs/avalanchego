@@ -165,6 +165,7 @@ type State interface {
 	// TODO: remove after v1.11.x is activated
 	PruneAndIndex(sync.Locker, logging.Logger) error
 
+	// TODO: remove after v1.11.x is activated
 	VerifyHeightIndex() error
 
 	// Commit changes to the base database.
