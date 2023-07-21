@@ -10,8 +10,6 @@ const (
 	ConfigContentKey                                   = "config-file-content"
 	ConfigContentTypeKey                               = "config-file-content-type"
 	VersionKey                                         = "version"
-	GenesisConfigFileKey                               = "genesis"         // TODO: deprecated, remove
-	GenesisConfigContentKey                            = "genesis-content" // TODO: deprecated, remove this
 	GenesisFileKey                                     = "genesis-file"
 	GenesisFileContentKey                              = "genesis-file-content"
 	NetworkNameKey                                     = "network-id"
@@ -42,10 +40,6 @@ const (
 	PublicIPKey                                        = "public-ip"
 	PublicIPResolutionFreqKey                          = "public-ip-resolution-frequency"
 	PublicIPResolutionServiceKey                       = "public-ip-resolution-service"
-	InboundConnUpgradeThrottlerCooldownKey             = "inbound-connection-throttling-cooldown"          // TODO: deprecated, remove this
-	InboundThrottlerMaxConnsPerSecKey                  = "inbound-connection-throttling-max-conns-per-sec" // TODO: deprecated, remove this
-	OutboundConnectionThrottlingRpsKey                 = "outbound-connection-throttling-rps"              // TODO: deprecated, remove this
-	OutboundConnectionTimeoutKey                       = "outbound-connection-timeout"                     // TODO: deprecated, remove this
 	HTTPHostKey                                        = "http-host"
 	HTTPPortKey                                        = "http-port"
 	HTTPSEnabledKey                                    = "http-tls-enabled"
@@ -70,7 +64,6 @@ const (
 	BootstrapIDsKey                                    = "bootstrap-ids"
 	StakingHostKey                                     = "staking-host"
 	StakingPortKey                                     = "staking-port"
-	StakingEnabledKey                                  = "staking-enabled" // TODO: deprecated, remove this
 	StakingEphemeralCertEnabledKey                     = "staking-ephemeral-cert-enabled"
 	StakingTLSKeyPathKey                               = "staking-tls-key-file"
 	StakingTLSKeyContentKey                            = "staking-tls-key-file-content"
@@ -79,7 +72,6 @@ const (
 	StakingEphemeralSignerEnabledKey                   = "staking-ephemeral-signer-enabled"
 	StakingSignerKeyPathKey                            = "staking-signer-key-file"
 	StakingSignerKeyContentKey                         = "staking-signer-key-file-content"
-	StakingDisabledWeightKey                           = "staking-disabled-weight" // TODO: deprecated, remove this
 	SybilProtectionEnabledKey                          = "sybil-protection-enabled"
 	SybilProtectionDisabledWeightKey                   = "sybil-protection-disabled-weight"
 	NetworkInitialTimeoutKey                           = "network-initial-timeout"
@@ -104,7 +96,6 @@ const (
 	NetworkPingTimeoutKey                              = "network-ping-timeout"
 	NetworkPingFrequencyKey                            = "network-ping-frequency"
 	NetworkMaxReconnectDelayKey                        = "network-max-reconnect-delay"
-	NetworkCompressionEnabledKey                       = "network-compression-enabled" // TODO this is deprecated. Eventually remove it and constants.DefaultNetworkCompressionEnabled
 	NetworkCompressionTypeKey                          = "network-compression-type"
 	NetworkMaxClockDifferenceKey                       = "network-max-clock-difference"
 	NetworkAllowPrivateIPsKey                          = "network-allow-private-ips"
@@ -148,7 +139,6 @@ const (
 	IpcsChainIDsKey                                    = "ipcs-chain-ids"
 	IpcsPathKey                                        = "ipcs-path"
 	MeterVMsEnabledKey                                 = "meter-vms-enabled"
-	ConsensusGossipFrequencyKey                        = "consensus-gossip-frequency" // TODO: deprecated, remove this
 	ConsensusAcceptedFrontierGossipFrequencyKey        = "consensus-accepted-frontier-gossip-frequency"
 	ConsensusAppConcurrencyKey                         = "consensus-app-concurrency"
 	ConsensusGossipAcceptedFrontierValidatorSizeKey    = "consensus-accepted-frontier-gossip-validator-size"
