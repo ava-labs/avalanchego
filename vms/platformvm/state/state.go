@@ -423,6 +423,24 @@ func New(
 		return nil, err
 	}
 
+	// Before we start accepting new blocks, we check if the pruning process needs
+	// to be run.
+	//
+	// TODO: Cleanup after v1.11.x is activated
+	shouldPrune, err := s.shouldPrune()
+	if err != nil {
+		return nil, err
+	}
+	if shouldPrune {
+		if err := s.singletonDB.Delete(prunedKey); err != nil {
+			return nil, fmt.Errorf("failed to check if prunedKey is in singletonDB: %w", err)
+		}
+
+		if err := s.Commit(); err != nil {
+			return nil, fmt.Errorf("failed to commit to baseDB: %w", err)
+		}
+	}
+
 	return s, nil
 }
 
@@ -553,7 +571,7 @@ func new(
 		return nil, err
 	}
 
-	s := &state{
+	return &state{
 		validatorState: newValidatorState(),
 
 		cfg:          cfg,
@@ -627,27 +645,7 @@ func new(
 		chainDBCache: chainDBCache,
 
 		singletonDB: prefixdb.New(singletonPrefix, baseDB),
-	}
-
-	// Before we start accepting new blocks, we check if the pruning process needs
-	// to be run.
-	//
-	// TODO: Cleanup after v1.11.x is activated
-	shouldPrune, err := s.shouldPrune()
-	if err != nil {
-		return nil, err
-	}
-	if shouldPrune {
-		if err := s.singletonDB.Delete(prunedKey); err != nil {
-			return nil, fmt.Errorf("failed to check if prunedKey is in singletonDB: %w", err)
-		}
-
-		if err := s.Commit(); err != nil {
-			return nil, fmt.Errorf("failed to commit to baseDB: %w", err)
-		}
-	}
-
-	return s, nil
+	}, nil
 }
 
 func (s *state) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker, error) {
