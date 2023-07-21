@@ -60,6 +60,7 @@ var (
 	rewardUtxosSectionPrefix        = []byte{0x5}
 	currentStakersSectionPrefix     = []byte{0x6}
 	pendingStakersSectionPrefix     = []byte{0x7}
+	delegateeRewardsPrefix          = []byte{0x8}
 )
 
 func NewMerkleState(
@@ -153,6 +154,9 @@ func NewMerkleState(
 		currentStakers: newBaseStakers(),
 		pendingStakers: newBaseStakers(),
 
+		delegateeRewardCache:    make(map[ids.NodeID]map[ids.ID]uint64),
+		modifiedDelegateeReward: make(map[ids.NodeID]set.Set[ids.ID]),
+
 		modifiedUTXOs:    make(map[ids.ID]*avax.UTXO),
 		utxoCache:        &cache.LRU[ids.ID, *avax.UTXO]{Size: utxoCacheSize},
 		addedRewardUTXOs: make(map[ids.ID][]*avax.UTXO),
@@ -195,6 +199,9 @@ type merkleState struct {
 	// TODO: Consider moving delegatee to UTXOs section
 	currentStakers *baseStakers
 	pendingStakers *baseStakers
+
+	delegateeRewardCache    map[ids.NodeID]map[ids.ID]uint64
+	modifiedDelegateeReward map[ids.NodeID]set.Set[ids.ID]
 
 	// UTXOs section
 	modifiedUTXOs map[ids.ID]*avax.UTXO            // map of UTXO ID -> *UTXO
@@ -304,12 +311,34 @@ func (ms *merkleState) GetPendingStakerIterator() (StakerIterator, error) {
 	return ms.pendingStakers.GetStakerIterator(), nil
 }
 
-func (*merkleState) GetDelegateeReward( /*subnetID*/ ids.ID /*vdrID*/, ids.NodeID) (amount uint64, err error) {
-	return 0, errNotYetImplemented
+func (ms *merkleState) GetDelegateeReward(subnetID ids.ID, vdrID ids.NodeID) (uint64, error) {
+	nodeDelegateeRewards, exists := ms.delegateeRewardCache[vdrID]
+	if !exists {
+		return 0, database.ErrNotFound
+	}
+	delegateeReward, exists := nodeDelegateeRewards[subnetID]
+	if !exists {
+		return 0, database.ErrNotFound
+	}
+	return delegateeReward, nil
 }
 
-func (*merkleState) SetDelegateeReward( /*subnetID*/ ids.ID /*vdrID*/, ids.NodeID /*amount*/, uint64) error {
-	return errNotYetImplemented
+func (ms *merkleState) SetDelegateeReward(subnetID ids.ID, vdrID ids.NodeID, amount uint64) error {
+	nodeDelegateeRewards, exists := ms.delegateeRewardCache[vdrID]
+	if !exists {
+		nodeDelegateeRewards = make(map[ids.ID]uint64)
+		ms.delegateeRewardCache[vdrID] = nodeDelegateeRewards
+	}
+	nodeDelegateeRewards[subnetID] = amount
+
+	// track diff
+	updatedDelegateeRewards, ok := ms.modifiedDelegateeReward[vdrID]
+	if !ok {
+		updatedDelegateeRewards = set.Set[ids.ID]{}
+		ms.modifiedDelegateeReward[vdrID] = updatedDelegateeRewards
+	}
+	updatedDelegateeRewards.Add(subnetID)
+	return nil
 }
 
 // UTXOs section
@@ -916,6 +945,7 @@ func (ms *merkleState) writeMerkleState(currentData, pendingData map[ids.ID]*sta
 		ms.writeChains(view, ctx),
 		ms.writeCurrentStakers(view, ctx, currentData),
 		ms.writePendingStakers(view, ctx, pendingData),
+		ms.writeDelegateeRewards(view, ctx),
 		ms.writeUTXOs(view, ctx),
 		ms.writeRewardUTXOs(view, ctx),
 	)
@@ -1078,6 +1108,22 @@ func (ms *merkleState) writeRewardUTXOs(view merkledb.TrieView, ctx context.Cont
 				return fmt.Errorf("failed to add reward UTXO: %w", err)
 			}
 		}
+	}
+	return nil
+}
+
+func (ms *merkleState) writeDelegateeRewards(view merkledb.TrieView, ctx context.Context) error {
+	for nodeID, nodeDelegateeRewards := range ms.modifiedDelegateeReward {
+		nodeDelegateeRewardsList := nodeDelegateeRewards.List()
+		for _, subnetID := range nodeDelegateeRewardsList {
+			delegateeReward := ms.delegateeRewardCache[nodeID][subnetID]
+
+			key := merkleDelegateeRewardsKey(nodeID, subnetID)
+			if err := view.Insert(ctx, key, database.PackUInt64(delegateeReward)); err != nil {
+				return fmt.Errorf("failed to add reward UTXO: %w", err)
+			}
+		}
+		delete(ms.modifiedDelegateeReward, nodeID)
 	}
 	return nil
 }

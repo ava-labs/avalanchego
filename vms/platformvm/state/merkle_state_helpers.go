@@ -91,3 +91,11 @@ func merklePendingStakersKey(txID ids.ID) []byte {
 	key = append(key, txID[:]...)
 	return key
 }
+
+func merkleDelegateeRewardsKey(nodeID ids.NodeID, subnetID ids.ID) []byte {
+	key := make([]byte, 0, len(delegateeRewardsPrefix)+len(nodeID)+len(subnetID))
+	copy(key, delegateeRewardsPrefix)
+	key = append(key, nodeID[:]...)
+	key = append(key, subnetID[:]...)
+	return key
+}
