@@ -78,8 +78,7 @@ var (
 	// Used to create and use keys.
 	testKeyfactory secp256k1.Factory
 
-	errMissingPrimaryValidators = errors.New("missing primary validator set")
-	errMissing                  = errors.New("missing")
+	errMissing = errors.New("missing")
 )
 
 type mutableSharedMemory struct {
@@ -428,31 +427,24 @@ func buildGenesisTest(ctx *snow.Context) []byte {
 
 func shutdownEnvironment(env *environment) error {
 	if env.isBootstrapped.Get() {
-		primaryValidatorSet, exist := env.config.Validators.Get(constants.PrimaryNetworkID)
-		if !exist {
-			return errMissingPrimaryValidators
+		validatorIDs, err := validators.NodeIDs(env.config.Validators, constants.PrimaryNetworkID)
+		if err != nil {
+			return err
 		}
-		primaryValidators := primaryValidatorSet.List()
 
-		validatorIDs := make([]ids.NodeID, len(primaryValidators))
-		for i, vdr := range primaryValidators {
-			validatorIDs[i] = vdr.NodeID
-		}
 		if err := env.uptimes.StopTracking(validatorIDs, constants.PrimaryNetworkID); err != nil {
 			return err
 		}
 
 		for subnetID := range env.config.TrackedSubnets {
-			vdrs, exist := env.config.Validators.Get(subnetID)
-			if !exist {
+			validatorIDs, err := validators.NodeIDs(env.config.Validators, subnetID)
+			if errors.Is(err, validators.ErrMissingValidators) {
 				return nil
 			}
-			validators := vdrs.List()
-
-			validatorIDs := make([]ids.NodeID, len(validators))
-			for i, vdr := range validators {
-				validatorIDs[i] = vdr.NodeID
+			if err != nil {
+				return err
 			}
+
 			if err := env.uptimes.StopTracking(validatorIDs, subnetID); err != nil {
 				return err
 			}
