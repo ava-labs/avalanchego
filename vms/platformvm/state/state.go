@@ -433,7 +433,7 @@ func New(
 	}
 	if shouldPrune {
 		if err := s.singletonDB.Delete(prunedKey); err != nil {
-			return nil, fmt.Errorf("failed to check if prunedKey is in singletonDB: %w", err)
+			return nil, fmt.Errorf("failed to remove prunedKey from singletonDB: %w", err)
 		}
 
 		if err := s.Commit(); err != nil {
