@@ -585,8 +585,6 @@ func TestBlockAccept(t *testing.T) {
 			blockFunc: func(ctrl *gomock.Controller) *Block {
 				mockBlock := blocks.NewMockBlock(ctrl)
 				mockBlock.EXPECT().ID().Return(ids.GenerateTestID()).AnyTimes()
-				mockBlock.EXPECT().Height().Return(uint64(0)).AnyTimes()
-				mockBlock.EXPECT().Parent().Return(ids.GenerateTestID()).AnyTimes()
 				mockBlock.EXPECT().Txs().Return([]*txs.Tx{}).AnyTimes()
 
 				mempool := mempool.NewMockMempool(ctrl)
@@ -614,8 +612,6 @@ func TestBlockAccept(t *testing.T) {
 				blockID := ids.GenerateTestID()
 				mockBlock := blocks.NewMockBlock(ctrl)
 				mockBlock.EXPECT().ID().Return(blockID).AnyTimes()
-				mockBlock.EXPECT().Height().Return(uint64(0)).AnyTimes()
-				mockBlock.EXPECT().Parent().Return(ids.GenerateTestID()).AnyTimes()
 				mockBlock.EXPECT().Txs().Return([]*txs.Tx{}).AnyTimes()
 
 				mempool := mempool.NewMockMempool(ctrl)
@@ -654,8 +650,6 @@ func TestBlockAccept(t *testing.T) {
 				blockID := ids.GenerateTestID()
 				mockBlock := blocks.NewMockBlock(ctrl)
 				mockBlock.EXPECT().ID().Return(blockID).AnyTimes()
-				mockBlock.EXPECT().Height().Return(uint64(0)).AnyTimes()
-				mockBlock.EXPECT().Parent().Return(ids.GenerateTestID()).AnyTimes()
 				mockBlock.EXPECT().Txs().Return([]*txs.Tx{}).AnyTimes()
 
 				mempool := mempool.NewMockMempool(ctrl)
@@ -700,8 +694,6 @@ func TestBlockAccept(t *testing.T) {
 				blockID := ids.GenerateTestID()
 				mockBlock := blocks.NewMockBlock(ctrl)
 				mockBlock.EXPECT().ID().Return(blockID).AnyTimes()
-				mockBlock.EXPECT().Height().Return(uint64(0)).AnyTimes()
-				mockBlock.EXPECT().Parent().Return(ids.GenerateTestID()).AnyTimes()
 				mockBlock.EXPECT().Txs().Return([]*txs.Tx{}).AnyTimes()
 
 				mempool := mempool.NewMockMempool(ctrl)
@@ -762,6 +754,7 @@ func TestBlockAccept(t *testing.T) {
 				// because we mock the call to shared memory
 				mockManagerState.EXPECT().CommitBatch().Return(nil, nil)
 				mockManagerState.EXPECT().Abort()
+				mockManagerState.EXPECT().Checksums().Return(ids.Empty, ids.Empty)
 
 				mockSharedMemory := atomic.NewMockSharedMemory(ctrl)
 				mockSharedMemory.EXPECT().Apply(gomock.Any(), gomock.Any()).Return(nil)
@@ -961,8 +954,7 @@ func TestBlockReject(t *testing.T) {
 			defer ctrl.Finish()
 
 			b := tt.blockFunc(ctrl)
-			err := b.Reject(context.Background())
-			require.NoError(err)
+			require.NoError(b.Reject(context.Background()))
 			require.True(b.rejected)
 			_, ok := b.manager.blkIDToState[b.ID()]
 			require.False(ok)

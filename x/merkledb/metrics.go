@@ -12,8 +12,8 @@ import (
 )
 
 var (
-	_ merkleMetrics = &mockMetrics{}
-	_ merkleMetrics = &metrics{}
+	_ merkleMetrics = (*mockMetrics)(nil)
+	_ merkleMetrics = (*metrics)(nil)
 )
 
 type merkleMetrics interface {
@@ -117,6 +117,7 @@ type metrics struct {
 }
 
 func newMetrics(namespace string, reg prometheus.Registerer) (merkleMetrics, error) {
+	// TODO: Should we instead return an error if reg is nil?
 	if reg == nil {
 		return &mockMetrics{}, nil
 	}

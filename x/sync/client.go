@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"sync/atomic"
 	"time"
 
@@ -19,17 +20,19 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 
-	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
+	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
 const (
-	failedRequestSleepInterval = 10 * time.Millisecond
+	initialRetryWait = 10 * time.Millisecond
+	maxRetryWait     = time.Second
+	retryWaitFactor  = 1.5 // Larger --> timeout grows more quickly
 
 	epsilon = 1e-6 // small amount to add to time to avoid division by 0
 )
 
 var (
-	_ Client = &client{}
+	_ Client = (*client)(nil)
 
 	errInvalidRangeProof = errors.New("failed to verify range proof")
 	errTooManyKeys       = errors.New("response contains more than requested keys")
@@ -41,11 +44,11 @@ var (
 type Client interface {
 	// GetRangeProof synchronously sends the given request, returning a parsed StateResponse or error
 	// Note: this verifies the response including the range proof.
-	GetRangeProof(ctx context.Context, request *syncpb.RangeProofRequest) (*merkledb.RangeProof, error)
+	GetRangeProof(ctx context.Context, request *pb.SyncGetRangeProofRequest) (*merkledb.RangeProof, error)
 	// GetChangeProof synchronously sends the given request, returning a parsed ChangesResponse or error
 	// [verificationDB] is the local db that has all key/values in it for the proof's startroot within the proof's key range
 	// Note: this verifies the response including the change proof.
-	GetChangeProof(ctx context.Context, request *syncpb.ChangeProofRequest, verificationDB *merkledb.Database) (*merkledb.ChangeProof, error)
+	GetChangeProof(ctx context.Context, request *pb.SyncGetChangeProofRequest, verificationDB DB) (*merkledb.ChangeProof, error)
 }
 
 type client struct {
@@ -79,14 +82,21 @@ func NewClient(config *ClientConfig) Client {
 // GetChangeProof synchronously retrieves the change proof given by [req].
 // Upon failure, retries until the context is expired.
 // The returned change proof is verified.
-func (c *client) GetChangeProof(ctx context.Context, req *syncpb.ChangeProofRequest, db *merkledb.Database) (*merkledb.ChangeProof, error) {
+func (c *client) GetChangeProof(ctx context.Context, req *pb.SyncGetChangeProofRequest, db DB) (*merkledb.ChangeProof, error) {
 	parseFn := func(ctx context.Context, responseBytes []byte) (*merkledb.ChangeProof, error) {
 		if len(responseBytes) > int(req.BytesLimit) {
 			return nil, fmt.Errorf("%w: (%d) > %d)", errTooManyBytes, len(responseBytes), req.BytesLimit)
 		}
 
-		changeProof := &merkledb.ChangeProof{}
-		if _, err := merkledb.Codec.DecodeChangeProof(responseBytes, changeProof); err != nil {
+		var changeProofResp pb.SyncGetChangeProofResponse
+		if err := proto.Unmarshal(responseBytes, &changeProofResp); err != nil {
+			return nil, err
+		}
+
+		// TODO: When the server is updated so that the response can be a
+		// RangeProof, this must be updated to handle that case.
+		var changeProof merkledb.ChangeProof
+		if err := changeProof.UnmarshalProto(changeProofResp.GetChangeProof()); err != nil {
 			return nil, err
 		}
 
@@ -96,19 +106,19 @@ func (c *client) GetChangeProof(ctx context.Context, req *syncpb.ChangeProofRequ
 			return nil, fmt.Errorf("%w: (%d) > %d)", errTooManyKeys, len(changeProof.KeyChanges), req.KeyLimit)
 		}
 
-		endRoot, err := ids.ToID(req.EndRoot)
+		endRoot, err := ids.ToID(req.EndRootHash)
 		if err != nil {
 			return nil, err
 		}
 
-		if err := changeProof.Verify(ctx, db, req.Start, req.End, endRoot); err != nil {
+		if err := db.VerifyChangeProof(ctx, &changeProof, req.StartKey, req.EndKey, endRoot); err != nil {
 			return nil, fmt.Errorf("%s due to %w", errInvalidRangeProof, err)
 		}
-		return changeProof, nil
+		return &changeProof, nil
 	}
 
-	reqBytes, err := proto.Marshal(&syncpb.Request{
-		Message: &syncpb.Request_ChangeProofRequest{
+	reqBytes, err := proto.Marshal(&pb.Request{
+		Message: &pb.Request_ChangeProofRequest{
 			ChangeProofRequest: req,
 		},
 	})
@@ -121,14 +131,19 @@ func (c *client) GetChangeProof(ctx context.Context, req *syncpb.ChangeProofRequ
 // GetRangeProof synchronously retrieves the range proof given by [req].
 // Upon failure, retries until the context is expired.
 // The returned range proof is verified.
-func (c *client) GetRangeProof(ctx context.Context, req *syncpb.RangeProofRequest) (*merkledb.RangeProof, error) {
+func (c *client) GetRangeProof(ctx context.Context, req *pb.SyncGetRangeProofRequest) (*merkledb.RangeProof, error) {
 	parseFn := func(ctx context.Context, responseBytes []byte) (*merkledb.RangeProof, error) {
 		if len(responseBytes) > int(req.BytesLimit) {
 			return nil, fmt.Errorf("%w: (%d) > %d)", errTooManyBytes, len(responseBytes), req.BytesLimit)
 		}
 
-		rangeProof := &merkledb.RangeProof{}
-		if _, err := merkledb.Codec.DecodeRangeProof(responseBytes, rangeProof); err != nil {
+		var rangeProofProto pb.RangeProof
+		if err := proto.Unmarshal(responseBytes, &rangeProofProto); err != nil {
+			return nil, err
+		}
+
+		var rangeProof merkledb.RangeProof
+		if err := rangeProof.UnmarshalProto(&rangeProofProto); err != nil {
 			return nil, err
 		}
 
@@ -137,24 +152,24 @@ func (c *client) GetRangeProof(ctx context.Context, req *syncpb.RangeProofReques
 			return nil, fmt.Errorf("%w: (%d) > %d)", errTooManyKeys, len(rangeProof.KeyValues), req.KeyLimit)
 		}
 
-		root, err := ids.ToID(req.Root)
+		root, err := ids.ToID(req.RootHash)
 		if err != nil {
 			return nil, err
 		}
 
 		if err := rangeProof.Verify(
 			ctx,
-			req.Start,
-			req.End,
+			req.StartKey,
+			req.EndKey,
 			root,
 		); err != nil {
 			return nil, fmt.Errorf("%s due to %w", errInvalidRangeProof, err)
 		}
-		return rangeProof, nil
+		return &rangeProof, nil
 	}
 
-	reqBytes, err := proto.Marshal(&syncpb.Request{
-		Message: &syncpb.Request_RangeProofRequest{
+	reqBytes, err := proto.Marshal(&pb.Request{
+		Message: &pb.Request_RangeProofRequest{
 			RangeProofRequest: req,
 		},
 	})
@@ -165,25 +180,24 @@ func (c *client) GetRangeProof(ctx context.Context, req *syncpb.RangeProofReques
 	return getAndParse(ctx, c, reqBytes, parseFn)
 }
 
-// getAndParse uses [client] to send [request] to an arbitrary peer. If the peer responds,
-// [parseFn] is called with the raw response. If [parseFn] returns an error or the request
-// times out, this function will retry the request to a different peer until [ctx] expires.
-// If [parseFn] returns a nil error, the result is returned from getAndParse.
-func getAndParse[T any](ctx context.Context, client *client, request []byte, parseFn func(context.Context, []byte) (*T, error)) (*T, error) {
+// getAndParse uses [client] to send [request] to an arbitrary peer.
+// Returns the response to the request.
+// [parseFn] parses the raw response.
+// If the request is unsuccessful or the response can't be parsed,
+// retries the request to a different peer until [ctx] expires.
+func getAndParse[T any](
+	ctx context.Context,
+	client *client,
+	request []byte,
+	parseFn func(context.Context, []byte) (*T, error),
+) (*T, error) {
 	var (
 		lastErr  error
 		response *T
 	)
 	// Loop until the context is cancelled or we get a valid response.
-	for attempt := 0; ; attempt++ {
-		// If the context has finished, return the context error early.
-		if err := ctx.Err(); err != nil {
-			if lastErr != nil {
-				return nil, fmt.Errorf("request failed after %d attempts with last error %w and ctx error %s", attempt, lastErr, err)
-			}
-			return nil, err
-		}
-		responseBytes, nodeID, err := client.get(ctx, request)
+	for attempt := 1; ; attempt++ {
+		nodeID, responseBytes, err := client.get(ctx, request)
 		if err == nil {
 			if response, err = parseFn(ctx, responseBytes); err == nil {
 				return response, nil
@@ -193,44 +207,62 @@ func getAndParse[T any](ctx context.Context, client *client, request []byte, par
 		client.log.Debug("request failed, retrying",
 			zap.Stringer("nodeID", nodeID),
 			zap.Int("attempt", attempt),
-			zap.Error(err))
-
+			zap.Error(err),
+		)
+		// if [err] is being propagated from [ctx], avoid overwriting [lastErr].
 		if err != ctx.Err() {
-			// if [err] is being propagated from [ctx], avoid overwriting [lastErr].
 			lastErr = err
-			time.Sleep(failedRequestSleepInterval)
+		}
+
+		retryWait := initialRetryWait * time.Duration(math.Pow(retryWaitFactor, float64(attempt)))
+		if retryWait > maxRetryWait || retryWait < 0 { // Handle overflows with negative check.
+			retryWait = maxRetryWait
+		}
+
+		select {
+		case <-ctx.Done():
+			if lastErr != nil {
+				// prefer reporting [lastErr] if it's not nil.
+				return nil, fmt.Errorf(
+					"request failed after %d attempts with last error %w and ctx error %s",
+					attempt, lastErr, ctx.Err(),
+				)
+			}
+			return nil, ctx.Err()
+		case <-time.After(retryWait):
 		}
 	}
 }
 
-// get sends [request] to an arbitrary peer and blocks until the node receives a response
-// or [ctx] expires. Returns the raw response from the peer, the peer's NodeID, and an
-// error if the request timed out. Thread safe.
-func (c *client) get(ctx context.Context, requestBytes []byte) ([]byte, ids.NodeID, error) {
-	c.metrics.RequestMade()
+// get sends [request] to an arbitrary peer and blocks
+// until the node receives a response, failure notification
+// or [ctx] is canceled.
+// Returns the peer's NodeID and response.
+// It's safe to call this method multiple times concurrently.
+func (c *client) get(ctx context.Context, request []byte) (ids.NodeID, []byte, error) {
 	var (
-		response  []byte
-		nodeID    ids.NodeID
-		err       error
-		startTime = time.Now()
+		response []byte
+		nodeID   ids.NodeID
+		err      error
 	)
+
+	c.metrics.RequestMade()
+
 	if len(c.stateSyncNodes) == 0 {
-		response, nodeID, err = c.networkClient.RequestAny(ctx, c.stateSyncMinVersion, requestBytes)
+		nodeID, response, err = c.networkClient.RequestAny(ctx, c.stateSyncMinVersion, request)
 	} else {
-		// get the next nodeID using the nodeIdx offset. If we're out of nodes, loop back to 0
-		// we do this every attempt to ensure we get a different node each time if possible.
+		// Get the next nodeID to query using the [nodeIdx] offset.
+		// If we're out of nodes, loop back to 0.
+		// We do this try to query a different node each time if possible.
 		nodeIdx := atomic.AddUint32(&c.stateSyncNodeIdx, 1)
 		nodeID = c.stateSyncNodes[nodeIdx%uint32(len(c.stateSyncNodes))]
-		response, err = c.networkClient.Request(ctx, nodeID, requestBytes)
+		response, err = c.networkClient.Request(ctx, nodeID, request)
 	}
 	if err != nil {
 		c.metrics.RequestFailed()
-		c.networkClient.TrackBandwidth(nodeID, 0)
-		return response, nodeID, err
+		return nodeID, response, err
 	}
 
-	bandwidth := float64(len(response)) / (time.Since(startTime).Seconds() + epsilon)
-	c.networkClient.TrackBandwidth(nodeID, bandwidth)
 	c.metrics.RequestSucceeded()
-	return response, nodeID, nil
+	return nodeID, response, nil
 }

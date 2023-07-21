@@ -118,9 +118,7 @@ func TestVMServerInterface(t *testing.T) {
 	}
 	slices.Sort(gotMethods)
 
-	if !reflect.DeepEqual(gotMethods, wantMethods) {
-		t.Errorf("\ngot: %q\nwant: %q", gotMethods, wantMethods)
-	}
+	require.Equal(t, wantMethods, gotMethods)
 }
 
 func TestRuntimeSubprocessBootstrap(t *testing.T) {
@@ -181,8 +179,7 @@ func TestRuntimeSubprocessBootstrap(t *testing.T) {
 			listener, err := grpcutils.NewListener()
 			require.NoError(err)
 
-			err = os.Setenv(runtime.EngineAddressKey, listener.Addr().String())
-			require.NoError(err)
+			require.NoError(os.Setenv(runtime.EngineAddressKey, listener.Addr().String()))
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()

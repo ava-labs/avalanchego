@@ -6,9 +6,12 @@ package state
 import (
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/google/btree"
+
+	"go.uber.org/zap"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -21,13 +24,16 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
@@ -40,13 +46,22 @@ import (
 )
 
 const (
+	blockCacheSize               = 64 * units.MiB
+	txCacheSize                  = 128 * units.MiB
+	transformedSubnetTxCacheSize = 4 * units.MiB
+
+	pointerOverhead = wrappers.LongLen
+
 	validatorDiffsCacheSize = 2048
 	blockIDCacheSize        = 2048
-	blockCacheSize          = 2048
-	txCacheSize             = 2048
 	rewardUTXOsCacheSize    = 2048
 	chainCacheSize          = 2048
 	chainDBCacheSize        = 2048
+
+	pruneCommitLimit           = 1024
+	pruneCommitSleepMultiplier = 5
+	pruneCommitSleepCap        = 10 * time.Second
+	pruneUpdateFrequency       = 30 * time.Second
 )
 
 var (
@@ -81,6 +96,7 @@ var (
 	currentSupplyKey = []byte("current supply")
 	lastAcceptedKey  = []byte("last accepted")
 	initializedKey   = []byte("initialized")
+	prunedKey        = []byte("pruned")
 )
 
 // Chain collects all methods to manage the state of the chain for block
@@ -121,8 +137,12 @@ type State interface {
 	GetLastAccepted() ids.ID
 	SetLastAccepted(blkID ids.ID)
 
-	GetStatelessBlock(blockID ids.ID) (blocks.Block, choices.Status, error)
-	AddStatelessBlock(block blocks.Block, status choices.Status)
+	GetStatelessBlock(blockID ids.ID) (blocks.Block, error)
+
+	// Invariant: [block] is an accepted block.
+	AddStatelessBlock(block blocks.Block)
+
+	GetBlockIDAtHeight(height uint64) (ids.ID, error)
 
 	GetBlockID(height uint64) (ids.ID, error)
 
@@ -141,6 +161,15 @@ type State interface {
 	// Discard uncommitted changes to the database.
 	Abort()
 
+	// Asynchronously removes rejected blocks from disk and indexes accepted blocks
+	// by height.
+	//
+	// TODO: remove after v1.11.x is activated
+	PruneAndIndex(sync.Locker, logging.Logger) error
+
+	// TODO: remove after v1.11.x is activated
+	VerifyHeightIndex() error
+
 	// Commit changes to the base database.
 	Commit() error
 
@@ -148,9 +177,12 @@ type State interface {
 	// pending changes to the base database.
 	CommitBatch() (database.Batch, error)
 
+	Checksum() ids.ID
+
 	Close() error
 }
 
+// TODO: remove after v1.11.x is activated
 type stateBlk struct {
 	Blk    blocks.Block
 	Bytes  []byte         `serialize:"true"`
@@ -215,6 +247,7 @@ type stateBlk struct {
  * |     '-- txID -> nil
  * '-. singletons
  *   |-- initializedKey -> nil
+ *   |-- prunedKey -> nil
  *   |-- timestampKey -> timestamp
  *   |-- currentSupplyKey -> currentSupply
  *   '-- lastAcceptedKey -> lastAccepted
@@ -239,8 +272,8 @@ type state struct {
 	blockIDCache  cache.Cacher[uint64, ids.ID] // cache of height -> blockID. If the entry is ids.Empty, it is not in the database
 	blockIDDB     database.Database
 
-	addedBlocks map[ids.ID]stateBlk             // map of blockID -> Block
-	blockCache  cache.Cacher[ids.ID, *stateBlk] // cache of blockID -> Block. If the entry is nil, it is not in the database
+	addedBlocks map[ids.ID]blocks.Block            // map of blockID -> Block
+	blockCache  cache.Cacher[ids.ID, blocks.Block] // cache of blockID -> Block. If the entry is nil, it is not in the database
 	blockDB     database.Database
 
 	validatorsDB                 database.Database
@@ -343,6 +376,27 @@ type txAndStatus struct {
 	status status.Status
 }
 
+func txSize(tx *txs.Tx) int {
+	if tx == nil {
+		return pointerOverhead
+	}
+	return len(tx.Bytes()) + pointerOverhead
+}
+
+func txAndStatusSize(t *txAndStatus) int {
+	if t == nil {
+		return pointerOverhead
+	}
+	return len(t.tx.Bytes()) + wrappers.IntLen + pointerOverhead
+}
+
+func blockSize(blk blocks.Block) int {
+	if blk == nil {
+		return pointerOverhead
+	}
+	return len(blk.Bytes()) + pointerOverhead
+}
+
 func New(
 	db database.Database,
 	genesisBytes []byte,
@@ -352,6 +406,7 @@ func New(
 	metrics metrics.Metrics,
 	rewards reward.Calculator,
 	bootstrapped *utils.Atomic[bool],
+	trackChecksums bool,
 ) (State, error) {
 	s, err := new(
 		db,
@@ -361,6 +416,7 @@ func New(
 		metricsReg,
 		rewards,
 		bootstrapped,
+		trackChecksums,
 	)
 	if err != nil {
 		return nil, err
@@ -384,6 +440,7 @@ func new(
 	metricsReg prometheus.Registerer,
 	rewards reward.Calculator,
 	bootstrapped *utils.Atomic[bool],
+	trackChecksums bool,
 ) (*state, error) {
 	blockIDCache, err := metercacher.New[uint64, ids.ID](
 		"block_id_cache",
@@ -394,10 +451,10 @@ func new(
 		return nil, err
 	}
 
-	blockCache, err := metercacher.New[ids.ID, *stateBlk](
+	blockCache, err := metercacher.New[ids.ID, blocks.Block](
 		"block_cache",
 		metricsReg,
-		&cache.LRU[ids.ID, *stateBlk]{Size: blockCacheSize},
+		cache.NewSizedLRU[ids.ID, blocks.Block](blockCacheSize, blockSize),
 	)
 	if err != nil {
 		return nil, err
@@ -439,10 +496,10 @@ func new(
 		return nil, err
 	}
 
-	txCache, err := metercacher.New[ids.ID, *txAndStatus](
+	txCache, err := metercacher.New(
 		"tx_cache",
 		metricsReg,
-		&cache.LRU[ids.ID, *txAndStatus]{Size: txCacheSize},
+		cache.NewSizedLRU[ids.ID, *txAndStatus](txCacheSize, txAndStatusSize),
 	)
 	if err != nil {
 		return nil, err
@@ -459,17 +516,17 @@ func new(
 	}
 
 	utxoDB := prefixdb.New(utxoPrefix, baseDB)
-	utxoState, err := avax.NewMeteredUTXOState(utxoDB, txs.GenesisCodec, metricsReg)
+	utxoState, err := avax.NewMeteredUTXOState(utxoDB, txs.GenesisCodec, metricsReg, trackChecksums)
 	if err != nil {
 		return nil, err
 	}
 
 	subnetBaseDB := prefixdb.New(subnetPrefix, baseDB)
 
-	transformedSubnetCache, err := metercacher.New[ids.ID, *txs.Tx](
+	transformedSubnetCache, err := metercacher.New(
 		"transformed_subnet_cache",
 		metricsReg,
-		&cache.LRU[ids.ID, *txs.Tx]{Size: chainCacheSize},
+		cache.NewSizedLRU[ids.ID, *txs.Tx](transformedSubnetTxCacheSize, txSize),
 	)
 	if err != nil {
 		return nil, err
@@ -516,7 +573,7 @@ func new(
 		blockIDCache:  blockIDCache,
 		blockIDDB:     prefixdb.New(blockIDPrefix, baseDB),
 
-		addedBlocks: make(map[ids.ID]stateBlk),
+		addedBlocks: make(map[ids.ID]blocks.Block),
 		blockCache:  blockCache,
 		blockDB:     prefixdb.New(blockPrefix, baseDB),
 
@@ -642,6 +699,23 @@ func (s *state) shouldInit() (bool, error) {
 
 func (s *state) doneInit() error {
 	return s.singletonDB.Put(initializedKey, nil)
+}
+
+func (s *state) shouldPrune() (bool, error) {
+	has, err := s.singletonDB.Has(prunedKey)
+	return !has, err
+}
+
+func (s *state) donePrune() error {
+	return s.singletonDB.Put(prunedKey, nil)
+}
+
+func (s *state) VerifyHeightIndex() error {
+	shouldPrune, err := s.shouldPrune()
+	if err != nil || shouldPrune {
+		return block.ErrIndexIncomplete
+	}
+	return nil
 }
 
 func (s *state) GetSubnets() ([]*txs.Tx, error) {
@@ -1020,7 +1094,7 @@ func (s *state) syncGenesis(genesisBlk blocks.Block, genesis *genesis.State) err
 	s.SetLastAccepted(genesisBlkID)
 	s.SetTimestamp(time.Unix(int64(genesis.Timestamp), 0))
 	s.SetCurrentSupply(constants.PrimaryNetworkID, genesis.InitialSupply)
-	s.AddStatelessBlock(genesisBlk, choices.Accepted)
+	s.AddStatelessBlock(genesisBlk)
 
 	// Persist UTXOs that exist at genesis
 	for _, utxo := range genesis.UTXOs {
@@ -1486,14 +1560,10 @@ func (s *state) init(genesisBytes []byte) error {
 	return s.Commit()
 }
 
-func (s *state) AddStatelessBlock(block blocks.Block, status choices.Status) {
+func (s *state) AddStatelessBlock(block blocks.Block) {
 	blkID := block.ID()
 	s.addedBlockIDs[block.Height()] = blkID
-	s.addedBlocks[blkID] = stateBlk{
-		Blk:    block,
-		Bytes:  block.Bytes(),
-		Status: status,
-	}
+	s.addedBlocks[blkID] = block
 }
 
 func (s *state) SetHeight(height uint64) {
@@ -1511,6 +1581,10 @@ func (s *state) Commit() error {
 
 func (s *state) Abort() {
 	s.baseDB.Abort()
+}
+
+func (s *state) Checksum() ids.ID {
+	return s.utxoState.Checksum()
 }
 
 func (s *state) CommitBatch() (database.Batch, error) {
@@ -1536,59 +1610,90 @@ func (s *state) writeBlockIDs() error {
 }
 
 func (s *state) writeBlocks() error {
-	for blkID, stateBlk := range s.addedBlocks {
-		var (
-			blkID = blkID
-			stBlk = stateBlk
-		)
+	for blkID, blk := range s.addedBlocks {
+		blkID := blkID
+		blkBytes := blk.Bytes()
+		blkHeight := blk.Height()
+		heightKey := database.PackUInt64(blkHeight)
 
-		// Note: blocks to be stored are verified, so it's safe to marshal them with GenesisCodec
-		blockBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, &stBlk)
-		if err != nil {
-			return fmt.Errorf("failed to marshal block %s to store: %w", blkID, err)
+		delete(s.addedBlockIDs, blkHeight)
+		s.blockIDCache.Put(blkHeight, blkID)
+		if err := database.PutID(s.blockIDDB, heightKey, blkID); err != nil {
+			return fmt.Errorf("failed to add blockID: %w", err)
 		}
 
 		delete(s.addedBlocks, blkID)
-		s.blockCache.Put(blkID, &stBlk)
-		if err := s.blockDB.Put(blkID[:], blockBytes); err != nil {
+		// Note: Evict is used rather than Put here because blk may end up
+		// referencing additional data (because of shared byte slices) that
+		// would not be properly accounted for in the cache sizing.
+		s.blockCache.Evict(blkID)
+		if err := s.blockDB.Put(blkID[:], blkBytes); err != nil {
 			return fmt.Errorf("failed to write block %s: %w", blkID, err)
 		}
 	}
 	return nil
 }
 
-func (s *state) GetStatelessBlock(blockID ids.ID) (blocks.Block, choices.Status, error) {
-	if blk, ok := s.addedBlocks[blockID]; ok {
-		return blk.Blk, blk.Status, nil
+func (s *state) GetStatelessBlock(blockID ids.ID) (blocks.Block, error) {
+	if blk, exists := s.addedBlocks[blockID]; exists {
+		return blk, nil
 	}
-	if blkState, ok := s.blockCache.Get(blockID); ok {
-		if blkState == nil {
-			return nil, choices.Processing, database.ErrNotFound
+	if blk, cached := s.blockCache.Get(blockID); cached {
+		if blk == nil {
+			return nil, database.ErrNotFound
 		}
-		return blkState.Blk, blkState.Status, nil
+
+		return blk, nil
 	}
 
 	blkBytes, err := s.blockDB.Get(blockID[:])
 	if err == database.ErrNotFound {
 		s.blockCache.Put(blockID, nil)
-		return nil, choices.Processing, database.ErrNotFound // status does not matter here
-	} else if err != nil {
-		return nil, choices.Processing, err // status does not matter here
+		return nil, database.ErrNotFound
 	}
-
-	// Note: stored blocks are verified, so it's safe to unmarshal them with GenesisCodec
-	blkState := stateBlk{}
-	if _, err := blocks.GenesisCodec.Unmarshal(blkBytes, &blkState); err != nil {
-		return nil, choices.Processing, err // status does not matter here
-	}
-
-	blkState.Blk, err = blocks.Parse(blocks.GenesisCodec, blkState.Bytes)
 	if err != nil {
-		return nil, choices.Processing, err
+		return nil, err
 	}
 
-	s.blockCache.Put(blockID, &blkState)
-	return blkState.Blk, blkState.Status, nil
+	blk, status, _, err := parseStoredBlock(blkBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	if status != choices.Accepted {
+		s.blockCache.Put(blockID, nil)
+		return nil, database.ErrNotFound
+	}
+
+	s.blockCache.Put(blockID, blk)
+	return blk, nil
+}
+
+func (s *state) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
+	if blkID, exists := s.addedBlockIDs[height]; exists {
+		return blkID, nil
+	}
+	if blkID, cached := s.blockIDCache.Get(height); cached {
+		if blkID == ids.Empty {
+			return ids.Empty, database.ErrNotFound
+		}
+
+		return blkID, nil
+	}
+
+	heightKey := database.PackUInt64(height)
+
+	blkID, err := database.GetID(s.blockIDDB, heightKey)
+	if err == database.ErrNotFound {
+		s.blockIDCache.Put(height, ids.Empty)
+		return ids.Empty, database.ErrNotFound
+	}
+	if err != nil {
+		return ids.Empty, err
+	}
+
+	s.blockIDCache.Put(height, blkID)
+	return blkID, nil
 }
 
 func (s *state) GetBlockID(height uint64) (ids.ID, error) {
@@ -1891,7 +1996,10 @@ func (s *state) writeTXs() error {
 		}
 
 		delete(s.addedTxs, txID)
-		s.txCache.Put(txID, txStatus)
+		// Note: Evict is used rather than Put here because stx may end up
+		// referencing additional data (because of shared byte slices) that
+		// would not be properly accounted for in the cache sizing.
+		s.txCache.Evict(txID)
 		if err := s.txDB.Put(txID[:], txBytes); err != nil {
 			return fmt.Errorf("failed to add tx: %w", err)
 		}
@@ -1954,7 +2062,10 @@ func (s *state) writeTransformedSubnets() error {
 		txID := tx.ID()
 
 		delete(s.transformedSubnets, subnetID)
-		s.transformedSubnetCache.Put(subnetID, tx)
+		// Note: Evict is used rather than Put here because tx may end up
+		// referencing additional data (because of shared byte slices) that
+		// would not be properly accounted for in the cache sizing.
+		s.transformedSubnetCache.Evict(subnetID)
 		if err := database.PutID(s.transformedSubnetDB, subnetID[:], txID); err != nil {
 			return fmt.Errorf("failed to write transformed subnet: %w", err)
 		}
@@ -2011,49 +2122,187 @@ func (s *state) writeMetadata() error {
 	return nil
 }
 
-// TODO: Remove after next hard-fork when everybody has run this.
-func (s *state) populateBlockHeightIndex() error {
-	blk, _, err := s.GetStatelessBlock(s.lastAccepted)
-	if err != nil {
-		return fmt.Errorf("failed to retrieve last accepted block from local disk: %w", err)
+// Returns the block, status of the block, and whether it is a [stateBlk].
+// Invariant: blkBytes is safe to parse with blocks.GenesisCodec
+//
+// TODO: Cleanup after v1.11.x is activated
+func parseStoredBlock(blkBytes []byte) (blocks.Block, choices.Status, bool, error) {
+	blk, err := blocks.Parse(blocks.GenesisCodec, blkBytes)
+	if err == nil {
+		return blk, choices.Accepted, false, nil
 	}
 
-	heightKey := database.PackUInt64(blk.Height())
-	if _, err := database.GetID(s.blockIDDB, heightKey); err == nil {
-		// If the last accepted block is in [s.blockIDDB], no backfilling is required.
+	// Fallback to [stateBlk], we have not finished pruning.
+	blkState := stateBlk{}
+	if _, err := blocks.GenesisCodec.Unmarshal(blkBytes, &blkState); err != nil {
+		return nil, choices.Processing, false, err
+	}
+
+	blkState.Blk, err = blocks.Parse(blocks.GenesisCodec, blkState.Bytes)
+	if err != nil {
+		return nil, choices.Processing, false, err
+	}
+
+	return blkState.Blk, blkState.Status, true, nil
+}
+
+func (s *state) PruneAndIndex(lock sync.Locker, log logging.Logger) error {
+	lock.Lock()
+	// We use a singleton to check if this method has been run before.
+	shouldPrune, err := s.shouldPrune()
+	if err != nil {
+		lock.Unlock()
+		return fmt.Errorf(
+			"failed to check if the database should be pruned: %w",
+			err,
+		)
+	}
+	if !shouldPrune {
+		lock.Unlock()
 		return nil
 	}
 
+	// It is possible that new blocks are added after grabbing this iterator. New
+	// blocks are guaranteed to be accepted and height-indexed, so we don't need to
+	// check them.
 	blockIterator := s.blockDB.NewIterator()
-	defer blockIterator.Release()
+	// Releasing is done using a closure to ensure that updating blockIterator will
+	// result in having the most recent iterator released when executing the
+	// deferred function.
+	defer func() {
+		blockIterator.Release()
+	}()
+
+	// While we are pruning the disk, we disable caching of the data we are
+	// modifying. Caching is re-enabled when pruning finishes.
+	//
+	// Note: If an unexpected error occurs the caches are never re-enabled.
+	// That's fine as the node is going to be in an unhealthy state regardless.
+	oldBlockIDCache := s.blockIDCache
+	s.blockIDCache = &cache.Empty[uint64, ids.ID]{}
+	lock.Unlock()
+
+	log.Info("starting state pruning and indexing")
+
+	startTime := time.Now()
+	lastCommit := startTime
+	lastUpdate := startTime
+	numPruned := 0
+
 	for blockIterator.Next() {
 		blkBytes := blockIterator.Value()
 
-		// Note: stored blocks are verified, so it's safe to unmarshal them with GenesisCodec
-		blkState := stateBlk{}
-		if _, err := blocks.GenesisCodec.Unmarshal(blkBytes, &blkState); err != nil {
-			return err
-		}
-
-		blkState.Blk, err = blocks.Parse(blocks.GenesisCodec, blkState.Bytes)
+		blk, status, isStateBlk, err := parseStoredBlock(blkBytes)
 		if err != nil {
 			return err
 		}
 
-		blkHeight := blkState.Blk.Height()
-		blkID := blkState.Blk.ID()
+		if status != choices.Accepted {
+			// Remove non-accepted blocks from disk.
+			if err := s.blockDB.Delete(blockIterator.Key()); err != nil {
+				return fmt.Errorf("failed to delete block: %w", err)
+			}
 
-		// Populate the in-memory cache with the [blockIDCacheSize] most recent blocks
-		if math.AbsDiff(s.currentHeight, blkHeight) <= blockIDCacheSize {
-			s.addedBlockIDs[blkHeight] = blkID
-			s.blockIDCache.Put(blkHeight, blkID)
+			// We don't index the height of non-accepted blocks.
+			continue
 		}
 
+		blkHeight := blk.Height()
+		blkID := blk.ID()
+
+		// Populate the map of height -> blockID.
 		heightKey := database.PackUInt64(blkHeight)
 		if err := database.PutID(s.blockIDDB, heightKey, blkID); err != nil {
 			return fmt.Errorf("failed to add blockID: %w", err)
 		}
+
+		// Since we only store accepted blocks on disk, we only need to store a map of
+		// ids.ID to Block.
+		if isStateBlk {
+			if err := s.blockDB.Put(blkID[:], blkBytes); err != nil {
+				return fmt.Errorf("failed to write block: %w", err)
+			}
+		}
+
+		numPruned++
+
+		if numPruned%pruneCommitLimit == 0 {
+			// We must hold the lock during committing to make sure we don't
+			// attempt to commit to disk while a block is concurrently being
+			// accepted.
+			lock.Lock()
+			errs := wrappers.Errs{}
+			errs.Add(
+				s.Commit(),
+				blockIterator.Error(),
+			)
+			lock.Unlock()
+			if errs.Errored() {
+				return errs.Err
+			}
+
+			// We release the iterator here to allow the underlying database to
+			// clean up deleted state.
+			blockIterator.Release()
+
+			now := time.Now()
+			if now.Sub(lastUpdate) > pruneUpdateFrequency {
+				lastUpdate = now
+
+				log.Info("committing state pruning",
+					zap.Int("numPruned", numPruned),
+				)
+			}
+
+			// We take the minimum here because it's possible that the node is
+			// currently bootstrapping. This would mean that grabbing the lock
+			// could take an extremely long period of time; which we should not
+			// delay processing for.
+			pruneDuration := now.Sub(lastCommit)
+			sleepDuration := math.Min(
+				pruneCommitSleepMultiplier*pruneDuration,
+				pruneCommitSleepCap,
+			)
+			time.Sleep(sleepDuration)
+
+			// Make sure not to include the sleep duration into the next prune
+			// duration.
+			lastCommit = time.Now()
+
+			blockIterator = s.blockDB.NewIteratorWithStart(blkBytes)
+		}
 	}
 
-	return nil
+	// We must hold the lock during committing to make sure we don't
+	// attempt to commit to disk while a block is concurrently being
+	// accepted.
+	lock.Lock()
+	defer lock.Unlock()
+
+	errs := wrappers.Errs{}
+	errs.Add(
+		s.Commit(),
+		blockIterator.Error(),
+	)
+
+	// Make sure we flush the original cache before re-enabling it to prevent
+	// surfacing any stale data.
+	oldBlockIDCache.Flush()
+	s.blockIDCache = oldBlockIDCache
+
+	log.Info("finished state pruning and indexing",
+		zap.Int("numPruned", numPruned),
+		zap.Duration("duration", time.Since(startTime)),
+	)
+
+	if errs.Errored() {
+		return errs.Err
+	}
+
+	errs.Add(
+		s.donePrune(),
+		s.Commit(),
+	)
+
+	return errs.Err
 }

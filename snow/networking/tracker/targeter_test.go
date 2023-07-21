@@ -33,8 +33,8 @@ func TestNewTargeter(t *testing.T) {
 		vdrs,
 		tracker,
 	)
-	targeter, ok := targeterIntf.(*targeter)
-	require.True(ok)
+	require.IsType(&targeter{}, targeterIntf)
+	targeter := targeterIntf.(*targeter)
 	require.Equal(vdrs, targeter.vdrs)
 	require.Equal(tracker, targeter.tracker)
 	require.Equal(config.MaxNonVdrUsage, targeter.maxNonVdrUsage)
@@ -50,12 +50,8 @@ func TestTarget(t *testing.T) {
 	totalVdrWeight := uint64(10)
 	nonVdr := ids.NodeID{2}
 	vdrs := validators.NewSet()
-	if err := vdrs.Add(vdr, nil, ids.Empty, 1); err != nil {
-		t.Fatal(err)
-	}
-	if err := vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, totalVdrWeight-vdrWeight); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, vdrs.Add(vdr, nil, ids.Empty, 1))
+	require.NoError(t, vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, totalVdrWeight-vdrWeight))
 
 	tracker := NewMockTracker(ctrl)
 	config := &TargeterConfig{

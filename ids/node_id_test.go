@@ -4,55 +4,58 @@
 package ids
 
 import (
-	"bytes"
 	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/utils/cb58"
 )
 
 func TestNodeIDEquality(t *testing.T) {
+	require := require.New(t)
+
 	id := NodeID{24}
 	idCopy := NodeID{24}
-	if id != idCopy {
-		t.Fatalf("ID.Prefix mutated the ID")
-	}
+	require.Equal(id, idCopy)
 	id2 := NodeID{}
-	if id == id2 {
-		t.Fatal("expected Node IDs to be unequal")
-	}
+	require.NotEqual(id, id2)
 }
 
 func TestNodeIDFromString(t *testing.T) {
+	require := require.New(t)
+
 	id := NodeID{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}
 	idStr := id.String()
 	id2, err := NodeIDFromString(idStr)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if id != id2 {
-		t.Fatal("Expected FromString to be inverse of String but it wasn't")
-	}
+	require.NoError(err)
+	require.Equal(id, id2)
 	expected := "NodeID-9tLMkeWFhWXd8QZc4rSiS5meuVXF5kRsz"
-	if idStr != expected {
-		t.Fatalf("expected %s but got %s", expected, idStr)
-	}
+	require.Equal(expected, idStr)
 }
 
 func TestNodeIDFromStringError(t *testing.T) {
 	tests := []struct {
-		in string
+		in          string
+		expectedErr error
 	}{
-		{""},
-		{"foo"},
-		{"foobar"},
+		{
+			in:          "",
+			expectedErr: cb58.ErrBase58Decoding,
+		},
+		{
+			in:          "foo",
+			expectedErr: cb58.ErrMissingChecksum,
+		},
+		{
+			in:          "foobar",
+			expectedErr: cb58.ErrBadChecksum,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.in, func(t *testing.T) {
 			_, err := FromString(tt.in)
-			if err == nil {
-				t.Error("Unexpected success")
-			}
+			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
 }
@@ -74,73 +77,68 @@ func TestNodeIDMarshalJSON(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.label, func(t *testing.T) {
+			require := require.New(t)
+
 			out, err := tt.in.MarshalJSON()
-			if err != tt.err {
-				t.Errorf("Expected err %s, got error %v", tt.err, err)
-			} else if !bytes.Equal(out, tt.out) {
-				t.Errorf("got %q, expected %q", out, tt.out)
-			}
+			require.ErrorIs(err, tt.err)
+			require.Equal(tt.out, out)
 		})
 	}
 }
 
 func TestNodeIDUnmarshalJSON(t *testing.T) {
 	tests := []struct {
-		label     string
-		in        []byte
-		out       NodeID
-		shouldErr bool
+		label       string
+		in          []byte
+		out         NodeID
+		expectedErr error
 	}{
-		{"NodeID{}", []byte("null"), NodeID{}, false},
+		{"NodeID{}", []byte("null"), NodeID{}, nil},
 		{
 			"NodeID(\"ava labs\")",
 			[]byte("\"NodeID-9tLMkeWFhWXd8QZc4rSiS5meuVXF5kRsz\""),
 			NodeID{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
-			false,
+			nil,
 		},
 		{
 			"missing start quote",
 			[]byte("NodeID-9tLMkeWFhWXd8QZc4rSiS5meuVXF5kRsz\""),
 			NodeID{},
-			true,
+			errMissingQuotes,
 		},
 		{
 			"missing end quote",
 			[]byte("\"NodeID-9tLMkeWFhWXd8QZc4rSiS5meuVXF5kRsz"),
 			NodeID{},
-			true,
+			errMissingQuotes,
 		},
 		{
 			"NodeID-",
 			[]byte("\"NodeID-\""),
 			NodeID{},
-			true,
+			errShortNodeID,
 		},
 		{
 			"NodeID-1",
 			[]byte("\"NodeID-1\""),
 			NodeID{},
-			true,
+			cb58.ErrMissingChecksum,
 		},
 		{
 			"NodeID-9tLMkeWFhWXd8QZc4rSiS5meuVXF5kRsz1",
 			[]byte("\"NodeID-1\""),
 			NodeID{},
-			true,
+			cb58.ErrMissingChecksum,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.label, func(t *testing.T) {
+			require := require.New(t)
+
 			foo := NodeID{}
 			err := foo.UnmarshalJSON(tt.in)
-			switch {
-			case err == nil && tt.shouldErr:
-				t.Errorf("Expected no error but got error %v", err)
-			case err != nil && !tt.shouldErr:
-				t.Errorf("unxpected error: %v", err)
-			case foo != tt.out:
-				t.Errorf("got %q, expected %q", foo, tt.out)
-			}
+			require.ErrorIs(err, tt.expectedErr)
+			require.Equal(tt.out, foo)
 		})
 	}
 }
@@ -156,38 +154,24 @@ func TestNodeIDString(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.label, func(t *testing.T) {
-			result := tt.id.String()
-			if result != tt.expected {
-				t.Errorf("got %q, expected %q", result, tt.expected)
-			}
+			require.Equal(t, tt.expected, tt.id.String())
 		})
 	}
 }
 
 func TestNodeIDMapMarshalling(t *testing.T) {
+	require := require.New(t)
+
 	originalMap := map[NodeID]int{
 		{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'}: 1,
 		{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}: 2,
 	}
 	mapJSON, err := json.Marshal(originalMap)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	var unmarshalledMap map[NodeID]int
-	err = json.Unmarshal(mapJSON, &unmarshalledMap)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if len(originalMap) != len(unmarshalledMap) {
-		t.Fatalf("wrong map lengths")
-	}
-	for originalID, num := range originalMap {
-		if unmarshalledMap[originalID] != num {
-			t.Fatalf("map was incorrectly Unmarshalled")
-		}
-	}
+	require.NoError(json.Unmarshal(mapJSON, &unmarshalledMap))
+	require.Equal(originalMap, unmarshalledMap)
 }
 
 func TestNodeIDLess(t *testing.T) {

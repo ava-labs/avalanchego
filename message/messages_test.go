@@ -25,15 +25,13 @@ import (
 func TestMessage(t *testing.T) {
 	t.Parallel()
 
-	require := require.New(t)
-
 	mb, err := newMsgBuilder(
 		logging.NoLog{},
 		"test",
 		prometheus.NewRegistry(),
 		5*time.Second,
 	)
-	require.NoError(err)
+	require.NoError(t, err)
 
 	testID := ids.GenerateTestID()
 	compressibleContainers := [][]byte{
@@ -43,10 +41,10 @@ func TestMessage(t *testing.T) {
 	}
 
 	testCertRaw, testKeyRaw, err := staking.NewCertAndKeyBytes()
-	require.NoError(err)
+	require.NoError(t, err)
 
 	testTLSCert, err := staking.LoadTLSCertFromBytes(testKeyRaw, testCertRaw)
-	require.NoError(err)
+	require.NoError(t, err)
 
 	nowUnix := time.Now().Unix()
 
@@ -59,7 +57,7 @@ func TestMessage(t *testing.T) {
 		bytesSaved       bool // if true, outbound message saved bytes must be non-zero
 	}{
 		{
-			desc: "ping message with no compression",
+			desc: "ping message with no compression no subnet uptimes",
 			op:   PingOp,
 			msg: &p2p.Message{
 				Message: &p2p.Message_Ping{
@@ -77,6 +75,25 @@ func TestMessage(t *testing.T) {
 				Message: &p2p.Message_Pong{
 					Pong: &p2p.Pong{
 						Uptime: 100,
+					},
+				},
+			},
+			compressionType:  compression.TypeNone,
+			bypassThrottling: true,
+			bytesSaved:       false,
+		},
+		{
+			desc: "ping message with no compression and subnet uptimes",
+			op:   PingOp,
+			msg: &p2p.Message{
+				Message: &p2p.Message_Ping{
+					Ping: &p2p.Ping{
+						SubnetUptimes: []*p2p.SubnetUptime{
+							{
+								SubnetId: testID[:],
+								Uptime:   100,
+							},
+						},
 					},
 				},
 			},
@@ -396,9 +413,9 @@ func TestMessage(t *testing.T) {
 			msg: &p2p.Message{
 				Message: &p2p.Message_AcceptedFrontier_{
 					AcceptedFrontier_: &p2p.AcceptedFrontier{
-						ChainId:      testID[:],
-						RequestId:    1,
-						ContainerIds: [][]byte{testID[:], testID[:]},
+						ChainId:     testID[:],
+						RequestId:   1,
+						ContainerId: testID[:],
 					},
 				},
 			},
@@ -653,9 +670,9 @@ func TestMessage(t *testing.T) {
 			msg: &p2p.Message{
 				Message: &p2p.Message_Chits{
 					Chits: &p2p.Chits{
-						ChainId:               testID[:],
-						RequestId:             1,
-						PreferredContainerIds: [][]byte{testID[:], testID[:]},
+						ChainId:     testID[:],
+						RequestId:   1,
+						PreferredId: testID[:],
 					},
 				},
 			},
@@ -810,7 +827,9 @@ func TestMessage(t *testing.T) {
 	}
 
 	for _, tv := range tests {
-		require.True(t.Run(tv.desc, func(t2 *testing.T) {
+		t.Run(tv.desc, func(t *testing.T) {
+			require := require.New(t)
+
 			encodedMsg, err := mb.createOutbound(tv.msg, tv.compressionType, tv.bypassThrottling)
 			require.NoError(err)
 
@@ -823,8 +842,42 @@ func TestMessage(t *testing.T) {
 			parsedMsg, err := mb.parseInbound(encodedMsg.Bytes(), ids.EmptyNodeID, func() {})
 			require.NoError(err)
 			require.Equal(tv.op, parsedMsg.Op())
-		}))
+		})
 	}
+}
+
+// Tests the Stringer interface on inbound messages
+func TestInboundMessageToString(t *testing.T) {
+	t.Parallel()
+
+	require := require.New(t)
+
+	mb, err := newMsgBuilder(
+		logging.NoLog{},
+		"test",
+		prometheus.NewRegistry(),
+		5*time.Second,
+	)
+	require.NoError(err)
+
+	// msg that will become the tested InboundMessage
+	msg := &p2p.Message{
+		Message: &p2p.Message_Pong{
+			Pong: &p2p.Pong{
+				Uptime: 100,
+			},
+		},
+	}
+	msgBytes, err := proto.Marshal(msg)
+	require.NoError(err)
+
+	inboundMsg, err := mb.parseInbound(msgBytes, ids.EmptyNodeID, func() {})
+	require.NoError(err)
+
+	require.Equal("NodeID-111111111111111111116DBWJs Op: pong Message: uptime:100", inboundMsg.String())
+
+	internalMsg := InternalGetStateSummaryFrontierFailed(ids.EmptyNodeID, ids.Empty, 1)
+	require.Equal("NodeID-111111111111111111116DBWJs Op: get_state_summary_frontier_failed Message: ChainID: 11111111111111111111111111111111LpoYY RequestID: 1", internalMsg.String())
 }
 
 func TestEmptyInboundMessage(t *testing.T) {
@@ -872,7 +925,7 @@ func TestNilInboundMessage(t *testing.T) {
 	parsedMsg, err := mb.parseInbound(msgBytes, ids.EmptyNodeID, func() {})
 	require.NoError(err)
 
-	pingMsg, ok := parsedMsg.message.(*p2p.Ping)
-	require.True(ok)
+	require.IsType(&p2p.Ping{}, parsedMsg.message)
+	pingMsg := parsedMsg.message.(*p2p.Ping)
 	require.NotNil(pingMsg)
 }

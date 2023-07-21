@@ -15,7 +15,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -113,9 +112,9 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	onParentAccept.EXPECT().GetDelegateeReward(constants.PrimaryNetworkID, utx.NodeID()).Return(uint64(0), nil).AnyTimes()
 
 	env.mockedState.EXPECT().GetUptime(gomock.Any(), constants.PrimaryNetworkID).Return(
-		time.Duration(1000), /*upDuration*/
-		time.Time{},         /*lastUpdated*/
-		nil,                 /*err*/
+		time.Microsecond, /*upDuration*/
+		time.Time{},      /*lastUpdated*/
+		nil,              /*err*/
 	).AnyTimes()
 
 	// wrong height
@@ -183,11 +182,11 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	env.blkManager.(*manager).lastAccepted = parentID
 	env.mockedState.EXPECT().GetLastAccepted().Return(parentID).AnyTimes()
 	env.mockedState.EXPECT().GetStatelessBlock(gomock.Any()).DoAndReturn(
-		func(blockID ids.ID) (blocks.Block, choices.Status, error) {
+		func(blockID ids.ID) (blocks.Block, error) {
 			if blockID == parentID {
-				return banffParentBlk, choices.Accepted, nil
+				return banffParentBlk, nil
 			}
-			return nil, choices.Rejected, database.ErrNotFound
+			return nil, database.ErrNotFound
 		}).AnyTimes()
 
 	// setup state to validate proposal block transaction
@@ -240,9 +239,9 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	onParentAccept.EXPECT().GetPendingStakerIterator().Return(pendingStakersIt, nil).AnyTimes()
 
 	env.mockedState.EXPECT().GetUptime(gomock.Any(), gomock.Any()).Return(
-		time.Duration(1000), /*upDuration*/
-		time.Time{},         /*lastUpdated*/
-		nil,                 /*err*/
+		time.Microsecond, /*upDuration*/
+		time.Time{},      /*lastUpdated*/
+		nil,              /*err*/
 	).AnyTimes()
 
 	// create proposal tx to be included in the proposal block
@@ -660,7 +659,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 				// build proposal block moving ahead chain time
 				// as well as rewarding staker0
 				preferredID := env.state.GetLastAccepted()
-				parentBlk, _, err := env.state.GetStatelessBlock(preferredID)
+				parentBlk, err := env.state.GetStatelessBlock(preferredID)
 				require.NoError(err)
 				statelessProposalBlock, err := blocks.NewBanffProposalBlock(
 					newTime,
@@ -815,7 +814,7 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 
 	// build proposal block moving ahead chain time
 	preferredID := env.state.GetLastAccepted()
-	parentBlk, _, err := env.state.GetStatelessBlock(preferredID)
+	parentBlk, err := env.state.GetStatelessBlock(preferredID)
 	require.NoError(err)
 	statelessProposalBlock, err := blocks.NewBanffProposalBlock(
 		subnetVdr1EndTime,
@@ -927,7 +926,7 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 
 			// build proposal block moving ahead chain time
 			preferredID := env.state.GetLastAccepted()
-			parentBlk, _, err := env.state.GetStatelessBlock(preferredID)
+			parentBlk, err := env.state.GetStatelessBlock(preferredID)
 			require.NoError(err)
 			statelessProposalBlock, err := blocks.NewBanffProposalBlock(
 				subnetVdr1StartTime,
@@ -1012,7 +1011,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 
 	// build proposal block moving ahead chain time
 	preferredID := env.state.GetLastAccepted()
-	parentBlk, _, err := env.state.GetStatelessBlock(preferredID)
+	parentBlk, err := env.state.GetStatelessBlock(preferredID)
 	require.NoError(err)
 	statelessProposalBlock, err := blocks.NewBanffProposalBlock(
 		pendingValidatorStartTime,
@@ -1105,7 +1104,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 
 	// Advance Time
 	preferredID = env.state.GetLastAccepted()
-	parentBlk, _, err = env.state.GetStatelessBlock(preferredID)
+	parentBlk, err = env.state.GetStatelessBlock(preferredID)
 	require.NoError(err)
 	statelessProposalBlock, err = blocks.NewBanffProposalBlock(
 		pendingDelegatorStartTime,
@@ -1196,7 +1195,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 
 	// build proposal block moving ahead chain time
 	preferredID := env.state.GetLastAccepted()
-	parentBlk, _, err := env.state.GetStatelessBlock(preferredID)
+	parentBlk, err := env.state.GetStatelessBlock(preferredID)
 	require.NoError(err)
 	statelessProposalBlock, err := blocks.NewBanffProposalBlock(
 		pendingValidatorStartTime,
@@ -1288,7 +1287,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 
 	// Advance Time
 	preferredID = env.state.GetLastAccepted()
-	parentBlk, _, err = env.state.GetStatelessBlock(preferredID)
+	parentBlk, err = env.state.GetStatelessBlock(preferredID)
 	require.NoError(err)
 	statelessProposalBlock, err = blocks.NewBanffProposalBlock(
 		pendingDelegatorStartTime,

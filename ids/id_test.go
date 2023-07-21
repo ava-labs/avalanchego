@@ -4,30 +4,39 @@
 package ids
 
 import (
-	"bytes"
 	"encoding/json"
-	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/cb58"
 )
 
 func TestID(t *testing.T) {
+	require := require.New(t)
+
 	id := ID{24}
 	idCopy := ID{24}
 	prefixed := id.Prefix(0)
 
-	if id != idCopy {
-		t.Fatalf("ID.Prefix mutated the ID")
-	}
-	if nextPrefix := id.Prefix(0); prefixed != nextPrefix {
-		t.Fatalf("ID.Prefix not consistent")
-	}
+	require.Equal(idCopy, id)
+	require.Equal(prefixed, id.Prefix(0))
+}
+
+func TestIDXOR(t *testing.T) {
+	require := require.New(t)
+
+	id1 := ID{1}
+	id3 := ID{3}
+
+	require.Equal(ID{2}, id1.XOR(id3))
+	require.Equal(ID{1}, id1)
 }
 
 func TestIDBit(t *testing.T) {
+	require := require.New(t)
+
 	id0 := ID{1 << 0}
 	id1 := ID{1 << 1}
 	id2 := ID{1 << 2}
@@ -38,54 +47,49 @@ func TestIDBit(t *testing.T) {
 	id7 := ID{1 << 7}
 	id8 := ID{0, 1 << 0}
 
-	switch {
-	case id0.Bit(0) != 1:
-		t.Fatalf("Wrong bit")
-	case id1.Bit(1) != 1:
-		t.Fatalf("Wrong bit")
-	case id2.Bit(2) != 1:
-		t.Fatalf("Wrong bit")
-	case id3.Bit(3) != 1:
-		t.Fatalf("Wrong bit")
-	case id4.Bit(4) != 1:
-		t.Fatalf("Wrong bit")
-	case id5.Bit(5) != 1:
-		t.Fatalf("Wrong bit")
-	case id6.Bit(6) != 1:
-		t.Fatalf("Wrong bit")
-	case id7.Bit(7) != 1:
-		t.Fatalf("Wrong bit")
-	case id8.Bit(8) != 1:
-		t.Fatalf("Wrong bit")
-	}
+	require.Equal(1, id0.Bit(0))
+	require.Equal(1, id1.Bit(1))
+	require.Equal(1, id2.Bit(2))
+	require.Equal(1, id3.Bit(3))
+	require.Equal(1, id4.Bit(4))
+	require.Equal(1, id5.Bit(5))
+	require.Equal(1, id6.Bit(6))
+	require.Equal(1, id7.Bit(7))
+	require.Equal(1, id8.Bit(8))
 }
 
 func TestFromString(t *testing.T) {
+	require := require.New(t)
+
 	id := ID{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}
 	idStr := id.String()
 	id2, err := FromString(idStr)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if id != id2 {
-		t.Fatal("Expected FromString to be inverse of String but it wasn't")
-	}
+	require.NoError(err)
+	require.Equal(id, id2)
 }
 
 func TestIDFromStringError(t *testing.T) {
 	tests := []struct {
-		in string
+		in          string
+		expectedErr error
 	}{
-		{""},
-		{"foo"},
-		{"foobar"},
+		{
+			in:          "",
+			expectedErr: cb58.ErrBase58Decoding,
+		},
+		{
+			in:          "foo",
+			expectedErr: cb58.ErrMissingChecksum,
+		},
+		{
+			in:          "foobar",
+			expectedErr: cb58.ErrBadChecksum,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.in, func(t *testing.T) {
 			_, err := FromString(tt.in)
-			if err == nil {
-				t.Error("Unexpected success")
-			}
+			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
 }
@@ -107,12 +111,11 @@ func TestIDMarshalJSON(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.label, func(t *testing.T) {
+			require := require.New(t)
+
 			out, err := tt.in.MarshalJSON()
-			if err != tt.err {
-				t.Errorf("Expected err %s, got error %v", tt.err, err)
-			} else if !bytes.Equal(out, tt.out) {
-				t.Errorf("got %q, expected %q", out, tt.out)
-			}
+			require.ErrorIs(err, tt.err)
+			require.Equal(tt.out, out)
 		})
 	}
 }
@@ -134,13 +137,12 @@ func TestIDUnmarshalJSON(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.label, func(t *testing.T) {
+			require := require.New(t)
+
 			foo := ID{}
 			err := foo.UnmarshalJSON(tt.in)
-			if err != tt.err {
-				t.Errorf("Expected err %s, got error %v", tt.err, err)
-			} else if foo != tt.out {
-				t.Errorf("got %q, expected %q", foo, tt.out)
-			}
+			require.ErrorIs(err, tt.err)
+			require.Equal(tt.out, foo)
 		})
 	}
 }
@@ -148,10 +150,7 @@ func TestIDUnmarshalJSON(t *testing.T) {
 func TestIDHex(t *testing.T) {
 	id := ID{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}
 	expected := "617661206c616273000000000000000000000000000000000000000000000000"
-	actual := id.Hex()
-	if actual != expected {
-		t.Fatalf("got %s, expected %s", actual, expected)
-	}
+	require.Equal(t, expected, id.Hex())
 }
 
 func TestIDString(t *testing.T) {
@@ -165,10 +164,7 @@ func TestIDString(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.label, func(t *testing.T) {
-			result := tt.id.String()
-			if result != tt.expected {
-				t.Errorf("got %q, expected %q", result, tt.expected)
-			}
+			require.Equal(t, tt.expected, tt.id.String())
 		})
 	}
 }
@@ -185,35 +181,23 @@ func TestSortIDs(t *testing.T) {
 		{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
 		{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'},
 	}
-	if !reflect.DeepEqual(ids, expected) {
-		t.Fatal("[]ID was not sorted lexographically")
-	}
+	require.Equal(t, expected, ids)
 }
 
 func TestIDMapMarshalling(t *testing.T) {
+	require := require.New(t)
+
 	originalMap := map[ID]int{
 		{'e', 'v', 'a', ' ', 'l', 'a', 'b', 's'}: 1,
 		{'a', 'v', 'a', ' ', 'l', 'a', 'b', 's'}: 2,
 	}
 	mapJSON, err := json.Marshal(originalMap)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	var unmarshalledMap map[ID]int
-	err = json.Unmarshal(mapJSON, &unmarshalledMap)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(json.Unmarshal(mapJSON, &unmarshalledMap))
 
-	if len(originalMap) != len(unmarshalledMap) {
-		t.Fatalf("wrong map lengths")
-	}
-	for originalID, num := range originalMap {
-		if unmarshalledMap[originalID] != num {
-			t.Fatalf("map was incorrectly Unmarshalled")
-		}
-	}
+	require.Equal(originalMap, unmarshalledMap)
 }
 
 func TestIDLess(t *testing.T) {

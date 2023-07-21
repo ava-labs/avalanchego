@@ -22,7 +22,7 @@ func TestLockedCalculator(t *testing.T) {
 	defer ctrl.Finish()
 
 	lc := NewLockedCalculator()
-	require.NotNil(t)
+	require.NotNil(lc)
 
 	// Should still error because ctx is nil
 	nodeID := ids.GenerateTestNodeID()
@@ -48,7 +48,7 @@ func TestLockedCalculator(t *testing.T) {
 	require.ErrorIs(err, errStillBootstrapping)
 
 	_, err = lc.CalculateUptimePercentFrom(nodeID, subnetID, time.Now())
-	require.EqualValues(errStillBootstrapping, err)
+	require.ErrorIs(err, errStillBootstrapping)
 
 	isBootstrapped.Set(true)
 

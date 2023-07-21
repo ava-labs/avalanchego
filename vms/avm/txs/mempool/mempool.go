@@ -33,7 +33,7 @@ const (
 )
 
 var (
-	_ Mempool = &mempool{}
+	_ Mempool = (*mempool)(nil)
 
 	errDuplicateTx          = errors.New("duplicate tx")
 	errTxTooLarge           = errors.New("tx too large")

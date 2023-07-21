@@ -40,6 +40,8 @@ import (
 	txexecutor "github.com/ava-labs/avalanchego/vms/avm/txs/executor"
 )
 
+const trackChecksums = false
+
 var (
 	errTest = errors.New("test error")
 	chainID = ids.GenerateTestID()
@@ -265,8 +267,8 @@ func TestBuilderBuildBlock(t *testing.T) {
 				unsignedTx1.EXPECT().Visit(gomock.Any()).Return(nil)  // Pass semantic verification
 				unsignedTx1.EXPECT().Visit(gomock.Any()).DoAndReturn( // Pass execution
 					func(visitor txs.Visitor) error {
-						executor, ok := visitor.(*txexecutor.Executor)
-						require.True(t, ok)
+						require.IsType(t, &txexecutor.Executor{}, visitor)
+						executor := visitor.(*txexecutor.Executor)
 						executor.Inputs.Add(inputID)
 						return nil
 					},
@@ -282,8 +284,8 @@ func TestBuilderBuildBlock(t *testing.T) {
 				unsignedTx2.EXPECT().Visit(gomock.Any()).Return(nil)  // Pass semantic verification
 				unsignedTx2.EXPECT().Visit(gomock.Any()).DoAndReturn( // Pass execution
 					func(visitor txs.Visitor) error {
-						executor, ok := visitor.(*txexecutor.Executor)
-						require.True(t, ok)
+						require.IsType(t, &txexecutor.Executor{}, visitor)
+						executor := visitor.(*txexecutor.Executor)
 						executor.Inputs.Add(inputID)
 						return nil
 					},
@@ -374,8 +376,8 @@ func TestBuilderBuildBlock(t *testing.T) {
 				unsignedTx.EXPECT().Visit(gomock.Any()).Return(nil)  // Pass semantic verification
 				unsignedTx.EXPECT().Visit(gomock.Any()).DoAndReturn( // Pass execution
 					func(visitor txs.Visitor) error {
-						executor, ok := visitor.(*txexecutor.Executor)
-						require.True(t, ok)
+						require.IsType(t, &txexecutor.Executor{}, visitor)
+						executor := visitor.(*txexecutor.Executor)
 						executor.Inputs.Add(inputID)
 						return nil
 					},
@@ -448,8 +450,8 @@ func TestBuilderBuildBlock(t *testing.T) {
 				unsignedTx.EXPECT().Visit(gomock.Any()).Return(nil)  // Pass semantic verification
 				unsignedTx.EXPECT().Visit(gomock.Any()).DoAndReturn( // Pass execution
 					func(visitor txs.Visitor) error {
-						executor, ok := visitor.(*txexecutor.Executor)
-						require.True(t, ok)
+						require.IsType(t, &txexecutor.Executor{}, visitor)
+						executor := visitor.(*txexecutor.Executor)
 						executor.Inputs.Add(inputID)
 						return nil
 					},
@@ -487,13 +489,12 @@ func TestBuilderBuildBlock(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
 			builder := tt.builderFunc(ctrl)
 			_, err := builder.BuildBlock(context.Background())
-			require.ErrorIs(err, tt.expectedErr)
+			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
 }
@@ -510,11 +511,8 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	// add a tx to the mempool
 	tx := transactions[0]
 	txID := tx.ID()
-	err = mempool.Add(tx)
-	require.NoError(err)
-
-	has := mempool.Has(txID)
-	require.True(has)
+	require.NoError(mempool.Add(tx))
+	require.True(mempool.Has(txID))
 
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -534,7 +532,7 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	baseDB := versiondb.New(baseDBManager.Current().Database)
 
-	state, err := states.New(baseDB, parser, registerer)
+	state, err := states.New(baseDB, parser, registerer, trackChecksums)
 	require.NoError(err)
 
 	clk := &mockable.Clock{}

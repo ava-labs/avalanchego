@@ -12,9 +12,9 @@ import (
 
 // UnsignedMessage defines the standard format for an unsigned Warp message.
 type UnsignedMessage struct {
-	SourceChainID      ids.ID `serialize:"true"`
-	DestinationChainID ids.ID `serialize:"true"`
-	Payload            []byte `serialize:"true"`
+	NetworkID     uint32 `serialize:"true"`
+	SourceChainID ids.ID `serialize:"true"`
+	Payload       []byte `serialize:"true"`
 
 	bytes []byte
 	id    ids.ID
@@ -22,14 +22,14 @@ type UnsignedMessage struct {
 
 // NewUnsignedMessage creates a new *UnsignedMessage and initializes it.
 func NewUnsignedMessage(
+	networkID uint32,
 	sourceChainID ids.ID,
-	destinationChainID ids.ID,
 	payload []byte,
 ) (*UnsignedMessage, error) {
 	msg := &UnsignedMessage{
-		SourceChainID:      sourceChainID,
-		DestinationChainID: destinationChainID,
-		Payload:            payload,
+		NetworkID:     networkID,
+		SourceChainID: sourceChainID,
+		Payload:       payload,
 	}
 	return msg, msg.Initialize()
 }
