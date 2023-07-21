@@ -487,6 +487,7 @@ type ChangeProof struct {
 	// sufficient history to generate a change proof and
 	// all other fields must be empty.
 	// Otherwise at least one other field is non-empty.
+	// TODO remove
 	HadRootsInHistory bool
 	// A proof that the smallest key in the requested range does/doesn't
 	// exist in the trie with the requested start root.

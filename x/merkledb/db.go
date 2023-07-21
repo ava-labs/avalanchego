@@ -56,6 +56,8 @@ type ChangeProofer interface {
 	// GetChangeProof returns a proof for a subset of the key/value changes in key range
 	// [start, end] that occurred between [startRootID] and [endRootID].
 	// Returns at most [maxLength] key/value pairs.
+	// Returns [ErrRootIDNotPresent] if this node has insufficient history
+	// to generate the proof.
 	GetChangeProof(
 		ctx context.Context,
 		startRootID ids.ID,
@@ -549,14 +551,7 @@ func (db *merkleDB) GetChangeProof(
 		return nil, database.ErrClosed
 	}
 
-	result := &ChangeProof{
-		HadRootsInHistory: true,
-	}
 	changes, err := db.history.getValueChanges(startRootID, endRootID, start, end, maxLength)
-	if err == ErrRootIDNotPresent {
-		result.HadRootsInHistory = false
-		return result, nil
-	}
 	if err != nil {
 		return nil, err
 	}
@@ -568,6 +563,10 @@ func (db *merkleDB) GetChangeProof(
 	slices.SortFunc(changedKeys, func(i, j path) bool {
 		return i.Compare(j) < 0
 	})
+
+	result := &ChangeProof{
+		HadRootsInHistory: true,
+	}
 
 	result.KeyChanges = make([]KeyChange, 0, len(changedKeys))
 
