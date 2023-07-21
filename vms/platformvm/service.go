@@ -2605,7 +2605,7 @@ func (s *Service) GetBlockByHeight(_ *http.Request, args *api.GetBlockByHeightAr
 
 	response.Encoding = args.Encoding
 
-	blockID, err := s.vm.state.GetBlockID(uint64(args.Height))
+	blockID, err := s.vm.state.GetBlockIDAtHeight(uint64(args.Height))
 	if err != nil {
 		return fmt.Errorf("couldn't get block at height %d: %w", args.Height, err)
 	}
