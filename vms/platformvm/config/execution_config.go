@@ -53,9 +53,5 @@ func GetExecutionConfig(b []byte) (*ExecutionConfig, error) {
 		return ec, nil
 	}
 
-	err := json.Unmarshal(b, ec)
-	if err != nil {
-		return nil, err
-	}
-	return ec, nil
+	return ec, json.Unmarshal(b, ec)
 }
