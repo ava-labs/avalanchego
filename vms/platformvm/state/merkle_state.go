@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -25,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/x/merkledb"
@@ -41,12 +43,13 @@ var (
 	_ State = (*merkleState)(nil)
 
 	merkleStatePrefix      = []byte{0x0}
-	merkleBlockPrefix      = []byte{0x1}
-	merkleTxPrefix         = []byte{0x2}
-	merkleIndexUTXOsPrefix = []byte{0x3} // to serve UTXOIDs(addr)
-	merkleUptimesPrefix    = []byte{0x4} // locally measured uptimes
-	merkleWeightDiffPrefix = []byte{0x5} // non-merklelized validators weight diff. TODO: should we merklelize them?
-	merkleBlsKeyDiffPrefix = []byte{0x6}
+	merkleSingletonPrefix  = []byte{0x1}
+	merkleBlockPrefix      = []byte{0x2}
+	merkleTxPrefix         = []byte{0x3}
+	merkleIndexUTXOsPrefix = []byte{0x4} // to serve UTXOIDs(addr)
+	merkleUptimesPrefix    = []byte{0x5} // locally measured uptimes
+	merkleWeightDiffPrefix = []byte{0x6} // non-merklelized validators weight diff. TODO: should we merklelize them?
+	merkleBlsKeyDiffPrefix = []byte{0x7}
 
 	// merkle db sections
 	metadataSectionPrefix      = []byte{0x0}
@@ -65,13 +68,17 @@ var (
 )
 
 func NewMerkleState(
-	cfg *config.Config,
 	rawDB database.Database,
+	genesisBytes []byte,
+	cfg *config.Config,
+	ctx *snow.Context,
 	metricsReg prometheus.Registerer,
+	rewards reward.Calculator,
 ) (Chain, error) {
 	var (
 		baseDB            = versiondb.New(rawDB)
 		baseMerkleDB      = prefixdb.New(merkleStatePrefix, baseDB)
+		singletonDB       = prefixdb.New(merkleSingletonPrefix, baseDB)
 		blockDB           = prefixdb.New(merkleBlockPrefix, baseDB)
 		txDB              = prefixdb.New(merkleTxPrefix, baseDB)
 		indexedUTXOsDB    = prefixdb.New(merkleIndexUTXOsPrefix, baseDB)
@@ -80,13 +87,13 @@ func NewMerkleState(
 		localBlsKeyDiffDB = prefixdb.New(merkleBlsKeyDiffPrefix, baseDB)
 	)
 
-	ctx := context.TODO()
+	traceCtx := context.TODO()
 	noOpTracer, err := trace.New(trace.Config{Enabled: false})
 	if err != nil {
 		return nil, fmt.Errorf("failed creating noOpTraces: %w", err)
 	}
 
-	merkleDB, err := merkledb.New(ctx, baseMerkleDB, merkledb.Config{
+	merkleDB, err := merkledb.New(traceCtx, baseMerkleDB, merkledb.Config{
 		HistoryLength: HistoryLength,
 		NodeCacheSize: NodeCacheSize,
 		Reg:           prometheus.NewRegistry(),
@@ -170,9 +177,12 @@ func NewMerkleState(
 
 	res := &merkleState{
 		cfg:          cfg,
+		ctx:          ctx,
+		rewards:      rewards,
 		baseDB:       baseDB,
 		baseMerkleDB: baseMerkleDB,
 		merkleDB:     merkleDB,
+		singletonDB:  singletonDB,
 
 		currentStakers: newBaseStakers(),
 		pendingStakers: newBaseStakers(),
@@ -216,13 +226,23 @@ func NewMerkleState(
 		validatorBlsKeyDiffsCache: validatorBlsKeyDiffsCache,
 		localBlsKeyDiffDB:         localBlsKeyDiffDB,
 	}
+
+	if err := res.sync(genesisBytes); err != nil {
+		// Drop any errors on close to return the first error
+		_ = res.Close()
+		return nil, err
+	}
+
 	return res, nil
 }
 
 type merkleState struct {
-	cfg *config.Config
+	cfg     *config.Config
+	ctx     *snow.Context
+	rewards reward.Calculator
 
 	baseDB       *versiondb.Database
+	singletonDB  database.Database
 	baseMerkleDB database.Database
 	merkleDB     merkledb.MerkleDB // meklelized state
 
@@ -282,7 +302,6 @@ type merkleState struct {
 	validatorBlsKeyDiffsCache cache.Cacher[uint64, map[ids.NodeID]*bls.PublicKey] // cache of height -> map[ids.NodeID]*bls.PublicKey
 	localBlsKeyDiffDB         database.Database
 }
-
 type uptimes struct {
 	Duration    time.Duration `serialize:"true"`
 	LastUpdated uint64        `serialize:"true"` // Unix time in seconds
