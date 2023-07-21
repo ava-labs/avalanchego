@@ -565,10 +565,8 @@ func (db *merkleDB) GetChangeProof(
 	})
 
 	result := &ChangeProof{
-		HadRootsInHistory: true,
+		KeyChanges: make([]KeyChange, 0, len(changedKeys)),
 	}
-
-	result.KeyChanges = make([]KeyChange, 0, len(changedKeys))
 
 	for _, key := range changedKeys {
 		change := changes.values[key]
@@ -964,15 +962,16 @@ func (db *merkleDB) VerifyChangeProof(
 		return ErrStartAfterEnd
 	}
 
-	if !proof.HadRootsInHistory {
-		// The node we requested the proof from didn't have sufficient
-		// history to fulfill this request.
-		if !proof.Empty() {
-			// cannot have any changes if the root was missing
-			return ErrDataInMissingRootProof
-		}
-		return nil
-	}
+	// TODO remove
+	// if !proof.HadRootsInHistory {
+	// 	// The node we requested the proof from didn't have sufficient
+	// 	// history to fulfill this request.
+	// 	if !proof.Empty() {
+	// 		// cannot have any changes if the root was missing
+	// 		return ErrDataInMissingRootProof
+	// 	}
+	// 	return nil
+	// }
 
 	switch {
 	case proof.Empty():

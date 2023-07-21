@@ -643,12 +643,8 @@ func Test_ChangeProof_Missing_History_For_EndRoot(t *testing.T) {
 	startRoot, err := db.GetMerkleRoot(context.Background())
 	require.NoError(err)
 
-	proof, err := db.GetChangeProof(context.Background(), startRoot, ids.Empty, nil, nil, 50)
-	require.NoError(err)
-	require.NotNil(proof)
-	require.False(proof.HadRootsInHistory)
-
-	require.NoError(db.VerifyChangeProof(context.Background(), proof, nil, nil, db.getMerkleRoot()))
+	_, err = db.GetChangeProof(context.Background(), startRoot, ids.Empty, nil, nil, 50)
+	require.ErrorIs(err, ErrRootIDNotPresent)
 }
 
 func Test_ChangeProof_BadBounds(t *testing.T) {
@@ -839,59 +835,8 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 			expectedErr: ErrStartAfterEnd,
 		},
 		{
-			name: "no roots in history and non-empty key-values",
-			proof: &ChangeProof{
-				HadRootsInHistory: false,
-				KeyChanges:        []KeyChange{{Key: []byte{1}, Value: Some([]byte{1})}},
-			},
-			start:       []byte{0},
-			end:         nil, // Also tests start can be after end if end is nil
-			expectedErr: ErrDataInMissingRootProof,
-		},
-		{
-			name: "no roots in history and non-empty deleted keys",
-			proof: &ChangeProof{
-				HadRootsInHistory: false,
-				KeyChanges:        []KeyChange{{Key: []byte{1}}},
-			},
-			start:       nil,
-			end:         nil,
-			expectedErr: ErrDataInMissingRootProof,
-		},
-		{
-			name: "no roots in history and non-empty start proof",
-			proof: &ChangeProof{
-				HadRootsInHistory: false,
-				StartProof:        []ProofNode{{}},
-			},
-			start:       nil,
-			end:         nil,
-			expectedErr: ErrDataInMissingRootProof,
-		},
-		{
-			name: "no roots in history and non-empty end proof",
-			proof: &ChangeProof{
-				HadRootsInHistory: false,
-				EndProof:          []ProofNode{{}},
-			},
-			start:       nil,
-			end:         nil,
-			expectedErr: ErrDataInMissingRootProof,
-		},
-		{
-			name: "no roots in history; empty",
-			proof: &ChangeProof{
-				HadRootsInHistory: false,
-			},
-			start:       nil,
-			end:         nil,
-			expectedErr: nil,
-		},
-		{
-			name: "root in history; empty",
-			proof: &ChangeProof{
-				HadRootsInHistory: true,
-			},
+			name:        "empty",
+			proof:       &ChangeProof{},
 			start:       nil,
 			end:         nil,
 			expectedErr: ErrNoMerkleProof,
@@ -899,8 +844,7 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 		{
 			name: "no end proof",
 			proof: &ChangeProof{
-				HadRootsInHistory: true,
-				StartProof:        []ProofNode{{}},
+				StartProof: []ProofNode{{}},
 			},
 			start:       nil,
 			end:         []byte{1},
@@ -909,8 +853,7 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 		{
 			name: "no start proof",
 			proof: &ChangeProof{
-				HadRootsInHistory: true,
-				KeyChanges:        []KeyChange{{Key: []byte{1}}},
+				KeyChanges: []KeyChange{{Key: []byte{1}}},
 			},
 			start:       []byte{1},
 			end:         nil,
@@ -919,7 +862,6 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 		{
 			name: "non-increasing key-values",
 			proof: &ChangeProof{
-				HadRootsInHistory: true,
 				KeyChanges: []KeyChange{
 					{Key: []byte{1}},
 					{Key: []byte{0}},
@@ -932,8 +874,7 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 		{
 			name: "key-value too low",
 			proof: &ChangeProof{
-				HadRootsInHistory: true,
-				StartProof:        []ProofNode{{}},
+				StartProof: []ProofNode{{}},
 				KeyChanges: []KeyChange{
 					{Key: []byte{0}},
 				},
@@ -945,8 +886,7 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 		{
 			name: "key-value too great",
 			proof: &ChangeProof{
-				HadRootsInHistory: true,
-				EndProof:          []ProofNode{{}},
+				EndProof: []ProofNode{{}},
 				KeyChanges: []KeyChange{
 					{Key: []byte{2}},
 				},
@@ -958,7 +898,6 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 		{
 			name: "duplicate key",
 			proof: &ChangeProof{
-				HadRootsInHistory: true,
 				KeyChanges: []KeyChange{
 					{Key: []byte{1}},
 					{Key: []byte{1}},
@@ -971,7 +910,6 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 		{
 			name: "start proof node has wrong prefix",
 			proof: &ChangeProof{
-				HadRootsInHistory: true,
 				StartProof: []ProofNode{
 					{KeyPath: newPath([]byte{2}).Serialize()},
 					{KeyPath: newPath([]byte{2, 3}).Serialize()},
@@ -984,7 +922,6 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 		{
 			name: "start proof non-increasing",
 			proof: &ChangeProof{
-				HadRootsInHistory: true,
 				StartProof: []ProofNode{
 					{KeyPath: newPath([]byte{1}).Serialize()},
 					{KeyPath: newPath([]byte{2, 3}).Serialize()},
@@ -997,7 +934,6 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 		{
 			name: "end proof node has wrong prefix",
 			proof: &ChangeProof{
-				HadRootsInHistory: true,
 				KeyChanges: []KeyChange{
 					{Key: []byte{1, 2}, Value: Some([]byte{0})},
 				},
@@ -1013,7 +949,6 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 		{
 			name: "end proof non-increasing",
 			proof: &ChangeProof{
-				HadRootsInHistory: true,
 				KeyChanges: []KeyChange{
 					{Key: []byte{1, 2, 3}},
 				},

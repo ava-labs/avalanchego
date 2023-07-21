@@ -93,6 +93,7 @@ func (c *client) GetChangeProof(ctx context.Context, req *pb.SyncGetChangeProofR
 			return nil, err
 		}
 
+		// TODO fix
 		// TODO: When the server is updated so that the response can be a
 		// RangeProof, this must be updated to handle that case.
 		var changeProof merkledb.ChangeProof
