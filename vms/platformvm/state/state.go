@@ -2133,7 +2133,7 @@ func (s *state) PruneAndIndex(lock sync.Locker, log logging.Logger) error {
 	lastUpdate := startTime
 	numPruned := 0
 
-	for len(blockIterator.Value()) != 0 {
+	for blockIterator.Next() {
 		blkBytes := blockIterator.Value()
 
 		blk, status, isStateBlk, err := parseStoredBlock(blkBytes)
