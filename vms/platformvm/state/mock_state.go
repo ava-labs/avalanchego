@@ -756,17 +756,3 @@ func (mr *MockStateMockRecorder) ValidatorSet(arg0, arg1 interface{}) *gomock.Ca
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ValidatorSet", reflect.TypeOf((*MockState)(nil).ValidatorSet), arg0, arg1)
 }
-
-// VerifyHeightIndex mocks base method.
-func (m *MockState) VerifyHeightIndex() error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "VerifyHeightIndex")
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// VerifyHeightIndex indicates an expected call of VerifyHeightIndex.
-func (mr *MockStateMockRecorder) VerifyHeightIndex() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyHeightIndex", reflect.TypeOf((*MockState)(nil).VerifyHeightIndex))
-}
