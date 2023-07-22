@@ -1223,12 +1223,19 @@ func (*merkleState) writeCurrentStakers(view merkledb.TrieView, ctx context.Cont
 	for stakerTxID, data := range currentData {
 		key := merkleCurrentStakersKey(stakerTxID)
 
+		if data.TxBytes == nil {
+			if err := view.Remove(ctx, key); err != nil {
+				return fmt.Errorf("failed to remove current stakers data, stakerTxID %v: %w", stakerTxID, err)
+			}
+			continue
+		}
+
 		dataBytes, err := txs.GenesisCodec.Marshal(txs.Version, data)
 		if err != nil {
-			return fmt.Errorf("failed to serialize current stakers data, stakerTxID%v : %w", stakerTxID, err)
+			return fmt.Errorf("failed to serialize current stakers data, stakerTxID %v: %w", stakerTxID, err)
 		}
 		if err := view.Insert(ctx, key, dataBytes); err != nil {
-			return fmt.Errorf("failed to write current stakers data, stakerTxID%v : %w", stakerTxID, err)
+			return fmt.Errorf("failed to write current stakers data, stakerTxID %v: %w", stakerTxID, err)
 		}
 	}
 	return nil
@@ -1238,12 +1245,19 @@ func (*merkleState) writePendingStakers(view merkledb.TrieView, ctx context.Cont
 	for stakerTxID, data := range pendingData {
 		key := merklePendingStakersKey(stakerTxID)
 
+		if data.TxBytes == nil {
+			if err := view.Remove(ctx, key); err != nil {
+				return fmt.Errorf("failed to write pending stakers data, stakerTxID %v: %w", stakerTxID, err)
+			}
+			continue
+		}
+
 		dataBytes, err := txs.GenesisCodec.Marshal(txs.Version, data)
 		if err != nil {
-			return fmt.Errorf("failed to serialize pending stakers data, stakerTxID%v : %w", stakerTxID, err)
+			return fmt.Errorf("failed to serialize pending stakers data, stakerTxID %v: %w", stakerTxID, err)
 		}
 		if err := view.Insert(ctx, key, dataBytes); err != nil {
-			return fmt.Errorf("failed to write pending stakers data, stakerTxID%v : %w", stakerTxID, err)
+			return fmt.Errorf("failed to write pending stakers data, stakerTxID %v: %w", stakerTxID, err)
 		}
 	}
 	return nil

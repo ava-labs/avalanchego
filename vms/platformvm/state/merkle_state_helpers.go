@@ -20,7 +20,7 @@ type uptimes struct {
 }
 
 type stakersData struct {
-	TxBytes         []byte `serialize:"true"`
+	TxBytes         []byte `serialize:"true"` // nit signals remove
 	PotentialReward uint64 `serialize:"true"`
 }
 
