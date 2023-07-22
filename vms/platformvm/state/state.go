@@ -1994,13 +1994,13 @@ func (s *state) writeMetadata() error {
 //
 // TODO: Remove after v1.11.x is activated
 func parseStoredBlock(blkBytes []byte) (blocks.Block, choices.Status, bool, error) {
-	// Attempt to parse as blocks.Block directly.
+	// Attempt to parse as blocks.Block
 	blk, err := blocks.Parse(blocks.GenesisCodec, blkBytes)
 	if err == nil {
 		return blk, choices.Accepted, false, nil
 	}
 
-	// Fallback to [stateBlk].
+	// Fallback to [stateBlk]
 	blkState := stateBlk{}
 	if _, err := blocks.GenesisCodec.Unmarshal(blkBytes, &blkState); err != nil {
 		return nil, choices.Processing, false, err
