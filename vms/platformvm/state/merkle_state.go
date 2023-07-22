@@ -378,13 +378,28 @@ func (ms *merkleState) GetPendingStakerIterator() (StakerIterator, error) {
 
 func (ms *merkleState) GetDelegateeReward(subnetID ids.ID, vdrID ids.NodeID) (uint64, error) {
 	nodeDelegateeRewards, exists := ms.delegateeRewardCache[vdrID]
-	if !exists {
-		return 0, database.ErrNotFound
+	if exists {
+		delegateeReward, exists := nodeDelegateeRewards[subnetID]
+		if exists {
+			return delegateeReward, nil
+		}
 	}
-	delegateeReward, exists := nodeDelegateeRewards[subnetID]
-	if !exists {
-		return 0, database.ErrNotFound
+
+	// try loading from the db
+	key := merkleDelegateeRewardsKey(vdrID, subnetID)
+	amountBytes, err := ms.merkleDB.Get(key)
+	if err != nil {
+		return 0, err
 	}
+	delegateeReward, err := database.ParseUInt64(amountBytes)
+	if err != nil {
+		return 0, err
+	}
+
+	if _, found := ms.delegateeRewardCache[vdrID]; !found {
+		ms.delegateeRewardCache[vdrID] = make(map[ids.ID]uint64)
+	}
+	ms.delegateeRewardCache[vdrID][subnetID] = delegateeReward
 	return delegateeReward, nil
 }
 
@@ -992,6 +1007,12 @@ func (ms *merkleState) processCurrentStakers() (
 			}
 			outputValSet[weightKey] = validatorDiff
 
+			// make sure there is an entry for delegators even in case
+			// there are no validators modified.
+			outputWeights[weightKey] = &ValidatorWeightDiff{
+				Decrease: validatorDiff.validatorStatus == deleted,
+			}
+
 			switch validatorDiff.validatorStatus {
 			case added:
 				var (
@@ -1008,10 +1029,7 @@ func (ms *merkleState) processCurrentStakers() (
 					TxBytes:         tx.Bytes(),
 					PotentialReward: potentialReward,
 				}
-				outputWeights[weightKey] = &ValidatorWeightDiff{
-					Decrease: false,
-					Amount:   weight,
-				}
+				outputWeights[weightKey].Amount = weight
 
 			case deleted:
 				var (
@@ -1023,10 +1041,8 @@ func (ms *merkleState) processCurrentStakers() (
 				outputStakers[txID] = &stakersData{
 					TxBytes: nil,
 				}
-				outputWeights[weightKey] = &ValidatorWeightDiff{
-					Decrease: true,
-					Amount:   weight,
-				}
+				outputWeights[weightKey].Amount = weight
+
 				if blkKey != nil {
 					outputBlsKey[nodeID] = blkKey
 				}
