@@ -143,16 +143,16 @@ func (vm *VM) Initialize(
 	}
 
 	rewards := reward.NewCalculator(vm.RewardConfig)
-	vm.state, err = state.New(
+	vm.state, err = state.NewMerkleState(
 		vm.dbManager.Current().Database,
+		vm.metrics,
 		genesisBytes,
-		registerer,
 		&vm.Config,
 		vm.ctx,
-		vm.metrics,
+		registerer,
 		rewards,
 		&vm.bootstrapped,
-		platformConfig.ChecksumsEnabled,
+		// platformConfig.ChecksumsEnabled,
 	)
 	if err != nil {
 		return err

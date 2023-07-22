@@ -78,7 +78,7 @@ func NewMerkleState(
 	metricsReg prometheus.Registerer,
 	rewards reward.Calculator,
 	bootstrapped *utils.Atomic[bool],
-) (Chain, error) {
+) (State, error) {
 	var (
 		baseDB            = versiondb.New(rawDB)
 		baseMerkleDB      = prefixdb.New(merkleStatePrefix, baseDB)
@@ -272,7 +272,7 @@ type merkleState struct {
 	// Metadata section
 	chainTime          time.Time
 	lastAcceptedBlkID  ids.ID
-	lastAcceptedHeight uint64                        // Should this be written to state??
+	lastAcceptedHeight uint64                        // TODO: Should this be written to state??
 	supplies           map[ids.ID]uint64             // map of subnetID -> current supply
 	suppliesCache      cache.Cacher[ids.ID, *uint64] // cache of subnetID -> current supply if the entry is nil, it is not in the database
 
@@ -1141,7 +1141,7 @@ func (ms *merkleState) writePermissionedSubnets(view merkledb.TrieView, ctx cont
 			return fmt.Errorf("failed to write subnetTx: %w", err)
 		}
 	}
-	ms.addedPermissionedSubnets = nil
+	ms.addedPermissionedSubnets = make([]*txs.Tx, 0)
 	return nil
 }
 
