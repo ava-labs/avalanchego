@@ -287,17 +287,17 @@ type merkleState struct {
 	addedChains map[ids.ID][]*txs.Tx            // maps subnetID -> the newly added chains to the subnet
 	chainCache  cache.Cacher[ids.ID, []*txs.Tx] // cache of subnetID -> the chains after all local modifications []*txs.Tx
 
+	// Blocks section
+	addedBlocks map[ids.ID]blocks.Block            // map of blockID -> Block
+	blockCache  cache.Cacher[ids.ID, blocks.Block] // cache of blockID -> Block. If the entry is nil, it is not in the database
+	blockDB     database.Database
+
 	// Txs section
 	// FIND a way to reduce use of these. No use in verification of addedTxs
 	// a limited windows to support APIs
 	addedTxs map[ids.ID]*txAndStatus            // map of txID -> {*txs.Tx, Status}
 	txCache  cache.Cacher[ids.ID, *txAndStatus] // txID -> {*txs.Tx, Status}. If the entry is nil, it isn't in the database
 	txDB     database.Database
-
-	// Blocks section
-	addedBlocks map[ids.ID]blocks.Block            // map of blockID -> Block
-	blockCache  cache.Cacher[ids.ID, blocks.Block] // cache of blockID -> Block. If the entry is nil, it is not in the database
-	blockDB     database.Database
 
 	indexedUTXOsDB database.Database
 
@@ -931,6 +931,8 @@ func (*merkleState) Checksum() ids.ID {
 func (ms *merkleState) Close() error {
 	errs := wrappers.Errs{}
 	errs.Add(
+		ms.localBlsKeyDiffDB.Close(),
+		ms.localWeightDiffDB.Close(),
 		ms.localUptimesDB.Close(),
 		ms.indexedUTXOsDB.Close(),
 		ms.txDB.Close(),
