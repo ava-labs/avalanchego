@@ -230,16 +230,15 @@ func defaultState(
 	require := require.New(t)
 
 	genesisBytes := buildGenesisTest(t, ctx)
-	state, err := state.New(
+	state, err := state.NewMerkleState(
 		db,
+		metrics.Noop,
 		genesisBytes,
-		prometheus.NewRegistry(),
 		cfg,
 		ctx,
-		metrics.Noop,
+		prometheus.NewRegistry(),
 		rewards,
 		&utils.Atomic[bool]{},
-		trackChecksum,
 	)
 	require.NoError(err)
 

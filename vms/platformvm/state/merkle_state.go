@@ -1498,6 +1498,10 @@ func (ms *merkleState) updateValidatorSet(
 		if subnetID != constants.PrimaryNetworkID && !ms.cfg.TrackedSubnets.Contains(subnetID) {
 			continue
 		}
+		if weightDiff.Amount == 0 {
+			// No weight change to record; go to next validator.
+			continue
+		}
 
 		if weightDiff.Decrease {
 			err = validators.RemoveWeight(ms.cfg.Validators, subnetID, nodeID, weightDiff.Amount)

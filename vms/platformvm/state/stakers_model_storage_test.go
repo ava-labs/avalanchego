@@ -877,7 +877,7 @@ func checkSystemAndModelContent(cmdState commands.State, res commands.Result) bo
 // makes sure they are coherent.
 func checkValidatorSetContent(res commands.Result) bool {
 	sys := res.(*sysUnderTest)
-	valSet := sys.baseState.(*state).cfg.Validators
+	valSet := sys.baseState.(*merkleState).cfg.Validators
 
 	sysIt, err := sys.baseState.GetCurrentStakerIterator()
 	if err != nil {

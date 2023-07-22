@@ -269,16 +269,15 @@ func defaultState(
 	rewards reward.Calculator,
 ) state.State {
 	genesisBytes := buildGenesisTest(ctx)
-	state, err := state.New(
+	state, err := state.NewMerkleState(
 		db,
+		metrics.Noop,
 		genesisBytes,
-		prometheus.NewRegistry(),
 		cfg,
 		ctx,
-		metrics.Noop,
+		prometheus.NewRegistry(),
 		rewards,
 		&utils.Atomic[bool]{},
-		trackChecksum,
 	)
 	if err != nil {
 		panic(err)
