@@ -206,7 +206,7 @@ func NewMerkleState(
 		suppliesCache: suppliesCache,
 
 		addedPermissionedSubnets: make([]*txs.Tx, 0),
-		permissionedSubnetCache:  make([]*txs.Tx, 0),
+		permissionedSubnetCache:  nil, // created first time GetSubnets is called
 		addedElasticSubnets:      make(map[ids.ID]*txs.Tx),
 		elasticSubnetCache:       transformedSubnetCache,
 
@@ -442,9 +442,12 @@ func (ms *merkleState) GetUTXO(utxoID ids.ID) (*avax.UTXO, error) {
 }
 
 func (ms *merkleState) UTXOIDs(addr []byte, start ids.ID, limit int) ([]ids.ID, error) {
-	key := merkleUtxoIndexKey(addr, start)
+	var (
+		prefix = merkleUtxoIndexPrefix(addr)
+		key    = merkleUtxoIndexKey(addr, start)
+	)
 
-	iter := ms.indexedUTXOsDB.NewIteratorWithStart(key)
+	iter := ms.indexedUTXOsDB.NewIteratorWithStartAndPrefix(key, prefix)
 	defer iter.Release()
 
 	utxoIDs := []ids.ID(nil)
@@ -1235,25 +1238,26 @@ func (ms *merkleState) writeUTXOs(view merkledb.TrieView, ctx context.Context) e
 		delete(ms.modifiedUTXOs, utxoID)
 		key := merkleUtxoIDKey(utxoID)
 		if utxo == nil { // delete the UTXO
-			switch _, err := ms.GetUTXO(utxoID); err {
+			switch utxo, err := ms.GetUTXO(utxoID); err {
 			case nil:
 				ms.utxoCache.Put(utxoID, nil)
 				if err := view.Remove(ctx, key); err != nil {
 					return err
 				}
-
 				// store the index
 				if err := ms.writeUTXOsIndex(utxo, false /*insertUtxo*/); err != nil {
 					return err
 				}
+				// go process next utxo
+				continue
 
 			case database.ErrNotFound:
-				return nil
+				// trying to delete a non-existing utxo.
+				continue
 
 			default:
 				return err
 			}
-			continue
 		}
 
 		// insert the UTXO
