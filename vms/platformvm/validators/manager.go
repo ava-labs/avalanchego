@@ -118,7 +118,7 @@ func (m *manager) GetMinimumHeight(ctx context.Context) (uint64, error) {
 		return m.GetCurrentHeight(ctx)
 	}
 
-	blk, _, err := m.state.GetStatelessBlock(oldest)
+	blk, err := m.state.GetStatelessBlock(oldest)
 	if err != nil {
 		return 0, err
 	}
@@ -133,7 +133,7 @@ func (m *manager) GetMinimumHeight(ctx context.Context) (uint64, error) {
 
 func (m *manager) GetCurrentHeight(context.Context) (uint64, error) {
 	lastAcceptedID := m.state.GetLastAccepted()
-	lastAccepted, _, err := m.state.GetStatelessBlock(lastAcceptedID)
+	lastAccepted, err := m.state.GetStatelessBlock(lastAcceptedID)
 	if err != nil {
 		return 0, err
 	}
@@ -217,18 +217,10 @@ func (m *manager) makePrimaryNetworkValidatorSet(
 		)
 		return nil, ErrMissingValidatorSet
 	}
-	currentValidatorList := currentValidators.List()
 
 	// Node ID --> Validator information for the node validating the Primary
 	// Network.
-	validatorSet := make(map[ids.NodeID]*validators.GetValidatorOutput, len(currentValidatorList))
-	for _, vdr := range currentValidatorList {
-		validatorSet[vdr.NodeID] = &validators.GetValidatorOutput{
-			NodeID:    vdr.NodeID,
-			PublicKey: vdr.PublicKey,
-			Weight:    vdr.Weight,
-		}
-	}
+	validatorSet := currentValidators.Map()
 
 	// Rebuild primary network validators at [height]
 	for diffHeight := currentHeight; diffHeight > targetHeight; diffHeight-- {
@@ -269,17 +261,9 @@ func (m *manager) makeSubnetValidatorSet(
 			return nil, err
 		}
 	}
-	currentValidatorList := currentValidators.List()
 
 	// Node ID --> Validator information for the node validating the Subnet.
-	subnetValidatorSet := make(map[ids.NodeID]*validators.GetValidatorOutput, len(currentValidatorList))
-	for _, vdr := range currentValidatorList {
-		subnetValidatorSet[vdr.NodeID] = &validators.GetValidatorOutput{
-			NodeID: vdr.NodeID,
-			// PublicKey will be picked from primary validators
-			Weight: vdr.Weight,
-		}
-	}
+	subnetValidatorSet := currentValidators.Map()
 
 	// Rebuild subnet validators at [targetHeight]
 	for diffHeight := currentHeight; diffHeight > targetHeight; diffHeight-- {

@@ -55,7 +55,6 @@ type workItem struct {
 	localRootID ids.ID
 }
 
-// TODO danlaine look into using a sync.Pool for workItems
 func newWorkItem(localRootID ids.ID, start, end []byte, priority priority) *workItem {
 	return &workItem{
 		localRootID: localRootID,
@@ -190,10 +189,6 @@ func (m *Manager) sync(ctx context.Context) {
 		default:
 			m.processingWorkItems++
 			work := m.unprocessedWork.GetWork()
-			// TODO danlaine: We won't release [m.workLock] until
-			// we've started a goroutine for each available work item.
-			// We can't apply proofs we receive until we release [m.workLock].
-			// Is this OK? Is it possible we end up with too many goroutines?
 			go m.doWork(ctx, work)
 		}
 	}
@@ -645,6 +640,16 @@ func (m *Manager) enqueueWork(work *workItem) {
 	// Split the remaining range into to 2.
 	// Find the middle point.
 	mid := midPoint(work.start, work.end)
+
+	if bytes.Equal(work.start, mid) || bytes.Equal(mid, work.end) {
+		// The range is too small to split.
+		// If we didn't have this check we would add work items
+		// [start, start] and [start, end]. Since start <= end, this would
+		// violate the invariant of [m.unprocessedWork] and [m.processedWork]
+		// that there are no overlapping ranges.
+		m.unprocessedWork.Insert(work)
+		return
+	}
 
 	// first item gets higher priority than the second to encourage finished ranges to grow
 	// rather than start a new range that is not contiguous with existing completed ranges

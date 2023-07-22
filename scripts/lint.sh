@@ -9,6 +9,16 @@ if ! [[ "$0" =~ scripts/lint.sh ]]; then
   exit 255
 fi
 
+# The -P option is not supported by the grep version installed by
+# default on macos. Since `-o errexit` is ignored in an if
+# conditional, triggering the problem here ensures script failure when
+# using an unsupported version of grep.
+grep -P 'lint.sh' scripts/lint.sh &> /dev/null || (\
+  >&2 echo "error: This script requires a recent version of gnu grep.";\
+  >&2 echo "       On macos, gnu grep can be installed with 'brew install grep'.";\
+  >&2 echo "       It will also be necessary to ensure that gnu grep is available in the path.";\
+  exit 255 )
+
 if [ "$#" -eq 0 ]; then
   # by default, check all source code
   # to test only "snow" package
