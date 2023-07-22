@@ -234,18 +234,19 @@ func defaultState(
 	tracer, err := trace.New(trace.Config{})
 	require.NoError(err)
 
+	execCfg, _ := config.GetExecutionConfig([]byte(`{}`))
 	genesisBytes := buildGenesisTest(t, ctx)
 	state, err := state.New(
 		db,
 		genesisBytes,
 		prometheus.NewRegistry(),
 		cfg,
+		execCfg,
 		ctx,
 		metrics.Noop,
 		rewards,
 		&utils.Atomic[bool]{},
 		tracer,
-		trackChecksum,
 	)
 	require.NoError(err)
 

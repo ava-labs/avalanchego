@@ -46,8 +46,6 @@ import (
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/blocks/executor"
 )
 
-const trackChecksum = false
-
 func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	require := require.New(t)
 	vm, _, _ := defaultVM(t)
@@ -660,17 +658,18 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	// Force a reload of the state from the database.
 	vm.Config.Validators = validators.NewManager()
 	vm.Config.Validators.Add(constants.PrimaryNetworkID, validators.NewSet())
+	execCfg, _ := config.GetExecutionConfig(nil)
 	newState, err := state.New(
 		vm.dbManager.Current().Database,
 		nil,
 		prometheus.NewRegistry(),
 		&vm.Config,
+		execCfg,
 		vm.ctx,
 		metrics.Noop,
 		reward.NewCalculator(vm.Config.RewardConfig),
 		&utils.Atomic[bool]{},
 		tracer,
-		trackChecksum,
 	)
 	require.NoError(err)
 
@@ -973,17 +972,18 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	// Force a reload of the state from the database.
 	vm.Config.Validators = validators.NewManager()
 	vm.Config.Validators.Add(constants.PrimaryNetworkID, validators.NewSet())
+	execCfg, _ := config.GetExecutionConfig(nil)
 	newState, err := state.New(
 		vm.dbManager.Current().Database,
 		nil,
 		prometheus.NewRegistry(),
 		&vm.Config,
+		execCfg,
 		vm.ctx,
 		metrics.Noop,
 		reward.NewCalculator(vm.Config.RewardConfig),
 		&utils.Atomic[bool]{},
 		tracer,
-		trackChecksum,
 	)
 	require.NoError(err)
 

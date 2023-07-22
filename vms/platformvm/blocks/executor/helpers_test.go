@@ -277,17 +277,18 @@ func defaultState(
 	}
 
 	genesisBytes := buildGenesisTest(ctx)
+	execCfg, _ := config.GetExecutionConfig([]byte(`{}`))
 	state, err := state.New(
 		db,
 		genesisBytes,
 		prometheus.NewRegistry(),
 		cfg,
+		execCfg,
 		ctx,
 		metrics.Noop,
 		rewards,
 		&utils.Atomic[bool]{},
 		tracer,
-		trackChecksum,
 	)
 	if err != nil {
 		panic(err)
