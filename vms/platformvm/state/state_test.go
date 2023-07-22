@@ -34,8 +34,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-const trackChecksum = false
-
 var (
 	initialTxID             = ids.GenerateTestID()
 	initialNodeID           = ids.GenerateTestNodeID()
@@ -498,12 +496,14 @@ func newStateFromDB(require *require.Assertions, db database.Database) State {
 	vdrs := validators.NewManager()
 	primaryVdrs := validators.NewSet()
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
+	execCfg, _ := config.GetExecutionConfig(nil)
 	state, err := new(
 		db,
 		metrics.Noop,
 		&config.Config{
 			Validators: vdrs,
 		},
+		execCfg,
 		&snow.Context{},
 		prometheus.NewRegistry(),
 		reward.NewCalculator(reward.Config{
@@ -513,7 +513,6 @@ func newStateFromDB(require *require.Assertions, db database.Database) State {
 			SupplyCap:          720 * units.MegaAvax,
 		}),
 		&utils.Atomic[bool]{},
-		trackChecksum,
 	)
 	require.NoError(err)
 	require.NotNil(state)
