@@ -62,9 +62,7 @@ type State interface {
 	GetLastAccepted() ids.ID
 	GetStatelessBlock(blockID ids.ID) (blocks.Block, error)
 
-	// ValidatorSet adds all the validators and delegators of [subnetID] into
-	// [vdrs].
-	ValidatorSet(subnetID ids.ID, vdrs validators.Set) error
+	GetValidatorSet(subnetID ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error)
 
 	// startHeight > endHeight
 	ApplyValidatorWeightDiffs(
@@ -393,15 +391,18 @@ func (m *manager) getCurrentValidatorSets(
 	m.acceptLock.RLock()
 	defer m.acceptLock.RUnlock()
 
-	currentSubnetValidators, ok := m.cfg.Validators.Get(subnetID)
-	if !ok {
-		currentSubnetValidators = validators.NewSet()
-		if err := m.state.ValidatorSet(subnetID, currentSubnetValidators); err != nil {
+	var currentSubnetValidators map[ids.NodeID]*validators.GetValidatorOutput
+	if currentSubnetValidatorSet, ok := m.cfg.Validators.Get(subnetID); ok {
+		currentSubnetValidators = currentSubnetValidatorSet.Map()
+	} else {
+		var err error
+		currentSubnetValidators, err = m.state.GetValidatorSet(subnetID)
+		if err != nil {
 			return nil, nil, 0, err
 		}
 	}
 
-	currentPrimaryValidators, ok := m.cfg.Validators.Get(constants.PrimaryNetworkID)
+	currentPrimaryValidatorSet, ok := m.cfg.Validators.Get(constants.PrimaryNetworkID)
 	if !ok {
 		// This should never happen
 		m.log.Error(ErrMissingValidatorSet.Error(),
@@ -411,7 +412,7 @@ func (m *manager) getCurrentValidatorSets(
 	}
 
 	currentHeight, err := m.getCurrentHeight(ctx)
-	return currentSubnetValidators.Map(), currentPrimaryValidators.Map(), currentHeight, err
+	return currentSubnetValidators, currentPrimaryValidatorSet.Map(), currentHeight, err
 }
 
 func (m *manager) GetSubnetID(_ context.Context, chainID ids.ID) (ids.ID, error) {
