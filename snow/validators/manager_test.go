@@ -20,7 +20,7 @@ func TestAdd(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 
 	err := Add(m, subnetID, nodeID, nil, ids.Empty, 1)
-	require.ErrorIs(err, errMissingValidators)
+	require.ErrorIs(err, ErrMissingValidators)
 
 	s := NewSet()
 	m.Add(subnetID, s)
@@ -39,7 +39,7 @@ func TestAddWeight(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 
 	err := AddWeight(m, subnetID, nodeID, 1)
-	require.ErrorIs(err, errMissingValidators)
+	require.ErrorIs(err, ErrMissingValidators)
 
 	s := NewSet()
 	m.Add(subnetID, s)
@@ -63,7 +63,7 @@ func TestRemoveWeight(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 
 	err := RemoveWeight(m, subnetID, nodeID, 1)
-	require.ErrorIs(err, errMissingValidators)
+	require.ErrorIs(err, ErrMissingValidators)
 
 	s := NewSet()
 	m.Add(subnetID, s)
