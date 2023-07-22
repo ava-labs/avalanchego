@@ -321,8 +321,13 @@ func (ms *merkleState) PutCurrentValidator(staker *Staker) {
 	ms.currentStakers.PutValidator(staker)
 
 	// make sure that each new validator has an uptime entry
-	// merkleState implementation of SetUptime must not err
+	// and a delegatee reward entry. MerkleState implementations
+	// of SetUptime and SetDelegateeReward must not err
 	err := ms.SetUptime(staker.NodeID, staker.SubnetID, 0 /*duration*/, staker.StartTime)
+	if err != nil {
+		panic(err)
+	}
+	err = ms.SetDelegateeReward(staker.SubnetID, staker.NodeID, 0)
 	if err != nil {
 		panic(err)
 	}
