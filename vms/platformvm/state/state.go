@@ -156,6 +156,7 @@ type State interface {
 	Close() error
 }
 
+// TODO: Remove after v1.11.x is activated
 type stateBlk struct {
 	Blk    blocks.Block
 	Bytes  []byte         `serialize:"true"`
