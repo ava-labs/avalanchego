@@ -230,6 +230,7 @@ func (ms *merkleState) loadCurrentStakers() error {
 			return err
 		}
 		if staker.Priority.IsValidator() {
+			// TODO: why not PutValidator/PutDelegator??
 			validator := ms.currentStakers.getOrCreateValidator(staker.SubnetID, staker.NodeID)
 			validator.validator = staker
 			ms.currentStakers.stakers.ReplaceOrInsert(staker)

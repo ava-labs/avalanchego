@@ -4,6 +4,7 @@
 package state
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"time"
@@ -318,6 +319,13 @@ func (ms *merkleState) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (
 
 func (ms *merkleState) PutCurrentValidator(staker *Staker) {
 	ms.currentStakers.PutValidator(staker)
+
+	// make sure that each new validator has an uptime entry
+	// merkleState implementation of SetUptime must not err
+	err := ms.SetUptime(staker.NodeID, staker.SubnetID, 0 /*duration*/, staker.StartTime)
+	if err != nil {
+		panic(err)
+	}
 }
 
 func (ms *merkleState) DeleteCurrentValidator(staker *Staker) {
@@ -441,9 +449,9 @@ func (ms *merkleState) UTXOIDs(addr []byte, start ids.ID, limit int) ([]ids.ID, 
 
 	utxoIDs := []ids.ID(nil)
 	for len(utxoIDs) < limit && iter.Next() {
-		utxoID, err := ids.ToID(iter.Key())
-		if err != nil {
-			return nil, err
+		itAddr, utxoID := splitUtxoIndexKey(iter.Key())
+		if !bytes.Equal(itAddr, addr) {
+			break
 		}
 		if utxoID == start {
 			continue
@@ -750,26 +758,47 @@ func (ms *merkleState) AddStatelessBlock(block blocks.Block) {
 // UPTIMES SECTION
 func (ms *merkleState) GetUptime(vdrID ids.NodeID, subnetID ids.ID) (upDuration time.Duration, lastUpdated time.Time, err error) {
 	nodeUptimes, exists := ms.localUptimesCache[vdrID]
-	if !exists {
-		return 0, time.Time{}, database.ErrNotFound
-	}
-	uptime, exists := nodeUptimes[subnetID]
-	if !exists {
-		return 0, time.Time{}, database.ErrNotFound
+	if exists {
+		uptime, exists := nodeUptimes[subnetID]
+		if exists {
+			return uptime.Duration, uptime.lastUpdated, nil
+		}
 	}
 
-	return uptime.Duration, uptime.lastUpdated, nil
+	// try loading from DB
+	key := merkleLocalUptimesKey(vdrID, subnetID)
+	uptimeBytes, err := ms.localUptimesDB.Get(key)
+	switch err {
+	case nil:
+		upTm := &uptimes{}
+		if _, err := txs.GenesisCodec.Unmarshal(uptimeBytes, upTm); err != nil {
+			return 0, time.Time{}, err
+		}
+		upTm.lastUpdated = time.Unix(int64(upTm.LastUpdated), 0)
+		ms.localUptimesCache[vdrID] = make(map[ids.ID]*uptimes)
+		ms.localUptimesCache[vdrID][subnetID] = upTm
+		return upTm.Duration, upTm.lastUpdated, nil
+
+	case database.ErrNotFound:
+		// no local data for this staker uptime
+		return 0, time.Time{}, database.ErrNotFound
+	default:
+		return 0, time.Time{}, err
+	}
 }
 
 func (ms *merkleState) SetUptime(vdrID ids.NodeID, subnetID ids.ID, upDuration time.Duration, lastUpdated time.Time) error {
 	nodeUptimes, exists := ms.localUptimesCache[vdrID]
 	if !exists {
-		nodeUptimes = map[ids.ID]*uptimes{}
+		nodeUptimes = make(map[ids.ID]*uptimes)
 		ms.localUptimesCache[vdrID] = nodeUptimes
 	}
 
-	nodeUptimes[subnetID].Duration = upDuration
-	nodeUptimes[subnetID].lastUpdated = lastUpdated
+	nodeUptimes[subnetID] = &uptimes{
+		Duration:    upDuration,
+		LastUpdated: uint64(lastUpdated.Unix()),
+		lastUpdated: lastUpdated,
+	}
 
 	// track diff
 	updatedNodeUptimes, ok := ms.modifiedLocalUptimes[vdrID]
@@ -782,7 +811,7 @@ func (ms *merkleState) SetUptime(vdrID ids.NodeID, subnetID ids.ID, upDuration t
 }
 
 func (ms *merkleState) GetStartTime(nodeID ids.NodeID, subnetID ids.ID) (time.Time, error) {
-	staker, err := ms.currentStakers.GetValidator(subnetID, nodeID)
+	staker, err := ms.GetCurrentValidator(subnetID, nodeID)
 	if err != nil {
 		return time.Time{}, err
 	}
@@ -1351,7 +1380,6 @@ func (ms *merkleState) writeLocalUptimes() error {
 			key := merkleLocalUptimesKey(vdrID, subnetID)
 
 			uptimes := ms.localUptimesCache[vdrID][subnetID]
-			uptimes.LastUpdated = uint64(uptimes.lastUpdated.Unix())
 			uptimeBytes, err := txs.GenesisCodec.Marshal(txs.Version, uptimes)
 			if err != nil {
 				return err

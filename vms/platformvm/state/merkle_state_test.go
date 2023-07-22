@@ -100,11 +100,13 @@ func TestUtxosIndexKey(t *testing.T) {
 
 	keys := secp256k1.TestKeys()
 	address := keys[1].PublicKey().Address().Bytes()
-	key := merkleUtxoIndexKey(address, utxoID)
 
-	require.Len(key, len(address[:])+len(utxoID[:]))
-	require.Equal(address[:], key[0:len(address[:])])
-	require.Equal(utxoID[:], key[len(address[:]):])
+	key := merkleUtxoIndexKey(address, utxoID)
+	rAddress, rUtxoID := splitUtxoIndexKey(key)
+
+	require.Len(key, len(address)+len(utxoID[:]))
+	require.Equal(address, rAddress)
+	require.Equal(utxoID, rUtxoID)
 }
 
 func TestLocalUptimesKey(t *testing.T) {
@@ -152,9 +154,9 @@ func TestDelegateeRewardsKey(t *testing.T) {
 	key := merkleDelegateeRewardsKey(nodeID, subnetID)
 
 	require.Len(key, len(prefix)+len(nodeID[:])+len(subnetID[:]))
-	require.Equal(prefix, key[0:len(prefix[:])])
-	require.Equal(nodeID[:], key[len(prefix[:]):len(prefix[:])+len(nodeID[:])])
-	require.Equal(subnetID[:], key[len(prefix[:])+len(nodeID[:]):])
+	require.Equal(prefix, key[0:len(prefix)])
+	require.Equal(nodeID[:], key[len(prefix):len(prefix)+len(nodeID[:])])
+	require.Equal(subnetID[:], key[len(prefix)+len(nodeID[:]):])
 }
 
 func TestWeightDiffKey(t *testing.T) {
@@ -162,7 +164,7 @@ func TestWeightDiffKey(t *testing.T) {
 
 	subnetID := ids.GenerateTestID()
 	nodeID := ids.GenerateTestNodeID()
-	height := rand.Uint64()
+	height := rand.Uint64() // #nosec G404
 
 	key := merkleWeightDiffKey(subnetID, nodeID, height)
 	rSubnetID, rNodeID, rHeight, err := splitMerkleWeightDiffKey(key)
@@ -177,7 +179,7 @@ func TestBlsKeyDiffKey(t *testing.T) {
 	require := require.New(t)
 
 	nodeID := ids.GenerateTestNodeID()
-	height := rand.Uint64()
+	height := rand.Uint64() // #nosec G404
 
 	key := merkleBlsKeytDiffKey(nodeID, height)
 	rNodeID, rHeight, err := splitMerkleBlsKeyDiffKey(key)

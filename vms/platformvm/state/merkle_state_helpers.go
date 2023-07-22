@@ -103,6 +103,14 @@ func merkleUtxoIndexKey(address []byte, utxoID ids.ID) []byte {
 	return key
 }
 
+func splitUtxoIndexKey(b []byte) ([]byte, ids.ID) {
+	utxoID := ids.Empty
+	address := make([]byte, len(b)-len(utxoID))
+	copy(address, b[:len(address)])
+	copy(utxoID[:], b[len(address):])
+	return address, utxoID
+}
+
 func merkleLocalUptimesKey(nodeID ids.NodeID, subnetID ids.ID) []byte {
 	key := make([]byte, len(nodeID), len(nodeID)+len(subnetID))
 	copy(key, nodeID[:])
