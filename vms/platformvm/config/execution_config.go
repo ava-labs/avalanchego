@@ -21,6 +21,17 @@ const (
 	checksumsEnabled        = false
 )
 
+var DefaultExecutionConfig = &ExecutionConfig{
+	BlockCacheSize:               blockCacheSize,
+	TxCacheSize:                  txCacheSize,
+	TransformedSubnetTxCacheSize: transformedSubnetTxCacheSize,
+	ValidatorDiffsCacheSize:      validatorDiffsCacheSize,
+	RewardUTXOsCacheSize:         rewardUTXOsCacheSize,
+	ChainCacheSize:               chainCacheSize,
+	ChainDBCacheSize:             chainDBCacheSize,
+	ChecksumsEnabled:             checksumsEnabled,
+}
+
 // ExecutionConfig provides execution parameters of PlatformVM
 type ExecutionConfig struct {
 	BlockCacheSize               int  `json:"block-cache-size"`
@@ -37,16 +48,7 @@ type ExecutionConfig struct {
 // input is unmarshalled into an ExecutionConfig previously
 // initialized with default values
 func GetExecutionConfig(b []byte) (*ExecutionConfig, error) {
-	ec := &ExecutionConfig{
-		BlockCacheSize:               blockCacheSize,
-		TxCacheSize:                  txCacheSize,
-		TransformedSubnetTxCacheSize: transformedSubnetTxCacheSize,
-		ValidatorDiffsCacheSize:      validatorDiffsCacheSize,
-		RewardUTXOsCacheSize:         rewardUTXOsCacheSize,
-		ChainCacheSize:               chainCacheSize,
-		ChainDBCacheSize:             chainDBCacheSize,
-		ChecksumsEnabled:             checksumsEnabled,
-	}
+	ec := DefaultExecutionConfig
 
 	// if bytes are empty keep default values
 	if len(b) == 0 {
