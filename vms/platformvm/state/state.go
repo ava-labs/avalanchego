@@ -144,6 +144,7 @@ type State interface {
 	Close() error
 }
 
+// TODO: Remove after v1.11.x is activated
 type stateBlk struct {
 	Blk    blocks.Block
 	Bytes  []byte         `serialize:"true"`
@@ -1564,24 +1565,18 @@ func (s *state) GetStatelessBlock(blockID ids.ID) (blocks.Block, error) {
 		return nil, err
 	}
 
-	// Note: stored blocks are verified, so it's safe to unmarshal them with GenesisCodec
-	blkState := stateBlk{}
-	if _, err := blocks.GenesisCodec.Unmarshal(blkBytes, &blkState); err != nil {
-		return nil, err
-	}
-
-	if blkState.Status != choices.Accepted {
-		s.blockCache.Put(blockID, nil)
-		return nil, database.ErrNotFound
-	}
-
-	blkState.Blk, err = blocks.Parse(blocks.GenesisCodec, blkState.Bytes)
+	blk, status, _, err := parseStoredBlock(blkBytes)
 	if err != nil {
 		return nil, err
 	}
 
-	s.blockCache.Put(blockID, blkState.Blk)
-	return blkState.Blk, nil
+	if status != choices.Accepted {
+		s.blockCache.Put(blockID, nil)
+		return nil, database.ErrNotFound
+	}
+
+	s.blockCache.Put(blockID, blk)
+	return blk, nil
 }
 
 func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error {
@@ -1981,4 +1976,29 @@ func (s *state) writeMetadata() error {
 		s.persistedLastAccepted = s.lastAccepted
 	}
 	return nil
+}
+
+// Returns the block, status of the block, and whether it is a [stateBlk].
+// Invariant: blkBytes is safe to parse with blocks.GenesisCodec
+//
+// TODO: Remove after v1.11.x is activated
+func parseStoredBlock(blkBytes []byte) (blocks.Block, choices.Status, bool, error) {
+	// Attempt to parse as blocks.Block
+	blk, err := blocks.Parse(blocks.GenesisCodec, blkBytes)
+	if err == nil {
+		return blk, choices.Accepted, false, nil
+	}
+
+	// Fallback to [stateBlk]
+	blkState := stateBlk{}
+	if _, err := blocks.GenesisCodec.Unmarshal(blkBytes, &blkState); err != nil {
+		return nil, choices.Processing, false, err
+	}
+
+	blkState.Blk, err = blocks.Parse(blocks.GenesisCodec, blkState.Bytes)
+	if err != nil {
+		return nil, choices.Processing, false, err
+	}
+
+	return blkState.Blk, blkState.Status, true, nil
 }
