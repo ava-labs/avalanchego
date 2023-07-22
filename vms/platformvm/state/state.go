@@ -161,7 +161,7 @@ type State interface {
 	// Removes rejected blocks from disk and indexes accepted blocks by height. This
 	// function supports being (and is recommended to be) called asynchronously.
 	//
-	// TODO: remove after v1.11.x is activated
+	// TODO: Remove after v1.11.x is activated
 	PruneAndIndex(sync.Locker, logging.Logger) error
 
 	// Commit changes to the base database.
@@ -176,7 +176,7 @@ type State interface {
 	Close() error
 }
 
-// TODO: remove after v1.11.x is activated
+// TODO: Remove after v1.11.x is activated
 type stateBlk struct {
 	Blk    blocks.Block
 	Bytes  []byte         `serialize:"true"`
@@ -2111,12 +2111,13 @@ func (s *state) writeMetadata() error {
 //
 // TODO: Remove after v1.11.x is activated
 func parseStoredBlock(blkBytes []byte) (blocks.Block, choices.Status, bool, error) {
+	// Attempt to parse as blocks.Block
 	blk, err := blocks.Parse(blocks.GenesisCodec, blkBytes)
 	if err == nil {
 		return blk, choices.Accepted, false, nil
 	}
 
-	// Fallback to [stateBlk], we have not finished pruning.
+	// Fallback to [stateBlk]
 	blkState := stateBlk{}
 	if _, err := blocks.GenesisCodec.Unmarshal(blkBytes, &blkState); err != nil {
 		return nil, choices.Processing, false, err
