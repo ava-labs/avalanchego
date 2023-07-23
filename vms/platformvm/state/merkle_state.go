@@ -906,20 +906,17 @@ func (ms *merkleState) GetValidatorPublicKeyDiffs(height uint64) (map[ids.NodeID
 	iter := ms.localBlsKeyDiffDB.NewIterator()
 	defer iter.Release()
 	for iter.Next() {
-		nodeID, retrievedHeight, err := splitMerkleBlsKeyDiffKey(iter.Key())
-		switch {
-		case err != nil:
-			return nil, err
-		case retrievedHeight != height:
+		nodeID, retrievedHeight := splitMerkleBlsKeyDiffKey(iter.Key())
+		if retrievedHeight != height {
 			continue // loop them all, we'll worry about efficiency after correctness
-		default:
-			pkBytes := iter.Value()
-			val, err := bls.PublicKeyFromBytes(pkBytes)
-			if err != nil {
-				return nil, err
-			}
-			res[nodeID] = val
 		}
+
+		pkBytes := iter.Value()
+		val, err := bls.PublicKeyFromBytes(pkBytes)
+		if err != nil {
+			return nil, err
+		}
+		res[nodeID] = val
 	}
 	return res, iter.Error()
 }

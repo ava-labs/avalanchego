@@ -182,9 +182,8 @@ func TestBlsKeyDiffKey(t *testing.T) {
 	height := rand.Uint64() // #nosec G404
 
 	key := merkleBlsKeytDiffKey(nodeID, height)
-	rNodeID, rHeight, err := splitMerkleBlsKeyDiffKey(key)
+	rNodeID, rHeight := splitMerkleBlsKeyDiffKey(key)
 
-	require.NoError(err)
 	require.Equal(nodeID, rNodeID)
 	require.Equal(height, rHeight)
 }

@@ -4,6 +4,7 @@
 package platformvm
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"testing"
@@ -2130,9 +2131,17 @@ func checkValidatorBlsKeyIsSet(
 	if !found {
 		return database.ErrNotFound
 	}
-	if val.PublicKey != expectedBlsKey {
+	switch {
+	case expectedBlsKey == nil && val.PublicKey == nil:
+		return nil
+	case expectedBlsKey != nil && val.PublicKey == nil:
 		return errors.New("unexpected BLS key")
+	case expectedBlsKey == nil && val.PublicKey != nil:
+		return errors.New("unexpected BLS key")
+	default:
+		if !bytes.Equal(bls.PublicKeyToBytes(val.PublicKey), bls.PublicKeyToBytes(expectedBlsKey)) {
+			return errors.New("unexpected BLS key")
+		}
+		return nil
 	}
-
-	return nil
 }

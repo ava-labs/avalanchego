@@ -4,6 +4,7 @@
 package state
 
 import (
+	"encoding/binary"
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -170,20 +171,21 @@ func splitMerkleWeightDiffKey(key []byte) (ids.ID, ids.NodeID, uint64, error) {
 }
 
 func merkleBlsKeytDiffKey(nodeID ids.NodeID, height uint64) []byte {
-	packedHeight := database.PackUInt64(height)
-	key := make([]byte, 0, len(nodeID)+len(packedHeight))
-	key = append(key, nodeID[:]...)
-	key = append(key, packedHeight...)
+	key := make([]byte, len(nodeID)+database.Uint64Size)
+	copy(key, nodeID[:])
+	binary.BigEndian.PutUint64(key[len(nodeID):], ^height)
 	return key
 }
 
 // TODO: remove when ValidatorDiff optimization is merged in
-func splitMerkleBlsKeyDiffKey(key []byte) (ids.NodeID, uint64, error) {
+func splitMerkleBlsKeyDiffKey(key []byte) (ids.NodeID, uint64) {
 	nodeIDLenght := 20
 
 	nodeID := ids.EmptyNodeID
 	copy(nodeID[:], key[0:nodeIDLenght])
 
-	height, err := database.ParseUInt64(key[nodeIDLenght:])
-	return nodeID, height, err
+	// Because we bit flip the height when constructing the key, we must
+	// remember to bip flip again here.
+	height := ^binary.BigEndian.Uint64(key[nodeIDLenght:])
+	return nodeID, height
 }
