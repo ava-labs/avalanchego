@@ -83,8 +83,7 @@ var (
 	genesisBlkID ids.ID
 	testSubnet1  *txs.Tx
 
-	errMissingPrimaryValidators = errors.New("missing primary validator set")
-	errMissing                  = errors.New("missing")
+	errMissing = errors.New("missing")
 )
 
 type stakerStatus uint
@@ -269,11 +268,13 @@ func defaultState(
 	rewards reward.Calculator,
 ) state.State {
 	genesisBytes := buildGenesisTest(ctx)
+	execCfg, _ := config.GetExecutionConfig([]byte(`{}`))
 	state, err := state.NewMerkleState(
 		db,
 		metrics.Noop,
 		genesisBytes,
 		cfg,
+		execCfg,
 		ctx,
 		prometheus.NewRegistry(),
 		rewards,
@@ -462,15 +463,9 @@ func shutdownEnvironment(t *environment) error {
 	}
 
 	if t.isBootstrapped.Get() {
-		primaryValidatorSet, exist := t.config.Validators.Get(constants.PrimaryNetworkID)
-		if !exist {
-			return errMissingPrimaryValidators
-		}
-		primaryValidators := primaryValidatorSet.List()
-
-		validatorIDs := make([]ids.NodeID, len(primaryValidators))
-		for i, vdr := range primaryValidators {
-			validatorIDs[i] = vdr.NodeID
+		validatorIDs, err := validators.NodeIDs(t.config.Validators, constants.PrimaryNetworkID)
+		if err != nil {
+			return err
 		}
 
 		if err := t.uptimes.StopTracking(validatorIDs, constants.PrimaryNetworkID); err != nil {
