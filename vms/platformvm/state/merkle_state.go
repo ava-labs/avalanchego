@@ -1199,13 +1199,13 @@ func (ms *merkleState) writePermissionedSubnets(view merkledb.TrieView, ctx cont
 }
 
 func (ms *merkleState) writeElasticSubnets(view merkledb.TrieView, ctx context.Context) error {
-	for _, subnetTx := range ms.addedElasticSubnets {
+	for subnetID, subnetTx := range ms.addedElasticSubnets {
 		key := merkleElasticSubnetKey(subnetTx.ID())
 		if err := view.Insert(ctx, key, subnetTx.Bytes()); err != nil {
 			return fmt.Errorf("failed to write subnetTx: %w", err)
 		}
+		delete(ms.addedElasticSubnets, subnetID)
 	}
-	ms.addedElasticSubnets = nil
 	return nil
 }
 
