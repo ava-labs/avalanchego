@@ -1205,6 +1205,11 @@ func (ms *merkleState) writeElasticSubnets(view merkledb.TrieView, ctx context.C
 			return fmt.Errorf("failed to write subnetTx: %w", err)
 		}
 		delete(ms.addedElasticSubnets, subnetID)
+
+		// Note: Evict is used rather than Put here because tx may end up
+		// referencing additional data (because of shared byte slices) that
+		// would not be properly accounted for in the cache sizing.
+		ms.elasticSubnetCache.Evict(subnetID)
 	}
 	return nil
 }
