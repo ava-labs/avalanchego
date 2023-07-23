@@ -632,11 +632,10 @@ func (ms *merkleState) GetSubnetTransformation(subnetID ids.ID) (*txs.Tx, error)
 	}
 
 	key := merkleElasticSubnetKey(subnetID)
-
-	transformSubnetTxID, err := database.GetID(ms.merkleDB, key)
+	transformSubnetTxBytes, err := ms.merkleDB.Get(key)
 	switch err {
 	case nil:
-		transformSubnetTx, _, err := ms.GetTx(transformSubnetTxID)
+		transformSubnetTx, err := txs.Parse(txs.GenesisCodec, transformSubnetTxBytes)
 		if err != nil {
 			return nil, err
 		}
@@ -1199,9 +1198,9 @@ func (ms *merkleState) writePermissionedSubnets(view merkledb.TrieView, ctx cont
 }
 
 func (ms *merkleState) writeElasticSubnets(view merkledb.TrieView, ctx context.Context) error {
-	for subnetID, subnetTx := range ms.addedElasticSubnets {
-		key := merkleElasticSubnetKey(subnetTx.ID())
-		if err := view.Insert(ctx, key, subnetTx.Bytes()); err != nil {
+	for subnetID, transforkSubnetTx := range ms.addedElasticSubnets {
+		key := merkleElasticSubnetKey(subnetID)
+		if err := view.Insert(ctx, key, transforkSubnetTx.Bytes()); err != nil {
 			return fmt.Errorf("failed to write subnetTx: %w", err)
 		}
 		delete(ms.addedElasticSubnets, subnetID)
