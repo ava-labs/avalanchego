@@ -113,12 +113,16 @@ func parseBLSKey(key []byte) (uint64, ids.NodeID, error) {
 
 // Note: [height] is encoded as a bit flipped big endian number so that
 // iterating lexicographically results in iterating in decreasing heights.
+//
+// Invariant: [key] has sufficient length
 func packIterableHeight(key []byte, height uint64) {
 	binary.BigEndian.PutUint64(key, ^height)
 }
 
 // Because we bit flip the height when constructing the key, we must remember to
 // bip flip again here.
+//
+// Invariant: [key] has sufficient length
 func unpackIterableHeight(key []byte) uint64 {
 	return ^binary.BigEndian.Uint64(key)
 }
