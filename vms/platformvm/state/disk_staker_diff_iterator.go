@@ -39,18 +39,14 @@ var (
 func getStartWeightKey(subnetID ids.ID, height uint64) []byte {
 	key := make([]byte, startWeightKeyLength)
 	copy(key, subnetID[:])
-	// Note: [height] is encoded as a bit flipped big endian number so that
-	// iterating lexicographically results in iterating in decreasing heights.
-	binary.BigEndian.PutUint64(key[weightKeyHeightOffset:], ^height)
+	packIterableHeight(key[weightKeyHeightOffset:], height)
 	return key
 }
 
 func getWeightKey(subnetID ids.ID, height uint64, nodeID ids.NodeID) []byte {
 	key := make([]byte, weightKeyLength)
 	copy(key, subnetID[:])
-	// Note: [height] is encoded as a bit flipped big endian number so that
-	// iterating lexicographically results in iterating in decreasing heights.
-	binary.BigEndian.PutUint64(key[weightKeyHeightOffset:], ^height)
+	packIterableHeight(key[weightKeyHeightOffset:], height)
 	copy(key[weightKeyNodeIDOffset:], nodeID[:])
 	return key
 }
@@ -64,9 +60,7 @@ func parseWeightKey(key []byte) (ids.ID, uint64, ids.NodeID, error) {
 		nodeID   ids.NodeID
 	)
 	copy(subnetID[:], key)
-	// Because we bit flip the height when constructing the key, we must
-	// remember to bip flip again here.
-	height := ^binary.BigEndian.Uint64(key[weightKeyHeightOffset:])
+	height := unpackIterableHeight(key[weightKeyHeightOffset:])
 	copy(nodeID[:], key[weightKeyNodeIDOffset:])
 	return subnetID, height, nodeID, nil
 }
@@ -96,17 +90,13 @@ func parseWeightValue(value []byte) (*ValidatorWeightDiff, error) {
 // arguments.
 func getStartBLSKey(height uint64) []byte {
 	key := make([]byte, startBLSKeyLength)
-	// Note: [height] is encoded as a bit flipped big endian number so that
-	// iterating lexicographically results in iterating in decreasing heights.
-	binary.BigEndian.PutUint64(key, ^height)
+	packIterableHeight(key, height)
 	return key
 }
 
 func getBLSKey(height uint64, nodeID ids.NodeID) []byte {
 	key := make([]byte, blsKeyLength)
-	// Note: [height] is encoded as a bit flipped big endian number so that
-	// iterating lexicographically results in iterating in decreasing heights.
-	binary.BigEndian.PutUint64(key, ^height)
+	packIterableHeight(key, height)
 	copy(key[blsKeyNodeIDOffset:], nodeID[:])
 	return key
 }
@@ -116,9 +106,19 @@ func parseBLSKey(key []byte) (uint64, ids.NodeID, error) {
 		return 0, ids.EmptyNodeID, errUnexpectedBLSKeyLength
 	}
 	var nodeID ids.NodeID
-	// Because we bit flip the height when constructing the key, we must
-	// remember to bip flip again here.
-	height := ^binary.BigEndian.Uint64(key)
+	height := unpackIterableHeight(key)
 	copy(nodeID[:], key[blsKeyNodeIDOffset:])
 	return height, nodeID, nil
+}
+
+// Note: [height] is encoded as a bit flipped big endian number so that
+// iterating lexicographically results in iterating in decreasing heights.
+func packIterableHeight(key []byte, height uint64) {
+	binary.BigEndian.PutUint64(key, ^height)
+}
+
+// Because we bit flip the height when constructing the key, we must remember to
+// bip flip again here.
+func unpackIterableHeight(key []byte) uint64 {
+	return ^binary.BigEndian.Uint64(key)
 }
