@@ -245,11 +245,12 @@ func (c *networkClient) request(
 
 	handler := newResponseHandler()
 	c.outstandingRequestHandlers[requestID] = handler
-	c.lock.Unlock() // unlock so response can be received
 
+	c.lock.Unlock() // unlock so response can be received
 	var (
-		response   []byte
 		startTime  = time.Now()
+		response   []byte
+		bandwidth  float64
 		requestErr error
 	)
 	select {
@@ -258,14 +259,16 @@ func (c *networkClient) request(
 	case response = <-handler.responseChan:
 		if handler.failed {
 			requestErr = ErrRequestFailed
+		} else {
+			elapsedSeconds := time.Since(startTime).Seconds()
+			bandwidth = float64(len(response))/elapsedSeconds + epsilon
 		}
 	}
-	c.lock.Lock() // we explicitly unlock to avoid holding while logging
+	c.lock.Lock()
+	c.peers.TrackBandwidth(nodeID, bandwidth)
+	c.lock.Unlock()
 
-	// Handle case where response was not recieved
 	if requestErr != nil {
-		c.peers.TrackBandwidth(nodeID, 0)
-		c.lock.Unlock()
 		c.log.Debug("did not recieve response from peer",
 			zap.Stringer("nodeID", nodeID),
 			zap.Uint32("requestID", requestID),
@@ -273,12 +276,6 @@ func (c *networkClient) request(
 		)
 		return nil, requestErr
 	}
-
-	// Handle case where response was recieved
-	elapsedSeconds := time.Since(startTime).Seconds()
-	bandwidth := float64(len(response))/elapsedSeconds + epsilon
-	c.peers.TrackBandwidth(nodeID, bandwidth)
-	c.lock.Unlock()
 	c.log.Debug("received response from peer",
 		zap.Stringer("nodeID", nodeID),
 		zap.Uint32("requestID", requestID),
