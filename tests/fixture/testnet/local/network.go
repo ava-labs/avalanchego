@@ -30,11 +30,11 @@ import (
 const networkHealthCheckInterval = 200 * time.Millisecond
 
 var (
-	errInvalidNodeCount        = errors.New("failed to populate local network config: non-zero node count is only valid for a network without nodes")
-	errInvalidKeyCount         = errors.New("failed to populate local network config: non-zero key count is only valid for a network without keys")
-	errLocalNetworkDirNotSet   = errors.New("local network directory not set - has Create() been called?")
-	errInvalidNetworkDir       = errors.New("failed to write local network: invalid network directory")
-	errNotHealthyBeforeTimeout = errors.New("failed to see all nodes healthy before timeout")
+	errInvalidNodeCount      = errors.New("failed to populate local network config: non-zero node count is only valid for a network without nodes")
+	errInvalidKeyCount       = errors.New("failed to populate local network config: non-zero key count is only valid for a network without keys")
+	errLocalNetworkDirNotSet = errors.New("local network directory not set - has Create() been called?")
+	errInvalidNetworkDir     = errors.New("failed to write local network: invalid network directory")
+	errMissingBootstrapNodes = errors.New("failed to add node due to missing bootstrap nodes")
 )
 
 // Default root dir for storing networks and their configuration.
@@ -100,6 +100,18 @@ func (ln *LocalNetwork) GetNodes() []testnet.Node {
 		nodes = append(nodes, node)
 	}
 	return nodes
+}
+
+// Adds a backend-agnostic node to the network
+func (ln *LocalNetwork) AddNode(w io.Writer, flags testnet.FlagsMap) (testnet.Node, error) {
+	if flags == nil {
+		flags = testnet.FlagsMap{}
+	}
+	return ln.AddLocalNode(w, &LocalNode{
+		NodeConfig: testnet.NodeConfig{
+			Flags: flags,
+		},
+	})
 }
 
 // Starts a new network stored under the provided root dir. Required
@@ -383,7 +395,7 @@ func (ln *LocalNetwork) WaitForHealthy(ctx context.Context, w io.Writer) error {
 
 		select {
 		case <-ctx.Done():
-			return errNotHealthyBeforeTimeout
+			return fmt.Errorf("failed to see all nodes healthy before timeout: %w", ctx.Err())
 		case <-ticker.C:
 		}
 	}
@@ -631,4 +643,49 @@ func (ln *LocalNetwork) ReadAll() error {
 		return err
 	}
 	return ln.ReadNodes()
+}
+
+func (ln *LocalNetwork) AddLocalNode(w io.Writer, node *LocalNode) (*LocalNode, error) {
+	// Assume network configuration has been written to disk and is current in memory
+
+	if node == nil {
+		node = NewLocalNode("")
+	}
+	if err := ln.PopulateNodeConfig(node); err != nil {
+		return nil, err
+	}
+
+	// Use dynamic port allocation.
+	var httpPort uint16 = 0
+	var stakingPort uint16 = 0
+
+	// Collect staking addresses of running nodes for use in bootstraping the new node
+	if err := ln.ReadNodes(); err != nil {
+		return nil, fmt.Errorf("failed to read local network nodes: %w", err)
+	}
+	bootstrapIPs := make([]string, 0, len(ln.Nodes))
+	bootstrapIDs := make([]string, 0, len(ln.Nodes))
+	for _, node := range ln.Nodes {
+		if len(node.StakingAddress) == 0 {
+			// Node is not running
+			continue
+		}
+
+		bootstrapIPs = append(bootstrapIPs, node.StakingAddress)
+		bootstrapIDs = append(bootstrapIDs, node.NodeID.String())
+	}
+	if len(bootstrapIDs) == 0 {
+		return nil, errMissingBootstrapNodes
+	}
+
+	node.SetNetworkingConfigDefaults(httpPort, stakingPort, bootstrapIDs, bootstrapIPs)
+
+	if err := node.WriteConfig(); err != nil {
+		return nil, err
+	}
+	if err := node.Start(w, ln.ExecPath); err != nil {
+		return nil, err
+	}
+
+	return node, nil
 }

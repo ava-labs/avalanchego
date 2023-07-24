@@ -186,13 +186,24 @@ func (n *LocalNode) Start(w io.Writer, defaultExecPath string) error {
 		return err
 	}
 
+	// A temporary node directory won't match its node name.
+	isTemporaryNode := filepath.Base(n.GetDataDir()) != n.NodeID.String()
+	var nodeDescription string
+	if isTemporaryNode {
+		// Qualify the description for a temporary node with its path
+		// since it won't be stored in the network's directory.
+		nodeDescription = fmt.Sprintf("temporary node %q @ %s", n.NodeID, n.GetDataDir())
+	} else {
+		nodeDescription = fmt.Sprintf("node %q", n.NodeID)
+	}
+
 	go func() {
 		if err := cmd.Wait(); err != nil {
 			if err.Error() != "signal: killed" {
-				_, _ = fmt.Fprintf(w, "node %q finished with error: %v\n", n.NodeID, err)
+				_, _ = fmt.Fprintf(w, "%s finished with error: %v\n", nodeDescription, err)
 			}
 		}
-		_, _ = fmt.Fprintf(w, "node %q exited\n", n.NodeID)
+		_, _ = fmt.Fprintf(w, "%s exited\n", nodeDescription)
 	}()
 
 	// A node writes a process context file on start. If the file is not
@@ -202,7 +213,7 @@ func (n *LocalNode) Start(w io.Writer, defaultExecPath string) error {
 		return fmt.Errorf("failed to start local node: %w", err)
 	}
 
-	_, err = fmt.Fprintf(w, "Started %s\n", n.NodeID)
+	_, err = fmt.Fprintf(w, "Started %s\n", nodeDescription)
 	return err
 }
 
@@ -308,7 +319,28 @@ func (n *LocalNode) IsHealthy(ctx context.Context) (bool, error) {
 		}
 	}
 	// Assume all other errors are not recoverable
-	return false, err
+	return false, fmt.Errorf("failed to query node health: %w", err)
+}
+
+func (n *LocalNode) WaitForHealthy(ctx context.Context) error {
+	ticker := time.NewTicker(DefaultNodeTickerInterval)
+	defer ticker.Stop()
+
+	for {
+		healthy, err := n.IsHealthy(ctx)
+		if err != nil && !errors.Is(err, errProcessNotRunning) {
+			return fmt.Errorf("failed to wait for health of node %q: %w", n.NodeID, err)
+		}
+		if healthy {
+			return nil
+		}
+
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("failed to wait for health of node %q before timeout: %w", n.NodeID, ctx.Err())
+		case <-ticker.C:
+		}
+	}
 }
 
 func (n *LocalNode) WaitForProcessContext(ctx context.Context) error {
@@ -328,6 +360,18 @@ func (n *LocalNode) WaitForProcessContext(ctx context.Context) error {
 			return fmt.Errorf("failed to load process context for node %q before timeout: %w", n.NodeID, ctx.Err())
 		case <-ticker.C:
 		}
+	}
+	return nil
+}
+
+// Ensure the node is stopped and its configuration removed.
+func (n *LocalNode) Remove() error {
+	// Ensure the node is stopped before removing its configuration
+	if err := n.Stop(); err != nil {
+		return fmt.Errorf("failed to stop node %q: %w", n.NodeID, err)
+	}
+	if err := os.RemoveAll(n.GetDataDir()); err != nil {
+		return fmt.Errorf("failed to remove configuration for node %q: %w", n.NodeID, err)
 	}
 	return nil
 }

@@ -18,6 +18,7 @@ import (
 
 	"github.com/ava-labs/coreth/ethclient"
 
+	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture"
 	"github.com/ava-labs/avalanchego/tests/fixture/testnet"
@@ -35,6 +36,10 @@ const (
 	// Defines default tx confirmation timeout.
 	// Enough for test/custom networks.
 	DefaultConfirmTxTimeout = 20 * time.Second
+
+	// This interval should represent the upper bound of the time
+	// required to start a new node on a local test network.
+	DefaultNodeStartTimeout = 20 * time.Second
 
 	// A long default timeout used to timeout failed operations but
 	// unlikely to induce flaking due to unexpected resource
@@ -167,4 +172,33 @@ func Eventually(condition func() bool, waitFor time.Duration, tick time.Duration
 		case <-ticker.C:
 		}
 	}
+}
+
+// Add a temporary node that is only intended to be used by a single test. Its ID and
+// URI are not intended to be returned from the Network instance to minimize
+// accessibility from other tests.
+func AddTemporaryNode(network testnet.Network, flags testnet.FlagsMap) testnet.Node {
+	require := require.New(ginkgo.GinkgoT())
+
+	// A temporary location ensures the node won't be accessible from
+	// the Network instance.
+	flags[config.DataDirKey] = ginkgo.GinkgoT().TempDir()
+
+	node, err := network.AddNode(ginkgo.GinkgoWriter, flags)
+	require.NoError(err)
+
+	// Ensure node is stopped and its configuration removed on teardown
+	ginkgo.DeferCleanup(func() {
+		tests.Outf("Shutting down temporary node %s\n", node.GetID())
+		require.NoError(node.Remove())
+	})
+
+	return node
+}
+
+// Wait for the given node to report healthy.
+func WaitForHealthy(node testnet.Node) {
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
+	defer cancel()
+	require.NoError(ginkgo.GinkgoT(), node.WaitForHealthy(ctx))
 }
