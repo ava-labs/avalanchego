@@ -269,7 +269,7 @@ func (c *networkClient) request(
 	c.lock.Unlock()
 
 	if requestErr != nil {
-		c.log.Debug("did not recieve response from peer",
+		c.log.Debug("did not receive response from peer",
 			zap.Stringer("nodeID", nodeID),
 			zap.Uint32("requestID", requestID),
 			zap.Error(requestErr),
