@@ -135,6 +135,7 @@ type State interface {
 
 	// Returns a map of node ID --> BLS Public Key for all validators
 	// that left the Primary Network validator set.
+	//
 	// startHeight > endHeight
 	ApplyValidatorPublicKeyDiffs(
 		ctx context.Context,
@@ -308,9 +309,11 @@ type state struct {
 	singletonDB                         database.Database
 }
 
+// heightRange is used to track which heights are safe to use the native DB
+// iterator for querying validator diffs.
 type heightRange struct {
-	Start uint64 `serialize:"true"`
-	End   uint64 `serialize:"true"`
+	LowerBound uint64 `serialize:"true"`
+	UpperBound uint64 `serialize:"true"`
 }
 
 type ValidatorWeightDiff struct {
@@ -971,7 +974,7 @@ func (s *state) ApplyValidatorWeightDiffs(
 	prevHeight := startHeight + 1
 	// TODO: Remove the index continuity checks once we are guaranteed nodes can
 	// not rollback to not support the new indexing mechanism.
-	for diffIter.Next() && s.indexedHeights != nil && s.indexedHeights.Start <= endHeight {
+	for diffIter.Next() && s.indexedHeights != nil && s.indexedHeights.LowerBound <= endHeight {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
@@ -1243,7 +1246,7 @@ func (s *state) loadMetadata() error {
 	if err != nil {
 		return err
 	}
-	if indexedHeights.End != lastAcceptedBlock.Height() {
+	if indexedHeights.UpperBound != lastAcceptedBlock.Height() {
 		return nil
 	}
 	s.indexedHeights = indexedHeights
@@ -1641,11 +1644,11 @@ func (s *state) AddStatelessBlock(block blocks.Block) {
 func (s *state) SetHeight(height uint64) {
 	if s.indexedHeights == nil {
 		s.indexedHeights = &heightRange{
-			Start: height,
+			LowerBound: height,
 		}
 	}
 
-	s.indexedHeights.End = height
+	s.indexedHeights.UpperBound = height
 	s.currentHeight = height
 }
 
