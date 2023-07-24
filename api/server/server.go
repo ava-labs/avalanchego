@@ -29,7 +29,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -66,11 +65,7 @@ type Server interface {
 	PathAdderWithReadLock
 	// Dispatch starts the API server
 	Dispatch() error
-	// DispatchTLS starts the API server with the provided TLS certificate
-	DispatchTLS(certBytes, keyBytes []byte) error
-	// Return the uri used to access the api server. Set by the
-	// Dispatch and DispatchTLS methods after binding a listener, so
-	// may need to be called until a non-empty value is returned.
+	// GetURI returns the URI used to access the API server
 	GetURI() string
 	// RegisterChain registers the API endpoints associated with this chain.
 	// That is, add <route, handler> pairs to server so that API calls can be
@@ -108,10 +103,10 @@ type server struct {
 
 	srv *http.Server
 
-	// Synchronizes access to uri across this type's Dispatch*() methods
-	// and another goroutine calling GetURI().
-	uriLock sync.RWMutex
-	// URI (https://host:port) to access the api server.
+	// Listener used to serve traffic
+	listener net.Listener
+
+	// URI ([http|https]://[host]:[port]) to access the api server.
 	uri string
 }
 
@@ -130,6 +125,9 @@ func New(
 	registerer prometheus.Registerer,
 	httpConfig HTTPConfig,
 	allowedHosts []string,
+	httpsEnabled bool,
+	httpsCert []byte,
+	httpsKey []byte,
 	wrappers ...Wrapper,
 ) (Server, error) {
 	m, err := newMetrics(namespace, registerer)
@@ -160,7 +158,7 @@ func New(
 		zap.Strings("allowedOrigins", allowedOrigins),
 	)
 
-	return &server{
+	s := &server{
 		log:             log,
 		factory:         factory,
 		listenHost:      host,
@@ -177,78 +175,65 @@ func New(
 			WriteTimeout:      httpConfig.WriteTimeout,
 			IdleTimeout:       httpConfig.IdleTimeout,
 		},
-	}, nil
+	}
+
+	// Bind a listener for the API endpoint at server construction to
+	// simplify determination of the URI. Previously a listener was
+	// bound in Dispatch but since that method is called concurrently,
+	// retrieving the URI would require synchronization.
+	if err := s.bindListener(httpsEnabled, httpsCert, httpsKey); err != nil {
+		return nil, fmt.Errorf("failed to bind listener: %w", err)
+	}
+
+	return s, nil
 }
 
-// Retrieve the uri used to access the server.
+// Retrieve the URI used to access the server.
 func (s *server) GetURI() string {
-	s.uriLock.RLock()
-	defer s.uriLock.RUnlock()
 	return s.uri
 }
 
-// Set the uri used to access the server.
-func (s *server) setURI(uri string) {
-	s.uriLock.Lock()
-	defer s.uriLock.Unlock()
-	s.uri = uri
+// Bind a listener and set the URI it will serve traffic on.
+func (s *server) bindListener(httpsEnabled bool, certBytes, keyBytes []byte) error {
+	listenAddress := net.JoinHostPort(s.listenHost, s.listenPort)
+
+	// Bind the listener
+	if httpsEnabled {
+		cert, err := tls.X509KeyPair(certBytes, keyBytes)
+		if err != nil {
+			return err
+		}
+		config := &tls.Config{
+			MinVersion:   tls.VersionTLS12,
+			Certificates: []tls.Certificate{cert},
+		}
+		s.listener, err = tls.Listen("tcp", listenAddress, config)
+		if err != nil {
+			return err
+		}
+	} else {
+		var err error
+		s.listener, err = net.Listen("tcp", listenAddress)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Record the URI the listener will respond to
+	var protocol string
+	if httpsEnabled {
+		protocol = "https"
+	} else {
+		protocol = "http"
+	}
+	s.uri = protocol + "://" + s.listener.Addr().String()
+
+	return nil
 }
 
 func (s *server) Dispatch() error {
-	listenAddress := net.JoinHostPort(s.listenHost, s.listenPort)
-	listener, err := net.Listen("tcp", listenAddress)
-	if err != nil {
-		return err
-	}
-
-	s.setURI("http://" + listener.Addr().String())
-
-	ipPort, err := ips.ToIPPort(listener.Addr().String())
-	if err != nil {
-		s.log.Info("HTTP API server listening",
-			zap.String("address", listenAddress),
-		)
-	} else {
-		s.log.Info("HTTP API server listening",
-			zap.String("host", s.listenHost),
-			zap.Uint16("port", ipPort.Port),
-		)
-	}
-
-	return s.srv.Serve(listener)
-}
-
-func (s *server) DispatchTLS(certBytes, keyBytes []byte) error {
-	listenAddress := net.JoinHostPort(s.listenHost, s.listenPort)
-	cert, err := tls.X509KeyPair(certBytes, keyBytes)
-	if err != nil {
-		return err
-	}
-	config := &tls.Config{
-		MinVersion:   tls.VersionTLS12,
-		Certificates: []tls.Certificate{cert},
-	}
-
-	listener, err := tls.Listen("tcp", listenAddress, config)
-	if err != nil {
-		return err
-	}
-
-	s.setURI("https://" + listener.Addr().String())
-
-	ipPort, err := ips.ToIPPort(listener.Addr().String())
-	if err != nil {
-		s.log.Info("HTTPS API server listening",
-			zap.String("address", listenAddress),
-		)
-	} else {
-		s.log.Info("HTTPS API server listening",
-			zap.String("host", s.listenHost),
-			zap.Uint16("port", ipPort.Port),
-		)
-	}
-
-	return s.srv.Serve(listener)
+	s.log.Info("API server listening", zap.String("uri", s.uri))
+	return s.srv.Serve(s.listener)
 }
 
 func (s *server) RegisterChain(chainName string, ctx *snow.ConsensusContext, vm common.VM) {

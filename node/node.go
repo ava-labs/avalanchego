@@ -396,60 +396,37 @@ type NodeRuntimeState struct {
 
 // Write runtime state to the configured path. Supports the use of
 // dynamically chosen network ports with local network orchestration.
-func (n *Node) writeRuntimeState() {
-	n.Log.Info("attempting to write runtime state to configured path", zap.String("path", n.Config.RuntimeStatePath))
-
-	uri := ""
-
-	// Wait until the API Server URI is available.
-	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
-	defer cancel()
-	for {
-		select {
-		case <-ctx.Done():
-			n.Log.Error("failed to retrieve API Server URI before timeout")
-			return
-		default:
-			uri = n.APIServer.GetURI()
-		}
-		if len(uri) > 0 {
-			break
-		}
-		time.Sleep(time.Millisecond * 200)
-	}
+func (n *Node) writeRuntimeState() error {
+	n.Log.Info("writing runtime state to configured path", zap.String("path", n.Config.RuntimeStatePath))
 
 	// Write the runtime state to disk
 	runtimeState := &NodeRuntimeState{
 		PID:              os.Getpid(),
-		URI:              uri,
+		URI:              n.APIServer.GetURI(),
 		BootstrapAddress: n.bootstrapAddress, // Set by network initialization
 	}
 	bytes, err := json.MarshalIndent(runtimeState, "", "  ")
 	if err != nil {
-		n.Log.Error("failed to marshal runtime state", zap.Error(err))
-		return
+		return fmt.Errorf("failed to marshal runtime state: %w", err)
 	}
 	if err := os.WriteFile(n.Config.RuntimeStatePath, bytes, perms.ReadWrite); err != nil {
-		n.Log.Error("failed to write runtime state", zap.Error(err))
-		return
+		return fmt.Errorf("failed to write runtime state: %w", err)
 	}
-
-	n.Log.Info("wrote runtime state")
+	return nil
 }
 
 // Dispatch starts the node's servers.
 // Returns when the node exits.
 func (n *Node) Dispatch() error {
+	if len(n.Config.RuntimeStatePath) > 0 {
+		if err := n.writeRuntimeState(); err != nil {
+			return err
+		}
+	}
+
 	// Start the HTTP API server
 	go n.Log.RecoverAndPanic(func() {
-		var err error
-		if n.Config.HTTPSEnabled {
-			n.Log.Debug("initializing API server with TLS")
-			err = n.APIServer.DispatchTLS(n.Config.HTTPSCert, n.Config.HTTPSKey)
-		} else {
-			n.Log.Debug("initializing API server without TLS")
-			err = n.APIServer.Dispatch()
-		}
+		err := n.APIServer.Dispatch()
 		// When [n].Shutdown() is called, [n.APIServer].Close() is called.
 		// This causes [n.APIServer].Dispatch() to return an error.
 		// If that happened, don't log/return an error here.
@@ -462,10 +439,6 @@ func (n *Node) Dispatch() error {
 		// If node is already shutting down, this does nothing.
 		n.Shutdown(1)
 	})
-
-	if len(n.Config.RuntimeStatePath) > 0 {
-		go n.writeRuntimeState()
-	}
 
 	// Add state sync nodes to the peer network
 	for i, peerIP := range n.Config.StateSyncIPs {
@@ -696,6 +669,9 @@ func (n *Node) initAPIServer() error {
 			n.MetricsRegisterer,
 			n.Config.HTTPConfig.HTTPConfig,
 			n.Config.HTTPAllowedHosts,
+			n.Config.HTTPSEnabled,
+			n.Config.HTTPSCert,
+			n.Config.HTTPSKey,
 		)
 		return err
 	}
@@ -719,6 +695,9 @@ func (n *Node) initAPIServer() error {
 		n.MetricsRegisterer,
 		n.Config.HTTPConfig.HTTPConfig,
 		n.Config.HTTPAllowedHosts,
+		n.Config.HTTPSEnabled,
+		n.Config.HTTPSCert,
+		n.Config.HTTPSKey,
 		a,
 	)
 	if err != nil {
