@@ -182,10 +182,10 @@ func (m *manager) GetValidatorSet(
 ) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 	validatorSetsCache := m.getValidatorSetCache(subnetID)
 
-	// if validatorSet, ok := validatorSetsCache.Get(targetHeight); ok {
-	// 	m.metrics.IncValidatorSetsCached()
-	// 	return validatorSet, nil
-	// }
+	if validatorSet, ok := validatorSetsCache.Get(targetHeight); ok {
+		m.metrics.IncValidatorSetsCached()
+		return validatorSet, nil
+	}
 
 	// get the start time to track metrics
 	startTime := m.clk.Time()
