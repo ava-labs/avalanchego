@@ -498,7 +498,8 @@ func (n *Node) Dispatch() error {
 	n.DoneShuttingDown.Wait()
 
 	if len(n.Config.RuntimeStatePath) > 0 {
-		// Attempt to remove the runtime state path
+		// Attempt to remove the runtime state path to communicate to an
+		// orchestrator that the node is no longer running.
 		if err := os.Remove(n.Config.RuntimeStatePath); err != nil && !os.IsNotExist(err) {
 			n.Log.Error("removal of runtime state file failed",
 				zap.String("path", n.Config.RuntimeStatePath),

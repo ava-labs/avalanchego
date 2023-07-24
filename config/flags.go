@@ -50,6 +50,7 @@ var (
 	defaultSubnetConfigDir      = filepath.Join(defaultConfigDir, "subnets")
 	defaultPluginDir            = filepath.Join(defaultUnexpandedDataDir, "plugins")
 	defaultChainDataDir         = filepath.Join(defaultUnexpandedDataDir, "chainData")
+	defaultRuntimeStatePath     = filepath.Join(defaultUnexpandedDataDir, "runtime.json")
 )
 
 func deprecateFlags(fs *pflag.FlagSet) error {
@@ -370,7 +371,7 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.StringToString(TracingHeadersKey, map[string]string{}, "The headers to provide the trace indexer")
 	// TODO add flag to take in headers to send from exporter
 
-	fs.String(RuntimeStatePathKey, "", "The path to write runtime state to (including uri, bootstrap address and pid). If empty, runtime state will not be written.")
+	fs.String(RuntimeStatePathKey, defaultRuntimeStatePath, "The path to write runtime state to (including PID, API URI, and bootstrap address).")
 }
 
 // BuildFlagSet returns a complete set of flags for avalanchego
