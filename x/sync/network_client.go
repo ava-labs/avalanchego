@@ -245,28 +245,40 @@ func (c *networkClient) request(
 
 	handler := newResponseHandler()
 	c.outstandingRequestHandlers[requestID] = handler
-
-	var (
-		response  []byte
-		startTime = time.Now()
-	)
-
 	c.lock.Unlock() // unlock so response can be received
 
+	var (
+		response   []byte
+		startTime  = time.Now()
+		requestErr error
+	)
 	select {
 	case <-ctx.Done():
-		c.peers.TrackBandwidth(nodeID, 0)
-		return nil, ctx.Err()
+		requestErr = ctx.Err()
 	case response = <-handler.responseChan:
-		elapsedSeconds := time.Since(startTime).Seconds()
-		bandwidth := float64(len(response))/elapsedSeconds + epsilon
-		c.peers.TrackBandwidth(nodeID, bandwidth)
+		if handler.failed {
+			requestErr = ErrRequestFailed
+		}
 	}
-	if handler.failed {
+	c.lock.Lock() // we explicitly unlock to avoid holding while logging
+
+	// Handle case where response was not recieved
+	if requestErr != nil {
 		c.peers.TrackBandwidth(nodeID, 0)
-		return nil, ErrRequestFailed
+		c.lock.Unlock()
+		c.log.Debug("did not recieve response from peer",
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint32("requestID", requestID),
+			zap.Error(requestErr),
+		)
+		return nil, requestErr
 	}
 
+	// Handle case where response was recieved
+	elapsedSeconds := time.Since(startTime).Seconds()
+	bandwidth := float64(len(response))/elapsedSeconds + epsilon
+	c.peers.TrackBandwidth(nodeID, bandwidth)
+	c.lock.Unlock()
 	c.log.Debug("received response from peer",
 		zap.Stringer("nodeID", nodeID),
 		zap.Uint32("requestID", requestID),
