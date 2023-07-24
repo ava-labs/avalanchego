@@ -56,7 +56,9 @@ type State interface {
 	GetLastAccepted() ids.ID
 	GetStatelessBlock(blockID ids.ID) (blocks.Block, error)
 
-	GetValidatorSet(subnetID ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error)
+	// ValidatorSet adds all the validators and delegators of [subnetID] into
+	// [vdrs].
+	ValidatorSet(subnetID ids.ID, vdrs validators.Set) error
 
 	// startHeight > endHeight
 	ApplyValidatorWeightDiffs(
@@ -341,18 +343,16 @@ func (m *manager) getCurrentValidatorSets(
 	ctx context.Context,
 	subnetID ids.ID,
 ) (map[ids.NodeID]*validators.GetValidatorOutput, map[ids.NodeID]*validators.GetValidatorOutput, uint64, error) {
-	var currentSubnetValidators map[ids.NodeID]*validators.GetValidatorOutput
-	if currentSubnetValidatorSet, ok := m.cfg.Validators.Get(subnetID); ok {
-		currentSubnetValidators = currentSubnetValidatorSet.Map()
-	} else {
-		var err error
-		currentSubnetValidators, err = m.state.GetValidatorSet(subnetID)
+	currentSubnetValidators, ok := m.cfg.Validators.Get(subnetID)
+	if !ok {
+		currentSubnetValidators = validators.NewSet()
+		err := m.state.ValidatorSet(subnetID, currentSubnetValidators)
 		if err != nil {
 			return nil, nil, 0, err
 		}
 	}
 
-	currentPrimaryValidatorSet, ok := m.cfg.Validators.Get(constants.PrimaryNetworkID)
+	currentPrimaryValidators, ok := m.cfg.Validators.Get(constants.PrimaryNetworkID)
 	if !ok {
 		// This should never happen
 		m.log.Error(ErrMissingValidatorSet.Error(),
@@ -362,7 +362,7 @@ func (m *manager) getCurrentValidatorSets(
 	}
 
 	currentHeight, err := m.getCurrentHeight(ctx)
-	return currentSubnetValidators, currentPrimaryValidatorSet.Map(), currentHeight, err
+	return currentSubnetValidators.Map(), currentPrimaryValidators.Map(), currentHeight, err
 }
 
 func (m *manager) GetSubnetID(_ context.Context, chainID ids.ID) (ids.ID, error) {

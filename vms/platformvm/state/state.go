@@ -121,8 +121,9 @@ type State interface {
 	// Invariant: [block] is an accepted block.
 	AddStatelessBlock(block blocks.Block)
 
-	// GetValidatorSet returns the current validator set of [subnetID].
-	GetValidatorSet(subnetID ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error)
+	// ValidatorSet adds all the validators and delegators of [subnetID] into
+	// [vdrs].
+	ValidatorSet(subnetID ids.ID, vdrs validators.Set) error
 
 	// startHeight > endHeight
 	ApplyValidatorWeightDiffs(
@@ -930,32 +931,24 @@ func (s *state) SetCurrentSupply(subnetID ids.ID, cs uint64) {
 	}
 }
 
-func (s *state) GetValidatorSet(subnetID ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-	subnetValidators := s.currentStakers.validators[subnetID]
-	vdrs := make(map[ids.NodeID]*validators.GetValidatorOutput, len(subnetValidators))
-	for nodeID, validator := range subnetValidators {
+func (s *state) ValidatorSet(subnetID ids.ID, vdrs validators.Set) error {
+	for nodeID, validator := range s.currentStakers.validators[subnetID] {
 		staker := validator.validator
-		vdr := &validators.GetValidatorOutput{
-			NodeID:    nodeID,
-			PublicKey: staker.PublicKey,
-			Weight:    staker.Weight,
+		if err := vdrs.Add(nodeID, staker.PublicKey, staker.TxID, staker.Weight); err != nil {
+			return err
 		}
 
 		delegatorIterator := NewTreeIterator(validator.delegators)
 		for delegatorIterator.Next() {
 			staker := delegatorIterator.Value()
-			newWeight, err := math.Add64(vdr.Weight, staker.Weight)
-			if err != nil {
+			if err := vdrs.AddWeight(nodeID, staker.Weight); err != nil {
 				delegatorIterator.Release()
-				return nil, err
+				return err
 			}
-			vdr.Weight = newWeight
 		}
 		delegatorIterator.Release()
-
-		vdrs[nodeID] = vdr
 	}
-	return vdrs, nil
+	return nil
 }
 
 func (s *state) ApplyValidatorWeightDiffs(
@@ -1489,7 +1482,7 @@ func (s *state) initValidatorSets() error {
 		// Enforce the invariant that the validator set is empty here.
 		return errValidatorSetAlreadyPopulated
 	}
-	err := s.populateValidatorSet(constants.PrimaryNetworkID, primaryValidators)
+	err := s.ValidatorSet(constants.PrimaryNetworkID, primaryValidators)
 	if err != nil {
 		return err
 	}
@@ -1502,7 +1495,7 @@ func (s *state) initValidatorSets() error {
 
 	for subnetID := range s.cfg.TrackedSubnets {
 		subnetValidators := validators.NewSet()
-		err := s.populateValidatorSet(subnetID, subnetValidators)
+		err := s.ValidatorSet(subnetID, subnetValidators)
 		if err != nil {
 			return err
 		}
@@ -1513,26 +1506,6 @@ func (s *state) initValidatorSets() error {
 
 		vl := validators.NewLogger(s.ctx.Log, s.bootstrapped, subnetID, s.ctx.NodeID)
 		subnetValidators.RegisterCallbackListener(vl)
-	}
-	return nil
-}
-
-func (s *state) populateValidatorSet(subnetID ids.ID, vdrs validators.Set) error {
-	for nodeID, validator := range s.currentStakers.validators[subnetID] {
-		staker := validator.validator
-		if err := vdrs.Add(nodeID, staker.PublicKey, staker.TxID, staker.Weight); err != nil {
-			return err
-		}
-
-		delegatorIterator := NewTreeIterator(validator.delegators)
-		for delegatorIterator.Next() {
-			staker := delegatorIterator.Value()
-			if err := vdrs.AddWeight(nodeID, staker.Weight); err != nil {
-				delegatorIterator.Release()
-				return err
-			}
-		}
-		delegatorIterator.Release()
 	}
 	return nil
 }
