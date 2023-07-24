@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
-var DefaultExecutionConfig = &ExecutionConfig{
+var DefaultExecutionConfig = ExecutionConfig{
 	BlockCacheSize:               64 * units.MiB,
 	TxCacheSize:                  128 * units.MiB,
 	TransformedSubnetTxCacheSize: 4 * units.MiB,
@@ -17,7 +17,6 @@ var DefaultExecutionConfig = &ExecutionConfig{
 	RewardUTXOsCacheSize:         2048,
 	ChainCacheSize:               2048,
 	ChainDBCacheSize:             2048,
-	BlockIDCacheSize:             2048,
 	ChecksumsEnabled:             false,
 }
 
@@ -42,8 +41,8 @@ func GetExecutionConfig(b []byte) (*ExecutionConfig, error) {
 
 	// if bytes are empty keep default values
 	if len(b) == 0 {
-		return ec, nil
+		return &ec, nil
 	}
 
-	return ec, json.Unmarshal(b, ec)
+	return &ec, json.Unmarshal(b, &ec)
 }
