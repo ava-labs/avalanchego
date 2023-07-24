@@ -117,6 +117,7 @@ propose a batch against any existing proposed revision.
 - [ ] Be able to quickly commit a batch that has been proposed. Note that this
 invalidates all other proposals that are not children of the committed proposed batch.
 - [ ] Add metric reporting
+- [ ] Refactor `Shale` to be more idiomatic
 
 ### Dried milestone
 The focus of this milestone will be to support synchronization to other
