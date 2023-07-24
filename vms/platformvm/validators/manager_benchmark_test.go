@@ -4,6 +4,8 @@
 package validators
 
 import (
+	"context"
+	"math/rand"
 	"testing"
 	"time"
 
@@ -122,34 +124,136 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 
 	m := NewManager(
 		logging.NoLog{},
-		config.Config{},
+		config.Config{
+			Validators: vdrs,
+		},
 		s,
 		metrics,
 		new(mockable.Clock),
 	)
 
-	sk, err := bls.NewSecretKey()
-	require.NoError(err)
+	var (
+		nodeIDs       []ids.NodeID
+		currentHeight uint64
+	)
+	for i := 0; i < 50; i++ {
+		require.NoError(addPrimaryValidator(s, genesisTime, genesisEndTime, &nodeIDs, &currentHeight))
+	}
+	subnetID := ids.GenerateTestID()
+	for _, nodeID := range nodeIDs {
+		require.NoError(addSubnetValidator(s, subnetID, genesisTime, genesisEndTime, nodeID, &currentHeight))
+	}
+	for i := 0; i < 9900; i++ {
+		require.NoError(addSubnetDelegator(s, subnetID, genesisTime, genesisEndTime, nodeIDs, &currentHeight))
+	}
 
+	ctx := context.Background()
+	height, err := m.GetCurrentHeight(ctx)
+	require.NoError(err)
+	require.Equal(currentHeight, height)
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		_, err := m.GetValidatorSet(ctx, 0, subnetID)
+		require.NoError(err)
+	}
+}
+
+func addPrimaryValidator(s state.State, startTime, endTime time.Time, nodeIDs *[]ids.NodeID, height *uint64) error {
+	sk, err := bls.NewSecretKey()
+	if err != nil {
+		return err
+	}
+
+	nodeID := ids.GenerateTestNodeID()
 	s.PutCurrentValidator(&state.Staker{
 		TxID:            ids.GenerateTestID(),
-		NodeID:          ids.GenerateTestNodeID(),
+		NodeID:          nodeID,
 		PublicKey:       bls.PublicFromSecretKey(sk),
 		SubnetID:        constants.PrimaryNetworkID,
 		Weight:          2 * units.MegaAvax,
-		StartTime:       genesisTime,
-		EndTime:         genesisEndTime,
+		StartTime:       startTime,
+		EndTime:         endTime,
 		PotentialReward: 0,
-		NextTime:        genesisEndTime,
+		NextTime:        endTime,
 		Priority:        txs.PrimaryNetworkValidatorCurrentPriority,
 	})
 
-	blk, err := blocks.NewBanffStandardBlock(genesisTime, ids.GenerateTestID(), 1, nil)
-	require.NoError(err)
+	blk, err := blocks.NewBanffStandardBlock(startTime, ids.GenerateTestID(), 1, nil)
+	if err != nil {
+		return err
+	}
 
 	s.AddStatelessBlock(blk)
-	s.SetHeight(1)
-	require.NoError(s.Commit())
+	s.SetHeight(*height + 1)
+	if err := s.Commit(); err != nil {
+		s.Abort()
+		return err
+	}
 
-	_ = m
+	*nodeIDs = append(*nodeIDs, nodeID)
+	*height++
+	return nil
+}
+
+func addSubnetValidator(s state.State, subnetID ids.ID, startTime, endTime time.Time, nodeID ids.NodeID, height *uint64) error {
+	s.PutCurrentValidator(&state.Staker{
+		TxID:            ids.GenerateTestID(),
+		NodeID:          nodeID,
+		SubnetID:        subnetID,
+		Weight:          1 * units.Avax,
+		StartTime:       startTime,
+		EndTime:         endTime,
+		PotentialReward: 0,
+		NextTime:        endTime,
+		Priority:        txs.SubnetPermissionlessValidatorCurrentPriority,
+	})
+
+	blk, err := blocks.NewBanffStandardBlock(startTime, ids.GenerateTestID(), 1, nil)
+	if err != nil {
+		return err
+	}
+
+	s.AddStatelessBlock(blk)
+	s.SetHeight(*height + 1)
+	if err := s.Commit(); err != nil {
+		s.Abort()
+		return err
+	}
+
+	*height++
+	return nil
+}
+
+func addSubnetDelegator(s state.State, subnetID ids.ID, startTime, endTime time.Time, nodeIDs []ids.NodeID, height *uint64) error {
+	i := rand.Intn(len(nodeIDs)) //#nosec G404
+	nodeID := nodeIDs[i]
+	s.PutCurrentDelegator(&state.Staker{
+		TxID:            ids.GenerateTestID(),
+		NodeID:          nodeID,
+		SubnetID:        subnetID,
+		Weight:          1 * units.Avax,
+		StartTime:       startTime,
+		EndTime:         endTime,
+		PotentialReward: 0,
+		NextTime:        endTime,
+		Priority:        txs.SubnetPermissionlessDelegatorCurrentPriority,
+	})
+
+	blk, err := blocks.NewBanffStandardBlock(startTime, ids.GenerateTestID(), *height+1, nil)
+	if err != nil {
+		return err
+	}
+
+	s.AddStatelessBlock(blk)
+	s.SetLastAccepted(blk.ID())
+	s.SetHeight(*height + 1)
+	if err := s.Commit(); err != nil {
+		s.Abort()
+		return err
+	}
+
+	*height++
+	return nil
 }
