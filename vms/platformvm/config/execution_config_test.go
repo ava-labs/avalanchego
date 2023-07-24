@@ -6,6 +6,7 @@ package config
 import (
 	"testing"
 
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/stretchr/testify/require"
 )
 
@@ -15,7 +16,7 @@ func TestExecutionConfigUnmarshal(t *testing.T) {
 		b := []byte(`{}`)
 		ec, err := GetExecutionConfig(b)
 		require.NoError(err)
-		require.Equal(DefaultExecutionConfig, *ec)
+		require.Equal(&DefaultExecutionConfig, ec)
 	})
 
 	t.Run("default values from empty bytes", func(t *testing.T) {
@@ -23,7 +24,7 @@ func TestExecutionConfigUnmarshal(t *testing.T) {
 		b := []byte(``)
 		ec, err := GetExecutionConfig(b)
 		require.NoError(err)
-		require.Equal(DefaultExecutionConfig, *ec)
+		require.Equal(&DefaultExecutionConfig, ec)
 	})
 
 	t.Run("mix default and extracted values from json", func(t *testing.T) {
@@ -34,6 +35,7 @@ func TestExecutionConfigUnmarshal(t *testing.T) {
 		expected := DefaultExecutionConfig
 		expected.BlockCacheSize = 1
 		require.Equal(&expected, ec)
+		require.Equal(DefaultExecutionConfig.BlockCacheSize, 64*units.MiB)
 	})
 
 	t.Run("all values extracted from json", func(t *testing.T) {
