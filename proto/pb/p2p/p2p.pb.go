@@ -1905,15 +1905,24 @@ func (x *Put) GetEngineType() EngineType {
 	return EngineType_ENGINE_TYPE_UNSPECIFIED
 }
 
-// Message that contains a preferred container ID and its container bytes
-// in order to query other peers for their preferences of the container.
-// For example, when a new container is issued, the engine sends out
-// "push_query" and "pull_query" queries to ask other peers their preferences.
-// See "avalanchego/snow/engine/common#SendMixedQuery".
+// push_query signifies that this consensus engine would like
+// each node to send its preferred frontier given the existence of
+// the specified container. The container bytes is the sender's locally
+// preferred frontier.
 //
-// On receiving the "push_query", the engine parses the incoming container
-// and tries to issue the container and all of its parents to the consensus,
-// and calls "pull_query" handler to send "chits" for voting.
+// It is called "push", because the outgoing push_query disseminates
+// each newly issued (or newly built) block to the sampled validators,
+// and triggers its remote peers to send back its preferred frontiers
+// in chits messages and missing container fetch requests in get messages,
+// thus querying the frontier of each peer. And this is why the push_query
+// is the first message to send out, when a new block is added to the
+// consensus.
+//
+// On receiving the push_query, the handler immediately responds to the
+// push_query sender with a chits message, to tell the sender about its
+// locally preferred frontier and the last accepted block ID. Then the
+// handler parses the block and issues all the block in its transitive
+// path to the consensus.
 type PushQuery struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -1993,11 +2002,19 @@ func (x *PushQuery) GetEngineType() EngineType {
 	return EngineType_ENGINE_TYPE_UNSPECIFIED
 }
 
-// Message that contains a preferred container ID to query other peers
-// for their preferences of the container.
-// For example, when a new container is issued, the engine sends out
-// "push_query" and "pull_query" queries to ask other peers their preferences.
-// See "avalanchego/snow/engine/common#SendMixedQuery".
+// pull_query signifies that this consensus engine would like each
+// node to send its preferred frontier. The container ID is the sender's
+// locally preferred frontier.
+//
+// It is called "pull", because the outgoing pull_query triggers the
+// remote peers to send back chits message with preferred frontier, and
+// triggers the remote peers to send back get messages to fetch missing
+// containers, thus pulling the frontier status of the peers.
+//
+// On receiving pull_query, the handler immediately responds to the
+// pull_query sender with a chits message, to tell the sender about its
+// locally preferred frontier and the last accepted block ID. Similarly,
+// the handler issues all the blocks in its transitive path to consensus.
 type PullQuery struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
