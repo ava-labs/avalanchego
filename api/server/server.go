@@ -5,7 +5,6 @@ package server
 
 import (
 	"context"
-	"crypto/tls"
 	"errors"
 	"fmt"
 	"net"
@@ -65,8 +64,6 @@ type Server interface {
 	PathAdderWithReadLock
 	// Dispatch starts the API server
 	Dispatch() error
-	// GetURI returns the URI used to access the API server
-	GetURI() string
 	// RegisterChain registers the API endpoints associated with this chain.
 	// That is, add <route, handler> pairs to server so that API calls can be
 	// made to the VM.
@@ -87,9 +84,6 @@ type server struct {
 	log logging.Logger
 	// generates new logs for chains to write to
 	factory logging.Factory
-	// Listens for HTTP traffic on this address
-	listenHost string
-	listenPort string
 
 	shutdownTimeout time.Duration
 
@@ -105,17 +99,13 @@ type server struct {
 
 	// Listener used to serve traffic
 	listener net.Listener
-
-	// URI ([http|https]://[host]:[port]) to access the api server.
-	uri string
 }
 
 // New returns an instance of a Server.
 func New(
 	log logging.Logger,
 	factory logging.Factory,
-	host string,
-	port uint16,
+	listener net.Listener,
 	allowedOrigins []string,
 	shutdownTimeout time.Duration,
 	nodeID ids.NodeID,
@@ -125,9 +115,6 @@ func New(
 	registerer prometheus.Registerer,
 	httpConfig HTTPConfig,
 	allowedHosts []string,
-	httpsEnabled bool,
-	httpsCert []byte,
-	httpsKey []byte,
 	wrappers ...Wrapper,
 ) (Server, error) {
 	m, err := newMetrics(namespace, registerer)
@@ -158,11 +145,9 @@ func New(
 		zap.Strings("allowedOrigins", allowedOrigins),
 	)
 
-	s := &server{
+	return &server{
 		log:             log,
 		factory:         factory,
-		listenHost:      host,
-		listenPort:      fmt.Sprintf("%d", port),
 		shutdownTimeout: shutdownTimeout,
 		tracingEnabled:  tracingEnabled,
 		tracer:          tracer,
@@ -175,64 +160,11 @@ func New(
 			WriteTimeout:      httpConfig.WriteTimeout,
 			IdleTimeout:       httpConfig.IdleTimeout,
 		},
-	}
-
-	// Bind a listener for the API endpoint at server construction to
-	// simplify determination of the URI. Previously a listener was
-	// bound in Dispatch but since that method is called concurrently,
-	// retrieving the URI would require synchronization.
-	if err := s.bindListener(httpsEnabled, httpsCert, httpsKey); err != nil {
-		return nil, fmt.Errorf("failed to bind listener: %w", err)
-	}
-
-	return s, nil
-}
-
-// Retrieve the URI used to access the server.
-func (s *server) GetURI() string {
-	return s.uri
-}
-
-// Bind a listener and set the URI it will serve traffic on.
-func (s *server) bindListener(httpsEnabled bool, certBytes, keyBytes []byte) error {
-	listenAddress := net.JoinHostPort(s.listenHost, s.listenPort)
-
-	// Bind the listener
-	if httpsEnabled {
-		cert, err := tls.X509KeyPair(certBytes, keyBytes)
-		if err != nil {
-			return err
-		}
-		config := &tls.Config{
-			MinVersion:   tls.VersionTLS12,
-			Certificates: []tls.Certificate{cert},
-		}
-		s.listener, err = tls.Listen("tcp", listenAddress, config)
-		if err != nil {
-			return err
-		}
-	} else {
-		var err error
-		s.listener, err = net.Listen("tcp", listenAddress)
-		if err != nil {
-			return err
-		}
-	}
-
-	// Record the URI the listener will respond to
-	var protocol string
-	if httpsEnabled {
-		protocol = "https"
-	} else {
-		protocol = "http"
-	}
-	s.uri = protocol + "://" + s.listener.Addr().String()
-
-	return nil
+		listener: listener,
+	}, nil
 }
 
 func (s *server) Dispatch() error {
-	s.log.Info("API server listening", zap.String("uri", s.uri))
 	return s.srv.Serve(s.listener)
 }
 

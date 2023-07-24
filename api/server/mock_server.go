@@ -105,11 +105,6 @@ func (mr *MockServerMockRecorder) AddRouteWithReadLock(arg0, arg1, arg2, arg3 in
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddRouteWithReadLock", reflect.TypeOf((*MockServer)(nil).AddRouteWithReadLock), arg0, arg1, arg2, arg3)
 }
 
-// Not used in testing but required for interface compliance
-func (m *MockServer) GetURI() string {
-	return ""
-}
-
 // Dispatch mocks base method.
 func (m *MockServer) Dispatch() error {
 	m.ctrl.T.Helper()

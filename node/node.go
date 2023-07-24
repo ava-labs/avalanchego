@@ -6,6 +6,7 @@ package node
 import (
 	"context"
 	"crypto"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -159,6 +160,8 @@ type Node struct {
 
 	// current validators of the network
 	vdrs validators.Manager
+
+	apiURI string
 
 	// Handles HTTP API calls
 	APIServer server.Server
@@ -402,7 +405,7 @@ func (n *Node) writeRuntimeState() error {
 	// Write the runtime state to disk
 	runtimeState := &NodeRuntimeState{
 		PID:              os.Getpid(),
-		URI:              n.APIServer.GetURI(),
+		URI:              n.apiURI,
 		BootstrapAddress: n.bootstrapAddress, // Set by network initialization
 	}
 	bytes, err := json.MarshalIndent(runtimeState, "", "  ")
@@ -426,6 +429,9 @@ func (n *Node) Dispatch() error {
 
 	// Start the HTTP API server
 	go n.Log.RecoverAndPanic(func() {
+		n.Log.Info("API server listening",
+			zap.String("uri", n.apiURI),
+		)
 		err := n.APIServer.Dispatch()
 		// When [n].Shutdown() is called, [n.APIServer].Close() is called.
 		// This causes [n.APIServer].Dispatch() to return an error.
@@ -653,13 +659,34 @@ func (n *Node) initMetrics() {
 func (n *Node) initAPIServer() error {
 	n.Log.Info("initializing API server")
 
+	listenAddress := net.JoinHostPort(n.Config.HTTPHost, fmt.Sprintf("%d", n.Config.HTTPPort))
+	listener, err := net.Listen("tcp", listenAddress)
+	if err != nil {
+		return err
+	}
+
+	protocol := "http"
+	if n.Config.HTTPSEnabled {
+		cert, err := tls.X509KeyPair(n.Config.HTTPSCert, n.Config.HTTPSKey)
+		if err != nil {
+			return err
+		}
+		config := &tls.Config{
+			MinVersion:   tls.VersionTLS12,
+			Certificates: []tls.Certificate{cert},
+		}
+		listener = tls.NewListener(listener, config)
+
+		protocol = "https"
+	}
+	n.apiURI = fmt.Sprintf("%s://%s", protocol, listener.Addr())
+
 	if !n.Config.APIRequireAuthToken {
 		var err error
 		n.APIServer, err = server.New(
 			n.Log,
 			n.LogFactory,
-			n.Config.HTTPHost,
-			n.Config.HTTPPort,
+			listener,
 			n.Config.HTTPAllowedOrigins,
 			n.Config.ShutdownTimeout,
 			n.ID,
@@ -669,9 +696,6 @@ func (n *Node) initAPIServer() error {
 			n.MetricsRegisterer,
 			n.Config.HTTPConfig.HTTPConfig,
 			n.Config.HTTPAllowedHosts,
-			n.Config.HTTPSEnabled,
-			n.Config.HTTPSCert,
-			n.Config.HTTPSKey,
 		)
 		return err
 	}
@@ -684,8 +708,7 @@ func (n *Node) initAPIServer() error {
 	n.APIServer, err = server.New(
 		n.Log,
 		n.LogFactory,
-		n.Config.HTTPHost,
-		n.Config.HTTPPort,
+		listener,
 		n.Config.HTTPAllowedOrigins,
 		n.Config.ShutdownTimeout,
 		n.ID,
@@ -695,9 +718,6 @@ func (n *Node) initAPIServer() error {
 		n.MetricsRegisterer,
 		n.Config.HTTPConfig.HTTPConfig,
 		n.Config.HTTPAllowedHosts,
-		n.Config.HTTPSEnabled,
-		n.Config.HTTPSCert,
-		n.Config.HTTPSKey,
 		a,
 	)
 	if err != nil {
