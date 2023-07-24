@@ -4,6 +4,7 @@
 package state
 
 import (
+	"strconv"
 	"testing"
 	"time"
 
@@ -30,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -45,16 +47,16 @@ func TestStateInitialization(t *testing.T) {
 	require := require.New(t)
 	s, db := newUninitializedState(require)
 
-	shouldInit, err := s.(*state).shouldInit()
+	shouldInit, err := s.(*merkleState).shouldInit()
 	require.NoError(err)
 	require.True(shouldInit)
 
-	require.NoError(s.(*state).doneInit())
+	require.NoError(s.(*merkleState).doneInit())
 	require.NoError(s.Commit())
 
 	s = newStateFromDB(require, db)
 
-	shouldInit, err = s.(*state).shouldInit()
+	shouldInit, err = s.(*merkleState).shouldInit()
 	require.NoError(err)
 	require.False(shouldInit)
 }
@@ -87,20 +89,36 @@ func TestStateSyncGenesis(t *testing.T) {
 func TestGetValidatorWeightDiffs(t *testing.T) {
 	require := require.New(t)
 	stateIntf, _ := newInitializedState(require)
-	state := stateIntf.(*state)
+	state := stateIntf.(*merkleState)
 
-	txID0 := ids.GenerateTestID()
-	txID1 := ids.GenerateTestID()
-	txID2 := ids.GenerateTestID()
-	txID3 := ids.GenerateTestID()
+	tx0 := &txs.Tx{
+		Unsigned: &txs.AddValidatorTx{}, // don't really care to fill it up
+	}
+	tx0.SetBytes([]byte{0x1}, []byte(strconv.Itoa(0)))
+
+	tx1 := &txs.Tx{
+		Unsigned: &txs.AddDelegatorTx{}, // don't really care to fill it up
+	}
+	tx1.SetBytes([]byte{0x1}, []byte(strconv.Itoa(1)))
+
+	tx2 := &txs.Tx{
+		Unsigned: &txs.AddDelegatorTx{}, // don't really care to fill it up
+	}
+	tx2.SetBytes([]byte{0x1}, []byte(strconv.Itoa(2)))
+
+	tx3 := &txs.Tx{
+		Unsigned: &txs.AddValidatorTx{}, // don't really care to fill it up
+	}
+	tx3.SetBytes([]byte{0x1}, []byte(strconv.Itoa(3)))
 
 	nodeID0 := ids.GenerateTestNodeID()
-
 	subnetID0 := ids.GenerateTestID()
 
 	type stakerDiff struct {
 		validatorsToAdd    []*Staker
+		valTxs             []*txs.Tx
 		delegatorsToAdd    []*Staker
+		delTxs             []*txs.Tx
 		validatorsToRemove []*Staker
 		delegatorsToRemove []*Staker
 
@@ -110,12 +128,13 @@ func TestGetValidatorWeightDiffs(t *testing.T) {
 		{
 			validatorsToAdd: []*Staker{
 				{
-					TxID:     txID0,
+					TxID:     tx0.ID(),
 					NodeID:   nodeID0,
 					SubnetID: constants.PrimaryNetworkID,
 					Weight:   1,
 				},
 			},
+			valTxs: []*txs.Tx{tx0},
 			expectedValidatorWeightDiffs: map[ids.ID]map[ids.NodeID]*ValidatorWeightDiff{
 				constants.PrimaryNetworkID: {
 					nodeID0: {
@@ -128,20 +147,22 @@ func TestGetValidatorWeightDiffs(t *testing.T) {
 		{
 			validatorsToAdd: []*Staker{
 				{
-					TxID:     txID3,
+					TxID:     tx3.ID(),
 					NodeID:   nodeID0,
 					SubnetID: subnetID0,
 					Weight:   10,
 				},
 			},
+			valTxs: []*txs.Tx{tx3},
 			delegatorsToAdd: []*Staker{
 				{
-					TxID:     txID1,
+					TxID:     tx1.ID(),
 					NodeID:   nodeID0,
 					SubnetID: constants.PrimaryNetworkID,
 					Weight:   5,
 				},
 			},
+			delTxs: []*txs.Tx{tx1},
 			expectedValidatorWeightDiffs: map[ids.ID]map[ids.NodeID]*ValidatorWeightDiff{
 				constants.PrimaryNetworkID: {
 					nodeID0: {
@@ -160,15 +181,16 @@ func TestGetValidatorWeightDiffs(t *testing.T) {
 		{
 			delegatorsToAdd: []*Staker{
 				{
-					TxID:     txID2,
+					TxID:     tx2.ID(),
 					NodeID:   nodeID0,
 					SubnetID: constants.PrimaryNetworkID,
 					Weight:   15,
 				},
 			},
+			delTxs: []*txs.Tx{tx2},
 			delegatorsToRemove: []*Staker{
 				{
-					TxID:     txID1,
+					TxID:     tx1.ID(),
 					NodeID:   nodeID0,
 					SubnetID: constants.PrimaryNetworkID,
 					Weight:   5,
@@ -186,26 +208,28 @@ func TestGetValidatorWeightDiffs(t *testing.T) {
 		{
 			validatorsToRemove: []*Staker{
 				{
-					TxID:     txID0,
+					TxID:     tx0.ID(),
 					NodeID:   nodeID0,
 					SubnetID: constants.PrimaryNetworkID,
 					Weight:   1,
 				},
 				{
-					TxID:     txID3,
+					TxID:     tx3.ID(),
 					NodeID:   nodeID0,
 					SubnetID: subnetID0,
 					Weight:   10,
 				},
 			},
+			valTxs: []*txs.Tx{tx0, tx3},
 			delegatorsToRemove: []*Staker{
 				{
-					TxID:     txID2,
+					TxID:     tx2.ID(),
 					NodeID:   nodeID0,
 					SubnetID: constants.PrimaryNetworkID,
 					Weight:   15,
 				},
 			},
+			delTxs: []*txs.Tx{tx2},
 			expectedValidatorWeightDiffs: map[ids.ID]map[ids.NodeID]*ValidatorWeightDiff{
 				constants.PrimaryNetworkID: {
 					nodeID0: {
@@ -225,6 +249,12 @@ func TestGetValidatorWeightDiffs(t *testing.T) {
 	}
 
 	for i, stakerDiff := range stakerDiffs {
+		for _, valTx := range stakerDiff.valTxs {
+			state.AddTx(valTx, status.Committed)
+		}
+		for _, delTx := range stakerDiff.delTxs {
+			state.AddTx(delTx, status.Committed)
+		}
 		for _, validator := range stakerDiff.validatorsToAdd {
 			state.PutCurrentValidator(validator)
 		}
@@ -259,11 +289,11 @@ func TestGetValidatorWeightDiffs(t *testing.T) {
 func TestGetValidatorPublicKeyDiffs(t *testing.T) {
 	require := require.New(t)
 	stateIntf, _ := newInitializedState(require)
-	state := stateIntf.(*state)
+	state := stateIntf.(*merkleState)
 
 	var (
 		numNodes = 6
-		txIDs    = make([]ids.ID, numNodes)
+		valTxs   = make([]*txs.Tx, numNodes)
 		nodeIDs  = make([]ids.NodeID, numNodes)
 		sks      = make([]*bls.SecretKey, numNodes)
 		pks      = make([]*bls.PublicKey, numNodes)
@@ -271,7 +301,10 @@ func TestGetValidatorPublicKeyDiffs(t *testing.T) {
 		err      error
 	)
 	for i := 0; i < numNodes; i++ {
-		txIDs[i] = ids.GenerateTestID()
+		valTxs[i] = &txs.Tx{
+			Unsigned: &txs.AddValidatorTx{}, // don't really care to fill it up
+		}
+		valTxs[i].SetBytes([]byte{0x1}, []byte(strconv.Itoa(i)))
 		nodeIDs[i] = ids.GenerateTestNodeID()
 		sks[i], err = bls.NewSecretKey()
 		require.NoError(err)
@@ -281,6 +314,7 @@ func TestGetValidatorPublicKeyDiffs(t *testing.T) {
 
 	type stakerDiff struct {
 		validatorsToAdd        []*Staker
+		validatorsTxsToAdd     []*txs.Tx
 		validatorsToRemove     []*Staker
 		expectedPublicKeyDiffs map[ids.NodeID]*bls.PublicKey
 	}
@@ -289,25 +323,26 @@ func TestGetValidatorPublicKeyDiffs(t *testing.T) {
 			// Add two validators
 			validatorsToAdd: []*Staker{
 				{
-					TxID:      txIDs[0],
+					TxID:      valTxs[0].ID(),
 					NodeID:    nodeIDs[0],
 					Weight:    1,
 					PublicKey: pks[0],
 				},
 				{
-					TxID:      txIDs[1],
+					TxID:      valTxs[1].ID(),
 					NodeID:    nodeIDs[1],
 					Weight:    10,
 					PublicKey: pks[1],
 				},
 			},
+			validatorsTxsToAdd:     []*txs.Tx{valTxs[0], valTxs[1]},
 			expectedPublicKeyDiffs: map[ids.NodeID]*bls.PublicKey{},
 		},
 		{
 			// Remove a validator
 			validatorsToRemove: []*Staker{
 				{
-					TxID:      txIDs[0],
+					TxID:      valTxs[0].ID(),
 					NodeID:    nodeIDs[0],
 					Weight:    1,
 					PublicKey: pks[0],
@@ -321,21 +356,22 @@ func TestGetValidatorPublicKeyDiffs(t *testing.T) {
 			// Add 2 validators and remove a validator
 			validatorsToAdd: []*Staker{
 				{
-					TxID:      txIDs[2],
+					TxID:      valTxs[2].ID(),
 					NodeID:    nodeIDs[2],
 					Weight:    10,
 					PublicKey: pks[2],
 				},
 				{
-					TxID:      txIDs[3],
+					TxID:      valTxs[3].ID(),
 					NodeID:    nodeIDs[3],
 					Weight:    10,
 					PublicKey: pks[3],
 				},
 			},
+			validatorsTxsToAdd: []*txs.Tx{valTxs[2], valTxs[3]},
 			validatorsToRemove: []*Staker{
 				{
-					TxID:      txIDs[1],
+					TxID:      valTxs[1].ID(),
 					NodeID:    nodeIDs[1],
 					Weight:    10,
 					PublicKey: pks[1],
@@ -349,21 +385,22 @@ func TestGetValidatorPublicKeyDiffs(t *testing.T) {
 			// Remove 2 validators and add a validator
 			validatorsToAdd: []*Staker{
 				{
-					TxID:      txIDs[4],
+					TxID:      valTxs[4].ID(),
 					NodeID:    nodeIDs[4],
 					Weight:    10,
 					PublicKey: pks[4],
 				},
 			},
+			validatorsTxsToAdd: []*txs.Tx{valTxs[4]},
 			validatorsToRemove: []*Staker{
 				{
-					TxID:      txIDs[2],
+					TxID:      valTxs[2].ID(),
 					NodeID:    nodeIDs[2],
 					Weight:    10,
 					PublicKey: pks[2],
 				},
 				{
-					TxID:      txIDs[3],
+					TxID:      valTxs[3].ID(),
 					NodeID:    nodeIDs[3],
 					Weight:    10,
 					PublicKey: pks[3],
@@ -378,19 +415,20 @@ func TestGetValidatorPublicKeyDiffs(t *testing.T) {
 			// Add a validator with no pub key
 			validatorsToAdd: []*Staker{
 				{
-					TxID:      txIDs[5],
+					TxID:      valTxs[5].ID(),
 					NodeID:    nodeIDs[5],
 					Weight:    10,
 					PublicKey: nil,
 				},
 			},
+			validatorsTxsToAdd:     []*txs.Tx{valTxs[5]},
 			expectedPublicKeyDiffs: map[ids.NodeID]*bls.PublicKey{},
 		},
 		{
 			// Remove a validator with no pub key
 			validatorsToRemove: []*Staker{
 				{
-					TxID:      txIDs[5],
+					TxID:      valTxs[5].ID(),
 					NodeID:    nodeIDs[5],
 					Weight:    10,
 					PublicKey: nil,
@@ -401,6 +439,9 @@ func TestGetValidatorPublicKeyDiffs(t *testing.T) {
 	}
 
 	for i, stakerDiff := range stakerDiffs {
+		for _, tx := range stakerDiff.validatorsTxsToAdd {
+			state.AddTx(tx, status.Committed)
+		}
 		for _, validator := range stakerDiff.validatorsToAdd {
 			state.PutCurrentValidator(validator)
 		}
@@ -418,7 +459,7 @@ func TestGetValidatorPublicKeyDiffs(t *testing.T) {
 			pkDiffs, err := state.GetValidatorPublicKeyDiffs(uint64(j + 1))
 			require.NoError(err)
 			require.Equal(stakerDiff.expectedPublicKeyDiffs, pkDiffs)
-			state.validatorPublicKeyDiffsCache.Flush()
+			state.validatorBlsKeyDiffsCache.Flush()
 		}
 	}
 }
@@ -482,7 +523,7 @@ func newInitializedState(require *require.Assertions) (State, database.Database)
 
 	genesisBlk, err := blocks.NewApricotCommitBlock(genesisBlkID, 0)
 	require.NoError(err)
-	require.NoError(s.(*state).syncGenesis(genesisBlk, genesisState))
+	require.NoError(s.(*merkleState).syncGenesis(genesisBlk, genesisState))
 
 	return s, db
 }
@@ -497,7 +538,7 @@ func newStateFromDB(require *require.Assertions, db database.Database) State {
 	primaryVdrs := validators.NewSet()
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 	execCfg, _ := config.GetExecutionConfig(nil)
-	state, err := new(
+	state, err := newMerklsState(
 		db,
 		metrics.Noop,
 		&config.Config{
@@ -672,14 +713,28 @@ func TestStateAddRemoveValidator(t *testing.T) {
 		startTime = time.Now()
 		endTime   = startTime.Add(24 * time.Hour)
 		stakers   = make([]Staker, numNodes)
+		addedTxs  = make([]*txs.Tx, numNodes)
 	)
 	for i := 0; i < numNodes; i++ {
+		valTx := txs.Validator{
+			NodeID: ids.GenerateTestNodeID(),
+			Start:  uint64(startTime.Add(time.Duration(i) * time.Second).Unix()),
+			End:    uint64(endTime.Add(time.Duration(i) * time.Second).Unix()),
+			Wght:   uint64(i + 1),
+		}
+		addedTxs[i] = &txs.Tx{
+			Unsigned: &txs.AddValidatorTx{
+				Validator: valTx,
+			},
+		}
+		addedTxs[i].SetBytes([]byte{0x1}, []byte(strconv.Itoa(10*i)))
+
 		stakers[i] = Staker{
-			TxID:            ids.GenerateTestID(),
-			NodeID:          ids.GenerateTestNodeID(),
-			Weight:          uint64(i + 1),
-			StartTime:       startTime.Add(time.Duration(i) * time.Second),
-			EndTime:         endTime.Add(time.Duration(i) * time.Second),
+			TxID:            addedTxs[i].ID(),
+			NodeID:          valTx.NodeID,
+			Weight:          valTx.Wght,
+			StartTime:       valTx.StartTime(),
+			EndTime:         valTx.EndTime(),
 			PotentialReward: uint64(i + 1),
 		}
 		if i%2 == 0 {
@@ -693,7 +748,8 @@ func TestStateAddRemoveValidator(t *testing.T) {
 	}
 
 	type diff struct {
-		added                            []Staker
+		addedStakers                     []Staker
+		addedTxs                         []*txs.Tx
 		removed                          []Staker
 		expectedSubnetWeightDiff         map[ids.NodeID]*ValidatorWeightDiff
 		expectedPrimaryNetworkWeightDiff map[ids.NodeID]*ValidatorWeightDiff
@@ -702,7 +758,8 @@ func TestStateAddRemoveValidator(t *testing.T) {
 	diffs := []diff{
 		{
 			// Add a subnet validator
-			added:                            []Staker{stakers[0]},
+			addedStakers:                     []Staker{stakers[0]},
+			addedTxs:                         []*txs.Tx{addedTxs[0]},
 			expectedPrimaryNetworkWeightDiff: map[ids.NodeID]*ValidatorWeightDiff{},
 			expectedSubnetWeightDiff: map[ids.NodeID]*ValidatorWeightDiff{
 				stakers[0].NodeID: {
@@ -727,7 +784,8 @@ func TestStateAddRemoveValidator(t *testing.T) {
 			expectedPublicKeyDiff: map[ids.NodeID]*bls.PublicKey{},
 		},
 		{ // Add a primary network validator
-			added: []Staker{stakers[1]},
+			addedStakers: []Staker{stakers[1]},
+			addedTxs:     []*txs.Tx{addedTxs[1]},
 			expectedPrimaryNetworkWeightDiff: map[ids.NodeID]*ValidatorWeightDiff{
 				stakers[1].NodeID: {
 					Decrease: false,
@@ -752,7 +810,8 @@ func TestStateAddRemoveValidator(t *testing.T) {
 		},
 		{
 			// Add 2 subnet validators and a primary network validator
-			added: []Staker{stakers[0], stakers[1], stakers[2]},
+			addedStakers: []Staker{stakers[0], stakers[1], stakers[2]},
+			addedTxs:     []*txs.Tx{addedTxs[0], addedTxs[1], addedTxs[2]},
 			expectedPrimaryNetworkWeightDiff: map[ids.NodeID]*ValidatorWeightDiff{
 				stakers[1].NodeID: {
 					Decrease: false,
@@ -797,7 +856,11 @@ func TestStateAddRemoveValidator(t *testing.T) {
 	}
 
 	for i, diff := range diffs {
-		for _, added := range diff.added {
+		for _, tx := range diff.addedTxs {
+			state.AddTx(tx, status.Committed)
+		}
+
+		for _, added := range diff.addedStakers {
 			added := added
 			state.PutCurrentValidator(&added)
 		}
@@ -811,7 +874,7 @@ func TestStateAddRemoveValidator(t *testing.T) {
 
 		require.NoError(state.Commit())
 
-		for _, added := range diff.added {
+		for _, added := range diff.addedStakers {
 			gotValidator, err := state.GetCurrentValidator(added.SubnetID, added.NodeID)
 			require.NoError(err)
 			require.Equal(added, *gotValidator)

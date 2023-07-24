@@ -81,6 +81,39 @@ func NewMerkleState(
 	rewards reward.Calculator,
 	bootstrapped *utils.Atomic[bool],
 ) (State, error) {
+	res, err := newMerklsState(
+		rawDB,
+		metrics,
+		cfg,
+		execCfg,
+		ctx,
+		metricsReg,
+		rewards,
+		bootstrapped,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := res.sync(genesisBytes); err != nil {
+		// Drop any errors on close to return the first error
+		_ = res.Close()
+		return nil, err
+	}
+
+	return res, nil
+}
+
+func newMerklsState(
+	rawDB database.Database,
+	metrics metrics.Metrics,
+	cfg *config.Config,
+	execCfg *config.ExecutionConfig,
+	ctx *snow.Context,
+	metricsReg prometheus.Registerer,
+	rewards reward.Calculator,
+	bootstrapped *utils.Atomic[bool],
+) (*merkleState, error) {
 	var (
 		baseDB            = versiondb.New(rawDB)
 		baseMerkleDB      = prefixdb.New(merkleStatePrefix, baseDB)
@@ -181,7 +214,7 @@ func NewMerkleState(
 		return nil, err
 	}
 
-	res := &merkleState{
+	return &merkleState{
 		cfg:          cfg,
 		ctx:          ctx,
 		metrics:      metrics,
@@ -233,15 +266,7 @@ func NewMerkleState(
 
 		validatorBlsKeyDiffsCache: validatorBlsKeyDiffsCache,
 		localBlsKeyDiffDB:         localBlsKeyDiffDB,
-	}
-
-	if err := res.sync(genesisBytes); err != nil {
-		// Drop any errors on close to return the first error
-		_ = res.Close()
-		return nil, err
-	}
-
-	return res, nil
+	}, nil
 }
 
 type merkleState struct {
@@ -1459,9 +1484,11 @@ func (ms *merkleState) writeWeightDiffs(height uint64, weightDiffs map[weightDif
 			Height:   height,
 			SubnetID: weightKey.subnetID,
 		}
-		cacheValue := map[ids.NodeID]*ValidatorWeightDiff{
-			weightKey.nodeID: weightDiff,
+		cacheValue, found := ms.validatorWeightDiffsCache.Get(cacheKey)
+		if !found {
+			cacheValue = make(map[ids.NodeID]*ValidatorWeightDiff)
 		}
+		cacheValue[weightKey.nodeID] = weightDiff
 		ms.validatorWeightDiffsCache.Put(cacheKey, cacheValue)
 	}
 	return nil
