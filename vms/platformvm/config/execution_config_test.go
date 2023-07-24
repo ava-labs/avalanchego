@@ -6,7 +6,6 @@ package config
 import (
 	"testing"
 
-	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/stretchr/testify/require"
 )
 
@@ -35,7 +34,6 @@ func TestExecutionConfigUnmarshal(t *testing.T) {
 		expected := DefaultExecutionConfig
 		expected.BlockCacheSize = 1
 		require.Equal(&expected, ec)
-		require.Equal(DefaultExecutionConfig.BlockCacheSize, 64*units.MiB)
 	})
 
 	t.Run("all values extracted from json", func(t *testing.T) {
