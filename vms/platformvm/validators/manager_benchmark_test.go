@@ -35,6 +35,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
+// BenchmarkGetValidatorSet generates 10k diffs and calculates the time to
+// generate the genesis validator set by applying them.
+//
+// This generates a single diff for each height. In practice there could be
+// multiple or zero diffs at a given height.
+//
 // Note: BenchmarkGetValidatorSet gets the validator set of a subnet rather than
 // the primary network because the primary network performs caching that would
 // interfere with the benchmark.
