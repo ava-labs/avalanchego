@@ -307,8 +307,8 @@ func (b *bootstrapper) Startup(ctx context.Context) error {
 	b.acceptedFrontierSet.Clear()
 
 	b.pendingSendAccepted.Clear()
-	for _, vdr := range b.Beacons.List() {
-		b.pendingSendAccepted.Add(vdr.NodeID)
+	for nodeID := range b.Beacons.Map() {
+		b.pendingSendAccepted.Add(nodeID)
 	}
 
 	b.pendingReceiveAccepted.Clear()
