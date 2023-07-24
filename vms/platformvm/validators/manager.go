@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
 	"time"
 
 	"go.uber.org/zap"
@@ -116,8 +115,7 @@ type manager struct {
 	// Maps caches for each subnet that is currently tracked.
 	// Key: Subnet ID
 	// Value: cache mapping height -> validator set map
-	cachesLock sync.RWMutex
-	caches     map[ids.ID]cache.Cacher[uint64, map[ids.NodeID]*validators.GetValidatorOutput]
+	caches map[ids.ID]cache.Cacher[uint64, map[ids.NodeID]*validators.GetValidatorOutput]
 
 	// sliding window of blocks that were recently accepted
 	recentlyAccepted window.Window[ids.ID]
@@ -222,17 +220,7 @@ func (m *manager) getValidatorSetCache(subnetID ids.ID) cache.Cacher[uint64, map
 		return &cache.Empty[uint64, map[ids.NodeID]*validators.GetValidatorOutput]{}
 	}
 
-	m.cachesLock.RLock()
 	validatorSetsCache, exists := m.caches[subnetID]
-	m.cachesLock.RUnlock()
-	if exists {
-		return validatorSetsCache
-	}
-
-	m.cachesLock.Lock()
-	defer m.cachesLock.Unlock()
-
-	validatorSetsCache, exists = m.caches[subnetID]
 	if exists {
 		return validatorSetsCache
 	}
