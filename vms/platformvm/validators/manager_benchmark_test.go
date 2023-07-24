@@ -35,6 +35,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
+// Note: BenchmarkGetValidatorSet gets the validator set of a subnet rather than
+// the primary network because the primary network performs caching that would
+// interfere with the benchmark.
 func BenchmarkGetValidatorSet(b *testing.B) {
 	require := require.New(b)
 
