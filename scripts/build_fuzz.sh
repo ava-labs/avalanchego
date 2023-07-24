@@ -2,6 +2,9 @@
 
 # Mostly taken from https://github.com/golang/go/issues/46312#issuecomment-1153345129
 
+# Load the constants
+source "$AVALANCHE_PATH"/scripts/constants.sh
+
 fuzzTime=${1:-1}
 files=$(grep -r --include='**_test.go' --files-with-matches 'func Fuzz' .)
 failed=false
