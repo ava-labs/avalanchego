@@ -1405,8 +1405,6 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 
 	vm.TrackedSubnets.Add(createSubnetTx.ID())
 	subnetValidators := validators.NewSet()
-	require.NoError(vm.state.ValidatorSet(createSubnetTx.ID(), subnetValidators))
-
 	require.True(vm.Validators.Add(createSubnetTx.ID(), subnetValidators))
 
 	addSubnetValidatorTx, err := vm.txBuilder.NewAddSubnetValidatorTx(

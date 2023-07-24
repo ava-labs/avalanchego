@@ -14,11 +14,10 @@ const (
 	txCacheSize                  = 128 * units.MiB
 	transformedSubnetTxCacheSize = 4 * units.MiB
 
-	validatorDiffsCacheSize = 2048
-	rewardUTXOsCacheSize    = 2048
-	chainCacheSize          = 2048
-	chainDBCacheSize        = 2048
-	checksumsEnabled        = false
+	rewardUTXOsCacheSize = 2048
+	chainCacheSize       = 2048
+	chainDBCacheSize     = 2048
+	checksumsEnabled     = false
 )
 
 // ExecutionConfig provides execution parameters of PlatformVM
@@ -26,7 +25,6 @@ type ExecutionConfig struct {
 	BlockCacheSize               int  `json:"block-cache-size"`
 	TxCacheSize                  int  `json:"tx-cache-size"`
 	TransformedSubnetTxCacheSize int  `json:"transformed-subnet-tx-cache-size"`
-	ValidatorDiffsCacheSize      int  `json:"validator-diffs-cache-size"`
 	RewardUTXOsCacheSize         int  `json:"reward-utxos-cache-size"`
 	ChainCacheSize               int  `json:"chain-cache-size"`
 	ChainDBCacheSize             int  `json:"chain-db-cache-size"`
@@ -41,7 +39,6 @@ func GetExecutionConfig(b []byte) (*ExecutionConfig, error) {
 		BlockCacheSize:               blockCacheSize,
 		TxCacheSize:                  txCacheSize,
 		TransformedSubnetTxCacheSize: transformedSubnetTxCacheSize,
-		ValidatorDiffsCacheSize:      validatorDiffsCacheSize,
 		RewardUTXOsCacheSize:         rewardUTXOsCacheSize,
 		ChainCacheSize:               chainCacheSize,
 		ChainDBCacheSize:             chainDBCacheSize,
