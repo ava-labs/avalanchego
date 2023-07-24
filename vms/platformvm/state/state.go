@@ -1772,7 +1772,9 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 				// Invariant: Only the Primary Network contains non-nil public
 				// keys.
 				if staker.PublicKey != nil {
-					// Record the public key of the validator being added.
+					// Record that the public key for the validator is being
+					// added. This means the prior value for the public key was
+					// nil.
 					err := s.flatValidatorPublicKeyDiffsDB.Put(
 						getBLSKey(height, nodeID),
 						nil,
