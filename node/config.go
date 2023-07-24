@@ -235,7 +235,6 @@ type Config struct {
 	ChainDataDir string `json:"chainDataDir"`
 
 	// Path to write runtime state to (including PID, API URI, and
-	// bootstrap address). If empty, runtime state will not be
-	// written.
-	RuntimeStatePath string `json:"runtimeStatePath"`
+	// staking address).
+	RuntimeStateFilePath string `json:"runtimeStateFilePath"`
 }
