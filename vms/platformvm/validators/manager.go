@@ -60,7 +60,16 @@ type State interface {
 	// [vdrs].
 	ValidatorSet(subnetID ids.ID, vdrs validators.Set) error
 
-	// startHeight > endHeight
+	// ApplyValidatorWeightDiffs iterates from [startHeight] towards the genesis
+	// block until it has applied all of the diffs through [endHeight]. Applying
+	// the diffs results in modifying [validators].
+	//
+	// Invariant: If attempting to generate the validator set for
+	// [endHeight - 1], [validators] should initially contain the validator
+	// weights for [startHeight].
+	//
+	// Note: Because this function iterates towards the genesis, [startHeight]
+	// should normally be greater than or equal to [endHeight].
 	ApplyValidatorWeightDiffs(
 		ctx context.Context,
 		validators map[ids.NodeID]*validators.GetValidatorOutput,
@@ -69,9 +78,16 @@ type State interface {
 		subnetID ids.ID,
 	) error
 
-	// Returns a map of node ID --> BLS Public Key for all validators
-	// that left the Primary Network validator set.
-	// startHeight > endHeight
+	// ApplyValidatorPublicKeyDiffs iterates from [startHeight] towards the
+	// genesis block until it has applied all of the diffs through [endHeight].
+	// Applying the diffs results in modifying [validators].
+	//
+	// Invariant: If attempting to generate the validator set for
+	// [endHeight - 1], [validators] should initially contain the validators for
+	// [endHeight - 1] and the public keys for [startHeight].
+	//
+	// Note: Because this function iterates towards the genesis, [startHeight]
+	// should normally be greater than or equal to [endHeight].
 	ApplyValidatorPublicKeyDiffs(
 		ctx context.Context,
 		validators map[ids.NodeID]*validators.GetValidatorOutput,
