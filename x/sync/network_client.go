@@ -178,10 +178,8 @@ func (c *networkClient) RequestAny(
 	}
 	defer c.activeRequests.Release(1)
 
-	c.lock.Lock()
 	nodeID, ok := c.peers.GetAnyPeer(minVersion)
 	if !ok {
-		c.lock.Unlock()
 		return ids.EmptyNodeID, nil, fmt.Errorf(
 			"no peers found matching version %s out of %d peers",
 			minVersion, c.peers.Size(),
@@ -189,6 +187,7 @@ func (c *networkClient) RequestAny(
 	}
 
 	// Note [c.request] releases [c.lock].
+	c.lock.Lock()
 	response, err := c.request(ctx, nodeID, request)
 	return nodeID, response, err
 }
@@ -283,9 +282,6 @@ func (c *networkClient) Connected(
 	nodeID ids.NodeID,
 	nodeVersion *version.Application,
 ) error {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
 	if nodeID == c.myNodeID {
 		c.log.Debug("skipping registering self as peer")
 		return nil
@@ -298,9 +294,6 @@ func (c *networkClient) Connected(
 
 // Disconnected removes given [nodeID] from the peer list.
 func (c *networkClient) Disconnected(_ context.Context, nodeID ids.NodeID) error {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
 	if nodeID == c.myNodeID {
 		c.log.Debug("skipping deregistering self as peer")
 		return nil
