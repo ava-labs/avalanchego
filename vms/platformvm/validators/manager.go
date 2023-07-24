@@ -345,6 +345,8 @@ func (m *manager) getCurrentValidatorSets(
 ) (map[ids.NodeID]*validators.GetValidatorOutput, map[ids.NodeID]*validators.GetValidatorOutput, uint64, error) {
 	currentSubnetValidators, ok := m.cfg.Validators.Get(subnetID)
 	if !ok {
+		// TODO: Require that the current validator set for all subnets is
+		// included in the validator manager.
 		currentSubnetValidators = validators.NewSet()
 		err := m.state.ValidatorSet(subnetID, currentSubnetValidators)
 		if err != nil {
