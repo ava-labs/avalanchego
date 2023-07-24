@@ -143,11 +143,6 @@ type State interface {
 		subnetID ids.ID,
 	) error
 
-	// Returns a map of node ID --> BLS Public Key for all validators
-	// that left the Primary Network validator set.
-	//
-	// startHeight > endHeight
-
 	// ApplyValidatorPublicKeyDiffs iterates from [startHeight] towards the
 	// genesis block until it has applied all of the diffs through [endHeight].
 	// Applying the diffs results in modifying [validators].
