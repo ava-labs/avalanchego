@@ -163,11 +163,11 @@ func (m *manager) GetMinimumHeight(ctx context.Context) (uint64, error) {
 	return blk.Height() - 1, nil
 }
 
-// TODO: Pass the context into the state.
 func (m *manager) GetCurrentHeight(ctx context.Context) (uint64, error) {
 	return m.getCurrentHeight(ctx)
 }
 
+// TODO: Pass the context into the state.
 func (m *manager) getCurrentHeight(context.Context) (uint64, error) {
 	lastAcceptedID := m.state.GetLastAccepted()
 	lastAccepted, err := m.state.GetStatelessBlock(lastAcceptedID)
