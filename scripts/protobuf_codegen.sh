@@ -9,7 +9,7 @@ fi
 # any version changes here should also be bumped in Dockerfile.buf
 # ref. https://docs.buf.build/installation
 # ref. https://github.com/bufbuild/buf/releases
-BUF_VERSION='1.23.1'
+BUF_VERSION='1.25.0'
 if [[ $(buf --version | cut -f2 -d' ') != "${BUF_VERSION}" ]]; then
   echo "could not find buf ${BUF_VERSION}, is it installed + in PATH?"
   exit 255
@@ -39,7 +39,7 @@ if [[ $(protoc-gen-go-grpc --version | cut -f2 -d' ') != "${PROTOC_GEN_GO_GRPC_V
 fi
 
 TARGET=$PWD/proto
-if [ -n "$1" ]; then 
+if [ -n "$1" ]; then
   TARGET="$1"
 fi
 
