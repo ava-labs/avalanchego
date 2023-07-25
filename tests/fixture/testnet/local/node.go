@@ -209,14 +209,17 @@ func (n *LocalNode) Stop() error {
 	if err != nil {
 		return fmt.Errorf("failed to find process to stop: %w", err)
 	}
+	// Sending 0 will not actually send a signal but will perform
+	// error checking. If no error is returned, the process is still
+	// running.
 	if err := proc.Signal(syscall.Signal(0)); err != nil {
 		if strings.Contains(err.Error(), "os: process already finished") {
 			return nil
 		}
 		return fmt.Errorf("process.Signal(0) on pid %d returned: %w", pid, err)
 	}
-	if err := proc.Kill(); err != nil {
-		return fmt.Errorf("failed to kill pid %d: %w", pid, err)
+	if err := proc.Signal(syscall.SIGTERM); err != nil {
+		return fmt.Errorf("failed to send SIGTERM to pid %d: %w", pid, err)
 	}
 	return nil
 }
