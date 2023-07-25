@@ -186,8 +186,6 @@ func (c *networkClient) RequestAny(
 		)
 	}
 
-	// Note [c.request] releases [c.lock].
-	c.lock.Lock()
 	response, err := c.request(ctx, nodeID, request)
 	return nodeID, response, err
 }
@@ -207,8 +205,6 @@ func (c *networkClient) Request(
 	}
 	defer c.activeRequests.Release(1)
 
-	c.lock.Lock()
-	// Note [c.request] releases [c.lock].
 	return c.request(ctx, nodeID, request)
 }
 
@@ -218,12 +214,13 @@ func (c *networkClient) Request(
 // Releases active requests semaphore if there was an error in sending the request.
 // Assumes [nodeID] is never [c.myNodeID] since we guarantee
 // [c.myNodeID] will not be added to [c.peers].
-// Assumes [c.lock] is held and unlocks [c.lock] before returning.
+// Assumes [c.lock] is not held and unlocks [c.lock] before returning.
 func (c *networkClient) request(
 	ctx context.Context,
 	nodeID ids.NodeID,
 	request []byte,
 ) ([]byte, error) {
+	c.lock.Lock()
 	c.log.Debug("sending request to peer",
 		zap.Stringer("nodeID", nodeID),
 		zap.Int("requestLen", len(request)),
@@ -245,12 +242,12 @@ func (c *networkClient) request(
 	handler := newResponseHandler()
 	c.outstandingRequestHandlers[requestID] = handler
 
+	c.lock.Unlock() // unlock so response can be received
+
 	var (
 		response  []byte
 		startTime = time.Now()
 	)
-
-	c.lock.Unlock() // unlock so response can be received
 
 	select {
 	case <-ctx.Done():
