@@ -119,20 +119,6 @@ func (mr *MockServerMockRecorder) Dispatch() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Dispatch", reflect.TypeOf((*MockServer)(nil).Dispatch))
 }
 
-// DispatchTLS mocks base method.
-func (m *MockServer) DispatchTLS(arg0, arg1 []byte) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DispatchTLS", arg0, arg1)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// DispatchTLS indicates an expected call of DispatchTLS.
-func (mr *MockServerMockRecorder) DispatchTLS(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DispatchTLS", reflect.TypeOf((*MockServer)(nil).DispatchTLS), arg0, arg1)
-}
-
 // RegisterChain mocks base method.
 func (m *MockServer) RegisterChain(arg0 string, arg1 *snow.ConsensusContext, arg2 common.VM) {
 	m.ctrl.T.Helper()
