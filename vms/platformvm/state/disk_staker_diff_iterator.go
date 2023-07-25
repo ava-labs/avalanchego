@@ -9,14 +9,13 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
 const (
 	// diffKey = [subnetID] + [inverseHeight] + [nodeID]
-	startDiffKeyLength  = hashing.HashLen + database.Uint64Size
-	diffKeyLength       = startDiffKeyLength + hashing.AddrLen
-	diffKeyHeightOffset = hashing.HashLen
+	startDiffKeyLength  = ids.IDLen + database.Uint64Size
+	diffKeyLength       = startDiffKeyLength + ids.NodeIDLen
+	diffKeyHeightOffset = ids.IDLen
 	diffKeyNodeIDOffset = diffKeyHeightOffset + database.Uint64Size
 
 	// weightValue = [isNegative] + [weight]
