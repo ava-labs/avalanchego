@@ -233,4 +233,8 @@ type Config struct {
 	// ChainDataDir is the root path for per-chain directories where VMs can
 	// write arbitrary data.
 	ChainDataDir string `json:"chainDataDir"`
+
+	// Path to write process context to (including PID, API URI, and
+	// staking address).
+	ProcessContextFilePath string `json:"processContextFilePath"`
 }
