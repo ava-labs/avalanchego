@@ -264,8 +264,10 @@ func (m *manager) makePrimaryNetworkValidatorSet(
 
 	// Rebuild primary network validators at [targetHeight]
 	//
-	// Note: Height h contains the diffs from height h-1 to h. So, to rebuild
-	// validators state at height h, we apply diffs till height h+1.
+	// Note: Since we are attempting to generate the validator set at
+	// [targetHeight], we want to apply the diffs from
+	// (targetHeight, currentHeight]. Because the state interface is implemented
+	// to be inclusive, we apply diffs in [targetHeight + 1, currentHeight].
 	lastDiffHeight := targetHeight + 1
 	err = m.state.ApplyValidatorWeightDiffs(
 		ctx,
@@ -318,8 +320,10 @@ func (m *manager) makeSubnetValidatorSet(
 
 	// Rebuild subnet validators at [targetHeight]
 	//
-	// Note: Height h contains the diffs from height h-1 to h. So, to rebuild
-	// validators state at height h, we apply diffs till height h+1.
+	// Note: Since we are attempting to generate the validator set at
+	// [targetHeight], we want to apply the diffs from
+	// (targetHeight, currentHeight]. Because the state interface is implemented
+	// to be inclusive, we apply diffs in [targetHeight + 1, currentHeight].
 	lastDiffHeight := targetHeight + 1
 	err = m.state.ApplyValidatorWeightDiffs(
 		ctx,
