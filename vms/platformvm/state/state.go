@@ -1020,6 +1020,10 @@ func (s *state) ApplyValidatorWeightDiffs(
 		}
 	}
 
+	if err := diffIter.Error(); err != nil {
+		return err
+	}
+
 	// TODO: Remove this once it is assumed that all subnet validators have
 	// adopted the new indexing.
 	for height := prevHeight - 1; height >= endHeight; height-- {
@@ -1059,7 +1063,7 @@ func (s *state) ApplyValidatorWeightDiffs(
 		}
 	}
 
-	return diffIter.Error()
+	return nil
 }
 
 func applyWeightDiff(
