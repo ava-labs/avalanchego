@@ -213,9 +213,17 @@ type stateBlk struct {
  * | | '-. subnetDelegator
  * | |   '-. list
  * | |     '-- txID -> nil
- * | |-. weight diffs
+ * | |-. nested weight diffs TODO: Remove once only the flat db is needed
+ * | | '-. height+subnet
+ * | |   '-. list
+ * | |     '-- nodeID -> weightChange
+ * | |-. nested pub key diffs TODO: Remove once only the flat db is needed
+ * | | '-. height
+ * | |   '-. list
+ * | |     '-- nodeID -> public key
+ * | |-. flat weight diffs
  * | | '-- subnet+height+nodeID -> weightChange
- * | '-. pub key diffs
+ * | '-. flat pub key diffs
  * |   '-- height+nodeID -> public key or nil
  * |-. blocks
  * | '-- blockID -> block bytes
