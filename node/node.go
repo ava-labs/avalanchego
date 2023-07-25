@@ -885,6 +885,7 @@ func (n *Node) initVMs() error {
 				Validators:                    vdrs,
 				UptimeLockedCalculator:        n.uptimeCalculator,
 				SybilProtectionEnabled:        n.Config.SybilProtectionEnabled,
+				ReducedModeEnabled:            n.Config.ReducedModeEnabled,
 				TrackedSubnets:                n.Config.TrackedSubnets,
 				TxFee:                         n.Config.TxFee,
 				CreateAssetTxFee:              n.Config.CreateAssetTxFee,

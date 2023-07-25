@@ -35,6 +35,9 @@ type Config struct {
 	// True if the node is being run with staking enabled
 	SybilProtectionEnabled bool
 
+	// If true, C-chain and X-chain won't be instantiated. Allowed only while node is non-validator
+	ReducedModeEnabled bool
+
 	// Set of subnets that this node is validating
 	TrackedSubnets set.Set[ids.ID]
 
