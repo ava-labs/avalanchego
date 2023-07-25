@@ -608,26 +608,28 @@ func (m *Manager) completeWorkItem(ctx context.Context, work *workItem, largestH
 		}
 	}
 
-	// completed the range [work.start, lastKey], log and record in the completed work heap
-	m.config.Log.Info("completed range",
-		zap.Binary("start", work.start),
-		zap.Binary("end", largestHandledKey),
-	)
-
 	// update work queues (make sure to keep same locking order as [UpdateSyncTarget]
 	// or could cause a deadlock
 	m.workLock.Lock()
-	defer m.workLock.Unlock()
-
 	m.syncTargetLock.RLock()
-	defer m.syncTargetLock.RUnlock()
-
+	var stale bool
 	if m.config.TargetRoot == rootID {
 		m.processedWork.MergeInsert(newWorkItem(rootID, work.start, largestHandledKey, work.priority))
 	} else {
 		// the root has changed, so reinsert with high priority
 		m.enqueueWork(newWorkItem(rootID, work.start, largestHandledKey, highPriority))
+		stale = true
 	}
+	m.syncTargetLock.RUnlock()
+	m.workLock.Unlock()
+
+	// completed the range [work.start, lastKey], log and record in the completed work heap
+	m.config.Log.Info("completed range",
+		zap.Binary("start", work.start),
+		zap.Binary("end", largestHandledKey),
+		zap.Stringer("rootID", rootID),
+		zap.Bool("stale", stale),
+	)
 }
 
 // Queue the given key range to be fetched and applied.
