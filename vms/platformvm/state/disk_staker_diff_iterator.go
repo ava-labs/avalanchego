@@ -13,14 +13,17 @@ import (
 )
 
 const (
+	// weightKey = [subnetID] + [inverseHeight] + [nodeID]
 	startWeightKeyLength  = hashing.HashLen + database.Uint64Size
 	weightKeyLength       = startWeightKeyLength + hashing.AddrLen
 	weightKeyHeightOffset = hashing.HashLen
 	weightKeyNodeIDOffset = weightKeyHeightOffset + database.Uint64Size
 
+	// weightValue = [isNegative] + [weight]
 	weightValueLength = 1 + database.Uint64Size
 	weightValueTrue   = 0x01
 
+	// blsKey = [inverseHeight] + [nodeID]
 	startBLSKeyLength  = database.Uint64Size
 	blsKeyLength       = startBLSKeyLength + hashing.AddrLen
 	blsKeyNodeIDOffset = database.Uint64Size
