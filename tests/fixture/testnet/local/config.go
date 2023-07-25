@@ -18,8 +18,7 @@ const (
 	RootDirEnvName         = "TESTNETCTL_ROOT_DIR"
 
 	DefaultNetworkStartTimeout = 2 * time.Minute
-
-	DefaultNodeStartTimeout = 10 * time.Second
+	DefaultNodeInitTimeout     = 10 * time.Second
 
 	// The default initial static port should differ from the ANR default of 9650.
 	DefaultInitialStaticPort = 9850

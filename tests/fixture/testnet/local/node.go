@@ -273,7 +273,7 @@ func (n *LocalNode) IsHealthy(ctx context.Context) (bool, error) {
 }
 
 func (n *LocalNode) WaitForProcessContext(ctx context.Context) error {
-	ctx, cancel := context.WithTimeout(ctx, DefaultNodeStartTimeout)
+	ctx, cancel := context.WithTimeout(ctx, DefaultNodeInitTimeout)
 	defer cancel()
 	for {
 		select {
