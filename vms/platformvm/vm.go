@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -58,7 +59,8 @@ var (
 	_ validators.State           = (*VM)(nil)
 	_ validators.SubnetConnector = (*VM)(nil)
 
-	errMissingValidatorSet = errors.New("missing validator set")
+	errMissingValidatorSet        = errors.New("missing validator set")
+	errNoReducedModeForValidators = errors.New("reduced mode cannot be configured for validators")
 )
 
 type VM struct {
@@ -146,6 +148,19 @@ func (vm *VM) Initialize(
 	)
 	if err != nil {
 		return err
+	}
+
+	if vm.Config.ReducedModeEnabled {
+		_, err := vm.state.GetCurrentValidator(constants.PrimaryNetworkID, vm.ctx.NodeID)
+		switch err {
+		case nil:
+			vm.ctx.Log.Error("configured reduced mode while node is a validator")
+			return errNoReducedModeForValidators
+		case database.ErrNotFound:
+			// all fine, continue with vm instantiation
+		default:
+			return err
+		}
 	}
 
 	validatorManager := pvalidators.NewManager(chainCtx.Log, vm.Config, vm.state, vm.metrics, &vm.clock)
