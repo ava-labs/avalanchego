@@ -133,7 +133,7 @@ func (n *LocalNode) WriteConfig() error {
 }
 
 func (n *LocalNode) GetProcessContextPath() string {
-	return filepath.Join(n.GetDataDir(), "process.json")
+	return filepath.Join(n.GetDataDir(), cfg.ProcessContextFilename)
 }
 
 func (n *LocalNode) ReadProcessContext() error {
@@ -273,7 +273,7 @@ func (n *LocalNode) IsHealthy(ctx context.Context) (bool, error) {
 }
 
 func (n *LocalNode) WaitForProcessContext(ctx context.Context) error {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, DefaultNodeStartTimeout)
 	defer cancel()
 	for {
 		select {
@@ -289,7 +289,7 @@ func (n *LocalNode) WaitForProcessContext(ctx context.Context) error {
 		if len(n.URI) > 0 {
 			break
 		}
-		time.Sleep(time.Millisecond * 200)
+		time.Sleep(time.Millisecond * 50)
 	}
 	return nil
 }

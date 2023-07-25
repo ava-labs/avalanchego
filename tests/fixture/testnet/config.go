@@ -209,11 +209,11 @@ func (nc *NodeConfig) EnsureNodeID() error {
 		return err
 	}
 	if len(key) == 0 {
-		return fmt.Errorf("missing value for %q", keyKey)
+		return fmt.Errorf("failed to ensure node ID: missing value for %q", keyKey)
 	}
 	keyBytes, err := base64.StdEncoding.DecodeString(key)
 	if err != nil {
-		return fmt.Errorf("failed to base64 decode value for %q", keyKey)
+		return fmt.Errorf("failed to ensure node ID: failed to base64 decode value for %q", keyKey)
 	}
 
 	cert, err := nc.Flags.GetStringVal(certKey)
@@ -221,16 +221,16 @@ func (nc *NodeConfig) EnsureNodeID() error {
 		return err
 	}
 	if len(cert) == 0 {
-		return fmt.Errorf("missing value for %q", certKey)
+		return fmt.Errorf("failed to ensure node ID: missing value for %q", certKey)
 	}
 	certBytes, err := base64.StdEncoding.DecodeString(cert)
 	if err != nil {
-		return fmt.Errorf("failed to base64 decode value for %q", certKey)
+		return fmt.Errorf("failed to ensure node ID: failed to base64 decode value for %q", certKey)
 	}
 
 	tlsCert, err := staking.LoadTLSCertFromBytes(keyBytes, certBytes)
 	if err != nil {
-		return fmt.Errorf("failed to load tls cert: %w", err)
+		return fmt.Errorf("failed to ensure node ID: failed to load tls cert: %w", err)
 	}
 	nc.NodeID = ids.NodeIDFromCert(tlsCert.Leaf)
 

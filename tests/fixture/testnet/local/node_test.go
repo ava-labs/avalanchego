@@ -11,14 +11,16 @@ import (
 )
 
 func TestNodeSerialization(t *testing.T) {
+	require := require.New(t)
+
 	tmpDir, err := os.MkdirTemp("", "")
-	require.NoError(t, err)
+	require.NoError(err)
 
 	node := NewLocalNode(tmpDir)
-	require.NoError(t, node.EnsureKeys())
-	require.NoError(t, node.WriteConfig())
+	require.NoError(node.EnsureKeys())
+	require.NoError(node.WriteConfig())
 
 	loadedNode, err := ReadNode(tmpDir)
-	require.NoError(t, err)
-	require.Equal(t, node, loadedNode)
+	require.NoError(err)
+	require.Equal(node, loadedNode)
 }

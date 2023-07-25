@@ -11,19 +11,21 @@ import (
 )
 
 func TestNetworkSerialization(t *testing.T) {
+	require := require.New(t)
+
 	tmpDir, err := os.MkdirTemp("", "")
-	require.NoError(t, err)
+	require.NoError(err)
 
 	network := &LocalNetwork{Dir: tmpDir}
-	require.NoError(t, network.PopulateLocalNetworkConfig(1337, 1, 1))
-	require.NoError(t, network.WriteAll())
+	require.NoError(network.PopulateLocalNetworkConfig(1337, 1, 1))
+	require.NoError(network.WriteAll())
 
 	loadedNetwork, err := ReadNetwork(tmpDir)
-	require.NoError(t, err)
+	require.NoError(err)
 	for _, key := range loadedNetwork.FundedKeys {
 		// Address() enables comparison with the original network by
 		// ensuring full population of a key's in-memory representation.
 		_ = key.Address()
 	}
-	require.Equal(t, network, loadedNetwork)
+	require.Equal(network, loadedNetwork)
 }
