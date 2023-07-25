@@ -126,10 +126,20 @@ type State interface {
 	// Invariant: [block] is an accepted block.
 	AddStatelessBlock(block blocks.Block)
 
-	// GetValidatorSet returns the current validator set of [subnetID].
-	GetValidatorSet(subnetID ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error)
+	// ValidatorSet adds all the validators and delegators of [subnetID] into
+	// [vdrs].
+	ValidatorSet(subnetID ids.ID, vdrs validators.Set) error
 
-	// startHeight > endHeight
+	// ApplyValidatorWeightDiffs iterates from [startHeight] towards the genesis
+	// block until it has applied all of the diffs through [endHeight]. Applying
+	// the diffs results in modifying [validators].
+	//
+	// Invariant: If attempting to generate the validator set for
+	// [endHeight - 1], [validators] should initially contain the validator
+	// weights for [startHeight].
+	//
+	// Note: Because this function iterates towards the genesis, [startHeight]
+	// should normally be greater than or equal to [endHeight].
 	ApplyValidatorWeightDiffs(
 		ctx context.Context,
 		validators map[ids.NodeID]*validators.GetValidatorOutput,
@@ -138,9 +148,16 @@ type State interface {
 		subnetID ids.ID,
 	) error
 
-	// Returns a map of node ID --> BLS Public Key for all validators
-	// that left the Primary Network validator set.
-	// startHeight > endHeight
+	// ApplyValidatorPublicKeyDiffs iterates from [startHeight] towards the
+	// genesis block until it has applied all of the diffs through [endHeight].
+	// Applying the diffs results in modifying [validators].
+	//
+	// Invariant: If attempting to generate the validator set for
+	// [endHeight - 1], [validators] should initially contain the validators for
+	// [endHeight - 1] and the public keys for [startHeight].
+	//
+	// Note: Because this function iterates towards the genesis, [startHeight]
+	// should normally be greater than or equal to [endHeight].
 	ApplyValidatorPublicKeyDiffs(
 		ctx context.Context,
 		validators map[ids.NodeID]*validators.GetValidatorOutput,
@@ -165,6 +182,7 @@ type State interface {
 	Close() error
 }
 
+// TODO: Remove after v1.11.x is activated
 type stateBlk struct {
 	Blk    blocks.Block
 	Bytes  []byte         `serialize:"true"`
@@ -313,9 +331,11 @@ type state struct {
 	singletonDB                         database.Database
 }
 
+// heightRange is used to track which heights are safe to use the native DB
+// iterator for querying validator diffs.
 type heightRange struct {
-	Start uint64 `serialize:"true"`
-	End   uint64 `serialize:"true"`
+	LowerBound uint64 `serialize:"true"`
+	UpperBound uint64 `serialize:"true"`
 }
 
 type ValidatorWeightDiff struct {
@@ -936,32 +956,24 @@ func (s *state) SetCurrentSupply(subnetID ids.ID, cs uint64) {
 	}
 }
 
-func (s *state) GetValidatorSet(subnetID ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-	subnetValidators := s.currentStakers.validators[subnetID]
-	vdrs := make(map[ids.NodeID]*validators.GetValidatorOutput, len(subnetValidators))
-	for nodeID, validator := range subnetValidators {
+func (s *state) ValidatorSet(subnetID ids.ID, vdrs validators.Set) error {
+	for nodeID, validator := range s.currentStakers.validators[subnetID] {
 		staker := validator.validator
-		vdr := &validators.GetValidatorOutput{
-			NodeID:    nodeID,
-			PublicKey: staker.PublicKey,
-			Weight:    staker.Weight,
+		if err := vdrs.Add(nodeID, staker.PublicKey, staker.TxID, staker.Weight); err != nil {
+			return err
 		}
 
 		delegatorIterator := NewTreeIterator(validator.delegators)
 		for delegatorIterator.Next() {
 			staker := delegatorIterator.Value()
-			newWeight, err := math.Add64(vdr.Weight, staker.Weight)
-			if err != nil {
+			if err := vdrs.AddWeight(nodeID, staker.Weight); err != nil {
 				delegatorIterator.Release()
-				return nil, err
+				return err
 			}
-			vdr.Weight = newWeight
 		}
 		delegatorIterator.Release()
-
-		vdrs[nodeID] = vdr
 	}
-	return vdrs, nil
+	return nil
 }
 
 func (s *state) ApplyValidatorWeightDiffs(
@@ -994,7 +1006,7 @@ func (s *state) ApplyValidatorWeightDiffs(
 	prevHeight := startHeight + 1
 	// TODO: Remove the index continuity checks once we are guaranteed nodes can
 	// not rollback to not support the new indexing mechanism.
-	for diffIter.Next() && s.indexedHeights != nil && s.indexedHeights.Start <= endHeight {
+	for diffIter.Next() && s.indexedHeights != nil && s.indexedHeights.LowerBound <= endHeight {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
@@ -1285,7 +1297,7 @@ func (s *state) loadMetadata() error {
 	if err != nil {
 		return err
 	}
-	if indexedHeights.End != lastAcceptedBlock.Height() {
+	if indexedHeights.UpperBound != lastAcceptedBlock.Height() {
 		return nil
 	}
 	s.indexedHeights = indexedHeights
@@ -1683,11 +1695,11 @@ func (s *state) AddStatelessBlock(block blocks.Block) {
 func (s *state) SetHeight(height uint64) {
 	if s.indexedHeights == nil {
 		s.indexedHeights = &heightRange{
-			Start: height,
+			LowerBound: height,
 		}
 	}
 
-	s.indexedHeights.End = height
+	s.indexedHeights.UpperBound = height
 	s.currentHeight = height
 }
 
@@ -1766,24 +1778,18 @@ func (s *state) GetStatelessBlock(blockID ids.ID) (blocks.Block, error) {
 		return nil, err
 	}
 
-	// Note: stored blocks are verified, so it's safe to unmarshal them with GenesisCodec
-	blkState := stateBlk{}
-	if _, err := blocks.GenesisCodec.Unmarshal(blkBytes, &blkState); err != nil {
-		return nil, err
-	}
-
-	if blkState.Status != choices.Accepted {
-		s.blockCache.Put(blockID, nil)
-		return nil, database.ErrNotFound
-	}
-
-	blkState.Blk, err = blocks.Parse(blocks.GenesisCodec, blkState.Bytes)
+	blk, status, _, err := parseStoredBlock(blkBytes)
 	if err != nil {
 		return nil, err
 	}
 
-	s.blockCache.Put(blockID, blkState.Blk)
-	return blkState.Blk, nil
+	if status != choices.Accepted {
+		s.blockCache.Put(blockID, nil)
+		return nil, database.ErrNotFound
+	}
+
+	s.blockCache.Put(blockID, blk)
+	return blk, nil
 }
 
 func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error {
@@ -1829,7 +1835,9 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 				// Invariant: Only the Primary Network contains non-nil public
 				// keys.
 				if staker.PublicKey != nil {
-					// Record the public key of the validator being added.
+					// Record that the public key for the validator is being
+					// added. This means the prior value for the public key was
+					// nil.
 					err := s.flatValidatorPublicKeyDiffsDB.Put(
 						getBLSKey(height, nodeID),
 						nil,
@@ -2217,4 +2225,29 @@ func (s *state) writeMetadata() error {
 	}
 
 	return nil
+}
+
+// Returns the block, status of the block, and whether it is a [stateBlk].
+// Invariant: blkBytes is safe to parse with blocks.GenesisCodec
+//
+// TODO: Remove after v1.11.x is activated
+func parseStoredBlock(blkBytes []byte) (blocks.Block, choices.Status, bool, error) {
+	// Attempt to parse as blocks.Block
+	blk, err := blocks.Parse(blocks.GenesisCodec, blkBytes)
+	if err == nil {
+		return blk, choices.Accepted, false, nil
+	}
+
+	// Fallback to [stateBlk]
+	blkState := stateBlk{}
+	if _, err := blocks.GenesisCodec.Unmarshal(blkBytes, &blkState); err != nil {
+		return nil, choices.Processing, false, err
+	}
+
+	blkState.Blk, err = blocks.Parse(blocks.GenesisCodec, blkState.Bytes)
+	if err != nil {
+		return nil, choices.Processing, false, err
+	}
+
+	return blkState.Blk, blkState.Status, true, nil
 }
