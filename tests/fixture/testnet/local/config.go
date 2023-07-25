@@ -43,9 +43,9 @@ func LocalFlags() testnet.FlagsMap {
 
 // C-Chain config for local testing.
 func LocalCChainConfig() testnet.FlagsMap {
-	// EVM configuration is defined in the `github.com/ava-labs/coreth/evm` package
-
-	// Supply only non-default configuration to ensure that default values will be used.
+	// Supply only non-default configuration to ensure that default
+	// values will be used. Available cchain configuration options are
+	// defined in the `github.com/ava-labs/coreth/evm` package.
 	return map[string]interface{}{
 		"log-level": "debug",
 	}

@@ -161,13 +161,13 @@ func StartNetwork(
 	if err := network.Start(w); err != nil {
 		return nil, err
 	}
-	if _, err := fmt.Fprintf(w, "Waiting for all nodes to report healthy...\n"); err != nil {
+	if _, err := fmt.Fprintf(w, "Waiting for all nodes to report healthy...\n\n"); err != nil {
 		return nil, err
 	}
 	if err := network.WaitForHealth(ctx, w); err != nil {
 		return nil, err
 	}
-	if _, err := fmt.Fprintf(w, "Started network %d @ %s\n", network.Genesis.NetworkID, network.Dir); err != nil {
+	if _, err := fmt.Fprintf(w, "\nStarted network %d @ %s\n", network.Genesis.NetworkID, network.Dir); err != nil {
 		return nil, err
 	}
 	return network, nil

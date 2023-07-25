@@ -17,19 +17,27 @@ if ! [[ "$0" =~ scripts/tests.e2e.persistent.sh ]]; then
   exit 255
 fi
 
-export AVALANCHEGO_PATH="${1-${AVALANCHEGO_PATH}}"
+AVALANCHEGO_PATH="${1-${AVALANCHEGO_PATH:-}}"
 if [[ -z "${AVALANCHEGO_PATH}" ]]; then
   echo "Missing AVALANCHEGO_PATH argument!"
   echo "Usage: ${0} [AVALANCHEGO_PATH]" >>/dev/stderr
   exit 255
 fi
+# Ensure an absolute path to avoid dependency on the working directory
+# of script execution.
+export AVALANCHEGO_PATH="$(realpath ${AVALANCHEGO_PATH})"
 
 # Create a temporary directory to store persistent network
 ROOT_DIR="$(mktemp -d -t e2e-testnet.XXXXX)"
 
+# Provide visual separation between testing and setup/teardown
+function print_separator {
+  printf '%*s\n' "${COLUMNS:-80}" '' | tr ' ' ─
+}
+
 # Ensure network cleanup on teardown
 function cleanup {
-  echo "───────────────────────────────────────────────────────────────────────────────────────────────────────────────"
+  print_separator
   echo "cleaning up persistent network"
   if [[ -n "${TESTNETCTL_NETWORK_DIR:-}" ]]; then
     ./build/testnetctl stop-network
@@ -40,7 +48,7 @@ trap cleanup EXIT
 
 # Start a persistent network
 ./scripts/build_testnetctl.sh
-echo "───────────────────────────────────────────────────────────────────────────────────────────────────────────────"
+print_separator
 ./build/testnetctl start-network --root-dir="${ROOT_DIR}"
 
 # Determine the network configuration path from the latest symlink
@@ -52,5 +60,5 @@ else
   exit 255
 fi
 
-echo "───────────────────────────────────────────────────────────────────────────────────────────────────────────────"
+print_separator
 # TODO(marun) Enable e2e testing
