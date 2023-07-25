@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -209,6 +210,9 @@ func (n *LocalNode) Stop() error {
 		return fmt.Errorf("failed to find process to stop: %w", err)
 	}
 	if err := proc.Signal(syscall.Signal(0)); err != nil {
+		if strings.Contains(err.Error(), "os: process already finished") {
+			return nil
+		}
 		return fmt.Errorf("process.Signal(0) on pid %d returned: %w", pid, err)
 	}
 	if err := proc.Kill(); err != nil {
