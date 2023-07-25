@@ -224,7 +224,7 @@ type stateBlk struct {
  * | |-. flat weight diffs
  * | | '-- subnet+height+nodeID -> weightChange
  * | '-. flat pub key diffs
- * |   '-- height+nodeID -> public key or nil
+ * |   '-- subnet+height+nodeID -> public key or nil
  * |-. blocks
  * | '-- blockID -> block bytes
  * |-. txs
@@ -985,7 +985,7 @@ func (s *state) ApplyValidatorWeightDiffs(
 	subnetID ids.ID,
 ) error {
 	diffIter := s.flatValidatorWeightDiffsDB.NewIteratorWithStartAndPrefix(
-		getStartWeightKey(subnetID, startHeight),
+		getStartDiffKey(subnetID, startHeight),
 		subnetID[:],
 	)
 	defer diffIter.Release()
@@ -998,7 +998,7 @@ func (s *state) ApplyValidatorWeightDiffs(
 			return err
 		}
 
-		_, parsedHeight, nodeID, err := parseWeightKey(diffIter.Key())
+		_, parsedHeight, nodeID, err := parseDiffKey(diffIter.Key())
 		if err != nil {
 			return err
 		}
@@ -1106,7 +1106,7 @@ func (s *state) ApplyValidatorPublicKeyDiffs(
 	endHeight uint64,
 ) error {
 	diffIter := s.flatValidatorPublicKeyDiffsDB.NewIteratorWithStart(
-		getStartBLSKey(startHeight),
+		getStartDiffKey(constants.PrimaryNetworkID, startHeight),
 	)
 	defer diffIter.Release()
 
@@ -1115,7 +1115,7 @@ func (s *state) ApplyValidatorPublicKeyDiffs(
 			return err
 		}
 
-		parsedHeight, nodeID, err := parseBLSKey(diffIter.Key())
+		_, parsedHeight, nodeID, err := parseDiffKey(diffIter.Key())
 		if err != nil {
 			return err
 		}
@@ -1787,7 +1787,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 					// added. This means the prior value for the public key was
 					// nil.
 					err := s.flatValidatorPublicKeyDiffsDB.Put(
-						getBLSKey(height, nodeID),
+						getDiffKey(constants.PrimaryNetworkID, height, nodeID),
 						nil,
 					)
 					if err != nil {
@@ -1828,7 +1828,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 				if staker.PublicKey != nil {
 					// Record the public key of the validator being removed.
 					err := s.flatValidatorPublicKeyDiffsDB.Put(
-						getBLSKey(height, nodeID),
+						getDiffKey(constants.PrimaryNetworkID, height, nodeID),
 						staker.PublicKey.Serialize(),
 					)
 					if err != nil {
@@ -1865,7 +1865,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 			}
 
 			err = s.flatValidatorWeightDiffsDB.Put(
-				getWeightKey(subnetID, height, nodeID),
+				getDiffKey(subnetID, height, nodeID),
 				getWeightValue(weightDiff),
 			)
 			if err != nil {
