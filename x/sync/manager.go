@@ -282,7 +282,9 @@ func (m *Manager) getAndApplyChangeProof(ctx context.Context, work *workItem) {
 	// TODO danlaine send range proof instead of failure notification
 	if !changeProof.HadRootsInHistory {
 		work.localRootID = ids.Empty
+		m.workLock.Lock()
 		m.enqueueWork(work)
+		m.workLock.Unlock()
 		return
 	}
 
@@ -599,7 +601,9 @@ func (m *Manager) completeWorkItem(ctx context.Context, work *workItem, largestH
 			largestHandledKey = work.end
 		} else {
 			// the full range wasn't completed, so enqueue a new work item for the range [nextStartKey, workItem.end]
+			m.workLock.Lock()
 			m.enqueueWork(newWorkItem(work.localRootID, nextStartKey, work.end, work.priority))
+			m.workLock.Unlock()
 			largestHandledKey = nextStartKey
 		}
 	}
@@ -609,10 +613,16 @@ func (m *Manager) completeWorkItem(ctx context.Context, work *workItem, largestH
 		zap.Binary("start", work.start),
 		zap.Binary("end", largestHandledKey),
 	)
-	if m.getTargetRoot() == rootID {
-		m.workLock.Lock()
-		defer m.workLock.Unlock()
 
+	// update work queues (make sure to keep same locking order as [UpdateSyncTarget]
+	// or could cause a deadlock
+	m.workLock.Lock()
+	defer m.workLock.Unlock()
+
+	m.syncTargetLock.RLock()
+	defer m.syncTargetLock.RUnlock()
+
+	if m.config.TargetRoot == rootID {
 		m.processedWork.MergeInsert(newWorkItem(rootID, work.start, largestHandledKey, work.priority))
 	} else {
 		// the root has changed, so reinsert with high priority
@@ -623,11 +633,10 @@ func (m *Manager) completeWorkItem(ctx context.Context, work *workItem, largestH
 // Queue the given key range to be fetched and applied.
 // If there are sufficiently few unprocessed/processing work items,
 // splits the range into two items and queues them both.
-// Assumes [m.workLock] is not held.
+//
+// Assumes [m.workLock] is held.
 func (m *Manager) enqueueWork(work *workItem) {
-	m.workLock.Lock()
 	defer func() {
-		m.workLock.Unlock()
 		m.unprocessedWorkCond.Signal()
 	}()
 
