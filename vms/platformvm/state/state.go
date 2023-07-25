@@ -1109,8 +1109,9 @@ func (s *state) ApplyValidatorPublicKeyDiffs(
 	startHeight uint64,
 	endHeight uint64,
 ) error {
-	diffIter := s.flatValidatorPublicKeyDiffsDB.NewIteratorWithStart(
+	diffIter := s.flatValidatorPublicKeyDiffsDB.NewIteratorWithStartAndPrefix(
 		getStartDiffKey(constants.PrimaryNetworkID, startHeight),
+		constants.PrimaryNetworkID[:],
 	)
 	defer diffIter.Release()
 
