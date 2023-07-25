@@ -26,7 +26,7 @@ import (
 )
 
 // Defines a mapping of flag keys to values intended to be supplied to
-// an invocation of an Avalanche node.
+// an invocation of an AvalancheGo node.
 type FlagsMap map[string]interface{}
 
 // SetDefaults ensures the effectiveness of flag overrides by only
@@ -67,9 +67,8 @@ type NetworkConfig struct {
 	FundedKeys   []*secp256k1.PrivateKey
 }
 
-// Starting from the provided config generate any
-func (c *NetworkConfig) PopulateNetworkConfig(networkID uint32, validatorIDs []ids.NodeID) error {
-	// Create genesis if not provided
+// Ensure genesis is generated if not already present.
+func (c *NetworkConfig) EnsureGenesis(networkID uint32, validatorIDs []ids.NodeID) error {
 	if c.Genesis == nil {
 		if len(validatorIDs) == 0 {
 			return errors.New("unable to generate genesis without at least one validator id")
@@ -99,7 +98,7 @@ func (c *NetworkConfig) PopulateNetworkConfig(networkID uint32, validatorIDs []i
 }
 
 // NodeConfig defines configuration for an
-// avalanchego node.
+// AvalancheGo node.
 type NodeConfig struct {
 	NodeID ids.NodeID
 	Flags  FlagsMap
@@ -140,10 +139,8 @@ func (nc *NodeConfig) EnsureKeys() error {
 
 // Ensures a signing key is generated if not already present.
 func (nc *NodeConfig) EnsureSigningKey() error {
-	flagKey := cfg.StakingSignerKeyContentKey
-
 	// Attempt to retrieve an existing key
-	existingKey, err := nc.Flags.GetStringVal(flagKey)
+	existingKey, err := nc.Flags.GetStringVal(cfg.StakingSignerKeyContentKey)
 	if err != nil {
 		return err
 	}
@@ -157,22 +154,21 @@ func (nc *NodeConfig) EnsureSigningKey() error {
 	if err != nil {
 		return fmt.Errorf("failed to generate staking signer key: %w", err)
 	}
-	nc.Flags[flagKey] = base64.StdEncoding.EncodeToString(newKey.Serialize())
+	nc.Flags[cfg.StakingSignerKeyContentKey] = base64.StdEncoding.EncodeToString(newKey.Serialize())
 	return nil
 }
 
-// Ensures a staking keypair is generated if not already present and ensures node ID is set accordingly.
+// Ensures a staking keypair is generated if not already present and that the node ID is set.
 func (nc *NodeConfig) EnsureStakingKeypair() error {
-	flags := nc.Flags
 	keyKey := cfg.StakingTLSKeyContentKey
 	certKey := cfg.StakingCertContentKey
 
-	key, err := flags.GetStringVal(keyKey)
+	key, err := nc.Flags.GetStringVal(keyKey)
 	if err != nil {
 		return err
 	}
 
-	cert, err := flags.GetStringVal(certKey)
+	cert, err := nc.Flags.GetStringVal(certKey)
 	if err != nil {
 		return err
 	}
@@ -183,8 +179,8 @@ func (nc *NodeConfig) EnsureStakingKeypair() error {
 		if err != nil {
 			return fmt.Errorf("failed to generate staking keypair: %w", err)
 		}
-		flags[keyKey] = base64.StdEncoding.EncodeToString(tlsKeyBytes)
-		flags[certKey] = base64.StdEncoding.EncodeToString(tlsCertBytes)
+		nc.Flags[keyKey] = base64.StdEncoding.EncodeToString(tlsKeyBytes)
+		nc.Flags[certKey] = base64.StdEncoding.EncodeToString(tlsCertBytes)
 	} else if !(len(key) > 0 && len(cert) > 0) {
 		// Only one of key and cert was provided
 		return fmt.Errorf("%q and %q must be provided together or not at all", keyKey, certKey)
@@ -200,11 +196,10 @@ func (nc *NodeConfig) EnsureStakingKeypair() error {
 
 // Attempt to derive the node ID from the node configuration.
 func (nc *NodeConfig) EnsureNodeID() error {
-	flags := nc.Flags
 	keyKey := cfg.StakingTLSKeyContentKey
 	certKey := cfg.StakingCertContentKey
 
-	key, err := flags.GetStringVal(keyKey)
+	key, err := nc.Flags.GetStringVal(keyKey)
 	if err != nil {
 		return err
 	}
@@ -216,7 +211,7 @@ func (nc *NodeConfig) EnsureNodeID() error {
 		return fmt.Errorf("failed to base64 decode value for %q", keyKey)
 	}
 
-	cert, err := flags.GetStringVal(certKey)
+	cert, err := nc.Flags.GetStringVal(certKey)
 	if err != nil {
 		return err
 	}
@@ -242,7 +237,7 @@ type AddrAndBalance struct {
 	Balance *big.Int
 }
 
-// Return a genesis struct where. Note that many of the genesis fields (i.e. reward addresses)
+// Return a genesis struct where. Note that many of the genesis fields (e.g. reward addresses)
 // are randomly generated or hard-coded.
 func NewTestGenesis(
 	networkID uint32,

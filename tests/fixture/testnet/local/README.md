@@ -2,10 +2,10 @@
 
 This package implements a simple orchestrator for the avalanchego
 nodes of a local network. Configuration is stored on disk, and nodes
-run as independent processes whose process details are also written
-to disk. Using the filesystem to store configuration and process
-details allows for both the testnetctl cli tool and e2e test fixture
-to orchestrate the local networks without the use of an rpc daemon.
+run as independent processes whose process details are also written to
+disk. Using the filesystem to store configuration and process details
+allows for the `testnetctl` cli and e2e test fixture to orchestrate
+the same local networks without the use of an rpc daemon.
 
 ## Package details
 
@@ -20,9 +20,9 @@ the following non-test files:
 
 This package depends on its parent package for implementation-agnostic
 network and node configuration. Only configuration and code specific
-to orchestrating local networks belongs here to ensure that other
-orchestration implementations (e.g. for kubernetes) can reuse the
-shared configuration abstractions without complication.
+to orchestrating local networks belongs in this package to ensure that
+other orchestration implementations can reuse the shared configuration
+abstractions.
 
 ## Usage
 
@@ -44,17 +44,17 @@ Started network 1000 @ /home/me/.testnetctl/networks/1000
 Configure testnetctl to target this network by default with one of the following statements:
  - source /home/me/.testnetctl/networks/1000/network.env
  - export TESTNETCTL_NETWORK_DIR=/home/me/.testnetctl/networks/1000
- - export TESTNETCTL_NETWORK_DIR=/Users/me/.testnetctl/networks/latest
+ - export TESTNETCTL_NETWORK_DIR=/home/me/.testnetctl/networks/latest
 
 # Stop the network
 $ ./build/testnetctl stop-network --network-dir=/path/to/network
 ```
 
-Note the export of the path ending in `latest`. This is a symlink
-that is always be set to the last network created by `testnetctl
-start-network`. Setting `TESTNETCTL_NETWORK_DIR` to this symlink will
-ensure that `testnetctl` and e2e execution with
-`--use-persistent-network` will always use the most recently deployed
+Note the export of the path ending in `latest`. This is a symlink that
+set to the last network created by `testnetctl start-network`. Setting
+the `TESTNETCTL_NETWORK_DIR` env var to this symlink ensures that
+`testnetctl` commands and e2e execution with
+`--use-persistent-network` will target the most recently deployed
 local network.
 
 ### Via code
@@ -63,8 +63,8 @@ A local network can be managed in code:
 
 ```golang
 network, _ := local.StartNetwork(
-    ctx,
-    ginkgo.GinkgoWriter,
+    ctx,                                       // Context used to limit duration of waiting for network health
+    ginkgo.GinkgoWriter,                       // Writer to report progress of network start
     "",                                        // Use default root dir (~/.testnetctl)
     &local.LocalNetwork{
         LocalConfig: local.LocalConfig{
@@ -89,40 +89,40 @@ configuration and by supplying a nodeCount argument of `0`:
 
 ```golang
 network, _ := local.StartNetwork(
+    ctx,
     ginkgo.GinkgoWriter,
-    "", // Use default root dir (~/.testnetctl)
+    "",
     &local.LocalNetwork{
         LocalConfig: local.LocalConfig{
-            ExecPath: "/path/to/avalanchego",  // Default avalanchego path
+            ExecPath: "/path/to/avalanchego",
         },
-        Nodes: []*LocalNode{{
-            ExecPath: "/different/path/to/avalanchego", // Node-specific avalanchego path
-            Flags: FlagsMap{                            // Any and all node flags can be configured here
+        Nodes: []*LocalNode{{                                // node1 configuration is customized
+            Flags: FlagsMap{                                 // Any and all node flags can be configured here
                 cfg.DataDirKey: "/custom/path/to/node/data",
             },
-        },{ // node2 uses default configuration
-        },{ // node3 uses default configuration
-        },{ // node4 uses default configuration
-        },{ // node5 uses default configuration
+        },{                                                  // node2 uses default configuration
+        },{                                                  // node3 uses default configuration
+        },{                                                  // node4 uses default configuration
+        },{                                                  // node5 uses default configuration
         }},
 	},
-    uint32(0), // Network ID will be generated
-	0, // Number of nodes must be zero if explicitly setting node config
+	0,                                                       // Node count must be zero when setting node config
+    50,
 )
 ```
 
 Further examples of use code-based usage are located in the [e2e
-tests](../../../e2e/e2e.go).
+tests](../../../e2e/e2e_test.go).
 
 ## Networking configuration
 
 By default, nodes in a local network will be started with staking and
-API ports set to `0` to ensure that a port will be dynamically
-chosen. Discovering which ports are bound is possible due to
-avalanchego process writing this and other process details to
-`[base-data-dir]/process.json`. The use of dynamic ports supports
-testing with many local networks without having to manually select
-compatible port ranges.
+API ports set to `0` to ensure that ports will be dynamically
+chosen. The testnet fixture discovers the ports used by a given node
+by reading the `[base-data-dir]/process.json` file written by
+avalanchego on node start. The use of dynamic ports supports testing
+with many local networks without having to manually select compatible
+port ranges.
 
 ## Configuration on disk
 
@@ -156,9 +156,9 @@ HOME
 ### Default flags and configuration
 
 The default avalanchego node flags (e.g. `--staking-port=`) and
-default configuration like avalanchego path will be stored at
-`[network-dir]/defaults.json`. The value for a defaulted flag will be
-set on all initial and subsequently added nodes that do not supply
+default configuration like the avalanchego path are stored at
+`[network-dir]/defaults.json`. The value for a given defaulted flag
+will be set on initial and subsequently added nodes that do not supply
 values for a given defaulted flag.
 
 ### Genesis
@@ -176,25 +176,23 @@ The C-Chain config for a local network is stored at
 by all nodes in the network. The C-Chain config will be generated with
 reasonable defaults if not supplied. Each node in the network can
 override the default by setting an explicit value for
-`--chain-config-dir` and ensure the cchain C-Chain config file exists
-at `[chain-config-dir]/C/cchain_config.json`.
+`--chain-config-dir` and ensuring the cchain C-Chain config file
+exists at `[chain-config-dir]/C/cchain_config.json`.
 
 ### Network env
 
 A shell script that sets the `TESTNETCTL_NETWORK_DIR` env var to the
-path of the network is stored at
-`[network-dir]/network.env`. Sourcing this file (i.e. `source
-network.env`) in a shell will configure ginkgo e2e and the
-`testnetctl` command to implicitly target the network path specified
-in the env var.
+path of the network is stored at `[network-dir]/network.env`. Sourcing
+this file (i.e. `source network.env`) in a shell will configure ginkgo
+e2e and the `testnetctl` cli to target the network path specified in
+the env var.
 
 ### Node configuration
 
-The data dir for a node is ssetby default to `[network-path]/[node
-id]`. A node can be configured to use a non-default path by
-explicitly setting the `--data-dir` flag. Similarly, the
-`--genesis-file` and `--chain-config-dir` are set to the default
-paths for the network by default but can be overridden.
+The data dir for a node is set by default to
+`[network-path]/[node-id]`. A node can be configured to use a
+non-default path by explicitly setting the `--data-dir`
+flag.
 
 #### Flags
 
@@ -207,7 +205,7 @@ editing the config file.
 
 #### Process details
 
-The process details of a node are written by the node to
+The process details of a node are written by avalanchego to
 `[base-data-dir]/process.json`. The file contains the PID of the node
 process, the URI of the node's API, and the address other nodes can
 use to bootstrap themselves (aka staking address).

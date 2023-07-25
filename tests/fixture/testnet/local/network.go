@@ -101,16 +101,22 @@ func StartNetwork(
 	if _, err := fmt.Fprintln(w, "Preparing configuration for new local network..."); err != nil {
 		return nil, err
 	}
+
 	if len(rootDir) == 0 {
+		// Use the default root dir
 		var err error
 		rootDir, err = GetDefaultRootDir()
 		if err != nil {
 			return nil, err
 		}
 	}
+
+	// Ensure creation of the root dir
 	if err := os.MkdirAll(rootDir, perms.ReadWriteExecute); err != nil {
 		return nil, fmt.Errorf("failed to create root network dir: %w", err)
 	}
+
+	// Determine the network path and ID
 	networkDir := ""
 	networkID := uint32(0)
 	if network.Genesis != nil && network.Genesis.NetworkID > 0 {
@@ -132,10 +138,15 @@ func StartNetwork(
 			return nil, err
 		}
 	}
+
+	// Setting the network dir before populating config ensures the
+	// nodes know where to write their configuration.
+	network.Dir = networkDir
+
 	if err := network.PopulateLocalNetworkConfig(networkID, nodeCount, keyCount); err != nil {
 		return nil, err
 	}
-	network.Dir = networkDir
+
 	if err := network.WriteAll(); err != nil {
 		return nil, err
 	}
@@ -193,7 +204,9 @@ func (ln *LocalNetwork) PopulateLocalNetworkConfig(networkID uint32, nodeCount i
 		ln.Nodes = nodes
 	}
 
-	// Ensure each node has keys and an associated node ID
+	// Ensure each node has keys and an associated node ID. This
+	// ensures the availability of validator node IDs for genesis
+	// generation.
 	for _, node := range ln.Nodes {
 		if err := node.EnsureKeys(); err != nil {
 			return err
@@ -207,7 +220,7 @@ func (ln *LocalNetwork) PopulateLocalNetworkConfig(networkID uint32, nodeCount i
 	}
 
 	if keyCount > 0 {
-		// Create the specified number of keys
+		// Ensure there are keys for genesis generation to fund
 		factory := secp256k1.Factory{}
 		keys := []*secp256k1.PrivateKey{}
 		for i := 0; i < keyCount; i++ {
@@ -220,7 +233,7 @@ func (ln *LocalNetwork) PopulateLocalNetworkConfig(networkID uint32, nodeCount i
 		ln.FundedKeys = keys
 	}
 
-	if err := ln.PopulateNetworkConfig(networkID, validatorIDs); err != nil {
+	if err := ln.EnsureGenesis(networkID, validatorIDs); err != nil {
 		return err
 	}
 
@@ -228,14 +241,25 @@ func (ln *LocalNetwork) PopulateLocalNetworkConfig(networkID uint32, nodeCount i
 		ln.CChainConfig = LocalCChainConfig()
 	}
 
+	// Default flags need to be set in advance of node config
+	// population to ensure correct node configuration.
 	if ln.DefaultFlags == nil {
 		ln.DefaultFlags = LocalFlags()
+	}
+
+	for _, node := range ln.Nodes {
+		// Ensure the node is configured for use with the network and
+		// knows where to write its configuration.
+		if err := ln.PopulateNodeConfig(node); err != nil {
+			return err
+		}
 	}
 
 	return nil
 }
 
-// Ensure the provided node has the configuration it needs to start.
+// Ensure the provided node has the configuration it needs to
+// start. Requires that the network has valid genesis data.
 func (ln *LocalNetwork) PopulateNodeConfig(node *LocalNode) error {
 	flags := node.Flags
 
@@ -364,7 +388,8 @@ func (ln *LocalNetwork) WaitForHealth(ctx context.Context, w io.Writer) error {
 	return nil
 }
 
-// Retrieve API URIs for all nodes in the network.
+// Retrieve API URIs for all nodes in the network. Assumes nodes have
+// been loaded.
 func (ln *LocalNetwork) GetURIs() []string {
 	uris := []string{}
 	for _, node := range ln.Nodes {
@@ -405,6 +430,8 @@ func (ln *LocalNetwork) Stop() error {
 		}
 	}
 	if len(errs) > 0 {
+		// TODO(marun) When avalanchego updates to go 1.20, update to
+		// use the new capability to wrap multiple errors.
 		return &NetworkStopError{Errors: errs}
 	}
 	return nil
@@ -540,11 +567,6 @@ func (ln *LocalNetwork) WriteEnvFile() error {
 
 func (ln *LocalNetwork) WriteNodes() error {
 	for _, node := range ln.Nodes {
-		// Ensure the node is configured for use with the network and knows where to write its
-		// configuration.
-		if err := ln.PopulateNodeConfig(node); err != nil {
-			return err
-		}
 		if err := node.WriteConfig(); err != nil {
 			return err
 		}

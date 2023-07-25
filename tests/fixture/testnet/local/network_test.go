@@ -21,7 +21,7 @@ func TestNetworkSerialization(t *testing.T) {
 	loadedNetwork, err := ReadNetwork(tmpDir)
 	require.NoError(t, err)
 	for _, key := range loadedNetwork.FundedKeys {
-		// Address() enables comparison with the originaln etwork by
+		// Address() enables comparison with the original network by
 		// ensuring full population of a key's in-memory representation.
 		_ = key.Address()
 	}

@@ -28,6 +28,10 @@ import (
 
 // Defines local-specific node configuration. Supports setting default
 // and node-specific values.
+//
+// TODO(marun) Support persisting this configuration per-node when
+// node restart is implemented. Currently it can be supplied for node
+// start but won't survive restart.
 type LocalConfig struct {
 	// Path to avalanchego binary
 	ExecPath string
@@ -134,7 +138,7 @@ func (n *LocalNode) GetProcessContextPath() string {
 func (n *LocalNode) ReadProcessContext() error {
 	path := n.GetProcessContextPath()
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		// No process context is present (e.g. node has not started or is not running)
+		// The absence of the process context file indicates the node is not running
 		return nil
 	}
 
@@ -161,8 +165,8 @@ func (n *LocalNode) ReadAll() error {
 }
 
 func (n *LocalNode) Start(w io.Writer, defaultExecPath string) error {
-	// Ensure process context file is removed so that the creation of
-	// a new file can signal successful node start.
+	// Ensure a stale process context file is removed so that the
+	// creation of a new file can indicate node start.
 	if err := os.Remove(n.GetProcessContextPath()); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to remove stale process context file: %w", err)
 	}
@@ -241,9 +245,7 @@ func (n *LocalNode) IsHealthy(ctx context.Context) (bool, error) {
 	}
 
 	// Check that the node is reporting healthy
-	healthContext, cancel := context.WithTimeout(ctx, time.Second*5)
-	defer cancel()
-	health, err := health.NewClient(n.URI).Health(healthContext, nil)
+	health, err := health.NewClient(n.URI).Health(ctx, nil)
 	if err != nil {
 		switch t := err.(type) {
 		case *net.OpError:
