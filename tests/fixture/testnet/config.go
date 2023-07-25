@@ -242,8 +242,9 @@ type AddrAndBalance struct {
 	Balance *big.Int
 }
 
-// Return a genesis struct where. Note that many of the genesis fields (e.g. reward addresses)
-// are randomly generated or hard-coded.
+// Create a genesis struct valid for bootstrapping a test
+// network. Note that many of the genesis fields (e.g. reward
+// addresses) are randomly generated or hard-coded.
 func NewTestGenesis(
 	networkID uint32,
 	xChainBalances []AddrAndBalance,
