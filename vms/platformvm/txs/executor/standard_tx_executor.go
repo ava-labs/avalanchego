@@ -186,11 +186,16 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 	// Produce the UTXOS
 	avax.Produce(e.State, txID, tx.Outs)
 
-	e.AtomicRequests = map[ids.ID]*atomic.Requests{
-		tx.SourceChain: {
-			RemoveRequests: utxoIDs,
-		},
+	if !e.Config.ReducedModeEnabled {
+		// fill up atomic requests only if node is validating
+		// C-chain and X-chain.
+		e.AtomicRequests = map[ids.ID]*atomic.Requests{
+			tx.SourceChain: {
+				RemoveRequests: utxoIDs,
+			},
+		}
 	}
+
 	return nil
 }
 
@@ -229,6 +234,12 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 	avax.Consume(e.State, tx.Ins)
 	// Produce the UTXOS
 	avax.Produce(e.State, txID, tx.Outs)
+
+	if e.Config.ReducedModeEnabled {
+		// node is not validating C-chain and X-chain hence
+		// it'll skip filling up atomic requests
+		return nil
+	}
 
 	elems := make([]*atomic.Element, len(tx.ExportedOutputs))
 	for i, out := range tx.ExportedOutputs {
