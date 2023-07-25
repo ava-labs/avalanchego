@@ -609,7 +609,7 @@ func (m *Manager) completeWorkItem(ctx context.Context, work *workItem, largestH
 	}
 
 	// update work queues (make sure to keep same locking order as [UpdateSyncTarget]
-	// or could cause a deadlock
+	// or could cause a deadlock)
 	m.workLock.Lock()
 	m.syncTargetLock.RLock()
 	var stale bool
