@@ -99,7 +99,7 @@ func fromBuf(vm *goja.Runtime, bufType goja.Value, buf goja.Value, allowString b
 		b := obj.Get("buffer").Export().(goja.ArrayBuffer).Bytes()
 		return b, nil
 	}
-	return nil, fmt.Errorf("invalid buffer type")
+	return nil, errors.New("invalid buffer type")
 }
 
 // jsTracer is an implementation of the Tracer interface which evaluates
@@ -245,7 +245,7 @@ func (t *jsTracer) CaptureStart(env *vm.EVM, from common.Address, to common.Addr
 	t.ctx["from"] = t.vm.ToValue(from.Bytes())
 	t.ctx["to"] = t.vm.ToValue(to.Bytes())
 	t.ctx["input"] = t.vm.ToValue(input)
-	t.ctx["gas"] = t.vm.ToValue(gas)
+	t.ctx["gas"] = t.vm.ToValue(t.gasLimit)
 	t.ctx["gasPrice"] = t.vm.ToValue(env.TxContext.GasPrice)
 	valueBig, err := t.toBig(t.vm, value.String())
 	if err != nil {

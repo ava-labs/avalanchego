@@ -246,7 +246,7 @@ func (g *Genesis) ToBlock() *types.Block {
 
 // TODO: migrate this function to "flush" for more similarity with upstream.
 func (g *Genesis) toBlock(db ethdb.Database, triedb *trie.Database) *types.Block {
-	statedb, err := state.New(common.Hash{}, state.NewDatabaseWithNodeDB(db, triedb), nil)
+	statedb, err := state.New(types.EmptyRootHash, state.NewDatabaseWithNodeDB(db, triedb), nil)
 	if err != nil {
 		panic(err)
 	}

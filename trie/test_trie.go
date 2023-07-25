@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/coreth/accounts/keystore"
 	"github.com/ava-labs/coreth/core/types"
+	"github.com/ava-labs/coreth/trie/trienode"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -33,7 +34,7 @@ func GenerateTrie(t *testing.T, trieDB *Database, numKeys int, keySize int) (com
 
 	// Commit the root to [trieDB]
 	root, nodes := testTrie.Commit(false)
-	err := trieDB.Update(NewWithNodeSet(nodes))
+	err := trieDB.Update(root, types.EmptyRootHash, trienode.NewWithNodeSet(nodes))
 	assert.NoError(t, err)
 	err = trieDB.Commit(root, false)
 	assert.NoError(t, err)
@@ -59,9 +60,7 @@ func FillTrie(t *testing.T, numKeys int, keySize int, testTrie *Trie) ([][]byte,
 		_, err = rand.Read(value)
 		assert.NoError(t, err)
 
-		if err = testTrie.TryUpdate(key, value); err != nil {
-			t.Fatal("error updating trie", err)
-		}
+		testTrie.MustUpdate(key, value)
 
 		keys = append(keys, key)
 		values = append(values, value)
@@ -169,14 +168,12 @@ func FillAccounts(
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err = tr.TryUpdate(key.Address[:], accBytes); err != nil {
-			t.Fatalf("error updating trie with account, address=%s, err=%v", key.Address, err)
-		}
+		tr.MustUpdate(key.Address[:], accBytes)
 		accounts[key] = &acc
 	}
 
 	newRoot, nodes := tr.Commit(false)
-	if err := trieDB.Update(NewWithNodeSet(nodes)); err != nil {
+	if err := trieDB.Update(newRoot, root, trienode.NewWithNodeSet(nodes)); err != nil {
 		t.Fatalf("error updating trieDB: %v", err)
 	}
 	if err := trieDB.Commit(newRoot, false); err != nil {

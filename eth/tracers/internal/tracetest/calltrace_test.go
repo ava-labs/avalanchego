@@ -153,7 +153,7 @@ func testCallTracer(tracerName string, dirPath string, t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to create call tracer: %v", err)
 			}
-			evm := vm.NewEVM(context, txContext, statedb, test.Genesis.Config, vm.Config{Debug: true, Tracer: tracer})
+			evm := vm.NewEVM(context, txContext, statedb, test.Genesis.Config, vm.Config{Tracer: tracer})
 			msg, err := core.TransactionToMessage(tx, signer, nil)
 			if err != nil {
 				t.Fatalf("failed to prepare transaction for tracing: %v", err)
@@ -256,7 +256,7 @@ func benchTracer(tracerName string, test *callTracerTest, b *testing.B) {
 		if err != nil {
 			b.Fatalf("failed to create call tracer: %v", err)
 		}
-		evm := vm.NewEVM(context, txContext, statedb, test.Genesis.Config, vm.Config{Debug: true, Tracer: tracer})
+		evm := vm.NewEVM(context, txContext, statedb, test.Genesis.Config, vm.Config{Tracer: tracer})
 		snap := statedb.Snapshot()
 		st := core.NewStateTransition(evm, msg, new(core.GasPool).AddGas(tx.Gas()))
 		if _, err = st.TransitionDb(); err != nil {
@@ -285,7 +285,6 @@ func TestInternals(t *testing.T) {
 			Time:        5,
 			Difficulty:  big.NewInt(0x30000),
 			GasLimit:    uint64(6000000),
-			BaseFee:     common.Big0,
 		}
 	)
 	mkTracer := func(name string, cfg json.RawMessage) tracers.Tracer {
@@ -313,13 +312,13 @@ func TestInternals(t *testing.T) {
 				byte(vm.CALL),
 			},
 			tracer: mkTracer("callTracer", nil),
-			want:   `{"from":"0x000000000000000000000000000000000000feed","gas":"0x7148","gasUsed":"0x54d8","to":"0x00000000000000000000000000000000deadbeef","input":"0x","calls":[{"from":"0x00000000000000000000000000000000deadbeef","gas":"0x6cbf","gasUsed":"0x0","to":"0x00000000000000000000000000000000000000ff","input":"0x","value":"0x0","type":"CALL"}],"value":"0x0","type":"CALL"}`,
+			want:   `{"from":"0x000000000000000000000000000000000000feed","gas":"0xc350","gasUsed":"0x54d8","to":"0x00000000000000000000000000000000deadbeef","input":"0x","calls":[{"from":"0x00000000000000000000000000000000deadbeef","gas":"0x6cbf","gasUsed":"0x0","to":"0x00000000000000000000000000000000000000ff","input":"0x","value":"0x0","type":"CALL"}],"value":"0x0","type":"CALL"}`,
 		},
 		{
 			name:   "Stack depletion in LOG0",
 			code:   []byte{byte(vm.LOG3)},
 			tracer: mkTracer("callTracer", json.RawMessage(`{ "withLog": true }`)),
-			want:   `{"from":"0x000000000000000000000000000000000000feed","gas":"0x7148","gasUsed":"0xc350","to":"0x00000000000000000000000000000000deadbeef","input":"0x","error":"stack underflow (0 \u003c=\u003e 5)","value":"0x0","type":"CALL"}`,
+			want:   `{"from":"0x000000000000000000000000000000000000feed","gas":"0xc350","gasUsed":"0xc350","to":"0x00000000000000000000000000000000deadbeef","input":"0x","error":"stack underflow (0 \u003c=\u003e 5)","value":"0x0","type":"CALL"}`,
 		},
 		{
 			name: "Mem expansion in LOG0",
@@ -332,7 +331,7 @@ func TestInternals(t *testing.T) {
 				byte(vm.LOG0),
 			},
 			tracer: mkTracer("callTracer", json.RawMessage(`{ "withLog": true }`)),
-			want:   `{"from":"0x000000000000000000000000000000000000feed","gas":"0x7148","gasUsed":"0x5b9e","to":"0x00000000000000000000000000000000deadbeef","input":"0x","logs":[{"address":"0x00000000000000000000000000000000deadbeef","topics":[],"data":"0x000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"}],"value":"0x0","type":"CALL"}`,
+			want:   `{"from":"0x000000000000000000000000000000000000feed","gas":"0xc350","gasUsed":"0x5b9e","to":"0x00000000000000000000000000000000deadbeef","input":"0x","logs":[{"address":"0x00000000000000000000000000000000deadbeef","topics":[],"data":"0x000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"}],"value":"0x0","type":"CALL"}`,
 		},
 		{
 			// Leads to OOM on the prestate tracer
@@ -363,7 +362,7 @@ func TestInternals(t *testing.T) {
 					Balance: big.NewInt(500000000000000),
 				},
 			}, false)
-		evm := vm.NewEVM(context, txContext, statedb, params.TestLaunchConfig, vm.Config{Debug: true, Tracer: tc.tracer})
+		evm := vm.NewEVM(context, txContext, statedb, params.AvalancheMainnetChainConfig, vm.Config{Tracer: tc.tracer})
 		msg := &core.Message{
 			To:                &to,
 			From:              origin,

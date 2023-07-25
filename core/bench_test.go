@@ -89,7 +89,8 @@ func genValueTx(nbytes int) func(int, *BlockGen) {
 		toaddr := common.Address{}
 		data := make([]byte, nbytes)
 		gas, _ := IntrinsicGas(data, nil, false, false, false, false)
-		tx, _ := types.SignTx(types.NewTransaction(gen.TxNonce(benchRootAddr), toaddr, big.NewInt(1), gas, big.NewInt(225000000000), data), types.HomesteadSigner{}, benchRootKey)
+		signer := types.MakeSigner(gen.config, big.NewInt(int64(i)), gen.header.Time)
+		tx, _ := types.SignTx(types.NewTransaction(gen.TxNonce(benchRootAddr), toaddr, big.NewInt(1), gas, big.NewInt(225000000000), data), signer, benchRootKey)
 		gen.AddTx(tx)
 	}
 }
@@ -118,6 +119,7 @@ func genTxRing(naccounts int) func(int, *BlockGen) {
 	return func(i int, gen *BlockGen) {
 		block := gen.PrevBlock(i - 1)
 		gas := block.GasLimit()
+		signer := types.MakeSigner(gen.config, big.NewInt(int64(i)), gen.header.Time)
 		for {
 			gas -= params.TxGas
 			if gas < params.TxGas {
@@ -132,7 +134,7 @@ func genTxRing(naccounts int) func(int, *BlockGen) {
 				big.NewInt(225000000000),
 				nil,
 			)
-			tx, _ = types.SignTx(tx, types.HomesteadSigner{}, ringKeys[from])
+			tx, _ = types.SignTx(tx, signer, ringKeys[from])
 			gen.AddTx(tx)
 			from = to
 		}
@@ -282,7 +284,7 @@ func benchReadChain(b *testing.B, full bool, count uint64) {
 			if full {
 				hash := header.Hash()
 				rawdb.ReadBody(db, hash, n)
-				rawdb.ReadReceipts(db, hash, n, chain.Config())
+				rawdb.ReadReceipts(db, hash, n, header.Time, chain.Config())
 			}
 		}
 		chain.Stop()

@@ -51,7 +51,7 @@ type Config struct {
 	// is created by New and destroyed when the node is stopped.
 	KeyStoreDir string `toml:",omitempty"`
 
-	// ExternalSigner specifies an external URI for a clef-type signer
+	// ExternalSigner specifies an external URI for a clef-type signer.
 	ExternalSigner string `toml:",omitempty"`
 
 	// UseLightweightKDF lowers the memory and CPU requirements of the key store
@@ -187,10 +187,10 @@ func (c *Config) KeyDirConfig() (string, error) {
 	return keydir, err
 }
 
-// getKeyStoreDir retrieves the key directory and will create
+// GetKeyStoreDir retrieves the key directory and will create
 // and ephemeral one if necessary.
-func getKeyStoreDir(conf *Config) (string, bool, error) {
-	keydir, err := conf.KeyDirConfig()
+func (c *Config) GetKeyStoreDir() (string, bool, error) {
+	keydir, err := c.KeyDirConfig()
 	if err != nil {
 		return "", false, err
 	}
@@ -219,7 +219,7 @@ func makeAccountManager(conf *Config) (*accounts.Manager, error) {
 		scryptP = keystore.LightScryptP
 	}
 
-	keydir, _, err := getKeyStoreDir(conf)
+	keydir, _, err := conf.GetKeyStoreDir()
 	if err != nil {
 		return nil, err
 	}

@@ -96,7 +96,7 @@ func (api *AdminAPI) ExportChain(file string, first *uint64, last *uint64) (bool
 		return false, errors.New("location would overwrite an existing file")
 	}
 	// Make sure we can create the file to export into
-	out, err := os.OpenFile(file, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, os.ModePerm)
+	out, err := os.OpenFile(file, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
 		return false, err
 	}
@@ -435,7 +435,7 @@ func (api *DebugAPI) GetAccessibleState(from, to rpc.BlockNumber) (uint64, error
 		if num.Int64() < 0 {
 			block := api.eth.blockchain.CurrentBlock()
 			if block == nil {
-				return 0, fmt.Errorf("current block missing")
+				return 0, errors.New("current block missing")
 			}
 			return block.Number.Uint64(), nil
 		}
@@ -455,7 +455,7 @@ func (api *DebugAPI) GetAccessibleState(from, to rpc.BlockNumber) (uint64, error
 		return 0, err
 	}
 	if start == end {
-		return 0, fmt.Errorf("from and to needs to be different")
+		return 0, errors.New("from and to needs to be different")
 	}
 	if start > end {
 		delta = -1
