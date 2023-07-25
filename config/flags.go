@@ -50,6 +50,7 @@ var (
 	defaultSubnetConfigDir      = filepath.Join(defaultConfigDir, "subnets")
 	defaultPluginDir            = filepath.Join(defaultUnexpandedDataDir, "plugins")
 	defaultChainDataDir         = filepath.Join(defaultUnexpandedDataDir, "chainData")
+	defaultProcessContextPath   = filepath.Join(defaultUnexpandedDataDir, "process.json")
 )
 
 func deprecateFlags(fs *pflag.FlagSet) error {
@@ -368,7 +369,8 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.Bool(TracingInsecureKey, true, "If true, don't use TLS when sending trace data")
 	fs.Float64(TracingSampleRateKey, 0.1, "The fraction of traces to sample. If >= 1, always sample. If <= 0, never sample")
 	fs.StringToString(TracingHeadersKey, map[string]string{}, "The headers to provide the trace indexer")
-	// TODO add flag to take in headers to send from exporter
+
+	fs.String(ProcessContextFileKey, defaultProcessContextPath, "The path to write process context to (including PID, API URI, and staking address).")
 }
 
 // BuildFlagSet returns a complete set of flags for avalanchego
