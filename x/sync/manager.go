@@ -282,9 +282,7 @@ func (m *Manager) getAndApplyChangeProof(ctx context.Context, work *workItem) {
 	// TODO danlaine send range proof instead of failure notification
 	if !changeProof.HadRootsInHistory {
 		work.localRootID = ids.Empty
-		m.workLock.Lock()
 		m.enqueueWork(work)
-		m.workLock.Unlock()
 		return
 	}
 
@@ -528,6 +526,9 @@ func (m *Manager) Wait(ctx context.Context) error {
 }
 
 func (m *Manager) UpdateSyncTarget(syncTargetRoot ids.ID) error {
+	m.syncTargetLock.Lock()
+	defer m.syncTargetLock.Unlock()
+
 	m.workLock.Lock()
 	defer m.workLock.Unlock()
 
@@ -536,9 +537,6 @@ func (m *Manager) UpdateSyncTarget(syncTargetRoot ids.ID) error {
 		return ErrAlreadyClosed
 	default:
 	}
-
-	m.syncTargetLock.Lock()
-	defer m.syncTargetLock.Unlock()
 
 	if m.config.TargetRoot == syncTargetRoot {
 		// the target hasn't changed, so there is nothing to do
@@ -601,27 +599,25 @@ func (m *Manager) completeWorkItem(ctx context.Context, work *workItem, largestH
 			largestHandledKey = work.end
 		} else {
 			// the full range wasn't completed, so enqueue a new work item for the range [nextStartKey, workItem.end]
-			m.workLock.Lock()
 			m.enqueueWork(newWorkItem(work.localRootID, nextStartKey, work.end, work.priority))
-			m.workLock.Unlock()
 			largestHandledKey = nextStartKey
 		}
 	}
 
-	// update work queues (make sure to keep same locking order as [UpdateSyncTarget]
-	// or could cause a deadlock)
-	m.workLock.Lock()
+	// Process [work] while holding [syncTargetLock] to ensure that object
+	// is added to the right queue, even if a target update is triggered
 	m.syncTargetLock.RLock()
 	var stale bool
 	if m.config.TargetRoot == rootID {
+		m.workLock.Lock()
 		m.processedWork.MergeInsert(newWorkItem(rootID, work.start, largestHandledKey, work.priority))
+		m.workLock.Unlock()
 	} else {
 		// the root has changed, so reinsert with high priority
 		m.enqueueWork(newWorkItem(rootID, work.start, largestHandledKey, highPriority))
 		stale = true
 	}
 	m.syncTargetLock.RUnlock()
-	m.workLock.Unlock()
 
 	// completed the range [work.start, lastKey], log and record in the completed work heap
 	m.config.Log.Info("completed range",
@@ -635,10 +631,11 @@ func (m *Manager) completeWorkItem(ctx context.Context, work *workItem, largestH
 // Queue the given key range to be fetched and applied.
 // If there are sufficiently few unprocessed/processing work items,
 // splits the range into two items and queues them both.
-//
-// Assumes [m.workLock] is held.
+// Assumes [m.workLock] is not held.
 func (m *Manager) enqueueWork(work *workItem) {
+	m.workLock.Lock()
 	defer func() {
+		m.workLock.Unlock()
 		m.unprocessedWorkCond.Signal()
 	}()
 
