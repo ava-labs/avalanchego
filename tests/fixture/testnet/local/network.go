@@ -27,6 +27,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
+// This interval was chosen to avoid spamming node APIs during
+// startup, as smaller intervals (e.g. 50ms) seemed to noticeably
+// increase the time for a network's nodes to be seen as healthy.
+const networkHealthCheckInterval = 200 * time.Millisecond
+
 // Default root dir for storing networks and their configuration.
 func GetDefaultRootDir() (string, error) {
 	homeDir, err := os.UserHomeDir()
@@ -54,7 +59,7 @@ func FindNextNetworkID(rootDir string) (uint32, string, error) {
 				}
 				continue
 			} else if err != nil {
-				return 0, "", err
+				return 0, "", fmt.Errorf("failed to create network directory: %w", err)
 			}
 		}
 		break
@@ -172,7 +177,7 @@ func StartNetwork(
 func ReadNetwork(dir string) (*LocalNetwork, error) {
 	network := &LocalNetwork{Dir: dir}
 	if err := network.ReadAll(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read local network: %w", err)
 	}
 	return network, nil
 }
@@ -189,10 +194,10 @@ func StopNetwork(dir string) error {
 // Ensure the network has the configuration it needs to start.
 func (ln *LocalNetwork) PopulateLocalNetworkConfig(networkID uint32, nodeCount int, keyCount int) error {
 	if len(ln.Nodes) > 0 && nodeCount > 0 {
-		return errors.New("non-zero node count is only valid for a network without nodes")
+		return errors.New("failed to populate local network config: non-zero node count is only valid for a network without nodes")
 	}
 	if len(ln.FundedKeys) > 0 && keyCount > 0 {
-		return errors.New("non-zero key count is only valid for a network without keys")
+		return errors.New("failed to populate local network config: non-zero key count is only valid for a network without keys")
 	}
 
 	if nodeCount > 0 {
@@ -370,9 +375,11 @@ func (ln *LocalNetwork) WaitForHealth(ctx context.Context, w io.Writer) error {
 				if healthyNodes.Contains(node.NodeID) {
 					continue
 				}
-				if healthy, err := node.IsHealthy(ctx); err != nil {
+				healthy, err := node.IsHealthy(ctx)
+				if err != nil {
 					return err
-				} else if healthy {
+				}
+				if healthy {
 					healthyNodes.Add(node.NodeID)
 					if _, err := fmt.Fprintf(w, "%s is healthy @ %s\n", node.NodeID, node.URI); err != nil {
 						return err
@@ -383,7 +390,7 @@ func (ln *LocalNetwork) WaitForHealth(ctx context.Context, w io.Writer) error {
 		if len(healthyNodes) == len(ln.Nodes) {
 			break
 		}
-		time.Sleep(time.Millisecond * 200)
+		time.Sleep(networkHealthCheckInterval)
 	}
 	return nil
 }
@@ -577,7 +584,7 @@ func (ln *LocalNetwork) WriteNodes() error {
 // Write network configuration to disk.
 func (ln *LocalNetwork) WriteAll() error {
 	if len(ln.Dir) == 0 {
-		return errors.New("unable to write local network without network directory")
+		return errors.New("failed to write local network: invalid network directory")
 	}
 	if err := ln.WriteGenesis(); err != nil {
 		return err

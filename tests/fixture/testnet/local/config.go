@@ -4,6 +4,8 @@
 package local
 
 import (
+	"time"
+
 	cfg "github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/tests/fixture/testnet"
 )
@@ -11,9 +13,14 @@ import (
 const (
 	// Constants defining the names of shell variables whose value can
 	// configure local network orchestration.
-	AvalancheGoEnvName = "AVALANCHEGO_PATH"
-	NetworkDirEnvName  = "TESTNETCTL_NETWORK_DIR"
-	RootDirEnvName     = "TESTNETCTL_ROOT_DIR"
+	AvalancheGoPathEnvName = "AVALANCHEGO_PATH"
+	NetworkDirEnvName      = "TESTNETCTL_NETWORK_DIR"
+	RootDirEnvName         = "TESTNETCTL_ROOT_DIR"
+
+	DefaultNetworkStartTimeout = 2 * time.Minute
+
+	// The default initial static port should differ from the ANR default of 9650.
+	DefaultInitialStaticPort = 9850
 )
 
 // A set of flags appropriate for local testing.

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+
 set -e
 set -o nounset
 set -o pipefail
@@ -47,7 +48,7 @@ LATEST_SYMLINK_PATH="${ROOT_DIR}/latest"
 if [[ -h "${LATEST_SYMLINK_PATH}" ]]; then
   export TESTNETCTL_NETWORK_DIR="$(realpath ${LATEST_SYMLINK_PATH})"
 else
-  echo "${LATEST_SYMLINK_PATH} symlink not found"
+  echo "failed to find configuration path: ${LATEST_SYMLINK_PATH} symlink not found"
   exit 255
 fi
 

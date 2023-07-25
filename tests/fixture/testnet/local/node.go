@@ -66,7 +66,7 @@ func NewLocalNode(dataDir string) *LocalNode {
 func ReadNode(dataDir string) (*LocalNode, error) {
 	node := NewLocalNode(dataDir)
 	if _, err := os.Stat(node.GetConfigPath()); err != nil {
-		return nil, fmt.Errorf("unexpected error checking for local node config file: %w", err)
+		return nil, fmt.Errorf("failed to read local node config file: %w", err)
 	}
 	if err := node.ReadAll(); err != nil {
 		return nil, err
@@ -221,7 +221,7 @@ func (n *LocalNode) IsHealthy(ctx context.Context) (bool, error) {
 	// Ensure the API URI is available
 	if len(n.URI) == 0 {
 		if err := n.ReadProcessContext(); err != nil {
-			return false, fmt.Errorf("failed to read process context: %v", err)
+			return false, fmt.Errorf("failed to read process context: %w", err)
 		}
 		if len(n.URI) == 0 {
 			return false, nil

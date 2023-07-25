@@ -25,6 +25,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
+const (
+	DefaultNodeCount      = 5
+	DefaultFundedKeyCount = 50
+)
+
 // Defines a mapping of flag keys to values intended to be supplied to
 // an invocation of an AvalancheGo node.
 type FlagsMap map[string]interface{}
@@ -71,10 +76,10 @@ type NetworkConfig struct {
 func (c *NetworkConfig) EnsureGenesis(networkID uint32, validatorIDs []ids.NodeID) error {
 	if c.Genesis == nil {
 		if len(validatorIDs) == 0 {
-			return errors.New("unable to generate genesis without at least one validator id")
+			return errors.New("failed to generate genesis: empty validator IDs")
 		}
 		if len(c.FundedKeys) == 0 {
-			return errors.New("unable to generate genesis without at least one key to fund")
+			return errors.New("failed to generate genesis: no keys to fund")
 		}
 
 		// Fund the provided keys
@@ -130,15 +135,15 @@ func (nc *NodeConfig) SetNetworkingConfig(
 
 // Ensures staking and signing keys are generated if not already present.
 func (nc *NodeConfig) EnsureKeys() error {
-	err := nc.EnsureSigningKey()
+	err := nc.EnsureBLSSigningKey()
 	if err != nil {
 		return err
 	}
 	return nc.EnsureStakingKeypair()
 }
 
-// Ensures a signing key is generated if not already present.
-func (nc *NodeConfig) EnsureSigningKey() error {
+// Ensures a BLS signing key is generated if not already present.
+func (nc *NodeConfig) EnsureBLSSigningKey() error {
 	// Attempt to retrieve an existing key
 	existingKey, err := nc.Flags.GetStringVal(cfg.StakingSignerKeyContentKey)
 	if err != nil {
@@ -270,8 +275,11 @@ func NewTestGenesis(
 	// TODO(marun) Why is this amount significant?
 	totalStake := uint64(len(validatorIDs)) * units.MegaAvax
 
-	// TODO(marun) How should the eth address be determined?
-	ethAddress := "0xb3d82b1367d362de99ab59a658165aff520cbd4d"
+	// The eth address is only needed to link pre-mainnet assets. Until that capability
+	// becomes necessary for testing, use a bogus address.
+	//
+	// Reference: https://github.com/ava-labs/avalanchego/issues/1365#issuecomment-1511508767
+	ethAddress := "0x0000000000000000000000000000000000000000"
 
 	config := &genesis.UnparsedConfig{
 		NetworkID: networkID,

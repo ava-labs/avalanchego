@@ -8,10 +8,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/spf13/cobra"
 
+	"github.com/ava-labs/avalanchego/tests/fixture/testnet"
 	"github.com/ava-labs/avalanchego/tests/fixture/testnet/local"
 )
 
@@ -26,7 +26,8 @@ func main() {
 	rootCmd.PersistentFlags().StringVar(&rootDir, "root-dir", os.Getenv(local.RootDirEnvName), "The path to the root directory for local networks")
 
 	var execPath string
-	var nodeCount uint16
+	var nodeCount uint8
+	var fundedKeyCount uint8
 	var useStaticPorts bool
 	var initialStaticPort uint16
 	startNetworkCmd := &cobra.Command{
@@ -34,7 +35,7 @@ func main() {
 		Short: "Start a new local network",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(execPath) == 0 {
-				return fmt.Errorf("--avalanchego-path or %s are required", local.AvalancheGoEnvName)
+				return fmt.Errorf("--avalanchego-path or %s are required", local.AvalancheGoPathEnvName)
 			}
 
 			// Root dir will be defaulted on start if not provided
@@ -46,9 +47,9 @@ func main() {
 					InitialStaticPort: initialStaticPort,
 				},
 			}
-			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+			ctx, cancel := context.WithTimeout(context.Background(), local.DefaultNetworkStartTimeout)
 			defer cancel()
-			network, err := local.StartNetwork(ctx, os.Stdout, rootDir, network, 5, 50)
+			network, err := local.StartNetwork(ctx, os.Stdout, rootDir, network, int(nodeCount), int(fundedKeyCount))
 			if err != nil {
 				return err
 			}
@@ -72,11 +73,11 @@ func main() {
 			return nil
 		},
 	}
-	startNetworkCmd.PersistentFlags().StringVar(&execPath, "avalanchego-path", os.Getenv(local.AvalancheGoEnvName), "The path to an avalanchego binary")
-	startNetworkCmd.PersistentFlags().Uint16Var(&nodeCount, "node-count", 5, "Number of nodes the network should initially consist of")
+	startNetworkCmd.PersistentFlags().StringVar(&execPath, "avalanchego-path", os.Getenv(local.AvalancheGoPathEnvName), "The path to an avalanchego binary")
+	startNetworkCmd.PersistentFlags().Uint8Var(&nodeCount, "node-count", testnet.DefaultNodeCount, "Number of nodes the network should initially consist of")
+	startNetworkCmd.PersistentFlags().Uint8Var(&fundedKeyCount, "funded-key-count", testnet.DefaultFundedKeyCount, "Number of funded keys the network should start with")
 	startNetworkCmd.PersistentFlags().BoolVar(&useStaticPorts, "use-static-ports", false, "Whether to attempt to configure nodes with static ports. A network will start faster using statically assigned ports but start will fail if the ports chosen are already bound.")
-	// The default initial static port should differ from the ANR default of 9650.
-	startNetworkCmd.PersistentFlags().Uint16Var(&initialStaticPort, "initial-static-port", 9850, "The initial port number from which API and staking ports will be statically determined.")
+	startNetworkCmd.PersistentFlags().Uint16Var(&initialStaticPort, "initial-static-port", local.DefaultInitialStaticPort, "The initial port number from which API and staking ports will be statically determined.")
 
 	rootCmd.AddCommand(startNetworkCmd)
 
@@ -97,7 +98,7 @@ func main() {
 	rootCmd.AddCommand(stopNetworkCmd)
 
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintf(os.Stderr, "testnetctl failed %v\n", err)
+		fmt.Fprintf(os.Stderr, "testnetctl failed: %v\n", err)
 		os.Exit(1)
 	}
 	os.Exit(0)
