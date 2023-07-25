@@ -335,6 +335,9 @@ type state struct {
 
 // heightRange is used to track which heights are safe to use the native DB
 // iterator for querying validator diffs.
+//
+// TODO: Remove once we are guaranteed nodes can not rollback to not support the
+// new indexing mechanism.
 type heightRange struct {
 	LowerBound uint64 `serialize:"true"`
 	UpperBound uint64 `serialize:"true"`
