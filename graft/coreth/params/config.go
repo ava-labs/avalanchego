@@ -57,7 +57,6 @@ var (
 		DAOForkBlock:                    big.NewInt(0),
 		DAOForkSupport:                  true,
 		EIP150Block:                     big.NewInt(0),
-		EIP150Hash:                      common.HexToHash("0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0"),
 		EIP155Block:                     big.NewInt(0),
 		EIP158Block:                     big.NewInt(0),
 		ByzantiumBlock:                  big.NewInt(0),
@@ -85,7 +84,6 @@ var (
 		DAOForkBlock:                    big.NewInt(0),
 		DAOForkSupport:                  true,
 		EIP150Block:                     big.NewInt(0),
-		EIP150Hash:                      common.HexToHash("0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0"),
 		EIP155Block:                     big.NewInt(0),
 		EIP158Block:                     big.NewInt(0),
 		ByzantiumBlock:                  big.NewInt(0),
@@ -113,7 +111,6 @@ var (
 		DAOForkBlock:                    big.NewInt(0),
 		DAOForkSupport:                  true,
 		EIP150Block:                     big.NewInt(0),
-		EIP150Hash:                      common.HexToHash("0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0"),
 		EIP155Block:                     big.NewInt(0),
 		EIP158Block:                     big.NewInt(0),
 		ByzantiumBlock:                  big.NewInt(0),
@@ -141,7 +138,6 @@ var (
 		DAOForkBlock:                    nil,
 		DAOForkSupport:                  false,
 		EIP150Block:                     big.NewInt(0),
-		EIP150Hash:                      common.Hash{},
 		EIP155Block:                     big.NewInt(0),
 		EIP158Block:                     big.NewInt(0),
 		ByzantiumBlock:                  big.NewInt(0),
@@ -169,7 +165,6 @@ var (
 		DAOForkBlock:                    nil,
 		DAOForkSupport:                  false,
 		EIP150Block:                     big.NewInt(0),
-		EIP150Hash:                      common.Hash{},
 		EIP155Block:                     big.NewInt(0),
 		EIP158Block:                     big.NewInt(0),
 		ByzantiumBlock:                  big.NewInt(0),
@@ -197,7 +192,6 @@ var (
 		DAOForkBlock:                    nil,
 		DAOForkSupport:                  false,
 		EIP150Block:                     big.NewInt(0),
-		EIP150Hash:                      common.Hash{},
 		EIP155Block:                     big.NewInt(0),
 		EIP158Block:                     big.NewInt(0),
 		ByzantiumBlock:                  big.NewInt(0),
@@ -225,7 +219,6 @@ var (
 		DAOForkBlock:                    nil,
 		DAOForkSupport:                  false,
 		EIP150Block:                     big.NewInt(0),
-		EIP150Hash:                      common.Hash{},
 		EIP155Block:                     big.NewInt(0),
 		EIP158Block:                     big.NewInt(0),
 		ByzantiumBlock:                  big.NewInt(0),
@@ -253,7 +246,6 @@ var (
 		DAOForkBlock:                    nil,
 		DAOForkSupport:                  false,
 		EIP150Block:                     big.NewInt(0),
-		EIP150Hash:                      common.Hash{},
 		EIP155Block:                     big.NewInt(0),
 		EIP158Block:                     big.NewInt(0),
 		ByzantiumBlock:                  big.NewInt(0),
@@ -281,7 +273,6 @@ var (
 		DAOForkBlock:                    nil,
 		DAOForkSupport:                  false,
 		EIP150Block:                     big.NewInt(0),
-		EIP150Hash:                      common.Hash{},
 		EIP155Block:                     big.NewInt(0),
 		EIP158Block:                     big.NewInt(0),
 		ByzantiumBlock:                  big.NewInt(0),
@@ -309,7 +300,6 @@ var (
 		DAOForkBlock:                    nil,
 		DAOForkSupport:                  false,
 		EIP150Block:                     big.NewInt(0),
-		EIP150Hash:                      common.Hash{},
 		EIP155Block:                     big.NewInt(0),
 		EIP158Block:                     big.NewInt(0),
 		ByzantiumBlock:                  big.NewInt(0),
@@ -337,7 +327,6 @@ var (
 		DAOForkBlock:                    nil,
 		DAOForkSupport:                  false,
 		EIP150Block:                     big.NewInt(0),
-		EIP150Hash:                      common.Hash{},
 		EIP155Block:                     big.NewInt(0),
 		EIP158Block:                     big.NewInt(0),
 		ByzantiumBlock:                  big.NewInt(0),
@@ -365,7 +354,6 @@ var (
 		DAOForkBlock:                    nil,
 		DAOForkSupport:                  false,
 		EIP150Block:                     big.NewInt(0),
-		EIP150Hash:                      common.Hash{},
 		EIP155Block:                     big.NewInt(0),
 		EIP158Block:                     big.NewInt(0),
 		ByzantiumBlock:                  big.NewInt(0),
@@ -393,7 +381,6 @@ var (
 		DAOForkBlock:                    nil,
 		DAOForkSupport:                  false,
 		EIP150Block:                     big.NewInt(0),
-		EIP150Hash:                      common.Hash{},
 		EIP155Block:                     big.NewInt(0),
 		EIP158Block:                     big.NewInt(0),
 		ByzantiumBlock:                  big.NewInt(0),
@@ -421,7 +408,6 @@ var (
 		DAOForkBlock:                    nil,
 		DAOForkSupport:                  false,
 		EIP150Block:                     big.NewInt(0),
-		EIP150Hash:                      common.Hash{},
 		EIP155Block:                     big.NewInt(0),
 		EIP158Block:                     big.NewInt(0),
 		ByzantiumBlock:                  big.NewInt(0),
@@ -449,7 +435,6 @@ var (
 		DAOForkBlock:                    nil,
 		DAOForkSupport:                  false,
 		EIP150Block:                     big.NewInt(0),
-		EIP150Hash:                      common.Hash{},
 		EIP155Block:                     big.NewInt(0),
 		EIP158Block:                     big.NewInt(0),
 		ByzantiumBlock:                  big.NewInt(0),
@@ -477,7 +462,6 @@ var (
 		DAOForkBlock:                    nil,
 		DAOForkSupport:                  false,
 		EIP150Block:                     big.NewInt(0),
-		EIP150Hash:                      common.Hash{},
 		EIP155Block:                     big.NewInt(0),
 		EIP158Block:                     big.NewInt(0),
 		ByzantiumBlock:                  big.NewInt(0),
@@ -516,9 +500,7 @@ type ChainConfig struct {
 	DAOForkSupport bool     `json:"daoForkSupport,omitempty"` // Whether the nodes supports or opposes the DAO hard-fork
 
 	// EIP150 implements the Gas price changes (https://github.com/ethereum/EIPs/issues/150)
-	EIP150Block *big.Int    `json:"eip150Block,omitempty"` // EIP150 HF block (nil = no fork)
-	EIP150Hash  common.Hash `json:"eip150Hash,omitempty"`  // EIP150 HF hash (needed for header only clients as only gas pricing changed)
-
+	EIP150Block *big.Int `json:"eip150Block,omitempty"` // EIP150 HF block (nil = no fork)
 	EIP155Block *big.Int `json:"eip155Block,omitempty"` // EIP155 HF block
 	EIP158Block *big.Int `json:"eip158Block,omitempty"` // EIP158 HF block
 
@@ -551,6 +533,8 @@ type ChainConfig struct {
 	CortinaBlockTimestamp *uint64 `json:"cortinaBlockTimestamp,omitempty"`
 	// DUpgrade activates the Shanghai upgrade from Ethereum. (nil = no fork, 0 = already activated)
 	DUpgradeBlockTimestamp *uint64 `json:"dUpgradeBlockTimestamp,omitempty"`
+	// Cancun activates the Cancun upgrade from Ethereum. (nil = no fork, 0 = already activated)
+	CancunTime *uint64 `json:"cancunTime,omitempty"`
 }
 
 // AvalancheContext provides Avalanche specific context directly into the EVM.
@@ -593,7 +577,8 @@ func (c *ChainConfig) Description() string {
 	banner += fmt.Sprintf(" - Apricot Phase Post-6 Timestamp:   #%-8v (https://github.com/ava-labs/avalanchego/releases/tag/v1.8.0\n", c.ApricotPhasePost6BlockTimestamp)
 	banner += fmt.Sprintf(" - Banff Timestamp:                  #%-8v (https://github.com/ava-labs/avalanchego/releases/tag/v1.9.0)\n", c.BanffBlockTimestamp)
 	banner += fmt.Sprintf(" - Cortina Timestamp:                #%-8v (https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0)\n", c.CortinaBlockTimestamp)
-	banner += fmt.Sprintf(" - DUpgrade Timestamp               #%-8v (https://github.com/ava-labs/avalanchego/releases/tag/v1.11.0)\n", c.DUpgradeBlockTimestamp)
+	banner += fmt.Sprintf(" - DUpgrade Timestamp:               #%-8v (https://github.com/ava-labs/avalanchego/releases/tag/v1.11.0)\n", c.DUpgradeBlockTimestamp)
+	banner += fmt.Sprintf(" - Cancun Timestamp:                 #%-8v (https://github.com/ava-labs/avalanchego/releases/tag/v1.11.0)\n", c.DUpgradeBlockTimestamp)
 	banner += "\n"
 	return banner
 }
@@ -718,6 +703,12 @@ func (c *ChainConfig) IsDUpgrade(time uint64) bool {
 	return utils.IsTimestampForked(c.DUpgradeBlockTimestamp, time)
 }
 
+// IsCancun returns whether [time] represents a block
+// with a timestamp after the Cancun upgrade time.
+func (c *ChainConfig) IsCancun(time uint64) bool {
+	return utils.IsTimestampForked(c.CancunTime, time)
+}
+
 // CheckCompatible checks whether scheduled fork transitions have been imported
 // with a mismatching chain configuration.
 func (c *ChainConfig) CheckCompatible(newcfg *ChainConfig, height uint64, time uint64) *ConfigCompatError {
@@ -806,6 +797,7 @@ func (c *ChainConfig) CheckConfigForkOrder() error {
 		{name: "banffBlockTimestamp", timestamp: c.BanffBlockTimestamp},
 		{name: "cortinaBlockTimestamp", timestamp: c.CortinaBlockTimestamp},
 		{name: "dUpgradeBlockTimestamp", timestamp: c.DUpgradeBlockTimestamp},
+		{name: "cancunTime", timestamp: c.CancunTime},
 	} {
 		if lastFork.name != "" {
 			// Next one must be higher number
@@ -906,6 +898,10 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, height *big.Int, time
 	if isForkTimestampIncompatible(c.DUpgradeBlockTimestamp, newcfg.DUpgradeBlockTimestamp, time) {
 		return newTimestampCompatError("DUpgrade fork block timestamp", c.DUpgradeBlockTimestamp, newcfg.DUpgradeBlockTimestamp)
 	}
+	if isForkTimestampIncompatible(c.CancunTime, newcfg.CancunTime, time) {
+		return newTimestampCompatError("Cancun fork block timestamp", c.DUpgradeBlockTimestamp, newcfg.DUpgradeBlockTimestamp)
+	}
+
 	return nil
 }
 
@@ -1019,6 +1015,7 @@ type Rules struct {
 	ChainID                                                 *big.Int
 	IsHomestead, IsEIP150, IsEIP155, IsEIP158               bool
 	IsByzantium, IsConstantinople, IsPetersburg, IsIstanbul bool
+	IsCancun                                                bool
 
 	// Rules for Avalanche releases
 	IsApricotPhase1, IsApricotPhase2, IsApricotPhase3, IsApricotPhase4, IsApricotPhase5 bool
@@ -1035,7 +1032,7 @@ type Rules struct {
 }
 
 // Rules ensures c's ChainID is not nil.
-func (c *ChainConfig) rules(num *big.Int) Rules {
+func (c *ChainConfig) rules(num *big.Int, timestamp uint64) Rules {
 	chainID := c.ChainID
 	if chainID == nil {
 		chainID = new(big.Int)
@@ -1050,13 +1047,14 @@ func (c *ChainConfig) rules(num *big.Int) Rules {
 		IsConstantinople: c.IsConstantinople(num),
 		IsPetersburg:     c.IsPetersburg(num),
 		IsIstanbul:       c.IsIstanbul(num),
+		IsCancun:         c.IsCancun(timestamp),
 	}
 }
 
 // AvalancheRules returns the Avalanche modified rules to support Avalanche
 // network upgrades
 func (c *ChainConfig) AvalancheRules(blockNum *big.Int, timestamp uint64) Rules {
-	rules := c.rules(blockNum)
+	rules := c.rules(blockNum, timestamp)
 
 	rules.IsApricotPhase1 = c.IsApricotPhase1(timestamp)
 	rules.IsApricotPhase2 = c.IsApricotPhase2(timestamp)

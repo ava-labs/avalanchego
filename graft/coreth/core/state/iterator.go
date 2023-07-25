@@ -36,9 +36,9 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
-// NodeIterator is an iterator to traverse the entire state trie post-order,
+// nodeIterator is an iterator to traverse the entire state trie post-order,
 // including all of the contract code and contract state tries.
-type NodeIterator struct {
+type nodeIterator struct {
 	state *StateDB // State being iterated
 
 	stateIt trie.NodeIterator // Primary iterator for the global state trie
@@ -54,9 +54,9 @@ type NodeIterator struct {
 	Error error // Failure set in case of an internal error in the iterator
 }
 
-// NewNodeIterator creates an post-order state node iterator.
-func NewNodeIterator(state *StateDB) *NodeIterator {
-	return &NodeIterator{
+// newNodeIterator creates an post-order state node iterator.
+func newNodeIterator(state *StateDB) *nodeIterator {
+	return &nodeIterator{
 		state: state,
 	}
 }
@@ -64,7 +64,7 @@ func NewNodeIterator(state *StateDB) *NodeIterator {
 // Next moves the iterator to the next node, returning whether there are any
 // further nodes. In case of an internal error this method returns false and
 // sets the Error field to the encountered failure.
-func (it *NodeIterator) Next() bool {
+func (it *nodeIterator) Next() bool {
 	// If the iterator failed previously, don't do anything
 	if it.Error != nil {
 		return false
@@ -78,7 +78,7 @@ func (it *NodeIterator) Next() bool {
 }
 
 // step moves the iterator to the next entry of the state trie.
-func (it *NodeIterator) step() error {
+func (it *nodeIterator) step() error {
 	// Abort if we reached the end of the iteration
 	if it.state == nil {
 		return nil
@@ -141,7 +141,7 @@ func (it *NodeIterator) step() error {
 
 // retrieve pulls and caches the current state entry the iterator is traversing.
 // The method returns whether there are any more data left for inspection.
-func (it *NodeIterator) retrieve() bool {
+func (it *nodeIterator) retrieve() bool {
 	// Clear out any previously set values
 	it.Hash = common.Hash{}
 

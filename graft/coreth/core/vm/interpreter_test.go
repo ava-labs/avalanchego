@@ -33,6 +33,7 @@ import (
 
 	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/core/state"
+	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
@@ -52,7 +53,7 @@ func TestLoopInterrupt(t *testing.T) {
 	}
 
 	for i, tt := range loopInterruptTests {
-		statedb, _ := state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
+		statedb, _ := state.New(types.EmptyRootHash, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
 		statedb.CreateAccount(address)
 		statedb.SetCode(address, common.Hex2Bytes(tt))
 		statedb.Finalise(true)

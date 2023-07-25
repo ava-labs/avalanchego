@@ -113,7 +113,7 @@ func TestExecute(t *testing.T) {
 }
 
 func TestCall(t *testing.T) {
-	state, _ := state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
+	state, _ := state.New(types.EmptyRootHash, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
 	address := common.HexToAddress("0x0a")
 	state.SetCode(address, []byte{
 		byte(vm.PUSH1), 10,
@@ -169,7 +169,7 @@ func BenchmarkCall(b *testing.B) {
 }
 func benchmarkEVM_Create(bench *testing.B, code string) {
 	var (
-		statedb, _ = state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
+		statedb, _ = state.New(types.EmptyRootHash, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
 		sender     = common.BytesToAddress([]byte("sender"))
 		receiver   = common.BytesToAddress([]byte("receiver"))
 	)
@@ -337,7 +337,7 @@ func TestBlockhash(t *testing.T) {
 func benchmarkNonModifyingCode(gas uint64, code []byte, name string, tracerCode string, b *testing.B) {
 	cfg := new(Config)
 	setDefaults(cfg)
-	cfg.State, _ = state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
+	cfg.State, _ = state.New(types.EmptyRootHash, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
 	cfg.GasLimit = gas
 	if len(tracerCode) > 0 {
 		tracer, err := tracers.DefaultDirectory.New(tracerCode, new(tracers.Context), nil)
@@ -345,7 +345,6 @@ func benchmarkNonModifyingCode(gas uint64, code []byte, name string, tracerCode 
 			b.Fatal(err)
 		}
 		cfg.EVMConfig = vm.Config{
-			Debug:  true,
 			Tracer: tracer,
 		}
 	}
@@ -521,7 +520,6 @@ func TestEip2929Cases(t *testing.T) {
 			code, ops)
 		Execute(code, nil, &Config{
 			EVMConfig: vm.Config{
-				Debug:     true,
 				Tracer:    logger.NewMarkdownLogger(nil, os.Stdout),
 				ExtraEips: []int{2929},
 			},
@@ -675,7 +673,6 @@ func TestColdAccountAccessCost(t *testing.T) {
 		tracer := logger.NewStructLogger(nil)
 		Execute(tc.code, nil, &Config{
 			EVMConfig: vm.Config{
-				Debug:  true,
 				Tracer: tracer,
 			},
 		})
@@ -831,7 +828,7 @@ func TestRuntimeJSTracer(t *testing.T) {
 	main := common.HexToAddress("0xaa")
 	for i, jsTracer := range jsTracers {
 		for j, tc := range tests {
-			statedb, _ := state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
+			statedb, _ := state.New(types.EmptyRootHash, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
 			statedb.SetCode(main, tc.code)
 			statedb.SetCode(common.HexToAddress("0xbb"), calleeCode)
 			statedb.SetCode(common.HexToAddress("0xcc"), calleeCode)
@@ -847,7 +844,6 @@ func TestRuntimeJSTracer(t *testing.T) {
 				GasLimit: 1000000,
 				State:    statedb,
 				EVMConfig: vm.Config{
-					Debug:  true,
 					Tracer: tracer,
 				}})
 			if err != nil {
@@ -874,7 +870,7 @@ func TestJSTracerCreateTx(t *testing.T) {
 	exit: function(res) { this.exits++ }}`
 	code := []byte{byte(vm.PUSH1), 0, byte(vm.PUSH1), 0, byte(vm.RETURN)}
 
-	statedb, _ := state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
+	statedb, _ := state.New(types.EmptyRootHash, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
 	tracer, err := tracers.DefaultDirectory.New(jsTracer, new(tracers.Context), nil)
 	if err != nil {
 		t.Fatal(err)
@@ -882,7 +878,6 @@ func TestJSTracerCreateTx(t *testing.T) {
 	_, _, _, err = Create(code, &Config{
 		State: statedb,
 		EVMConfig: vm.Config{
-			Debug:  true,
 			Tracer: tracer,
 		}})
 	if err != nil {

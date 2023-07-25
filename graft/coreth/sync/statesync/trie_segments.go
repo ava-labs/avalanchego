@@ -197,7 +197,7 @@ func (t *trieToSync) segmentFinished(ctx context.Context, idx int) error {
 			}
 			// update the stack trie and cap the batch it writes to.
 			value := common.CopyBytes(it.Value())
-			if err := t.stackTrie.TryUpdate(it.Key(), value); err != nil {
+			if err := t.stackTrie.Update(it.Key(), value); err != nil {
 				return err
 			}
 			if t.batch.ValueSize() > t.sync.batchSize {

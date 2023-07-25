@@ -113,8 +113,8 @@ type callTracer struct {
 	callstack []callFrame
 	config    callTracerConfig
 	gasLimit  uint64
-	interrupt uint32 // Atomic flag to signal execution interruption
-	reason    error  // Textual reason for the interruption
+	interrupt atomic.Bool // Atomic flag to signal execution interruption
+	reason    error       // Textual reason for the interruption
 }
 
 type callTracerConfig struct {
@@ -144,7 +144,7 @@ func (t *callTracer) CaptureStart(env *vm.EVM, from common.Address, to common.Ad
 		From:  from,
 		To:    &toCopy,
 		Input: common.CopyBytes(input),
-		Gas:   gas,
+		Gas:   t.gasLimit,
 		Value: value,
 	}
 	if create {
@@ -172,7 +172,7 @@ func (t *callTracer) CaptureState(pc uint64, op vm.OpCode, gas, cost uint64, sco
 		return
 	}
 	// Skip if tracing was interrupted
-	if atomic.LoadUint32(&t.interrupt) > 0 {
+	if t.interrupt.Load() {
 		return
 	}
 	switch op {
@@ -208,7 +208,7 @@ func (t *callTracer) CaptureEnter(typ vm.OpCode, from common.Address, to common.
 		return
 	}
 	// Skip if tracing was interrupted
-	if atomic.LoadUint32(&t.interrupt) > 0 {
+	if t.interrupt.Load() {
 		return
 	}
 
@@ -273,7 +273,7 @@ func (t *callTracer) GetResult() (json.RawMessage, error) {
 // Stop terminates execution of the tracer at the first opportune moment.
 func (t *callTracer) Stop(err error) {
 	t.reason = err
-	atomic.StoreUint32(&t.interrupt, 1)
+	t.interrupt.Store(true)
 }
 
 // clearFailedLogs clears the logs of a callframe and all its children

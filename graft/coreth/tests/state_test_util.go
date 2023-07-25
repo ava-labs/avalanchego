@@ -30,13 +30,15 @@ import (
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/state/snapshot"
+	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/ethdb"
+	"github.com/ava-labs/coreth/trie"
 	"github.com/ethereum/go-ethereum/common"
 )
 
 func MakePreState(db ethdb.Database, accounts core.GenesisAlloc, snapshotter bool) (*snapshot.Tree, *state.StateDB) {
-	sdb := state.NewDatabase(db)
-	statedb, _ := state.New(common.Hash{}, sdb, nil)
+	sdb := state.NewDatabaseWithConfig(db, &trie.Config{Preimages: true})
+	statedb, _ := state.New(types.EmptyRootHash, sdb, nil)
 	for addr, a := range accounts {
 		statedb.SetCode(addr, a.Code)
 		statedb.SetNonce(addr, a.Nonce)

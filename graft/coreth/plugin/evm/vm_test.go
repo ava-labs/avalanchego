@@ -2583,7 +2583,7 @@ func TestUncleBlock(t *testing.T) {
 		blkDEthBlock.Transactions(),
 		uncles,
 		nil,
-		new(trie.Trie),
+		trie.NewStackTrie(nil),
 		blkDEthBlock.ExtData(),
 		false,
 	)

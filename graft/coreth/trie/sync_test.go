@@ -30,14 +30,18 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/coreth/core/rawdb"
+	"github.com/ava-labs/coreth/core/types"
+	"github.com/ava-labs/coreth/ethdb"
+	"github.com/ava-labs/coreth/trie/trienode"
 	"github.com/ethereum/go-ethereum/common"
 )
 
 // makeTestTrie create a sample test trie to test node-wise reconstruction.
-func makeTestTrie() (*Database, *StateTrie, map[string][]byte) {
+func makeTestTrie(scheme string) (ethdb.Database, *Database, *StateTrie, map[string][]byte) {
 	// Create an empty trie
-	triedb := NewDatabase(rawdb.NewMemoryDatabase())
-	trie, _ := NewStateTrie(TrieID(common.Hash{}), triedb)
+	db := rawdb.NewMemoryDatabase()
+	triedb := newTestDatabase(db, scheme)
+	trie, _ := NewStateTrie(TrieID(types.EmptyRootHash), triedb)
 
 	// Fill it with some arbitrary data
 	content := make(map[string][]byte)
@@ -45,24 +49,27 @@ func makeTestTrie() (*Database, *StateTrie, map[string][]byte) {
 		// Map the same data under multiple keys
 		key, val := common.LeftPadBytes([]byte{1, i}, 32), []byte{i}
 		content[string(key)] = val
-		trie.Update(key, val)
+		trie.MustUpdate(key, val)
 
 		key, val = common.LeftPadBytes([]byte{2, i}, 32), []byte{i}
 		content[string(key)] = val
-		trie.Update(key, val)
+		trie.MustUpdate(key, val)
 
 		// Add some other data to inflate the trie
 		for j := byte(3); j < 13; j++ {
 			key, val = common.LeftPadBytes([]byte{j, i}, 32), []byte{j, i}
 			content[string(key)] = val
-			trie.Update(key, val)
+			trie.MustUpdate(key, val)
 		}
 	}
 	root, nodes := trie.Commit(false)
-	if err := triedb.Update(NewWithNodeSet(nodes)); err != nil {
+	if err := triedb.Update(root, types.EmptyRootHash, trienode.NewWithNodeSet(nodes)); err != nil {
 		panic(fmt.Errorf("failed to commit db %v", err))
+	}
+	if err := triedb.Commit(root, false); err != nil {
+		panic(err)
 	}
 	// Re-create the trie based on the new state
 	trie, _ = NewStateTrie(TrieID(root), triedb)
-	return triedb, trie, content
+	return db, triedb, trie, content
 }

@@ -76,7 +76,7 @@ var (
 	blockStateInitTimer         = metrics.NewRegisteredCounter("chain/block/inits/state", nil)
 	blockExecutionTimer         = metrics.NewRegisteredCounter("chain/block/executions", nil)
 	blockTrieOpsTimer           = metrics.NewRegisteredCounter("chain/block/trie", nil)
-	blockStateValidationTimer   = metrics.NewRegisteredCounter("chain/block/validations/state", nil)
+	blockValidationTimer        = metrics.NewRegisteredCounter("chain/block/validations/state", nil)
 	blockWriteTimer             = metrics.NewRegisteredCounter("chain/block/writes", nil)
 
 	acceptorQueueGauge           = metrics.NewRegisteredGauge("chain/acceptor/queue/size", nil)
@@ -225,7 +225,7 @@ type BlockChain struct {
 	txLookupCache *lru.Cache[common.Hash, *rawdb.LegacyTxLookupEntry] // Cache for the most recent transaction lookup data.
 	badBlocks     *lru.Cache[common.Hash, *badBlock]                  // Cache for bad blocks
 
-	running int32 // 0 if chain is running, 1 when stopped
+	stopping atomic.Bool // false if chain is running, true when stopped
 
 	engine     consensus.Engine
 	validator  Validator  // Block and state validator interface
@@ -288,7 +288,6 @@ func NewBlockChain(
 	if cacheConfig == nil {
 		return nil, errCacheConfigNotSpecified
 	}
-
 	// Open trie database with provided config
 	triedb := trie.NewDatabaseWithConfig(db, &trie.Config{
 		Cache:       cacheConfig.TrieCleanLimit,
@@ -912,14 +911,14 @@ func (bc *BlockChain) ValidateCanonicalChain() error {
 	return nil
 }
 
-// stop stops the blockchain service. If any imports are currently in progress
+// stopWithoutSaving stops the blockchain service. If any imports are currently in progress
 // it will abort them using the procInterrupt. This method stops all running
 // goroutines, but does not do all the post-stop work of persisting data.
 // OBS! It is generally recommended to use the Stop method!
 // This method has been exposed to allow tests to stop the blockchain while simulating
 // a crash.
 func (bc *BlockChain) stopWithoutSaving() {
-	if !atomic.CompareAndSwapInt32(&bc.running, 0, 1) {
+	if !bc.stopping.CompareAndSwap(false, true) {
 		return
 	}
 
@@ -956,8 +955,8 @@ func (bc *BlockChain) Stop() {
 	}
 	log.Info("State manager shut down", "t", time.Since(start))
 	// Flush the collected preimages to disk
-	if err := bc.stateCache.TrieDB().CommitPreimages(); err != nil {
-		log.Error("Failed to commit trie preimages", "err", err)
+	if err := bc.stateCache.TrieDB().Close(); err != nil {
+		log.Error("Failed to close trie db", "err", err)
 	}
 
 	log.Info("Blockchain stopped")
@@ -1316,7 +1315,7 @@ func (bc *BlockChain) insertBlock(block *types.Block, writes bool) error {
 	// If we have a followup block, run that against the current state to pre-cache
 	// transactions and probabilistically some of the account/storage trie nodes.
 	// Process block using the parent state as reference point
-	substart = time.Now()
+	pstart := time.Now()
 	receipts, logs, usedGas, err := bc.processor.Process(block, parent, statedb, bc.vmConfig)
 	if serr := statedb.Error(); serr != nil {
 		log.Error("statedb error encountered", "err", serr, "number", block.Number(), "hash", block.Hash())
@@ -1325,32 +1324,32 @@ func (bc *BlockChain) insertBlock(block *types.Block, writes bool) error {
 		bc.reportBlock(block, receipts, err)
 		return err
 	}
-
-	// Update the metrics touched during block processing
-	accountReadTimer.Inc(statedb.AccountReads.Milliseconds())                 // Account reads are complete, we can mark them
-	storageReadTimer.Inc(statedb.StorageReads.Milliseconds())                 // Storage reads are complete, we can mark them
-	snapshotAccountReadTimer.Inc(statedb.SnapshotAccountReads.Milliseconds()) // Account reads are complete, we can mark them
-	snapshotStorageReadTimer.Inc(statedb.SnapshotStorageReads.Milliseconds()) // Storage reads are complete, we can mark them
-	trieproc := statedb.AccountHashes + statedb.StorageHashes                 // Save to not double count in validation
-	trieproc += statedb.SnapshotAccountReads + statedb.AccountReads + statedb.AccountUpdates
-	trieproc += statedb.SnapshotStorageReads + statedb.StorageReads + statedb.StorageUpdates
-	blockExecutionTimer.Inc((time.Since(substart) - trieproc).Milliseconds())
+	ptime := time.Since(pstart)
 
 	// Validate the state using the default validator
-	substart = time.Now()
+	vstart := time.Now()
 	if err := bc.validator.ValidateState(block, statedb, receipts, usedGas); err != nil {
 		bc.reportBlock(block, receipts, err)
 		return err
 	}
+	vtime := time.Since(vstart)
 
-	// Update the metrics touched during block validation
-	accountUpdateTimer.Inc(statedb.AccountUpdates.Milliseconds()) // Account updates are complete, we can mark them
-	storageUpdateTimer.Inc(statedb.StorageUpdates.Milliseconds()) // Storage updates are complete, we can mark them
-	accountHashTimer.Inc(statedb.AccountHashes.Milliseconds())    // Account hashes are complete, we can mark them
-	storageHashTimer.Inc(statedb.StorageHashes.Milliseconds())    // Storage hashes are complete, we can mark them
-	additionalTrieProc := statedb.AccountHashes + statedb.StorageHashes + statedb.AccountUpdates + statedb.StorageUpdates - trieproc
-	blockStateValidationTimer.Inc((time.Since(substart) - additionalTrieProc).Milliseconds())
-	blockTrieOpsTimer.Inc((trieproc + additionalTrieProc).Milliseconds())
+	// Update the metrics touched during block processing and validation
+	accountReadTimer.Inc(statedb.AccountReads.Milliseconds())                  // Account reads are complete(in processing)
+	storageReadTimer.Inc(statedb.StorageReads.Milliseconds())                  // Storage reads are complete(in processing)
+	snapshotAccountReadTimer.Inc(statedb.SnapshotAccountReads.Milliseconds())  // Account reads are complete(in processing)
+	snapshotStorageReadTimer.Inc(statedb.SnapshotStorageReads.Milliseconds())  // Storage reads are complete(in processing)
+	accountUpdateTimer.Inc(statedb.AccountUpdates.Milliseconds())              // Account updates are complete(in validation)
+	storageUpdateTimer.Inc(statedb.StorageUpdates.Milliseconds())              // Storage updates are complete(in validation)
+	accountHashTimer.Inc(statedb.AccountHashes.Milliseconds())                 // Account hashes are complete(in validation)
+	storageHashTimer.Inc(statedb.StorageHashes.Milliseconds())                 // Storage hashes are complete(in validation)
+	triehash := statedb.AccountHashes + statedb.StorageHashes                  // The time spent on tries hashing
+	trieUpdate := statedb.AccountUpdates + statedb.StorageUpdates              // The time spent on tries update
+	trieRead := statedb.SnapshotAccountReads + statedb.AccountReads            // The time spent on account read
+	trieRead += statedb.SnapshotStorageReads + statedb.StorageReads            // The time spent on storage read
+	blockExecutionTimer.Inc((ptime - trieRead).Milliseconds())                 // The time spent on EVM processing
+	blockValidationTimer.Inc((vtime - (triehash + trieUpdate)).Milliseconds()) // The time spent on block validation
+	blockTrieOpsTimer.Inc((triehash + trieUpdate + trieRead).Milliseconds())   // The time spent on trie operations
 
 	// If [writes] are disabled, skip [writeBlockWithState] so that we do not write the block
 	// or the state trie to disk.
@@ -1363,7 +1362,7 @@ func (bc *BlockChain) insertBlock(block *types.Block, writes bool) error {
 	// writeBlockWithState (called within writeBlockAndSethead) creates a reference that
 	// will be cleaned up in Accept/Reject so we need to ensure an error cannot occur
 	// later in verification, since that would cause the referenced root to never be dereferenced.
-	substart = time.Now()
+	wstart := time.Now()
 	if err := bc.writeBlockAndSetHead(block, receipts, logs, statedb); err != nil {
 		return err
 	}
@@ -1371,8 +1370,8 @@ func (bc *BlockChain) insertBlock(block *types.Block, writes bool) error {
 	accountCommitTimer.Inc(statedb.AccountCommits.Milliseconds())   // Account commits are complete, we can mark them
 	storageCommitTimer.Inc(statedb.StorageCommits.Milliseconds())   // Storage commits are complete, we can mark them
 	snapshotCommitTimer.Inc(statedb.SnapshotCommits.Milliseconds()) // Snapshot commits are complete, we can mark them
-	triedbCommitTimer.Inc(statedb.TrieDBCommits.Milliseconds())     // Triedb commits are complete, we can mark them
-	blockWriteTimer.Inc((time.Since(substart) - statedb.AccountCommits - statedb.StorageCommits - statedb.SnapshotCommits - statedb.TrieDBCommits).Milliseconds())
+	triedbCommitTimer.Inc(statedb.TrieDBCommits.Milliseconds())     // Trie database commits are complete, we can mark them
+	blockWriteTimer.Inc((time.Since(wstart) - statedb.AccountCommits - statedb.StorageCommits - statedb.SnapshotCommits - statedb.TrieDBCommits).Milliseconds())
 	blockInsertTimer.Inc(time.Since(start).Milliseconds())
 
 	log.Debug("Inserted new block", "number", block.Number(), "hash", block.Hash(),

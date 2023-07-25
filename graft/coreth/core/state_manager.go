@@ -65,7 +65,7 @@ type TrieWriter interface {
 }
 
 type TrieDB interface {
-	Dereference(root common.Hash)
+	Dereference(root common.Hash) error
 	Commit(root common.Hash, report bool) error
 	Size() (common.StorageSize, common.StorageSize)
 	Cap(limit common.StorageSize) error
@@ -107,8 +107,7 @@ func (np *noPruningTrieWriter) AcceptTrie(block *types.Block) error {
 }
 
 func (np *noPruningTrieWriter) RejectTrie(block *types.Block) error {
-	np.TrieDB.Dereference(block.Root())
-	return nil
+	return np.TrieDB.Dereference(block.Root())
 }
 
 func (np *noPruningTrieWriter) Shutdown() error { return nil }
@@ -146,7 +145,9 @@ func (cm *cappedMemoryTrieWriter) AcceptTrie(block *types.Block) error {
 	//
 	// Note: It is safe to dereference roots that have been committed to disk
 	// (they are no-ops).
-	cm.tipBuffer.Insert(root)
+	if err := cm.tipBuffer.Insert(root); err != nil {
+		return err
+	}
 
 	// Commit this root if we have reached the [commitInterval].
 	modCommitInterval := block.NumberU64() % cm.commitInterval

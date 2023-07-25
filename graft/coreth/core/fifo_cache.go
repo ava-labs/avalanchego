@@ -58,8 +58,9 @@ func (f *BufferFIFOCache[K, V]) Get(key K) (V, bool) {
 
 // remove is used as the callback in [BoundedBuffer]. It is assumed that the
 // [WriteLock] is held when this is accessed.
-func (f *BufferFIFOCache[K, V]) remove(key K) {
+func (f *BufferFIFOCache[K, V]) remove(key K) error {
 	delete(f.m, key)
+	return nil
 }
 
 type NoOpFIFOCache[K comparable, V any] struct{}

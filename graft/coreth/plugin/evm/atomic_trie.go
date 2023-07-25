@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/ethdb"
 	"github.com/ava-labs/coreth/trie"
+	"github.com/ava-labs/coreth/trie/trienode"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 )
@@ -73,7 +74,7 @@ type AtomicTrie interface {
 	// InsertTrie updates the trieDB with the provided node set and adds a reference
 	// to root in the trieDB. Once InsertTrie is called, it is expected either
 	// AcceptTrie or RejectTrie be called for the same root.
-	InsertTrie(nodes *trie.NodeSet, root common.Hash) error
+	InsertTrie(nodes *trienode.NodeSet, root common.Hash) error
 
 	// AcceptTrie marks root as the last accepted atomic trie root, and
 	// commits the trie to persistent storage if height is divisible by
@@ -223,7 +224,7 @@ func (a *atomicTrie) UpdateTrie(trie *trie.Trie, height uint64, atomicOps map[id
 		keyPacker := wrappers.Packer{Bytes: make([]byte, atomicKeyLength)}
 		keyPacker.PackLong(height)
 		keyPacker.PackFixedBytes(blockchainID[:])
-		if err := trie.TryUpdate(keyPacker.Bytes, valueBytes); err != nil {
+		if err := trie.Update(keyPacker.Bytes, valueBytes); err != nil {
 			return err
 		}
 	}
@@ -307,9 +308,9 @@ func (a *atomicTrie) LastAcceptedRoot() common.Hash {
 	return a.lastAcceptedRoot
 }
 
-func (a *atomicTrie) InsertTrie(nodes *trie.NodeSet, root common.Hash) error {
+func (a *atomicTrie) InsertTrie(nodes *trienode.NodeSet, root common.Hash) error {
 	if nodes != nil {
-		if err := a.trieDB.Update(trie.NewWithNodeSet(nodes)); err != nil {
+		if err := a.trieDB.Update(root, types.EmptyRootHash, trienode.NewWithNodeSet(nodes)); err != nil {
 			return err
 		}
 	}
