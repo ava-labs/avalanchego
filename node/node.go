@@ -146,7 +146,7 @@ type Node struct {
 	networkNamespace string
 	Net              network.Network
 
-	// The staking address will optionally be written to a runtime state
+	// The staking address will optionally be written to a process context
 	// file to enable other nodes to be configured to use this node as a
 	// beacon.
 	stakingAddress string
@@ -263,7 +263,7 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 		)
 	}
 
-	// Record the bound address to enable inclusion in runtime state file.
+	// Record the bound address to enable inclusion in process context file.
 	n.stakingAddress = listener.Addr().String()
 
 	tlsKey, ok := n.Config.StakingTLSCert.PrivateKey.(crypto.Signer)
@@ -386,7 +386,7 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 	return err
 }
 
-type NodeRuntimeState struct {
+type NodeProcessContext struct {
 	// The process id of the node
 	PID int `json:"pid"`
 	// URI to access the node API
@@ -397,23 +397,23 @@ type NodeRuntimeState struct {
 	StakingAddress string `json:"stakingAddress"`
 }
 
-// Write runtime state to the configured path. Supports the use of
+// Write process context to the configured path. Supports the use of
 // dynamically chosen network ports with local network orchestration.
-func (n *Node) writeRuntimeState() error {
-	n.Log.Info("writing runtime state", zap.String("path", n.Config.RuntimeStateFilePath))
+func (n *Node) writeProcessContext() error {
+	n.Log.Info("writing process context", zap.String("path", n.Config.ProcessContextFilePath))
 
-	// Write the runtime state to disk
-	runtimeState := &NodeRuntimeState{
+	// Write the process context to disk
+	processContext := &NodeProcessContext{
 		PID:            os.Getpid(),
 		URI:            n.apiURI,
 		StakingAddress: n.stakingAddress, // Set by network initialization
 	}
-	bytes, err := json.MarshalIndent(runtimeState, "", "  ")
+	bytes, err := json.MarshalIndent(processContext, "", "  ")
 	if err != nil {
-		return fmt.Errorf("failed to marshal runtime state: %w", err)
+		return fmt.Errorf("failed to marshal process context: %w", err)
 	}
-	if err := os.WriteFile(n.Config.RuntimeStateFilePath, bytes, perms.ReadWrite); err != nil {
-		return fmt.Errorf("failed to write runtime state: %w", err)
+	if err := os.WriteFile(n.Config.ProcessContextFilePath, bytes, perms.ReadWrite); err != nil {
+		return fmt.Errorf("failed to write process context: %w", err)
 	}
 	return nil
 }
@@ -421,7 +421,7 @@ func (n *Node) writeRuntimeState() error {
 // Dispatch starts the node's servers.
 // Returns when the node exits.
 func (n *Node) Dispatch() error {
-	if err := n.writeRuntimeState(); err != nil {
+	if err := n.writeProcessContext(); err != nil {
 		return err
 	}
 
@@ -474,11 +474,11 @@ func (n *Node) Dispatch() error {
 	// Wait until the node is done shutting down before returning
 	n.DoneShuttingDown.Wait()
 
-	// Attempt to remove the runtime state path to communicate to an
-	// orchestrator that the node is no longer running.
-	if err := os.Remove(n.Config.RuntimeStateFilePath); err != nil && !os.IsNotExist(err) {
-		n.Log.Error("removal of runtime state file failed",
-			zap.String("path", n.Config.RuntimeStateFilePath),
+	// Remove the process context file to communicate to an orchestrator
+	// that the node is no longer running.
+	if err := os.Remove(n.Config.ProcessContextFilePath); err != nil && !os.IsNotExist(err) {
+		n.Log.Error("removal of process context file failed",
+			zap.String("path", n.Config.ProcessContextFilePath),
 			zap.Error(err),
 		)
 	}

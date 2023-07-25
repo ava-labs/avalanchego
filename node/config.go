@@ -234,7 +234,7 @@ type Config struct {
 	// write arbitrary data.
 	ChainDataDir string `json:"chainDataDir"`
 
-	// Path to write runtime state to (including PID, API URI, and
+	// Path to write process context to (including PID, API URI, and
 	// staking address).
-	RuntimeStateFilePath string `json:"runtimeStateFilePath"`
+	ProcessContextFilePath string `json:"processContextFilePath"`
 }
