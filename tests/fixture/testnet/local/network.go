@@ -333,10 +333,12 @@ func (ln *LocalNetwork) Start(w io.Writer) error {
 	// Configure networking and start each node
 	for i, node := range ln.Nodes {
 		// Update network configuration and write to disk
-		httpPort := 0
-		stakingPort := 0
+		var (
+			httpPort    uint16
+			stakingPort uint16
+		)
 		if ln.UseStaticPorts {
-			httpPort = int(ln.InitialStaticPort) + i*2
+			httpPort = ln.InitialStaticPort + uint16(i)*2
 			stakingPort = httpPort + 1
 		}
 		node.SetNetworkingConfigDefaults(httpPort, stakingPort, bootstrapIDs, bootstrapIPs)
@@ -389,7 +391,7 @@ func (ln *LocalNetwork) WaitForHealthy(ctx context.Context, w io.Writer) error {
 			}
 
 			healthy, err := node.IsHealthy(ctx)
-			if err != nil {
+			if err != nil && !errors.Is(err, errProcessNotRunning) {
 				return err
 			}
 			if !healthy {

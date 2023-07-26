@@ -219,7 +219,7 @@ func (n *LocalNode) GetProcess() (*os.Process, error) {
 	// error checking.
 	err = proc.Signal(syscall.Signal(0))
 	if err == nil {
-		// Process is still running
+		// Process is running
 		return proc, nil
 	}
 	if errors.Is(err, os.ErrProcessDone) {

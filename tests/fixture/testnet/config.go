@@ -128,8 +128,8 @@ func NewNodeConfig() *NodeConfig {
 
 // Convenience method for setting networking flags.
 func (nc *NodeConfig) SetNetworkingConfigDefaults(
-	httpPort int,
-	stakingPort int,
+	httpPort uint16,
+	stakingPort uint16,
 	bootstrapIDs []string,
 	bootstrapIPs []string,
 ) {
