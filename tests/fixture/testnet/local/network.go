@@ -10,13 +10,9 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"net"
 	"os"
 	"path/filepath"
-	"strconv"
 	"time"
-
-	"github.com/spf13/cast"
 
 	cfg "github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/genesis"
@@ -352,27 +348,16 @@ func (ln *LocalNetwork) Start(w io.Writer) error {
 			return err
 		}
 
-		bootstrapIP := ""
-		if ln.UseStaticPorts {
-			// Infer the bootstrap IP from flag configuration
-			rawStakingHost, ok := node.Flags[cfg.StakingHostKey]
-			// Only use the default value if the key is not set to allow
-			// an empty value (i.e. bind all interfaces) to be supplied.
-			stakingHost := "127.0.0.1"
-			if ok {
-				stakingHost = cast.ToString(rawStakingHost)
-			}
-			stakingPort := strconv.Itoa(cast.ToInt(node.Flags[cfg.StakingPortKey]))
-			bootstrapIP = net.JoinHostPort(stakingHost, stakingPort)
-		} else {
-			// Use the bootstrap ip from process context
-			if err := node.WaitForProcessContext(context.TODO()); err != nil {
-				return err
-			}
-			bootstrapIP = node.StakingAddress
+		// Waiting for the process context ensures the node is accepting
+		// connections on its staking port. The network will start faster with
+		// this synchronization due to the avoidance of exponential backoff if a
+		// node tries to connect to a beacon that is not ready.
+		if err := node.WaitForProcessContext(context.Background()); err != nil {
+			return err
 		}
+
 		bootstrapIDs = append(bootstrapIDs, node.NodeID.String())
-		bootstrapIPs = append(bootstrapIPs, bootstrapIP)
+		bootstrapIPs = append(bootstrapIPs, node.StakingAddress)
 	}
 
 	return nil
