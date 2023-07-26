@@ -40,7 +40,7 @@ func newDefaultDBConfig() merkledb.Config {
 
 func sendRangeRequest(
 	t *testing.T,
-	db SyncableDB,
+	db DB,
 	request *pb.SyncGetRangeProofRequest,
 	maxAttempts uint32,
 	modifyResponse func(*merkledb.RangeProof),
@@ -144,7 +144,7 @@ func TestGetRangeProof(t *testing.T) {
 	require.NoError(t, err)
 
 	tests := map[string]struct {
-		db                  SyncableDB
+		db                  DB
 		request             *pb.SyncGetRangeProofRequest
 		modifyResponse      func(*merkledb.RangeProof)
 		expectedErr         error
@@ -299,8 +299,8 @@ func TestGetRangeProof(t *testing.T) {
 
 func sendChangeRequest(
 	t *testing.T,
-	db SyncableDB,
-	verificationDB SyncableDB,
+	db DB,
+	verificationDB DB,
 	request *pb.SyncGetChangeProofRequest,
 	maxAttempts uint32,
 	modifyResponse func(*merkledb.ChangeProof),
@@ -450,7 +450,7 @@ func TestGetChangeProof(t *testing.T) {
 	require.NoError(t, err)
 
 	tests := map[string]struct {
-		db                  SyncableDB
+		db                  DB
 		request             *pb.SyncGetChangeProofRequest
 		modifyResponse      func(*merkledb.ChangeProof)
 		expectedErr         error

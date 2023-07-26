@@ -5,376 +5,160 @@ package avm
 
 import (
 	"context"
-	"encoding/binary"
-	"encoding/json"
-	"fmt"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/vms/avm/config"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/index"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-var indexEnabledAvmConfig = Config{
-	IndexTransactions: true,
-}
-
 func TestIndexTransaction_Ordered(t *testing.T) {
-	genesisBytes := BuildGenesisTest(t)
-	issuer := make(chan common.Message, 1)
-	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
-	ctx := NewContext(t)
-	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
-	avaxID := genesisTx.ID()
-	vm := setupTestVM(t, ctx, baseDBManager, genesisBytes, issuer, indexEnabledAvmConfig)
+	require := require.New(t)
+
+	env := setup(t, &envConfig{
+		vmStaticConfig: &config.Config{},
+	})
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
-			t.Fatal(err)
-		}
-		ctx.Lock.Unlock()
+		require.NoError(env.vm.Shutdown(context.Background()))
+		env.vm.ctx.Lock.Unlock()
 	}()
 
 	key := keys[0]
 	addr := key.PublicKey().Address()
+	txAssetID := avax.Asset{ID: env.genesisTx.ID()}
 
-	var uniqueTxs []*UniqueTx
-	txAssetID := avax.Asset{ID: avaxID}
-
-	ctx.Lock.Lock()
+	var txs []*txs.Tx
 	for i := 0; i < 5; i++ {
-		// create utxoID and assetIDs
+		// make utxo
 		utxoID := avax.UTXOID{
 			TxID: ids.GenerateTestID(),
 		}
+		utxo := buildUTXO(utxoID, txAssetID, addr)
+		env.vm.state.AddUTXO(utxo)
 
-		// build the transaction
+		// make transaction
 		tx := buildTX(utxoID, txAssetID, addr)
-
-		// sign the transaction
-		if err := signTX(vm.parser.Codec(), tx, key); err != nil {
-			t.Fatal(err)
-		}
-
-		// Provide the platform UTXO
-		utxo := buildPlatformUTXO(utxoID, txAssetID, addr)
-
-		// save utxo to state
-		vm.state.AddUTXO(utxo)
+		require.NoError(tx.SignSECP256K1Fx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
 
 		// issue transaction
-		if _, err := vm.IssueTx(tx.Bytes()); err != nil {
-			t.Fatalf("should have issued the transaction correctly but erred: %s", err)
-		}
+		issueAndAccept(require, env.vm, env.issuer, tx)
 
-		ctx.Lock.Unlock()
-
-		msg := <-issuer
-		if msg != common.PendingTxs {
-			t.Fatalf("Wrong message")
-		}
-
-		ctx.Lock.Lock()
-
-		// get pending transactions
-		txs := vm.PendingTxs(context.Background())
-		if len(txs) != 1 {
-			t.Fatalf("Should have returned %d tx(s)", 1)
-		}
-
-		parsedTx := txs[0]
-		uniqueParsedTX := parsedTx.(*UniqueTx)
-		uniqueTxs = append(uniqueTxs, uniqueParsedTX)
-
-		var inputUTXOs []*avax.UTXO
-		for _, utxoID := range uniqueParsedTX.InputUTXOs() {
-			utxo, err := vm.dagState.GetUTXOFromID(utxoID)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			inputUTXOs = append(inputUTXOs, utxo)
-		}
-
-		// index the transaction
-		require.NoError(t, vm.addressTxsIndexer.Accept(uniqueParsedTX.ID(), inputUTXOs, uniqueParsedTX.UTXOs()))
+		txs = append(txs, tx)
 	}
 
-	// ensure length is 5
-	require.Len(t, uniqueTxs, 5)
-	// for each *UniqueTx check its indexed at right index
-	for i, tx := range uniqueTxs {
-		assertIndexedTX(t, vm.db, uint64(i), addr, txAssetID.ID, tx.ID())
+	// for each tx check its indexed at right index
+	for i, tx := range txs {
+		assertIndexedTX(t, env.vm.db, uint64(i), addr, txAssetID.ID, tx.ID())
 	}
-
-	assertLatestIdx(t, vm.db, addr, txAssetID.ID, 5)
+	assertLatestIdx(t, env.vm.db, addr, txAssetID.ID, 5)
 }
 
 func TestIndexTransaction_MultipleTransactions(t *testing.T) {
-	genesisBytes := BuildGenesisTest(t)
-	issuer := make(chan common.Message, 1)
-	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
-	ctx := NewContext(t)
-	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
+	require := require.New(t)
 
-	avaxID := genesisTx.ID()
-	vm := setupTestVM(t, ctx, baseDBManager, genesisBytes, issuer, indexEnabledAvmConfig)
+	env := setup(t, &envConfig{
+		vmStaticConfig: &config.Config{},
+	})
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
-			t.Fatal(err)
-		}
-		ctx.Lock.Unlock()
+		require.NoError(env.vm.Shutdown(context.Background()))
+		env.vm.ctx.Lock.Unlock()
 	}()
 
-	addressTxMap := map[ids.ShortID]*UniqueTx{}
-	txAssetID := avax.Asset{ID: avaxID}
+	addressTxMap := map[ids.ShortID]*txs.Tx{}
+	txAssetID := avax.Asset{ID: env.genesisTx.ID()}
 
-	ctx.Lock.Lock()
 	for _, key := range keys {
 		addr := key.PublicKey().Address()
-		// create utxoID and assetIDs
+
+		// make utxo
 		utxoID := avax.UTXOID{
 			TxID: ids.GenerateTestID(),
 		}
+		utxo := buildUTXO(utxoID, txAssetID, addr)
+		env.vm.state.AddUTXO(utxo)
 
-		// build the transaction
+		// make transaction
 		tx := buildTX(utxoID, txAssetID, addr)
-
-		// sign the transaction
-		if err := signTX(vm.parser.Codec(), tx, key); err != nil {
-			t.Fatal(err)
-		}
-
-		// Provide the platform UTXO
-		utxo := buildPlatformUTXO(utxoID, txAssetID, addr)
-
-		// save utxo to state
-		vm.state.AddUTXO(utxo)
+		require.NoError(tx.SignSECP256K1Fx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
 
 		// issue transaction
-		if _, err := vm.IssueTx(tx.Bytes()); err != nil {
-			t.Fatalf("should have issued the transaction correctly but erred: %s", err)
-		}
+		issueAndAccept(require, env.vm, env.issuer, tx)
 
-		ctx.Lock.Unlock()
-
-		msg := <-issuer
-		if msg != common.PendingTxs {
-			t.Fatalf("Wrong message")
-		}
-
-		ctx.Lock.Lock()
-
-		// get pending transactions
-		txs := vm.PendingTxs(context.Background())
-		if len(txs) != 1 {
-			t.Fatalf("Should have returned %d tx(s)", 1)
-		}
-
-		parsedTx := txs[0]
-		uniqueParsedTX := parsedTx.(*UniqueTx)
-		addressTxMap[addr] = uniqueParsedTX
-
-		var inputUTXOs []*avax.UTXO
-		for _, utxoID := range uniqueParsedTX.InputUTXOs() {
-			utxo, err := vm.dagState.GetUTXOFromID(utxoID)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			inputUTXOs = append(inputUTXOs, utxo)
-		}
-
-		// index the transaction
-		require.NoError(t, vm.addressTxsIndexer.Accept(uniqueParsedTX.ID(), inputUTXOs, uniqueParsedTX.UTXOs()))
+		addressTxMap[addr] = tx
 	}
 
 	// ensure length is same as keys length
-	require.Len(t, addressTxMap, len(keys))
+	require.Len(addressTxMap, len(keys))
 
 	// for each *UniqueTx check its indexed at right index for the right address
-	for key, tx := range addressTxMap {
-		assertIndexedTX(t, vm.db, uint64(0), key, txAssetID.ID, tx.ID())
-		assertLatestIdx(t, vm.db, key, txAssetID.ID, 1)
+	for addr, tx := range addressTxMap {
+		assertIndexedTX(t, env.vm.db, 0, addr, txAssetID.ID, tx.ID())
+		assertLatestIdx(t, env.vm.db, addr, txAssetID.ID, 1)
 	}
 }
 
 func TestIndexTransaction_MultipleAddresses(t *testing.T) {
-	genesisBytes := BuildGenesisTest(t)
-	issuer := make(chan common.Message, 1)
-	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
-	ctx := NewContext(t)
-	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
+	require := require.New(t)
 
-	avaxID := genesisTx.ID()
-	vm := setupTestVM(t, ctx, baseDBManager, genesisBytes, issuer, indexEnabledAvmConfig)
+	env := setup(t, &envConfig{
+		vmStaticConfig: &config.Config{},
+	})
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
-			t.Fatal(err)
-		}
-		ctx.Lock.Unlock()
+		require.NoError(env.vm.Shutdown(context.Background()))
+		env.vm.ctx.Lock.Unlock()
 	}()
 
-	txAssetID := avax.Asset{ID: avaxID}
 	addrs := make([]ids.ShortID, len(keys))
-	for _, key := range keys {
-		addrs = append(addrs, key.PublicKey().Address())
+	for i, key := range keys {
+		addrs[i] = key.PublicKey().Address()
 	}
+	utils.Sort(addrs)
 
-	ctx.Lock.Lock()
+	txAssetID := avax.Asset{ID: env.genesisTx.ID()}
 
 	key := keys[0]
 	addr := key.PublicKey().Address()
-	// create utxoID and assetIDs
+
+	// make utxo
 	utxoID := avax.UTXOID{
 		TxID: ids.GenerateTestID(),
 	}
+	utxo := buildUTXO(utxoID, txAssetID, addr)
+	env.vm.state.AddUTXO(utxo)
 
-	// build the transaction
+	// make transaction
 	tx := buildTX(utxoID, txAssetID, addrs...)
+	require.NoError(tx.SignSECP256K1Fx(env.vm.parser.Codec(), [][]*secp256k1.PrivateKey{{key}}))
 
-	// sign the transaction
-	if err := signTX(vm.parser.Codec(), tx, key); err != nil {
-		t.Fatal(err)
-	}
+	// issue transaction
+	issueAndAccept(require, env.vm, env.issuer, tx)
 
-	// Provide the platform UTXO
-	utxo := buildPlatformUTXO(utxoID, txAssetID, addr)
-
-	// save utxo to state
-	vm.state.AddUTXO(utxo)
-
-	var inputUTXOs []*avax.UTXO //nolint:prealloc
-	for _, utxoID := range tx.Unsigned.InputUTXOs() {
-		utxo, err := vm.dagState.GetUTXOFromID(utxoID)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		inputUTXOs = append(inputUTXOs, utxo)
-	}
-
-	// index the transaction
-	require.NoError(t, vm.addressTxsIndexer.Accept(tx.ID(), inputUTXOs, tx.UTXOs()))
-
-	assertIndexedTX(t, vm.db, uint64(0), addr, txAssetID.ID, tx.ID())
-	assertLatestIdx(t, vm.db, addr, txAssetID.ID, 1)
-}
-
-func TestIndexTransaction_UnorderedWrites(t *testing.T) {
-	genesisBytes := BuildGenesisTest(t)
-	issuer := make(chan common.Message, 1)
-	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
-	ctx := NewContext(t)
-	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
-	avaxID := genesisTx.ID()
-	vm := setupTestVM(t, ctx, baseDBManager, genesisBytes, issuer, indexEnabledAvmConfig)
-	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
-			t.Fatal(err)
-		}
-		ctx.Lock.Unlock()
-	}()
-
-	addressTxMap := map[ids.ShortID]*UniqueTx{}
-	txAssetID := avax.Asset{ID: avaxID}
-
-	ctx.Lock.Lock()
-	for _, key := range keys {
-		addr := key.PublicKey().Address()
-		// create utxoID and assetIDs
-		utxoID := avax.UTXOID{
-			TxID: ids.GenerateTestID(),
-		}
-
-		// build the transaction
-		tx := buildTX(utxoID, txAssetID, addr)
-
-		// sign the transaction
-		if err := signTX(vm.parser.Codec(), tx, key); err != nil {
-			t.Fatal(err)
-		}
-
-		// Provide the platform UTXO
-		utxo := buildPlatformUTXO(utxoID, txAssetID, addr)
-
-		// save utxo to state
-		vm.state.AddUTXO(utxo)
-
-		// issue transaction
-		if _, err := vm.IssueTx(tx.Bytes()); err != nil {
-			t.Fatalf("should have issued the transaction correctly but erred: %s", err)
-		}
-
-		ctx.Lock.Unlock()
-
-		msg := <-issuer
-		if msg != common.PendingTxs {
-			t.Fatalf("Wrong message")
-		}
-
-		ctx.Lock.Lock()
-
-		// get pending transactions
-		txs := vm.PendingTxs(context.Background())
-		if len(txs) != 1 {
-			t.Fatalf("Should have returned %d tx(s)", 1)
-		}
-
-		parsedTx := txs[0]
-		uniqueParsedTX := parsedTx.(*UniqueTx)
-		addressTxMap[addr] = uniqueParsedTX
-
-		var inputUTXOs []*avax.UTXO
-		for _, utxoID := range uniqueParsedTX.InputUTXOs() {
-			utxo, err := vm.dagState.GetUTXOFromID(utxoID)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			inputUTXOs = append(inputUTXOs, utxo)
-		}
-
-		// index the transaction, NOT calling Accept(ids.ID) method
-		require.NoError(t, vm.addressTxsIndexer.Accept(uniqueParsedTX.ID(), inputUTXOs, uniqueParsedTX.UTXOs()))
-	}
-
-	// ensure length is same as keys length
-	require.Len(t, addressTxMap, len(keys))
-
-	// for each *UniqueTx check its indexed at right index for the right address
-	for key, tx := range addressTxMap {
-		assertIndexedTX(t, vm.db, uint64(0), key, txAssetID.ID, tx.ID())
-		assertLatestIdx(t, vm.db, key, txAssetID.ID, 1)
-	}
+	assertIndexedTX(t, env.vm.db, 0, addr, txAssetID.ID, tx.ID())
+	assertLatestIdx(t, env.vm.db, addr, txAssetID.ID, 1)
 }
 
 func TestIndexer_Read(t *testing.T) {
-	// setup vm, db etc
-	_, vm, _, _, _ := setup(t, true)
+	require := require.New(t)
 
+	env := setup(t, &envConfig{})
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
-			t.Fatal(err)
-		}
-		vm.ctx.Lock.Unlock()
+		require.NoError(env.vm.Shutdown(context.Background()))
+		env.vm.ctx.Lock.Unlock()
 	}()
 
 	// generate test address and asset IDs
@@ -382,85 +166,85 @@ func TestIndexer_Read(t *testing.T) {
 	addr := ids.GenerateTestShortID()
 
 	// setup some fake txs under the above generated address and asset IDs
-	testTxCount := 25
-	testTxs := setupTestTxsInDB(t, vm.db, addr, assetID, testTxCount)
-	require.Len(t, testTxs, 25)
+	testTxs := initTestTxIndex(t, env.vm.db, addr, assetID, 25)
+	require.Len(testTxs, 25)
 
 	// read the pages, 5 items at a time
-	var cursor uint64
-	var pageSize uint64 = 5
+	var (
+		cursor   uint64
+		pageSize uint64 = 5
+	)
 	for cursor < 25 {
-		txIDs, err := vm.addressTxsIndexer.Read(addr[:], assetID, cursor, pageSize)
-		require.NoError(t, err)
-		require.Len(t, txIDs, 5)
-		require.Equal(t, txIDs, testTxs[cursor:cursor+pageSize])
+		txIDs, err := env.vm.addressTxsIndexer.Read(addr[:], assetID, cursor, pageSize)
+		require.NoError(err)
+		require.Len(txIDs, 5)
+		require.Equal(txIDs, testTxs[cursor:cursor+pageSize])
 		cursor += pageSize
 	}
 }
 
 func TestIndexingNewInitWithIndexingEnabled(t *testing.T) {
-	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
-	ctx := NewContext(t)
+	require := require.New(t)
 
-	db := baseDBManager.NewPrefixDBManager([]byte{1}).Current().Database
+	db := memdb.New()
 
 	// start with indexing enabled
-	_, err := index.NewIndexer(db, ctx.Log, "", prometheus.NewRegistry(), true)
-	require.NoError(t, err)
+	_, err := index.NewIndexer(db, logging.NoWarn{}, "", prometheus.NewRegistry(), true)
+	require.NoError(err)
 
 	// now disable indexing with allow-incomplete set to false
 	_, err = index.NewNoIndexer(db, false)
-	require.ErrorIs(t, err, index.ErrCausesIncompleteIndex)
+	require.ErrorIs(err, index.ErrCausesIncompleteIndex)
 
 	// now disable indexing with allow-incomplete set to true
 	_, err = index.NewNoIndexer(db, true)
-	require.NoError(t, err)
+	require.NoError(err)
 }
 
 func TestIndexingNewInitWithIndexingDisabled(t *testing.T) {
-	ctx := NewContext(t)
+	require := require.New(t)
+
 	db := memdb.New()
 
 	// disable indexing with allow-incomplete set to false
 	_, err := index.NewNoIndexer(db, false)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	// It's not OK to have an incomplete index when allowIncompleteIndices is false
-	_, err = index.NewIndexer(db, ctx.Log, "", prometheus.NewRegistry(), false)
-	require.ErrorIs(t, err, index.ErrIndexingRequiredFromGenesis)
+	_, err = index.NewIndexer(db, logging.NoWarn{}, "", prometheus.NewRegistry(), false)
+	require.ErrorIs(err, index.ErrIndexingRequiredFromGenesis)
 
 	// It's OK to have an incomplete index when allowIncompleteIndices is true
-	_, err = index.NewIndexer(db, ctx.Log, "", prometheus.NewRegistry(), true)
-	require.NoError(t, err)
+	_, err = index.NewIndexer(db, logging.NoWarn{}, "", prometheus.NewRegistry(), true)
+	require.NoError(err)
 
 	// It's OK to have an incomplete index when indexing currently disabled
 	_, err = index.NewNoIndexer(db, false)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	// It's OK to have an incomplete index when allowIncompleteIndices is true
 	_, err = index.NewNoIndexer(db, true)
-	require.NoError(t, err)
+	require.NoError(err)
 }
 
 func TestIndexingAllowIncomplete(t *testing.T) {
-	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
-	ctx := NewContext(t)
+	require := require.New(t)
 
-	prefixDB := baseDBManager.NewPrefixDBManager([]byte{1}).Current().Database
-	db := versiondb.New(prefixDB)
+	baseDB := memdb.New()
+	db := versiondb.New(baseDB)
 	// disabled indexer will persist idxEnabled as false
 	_, err := index.NewNoIndexer(db, false)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	// we initialize with indexing enabled now and allow incomplete indexing as false
-	_, err = index.NewIndexer(db, ctx.Log, "", prometheus.NewRegistry(), false)
+	_, err = index.NewIndexer(db, logging.NoWarn{}, "", prometheus.NewRegistry(), false)
 	// we should get error because:
 	// - indexing was disabled previously
 	// - node now is asked to enable indexing with allow incomplete set to false
-	require.ErrorIs(t, err, index.ErrIndexingRequiredFromGenesis)
+	require.ErrorIs(err, index.ErrIndexingRequiredFromGenesis)
 }
 
-func buildPlatformUTXO(utxoID avax.UTXOID, txAssetID avax.Asset, addr ids.ShortID) *avax.UTXO {
+func buildUTXO(utxoID avax.UTXOID, txAssetID avax.Asset, addr ids.ShortID) *avax.UTXO {
 	return &avax.UTXO{
 		UTXOID: utxoID,
 		Asset:  txAssetID,
@@ -472,10 +256,6 @@ func buildPlatformUTXO(utxoID avax.UTXOID, txAssetID avax.Asset, addr ids.ShortI
 			},
 		},
 	}
-}
-
-func signTX(codec codec.Manager, tx *txs.Tx, key *secp256k1.PrivateKey) error {
-	return tx.SignSECP256K1Fx(codec, [][]*secp256k1.PrivateKey{{key}})
 }
 
 func buildTX(utxoID avax.UTXOID, txAssetID avax.Asset, address ...ids.ShortID) *txs.Tx {
@@ -505,81 +285,28 @@ func buildTX(utxoID avax.UTXOID, txAssetID avax.Asset, address ...ids.ShortID) *
 	}}
 }
 
-func setupTestVM(t *testing.T, ctx *snow.Context, baseDBManager manager.Manager, genesisBytes []byte, issuer chan common.Message, config Config) *VM {
-	vm := &VM{}
-	avmConfigBytes, err := json.Marshal(config)
-	require.NoError(t, err)
-	appSender := &common.SenderTest{T: t}
-
-	err = vm.Initialize(
-		context.Background(),
-		ctx,
-		baseDBManager.NewPrefixDBManager([]byte{1}),
-		genesisBytes,
-		nil,
-		avmConfigBytes,
-		issuer,
-		[]*common.Fx{{
-			ID: ids.Empty,
-			Fx: &secp256k1fx.Fx{},
-		}},
-		appSender,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	vm.batchTimeout = 0
-
-	if err := vm.SetState(context.Background(), snow.Bootstrapping); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := vm.SetState(context.Background(), snow.NormalOp); err != nil {
-		t.Fatal(err)
-	}
-	return vm
-}
-
 func assertLatestIdx(t *testing.T, db database.Database, sourceAddress ids.ShortID, assetID ids.ID, expectedIdx uint64) {
 	require := require.New(t)
 
 	addressDB := prefixdb.New(sourceAddress[:], db)
 	assetDB := prefixdb.New(assetID[:], addressDB)
 
-	expectedIdxBytes := make([]byte, wrappers.LongLen)
-	binary.BigEndian.PutUint64(expectedIdxBytes, expectedIdx)
-
+	expectedIdxBytes := database.PackUInt64(expectedIdx)
 	idxBytes, err := assetDB.Get([]byte("idx"))
 	require.NoError(err)
-
 	require.Equal(expectedIdxBytes, idxBytes)
 }
 
-func checkIndexedTX(db database.Database, index uint64, sourceAddress ids.ShortID, assetID ids.ID, transactionID ids.ID) error {
+func assertIndexedTX(t *testing.T, db database.Database, index uint64, sourceAddress ids.ShortID, assetID ids.ID, transactionID ids.ID) {
+	require := require.New(t)
+
 	addressDB := prefixdb.New(sourceAddress[:], db)
 	assetDB := prefixdb.New(assetID[:], addressDB)
 
-	idxBytes := make([]byte, wrappers.LongLen)
-	binary.BigEndian.PutUint64(idxBytes, index)
-	tx1Bytes, err := assetDB.Get(idxBytes)
-	if err != nil {
-		return err
-	}
-
-	var txID ids.ID
-	copy(txID[:], tx1Bytes)
-
-	if txID != transactionID {
-		return fmt.Errorf("txID %s not same as %s", txID, transactionID)
-	}
-	return nil
-}
-
-func assertIndexedTX(t *testing.T, db database.Database, index uint64, sourceAddress ids.ShortID, assetID ids.ID, transactionID ids.ID) {
-	if err := checkIndexedTX(db, index, sourceAddress, assetID, transactionID); err != nil {
-		t.Fatal(err)
-	}
+	idxBytes := database.PackUInt64(index)
+	txID, err := database.GetID(assetDB, idxBytes)
+	require.NoError(err)
+	require.Equal(transactionID, txID)
 }
 
 // Sets up test tx IDs in DB in the following structure for the indexer to pick
@@ -590,27 +317,27 @@ func assertIndexedTX(t *testing.T, db database.Database, index uint64, sourceAdd
 //	    - "idx": 2
 //	    - 0: txID1
 //	    - 1: txID1
-func setupTestTxsInDB(t *testing.T, db *versiondb.Database, address ids.ShortID, assetID ids.ID, txCount int) []ids.ID {
-	var testTxs []ids.ID
+func initTestTxIndex(t *testing.T, db *versiondb.Database, address ids.ShortID, assetID ids.ID, txCount int) []ids.ID {
+	require := require.New(t)
+
+	testTxs := make([]ids.ID, txCount)
 	for i := 0; i < txCount; i++ {
-		testTxs = append(testTxs, ids.GenerateTestID())
+		testTxs[i] = ids.GenerateTestID()
 	}
 
 	addressPrefixDB := prefixdb.New(address[:], db)
 	assetPrefixDB := prefixdb.New(assetID[:], addressPrefixDB)
-	var idx uint64
-	idxBytes := make([]byte, 8)
-	binary.BigEndian.PutUint64(idxBytes, idx)
-	for _, txID := range testTxs {
+
+	for i, txID := range testTxs {
+		idxBytes := database.PackUInt64(uint64(i))
 		txID := txID
-		require.NoError(t, assetPrefixDB.Put(idxBytes, txID[:]))
-		idx++
-		binary.BigEndian.PutUint64(idxBytes, idx)
+		require.NoError(assetPrefixDB.Put(idxBytes, txID[:]))
 	}
 	_, err := db.CommitBatch()
-	require.NoError(t, err)
+	require.NoError(err)
 
-	require.NoError(t, assetPrefixDB.Put([]byte("idx"), idxBytes))
-	require.NoError(t, db.Commit())
+	idxBytes := database.PackUInt64(uint64(len(testTxs)))
+	require.NoError(assetPrefixDB.Put([]byte("idx"), idxBytes))
+	require.NoError(db.Commit())
 	return testTxs
 }

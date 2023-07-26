@@ -6,6 +6,8 @@ package node
 import (
 	"context"
 	"crypto"
+	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -144,6 +146,11 @@ type Node struct {
 	networkNamespace string
 	Net              network.Network
 
+	// The staking address will optionally be written to a process context
+	// file to enable other nodes to be configured to use this node as a
+	// beacon.
+	stakingAddress string
+
 	// tlsKeyLogWriterCloser is a debug file handle that writes all the TLS
 	// session keys. This value should only be non-nil during debugging.
 	tlsKeyLogWriterCloser io.WriteCloser
@@ -153,6 +160,8 @@ type Node struct {
 
 	// current validators of the network
 	vdrs validators.Manager
+
+	apiURI string
 
 	// Handles HTTP API calls
 	APIServer server.Server
@@ -212,7 +221,27 @@ type Node struct {
 // Assumes [n.CPUTracker] and [n.CPUTargeter] have been initialized.
 func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 	currentIPPort := n.Config.IPPort.IPPort()
-	listener, err := net.Listen(constants.NetworkType, fmt.Sprintf(":%d", currentIPPort.Port))
+
+	// Providing either loopback address - `::1` for ipv6 and `127.0.0.1` for ipv4 - as the listen
+	// host will avoid the need for a firewall exception on recent MacOS:
+	//
+	//   - MacOS requires a manually-approved firewall exception [1] for each version of a given
+	//   binary that wants to bind to all interfaces (i.e. with an address of `:[port]`). Each
+	//   compiled version of avalanchego requires a separate exception to be allowed to bind to all
+	//   interfaces.
+	//
+	//   - A firewall exception is not required to bind to a loopback interface, but the only way for
+	//   Listen() to bind to loopback for both ipv4 and ipv6 is to bind to all interfaces [2] which
+	//   requires an exception.
+	//
+	//   - Thus, the only way to start a node on MacOS without approving a firewall exception for the
+	//   avalanchego binary is to bind to loopback by specifying the host to be `::1` or `127.0.0.1`.
+	//
+	// 1: https://apple.stackexchange.com/questions/393715/do-you-want-the-application-main-to-accept-incoming-network-connections-pop
+	// 2: https://github.com/golang/go/issues/56998
+	listenAddress := net.JoinHostPort(n.Config.ListenHost, fmt.Sprintf("%d", currentIPPort.Port))
+
+	listener, err := net.Listen(constants.NetworkType, listenAddress)
 	if err != nil {
 		return err
 	}
@@ -233,6 +262,9 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 			zap.Stringer("currentNodeIP", ipPort),
 		)
 	}
+
+	// Record the bound address to enable inclusion in process context file.
+	n.stakingAddress = listener.Addr().String()
 
 	tlsKey, ok := n.Config.StakingTLSCert.PrivateKey.(crypto.Signer)
 	if !ok {
@@ -354,19 +386,51 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 	return err
 }
 
+type NodeProcessContext struct {
+	// The process id of the node
+	PID int `json:"pid"`
+	// URI to access the node API
+	// Format: [https|http]://[host]:[port]
+	URI string `json:"uri"`
+	// Address other nodes can use to communicate with this node
+	// Format: [host]:[port]
+	StakingAddress string `json:"stakingAddress"`
+}
+
+// Write process context to the configured path. Supports the use of
+// dynamically chosen network ports with local network orchestration.
+func (n *Node) writeProcessContext() error {
+	n.Log.Info("writing process context", zap.String("path", n.Config.ProcessContextFilePath))
+
+	// Write the process context to disk
+	processContext := &NodeProcessContext{
+		PID:            os.Getpid(),
+		URI:            n.apiURI,
+		StakingAddress: n.stakingAddress, // Set by network initialization
+	}
+	bytes, err := json.MarshalIndent(processContext, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal process context: %w", err)
+	}
+	if err := os.WriteFile(n.Config.ProcessContextFilePath, bytes, perms.ReadWrite); err != nil {
+		return fmt.Errorf("failed to write process context: %w", err)
+	}
+	return nil
+}
+
 // Dispatch starts the node's servers.
 // Returns when the node exits.
 func (n *Node) Dispatch() error {
+	if err := n.writeProcessContext(); err != nil {
+		return err
+	}
+
 	// Start the HTTP API server
 	go n.Log.RecoverAndPanic(func() {
-		var err error
-		if n.Config.HTTPSEnabled {
-			n.Log.Debug("initializing API server with TLS")
-			err = n.APIServer.DispatchTLS(n.Config.HTTPSCert, n.Config.HTTPSKey)
-		} else {
-			n.Log.Debug("initializing API server without TLS")
-			err = n.APIServer.Dispatch()
-		}
+		n.Log.Info("API server listening",
+			zap.String("uri", n.apiURI),
+		)
+		err := n.APIServer.Dispatch()
 		// When [n].Shutdown() is called, [n.APIServer].Close() is called.
 		// This causes [n.APIServer].Dispatch() to return an error.
 		// If that happened, don't log/return an error here.
@@ -409,6 +473,16 @@ func (n *Node) Dispatch() error {
 
 	// Wait until the node is done shutting down before returning
 	n.DoneShuttingDown.Wait()
+
+	// Remove the process context file to communicate to an orchestrator
+	// that the node is no longer running.
+	if err := os.Remove(n.Config.ProcessContextFilePath); err != nil && !os.IsNotExist(err) {
+		n.Log.Error("removal of process context file failed",
+			zap.String("path", n.Config.ProcessContextFilePath),
+			zap.Error(err),
+		)
+	}
+
 	return err
 }
 
@@ -581,13 +655,34 @@ func (n *Node) initMetrics() {
 func (n *Node) initAPIServer() error {
 	n.Log.Info("initializing API server")
 
+	listenAddress := net.JoinHostPort(n.Config.HTTPHost, fmt.Sprintf("%d", n.Config.HTTPPort))
+	listener, err := net.Listen("tcp", listenAddress)
+	if err != nil {
+		return err
+	}
+
+	protocol := "http"
+	if n.Config.HTTPSEnabled {
+		cert, err := tls.X509KeyPair(n.Config.HTTPSCert, n.Config.HTTPSKey)
+		if err != nil {
+			return err
+		}
+		config := &tls.Config{
+			MinVersion:   tls.VersionTLS12,
+			Certificates: []tls.Certificate{cert},
+		}
+		listener = tls.NewListener(listener, config)
+
+		protocol = "https"
+	}
+	n.apiURI = fmt.Sprintf("%s://%s", protocol, listener.Addr())
+
 	if !n.Config.APIRequireAuthToken {
 		var err error
 		n.APIServer, err = server.New(
 			n.Log,
 			n.LogFactory,
-			n.Config.HTTPHost,
-			n.Config.HTTPPort,
+			listener,
 			n.Config.HTTPAllowedOrigins,
 			n.Config.ShutdownTimeout,
 			n.ID,
@@ -609,8 +704,7 @@ func (n *Node) initAPIServer() error {
 	n.APIServer, err = server.New(
 		n.Log,
 		n.LogFactory,
-		n.Config.HTTPHost,
-		n.Config.HTTPPort,
+		listener,
 		n.Config.HTTPAllowedOrigins,
 		n.Config.ShutdownTimeout,
 		n.ID,

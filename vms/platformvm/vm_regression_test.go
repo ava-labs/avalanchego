@@ -4,6 +4,7 @@
 package platformvm
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"testing"
@@ -46,7 +47,7 @@ import (
 
 func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM()
+	vm, _, _ := defaultVM(t)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -206,7 +207,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			vm, _, _ := defaultVM()
+			vm, _, _ := defaultVM(t)
 			vm.ApricotPhase3Time = test.ap3Time
 
 			vm.ctx.Lock.Lock()
@@ -340,7 +341,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 // panic.
 func TestUnverifiedParentPanicRegression(t *testing.T) {
 	require := require.New(t)
-	_, genesisBytes := defaultGenesis()
+	_, genesisBytes := defaultGenesis(t)
 
 	baseDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	atomicDB := prefixdb.New([]byte{1}, baseDBManager.Current().Database)
@@ -358,7 +359,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 		BanffTime:              banffForkTime,
 	}}
 
-	ctx := defaultContext()
+	ctx := defaultContext(t)
 	ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -467,7 +468,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	require := require.New(t)
 
-	vm, baseDB, mutableSharedMemory := defaultVM()
+	vm, baseDB, mutableSharedMemory := defaultVM(t)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -653,28 +654,29 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	// Force a reload of the state from the database.
 	vm.Config.Validators = validators.NewManager()
 	vm.Config.Validators.Add(constants.PrimaryNetworkID, validators.NewSet())
-	is, err := state.New(
+	execCfg, _ := config.GetExecutionConfig(nil)
+	newState, err := state.New(
 		vm.dbManager.Current().Database,
 		nil,
 		prometheus.NewRegistry(),
 		&vm.Config,
+		execCfg,
 		vm.ctx,
 		metrics.Noop,
 		reward.NewCalculator(vm.Config.RewardConfig),
 		&utils.Atomic[bool]{},
 	)
 	require.NoError(err)
-	vm.state = is
 
 	// Verify that new validator is now in the current validator set.
 	{
-		_, err := vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+		_, err := newState.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 		require.NoError(err)
 
-		_, err = vm.state.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
+		_, err = newState.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
 		require.ErrorIs(err, database.ErrNotFound)
 
-		currentTimestamp := vm.state.GetTimestamp()
+		currentTimestamp := newState.GetTimestamp()
 		require.Equal(newValidatorStartTime.Unix(), currentTimestamp.Unix())
 	}
 }
@@ -682,7 +684,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	require := require.New(t)
 
-	vm, baseDB, mutableSharedMemory := defaultVM()
+	vm, baseDB, mutableSharedMemory := defaultVM(t)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -962,37 +964,38 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	// Force a reload of the state from the database.
 	vm.Config.Validators = validators.NewManager()
 	vm.Config.Validators.Add(constants.PrimaryNetworkID, validators.NewSet())
-	is, err := state.New(
+	execCfg, _ := config.GetExecutionConfig(nil)
+	newState, err := state.New(
 		vm.dbManager.Current().Database,
 		nil,
 		prometheus.NewRegistry(),
 		&vm.Config,
+		execCfg,
 		vm.ctx,
 		metrics.Noop,
 		reward.NewCalculator(vm.Config.RewardConfig),
 		&utils.Atomic[bool]{},
 	)
 	require.NoError(err)
-	vm.state = is
 
 	// Verify that validators are in the current validator set with the correct
 	// reward calculated.
 	{
-		staker0, err := vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID0)
+		staker0, err := newState.GetCurrentValidator(constants.PrimaryNetworkID, nodeID0)
 		require.NoError(err)
 		require.Equal(uint64(60000000), staker0.PotentialReward)
 
-		staker1, err := vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID1)
+		staker1, err := newState.GetCurrentValidator(constants.PrimaryNetworkID, nodeID1)
 		require.NoError(err)
 		require.Equal(uint64(59999999), staker1.PotentialReward)
 
-		_, err = vm.state.GetPendingValidator(constants.PrimaryNetworkID, nodeID0)
+		_, err = newState.GetPendingValidator(constants.PrimaryNetworkID, nodeID0)
 		require.ErrorIs(err, database.ErrNotFound)
 
-		_, err = vm.state.GetPendingValidator(constants.PrimaryNetworkID, nodeID1)
+		_, err = newState.GetPendingValidator(constants.PrimaryNetworkID, nodeID1)
 		require.ErrorIs(err, database.ErrNotFound)
 
-		currentTimestamp := vm.state.GetTimestamp()
+		currentTimestamp := newState.GetTimestamp()
 		require.Equal(newValidatorStartTime1.Unix(), currentTimestamp.Unix())
 	}
 }
@@ -1000,7 +1003,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	require := require.New(t)
 
-	vm, _, _ := defaultVM()
+	vm, _, _ := defaultVM(t)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -1146,7 +1149,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 	delegator2EndTime := delegator2StartTime.Add(3 * defaultMinStakingDuration)
 	delegator2Stake := defaultMaxValidatorStake - validatorStake
 
-	vm, _, _ := defaultVM()
+	vm, _, _ := defaultVM(t)
 
 	vm.ctx.Lock.Lock()
 	defer func() {
@@ -1230,7 +1233,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 	validatorStartTime := banffForkTime.Add(executor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 
-	vm, _, _ := defaultVM()
+	vm, _, _ := defaultVM(t)
 
 	vm.ctx.Lock.Lock()
 	defer func() {
@@ -1347,7 +1350,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 	validatorStartTime := banffForkTime.Add(executor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 
-	vm, _, _ := defaultVM()
+	vm, _, _ := defaultVM(t)
 
 	vm.ctx.Lock.Lock()
 	defer func() {
@@ -1404,8 +1407,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 	subnetValidators := validators.NewSet()
 	require.NoError(vm.state.ValidatorSet(createSubnetTx.ID(), subnetValidators))
 
-	added := vm.Validators.Add(createSubnetTx.ID(), subnetValidators)
-	require.True(added)
+	require.True(vm.Validators.Add(createSubnetTx.ID(), subnetValidators))
 
 	addSubnetValidatorTx, err := vm.txBuilder.NewAddSubnetValidatorTx(
 		defaultMaxValidatorStake,
@@ -1454,7 +1456,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 	// setup
 	require := require.New(t)
-	vm, _, _ := defaultVM()
+	vm, _, _ := defaultVM(t)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -1686,26 +1688,26 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 			nodeID,
 			constants.PrimaryNetworkID,
 			height,
-			uPrimaryTx.Signer.Key()),
-		)
+			uPrimaryTx.Signer.Key(),
+		))
 	}
 	for height := primaryEndHeight; height < primaryRestartHeight; height++ {
-		require.ErrorIs(checkValidatorBlsKeyIsSet(
+		err := checkValidatorBlsKeyIsSet(
 			vm.State,
 			nodeID,
 			constants.PrimaryNetworkID,
 			primaryEndHeight,
-			uPrimaryTx.Signer.Key()),
-			database.ErrNotFound,
+			uPrimaryTx.Signer.Key(),
 		)
+		require.ErrorIs(err, database.ErrNotFound)
 	}
 	require.NoError(checkValidatorBlsKeyIsSet(
 		vm.State,
 		nodeID,
 		constants.PrimaryNetworkID,
 		primaryRestartHeight,
-		uPrimaryRestartTx.Signer.Key()),
-	)
+		uPrimaryRestartTx.Signer.Key(),
+	))
 
 	for height := subnetStartHeight; height < subnetEndHeight; height++ {
 		require.NoError(checkValidatorBlsKeyIsSet(
@@ -1713,19 +1715,19 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 			nodeID,
 			subnetID,
 			height,
-			uPrimaryTx.Signer.Key()),
-		)
+			uPrimaryTx.Signer.Key(),
+		))
 	}
 
 	for height := subnetEndHeight; height <= primaryRestartHeight; height++ {
-		require.ErrorIs(checkValidatorBlsKeyIsSet(
+		err := checkValidatorBlsKeyIsSet(
 			vm.State,
 			nodeID,
 			subnetID,
 			primaryEndHeight,
-			uPrimaryTx.Signer.Key()),
-			database.ErrNotFound,
+			uPrimaryTx.Signer.Key(),
 		)
+		require.ErrorIs(err, database.ErrNotFound)
 	}
 }
 
@@ -1736,7 +1738,7 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 
 	// setup
 	require := require.New(t)
-	vm, _, _ := defaultVM()
+	vm, _, _ := defaultVM(t)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -1883,8 +1885,8 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 			nodeID,
 			constants.PrimaryNetworkID,
 			height,
-			emptySigner.Key()),
-		)
+			emptySigner.Key(),
+		))
 	}
 }
 
@@ -1896,7 +1898,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 
 	// setup
 	require := require.New(t)
-	vm, _, _ := defaultVM()
+	vm, _, _ := defaultVM(t)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
@@ -2085,8 +2087,8 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 			nodeID,
 			constants.PrimaryNetworkID,
 			height,
-			emptySigner.Key()),
-		)
+			emptySigner.Key(),
+		))
 	}
 	for height := subnetStartHeight; height < subnetEndHeight; height++ {
 		require.NoError(checkValidatorBlsKeyIsSet(
@@ -2094,8 +2096,8 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 			nodeID,
 			subnetID,
 			height,
-			emptySigner.Key()),
-		)
+			emptySigner.Key(),
+		))
 	}
 }
 
@@ -2129,12 +2131,18 @@ func checkValidatorBlsKeyIsSet(
 	}
 
 	val, found := vals[nodeID]
-	if !found {
+	switch {
+	case !found:
 		return database.ErrNotFound
-	}
-	if val.PublicKey != expectedBlsKey {
+	case expectedBlsKey == val.PublicKey:
+		return nil
+	case expectedBlsKey == nil && val.PublicKey != nil:
 		return errors.New("unexpected BLS key")
+	case expectedBlsKey != nil && val.PublicKey == nil:
+		return errors.New("missing BLS key")
+	case !bytes.Equal(expectedBlsKey.Serialize(), val.PublicKey.Serialize()):
+		return errors.New("incorrect BLS key")
+	default:
+		return nil
 	}
-
-	return nil
 }

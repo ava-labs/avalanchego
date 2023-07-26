@@ -28,7 +28,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/math"
-	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
@@ -40,21 +39,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-const (
-	blockCacheSize               = 64 * units.MiB
-	txCacheSize                  = 128 * units.MiB
-	transformedSubnetTxCacheSize = 4 * units.MiB
-
-	validatorDiffsCacheSize = 2048
-	rewardUTXOsCacheSize    = 2048
-	chainCacheSize          = 2048
-	chainDBCacheSize        = 2048
-)
+const pointerOverhead = wrappers.LongLen
 
 var (
-	_ State              = (*state)(nil)
-	_ cache.SizedElement = (*stateBlk)(nil)
-	_ cache.SizedElement = (*txAndStatus)(nil)
+	_ State = (*state)(nil)
 
 	ErrDelegatorSubset              = errors.New("delegator's time range must be a subset of the validator's time range")
 	errMissingValidatorSet          = errors.New("missing validator set")
@@ -124,8 +112,10 @@ type State interface {
 	GetLastAccepted() ids.ID
 	SetLastAccepted(blkID ids.ID)
 
-	GetStatelessBlock(blockID ids.ID) (blocks.Block, choices.Status, error)
-	AddStatelessBlock(block blocks.Block, status choices.Status)
+	GetStatelessBlock(blockID ids.ID) (blocks.Block, error)
+
+	// Invariant: [block] is an accepted block.
+	AddStatelessBlock(block blocks.Block)
 
 	// ValidatorSet adds all the validators and delegators of [subnetID] into
 	// [vdrs].
@@ -149,20 +139,16 @@ type State interface {
 	// pending changes to the base database.
 	CommitBatch() (database.Batch, error)
 
+	Checksum() ids.ID
+
 	Close() error
 }
 
+// TODO: Remove after v1.11.x is activated
 type stateBlk struct {
 	Blk    blocks.Block
 	Bytes  []byte         `serialize:"true"`
 	Status choices.Status `serialize:"true"`
-}
-
-func (b *stateBlk) Size() int {
-	if b == nil {
-		return wrappers.LongLen
-	}
-	return len(b.Bytes) + wrappers.IntLen + wrappers.LongLen
 }
 
 /*
@@ -241,11 +227,9 @@ type state struct {
 
 	currentHeight uint64
 
-	addedBlocks map[ids.ID]stateBlk // map of blockID -> Block
-	// cache of blockID -> Block
-	// If the block isn't known, nil is cached.
-	blockCache cache.Cacher[ids.ID, *stateBlk]
-	blockDB    database.Database
+	addedBlocks map[ids.ID]blocks.Block            // map of blockID -> Block
+	blockCache  cache.Cacher[ids.ID, blocks.Block] // cache of blockID -> Block. If the entry is nil, it is not in the database
+	blockDB     database.Database
 
 	validatorsDB                 database.Database
 	currentValidatorsDB          database.Database
@@ -347,11 +331,25 @@ type txAndStatus struct {
 	status status.Status
 }
 
-func (t *txAndStatus) Size() int {
-	if t == nil {
-		return wrappers.LongLen
+func txSize(tx *txs.Tx) int {
+	if tx == nil {
+		return pointerOverhead
 	}
-	return t.tx.Size() + wrappers.IntLen + wrappers.LongLen
+	return len(tx.Bytes()) + pointerOverhead
+}
+
+func txAndStatusSize(t *txAndStatus) int {
+	if t == nil {
+		return pointerOverhead
+	}
+	return len(t.tx.Bytes()) + wrappers.IntLen + pointerOverhead
+}
+
+func blockSize(blk blocks.Block) int {
+	if blk == nil {
+		return pointerOverhead
+	}
+	return len(blk.Bytes()) + pointerOverhead
 }
 
 func New(
@@ -359,6 +357,7 @@ func New(
 	genesisBytes []byte,
 	metricsReg prometheus.Registerer,
 	cfg *config.Config,
+	execCfg *config.ExecutionConfig,
 	ctx *snow.Context,
 	metrics metrics.Metrics,
 	rewards reward.Calculator,
@@ -368,6 +367,7 @@ func New(
 		db,
 		metrics,
 		cfg,
+		execCfg,
 		ctx,
 		metricsReg,
 		rewards,
@@ -391,15 +391,16 @@ func new(
 	db database.Database,
 	metrics metrics.Metrics,
 	cfg *config.Config,
+	execCfg *config.ExecutionConfig,
 	ctx *snow.Context,
 	metricsReg prometheus.Registerer,
 	rewards reward.Calculator,
 	bootstrapped *utils.Atomic[bool],
 ) (*state, error) {
-	blockCache, err := metercacher.New(
+	blockCache, err := metercacher.New[ids.ID, blocks.Block](
 		"block_cache",
 		metricsReg,
-		cache.NewSizedLRU[ids.ID, *stateBlk](blockCacheSize),
+		cache.NewSizedLRU[ids.ID, blocks.Block](execCfg.BlockCacheSize, blockSize),
 	)
 	if err != nil {
 		return nil, err
@@ -425,7 +426,7 @@ func new(
 	validatorWeightDiffsCache, err := metercacher.New[string, map[ids.NodeID]*ValidatorWeightDiff](
 		"validator_weight_diffs_cache",
 		metricsReg,
-		&cache.LRU[string, map[ids.NodeID]*ValidatorWeightDiff]{Size: validatorDiffsCacheSize},
+		&cache.LRU[string, map[ids.NodeID]*ValidatorWeightDiff]{Size: execCfg.ValidatorDiffsCacheSize},
 	)
 	if err != nil {
 		return nil, err
@@ -435,7 +436,7 @@ func new(
 	validatorPublicKeyDiffsCache, err := metercacher.New[uint64, map[ids.NodeID]*bls.PublicKey](
 		"validator_pub_key_diffs_cache",
 		metricsReg,
-		&cache.LRU[uint64, map[ids.NodeID]*bls.PublicKey]{Size: validatorDiffsCacheSize},
+		&cache.LRU[uint64, map[ids.NodeID]*bls.PublicKey]{Size: execCfg.ValidatorDiffsCacheSize},
 	)
 	if err != nil {
 		return nil, err
@@ -444,7 +445,7 @@ func new(
 	txCache, err := metercacher.New(
 		"tx_cache",
 		metricsReg,
-		cache.NewSizedLRU[ids.ID, *txAndStatus](txCacheSize),
+		cache.NewSizedLRU[ids.ID, *txAndStatus](execCfg.TxCacheSize, txAndStatusSize),
 	)
 	if err != nil {
 		return nil, err
@@ -454,14 +455,14 @@ func new(
 	rewardUTXOsCache, err := metercacher.New[ids.ID, []*avax.UTXO](
 		"reward_utxos_cache",
 		metricsReg,
-		&cache.LRU[ids.ID, []*avax.UTXO]{Size: rewardUTXOsCacheSize},
+		&cache.LRU[ids.ID, []*avax.UTXO]{Size: execCfg.RewardUTXOsCacheSize},
 	)
 	if err != nil {
 		return nil, err
 	}
 
 	utxoDB := prefixdb.New(utxoPrefix, baseDB)
-	utxoState, err := avax.NewMeteredUTXOState(utxoDB, txs.GenesisCodec, metricsReg)
+	utxoState, err := avax.NewMeteredUTXOState(utxoDB, txs.GenesisCodec, metricsReg, execCfg.ChecksumsEnabled)
 	if err != nil {
 		return nil, err
 	}
@@ -471,7 +472,7 @@ func new(
 	transformedSubnetCache, err := metercacher.New(
 		"transformed_subnet_cache",
 		metricsReg,
-		cache.NewSizedLRU[ids.ID, *txs.Tx](transformedSubnetTxCacheSize),
+		cache.NewSizedLRU[ids.ID, *txs.Tx](execCfg.TransformedSubnetTxCacheSize, txSize),
 	)
 	if err != nil {
 		return nil, err
@@ -480,7 +481,7 @@ func new(
 	supplyCache, err := metercacher.New[ids.ID, *uint64](
 		"supply_cache",
 		metricsReg,
-		&cache.LRU[ids.ID, *uint64]{Size: chainCacheSize},
+		&cache.LRU[ids.ID, *uint64]{Size: execCfg.ChainCacheSize},
 	)
 	if err != nil {
 		return nil, err
@@ -489,7 +490,7 @@ func new(
 	chainCache, err := metercacher.New[ids.ID, []*txs.Tx](
 		"chain_cache",
 		metricsReg,
-		&cache.LRU[ids.ID, []*txs.Tx]{Size: chainCacheSize},
+		&cache.LRU[ids.ID, []*txs.Tx]{Size: execCfg.ChainCacheSize},
 	)
 	if err != nil {
 		return nil, err
@@ -498,7 +499,7 @@ func new(
 	chainDBCache, err := metercacher.New[ids.ID, linkeddb.LinkedDB](
 		"chain_db_cache",
 		metricsReg,
-		&cache.LRU[ids.ID, linkeddb.LinkedDB]{Size: chainDBCacheSize},
+		&cache.LRU[ids.ID, linkeddb.LinkedDB]{Size: execCfg.ChainDBCacheSize},
 	)
 	if err != nil {
 		return nil, err
@@ -514,7 +515,7 @@ func new(
 		bootstrapped: bootstrapped,
 		baseDB:       baseDB,
 
-		addedBlocks: make(map[ids.ID]stateBlk),
+		addedBlocks: make(map[ids.ID]blocks.Block),
 		blockCache:  blockCache,
 		blockDB:     prefixdb.New(blockPrefix, baseDB),
 
@@ -1018,7 +1019,7 @@ func (s *state) syncGenesis(genesisBlk blocks.Block, genesis *genesis.State) err
 	s.SetLastAccepted(genesisBlkID)
 	s.SetTimestamp(time.Unix(int64(genesis.Timestamp), 0))
 	s.SetCurrentSupply(constants.PrimaryNetworkID, genesis.InitialSupply)
-	s.AddStatelessBlock(genesisBlk, choices.Accepted)
+	s.AddStatelessBlock(genesisBlk)
 
 	// Persist UTXOs that exist at genesis
 	for _, utxo := range genesis.UTXOs {
@@ -1481,12 +1482,8 @@ func (s *state) init(genesisBytes []byte) error {
 	return s.Commit()
 }
 
-func (s *state) AddStatelessBlock(block blocks.Block, status choices.Status) {
-	s.addedBlocks[block.ID()] = stateBlk{
-		Blk:    block,
-		Bytes:  block.Bytes(),
-		Status: status,
-	}
+func (s *state) AddStatelessBlock(block blocks.Block) {
+	s.addedBlocks[block.ID()] = block
 }
 
 func (s *state) SetHeight(height uint64) {
@@ -1506,6 +1503,10 @@ func (s *state) Abort() {
 	s.baseDB.Abort()
 }
 
+func (s *state) Checksum() ids.ID {
+	return s.utxoState.Checksum()
+}
+
 func (s *state) CommitBatch() (database.Batch, error) {
 	// updateValidators is set to true here so that the validator manager is
 	// kept up to date with the last accepted state.
@@ -1516,11 +1517,14 @@ func (s *state) CommitBatch() (database.Batch, error) {
 }
 
 func (s *state) writeBlocks() error {
-	for blkID, stateBlk := range s.addedBlocks {
-		var (
-			blkID = blkID
-			stBlk = stateBlk
-		)
+	for blkID, blk := range s.addedBlocks {
+		blkID := blkID
+
+		stBlk := stateBlk{
+			Blk:    blk,
+			Bytes:  blk.Bytes(),
+			Status: choices.Accepted,
+		}
 
 		// Note: blocks to be stored are verified, so it's safe to marshal them with GenesisCodec
 		blockBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, &stBlk)
@@ -1529,7 +1533,7 @@ func (s *state) writeBlocks() error {
 		}
 
 		delete(s.addedBlocks, blkID)
-		// Note: Evict is used rather than Put here because stBlk may end up
+		// Note: Evict is used rather than Put here because blk may end up
 		// referencing additional data (because of shared byte slices) that
 		// would not be properly accounted for in the cache sizing.
 		s.blockCache.Evict(blkID)
@@ -1540,38 +1544,39 @@ func (s *state) writeBlocks() error {
 	return nil
 }
 
-func (s *state) GetStatelessBlock(blockID ids.ID) (blocks.Block, choices.Status, error) {
-	if blk, ok := s.addedBlocks[blockID]; ok {
-		return blk.Blk, blk.Status, nil
+func (s *state) GetStatelessBlock(blockID ids.ID) (blocks.Block, error) {
+	if blk, exists := s.addedBlocks[blockID]; exists {
+		return blk, nil
 	}
-	if blkState, ok := s.blockCache.Get(blockID); ok {
-		if blkState == nil {
-			return nil, choices.Processing, database.ErrNotFound
+	if blk, cached := s.blockCache.Get(blockID); cached {
+		if blk == nil {
+			return nil, database.ErrNotFound
 		}
-		return blkState.Blk, blkState.Status, nil
+
+		return blk, nil
 	}
 
 	blkBytes, err := s.blockDB.Get(blockID[:])
 	if err == database.ErrNotFound {
 		s.blockCache.Put(blockID, nil)
-		return nil, choices.Processing, database.ErrNotFound // status does not matter here
-	} else if err != nil {
-		return nil, choices.Processing, err // status does not matter here
+		return nil, database.ErrNotFound
 	}
-
-	// Note: stored blocks are verified, so it's safe to unmarshal them with GenesisCodec
-	blkState := stateBlk{}
-	if _, err := blocks.GenesisCodec.Unmarshal(blkBytes, &blkState); err != nil {
-		return nil, choices.Processing, err // status does not matter here
-	}
-
-	blkState.Blk, err = blocks.Parse(blocks.GenesisCodec, blkState.Bytes)
 	if err != nil {
-		return nil, choices.Processing, err
+		return nil, err
 	}
 
-	s.blockCache.Put(blockID, &blkState)
-	return blkState.Blk, blkState.Status, nil
+	blk, status, _, err := parseStoredBlock(blkBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	if status != choices.Accepted {
+		s.blockCache.Put(blockID, nil)
+		return nil, database.ErrNotFound
+	}
+
+	s.blockCache.Put(blockID, blk)
+	return blk, nil
 }
 
 func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error {
@@ -1971,4 +1976,29 @@ func (s *state) writeMetadata() error {
 		s.persistedLastAccepted = s.lastAccepted
 	}
 	return nil
+}
+
+// Returns the block, status of the block, and whether it is a [stateBlk].
+// Invariant: blkBytes is safe to parse with blocks.GenesisCodec
+//
+// TODO: Remove after v1.11.x is activated
+func parseStoredBlock(blkBytes []byte) (blocks.Block, choices.Status, bool, error) {
+	// Attempt to parse as blocks.Block
+	blk, err := blocks.Parse(blocks.GenesisCodec, blkBytes)
+	if err == nil {
+		return blk, choices.Accepted, false, nil
+	}
+
+	// Fallback to [stateBlk]
+	blkState := stateBlk{}
+	if _, err := blocks.GenesisCodec.Unmarshal(blkBytes, &blkState); err != nil {
+		return nil, choices.Processing, false, err
+	}
+
+	blkState.Blk, err = blocks.Parse(blocks.GenesisCodec, blkState.Bytes)
+	if err != nil {
+		return nil, choices.Processing, false, err
+	}
+
+	return blkState.Blk, blkState.Status, true, nil
 }

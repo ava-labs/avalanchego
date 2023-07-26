@@ -17,20 +17,20 @@ import (
 func TestInterface(t *testing.T) {
 	type scenario struct {
 		description string
-		setup       func(size int) cache.Cacher[ids.ID, cache.TestSizedInt]
+		setup       func(size int) cache.Cacher[ids.ID, int64]
 	}
 
 	scenarios := []scenario{
 		{
 			description: "cache LRU",
-			setup: func(size int) cache.Cacher[ids.ID, cache.TestSizedInt] {
-				return &cache.LRU[ids.ID, cache.TestSizedInt]{Size: size}
+			setup: func(size int) cache.Cacher[ids.ID, int64] {
+				return &cache.LRU[ids.ID, int64]{Size: size}
 			},
 		},
 		{
 			description: "sized cache LRU",
-			setup: func(size int) cache.Cacher[ids.ID, cache.TestSizedInt] {
-				return cache.NewSizedLRU[ids.ID, cache.TestSizedInt](size * cache.TestSizedIntSize)
+			setup: func(size int) cache.Cacher[ids.ID, int64] {
+				return cache.NewSizedLRU[ids.ID, int64](size*cache.TestIntSize, cache.TestIntSizeFunc)
 			},
 		},
 	}

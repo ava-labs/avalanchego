@@ -98,12 +98,18 @@ func (vm *VM) Initialize(
 	dbManager manager.Manager,
 	genesisBytes []byte,
 	_ []byte,
-	_ []byte,
+	configBytes []byte,
 	toEngine chan<- common.Message,
 	_ []*common.Fx,
 	appSender common.AppSender,
 ) error {
 	chainCtx.Log.Verbo("initializing platform chain")
+
+	execConfig, err := config.GetExecutionConfig(configBytes)
+	if err != nil {
+		return err
+	}
+	chainCtx.Log.Info("using VM execution config", zap.Reflect("config", execConfig))
 
 	registerer := prometheus.NewRegistry()
 	if err := chainCtx.Metrics.Register(registerer); err != nil {
@@ -111,7 +117,6 @@ func (vm *VM) Initialize(
 	}
 
 	// Initialize metrics as soon as possible
-	var err error
 	vm.metrics, err = metrics.New("", registerer)
 	if err != nil {
 		return fmt.Errorf("failed to initialize metrics: %w", err)
@@ -127,11 +132,13 @@ func (vm *VM) Initialize(
 	}
 
 	rewards := reward.NewCalculator(vm.RewardConfig)
+
 	vm.state, err = state.New(
 		vm.dbManager.Current().Database,
 		genesisBytes,
 		registerer,
 		&vm.Config,
+		execConfig,
 		vm.ctx,
 		vm.metrics,
 		rewards,

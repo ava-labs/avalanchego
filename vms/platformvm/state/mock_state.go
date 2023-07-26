@@ -13,7 +13,6 @@ import (
 
 	database "github.com/ava-labs/avalanchego/database"
 	ids "github.com/ava-labs/avalanchego/ids"
-	choices "github.com/ava-labs/avalanchego/snow/choices"
 	validators "github.com/ava-labs/avalanchego/snow/validators"
 	bls "github.com/ava-labs/avalanchego/utils/crypto/bls"
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
@@ -83,15 +82,15 @@ func (mr *MockStateMockRecorder) AddRewardUTXO(arg0, arg1 interface{}) *gomock.C
 }
 
 // AddStatelessBlock mocks base method.
-func (m *MockState) AddStatelessBlock(arg0 blocks.Block, arg1 choices.Status) {
+func (m *MockState) AddStatelessBlock(arg0 blocks.Block) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "AddStatelessBlock", arg0, arg1)
+	m.ctrl.Call(m, "AddStatelessBlock", arg0)
 }
 
 // AddStatelessBlock indicates an expected call of AddStatelessBlock.
-func (mr *MockStateMockRecorder) AddStatelessBlock(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockStateMockRecorder) AddStatelessBlock(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddStatelessBlock", reflect.TypeOf((*MockState)(nil).AddStatelessBlock), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddStatelessBlock", reflect.TypeOf((*MockState)(nil).AddStatelessBlock), arg0)
 }
 
 // AddSubnet mocks base method.
@@ -140,6 +139,20 @@ func (m *MockState) AddUTXO(arg0 *avax.UTXO) {
 func (mr *MockStateMockRecorder) AddUTXO(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddUTXO", reflect.TypeOf((*MockState)(nil).AddUTXO), arg0)
+}
+
+// Checksum mocks base method.
+func (m *MockState) Checksum() ids.ID {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Checksum")
+	ret0, _ := ret[0].(ids.ID)
+	return ret0
+}
+
+// Checksum indicates an expected call of Checksum.
+func (mr *MockStateMockRecorder) Checksum() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Checksum", reflect.TypeOf((*MockState)(nil).Checksum))
 }
 
 // Close mocks base method.
@@ -425,13 +438,12 @@ func (mr *MockStateMockRecorder) GetStartTime(arg0, arg1 interface{}) *gomock.Ca
 }
 
 // GetStatelessBlock mocks base method.
-func (m *MockState) GetStatelessBlock(arg0 ids.ID) (blocks.Block, choices.Status, error) {
+func (m *MockState) GetStatelessBlock(arg0 ids.ID) (blocks.Block, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetStatelessBlock", arg0)
 	ret0, _ := ret[0].(blocks.Block)
-	ret1, _ := ret[1].(choices.Status)
-	ret2, _ := ret[2].(error)
-	return ret0, ret1, ret2
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // GetStatelessBlock indicates an expected call of GetStatelessBlock.

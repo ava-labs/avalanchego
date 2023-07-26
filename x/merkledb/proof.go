@@ -167,6 +167,7 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID) error {
 		return ErrProofValueDoesntMatch
 	}
 
+	// Don't bother locking [view] -- nobody else has a reference to it.
 	view, err := getEmptyTrieView(ctx)
 	if err != nil {
 		return err
@@ -175,9 +176,8 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID) error {
 	// Insert all of the proof nodes.
 	// [provenPath] is the path that we are proving exists, or the path
 	// that is where the path we are proving doesn't exist should be.
-	provenPath := proof.Path[len(proof.Path)-1].KeyPath.deserialize()
+	provenPath := Some(proof.Path[len(proof.Path)-1].KeyPath.deserialize())
 
-	// Don't bother locking [db] and [view] -- nobody else has a reference to them.
 	if err = addPathInfo(view, proof.Path, provenPath, provenPath); err != nil {
 		return err
 	}
@@ -251,11 +251,16 @@ type RangeProof struct {
 	// they are also in [EndProof].
 	StartProof []ProofNode
 
-	// A proof of the greatest key in [KeyValues], or, if this proof contains
-	// no [KeyValues], just the root.
-	// Empty if the request for this range proof gave no upper bound
-	// on the range to fetch, unless this proof contains no [KeyValues]
-	// and [StartProof] is empty.
+	// If no upper range bound was given, [KeyValues] is empty,
+	// and [StartProof] is non-empty, this is empty.
+	//
+	// If no upper range bound was given, [KeyValues] is empty,
+	// and [StartProof] is empty, this is the root.
+	//
+	// If an upper range bound was given and [KeyValues] is empty,
+	// this is a proof for the upper range bound.
+	//
+	// Otherwise, this is a proof for the largest key in [KeyValues].
 	EndProof []ProofNode
 
 	// This proof proves that the key-value pairs in [KeyValues] are in the trie.
@@ -300,12 +305,12 @@ func (proof *RangeProof) Verify(
 		return err
 	}
 
-	largestkey := end
+	largestKey := end
 	if len(proof.KeyValues) > 0 {
 		// If [proof] has key-value pairs, we should insert children
-		// greater than [end] to ancestors of the node containing [end]
-		// so that we get the expected root ID.
-		largestkey = proof.KeyValues[len(proof.KeyValues)-1].Key
+		// greater than [largestKey] to ancestors of the node containing
+		// [largestKey] so that we get the expected root ID.
+		largestKey = proof.KeyValues[len(proof.KeyValues)-1].Key
 	}
 
 	// The key-value pairs (allegedly) proven by [proof].
@@ -315,7 +320,7 @@ func (proof *RangeProof) Verify(
 	}
 
 	smallestPath := newPath(start)
-	largestPath := newPath(largestkey)
+	largestPath := newPath(largestKey)
 
 	// Ensure that the start proof is valid and contains values that
 	// match the key/values that were sent.
@@ -348,15 +353,34 @@ func (proof *RangeProof) Verify(
 		}
 	}
 
-	// For all the nodes along the edges of the proof, insert children < [start] and > [end]
+	// For all the nodes along the edges of the proof, insert children
+	// < [insertChildrenLessThan] and > [insertChildrenGreaterThan]
 	// into the trie so that we get the expected root ID (if this proof is valid).
-	// By inserting all children < [start], we prove that there are no keys
-	// > [start] but less than the first key given. That is, the peer who
-	// gave us this proof is not omitting nodes.
-	if err := addPathInfo(view, proof.StartProof, smallestPath, largestPath); err != nil {
+	// By inserting all children < [insertChildrenLessThan], we prove that there are no keys
+	// > [insertChildrenLessThan] but less than the first key given.
+	// That is, the peer who gave us this proof is not omitting nodes.
+	insertChildrenLessThan := Nothing[path]()
+	if len(smallestPath) > 0 {
+		insertChildrenLessThan = Some(smallestPath)
+	}
+	insertChildrenGreaterThan := Nothing[path]()
+	if len(largestPath) > 0 {
+		insertChildrenGreaterThan = Some(largestPath)
+	}
+	if err := addPathInfo(
+		view,
+		proof.StartProof,
+		insertChildrenLessThan,
+		insertChildrenGreaterThan,
+	); err != nil {
 		return err
 	}
-	if err := addPathInfo(view, proof.EndProof, smallestPath, largestPath); err != nil {
+	if err := addPathInfo(
+		view,
+		proof.EndProof,
+		insertChildrenLessThan,
+		insertChildrenGreaterThan,
+	); err != nil {
 		return err
 	}
 
@@ -728,19 +752,20 @@ func valueOrHashMatches(value Maybe[[]byte], valueOrHash Maybe[[]byte]) bool {
 }
 
 // Adds each key/value pair in [proofPath] to [t].
-// For each proof node, adds the children that are < [start] or > [end].
-// If [start] is empty, no children are < [start].
-// If [end] is empty, no children are > [end].
+// For each proof node, adds the children that are
+// < [insertChildrenLessThan] or > [insertChildrenGreaterThan].
+// If [insertChildrenLessThan] is Nothing, no children are < [insertChildrenLessThan].
+// If [insertChildrenGreaterThan] is Nothing, no children are > [insertChildrenGreaterThan].
 // Assumes [t.lock] is held.
 func addPathInfo(
 	t *trieView,
 	proofPath []ProofNode,
-	startPath path,
-	endPath path,
+	insertChildrenLessThan Maybe[path],
+	insertChildrenGreaterThan Maybe[path],
 ) error {
 	var (
-		hasLowerBound = len(startPath) > 0
-		hasUpperBound = len(endPath) > 0
+		shouldInsertLeftChildren  = insertChildrenLessThan.hasValue
+		shouldInsertRightChildren = insertChildrenGreaterThan.hasValue
 	)
 
 	for i := len(proofPath) - 1; i >= 0; i-- {
@@ -762,21 +787,22 @@ func addPathInfo(
 		// node because we may not know the pre-image of the valueDigest.
 		n.valueDigest = proofNode.ValueOrHash
 
-		if !hasLowerBound && !hasUpperBound {
+		if !shouldInsertLeftChildren && !shouldInsertRightChildren {
 			// No children of proof nodes are outside the range.
 			// No need to add any children to [n].
 			continue
 		}
 
-		// Add [proofNode]'s children which are outside the range [start, end].
+		// Add [proofNode]'s children which are outside the range
+		// [insertChildrenLessThan, insertChildrenGreaterThan].
 		compressedPath := EmptyPath
 		for index, childID := range proofNode.Children {
 			if existingChild, ok := n.children[index]; ok {
 				compressedPath = existingChild.compressedPath
 			}
 			childPath := keyPath.Append(index) + compressedPath
-			if (hasLowerBound && childPath.Compare(startPath) < 0) ||
-				(hasUpperBound && childPath.Compare(endPath) > 0) {
+			if (shouldInsertLeftChildren && childPath.Compare(insertChildrenLessThan.value) < 0) ||
+				(shouldInsertRightChildren && childPath.Compare(insertChildrenGreaterThan.value) > 0) {
 				n.addChildWithoutNode(index, compressedPath, childID)
 			}
 		}
@@ -794,8 +820,9 @@ func getEmptyTrieView(ctx context.Context) (*trieView, error) {
 		ctx,
 		memdb.New(),
 		Config{
-			Tracer:        tracer,
-			NodeCacheSize: verificationCacheSize,
+			EvictionBatchSize: DefaultEvictionBatchSize,
+			Tracer:            tracer,
+			NodeCacheSize:     verificationCacheSize,
 		},
 		&mockMetrics{},
 	)

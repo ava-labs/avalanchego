@@ -174,14 +174,14 @@ func TestStateSyncLocalSummaryIsIncludedAmongFrontiersIfAvailable(t *testing.T) 
 	}
 
 	// Connect enough stake to start syncer
-	for _, vdr := range vdrs.List() {
-		require.NoError(syncer.Connected(context.Background(), vdr.NodeID, version.CurrentApp))
+	for nodeID := range vdrs.Map() {
+		require.NoError(syncer.Connected(context.Background(), nodeID, version.CurrentApp))
 	}
 
 	require.Equal(localSummary, syncer.locallyAvailableSummary)
 	ws, ok := syncer.weightedSummaries[summaryID]
 	require.True(ok)
-	require.True(bytes.Equal(ws.summary.Bytes(), summaryBytes))
+	require.Equal(summaryBytes, ws.summary.Bytes())
 	require.Zero(ws.weight)
 }
 
@@ -211,8 +211,8 @@ func TestStateSyncNotFoundOngoingSummaryIsNotIncludedAmongFrontiers(t *testing.T
 	}
 
 	// Connect enough stake to start syncer
-	for _, vdr := range vdrs.List() {
-		require.NoError(syncer.Connected(context.Background(), vdr.NodeID, version.CurrentApp))
+	for nodeID := range vdrs.Map() {
+		require.NoError(syncer.Connected(context.Background(), nodeID, version.CurrentApp))
 	}
 
 	require.Nil(syncer.locallyAvailableSummary)
@@ -246,15 +246,15 @@ func TestBeaconsAreReachedForFrontiersUponStartup(t *testing.T) {
 	}
 
 	// Connect enough stake to start syncer
-	for _, vdr := range vdrs.List() {
-		require.NoError(syncer.Connected(context.Background(), vdr.NodeID, version.CurrentApp))
+	for nodeID := range vdrs.Map() {
+		require.NoError(syncer.Connected(context.Background(), nodeID, version.CurrentApp))
 	}
 
 	// check that vdrs are reached out for frontiers
 	require.Len(contactedFrontiersProviders, safeMath.Min(vdrs.Len(), common.MaxOutstandingBroadcastRequests))
 	for beaconID := range contactedFrontiersProviders {
 		// check that beacon is duly marked as reached out
-		require.True(syncer.pendingSeeders.Contains(beaconID))
+		require.Contains(syncer.pendingSeeders, beaconID)
 	}
 
 	// check that, obviously, no summary is yet registered
@@ -290,13 +290,13 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 	}
 
 	// Connect enough stake to start syncer
-	for _, vdr := range vdrs.List() {
-		require.NoError(syncer.Connected(context.Background(), vdr.NodeID, version.CurrentApp))
+	for nodeID := range vdrs.Map() {
+		require.NoError(syncer.Connected(context.Background(), nodeID, version.CurrentApp))
 	}
 
 	initiallyReachedOutBeaconsSize := len(contactedFrontiersProviders)
-	require.True(initiallyReachedOutBeaconsSize > 0)
-	require.True(initiallyReachedOutBeaconsSize <= common.MaxOutstandingBroadcastRequests)
+	require.Positive(initiallyReachedOutBeaconsSize)
+	require.LessOrEqual(initiallyReachedOutBeaconsSize, common.MaxOutstandingBroadcastRequests)
 
 	// mock VM to simulate a valid summary is returned
 	fullVM.CantParseStateSummary = true
@@ -383,13 +383,13 @@ func TestMalformedStateSummaryFrontiersAreDropped(t *testing.T) {
 	}
 
 	// Connect enough stake to start syncer
-	for _, vdr := range vdrs.List() {
-		require.NoError(syncer.Connected(context.Background(), vdr.NodeID, version.CurrentApp))
+	for nodeID := range vdrs.Map() {
+		require.NoError(syncer.Connected(context.Background(), nodeID, version.CurrentApp))
 	}
 
 	initiallyReachedOutBeaconsSize := len(contactedFrontiersProviders)
-	require.True(initiallyReachedOutBeaconsSize > 0)
-	require.True(initiallyReachedOutBeaconsSize <= common.MaxOutstandingBroadcastRequests)
+	require.Positive(initiallyReachedOutBeaconsSize)
+	require.LessOrEqual(initiallyReachedOutBeaconsSize, common.MaxOutstandingBroadcastRequests)
 
 	// mock VM to simulate an invalid summary is returned
 	summary := []byte{'s', 'u', 'm', 'm', 'a', 'r', 'y'}
@@ -455,13 +455,13 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 	}
 
 	// Connect enough stake to start syncer
-	for _, vdr := range vdrs.List() {
-		require.NoError(syncer.Connected(context.Background(), vdr.NodeID, version.CurrentApp))
+	for nodeID := range vdrs.Map() {
+		require.NoError(syncer.Connected(context.Background(), nodeID, version.CurrentApp))
 	}
 
 	initiallyReachedOutBeaconsSize := len(contactedFrontiersProviders)
-	require.True(initiallyReachedOutBeaconsSize > 0)
-	require.True(initiallyReachedOutBeaconsSize <= common.MaxOutstandingBroadcastRequests)
+	require.Positive(initiallyReachedOutBeaconsSize)
+	require.LessOrEqual(initiallyReachedOutBeaconsSize, common.MaxOutstandingBroadcastRequests)
 
 	// pick one of the vdrs that have been reached out
 	unresponsiveBeaconID := pickRandomFrom(contactedFrontiersProviders)
@@ -568,10 +568,10 @@ func TestStateSyncIsRestartedIfTooManyFrontierSeedersTimeout(t *testing.T) {
 	}
 
 	// Connect enough stake to start syncer
-	for _, vdr := range vdrs.List() {
-		require.NoError(syncer.Connected(context.Background(), vdr.NodeID, version.CurrentApp))
+	for nodeID := range vdrs.Map() {
+		require.NoError(syncer.Connected(context.Background(), nodeID, version.CurrentApp))
 	}
-	require.True(syncer.pendingSeeders.Len() != 0)
+	require.NotEmpty(syncer.pendingSeeders)
 
 	// let just one node respond and all others timeout
 	maxResponses := 1
@@ -637,7 +637,7 @@ func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
 	// mock VM to simulate a valid summary is returned
 	fullVM.CantParseStateSummary = true
 	fullVM.ParseStateSummaryF = func(_ context.Context, b []byte) (block.StateSummary, error) {
-		require.True(bytes.Equal(b, summaryBytes))
+		require.Equal(summaryBytes, b)
 		return &block.TestStateSummary{
 			HeightV: key,
 			IDV:     summaryID,
@@ -654,10 +654,10 @@ func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
 	}
 
 	// Connect enough stake to start syncer
-	for _, vdr := range vdrs.List() {
-		require.NoError(syncer.Connected(context.Background(), vdr.NodeID, version.CurrentApp))
+	for nodeID := range vdrs.Map() {
+		require.NoError(syncer.Connected(context.Background(), nodeID, version.CurrentApp))
 	}
-	require.True(syncer.pendingSeeders.Len() != 0)
+	require.NotEmpty(syncer.pendingSeeders)
 
 	// let all contacted vdrs respond
 	for syncer.pendingSeeders.Len() != 0 {
@@ -672,12 +672,12 @@ func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
 			summaryBytes,
 		))
 	}
-	require.False(syncer.pendingSeeders.Len() != 0)
+	require.Empty(syncer.pendingSeeders)
 
 	// check that vote requests are issued
 	initiallyContactedVotersSize := len(contactedVoters)
-	require.True(initiallyContactedVotersSize > 0)
-	require.True(initiallyContactedVotersSize <= common.MaxOutstandingBroadcastRequests)
+	require.Positive(initiallyContactedVotersSize)
+	require.LessOrEqual(initiallyContactedVotersSize, common.MaxOutstandingBroadcastRequests)
 }
 
 func TestUnRequestedVotesAreDropped(t *testing.T) {
@@ -727,10 +727,10 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 	}
 
 	// Connect enough stake to start syncer
-	for _, vdr := range vdrs.List() {
-		require.NoError(syncer.Connected(context.Background(), vdr.NodeID, version.CurrentApp))
+	for nodeID := range vdrs.Map() {
+		require.NoError(syncer.Connected(context.Background(), nodeID, version.CurrentApp))
 	}
-	require.True(syncer.pendingSeeders.Len() != 0)
+	require.NotEmpty(syncer.pendingSeeders)
 
 	// let all contacted vdrs respond
 	for syncer.pendingSeeders.Len() != 0 {
@@ -745,12 +745,12 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 			summaryBytes,
 		))
 	}
-	require.False(syncer.pendingSeeders.Len() != 0)
+	require.Empty(syncer.pendingSeeders)
 
 	// check that vote requests are issued
 	initiallyContactedVotersSize := len(contactedVoters)
-	require.True(initiallyContactedVotersSize > 0)
-	require.True(initiallyContactedVotersSize <= common.MaxOutstandingBroadcastRequests)
+	require.Positive(initiallyContactedVotersSize)
+	require.LessOrEqual(initiallyContactedVotersSize, common.MaxOutstandingBroadcastRequests)
 
 	_, found := syncer.weightedSummaries[summaryID]
 	require.True(found)
@@ -847,10 +847,10 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 	}
 
 	// Connect enough stake to start syncer
-	for _, vdr := range vdrs.List() {
-		require.NoError(syncer.Connected(context.Background(), vdr.NodeID, version.CurrentApp))
+	for nodeID := range vdrs.Map() {
+		require.NoError(syncer.Connected(context.Background(), nodeID, version.CurrentApp))
 	}
-	require.True(syncer.pendingSeeders.Len() != 0)
+	require.NotEmpty(syncer.pendingSeeders)
 
 	// let all contacted vdrs respond
 	for syncer.pendingSeeders.Len() != 0 {
@@ -865,12 +865,12 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 			summaryBytes,
 		))
 	}
-	require.False(syncer.pendingSeeders.Len() != 0)
+	require.Empty(syncer.pendingSeeders)
 
 	// check that vote requests are issued
 	initiallyContactedVotersSize := len(contactedVoters)
-	require.True(initiallyContactedVotersSize > 0)
-	require.True(initiallyContactedVotersSize <= common.MaxOutstandingBroadcastRequests)
+	require.Positive(initiallyContactedVotersSize)
+	require.LessOrEqual(initiallyContactedVotersSize, common.MaxOutstandingBroadcastRequests)
 
 	_, found := syncer.weightedSummaries[summaryID]
 	require.True(found)
@@ -969,10 +969,10 @@ func TestStateSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 	}
 
 	// Connect enough stake to start syncer
-	for _, vdr := range vdrs.List() {
-		require.NoError(syncer.Connected(context.Background(), vdr.NodeID, version.CurrentApp))
+	for nodeID := range vdrs.Map() {
+		require.NoError(syncer.Connected(context.Background(), nodeID, version.CurrentApp))
 	}
-	require.True(syncer.pendingSeeders.Len() != 0)
+	require.NotEmpty(syncer.pendingSeeders)
 
 	// let all contacted vdrs respond with majority or minority summaries
 	for {
@@ -1000,7 +1000,7 @@ func TestStateSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 			))
 		}
 	}
-	require.False(syncer.pendingSeeders.Len() != 0)
+	require.Empty(syncer.pendingSeeders)
 
 	majoritySummaryCalled := false
 	minoritySummaryCalled := false
@@ -1104,10 +1104,10 @@ func TestVotingIsRestartedIfMajorityIsNotReachedDueToTimeouts(t *testing.T) {
 	}
 
 	// Connect enough stake to start syncer
-	for _, vdr := range vdrs.List() {
-		require.NoError(syncer.Connected(context.Background(), vdr.NodeID, version.CurrentApp))
+	for nodeID := range vdrs.Map() {
+		require.NoError(syncer.Connected(context.Background(), nodeID, version.CurrentApp))
 	}
-	require.True(syncer.pendingSeeders.Len() != 0)
+	require.NotEmpty(syncer.pendingSeeders)
 
 	// let all contacted vdrs respond
 	for syncer.pendingSeeders.Len() != 0 {
@@ -1122,7 +1122,7 @@ func TestVotingIsRestartedIfMajorityIsNotReachedDueToTimeouts(t *testing.T) {
 			summaryBytes,
 		))
 	}
-	require.False(syncer.pendingSeeders.Len() != 0)
+	require.Empty(syncer.pendingSeeders)
 
 	minoritySummaryCalled := false
 	minoritySummary.AcceptF = func(context.Context) (block.StateSyncMode, error) {
@@ -1159,8 +1159,8 @@ func TestVotingIsRestartedIfMajorityIsNotReachedDueToTimeouts(t *testing.T) {
 	require.False(minoritySummaryCalled)
 
 	// instead the whole process is restared
-	require.False(syncer.pendingVoters.Len() != 0) // no voters reached
-	require.True(syncer.pendingSeeders.Len() != 0) // frontiers providers reached again
+	require.Empty(syncer.pendingVoters)     // no voters reached
+	require.NotEmpty(syncer.pendingSeeders) // frontiers providers reached again
 }
 
 func TestStateSyncIsStoppedIfEnoughVotesAreCastedWithNoClearMajority(t *testing.T) {
@@ -1226,10 +1226,10 @@ func TestStateSyncIsStoppedIfEnoughVotesAreCastedWithNoClearMajority(t *testing.
 	}
 
 	// Connect enough stake to start syncer
-	for _, vdr := range vdrs.List() {
-		require.NoError(syncer.Connected(context.Background(), vdr.NodeID, version.CurrentApp))
+	for nodeID := range vdrs.Map() {
+		require.NoError(syncer.Connected(context.Background(), nodeID, version.CurrentApp))
 	}
-	require.True(syncer.pendingSeeders.Len() != 0)
+	require.NotEmpty(syncer.pendingSeeders)
 
 	// let all contacted vdrs respond with majority or minority summaries
 	for {
@@ -1257,7 +1257,7 @@ func TestStateSyncIsStoppedIfEnoughVotesAreCastedWithNoClearMajority(t *testing.
 			))
 		}
 	}
-	require.False(syncer.pendingSeeders.Len() != 0)
+	require.Empty(syncer.pendingSeeders)
 
 	majoritySummaryCalled := false
 	minoritySummaryCalled := false

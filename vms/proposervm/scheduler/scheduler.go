@@ -14,6 +14,9 @@ import (
 
 type Scheduler interface {
 	Dispatch(startTime time.Time)
+
+	// Client must guarantee that [SetBuildBlockTime]
+	// is never called after [Close]
 	SetBuildBlockTime(t time.Time)
 	Close()
 }

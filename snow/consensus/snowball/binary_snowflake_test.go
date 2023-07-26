@@ -3,9 +3,15 @@
 
 package snowball
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
 
 func TestBinarySnowflake(t *testing.T) {
+	require := require.New(t)
+
 	blue := 0
 	red := 1
 
@@ -14,41 +20,26 @@ func TestBinarySnowflake(t *testing.T) {
 	sf := binarySnowflake{}
 	sf.Initialize(beta, red)
 
-	if pref := sf.Preference(); pref != red {
-		t.Fatalf("Wrong preference. Expected %d got %d", red, pref)
-	} else if sf.Finalized() {
-		t.Fatalf("Finalized too early")
-	}
+	require.Equal(red, sf.Preference())
+	require.False(sf.Finalized())
 
 	sf.RecordSuccessfulPoll(blue)
 
-	if pref := sf.Preference(); pref != blue {
-		t.Fatalf("Wrong preference. Expected %d got %d", blue, pref)
-	} else if sf.Finalized() {
-		t.Fatalf("Finalized too early")
-	}
+	require.Equal(blue, sf.Preference())
+	require.False(sf.Finalized())
 
 	sf.RecordSuccessfulPoll(red)
 
-	if pref := sf.Preference(); pref != red {
-		t.Fatalf("Wrong preference. Expected %d got %d", red, pref)
-	} else if sf.Finalized() {
-		t.Fatalf("Finalized too early")
-	}
+	require.Equal(red, sf.Preference())
+	require.False(sf.Finalized())
 
 	sf.RecordSuccessfulPoll(blue)
 
-	if pref := sf.Preference(); pref != blue {
-		t.Fatalf("Wrong preference. Expected %d got %d", blue, pref)
-	} else if sf.Finalized() {
-		t.Fatalf("Finalized too early")
-	}
+	require.Equal(blue, sf.Preference())
+	require.False(sf.Finalized())
 
 	sf.RecordSuccessfulPoll(blue)
 
-	if pref := sf.Preference(); pref != blue {
-		t.Fatalf("Wrong preference. Expected %d got %d", blue, pref)
-	} else if !sf.Finalized() {
-		t.Fatalf("Didn't finalized correctly")
-	}
+	require.Equal(blue, sf.Preference())
+	require.True(sf.Finalized())
 }
