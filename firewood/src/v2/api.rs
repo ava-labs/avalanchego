@@ -1,8 +1,4 @@
-use std::{
-    collections::HashMap,
-    fmt::Debug,
-    sync::{Arc, Weak},
-};
+use std::{collections::HashMap, fmt::Debug, sync::Arc};
 
 use async_trait::async_trait;
 
@@ -99,7 +95,7 @@ pub trait Db {
     /// # Arguments
     ///
     /// - `hash` - Identifies the revision for the view
-    async fn revision(&self, hash: HashKey) -> Result<Weak<Self::Historical>, Error>;
+    async fn revision(&self, hash: HashKey) -> Result<Arc<Self::Historical>, Error>;
 
     /// Get the hash of the most recently committed version
     async fn root_hash(&self) -> Result<HashKey, Error>;
@@ -115,9 +111,9 @@ pub trait Db {
     ///            [BatchOp::Delete] operations to apply
     ///
     async fn propose<K: KeyType, V: ValueType>(
-        self: Arc<Self>,
+        &self,
         data: Batch<K, V>,
-    ) -> Result<Arc<Self::Proposal>, Error>;
+    ) -> Result<Self::Proposal, Error>;
 }
 
 /// A view of the database at a specific time. These are wrapped with
@@ -175,8 +171,8 @@ pub trait Proposal<T: DbView>: DbView {
     ///
     /// # Return value
     ///
-    /// * A weak reference to a new historical view
-    async fn commit(self) -> Result<T, Error>;
+    /// * A reference to a new historical view
+    async fn commit(self: Arc<Self>) -> Result<Arc<T>, Error>;
 
     /// Propose a new revision on top of an existing proposal
     ///
@@ -186,10 +182,10 @@ pub trait Proposal<T: DbView>: DbView {
     ///
     /// # Return value
     ///
-    /// A weak reference to a new proposal
+    /// A reference to a new proposal
     ///
     async fn propose<K: KeyType, V: ValueType>(
         self: Arc<Self>,
         data: Batch<K, V>,
-    ) -> Result<Arc<Self::Proposal>, Error>;
+    ) -> Result<Self::Proposal, Error>;
 }
