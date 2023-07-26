@@ -27,10 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/perms"
 )
 
-var (
-	errProcessNotRunning        = errors.New("process not running")
-	errProcessQueryNotPermitted = errors.New("process running but query operation not permitted")
-)
+var errProcessNotRunning = errors.New("process not running")
 
 // Defines local-specific node configuration. Supports setting default
 // and node-specific values.
@@ -198,57 +195,87 @@ func (n *LocalNode) Start(w io.Writer, defaultExecPath string) error {
 	return nil
 }
 
+// Retrieve the node process if it is running. As part of determining
+// process liveness, the node's process context will be refreshed if
+// live or cleared if not running.
+func (n *LocalNode) GetProcess() (*os.Process, error) {
+	// Read the process context to ensure freshness. The node may have
+	// stopped or been restarted since last read.
+	if err := n.ReadProcessContext(); err != nil {
+		return nil, fmt.Errorf("failed to read process context: %w", err)
+	}
+
+	if n.PID == 0 {
+		// Process is not running
+		return nil, nil
+	}
+
+	proc, err := os.FindProcess(n.PID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find process: %w", err)
+	}
+
+	// Sending 0 will not actually send a signal but will perform
+	// error checking.
+	err = proc.Signal(syscall.Signal(0))
+	if err == nil {
+		// Process is still running
+		return proc, nil
+	}
+	if errors.Is(err, os.ErrProcessDone) {
+		// Process is not running
+		return nil, nil
+	}
+	return nil, fmt.Errorf("failed to determine process status: %w", err)
+}
+
+// Signals the node process to stop and waits for the node process to
+// stop running.
 func (n *LocalNode) Stop() error {
-	pid := n.PID
-	if pid == 0 {
-		// Nothing to do
+	proc, err := n.GetProcess()
+	if err != nil {
+		return fmt.Errorf("failed to retrieve process to stop: %w", err)
+	}
+	if proc == nil {
+		// Already stopped
 		return nil
 	}
-	proc, err := os.FindProcess(pid)
-	if err != nil {
-		return fmt.Errorf("failed to find process to stop: %w", err)
+	if err := proc.Signal(syscall.SIGTERM); err != nil {
+		return fmt.Errorf("failed to send SIGTERM to pid %d: %w", n.PID, err)
 	}
-	// Sending 0 will not actually send a signal but will perform
-	// error checking. If no error is returned, the process is still
-	// running.
-	if err := proc.Signal(syscall.Signal(0)); err != nil {
-		if err == syscall.ESRCH {
-			// Process is dead
+
+	// Wait for the node process to stop
+	ticker := time.NewTicker(DefaultNodeTickerInterval)
+	defer ticker.Stop()
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultNodeStopTimeout)
+	defer cancel()
+	for {
+		proc, err := n.GetProcess()
+		if err != nil {
+			return fmt.Errorf("failed to retrieve process: %w", err)
+		}
+		if proc == nil {
 			return nil
 		}
-		return fmt.Errorf("process.Signal(0) on pid %d returned: %w", pid, err)
+
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("failed to see node process stop %q before timeout", n.NodeID)
+		case <-ticker.C:
+		}
 	}
-	if err := proc.Signal(syscall.SIGTERM); err != nil {
-		return fmt.Errorf("failed to send SIGTERM to pid %d: %w", pid, err)
-	}
-	return nil
 }
 
 func (n *LocalNode) IsHealthy(ctx context.Context) (bool, error) {
-	// Ensure the API URI is available
-	if len(n.URI) == 0 {
-		if err := n.ReadProcessContext(); err != nil {
-			return false, fmt.Errorf("failed to read process context: %w", err)
-		}
-		if len(n.URI) == 0 {
-			return false, nil
-		}
-	}
-
-	// Check that the process is still alive
-	proc, err := os.FindProcess(n.PID)
+	// Check that the node process is running as a precondition for
+	// checking health. GetProcess will also ensure that the node's
+	// API URI is current.
+	proc, err := n.GetProcess()
 	if err != nil {
-		return false, fmt.Errorf("failed to find process: %w", err)
+		return false, fmt.Errorf("failed to determine process status: %w", err)
 	}
-	err = proc.Signal(syscall.Signal(0))
-	switch err {
-	case nil:
-		// Process is alive
-	case syscall.ESRCH:
-		// Process is dead
+	if proc == nil {
 		return false, errProcessNotRunning
-	default:
-		return false, errProcessQueryNotPermitted
 	}
 
 	// Check that the node is reporting healthy
@@ -274,7 +301,7 @@ func (n *LocalNode) IsHealthy(ctx context.Context) (bool, error) {
 }
 
 func (n *LocalNode) WaitForProcessContext(ctx context.Context) error {
-	ticker := time.NewTicker(50 * time.Millisecond)
+	ticker := time.NewTicker(DefaultNodeTickerInterval)
 	defer ticker.Stop()
 
 	ctx, cancel := context.WithTimeout(ctx, DefaultNodeInitTimeout)
