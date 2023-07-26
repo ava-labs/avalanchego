@@ -607,16 +607,18 @@ func (m *Manager) completeWorkItem(ctx context.Context, work *workItem, largestH
 	// Process [work] while holding [syncTargetLock] to ensure that object
 	// is added to the right queue, even if a target update is triggered
 	m.syncTargetLock.RLock()
+	defer m.syncTargetLock.RUnlock()
+
 	stale := m.config.TargetRoot != rootID
 	if stale {
 		// the root has changed, so reinsert with high priority
 		m.enqueueWork(newWorkItem(rootID, work.start, largestHandledKey, highPriority))
 	} else {
 		m.workLock.Lock()
+		defer m.workLock.Unlock()
+
 		m.processedWork.MergeInsert(newWorkItem(rootID, work.start, largestHandledKey, work.priority))
-		m.workLock.Unlock()
 	}
-	m.syncTargetLock.RUnlock()
 
 	// completed the range [work.start, lastKey], log and record in the completed work heap
 	m.config.Log.Info("completed range",
