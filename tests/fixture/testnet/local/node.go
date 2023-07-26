@@ -14,7 +14,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"syscall"
 	"time"
 
@@ -188,9 +187,8 @@ func (n *LocalNode) Start(w io.Writer, defaultExecPath string) error {
 			if err.Error() != "signal: killed" {
 				_, _ = fmt.Fprintf(w, "node %q finished with error: %v\n", n.NodeID, err)
 			}
-		} else {
-			_, _ = fmt.Fprintf(w, "node %q finished: %v\n", n.NodeID, cmd.ProcessState.String())
 		}
+		_, _ = fmt.Fprintf(w, "node %q exited\n", n.NodeID)
 	}()
 
 	if _, err := fmt.Fprintf(w, "Started %s\n", n.NodeID); err != nil {
@@ -214,7 +212,8 @@ func (n *LocalNode) Stop() error {
 	// error checking. If no error is returned, the process is still
 	// running.
 	if err := proc.Signal(syscall.Signal(0)); err != nil {
-		if strings.Contains(err.Error(), "os: process already finished") {
+		if err == syscall.ESRCH {
+			// Process is dead
 			return nil
 		}
 		return fmt.Errorf("process.Signal(0) on pid %d returned: %w", pid, err)
