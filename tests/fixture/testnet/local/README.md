@@ -174,12 +174,12 @@ an explicit value for `--genesis-file` or `--genesis-file-content`.
 ### C-Chain config
 
 The C-Chain config for a local network is stored at
-`[network-dir]/chains/C/cchain_config.json` and referenced by default
-by all nodes in the network. The C-Chain config will be generated with
+`[network-dir]/chains/C/config.json` and referenced by default by all
+nodes in the network. The C-Chain config will be generated with
 reasonable defaults if not supplied. Each node in the network can
 override the default by setting an explicit value for
-`--chain-config-dir` and ensuring the cchain C-Chain config file
-exists at `[chain-config-dir]/C/cchain_config.json`.
+`--chain-config-dir` and ensuring the C-Chain config file exists at
+`[chain-config-dir]/C/config.json`.
 
 ### Network env
 

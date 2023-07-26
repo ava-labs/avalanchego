@@ -496,17 +496,17 @@ func (ln *LocalNetwork) GetChainConfigDir() string {
 }
 
 func (ln *LocalNetwork) GetCChainConfigPath() string {
-	return filepath.Join(ln.GetChainConfigDir(), "C", "cchain_config.json")
+	return filepath.Join(ln.GetChainConfigDir(), "C", "config.json")
 }
 
 func (ln *LocalNetwork) ReadCChainConfig() error {
 	bytes, err := os.ReadFile(ln.GetCChainConfigPath())
 	if err != nil {
-		return fmt.Errorf("failed to read cchain config: %w", err)
+		return fmt.Errorf("failed to read C-Chain config: %w", err)
 	}
 	cChainConfig := testnet.FlagsMap{}
 	if err := json.Unmarshal(bytes, &cChainConfig); err != nil {
-		return fmt.Errorf("failed to unmarshal cchain config: %w", err)
+		return fmt.Errorf("failed to unmarshal C-Chain config: %w", err)
 	}
 	ln.CChainConfig = cChainConfig
 	return nil
@@ -516,14 +516,14 @@ func (ln *LocalNetwork) WriteCChainConfig() error {
 	path := ln.GetCChainConfigPath()
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, perms.ReadWriteExecute); err != nil {
-		return fmt.Errorf("failed to create cchain config dir: %w", err)
+		return fmt.Errorf("failed to create C-Chain config dir: %w", err)
 	}
 	bytes, err := testnet.DefaultJSONMarshal(ln.CChainConfig)
 	if err != nil {
-		return fmt.Errorf("failed to marshal cchain config: %w", err)
+		return fmt.Errorf("failed to marshal C-Chain config: %w", err)
 	}
 	if err := os.WriteFile(path, bytes, perms.ReadWrite); err != nil {
-		return fmt.Errorf("failed to write cchain config: %w", err)
+		return fmt.Errorf("failed to write C-Chain config: %w", err)
 	}
 	return nil
 }
