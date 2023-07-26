@@ -87,6 +87,7 @@ func TestDiffIteration(t *testing.T) {
 			require.True(it.Next())
 			require.Equal(expectedKey, it.Key())
 		}
+		require.False(it.Next())
 	}
 
 	{
@@ -102,5 +103,6 @@ func TestDiffIteration(t *testing.T) {
 			require.True(it.Next())
 			require.Equal(expectedKey, it.Key())
 		}
+		require.False(it.Next())
 	}
 }

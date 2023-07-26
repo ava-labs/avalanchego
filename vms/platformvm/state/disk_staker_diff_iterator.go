@@ -12,15 +12,15 @@ import (
 )
 
 const (
+	// startDiffKey = [subnetID] + [inverseHeight]
+	startDiffKeyLength = ids.IDLen + database.Uint64Size
 	// diffKey = [subnetID] + [inverseHeight] + [nodeID]
-	startDiffKeyLength  = ids.IDLen + database.Uint64Size
 	diffKeyLength       = startDiffKeyLength + ids.NodeIDLen
 	diffKeyHeightOffset = ids.IDLen
 	diffKeyNodeIDOffset = diffKeyHeightOffset + database.Uint64Size
 
 	// weightValue = [isNegative] + [weight]
-	weightValueLength = 1 + database.Uint64Size
-	weightValueTrue   = 0x01
+	weightValueLength = database.BoolSize + database.Uint64Size
 )
 
 var (
@@ -64,9 +64,9 @@ func parseDiffKey(key []byte) (ids.ID, uint64, ids.NodeID, error) {
 func getWeightValue(diff *ValidatorWeightDiff) []byte {
 	value := make([]byte, weightValueLength)
 	if diff.Decrease {
-		value[0] = weightValueTrue
+		value[0] = database.BoolTrue
 	}
-	binary.BigEndian.PutUint64(value[1:], diff.Amount)
+	binary.BigEndian.PutUint64(value[database.BoolSize:], diff.Amount)
 	return value
 }
 
@@ -75,8 +75,8 @@ func parseWeightValue(value []byte) (*ValidatorWeightDiff, error) {
 		return nil, errUnexpectedWeightValueLength
 	}
 	return &ValidatorWeightDiff{
-		Decrease: value[0] == weightValueTrue,
-		Amount:   binary.BigEndian.Uint64(value[1:]),
+		Decrease: value[0] == database.BoolTrue,
+		Amount:   binary.BigEndian.Uint64(value[database.BoolSize:]),
 	}, nil
 }
 

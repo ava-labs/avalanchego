@@ -146,14 +146,19 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 		currentHeight uint64
 	)
 	for i := 0; i < 50; i++ {
-		require.NoError(addPrimaryValidator(s, genesisTime, genesisEndTime, &nodeIDs, &currentHeight))
+		currentHeight++
+		nodeID, err := addPrimaryValidator(s, genesisTime, genesisEndTime, currentHeight)
+		require.NoError(err)
+		nodeIDs = append(nodeIDs, nodeID)
 	}
 	subnetID := ids.GenerateTestID()
 	for _, nodeID := range nodeIDs {
-		require.NoError(addSubnetValidator(s, subnetID, genesisTime, genesisEndTime, nodeID, &currentHeight))
+		currentHeight++
+		require.NoError(addSubnetValidator(s, subnetID, genesisTime, genesisEndTime, nodeID, currentHeight))
 	}
 	for i := 0; i < 9900; i++ {
-		require.NoError(addSubnetDelegator(s, subnetID, genesisTime, genesisEndTime, nodeIDs, &currentHeight))
+		currentHeight++
+		require.NoError(addSubnetDelegator(s, subnetID, genesisTime, genesisEndTime, nodeIDs, currentHeight))
 	}
 
 	ctx := context.Background()
@@ -169,10 +174,15 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 	}
 }
 
-func addPrimaryValidator(s state.State, startTime, endTime time.Time, nodeIDs *[]ids.NodeID, height *uint64) error {
+func addPrimaryValidator(
+	s state.State,
+	startTime time.Time,
+	endTime time.Time,
+	height uint64,
+) (ids.NodeID, error) {
 	sk, err := bls.NewSecretKey()
 	if err != nil {
-		return err
+		return ids.EmptyNodeID, err
 	}
 
 	nodeID := ids.GenerateTestNodeID()
@@ -189,24 +199,24 @@ func addPrimaryValidator(s state.State, startTime, endTime time.Time, nodeIDs *[
 		Priority:        txs.PrimaryNetworkValidatorCurrentPriority,
 	})
 
-	blk, err := blocks.NewBanffStandardBlock(startTime, ids.GenerateTestID(), 1, nil)
+	blk, err := blocks.NewBanffStandardBlock(startTime, ids.GenerateTestID(), height, nil)
 	if err != nil {
-		return err
+		return ids.EmptyNodeID, err
 	}
 
 	s.AddStatelessBlock(blk)
-	s.SetHeight(*height + 1)
-	if err := s.Commit(); err != nil {
-		s.Abort()
-		return err
-	}
-
-	*nodeIDs = append(*nodeIDs, nodeID)
-	*height++
-	return nil
+	s.SetHeight(height)
+	return nodeID, s.Commit()
 }
 
-func addSubnetValidator(s state.State, subnetID ids.ID, startTime, endTime time.Time, nodeID ids.NodeID, height *uint64) error {
+func addSubnetValidator(
+	s state.State,
+	subnetID ids.ID,
+	startTime time.Time,
+	endTime time.Time,
+	nodeID ids.NodeID,
+	height uint64,
+) error {
 	s.PutCurrentValidator(&state.Staker{
 		TxID:            ids.GenerateTestID(),
 		NodeID:          nodeID,
@@ -219,23 +229,24 @@ func addSubnetValidator(s state.State, subnetID ids.ID, startTime, endTime time.
 		Priority:        txs.SubnetPermissionlessValidatorCurrentPriority,
 	})
 
-	blk, err := blocks.NewBanffStandardBlock(startTime, ids.GenerateTestID(), 1, nil)
+	blk, err := blocks.NewBanffStandardBlock(startTime, ids.GenerateTestID(), height, nil)
 	if err != nil {
 		return err
 	}
 
 	s.AddStatelessBlock(blk)
-	s.SetHeight(*height + 1)
-	if err := s.Commit(); err != nil {
-		s.Abort()
-		return err
-	}
-
-	*height++
-	return nil
+	s.SetHeight(height)
+	return s.Commit()
 }
 
-func addSubnetDelegator(s state.State, subnetID ids.ID, startTime, endTime time.Time, nodeIDs []ids.NodeID, height *uint64) error {
+func addSubnetDelegator(
+	s state.State,
+	subnetID ids.ID,
+	startTime time.Time,
+	endTime time.Time,
+	nodeIDs []ids.NodeID,
+	height uint64,
+) error {
 	i := rand.Intn(len(nodeIDs)) //#nosec G404
 	nodeID := nodeIDs[i]
 	s.PutCurrentDelegator(&state.Staker{
@@ -250,19 +261,13 @@ func addSubnetDelegator(s state.State, subnetID ids.ID, startTime, endTime time.
 		Priority:        txs.SubnetPermissionlessDelegatorCurrentPriority,
 	})
 
-	blk, err := blocks.NewBanffStandardBlock(startTime, ids.GenerateTestID(), *height+1, nil)
+	blk, err := blocks.NewBanffStandardBlock(startTime, ids.GenerateTestID(), height, nil)
 	if err != nil {
 		return err
 	}
 
 	s.AddStatelessBlock(blk)
 	s.SetLastAccepted(blk.ID())
-	s.SetHeight(*height + 1)
-	if err := s.Commit(); err != nil {
-		s.Abort()
-		return err
-	}
-
-	*height++
-	return nil
+	s.SetHeight(height)
+	return s.Commit()
 }
