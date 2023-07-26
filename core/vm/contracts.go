@@ -43,7 +43,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto/blake2b"
 	"github.com/ethereum/go-ethereum/crypto/bls12381"
 	"github.com/ethereum/go-ethereum/crypto/bn256"
-
 	big2 "github.com/holiman/big"
 	"golang.org/x/crypto/ripemd160"
 )
@@ -276,7 +275,7 @@ func (c *dataCopy) RequiredGas(input []byte) uint64 {
 	return uint64(len(input)+31)/32*params.IdentityPerWordGas + params.IdentityBaseGas
 }
 func (c *dataCopy) Run(in []byte) ([]byte, error) {
-	return in, nil
+	return common.CopyBytes(in), nil
 }
 
 // bigModExp implements a native big integer exponential modular operation.
@@ -304,11 +303,10 @@ var (
 
 // modexpMultComplexity implements bigModexp multComplexity formula, as defined in EIP-198
 //
-// def mult_complexity(x):
-//
-//	if x <= 64: return x ** 2
-//	elif x <= 1024: return x ** 2 // 4 + 96 * x - 3072
-//	else: return x ** 2 // 16 + 480 * x - 199680
+//	def mult_complexity(x):
+//		if x <= 64: return x ** 2
+//		elif x <= 1024: return x ** 2 // 4 + 96 * x - 3072
+//		else: return x ** 2 // 16 + 480 * x - 199680
 //
 // where is x is max(length_of_MODULUS, length_of_BASE)
 func modexpMultComplexity(x *big.Int) *big.Int {
@@ -984,7 +982,7 @@ func (c *bls12381Pairing) Run(input []byte) ([]byte, error) {
 			return nil, errBLS12381G2PointSubgroup
 		}
 
-		// Update pairing engine with G1 and G2 ponits
+		// Update pairing engine with G1 and G2 points
 		e.AddPair(p1, p2)
 	}
 	// Prepare 32 byte output

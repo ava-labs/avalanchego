@@ -180,15 +180,19 @@ func (ec *client) getBlock(ctx context.Context, method string, args ...interface
 	err := ec.c.CallContext(ctx, &raw, method, args...)
 	if err != nil {
 		return nil, err
-	} else if len(raw) == 0 {
-		return nil, interfaces.NotFound
 	}
+
 	// Decode header and transactions.
 	var head *types.Header
-	var body rpcBlock
 	if err := json.Unmarshal(raw, &head); err != nil {
 		return nil, err
 	}
+	// When the block is not found, the API returns JSON null.
+	if head == nil {
+		return nil, interfaces.NotFound
+	}
+
+	var body rpcBlock
 	if err := json.Unmarshal(raw, &body); err != nil {
 		return nil, err
 	}
@@ -199,10 +203,10 @@ func (ec *client) getBlock(ctx context.Context, method string, args ...interface
 	if head.UncleHash != types.EmptyUncleHash && len(body.UncleHashes) == 0 {
 		return nil, fmt.Errorf("server returned empty uncle list but block header indicates uncles")
 	}
-	if head.TxHash == types.EmptyRootHash && len(body.Transactions) > 0 {
+	if head.TxHash == types.EmptyTxsHash && len(body.Transactions) > 0 {
 		return nil, fmt.Errorf("server returned non-empty transaction list but block header indicates no transactions")
 	}
-	if head.TxHash != types.EmptyRootHash && len(body.Transactions) == 0 {
+	if head.TxHash != types.EmptyTxsHash && len(body.Transactions) == 0 {
 		return nil, fmt.Errorf("server returned empty transaction list but block header indicates transactions")
 	}
 	// Load uncles because they are not included in the block response.
@@ -397,7 +401,7 @@ func (ec *client) SubscribeNewHead(ctx context.Context, ch chan<- *types.Header)
 
 // State Access
 
-// NetworkID returns the network ID (also known as the chain ID) for this chain.
+// NetworkID returns the network ID for this client.
 func (ec *client) NetworkID(ctx context.Context) (*big.Int, error) {
 	version := new(big.Int)
 	var ver string
@@ -632,12 +636,12 @@ func ToBlockNumArg(number *big.Int) string {
 	// negative numbers to special strings (latest, pending) then is
 	// used on its server side. See rpc/types.go for the comparison.
 	// In Subnet EVM, latest, pending, and accepted are all treated the same
-	// therefore, if [number] is nil or a negative number in [-3, -1]
+	// therefore, if [number] is nil or a negative number in [-4, -1]
 	// we want the latest accepted block
 	if number == nil {
 		return "latest"
 	}
-	low := big.NewInt(-3)
+	low := big.NewInt(-4)
 	high := big.NewInt(-1)
 	if number.Cmp(low) >= 0 && number.Cmp(high) <= 0 {
 		return "latest"

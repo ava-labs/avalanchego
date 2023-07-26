@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/subnet-evm/metrics"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/precompile/contracts/txallowlist"
+	"github.com/ava-labs/subnet-evm/utils"
 	"github.com/ava-labs/subnet-evm/vmerrs"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -35,7 +36,7 @@ func TestVMUpgradeBytesPrecompile(t *testing.T) {
 	upgradeConfig := &params.UpgradeConfig{
 		PrecompileUpgrades: []params.PrecompileUpgrade{
 			{
-				Config: txallowlist.NewConfig(big.NewInt(enableAllowListTimestamp.Unix()), testEthAddrs[0:1], nil),
+				Config: txallowlist.NewConfig(utils.TimeToNewUint64(enableAllowListTimestamp), testEthAddrs[0:1], nil),
 			},
 		},
 	}
@@ -78,7 +79,7 @@ func TestVMUpgradeBytesPrecompile(t *testing.T) {
 	upgradeConfig.PrecompileUpgrades = append(
 		upgradeConfig.PrecompileUpgrades,
 		params.PrecompileUpgrade{
-			Config: txallowlist.NewDisableConfig(big.NewInt(disableAllowListTimestamp.Unix())),
+			Config: txallowlist.NewDisableConfig(utils.TimeToNewUint64(disableAllowListTimestamp)),
 		},
 	)
 	upgradeBytesJSON, err = json.Marshal(upgradeConfig)
@@ -135,7 +136,7 @@ func TestVMUpgradeBytesPrecompile(t *testing.T) {
 	assert.Equal(t, signedTx0.Hash(), txs[0].Hash())
 
 	// verify the issued block is after the network upgrade
-	assert.True(t, block.Timestamp().Cmp(big.NewInt(disableAllowListTimestamp.Unix())) >= 0)
+	assert.GreaterOrEqual(t, int64(block.Timestamp()), disableAllowListTimestamp.Unix())
 
 	<-newTxPoolHeadChan // wait for new head in tx pool
 
@@ -236,7 +237,7 @@ func TestVMUpgradeBytesNetworkUpgradesWithGenesis(t *testing.T) {
 	if err := json.Unmarshal([]byte(genesisJSONPreSubnetEVM), &genesis); err != nil {
 		t.Fatalf("could not unmarshal genesis bytes: %s", err)
 	}
-	genesisSubnetEVMTimestamp := big.NewInt(5)
+	genesisSubnetEVMTimestamp := utils.NewUint64(5)
 	genesis.Config.SubnetEVMTimestamp = genesisSubnetEVMTimestamp
 	genesisBytes, err := json.Marshal(&genesis)
 	if err != nil {
@@ -247,7 +248,7 @@ func TestVMUpgradeBytesNetworkUpgradesWithGenesis(t *testing.T) {
 	_, vm, _, _ := GenesisVM(t, true, string(genesisBytes), "", "")
 
 	// verify upgrade is rescheduled
-	require.True(t, vm.chainConfig.IsSubnetEVM(big.NewInt(0)))
+	require.True(t, vm.chainConfig.IsSubnetEVM(0))
 
 	if err := vm.Shutdown(context.Background()); err != nil {
 		t.Fatal(err)

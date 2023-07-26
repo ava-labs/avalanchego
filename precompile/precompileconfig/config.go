@@ -5,8 +5,6 @@
 package precompileconfig
 
 import (
-	"math/big"
-
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -24,7 +22,7 @@ type Config interface {
 	// 1) 0 indicates that the precompile should be enabled from genesis.
 	// 2) n indicates that the precompile should be enabled in the first block with timestamp >= [n].
 	// 3) nil indicates that the precompile is never enabled.
-	Timestamp() *big.Int
+	Timestamp() *uint64
 	// IsDisabled returns true if this network upgrade should disable the precompile.
 	IsDisabled() bool
 	// Equal returns true if the provided argument configures the same precompile with the same parameters.

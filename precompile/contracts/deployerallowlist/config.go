@@ -4,8 +4,6 @@
 package deployerallowlist
 
 import (
-	"math/big"
-
 	"github.com/ava-labs/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
 	"github.com/ethereum/go-ethereum/common"
@@ -22,7 +20,7 @@ type Config struct {
 
 // NewConfig returns a config for a network upgrade at [blockTimestamp] that enables
 // ContractDeployerAllowList with [admins] and [enableds] as members of the allowlist.
-func NewConfig(blockTimestamp *big.Int, admins []common.Address, enableds []common.Address) *Config {
+func NewConfig(blockTimestamp *uint64, admins []common.Address, enableds []common.Address) *Config {
 	return &Config{
 		AllowListConfig: allowlist.AllowListConfig{
 			AdminAddresses:   admins,
@@ -34,7 +32,7 @@ func NewConfig(blockTimestamp *big.Int, admins []common.Address, enableds []comm
 
 // NewDisableConfig returns config for a network upgrade at [blockTimestamp]
 // that disables ContractDeployerAllowList.
-func NewDisableConfig(blockTimestamp *big.Int) *Config {
+func NewDisableConfig(blockTimestamp *uint64) *Config {
 	return &Config{
 		Upgrade: precompileconfig.Upgrade{
 			BlockTimestamp: blockTimestamp,

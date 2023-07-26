@@ -11,8 +11,6 @@ const tmplSourcePrecompileConfigGo = `
 package {{.Package}}
 
 import (
-	"math/big"
-
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
 	{{- if .Contract.AllowList}}
 	"github.com/ava-labs/subnet-evm/precompile/allowlist"
@@ -37,7 +35,7 @@ type Config struct {
 
 // NewConfig returns a config for a network upgrade at [blockTimestamp] that enables
 // {{.Contract.Type}} {{- if .Contract.AllowList}} with the given [admins] as members of the allowlist {{end}}.
-func NewConfig(blockTimestamp *big.Int{{if .Contract.AllowList}}, admins []common.Address, enableds []common.Address,{{end}}) *Config {
+func NewConfig(blockTimestamp *uint64{{if .Contract.AllowList}}, admins []common.Address, enableds []common.Address,{{end}}) *Config {
 	return &Config{
 		{{- if .Contract.AllowList}}
 		AllowListConfig: allowlist.AllowListConfig{
@@ -51,7 +49,7 @@ func NewConfig(blockTimestamp *big.Int{{if .Contract.AllowList}}, admins []commo
 
 // NewDisableConfig returns config for a network upgrade at [blockTimestamp]
 // that disables {{.Contract.Type}}.
-func NewDisableConfig(blockTimestamp *big.Int) *Config {
+func NewDisableConfig(blockTimestamp *uint64) *Config {
 	return &Config{
 		Upgrade: precompileconfig.Upgrade{
 			BlockTimestamp: blockTimestamp,

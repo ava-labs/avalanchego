@@ -30,6 +30,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"math/big"
 
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/ethdb"
@@ -390,16 +391,19 @@ func ReadReceipts(db ethdb.Reader, hash common.Hash, number uint64, config *para
 	if receipts == nil {
 		return nil
 	}
-	header := ReadHeader(db, hash, number)
-	if header == nil {
-		return nil
-	}
 	body := ReadBody(db, hash, number)
 	if body == nil {
 		log.Error("Missing body but have receipt", "hash", hash, "number", number)
 		return nil
 	}
-	if err := receipts.DeriveFields(config, hash, number, header.Time, body.Transactions); err != nil {
+	header := ReadHeader(db, hash, number)
+	var baseFee *big.Int
+	if header == nil {
+		baseFee = big.NewInt(0)
+	} else {
+		baseFee = header.BaseFee
+	}
+	if err := receipts.DeriveFields(config, hash, number, header.Time, baseFee, body.Transactions); err != nil {
 		log.Error("Failed to derive block receipts fields", "hash", hash, "number", number, "err", err)
 		return nil
 	}
@@ -432,10 +436,11 @@ func DeleteReceipts(db ethdb.KeyValueWriter, hash common.Hash, number uint64) {
 
 // storedReceiptRLP is the storage encoding of a receipt.
 // Re-definition in core/types/receipt.go.
+// TODO: Re-use the existing definition.
 type storedReceiptRLP struct {
 	PostStateOrStatus []byte
 	CumulativeGasUsed uint64
-	Logs              []*types.LogForStorage
+	Logs              []*types.Log
 }
 
 // ReceiptLogs is a barebone version of ReceiptForStorage which only keeps
@@ -451,10 +456,7 @@ func (r *receiptLogs) DecodeRLP(s *rlp.Stream) error {
 	if err := s.Decode(&stored); err != nil {
 		return err
 	}
-	r.Logs = make([]*types.Log, len(stored.Logs))
-	for i, log := range stored.Logs {
-		r.Logs[i] = (*types.Log)(log)
-	}
+	r.Logs = stored.Logs
 	return nil
 }
 
@@ -479,9 +481,9 @@ func deriveLogFields(receipts []*receiptLogs, hash common.Hash, number uint64, t
 	return nil
 }
 
-// ReadLogs retrieves the logs for all transactions in a block. The log fields
-// are populated with metadata. In case the receipts or the block body
-// are not found, a nil is returned.
+// ReadLogs retrieves the logs for all transactions in a block. In case
+// receipts is not found, a nil is returned.
+// Note: ReadLogs does not derive unstored log fields.
 func ReadLogs(db ethdb.Reader, hash common.Hash, number uint64) [][]*types.Log {
 	// Retrieve the flattened receipt slice
 	data := ReadReceiptsRLP(db, hash, number)
@@ -494,15 +496,6 @@ func ReadLogs(db ethdb.Reader, hash common.Hash, number uint64) [][]*types.Log {
 		return nil
 	}
 
-	body := ReadBody(db, hash, number)
-	if body == nil {
-		log.Error("Missing body but have receipt", "hash", hash, "number", number)
-		return nil
-	}
-	if err := deriveLogFields(receipts, hash, number, body.Transactions); err != nil {
-		log.Error("Failed to derive block receipts fields", "hash", hash, "number", number, "err", err)
-		return nil
-	}
 	logs := make([][]*types.Log, len(receipts))
 	for i, receipt := range receipts {
 		logs[i] = receipt.Logs
@@ -590,8 +583,7 @@ func ReadHeadBlock(db ethdb.Reader) *types.Block {
 }
 
 // ReadTxIndexTail retrieves the number of oldest indexed block
-// whose transaction indices has been indexed. If the corresponding entry
-// is non-existent in database it means the indexing has been finished.
+// whose transaction indices has been indexed.
 func ReadTxIndexTail(db ethdb.KeyValueReader) *uint64 {
 	data, _ := db.Get(txIndexTailKey)
 	if len(data) != 8 {

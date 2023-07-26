@@ -86,13 +86,12 @@ func ClearSyncSegments(db ethdb.KeyValueStore, root common.Hash) error {
 	segmentsPrefix := make([]byte, len(syncSegmentsPrefix)+common.HashLength)
 	copy(segmentsPrefix, syncSegmentsPrefix)
 	copy(segmentsPrefix[len(syncSegmentsPrefix):], root[:])
-
-	return ClearPrefix(db, segmentsPrefix)
+	return ClearPrefix(db, segmentsPrefix, syncSegmentsKeyLength)
 }
 
 // ClearAllSyncSegments removes all segment markers from db
 func ClearAllSyncSegments(db ethdb.KeyValueStore) error {
-	return ClearPrefix(db, syncSegmentsPrefix)
+	return ClearPrefix(db, syncSegmentsPrefix, syncSegmentsKeyLength)
 }
 
 // UnpackSyncSegmentKey returns the root and start position for a trie segment
@@ -131,12 +130,12 @@ func ClearSyncStorageTrie(db ethdb.KeyValueStore, root common.Hash) error {
 	accountsPrefix := make([]byte, len(syncStorageTriesPrefix)+common.HashLength)
 	copy(accountsPrefix, syncStorageTriesPrefix)
 	copy(accountsPrefix[len(syncStorageTriesPrefix):], root[:])
-	return ClearPrefix(db, accountsPrefix)
+	return ClearPrefix(db, accountsPrefix, syncStorageTriesKeyLength)
 }
 
 // ClearAllSyncStorageTries removes all storage tries added for syncing from db
 func ClearAllSyncStorageTries(db ethdb.KeyValueStore) error {
-	return ClearPrefix(db, syncStorageTriesPrefix)
+	return ClearPrefix(db, syncStorageTriesPrefix, syncStorageTriesKeyLength)
 }
 
 // UnpackSyncStorageTrieKey returns the root and account for a storage trie

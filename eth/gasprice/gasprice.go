@@ -42,10 +42,10 @@ import (
 	"github.com/ava-labs/subnet-evm/precompile/contracts/feemanager"
 	"github.com/ava-labs/subnet-evm/rpc"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/lru"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
-	lru "github.com/hashicorp/golang-lru"
 )
 
 const (
@@ -128,7 +128,7 @@ type Oracle struct {
 	maxLookbackSeconds      uint64
 	maxCallBlockHistory     uint64
 	maxBlockHistory         int
-	historyCache            *lru.Cache
+	historyCache            *lru.Cache[uint64, *slimBlock]
 	feeInfoProvider         *feeInfoProvider
 }
 
@@ -179,7 +179,7 @@ func NewOracle(backend OracleBackend, config Config) (*Oracle, error) {
 		log.Warn("Sanitizing invalid gasprice oracle max block history", "provided", config.MaxBlockHistory, "updated", maxBlockHistory)
 	}
 
-	cache, _ := lru.New(DefaultFeeHistoryCacheSize)
+	cache := lru.NewCache[uint64, *slimBlock](DefaultFeeHistoryCacheSize)
 	headEvent := make(chan core.ChainHeadEvent, 1)
 	backend.SubscribeChainHeadEvent(headEvent)
 	go func() {
@@ -318,7 +318,7 @@ func (oracle *Oracle) suggestDynamicFees(ctx context.Context) (*big.Int, *big.In
 		feeLastChangedAt *big.Int
 		feeConfig        commontype.FeeConfig
 	)
-	if oracle.backend.ChainConfig().IsPrecompileEnabled(feemanager.ContractAddress, new(big.Int).SetUint64(head.Time)) {
+	if oracle.backend.ChainConfig().IsPrecompileEnabled(feemanager.ContractAddress, head.Time) {
 		feeConfig, feeLastChangedAt, err = oracle.backend.GetFeeConfigAt(head)
 		if err != nil {
 			return nil, nil, err

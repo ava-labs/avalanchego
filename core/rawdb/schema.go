@@ -89,6 +89,20 @@ var (
 	SnapshotStoragePrefix = []byte("o") // SnapshotStoragePrefix + account hash + storage hash -> storage trie value
 	CodePrefix            = []byte("c") // CodePrefix + code hash -> account code
 
+	// Path-based trie node scheme.
+	trieNodeAccountPrefix = []byte("A") // trieNodeAccountPrefix + hexPath -> trie node
+	trieNodeStoragePrefix = []byte("O") // trieNodeStoragePrefix + accountHash + hexPath -> trie node
+
+	PreimagePrefix      = []byte("secure-key-")      // PreimagePrefix + hash -> preimage
+	configPrefix        = []byte("ethereum-config-") // config prefix for the db
+	upgradeConfigPrefix = []byte("upgrade-config-")  // upgrade bytes passed to the chain are stored with this prefix
+
+	// BloomBitsIndexPrefix is the data table of a chain indexer to track its progress
+	BloomBitsIndexPrefix = []byte("iB")
+
+	preimageCounter    = metrics.NewRegisteredCounter("db/preimage/total", nil)
+	preimageHitCounter = metrics.NewRegisteredCounter("db/preimage/hits", nil)
+
 	// State sync progress keys and prefixes
 	syncRootKey            = []byte("sync_root")     // indicates the root of the main account trie currently being synced
 	syncStorageTriesPrefix = []byte("sync_storage")  // syncStorageTriesPrefix + trie root + account hash: indicates a storage trie must be fetched for the account
@@ -103,16 +117,6 @@ var (
 	// State sync metadata
 	syncPerformedPrefix    = []byte("sync_performed")
 	syncPerformedKeyLength = len(syncPerformedPrefix) + wrappers.LongLen // prefix + block number as uint64
-
-	preimagePrefix      = []byte("secure-key-")      // preimagePrefix + hash -> preimage
-	configPrefix        = []byte("ethereum-config-") // config prefix for the db
-	upgradeConfigPrefix = []byte("upgrade-config-")  // upgrade bytes passed to the chain are stored with this prefix
-
-	// Chain index prefixes (use `i` + single byte to avoid mixing data types).
-	BloomBitsIndexPrefix = []byte("iB") // BloomBitsIndexPrefix is the data table of a chain indexer to track its progress
-
-	preimageCounter    = metrics.NewRegisteredCounter("db/preimage/total", nil)
-	preimageHitCounter = metrics.NewRegisteredCounter("db/preimage/hits", nil)
 )
 
 // LegacyTxLookupEntry is the legacy TxLookupEntry definition with some unnecessary
@@ -192,7 +196,7 @@ func bloomBitsKey(bit uint, section uint64, hash common.Hash) []byte {
 
 // preimageKey = preimagePrefix + hash
 func preimageKey(hash common.Hash) []byte {
-	return append(preimagePrefix, hash.Bytes()...)
+	return append(PreimagePrefix, hash.Bytes()...)
 }
 
 // codeKey = CodePrefix + hash
@@ -217,4 +221,14 @@ func configKey(hash common.Hash) []byte {
 // upgradeConfigKey = upgradeConfigPrefix + hash
 func upgradeConfigKey(hash common.Hash) []byte {
 	return append(upgradeConfigPrefix, hash.Bytes()...)
+}
+
+// accountTrieNodeKey = trieNodeAccountPrefix + nodePath.
+func accountTrieNodeKey(path []byte) []byte {
+	return append(trieNodeAccountPrefix, path...)
+}
+
+// storageTrieNodeKey = trieNodeStoragePrefix + accountHash + nodePath.
+func storageTrieNodeKey(accountHash common.Hash, path []byte) []byte {
+	return append(append(trieNodeStoragePrefix, accountHash.Bytes()...), path...)
 }

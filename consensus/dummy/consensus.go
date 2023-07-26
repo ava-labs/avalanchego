@@ -107,8 +107,6 @@ func (self *DummyEngine) verifyCoinbase(config *params.ChainConfig, header *type
 }
 
 func (self *DummyEngine) verifyHeaderGasFields(config *params.ChainConfig, header *types.Header, parent *types.Header, chain consensus.ChainHeaderReader) error {
-	timestamp := new(big.Int).SetUint64(header.Time)
-
 	// Verify that the gas limit is <= 2^63-1
 	if header.GasLimit > params.MaxGasLimit {
 		return fmt.Errorf("invalid gasLimit: have %v, max %v", header.GasLimit, params.MaxGasLimit)
@@ -126,7 +124,7 @@ func (self *DummyEngine) verifyHeaderGasFields(config *params.ChainConfig, heade
 	if err != nil {
 		return err
 	}
-	if config.IsSubnetEVM(timestamp) {
+	if config.IsSubnetEVM(header.Time) {
 		expectedGasLimit := feeConfig.GasLimit.Uint64()
 		if header.GasLimit != expectedGasLimit {
 			return fmt.Errorf("expected gas limit to be %d, but found %d", expectedGasLimit, header.GasLimit)
@@ -195,15 +193,14 @@ func (self *DummyEngine) verifyHeaderGasFields(config *params.ChainConfig, heade
 // modified from consensus.go
 func (self *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header *types.Header, parent *types.Header, uncle bool) error {
 	var (
-		config    = chain.Config()
-		timestamp = new(big.Int).SetUint64(header.Time)
+		config = chain.Config()
 	)
 	// Ensure that we do not verify an uncle
 	if uncle {
 		return errUnclesUnsupported
 	}
 	// Ensure that the header's extra-data section is of a reasonable size
-	if !config.IsSubnetEVM(timestamp) {
+	if !config.IsSubnetEVM(header.Time) {
 		if uint64(len(header.Extra)) > params.MaximumExtraDataSize {
 			return fmt.Errorf("extra-data too long: %d > %d", len(header.Extra), params.MaximumExtraDataSize)
 		}
@@ -332,7 +329,7 @@ func (self *DummyEngine) verifyBlockFee(
 }
 
 func (self *DummyEngine) Finalize(chain consensus.ChainHeaderReader, block *types.Block, parent *types.Header, state *state.StateDB, receipts []*types.Receipt) error {
-	if chain.Config().IsSubnetEVM(new(big.Int).SetUint64(block.Time())) {
+	if chain.Config().IsSubnetEVM(block.Time()) {
 		// we use the parent to determine the fee config
 		// since the current block has not been finalized yet.
 		feeConfig, _, err := chain.GetFeeConfigAt(parent)
@@ -371,7 +368,7 @@ func (self *DummyEngine) Finalize(chain consensus.ChainHeaderReader, block *type
 func (self *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *types.Header, parent *types.Header, state *state.StateDB, txs []*types.Transaction,
 	uncles []*types.Header, receipts []*types.Receipt,
 ) (*types.Block, error) {
-	if chain.Config().IsSubnetEVM(new(big.Int).SetUint64(header.Time)) {
+	if chain.Config().IsSubnetEVM(header.Time) {
 		// we use the parent to determine the fee config
 		// since the current block has not been finalized yet.
 		feeConfig, _, err := chain.GetFeeConfigAt(parent)

@@ -7,8 +7,6 @@
 package rewardmanager
 
 import (
-	"math/big"
-
 	"github.com/ava-labs/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/subnet-evm/precompile/contract"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
@@ -64,7 +62,7 @@ type Config struct {
 
 // NewConfig returns a config for a network upgrade at [blockTimestamp] that enables
 // RewardManager with the given [admins] and [enableds] as members of the allowlist with [initialConfig] as initial rewards config if specified.
-func NewConfig(blockTimestamp *big.Int, admins []common.Address, enableds []common.Address, initialConfig *InitialRewardConfig) *Config {
+func NewConfig(blockTimestamp *uint64, admins []common.Address, enableds []common.Address, initialConfig *InitialRewardConfig) *Config {
 	return &Config{
 		AllowListConfig: allowlist.AllowListConfig{
 			AdminAddresses:   admins,
@@ -77,7 +75,7 @@ func NewConfig(blockTimestamp *big.Int, admins []common.Address, enableds []comm
 
 // NewDisableConfig returns config for a network upgrade at [blockTimestamp]
 // that disables RewardManager.
-func NewDisableConfig(blockTimestamp *big.Int) *Config {
+func NewDisableConfig(blockTimestamp *uint64) *Config {
 	return &Config{
 		Upgrade: precompileconfig.Upgrade{
 			BlockTimestamp: blockTimestamp,

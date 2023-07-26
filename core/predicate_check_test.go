@@ -236,7 +236,7 @@ func TestCheckPredicate(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			require := require.New(t)
 			// Create the rules from TestChainConfig and update the predicates based on the test params
-			rules := params.TestChainConfig.AvalancheRules(common.Big0, common.Big0)
+			rules := params.TestChainConfig.AvalancheRules(common.Big0, 0)
 			if test.proposerPredicater != nil {
 				rules.ProposerPredicates[test.address] = test.proposerPredicater
 			}

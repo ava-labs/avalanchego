@@ -28,6 +28,7 @@ package bloombits
 
 import (
 	"bytes"
+	crand "crypto/rand"
 	"math/rand"
 	"testing"
 
@@ -88,7 +89,7 @@ func BenchmarkGenerator(b *testing.B) {
 		}
 	})
 	for i := 0; i < types.BloomBitLength; i++ {
-		rand.Read(input[i][:])
+		crand.Read(input[i][:])
 	}
 	b.Run("random", func(b *testing.B) {
 		b.ReportAllocs()

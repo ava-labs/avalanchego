@@ -11,11 +11,11 @@ const tmplSourcePrecompileConfigTestGo = `
 package {{.Package}}
 
 import (
-	"math/big"
 	"testing"
 
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/subnet-evm/precompile/testutils"
+	"github.com/ava-labs/subnet-evm/utils"
 	{{- if .Contract.AllowList}}
 	"github.com/ava-labs/subnet-evm/precompile/allowlist"
 
@@ -31,13 +31,13 @@ func TestVerify(t *testing.T) {
 	{{- end}}
 	tests := map[string]testutils.ConfigVerifyTest{
 		"valid config": {
-			Config: NewConfig(big.NewInt(3){{- if .Contract.AllowList}}, admins, enableds{{- end}}),
+			Config: NewConfig(utils.NewUint64(3){{- if .Contract.AllowList}}, admins, enableds{{- end}}),
 			ExpectedError: "",
 		},
 		// CUSTOM CODE STARTS HERE
 		// Add your own Verify tests here, e.g.:
 		// "your custom test name": {
-		// 	Config: NewConfig(big.NewInt(3), {{- if .Contract.AllowList}} admins, enableds{{- end}}),
+		// 	Config: NewConfig(utils.NewUint64(3), {{- if .Contract.AllowList}} admins, enableds{{- end}}),
 		// 	ExpectedError: ErrYourCustomError.Error(),
 		// },
 	}
@@ -62,23 +62,23 @@ func TestEqual(t *testing.T) {
 	{{- end}}
 	tests := map[string]testutils.ConfigEqualTest{
 		"non-nil config and nil other": {
-			Config:   NewConfig(big.NewInt(3){{- if .Contract.AllowList}}, admins, enableds{{- end}}),
+			Config:   NewConfig(utils.NewUint64(3){{- if .Contract.AllowList}}, admins, enableds{{- end}}),
 			Other:    nil,
 			Expected: false,
 		},
 		"different type": {
-			Config:   NewConfig(big.NewInt(3){{- if .Contract.AllowList}}, admins, enableds{{- end}}),
+			Config:   NewConfig(utils.NewUint64(3){{- if .Contract.AllowList}}, admins, enableds{{- end}}),
 			Other:    precompileconfig.NewNoopStatefulPrecompileConfig(),
 			Expected: false,
 		},
 		"different timestamp": {
-			Config:   NewConfig(big.NewInt(3){{- if .Contract.AllowList}}, admins, enableds{{- end}}),
-			Other:    NewConfig(big.NewInt(4){{- if .Contract.AllowList}}, admins, enableds{{- end}}),
+			Config:   NewConfig(utils.NewUint64(3){{- if .Contract.AllowList}}, admins, enableds{{- end}}),
+			Other:    NewConfig(utils.NewUint64(4){{- if .Contract.AllowList}}, admins, enableds{{- end}}),
 			Expected: false,
 		},
 		"same config": {
-			Config: NewConfig(big.NewInt(3){{- if .Contract.AllowList}}, admins, enableds{{- end}}),
-			Other: NewConfig(big.NewInt(3){{- if .Contract.AllowList}}, admins, enableds{{- end}}),
+			Config: NewConfig(utils.NewUint64(3){{- if .Contract.AllowList}}, admins, enableds{{- end}}),
+			Other: NewConfig(utils.NewUint64(3){{- if .Contract.AllowList}}, admins, enableds{{- end}}),
 			Expected: true,
 		},
 		// CUSTOM CODE STARTS HERE

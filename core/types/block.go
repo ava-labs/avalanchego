@@ -36,14 +36,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
-)
-
-var (
-	EmptyRootHash  = common.HexToHash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
-	EmptyCodeHash  = common.BytesToHash(crypto.Keccak256(nil))
-	EmptyUncleHash = rlpHash([]*Header(nil))
 )
 
 // A BlockNonce is a 64-bit hash which proves (combined with the
@@ -126,18 +119,22 @@ var headerSize = common.StorageSize(reflect.TypeOf(Header{}).Size())
 // Size returns the approximate memory used by all internal contents. It is used
 // to approximate and limit the memory consumption of various caches.
 func (h *Header) Size() common.StorageSize {
-	return headerSize + common.StorageSize(len(h.Extra)+(h.Difficulty.BitLen()+h.Number.BitLen())/8)
+	var baseFeeBits int
+	if h.BaseFee != nil {
+		baseFeeBits = h.BaseFee.BitLen()
+	}
+	return headerSize + common.StorageSize(len(h.Extra)+(h.Difficulty.BitLen()+h.Number.BitLen()+baseFeeBits)/8)
 }
 
 // EmptyBody returns true if there is no additional 'body' to complete the header
 // that is: no transactions and no uncles.
 func (h *Header) EmptyBody() bool {
-	return h.TxHash == EmptyRootHash && h.UncleHash == EmptyUncleHash
+	return h.TxHash == EmptyTxsHash && h.UncleHash == EmptyUncleHash
 }
 
 // EmptyReceipts returns true if there are no receipts for this header/block.
 func (h *Header) EmptyReceipts() bool {
-	return h.ReceiptHash == EmptyRootHash
+	return h.ReceiptHash == EmptyReceiptsHash
 }
 
 // Body is a simple (mutable, non-safe) data container for storing and moving
@@ -179,7 +176,7 @@ func NewBlock(
 
 	// TODO: panic if len(txs) != len(receipts)
 	if len(txs) == 0 {
-		b.header.TxHash = EmptyRootHash
+		b.header.TxHash = EmptyTxsHash
 	} else {
 		b.header.TxHash = DeriveSha(Transactions(txs), hasher)
 		b.transactions = make(Transactions, len(txs))
@@ -187,7 +184,7 @@ func NewBlock(
 	}
 
 	if len(receipts) == 0 {
-		b.header.ReceiptHash = EmptyRootHash
+		b.header.ReceiptHash = EmptyReceiptsHash
 	} else {
 		b.header.ReceiptHash = DeriveSha(Receipts(receipts), hasher)
 		b.header.Bloom = CreateBloom(receipts)
@@ -244,7 +241,7 @@ func (b *Block) DecodeRLP(s *rlp.Stream) error {
 		return err
 	}
 	b.header, b.uncles, b.transactions = eb.Header, eb.Uncles, eb.Txs
-	b.size.Store(common.StorageSize(rlp.ListSize(size)))
+	b.size.Store(rlp.ListSize(size))
 	return nil
 }
 
@@ -276,7 +273,7 @@ func (b *Block) GasLimit() uint64     { return b.header.GasLimit }
 func (b *Block) GasUsed() uint64      { return b.header.GasUsed }
 func (b *Block) Difficulty() *big.Int { return new(big.Int).Set(b.header.Difficulty) }
 func (b *Block) Time() uint64         { return b.header.Time }
-func (b *Block) Timestamp() *big.Int  { return new(big.Int).SetUint64(b.header.Time) }
+func (b *Block) Timestamp() uint64    { return b.header.Time }
 
 func (b *Block) NumberU64() uint64        { return b.header.Number.Uint64() }
 func (b *Block) MixDigest() common.Hash   { return b.header.MixDigest }
@@ -311,17 +308,17 @@ func (b *Block) Body() *Body { return &Body{b.transactions, b.uncles} }
 
 // Size returns the true RLP encoded storage size of the block, either by encoding
 // and returning it, or returning a previously cached value.
-func (b *Block) Size() common.StorageSize {
+func (b *Block) Size() uint64 {
 	if size := b.size.Load(); size != nil {
-		return size.(common.StorageSize)
+		return size.(uint64)
 	}
 	c := writeCounter(0)
 	rlp.Encode(&c, b)
-	b.size.Store(common.StorageSize(c))
-	return common.StorageSize(c)
+	b.size.Store(uint64(c))
+	return uint64(c)
 }
 
-type writeCounter common.StorageSize
+type writeCounter uint64
 
 func (c *writeCounter) Write(b []byte) (int, error) {
 	*c += writeCounter(len(b))

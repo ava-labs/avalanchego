@@ -71,7 +71,7 @@ func TestBlockEncoding(t *testing.T) {
 	check("BaseFee", block.BaseFee(), (*big.Int)(nil))
 	check("BlockGasCost", block.BlockGasCost(), (*big.Int)(nil))
 
-	check("Size", block.Size(), common.StorageSize(len(blockEnc)))
+	check("Size", block.Size(), uint64(len(blockEnc)))
 	check("BlockHash", block.Hash(), common.HexToHash("0x0a5843ac1cb04865017cb35a57b50b07084e5fcee39b5acadade33149f4fff9e"))
 
 	txHash := common.HexToHash("0x77b19baa4de67e45a7b26e4a220bccdbb6731885aa9927064e239ca232023215")
@@ -108,7 +108,7 @@ func TestEIP1559BlockEncoding(t *testing.T) {
 	check("Hash", block.Hash(), common.HexToHash("c7252048cd273fe0dac09650027d07f0e3da4ee0675ebbb26627cea92729c372"))
 	check("Nonce", block.Nonce(), uint64(0xa13a5a8c8f2bb1c4))
 	check("Time", block.Time(), uint64(1426516743))
-	check("Size", block.Size(), common.StorageSize(len(blockEnc)))
+	check("Size", block.Size(), uint64(len(blockEnc)))
 	check("BaseFee", block.BaseFee(), new(big.Int).SetUint64(1000000000))
 	check("BlockGasCost", block.BlockGasCost(), (*big.Int)(nil))
 
@@ -172,7 +172,7 @@ func TestEIP2718BlockEncoding(t *testing.T) {
 	check("Root", block.Root(), common.HexToHash("ef1552a40b7165c3cd773806b9e0c165b75356e0314bf0706f279c729f51e017"))
 	check("Nonce", block.Nonce(), uint64(0xa13a5a8c8f2bb1c4))
 	check("Time", block.Time(), uint64(1426516743))
-	check("Size", block.Size(), common.StorageSize(len(blockEnc)))
+	check("Size", block.Size(), uint64(len(blockEnc)))
 	check("BaseFee", block.BaseFee(), (*big.Int)(nil))
 	check("BlockGasCost", block.BlockGasCost(), (*big.Int)(nil))
 
@@ -326,7 +326,7 @@ func TestSubnetEVMBlockEncoding(t *testing.T) {
 	check("Hash", block.Hash(), common.HexToHash("0x06206d4ff804e93b36a8447a12a47653b07fd18115a05956c5ed8817f0b11eb9"))
 	check("Nonce", block.Nonce(), uint64(0xa13a5a8c8f2bb1c4))
 	check("Time", block.Time(), uint64(1426516743))
-	check("Size", block.Size(), common.StorageSize(len(blockEnc)))
+	check("Size", block.Size(), uint64(len(blockEnc)))
 	check("BaseFee", block.BaseFee(), big.NewInt(1_000_000_000))
 	check("BlockGasCost", block.BlockGasCost(), big.NewInt(100_000))
 

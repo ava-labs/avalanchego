@@ -38,10 +38,10 @@ import (
 	"github.com/ava-labs/subnet-evm/core/rawdb"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/core/vm"
-	"github.com/ava-labs/subnet-evm/ethdb"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/precompile/contracts/feemanager"
 	"github.com/ava-labs/subnet-evm/rpc"
+	"github.com/ava-labs/subnet-evm/utils"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/event"
@@ -55,21 +55,20 @@ var (
 )
 
 type testBackend struct {
-	db            ethdb.Database
 	chain         *core.BlockChain
 	acceptedEvent chan<- core.ChainEvent
 }
 
 func (b *testBackend) HeaderByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Header, error) {
 	if number == rpc.LatestBlockNumber {
-		return b.chain.CurrentBlock().Header(), nil
+		return b.chain.CurrentBlock(), nil
 	}
 	return b.chain.GetHeaderByNumber(uint64(number)), nil
 }
 
 func (b *testBackend) BlockByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Block, error) {
 	if number == rpc.LatestBlockNumber {
-		return b.chain.CurrentBlock(), nil
+		number = rpc.BlockNumber(b.chain.CurrentBlock().Number.Uint64())
 	}
 	return b.chain.GetBlockByNumber(uint64(number)), nil
 }
@@ -95,6 +94,10 @@ func (b *testBackend) GetFeeConfigAt(parent *types.Header) (commontype.FeeConfig
 	return b.chain.GetFeeConfigAt(parent)
 }
 
+func (b *testBackend) teardown() {
+	b.chain.Stop()
+}
+
 func newTestBackendFakerEngine(t *testing.T, config *params.ChainConfig, numBlocks int, genBlocks func(i int, b *core.BlockGen)) *testBackend {
 	var gspec = &core.Genesis{
 		Config: config,
@@ -102,18 +105,15 @@ func newTestBackendFakerEngine(t *testing.T, config *params.ChainConfig, numBloc
 	}
 
 	engine := dummy.NewETHFaker()
-	db := rawdb.NewMemoryDatabase()
-	genesis := gspec.MustCommit(db)
 
 	// Generate testing blocks
-	blocks, _, err := core.GenerateChain(gspec.Config, genesis, engine, db, numBlocks, 0, genBlocks)
+	_, blocks, _, err := core.GenerateChainWithGenesis(gspec, engine, numBlocks, 0, genBlocks)
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Construct testing chain
 	diskdb := rawdb.NewMemoryDatabase()
-	gspec.Commit(diskdb)
-	chain, err := core.NewBlockChain(diskdb, core.DefaultCacheConfig, gspec.Config, engine, vm.Config{}, common.Hash{})
+	chain, err := core.NewBlockChain(diskdb, core.DefaultCacheConfig, gspec, engine, vm.Config{}, common.Hash{}, false)
 	if err != nil {
 		t.Fatalf("Failed to create local chain, %v", err)
 	}
@@ -123,6 +123,8 @@ func newTestBackendFakerEngine(t *testing.T, config *params.ChainConfig, numBloc
 	return &testBackend{chain: chain}
 }
 
+// newTestBackend creates a test backend. OBS: don't forget to invoke tearDown
+// after use, otherwise the blockchain instance will mem-leak via goroutines.
 func newTestBackend(t *testing.T, config *params.ChainConfig, numBlocks int, genBlocks func(i int, b *core.BlockGen)) *testBackend {
 	var gspec = &core.Genesis{
 		Config: config,
@@ -130,25 +132,21 @@ func newTestBackend(t *testing.T, config *params.ChainConfig, numBlocks int, gen
 	}
 
 	engine := dummy.NewFaker()
-	db := rawdb.NewMemoryDatabase()
-	genesis := gspec.MustCommit(db)
 
 	// Generate testing blocks
-	blocks, _, err := core.GenerateChain(gspec.Config, genesis, engine, db, numBlocks, 1, genBlocks)
+	_, blocks, _, err := core.GenerateChainWithGenesis(gspec, engine, numBlocks, 1, genBlocks)
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Construct testing chain
-	diskdb := rawdb.NewMemoryDatabase()
-	gspec.Commit(diskdb)
-	chain, err := core.NewBlockChain(diskdb, core.DefaultCacheConfig, gspec.Config, engine, vm.Config{}, common.Hash{})
+	chain, err := core.NewBlockChain(rawdb.NewMemoryDatabase(), core.DefaultCacheConfig, gspec, engine, vm.Config{}, common.Hash{}, false)
 	if err != nil {
 		t.Fatalf("Failed to create local chain, %v", err)
 	}
 	if _, err := chain.InsertChain(blocks); err != nil {
 		t.Fatalf("Failed to insert chain, %v", err)
 	}
-	return &testBackend{chain: chain, db: db}
+	return &testBackend{chain: chain}
 }
 
 func (b *testBackend) MinRequiredTip(ctx context.Context, header *types.Header) (*big.Int, error) {
@@ -160,7 +158,11 @@ func (b *testBackend) CurrentHeader() *types.Header {
 }
 
 func (b *testBackend) LastAcceptedBlock() *types.Block {
-	return b.chain.CurrentBlock()
+	current := b.chain.CurrentBlock()
+	if current == nil {
+		return nil
+	}
+	return b.chain.GetBlockByNumber(current.Number.Uint64())
 }
 
 func (b *testBackend) GetBlockByNumber(number uint64) *types.Block {
@@ -205,6 +207,7 @@ func applyGasPriceTest(t *testing.T, test suggestTipCapTest, config Config) {
 	oracle.clock.Set(time.Unix(20, 0))
 
 	got, err := oracle.SuggestTipCap(context.Background())
+	backend.teardown()
 	require.NoError(t, err)
 
 	if got.Cmp(test.expectedTip) != 0 {
@@ -325,50 +328,10 @@ func TestSuggestTipCapMinGas(t *testing.T) {
 	}, defaultOracleConfig())
 }
 
-// Regression test to ensure that SuggestPrice does not panic prior to activation of Subnet EVM
+// Regression test to ensure that SuggestPrice does not panic with activation of Subnet EVM
 // Note: support for gas estimation without activated hard forks has been deprecated, but we still
 // ensure that the call does not panic.
-func TestSuggestGasPricePreSubnetEVM(t *testing.T) {
-	config := Config{
-		Blocks:     20,
-		Percentile: 60,
-	}
-
-	backend := newTestBackend(t, params.TestPreSubnetEVMConfig, 3, func(i int, b *core.BlockGen) {
-		b.SetCoinbase(common.Address{1})
-
-		signer := types.LatestSigner(params.TestPreSubnetEVMConfig)
-		gasPrice := big.NewInt(params.MinGasPrice)
-		for j := 0; j < 50; j++ {
-			tx := types.NewTx(&types.LegacyTx{
-				Nonce:    b.TxNonce(addr),
-				To:       &common.Address{},
-				Gas:      params.TxGas,
-				GasPrice: gasPrice,
-				Data:     []byte{},
-			})
-			tx, err := types.SignTx(tx, signer, key)
-			if err != nil {
-				t.Fatalf("failed to create tx: %s", err)
-			}
-			b.AddTx(tx)
-		}
-	})
-	oracle, err := NewOracle(backend, config)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	_, err = oracle.SuggestPrice(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
-// Regression test to ensure that SuggestPrice does not panic prior to activation of SubnetEVM
-// Note: support for gas estimation without activated hard forks has been deprecated, but we still
-// ensure that the call does not panic.
-func TestSuggestGasPricePreAP3(t *testing.T) {
+func TestSuggestGasPriceSubnetEVM(t *testing.T) {
 	config := Config{
 		Blocks:     20,
 		Percentile: 60,
@@ -388,21 +351,17 @@ func TestSuggestGasPricePreAP3(t *testing.T) {
 				Data:     []byte{},
 			})
 			tx, err := types.SignTx(tx, signer, key)
-			if err != nil {
-				t.Fatalf("failed to create tx: %s", err)
-			}
+			require.NoError(t, err, "failed to create tx")
 			b.AddTx(tx)
 		}
 	})
+	defer backend.teardown()
+
 	oracle, err := NewOracle(backend, config)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	_, err = oracle.SuggestPrice(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 }
 
 func TestSuggestTipCapMaxBlocksLookback(t *testing.T) {
@@ -435,7 +394,7 @@ func TestSuggestGasPriceAfterFeeConfigUpdate(t *testing.T) {
 	// create a chain config with fee manager enabled at genesis with [addr] as the admin
 	chainConfig := *params.TestChainConfig
 	chainConfig.GenesisPrecompiles = params.Precompiles{
-		feemanager.ConfigKey: feemanager.NewConfig(big.NewInt(0), []common.Address{addr}, nil, nil),
+		feemanager.ConfigKey: feemanager.NewConfig(utils.NewUint64(0), []common.Address{addr}, nil, nil),
 	}
 
 	// create a fee config with higher MinBaseFee and prepare it for inclusion in a tx
@@ -448,6 +407,7 @@ func TestSuggestGasPriceAfterFeeConfigUpdate(t *testing.T) {
 	// before issuing the block changing the fee into the chain, the fee estimation should
 	// follow the fee config in genesis.
 	backend := newTestBackend(t, &chainConfig, 0, func(i int, b *core.BlockGen) {})
+	defer backend.teardown()
 	oracle, err := NewOracle(backend, config)
 	require.NoError(err)
 	got, err := oracle.SuggestPrice(context.Background())
@@ -457,7 +417,8 @@ func TestSuggestGasPriceAfterFeeConfigUpdate(t *testing.T) {
 	// issue the block with tx that changes the fee
 	genesis := backend.chain.Genesis()
 	engine := backend.chain.Engine()
-	blocks, _, err := core.GenerateChain(&chainConfig, genesis, engine, backend.db, 1, 0, func(i int, b *core.BlockGen) {
+	db := backend.chain.StateCache().DiskDB()
+	blocks, _, err := core.GenerateChain(&chainConfig, genesis, engine, db, 1, 0, func(i int, b *core.BlockGen) {
 		b.SetCoinbase(common.Address{1})
 
 		// admin issues tx to change fee config to higher MinBaseFee

@@ -44,12 +44,6 @@ import (
 )
 
 var (
-	// Git SHA1 commit hash of the release (set via linker flags)
-	gitCommit = ""
-	gitDate   = ""
-
-	app *cli.App
-
 	//go:embed template-readme.md
 	readme string
 )
@@ -74,8 +68,9 @@ var (
 	}
 )
 
+var app = flags.NewApp("subnet-evm precompile generator tool")
+
 func init() {
-	app = flags.NewApp(gitCommit, gitDate, "subnet-evm precompile generator tool")
 	app.Name = "precompilegen"
 	app.Flags = []cli.Flag{
 		abiFlag,

@@ -140,7 +140,6 @@ func (h *storageJSON) UnmarshalText(text []byte) error {
 	}
 	offset := len(h) - len(text)/2 // pad on the left
 	if _, err := hex.Decode(h[offset:], text); err != nil {
-		fmt.Println(err)
 		return fmt.Errorf("invalid hex storage key/value %q", text)
 	}
 	return nil
@@ -176,54 +175,45 @@ func (e *GenesisMismatchError) Error() string {
 // specify a fork block below the local head block). In case of a conflict, the
 // error is a *params.ConfigCompatError and the new, unwritten config is returned.
 func SetupGenesisBlock(
-	db ethdb.Database, genesis *Genesis, lastAcceptedHash common.Hash, skipChainConfigCheckCompatible bool,
-) (*params.ChainConfig, error) {
+	db ethdb.Database, triedb *trie.Database, genesis *Genesis, lastAcceptedHash common.Hash, skipChainConfigCheckCompatible bool,
+) (*params.ChainConfig, common.Hash, error) {
 	if genesis == nil {
-		return nil, ErrNoGenesis
+		return nil, common.Hash{}, ErrNoGenesis
 	}
 	if genesis.Config == nil {
-		return nil, errGenesisNoConfig
-	}
-	// Make sure genesis gas limit is consistent in SubnetEVM fork
-	gasLimitConfig := genesis.Config.FeeConfig.GasLimit.Uint64()
-	if gasLimitConfig != genesis.GasLimit {
-		return nil, fmt.Errorf("gas limit in fee config (%d) does not match gas limit in header (%d)", gasLimitConfig, genesis.GasLimit)
+		return nil, common.Hash{}, errGenesisNoConfig
 	}
 
-	// Verify config
-	if err := genesis.Config.Verify(); err != nil {
-		return nil, err
-	}
 	// Just commit the new block if there is no stored genesis block.
 	stored := rawdb.ReadCanonicalHash(db, 0)
 	if (stored == common.Hash{}) {
 		log.Info("Writing genesis to database")
-		_, err := genesis.Commit(db)
+		block, err := genesis.Commit(db, triedb)
 		if err != nil {
-			return genesis.Config, err
+			return genesis.Config, common.Hash{}, err
 		}
-		return genesis.Config, nil
+		return genesis.Config, block.Hash(), nil
 	}
 	// We have the genesis block in database but the corresponding state is missing.
 	header := rawdb.ReadHeader(db, stored, 0)
-	if _, err := state.New(header.Root, state.NewDatabase(db), nil); err != nil {
+	if header.Root != types.EmptyRootHash && !rawdb.HasLegacyTrieNode(db, header.Root) {
 		// Ensure the stored genesis matches with the given one.
-		hash := genesis.ToBlock(nil).Hash()
+		hash := genesis.ToBlock().Hash()
 		if hash != stored {
-			return genesis.Config, &GenesisMismatchError{stored, hash}
+			return genesis.Config, common.Hash{}, &GenesisMismatchError{stored, hash}
 		}
-		_, err := genesis.Commit(db)
-		return genesis.Config, err
+		_, err := genesis.Commit(db, triedb)
+		return genesis.Config, common.Hash{}, err
 	}
 	// Check whether the genesis block is already written.
-	hash := genesis.ToBlock(nil).Hash()
+	hash := genesis.ToBlock().Hash()
 	if hash != stored {
-		return genesis.Config, &GenesisMismatchError{stored, hash}
+		return genesis.Config, common.Hash{}, &GenesisMismatchError{stored, hash}
 	}
 	// Get the existing chain configuration.
 	newcfg := genesis.Config
 	if err := newcfg.CheckConfigForkOrder(); err != nil {
-		return newcfg, err
+		return newcfg, common.Hash{}, err
 	}
 	storedcfg := rawdb.ReadChainConfig(db, stored)
 	// If there is no previously stored chain config, write the chain config to disk.
@@ -231,12 +221,11 @@ func SetupGenesisBlock(
 		// Note: this can happen since we did not previously write the genesis block and chain config in the same batch.
 		log.Warn("Found genesis block without chain config")
 		rawdb.WriteChainConfig(db, stored, newcfg)
-		return newcfg, nil
+		return newcfg, stored, nil
 	}
-
+	storedData, _ := json.Marshal(storedcfg)
 	// Check config compatibility and write the config. Compatibility errors
 	// are returned to the caller unless we're already at block zero.
-
 	// we use last accepted block for cfg compatibility check. Note this allows
 	// the node to continue if it previously halted due to attempting to process blocks with
 	// an incorrect chain config.
@@ -245,30 +234,35 @@ func SetupGenesisBlock(
 	// when we start syncing from scratch, the last accepted block
 	// will be genesis block
 	if lastBlock == nil {
-		return newcfg, fmt.Errorf("missing last accepted block")
+		return newcfg, common.Hash{}, fmt.Errorf("missing last accepted block")
 	}
-
 	height := lastBlock.NumberU64()
 	timestamp := lastBlock.Time()
 	if skipChainConfigCheckCompatible {
 		log.Info("skipping verifying activated network upgrades on chain config")
 	} else {
 		compatErr := storedcfg.CheckCompatible(newcfg, height, timestamp)
-		if compatErr != nil && height != 0 && compatErr.RewindTo != 0 {
-			return newcfg, compatErr
+		if compatErr != nil && ((height != 0 && compatErr.RewindToBlock != 0) || (timestamp != 0 && compatErr.RewindToTime != 0)) {
+			return newcfg, stored, compatErr
 		}
 	}
-	rawdb.WriteChainConfig(db, stored, newcfg)
-	return newcfg, nil
+	// Don't overwrite if the old is identical to the new
+	if newData, _ := json.Marshal(newcfg); !bytes.Equal(storedData, newData) {
+		rawdb.WriteChainConfig(db, stored, newcfg)
+	}
+	return newcfg, stored, nil
 }
 
 // ToBlock creates the genesis block and writes state of a genesis specification
 // to the given database (or discards it if nil).
-func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
-	if db == nil {
-		db = rawdb.NewMemoryDatabase()
-	}
-	statedb, err := state.New(common.Hash{}, state.NewDatabase(db), nil)
+func (g *Genesis) ToBlock() *types.Block {
+	db := rawdb.NewMemoryDatabase()
+	return g.toBlock(db, trie.NewDatabase(db))
+}
+
+// TODO: migrate this function to "flush" for more similarity with upstream.
+func (g *Genesis) toBlock(db ethdb.Database, triedb *trie.Database) *types.Block {
+	statedb, err := state.New(common.Hash{}, state.NewDatabaseWithNodeDB(db, triedb), nil)
 	if err != nil {
 		panic(err)
 	}
@@ -331,7 +325,7 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 	if g.Difficulty == nil {
 		head.Difficulty = params.GenesisDifficulty
 	}
-	if g.Config != nil && g.Config.IsSubnetEVM(common.Big0) {
+	if g.Config != nil && g.Config.IsSubnetEVM(0) {
 		if g.BaseFee != nil {
 			head.BaseFee = g.BaseFee
 		} else {
@@ -339,17 +333,19 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 		}
 	}
 	statedb.Commit(false, false)
-	if err := statedb.Database().TrieDB().Commit(root, true, nil); err != nil {
-		panic(fmt.Sprintf("unable to commit genesis block: %v", err))
+	// Commit newly generated states into disk if it's not empty.
+	if root != types.EmptyRootHash {
+		if err := triedb.Commit(root, true); err != nil {
+			panic(fmt.Sprintf("unable to commit genesis block: %v", err))
+		}
 	}
-
 	return types.NewBlock(head, nil, nil, nil, trie.NewStackTrie(nil))
 }
 
 // Commit writes the block and state of a genesis specification to the database.
 // The block is committed as the canonical head block.
-func (g *Genesis) Commit(db ethdb.Database) (*types.Block, error) {
-	block := g.ToBlock(db)
+func (g *Genesis) Commit(db ethdb.Database, triedb *trie.Database) (*types.Block, error) {
+	block := g.toBlock(db, triedb)
 	if block.Number().Sign() != 0 {
 		return nil, errors.New("can't commit genesis block with number > 0")
 	}
@@ -375,12 +371,31 @@ func (g *Genesis) Commit(db ethdb.Database) (*types.Block, error) {
 
 // MustCommit writes the genesis block and state to db, panicking on error.
 // The block is committed as the canonical head block.
+// Note the state changes will be committed in hash-based scheme, use Commit
+// if path-scheme is preferred.
 func (g *Genesis) MustCommit(db ethdb.Database) *types.Block {
-	block, err := g.Commit(db)
+	block, err := g.Commit(db, trie.NewDatabase(db))
 	if err != nil {
 		panic(err)
 	}
 	return block
+}
+
+func (g *Genesis) Verify() error {
+	// Make sure genesis gas limit is consistent
+	gasLimitConfig := g.Config.FeeConfig.GasLimit.Uint64()
+	if gasLimitConfig != g.GasLimit {
+		return fmt.Errorf(
+			"gas limit in fee config (%d) does not match gas limit in header (%d)",
+			gasLimitConfig,
+			g.GasLimit,
+		)
+	}
+	// Verify config
+	if err := g.Config.Verify(); err != nil {
+		return err
+	}
+	return nil
 }
 
 // GenesisBlockForTesting creates and writes a block in which addr has the given wei balance.
@@ -388,7 +403,7 @@ func GenesisBlockForTesting(db ethdb.Database, addr common.Address, balance *big
 	g := Genesis{
 		Config:  params.TestChainConfig,
 		Alloc:   GenesisAlloc{addr: {Balance: balance}},
-		BaseFee: new(big.Int).Set(params.TestMaxBaseFee),
+		BaseFee: big.NewInt(params.TestMaxBaseFee),
 	}
 	return g.MustCommit(db)
 }

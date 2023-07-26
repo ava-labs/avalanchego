@@ -111,8 +111,8 @@ func TestBlockStorage(t *testing.T) {
 	block := types.NewBlockWithHeader(&types.Header{
 		Extra:       []byte("test block"),
 		UncleHash:   types.EmptyUncleHash,
-		TxHash:      types.EmptyRootHash,
-		ReceiptHash: types.EmptyRootHash,
+		TxHash:      types.EmptyTxsHash,
+		ReceiptHash: types.EmptyReceiptsHash,
 	})
 	if entry := ReadBlock(db, block.Hash(), block.NumberU64()); entry != nil {
 		t.Fatalf("Non existent block returned: %v", entry)
@@ -159,8 +159,8 @@ func TestPartialBlockStorage(t *testing.T) {
 	block := types.NewBlockWithHeader(&types.Header{
 		Extra:       []byte("test block"),
 		UncleHash:   types.EmptyUncleHash,
-		TxHash:      types.EmptyRootHash,
-		ReceiptHash: types.EmptyRootHash,
+		TxHash:      types.EmptyTxsHash,
+		ReceiptHash: types.EmptyReceiptsHash,
 	})
 	// Store a header and check that it's not recognized as a block
 	WriteHeader(db, block.Header())
@@ -499,10 +499,6 @@ func TestReadLogs(t *testing.T) {
 		t.Fatalf("unexpected number of logs[1] returned, have %d want %d", have, want)
 	}
 
-	// Fill in log fields so we can compare their rlp encoding
-	if err := types.Receipts(receipts).DeriveFields(params.TestChainConfig, hash, 0, 0, body.Transactions); err != nil {
-		t.Fatal(err)
-	}
 	for i, pr := range receipts {
 		for j, pl := range pr.Logs {
 			rlpHave, err := rlp.EncodeToBytes(newFullLogRLP(logs[i][j]))

@@ -33,6 +33,7 @@ import (
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/core/vm"
 	"github.com/ethereum/go-ethereum/common"
+	//"github.com/ethereum/go-ethereum/log"
 )
 
 // ChainContext supports retrieving headers and consensus parameters from the
@@ -67,7 +68,7 @@ func NewEVMBlockContext(header *types.Header, chain ChainContext, author *common
 		GetHash:     GetHashFn(header, chain),
 		Coinbase:    beneficiary,
 		BlockNumber: new(big.Int).Set(header.Number),
-		Time:        new(big.Int).SetUint64(header.Time),
+		Time:        header.Time,
 		Difficulty:  new(big.Int).Set(header.Difficulty),
 		BaseFee:     baseFee,
 		GasLimit:    header.GasLimit,
@@ -75,10 +76,10 @@ func NewEVMBlockContext(header *types.Header, chain ChainContext, author *common
 }
 
 // NewEVMTxContext creates a new transaction context for a single transaction.
-func NewEVMTxContext(msg Message) vm.TxContext {
+func NewEVMTxContext(msg *Message) vm.TxContext {
 	return vm.TxContext{
-		Origin:   msg.From(),
-		GasPrice: new(big.Int).Set(msg.GasPrice()),
+		Origin:   msg.From,
+		GasPrice: new(big.Int).Set(msg.GasPrice),
 	}
 }
 

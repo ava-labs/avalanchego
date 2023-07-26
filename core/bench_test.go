@@ -46,18 +46,23 @@ import (
 func BenchmarkInsertChain_empty_memdb(b *testing.B) {
 	benchInsertChain(b, false, nil)
 }
+
 func BenchmarkInsertChain_empty_diskdb(b *testing.B) {
 	benchInsertChain(b, true, nil)
 }
+
 func BenchmarkInsertChain_valueTx_memdb(b *testing.B) {
 	benchInsertChain(b, false, genValueTx(0))
 }
+
 func BenchmarkInsertChain_valueTx_diskdb(b *testing.B) {
 	benchInsertChain(b, true, genValueTx(0))
 }
+
 func BenchmarkInsertChain_valueTx_100kB_memdb(b *testing.B) {
 	benchInsertChain(b, false, genValueTx(100*1024))
 }
+
 func BenchmarkInsertChain_valueTx_100kB_diskdb(b *testing.B) {
 	benchInsertChain(b, true, genValueTx(100*1024))
 }
@@ -65,12 +70,15 @@ func BenchmarkInsertChain_valueTx_100kB_diskdb(b *testing.B) {
 func BenchmarkInsertChain_ring200_memdb(b *testing.B) {
 	benchInsertChain(b, false, genTxRing(200))
 }
+
 func BenchmarkInsertChain_ring200_diskdb(b *testing.B) {
 	benchInsertChain(b, true, genTxRing(200))
 }
+
 func BenchmarkInsertChain_ring1000_memdb(b *testing.B) {
 	benchInsertChain(b, false, genTxRing(1000))
 }
+
 func BenchmarkInsertChain_ring1000_diskdb(b *testing.B) {
 	benchInsertChain(b, true, genTxRing(1000))
 }
@@ -157,22 +165,15 @@ func benchInsertChain(b *testing.B, disk bool, gen func(int, *BlockGen)) {
 
 	// Generate a chain of b.N blocks using the supplied block
 	// generator function.
-	gspec := Genesis{
-		Config:   params.TestChainConfig,
-		Alloc:    GenesisAlloc{benchRootAddr: {Balance: benchRootFunds}},
-		Coinbase: constants.BlackholeAddr,
+	gspec := &Genesis{
+		Config: params.TestChainConfig,
+		Alloc:  GenesisAlloc{benchRootAddr: {Balance: benchRootFunds}},
 	}
-	genesis := gspec.MustCommit(db)
-	chain, _, _ := GenerateChain(gspec.Config, genesis, dummy.NewFaker(), db, b.N, 10, func(i int, bg *BlockGen) {
-		bg.SetCoinbase(constants.BlackholeAddr)
-		if gen != nil {
-			gen(i, bg)
-		}
-	})
+	_, chain, _, _ := GenerateChainWithGenesis(gspec, dummy.NewCoinbaseFaker(), b.N, 10, gen)
 
 	// Time the insertion of the new chain.
 	// State and blocks are stored in the same DB.
-	chainman, _ := NewBlockChain(db, DefaultCacheConfig, gspec.Config, dummy.NewFaker(), vm.Config{}, common.Hash{})
+	chainman, _ := NewBlockChain(db, DefaultCacheConfig, gspec, dummy.NewCoinbaseFaker(), vm.Config{}, common.Hash{}, false)
 	defer chainman.Stop()
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -184,36 +185,47 @@ func benchInsertChain(b *testing.B, disk bool, gen func(int, *BlockGen)) {
 func BenchmarkChainRead_header_10k(b *testing.B) {
 	benchReadChain(b, false, 10000)
 }
+
 func BenchmarkChainRead_full_10k(b *testing.B) {
 	benchReadChain(b, true, 10000)
 }
+
 func BenchmarkChainRead_header_100k(b *testing.B) {
 	benchReadChain(b, false, 100000)
 }
+
 func BenchmarkChainRead_full_100k(b *testing.B) {
 	benchReadChain(b, true, 100000)
 }
+
 func BenchmarkChainRead_header_500k(b *testing.B) {
 	benchReadChain(b, false, 500000)
 }
+
 func BenchmarkChainRead_full_500k(b *testing.B) {
 	benchReadChain(b, true, 500000)
 }
+
 func BenchmarkChainWrite_header_10k(b *testing.B) {
 	benchWriteChain(b, false, 10000)
 }
+
 func BenchmarkChainWrite_full_10k(b *testing.B) {
 	benchWriteChain(b, true, 10000)
 }
+
 func BenchmarkChainWrite_header_100k(b *testing.B) {
 	benchWriteChain(b, false, 100000)
 }
+
 func BenchmarkChainWrite_full_100k(b *testing.B) {
 	benchWriteChain(b, true, 100000)
 }
+
 func BenchmarkChainWrite_header_500k(b *testing.B) {
 	benchWriteChain(b, false, 500000)
 }
+
 func BenchmarkChainWrite_full_500k(b *testing.B) {
 	benchWriteChain(b, true, 500000)
 }
@@ -229,13 +241,18 @@ func makeChainForBench(db ethdb.Database, full bool, count uint64) {
 			ParentHash:  hash,
 			Difficulty:  big.NewInt(1),
 			UncleHash:   types.EmptyUncleHash,
-			TxHash:      types.EmptyRootHash,
-			ReceiptHash: types.EmptyRootHash,
+			TxHash:      types.EmptyTxsHash,
+			ReceiptHash: types.EmptyReceiptsHash,
 		}
 		hash = header.Hash()
 
 		rawdb.WriteHeader(db, header)
 		rawdb.WriteCanonicalHash(db, hash, n)
+
+		if n == 0 {
+			rawdb.WriteChainConfig(db, hash, params.TestChainConfig)
+		}
+		rawdb.WriteHeadHeaderHash(db, hash)
 
 		if full || n == 0 {
 			block := types.NewBlockWithHeader(header)
@@ -275,7 +292,7 @@ func benchReadChain(b *testing.B, full bool, count uint64) {
 		if err != nil {
 			b.Fatalf("error opening database at %v: %v", dir, err)
 		}
-		chain, err := NewBlockChain(db, DefaultCacheConfig, params.TestChainConfig, dummy.NewFaker(), vm.Config{}, common.Hash{})
+		chain, err := NewBlockChain(db, DefaultCacheConfig, nil, dummy.NewFaker(), vm.Config{}, common.Hash{}, false)
 		if err != nil {
 			b.Fatalf("error creating chain: %v", err)
 		}

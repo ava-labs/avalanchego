@@ -4,11 +4,11 @@
 package params
 
 import (
-	"math/big"
 	"testing"
 
 	"github.com/ava-labs/subnet-evm/precompile/contracts/deployerallowlist"
 	"github.com/ava-labs/subnet-evm/precompile/contracts/txallowlist"
+	"github.com/ava-labs/subnet-evm/utils"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 )
@@ -17,7 +17,7 @@ func TestVerifyUpgradeConfig(t *testing.T) {
 	admins := []common.Address{{1}}
 	chainConfig := *TestChainConfig
 	chainConfig.GenesisPrecompiles = Precompiles{
-		txallowlist.ConfigKey: txallowlist.NewConfig(big.NewInt(1), admins, nil),
+		txallowlist.ConfigKey: txallowlist.NewConfig(utils.NewUint64(1), admins, nil),
 	}
 
 	type test struct {
@@ -30,7 +30,7 @@ func TestVerifyUpgradeConfig(t *testing.T) {
 			expectedErrorString: "disable should be [true]",
 			upgrades: []PrecompileUpgrade{
 				{
-					Config: txallowlist.NewConfig(big.NewInt(2), admins, nil),
+					Config: txallowlist.NewConfig(utils.NewUint64(2), admins, nil),
 				},
 			},
 		},
@@ -38,7 +38,7 @@ func TestVerifyUpgradeConfig(t *testing.T) {
 			expectedErrorString: "config block timestamp (0) <= previous timestamp (1) of same key",
 			upgrades: []PrecompileUpgrade{
 				{
-					Config: txallowlist.NewDisableConfig(big.NewInt(0)),
+					Config: txallowlist.NewDisableConfig(utils.NewUint64(0)),
 				},
 			},
 		},
@@ -46,7 +46,7 @@ func TestVerifyUpgradeConfig(t *testing.T) {
 			expectedErrorString: "config block timestamp (1) <= previous timestamp (1) of same key",
 			upgrades: []PrecompileUpgrade{
 				{
-					Config: txallowlist.NewDisableConfig(big.NewInt(1)),
+					Config: txallowlist.NewDisableConfig(utils.NewUint64(1)),
 				},
 			},
 		},
@@ -74,46 +74,46 @@ func TestCheckCompatibleUpgradeConfigs(t *testing.T) {
 	admins := []common.Address{{1}}
 	chainConfig := *TestChainConfig
 	chainConfig.GenesisPrecompiles = Precompiles{
-		txallowlist.ConfigKey:       txallowlist.NewConfig(big.NewInt(1), admins, nil),
-		deployerallowlist.ConfigKey: deployerallowlist.NewConfig(big.NewInt(10), admins, nil),
+		txallowlist.ConfigKey:       txallowlist.NewConfig(utils.NewUint64(1), admins, nil),
+		deployerallowlist.ConfigKey: deployerallowlist.NewConfig(utils.NewUint64(10), admins, nil),
 	}
 
 	tests := map[string]upgradeCompatibilityTest{
 		"disable and re-enable": {
-			startTimestamps: []*big.Int{big.NewInt(5)},
+			startTimestamps: []uint64{5},
 			configs: []*UpgradeConfig{
 				{
 					PrecompileUpgrades: []PrecompileUpgrade{
 						{
-							Config: txallowlist.NewDisableConfig(big.NewInt(6)),
+							Config: txallowlist.NewDisableConfig(utils.NewUint64(6)),
 						},
 						{
-							Config: txallowlist.NewConfig(big.NewInt(7), admins, nil),
+							Config: txallowlist.NewConfig(utils.NewUint64(7), admins, nil),
 						},
 					},
 				},
 			},
 		},
 		"disable and re-enable, reschedule upgrade before it happens": {
-			startTimestamps: []*big.Int{big.NewInt(5), big.NewInt(6)},
+			startTimestamps: []uint64{5, 6},
 			configs: []*UpgradeConfig{
 				{
 					PrecompileUpgrades: []PrecompileUpgrade{
 						{
-							Config: txallowlist.NewDisableConfig(big.NewInt(6)),
+							Config: txallowlist.NewDisableConfig(utils.NewUint64(6)),
 						},
 						{
-							Config: txallowlist.NewConfig(big.NewInt(7), admins, nil),
+							Config: txallowlist.NewConfig(utils.NewUint64(7), admins, nil),
 						},
 					},
 				},
 				{
 					PrecompileUpgrades: []PrecompileUpgrade{
 						{
-							Config: txallowlist.NewDisableConfig(big.NewInt(6)),
+							Config: txallowlist.NewDisableConfig(utils.NewUint64(6)),
 						},
 						{
-							Config: txallowlist.NewConfig(big.NewInt(8), admins, nil),
+							Config: txallowlist.NewConfig(utils.NewUint64(8), admins, nil),
 						},
 					},
 				},
@@ -121,47 +121,47 @@ func TestCheckCompatibleUpgradeConfigs(t *testing.T) {
 		},
 		"disable and re-enable, reschedule upgrade after it happens": {
 			expectedErrorString: "mismatching PrecompileUpgrade",
-			startTimestamps:     []*big.Int{big.NewInt(5), big.NewInt(8)},
+			startTimestamps:     []uint64{5, 8},
 			configs: []*UpgradeConfig{
 				{
 					PrecompileUpgrades: []PrecompileUpgrade{
 						{
-							Config: txallowlist.NewDisableConfig(big.NewInt(6)),
+							Config: txallowlist.NewDisableConfig(utils.NewUint64(6)),
 						},
 						{
-							Config: txallowlist.NewConfig(big.NewInt(7), admins, nil),
+							Config: txallowlist.NewConfig(utils.NewUint64(7), admins, nil),
 						},
 					},
 				},
 				{
 					PrecompileUpgrades: []PrecompileUpgrade{
 						{
-							Config: txallowlist.NewDisableConfig(big.NewInt(6)),
+							Config: txallowlist.NewDisableConfig(utils.NewUint64(6)),
 						},
 						{
-							Config: txallowlist.NewConfig(big.NewInt(8), admins, nil),
+							Config: txallowlist.NewConfig(utils.NewUint64(8), admins, nil),
 						},
 					},
 				},
 			},
 		},
 		"disable and re-enable, cancel upgrade before it happens": {
-			startTimestamps: []*big.Int{big.NewInt(5), big.NewInt(6)},
+			startTimestamps: []uint64{5, 6},
 			configs: []*UpgradeConfig{
 				{
 					PrecompileUpgrades: []PrecompileUpgrade{
 						{
-							Config: txallowlist.NewDisableConfig(big.NewInt(6)),
+							Config: txallowlist.NewDisableConfig(utils.NewUint64(6)),
 						},
 						{
-							Config: txallowlist.NewConfig(big.NewInt(7), admins, nil),
+							Config: txallowlist.NewConfig(utils.NewUint64(7), admins, nil),
 						},
 					},
 				},
 				{
 					PrecompileUpgrades: []PrecompileUpgrade{
 						{
-							Config: txallowlist.NewDisableConfig(big.NewInt(6)),
+							Config: txallowlist.NewDisableConfig(utils.NewUint64(6)),
 						},
 					},
 				},
@@ -169,22 +169,22 @@ func TestCheckCompatibleUpgradeConfigs(t *testing.T) {
 		},
 		"disable and re-enable, cancel upgrade after it happens": {
 			expectedErrorString: "mismatching missing PrecompileUpgrade",
-			startTimestamps:     []*big.Int{big.NewInt(5), big.NewInt(8)},
+			startTimestamps:     []uint64{5, 8},
 			configs: []*UpgradeConfig{
 				{
 					PrecompileUpgrades: []PrecompileUpgrade{
 						{
-							Config: txallowlist.NewDisableConfig(big.NewInt(6)),
+							Config: txallowlist.NewDisableConfig(utils.NewUint64(6)),
 						},
 						{
-							Config: txallowlist.NewConfig(big.NewInt(7), admins, nil),
+							Config: txallowlist.NewConfig(utils.NewUint64(7), admins, nil),
 						},
 					},
 				},
 				{
 					PrecompileUpgrades: []PrecompileUpgrade{
 						{
-							Config: txallowlist.NewDisableConfig(big.NewInt(6)),
+							Config: txallowlist.NewDisableConfig(utils.NewUint64(6)),
 						},
 					},
 				},
@@ -192,51 +192,51 @@ func TestCheckCompatibleUpgradeConfigs(t *testing.T) {
 		},
 		"disable and re-enable, change upgrade config after upgrade not allowed": {
 			expectedErrorString: "mismatching PrecompileUpgrade",
-			startTimestamps:     []*big.Int{big.NewInt(5), big.NewInt(8)},
+			startTimestamps:     []uint64{5, 8},
 			configs: []*UpgradeConfig{
 				{
 					PrecompileUpgrades: []PrecompileUpgrade{
 						{
-							Config: txallowlist.NewDisableConfig(big.NewInt(6)),
+							Config: txallowlist.NewDisableConfig(utils.NewUint64(6)),
 						},
 						{
-							Config: txallowlist.NewConfig(big.NewInt(7), admins, nil),
+							Config: txallowlist.NewConfig(utils.NewUint64(7), admins, nil),
 						},
 					},
 				},
 				{
 					PrecompileUpgrades: []PrecompileUpgrade{
 						{
-							Config: txallowlist.NewDisableConfig(big.NewInt(6)),
+							Config: txallowlist.NewDisableConfig(utils.NewUint64(6)),
 						},
 						{
 							// uses a different (empty) admin list, not allowed
-							Config: txallowlist.NewConfig(big.NewInt(7), []common.Address{}, nil),
+							Config: txallowlist.NewConfig(utils.NewUint64(7), []common.Address{}, nil),
 						},
 					},
 				},
 			},
 		},
 		"disable and re-enable, identical upgrade config should be accepted": {
-			startTimestamps: []*big.Int{big.NewInt(5), big.NewInt(8)},
+			startTimestamps: []uint64{5, 8},
 			configs: []*UpgradeConfig{
 				{
 					PrecompileUpgrades: []PrecompileUpgrade{
 						{
-							Config: txallowlist.NewDisableConfig(big.NewInt(6)),
+							Config: txallowlist.NewDisableConfig(utils.NewUint64(6)),
 						},
 						{
-							Config: txallowlist.NewConfig(big.NewInt(7), admins, nil),
+							Config: txallowlist.NewConfig(utils.NewUint64(7), admins, nil),
 						},
 					},
 				},
 				{
 					PrecompileUpgrades: []PrecompileUpgrade{
 						{
-							Config: txallowlist.NewDisableConfig(big.NewInt(6)),
+							Config: txallowlist.NewDisableConfig(utils.NewUint64(6)),
 						},
 						{
-							Config: txallowlist.NewConfig(big.NewInt(7), admins, nil),
+							Config: txallowlist.NewConfig(utils.NewUint64(7), admins, nil),
 						},
 					},
 				},
@@ -253,7 +253,7 @@ func TestCheckCompatibleUpgradeConfigs(t *testing.T) {
 
 type upgradeCompatibilityTest struct {
 	configs             []*UpgradeConfig
-	startTimestamps     []*big.Int
+	startTimestamps     []uint64
 	expectedErrorString string
 }
 

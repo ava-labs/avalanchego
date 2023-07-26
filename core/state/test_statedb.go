@@ -6,14 +6,14 @@ package state
 import (
 	"testing"
 
-	"github.com/ava-labs/subnet-evm/ethdb/memorydb"
+	"github.com/ava-labs/subnet-evm/core/rawdb"
 	"github.com/ava-labs/subnet-evm/precompile/contract"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 )
 
 func NewTestStateDB(t testing.TB) contract.StateDB {
-	db := memorydb.New()
+	db := rawdb.NewMemoryDatabase()
 	stateDB, err := New(common.Hash{}, NewDatabase(db), nil)
 	require.NoError(t, err)
 	return stateDB

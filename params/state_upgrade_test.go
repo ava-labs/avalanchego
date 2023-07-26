@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/ava-labs/subnet-evm/utils"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/stretchr/testify/require"
@@ -27,30 +28,30 @@ func TestVerifyStateUpgrades(t *testing.T) {
 		{
 			name: "valid upgrade",
 			upgrades: []StateUpgrade{
-				{BlockTimestamp: common.Big1, StateUpgradeAccounts: modifiedAccounts},
-				{BlockTimestamp: common.Big2, StateUpgradeAccounts: modifiedAccounts},
+				{BlockTimestamp: utils.NewUint64(1), StateUpgradeAccounts: modifiedAccounts},
+				{BlockTimestamp: utils.NewUint64(2), StateUpgradeAccounts: modifiedAccounts},
 			},
 		},
 		{
 			name: "upgrade block timestamp is not strictly increasing",
 			upgrades: []StateUpgrade{
-				{BlockTimestamp: common.Big1, StateUpgradeAccounts: modifiedAccounts},
-				{BlockTimestamp: common.Big1, StateUpgradeAccounts: modifiedAccounts},
+				{BlockTimestamp: utils.NewUint64(1), StateUpgradeAccounts: modifiedAccounts},
+				{BlockTimestamp: utils.NewUint64(1), StateUpgradeAccounts: modifiedAccounts},
 			},
 			expectedError: "config block timestamp (1) <= previous timestamp (1)",
 		},
 		{
 			name: "upgrade block timestamp decreases",
 			upgrades: []StateUpgrade{
-				{BlockTimestamp: common.Big2, StateUpgradeAccounts: modifiedAccounts},
-				{BlockTimestamp: common.Big1, StateUpgradeAccounts: modifiedAccounts},
+				{BlockTimestamp: utils.NewUint64(2), StateUpgradeAccounts: modifiedAccounts},
+				{BlockTimestamp: utils.NewUint64(1), StateUpgradeAccounts: modifiedAccounts},
 			},
 			expectedError: "config block timestamp (1) <= previous timestamp (2)",
 		},
 		{
 			name: "upgrade block timestamp is zero",
 			upgrades: []StateUpgrade{
-				{BlockTimestamp: common.Big0, StateUpgradeAccounts: modifiedAccounts},
+				{BlockTimestamp: utils.NewUint64(0), StateUpgradeAccounts: modifiedAccounts},
 			},
 			expectedError: "config block timestamp (0) must be greater than 0",
 		},
@@ -83,61 +84,61 @@ func TestCheckCompatibleStateUpgrades(t *testing.T) {
 
 	tests := map[string]upgradeCompatibilityTest{
 		"reschedule upgrade before it happens": {
-			startTimestamps: []*big.Int{big.NewInt(5), big.NewInt(6)},
+			startTimestamps: []uint64{5, 6},
 			configs: []*UpgradeConfig{
 				{
 					StateUpgrades: []StateUpgrade{
-						{BlockTimestamp: big.NewInt(6), StateUpgradeAccounts: stateUpgrade},
+						{BlockTimestamp: utils.NewUint64(6), StateUpgradeAccounts: stateUpgrade},
 					},
 				},
 				{
 					StateUpgrades: []StateUpgrade{
-						{BlockTimestamp: big.NewInt(6), StateUpgradeAccounts: stateUpgrade},
+						{BlockTimestamp: utils.NewUint64(6), StateUpgradeAccounts: stateUpgrade},
 					},
 				},
 			},
 		},
 		"modify upgrade after it happens not allowed": {
 			expectedErrorString: "mismatching StateUpgrade",
-			startTimestamps:     []*big.Int{big.NewInt(5), big.NewInt(8)},
+			startTimestamps:     []uint64{5, 8},
 			configs: []*UpgradeConfig{
 				{
 					StateUpgrades: []StateUpgrade{
-						{BlockTimestamp: big.NewInt(6), StateUpgradeAccounts: stateUpgrade},
-						{BlockTimestamp: big.NewInt(7), StateUpgradeAccounts: stateUpgrade},
+						{BlockTimestamp: utils.NewUint64(6), StateUpgradeAccounts: stateUpgrade},
+						{BlockTimestamp: utils.NewUint64(7), StateUpgradeAccounts: stateUpgrade},
 					},
 				},
 				{
 					StateUpgrades: []StateUpgrade{
-						{BlockTimestamp: big.NewInt(6), StateUpgradeAccounts: stateUpgrade},
-						{BlockTimestamp: big.NewInt(7), StateUpgradeAccounts: differentStateUpgrade},
+						{BlockTimestamp: utils.NewUint64(6), StateUpgradeAccounts: stateUpgrade},
+						{BlockTimestamp: utils.NewUint64(7), StateUpgradeAccounts: differentStateUpgrade},
 					},
 				},
 			},
 		},
 		"cancel upgrade before it happens": {
-			startTimestamps: []*big.Int{big.NewInt(5), big.NewInt(6)},
+			startTimestamps: []uint64{5, 6},
 			configs: []*UpgradeConfig{
 				{
 					StateUpgrades: []StateUpgrade{
-						{BlockTimestamp: big.NewInt(6), StateUpgradeAccounts: stateUpgrade},
-						{BlockTimestamp: big.NewInt(7), StateUpgradeAccounts: stateUpgrade},
+						{BlockTimestamp: utils.NewUint64(6), StateUpgradeAccounts: stateUpgrade},
+						{BlockTimestamp: utils.NewUint64(7), StateUpgradeAccounts: stateUpgrade},
 					},
 				},
 				{
 					StateUpgrades: []StateUpgrade{
-						{BlockTimestamp: big.NewInt(6), StateUpgradeAccounts: stateUpgrade},
+						{BlockTimestamp: utils.NewUint64(6), StateUpgradeAccounts: stateUpgrade},
 					},
 				},
 			},
 		},
 		"retroactively enabling upgrades is not allowed": {
 			expectedErrorString: "cannot retroactively enable StateUpgrade",
-			startTimestamps:     []*big.Int{big.NewInt(6)},
+			startTimestamps:     []uint64{6},
 			configs: []*UpgradeConfig{
 				{
 					StateUpgrades: []StateUpgrade{
-						{BlockTimestamp: big.NewInt(5), StateUpgradeAccounts: stateUpgrade},
+						{BlockTimestamp: utils.NewUint64(5), StateUpgradeAccounts: stateUpgrade},
 					},
 				},
 			},
@@ -170,7 +171,7 @@ func TestUnmarshalStateUpgradeJSON(t *testing.T) {
 	upgradeConfig := UpgradeConfig{
 		StateUpgrades: []StateUpgrade{
 			{
-				BlockTimestamp: big.NewInt(1677608400),
+				BlockTimestamp: utils.NewUint64(1677608400),
 				StateUpgradeAccounts: map[common.Address]StateUpgradeAccount{
 					common.HexToAddress("0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC"): {
 						BalanceChange: (*math.HexOrDecimal256)(big.NewInt(100)),

@@ -4,12 +4,12 @@
 package rewardmanager
 
 import (
-	"math/big"
 	"testing"
 
 	"github.com/ava-labs/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/subnet-evm/precompile/testutils"
+	"github.com/ava-labs/subnet-evm/utils"
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -18,7 +18,7 @@ func TestVerify(t *testing.T) {
 	enableds := []common.Address{allowlist.TestEnabledAddr}
 	tests := map[string]testutils.ConfigVerifyTest{
 		"both reward mechanisms should not be activated at the same time in reward manager": {
-			Config: NewConfig(big.NewInt(3), admins, enableds, &InitialRewardConfig{
+			Config: NewConfig(utils.NewUint64(3), admins, enableds, &InitialRewardConfig{
 				AllowFeeRecipients: true,
 				RewardAddress:      common.HexToAddress("0x01"),
 			}),
@@ -33,42 +33,42 @@ func TestEqual(t *testing.T) {
 	enableds := []common.Address{allowlist.TestEnabledAddr}
 	tests := map[string]testutils.ConfigEqualTest{
 		"non-nil config and nil other": {
-			Config:   NewConfig(big.NewInt(3), admins, enableds, nil),
+			Config:   NewConfig(utils.NewUint64(3), admins, enableds, nil),
 			Other:    nil,
 			Expected: false,
 		},
 		"different type": {
-			Config:   NewConfig(big.NewInt(3), admins, enableds, nil),
+			Config:   NewConfig(utils.NewUint64(3), admins, enableds, nil),
 			Other:    precompileconfig.NewNoopStatefulPrecompileConfig(),
 			Expected: false,
 		},
 		"different timestamp": {
-			Config:   NewConfig(big.NewInt(3), admins, nil, nil),
-			Other:    NewConfig(big.NewInt(4), admins, nil, nil),
+			Config:   NewConfig(utils.NewUint64(3), admins, nil, nil),
+			Other:    NewConfig(utils.NewUint64(4), admins, nil, nil),
 			Expected: false,
 		},
 		"non-nil initial config and nil initial config": {
-			Config: NewConfig(big.NewInt(3), admins, nil, &InitialRewardConfig{
+			Config: NewConfig(utils.NewUint64(3), admins, nil, &InitialRewardConfig{
 				AllowFeeRecipients: true,
 			}),
-			Other:    NewConfig(big.NewInt(3), admins, nil, nil),
+			Other:    NewConfig(utils.NewUint64(3), admins, nil, nil),
 			Expected: false,
 		},
 		"different initial config": {
-			Config: NewConfig(big.NewInt(3), admins, nil, &InitialRewardConfig{
+			Config: NewConfig(utils.NewUint64(3), admins, nil, &InitialRewardConfig{
 				RewardAddress: common.HexToAddress("0x01"),
 			}),
-			Other: NewConfig(big.NewInt(3), admins, nil,
+			Other: NewConfig(utils.NewUint64(3), admins, nil,
 				&InitialRewardConfig{
 					RewardAddress: common.HexToAddress("0x02"),
 				}),
 			Expected: false,
 		},
 		"same config": {
-			Config: NewConfig(big.NewInt(3), admins, nil, &InitialRewardConfig{
+			Config: NewConfig(utils.NewUint64(3), admins, nil, &InitialRewardConfig{
 				RewardAddress: common.HexToAddress("0x01"),
 			}),
-			Other: NewConfig(big.NewInt(3), admins, nil, &InitialRewardConfig{
+			Other: NewConfig(utils.NewUint64(3), admins, nil, &InitialRewardConfig{
 				RewardAddress: common.HexToAddress("0x01"),
 			}),
 			Expected: true,

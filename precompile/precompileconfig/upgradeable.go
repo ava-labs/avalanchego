@@ -3,22 +3,18 @@
 
 package precompileconfig
 
-import (
-	"math/big"
-
-	"github.com/ava-labs/subnet-evm/utils"
-)
+import "github.com/ava-labs/subnet-evm/utils"
 
 // Upgrade contains the timestamp for the upgrade along with
 // a boolean [Disable]. If [Disable] is set, the upgrade deactivates
 // the precompile and clears its storage.
 type Upgrade struct {
-	BlockTimestamp *big.Int `json:"blockTimestamp"`
-	Disable        bool     `json:"disable,omitempty"`
+	BlockTimestamp *uint64 `json:"blockTimestamp"`
+	Disable        bool    `json:"disable,omitempty"`
 }
 
 // Timestamp returns the timestamp this network upgrade goes into effect.
-func (u *Upgrade) Timestamp() *big.Int {
+func (u *Upgrade) Timestamp() *uint64 {
 	return u.BlockTimestamp
 }
 
@@ -33,5 +29,5 @@ func (u *Upgrade) Equal(other *Upgrade) bool {
 	if other == nil {
 		return false
 	}
-	return u.Disable == other.Disable && utils.BigNumEqual(u.BlockTimestamp, other.BlockTimestamp)
+	return u.Disable == other.Disable && utils.Uint64PtrEqual(u.BlockTimestamp, other.BlockTimestamp)
 }

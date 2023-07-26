@@ -36,11 +36,11 @@ import (
 
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/core/bloombits"
-	"github.com/ava-labs/subnet-evm/core/rawdb"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/core/vm"
 	"github.com/ava-labs/subnet-evm/ethdb"
 	"github.com/ava-labs/subnet-evm/interfaces"
+	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/rpc"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
@@ -63,9 +63,12 @@ type Backend interface {
 	ChainDb() ethdb.Database
 	HeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*types.Header, error)
 	HeaderByHash(ctx context.Context, blockHash common.Hash) (*types.Header, error)
+	GetBody(ctx context.Context, hash common.Hash, number rpc.BlockNumber) (*types.Body, error)
 	GetReceipts(ctx context.Context, blockHash common.Hash) (types.Receipts, error)
 	GetLogs(ctx context.Context, blockHash common.Hash, number uint64) ([][]*types.Log, error)
 
+	CurrentHeader() *types.Header
+	ChainConfig() *params.ChainConfig
 	SubscribeNewTxsEvent(chan<- core.NewTxsEvent) event.Subscription
 	SubscribeChainEvent(ch chan<- core.ChainEvent) event.Subscription
 	SubscribeChainAcceptedEvent(ch chan<- core.ChainEvent) event.Subscription
@@ -88,6 +91,8 @@ type Backend interface {
 
 // FilterSystem holds resources shared by all filters.
 type FilterSystem struct {
+	// Note: go-ethereum uses an LRU cache for logs,
+	// instead we cache logs on the blockchain object itself.
 	backend Backend
 	cfg     *Config
 }
@@ -129,16 +134,16 @@ const (
 	PendingLogsSubscription
 	// MinedAndPendingLogsSubscription queries for logs in mined and pending blocks.
 	MinedAndPendingLogsSubscription
-	// PendingTransactionsSubscription queries tx hashes for pending
-	// transactions entering the pending state
+	// PendingTransactionsSubscription queries for pending transactions entering
+	// the pending state
 	PendingTransactionsSubscription
-	// AcceptedTransactionsSubscription queries tx hashes for accepted transactions
+	// AcceptedTransactionsSubscription queries for accepted transactions
 	AcceptedTransactionsSubscription
 	// BlocksSubscription queries hashes for blocks that are imported
 	BlocksSubscription
 	// AcceptedBlocksSubscription queries hashes for blocks that are accepted
 	AcceptedBlocksSubscription
-	// LastSubscription keeps track of the last index
+	// LastIndexSubscription keeps track of the last index
 	LastIndexSubscription
 )
 
@@ -160,7 +165,7 @@ type subscription struct {
 	created   time.Time
 	logsCrit  interfaces.FilterQuery
 	logs      chan []*types.Log
-	hashes    chan []common.Hash
+	txs       chan []*types.Transaction
 	headers   chan *types.Header
 	installed chan struct{} // closed when the filter is installed
 	err       chan error    // closed when the filter is uninstalled
@@ -169,10 +174,8 @@ type subscription struct {
 // EventSystem creates subscriptions, processes events and broadcasts them to the
 // subscription which match the subscription criteria.
 type EventSystem struct {
-	backend   Backend
-	sys       *FilterSystem
-	lightMode bool
-	lastHead  *types.Header
+	backend Backend
+	sys     *FilterSystem
 
 	// Subscriptions
 	txsSub           event.Subscription // Subscription for new transaction event
@@ -203,11 +206,10 @@ type EventSystem struct {
 //
 // The returned manager has a loop that needs to be stopped with the Stop function
 // or by stopping the given mux.
-func NewEventSystem(sys *FilterSystem, lightMode bool) *EventSystem {
+func NewEventSystem(sys *FilterSystem) *EventSystem {
 	m := &EventSystem{
 		sys:             sys,
 		backend:         sys.backend,
-		lightMode:       lightMode,
 		install:         make(chan *subscription),
 		uninstall:       make(chan *subscription),
 		txsCh:           make(chan core.NewTxsEvent, txChanSize),
@@ -265,7 +267,7 @@ func (sub *Subscription) Unsubscribe() {
 			case sub.es.uninstall <- sub.f:
 				break uninstallLoop
 			case <-sub.f.logs:
-			case <-sub.f.hashes:
+			case <-sub.f.txs:
 			case <-sub.f.headers:
 			}
 		}
@@ -355,7 +357,7 @@ func (es *EventSystem) subscribeAcceptedLogs(crit interfaces.FilterQuery, logs c
 		logsCrit:  crit,
 		created:   time.Now(),
 		logs:      logs,
-		hashes:    make(chan []common.Hash),
+		txs:       make(chan []*types.Transaction),
 		headers:   make(chan *types.Header),
 		installed: make(chan struct{}),
 		err:       make(chan error),
@@ -372,7 +374,7 @@ func (es *EventSystem) subscribeMinedPendingLogs(crit interfaces.FilterQuery, lo
 		logsCrit:  crit,
 		created:   time.Now(),
 		logs:      logs,
-		hashes:    make(chan []common.Hash),
+		txs:       make(chan []*types.Transaction),
 		headers:   make(chan *types.Header),
 		installed: make(chan struct{}),
 		err:       make(chan error),
@@ -389,7 +391,7 @@ func (es *EventSystem) subscribeLogs(crit interfaces.FilterQuery, logs chan []*t
 		logsCrit:  crit,
 		created:   time.Now(),
 		logs:      logs,
-		hashes:    make(chan []common.Hash),
+		txs:       make(chan []*types.Transaction),
 		headers:   make(chan *types.Header),
 		installed: make(chan struct{}),
 		err:       make(chan error),
@@ -406,7 +408,7 @@ func (es *EventSystem) subscribePendingLogs(crit interfaces.FilterQuery, logs ch
 		logsCrit:  crit,
 		created:   time.Now(),
 		logs:      logs,
-		hashes:    make(chan []common.Hash),
+		txs:       make(chan []*types.Transaction),
 		headers:   make(chan *types.Header),
 		installed: make(chan struct{}),
 		err:       make(chan error),
@@ -422,7 +424,7 @@ func (es *EventSystem) SubscribeNewHeads(headers chan *types.Header) *Subscripti
 		typ:       BlocksSubscription,
 		created:   time.Now(),
 		logs:      make(chan []*types.Log),
-		hashes:    make(chan []common.Hash),
+		txs:       make(chan []*types.Transaction),
 		headers:   headers,
 		installed: make(chan struct{}),
 		err:       make(chan error),
@@ -438,7 +440,7 @@ func (es *EventSystem) SubscribeAcceptedHeads(headers chan *types.Header) *Subsc
 		typ:       AcceptedBlocksSubscription,
 		created:   time.Now(),
 		logs:      make(chan []*types.Log),
-		hashes:    make(chan []common.Hash),
+		txs:       make(chan []*types.Transaction),
 		headers:   headers,
 		installed: make(chan struct{}),
 		err:       make(chan error),
@@ -446,15 +448,15 @@ func (es *EventSystem) SubscribeAcceptedHeads(headers chan *types.Header) *Subsc
 	return es.subscribe(sub)
 }
 
-// SubscribePendingTxs creates a subscription that writes transaction hashes for
+// SubscribePendingTxs creates a subscription that writes transactions for
 // transactions that enter the transaction pool.
-func (es *EventSystem) SubscribePendingTxs(hashes chan []common.Hash) *Subscription {
+func (es *EventSystem) SubscribePendingTxs(txs chan []*types.Transaction) *Subscription {
 	sub := &subscription{
 		id:        rpc.NewID(),
 		typ:       PendingTransactionsSubscription,
 		created:   time.Now(),
 		logs:      make(chan []*types.Log),
-		hashes:    hashes,
+		txs:       txs,
 		headers:   make(chan *types.Header),
 		installed: make(chan struct{}),
 		err:       make(chan error),
@@ -462,15 +464,15 @@ func (es *EventSystem) SubscribePendingTxs(hashes chan []common.Hash) *Subscript
 	return es.subscribe(sub)
 }
 
-// SubscribeAcceptedTxs creates a subscription that writes transaction hashes for
+// SubscribeAcceptedTxs creates a subscription that writes transactions for
 // transactions have been accepted.
-func (es *EventSystem) SubscribeAcceptedTxs(hashes chan []common.Hash) *Subscription {
+func (es *EventSystem) SubscribeAcceptedTxs(txs chan []*types.Transaction) *Subscription {
 	sub := &subscription{
 		id:        rpc.NewID(),
 		typ:       AcceptedTransactionsSubscription,
 		created:   time.Now(),
 		logs:      make(chan []*types.Log),
-		hashes:    hashes,
+		txs:       txs,
 		headers:   make(chan *types.Header),
 		installed: make(chan struct{}),
 		err:       make(chan error),
@@ -526,16 +528,12 @@ func (es *EventSystem) handleRemovedLogs(filters filterIndex, ev core.RemovedLog
 }
 
 func (es *EventSystem) handleTxsEvent(filters filterIndex, ev core.NewTxsEvent, accepted bool) {
-	hashes := make([]common.Hash, 0, len(ev.Txs))
-	for _, tx := range ev.Txs {
-		hashes = append(hashes, tx.Hash())
-	}
 	for _, f := range filters[PendingTransactionsSubscription] {
-		f.hashes <- hashes
+		f.txs <- ev.Txs
 	}
 	if accepted {
 		for _, f := range filters[AcceptedTransactionsSubscription] {
-			f.hashes <- hashes
+			f.txs <- ev.Txs
 		}
 	}
 }
@@ -544,103 +542,12 @@ func (es *EventSystem) handleChainEvent(filters filterIndex, ev core.ChainEvent)
 	for _, f := range filters[BlocksSubscription] {
 		f.headers <- ev.Block.Header()
 	}
-	if es.lightMode && len(filters[LogsSubscription]) > 0 {
-		es.lightFilterNewHead(ev.Block.Header(), func(header *types.Header, remove bool) {
-			for _, f := range filters[LogsSubscription] {
-				if matchedLogs := es.lightFilterLogs(header, f.logsCrit.Addresses, f.logsCrit.Topics, remove); len(matchedLogs) > 0 {
-					f.logs <- matchedLogs
-				}
-			}
-		})
-	}
 }
 
 func (es *EventSystem) handleChainAcceptedEvent(filters filterIndex, ev core.ChainEvent) {
 	for _, f := range filters[AcceptedBlocksSubscription] {
 		f.headers <- ev.Block.Header()
 	}
-	if es.lightMode && len(filters[LogsSubscription]) > 0 {
-		es.lightFilterNewHead(ev.Block.Header(), func(header *types.Header, remove bool) {
-			for _, f := range filters[LogsSubscription] {
-				if matchedLogs := es.lightFilterLogs(header, f.logsCrit.Addresses, f.logsCrit.Topics, remove); len(matchedLogs) > 0 {
-					f.logs <- matchedLogs
-				}
-			}
-		})
-	}
-}
-
-func (es *EventSystem) lightFilterNewHead(newHeader *types.Header, callBack func(*types.Header, bool)) {
-	oldh := es.lastHead
-	es.lastHead = newHeader
-	if oldh == nil {
-		return
-	}
-	newh := newHeader
-	// find common ancestor, create list of rolled back and new block hashes
-	var oldHeaders, newHeaders []*types.Header
-	for oldh.Hash() != newh.Hash() {
-		if oldh.Number.Uint64() >= newh.Number.Uint64() {
-			oldHeaders = append(oldHeaders, oldh)
-			oldh = rawdb.ReadHeader(es.backend.ChainDb(), oldh.ParentHash, oldh.Number.Uint64()-1)
-		}
-		if oldh.Number.Uint64() < newh.Number.Uint64() {
-			newHeaders = append(newHeaders, newh)
-			newh = rawdb.ReadHeader(es.backend.ChainDb(), newh.ParentHash, newh.Number.Uint64()-1)
-			if newh == nil {
-				// happens when CHT syncing, nothing to do
-				newh = oldh
-			}
-		}
-	}
-	// roll back old blocks
-	for _, h := range oldHeaders {
-		callBack(h, true)
-	}
-	// check new blocks (array is in reverse order)
-	for i := len(newHeaders) - 1; i >= 0; i-- {
-		callBack(newHeaders[i], false)
-	}
-}
-
-// filter logs of a single header in light client mode
-func (es *EventSystem) lightFilterLogs(header *types.Header, addresses []common.Address, topics [][]common.Hash, remove bool) []*types.Log {
-	if bloomFilter(header.Bloom, addresses, topics) {
-		// Get the logs of the block
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-		defer cancel()
-		logsList, err := es.sys.getLogs(ctx, header.Hash(), header.Number.Uint64())
-		if err != nil {
-			return nil
-		}
-		var unfiltered []*types.Log
-		for _, logs := range logsList {
-			for _, log := range logs {
-				logcopy := *log
-				logcopy.Removed = remove
-				unfiltered = append(unfiltered, &logcopy)
-			}
-		}
-		logs := filterLogs(unfiltered, nil, nil, addresses, topics)
-		if len(logs) > 0 && logs[0].TxHash == (common.Hash{}) {
-			// We have matching but non-derived logs
-			receipts, err := es.backend.GetReceipts(ctx, header.Hash())
-			if err != nil {
-				return nil
-			}
-			unfiltered = unfiltered[:0]
-			for _, receipt := range receipts {
-				for _, log := range receipt.Logs {
-					logcopy := *log
-					logcopy.Removed = remove
-					unfiltered = append(unfiltered, &logcopy)
-				}
-			}
-			logs = filterLogs(unfiltered, nil, nil, addresses, topics)
-		}
-		return logs
-	}
-	return nil
 }
 
 // eventLoop (un)installs filters and processes mux events.

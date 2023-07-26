@@ -4,12 +4,12 @@
 package txallowlist
 
 import (
-	"math/big"
 	"testing"
 
 	"github.com/ava-labs/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/subnet-evm/precompile/testutils"
+	"github.com/ava-labs/subnet-evm/utils"
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -22,7 +22,7 @@ func TestEqual(t *testing.T) {
 	enableds := []common.Address{allowlist.TestEnabledAddr}
 	tests := map[string]testutils.ConfigEqualTest{
 		"non-nil config and nil other": {
-			Config:   NewConfig(big.NewInt(3), admins, enableds),
+			Config:   NewConfig(utils.NewUint64(3), admins, enableds),
 			Other:    nil,
 			Expected: false,
 		},
@@ -32,13 +32,13 @@ func TestEqual(t *testing.T) {
 			Expected: false,
 		},
 		"different timestamp": {
-			Config:   NewConfig(big.NewInt(3), admins, enableds),
-			Other:    NewConfig(big.NewInt(4), admins, enableds),
+			Config:   NewConfig(utils.NewUint64(3), admins, enableds),
+			Other:    NewConfig(utils.NewUint64(4), admins, enableds),
 			Expected: false,
 		},
 		"same config": {
-			Config:   NewConfig(big.NewInt(3), admins, enableds),
-			Other:    NewConfig(big.NewInt(3), admins, enableds),
+			Config:   NewConfig(utils.NewUint64(3), admins, enableds),
+			Other:    NewConfig(utils.NewUint64(3), admins, enableds),
 			Expected: true,
 		},
 	}

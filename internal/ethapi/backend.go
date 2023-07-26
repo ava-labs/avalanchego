@@ -36,10 +36,10 @@ import (
 	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ava-labs/subnet-evm/consensus"
 	"github.com/ava-labs/subnet-evm/core"
+	"github.com/ava-labs/subnet-evm/core/bloombits"
 	"github.com/ava-labs/subnet-evm/core/state"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/core/vm"
-	"github.com/ava-labs/subnet-evm/eth/filters"
 	"github.com/ava-labs/subnet-evm/ethdb"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/rpc"
@@ -68,14 +68,14 @@ type Backend interface {
 	HeaderByHash(ctx context.Context, hash common.Hash) (*types.Header, error)
 	HeaderByNumberOrHash(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash) (*types.Header, error)
 	CurrentHeader() *types.Header
-	CurrentBlock() *types.Block
+	CurrentBlock() *types.Header
 	BlockByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Block, error)
 	BlockByHash(ctx context.Context, hash common.Hash) (*types.Block, error)
 	BlockByNumberOrHash(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash) (*types.Block, error)
 	StateAndHeaderByNumber(ctx context.Context, number rpc.BlockNumber) (*state.StateDB, *types.Header, error)
 	StateAndHeaderByNumberOrHash(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash) (*state.StateDB, *types.Header, error)
 	GetReceipts(ctx context.Context, hash common.Hash) (types.Receipts, error)
-	GetEVM(ctx context.Context, msg core.Message, state *state.StateDB, header *types.Header, vmConfig *vm.Config) (*vm.EVM, func() error, error)
+	GetEVM(ctx context.Context, msg *core.Message, state *state.StateDB, header *types.Header, vmConfig *vm.Config) (*vm.EVM, func() error, error)
 	SubscribeChainEvent(ch chan<- core.ChainEvent) event.Subscription
 	SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription
 	SubscribeChainSideEvent(ch chan<- core.ChainSideEvent) event.Subscription
@@ -97,9 +97,16 @@ type Backend interface {
 	Engine() consensus.Engine
 	LastAcceptedBlock() *types.Block
 
+	// This is copied from filters.Backend
 	// eth/filters needs to be initialized from this backend type, so methods needed by
 	// it must also be included here.
-	filters.Backend
+	GetBody(ctx context.Context, hash common.Hash, number rpc.BlockNumber) (*types.Body, error)
+	GetLogs(ctx context.Context, blockHash common.Hash, number uint64) ([][]*types.Log, error)
+	SubscribeRemovedLogsEvent(ch chan<- core.RemovedLogsEvent) event.Subscription
+	SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscription
+	SubscribePendingLogsEvent(ch chan<- []*types.Log) event.Subscription
+	BloomStatus() (uint64, uint64)
+	ServiceFilter(ctx context.Context, session *bloombits.MatcherSession)
 }
 
 func GetAPIs(apiBackend Backend) []rpc.API {

@@ -128,7 +128,7 @@ func (f *Filter) Logs(ctx context.Context) ([]*types.Log, error) {
 		if header == nil {
 			return nil, errors.New("unknown block")
 		}
-		return f.blockLogs(ctx, header, false)
+		return f.blockLogs(ctx, header)
 	}
 	// Short-cut if all we care about is pending logs
 	if f.begin == rpc.PendingBlockNumber.Int64() {
@@ -171,7 +171,7 @@ func (f *Filter) Logs(ctx context.Context) ([]*types.Log, error) {
 
 	// If the requested range of blocks exceeds the maximum number of blocks allowed by the backend
 	// return an error instead of searching for the logs.
-	if maxBlocks := f.sys.backend.GetMaxBlocksPerRequest(); int64(end)-f.begin > maxBlocks && maxBlocks > 0 {
+	if maxBlocks := f.sys.backend.GetMaxBlocksPerRequest(); int64(end)-f.begin >= maxBlocks && maxBlocks > 0 {
 		return nil, fmt.Errorf("requested too many blocks from %d to %d, maximum is set to %d", f.begin, int64(end), maxBlocks)
 	}
 	// Gather all indexed logs, and finish with non indexed ones
@@ -229,7 +229,7 @@ func (f *Filter) indexedLogs(ctx context.Context, end uint64) ([]*types.Log, err
 			if header == nil || err != nil {
 				return logs, err
 			}
-			found, err := f.blockLogs(ctx, header, true)
+			found, err := f.checkMatches(ctx, header)
 			if err != nil {
 				return logs, err
 			}
@@ -247,11 +247,14 @@ func (f *Filter) unindexedLogs(ctx context.Context, end uint64) ([]*types.Log, e
 	var logs []*types.Log
 
 	for ; f.begin <= int64(end); f.begin++ {
+		if f.begin%10 == 0 && ctx.Err() != nil {
+			return logs, ctx.Err()
+		}
 		header, err := f.sys.backend.HeaderByNumber(ctx, rpc.BlockNumber(f.begin))
 		if header == nil || err != nil {
 			return logs, err
 		}
-		found, err := f.blockLogs(ctx, header, false)
+		found, err := f.blockLogs(ctx, header)
 		if err != nil {
 			return logs, err
 		}
@@ -261,15 +264,8 @@ func (f *Filter) unindexedLogs(ctx context.Context, end uint64) ([]*types.Log, e
 }
 
 // blockLogs returns the logs matching the filter criteria within a single block.
-func (f *Filter) blockLogs(ctx context.Context, header *types.Header, skipBloom bool) ([]*types.Log, error) {
-	// Fast track: no filtering criteria
-	if len(f.addresses) == 0 && len(f.topics) == 0 {
-		list, err := f.sys.getLogs(ctx, header.Hash(), header.Number.Uint64())
-		if err != nil {
-			return nil, err
-		}
-		return types.FlattenLogs(list), nil
-	} else if skipBloom || bloomFilter(header.Bloom, f.addresses, f.topics) {
+func (f *Filter) blockLogs(ctx context.Context, header *types.Header) ([]*types.Log, error) {
+	if bloomFilter(header.Bloom, f.addresses, f.topics) {
 		return f.checkMatches(ctx, header)
 	}
 	return nil, nil

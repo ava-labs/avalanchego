@@ -4,12 +4,12 @@
 package evm
 
 import (
-	"math/big"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/utils"
 
 	"github.com/ava-labs/avalanchego/snow"
 )
@@ -36,7 +36,8 @@ func TestBlockBuilderShutsDown(t *testing.T) {
 	shutdownChan := make(chan struct{})
 	wg := &sync.WaitGroup{}
 	config := *params.TestChainConfig
-	config.SubnetEVMTimestamp = big.NewInt(time.Now().Add(time.Hour).Unix())
+
+	config.SubnetEVMTimestamp = utils.TimeToNewUint64(time.Now().Add(time.Hour))
 
 	builder := &blockBuilder{
 		ctx:          snow.DefaultContextTest(),

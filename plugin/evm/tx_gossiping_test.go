@@ -43,8 +43,7 @@ func fundAddressByGenesis(addrs []common.Address) (string, error) {
 		}
 	}
 	genesis.Alloc = funds
-	cpcfg := *params.TestChainConfig
-	genesis.Config = &cpcfg
+	genesis.Config = params.TestChainConfig
 
 	bytes, err := json.Marshal(genesis)
 	return string(bytes), err

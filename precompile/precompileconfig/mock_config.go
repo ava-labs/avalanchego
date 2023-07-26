@@ -5,8 +5,6 @@
 package precompileconfig
 
 import (
-	"math/big"
-
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -27,8 +25,8 @@ func (n *noopStatefulPrecompileConfig) Address() common.Address {
 	return common.Address{}
 }
 
-func (n *noopStatefulPrecompileConfig) Timestamp() *big.Int {
-	return new(big.Int)
+func (n *noopStatefulPrecompileConfig) Timestamp() *uint64 {
+	return nil
 }
 
 func (n *noopStatefulPrecompileConfig) IsDisabled() bool {

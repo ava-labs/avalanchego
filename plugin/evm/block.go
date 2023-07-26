@@ -6,7 +6,6 @@ package evm
 import (
 	"context"
 	"fmt"
-	"math/big"
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
@@ -162,7 +161,7 @@ func (b *Block) syntacticVerify() error {
 	}
 
 	header := b.ethBlock.Header()
-	rules := b.vm.chainConfig.AvalancheRules(header.Number, new(big.Int).SetUint64(header.Time))
+	rules := b.vm.chainConfig.AvalancheRules(header.Number, header.Time)
 	return b.vm.syntacticBlockValidator.SyntacticVerify(b, rules)
 }
 

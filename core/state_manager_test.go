@@ -21,7 +21,7 @@ type MockTrieDB struct {
 func (t *MockTrieDB) Dereference(root common.Hash) {
 	t.LastDereference = root
 }
-func (t *MockTrieDB) Commit(root common.Hash, report bool, callback func(common.Hash)) error {
+func (t *MockTrieDB) Commit(root common.Hash, report bool) error {
 	t.LastCommit = root
 	return nil
 }

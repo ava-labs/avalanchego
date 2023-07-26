@@ -34,11 +34,13 @@ import (
 	"github.com/ava-labs/subnet-evm/consensus"
 	"github.com/ava-labs/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/subnet-evm/constants"
+	"github.com/ava-labs/subnet-evm/core/rawdb"
 	"github.com/ava-labs/subnet-evm/core/state"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/core/vm"
 	"github.com/ava-labs/subnet-evm/ethdb"
 	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/trie"
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -91,6 +93,26 @@ func (b *BlockGen) SetDifficulty(diff *big.Int) {
 	b.header.Difficulty = diff
 }
 
+// addTx adds a transaction to the generated block. If no coinbase has
+// been set, the block's coinbase is set to the zero address.
+//
+// There are a few options can be passed as well in order to run some
+// customized rules.
+// - bc:       enables the ability to query historical block hashes for BLOCKHASH
+// - vmConfig: extends the flexibility for customizing evm rules, e.g. enable extra EIPs
+func (b *BlockGen) addTx(bc *BlockChain, vmConfig vm.Config, tx *types.Transaction) {
+	if b.gasPool == nil {
+		b.SetCoinbase(common.Address{})
+	}
+	b.statedb.SetTxContext(tx.Hash(), len(b.txs))
+	receipt, err := ApplyTransaction(b.config, bc, &b.header.Coinbase, b.gasPool, b.statedb, b.header, tx, &b.header.GasUsed, vmConfig)
+	if err != nil {
+		panic(err)
+	}
+	b.txs = append(b.txs, tx)
+	b.receipts = append(b.receipts, receipt)
+}
+
 // AddTx adds a transaction to the generated block. If no coinbase has
 // been set, the block's coinbase is set to the zero address.
 //
@@ -100,7 +122,7 @@ func (b *BlockGen) SetDifficulty(diff *big.Int) {
 // added. Notably, contract code relying on the BLOCKHASH instruction
 // will panic during execution.
 func (b *BlockGen) AddTx(tx *types.Transaction) {
-	b.AddTxWithChain(nil, tx)
+	b.addTx(nil, vm.Config{}, tx)
 }
 
 // AddTxWithChain adds a transaction to the generated block. If no coinbase has
@@ -112,16 +134,14 @@ func (b *BlockGen) AddTx(tx *types.Transaction) {
 // added. If contract code relies on the BLOCKHASH instruction,
 // the block in chain will be returned.
 func (b *BlockGen) AddTxWithChain(bc *BlockChain, tx *types.Transaction) {
-	if b.gasPool == nil {
-		b.SetCoinbase(common.Address{})
-	}
-	b.statedb.Prepare(tx.Hash(), len(b.txs))
-	receipt, err := ApplyTransaction(b.config, bc, &b.header.Coinbase, b.gasPool, b.statedb, b.header, tx, &b.header.GasUsed, vm.Config{})
-	if err != nil {
-		panic(err)
-	}
-	b.txs = append(b.txs, tx)
-	b.receipts = append(b.receipts, receipt)
+	b.addTx(bc, vm.Config{}, tx)
+}
+
+// AddTxWithVMConfig adds a transaction to the generated block. If no coinbase has
+// been set, the block's coinbase is set to the zero address.
+// The evm interpreter can be customized with the provided vm config.
+func (b *BlockGen) AddTxWithVMConfig(tx *types.Transaction, config vm.Config) {
+	b.addTx(nil, config, tx)
 }
 
 // GetBalance returns the balance of the given address at the generated block.
@@ -141,6 +161,11 @@ func (b *BlockGen) AddUncheckedTx(tx *types.Transaction) {
 // Number returns the block number of the block being generated.
 func (b *BlockGen) Number() *big.Int {
 	return new(big.Int).Set(b.header.Number)
+}
+
+// Timestamp returns the timestamp of the block being generated.
+func (b *BlockGen) Timestamp() uint64 {
+	return b.header.Time
 }
 
 // BaseFee returns the EIP-1559 base fee of the block being generated.
@@ -239,7 +264,7 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 			if err != nil {
 				panic(fmt.Sprintf("state write error: %v", err))
 			}
-			if err := statedb.Database().TrieDB().Commit(root, false, nil); err != nil {
+			if err := statedb.Database().TrieDB().Commit(root, false); err != nil {
 				panic(fmt.Sprintf("trie write error: %v", err))
 			}
 			if b.onBlockGenerated != nil {
@@ -265,6 +290,19 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 	return blocks, receipts, nil
 }
 
+// GenerateChainWithGenesis is a wrapper of GenerateChain which will initialize
+// genesis block to database first according to the provided genesis specification
+// then generate chain on top.
+func GenerateChainWithGenesis(genesis *Genesis, engine consensus.Engine, n int, gap uint64, gen func(int, *BlockGen)) (ethdb.Database, []*types.Block, []types.Receipts, error) {
+	db := rawdb.NewMemoryDatabase()
+	_, err := genesis.Commit(db, trie.NewDatabase(db))
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	blocks, receipts, err := GenerateChain(genesis.Config, genesis.ToBlock(), engine, db, n, gap, gen)
+	return db, blocks, receipts, err
+}
+
 func makeHeader(chain consensus.ChainReader, config *params.ChainConfig, parent *types.Block, gap uint64, state *state.StateDB, engine consensus.Engine) *types.Header {
 	var time uint64
 	if parent.Time() == 0 {
@@ -287,8 +325,7 @@ func makeHeader(chain consensus.ChainReader, config *params.ChainConfig, parent 
 		Time:   time,
 	}
 
-	timestamp := new(big.Int).SetUint64(time)
-	if chain.Config().IsSubnetEVM(timestamp) {
+	if chain.Config().IsSubnetEVM(time) {
 		feeConfig, _, err := chain.GetFeeConfigAt(parent.Header())
 		if err != nil {
 			panic(err)

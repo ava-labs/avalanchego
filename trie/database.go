@@ -86,7 +86,7 @@ var (
 // The trie Database is thread-safe in its mutations and is thread-safe in providing individual,
 // independent node access.
 type Database struct {
-	diskdb ethdb.KeyValueStore // Persistent storage for matured trie nodes
+	diskdb ethdb.Database // Persistent storage for matured trie nodes
 
 	cleans  *utils.MeteredCache         // GC friendly memory cache of clean node RLPs
 	dirties map[common.Hash]*cachedNode // Data and references relationships of dirty trie nodes
@@ -292,14 +292,14 @@ type Config struct {
 // NewDatabase creates a new trie database to store ephemeral trie content before
 // its written out to disk or garbage collected. No read cache is created, so all
 // data retrievals will hit the underlying disk database.
-func NewDatabase(diskdb ethdb.KeyValueStore) *Database {
+func NewDatabase(diskdb ethdb.Database) *Database {
 	return NewDatabaseWithConfig(diskdb, nil)
 }
 
 // NewDatabaseWithConfig creates a new trie database to store ephemeral trie content
 // before its written out to disk or garbage collected. It also acts as a read cache
 // for nodes loaded from disk.
-func NewDatabaseWithConfig(diskdb ethdb.KeyValueStore, config *Config) *Database {
+func NewDatabaseWithConfig(diskdb ethdb.Database, config *Config) *Database {
 	var cleans *utils.MeteredCache
 	if config != nil && config.Cache > 0 {
 		cleans = utils.NewMeteredCache(config.Cache*1024*1024, config.Journal, config.StatsPrefix, cacheStatsUpdateFrequency)
@@ -317,11 +317,6 @@ func NewDatabaseWithConfig(diskdb ethdb.KeyValueStore, config *Config) *Database
 		preimages: preimage,
 	}
 	return db
-}
-
-// DiskDB retrieves the persistent storage backing the trie database.
-func (db *Database) DiskDB() ethdb.KeyValueStore {
-	return db.diskdb
 }
 
 // insert inserts a simplified trie node into the memory database.
@@ -424,7 +419,7 @@ func (db *Database) node(hash common.Hash) ([]byte, *cachedNode, error) {
 	memcacheDirtyMissMeter.Mark(1)
 
 	// Content unavailable in memory, attempt to retrieve from disk
-	enc := rawdb.ReadTrieNode(db.diskdb, hash)
+	enc := rawdb.ReadLegacyTrieNode(db.diskdb, hash)
 	if len(enc) > 0 {
 		if db.cleans != nil {
 			db.cleans.Set(hash[:], enc)
@@ -577,7 +572,7 @@ func (db *Database) writeFlushItems(toFlush []*flushItem) error {
 	for _, item := range toFlush {
 		rlp := item.node.rlp()
 		item.rlp = rlp
-		rawdb.WriteTrieNode(batch, item.hash, rlp)
+		rawdb.WriteLegacyTrieNode(batch, item.hash, rlp)
 
 		// If we exceeded the ideal batch size, commit and reset
 		if batch.ValueSize() >= ethdb.IdealBatchSize {
@@ -686,7 +681,7 @@ func (db *Database) Cap(limit common.StorageSize) error {
 // Commit iterates over all the children of a particular node, writes them out
 // to disk, forcefully tearing down all references in both directions. As a side
 // effect, all pre-images accumulated up to this point are also written.
-func (db *Database) Commit(node common.Hash, report bool, callback func(common.Hash)) error {
+func (db *Database) Commit(node common.Hash, report bool) error {
 	start := time.Now()
 	if db.preimages != nil {
 		if err := db.preimages.commit(true); err != nil {
@@ -700,7 +695,7 @@ func (db *Database) Commit(node common.Hash, report bool, callback func(common.H
 	db.lock.RLock()
 	lockStart := time.Now()
 	nodes, storage := len(db.dirties), db.dirtiesSize
-	toFlush, err := db.commit(node, make([]*flushItem, 0, 128), callback)
+	toFlush, err := db.commit(node, make([]*flushItem, 0, 128))
 	if err != nil {
 		db.lock.RUnlock()
 		log.Error("Failed to commit trie from trie database", "err", err)
@@ -751,7 +746,7 @@ func (db *Database) Commit(node common.Hash, report bool, callback func(common.H
 //
 // [callback] will be invoked as soon as it is determined a trie node will be
 // flushed to disk (before it is actually written).
-func (db *Database) commit(hash common.Hash, toFlush []*flushItem, callback func(common.Hash)) ([]*flushItem, error) {
+func (db *Database) commit(hash common.Hash, toFlush []*flushItem) ([]*flushItem, error) {
 	// If the node does not exist, it's a previously committed node
 	node, ok := db.dirties[hash]
 	if !ok {
@@ -760,7 +755,7 @@ func (db *Database) commit(hash common.Hash, toFlush []*flushItem, callback func
 	var err error
 	node.forChilds(func(child common.Hash) {
 		if err == nil {
-			toFlush, err = db.commit(child, toFlush, callback)
+			toFlush, err = db.commit(child, toFlush)
 		}
 	})
 	if err != nil {
@@ -770,9 +765,6 @@ func (db *Database) commit(hash common.Hash, toFlush []*flushItem, callback func
 	// that children are committed before their parents (an invariant of this
 	// package).
 	toFlush = append(toFlush, &flushItem{hash, node, nil})
-	if callback != nil {
-		callback(hash)
-	}
 	return toFlush, nil
 }
 
@@ -860,8 +852,8 @@ func (db *Database) update(nodes *MergedNodeSet) error {
 	}
 	for _, owner := range order {
 		subset := nodes.sets[owner]
-		for _, path := range subset.paths {
-			n, ok := subset.nodes[path]
+		for _, path := range subset.updates.order {
+			n, ok := subset.updates.nodes[path]
 			if !ok {
 				return fmt.Errorf("missing node %x %v", owner, path)
 			}
@@ -876,7 +868,7 @@ func (db *Database) update(nodes *MergedNodeSet) error {
 			if err := rlp.DecodeBytes(n.blob, &account); err != nil {
 				return err
 			}
-			if account.Root != emptyRoot {
+			if account.Root != types.EmptyRootHash {
 				db.reference(account.Root, n.parent)
 			}
 		}
@@ -901,17 +893,32 @@ func (db *Database) Size() (common.StorageSize, common.StorageSize) {
 	return db.dirtiesSize + db.childrenSize + metadataSize - metarootRefs, preimageSize
 }
 
-// CommitPreimages flushes the dangling preimages to disk. It is meant to be
-// called when closing the blockchain object, so that preimages are persisted
-// to the database.
-func (db *Database) CommitPreimages() error {
-	db.lock.Lock()
-	defer db.lock.Unlock()
+// GetReader retrieves a node reader belonging to the given state root.
+func (db *Database) GetReader(root common.Hash) Reader {
+	return newHashReader(db)
+}
 
-	if db.preimages == nil {
-		return nil
-	}
-	return db.preimages.commit(true)
+// hashReader is reader of hashDatabase which implements the Reader interface.
+type hashReader struct {
+	db *Database
+}
+
+// newHashReader initializes the hash reader.
+func newHashReader(db *Database) *hashReader {
+	return &hashReader{db: db}
+}
+
+// Node retrieves the trie node with the given node hash.
+// No error will be returned if the node is not found.
+func (reader *hashReader) Node(_ common.Hash, _ []byte, hash common.Hash) (node, error) {
+	return reader.db.EncodedNode(hash), nil
+}
+
+// NodeBlob retrieves the RLP-encoded trie node blob with the given node hash.
+// No error will be returned if the node is not found.
+func (reader *hashReader) NodeBlob(_ common.Hash, _ []byte, hash common.Hash) ([]byte, error) {
+	blob, _ := reader.db.RawNode(hash)
+	return blob, nil
 }
 
 // saveCache saves clean state cache to given directory path
@@ -946,4 +953,22 @@ func (db *Database) SaveCachePeriodically(dir string, interval time.Duration, st
 			return
 		}
 	}
+}
+
+// CommitPreimages flushes the dangling preimages to disk. It is meant to be
+// called when closing the blockchain object, so that preimages are persisted
+// to the database.
+func (db *Database) CommitPreimages() error {
+	db.lock.Lock()
+	defer db.lock.Unlock()
+
+	if db.preimages == nil {
+		return nil
+	}
+	return db.preimages.commit(true)
+}
+
+// Scheme returns the node scheme used in the database.
+func (db *Database) Scheme() string {
+	return rawdb.HashScheme
 }

@@ -66,7 +66,7 @@ type AccessibleState interface {
 // current block. The BlockContext may be provided during both precompile activation and execution.
 type BlockContext interface {
 	Number() *big.Int
-	Timestamp() *big.Int
+	Timestamp() uint64
 }
 
 type Configurator interface {

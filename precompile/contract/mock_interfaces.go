@@ -29,8 +29,8 @@ func NewMockBlockContext(blockNumber *big.Int, timestamp uint64) *mockBlockConte
 	}
 }
 
-func (mb *mockBlockContext) Number() *big.Int    { return mb.blockNumber }
-func (mb *mockBlockContext) Timestamp() *big.Int { return new(big.Int).SetUint64(mb.timestamp) }
+func (mb *mockBlockContext) Number() *big.Int  { return mb.blockNumber }
+func (mb *mockBlockContext) Timestamp() uint64 { return mb.timestamp }
 
 type mockAccessibleState struct {
 	state        StateDB

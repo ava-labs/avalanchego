@@ -36,7 +36,7 @@ type NewTxsEvent struct{ Txs []*types.Transaction }
 
 // NewTxPoolHeadEvent is posted when the pool receives a request to update
 // its head to [Block].
-type NewTxPoolHeadEvent struct{ Block *types.Block }
+type NewTxPoolHeadEvent struct{ Head *types.Header }
 
 // NewTxPoolReorgEvent is posted when the pool head is updated.
 type NewTxPoolReorgEvent struct{ Head *types.Header }

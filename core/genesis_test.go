@@ -40,16 +40,16 @@ import (
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/subnet-evm/precompile/contracts/deployerallowlist"
+	"github.com/ava-labs/subnet-evm/trie"
+	"github.com/ava-labs/subnet-evm/utils"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func setupGenesisBlock(db ethdb.Database, genesis *Genesis, lastAcceptedHash common.Hash) (*params.ChainConfig, common.Hash, error) {
-	conf, err := SetupGenesisBlock(db, genesis, lastAcceptedHash, false)
-	stored := rawdb.ReadCanonicalHash(db, 0)
-	return conf, stored, err
+func setupGenesisBlock(db ethdb.Database, triedb *trie.Database, genesis *Genesis, lastAcceptedHash common.Hash) (*params.ChainConfig, common.Hash, error) {
+	return SetupGenesisBlock(db, triedb, genesis, lastAcceptedHash, false)
 }
 
 func TestGenesisBlockForTesting(t *testing.T) {
@@ -62,7 +62,7 @@ func TestGenesisBlockForTesting(t *testing.T) {
 
 func TestSetupGenesis(t *testing.T) {
 	preSubnetConfig := *params.TestPreSubnetEVMConfig
-	preSubnetConfig.SubnetEVMTimestamp = big.NewInt(100)
+	preSubnetConfig.SubnetEVMTimestamp = utils.NewUint64(100)
 	var (
 		customghash = common.HexToHash("0x4a12fe7bf8d40d152d7e9de22337b115186a4662aa3a97217b36146202bbfc66")
 		customg     = Genesis{
@@ -76,7 +76,7 @@ func TestSetupGenesis(t *testing.T) {
 	)
 
 	rollbackpreSubnetConfig := preSubnetConfig
-	rollbackpreSubnetConfig.SubnetEVMTimestamp = big.NewInt(90)
+	rollbackpreSubnetConfig.SubnetEVMTimestamp = utils.NewUint64(90)
 	oldcustomg.Config = &rollbackpreSubnetConfig
 	tests := []struct {
 		name       string
@@ -88,7 +88,7 @@ func TestSetupGenesis(t *testing.T) {
 		{
 			name: "genesis without ChainConfig",
 			fn: func(db ethdb.Database) (*params.ChainConfig, common.Hash, error) {
-				return setupGenesisBlock(db, new(Genesis), common.Hash{})
+				return setupGenesisBlock(db, trie.NewDatabase(db), new(Genesis), common.Hash{})
 			},
 			wantErr:    errGenesisNoConfig,
 			wantConfig: nil,
@@ -96,7 +96,7 @@ func TestSetupGenesis(t *testing.T) {
 		{
 			name: "no block in DB, genesis == nil",
 			fn: func(db ethdb.Database) (*params.ChainConfig, common.Hash, error) {
-				return setupGenesisBlock(db, nil, common.Hash{})
+				return setupGenesisBlock(db, trie.NewDatabase(db), nil, common.Hash{})
 			},
 			wantErr:    ErrNoGenesis,
 			wantConfig: nil,
@@ -105,17 +105,16 @@ func TestSetupGenesis(t *testing.T) {
 			name: "custom block in DB, genesis == nil",
 			fn: func(db ethdb.Database) (*params.ChainConfig, common.Hash, error) {
 				customg.MustCommit(db)
-				return setupGenesisBlock(db, nil, common.Hash{})
+				return setupGenesisBlock(db, trie.NewDatabase(db), nil, common.Hash{})
 			},
 			wantErr:    ErrNoGenesis,
-			wantHash:   customghash,
 			wantConfig: nil,
 		},
 		{
 			name: "compatible config in DB",
 			fn: func(db ethdb.Database) (*params.ChainConfig, common.Hash, error) {
 				oldcustomg.MustCommit(db)
-				return setupGenesisBlock(db, &customg, customghash)
+				return setupGenesisBlock(db, trie.NewDatabase(db), &customg, customghash)
 			},
 			wantHash:   customghash,
 			wantConfig: customg.Config,
@@ -127,7 +126,7 @@ func TestSetupGenesis(t *testing.T) {
 				// Advance to block #4, past the SubnetEVM transition block of customg.
 				genesis := oldcustomg.MustCommit(db)
 
-				bc, _ := NewBlockChain(db, DefaultCacheConfig, oldcustomg.Config, dummy.NewFullFaker(), vm.Config{}, common.Hash{})
+				bc, _ := NewBlockChain(db, DefaultCacheConfig, &oldcustomg, dummy.NewFullFaker(), vm.Config{}, genesis.Hash(), false)
 				defer bc.Stop()
 
 				blocks, _, _ := GenerateChain(oldcustomg.Config, genesis, dummy.NewFullFaker(), db, 4, 25, nil)
@@ -140,15 +139,15 @@ func TestSetupGenesis(t *testing.T) {
 				}
 
 				// This should return a compatibility error.
-				return setupGenesisBlock(db, &customg, bc.lastAccepted.Hash())
+				return setupGenesisBlock(db, trie.NewDatabase(db), &customg, bc.lastAccepted.Hash())
 			},
 			wantHash:   customghash,
 			wantConfig: customg.Config,
 			wantErr: &params.ConfigCompatError{
 				What:         "SubnetEVM fork block timestamp",
-				StoredConfig: big.NewInt(90),
-				NewConfig:    big.NewInt(100),
-				RewindTo:     89,
+				StoredTime:   u64(90),
+				NewTime:      u64(100),
+				RewindToTime: 89,
 			},
 		},
 	}
@@ -192,7 +191,7 @@ func TestStatefulPrecompilesConfigure(t *testing.T) {
 			getConfig: func() *params.ChainConfig {
 				config := *params.TestChainConfig
 				config.GenesisPrecompiles = params.Precompiles{
-					deployerallowlist.ConfigKey: deployerallowlist.NewConfig(big.NewInt(0), []common.Address{addr}, nil),
+					deployerallowlist.ConfigKey: deployerallowlist.NewConfig(utils.NewUint64(0), []common.Address{addr}, nil),
 				}
 				return &config
 			},
@@ -215,10 +214,10 @@ func TestStatefulPrecompilesConfigure(t *testing.T) {
 
 			db := rawdb.NewMemoryDatabase()
 
-			genesisBlock := genesis.ToBlock(nil)
+			genesisBlock := genesis.ToBlock()
 			genesisRoot := genesisBlock.Root()
 
-			_, err := SetupGenesisBlock(db, genesis, genesisBlock.Hash(), false)
+			_, _, err := setupGenesisBlock(db, trie.NewDatabase(db), genesis, genesisBlock.Hash())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -238,20 +237,18 @@ func TestStatefulPrecompilesConfigure(t *testing.T) {
 // regression test for precompile activation after header block
 func TestPrecompileActivationAfterHeaderBlock(t *testing.T) {
 	db := rawdb.NewMemoryDatabase()
-	copyCfg := *params.TestChainConfig
 	customg := Genesis{
-		Config: &copyCfg,
+		Config: params.TestChainConfig,
 		Alloc: GenesisAlloc{
 			{1}: {Balance: big.NewInt(1), Storage: map[common.Hash]common.Hash{{1}: {1}}},
 		},
 		GasLimit: params.TestChainConfig.FeeConfig.GasLimit.Uint64(),
 	}
-	genesis := customg.MustCommit(db)
-	bc, _ := NewBlockChain(db, DefaultCacheConfig, customg.Config, dummy.NewFullFaker(), vm.Config{}, common.Hash{})
+	bc, _ := NewBlockChain(db, DefaultCacheConfig, &customg, dummy.NewFullFaker(), vm.Config{}, common.Hash{}, false)
 	defer bc.Stop()
 
 	// Advance header to block #4, past the ContractDeployerAllowListConfig.
-	blocks, _, _ := GenerateChain(customg.Config, genesis, dummy.NewFullFaker(), db, 4, 25, nil)
+	_, blocks, _, _ := GenerateChainWithGenesis(&customg, dummy.NewFullFaker(), 4, 25, nil)
 
 	require := require.New(t)
 	_, err := bc.InsertChain(blocks)
@@ -265,25 +262,26 @@ func TestPrecompileActivationAfterHeaderBlock(t *testing.T) {
 
 	require.Equal(blocks[1].Hash(), bc.lastAccepted.Hash())
 	// header must be bigger than last accepted
-	require.Greater(block.Time(), bc.lastAccepted.Time())
+	require.Greater(block.Time, bc.lastAccepted.Time())
 
-	activatedGenesis := customg
-	contractDeployerConfig := deployerallowlist.NewConfig(big.NewInt(51), nil, nil)
-	activatedGenesis.Config.UpgradeConfig.PrecompileUpgrades = []params.PrecompileUpgrade{
+	activatedGenesisConfig := *customg.Config
+	contractDeployerConfig := deployerallowlist.NewConfig(utils.NewUint64(51), nil, nil)
+	activatedGenesisConfig.UpgradeConfig.PrecompileUpgrades = []params.PrecompileUpgrade{
 		{
 			Config: contractDeployerConfig,
 		},
 	}
+	customg.Config = &activatedGenesisConfig
 
 	// assert block is after the activation block
-	require.Greater(block.Time(), contractDeployerConfig.Timestamp().Uint64())
+	require.Greater(block.Time, *contractDeployerConfig.Timestamp())
 	// assert last accepted block is before the activation block
-	require.Less(bc.lastAccepted.Time(), contractDeployerConfig.Timestamp().Uint64())
+	require.Less(bc.lastAccepted.Time(), *contractDeployerConfig.Timestamp())
 
 	// This should not return any error since the last accepted block is before the activation block.
-	config, _, err := setupGenesisBlock(db, &activatedGenesis, bc.lastAccepted.Hash())
+	config, _, err := setupGenesisBlock(db, trie.NewDatabase(db), &customg, bc.lastAccepted.Hash())
 	require.NoError(err)
-	if !reflect.DeepEqual(config, activatedGenesis.Config) {
-		t.Errorf("returned %v\nwant     %v", config, activatedGenesis.Config)
+	if !reflect.DeepEqual(config, customg.Config) {
+		t.Errorf("returned %v\nwant     %v", config, customg.Config)
 	}
 }

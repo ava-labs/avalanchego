@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/subnet-evm/ethdb"
 	"github.com/ava-labs/subnet-evm/metrics"
 	"github.com/ava-labs/subnet-evm/plugin/evm/message"
 	syncHandlers "github.com/ava-labs/subnet-evm/sync/handlers"
@@ -28,6 +29,7 @@ type networkHandler struct {
 // newNetworkHandler constructs the handler for serving network requests.
 func newNetworkHandler(
 	provider syncHandlers.SyncDataProvider,
+	diskDB ethdb.KeyValueReader,
 	evmTrieDB *trie.Database,
 	networkCodec codec.Manager,
 ) message.RequestHandler {
@@ -36,7 +38,7 @@ func newNetworkHandler(
 		// State sync handlers
 		stateTrieLeafsRequestHandler: syncHandlers.NewLeafsRequestHandler(evmTrieDB, provider, networkCodec, syncStats),
 		blockRequestHandler:          syncHandlers.NewBlockRequestHandler(provider, networkCodec, syncStats),
-		codeRequestHandler:           syncHandlers.NewCodeRequestHandler(evmTrieDB.DiskDB(), networkCodec, syncStats),
+		codeRequestHandler:           syncHandlers.NewCodeRequestHandler(diskDB, networkCodec, syncStats),
 
 		// TODO: initialize actual signature request handler when warp is ready
 		signatureRequestHandler: &warpHandlers.NoopSignatureRequestHandler{},

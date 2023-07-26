@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/subnet-evm/constants"
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/core/rawdb"
+	"github.com/ava-labs/subnet-evm/core/txpool"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/eth"
 	"github.com/ava-labs/subnet-evm/eth/ethconfig"
@@ -160,7 +161,7 @@ type VM struct {
 
 	// pointers to eth constructs
 	eth        *eth.Ethereum
-	txPool     *core.TxPool
+	txPool     *txpool.TxPool
 	blockChain *core.BlockChain
 	miner      *miner.Miner
 
@@ -313,6 +314,10 @@ func (vm *VM) Initialize(
 		g.Config.FeeConfig = params.DefaultFeeConfig
 	}
 
+	if err := g.Verify(); err != nil {
+		return fmt.Errorf("failed to verify genesis: %w", err)
+	}
+
 	vm.ethConfig = ethconfig.NewDefaultConfig()
 	vm.ethConfig.Genesis = g
 	// NetworkID here is different than Avalanche's NetworkID.
@@ -355,7 +360,7 @@ func (vm *VM) Initialize(
 	vm.ethConfig.PopulateMissingTriesParallelism = vm.config.PopulateMissingTriesParallelism
 	vm.ethConfig.AllowMissingTries = vm.config.AllowMissingTries
 	vm.ethConfig.SnapshotDelayInit = vm.config.StateSyncEnabled
-	vm.ethConfig.SnapshotAsync = vm.config.SnapshotAsync
+	vm.ethConfig.SnapshotWait = vm.config.SnapshotWait
 	vm.ethConfig.SnapshotVerify = vm.config.SnapshotVerify
 	vm.ethConfig.OfflinePruning = vm.config.OfflinePruning
 	vm.ethConfig.OfflinePruningBloomFilterSize = vm.config.OfflinePruningBloomFilterSize
@@ -398,13 +403,12 @@ func (vm *VM) Initialize(
 
 	// create genesisHash after applying upgradeBytes in case
 	// upgradeBytes modifies genesis.
-	vm.genesisHash = vm.ethConfig.Genesis.ToBlock(nil).Hash()
-
+	vm.genesisHash = vm.ethConfig.Genesis.ToBlock().Hash() // must create genesis hash before [vm.readLastAccepted]
 	lastAcceptedHash, lastAcceptedHeight, err := vm.readLastAccepted()
 	if err != nil {
 		return err
 	}
-	log.Info("reading accepted block db", "lastAcceptedHash", lastAcceptedHash)
+	log.Info(fmt.Sprintf("lastAccepted = %s", lastAcceptedHash))
 
 	if err := vm.initializeMetrics(); err != nil {
 		return err
@@ -617,7 +621,7 @@ func (vm *VM) setAppRequestHandlers() {
 		},
 	)
 
-	networkHandler := newNetworkHandler(vm.blockChain, evmTrieDB, vm.networkCodec)
+	networkHandler := newNetworkHandler(vm.blockChain, vm.chaindb, evmTrieDB, vm.networkCodec)
 	vm.Network.SetRequestHandler(networkHandler)
 }
 
@@ -911,7 +915,7 @@ func (vm *VM) startContinuousProfiler() {
 // readLastAccepted reads the last accepted hash from [acceptedBlockDB] and returns the
 // last accepted block hash and height by reading directly from [vm.chaindb] instead of relying
 // on [chain].
-// Note: assumes chaindb, ethConfig, and genesisHash have been initialized.
+// Note: assumes [vm.chaindb] and [vm.genesisHash] have been initialized.
 func (vm *VM) readLastAccepted() (common.Hash, uint64, error) {
 	// Attempt to load last accepted block to determine if it is necessary to
 	// initialize state with the genesis block.

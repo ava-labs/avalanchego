@@ -27,119 +27,12 @@
 package tests
 
 import (
-	"encoding/json"
-	"fmt"
-	"math/big"
-	"strconv"
-	"strings"
-
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/core/state"
 	"github.com/ava-labs/subnet-evm/core/state/snapshot"
-	"github.com/ava-labs/subnet-evm/core/types"
-	"github.com/ava-labs/subnet-evm/core/vm"
 	"github.com/ava-labs/subnet-evm/ethdb"
-	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 )
-
-// StateTest checks transaction processing without block context.
-// See https://github.com/ethereum/EIPs/issues/176 for the test format specification.
-type StateTest struct {
-	json stJSON
-}
-
-// StateSubtest selects a specific configuration of a General State Test.
-type StateSubtest struct {
-	Fork  string
-	Index int
-}
-
-func (t *StateTest) UnmarshalJSON(in []byte) error {
-	return json.Unmarshal(in, &t.json)
-}
-
-type stJSON struct {
-	Env  stEnv                    `json:"env"`
-	Pre  core.GenesisAlloc        `json:"pre"`
-	Tx   stTransaction            `json:"transaction"`
-	Out  hexutil.Bytes            `json:"out"`
-	Post map[string][]stPostState `json:"post"`
-}
-
-type stPostState struct {
-	Root            common.UnprefixedHash `json:"hash"`
-	Logs            common.UnprefixedHash `json:"logs"`
-	TxBytes         hexutil.Bytes         `json:"txbytes"`
-	ExpectException string                `json:"expectException"`
-	Indexes         struct {
-		Data  int `json:"data"`
-		Gas   int `json:"gas"`
-		Value int `json:"value"`
-	}
-}
-
-//go:generate go run github.com/fjl/gencodec -type stEnv -field-override stEnvMarshaling -out gen_stenv.go
-type stEnv struct {
-	Coinbase   common.Address `json:"currentCoinbase"   gencodec:"required"`
-	Difficulty *big.Int       `json:"currentDifficulty" gencodec:"required"`
-	GasLimit   uint64         `json:"currentGasLimit"   gencodec:"required"`
-	Number     uint64         `json:"currentNumber"     gencodec:"required"`
-	Timestamp  uint64         `json:"currentTimestamp"  gencodec:"required"`
-	BaseFee    *big.Int       `json:"currentBaseFee"  gencodec:"optional"`
-}
-
-//go:generate go run github.com/fjl/gencodec -type stTransaction -field-override stTransactionMarshaling -out gen_sttransaction.go
-type stTransaction struct {
-	GasPrice             *big.Int            `json:"gasPrice"`
-	MaxFeePerGas         *big.Int            `json:"maxFeePerGas"`
-	MaxPriorityFeePerGas *big.Int            `json:"maxPriorityFeePerGas"`
-	Nonce                uint64              `json:"nonce"`
-	To                   string              `json:"to"`
-	Data                 []string            `json:"data"`
-	AccessLists          []*types.AccessList `json:"accessLists,omitempty"`
-	GasLimit             []uint64            `json:"gasLimit"`
-	Value                []string            `json:"value"`
-	PrivateKey           []byte              `json:"secretKey"`
-}
-
-// GetChainConfig takes a fork definition and returns a chain config.
-// The fork definition can be
-// - a plain forkname, e.g. `Byzantium`,
-// - a fork basename, and a list of EIPs to enable; e.g. `Byzantium+1884+1283`.
-func GetChainConfig(forkString string) (baseConfig *params.ChainConfig, eips []int, err error) {
-	var (
-		splitForks            = strings.Split(forkString, "+")
-		ok                    bool
-		baseName, eipsStrings = splitForks[0], splitForks[1:]
-	)
-	if baseConfig, ok = Forks[baseName]; !ok {
-		return nil, nil, UnsupportedForkError{baseName}
-	}
-	for _, eip := range eipsStrings {
-		if eipNum, err := strconv.Atoi(eip); err != nil {
-			return nil, nil, fmt.Errorf("syntax error, invalid eip number %v", eipNum)
-		} else {
-			if !vm.ValidEip(eipNum) {
-				return nil, nil, fmt.Errorf("syntax error, invalid eip number %v", eipNum)
-			}
-			eips = append(eips, eipNum)
-		}
-	}
-	return baseConfig, eips, nil
-}
-
-// Subtests returns all valid subtests of the test.
-func (t *StateTest) Subtests() []StateSubtest {
-	var sub []StateSubtest
-	for fork, pss := range t.json.Post {
-		for i := range pss {
-			sub = append(sub, StateSubtest{fork, i})
-		}
-	}
-	return sub
-}
 
 func MakePreState(db ethdb.Database, accounts core.GenesisAlloc, snapshotter bool) (*snapshot.Tree, *state.StateDB) {
 	sdb := state.NewDatabase(db)
@@ -157,7 +50,13 @@ func MakePreState(db ethdb.Database, accounts core.GenesisAlloc, snapshotter boo
 
 	var snaps *snapshot.Tree
 	if snapshotter {
-		snaps, _ = snapshot.New(db, sdb.TrieDB(), 1, common.Hash{}, root, false, true, false)
+		snapconfig := snapshot.Config{
+			CacheSize:  1,
+			AsyncBuild: false,
+			NoBuild:    false,
+			SkipVerify: true,
+		}
+		snaps, _ = snapshot.New(snapconfig, db, sdb.TrieDB(), common.Hash{}, root)
 	}
 	statedb, _ = state.New(root, sdb, snaps)
 	return snaps, statedb

@@ -63,19 +63,11 @@ var (
 	constantinopleInstructionSet   = newConstantinopleInstructionSet()
 	istanbulInstructionSet         = newIstanbulInstructionSet()
 	subnetEVMInstructionSet        = newSubnetEVMInstructionSet()
+	dUpgradeInstructionSet         = newDUpgradeInstructionSet()
 )
 
 // JumpTable contains the EVM opcodes supported at a given fork.
 type JumpTable [256]*operation
-
-// newSubnetEVMInstructionSet returns the frontier, homestead, byzantium,
-// contantinople, istanbul, petersburg, subnet-evm instructions.
-func newSubnetEVMInstructionSet() JumpTable {
-	instructionSet := newIstanbulInstructionSet()
-	enable2929(&instructionSet)
-	enable3198(&instructionSet) // Base fee opcode https://eips.ethereum.org/EIPS/eip-3198
-	return validate(instructionSet)
-}
 
 func validate(jt JumpTable) JumpTable {
 	for i, op := range jt {
@@ -93,6 +85,24 @@ func validate(jt JumpTable) JumpTable {
 		}
 	}
 	return jt
+}
+
+// newDUpgradeInstructionSet returns the frontier, homestead, byzantium,
+// contantinople, istanbul, petersburg, subnet-evm, d-upgrade instructions.
+func newDUpgradeInstructionSet() JumpTable {
+	instructionSet := newSubnetEVMInstructionSet()
+	enable3855(&instructionSet) // PUSH0 instruction
+	enable3860(&instructionSet) // Limit and meter initcode
+	return validate(instructionSet)
+}
+
+// newSubnetEVMInstructionSet returns the frontier, homestead, byzantium,
+// contantinople, istanbul, petersburg, subnet-evm instructions.
+func newSubnetEVMInstructionSet() JumpTable {
+	instructionSet := newIstanbulInstructionSet()
+	enable2929(&instructionSet)
+	enable3198(&instructionSet) // Base fee opcode https://eips.ethereum.org/EIPS/eip-3198
+	return validate(instructionSet)
 }
 
 // newIstanbulInstructionSet returns the frontier,
@@ -1031,4 +1041,15 @@ func newFrontierInstructionSet() JumpTable {
 	}
 
 	return validate(tbl)
+}
+
+func copyJumpTable(source *JumpTable) *JumpTable {
+	dest := *source
+	for i, op := range source {
+		if op != nil {
+			opCopy := *op
+			dest[i] = &opCopy
+		}
+	}
+	return &dest
 }

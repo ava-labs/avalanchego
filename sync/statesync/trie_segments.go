@@ -62,13 +62,16 @@ type trieToSync struct {
 
 // NewTrieToSync initializes a trieToSync and restores any previously started segments.
 func NewTrieToSync(sync *stateSync, root common.Hash, account common.Hash, syncTask syncTask) (*trieToSync, error) {
-	batch := sync.db.NewBatch()
+	batch := sync.db.NewBatch() // TODO: migrate state sync to use database schemes.
+	writeFn := func(owner common.Hash, path []byte, hash common.Hash, blob []byte) {
+		rawdb.WriteTrieNode(batch, owner, path, hash, blob, rawdb.HashScheme)
+	}
 	trieToSync := &trieToSync{
 		sync:         sync,
 		root:         root,
 		account:      account,
 		batch:        batch,
-		stackTrie:    trie.NewStackTrie(batch),
+		stackTrie:    trie.NewStackTrie(writeFn),
 		isMainTrie:   (root == sync.root),
 		task:         syncTask,
 		segmentsDone: make(map[int]struct{}),

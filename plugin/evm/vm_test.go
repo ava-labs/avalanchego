@@ -47,6 +47,7 @@ import (
 	"github.com/ava-labs/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/subnet-evm/constants"
 	"github.com/ava-labs/subnet-evm/core"
+	"github.com/ava-labs/subnet-evm/core/txpool"
 	"github.com/ava-labs/subnet-evm/core/types"
 	"github.com/ava-labs/subnet-evm/eth"
 	"github.com/ava-labs/subnet-evm/internal/ethapi"
@@ -60,6 +61,7 @@ import (
 	"github.com/ava-labs/subnet-evm/precompile/contracts/txallowlist"
 	"github.com/ava-labs/subnet-evm/rpc"
 	"github.com/ava-labs/subnet-evm/trie"
+	"github.com/ava-labs/subnet-evm/utils"
 	"github.com/ava-labs/subnet-evm/vmerrs"
 
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
@@ -78,8 +80,9 @@ var (
 	// Use chainId: 43111, so that it does not overlap with any Avalanche ChainIDs, which may have their
 	// config overridden in vm.Initialize.
 	genesisJSONSubnetEVM    = "{\"config\":{\"chainId\":43111,\"homesteadBlock\":0,\"eip150Block\":0,\"eip150Hash\":\"0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0\",\"eip155Block\":0,\"eip158Block\":0,\"byzantiumBlock\":0,\"constantinopleBlock\":0,\"petersburgBlock\":0,\"istanbulBlock\":0,\"muirGlacierBlock\":0,\"subnetEVMTimestamp\":0},\"nonce\":\"0x0\",\"timestamp\":\"0x0\",\"extraData\":\"0x00\",\"gasLimit\":\"0x7A1200\",\"difficulty\":\"0x0\",\"mixHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"coinbase\":\"0x0000000000000000000000000000000000000000\",\"alloc\":{\"0x71562b71999873DB5b286dF957af199Ec94617F7\": {\"balance\":\"0x4192927743b88000\"}, \"0x703c4b2bD70c169f5717101CaeE543299Fc946C7\": {\"balance\":\"0x4192927743b88000\"}},\"number\":\"0x0\",\"gasUsed\":\"0x0\",\"parentHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\"}"
+	genesisJSONDUpgrade     = "{\"config\":{\"chainId\":43111,\"homesteadBlock\":0,\"eip150Block\":0,\"eip150Hash\":\"0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0\",\"eip155Block\":0,\"eip158Block\":0,\"byzantiumBlock\":0,\"constantinopleBlock\":0,\"petersburgBlock\":0,\"istanbulBlock\":0,\"muirGlacierBlock\":0,\"subnetEVMTimestamp\":0,\"dUpgradeTimestamp\":0},\"nonce\":\"0x0\",\"timestamp\":\"0x0\",\"extraData\":\"0x00\",\"gasLimit\":\"0x7A1200\",\"difficulty\":\"0x0\",\"mixHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"coinbase\":\"0x0000000000000000000000000000000000000000\",\"alloc\":{\"0x71562b71999873DB5b286dF957af199Ec94617F7\": {\"balance\":\"0x4192927743b88000\"}, \"0x703c4b2bD70c169f5717101CaeE543299Fc946C7\": {\"balance\":\"0x4192927743b88000\"}},\"number\":\"0x0\",\"gasUsed\":\"0x0\",\"parentHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\"}"
 	genesisJSONPreSubnetEVM = "{\"config\":{\"chainId\":43111,\"homesteadBlock\":0,\"eip150Block\":0,\"eip150Hash\":\"0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0\",\"eip155Block\":0,\"eip158Block\":0,\"byzantiumBlock\":0,\"constantinopleBlock\":0,\"petersburgBlock\":0,\"istanbulBlock\":0,\"muirGlacierBlock\":0},\"nonce\":\"0x0\",\"timestamp\":\"0x0\",\"extraData\":\"0x00\",\"gasLimit\":\"0x7A1200\",\"difficulty\":\"0x0\",\"mixHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"coinbase\":\"0x0000000000000000000000000000000000000000\",\"alloc\":{\"0x71562b71999873DB5b286dF957af199Ec94617F7\": {\"balance\":\"0x4192927743b88000\"}, \"0x703c4b2bD70c169f5717101CaeE543299Fc946C7\": {\"balance\":\"0x4192927743b88000\"}},\"number\":\"0x0\",\"gasUsed\":\"0x0\",\"parentHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\"}"
-	genesisJSONLatest       = genesisJSONSubnetEVM
+	genesisJSONLatest       = genesisJSONDUpgrade
 
 	firstTxAmount  *big.Int
 	genesisBalance *big.Int
@@ -2133,7 +2136,7 @@ func TestBuildAllowListActivationBlock(t *testing.T) {
 		t.Fatal(err)
 	}
 	genesis.Config.GenesisPrecompiles = params.Precompiles{
-		deployerallowlist.ConfigKey: deployerallowlist.NewConfig(big.NewInt(time.Now().Unix()), testEthAddrs, nil),
+		deployerallowlist.ConfigKey: deployerallowlist.NewConfig(utils.TimeToNewUint64(time.Now()), testEthAddrs, nil),
 	}
 
 	genesisJSON, err := genesis.MarshalJSON()
@@ -2199,7 +2202,7 @@ func TestTxAllowListSuccessfulTx(t *testing.T) {
 		t.Fatal(err)
 	}
 	genesis.Config.GenesisPrecompiles = params.Precompiles{
-		txallowlist.ConfigKey: txallowlist.NewConfig(big.NewInt(0), testEthAddrs[0:1], nil),
+		txallowlist.ConfigKey: txallowlist.NewConfig(utils.NewUint64(0), testEthAddrs[0:1], nil),
 	}
 	genesisJSON, err := genesis.MarshalJSON()
 	if err != nil {
@@ -2277,7 +2280,7 @@ func TestTxAllowListDisablePrecompile(t *testing.T) {
 	}
 	enableAllowListTimestamp := time.Unix(0, 0) // enable at genesis
 	genesis.Config.GenesisPrecompiles = params.Precompiles{
-		txallowlist.ConfigKey: txallowlist.NewConfig(big.NewInt(enableAllowListTimestamp.Unix()), testEthAddrs[0:1], nil),
+		txallowlist.ConfigKey: txallowlist.NewConfig(utils.TimeToNewUint64(enableAllowListTimestamp), testEthAddrs[0:1], nil),
 	}
 	genesisJSON, err := genesis.MarshalJSON()
 	if err != nil {
@@ -2361,7 +2364,7 @@ func TestTxAllowListDisablePrecompile(t *testing.T) {
 	require.Equal(t, signedTx0.Hash(), txs[0].Hash())
 
 	// verify the issued block is after the network upgrade
-	require.True(t, block.Timestamp().Cmp(big.NewInt(disableAllowListTimestamp.Unix())) >= 0)
+	require.GreaterOrEqual(t, int64(block.Timestamp()), disableAllowListTimestamp.Unix())
 
 	<-newTxPoolHeadChan // wait for new head in tx pool
 
@@ -2391,7 +2394,7 @@ func TestFeeManagerChangeFee(t *testing.T) {
 		t.Fatal(err)
 	}
 	genesis.Config.GenesisPrecompiles = params.Precompiles{
-		feemanager.ConfigKey: feemanager.NewConfig(big.NewInt(0), testEthAddrs[0:1], nil, nil),
+		feemanager.ConfigKey: feemanager.NewConfig(utils.NewUint64(0), testEthAddrs[0:1], nil, nil),
 	}
 
 	// set a lower fee config now
@@ -2442,7 +2445,7 @@ func TestFeeManagerChangeFee(t *testing.T) {
 	feeConfig, lastChangedAt, err := vm.blockChain.GetFeeConfigAt(vm.blockChain.Genesis().Header())
 	require.NoError(t, err)
 	require.EqualValues(t, feeConfig, testLowFeeConfig)
-	require.Zero(t, vm.blockChain.CurrentBlock().Number().Cmp(lastChangedAt))
+	require.Zero(t, vm.blockChain.CurrentBlock().Number.Cmp(lastChangedAt))
 
 	// set a different fee config now
 	testHighFeeConfig := testLowFeeConfig
@@ -2484,7 +2487,7 @@ func TestFeeManagerChangeFee(t *testing.T) {
 	feeConfig, lastChangedAt, err = vm.blockChain.GetFeeConfigAt(block.Header())
 	require.NoError(t, err)
 	require.EqualValues(t, testHighFeeConfig, feeConfig)
-	require.EqualValues(t, vm.blockChain.CurrentBlock().Number(), lastChangedAt)
+	require.EqualValues(t, vm.blockChain.CurrentBlock().Number, lastChangedAt)
 
 	// should fail, with same params since fee is higher now
 	tx2 := types.NewTx(&types.DynamicFeeTx{
@@ -2504,7 +2507,7 @@ func TestFeeManagerChangeFee(t *testing.T) {
 	}
 
 	err = vm.txPool.AddRemote(signedTx2)
-	require.ErrorIs(t, err, core.ErrUnderpriced)
+	require.ErrorIs(t, err, txpool.ErrUnderpriced)
 }
 
 // Test Allow Fee Recipients is disabled and, etherbase must be blackhole address
@@ -2633,7 +2636,7 @@ func TestRewardManagerPrecompileSetRewardAddress(t *testing.T) {
 	require.NoError(t, genesis.UnmarshalJSON([]byte(genesisJSONSubnetEVM)))
 
 	genesis.Config.GenesisPrecompiles = params.Precompiles{
-		rewardmanager.ConfigKey: rewardmanager.NewConfig(common.Big0, testEthAddrs[0:1], nil, nil),
+		rewardmanager.ConfigKey: rewardmanager.NewConfig(utils.NewUint64(0), testEthAddrs[0:1], nil, nil),
 	}
 	genesis.Config.AllowFeeRecipients = true // enable this in genesis to test if this is recognized by the reward manager
 	genesisJSON, err := genesis.MarshalJSON()
@@ -2740,7 +2743,7 @@ func TestRewardManagerPrecompileSetRewardAddress(t *testing.T) {
 	// to determine the coinbase for this block before full deactivation in the
 	// next block.
 	require.Equal(t, testAddr, ethBlock.Coinbase())
-	require.True(t, ethBlock.Timestamp().Cmp(big.NewInt(disableTime.Unix())) >= 0)
+	require.GreaterOrEqual(t, int64(ethBlock.Timestamp()), disableTime.Unix())
 
 	vm.clock.Set(vm.clock.Time().Add(3 * time.Hour)) // let time pass to decrease gas price
 	// issue another block to verify that the reward manager is disabled
@@ -2760,7 +2763,7 @@ func TestRewardManagerPrecompileSetRewardAddress(t *testing.T) {
 	// reward manager was disabled at previous block
 	// so this block should revert back to enabling fee recipients
 	require.Equal(t, etherBase, ethBlock.Coinbase())
-	require.True(t, ethBlock.Timestamp().Cmp(big.NewInt(disableTime.Unix())) >= 0)
+	require.GreaterOrEqual(t, int64(ethBlock.Timestamp()), disableTime.Unix())
 
 	// Verify that Blackhole has received fees
 	blkState, err = vm.blockChain.StateAt(ethBlock.Root())
@@ -2775,7 +2778,7 @@ func TestRewardManagerPrecompileAllowFeeRecipients(t *testing.T) {
 	require.NoError(t, genesis.UnmarshalJSON([]byte(genesisJSONSubnetEVM)))
 
 	genesis.Config.GenesisPrecompiles = params.Precompiles{
-		rewardmanager.ConfigKey: rewardmanager.NewConfig(common.Big0, testEthAddrs[0:1], nil, nil),
+		rewardmanager.ConfigKey: rewardmanager.NewConfig(utils.NewUint64(0), testEthAddrs[0:1], nil, nil),
 	}
 	genesis.Config.AllowFeeRecipients = false // disable this in genesis
 	genesisJSON, err := genesis.MarshalJSON()
@@ -2874,7 +2877,7 @@ func TestRewardManagerPrecompileAllowFeeRecipients(t *testing.T) {
 	require.Equal(t, newHead.Head.Hash(), common.Hash(blk.ID()))
 	ethBlock = blk.(*chain.BlockWrapper).Block.(*Block).ethBlock
 	require.Equal(t, etherBase, ethBlock.Coinbase()) // reward address was activated at previous block
-	require.True(t, ethBlock.Timestamp().Cmp(big.NewInt(disableTime.Unix())) >= 0)
+	require.GreaterOrEqual(t, int64(ethBlock.Timestamp()), disableTime.Unix())
 
 	vm.clock.Set(vm.clock.Time().Add(3 * time.Hour)) // let time pass so that gas price is reduced
 	tx2 = types.NewTransaction(uint64(2), testEthAddrs[0], big.NewInt(2), 21000, big.NewInt(testMinGasPrice), nil)
@@ -2891,7 +2894,7 @@ func TestRewardManagerPrecompileAllowFeeRecipients(t *testing.T) {
 	require.Equal(t, newHead.Head.Hash(), common.Hash(blk.ID()))
 	ethBlock = blk.(*chain.BlockWrapper).Block.(*Block).ethBlock
 	require.Equal(t, constants.BlackholeAddr, ethBlock.Coinbase()) // reward address was activated at previous block
-	require.True(t, ethBlock.Timestamp().Cmp(big.NewInt(disableTime.Unix())) >= 0)
+	require.Greater(t, int64(ethBlock.Timestamp()), disableTime.Unix())
 
 	// Verify that Blackhole has received fees
 	blkState, err = vm.blockChain.StateAt(ethBlock.Root())
@@ -2949,7 +2952,7 @@ func TestSkipChainConfigCheckCompatible(t *testing.T) {
 	// is hardcoded to be allowed in core/genesis.go.
 	genesisWithUpgrade := &core.Genesis{}
 	require.NoError(t, json.Unmarshal([]byte(genesisJSONPreSubnetEVM), genesisWithUpgrade))
-	genesisWithUpgrade.Config.SubnetEVMTimestamp = big.NewInt(blk.Timestamp().Unix())
+	genesisWithUpgrade.Config.SubnetEVMTimestamp = utils.TimeToNewUint64(blk.Timestamp())
 	genesisWithUpgradeBytes, err := json.Marshal(genesisWithUpgrade)
 	require.NoError(t, err)
 
@@ -2968,7 +2971,7 @@ func TestMandatoryUpgrades(t *testing.T) {
 	modifiedSubnetEVMGenesis := &core.Genesis{}
 	err := json.Unmarshal([]byte(genesisJSONSubnetEVM), &modifiedSubnetEVMGenesis)
 	require.NoError(t, err)
-	modifiedSubnetEVMGenesis.Config.SubnetEVMTimestamp = big.NewInt(1)
+	modifiedSubnetEVMGenesis.Config.SubnetEVMTimestamp = utils.NewUint64(1)
 	modifiedSubnetEVMGenesisBytes, err := json.Marshal(modifiedSubnetEVMGenesis)
 	modifiedSubnetEVMGenesisString := string(modifiedSubnetEVMGenesisBytes)
 	require.NoError(t, err)
@@ -2983,7 +2986,7 @@ func TestMandatoryUpgrades(t *testing.T) {
 	}()
 
 	// modification to genesis for mandatory upgrades should have no effect on the VM
-	require.Equal(t, vm.chainConfig.SubnetEVMTimestamp, big.NewInt(0))
+	require.Equal(t, *vm.chainConfig.SubnetEVMTimestamp, uint64(0))
 }
 
 func TestCrossChainMessagestoVM(t *testing.T) {
