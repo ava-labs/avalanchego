@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -289,6 +290,10 @@ func (e *StandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 		return err
 	}
 
+	if e.Config.ReducedModeEnabled && (tx.NodeID() == e.Ctx.NodeID) {
+		e.Ctx.Log.Warn("Verified transaction that would promote node %v to validator. Reduced mode is active and node will shutdown when validation will start.")
+	}
+
 	txID := e.Tx.ID()
 	newStaker, err := state.NewPendingStaker(txID, tx)
 	if err != nil {
@@ -444,6 +449,12 @@ func (e *StandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionl
 	e.State.PutPendingValidator(newStaker)
 	avax.Consume(e.State, tx.Ins)
 	avax.Produce(e.State, txID, tx.Outs)
+
+	if e.Config.ReducedModeEnabled {
+		if tx.SubnetID() == constants.PrimaryNetworkID && tx.NodeID() == e.Ctx.NodeID {
+			e.Ctx.Log.Warn("Verified transaction that would promote node %v to validator. Reduced mode is active and node will shutdown when validation will start.")
+		}
+	}
 
 	return nil
 }
