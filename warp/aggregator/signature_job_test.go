@@ -26,13 +26,15 @@ var (
 	nodeIDs       []ids.NodeID
 	blsSecretKeys []*bls.SecretKey
 	blsPublicKeys []*bls.PublicKey
+	networkID     uint32 = 54321
+	sourceChainID        = ids.GenerateTestID()
 	unsignedMsg   *avalancheWarp.UnsignedMessage
 	blsSignatures []*bls.Signature
 )
 
 func init() {
 	var err error
-	unsignedMsg, err = avalancheWarp.NewUnsignedMessage(ids.GenerateTestID(), ids.GenerateTestID(), []byte{1, 2, 3})
+	unsignedMsg, err = avalancheWarp.NewUnsignedMessage(networkID, sourceChainID, []byte{1, 2, 3})
 	if err != nil {
 		panic(err)
 	}

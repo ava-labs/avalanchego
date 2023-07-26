@@ -72,7 +72,7 @@ func CreateNewSubnet(ctx context.Context, genesisFilePath string) string {
 	gomega.Expect(err).Should(gomega.BeNil())
 
 	log.Info("Creating new subnet")
-	createSubnetTxID, err := pWallet.IssueCreateSubnetTx(owner)
+	createSubnetTx, err := pWallet.IssueCreateSubnetTx(owner)
 	gomega.Expect(err).Should(gomega.BeNil())
 
 	genesis := &core.Genesis{}
@@ -80,14 +80,15 @@ func CreateNewSubnet(ctx context.Context, genesisFilePath string) string {
 	gomega.Expect(err).Should(gomega.BeNil())
 
 	log.Info("Creating new Subnet-EVM blockchain", "genesis", genesis)
-	createChainTxID, err := pWallet.IssueCreateChainTx(
-		createSubnetTxID,
+	createChainTx, err := pWallet.IssueCreateChainTx(
+		createSubnetTx.ID(),
 		genesisBytes,
 		evm.ID,
 		nil,
 		"testChain",
 	)
 	gomega.Expect(err).Should(gomega.BeNil())
+	createChainTxID := createChainTx.ID()
 
 	// Confirm the new blockchain is ready by waiting for the readiness endpoint
 	infoClient := info.NewClient(DefaultLocalNodeURI)

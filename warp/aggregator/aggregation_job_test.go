@@ -44,6 +44,7 @@ func executeSignatureAggregationTest(t testing.TB, test signatureAggregationTest
 	require.NoError(t, res.Message.Signature.Verify(
 		context.Background(),
 		&res.Message.UnsignedMessage,
+		networkID,
 		test.job.state,
 		pChainHeight,
 		test.job.minValidQuorumNum,
