@@ -30,10 +30,11 @@ import (
 const networkHealthCheckInterval = 200 * time.Millisecond
 
 var (
-	errInvalidNodeCount      = errors.New("failed to populate local network config: non-zero node count is only valid for a network without nodes")
-	errInvalidKeyCount       = errors.New("failed to populate local network config: non-zero key count is only valid for a network without keys")
-	errLocalNetworkDirNotSet = errors.New("local network directory not set - has Create() been called?")
-	errInvalidNetworkDir     = errors.New("failed to write local network: invalid network directory")
+	errInvalidNodeCount        = errors.New("failed to populate local network config: non-zero node count is only valid for a network without nodes")
+	errInvalidKeyCount         = errors.New("failed to populate local network config: non-zero key count is only valid for a network without keys")
+	errLocalNetworkDirNotSet   = errors.New("local network directory not set - has Create() been called?")
+	errInvalidNetworkDir       = errors.New("failed to write local network: invalid network directory")
+	errNotHealthyBeforeTimeout = errors.New("failed to see all nodes healthy before timeout")
 )
 
 // Default root dir for storing networks and their configuration.
@@ -391,7 +392,7 @@ func (ln *LocalNetwork) WaitForHealthy(ctx context.Context, w io.Writer) error {
 
 		select {
 		case <-ctx.Done():
-			return errors.New("failed to see healthy nodes before timeout")
+			return errNotHealthyBeforeTimeout
 		case <-ticker.C:
 		}
 	}
