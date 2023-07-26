@@ -1647,6 +1647,9 @@ func (s *state) AddStatelessBlock(block blocks.Block) {
 
 func (s *state) SetHeight(height uint64) {
 	if s.indexedHeights == nil {
+		// If indexedHeights hasn't been created yet, then we are newly tracking
+		// the range. This means we should initialize the LowerBound to the
+		// current height.
 		s.indexedHeights = &heightRange{
 			LowerBound: height,
 		}
