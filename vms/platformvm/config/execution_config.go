@@ -9,17 +9,16 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
-const (
-	blockCacheSize               = 64 * units.MiB
-	txCacheSize                  = 128 * units.MiB
-	transformedSubnetTxCacheSize = 4 * units.MiB
-
-	validatorDiffsCacheSize = 2048
-	rewardUTXOsCacheSize    = 2048
-	chainCacheSize          = 2048
-	chainDBCacheSize        = 2048
-	checksumsEnabled        = false
-)
+var DefaultExecutionConfig = ExecutionConfig{
+	BlockCacheSize:               64 * units.MiB,
+	TxCacheSize:                  128 * units.MiB,
+	TransformedSubnetTxCacheSize: 4 * units.MiB,
+	ValidatorDiffsCacheSize:      2048,
+	RewardUTXOsCacheSize:         2048,
+	ChainCacheSize:               2048,
+	ChainDBCacheSize:             2048,
+	ChecksumsEnabled:             false,
+}
 
 // ExecutionConfig provides execution parameters of PlatformVM
 type ExecutionConfig struct {
@@ -37,21 +36,12 @@ type ExecutionConfig struct {
 // input is unmarshalled into an ExecutionConfig previously
 // initialized with default values
 func GetExecutionConfig(b []byte) (*ExecutionConfig, error) {
-	ec := &ExecutionConfig{
-		BlockCacheSize:               blockCacheSize,
-		TxCacheSize:                  txCacheSize,
-		TransformedSubnetTxCacheSize: transformedSubnetTxCacheSize,
-		ValidatorDiffsCacheSize:      validatorDiffsCacheSize,
-		RewardUTXOsCacheSize:         rewardUTXOsCacheSize,
-		ChainCacheSize:               chainCacheSize,
-		ChainDBCacheSize:             chainDBCacheSize,
-		ChecksumsEnabled:             checksumsEnabled,
-	}
+	ec := DefaultExecutionConfig
 
 	// if bytes are empty keep default values
 	if len(b) == 0 {
-		return ec, nil
+		return &ec, nil
 	}
 
-	return ec, json.Unmarshal(b, ec)
+	return &ec, json.Unmarshal(b, &ec)
 }
