@@ -5,7 +5,9 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 
@@ -15,9 +17,16 @@ import (
 	"github.com/ava-labs/avalanchego/tests/fixture/testnet/local"
 )
 
+var (
+	errAvalancheGoRequired = fmt.Errorf("--avalanchego-path or %s are required", local.AvalancheGoPathEnvName)
+	errNetworkDirRequired  = fmt.Errorf("--network-dir or %s are required", local.NetworkDirEnvName)
+)
+
 func main() {
-	var networkDir string
-	var rootDir string
+	var (
+		networkDir string
+		rootDir    string
+	)
 	rootCmd := &cobra.Command{
 		Use:   "testnetctl",
 		Short: "testnetctl commands",
@@ -25,17 +34,19 @@ func main() {
 	rootCmd.PersistentFlags().StringVar(&networkDir, "network-dir", os.Getenv(local.NetworkDirEnvName), "The path to the configuration directory of a local network")
 	rootCmd.PersistentFlags().StringVar(&rootDir, "root-dir", os.Getenv(local.RootDirEnvName), "The path to the root directory for local networks")
 
-	var execPath string
-	var nodeCount uint8
-	var fundedKeyCount uint8
-	var useStaticPorts bool
-	var initialStaticPort uint16
+	var (
+		execPath          string
+		nodeCount         uint8
+		fundedKeyCount    uint8
+		useStaticPorts    bool
+		initialStaticPort uint16
+	)
 	startNetworkCmd := &cobra.Command{
 		Use:   "start-network [/path/to/avalanchego]",
 		Short: "Start a new local network",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(execPath) == 0 {
-				return fmt.Errorf("--avalanchego-path or %s are required", local.AvalancheGoPathEnvName)
+				return errAvalancheGoRequired
 			}
 
 			// Root dir will be defaulted on start if not provided
@@ -58,7 +69,7 @@ func main() {
 			networkRootDir := filepath.Dir(network.Dir)
 			networkDirName := filepath.Base(network.Dir)
 			latestSymlinkPath := filepath.Join(networkRootDir, "latest")
-			if err := os.Remove(latestSymlinkPath); err != nil && !os.IsNotExist(err) {
+			if err := os.Remove(latestSymlinkPath); err != nil && !errors.Is(err, fs.ErrNotExist) {
 				return err
 			}
 			if err := os.Symlink(networkDirName, latestSymlinkPath); err != nil {
@@ -86,7 +97,7 @@ func main() {
 		Short: "Stop a local network",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(networkDir) == 0 {
-				return fmt.Errorf("--network-dir or %s are required", local.NetworkDirEnvName)
+				return errNetworkDirRequired
 			}
 			if err := local.StopNetwork(networkDir); err != nil {
 				return err

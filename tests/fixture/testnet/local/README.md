@@ -70,8 +70,8 @@ network, _ := local.StartNetwork(
         LocalConfig: local.LocalConfig{
             ExecPath: "/path/to/avalanchego",  // Defining the avalanchego exec path is required
         },
-	},
-	5,                                         // Number of initial validating nodes
+    },
+    5,                                         // Number of initial validating nodes
     50,                                        // Number of pre-funded keys to create
 )
 
@@ -96,17 +96,19 @@ network, _ := local.StartNetwork(
         LocalConfig: local.LocalConfig{
             ExecPath: "/path/to/avalanchego",
         },
-        Nodes: []*LocalNode{{                                // node1 configuration is customized
-            Flags: FlagsMap{                                 // Any and all node flags can be configured here
-                cfg.DataDirKey: "/custom/path/to/node/data",
+        Nodes: []*LocalNode{
+            {                                                    // node1 configuration is customized
+                Flags: FlagsMap{                                 // Any and all node flags can be configured here
+                    cfg.DataDirKey: "/custom/path/to/node/data",
+                }
             },
-        },{                                                  // node2 uses default configuration
-        },{                                                  // node3 uses default configuration
-        },{                                                  // node4 uses default configuration
-        },{                                                  // node5 uses default configuration
-        }},
-	},
-	0,                                                       // Node count must be zero when setting node config
+        },
+        {},                                                      // node2 uses default configuration
+        {},                                                      // node3 uses default configuration
+        {},                                                      // node4 uses default configuration
+        {},                                                      // node5 uses default configuration
+    },
+    0,                                                           // Node count must be zero when setting node config
     50,
 )
 ```
@@ -146,7 +148,7 @@ HOME
             │   └── process.json                         // Node process details (PID, API URI, staking address)
             ├── chains
             │   └── C
-            │       └── cchain_config.json               // C-Chain config for all nodes
+            │       └── config.json                      // C-Chain config for all nodes
             ├── defaults.json                            // Default flags and configuration for network
             ├── genesis.json                             // Genesis for all nodes
             └── network.env                              // Sets network dir env to simplify use of network

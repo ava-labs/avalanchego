@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net"
 	"os"
 	"os/exec"
@@ -25,6 +26,11 @@ import (
 	"github.com/ava-labs/avalanchego/node"
 	"github.com/ava-labs/avalanchego/tests/fixture/testnet"
 	"github.com/ava-labs/avalanchego/utils/perms"
+)
+
+var (
+	errProcessNotRunning        = errors.New("process not running")
+	errProcessQueryNotPermitted = errors.New("process running but query operation not permitted")
 )
 
 // Defines local-specific node configuration. Supports setting default
@@ -69,10 +75,7 @@ func ReadNode(dataDir string) (*LocalNode, error) {
 	if _, err := os.Stat(node.GetConfigPath()); err != nil {
 		return nil, fmt.Errorf("failed to read local node config file: %w", err)
 	}
-	if err := node.ReadAll(); err != nil {
-		return nil, err
-	}
-	return node, nil
+	return node, node.ReadAll()
 }
 
 // Retrieve the ID of the node. The returned value may be nil if the
@@ -138,8 +141,9 @@ func (n *LocalNode) GetProcessContextPath() string {
 
 func (n *LocalNode) ReadProcessContext() error {
 	path := n.GetProcessContextPath()
-	if _, err := os.Stat(path); os.IsNotExist(err) {
+	if _, err := os.Stat(path); errors.Is(err, fs.ErrNotExist) {
 		// The absence of the process context file indicates the node is not running
+		n.NodeProcessContext = node.NodeProcessContext{}
 		return nil
 	}
 
@@ -159,16 +163,13 @@ func (n *LocalNode) ReadAll() error {
 	if err := n.ReadConfig(); err != nil {
 		return err
 	}
-	if err := n.ReadProcessContext(); err != nil {
-		return err
-	}
-	return nil
+	return n.ReadProcessContext()
 }
 
 func (n *LocalNode) Start(w io.Writer, defaultExecPath string) error {
 	// Ensure a stale process context file is removed so that the
 	// creation of a new file can indicate node start.
-	if err := os.Remove(n.GetProcessContextPath()); err != nil && !os.IsNotExist(err) {
+	if err := os.Remove(n.GetProcessContextPath()); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return fmt.Errorf("failed to remove stale process context file: %w", err)
 	}
 
@@ -246,50 +247,50 @@ func (n *LocalNode) IsHealthy(ctx context.Context) (bool, error) {
 		// Process is alive
 	case syscall.ESRCH:
 		// Process is dead
-		return false, errors.New("process not running")
+		return false, errProcessNotRunning
 	default:
-		return false, errors.New("process running but query operation not permitted")
+		return false, errProcessQueryNotPermitted
 	}
 
 	// Check that the node is reporting healthy
 	health, err := health.NewClient(n.URI).Health(ctx, nil)
-	if err != nil {
-		switch t := err.(type) {
-		case *net.OpError:
-			if t.Op == "read" {
-				// Connection refused - potentially recoverable
-				return false, nil
-			}
-		case syscall.Errno:
-			if t == syscall.ECONNREFUSED {
-				// Connection refused - potentially recoverable
-				return false, nil
-			}
-		}
-		// Assume all other errors are not recoverable
-		return false, err
+	if err == nil {
+		return health.Healthy, nil
 	}
-	return health.Healthy, nil
+
+	switch t := err.(type) {
+	case *net.OpError:
+		if t.Op == "read" {
+			// Connection refused - potentially recoverable
+			return false, nil
+		}
+	case syscall.Errno:
+		if t == syscall.ECONNREFUSED {
+			// Connection refused - potentially recoverable
+			return false, nil
+		}
+	}
+	// Assume all other errors are not recoverable
+	return false, err
 }
 
 func (n *LocalNode) WaitForProcessContext(ctx context.Context) error {
+	ticker := time.NewTicker(50 * time.Millisecond)
+	defer ticker.Stop()
+
 	ctx, cancel := context.WithTimeout(ctx, DefaultNodeInitTimeout)
 	defer cancel()
-	for {
+	for len(n.URI) == 0 {
+		err := n.ReadProcessContext()
+		if err != nil {
+			return fmt.Errorf("failed to read process context for node %q: %w", n.NodeID, err)
+		}
+
 		select {
 		case <-ctx.Done():
 			return fmt.Errorf("failed to load process context for node %q before timeout", n.NodeID)
-		default:
-			// Attempt to read process context from disk
-			err := n.ReadProcessContext()
-			if err != nil {
-				return fmt.Errorf("failed to read process context for node %q: %w", n.NodeID, err)
-			}
+		case <-ticker.C:
 		}
-		if len(n.URI) > 0 {
-			break
-		}
-		time.Sleep(time.Millisecond * 50)
 	}
 	return nil
 }

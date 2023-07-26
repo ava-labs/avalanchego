@@ -20,7 +20,7 @@ const (
 	DefaultNetworkStartTimeout = 2 * time.Minute
 	DefaultNodeInitTimeout     = 10 * time.Second
 
-	// The default initial static port should differ from the ANR default of 9650.
+	// The default initial static port should differ from the AvalancheGO default of 9650.
 	DefaultInitialStaticPort = 9850
 )
 
@@ -45,9 +45,9 @@ func LocalFlags() testnet.FlagsMap {
 // C-Chain config for local testing.
 func LocalCChainConfig() testnet.FlagsMap {
 	// Supply only non-default configuration to ensure that default
-	// values will be used. Available cchain configuration options are
+	// values will be used. Available C-Chain configuration options are
 	// defined in the `github.com/ava-labs/coreth/evm` package.
-	return map[string]interface{}{
+	return testnet.FlagsMap{
 		"log-level": "debug",
 	}
 }

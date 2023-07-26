@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net"
 	"os"
 	"path/filepath"
@@ -32,6 +33,13 @@ import (
 // increase the time for a network's nodes to be seen as healthy.
 const networkHealthCheckInterval = 200 * time.Millisecond
 
+var (
+	errInvalidNodeCount      = errors.New("failed to populate local network config: non-zero node count is only valid for a network without nodes")
+	errInvalidKeyCount       = errors.New("failed to populate local network config: non-zero key count is only valid for a network without keys")
+	errLocalNetworkDirNotSet = errors.New("local network directory not set - has Create() been called?")
+	errInvalidNetworkDir     = errors.New("failed to write local network: invalid network directory")
+)
+
 // Default root dir for storing networks and their configuration.
 func GetDefaultRootDir() (string, error) {
 	homeDir, err := os.UserHomeDir()
@@ -45,26 +53,29 @@ func GetDefaultRootDir() (string, error) {
 // directory numbered from 1000 until creation succeeds. Returns the
 // network id and the full path of the created directory.
 func FindNextNetworkID(rootDir string) (uint32, string, error) {
-	dirPath := ""
-	networkID := 1000
+	var (
+		networkID uint32 = 1000
+		dirPath   string
+	)
 	for {
-		dirPath = filepath.Join(rootDir, strconv.Itoa(networkID))
-		if err := os.Mkdir(dirPath, perms.ReadWriteExecute); err != nil {
-			if os.IsExist(err) {
-				// Directory already exists, keep iterating
-				networkID += 1
-				if networkID == int(constants.LocalID) {
-					// The local id is reserved
-					networkID += 1
-				}
-				continue
-			} else if err != nil {
-				return 0, "", fmt.Errorf("failed to create network directory: %w", err)
-			}
+		_, reserved := constants.NetworkIDToNetworkName[networkID]
+		if reserved {
+			continue
 		}
-		break
+
+		dirPath = filepath.Join(rootDir, fmt.Sprint(networkID))
+		err := os.Mkdir(dirPath, perms.ReadWriteExecute)
+		if err == nil {
+			return networkID, dirPath, nil
+		}
+
+		if !errors.Is(err, fs.ErrExist) {
+			return 0, "", fmt.Errorf("failed to create network directory: %w", err)
+		}
+
+		// Directory already exists, keep iterating
+		networkID++
 	}
-	return uint32(networkID), dirPath, nil
 }
 
 // Defines the configuration required for a local network (i.e. one composed of local processes).
@@ -122,8 +133,10 @@ func StartNetwork(
 	}
 
 	// Determine the network path and ID
-	networkDir := ""
-	networkID := uint32(0)
+	var (
+		networkDir string
+		networkID  uint32
+	)
 	if network.Genesis != nil && network.Genesis.NetworkID > 0 {
 		// Use the network ID defined in the provided genesis
 		networkID = network.Genesis.NetworkID
@@ -164,7 +177,7 @@ func StartNetwork(
 	if _, err := fmt.Fprintf(w, "Waiting for all nodes to report healthy...\n\n"); err != nil {
 		return nil, err
 	}
-	if err := network.WaitForHealth(ctx, w); err != nil {
+	if err := network.WaitForHealthy(ctx, w); err != nil {
 		return nil, err
 	}
 	if _, err := fmt.Fprintf(w, "\nStarted network %d @ %s\n", network.Genesis.NetworkID, network.Dir); err != nil {
@@ -194,10 +207,10 @@ func StopNetwork(dir string) error {
 // Ensure the network has the configuration it needs to start.
 func (ln *LocalNetwork) PopulateLocalNetworkConfig(networkID uint32, nodeCount int, keyCount int) error {
 	if len(ln.Nodes) > 0 && nodeCount > 0 {
-		return errors.New("failed to populate local network config: non-zero node count is only valid for a network without nodes")
+		return errInvalidNodeCount
 	}
 	if len(ln.FundedKeys) > 0 && keyCount > 0 {
-		return errors.New("failed to populate local network config: non-zero key count is only valid for a network without keys")
+		return errInvalidKeyCount
 	}
 
 	if nodeCount > 0 {
@@ -297,7 +310,7 @@ func (ln *LocalNetwork) PopulateNodeConfig(node *LocalNode) error {
 // Starts a network for the first time
 func (ln *LocalNetwork) Start(w io.Writer) error {
 	if len(ln.Dir) == 0 {
-		return errors.New("local network directory not set - has Create() been called?")
+		return errLocalNetworkDirNotSet
 	}
 
 	// Ensure configuration on disk is current
@@ -326,7 +339,7 @@ func (ln *LocalNetwork) Start(w io.Writer) error {
 			httpPort = int(ln.InitialStaticPort) + i*2
 			stakingPort = httpPort + 1
 		}
-		node.SetNetworkingConfig(httpPort, stakingPort, bootstrapIDs, bootstrapIPs)
+		node.SetNetworkingConfigDefaults(httpPort, stakingPort, bootstrapIDs, bootstrapIPs)
 
 		// Write configuration to disk in preparation for node start
 		if err := node.WriteConfig(); err != nil {
@@ -364,33 +377,36 @@ func (ln *LocalNetwork) Start(w io.Writer) error {
 }
 
 // Wait until all nodes in the network are healthy.
-func (ln *LocalNetwork) WaitForHealth(ctx context.Context, w io.Writer) error {
+func (ln *LocalNetwork) WaitForHealthy(ctx context.Context, w io.Writer) error {
+	ticker := time.NewTicker(networkHealthCheckInterval)
+	defer ticker.Stop()
+
 	healthyNodes := set.NewSet[ids.NodeID](len(ln.Nodes))
-	for {
+	for healthyNodes.Len() < len(ln.Nodes) {
 		for _, node := range ln.Nodes {
-			select {
-			case <-ctx.Done():
-				return errors.New("failed to see healthy nodes before timeout")
-			default:
-				if healthyNodes.Contains(node.NodeID) {
-					continue
-				}
-				healthy, err := node.IsHealthy(ctx)
-				if err != nil {
-					return err
-				}
-				if healthy {
-					healthyNodes.Add(node.NodeID)
-					if _, err := fmt.Fprintf(w, "%s is healthy @ %s\n", node.NodeID, node.URI); err != nil {
-						return err
-					}
-				}
+			if healthyNodes.Contains(node.NodeID) {
+				continue
+			}
+
+			healthy, err := node.IsHealthy(ctx)
+			if err != nil {
+				return err
+			}
+			if !healthy {
+				continue
+			}
+
+			healthyNodes.Add(node.NodeID)
+			if _, err := fmt.Fprintf(w, "%s is healthy @ %s\n", node.NodeID, node.URI); err != nil {
+				return err
 			}
 		}
-		if len(healthyNodes) == len(ln.Nodes) {
-			break
+
+		select {
+		case <-ctx.Done():
+			return errors.New("failed to see healthy nodes before timeout")
+		case <-ticker.C:
 		}
-		time.Sleep(networkHealthCheckInterval)
 	}
 	return nil
 }
@@ -400,6 +416,9 @@ func (ln *LocalNetwork) WaitForHealth(ctx context.Context, w io.Writer) error {
 func (ln *LocalNetwork) GetURIs() []string {
 	uris := []string{}
 	for _, node := range ln.Nodes {
+		// Only append URIs that are not empty. A node may have an
+		// empty URI if it was not running at the time
+		// node.ReadProcessContext() was called.
 		if len(node.URI) > 0 {
 			uris = append(uris, node.URI)
 		}
@@ -584,7 +603,7 @@ func (ln *LocalNetwork) WriteNodes() error {
 // Write network configuration to disk.
 func (ln *LocalNetwork) WriteAll() error {
 	if len(ln.Dir) == 0 {
-		return errors.New("failed to write local network: invalid network directory")
+		return errInvalidNetworkDir
 	}
 	if err := ln.WriteGenesis(); err != nil {
 		return err
@@ -598,10 +617,7 @@ func (ln *LocalNetwork) WriteAll() error {
 	if err := ln.WriteEnvFile(); err != nil {
 		return err
 	}
-	if err := ln.WriteNodes(); err != nil {
-		return err
-	}
-	return nil
+	return ln.WriteNodes()
 }
 
 // Read network configuration from disk.
@@ -612,10 +628,7 @@ func (ln *LocalNetwork) ReadConfig() error {
 	if err := ln.ReadCChainConfig(); err != nil {
 		return err
 	}
-	if err := ln.ReadDefaults(); err != nil {
-		return err
-	}
-	return nil
+	return ln.ReadDefaults()
 }
 
 // Read node configuration and process context from disk.

@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math/big"
 	"strings"
 	"time"
 
@@ -23,11 +22,22 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 )
 
 const (
 	DefaultNodeCount      = 5
 	DefaultFundedKeyCount = 50
+)
+
+var (
+	errEmptyValidatorsForGenesis   = errors.New("failed to generate genesis: empty validator IDs")
+	errNoKeysForGenesis            = errors.New("failed to generate genesis: no keys to fund")
+	errInvalidNetworkIDForGenesis  = errors.New("network ID can't be mainnet, testnet or local network ID")
+	errMissingValidatorsForGenesis = errors.New("no genesis validators provided")
+	errMissingBalancesForGenesis   = errors.New("no genesis balances given")
+	errMissingTLSKeyForNodeID      = fmt.Errorf("failed to ensure node ID: missing value for %q", cfg.StakingTLSKeyContentKey)
+	errMissingCertForNodeID        = fmt.Errorf("failed to ensure node ID: missing value for %q", cfg.StakingCertContentKey)
 )
 
 // Defines a mapping of flag keys to values intended to be supplied to
@@ -48,14 +58,15 @@ func (f FlagsMap) SetDefaults(defaults FlagsMap) {
 // GetStringVal simplifies retrieving a map value as a string.
 func (f FlagsMap) GetStringVal(key string) (string, error) {
 	rawVal, ok := f[key]
-	if ok {
-		val, err := cast.ToStringE(rawVal)
-		if err != nil {
-			return "", fmt.Errorf("failed to cast value for %q: %v", key, err)
-		}
-		return val, nil
+	if !ok {
+		return "", nil
 	}
-	return "", nil
+
+	val, err := cast.ToStringE(rawVal)
+	if err != nil {
+		return "", fmt.Errorf("failed to cast value for %q: %v", key, err)
+	}
+	return val, nil
 }
 
 // Marshal to json with default prefix and indent.
@@ -74,36 +85,36 @@ type NetworkConfig struct {
 
 // Ensure genesis is generated if not already present.
 func (c *NetworkConfig) EnsureGenesis(networkID uint32, validatorIDs []ids.NodeID) error {
-	if c.Genesis == nil {
-		if len(validatorIDs) == 0 {
-			return errors.New("failed to generate genesis: empty validator IDs")
-		}
-		if len(c.FundedKeys) == 0 {
-			return errors.New("failed to generate genesis: no keys to fund")
-		}
-
-		// Fund the provided keys
-		xChainBalances := []AddrAndBalance{}
-		for _, key := range c.FundedKeys {
-			xChainBalances = append(xChainBalances, AddrAndBalance{
-				key.Address(),
-				big.NewInt(300000000000000000),
-			})
-		}
-
-		genesis, err := NewTestGenesis(networkID, xChainBalances, validatorIDs)
-		if err != nil {
-			return err
-		}
-
-		c.Genesis = genesis
+	if c.Genesis != nil {
+		return nil
 	}
 
+	if len(validatorIDs) == 0 {
+		return errEmptyValidatorsForGenesis
+	}
+	if len(c.FundedKeys) == 0 {
+		return errNoKeysForGenesis
+	}
+
+	// Fund the provided keys
+	xChainBalances := []AddrAndBalance{}
+	for _, key := range c.FundedKeys {
+		xChainBalances = append(xChainBalances, AddrAndBalance{
+			key.Address(),
+			30 * units.MegaAvax,
+		})
+	}
+
+	genesis, err := NewTestGenesis(networkID, xChainBalances, validatorIDs)
+	if err != nil {
+		return err
+	}
+
+	c.Genesis = genesis
 	return nil
 }
 
-// NodeConfig defines configuration for an
-// AvalancheGo node.
+// NodeConfig defines configuration for an AvalancheGo node.
 type NodeConfig struct {
 	NodeID ids.NodeID
 	Flags  FlagsMap
@@ -116,7 +127,7 @@ func NewNodeConfig() *NodeConfig {
 }
 
 // Convenience method for setting networking flags.
-func (nc *NodeConfig) SetNetworkingConfig(
+func (nc *NodeConfig) SetNetworkingConfigDefaults(
 	httpPort int,
 	stakingPort int,
 	bootstrapIDs []string,
@@ -186,7 +197,7 @@ func (nc *NodeConfig) EnsureStakingKeypair() error {
 		}
 		nc.Flags[keyKey] = base64.StdEncoding.EncodeToString(tlsKeyBytes)
 		nc.Flags[certKey] = base64.StdEncoding.EncodeToString(tlsCertBytes)
-	} else if !(len(key) > 0 && len(cert) > 0) {
+	} else if len(key) == 0 || len(cert) == 0 {
 		// Only one of key and cert was provided
 		return fmt.Errorf("%q and %q must be provided together or not at all", keyKey, certKey)
 	}
@@ -209,11 +220,11 @@ func (nc *NodeConfig) EnsureNodeID() error {
 		return err
 	}
 	if len(key) == 0 {
-		return fmt.Errorf("failed to ensure node ID: missing value for %q", keyKey)
+		return errMissingTLSKeyForNodeID
 	}
 	keyBytes, err := base64.StdEncoding.DecodeString(key)
 	if err != nil {
-		return fmt.Errorf("failed to ensure node ID: failed to base64 decode value for %q", keyKey)
+		return fmt.Errorf("failed to ensure node ID: failed to base64 decode value for %q: %w", keyKey, err)
 	}
 
 	cert, err := nc.Flags.GetStringVal(certKey)
@@ -221,11 +232,11 @@ func (nc *NodeConfig) EnsureNodeID() error {
 		return err
 	}
 	if len(cert) == 0 {
-		return fmt.Errorf("failed to ensure node ID: missing value for %q", certKey)
+		return errMissingCertForNodeID
 	}
 	certBytes, err := base64.StdEncoding.DecodeString(cert)
 	if err != nil {
-		return fmt.Errorf("failed to ensure node ID: failed to base64 decode value for %q", certKey)
+		return fmt.Errorf("failed to ensure node ID: failed to base64 decode value for %q: %w", certKey, err)
 	}
 
 	tlsCert, err := staking.LoadTLSCertFromBytes(keyBytes, certBytes)
@@ -239,7 +250,7 @@ func (nc *NodeConfig) EnsureNodeID() error {
 
 type AddrAndBalance struct {
 	Addr    ids.ShortID
-	Balance *big.Int
+	Balance uint64
 }
 
 // Create a genesis struct valid for bootstrapping a test
@@ -253,13 +264,13 @@ func NewTestGenesis(
 	// Validate inputs
 	switch networkID {
 	case constants.TestnetID, constants.MainnetID, constants.LocalID:
-		return nil, errors.New("network ID can't be mainnet, testnet or local network ID")
+		return nil, errInvalidNetworkIDForGenesis
 	}
 	if len(validatorIDs) == 0 {
-		return nil, errors.New("no genesis validators provided")
+		return nil, errMissingValidatorsForGenesis
 	}
 	if len(xChainBalances) == 0 {
-		return nil, errors.New("no genesis balances given")
+		return nil, errMissingBalancesForGenesis
 	}
 
 	// Address that controls stake doesn't matter -- generate it randomly
@@ -273,7 +284,6 @@ func NewTestGenesis(
 	}
 
 	// Ensure the total stake allows a MegaAvax per validator
-	// TODO(marun) Why is this amount significant?
 	totalStake := uint64(len(validatorIDs)) * units.MegaAvax
 
 	// The eth address is only needed to link pre-mainnet assets. Until that capability
@@ -281,6 +291,8 @@ func NewTestGenesis(
 	//
 	// Reference: https://github.com/ava-labs/avalanchego/issues/1365#issuecomment-1511508767
 	ethAddress := "0x0000000000000000000000000000000000000000"
+
+	now := time.Now()
 
 	config := &genesis.UnparsedConfig{
 		NetworkID: networkID,
@@ -292,15 +304,15 @@ func NewTestGenesis(
 				UnlockSchedule: []genesis.LockedAmount{ // Provides stake to validators
 					{
 						Amount:   totalStake,
-						Locktime: uint64(time.Now().Add(7 * 24 * time.Hour).Unix()), // 1 Week
+						Locktime: uint64(now.Add(7 * 24 * time.Hour).Unix()), // 1 Week
 					},
 				},
 			},
 		},
-		StartTime:                  uint64(time.Now().Unix()),
+		StartTime:                  uint64(now.Unix()),
 		InitialStakedFunds:         []string{stakeAddress},
-		InitialStakeDuration:       31_536_000, // 1 year
-		InitialStakeDurationOffset: 5_400,      // 90 minutes
+		InitialStakeDuration:       365 * 24 * 60 * 60, // 1 year
+		InitialStakeDurationOffset: 90 * 60,            // 90 minutes
 		CChainGenesis:              genesis.LocalConfig.CChainGenesis,
 		Message:                    "hello avalanche!",
 	}
@@ -316,14 +328,14 @@ func NewTestGenesis(
 			genesis.UnparsedAllocation{
 				ETHAddr:       ethAddress,
 				AVAXAddr:      address,
-				InitialAmount: addressBalance.Balance.Uint64(),
+				InitialAmount: addressBalance.Balance,
 				UnlockSchedule: []genesis.LockedAmount{
 					{
-						Amount: 20000000000000000,
+						Amount: 20 * units.MegaAvax,
 					},
 					{
 						Amount:   totalStake,
-						Locktime: uint64(time.Now().Add(7 * 24 * time.Hour).Unix()), // 1 Week
+						Locktime: uint64(now.Add(7 * 24 * time.Hour).Unix()), // 1 Week
 					},
 				},
 			},
@@ -345,7 +357,7 @@ func NewTestGenesis(
 			genesis.UnparsedStaker{
 				NodeID:        validatorID,
 				RewardAddress: rewardAddr,
-				DelegationFee: 10_000,
+				DelegationFee: .01 * reward.PercentDenominator,
 			},
 		)
 	}
