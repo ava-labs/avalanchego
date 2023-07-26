@@ -13,7 +13,6 @@ import (
 	"sync"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
 const (
@@ -21,11 +20,10 @@ const (
 	falseByte            = 0
 	minVarIntLen         = 1
 	minMaybeByteSliceLen = 1
-	idLen                = hashing.HashLen
 	minSerializedPathLen = minVarIntLen
 	minByteSliceLen      = minVarIntLen
 	minDBNodeLen         = minMaybeByteSliceLen + minVarIntLen
-	minChildLen          = minVarIntLen + minSerializedPathLen + idLen
+	minChildLen          = minVarIntLen + minSerializedPathLen + ids.IDLen
 )
 
 var (
@@ -352,7 +350,7 @@ func (c *codecImpl) encodeByteSlice(dst io.Writer, value []byte) error {
 }
 
 func (*codecImpl) decodeID(src *bytes.Reader) (ids.ID, error) {
-	if idLen > src.Len() {
+	if ids.IDLen > src.Len() {
 		return ids.ID{}, io.ErrUnexpectedEOF
 	}
 
