@@ -1019,7 +1019,6 @@ func (s *state) ApplyValidatorWeightDiffs(
 			return err
 		}
 	}
-
 	if err := diffIter.Error(); err != nil {
 		return err
 	}
