@@ -12,13 +12,13 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var (
 	ErrAppRequestFailed = errors.New("app request failed")
 	ErrRequestPending   = errors.New("request pending")
+	ErrNoPeers          = errors.New("no peers")
 )
 
 type AppResponseCallback func(
@@ -47,14 +47,12 @@ func (c *Client) AppRequestAny(
 	peers := maps.Keys(c.router.peers)
 	c.router.lock.RUnlock()
 
-	s := sampler.NewUniform()
-	s.Initialize(uint64(len(peers)))
-	drawn, err := s.Next()
-	if err != nil {
-		return err
+	if len(peers) == 0 {
+		return ErrNoPeers
 	}
 
-	nodeIDs := set.Set[ids.NodeID]{peers[drawn]: struct{}{}}
+	// map iteration is random
+	nodeIDs := set.Set[ids.NodeID]{peers[0]: struct{}{}}
 	return c.AppRequest(ctx, nodeIDs, appRequestBytes, onResponse)
 }
 
@@ -64,12 +62,12 @@ func (c *Client) AppRequest(
 	appRequestBytes []byte,
 	onResponse AppResponseCallback,
 ) error {
+	c.router.lock.Lock()
+	defer c.router.lock.Unlock()
+
 	appRequestBytes = c.prefixMessage(appRequestBytes)
 	for nodeID := range nodeIDs {
-
-		c.router.lock.Lock()
 		requestID := c.router.requestID
-
 		if _, ok := c.router.pendingAppRequests[requestID]; ok {
 			return fmt.Errorf(
 				"failed to issue request with request id %d: %w",
@@ -90,10 +88,9 @@ func (c *Client) AppRequest(
 		c.router.pendingAppRequests[requestID] = pendingAppRequest{
 			onResponse: onResponse,
 		}
-
 		c.router.requestID++
-		c.router.lock.Unlock()
 	}
+
 	return nil
 }
 
@@ -137,8 +134,9 @@ func (c *Client) CrossChainAppRequest(
 	onResponse CrossChainAppResponseCallback,
 ) error {
 	c.router.lock.Lock()
-	requestID := c.router.requestID
+	defer c.router.lock.Unlock()
 
+	requestID := c.router.requestID
 	if _, ok := c.router.pendingCrossChainAppRequests[requestID]; ok {
 		return fmt.Errorf(
 			"failed to issue request with request id %d: %w",
@@ -160,7 +158,6 @@ func (c *Client) CrossChainAppRequest(
 		onResponse: onResponse,
 	}
 	c.router.requestID++
-	c.router.lock.Unlock()
 
 	return nil
 }
