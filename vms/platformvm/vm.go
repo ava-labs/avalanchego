@@ -60,7 +60,7 @@ var (
 	_ validators.SubnetConnector = (*VM)(nil)
 
 	errMissingValidatorSet        = errors.New("missing validator set")
-	errNoReducedModeForValidators = errors.New("reduced mode cannot be configured for validators")
+	ErrNoReducedModeForValidators = errors.New("reduced mode cannot be configured for validators")
 )
 
 type VM struct {
@@ -155,7 +155,7 @@ func (vm *VM) Initialize(
 		switch err {
 		case nil:
 			vm.ctx.Log.Error("configured reduced mode while node is a validator")
-			return errNoReducedModeForValidators
+			return ErrNoReducedModeForValidators
 		case database.ErrNotFound:
 			// all fine, continue with vm instantiation
 		default:
