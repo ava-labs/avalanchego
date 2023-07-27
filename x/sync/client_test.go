@@ -304,7 +304,7 @@ func sendChangeRequest(
 	request *pb.SyncGetChangeProofRequest,
 	maxAttempts uint32,
 	modifyResponse func(*merkledb.ChangeProof),
-) (*merkledb.ChangeProof, error) {
+) (*merkledb.ChangeOrRangeProof, error) {
 	t.Helper()
 
 	var wg sync.WaitGroup
@@ -455,6 +455,7 @@ func TestGetChangeProof(t *testing.T) {
 		modifyResponse      func(*merkledb.ChangeProof)
 		expectedErr         error
 		expectedResponseLen int
+		expectRangeProof    bool // Otherwise expect change proof
 	}{
 		"proof restricted by BytesLimit": {
 			request: &pb.SyncGetChangeProofRequest{
@@ -549,22 +550,44 @@ func TestGetChangeProof(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			require := require.New(t)
 
-			proof, err := sendChangeRequest(t, trieDB, verificationDB, test.request, 1, test.modifyResponse)
+			changeOrRangeProof, err := sendChangeRequest(t, trieDB, verificationDB, test.request, 1, test.modifyResponse)
 			require.ErrorIs(err, test.expectedErr)
 			if test.expectedErr != nil {
 				return
 			}
+
+			if test.expectRangeProof {
+				require.NotNil(changeOrRangeProof.RangeProof)
+				require.Nil(changeOrRangeProof.ChangeProof)
+			} else {
+				require.NotNil(changeOrRangeProof.ChangeProof)
+				require.Nil(changeOrRangeProof.RangeProof)
+			}
+
 			if test.expectedResponseLen > 0 {
-				require.LessOrEqual(len(proof.KeyChanges), test.expectedResponseLen)
+				if test.expectRangeProof {
+					require.LessOrEqual(len(changeOrRangeProof.RangeProof.KeyValues), test.expectedResponseLen)
+				} else {
+					require.LessOrEqual(len(changeOrRangeProof.ChangeProof.KeyChanges), test.expectedResponseLen)
+				}
 			}
 
 			// TODO when the client/server support including range proofs in the response,
 			// this will need to be updated.
-			bytes, err := proto.Marshal(&pb.SyncGetChangeProofResponse{
-				Response: &pb.SyncGetChangeProofResponse_ChangeProof{
-					ChangeProof: proof.ToProto(),
-				},
-			})
+			var bytes []byte
+			if test.expectRangeProof {
+				bytes, err = proto.Marshal(&pb.SyncGetChangeProofResponse{
+					Response: &pb.SyncGetChangeProofResponse_RangeProof{
+						RangeProof: changeOrRangeProof.RangeProof.ToProto(),
+					},
+				})
+			} else {
+				bytes, err = proto.Marshal(&pb.SyncGetChangeProofResponse{
+					Response: &pb.SyncGetChangeProofResponse_ChangeProof{
+						ChangeProof: changeOrRangeProof.ChangeProof.ToProto(),
+					},
+				})
+			}
 			require.NoError(err)
 			require.LessOrEqual(len(bytes), int(test.request.BytesLimit))
 		})

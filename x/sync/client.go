@@ -49,7 +49,7 @@ type Client interface {
 	// GetChangeProof synchronously sends the given request, returning a parsed ChangesResponse or error
 	// [verificationDB] is the local db that has all key/values in it for the proof's startroot within the proof's key range
 	// Note: this verifies the response including the change proof.
-	GetChangeProof(ctx context.Context, request *pb.SyncGetChangeProofRequest, verificationDB DB) (*merkledb.ChangeProof, error)
+	GetChangeProof(ctx context.Context, request *pb.SyncGetChangeProofRequest, verificationDB DB) (*merkledb.ChangeOrRangeProof, error)
 }
 
 type client struct {
@@ -83,8 +83,8 @@ func NewClient(config *ClientConfig) Client {
 // GetChangeProof synchronously retrieves the change proof given by [req].
 // Upon failure, retries until the context is expired.
 // The returned change proof is verified.
-func (c *client) GetChangeProof(ctx context.Context, req *pb.SyncGetChangeProofRequest, db DB) (*merkledb.ChangeProof, error) {
-	parseFn := func(ctx context.Context, responseBytes []byte) (*merkledb.ChangeProof, error) {
+func (c *client) GetChangeProof(ctx context.Context, req *pb.SyncGetChangeProofRequest, db DB) (*merkledb.ChangeOrRangeProof, error) {
+	parseFn := func(ctx context.Context, responseBytes []byte) (*merkledb.ChangeOrRangeProof, error) {
 		if len(responseBytes) > int(req.BytesLimit) {
 			return nil, fmt.Errorf("%w: (%d) > %d)", errTooManyBytes, len(responseBytes), req.BytesLimit)
 		}
@@ -117,7 +117,9 @@ func (c *client) GetChangeProof(ctx context.Context, req *pb.SyncGetChangeProofR
 				return nil, fmt.Errorf("%s due to %w", errInvalidRangeProof, err)
 			}
 
-			return &changeProof, nil
+			return &merkledb.ChangeOrRangeProof{
+				ChangeProof: &changeProof,
+			}, nil
 		case *pb.SyncGetChangeProofResponse_RangeProof:
 			// The server did not have enough history to send us a change proof
 			// so they sent a range proof instead.
@@ -133,8 +135,9 @@ func (c *client) GetChangeProof(ctx context.Context, req *pb.SyncGetChangeProofR
 				return nil, err
 			}
 
-			_ = rangeProof  // TODO use
-			return nil, nil // TODO return
+			return &merkledb.ChangeOrRangeProof{
+				RangeProof: rangeProof,
+			}, nil
 		default:
 			return nil, fmt.Errorf("%w: %T", errUnexpectedChangeProofResponse, changeProofResp)
 		}

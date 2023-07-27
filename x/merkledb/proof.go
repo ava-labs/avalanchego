@@ -630,6 +630,12 @@ func (proof *ChangeProof) Empty() bool {
 		len(proof.StartProof) == 0 && len(proof.EndProof) == 0
 }
 
+// Exactly one of [ChangeProof] or [RangeProof] is non-nil.
+type ChangeOrRangeProof struct {
+	ChangeProof *ChangeProof
+	RangeProof  *RangeProof
+}
+
 // Returns nil iff both hold:
 // 1. [kvs] is sorted by key in increasing order.
 // 2. All keys in [kvs] are in the range [start, end].

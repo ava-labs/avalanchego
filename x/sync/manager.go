@@ -253,7 +253,7 @@ func (m *Manager) getAndApplyChangeProof(ctx context.Context, work *workItem) {
 		return
 	}
 
-	changeProof, err := m.config.Client.GetChangeProof(
+	changeOrRangeProof, err := m.config.Client.GetChangeProof(
 		ctx,
 		&pb.SyncGetChangeProofRequest{
 			StartRootHash: work.localRootID[:],
@@ -286,17 +286,22 @@ func (m *Manager) getAndApplyChangeProof(ctx context.Context, work *workItem) {
 	// 	return
 	// }
 
-	largestHandledKey := work.end
-	// if the proof wasn't empty, apply changes to the sync DB
-	if len(changeProof.KeyChanges) > 0 {
-		if err := m.config.DB.CommitChangeProof(ctx, changeProof); err != nil {
-			m.setError(err)
-			return
+	if changeOrRangeProof.ChangeProof != nil {
+		changeProof := changeOrRangeProof.ChangeProof
+		largestHandledKey := work.end
+		// if the proof wasn't empty, apply changes to the sync DB
+		if len(changeProof.KeyChanges) > 0 {
+			if err := m.config.DB.CommitChangeProof(ctx, changeProof); err != nil {
+				m.setError(err)
+				return
+			}
+			largestHandledKey = changeProof.KeyChanges[len(changeProof.KeyChanges)-1].Key
 		}
-		largestHandledKey = changeProof.KeyChanges[len(changeProof.KeyChanges)-1].Key
+
+		m.completeWorkItem(ctx, work, largestHandledKey, targetRootID, changeProof.EndProof)
 	}
 
-	m.completeWorkItem(ctx, work, largestHandledKey, targetRootID, changeProof.EndProof)
+	// TODO handle range proofs
 }
 
 // Fetch and apply the range proof given by [work].
