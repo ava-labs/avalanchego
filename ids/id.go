@@ -15,7 +15,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-const nullStr = "null"
+const (
+	IDLen   = 32
+	nullStr = "null"
+)
 
 var (
 	// Empty is a useful all zero value
@@ -27,7 +30,7 @@ var (
 )
 
 // ID wraps a 32 byte hash used as an identifier
-type ID [32]byte
+type ID [IDLen]byte
 
 // ToID attempt to convert a byte slice into an id
 func ToID(bytes []byte) (ID, error) {
@@ -84,7 +87,7 @@ func (id *ID) UnmarshalText(text []byte) error {
 // This will return a new id and not modify the original id.
 func (id ID) Prefix(prefixes ...uint64) ID {
 	packer := wrappers.Packer{
-		Bytes: make([]byte, len(prefixes)*wrappers.LongLen+hashing.HashLen),
+		Bytes: make([]byte, len(prefixes)*wrappers.LongLen+IDLen),
 	}
 
 	for _, prefix := range prefixes {
