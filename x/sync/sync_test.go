@@ -1131,8 +1131,7 @@ func generateTrie(t *testing.T, r *rand.Rand, count int) (merkledb.MerkleDB, err
 	return db, err
 }
 
-// TODO remove onlint on next line
-func generateTrieWithMinKeyLen(t *testing.T, r *rand.Rand, count int, minKeyLen int) (merkledb.MerkleDB, [][]byte, error) { //nolint:unparam
+func generateTrieWithMinKeyLen(t *testing.T, r *rand.Rand, count int, minKeyLen int) (merkledb.MerkleDB, [][]byte, error) {
 	require := require.New(t)
 
 	db, err := merkledb.New(
