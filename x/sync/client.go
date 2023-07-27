@@ -34,9 +34,10 @@ const (
 var (
 	_ Client = (*client)(nil)
 
-	errInvalidRangeProof = errors.New("failed to verify range proof")
-	errTooManyKeys       = errors.New("response contains more than requested keys")
-	errTooManyBytes      = errors.New("response contains more than requested bytes")
+	errInvalidRangeProof             = errors.New("failed to verify range proof")
+	errTooManyKeys                   = errors.New("response contains more than requested keys")
+	errTooManyBytes                  = errors.New("response contains more than requested bytes")
+	errUnexpectedChangeProofResponse = errors.New("unexpected response type")
 )
 
 // Client synchronously fetches data from the network to fulfill state sync requests.
@@ -93,11 +94,11 @@ func (c *client) GetChangeProof(ctx context.Context, req *pb.SyncGetChangeProofR
 			return nil, err
 		}
 
-		changeProofProto := changeProofResp.GetChangeProof()
-		if changeProofProto != nil {
+		switch changeProofResp := changeProofResp.Response.(type) {
+		case *pb.SyncGetChangeProofResponse_ChangeProof:
 			// The server had enough history to send us a change proof
 			var changeProof merkledb.ChangeProof
-			if err := changeProof.UnmarshalProto(changeProofResp.GetChangeProof()); err != nil {
+			if err := changeProof.UnmarshalProto(changeProofResp.ChangeProof); err != nil {
 				return nil, err
 			}
 
@@ -117,25 +118,26 @@ func (c *client) GetChangeProof(ctx context.Context, req *pb.SyncGetChangeProofR
 			}
 
 			return &changeProof, nil
+		case *pb.SyncGetChangeProofResponse_RangeProof:
+			// The server did not have enough history to send us a change proof
+			// so they sent a range proof instead.
+			rangeProof, err := parseAndVerifyRangeProof(
+				ctx,
+				changeProofResp.RangeProof,
+				int(req.KeyLimit),
+				req.StartKey,
+				req.EndKey,
+				req.EndRootHash,
+			)
+			if err != nil {
+				return nil, err
+			}
+
+			_ = rangeProof  // TODO use
+			return nil, nil // TODO return
+		default:
+			return nil, fmt.Errorf("%w: %T", errUnexpectedChangeProofResponse, changeProofResp)
 		}
-
-		// The server did not have enough history to send us a change proof
-		// so they sent a range proof instead.
-		rangeProof, err := c.parseAndVerifyRangeProof(
-			ctx,
-			changeProofResp.GetRangeProof(),
-			int(req.KeyLimit),
-			req.StartKey,
-			req.EndKey,
-			req.EndRootHash,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		_ = rangeProof // TODO
-
-		return nil, nil // TODO return range proof
 	}
 
 	reqBytes, err := proto.Marshal(&pb.Request{
@@ -149,7 +151,7 @@ func (c *client) GetChangeProof(ctx context.Context, req *pb.SyncGetChangeProofR
 	return getAndParse(ctx, c, reqBytes, parseFn)
 }
 
-func (c *client) parseAndVerifyRangeProof(
+func parseAndVerifyRangeProof(
 	ctx context.Context,
 	rangeProofProto *pb.RangeProof,
 	keyLimit int,
@@ -197,7 +199,7 @@ func (c *client) GetRangeProof(ctx context.Context, req *pb.SyncGetRangeProofReq
 			return nil, err
 		}
 
-		return c.parseAndVerifyRangeProof(
+		return parseAndVerifyRangeProof(
 			ctx,
 			&rangeProofProto,
 			int(req.KeyLimit),

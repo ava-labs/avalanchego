@@ -277,9 +277,9 @@ func (m *Manager) getAndApplyChangeProof(ctx context.Context, work *workItem) {
 	default:
 	}
 
+	// TODO danlaine send range proof instead of failure notification
 	// The start or end root IDs are not present in other nodes' history.
 	// Add this range as a fresh uncompleted work item to the work heap.
-	// TODO danlaine send range proof instead of failure notification
 	// if !changeProof.HadRootsInHistory {
 	// 	work.localRootID = ids.Empty
 	// 	m.enqueueWork(work)
