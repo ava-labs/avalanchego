@@ -16,7 +16,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-var ErrRequestPending = errors.New("request pending")
+var (
+	ErrAppRequestFailed = errors.New("app request failed")
+	ErrRequestPending   = errors.New("request pending")
+)
 
 type AppResponseCallback func(
 	nodeID ids.NodeID,
