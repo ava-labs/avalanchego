@@ -91,8 +91,9 @@ var (
 	genesisHashKey  = []byte("genesisID")
 	indexerDBPrefix = []byte{0x00}
 
-	errInvalidTLSKey = errors.New("invalid TLS key")
-	errShuttingDown  = errors.New("server shutting down")
+	errInvalidTLSKey              = errors.New("invalid TLS key")
+	errShuttingDown               = errors.New("server shutting down")
+	errReducedModeWhileValidating = errors.New("reduced mode is enabled but node is a primary network validator")
 )
 
 // Node is an instance of an Avalanche node.
@@ -1169,6 +1170,20 @@ func (n *Node) initHealthAPI() error {
 		return fmt.Errorf("couldn't register resource health check: %w", err)
 	}
 
+	reducedModeCheck := health.CheckerFunc(func(ctx context.Context) (interface{}, error) {
+		primaryValidators, _ := n.vdrs.Get(constants.PrimaryNetworkID)
+		if n.Config.ReducedModeEnabled && primaryValidators.GetWeight(n.ID) != 0 {
+			n.Log.Fatal(fmt.Sprintf("%s. Shutting down...", errReducedModeWhileValidating.Error()))
+			go n.Shutdown(1)
+			return nil, errReducedModeWhileValidating
+		}
+		return nil, nil
+	})
+	err = n.health.RegisterHealthCheck("diskspace", reducedModeCheck, health.ApplicationTag)
+	if err != nil {
+		return fmt.Errorf("couldn't register reduced mode health check: %w", err)
+	}
+
 	handler, err := health.NewGetAndPostHandler(n.Log, healthChecker)
 	if err != nil {
 		return err
@@ -1429,6 +1444,7 @@ func (n *Node) Initialize(
 
 	// Start the Health API
 	// Has to be initialized before chain manager
+	// Has to be initialized after Validators Set
 	// [n.Net] must already be set
 	if err := n.initHealthAPI(); err != nil {
 		return fmt.Errorf("couldn't initialize health API: %w", err)
