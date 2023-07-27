@@ -31,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/proposervm/indexer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/scheduler"
@@ -46,7 +47,7 @@ const (
 	DefaultMinBlockDelay = time.Second
 
 	checkIndexedFrequency = 10 * time.Second
-	innerBlkCacheSize     = 512
+	innerBlkCacheSize     = 128 * units.MiB
 )
 
 var (
@@ -192,7 +193,12 @@ func (vm *VM) Initialize(
 	innerBlkCache, err := metercacher.New[ids.ID, snowman.Block](
 		"inner_block_cache",
 		registerer,
-		&cache.LRU[ids.ID, snowman.Block]{Size: innerBlkCacheSize},
+		cache.NewSizedLRU[ids.ID, snowman.Block](
+			innerBlkCacheSize,
+			func(b snowman.Block) int {
+				return len(b.Bytes())
+			},
+		),
 	)
 	if err != nil {
 		return err

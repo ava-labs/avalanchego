@@ -138,11 +138,21 @@ func (s *State) initialize(config *Config) {
 
 func NewState(config *Config) *State {
 	c := &State{
-		verifiedBlocks:   make(map[ids.ID]*BlockWrapper),
-		decidedBlocks:    &cache.LRU[ids.ID, *BlockWrapper]{Size: config.DecidedCacheSize},
-		missingBlocks:    &cache.LRU[ids.ID, struct{}]{Size: config.MissingCacheSize},
-		unverifiedBlocks: &cache.LRU[ids.ID, *BlockWrapper]{Size: config.UnverifiedCacheSize},
-		bytesToIDCache:   &cache.LRU[string, ids.ID]{Size: config.BytesToIDCacheSize},
+		verifiedBlocks: make(map[ids.ID]*BlockWrapper),
+		decidedBlocks: cache.NewSizedLRU[ids.ID, *BlockWrapper](
+			config.DecidedCacheSize,
+			func(bw *BlockWrapper) int {
+				return len(bw.Bytes())
+			},
+		),
+		missingBlocks: &cache.LRU[ids.ID, struct{}]{Size: config.MissingCacheSize},
+		unverifiedBlocks: cache.NewSizedLRU[ids.ID, *BlockWrapper](
+			config.UnverifiedCacheSize,
+			func(bw *BlockWrapper) int {
+				return len(bw.Bytes())
+			},
+		),
+		bytesToIDCache: &cache.LRU[string, ids.ID]{Size: config.BytesToIDCacheSize},
 	}
 	c.initialize(config)
 	return c
@@ -155,7 +165,12 @@ func NewMeteredState(
 	decidedCache, err := metercacher.New[ids.ID, *BlockWrapper](
 		"decided_cache",
 		registerer,
-		&cache.LRU[ids.ID, *BlockWrapper]{Size: config.DecidedCacheSize},
+		cache.NewSizedLRU[ids.ID, *BlockWrapper](
+			config.DecidedCacheSize,
+			func(bw *BlockWrapper) int {
+				return len(bw.Bytes())
+			},
+		),
 	)
 	if err != nil {
 		return nil, err
@@ -171,7 +186,12 @@ func NewMeteredState(
 	unverifiedCache, err := metercacher.New[ids.ID, *BlockWrapper](
 		"unverified_cache",
 		registerer,
-		&cache.LRU[ids.ID, *BlockWrapper]{Size: config.UnverifiedCacheSize},
+		cache.NewSizedLRU[ids.ID, *BlockWrapper](
+			config.UnverifiedCacheSize,
+			func(bw *BlockWrapper) int {
+				return len(bw.Bytes())
+			},
+		),
 	)
 	if err != nil {
 		return nil, err

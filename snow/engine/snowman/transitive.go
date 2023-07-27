@@ -24,10 +24,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/bag"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-const nonVerifiedCacheSize = 128
+const nonVerifiedCacheSize = 128 * units.MiB
 
 var _ Engine = (*Transitive)(nil)
 
@@ -92,7 +93,12 @@ func newTransitive(config Config) (*Transitive, error) {
 	nonVerifiedCache, err := metercacher.New[ids.ID, snowman.Block](
 		"non_verified_cache",
 		config.Ctx.Registerer,
-		&cache.LRU[ids.ID, snowman.Block]{Size: nonVerifiedCacheSize},
+		cache.NewSizedLRU[ids.ID, snowman.Block](
+			nonVerifiedCacheSize,
+			func(b snowman.Block) int {
+				return len(b.Bytes())
+			},
+		),
 	)
 	if err != nil {
 		return nil, err

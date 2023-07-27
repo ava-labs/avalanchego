@@ -41,6 +41,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators/gvalidators"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/resource"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
@@ -63,9 +64,9 @@ import (
 )
 
 const (
-	decidedCacheSize    = 2048
+	decidedCacheSize    = 256 * units.MiB
 	missingCacheSize    = 2048
-	unverifiedCacheSize = 2048
+	unverifiedCacheSize = 64 * units.MiB
 	bytesToIDCacheSize  = 2048
 )
 
