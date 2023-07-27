@@ -74,7 +74,7 @@ const (
 	StakingSignerKeyContentKey                         = "staking-signer-key-file-content"
 	SybilProtectionEnabledKey                          = "sybil-protection-enabled"
 	SybilProtectionDisabledWeightKey                   = "sybil-protection-disabled-weight"
-	ReducedModeEnabledKey                              = "reduced mode enabled"
+	ReducedModeKey                                     = "reduced-mode"
 	NetworkInitialTimeoutKey                           = "network-initial-timeout"
 	NetworkMinimumTimeoutKey                           = "network-minimum-timeout"
 	NetworkMaximumTimeoutKey                           = "network-maximum-timeout"

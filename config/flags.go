@@ -256,7 +256,7 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.String(StakingSignerKeyContentKey, "", "Specifies base64 encoded signer private key for staking")
 	fs.Bool(SybilProtectionEnabledKey, true, "Enables sybil protection. If enabled, Network TLS is required")
 	fs.Uint64(SybilProtectionDisabledWeightKey, 100, "Weight to provide to each peer when sybil protection is disabled")
-	fs.Bool(ReducedModeEnabledKey, false, "Disable C-chain and X-chain validation. Only allowed for non-validators. Node would shutdown otherwise")
+	fs.Bool(ReducedModeKey, false, "Disable C-chain and X-chain validation. Only allowed for non-validators. Node would shutdown otherwise")
 	// Uptime Requirement
 	fs.Float64(UptimeRequirementKey, genesis.LocalParams.UptimeRequirement, "Fraction of time a validator must be online to receive rewards")
 	// Minimum Stake required to validate the Primary Network

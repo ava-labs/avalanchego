@@ -187,7 +187,7 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 	// Produce the UTXOS
 	avax.Produce(e.State, txID, tx.Outs)
 
-	if !e.Config.ReducedModeEnabled {
+	if !e.Config.ReducedMode {
 		// fill up atomic requests only if node is validating
 		// C-chain and X-chain.
 		e.AtomicRequests = map[ids.ID]*atomic.Requests{
@@ -236,7 +236,7 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 	// Produce the UTXOS
 	avax.Produce(e.State, txID, tx.Outs)
 
-	if e.Config.ReducedModeEnabled {
+	if e.Config.ReducedMode {
 		// node is not validating C-chain and X-chain hence
 		// it'll skip filling up atomic requests
 		return nil
@@ -290,7 +290,7 @@ func (e *StandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 		return err
 	}
 
-	if e.Config.ReducedModeEnabled && (tx.NodeID() == e.Ctx.NodeID) {
+	if e.Config.ReducedMode && (tx.NodeID() == e.Ctx.NodeID) {
 		e.Ctx.Log.Warn("Verified transaction that would promote node %v to validator. Reduced mode is active and node will shutdown when validation will start.")
 	}
 
@@ -450,7 +450,7 @@ func (e *StandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionl
 	avax.Consume(e.State, tx.Ins)
 	avax.Produce(e.State, txID, tx.Outs)
 
-	if e.Config.ReducedModeEnabled {
+	if e.Config.ReducedMode {
 		if tx.SubnetID() == constants.PrimaryNetworkID && tx.NodeID() == e.Ctx.NodeID {
 			e.Ctx.Log.Warn("Verified transaction that would promote node %v to validator. Reduced mode is active and node will shutdown when validation will start.")
 		}

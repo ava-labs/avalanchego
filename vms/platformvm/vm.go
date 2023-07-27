@@ -150,7 +150,7 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	if vm.Config.ReducedModeEnabled {
+	if vm.Config.ReducedMode {
 		_, err := vm.state.GetCurrentValidator(constants.PrimaryNetworkID, vm.ctx.NodeID)
 		switch err {
 		case nil:
@@ -266,7 +266,7 @@ func (vm *VM) createSubnet(subnetID ids.ID) error {
 		if !ok {
 			return fmt.Errorf("expected tx type *txs.CreateChainTx but got %T", chain.Unsigned)
 		}
-		if vm.Config.ReducedModeEnabled && tx.SubnetID == constants.PrimaryNetworkID {
+		if vm.Config.ReducedMode && tx.SubnetID == constants.PrimaryNetworkID {
 			vm.ctx.Log.Info("reduced mode enabled, skipping C-chain and X-chain validation.")
 			continue
 		}

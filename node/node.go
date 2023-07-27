@@ -886,7 +886,7 @@ func (n *Node) initVMs() error {
 				Validators:                    vdrs,
 				UptimeLockedCalculator:        n.uptimeCalculator,
 				SybilProtectionEnabled:        n.Config.SybilProtectionEnabled,
-				ReducedModeEnabled:            n.Config.ReducedModeEnabled,
+				ReducedMode:                   n.Config.ReducedMode,
 				TrackedSubnets:                n.Config.TrackedSubnets,
 				TxFee:                         n.Config.TxFee,
 				CreateAssetTxFee:              n.Config.CreateAssetTxFee,
@@ -1172,14 +1172,14 @@ func (n *Node) initHealthAPI() error {
 
 	reducedModeCheck := health.CheckerFunc(func(ctx context.Context) (interface{}, error) {
 		primaryValidators, _ := n.vdrs.Get(constants.PrimaryNetworkID)
-		if n.Config.ReducedModeEnabled && primaryValidators.GetWeight(n.ID) != 0 {
+		if n.Config.ReducedMode && primaryValidators.GetWeight(n.ID) != 0 {
 			n.Log.Fatal(fmt.Sprintf("%s. Shutting down...", errReducedModeWhileValidating.Error()))
 			go n.Shutdown(1)
 			return nil, errReducedModeWhileValidating
 		}
 		return nil, nil
 	})
-	err = n.health.RegisterHealthCheck("diskspace", reducedModeCheck, health.ApplicationTag)
+	err = n.health.RegisterHealthCheck("reducedmode", reducedModeCheck, health.ApplicationTag)
 	if err != nil {
 		return fmt.Errorf("couldn't register reduced mode health check: %w", err)
 	}
