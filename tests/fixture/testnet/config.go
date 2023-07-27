@@ -64,7 +64,7 @@ func (f FlagsMap) GetStringVal(key string) (string, error) {
 
 	val, err := cast.ToStringE(rawVal)
 	if err != nil {
-		return "", fmt.Errorf("failed to cast value for %q: %v", key, err)
+		return "", fmt.Errorf("failed to cast value for %q: %w", key, err)
 	}
 	return val, nil
 }
