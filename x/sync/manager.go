@@ -277,16 +277,8 @@ func (m *Manager) getAndApplyChangeProof(ctx context.Context, work *workItem) {
 	default:
 	}
 
-	// TODO danlaine send range proof instead of failure notification
-	// The start or end root IDs are not present in other nodes' history.
-	// Add this range as a fresh uncompleted work item to the work heap.
-	// if !changeProof.HadRootsInHistory {
-	// 	work.localRootID = ids.Empty
-	// 	m.enqueueWork(work)
-	// 	return
-	// }
-
 	if changeOrRangeProof.ChangeProof != nil {
+		// The server had sufficient history to respond with a change proof.
 		changeProof := changeOrRangeProof.ChangeProof
 		largestHandledKey := work.end
 		// if the proof wasn't empty, apply changes to the sync DB
@@ -299,9 +291,22 @@ func (m *Manager) getAndApplyChangeProof(ctx context.Context, work *workItem) {
 		}
 
 		m.completeWorkItem(ctx, work, largestHandledKey, targetRootID, changeProof.EndProof)
+		return
 	}
 
-	// TODO handle range proofs
+	// The server responded with a range proof.
+	rangeProof := changeOrRangeProof.RangeProof
+	largestHandledKey := work.end
+	if len(rangeProof.KeyValues) > 0 {
+		// Add all the key-value pairs we got to the database.
+		if err := m.config.DB.CommitRangeProof(ctx, work.start, rangeProof); err != nil {
+			m.setError(err)
+			return
+		}
+		largestHandledKey = rangeProof.KeyValues[len(rangeProof.KeyValues)-1].Key
+	}
+
+	m.completeWorkItem(ctx, work, largestHandledKey, targetRootID, rangeProof.EndProof)
 }
 
 // Fetch and apply the range proof given by [work].
