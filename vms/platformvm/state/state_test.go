@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
@@ -41,8 +42,6 @@ import (
 type activeFork uint8
 
 const (
-	trackChecksum = false
-
 	apricotPhase3Fork     activeFork = 0
 	apricotPhase5Fork     activeFork = 1
 	banffFork             activeFork = 2
@@ -1040,10 +1039,12 @@ func newUninitializedState(cfg *config.Config) (State, database.Database, error)
 }
 
 func newStateFromDB(db database.Database, cfg *config.Config) (State, error) {
+	execCfg, _ := config.GetExecutionConfig(nil)
 	return new(
 		db,
 		metrics.Noop,
 		cfg,
+		execCfg,
 		defaultCtx(),
 		prometheus.NewRegistry(),
 		reward.NewCalculator(reward.Config{
@@ -1053,6 +1054,110 @@ func newStateFromDB(db database.Database, cfg *config.Config) (State, error) {
 			SupplyCap:          720 * units.MegaAvax,
 		}),
 		&utils.Atomic[bool]{},
-		trackChecksum,
 	)
+}
+
+func TestParsedStateBlock(t *testing.T) {
+	require := require.New(t)
+
+	var blks []blocks.Block
+
+	{
+		blk, err := blocks.NewApricotAbortBlock(ids.GenerateTestID(), 1000)
+		require.NoError(err)
+		blks = append(blks, blk)
+	}
+
+	{
+		blk, err := blocks.NewApricotAtomicBlock(ids.GenerateTestID(), 1000, &txs.Tx{
+			Unsigned: &txs.AdvanceTimeTx{
+				Time: 1000,
+			},
+		})
+		require.NoError(err)
+		blks = append(blks, blk)
+	}
+
+	{
+		blk, err := blocks.NewApricotCommitBlock(ids.GenerateTestID(), 1000)
+		require.NoError(err)
+		blks = append(blks, blk)
+	}
+
+	{
+		blk, err := blocks.NewApricotProposalBlock(ids.GenerateTestID(), 1000, &txs.Tx{
+			Unsigned: &txs.RewardValidatorTx{
+				TxID: ids.GenerateTestID(),
+			},
+		})
+		require.NoError(err)
+		blks = append(blks, blk)
+	}
+
+	{
+		blk, err := blocks.NewApricotStandardBlock(ids.GenerateTestID(), 1000, []*txs.Tx{
+			{
+				Unsigned: &txs.RewardValidatorTx{
+					TxID: ids.GenerateTestID(),
+				},
+			},
+		})
+		require.NoError(err)
+		blks = append(blks, blk)
+	}
+
+	{
+		blk, err := blocks.NewBanffAbortBlock(time.Now(), ids.GenerateTestID(), 1000)
+		require.NoError(err)
+		blks = append(blks, blk)
+	}
+
+	{
+		blk, err := blocks.NewBanffCommitBlock(time.Now(), ids.GenerateTestID(), 1000)
+		require.NoError(err)
+		blks = append(blks, blk)
+	}
+
+	{
+		blk, err := blocks.NewBanffProposalBlock(time.Now(), ids.GenerateTestID(), 1000, &txs.Tx{
+			Unsigned: &txs.RewardValidatorTx{
+				TxID: ids.GenerateTestID(),
+			},
+		})
+		require.NoError(err)
+		blks = append(blks, blk)
+	}
+
+	{
+		blk, err := blocks.NewBanffStandardBlock(time.Now(), ids.GenerateTestID(), 1000, []*txs.Tx{
+			{
+				Unsigned: &txs.RewardValidatorTx{
+					TxID: ids.GenerateTestID(),
+				},
+			},
+		})
+		require.NoError(err)
+		blks = append(blks, blk)
+	}
+
+	for _, blk := range blks {
+		stBlk := stateBlk{
+			Blk:    blk,
+			Bytes:  blk.Bytes(),
+			Status: choices.Accepted,
+		}
+
+		stBlkBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, &stBlk)
+		require.NoError(err)
+
+		gotBlk, _, isStateBlk, err := parseStoredBlock(stBlkBytes)
+		require.NoError(err)
+		require.True(isStateBlk)
+		require.Equal(blk.ID(), gotBlk.ID())
+
+		gotBlk, _, isStateBlk, err = parseStoredBlock(blk.Bytes())
+		require.NoError(err)
+		require.False(isStateBlk)
+		require.Equal(blk.ID(), gotBlk.ID())
+	}
 }

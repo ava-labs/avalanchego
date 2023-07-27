@@ -217,18 +217,10 @@ func (m *manager) makePrimaryNetworkValidatorSet(
 		)
 		return nil, ErrMissingValidatorSet
 	}
-	currentValidatorList := currentValidators.List()
 
 	// Node ID --> Validator information for the node validating the Primary
 	// Network.
-	validatorSet := make(map[ids.NodeID]*validators.GetValidatorOutput, len(currentValidatorList))
-	for _, vdr := range currentValidatorList {
-		validatorSet[vdr.NodeID] = &validators.GetValidatorOutput{
-			NodeID:    vdr.NodeID,
-			PublicKey: vdr.PublicKey,
-			Weight:    vdr.Weight,
-		}
-	}
+	validatorSet := currentValidators.Map()
 
 	// Rebuild primary network validators at [height]
 	for diffHeight := currentHeight; diffHeight > targetHeight; diffHeight-- {
@@ -269,17 +261,9 @@ func (m *manager) makeSubnetValidatorSet(
 			return nil, err
 		}
 	}
-	currentValidatorList := currentValidators.List()
 
 	// Node ID --> Validator information for the node validating the Subnet.
-	subnetValidatorSet := make(map[ids.NodeID]*validators.GetValidatorOutput, len(currentValidatorList))
-	for _, vdr := range currentValidatorList {
-		subnetValidatorSet[vdr.NodeID] = &validators.GetValidatorOutput{
-			NodeID: vdr.NodeID,
-			// PublicKey will be picked from primary validators
-			Weight: vdr.Weight,
-		}
-	}
+	subnetValidatorSet := currentValidators.Map()
 
 	// Rebuild subnet validators at [targetHeight]
 	for diffHeight := currentHeight; diffHeight > targetHeight; diffHeight-- {

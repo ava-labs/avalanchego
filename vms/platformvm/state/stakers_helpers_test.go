@@ -64,6 +64,11 @@ func buildChainState(baseDB database.Database, trackedSubnets []ids.ID) (State, 
 	cfg := defaultConfig(latestFork)
 	cfg.TrackedSubnets.Add(trackedSubnets...)
 
+	execConfig, err := config.GetExecutionConfig(nil)
+	if err != nil {
+		return nil, err
+	}
+
 	ctx := buildStateCtx()
 
 	genesisBytes, err := buildGenesisTest(ctx)
@@ -77,11 +82,11 @@ func buildChainState(baseDB database.Database, trackedSubnets []ids.ID) (State, 
 		genesisBytes,
 		prometheus.NewRegistry(),
 		cfg,
+		execConfig,
 		ctx,
 		metrics.Noop,
 		rewardsCalc,
 		&utils.Atomic[bool]{},
-		trackChecksum,
 	)
 }
 

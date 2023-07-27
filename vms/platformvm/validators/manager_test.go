@@ -14,8 +14,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"golang.org/x/exp/maps"
-
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -45,14 +43,14 @@ func TestVM_GetValidatorSet(t *testing.T) {
 	var (
 		numVdrs        = 4
 		vdrBaseWeight  = uint64(1_000)
-		testValidators []*validators.Validator
+		testValidators []*validators.GetValidatorOutput
 	)
 
 	for i := 0; i < numVdrs; i++ {
 		sk, err := bls.NewSecretKey()
 		require.NoError(t, err)
 
-		testValidators = append(testValidators, &validators.Validator{
+		testValidators = append(testValidators, &validators.GetValidatorOutput{
 			NodeID:    ids.GenerateTestNodeID(),
 			PublicKey: bls.PublicFromSecretKey(sk),
 			Weight:    vdrBaseWeight + uint64(i),
@@ -66,8 +64,8 @@ func TestVM_GetValidatorSet(t *testing.T) {
 		lastAcceptedHeight uint64
 		subnetID           ids.ID
 		// Validator sets at tip
-		currentPrimaryNetworkValidators map[ids.NodeID]*validators.Validator
-		currentSubnetValidators         []*validators.Validator
+		currentPrimaryNetworkValidators map[ids.NodeID]*validators.GetValidatorOutput
+		currentSubnetValidators         map[ids.NodeID]*validators.GetValidatorOutput
 
 		// height --> nodeID --> weightDiff
 		weightDiffs map[uint64]map[ids.NodeID]*state.ValidatorWeightDiff
@@ -91,11 +89,11 @@ func TestVM_GetValidatorSet(t *testing.T) {
 			subnetID:           constants.PrimaryNetworkID,
 			height:             1,
 			lastAcceptedHeight: 1,
-			currentPrimaryNetworkValidators: map[ids.NodeID]*validators.Validator{
+			currentPrimaryNetworkValidators: map[ids.NodeID]*validators.GetValidatorOutput{
 				testValidators[0].NodeID: copyPrimaryValidator(testValidators[0]),
 			},
-			currentSubnetValidators: []*validators.Validator{
-				copySubnetValidator(testValidators[0]),
+			currentSubnetValidators: map[ids.NodeID]*validators.GetValidatorOutput{
+				testValidators[0].NodeID: copySubnetValidator(testValidators[0]),
 			},
 			expectedVdrSet: map[ids.NodeID]*validators.GetValidatorOutput{
 				testValidators[0].NodeID: {
@@ -110,14 +108,14 @@ func TestVM_GetValidatorSet(t *testing.T) {
 			name:               "1 before tip",
 			height:             2,
 			lastAcceptedHeight: 3,
-			currentPrimaryNetworkValidators: map[ids.NodeID]*validators.Validator{
+			currentPrimaryNetworkValidators: map[ids.NodeID]*validators.GetValidatorOutput{
 				testValidators[0].NodeID: copyPrimaryValidator(testValidators[0]),
 				testValidators[1].NodeID: copyPrimaryValidator(testValidators[1]),
 			},
-			currentSubnetValidators: []*validators.Validator{
+			currentSubnetValidators: map[ids.NodeID]*validators.GetValidatorOutput{
 				// At tip we have these 2 validators
-				copySubnetValidator(testValidators[0]),
-				copySubnetValidator(testValidators[1]),
+				testValidators[0].NodeID: copySubnetValidator(testValidators[0]),
+				testValidators[1].NodeID: copySubnetValidator(testValidators[1]),
 			},
 			weightDiffs: map[uint64]map[ids.NodeID]*state.ValidatorWeightDiff{
 				3: {
@@ -165,14 +163,14 @@ func TestVM_GetValidatorSet(t *testing.T) {
 			name:               "2 before tip",
 			height:             3,
 			lastAcceptedHeight: 5,
-			currentPrimaryNetworkValidators: map[ids.NodeID]*validators.Validator{
+			currentPrimaryNetworkValidators: map[ids.NodeID]*validators.GetValidatorOutput{
 				testValidators[0].NodeID: copyPrimaryValidator(testValidators[0]),
 				testValidators[1].NodeID: copyPrimaryValidator(testValidators[1]),
 			},
-			currentSubnetValidators: []*validators.Validator{
+			currentSubnetValidators: map[ids.NodeID]*validators.GetValidatorOutput{
 				// At tip we have these 2 validators
-				copySubnetValidator(testValidators[0]),
-				copySubnetValidator(testValidators[1]),
+				testValidators[0].NodeID: copySubnetValidator(testValidators[0]),
+				testValidators[1].NodeID: copySubnetValidator(testValidators[1]),
 			},
 			weightDiffs: map[uint64]map[ids.NodeID]*state.ValidatorWeightDiff{
 				5: {
@@ -232,14 +230,14 @@ func TestVM_GetValidatorSet(t *testing.T) {
 			name:               "1 before tip; nil public key",
 			height:             4,
 			lastAcceptedHeight: 5,
-			currentPrimaryNetworkValidators: map[ids.NodeID]*validators.Validator{
+			currentPrimaryNetworkValidators: map[ids.NodeID]*validators.GetValidatorOutput{
 				testValidators[0].NodeID: copyPrimaryValidator(testValidators[0]),
 				testValidators[1].NodeID: copyPrimaryValidator(testValidators[1]),
 			},
-			currentSubnetValidators: []*validators.Validator{
+			currentSubnetValidators: map[ids.NodeID]*validators.GetValidatorOutput{
 				// At tip we have these 2 validators
-				copySubnetValidator(testValidators[0]),
-				copySubnetValidator(testValidators[1]),
+				testValidators[0].NodeID: copySubnetValidator(testValidators[0]),
+				testValidators[1].NodeID: copySubnetValidator(testValidators[1]),
 			},
 			weightDiffs: map[uint64]map[ids.NodeID]*state.ValidatorWeightDiff{
 				5: {
@@ -285,15 +283,15 @@ func TestVM_GetValidatorSet(t *testing.T) {
 			height:             5,
 			lastAcceptedHeight: 6,
 			subnetID:           ids.GenerateTestID(),
-			currentPrimaryNetworkValidators: map[ids.NodeID]*validators.Validator{
+			currentPrimaryNetworkValidators: map[ids.NodeID]*validators.GetValidatorOutput{
 				testValidators[0].NodeID: copyPrimaryValidator(testValidators[0]),
 				testValidators[1].NodeID: copyPrimaryValidator(testValidators[1]),
 				testValidators[3].NodeID: copyPrimaryValidator(testValidators[3]),
 			},
-			currentSubnetValidators: []*validators.Validator{
+			currentSubnetValidators: map[ids.NodeID]*validators.GetValidatorOutput{
 				// At tip we have these 2 validators
-				copySubnetValidator(testValidators[0]),
-				copySubnetValidator(testValidators[1]),
+				testValidators[0].NodeID: copySubnetValidator(testValidators[0]),
+				testValidators[1].NodeID: copySubnetValidator(testValidators[1]),
 			},
 			weightDiffs: map[uint64]map[ids.NodeID]*state.ValidatorWeightDiff{
 				6: {
@@ -339,11 +337,11 @@ func TestVM_GetValidatorSet(t *testing.T) {
 			height:             4,
 			lastAcceptedHeight: 5,
 			subnetID:           ids.GenerateTestID(),
-			currentPrimaryNetworkValidators: map[ids.NodeID]*validators.Validator{
+			currentPrimaryNetworkValidators: map[ids.NodeID]*validators.GetValidatorOutput{
 				testValidators[0].NodeID: copyPrimaryValidator(testValidators[0]),
 			},
-			currentSubnetValidators: []*validators.Validator{
-				copySubnetValidator(testValidators[0]),
+			currentSubnetValidators: map[ids.NodeID]*validators.GetValidatorOutput{
+				testValidators[0].NodeID: copySubnetValidator(testValidators[0]),
 			},
 			weightDiffs: map[uint64]map[ids.NodeID]*state.ValidatorWeightDiff{
 				5: {},
@@ -390,20 +388,26 @@ func TestVM_GetValidatorSet(t *testing.T) {
 
 			// Mock the VM's validators
 			mockPrimaryVdrSet := validators.NewMockSet(ctrl)
-			mockPrimaryVdrSet.EXPECT().List().Return(maps.Values(tt.currentPrimaryNetworkValidators)).AnyTimes()
+			mockPrimaryVdrSet.EXPECT().Map().Return(tt.currentPrimaryNetworkValidators).AnyTimes()
 			vdrs.EXPECT().Get(constants.PrimaryNetworkID).Return(mockPrimaryVdrSet, true).AnyTimes()
 
-			mockSubnetVdrSet := mockPrimaryVdrSet
 			if tt.subnetID != constants.PrimaryNetworkID {
-				mockSubnetVdrSet = validators.NewMockSet(ctrl)
-				mockSubnetVdrSet.EXPECT().List().Return(tt.currentSubnetValidators).AnyTimes()
+				mockSubnetVdrSet := validators.NewMockSet(ctrl)
+				mockSubnetVdrSet.EXPECT().Map().Return(tt.currentSubnetValidators).AnyTimes()
+				vdrs.EXPECT().Get(tt.subnetID).Return(mockSubnetVdrSet, true).AnyTimes()
 			}
-			vdrs.EXPECT().Get(tt.subnetID).Return(mockSubnetVdrSet, true).AnyTimes()
 
 			for _, vdr := range testValidators {
 				_, current := tt.currentPrimaryNetworkValidators[vdr.NodeID]
 				if current {
-					mockPrimaryVdrSet.EXPECT().Get(vdr.NodeID).Return(vdr, true).AnyTimes()
+					mockPrimaryVdrSet.EXPECT().Get(vdr.NodeID).Return(
+						&validators.Validator{
+							NodeID:    vdr.NodeID,
+							PublicKey: vdr.PublicKey,
+							Weight:    vdr.Weight,
+						},
+						true,
+					).AnyTimes()
 				} else {
 					mockPrimaryVdrSet.EXPECT().Get(vdr.NodeID).Return(nil, false).AnyTimes()
 				}
@@ -436,12 +440,12 @@ func TestVM_GetValidatorSet(t *testing.T) {
 	}
 }
 
-func copyPrimaryValidator(vdr *validators.Validator) *validators.Validator {
+func copyPrimaryValidator(vdr *validators.GetValidatorOutput) *validators.GetValidatorOutput {
 	newVdr := *vdr
 	return &newVdr
 }
 
-func copySubnetValidator(vdr *validators.Validator) *validators.Validator {
+func copySubnetValidator(vdr *validators.GetValidatorOutput) *validators.GetValidatorOutput {
 	newVdr := *vdr
 	newVdr.PublicKey = nil
 	return &newVdr
