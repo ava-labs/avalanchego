@@ -28,7 +28,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-const nonVerifiedCacheSize = 128 * units.MiB
+const (
+	nonVerifiedCacheSize = 128 * units.MiB
+	pointerOverhead      = wrappers.LongLen
+)
 
 var _ Engine = (*Transitive)(nil)
 
@@ -96,7 +99,7 @@ func newTransitive(config Config) (*Transitive, error) {
 		cache.NewSizedLRU[ids.ID, snowman.Block](
 			nonVerifiedCacheSize,
 			func(b snowman.Block) int {
-				return len(b.Bytes())
+				return len(b.Bytes()) + pointerOverhead
 			},
 		),
 	)

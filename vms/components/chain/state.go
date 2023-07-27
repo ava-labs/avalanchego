@@ -17,7 +17,10 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
+
+const pointerOverhead = wrappers.LongLen
 
 // State implements an efficient caching layer used to wrap a VM
 // implementation.
@@ -142,14 +145,14 @@ func NewState(config *Config) *State {
 		decidedBlocks: cache.NewSizedLRU[ids.ID, *BlockWrapper](
 			config.DecidedCacheSize,
 			func(bw *BlockWrapper) int {
-				return len(bw.Bytes())
+				return len(bw.Bytes()) + 2*pointerOverhead
 			},
 		),
 		missingBlocks: &cache.LRU[ids.ID, struct{}]{Size: config.MissingCacheSize},
 		unverifiedBlocks: cache.NewSizedLRU[ids.ID, *BlockWrapper](
 			config.UnverifiedCacheSize,
 			func(bw *BlockWrapper) int {
-				return len(bw.Bytes())
+				return len(bw.Bytes()) + 2*pointerOverhead
 			},
 		),
 		bytesToIDCache: &cache.LRU[string, ids.ID]{Size: config.BytesToIDCacheSize},
@@ -168,7 +171,7 @@ func NewMeteredState(
 		cache.NewSizedLRU[ids.ID, *BlockWrapper](
 			config.DecidedCacheSize,
 			func(bw *BlockWrapper) int {
-				return len(bw.Bytes())
+				return len(bw.Bytes()) + 2*pointerOverhead
 			},
 		),
 	)
@@ -189,7 +192,7 @@ func NewMeteredState(
 		cache.NewSizedLRU[ids.ID, *BlockWrapper](
 			config.UnverifiedCacheSize,
 			func(bw *BlockWrapper) int {
-				return len(bw.Bytes())
+				return len(bw.Bytes()) + 2*pointerOverhead
 			},
 		),
 	)

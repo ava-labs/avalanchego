@@ -14,11 +14,15 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
-const blockCacheSize = 8192
+const (
+	blockCacheSize  = 256 * units.MiB
+	pointerOverhead = wrappers.LongLen
+)
 
 var (
 	errBlockWrongVersion = errors.New("wrong version")
@@ -52,9 +56,9 @@ func NewBlockState(db database.Database) BlockState {
 			blockCacheSize,
 			func(bw *blockWrapper) int {
 				if bw == nil {
-					return wrappers.LongLen
+					return pointerOverhead
 				}
-				return len(bw.Block) + 2*wrappers.LongLen
+				return len(bw.Block) + wrappers.IntLen + 2*pointerOverhead
 			},
 		),
 		db: db,
@@ -69,9 +73,9 @@ func NewMeteredBlockState(db database.Database, namespace string, metrics promet
 			blockCacheSize,
 			func(bw *blockWrapper) int {
 				if bw == nil {
-					return wrappers.LongLen
+					return pointerOverhead
 				}
-				return len(bw.Block) + 2*wrappers.LongLen
+				return len(bw.Block) + wrappers.IntLen + 2*pointerOverhead
 			},
 		),
 	)
