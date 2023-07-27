@@ -336,6 +336,9 @@ func (m *manager) makeSubnetValidatorSet(
 		return nil, 0, err
 	}
 
+	// Update the subnet validator set to include the public keys at
+	// [currentHeight]. When we apply the public key diffs, we will convert
+	// these keys to represent the public keys at [targetHeight].
 	for nodeID, vdr := range subnetValidatorSet {
 		primaryVdr, ok := primaryValidatorSet[nodeID]
 		if !ok {
