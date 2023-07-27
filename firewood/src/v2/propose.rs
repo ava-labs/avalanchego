@@ -29,6 +29,37 @@ impl<T: api::DbView> Clone for ProposalBase<T> {
     }
 }
 
+/// A proposal is created either from the [[crate::v2::api::Db]] object
+/// or from another proposal. Proposals are owned by the
+/// caller. A proposal can only be committed if it has a
+/// base of the current revision of the [[crate::v2::api::Db]].
+#[cfg_attr(doc, aquamarine::aquamarine)]
+/// ```mermaid
+/// graph LR
+///   subgraph historical
+///     direction BT
+///     PH1 --> R1((R1))
+///     PH2 --> R1
+///     PH3 --> PH2
+///   end
+///   R1 ~~~|"proposals on R1<br>may not be committed"| R1
+///   subgraph committed_head
+///     direction BT
+///     R2 ~~~|"proposals on R2<br>may be committed"| R2
+///     PC4 --> R2((R2))
+///     PC6 --> PC5
+///     PC5 --> R2
+///     PC6 ~~~|"Committing PC6<br>creates two revisions"| PC6
+///   end
+///   subgraph new_committing
+///     direction BT
+///     PN --> R3((R3))
+///     R3 ~~~|"R3 does not yet exist"| R3
+///     PN ~~~|"this proposal<br>is committing"<br>--<br>could be<br>PC4 or PC5| PN
+///   end
+///   historical ==> committed_head
+///   committed_head ==> new_committing
+/// ```
 #[derive(Debug)]
 pub struct Proposal<T> {
     pub(crate) base: ProposalBase<T>,
