@@ -853,7 +853,7 @@ func RecordPollTransitivelyResetConfidenceTest(t *testing.T, factory Factory) {
 		t.Fatalf("Wrong preference listed")
 	} else if err := sm.RecordPoll(context.Background(), votesFor3); err != nil {
 		t.Fatal(err)
-	} else if !(sm.NumProcessing() == 1) {
+	} else if sm.NumProcessing() > 0 {
 		t.Fatalf("Finalized too late")
 	} else if pref := sm.Preference(); block3.ID() != pref {
 		t.Fatalf("Wrong preference listed")
@@ -1050,7 +1050,7 @@ func RecordPollTransitiveVotingTest(t *testing.T, factory Factory) {
 	switch {
 	case block2.ID() != pref:
 		t.Fatalf("Wrong preference listed")
-	case !(sm.NumProcessing() == 1):
+	case sm.NumProcessing() > 0:
 		t.Fatalf("Finalized too late")
 	case block0.Status() != choices.Accepted:
 		t.Fatalf("Should have accepted")
