@@ -819,7 +819,7 @@ func TestSignatureVerification(t *testing.T) {
 				require.NoError(err)
 				return msg
 			},
-			err: errWrongNetworkID,
+			err: ErrWrongNetworkID,
 		},
 	}
 
