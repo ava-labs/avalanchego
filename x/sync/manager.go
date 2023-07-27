@@ -526,6 +526,9 @@ func (m *Manager) Wait(ctx context.Context) error {
 }
 
 func (m *Manager) UpdateSyncTarget(syncTargetRoot ids.ID) error {
+	m.syncTargetLock.Lock()
+	defer m.syncTargetLock.Unlock()
+
 	m.workLock.Lock()
 	defer m.workLock.Unlock()
 
@@ -534,9 +537,6 @@ func (m *Manager) UpdateSyncTarget(syncTargetRoot ids.ID) error {
 		return ErrAlreadyClosed
 	default:
 	}
-
-	m.syncTargetLock.Lock()
-	defer m.syncTargetLock.Unlock()
 
 	if m.config.TargetRoot == syncTargetRoot {
 		// the target hasn't changed, so there is nothing to do
@@ -604,20 +604,29 @@ func (m *Manager) completeWorkItem(ctx context.Context, work *workItem, largestH
 		}
 	}
 
-	// completed the range [work.start, lastKey], log and record in the completed work heap
-	m.config.Log.Info("completed range",
-		zap.Binary("start", work.start),
-		zap.Binary("end", largestHandledKey),
-	)
-	if m.getTargetRoot() == rootID {
+	// Process [work] while holding [syncTargetLock] to ensure that object
+	// is added to the right queue, even if a target update is triggered
+	m.syncTargetLock.RLock()
+	defer m.syncTargetLock.RUnlock()
+
+	stale := m.config.TargetRoot != rootID
+	if stale {
+		// the root has changed, so reinsert with high priority
+		m.enqueueWork(newWorkItem(rootID, work.start, largestHandledKey, highPriority))
+	} else {
 		m.workLock.Lock()
 		defer m.workLock.Unlock()
 
 		m.processedWork.MergeInsert(newWorkItem(rootID, work.start, largestHandledKey, work.priority))
-	} else {
-		// the root has changed, so reinsert with high priority
-		m.enqueueWork(newWorkItem(rootID, work.start, largestHandledKey, highPriority))
 	}
+
+	// completed the range [work.start, lastKey], log and record in the completed work heap
+	m.config.Log.Info("completed range",
+		zap.Binary("start", work.start),
+		zap.Binary("end", largestHandledKey),
+		zap.Stringer("rootID", rootID),
+		zap.Bool("stale", stale),
+	)
 }
 
 // Queue the given key range to be fetched and applied.
