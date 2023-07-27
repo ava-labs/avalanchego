@@ -504,7 +504,7 @@ func (ts *Topological) vote(ctx context.Context, voteStack []votes) (ids.ID, err
 		pollSuccessful = parentBlock.sb.RecordPoll(vote.votes) || pollSuccessful
 
 		// Only accept when you are finalized and the head.
-		if parentBlock.sb.NumProcessing() == 1 && ts.head == vote.parentID {
+		if parentBlock.sb.Finalized() && ts.head == vote.parentID {
 			if err := ts.acceptPreferredChild(ctx, parentBlock); err != nil {
 				return ids.ID{}, err
 			}

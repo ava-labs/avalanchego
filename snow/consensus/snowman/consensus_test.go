@@ -107,7 +107,7 @@ func InitializeTest(t *testing.T, factory Factory) {
 
 	if pref := sm.Preference(); pref != GenesisID {
 		t.Fatalf("Wrong preference returned")
-	} else if !(sm.NumProcessing() == 1) {
+	} else if sm.NumProcessing() > 0 {
 		t.Fatalf("Wrong should have marked the instance as being finalized")
 	}
 }
@@ -502,7 +502,7 @@ func RecordPollAcceptSingleBlockTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	} else if pref := sm.Preference(); pref != block.ID() {
 		t.Fatalf("Preference returned the wrong block")
-	} else if !(sm.NumProcessing() == 1) {
+	} else if sm.NumProcessing() > 0 {
 		t.Fatalf("Snowman instance didn't finalize")
 	} else if status := block.Status(); status != choices.Accepted {
 		t.Fatalf("Block's status should have been set to accepted")
@@ -661,7 +661,7 @@ func RecordPollWhenFinalizedTest(t *testing.T, factory Factory) {
 	votes.Add(GenesisID)
 	if err := sm.RecordPoll(context.Background(), votes); err != nil {
 		t.Fatal(err)
-	} else if !(sm.NumProcessing() == 1) {
+	} else if sm.NumProcessing() > 0 {
 		t.Fatalf("Consensus should still be finalized")
 	} else if pref := sm.Preference(); GenesisID != pref {
 		t.Fatalf("Wrong preference listed")
@@ -737,7 +737,7 @@ func RecordPollRejectTransitivelyTest(t *testing.T, factory Factory) {
 	// 0
 	// Tail = 0
 
-	if !(sm.NumProcessing() == 1) {
+	if sm.NumProcessing() > 0 {
 		t.Fatalf("Finalized too late")
 	} else if pref := sm.Preference(); block0.ID() != pref {
 		t.Fatalf("Wrong preference listed")
