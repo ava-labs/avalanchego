@@ -284,8 +284,12 @@ func (c *ChainConfig) Description() string {
 		banner += fmt.Sprintf(" - Muir Glacier:                #%-8v (https://github.com/ethereum/execution-specs/blob/master/network-upgrades/mainnet-upgrades/muir-glacier.md)\n", c.MuirGlacierBlock)
 	}
 	banner += "Mandatory Upgrades:\n"
-	banner += fmt.Sprintf(" - SubnetEVM Timestamp:             #%-8d (https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0)\n", c.SubnetEVMTimestamp)
-	banner += fmt.Sprintf(" - DUpgrade Timestamp:              #%-8d (https://github.com/ava-labs/avalanchego/releases/tag/v1.11.0)\n", c.DUpgradeTimestamp)
+	if c.SubnetEVMTimestamp != nil {
+		banner += fmt.Sprintf(" - SubnetEVM Timestamp:             @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0)\n", *c.SubnetEVMTimestamp)
+	}
+	if c.DUpgradeTimestamp != nil {
+		banner += fmt.Sprintf(" - DUpgrade Timestamp:              @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.11.0)\n", *c.DUpgradeTimestamp)
+	}
 	banner += "\n"
 
 	// Add Subnet-EVM custom fields
