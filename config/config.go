@@ -319,7 +319,7 @@ func getNetworkConfig(
 		return network.Config{}, err
 	}
 
-	allowPrivateIPs := networkID != constants.MainnetID && networkID != constants.FujiID
+	allowPrivateIPs := !constants.ProductionNetworkIDs.Contains(networkID)
 	if v.IsSet(NetworkAllowPrivateIPsKey) {
 		allowPrivateIPs = v.GetBool(NetworkAllowPrivateIPsKey)
 	}
