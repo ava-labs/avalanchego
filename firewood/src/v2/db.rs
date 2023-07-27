@@ -68,7 +68,7 @@ pub struct DbView;
 
 #[async_trait]
 impl api::DbView for DbView {
-    async fn hash(&self) -> Result<api::HashKey, api::Error> {
+    async fn root_hash(&self) -> Result<api::HashKey, api::Error> {
         todo!()
     }
 

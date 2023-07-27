@@ -98,7 +98,7 @@ impl<T> Proposal<T> {
 
 #[async_trait]
 impl<T: api::DbView + Send + Sync> api::DbView for Proposal<T> {
-    async fn hash(&self) -> Result<api::HashKey, api::Error> {
+    async fn root_hash(&self) -> Result<api::HashKey, api::Error> {
         todo!()
     }
 

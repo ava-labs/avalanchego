@@ -50,7 +50,7 @@ impl Db for EmptyDb {
 
 #[async_trait]
 impl DbView for HistoricalImpl {
-    async fn hash(&self) -> Result<HashKey, Error> {
+    async fn root_hash(&self) -> Result<HashKey, Error> {
         Ok(ROOT_HASH)
     }
 
