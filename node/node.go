@@ -818,6 +818,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		Router:                                  n.Config.ConsensusRouter,
 		Net:                                     n.Net,
 		Validators:                              n.vdrs,
+		ReducedMode:                             n.Config.ReducedMode,
 		NodeID:                                  n.ID,
 		NetworkID:                               n.Config.NetworkID,
 		Server:                                  n.APIServer,

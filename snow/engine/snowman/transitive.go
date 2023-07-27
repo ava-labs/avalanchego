@@ -446,7 +446,7 @@ func (t *Transitive) GetBlock(ctx context.Context, blkID ids.ID) (snowman.Block,
 
 func (t *Transitive) sendChits(ctx context.Context, nodeID ids.NodeID, requestID uint32) {
 	lastAccepted := t.Consensus.LastAccepted()
-	if t.Ctx.StateSyncing.Get() {
+	if t.Ctx.StateSyncing.Get() || t.Config.ReducedMode {
 		t.Sender.SendChits(ctx, nodeID, requestID, lastAccepted, lastAccepted)
 	} else {
 		t.Sender.SendChits(ctx, nodeID, requestID, t.Consensus.Preference(), lastAccepted)

@@ -183,9 +183,10 @@ type ManagerConfig struct {
 	Router                      router.Router              // Routes incoming messages to the appropriate chain
 	Net                         network.Network            // Sends consensus messages to other validators
 	Validators                  validators.Manager         // Validators validating on this chain
-	NodeID                      ids.NodeID                 // The ID of this node
-	NetworkID                   uint32                     // ID of the network this node is connected to
-	Server                      server.Server              // Handles HTTP API calls
+	ReducedMode                 bool
+	NodeID                      ids.NodeID    // The ID of this node
+	NetworkID                   uint32        // ID of the network this node is connected to
+	Server                      server.Server // Handles HTTP API calls
 	Keystore                    keystore.Keystore
 	AtomicMemory                *atomic.Memory
 	AVAXAssetID                 ids.ID
@@ -869,6 +870,7 @@ func (m *manager) createAvalancheChain(
 		Validators:    vdrs,
 		Params:        consensusParams,
 		Consensus:     snowmanConsensus,
+		ReducedMode:   m.ReducedMode,
 	}
 	snowmanEngine, err := smeng.New(snowmanEngineConfig)
 	if err != nil {
