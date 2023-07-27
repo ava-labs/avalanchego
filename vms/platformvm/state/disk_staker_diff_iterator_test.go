@@ -35,7 +35,7 @@ func FuzzGetDiffKey(f *testing.F) {
 	})
 }
 
-func FuzzParseWeightKey(f *testing.F) {
+func FuzzParseDiffKey(f *testing.F) {
 	f.Fuzz(func(t *testing.T, key []byte) {
 		require := require.New(t)
 
@@ -88,6 +88,7 @@ func TestDiffIteration(t *testing.T) {
 			require.Equal(expectedKey, it.Key())
 		}
 		require.False(it.Next())
+		require.NoError(it.Error())
 	}
 
 	{
@@ -104,5 +105,6 @@ func TestDiffIteration(t *testing.T) {
 			require.Equal(expectedKey, it.Key())
 		}
 		require.False(it.Next())
+		require.NoError(it.Error())
 	}
 }

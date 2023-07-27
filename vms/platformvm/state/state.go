@@ -220,11 +220,11 @@ type stateBlk struct {
  * | |-. nested pub key diffs TODO: Remove once only the flat db is needed
  * | | '-. height
  * | |   '-. list
- * | |     '-- nodeID -> public key
+ * | |     '-- nodeID -> compressed public key
  * | |-. flat weight diffs
  * | | '-- subnet+height+nodeID -> weightChange
  * | '-. flat pub key diffs
- * |   '-- subnet+height+nodeID -> public key or nil
+ * |   '-- subnet+height+nodeID -> uncompressed public key or nil
  * |-. blocks
  * | '-- blockID -> block bytes
  * |-. txs
@@ -1836,6 +1836,10 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 					// Record that the public key for the validator is being
 					// removed. This means we must record the prior value of the
 					// public key.
+					//
+					// Note: We store the uncompressed public key here as it is
+					// significantly more efficient to parse when applying
+					// diffs.
 					err := s.flatValidatorPublicKeyDiffsDB.Put(
 						getDiffKey(constants.PrimaryNetworkID, height, nodeID),
 						staker.PublicKey.Serialize(),
@@ -1846,6 +1850,8 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 
 					// TODO: Remove this once we no longer support version
 					// rollbacks.
+					//
+					// Note: We store the compressed public key here.
 					pkBytes := bls.PublicKeyToBytes(staker.PublicKey)
 					if err := pkDiffDB.Put(nodeID[:], pkBytes); err != nil {
 						return err
