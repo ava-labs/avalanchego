@@ -9,11 +9,13 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
+	"golang.org/x/exp/slices"
+
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/x/merkledb"
-	"github.com/stretchr/testify/require"
-	"golang.org/x/exp/slices"
 )
 
 // TODO uncomment / fix
@@ -1068,7 +1070,8 @@ func newNoopTracer() trace.Tracer {
 // 	return db, err
 // }
 
-func generateTrieWithMinKeyLen(t *testing.T, r *rand.Rand, count int, minKeyLen int) (merkledb.MerkleDB, [][]byte, error) {
+// TODO remove onlint on next line
+func generateTrieWithMinKeyLen(t *testing.T, r *rand.Rand, count int, minKeyLen int) (merkledb.MerkleDB, [][]byte, error) { //nolint:unparam
 	require := require.New(t)
 
 	db, err := merkledb.New(
