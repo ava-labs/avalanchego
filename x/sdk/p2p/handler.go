@@ -11,9 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-var (
-	ErrAppRequestFailed = errors.New("app request failed")
-)
+var ErrAppRequestFailed = errors.New("app request failed")
 
 type Handler interface {
 	AppGossip(ctx context.Context, nodeID ids.NodeID, gossipBytes []byte) error
