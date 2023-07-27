@@ -43,12 +43,13 @@ var (
 // Client synchronously fetches data from the network to fulfill state sync requests.
 // Repeatedly retries failed requests until the context is canceled.
 type Client interface {
-	// GetRangeProof synchronously sends the given request, returning a parsed StateResponse or error
-	// Note: this verifies the response including the range proof.
+	// GetRangeProof synchronously sends the given request and returns the parsed response.
+	// This method verifies the range proof before returning it.
 	GetRangeProof(ctx context.Context, request *pb.SyncGetRangeProofRequest) (*merkledb.RangeProof, error)
-	// GetChangeProof synchronously sends the given request, returning a parsed ChangesResponse or error
-	// [verificationDB] is the local db that has all key/values in it for the proof's startroot within the proof's key range
-	// Note: this verifies the response including the change proof.
+
+	// GetChangeProof synchronously sends the given request and returns the parsed response.
+	// This method verifies the change proof / range proof before returning it.
+	// If the server responds a change proof, it's verified using [verificationDB].
 	GetChangeProof(ctx context.Context, request *pb.SyncGetChangeProofRequest, verificationDB DB) (*merkledb.ChangeOrRangeProof, error)
 }
 
