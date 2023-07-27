@@ -55,6 +55,9 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
+	defer func() {
+		require.NoError(db.Close())
+	}()
 
 	avaxAssetID := ids.GenerateTestID()
 	genesisTime := time.Now().Truncate(time.Second)
@@ -172,6 +175,8 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 		_, err := m.GetValidatorSet(ctx, 0, subnetID)
 		require.NoError(err)
 	}
+
+	b.StopTimer()
 }
 
 func addPrimaryValidator(
