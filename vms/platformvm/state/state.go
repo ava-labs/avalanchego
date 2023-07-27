@@ -134,7 +134,8 @@ type State interface {
 	// weights for [startHeight].
 	//
 	// Note: Because this function iterates towards the genesis, [startHeight]
-	// should normally be greater than or equal to [endHeight].
+	// will typically be greater than or equal to [endHeight]. If [startHeight]
+	// is less than [endHeight], no diffs will be applied.
 	ApplyValidatorWeightDiffs(
 		ctx context.Context,
 		validators map[ids.NodeID]*validators.GetValidatorOutput,
@@ -152,7 +153,8 @@ type State interface {
 	// [endHeight - 1] and the public keys for [startHeight].
 	//
 	// Note: Because this function iterates towards the genesis, [startHeight]
-	// should normally be greater than or equal to [endHeight].
+	// will typically be greater than or equal to [endHeight]. If [startHeight]
+	// is less than [endHeight], no diffs will be applied.
 	ApplyValidatorPublicKeyDiffs(
 		ctx context.Context,
 		validators map[ids.NodeID]*validators.GetValidatorOutput,
@@ -985,7 +987,7 @@ func (s *state) ApplyValidatorWeightDiffs(
 	subnetID ids.ID,
 ) error {
 	diffIter := s.flatValidatorWeightDiffsDB.NewIteratorWithStartAndPrefix(
-		getStartDiffKey(subnetID, startHeight),
+		marshalStartDiffKey(subnetID, startHeight),
 		subnetID[:],
 	)
 	defer diffIter.Release()
@@ -998,7 +1000,7 @@ func (s *state) ApplyValidatorWeightDiffs(
 			return err
 		}
 
-		_, parsedHeight, nodeID, err := parseDiffKey(diffIter.Key())
+		_, parsedHeight, nodeID, err := unmarshalDiffKey(diffIter.Key())
 		if err != nil {
 			return err
 		}
@@ -1010,7 +1012,7 @@ func (s *state) ApplyValidatorWeightDiffs(
 
 		prevHeight = parsedHeight
 
-		weightDiff, err := parseWeightValue(diffIter.Value())
+		weightDiff, err := unmarshalWeightDiff(diffIter.Value())
 		if err != nil {
 			return err
 		}
@@ -1109,7 +1111,7 @@ func (s *state) ApplyValidatorPublicKeyDiffs(
 	endHeight uint64,
 ) error {
 	diffIter := s.flatValidatorPublicKeyDiffsDB.NewIteratorWithStartAndPrefix(
-		getStartDiffKey(constants.PrimaryNetworkID, startHeight),
+		marshalStartDiffKey(constants.PrimaryNetworkID, startHeight),
 		constants.PrimaryNetworkID[:],
 	)
 	defer diffIter.Release()
@@ -1119,7 +1121,7 @@ func (s *state) ApplyValidatorPublicKeyDiffs(
 			return err
 		}
 
-		_, parsedHeight, nodeID, err := parseDiffKey(diffIter.Key())
+		_, parsedHeight, nodeID, err := unmarshalDiffKey(diffIter.Key())
 		if err != nil {
 			return err
 		}
@@ -1794,7 +1796,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 					// added. This means the prior value for the public key was
 					// nil.
 					err := s.flatValidatorPublicKeyDiffsDB.Put(
-						getDiffKey(constants.PrimaryNetworkID, height, nodeID),
+						marshalDiffKey(constants.PrimaryNetworkID, height, nodeID),
 						nil,
 					)
 					if err != nil {
@@ -1841,7 +1843,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 					// significantly more efficient to parse when applying
 					// diffs.
 					err := s.flatValidatorPublicKeyDiffsDB.Put(
-						getDiffKey(constants.PrimaryNetworkID, height, nodeID),
+						marshalDiffKey(constants.PrimaryNetworkID, height, nodeID),
 						staker.PublicKey.Serialize(),
 					)
 					if err != nil {
@@ -1880,8 +1882,8 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 			}
 
 			err = s.flatValidatorWeightDiffsDB.Put(
-				getDiffKey(subnetID, height, nodeID),
-				getWeightValue(weightDiff),
+				marshalDiffKey(subnetID, height, nodeID),
+				marshalWeightDiff(weightDiff),
 			)
 			if err != nil {
 				return err

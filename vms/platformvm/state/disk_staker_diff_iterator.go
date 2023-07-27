@@ -15,9 +15,9 @@ const (
 	// startDiffKey = [subnetID] + [inverseHeight]
 	startDiffKeyLength = ids.IDLen + database.Uint64Size
 	// diffKey = [subnetID] + [inverseHeight] + [nodeID]
-	diffKeyLength       = startDiffKeyLength + ids.NodeIDLen
-	diffKeyHeightOffset = ids.IDLen
-	diffKeyNodeIDOffset = diffKeyHeightOffset + database.Uint64Size
+	diffKeyLength = startDiffKeyLength + ids.NodeIDLen
+	// diffKeyNodeIDOffset = [subnetIDLen] + [inverseHeightLen]
+	diffKeyNodeIDOffset = ids.IDLen + database.Uint64Size
 
 	// weightValue = [isNegative] + [weight]
 	weightValueLength = database.BoolSize + database.Uint64Size
@@ -28,26 +28,26 @@ var (
 	errUnexpectedWeightValueLength = fmt.Errorf("expected weight value length %d", weightValueLength)
 )
 
-// getStartDiffKey is used to determine the starting key when iterating.
+// marshalStartDiffKey is used to determine the starting key when iterating.
 //
-// Note: the result should be a prefix of [getDiffKey] if called with the same
-// arguments.
-func getStartDiffKey(subnetID ids.ID, height uint64) []byte {
+// Invariant: the result is a prefix of [marshalDiffKey] when called with the
+// same arguments.
+func marshalStartDiffKey(subnetID ids.ID, height uint64) []byte {
 	key := make([]byte, startDiffKeyLength)
 	copy(key, subnetID[:])
-	packIterableHeight(key[diffKeyHeightOffset:], height)
+	packIterableHeight(key[ids.IDLen:], height)
 	return key
 }
 
-func getDiffKey(subnetID ids.ID, height uint64, nodeID ids.NodeID) []byte {
+func marshalDiffKey(subnetID ids.ID, height uint64, nodeID ids.NodeID) []byte {
 	key := make([]byte, diffKeyLength)
 	copy(key, subnetID[:])
-	packIterableHeight(key[diffKeyHeightOffset:], height)
+	packIterableHeight(key[ids.IDLen:], height)
 	copy(key[diffKeyNodeIDOffset:], nodeID[:])
 	return key
 }
 
-func parseDiffKey(key []byte) (ids.ID, uint64, ids.NodeID, error) {
+func unmarshalDiffKey(key []byte) (ids.ID, uint64, ids.NodeID, error) {
 	if len(key) != diffKeyLength {
 		return ids.Empty, 0, ids.EmptyNodeID, errUnexpectedDiffKeyLength
 	}
@@ -56,12 +56,12 @@ func parseDiffKey(key []byte) (ids.ID, uint64, ids.NodeID, error) {
 		nodeID   ids.NodeID
 	)
 	copy(subnetID[:], key)
-	height := unpackIterableHeight(key[diffKeyHeightOffset:])
+	height := unpackIterableHeight(key[ids.IDLen:])
 	copy(nodeID[:], key[diffKeyNodeIDOffset:])
 	return subnetID, height, nodeID, nil
 }
 
-func getWeightValue(diff *ValidatorWeightDiff) []byte {
+func marshalWeightDiff(diff *ValidatorWeightDiff) []byte {
 	value := make([]byte, weightValueLength)
 	if diff.Decrease {
 		value[0] = database.BoolTrue
@@ -70,7 +70,7 @@ func getWeightValue(diff *ValidatorWeightDiff) []byte {
 	return value
 }
 
-func parseWeightValue(value []byte) (*ValidatorWeightDiff, error) {
+func unmarshalWeightDiff(value []byte) (*ValidatorWeightDiff, error) {
 	if len(value) != weightValueLength {
 		return nil, errUnexpectedWeightValueLength
 	}
