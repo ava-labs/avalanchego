@@ -166,7 +166,7 @@ func NewTestNetwork(
 		MaxClockDifference:           constants.DefaultNetworkMaxClockDifference,
 		CompressionType:              constants.DefaultNetworkCompressionType,
 		PingFrequency:                constants.DefaultPingFrequency,
-		AllowPrivateIPs:              constants.DefaultNetworkAllowPrivateIPs,
+		AllowPrivateIPs:              !constants.ProductionNetworkIDs.Contains(networkID),
 		UptimeMetricFreq:             constants.DefaultUptimeMetricFreq,
 		MaximumInboundMessageTimeout: constants.DefaultNetworkMaximumInboundTimeout,
 
