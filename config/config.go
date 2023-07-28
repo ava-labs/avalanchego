@@ -303,6 +303,7 @@ func getGossipConfig(v *viper.Viper) subnets.GossipConfig {
 
 func getNetworkConfig(
 	v *viper.Viper,
+	networkID uint32,
 	sybilProtectionEnabled bool,
 	halflife time.Duration,
 ) (network.Config, error) {
@@ -313,14 +314,14 @@ func getNetworkConfig(
 	upgradeCooldownInSeconds := upgradeCooldown.Seconds()
 	maxRecentConnsUpgraded := int(math.Ceil(maxInboundConnsPerSec * upgradeCooldownInSeconds))
 
-	var (
-		compressionType compression.Type
-		err             error
-	)
-
-	compressionType, err = compression.TypeFromString(v.GetString(NetworkCompressionTypeKey))
+	compressionType, err := compression.TypeFromString(v.GetString(NetworkCompressionTypeKey))
 	if err != nil {
 		return network.Config{}, err
+	}
+
+	allowPrivateIPs := !constants.ProductionNetworkIDs.Contains(networkID)
+	if v.IsSet(NetworkAllowPrivateIPsKey) {
+		allowPrivateIPs = v.GetBool(NetworkAllowPrivateIPsKey)
 	}
 
 	config := network.Config{
@@ -398,7 +399,7 @@ func getNetworkConfig(
 		MaxClockDifference:           v.GetDuration(NetworkMaxClockDifferenceKey),
 		CompressionType:              compressionType,
 		PingFrequency:                v.GetDuration(NetworkPingFrequencyKey),
-		AllowPrivateIPs:              v.GetBool(NetworkAllowPrivateIPsKey),
+		AllowPrivateIPs:              allowPrivateIPs,
 		UptimeMetricFreq:             v.GetDuration(UptimeMetricFreqKey),
 		MaximumInboundMessageTimeout: v.GetDuration(NetworkMaximumInboundTimeoutKey),
 
@@ -1371,7 +1372,12 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	}
 
 	// Network Config
-	nodeConfig.NetworkConfig, err = getNetworkConfig(v, nodeConfig.SybilProtectionEnabled, healthCheckAveragerHalflife)
+	nodeConfig.NetworkConfig, err = getNetworkConfig(
+		v,
+		nodeConfig.NetworkID,
+		nodeConfig.SybilProtectionEnabled,
+		healthCheckAveragerHalflife,
+	)
 	if err != nil {
 		return node.Config{}, err
 	}
