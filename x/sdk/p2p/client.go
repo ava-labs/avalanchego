@@ -91,9 +91,7 @@ func (c *Client) AppRequest(
 			return err
 		}
 
-		c.router.pendingAppRequests[requestID] = pendingAppRequest{
-			onResponse: onResponse,
-		}
+		c.router.pendingAppRequests[requestID] = onResponse
 		c.router.requestID++
 	}
 
@@ -160,9 +158,7 @@ func (c *Client) CrossChainAppRequest(
 		return err
 	}
 
-	c.router.pendingCrossChainAppRequests[requestID] = pendingCrossChainAppRequest{
-		onResponse: onResponse,
-	}
+	c.router.pendingCrossChainAppRequests[requestID] = onResponse
 	c.router.requestID++
 
 	return nil

@@ -26,16 +26,6 @@ var (
 	_ validators.Connector = (*Router)(nil)
 )
 
-type pendingAppRequest struct {
-	handler    uint8
-	onResponse AppResponseCallback
-}
-
-type pendingCrossChainAppRequest struct {
-	handler    uint8
-	onResponse CrossChainAppResponseCallback
-}
-
 // Router routes incoming application messages to the corresponding registered
 // app handler. App messages must be made using the registered handler's
 // corresponding Client.
@@ -43,14 +33,14 @@ type Router struct {
 	nodeID ids.NodeID
 
 	handlers                     map[uint8]responder
-	pendingAppRequests           map[uint32]pendingAppRequest
-	pendingCrossChainAppRequests map[uint32]pendingCrossChainAppRequest
+	pendingAppRequests           map[uint32]AppResponseCallback
+	pendingCrossChainAppRequests map[uint32]CrossChainAppResponseCallback
 	requestID                    uint32
 	peers                        set.Set[ids.NodeID]
 	lock                         sync.RWMutex
 }
 
-func (r *Router) Connected(ctx context.Context, nodeID ids.NodeID, _ *version.Application) error {
+func (r *Router) Connected(_ context.Context, nodeID ids.NodeID, _ *version.Application) error {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
@@ -58,7 +48,7 @@ func (r *Router) Connected(ctx context.Context, nodeID ids.NodeID, _ *version.Ap
 	return nil
 }
 
-func (r *Router) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
+func (r *Router) Disconnected(_ context.Context, nodeID ids.NodeID) error {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
@@ -70,8 +60,8 @@ func (r *Router) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
 func NewRouter() *Router {
 	return &Router{
 		handlers:                     make(map[uint8]responder),
-		pendingAppRequests:           make(map[uint32]pendingAppRequest),
-		pendingCrossChainAppRequests: make(map[uint32]pendingCrossChainAppRequest),
+		pendingAppRequests:           make(map[uint32]AppResponseCallback),
+		pendingCrossChainAppRequests: make(map[uint32]CrossChainAppResponseCallback),
 	}
 }
 
@@ -115,25 +105,25 @@ func (r *Router) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID ui
 
 func (r *Router) AppRequestFailed(_ context.Context, nodeID ids.NodeID, requestID uint32) error {
 	r.lock.RLock()
-	pending, ok := r.clearAppRequest(requestID)
+	callback, ok := r.clearAppRequest(requestID)
 	r.lock.RUnlock()
 	if !ok {
 		return ErrUnrequestedResponse
 	}
 
-	pending.onResponse(nodeID, nil, ErrAppRequestFailed)
+	callback(nodeID, nil, ErrAppRequestFailed)
 	return nil
 }
 
 func (r *Router) AppResponse(_ context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
 	r.lock.RLock()
-	pending, ok := r.clearAppRequest(requestID)
+	callback, ok := r.clearAppRequest(requestID)
 	r.lock.RUnlock()
 	if !ok {
 		return ErrUnrequestedResponse
 	}
 
-	pending.onResponse(nodeID, response, nil)
+	callback(nodeID, response, nil)
 	return nil
 }
 
@@ -168,25 +158,25 @@ func (r *Router) CrossChainAppRequest(
 
 func (r *Router) CrossChainAppRequestFailed(_ context.Context, chainID ids.ID, requestID uint32) error {
 	r.lock.RLock()
-	pending, ok := r.clearCrossChainAppRequest(requestID)
+	callback, ok := r.clearCrossChainAppRequest(requestID)
 	r.lock.RUnlock()
 	if !ok {
 		return ErrUnrequestedResponse
 	}
 
-	pending.onResponse(chainID, nil, ErrAppRequestFailed)
+	callback(chainID, nil, ErrAppRequestFailed)
 	return nil
 }
 
 func (r *Router) CrossChainAppResponse(_ context.Context, chainID ids.ID, requestID uint32, response []byte) error {
 	r.lock.RLock()
-	pending, ok := r.clearCrossChainAppRequest(requestID)
+	callback, ok := r.clearCrossChainAppRequest(requestID)
 	r.lock.RUnlock()
 	if !ok {
 		return ErrUnrequestedResponse
 	}
 
-	pending.onResponse(chainID, response, nil)
+	callback(chainID, response, nil)
 	return nil
 }
 
@@ -202,22 +192,22 @@ func (r *Router) parse(msg []byte) (byte, []byte, responder, bool) {
 	return handlerID, msg[1:], handler, ok
 }
 
-func (r *Router) clearAppRequest(requestID uint32) (pendingAppRequest, bool) {
-	result, ok := r.pendingAppRequests[requestID]
+func (r *Router) clearAppRequest(requestID uint32) (AppResponseCallback, bool) {
+	callback, ok := r.pendingAppRequests[requestID]
 	if !ok {
-		return pendingAppRequest{}, false
+		return nil, false
 	}
 
 	delete(r.pendingAppRequests, requestID)
-	return result, true
+	return callback, true
 }
 
-func (r *Router) clearCrossChainAppRequest(requestID uint32) (pendingCrossChainAppRequest, bool) {
-	result, ok := r.pendingCrossChainAppRequests[requestID]
+func (r *Router) clearCrossChainAppRequest(requestID uint32) (CrossChainAppResponseCallback, bool) {
+	callback, ok := r.pendingCrossChainAppRequests[requestID]
 	if !ok {
-		return pendingCrossChainAppRequest{}, false
+		return nil, false
 	}
 
 	delete(r.pendingCrossChainAppRequests, requestID)
-	return result, true
+	return callback, true
 }
