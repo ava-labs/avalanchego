@@ -95,10 +95,10 @@ func (r *Router) RegisterAppProtocol(handlerID uint8, handler Handler) (*Client,
 
 func (r *Router) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
 	r.lock.RLock()
-	app, parsedMsg, handler, ok := r.parse(request)
+	handlerID, parsedMsg, handler, ok := r.parse(request)
 	r.lock.RUnlock()
 	if !ok {
-		return fmt.Errorf("failed to process app request message for app protocol %d: %w", app, ErrUnregisteredHandler)
+		return fmt.Errorf("failed to process app request message for app protocol %d: %w", handlerID, ErrUnregisteredHandler)
 	}
 
 	return handler.AppRequest(ctx, nodeID, requestID, deadline, parsedMsg)
@@ -130,10 +130,10 @@ func (r *Router) AppResponse(_ context.Context, nodeID ids.NodeID, requestID uin
 
 func (r *Router) AppGossip(ctx context.Context, nodeID ids.NodeID, gossip []byte) error {
 	r.lock.RLock()
-	app, parsedMsg, handler, ok := r.parse(gossip)
+	handlerID, parsedMsg, handler, ok := r.parse(gossip)
 	r.lock.RUnlock()
 	if !ok {
-		return fmt.Errorf("failed to process gossip message for app protocol %d: %w", app, ErrUnregisteredHandler)
+		return fmt.Errorf("failed to process gossip message for app protocol %d: %w", handlerID, ErrUnregisteredHandler)
 	}
 
 	return handler.AppGossip(ctx, nodeID, parsedMsg)
@@ -147,11 +147,11 @@ func (r *Router) CrossChainAppRequest(
 	msg []byte,
 ) error {
 	r.lock.RLock()
-	app, parsedMsg, handler, ok := r.parse(msg)
+	handlerID, parsedMsg, handler, ok := r.parse(msg)
 	r.lock.RUnlock()
 
 	if !ok {
-		return fmt.Errorf("failed to process cross chain app request message for app protocol %d: %w", app, ErrUnregisteredHandler)
+		return fmt.Errorf("failed to process cross chain app request message for app protocol %d: %w", handlerID, ErrUnregisteredHandler)
 	}
 
 	return handler.CrossChainAppRequest(ctx, chainID, requestID, deadline, parsedMsg)
