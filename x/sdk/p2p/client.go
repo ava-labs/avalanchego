@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -51,8 +52,13 @@ func (c *Client) AppRequestAny(
 		return ErrNoPeers
 	}
 
-	// map iteration is random
-	nodeIDs := set.Set[ids.NodeID]{peers[0]: struct{}{}}
+	s := sampler.NewUniform()
+	s.Initialize(uint64(len(peers)))
+	i, err := s.Next()
+	if err != nil {
+		return err
+	}
+	nodeIDs := set.Set[ids.NodeID]{peers[i]: struct{}{}}
 	return c.AppRequest(ctx, nodeIDs, appRequestBytes, onResponse)
 }
 

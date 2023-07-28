@@ -155,31 +155,38 @@ func TestAppRequestDuplicateRequestIDs(t *testing.T) {
 	router := NewRouter()
 	nodeID := ids.GenerateTestNodeID()
 
+	requestSent := &sync.WaitGroup{}
 	sender.EXPECT().SendAppRequest(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 		Do(func(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, request []byte) {
 			for range nodeIDs {
+				requestSent.Add(1)
 				go func() {
 					require.NoError(router.AppRequest(ctx, nodeID, requestID, time.Time{}, request))
+					requestSent.Done()
 				}()
 			}
 		}).AnyTimes()
 
 	timeout := &sync.WaitGroup{}
+	response := []byte("response")
 	handler.EXPECT().AppRequest(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 		DoAndReturn(func(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) ([]byte, error) {
 			timeout.Wait()
-			return []byte("slow response"), nil
+			return response, nil
 		}).AnyTimes()
+	sender.EXPECT().SendAppResponse(gomock.Any(), gomock.Any(), gomock.Any(), response)
 
 	client, err := router.RegisterAppProtocol(0x1, handler, sender)
 	require.NoError(err)
 
 	require.NoError(client.AppRequest(context.Background(), set.Set[ids.NodeID]{nodeID: struct{}{}}, []byte{}, nil))
+	requestSent.Wait()
 
-	// force the router ot use the same requestID
+	// force the router to use the same requestID
 	router.requestID = 0
 	timeout.Add(1)
 	err = client.AppRequest(context.Background(), set.Set[ids.NodeID]{nodeID: struct{}{}}, []byte{}, nil)
+	requestSent.Wait()
 	require.ErrorIs(err, ErrRequestPending)
 
 	timeout.Done()

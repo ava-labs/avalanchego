@@ -69,10 +69,9 @@ func (r *Router) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
 // NewRouter returns a new instance of Router
 func NewRouter() *Router {
 	return &Router{
-		handlers:                     map[uint8]responder{},
+		handlers:                     make(map[uint8]responder),
 		pendingAppRequests:           make(map[uint32]pendingAppRequest),
 		pendingCrossChainAppRequests: make(map[uint32]pendingCrossChainAppRequest),
-		peers:                        set.Set[ids.NodeID]{},
 	}
 }
 
