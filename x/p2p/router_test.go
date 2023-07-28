@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/x/sdk/p2p/mocks"
+	"github.com/ava-labs/avalanchego/x/p2p/mocks"
 )
 
 func TestAppRequestResponse(t *testing.T) {
