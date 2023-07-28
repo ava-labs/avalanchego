@@ -870,7 +870,7 @@ func (m *manager) createAvalancheChain(
 		Validators:    vdrs,
 		Params:        consensusParams,
 		Consensus:     snowmanConsensus,
-		ReducedMode:   m.ReducedMode,
+		ReducedMode:   m.ReducedMode && snowmanCommonCfg.Ctx.ChainID == constants.PlatformChainID,
 	}
 	snowmanEngine, err := smeng.New(snowmanEngineConfig)
 	if err != nil {
