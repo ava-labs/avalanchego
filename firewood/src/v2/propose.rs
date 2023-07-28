@@ -102,13 +102,13 @@ impl<T: api::DbView + Send + Sync> api::DbView for Proposal<T> {
         todo!()
     }
 
-    async fn val<K: KeyType>(&self, key: K) -> Result<Vec<u8>, api::Error> {
+    async fn val<K: KeyType>(&self, key: K) -> Result<Option<Vec<u8>>, api::Error> {
         // see if this key is in this proposal
         match self.delta.get(key.as_ref()) {
             Some(change) => match change {
                 // key in proposal, check for Put or Delete
-                KeyOp::Put(val) => Ok(val.clone()),
-                KeyOp::Delete => Err(api::Error::KeyNotFound), // key was deleted in this proposal
+                KeyOp::Put(val) => Ok(Some(val.clone())),
+                KeyOp::Delete => Ok(None), // key was deleted in this proposal
             },
             None => match &self.base {
                 // key not in this proposal, so delegate to base
@@ -121,7 +121,7 @@ impl<T: api::DbView + Send + Sync> api::DbView for Proposal<T> {
     async fn single_key_proof<K: KeyType, V: ValueType>(
         &self,
         _key: K,
-    ) -> Result<api::Proof<V>, api::Error> {
+    ) -> Result<Option<api::Proof<V>>, api::Error> {
         todo!()
     }
 
@@ -130,7 +130,7 @@ impl<T: api::DbView + Send + Sync> api::DbView for Proposal<T> {
         _first_key: Option<KT>,
         _last_key: Option<KT>,
         _limit: usize,
-    ) -> Result<api::RangeProof<KT, VT>, api::Error> {
+    ) -> Result<Option<api::RangeProof<KT, VT>>, api::Error> {
         todo!()
     }
 }

@@ -72,14 +72,14 @@ impl api::DbView for DbView {
         todo!()
     }
 
-    async fn val<K: KeyType>(&self, _key: K) -> Result<Vec<u8>, api::Error> {
+    async fn val<K: KeyType>(&self, _key: K) -> Result<Option<Vec<u8>>, api::Error> {
         todo!()
     }
 
     async fn single_key_proof<K: KeyType, V: ValueType>(
         &self,
         _key: K,
-    ) -> Result<api::Proof<V>, api::Error> {
+    ) -> Result<Option<api::Proof<V>>, api::Error> {
         todo!()
     }
 
@@ -88,7 +88,7 @@ impl api::DbView for DbView {
         _first_key: Option<K>,
         _last_key: Option<K>,
         _limit: usize,
-    ) -> Result<api::RangeProof<K, V>, api::Error> {
+    ) -> Result<Option<api::RangeProof<K, V>>, api::Error> {
         todo!()
     }
 }

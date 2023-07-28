@@ -54,12 +54,15 @@ impl DbView for HistoricalImpl {
         Ok(ROOT_HASH)
     }
 
-    async fn val<K: KeyType>(&self, _key: K) -> Result<Vec<u8>, Error> {
-        Err(Error::KeyNotFound)
+    async fn val<K: KeyType>(&self, _key: K) -> Result<Option<Vec<u8>>, Error> {
+        Ok(None)
     }
 
-    async fn single_key_proof<K: KeyType, V: ValueType>(&self, _key: K) -> Result<Proof<V>, Error> {
-        Err(Error::KeyNotFound)
+    async fn single_key_proof<K: KeyType, V: ValueType>(
+        &self,
+        _key: K,
+    ) -> Result<Option<Proof<V>>, Error> {
+        Ok(None)
     }
 
     async fn range_proof<K: KeyType, V: ValueType>(
@@ -67,8 +70,8 @@ impl DbView for HistoricalImpl {
         _first_key: Option<K>,
         _last_key: Option<K>,
         _limit: usize,
-    ) -> Result<RangeProof<K, V>, Error> {
-        Err(Error::KeyNotFound)
+    ) -> Result<Option<RangeProof<K, V>>, Error> {
+        Ok(None)
     }
 }
 
@@ -91,12 +94,9 @@ mod tests {
 
         let proposal = db.propose(batch).await?;
 
-        assert_eq!(proposal.val(b"k").await.unwrap(), b"v");
+        assert_eq!(proposal.val(b"k").await.unwrap().unwrap(), b"v");
 
-        assert!(matches!(
-            proposal.val(b"z").await.unwrap_err(),
-            Error::KeyNotFound
-        ));
+        assert!(matches!(proposal.val(b"z").await.unwrap(), None));
 
         Ok(())
     }
@@ -126,20 +126,17 @@ mod tests {
             .await?;
         let proposal2 = Arc::new(proposal2);
         // both proposals still have (k,v)
-        assert_eq!(proposal1.val(b"k").await.unwrap(), b"v");
-        assert_eq!(proposal2.val(b"k").await.unwrap(), b"v");
+        assert_eq!(proposal1.val(b"k").await.unwrap().unwrap(), b"v");
+        assert_eq!(proposal2.val(b"k").await.unwrap().unwrap(), b"v");
         // only proposal1 doesn't have z
-        assert!(matches!(
-            proposal1.val(b"z").await.unwrap_err(),
-            Error::KeyNotFound
-        ));
+        assert!(matches!(proposal1.val(b"z").await.unwrap(), None));
         // proposal2 has z with value "undo"
-        assert_eq!(proposal2.val(b"z").await.unwrap(), b"undo");
+        assert_eq!(proposal2.val(b"z").await.unwrap().unwrap(), b"undo");
 
         // create a proposal3 by adding the two proposals together, keeping the originals
         let proposal3 = proposal1.as_ref() + proposal2.as_ref();
-        assert_eq!(proposal3.val(b"k").await.unwrap(), b"v");
-        assert_eq!(proposal3.val(b"z").await.unwrap(), b"undo");
+        assert_eq!(proposal3.val(b"k").await.unwrap().unwrap(), b"v");
+        assert_eq!(proposal3.val(b"z").await.unwrap().unwrap(), b"undo");
 
         // now consume proposal1 and proposal2
         proposal2.commit().await?;

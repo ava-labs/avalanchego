@@ -62,8 +62,6 @@ pub enum Error {
         provided: HashKey,
         current: HashKey,
     },
-    /// Key not found
-    KeyNotFound,
     IO(std::io::Error),
     InvalidProposal,
 }
@@ -131,10 +129,13 @@ pub trait DbView {
     async fn root_hash(&self) -> Result<HashKey, Error>;
 
     /// Get the value of a specific key
-    async fn val<K: KeyType>(&self, key: K) -> Result<Vec<u8>, Error>;
+    async fn val<K: KeyType>(&self, key: K) -> Result<Option<Vec<u8>>, Error>;
 
     /// Obtain a proof for a single key
-    async fn single_key_proof<K: KeyType, V: ValueType>(&self, key: K) -> Result<Proof<V>, Error>;
+    async fn single_key_proof<K: KeyType, V: ValueType>(
+        &self,
+        key: K,
+    ) -> Result<Option<Proof<V>>, Error>;
 
     /// Obtain a range proof over a set of keys
     ///
@@ -149,7 +150,7 @@ pub trait DbView {
         first_key: Option<K>,
         last_key: Option<K>,
         limit: usize,
-    ) -> Result<RangeProof<K, V>, Error>;
+    ) -> Result<Option<RangeProof<K, V>>, Error>;
 }
 
 /// A proposal for a new revision of the database.
