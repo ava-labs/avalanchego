@@ -22,6 +22,25 @@ fn main() {
         .expect("db initiation should succeed");
     let items = vec![("dof", "verb"), ("doe", "reindeer"), ("dog", "puppy")];
 
+    std::thread::scope(|scope| {
+        scope.spawn(|| {
+            db.new_writebatch()
+                .kv_insert("k1", "v1".into())
+                .unwrap()
+                .commit();
+        });
+
+        scope.spawn(|| {
+            db.new_writebatch()
+                .kv_insert("k2", "v2".into())
+                .unwrap()
+                .commit();
+        });
+    });
+
+    assert_eq!("v1".as_bytes().to_vec(), db.kv_get("k1").unwrap());
+    assert_eq!("v2".as_bytes().to_vec(), db.kv_get("k2").unwrap());
+
     let mut revision_tracker = RevisionTracker::new(db);
 
     revision_tracker.create_revisions(items.into_iter());
