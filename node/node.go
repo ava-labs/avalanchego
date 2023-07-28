@@ -91,8 +91,9 @@ var (
 	genesisHashKey  = []byte("genesisID")
 	indexerDBPrefix = []byte{0x00}
 
-	errInvalidTLSKey = errors.New("invalid TLS key")
-	errShuttingDown  = errors.New("server shutting down")
+	errInvalidTLSKey              = errors.New("invalid TLS key")
+	errShuttingDown               = errors.New("server shutting down")
+	errNoReducedModeForValidators = errors.New("reduced mode cannot be configured for validators")
 )
 
 // Node is an instance of an Avalanche node.
@@ -1173,9 +1174,9 @@ func (n *Node) initHealthAPI() error {
 	reducedModeCheck := health.CheckerFunc(func(ctx context.Context) (interface{}, error) {
 		primaryValidators, _ := n.vdrs.Get(constants.PrimaryNetworkID)
 		if n.Config.ReducedMode && primaryValidators.GetWeight(n.ID) != 0 {
-			n.Log.Fatal(fmt.Sprintf("%s. Shutting down...", platformvm.ErrNoReducedModeForValidators.Error()))
+			n.Log.Fatal(fmt.Sprintf("%s. Shutting down...", errNoReducedModeForValidators.Error()))
 			go n.Shutdown(1)
-			return nil, platformvm.ErrNoReducedModeForValidators
+			return nil, errNoReducedModeForValidators
 		}
 		return nil, nil
 	})

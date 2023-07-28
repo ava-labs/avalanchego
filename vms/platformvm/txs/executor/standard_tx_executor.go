@@ -136,7 +136,7 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 		utxoIDs[i] = utxoID[:]
 	}
 
-	if e.Bootstrapped.Get() {
+	if e.Bootstrapped.Get() && !e.Config.ReducedMode {
 		if err := verify.SameSubnet(context.TODO(), e.Ctx, tx.SourceChain); err != nil {
 			return err
 		}
@@ -187,14 +187,12 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 	// Produce the UTXOS
 	avax.Produce(e.State, txID, tx.Outs)
 
-	if !e.Config.ReducedMode {
-		// fill up atomic requests only if node is validating
-		// C-chain and X-chain.
-		e.AtomicRequests = map[ids.ID]*atomic.Requests{
-			tx.SourceChain: {
-				RemoveRequests: utxoIDs,
-			},
-		}
+	// we fill atomic requests even if reducedMode is enabled
+	// so to allow node to smoothly switch back from reducedMode
+	e.AtomicRequests = map[ids.ID]*atomic.Requests{
+		tx.SourceChain: {
+			RemoveRequests: utxoIDs,
+		},
 	}
 
 	return nil
@@ -236,12 +234,8 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 	// Produce the UTXOS
 	avax.Produce(e.State, txID, tx.Outs)
 
-	if e.Config.ReducedMode {
-		// node is not validating C-chain and X-chain hence
-		// it'll skip filling up atomic requests
-		return nil
-	}
-
+	// we fill atomic requests even if reducedMode is enabled
+	// so to allow node to smoothly switch back from reducedMode
 	elems := make([]*atomic.Element, len(tx.ExportedOutputs))
 	for i, out := range tx.ExportedOutputs {
 		utxo := &avax.UTXO{
