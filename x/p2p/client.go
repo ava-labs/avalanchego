@@ -98,17 +98,6 @@ func (c *Client) AppRequest(
 	return nil
 }
 
-func (c *Client) AppResponse(
-	ctx context.Context,
-	nodeID ids.NodeID,
-	requestID uint32,
-	response []byte,
-) error {
-	// response doesn't need to be prefixed with the app protocol because
-	// it is registered in the router when making the request
-	return c.sender.SendAppResponse(ctx, nodeID, requestID, response)
-}
-
 func (c *Client) AppGossip(
 	ctx context.Context,
 	appGossipBytes []byte,
@@ -162,17 +151,6 @@ func (c *Client) CrossChainAppRequest(
 	c.router.requestID++
 
 	return nil
-}
-
-func (c *Client) CrossChainAppResponse(
-	ctx context.Context,
-	chainID ids.ID,
-	requestID uint32,
-	response []byte,
-) error {
-	// response doesn't need to be prefixed with the app protocol because
-	// it is registered in the router when making the request
-	return c.sender.SendCrossChainAppResponse(ctx, chainID, requestID, response)
 }
 
 func (c *Client) prefixMessage(src []byte) []byte {

@@ -99,11 +99,11 @@ func TestAppRequestResponse(t *testing.T) {
 			require := require.New(t)
 			ctrl := gomock.NewController(t)
 
-			router := NewRouter()
 			sender := common.NewMockSender(ctrl)
 			handler := mocks.NewMockHandler(ctrl)
+			router := NewRouter(sender)
 
-			client, err := router.RegisterAppProtocol(0x1, handler, sender)
+			client, err := router.RegisterAppProtocol(0x1, handler)
 			require.NoError(err)
 
 			wg := &sync.WaitGroup{}
@@ -135,7 +135,7 @@ func TestAppRequestDroppedMessage(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			router := NewRouter()
+			router := NewRouter(nil)
 
 			err := tt.requestFunc(router)
 			require.ErrorIs(t, err, ErrUnregisteredHandler)
@@ -152,7 +152,7 @@ func TestAppRequestDuplicateRequestIDs(t *testing.T) {
 
 	handler := mocks.NewMockHandler(ctrl)
 	sender := common.NewMockSender(ctrl)
-	router := NewRouter()
+	router := NewRouter(sender)
 	nodeID := ids.GenerateTestNodeID()
 
 	requestSent := &sync.WaitGroup{}
@@ -176,7 +176,7 @@ func TestAppRequestDuplicateRequestIDs(t *testing.T) {
 		}).AnyTimes()
 	sender.EXPECT().SendAppResponse(gomock.Any(), gomock.Any(), gomock.Any(), response)
 
-	client, err := router.RegisterAppProtocol(0x1, handler, sender)
+	client, err := router.RegisterAppProtocol(0x1, handler)
 	require.NoError(err)
 
 	require.NoError(client.AppRequest(context.Background(), set.Set[ids.NodeID]{nodeID: struct{}{}}, []byte{}, nil))

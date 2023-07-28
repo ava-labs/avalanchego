@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
 type Handler interface {
@@ -18,7 +19,7 @@ type Handler interface {
 
 type responder struct {
 	handler Handler
-	client  *Client
+	sender  common.AppSender
 }
 
 func (r responder) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
@@ -27,7 +28,7 @@ func (r responder) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID 
 		return err
 	}
 
-	return r.client.AppResponse(ctx, nodeID, requestID, appResponse)
+	return r.sender.SendAppResponse(ctx, nodeID, requestID, appResponse)
 }
 
 func (r responder) AppGossip(ctx context.Context, nodeID ids.NodeID, msg []byte) error {
@@ -40,5 +41,5 @@ func (r responder) CrossChainAppRequest(ctx context.Context, chainID ids.ID, req
 		return err
 	}
 
-	return r.client.CrossChainAppResponse(ctx, chainID, requestID, appResponse)
+	return r.sender.SendCrossChainAppResponse(ctx, chainID, requestID, appResponse)
 }

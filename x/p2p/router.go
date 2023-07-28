@@ -30,7 +30,7 @@ var (
 // app handler. App messages must be made using the registered handler's
 // corresponding Client.
 type Router struct {
-	nodeID ids.NodeID
+	sender common.AppSender
 
 	handlers                     map[uint8]responder
 	pendingAppRequests           map[uint32]AppResponseCallback
@@ -57,8 +57,9 @@ func (r *Router) Disconnected(_ context.Context, nodeID ids.NodeID) error {
 }
 
 // NewRouter returns a new instance of Router
-func NewRouter() *Router {
+func NewRouter(sender common.AppSender) *Router {
 	return &Router{
+		sender:                       sender,
 		handlers:                     make(map[uint8]responder),
 		pendingAppRequests:           make(map[uint32]AppResponseCallback),
 		pendingCrossChainAppRequests: make(map[uint32]CrossChainAppResponseCallback),
@@ -68,7 +69,7 @@ func NewRouter() *Router {
 // RegisterAppProtocol reserves an identifier for an application protocol and
 // returns a Client that can be used to send messages for the corresponding
 // protocol.
-func (r *Router) RegisterAppProtocol(handlerID uint8, handler Handler, sender common.AppSender) (*Client, error) {
+func (r *Router) RegisterAppProtocol(handlerID uint8, handler Handler) (*Client, error) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
@@ -78,13 +79,13 @@ func (r *Router) RegisterAppProtocol(handlerID uint8, handler Handler, sender co
 
 	client := &Client{
 		handlerID: handlerID,
-		sender:    sender,
+		sender:    r.sender,
 		router:    r,
 	}
 
 	responder := responder{
 		handler: handler,
-		client:  client,
+		sender:  r.sender,
 	}
 
 	r.handlers[handlerID] = responder
