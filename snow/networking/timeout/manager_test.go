@@ -4,6 +4,7 @@
 package timeout
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -34,11 +35,16 @@ func TestManagerFire(t *testing.T) {
 	go manager.Dispatch()
 	defer manager.Stop()
 
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+
 	manager.RegisterRequest(
 		ids.NodeID{},
 		ids.ID{},
 		true,
 		ids.RequestID{},
-		nil,
+		wg.Done,
 	)
+
+	wg.Wait()
 }
