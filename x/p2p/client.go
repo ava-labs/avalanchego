@@ -22,11 +22,18 @@ var (
 	ErrNoPeers          = errors.New("no peers")
 )
 
+// AppResponseCallback is called upon receiving an AppResponse for an AppRequest
+// issued by Client.
+// Callers should check [err] to see whether the AppRequest failed or not.
 type AppResponseCallback func(
 	nodeID ids.NodeID,
 	responseBytes []byte,
 	err error,
 )
+
+// CrossChainAppResponseCallback is called upon receiving an
+// CrossChainAppResponse for a CrossChainAppRequest issued by Client.
+// Callers should check [err] to see whether the AppRequest failed or not.
 type CrossChainAppResponseCallback func(
 	chainID ids.ID,
 	responseBytes []byte,
@@ -39,6 +46,9 @@ type Client struct {
 	sender    common.AppSender
 }
 
+// AppRequestAny issues an AppRequest to an arbitrary node decided by Client.
+// If a specific node needs to be requested, use AppRequest instead.
+// See AppRequest for more docs.
 func (c *Client) AppRequestAny(
 	ctx context.Context,
 	appRequestBytes []byte,
@@ -62,6 +72,8 @@ func (c *Client) AppRequestAny(
 	return c.AppRequest(ctx, nodeIDs, appRequestBytes, onResponse)
 }
 
+// AppRequest issues an arbitrary request to a node.
+// [onResponse] is invoked upon an error or a response.
 func (c *Client) AppRequest(
 	ctx context.Context,
 	nodeIDs set.Set[ids.NodeID],
@@ -98,6 +110,7 @@ func (c *Client) AppRequest(
 	return nil
 }
 
+// AppGossip sends a gossip message to a random set of peers.
 func (c *Client) AppGossip(
 	ctx context.Context,
 	appGossipBytes []byte,
@@ -108,6 +121,7 @@ func (c *Client) AppGossip(
 	)
 }
 
+// AppGossipSpecific sends a gossip message to a predetermined set of peers.
 func (c *Client) AppGossipSpecific(
 	ctx context.Context,
 	nodeIDs set.Set[ids.NodeID],
@@ -120,6 +134,8 @@ func (c *Client) AppGossipSpecific(
 	)
 }
 
+// CrossChainAppRequest sends a cross chain app request to another vm.
+// [onResponse] is invoked upon an error or a response.
 func (c *Client) CrossChainAppRequest(
 	ctx context.Context,
 	chainID ids.ID,
@@ -153,6 +169,12 @@ func (c *Client) CrossChainAppRequest(
 	return nil
 }
 
+// prefixMessage prefixes the original message with the handler identifier
+// corresponding to this client.
+//
+// Only gossip and request messages need to be prefixed.
+// Response messages don't need to be prefixed because request ids are tracked
+// which map to the expected response handler.
 func (c *Client) prefixMessage(src []byte) []byte {
 	messageBytes := make([]byte, 1+len(src))
 	messageBytes[0] = c.handlerID
