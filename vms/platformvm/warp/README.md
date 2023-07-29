@@ -2,15 +2,15 @@
 
 Avalanche Warp Messaging (AWM) provides a primitive for Cross-Subnet Communication on the Avalanche Network.
 
-The Avalanche P-Chain provides an index of every Subnet's validator set on the Avalanche Network including a BLS Public Key registered to validators (as of [Banff Upgrade](https://github.com/ava-labs/avalanchego/releases/v1.9.0)). AWM utilizes the weighted validator sets stored on the P-Chain and the registered BLS Public Keys to build a Cross-Subnet Communication Protocol between any two Subnets on the Avalanche Network.
+The Avalanche P-Chain provides an index of every Subnet's validator set on the Avalanche Network including a BLS Public Key registered to validators (as of the [Banff Upgrade](https://github.com/ava-labs/avalanchego/releases/v1.9.0)). AWM utilizes the weighted validator sets stored on the P-Chain to build a Cross-Subnet Communication Protocol between any two Subnets on the Avalanche Network.
 
-Any Virtual Machine (VM) on Avalanche, can integrate Avalanche Warp Messaging to send and receive verifiable messages across Subnets.
+Any Virtual Machine (VM) on Avalanche, can integrate Avalanche Warp Messaging to send and receive verifiable messages across Avalanche Subnets.
 
 ## BLS Multi-Signatures with Public-Key Aggregation
 
-Avalanche Warp Messaging utilizes BLS Multi-Signatures with Public-Key Aggregation in order to verify messages signed by another Subnet. To accomplish this, when a validator is added to the Avalanche P-Chain, it registers a BLS Public-Key to its NodeID along with a Proof of Possession of the corresponding private key to defend against a rogue public-key attack.
+Avalanche Warp Messaging utilizes BLS Multi-Signatures with Public-Key Aggregation in order to verify messages signed by another Subnet. To accomplish this, when a validator is added to the Avalanche P-Chain, it registers a BLS Public-Key to its NodeID along with a Proof of Possession of the corresponding private key to defend against a [rogue public-key attack](https://crypto.stanford.edu/~dabo/pubs/papers/BLSmultisig.html#mjx-eqn-eqaggsame).
 
-The P-Chain already provides the weighted validator set for every Subnet used in consensus. AWM relies on the registered BLS Public Keys to each validator to provide a weighted set of BLS Public Keys to verify a messaage coming from any Subnet.
+AWM utilizes the weighted validator sets registered BLS Public Keys to each validator to provide a weighted set of BLS Public Keys to verify a messaage coming from any Subnet with Warp Messaging.
 
 BLS Multi-Signatures with Public-Key Aggregation provides a way to aggregate BLS private keys, public keys, and signatures into a single key/signature.
 
@@ -51,7 +51,7 @@ BitSet Signature:
 - `signers` encodes a BitSet of which validators' signatures are included
 - `signature` is an aggregated BLS Multi-Signature of the Unsigned Message
 
-BitSet Signatures are verified within the context of a specific P-Chain height. At a specific P-Chain height, the PlatformVM can serve a canonically ordered validator set for the source subnet. The signers BitSet encodes which validators' signature was included. A 1 at index i in `signers` claims that a signature from the validator at index i in the canonical validator set is included in the aggregate signature.
+BitSet Signatures are verified within the context of a specific P-Chain height. At a specific P-Chain height, the PlatformVM serves a canonically ordered validator set for the source subnet. The signers BitSet encodes which validators' signature was included. A 1 at index i in `signers` claims that a signature from the validator at index i in the canonical validator set is included in the aggregate signature.
 
 The BitSet tells the verifier which BLS Public Keys should be aggregated to verify the Warp Message.
 
@@ -70,9 +70,9 @@ Signed Message:
 
 A Blockchain on Avalanche sends an Avalanche Warp Message by coming to agreement on the message that every validator should be willing to sign. As an example, the VM of a Blockchain may define that once a block is accepted, the VM should be willing to sign a message including the block hash in the payload to attest to any other Subnet that the block was accepted. The contents of the payload, how to aggregate the signature (VM-to-VM communication, off-chain relayer, etc.), is left to the VM.
 
-Once the validator set of a blockchain is willing to sign the message M, an aggregator can perform the following process:
+Once the validator set of a blockchain is willing to sign the message M, an aggregator performs the following process:
 
-1. Gather signatures of the message M from N validators (assume N validators meets the required threshold of stake)
+1. Gather signatures of the message M from N validators (assume N validators meets the required threshold of stake on the destination chain)
 2. Aggregate the N signatures into a multi-signature
 3. Look up the canonical validator set at the P-Chain height where the message will be verified
 4. Encode the selection of N validators included in the signature out of the canonical validator set as a BitSet
@@ -80,7 +80,7 @@ Once the validator set of a blockchain is willing to sign the message M, an aggr
 
 ## Verifying / Receiving an Avalanche Warp Message
 
-Avalanache Warp Messages are verified within the context of a specific P-Chain height that is included in the [ProposerVM](../../proposervm/README.md)'s header. The P-Chain height is provided as context to the wrapped VM when verifying the VM's internal blocks (implemented by the optional interface [WithVerifyContext](../../../snow/engine/snowman/block/block_context_vm.go)).
+Avalanache Warp Messages are verified within the context of a specific P-Chain height included in the [ProposerVM](../../proposervm/README.md)'s header. The P-Chain height is provided as context to the wrapped VM when verifying the VM's internal blocks (implemented by the optional interface [WithVerifyContext](../../../snow/engine/snowman/block/block_context_vm.go)).
 
 To verify the message, the VM utilizes this Warp package to perform the following steps:
 
