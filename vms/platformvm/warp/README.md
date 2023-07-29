@@ -6,6 +6,14 @@ The Avalanche P-Chain provides an index of every Subnet's validator set on the A
 
 Any Virtual Machine (VM) on Avalanche, can integrate Avalanche Warp Messaging to send and receive verifiable messages across Avalanche Subnets.
 
+## Background
+
+This README assumes familiarity with:
+
+- Avalanche P-Chain / [PlatformVM](../)
+- [ProposerVM](../../proposervm/README.md)
+- Basic familiarity with [BLS Multi-Signatures](https://crypto.stanford.edu/~dabo/pubs/papers/BLSmultisig.html)
+
 ## BLS Multi-Signatures with Public-Key Aggregation
 
 Avalanche Warp Messaging utilizes BLS Multi-Signatures with Public-Key Aggregation in order to verify messages signed by another Subnet. To accomplish this, when a validator is added to the Avalanche P-Chain, it registers a BLS Public-Key to its NodeID along with a Proof of Possession of the corresponding private key to defend against a [rogue public-key attack](https://crypto.stanford.edu/~dabo/pubs/papers/BLSmultisig.html#mjx-eqn-eqaggsame).
