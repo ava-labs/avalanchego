@@ -11,12 +11,20 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
+// Handler is the server-side logic for virtual machine application protocols.
 type Handler interface {
+	// AppGossip is called when handling an AppGossip message.
 	AppGossip(ctx context.Context, nodeID ids.NodeID, gossipBytes []byte) error
+	// AppRequest is called when handling an AppRequest message.
+	// Returns the bytes for the response corresponding to [requestBytes]
 	AppRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, requestBytes []byte) ([]byte, error)
+	// CrossChainAppRequest is called when handling a CrossChainAppRequest
+	// message.
+	// Returns the bytes for the response corresponding to [requestBytes]
 	CrossChainAppRequest(ctx context.Context, chainID ids.ID, requestID uint32, deadline time.Time, requestBytes []byte) ([]byte, error)
 }
 
+// responder automatically sends the response for a given request
 type responder struct {
 	handler Handler
 	sender  common.AppSender
