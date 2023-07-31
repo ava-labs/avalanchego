@@ -1,10 +1,10 @@
 # Avalanche Warp Messaging
 
-Avalanche Warp Messaging (AWM) provides a primitive for Cross-Subnet Communication on the Avalanche Network.
+Avalanche Warp Messaging (AWM) provides a primitive for cross-subnet communication on the Avalanche Network.
 
-The Avalanche P-Chain provides an index of every Subnet's validator set on the Avalanche Network including a BLS Public Key registered to validators (as of the [Banff Upgrade](https://github.com/ava-labs/avalanchego/releases/v1.9.0)). AWM utilizes the weighted validator sets stored on the P-Chain to build a Cross-Subnet Communication Protocol between any two Subnets on the Avalanche Network.
+The Avalanche P-Chain provides an index of every Subnet's validator set on the Avalanche Network, including the BLS public key of each validator (as of the [Banff Upgrade](https://github.com/ava-labs/avalanchego/releases/v1.9.0)). AWM utilizes the weighted validator sets stored on the P-Chain to build a cross-subnet communication protocol between any two Subnets on the Avalanche Network.
 
-Any Virtual Machine (VM) on Avalanche, can integrate Avalanche Warp Messaging to send and receive verifiable messages across Avalanche Subnets.
+Any Virtual Machine (VM) on Avalanche can integrate Avalanche Warp Messaging to send and receive messages across Avalanche Subnets.
 
 ## Background
 
@@ -16,9 +16,9 @@ This README assumes familiarity with:
 
 ## BLS Multi-Signatures with Public-Key Aggregation
 
-Avalanche Warp Messaging utilizes BLS Multi-Signatures with Public-Key Aggregation in order to verify messages signed by another Subnet. To accomplish this, when a validator is added to the Avalanche P-Chain, it registers a BLS Public-Key to its NodeID along with a Proof of Possession of the corresponding private key to defend against a [rogue public-key attack](https://crypto.stanford.edu/~dabo/pubs/papers/BLSmultisig.html#mjx-eqn-eqaggsame).
+Avalanche Warp Messaging utilizes BLS multi-signatures with public key aggregation in order to verify messages signed by another Subnet. When a validator joins a Subnet, the P-Chain records the validator's BLS public Key and NodeID, as well as a proof of possession of the validator's BLS private key to defend against [rogue public-key attacks](https://crypto.stanford.edu/~dabo/pubs/papers/BLSmultisig.html#mjx-eqn-eqaggsame).
 
-AWM utilizes the weighted validator sets registered BLS Public Keys to each validator to provide a weighted set of BLS Public Keys to verify a messaage coming from any Subnet with Warp Messaging.
+AWM utilizes the weighted validator sets registered BLS public keys verify that an aggregate signature has sufficient weight signing the message from the source Subnet.
 
 BLS Multi-Signatures with Public-Key Aggregation provides a way to aggregate BLS private keys, public keys, and signatures into a single key/signature.
 
@@ -39,13 +39,13 @@ Unsigned Message:
                              +--------------------------+
 ```
 
-- `networkID` provides replay protection for BLS Signers across different Avalanche Networks
-- `sourceChainID` ensures that each blockchain on Avalanche can only sign a message with its own `blockchainID`
-- `payload` is a byte array containing the contents of the message. VMs can define their own message types to include in the `payload`
+- `networkID` is the unique ID of an Avalanche Network (Mainnet/Testnet) and provides replay protection for BLS Signers across different Avalanche Networks
+- `sourceChainID` is the `blockchainID` of the blockchain sending a message. This ensures that each blockchain can only sign a message with its own `blockchainID`
+- `payload` provides an arbitrary byte array containing the contents of the message. VMs define their own message types to include in the `payload`
 
 Note: the `blockchainID` is the hash of the transaction that created the blockchain on the Avalanche P-Chain. It serves as the unique identifier for the blockchain across the Avalanche Network.
 
-BitSet Signature:
+BitSetSignature:
 ```
 +-----------+----------+---------------------------+
 |   signers :   []byte |          4 + len(signers) |
@@ -56,12 +56,12 @@ BitSet Signature:
                        +---------------------------+
 ```
 
-- `signers` encodes a BitSet of which validators' signatures are included
+- `signers` encodes a bitset of which validators' signatures are included
 - `signature` is an aggregated BLS Multi-Signature of the Unsigned Message
 
-BitSet Signatures are verified within the context of a specific P-Chain height. At a specific P-Chain height, the PlatformVM serves a canonically ordered validator set for the source subnet. The signers BitSet encodes which validators' signature was included. A 1 at index i in `signers` claims that a signature from the validator at index i in the canonical validator set is included in the aggregate signature.
+BitSetSignatures are verified within the context of a specific P-Chain height. At a specific P-Chain height, the PlatformVM serves a canonically ordered validator set for the source subnet (validator set is ordered lexicographically by the BLS public key bytes). The signers bitset encodes which validators' signature was included. A 1 at index i in `signers` claims that a signature from the validator at index i in the canonical validator set is included in the aggregate signature.
 
-The BitSet tells the verifier which BLS Public Keys should be aggregated to verify the Warp Message.
+The bitset tells the verifier which BLS public keys should be aggregated to verify the warp message.
 
 Signed Message:
 ```
@@ -83,8 +83,8 @@ Once the validator set of a blockchain is willing to sign the message M, an aggr
 1. Gather signatures of the message M from N validators (assume N validators meets the required threshold of stake on the destination chain)
 2. Aggregate the N signatures into a multi-signature
 3. Look up the canonical validator set at the P-Chain height where the message will be verified
-4. Encode the selection of N validators included in the signature out of the canonical validator set as a BitSet
-5. Construct the Signed Message with the aggregate signature, BitSet, and the Unsigned Message
+4. Encode the selection of the N validators included in the signature in a bitset
+5. Construct the Signed Message from the aggregate signature, bitset, and unsigned message
 
 ## Verifying / Receiving an Avalanche Warp Message
 
@@ -93,8 +93,8 @@ Avalanache Warp Messages are verified within the context of a specific P-Chain h
 To verify the message, the VM utilizes this Warp package to perform the following steps:
 
 1. Lookup the canonical validator set of the Subnet sending the message at the P-Chain height
-2. Filter the canonical validator set to only the validators claimed by the BitSetSignature
-3. Verify the weight of the included validators meets the required threshold
+2. Filter the canonical validator set to only the validators claimed by the signature
+3. Verify the weight of the included validators meets the required threshold (threshold defined by the receiving VM)
 4. Aggregate the public keys of the claimed validators into a single aggregate public key
 5. Verify the aggregate signature of the unsigned message against the aggregate public key
 
@@ -116,6 +116,6 @@ Therefore, the new bootstrapping node can use a heuristic encoded in the block t
 
 Two strategies to provide that heuristic are:
 
-- Encode the Warp Message as a predicate for transaction inclusion. If the transaction is included, the Warp Message must have passed verification.
-- Staple the results of every Warp Message verification operation to the block itself. Use the stapled results to determine which messages passed verification.
+- Encode the warp message as a predicate for transaction inclusion. If the transaction is included, the warp message must have passed verification.
+- Staple the results of every warp message verification operation to the block itself. Use the stapled results to determine which messages passed verification.
 
