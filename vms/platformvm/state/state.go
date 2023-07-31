@@ -126,11 +126,11 @@ type State interface {
 	ValidatorSet(subnetID ids.ID, vdrs validators.Set) error
 
 	// ApplyValidatorWeightDiffs iterates from [startHeight] towards the genesis
-	// block until it has applied all of the diffs through [endHeight]. Applying
-	// the diffs results in modifying [validators].
+	// block until it has applied all of the diffs up to and including
+	// [endHeight]. Applying the diffs modifies [validators].
 	//
 	// Invariant: If attempting to generate the validator set for
-	// [endHeight - 1], [validators] should initially contain the validator
+	// [endHeight - 1], [validators] must initially contain the validator
 	// weights for [startHeight].
 	//
 	// Note: Because this function iterates towards the genesis, [startHeight]
@@ -145,12 +145,12 @@ type State interface {
 	) error
 
 	// ApplyValidatorPublicKeyDiffs iterates from [startHeight] towards the
-	// genesis block until it has applied all of the diffs through [endHeight].
-	// Applying the diffs results in modifying [validators].
+	// genesis block until it has applied all of the diffs up to and including
+	// [endHeight]. Applying the diffs modifies [validators].
 	//
 	// Invariant: If attempting to generate the validator set for
-	// [endHeight - 1], [validators] should initially contain the validators for
-	// [endHeight - 1] and the public keys for [startHeight].
+	// [endHeight - 1], [validators] must initially contain the validator
+	// weights for [startHeight].
 	//
 	// Note: Because this function iterates towards the genesis, [startHeight]
 	// will typically be greater than or equal to [endHeight]. If [startHeight]
@@ -1144,6 +1144,12 @@ func (s *state) ApplyValidatorPublicKeyDiffs(
 
 		vdr.PublicKey = new(bls.PublicKey).Deserialize(pkBytes)
 	}
+
+	// Note: this does not fallback to the linkeddb index because the linkeddb
+	// index does not contain entries for when to remove the public key.
+	//
+	// Nodes may see inconsistent public keys for heights before the new public
+	// key index was populated.
 	return diffIter.Error()
 }
 
