@@ -224,7 +224,7 @@ func (s *NetworkServer) HandleChangeProofRequest(
 		}
 
 		// The proof was too large. Try to shrink it.
-		keyLimit = keyLimit / 2
+		keyLimit /= 2
 	}
 	return ErrMinProofSizeIsTooLarge
 }
