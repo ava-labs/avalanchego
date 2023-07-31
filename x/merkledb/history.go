@@ -14,8 +14,8 @@ import (
 )
 
 var (
-	ErrStartRootNotFound = errors.New("start root is not before end root in history")
-	ErrRootIDNotPresent  = errors.New("root id is not present in history")
+	ErrStartRootNotFound   = errors.New("start root is not before end root in history")
+	ErrInsufficientHistory = errors.New("root id is not present in history")
 )
 
 // stores previous trie states
@@ -76,8 +76,10 @@ func newTrieHistory(maxHistoryLookback int) *trieHistory {
 	}
 }
 
-// Returns up to [maxLength] key-value pair changes with keys in [start, end] that
-// occurred between [startRoot] and [endRoot].
+// Returns up to [maxLength] key-value pair changes with keys in
+// [start, end] that occurred between [startRoot] and [endRoot].
+// Returns ErrInsufficientHistory if the history is insufficient
+// to generate the proof.
 func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start, end []byte, maxLength int) (*changeSummary, error) {
 	if maxLength <= 0 {
 		return nil, fmt.Errorf("%w but was %d", ErrInvalidMaxLength, maxLength)
@@ -92,13 +94,13 @@ func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start, end []b
 	// [lastEndRootChange] is the last change in the history resulting in [endRoot].
 	lastEndRootChange, ok := th.lastChanges[endRoot]
 	if !ok {
-		return nil, ErrRootIDNotPresent
+		return nil, fmt.Errorf("%w: end root %s not found", ErrInsufficientHistory, endRoot)
 	}
 
 	// [startRootChanges] is the last appearance of [startRoot]
 	startRootChanges, ok := th.lastChanges[startRoot]
 	if !ok {
-		return nil, ErrStartRootNotFound
+		return nil, fmt.Errorf("%w: start root %s not found", ErrInsufficientHistory, startRoot)
 	}
 
 	// startRootChanges is after the lastEndRootChange, but that is just the latest appearance of start root
@@ -119,7 +121,10 @@ func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start, end []b
 		)
 		// There's no change resulting in [startRoot] before the latest change resulting in [endRoot].
 		if startRootChanges.index > lastEndRootChange.index {
-			return nil, ErrStartRootNotFound
+			return nil, fmt.Errorf(
+				"%w: start root %s not found before end root %s",
+				ErrInsufficientHistory, startRoot, endRoot,
+			)
 		}
 	}
 
@@ -202,7 +207,7 @@ func (th *trieHistory) getChangesToGetToRoot(rootID ids.ID, start, end []byte) (
 	// [lastRootChange] is the last change in the history resulting in [rootID].
 	lastRootChange, ok := th.lastChanges[rootID]
 	if !ok {
-		return nil, ErrRootIDNotPresent
+		return nil, ErrInsufficientHistory
 	}
 
 	var (

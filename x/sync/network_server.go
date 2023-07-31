@@ -175,7 +175,7 @@ func (s *NetworkServer) HandleChangeProofRequest(
 		changeProof, err := s.db.GetChangeProof(ctx, startRoot, endRoot, req.StartKey, req.EndKey, int(keyLimit))
 		if err != nil {
 			// handle expected errors so clients cannot cause servers to spam warning logs.
-			if errors.Is(err, merkledb.ErrRootIDNotPresent) || errors.Is(err, merkledb.ErrStartRootNotFound) {
+			if errors.Is(err, merkledb.ErrInsufficientHistory) || errors.Is(err, merkledb.ErrStartRootNotFound) {
 				s.log.Debug(
 					"dropping invalid change proof request",
 					zap.Stringer("nodeID", nodeID),
@@ -249,7 +249,7 @@ func (s *NetworkServer) HandleRangeProofRequest(
 		rangeProof, err := s.db.GetRangeProofAtRoot(ctx, root, req.StartKey, req.EndKey, int(keyLimit))
 		if err != nil {
 			// handle expected errors so clients cannot cause servers to spam warning logs.
-			if errors.Is(err, merkledb.ErrRootIDNotPresent) {
+			if errors.Is(err, merkledb.ErrInsufficientHistory) {
 				s.log.Debug(
 					"dropping invalid range proof request",
 					zap.Stringer("nodeID", nodeID),

@@ -56,7 +56,7 @@ type ChangeProofer interface {
 	// GetChangeProof returns a proof for a subset of the key/value changes in key range
 	// [start, end] that occurred between [startRootID] and [endRootID].
 	// Returns at most [maxLength] key/value pairs.
-	// Returns [ErrRootIDNotPresent] if this node has insufficient history
+	// Returns [ErrInsufficientHistory] if this node has insufficient history
 	// to generate the proof.
 	GetChangeProof(
 		ctx context.Context,

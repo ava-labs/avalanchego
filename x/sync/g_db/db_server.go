@@ -43,7 +43,7 @@ func (s *DBServer) GetMerkleRoot(
 func (s *DBServer) GetChangeProof(
 	ctx context.Context,
 	req *pb.GetChangeProofRequest,
-) (*pb.ChangeProof, error) {
+) (*pb.GetChangeProofResponse, error) {
 	startRootID, err := ids.ToID(req.StartRootHash)
 	if err != nil {
 		return nil, err
@@ -60,10 +60,22 @@ func (s *DBServer) GetChangeProof(
 		req.EndKey,
 		int(req.KeyLimit),
 	)
+	if err == merkledb.ErrInsufficientHistory {
+		return &pb.GetChangeProofResponse{
+			Response: &pb.GetChangeProofResponse_RootNotPresent{
+				RootNotPresent: true,
+			},
+		}, nil
+	}
 	if err != nil {
 		return nil, err
 	}
-	return changeProof.ToProto(), nil
+
+	return &pb.GetChangeProofResponse{
+		Response: &pb.GetChangeProofResponse_ChangeProof{
+			ChangeProof: changeProof.ToProto(),
+		},
+	}, nil
 }
 
 func (s *DBServer) VerifyChangeProof(
