@@ -381,25 +381,25 @@ type txAndStatus struct {
 	status status.Status
 }
 
-func txSize(tx *txs.Tx) int {
+func txSize(_ ids.ID, tx *txs.Tx) int {
 	if tx == nil {
-		return pointerOverhead
+		return ids.IDLen + pointerOverhead
 	}
-	return len(tx.Bytes()) + pointerOverhead
+	return ids.IDLen + len(tx.Bytes()) + pointerOverhead
 }
 
-func txAndStatusSize(t *txAndStatus) int {
+func txAndStatusSize(_ ids.ID, t *txAndStatus) int {
 	if t == nil {
-		return pointerOverhead
+		return ids.IDLen + pointerOverhead
 	}
-	return len(t.tx.Bytes()) + wrappers.IntLen + pointerOverhead
+	return ids.IDLen + len(t.tx.Bytes()) + wrappers.IntLen + pointerOverhead
 }
 
-func blockSize(blk blocks.Block) int {
+func blockSize(_ ids.ID, blk blocks.Block) int {
 	if blk == nil {
-		return pointerOverhead
+		return ids.IDLen + pointerOverhead
 	}
-	return len(blk.Bytes()) + pointerOverhead
+	return ids.IDLen + len(blk.Bytes()) + pointerOverhead
 }
 
 func New(

@@ -11,9 +11,9 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-const TestIntSize = 8
+const TestIntSize = ids.IDLen + 8
 
-func TestIntSizeFunc(int64) int {
+func TestIntSizeFunc(ids.ID, int64) int {
 	return TestIntSize
 }
 
