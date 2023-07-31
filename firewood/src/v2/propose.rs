@@ -102,12 +102,12 @@ impl<T: api::DbView + Send + Sync> api::DbView for Proposal<T> {
         todo!()
     }
 
-    async fn val<K: KeyType>(&self, key: K) -> Result<Option<Vec<u8>>, api::Error> {
+    async fn val<K: KeyType>(&self, key: K) -> Result<Option<&[u8]>, api::Error> {
         // see if this key is in this proposal
         match self.delta.get(key.as_ref()) {
             Some(change) => match change {
                 // key in proposal, check for Put or Delete
-                KeyOp::Put(val) => Ok(Some(val.clone())),
+                KeyOp::Put(val) => Ok(Some(val)),
                 KeyOp::Delete => Ok(None), // key was deleted in this proposal
             },
             None => match &self.base {
