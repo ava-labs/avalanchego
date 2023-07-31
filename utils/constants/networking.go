@@ -52,7 +52,6 @@ const (
 
 	DefaultNetworkCompressionType           = compression.TypeGzip
 	DefaultNetworkMaxClockDifference        = time.Minute
-	DefaultNetworkAllowPrivateIPs           = true
 	DefaultNetworkRequireValidatorToConnect = false
 	DefaultNetworkPeerReadBufferSize        = 8 * units.KiB
 	DefaultNetworkPeerWriteBufferSize       = 8 * units.KiB
