@@ -4,5 +4,7 @@
 package params
 
 const (
-	WarpQuorumDenominator uint64 = 100
+	WarpDefaultQuorumNumerator uint64 = 67
+	WarpQuorumNumeratorMinimum uint64 = 33
+	WarpQuorumDenominator      uint64 = 100
 )

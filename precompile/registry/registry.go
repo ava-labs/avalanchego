@@ -16,6 +16,8 @@ import (
 	_ "github.com/ava-labs/subnet-evm/precompile/contracts/feemanager"
 
 	_ "github.com/ava-labs/subnet-evm/precompile/contracts/rewardmanager"
+
+	_ "github.com/ava-labs/subnet-evm/x/warp"
 	// ADD YOUR PRECOMPILE HERE
 	// _ "github.com/ava-labs/subnet-evm/precompile/contracts/yourprecompile"
 )
@@ -37,5 +39,6 @@ import (
 // TxAllowListAddress               = common.HexToAddress("0x0200000000000000000000000000000000000002")
 // FeeManagerAddress                = common.HexToAddress("0x0200000000000000000000000000000000000003")
 // RewardManagerAddress             = common.HexToAddress("0x0200000000000000000000000000000000000004")
+// WarpAddress                      = common.HexToAddress("0x0200000000000000000000000000000000000005")
 // ADD YOUR PRECOMPILE HERE
 // {YourPrecompile}Address          = common.HexToAddress("0x03000000000000000000000000000000000000??")

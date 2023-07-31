@@ -159,19 +159,20 @@ func NewWithSnapshot(root common.Hash, db Database, snap snapshot.Snapshot) (*St
 		return nil, err
 	}
 	sdb := &StateDB{
-		db:                   db,
-		trie:                 tr,
-		originalRoot:         root,
-		stateObjects:         make(map[common.Address]*stateObject),
-		stateObjectsPending:  make(map[common.Address]struct{}),
-		stateObjectsDirty:    make(map[common.Address]struct{}),
-		stateObjectsDestruct: make(map[common.Address]struct{}),
-		logs:                 make(map[common.Hash][]*types.Log),
-		preimages:            make(map[common.Hash][]byte),
-		journal:              newJournal(),
-		accessList:           newAccessList(),
-		transientStorage:     newTransientStorage(),
-		hasher:               crypto.NewKeccakState(),
+		db:                    db,
+		trie:                  tr,
+		originalRoot:          root,
+		stateObjects:          make(map[common.Address]*stateObject),
+		stateObjectsPending:   make(map[common.Address]struct{}),
+		stateObjectsDirty:     make(map[common.Address]struct{}),
+		stateObjectsDestruct:  make(map[common.Address]struct{}),
+		logs:                  make(map[common.Hash][]*types.Log),
+		preimages:             make(map[common.Hash][]byte),
+		journal:               newJournal(),
+		predicateStorageSlots: make(map[common.Address][]byte),
+		accessList:            newAccessList(),
+		transientStorage:      newTransientStorage(),
+		hasher:                crypto.NewKeccakState(),
 	}
 	if snap != nil {
 		if snap.Root() != root {

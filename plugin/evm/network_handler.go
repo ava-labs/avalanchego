@@ -14,7 +14,9 @@ import (
 	syncHandlers "github.com/ava-labs/subnet-evm/sync/handlers"
 	syncStats "github.com/ava-labs/subnet-evm/sync/handlers/stats"
 	"github.com/ava-labs/subnet-evm/trie"
+	"github.com/ava-labs/subnet-evm/warp"
 	warpHandlers "github.com/ava-labs/subnet-evm/warp/handlers"
+	warpStats "github.com/ava-labs/subnet-evm/warp/handlers/stats"
 )
 
 var _ message.RequestHandler = &networkHandler{}
@@ -31,17 +33,15 @@ func newNetworkHandler(
 	provider syncHandlers.SyncDataProvider,
 	diskDB ethdb.KeyValueReader,
 	evmTrieDB *trie.Database,
+	warpBackend warp.WarpBackend,
 	networkCodec codec.Manager,
 ) message.RequestHandler {
 	syncStats := syncStats.NewHandlerStats(metrics.Enabled)
 	return &networkHandler{
-		// State sync handlers
 		stateTrieLeafsRequestHandler: syncHandlers.NewLeafsRequestHandler(evmTrieDB, provider, networkCodec, syncStats),
 		blockRequestHandler:          syncHandlers.NewBlockRequestHandler(provider, networkCodec, syncStats),
 		codeRequestHandler:           syncHandlers.NewCodeRequestHandler(diskDB, networkCodec, syncStats),
-
-		// TODO: initialize actual signature request handler when warp is ready
-		signatureRequestHandler: &warpHandlers.NoopSignatureRequestHandler{},
+		signatureRequestHandler:      warpHandlers.NewSignatureRequestHandler(warpBackend, networkCodec, warpStats.NewStats()),
 	}
 }
 
