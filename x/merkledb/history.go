@@ -13,10 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-var (
-	ErrStartRootNotFound   = errors.New("start root is not before end root in history")
-	ErrInsufficientHistory = errors.New("insufficient history to generate change proof")
-)
+var ErrInsufficientHistory = errors.New("insufficient history to generate change proof")
 
 // stores previous trie states
 type trieHistory struct {

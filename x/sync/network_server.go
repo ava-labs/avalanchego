@@ -152,52 +152,74 @@ func (s *NetworkServer) HandleChangeProofRequest(
 		return nil // dropping request
 	}
 
-	// override limit if it is greater than maxKeyValuesLimit
+	// override limits if they exceed caps
 	keyLimit := req.KeyLimit
 	if keyLimit > maxKeyValuesLimit {
 		keyLimit = maxKeyValuesLimit
 	}
+
 	bytesLimit := int(req.BytesLimit)
 	if bytesLimit > maxByteSizeLimit {
 		bytesLimit = maxByteSizeLimit
 	}
 
-	// attempt to get a proof within the bytes limit
 	for keyLimit > 0 {
 		startRoot, err := ids.ToID(req.StartRootHash)
 		if err != nil {
 			return err
 		}
+
 		endRoot, err := ids.ToID(req.EndRootHash)
 		if err != nil {
 			return err
 		}
+
+		var (
+			response     *pb.SyncGetChangeProofResponse
+			numKeyValues int
+		)
 		changeProof, err := s.db.GetChangeProof(ctx, startRoot, endRoot, req.StartKey, req.EndKey, int(keyLimit))
-		if err != nil {
-			// handle expected errors so clients cannot cause servers to spam warning logs.
-			if errors.Is(err, merkledb.ErrInsufficientHistory) || errors.Is(err, merkledb.ErrStartRootNotFound) {
+		switch {
+		case err == nil:
+			response = &pb.SyncGetChangeProofResponse{
+				Response: &pb.SyncGetChangeProofResponse_ChangeProof{
+					ChangeProof: changeProof.ToProto(),
+				},
+			}
+			numKeyValues = len(changeProof.KeyChanges)
+		case !errors.Is(err, merkledb.ErrInsufficientHistory):
+			return err
+		default:
+			// [s.db] doesn't have sufficient history to generate change proof.
+			// Generate a range proof for the end root ID instead.
+			// TODO remove duplicate code
+			rangeProof, err := s.db.GetRangeProofAtRoot(ctx, endRoot, req.StartKey, req.EndKey, int(keyLimit))
+			if err != nil {
+				if !errors.Is(err, merkledb.ErrInsufficientHistory) {
+					return err
+				}
+
+				// Insufficient history to generate range proof or
+				// change proof. Drop request.
 				s.log.Debug(
-					"dropping invalid change proof request",
+					"insufficient history to generate range proof",
 					zap.Stringer("nodeID", nodeID),
 					zap.Uint32("requestID", requestID),
 					zap.Stringer("req", req),
 					zap.Error(err),
 				)
-				return nil // dropping request
+				return nil
 			}
-			return err
+
+			response = &pb.SyncGetChangeProofResponse{
+				Response: &pb.SyncGetChangeProofResponse_RangeProof{
+					RangeProof: rangeProof.ToProto(),
+				},
+			}
+			numKeyValues = len(rangeProof.KeyValues)
 		}
 
-		proofBytes, err := proto.Marshal(&pb.SyncGetChangeProofResponse{
-			// TODO: Remove [changeProof.HadRootsInHistory] and if
-			// this node is unable to serve a change proof because it has
-			// insufficient history, get a range proof and set [Response]
-			// to that range proof.
-			// When this change is made, the client must be updated accordingly.
-			Response: &pb.SyncGetChangeProofResponse_ChangeProof{
-				ChangeProof: changeProof.ToProto(),
-			},
-		})
+		proofBytes, err := proto.Marshal(response)
 		if err != nil {
 			return err
 		}
@@ -205,8 +227,9 @@ func (s *NetworkServer) HandleChangeProofRequest(
 		if len(proofBytes) < bytesLimit {
 			return s.appSender.SendAppResponse(ctx, nodeID, requestID, proofBytes)
 		}
-		// the proof size was too large, try to shrink it
-		keyLimit = uint32(len(changeProof.KeyChanges)) / 2
+
+		// The proof was too large. Try to shrink it.
+		keyLimit = uint32(numKeyValues) / 2
 	}
 	return ErrMinProofSizeIsTooLarge
 }
@@ -232,20 +255,23 @@ func (s *NetworkServer) HandleRangeProofRequest(
 		return nil // dropping request
 	}
 
-	// override limit if it is greater than maxKeyValuesLimit
+	// override limits if they exceed caps
 	keyLimit := req.KeyLimit
 	if keyLimit > maxKeyValuesLimit {
 		keyLimit = maxKeyValuesLimit
 	}
+
 	bytesLimit := int(req.BytesLimit)
 	if bytesLimit > maxByteSizeLimit {
 		bytesLimit = maxByteSizeLimit
 	}
+
+	root, err := ids.ToID(req.RootHash)
+	if err != nil {
+		return err
+	}
+
 	for keyLimit > 0 {
-		root, err := ids.ToID(req.RootHash)
-		if err != nil {
-			return err
-		}
 		rangeProof, err := s.db.GetRangeProofAtRoot(ctx, root, req.StartKey, req.EndKey, int(keyLimit))
 		if err != nil {
 			// handle expected errors so clients cannot cause servers to spam warning logs.
@@ -270,7 +296,8 @@ func (s *NetworkServer) HandleRangeProofRequest(
 		if len(proofBytes) < bytesLimit {
 			return s.appSender.SendAppResponse(ctx, nodeID, requestID, proofBytes)
 		}
-		// the proof size was too large, try to shrink it
+
+		// The proof was too large. Try to shrink it.
 		keyLimit = uint32(len(rangeProof.KeyValues)) / 2
 	}
 	return ErrMinProofSizeIsTooLarge

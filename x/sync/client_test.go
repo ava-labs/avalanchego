@@ -299,8 +299,8 @@ func TestGetRangeProof(t *testing.T) {
 
 func sendChangeRequest(
 	t *testing.T,
-	db DB,
-	verificationDB DB,
+	clientDB DB,
+	serverDB DB,
 	request *pb.SyncGetChangeProofRequest,
 	maxAttempts uint32,
 	modifyResponse func(*merkledb.ChangeProof),
@@ -315,7 +315,7 @@ func sendChangeRequest(
 	defer ctrl.Finish()
 
 	sender := common.NewMockSender(ctrl)
-	handler := NewNetworkServer(sender, db, logging.NoLog{})
+	handler := NewNetworkServer(sender, clientDB, logging.NoLog{})
 	clientNodeID, serverNodeID := ids.GenerateTestNodeID(), ids.GenerateTestNodeID()
 	networkClient := NewNetworkClient(sender, clientNodeID, 1, logging.NoLog{})
 	require.NoError(networkClient.Connected(context.Background(), serverNodeID, version.CurrentApp))
@@ -329,6 +329,7 @@ func sendChangeRequest(
 	deadline := time.Now().Add(1 * time.Hour) // enough time to complete a request
 	defer cancel()                            // avoid leaking a goroutine
 
+	// Expect client (clientDB) to send appRequest to server (serverDB)
 	expectedSendNodeIDs := set.NewSet[ids.NodeID](1)
 	expectedSendNodeIDs.Add(serverNodeID)
 	sender.EXPECT().SendAppRequest(
@@ -352,6 +353,8 @@ func sendChangeRequest(
 			return nil
 		},
 	).AnyTimes()
+
+	// Expect server (serverDB) to send app response to client (clientDB)
 	sender.EXPECT().SendAppResponse(
 		gomock.Any(), // ctx
 		clientNodeID,
@@ -363,20 +366,41 @@ func sendChangeRequest(
 			var responseProto pb.SyncGetChangeProofResponse
 			require.NoError(proto.Unmarshal(responseBytes, &responseProto))
 
-			var changeProof merkledb.ChangeProof
-			// TODO when the client/server support including range proofs in the response,
-			// this will need to be updated.
-			require.NoError(changeProof.UnmarshalProto(responseProto.GetChangeProof()))
+			if responseProto.GetChangeProof() != nil {
+				// Server responded with a change proof
+				var changeProof merkledb.ChangeProof
+				require.NoError(changeProof.UnmarshalProto(responseProto.GetChangeProof()))
 
-			// modify if needed
-			if modifyResponse != nil {
-				modifyResponse(&changeProof)
+				// modify if needed
+				if modifyResponse != nil {
+					modifyResponse(&changeProof)
+				}
+
+				// reserialize the response and pass it to the client to complete the handling.
+				responseBytes, err := proto.Marshal(&pb.SyncGetChangeProofResponse{
+					Response: &pb.SyncGetChangeProofResponse_ChangeProof{
+						ChangeProof: changeProof.ToProto(),
+					},
+				})
+				require.NoError(err)
+				require.NoError(networkClient.AppResponse(context.Background(), serverNodeID, requestID, responseBytes))
+				return nil
 			}
+
+			// Server responded with a range proof
+			var rangeProof merkledb.RangeProof
+			require.NoError(rangeProof.UnmarshalProto(responseProto.GetRangeProof()))
+
+			// TODO use or delete
+			// // modify if needed
+			// if modifyResponse != nil {
+			// 	modifyResponse(&rangeProof)
+			// }
 
 			// reserialize the response and pass it to the client to complete the handling.
 			responseBytes, err := proto.Marshal(&pb.SyncGetChangeProofResponse{
-				Response: &pb.SyncGetChangeProofResponse_ChangeProof{
-					ChangeProof: changeProof.ToProto(),
+				Response: &pb.SyncGetChangeProofResponse_RangeProof{
+					RangeProof: rangeProof.ToProto(),
 				},
 			})
 			require.NoError(err)
@@ -385,7 +409,7 @@ func sendChangeRequest(
 		},
 	).AnyTimes()
 
-	return client.GetChangeProof(ctx, request, verificationDB)
+	return client.GetChangeProof(ctx, request, serverDB)
 }
 
 func TestGetChangeProof(t *testing.T) {
@@ -544,6 +568,19 @@ func TestGetChangeProof(t *testing.T) {
 			},
 			expectedErr: merkledb.ErrInvalidProof,
 		},
+		"range proof response happy path": {
+			request: &pb.SyncGetChangeProofRequest{
+				// Server doesn't have the (non-existent) start root
+				// so should respond with range proof.
+				StartRootHash: ids.Empty[:],
+				EndRootHash:   endRoot[:],
+				KeyLimit:      defaultRequestKeyLimit,
+				BytesLimit:    defaultRequestByteSizeLimit,
+			},
+			modifyResponse:   nil,
+			expectedErr:      nil,
+			expectRangeProof: true,
+		},
 	}
 
 	for name, test := range tests {
@@ -572,8 +609,6 @@ func TestGetChangeProof(t *testing.T) {
 				}
 			}
 
-			// TODO when the client/server support including range proofs in the response,
-			// this will need to be updated.
 			var bytes []byte
 			if test.expectRangeProof {
 				bytes, err = proto.Marshal(&pb.SyncGetChangeProofResponse{
