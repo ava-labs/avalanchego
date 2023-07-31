@@ -197,8 +197,8 @@ func (vm *VM) Initialize(
 		registerer,
 		cache.NewSizedLRU[ids.ID, snowman.Block](
 			innerBlkCacheSize,
-			func(b snowman.Block) int {
-				return len(b.Bytes()) + pointerOverhead
+			func(_ ids.ID, b snowman.Block) int {
+				return ids.IDLen + len(b.Bytes()) + pointerOverhead
 			},
 		),
 	)

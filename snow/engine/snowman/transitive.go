@@ -98,8 +98,8 @@ func newTransitive(config Config) (*Transitive, error) {
 		config.Ctx.Registerer,
 		cache.NewSizedLRU[ids.ID, snowman.Block](
 			nonVerifiedCacheSize,
-			func(b snowman.Block) int {
-				return len(b.Bytes()) + pointerOverhead
+			func(_ ids.ID, b snowman.Block) int {
+				return ids.IDLen + len(b.Bytes()) + pointerOverhead
 			},
 		),
 	)

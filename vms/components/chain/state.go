@@ -144,18 +144,23 @@ func NewState(config *Config) *State {
 		verifiedBlocks: make(map[ids.ID]*BlockWrapper),
 		decidedBlocks: cache.NewSizedLRU[ids.ID, *BlockWrapper](
 			config.DecidedCacheSize,
-			func(bw *BlockWrapper) int {
-				return len(bw.Bytes()) + 2*pointerOverhead
+			func(_ ids.ID, bw *BlockWrapper) int {
+				return ids.IDLen + len(bw.Bytes()) + 2*pointerOverhead
 			},
 		),
 		missingBlocks: &cache.LRU[ids.ID, struct{}]{Size: config.MissingCacheSize},
 		unverifiedBlocks: cache.NewSizedLRU[ids.ID, *BlockWrapper](
 			config.UnverifiedCacheSize,
-			func(bw *BlockWrapper) int {
-				return len(bw.Bytes()) + 2*pointerOverhead
+			func(_ ids.ID, bw *BlockWrapper) int {
+				return ids.IDLen + len(bw.Bytes()) + 2*pointerOverhead
 			},
 		),
-		bytesToIDCache: &cache.LRU[string, ids.ID]{Size: config.BytesToIDCacheSize},
+		bytesToIDCache: cache.NewSizedLRU[string, ids.ID](
+			config.BytesToIDCacheSize,
+			func(blockBytes string, _ ids.ID) int {
+				return len(blockBytes) + ids.IDLen
+			},
+		),
 	}
 	c.initialize(config)
 	return c
@@ -170,8 +175,8 @@ func NewMeteredState(
 		registerer,
 		cache.NewSizedLRU[ids.ID, *BlockWrapper](
 			config.DecidedCacheSize,
-			func(bw *BlockWrapper) int {
-				return len(bw.Bytes()) + 2*pointerOverhead
+			func(_ ids.ID, bw *BlockWrapper) int {
+				return ids.IDLen + len(bw.Bytes()) + 2*pointerOverhead
 			},
 		),
 	)
@@ -191,8 +196,8 @@ func NewMeteredState(
 		registerer,
 		cache.NewSizedLRU[ids.ID, *BlockWrapper](
 			config.UnverifiedCacheSize,
-			func(bw *BlockWrapper) int {
-				return len(bw.Bytes()) + 2*pointerOverhead
+			func(_ ids.ID, bw *BlockWrapper) int {
+				return ids.IDLen + len(bw.Bytes()) + 2*pointerOverhead
 			},
 		),
 	)
@@ -202,7 +207,12 @@ func NewMeteredState(
 	bytesToIDCache, err := metercacher.New[string, ids.ID](
 		"bytes_to_id_cache",
 		registerer,
-		&cache.LRU[string, ids.ID]{Size: config.BytesToIDCacheSize},
+		cache.NewSizedLRU[string, ids.ID](
+			config.BytesToIDCacheSize,
+			func(blockBytes string, _ ids.ID) int {
+				return len(blockBytes) + ids.IDLen
+			},
+		),
 	)
 	if err != nil {
 		return nil, err

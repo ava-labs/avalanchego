@@ -67,7 +67,7 @@ const (
 	decidedCacheSize    = 256 * units.MiB
 	missingCacheSize    = 2048
 	unverifiedCacheSize = 64 * units.MiB
-	bytesToIDCacheSize  = 2048
+	bytesToIDCacheSize  = 64 * units.MiB
 )
 
 var (

@@ -54,11 +54,11 @@ func NewBlockState(db database.Database) BlockState {
 	return &blockState{
 		blkCache: cache.NewSizedLRU[ids.ID, *blockWrapper](
 			blockCacheSize,
-			func(bw *blockWrapper) int {
+			func(_ ids.ID, bw *blockWrapper) int {
 				if bw == nil {
-					return pointerOverhead
+					return ids.IDLen + pointerOverhead
 				}
-				return len(bw.Block) + wrappers.IntLen + 2*pointerOverhead
+				return ids.IDLen + len(bw.Block) + wrappers.IntLen + 2*pointerOverhead
 			},
 		),
 		db: db,
@@ -71,11 +71,11 @@ func NewMeteredBlockState(db database.Database, namespace string, metrics promet
 		metrics,
 		cache.NewSizedLRU[ids.ID, *blockWrapper](
 			blockCacheSize,
-			func(bw *blockWrapper) int {
+			func(_ ids.ID, bw *blockWrapper) int {
 				if bw == nil {
-					return pointerOverhead
+					return ids.IDLen + pointerOverhead
 				}
-				return len(bw.Block) + wrappers.IntLen + 2*pointerOverhead
+				return ids.IDLen + len(bw.Block) + wrappers.IntLen + 2*pointerOverhead
 			},
 		),
 	)
