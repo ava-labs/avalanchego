@@ -936,7 +936,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 		nil,
 	))
 	defer func() {
-		require.NoError(proVM.Shutdown(context.TODO()))
+		require.NoError(proVM.Shutdown(context.Background()))
 	}()
 
 	// Initialize shouldn't be called again

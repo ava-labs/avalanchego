@@ -13,7 +13,6 @@ var DefaultExecutionConfig = ExecutionConfig{
 	BlockCacheSize:               64 * units.MiB,
 	TxCacheSize:                  128 * units.MiB,
 	TransformedSubnetTxCacheSize: 4 * units.MiB,
-	ValidatorDiffsCacheSize:      2048,
 	RewardUTXOsCacheSize:         2048,
 	ChainCacheSize:               2048,
 	ChainDBCacheSize:             2048,
@@ -25,7 +24,6 @@ type ExecutionConfig struct {
 	BlockCacheSize               int  `json:"block-cache-size"`
 	TxCacheSize                  int  `json:"tx-cache-size"`
 	TransformedSubnetTxCacheSize int  `json:"transformed-subnet-tx-cache-size"`
-	ValidatorDiffsCacheSize      int  `json:"validator-diffs-cache-size"`
 	RewardUTXOsCacheSize         int  `json:"reward-utxos-cache-size"`
 	ChainCacheSize               int  `json:"chain-cache-size"`
 	ChainDBCacheSize             int  `json:"chain-db-cache-size"`
