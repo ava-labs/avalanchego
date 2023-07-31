@@ -19,9 +19,11 @@ import (
 )
 
 func TestAppRequestResponse(t *testing.T) {
+	handlerID := byte(0x0)
 	request := []byte("request")
 	response := []byte("response")
 	nodeID := ids.GenerateTestNodeID()
+	chainID := ids.GenerateTestID()
 
 	tests := []struct {
 		name        string
@@ -51,10 +53,34 @@ func TestAppRequestResponse(t *testing.T) {
 					})
 
 				callback := func(actualNodeID ids.NodeID, actualResponse []byte, err error) {
+					defer wg.Done()
+
 					require.NoError(t, err)
 					require.Equal(t, nodeID, actualNodeID)
 					require.Equal(t, response, actualResponse)
-					wg.Done()
+				}
+
+				require.NoError(t, client.AppRequest(context.Background(), set.Set[ids.NodeID]{nodeID: struct{}{}}, request, callback))
+			},
+		},
+		{
+			name: "app request failed",
+			requestFunc: func(t *testing.T, router *Router, client *Client, sender *common.MockSender, handler *mocks.MockHandler, wg *sync.WaitGroup) {
+				sender.EXPECT().SendAppRequest(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+					Do(func(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, request []byte) {
+						for range nodeIDs {
+							go func() {
+								require.NoError(t, router.AppRequestFailed(ctx, nodeID, requestID))
+							}()
+						}
+					})
+
+				callback := func(actualNodeID ids.NodeID, actualResponse []byte, err error) {
+					defer wg.Done()
+
+					require.Error(t, ErrAppRequestFailed)
+					require.Equal(t, nodeID, actualNodeID)
+					require.Nil(t, actualResponse)
 				}
 
 				require.NoError(t, client.AppRequest(context.Background(), set.Set[ids.NodeID]{nodeID: struct{}{}}, request, callback))
@@ -83,13 +109,53 @@ func TestAppRequestResponse(t *testing.T) {
 					})
 
 				callback := func(actualChainID ids.ID, actualResponse []byte, err error) {
+					defer wg.Done()
 					require.NoError(t, err)
 					require.Equal(t, chainID, actualChainID)
 					require.Equal(t, response, actualResponse)
-					wg.Done()
 				}
 
 				require.NoError(t, client.CrossChainAppRequest(context.Background(), chainID, request, callback))
+			},
+		},
+		{
+			name: "cross-chain app request failed",
+			requestFunc: func(t *testing.T, router *Router, client *Client, sender *common.MockSender, handler *mocks.MockHandler, wg *sync.WaitGroup) {
+				sender.EXPECT().SendCrossChainAppRequest(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+					Do(func(ctx context.Context, chainID ids.ID, requestID uint32, request []byte) {
+						go func() {
+							require.NoError(t, router.CrossChainAppRequestFailed(ctx, chainID, requestID))
+						}()
+					})
+
+				callback := func(actualChainID ids.ID, actualResponse []byte, err error) {
+					defer wg.Done()
+
+					require.Error(t, ErrAppRequestFailed)
+					require.Equal(t, chainID, actualChainID)
+					require.Nil(t, actualResponse)
+				}
+
+				require.NoError(t, client.CrossChainAppRequest(context.Background(), chainID, request, callback))
+			},
+		},
+		{
+			name: "app gossip",
+			requestFunc: func(t *testing.T, router *Router, client *Client, sender *common.MockSender, handler *mocks.MockHandler, wg *sync.WaitGroup) {
+				sender.EXPECT().SendAppGossip(gomock.Any(), gomock.Any()).
+					Do(func(ctx context.Context, gossip []byte) {
+						go func() {
+							require.NoError(t, router.AppGossip(ctx, nodeID, gossip))
+						}()
+					}).AnyTimes()
+				handler.EXPECT().
+					AppGossip(context.Background(), nodeID, request).
+					DoAndReturn(func(context.Context, ids.NodeID, []byte) error {
+						defer wg.Done()
+						return nil
+					})
+
+				require.NoError(t, client.AppGossip(context.Background(), request))
 			},
 		},
 	}
@@ -103,7 +169,7 @@ func TestAppRequestResponse(t *testing.T) {
 			handler := mocks.NewMockHandler(ctrl)
 			router := NewRouter(sender)
 
-			client, err := router.RegisterAppProtocol(0x1, handler)
+			client, err := router.RegisterAppProtocol(handlerID, handler)
 			require.NoError(err)
 
 			wg := &sync.WaitGroup{}
@@ -114,31 +180,80 @@ func TestAppRequestResponse(t *testing.T) {
 	}
 }
 
-func TestAppRequestDroppedMessage(t *testing.T) {
+func TestRouterDropMessage(t *testing.T) {
+	unregistered := byte(0x0)
+
 	tests := []struct {
 		name        string
 		requestFunc func(router *Router) error
+		err         error
 	}{
 		{
 			name: "drop unregistered app request message",
 			requestFunc: func(router *Router) error {
-				return router.AppRequest(context.Background(), ids.GenerateTestNodeID(), 0, time.Time{}, []byte{0x1})
+				return router.AppRequest(context.Background(), ids.GenerateTestNodeID(), 0, time.Time{}, []byte{unregistered})
 			},
+			err: ErrUnregisteredHandler,
+		},
+		{
+			name: "drop empty app request message",
+			requestFunc: func(router *Router) error {
+				return router.AppRequest(context.Background(), ids.GenerateTestNodeID(), 0, time.Time{}, []byte{})
+			},
+			err: ErrUnregisteredHandler,
 		},
 		{
 			name: "drop unregistered cross-chain app request message",
 			requestFunc: func(router *Router) error {
-				return router.CrossChainAppRequest(context.Background(), ids.GenerateTestID(), 0, time.Time{}, []byte{0x1})
+				return router.CrossChainAppRequest(context.Background(), ids.GenerateTestID(), 0, time.Time{}, []byte{unregistered})
 			},
+			err: ErrUnregisteredHandler,
+		},
+		{
+			name: "drop empty cross-chain app request message",
+			requestFunc: func(router *Router) error {
+				return router.CrossChainAppRequest(context.Background(), ids.GenerateTestID(), 0, time.Time{}, []byte{})
+			},
+			err: ErrUnregisteredHandler,
+		},
+		{
+			name: "drop unregistered gossip message",
+			requestFunc: func(router *Router) error {
+				return router.AppGossip(context.Background(), ids.GenerateTestNodeID(), []byte{unregistered})
+			},
+			err: ErrUnregisteredHandler,
+		},
+		{
+			name: "drop empty gossip message",
+			requestFunc: func(router *Router) error {
+				return router.AppGossip(context.Background(), ids.GenerateTestNodeID(), []byte{})
+			},
+			err: ErrUnregisteredHandler,
+		},
+		{
+			name: "drop unrequested app response failed",
+			requestFunc: func(router *Router) error {
+				return router.AppRequestFailed(context.Background(), ids.GenerateTestNodeID(), 0)
+			},
+			err: ErrUnrequestedResponse,
+		},
+		{
+			name: "drop unrequested cross-chain response",
+			requestFunc: func(router *Router) error {
+				return router.CrossChainAppRequestFailed(context.Background(), ids.GenerateTestID(), 0)
+			},
+			err: ErrUnrequestedResponse,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+
 			router := NewRouter(nil)
 
 			err := tt.requestFunc(router)
-			require.ErrorIs(t, err, ErrUnregisteredHandler)
+			require.ErrorIs(err, tt.err)
 		})
 	}
 }
@@ -190,4 +305,82 @@ func TestAppRequestDuplicateRequestIDs(t *testing.T) {
 	require.ErrorIs(err, ErrRequestPending)
 
 	timeout.Done()
+}
+
+func TestRouterConnected(t *testing.T) {
+	tests := []struct {
+		name       string
+		connect    []ids.NodeID
+		disconnect []ids.NodeID
+	}{
+		{
+			name: "empty",
+		},
+		{
+			name: "connect and disconnect",
+			connect: []ids.NodeID{
+				{0x0},
+			},
+			disconnect: []ids.NodeID{
+				{0x0},
+			},
+		},
+		{
+			name: "two nodes connect",
+			connect: []ids.NodeID{
+				{0x0, 0x1},
+			},
+		},
+		{
+			name: "two nodes connect, last one disconnects",
+			connect: []ids.NodeID{
+				{0x0, 0x1},
+			},
+			disconnect: []ids.NodeID{
+				{0x1},
+			},
+		},
+		{
+			name: "two nodes connect, first one disconnects",
+			connect: []ids.NodeID{
+				{0x0, 0x1},
+			},
+			disconnect: []ids.NodeID{
+				{0x0},
+			},
+		},
+		{
+			name: "two nodes connect and disconnect",
+			connect: []ids.NodeID{
+				{0x0, 0x1},
+			},
+			disconnect: []ids.NodeID{
+				{0x0, 0x1},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+			router := NewRouter(nil)
+
+			expected := set.Set[ids.NodeID]{}
+
+			for _, connect := range tt.connect {
+				expected.Add(connect)
+				require.NoError(router.Connected(context.Background(), connect, nil))
+			}
+
+			for _, disconnect := range tt.disconnect {
+				expected.Remove(disconnect)
+				require.NoError(router.Disconnected(context.Background(), disconnect))
+			}
+
+			require.Len(router.peers, len(expected))
+			for peer := range router.peers {
+				require.Contains(expected, peer)
+			}
+		})
+	}
 }
