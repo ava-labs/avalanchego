@@ -15,7 +15,7 @@ import (
 
 var (
 	ErrStartRootNotFound   = errors.New("start root is not before end root in history")
-	ErrInsufficientHistory = errors.New("root id is not present in history")
+	ErrInsufficientHistory = errors.New("insufficient history to generate change proof")
 )
 
 // stores previous trie states
