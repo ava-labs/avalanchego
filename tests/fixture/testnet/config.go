@@ -38,6 +38,7 @@ var (
 	errMissingBalancesForGenesis   = errors.New("no genesis balances given")
 	errMissingTLSKeyForNodeID      = fmt.Errorf("failed to ensure node ID: missing value for %q", cfg.StakingTLSKeyContentKey)
 	errMissingCertForNodeID        = fmt.Errorf("failed to ensure node ID: missing value for %q", cfg.StakingCertContentKey)
+	errInvalidKeypair              = fmt.Errorf("%q and %q must be provided together or not at all", cfg.StakingTLSKeyContentKey, cfg.StakingCertContentKey)
 )
 
 // Defines a mapping of flag keys to values intended to be supplied to
@@ -101,7 +102,7 @@ func (c *NetworkConfig) EnsureGenesis(networkID uint32, validatorIDs []ids.NodeI
 	for _, key := range c.FundedKeys {
 		xChainBalances = append(xChainBalances, AddrAndBalance{
 			key.Address(),
-			30 * units.MegaAvax,
+			30 * units.MegaAvax, // Arbitrary large amount to support testing
 		})
 	}
 
@@ -144,13 +145,17 @@ func (nc *NodeConfig) SetNetworkingConfigDefaults(
 	nc.Flags.SetDefaults(startDefaults)
 }
 
-// Ensures staking and signing keys are generated if not already present.
+// Ensures staking and signing keys are generated if not already present and
+// that the node ID (derived from the staking keypair) is set.
 func (nc *NodeConfig) EnsureKeys() error {
-	err := nc.EnsureBLSSigningKey()
-	if err != nil {
+	if err := nc.EnsureBLSSigningKey(); err != nil {
 		return err
 	}
-	return nc.EnsureStakingKeypair()
+	if err := nc.EnsureStakingKeypair(); err != nil {
+		return err
+	}
+	// Once a staking keypair is guaranteed it is safe to derive the node ID
+	return nc.EnsureNodeID()
 }
 
 // Ensures a BLS signing key is generated if not already present.
@@ -174,7 +179,7 @@ func (nc *NodeConfig) EnsureBLSSigningKey() error {
 	return nil
 }
 
-// Ensures a staking keypair is generated if not already present and that the node ID is set.
+// Ensures a staking keypair is generated if not already present.
 func (nc *NodeConfig) EnsureStakingKeypair() error {
 	keyKey := cfg.StakingTLSKeyContentKey
 	certKey := cfg.StakingCertContentKey
@@ -199,7 +204,7 @@ func (nc *NodeConfig) EnsureStakingKeypair() error {
 		nc.Flags[certKey] = base64.StdEncoding.EncodeToString(tlsCertBytes)
 	} else if len(key) == 0 || len(cert) == 0 {
 		// Only one of key and cert was provided
-		return fmt.Errorf("%q and %q must be provided together or not at all", keyKey, certKey)
+		return errInvalidKeypair
 	}
 
 	err = nc.EnsureNodeID()
