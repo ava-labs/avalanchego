@@ -79,9 +79,9 @@ func (c *sizedLRU[K, V]) put(key K, value V) {
 
 	// Remove elements until the size of elements in the cache <= [c.maxSize].
 	for c.currentSize > c.maxSize-newEntrySize {
-		oldestKey, value, _ := c.elements.Oldest()
+		oldestKey, oldestValue, _ := c.elements.Oldest()
 		c.elements.Delete(oldestKey)
-		c.currentSize -= c.size(key, value)
+		c.currentSize -= c.size(oldestKey, oldestValue)
 	}
 
 	c.elements.Put(key, value)
