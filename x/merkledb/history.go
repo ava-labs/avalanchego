@@ -78,9 +78,15 @@ func newTrieHistory(maxHistoryLookback int) *trieHistory {
 
 // Returns up to [maxLength] key-value pair changes with keys in
 // [start, end] that occurred between [startRoot] and [endRoot].
-// Returns ErrInsufficientHistory if the history is insufficient
+// Returns [ErrInsufficientHistory] if the history is insufficient
 // to generate the proof.
-func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start, end []byte, maxLength int) (*changeSummary, error) {
+func (th *trieHistory) getValueChanges(
+	startRoot ids.ID,
+	endRoot ids.ID,
+	start []byte,
+	end []byte,
+	maxLength int,
+) (*changeSummary, error) {
 	if maxLength <= 0 {
 		return nil, fmt.Errorf("%w but was %d", ErrInvalidMaxLength, maxLength)
 	}
