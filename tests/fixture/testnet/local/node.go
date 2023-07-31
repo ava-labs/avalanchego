@@ -27,7 +27,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/perms"
 )
 
-var errProcessNotRunning = errors.New("process not running")
+var (
+	errProcessNotRunning  = errors.New("process not running")
+	errNodeAlreadyRunning = errors.New("failed to start local node: node is already running")
+)
 
 // Defines local-specific node configuration. Supports setting default
 // and node-specific values.
@@ -163,6 +166,15 @@ func (n *LocalNode) ReadAll() error {
 }
 
 func (n *LocalNode) Start(w io.Writer, defaultExecPath string) error {
+	// Avoid attempting to start an already running node.
+	proc, err := n.GetProcess()
+	if err != nil {
+		return fmt.Errorf("failed to start local node: %w", err)
+	}
+	if proc != nil {
+		return errNodeAlreadyRunning
+	}
+
 	// Ensure a stale process context file is removed so that the
 	// creation of a new file can indicate node start.
 	if err := os.Remove(n.GetProcessContextPath()); err != nil && !errors.Is(err, fs.ErrNotExist) {
@@ -187,6 +199,13 @@ func (n *LocalNode) Start(w io.Writer, defaultExecPath string) error {
 		}
 		_, _ = fmt.Fprintf(w, "node %q exited\n", n.NodeID)
 	}()
+
+	// A node writes a process context file on start. If the file is not
+	// found in a reasonable amount of time, the node is unlikely to have
+	// started successfully.
+	if err := n.WaitForProcessContext(context.Background()); err != nil {
+		return fmt.Errorf("failed to start local node: %w", err)
+	}
 
 	if _, err := fmt.Fprintf(w, "Started %s\n", n.NodeID); err != nil {
 		return err

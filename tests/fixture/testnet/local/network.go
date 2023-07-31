@@ -329,7 +329,7 @@ func (ln *LocalNetwork) Start(w io.Writer) error {
 
 	// Configure networking and start each node
 	for i, node := range ln.Nodes {
-		// Update network configuration and write to disk
+		// Update network configuration
 		var (
 			httpPort    uint16
 			stakingPort uint16
@@ -345,18 +345,16 @@ func (ln *LocalNetwork) Start(w io.Writer) error {
 			return err
 		}
 
+		// Start waits for the process context to be written which
+		// indicates that the node will be accepting connections on
+		// its staking port. The network will start faster with this
+		// synchronization due to the avoidance of exponential backoff
+		// if a node tries to connect to a beacon that is not ready.
 		if err := node.Start(w, ln.ExecPath); err != nil {
 			return err
 		}
 
-		// Waiting for the process context ensures the node is accepting
-		// connections on its staking port. The network will start faster with
-		// this synchronization due to the avoidance of exponential backoff if a
-		// node tries to connect to a beacon that is not ready.
-		if err := node.WaitForProcessContext(context.Background()); err != nil {
-			return err
-		}
-
+		// Collect bootstrap nodes for subsequently started nodes to use
 		bootstrapIDs = append(bootstrapIDs, node.NodeID.String())
 		bootstrapIPs = append(bootstrapIPs, node.StakingAddress)
 	}
