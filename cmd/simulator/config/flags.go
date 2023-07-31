@@ -13,7 +13,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-const Version = "v0.1.0"
+const Version = "v0.1.1"
 
 const (
 	ConfigFilePathKey = "config-file"
@@ -27,6 +27,7 @@ const (
 	VersionKey        = "version"
 	TimeoutKey        = "timeout"
 	BatchSizeKey      = "batch-size"
+	MetricsPortKey    = "metrics-port"
 )
 
 var (
@@ -44,6 +45,7 @@ type Config struct {
 	KeyDir       string        `json:"key-dir"`
 	Timeout      time.Duration `json:"timeout"`
 	BatchSize    uint64        `json:"batch-size"`
+	MetricsPort  uint64        `json:"metrics-port"`
 }
 
 func BuildConfig(v *viper.Viper) (Config, error) {
@@ -56,6 +58,7 @@ func BuildConfig(v *viper.Viper) (Config, error) {
 		KeyDir:       v.GetString(KeyDirKey),
 		Timeout:      v.GetDuration(TimeoutKey),
 		BatchSize:    v.GetUint64(BatchSizeKey),
+		MetricsPort:  v.GetUint64(MetricsPortKey),
 	}
 	if len(c.Endpoints) == 0 {
 		return c, ErrNoEndpoints
@@ -118,4 +121,5 @@ func addSimulatorFlags(fs *pflag.FlagSet) {
 	fs.Duration(TimeoutKey, 5*time.Minute, "Specify the timeout for the simulator to complete (0 indicates no timeout)")
 	fs.String(LogLevelKey, "info", "Specify the log level to use in the simulator")
 	fs.Uint64(BatchSizeKey, 100, "Specify the batchsize for the worker to issue and confirm txs")
+	fs.Uint64(MetricsPortKey, 8082, "Specify the port to use for the metrics server")
 }

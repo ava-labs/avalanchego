@@ -388,7 +388,7 @@ func (ec *client) SubscribeNewAcceptedTransactions(ctx context.Context, ch chan<
 	return ec.c.EthSubscribe(ctx, ch, "newAcceptedTransactions")
 }
 
-// SubscribeNewAcceptedTransactions subscribes to notifications about the accepted transaction hashes on the given channel.
+// SubscribeNewPendingTransactions subscribes to notifications about the pending transaction hashes on the given channel.
 func (ec *client) SubscribeNewPendingTransactions(ctx context.Context, ch chan<- *common.Hash) (interfaces.Subscription, error) {
 	return ec.c.EthSubscribe(ctx, ch, "newPendingTransactions")
 }
