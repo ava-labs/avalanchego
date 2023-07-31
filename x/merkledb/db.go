@@ -78,7 +78,6 @@ type ChangeProofer interface {
 	//   - When the keys in [proof.KeyValues] are added to [db] and the keys in [proof.DeletedKeys]
 	//     are removed from [db], the root ID of [db] is [expectedEndRootID].
 	//
-	// Assumes [db.lock] isn't held.
 	// This is defined on Database instead of ChangeProof because it accesses
 	// database internals.
 	VerifyChangeProof(
@@ -951,6 +950,7 @@ func (*merkleDB) CommitToDB(context.Context) error {
 	return nil
 }
 
+// Assumes [db.lock] isn't held.
 func (db *merkleDB) VerifyChangeProof(
 	ctx context.Context,
 	proof *ChangeProof,
