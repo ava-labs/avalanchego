@@ -3,7 +3,18 @@
 
 package utils
 
-var (
+import "time"
+
+const (
+	// Timeout to boot the AvalancheGo node
+	BootAvalancheNodeTimeout = 5 * time.Minute
+
+	// Timeout for the health API to check the AvalancheGo is ready
+	HealthCheckTimeout = 5 * time.Second
+
 	DefaultLocalNodeURI = "http://127.0.0.1:9650"
-	NodeURIs            = []string{DefaultLocalNodeURI, "http://127.0.0.1:9652", "http://127.0.0.1:9654", "http://127.0.0.1:9656", "http://127.0.0.1:9658"}
+)
+
+var (
+	NodeURIs = []string{DefaultLocalNodeURI, "http://127.0.0.1:9652", "http://127.0.0.1:9654", "http://127.0.0.1:9656", "http://127.0.0.1:9658"}
 )

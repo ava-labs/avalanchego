@@ -8,9 +8,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
+	"path/filepath"
+	"strings"
+	"sync"
 	"time"
 
+	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
@@ -18,32 +21,91 @@ import (
 	wallet "github.com/ava-labs/avalanchego/wallet/subnet/primary"
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/plugin/evm"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/go-cmd/cmd"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
-// RunTestCMD runs a given test command with the given rpcURI
-// It also waits for the test ping to succeed before running the test command
-func RunTestCMD(testCMD *exec.Cmd, rpcURI string) {
-	log.Info("Sleeping to wait for test ping", "rpcURI", rpcURI)
-	client, err := NewEvmClient(rpcURI, 225, 2)
-	gomega.Expect(err).Should(gomega.BeNil())
+type SubnetSuite struct {
+	blockchainIDs map[string]string
+	lock          sync.RWMutex
+}
 
-	bal, err := client.FetchBalance(context.Background(), common.HexToAddress(""))
-	gomega.Expect(err).Should(gomega.BeNil())
-	gomega.Expect(bal.Cmp(common.Big0)).Should(gomega.Equal(0))
+func (s *SubnetSuite) GetBlockchainID(alias string) string {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	return s.blockchainIDs[alias]
+}
 
-	err = os.Setenv("RPC_URI", rpcURI)
-	gomega.Expect(err).Should(gomega.BeNil())
-	log.Info("Running test command", "cmd", testCMD.String())
+func (s *SubnetSuite) SetBlockchainIDs(blockchainIDs map[string]string) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	s.blockchainIDs = blockchainIDs
+}
 
-	out, err := testCMD.CombinedOutput()
-	fmt.Printf("\nCombined output:\n\n%s\n", string(out))
-	if err != nil {
-		fmt.Printf("\nErr: %s\n", err.Error())
-	}
-	gomega.Expect(err).Should(gomega.BeNil())
+// CreateSubnetsSuite creates subnets for given [genesisFiles], and registers a before suite that starts an AvalancheGo process to use for the e2e tests.
+// genesisFiles is a map of test aliases to genesis file paths.
+func CreateSubnetsSuite(genesisFiles map[string]string) *SubnetSuite {
+	// Keep track of the AvalancheGo external bash script, it is null for most
+	// processes except the first process that starts AvalancheGo
+	var startCmd *cmd.Cmd
+
+	// This is used to pass the blockchain IDs from the SynchronizedBeforeSuite() to the tests
+	var globalSuite SubnetSuite
+
+	// Our test suite runs in separate processes, ginkgo has
+	// SynchronizedBeforeSuite() which runs once, and its return value is passed
+	// over to each worker.
+	//
+	// Here an AvalancheGo node instance is started, and subnets are created for
+	// each test case. Each test case has its own subnet, therefore all tests
+	// can run in parallel without any issue.
+	//
+	var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
+		ctx, cancel := context.WithTimeout(context.Background(), BootAvalancheNodeTimeout)
+		defer cancel()
+
+		wd, err := os.Getwd()
+		gomega.Expect(err).Should(gomega.BeNil())
+		log.Info("Starting AvalancheGo node", "wd", wd)
+		cmd, err := RunCommand("./scripts/run.sh")
+		startCmd = cmd
+		gomega.Expect(err).Should(gomega.BeNil())
+
+		// Assumes that startCmd will launch a node with HTTP Port at [utils.DefaultLocalNodeURI]
+		healthClient := health.NewClient(DefaultLocalNodeURI)
+		healthy, err := health.AwaitReady(ctx, healthClient, HealthCheckTimeout, nil)
+		gomega.Expect(err).Should(gomega.BeNil())
+		gomega.Expect(healthy).Should(gomega.BeTrue())
+		log.Info("AvalancheGo node is healthy")
+
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		blockchainIDs := make(map[string]string)
+		for alias, file := range genesisFiles {
+			blockchainIDs[alias] = CreateNewSubnet(ctx, file)
+		}
+
+		blockchainIDsBytes, err := json.Marshal(blockchainIDs)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		return blockchainIDsBytes
+	}, func(ctx ginkgo.SpecContext, data []byte) {
+		blockchainIDs := make(map[string]string)
+		err := json.Unmarshal(data, &blockchainIDs)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+		globalSuite.SetBlockchainIDs(blockchainIDs)
+	})
+
+	// SynchronizedAfterSuite() takes two functions, the first runs after each test suite is done and the second
+	// function is executed once when all the tests are done. This function is used
+	// to gracefully shutdown the AvalancheGo node.
+	var _ = ginkgo.SynchronizedAfterSuite(func() {}, func() {
+		gomega.Expect(startCmd).ShouldNot(gomega.BeNil())
+		gomega.Expect(startCmd.Stop()).Should(gomega.BeNil())
+	})
+
+	return &globalSuite
 }
 
 // CreateNewSubnet creates a new subnet and Subnet-EVM blockchain with the given genesis file.
@@ -105,25 +167,16 @@ func GetDefaultChainURI(blockchainID string) string {
 	return fmt.Sprintf("%s/ext/bc/%s/rpc", DefaultLocalNodeURI, blockchainID)
 }
 
-// RunDefaultHardhatTests runs the hardhat tests on a given blockchain ID
-// with default parameters. Default parameters are:
-// 1. Hardhat contract environment is located at ./contracts
-// 2. Hardhat test file is located at ./contracts/test/<test>.ts
-// 3. npx is available in the ./contracts directory
-func RunDefaultHardhatTests(ctx context.Context, blockchainID string, test string) {
-	chainURI := GetDefaultChainURI(blockchainID)
-	log.Info(
-		"Executing HardHat tests on a new blockchain",
-		"blockchainID", blockchainID,
-		"test", test,
-		"ChainURI", chainURI,
-	)
-
-	cmdPath := "./contracts"
-	// test path is relative to the cmd path
-	testPath := fmt.Sprintf("./test/%s.ts", test)
-	cmd := exec.Command("npx", "hardhat", "test", testPath, "--network", "local")
-	cmd.Dir = cmdPath
-
-	RunTestCMD(cmd, chainURI)
+// GetFilesAndAliases returns a map of aliases to file paths in given [dir].
+func GetFilesAndAliases(dir string) (map[string]string, error) {
+	files, err := filepath.Glob(dir)
+	if err != nil {
+		return nil, err
+	}
+	aliasesToFiles := make(map[string]string)
+	for _, file := range files {
+		alias := strings.TrimSuffix(filepath.Base(file), filepath.Ext(file))
+		aliasesToFiles[alias] = file
+	}
+	return aliasesToFiles, nil
 }

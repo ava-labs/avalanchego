@@ -5,10 +5,9 @@ package utils
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -18,22 +17,6 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
-
-const (
-	// Timeout to boot the AvalancheGo node
-	bootAvalancheNodeTimeout = 5 * time.Minute
-
-	// Timeout for the health API to check the AvalancheGo is ready
-	healthCheckTimeout = 5 * time.Second
-)
-
-// At boot time subnets are created, one for each test suite. This global
-// variable has all the subnets IDs that can be used.
-//
-// One process creates the AvalancheGo node and all the subnets, and these
-// subnets IDs are passed to all other processes and stored in this global
-// variable
-var BlockchainIDs map[string]string
 
 // RunCommand starts the command [bin] with the given [args] and returns the command to the caller
 // TODO cmd package mentions we can do this more efficiently with cmd.NewCmdOptions rather than looping
@@ -76,22 +59,13 @@ func RegisterPingTest() {
 	})
 }
 
+// RegisterNodeRun registers a before suite that starts an AvalancheGo process to use for the e2e tests
+// and an after suite that stops the AvalancheGo process
 func RegisterNodeRun() {
-	// Keep track of the AvalancheGo external bash script, it is null for most
-	// processes except the first process that starts AvalancheGo
+	// BeforeSuite starts an AvalancheGo process to use for the e2e tests
 	var startCmd *cmd.Cmd
-
-	// Our test suite runs in separate processes, ginkgo has
-	// SynchronizedBeforeSuite() which runs once, and its return value is passed
-	// over to each worker.
-	//
-	// Here an AvalancheGo node instance is started, and subnets are created for
-	// each test case. Each test case has its own subnet, therefore all tests
-	// can run in parallel without any issue.
-	//
-	// This function also compiles all the solidity contracts
-	var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
-		ctx, cancel := context.WithTimeout(context.Background(), bootAvalancheNodeTimeout)
+	_ = ginkgo.BeforeSuite(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 		defer cancel()
 
 		wd, err := os.Getwd()
@@ -103,34 +77,40 @@ func RegisterNodeRun() {
 
 		// Assumes that startCmd will launch a node with HTTP Port at [utils.DefaultLocalNodeURI]
 		healthClient := health.NewClient(DefaultLocalNodeURI)
-		healthy, err := health.AwaitReady(ctx, healthClient, healthCheckTimeout, nil)
+		healthy, err := health.AwaitReady(ctx, healthClient, HealthCheckTimeout, nil)
 		gomega.Expect(err).Should(gomega.BeNil())
 		gomega.Expect(healthy).Should(gomega.BeTrue())
 		log.Info("AvalancheGo node is healthy")
-
-		blockchainIds := make(map[string]string)
-		files, err := filepath.Glob("./tests/precompile/genesis/*.json")
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-		for _, file := range files {
-			basename := filepath.Base(file)
-			index := basename[:len(basename)-5]
-			blockchainIds[index] = CreateNewSubnet(ctx, file)
-		}
-
-		blockchainIDsBytes, err := json.Marshal(blockchainIds)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		return blockchainIDsBytes
-	}, func(data []byte) {
-		err := json.Unmarshal(data, &BlockchainIDs)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	})
 
-	// SynchronizedAfterSuite() takes two functions, the first runs after each test suite is done and the second
-	// function is executed once when all the tests are done. This function is used
-	// to gracefully shutdown the AvalancheGo node.
-	var _ = ginkgo.SynchronizedAfterSuite(func() {}, func() {
+	ginkgo.AfterSuite(func() {
 		gomega.Expect(startCmd).ShouldNot(gomega.BeNil())
 		gomega.Expect(startCmd.Stop()).Should(gomega.BeNil())
+		// TODO add a new node to bootstrap off of the existing node and ensure it can bootstrap all subnets
+		// created during the test
 	})
+}
+
+// RunDefaultHardhatTests runs the hardhat tests in the given [testPath] on the blockchain with [blockchainID]
+// [execPath] is the path where the test command is executed
+func RunHardhatTests(ctx context.Context, blockchainID string, execPath string, testPath string) {
+	chainURI := GetDefaultChainURI(blockchainID)
+	log.Info(
+		"Executing HardHat tests on blockchain",
+		"blockchainID", blockchainID,
+		"testPath", testPath,
+		"ChainURI", chainURI,
+	)
+
+	cmd := exec.Command("npx", "hardhat", "test", testPath, "--network", "local")
+	cmd.Dir = execPath
+
+	log.Info("Sleeping to wait for test ping", "rpcURI", chainURI)
+	err := os.Setenv("RPC_URI", chainURI)
+	gomega.Expect(err).Should(gomega.BeNil())
+	log.Info("Running test command", "cmd", cmd.String())
+
+	out, err := cmd.CombinedOutput()
+	fmt.Printf("\nCombined output:\n\n%s\n", string(out))
+	gomega.Expect(err).Should(gomega.BeNil())
 }
