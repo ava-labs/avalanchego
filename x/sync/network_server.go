@@ -163,73 +163,68 @@ func (s *NetworkServer) HandleChangeProofRequest(
 		bytesLimit = maxByteSizeLimit
 	}
 
+	startRoot, err := ids.ToID(req.StartRootHash)
+	if err != nil {
+		return err
+	}
+
+	endRoot, err := ids.ToID(req.EndRootHash)
+	if err != nil {
+		return err
+	}
+
 	for keyLimit > 0 {
-		startRoot, err := ids.ToID(req.StartRootHash)
-		if err != nil {
-			return err
-		}
-
-		endRoot, err := ids.ToID(req.EndRootHash)
-		if err != nil {
-			return err
-		}
-
-		var (
-			response     *pb.SyncGetChangeProofResponse
-			numKeyValues int
-		)
 		changeProof, err := s.db.GetChangeProof(ctx, startRoot, endRoot, req.StartKey, req.EndKey, int(keyLimit))
-		switch {
-		case err == nil:
-			response = &pb.SyncGetChangeProofResponse{
-				Response: &pb.SyncGetChangeProofResponse_ChangeProof{
-					ChangeProof: changeProof.ToProto(),
-				},
+		if err != nil {
+			if !errors.Is(err, merkledb.ErrInsufficientHistory) {
+				return err
 			}
-			numKeyValues = len(changeProof.KeyChanges)
-		case !errors.Is(err, merkledb.ErrInsufficientHistory):
-			return err
-		default:
+
 			// [s.db] doesn't have sufficient history to generate change proof.
 			// Generate a range proof for the end root ID instead.
-			// TODO remove duplicate code
-			rangeProof, err := s.db.GetRangeProofAtRoot(ctx, endRoot, req.StartKey, req.EndKey, int(keyLimit))
-			if err != nil {
-				if !errors.Is(err, merkledb.ErrInsufficientHistory) {
-					return err
-				}
-
-				// Insufficient history to generate range proof or
-				// change proof. Drop request.
-				s.log.Debug(
-					"insufficient history to generate range proof",
-					zap.Stringer("nodeID", nodeID),
-					zap.Uint32("requestID", requestID),
-					zap.Stringer("req", req),
-					zap.Error(err),
-				)
-				return nil
-			}
-
-			response = &pb.SyncGetChangeProofResponse{
-				Response: &pb.SyncGetChangeProofResponse_RangeProof{
-					RangeProof: rangeProof.ToProto(),
+			proofBytes, err := getRangeProof(
+				ctx,
+				s.db,
+				&pb.SyncGetRangeProofRequest{
+					RootHash:   req.EndRootHash,
+					StartKey:   req.StartKey,
+					EndKey:     req.EndKey,
+					KeyLimit:   req.KeyLimit,
+					BytesLimit: req.BytesLimit,
 				},
+				func(rangeProof *merkledb.RangeProof) ([]byte, error) {
+					return proto.Marshal(&pb.SyncGetChangeProofResponse{
+						Response: &pb.SyncGetChangeProofResponse_RangeProof{
+							RangeProof: rangeProof.ToProto(),
+						},
+					})
+				},
+			)
+			if err != nil {
+				return err
 			}
-			numKeyValues = len(rangeProof.KeyValues)
+
+			// TODO handle this fatal error
+			return s.appSender.SendAppResponse(ctx, nodeID, requestID, proofBytes)
 		}
 
-		proofBytes, err := proto.Marshal(response)
+		// We generated a change proof. See if it's small enough.
+		proofBytes, err := proto.Marshal(&pb.SyncGetChangeProofResponse{
+			Response: &pb.SyncGetChangeProofResponse_ChangeProof{
+				ChangeProof: changeProof.ToProto(),
+			},
+		})
 		if err != nil {
 			return err
 		}
 
 		if len(proofBytes) < bytesLimit {
+			// TODO handle this fatal error
 			return s.appSender.SendAppResponse(ctx, nodeID, requestID, proofBytes)
 		}
 
 		// The proof was too large. Try to shrink it.
-		keyLimit = uint32(numKeyValues) / 2
+		keyLimit = uint32(keyLimit) / 2
 	}
 	return ErrMinProofSizeIsTooLarge
 }
@@ -256,51 +251,76 @@ func (s *NetworkServer) HandleRangeProofRequest(
 	}
 
 	// override limits if they exceed caps
-	keyLimit := req.KeyLimit
-	if keyLimit > maxKeyValuesLimit {
-		keyLimit = maxKeyValuesLimit
+	if req.KeyLimit > maxKeyValuesLimit {
+		req.KeyLimit = maxKeyValuesLimit
 	}
 
-	bytesLimit := int(req.BytesLimit)
-	if bytesLimit > maxByteSizeLimit {
-		bytesLimit = maxByteSizeLimit
+	if req.BytesLimit > maxByteSizeLimit {
+		req.BytesLimit = maxByteSizeLimit
 	}
 
-	root, err := ids.ToID(req.RootHash)
+	proofBytes, err := getRangeProof(
+		ctx,
+		s.db,
+		req,
+		func(rangeProof *merkledb.RangeProof) ([]byte, error) {
+			return proto.Marshal(rangeProof.ToProto())
+		},
+	)
 	if err != nil {
 		return err
 	}
+	// TODO handle this fatal error
+	return s.appSender.SendAppResponse(ctx, nodeID, requestID, proofBytes)
+}
+
+// Get the range proof specified by [req].
+// If the generated proof is too large, the key limit is reduced
+// and the proof is regenerated. This process is repeated until
+// the proof is smaller than [req.BytesLimit].
+// When a sufficiently small proof is generated, returns it.
+// If no sufficiently small proof can be generated, returns [ErrMinProofSizeIsTooLarge].
+func getRangeProof(
+	ctx context.Context,
+	db DB,
+	req *pb.SyncGetRangeProofRequest,
+	marshalFunc func(*merkledb.RangeProof) ([]byte, error),
+) ([]byte, error) {
+	root, err := ids.ToID(req.RootHash)
+	if err != nil {
+		return nil, err
+	}
+
+	keyLimit := int(req.KeyLimit)
 
 	for keyLimit > 0 {
-		rangeProof, err := s.db.GetRangeProofAtRoot(ctx, root, req.StartKey, req.EndKey, int(keyLimit))
+		rangeProof, err := db.GetRangeProofAtRoot(
+			ctx,
+			root,
+			req.StartKey,
+			req.EndKey,
+			keyLimit,
+		)
 		if err != nil {
-			// handle expected errors so clients cannot cause servers to spam warning logs.
 			if errors.Is(err, merkledb.ErrInsufficientHistory) {
-				s.log.Debug(
-					"dropping invalid range proof request",
-					zap.Stringer("nodeID", nodeID),
-					zap.Uint32("requestID", requestID),
-					zap.Stringer("req", req),
-					zap.Error(err),
-				)
-				return nil // dropping request
+				return nil, nil // drop request
 			}
-			return err
+			return nil, err
 		}
 
-		proofBytes, err := proto.Marshal(rangeProof.ToProto())
+		proofBytes, err := marshalFunc(rangeProof)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
-		if len(proofBytes) < bytesLimit {
-			return s.appSender.SendAppResponse(ctx, nodeID, requestID, proofBytes)
+		if len(proofBytes) < int(req.BytesLimit) {
+			return proofBytes, nil
 		}
 
 		// The proof was too large. Try to shrink it.
-		keyLimit = uint32(len(rangeProof.KeyValues)) / 2
+		keyLimit = len(rangeProof.KeyValues) / 2
 	}
-	return ErrMinProofSizeIsTooLarge
+	return nil, ErrMinProofSizeIsTooLarge
 }
 
 // isTimeout returns true if err is a timeout from a context cancellation
