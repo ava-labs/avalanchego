@@ -78,7 +78,7 @@ func TestAppRequestResponse(t *testing.T) {
 				callback := func(actualNodeID ids.NodeID, actualResponse []byte, err error) {
 					defer wg.Done()
 
-					require.Error(t, ErrAppRequestFailed)
+					require.ErrorIs(t, err, ErrAppRequestFailed)
 					require.Equal(t, nodeID, actualNodeID)
 					require.Nil(t, actualResponse)
 				}
@@ -131,7 +131,7 @@ func TestAppRequestResponse(t *testing.T) {
 				callback := func(actualChainID ids.ID, actualResponse []byte, err error) {
 					defer wg.Done()
 
-					require.Error(t, ErrAppRequestFailed)
+					require.ErrorIs(t, err, ErrAppRequestFailed)
 					require.Equal(t, chainID, actualChainID)
 					require.Nil(t, actualResponse)
 				}
