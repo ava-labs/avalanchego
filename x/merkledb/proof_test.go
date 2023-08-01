@@ -1678,12 +1678,19 @@ func FuzzRangeProofInvariants(f *testing.F) {
 		deletePortion,
 	)
 
+	i := 0 // TODO remove
+
 	f.Fuzz(func(
 		t *testing.T,
 		start []byte,
 		end []byte,
 		maxProofLen uint,
 	) {
+		t.Log(i)
+		defer func() {
+			i++
+		}()
+
 		require := require.New(t)
 
 		// Make sure proof bounds are valid
@@ -1702,6 +1709,16 @@ func FuzzRangeProofInvariants(f *testing.F) {
 			int(maxProofLen),
 		)
 		require.NoError(err)
+
+		rootID, err := db.GetMerkleRoot(context.Background())
+		require.NoError(err)
+
+		require.NoError(rangeProof.Verify(
+			context.Background(),
+			start,
+			end,
+			rootID,
+		))
 
 		// Make sure the start proof doesn't contain any nodes
 		// that are in the end proof.
