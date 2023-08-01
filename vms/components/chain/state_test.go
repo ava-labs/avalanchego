@@ -585,7 +585,7 @@ func TestStateBytesToIDCache(t *testing.T) {
 		DecidedCacheSize:    0,
 		MissingCacheSize:    0,
 		UnverifiedCacheSize: 0,
-		BytesToIDCacheSize:  1,
+		BytesToIDCacheSize:  1 + ids.IDLen, // Size of one block
 		LastAcceptedBlock:   genesisBlock,
 		GetBlock:            getBlock,
 		UnmarshalBlock:      parseBlock,

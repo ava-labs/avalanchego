@@ -14,11 +14,20 @@ import (
 
 const (
 	Uint64Size = 8 // bytes
+	BoolSize   = 1 // bytes
+	BoolFalse  = 0x00
+	BoolTrue   = 0x01
+
 	// kvPairOverhead is an estimated overhead for a kv pair in a database.
 	kvPairOverhead = 8 // bytes
 )
 
-var errWrongSize = errors.New("value has unexpected size")
+var (
+	boolFalseKey = []byte{BoolFalse}
+	boolTrueKey  = []byte{BoolTrue}
+
+	errWrongSize = errors.New("value has unexpected size")
+)
 
 func PutID(db KeyValueWriter, key []byte, val ids.ID) error {
 	return db.Put(key, val[:])
@@ -114,9 +123,9 @@ func ParseTimestamp(b []byte) (time.Time, error) {
 
 func PutBool(db KeyValueWriter, key []byte, b bool) error {
 	if b {
-		return db.Put(key, []byte{1})
+		return db.Put(key, boolTrueKey)
 	}
-	return db.Put(key, []byte{0})
+	return db.Put(key, boolFalseKey)
 }
 
 func GetBool(db KeyValueReader, key []byte) (bool, error) {
@@ -124,12 +133,12 @@ func GetBool(db KeyValueReader, key []byte) (bool, error) {
 	switch {
 	case err != nil:
 		return false, err
-	case len(b) != 1:
-		return false, fmt.Errorf("length should be 1 but is %d", len(b))
-	case b[0] != 0 && b[0] != 1:
-		return false, fmt.Errorf("should be 0 or 1 but is %v", b[0])
+	case len(b) != BoolSize:
+		return false, fmt.Errorf("length should be %d but is %d", BoolSize, len(b))
+	case b[0] != BoolFalse && b[0] != BoolTrue:
+		return false, fmt.Errorf("should be %d or %d but is %d", BoolFalse, BoolTrue, b[0])
 	}
-	return b[0] == 1, nil
+	return b[0] == BoolTrue, nil
 }
 
 func Count(db Iteratee) (int, error) {

@@ -22,17 +22,23 @@ import (
 	"github.com/ava-labs/avalanchego/snow/events"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/bag"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-const nonVerifiedCacheSize = 128
+const nonVerifiedCacheSize = 128 * units.MiB
 
 var _ Engine = (*Transitive)(nil)
 
 func New(config Config) (Engine, error) {
 	return newTransitive(config)
+}
+
+func cachedBlockSize(_ ids.ID, blk snowman.Block) int {
+	return ids.IDLen + len(blk.Bytes()) + constants.PointerOverhead
 }
 
 // Transitive implements the Engine interface by attempting to fetch all
@@ -92,7 +98,10 @@ func newTransitive(config Config) (*Transitive, error) {
 	nonVerifiedCache, err := metercacher.New[ids.ID, snowman.Block](
 		"non_verified_cache",
 		config.Ctx.Registerer,
-		&cache.LRU[ids.ID, snowman.Block]{Size: nonVerifiedCacheSize},
+		cache.NewSizedLRU[ids.ID, snowman.Block](
+			nonVerifiedCacheSize,
+			cachedBlockSize,
+		),
 	)
 	if err != nil {
 		return nil, err
