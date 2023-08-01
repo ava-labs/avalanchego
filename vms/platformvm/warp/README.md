@@ -40,10 +40,9 @@ Unsigned Message:
 ```
 
 - `networkID` is the unique ID of an Avalanche Network (Mainnet/Testnet) and provides replay protection for BLS Signers across different Avalanche Networks
-- `sourceChainID` is the `blockchainID` of the blockchain sending a message. This ensures that each blockchain can only sign a message with its own `blockchainID`
+- `sourceChainID` is the `blockchainID` of the blockchain sending a message. This ensures that each blockchain can only sign a message with its own `blockchainID`. Note: the `blockchainID` is the hash of the transaction that created the blockchain on the Avalanche P-Chain. It serves as the unique identifier for the blockchain across the Avalanche Network.
 - `payload` provides an arbitrary byte array containing the contents of the message. VMs define their own message types to include in the `payload`
 
-Note: the `blockchainID` is the hash of the transaction that created the blockchain on the Avalanche P-Chain. It serves as the unique identifier for the blockchain across the Avalanche Network.
 
 BitSetSignature:
 ```
@@ -59,7 +58,7 @@ BitSetSignature:
 - `signers` encodes a bitset of which validators' signatures are included
 - `signature` is an aggregated BLS Multi-Signature of the Unsigned Message
 
-BitSetSignatures are verified within the context of a specific P-Chain height. At a specific P-Chain height, the PlatformVM serves a canonically ordered validator set for the source subnet (validator set is ordered lexicographically by the BLS public key bytes). The signers bitset encodes which validators' signature was included. A 1 at index i in `signers` claims that a signature from the validator at index i in the canonical validator set is included in the aggregate signature.
+BitSetSignatures are verified within the context of a specific P-Chain height. At a specific P-Chain height, the PlatformVM serves a canonically ordered validator set for the source subnet (validator set is ordered lexicographically by the BLS public key bytes). The signers bitset encodes which validators' signature was included. A value of 1 at index i in `signers` claims that a signature from the validator at index i in the canonical validator set is included in the aggregate signature.
 
 The bitset tells the verifier which BLS public keys should be aggregated to verify the warp message.
 
@@ -90,7 +89,7 @@ Once the validator set of a blockchain is willing to sign the message M, an aggr
 
 Avalanache Warp Messages are verified within the context of a specific P-Chain height included in the [ProposerVM](../../proposervm/README.md)'s header. The P-Chain height is provided as context to the wrapped VM when verifying the VM's internal blocks (implemented by the optional interface [WithVerifyContext](../../../snow/engine/snowman/block/block_context_vm.go)).
 
-To verify the message, the VM utilizes this Warp package to perform the following steps:
+To verify the message, the wrapped VM utilizes this Warp package to perform the following steps:
 
 1. Lookup the canonical validator set of the Subnet sending the message at the P-Chain height
 2. Filter the canonical validator set to only the validators claimed by the signature
