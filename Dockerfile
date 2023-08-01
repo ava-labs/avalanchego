@@ -6,7 +6,7 @@
 # go.mod
 # ============= Compilation Stage ================
 FROM golang:1.19.12-bullseye AS builder
-RUN apt-get update && apt-get install -y --no-install-recommends bash make gcc musl-dev ca-certificates linux-headers-4.19.0-21-all
+RUN apt-get update && apt-get install -y --no-install-recommends bash make gcc musl-dev ca-certificates linux-headers-5.10.0-all
 
 WORKDIR /build
 # Copy and download avalanche dependencies using go mod
