@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -136,7 +138,7 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 		utxoIDs[i] = utxoID[:]
 	}
 
-	if e.Bootstrapped.Get() && !e.Config.ReducedMode {
+	if e.Bootstrapped.Get() && !e.Config.LightSyncPrimaryNetwork {
 		if err := verify.SameSubnet(context.TODO(), e.Ctx, tx.SourceChain); err != nil {
 			return err
 		}
@@ -187,14 +189,14 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 	// Produce the UTXOS
 	avax.Produce(e.State, txID, tx.Outs)
 
-	// we fill atomic requests even if reducedMode is enabled
-	// so to allow node to smoothly switch back from reducedMode
+	// Note: We apply atomic requests even if we are not verifying atomic
+	// requests to ensure the shared state will be correct if we later start
+	// verifying the requests.
 	e.AtomicRequests = map[ids.ID]*atomic.Requests{
 		tx.SourceChain: {
 			RemoveRequests: utxoIDs,
 		},
 	}
-
 	return nil
 }
 
@@ -234,8 +236,9 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 	// Produce the UTXOS
 	avax.Produce(e.State, txID, tx.Outs)
 
-	// we fill atomic requests even if reducedMode is enabled
-	// so to allow node to smoothly switch back from reducedMode
+	// Note: We apply atomic requests even if we are not verifying atomic
+	// requests to ensure the shared state will be correct if we later start
+	// verifying the requests.
 	elems := make([]*atomic.Element, len(tx.ExportedOutputs))
 	for i, out := range tx.ExportedOutputs {
 		utxo := &avax.UTXO{
@@ -284,10 +287,6 @@ func (e *StandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 		return err
 	}
 
-	if e.Config.ReducedMode && (tx.NodeID() == e.Ctx.NodeID) {
-		e.Ctx.Log.Warn("Verified transaction that would promote node %v to validator. Reduced mode is active and node will shutdown when validation will start.")
-	}
-
 	txID := e.Tx.ID()
 	newStaker, err := state.NewPendingStaker(txID, tx)
 	if err != nil {
@@ -298,6 +297,14 @@ func (e *StandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	avax.Consume(e.State, tx.Ins)
 	avax.Produce(e.State, txID, tx.Outs)
 
+	if e.Config.LightSyncPrimaryNetwork && tx.Validator.NodeID == e.Ctx.NodeID {
+		e.Ctx.Log.Warn("verified transaction that would shutdown this node",
+			zap.String("reason", "primary network is not being fully synced"),
+			zap.Stringer("txID", txID),
+			zap.String("txType", "addValidator"),
+			zap.Stringer("nodeID", tx.Validator.NodeID),
+		)
+	}
 	return nil
 }
 
@@ -444,10 +451,21 @@ func (e *StandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionl
 	avax.Consume(e.State, tx.Ins)
 	avax.Produce(e.State, txID, tx.Outs)
 
-	if e.Config.ReducedMode {
+	if e.Config.LightSyncPrimaryNetwork {
 		if tx.SubnetID() == constants.PrimaryNetworkID && tx.NodeID() == e.Ctx.NodeID {
 			e.Ctx.Log.Warn("Verified transaction that would promote node %v to validator. Reduced mode is active and node will shutdown when validation will start.")
 		}
+	}
+
+	if e.Config.LightSyncPrimaryNetwork &&
+		tx.Subnet == constants.PrimaryNetworkID &&
+		tx.Validator.NodeID == e.Ctx.NodeID {
+		e.Ctx.Log.Warn("verified transaction that would shutdown this node",
+			zap.String("reason", "primary network is not being fully synced"),
+			zap.Stringer("txID", txID),
+			zap.String("txType", "addPermissionlessValidator"),
+			zap.Stringer("nodeID", tx.Validator.NodeID),
+		)
 	}
 
 	return nil

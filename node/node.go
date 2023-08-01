@@ -91,9 +91,8 @@ var (
 	genesisHashKey  = []byte("genesisID")
 	indexerDBPrefix = []byte{0x00}
 
-	errInvalidTLSKey              = errors.New("invalid TLS key")
-	errShuttingDown               = errors.New("server shutting down")
-	errNoReducedModeForValidators = errors.New("reduced mode cannot be configured for validators")
+	errInvalidTLSKey = errors.New("invalid TLS key")
+	errShuttingDown  = errors.New("server shutting down")
 )
 
 // Node is an instance of an Avalanche node.
@@ -818,7 +817,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		Router:                                  n.Config.ConsensusRouter,
 		Net:                                     n.Net,
 		Validators:                              n.vdrs,
-		ReducedMode:                             n.Config.ReducedMode,
+		LightSyncPrimaryNetwork:                 n.Config.LightSyncPrimaryNetwork,
 		NodeID:                                  n.ID,
 		NetworkID:                               n.Config.NetworkID,
 		Server:                                  n.APIServer,
@@ -887,7 +886,7 @@ func (n *Node) initVMs() error {
 				Validators:                    vdrs,
 				UptimeLockedCalculator:        n.uptimeCalculator,
 				SybilProtectionEnabled:        n.Config.SybilProtectionEnabled,
-				ReducedMode:                   n.Config.ReducedMode,
+				LightSyncPrimaryNetwork:       n.Config.LightSyncPrimaryNetwork,
 				TrackedSubnets:                n.Config.TrackedSubnets,
 				TxFee:                         n.Config.TxFee,
 				CreateAssetTxFee:              n.Config.CreateAssetTxFee,
@@ -1171,20 +1170,6 @@ func (n *Node) initHealthAPI() error {
 		return fmt.Errorf("couldn't register resource health check: %w", err)
 	}
 
-	reducedModeCheck := health.CheckerFunc(func(ctx context.Context) (interface{}, error) {
-		primaryValidators, _ := n.vdrs.Get(constants.PrimaryNetworkID)
-		if n.Config.ReducedMode && primaryValidators.GetWeight(n.ID) != 0 {
-			n.Log.Fatal(fmt.Sprintf("%s. Shutting down...", errNoReducedModeForValidators.Error()))
-			go n.Shutdown(1)
-			return nil, errNoReducedModeForValidators
-		}
-		return nil, nil
-	})
-	err = n.health.RegisterHealthCheck("reducedmode", reducedModeCheck, health.ApplicationTag)
-	if err != nil {
-		return fmt.Errorf("couldn't register reduced mode health check: %w", err)
-	}
-
 	handler, err := health.NewGetAndPostHandler(n.Log, healthChecker)
 	if err != nil {
 		return err
@@ -1445,7 +1430,6 @@ func (n *Node) Initialize(
 
 	// Start the Health API
 	// Has to be initialized before chain manager
-	// Has to be initialized after Validators Set
 	// [n.Net] must already be set
 	if err := n.initHealthAPI(); err != nil {
 		return fmt.Errorf("couldn't initialize health API: %w", err)
