@@ -451,12 +451,6 @@ func (e *StandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionl
 	avax.Consume(e.State, tx.Ins)
 	avax.Produce(e.State, txID, tx.Outs)
 
-	if e.Config.LightSyncPrimaryNetwork {
-		if tx.SubnetID() == constants.PrimaryNetworkID && tx.NodeID() == e.Ctx.NodeID {
-			e.Ctx.Log.Warn("Verified transaction that would promote node %v to validator. Reduced mode is active and node will shutdown when validation will start.")
-		}
-	}
-
 	if e.Config.LightSyncPrimaryNetwork &&
 		tx.Subnet == constants.PrimaryNetworkID &&
 		tx.Validator.NodeID == e.Ctx.NodeID {
