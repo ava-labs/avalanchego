@@ -22,5 +22,5 @@ type Config struct {
 	Validators validators.Set
 	Params     snowball.Parameters
 	Consensus  snowman.Consensus
-	LightSync  bool
+	LiteSync   bool
 }

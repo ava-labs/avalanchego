@@ -138,7 +138,7 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 		utxoIDs[i] = utxoID[:]
 	}
 
-	if e.Bootstrapped.Get() && !e.Config.LightSyncPrimaryNetwork {
+	if e.Bootstrapped.Get() && !e.Config.LiteSyncPrimaryNetwork {
 		if err := verify.SameSubnet(context.TODO(), e.Ctx, tx.SourceChain); err != nil {
 			return err
 		}
@@ -297,7 +297,7 @@ func (e *StandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	avax.Consume(e.State, tx.Ins)
 	avax.Produce(e.State, txID, tx.Outs)
 
-	if e.Config.LightSyncPrimaryNetwork && tx.Validator.NodeID == e.Ctx.NodeID {
+	if e.Config.LiteSyncPrimaryNetwork && tx.Validator.NodeID == e.Ctx.NodeID {
 		e.Ctx.Log.Warn("verified transaction that would shutdown this node",
 			zap.String("reason", "primary network is not being fully synced"),
 			zap.Stringer("txID", txID),
@@ -451,7 +451,7 @@ func (e *StandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionl
 	avax.Consume(e.State, tx.Ins)
 	avax.Produce(e.State, txID, tx.Outs)
 
-	if e.Config.LightSyncPrimaryNetwork &&
+	if e.Config.LiteSyncPrimaryNetwork &&
 		tx.Subnet == constants.PrimaryNetworkID &&
 		tx.Validator.NodeID == e.Ctx.NodeID {
 		e.Ctx.Log.Warn("verified transaction that would shutdown this node",

@@ -147,9 +147,9 @@ func (b *builder) AddUnverifiedTx(tx *txs.Tx) error {
 		return err
 	}
 
-	// If we are light syncing the Primary Network, we should not be maintaining
+	// If we are lite syncing the Primary Network, we should not be maintaining
 	// the transaction mempool locally.
-	if !b.txExecutorBackend.Config.LightSyncPrimaryNetwork {
+	if !b.txExecutorBackend.Config.LiteSyncPrimaryNetwork {
 		if err := b.Mempool.Add(tx); err != nil {
 			return err
 		}

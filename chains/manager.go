@@ -87,11 +87,11 @@ var (
 	// Bootstrapping prefixes for ChainVMs
 	bootstrappingDB = []byte("bs")
 
-	errUnknownVMType            = errors.New("the vm should have type avalanche.DAGVM or snowman.ChainVM")
-	errCreatePlatformVM         = errors.New("attempted to create a chain running the PlatformVM")
-	errNotBootstrapped          = errors.New("subnets not bootstrapped")
-	errNoPrimaryNetworkConfig   = errors.New("no subnet config for primary network found")
-	errNoLightSyncForValidators = errors.New("light sync cannot be configured for a validator")
+	errUnknownVMType           = errors.New("the vm should have type avalanche.DAGVM or snowman.ChainVM")
+	errCreatePlatformVM        = errors.New("attempted to create a chain running the PlatformVM")
+	errNotBootstrapped         = errors.New("subnets not bootstrapped")
+	errNoPrimaryNetworkConfig  = errors.New("no subnet config for primary network found")
+	errNoLiteSyncForValidators = errors.New("lite sync cannot be configured for a validator")
 
 	_ Manager = (*manager)(nil)
 )
@@ -184,7 +184,7 @@ type ManagerConfig struct {
 	Router                      router.Router              // Routes incoming messages to the appropriate chain
 	Net                         network.Network            // Sends consensus messages to other validators
 	Validators                  validators.Manager         // Validators validating on this chain
-	LightSyncPrimaryNetwork     bool
+	LiteSyncPrimaryNetwork      bool
 	NodeID                      ids.NodeID    // The ID of this node
 	NetworkID                   uint32        // ID of the network this node is connected to
 	Server                      server.Server // Handles HTTP API calls
@@ -1214,7 +1214,7 @@ func (m *manager) createSnowmanChain(
 		Validators:    vdrs,
 		Params:        consensusParams,
 		Consensus:     consensus,
-		LightSync:     m.LightSyncPrimaryNetwork && commonCfg.Ctx.ChainID == constants.PlatformChainID,
+		LiteSync:      m.LiteSyncPrimaryNetwork && commonCfg.Ctx.ChainID == constants.PlatformChainID,
 	}
 	engine, err := smeng.New(engineConfig)
 	if err != nil {
@@ -1325,13 +1325,13 @@ func (m *manager) registerBootstrappedHealthChecks() error {
 		return fmt.Errorf("couldn't register bootstrapped health check: %w", err)
 	}
 
-	// If the node is not light syncing the Primary Network, there is no reason
+	// If the node is not lite syncing the Primary Network, there is no reason
 	// to shutdown if it is a validator.
-	if !m.LightSyncPrimaryNetwork {
+	if !m.LiteSyncPrimaryNetwork {
 		return nil
 	}
 
-	lightSyncCheck := health.CheckerFunc(func(ctx context.Context) (interface{}, error) {
+	liteSyncCheck := health.CheckerFunc(func(ctx context.Context) (interface{}, error) {
 		// Note: The health check is skipped during bootstrapping to allow a
 		// node to sync the network even if it was previously a validator.
 		if !m.IsBootstrapped(constants.PlatformChainID) {
@@ -1342,13 +1342,13 @@ func (m *manager) registerBootstrappedHealthChecks() error {
 		}
 
 		m.Log.Fatal("node is a primary network validator. Shutting down...",
-			zap.Error(errNoLightSyncForValidators),
+			zap.Error(errNoLiteSyncForValidators),
 		)
 		go m.ShutdownNodeFunc(1)
-		return "node is a primary network validator", errNoLightSyncForValidators
+		return "node is a primary network validator", errNoLiteSyncForValidators
 	})
 
-	if err := m.Health.RegisterHealthCheck("validation", lightSyncCheck, health.ApplicationTag); err != nil {
+	if err := m.Health.RegisterHealthCheck("validation", liteSyncCheck, health.ApplicationTag); err != nil {
 		return fmt.Errorf("couldn't register validation health check: %w", err)
 	}
 	return nil
