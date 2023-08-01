@@ -681,11 +681,6 @@ func TestAppRequestSendFailed(t *testing.T) {
 		gomock.Any(),
 	).Return(ids.NodeID{}, nil, errAppRequestSendFailed).Times(2)
 
-	networkClient.EXPECT().TrackBandwidth(
-		gomock.Any(),
-		gomock.Any(),
-	).Times(2)
-
 	_, err := client.GetChangeProof(
 		context.Background(),
 		&pb.SyncGetChangeProofRequest{},
