@@ -59,6 +59,13 @@ func (c *sizedLRU[K, V]) Flush() {
 	c.flush()
 }
 
+func (c *sizedLRU[_, _]) Len() int {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	return c.len()
+}
+
 func (c *sizedLRU[_, _]) PortionFilled() float64 {
 	c.lock.Lock()
 	defer c.lock.Unlock()
@@ -108,6 +115,10 @@ func (c *sizedLRU[K, _]) evict(key K) {
 func (c *sizedLRU[K, V]) flush() {
 	c.elements = linkedhashmap.New[K, V]()
 	c.currentSize = 0
+}
+
+func (c *sizedLRU[_, _]) len() int {
+	return c.elements.Len()
 }
 
 func (c *sizedLRU[_, _]) portionFilled() float64 {
