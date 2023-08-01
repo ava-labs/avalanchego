@@ -23,6 +23,12 @@ echo "installing avalanche-network-runner"
 ANR_WORKDIR="/tmp"
 ./scripts/install_anr.sh
 
+# Sourcing constants.sh ensures that the necessary CGO flags are set to
+# build the portable version of BLST. Without this, ginkgo may fail to
+# build the test binary if run on a host (e.g. github worker) that lacks
+# the instructions to build non-portable BLST.
+source ./scripts/constants.sh
+
 #################################
 echo "building e2e.test"
 # to install the ginkgo binary (required for test build and run)

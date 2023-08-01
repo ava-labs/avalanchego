@@ -538,6 +538,9 @@ func (m *Manager) Wait(ctx context.Context) error {
 }
 
 func (m *Manager) UpdateSyncTarget(syncTargetRoot ids.ID) error {
+	m.syncTargetLock.Lock()
+	defer m.syncTargetLock.Unlock()
+
 	m.workLock.Lock()
 	defer m.workLock.Unlock()
 
@@ -546,9 +549,6 @@ func (m *Manager) UpdateSyncTarget(syncTargetRoot ids.ID) error {
 		return ErrAlreadyClosed
 	default:
 	}
-
-	m.syncTargetLock.Lock()
-	defer m.syncTargetLock.Unlock()
 
 	if m.config.TargetRoot == syncTargetRoot {
 		// the target hasn't changed, so there is nothing to do
@@ -638,20 +638,29 @@ func (m *Manager) completeWorkItem(
 		}
 	}
 
-	// completed the range [work.start, lastKey], log and record in the completed work heap
-	m.config.Log.Info("completed range",
-		zap.Stringer("start", work.start),
-		zap.Stringer("end", largestHandledKey),
-	)
-	if m.getTargetRoot() == rootID {
+	// Process [work] while holding [syncTargetLock] to ensure that object
+	// is added to the right queue, even if a target update is triggered
+	m.syncTargetLock.RLock()
+	defer m.syncTargetLock.RUnlock()
+
+	stale := m.config.TargetRoot != rootID
+	if stale {
+		// the root has changed, so reinsert with high priority
+		m.enqueueWork(newWorkItem(rootID, work.start, largestHandledKey, highPriority))
+	} else {
 		m.workLock.Lock()
 		defer m.workLock.Unlock()
 
 		m.processedWork.MergeInsert(newWorkItem(rootID, work.start, largestHandledKey, work.priority))
-	} else {
-		// the root has changed, so reinsert with high priority
-		m.enqueueWork(newWorkItem(rootID, work.start, largestHandledKey, highPriority))
 	}
+
+	// completed the range [work.start, lastKey], log and record in the completed work heap
+	m.config.Log.Info("completed range",
+		zap.Stringer("start", work.start),
+		zap.Stringer("end", largestHandledKey),
+		zap.Stringer("rootID", rootID),
+		zap.Bool("stale", stale),
+	)
 }
 
 // Queue the given key range to be fetched and applied.
@@ -674,6 +683,16 @@ func (m *Manager) enqueueWork(work *workItem) {
 	// Split the remaining range into to 2.
 	// Find the middle point.
 	mid := midPoint(work.start, work.end)
+
+	if merkledb.MaybeBytesEquals(work.start, mid) || merkledb.MaybeBytesEquals(mid, work.end) {
+		// The range is too small to split.
+		// If we didn't have this check we would add work items
+		// [start, start] and [start, end]. Since start <= end, this would
+		// violate the invariant of [m.unprocessedWork] and [m.processedWork]
+		// that there are no overlapping ranges.
+		m.unprocessedWork.Insert(work)
+		return
+	}
 
 	// first item gets higher priority than the second to encourage finished ranges to grow
 	// rather than start a new range that is not contiguous with existing completed ranges

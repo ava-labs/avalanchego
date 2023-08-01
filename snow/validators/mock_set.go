@@ -124,18 +124,18 @@ func (mr *MockSetMockRecorder) Len() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Len", reflect.TypeOf((*MockSet)(nil).Len))
 }
 
-// List mocks base method.
-func (m *MockSet) List() []*Validator {
+// Map mocks base method.
+func (m *MockSet) Map() map[ids.NodeID]*GetValidatorOutput {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "List")
-	ret0, _ := ret[0].([]*Validator)
+	ret := m.ctrl.Call(m, "Map")
+	ret0, _ := ret[0].(map[ids.NodeID]*GetValidatorOutput)
 	return ret0
 }
 
-// List indicates an expected call of List.
-func (mr *MockSetMockRecorder) List() *gomock.Call {
+// Map indicates an expected call of Map.
+func (mr *MockSetMockRecorder) Map() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "List", reflect.TypeOf((*MockSet)(nil).List))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Map", reflect.TypeOf((*MockSet)(nil).Map))
 }
 
 // PrefixedString mocks base method.

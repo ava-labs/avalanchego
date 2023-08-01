@@ -343,7 +343,7 @@ func validateRangeProofRequest(req *pb.SyncGetRangeProofRequest) error {
 		return errInvalidBytesLimit
 	case req.KeyLimit == 0:
 		return errInvalidKeyLimit
-	case len(req.RootHash) != hashing.HashLen:
+	case len(req.RootHash) != ids.IDLen:
 		return errInvalidRootHash
 	case req.StartKey != nil && req.StartKey.IsNothing && len(req.StartKey.Value) > 0:
 		return errInvalidStartKey

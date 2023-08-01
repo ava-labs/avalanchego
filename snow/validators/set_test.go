@@ -234,13 +234,13 @@ func TestSetLen(t *testing.T) {
 	require.Zero(len)
 }
 
-func TestSetList(t *testing.T) {
+func TestSetMap(t *testing.T) {
 	require := require.New(t)
 
 	s := NewSet()
 
-	list := s.List()
-	require.Empty(list)
+	m := s.Map()
+	require.Empty(m)
 
 	sk, err := bls.NewSecretKey()
 	require.NoError(err)
@@ -249,10 +249,11 @@ func TestSetList(t *testing.T) {
 	nodeID0 := ids.GenerateTestNodeID()
 	require.NoError(s.Add(nodeID0, pk, ids.Empty, 2))
 
-	list = s.List()
-	require.Len(list, 1)
+	m = s.Map()
+	require.Len(m, 1)
+	require.Contains(m, nodeID0)
 
-	node0 := list[0]
+	node0 := m[nodeID0]
 	require.Equal(nodeID0, node0.NodeID)
 	require.Equal(pk, node0.PublicKey)
 	require.Equal(uint64(2), node0.Weight)
@@ -260,15 +261,17 @@ func TestSetList(t *testing.T) {
 	nodeID1 := ids.GenerateTestNodeID()
 	require.NoError(s.Add(nodeID1, nil, ids.Empty, 1))
 
-	list = s.List()
-	require.Len(list, 2)
+	m = s.Map()
+	require.Len(m, 2)
+	require.Contains(m, nodeID0)
+	require.Contains(m, nodeID1)
 
-	node0 = list[0]
+	node0 = m[nodeID0]
 	require.Equal(nodeID0, node0.NodeID)
 	require.Equal(pk, node0.PublicKey)
 	require.Equal(uint64(2), node0.Weight)
 
-	node1 := list[1]
+	node1 := m[nodeID1]
 	require.Equal(nodeID1, node1.NodeID)
 	require.Nil(node1.PublicKey)
 	require.Equal(uint64(1), node1.Weight)
@@ -278,32 +281,35 @@ func TestSetList(t *testing.T) {
 	require.Equal(pk, node0.PublicKey)
 	require.Equal(uint64(2), node0.Weight)
 
-	list = s.List()
-	require.Len(list, 2)
+	m = s.Map()
+	require.Len(m, 2)
+	require.Contains(m, nodeID0)
+	require.Contains(m, nodeID1)
 
-	node0 = list[0]
+	node0 = m[nodeID0]
 	require.Equal(nodeID0, node0.NodeID)
 	require.Equal(pk, node0.PublicKey)
 	require.Equal(uint64(1), node0.Weight)
 
-	node1 = list[1]
+	node1 = m[nodeID1]
 	require.Equal(nodeID1, node1.NodeID)
 	require.Nil(node1.PublicKey)
 	require.Equal(uint64(1), node1.Weight)
 
 	require.NoError(s.RemoveWeight(nodeID0, 1))
 
-	list = s.List()
-	require.Len(list, 1)
+	m = s.Map()
+	require.Len(m, 1)
+	require.Contains(m, nodeID1)
 
-	node0 = list[0]
-	require.Equal(nodeID1, node0.NodeID)
-	require.Nil(node0.PublicKey)
-	require.Equal(uint64(1), node0.Weight)
+	node1 = m[nodeID1]
+	require.Equal(nodeID1, node1.NodeID)
+	require.Nil(node1.PublicKey)
+	require.Equal(uint64(1), node1.Weight)
 
 	require.NoError(s.RemoveWeight(nodeID1, 1))
 
-	require.Empty(s.List())
+	require.Empty(s.Map())
 }
 
 func TestSetWeight(t *testing.T) {
