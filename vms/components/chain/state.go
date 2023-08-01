@@ -22,6 +22,14 @@ import (
 
 const pointerOverhead = wrappers.LongLen
 
+func cachedBlockSize(_ ids.ID, bw *BlockWrapper) int {
+	return ids.IDLen + len(bw.Bytes()) + 2*pointerOverhead
+}
+
+func cachedBlockBytesSize(blockBytes string, _ ids.ID) int {
+	return len(blockBytes) + ids.IDLen
+}
+
 // State implements an efficient caching layer used to wrap a VM
 // implementation.
 type State struct {
@@ -144,22 +152,16 @@ func NewState(config *Config) *State {
 		verifiedBlocks: make(map[ids.ID]*BlockWrapper),
 		decidedBlocks: cache.NewSizedLRU[ids.ID, *BlockWrapper](
 			config.DecidedCacheSize,
-			func(_ ids.ID, bw *BlockWrapper) int {
-				return ids.IDLen + len(bw.Bytes()) + 2*pointerOverhead
-			},
+			cachedBlockSize,
 		),
 		missingBlocks: &cache.LRU[ids.ID, struct{}]{Size: config.MissingCacheSize},
 		unverifiedBlocks: cache.NewSizedLRU[ids.ID, *BlockWrapper](
 			config.UnverifiedCacheSize,
-			func(_ ids.ID, bw *BlockWrapper) int {
-				return ids.IDLen + len(bw.Bytes()) + 2*pointerOverhead
-			},
+			cachedBlockSize,
 		),
 		bytesToIDCache: cache.NewSizedLRU[string, ids.ID](
 			config.BytesToIDCacheSize,
-			func(blockBytes string, _ ids.ID) int {
-				return len(blockBytes) + ids.IDLen
-			},
+			cachedBlockBytesSize,
 		),
 	}
 	c.initialize(config)
@@ -175,9 +177,7 @@ func NewMeteredState(
 		registerer,
 		cache.NewSizedLRU[ids.ID, *BlockWrapper](
 			config.DecidedCacheSize,
-			func(_ ids.ID, bw *BlockWrapper) int {
-				return ids.IDLen + len(bw.Bytes()) + 2*pointerOverhead
-			},
+			cachedBlockSize,
 		),
 	)
 	if err != nil {
@@ -196,9 +196,7 @@ func NewMeteredState(
 		registerer,
 		cache.NewSizedLRU[ids.ID, *BlockWrapper](
 			config.UnverifiedCacheSize,
-			func(_ ids.ID, bw *BlockWrapper) int {
-				return ids.IDLen + len(bw.Bytes()) + 2*pointerOverhead
-			},
+			cachedBlockSize,
 		),
 	)
 	if err != nil {
@@ -209,9 +207,7 @@ func NewMeteredState(
 		registerer,
 		cache.NewSizedLRU[string, ids.ID](
 			config.BytesToIDCacheSize,
-			func(blockBytes string, _ ids.ID) int {
-				return len(blockBytes) + ids.IDLen
-			},
+			cachedBlockBytesSize,
 		),
 	)
 	if err != nil {

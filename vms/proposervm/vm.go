@@ -78,6 +78,10 @@ func init() {
 	}
 }
 
+func cachedBlockSize(_ ids.ID, b snowman.Block) int {
+	return ids.IDLen + len(b.Bytes()) + pointerOverhead
+}
+
 type VM struct {
 	block.ChainVM
 	blockBuilderVM block.BuildBlockWithContextChainVM
@@ -197,9 +201,7 @@ func (vm *VM) Initialize(
 		registerer,
 		cache.NewSizedLRU[ids.ID, snowman.Block](
 			innerBlkCacheSize,
-			func(_ ids.ID, b snowman.Block) int {
-				return ids.IDLen + len(b.Bytes()) + pointerOverhead
-			},
+			cachedBlockSize,
 		),
 	)
 	if err != nil {

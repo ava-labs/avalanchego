@@ -39,6 +39,10 @@ func New(config Config) (Engine, error) {
 	return newTransitive(config)
 }
 
+func cachedBlockSize(_ ids.ID, b snowman.Block) int {
+	return ids.IDLen + len(b.Bytes()) + pointerOverhead
+}
+
 // Transitive implements the Engine interface by attempting to fetch all
 // Transitive dependencies.
 type Transitive struct {
@@ -98,9 +102,7 @@ func newTransitive(config Config) (*Transitive, error) {
 		config.Ctx.Registerer,
 		cache.NewSizedLRU[ids.ID, snowman.Block](
 			nonVerifiedCacheSize,
-			func(_ ids.ID, b snowman.Block) int {
-				return ids.IDLen + len(b.Bytes()) + pointerOverhead
-			},
+			cachedBlockSize,
 		),
 	)
 	if err != nil {

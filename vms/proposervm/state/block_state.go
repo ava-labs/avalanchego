@@ -50,16 +50,18 @@ type blockWrapper struct {
 	block block.Block
 }
 
+func cachedBlockSize(_ ids.ID, bw *blockWrapper) int {
+	if bw == nil {
+		return ids.IDLen + pointerOverhead
+	}
+	return ids.IDLen + len(bw.Block) + wrappers.IntLen + 2*pointerOverhead
+}
+
 func NewBlockState(db database.Database) BlockState {
 	return &blockState{
 		blkCache: cache.NewSizedLRU[ids.ID, *blockWrapper](
 			blockCacheSize,
-			func(_ ids.ID, bw *blockWrapper) int {
-				if bw == nil {
-					return ids.IDLen + pointerOverhead
-				}
-				return ids.IDLen + len(bw.Block) + wrappers.IntLen + 2*pointerOverhead
-			},
+			cachedBlockSize,
 		),
 		db: db,
 	}
@@ -71,12 +73,7 @@ func NewMeteredBlockState(db database.Database, namespace string, metrics promet
 		metrics,
 		cache.NewSizedLRU[ids.ID, *blockWrapper](
 			blockCacheSize,
-			func(_ ids.ID, bw *blockWrapper) int {
-				if bw == nil {
-					return ids.IDLen + pointerOverhead
-				}
-				return ids.IDLen + len(bw.Block) + wrappers.IntLen + 2*pointerOverhead
-			},
+			cachedBlockSize,
 		),
 	)
 
