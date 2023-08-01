@@ -390,7 +390,7 @@ func txAndStatusSize(_ ids.ID, t *txAndStatus) int {
 	if t == nil {
 		return ids.IDLen + constants.PointerOverhead
 	}
-	return ids.IDLen + len(t.tx.Bytes()) + wrappers.IntLen + constants.PointerOverhead
+	return ids.IDLen + len(t.tx.Bytes()) + wrappers.IntLen + 2*constants.PointerOverhead
 }
 
 func blockSize(_ ids.ID, blk blocks.Block) int {

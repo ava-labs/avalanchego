@@ -37,8 +37,8 @@ func New(config Config) (Engine, error) {
 	return newTransitive(config)
 }
 
-func cachedBlockSize(_ ids.ID, b snowman.Block) int {
-	return ids.IDLen + len(b.Bytes()) + constants.PointerOverhead
+func cachedBlockSize(_ ids.ID, blk snowman.Block) int {
+	return ids.IDLen + len(blk.Bytes()) + constants.PointerOverhead
 }
 
 // Transitive implements the Engine interface by attempting to fetch all
