@@ -305,12 +305,21 @@ func (proof *RangeProof) Verify(
 		return err
 	}
 
-	largestKey := end
+	smallestPath := Nothing[path]()
+	if start != nil {
+		smallestPath = Some(newPath(start))
+	}
+
+	largestPath := Nothing[path]()
+	if end != nil {
+		largestPath = Some(newPath(end))
+	}
+
 	if len(proof.KeyValues) > 0 {
 		// If [proof] has key-value pairs, we should insert children
 		// greater than [largestKey] to ancestors of the node containing
 		// [largestKey] so that we get the expected root ID.
-		largestKey = proof.KeyValues[len(proof.KeyValues)-1].Key
+		largestPath = Some(newPath(proof.KeyValues[len(proof.KeyValues)-1].Key))
 	}
 
 	// The key-value pairs (allegedly) proven by [proof].
@@ -319,24 +328,21 @@ func (proof *RangeProof) Verify(
 		keyValues[newPath(keyValue.Key)] = keyValue.Value
 	}
 
-	smallestPath := newPath(start)
-	largestPath := newPath(largestKey)
-
 	// Ensure that the start proof is valid and contains values that
 	// match the key/values that were sent.
-	if err := verifyProofPath(proof.StartProof, smallestPath); err != nil {
+	if err := verifyProofPath(proof.StartProof, smallestPath.Value()); err != nil {
 		return err
 	}
-	if err := verifyAllRangeProofKeyValuesPresent(proof.StartProof, smallestPath, largestPath, keyValues); err != nil {
+	if err := verifyAllRangeProofKeyValuesPresent(proof.StartProof, smallestPath.Value(), largestPath.Value(), keyValues); err != nil {
 		return err
 	}
 
 	// Ensure that the end proof is valid and contains values that
 	// match the key/values that were sent.
-	if err := verifyProofPath(proof.EndProof, largestPath); err != nil {
+	if err := verifyProofPath(proof.EndProof, largestPath.Value()); err != nil {
 		return err
 	}
-	if err := verifyAllRangeProofKeyValuesPresent(proof.EndProof, smallestPath, largestPath, keyValues); err != nil {
+	if err := verifyAllRangeProofKeyValuesPresent(proof.EndProof, smallestPath.Value(), largestPath.Value(), keyValues); err != nil {
 		return err
 	}
 
@@ -359,27 +365,19 @@ func (proof *RangeProof) Verify(
 	// By inserting all children < [insertChildrenLessThan], we prove that there are no keys
 	// > [insertChildrenLessThan] but less than the first key given.
 	// That is, the peer who gave us this proof is not omitting nodes.
-	insertChildrenLessThan := Nothing[path]()
-	if len(smallestPath) > 0 {
-		insertChildrenLessThan = Some(smallestPath)
-	}
-	insertChildrenGreaterThan := Nothing[path]()
-	if len(largestPath) > 0 {
-		insertChildrenGreaterThan = Some(largestPath)
-	}
 	if err := addPathInfo(
 		view,
 		proof.StartProof,
-		insertChildrenLessThan,
-		insertChildrenGreaterThan,
+		smallestPath,
+		largestPath,
 	); err != nil {
 		return err
 	}
 	if err := addPathInfo(
 		view,
 		proof.EndProof,
-		insertChildrenLessThan,
-		insertChildrenGreaterThan,
+		smallestPath,
+		largestPath,
 	); err != nil {
 		return err
 	}
