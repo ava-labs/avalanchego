@@ -40,8 +40,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-const pointerOverhead = wrappers.LongLen
-
 var (
 	_ State = (*state)(nil)
 
@@ -383,23 +381,23 @@ type txAndStatus struct {
 
 func txSize(_ ids.ID, tx *txs.Tx) int {
 	if tx == nil {
-		return ids.IDLen + pointerOverhead
+		return ids.IDLen + constants.PointerOverhead
 	}
-	return ids.IDLen + len(tx.Bytes()) + pointerOverhead
+	return ids.IDLen + len(tx.Bytes()) + constants.PointerOverhead
 }
 
 func txAndStatusSize(_ ids.ID, t *txAndStatus) int {
 	if t == nil {
-		return ids.IDLen + pointerOverhead
+		return ids.IDLen + constants.PointerOverhead
 	}
-	return ids.IDLen + len(t.tx.Bytes()) + wrappers.IntLen + pointerOverhead
+	return ids.IDLen + len(t.tx.Bytes()) + wrappers.IntLen + 2*constants.PointerOverhead
 }
 
 func blockSize(_ ids.ID, blk blocks.Block) int {
 	if blk == nil {
-		return ids.IDLen + pointerOverhead
+		return ids.IDLen + constants.PointerOverhead
 	}
-	return ids.IDLen + len(blk.Bytes()) + pointerOverhead
+	return ids.IDLen + len(blk.Bytes()) + constants.PointerOverhead
 }
 
 func New(
