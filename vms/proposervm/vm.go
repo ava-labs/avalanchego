@@ -191,7 +191,11 @@ func (vm *VM) Initialize(
 	rawDB := dbManager.Current().Database
 	prefixDB := prefixdb.New(dbPrefix, rawDB)
 	vm.db = versiondb.New(prefixDB)
-	vm.State = state.New(vm.db)
+	baseState, err := state.NewMetered(vm.db, "state", registerer)
+	if err != nil {
+		return err
+	}
+	vm.State = baseState
 	vm.Windower = proposer.New(chainCtx.ValidatorState, chainCtx.SubnetID, chainCtx.ChainID)
 	vm.Tree = tree.New()
 	innerBlkCache, err := metercacher.New[ids.ID, snowman.Block](
@@ -208,7 +212,6 @@ func (vm *VM) Initialize(
 	vm.innerBlkCache = innerBlkCache
 
 	indexerDB := versiondb.New(vm.db)
-	// TODO: Use [state.NewMetered] here to populate additional metrics.
 	indexerState := state.New(indexerDB)
 	vm.hIndexer = indexer.NewHeightIndexer(vm, vm.ctx.Log, indexerState)
 
