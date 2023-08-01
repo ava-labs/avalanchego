@@ -60,7 +60,7 @@ func TestAppRequestResponse(t *testing.T) {
 					require.Equal(t, response, actualResponse)
 				}
 
-				require.NoError(t, client.AppRequest(context.Background(), set.Set[ids.NodeID]{nodeID: struct{}{}}, request, callback))
+				require.NoError(t, client.AppRequestAny(context.Background(), request, callback))
 			},
 		},
 		{
@@ -158,6 +158,28 @@ func TestAppRequestResponse(t *testing.T) {
 				require.NoError(t, client.AppGossip(context.Background(), request))
 			},
 		},
+		{
+			name: "app gossip specific",
+			requestFunc: func(t *testing.T, router *Router, client *Client, sender *common.MockSender, handler *mocks.MockHandler, wg *sync.WaitGroup) {
+				sender.EXPECT().SendAppGossipSpecific(gomock.Any(), gomock.Any(), gomock.Any()).
+					Do(func(ctx context.Context, nodeIDs set.Set[ids.NodeID], gossip []byte) {
+						for n := range nodeIDs {
+							nodeID := n
+							go func() {
+								require.NoError(t, router.AppGossip(ctx, nodeID, gossip))
+							}()
+						}
+					}).AnyTimes()
+				handler.EXPECT().
+					AppGossip(context.Background(), nodeID, request).
+					DoAndReturn(func(context.Context, ids.NodeID, []byte) error {
+						defer wg.Done()
+						return nil
+					})
+
+				require.NoError(t, client.AppGossipSpecific(context.Background(), set.Set[ids.NodeID]{nodeID: struct{}{}}, request))
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -168,6 +190,7 @@ func TestAppRequestResponse(t *testing.T) {
 			sender := common.NewMockSender(ctrl)
 			handler := mocks.NewMockHandler(ctrl)
 			router := NewRouter(sender)
+			require.NoError(router.Connected(context.Background(), nodeID, nil))
 
 			client, err := router.RegisterAppProtocol(handlerID, handler)
 			require.NoError(err)
