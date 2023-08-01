@@ -4,6 +4,7 @@
 package block
 
 import (
+	"crypto/rsa"
 	"crypto/x509"
 	"errors"
 	"fmt"
@@ -14,12 +15,18 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
+// maxRSAKeyBitlen is the maximum RSA key size in bits that we are willing to
+// parse.
+const maxRSAKeyBitlen = 8192
+
 var (
 	_ SignedBlock = (*statelessBlock)(nil)
 
-	errUnexpectedProposer = errors.New("expected no proposer but one was provided")
-	errMissingProposer    = errors.New("expected proposer but none was provided")
-	errInvalidCertificate = errors.New("invalid certificate")
+	errInvalidCertificate   = errors.New("invalid certificate")
+	errInvalidPublicKeyType = errors.New("invalid public key type")
+	errInvalidPublicKey     = errors.New("invalid public key")
+	errUnexpectedProposer   = errors.New("expected no proposer but one was provided")
+	errMissingProposer      = errors.New("expected proposer but none was provided")
 )
 
 type Block interface {
@@ -95,6 +102,17 @@ func (b *statelessBlock) initialize(bytes []byte) error {
 	if err != nil {
 		return fmt.Errorf("%w: %s", errInvalidCertificate, err)
 	}
+	if cert.PublicKeyAlgorithm != x509.RSA {
+		return fmt.Errorf("%w: %s", errInvalidPublicKeyType, cert.PublicKeyAlgorithm)
+	}
+
+	pk, ok := cert.PublicKey.(*rsa.PublicKey)
+	if !ok {
+		return fmt.Errorf("%w: %T", errInvalidPublicKeyType, cert.PublicKey)
+	}
+	if bitlen := pk.N.BitLen(); bitlen > maxRSAKeyBitlen {
+		return fmt.Errorf("%w: bitlen=%d > maxBitlen=%d", errInvalidPublicKey, bitlen, maxRSAKeyBitlen)
+	}
 
 	b.cert = cert
 	b.proposer = ids.NodeIDFromCert(cert)
@@ -119,7 +137,9 @@ func (b *statelessBlock) Verify(shouldHaveProposer bool, chainID ids.ID) error {
 			return errUnexpectedProposer
 		}
 		return nil
-	} else if b.cert == nil {
+	}
+
+	if b.cert == nil {
 		return errMissingProposer
 	}
 
