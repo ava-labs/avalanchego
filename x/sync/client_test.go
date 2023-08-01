@@ -57,7 +57,8 @@ func sendRangeRequest(
 	sender := common.NewMockSender(ctrl)
 	handler := NewNetworkServer(sender, db, logging.NoLog{})
 	clientNodeID, serverNodeID := ids.GenerateTestNodeID(), ids.GenerateTestNodeID()
-	networkClient := NewNetworkClient(sender, clientNodeID, 1, logging.NoLog{})
+	networkClient, err := NewNetworkClient(sender, clientNodeID, 1, logging.NoLog{}, "", prometheus.NewRegistry())
+	require.NoError(err)
 	require.NoError(networkClient.Connected(context.Background(), serverNodeID, version.CurrentApp))
 	client := NewClient(&ClientConfig{
 		NetworkClient: networkClient,
@@ -317,7 +318,8 @@ func sendChangeRequest(
 	sender := common.NewMockSender(ctrl)
 	handler := NewNetworkServer(sender, db, logging.NoLog{})
 	clientNodeID, serverNodeID := ids.GenerateTestNodeID(), ids.GenerateTestNodeID()
-	networkClient := NewNetworkClient(sender, clientNodeID, 1, logging.NoLog{})
+	networkClient, err := NewNetworkClient(sender, clientNodeID, 1, logging.NoLog{}, "", prometheus.NewRegistry())
+	require.NoError(err)
 	require.NoError(networkClient.Connected(context.Background(), serverNodeID, version.CurrentApp))
 	client := NewClient(&ClientConfig{
 		NetworkClient: networkClient,
