@@ -17,13 +17,11 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
-const pointerOverhead = wrappers.LongLen
-
 func cachedBlockSize(_ ids.ID, bw *BlockWrapper) int {
-	return ids.IDLen + len(bw.Bytes()) + 2*pointerOverhead
+	return ids.IDLen + len(bw.Bytes()) + 2*constants.PointerOverhead
 }
 
 func cachedBlockBytesSize(blockBytes string, _ ids.ID) int {

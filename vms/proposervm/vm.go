@@ -32,7 +32,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/proposervm/indexer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/scheduler"
@@ -49,7 +48,6 @@ const (
 
 	checkIndexedFrequency = 10 * time.Second
 	innerBlkCacheSize     = 128 * units.MiB
-	pointerOverhead       = wrappers.LongLen
 )
 
 var (
@@ -79,7 +77,7 @@ func init() {
 }
 
 func cachedBlockSize(_ ids.ID, b snowman.Block) int {
-	return ids.IDLen + len(b.Bytes()) + pointerOverhead
+	return ids.IDLen + len(b.Bytes()) + constants.PointerOverhead
 }
 
 type VM struct {

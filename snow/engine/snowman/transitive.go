@@ -22,16 +22,14 @@ import (
 	"github.com/ava-labs/avalanchego/snow/events"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/bag"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-const (
-	nonVerifiedCacheSize = 128 * units.MiB
-	pointerOverhead      = wrappers.LongLen
-)
+const nonVerifiedCacheSize = 128 * units.MiB
 
 var _ Engine = (*Transitive)(nil)
 
@@ -40,7 +38,7 @@ func New(config Config) (Engine, error) {
 }
 
 func cachedBlockSize(_ ids.ID, b snowman.Block) int {
-	return ids.IDLen + len(b.Bytes()) + pointerOverhead
+	return ids.IDLen + len(b.Bytes()) + constants.PointerOverhead
 }
 
 // Transitive implements the Engine interface by attempting to fetch all

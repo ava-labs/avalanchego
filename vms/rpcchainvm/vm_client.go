@@ -63,6 +63,7 @@ import (
 	warppb "github.com/ava-labs/avalanchego/proto/pb/warp"
 )
 
+// TODO: Enable these to be configured by the user
 const (
 	decidedCacheSize    = 256 * units.MiB
 	missingCacheSize    = 2048
