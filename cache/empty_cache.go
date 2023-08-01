@@ -19,6 +19,10 @@ func (*Empty[K, _]) Evict(K) {}
 
 func (*Empty[_, _]) Flush() {}
 
+func (*Empty[_, _]) Len() int {
+	return 0
+}
+
 func (*Empty[_, _]) PortionFilled() float64 {
 	return 0
 }

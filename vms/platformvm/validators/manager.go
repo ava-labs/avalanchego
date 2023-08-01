@@ -17,12 +17,12 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/window"
+	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
-	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -50,10 +50,56 @@ type Manager interface {
 	OnAcceptedBlockID(blkID ids.ID)
 }
 
+type State interface {
+	GetTx(txID ids.ID) (*txs.Tx, status.Status, error)
+
+	GetLastAccepted() ids.ID
+	GetStatelessBlock(blockID ids.ID) (blocks.Block, error)
+
+	// ValidatorSet adds all the validators and delegators of [subnetID] into
+	// [vdrs].
+	ValidatorSet(subnetID ids.ID, vdrs validators.Set) error
+
+	// ApplyValidatorWeightDiffs iterates from [startHeight] towards the genesis
+	// block until it has applied all of the diffs up to and including
+	// [endHeight]. Applying the diffs modifies [validators].
+	//
+	// Invariant: If attempting to generate the validator set for
+	// [endHeight - 1], [validators] must initially contain the validator
+	// weights for [startHeight].
+	//
+	// Note: Because this function iterates towards the genesis, [startHeight]
+	// should normally be greater than or equal to [endHeight].
+	ApplyValidatorWeightDiffs(
+		ctx context.Context,
+		validators map[ids.NodeID]*validators.GetValidatorOutput,
+		startHeight uint64,
+		endHeight uint64,
+		subnetID ids.ID,
+	) error
+
+	// ApplyValidatorPublicKeyDiffs iterates from [startHeight] towards the
+	// genesis block until it has applied all of the diffs up to and including
+	// [endHeight]. Applying the diffs modifies [validators].
+	//
+	// Invariant: If attempting to generate the validator set for
+	// [endHeight - 1], [validators] must initially contain the validator
+	// weights for [startHeight].
+	//
+	// Note: Because this function iterates towards the genesis, [startHeight]
+	// should normally be greater than or equal to [endHeight].
+	ApplyValidatorPublicKeyDiffs(
+		ctx context.Context,
+		validators map[ids.NodeID]*validators.GetValidatorOutput,
+		startHeight uint64,
+		endHeight uint64,
+	) error
+}
+
 func NewManager(
 	log logging.Logger,
 	cfg config.Config,
-	state state.State,
+	state State,
 	metrics metrics.Metrics,
 	clk *mockable.Clock,
 ) Manager {
@@ -75,10 +121,12 @@ func NewManager(
 	}
 }
 
+// TODO: Remove requirement for the P-chain's context lock to be held when
+// calling exported functions.
 type manager struct {
 	log     logging.Logger
 	cfg     config.Config
-	state   state.State
+	state   State
 	metrics metrics.Metrics
 	clk     *mockable.Clock
 
@@ -110,12 +158,12 @@ type manager struct {
 // as the minimum.
 func (m *manager) GetMinimumHeight(ctx context.Context) (uint64, error) {
 	if m.cfg.UseCurrentHeight {
-		return m.GetCurrentHeight(ctx)
+		return m.getCurrentHeight(ctx)
 	}
 
 	oldest, ok := m.recentlyAccepted.Oldest()
 	if !ok {
-		return m.GetCurrentHeight(ctx)
+		return m.getCurrentHeight(ctx)
 	}
 
 	blk, err := m.state.GetStatelessBlock(oldest)
@@ -131,7 +179,12 @@ func (m *manager) GetMinimumHeight(ctx context.Context) (uint64, error) {
 	return blk.Height() - 1, nil
 }
 
-func (m *manager) GetCurrentHeight(context.Context) (uint64, error) {
+func (m *manager) GetCurrentHeight(ctx context.Context) (uint64, error) {
+	return m.getCurrentHeight(ctx)
+}
+
+// TODO: Pass the context into the state.
+func (m *manager) getCurrentHeight(context.Context) (uint64, error) {
 	lastAcceptedID := m.state.GetLastAccepted()
 	lastAccepted, err := m.state.GetStatelessBlock(lastAcceptedID)
 	if err != nil {
@@ -142,37 +195,10 @@ func (m *manager) GetCurrentHeight(context.Context) (uint64, error) {
 
 func (m *manager) GetValidatorSet(
 	ctx context.Context,
-	height uint64,
-	subnetID ids.ID,
-) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-	lastAcceptedHeight, err := m.GetCurrentHeight(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if lastAcceptedHeight < height {
-		return nil, database.ErrNotFound
-	}
-
-	return m.getValidatorSetFrom(lastAcceptedHeight, height, subnetID)
-}
-
-// getValidatorSetFrom fetches the validator set of [subnetID] at [targetHeight]
-// or builds it starting from [currentHeight].
-//
-// Invariant: [m.cfg.Validators] contains the validator set at [currentHeight].
-func (m *manager) getValidatorSetFrom(
-	currentHeight uint64,
 	targetHeight uint64,
 	subnetID ids.ID,
 ) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-	validatorSetsCache, exists := m.caches[subnetID]
-	if !exists {
-		validatorSetsCache = &cache.LRU[uint64, map[ids.NodeID]*validators.GetValidatorOutput]{Size: validatorSetsCacheSize}
-		// Only cache tracked subnets
-		if subnetID == constants.PrimaryNetworkID || m.cfg.TrackedSubnets.Contains(subnetID) {
-			m.caches[subnetID] = validatorSetsCache
-		}
-	}
+	validatorSetsCache := m.getValidatorSetCache(subnetID)
 
 	if validatorSet, ok := validatorSetsCache.Get(targetHeight); ok {
 		m.metrics.IncValidatorSetsCached()
@@ -183,13 +209,14 @@ func (m *manager) getValidatorSetFrom(
 	startTime := m.clk.Time()
 
 	var (
-		validatorSet map[ids.NodeID]*validators.GetValidatorOutput
-		err          error
+		validatorSet  map[ids.NodeID]*validators.GetValidatorOutput
+		currentHeight uint64
+		err           error
 	)
 	if subnetID == constants.PrimaryNetworkID {
-		validatorSet, err = m.makePrimaryNetworkValidatorSet(currentHeight, targetHeight)
+		validatorSet, currentHeight, err = m.makePrimaryNetworkValidatorSet(ctx, targetHeight)
 	} else {
-		validatorSet, err = m.makeSubnetValidatorSet(currentHeight, targetHeight, subnetID)
+		validatorSet, currentHeight, err = m.makeSubnetValidatorSet(ctx, targetHeight, subnetID)
 	}
 	if err != nil {
 		return nil, err
@@ -198,146 +225,169 @@ func (m *manager) getValidatorSetFrom(
 	// cache the validator set
 	validatorSetsCache.Put(targetHeight, validatorSet)
 
-	endTime := m.clk.Time()
+	duration := m.clk.Time().Sub(startTime)
 	m.metrics.IncValidatorSetsCreated()
-	m.metrics.AddValidatorSetsDuration(endTime.Sub(startTime))
+	m.metrics.AddValidatorSetsDuration(duration)
 	m.metrics.AddValidatorSetsHeightDiff(currentHeight - targetHeight)
 	return validatorSet, nil
 }
 
+func (m *manager) getValidatorSetCache(subnetID ids.ID) cache.Cacher[uint64, map[ids.NodeID]*validators.GetValidatorOutput] {
+	// Only cache tracked subnets
+	if subnetID != constants.PrimaryNetworkID && !m.cfg.TrackedSubnets.Contains(subnetID) {
+		return &cache.Empty[uint64, map[ids.NodeID]*validators.GetValidatorOutput]{}
+	}
+
+	validatorSetsCache, exists := m.caches[subnetID]
+	if exists {
+		return validatorSetsCache
+	}
+
+	validatorSetsCache = &cache.LRU[uint64, map[ids.NodeID]*validators.GetValidatorOutput]{
+		Size: validatorSetsCacheSize,
+	}
+	m.caches[subnetID] = validatorSetsCache
+	return validatorSetsCache
+}
+
 func (m *manager) makePrimaryNetworkValidatorSet(
-	currentHeight uint64,
+	ctx context.Context,
 	targetHeight uint64,
-) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+) (map[ids.NodeID]*validators.GetValidatorOutput, uint64, error) {
+	validatorSet, currentHeight, err := m.getCurrentPrimaryValidatorSet(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	if currentHeight < targetHeight {
+		return nil, 0, database.ErrNotFound
+	}
+
+	// Rebuild primary network validators at [targetHeight]
+	//
+	// Note: Since we are attempting to generate the validator set at
+	// [targetHeight], we want to apply the diffs from
+	// (targetHeight, currentHeight]. Because the state interface is implemented
+	// to be inclusive, we apply diffs in [targetHeight + 1, currentHeight].
+	lastDiffHeight := targetHeight + 1
+	err = m.state.ApplyValidatorWeightDiffs(
+		ctx,
+		validatorSet,
+		currentHeight,
+		lastDiffHeight,
+		constants.PlatformChainID,
+	)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	err = m.state.ApplyValidatorPublicKeyDiffs(
+		ctx,
+		validatorSet,
+		currentHeight,
+		lastDiffHeight,
+	)
+	return validatorSet, currentHeight, err
+}
+
+func (m *manager) getCurrentPrimaryValidatorSet(
+	ctx context.Context,
+) (map[ids.NodeID]*validators.GetValidatorOutput, uint64, error) {
 	currentValidators, ok := m.cfg.Validators.Get(constants.PrimaryNetworkID)
 	if !ok {
 		// This should never happen
 		m.log.Error(ErrMissingValidatorSet.Error(),
 			zap.Stringer("subnetID", constants.PrimaryNetworkID),
 		)
-		return nil, ErrMissingValidatorSet
+		return nil, 0, ErrMissingValidatorSet
 	}
 
-	// Node ID --> Validator information for the node validating the Primary
-	// Network.
-	validatorSet := currentValidators.Map()
-
-	// Rebuild primary network validators at [height]
-	for diffHeight := currentHeight; diffHeight > targetHeight; diffHeight-- {
-		weightDiffs, err := m.state.GetValidatorWeightDiffs(diffHeight, constants.PlatformChainID)
-		if err != nil {
-			return nil, err
-		}
-		for nodeID, weightDiff := range weightDiffs {
-			if err := applyWeightDiff(validatorSet, nodeID, weightDiff); err != nil {
-				return nil, err
-			}
-		}
-
-		pkDiffs, err := m.state.GetValidatorPublicKeyDiffs(diffHeight)
-		if err != nil {
-			return nil, err
-		}
-		for nodeID, pk := range pkDiffs {
-			if vdr, ok := validatorSet[nodeID]; ok {
-				// The validator's public key was removed at this block, so it
-				// was in the validator set before.
-				vdr.PublicKey = pk
-			}
-		}
-	}
-	return validatorSet, nil
+	currentHeight, err := m.getCurrentHeight(ctx)
+	return currentValidators.Map(), currentHeight, err
 }
 
 func (m *manager) makeSubnetValidatorSet(
-	currentHeight uint64,
+	ctx context.Context,
 	targetHeight uint64,
 	subnetID ids.ID,
-) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-	currentValidators, ok := m.cfg.Validators.Get(subnetID)
-	if !ok {
-		currentValidators = validators.NewSet()
-		if err := m.state.ValidatorSet(subnetID, currentValidators); err != nil {
-			return nil, err
-		}
+) (map[ids.NodeID]*validators.GetValidatorOutput, uint64, error) {
+	subnetValidatorSet, primaryValidatorSet, currentHeight, err := m.getCurrentValidatorSets(ctx, subnetID)
+	if err != nil {
+		return nil, 0, err
 	}
-
-	// Node ID --> Validator information for the node validating the Subnet.
-	subnetValidatorSet := currentValidators.Map()
+	if currentHeight < targetHeight {
+		return nil, 0, database.ErrNotFound
+	}
 
 	// Rebuild subnet validators at [targetHeight]
-	for diffHeight := currentHeight; diffHeight > targetHeight; diffHeight-- {
-		weightDiffs, err := m.state.GetValidatorWeightDiffs(diffHeight, subnetID)
-		if err != nil {
-			return nil, err
-		}
-
-		for nodeID, weightDiff := range weightDiffs {
-			if err := applyWeightDiff(subnetValidatorSet, nodeID, weightDiff); err != nil {
-				return nil, err
-			}
-		}
-	}
-
-	// Get the public keys for all the validators at [targetHeight]
-	primarySet, err := m.getValidatorSetFrom(currentHeight, targetHeight, constants.PrimaryNetworkID)
+	//
+	// Note: Since we are attempting to generate the validator set at
+	// [targetHeight], we want to apply the diffs from
+	// (targetHeight, currentHeight]. Because the state interface is implemented
+	// to be inclusive, we apply diffs in [targetHeight + 1, currentHeight].
+	lastDiffHeight := targetHeight + 1
+	err = m.state.ApplyValidatorWeightDiffs(
+		ctx,
+		subnetValidatorSet,
+		currentHeight,
+		lastDiffHeight,
+		subnetID,
+	)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	// Update the subnet validator set to include the public keys at
-	// [targetHeight].
-	for nodeID, subnetValidator := range subnetValidatorSet {
-		primaryValidator, ok := primarySet[nodeID]
+	// [currentHeight]. When we apply the public key diffs, we will convert
+	// these keys to represent the public keys at [targetHeight].
+	for nodeID, vdr := range subnetValidatorSet {
+		primaryVdr, ok := primaryValidatorSet[nodeID]
 		if !ok {
 			// This should never happen
 			m.log.Error(ErrMissingValidator.Error(),
-				zap.Stringer("nodeID", nodeID),
 				zap.Stringer("subnetID", subnetID),
+				zap.Stringer("nodeID", vdr.NodeID),
 			)
-			return nil, ErrMissingValidator
+			return nil, 0, ErrMissingValidator
 		}
-		subnetValidator.PublicKey = primaryValidator.PublicKey
+
+		vdr.PublicKey = primaryVdr.PublicKey
 	}
 
-	return subnetValidatorSet, nil
+	err = m.state.ApplyValidatorPublicKeyDiffs(
+		ctx,
+		subnetValidatorSet,
+		currentHeight,
+		lastDiffHeight,
+	)
+	return subnetValidatorSet, currentHeight, err
 }
 
-func applyWeightDiff(
-	targetSet map[ids.NodeID]*validators.GetValidatorOutput,
-	nodeID ids.NodeID,
-	weightDiff *state.ValidatorWeightDiff,
-) error {
-	vdr, ok := targetSet[nodeID]
+func (m *manager) getCurrentValidatorSets(
+	ctx context.Context,
+	subnetID ids.ID,
+) (map[ids.NodeID]*validators.GetValidatorOutput, map[ids.NodeID]*validators.GetValidatorOutput, uint64, error) {
+	currentSubnetValidators, ok := m.cfg.Validators.Get(subnetID)
 	if !ok {
-		// This node isn't in the current validator set.
-		vdr = &validators.GetValidatorOutput{
-			NodeID: nodeID,
+		// TODO: Require that the current validator set for all subnets is
+		// included in the validator manager.
+		currentSubnetValidators = validators.NewSet()
+		err := m.state.ValidatorSet(subnetID, currentSubnetValidators)
+		if err != nil {
+			return nil, nil, 0, err
 		}
-		targetSet[nodeID] = vdr
 	}
 
-	// The weight of this node changed at this block.
-	var err error
-	if weightDiff.Decrease {
-		// The validator's weight was decreased at this block, so in the
-		// prior block it was higher.
-		vdr.Weight, err = math.Add64(vdr.Weight, weightDiff.Amount)
-	} else {
-		// The validator's weight was increased at this block, so in the
-		// prior block it was lower.
-		vdr.Weight, err = math.Sub(vdr.Weight, weightDiff.Amount)
-	}
-	if err != nil {
-		return err
+	currentPrimaryValidators, ok := m.cfg.Validators.Get(constants.PrimaryNetworkID)
+	if !ok {
+		// This should never happen
+		m.log.Error(ErrMissingValidatorSet.Error(),
+			zap.Stringer("subnetID", constants.PrimaryNetworkID),
+		)
+		return nil, nil, 0, ErrMissingValidatorSet
 	}
 
-	if vdr.Weight == 0 {
-		// The validator's weight was 0 before this block so
-		// they weren't in the validator set.
-		delete(targetSet, nodeID)
-	}
-	return nil
+	currentHeight, err := m.getCurrentHeight(ctx)
+	return currentSubnetValidators.Map(), currentPrimaryValidators.Map(), currentHeight, err
 }
 
 func (m *manager) GetSubnetID(_ context.Context, chainID ids.ID) (ids.ID, error) {
