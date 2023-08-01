@@ -475,7 +475,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 			BCLookup:     m,
 			Metrics:      vmMetrics,
 
-			WarpSigner: warp.NewSigner(m.StakingBLSKey, chainParams.ID),
+			WarpSigner: warp.NewSigner(m.StakingBLSKey, m.NetworkID, chainParams.ID),
 
 			ValidatorState: m.validatorState,
 			ChainDataDir:   chainDataDir,

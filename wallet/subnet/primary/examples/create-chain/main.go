@@ -49,7 +49,7 @@ func main() {
 	pWallet := wallet.P()
 
 	createChainStartTime := time.Now()
-	createChainTxID, err := pWallet.IssueCreateChainTx(
+	createChainTx, err := pWallet.IssueCreateChainTx(
 		subnetID,
 		genesisBytes,
 		vmID,
@@ -59,5 +59,5 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to issue create chain transaction: %s\n", err)
 	}
-	log.Printf("created new chain %s in %s\n", createChainTxID, time.Since(createChainStartTime))
+	log.Printf("created new chain %s in %s\n", createChainTx.ID(), time.Since(createChainStartTime))
 }

@@ -10,26 +10,24 @@ import (
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 )
 
-var _ Cacher[struct{}, SizedElement] = (*sizedLRU[struct{}, SizedElement])(nil)
-
-type SizedElement interface {
-	Size() int
-}
+var _ Cacher[struct{}, any] = (*sizedLRU[struct{}, any])(nil)
 
 // sizedLRU is a key value store with bounded size. If the size is attempted to
 // be exceeded, then elements are removed from the cache until the bound is
 // honored, based on evicting the least recently used value.
-type sizedLRU[K comparable, V SizedElement] struct {
+type sizedLRU[K comparable, V any] struct {
 	lock        sync.Mutex
 	elements    linkedhashmap.LinkedHashmap[K, V]
 	maxSize     int
 	currentSize int
+	size        func(K, V) int
 }
 
-func NewSizedLRU[K comparable, V SizedElement](maxSize int) Cacher[K, V] {
+func NewSizedLRU[K comparable, V any](maxSize int, size func(K, V) int) Cacher[K, V] {
 	return &sizedLRU[K, V]{
 		elements: linkedhashmap.New[K, V](),
 		maxSize:  maxSize,
+		size:     size,
 	}
 }
 
@@ -61,6 +59,13 @@ func (c *sizedLRU[K, V]) Flush() {
 	c.flush()
 }
 
+func (c *sizedLRU[_, _]) Len() int {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	return c.len()
+}
+
 func (c *sizedLRU[_, _]) PortionFilled() float64 {
 	c.lock.Lock()
 	defer c.lock.Unlock()
@@ -69,25 +74,25 @@ func (c *sizedLRU[_, _]) PortionFilled() float64 {
 }
 
 func (c *sizedLRU[K, V]) put(key K, value V) {
-	valueSize := value.Size()
-	if valueSize > c.maxSize {
+	newEntrySize := c.size(key, value)
+	if newEntrySize > c.maxSize {
 		c.flush()
 		return
 	}
 
 	if oldValue, ok := c.elements.Get(key); ok {
-		c.currentSize -= oldValue.Size()
+		c.currentSize -= c.size(key, oldValue)
 	}
 
 	// Remove elements until the size of elements in the cache <= [c.maxSize].
-	for c.currentSize > c.maxSize-valueSize {
-		oldestKey, value, _ := c.elements.Oldest()
+	for c.currentSize > c.maxSize-newEntrySize {
+		oldestKey, oldestValue, _ := c.elements.Oldest()
 		c.elements.Delete(oldestKey)
-		c.currentSize -= value.Size()
+		c.currentSize -= c.size(oldestKey, oldestValue)
 	}
 
 	c.elements.Put(key, value)
-	c.currentSize += valueSize
+	c.currentSize += newEntrySize
 }
 
 func (c *sizedLRU[K, V]) get(key K) (V, bool) {
@@ -103,13 +108,17 @@ func (c *sizedLRU[K, V]) get(key K) (V, bool) {
 func (c *sizedLRU[K, _]) evict(key K) {
 	if value, ok := c.elements.Get(key); ok {
 		c.elements.Delete(key)
-		c.currentSize -= value.Size()
+		c.currentSize -= c.size(key, value)
 	}
 }
 
 func (c *sizedLRU[K, V]) flush() {
 	c.elements = linkedhashmap.New[K, V]()
 	c.currentSize = 0
+}
+
+func (c *sizedLRU[_, _]) len() int {
+	return c.elements.Len()
 }
 
 func (c *sizedLRU[_, _]) portionFilled() float64 {

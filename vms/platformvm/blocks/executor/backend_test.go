@@ -13,7 +13,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 )
@@ -98,7 +97,7 @@ func TestBackendGetBlock(t *testing.T) {
 	{
 		// Case: block isn't in the map or database.
 		blkID := ids.GenerateTestID()
-		state.EXPECT().GetStatelessBlock(blkID).Return(nil, choices.Unknown, database.ErrNotFound)
+		state.EXPECT().GetStatelessBlock(blkID).Return(nil, database.ErrNotFound)
 		_, err := b.GetBlock(blkID)
 		require.Equal(database.ErrNotFound, err)
 	}
@@ -106,7 +105,7 @@ func TestBackendGetBlock(t *testing.T) {
 	{
 		// Case: block isn't in the map and is in database.
 		blkID := ids.GenerateTestID()
-		state.EXPECT().GetStatelessBlock(blkID).Return(statelessBlk, choices.Accepted, nil)
+		state.EXPECT().GetStatelessBlock(blkID).Return(statelessBlk, nil)
 		gotBlk, err := b.GetBlock(blkID)
 		require.NoError(err)
 		require.Equal(statelessBlk, gotBlk)

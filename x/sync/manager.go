@@ -55,7 +55,6 @@ type workItem struct {
 	localRootID ids.ID
 }
 
-// TODO danlaine look into using a sync.Pool for workItems
 func newWorkItem(localRootID ids.ID, start, end []byte, priority priority) *workItem {
 	return &workItem{
 		localRootID: localRootID,
@@ -190,10 +189,6 @@ func (m *Manager) sync(ctx context.Context) {
 		default:
 			m.processingWorkItems++
 			work := m.unprocessedWork.GetWork()
-			// TODO danlaine: We won't release [m.workLock] until
-			// we've started a goroutine for each available work item.
-			// We can't apply proofs we receive until we release [m.workLock].
-			// Is this OK? Is it possible we end up with too many goroutines?
 			go m.doWork(ctx, work)
 		}
 	}
@@ -531,6 +526,9 @@ func (m *Manager) Wait(ctx context.Context) error {
 }
 
 func (m *Manager) UpdateSyncTarget(syncTargetRoot ids.ID) error {
+	m.syncTargetLock.Lock()
+	defer m.syncTargetLock.Unlock()
+
 	m.workLock.Lock()
 	defer m.workLock.Unlock()
 
@@ -539,9 +537,6 @@ func (m *Manager) UpdateSyncTarget(syncTargetRoot ids.ID) error {
 		return ErrAlreadyClosed
 	default:
 	}
-
-	m.syncTargetLock.Lock()
-	defer m.syncTargetLock.Unlock()
 
 	if m.config.TargetRoot == syncTargetRoot {
 		// the target hasn't changed, so there is nothing to do
@@ -609,20 +604,29 @@ func (m *Manager) completeWorkItem(ctx context.Context, work *workItem, largestH
 		}
 	}
 
-	// completed the range [work.start, lastKey], log and record in the completed work heap
-	m.config.Log.Info("completed range",
-		zap.Binary("start", work.start),
-		zap.Binary("end", largestHandledKey),
-	)
-	if m.getTargetRoot() == rootID {
+	// Process [work] while holding [syncTargetLock] to ensure that object
+	// is added to the right queue, even if a target update is triggered
+	m.syncTargetLock.RLock()
+	defer m.syncTargetLock.RUnlock()
+
+	stale := m.config.TargetRoot != rootID
+	if stale {
+		// the root has changed, so reinsert with high priority
+		m.enqueueWork(newWorkItem(rootID, work.start, largestHandledKey, highPriority))
+	} else {
 		m.workLock.Lock()
 		defer m.workLock.Unlock()
 
 		m.processedWork.MergeInsert(newWorkItem(rootID, work.start, largestHandledKey, work.priority))
-	} else {
-		// the root has changed, so reinsert with high priority
-		m.enqueueWork(newWorkItem(rootID, work.start, largestHandledKey, highPriority))
 	}
+
+	// completed the range [work.start, lastKey], log and record in the completed work heap
+	m.config.Log.Info("completed range",
+		zap.Binary("start", work.start),
+		zap.Binary("end", largestHandledKey),
+		zap.Stringer("rootID", rootID),
+		zap.Bool("stale", stale),
+	)
 }
 
 // Queue the given key range to be fetched and applied.
@@ -645,6 +649,16 @@ func (m *Manager) enqueueWork(work *workItem) {
 	// Split the remaining range into to 2.
 	// Find the middle point.
 	mid := midPoint(work.start, work.end)
+
+	if bytes.Equal(work.start, mid) || bytes.Equal(mid, work.end) {
+		// The range is too small to split.
+		// If we didn't have this check we would add work items
+		// [start, start] and [start, end]. Since start <= end, this would
+		// violate the invariant of [m.unprocessedWork] and [m.processedWork]
+		// that there are no overlapping ranges.
+		m.unprocessedWork.Insert(work)
+		return
+	}
 
 	// first item gets higher priority than the second to encourage finished ranges to grow
 	// rather than start a new range that is not contiguous with existing completed ranges

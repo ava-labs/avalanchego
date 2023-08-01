@@ -12,7 +12,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 )
@@ -34,13 +33,13 @@ func TestGetBlock(t *testing.T) {
 
 	{
 		// Case: block isn't in memory or database
-		state.EXPECT().GetStatelessBlock(statelessBlk.ID()).Return(nil, choices.Unknown, database.ErrNotFound).Times(1)
+		state.EXPECT().GetStatelessBlock(statelessBlk.ID()).Return(nil, database.ErrNotFound).Times(1)
 		_, err := manager.GetBlock(statelessBlk.ID())
 		require.ErrorIs(err, database.ErrNotFound)
 	}
 	{
 		// Case: block isn't in memory but is in database.
-		state.EXPECT().GetStatelessBlock(statelessBlk.ID()).Return(statelessBlk, choices.Accepted, nil).Times(1)
+		state.EXPECT().GetStatelessBlock(statelessBlk.ID()).Return(statelessBlk, nil).Times(1)
 		gotBlk, err := manager.GetBlock(statelessBlk.ID())
 		require.NoError(err)
 		require.Equal(statelessBlk.ID(), gotBlk.ID())

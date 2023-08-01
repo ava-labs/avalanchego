@@ -43,9 +43,9 @@ func main() {
 	}
 
 	createSubnetStartTime := time.Now()
-	createSubnetTxID, err := pWallet.IssueCreateSubnetTx(owner)
+	createSubnetTx, err := pWallet.IssueCreateSubnetTx(owner)
 	if err != nil {
 		log.Fatalf("failed to issue create subnet transaction: %s\n", err)
 	}
-	log.Printf("created new subnet %s in %s\n", createSubnetTxID, time.Since(createSubnetStartTime))
+	log.Printf("created new subnet %s in %s\n", createSubnetTx.ID(), time.Since(createSubnetStartTime))
 }

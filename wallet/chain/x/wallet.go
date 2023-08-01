@@ -38,7 +38,7 @@ type Wallet interface {
 	IssueBaseTx(
 		outputs []*avax.TransferableOutput,
 		options ...common.Option,
-	) (ids.ID, error)
+	) (*txs.Tx, error)
 
 	// IssueCreateAssetTx creates, signs, and issues a new asset.
 	//
@@ -55,7 +55,7 @@ type Wallet interface {
 		denomination byte,
 		initialState map[uint32][]verify.State,
 		options ...common.Option,
-	) (ids.ID, error)
+	) (*txs.Tx, error)
 
 	// IssueOperationTx creates, signs, and issues state changes on the UTXO
 	// set. These state changes may be more complex than simple value transfers.
@@ -64,7 +64,7 @@ type Wallet interface {
 	IssueOperationTx(
 		operations []*txs.Operation,
 		options ...common.Option,
-	) (ids.ID, error)
+	) (*txs.Tx, error)
 
 	// IssueOperationTxMintFT creates, signs, and issues a set of state changes
 	// that mint new tokens for the requested assets.
@@ -74,7 +74,7 @@ type Wallet interface {
 	IssueOperationTxMintFT(
 		outputs map[ids.ID]*secp256k1fx.TransferOutput,
 		options ...common.Option,
-	) (ids.ID, error)
+	) (*txs.Tx, error)
 
 	// IssueOperationTxMintNFT creates, signs, and issues a state change that
 	// mints new NFTs for the requested asset.
@@ -87,7 +87,7 @@ type Wallet interface {
 		payload []byte,
 		owners []*secp256k1fx.OutputOwners,
 		options ...common.Option,
-	) (ids.ID, error)
+	) (*txs.Tx, error)
 
 	// IssueOperationTxMintProperty creates, signs, and issues a state change
 	// that mints a new property for the requested asset.
@@ -98,7 +98,7 @@ type Wallet interface {
 		assetID ids.ID,
 		owner *secp256k1fx.OutputOwners,
 		options ...common.Option,
-	) (ids.ID, error)
+	) (*txs.Tx, error)
 
 	// IssueOperationTxBurnProperty creates, signs, and issues state changes
 	// that burns all the properties of the requested asset.
@@ -107,7 +107,7 @@ type Wallet interface {
 	IssueOperationTxBurnProperty(
 		assetID ids.ID,
 		options ...common.Option,
-	) (ids.ID, error)
+	) (*txs.Tx, error)
 
 	// IssueImportTx creates, signs, and issues an import transaction that
 	// attempts to consume all the available UTXOs and import the funds to [to].
@@ -118,7 +118,7 @@ type Wallet interface {
 		chainID ids.ID,
 		to *secp256k1fx.OutputOwners,
 		options ...common.Option,
-	) (ids.ID, error)
+	) (*txs.Tx, error)
 
 	// IssueExportTx creates, signs, and issues an export transaction that
 	// attempts to send all the provided [outputs] to the requested [chainID].
@@ -129,19 +129,19 @@ type Wallet interface {
 		chainID ids.ID,
 		outputs []*avax.TransferableOutput,
 		options ...common.Option,
-	) (ids.ID, error)
+	) (*txs.Tx, error)
 
 	// IssueUnsignedTx signs and issues the unsigned tx.
 	IssueUnsignedTx(
 		utx txs.UnsignedTx,
 		options ...common.Option,
-	) (ids.ID, error)
+	) (*txs.Tx, error)
 
 	// IssueTx issues the signed tx.
 	IssueTx(
 		tx *txs.Tx,
 		options ...common.Option,
-	) (ids.ID, error)
+	) error
 }
 
 func NewWallet(
@@ -176,10 +176,10 @@ func (w *wallet) Signer() Signer {
 func (w *wallet) IssueBaseTx(
 	outputs []*avax.TransferableOutput,
 	options ...common.Option,
-) (ids.ID, error) {
+) (*txs.Tx, error) {
 	utx, err := w.builder.NewBaseTx(outputs, options...)
 	if err != nil {
-		return ids.Empty, err
+		return nil, err
 	}
 	return w.IssueUnsignedTx(utx, options...)
 }
@@ -190,10 +190,10 @@ func (w *wallet) IssueCreateAssetTx(
 	denomination byte,
 	initialState map[uint32][]verify.State,
 	options ...common.Option,
-) (ids.ID, error) {
+) (*txs.Tx, error) {
 	utx, err := w.builder.NewCreateAssetTx(name, symbol, denomination, initialState, options...)
 	if err != nil {
-		return ids.Empty, err
+		return nil, err
 	}
 	return w.IssueUnsignedTx(utx, options...)
 }
@@ -201,10 +201,10 @@ func (w *wallet) IssueCreateAssetTx(
 func (w *wallet) IssueOperationTx(
 	operations []*txs.Operation,
 	options ...common.Option,
-) (ids.ID, error) {
+) (*txs.Tx, error) {
 	utx, err := w.builder.NewOperationTx(operations, options...)
 	if err != nil {
-		return ids.Empty, err
+		return nil, err
 	}
 	return w.IssueUnsignedTx(utx, options...)
 }
@@ -212,10 +212,10 @@ func (w *wallet) IssueOperationTx(
 func (w *wallet) IssueOperationTxMintFT(
 	outputs map[ids.ID]*secp256k1fx.TransferOutput,
 	options ...common.Option,
-) (ids.ID, error) {
+) (*txs.Tx, error) {
 	utx, err := w.builder.NewOperationTxMintFT(outputs, options...)
 	if err != nil {
-		return ids.Empty, err
+		return nil, err
 	}
 	return w.IssueUnsignedTx(utx, options...)
 }
@@ -225,10 +225,10 @@ func (w *wallet) IssueOperationTxMintNFT(
 	payload []byte,
 	owners []*secp256k1fx.OutputOwners,
 	options ...common.Option,
-) (ids.ID, error) {
+) (*txs.Tx, error) {
 	utx, err := w.builder.NewOperationTxMintNFT(assetID, payload, owners, options...)
 	if err != nil {
-		return ids.Empty, err
+		return nil, err
 	}
 	return w.IssueUnsignedTx(utx, options...)
 }
@@ -237,10 +237,10 @@ func (w *wallet) IssueOperationTxMintProperty(
 	assetID ids.ID,
 	owner *secp256k1fx.OutputOwners,
 	options ...common.Option,
-) (ids.ID, error) {
+) (*txs.Tx, error) {
 	utx, err := w.builder.NewOperationTxMintProperty(assetID, owner, options...)
 	if err != nil {
-		return ids.Empty, err
+		return nil, err
 	}
 	return w.IssueUnsignedTx(utx, options...)
 }
@@ -248,10 +248,10 @@ func (w *wallet) IssueOperationTxMintProperty(
 func (w *wallet) IssueOperationTxBurnProperty(
 	assetID ids.ID,
 	options ...common.Option,
-) (ids.ID, error) {
+) (*txs.Tx, error) {
 	utx, err := w.builder.NewOperationTxBurnProperty(assetID, options...)
 	if err != nil {
-		return ids.Empty, err
+		return nil, err
 	}
 	return w.IssueUnsignedTx(utx, options...)
 }
@@ -260,10 +260,10 @@ func (w *wallet) IssueImportTx(
 	chainID ids.ID,
 	to *secp256k1fx.OutputOwners,
 	options ...common.Option,
-) (ids.ID, error) {
+) (*txs.Tx, error) {
 	utx, err := w.builder.NewImportTx(chainID, to, options...)
 	if err != nil {
-		return ids.Empty, err
+		return nil, err
 	}
 	return w.IssueUnsignedTx(utx, options...)
 }
@@ -272,10 +272,10 @@ func (w *wallet) IssueExportTx(
 	chainID ids.ID,
 	outputs []*avax.TransferableOutput,
 	options ...common.Option,
-) (ids.ID, error) {
+) (*txs.Tx, error) {
 	utx, err := w.builder.NewExportTx(chainID, outputs, options...)
 	if err != nil {
-		return ids.Empty, err
+		return nil, err
 	}
 	return w.IssueUnsignedTx(utx, options...)
 }
@@ -283,43 +283,43 @@ func (w *wallet) IssueExportTx(
 func (w *wallet) IssueUnsignedTx(
 	utx txs.UnsignedTx,
 	options ...common.Option,
-) (ids.ID, error) {
+) (*txs.Tx, error) {
 	ops := common.NewOptions(options)
 	ctx := ops.Context()
 	tx, err := w.signer.SignUnsigned(ctx, utx)
 	if err != nil {
-		return ids.Empty, err
+		return nil, err
 	}
 
-	return w.IssueTx(tx, options...)
+	return tx, w.IssueTx(tx, options...)
 }
 
 func (w *wallet) IssueTx(
 	tx *txs.Tx,
 	options ...common.Option,
-) (ids.ID, error) {
+) error {
 	ops := common.NewOptions(options)
 	ctx := ops.Context()
 	txID, err := w.client.IssueTx(ctx, tx.Bytes())
 	if err != nil {
-		return ids.Empty, err
+		return err
 	}
 
 	if ops.AssumeDecided() {
-		return txID, w.Backend.AcceptTx(ctx, tx)
+		return w.Backend.AcceptTx(ctx, tx)
 	}
 
 	txStatus, err := w.client.ConfirmTx(ctx, txID, ops.PollFrequency())
 	if err != nil {
-		return txID, err
+		return err
 	}
 
 	if err := w.Backend.AcceptTx(ctx, tx); err != nil {
-		return txID, err
+		return err
 	}
 
 	if txStatus != choices.Accepted {
-		return txID, errNotAccepted
+		return errNotAccepted
 	}
-	return txID, nil
+	return nil
 }

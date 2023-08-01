@@ -47,7 +47,7 @@ func main() {
 	avaxAssetID := pWallet.AVAXAssetID()
 
 	issueTxStartTime := time.Now()
-	txID, err := pWallet.IssueBaseTx([]*avax.TransferableOutput{
+	tx, err := pWallet.IssueBaseTx([]*avax.TransferableOutput{
 		{
 			Asset: avax.Asset{
 				ID: avaxAssetID,
@@ -69,5 +69,5 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to issue transaction: %s\n", err)
 	}
-	log.Printf("issued %s in %s\n", txID, time.Since(issueTxStartTime))
+	log.Printf("issued %s in %s\n", tx.ID(), time.Since(issueTxStartTime))
 }

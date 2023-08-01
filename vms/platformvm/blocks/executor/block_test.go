@@ -76,7 +76,7 @@ func TestStatus(t *testing.T) {
 				statelessBlk.EXPECT().ID().Return(blkID)
 
 				state := state.NewMockState(ctrl)
-				state.EXPECT().GetStatelessBlock(blkID).Return(statelessBlk, choices.Accepted, nil)
+				state.EXPECT().GetStatelessBlock(blkID).Return(statelessBlk, nil)
 
 				manager := &manager{
 					backend: &backend{
@@ -98,7 +98,7 @@ func TestStatus(t *testing.T) {
 				statelessBlk.EXPECT().ID().Return(blkID)
 
 				state := state.NewMockState(ctrl)
-				state.EXPECT().GetStatelessBlock(blkID).Return(nil, choices.Unknown, database.ErrNotFound)
+				state.EXPECT().GetStatelessBlock(blkID).Return(nil, database.ErrNotFound)
 
 				manager := &manager{
 					backend: &backend{
