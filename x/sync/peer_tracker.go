@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	stdmath "math"
 
 	"go.uber.org/zap"
@@ -18,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 const (
