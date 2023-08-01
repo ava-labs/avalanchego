@@ -72,8 +72,15 @@ func TestEviction(t *testing.T, cache Cacher[ids.ID, int64]) {
 	expectedValue2 := int64(2)
 	expectedValue3 := int64(3)
 
+	require.Zero(cache.Len())
+
 	cache.Put(id1, expectedValue1)
+
+	require.Equal(1, cache.Len())
+
 	cache.Put(id2, expectedValue2)
+
+	require.Equal(2, cache.Len())
 
 	val, found := cache.Get(id1)
 	require.True(found)
@@ -87,6 +94,7 @@ func TestEviction(t *testing.T, cache Cacher[ids.ID, int64]) {
 	require.False(found)
 
 	cache.Put(id3, expectedValue3)
+	require.Equal(2, cache.Len())
 
 	_, found = cache.Get(id1)
 	require.False(found)
