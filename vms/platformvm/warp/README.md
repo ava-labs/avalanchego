@@ -55,7 +55,7 @@ BitSetSignature:
                        +---------------------------+
 ```
 
-- `signers` encodes a bitset of which validators' signatures are included
+- `signers` encodes a bitset of which validators' signatures are included (a bitset is a byte array where each bit indicates membership of the element at that index in the set)
 - `signature` is an aggregated BLS Multi-Signature of the Unsigned Message
 
 BitSetSignatures are verified within the context of a specific P-Chain height. At a specific P-Chain height, the PlatformVM serves a canonically ordered validator set for the source subnet (validator set is ordered lexicographically by the BLS public key bytes). The signers bitset encodes which validators' signature was included. A value of 1 at index i in `signers` claims that a signature from the validator at index i in the canonical validator set is included in the aggregate signature.
