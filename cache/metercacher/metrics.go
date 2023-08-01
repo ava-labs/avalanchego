@@ -33,11 +33,12 @@ func newCounterMetric(namespace, name string, reg prometheus.Registerer, errs *w
 }
 
 type metrics struct {
-	get,
-	put metric.Averager
+	get           metric.Averager
+	put           metric.Averager
+	len           prometheus.Gauge
 	portionFilled prometheus.Gauge
-	hit,
-	miss prometheus.Counter
+	hit           prometheus.Counter
+	miss          prometheus.Counter
 }
 
 func (m *metrics) Initialize(
@@ -47,6 +48,13 @@ func (m *metrics) Initialize(
 	errs := wrappers.Errs{}
 	m.get = newAveragerMetric(namespace, "get", reg, &errs)
 	m.put = newAveragerMetric(namespace, "put", reg, &errs)
+	m.len = prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "len",
+			Help:      "number of entries",
+		},
+	)
 	m.portionFilled = prometheus.NewGauge(
 		prometheus.GaugeOpts{
 			Namespace: namespace,
