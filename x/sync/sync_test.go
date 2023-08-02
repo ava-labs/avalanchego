@@ -1044,7 +1044,7 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 	// moves the work to [m.unprocessedWork].
 	item := &workItem{
 		start:       []byte{1},
-		end:         []byte{2},
+		end:         merkledb.Some([]byte{2}),
 		localRootID: ids.GenerateTestID(),
 	}
 	m.processedWork.Insert(item)
