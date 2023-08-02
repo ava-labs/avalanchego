@@ -47,7 +47,7 @@ const (
 	DefaultMinBlockDelay = time.Second
 
 	checkIndexedFrequency = 10 * time.Second
-	innerBlkCacheSize     = 128 * units.MiB
+	innerBlkCacheSize     = 64 * units.MiB
 )
 
 var (

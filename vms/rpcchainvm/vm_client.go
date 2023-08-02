@@ -65,7 +65,7 @@ import (
 
 // TODO: Enable these to be configured by the user
 const (
-	decidedCacheSize    = 256 * units.MiB
+	decidedCacheSize    = 64 * units.MiB
 	missingCacheSize    = 2048
 	unverifiedCacheSize = 64 * units.MiB
 	bytesToIDCacheSize  = 64 * units.MiB
