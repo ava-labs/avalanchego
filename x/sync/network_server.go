@@ -138,6 +138,9 @@ func (s *NetworkServer) HandleChangeProofRequest(
 	requestID uint32,
 	req *pb.SyncGetChangeProofRequest,
 ) error {
+	if req.EndKey == nil {
+		req.EndKey = &pb.MaybeBytes{IsNothing: true}
+	}
 	if req.BytesLimit == 0 ||
 		req.KeyLimit == 0 ||
 		len(req.StartRootHash) != ids.IDLen ||
@@ -219,6 +222,9 @@ func (s *NetworkServer) HandleRangeProofRequest(
 	requestID uint32,
 	req *pb.SyncGetRangeProofRequest,
 ) error {
+	if req.EndKey == nil {
+		req.EndKey = &pb.MaybeBytes{IsNothing: true}
+	}
 	if req.BytesLimit == 0 ||
 		req.KeyLimit == 0 ||
 		len(req.RootHash) != ids.IDLen ||

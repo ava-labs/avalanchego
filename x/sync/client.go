@@ -112,9 +112,10 @@ func (c *client) GetChangeProof(ctx context.Context, req *pb.SyncGetChangeProofR
 		}
 
 		endKey := merkledb.Nothing[[]byte]()
-		if !req.EndKey.IsNothing {
+		if req.EndKey != nil && !req.EndKey.IsNothing {
 			endKey = merkledb.Some(req.EndKey.Value)
 		}
+
 		if err := db.VerifyChangeProof(ctx, &changeProof, req.StartKey, endKey, endRoot); err != nil {
 			return nil, fmt.Errorf("%s due to %w", errInvalidRangeProof, err)
 		}
@@ -162,7 +163,7 @@ func (c *client) GetRangeProof(ctx context.Context, req *pb.SyncGetRangeProofReq
 		}
 
 		endKey := merkledb.Nothing[[]byte]()
-		if !req.EndKey.IsNothing {
+		if req.EndKey != nil && !req.EndKey.IsNothing {
 			endKey = merkledb.Some(req.EndKey.Value)
 		}
 
