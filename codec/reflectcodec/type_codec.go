@@ -393,10 +393,9 @@ func (c *genericCodec) marshal(value reflect.Value, p *wrappers.Packer, maxSlice
 			}
 
 			for i := 0; i < minLength; i++ {
-				if sortedKeys[a].binary[i] == sortedKeys[b].binary[i] {
-					continue
+				if sortedKeys[a].binary[i] != sortedKeys[b].binary[i] {
+					return sortedKeys[a].binary[i] > sortedKeys[b].binary[i]
 				}
-				return sortedKeys[a].binary[i] > sortedKeys[b].binary[i]
 			}
 
 			return true
