@@ -1678,19 +1678,12 @@ func FuzzRangeProofInvariants(f *testing.F) {
 		deletePortion,
 	)
 
-	i := 0 // TODO remove
-
 	f.Fuzz(func(
 		t *testing.T,
 		start []byte,
 		end []byte,
 		maxProofLen uint,
 	) {
-		t.Log(i)
-		defer func() {
-			i++
-		}()
-
 		require := require.New(t)
 
 		// Make sure proof bounds are valid

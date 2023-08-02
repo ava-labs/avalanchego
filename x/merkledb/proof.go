@@ -305,21 +305,21 @@ func (proof *RangeProof) Verify(
 		return err
 	}
 
-	smallestPath := Nothing[path]()
+	smallestProvenPath := Nothing[path]()
 	if start != nil {
-		smallestPath = Some(newPath(start))
+		smallestProvenPath = Some(newPath(start))
 	}
 
-	largestPath := Nothing[path]()
+	largestProvenPath := Nothing[path]()
 	if end != nil {
-		largestPath = Some(newPath(end))
+		largestProvenPath = Some(newPath(end))
 	}
 
 	if len(proof.KeyValues) > 0 {
 		// If [proof] has key-value pairs, we should insert children
-		// greater than [largestKey] to ancestors of the node containing
-		// [largestKey] so that we get the expected root ID.
-		largestPath = Some(newPath(proof.KeyValues[len(proof.KeyValues)-1].Key))
+		// greater than [largestProvenPath] to ancestors of the node containing
+		// [largestProvenPath] so that we get the expected root ID.
+		largestProvenPath = Some(newPath(proof.KeyValues[len(proof.KeyValues)-1].Key))
 	}
 
 	// The key-value pairs (allegedly) proven by [proof].
@@ -330,19 +330,29 @@ func (proof *RangeProof) Verify(
 
 	// Ensure that the start proof is valid and contains values that
 	// match the key/values that were sent.
-	if err := verifyProofPath(proof.StartProof, smallestPath.Value()); err != nil {
+	if err := verifyProofPath(proof.StartProof, smallestProvenPath.Value()); err != nil {
 		return err
 	}
-	if err := verifyAllRangeProofKeyValuesPresent(proof.StartProof, smallestPath.Value(), largestPath.Value(), keyValues); err != nil {
+	if err := verifyAllRangeProofKeyValuesPresent(
+		proof.StartProof,
+		smallestProvenPath.Value(),
+		largestProvenPath.Value(),
+		keyValues,
+	); err != nil {
 		return err
 	}
 
 	// Ensure that the end proof is valid and contains values that
 	// match the key/values that were sent.
-	if err := verifyProofPath(proof.EndProof, largestPath.Value()); err != nil {
+	if err := verifyProofPath(proof.EndProof, largestProvenPath.Value()); err != nil {
 		return err
 	}
-	if err := verifyAllRangeProofKeyValuesPresent(proof.EndProof, smallestPath.Value(), largestPath.Value(), keyValues); err != nil {
+	if err := verifyAllRangeProofKeyValuesPresent(
+		proof.EndProof,
+		smallestProvenPath.Value(),
+		largestProvenPath.Value(),
+		keyValues,
+	); err != nil {
 		return err
 	}
 
@@ -360,24 +370,24 @@ func (proof *RangeProof) Verify(
 	}
 
 	// For all the nodes along the edges of the proof, insert children
-	// < [insertChildrenLessThan] and > [insertChildrenGreaterThan]
+	// < [smallestProvenPath] and > [largestProvenPath]
 	// into the trie so that we get the expected root ID (if this proof is valid).
-	// By inserting all children < [insertChildrenLessThan], we prove that there are no keys
-	// > [insertChildrenLessThan] but less than the first key given.
+	// By inserting all children < [smallestProvenPath], we prove that there are no keys
+	// > [smallestProvenPath] but less than the first key given.
 	// That is, the peer who gave us this proof is not omitting nodes.
 	if err := addPathInfo(
 		view,
 		proof.StartProof,
-		smallestPath,
-		largestPath,
+		smallestProvenPath,
+		largestProvenPath,
 	); err != nil {
 		return err
 	}
 	if err := addPathInfo(
 		view,
 		proof.EndProof,
-		smallestPath,
-		largestPath,
+		smallestProvenPath,
+		largestProvenPath,
 	); err != nil {
 		return err
 	}
