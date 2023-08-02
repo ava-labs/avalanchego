@@ -83,7 +83,7 @@ type ChangeProofer interface {
 		ctx context.Context,
 		proof *ChangeProof,
 		start []byte,
-		end []byte,
+		end Maybe[[]byte],
 		expectedEndRootID ids.ID,
 	) error
 
@@ -958,10 +958,10 @@ func (db *merkleDB) VerifyChangeProof(
 	ctx context.Context,
 	proof *ChangeProof,
 	start []byte,
-	end []byte,
+	end Maybe[[]byte],
 	expectedEndRootID ids.ID,
 ) error {
-	if len(end) > 0 && bytes.Compare(start, end) > 0 {
+	if end.HasValue() && bytes.Compare(start, end.Value()) > 0 {
 		return ErrStartAfterEnd
 	}
 
@@ -978,7 +978,7 @@ func (db *merkleDB) VerifyChangeProof(
 	switch {
 	case proof.Empty():
 		return ErrNoMerkleProof
-	case len(end) > 0 && len(proof.EndProof) == 0:
+	case end.HasValue() && len(proof.EndProof) == 0:
 		// We requested an end proof but didn't get one.
 		return ErrNoEndProof
 	case len(start) > 0 && len(proof.StartProof) == 0 && len(proof.EndProof) == 0:
@@ -997,21 +997,22 @@ func (db *merkleDB) VerifyChangeProof(
 	smallestPath := newPath(start)
 
 	// Make sure the start proof, if given, is well-formed.
-	if err := verifyProofPath(proof.StartProof, smallestPath); err != nil {
+	if err := verifyProofPath(proof.StartProof, Some(smallestPath)); err != nil {
 		return err
 	}
 
 	// Find the greatest key in [proof.KeyChanges]
 	// Note that [proof.EndProof] is a proof for this key.
 	// [largestPath] is also used when we add children of proof nodes to [trie] below.
-	largestKey := end
+	largestPath := Nothing[path]()
 	if len(proof.KeyChanges) > 0 {
 		// If [proof] has key-value pairs, we should insert children
 		// greater than [end] to ancestors of the node containing [end]
 		// so that we get the expected root ID.
-		largestKey = proof.KeyChanges[len(proof.KeyChanges)-1].Key
+		largestPath = Some(newPath(proof.KeyChanges[len(proof.KeyChanges)-1].Key))
+	} else if end.HasValue() {
+		largestPath = Some(newPath(end.Value()))
 	}
-	largestPath := newPath(largestKey)
 
 	// Make sure the end proof, if given, is well-formed.
 	if err := verifyProofPath(proof.EndProof, largestPath); err != nil {
@@ -1074,15 +1075,11 @@ func (db *merkleDB) VerifyChangeProof(
 	if len(smallestPath) > 0 {
 		insertChildrenLessThan = Some(smallestPath)
 	}
-	insertChildrenGreaterThan := Nothing[path]()
-	if len(largestPath) > 0 {
-		insertChildrenGreaterThan = Some(largestPath)
-	}
 	if err := addPathInfo(
 		view,
 		proof.StartProof,
 		insertChildrenLessThan,
-		insertChildrenGreaterThan,
+		largestPath,
 	); err != nil {
 		return err
 	}
@@ -1090,7 +1087,7 @@ func (db *merkleDB) VerifyChangeProof(
 		view,
 		proof.EndProof,
 		insertChildrenLessThan,
-		insertChildrenGreaterThan,
+		largestPath,
 	); err != nil {
 		return err
 	}

@@ -29,9 +29,14 @@ func Nothing[T any]() Maybe[T] {
 	return Maybe[T]{}
 }
 
-// Returns true iff [m] has a value.
+// Returns false iff [m] has a value.
 func (m Maybe[T]) IsNothing() bool {
 	return !m.hasValue
+}
+
+// Returns true iff [m] has a value.
+func (m Maybe[T]) HasValue() bool {
+	return m.hasValue
 }
 
 // Returns the value of [m].
