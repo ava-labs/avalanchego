@@ -21,9 +21,6 @@ const (
 	DefaultNodeInitTimeout     = 10 * time.Second
 	DefaultNodeStopTimeout     = 5 * time.Second
 	DefaultNodeTickerInterval  = 50 * time.Millisecond
-
-	// The default initial static port should differ from the AvalancheGo default of 9650.
-	DefaultInitialStaticPort = 9850
 )
 
 // A set of flags appropriate for local testing.
