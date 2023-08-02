@@ -29,7 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-const nonVerifiedCacheSize = 128 * units.MiB
+const nonVerifiedCacheSize = 64 * units.MiB
 
 var _ Engine = (*Transitive)(nil)
 
