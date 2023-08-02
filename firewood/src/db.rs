@@ -1182,7 +1182,6 @@ impl<S: ShaleStore<Node> + Send + Sync> WriteBatch<S> {
 
         rev_inner.root_hash_staging.write(0, &kv_root_hash.0);
         let (root_hash_redo, root_hash_wal) = rev_inner.root_hash_staging.take_delta();
-        // let base_root_hash = StoreRevShared::from_delta(rev_inner.root_hash_cache, root_hash_redo);
 
         self.committed = true;
 
