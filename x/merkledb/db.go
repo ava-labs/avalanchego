@@ -582,20 +582,22 @@ func (db *merkleDB) GetChangeProof(
 		})
 	}
 
-	largestKey := end
+	largestKey := Nothing[[]byte]()
 	if len(result.KeyChanges) > 0 {
-		largestKey = result.KeyChanges[len(result.KeyChanges)-1].Key
+		largestKey = Some(result.KeyChanges[len(result.KeyChanges)-1].Key)
+	} else if len(end) > 0 {
+		largestKey = Some(end)
 	}
 
 	// Since we hold [db.commitlock] we must still have sufficient
 	// history to recreate the trie at [endRootID].
-	historicalView, err := db.getHistoricalViewForRange(endRootID, start, largestKey)
+	historicalView, err := db.getHistoricalViewForRange(endRootID, start, largestKey.Value())
 	if err != nil {
 		return nil, err
 	}
 
-	if len(largestKey) > 0 {
-		endProof, err := historicalView.getProof(ctx, largestKey)
+	if largestKey.HasValue() {
+		endProof, err := historicalView.getProof(ctx, largestKey.Value())
 		if err != nil {
 			return nil, err
 		}
