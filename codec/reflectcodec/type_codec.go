@@ -4,14 +4,15 @@
 package reflectcodec
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"math"
 	"reflect"
-	"sort"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"golang.org/x/exp/slices"
 )
 
 const (
@@ -366,8 +367,8 @@ func (c *genericCodec) marshal(value reflect.Value, p *wrappers.Packer, maxSlice
 		}
 
 		type keyTuple struct {
-			key    reflect.Value
-			binary []byte
+			key   reflect.Value
+			bytes []byte
 		}
 
 		sortedKeys := make([]keyTuple, len(keys))
@@ -381,31 +382,22 @@ func (c *genericCodec) marshal(value reflect.Value, p *wrappers.Packer, maxSlice
 				return err
 			}
 			sortedKeys[i] = keyTuple{
-				key:    key,
-				binary: p.Bytes,
+				key:   key,
+				bytes: p.Bytes,
 			}
 		}
 
-		sort.Slice(sortedKeys, func(a, b int) bool {
-			minLength := len(sortedKeys[a].binary)
-			if minLength > len(sortedKeys[b].binary) {
-				minLength = len(sortedKeys[b].binary)
-			}
-
-			for i := 0; i < minLength; i++ {
-				if sortedKeys[a].binary[i] != sortedKeys[b].binary[i] {
-					return sortedKeys[a].binary[i] > sortedKeys[b].binary[i]
-				}
-			}
-
-			return true
+		slices.SortFunc(sortedKeys, func(a, b keyTuple) bool {
+			return bytes.Compare(a.bytes, b.bytes) >= 0
 		})
 
 		for _, key := range sortedKeys {
 			// serialize key
-			if err := c.marshal(key.key, p, c.maxSliceLen); err != nil {
-				return err
+			p.PackFixedBytes(key.bytes)
+			if p.Err != nil {
+				return p.Err
 			}
+
 			// serialize value
 			if err := c.marshal(value.MapIndex(key.key), p, c.maxSliceLen); err != nil {
 				return err
