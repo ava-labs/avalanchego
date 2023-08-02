@@ -41,6 +41,9 @@ var Tests = []func(c GeneralCodec, t testing.TB){
 	TestRestrictedSlice,
 	TestExtraSpace,
 	TestSliceLengthOverflow,
+	TestMap,
+	TestMap2,
+	TestMap3,
 }
 
 var MultipleTagsTests = []func(c GeneralCodec, t testing.TB){
@@ -886,4 +889,91 @@ func TestMultipleTags(codec GeneralCodec, t testing.TB) {
 		require.Equal(inputs.EitherTags2, output.EitherTags2)
 		require.Empty(output.NoTags)
 	}
+}
+
+func TestMap(codec GeneralCodec, t testing.TB) {
+	require := require.New(t)
+
+	data := make(map[string]int32)
+	data["test"] = 12
+	data["bar"] = 33
+
+	manager := NewDefaultManager()
+	require.NoError(manager.RegisterCodec(0, codec))
+
+	bytes, err := manager.Marshal(0, data)
+	require.NoError(err)
+
+	bytesLen, err := manager.Size(0, data)
+	require.NoError(err)
+	require.Equal(len(bytes), bytesLen)
+
+	var output map[string]int32
+	_, err = manager.Unmarshal(bytes, &output)
+	require.NoError(err)
+
+	require.Equal(data, output)
+}
+
+func TestMap2(codec GeneralCodec, t testing.TB) {
+	require := require.New(t)
+
+	type Foo struct {
+		A int32  `serialize:"true"`
+		B string `serialize:"true"`
+	}
+
+	data := make(map[int32]Foo)
+	data[12] = Foo{A: 1, B: "test"}
+	data[13] = Foo{A: 2, B: "more test"}
+
+	manager := NewDefaultManager()
+	require.NoError(manager.RegisterCodec(0, codec))
+
+	bytes, err := manager.Marshal(0, data)
+	require.NoError(err)
+
+	bytesLen, err := manager.Size(0, data)
+	require.NoError(err)
+	require.Equal(len(bytes), bytesLen)
+
+	var output map[int32]Foo
+	_, err = manager.Unmarshal(bytes, &output)
+	require.NoError(err)
+
+	require.Equal(data, output)
+}
+
+func TestMap3(codec GeneralCodec, t testing.TB) {
+	require := require.New(t)
+
+	type Foo struct {
+		A int32            `serialize:"true"`
+		B string           `serialize:"true"`
+		E map[int32]string `serialize:"true"`
+	}
+
+	data := Foo{
+		A: 1,
+		B: "test",
+		E: make(map[int32]string, 2),
+	}
+	data.E[12] = "test"
+	data.E[13] = "test"
+
+	manager := NewDefaultManager()
+	require.NoError(manager.RegisterCodec(0, codec))
+
+	bytes, err := manager.Marshal(0, data)
+	require.NoError(err)
+
+	bytesLen, err := manager.Size(0, data)
+	require.NoError(err)
+	require.Equal(len(bytes), bytesLen)
+
+	var output Foo
+	_, err = manager.Unmarshal(bytes, &output)
+	require.NoError(err)
+
+	require.Equal(data, output)
 }
