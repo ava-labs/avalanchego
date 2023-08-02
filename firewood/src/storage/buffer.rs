@@ -803,6 +803,105 @@ mod tests {
         assert_eq!(view.as_deref(), hash);
     }
 
+    #[test]
+    fn test_multi_stores() {
+        let buf_cfg = DiskBufferConfig::builder().max_buffered(1).build();
+        let wal_cfg = WalConfig::builder().build();
+        let disk_requester = init_buffer(buf_cfg, wal_cfg);
+
+        // TODO: Run the test in a separate standalone directory for concurrency reasons
+        let tmp_dir = TempDir::new("firewood").unwrap();
+        let path = get_file_path(tmp_dir.path(), file!(), line!());
+        let (root_db_path, reset) = crate::file::open_dir(path, true).unwrap();
+
+        // file descriptor of the state directory
+        let state_path = file::touch_dir("state", &root_db_path).unwrap();
+        assert!(reset);
+        // create a new wal directory on top of root_db_fd
+        disk_requester.init_wal("wal", root_db_path);
+
+        // create a new state cache which tracks on disk state.
+        let state_cache = Arc::new(
+            CachedSpace::new(
+                &StoreConfig::builder()
+                    .ncached_pages(1)
+                    .ncached_files(1)
+                    .space_id(STATE_SPACE)
+                    .file_nbit(1)
+                    .rootdir(state_path)
+                    .build(),
+                disk_requester.clone(),
+            )
+            .unwrap(),
+        );
+
+        // add an in memory cached space. this will allow us to write to the
+        // disk buffer then later persist the change to disk.
+        disk_requester.reg_cached_space(state_cache.id(), state_cache.clone_files());
+
+        // memory mapped store
+        let mut store = StoreRevMut::new(state_cache.clone());
+
+        // mutate the in memory buffer.
+        let data = b"this is a test";
+        let hash: [u8; HASH_SIZE] = sha3::Keccak256::digest(data).into();
+        store.write(0, &hash);
+        assert_eq!(store.id(), STATE_SPACE);
+
+        let another_data = b"this is another test";
+        let another_hash: [u8; HASH_SIZE] = sha3::Keccak256::digest(another_data).into();
+
+        // mutate the in memory buffer in another StoreRev new from the above.
+        let mut another_store = StoreRevMut::new_from_other(&store);
+        another_store.write(32, &another_hash);
+        assert_eq!(another_store.id(), STATE_SPACE);
+
+        // wal should have no records.
+        assert!(disk_requester.collect_ash(1).unwrap().is_empty());
+
+        // get RO view of the buffer from the beginning. Both stores should have the same view.
+        let view = store.get_view(0, HASH_SIZE as u64).unwrap();
+        assert_eq!(view.as_deref(), hash);
+
+        let view = another_store.get_view(0, HASH_SIZE as u64).unwrap();
+        assert_eq!(view.as_deref(), hash);
+
+        // get RO view of the buffer from the second hash. Only the new store shoulde see the value.
+        let view = another_store.get_view(32, HASH_SIZE as u64).unwrap();
+        assert_eq!(view.as_deref(), another_hash);
+        let empty: [u8; HASH_SIZE] = [0; HASH_SIZE];
+        let view = store.get_view(32, HASH_SIZE as u64).unwrap();
+        assert_eq!(view.as_deref(), empty);
+
+        // Overwrite the value from the beginning in the new store.  Only the new store shoulde see the change.
+        another_store.write(0, &another_hash);
+        let view = another_store.get_view(0, HASH_SIZE as u64).unwrap();
+        assert_eq!(view.as_deref(), another_hash);
+        let view = store.get_view(0, HASH_SIZE as u64).unwrap();
+        assert_eq!(view.as_deref(), hash);
+
+        // Commit the change. Take the delta from both stores.
+        let (redo_delta, wal) = store.take_delta();
+        assert_eq!(1, redo_delta.0.len());
+        assert_eq!(1, wal.undo.len());
+
+        let (another_redo_delta, another_wal) = another_store.take_delta();
+        assert_eq!(1, another_redo_delta.0.len());
+        assert_eq!(2, another_wal.undo.len());
+
+        // Verify after the changes been applied to underlying CachedSpace,
+        // the newly created stores should see the previous changes.
+        state_cache.update(&redo_delta).unwrap();
+        let store = StoreRevMut::new(state_cache.clone());
+        let view = store.get_view(0, HASH_SIZE as u64).unwrap();
+        assert_eq!(view.as_deref(), hash);
+
+        state_cache.update(&another_redo_delta).unwrap();
+        let another_store = StoreRevMut::new(state_cache);
+        let view = another_store.get_view(0, HASH_SIZE as u64).unwrap();
+        assert_eq!(view.as_deref(), another_hash);
+    }
+
     fn get_file_path(path: &Path, file: &str, line: u32) -> PathBuf {
         path.join(format!("{}_{}", file.replace('/', "-"), line))
     }

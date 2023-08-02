@@ -139,10 +139,11 @@ fn test_revisions() {
             .zip(hashes.iter().cloned())
             .map(|(data, hash)| (data, db.get_revision(&hash, None).unwrap()))
             .map(|(data, rev)| (data, kv_dump!(rev)))
-            .for_each(|(b, a)| {
-                if &a != b {
-                    print!("{a}\n{b}");
-                    panic!("not the same");
+            .for_each(|(previous_dump, after_reopen_dump)| {
+                if &after_reopen_dump != previous_dump {
+                    panic!(
+                        "not the same: pass {i}:\n{after_reopen_dump}\n--------\n{previous_dump}"
+                    );
                 }
             });
         println!("i = {i}");

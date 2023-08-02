@@ -53,13 +53,13 @@ pub trait MemStoreR: Debug + Send + Sync {
 // Page should be boxed as to not take up so much stack-space
 type Page = Box<[u8; PAGE_SIZE as usize]>;
 
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct SpaceWrite {
     offset: u64,
     data: Box<[u8]>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 /// In memory representation of Write-ahead log with `undo` and `redo`.
 pub struct Ash {
     /// Deltas to undo the changes.
@@ -432,13 +432,33 @@ struct StoreRevMutDelta {
     plain: Ash,
 }
 
+impl Clone for StoreRevMutDelta {
+    fn clone(&self) -> Self {
+        let mut pages = HashMap::new();
+        for (pid, page) in self.pages.iter() {
+            let mut data = Box::new([0u8; PAGE_SIZE as usize]);
+            data.copy_from_slice(page.as_ref());
+            pages.insert(*pid, data);
+        }
+
+        Self {
+            pages,
+            plain: self.plain.clone(),
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 /// A mutable revision of the store. The view is constucted by applying the `deltas` to the
 /// `base space`. The `deltas` tracks both `undo` and `redo` to be able to rewind or reapply
-/// the changes.
+/// the changes. `StoreRevMut` supports basing on top of another `StoreRevMut`, by chaining
+/// `prev_deltas` (from based `StoreRevMut`) with current `deltas` from itself . In this way,
+/// callers can create a new `StoreRevMut` from an existing one without actually committing
+/// the mutations to the base space.
 pub struct StoreRevMut {
     base_space: Arc<dyn MemStoreR>,
     deltas: Arc<RwLock<StoreRevMutDelta>>,
+    prev_deltas: Arc<RwLock<StoreRevMutDelta>>,
 }
 
 impl StoreRevMut {
@@ -446,37 +466,56 @@ impl StoreRevMut {
         Self {
             base_space,
             deltas: Default::default(),
+            prev_deltas: Default::default(),
         }
     }
 
-    fn get_page_mut<'a>(&self, deltas: &'a mut StoreRevMutDelta, pid: u64) -> &'a mut [u8] {
-        let page = deltas.pages.entry(pid).or_insert_with(|| {
-            Box::new(
-                self.base_space
-                    .get_slice(pid << PAGE_SIZE_NBIT, PAGE_SIZE)
-                    .unwrap()
-                    .try_into()
-                    .unwrap(),
-            )
-        });
+    pub fn new_from_other(other: &StoreRevMut) -> Self {
+        Self {
+            base_space: other.base_space.clone(),
+            deltas: Default::default(),
+            prev_deltas: other.deltas.clone(),
+        }
+    }
+
+    fn get_page_mut<'a>(
+        &self,
+        deltas: &'a mut StoreRevMutDelta,
+        prev_deltas: &StoreRevMutDelta,
+        pid: u64,
+    ) -> &'a mut [u8] {
+        let page = deltas
+            .pages
+            .entry(pid)
+            .or_insert_with(|| match prev_deltas.pages.get(&pid) {
+                Some(p) => Box::new(*p.as_ref()),
+                None => Box::new(
+                    self.base_space
+                        .get_slice(pid << PAGE_SIZE_NBIT, PAGE_SIZE)
+                        .unwrap()
+                        .try_into()
+                        .unwrap(),
+                ),
+            });
 
         page.as_mut()
     }
 
     pub fn take_delta(&self) -> (StoreDelta, Ash) {
-        let mut pages = Vec::new();
-        let deltas = std::mem::replace(
-            &mut *self.deltas.write(),
-            StoreRevMutDelta {
-                pages: HashMap::new(),
-                plain: Ash::new(),
-            },
-        );
-        for (pid, page) in deltas.pages.into_iter() {
-            pages.push(DeltaPage(pid, page));
-        }
+        let mut guard = self.deltas.write();
+        let mut pages: Vec<DeltaPage> = guard
+            .pages
+            .iter()
+            .map(|page| DeltaPage(*page.0, page.1.clone()))
+            .collect();
         pages.sort_by_key(|p| p.0);
-        (StoreDelta(pages), deltas.plain)
+        let cloned_plain = guard.plain.clone();
+        // TODO: remove this line, since we don't know why this works
+        *guard = StoreRevMutDelta {
+            pages: HashMap::new(),
+            plain: Ash::new(),
+        };
+        (StoreDelta(pages), cloned_plain)
     }
 }
 
@@ -544,7 +583,8 @@ impl CachedStore for StoreRevMut {
 
         if s_pid == e_pid {
             let mut deltas = self.deltas.write();
-            let slice = &mut self.get_page_mut(deltas.deref_mut(), s_pid)[s_off..e_off + 1];
+            let slice = &mut self.get_page_mut(deltas.deref_mut(), &self.prev_deltas.read(), s_pid)
+                [s_off..e_off + 1];
             undo.extend(&*slice);
             slice.copy_from_slice(change)
         } else {
@@ -552,7 +592,9 @@ impl CachedStore for StoreRevMut {
 
             {
                 let mut deltas = self.deltas.write();
-                let slice = &mut self.get_page_mut(deltas.deref_mut(), s_pid)[s_off..];
+                let slice =
+                    &mut self.get_page_mut(deltas.deref_mut(), &self.prev_deltas.read(), s_pid)
+                        [s_off..];
                 undo.extend(&*slice);
                 slice.copy_from_slice(&change[..len]);
             }
@@ -561,13 +603,14 @@ impl CachedStore for StoreRevMut {
 
             let mut deltas = self.deltas.write();
             for p in s_pid + 1..e_pid {
-                let slice = self.get_page_mut(deltas.deref_mut(), p);
+                let slice = self.get_page_mut(deltas.deref_mut(), &self.prev_deltas.read(), p);
                 undo.extend(&*slice);
                 slice.copy_from_slice(&change[..PAGE_SIZE as usize]);
                 change = &change[PAGE_SIZE as usize..];
             }
 
-            let slice = &mut self.get_page_mut(deltas.deref_mut(), e_pid)[..e_off + 1];
+            let slice = &mut self.get_page_mut(deltas.deref_mut(), &self.prev_deltas.read(), e_pid)
+                [..e_off + 1];
             undo.extend(&*slice);
             slice.copy_from_slice(change);
         }
