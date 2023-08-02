@@ -2,7 +2,7 @@
 
 ## [v1.10.6](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.6)
 
-This version is backwards compatible to [v1.10.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0). It is optional, but encouraged.
+This version is backwards compatible to [v1.10.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0). This release contains meaningful performance improvements and we recommend updating as soon as possible.
 
 The plugin version is updated to `27` all plugins must update to be compatible.
 
