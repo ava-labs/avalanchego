@@ -31,7 +31,7 @@ function _set_config(){
   cat <<EOF >$1
   {
     "network-id": "local",
-    "staking-enabled": false,
+    "sybil-protection-enabled": false,
     "health-check-frequency": "5s",
     "plugin-dir": "$AVALANCHEGO_PLUGIN_DIR"
   }
