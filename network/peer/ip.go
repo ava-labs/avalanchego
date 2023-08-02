@@ -8,6 +8,7 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 
+	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -50,8 +51,8 @@ type SignedIP struct {
 }
 
 func (ip *SignedIP) Verify(cert *x509.Certificate) error {
-	return cert.CheckSignature(
-		cert.SignatureAlgorithm,
+	return staking.CheckSignature(
+		cert,
 		ip.UnsignedIP.bytes(),
 		ip.Signature,
 	)
