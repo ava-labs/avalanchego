@@ -1767,3 +1767,81 @@ func FuzzRangeProofInvariants(f *testing.F) {
 		}
 	})
 }
+
+// Generate change proofs and verify that they are valid.
+func FuzzChangeProof(f *testing.F) {
+	now := time.Now().UnixNano()
+	f.Logf("seed: %d", now)
+	rand := rand.New(rand.NewSource(now)) // #nosec G404
+
+	const deletePortion = 0.25
+
+	db, err := getBasicDB()
+	require.NoError(f, err)
+
+	startRootID, err := db.GetMerkleRoot(context.Background())
+	require.NoError(f, err)
+
+	// Insert a bunch of random key values.
+	// Don't insert so many that we have insufficient history.
+	insertRandomKeyValues(
+		require.New(f),
+		rand,
+		[]database.Database{db},
+		defaultHistoryLength/2,
+		deletePortion,
+	)
+
+	endRootID, err := db.GetMerkleRoot(context.Background())
+	require.NoError(f, err)
+
+	f.Fuzz(func(
+		t *testing.T,
+		start []byte,
+		end []byte,
+		maxProofLen uint,
+	) {
+		require := require.New(t)
+
+		// Make sure proof bounds are valid
+		if len(end) != 0 && bytes.Compare(start, end) > 0 {
+			return
+		}
+		// Make sure proof length is valid
+		if maxProofLen == 0 {
+			return
+		}
+
+		changeProof, err := db.GetChangeProof(
+			context.Background(),
+			startRootID,
+			endRootID,
+			start,
+			end,
+			int(maxProofLen),
+		)
+		require.NoError(err)
+
+		require.NoError(db.VerifyChangeProof(
+			context.Background(),
+			changeProof,
+			start,
+			end,
+			endRootID,
+		))
+
+		startRootID = endRootID
+
+		// Insert more key-value pairs
+		insertRandomKeyValues(
+			require,
+			rand,
+			[]database.Database{db},
+			defaultHistoryLength/2,
+			deletePortion,
+		)
+
+		endRootID, err = db.GetMerkleRoot(context.Background())
+		require.NoError(err)
+	})
+}
