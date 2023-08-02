@@ -10,23 +10,20 @@ import (
 	"fmt"
 )
 
-// MaxRSAKeyBitlen is the maximum RSA key size in bits that we are willing to
+// MaxRSAKeyBitLen is the maximum RSA key size in bits that we are willing to
 // parse.
-const MaxRSAKeyBitlen = 8192
+const MaxRSAKeyBitLen = 8192
 
-var (
-	ErrInvalidPublicKeyType = errors.New("invalid public key type")
-	ErrInvalidPublicKey     = errors.New("invalid public key")
-)
+var ErrInvalidPublicKey = errors.New("invalid public key")
 
 func CheckSignature(cert *x509.Certificate, message []byte, signature []byte) error {
 	if cert.PublicKeyAlgorithm == x509.RSA {
 		pk, ok := cert.PublicKey.(*rsa.PublicKey)
 		if !ok {
-			return fmt.Errorf("%w: %T", ErrInvalidPublicKeyType, cert.PublicKey)
+			return fmt.Errorf("%w: %T", ErrInvalidPublicKey, cert.PublicKey)
 		}
-		if bitlen := pk.N.BitLen(); bitlen > MaxRSAKeyBitlen {
-			return fmt.Errorf("%w: bitlen=%d > maxBitlen=%d", ErrInvalidPublicKey, bitlen, MaxRSAKeyBitlen)
+		if bitLen := pk.N.BitLen(); bitLen > MaxRSAKeyBitLen {
+			return fmt.Errorf("%w: bitLen=%d > maxBitLen=%d", ErrInvalidPublicKey, bitLen, MaxRSAKeyBitLen)
 		}
 	}
 
