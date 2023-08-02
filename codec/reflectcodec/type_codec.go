@@ -204,6 +204,23 @@ func (c *genericCodec) size(value reflect.Value) (int, bool, error) {
 		}
 		return size, constSize, nil
 
+	case reflect.Map:
+		keys := value.MapKeys()
+		size := wrappers.IntLen
+		for _, key := range keys {
+			innerSize, _, err := c.size(key)
+			if err != nil {
+				return 0, false, err
+			}
+			size += innerSize
+			innerSize, _, err = c.size(value.MapIndex(key))
+			if err != nil {
+				return 0, false, err
+			}
+			size += innerSize
+		}
+		return size, false, nil
+
 	default:
 		return 0, false, fmt.Errorf("can't evaluate marshal length of unknown kind %s", valueKind)
 	}
@@ -332,6 +349,30 @@ func (c *genericCodec) marshal(value reflect.Value, p *wrappers.Packer, maxSlice
 				return err
 			}
 		}
+		return nil
+	case reflect.Map:
+		keys := value.MapKeys()
+		numElts := len(keys) * 2
+		if uint32(numElts) > maxSliceLen {
+			return fmt.Errorf("%w; slice length, %d, exceeds maximum length, %d",
+				codec.ErrMaxSliceLenExceeded,
+				numElts,
+				maxSliceLen,
+			)
+		}
+		p.PackInt(uint32(numElts)) // pack # elements
+
+		for _, key := range keys {
+			// serialize key
+			if err := c.marshal(key, p, c.maxSliceLen); err != nil {
+				return err
+			}
+			// serialize value
+			if err := c.marshal(value.MapIndex(key), p, c.maxSliceLen); err != nil {
+				return err
+			}
+		}
+
 		return nil
 	default:
 		return fmt.Errorf("%w: %s", codec.ErrUnsupportedType, valueKind)
@@ -520,6 +561,36 @@ func (c *genericCodec) unmarshal(p *wrappers.Packer, value reflect.Value, maxSli
 		// Assign to the top-level struct's member
 		value.Set(v)
 		return nil
+	case reflect.Map:
+		numElts32 := p.UnpackInt()
+		if numElts32 > c.maxSliceLen || numElts32%2 != 0 {
+			return fmt.Errorf("%w; array length, %d, exceeds maximum length, %d",
+				codec.ErrMaxSliceLenExceeded,
+				numElts32,
+				c.maxSliceLen,
+			)
+		}
+
+		numElts := int(numElts32 / 2)
+		value.Set(reflect.MakeMapWithSize(value.Type(), numElts))
+		keyType := value.Type().Key()
+		valueType := value.Type().Elem()
+
+		for i := 0; i < numElts; i++ {
+			keyValue := reflect.New(keyType).Elem()
+			valueValue := reflect.New(valueType).Elem()
+
+			if err := c.unmarshal(p, keyValue, c.maxSliceLen); err != nil {
+				return fmt.Errorf("couldn't unmarshal map key: %w", err)
+			}
+			if err := c.unmarshal(p, valueValue, c.maxSliceLen); err != nil {
+				return fmt.Errorf("couldn't unmarshal map element: %w", err)
+			}
+			value.SetMapIndex(keyValue, valueValue)
+		}
+
+		return nil
+
 	default:
 		return fmt.Errorf("can't unmarshal unknown type %s", value.Kind().String())
 	}
