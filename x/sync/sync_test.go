@@ -46,7 +46,7 @@ func (client *mockClient) GetChangeProof(ctx context.Context, request *pb.SyncGe
 	if err != nil {
 		return nil, err
 	}
-	return client.db.GetChangeProof(ctx, startRoot, endRoot, request.StartKey, request.EndKey, int(request.KeyLimit))
+	return client.db.GetChangeProof(ctx, startRoot, endRoot, request.StartKey, request.EndKey.Value, int(request.KeyLimit))
 }
 
 func (client *mockClient) GetRangeProof(ctx context.Context, request *pb.SyncGetRangeProofRequest) (*merkledb.RangeProof, error) {
@@ -54,7 +54,7 @@ func (client *mockClient) GetRangeProof(ctx context.Context, request *pb.SyncGet
 	if err != nil {
 		return nil, err
 	}
-	return client.db.GetRangeProofAtRoot(ctx, root, request.StartKey, request.EndKey, int(request.KeyLimit))
+	return client.db.GetRangeProofAtRoot(ctx, root, request.StartKey, request.EndKey.Value, int(request.KeyLimit))
 }
 
 func Test_Creation(t *testing.T) {
@@ -897,7 +897,7 @@ func Test_Sync_Error_During_Sync(t *testing.T) {
 			require.NoError(err)
 			endRoot, err := ids.ToID(request.EndRootHash)
 			require.NoError(err)
-			return dbToSync.GetChangeProof(ctx, startRoot, endRoot, request.StartKey, request.EndKey, int(request.KeyLimit))
+			return dbToSync.GetChangeProof(ctx, startRoot, endRoot, request.StartKey, request.EndKey.Value, int(request.KeyLimit))
 		},
 	).AnyTimes()
 
@@ -976,7 +976,7 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 				<-updatedRootChan
 				root, err := ids.ToID(request.RootHash)
 				require.NoError(err)
-				return dbToSync.GetRangeProofAtRoot(ctx, root, request.StartKey, request.EndKey, int(request.KeyLimit))
+				return dbToSync.GetRangeProofAtRoot(ctx, root, request.StartKey, request.EndKey.Value, int(request.KeyLimit))
 			},
 		).AnyTimes()
 		client.EXPECT().GetChangeProof(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
@@ -986,7 +986,7 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 				require.NoError(err)
 				endRoot, err := ids.ToID(request.EndRootHash)
 				require.NoError(err)
-				return dbToSync.GetChangeProof(ctx, startRoot, endRoot, request.StartKey, request.EndKey, int(request.KeyLimit))
+				return dbToSync.GetChangeProof(ctx, startRoot, endRoot, request.StartKey, request.EndKey.Value, int(request.KeyLimit))
 			},
 		).AnyTimes()
 
