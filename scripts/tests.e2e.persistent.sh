@@ -49,9 +49,7 @@ trap cleanup EXIT
 # Start a persistent network
 ./scripts/build_testnetctl.sh
 print_separator
-# Test with static node ports to ensure coverage. tests.e2e.sh is
-# already testing with the default of dynamic ports.
-./build/testnetctl start-network --root-dir="${ROOT_DIR}" --use-static-ports
+./build/testnetctl start-network --root-dir="${ROOT_DIR}"
 
 # Determine the network configuration path from the latest symlink
 LATEST_SYMLINK_PATH="${ROOT_DIR}/latest"

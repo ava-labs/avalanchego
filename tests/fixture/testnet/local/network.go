@@ -328,17 +328,9 @@ func (ln *LocalNetwork) Start(w io.Writer) error {
 	bootstrapIPs := []string{}
 
 	// Configure networking and start each node
-	for i, node := range ln.Nodes {
+	for _, node := range ln.Nodes {
 		// Update network configuration
-		var (
-			httpPort    uint16
-			stakingPort uint16
-		)
-		if ln.UseStaticPorts {
-			httpPort = ln.InitialStaticPort + uint16(i)*2
-			stakingPort = httpPort + 1
-		}
-		node.SetNetworkingConfigDefaults(httpPort, stakingPort, bootstrapIDs, bootstrapIPs)
+		node.SetNetworkingConfigDefaults(0, 0, bootstrapIDs, bootstrapIPs)
 
 		// Write configuration to disk in preparation for node start
 		if err := node.WriteConfig(); err != nil {
@@ -516,11 +508,9 @@ func (ln *LocalNetwork) WriteCChainConfig() error {
 
 // Used to marshal/unmarshal persistent local network defaults.
 type localDefaults struct {
-	Flags             testnet.FlagsMap
-	ExecPath          string
-	UseStaticPorts    bool
-	InitialStaticPort uint16
-	FundedKeys        []*secp256k1.PrivateKey
+	Flags      testnet.FlagsMap
+	ExecPath   string
+	FundedKeys []*secp256k1.PrivateKey
 }
 
 func (ln *LocalNetwork) GetDefaultsPath() string {
@@ -538,18 +528,15 @@ func (ln *LocalNetwork) ReadDefaults() error {
 	}
 	ln.DefaultFlags = defaults.Flags
 	ln.ExecPath = defaults.ExecPath
-	ln.UseStaticPorts = defaults.UseStaticPorts
-	ln.InitialStaticPort = defaults.InitialStaticPort
 	ln.FundedKeys = defaults.FundedKeys
 	return nil
 }
 
 func (ln *LocalNetwork) WriteDefaults() error {
 	defaults := localDefaults{
-		Flags:          ln.DefaultFlags,
-		ExecPath:       ln.ExecPath,
-		UseStaticPorts: ln.UseStaticPorts,
-		FundedKeys:     ln.FundedKeys,
+		Flags:      ln.DefaultFlags,
+		ExecPath:   ln.ExecPath,
+		FundedKeys: ln.FundedKeys,
 	}
 	bytes, err := testnet.DefaultJSONMarshal(defaults)
 	if err != nil {

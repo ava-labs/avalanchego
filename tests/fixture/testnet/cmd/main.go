@@ -52,11 +52,9 @@ func main() {
 	rootCmd.AddCommand(versionCmd)
 
 	var (
-		execPath          string
-		nodeCount         uint8
-		fundedKeyCount    uint8
-		useStaticPorts    bool
-		initialStaticPort uint16
+		execPath       string
+		nodeCount      uint8
+		fundedKeyCount uint8
 	)
 	startNetworkCmd := &cobra.Command{
 		Use:   "start-network [/path/to/avalanchego]",
@@ -70,9 +68,7 @@ func main() {
 
 			network := &local.LocalNetwork{
 				LocalConfig: local.LocalConfig{
-					ExecPath:          execPath,
-					UseStaticPorts:    useStaticPorts,
-					InitialStaticPort: initialStaticPort,
+					ExecPath: execPath,
 				},
 			}
 			ctx, cancel := context.WithTimeout(context.Background(), local.DefaultNetworkStartTimeout)
@@ -104,8 +100,6 @@ func main() {
 	startNetworkCmd.PersistentFlags().StringVar(&execPath, "avalanchego-path", os.Getenv(local.AvalancheGoPathEnvName), "The path to an avalanchego binary")
 	startNetworkCmd.PersistentFlags().Uint8Var(&nodeCount, "node-count", testnet.DefaultNodeCount, "Number of nodes the network should initially consist of")
 	startNetworkCmd.PersistentFlags().Uint8Var(&fundedKeyCount, "funded-key-count", testnet.DefaultFundedKeyCount, "Number of funded keys the network should start with")
-	startNetworkCmd.PersistentFlags().BoolVar(&useStaticPorts, "use-static-ports", false, "Whether to attempt to configure nodes with static ports. A network will start faster using statically assigned ports but start will fail if the ports chosen are already bound.")
-	startNetworkCmd.PersistentFlags().Uint16Var(&initialStaticPort, "initial-static-port", local.DefaultInitialStaticPort, "The initial port number from which API and staking ports will be statically determined.")
 
 	rootCmd.AddCommand(startNetworkCmd)
 

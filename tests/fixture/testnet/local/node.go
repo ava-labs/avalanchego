@@ -41,11 +41,6 @@ var (
 type LocalConfig struct {
 	// Path to avalanchego binary
 	ExecPath string
-	// Whether a node is configured with static (e.g. 9560) or dynamic
-	// (e.g. 0) tcp ports for both staking and api connections.
-	UseStaticPorts bool
-	// The port number to start from when assigning static ports.
-	InitialStaticPort uint16
 }
 
 // Stores the configuration and process details of a node in a local network.
