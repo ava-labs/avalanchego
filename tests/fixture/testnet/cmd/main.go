@@ -57,7 +57,7 @@ func main() {
 		fundedKeyCount uint8
 	)
 	startNetworkCmd := &cobra.Command{
-		Use:   "start-network [/path/to/avalanchego]",
+		Use:   "start-network",
 		Short: "Start a new local network",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(execPath) == 0 {
