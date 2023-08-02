@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"sort"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -205,9 +206,8 @@ func (c *genericCodec) size(value reflect.Value) (int, bool, error) {
 		return size, constSize, nil
 
 	case reflect.Map:
-		keys := value.MapKeys()
 		size := wrappers.IntLen
-		for _, key := range keys {
+		for _, key := range value.MapKeys() {
 			innerSize, _, err := c.size(key)
 			if err != nil {
 				return 0, false, err
@@ -352,7 +352,7 @@ func (c *genericCodec) marshal(value reflect.Value, p *wrappers.Packer, maxSlice
 		return nil
 	case reflect.Map:
 		keys := value.MapKeys()
-		numElts := len(keys) * 2
+		numElts := len(keys)
 		if uint32(numElts) > maxSliceLen {
 			return fmt.Errorf("%w; slice length, %d, exceeds maximum length, %d",
 				codec.ErrMaxSliceLenExceeded,
@@ -361,14 +361,54 @@ func (c *genericCodec) marshal(value reflect.Value, p *wrappers.Packer, maxSlice
 			)
 		}
 		p.PackInt(uint32(numElts)) // pack # elements
+		if p.Err != nil {
+			return p.Err
+		}
+
+		type keyTuple struct {
+			key    reflect.Value
+			binary []byte
+		}
+
+		sortedKeys := make([]keyTuple, 0)
 
 		for _, key := range keys {
+			p := wrappers.Packer{
+				MaxSize: int(c.maxSliceLen),
+				Bytes:   make([]byte, 0, 128),
+			}
+			if err := c.marshal(key, &p, c.maxSliceLen); err != nil {
+				return err
+			}
+			sortedKeys = append(sortedKeys, keyTuple{
+				key:    key,
+				binary: p.Bytes,
+			})
+		}
+
+		sort.Slice(sortedKeys, func(a, b int) bool {
+			minLength := len(sortedKeys[a].binary)
+			if minLength > len(sortedKeys[b].binary) {
+				minLength = len(sortedKeys[b].binary)
+			}
+
+			for i := 0; i < minLength; i++ {
+				if sortedKeys[a].binary[i] == sortedKeys[b].binary[i] {
+					continue
+				}
+				return sortedKeys[a].binary[i] > sortedKeys[b].binary[i]
+			}
+
+			return true
+		})
+
+		for _, key := range sortedKeys {
 			// serialize key
-			if err := c.marshal(key, p, c.maxSliceLen); err != nil {
+			if err := c.marshal(key.key, p, c.maxSliceLen); err != nil {
 				return err
 			}
 			// serialize value
-			if err := c.marshal(value.MapIndex(key), p, c.maxSliceLen); err != nil {
+			if err := c.marshal(value.MapIndex(key.key), p, c.maxSliceLen); err != nil {
 				return err
 			}
 		}
@@ -563,30 +603,35 @@ func (c *genericCodec) unmarshal(p *wrappers.Packer, value reflect.Value, maxSli
 		return nil
 	case reflect.Map:
 		numElts32 := p.UnpackInt()
-		if numElts32 > c.maxSliceLen || numElts32%2 != 0 {
-			return fmt.Errorf("%w; array length, %d, exceeds maximum length, %d",
+		if p.Err != nil {
+			return fmt.Errorf("couldn't unmarshal slice: %w", p.Err)
+		}
+		if numElts32 > c.maxSliceLen {
+			return fmt.Errorf("%w; map length, %d, exceeds maximum length, %d",
 				codec.ErrMaxSliceLenExceeded,
 				numElts32,
 				c.maxSliceLen,
 			)
 		}
 
-		numElts := int(numElts32 / 2)
+		numElts := int(numElts32)
 		value.Set(reflect.MakeMapWithSize(value.Type(), numElts))
-		keyType := value.Type().Key()
-		valueType := value.Type().Elem()
+		valueTypeReflection := value.Type()
+		mapKeyType := valueTypeReflection.Key()
+		mapValueType := valueTypeReflection.Elem()
 
 		for i := 0; i < numElts; i++ {
-			keyValue := reflect.New(keyType).Elem()
-			valueValue := reflect.New(valueType).Elem()
+			mapKey := reflect.New(mapKeyType).Elem()
+			mapValue := reflect.New(mapValueType).Elem()
 
-			if err := c.unmarshal(p, keyValue, c.maxSliceLen); err != nil {
-				return fmt.Errorf("couldn't unmarshal map key: %w", err)
+			if err := c.unmarshal(p, mapKey, c.maxSliceLen); err != nil {
+				return fmt.Errorf("couldn't unmarshal map key (%s): %w", mapKeyType, err)
 			}
-			if err := c.unmarshal(p, valueValue, c.maxSliceLen); err != nil {
-				return fmt.Errorf("couldn't unmarshal map element: %w", err)
+
+			if err := c.unmarshal(p, mapValue, c.maxSliceLen); err != nil {
+				return fmt.Errorf("couldn't unmarshal map value for key %s: %w", mapKey, err)
 			}
-			value.SetMapIndex(keyValue, valueValue)
+			value.SetMapIndex(mapKey, mapValue)
 		}
 
 		return nil

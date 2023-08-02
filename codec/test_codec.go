@@ -44,6 +44,7 @@ var Tests = []func(c GeneralCodec, t testing.TB){
 	TestMap,
 	TestMap2,
 	TestMap3,
+	TestMapSorting,
 }
 
 var MultipleTagsTests = []func(c GeneralCodec, t testing.TB){
@@ -976,4 +977,42 @@ func TestMap3(codec GeneralCodec, t testing.TB) {
 	require.NoError(err)
 
 	require.Equal(data, output)
+}
+
+func TestMapSorting(codec GeneralCodec, t testing.TB) {
+	require := require.New(t)
+
+	type Foo struct {
+		A int32            `serialize:"true"`
+		B string           `serialize:"true"`
+		E map[int32]string `serialize:"true"`
+	}
+
+	manager := NewDefaultManager()
+	require.NoError(manager.RegisterCodec(0, codec))
+
+	// test sorting
+	data1 := Foo{
+		A: 1,
+		B: "test",
+		E: make(map[int32]string, 2),
+	}
+	data1.E[12] = "test-12"
+	data1.E[13] = "test-13"
+
+	data2 := Foo{
+		A: 1,
+		B: "test",
+		E: make(map[int32]string, 2),
+	}
+	data2.E[13] = "test-13"
+	data2.E[12] = "test-12"
+
+	bytes1, err := manager.Marshal(0, data1)
+	require.NoError(err)
+
+	bytes2, err := manager.Marshal(0, data2)
+	require.NoError(err)
+
+	require.Equal(bytes1, bytes2)
 }
