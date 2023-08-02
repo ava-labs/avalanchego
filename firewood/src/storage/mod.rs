@@ -432,22 +432,6 @@ struct StoreRevMutDelta {
     plain: Ash,
 }
 
-impl Clone for StoreRevMutDelta {
-    fn clone(&self) -> Self {
-        let mut pages = HashMap::new();
-        for (pid, page) in self.pages.iter() {
-            let mut data = Box::new([0u8; PAGE_SIZE as usize]);
-            data.copy_from_slice(page.as_ref());
-            pages.insert(*pid, data);
-        }
-
-        Self {
-            pages,
-            plain: self.plain.clone(),
-        }
-    }
-}
-
 #[derive(Clone, Debug)]
 /// A mutable revision of the store. The view is constucted by applying the `deltas` to the
 /// `base space`. The `deltas` tracks both `undo` and `redo` to be able to rewind or reapply

@@ -809,7 +809,6 @@ mod tests {
         let wal_cfg = WalConfig::builder().build();
         let disk_requester = init_buffer(buf_cfg, wal_cfg);
 
-        // TODO: Run the test in a separate standalone directory for concurrency reasons
         let tmp_dir = TempDir::new("firewood").unwrap();
         let path = get_file_path(tmp_dir.path(), file!(), line!());
         let (root_db_path, reset) = crate::file::open_dir(path, true).unwrap();
