@@ -845,7 +845,7 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 				KeyChanges:        []KeyChange{{Key: []byte{1}, Value: Some([]byte{1})}},
 			},
 			start:       []byte{0},
-			end:         Nothing[[]byte](), // Also tests start can be after end if end is nil
+			end:         Nothing[[]byte](), // Also tests start can be after end if end is nothing
 			expectedErr: ErrDataInMissingRootProof,
 		},
 		{
