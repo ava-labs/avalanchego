@@ -18,9 +18,9 @@ import (
 var (
 	_ SignedBlock = (*statelessBlock)(nil)
 
-	errInvalidCertificate = errors.New("invalid certificate")
 	errUnexpectedProposer = errors.New("expected no proposer but one was provided")
 	errMissingProposer    = errors.New("expected proposer but none was provided")
+	errInvalidCertificate = errors.New("invalid certificate")
 )
 
 type Block interface {
@@ -120,9 +120,7 @@ func (b *statelessBlock) Verify(shouldHaveProposer bool, chainID ids.ID) error {
 			return errUnexpectedProposer
 		}
 		return nil
-	}
-
-	if b.cert == nil {
+	} else if b.cert == nil {
 		return errMissingProposer
 	}
 
