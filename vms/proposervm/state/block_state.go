@@ -20,7 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
-const blockCacheSize = 256 * units.MiB
+const blockCacheSize = 64 * units.MiB
 
 var (
 	errBlockWrongVersion = errors.New("wrong version")
