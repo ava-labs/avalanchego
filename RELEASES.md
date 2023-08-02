@@ -34,6 +34,7 @@ The plugin version is updated to `27` all plugins must update to be compatible.
 
 ### Fixes
 
+- Fixed C-chain tx tracer crashes
 - Fixed merkledb panic during state sync
 - Fixed merkledb state sync stale target tracking
 
