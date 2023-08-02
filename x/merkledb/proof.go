@@ -305,6 +305,13 @@ func (proof *RangeProof) Verify(
 		return err
 	}
 
+	// [proof] allegedly provides and proves all key-value
+	// pairs in [smallestProvenPath, largestProvenPath].
+	// If [smallestProvenPath] is Nothing, [proof] should
+	// provide and prove all keys < [largestProvenPath].
+	// If [largestProvenPath] is Nothing, [proof] should
+	// provide and prove all keys > [smallestProvenPath].
+	// If both are Nothing, [proof] should prove the entire trie.
 	smallestProvenPath := Nothing[path]()
 	if start != nil {
 		smallestProvenPath = Some(newPath(start))
