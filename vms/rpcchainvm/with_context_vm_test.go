@@ -47,7 +47,7 @@ type ContextEnabledBlockMock struct {
 	*mocks.MockWithVerifyContext
 }
 
-func contextEnabledTestPlugin(t *testing.T, loadExpectations bool) (block.ChainVM, *gomock.Controller) {
+func contextEnabledTestPlugin(t *testing.T, loadExpectations bool) block.ChainVM {
 	// test key is "contextTestKey"
 
 	// create mock
@@ -88,7 +88,7 @@ func contextEnabledTestPlugin(t *testing.T, loadExpectations bool) (block.ChainV
 		)
 	}
 
-	return ctxVM, ctrl
+	return ctxVM
 }
 
 func TestContextVMSummary(t *testing.T) {
