@@ -31,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/proposervm/indexer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/scheduler"
@@ -46,7 +47,7 @@ const (
 	DefaultMinBlockDelay = time.Second
 
 	checkIndexedFrequency = 10 * time.Second
-	innerBlkCacheSize     = 512
+	innerBlkCacheSize     = 64 * units.MiB
 )
 
 var (
@@ -73,6 +74,10 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func cachedBlockSize(_ ids.ID, blk snowman.Block) int {
+	return ids.IDLen + len(blk.Bytes()) + constants.PointerOverhead
 }
 
 type VM struct {
@@ -186,13 +191,20 @@ func (vm *VM) Initialize(
 	rawDB := dbManager.Current().Database
 	prefixDB := prefixdb.New(dbPrefix, rawDB)
 	vm.db = versiondb.New(prefixDB)
-	vm.State = state.New(vm.db)
+	baseState, err := state.NewMetered(vm.db, "state", registerer)
+	if err != nil {
+		return err
+	}
+	vm.State = baseState
 	vm.Windower = proposer.New(chainCtx.ValidatorState, chainCtx.SubnetID, chainCtx.ChainID)
 	vm.Tree = tree.New()
 	innerBlkCache, err := metercacher.New[ids.ID, snowman.Block](
 		"inner_block_cache",
 		registerer,
-		&cache.LRU[ids.ID, snowman.Block]{Size: innerBlkCacheSize},
+		cache.NewSizedLRU[ids.ID, snowman.Block](
+			innerBlkCacheSize,
+			cachedBlockSize,
+		),
 	)
 	if err != nil {
 		return err
@@ -200,7 +212,6 @@ func (vm *VM) Initialize(
 	vm.innerBlkCache = innerBlkCache
 
 	indexerDB := versiondb.New(vm.db)
-	// TODO: Use [state.NewMetered] here to populate additional metrics.
 	indexerState := state.New(indexerDB)
 	vm.hIndexer = indexer.NewHeightIndexer(vm, vm.ctx.Log, indexerState)
 

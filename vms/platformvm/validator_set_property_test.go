@@ -189,7 +189,7 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 						return fmt.Sprintf("failed GetValidatorSet: %s", err.Error())
 					}
 					if !reflect.DeepEqual(validatorsSet, res) {
-						return fmt.Sprintf("failed validators set comparison: %s", err.Error())
+						return "failed validators set comparison"
 					}
 				}
 			}

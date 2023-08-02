@@ -427,9 +427,7 @@ func TestGenesis(t *testing.T) {
 	// Ensure current validator set of primary network is correct
 	vdrSet, ok := vm.Validators.Get(constants.PrimaryNetworkID)
 	require.True(ok)
-
-	currentValidators := vdrSet.List()
-	require.Len(genesisState.Validators, len(currentValidators))
+	require.Len(genesisState.Validators, vdrSet.Len())
 
 	for _, key := range keys {
 		nodeID := ids.NodeID(key.PublicKey().Address())

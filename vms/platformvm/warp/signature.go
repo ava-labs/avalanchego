@@ -75,7 +75,7 @@ func (s *BitSetSignature) Verify(
 	quorumDen uint64,
 ) error {
 	if msg.NetworkID != networkID {
-		return errWrongNetworkID
+		return ErrWrongNetworkID
 	}
 
 	subnetID, err := pChainState.GetSubnetID(ctx, msg.SourceChainID)

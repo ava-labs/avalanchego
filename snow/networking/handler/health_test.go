@@ -124,8 +124,8 @@ func TestHealthCheckSubnet(t *testing.T) {
 				require.NoError(vdrs.Add(vdrID, nil, ids.Empty, 100))
 			}
 
-			for index, vdr := range vdrs.List() {
-				require.NoError(peerTracker.Connected(context.Background(), vdr.NodeID, nil))
+			for index, nodeID := range vdrIDs.List() {
+				require.NoError(peerTracker.Connected(context.Background(), nodeID, nil))
 
 				details, err := handlerIntf.HealthCheck(context.Background())
 				expectedPercentConnected := float64(index+1) / float64(testVdrCount)

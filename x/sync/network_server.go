@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/x/merkledb"
@@ -141,8 +140,8 @@ func (s *NetworkServer) HandleChangeProofRequest(
 ) error {
 	if req.BytesLimit == 0 ||
 		req.KeyLimit == 0 ||
-		len(req.StartRootHash) != hashing.HashLen ||
-		len(req.EndRootHash) != hashing.HashLen ||
+		len(req.StartRootHash) != ids.IDLen ||
+		len(req.EndRootHash) != ids.IDLen ||
 		(len(req.EndKey) > 0 && bytes.Compare(req.StartKey, req.EndKey) > 0) {
 		s.log.Debug(
 			"dropping invalid change proof request",
@@ -222,7 +221,7 @@ func (s *NetworkServer) HandleRangeProofRequest(
 ) error {
 	if req.BytesLimit == 0 ||
 		req.KeyLimit == 0 ||
-		len(req.RootHash) != hashing.HashLen ||
+		len(req.RootHash) != ids.IDLen ||
 		(len(req.EndKey) > 0 && bytes.Compare(req.StartKey, req.EndKey) > 0) {
 		s.log.Debug(
 			"dropping invalid range proof request",
