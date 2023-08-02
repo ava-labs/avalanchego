@@ -64,6 +64,9 @@ The plugin version is updated to `27` all plugins must update to be compatible.
 - Add metric for the number of elements in a cache by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1782
 - Evict blocks based on size by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1766
 - Add proposervm state metrics by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1785
+- Register metercacher `len` metric by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1791
+- Reduce block cache sizes to 64 MiB by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1794
+- Add p2p sdk by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/1799
 
 **Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.10.5...v1.10.6
 
