@@ -999,7 +999,7 @@ func (db *merkleDB) VerifyChangeProof(
 	smallestPath := newPath(start)
 
 	// Make sure the start proof, if given, is well-formed.
-	if err := verifyProofPath(proof.StartProof, Some(smallestPath)); err != nil {
+	if err := verifyProofPath(proof.StartProof, smallestPath); err != nil {
 		return err
 	}
 
@@ -1017,8 +1017,10 @@ func (db *merkleDB) VerifyChangeProof(
 	}
 
 	// Make sure the end proof, if given, is well-formed.
-	if err := verifyProofPath(proof.EndProof, largestPath); err != nil {
-		return err
+	if largestPath.HasValue() {
+		if err := verifyProofPath(proof.EndProof, largestPath.Value()); err != nil {
+			return err
+		}
 	}
 
 	keyValues := make(map[path]Maybe[[]byte], len(proof.KeyChanges))

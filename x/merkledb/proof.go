@@ -27,6 +27,7 @@ var (
 	ErrStateFromOutsideOfRange     = errors.New("state key falls outside of the start->end range")
 	ErrNonIncreasingProofNodes     = errors.New("each proof node key must be a strict prefix of the next")
 	ErrExtraProofNodes             = errors.New("extra proof nodes in path")
+	ErrProofOnNothingKey           = errors.New("there should be no proof for the nothing key")
 	ErrDataInMissingRootProof      = errors.New("there should be no state or deleted keys in a change proof that had a missing root")
 	ErrNoMerkleProof               = errors.New("empty key response must include merkle proof")
 	ErrShouldJustBeRoot            = errors.New("end proof should only contain root")
@@ -141,7 +142,7 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID) error {
 	if len(proof.Path) == 0 {
 		return ErrNoProof
 	}
-	if err := verifyProofPath(proof.Path, Some(newPath(proof.Key))); err != nil {
+	if err := verifyProofPath(proof.Path, newPath(proof.Key)); err != nil {
 		return err
 	}
 
@@ -325,7 +326,7 @@ func (proof *RangeProof) Verify(
 
 	// Ensure that the start proof is valid and contains values that
 	// match the key/values that were sent.
-	if err := verifyProofPath(proof.StartProof, Some(smallestPath)); err != nil {
+	if err := verifyProofPath(proof.StartProof, smallestPath); err != nil {
 		return err
 	}
 	if err := verifyAllRangeProofKeyValuesPresent(proof.StartProof, smallestPath, largestPath, keyValues); err != nil {
@@ -334,8 +335,10 @@ func (proof *RangeProof) Verify(
 
 	// Ensure that the end proof is valid and contains values that
 	// match the key/values that were sent.
-	if err := verifyProofPath(proof.EndProof, largestPath); err != nil {
-		return err
+	if largestPath.HasValue() {
+		if err := verifyProofPath(proof.EndProof, largestPath.Value()); err != nil {
+			return err
+		}
 	}
 	if err := verifyAllRangeProofKeyValuesPresent(proof.EndProof, smallestPath, largestPath, keyValues); err != nil {
 		return err
@@ -355,20 +358,15 @@ func (proof *RangeProof) Verify(
 	}
 
 	// For all the nodes along the edges of the proof, insert children
-	// < [insertChildrenLessThan] and > [insertChildrenGreaterThan]
+	// < [smallestPath] and > [largestPath]
 	// into the trie so that we get the expected root ID (if this proof is valid).
-	// By inserting all children < [insertChildrenLessThan], we prove that there are no keys
-	// > [insertChildrenLessThan] but less than the first key given.
+	// By inserting all children < [smallestPath], we prove that there are no keys
+	// > [largestPath] but less than the first key given.
 	// That is, the peer who gave us this proof is not omitting nodes.
-	insertChildrenLessThan := Nothing[path]()
-	if len(smallestPath) > 0 {
-		insertChildrenLessThan = Some(smallestPath)
-	}
-
 	if err := addPathInfo(
 		view,
 		proof.StartProof,
-		insertChildrenLessThan,
+		Some(smallestPath),
 		largestPath,
 	); err != nil {
 		return err
@@ -376,7 +374,7 @@ func (proof *RangeProof) Verify(
 	if err := addPathInfo(
 		view,
 		proof.EndProof,
-		insertChildrenLessThan,
+		Some(smallestPath),
 		largestPath,
 	); err != nil {
 		return err
@@ -640,7 +638,7 @@ func (proof *ChangeProof) Empty() bool {
 // 1. [kvs] is sorted by key in increasing order.
 // 2. All keys in [kvs] are in the range [start, end].
 // If [start] is nil, there is no lower bound on acceptable keys.
-// If [end] is nil, there is no upper bound on acceptable keys.
+// If [end] is nothing, there is no upper bound on acceptable keys.
 // If [kvs] is empty, returns nil.
 func verifyKeyChanges(kvs []KeyChange, start []byte, end Maybe[[]byte]) error {
 	if len(kvs) == 0 {
@@ -667,7 +665,7 @@ func verifyKeyChanges(kvs []KeyChange, start []byte, end Maybe[[]byte]) error {
 // 1. [kvs] is sorted by key in increasing order.
 // 2. All keys in [kvs] are in the range [start, end].
 // If [start] is nil, there is no lower bound on acceptable keys.
-// If [end] is nil, there is no upper bound on acceptable keys.
+// If [end] is nothing, there is no upper bound on acceptable keys.
 // If [kvs] is empty, returns nil.
 func verifyKeyValues(kvs []KeyValue, start []byte, end Maybe[[]byte]) error {
 	hasLowerBound := len(start) > 0
@@ -688,14 +686,14 @@ func verifyKeyValues(kvs []KeyValue, start []byte, end Maybe[[]byte]) error {
 //     since all keys with values are written in bytes, so have even nibble length.
 //   - Each key in [proof] is a strict prefix of the following key.
 //   - Each key in [proof] is a strict prefix of [keyBytes], except possibly the last.
-//   - If the last element in [proof] is [keyBytes], this is an inclusion proof.
+//   - If the last element in [proof] is [keyPath], this is an inclusion proof.
 //     Otherwise, this is an exclusion proof and [keyBytes] must not be in [proof].
-func verifyProofPath(proof []ProofNode, keyPath Maybe[path]) error {
+func verifyProofPath(proof []ProofNode, keyPath path) error {
 	if len(proof) == 0 {
 		return nil
 	}
 
-	provenKey := keyPath.Value().Serialize()
+	provenKey := keyPath.Serialize()
 	// loop over all but the last node since it will not have the prefix in exclusion proofs
 	for i := 0; i < len(proof)-1; i++ {
 		nodeKey := proof[i].KeyPath

@@ -654,7 +654,7 @@ func (m *Manager) enqueueWork(work *workItem) {
 
 	// Split the remaining range into to 2.
 	// Find the middle point.
-	mid := midPoint(work.start, work.end.Value())
+	mid := midPoint(work.start, work.end)
 
 	if bytes.Equal(work.start, mid) || bytes.Equal(mid, work.end.Value()) {
 		// The range is too small to split.
@@ -677,20 +677,25 @@ func (m *Manager) enqueueWork(work *workItem) {
 
 // find the midpoint between two keys
 // nil on start is treated as all 0's
-// nil on end is treated as all 255's
-func midPoint(start, end []byte) []byte {
+// nothing on end is treated as all 255's
+func midPoint(start []byte, end merkledb.Maybe[[]byte]) []byte {
 	length := len(start)
-	if len(end) > length {
-		length = len(end)
+	if len(end.Value()) > length {
+		length = len(end.Value())
 	}
+
 	if length == 0 {
-		return []byte{127}
+		if end.IsNothing() {
+			return []byte{127}
+		} else if len(end.Value()) == 0 {
+			return nil
+		}
 	}
 
 	// This check deals with cases where the end has a 255(or is nil which is treated as all 255s) and the start key ends 255.
 	// For example, midPoint([255], nil) should be [255, 127], not [255].
 	// The result needs the extra byte added on to the end to deal with the fact that the naive midpoint between 255 and 255 would be 255
-	if (len(start) > 0 && start[len(start)-1] == 255) && (len(end) == 0 || end[len(end)-1] == 255) {
+	if (len(start) > 0 && start[len(start)-1] == 255) && (end.IsNothing() || end.Value()[len(end.Value())-1] == 255) {
 		length++
 	}
 
@@ -703,11 +708,11 @@ func midPoint(start, end []byte) []byte {
 		}
 
 		endVal := 0
-		if len(end) == 0 {
+		if end.IsNothing() {
 			endVal = 255
 		}
-		if i < len(end) {
-			endVal = int(end[i])
+		if i < len(end.Value()) {
+			endVal = int(end.Value()[i])
 		}
 
 		total := startVal + endVal + leftover

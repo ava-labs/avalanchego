@@ -119,40 +119,49 @@ func Test_Completion(t *testing.T) {
 func Test_Midpoint(t *testing.T) {
 	require := require.New(t)
 
-	mid := midPoint([]byte{1, 255}, []byte{2, 1})
+	mid := midPoint(nil, merkledb.Some[[]byte](nil))
+	require.Nil(mid)
+
+	mid = midPoint([]byte{2}, merkledb.Some[[]byte](nil))
+	require.Equal([]byte{1}, mid)
+
+	mid = midPoint([]byte{1, 255}, merkledb.Some([]byte{2, 1}))
 	require.Equal([]byte{2, 0}, mid)
 
-	mid = midPoint(nil, []byte{255, 255, 0})
+	mid = midPoint([]byte{1, 255}, merkledb.Some([]byte{2, 1}))
+	require.Equal([]byte{2, 0}, mid)
+
+	mid = midPoint(nil, merkledb.Some([]byte{255, 255, 0}))
 	require.Equal([]byte{127, 255, 128}, mid)
 
-	mid = midPoint([]byte{255, 255, 255}, []byte{255, 255})
+	mid = midPoint([]byte{255, 255, 255}, merkledb.Some([]byte{255, 255}))
 	require.Equal([]byte{255, 255, 127, 128}, mid)
 
-	mid = midPoint(nil, []byte{255})
+	mid = midPoint(nil, merkledb.Some([]byte{255}))
 	require.Equal([]byte{127, 127}, mid)
 
-	mid = midPoint([]byte{1, 255}, []byte{255, 1})
+	mid = midPoint([]byte{1, 255}, merkledb.Some([]byte{255, 1}))
 	require.Equal([]byte{128, 128}, mid)
 
-	mid = midPoint([]byte{140, 255}, []byte{141, 0})
+	mid = midPoint([]byte{140, 255}, merkledb.Some([]byte{141, 0}))
 	require.Equal([]byte{140, 255, 127}, mid)
 
-	mid = midPoint([]byte{126, 255}, []byte{127})
+	mid = midPoint([]byte{126, 255}, merkledb.Some([]byte{127}))
 	require.Equal([]byte{126, 255, 127}, mid)
 
-	mid = midPoint(nil, nil)
+	mid = midPoint(nil, merkledb.Nothing[[]byte]())
 	require.Equal([]byte{127}, mid)
 
-	low := midPoint(nil, mid)
+	low := midPoint(nil, merkledb.Some(mid))
 	require.Equal([]byte{63, 127}, low)
 
-	high := midPoint(mid, nil)
+	high := midPoint(mid, merkledb.Nothing[[]byte]())
 	require.Equal([]byte{191}, high)
 
-	mid = midPoint([]byte{255, 255}, nil)
+	mid = midPoint([]byte{255, 255}, merkledb.Nothing[[]byte]())
 	require.Equal([]byte{255, 255, 127, 127}, mid)
 
-	mid = midPoint([]byte{255}, nil)
+	mid = midPoint([]byte{255}, merkledb.Nothing[[]byte]())
 	require.Equal([]byte{255, 127, 127}, mid)
 
 	for i := 0; i < 5000; i++ {
@@ -175,7 +184,7 @@ func Test_Midpoint(t *testing.T) {
 			start, end = end, start
 		}
 
-		mid = midPoint(start, end)
+		mid = midPoint(start, merkledb.Some(end))
 		require.Equal(-1, bytes.Compare(start, mid))
 		require.Equal(-1, bytes.Compare(mid, end))
 	}
@@ -222,7 +231,7 @@ func Test_Sync_FindNextKey_InSync(t *testing.T) {
 		require.Nil(nextKey)
 
 		// add an extra value to sync db past the last key returned
-		newKey := midPoint(lastKey, nil)
+		newKey := midPoint(lastKey, merkledb.Nothing[[]byte]())
 		require.NoError(db.Put(newKey, []byte{1}))
 
 		// create a range endpoint that is before the newly added key, but after the last key
@@ -402,7 +411,7 @@ func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 
 		// add an extra value to local db
 		lastKey := proof.KeyValues[len(proof.KeyValues)-1].Key
-		midpoint := midPoint(lastKey, nil)
+		midpoint := midPoint(lastKey, merkledb.Nothing[[]byte]())
 
 		require.NoError(db.Put(midpoint, []byte{1}))
 
