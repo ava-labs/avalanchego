@@ -370,9 +370,9 @@ func (c *genericCodec) marshal(value reflect.Value, p *wrappers.Packer, maxSlice
 			binary []byte
 		}
 
-		sortedKeys := make([]keyTuple, 0)
+		sortedKeys := make([]keyTuple, len(keys))
 
-		for _, key := range keys {
+		for i, key := range keys {
 			p := wrappers.Packer{
 				MaxSize: int(c.maxSliceLen),
 				Bytes:   make([]byte, 0, 128),
@@ -380,10 +380,10 @@ func (c *genericCodec) marshal(value reflect.Value, p *wrappers.Packer, maxSlice
 			if err := c.marshal(key, &p, c.maxSliceLen); err != nil {
 				return err
 			}
-			sortedKeys = append(sortedKeys, keyTuple{
+			sortedKeys[i] = keyTuple{
 				key:    key,
 				binary: p.Bytes,
-			})
+			}
 		}
 
 		sort.Slice(sortedKeys, func(a, b int) bool {
