@@ -50,12 +50,12 @@ const (
 // If we have no local root for this range, [localRootID] is ids.Empty.
 type workItem struct {
 	start       []byte
-	end         []byte
+	end         merkledb.Maybe[[]byte]
 	priority    priority
 	localRootID ids.ID
 }
 
-func newWorkItem(localRootID ids.ID, start, end []byte, priority priority) *workItem {
+func newWorkItem(localRootID ids.ID, start []byte, end merkledb.Maybe[[]byte], priority priority) *workItem {
 	return &workItem{
 		localRootID: localRootID,
 		start:       start,
@@ -145,7 +145,7 @@ func (m *Manager) Start(ctx context.Context) error {
 
 	// Add work item to fetch the entire key range.
 	// Note that this will be the first work item to be processed.
-	m.unprocessedWork.Insert(newWorkItem(ids.Empty, nil, nil, lowPriority))
+	m.unprocessedWork.Insert(newWorkItem(ids.Empty, nil, merkledb.Nothing[[]byte](), lowPriority))
 
 	m.syncing = true
 	ctx, m.cancelCtx = context.WithCancel(ctx)
@@ -259,9 +259,12 @@ func (m *Manager) getAndApplyChangeProof(ctx context.Context, work *workItem) {
 			StartRootHash: work.localRootID[:],
 			EndRootHash:   targetRootID[:],
 			StartKey:      work.start,
-			EndKey:        work.end,
-			KeyLimit:      defaultRequestKeyLimit,
-			BytesLimit:    defaultRequestByteSizeLimit,
+			EndKey: &pb.MaybeBytes{
+				Value:     work.end.Value(),
+				IsNothing: work.end.IsNothing(),
+			},
+			KeyLimit:   defaultRequestKeyLimit,
+			BytesLimit: defaultRequestByteSizeLimit,
 		},
 		m.config.DB,
 	)
@@ -293,7 +296,7 @@ func (m *Manager) getAndApplyChangeProof(ctx context.Context, work *workItem) {
 			m.setError(err)
 			return
 		}
-		largestHandledKey = changeProof.KeyChanges[len(changeProof.KeyChanges)-1].Key
+		largestHandledKey = merkledb.Some(changeProof.KeyChanges[len(changeProof.KeyChanges)-1].Key)
 	}
 
 	m.completeWorkItem(ctx, work, largestHandledKey, targetRootID, changeProof.EndProof)
@@ -305,9 +308,12 @@ func (m *Manager) getAndApplyRangeProof(ctx context.Context, work *workItem) {
 	targetRootID := m.getTargetRoot()
 	proof, err := m.config.Client.GetRangeProof(ctx,
 		&pb.SyncGetRangeProofRequest{
-			RootHash:   targetRootID[:],
-			StartKey:   work.start,
-			EndKey:     work.end,
+			RootHash: targetRootID[:],
+			StartKey: work.start,
+			EndKey: &pb.MaybeBytes{
+				Value:     work.end.Value(),
+				IsNothing: work.end.IsNothing(),
+			},
 			KeyLimit:   defaultRequestKeyLimit,
 			BytesLimit: defaultRequestByteSizeLimit,
 		},
@@ -332,7 +338,7 @@ func (m *Manager) getAndApplyRangeProof(ctx context.Context, work *workItem) {
 			return
 		}
 
-		largestHandledKey = proof.KeyValues[len(proof.KeyValues)-1].Key
+		largestHandledKey = merkledb.Some(proof.KeyValues[len(proof.KeyValues)-1].Key)
 	}
 
 	m.completeWorkItem(ctx, work, largestHandledKey, targetRootID, proof.EndProof)
@@ -584,11 +590,11 @@ func (m *Manager) setError(err error) {
 
 // Mark the range [start, end] as synced up to [rootID].
 // Assumes [m.workLock] is not held.
-func (m *Manager) completeWorkItem(ctx context.Context, work *workItem, largestHandledKey []byte, rootID ids.ID, proofOfLargestKey []merkledb.ProofNode) {
+func (m *Manager) completeWorkItem(ctx context.Context, work *workItem, largestHandledKey merkledb.Maybe[[]byte], rootID ids.ID, proofOfLargestKey []merkledb.ProofNode) {
 	// if the last key is equal to the end, then the full range is completed
-	if !bytes.Equal(largestHandledKey, work.end) {
+	if work.end.IsNothing() || !bytes.Equal(largestHandledKey.Value(), work.end.Value()) {
 		// find the next key to start querying by comparing the proofs for the last completed key
-		nextStartKey, err := m.findNextKey(ctx, largestHandledKey, work.end, proofOfLargestKey)
+		nextStartKey, err := m.findNextKey(ctx, largestHandledKey.Value(), work.end.Value(), proofOfLargestKey)
 		if err != nil {
 			m.setError(err)
 			return
@@ -600,7 +606,7 @@ func (m *Manager) completeWorkItem(ctx context.Context, work *workItem, largestH
 		} else {
 			// the full range wasn't completed, so enqueue a new work item for the range [nextStartKey, workItem.end]
 			m.enqueueWork(newWorkItem(work.localRootID, nextStartKey, work.end, work.priority))
-			largestHandledKey = nextStartKey
+			largestHandledKey = merkledb.Some(nextStartKey)
 		}
 	}
 
@@ -623,7 +629,7 @@ func (m *Manager) completeWorkItem(ctx context.Context, work *workItem, largestH
 	// completed the range [work.start, lastKey], log and record in the completed work heap
 	m.config.Log.Info("completed range",
 		zap.Binary("start", work.start),
-		zap.Binary("end", largestHandledKey),
+		zap.Binary("end", largestHandledKey.Value()),
 		zap.Stringer("rootID", rootID),
 		zap.Bool("stale", stale),
 	)
@@ -648,9 +654,9 @@ func (m *Manager) enqueueWork(work *workItem) {
 
 	// Split the remaining range into to 2.
 	// Find the middle point.
-	mid := midPoint(work.start, work.end)
+	mid := midPoint(work.start, work.end.Value())
 
-	if bytes.Equal(work.start, mid) || bytes.Equal(mid, work.end) {
+	if bytes.Equal(work.start, mid) || bytes.Equal(mid, work.end.Value()) {
 		// The range is too small to split.
 		// If we didn't have this check we would add work items
 		// [start, start] and [start, end]. Since start <= end, this would
@@ -662,7 +668,7 @@ func (m *Manager) enqueueWork(work *workItem) {
 
 	// first item gets higher priority than the second to encourage finished ranges to grow
 	// rather than start a new range that is not contiguous with existing completed ranges
-	first := newWorkItem(work.localRootID, work.start, mid, medPriority)
+	first := newWorkItem(work.localRootID, work.start, merkledb.Some(mid), medPriority)
 	second := newWorkItem(work.localRootID, mid, work.end, lowPriority)
 
 	m.unprocessedWork.Insert(first)

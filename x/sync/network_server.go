@@ -142,7 +142,7 @@ func (s *NetworkServer) HandleChangeProofRequest(
 		req.KeyLimit == 0 ||
 		len(req.StartRootHash) != ids.IDLen ||
 		len(req.EndRootHash) != ids.IDLen ||
-		(len(req.EndKey) > 0 && bytes.Compare(req.StartKey, req.EndKey) > 0) {
+		(!req.EndKey.IsNothing && bytes.Compare(req.StartKey, req.EndKey.Value) > 0) {
 		s.log.Debug(
 			"dropping invalid change proof request",
 			zap.Stringer("nodeID", nodeID),
@@ -172,7 +172,7 @@ func (s *NetworkServer) HandleChangeProofRequest(
 		if err != nil {
 			return err
 		}
-		changeProof, err := s.db.GetChangeProof(ctx, startRoot, endRoot, req.StartKey, req.EndKey, int(keyLimit))
+		changeProof, err := s.db.GetChangeProof(ctx, startRoot, endRoot, req.StartKey, req.EndKey.Value, int(keyLimit))
 		if err != nil {
 			// handle expected errors so clients cannot cause servers to spam warning logs.
 			if errors.Is(err, merkledb.ErrRootIDNotPresent) || errors.Is(err, merkledb.ErrStartRootNotFound) {
@@ -222,7 +222,7 @@ func (s *NetworkServer) HandleRangeProofRequest(
 	if req.BytesLimit == 0 ||
 		req.KeyLimit == 0 ||
 		len(req.RootHash) != ids.IDLen ||
-		(len(req.EndKey) > 0 && bytes.Compare(req.StartKey, req.EndKey) > 0) {
+		(!req.EndKey.IsNothing && bytes.Compare(req.StartKey, req.EndKey.Value) > 0) {
 		s.log.Debug(
 			"dropping invalid range proof request",
 			zap.Stringer("nodeID", nodeID),
@@ -246,7 +246,7 @@ func (s *NetworkServer) HandleRangeProofRequest(
 		if err != nil {
 			return err
 		}
-		rangeProof, err := s.db.GetRangeProofAtRoot(ctx, root, req.StartKey, req.EndKey, int(keyLimit))
+		rangeProof, err := s.db.GetRangeProofAtRoot(ctx, root, req.StartKey, req.EndKey.Value, int(keyLimit))
 		if err != nil {
 			// handle expected errors so clients cannot cause servers to spam warning logs.
 			if errors.Is(err, merkledb.ErrRootIDNotPresent) {
