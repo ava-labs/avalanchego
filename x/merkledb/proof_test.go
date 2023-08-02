@@ -1774,7 +1774,10 @@ func FuzzChangeProof(f *testing.F) {
 	f.Logf("seed: %d", now)
 	rand := rand.New(rand.NewSource(now)) // #nosec G404
 
-	const deletePortion = 0.25
+	const (
+		numKeyValues  = defaultHistoryLength / 2
+		deletePortion = 0.25
+	)
 
 	db, err := getBasicDB()
 	require.NoError(f, err)
@@ -1788,7 +1791,7 @@ func FuzzChangeProof(f *testing.F) {
 		require.New(f),
 		rand,
 		[]database.Database{db},
-		defaultHistoryLength/2,
+		numKeyValues,
 		deletePortion,
 	)
 
@@ -1830,18 +1833,26 @@ func FuzzChangeProof(f *testing.F) {
 			endRootID,
 		))
 
-		startRootID = endRootID
+		// Insert another key-value pair
+		newKey := make([]byte, 32)
+		_, _ = rand.Read(newKey) // #nosec G404
+		newValue := make([]byte, 32)
+		_, _ = rand.Read(newValue) // #nosec G404
+		require.NoError(db.Put(newKey, newValue))
 
-		// Insert more key-value pairs
-		insertRandomKeyValues(
-			require,
-			rand,
-			[]database.Database{db},
-			defaultHistoryLength/2,
-			deletePortion,
-		)
+		// Delete a key-value pair so database doesn't grow too large
+		iter := db.NewIterator()
+		require.NoError(db.Delete(iter.Key()))
+		iter.Release()
 
+		oldEndRootID := endRootID
 		endRootID, err = db.GetMerkleRoot(context.Background())
 		require.NoError(err)
+		if oldEndRootID != endRootID {
+			// Need this check because if we insert and then immediately
+			// delete a key-value pair, the root ID won't change and we'll
+			// error because start root ID == end root ID.
+			startRootID = oldEndRootID
+		}
 	})
 }
