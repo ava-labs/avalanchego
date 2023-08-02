@@ -92,12 +92,11 @@ func TestHelperProcess(t *testing.T) {
 		select {}
 	}
 
-	mockedVM, ctrl := TestServerPluginMap[testKey](t, true /*loadExpectations*/)
+	mockedVM, _ := TestServerPluginMap[testKey](t, true /*loadExpectations*/)
 	err := Serve(context.Background(), mockedVM)
 	if err != nil {
 		os.Exit(1)
 	}
-	ctrl.Finish()
 
 	os.Exit(0)
 }

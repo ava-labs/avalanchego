@@ -210,7 +210,6 @@ func benchmarkGetValidatorSet(b *testing.B, vs map[ids.NodeID]*validators.GetVal
 	ctrl := gomock.NewController(b)
 	state := setupState(b, ctrl)
 	defer func() {
-		ctrl.Finish()
 		state.closeFn()
 	}()
 
