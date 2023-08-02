@@ -54,6 +54,8 @@ const (
 	// current time for validator addition to succeed, and adding 20
 	// seconds provides a buffer in case of any delay in processing.
 	DefaultValidatorStartTimeDiff = executor.SyncBound + 20*time.Second
+
+	DefaultGasLimit = uint64(21000) // Standard gas limit
 )
 
 // Env is used to access shared test fixture. Intended to be

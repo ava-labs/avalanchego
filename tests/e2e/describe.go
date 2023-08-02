@@ -39,3 +39,9 @@ func DescribeCChain(text string, args ...interface{}) bool {
 	args = append(args, ginkgo.Label("c"))
 	return ginkgo.Describe("[C-Chain] "+text, args...)
 }
+
+// DescribeCChain annotates serial tests for C-Chain.
+// Can run with any type of cluster (e.g., local, fuji, mainnet).
+func DescribeCChainSerial(text string, body func()) bool {
+	return ginkgo.Describe("[C-Chain] "+text, ginkgo.Serial, body)
+}
