@@ -69,7 +69,7 @@ The plugin version is unchanged at `27` and compatible with versions `v1.10.5 - 
 - Reduce block cache sizes to 64 MiB by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1794
 - Add p2p sdk by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/1799
 
-**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.10.5...v1.10.6
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.10.5...v1.10.7
 
 ## [v1.10.5](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.5)
 
