@@ -70,7 +70,7 @@ type ChangeProofer interface {
 	//   - [proof] is non-empty iff [proof.HadRootsInHistory].
 	//   - All keys in [proof.KeyValues] and [proof.DeletedKeys] are in [start, end].
 	//     If [start] is empty, all keys are considered > [start].
-	//     If [end] is empty, all keys are considered < [end].
+	//     If [end] is nothing, all keys are considered < [end].
 	//   - [proof.KeyValues] and [proof.DeletedKeys] are sorted in order of increasing key.
 	//   - [proof.StartProof] and [proof.EndProof] are well-formed.
 	//   - When the keys in [proof.KeyValues] are added to [db] and the keys in [proof.DeletedKeys]
