@@ -107,7 +107,7 @@ func InitializeTest(t *testing.T, factory Factory) {
 
 	if pref := sm.Preference(); pref != GenesisID {
 		t.Fatalf("Wrong preference returned")
-	} else if !sm.Finalized() {
+	} else if sm.NumProcessing() > 0 {
 		t.Fatalf("Wrong should have marked the instance as being finalized")
 	}
 }
@@ -494,7 +494,7 @@ func RecordPollAcceptSingleBlockTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	} else if pref := sm.Preference(); pref != block.ID() {
 		t.Fatalf("Preference returned the wrong block")
-	} else if sm.Finalized() {
+	} else if !(sm.NumProcessing() > 0) {
 		t.Fatalf("Snowman instance finalized too soon")
 	} else if status := block.Status(); status != choices.Processing {
 		t.Fatalf("Block's status changed unexpectedly")
@@ -502,7 +502,7 @@ func RecordPollAcceptSingleBlockTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	} else if pref := sm.Preference(); pref != block.ID() {
 		t.Fatalf("Preference returned the wrong block")
-	} else if !sm.Finalized() {
+	} else if sm.NumProcessing() > 0 {
 		t.Fatalf("Snowman instance didn't finalize")
 	} else if status := block.Status(); status != choices.Accepted {
 		t.Fatalf("Block's status should have been set to accepted")
@@ -557,7 +557,7 @@ func RecordPollAcceptAndRejectTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	} else if pref := sm.Preference(); pref != firstBlock.ID() {
 		t.Fatalf("Preference returned the wrong block")
-	} else if sm.Finalized() {
+	} else if !(sm.NumProcessing() > 0) {
 		t.Fatalf("Snowman instance finalized too soon")
 	} else if status := firstBlock.Status(); status != choices.Processing {
 		t.Fatalf("Block's status changed unexpectedly")
@@ -567,7 +567,7 @@ func RecordPollAcceptAndRejectTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	} else if pref := sm.Preference(); pref != firstBlock.ID() {
 		t.Fatalf("Preference returned the wrong block")
-	} else if !sm.Finalized() {
+	} else if sm.NumProcessing() > 0 {
 		t.Fatalf("Snowman instance didn't finalize")
 	} else if status := firstBlock.Status(); status != choices.Accepted {
 		t.Fatalf("Block's status should have been set to accepted")
@@ -623,7 +623,7 @@ func RecordPollSplitVoteNoChangeTest(t *testing.T, factory Factory) {
 	// The first poll will accept shared bits
 	require.NoError(sm.RecordPoll(context.Background(), votes))
 	require.Equal(firstBlock.ID(), sm.Preference())
-	require.False(sm.Finalized())
+	require.False(!(sm.NumProcessing() > 0))
 
 	metrics := gatherCounterGauge(t, registerer)
 	require.Zero(metrics["polls_failed"])
@@ -632,7 +632,7 @@ func RecordPollSplitVoteNoChangeTest(t *testing.T, factory Factory) {
 	// The second poll will do nothing
 	require.NoError(sm.RecordPoll(context.Background(), votes))
 	require.Equal(firstBlock.ID(), sm.Preference())
-	require.False(sm.Finalized())
+	require.False(!(sm.NumProcessing() > 0))
 
 	metrics = gatherCounterGauge(t, registerer)
 	require.Equal(float64(1), metrics["polls_failed"])
@@ -661,7 +661,7 @@ func RecordPollWhenFinalizedTest(t *testing.T, factory Factory) {
 	votes.Add(GenesisID)
 	if err := sm.RecordPoll(context.Background(), votes); err != nil {
 		t.Fatal(err)
-	} else if !sm.Finalized() {
+	} else if sm.NumProcessing() > 0 {
 		t.Fatalf("Consensus should still be finalized")
 	} else if pref := sm.Preference(); GenesisID != pref {
 		t.Fatalf("Wrong preference listed")
@@ -737,7 +737,7 @@ func RecordPollRejectTransitivelyTest(t *testing.T, factory Factory) {
 	// 0
 	// Tail = 0
 
-	if !sm.Finalized() {
+	if sm.NumProcessing() > 0 {
 		t.Fatalf("Finalized too late")
 	} else if pref := sm.Preference(); block0.ID() != pref {
 		t.Fatalf("Wrong preference listed")
@@ -822,7 +822,7 @@ func RecordPollTransitivelyResetConfidenceTest(t *testing.T, factory Factory) {
 	votesFor2.Add(block2.ID())
 	if err := sm.RecordPoll(context.Background(), votesFor2); err != nil {
 		t.Fatal(err)
-	} else if sm.Finalized() {
+	} else if !(sm.NumProcessing() > 0) {
 		t.Fatalf("Finalized too early")
 	} else if pref := sm.Preference(); block2.ID() != pref {
 		t.Fatalf("Wrong preference listed")
@@ -831,13 +831,13 @@ func RecordPollTransitivelyResetConfidenceTest(t *testing.T, factory Factory) {
 	emptyVotes := bag.Bag[ids.ID]{}
 	if err := sm.RecordPoll(context.Background(), emptyVotes); err != nil {
 		t.Fatal(err)
-	} else if sm.Finalized() {
+	} else if !(sm.NumProcessing() > 0) {
 		t.Fatalf("Finalized too early")
 	} else if pref := sm.Preference(); block2.ID() != pref {
 		t.Fatalf("Wrong preference listed")
 	} else if err := sm.RecordPoll(context.Background(), votesFor2); err != nil {
 		t.Fatal(err)
-	} else if sm.Finalized() {
+	} else if !(sm.NumProcessing() > 0) {
 		t.Fatalf("Finalized too early")
 	} else if pref := sm.Preference(); block2.ID() != pref {
 		t.Fatalf("Wrong preference listed")
@@ -847,13 +847,13 @@ func RecordPollTransitivelyResetConfidenceTest(t *testing.T, factory Factory) {
 	votesFor3.Add(block3.ID())
 	if err := sm.RecordPoll(context.Background(), votesFor3); err != nil {
 		t.Fatal(err)
-	} else if sm.Finalized() {
+	} else if !(sm.NumProcessing() > 0) {
 		t.Fatalf("Finalized too early")
 	} else if pref := sm.Preference(); block2.ID() != pref {
 		t.Fatalf("Wrong preference listed")
 	} else if err := sm.RecordPoll(context.Background(), votesFor3); err != nil {
 		t.Fatal(err)
-	} else if !sm.Finalized() {
+	} else if sm.NumProcessing() > 0 {
 		t.Fatalf("Finalized too late")
 	} else if pref := sm.Preference(); block3.ID() != pref {
 		t.Fatalf("Wrong preference listed")
@@ -912,7 +912,7 @@ func RecordPollInvalidVoteTest(t *testing.T, factory Factory) {
 		t.Fatal(err)
 	} else if err := sm.RecordPoll(context.Background(), validVotes); err != nil {
 		t.Fatal(err)
-	} else if sm.Finalized() {
+	} else if !(sm.NumProcessing() > 0) {
 		t.Fatalf("Finalized too early")
 	} else if pref := sm.Preference(); block.ID() != pref {
 		t.Fatalf("Wrong preference listed")
@@ -1022,7 +1022,7 @@ func RecordPollTransitiveVotingTest(t *testing.T, factory Factory) {
 	switch {
 	case block2.ID() != pref:
 		t.Fatalf("Wrong preference listed")
-	case sm.Finalized():
+	case !(sm.NumProcessing() > 0):
 		t.Fatalf("Finalized too early")
 	case block0.Status() != choices.Accepted:
 		t.Fatalf("Should have accepted")
@@ -1050,7 +1050,7 @@ func RecordPollTransitiveVotingTest(t *testing.T, factory Factory) {
 	switch {
 	case block2.ID() != pref:
 		t.Fatalf("Wrong preference listed")
-	case !sm.Finalized():
+	case sm.NumProcessing() > 0:
 		t.Fatalf("Finalized too late")
 	case block0.Status() != choices.Accepted:
 		t.Fatalf("Should have accepted")
@@ -1162,7 +1162,7 @@ func RecordPollDivergedVotingTest(t *testing.T, factory Factory) {
 	votes3.Add(block3.ID())
 	require.NoError(sm.RecordPoll(context.Background(), votes3))
 
-	require.True(sm.Finalized(), "finalized too late")
+	require.True(!(sm.NumProcessing() > 0), "finalized too late")
 	require.Equal(choices.Accepted, block0.Status(), "should be accepted")
 	require.Equal(choices.Rejected, block1.Status())
 	require.Equal(choices.Rejected, block2.Status())
@@ -1266,7 +1266,7 @@ func RecordPollDivergedVotingWithNoConflictingBitTest(t *testing.T, factory Fact
 	votes3.Add(block3.ID())
 	require.NoError(sm.RecordPoll(context.Background(), votes3))
 
-	require.False(sm.Finalized(), "finalized too early")
+	require.False(!(sm.NumProcessing() > 0), "finalized too early")
 	require.Equal(choices.Processing, block0.Status())
 	require.Equal(choices.Processing, block1.Status())
 	require.Equal(choices.Processing, block2.Status())
