@@ -15,7 +15,10 @@ import (
 
 	"github.com/ava-labs/avalanchego/tests/fixture/testnet"
 	"github.com/ava-labs/avalanchego/tests/fixture/testnet/local"
+	"github.com/ava-labs/avalanchego/version"
 )
+
+const cliVersion = "0.0.1"
 
 var (
 	errAvalancheGoRequired = fmt.Errorf("--avalanchego-path or %s are required", local.AvalancheGoPathEnvName)
@@ -33,6 +36,20 @@ func main() {
 	}
 	rootCmd.PersistentFlags().StringVar(&networkDir, "network-dir", os.Getenv(local.NetworkDirEnvName), "The path to the configuration directory of a local network")
 	rootCmd.PersistentFlags().StringVar(&rootDir, "root-dir", os.Getenv(local.RootDirEnvName), "The path to the root directory for local networks")
+
+	versionCmd := &cobra.Command{
+		Use:   "version",
+		Short: "Print version details",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			msg := cliVersion
+			if len(version.GitCommit) > 0 {
+				msg += ", commit=" + version.GitCommit
+			}
+			fmt.Fprintf(os.Stdout, msg+"\n")
+			return nil
+		},
+	}
+	rootCmd.AddCommand(versionCmd)
 
 	var (
 		execPath          string
