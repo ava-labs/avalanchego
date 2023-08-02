@@ -174,7 +174,6 @@ func TestRuntimeSubprocessBootstrap(t *testing.T) {
 
 			ctrl := gomock.NewController(t)
 			vm := mocks.NewMockChainVM(ctrl)
-			defer ctrl.Finish()
 
 			listener, err := grpcutils.NewListener()
 			require.NoError(err)

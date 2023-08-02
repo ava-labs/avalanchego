@@ -117,7 +117,6 @@ func TestStatus(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 
 			blk := tt.blockF(ctrl)
 			require.Equal(t, tt.expectedStatus, blk.Status())
@@ -241,8 +240,6 @@ func TestBlockOptions(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 
 			blk := tt.blkF()
 			options, err := blk.Options(context.Background())

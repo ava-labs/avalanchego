@@ -432,8 +432,6 @@ func TestBatchRewrite(t *testing.T, db Database) {
 // contents.
 func TestBatchReplay(t *testing.T, db Database) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	require := require.New(t)
 
 	key1 := []byte("hello1")
@@ -469,8 +467,6 @@ func TestBatchReplay(t *testing.T, db Database) {
 // propagate any returned error during Replay.
 func TestBatchReplayPropagateError(t *testing.T, db Database) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	require := require.New(t)
 
 	key1 := []byte("hello1")
