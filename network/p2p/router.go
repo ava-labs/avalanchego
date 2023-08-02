@@ -38,11 +38,22 @@ type Router struct {
 	sender common.AppSender
 
 	lock                         sync.RWMutex
-	handlers                     map[uint64]responder
+	handlers                     map[uint64]*responder
 	pendingAppRequests           map[uint32]AppResponseCallback
 	pendingCrossChainAppRequests map[uint32]CrossChainAppResponseCallback
 	requestID                    uint32
 	peers                        set.SampleableSet[ids.NodeID]
+}
+
+// NewRouter returns a new instance of Router
+func NewRouter(log logging.Logger, sender common.AppSender) *Router {
+	return &Router{
+		log:                          log,
+		sender:                       sender,
+		handlers:                     make(map[uint64]*responder),
+		pendingAppRequests:           make(map[uint32]AppResponseCallback),
+		pendingCrossChainAppRequests: make(map[uint32]CrossChainAppResponseCallback),
+	}
 }
 
 func (r *Router) Connected(_ context.Context, nodeID ids.NodeID, _ *version.Application) error {
@@ -61,17 +72,6 @@ func (r *Router) Disconnected(_ context.Context, nodeID ids.NodeID) error {
 	return nil
 }
 
-// NewRouter returns a new instance of Router
-func NewRouter(log logging.Logger, sender common.AppSender) *Router {
-	return &Router{
-		log:                          log,
-		sender:                       sender,
-		handlers:                     make(map[uint64]responder),
-		pendingAppRequests:           make(map[uint32]AppResponseCallback),
-		pendingCrossChainAppRequests: make(map[uint32]CrossChainAppResponseCallback),
-	}
-}
-
 // RegisterAppProtocol reserves an identifier for an application protocol and
 // returns a Client that can be used to send messages for the corresponding
 // protocol.
@@ -83,10 +83,11 @@ func (r *Router) RegisterAppProtocol(handlerID uint64, handler Handler) (*Client
 		return nil, fmt.Errorf("failed to register handler id %d: %w", handlerID, ErrExistingAppProtocol)
 	}
 
-	r.handlers[handlerID] = responder{
-		handler: handler,
-		log:     r.log,
-		sender:  r.sender,
+	r.handlers[handlerID] = &responder{
+		handlerID: handlerID,
+		handler:   handler,
+		log:       r.log,
+		sender:    r.sender,
 	}
 
 	return &Client{
@@ -190,10 +191,17 @@ func (r *Router) CrossChainAppResponse(_ context.Context, chainID ids.ID, reques
 
 // Parse parses a gossip or request message and maps it to a corresponding
 // handler if present.
-func (r *Router) parse(msg []byte) ([]byte, responder, bool) {
+//
+// Returns:
+// - The unprefixed protocol message.
+// - The protocol responder.
+// - A boolean indicating that parsing succeeded.
+//
+// Invariant: Assumes [r.lock] isn't held.
+func (r *Router) parse(msg []byte) ([]byte, *responder, bool) {
 	handlerID, bytesRead := binary.Uvarint(msg)
 	if bytesRead <= 0 {
-		return nil, responder{}, false
+		return nil, nil, false
 	}
 
 	r.lock.RLock()
@@ -203,6 +211,7 @@ func (r *Router) parse(msg []byte) ([]byte, responder, bool) {
 	return msg[bytesRead:], handler, ok
 }
 
+// Invariant: Assumes [r.lock] isn't held.
 func (r *Router) clearAppRequest(requestID uint32) (AppResponseCallback, bool) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
@@ -212,6 +221,7 @@ func (r *Router) clearAppRequest(requestID uint32) (AppResponseCallback, bool) {
 	return callback, ok
 }
 
+// Invariant: Assumes [r.lock] isn't held.
 func (r *Router) clearCrossChainAppRequest(requestID uint32) (CrossChainAppResponseCallback, bool) {
 	r.lock.Lock()
 	defer r.lock.Unlock()

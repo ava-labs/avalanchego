@@ -44,12 +44,13 @@ type Handler interface {
 
 // responder automatically sends the response for a given request
 type responder struct {
-	handler Handler
-	log     logging.Logger
-	sender  common.AppSender
+	handlerID uint64
+	handler   Handler
+	log       logging.Logger
+	sender    common.AppSender
 }
 
-func (r responder) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
+func (r *responder) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
 	appResponse, err := r.handler.AppRequest(ctx, nodeID, deadline, request)
 	if err != nil {
 		r.log.Debug("failed to handle message",
@@ -57,6 +58,7 @@ func (r responder) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID 
 			zap.Stringer("nodeID", nodeID),
 			zap.Uint32("requestID", requestID),
 			zap.Time("deadline", deadline),
+			zap.Uint64("handlerID", r.handlerID),
 			zap.Binary("message", request),
 		)
 		return nil
@@ -65,19 +67,20 @@ func (r responder) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID 
 	return r.sender.SendAppResponse(ctx, nodeID, requestID, appResponse)
 }
 
-func (r responder) AppGossip(ctx context.Context, nodeID ids.NodeID, msg []byte) error {
+func (r *responder) AppGossip(ctx context.Context, nodeID ids.NodeID, msg []byte) error {
 	err := r.handler.AppGossip(ctx, nodeID, msg)
 	if err != nil {
 		r.log.Debug("failed to handle message",
 			zap.Stringer("messageOp", message.AppGossipOp),
 			zap.Stringer("nodeID", nodeID),
+			zap.Uint64("handlerID", r.handlerID),
 			zap.Binary("message", msg),
 		)
 	}
 	return nil
 }
 
-func (r responder) CrossChainAppRequest(ctx context.Context, chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
+func (r *responder) CrossChainAppRequest(ctx context.Context, chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
 	appResponse, err := r.handler.CrossChainAppRequest(ctx, chainID, deadline, request)
 	if err != nil {
 		r.log.Debug("failed to handle message",
@@ -85,6 +88,7 @@ func (r responder) CrossChainAppRequest(ctx context.Context, chainID ids.ID, req
 			zap.Stringer("chainID", chainID),
 			zap.Uint32("requestID", requestID),
 			zap.Time("deadline", deadline),
+			zap.Uint64("handlerID", r.handlerID),
 			zap.Binary("message", request),
 		)
 		return nil

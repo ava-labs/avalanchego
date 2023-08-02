@@ -22,7 +22,9 @@ var _ stdjson.Marshaler = (*Set[int])(nil)
 
 // SampleableSet is a set of elements that supports sampling.
 type SampleableSet[T comparable] struct {
-	indicies map[T]int
+	// indices maps the element in the set to the index that it appears in
+	// elements.
+	indices  map[T]int
 	elements []T
 }
 
@@ -36,7 +38,7 @@ func NewSampleableSet[T comparable](size int) SampleableSet[T] {
 		return SampleableSet[T]{}
 	}
 	return SampleableSet[T]{
-		indicies: make(map[T]int, size),
+		indices:  make(map[T]int, size),
 		elements: make([]T, 0, size),
 	}
 }
@@ -67,7 +69,7 @@ func (s *SampleableSet[T]) Difference(set SampleableSet[T]) {
 
 // Contains returns true iff the set contains this element.
 func (s SampleableSet[T]) Contains(e T) bool {
-	_, contains := s.indicies[e]
+	_, contains := s.indices[e]
 	return contains
 }
 
@@ -79,7 +81,7 @@ func (s SampleableSet[T]) Overlaps(big SampleableSet[T]) bool {
 	}
 
 	for _, e := range small.elements {
-		if _, ok := big.indicies[e]; ok {
+		if _, ok := big.indices[e]; ok {
 			return true
 		}
 	}
@@ -101,7 +103,7 @@ func (s *SampleableSet[T]) Remove(elements ...T) {
 
 // Clear empties this set
 func (s *SampleableSet[T]) Clear() {
-	maps.Clear(s.indicies)
+	maps.Clear(s.indices)
 	for i := range s.elements {
 		s.elements[i] = utils.Zero[T]()
 	}
@@ -115,11 +117,11 @@ func (s SampleableSet[T]) List() []T {
 
 // Equals returns true if the sets contain the same elements
 func (s SampleableSet[T]) Equals(other SampleableSet[T]) bool {
-	if len(s.indicies) != len(other.indicies) {
+	if len(s.indices) != len(other.indices) {
 		return false
 	}
-	for k := range s.indicies {
-		if _, ok := other.indicies[k]; !ok {
+	for k := range s.indices {
+		if _, ok := other.indices[k]; !ok {
 			return false
 		}
 	}
@@ -195,22 +197,22 @@ func (s *SampleableSet[T]) resize(size int) {
 		if minSetSize > size {
 			size = minSetSize
 		}
-		s.indicies = make(map[T]int, size)
+		s.indices = make(map[T]int, size)
 	}
 }
 
 func (s *SampleableSet[T]) add(e T) {
-	_, ok := s.indicies[e]
+	_, ok := s.indices[e]
 	if ok {
 		return
 	}
 
-	s.indicies[e] = len(s.elements)
+	s.indices[e] = len(s.elements)
 	s.elements = append(s.elements, e)
 }
 
 func (s *SampleableSet[T]) remove(e T) {
-	indexToRemove, ok := s.indicies[e]
+	indexToRemove, ok := s.indices[e]
 	if !ok {
 		return
 	}
@@ -219,11 +221,11 @@ func (s *SampleableSet[T]) remove(e T) {
 	if indexToRemove != lastIndex {
 		lastElement := s.elements[lastIndex]
 
-		s.indicies[lastElement] = indexToRemove
+		s.indices[lastElement] = indexToRemove
 		s.elements[indexToRemove] = lastElement
 	}
 
-	delete(s.indicies, e)
+	delete(s.indices, e)
 	s.elements[lastIndex] = utils.Zero[T]()
 	s.elements = s.elements[:lastIndex]
 }
