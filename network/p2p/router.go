@@ -5,20 +5,24 @@ package p2p
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"sync"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 )
 
 var (
-	ErrUnregisteredHandler = errors.New("unregistered app protocol")
 	ErrExistingAppProtocol = errors.New("existing app protocol")
 	ErrUnrequestedResponse = errors.New("unrequested response")
 
@@ -30,14 +34,15 @@ var (
 // app handler. App messages must be made using the registered handler's
 // corresponding Client.
 type Router struct {
+	log    logging.Logger
 	sender common.AppSender
 
-	handlers                     map[uint8]responder
+	lock                         sync.RWMutex
+	handlers                     map[uint64]responder
 	pendingAppRequests           map[uint32]AppResponseCallback
 	pendingCrossChainAppRequests map[uint32]CrossChainAppResponseCallback
 	requestID                    uint32
-	peers                        set.Set[ids.NodeID]
-	lock                         sync.RWMutex
+	peers                        set.SampleableSet[ids.NodeID]
 }
 
 func (r *Router) Connected(_ context.Context, nodeID ids.NodeID, _ *version.Application) error {
@@ -57,10 +62,11 @@ func (r *Router) Disconnected(_ context.Context, nodeID ids.NodeID) error {
 }
 
 // NewRouter returns a new instance of Router
-func NewRouter(sender common.AppSender) *Router {
+func NewRouter(log logging.Logger, sender common.AppSender) *Router {
 	return &Router{
+		log:                          log,
 		sender:                       sender,
-		handlers:                     make(map[uint8]responder),
+		handlers:                     make(map[uint64]responder),
 		pendingAppRequests:           make(map[uint32]AppResponseCallback),
 		pendingCrossChainAppRequests: make(map[uint32]CrossChainAppResponseCallback),
 	}
@@ -69,7 +75,7 @@ func NewRouter(sender common.AppSender) *Router {
 // RegisterAppProtocol reserves an identifier for an application protocol and
 // returns a Client that can be used to send messages for the corresponding
 // protocol.
-func (r *Router) RegisterAppProtocol(handlerID uint8, handler Handler) (*Client, error) {
+func (r *Router) RegisterAppProtocol(handlerID uint64, handler Handler) (*Client, error) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
@@ -77,37 +83,37 @@ func (r *Router) RegisterAppProtocol(handlerID uint8, handler Handler) (*Client,
 		return nil, fmt.Errorf("failed to register handler id %d: %w", handlerID, ErrExistingAppProtocol)
 	}
 
-	client := &Client{
-		handlerID: handlerID,
-		sender:    r.sender,
-		router:    r,
-	}
-
-	responder := responder{
+	r.handlers[handlerID] = responder{
 		handler: handler,
+		log:     r.log,
 		sender:  r.sender,
 	}
 
-	r.handlers[handlerID] = responder
-
-	return client, nil
+	return &Client{
+		handlerPrefix: binary.AppendUvarint(nil, handlerID),
+		sender:        r.sender,
+		router:        r,
+	}, nil
 }
 
 func (r *Router) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
-	r.lock.RLock()
-	handlerID, parsedMsg, handler, ok := r.parse(request)
-	r.lock.RUnlock()
+	parsedMsg, handler, ok := r.parse(request)
 	if !ok {
-		return fmt.Errorf("failed to process app request message for app protocol %d: %w", handlerID, ErrUnregisteredHandler)
+		r.log.Debug("failed to process message",
+			zap.Stringer("messageOp", message.AppRequestOp),
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint32("requestID", requestID),
+			zap.Time("deadline", deadline),
+			zap.Binary("message", request),
+		)
+		return nil
 	}
 
 	return handler.AppRequest(ctx, nodeID, requestID, deadline, parsedMsg)
 }
 
 func (r *Router) AppRequestFailed(_ context.Context, nodeID ids.NodeID, requestID uint32) error {
-	r.lock.RLock()
 	callback, ok := r.clearAppRequest(requestID)
-	r.lock.RUnlock()
 	if !ok {
 		return ErrUnrequestedResponse
 	}
@@ -117,9 +123,7 @@ func (r *Router) AppRequestFailed(_ context.Context, nodeID ids.NodeID, requestI
 }
 
 func (r *Router) AppResponse(_ context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
-	r.lock.RLock()
 	callback, ok := r.clearAppRequest(requestID)
-	r.lock.RUnlock()
 	if !ok {
 		return ErrUnrequestedResponse
 	}
@@ -129,11 +133,14 @@ func (r *Router) AppResponse(_ context.Context, nodeID ids.NodeID, requestID uin
 }
 
 func (r *Router) AppGossip(ctx context.Context, nodeID ids.NodeID, gossip []byte) error {
-	r.lock.RLock()
-	handlerID, parsedMsg, handler, ok := r.parse(gossip)
-	r.lock.RUnlock()
+	parsedMsg, handler, ok := r.parse(gossip)
 	if !ok {
-		return fmt.Errorf("failed to process gossip message for app protocol %d: %w", handlerID, ErrUnregisteredHandler)
+		r.log.Debug("failed to process message",
+			zap.Stringer("messageOp", message.AppGossipOp),
+			zap.Stringer("nodeID", nodeID),
+			zap.Binary("message", gossip),
+		)
+		return nil
 	}
 
 	return handler.AppGossip(ctx, nodeID, parsedMsg)
@@ -146,21 +153,23 @@ func (r *Router) CrossChainAppRequest(
 	deadline time.Time,
 	msg []byte,
 ) error {
-	r.lock.RLock()
-	handlerID, parsedMsg, handler, ok := r.parse(msg)
-	r.lock.RUnlock()
-
+	parsedMsg, handler, ok := r.parse(msg)
 	if !ok {
-		return fmt.Errorf("failed to process cross chain app request message for app protocol %d: %w", handlerID, ErrUnregisteredHandler)
+		r.log.Debug("failed to process message",
+			zap.Stringer("messageOp", message.CrossChainAppRequestOp),
+			zap.Stringer("chainID", chainID),
+			zap.Uint32("requestID", requestID),
+			zap.Time("deadline", deadline),
+			zap.Binary("message", msg),
+		)
+		return nil
 	}
 
 	return handler.CrossChainAppRequest(ctx, chainID, requestID, deadline, parsedMsg)
 }
 
 func (r *Router) CrossChainAppRequestFailed(_ context.Context, chainID ids.ID, requestID uint32) error {
-	r.lock.RLock()
 	callback, ok := r.clearCrossChainAppRequest(requestID)
-	r.lock.RUnlock()
 	if !ok {
 		return ErrUnrequestedResponse
 	}
@@ -170,9 +179,7 @@ func (r *Router) CrossChainAppRequestFailed(_ context.Context, chainID ids.ID, r
 }
 
 func (r *Router) CrossChainAppResponse(_ context.Context, chainID ids.ID, requestID uint32, response []byte) error {
-	r.lock.RLock()
 	callback, ok := r.clearCrossChainAppRequest(requestID)
-	r.lock.RUnlock()
 	if !ok {
 		return ErrUnrequestedResponse
 	}
@@ -183,32 +190,33 @@ func (r *Router) CrossChainAppResponse(_ context.Context, chainID ids.ID, reques
 
 // Parse parses a gossip or request message and maps it to a corresponding
 // handler if present.
-func (r *Router) parse(msg []byte) (byte, []byte, responder, bool) {
-	if len(msg) == 0 {
-		return 0, nil, responder{}, false
+func (r *Router) parse(msg []byte) ([]byte, responder, bool) {
+	handlerID, bytesRead := binary.Uvarint(msg)
+	if bytesRead <= 0 {
+		return nil, responder{}, false
 	}
 
-	handlerID := msg[0]
+	r.lock.RLock()
+	defer r.lock.RUnlock()
+
 	handler, ok := r.handlers[handlerID]
-	return handlerID, msg[1:], handler, ok
+	return msg[bytesRead:], handler, ok
 }
 
 func (r *Router) clearAppRequest(requestID uint32) (AppResponseCallback, bool) {
-	callback, ok := r.pendingAppRequests[requestID]
-	if !ok {
-		return nil, false
-	}
+	r.lock.Lock()
+	defer r.lock.Unlock()
 
+	callback, ok := r.pendingAppRequests[requestID]
 	delete(r.pendingAppRequests, requestID)
-	return callback, true
+	return callback, ok
 }
 
 func (r *Router) clearCrossChainAppRequest(requestID uint32) (CrossChainAppResponseCallback, bool) {
-	callback, ok := r.pendingCrossChainAppRequests[requestID]
-	if !ok {
-		return nil, false
-	}
+	r.lock.Lock()
+	defer r.lock.Unlock()
 
+	callback, ok := r.pendingCrossChainAppRequests[requestID]
 	delete(r.pendingCrossChainAppRequests, requestID)
-	return callback, true
+	return callback, ok
 }

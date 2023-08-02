@@ -8,11 +8,8 @@ import (
 	"errors"
 	"fmt"
 
-	"golang.org/x/exp/maps"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -41,9 +38,9 @@ type CrossChainAppResponseCallback func(
 )
 
 type Client struct {
-	handlerID uint8
-	router    *Router
-	sender    common.AppSender
+	handlerPrefix []byte
+	router        *Router
+	sender        common.AppSender
 }
 
 // AppRequestAny issues an AppRequest to an arbitrary node decided by Client.
@@ -55,20 +52,16 @@ func (c *Client) AppRequestAny(
 	onResponse AppResponseCallback,
 ) error {
 	c.router.lock.RLock()
-	peers := maps.Keys(c.router.peers)
+	peers := c.router.peers.Sample(1)
 	c.router.lock.RUnlock()
 
-	if len(peers) == 0 {
+	if len(peers) != 1 {
 		return ErrNoPeers
 	}
 
-	s := sampler.NewUniform()
-	s.Initialize(uint64(len(peers)))
-	i, err := s.Next()
-	if err != nil {
-		return err
+	nodeIDs := set.Set[ids.NodeID]{
+		peers[0]: struct{}{},
 	}
-	nodeIDs := set.Set[ids.NodeID]{peers[i]: struct{}{}}
 	return c.AppRequest(ctx, nodeIDs, appRequestBytes, onResponse)
 }
 
@@ -176,8 +169,8 @@ func (c *Client) CrossChainAppRequest(
 // Response messages don't need to be prefixed because request ids are tracked
 // which map to the expected response handler.
 func (c *Client) prefixMessage(src []byte) []byte {
-	messageBytes := make([]byte, 1+len(src))
-	messageBytes[0] = c.handlerID
-	copy(messageBytes[1:], src)
+	messageBytes := make([]byte, len(c.handlerPrefix)+len(src))
+	copy(messageBytes, c.handlerPrefix)
+	copy(messageBytes[len(c.handlerPrefix):], src)
 	return messageBytes
 }
