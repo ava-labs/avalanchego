@@ -4,8 +4,9 @@
 package sync
 
 import (
-	"github.com/ava-labs/avalanchego/x/merkledb"
 	"testing"
+
+	"github.com/ava-labs/avalanchego/x/merkledb"
 
 	"github.com/stretchr/testify/require"
 
