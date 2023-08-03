@@ -805,7 +805,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 
 	n.chainManager = chains.New(&chains.ManagerConfig{
 		SybilProtectionEnabled:                  n.Config.SybilProtectionEnabled,
-		StakingCert:                             n.Config.StakingTLSCert,
+		StakingTLSCert:                          n.Config.StakingTLSCert,
 		StakingBLSKey:                           n.Config.StakingSigningKey,
 		Log:                                     n.Log,
 		LogFactory:                              n.LogFactory,

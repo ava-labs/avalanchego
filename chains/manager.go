@@ -168,7 +168,7 @@ type ChainConfig struct {
 
 type ManagerConfig struct {
 	SybilProtectionEnabled bool
-	StakingCert            tls.Certificate // needed to sign snowman++ blocks
+	StakingTLSCert         tls.Certificate // needed to sign snowman++ blocks
 	StakingBLSKey          *bls.SecretKey
 	TracingEnabled         bool
 	// Must not be used unless [TracingEnabled] is true as this may be nil.
@@ -233,6 +233,9 @@ type manager struct {
 	ids.Aliaser
 	ManagerConfig
 
+	stakingSigner crypto.Signer
+	stakingCert   *staking.Certificate
+
 	// Those notified when a chain is created
 	registrants []Registrant
 
@@ -261,6 +264,8 @@ func New(config *ManagerConfig) Manager {
 	return &manager{
 		Aliaser:                ids.NewAliaser(),
 		ManagerConfig:          *config,
+		stakingSigner:          config.StakingTLSCert.PrivateKey.(crypto.Signer),
+		stakingCert:            staking.CertificateFromX509(config.StakingTLSCert.Leaf),
 		subnets:                make(map[ids.ID]subnets.Subnet),
 		chains:                 make(map[ids.ID]handler.Handler),
 		chainsQueue:            buffer.NewUnboundedBlockingDeque[ChainParameters](initialQueueSize),
@@ -771,8 +776,8 @@ func (m *manager) createAvalancheChain(
 		m.ApricotPhase4Time,
 		m.ApricotPhase4MinPChainHeight,
 		minBlockDelay,
-		m.StakingCert.PrivateKey.(crypto.Signer),
-		staking.CertificateFromX509(m.StakingCert.Leaf),
+		m.stakingSigner,
+		m.stakingCert,
 	)
 
 	if m.MeterVMEnabled {
@@ -1113,8 +1118,8 @@ func (m *manager) createSnowmanChain(
 		m.ApricotPhase4Time,
 		m.ApricotPhase4MinPChainHeight,
 		minBlockDelay,
-		m.StakingCert.PrivateKey.(crypto.Signer),
-		staking.CertificateFromX509(m.StakingCert.Leaf),
+		m.stakingSigner,
+		m.stakingCert,
 	)
 
 	if m.MeterVMEnabled {
