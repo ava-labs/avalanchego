@@ -52,7 +52,6 @@ func sendRangeRequest(
 
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	sender := common.NewMockSender(ctrl)
 	handler := NewNetworkServer(sender, db, logging.NoLog{})
@@ -312,7 +311,6 @@ func sendChangeRequest(
 
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	sender := common.NewMockSender(ctrl)
 	handler := NewNetworkServer(sender, db, logging.NoLog{})

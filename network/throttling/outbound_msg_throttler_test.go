@@ -20,8 +20,6 @@ import (
 
 func TestSybilOutboundMsgThrottler(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	require := require.New(t)
 	config := MsgByteThrottlerConfig{
 		VdrAllocSize:        1024,
@@ -166,8 +164,6 @@ func TestSybilOutboundMsgThrottler(t *testing.T) {
 // Ensure that the limit on taking from the at-large allocation is enforced
 func TestSybilOutboundMsgThrottlerMaxNonVdr(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	require := require.New(t)
 	config := MsgByteThrottlerConfig{
 		VdrAllocSize:        100,
@@ -215,8 +211,6 @@ func TestSybilOutboundMsgThrottlerMaxNonVdr(t *testing.T) {
 // Ensure that the throttler honors requested bypasses
 func TestBypassThrottling(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	require := require.New(t)
 	config := MsgByteThrottlerConfig{
 		VdrAllocSize:        100,
