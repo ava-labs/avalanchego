@@ -26,7 +26,6 @@ var id = ids.GenerateTestID()
 // Register should succeed even if we can't register a VM
 func TestRegisterRegisterVMFails(t *testing.T) {
 	resources := initRegistererTest(t)
-	defer resources.ctrl.Finish()
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
 
@@ -40,7 +39,6 @@ func TestRegisterRegisterVMFails(t *testing.T) {
 // Tests Register if a VM doesn't actually implement VM.
 func TestRegisterBadVM(t *testing.T) {
 	resources := initRegistererTest(t)
-	defer resources.ctrl.Finish()
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
 	vm := "this is not a vm..."
@@ -56,7 +54,6 @@ func TestRegisterBadVM(t *testing.T) {
 // Tests Register if creating endpoints for a VM fails + shutdown fails
 func TestRegisterCreateHandlersAndShutdownFails(t *testing.T) {
 	resources := initRegistererTest(t)
-	defer resources.ctrl.Finish()
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
 	vm := mocks.NewMockChainVM(resources.ctrl)
@@ -74,7 +71,6 @@ func TestRegisterCreateHandlersAndShutdownFails(t *testing.T) {
 // Tests Register if creating endpoints for a VM fails + shutdown succeeds
 func TestRegisterCreateHandlersFails(t *testing.T) {
 	resources := initRegistererTest(t)
-	defer resources.ctrl.Finish()
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
 	vm := mocks.NewMockChainVM(resources.ctrl)
@@ -92,7 +88,6 @@ func TestRegisterCreateHandlersFails(t *testing.T) {
 // Tests Register if we fail to register the new endpoint on the server.
 func TestRegisterAddRouteFails(t *testing.T) {
 	resources := initRegistererTest(t)
-	defer resources.ctrl.Finish()
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
 	vm := mocks.NewMockChainVM(resources.ctrl)
@@ -122,7 +117,6 @@ func TestRegisterAddRouteFails(t *testing.T) {
 // Tests Register we can't find the alias for the newly registered vm
 func TestRegisterAliasLookupFails(t *testing.T) {
 	resources := initRegistererTest(t)
-	defer resources.ctrl.Finish()
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
 	vm := mocks.NewMockChainVM(resources.ctrl)
@@ -153,7 +147,6 @@ func TestRegisterAliasLookupFails(t *testing.T) {
 // Tests Register if adding aliases for the newly registered vm fails
 func TestRegisterAddAliasesFails(t *testing.T) {
 	resources := initRegistererTest(t)
-	defer resources.ctrl.Finish()
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
 	vm := mocks.NewMockChainVM(resources.ctrl)
@@ -192,7 +185,6 @@ func TestRegisterAddAliasesFails(t *testing.T) {
 // Tests Register if no errors are thrown
 func TestRegisterHappyCase(t *testing.T) {
 	resources := initRegistererTest(t)
-	defer resources.ctrl.Finish()
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
 	vm := mocks.NewMockChainVM(resources.ctrl)
@@ -230,7 +222,6 @@ func TestRegisterHappyCase(t *testing.T) {
 // RegisterWithReadLock should succeed even if we can't register a VM
 func TestRegisterWithReadLockRegisterVMFails(t *testing.T) {
 	resources := initRegistererTest(t)
-	defer resources.ctrl.Finish()
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
 
@@ -244,7 +235,6 @@ func TestRegisterWithReadLockRegisterVMFails(t *testing.T) {
 // Tests RegisterWithReadLock if a VM doesn't actually implement VM.
 func TestRegisterWithReadLockBadVM(t *testing.T) {
 	resources := initRegistererTest(t)
-	defer resources.ctrl.Finish()
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
 	vm := "this is not a vm..."
@@ -260,7 +250,6 @@ func TestRegisterWithReadLockBadVM(t *testing.T) {
 // Tests RegisterWithReadLock if creating endpoints for a VM fails + shutdown fails
 func TestRegisterWithReadLockCreateHandlersAndShutdownFails(t *testing.T) {
 	resources := initRegistererTest(t)
-	defer resources.ctrl.Finish()
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
 	vm := mocks.NewMockChainVM(resources.ctrl)
@@ -278,7 +267,6 @@ func TestRegisterWithReadLockCreateHandlersAndShutdownFails(t *testing.T) {
 // Tests RegisterWithReadLock if creating endpoints for a VM fails + shutdown succeeds
 func TestRegisterWithReadLockCreateHandlersFails(t *testing.T) {
 	resources := initRegistererTest(t)
-	defer resources.ctrl.Finish()
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
 	vm := mocks.NewMockChainVM(resources.ctrl)
@@ -296,7 +284,6 @@ func TestRegisterWithReadLockCreateHandlersFails(t *testing.T) {
 // Tests RegisterWithReadLock if we fail to register the new endpoint on the server.
 func TestRegisterWithReadLockAddRouteWithReadLockFails(t *testing.T) {
 	resources := initRegistererTest(t)
-	defer resources.ctrl.Finish()
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
 	vm := mocks.NewMockChainVM(resources.ctrl)
@@ -326,7 +313,6 @@ func TestRegisterWithReadLockAddRouteWithReadLockFails(t *testing.T) {
 // Tests RegisterWithReadLock we can't find the alias for the newly registered vm
 func TestRegisterWithReadLockAliasLookupFails(t *testing.T) {
 	resources := initRegistererTest(t)
-	defer resources.ctrl.Finish()
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
 	vm := mocks.NewMockChainVM(resources.ctrl)
@@ -357,7 +343,6 @@ func TestRegisterWithReadLockAliasLookupFails(t *testing.T) {
 // Tests RegisterWithReadLock if adding aliases for the newly registered vm fails
 func TestRegisterWithReadLockAddAliasesFails(t *testing.T) {
 	resources := initRegistererTest(t)
-	defer resources.ctrl.Finish()
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
 	vm := mocks.NewMockChainVM(resources.ctrl)
@@ -396,7 +381,6 @@ func TestRegisterWithReadLockAddAliasesFails(t *testing.T) {
 // Tests RegisterWithReadLock if no errors are thrown
 func TestRegisterWithReadLockHappyCase(t *testing.T) {
 	resources := initRegistererTest(t)
-	defer resources.ctrl.Finish()
 
 	vmFactory := vms.NewMockFactory(resources.ctrl)
 	vm := mocks.NewMockChainVM(resources.ctrl)

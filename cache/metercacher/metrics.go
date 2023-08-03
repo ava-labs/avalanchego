@@ -55,6 +55,7 @@ func (m *metrics) Initialize(
 			Help:      "number of entries",
 		},
 	)
+	errs.Add(reg.Register(m.len))
 	m.portionFilled = prometheus.NewGauge(
 		prometheus.GaugeOpts{
 			Namespace: namespace,
