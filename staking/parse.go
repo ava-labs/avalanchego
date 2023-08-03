@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"crypto"
 	"crypto/dsa"
-	"crypto/ecdh"
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/elliptic"
@@ -29,16 +28,12 @@ func ParseCertificate(der []byte) (*Certificate, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(der) != len(cert.Raw) {
-		return nil, errors.New("x509: trailing data")
-	}
 	return CertificateFromX509(cert), nil
 }
 
 func CertificateFromX509(cert *x509.Certificate) *Certificate {
 	return &Certificate{
 		Raw:                cert.Raw,
-		PublicKeyAlgorithm: cert.PublicKeyAlgorithm,
 		PublicKey:          cert.PublicKey,
 		SignatureAlgorithm: cert.SignatureAlgorithm,
 	}
@@ -63,9 +58,7 @@ var (
 	oidPublicKeyECDSA = asn1.ObjectIdentifier{1, 2, 840, 10045, 2, 1}
 	// RFC 8410, Section 3
 	//
-	//	id-X25519    OBJECT IDENTIFIER ::= { 1 3 101 110 }
 	//	id-Ed25519   OBJECT IDENTIFIER ::= { 1 3 101 112 }
-	oidPublicKeyX25519  = asn1.ObjectIdentifier{1, 3, 101, 110}
 	oidPublicKeyEd25519 = asn1.ObjectIdentifier{1, 3, 101, 112}
 )
 
@@ -197,15 +190,15 @@ var (
 )
 
 func parseCertificate(der []byte) (*x509.Certificate, error) {
-	cert := &x509.Certificate{}
-
 	input := cryptobyte.String(der)
 	// Read the SEQUENCE including length and tag bytes so that we can populate
 	// the Raw bytes without any unexpected suffix.
 	if !input.ReadASN1Element(&input, cryptobyte_asn1.SEQUENCE) {
 		return nil, errors.New("x509: malformed certificate")
 	}
-	cert.Raw = input
+	if len(der) != len(input) {
+		return nil, errors.New("x509: trailing data")
+	}
 
 	// Consume the length and tag bytes.
 	if !input.ReadASN1(&input, cryptobyte_asn1.SEQUENCE) {
@@ -232,7 +225,7 @@ func parseCertificate(der []byte) (*x509.Certificate, error) {
 	if err != nil {
 		return nil, err
 	}
-	cert.SignatureAlgorithm = getSignatureAlgorithmFromAI(sigAI)
+	signatureAlgorithm := getSignatureAlgorithmFromAI(sigAI)
 
 	if !input.SkipASN1(cryptobyte_asn1.SEQUENCE) {
 		return nil, errors.New("x509: malformed issuer")
@@ -256,21 +249,23 @@ func parseCertificate(der []byte) (*x509.Certificate, error) {
 	if err != nil {
 		return nil, err
 	}
-	cert.PublicKeyAlgorithm = getPublicKeyAlgorithmFromOID(pkAI.Algorithm)
-	if cert.PublicKeyAlgorithm == x509.UnknownPublicKeyAlgorithm {
-		// TODO: should this error?
-		return cert, nil
-	}
+
+	// TODO: Does it make sense for us to allow someone to specify an unknown
+	// public key without erroring?
 
 	var spk asn1.BitString
 	if !input.ReadASN1BitString(&spk) {
 		return nil, errors.New("x509: malformed subjectPublicKey")
 	}
-	cert.PublicKey, err = parsePublicKey(&publicKeyInfo{
+	publicKey, err := parsePublicKey(&publicKeyInfo{
 		Algorithm: pkAI,
 		PublicKey: spk,
 	})
-	return cert, err
+	return &x509.Certificate{
+		Raw:                der,
+		SignatureAlgorithm: signatureAlgorithm,
+		PublicKey:          publicKey,
+	}, err
 }
 
 func parseAI(der cryptobyte.String) (pkix.AlgorithmIdentifier, error) {
@@ -359,23 +354,6 @@ func getSignatureAlgorithmFromAI(ai pkix.AlgorithmIdentifier) x509.SignatureAlgo
 	return x509.UnknownSignatureAlgorithm
 }
 
-// getPublicKeyAlgorithmFromOID returns the exposed PublicKeyAlgorithm
-// identifier for public key types supported in certificates and CSRs. Marshal
-// and Parse functions may support a different set of public key types.
-func getPublicKeyAlgorithmFromOID(oid asn1.ObjectIdentifier) x509.PublicKeyAlgorithm {
-	switch {
-	case oid.Equal(oidPublicKeyRSA):
-		return x509.RSA
-	case oid.Equal(oidPublicKeyDSA):
-		return x509.DSA
-	case oid.Equal(oidPublicKeyECDSA):
-		return x509.ECDSA
-	case oid.Equal(oidPublicKeyEd25519):
-		return x509.Ed25519
-	}
-	return x509.UnknownPublicKeyAlgorithm
-}
-
 type publicKeyInfo struct {
 	Algorithm pkix.AlgorithmIdentifier
 	PublicKey asn1.BitString
@@ -452,13 +430,6 @@ func parsePublicKey(keyData *publicKeyInfo) (any, error) {
 			return nil, errors.New("x509: wrong Ed25519 public key size")
 		}
 		return ed25519.PublicKey(der), nil
-	case oid.Equal(oidPublicKeyX25519):
-		// RFC 8410, Section 3
-		// > For all of the OIDs, the parameters MUST be absent.
-		if len(params.FullBytes) != 0 {
-			return nil, errors.New("x509: X25519 key encoded with illegal parameters")
-		}
-		return ecdh.X25519().NewPublicKey(der)
 	case oid.Equal(oidPublicKeyDSA):
 		y := new(big.Int)
 		if !der.ReadASN1Integer(y) {

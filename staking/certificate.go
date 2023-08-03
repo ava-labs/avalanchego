@@ -9,7 +9,6 @@ import (
 
 type Certificate struct {
 	Raw                []byte
-	PublicKeyAlgorithm x509.PublicKeyAlgorithm
 	PublicKey          any
 	SignatureAlgorithm x509.SignatureAlgorithm
 }
