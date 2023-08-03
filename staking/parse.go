@@ -186,11 +186,13 @@ var (
 
 func parseCertificate(der []byte) (*x509.Certificate, error) {
 	input := cryptobyte.String(der)
-	// Read the SEQUENCE including length and tag bytes so that we can populate
-	// the Raw bytes without any unexpected suffix.
+	// Read the SEQUENCE including length and tag bytes so that we check if
+	// there is an unexpected suffix.
 	if !input.ReadASN1Element(&input, cryptobyte_asn1.SEQUENCE) {
 		return nil, errors.New("x509: malformed certificate")
 	}
+
+	// If there is an unexpected suffix the certificate was not DER encoded.
 	if len(der) != len(input) {
 		return nil, errors.New("x509: trailing data")
 	}
@@ -202,6 +204,7 @@ func parseCertificate(der []byte) (*x509.Certificate, error) {
 		return nil, errors.New("x509: malformed certificate")
 	}
 
+	// Read the "to be signed" certificate into input.
 	if !input.ReadASN1(&input, cryptobyte_asn1.SEQUENCE) {
 		return nil, errors.New("x509: malformed tbs certificate")
 	}
@@ -212,6 +215,7 @@ func parseCertificate(der []byte) (*x509.Certificate, error) {
 		return nil, errors.New("x509: malformed serial number")
 	}
 
+	// Read the signature algorithm identifier.
 	var sigAISeq cryptobyte.String
 	if !input.ReadASN1(&sigAISeq, cryptobyte_asn1.SEQUENCE) {
 		return nil, errors.New("x509: malformed signature algorithm identifier")
@@ -232,10 +236,15 @@ func parseCertificate(der []byte) (*x509.Certificate, error) {
 		return nil, errors.New("x509: malformed issuer")
 	}
 
+	// Read the "simple public key infrastructure" data into input.
 	if !input.ReadASN1(&input, cryptobyte_asn1.SEQUENCE) {
 		return nil, errors.New("x509: malformed spki")
 	}
 
+	// Read the public key algorithm identifier.
+	//
+	// Note: We can't generate this from the signature algorithm because of the
+	// additional params field.
 	var pkAISeq cryptobyte.String
 	if !input.ReadASN1(&pkAISeq, cryptobyte_asn1.SEQUENCE) {
 		return nil, errors.New("x509: malformed public key algorithm identifier")
