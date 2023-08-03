@@ -362,7 +362,7 @@ func (c *genericCodec) marshal(value reflect.Value, p *wrappers.Packer, maxSlice
 		keys := value.MapKeys()
 		numElts := len(keys)
 		if uint32(numElts) > maxSliceLen {
-			return fmt.Errorf("%w; slice length, %d, exceeds maximum length, %d",
+			return fmt.Errorf("%w; map length, %d, exceeds maximum length, %d",
 				codec.ErrMaxSliceLenExceeded,
 				numElts,
 				maxSliceLen,
@@ -610,7 +610,7 @@ func (c *genericCodec) unmarshal(p *wrappers.Packer, value reflect.Value, maxSli
 		}
 		numElts32 := p.UnpackInt()
 		if p.Err != nil {
-			return fmt.Errorf("couldn't unmarshal slice: %w", p.Err)
+			return fmt.Errorf("couldn't unmarshal map: %w", p.Err)
 		}
 		if numElts32 > c.maxSliceLen {
 			return fmt.Errorf("%w; map length, %d, exceeds maximum length, %d",
