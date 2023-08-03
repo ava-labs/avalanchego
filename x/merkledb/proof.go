@@ -46,6 +46,7 @@ var (
 	ErrNilMaybeBytes               = errors.New("maybe bytes is nil")
 	ErrNilProof                    = errors.New("proof is nil")
 	ErrNilValue                    = errors.New("value is nil")
+	ErrUnexpectedEndProof          = errors.New("end proof should be empty")
 )
 
 type ProofNode struct {
@@ -246,6 +247,8 @@ type KeyValue struct {
 
 // A proof that a given set of key-value pairs are in a trie.
 type RangeProof struct {
+	// Invariant: At least one of [StartProof], [EndProof], [KeyValues] is non-empty.
+
 	// A proof that the smallest key in the requested range does/doesn't exist.
 	// Note that this may not be an entire proof -- nodes are omitted if
 	// they are also in [EndProof].
@@ -269,20 +272,13 @@ type RangeProof struct {
 }
 
 // Returns nil iff all the following hold:
+//   - The invariants of RangeProof hold.
 //   - [start] <= [end].
-//   - [proof] is non-empty.
+//   - [proof] proves the key-value pairs in [proof.KeyValues] are in the trie
+//     whose root is [expectedRootID].
 //   - All keys in [proof.KeyValues] are in the range [start, end].
 //     If [start] is empty, all keys are considered > [start].
 //     If [end] is empty, all keys are considered < [end].
-//   - [proof.KeyValues] is sorted by increasing key.
-//   - [proof.StartProof] and [proof.EndProof] are well-formed.
-//   - One of the following holds:
-//     [end] and [proof.EndProof] are empty.
-//     [proof.StartProof], [start], [end], and [proof.KeyValues] are empty and
-//     [proof.EndProof] is just the root.
-//     [end] is non-empty and [proof.EndProof] is a valid proof of a key <= [end].
-//   - [expectedRootID] is the root of the trie containing the given key-value
-//     pairs and start/end proofs.
 func (proof *RangeProof) Verify(
 	ctx context.Context,
 	start []byte,
@@ -294,9 +290,11 @@ func (proof *RangeProof) Verify(
 		return ErrStartAfterEnd
 	case len(proof.KeyValues) == 0 && len(proof.StartProof) == 0 && len(proof.EndProof) == 0:
 		return ErrNoMerkleProof
-	case len(start) == 0 && len(end) == 0 && len(proof.KeyValues) == 0 && len(proof.EndProof) != 1:
+	case len(end) == 0 && len(proof.KeyValues) == 0 && len(proof.StartProof) > 0 && len(proof.EndProof) != 0:
+		return ErrUnexpectedEndProof
+	case len(end) == 0 && len(proof.KeyValues) == 0 && len(proof.StartProof) == 0 && len(proof.EndProof) != 1:
 		return ErrShouldJustBeRoot
-	case len(proof.EndProof) == 0 && len(end) > 0:
+	case len(end) > 0 && len(proof.KeyValues) == 0 && len(proof.EndProof) == 0:
 		return ErrNoEndProof
 	}
 

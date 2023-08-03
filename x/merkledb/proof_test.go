@@ -328,6 +328,16 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 			expectedErr: ErrNoMerkleProof,
 		},
 		{
+			name:  "unexpected end proof",
+			start: []byte{1},
+			end:   nil,
+			proof: &RangeProof{
+				StartProof: []ProofNode{{}},
+				EndProof:   []ProofNode{{}},
+			},
+			expectedErr: ErrUnexpectedEndProof,
+		},
+		{
 			name:  "should just be root",
 			start: nil,
 			end:   nil,
@@ -341,7 +351,7 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 			start: []byte{1},
 			end:   []byte{1},
 			proof: &RangeProof{
-				KeyValues: []KeyValue{{Key: []byte{1}, Value: []byte{1}}},
+				StartProof: []ProofNode{{}},
 			},
 			expectedErr: ErrNoEndProof,
 		},
