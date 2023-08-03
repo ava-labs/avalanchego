@@ -196,6 +196,11 @@ func TestStruct(codec GeneralCodec, t testing.TB) {
 	version, err := manager.Unmarshal(myStructBytes, myStructUnmarshaled)
 	require.NoError(err)
 
+	// In myStructInstance MyMap4 is nil and in myStructUnmarshaled MyMap4 is an
+	// empty map
+	require.Equal(0, len(myStructUnmarshaled.MyMap4))
+	myStructUnmarshaled.MyMap4 = nil
+
 	require.Zero(version)
 	require.Equal(myStructInstance, *myStructUnmarshaled)
 }
