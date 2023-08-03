@@ -841,7 +841,6 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 
 			var (
 				msgCreator     = message.NewMockOutboundMsgBuilder(ctrl)
@@ -1067,7 +1066,6 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 
 			var (
 				msgCreator     = message.NewMockOutboundMsgBuilder(ctrl)
@@ -1239,7 +1237,6 @@ func TestSender_Single_Request(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 
 			var (
 				msgCreator     = message.NewMockOutboundMsgBuilder(ctrl)
