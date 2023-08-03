@@ -10,9 +10,10 @@ import (
 	"math"
 	"reflect"
 
+	"golang.org/x/exp/slices"
+
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"golang.org/x/exp/slices"
 )
 
 const (
