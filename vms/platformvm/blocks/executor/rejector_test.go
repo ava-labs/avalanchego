@@ -135,6 +135,7 @@ func TestRejectBlock(t *testing.T) {
 					Mempool:      mempool,
 					state:        state,
 				},
+				addTxsToMempool: true,
 			}
 
 			// Set expected calls on dependencies.

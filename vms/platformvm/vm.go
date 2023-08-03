@@ -147,9 +147,6 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return err
 	}
-	// We don't bother checking whether reducedMode is allowed here
-	// (node must not be a primary network validator). Node-level health checks
-	// will take care of this and err
 
 	validatorManager := pvalidators.NewManager(chainCtx.Log, vm.Config, vm.state, vm.metrics, &vm.clock)
 	vm.State = validatorManager
@@ -219,7 +216,9 @@ func (vm *VM) Initialize(
 
 // Create all chains that exist that this node validates.
 func (vm *VM) initBlockchains() error {
-	if err := vm.createSubnet(constants.PrimaryNetworkID); err != nil {
+	if vm.Config.LiteSyncPrimaryNetwork {
+		vm.ctx.Log.Info("skipping primary network chain creation")
+	} else if err := vm.createSubnet(constants.PrimaryNetworkID); err != nil {
 		return err
 	}
 
@@ -253,10 +252,6 @@ func (vm *VM) createSubnet(subnetID ids.ID) error {
 		tx, ok := chain.Unsigned.(*txs.CreateChainTx)
 		if !ok {
 			return fmt.Errorf("expected tx type *txs.CreateChainTx but got %T", chain.Unsigned)
-		}
-		if vm.Config.ReducedMode && tx.SubnetID == constants.PrimaryNetworkID {
-			vm.ctx.Log.Info("reduced mode enabled, skipping C-chain and X-chain validation.")
-			continue
 		}
 		vm.Config.CreateChain(chain.ID(), tx)
 	}

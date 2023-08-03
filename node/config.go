@@ -92,7 +92,7 @@ type IPConfig struct {
 type StakingConfig struct {
 	genesis.StakingConfig
 	SybilProtectionEnabled        bool            `json:"sybilProtectionEnabled"`
-	ReducedMode                   bool            `json:"reducedModeEnabled"`
+	LiteSyncPrimaryNetwork        bool            `json:"liteSyncPrimaryNetwork"`
 	StakingTLSCert                tls.Certificate `json:"-"`
 	StakingSigningKey             *bls.SecretKey  `json:"-"`
 	SybilProtectionDisabledWeight uint64          `json:"sybilProtectionDisabledWeight"`
