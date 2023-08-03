@@ -165,7 +165,7 @@ var (
 
 func parseCertificate(der []byte) (*x509.Certificate, error) {
 	input := cryptobyte.String(der)
-	// Read the SEQUENCE including length and tag bytes so that we check if
+	// Read the SEQUENCE including length and tag bytes so that we can check if
 	// there is an unexpected suffix.
 	if !input.ReadASN1Element(&input, cryptobyte_asn1.SEQUENCE) {
 		return nil, errors.New("x509: malformed certificate")
