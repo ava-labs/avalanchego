@@ -32,10 +32,14 @@ import (
 	cryptobyte_asn1 "golang.org/x/crypto/cryptobyte/asn1"
 )
 
-func NewParseCertificate(der []byte) (*Certificate, error) {
-	cert, err := ParseCertificate(der)
+// ParseCertificate parses a single certificate from the given ASN.1 DER data.
+func ParseCertificate(der []byte) (*Certificate, error) {
+	cert, err := parseCertificate(der)
 	if err != nil {
 		return nil, err
+	}
+	if len(der) != len(cert.Raw) {
+		return nil, errors.New("x509: trailing data")
 	}
 	return CertificateFromX509(cert), nil
 }
@@ -275,18 +279,6 @@ var extKeyUsageOIDs = []struct {
 	{x509.ExtKeyUsageNetscapeServerGatedCrypto, oidExtKeyUsageNetscapeServerGatedCrypto},
 	{x509.ExtKeyUsageMicrosoftCommercialCodeSigning, oidExtKeyUsageMicrosoftCommercialCodeSigning},
 	{x509.ExtKeyUsageMicrosoftKernelCodeSigning, oidExtKeyUsageMicrosoftKernelCodeSigning},
-}
-
-// ParseCertificate parses a single certificate from the given ASN.1 DER data.
-func ParseCertificate(der []byte) (*x509.Certificate, error) {
-	cert, err := parseCertificate(der)
-	if err != nil {
-		return nil, err
-	}
-	if len(der) != len(cert.Raw) {
-		return nil, errors.New("x509: trailing data")
-	}
-	return cert, err
 }
 
 func parseCertificate(der []byte) (*x509.Certificate, error) {

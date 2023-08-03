@@ -50,7 +50,7 @@ type SignedIP struct {
 }
 
 func (ip *SignedIP) Verify(cert *staking.Certificate) error {
-	return staking.NewCheckSignature(
+	return staking.CheckSignature(
 		cert,
 		ip.UnsignedIP.bytes(),
 		ip.Signature,

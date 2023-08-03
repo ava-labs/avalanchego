@@ -26,7 +26,7 @@ const MaxRSAKeyBitLen = 8192
 
 var ErrInvalidPublicKey = errors.New("invalid public key")
 
-func NewCheckSignature(cert *Certificate, message []byte, signature []byte) error {
+func CheckSignature(cert *Certificate, message []byte, signature []byte) error {
 	if cert.PublicKeyAlgorithm == x509.RSA {
 		pk, ok := cert.PublicKey.(*rsa.PublicKey)
 		if !ok {

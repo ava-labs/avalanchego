@@ -91,7 +91,7 @@ func (b *statelessBlock) initialize(bytes []byte) error {
 		return nil
 	}
 
-	cert, err := staking.NewParseCertificate(b.StatelessBlock.Certificate)
+	cert, err := staking.ParseCertificate(b.StatelessBlock.Certificate)
 	if err != nil {
 		return fmt.Errorf("%w: %s", errInvalidCertificate, err)
 	}
@@ -129,7 +129,7 @@ func (b *statelessBlock) Verify(shouldHaveProposer bool, chainID ids.ID) error {
 	}
 
 	headerBytes := header.Bytes()
-	return staking.NewCheckSignature(
+	return staking.CheckSignature(
 		b.cert,
 		headerBytes,
 		b.Signature,
