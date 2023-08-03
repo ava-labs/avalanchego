@@ -72,8 +72,6 @@ var (
 	nestedValidatorPublicKeyDiffsPrefix = []byte("publicKeyDiffs")
 	flatValidatorWeightDiffsPrefix      = []byte("flatValidatorDiffs")
 	flatValidatorPublicKeyDiffsPrefix   = []byte("flatPublicKeyDiffs")
-	validatorWeightDiffsPrefix          = []byte("validatorDiffs")
-	validatorPublicKeyDiffsPrefix       = []byte("publicKeyDiffs")
 	txPrefix                            = []byte("tx")
 	rewardUTXOsPrefix                   = []byte("rewardUTXOs")
 	utxoPrefix                          = []byte("utxo")
