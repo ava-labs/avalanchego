@@ -204,6 +204,7 @@ pub mod proof;
 pub mod storage;
 
 pub mod api;
+pub(crate) mod config;
 pub mod service;
 
 pub mod v2;

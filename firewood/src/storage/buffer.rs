@@ -1,4 +1,11 @@
 //! Disk buffer for staging in memory pages and flushing them to disk.
+use std::fmt::Debug;
+use std::ops::IndexMut;
+use std::path::{Path, PathBuf};
+use std::rc::Rc;
+use std::sync::Arc;
+use std::{cell::RefCell, collections::HashMap};
+
 use super::{AshRecord, FilePool, Page, StoreDelta, StoreError, WalConfig, PAGE_SIZE_NBIT};
 use crate::storage::DeltaPage;
 use aiofut::{AioBuilder, AioError, AioManager};
@@ -9,15 +16,6 @@ use growthring::{
     WalFileImpl, WalStoreImpl,
 };
 use shale::SpaceId;
-use std::{
-    cell::RefCell,
-    collections::HashMap,
-    fmt::Debug,
-    ops::IndexMut,
-    path::{Path, PathBuf},
-    rc::Rc,
-    sync::Arc,
-};
 use tokio::{
     sync::{
         mpsc,
@@ -581,9 +579,12 @@ impl DiskBufferRequester {
     }
 
     /// Initialize the Wal.
-    pub fn init_wal(&self, waldir: &str, rootpath: PathBuf) {
+    pub fn init_wal(&self, waldir: &str, rootpath: &Path) {
         self.sender
-            .blocking_send(BufferCmd::InitWal(rootpath, waldir.to_string()))
+            .blocking_send(BufferCmd::InitWal(
+                rootpath.to_path_buf(),
+                waldir.to_string(),
+            ))
             .map_err(StoreError::Send)
             .ok();
     }
@@ -645,7 +646,7 @@ mod tests {
         let state_path = file::touch_dir("state", &root_db_path).unwrap();
         assert!(reset);
         // create a new wal directory on top of root_db_fd
-        disk_requester.init_wal("wal", root_db_path);
+        disk_requester.init_wal("wal", &root_db_path);
 
         // create a new state cache which tracks on disk state.
         let state_cache = Arc::new(
@@ -733,7 +734,7 @@ mod tests {
         let state_path = file::touch_dir("state", &root_db_path).unwrap();
         assert!(reset);
         // create a new wal directory on top of root_db_fd
-        disk_requester.init_wal("wal", root_db_path);
+        disk_requester.init_wal("wal", &root_db_path);
 
         // create a new state cache which tracks on disk state.
         let state_cache = Arc::new(
@@ -817,7 +818,7 @@ mod tests {
         let state_path = file::touch_dir("state", &root_db_path).unwrap();
         assert!(reset);
         // create a new wal directory on top of root_db_fd
-        disk_requester.init_wal("wal", root_db_path);
+        disk_requester.init_wal("wal", &root_db_path);
 
         // create a new state cache which tracks on disk state.
         let state_cache = Arc::new(

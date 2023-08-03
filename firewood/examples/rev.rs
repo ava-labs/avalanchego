@@ -180,7 +180,7 @@ impl RevisionTracker {
     fn get_revision(&self, index: usize) -> Revision<SharedStore> {
         self.db
             .get_revision(&self.hashes[index], None)
-            .expect(&format!("revision-{index} should exist"))
+            .unwrap_or_else(|| panic!("revision-{index} should exist"))
     }
 }
 

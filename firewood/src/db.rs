@@ -3,6 +3,7 @@
 
 #[cfg(feature = "eth")]
 use crate::account::{Account, AccountRlp, Blob, BlobStash};
+pub use crate::config::{DbConfig, DbRevConfig};
 pub use crate::storage::{buffer::DiskBufferConfig, WalConfig};
 use crate::storage::{
     AshRecord, CachedSpace, MemStoreR, SpaceWrite, StoreConfig, StoreDelta, StoreRevMut,
@@ -33,7 +34,6 @@ use std::{
     sync::Arc,
     thread::JoinHandle,
 };
-use typed_builder::TypedBuilder;
 
 const MERKLE_META_SPACE: SpaceId = 0x0;
 const MERKLE_PAYLOAD_SPACE: SpaceId = 0x1;
@@ -106,73 +106,6 @@ struct DbParams {
     wal_file_nbit: u64,
     wal_block_nbit: u64,
     root_hash_file_nbit: u64,
-}
-
-/// Config for accessing a version of the DB.
-#[derive(TypedBuilder, Clone, Debug)]
-pub struct DbRevConfig {
-    /// Maximum cached Trie objects.
-    #[builder(default = 1 << 20)]
-    pub merkle_ncached_objs: usize,
-    /// Maximum cached Blob (currently just `Account`) objects.
-    #[builder(default = 4096)]
-    pub blob_ncached_objs: usize,
-}
-
-/// Database configuration.
-#[derive(Clone, TypedBuilder, Debug)]
-pub struct DbConfig {
-    /// Maximum cached pages for the free list of the item stash.
-    #[builder(default = 16384)] // 64M total size by default
-    pub meta_ncached_pages: usize,
-    /// Maximum cached file descriptors for the free list of the item stash.
-    #[builder(default = 1024)] // 1K fds by default
-    pub meta_ncached_files: usize,
-    /// Number of low-bits in the 64-bit address to determine the file ID. It is the exponent to
-    /// the power of 2 for the file size.
-    #[builder(default = 22)] // 4MB file by default
-    pub meta_file_nbit: u64,
-    /// Maximum cached pages for the item stash. This is the low-level cache used by the linear
-    /// space that holds Trie nodes and account objects.
-    #[builder(default = 262144)] // 1G total size by default
-    pub payload_ncached_pages: usize,
-    /// Maximum cached file descriptors for the item stash.
-    #[builder(default = 1024)] // 1K fds by default
-    pub payload_ncached_files: usize,
-    /// Number of low-bits in the 64-bit address to determine the file ID. It is the exponent to
-    /// the power of 2 for the file size.
-    #[builder(default = 22)] // 4MB file by default
-    pub payload_file_nbit: u64,
-    /// Maximum steps of walk to recycle a freed item.
-    #[builder(default = 10)]
-    pub payload_max_walk: u64,
-    /// Region size in bits (should be not greater than `payload_file_nbit`). One file is
-    /// partitioned into multiple regions. Just use the default value.
-    #[builder(default = 22)]
-    pub payload_regn_nbit: u64,
-    /// Maximum cached pages for the free list of the item stash.
-    #[builder(default = 16384)] // 64M total size by default
-    pub root_hash_ncached_pages: usize,
-    /// Maximum cached file descriptors for the free list of the item stash.
-    #[builder(default = 1024)] // 1K fds by default
-    pub root_hash_ncached_files: usize,
-    /// Number of low-bits in the 64-bit address to determine the file ID. It is the exponent to
-    /// the power of 2 for the file size.
-    #[builder(default = 22)] // 4MB file by default
-    pub root_hash_file_nbit: u64,
-    /// Whether to truncate the DB when opening it. If set, the DB will be reset and all its
-    /// existing contents will be lost.
-    #[builder(default = false)]
-    pub truncate: bool,
-    /// Config for accessing a version of the DB.
-    #[builder(default = DbRevConfig::builder().build())]
-    pub rev: DbRevConfig,
-    /// Config for the disk buffer.
-    #[builder(default = DiskBufferConfig::builder().build())]
-    pub buffer: DiskBufferConfig,
-    /// Config for Wal.
-    #[builder(default = WalConfig::builder().build())]
-    pub wal: WalConfig,
 }
 
 /// Necessary linear space instances bundled for a `CompactSpace`.
@@ -671,7 +604,7 @@ impl Db<CompactSpace<Node, StoreRevMut>> {
         });
 
         // recover from Wal
-        disk_requester.init_wal("wal", db_path);
+        disk_requester.init_wal("wal", &db_path);
 
         let root_hash_staging = StoreRevMut::new(root_hash_cache);
         let (data_staging, mut latest) = Db::new_store(&data_cache, reset, offset, cfg, &params)?;
