@@ -104,6 +104,7 @@ type myStruct struct {
 	MyMap1       map[string]string          `serialize:"true"`
 	MyMap2       map[int32][]MyInnerStruct3 `serialize:"true"`
 	MyMap3       map[MyInnerStruct2][]int32 `serialize:"true"`
+	MyMap4       map[int32]int32            `serialize:"true"`
 }
 
 // Test marshaling/unmarshaling a complicated struct

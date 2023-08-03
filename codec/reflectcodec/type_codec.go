@@ -208,7 +208,13 @@ func (c *genericCodec) size(value reflect.Value) (int, bool, error) {
 		return size, constSize, nil
 
 	case reflect.Map:
-		size := wrappers.IntLen
+		if value.IsNil() {
+			// Map is nil, we only pack a single byte
+			return 1, false, nil
+		}
+		// 1 byte to to keep track if Nil or not, IntLen bytes to keep track of the number of elements
+		size := wrappers.IntLen + 1
+		// add the length of each key and value
 		for _, key := range value.MapKeys() {
 			innerSize, _, err := c.size(key)
 			if err != nil {
@@ -362,7 +368,11 @@ func (c *genericCodec) marshal(value reflect.Value, p *wrappers.Packer, maxSlice
 				maxSliceLen,
 			)
 		}
-		p.PackInt(uint32(numElts)) // pack # elements
+		p.PackBool(value.IsNil()) // Map is nil, pack that to rebuild the same object
+		if value.IsNil() {
+			return nil
+		}
+		p.PackInt(uint32(numElts)) // pack # elements, if map is not nil
 		if p.Err != nil {
 			return p.Err
 		}
@@ -594,6 +604,10 @@ func (c *genericCodec) unmarshal(p *wrappers.Packer, value reflect.Value, maxSli
 		value.Set(v)
 		return nil
 	case reflect.Map:
+		if p.UnpackBool() {
+			// Map should be nil
+			return nil
+		}
 		numElts32 := p.UnpackInt()
 		if p.Err != nil {
 			return fmt.Errorf("couldn't unmarshal slice: %w", p.Err)
