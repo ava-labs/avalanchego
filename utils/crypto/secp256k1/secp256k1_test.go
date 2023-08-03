@@ -238,3 +238,46 @@ func TestSigning(t *testing.T) {
 		})
 	}
 }
+
+func FuzzVerifySignature(f *testing.F) {
+	factory := Factory{}
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		require := require.New(t)
+
+		privateKey, err := factory.NewPrivateKey()
+		require.NoError(err)
+
+		publicKey := privateKey.PublicKey()
+
+		sig, err := privateKey.Sign(data)
+		require.NoError(err)
+
+		recoveredPublicKey, err := factory.RecoverPublicKey(data, sig)
+		require.NoError(err)
+
+		require.Equal(publicKey.Bytes(), recoveredPublicKey.Bytes())
+	})
+}
+
+func FuzzVerifyInvalidSignature(f *testing.F) {
+	factory := Factory{}
+	realPrivateKey, err := factory.NewPrivateKey()
+	require.NoError(f, err)
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		require := require.New(t)
+
+		sig, err := realPrivateKey.Sign(data)
+		require.NoError(err)
+
+		fakePrivateKey, err := factory.NewPrivateKey()
+		require.NoError(err)
+		fakePublicKey := fakePrivateKey.PublicKey()
+
+		recoveredPublicKey, err := factory.RecoverPublicKey(data, sig)
+		require.NoError(err)
+
+		require.NotEqual(recoveredPublicKey.Bytes(), fakePublicKey.Bytes())
+	})
+}
