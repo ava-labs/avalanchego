@@ -27,7 +27,6 @@ var (
 	ErrStateFromOutsideOfRange     = errors.New("state key falls outside of the start->end range")
 	ErrNonIncreasingProofNodes     = errors.New("each proof node key must be a strict prefix of the next")
 	ErrExtraProofNodes             = errors.New("extra proof nodes in path")
-	ErrProofOnNothingKey           = errors.New("there should be no proof for the nothing key")
 	ErrDataInMissingRootProof      = errors.New("there should be no state or deleted keys in a change proof that had a missing root")
 	ErrNoMerkleProof               = errors.New("empty key response must include merkle proof")
 	ErrShouldJustBeRoot            = errors.New("end proof should only contain root")

@@ -330,7 +330,7 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 		{
 			name:  "unexpected end proof",
 			start: []byte{1},
-			end:   nil,
+			end:   Nothing[[]byte](),
 			proof: &RangeProof{
 				StartProof: []ProofNode{{}},
 				EndProof:   []ProofNode{{}},
