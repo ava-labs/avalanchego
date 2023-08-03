@@ -201,7 +201,7 @@ func parseCertificate(der []byte) (*x509.Certificate, error) {
 
 	input := cryptobyte.String(der)
 	// Read the SEQUENCE including length and tag bytes so that we can populate
-	// Certificate.Raw.
+	// the Raw bytes without any unexpected suffix.
 	if !input.ReadASN1Element(&input, cryptobyte_asn1.SEQUENCE) {
 		return nil, errors.New("x509: malformed certificate")
 	}
@@ -214,47 +214,19 @@ func parseCertificate(der []byte) (*x509.Certificate, error) {
 		return nil, errors.New("x509: malformed certificate")
 	}
 
-	var tbs cryptobyte.String
-	// do the same trick again as above to extract the raw
-	// bytes for Certificate.RawTBSCertificate
-	if !input.ReadASN1Element(&tbs, cryptobyte_asn1.SEQUENCE) {
+	if !input.ReadASN1(&input, cryptobyte_asn1.SEQUENCE) {
 		return nil, errors.New("x509: malformed tbs certificate")
 	}
-	if !tbs.ReadASN1(&tbs, cryptobyte_asn1.SEQUENCE) {
-		return nil, errors.New("x509: malformed tbs certificate")
-	}
-
-	if !tbs.ReadOptionalASN1Integer(&cert.Version, cryptobyte_asn1.Tag(0).Constructed().ContextSpecific(), 0) {
+	if !input.SkipOptionalASN1(cryptobyte_asn1.Tag(0).Constructed().ContextSpecific()) {
 		return nil, errors.New("x509: malformed version")
 	}
-	if cert.Version < 0 {
-		return nil, errors.New("x509: malformed version")
-	}
-	// for backwards compat reasons Version is one-indexed,
-	// rather than zero-indexed as defined in 5280
-	cert.Version++
-	if cert.Version > 3 {
-		return nil, errors.New("x509: invalid version")
-	}
-
-	serial := new(big.Int)
-	if !tbs.ReadASN1Integer(serial) {
+	if !input.SkipASN1(cryptobyte_asn1.INTEGER) {
 		return nil, errors.New("x509: malformed serial number")
 	}
 
 	var sigAISeq cryptobyte.String
-	if !tbs.ReadASN1(&sigAISeq, cryptobyte_asn1.SEQUENCE) {
+	if !input.ReadASN1(&sigAISeq, cryptobyte_asn1.SEQUENCE) {
 		return nil, errors.New("x509: malformed signature algorithm identifier")
-	}
-	// Before parsing the inner algorithm identifier, extract
-	// the outer algorithm identifier and make sure that they
-	// match.
-	var outerSigAISeq cryptobyte.String
-	if !input.ReadASN1(&outerSigAISeq, cryptobyte_asn1.SEQUENCE) {
-		return nil, errors.New("x509: malformed algorithm identifier")
-	}
-	if !bytes.Equal(outerSigAISeq, sigAISeq) {
-		return nil, errors.New("x509: inner and outer signature algorithm identifiers don't match")
 	}
 	sigAI, err := parseAI(sigAISeq)
 	if err != nil {
@@ -262,30 +234,22 @@ func parseCertificate(der []byte) (*x509.Certificate, error) {
 	}
 	cert.SignatureAlgorithm = getSignatureAlgorithmFromAI(sigAI)
 
-	var issuerSeq cryptobyte.String
-	if !tbs.ReadASN1Element(&issuerSeq, cryptobyte_asn1.SEQUENCE) {
+	if !input.SkipASN1(cryptobyte_asn1.SEQUENCE) {
 		return nil, errors.New("x509: malformed issuer")
 	}
-
-	var validity cryptobyte.String
-	if !tbs.ReadASN1(&validity, cryptobyte_asn1.SEQUENCE) {
+	if !input.SkipASN1(cryptobyte_asn1.SEQUENCE) {
 		return nil, errors.New("x509: malformed validity")
 	}
-
-	var subjectSeq cryptobyte.String
-	if !tbs.ReadASN1Element(&subjectSeq, cryptobyte_asn1.SEQUENCE) {
+	if !input.SkipASN1(cryptobyte_asn1.SEQUENCE) {
 		return nil, errors.New("x509: malformed issuer")
 	}
 
-	var spki cryptobyte.String
-	if !tbs.ReadASN1Element(&spki, cryptobyte_asn1.SEQUENCE) {
+	if !input.ReadASN1(&input, cryptobyte_asn1.SEQUENCE) {
 		return nil, errors.New("x509: malformed spki")
 	}
-	if !spki.ReadASN1(&spki, cryptobyte_asn1.SEQUENCE) {
-		return nil, errors.New("x509: malformed spki")
-	}
+
 	var pkAISeq cryptobyte.String
-	if !spki.ReadASN1(&pkAISeq, cryptobyte_asn1.SEQUENCE) {
+	if !input.ReadASN1(&pkAISeq, cryptobyte_asn1.SEQUENCE) {
 		return nil, errors.New("x509: malformed public key algorithm identifier")
 	}
 	pkAI, err := parseAI(pkAISeq)
@@ -293,8 +257,9 @@ func parseCertificate(der []byte) (*x509.Certificate, error) {
 		return nil, err
 	}
 	cert.PublicKeyAlgorithm = getPublicKeyAlgorithmFromOID(pkAI.Algorithm)
+
 	var spk asn1.BitString
-	if !spki.ReadASN1BitString(&spk) {
+	if !input.ReadASN1BitString(&spk) {
 		return nil, errors.New("x509: malformed subjectPublicKey")
 	}
 	if cert.PublicKeyAlgorithm != x509.UnknownPublicKeyAlgorithm {
