@@ -676,6 +676,7 @@ func (m *Manager) enqueueWork(work *workItem) {
 }
 
 // find the midpoint between two keys
+// start is expected to be less than end
 // nil on start is treated as all 0's
 // nothing on end is treated as all 255's
 func midPoint(start []byte, end merkledb.Maybe[[]byte]) []byte {
