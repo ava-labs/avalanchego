@@ -81,9 +81,7 @@ func testSetup(
 
 func TestAcceptedFrontier(t *testing.T) {
 	require := require.New(t)
-
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	vm, sender, config := testSetup(t, ctrl)
 
@@ -122,9 +120,7 @@ func TestAcceptedFrontier(t *testing.T) {
 
 func TestFilterAccepted(t *testing.T) {
 	require := require.New(t)
-
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	vm, sender, config := testSetup(t, ctrl)
 
