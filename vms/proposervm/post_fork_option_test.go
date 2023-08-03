@@ -6,7 +6,6 @@ package proposervm
 import (
 	"bytes"
 	"context"
-	"crypto"
 	"testing"
 	"time"
 
@@ -665,7 +664,7 @@ func TestOptionTimestampValidity(t *testing.T) {
 		time.Time{},
 		0,
 		DefaultMinBlockDelay,
-		pTestTLSCert.PrivateKey.(crypto.Signer),
+		pTestSigner,
 		pTestCert,
 	)
 

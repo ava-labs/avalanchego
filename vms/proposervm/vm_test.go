@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"context"
 	"crypto"
-	"crypto/tls"
 	"errors"
 	"fmt"
 	"testing"
@@ -49,8 +48,8 @@ type fullVM struct {
 }
 
 var (
-	pTestTLSCert *tls.Certificate
-	pTestCert    *staking.Certificate
+	pTestSigner crypto.Signer
+	pTestCert   *staking.Certificate
 
 	genesisUnixTimestamp int64 = 1000
 	genesisTimestamp           = time.Unix(genesisUnixTimestamp, 0)
@@ -65,12 +64,12 @@ var (
 )
 
 func init() {
-	var err error
-	pTestTLSCert, err = staking.NewTLSCert()
+	tlsCert, err := staking.NewTLSCert()
 	if err != nil {
 		panic(err)
 	}
-	pTestCert = staking.CertificateFromX509(pTestTLSCert.Leaf)
+	pTestSigner = tlsCert.PrivateKey.(crypto.Signer)
+	pTestCert = staking.CertificateFromX509(tlsCert.Leaf)
 }
 
 func initTestProposerVM(
@@ -142,7 +141,7 @@ func initTestProposerVM(
 		proBlkStartTime,
 		minPChainHeight,
 		DefaultMinBlockDelay,
-		pTestTLSCert.PrivateKey.(crypto.Signer),
+		pTestSigner,
 		pTestCert,
 	)
 
@@ -880,7 +879,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 		time.Time{},
 		0,
 		DefaultMinBlockDelay,
-		pTestTLSCert.PrivateKey.(crypto.Signer),
+		pTestSigner,
 		pTestCert,
 	)
 
@@ -1216,7 +1215,7 @@ func TestInnerVMRollback(t *testing.T) {
 		time.Time{},
 		0,
 		DefaultMinBlockDelay,
-		pTestTLSCert.PrivateKey.(crypto.Signer),
+		pTestSigner,
 		pTestCert,
 	)
 
@@ -1301,7 +1300,7 @@ func TestInnerVMRollback(t *testing.T) {
 		time.Time{},
 		0,
 		DefaultMinBlockDelay,
-		pTestTLSCert.PrivateKey.(crypto.Signer),
+		pTestSigner,
 		pTestCert,
 	)
 
@@ -1800,7 +1799,7 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 		time.Time{},
 		0,
 		DefaultMinBlockDelay,
-		pTestTLSCert.PrivateKey.(crypto.Signer),
+		pTestSigner,
 		pTestCert,
 	)
 
@@ -2011,7 +2010,7 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 		time.Time{},
 		0,
 		DefaultMinBlockDelay,
-		pTestTLSCert.PrivateKey.(crypto.Signer),
+		pTestSigner,
 		pTestCert,
 	)
 
@@ -2170,7 +2169,7 @@ func TestVMInnerBlkCache(t *testing.T) {
 		time.Time{}, // fork is active
 		0,           // minimum P-Chain height
 		DefaultMinBlockDelay,
-		pTestTLSCert.PrivateKey.(crypto.Signer),
+		pTestSigner,
 		pTestCert,
 	)
 
@@ -2394,7 +2393,7 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 		time.Time{}, // fork is active
 		0,           // minimum P-Chain height
 		DefaultMinBlockDelay,
-		pTestTLSCert.PrivateKey.(crypto.Signer),
+		pTestSigner,
 		pTestCert,
 	)
 

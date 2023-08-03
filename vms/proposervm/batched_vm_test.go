@@ -6,7 +6,6 @@ package proposervm
 import (
 	"bytes"
 	"context"
-	"crypto"
 	"testing"
 	"time"
 
@@ -1020,7 +1019,7 @@ func initTestRemoteProposerVM(
 		proBlkStartTime,
 		0,
 		DefaultMinBlockDelay,
-		pTestTLSCert.PrivateKey.(crypto.Signer),
+		pTestSigner,
 		pTestCert,
 	)
 

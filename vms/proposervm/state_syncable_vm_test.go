@@ -5,7 +5,6 @@ package proposervm
 
 import (
 	"context"
-	"crypto"
 	"testing"
 	"time"
 
@@ -79,7 +78,7 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 		time.Time{},
 		0,
 		DefaultMinBlockDelay,
-		pTestTLSCert.PrivateKey.(crypto.Signer),
+		pTestSigner,
 		pTestCert,
 	)
 
