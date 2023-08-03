@@ -285,14 +285,17 @@ func parseCertificate(der []byte) (*x509.Certificate, error) {
 	cert := &x509.Certificate{}
 
 	input := cryptobyte.String(der)
-	// we read the SEQUENCE including length and tag bytes so that
-	// we can populate Certificate.Raw, before unwrapping the
-	// SEQUENCE so it can be operated on
+	// Read the SEQUENCE including length and tag bytes so that we can populate
+	// Certificate.Raw.
 	if !input.ReadASN1Element(&input, cryptobyte_asn1.SEQUENCE) {
 		return nil, errors.New("x509: malformed certificate")
 	}
 	cert.Raw = input
+
+	// Consume the length and tag bytes.
 	if !input.ReadASN1(&input, cryptobyte_asn1.SEQUENCE) {
+		// Note: because the above call to ReadASN1Element succeeded, this
+		// should never happen.
 		return nil, errors.New("x509: malformed certificate")
 	}
 
@@ -454,12 +457,6 @@ func parseCertificate(der []byte) (*x509.Certificate, error) {
 			}
 		}
 	}
-
-	var signature asn1.BitString
-	if !input.ReadASN1BitString(&signature) {
-		return nil, errors.New("x509: malformed signature")
-	}
-	cert.Signature = signature.RightAlign()
 
 	return cert, nil
 }
