@@ -64,14 +64,7 @@ var (
 //
 // RFC 3279 2.2.1 RSA Signature Algorithms
 //
-//	md2WithRSAEncryption OBJECT IDENTIFIER ::= { pkcs-1 2 }
-//
-//	md5WithRSAEncryption OBJECT IDENTIFIER ::= { pkcs-1 4 }
-//
 //	sha-1WithRSAEncryption OBJECT IDENTIFIER ::= { pkcs-1 5 }
-//
-//	dsaWithSha1 OBJECT IDENTIFIER ::= {
-//		iso(1) member-body(2) us(840) x9-57(10040) x9cm(4) 3 }
 //
 // RFC 3279 2.2.3 ECDSA Signature Algorithm
 //
@@ -86,12 +79,6 @@ var (
 //	sha384WithRSAEncryption OBJECT IDENTIFIER ::= { pkcs-1 12 }
 //
 //	sha512WithRSAEncryption OBJECT IDENTIFIER ::= { pkcs-1 13 }
-//
-// RFC 5758 3.1 DSA Signature Algorithms
-//
-//	dsaWithSha256 OBJECT IDENTIFIER ::= {
-//		joint-iso-ccitt(2) country(16) us(840) organization(1) gov(101)
-//		csor(3) algorithms(4) id-dsa-with-sha2(3) 2}
 //
 // RFC 5758 3.2 ECDSA Signature Algorithm
 //
@@ -108,15 +95,11 @@ var (
 //
 //	id-Ed25519   OBJECT IDENTIFIER ::= { 1 3 101 112 }
 var (
-	oidSignatureMD2WithRSA      = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 2}
-	oidSignatureMD5WithRSA      = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 4}
 	oidSignatureSHA1WithRSA     = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 5}
 	oidSignatureSHA256WithRSA   = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 11}
 	oidSignatureSHA384WithRSA   = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 12}
 	oidSignatureSHA512WithRSA   = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 13}
 	oidSignatureRSAPSS          = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 10}
-	oidSignatureDSAWithSHA1     = asn1.ObjectIdentifier{1, 2, 840, 10040, 4, 3}
-	oidSignatureDSAWithSHA256   = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 3, 2}
 	oidSignatureECDSAWithSHA1   = asn1.ObjectIdentifier{1, 2, 840, 10045, 4, 1}
 	oidSignatureECDSAWithSHA256 = asn1.ObjectIdentifier{1, 2, 840, 10045, 4, 3, 2}
 	oidSignatureECDSAWithSHA384 = asn1.ObjectIdentifier{1, 2, 840, 10045, 4, 3, 3}
@@ -142,8 +125,6 @@ var signatureAlgorithmDetails = []struct {
 	pubKeyAlgo x509.PublicKeyAlgorithm
 	hash       crypto.Hash
 }{
-	{x509.MD2WithRSA, "MD2-RSA", oidSignatureMD2WithRSA, x509.RSA, crypto.Hash(0) /* no value for MD2 */},
-	{x509.MD5WithRSA, "MD5-RSA", oidSignatureMD5WithRSA, x509.RSA, crypto.MD5},
 	{x509.SHA1WithRSA, "SHA1-RSA", oidSignatureSHA1WithRSA, x509.RSA, crypto.SHA1},
 	{x509.SHA1WithRSA, "SHA1-RSA", oidISOSignatureSHA1WithRSA, x509.RSA, crypto.SHA1},
 	{x509.SHA256WithRSA, "SHA256-RSA", oidSignatureSHA256WithRSA, x509.RSA, crypto.SHA256},
@@ -152,8 +133,6 @@ var signatureAlgorithmDetails = []struct {
 	{x509.SHA256WithRSAPSS, "SHA256-RSAPSS", oidSignatureRSAPSS, x509.RSA, crypto.SHA256},
 	{x509.SHA384WithRSAPSS, "SHA384-RSAPSS", oidSignatureRSAPSS, x509.RSA, crypto.SHA384},
 	{x509.SHA512WithRSAPSS, "SHA512-RSAPSS", oidSignatureRSAPSS, x509.RSA, crypto.SHA512},
-	{x509.DSAWithSHA1, "DSA-SHA1", oidSignatureDSAWithSHA1, x509.DSA, crypto.SHA1},
-	{x509.DSAWithSHA256, "DSA-SHA256", oidSignatureDSAWithSHA256, x509.DSA, crypto.SHA256},
 	{x509.ECDSAWithSHA1, "ECDSA-SHA1", oidSignatureECDSAWithSHA1, x509.ECDSA, crypto.SHA1},
 	{x509.ECDSAWithSHA256, "ECDSA-SHA256", oidSignatureECDSAWithSHA256, x509.ECDSA, crypto.SHA256},
 	{x509.ECDSAWithSHA384, "ECDSA-SHA384", oidSignatureECDSAWithSHA384, x509.ECDSA, crypto.SHA384},
