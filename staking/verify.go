@@ -70,6 +70,7 @@ func checkSignature(algo x509.SignatureAlgorithm, signed, signature []byte, publ
 			return x509.ErrUnsupportedAlgorithm
 		}
 		h := hashType.New()
+		// TODO: should we handle this error?
 		_, _ = h.Write(signed)
 		signed = h.Sum(nil)
 	}
