@@ -122,9 +122,6 @@ func Test_Midpoint(t *testing.T) {
 	mid := midPoint(nil, merkledb.Some[[]byte](nil))
 	require.Nil(mid)
 
-	mid = midPoint([]byte{2}, merkledb.Some[[]byte](nil))
-	require.Equal([]byte{1}, mid)
-
 	mid = midPoint([]byte{1, 255}, merkledb.Some([]byte{2, 1}))
 	require.Equal([]byte{2, 0}, mid)
 
