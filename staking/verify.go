@@ -36,7 +36,7 @@ func CheckSignature(cert *Certificate, message []byte, signature []byte) error {
 
 // checkSignature verifies that signature is a valid signature over signed from
 // a crypto.PublicKey.
-func checkSignature(algo x509.SignatureAlgorithm, signed, signature []byte, publicKey crypto.PublicKey) (err error) {
+func checkSignature(algo x509.SignatureAlgorithm, signed, signature []byte, publicKey crypto.PublicKey) error {
 	var hashType crypto.Hash
 	var pubKeyAlgo x509.PublicKeyAlgorithm
 
@@ -71,9 +71,8 @@ func checkSignature(algo x509.SignatureAlgorithm, signed, signature []byte, publ
 		}
 		if isRSAPSS(algo) {
 			return rsa.VerifyPSS(pub, hashType, signed, signature, &rsa.PSSOptions{SaltLength: rsa.PSSSaltLengthEqualsHash})
-		} else {
-			return rsa.VerifyPKCS1v15(pub, hashType, signed, signature)
 		}
+		return rsa.VerifyPKCS1v15(pub, hashType, signed, signature)
 	case *ecdsa.PublicKey:
 		if pubKeyAlgo != x509.ECDSA {
 			return signaturePublicKeyAlgoMismatchError(pubKeyAlgo, pub)
@@ -81,7 +80,7 @@ func checkSignature(algo x509.SignatureAlgorithm, signed, signature []byte, publ
 		if !ecdsa.VerifyASN1(pub, signed, signature) {
 			return errors.New("x509: ECDSA verification failure")
 		}
-		return
+		return nil
 	case ed25519.PublicKey:
 		if pubKeyAlgo != x509.Ed25519 {
 			return signaturePublicKeyAlgoMismatchError(pubKeyAlgo, pub)
@@ -89,9 +88,10 @@ func checkSignature(algo x509.SignatureAlgorithm, signed, signature []byte, publ
 		if !ed25519.Verify(pub, signed, signature) {
 			return errors.New("x509: Ed25519 verification failure")
 		}
-		return
+		return nil
+	default:
+		return x509.ErrUnsupportedAlgorithm
 	}
-	return x509.ErrUnsupportedAlgorithm
 }
 
 func isRSAPSS(algo x509.SignatureAlgorithm) bool {

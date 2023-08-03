@@ -344,9 +344,9 @@ func getSignatureAlgorithmFromAI(ai pkix.AlgorithmIdentifier) x509.SignatureAlgo
 		return x509.SHA384WithRSAPSS
 	case params.Hash.Algorithm.Equal(oidSHA512) && params.SaltLength == 64:
 		return x509.SHA512WithRSAPSS
+	default:
+		return x509.UnknownSignatureAlgorithm
 	}
-
-	return x509.UnknownSignatureAlgorithm
 }
 
 type publicKeyInfo struct {
@@ -433,6 +433,7 @@ func namedCurveFromOID(oid asn1.ObjectIdentifier) elliptic.Curve {
 		return elliptic.P384()
 	case oid.Equal(oidNamedCurveP521):
 		return elliptic.P521()
+	default:
+		return nil
 	}
-	return nil
 }
