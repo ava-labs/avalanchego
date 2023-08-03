@@ -13,13 +13,6 @@ import (
 	"fmt"
 )
 
-type Certificate struct {
-	Raw                []byte
-	PublicKeyAlgorithm x509.PublicKeyAlgorithm
-	PublicKey          any
-	SignatureAlgorithm x509.SignatureAlgorithm
-}
-
 // MaxRSAKeyBitLen is the maximum RSA key size in bits that we are willing to
 // parse.
 const MaxRSAKeyBitLen = 8192
