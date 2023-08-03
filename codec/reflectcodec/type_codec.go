@@ -390,7 +390,7 @@ func (c *genericCodec) marshal(value reflect.Value, p *wrappers.Packer, maxSlice
 		}
 
 		slices.SortFunc(sortedKeys, func(a, b keyTuple) bool {
-			return bytes.Compare(a.bytes, b.bytes) >= 0
+			return bytes.Compare(a.bytes, b.bytes) < 0
 		})
 
 		for _, key := range sortedKeys {
@@ -608,10 +608,11 @@ func (c *genericCodec) unmarshal(p *wrappers.Packer, value reflect.Value, maxSli
 		}
 
 		numElts := int(numElts32)
-		value.Set(reflect.MakeMapWithSize(value.Type(), numElts))
 		valueTypeReflection := value.Type()
 		mapKeyType := valueTypeReflection.Key()
 		mapValueType := valueTypeReflection.Elem()
+
+		value.Set(reflect.MakeMapWithSize(valueTypeReflection, numElts))
 
 		for i := 0; i < numElts; i++ {
 			mapKey := reflect.New(mapKeyType).Elem()
