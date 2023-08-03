@@ -473,7 +473,7 @@ func TestBlockVerify(t *testing.T) {
 							parentID: {
 								onAcceptState:  mockParentState,
 								statelessBlock: mockParentBlock,
-								importedInputs: set.Set[ids.ID]{inputID: struct{}{}},
+								importedInputs: set.Of[ids.ID](inputID),
 							},
 						},
 						clk:          &mockable.Clock{},

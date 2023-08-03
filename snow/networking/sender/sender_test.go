@@ -962,9 +962,9 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 			},
 			setExternalSenderExpect: func(externalSender *MockExternalSender) {
 				externalSender.EXPECT().Send(
-					gomock.Any(), // Outbound message
-					set.Set[ids.NodeID]{destinationNodeID: struct{}{}}, // Node IDs
-					subnetID, // Subnet ID
+					gomock.Any(),                          // Outbound message
+					set.Of[ids.NodeID](destinationNodeID), // Node IDs
+					subnetID,                              // Subnet ID
 					gomock.Any(),
 				).Return(nil)
 			},
@@ -992,9 +992,9 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 			},
 			setExternalSenderExpect: func(externalSender *MockExternalSender) {
 				externalSender.EXPECT().Send(
-					gomock.Any(), // Outbound message
-					set.Set[ids.NodeID]{destinationNodeID: struct{}{}}, // Node IDs
-					subnetID, // Subnet ID
+					gomock.Any(),                          // Outbound message
+					set.Of[ids.NodeID](destinationNodeID), // Node IDs
+					subnetID,                              // Subnet ID
 					gomock.Any(),
 				).Return(nil)
 			},
@@ -1020,9 +1020,9 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 			},
 			setExternalSenderExpect: func(externalSender *MockExternalSender) {
 				externalSender.EXPECT().Send(
-					gomock.Any(), // Outbound message
-					set.Set[ids.NodeID]{destinationNodeID: struct{}{}}, // Node IDs
-					subnetID, // Subnet ID
+					gomock.Any(),                          // Outbound message
+					set.Of[ids.NodeID](destinationNodeID), // Node IDs
+					subnetID,                              // Subnet ID
 					gomock.Any(),
 				).Return(nil)
 			},
@@ -1050,9 +1050,9 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 			},
 			setExternalSenderExpect: func(externalSender *MockExternalSender) {
 				externalSender.EXPECT().Send(
-					gomock.Any(), // Outbound message
-					set.Set[ids.NodeID]{destinationNodeID: struct{}{}}, // Node IDs
-					subnetID, // Subnet ID
+					gomock.Any(),                          // Outbound message
+					set.Of[ids.NodeID](destinationNodeID), // Node IDs
+					subnetID,                              // Subnet ID
 					gomock.Any(),
 				).Return(nil)
 			},
@@ -1182,8 +1182,8 @@ func TestSender_Single_Request(t *testing.T) {
 			},
 			setExternalSenderExpect: func(externalSender *MockExternalSender, sentTo set.Set[ids.NodeID]) {
 				externalSender.EXPECT().Send(
-					gomock.Any(), // Outbound message
-					set.Set[ids.NodeID]{destinationNodeID: struct{}{}}, // Node IDs
+					gomock.Any(),                          // Outbound message
+					set.Of[ids.NodeID](destinationNodeID), // Node IDs
 					subnetID,
 					gomock.Any(),
 				).Return(sentTo)
@@ -1221,8 +1221,8 @@ func TestSender_Single_Request(t *testing.T) {
 			},
 			setExternalSenderExpect: func(externalSender *MockExternalSender, sentTo set.Set[ids.NodeID]) {
 				externalSender.EXPECT().Send(
-					gomock.Any(), // Outbound message
-					set.Set[ids.NodeID]{destinationNodeID: struct{}{}}, // Node IDs
+					gomock.Any(),                          // Outbound message
+					set.Of[ids.NodeID](destinationNodeID), // Node IDs
 					subnetID,
 					gomock.Any(),
 				).Return(sentTo)

@@ -87,10 +87,10 @@ var (
 		UnitTestHRP: UnitTestID,
 		LocalHRP:    LocalID,
 	}
-	ProductionNetworkIDs = set.Set[uint32]{
-		MainnetID: struct{}{},
-		FujiID:    struct{}{},
-	}
+	ProductionNetworkIDs = set.Of[uint32](
+		MainnetID,
+		FujiID,
+	)
 
 	ValidNetworkPrefix = "network-"
 

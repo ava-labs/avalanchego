@@ -157,7 +157,7 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 
 	onAccept := state.NewMockDiff(ctrl)
 	blkTx := txs.NewMockUnsignedTx(ctrl)
-	inputs := set.Set[ids.ID]{ids.GenerateTestID(): struct{}{}}
+	inputs := set.Of[ids.ID](ids.GenerateTestID())
 	blkTx.EXPECT().Visit(gomock.AssignableToTypeOf(&executor.AtomicTxExecutor{})).DoAndReturn(
 		func(e *executor.AtomicTxExecutor) error {
 			e.OnAccept = onAccept
