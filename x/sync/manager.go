@@ -695,7 +695,7 @@ func midPoint(start []byte, end merkledb.Maybe[[]byte]) []byte {
 	// This check deals with cases where the end has a 255(or is nil which is treated as all 255s) and the start key ends 255.
 	// For example, midPoint([255], nil) should be [255, 127], not [255].
 	// The result needs the extra byte added on to the end to deal with the fact that the naive midpoint between 255 and 255 would be 255
-	if (len(start) > 0 && start[len(start)-1] == 255) && (end.IsNothing() || end.Value()[len(end.Value())-1] == 255) {
+	if (len(start) > 0 && start[len(start)-1] == 255) && (end.IsNothing() || len(end.Value()) == 0 || end.Value()[len(end.Value())-1] == 255) {
 		length++
 	}
 
