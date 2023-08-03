@@ -42,9 +42,6 @@ var Tests = []func(c GeneralCodec, t testing.TB){
 	TestExtraSpace,
 	TestSliceLengthOverflow,
 	TestMap,
-	TestMap2,
-	TestMap3,
-	TestMapSorting,
 }
 
 var MultipleTagsTests = []func(c GeneralCodec, t testing.TB){
@@ -88,22 +85,25 @@ type MyInnerStruct3 struct {
 }
 
 type myStruct struct {
-	InnerStruct  MyInnerStruct      `serialize:"true"`
-	InnerStruct2 *MyInnerStruct     `serialize:"true"`
-	Member1      int64              `serialize:"true"`
-	Member2      uint16             `serialize:"true"`
-	MyArray2     [5]string          `serialize:"true"`
-	MyArray3     [3]MyInnerStruct   `serialize:"true"`
-	MyArray4     [2]*MyInnerStruct2 `serialize:"true"`
-	MySlice      []byte             `serialize:"true"`
-	MySlice2     []string           `serialize:"true"`
-	MySlice3     []MyInnerStruct    `serialize:"true"`
-	MySlice4     []*MyInnerStruct2  `serialize:"true"`
-	MyArray      [4]byte            `serialize:"true"`
-	MyInterface  Foo                `serialize:"true"`
-	MySlice5     []Foo              `serialize:"true"`
-	InnerStruct3 MyInnerStruct3     `serialize:"true"`
-	MyPointer    *Foo               `serialize:"true"`
+	InnerStruct  MyInnerStruct              `serialize:"true"`
+	InnerStruct2 *MyInnerStruct             `serialize:"true"`
+	Member1      int64                      `serialize:"true"`
+	Member2      uint16                     `serialize:"true"`
+	MyArray2     [5]string                  `serialize:"true"`
+	MyArray3     [3]MyInnerStruct           `serialize:"true"`
+	MyArray4     [2]*MyInnerStruct2         `serialize:"true"`
+	MySlice      []byte                     `serialize:"true"`
+	MySlice2     []string                   `serialize:"true"`
+	MySlice3     []MyInnerStruct            `serialize:"true"`
+	MySlice4     []*MyInnerStruct2          `serialize:"true"`
+	MyArray      [4]byte                    `serialize:"true"`
+	MyInterface  Foo                        `serialize:"true"`
+	MySlice5     []Foo                      `serialize:"true"`
+	InnerStruct3 MyInnerStruct3             `serialize:"true"`
+	MyPointer    *Foo                       `serialize:"true"`
+	MyMap1       map[string]string          `serialize:"true"`
+	MyMap2       map[int32][]MyInnerStruct3 `serialize:"true"`
+	MyMap3       map[MyInnerStruct2][]int32 `serialize:"true"`
 }
 
 // Test marshaling/unmarshaling a complicated struct
@@ -111,6 +111,10 @@ func TestStruct(codec GeneralCodec, t testing.TB) {
 	require := require.New(t)
 
 	temp := Foo(&MyInnerStruct{})
+	myMap3 := make(map[MyInnerStruct2][]int32)
+	myMap3[MyInnerStruct2{false}] = []int32{991, 12}
+	myMap3[MyInnerStruct2{true}] = []int32{1911, 1921}
+
 	myStructInstance := myStruct{
 		InnerStruct:  MyInnerStruct{"hello"},
 		InnerStruct2: &MyInnerStruct{"yello"},
@@ -134,6 +138,44 @@ func TestStruct(codec GeneralCodec, t testing.TB) {
 			F: &MyInnerStruct2{},
 		},
 		MyPointer: &temp,
+		MyMap1: map[string]string{
+			"test": "test",
+		},
+		MyMap2: map[int32][]MyInnerStruct3{
+			199921: {
+				{
+					Str: "str-1",
+					M1: MyInnerStruct{
+						Str: "other str",
+					},
+					F: &MyInnerStruct2{},
+				},
+				{
+					Str: "str-2",
+					M1: MyInnerStruct{
+						Str: "other str",
+					},
+					F: &MyInnerStruct2{},
+				},
+			},
+			1921: {
+				{
+					Str: "str0",
+					M1: MyInnerStruct{
+						Str: "other str",
+					},
+					F: &MyInnerStruct2{},
+				},
+				{
+					Str: "str1",
+					M1: MyInnerStruct{
+						Str: "other str",
+					},
+					F: &MyInnerStruct2{},
+				},
+			},
+		},
+		MyMap3: myMap3,
 	}
 
 	manager := NewDefaultManager()
@@ -895,124 +937,34 @@ func TestMultipleTags(codec GeneralCodec, t testing.TB) {
 func TestMap(codec GeneralCodec, t testing.TB) {
 	require := require.New(t)
 
-	data := make(map[string]int32)
-	data["test"] = 12
-	data["bar"] = 33
+	data1 := make(map[string]int32)
+	data1["test"] = 12
+	data1["bar"] = 33
+
+	data2 := make(map[string]int32)
+	data2["bar"] = 33
+	data2["test"] = 12
 
 	manager := NewDefaultManager()
 	require.NoError(manager.RegisterCodec(0, codec))
-
-	bytes, err := manager.Marshal(0, data)
-	require.NoError(err)
-
-	bytesLen, err := manager.Size(0, data)
-	require.NoError(err)
-	require.Equal(len(bytes), bytesLen)
-
-	var output map[string]int32
-	_, err = manager.Unmarshal(bytes, &output)
-	require.NoError(err)
-
-	require.Equal(data, output)
-}
-
-func TestMap2(codec GeneralCodec, t testing.TB) {
-	require := require.New(t)
-
-	type Foo struct {
-		A int32  `serialize:"true"`
-		B string `serialize:"true"`
-	}
-
-	data := make(map[int32]Foo)
-	data[12] = Foo{A: 1, B: "test"}
-	data[13] = Foo{A: 2, B: "more test"}
-
-	manager := NewDefaultManager()
-	require.NoError(manager.RegisterCodec(0, codec))
-
-	bytes, err := manager.Marshal(0, data)
-	require.NoError(err)
-
-	bytesLen, err := manager.Size(0, data)
-	require.NoError(err)
-	require.Equal(len(bytes), bytesLen)
-
-	var output map[int32]Foo
-	_, err = manager.Unmarshal(bytes, &output)
-	require.NoError(err)
-
-	require.Equal(data, output)
-}
-
-func TestMap3(codec GeneralCodec, t testing.TB) {
-	require := require.New(t)
-
-	type Foo struct {
-		A int32            `serialize:"true"`
-		B string           `serialize:"true"`
-		E map[int32]string `serialize:"true"`
-	}
-
-	data := Foo{
-		A: 1,
-		B: "test",
-		E: make(map[int32]string, 2),
-	}
-	data.E[12] = "test"
-	data.E[13] = "test"
-
-	manager := NewDefaultManager()
-	require.NoError(manager.RegisterCodec(0, codec))
-
-	bytes, err := manager.Marshal(0, data)
-	require.NoError(err)
-
-	bytesLen, err := manager.Size(0, data)
-	require.NoError(err)
-	require.Equal(len(bytes), bytesLen)
-
-	var output Foo
-	_, err = manager.Unmarshal(bytes, &output)
-	require.NoError(err)
-
-	require.Equal(data, output)
-}
-
-func TestMapSorting(codec GeneralCodec, t testing.TB) {
-	require := require.New(t)
-
-	type Foo struct {
-		A int32            `serialize:"true"`
-		B string           `serialize:"true"`
-		E map[int32]string `serialize:"true"`
-	}
-
-	manager := NewDefaultManager()
-	require.NoError(manager.RegisterCodec(0, codec))
-
-	// test sorting
-	data1 := Foo{
-		A: 1,
-		B: "test",
-		E: make(map[int32]string, 2),
-	}
-	data1.E[12] = "test-12"
-	data1.E[13] = "test-13"
-
-	data2 := Foo{
-		A: 1,
-		B: "test",
-		E: make(map[int32]string, 2),
-	}
-	data2.E[13] = "test-13"
-	data2.E[12] = "test-12"
 
 	bytes1, err := manager.Marshal(0, data1)
 	require.NoError(err)
 
+	// data1 and data2, although the data has a different order, should be
+	// serialized using the same bytes. This will allow the serialized data to
+	// be used safely to hash data, to be used by nodes to exchange hashes and
+	// only request the whole data when the hash is not different than expected
 	bytes2, err := manager.Marshal(0, data2)
 	require.NoError(err)
-
 	require.Equal(bytes1, bytes2)
+
+	bytesLen, err := manager.Size(0, data1)
+	require.NoError(err)
+	require.Equal(len(bytes1), bytesLen)
+
+	var output map[string]int32
+	_, err = manager.Unmarshal(bytes1, &output)
+	require.NoError(err)
+	require.Equal(data1, output)
 }
