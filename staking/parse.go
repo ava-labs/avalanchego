@@ -257,22 +257,20 @@ func parseCertificate(der []byte) (*x509.Certificate, error) {
 		return nil, err
 	}
 	cert.PublicKeyAlgorithm = getPublicKeyAlgorithmFromOID(pkAI.Algorithm)
+	if cert.PublicKeyAlgorithm == x509.UnknownPublicKeyAlgorithm {
+		// TODO: should this error?
+		return cert, nil
+	}
 
 	var spk asn1.BitString
 	if !input.ReadASN1BitString(&spk) {
 		return nil, errors.New("x509: malformed subjectPublicKey")
 	}
-	if cert.PublicKeyAlgorithm != x509.UnknownPublicKeyAlgorithm {
-		cert.PublicKey, err = parsePublicKey(&publicKeyInfo{
-			Algorithm: pkAI,
-			PublicKey: spk,
-		})
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return cert, nil
+	cert.PublicKey, err = parsePublicKey(&publicKeyInfo{
+		Algorithm: pkAI,
+		PublicKey: spk,
+	})
+	return cert, err
 }
 
 func parseAI(der cryptobyte.String) (pkix.AlgorithmIdentifier, error) {
