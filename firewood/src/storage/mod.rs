@@ -69,13 +69,6 @@ pub struct Ash {
 }
 
 impl Ash {
-    fn new() -> Self {
-        Self {
-            undo: Vec::new(),
-            redo: Vec::new(),
-        }
-    }
-
     fn iter(&self) -> impl Iterator<Item = (&SpaceWrite, &SpaceWrite)> {
         self.undo.iter().zip(self.redo.iter())
     }
@@ -485,21 +478,21 @@ impl StoreRevMut {
         page.as_mut()
     }
 
-    pub fn take_delta(&self) -> (StoreDelta, Ash) {
-        let mut guard = self.deltas.write();
+    #[must_use]
+    pub fn delta(&self) -> (StoreDelta, Ash) {
+        let guard = self.deltas.read();
         let mut pages: Vec<DeltaPage> = guard
             .pages
             .iter()
             .map(|page| DeltaPage(*page.0, page.1.clone()))
             .collect();
         pages.sort_by_key(|p| p.0);
-        let cloned_plain = guard.plain.clone();
-        // TODO: remove this line, since we don't know why this works
-        *guard = StoreRevMutDelta {
-            pages: HashMap::new(),
-            plain: Ash::new(),
-        };
-        (StoreDelta(pages), cloned_plain)
+        (StoreDelta(pages), guard.plain.clone())
+    }
+    pub fn reset_deltas(&self) {
+        let mut guard = self.deltas.write();
+        guard.plain = Ash::default();
+        guard.pages = HashMap::new();
     }
 }
 

@@ -774,7 +774,7 @@ mod tests {
 
         // Commit the change. Take the delta from cached store,
         // then apply changes to the CachedSpace.
-        let (redo_delta, wal) = mut_store.take_delta();
+        let (redo_delta, wal) = mut_store.delta();
         state_cache.update(&redo_delta).unwrap();
 
         // create a mutation request to the disk buffer by passing the page and write batch.
@@ -880,11 +880,11 @@ mod tests {
         assert_eq!(view.as_deref(), hash);
 
         // Commit the change. Take the delta from both stores.
-        let (redo_delta, wal) = store.take_delta();
+        let (redo_delta, wal) = store.delta();
         assert_eq!(1, redo_delta.0.len());
         assert_eq!(1, wal.undo.len());
 
-        let (another_redo_delta, another_wal) = another_store.take_delta();
+        let (another_redo_delta, another_wal) = another_store.delta();
         assert_eq!(1, another_redo_delta.0.len());
         assert_eq!(2, another_wal.undo.len());
 
@@ -920,7 +920,7 @@ mod tests {
             &mut *rev_mut.deltas.write(),
             StoreRevMutDelta {
                 pages: HashMap::new(),
-                plain: Ash::new(),
+                plain: Ash::default(),
             },
         );
 

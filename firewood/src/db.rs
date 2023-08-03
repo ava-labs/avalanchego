@@ -1117,12 +1117,14 @@ impl<S: ShaleStore<Node> + Send + Sync> WriteBatch<S> {
         // clear the staging layer and apply changes to the CachedSpace
         rev_inner.latest.flush_dirty().unwrap();
         let (merkle_payload_redo, merkle_payload_wal) =
-            rev_inner.data_staging.merkle.payload.take_delta();
-        let (merkle_meta_redo, merkle_meta_wal) = rev_inner.data_staging.merkle.meta.take_delta();
-        let (blob_payload_redo, blob_payload_wal) =
-            rev_inner.data_staging.blob.payload.take_delta();
-        let (blob_meta_redo, blob_meta_wal) = rev_inner.data_staging.blob.meta.take_delta();
-
+            rev_inner.data_staging.merkle.payload.delta();
+        rev_inner.data_staging.merkle.payload.reset_deltas();
+        let (merkle_meta_redo, merkle_meta_wal) = rev_inner.data_staging.merkle.meta.delta();
+        rev_inner.data_staging.merkle.meta.reset_deltas();
+        let (blob_payload_redo, blob_payload_wal) = rev_inner.data_staging.blob.payload.delta();
+        rev_inner.data_staging.blob.payload.reset_deltas();
+        let (blob_meta_redo, blob_meta_wal) = rev_inner.data_staging.blob.meta.delta();
+        rev_inner.data_staging.blob.meta.reset_deltas();
         let merkle_meta_undo = rev_inner
             .data_cache
             .merkle
@@ -1198,7 +1200,7 @@ impl<S: ShaleStore<Node> + Send + Sync> WriteBatch<S> {
         }
 
         rev_inner.root_hash_staging.write(0, &kv_root_hash.0);
-        let (root_hash_redo, root_hash_wal) = rev_inner.root_hash_staging.take_delta();
+        let (root_hash_redo, root_hash_wal) = rev_inner.root_hash_staging.delta();
 
         self.committed = true;
 
@@ -1390,11 +1392,11 @@ impl<S> Drop for WriteBatch<S> {
     fn drop(&mut self) {
         if !self.committed {
             // drop the staging changes
-            self.m.read().data_staging.merkle.payload.take_delta();
-            self.m.read().data_staging.merkle.meta.take_delta();
-            self.m.read().data_staging.blob.payload.take_delta();
-            self.m.read().data_staging.blob.meta.take_delta();
-            self.m.read().root_hash_staging.take_delta();
+            self.m.read().data_staging.merkle.payload.reset_deltas();
+            self.m.read().data_staging.merkle.meta.reset_deltas();
+            self.m.read().data_staging.blob.payload.reset_deltas();
+            self.m.read().data_staging.blob.meta.reset_deltas();
+            self.m.read().root_hash_staging.reset_deltas();
         }
     }
 }
