@@ -943,13 +943,18 @@ func TestMultipleTags(codec GeneralCodec, t testing.TB) {
 func TestMap(codec GeneralCodec, t testing.TB) {
 	require := require.New(t)
 
-	data1 := make(map[string]int32)
-	data1["test"] = 12
-	data1["bar"] = 33
+	innerMap := make(map[int32]map[string]MyInnerStruct2)
 
-	data2 := make(map[string]int32)
-	data2["bar"] = 33
-	data2["test"] = 12
+	data1 := make(map[string]MyInnerStruct2)
+	data1["test"] = MyInnerStruct2{true}
+	data1["bar"] = MyInnerStruct2{false}
+
+	data2 := make(map[string]MyInnerStruct2)
+	data2["bar"] = MyInnerStruct2{false}
+	data2["test"] = MyInnerStruct2{true}
+
+	innerMap[3] = data1
+	innerMap[19] = data2
 
 	manager := NewDefaultManager()
 	require.NoError(manager.RegisterCodec(0, codec))
@@ -969,8 +974,20 @@ func TestMap(codec GeneralCodec, t testing.TB) {
 	require.NoError(err)
 	require.Equal(len(bytes1), bytesLen)
 
-	var output map[string]int32
+	var output map[string]MyInnerStruct2
 	_, err = manager.Unmarshal(bytes1, &output)
 	require.NoError(err)
 	require.Equal(data1, output)
+
+	bytes3, err := manager.Marshal(0, innerMap)
+	require.NoError(err)
+
+	bytesLen2, err := manager.Size(0, innerMap)
+	require.NoError(err)
+	require.Equal(len(bytes3), bytesLen2)
+
+	var output1 map[int32]map[string]MyInnerStruct2
+	_, err = manager.Unmarshal(bytes3, &output1)
+	require.NoError(err)
+	require.Equal(innerMap, output1)
 }
