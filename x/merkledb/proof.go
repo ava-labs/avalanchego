@@ -544,7 +544,7 @@ type ChangeProof struct {
 	// [kv1, kv3, kv2] (Not sorted by increasing key)
 	// [kv1, kv1] (Duplicate key-value pairs)
 	// [kv0, kv1] (For some kv1 < start)
-	// [kv1, kv2, kv6] (For some kv6 > end)
+	// [kv1, kv2, kv3, kv4, kv5, kv6] (For some kv6 > end)
 	KeyChanges []KeyChange
 }
 
