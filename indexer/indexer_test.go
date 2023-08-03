@@ -128,7 +128,6 @@ func TestMarkHasRunAndShutdown(t *testing.T) {
 func TestIndexer(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	baseDB := memdb.New()
 	db := versiondb.New(baseDB)
@@ -399,7 +398,6 @@ func TestIncompleteIndex(t *testing.T) {
 	// Create an indexer with indexing disabled
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	baseDB := memdb.New()
 	config := Config{
@@ -481,7 +479,6 @@ func TestIncompleteIndex(t *testing.T) {
 func TestIgnoreNonDefaultChains(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	baseDB := memdb.New()
 	db := versiondb.New(baseDB)

@@ -30,7 +30,6 @@ var (
 func TestManagerGetStatelessBlock(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	state := states.NewMockState(ctrl)
 	m := &manager{
@@ -73,7 +72,6 @@ func TestManagerGetStatelessBlock(t *testing.T) {
 func TestManagerGetState(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	state := states.NewMockState(ctrl)
 	m := &manager{
@@ -299,7 +297,6 @@ func TestManagerVerifyTx(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 
 			m := test.managerF(ctrl)
 			tx := test.txF(ctrl)
@@ -312,7 +309,6 @@ func TestManagerVerifyTx(t *testing.T) {
 func TestVerifyUniqueInputs(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	// Case: No inputs
 	{

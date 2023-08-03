@@ -29,7 +29,6 @@ import (
 func TestAcceptorVisitProposalBlock(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	lastAcceptedID := ids.GenerateTestID()
 
@@ -81,7 +80,6 @@ func TestAcceptorVisitProposalBlock(t *testing.T) {
 func TestAcceptorVisitAtomicBlock(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	s := state.NewMockState(ctrl)
 	sharedMemory := atomic.NewMockSharedMemory(ctrl)
@@ -161,7 +159,6 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 func TestAcceptorVisitStandardBlock(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	s := state.NewMockState(ctrl)
 	sharedMemory := atomic.NewMockSharedMemory(ctrl)
@@ -253,7 +250,6 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 func TestAcceptorVisitCommitBlock(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	s := state.NewMockState(ctrl)
 	sharedMemory := atomic.NewMockSharedMemory(ctrl)
@@ -345,7 +341,6 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 func TestAcceptorVisitAbortBlock(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	s := state.NewMockState(ctrl)
 	sharedMemory := atomic.NewMockSharedMemory(ctrl)

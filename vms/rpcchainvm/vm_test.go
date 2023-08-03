@@ -41,7 +41,7 @@ const (
 	batchedParseBlockCachingTestKey                = "batchedParseBlockCachingTest"
 )
 
-var TestServerPluginMap = map[string]func(*testing.T, bool) (block.ChainVM, *gomock.Controller){
+var TestServerPluginMap = map[string]func(*testing.T, bool) block.ChainVM{
 	stateSyncEnabledTestKey:                        stateSyncEnabledTestPlugin,
 	getOngoingSyncStateSummaryTestKey:              getOngoingSyncStateSummaryTestPlugin,
 	getLastStateSummaryTestKey:                     getLastStateSummaryTestPlugin,
@@ -92,12 +92,11 @@ func TestHelperProcess(t *testing.T) {
 		select {}
 	}
 
-	mockedVM, ctrl := TestServerPluginMap[testKey](t, true /*loadExpectations*/)
+	mockedVM := TestServerPluginMap[testKey](t, true /*loadExpectations*/)
 	err := Serve(context.Background(), mockedVM)
 	if err != nil {
 		os.Exit(1)
 	}
-	ctrl.Finish()
 
 	os.Exit(0)
 }
@@ -174,7 +173,6 @@ func TestRuntimeSubprocessBootstrap(t *testing.T) {
 
 			ctrl := gomock.NewController(t)
 			vm := mocks.NewMockChainVM(ctrl)
-			defer ctrl.Finish()
 
 			listener, err := grpcutils.NewListener()
 			require.NoError(err)

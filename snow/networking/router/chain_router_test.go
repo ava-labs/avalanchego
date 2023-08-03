@@ -678,8 +678,6 @@ func TestRouterTimeout(t *testing.T) {
 
 func TestRouterHonorsRequestedEngine(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	require := require.New(t)
 
 	// Create a timeout manager
@@ -1391,9 +1389,7 @@ func TestRouterCrossChainMessages(t *testing.T) {
 
 func TestConnectedSubnet(t *testing.T) {
 	require := require.New(t)
-
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	tm, err := timeout.NewManager(
 		&timer.AdaptiveTimeoutConfig{
