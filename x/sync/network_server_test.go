@@ -98,7 +98,6 @@ func Test_Server_GetRangeProof(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			require := require.New(t)
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 			sender := common.NewMockSender(ctrl)
 			var proof *merkledb.RangeProof
 			sender.EXPECT().SendAppResponse(
@@ -248,7 +247,6 @@ func Test_Server_GetChangeProof(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			require := require.New(t)
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 			sender := common.NewMockSender(ctrl)
 			var proofResult *merkledb.ChangeProof
 			sender.EXPECT().SendAppResponse(
