@@ -1017,10 +1017,8 @@ func (db *merkleDB) VerifyChangeProof(
 	}
 
 	// Make sure the end proof, if given, is well-formed.
-	if largestPath.HasValue() {
-		if err := verifyProofPath(proof.EndProof, largestPath.Value()); err != nil {
-			return err
-		}
+	if err := verifyProofPath(proof.EndProof, largestPath.Value()); err != nil {
+		return err
 	}
 
 	keyValues := make(map[path]Maybe[[]byte], len(proof.KeyChanges))

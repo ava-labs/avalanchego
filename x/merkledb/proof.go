@@ -332,10 +332,8 @@ func (proof *RangeProof) Verify(
 
 	// Ensure that the end proof is valid and contains values that
 	// match the key/values that were sent.
-	if largestPath.HasValue() {
-		if err := verifyProofPath(proof.EndProof, largestPath.Value()); err != nil {
-			return err
-		}
+	if err := verifyProofPath(proof.EndProof, largestPath.Value()); err != nil {
+		return err
 	}
 	if err := verifyAllRangeProofKeyValuesPresent(proof.EndProof, smallestPath, largestPath, keyValues); err != nil {
 		return err
