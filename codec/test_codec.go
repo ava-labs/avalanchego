@@ -198,7 +198,7 @@ func TestStruct(codec GeneralCodec, t testing.TB) {
 
 	// In myStructInstance MyMap4 is nil and in myStructUnmarshaled MyMap4 is an
 	// empty map
-	require.Equal(0, len(myStructUnmarshaled.MyMap4))
+	require.Zero(len(myStructUnmarshaled.MyMap4))
 	myStructUnmarshaled.MyMap4 = nil
 
 	require.Zero(version)
