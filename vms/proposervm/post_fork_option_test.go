@@ -665,8 +665,8 @@ func TestOptionTimestampValidity(t *testing.T) {
 		time.Time{},
 		0,
 		DefaultMinBlockDelay,
-		pTestCert.PrivateKey.(crypto.Signer),
-		pTestCert.Leaf,
+		pTestTLSCert.PrivateKey.(crypto.Signer),
+		pTestCert,
 	)
 
 	coreVM.InitializeF = func(

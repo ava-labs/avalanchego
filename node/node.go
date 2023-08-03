@@ -56,6 +56,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -1343,7 +1344,7 @@ func (n *Node) Initialize(
 ) error {
 	n.Log = logger
 	n.Config = config
-	n.ID = ids.NodeIDFromCert(n.Config.StakingTLSCert.Leaf)
+	n.ID = ids.NodeIDFromCert(staking.CertificateFromX509(n.Config.StakingTLSCert.Leaf))
 	n.LogFactory = logFactory
 	n.DoneShuttingDown.Add(1)
 

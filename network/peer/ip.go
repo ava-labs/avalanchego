@@ -6,7 +6,6 @@ package peer
 import (
 	"crypto"
 	"crypto/rand"
-	"crypto/x509"
 
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -50,8 +49,8 @@ type SignedIP struct {
 	Signature []byte
 }
 
-func (ip *SignedIP) Verify(cert *x509.Certificate) error {
-	return staking.CheckSignature(
+func (ip *SignedIP) Verify(cert *staking.Certificate) error {
+	return staking.NewCheckSignature(
 		cert,
 		ip.UnsignedIP.bytes(),
 		ip.Signature,

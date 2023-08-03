@@ -79,12 +79,12 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 		time.Time{},
 		0,
 		DefaultMinBlockDelay,
-		pTestCert.PrivateKey.(crypto.Signer),
-		pTestCert.Leaf,
+		pTestTLSCert.PrivateKey.(crypto.Signer),
+		pTestCert,
 	)
 
 	ctx := snow.DefaultContextTest()
-	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
+	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
 
 	require.NoError(vm.Initialize(
 		context.Background(),

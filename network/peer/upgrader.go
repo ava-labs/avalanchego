@@ -5,11 +5,11 @@ package peer
 
 import (
 	"crypto/tls"
-	"crypto/x509"
 	"errors"
 	"net"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/staking"
 )
 
 var (
@@ -21,7 +21,7 @@ var (
 
 type Upgrader interface {
 	// Must be thread safe
-	Upgrade(net.Conn) (ids.NodeID, net.Conn, *x509.Certificate, error)
+	Upgrade(net.Conn) (ids.NodeID, net.Conn, *staking.Certificate, error)
 }
 
 type tlsServerUpgrader struct {
@@ -34,7 +34,7 @@ func NewTLSServerUpgrader(config *tls.Config) Upgrader {
 	}
 }
 
-func (t tlsServerUpgrader) Upgrade(conn net.Conn) (ids.NodeID, net.Conn, *x509.Certificate, error) {
+func (t tlsServerUpgrader) Upgrade(conn net.Conn) (ids.NodeID, net.Conn, *staking.Certificate, error) {
 	return connToIDAndCert(tls.Server(conn, t.config))
 }
 
@@ -48,11 +48,11 @@ func NewTLSClientUpgrader(config *tls.Config) Upgrader {
 	}
 }
 
-func (t tlsClientUpgrader) Upgrade(conn net.Conn) (ids.NodeID, net.Conn, *x509.Certificate, error) {
+func (t tlsClientUpgrader) Upgrade(conn net.Conn) (ids.NodeID, net.Conn, *staking.Certificate, error) {
 	return connToIDAndCert(tls.Client(conn, t.config))
 }
 
-func connToIDAndCert(conn *tls.Conn) (ids.NodeID, net.Conn, *x509.Certificate, error) {
+func connToIDAndCert(conn *tls.Conn) (ids.NodeID, net.Conn, *staking.Certificate, error) {
 	if err := conn.Handshake(); err != nil {
 		return ids.NodeID{}, nil, nil, err
 	}
@@ -61,6 +61,6 @@ func connToIDAndCert(conn *tls.Conn) (ids.NodeID, net.Conn, *x509.Certificate, e
 	if len(state.PeerCertificates) == 0 {
 		return ids.NodeID{}, nil, nil, errNoCert
 	}
-	peerCert := state.PeerCertificates[0]
+	peerCert := staking.CertificateFromX509(state.PeerCertificates[0])
 	return ids.NodeIDFromCert(peerCert), conn, peerCert, nil
 }

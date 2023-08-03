@@ -41,6 +41,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/buffer"
@@ -771,7 +772,7 @@ func (m *manager) createAvalancheChain(
 		m.ApricotPhase4MinPChainHeight,
 		minBlockDelay,
 		m.StakingCert.PrivateKey.(crypto.Signer),
-		m.StakingCert.Leaf,
+		staking.CertificateFromX509(m.StakingCert.Leaf),
 	)
 
 	if m.MeterVMEnabled {
@@ -1113,7 +1114,7 @@ func (m *manager) createSnowmanChain(
 		m.ApricotPhase4MinPChainHeight,
 		minBlockDelay,
 		m.StakingCert.PrivateKey.(crypto.Signer),
-		m.StakingCert.Leaf,
+		staking.CertificateFromX509(m.StakingCert.Leaf),
 	)
 
 	if m.MeterVMEnabled {
