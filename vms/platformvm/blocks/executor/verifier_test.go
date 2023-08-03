@@ -681,9 +681,7 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := blocks.NewMockBlock(ctrl)
 	parentState := state.NewMockDiff(ctrl)
-	atomicInputs := set.Set[ids.ID]{
-		ids.GenerateTestID(): struct{}{},
-	}
+	atomicInputs := set.Of[ids.ID](ids.GenerateTestID())
 
 	backend := &backend{
 		blkIDToState: map[ids.ID]*blockState{
