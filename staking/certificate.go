@@ -3,9 +3,7 @@
 
 package staking
 
-import (
-	"crypto/x509"
-)
+import "crypto/x509"
 
 type Certificate struct {
 	Raw                []byte
