@@ -1344,7 +1344,8 @@ func (n *Node) Initialize(
 ) error {
 	n.Log = logger
 	n.Config = config
-	n.ID = ids.NodeIDFromCert(staking.CertificateFromX509(n.Config.StakingTLSCert.Leaf))
+	stakingCert := staking.CertificateFromX509(n.Config.StakingTLSCert.Leaf)
+	n.ID = ids.NodeIDFromCert(stakingCert)
 	n.LogFactory = logFactory
 	n.DoneShuttingDown.Add(1)
 
