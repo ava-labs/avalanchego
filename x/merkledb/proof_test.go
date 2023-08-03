@@ -1777,3 +1777,58 @@ func FuzzRangeProofInvariants(f *testing.F) {
 		}
 	})
 }
+
+func FuzzProof(f *testing.F) {
+	now := time.Now().UnixNano()
+	f.Logf("seed: %d", now)
+	rand := rand.New(rand.NewSource(now)) // #nosec G404
+
+	var (
+		numKeyValues  = 2048
+		deletePortion = 0.25
+	)
+
+	db, err := getBasicDB()
+	require.NoError(f, err)
+
+	// Insert a bunch of random key values.
+	insertRandomKeyValues(
+		require.New(f),
+		rand,
+		[]database.Database{db},
+		numKeyValues,
+		deletePortion,
+	)
+
+	f.Fuzz(func(
+		t *testing.T,
+		key []byte,
+	) {
+		require := require.New(t)
+
+		proof, err := db.GetProof(
+			context.Background(),
+			key,
+		)
+		require.NoError(err)
+
+		rootID, err := db.GetMerkleRoot(context.Background())
+		require.NoError(err)
+
+		require.NoError(proof.Verify(context.Background(), rootID))
+
+		// Insert a new key-value pair
+		newKey := make([]byte, 32)
+		_, _ = rand.Read(newKey) // #nosec G404
+		newValue := make([]byte, 32)
+		_, _ = rand.Read(newValue) // #nosec G404
+		require.NoError(db.Put(newKey, newValue))
+
+		// Delete a key-value pair so database doesn't grow unbounded
+		iter := db.NewIterator()
+		deleteKey := iter.Key()
+		iter.Release()
+
+		require.NoError(db.Delete(deleteKey))
+	})
+}
