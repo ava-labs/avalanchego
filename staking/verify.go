@@ -31,13 +31,12 @@ func CheckSignature(cert *Certificate, message []byte, signature []byte) error {
 		message,
 		signature,
 		cert.PublicKey,
-		true,
 	)
 }
 
 // checkSignature verifies that signature is a valid signature over signed from
 // a crypto.PublicKey.
-func checkSignature(algo x509.SignatureAlgorithm, signed, signature []byte, publicKey crypto.PublicKey, allowSHA1 bool) (err error) {
+func checkSignature(algo x509.SignatureAlgorithm, signed, signature []byte, publicKey crypto.PublicKey) (err error) {
 	var hashType crypto.Hash
 	var pubKeyAlgo x509.PublicKeyAlgorithm
 
@@ -55,12 +54,6 @@ func checkSignature(algo x509.SignatureAlgorithm, signed, signature []byte, publ
 		}
 	case crypto.MD5:
 		return x509.InsecureAlgorithmError(algo)
-	case crypto.SHA1:
-		// SHA-1 signatures are mostly disabled. See go.dev/issue/41682.
-		if !allowSHA1 { // Note: removed check for runtime override
-			return x509.InsecureAlgorithmError(algo)
-		}
-		fallthrough
 	default:
 		if !hashType.Available() {
 			return x509.ErrUnsupportedAlgorithm
@@ -111,5 +104,5 @@ func isRSAPSS(algo x509.SignatureAlgorithm) bool {
 }
 
 func signaturePublicKeyAlgoMismatchError(expectedPubKeyAlgo x509.PublicKeyAlgorithm, pubKey any) error {
-	return fmt.Errorf("x509: signature algorithm specifies an %s public key, but have public key of type %T", expectedPubKeyAlgo.String(), pubKey)
+	return fmt.Errorf("x509: signature algorithm specifies an %s public key, but have public key of type %T", expectedPubKeyAlgo, pubKey)
 }
