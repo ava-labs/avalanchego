@@ -354,12 +354,6 @@ type publicKeyInfo struct {
 	PublicKey asn1.BitString
 }
 
-// pkcs1PublicKey reflects the ASN.1 structure of a PKCS #1 public key.
-type pkcs1PublicKey struct {
-	N *big.Int
-	E int
-}
-
 func parsePublicKey(keyData *publicKeyInfo) (any, error) {
 	oid := keyData.Algorithm.Algorithm
 	params := keyData.Algorithm.Parameters
@@ -372,27 +366,22 @@ func parsePublicKey(keyData *publicKeyInfo) (any, error) {
 			return nil, errors.New("x509: RSA key missing NULL parameters")
 		}
 
-		p := &pkcs1PublicKey{N: new(big.Int)}
+		pub := &rsa.PublicKey{N: new(big.Int)}
 		if !der.ReadASN1(&der, cryptobyte_asn1.SEQUENCE) {
 			return nil, errors.New("x509: invalid RSA public key")
 		}
-		if !der.ReadASN1Integer(p.N) {
+		if !der.ReadASN1Integer(pub.N) {
 			return nil, errors.New("x509: invalid RSA modulus")
 		}
-		if !der.ReadASN1Integer(&p.E) {
+		if !der.ReadASN1Integer(&pub.E) {
 			return nil, errors.New("x509: invalid RSA public exponent")
 		}
 
-		if p.N.Sign() <= 0 {
+		if pub.N.Sign() <= 0 {
 			return nil, errors.New("x509: RSA modulus is not a positive number")
 		}
-		if p.E <= 0 {
+		if pub.E <= 0 {
 			return nil, errors.New("x509: RSA public exponent is not a positive number")
-		}
-
-		pub := &rsa.PublicKey{
-			E: p.E,
-			N: p.N,
 		}
 		return pub, nil
 	case oid.Equal(oidPublicKeyECDSA):
