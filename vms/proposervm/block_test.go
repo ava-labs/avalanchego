@@ -33,7 +33,6 @@ import (
 func TestPostForkCommonComponents_buildChild(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	pChainHeight := uint64(1337)
 	parentID := ids.GenerateTestID()

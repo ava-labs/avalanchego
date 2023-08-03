@@ -3,7 +3,7 @@
 
 package sampler
 
-import "github.com/ava-labs/avalanchego/utils/set"
+import "golang.org/x/exp/maps"
 
 // uniformResample allows for sampling over a uniform distribution without
 // replacement.
@@ -18,14 +18,14 @@ type uniformResample struct {
 	rng       *rng
 	seededRNG *rng
 	length    uint64
-	drawn     set.Set[uint64]
+	drawn     map[uint64]struct{}
 }
 
 func (s *uniformResample) Initialize(length uint64) {
 	s.rng = globalRNG
 	s.seededRNG = newRNG()
 	s.length = length
-	s.drawn.Clear()
+	s.drawn = make(map[uint64]struct{})
 }
 
 func (s *uniformResample) Sample(count int) ([]uint64, error) {
@@ -52,7 +52,7 @@ func (s *uniformResample) ClearSeed() {
 }
 
 func (s *uniformResample) Reset() {
-	s.drawn.Clear()
+	maps.Clear(s.drawn)
 }
 
 func (s *uniformResample) Next() (uint64, error) {
@@ -63,10 +63,10 @@ func (s *uniformResample) Next() (uint64, error) {
 
 	for {
 		draw := s.rng.Uint64Inclusive(s.length - 1)
-		if s.drawn.Contains(draw) {
+		if _, ok := s.drawn[draw]; ok {
 			continue
 		}
-		s.drawn.Add(draw)
+		s.drawn[draw] = struct{}{}
 		return draw, nil
 	}
 }

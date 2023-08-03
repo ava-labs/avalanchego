@@ -13,8 +13,8 @@ import (
 var (
 	_ Signer = (*signer)(nil)
 
-	errWrongSourceChainID = errors.New("wrong SourceChainID")
-	errWrongNetworkID     = errors.New("wrong networkID")
+	ErrWrongSourceChainID = errors.New("wrong SourceChainID")
+	ErrWrongNetworkID     = errors.New("wrong networkID")
 )
 
 type Signer interface {
@@ -42,10 +42,10 @@ type signer struct {
 
 func (s *signer) Sign(msg *UnsignedMessage) ([]byte, error) {
 	if msg.SourceChainID != s.chainID {
-		return nil, errWrongSourceChainID
+		return nil, ErrWrongSourceChainID
 	}
 	if msg.NetworkID != s.networkID {
-		return nil, errWrongNetworkID
+		return nil, ErrWrongNetworkID
 	}
 
 	msgBytes := msg.Bytes()
