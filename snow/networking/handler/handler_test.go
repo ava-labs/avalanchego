@@ -398,7 +398,6 @@ func TestHandlerSubnetConnector(t *testing.T) {
 	)
 	require.NoError(err)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 	connector := validators.NewMockSubnetConnector(ctrl)
 
 	nodeID := ids.GenerateTestNodeID()

@@ -281,7 +281,6 @@ func TestGetNextStakerToReward(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 
 			state := tt.stateF(ctrl)
 			txID, shouldReward, err := getNextStakerToReward(tt.timestamp, state)
@@ -659,7 +658,6 @@ func TestBuildBlock(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 
 			gotBlk, err := buildBlock(
 				tt.builderF(ctrl),
