@@ -90,8 +90,6 @@ func TestSameSubnet(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
-
 			ctx := test.ctxF(ctrl)
 
 			result := SameSubnet(context.Background(), ctx, test.chainID)

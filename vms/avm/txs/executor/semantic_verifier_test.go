@@ -373,7 +373,6 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 
 			state := test.stateFunc(ctrl)
 			tx := test.txFunc(require)
@@ -390,9 +389,7 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 
 func TestSemanticVerifierExportTx(t *testing.T) {
 	ctx := newContext(t)
-
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	validatorState := validators.NewMockState(ctrl)
 	validatorState.EXPECT().GetSubnetID(gomock.Any(), ctx.CChainID).AnyTimes().Return(ctx.SubnetID, nil)
@@ -742,7 +739,6 @@ func TestSemanticVerifierExportTx(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 
 			state := test.stateFunc(ctrl)
 			tx := test.txFunc(require)
@@ -759,11 +755,9 @@ func TestSemanticVerifierExportTx(t *testing.T) {
 
 func TestSemanticVerifierExportTxDifferentSubnet(t *testing.T) {
 	require := require.New(t)
+	ctrl := gomock.NewController(t)
 
 	ctx := newContext(t)
-
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	validatorState := validators.NewMockState(ctrl)
 	validatorState.EXPECT().GetSubnetID(gomock.Any(), ctx.CChainID).AnyTimes().Return(ids.GenerateTestID(), nil)
@@ -880,10 +874,9 @@ func TestSemanticVerifierExportTxDifferentSubnet(t *testing.T) {
 }
 
 func TestSemanticVerifierImportTx(t *testing.T) {
-	ctx := newContext(t)
-
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+
+	ctx := newContext(t)
 
 	validatorState := validators.NewMockState(ctrl)
 	validatorState.EXPECT().GetSubnetID(gomock.Any(), ctx.CChainID).AnyTimes().Return(ctx.SubnetID, nil)
@@ -1127,9 +1120,7 @@ func TestSemanticVerifierImportTx(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
-
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 
 			state := test.stateFunc(ctrl)
 			tx := test.txFunc(require)
