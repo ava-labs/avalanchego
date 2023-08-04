@@ -17,14 +17,20 @@ import (
 // parse.
 const MaxRSAKeyBitLen = 8192
 
-var ErrInvalidPublicKey = errors.New("invalid public key")
+var (
+	ErrUnsupportedAlgorithm       = errors.New("staking: cannot verify signature: unsupported algorithm")
+	ErrPublicKeyAlgoMismatch      = errors.New("staking: signature algorithm specified different public key type")
+	ErrInvalidRSAPublicKeyBitLen  = errors.New("staking: invalid RSA public key bitLen")
+	ErrECDSAVerificationFailure   = errors.New("staking: ECDSA verification failure")
+	ErrED25519VerificationFailure = errors.New("staking: Ed25519 verification failure")
+)
 
 // CheckSignature verifies that the signature is a valid signature over signed
 // from the certificate.
 func CheckSignature(cert *Certificate, signed []byte, signature []byte) error {
 	verificationDetails, ok := signatureAlgorithmVerificationDetails[cert.SignatureAlgorithm]
 	if !ok {
-		return x509.ErrUnsupportedAlgorithm
+		return ErrUnsupportedAlgorithm
 	}
 
 	if verificationDetails.hash != crypto.Hash(0) {
@@ -40,7 +46,7 @@ func CheckSignature(cert *Certificate, signed []byte, signature []byte) error {
 			return signaturePublicKeyAlgoMismatchError(verificationDetails.pubKeyAlgo, pub)
 		}
 		if bitLen := pub.N.BitLen(); bitLen > MaxRSAKeyBitLen {
-			return fmt.Errorf("%w: bitLen=%d > maxBitLen=%d", ErrInvalidPublicKey, bitLen, MaxRSAKeyBitLen)
+			return fmt.Errorf("%w: bitLen=%d > maxBitLen=%d", ErrInvalidRSAPublicKeyBitLen, bitLen, MaxRSAKeyBitLen)
 		}
 		if isRSAPSS(cert.SignatureAlgorithm) {
 			return rsa.VerifyPSS(pub, verificationDetails.hash, signed, signature, &rsa.PSSOptions{SaltLength: rsa.PSSSaltLengthEqualsHash})
@@ -51,7 +57,7 @@ func CheckSignature(cert *Certificate, signed []byte, signature []byte) error {
 			return signaturePublicKeyAlgoMismatchError(verificationDetails.pubKeyAlgo, pub)
 		}
 		if !ecdsa.VerifyASN1(pub, signed, signature) {
-			return errors.New("x509: ECDSA verification failure")
+			return ErrECDSAVerificationFailure
 		}
 		return nil
 	case ed25519.PublicKey:
@@ -59,11 +65,11 @@ func CheckSignature(cert *Certificate, signed []byte, signature []byte) error {
 			return signaturePublicKeyAlgoMismatchError(verificationDetails.pubKeyAlgo, pub)
 		}
 		if !ed25519.Verify(pub, signed, signature) {
-			return errors.New("x509: Ed25519 verification failure")
+			return ErrED25519VerificationFailure
 		}
 		return nil
 	default:
-		return x509.ErrUnsupportedAlgorithm
+		return ErrUnsupportedAlgorithm
 	}
 }
 
@@ -77,5 +83,5 @@ func isRSAPSS(algo x509.SignatureAlgorithm) bool {
 }
 
 func signaturePublicKeyAlgoMismatchError(expectedPubKeyAlgo x509.PublicKeyAlgorithm, pubKey any) error {
-	return fmt.Errorf("x509: signature algorithm specifies an %s public key, but have public key of type %T", expectedPubKeyAlgo, pubKey)
+	return fmt.Errorf("%w: expected an %s public key, but have public key of type %T", ErrPublicKeyAlgoMismatch, expectedPubKeyAlgo, pubKey)
 }

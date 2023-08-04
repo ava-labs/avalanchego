@@ -20,42 +20,70 @@ import (
 	cryptobyte_asn1 "golang.org/x/crypto/cryptobyte/asn1"
 )
 
+var (
+	ErrMalformedCertificate                  = errors.New("staking: malformed certificate")
+	ErrTrailingData                          = errors.New("staking: trailing data")
+	ErrMalformedTBSCertificate               = errors.New("staking: malformed tbs certificate")
+	ErrMalformedVersion                      = errors.New("staking: malformed version")
+	ErrMalformedSerialNumber                 = errors.New("staking: malformed serial number")
+	ErrMalformedSignatureAlgorithmIdentifier = errors.New("staking: malformed signature algorithm identifier")
+	ErrMalformedIssuer                       = errors.New("staking: malformed issuer")
+	ErrMalformedValidity                     = errors.New("staking: malformed validity")
+	ErrMalformedSPKI                         = errors.New("staking: malformed spki")
+	ErrMalformedPublicKeyAlgorithmIdentifier = errors.New("staking: malformed public key algorithm identifier")
+	ErrMalformedSubjectPublicKey             = errors.New("staking: malformed subject public key")
+	ErrMalformedOID                          = errors.New("staking: malformed oid")
+	ErrMalformedParameters                   = errors.New("staking: malformed parameters")
+	ErrRSAKeyMissingNULLParameters           = errors.New("staking: RSA key missing NULL parameters")
+	ErrInvalidRSAPublicKey                   = errors.New("staking: invalid RSA public key")
+	ErrInvalidRSAModulus                     = errors.New("staking: invalid RSA modulus")
+	ErrInvalidRSAPublicExponent              = errors.New("staking: invalid RSA public exponent")
+	ErrRSAModulusNotPositive                 = errors.New("staking: RSA modulus is not a positive number")
+	ErrRSAPublicExponentNotPositive          = errors.New("staking: RSA public exponent is not a positive number")
+	ErrInvalidECDSAParameters                = errors.New("staking: invalid ECDSA parameters")
+	ErrUnsupportedEllipticCurve              = errors.New("staking: unsupported elliptic curve")
+	ErrFailedUnmarshallingEllipticCurvePoint = errors.New("staking: failed to unmarshal elliptic curve point")
+	ErrUnexpectedED25519Parameters           = errors.New("staking: Ed25519 key encoded with illegal parameters")
+	ErrWrongED25519PublicKeySize             = errors.New("staking: wrong Ed25519 public key size")
+	ErrUnknownPublicKeyAlgorithm             = errors.New("staking: unknown public key algorithm")
+)
+
 // ParseCertificate parses a single certificate from the given ASN.1 DER data.
 func ParseCertificate(der []byte) (*Certificate, error) {
 	input := cryptobyte.String(der)
 	// Read the SEQUENCE including length and tag bytes so that we can check if
 	// there is an unexpected suffix.
 	if !input.ReadASN1Element(&input, cryptobyte_asn1.SEQUENCE) {
-		return nil, errors.New("x509: malformed certificate")
+		return nil, ErrMalformedCertificate
 	}
 
 	// If there is an unexpected suffix the certificate was not DER encoded.
 	if len(der) != len(input) {
-		return nil, errors.New("x509: trailing data")
+		return nil, ErrTrailingData
 	}
 
 	// Consume the length and tag bytes.
 	if !input.ReadASN1(&input, cryptobyte_asn1.SEQUENCE) {
 		// Note: because the above call to ReadASN1Element succeeded, this
 		// should never fail.
-		return nil, errors.New("x509: malformed certificate")
+		return nil, ErrMalformedCertificate
 	}
 
 	// Read the "to be signed" certificate into input.
 	if !input.ReadASN1(&input, cryptobyte_asn1.SEQUENCE) {
-		return nil, errors.New("x509: malformed tbs certificate")
+		return nil, ErrMalformedTBSCertificate
 	}
 	if !input.SkipOptionalASN1(cryptobyte_asn1.Tag(0).Constructed().ContextSpecific()) {
-		return nil, errors.New("x509: malformed version")
+		return nil, ErrMalformedVersion
 	}
 	if !input.SkipASN1(cryptobyte_asn1.INTEGER) {
-		return nil, errors.New("x509: malformed serial number")
+		return nil, ErrMalformedSerialNumber
 	}
 
 	// Read the signature algorithm identifier.
 	var sigAISeq cryptobyte.String
 	if !input.ReadASN1(&sigAISeq, cryptobyte_asn1.SEQUENCE) {
-		return nil, errors.New("x509: malformed signature algorithm identifier")
+		return nil, ErrMalformedSignatureAlgorithmIdentifier
 	}
 	sigAI, err := parseAI(sigAISeq)
 	if err != nil {
@@ -64,18 +92,18 @@ func ParseCertificate(der []byte) (*Certificate, error) {
 	signatureAlgorithm := getSignatureAlgorithmFromAI(sigAI)
 
 	if !input.SkipASN1(cryptobyte_asn1.SEQUENCE) {
-		return nil, errors.New("x509: malformed issuer")
+		return nil, ErrMalformedIssuer
 	}
 	if !input.SkipASN1(cryptobyte_asn1.SEQUENCE) {
-		return nil, errors.New("x509: malformed validity")
+		return nil, ErrMalformedValidity
 	}
 	if !input.SkipASN1(cryptobyte_asn1.SEQUENCE) {
-		return nil, errors.New("x509: malformed issuer")
+		return nil, ErrMalformedIssuer
 	}
 
 	// Read the "simple public key infrastructure" data into input.
 	if !input.ReadASN1(&input, cryptobyte_asn1.SEQUENCE) {
-		return nil, errors.New("x509: malformed spki")
+		return nil, ErrMalformedSPKI
 	}
 
 	// Read the public key algorithm identifier.
@@ -84,7 +112,7 @@ func ParseCertificate(der []byte) (*Certificate, error) {
 	// additional params field.
 	var pkAISeq cryptobyte.String
 	if !input.ReadASN1(&pkAISeq, cryptobyte_asn1.SEQUENCE) {
-		return nil, errors.New("x509: malformed public key algorithm identifier")
+		return nil, ErrMalformedPublicKeyAlgorithmIdentifier
 	}
 	pkAI, err := parseAI(pkAISeq)
 	if err != nil {
@@ -96,7 +124,7 @@ func ParseCertificate(der []byte) (*Certificate, error) {
 
 	var spk asn1.BitString
 	if !input.ReadASN1BitString(&spk) {
-		return nil, errors.New("x509: malformed subjectPublicKey")
+		return nil, ErrMalformedSubjectPublicKey
 	}
 	publicKey, err := parsePublicKey(&publicKeyInfo{
 		Algorithm: pkAI,
@@ -112,7 +140,7 @@ func ParseCertificate(der []byte) (*Certificate, error) {
 func parseAI(der cryptobyte.String) (pkix.AlgorithmIdentifier, error) {
 	ai := pkix.AlgorithmIdentifier{}
 	if !der.ReadASN1ObjectIdentifier(&ai.Algorithm) {
-		return ai, errors.New("x509: malformed OID")
+		return ai, ErrMalformedOID
 	}
 	if der.Empty() {
 		return ai, nil
@@ -123,7 +151,7 @@ func parseAI(der cryptobyte.String) (pkix.AlgorithmIdentifier, error) {
 		tag    cryptobyte_asn1.Tag
 	)
 	if !der.ReadAnyASN1Element(&params, &tag) {
-		return ai, errors.New("x509: malformed parameters")
+		return ai, ErrMalformedParameters
 	}
 	ai.Parameters.Tag = int(tag)
 	ai.Parameters.FullBytes = params
@@ -212,40 +240,40 @@ func parsePublicKey(keyData *publicKeyInfo) (any, error) {
 		// RSA public keys must have a NULL in the parameters.
 		// See RFC 3279, Section 2.3.1.
 		if !bytes.Equal(params.FullBytes, asn1.NullBytes) {
-			return nil, errors.New("x509: RSA key missing NULL parameters")
+			return nil, ErrRSAKeyMissingNULLParameters
 		}
 
 		pub := &rsa.PublicKey{N: new(big.Int)}
 		if !der.ReadASN1(&der, cryptobyte_asn1.SEQUENCE) {
-			return nil, errors.New("x509: invalid RSA public key")
+			return nil, ErrInvalidRSAPublicKey
 		}
 		if !der.ReadASN1Integer(pub.N) {
-			return nil, errors.New("x509: invalid RSA modulus")
+			return nil, ErrInvalidRSAModulus
 		}
 		if !der.ReadASN1Integer(&pub.E) {
-			return nil, errors.New("x509: invalid RSA public exponent")
+			return nil, ErrInvalidRSAPublicExponent
 		}
 
 		if pub.N.Sign() <= 0 {
-			return nil, errors.New("x509: RSA modulus is not a positive number")
+			return nil, ErrRSAModulusNotPositive
 		}
 		if pub.E <= 0 {
-			return nil, errors.New("x509: RSA public exponent is not a positive number")
+			return nil, ErrRSAPublicExponentNotPositive
 		}
 		return pub, nil
 	case oid.Equal(oidPublicKeyECDSA):
 		paramsDer := cryptobyte.String(params.FullBytes)
 		var namedCurveOID asn1.ObjectIdentifier
 		if !paramsDer.ReadASN1ObjectIdentifier(&namedCurveOID) {
-			return nil, errors.New("x509: invalid ECDSA parameters")
+			return nil, ErrInvalidECDSAParameters
 		}
 		namedCurve := namedCurveFromOID(namedCurveOID)
 		if namedCurve == nil {
-			return nil, errors.New("x509: unsupported elliptic curve")
+			return nil, ErrUnsupportedEllipticCurve
 		}
 		x, y := elliptic.Unmarshal(namedCurve, der)
 		if x == nil {
-			return nil, errors.New("x509: failed to unmarshal elliptic curve point")
+			return nil, ErrFailedUnmarshallingEllipticCurvePoint
 		}
 		return &ecdsa.PublicKey{
 			Curve: namedCurve,
@@ -260,14 +288,14 @@ func parsePublicKey(keyData *publicKeyInfo) (any, error) {
 		// RFC 8410, Section 3
 		// > For all of the OIDs, the parameters MUST be absent.
 		if len(params.FullBytes) != 0 {
-			return nil, errors.New("x509: Ed25519 key encoded with illegal parameters")
+			return nil, ErrUnexpectedED25519Parameters
 		}
 		if len(der) != ed25519.PublicKeySize {
-			return nil, errors.New("x509: wrong Ed25519 public key size")
+			return nil, ErrWrongED25519PublicKeySize
 		}
 		return ed25519.PublicKey(der), nil
 	default:
-		return nil, errors.New("x509: unknown public key algorithm")
+		return nil, ErrUnknownPublicKeyAlgorithm
 	}
 }
 
