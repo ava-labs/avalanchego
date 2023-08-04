@@ -37,7 +37,7 @@ func ParseCertificate(der []byte) (*Certificate, error) {
 	// Consume the length and tag bytes.
 	if !input.ReadASN1(&input, cryptobyte_asn1.SEQUENCE) {
 		// Note: because the above call to ReadASN1Element succeeded, this
-		// should never happen.
+		// should never fail.
 		return nil, errors.New("x509: malformed certificate")
 	}
 
