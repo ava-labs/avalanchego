@@ -592,7 +592,7 @@ func (m *Manager) setError(err error) {
 // Assumes [m.workLock] is not held.
 func (m *Manager) completeWorkItem(ctx context.Context, work *workItem, largestHandledKey merkledb.Maybe[[]byte], rootID ids.ID, proofOfLargestKey []merkledb.ProofNode) {
 	// if the last key is equal to the end, then the full range is completed
-	if work.end.IsNothing() || !bytes.Equal(largestHandledKey.Value(), work.end.Value()) {
+	if !merkledb.MaybeBytesEquals(largestHandledKey, work.end) {
 		// find the next key to start querying by comparing the proofs for the last completed key
 		nextStartKey, err := m.findNextKey(ctx, largestHandledKey.Value(), work.end.Value(), proofOfLargestKey)
 		if err != nil {

@@ -3,7 +3,10 @@
 
 package merkledb
 
-import "golang.org/x/exp/slices"
+import (
+	"bytes"
+	"golang.org/x/exp/slices"
+)
 
 // Maybe T = Some T | Nothing.
 // A data wrapper that allows values to be something [Some T] or nothing [Nothing].
@@ -49,4 +52,20 @@ func Clone(m Maybe[[]byte]) Maybe[[]byte] {
 		return Nothing[[]byte]()
 	}
 	return Some(slices.Clone(m.value))
+}
+
+// MaybeBytesEquals returns true iff [a] and [b] are equal.
+func MaybeBytesEquals(a, b Maybe[[]byte]) bool {
+	aNothing := a.IsNothing()
+	bNothing := b.IsNothing()
+
+	if aNothing {
+		return bNothing
+	}
+
+	if bNothing {
+		return false
+	}
+
+	return bytes.Equal(a.Value(), b.Value())
 }
