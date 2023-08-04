@@ -10,6 +10,8 @@ import (
 )
 
 var (
+	// Ref: https://github.com/golang/go/blob/go1.19.12/src/crypto/x509/x509.go#L433-L452
+	//
 	// RFC 3279, 2.3 Public Key Algorithms
 	//
 	//	pkcs-1 OBJECT IDENTIFIER ::== { iso(1) member-body(2) us(840)
@@ -27,6 +29,8 @@ var (
 	//	id-Ed25519   OBJECT IDENTIFIER ::= { 1 3 101 112 }
 	oidPublicKeyEd25519 = asn1.ObjectIdentifier{1, 3, 101, 112}
 
+	// Ref: https://github.com/golang/go/blob/go1.19.12/src/crypto/x509/x509.go#L248-L324
+	//
 	// OIDs for signature algorithms
 	//
 	//	pkcs-1 OBJECT IDENTIFIER ::= {
@@ -86,6 +90,7 @@ var (
 	// to produce certificates with this OID.
 	oidISOSignatureSHA1WithRSA = asn1.ObjectIdentifier{1, 3, 14, 3, 2, 29}
 
+	// Ref: https://github.com/golang/go/blob/go1.19.12/src/crypto/x509/x509.go#L326-L350
 	signatureAlgorithmParsingDetails = []struct {
 		algo x509.SignatureAlgorithm
 		oid  asn1.ObjectIdentifier
@@ -123,6 +128,8 @@ var (
 		x509.PureEd25519:      {x509.Ed25519, crypto.Hash(0) /* no pre-hashing */}, // Ed25519
 	}
 
+	// Ref: https://github.com/golang/go/blob/go1.19.12/src/crypto/x509/x509.go#L468-L489
+	//
 	// RFC 5480, 2.1.1.1. Named Curve
 	//
 	//	secp224r1 OBJECT IDENTIFIER ::= {

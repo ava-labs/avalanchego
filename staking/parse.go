@@ -49,6 +49,8 @@ var (
 )
 
 // ParseCertificate parses a single certificate from the given ASN.1 DER data.
+//
+// Ref: https://github.com/golang/go/blob/go1.19.12/src/crypto/x509/parser.go#L789-L968
 func ParseCertificate(der []byte) (*Certificate, error) {
 	input := cryptobyte.String(der)
 	// Read the SEQUENCE including length and tag bytes so that we can check if
@@ -58,6 +60,9 @@ func ParseCertificate(der []byte) (*Certificate, error) {
 	}
 
 	// If there is an unexpected suffix the certificate was not DER encoded.
+	//
+	// Ref: https://github.com/golang/go/blob/go1.19.12/src/crypto/x509/parser.go#L976-L978
+	// Ref: https://github.com/golang/go/blob/go1.19.12/src/crypto/x509/parser.go#L799
 	if len(der) != len(input) {
 		return nil, ErrTrailingData
 	}
@@ -137,6 +142,7 @@ func ParseCertificate(der []byte) (*Certificate, error) {
 	}, err
 }
 
+// Ref: https://github.com/golang/go/blob/go1.19.12/src/crypto/x509/parser.go#L149-L165
 func parseAI(der cryptobyte.String) (pkix.AlgorithmIdentifier, error) {
 	ai := pkix.AlgorithmIdentifier{}
 	if !der.ReadASN1ObjectIdentifier(&ai.Algorithm) {
@@ -160,6 +166,8 @@ func parseAI(der cryptobyte.String) (pkix.AlgorithmIdentifier, error) {
 
 // pssParameters reflects the parameters in an AlgorithmIdentifier that
 // specifies RSA PSS. See RFC 3447, Appendix A.2.3.
+//
+// Ref: https://github.com/golang/go/blob/go1.19.12/src/crypto/x509/x509.go#L365-L375
 type pssParameters struct {
 	// The following three fields are not marked as
 	// optional because the default values specify SHA-1,
@@ -170,6 +178,7 @@ type pssParameters struct {
 	TrailerField int                      `asn1:"optional,explicit,tag:3,default:1"`
 }
 
+// Ref: https://github.com/golang/go/blob/go1.19.12/src/crypto/x509/x509.go#L377-L431
 func getSignatureAlgorithmFromAI(ai pkix.AlgorithmIdentifier) x509.SignatureAlgorithm {
 	if ai.Algorithm.Equal(oidSignatureEd25519) {
 		// RFC 8410, Section 3
@@ -226,11 +235,13 @@ func getSignatureAlgorithmFromAI(ai pkix.AlgorithmIdentifier) x509.SignatureAlgo
 	}
 }
 
+// Ref: https://github.com/golang/go/blob/go1.19.12/src/crypto/x509/x509.go#L172-L176
 type publicKeyInfo struct {
 	Algorithm pkix.AlgorithmIdentifier
 	PublicKey asn1.BitString
 }
 
+// Ref: https://github.com/golang/go/blob/go1.19.12/src/crypto/x509/parser.go#L215-L306
 func parsePublicKey(keyData *publicKeyInfo) (any, error) {
 	oid := keyData.Algorithm.Algorithm
 	params := keyData.Algorithm.Parameters
@@ -299,6 +310,7 @@ func parsePublicKey(keyData *publicKeyInfo) (any, error) {
 	}
 }
 
+// Ref: https://github.com/golang/go/blob/go1.19.12/src/crypto/x509/x509.go#L491-L503
 func namedCurveFromOID(oid asn1.ObjectIdentifier) elliptic.Curve {
 	switch {
 	case oid.Equal(oidNamedCurveP224):

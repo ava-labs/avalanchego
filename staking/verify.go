@@ -15,6 +15,8 @@ import (
 
 // MaxRSAKeyBitLen is the maximum RSA key size in bits that we are willing to
 // parse.
+//
+// https://github.com/golang/go/blob/go1.19.12/src/crypto/tls/handshake_client.go#L860-L862
 const MaxRSAKeyBitLen = 8192
 
 var (
@@ -27,6 +29,9 @@ var (
 
 // CheckSignature verifies that the signature is a valid signature over signed
 // from the certificate.
+//
+// Ref: https://github.com/golang/go/blob/go1.19.12/src/crypto/x509/x509.go#L793-L797
+// Ref: https://github.com/golang/go/blob/go1.19.12/src/crypto/x509/x509.go#L816-L879
 func CheckSignature(cert *Certificate, signed []byte, signature []byte) error {
 	verificationDetails, ok := signatureAlgorithmVerificationDetails[cert.SignatureAlgorithm]
 	if !ok {
@@ -45,6 +50,7 @@ func CheckSignature(cert *Certificate, signed []byte, signature []byte) error {
 		if verificationDetails.pubKeyAlgo != x509.RSA {
 			return signaturePublicKeyAlgoMismatchError(verificationDetails.pubKeyAlgo, pub)
 		}
+		// Ref: https://github.com/golang/go/blob/go1.19.12/src/crypto/tls/handshake_client.go#L874-L877
 		if bitLen := pub.N.BitLen(); bitLen > MaxRSAKeyBitLen {
 			return fmt.Errorf("%w: bitLen=%d > maxBitLen=%d", ErrInvalidRSAPublicKeyBitLen, bitLen, MaxRSAKeyBitLen)
 		}
@@ -73,6 +79,7 @@ func CheckSignature(cert *Certificate, signed []byte, signature []byte) error {
 	}
 }
 
+// Ref: https://github.com/golang/go/blob/go1.19.12/src/crypto/x509/x509.go#L206-L213
 func isRSAPSS(algo x509.SignatureAlgorithm) bool {
 	switch algo {
 	case x509.SHA256WithRSAPSS, x509.SHA384WithRSAPSS, x509.SHA512WithRSAPSS:
@@ -82,6 +89,7 @@ func isRSAPSS(algo x509.SignatureAlgorithm) bool {
 	}
 }
 
+// Ref: https://github.com/golang/go/blob/go1.19.12/src/crypto/x509/x509.go#L812-L814
 func signaturePublicKeyAlgoMismatchError(expectedPubKeyAlgo x509.PublicKeyAlgorithm, pubKey any) error {
 	return fmt.Errorf("%w: expected an %s public key, but have public key of type %T", ErrPublicKeyAlgoMismatch, expectedPubKeyAlgo, pubKey)
 }
