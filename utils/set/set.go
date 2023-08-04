@@ -26,7 +26,6 @@ type Set[T comparable] map[T]struct{}
 func Of[T comparable](elts ...T) Set[T] {
 	s := NewSet[T](len(elts))
 	s.Add(elts...)
-
 	return s
 }
 
