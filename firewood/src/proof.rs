@@ -75,6 +75,7 @@ impl From<DbError> for ProofError {
                 ProofError::SystemError(nix::errno::Errno::from_i32(e.raw_os_error().unwrap()))
             }
             DbError::Shale(e) => ProofError::Shale(e),
+            DbError::InvalidProposal => ProofError::InvalidProof,
         }
     }
 }

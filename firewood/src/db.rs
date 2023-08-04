@@ -44,10 +44,8 @@ const SPACE_RESERVED: u64 = 0x1000;
 
 const MAGIC_STR: &[u8; 13] = b"firewood v0.1";
 
-type Store = (
-    Universe<Arc<StoreRevMut>>,
-    DbRev<CompactSpace<Node, StoreRevMut>>,
-);
+type Store = CompactSpace<Node, StoreRevMut>;
+type SharedStore = CompactSpace<Node, StoreRevShared>;
 
 #[derive(Debug)]
 #[non_exhaustive]
@@ -61,6 +59,7 @@ pub enum DbError {
     CreateError,
     Shale(ShaleError),
     IO(std::io::Error),
+    InvalidProposal,
 }
 
 impl fmt::Display for DbError {
@@ -75,6 +74,7 @@ impl fmt::Display for DbError {
             DbError::CreateError => write!(f, "database create error"),
             DbError::IO(e) => write!(f, "I/O error: {e:?}"),
             DbError::Shale(e) => write!(f, "shale error: {e:?}"),
+            DbError::InvalidProposal => write!(f, "invalid proposal"),
         }
     }
 }
@@ -108,6 +108,7 @@ struct DbParams {
     root_hash_file_nbit: u64,
 }
 
+#[derive(Clone)]
 /// Necessary linear space instances bundled for a `CompactSpace`.
 struct SubUniverse<T> {
     meta: T,
@@ -125,6 +126,15 @@ impl SubUniverse<StoreRevShared> {
         SubUniverse {
             meta: self.meta.inner().clone(),
             payload: self.payload.inner().clone(),
+        }
+    }
+}
+
+impl SubUniverse<Arc<StoreRevMut>> {
+    fn new_from_other(&self) -> SubUniverse<Arc<StoreRevMut>> {
+        SubUniverse {
+            meta: Arc::new(StoreRevMut::new_from_other(self.meta.as_ref())),
+            payload: Arc::new(StoreRevMut::new_from_other(self.payload.as_ref())),
         }
     }
 }
@@ -217,6 +227,7 @@ impl Storable for DbHeader {
     }
 }
 
+#[derive(Clone)]
 /// Necessary linear space instances bundled for the state of the entire DB.
 struct Universe<T> {
     merkle: SubUniverse<T>,
@@ -228,6 +239,15 @@ impl Universe<StoreRevShared> {
         Universe {
             merkle: self.merkle.to_mem_store_r(),
             blob: self.blob.to_mem_store_r(),
+        }
+    }
+}
+
+impl Universe<Arc<StoreRevMut>> {
+    fn new_from_other(&self) -> Universe<Arc<StoreRevMut>> {
+        Universe {
+            merkle: self.merkle.new_from_other(),
+            blob: self.blob.new_from_other(),
         }
     }
 }
@@ -426,24 +446,26 @@ impl<S> Drop for DbInner<S> {
     }
 }
 
-/// Firewood database handle.
-pub struct Db<S> {
-    inner: Arc<RwLock<DbInner<S>>>,
-    revisions: Arc<Mutex<DbRevInner>>,
-    payload_regn_nbit: u64,
-    rev_cfg: DbRevConfig,
-    metrics: Arc<DbMetrics>,
-}
-
-pub struct DbRevInner {
+pub struct DbRevInner<T> {
     inner: VecDeque<Universe<StoreRevShared>>,
     root_hashes: VecDeque<TrieHash>,
     max_revisions: usize,
     base: Universe<StoreRevShared>,
+    base_revision: Arc<DbRev<T>>,
+}
+
+/// Firewood database handle.
+pub struct Db<S, T> {
+    inner: Arc<RwLock<DbInner<S>>>,
+    revisions: Arc<Mutex<DbRevInner<T>>>,
+    payload_regn_nbit: u64,
+    rev_cfg: DbRevConfig,
+    metrics: Arc<DbMetrics>,
+    cfg: DbConfig,
 }
 
 // #[metered(registry = DbMetrics, visibility = pub)]
-impl Db<CompactSpace<Node, StoreRevMut>> {
+impl Db<Store, SharedStore> {
     /// Open a database.
     pub fn new<P: AsRef<Path>>(db_path: P, cfg: &DbConfig) -> Result<Self, DbError> {
         // TODO: make sure all fds are released at the end
@@ -501,7 +523,6 @@ impl Db<CompactSpace<Node, StoreRevMut>> {
         let mut header_bytes = [0; std::mem::size_of::<DbParams>()];
         nix::sys::uio::pread(fd0, &mut header_bytes, 0).map_err(DbError::System)?;
         drop(file0);
-        let offset = header_bytes.len() as u64;
         let params: DbParams = cast_slice(&header_bytes)[0];
 
         let wal = WalConfig::builder()
@@ -607,13 +628,20 @@ impl Db<CompactSpace<Node, StoreRevMut>> {
         disk_requester.init_wal("wal", &db_path);
 
         let root_hash_staging = StoreRevMut::new(root_hash_cache);
-        let (data_staging, mut latest) = Db::new_store(&data_cache, reset, offset, cfg, &params)?;
+        let (data_staging, mut latest) =
+            Db::new_store(&data_cache, reset, params.payload_regn_nbit, cfg)?;
         latest.flush_dirty().unwrap();
 
         let base = Universe {
             merkle: get_sub_universe_from_empty_delta(&data_cache.merkle),
             blob: get_sub_universe_from_empty_delta(&data_cache.blob),
         };
+        let base_revision = Db::new_revision(
+            &base,
+            params.payload_regn_nbit,
+            cfg.payload_max_walk,
+            &cfg.rev,
+        )?;
 
         Ok(Self {
             inner: Arc::new(RwLock::new(DbInner {
@@ -629,10 +657,12 @@ impl Db<CompactSpace<Node, StoreRevMut>> {
                 root_hashes: VecDeque::new(),
                 max_revisions: cfg.wal.max_revisions as usize,
                 base,
+                base_revision: Arc::new(base_revision),
             })),
             payload_regn_nbit: params.payload_regn_nbit,
             rev_cfg: cfg.rev.clone(),
             metrics: Arc::new(DbMetrics::default()),
+            cfg: cfg.clone(),
         })
     }
 
@@ -640,11 +670,10 @@ impl Db<CompactSpace<Node, StoreRevMut>> {
     fn new_store(
         cached_space: &Universe<Arc<CachedSpace>>,
         reset: bool,
-        offset: u64,
+        payload_regn_nbit: u64,
         cfg: &DbConfig,
-        params: &DbParams,
-    ) -> Result<Store, DbError> {
-        let mut offset = offset;
+    ) -> Result<(Universe<Arc<StoreRevMut>>, DbRev<Store>), DbError> {
+        let mut offset = std::mem::size_of::<DbParams>() as u64;
         let db_header: ObjPtr<DbHeader> = ObjPtr::new_from_addr(offset);
         offset += DbHeader::MSIZE;
         let merkle_payload_header: ObjPtr<CompactSpaceHeader> = ObjPtr::new_from_addr(offset);
@@ -688,6 +717,114 @@ impl Db<CompactSpace<Node, StoreRevMut>> {
             ),
         };
 
+        let mut rev =
+            Db::new_revision_arc(&store, payload_regn_nbit, cfg.payload_max_walk, &cfg.rev)?;
+        rev.flush_dirty().unwrap();
+
+        Ok((store, rev))
+    }
+
+    fn new_revision<K: CachedStore + Clone>(
+        store: &Universe<K>,
+        payload_regn_nbit: u64,
+        payload_max_walk: u64,
+        cfg: &DbRevConfig,
+    ) -> Result<DbRev<CompactSpace<Node, K>>, DbError> {
+        // Set up the storage layout
+        let mut offset = std::mem::size_of::<DbParams>() as u64;
+        // DbHeader starts after DbParams in merkle meta space
+        let db_header: ObjPtr<DbHeader> = ObjPtr::new_from_addr(offset);
+        offset += DbHeader::MSIZE;
+        // Merkle CompactHeader starts after DbHeader in merkle meta space
+        let merkle_payload_header: ObjPtr<CompactSpaceHeader> = ObjPtr::new_from_addr(offset);
+        offset += CompactSpaceHeader::MSIZE;
+        assert!(offset <= SPACE_RESERVED);
+        // Blob CompactSpaceHeader starts right in blob meta space
+        let blob_payload_header: ObjPtr<CompactSpaceHeader> = ObjPtr::new_from_addr(0);
+
+        let (mut db_header_ref, merkle_payload_header_ref, _blob_payload_header_ref) = {
+            let merkle_meta_ref = &store.merkle.meta;
+            let blob_meta_ref = &store.blob.meta;
+
+            (
+                StoredView::ptr_to_obj(merkle_meta_ref, db_header, DbHeader::MSIZE).unwrap(),
+                StoredView::ptr_to_obj(
+                    merkle_meta_ref,
+                    merkle_payload_header,
+                    shale::compact::CompactHeader::MSIZE,
+                )
+                .unwrap(),
+                StoredView::ptr_to_obj(
+                    blob_meta_ref,
+                    blob_payload_header,
+                    shale::compact::CompactHeader::MSIZE,
+                )
+                .unwrap(),
+            )
+        };
+
+        let merkle_space = shale::compact::CompactSpace::new(
+            Arc::new(store.merkle.meta.clone()),
+            Arc::new(store.merkle.payload.clone()),
+            merkle_payload_header_ref,
+            shale::ObjCache::new(cfg.merkle_ncached_objs),
+            payload_max_walk,
+            payload_regn_nbit,
+        )
+        .unwrap();
+
+        #[cfg(feature = "eth")]
+        let blob_space = shale::compact::CompactSpace::new(
+            Arc::new(store.blob.meta.clone()),
+            Arc::new(store.blob.payload.clone()),
+            blob_payload_header_ref,
+            shale::ObjCache::new(cfg.blob_ncached_objs),
+            payload_max_walk,
+            payload_regn_nbit,
+        )
+        .unwrap();
+
+        if db_header_ref.acc_root.is_null() {
+            let mut err = Ok(());
+            // create the sentinel node
+            db_header_ref
+                .write(|r| {
+                    err = (|| {
+                        Merkle::<Store>::init_root(&mut r.acc_root, &merkle_space)?;
+                        Merkle::<Store>::init_root(&mut r.kv_root, &merkle_space)
+                    })();
+                })
+                .unwrap();
+            err.map_err(DbError::Merkle)?
+        }
+
+        Ok(DbRev {
+            header: db_header_ref,
+            merkle: Merkle::new(Box::new(merkle_space)),
+            #[cfg(feature = "eth")]
+            blob: BlobStash::new(Box::new(blob_space)),
+        })
+    }
+
+    // TODO: can we only have one version of `new_revision`?
+    fn new_revision_arc<K: CachedStore + Clone>(
+        store: &Universe<Arc<K>>,
+        payload_regn_nbit: u64,
+        payload_max_walk: u64,
+        cfg: &DbRevConfig,
+    ) -> Result<DbRev<CompactSpace<Node, K>>, DbError> {
+        // Set up the storage layout
+        let mut offset = std::mem::size_of::<DbParams>() as u64;
+        // DbHeader starts after DbParams in merkle meta space
+        let db_header: ObjPtr<DbHeader> = ObjPtr::new_from_addr(offset);
+        offset += DbHeader::MSIZE;
+        // Merkle CompactHeader starts after DbHeader in merkle meta space
+        let merkle_payload_header: ObjPtr<CompactSpaceHeader> = ObjPtr::new_from_addr(offset);
+        offset += CompactSpaceHeader::MSIZE;
+        assert!(offset <= SPACE_RESERVED);
+        // Blob CompactSpaceHeader starts right in blob meta space
+        let blob_payload_header: ObjPtr<CompactSpaceHeader> = ObjPtr::new_from_addr(0);
+
         let (mut db_header_ref, merkle_payload_header_ref, _blob_payload_header_ref) = {
             let merkle_meta_ref = store.merkle.meta.as_ref();
             let blob_meta_ref = store.blob.meta.as_ref();
@@ -713,20 +850,20 @@ impl Db<CompactSpace<Node, StoreRevMut>> {
             store.merkle.meta.clone(),
             store.merkle.payload.clone(),
             merkle_payload_header_ref,
-            shale::ObjCache::new(cfg.rev.merkle_ncached_objs),
-            cfg.payload_max_walk,
-            params.payload_regn_nbit,
+            shale::ObjCache::new(cfg.merkle_ncached_objs),
+            payload_max_walk,
+            payload_regn_nbit,
         )
         .unwrap();
 
         #[cfg(feature = "eth")]
         let blob_space = shale::compact::CompactSpace::new(
-            staging.blob.meta.clone(),
-            staging.blob.payload.clone(),
+            Arc::new(store.blob.meta.clone()),
+            Arc::new(store.blob.payload.clone()),
             blob_payload_header_ref,
-            shale::ObjCache::new(cfg.rev.blob_ncached_objs),
-            cfg.payload_max_walk,
-            header.payload_regn_nbit,
+            shale::ObjCache::new(cfg.blob_ncached_objs),
+            payload_max_walk,
+            payload_regn_nbit,
         )
         .unwrap();
 
@@ -736,28 +873,71 @@ impl Db<CompactSpace<Node, StoreRevMut>> {
             db_header_ref
                 .write(|r| {
                     err = (|| {
-                        Merkle::<CompactSpace<Node, StoreRevMut>>::init_root(
-                            &mut r.acc_root,
-                            &merkle_space,
-                        )?;
-                        Merkle::<CompactSpace<Node, StoreRevMut>>::init_root(
-                            &mut r.kv_root,
-                            &merkle_space,
-                        )
+                        Merkle::<Store>::init_root(&mut r.acc_root, &merkle_space)?;
+                        Merkle::<Store>::init_root(&mut r.kv_root, &merkle_space)
                     })();
                 })
                 .unwrap();
             err.map_err(DbError::Merkle)?
         }
 
-        let rev = DbRev {
+        Ok(DbRev {
             header: db_header_ref,
             merkle: Merkle::new(Box::new(merkle_space)),
             #[cfg(feature = "eth")]
             blob: BlobStash::new(Box::new(blob_space)),
-        };
+        })
+    }
 
-        Ok((store, rev))
+    /// Create a proposal.
+    pub fn new_proposal<K: AsRef<[u8]>>(
+        &self,
+        data: Batch<K>,
+    ) -> Result<Proposal<Store, SharedStore>, DbError> {
+        let (store, mut rev) = Db::new_store(
+            &self.inner.read().data_cache,
+            false,
+            self.payload_regn_nbit,
+            &self.cfg,
+        )?;
+        data.into_iter().try_for_each(|op| -> Result<(), DbError> {
+            match op {
+                BatchOp::Put { key, value } => {
+                    #[cfg(feature = "eth")]
+                    let (header, merkle, _) = rev.borrow_split();
+                    #[cfg(not(feature = "eth"))]
+                    let (header, merkle) = rev.borrow_split();
+                    merkle
+                        .insert(key, value, header.kv_root)
+                        .map_err(DbError::Merkle)?;
+                    Ok(())
+                }
+                BatchOp::Delete { key } => {
+                    #[cfg(feature = "eth")]
+                    let (header, merkle, _) = rev.borrow_split();
+                    #[cfg(not(feature = "eth"))]
+                    let (header, merkle) = rev.borrow_split();
+                    merkle
+                        .remove(key, header.kv_root)
+                        .map_err(DbError::Merkle)?;
+                    Ok(())
+                }
+            }
+        })?;
+        rev.flush_dirty().unwrap();
+
+        // TODO: remove `WriteBatch`. Currently `WriteBatch`
+        // and `Proposal` cannot be used at the same time.
+        let parent = ProposalBase::View(Arc::clone(&self.revisions.lock().base_revision));
+        Ok(Proposal {
+            m: Arc::clone(&self.inner),
+            r: Arc::clone(&self.revisions),
+            cfg: self.cfg.clone(),
+            rev,
+            store,
+            committed: Arc::new(Mutex::new(false)),
+            parent,
+        })
     }
 
     /// Get a handle that grants the access to any committed state of the entire DB,
@@ -770,7 +950,7 @@ impl Db<CompactSpace<Node, StoreRevMut>> {
         &self,
         root_hash: &TrieHash,
         cfg: Option<DbRevConfig>,
-    ) -> Option<Revision<CompactSpace<Node, StoreRevShared>>> {
+    ) -> Option<Revision<SharedStore>> {
         let mut revisions = self.revisions.lock();
         let inner_lock = self.inner.read();
 
@@ -835,18 +1015,6 @@ impl Db<CompactSpace<Node, StoreRevMut>> {
             }
         }
 
-        // Set up the storage layout
-        let mut offset = std::mem::size_of::<DbParams>() as u64;
-        // DbHeader starts after DbParams in merkle meta space
-        let db_header: ObjPtr<DbHeader> = ObjPtr::new_from_addr(offset);
-        offset += DbHeader::MSIZE;
-        // Merkle CompactHeader starts after DbHeader in merkle meta space
-        let merkle_payload_header: ObjPtr<CompactSpaceHeader> = ObjPtr::new_from_addr(offset);
-        offset += CompactSpaceHeader::MSIZE;
-        assert!(offset <= SPACE_RESERVED);
-        // Blob CompactSpaceHeader starts right in blob meta space
-        let blob_payload_header: ObjPtr<CompactSpaceHeader> = ObjPtr::new_from_addr(0);
-
         let space = if nback == 0 {
             &revisions.base
         } else {
@@ -855,63 +1023,17 @@ impl Db<CompactSpace<Node, StoreRevMut>> {
         // Release the lock after we find the revision
         drop(inner_lock);
 
-        let (db_header_ref, merkle_payload_header_ref, _blob_payload_header_ref) = {
-            let merkle_meta_ref = &space.merkle.meta;
-            let blob_meta_ref = &space.blob.meta;
-
-            (
-                StoredView::ptr_to_obj(merkle_meta_ref, db_header, DbHeader::MSIZE).unwrap(),
-                StoredView::ptr_to_obj(
-                    merkle_meta_ref,
-                    merkle_payload_header,
-                    shale::compact::CompactHeader::MSIZE,
-                )
-                .unwrap(),
-                StoredView::ptr_to_obj(
-                    blob_meta_ref,
-                    blob_payload_header,
-                    shale::compact::CompactHeader::MSIZE,
-                )
-                .unwrap(),
-            )
-        };
-
-        let merkle_space = shale::compact::CompactSpace::new(
-            Arc::new(space.merkle.meta.clone()),
-            Arc::new(space.merkle.payload.clone()),
-            merkle_payload_header_ref,
-            shale::ObjCache::new(cfg.as_ref().unwrap_or(&self.rev_cfg).merkle_ncached_objs),
-            0,
-            self.payload_regn_nbit,
-        )
-        .unwrap();
-
-        #[cfg(feature = "eth")]
-        let blob_space = shale::compact::CompactSpace::new(
-            Arc::new(space.blob.meta.clone()),
-            Arc::new(space.blob.payload.clone()),
-            blob_payload_header_ref,
-            shale::ObjCache::new(cfg.as_ref().unwrap_or(&self.rev_cfg).blob_ncached_objs),
-            0,
-            self.payload_regn_nbit,
-        )
-        .unwrap();
-
+        let cfg = cfg.as_ref().unwrap_or(&self.rev_cfg);
         Some(Revision {
-            rev: DbRev {
-                header: db_header_ref,
-                merkle: Merkle::new(Box::new(merkle_space)),
-                #[cfg(feature = "eth")]
-                blob: BlobStash::new(Box::new(blob_space)),
-            },
+            rev: Db::new_revision(space, self.payload_regn_nbit, 0, cfg).unwrap(),
         })
     }
 }
 
 #[metered(registry = DbMetrics, visibility = pub)]
-impl<S: ShaleStore<Node> + Send + Sync> Db<S> {
+impl<S: ShaleStore<Node> + Send + Sync, T> Db<S, T> {
     /// Create a write batch.
-    pub fn new_writebatch(&self) -> WriteBatch<S> {
+    pub fn new_writebatch(&self) -> WriteBatch<S, T> {
         WriteBatch {
             m: Arc::clone(&self.inner),
             r: Arc::clone(&self.revisions),
@@ -943,7 +1065,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Db<S> {
     }
 }
 #[cfg(feature = "eth")]
-impl<S: ShaleStore<Node> + Send + Sync> Db<S> {
+impl<S: ShaleStore<Node> + Send + Sync, T: ShaleStore<Node> + Send + Sync> Db<S, T> {
     /// Dump the Trie of the latest entire account model storage.
     pub fn dump(&self, w: &mut dyn Write) -> Result<(), DbError> {
         self.inner.read().latest.dump(w)
@@ -997,16 +1119,273 @@ impl<S> std::ops::Deref for Revision<S> {
     }
 }
 
+/// A key/value pair operation. Only put (upsert) and delete are
+/// supported
+#[derive(Debug)]
+pub enum BatchOp<K> {
+    Put { key: K, value: Vec<u8> },
+    Delete { key: K },
+}
+
+/// A list of operations to consist of a batch that
+/// can be proposed
+pub type Batch<K> = Vec<BatchOp<K>>;
+
+pub struct Proposal<S, T> {
+    // State of the Db
+    m: Arc<RwLock<DbInner<S>>>,
+    r: Arc<Mutex<DbRevInner<T>>>,
+    cfg: DbConfig,
+
+    // State of the proposal
+    rev: DbRev<S>,
+    store: Universe<Arc<StoreRevMut>>,
+    committed: Arc<Mutex<bool>>,
+
+    parent: ProposalBase<S, T>,
+}
+
+pub enum ProposalBase<S, T> {
+    Proposal(Arc<Proposal<S, T>>),
+    View(Arc<DbRev<T>>),
+}
+
+impl Proposal<Store, SharedStore> {
+    pub fn propose<K: AsRef<[u8]>>(
+        self: Arc<Self>,
+        data: Batch<K>,
+    ) -> Result<Proposal<Store, SharedStore>, DbError> {
+        let store = self.store.new_from_other();
+
+        let m = Arc::clone(&self.m);
+        let r = Arc::clone(&self.r);
+        let cfg = self.cfg.clone();
+        let mut rev = Db::new_revision_arc(
+            &store,
+            cfg.payload_regn_nbit,
+            cfg.payload_max_walk,
+            &cfg.rev,
+        )?;
+        data.into_iter().try_for_each(|op| -> Result<(), DbError> {
+            match op {
+                BatchOp::Put { key, value } => {
+                    #[cfg(feature = "eth")]
+                    let (header, merkle, _) = rev.borrow_split();
+                    #[cfg(not(feature = "eth"))]
+                    let (header, merkle) = rev.borrow_split();
+                    merkle
+                        .insert(key, value, header.kv_root)
+                        .map_err(DbError::Merkle)?;
+                    Ok(())
+                }
+                BatchOp::Delete { key } => {
+                    #[cfg(feature = "eth")]
+                    let (header, merkle, _) = rev.borrow_split();
+                    #[cfg(not(feature = "eth"))]
+                    let (header, merkle) = rev.borrow_split();
+                    merkle
+                        .remove(key, header.kv_root)
+                        .map_err(DbError::Merkle)?;
+                    Ok(())
+                }
+            }
+        })?;
+        rev.flush_dirty().unwrap();
+
+        let parent = ProposalBase::Proposal(self);
+
+        Ok(Proposal {
+            m,
+            r,
+            cfg,
+            rev,
+            store,
+            committed: Arc::new(Mutex::new(false)),
+            parent,
+        })
+    }
+
+    pub fn commit(&self) -> Result<(), DbError> {
+        let mut committed = self.committed.lock();
+        if *committed {
+            return Ok(());
+        }
+
+        if let ProposalBase::Proposal(p) = &self.parent {
+            p.commit()?;
+        };
+
+        // Check for if it can be committed
+        let mut revisions = self.r.lock();
+        let committed_root_hash = revisions.base_revision.kv_root_hash().ok();
+        let committed_root_hash =
+            committed_root_hash.expect("committed_root_hash should not be none");
+        match &self.parent {
+            ProposalBase::Proposal(p) => {
+                let parent_root_hash = p.rev.kv_root_hash().ok();
+                let parent_root_hash =
+                    parent_root_hash.expect("parent_root_hash should not be none");
+                if parent_root_hash != committed_root_hash {
+                    return Err(DbError::InvalidProposal);
+                }
+            }
+            ProposalBase::View(p) => {
+                let parent_root_hash = p.kv_root_hash().ok();
+                let parent_root_hash =
+                    parent_root_hash.expect("parent_root_hash should not be none");
+                if parent_root_hash != committed_root_hash {
+                    return Err(DbError::InvalidProposal);
+                }
+            }
+        };
+
+        #[cfg(feature = "eth")]
+        self.rev.root_hash().ok();
+
+        let kv_root_hash = self.rev.kv_root_hash().ok();
+        let kv_root_hash = kv_root_hash.expect("kv_root_hash should not be none");
+
+        // clear the staging layer and apply changes to the CachedSpace
+        let (merkle_payload_redo, merkle_payload_wal) = self.store.merkle.payload.delta();
+        let (merkle_meta_redo, merkle_meta_wal) = self.store.merkle.meta.delta();
+        let (blob_payload_redo, blob_payload_wal) = self.store.blob.payload.delta();
+        let (blob_meta_redo, blob_meta_wal) = self.store.blob.meta.delta();
+
+        let mut rev_inner = self.m.write();
+        let merkle_meta_undo = rev_inner
+            .data_cache
+            .merkle
+            .meta
+            .update(&merkle_meta_redo)
+            .unwrap();
+        let merkle_payload_undo = rev_inner
+            .data_cache
+            .merkle
+            .payload
+            .update(&merkle_payload_redo)
+            .unwrap();
+        let blob_meta_undo = rev_inner
+            .data_cache
+            .blob
+            .meta
+            .update(&blob_meta_redo)
+            .unwrap();
+        let blob_payload_undo = rev_inner
+            .data_cache
+            .blob
+            .payload
+            .update(&blob_payload_redo)
+            .unwrap();
+
+        // update the rolling window of past revisions
+        let latest_past = Universe {
+            merkle: get_sub_universe_from_deltas(
+                &rev_inner.data_cache.merkle,
+                merkle_meta_undo,
+                merkle_payload_undo,
+            ),
+            blob: get_sub_universe_from_deltas(
+                &rev_inner.data_cache.blob,
+                blob_meta_undo,
+                blob_payload_undo,
+            ),
+        };
+
+        let max_revisions = revisions.max_revisions;
+        if let Some(rev) = revisions.inner.front_mut() {
+            rev.merkle
+                .meta
+                .set_base_space(latest_past.merkle.meta.inner().clone());
+            rev.merkle
+                .payload
+                .set_base_space(latest_past.merkle.payload.inner().clone());
+            rev.blob
+                .meta
+                .set_base_space(latest_past.blob.meta.inner().clone());
+            rev.blob
+                .payload
+                .set_base_space(latest_past.blob.payload.inner().clone());
+        }
+        revisions.inner.push_front(latest_past);
+        while revisions.inner.len() > max_revisions {
+            revisions.inner.pop_back();
+        }
+
+        let base = Universe {
+            merkle: get_sub_universe_from_empty_delta(&rev_inner.data_cache.merkle),
+            blob: get_sub_universe_from_empty_delta(&rev_inner.data_cache.blob),
+        };
+        let base_revision = Db::new_revision(&base, 0, self.cfg.payload_max_walk, &self.cfg.rev)?;
+        revisions.base = base;
+        revisions.base_revision = Arc::new(base_revision);
+
+        // update the rolling window of root hashes
+        revisions.root_hashes.push_front(kv_root_hash.clone());
+        if revisions.root_hashes.len() > max_revisions {
+            revisions
+                .root_hashes
+                .resize(max_revisions, TrieHash([0; TRIE_HASH_LEN]));
+        }
+
+        rev_inner.root_hash_staging.write(0, &kv_root_hash.0);
+        let (root_hash_redo, root_hash_wal) = rev_inner.root_hash_staging.delta();
+
+        // schedule writes to the disk
+        rev_inner.disk_requester.write(
+            vec![
+                BufferWrite {
+                    space_id: rev_inner.data_staging.merkle.payload.id(),
+                    delta: merkle_payload_redo,
+                },
+                BufferWrite {
+                    space_id: rev_inner.data_staging.merkle.meta.id(),
+                    delta: merkle_meta_redo,
+                },
+                BufferWrite {
+                    space_id: rev_inner.data_staging.blob.payload.id(),
+                    delta: blob_payload_redo,
+                },
+                BufferWrite {
+                    space_id: rev_inner.data_staging.blob.meta.id(),
+                    delta: blob_meta_redo,
+                },
+                BufferWrite {
+                    space_id: rev_inner.root_hash_staging.id(),
+                    delta: root_hash_redo,
+                },
+            ],
+            AshRecord(
+                [
+                    (MERKLE_META_SPACE, merkle_meta_wal),
+                    (MERKLE_PAYLOAD_SPACE, merkle_payload_wal),
+                    (BLOB_META_SPACE, blob_meta_wal),
+                    (BLOB_PAYLOAD_SPACE, blob_payload_wal),
+                    (ROOT_HASH_SPACE, root_hash_wal),
+                ]
+                .into(),
+            ),
+        );
+        *committed = true;
+        Ok(())
+    }
+}
+
+impl<S: ShaleStore<Node> + Send + Sync, T: ShaleStore<Node> + Send + Sync> Proposal<S, T> {
+    pub fn get_revision(&self) -> &DbRev<S> {
+        &self.rev
+    }
+}
+
 /// An atomic batch of changes made to the DB. Each operation on a [WriteBatch] will move itself
 /// because when an error occurs, the write batch will be automatically aborted so that the DB
 /// remains clean.
-pub struct WriteBatch<S> {
+pub struct WriteBatch<S, T> {
     m: Arc<RwLock<DbInner<S>>>,
-    r: Arc<Mutex<DbRevInner>>,
+    r: Arc<Mutex<DbRevInner<T>>>,
     committed: bool,
 }
 
-impl<S: ShaleStore<Node> + Send + Sync> WriteBatch<S> {
+impl<S: ShaleStore<Node> + Send + Sync, T> WriteBatch<S, T> {
     /// Insert an item to the generic key-value storage.
     pub fn kv_insert<K: AsRef<[u8]>>(self, key: K, val: Vec<u8>) -> Result<Self, DbError> {
         let mut rev = self.m.write();
@@ -1321,9 +1700,22 @@ impl<S: ShaleStore<Node> + Send + Sync> WriteBatch<S> {
     }
 }
 
-impl<S> Drop for WriteBatch<S> {
+impl<S, T> Drop for WriteBatch<S, T> {
     fn drop(&mut self) {
         if !self.committed {
+            // drop the staging changes
+            self.m.read().data_staging.merkle.payload.reset_deltas();
+            self.m.read().data_staging.merkle.meta.reset_deltas();
+            self.m.read().data_staging.blob.payload.reset_deltas();
+            self.m.read().data_staging.blob.meta.reset_deltas();
+            self.m.read().root_hash_staging.reset_deltas();
+        }
+    }
+}
+
+impl<S, T> Drop for Proposal<S, T> {
+    fn drop(&mut self) {
+        if !*self.committed.lock() {
             // drop the staging changes
             self.m.read().data_staging.merkle.payload.reset_deltas();
             self.m.read().data_staging.merkle.meta.reset_deltas();

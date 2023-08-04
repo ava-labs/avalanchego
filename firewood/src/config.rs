@@ -2,7 +2,7 @@ pub use crate::storage::{buffer::DiskBufferConfig, WalConfig};
 use typed_builder::TypedBuilder;
 
 /// Database configuration.
-#[derive(TypedBuilder, Debug)]
+#[derive(Clone, TypedBuilder, Debug)]
 pub struct DbConfig {
     /// Maximum cached pages for the free list of the item stash.
     #[builder(default = 16384)] // 64M total size by default

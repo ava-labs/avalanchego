@@ -126,11 +126,11 @@ fn main() {
 
 struct RevisionTracker {
     hashes: VecDeque<TrieHash>,
-    db: Db<Store>,
+    db: Db<Store, SharedStore>,
 }
 
 impl RevisionTracker {
-    fn new(db: Db<Store>) -> Self {
+    fn new(db: Db<Store, SharedStore>) -> Self {
         Self {
             hashes: VecDeque::new(),
             db,
@@ -159,7 +159,7 @@ impl RevisionTracker {
         self.hashes.push_front(hash);
     }
 
-    fn commit_batch(&mut self, batch: WriteBatch<Store>) {
+    fn commit_batch(&mut self, batch: WriteBatch<Store, SharedStore>) {
         batch.commit();
         let hash = self.db.kv_root_hash().expect("root-hash should exist");
         self.hashes.push_front(hash);

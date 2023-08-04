@@ -511,32 +511,45 @@ impl CachedStore for StoreRevMut {
             let e_pid = end >> PAGE_SIZE_NBIT;
             let e_off = (end & PAGE_MASK) as usize;
             let deltas = &self.deltas.read().pages;
+            let prev_deltas = &self.prev_deltas.read().pages;
             if s_pid == e_pid {
                 match deltas.get(&s_pid) {
                     Some(p) => p[s_off..e_off + 1].to_vec(),
-                    None => self.base_space.get_slice(offset, length)?,
+                    None => match prev_deltas.get(&s_pid) {
+                        Some(p) => p[s_off..e_off + 1].to_vec(),
+                        None => self.base_space.get_slice(offset, length)?,
+                    },
                 }
             } else {
                 let mut data = match deltas.get(&s_pid) {
                     Some(p) => p[s_off..].to_vec(),
-                    None => self
-                        .base_space
-                        .get_slice(offset, PAGE_SIZE - s_off as u64)?,
+                    None => match prev_deltas.get(&s_pid) {
+                        Some(p) => p[s_off..].to_vec(),
+                        None => self
+                            .base_space
+                            .get_slice(offset, PAGE_SIZE - s_off as u64)?,
+                    },
                 };
                 for p in s_pid + 1..e_pid {
                     match deltas.get(&p) {
                         Some(p) => data.extend(**p),
-                        None => {
-                            data.extend(&self.base_space.get_slice(p << PAGE_SIZE_NBIT, PAGE_SIZE)?)
-                        }
+                        None => match prev_deltas.get(&p) {
+                            Some(p) => data.extend(**p),
+                            None => data.extend(
+                                &self.base_space.get_slice(p << PAGE_SIZE_NBIT, PAGE_SIZE)?,
+                            ),
+                        },
                     };
                 }
                 match deltas.get(&e_pid) {
                     Some(p) => data.extend(&p[..e_off + 1]),
-                    None => data.extend(
-                        self.base_space
-                            .get_slice(e_pid << PAGE_SIZE_NBIT, e_off as u64 + 1)?,
-                    ),
+                    None => match prev_deltas.get(&e_pid) {
+                        Some(p) => data.extend(&p[..e_off + 1]),
+                        None => data.extend(
+                            self.base_space
+                                .get_slice(e_pid << PAGE_SIZE_NBIT, e_off as u64 + 1)?,
+                        ),
+                    },
                 }
                 data
             }

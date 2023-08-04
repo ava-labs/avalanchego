@@ -1,7 +1,7 @@
 use firewood::{
-    db::{Db as PersistedDb, DbConfig, DbError, WalConfig},
+    db::{BatchOp, Db as PersistedDb, DbConfig, DbError, WalConfig},
     merkle::{Node, TrieHash},
-    storage::StoreRevMut,
+    storage::{StoreRevMut, StoreRevShared},
 };
 use firewood_shale::compact::CompactSpace;
 use std::{
@@ -9,6 +9,7 @@ use std::{
     fs::remove_dir_all,
     ops::{Deref, DerefMut},
     path::Path,
+    sync::Arc,
 };
 
 // TODO: use a trait
@@ -21,8 +22,9 @@ macro_rules! kv_dump {
 }
 
 type Store = CompactSpace<Node, StoreRevMut>;
+type SharedStore = CompactSpace<Node, StoreRevShared>;
 
-struct Db<'a, P: AsRef<Path> + ?Sized>(PersistedDb<Store>, &'a P);
+struct Db<'a, P: AsRef<Path> + ?Sized>(PersistedDb<Store, SharedStore>, &'a P);
 
 impl<'a, P: AsRef<Path> + ?Sized> Db<'a, P> {
     fn new(path: &'a P, cfg: &DbConfig) -> Result<Self, DbError> {
@@ -216,7 +218,7 @@ fn create_db_issue_proof() {
 }
 
 impl<P: AsRef<Path> + ?Sized> Deref for Db<'_, P> {
-    type Target = PersistedDb<Store>;
+    type Target = PersistedDb<Store, SharedStore>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -224,7 +226,104 @@ impl<P: AsRef<Path> + ?Sized> Deref for Db<'_, P> {
 }
 
 impl<P: AsRef<Path> + ?Sized> DerefMut for Db<'_, P> {
-    fn deref_mut(&mut self) -> &mut PersistedDb<Store> {
+    fn deref_mut(&mut self) -> &mut PersistedDb<Store, SharedStore> {
         &mut self.0
     }
+}
+
+#[test]
+fn db_proposal() {
+    let cfg = DbConfig::builder().wal(WalConfig::builder().max_revisions(10).build());
+
+    let db = Db::new("test_db_proposal", &cfg.clone().truncate(true).build())
+        .expect("db initiation should succeed");
+
+    let batch = vec![
+        BatchOp::Put {
+            key: b"k",
+            value: "v".as_bytes().to_vec(),
+        },
+        BatchOp::Delete { key: b"z" },
+    ];
+
+    let proposal = Arc::new(db.new_proposal(batch).unwrap());
+    let rev = proposal.get_revision();
+    let val = rev.kv_get(b"k");
+    assert_eq!(val.unwrap(), "v".as_bytes().to_vec());
+
+    let batch_2 = vec![BatchOp::Put {
+        key: b"k2",
+        value: "v2".as_bytes().to_vec(),
+    }];
+    let proposal_2 = proposal.clone().propose(batch_2).unwrap();
+    let rev = proposal_2.get_revision();
+    let val = rev.kv_get(b"k");
+    assert_eq!(val.unwrap(), "v".as_bytes().to_vec());
+    let val = rev.kv_get(b"k2");
+    assert_eq!(val.unwrap(), "v2".as_bytes().to_vec());
+
+    proposal.commit().unwrap();
+    proposal_2.commit().unwrap();
+
+    std::thread::scope(|scope| {
+        scope.spawn(|| {
+            let another_batch = vec![BatchOp::Put {
+                key: b"another_k",
+                value: "another_v".as_bytes().to_vec(),
+            }];
+            let another_proposal = proposal.clone().propose(another_batch).unwrap();
+            let rev = another_proposal.get_revision();
+            let val = rev.kv_get(b"k");
+            assert_eq!(val.unwrap(), "v".as_bytes().to_vec());
+            let val = rev.kv_get(b"another_k");
+            assert_eq!(val.unwrap(), "another_v".as_bytes().to_vec());
+            // The proposal is invalid and cannot be committed
+            assert!(another_proposal.commit().is_err());
+        });
+
+        scope.spawn(|| {
+            let another_batch = vec![BatchOp::Put {
+                key: b"another_k_1",
+                value: "another_v_1".as_bytes().to_vec(),
+            }];
+            let another_proposal = proposal.clone().propose(another_batch).unwrap();
+            let rev = another_proposal.get_revision();
+            let val = rev.kv_get(b"k");
+            assert_eq!(val.unwrap(), "v".as_bytes().to_vec());
+            let val = rev.kv_get(b"another_k_1");
+            assert_eq!(val.unwrap(), "another_v_1".as_bytes().to_vec());
+        });
+    });
+
+    // Recusrive commit
+
+    let batch = vec![BatchOp::Put {
+        key: b"k3",
+        value: "v3".as_bytes().to_vec(),
+    }];
+    let proposal = Arc::new(db.new_proposal(batch).unwrap());
+    let rev = proposal.get_revision();
+    let val = rev.kv_get(b"k");
+    assert_eq!(val.unwrap(), "v".as_bytes().to_vec());
+    let val = rev.kv_get(b"k2");
+    assert_eq!(val.unwrap(), "v2".as_bytes().to_vec());
+    let val = rev.kv_get(b"k3");
+    assert_eq!(val.unwrap(), "v3".as_bytes().to_vec());
+
+    let batch_2 = vec![BatchOp::Put {
+        key: b"k4",
+        value: "v4".as_bytes().to_vec(),
+    }];
+    let proposal_2 = proposal.clone().propose(batch_2).unwrap();
+    let rev = proposal_2.get_revision();
+    let val = rev.kv_get(b"k");
+    assert_eq!(val.unwrap(), "v".as_bytes().to_vec());
+    let val = rev.kv_get(b"k2");
+    assert_eq!(val.unwrap(), "v2".as_bytes().to_vec());
+    let val = rev.kv_get(b"k3");
+    assert_eq!(val.unwrap(), "v3".as_bytes().to_vec());
+    let val = rev.kv_get(b"k4");
+    assert_eq!(val.unwrap(), "v4".as_bytes().to_vec());
+
+    proposal_2.commit().unwrap();
 }
