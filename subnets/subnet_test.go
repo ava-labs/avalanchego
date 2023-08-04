@@ -61,7 +61,7 @@ func TestIsAllowed(t *testing.T) {
 	allowedNodeID := ids.GenerateTestNodeID()
 	s = New(myNodeID, Config{
 		ValidatorOnly: true,
-		AllowedNodes:  set.Of[ids.NodeID](allowedNodeID),
+		AllowedNodes:  set.Of(allowedNodeID),
 	})
 	require.True(s.IsAllowed(allowedNodeID, true), "Validator should be allowed with validator only rules and allowed nodes")
 	require.True(s.IsAllowed(myNodeID, false), "Self node should be allowed with validator only rules")

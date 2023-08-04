@@ -157,7 +157,7 @@ func TestVerifierVisitAtomicBlock(t *testing.T) {
 
 	onAccept := state.NewMockDiff(ctrl)
 	blkTx := txs.NewMockUnsignedTx(ctrl)
-	inputs := set.Of[ids.ID](ids.GenerateTestID())
+	inputs := set.Of(ids.GenerateTestID())
 	blkTx.EXPECT().Visit(gomock.AssignableToTypeOf(&executor.AtomicTxExecutor{})).DoAndReturn(
 		func(e *executor.AtomicTxExecutor) error {
 			e.OnAccept = onAccept
@@ -681,7 +681,7 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := blocks.NewMockBlock(ctrl)
 	parentState := state.NewMockDiff(ctrl)
-	atomicInputs := set.Of[ids.ID](ids.GenerateTestID())
+	atomicInputs := set.Of(ids.GenerateTestID())
 
 	backend := &backend{
 		blkIDToState: map[ids.ID]*blockState{

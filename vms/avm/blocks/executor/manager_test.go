@@ -249,7 +249,7 @@ func TestManagerVerifyTx(t *testing.T) {
 						preferredID: {
 							statelessBlock: preferred,
 							onAcceptState:  diffState,
-							importedInputs: set.Of[ids.ID](inputID),
+							importedInputs: set.Of(inputID),
 						},
 					},
 					lastAccepted: lastAcceptedID,
@@ -327,17 +327,17 @@ func TestVerifyUniqueInputs(t *testing.T) {
 		blkIDToState: map[ids.ID]*blockState{
 			blk0ID: {
 				statelessBlock: blk0,
-				importedInputs: set.Of[ids.ID](inputID),
+				importedInputs: set.Of(inputID),
 			},
 			blk1ID: {
 				statelessBlock: blk1,
-				importedInputs: set.Of[ids.ID](ids.GenerateTestID()),
+				importedInputs: set.Of(ids.GenerateTestID()),
 			},
 		},
 	}
 	// [blk1]'s parent, [blk0], has [inputID] as an input
-	err := m.VerifyUniqueInputs(blk1ID, set.Of[ids.ID](inputID))
+	err := m.VerifyUniqueInputs(blk1ID, set.Of(inputID))
 	require.ErrorIs(err, ErrConflictingParentTxs)
 
-	require.NoError(m.VerifyUniqueInputs(blk1ID, set.Of[ids.ID](ids.GenerateTestID())))
+	require.NoError(m.VerifyUniqueInputs(blk1ID, set.Of(ids.GenerateTestID())))
 }

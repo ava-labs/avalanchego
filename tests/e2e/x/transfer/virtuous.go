@@ -85,7 +85,7 @@ var _ = e2e.DescribeXChain("[Virtuous Transfer Tx AVAX]", func() {
 
 					wallets[i] = primary.NewWalletWithOptions(
 						baseWallet,
-						common.WithCustomAddresses(set.Of[ids.ShortID](
+						common.WithCustomAddresses(set.Of(
 							testKeys[i].PublicKey().Address(),
 						)),
 					)

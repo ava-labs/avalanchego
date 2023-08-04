@@ -32,7 +32,7 @@ func testJob(t *testing.T, jobID ids.ID, executed *bool, parentID ids.ID, parent
 		},
 		MissingDependenciesF: func(context.Context) (set.Set[ids.ID], error) {
 			if parentID != ids.Empty && !*parentExecuted {
-				return set.Of[ids.ID](parentID), nil
+				return set.Of(parentID), nil
 			}
 			return set.Set[ids.ID]{}, nil
 		},

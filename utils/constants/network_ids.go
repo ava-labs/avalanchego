@@ -87,7 +87,7 @@ var (
 		UnitTestHRP: UnitTestID,
 		LocalHRP:    LocalID,
 	}
-	ProductionNetworkIDs = set.Of[uint32](
+	ProductionNetworkIDs = set.Of(
 		MainnetID,
 		FujiID,
 	)

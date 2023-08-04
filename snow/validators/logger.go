@@ -31,7 +31,7 @@ func NewLogger(
 	subnetID ids.ID,
 	nodeIDs ...ids.NodeID,
 ) SetCallbackListener {
-	nodeIDSet := set.Of[ids.NodeID](nodeIDs...)
+	nodeIDSet := set.Of(nodeIDs...)
 	return &logger{
 		log:      log,
 		enabled:  enabled,

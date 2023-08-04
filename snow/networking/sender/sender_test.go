@@ -218,28 +218,28 @@ func TestTimeout(t *testing.T) {
 
 	sendAll := func() {
 		{
-			nodeIDs := set.Of[ids.NodeID](ids.GenerateTestNodeID())
+			nodeIDs := set.Of(ids.GenerateTestNodeID())
 			vdrIDs.Union(nodeIDs)
 			wg.Add(1)
 			requestID++
 			sender.SendGetStateSummaryFrontier(cancelledCtx, nodeIDs, requestID)
 		}
 		{
-			nodeIDs := set.Of[ids.NodeID](ids.GenerateTestNodeID())
+			nodeIDs := set.Of(ids.GenerateTestNodeID())
 			vdrIDs.Union(nodeIDs)
 			wg.Add(1)
 			requestID++
 			sender.SendGetAcceptedStateSummary(cancelledCtx, nodeIDs, requestID, nil)
 		}
 		{
-			nodeIDs := set.Of[ids.NodeID](ids.GenerateTestNodeID())
+			nodeIDs := set.Of(ids.GenerateTestNodeID())
 			vdrIDs.Union(nodeIDs)
 			wg.Add(1)
 			requestID++
 			sender.SendGetAcceptedFrontier(cancelledCtx, nodeIDs, requestID)
 		}
 		{
-			nodeIDs := set.Of[ids.NodeID](ids.GenerateTestNodeID())
+			nodeIDs := set.Of(ids.GenerateTestNodeID())
 			vdrIDs.Union(nodeIDs)
 			wg.Add(1)
 			requestID++
@@ -260,21 +260,21 @@ func TestTimeout(t *testing.T) {
 			sender.SendGet(cancelledCtx, nodeID, requestID, ids.Empty)
 		}
 		{
-			nodeIDs := set.Of[ids.NodeID](ids.GenerateTestNodeID())
+			nodeIDs := set.Of(ids.GenerateTestNodeID())
 			vdrIDs.Union(nodeIDs)
 			wg.Add(1)
 			requestID++
 			sender.SendPullQuery(cancelledCtx, nodeIDs, requestID, ids.Empty)
 		}
 		{
-			nodeIDs := set.Of[ids.NodeID](ids.GenerateTestNodeID())
+			nodeIDs := set.Of(ids.GenerateTestNodeID())
 			vdrIDs.Union(nodeIDs)
 			wg.Add(1)
 			requestID++
 			sender.SendPushQuery(cancelledCtx, nodeIDs, requestID, nil)
 		}
 		{
-			nodeIDs := set.Of[ids.NodeID](ids.GenerateTestNodeID())
+			nodeIDs := set.Of(ids.GenerateTestNodeID())
 			vdrIDs.Union(nodeIDs)
 			wg.Add(1)
 			requestID++
@@ -669,13 +669,11 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 			setExternalSenderExpect: func(externalSender *MockExternalSender) {
 				externalSender.EXPECT().Send(
 					gomock.Any(), // Outbound message
-					set.Of[ids.NodeID]( // Note [myNodeID] is not in this set
-						successNodeID,
-						failedNodeID,
-					), // Node IDs
+					// Note [myNodeID] is not in this set
+					set.Of(successNodeID, failedNodeID),
 					subnetID, // Subnet ID
 					gomock.Any(),
-				).Return(set.Of[ids.NodeID](successNodeID))
+				).Return(set.Of(successNodeID))
 			},
 			sendF: func(_ *require.Assertions, sender common.Sender, nodeIDs set.Set[ids.NodeID]) {
 				sender.SendGetStateSummaryFrontier(
@@ -714,13 +712,11 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 			setExternalSenderExpect: func(externalSender *MockExternalSender) {
 				externalSender.EXPECT().Send(
 					gomock.Any(), // Outbound message
-					set.Of[ids.NodeID]( // Note [myNodeID] is not in this set
-						successNodeID,
-						failedNodeID,
-					), // Node IDs
+					// Note [myNodeID] is not in this set
+					set.Of(successNodeID, failedNodeID),
 					subnetID, // Subnet ID
 					gomock.Any(),
-				).Return(set.Of[ids.NodeID](successNodeID))
+				).Return(set.Of(successNodeID))
 			},
 			sendF: func(_ *require.Assertions, sender common.Sender, nodeIDs set.Set[ids.NodeID]) {
 				sender.SendGetAcceptedStateSummary(context.Background(), nodeIDs, requestID, heights)
@@ -756,13 +752,11 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 			setExternalSenderExpect: func(externalSender *MockExternalSender) {
 				externalSender.EXPECT().Send(
 					gomock.Any(), // Outbound message
-					set.Of[ids.NodeID]( // Note [myNodeID] is not in this set
-						successNodeID,
-						failedNodeID,
-					), // Node IDs
+					// Note [myNodeID] is not in this set
+					set.Of(successNodeID, failedNodeID),
 					subnetID, // Subnet ID
 					gomock.Any(),
-				).Return(set.Of[ids.NodeID](successNodeID))
+				).Return(set.Of(successNodeID))
 			},
 			sendF: func(_ *require.Assertions, sender common.Sender, nodeIDs set.Set[ids.NodeID]) {
 				sender.SendGetAcceptedFrontier(context.Background(), nodeIDs, requestID)
@@ -800,13 +794,11 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 			setExternalSenderExpect: func(externalSender *MockExternalSender) {
 				externalSender.EXPECT().Send(
 					gomock.Any(), // Outbound message
-					set.Of[ids.NodeID]( // Note [myNodeID] is not in this set
-						successNodeID,
-						failedNodeID,
-					), // Node IDs
+					// Note [myNodeID] is not in this set
+					set.Of(successNodeID, failedNodeID),
 					subnetID, // Subnet ID
 					gomock.Any(),
-				).Return(set.Of[ids.NodeID](successNodeID))
+				).Return(set.Of(successNodeID))
 			},
 			sendF: func(_ *require.Assertions, sender common.Sender, nodeIDs set.Set[ids.NodeID]) {
 				sender.SendGetAccepted(context.Background(), nodeIDs, requestID, containerIDs)
@@ -825,7 +817,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 				externalSender = NewMockExternalSender(ctrl)
 				timeoutManager = timeout.NewMockManager(ctrl)
 				router         = router.NewMockRouter(ctrl)
-				nodeIDs        = set.Of[ids.NodeID](
+				nodeIDs        = set.Of(
 					successNodeID,
 					failedNodeID,
 					myNodeID,
@@ -940,9 +932,9 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 			},
 			setExternalSenderExpect: func(externalSender *MockExternalSender) {
 				externalSender.EXPECT().Send(
-					gomock.Any(),                          // Outbound message
-					set.Of[ids.NodeID](destinationNodeID), // Node IDs
-					subnetID,                              // Subnet ID
+					gomock.Any(),              // Outbound message
+					set.Of(destinationNodeID), // Node IDs
+					subnetID,                  // Subnet ID
 					gomock.Any(),
 				).Return(nil)
 			},
@@ -970,9 +962,9 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 			},
 			setExternalSenderExpect: func(externalSender *MockExternalSender) {
 				externalSender.EXPECT().Send(
-					gomock.Any(),                          // Outbound message
-					set.Of[ids.NodeID](destinationNodeID), // Node IDs
-					subnetID,                              // Subnet ID
+					gomock.Any(),              // Outbound message
+					set.Of(destinationNodeID), // Node IDs
+					subnetID,                  // Subnet ID
 					gomock.Any(),
 				).Return(nil)
 			},
@@ -998,9 +990,9 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 			},
 			setExternalSenderExpect: func(externalSender *MockExternalSender) {
 				externalSender.EXPECT().Send(
-					gomock.Any(),                          // Outbound message
-					set.Of[ids.NodeID](destinationNodeID), // Node IDs
-					subnetID,                              // Subnet ID
+					gomock.Any(),              // Outbound message
+					set.Of(destinationNodeID), // Node IDs
+					subnetID,                  // Subnet ID
 					gomock.Any(),
 				).Return(nil)
 			},
@@ -1028,9 +1020,9 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 			},
 			setExternalSenderExpect: func(externalSender *MockExternalSender) {
 				externalSender.EXPECT().Send(
-					gomock.Any(),                          // Outbound message
-					set.Of[ids.NodeID](destinationNodeID), // Node IDs
-					subnetID,                              // Subnet ID
+					gomock.Any(),              // Outbound message
+					set.Of(destinationNodeID), // Node IDs
+					subnetID,                  // Subnet ID
 					gomock.Any(),
 				).Return(nil)
 			},
@@ -1160,8 +1152,8 @@ func TestSender_Single_Request(t *testing.T) {
 			},
 			setExternalSenderExpect: func(externalSender *MockExternalSender, sentTo set.Set[ids.NodeID]) {
 				externalSender.EXPECT().Send(
-					gomock.Any(),                          // Outbound message
-					set.Of[ids.NodeID](destinationNodeID), // Node IDs
+					gomock.Any(),              // Outbound message
+					set.Of(destinationNodeID), // Node IDs
 					subnetID,
 					gomock.Any(),
 				).Return(sentTo)
@@ -1199,8 +1191,8 @@ func TestSender_Single_Request(t *testing.T) {
 			},
 			setExternalSenderExpect: func(externalSender *MockExternalSender, sentTo set.Set[ids.NodeID]) {
 				externalSender.EXPECT().Send(
-					gomock.Any(),                          // Outbound message
-					set.Of[ids.NodeID](destinationNodeID), // Node IDs
+					gomock.Any(),              // Outbound message
+					set.Of(destinationNodeID), // Node IDs
 					subnetID,
 					gomock.Any(),
 				).Return(sentTo)

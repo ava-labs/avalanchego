@@ -147,7 +147,7 @@ func (w *worker) Results(tags ...string) (map[string]Result, bool) {
 
 	names := set.Set[string]{}
 	// we always want to include the application tag
-	tagSet := set.Of[string](append(tags, ApplicationTag)...)
+	tagSet := set.Of(append(tags, ApplicationTag)...)
 	for tag := range tagSet {
 		if set, ok := w.tags[tag]; ok {
 			names.Union(set)

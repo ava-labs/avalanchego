@@ -1547,7 +1547,7 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 
 	ctx := snow.DefaultConsensusContextTest()
 	allowedID := ids.GenerateTestNodeID()
-	allowedSet := set.Of[ids.NodeID](allowedID)
+	allowedSet := set.Of(allowedID)
 	sb := subnets.New(ctx.NodeID, subnets.Config{ValidatorOnly: true, AllowedNodes: allowedSet})
 
 	vdrs := validators.NewSet()

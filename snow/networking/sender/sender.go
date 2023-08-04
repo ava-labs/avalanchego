@@ -207,7 +207,7 @@ func (s *sender) SendStateSummaryFrontier(ctx context.Context, nodeID ids.NodeID
 	}
 
 	// Send the message over the network.
-	nodeIDs := set.Of[ids.NodeID](nodeID)
+	nodeIDs := set.Of(nodeID)
 	sentTo := s.sender.Send(
 		outMsg,
 		nodeIDs,
@@ -350,7 +350,7 @@ func (s *sender) SendAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID
 	}
 
 	// Send the message over the network.
-	nodeIDs := set.Of[ids.NodeID](nodeID)
+	nodeIDs := set.Of(nodeID)
 	sentTo := s.sender.Send(
 		outMsg,
 		nodeIDs,
@@ -485,7 +485,7 @@ func (s *sender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, re
 	}
 
 	// Send the message over the network.
-	nodeIDs := set.Of[ids.NodeID](nodeID)
+	nodeIDs := set.Of(nodeID)
 	sentTo := s.sender.Send(
 		outMsg,
 		nodeIDs,
@@ -618,7 +618,7 @@ func (s *sender) SendAccepted(ctx context.Context, nodeID ids.NodeID, requestID 
 	}
 
 	// Send the message over the network.
-	nodeIDs := set.Of[ids.NodeID](nodeID)
+	nodeIDs := set.Of(nodeID)
 	sentTo := s.sender.Send(
 		outMsg,
 		nodeIDs,
@@ -698,7 +698,7 @@ func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, reques
 	}
 
 	// Send the message over the network.
-	nodeIDs := set.Of[ids.NodeID](nodeID)
+	nodeIDs := set.Of(nodeID)
 	sentTo := s.sender.Send(
 		outMsg,
 		nodeIDs,
@@ -737,7 +737,7 @@ func (s *sender) SendAncestors(_ context.Context, nodeID ids.NodeID, requestID u
 	}
 
 	// Send the message over the network.
-	nodeIDs := set.Of[ids.NodeID](nodeID)
+	nodeIDs := set.Of(nodeID)
 	sentTo := s.sender.Send(
 		outMsg,
 		nodeIDs,
@@ -811,7 +811,7 @@ func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint3
 	// Send the message over the network.
 	var sentTo set.Set[ids.NodeID]
 	if err == nil {
-		nodeIDs := set.Of[ids.NodeID](nodeID)
+		nodeIDs := set.Of(nodeID)
 		sentTo = s.sender.Send(
 			outMsg,
 			nodeIDs,
@@ -862,7 +862,7 @@ func (s *sender) SendPut(_ context.Context, nodeID ids.NodeID, requestID uint32,
 	}
 
 	// Send the message over the network.
-	nodeIDs := set.Of[ids.NodeID](nodeID)
+	nodeIDs := set.Of(nodeID)
 	sentTo := s.sender.Send(
 		outMsg,
 		nodeIDs,
@@ -1177,7 +1177,7 @@ func (s *sender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID uin
 	}
 
 	// Send the message over the network.
-	nodeIDs := set.Of[ids.NodeID](nodeID)
+	nodeIDs := set.Of(nodeID)
 	sentTo := s.sender.Send(
 		outMsg,
 		nodeIDs,
@@ -1404,7 +1404,7 @@ func (s *sender) SendAppResponse(ctx context.Context, nodeID ids.NodeID, request
 	}
 
 	// Send the message over the network.
-	nodeIDs := set.Of[ids.NodeID](nodeID)
+	nodeIDs := set.Of(nodeID)
 	sentTo := s.sender.Send(
 		outMsg,
 		nodeIDs,

@@ -265,7 +265,7 @@ func TestPingUptimes(t *testing.T) {
 	trackedSubnetID := ids.GenerateTestID()
 	untrackedSubnetID := ids.GenerateTestID()
 
-	trackedSubnets := set.Of[ids.ID](trackedSubnetID)
+	trackedSubnets := set.Of(trackedSubnetID)
 
 	mc := newMessageCreator(t)
 

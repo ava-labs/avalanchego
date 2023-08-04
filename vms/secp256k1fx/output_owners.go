@@ -98,7 +98,7 @@ func (out *OutputOwners) Addresses() [][]byte {
 
 // AddressesSet returns addresses as a set
 func (out *OutputOwners) AddressesSet() set.Set[ids.ShortID] {
-	return set.Of[ids.ShortID](out.Addrs...)
+	return set.Of(out.Addrs...)
 }
 
 // Equals returns true if the provided owners create the same condition

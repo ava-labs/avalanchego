@@ -59,7 +59,7 @@ func (c *Client) AppRequestAny(
 		return ErrNoPeers
 	}
 
-	nodeIDs := set.Of[ids.NodeID](peers[0])
+	nodeIDs := set.Of(peers[0])
 	return c.AppRequest(ctx, nodeIDs, appRequestBytes, onResponse)
 }
 
@@ -87,7 +87,7 @@ func (c *Client) AppRequest(
 
 		if err := c.sender.SendAppRequest(
 			ctx,
-			set.Of[ids.NodeID](nodeID),
+			set.Of(nodeID),
 			requestID,
 			appRequestBytes,
 		); err != nil {
