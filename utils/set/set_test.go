@@ -77,7 +77,7 @@ func TestOf(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			s := Of[int](tt.elements...)
+			s := Of(tt.elements...)
 
 			require.Len(s, len(tt.expected))
 			for _, expected := range tt.expected {
