@@ -21,15 +21,6 @@ import (
 	cryptobyte_asn1 "golang.org/x/crypto/cryptobyte/asn1"
 )
 
-// ParseCertificate parses a single certificate from the given ASN.1 DER data.
-func ParseCertificate(der []byte) (*Certificate, error) {
-	cert, err := parseCertificate(der)
-	if err != nil {
-		return nil, err
-	}
-	return CertificateFromX509(cert), nil
-}
-
 var (
 	// RFC 3279, 2.3 Public Key Algorithms
 	//
@@ -154,7 +145,8 @@ var (
 	oidNamedCurveP521 = asn1.ObjectIdentifier{1, 3, 132, 0, 35}
 )
 
-func parseCertificate(der []byte) (*x509.Certificate, error) {
+// ParseCertificate parses a single certificate from the given ASN.1 DER data.
+func ParseCertificate(der []byte) (*Certificate, error) {
 	input := cryptobyte.String(der)
 	// Read the SEQUENCE including length and tag bytes so that we can check if
 	// there is an unexpected suffix.
@@ -235,7 +227,7 @@ func parseCertificate(der []byte) (*x509.Certificate, error) {
 		Algorithm: pkAI,
 		PublicKey: spk,
 	})
-	return &x509.Certificate{
+	return &Certificate{
 		Raw:                der,
 		SignatureAlgorithm: signatureAlgorithm,
 		PublicKey:          publicKey,
