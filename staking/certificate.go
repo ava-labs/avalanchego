@@ -11,6 +11,10 @@ type Certificate struct {
 	SignatureAlgorithm x509.SignatureAlgorithm
 }
 
+// CertificateFromX509 converts an x509 certificate into a staking certificate.
+//
+// Invariant: The provided certificate must be a parseable into a staking
+// certificate.
 func CertificateFromX509(cert *x509.Certificate) *Certificate {
 	return &Certificate{
 		Raw:                cert.Raw,

@@ -13,16 +13,9 @@ import (
 	"fmt"
 )
 
-// MaxRSAKeyBitLen is the maximum RSA key size in bits that we are willing to
-// parse.
-//
-// https://github.com/golang/go/blob/go1.19.12/src/crypto/tls/handshake_client.go#L860-L862
-const MaxRSAKeyBitLen = 8192
-
 var (
 	ErrUnsupportedAlgorithm       = errors.New("staking: cannot verify signature: unsupported algorithm")
 	ErrPublicKeyAlgoMismatch      = errors.New("staking: signature algorithm specified different public key type")
-	ErrInvalidRSAPublicKeyBitLen  = errors.New("staking: invalid RSA public key bitLen")
 	ErrECDSAVerificationFailure   = errors.New("staking: ECDSA verification failure")
 	ErrED25519VerificationFailure = errors.New("staking: Ed25519 verification failure")
 )
@@ -49,10 +42,6 @@ func CheckSignature(cert *Certificate, signed []byte, signature []byte) error {
 	case *rsa.PublicKey:
 		if verificationDetails.pubKeyAlgo != x509.RSA {
 			return signaturePublicKeyAlgoMismatchError(verificationDetails.pubKeyAlgo, pub)
-		}
-		// Ref: https://github.com/golang/go/blob/go1.19.12/src/crypto/tls/handshake_client.go#L874-L877
-		if bitLen := pub.N.BitLen(); bitLen > MaxRSAKeyBitLen {
-			return fmt.Errorf("%w: bitLen=%d > maxBitLen=%d", ErrInvalidRSAPublicKeyBitLen, bitLen, MaxRSAKeyBitLen)
 		}
 		if isRSAPSS(cert.SignatureAlgorithm) {
 			return rsa.VerifyPSS(pub, verificationDetails.hash, signed, signature, &rsa.PSSOptions{SaltLength: rsa.PSSSaltLengthEqualsHash})

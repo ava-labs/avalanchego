@@ -13,12 +13,19 @@ import (
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"errors"
+	"fmt"
 	"math/big"
 
 	"golang.org/x/crypto/cryptobyte"
 
 	cryptobyte_asn1 "golang.org/x/crypto/cryptobyte/asn1"
 )
+
+// MaxRSAKeyBitLen is the maximum RSA key size in bits that we are willing to
+// parse.
+//
+// https://github.com/golang/go/blob/go1.19.12/src/crypto/tls/handshake_client.go#L860-L862
+const MaxRSAKeyBitLen = 8192
 
 var (
 	ErrMalformedCertificate                  = errors.New("staking: malformed certificate")
@@ -39,6 +46,7 @@ var (
 	ErrInvalidRSAModulus                     = errors.New("staking: invalid RSA modulus")
 	ErrInvalidRSAPublicExponent              = errors.New("staking: invalid RSA public exponent")
 	ErrRSAModulusNotPositive                 = errors.New("staking: RSA modulus is not a positive number")
+	ErrInvalidRSAModulusBitLen               = fmt.Errorf("staking: RSA modulus bitLen is greater than %d", MaxRSAKeyBitLen)
 	ErrRSAPublicExponentNotPositive          = errors.New("staking: RSA public exponent is not a positive number")
 	ErrInvalidECDSAParameters                = errors.New("staking: invalid ECDSA parameters")
 	ErrUnsupportedEllipticCurve              = errors.New("staking: unsupported elliptic curve")
@@ -267,6 +275,10 @@ func parsePublicKey(keyData *publicKeyInfo) (any, error) {
 
 		if pub.N.Sign() <= 0 {
 			return nil, ErrRSAModulusNotPositive
+		}
+		// Ref: https://github.com/golang/go/blob/go1.19.12/src/crypto/tls/handshake_client.go#L874-L877
+		if pub.N.BitLen() > MaxRSAKeyBitLen {
+			return nil, ErrInvalidRSAModulusBitLen
 		}
 		if pub.E <= 0 {
 			return nil, ErrRSAPublicExponentNotPositive
