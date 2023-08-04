@@ -817,12 +817,8 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 				externalSender = NewMockExternalSender(ctrl)
 				timeoutManager = timeout.NewMockManager(ctrl)
 				router         = router.NewMockRouter(ctrl)
-				nodeIDs        = set.Of(
-					successNodeID,
-					failedNodeID,
-					myNodeID,
-				)
-				nodeIDsCopy set.Set[ids.NodeID]
+				nodeIDs        = set.Of(successNodeID, failedNodeID, myNodeID)
+				nodeIDsCopy    set.Set[ids.NodeID]
 			)
 			nodeIDsCopy.Union(nodeIDs)
 			snowCtx.Registerer = prometheus.NewRegistry()

@@ -87,10 +87,7 @@ var (
 		UnitTestHRP: UnitTestID,
 		LocalHRP:    LocalID,
 	}
-	ProductionNetworkIDs = set.Of(
-		MainnetID,
-		FujiID,
-	)
+	ProductionNetworkIDs = set.Of(MainnetID, FujiID)
 
 	ValidNetworkPrefix = "network-"
 
