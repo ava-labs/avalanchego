@@ -10,3 +10,11 @@ type Certificate struct {
 	PublicKey          any
 	SignatureAlgorithm x509.SignatureAlgorithm
 }
+
+func CertificateFromX509(cert *x509.Certificate) *Certificate {
+	return &Certificate{
+		Raw:                cert.Raw,
+		PublicKey:          cert.PublicKey,
+		SignatureAlgorithm: cert.SignatureAlgorithm,
+	}
+}

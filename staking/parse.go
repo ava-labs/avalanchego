@@ -30,14 +30,6 @@ func ParseCertificate(der []byte) (*Certificate, error) {
 	return CertificateFromX509(cert), nil
 }
 
-func CertificateFromX509(cert *x509.Certificate) *Certificate {
-	return &Certificate{
-		Raw:                cert.Raw,
-		PublicKey:          cert.PublicKey,
-		SignatureAlgorithm: cert.SignatureAlgorithm,
-	}
-}
-
 var (
 	// RFC 3279, 2.3 Public Key Algorithms
 	//
