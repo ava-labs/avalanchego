@@ -61,6 +61,13 @@ func connToIDAndCert(conn *tls.Conn) (ids.NodeID, net.Conn, *staking.Certificate
 	if len(state.PeerCertificates) == 0 {
 		return ids.NodeID{}, nil, nil, errNoCert
 	}
-	peerCert := staking.CertificateFromX509(state.PeerCertificates[0])
-	return ids.NodeIDFromCert(peerCert), conn, peerCert, nil
+
+	tlsCert := state.PeerCertificates[0]
+	peerCert, err := staking.ParseCertificate(tlsCert.Raw)
+	if err != nil {
+		return ids.NodeID{}, nil, nil, errNoCert
+	}
+
+	nodeID := ids.NodeIDFromCert(peerCert)
+	return nodeID, conn, peerCert, nil
 }
