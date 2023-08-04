@@ -363,25 +363,29 @@ func (c *genericCodec) marshal(value reflect.Value, p *wrappers.Packer, maxSlice
 				maxSliceLen,
 			)
 		}
-		p.PackInt(uint32(numElts)) // pack # elements, if map is not nil
+		p.PackInt(uint32(numElts)) // pack # elements
 		if p.Err != nil {
 			return p.Err
 		}
 
+		// pack key-value pairs sorted by increasing key
 		type keyTuple struct {
 			key   reflect.Value
 			bytes []byte
 		}
 
 		sortedKeys := make([]keyTuple, len(keys))
-
 		for i, key := range keys {
+			// Note this [p] shadows the outer [p]
 			p := wrappers.Packer{
 				MaxSize: int(c.maxSliceLen),
 				Bytes:   make([]byte, 0, 128),
 			}
 			if err := c.marshal(key, &p, c.maxSliceLen); err != nil {
 				return err
+			}
+			if p.Err != nil {
+				return fmt.Errorf("couldn't marshal map key %+v: %w ", key, p.Err)
 			}
 			sortedKeys[i] = keyTuple{
 				key:   key,
@@ -394,13 +398,13 @@ func (c *genericCodec) marshal(value reflect.Value, p *wrappers.Packer, maxSlice
 		})
 
 		for _, key := range sortedKeys {
-			// serialize key
+			// pack key
 			p.PackFixedBytes(key.bytes)
 			if p.Err != nil {
 				return p.Err
 			}
 
-			// serialize value
+			// serialize and pack value
 			if err := c.marshal(value.MapIndex(key.key), p, c.maxSliceLen); err != nil {
 				return err
 			}
@@ -607,44 +611,46 @@ func (c *genericCodec) unmarshal(p *wrappers.Packer, value reflect.Value, maxSli
 			)
 		}
 
-		numElts := int(numElts32)
-		valueTypeReflection := value.Type()
-		mapKeyType := valueTypeReflection.Key()
-		mapValueType := valueTypeReflection.Elem()
+		var (
+			numElts      = int(numElts32)
+			mapType      = value.Type()
+			mapKeyType   = mapType.Key()
+			mapValueType = mapType.Elem()
+			prevKey      []byte
+		)
 
-		value.Set(reflect.MakeMapWithSize(valueTypeReflection, numElts))
-
-		var lastKey []byte
+		// Set [value] to be a new map of the appropriate type.
+		value.Set(reflect.MakeMapWithSize(mapType, numElts))
 
 		for i := 0; i < numElts; i++ {
 			mapKey := reflect.New(mapKeyType).Elem()
-			mapValue := reflect.New(mapValueType).Elem()
 
-			keyStartPosition := p.Offset
+			keyStartOffset := p.Offset
 
 			if err := c.unmarshal(p, mapKey, c.maxSliceLen); err != nil {
 				return fmt.Errorf("couldn't unmarshal map key (%s): %w", mapKeyType, err)
 			}
 
-			// Get the key value from the slice of bytes and make sure, to be
-			// used in the next statement, if lastKey is available, and check
-			// the new key is actually bigger (according to bytes.Compare) than
+			// Get the key's byte representation and check that the new key
+			// is actually bigger (according to bytes.Compare) than
 			// the previous key.
 			//
-			// The reasoning is to discard any unsorted key, because the part of
-			// the serialization spec is to sort map keys before serializing,
-			// for consistency.
+			// We do this to enforce that key-value pairs are sorted by increasing key.
 			//
 			// See for context: https://github.com/ava-labs/avalanchego/pull/1790#discussion_r1283656558
-			keyBytes := p.Bytes[keyStartPosition:p.Offset]
-			if lastKey != nil && bytes.Compare(keyBytes, lastKey) < 0 {
-				return fmt.Errorf("keys are in the incorrect order (%s, %s)", lastKey, mapKey)
+			keyBytes := p.Bytes[keyStartOffset:p.Offset]
+			if i != 0 && bytes.Compare(keyBytes, prevKey) <= 0 {
+				return fmt.Errorf("keys aren't sorted: (%s, %s)", prevKey, mapKey)
 			}
-			lastKey = keyBytes
+			prevKey = keyBytes
 
+			// Get the value
+			mapValue := reflect.New(mapValueType).Elem()
 			if err := c.unmarshal(p, mapValue, c.maxSliceLen); err != nil {
 				return fmt.Errorf("couldn't unmarshal map value for key %s: %w", mapKey, err)
 			}
+
+			// Assign the key-value pair in the map
 			value.SetMapIndex(mapKey, mapValue)
 		}
 
