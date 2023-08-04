@@ -19,25 +19,10 @@ const MaxRSAKeyBitLen = 8192
 
 var ErrInvalidPublicKey = errors.New("invalid public key")
 
-func CheckSignature(cert *Certificate, message []byte, signature []byte) error {
-	if pk, ok := cert.PublicKey.(*rsa.PublicKey); ok {
-		if bitLen := pk.N.BitLen(); bitLen > MaxRSAKeyBitLen {
-			return fmt.Errorf("%w: bitLen=%d > maxBitLen=%d", ErrInvalidPublicKey, bitLen, MaxRSAKeyBitLen)
-		}
-	}
-
-	return checkSignature(
-		cert.SignatureAlgorithm,
-		message,
-		signature,
-		cert.PublicKey,
-	)
-}
-
-// checkSignature verifies that signature is a valid signature over signed from
-// a crypto.PublicKey.
-func checkSignature(algo x509.SignatureAlgorithm, signed, signature []byte, publicKey crypto.PublicKey) error {
-	details, ok := signatureAlgorithmVerificationDetails[algo]
+// CheckSignature verifies that the signature is a valid signature over signed
+// from the certificate.
+func CheckSignature(cert *Certificate, signed []byte, signature []byte) error {
+	details, ok := signatureAlgorithmVerificationDetails[cert.SignatureAlgorithm]
 	if !ok {
 		return x509.ErrUnsupportedAlgorithm
 	}
@@ -45,29 +30,22 @@ func checkSignature(algo x509.SignatureAlgorithm, signed, signature []byte, publ
 	hashType := details.hash
 	pubKeyAlgo := details.pubKeyAlgo
 
-	switch hashType {
-	case crypto.Hash(0):
-		if pubKeyAlgo != x509.Ed25519 {
-			return x509.ErrUnsupportedAlgorithm
-		}
-	case crypto.MD5:
-		return x509.InsecureAlgorithmError(algo)
-	default:
-		if !hashType.Available() {
-			return x509.ErrUnsupportedAlgorithm
-		}
+	if hashType != crypto.Hash(0) {
 		h := hashType.New()
 		// TODO: should we handle this error?
 		_, _ = h.Write(signed)
 		signed = h.Sum(nil)
 	}
 
-	switch pub := publicKey.(type) {
+	switch pub := cert.PublicKey.(type) {
 	case *rsa.PublicKey:
 		if pubKeyAlgo != x509.RSA {
 			return signaturePublicKeyAlgoMismatchError(pubKeyAlgo, pub)
 		}
-		if isRSAPSS(algo) {
+		if bitLen := pub.N.BitLen(); bitLen > MaxRSAKeyBitLen {
+			return fmt.Errorf("%w: bitLen=%d > maxBitLen=%d", ErrInvalidPublicKey, bitLen, MaxRSAKeyBitLen)
+		}
+		if isRSAPSS(cert.SignatureAlgorithm) {
 			return rsa.VerifyPSS(pub, hashType, signed, signature, &rsa.PSSOptions{SaltLength: rsa.PSSSaltLengthEqualsHash})
 		}
 		return rsa.VerifyPKCS1v15(pub, hashType, signed, signature)
