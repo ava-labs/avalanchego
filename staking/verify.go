@@ -37,15 +37,13 @@ func CheckSignature(cert *Certificate, message []byte, signature []byte) error {
 // checkSignature verifies that signature is a valid signature over signed from
 // a crypto.PublicKey.
 func checkSignature(algo x509.SignatureAlgorithm, signed, signature []byte, publicKey crypto.PublicKey) error {
-	var hashType crypto.Hash
-	var pubKeyAlgo x509.PublicKeyAlgorithm
-
-	for _, details := range signatureAlgorithmDetails {
-		if details.algo == algo {
-			hashType = details.hash
-			pubKeyAlgo = details.pubKeyAlgo
-		}
+	details, ok := signatureAlgorithmVerificationDetails[algo]
+	if !ok {
+		return x509.ErrUnsupportedAlgorithm
 	}
+
+	hashType := details.hash
+	pubKeyAlgo := details.pubKeyAlgo
 
 	switch hashType {
 	case crypto.Hash(0):
