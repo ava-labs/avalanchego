@@ -69,8 +69,7 @@ func sendRangeRequest(
 	deadline := time.Now().Add(1 * time.Hour) // enough time to complete a request
 	defer cancel()                            // avoid leaking a goroutine
 
-	expectedSendNodeIDs := set.NewSet[ids.NodeID](1)
-	expectedSendNodeIDs.Add(serverNodeID)
+	expectedSendNodeIDs := set.Of(serverNodeID)
 	sender.EXPECT().SendAppRequest(
 		gomock.Any(),        // ctx
 		expectedSendNodeIDs, // {serverNodeID}
@@ -329,8 +328,7 @@ func sendChangeRequest(
 	deadline := time.Now().Add(1 * time.Hour) // enough time to complete a request
 	defer cancel()                            // avoid leaking a goroutine
 
-	expectedSendNodeIDs := set.NewSet[ids.NodeID](1)
-	expectedSendNodeIDs.Add(serverNodeID)
+	expectedSendNodeIDs := set.Of(serverNodeID)
 	sender.EXPECT().SendAppRequest(
 		gomock.Any(),        // ctx
 		expectedSendNodeIDs, // {serverNodeID}
