@@ -5,6 +5,7 @@ package merkledb
 
 import (
 	"bytes"
+
 	"golang.org/x/exp/slices"
 )
 
