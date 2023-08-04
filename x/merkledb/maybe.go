@@ -70,3 +70,10 @@ func MaybeBytesEquals(a, b Maybe[[]byte]) bool {
 
 	return bytes.Equal(a.Value(), b.Value())
 }
+
+func BindMaybe[T, U any](m Maybe[T], f func(T) U) Maybe[U] {
+	if m.IsNothing() {
+		return Nothing[U]()
+	}
+	return Some(f(m.Value()))
+}

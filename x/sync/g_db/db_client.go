@@ -16,6 +16,13 @@ import (
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
+func MaybeBytesToMaybe(mb *pb.MaybeBytes) merkledb.Maybe[[]byte] {
+	if mb != nil && !mb.IsNothing {
+		return merkledb.Some(mb.Value)
+	}
+	return merkledb.Nothing[[]byte]()
+}
+
 var _ sync.DB = (*DBClient)(nil)
 
 func NewDBClient(client pb.DBClient) *DBClient {
@@ -39,14 +46,14 @@ func (c *DBClient) GetChangeProof(
 	startRootID ids.ID,
 	endRootID ids.ID,
 	startKey []byte,
-	endKey []byte,
+	endKey merkledb.Maybe[[]byte],
 	keyLimit int,
 ) (*merkledb.ChangeProof, error) {
 	resp, err := c.client.GetChangeProof(ctx, &pb.GetChangeProofRequest{
 		StartRootHash: startRootID[:],
 		EndRootHash:   endRootID[:],
 		StartKey:      startKey,
-		EndKey:        endKey,
+		EndKey:        &pb.MaybeBytes{IsNothing: endKey.IsNothing(), Value: endKey.Value()},
 		KeyLimit:      uint32(keyLimit),
 	})
 	if err != nil {
@@ -109,13 +116,13 @@ func (c *DBClient) GetRangeProofAtRoot(
 	ctx context.Context,
 	rootID ids.ID,
 	startKey []byte,
-	endKey []byte,
+	endKey merkledb.Maybe[[]byte],
 	keyLimit int,
 ) (*merkledb.RangeProof, error) {
 	resp, err := c.client.GetRangeProof(ctx, &pb.GetRangeProofRequest{
 		RootHash: rootID[:],
 		StartKey: startKey,
-		EndKey:   endKey,
+		EndKey:   &pb.MaybeBytes{IsNothing: endKey.IsNothing(), Value: endKey.Value()},
 		KeyLimit: uint32(keyLimit),
 	})
 	if err != nil {
