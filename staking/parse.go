@@ -374,11 +374,11 @@ func parsePublicKey(keyData *publicKeyInfo) (any, error) {
 		return pub, nil
 	case oid.Equal(oidPublicKeyECDSA):
 		paramsDer := cryptobyte.String(params.FullBytes)
-		namedCurveOID := new(asn1.ObjectIdentifier)
-		if !paramsDer.ReadASN1ObjectIdentifier(namedCurveOID) {
+		var namedCurveOID asn1.ObjectIdentifier
+		if !paramsDer.ReadASN1ObjectIdentifier(&namedCurveOID) {
 			return nil, errors.New("x509: invalid ECDSA parameters")
 		}
-		namedCurve := namedCurveFromOID(*namedCurveOID)
+		namedCurve := namedCurveFromOID(namedCurveOID)
 		if namedCurve == nil {
 			return nil, errors.New("x509: unsupported elliptic curve")
 		}
@@ -386,12 +386,11 @@ func parsePublicKey(keyData *publicKeyInfo) (any, error) {
 		if x == nil {
 			return nil, errors.New("x509: failed to unmarshal elliptic curve point")
 		}
-		pub := &ecdsa.PublicKey{
+		return &ecdsa.PublicKey{
 			Curve: namedCurve,
 			X:     x,
 			Y:     y,
-		}
-		return pub, nil
+		}, nil
 
 		// TODO: Since we don't allow verification of DSA signatures, we don't
 		// need to be able to parse DSA public keys right?
