@@ -614,13 +614,33 @@ func (c *genericCodec) unmarshal(p *wrappers.Packer, value reflect.Value, maxSli
 
 		value.Set(reflect.MakeMapWithSize(valueTypeReflection, numElts))
 
+		var lastKey []byte
+
 		for i := 0; i < numElts; i++ {
 			mapKey := reflect.New(mapKeyType).Elem()
 			mapValue := reflect.New(mapValueType).Elem()
 
+			keyStartPosition := p.Offset
+
 			if err := c.unmarshal(p, mapKey, c.maxSliceLen); err != nil {
 				return fmt.Errorf("couldn't unmarshal map key (%s): %w", mapKeyType, err)
 			}
+
+			// Get the key value from the slice of bytes and make sure, to be
+			// used in the next statement, if lastKey is available, and check
+			// the new key is actually bigger (according to bytes.Compare) than
+			// the previous key.
+			//
+			// The reasoning is to discard any unsorted key, because the part of
+			// the serialization spec is to sort map keys before serializing,
+			// for consistency.
+			//
+			// See for context: https://github.com/ava-labs/avalanchego/pull/1790#discussion_r1283656558
+			keyBytes := p.Bytes[keyStartPosition:p.Offset]
+			if lastKey != nil && bytes.Compare(keyBytes, lastKey) < 0 {
+				return fmt.Errorf("keys are in the incorrect order (%s, %s)", lastKey, mapKey)
+			}
+			lastKey = keyBytes
 
 			if err := c.unmarshal(p, mapValue, c.maxSliceLen); err != nil {
 				return fmt.Errorf("couldn't unmarshal map value for key %s: %w", mapKey, err)
