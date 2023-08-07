@@ -5,6 +5,7 @@ package sync
 
 import (
 	"context"
+	"github.com/ava-labs/avalanchego/database"
 	"math/rand"
 	"testing"
 	"time"
@@ -155,10 +156,8 @@ func Test_Server_GetChangeProof(t *testing.T) {
 	require.NoError(t, err)
 
 	// create changes
+	ops := make([]database.BatchOp, 0, 600)
 	for x := 0; x < 600; x++ {
-		view, err := trieDB.NewView()
-		require.NoError(t, err)
-
 		key := make([]byte, r.Intn(100))
 		_, err = r.Read(key)
 		require.NoError(t, err)
@@ -167,7 +166,7 @@ func Test_Server_GetChangeProof(t *testing.T) {
 		_, err = r.Read(val)
 		require.NoError(t, err)
 
-		require.NoError(t, view.Insert(context.Background(), key, val))
+		ops = append(ops, database.BatchOp{Key: key, Value: val})
 
 		deleteKeyStart := make([]byte, r.Intn(10))
 		_, err = r.Read(deleteKeyStart)
@@ -175,11 +174,13 @@ func Test_Server_GetChangeProof(t *testing.T) {
 
 		it := trieDB.NewIteratorWithStart(deleteKeyStart)
 		if it.Next() {
-			require.NoError(t, view.Remove(context.Background(), it.Key()))
+			ops = append(ops, database.BatchOp{Key: it.Key(), Delete: true})
 		}
 		require.NoError(t, it.Error())
 		it.Release()
 
+		view, err := trieDB.NewView(ops)
+		require.NoError(t, err)
 		require.NoError(t, view.CommitToDB(context.Background()))
 	}
 
