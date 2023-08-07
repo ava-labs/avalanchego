@@ -202,11 +202,8 @@ func (n *LocalNode) Start(w io.Writer, defaultExecPath string) error {
 		return fmt.Errorf("failed to start local node: %w", err)
 	}
 
-	if _, err := fmt.Fprintf(w, "Started %s\n", n.NodeID); err != nil {
-		return err
-	}
-
-	return nil
+	_, err = fmt.Fprintf(w, "Started %s\n", n.NodeID)
+	return err
 }
 
 // Retrieve the node process if it is running. As part of determining
