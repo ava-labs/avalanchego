@@ -71,6 +71,8 @@ func MaybeBytesEquals(a, b Maybe[[]byte]) bool {
 	return bytes.Equal(a.Value(), b.Value())
 }
 
+// If [m] is Nothing, returns Nothing.
+// Otherwise applies [f] to the value of [m] and returns the result as a Some.
 func BindMaybe[T, U any](m Maybe[T], f func(T) U) Maybe[U] {
 	if m.IsNothing() {
 		return Nothing[U]()
