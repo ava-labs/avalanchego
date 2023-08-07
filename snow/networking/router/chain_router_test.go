@@ -690,8 +690,6 @@ func TestRouterTimeout(t *testing.T) {
 
 func TestRouterHonorsRequestedEngine(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	require := require.New(t)
 
 	// Create a timeout manager
@@ -1441,9 +1439,7 @@ func TestRouterCrossChainMessages(t *testing.T) {
 
 func TestConnectedSubnet(t *testing.T) {
 	require := require.New(t)
-
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	tm, err := timeout.NewManager(
 		&timer.AdaptiveTimeoutConfig{
@@ -1606,8 +1602,7 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 
 	ctx := snow.DefaultConsensusContextTest()
 	allowedID := ids.GenerateTestNodeID()
-	allowedSet := set.NewSet[ids.NodeID](1)
-	allowedSet.Add(allowedID)
+	allowedSet := set.Of(allowedID)
 	sb := subnets.New(ctx.NodeID, subnets.Config{ValidatorOnly: true, AllowedNodes: allowedSet})
 
 	vdrs := validators.NewSet()

@@ -19,7 +19,6 @@ import (
 func TestLockedCalculator(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	lc := NewLockedCalculator()
 	require.NotNil(lc)

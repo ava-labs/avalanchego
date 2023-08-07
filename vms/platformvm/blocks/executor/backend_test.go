@@ -20,7 +20,6 @@ import (
 func TestGetState(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	var (
 		mockState     = state.NewMockState(ctrl)
@@ -71,7 +70,6 @@ func TestGetState(t *testing.T) {
 func TestBackendGetBlock(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	var (
 		blkID1       = ids.GenerateTestID()
@@ -150,7 +148,6 @@ func TestGetTimestamp(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 
 			backend := tt.backendF(ctrl)
 			gotTimestamp := backend.getTimestamp(blkID)

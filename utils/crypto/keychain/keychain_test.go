@@ -19,7 +19,6 @@ var errTest = errors.New("test")
 func TestNewLedgerKeychain(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	addr := ids.GenerateTestShortID()
 
@@ -50,7 +49,6 @@ func TestNewLedgerKeychain(t *testing.T) {
 func TestLedgerKeychain_Addresses(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	addr1 := ids.GenerateTestShortID()
 	addr2 := ids.GenerateTestShortID()
@@ -82,7 +80,6 @@ func TestLedgerKeychain_Addresses(t *testing.T) {
 func TestLedgerKeychain_Get(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	addr1 := ids.GenerateTestShortID()
 	addr2 := ids.GenerateTestShortID()
@@ -126,7 +123,6 @@ func TestLedgerKeychain_Get(t *testing.T) {
 func TestLedgerSigner_SignHash(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	addr1 := ids.GenerateTestShortID()
 	addr2 := ids.GenerateTestShortID()
@@ -210,7 +206,6 @@ func TestLedgerSigner_SignHash(t *testing.T) {
 func TestNewLedgerKeychainFromIndices(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	addr := ids.GenerateTestShortID()
 	_ = addr
@@ -242,7 +237,6 @@ func TestNewLedgerKeychainFromIndices(t *testing.T) {
 func TestLedgerKeychainFromIndices_Addresses(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	addr1 := ids.GenerateTestShortID()
 	addr2 := ids.GenerateTestShortID()
@@ -302,7 +296,6 @@ func TestLedgerKeychainFromIndices_Addresses(t *testing.T) {
 func TestLedgerKeychainFromIndices_Get(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	addr1 := ids.GenerateTestShortID()
 	addr2 := ids.GenerateTestShortID()
@@ -348,7 +341,6 @@ func TestLedgerKeychainFromIndices_Get(t *testing.T) {
 func TestLedgerSignerFromIndices_SignHash(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	addr1 := ids.GenerateTestShortID()
 	addr2 := ids.GenerateTestShortID()
