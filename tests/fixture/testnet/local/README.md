@@ -112,7 +112,7 @@ network, _ := local.StartNetwork(
 )
 ```
 
-Further examples of use code-based usage are located in the [e2e
+Further examples of code-based usage are located in the [e2e
 tests](../../../e2e/e2e_test.go).
 
 ## Networking configuration
