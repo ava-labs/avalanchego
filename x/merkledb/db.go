@@ -656,8 +656,8 @@ func (db *merkleDB) GetChangeProof(
 // Changes made to the view will only be reflected in the original trie if Commit is called.
 // Assumes [db.commitLock] isn't held.
 func (db *merkleDB) NewView(batchOps []database.BatchOp) (TrieView, error) {
-	db.commitLock.RLock()
-	defer db.commitLock.RUnlock()
+	db.commitLock.Lock()
+	defer db.commitLock.Unlock()
 
 	newView, err := db.newUntrackedView(batchOps)
 	if err != nil {

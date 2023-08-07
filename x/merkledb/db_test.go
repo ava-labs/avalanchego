@@ -827,12 +827,13 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 				&mockMetrics{},
 			)
 			require.NoError(err)
-			newView, err := dbTrie.NewView(nil)
-			require.NoError(err)
-			newViewAsTrieView := newView.(*trieView)
+			ops := make([]database.BatchOp, 0, len(values))
 			for key, value := range values {
-				require.NoError(newViewAsTrieView.insert(key.Serialize().Value, value))
+				ops = append(ops, database.BatchOp{Key: key.Serialize().Value, Value: value})
 			}
+			newView, err := dbTrie.NewView(ops)
+			require.NoError(err)
+
 			calculatedRoot, err := newView.GetMerkleRoot(context.Background())
 			require.NoError(err)
 			dbRoot, err := db.GetMerkleRoot(context.Background())

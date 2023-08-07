@@ -789,14 +789,15 @@ func Test_Trie_MultipleStates(t *testing.T) {
 
 			initialSet := 1000
 			// Populate initial set of keys
-			root, err := db.NewView(nil)
+			ops := make([]database.BatchOp, 0, initialSet)
 			require.NoError(err)
 			kv := [][]byte{}
 			for i := 0; i < initialSet; i++ {
 				k := []byte(strconv.Itoa(i))
 				kv = append(kv, k)
-				require.NoError(root.(*trieView).insert(k, hashing.ComputeHash256(k)))
+				ops = append(ops, database.BatchOp{Key: k, Value: hashing.ComputeHash256(k)})
 			}
+			root, err := db.NewView(ops)
 
 			// Get initial root
 			_, err = root.GetMerkleRoot(context.Background())
@@ -820,19 +821,20 @@ func Test_Trie_MultipleStates(t *testing.T) {
 
 			// Process ops
 			newStart := initialSet
+			concurrentOps := make([][]database.BatchOp, len(concurrentStates))
 			for i := 0; i < 100; i++ {
 				if r.Intn(100) < 20 {
 					// New Key
-					for _, state := range concurrentStates {
+					for index := range concurrentStates {
 						k := []byte(strconv.Itoa(newStart))
-						require.NoError(state.(*trieView).insert(k, hashing.ComputeHash256(k)))
+						concurrentOps[index] = append(concurrentOps[index], database.BatchOp{Key: k, Value: hashing.ComputeHash256(k)})
 					}
 					newStart++
 				} else {
 					// Fetch and update old
 					selectedKey := kv[r.Intn(len(kv))]
 					var pastV []byte
-					for _, state := range concurrentStates {
+					for index, state := range concurrentStates {
 						v, err := state.GetValue(context.Background(), selectedKey)
 						require.NoError(err)
 						if pastV == nil {
@@ -840,9 +842,13 @@ func Test_Trie_MultipleStates(t *testing.T) {
 						} else {
 							require.Equal(pastV, v)
 						}
-						require.NoError(state.(*trieView).insert(selectedKey, hashing.ComputeHash256(v)))
+						concurrentOps[index] = append(concurrentOps[index], database.BatchOp{Key: selectedKey, Value: hashing.ComputeHash256(v)})
 					}
 				}
+			}
+			for index, state := range concurrentStates {
+				concurrentStates[index], err = state.NewView(concurrentOps[index])
+				require.NoError(err)
 			}
 
 			// Generate roots
