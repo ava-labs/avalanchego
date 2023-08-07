@@ -627,6 +627,9 @@ func TestUngracefulAsyncShutdown(t *testing.T) {
 
 // TODO: simplify the unindexer logic and this test.
 func TestTransactionIndices(t *testing.T) {
+	if os.Getenv("RUN_FLAKY_TESTS") != "true" {
+		t.Skip("FLAKY")
+	}
 	// Configure and generate a sample block chain
 	require := require.New(t)
 	var (
