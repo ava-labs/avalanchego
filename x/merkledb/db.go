@@ -589,7 +589,7 @@ func (db *merkleDB) GetChangeProof(
 
 	// Since we hold [db.commitlock] we must still have sufficient
 	// history to recreate the trie at [endRootID].
-	historicalView, err := db.getHistoricalViewForRange(endRootID, start, largestKey)
+	historicalView, err := db.getHistoricalViewForRange(endRootID, start, largestKey.Value())
 	if err != nil {
 		return nil, err
 	}

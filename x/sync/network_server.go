@@ -183,7 +183,6 @@ func (s *NetworkServer) HandleChangeProofRequest(
 		if err != nil {
 			return err
 		}
-
 		changeProof, err := s.db.GetChangeProof(ctx, startRoot, endRoot, req.StartKey, end, int(keyLimit))
 		if err != nil {
 			// handle expected errors so clients cannot cause servers to spam warning logs.
@@ -263,7 +262,6 @@ func (s *NetworkServer) HandleRangeProofRequest(
 		if err != nil {
 			return err
 		}
-
 		rangeProof, err := s.db.GetRangeProofAtRoot(ctx, root, req.StartKey, end, int(keyLimit))
 		if err != nil {
 			// handle expected errors so clients cannot cause servers to spam warning logs.
