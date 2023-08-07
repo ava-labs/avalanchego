@@ -104,7 +104,8 @@ type myStruct struct {
 	MyMap1       map[string]string          `serialize:"true"`
 	MyMap2       map[int32][]MyInnerStruct3 `serialize:"true"`
 	MyMap3       map[MyInnerStruct2][]int32 `serialize:"true"`
-	MyMap4       map[int32]int32            `serialize:"true"`
+	MyMap4       map[int32]*int32           `serialize:"true"`
+	MyMap5       map[int32]int32            `serialize:"true"`
 }
 
 // Test marshaling/unmarshaling a complicated struct
@@ -115,6 +116,12 @@ func TestStruct(codec GeneralCodec, t testing.TB) {
 	myMap3 := make(map[MyInnerStruct2][]int32)
 	myMap3[MyInnerStruct2{false}] = []int32{991, 12}
 	myMap3[MyInnerStruct2{true}] = []int32{1911, 1921}
+
+	myMap4 := make(map[int32]*int32)
+	zero := int32(0)
+	one := int32(1)
+	myMap4[0] = &zero
+	myMap4[1] = &one
 
 	myStructInstance := myStruct{
 		InnerStruct:  MyInnerStruct{"hello"},
@@ -177,6 +184,7 @@ func TestStruct(codec GeneralCodec, t testing.TB) {
 			},
 		},
 		MyMap3: myMap3,
+		MyMap4: myMap4,
 	}
 
 	manager := NewDefaultManager()
@@ -198,8 +206,8 @@ func TestStruct(codec GeneralCodec, t testing.TB) {
 
 	// In myStructInstance MyMap4 is nil and in myStructUnmarshaled MyMap4 is an
 	// empty map
-	require.Zero(len(myStructUnmarshaled.MyMap4))
-	myStructUnmarshaled.MyMap4 = nil
+	require.Zero(len(myStructUnmarshaled.MyMap5))
+	myStructUnmarshaled.MyMap5 = nil
 
 	require.Zero(version)
 	require.Equal(myStructInstance, *myStructUnmarshaled)
