@@ -689,7 +689,7 @@ func midPoint(start []byte, end merkledb.Maybe[[]byte]) []byte {
 		if end.IsNothing() {
 			return []byte{127}
 		} else if len(end.Value()) == 0 {
-			return end.Value()
+			return nil
 		}
 	}
 
