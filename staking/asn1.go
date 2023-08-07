@@ -10,6 +10,8 @@ import (
 	"fmt"
 
 	// Explicitly import these for their crypto.RegisterHash init side-effects.
+	//
+	// Ref: https://github.com/golang/go/blob/go1.19.12/src/crypto/x509/x509.go#L30-L34
 	_ "crypto/sha1"   // initializes SHA1
 	_ "crypto/sha256" // initializes SHA256
 	_ "crypto/sha512" // initializes SHA384 and SHA512
