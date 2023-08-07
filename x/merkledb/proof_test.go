@@ -1691,14 +1691,18 @@ func FuzzRangeProofInvariants(f *testing.F) {
 	f.Fuzz(func(
 		t *testing.T,
 		start []byte,
-		end []byte,
+		endBytes []byte,
 		maxProofLen uint,
 	) {
 		require := require.New(t)
 
 		// Make sure proof bounds are valid
-		if len(end) != 0 && bytes.Compare(start, end) > 0 {
+		if len(endBytes) != 0 && bytes.Compare(start, endBytes) > 0 {
 			return
+		}
+		end := Nothing[[]byte]()
+		if len(endBytes) > 0 {
+			end = Some(endBytes)
 		}
 		// Make sure proof length is valid
 		if maxProofLen == 0 {
@@ -1708,7 +1712,7 @@ func FuzzRangeProofInvariants(f *testing.F) {
 		rangeProof, err := db.GetRangeProof(
 			context.Background(),
 			start,
-			Some(end),
+			end,
 			int(maxProofLen),
 		)
 		require.NoError(err)
@@ -1728,7 +1732,7 @@ func FuzzRangeProofInvariants(f *testing.F) {
 
 		// Make sure the EndProof invariant is maintained
 		switch {
-		case len(end) == 0:
+		case end.IsNothing():
 			if len(rangeProof.KeyValues) == 0 {
 				if len(rangeProof.StartProof) == 0 {
 					require.Len(rangeProof.EndProof, 1) // Just the root
@@ -1742,7 +1746,7 @@ func FuzzRangeProofInvariants(f *testing.F) {
 
 			// EndProof should be a proof for upper range bound.
 			value := Nothing[[]byte]()
-			upperRangeBoundVal, err := db.Get(end)
+			upperRangeBoundVal, err := db.Get(endBytes)
 			if err != nil {
 				require.ErrorIs(err, database.ErrNotFound)
 			} else {
@@ -1751,7 +1755,7 @@ func FuzzRangeProofInvariants(f *testing.F) {
 
 			proof := Proof{
 				Path:  rangeProof.EndProof,
-				Key:   end,
+				Key:   endBytes,
 				Value: value,
 			}
 
