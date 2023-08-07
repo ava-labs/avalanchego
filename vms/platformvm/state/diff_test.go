@@ -22,7 +22,6 @@ import (
 
 func TestDiffMissingState(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	versions := NewMockVersions(ctrl)
 
@@ -36,7 +35,6 @@ func TestDiffMissingState(t *testing.T) {
 func TestDiffCreation(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	lastAcceptedID := ids.GenerateTestID()
 	state, _ := newInitializedState(require)
@@ -51,7 +49,6 @@ func TestDiffCreation(t *testing.T) {
 func TestDiffCurrentSupply(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	lastAcceptedID := ids.GenerateTestID()
 	state, _ := newInitializedState(require)
@@ -79,7 +76,6 @@ func TestDiffCurrentSupply(t *testing.T) {
 func TestDiffCurrentValidator(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	lastAcceptedID := ids.GenerateTestID()
 	state := NewMockState(ctrl)
@@ -116,7 +112,6 @@ func TestDiffCurrentValidator(t *testing.T) {
 func TestDiffPendingValidator(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	lastAcceptedID := ids.GenerateTestID()
 	state := NewMockState(ctrl)
@@ -153,7 +148,6 @@ func TestDiffPendingValidator(t *testing.T) {
 func TestDiffCurrentDelegator(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	currentDelegator := &Staker{
 		TxID:     ids.GenerateTestID(),
@@ -202,7 +196,6 @@ func TestDiffCurrentDelegator(t *testing.T) {
 func TestDiffPendingDelegator(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	pendingDelegator := &Staker{
 		TxID:     ids.GenerateTestID(),
@@ -251,7 +244,6 @@ func TestDiffPendingDelegator(t *testing.T) {
 func TestDiffSubnet(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	state := NewMockState(ctrl)
 	state.EXPECT().GetTimestamp().Return(time.Now()) // Called in NewDiff
@@ -281,7 +273,6 @@ func TestDiffSubnet(t *testing.T) {
 func TestDiffChain(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	state := NewMockState(ctrl)
 	state.EXPECT().GetTimestamp().Return(time.Now()) // Called in NewDiff
@@ -320,7 +311,6 @@ func TestDiffChain(t *testing.T) {
 func TestDiffTx(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	state := NewMockState(ctrl)
 	state.EXPECT().GetTimestamp().Return(time.Now()) // Called in NewDiff
@@ -370,7 +360,6 @@ func TestDiffTx(t *testing.T) {
 func TestDiffRewardUTXO(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	state := NewMockState(ctrl)
 	state.EXPECT().GetTimestamp().Return(time.Now()) // Called in NewDiff
@@ -415,7 +404,6 @@ func TestDiffRewardUTXO(t *testing.T) {
 func TestDiffUTXO(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	state := NewMockState(ctrl)
 	state.EXPECT().GetTimestamp().Return(time.Now()) // Called in NewDiff
