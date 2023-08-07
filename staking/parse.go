@@ -132,8 +132,7 @@ func ParseCertificate(der []byte) (*Certificate, error) {
 		return nil, err
 	}
 
-	// TODO: Does it make sense for us to allow someone to specify an unknown
-	// public key without erroring?
+	// Note: Unlike the x509 package, we require parsing the public key.
 
 	var spk asn1.BitString
 	if !input.ReadASN1BitString(&spk) {
