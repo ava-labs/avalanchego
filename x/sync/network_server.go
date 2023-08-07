@@ -164,7 +164,7 @@ func (s *NetworkServer) HandleChangeProofRequest(
 	if bytesLimit > maxByteSizeLimit {
 		bytesLimit = maxByteSizeLimit
 	}
-	end := MaybeBytesToMaybe(req.EndKey)
+	end := maybeBytesToMaybe(req.EndKey)
 
 	// attempt to get a proof within the bytes limit
 	for keyLimit > 0 {
@@ -249,7 +249,7 @@ func (s *NetworkServer) HandleRangeProofRequest(
 	if bytesLimit > maxByteSizeLimit {
 		bytesLimit = maxByteSizeLimit
 	}
-	end := MaybeBytesToMaybe(req.EndKey)
+	end := maybeBytesToMaybe(req.EndKey)
 
 	for keyLimit > 0 {
 		root, err := ids.ToID(req.RootHash)

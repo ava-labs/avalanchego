@@ -16,7 +16,7 @@ import (
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
-func MaybeBytesToMaybe(mb *pb.MaybeBytes) merkledb.Maybe[[]byte] {
+func maybeBytesToMaybe(mb *pb.MaybeBytes) merkledb.Maybe[[]byte] {
 	if mb != nil && !mb.IsNothing {
 		return merkledb.Some(mb.Value)
 	}

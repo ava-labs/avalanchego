@@ -57,7 +57,7 @@ func (s *DBServer) GetChangeProof(
 		startRootID,
 		endRootID,
 		req.StartKey,
-		MaybeBytesToMaybe(req.EndKey),
+		maybeBytesToMaybe(req.EndKey),
 		int(req.KeyLimit),
 	)
 	if err != nil {
@@ -126,7 +126,7 @@ func (s *DBServer) GetRangeProof(
 		return nil, err
 	}
 
-	proof, err := s.db.GetRangeProofAtRoot(ctx, rootID, req.StartKey, MaybeBytesToMaybe(req.EndKey), int(req.KeyLimit))
+	proof, err := s.db.GetRangeProofAtRoot(ctx, rootID, req.StartKey, maybeBytesToMaybe(req.EndKey), int(req.KeyLimit))
 	if err != nil {
 		return nil, err
 	}

@@ -39,7 +39,7 @@ var (
 	errTooManyBytes      = errors.New("response contains more than requested bytes")
 )
 
-func MaybeBytesToMaybe(mb *pb.MaybeBytes) merkledb.Maybe[[]byte] {
+func maybeBytesToMaybe(mb *pb.MaybeBytes) merkledb.Maybe[[]byte] {
 	if mb != nil && !mb.IsNothing {
 		return merkledb.Some(mb.Value)
 	}
