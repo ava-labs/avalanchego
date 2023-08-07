@@ -967,35 +967,33 @@ func TestMap(codec GeneralCodec, t testing.TB) {
 	manager := NewDefaultManager()
 	require.NoError(manager.RegisterCodec(0, codec))
 
-	bytes1, err := manager.Marshal(0, data1)
+	data1Bytes, err := manager.Marshal(0, data1)
 	require.NoError(err)
 
-	// data1 and data2, although the data has a different order, should be
-	// serialized using the same bytes. This will allow the serialized data to
-	// be used safely to hash data, to be used by nodes to exchange hashes and
-	// only request the whole data when the hash is not different than expected
-	bytes2, err := manager.Marshal(0, data2)
+	// data1 and data2 should have the same byte representation even though
+	// their key-value pairs were defined in a different order.
+	data2Bytes, err := manager.Marshal(0, data2)
 	require.NoError(err)
-	require.Equal(bytes1, bytes2)
+	require.Equal(data1Bytes, data2Bytes)
 
-	bytesLen, err := manager.Size(0, data1)
+	data1Size, err := manager.Size(0, data1)
 	require.NoError(err)
-	require.Equal(len(bytes1), bytesLen)
+	require.Equal(len(data1Bytes), data1Size)
 
-	var output map[string]MyInnerStruct2
-	_, err = manager.Unmarshal(bytes1, &output)
+	var unmarshalledData1 map[string]MyInnerStruct2
+	_, err = manager.Unmarshal(data1Bytes, &unmarshalledData1)
 	require.NoError(err)
-	require.Equal(data1, output)
+	require.Equal(data1, unmarshalledData1)
 
-	bytes3, err := manager.Marshal(0, innerMap)
+	innerMapBytes, err := manager.Marshal(0, innerMap)
 	require.NoError(err)
 
-	bytesLen2, err := manager.Size(0, innerMap)
+	innerMapSize, err := manager.Size(0, innerMap)
 	require.NoError(err)
-	require.Equal(len(bytes3), bytesLen2)
+	require.Equal(len(innerMapBytes), innerMapSize)
 
-	var output1 map[int32]map[string]MyInnerStruct2
-	_, err = manager.Unmarshal(bytes3, &output1)
+	var unmarshalledInnerMap map[int32]map[string]MyInnerStruct2
+	_, err = manager.Unmarshal(innerMapBytes, &unmarshalledInnerMap)
 	require.NoError(err)
-	require.Equal(innerMap, output1)
+	require.Equal(innerMap, unmarshalledInnerMap)
 }
