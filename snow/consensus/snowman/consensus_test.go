@@ -106,7 +106,7 @@ func InitializeTest(t *testing.T, factory Factory) {
 	require.NoError(sm.Initialize(ctx, params, GenesisID, GenesisHeight, GenesisTimestamp))
 
 	require.Equal(GenesisID, sm.Preference())
-	require.True(sm.NumProcessing() > 0)
+	require.True(sm.NumProcessing() == 1)
 }
 
 // Make sure that the number of processing blocks is tracked correctly
