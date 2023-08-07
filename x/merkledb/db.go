@@ -264,7 +264,7 @@ func (db *merkleDB) rebuild(ctx context.Context) error {
 			return err
 		}
 
-		currentOps = append(currentOps, database.BatchOp{Key: path.Serialize().Value, Value: n.value.Value(), Delete: n.hasValue()})
+		currentOps = append(currentOps, database.BatchOp{Key: path.Serialize().Value, Value: n.value.Value(), Delete: !n.hasValue()})
 
 	}
 	if err := it.Error(); err != nil {
@@ -653,10 +653,10 @@ func (db *merkleDB) GetChangeProof(
 
 // NewView returns a new view on top of this trie.
 // Changes made to the view will only be reflected in the original trie if Commit is called.
-// Assumes [db.lock] isn't held.
+// Assumes [db.commitLock] isn't held.
 func (db *merkleDB) NewView(batchOps []database.BatchOp) (TrieView, error) {
-	db.lock.Lock()
-	defer db.lock.Unlock()
+	db.commitLock.RLock()
+	defer db.commitLock.RUnlock()
 
 	newView, err := db.newUntrackedView(batchOps)
 	if err != nil {

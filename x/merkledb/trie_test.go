@@ -270,40 +270,16 @@ func Test_Trie_InsertAndRetrieve(t *testing.T) {
 	require.NoError(err)
 	require.NotNil(dbTrie)
 
-	trieIntF := Trie(dbTrie)
-	trie := trieIntF.(*trieView)
-
 	// value hasn't been inserted so shouldn't exist
 	value, err := dbTrie.Get([]byte("key"))
 	require.ErrorIs(err, database.ErrNotFound)
 	require.Nil(value)
 
-	require.NoError(trie.insert([]byte("key"), []byte("value")))
+	require.NoError(dbTrie.Put([]byte("key"), []byte("value")))
 
-	value, err = getNodeValue(trie, "key")
+	value, err = getNodeValue(dbTrie, "key")
 	require.NoError(err)
 	require.Equal([]byte("value"), value)
-}
-
-func Test_Trie_Overwrite(t *testing.T) {
-	require := require.New(t)
-
-	dbTrie, err := getBasicDB()
-	require.NoError(err)
-	require.NotNil(dbTrie)
-	trieIntF := Trie(dbTrie)
-	trie := trieIntF.(*trieView)
-	require.NoError(trie.insert([]byte("key"), []byte("value0")))
-
-	value, err := getNodeValue(trie, "key")
-	require.NoError(err)
-	require.Equal([]byte("value0"), value)
-
-	require.NoError(trie.insert([]byte("key"), []byte("value1")))
-
-	value, err = getNodeValue(trie, "key")
-	require.NoError(err)
-	require.Equal([]byte("value1"), value)
 }
 
 func Test_Trie_Delete(t *testing.T) {
@@ -457,10 +433,12 @@ func Test_Trie_HashCountOnBranch(t *testing.T) {
 
 	// force a new node to generate with common prefix "key1" and have these two nodes as children
 	require.NoError(trie.insert([]byte("key12"), []byte("value12")))
+	trie.calculateNodeIDs(context.Background())
 	oldCount := dbTrie.metrics.(*mockMetrics).hashCount
 	require.NoError(trie.insert([]byte("key134"), []byte("value134")))
 	// only hashes the new branch node, the new child node, and root
 	// shouldn't hash the existing node
+	trie.calculateNodeIDs(context.Background())
 	require.Equal(oldCount+3, dbTrie.metrics.(*mockMetrics).hashCount)
 }
 
@@ -479,6 +457,7 @@ func Test_Trie_HashCountOnDelete(t *testing.T) {
 	require.NoError(err)
 	require.NotNil(trie)
 
+	require.NoError(trie.CommitToDB(context.Background()))
 	oldCount := dbTrie.metrics.(*mockMetrics).hashCount
 
 	// delete the middle values
