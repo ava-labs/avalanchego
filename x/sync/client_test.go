@@ -502,7 +502,7 @@ func TestGetChangeProof(t *testing.T) {
 				BytesLimit:    defaultRequestByteSizeLimit,
 			},
 			modifyResponse: func(response *merkledb.ChangeProof) {
-				response.KeyChanges = response.KeyChanges[2:]
+				response.KeyChanges = response.KeyChanges[1:]
 			},
 			expectedErr: merkledb.ErrInvalidProof,
 		},
