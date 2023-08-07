@@ -59,7 +59,7 @@ func main() {
 	startNetworkCmd := &cobra.Command{
 		Use:   "start-network",
 		Short: "Start a new local network",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(*cobra.Command, []string) error {
 			if len(execPath) == 0 {
 				return errAvalancheGoRequired
 			}
