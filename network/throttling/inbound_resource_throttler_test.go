@@ -23,8 +23,6 @@ import (
 
 func TestNewSystemThrottler(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	require := require.New(t)
 	reg := prometheus.NewRegistry()
 	clock := mockable.Clock{}
@@ -50,8 +48,6 @@ func TestNewSystemThrottler(t *testing.T) {
 
 func TestSystemThrottler(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	require := require.New(t)
 
 	// Setup
@@ -135,7 +131,6 @@ func TestSystemThrottler(t *testing.T) {
 func TestSystemThrottlerContextCancel(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	// Setup
 	mockTracker := tracker.NewMockTracker(ctrl)

@@ -82,8 +82,6 @@ func Test_Completion(t *testing.T) {
 	require := require.New(t)
 
 	for i := 0; i < 10; i++ {
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
 		emptyDB, err := merkledb.New(
 			context.Background(),
 			memdb.New(),
@@ -867,7 +865,6 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 func Test_Sync_Error_During_Sync(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)
 	r := rand.New(rand.NewSource(now)) // #nosec G404
@@ -920,7 +917,6 @@ func Test_Sync_Error_During_Sync(t *testing.T) {
 func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	for i := 0; i < 3; i++ {
 		now := time.Now().UnixNano()
@@ -1029,7 +1025,6 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 func Test_Sync_UpdateSyncTarget(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	m, err := NewManager(ManagerConfig{
 		DB:                    merkledb.NewMockMerkleDB(ctrl), // Not used

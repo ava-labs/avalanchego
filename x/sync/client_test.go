@@ -52,12 +52,12 @@ func sendRangeRequest(
 
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	sender := common.NewMockSender(ctrl)
 	handler := NewNetworkServer(sender, db, logging.NoLog{})
 	clientNodeID, serverNodeID := ids.GenerateTestNodeID(), ids.GenerateTestNodeID()
-	networkClient := NewNetworkClient(sender, clientNodeID, 1, logging.NoLog{})
+	networkClient, err := NewNetworkClient(sender, clientNodeID, 1, logging.NoLog{}, "", prometheus.NewRegistry())
+	require.NoError(err)
 	require.NoError(networkClient.Connected(context.Background(), serverNodeID, version.CurrentApp))
 	client := NewClient(&ClientConfig{
 		NetworkClient: networkClient,
@@ -69,8 +69,7 @@ func sendRangeRequest(
 	deadline := time.Now().Add(1 * time.Hour) // enough time to complete a request
 	defer cancel()                            // avoid leaking a goroutine
 
-	expectedSendNodeIDs := set.NewSet[ids.NodeID](1)
-	expectedSendNodeIDs.Add(serverNodeID)
+	expectedSendNodeIDs := set.Of(serverNodeID)
 	sender.EXPECT().SendAppRequest(
 		gomock.Any(),        // ctx
 		expectedSendNodeIDs, // {serverNodeID}
@@ -312,12 +311,12 @@ func sendChangeRequest(
 
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	sender := common.NewMockSender(ctrl)
 	handler := NewNetworkServer(sender, db, logging.NoLog{})
 	clientNodeID, serverNodeID := ids.GenerateTestNodeID(), ids.GenerateTestNodeID()
-	networkClient := NewNetworkClient(sender, clientNodeID, 1, logging.NoLog{})
+	networkClient, err := NewNetworkClient(sender, clientNodeID, 1, logging.NoLog{}, "", prometheus.NewRegistry())
+	require.NoError(err)
 	require.NoError(networkClient.Connected(context.Background(), serverNodeID, version.CurrentApp))
 	client := NewClient(&ClientConfig{
 		NetworkClient: networkClient,
@@ -329,8 +328,7 @@ func sendChangeRequest(
 	deadline := time.Now().Add(1 * time.Hour) // enough time to complete a request
 	defer cancel()                            // avoid leaking a goroutine
 
-	expectedSendNodeIDs := set.NewSet[ids.NodeID](1)
-	expectedSendNodeIDs.Add(serverNodeID)
+	expectedSendNodeIDs := set.Of(serverNodeID)
 	sender.EXPECT().SendAppRequest(
 		gomock.Any(),        // ctx
 		expectedSendNodeIDs, // {serverNodeID}
