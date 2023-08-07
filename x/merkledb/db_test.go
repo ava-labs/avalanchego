@@ -160,6 +160,7 @@ func Test_MerkleDB_DB_Rebuild(t *testing.T) {
 		ops = append(ops, database.BatchOp{Key: k, Value: hashing.ComputeHash256(k)})
 	}
 	view, err := db.NewView(ops)
+	require.NoError(err)
 	require.NoError(view.CommitToDB(context.Background()))
 
 	root, err := db.GetMerkleRoot(context.Background())

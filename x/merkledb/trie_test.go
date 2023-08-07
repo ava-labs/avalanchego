@@ -447,6 +447,7 @@ func Test_Trie_HashCountOnDelete(t *testing.T) {
 	require := require.New(t)
 
 	dbTrie, err := getBasicDB()
+	require.NoError(err)
 
 	trie, err := dbTrie.NewView([]database.BatchOp{
 		{Key: []byte("k"), Value: []byte("value0")},
@@ -735,6 +736,7 @@ func Test_Trie_NodeCollapse(t *testing.T) {
 		{Key: []byte("key1"), Value: []byte("value3")},
 		{Key: []byte("key2"), Value: []byte("value4")},
 	})
+	require.NoError(err)
 
 	require.NoError(trie.(*trieView).calculateNodeIDs(context.Background()))
 	root, err := trie.getEditableNode(EmptyPath)

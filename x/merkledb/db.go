@@ -265,7 +265,6 @@ func (db *merkleDB) rebuild(ctx context.Context) error {
 		}
 
 		currentOps = append(currentOps, database.BatchOp{Key: path.Serialize().Value, Value: n.value.Value(), Delete: !n.hasValue()})
-
 	}
 	if err := it.Error(); err != nil {
 		return err
