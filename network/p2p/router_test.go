@@ -85,7 +85,7 @@ func TestAppRequestResponse(t *testing.T) {
 					require.Nil(t, actualResponse)
 				}
 
-				require.NoError(t, client.AppRequest(context.Background(), set.Set[ids.NodeID]{nodeID: struct{}{}}, request, callback))
+				require.NoError(t, client.AppRequest(context.Background(), set.Of(nodeID), request, callback))
 			},
 		},
 		{
@@ -179,7 +179,7 @@ func TestAppRequestResponse(t *testing.T) {
 						return nil
 					})
 
-				require.NoError(t, client.AppGossipSpecific(context.Background(), set.Set[ids.NodeID]{nodeID: struct{}{}}, request))
+				require.NoError(t, client.AppGossipSpecific(context.Background(), set.Of(nodeID), request))
 			},
 		},
 	}
@@ -333,13 +333,13 @@ func TestAppRequestDuplicateRequestIDs(t *testing.T) {
 	client, err := router.RegisterAppProtocol(0x1, handler)
 	require.NoError(err)
 
-	require.NoError(client.AppRequest(context.Background(), set.Set[ids.NodeID]{nodeID: struct{}{}}, []byte{}, nil))
+	require.NoError(client.AppRequest(context.Background(), set.Of(nodeID), []byte{}, nil))
 	requestSent.Wait()
 
 	// force the router to use the same requestID
 	router.requestID = 0
 	timeout.Add(1)
-	err = client.AppRequest(context.Background(), set.Set[ids.NodeID]{nodeID: struct{}{}}, []byte{}, nil)
+	err = client.AppRequest(context.Background(), set.Of(nodeID), []byte{}, nil)
 	requestSent.Wait()
 	require.ErrorIs(err, ErrRequestPending)
 

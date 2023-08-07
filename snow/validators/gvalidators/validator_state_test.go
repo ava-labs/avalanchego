@@ -63,7 +63,6 @@ func setupState(t testing.TB, ctrl *gomock.Controller) *testState {
 func TestGetMinimumHeight(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	state := setupState(t, ctrl)
 	defer state.closeFn()
@@ -87,7 +86,6 @@ func TestGetMinimumHeight(t *testing.T) {
 func TestGetCurrentHeight(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	state := setupState(t, ctrl)
 	defer state.closeFn()
@@ -111,7 +109,6 @@ func TestGetCurrentHeight(t *testing.T) {
 func TestGetSubnetID(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	state := setupState(t, ctrl)
 	defer state.closeFn()
@@ -136,7 +133,6 @@ func TestGetSubnetID(t *testing.T) {
 func TestGetValidatorSet(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	state := setupState(t, ctrl)
 	defer state.closeFn()
@@ -214,7 +210,6 @@ func benchmarkGetValidatorSet(b *testing.B, vs map[ids.NodeID]*validators.GetVal
 	ctrl := gomock.NewController(b)
 	state := setupState(b, ctrl)
 	defer func() {
-		ctrl.Finish()
 		state.closeFn()
 	}()
 
