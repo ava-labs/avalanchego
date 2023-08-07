@@ -11,9 +11,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/stretchr/testify/require"
+
 	"golang.org/x/exp/maps"
+
+	"github.com/ava-labs/avalanchego/utils/maybe"
 )
 
 func Test_TrieView_Iterator(t *testing.T) {
