@@ -12,7 +12,6 @@ import (
 	// Explicitly import these for their crypto.RegisterHash init side-effects.
 	//
 	// Ref: https://github.com/golang/go/blob/go1.19.12/src/crypto/x509/x509.go#L30-L34
-	_ "crypto/sha1"   // initializes SHA1
 	_ "crypto/sha256" // initializes SHA256
 	_ "crypto/sha512" // initializes SHA384 and SHA512
 )
@@ -44,16 +43,6 @@ var (
 	//	pkcs-1 OBJECT IDENTIFIER ::= {
 	//		iso(1) member-body(2) us(840) rsadsi(113549) pkcs(1) 1 }
 	//
-	// RFC 3279 2.2.1 RSA Signature Algorithms
-	//
-	//	sha-1WithRSAEncryption OBJECT IDENTIFIER ::= { pkcs-1 5 }
-	//
-	// RFC 3279 2.2.3 ECDSA Signature Algorithm
-	//
-	//	ecdsa-with-SHA1 OBJECT IDENTIFIER ::= {
-	//		iso(1) member-body(2) us(840) ansi-x962(10045)
-	//		signatures(4) ecdsa-with-SHA1(1)}
-	//
 	// RFC 4055 5 PKCS #1 Version 1.5
 	//
 	//	sha256WithRSAEncryption OBJECT IDENTIFIER ::= { pkcs-1 11 }
@@ -76,12 +65,10 @@ var (
 	// RFC 8410 3 Curve25519 and Curve448 Algorithm Identifiers
 	//
 	//	id-Ed25519   OBJECT IDENTIFIER ::= { 1 3 101 112 }
-	oidSignatureSHA1WithRSA     = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 5}
 	oidSignatureSHA256WithRSA   = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 11}
 	oidSignatureSHA384WithRSA   = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 12}
 	oidSignatureSHA512WithRSA   = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 13}
 	oidSignatureRSAPSS          = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 10}
-	oidSignatureECDSAWithSHA1   = asn1.ObjectIdentifier{1, 2, 840, 10045, 4, 1}
 	oidSignatureECDSAWithSHA256 = asn1.ObjectIdentifier{1, 2, 840, 10045, 4, 3, 2}
 	oidSignatureECDSAWithSHA384 = asn1.ObjectIdentifier{1, 2, 840, 10045, 4, 3, 3}
 	oidSignatureECDSAWithSHA512 = asn1.ObjectIdentifier{1, 2, 840, 10045, 4, 3, 4}
@@ -93,25 +80,17 @@ var (
 
 	oidMGF1 = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 8}
 
-	// oidISOSignatureSHA1WithRSA means the same as oidSignatureSHA1WithRSA
-	// but it's specified by ISO. Microsoft's makecert.exe has been known
-	// to produce certificates with this OID.
-	oidISOSignatureSHA1WithRSA = asn1.ObjectIdentifier{1, 3, 14, 3, 2, 29}
-
 	// Ref: https://github.com/golang/go/blob/go1.19.12/src/crypto/x509/x509.go#L326-L350
 	signatureAlgorithmParsingDetails = []struct {
 		algo x509.SignatureAlgorithm
 		oid  asn1.ObjectIdentifier
 	}{
-		{x509.SHA1WithRSA, oidSignatureSHA1WithRSA},         // RSA-SHA1
-		{x509.SHA1WithRSA, oidISOSignatureSHA1WithRSA},      // RSA-SHA1
 		{x509.SHA256WithRSA, oidSignatureSHA256WithRSA},     // RSA-SHA256
 		{x509.SHA384WithRSA, oidSignatureSHA384WithRSA},     // RSA-SHA384
 		{x509.SHA512WithRSA, oidSignatureSHA512WithRSA},     // RSA-SHA512
 		{x509.SHA256WithRSAPSS, oidSignatureRSAPSS},         // RSAPSS-SHA256
 		{x509.SHA384WithRSAPSS, oidSignatureRSAPSS},         // RSAPSS-SHA384
 		{x509.SHA512WithRSAPSS, oidSignatureRSAPSS},         // RSAPSS-SHA512
-		{x509.ECDSAWithSHA1, oidSignatureECDSAWithSHA1},     // ECDSA-SHA1
 		{x509.ECDSAWithSHA256, oidSignatureECDSAWithSHA256}, // ECDSA-SHA256
 		{x509.ECDSAWithSHA384, oidSignatureECDSAWithSHA384}, // ECDSA-SHA384
 		{x509.ECDSAWithSHA512, oidSignatureECDSAWithSHA512}, // ECDSA-SHA512
@@ -122,14 +101,12 @@ var (
 		pubKeyAlgo x509.PublicKeyAlgorithm
 		hash       crypto.Hash
 	}{
-		x509.SHA1WithRSA:      {x509.RSA, crypto.SHA1},                             // RSA-SHA1
 		x509.SHA256WithRSA:    {x509.RSA, crypto.SHA256},                           // RSA-SHA256
 		x509.SHA384WithRSA:    {x509.RSA, crypto.SHA384},                           // RSA-SHA384
 		x509.SHA512WithRSA:    {x509.RSA, crypto.SHA512},                           // RSA-SHA512
 		x509.SHA256WithRSAPSS: {x509.RSA, crypto.SHA256},                           // RSAPSS-SHA256
 		x509.SHA384WithRSAPSS: {x509.RSA, crypto.SHA384},                           // RSAPSS-SHA384
 		x509.SHA512WithRSAPSS: {x509.RSA, crypto.SHA512},                           // RSAPSS-SHA512
-		x509.ECDSAWithSHA1:    {x509.ECDSA, crypto.SHA1},                           // ECDSA-SHA1
 		x509.ECDSAWithSHA256:  {x509.ECDSA, crypto.SHA256},                         // ECDSA-SHA256
 		x509.ECDSAWithSHA384:  {x509.ECDSA, crypto.SHA384},                         // ECDSA-SHA384
 		x509.ECDSAWithSHA512:  {x509.ECDSA, crypto.SHA512},                         // ECDSA-SHA512
@@ -162,7 +139,6 @@ var (
 
 func init() {
 	for _, hash := range []crypto.Hash{
-		crypto.SHA1,
 		crypto.SHA256,
 		crypto.SHA384,
 		crypto.SHA512,
