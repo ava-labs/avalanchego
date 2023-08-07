@@ -998,7 +998,7 @@ func RecordPollDivergedVotingTest(t *testing.T, factory Factory) {
 	votes3.Add(block3.ID())
 	require.NoError(sm.RecordPoll(context.Background(), votes3))
 
-	require.True(sm.NumProcessing() == 1, "finalized too late")
+	require.True(sm.NumProcessing() == 0, "finalized too late")
 	require.Equal(choices.Accepted, block0.Status(), "should be accepted")
 	require.Equal(choices.Rejected, block1.Status())
 	require.Equal(choices.Rejected, block2.Status())
