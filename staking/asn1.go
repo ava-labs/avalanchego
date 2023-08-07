@@ -68,17 +68,10 @@ var (
 	oidSignatureSHA256WithRSA   = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 11}
 	oidSignatureSHA384WithRSA   = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 12}
 	oidSignatureSHA512WithRSA   = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 13}
-	oidSignatureRSAPSS          = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 10}
 	oidSignatureECDSAWithSHA256 = asn1.ObjectIdentifier{1, 2, 840, 10045, 4, 3, 2}
 	oidSignatureECDSAWithSHA384 = asn1.ObjectIdentifier{1, 2, 840, 10045, 4, 3, 3}
 	oidSignatureECDSAWithSHA512 = asn1.ObjectIdentifier{1, 2, 840, 10045, 4, 3, 4}
 	oidSignatureEd25519         = asn1.ObjectIdentifier{1, 3, 101, 112}
-
-	oidSHA256 = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 2, 1}
-	oidSHA384 = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 2, 2}
-	oidSHA512 = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 2, 3}
-
-	oidMGF1 = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 8}
 
 	// Ref: https://github.com/golang/go/blob/go1.19.12/src/crypto/x509/x509.go#L326-L350
 	signatureAlgorithmParsingDetails = []struct {
@@ -88,9 +81,6 @@ var (
 		{x509.SHA256WithRSA, oidSignatureSHA256WithRSA},     // RSA-SHA256
 		{x509.SHA384WithRSA, oidSignatureSHA384WithRSA},     // RSA-SHA384
 		{x509.SHA512WithRSA, oidSignatureSHA512WithRSA},     // RSA-SHA512
-		{x509.SHA256WithRSAPSS, oidSignatureRSAPSS},         // RSAPSS-SHA256
-		{x509.SHA384WithRSAPSS, oidSignatureRSAPSS},         // RSAPSS-SHA384
-		{x509.SHA512WithRSAPSS, oidSignatureRSAPSS},         // RSAPSS-SHA512
 		{x509.ECDSAWithSHA256, oidSignatureECDSAWithSHA256}, // ECDSA-SHA256
 		{x509.ECDSAWithSHA384, oidSignatureECDSAWithSHA384}, // ECDSA-SHA384
 		{x509.ECDSAWithSHA512, oidSignatureECDSAWithSHA512}, // ECDSA-SHA512
@@ -101,16 +91,13 @@ var (
 		pubKeyAlgo x509.PublicKeyAlgorithm
 		hash       crypto.Hash
 	}{
-		x509.SHA256WithRSA:    {x509.RSA, crypto.SHA256},                           // RSA-SHA256
-		x509.SHA384WithRSA:    {x509.RSA, crypto.SHA384},                           // RSA-SHA384
-		x509.SHA512WithRSA:    {x509.RSA, crypto.SHA512},                           // RSA-SHA512
-		x509.SHA256WithRSAPSS: {x509.RSA, crypto.SHA256},                           // RSAPSS-SHA256
-		x509.SHA384WithRSAPSS: {x509.RSA, crypto.SHA384},                           // RSAPSS-SHA384
-		x509.SHA512WithRSAPSS: {x509.RSA, crypto.SHA512},                           // RSAPSS-SHA512
-		x509.ECDSAWithSHA256:  {x509.ECDSA, crypto.SHA256},                         // ECDSA-SHA256
-		x509.ECDSAWithSHA384:  {x509.ECDSA, crypto.SHA384},                         // ECDSA-SHA384
-		x509.ECDSAWithSHA512:  {x509.ECDSA, crypto.SHA512},                         // ECDSA-SHA512
-		x509.PureEd25519:      {x509.Ed25519, crypto.Hash(0) /* no pre-hashing */}, // Ed25519
+		x509.SHA256WithRSA:   {x509.RSA, crypto.SHA256},                           // RSA-SHA256
+		x509.SHA384WithRSA:   {x509.RSA, crypto.SHA384},                           // RSA-SHA384
+		x509.SHA512WithRSA:   {x509.RSA, crypto.SHA512},                           // RSA-SHA512
+		x509.ECDSAWithSHA256: {x509.ECDSA, crypto.SHA256},                         // ECDSA-SHA256
+		x509.ECDSAWithSHA384: {x509.ECDSA, crypto.SHA384},                         // ECDSA-SHA384
+		x509.ECDSAWithSHA512: {x509.ECDSA, crypto.SHA512},                         // ECDSA-SHA512
+		x509.PureEd25519:     {x509.Ed25519, crypto.Hash(0) /* no pre-hashing */}, // Ed25519
 	}
 
 	// Ref: https://github.com/golang/go/blob/go1.19.12/src/crypto/x509/x509.go#L468-L489

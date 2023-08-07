@@ -43,9 +43,6 @@ func CheckSignature(cert *Certificate, signed []byte, signature []byte) error {
 		if verificationDetails.pubKeyAlgo != x509.RSA {
 			return signaturePublicKeyAlgoMismatchError(verificationDetails.pubKeyAlgo, pub)
 		}
-		if isRSAPSS(cert.SignatureAlgorithm) {
-			return rsa.VerifyPSS(pub, verificationDetails.hash, signed, signature, &rsa.PSSOptions{SaltLength: rsa.PSSSaltLengthEqualsHash})
-		}
 		return rsa.VerifyPKCS1v15(pub, verificationDetails.hash, signed, signature)
 	case *ecdsa.PublicKey:
 		if verificationDetails.pubKeyAlgo != x509.ECDSA {
@@ -65,16 +62,6 @@ func CheckSignature(cert *Certificate, signed []byte, signature []byte) error {
 		return nil
 	default:
 		return ErrUnsupportedAlgorithm
-	}
-}
-
-// Ref: https://github.com/golang/go/blob/go1.19.12/src/crypto/x509/x509.go#L206-L213
-func isRSAPSS(algo x509.SignatureAlgorithm) bool {
-	switch algo {
-	case x509.SHA256WithRSAPSS, x509.SHA384WithRSAPSS, x509.SHA512WithRSAPSS:
-		return true
-	default:
-		return false
 	}
 }
 

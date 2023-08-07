@@ -171,20 +171,6 @@ func parseAI(der cryptobyte.String) (pkix.AlgorithmIdentifier, error) {
 	return ai, nil
 }
 
-// pssParameters reflects the parameters in an AlgorithmIdentifier that
-// specifies RSA PSS. See RFC 3447, Appendix A.2.3.
-//
-// Ref: https://github.com/golang/go/blob/go1.19.12/src/crypto/x509/x509.go#L365-L375
-type pssParameters struct {
-	// The following three fields are not marked as
-	// optional because the default values specify SHA-1,
-	// which is no longer suitable for use in signatures.
-	Hash         pkix.AlgorithmIdentifier `asn1:"explicit,tag:0"`
-	MGF          pkix.AlgorithmIdentifier `asn1:"explicit,tag:1"`
-	SaltLength   int                      `asn1:"explicit,tag:2"`
-	TrailerField int                      `asn1:"optional,explicit,tag:3,default:1"`
-}
-
 // Ref: https://github.com/golang/go/blob/go1.19.12/src/crypto/x509/x509.go#L377-L431
 func getSignatureAlgorithmFromAI(ai pkix.AlgorithmIdentifier) x509.SignatureAlgorithm {
 	if ai.Algorithm.Equal(oidSignatureEd25519) {
@@ -195,51 +181,12 @@ func getSignatureAlgorithmFromAI(ai pkix.AlgorithmIdentifier) x509.SignatureAlgo
 		}
 	}
 
-	if !ai.Algorithm.Equal(oidSignatureRSAPSS) {
-		for _, details := range signatureAlgorithmParsingDetails {
-			if ai.Algorithm.Equal(details.oid) {
-				return details.algo
-			}
+	for _, details := range signatureAlgorithmParsingDetails {
+		if ai.Algorithm.Equal(details.oid) {
+			return details.algo
 		}
-		return x509.UnknownSignatureAlgorithm
 	}
-
-	// RSA PSS is special because it encodes important parameters
-	// in the Parameters.
-
-	var params pssParameters
-	if _, err := asn1.Unmarshal(ai.Parameters.FullBytes, &params); err != nil {
-		return x509.UnknownSignatureAlgorithm
-	}
-
-	var mgf1HashFunc pkix.AlgorithmIdentifier
-	if _, err := asn1.Unmarshal(params.MGF.Parameters.FullBytes, &mgf1HashFunc); err != nil {
-		return x509.UnknownSignatureAlgorithm
-	}
-
-	// PSS is greatly overburdened with options. This code forces them into
-	// three buckets by requiring that the MGF1 hash function always match the
-	// message hash function (as recommended in RFC 3447, Section 8.1), that the
-	// salt length matches the hash length, and that the trailer field has the
-	// default value.
-	if (len(params.Hash.Parameters.FullBytes) != 0 && !bytes.Equal(params.Hash.Parameters.FullBytes, asn1.NullBytes)) ||
-		!params.MGF.Algorithm.Equal(oidMGF1) ||
-		!mgf1HashFunc.Algorithm.Equal(params.Hash.Algorithm) ||
-		(len(mgf1HashFunc.Parameters.FullBytes) != 0 && !bytes.Equal(mgf1HashFunc.Parameters.FullBytes, asn1.NullBytes)) ||
-		params.TrailerField != 1 {
-		return x509.UnknownSignatureAlgorithm
-	}
-
-	switch {
-	case params.Hash.Algorithm.Equal(oidSHA256) && params.SaltLength == 32:
-		return x509.SHA256WithRSAPSS
-	case params.Hash.Algorithm.Equal(oidSHA384) && params.SaltLength == 48:
-		return x509.SHA384WithRSAPSS
-	case params.Hash.Algorithm.Equal(oidSHA512) && params.SaltLength == 64:
-		return x509.SHA512WithRSAPSS
-	default:
-		return x509.UnknownSignatureAlgorithm
-	}
+	return x509.UnknownSignatureAlgorithm
 }
 
 // Ref: https://github.com/golang/go/blob/go1.19.12/src/crypto/x509/x509.go#L172-L176
