@@ -115,19 +115,7 @@ type trieView struct {
 // NewView returns a new view on top of this one.
 // Adds the new view to [t.childViews].
 // Assumes [t.lock] is not held.
-func (t *trieView) NewView() (TrieView, error) {
-	return t.NewPreallocatedView(defaultPreallocationSize)
-}
-
-// NewPreallocatedView returns a new view on top of this one with memory allocated to store the
-// [estimatedChanges] number of key/value changes.
-// If this view is already committed, the new view's parent will
-// be set to the parent of the current view.
-// Otherwise, adds the new view to [t.childViews].
-// Assumes [t.lock] is not held.
-func (t *trieView) NewPreallocatedView(
-	estimatedChanges int,
-) (TrieView, error) {
+func (t *trieView) NewView(changes map[string][]byte) (TrieView, error) {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
@@ -136,14 +124,19 @@ func (t *trieView) NewPreallocatedView(
 	}
 
 	if t.committed {
-		return t.getParentTrie().NewPreallocatedView(estimatedChanges)
+		return t.getParentTrie().NewView(changes)
 	}
 
-	newView, err := newTrieView(t.db, t, t.root.clone(), estimatedChanges)
+	newView, err := newTrieView(t.db, t, t.root.clone(), len(changes))
 	if err != nil {
 		return nil, err
 	}
 
+	for key, value := range changes {
+		if err := newView.insert([]byte(key), value); err != nil {
+			return nil, err
+		}
+	}
 	t.validityTrackingLock.Lock()
 	defer t.validityTrackingLock.Unlock()
 
