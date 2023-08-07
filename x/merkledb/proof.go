@@ -828,5 +828,5 @@ func getEmptyTrieView(ctx context.Context) (*trieView, error) {
 		return nil, err
 	}
 
-	return db.newUntrackedView(defaultPreallocationSize)
+	return db.newUntrackedView(nil)
 }

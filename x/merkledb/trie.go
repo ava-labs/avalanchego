@@ -53,7 +53,7 @@ type Trie interface {
 	ReadOnlyTrie
 
 	// NewView returns a new view on top of this Trie with the specified changes
-	NewView(changes map[string][]byte) (TrieView, error)
+	NewView(batchOps []database.BatchOp) (TrieView, error)
 }
 
 type TrieView interface {

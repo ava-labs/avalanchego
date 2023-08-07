@@ -108,14 +108,12 @@ type trieView struct {
 	// If true, this view has been committed and cannot be edited.
 	// Calls to Insert and Remove will return ErrCommitted.
 	committed bool
-
-	estimatedSize int
 }
 
 // NewView returns a new view on top of this one.
 // Adds the new view to [t.childViews].
 // Assumes [t.lock] is not held.
-func (t *trieView) NewView(changes map[string][]byte) (TrieView, error) {
+func (t *trieView) NewView(batchOps []database.BatchOp) (TrieView, error) {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
@@ -124,19 +122,14 @@ func (t *trieView) NewView(changes map[string][]byte) (TrieView, error) {
 	}
 
 	if t.committed {
-		return t.getParentTrie().NewView(changes)
+		return t.getParentTrie().NewView(batchOps)
 	}
 
-	newView, err := newTrieView(t.db, t, t.root.clone(), len(changes))
+	newView, err := newTrieView(t.db, t, t.root.clone(), batchOps)
 	if err != nil {
 		return nil, err
 	}
 
-	for key, value := range changes {
-		if err := newView.insert([]byte(key), value); err != nil {
-			return nil, err
-		}
-	}
 	t.validityTrackingLock.Lock()
 	defer t.validityTrackingLock.Unlock()
 
@@ -153,20 +146,32 @@ func newTrieView(
 	db *merkleDB,
 	parentTrie TrieView,
 	root *node,
-	estimatedSize int,
+	batchOps []database.BatchOp,
 ) (*trieView, error) {
 	if root == nil {
 		return nil, ErrNoValidRoot
 	}
 
-	return &trieView{
+	newView := &trieView{
 		root:                  root,
 		db:                    db,
 		parentTrie:            parentTrie,
-		changes:               newChangeSummary(estimatedSize),
-		estimatedSize:         estimatedSize,
-		unappliedValueChanges: make(map[path]Maybe[[]byte], estimatedSize),
-	}, nil
+		changes:               newChangeSummary(len(batchOps)),
+		unappliedValueChanges: make(map[path]Maybe[[]byte], len(batchOps)),
+	}
+
+	for _, op := range batchOps {
+		if op.Delete {
+			if err := newView.remove(op.Key); err != nil {
+				return nil, err
+			}
+		} else {
+			if err := newView.insert(op.Key, op.Value); err != nil {
+				return nil, err
+			}
+		}
+	}
+	return newView, nil
 }
 
 // Creates a new view with the given [parentTrie].
@@ -174,7 +179,6 @@ func newTrieViewWithChanges(
 	db *merkleDB,
 	parentTrie TrieView,
 	changes *changeSummary,
-	estimatedSize int,
 ) (*trieView, error) {
 	if changes == nil {
 		return nil, ErrNoValidRoot
@@ -190,8 +194,7 @@ func newTrieViewWithChanges(
 		db:                    db,
 		parentTrie:            parentTrie,
 		changes:               changes,
-		estimatedSize:         estimatedSize,
-		unappliedValueChanges: make(map[path]Maybe[[]byte], estimatedSize),
+		unappliedValueChanges: map[path]Maybe[[]byte]{},
 	}, nil
 }
 
@@ -779,14 +782,6 @@ func (t *trieView) getValue(key path, lock bool) ([]byte, error) {
 	return value, nil
 }
 
-// Insert will upsert the key/value pair into the trie.
-func (t *trieView) Insert(_ context.Context, key []byte, value []byte) error {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-
-	return t.insert(key, value)
-}
-
 // Assumes [t.lock] is held.
 // Assumes [t.validityTrackingLock] isn't held.
 func (t *trieView) insert(key []byte, value []byte) error {
@@ -812,14 +807,6 @@ func (t *trieView) insert(key []byte, value []byte) error {
 	}
 
 	return nil
-}
-
-// Remove will delete the value associated with [key] from this trie.
-func (t *trieView) Remove(_ context.Context, key []byte) error {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-
-	return t.remove(key)
 }
 
 // Assumes [t.lock] is held.
@@ -854,7 +841,7 @@ func (t *trieView) applyChangedValuesToTrie(ctx context.Context) error {
 	defer span.End()
 
 	unappliedValues := t.unappliedValueChanges
-	t.unappliedValueChanges = make(map[path]Maybe[[]byte], t.estimatedSize)
+	t.unappliedValueChanges = make(map[path]Maybe[[]byte], len(unappliedValues))
 
 	for key, change := range unappliedValues {
 		if change.IsNothing() {
