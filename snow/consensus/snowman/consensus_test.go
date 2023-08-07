@@ -427,7 +427,6 @@ func RecordPollAcceptSingleBlockTest(t *testing.T, factory Factory) {
 
 	votes := bag.Bag[ids.ID]{}
 	votes.Add(block.ID())
-
 	require.NoError(sm.RecordPoll(context.Background(), votes))
 	require.Equal(block.ID(), sm.Preference())
 	require.False(sm.Finalized())
