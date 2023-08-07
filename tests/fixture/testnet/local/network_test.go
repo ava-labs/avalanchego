@@ -13,8 +13,7 @@ import (
 func TestNetworkSerialization(t *testing.T) {
 	require := require.New(t)
 
-	tmpDir, err := os.MkdirTemp("", "")
-	require.NoError(err)
+	tmpDir := t.TempDir()
 
 	network := &LocalNetwork{Dir: tmpDir}
 	require.NoError(network.PopulateLocalNetworkConfig(1337, 1, 1))
