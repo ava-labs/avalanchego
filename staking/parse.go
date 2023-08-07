@@ -303,9 +303,6 @@ func parsePublicKey(keyData *publicKeyInfo) (any, error) {
 			Y:     y,
 		}, nil
 
-		// TODO: Since we don't allow verification of DSA signatures, we don't
-		// need to be able to parse DSA public keys right?
-
 	case oid.Equal(oidPublicKeyEd25519):
 		// RFC 8410, Section 3
 		// > For all of the OIDs, the parameters MUST be absent.
