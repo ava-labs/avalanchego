@@ -131,6 +131,13 @@ func (s *NetworkServer) AppRequest(
 	return nil
 }
 
+func maybeBytesToMaybe(mb *pb.MaybeBytes) merkledb.Maybe[[]byte] {
+	if mb != nil && !mb.IsNothing {
+		return merkledb.Some(mb.Value)
+	}
+	return merkledb.Nothing[[]byte]()
+}
+
 // Generates a change proof and sends it to [nodeID].
 func (s *NetworkServer) HandleChangeProofRequest(
 	ctx context.Context,

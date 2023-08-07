@@ -39,13 +39,6 @@ var (
 	errTooManyBytes      = errors.New("response contains more than requested bytes")
 )
 
-func maybeBytesToMaybe(mb *pb.MaybeBytes) merkledb.Maybe[[]byte] {
-	if mb != nil && !mb.IsNothing {
-		return merkledb.Some(mb.Value)
-	}
-	return merkledb.Nothing[[]byte]()
-}
-
 // Client synchronously fetches data from the network to fulfill state sync requests.
 // Repeatedly retries failed requests until the context is canceled.
 type Client interface {
