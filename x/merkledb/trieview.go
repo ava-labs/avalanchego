@@ -484,6 +484,7 @@ func (t *trieView) GetRangeProof(
 		}
 		result.EndProof = rootProof.Path
 	}
+
 	if t.isInvalid() {
 		return nil, ErrInvalid
 	}
