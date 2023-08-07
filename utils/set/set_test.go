@@ -46,6 +46,47 @@ func TestSet(t *testing.T) {
 	require.False(s.Overlaps(s2))
 }
 
+func TestOf(t *testing.T) {
+	tests := []struct {
+		name     string
+		elements []int
+		expected []int
+	}{
+		{
+			name:     "nil",
+			elements: nil,
+			expected: []int{},
+		},
+		{
+			name:     "empty",
+			elements: []int{},
+			expected: []int{},
+		},
+		{
+			name:     "unique elements",
+			elements: []int{1, 2, 3},
+			expected: []int{1, 2, 3},
+		},
+		{
+			name:     "duplicate elements",
+			elements: []int{1, 2, 3, 1, 2, 3},
+			expected: []int{1, 2, 3},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+
+			s := Of(tt.elements...)
+
+			require.Len(s, len(tt.expected))
+			for _, expected := range tt.expected {
+				require.True(s.Contains(expected))
+			}
+		})
+	}
+}
+
 func TestSetCappedList(t *testing.T) {
 	require := require.New(t)
 	s := Set[int]{}
@@ -76,14 +117,16 @@ func TestSetCappedList(t *testing.T) {
 }
 
 func TestSetClear(t *testing.T) {
+	require := require.New(t)
+
 	set := Set[int]{}
 	for i := 0; i < 25; i++ {
 		set.Add(i)
 	}
 	set.Clear()
-	require.Empty(t, set)
+	require.Empty(set)
 	set.Add(1337)
-	require.Len(t, set, 1)
+	require.Len(set, 1)
 }
 
 func TestSetPop(t *testing.T) {

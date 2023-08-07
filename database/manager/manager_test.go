@@ -37,14 +37,11 @@ func TestNewSingleLevelDB(t *testing.T) {
 	require.NoError(err)
 
 	semDB := manager.Current()
-	cmp := semDB.Version.Compare(v1)
-	require.Zero(cmp, "incorrect version on current database")
+	require.Zero(semDB.Version.Compare(v1))
 
 	_, exists := manager.Previous()
-	require.False(exists, "there should be no previous database")
-
-	dbs := manager.GetDatabases()
-	require.Len(dbs, 1)
+	require.False(exists)
+	require.Len(manager.GetDatabases(), 1)
 
 	require.NoError(manager.Close())
 }
@@ -60,14 +57,12 @@ func TestNewCreatesSingleDB(t *testing.T) {
 	require.NoError(err)
 
 	semDB := manager.Current()
-	cmp := semDB.Version.Compare(v1)
-	require.Zero(cmp, "incorrect version on current database")
+	require.Zero(semDB.Version.Compare(v1))
 
 	_, exists := manager.Previous()
-	require.False(exists, "there should be no previous database")
+	require.False(exists)
 
-	dbs := manager.GetDatabases()
-	require.Len(dbs, 1)
+	require.Len(manager.GetDatabases(), 1)
 
 	require.NoError(manager.Close())
 }
@@ -159,25 +154,21 @@ func TestNewSortsDatabases(t *testing.T) {
 	require.NoError(err)
 
 	defer func() {
-		err = manager.Close()
-		require.NoError(err, "problem closing database manager")
+		require.NoError(manager.Close())
 	}()
 
 	semDB := manager.Current()
-	cmp := semDB.Version.Compare(vers[0])
-	require.Zero(cmp, "incorrect version on current database")
+	require.Zero(semDB.Version.Compare(vers[0]))
 
 	prev, exists := manager.Previous()
-	require.True(exists, "expected to find a previous database")
-	cmp = prev.Version.Compare(vers[1])
-	require.Zero(cmp, "incorrect version on previous database")
+	require.True(exists)
+	require.Zero(prev.Version.Compare(vers[1]))
 
 	dbs := manager.GetDatabases()
 	require.Len(dbs, len(vers))
 
 	for i, db := range dbs {
-		cmp = db.Version.Compare(vers[i])
-		require.Zero(cmp, "expected to find database version %s, but found %s", vers[i], db.Version.String())
+		require.Zero(db.Version.Compare(vers[i]))
 	}
 }
 

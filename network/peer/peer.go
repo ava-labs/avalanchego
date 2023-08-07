@@ -848,7 +848,11 @@ func (p *peer) handleVersion(msg *p2p.Version) {
 	}
 
 	myTime := p.Clock.Unix()
-	if math.Abs(float64(msg.MyTime)-float64(myTime)) > p.MaxClockDifference.Seconds() {
+	clockDifference := math.Abs(float64(msg.MyTime) - float64(myTime))
+
+	p.Metrics.ClockSkew.Observe(clockDifference)
+
+	if clockDifference > p.MaxClockDifference.Seconds() {
 		if p.Beacons.Contains(p.id) {
 			p.Log.Warn("beacon reports out of sync time",
 				zap.Stringer("nodeID", p.id),

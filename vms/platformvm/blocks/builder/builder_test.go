@@ -52,9 +52,7 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 		return nil
 	}
 	require.NoError(env.Builder.AddUnverifiedTx(tx))
-
-	has := env.mempool.Has(txID)
-	require.True(has)
+	require.True(env.mempool.Has(txID))
 
 	// show that build block include that tx and removes it from mempool
 	blkIntf, err := env.Builder.BuildBlock(context.Background())
@@ -65,8 +63,7 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	require.Len(blk.Txs(), 1)
 	require.Equal(txID, blk.Txs()[0].ID())
 
-	has = env.mempool.Has(txID)
-	require.False(has)
+	require.False(env.mempool.Has(txID))
 }
 
 func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
@@ -284,7 +281,6 @@ func TestGetNextStakerToReward(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 
 			state := tt.stateF(ctrl)
 			txID, shouldReward, err := getNextStakerToReward(tt.timestamp, state)
@@ -662,7 +658,6 @@ func TestBuildBlock(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 
 			gotBlk, err := buildBlock(
 				tt.builderF(ctrl),

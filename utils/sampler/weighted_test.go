@@ -94,36 +94,44 @@ func WeightedInitializeOverflowTest(t *testing.T, s Weighted) {
 }
 
 func WeightedOutOfRangeTest(t *testing.T, s Weighted) {
-	require.NoError(t, s.Initialize([]uint64{1}))
+	require := require.New(t)
+
+	require.NoError(s.Initialize([]uint64{1}))
 
 	_, err := s.Sample(1)
-	require.ErrorIs(t, err, ErrOutOfRange)
+	require.ErrorIs(err, ErrOutOfRange)
 }
 
 func WeightedSingletonTest(t *testing.T, s Weighted) {
-	require.NoError(t, s.Initialize([]uint64{1}))
+	require := require.New(t)
+
+	require.NoError(s.Initialize([]uint64{1}))
 
 	index, err := s.Sample(0)
-	require.NoError(t, err)
-	require.Zero(t, index, "should have selected the first element")
+	require.NoError(err)
+	require.Zero(index)
 }
 
 func WeightedWithZeroTest(t *testing.T, s Weighted) {
-	require.NoError(t, s.Initialize([]uint64{0, 1}))
+	require := require.New(t)
+
+	require.NoError(s.Initialize([]uint64{0, 1}))
 
 	index, err := s.Sample(0)
-	require.NoError(t, err)
-	require.Equal(t, 1, index, "should have selected the second element")
+	require.NoError(err)
+	require.Equal(1, index)
 }
 
 func WeightedDistributionTest(t *testing.T, s Weighted) {
-	require.NoError(t, s.Initialize([]uint64{1, 1, 2, 3, 4}))
+	require := require.New(t)
+
+	require.NoError(s.Initialize([]uint64{1, 1, 2, 3, 4}))
 
 	counts := make([]int, 5)
 	for i := uint64(0); i < 11; i++ {
 		index, err := s.Sample(i)
-		require.NoError(t, err)
+		require.NoError(err)
 		counts[index]++
 	}
-	require.Equal(t, []int{1, 1, 2, 3, 4}, counts, "wrong distribution returned")
+	require.Equal([]int{1, 1, 2, 3, 4}, counts)
 }

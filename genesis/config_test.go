@@ -60,8 +60,7 @@ func TestAllocationLess(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
-			require.Equal(tt.expected, tt.alloc1.Less(tt.alloc2))
+			require.Equal(t, tt.expected, tt.alloc1.Less(tt.alloc2))
 		})
 	}
 }

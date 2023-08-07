@@ -8,6 +8,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/ids"
 )
 
@@ -34,7 +36,7 @@ func (vm *TestHeightIndexedVM) VerifyHeightIndex(ctx context.Context) error {
 		return vm.VerifyHeightIndexF(ctx)
 	}
 	if vm.CantVerifyHeightIndex && vm.T != nil {
-		vm.T.Fatal(errVerifyHeightIndex)
+		require.FailNow(vm.T, errVerifyHeightIndex.Error())
 	}
 	return errVerifyHeightIndex
 }
@@ -44,7 +46,7 @@ func (vm *TestHeightIndexedVM) GetBlockIDAtHeight(ctx context.Context, height ui
 		return vm.GetBlockIDAtHeightF(ctx, height)
 	}
 	if vm.CantGetBlockIDAtHeight && vm.T != nil {
-		vm.T.Fatal(errGetAncestor)
+		require.FailNow(vm.T, errGetAncestor.Error())
 	}
 	return ids.Empty, errGetBlockIDAtHeight
 }

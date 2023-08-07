@@ -38,56 +38,40 @@ func TestAddAddressesParseAddresses(t *testing.T) {
 }
 
 func TestFilterParamUpdateMulti(t *testing.T) {
+	require := require.New(t)
+
 	fp := NewFilterParam()
 
 	addr1 := []byte("abc")
 	addr2 := []byte("def")
 	addr3 := []byte("xyz")
 
-	if err := fp.Add(addr1, addr2, addr3); err != nil {
-		t.Fatal(err)
-	}
-	if len(fp.set) != 3 {
-		t.Fatalf("update multi failed")
-	}
-	if _, exists := fp.set[string(addr1)]; !exists {
-		t.Fatalf("update multi failed")
-	}
-	if _, exists := fp.set[string(addr2)]; !exists {
-		t.Fatalf("update multi failed")
-	}
-	if _, exists := fp.set[string(addr3)]; !exists {
-		t.Fatalf("update multi failed")
-	}
+	require.NoError(fp.Add(addr1, addr2, addr3))
+	require.Len(fp.set, 3)
+	require.Contains(fp.set, string(addr1))
+	require.Contains(fp.set, string(addr2))
+	require.Contains(fp.set, string(addr3))
 }
 
 func TestFilterParam(t *testing.T) {
+	require := require.New(t)
+
 	mapFilter := bloom.NewMap()
 
 	fp := NewFilterParam()
 	fp.SetFilter(mapFilter)
 
 	addr := ids.GenerateTestShortID()
-	if err := fp.Add(addr[:]); err != nil {
-		t.Fatal(err)
-	}
-	if !fp.Check(addr[:]) {
-		t.Fatalf("check address failed")
-	}
+	require.NoError(fp.Add(addr[:]))
+	require.True(fp.Check(addr[:]))
 	delete(fp.set, string(addr[:]))
 
 	mapFilter.Add(addr[:])
-	if !fp.Check(addr[:]) {
-		t.Fatalf("check address failed")
-	}
-	if fp.Check([]byte("bye")) {
-		t.Fatalf("check address failed")
-	}
+	require.True(fp.Check(addr[:]))
+	require.False(fp.Check([]byte("bye")))
 }
 
 func TestNewBloom(t *testing.T) {
 	cm := &NewBloom{}
-	if cm.IsParamsValid() {
-		t.Fatalf("new filter check failed")
-	}
+	require.False(t, cm.IsParamsValid())
 }

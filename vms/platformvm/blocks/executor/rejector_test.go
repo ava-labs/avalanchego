@@ -13,7 +13,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
@@ -116,7 +115,6 @@ func TestRejectBlock(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 
 			blk, err := tt.newBlockFunc()
 			require.NoError(err)
@@ -142,10 +140,6 @@ func TestRejectBlock(t *testing.T) {
 			for _, tx := range blk.Txs() {
 				mempool.EXPECT().Add(tx).Return(nil).Times(1)
 			}
-			gomock.InOrder(
-				state.EXPECT().AddStatelessBlock(blk, choices.Rejected).Times(1),
-				state.EXPECT().Commit().Return(nil).Times(1),
-			)
 
 			require.NoError(tt.rejectFunc(rejector, blk))
 			// Make sure block and its parent are removed from the state map.

@@ -71,7 +71,7 @@ func TestCorruption(t *testing.T) {
 	for name, testFn := range tests {
 		t.Run(name, func(tt *testing.T) {
 			err := testFn(corruptableDB)
-			require.ErrorIsf(tt, err, errTest, "not received the corruption error")
+			require.ErrorIs(tt, err, errTest)
 		})
 	}
 }

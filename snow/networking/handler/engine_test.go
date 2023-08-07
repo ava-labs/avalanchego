@@ -58,14 +58,12 @@ func TestEngineManager_Get(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			r := require.New(t)
-
 			e := EngineManager{
 				Avalanche: avalanche,
 				Snowman:   snowman,
 			}
 
-			r.Equal(test.expected.engine, e.Get(test.args.engineType))
+			require.Equal(t, test.expected.engine, e.Get(test.args.engineType))
 		})
 	}
 }

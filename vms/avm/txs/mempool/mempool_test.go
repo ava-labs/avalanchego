@@ -66,7 +66,7 @@ func TestTxsInMempool(t *testing.T) {
 	mempool.RequestBuildBlock()
 	select {
 	case <-toEngine:
-		t.Fatalf("should not have sent message to engine")
+		require.FailNow("should not have sent message to engine")
 	default:
 	}
 
@@ -102,7 +102,7 @@ func TestTxsInMempool(t *testing.T) {
 	select {
 	case <-toEngine:
 	default:
-		t.Fatalf("should have sent message to engine")
+		require.FailNow("should have sent message to engine")
 	}
 
 	mempool.Remove(testTxs)
@@ -110,7 +110,7 @@ func TestTxsInMempool(t *testing.T) {
 	mempool.RequestBuildBlock()
 	select {
 	case <-toEngine:
-		t.Fatalf("should not have sent message to engine")
+		require.FailNow("should not have sent message to engine")
 	default:
 	}
 }

@@ -20,25 +20,24 @@ import (
 
 func BenchmarkLoadUser(b *testing.B) {
 	runLoadUserBenchmark := func(b *testing.B, numKeys int) {
-		// This will segfault instead of failing gracefully if there's an error
-		_, _, vm, _ := GenesisVM(nil)
-		ctx := vm.ctx
+		require := require.New(b)
+
+		env := setup(b, &envConfig{
+			keystoreUsers: []*user{{
+				username: username,
+				password: password,
+			}},
+		})
 		defer func() {
-			if err := vm.Shutdown(context.Background()); err != nil {
-				b.Fatal(err)
-			}
-			ctx.Lock.Unlock()
+			require.NoError(env.vm.Shutdown(context.Background()))
+			env.vm.ctx.Lock.Unlock()
 		}()
 
-		user, err := keystore.NewUserFromKeystore(vm.ctx.Keystore, username, password)
-		if err != nil {
-			b.Fatalf("Failed to get user keystore db: %s", err)
-		}
+		user, err := keystore.NewUserFromKeystore(env.vm.ctx.Keystore, username, password)
+		require.NoError(err)
 
 		keys, err := keystore.NewKeys(user, numKeys)
-		if err != nil {
-			b.Fatalf("problem generating private key: %s", err)
-		}
+		require.NoError(err)
 
 		b.ResetTimer()
 
@@ -47,19 +46,16 @@ func BenchmarkLoadUser(b *testing.B) {
 			addrIndex := n % numKeys
 			fromAddrs.Clear()
 			fromAddrs.Add(keys[addrIndex].PublicKey().Address())
-			if _, _, err := vm.LoadUser(username, password, fromAddrs); err != nil {
-				b.Fatalf("Failed to load user: %s", err)
-			}
+			_, _, err := env.vm.LoadUser(username, password, fromAddrs)
+			require.NoError(err)
 		}
 
 		b.StopTimer()
 
-		if err := user.Close(); err != nil {
-			b.Fatal(err)
-		}
+		require.NoError(user.Close())
 	}
 
-	benchmarkSize := []int{10, 100, 1000, 10000}
+	benchmarkSize := []int{10, 100, 1000, 5000}
 	for _, numKeys := range benchmarkSize {
 		b.Run(fmt.Sprintf("NumKeys=%d", numKeys), func(b *testing.B) {
 			runLoadUserBenchmark(b, numKeys)
@@ -69,13 +65,12 @@ func BenchmarkLoadUser(b *testing.B) {
 
 // GetAllUTXOsBenchmark is a helper func to benchmark the GetAllUTXOs depending on the size
 func GetAllUTXOsBenchmark(b *testing.B, utxoCount int) {
-	_, _, vm, _ := GenesisVM(b)
-	ctx := vm.ctx
+	require := require.New(b)
+
+	env := setup(b, &envConfig{})
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
-			b.Fatal(err)
-		}
-		ctx.Lock.Unlock()
+		require.NoError(env.vm.Shutdown(context.Background()))
+		env.vm.ctx.Lock.Unlock()
 	}()
 
 	addr := ids.GenerateTestShortID()
@@ -98,9 +93,9 @@ func GetAllUTXOsBenchmark(b *testing.B, utxoCount int) {
 			},
 		}
 
-		vm.state.AddUTXO(utxo)
+		env.vm.state.AddUTXO(utxo)
 	}
-	require.NoError(b, vm.state.Commit())
+	require.NoError(env.vm.state.Commit())
 
 	addrsSet := set.Set[ids.ShortID]{}
 	addrsSet.Add(addr)
@@ -109,9 +104,9 @@ func GetAllUTXOsBenchmark(b *testing.B, utxoCount int) {
 
 	for i := 0; i < b.N; i++ {
 		// Fetch all UTXOs older version
-		notPaginatedUTXOs, err := avax.GetAllUTXOs(vm.state, addrsSet)
-		require.NoError(b, err)
-		require.Len(b, notPaginatedUTXOs, utxoCount)
+		notPaginatedUTXOs, err := avax.GetAllUTXOs(env.vm.state, addrsSet)
+		require.NoError(err)
+		require.Len(notPaginatedUTXOs, utxoCount)
 	}
 }
 
@@ -120,9 +115,18 @@ func BenchmarkGetUTXOs(b *testing.B) {
 		name      string
 		utxoCount int
 	}{
-		{"100", 100},
-		{"10k", 10000},
-		{"100k", 100000},
+		{
+			name:      "100",
+			utxoCount: 100,
+		},
+		{
+			name:      "10k",
+			utxoCount: 10_000,
+		},
+		{
+			name:      "100k",
+			utxoCount: 100_000,
+		},
 	}
 
 	for _, count := range tests {

@@ -8,9 +8,12 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"testing"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/chains/atomic"
@@ -49,7 +52,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-const defaultWeight = 5 * units.MilliAvax
+const (
+	defaultWeight = 5 * units.MilliAvax
+	trackChecksum = false
+)
 
 var (
 	defaultMinStakingDuration = 24 * time.Hour
@@ -72,8 +78,7 @@ var (
 	// Used to create and use keys.
 	testKeyfactory secp256k1.Factory
 
-	errMissingPrimaryValidators = errors.New("missing primary validator set")
-	errMissing                  = errors.New("missing")
+	errMissing = errors.New("missing")
 )
 
 type mutableSharedMemory struct {
@@ -109,7 +114,7 @@ func (e *environment) SetState(blkID ids.ID, chainState state.Chain) {
 	e.states[blkID] = chainState
 }
 
-func newEnvironment(postBanff, postCortina bool) *environment {
+func newEnvironment(t *testing.T, postBanff, postCortina bool) *environment {
 	var isBootstrapped utils.Atomic[bool]
 	isBootstrapped.Set(true)
 
@@ -167,15 +172,18 @@ func newEnvironment(postBanff, postCortina bool) *environment {
 		backend:        backend,
 	}
 
-	addSubnet(env, txBuilder)
+	addSubnet(t, env, txBuilder)
 
 	return env
 }
 
 func addSubnet(
+	t *testing.T,
 	env *environment,
 	txBuilder builder.Builder,
 ) {
+	require := require.New(t)
+
 	// Create a subnet
 	var err error
 	testSubnet1, err = txBuilder.NewCreateSubnetTx(
@@ -188,30 +196,21 @@ func addSubnet(
 		[]*secp256k1.PrivateKey{preFundedKeys[0]},
 		preFundedKeys[0].PublicKey().Address(),
 	)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(err)
 
 	// store it
 	stateDiff, err := state.NewDiff(lastAcceptedID, env)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(err)
 
 	executor := StandardTxExecutor{
 		Backend: &env.backend,
 		State:   stateDiff,
 		Tx:      testSubnet1,
 	}
-	err = testSubnet1.Unsigned.Visit(&executor)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(testSubnet1.Unsigned.Visit(&executor))
 
 	stateDiff.AddTx(testSubnet1, status.Committed)
-	if err := stateDiff.Apply(env.state); err != nil {
-		panic(err)
-	}
+	require.NoError(stateDiff.Apply(env.state))
 }
 
 func defaultState(
@@ -221,11 +220,13 @@ func defaultState(
 	rewards reward.Calculator,
 ) state.State {
 	genesisBytes := buildGenesisTest(ctx)
+	execCfg, _ := config.GetExecutionConfig(nil)
 	state, err := state.New(
 		db,
 		genesisBytes,
 		prometheus.NewRegistry(),
 		cfg,
+		execCfg,
 		ctx,
 		metrics.Noop,
 		rewards,
@@ -427,31 +428,24 @@ func buildGenesisTest(ctx *snow.Context) []byte {
 
 func shutdownEnvironment(env *environment) error {
 	if env.isBootstrapped.Get() {
-		primaryValidatorSet, exist := env.config.Validators.Get(constants.PrimaryNetworkID)
-		if !exist {
-			return errMissingPrimaryValidators
+		validatorIDs, err := validators.NodeIDs(env.config.Validators, constants.PrimaryNetworkID)
+		if err != nil {
+			return err
 		}
-		primaryValidators := primaryValidatorSet.List()
 
-		validatorIDs := make([]ids.NodeID, len(primaryValidators))
-		for i, vdr := range primaryValidators {
-			validatorIDs[i] = vdr.NodeID
-		}
 		if err := env.uptimes.StopTracking(validatorIDs, constants.PrimaryNetworkID); err != nil {
 			return err
 		}
 
 		for subnetID := range env.config.TrackedSubnets {
-			vdrs, exist := env.config.Validators.Get(subnetID)
-			if !exist {
+			validatorIDs, err := validators.NodeIDs(env.config.Validators, subnetID)
+			if errors.Is(err, validators.ErrMissingValidators) {
 				return nil
 			}
-			validators := vdrs.List()
-
-			validatorIDs := make([]ids.NodeID, len(validators))
-			for i, vdr := range validators {
-				validatorIDs[i] = vdr.NodeID
+			if err != nil {
+				return err
 			}
+
 			if err := env.uptimes.StopTracking(validatorIDs, subnetID); err != nil {
 				return err
 			}

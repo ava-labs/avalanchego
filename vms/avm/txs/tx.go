@@ -27,9 +27,6 @@ type UnsignedTx interface {
 
 	InputIDs() set.Set[ids.ID]
 
-	ConsumedAssetIDs() set.Set[ids.ID]
-	AssetIDs() set.Set[ids.ID]
-
 	NumCredentials() int
 	// TODO: deprecate after x-chain linearization
 	InputUTXOs() []*avax.UTXOID

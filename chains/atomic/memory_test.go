@@ -6,6 +6,8 @@ package atomic
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 )
@@ -19,32 +21,26 @@ func TestSharedID(t *testing.T) {
 	sharedID0 := sharedID(blockchainID0, blockchainID1)
 	sharedID1 := sharedID(blockchainID1, blockchainID0)
 
-	if sharedID0 != sharedID1 {
-		t.Fatalf("SharedMemory.sharedID should be communitive")
-	}
+	require.Equal(t, sharedID0, sharedID1)
 }
 
 func TestMemoryMakeReleaseLock(t *testing.T) {
+	require := require.New(t)
+
 	m := NewMemory(memdb.New())
 
 	sharedID := sharedID(blockchainID0, blockchainID1)
 
 	lock0 := m.makeLock(sharedID)
 
-	if lock1 := m.makeLock(sharedID); lock0 != lock1 {
-		t.Fatalf("Memory.makeLock should have returned the same lock")
-	}
+	require.Equal(lock0, m.makeLock(sharedID))
 	m.releaseLock(sharedID)
 
-	if lock2 := m.makeLock(sharedID); lock0 != lock2 {
-		t.Fatalf("Memory.makeLock should have returned the same lock")
-	}
+	require.Equal(lock0, m.makeLock(sharedID))
 	m.releaseLock(sharedID)
 	m.releaseLock(sharedID)
 
-	if lock3 := m.makeLock(sharedID); lock0 == lock3 {
-		t.Fatalf("Memory.releaseLock should have returned freed the lock")
-	}
+	require.Equal(lock0, m.makeLock(sharedID))
 	m.releaseLock(sharedID)
 }
 
@@ -54,9 +50,7 @@ func TestMemoryUnknownFree(t *testing.T) {
 	sharedID := sharedID(blockchainID0, blockchainID1)
 
 	defer func() {
-		if recover() == nil {
-			t.Fatalf("Should have panicked due to an unknown free")
-		}
+		require.NotNil(t, recover())
 	}()
 
 	m.releaseLock(sharedID)

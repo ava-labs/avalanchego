@@ -24,7 +24,7 @@ import (
 // Ensure Execute fails when there are not enough control sigs
 func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(true /*=postBanff*/, false /*=postCortina*/)
+	env := newEnvironment(t, true /*=postBanff*/, false /*=postCortina*/)
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
@@ -59,7 +59,7 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 // Ensure Execute fails when an incorrect control signature is given
 func TestCreateChainTxWrongControlSig(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(true /*=postBanff*/, false /*=postCortina*/)
+	env := newEnvironment(t, true /*=postBanff*/, false /*=postCortina*/)
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
@@ -102,7 +102,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 // its validator set doesn't exist
 func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(true /*=postBanff*/, false /*=postCortina*/)
+	env := newEnvironment(t, true /*=postBanff*/, false /*=postCortina*/)
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
@@ -136,7 +136,7 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 // Ensure valid tx passes semanticVerify
 func TestCreateChainTxValid(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(true /*=postBanff*/, false /*=postCortina*/)
+	env := newEnvironment(t, true /*=postBanff*/, false /*=postCortina*/)
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
@@ -195,7 +195,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			env := newEnvironment(true /*=postBanff*/, false /*=postCortina*/)
+			env := newEnvironment(t, true /*=postBanff*/, false /*=postCortina*/)
 			env.config.ApricotPhase3Time = ap3Time
 
 			defer func() {

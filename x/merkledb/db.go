@@ -29,7 +29,8 @@ import (
 )
 
 const (
-	RootPath = EmptyPath
+	DefaultEvictionBatchSize = 100
+	RootPath                 = EmptyPath
 	// TODO: name better
 	rebuildViewSizeFractionOfCacheSize = 50
 	minRebuildViewSizePerCommit        = 1000
@@ -39,7 +40,7 @@ var (
 	_ TrieView = (*merkleDB)(nil)
 	_ MerkleDB = (*merkleDB)(nil)
 
-	codec, version = newCodec()
+	codec = newCodec()
 
 	rootKey                 []byte
 	nodePrefix              = []byte("node")
@@ -69,7 +70,7 @@ type ChangeProofer interface {
 	//   - [proof] is non-empty iff [proof.HadRootsInHistory].
 	//   - All keys in [proof.KeyValues] and [proof.DeletedKeys] are in [start, end].
 	//     If [start] is empty, all keys are considered > [start].
-	//     If [end] is empty, all keys are considered < [end].
+	//     If [end] is nothing, all keys are considered < [end].
 	//   - [proof.KeyValues] and [proof.DeletedKeys] are sorted in order of increasing key.
 	//   - [proof.StartProof] and [proof.EndProof] are well-formed.
 	//   - When the keys in [proof.KeyValues] are added to [db] and the keys in [proof.DeletedKeys]
@@ -82,7 +83,7 @@ type ChangeProofer interface {
 		ctx context.Context,
 		proof *ChangeProof,
 		start []byte,
-		end []byte,
+		end Maybe[[]byte],
 		expectedEndRootID ids.ID,
 	) error
 
@@ -147,6 +148,9 @@ type merkleDB struct {
 	metadataDB database.Database
 
 	// If a value is nil, the corresponding key isn't in the trie.
+	// Note that a call to Put may cause a node to be evicted
+	// from the cache, which will call [OnEviction].
+	// A non-nil error returned from Put is considered fatal.
 	nodeCache         onEvictCache[path, *node]
 	onEvictionErr     utils.Atomic[error]
 	evictionBatchSize int
@@ -565,7 +569,6 @@ func (db *merkleDB) GetChangeProof(
 		return i.Compare(j) < 0
 	})
 
-	// TODO: sync.pool these buffers
 	result.KeyChanges = make([]KeyChange, 0, len(changedKeys))
 
 	for _, key := range changedKeys {
@@ -579,20 +582,22 @@ func (db *merkleDB) GetChangeProof(
 		})
 	}
 
-	largestKey := end
+	largestKey := Nothing[[]byte]()
 	if len(result.KeyChanges) > 0 {
-		largestKey = result.KeyChanges[len(result.KeyChanges)-1].Key
+		largestKey = Some(result.KeyChanges[len(result.KeyChanges)-1].Key)
+	} else if len(end) > 0 {
+		largestKey = Some(end)
 	}
 
 	// Since we hold [db.commitlock] we must still have sufficient
 	// history to recreate the trie at [endRootID].
-	historicalView, err := db.getHistoricalViewForRange(endRootID, start, largestKey)
+	historicalView, err := db.getHistoricalViewForRange(endRootID, start, largestKey.Value())
 	if err != nil {
 		return nil, err
 	}
 
-	if len(largestKey) > 0 {
-		endProof, err := historicalView.getProof(ctx, largestKey)
+	if largestKey.HasValue() {
+		endProof, err := historicalView.getProof(ctx, largestKey.Value())
 		if err != nil {
 			return nil, err
 		}
@@ -923,7 +928,7 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 	db.root = rootChange.after
 
 	for key, nodeChange := range changes.nodes {
-		if err := db.putNodeInCache(key, nodeChange.after); err != nil {
+		if err := db.nodeCache.Put(key, nodeChange.after); err != nil {
 			return err
 		}
 	}
@@ -955,10 +960,10 @@ func (db *merkleDB) VerifyChangeProof(
 	ctx context.Context,
 	proof *ChangeProof,
 	start []byte,
-	end []byte,
+	end Maybe[[]byte],
 	expectedEndRootID ids.ID,
 ) error {
-	if len(end) > 0 && bytes.Compare(start, end) > 0 {
+	if end.HasValue() && bytes.Compare(start, end.Value()) > 0 {
 		return ErrStartAfterEnd
 	}
 
@@ -975,7 +980,7 @@ func (db *merkleDB) VerifyChangeProof(
 	switch {
 	case proof.Empty():
 		return ErrNoMerkleProof
-	case len(end) > 0 && len(proof.EndProof) == 0:
+	case end.HasValue() && len(proof.EndProof) == 0:
 		// We requested an end proof but didn't get one.
 		return ErrNoEndProof
 	case len(start) > 0 && len(proof.StartProof) == 0 && len(proof.EndProof) == 0:
@@ -1001,17 +1006,18 @@ func (db *merkleDB) VerifyChangeProof(
 	// Find the greatest key in [proof.KeyChanges]
 	// Note that [proof.EndProof] is a proof for this key.
 	// [largestPath] is also used when we add children of proof nodes to [trie] below.
-	largestKey := end
+	largestPath := Nothing[path]()
 	if len(proof.KeyChanges) > 0 {
 		// If [proof] has key-value pairs, we should insert children
 		// greater than [end] to ancestors of the node containing [end]
 		// so that we get the expected root ID.
-		largestKey = proof.KeyChanges[len(proof.KeyChanges)-1].Key
+		largestPath = Some(newPath(proof.KeyChanges[len(proof.KeyChanges)-1].Key))
+	} else if end.HasValue() {
+		largestPath = Some(newPath(end.Value()))
 	}
-	largestPath := newPath(largestKey)
 
 	// Make sure the end proof, if given, is well-formed.
-	if err := verifyProofPath(proof.EndProof, largestPath); err != nil {
+	if err := verifyProofPath(proof.EndProof, largestPath.Value()); err != nil {
 		return err
 	}
 
@@ -1063,12 +1069,28 @@ func (db *merkleDB) VerifyChangeProof(
 		}
 	}
 
-	// For all the nodes along the edges of the proof, insert children < [start] and > [largestKey]
-	// into the trie so that we get the expected root ID (if this proof is valid).
-	if err := addPathInfo(view, proof.StartProof, smallestPath, largestPath); err != nil {
+	// For all the nodes along the edges of the proof, insert the children whose
+	// keys are less than [insertChildrenLessThan] or whose keys are greater
+	// than [insertChildrenGreaterThan] into the trie so that we get the
+	// expected root ID (if this proof is valid).
+	insertChildrenLessThan := Nothing[path]()
+	if len(smallestPath) > 0 {
+		insertChildrenLessThan = Some(smallestPath)
+	}
+	if err := addPathInfo(
+		view,
+		proof.StartProof,
+		insertChildrenLessThan,
+		largestPath,
+	); err != nil {
 		return err
 	}
-	if err := addPathInfo(view, proof.EndProof, smallestPath, largestPath); err != nil {
+	if err := addPathInfo(
+		view,
+		proof.EndProof,
+		insertChildrenLessThan,
+		largestPath,
+	); err != nil {
 		return err
 	}
 
@@ -1213,7 +1235,7 @@ func (db *merkleDB) getNode(key path) (*node, error) {
 		return db.root, nil
 	}
 
-	if n, isCached := db.getNodeInCache(key); isCached {
+	if n, isCached := db.nodeCache.Get(key); isCached {
 		db.metrics.DBNodeCacheHit()
 		if n == nil {
 			return nil, database.ErrNotFound
@@ -1227,7 +1249,7 @@ func (db *merkleDB) getNode(key path) (*node, error) {
 	if err != nil {
 		if err == database.ErrNotFound {
 			// Cache the miss.
-			if err := db.putNodeInCache(key, nil); err != nil {
+			if err := db.nodeCache.Put(key, nil); err != nil {
 				return nil, err
 			}
 		}
@@ -1239,7 +1261,7 @@ func (db *merkleDB) getNode(key path) (*node, error) {
 		return nil, err
 	}
 
-	err = db.putNodeInCache(key, node)
+	err = db.nodeCache.Put(key, node)
 	return node, err
 }
 
@@ -1319,20 +1341,4 @@ func (db *merkleDB) prepareRangeProofView(start []byte, proof *RangeProof) (*tri
 		}
 	}
 	return view, nil
-}
-
-// Non-nil error is fatal -- [db] will close.
-func (db *merkleDB) putNodeInCache(key path, n *node) error {
-	// TODO Cache metrics
-	// Note that this may cause a node to be evicted from the cache,
-	// which will call [OnEviction].
-	return db.nodeCache.Put(key, n)
-}
-
-func (db *merkleDB) getNodeInCache(key path) (*node, bool) {
-	// TODO Cache metrics
-	if node, ok := db.nodeCache.Get(key); ok {
-		return node, true
-	}
-	return nil, false
 }

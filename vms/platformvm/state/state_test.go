@@ -4,6 +4,7 @@
 package state
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -82,345 +84,6 @@ func TestStateSyncGenesis(t *testing.T) {
 	delegatorIterator, err = state.GetPendingDelegatorIterator(constants.PrimaryNetworkID, initialNodeID)
 	require.NoError(err)
 	assertIteratorsEqual(t, EmptyIterator, delegatorIterator)
-}
-
-func TestGetValidatorWeightDiffs(t *testing.T) {
-	require := require.New(t)
-	stateIntf, _ := newInitializedState(require)
-	state := stateIntf.(*state)
-
-	txID0 := ids.GenerateTestID()
-	txID1 := ids.GenerateTestID()
-	txID2 := ids.GenerateTestID()
-	txID3 := ids.GenerateTestID()
-
-	nodeID0 := ids.GenerateTestNodeID()
-
-	subnetID0 := ids.GenerateTestID()
-
-	type stakerDiff struct {
-		validatorsToAdd    []*Staker
-		delegatorsToAdd    []*Staker
-		validatorsToRemove []*Staker
-		delegatorsToRemove []*Staker
-
-		expectedValidatorWeightDiffs map[ids.ID]map[ids.NodeID]*ValidatorWeightDiff
-	}
-	stakerDiffs := []*stakerDiff{
-		{
-			validatorsToAdd: []*Staker{
-				{
-					TxID:     txID0,
-					NodeID:   nodeID0,
-					SubnetID: constants.PrimaryNetworkID,
-					Weight:   1,
-				},
-			},
-			expectedValidatorWeightDiffs: map[ids.ID]map[ids.NodeID]*ValidatorWeightDiff{
-				constants.PrimaryNetworkID: {
-					nodeID0: {
-						Decrease: false,
-						Amount:   1,
-					},
-				},
-			},
-		},
-		{
-			validatorsToAdd: []*Staker{
-				{
-					TxID:     txID3,
-					NodeID:   nodeID0,
-					SubnetID: subnetID0,
-					Weight:   10,
-				},
-			},
-			delegatorsToAdd: []*Staker{
-				{
-					TxID:     txID1,
-					NodeID:   nodeID0,
-					SubnetID: constants.PrimaryNetworkID,
-					Weight:   5,
-				},
-			},
-			expectedValidatorWeightDiffs: map[ids.ID]map[ids.NodeID]*ValidatorWeightDiff{
-				constants.PrimaryNetworkID: {
-					nodeID0: {
-						Decrease: false,
-						Amount:   5,
-					},
-				},
-				subnetID0: {
-					nodeID0: {
-						Decrease: false,
-						Amount:   10,
-					},
-				},
-			},
-		},
-		{
-			delegatorsToAdd: []*Staker{
-				{
-					TxID:     txID2,
-					NodeID:   nodeID0,
-					SubnetID: constants.PrimaryNetworkID,
-					Weight:   15,
-				},
-			},
-			delegatorsToRemove: []*Staker{
-				{
-					TxID:     txID1,
-					NodeID:   nodeID0,
-					SubnetID: constants.PrimaryNetworkID,
-					Weight:   5,
-				},
-			},
-			expectedValidatorWeightDiffs: map[ids.ID]map[ids.NodeID]*ValidatorWeightDiff{
-				constants.PrimaryNetworkID: {
-					nodeID0: {
-						Decrease: false,
-						Amount:   10,
-					},
-				},
-			},
-		},
-		{
-			validatorsToRemove: []*Staker{
-				{
-					TxID:     txID0,
-					NodeID:   nodeID0,
-					SubnetID: constants.PrimaryNetworkID,
-					Weight:   1,
-				},
-				{
-					TxID:     txID3,
-					NodeID:   nodeID0,
-					SubnetID: subnetID0,
-					Weight:   10,
-				},
-			},
-			delegatorsToRemove: []*Staker{
-				{
-					TxID:     txID2,
-					NodeID:   nodeID0,
-					SubnetID: constants.PrimaryNetworkID,
-					Weight:   15,
-				},
-			},
-			expectedValidatorWeightDiffs: map[ids.ID]map[ids.NodeID]*ValidatorWeightDiff{
-				constants.PrimaryNetworkID: {
-					nodeID0: {
-						Decrease: true,
-						Amount:   16,
-					},
-				},
-				subnetID0: {
-					nodeID0: {
-						Decrease: true,
-						Amount:   10,
-					},
-				},
-			},
-		},
-		{},
-	}
-
-	for i, stakerDiff := range stakerDiffs {
-		for _, validator := range stakerDiff.validatorsToAdd {
-			state.PutCurrentValidator(validator)
-		}
-		for _, delegator := range stakerDiff.delegatorsToAdd {
-			state.PutCurrentDelegator(delegator)
-		}
-		for _, validator := range stakerDiff.validatorsToRemove {
-			state.DeleteCurrentValidator(validator)
-		}
-		for _, delegator := range stakerDiff.delegatorsToRemove {
-			state.DeleteCurrentDelegator(delegator)
-		}
-		state.SetHeight(uint64(i + 1))
-		require.NoError(state.Commit())
-
-		// Calling write again should not change the state.
-		state.SetHeight(uint64(i + 1))
-		require.NoError(state.Commit())
-
-		for j, stakerDiff := range stakerDiffs[:i+1] {
-			for subnetID, expectedValidatorWeightDiffs := range stakerDiff.expectedValidatorWeightDiffs {
-				validatorWeightDiffs, err := state.GetValidatorWeightDiffs(uint64(j+1), subnetID)
-				require.NoError(err)
-				require.Equal(expectedValidatorWeightDiffs, validatorWeightDiffs)
-			}
-
-			state.validatorWeightDiffsCache.Flush()
-		}
-	}
-}
-
-func TestGetValidatorPublicKeyDiffs(t *testing.T) {
-	require := require.New(t)
-	stateIntf, _ := newInitializedState(require)
-	state := stateIntf.(*state)
-
-	var (
-		numNodes = 6
-		txIDs    = make([]ids.ID, numNodes)
-		nodeIDs  = make([]ids.NodeID, numNodes)
-		sks      = make([]*bls.SecretKey, numNodes)
-		pks      = make([]*bls.PublicKey, numNodes)
-		pkBytes  = make([][]byte, numNodes)
-		err      error
-	)
-	for i := 0; i < numNodes; i++ {
-		txIDs[i] = ids.GenerateTestID()
-		nodeIDs[i] = ids.GenerateTestNodeID()
-		sks[i], err = bls.NewSecretKey()
-		require.NoError(err)
-		pks[i] = bls.PublicFromSecretKey(sks[i])
-		pkBytes[i] = bls.PublicKeyToBytes(pks[i])
-	}
-
-	type stakerDiff struct {
-		validatorsToAdd        []*Staker
-		validatorsToRemove     []*Staker
-		expectedPublicKeyDiffs map[ids.NodeID]*bls.PublicKey
-	}
-	stakerDiffs := []*stakerDiff{
-		{
-			// Add two validators
-			validatorsToAdd: []*Staker{
-				{
-					TxID:      txIDs[0],
-					NodeID:    nodeIDs[0],
-					Weight:    1,
-					PublicKey: pks[0],
-				},
-				{
-					TxID:      txIDs[1],
-					NodeID:    nodeIDs[1],
-					Weight:    10,
-					PublicKey: pks[1],
-				},
-			},
-			expectedPublicKeyDiffs: map[ids.NodeID]*bls.PublicKey{},
-		},
-		{
-			// Remove a validator
-			validatorsToRemove: []*Staker{
-				{
-					TxID:      txIDs[0],
-					NodeID:    nodeIDs[0],
-					Weight:    1,
-					PublicKey: pks[0],
-				},
-			},
-			expectedPublicKeyDiffs: map[ids.NodeID]*bls.PublicKey{
-				nodeIDs[0]: pks[0],
-			},
-		},
-		{
-			// Add 2 validators and remove a validator
-			validatorsToAdd: []*Staker{
-				{
-					TxID:      txIDs[2],
-					NodeID:    nodeIDs[2],
-					Weight:    10,
-					PublicKey: pks[2],
-				},
-				{
-					TxID:      txIDs[3],
-					NodeID:    nodeIDs[3],
-					Weight:    10,
-					PublicKey: pks[3],
-				},
-			},
-			validatorsToRemove: []*Staker{
-				{
-					TxID:      txIDs[1],
-					NodeID:    nodeIDs[1],
-					Weight:    10,
-					PublicKey: pks[1],
-				},
-			},
-			expectedPublicKeyDiffs: map[ids.NodeID]*bls.PublicKey{
-				nodeIDs[1]: pks[1],
-			},
-		},
-		{
-			// Remove 2 validators and add a validator
-			validatorsToAdd: []*Staker{
-				{
-					TxID:      txIDs[4],
-					NodeID:    nodeIDs[4],
-					Weight:    10,
-					PublicKey: pks[4],
-				},
-			},
-			validatorsToRemove: []*Staker{
-				{
-					TxID:      txIDs[2],
-					NodeID:    nodeIDs[2],
-					Weight:    10,
-					PublicKey: pks[2],
-				},
-				{
-					TxID:      txIDs[3],
-					NodeID:    nodeIDs[3],
-					Weight:    10,
-					PublicKey: pks[3],
-				},
-			},
-			expectedPublicKeyDiffs: map[ids.NodeID]*bls.PublicKey{
-				nodeIDs[2]: pks[2],
-				nodeIDs[3]: pks[3],
-			},
-		},
-		{
-			// Add a validator with no pub key
-			validatorsToAdd: []*Staker{
-				{
-					TxID:      txIDs[5],
-					NodeID:    nodeIDs[5],
-					Weight:    10,
-					PublicKey: nil,
-				},
-			},
-			expectedPublicKeyDiffs: map[ids.NodeID]*bls.PublicKey{},
-		},
-		{
-			// Remove a validator with no pub key
-			validatorsToRemove: []*Staker{
-				{
-					TxID:      txIDs[5],
-					NodeID:    nodeIDs[5],
-					Weight:    10,
-					PublicKey: nil,
-				},
-			},
-			expectedPublicKeyDiffs: map[ids.NodeID]*bls.PublicKey{},
-		},
-	}
-
-	for i, stakerDiff := range stakerDiffs {
-		for _, validator := range stakerDiff.validatorsToAdd {
-			state.PutCurrentValidator(validator)
-		}
-		for _, validator := range stakerDiff.validatorsToRemove {
-			state.DeleteCurrentValidator(validator)
-		}
-		state.SetHeight(uint64(i + 1))
-		require.NoError(state.Commit())
-
-		// Calling write again should not change the state.
-		state.SetHeight(uint64(i + 1))
-		require.NoError(state.Commit())
-
-		for j, stakerDiff := range stakerDiffs[:i+1] {
-			pkDiffs, err := state.GetValidatorPublicKeyDiffs(uint64(j + 1))
-			require.NoError(err)
-			require.Equal(stakerDiff.expectedPublicKeyDiffs, pkDiffs)
-			state.validatorPublicKeyDiffsCache.Flush()
-		}
-	}
 }
 
 func newInitializedState(require *require.Assertions) (State, database.Database) {
@@ -496,12 +159,15 @@ func newStateFromDB(require *require.Assertions, db database.Database) State {
 	vdrs := validators.NewManager()
 	primaryVdrs := validators.NewSet()
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
-	state, err := new(
+
+	execCfg, _ := config.GetExecutionConfig(nil)
+	state, err := newState(
 		db,
 		metrics.Noop,
 		&config.Config{
 			Validators: vdrs,
 		},
+		execCfg,
 		&snow.Context{},
 		prometheus.NewRegistry(),
 		reward.NewCalculator(reward.Config{
@@ -649,15 +315,16 @@ func TestValidatorWeightDiff(t *testing.T) {
 				errs.Add(op(diff))
 			}
 			require.ErrorIs(errs.Err, tt.expectedErr)
-			if tt.expectedErr == nil {
-				require.Equal(tt.expected, diff)
+			if tt.expectedErr != nil {
+				return
 			}
+			require.Equal(tt.expected, diff)
 		})
 	}
 }
 
 // Tests PutCurrentValidator, DeleteCurrentValidator, GetCurrentValidator,
-// GetValidatorWeightDiffs, GetValidatorPublicKeyDiffs
+// ApplyValidatorWeightDiffs, ApplyValidatorPublicKeyDiffs
 func TestStateAddRemoveValidator(t *testing.T) {
 	require := require.New(t)
 
@@ -690,147 +357,303 @@ func TestStateAddRemoveValidator(t *testing.T) {
 	}
 
 	type diff struct {
-		added                            []Staker
-		removed                          []Staker
-		expectedSubnetWeightDiff         map[ids.NodeID]*ValidatorWeightDiff
-		expectedPrimaryNetworkWeightDiff map[ids.NodeID]*ValidatorWeightDiff
-		expectedPublicKeyDiff            map[ids.NodeID]*bls.PublicKey
+		addedValidators   []Staker
+		addedDelegators   []Staker
+		removedDelegators []Staker
+		removedValidators []Staker
+
+		expectedPrimaryValidatorSet map[ids.NodeID]*validators.GetValidatorOutput
+		expectedSubnetValidatorSet  map[ids.NodeID]*validators.GetValidatorOutput
 	}
 	diffs := []diff{
 		{
+			// Do nothing
+			expectedPrimaryValidatorSet: map[ids.NodeID]*validators.GetValidatorOutput{},
+			expectedSubnetValidatorSet:  map[ids.NodeID]*validators.GetValidatorOutput{},
+		},
+		{
 			// Add a subnet validator
-			added:                            []Staker{stakers[0]},
-			expectedPrimaryNetworkWeightDiff: map[ids.NodeID]*ValidatorWeightDiff{},
-			expectedSubnetWeightDiff: map[ids.NodeID]*ValidatorWeightDiff{
+			addedValidators:             []Staker{stakers[0]},
+			expectedPrimaryValidatorSet: map[ids.NodeID]*validators.GetValidatorOutput{},
+			expectedSubnetValidatorSet: map[ids.NodeID]*validators.GetValidatorOutput{
 				stakers[0].NodeID: {
-					Decrease: false,
-					Amount:   stakers[0].Weight,
+					NodeID: stakers[0].NodeID,
+					Weight: stakers[0].Weight,
 				},
 			},
-			// No diff because this is a subnet validator
-			expectedPublicKeyDiff: map[ids.NodeID]*bls.PublicKey{},
 		},
 		{
 			// Remove a subnet validator
-			removed:                          []Staker{stakers[0]},
-			expectedPrimaryNetworkWeightDiff: map[ids.NodeID]*ValidatorWeightDiff{},
-			expectedSubnetWeightDiff: map[ids.NodeID]*ValidatorWeightDiff{
-				stakers[0].NodeID: {
-					Decrease: true,
-					Amount:   stakers[0].Weight,
-				},
-			},
-			// No diff because this is a subnet validator
-			expectedPublicKeyDiff: map[ids.NodeID]*bls.PublicKey{},
+			removedValidators:           []Staker{stakers[0]},
+			expectedPrimaryValidatorSet: map[ids.NodeID]*validators.GetValidatorOutput{},
+			expectedSubnetValidatorSet:  map[ids.NodeID]*validators.GetValidatorOutput{},
 		},
 		{ // Add a primary network validator
-			added: []Staker{stakers[1]},
-			expectedPrimaryNetworkWeightDiff: map[ids.NodeID]*ValidatorWeightDiff{
+			addedValidators: []Staker{stakers[1]},
+			expectedPrimaryValidatorSet: map[ids.NodeID]*validators.GetValidatorOutput{
 				stakers[1].NodeID: {
-					Decrease: false,
-					Amount:   stakers[1].Weight,
+					NodeID:    stakers[1].NodeID,
+					PublicKey: stakers[1].PublicKey,
+					Weight:    stakers[1].Weight,
 				},
 			},
-			expectedSubnetWeightDiff: map[ids.NodeID]*ValidatorWeightDiff{},
-			expectedPublicKeyDiff:    map[ids.NodeID]*bls.PublicKey{},
+			expectedSubnetValidatorSet: map[ids.NodeID]*validators.GetValidatorOutput{},
+		},
+		{
+			// Do nothing
+			expectedPrimaryValidatorSet: map[ids.NodeID]*validators.GetValidatorOutput{
+				stakers[1].NodeID: {
+					NodeID:    stakers[1].NodeID,
+					PublicKey: stakers[1].PublicKey,
+					Weight:    stakers[1].Weight,
+				},
+			},
+			expectedSubnetValidatorSet: map[ids.NodeID]*validators.GetValidatorOutput{},
 		},
 		{ // Remove a primary network validator
-			removed: []Staker{stakers[1]},
-			expectedPrimaryNetworkWeightDiff: map[ids.NodeID]*ValidatorWeightDiff{
-				stakers[1].NodeID: {
-					Decrease: true,
-					Amount:   stakers[1].Weight,
-				},
-			},
-			expectedSubnetWeightDiff: map[ids.NodeID]*ValidatorWeightDiff{},
-			expectedPublicKeyDiff: map[ids.NodeID]*bls.PublicKey{
-				stakers[1].NodeID: stakers[1].PublicKey,
-			},
+			removedValidators:           []Staker{stakers[1]},
+			expectedPrimaryValidatorSet: map[ids.NodeID]*validators.GetValidatorOutput{},
+			expectedSubnetValidatorSet:  map[ids.NodeID]*validators.GetValidatorOutput{},
 		},
 		{
 			// Add 2 subnet validators and a primary network validator
-			added: []Staker{stakers[0], stakers[1], stakers[2]},
-			expectedPrimaryNetworkWeightDiff: map[ids.NodeID]*ValidatorWeightDiff{
+			addedValidators: []Staker{stakers[0], stakers[1], stakers[2]},
+			expectedPrimaryValidatorSet: map[ids.NodeID]*validators.GetValidatorOutput{
 				stakers[1].NodeID: {
-					Decrease: false,
-					Amount:   stakers[1].Weight,
+					NodeID:    stakers[1].NodeID,
+					PublicKey: stakers[1].PublicKey,
+					Weight:    stakers[1].Weight,
 				},
 			},
-			expectedSubnetWeightDiff: map[ids.NodeID]*ValidatorWeightDiff{
+			expectedSubnetValidatorSet: map[ids.NodeID]*validators.GetValidatorOutput{
 				stakers[0].NodeID: {
-					Decrease: false,
-					Amount:   stakers[0].Weight,
+					NodeID: stakers[0].NodeID,
+					Weight: stakers[0].Weight,
 				},
 				stakers[2].NodeID: {
-					Decrease: false,
-					Amount:   stakers[2].Weight,
+					NodeID: stakers[2].NodeID,
+					Weight: stakers[2].Weight,
 				},
 			},
-			expectedPublicKeyDiff: map[ids.NodeID]*bls.PublicKey{},
 		},
 		{
 			// Remove 2 subnet validators and a primary network validator.
-			removed: []Staker{stakers[0], stakers[1], stakers[2]},
-			expectedPrimaryNetworkWeightDiff: map[ids.NodeID]*ValidatorWeightDiff{
-				stakers[1].NodeID: {
-					Decrease: true,
-					Amount:   stakers[1].Weight,
-				},
-			},
-			expectedSubnetWeightDiff: map[ids.NodeID]*ValidatorWeightDiff{
-				stakers[0].NodeID: {
-					Decrease: true,
-					Amount:   stakers[0].Weight,
-				},
-				stakers[2].NodeID: {
-					Decrease: true,
-					Amount:   stakers[2].Weight,
-				},
-			},
-			expectedPublicKeyDiff: map[ids.NodeID]*bls.PublicKey{
-				stakers[1].NodeID: stakers[1].PublicKey,
-			},
+			removedValidators:           []Staker{stakers[0], stakers[1], stakers[2]},
+			expectedPrimaryValidatorSet: map[ids.NodeID]*validators.GetValidatorOutput{},
+			expectedSubnetValidatorSet:  map[ids.NodeID]*validators.GetValidatorOutput{},
 		},
 	}
-
-	for i, diff := range diffs {
-		for _, added := range diff.added {
+	for currentIndex, diff := range diffs {
+		for _, added := range diff.addedValidators {
 			added := added
 			state.PutCurrentValidator(&added)
 		}
-		for _, removed := range diff.removed {
+		for _, added := range diff.addedDelegators {
+			added := added
+			state.PutCurrentDelegator(&added)
+		}
+		for _, removed := range diff.removedDelegators {
+			removed := removed
+			state.DeleteCurrentDelegator(&removed)
+		}
+		for _, removed := range diff.removedValidators {
 			removed := removed
 			state.DeleteCurrentValidator(&removed)
 		}
 
-		newHeight := uint64(i + 1)
-		state.SetHeight(newHeight)
+		currentHeight := uint64(currentIndex + 1)
+		state.SetHeight(currentHeight)
 
 		require.NoError(state.Commit())
 
-		for _, added := range diff.added {
+		for _, added := range diff.addedValidators {
 			gotValidator, err := state.GetCurrentValidator(added.SubnetID, added.NodeID)
 			require.NoError(err)
 			require.Equal(added, *gotValidator)
 		}
 
-		for _, removed := range diff.removed {
+		for _, removed := range diff.removedValidators {
 			_, err := state.GetCurrentValidator(removed.SubnetID, removed.NodeID)
 			require.ErrorIs(err, database.ErrNotFound)
 		}
 
-		// Assert that we get the expected weight diffs
-		gotSubnetWeightDiffs, err := state.GetValidatorWeightDiffs(newHeight, subnetID)
-		require.NoError(err)
-		require.Equal(diff.expectedSubnetWeightDiff, gotSubnetWeightDiffs)
+		for i := 0; i < currentIndex; i++ {
+			prevDiff := diffs[i]
+			prevHeight := uint64(i + 1)
 
-		gotWeightDiffs, err := state.GetValidatorWeightDiffs(newHeight, constants.PrimaryNetworkID)
-		require.NoError(err)
-		require.Equal(diff.expectedPrimaryNetworkWeightDiff, gotWeightDiffs)
+			primaryValidatorSet := copyValidatorSet(diff.expectedPrimaryValidatorSet)
+			require.NoError(state.ApplyValidatorWeightDiffs(
+				context.Background(),
+				primaryValidatorSet,
+				currentHeight,
+				prevHeight+1,
+				constants.PrimaryNetworkID,
+			))
+			requireEqualWeightsValidatorSet(require, prevDiff.expectedPrimaryValidatorSet, primaryValidatorSet)
 
-		// Assert that we get the expected public key diff
-		gotPublicKeyDiffs, err := state.GetValidatorPublicKeyDiffs(newHeight)
+			require.NoError(state.ApplyValidatorPublicKeyDiffs(
+				context.Background(),
+				primaryValidatorSet,
+				currentHeight,
+				prevHeight+1,
+			))
+			requireEqualPublicKeysValidatorSet(require, prevDiff.expectedPrimaryValidatorSet, primaryValidatorSet)
+
+			subnetValidatorSet := copyValidatorSet(diff.expectedSubnetValidatorSet)
+			require.NoError(state.ApplyValidatorWeightDiffs(
+				context.Background(),
+				subnetValidatorSet,
+				currentHeight,
+				prevHeight+1,
+				subnetID,
+			))
+			requireEqualWeightsValidatorSet(require, prevDiff.expectedSubnetValidatorSet, subnetValidatorSet)
+		}
+	}
+}
+
+func copyValidatorSet(
+	input map[ids.NodeID]*validators.GetValidatorOutput,
+) map[ids.NodeID]*validators.GetValidatorOutput {
+	result := make(map[ids.NodeID]*validators.GetValidatorOutput, len(input))
+	for nodeID, vdr := range input {
+		vdrCopy := *vdr
+		result[nodeID] = &vdrCopy
+	}
+	return result
+}
+
+func requireEqualWeightsValidatorSet(
+	require *require.Assertions,
+	expected map[ids.NodeID]*validators.GetValidatorOutput,
+	actual map[ids.NodeID]*validators.GetValidatorOutput,
+) {
+	require.Len(actual, len(expected))
+	for nodeID, expectedVdr := range expected {
+		require.Contains(actual, nodeID)
+
+		actualVdr := actual[nodeID]
+		require.Equal(expectedVdr.NodeID, actualVdr.NodeID)
+		require.Equal(expectedVdr.Weight, actualVdr.Weight)
+	}
+}
+
+func requireEqualPublicKeysValidatorSet(
+	require *require.Assertions,
+	expected map[ids.NodeID]*validators.GetValidatorOutput,
+	actual map[ids.NodeID]*validators.GetValidatorOutput,
+) {
+	require.Len(actual, len(expected))
+	for nodeID, expectedVdr := range expected {
+		require.Contains(actual, nodeID)
+
+		actualVdr := actual[nodeID]
+		require.Equal(expectedVdr.NodeID, actualVdr.NodeID)
+		require.Equal(expectedVdr.PublicKey, actualVdr.PublicKey)
+	}
+}
+
+func TestParsedStateBlock(t *testing.T) {
+	require := require.New(t)
+
+	var blks []blocks.Block
+
+	{
+		blk, err := blocks.NewApricotAbortBlock(ids.GenerateTestID(), 1000)
 		require.NoError(err)
-		require.Equal(diff.expectedPublicKeyDiff, gotPublicKeyDiffs)
+		blks = append(blks, blk)
+	}
+
+	{
+		blk, err := blocks.NewApricotAtomicBlock(ids.GenerateTestID(), 1000, &txs.Tx{
+			Unsigned: &txs.AdvanceTimeTx{
+				Time: 1000,
+			},
+		})
+		require.NoError(err)
+		blks = append(blks, blk)
+	}
+
+	{
+		blk, err := blocks.NewApricotCommitBlock(ids.GenerateTestID(), 1000)
+		require.NoError(err)
+		blks = append(blks, blk)
+	}
+
+	{
+		blk, err := blocks.NewApricotProposalBlock(ids.GenerateTestID(), 1000, &txs.Tx{
+			Unsigned: &txs.RewardValidatorTx{
+				TxID: ids.GenerateTestID(),
+			},
+		})
+		require.NoError(err)
+		blks = append(blks, blk)
+	}
+
+	{
+		blk, err := blocks.NewApricotStandardBlock(ids.GenerateTestID(), 1000, []*txs.Tx{
+			{
+				Unsigned: &txs.RewardValidatorTx{
+					TxID: ids.GenerateTestID(),
+				},
+			},
+		})
+		require.NoError(err)
+		blks = append(blks, blk)
+	}
+
+	{
+		blk, err := blocks.NewBanffAbortBlock(time.Now(), ids.GenerateTestID(), 1000)
+		require.NoError(err)
+		blks = append(blks, blk)
+	}
+
+	{
+		blk, err := blocks.NewBanffCommitBlock(time.Now(), ids.GenerateTestID(), 1000)
+		require.NoError(err)
+		blks = append(blks, blk)
+	}
+
+	{
+		blk, err := blocks.NewBanffProposalBlock(time.Now(), ids.GenerateTestID(), 1000, &txs.Tx{
+			Unsigned: &txs.RewardValidatorTx{
+				TxID: ids.GenerateTestID(),
+			},
+		})
+		require.NoError(err)
+		blks = append(blks, blk)
+	}
+
+	{
+		blk, err := blocks.NewBanffStandardBlock(time.Now(), ids.GenerateTestID(), 1000, []*txs.Tx{
+			{
+				Unsigned: &txs.RewardValidatorTx{
+					TxID: ids.GenerateTestID(),
+				},
+			},
+		})
+		require.NoError(err)
+		blks = append(blks, blk)
+	}
+
+	for _, blk := range blks {
+		stBlk := stateBlk{
+			Blk:    blk,
+			Bytes:  blk.Bytes(),
+			Status: choices.Accepted,
+		}
+
+		stBlkBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, &stBlk)
+		require.NoError(err)
+
+		gotBlk, _, isStateBlk, err := parseStoredBlock(stBlkBytes)
+		require.NoError(err)
+		require.True(isStateBlk)
+		require.Equal(blk.ID(), gotBlk.ID())
+
+		gotBlk, _, isStateBlk, err = parseStoredBlock(blk.Bytes())
+		require.NoError(err)
+		require.False(isStateBlk)
+		require.Equal(blk.ID(), gotBlk.ID())
 	}
 }

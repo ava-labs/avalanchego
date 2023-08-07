@@ -63,18 +63,7 @@ const (
 var (
 	// Deprecated key --> deprecation message (i.e. which key replaces it)
 	// TODO: deprecate "BootstrapIDsKey" and "BootstrapIPsKey"
-	deprecatedKeys = map[string]string{
-		NetworkCompressionEnabledKey:           fmt.Sprintf("use --%s instead", NetworkCompressionTypeKey),
-		GenesisConfigFileKey:                   fmt.Sprintf("use --%s instead", GenesisFileKey),
-		GenesisConfigContentKey:                fmt.Sprintf("use --%s instead", GenesisFileContentKey),
-		InboundConnUpgradeThrottlerCooldownKey: fmt.Sprintf("use --%s instead", NetworkInboundConnUpgradeThrottlerCooldownKey),
-		InboundThrottlerMaxConnsPerSecKey:      fmt.Sprintf("use --%s instead", NetworkInboundThrottlerMaxConnsPerSecKey),
-		OutboundConnectionThrottlingRpsKey:     fmt.Sprintf("use --%s instead", NetworkOutboundConnectionThrottlingRpsKey),
-		OutboundConnectionTimeoutKey:           fmt.Sprintf("use --%s instead", NetworkOutboundConnectionTimeoutKey),
-		StakingEnabledKey:                      fmt.Sprintf("use --%s instead", SybilProtectionEnabledKey),
-		StakingDisabledWeightKey:               fmt.Sprintf("use --%s instead", SybilProtectionDisabledWeightKey),
-		ConsensusGossipFrequencyKey:            fmt.Sprintf("use --%s instead", ConsensusAcceptedFrontierGossipFrequencyKey),
-	}
+	deprecatedKeys = map[string]string{}
 
 	errSybilProtectionDisabledStakerWeights   = errors.New("sybil protection disabled weights must be positive")
 	errSybilProtectionDisabledOnPublicNetwork = errors.New("sybil protection disabled on public network")
@@ -314,35 +303,25 @@ func getGossipConfig(v *viper.Viper) subnets.GossipConfig {
 
 func getNetworkConfig(
 	v *viper.Viper,
+	networkID uint32,
 	sybilProtectionEnabled bool,
 	halflife time.Duration,
 ) (network.Config, error) {
 	// Set the max number of recent inbound connections upgraded to be
 	// equal to the max number of inbound connections per second.
-	maxInboundConnsPerSec := v.GetFloat64(getRenamedKey(v, InboundThrottlerMaxConnsPerSecKey, NetworkInboundThrottlerMaxConnsPerSecKey))
-	upgradeCooldown := v.GetDuration(getRenamedKey(v, InboundConnUpgradeThrottlerCooldownKey, NetworkInboundConnUpgradeThrottlerCooldownKey))
+	maxInboundConnsPerSec := v.GetFloat64(NetworkInboundThrottlerMaxConnsPerSecKey)
+	upgradeCooldown := v.GetDuration(NetworkInboundConnUpgradeThrottlerCooldownKey)
 	upgradeCooldownInSeconds := upgradeCooldown.Seconds()
 	maxRecentConnsUpgraded := int(math.Ceil(maxInboundConnsPerSec * upgradeCooldownInSeconds))
 
-	var (
-		compressionType compression.Type
-		err             error
-	)
-	if v.IsSet(NetworkCompressionTypeKey) {
-		if v.IsSet(NetworkCompressionEnabledKey) {
-			return network.Config{}, fmt.Errorf("cannot set both %q and %q", NetworkCompressionTypeKey, NetworkCompressionEnabledKey)
-		}
+	compressionType, err := compression.TypeFromString(v.GetString(NetworkCompressionTypeKey))
+	if err != nil {
+		return network.Config{}, err
+	}
 
-		compressionType, err = compression.TypeFromString(v.GetString(NetworkCompressionTypeKey))
-		if err != nil {
-			return network.Config{}, err
-		}
-	} else {
-		if v.GetBool(NetworkCompressionEnabledKey) {
-			compressionType = constants.DefaultNetworkCompressionType
-		} else {
-			compressionType = compression.TypeNone
-		}
+	allowPrivateIPs := !constants.ProductionNetworkIDs.Contains(networkID)
+	if v.IsSet(NetworkAllowPrivateIPsKey) {
+		allowPrivateIPs = v.GetBool(NetworkAllowPrivateIPsKey)
 	}
 
 	config := network.Config{
@@ -393,8 +372,8 @@ func getNetworkConfig(
 		ProxyReadHeaderTimeout: v.GetDuration(NetworkTCPProxyReadTimeoutKey),
 
 		DialerConfig: dialer.Config{
-			ThrottleRps:       v.GetUint32(getRenamedKey(v, OutboundConnectionThrottlingRpsKey, NetworkOutboundConnectionThrottlingRpsKey)),
-			ConnectionTimeout: v.GetDuration(getRenamedKey(v, OutboundConnectionTimeoutKey, NetworkOutboundConnectionTimeoutKey)),
+			ThrottleRps:       v.GetUint32(NetworkOutboundConnectionThrottlingRpsKey),
+			ConnectionTimeout: v.GetDuration(NetworkOutboundConnectionTimeoutKey),
 		},
 
 		TLSKeyLogFile: v.GetString(NetworkTLSKeyLogFileKey),
@@ -420,7 +399,7 @@ func getNetworkConfig(
 		MaxClockDifference:           v.GetDuration(NetworkMaxClockDifferenceKey),
 		CompressionType:              compressionType,
 		PingFrequency:                v.GetDuration(NetworkPingFrequencyKey),
-		AllowPrivateIPs:              v.GetBool(NetworkAllowPrivateIPsKey),
+		AllowPrivateIPs:              allowPrivateIPs,
 		UptimeMetricFreq:             v.GetDuration(UptimeMetricFreqKey),
 		MaximumInboundMessageTimeout: v.GetDuration(NetworkMaximumInboundTimeoutKey),
 
@@ -603,18 +582,22 @@ func getIPConfig(v *viper.Viper) (node.IPConfig, error) {
 		return node.IPConfig{}, fmt.Errorf("only one of --%s and --%s can be given", PublicIPKey, PublicIPResolutionServiceKey)
 	}
 
+	// Define default configuration
+	ipConfig := node.IPConfig{
+		IPUpdater:        dynamicip.NewNoUpdater(),
+		IPResolutionFreq: ipResolutionFreq,
+		Nat:              nat.NewNoRouter(),
+		ListenHost:       v.GetString(StakingHostKey),
+	}
+
 	if publicIP != "" {
 		// User specified a specific public IP to use.
 		ip := net.ParseIP(publicIP)
 		if ip == nil {
 			return node.IPConfig{}, fmt.Errorf("invalid IP Address %s", publicIP)
 		}
-		return node.IPConfig{
-			IPPort:           ips.NewDynamicIPPort(ip, stakingPort),
-			IPUpdater:        dynamicip.NewNoUpdater(),
-			IPResolutionFreq: ipResolutionFreq,
-			Nat:              nat.NewNoRouter(),
-		}, nil
+		ipConfig.IPPort = ips.NewDynamicIPPort(ip, stakingPort)
+		return ipConfig, nil
 	}
 	if ipResolutionService != "" {
 		// User specified to use dynamic IP resolution.
@@ -630,18 +613,9 @@ func getIPConfig(v *viper.Viper) (node.IPConfig, error) {
 		if err != nil {
 			return node.IPConfig{}, fmt.Errorf("couldn't resolve public IP: %w", err)
 		}
-		ipPort := ips.NewDynamicIPPort(ip, stakingPort)
-
-		return node.IPConfig{
-			IPPort: ipPort,
-			IPUpdater: dynamicip.NewUpdater(
-				ipPort,
-				resolver,
-				ipResolutionFreq,
-			),
-			IPResolutionFreq: ipResolutionFreq,
-			Nat:              nat.NewNoRouter(),
-		}, nil
+		ipConfig.IPPort = ips.NewDynamicIPPort(ip, stakingPort)
+		ipConfig.IPUpdater = dynamicip.NewUpdater(ipConfig.IPPort, resolver, ipResolutionFreq)
+		return ipConfig, nil
 	}
 
 	// User didn't specify a public IP to use, and they didn't specify a public IP resolution
@@ -651,13 +625,10 @@ func getIPConfig(v *viper.Viper) (node.IPConfig, error) {
 	if err != nil {
 		return node.IPConfig{}, fmt.Errorf("public IP / IP resolution service not given and failed to resolve IP with NAT: %w", err)
 	}
-	return node.IPConfig{
-		Nat:                   nat,
-		AttemptedNATTraversal: true,
-		IPPort:                ips.NewDynamicIPPort(ip, stakingPort),
-		IPUpdater:             dynamicip.NewNoUpdater(),
-		IPResolutionFreq:      ipResolutionFreq,
-	}, nil
+	ipConfig.IPPort = ips.NewDynamicIPPort(ip, stakingPort)
+	ipConfig.Nat = nat
+	ipConfig.AttemptedNATTraversal = true
+	return ipConfig, nil
 }
 
 func getProfilerConfig(v *viper.Viper) (profiler.Config, error) {
@@ -804,8 +775,8 @@ func getStakingSigner(v *viper.Viper) (*bls.SecretKey, error) {
 
 func getStakingConfig(v *viper.Viper, networkID uint32) (node.StakingConfig, error) {
 	config := node.StakingConfig{
-		SybilProtectionEnabled:        v.GetBool(getRenamedKey(v, StakingEnabledKey, SybilProtectionEnabledKey)),
-		SybilProtectionDisabledWeight: v.GetUint64(getRenamedKey(v, StakingDisabledWeightKey, SybilProtectionDisabledWeightKey)),
+		SybilProtectionEnabled:        v.GetBool(SybilProtectionEnabledKey),
+		SybilProtectionDisabledWeight: v.GetUint64(SybilProtectionDisabledWeightKey),
 		StakingKeyPath:                GetExpandedArg(v, StakingTLSKeyPathKey),
 		StakingCertPath:               GetExpandedArg(v, StakingCertPathKey),
 		StakingSignerPath:             GetExpandedArg(v, StakingSignerKeyPathKey),
@@ -882,16 +853,14 @@ func getTxFeeConfig(v *viper.Viper, networkID uint32) genesis.TxFeeConfig {
 
 func getGenesisData(v *viper.Viper, networkID uint32, stakingCfg *genesis.StakingConfig) ([]byte, ids.ID, error) {
 	// try first loading genesis content directly from flag/env-var
-	configContentKey := getRenamedKey(v, GenesisConfigContentKey, GenesisFileContentKey)
-	if v.IsSet(configContentKey) {
-		genesisData := v.GetString(configContentKey)
+	if v.IsSet(GenesisFileContentKey) {
+		genesisData := v.GetString(GenesisFileContentKey)
 		return genesis.FromFlag(networkID, genesisData, stakingCfg)
 	}
 
-	configFileKey := getRenamedKey(v, GenesisConfigFileKey, GenesisFileKey)
 	// if content is not specified go for the file
-	if v.IsSet(configFileKey) {
-		genesisFileName := GetExpandedArg(v, configFileKey)
+	if v.IsSet(GenesisFileKey) {
+		genesisFileName := GetExpandedArg(v, GenesisFileKey)
 		return genesis.FromFile(networkID, genesisFileName, stakingCfg)
 	}
 
@@ -1273,7 +1242,7 @@ func getTraceConfig(v *viper.Viper) (trace.Config, error) {
 			Type:     exporterType,
 			Endpoint: endpoint,
 			Insecure: v.GetBool(TracingInsecureKey),
-			// TODO add support for headers
+			Headers:  v.GetStringMapString(TracingHeadersKey),
 		},
 		Enabled:         true,
 		TraceSampleRate: v.GetFloat64(TracingSampleRateKey),
@@ -1320,7 +1289,7 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	}
 
 	// Gossiping
-	nodeConfig.AcceptedFrontierGossipFrequency = v.GetDuration(getRenamedKey(v, ConsensusGossipFrequencyKey, ConsensusAcceptedFrontierGossipFrequencyKey))
+	nodeConfig.AcceptedFrontierGossipFrequency = v.GetDuration(ConsensusAcceptedFrontierGossipFrequencyKey)
 	if nodeConfig.AcceptedFrontierGossipFrequency < 0 {
 		return node.Config{}, fmt.Errorf("%s must be >= 0", ConsensusAcceptedFrontierGossipFrequencyKey)
 	}
@@ -1403,7 +1372,12 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	}
 
 	// Network Config
-	nodeConfig.NetworkConfig, err = getNetworkConfig(v, nodeConfig.SybilProtectionEnabled, healthCheckAveragerHalflife)
+	nodeConfig.NetworkConfig, err = getNetworkConfig(
+		v,
+		nodeConfig.NetworkID,
+		nodeConfig.SybilProtectionEnabled,
+		healthCheckAveragerHalflife,
+	)
 	if err != nil {
 		return node.Config{}, err
 	}
@@ -1503,6 +1477,8 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 
 	nodeConfig.ChainDataDir = GetExpandedArg(v, ChainDataDirKey)
 
+	nodeConfig.ProcessContextFilePath = GetExpandedArg(v, ProcessContextFileKey)
+
 	nodeConfig.ProvidedFlags = providedFlags(v)
 	return nodeConfig, nil
 }
@@ -1516,13 +1492,4 @@ func providedFlags(v *viper.Viper) map[string]interface{} {
 		}
 	}
 	return customSettings
-}
-
-// getRenamedKey returns the new key if it is set, otherwise it returns the deprecated key.
-func getRenamedKey(v *viper.Viper, deprecatedKey string, newKey string) string {
-	if v.IsSet(newKey) {
-		return newKey
-	}
-
-	return deprecatedKey
 }

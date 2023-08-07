@@ -6,12 +6,13 @@ package nftfx
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
 func TestCredentialState(t *testing.T) {
 	intf := interface{}(&Credential{})
-	if _, ok := intf.(verify.State); ok {
-		t.Fatalf("shouldn't be marked as state")
-	}
+	_, ok := intf.(verify.State)
+	require.False(t, ok)
 }

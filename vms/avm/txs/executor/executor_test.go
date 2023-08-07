@@ -26,6 +26,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
+const trackChecksums = false
+
 var (
 	chainID = ids.ID{5, 4, 3, 2, 1}
 	assetID = ids.ID{1, 2, 3}
@@ -42,7 +44,7 @@ func TestBaseTxExecutor(t *testing.T) {
 	db := memdb.New()
 	vdb := versiondb.New(db)
 	registerer := prometheus.NewRegistry()
-	state, err := states.New(vdb, parser, registerer)
+	state, err := states.New(vdb, parser, registerer, trackChecksums)
 	require.NoError(err)
 
 	utxoID := avax.UTXOID{
@@ -147,7 +149,7 @@ func TestCreateAssetTxExecutor(t *testing.T) {
 	db := memdb.New()
 	vdb := versiondb.New(db)
 	registerer := prometheus.NewRegistry()
-	state, err := states.New(vdb, parser, registerer)
+	state, err := states.New(vdb, parser, registerer, trackChecksums)
 	require.NoError(err)
 
 	utxoID := avax.UTXOID{
@@ -290,7 +292,7 @@ func TestOperationTxExecutor(t *testing.T) {
 	db := memdb.New()
 	vdb := versiondb.New(db)
 	registerer := prometheus.NewRegistry()
-	state, err := states.New(vdb, parser, registerer)
+	state, err := states.New(vdb, parser, registerer, trackChecksums)
 	require.NoError(err)
 
 	outputOwners := secp256k1fx.OutputOwners{

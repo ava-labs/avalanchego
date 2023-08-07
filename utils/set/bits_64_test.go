@@ -3,152 +3,109 @@
 
 package set
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
 
 func TestBits64(t *testing.T) {
-	var bs1 Bits64
+	require := require.New(t)
 
-	if bs1.Len() != 0 {
-		t.Fatalf("Empty set's len should be 0")
-	}
+	var bs1 Bits64
+	require.Empty(bs1)
 
 	bs1.Add(5)
-	if bs1.Len() != 1 {
-		t.Fatalf("Wrong set length")
-	} else if !bs1.Contains(5) {
-		t.Fatalf("Set should contain element")
-	}
+	require.Equal(1, bs1.Len())
+	require.True(bs1.Contains(5))
 
 	bs1.Add(10)
-	switch {
-	case bs1.Len() != 2:
-		t.Fatalf("Wrong set length")
-	case !bs1.Contains(5):
-		t.Fatalf("Set should contain element")
-	case !bs1.Contains(10):
-		t.Fatalf("Set should contain element")
-	}
+	require.Equal(2, bs1.Len())
+	require.True(bs1.Contains(5))
+	require.True(bs1.Contains(10))
 
 	bs1.Add(10)
-	switch {
-	case bs1.Len() != 2:
-		t.Fatalf("Wrong set length")
-	case !bs1.Contains(5):
-		t.Fatalf("Set should contain element")
-	case !bs1.Contains(10):
-		t.Fatalf("Set should contain element")
-	}
+	require.Equal(2, bs1.Len())
+	require.True(bs1.Contains(5))
+	require.True(bs1.Contains(10))
 
 	var bs2 Bits64
+	require.Empty(bs2)
 
 	bs2.Add(0)
-	if bs2.Len() != 1 {
-		t.Fatalf("Wrong set length")
-	} else if !bs2.Contains(0) {
-		t.Fatalf("Set should contain element")
-	}
+	require.Equal(1, bs2.Len())
+	require.True(bs2.Contains(0))
 
 	bs2.Union(bs1)
-	switch {
-	case bs1.Len() != 2:
-		t.Fatalf("Wrong set length")
-	case !bs1.Contains(5):
-		t.Fatalf("Set should contain element")
-	case !bs1.Contains(10):
-		t.Fatalf("Set should contain element")
-	case bs2.Len() != 3:
-		t.Fatalf("Wrong set length")
-	case !bs2.Contains(0):
-		t.Fatalf("Set should contain element")
-	case !bs2.Contains(5):
-		t.Fatalf("Set should contain element")
-	case !bs2.Contains(10):
-		t.Fatalf("Set should contain element")
-	}
+	require.Equal(2, bs1.Len())
+	require.True(bs1.Contains(5))
+	require.True(bs1.Contains(10))
+	require.Equal(3, bs2.Len())
+	require.True(bs2.Contains(0))
+	require.True(bs2.Contains(5))
+	require.True(bs2.Contains(10))
 
 	bs1.Clear()
-	switch {
-	case bs1.Len() != 0:
-		t.Fatalf("Wrong set length")
-	case bs2.Len() != 3:
-		t.Fatalf("Wrong set length")
-	case !bs2.Contains(0):
-		t.Fatalf("Set should contain element")
-	case !bs2.Contains(5):
-		t.Fatalf("Set should contain element")
-	case !bs2.Contains(10):
-		t.Fatalf("Set should contain element")
-	}
+	require.Empty(bs1)
+	require.Equal(3, bs2.Len())
+	require.True(bs2.Contains(0))
+	require.True(bs2.Contains(5))
+	require.True(bs2.Contains(10))
 
 	bs1.Add(63)
-	if bs1.Len() != 1 {
-		t.Fatalf("Wrong set length")
-	} else if !bs1.Contains(63) {
-		t.Fatalf("Set should contain element")
-	}
+	require.Equal(1, bs1.Len())
+	require.True(bs1.Contains(63))
 
 	bs1.Add(1)
-	switch {
-	case bs1.Len() != 2:
-		t.Fatalf("Wrong set length")
-	case !bs1.Contains(1):
-		t.Fatalf("Set should contain element")
-	case !bs1.Contains(63):
-		t.Fatalf("Set should contain element")
-	}
+	require.Equal(2, bs1.Len())
+	require.True(bs1.Contains(1))
+	require.True(bs1.Contains(63))
 
 	bs1.Remove(63)
-	if bs1.Len() != 1 {
-		t.Fatalf("Wrong set length")
-	} else if !bs1.Contains(1) {
-		t.Fatalf("Set should contain element")
-	}
+	require.Equal(1, bs1.Len())
+	require.True(bs1.Contains(1))
 
 	var bs3 Bits64
+	require.Empty(bs3)
 
 	bs3.Add(0)
 	bs3.Add(2)
 	bs3.Add(5)
 
 	var bs4 Bits64
+	require.Empty(bs4)
 
 	bs4.Add(2)
 	bs4.Add(5)
 
 	bs3.Intersection(bs4)
 
-	switch {
-	case bs3.Len() != 2:
-		t.Fatalf("Wrong set length")
-	case !bs3.Contains(2):
-		t.Fatalf("Set should contain element")
-	case !bs3.Contains(5):
-		t.Fatalf("Set should contain element")
-	case bs4.Len() != 2:
-		t.Fatalf("Wrong set length")
-	}
+	require.Equal(2, bs3.Len())
+	require.True(bs3.Contains(2))
+	require.True(bs3.Contains(5))
+	require.Equal(2, bs4.Len())
+	require.True(bs4.Contains(2))
+	require.True(bs4.Contains(5))
 
 	var bs5 Bits64
+	require.Empty(bs5)
 
 	bs5.Add(7)
 	bs5.Add(11)
 	bs5.Add(9)
 
 	var bs6 Bits64
+	require.Empty(bs6)
 
 	bs6.Add(9)
 	bs6.Add(11)
 
 	bs5.Difference(bs6)
-
-	switch {
-	case bs5.Len() != 1:
-		t.Fatalf("Wrong set length")
-	case !bs5.Contains(7):
-		t.Fatalf("Set should contain element")
-	case bs6.Len() != 2:
-		t.Fatalf("Wrong set length")
-	}
+	require.Equal(1, bs5.Len())
+	require.True(bs5.Contains(7))
+	require.Equal(2, bs6.Len())
+	require.True(bs6.Contains(9))
+	require.True(bs6.Contains(11))
 }
 
 func TestBits64String(t *testing.T) {
@@ -156,9 +113,5 @@ func TestBits64String(t *testing.T) {
 
 	bs.Add(17)
 
-	expected := "0000000000020000"
-
-	if bsString := bs.String(); bsString != expected {
-		t.Fatalf("BitSet.String returned %s expected %s", bsString, expected)
-	}
+	require.Equal(t, "0000000000020000", bs.String())
 }

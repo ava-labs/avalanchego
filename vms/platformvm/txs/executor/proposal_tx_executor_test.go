@@ -87,7 +87,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 		require.NoError(t, target.state.Commit())
 	}
 
-	dummyH := newEnvironment(false /*=postBanff*/, false /*=postCortina*/)
+	dummyH := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/)
 	currentTimestamp := dummyH.state.GetTimestamp()
 
 	type test struct {
@@ -114,7 +114,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]},
 			setup:         nil,
 			AP3Time:       defaultGenesisTime,
-			expectedErr:   ErrOverDelegated,
+			expectedErr:   ErrPeriodMismatch,
 		},
 		{
 			description:   fmt.Sprintf("delegator should not be added more than (%s) in the future", MaxFutureStartTime),
@@ -150,7 +150,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]},
 			setup:         addMinStakeValidator,
 			AP3Time:       defaultGenesisTime,
-			expectedErr:   ErrOverDelegated,
+			expectedErr:   ErrPeriodMismatch,
 		},
 		{
 			description:   "delegator stops before validator",
@@ -162,7 +162,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 			feeKeys:       []*secp256k1.PrivateKey{preFundedKeys[0]},
 			setup:         addMinStakeValidator,
 			AP3Time:       defaultGenesisTime,
-			expectedErr:   ErrOverDelegated,
+			expectedErr:   ErrPeriodMismatch,
 		},
 		{
 			description:   "valid",
@@ -241,7 +241,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
 			require := require.New(t)
-			freshTH := newEnvironment(false /*=postBanff*/, false /*=postCortina*/)
+			freshTH := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/)
 			freshTH.config.ApricotPhase3Time = tt.AP3Time
 			defer func() {
 				require.NoError(shutdownEnvironment(freshTH))
@@ -282,7 +282,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 
 func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(false /*=postBanff*/, false /*=postCortina*/)
+	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/)
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(shutdownEnvironment(env))
@@ -318,7 +318,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		require.ErrorIs(err, ErrValidatorSubset)
+		require.ErrorIs(err, ErrPeriodMismatch)
 	}
 
 	{
@@ -444,7 +444,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		require.ErrorIs(err, ErrValidatorSubset)
+		require.ErrorIs(err, ErrPeriodMismatch)
 	}
 
 	{
@@ -474,7 +474,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 			Tx:            tx,
 		}
 		err = tx.Unsigned.Visit(&executor)
-		require.ErrorIs(err, ErrValidatorSubset)
+		require.ErrorIs(err, ErrPeriodMismatch)
 	}
 
 	{
@@ -715,7 +715,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 
 func TestProposalTxExecuteAddValidator(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(false /*=postBanff*/, false /*=postCortina*/)
+	env := newEnvironment(t, false /*=postBanff*/, false /*=postCortina*/)
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(shutdownEnvironment(env))

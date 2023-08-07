@@ -52,9 +52,7 @@ type changeSummaryAndIndex struct {
 // Tracks all of the node and value changes that resulted in the rootID.
 type changeSummary struct {
 	rootID ids.ID
-	// key is path prefix
-	nodes map[path]*change[*node]
-	// key is full path
+	nodes  map[path]*change[*node]
 	values map[path]*change[Maybe[[]byte]]
 }
 

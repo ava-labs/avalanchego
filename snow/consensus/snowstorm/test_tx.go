@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var _ Tx = (*TestTx)(nil)
@@ -16,19 +17,14 @@ var _ Tx = (*TestTx)(nil)
 type TestTx struct {
 	choices.TestDecidable
 
-	DependenciesV    []Tx
+	DependenciesV    set.Set[ids.ID]
 	DependenciesErrV error
-	InputIDsV        []ids.ID
 	VerifyV          error
 	BytesV           []byte
 }
 
-func (t *TestTx) Dependencies() ([]Tx, error) {
+func (t *TestTx) MissingDependencies() (set.Set[ids.ID], error) {
 	return t.DependenciesV, t.DependenciesErrV
-}
-
-func (t *TestTx) InputIDs() []ids.ID {
-	return t.InputIDsV
 }
 
 func (t *TestTx) Verify(context.Context) error {

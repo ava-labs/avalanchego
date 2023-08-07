@@ -48,7 +48,6 @@ func TestGetVMsSuccess(t *testing.T) {
 	require := require.New(t)
 
 	resources := initGetVMsTest(t)
-	defer resources.ctrl.Finish()
 
 	id1 := ids.GenerateTestID()
 	id2 := ids.GenerateTestID()
@@ -76,7 +75,6 @@ func TestGetVMsSuccess(t *testing.T) {
 // Tests GetVMs if we fail to list our vms.
 func TestGetVMsVMsListFactoriesFails(t *testing.T) {
 	resources := initGetVMsTest(t)
-	defer resources.ctrl.Finish()
 
 	resources.mockLog.EXPECT().Debug(gomock.Any(), gomock.Any()).Times(1)
 	resources.mockVMManager.EXPECT().ListFactories().Times(1).Return(nil, errTest)
@@ -89,7 +87,6 @@ func TestGetVMsVMsListFactoriesFails(t *testing.T) {
 // Tests GetVMs if we can't get our vm aliases.
 func TestGetVMsGetAliasesFails(t *testing.T) {
 	resources := initGetVMsTest(t)
-	defer resources.ctrl.Finish()
 
 	id1 := ids.GenerateTestID()
 	id2 := ids.GenerateTestID()

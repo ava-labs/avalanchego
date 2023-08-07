@@ -13,6 +13,8 @@ import (
 
 // Test that the DialThrottler returned by NewDialThrottler works
 func TestDialThrottler(t *testing.T) {
+	require := require.New(t)
+
 	startTime := time.Now()
 	// Allows 5 per second
 	throttler := NewDialThrottler(5)
@@ -21,12 +23,12 @@ func TestDialThrottler(t *testing.T) {
 		acquiredChan := make(chan struct{}, 1)
 		// Should return immediately because < 5 taken this second
 		go func() {
-			require.NoError(t, throttler.Acquire(context.Background()))
+			require.NoError(throttler.Acquire(context.Background()))
 			acquiredChan <- struct{}{}
 		}()
 		select {
 		case <-time.After(10 * time.Millisecond):
-			t.Fatal("should have acquired immediately")
+			require.FailNow("should have acquired immediately")
 		case <-acquiredChan:
 		}
 		close(acquiredChan)
@@ -35,14 +37,14 @@ func TestDialThrottler(t *testing.T) {
 	acquiredChan := make(chan struct{}, 1)
 	go func() {
 		// Should block because 5 already taken within last second
-		require.NoError(t, throttler.Acquire(context.Background()))
+		require.NoError(throttler.Acquire(context.Background()))
 		acquiredChan <- struct{}{}
 	}()
 
 	select {
 	case <-time.After(25 * time.Millisecond):
 	case <-acquiredChan:
-		t.Fatal("should not have been able to acquire immediately")
+		require.FailNow("should not have been able to acquire immediately")
 	}
 
 	// Wait until the 6th Acquire() has returned. The time at which
@@ -52,13 +54,13 @@ func TestDialThrottler(t *testing.T) {
 	close(acquiredChan)
 	// Use 1.05 seconds instead of 1 second to give some "wiggle room"
 	// so test doesn't flake
-	if time.Since(startTime) > 1050*time.Millisecond {
-		t.Fatal("should not have blocked for so long")
-	}
+	require.LessOrEqual(time.Since(startTime), 1050*time.Millisecond)
 }
 
 // Test that Acquire honors its specification about its context being canceled
 func TestDialThrottlerCancel(t *testing.T) {
+	require := require.New(t)
+
 	// Allows 5 per second
 	throttler := NewDialThrottler(5)
 	// Use all 5
@@ -66,12 +68,12 @@ func TestDialThrottlerCancel(t *testing.T) {
 		acquiredChan := make(chan struct{}, 1)
 		// Should return immediately because < 5 taken this second
 		go func() {
-			require.NoError(t, throttler.Acquire(context.Background()))
+			require.NoError(throttler.Acquire(context.Background()))
 			acquiredChan <- struct{}{}
 		}()
 		select {
 		case <-time.After(10 * time.Millisecond):
-			t.Fatal("should have acquired immediately")
+			require.FailNow("should have acquired immediately")
 		case <-acquiredChan:
 		}
 		close(acquiredChan)
@@ -83,7 +85,7 @@ func TestDialThrottlerCancel(t *testing.T) {
 		// Should block because 5 already taken within last second
 		err := throttler.Acquire(ctx)
 		// Should error because we call cancel() below
-		require.ErrorIs(t, err, context.Canceled)
+		require.ErrorIs(err, context.Canceled)
 		acquiredChan <- struct{}{}
 	}()
 
@@ -92,17 +94,19 @@ func TestDialThrottlerCancel(t *testing.T) {
 	select {
 	case <-acquiredChan:
 	case <-time.After(10 * time.Millisecond):
-		t.Fatal("Acquire should have returned immediately upon context cancellation")
+		require.FailNow("Acquire should have returned immediately upon context cancellation")
 	}
 	close(acquiredChan)
 }
 
 // Test that the Throttler return by NewNoThrottler never blocks on Acquire()
 func TestNoDialThrottler(t *testing.T) {
+	require := require.New(t)
+
 	throttler := NewNoDialThrottler()
 	for i := 0; i < 250; i++ {
 		startTime := time.Now()
-		require.NoError(t, throttler.Acquire(context.Background())) // Should always immediately return
-		require.WithinDuration(t, time.Now(), startTime, 25*time.Millisecond)
+		require.NoError(throttler.Acquire(context.Background())) // Should always immediately return
+		require.WithinDuration(time.Now(), startTime, 25*time.Millisecond)
 	}
 }

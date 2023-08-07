@@ -318,13 +318,13 @@ func TestSend(t *testing.T) {
 		t,
 		[]router.InboundHandler{
 			router.InboundHandlerFunc(func(context.Context, message.InboundMessage) {
-				t.Fatal("unexpected message received")
+				require.FailNow("unexpected message received")
 			}),
 			router.InboundHandlerFunc(func(_ context.Context, msg message.InboundMessage) {
 				received <- msg
 			}),
 			router.InboundHandlerFunc(func(context.Context, message.InboundMessage) {
-				t.Fatal("unexpected message received")
+				require.FailNow("unexpected message received")
 			}),
 		},
 	)
@@ -357,13 +357,13 @@ func TestSendAndGossipWithFilter(t *testing.T) {
 		t,
 		[]router.InboundHandler{
 			router.InboundHandlerFunc(func(context.Context, message.InboundMessage) {
-				t.Fatal("unexpected message received")
+				require.FailNow("unexpected message received")
 			}),
 			router.InboundHandlerFunc(func(_ context.Context, msg message.InboundMessage) {
 				received <- msg
 			}),
 			router.InboundHandlerFunc(func(context.Context, message.InboundMessage) {
-				t.Fatal("unexpected message received")
+				require.FailNow("unexpected message received")
 			}),
 		},
 	)
@@ -374,9 +374,8 @@ func TestSendAndGossipWithFilter(t *testing.T) {
 	outboundGetMsg, err := mc.Get(ids.Empty, 1, time.Second, ids.Empty, p2p.EngineType_ENGINE_TYPE_SNOWMAN)
 	require.NoError(err)
 
-	toSend := set.NewSet[ids.NodeID](3)
+	toSend := set.Of(nodeIDs...)
 	validNodeID := nodeIDs[1]
-	toSend.Add(nodeIDs...)
 	sentTo := net0.Send(outboundGetMsg, toSend, constants.PrimaryNetworkID, newNodeIDConnector(validNodeID))
 	require.Len(sentTo, 1)
 	require.Contains(sentTo, validNodeID)

@@ -11,6 +11,8 @@ import (
 )
 
 func TestMaybeClone(t *testing.T) {
+	require := require.New(t)
+
 	// Case: Value is maybe
 	{
 		val := []byte{1, 2, 3}
@@ -18,14 +20,14 @@ func TestMaybeClone(t *testing.T) {
 		m := Some(val)
 		mClone := Clone(m)
 		m.value[0] = 0
-		require.NotEqual(t, mClone.value, m.value)
-		require.Equal(t, originalVal, mClone.value)
+		require.NotEqual(mClone.value, m.value)
+		require.Equal(originalVal, mClone.value)
 	}
 
 	// Case: Value is nothing
 	{
 		m := Nothing[[]byte]()
 		mClone := Clone(m)
-		require.True(t, mClone.IsNothing())
+		require.True(mClone.IsNothing())
 	}
 }

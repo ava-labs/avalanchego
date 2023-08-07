@@ -14,13 +14,11 @@ import (
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/x/merkledb"
@@ -45,11 +43,11 @@ var ErrMinProofSizeIsTooLarge = errors.New("cannot generate any proof within the
 
 type NetworkServer struct {
 	appSender common.AppSender // Used to respond to peer requests via AppResponse.
-	db        SyncableDB
+	db        DB
 	log       logging.Logger
 }
 
-func NewNetworkServer(appSender common.AppSender, db SyncableDB, log logging.Logger) *NetworkServer {
+func NewNetworkServer(appSender common.AppSender, db DB, log logging.Logger) *NetworkServer {
 	return &NetworkServer{
 		appSender: appSender,
 		db:        db,
@@ -133,19 +131,6 @@ func (s *NetworkServer) AppRequest(
 	return nil
 }
 
-// isTimeout returns true if err is a timeout from a context cancellation
-// or a context cancellation over grpc.
-func isTimeout(err error) bool {
-	// handle grpc wrapped DeadlineExceeded
-	if e, ok := status.FromError(err); ok {
-		if e.Code() == codes.DeadlineExceeded {
-			return true
-		}
-	}
-	// otherwise, check for context.DeadlineExceeded directly
-	return errors.Is(err, context.DeadlineExceeded)
-}
-
 // Generates a change proof and sends it to [nodeID].
 func (s *NetworkServer) HandleChangeProofRequest(
 	ctx context.Context,
@@ -153,11 +138,14 @@ func (s *NetworkServer) HandleChangeProofRequest(
 	requestID uint32,
 	req *pb.SyncGetChangeProofRequest,
 ) error {
+	if req.EndKey == nil {
+		req.EndKey = &pb.MaybeBytes{IsNothing: true}
+	}
 	if req.BytesLimit == 0 ||
 		req.KeyLimit == 0 ||
-		len(req.StartRootHash) != hashing.HashLen ||
-		len(req.EndRootHash) != hashing.HashLen ||
-		(len(req.EndKey) > 0 && bytes.Compare(req.StartKey, req.EndKey) > 0) {
+		len(req.StartRootHash) != ids.IDLen ||
+		len(req.EndRootHash) != ids.IDLen ||
+		(!req.EndKey.IsNothing && bytes.Compare(req.StartKey, req.EndKey.Value) > 0) {
 		s.log.Debug(
 			"dropping invalid change proof request",
 			zap.Stringer("nodeID", nodeID),
@@ -187,7 +175,7 @@ func (s *NetworkServer) HandleChangeProofRequest(
 		if err != nil {
 			return err
 		}
-		changeProof, err := s.db.GetChangeProof(ctx, startRoot, endRoot, req.StartKey, req.EndKey, int(keyLimit))
+		changeProof, err := s.db.GetChangeProof(ctx, startRoot, endRoot, req.StartKey, req.EndKey.Value, int(keyLimit))
 		if err != nil {
 			// handle expected errors so clients cannot cause servers to spam warning logs.
 			if errors.Is(err, merkledb.ErrRootIDNotPresent) || errors.Is(err, merkledb.ErrStartRootNotFound) {
@@ -234,10 +222,13 @@ func (s *NetworkServer) HandleRangeProofRequest(
 	requestID uint32,
 	req *pb.SyncGetRangeProofRequest,
 ) error {
+	if req.EndKey == nil {
+		req.EndKey = &pb.MaybeBytes{IsNothing: true}
+	}
 	if req.BytesLimit == 0 ||
 		req.KeyLimit == 0 ||
-		len(req.RootHash) != hashing.HashLen ||
-		(len(req.EndKey) > 0 && bytes.Compare(req.StartKey, req.EndKey) > 0) {
+		len(req.RootHash) != ids.IDLen ||
+		(!req.EndKey.IsNothing && bytes.Compare(req.StartKey, req.EndKey.Value) > 0) {
 		s.log.Debug(
 			"dropping invalid range proof request",
 			zap.Stringer("nodeID", nodeID),
@@ -261,7 +252,7 @@ func (s *NetworkServer) HandleRangeProofRequest(
 		if err != nil {
 			return err
 		}
-		rangeProof, err := s.db.GetRangeProofAtRoot(ctx, root, req.StartKey, req.EndKey, int(keyLimit))
+		rangeProof, err := s.db.GetRangeProofAtRoot(ctx, root, req.StartKey, req.EndKey.Value, int(keyLimit))
 		if err != nil {
 			// handle expected errors so clients cannot cause servers to spam warning logs.
 			if errors.Is(err, merkledb.ErrRootIDNotPresent) {
@@ -289,4 +280,17 @@ func (s *NetworkServer) HandleRangeProofRequest(
 		keyLimit = uint32(len(rangeProof.KeyValues)) / 2
 	}
 	return ErrMinProofSizeIsTooLarge
+}
+
+// isTimeout returns true if err is a timeout from a context cancellation
+// or a context cancellation over grpc.
+func isTimeout(err error) bool {
+	// handle grpc wrapped DeadlineExceeded
+	if e, ok := status.FromError(err); ok {
+		if e.Code() == codes.DeadlineExceeded {
+			return true
+		}
+	}
+	// otherwise, check for context.DeadlineExceeded directly
+	return errors.Is(err, context.DeadlineExceeded)
 }

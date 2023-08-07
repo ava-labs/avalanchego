@@ -6,12 +6,13 @@ package propertyfx
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
 func TestOwnedOutputState(t *testing.T) {
 	intf := interface{}(&OwnedOutput{})
-	if _, ok := intf.(verify.State); !ok {
-		t.Fatalf("should be marked as state")
-	}
+	_, ok := intf.(verify.State)
+	require.True(t, ok)
 }

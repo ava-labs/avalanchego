@@ -20,19 +20,19 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	SyncableDB_GetMerkleRoot_FullMethodName     = "/sync.SyncableDB/GetMerkleRoot"
-	SyncableDB_GetProof_FullMethodName          = "/sync.SyncableDB/GetProof"
-	SyncableDB_GetChangeProof_FullMethodName    = "/sync.SyncableDB/GetChangeProof"
-	SyncableDB_VerifyChangeProof_FullMethodName = "/sync.SyncableDB/VerifyChangeProof"
-	SyncableDB_CommitChangeProof_FullMethodName = "/sync.SyncableDB/CommitChangeProof"
-	SyncableDB_GetRangeProof_FullMethodName     = "/sync.SyncableDB/GetRangeProof"
-	SyncableDB_CommitRangeProof_FullMethodName  = "/sync.SyncableDB/CommitRangeProof"
+	DB_GetMerkleRoot_FullMethodName     = "/sync.DB/GetMerkleRoot"
+	DB_GetProof_FullMethodName          = "/sync.DB/GetProof"
+	DB_GetChangeProof_FullMethodName    = "/sync.DB/GetChangeProof"
+	DB_VerifyChangeProof_FullMethodName = "/sync.DB/VerifyChangeProof"
+	DB_CommitChangeProof_FullMethodName = "/sync.DB/CommitChangeProof"
+	DB_GetRangeProof_FullMethodName     = "/sync.DB/GetRangeProof"
+	DB_CommitRangeProof_FullMethodName  = "/sync.DB/CommitRangeProof"
 )
 
-// SyncableDBClient is the client API for SyncableDB service.
+// DBClient is the client API for DB service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-type SyncableDBClient interface {
+type DBClient interface {
 	GetMerkleRoot(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetMerkleRootResponse, error)
 	GetProof(ctx context.Context, in *GetProofRequest, opts ...grpc.CallOption) (*GetProofResponse, error)
 	GetChangeProof(ctx context.Context, in *GetChangeProofRequest, opts ...grpc.CallOption) (*ChangeProof, error)
@@ -42,81 +42,81 @@ type SyncableDBClient interface {
 	CommitRangeProof(ctx context.Context, in *CommitRangeProofRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
-type syncableDBClient struct {
+type dBClient struct {
 	cc grpc.ClientConnInterface
 }
 
-func NewSyncableDBClient(cc grpc.ClientConnInterface) SyncableDBClient {
-	return &syncableDBClient{cc}
+func NewDBClient(cc grpc.ClientConnInterface) DBClient {
+	return &dBClient{cc}
 }
 
-func (c *syncableDBClient) GetMerkleRoot(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetMerkleRootResponse, error) {
+func (c *dBClient) GetMerkleRoot(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetMerkleRootResponse, error) {
 	out := new(GetMerkleRootResponse)
-	err := c.cc.Invoke(ctx, SyncableDB_GetMerkleRoot_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, DB_GetMerkleRoot_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *syncableDBClient) GetProof(ctx context.Context, in *GetProofRequest, opts ...grpc.CallOption) (*GetProofResponse, error) {
+func (c *dBClient) GetProof(ctx context.Context, in *GetProofRequest, opts ...grpc.CallOption) (*GetProofResponse, error) {
 	out := new(GetProofResponse)
-	err := c.cc.Invoke(ctx, SyncableDB_GetProof_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, DB_GetProof_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *syncableDBClient) GetChangeProof(ctx context.Context, in *GetChangeProofRequest, opts ...grpc.CallOption) (*ChangeProof, error) {
+func (c *dBClient) GetChangeProof(ctx context.Context, in *GetChangeProofRequest, opts ...grpc.CallOption) (*ChangeProof, error) {
 	out := new(ChangeProof)
-	err := c.cc.Invoke(ctx, SyncableDB_GetChangeProof_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, DB_GetChangeProof_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *syncableDBClient) VerifyChangeProof(ctx context.Context, in *VerifyChangeProofRequest, opts ...grpc.CallOption) (*VerifyChangeProofResponse, error) {
+func (c *dBClient) VerifyChangeProof(ctx context.Context, in *VerifyChangeProofRequest, opts ...grpc.CallOption) (*VerifyChangeProofResponse, error) {
 	out := new(VerifyChangeProofResponse)
-	err := c.cc.Invoke(ctx, SyncableDB_VerifyChangeProof_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, DB_VerifyChangeProof_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *syncableDBClient) CommitChangeProof(ctx context.Context, in *CommitChangeProofRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+func (c *dBClient) CommitChangeProof(ctx context.Context, in *CommitChangeProofRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, SyncableDB_CommitChangeProof_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, DB_CommitChangeProof_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *syncableDBClient) GetRangeProof(ctx context.Context, in *GetRangeProofRequest, opts ...grpc.CallOption) (*GetRangeProofResponse, error) {
+func (c *dBClient) GetRangeProof(ctx context.Context, in *GetRangeProofRequest, opts ...grpc.CallOption) (*GetRangeProofResponse, error) {
 	out := new(GetRangeProofResponse)
-	err := c.cc.Invoke(ctx, SyncableDB_GetRangeProof_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, DB_GetRangeProof_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *syncableDBClient) CommitRangeProof(ctx context.Context, in *CommitRangeProofRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+func (c *dBClient) CommitRangeProof(ctx context.Context, in *CommitRangeProofRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, SyncableDB_CommitRangeProof_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, DB_CommitRangeProof_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-// SyncableDBServer is the server API for SyncableDB service.
-// All implementations must embed UnimplementedSyncableDBServer
+// DBServer is the server API for DB service.
+// All implementations must embed UnimplementedDBServer
 // for forward compatibility
-type SyncableDBServer interface {
+type DBServer interface {
 	GetMerkleRoot(context.Context, *emptypb.Empty) (*GetMerkleRootResponse, error)
 	GetProof(context.Context, *GetProofRequest) (*GetProofResponse, error)
 	GetChangeProof(context.Context, *GetChangeProofRequest) (*ChangeProof, error)
@@ -124,207 +124,207 @@ type SyncableDBServer interface {
 	CommitChangeProof(context.Context, *CommitChangeProofRequest) (*emptypb.Empty, error)
 	GetRangeProof(context.Context, *GetRangeProofRequest) (*GetRangeProofResponse, error)
 	CommitRangeProof(context.Context, *CommitRangeProofRequest) (*emptypb.Empty, error)
-	mustEmbedUnimplementedSyncableDBServer()
+	mustEmbedUnimplementedDBServer()
 }
 
-// UnimplementedSyncableDBServer must be embedded to have forward compatible implementations.
-type UnimplementedSyncableDBServer struct {
+// UnimplementedDBServer must be embedded to have forward compatible implementations.
+type UnimplementedDBServer struct {
 }
 
-func (UnimplementedSyncableDBServer) GetMerkleRoot(context.Context, *emptypb.Empty) (*GetMerkleRootResponse, error) {
+func (UnimplementedDBServer) GetMerkleRoot(context.Context, *emptypb.Empty) (*GetMerkleRootResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetMerkleRoot not implemented")
 }
-func (UnimplementedSyncableDBServer) GetProof(context.Context, *GetProofRequest) (*GetProofResponse, error) {
+func (UnimplementedDBServer) GetProof(context.Context, *GetProofRequest) (*GetProofResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetProof not implemented")
 }
-func (UnimplementedSyncableDBServer) GetChangeProof(context.Context, *GetChangeProofRequest) (*ChangeProof, error) {
+func (UnimplementedDBServer) GetChangeProof(context.Context, *GetChangeProofRequest) (*ChangeProof, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetChangeProof not implemented")
 }
-func (UnimplementedSyncableDBServer) VerifyChangeProof(context.Context, *VerifyChangeProofRequest) (*VerifyChangeProofResponse, error) {
+func (UnimplementedDBServer) VerifyChangeProof(context.Context, *VerifyChangeProofRequest) (*VerifyChangeProofResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method VerifyChangeProof not implemented")
 }
-func (UnimplementedSyncableDBServer) CommitChangeProof(context.Context, *CommitChangeProofRequest) (*emptypb.Empty, error) {
+func (UnimplementedDBServer) CommitChangeProof(context.Context, *CommitChangeProofRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CommitChangeProof not implemented")
 }
-func (UnimplementedSyncableDBServer) GetRangeProof(context.Context, *GetRangeProofRequest) (*GetRangeProofResponse, error) {
+func (UnimplementedDBServer) GetRangeProof(context.Context, *GetRangeProofRequest) (*GetRangeProofResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetRangeProof not implemented")
 }
-func (UnimplementedSyncableDBServer) CommitRangeProof(context.Context, *CommitRangeProofRequest) (*emptypb.Empty, error) {
+func (UnimplementedDBServer) CommitRangeProof(context.Context, *CommitRangeProofRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CommitRangeProof not implemented")
 }
-func (UnimplementedSyncableDBServer) mustEmbedUnimplementedSyncableDBServer() {}
+func (UnimplementedDBServer) mustEmbedUnimplementedDBServer() {}
 
-// UnsafeSyncableDBServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to SyncableDBServer will
+// UnsafeDBServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to DBServer will
 // result in compilation errors.
-type UnsafeSyncableDBServer interface {
-	mustEmbedUnimplementedSyncableDBServer()
+type UnsafeDBServer interface {
+	mustEmbedUnimplementedDBServer()
 }
 
-func RegisterSyncableDBServer(s grpc.ServiceRegistrar, srv SyncableDBServer) {
-	s.RegisterService(&SyncableDB_ServiceDesc, srv)
+func RegisterDBServer(s grpc.ServiceRegistrar, srv DBServer) {
+	s.RegisterService(&DB_ServiceDesc, srv)
 }
 
-func _SyncableDB_GetMerkleRoot_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _DB_GetMerkleRoot_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(SyncableDBServer).GetMerkleRoot(ctx, in)
+		return srv.(DBServer).GetMerkleRoot(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: SyncableDB_GetMerkleRoot_FullMethodName,
+		FullMethod: DB_GetMerkleRoot_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SyncableDBServer).GetMerkleRoot(ctx, req.(*emptypb.Empty))
+		return srv.(DBServer).GetMerkleRoot(ctx, req.(*emptypb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _SyncableDB_GetProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _DB_GetProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetProofRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(SyncableDBServer).GetProof(ctx, in)
+		return srv.(DBServer).GetProof(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: SyncableDB_GetProof_FullMethodName,
+		FullMethod: DB_GetProof_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SyncableDBServer).GetProof(ctx, req.(*GetProofRequest))
+		return srv.(DBServer).GetProof(ctx, req.(*GetProofRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _SyncableDB_GetChangeProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _DB_GetChangeProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetChangeProofRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(SyncableDBServer).GetChangeProof(ctx, in)
+		return srv.(DBServer).GetChangeProof(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: SyncableDB_GetChangeProof_FullMethodName,
+		FullMethod: DB_GetChangeProof_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SyncableDBServer).GetChangeProof(ctx, req.(*GetChangeProofRequest))
+		return srv.(DBServer).GetChangeProof(ctx, req.(*GetChangeProofRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _SyncableDB_VerifyChangeProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _DB_VerifyChangeProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(VerifyChangeProofRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(SyncableDBServer).VerifyChangeProof(ctx, in)
+		return srv.(DBServer).VerifyChangeProof(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: SyncableDB_VerifyChangeProof_FullMethodName,
+		FullMethod: DB_VerifyChangeProof_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SyncableDBServer).VerifyChangeProof(ctx, req.(*VerifyChangeProofRequest))
+		return srv.(DBServer).VerifyChangeProof(ctx, req.(*VerifyChangeProofRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _SyncableDB_CommitChangeProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _DB_CommitChangeProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CommitChangeProofRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(SyncableDBServer).CommitChangeProof(ctx, in)
+		return srv.(DBServer).CommitChangeProof(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: SyncableDB_CommitChangeProof_FullMethodName,
+		FullMethod: DB_CommitChangeProof_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SyncableDBServer).CommitChangeProof(ctx, req.(*CommitChangeProofRequest))
+		return srv.(DBServer).CommitChangeProof(ctx, req.(*CommitChangeProofRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _SyncableDB_GetRangeProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _DB_GetRangeProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetRangeProofRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(SyncableDBServer).GetRangeProof(ctx, in)
+		return srv.(DBServer).GetRangeProof(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: SyncableDB_GetRangeProof_FullMethodName,
+		FullMethod: DB_GetRangeProof_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SyncableDBServer).GetRangeProof(ctx, req.(*GetRangeProofRequest))
+		return srv.(DBServer).GetRangeProof(ctx, req.(*GetRangeProofRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _SyncableDB_CommitRangeProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _DB_CommitRangeProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CommitRangeProofRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(SyncableDBServer).CommitRangeProof(ctx, in)
+		return srv.(DBServer).CommitRangeProof(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: SyncableDB_CommitRangeProof_FullMethodName,
+		FullMethod: DB_CommitRangeProof_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SyncableDBServer).CommitRangeProof(ctx, req.(*CommitRangeProofRequest))
+		return srv.(DBServer).CommitRangeProof(ctx, req.(*CommitRangeProofRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-// SyncableDB_ServiceDesc is the grpc.ServiceDesc for SyncableDB service.
+// DB_ServiceDesc is the grpc.ServiceDesc for DB service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
-var SyncableDB_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "sync.SyncableDB",
-	HandlerType: (*SyncableDBServer)(nil),
+var DB_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "sync.DB",
+	HandlerType: (*DBServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
 			MethodName: "GetMerkleRoot",
-			Handler:    _SyncableDB_GetMerkleRoot_Handler,
+			Handler:    _DB_GetMerkleRoot_Handler,
 		},
 		{
 			MethodName: "GetProof",
-			Handler:    _SyncableDB_GetProof_Handler,
+			Handler:    _DB_GetProof_Handler,
 		},
 		{
 			MethodName: "GetChangeProof",
-			Handler:    _SyncableDB_GetChangeProof_Handler,
+			Handler:    _DB_GetChangeProof_Handler,
 		},
 		{
 			MethodName: "VerifyChangeProof",
-			Handler:    _SyncableDB_VerifyChangeProof_Handler,
+			Handler:    _DB_VerifyChangeProof_Handler,
 		},
 		{
 			MethodName: "CommitChangeProof",
-			Handler:    _SyncableDB_CommitChangeProof_Handler,
+			Handler:    _DB_CommitChangeProof_Handler,
 		},
 		{
 			MethodName: "GetRangeProof",
-			Handler:    _SyncableDB_GetRangeProof_Handler,
+			Handler:    _DB_GetRangeProof_Handler,
 		},
 		{
 			MethodName: "CommitRangeProof",
-			Handler:    _SyncableDB_CommitRangeProof_Handler,
+			Handler:    _DB_CommitRangeProof_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
