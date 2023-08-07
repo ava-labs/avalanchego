@@ -7,6 +7,12 @@ import (
 	"crypto"
 	"crypto/x509"
 	"encoding/asn1"
+	"fmt"
+
+	// Explicitly import these for their crypto.RegisterHash init side-effects.
+	_ "crypto/sha1"   // initializes SHA1
+	_ "crypto/sha256" // initializes SHA256
+	_ "crypto/sha512" // initializes SHA384 and SHA512
 )
 
 var (
@@ -151,3 +157,16 @@ var (
 	oidNamedCurveP384 = asn1.ObjectIdentifier{1, 3, 132, 0, 34}
 	oidNamedCurveP521 = asn1.ObjectIdentifier{1, 3, 132, 0, 35}
 )
+
+func init() {
+	for _, hash := range []crypto.Hash{
+		crypto.SHA1,
+		crypto.SHA256,
+		crypto.SHA384,
+		crypto.SHA512,
+	} {
+		if !hash.Available() {
+			panic(fmt.Sprintf("required hash %q is not available", hash))
+		}
+	}
+}
