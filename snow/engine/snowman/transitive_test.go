@@ -1976,6 +1976,7 @@ func TestEngineRejectionAmplification(t *testing.T) {
 	}
 
 	require.NoError(te.Chits(context.Background(), vdr, reqID, acceptedBlk.ID(), acceptedBlk.ID()))
+
 	require.True(te.Consensus.Finalized())
 
 	queried = false
