@@ -1102,7 +1102,7 @@ func RecordPollDivergedVotingWithNoConflictingBitTest(t *testing.T, factory Fact
 	votes3.Add(block3.ID())
 	require.NoError(sm.RecordPoll(context.Background(), votes3))
 
-	require.False(sm.NumProcessing() == 1, "finalized too early")
+	require.False(sm.NumProcessing() > 0, "finalized too early")
 	require.Equal(choices.Processing, block0.Status())
 	require.Equal(choices.Processing, block1.Status())
 	require.Equal(choices.Processing, block2.Status())
