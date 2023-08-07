@@ -13,8 +13,7 @@ import (
 func TestNodeSerialization(t *testing.T) {
 	require := require.New(t)
 
-	tmpDir, err := os.MkdirTemp("", "")
-	require.NoError(err)
+	tmpDir := t.TempDir()
 
 	node := NewLocalNode(tmpDir)
 	require.NoError(node.EnsureKeys())
