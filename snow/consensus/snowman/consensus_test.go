@@ -779,7 +779,6 @@ func RecordPollInvalidVoteTest(t *testing.T, factory Factory) {
 
 	invalidVotes := bag.Bag[ids.ID]{}
 	invalidVotes.Add(unknownBlockID)
-
 	require.NoError(sm.RecordPoll(context.Background(), invalidVotes))
 	require.NoError(sm.RecordPoll(context.Background(), validVotes))
 	require.False(sm.Finalized())
