@@ -59,8 +59,8 @@ type TypeCodec interface {
 //     `{tagName}:"true"` to it. `{tagName}` defaults to `serialize`.
 //  3. These typed members of a struct may be serialized:
 //     bool, string, uint[8,16,32,64], int[8,16,32,64],
-//     structs, slices, arrays, interface.
-//     structs, slices and arrays can only be serialized if their constituent
+//     structs, slices, arrays, maps, interface.
+//     structs, slices, maps and arrays can only be serialized if their constituent
 //     values can be.
 //  4. To marshal an interface, you must pass a pointer to the value
 //  5. To unmarshal an interface, you must call
