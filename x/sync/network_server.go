@@ -138,11 +138,14 @@ func (s *NetworkServer) HandleChangeProofRequest(
 	requestID uint32,
 	req *pb.SyncGetChangeProofRequest,
 ) error {
+	if req.EndKey == nil {
+		req.EndKey = &pb.MaybeBytes{IsNothing: true}
+	}
 	if req.BytesLimit == 0 ||
 		req.KeyLimit == 0 ||
 		len(req.StartRootHash) != ids.IDLen ||
 		len(req.EndRootHash) != ids.IDLen ||
-		(len(req.EndKey) > 0 && bytes.Compare(req.StartKey, req.EndKey) > 0) {
+		(!req.EndKey.IsNothing && bytes.Compare(req.StartKey, req.EndKey.Value) > 0) {
 		s.log.Debug(
 			"dropping invalid change proof request",
 			zap.Stringer("nodeID", nodeID),
@@ -174,7 +177,7 @@ func (s *NetworkServer) HandleChangeProofRequest(
 	}
 
 	for keyLimit > 0 {
-		changeProof, err := s.db.GetChangeProof(ctx, startRoot, endRoot, req.StartKey, req.EndKey, int(keyLimit))
+		changeProof, err := s.db.GetChangeProof(ctx, startRoot, endRoot, req.StartKey, req.EndKey.Value, int(keyLimit))
 		if err != nil {
 			if !errors.Is(err, merkledb.ErrInsufficientHistory) {
 				return err
@@ -237,10 +240,13 @@ func (s *NetworkServer) HandleRangeProofRequest(
 	requestID uint32,
 	req *pb.SyncGetRangeProofRequest,
 ) error {
+	if req.EndKey == nil {
+		req.EndKey = &pb.MaybeBytes{IsNothing: true}
+	}
 	if req.BytesLimit == 0 ||
 		req.KeyLimit == 0 ||
 		len(req.RootHash) != ids.IDLen ||
-		(len(req.EndKey) > 0 && bytes.Compare(req.StartKey, req.EndKey) > 0) {
+		(!req.EndKey.IsNothing && bytes.Compare(req.StartKey, req.EndKey.Value) > 0) {
 		s.log.Debug(
 			"dropping invalid range proof request",
 			zap.Stringer("nodeID", nodeID),
@@ -298,7 +304,7 @@ func getRangeProof(
 			ctx,
 			root,
 			req.StartKey,
-			req.EndKey,
+			req.EndKey.Value,
 			keyLimit,
 		)
 		if err != nil {

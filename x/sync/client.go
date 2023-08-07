@@ -111,6 +111,11 @@ func (c *client) GetChangeProof(
 			return nil, err
 		}
 
+		endKey := merkledb.Nothing[[]byte]()
+		if req.EndKey != nil && !req.EndKey.IsNothing {
+			endKey = merkledb.Some(req.EndKey.Value)
+		}
+
 		switch changeProofResp := changeProofResp.Response.(type) {
 		case *pb.SyncGetChangeProofResponse_ChangeProof:
 			// The server had enough history to send us a change proof
@@ -137,7 +142,7 @@ func (c *client) GetChangeProof(
 				ctx,
 				&changeProof,
 				req.StartKey,
-				req.EndKey,
+				endKey,
 				endRoot,
 			); err != nil {
 				return nil, fmt.Errorf("%s due to %w", errInvalidRangeProof, err)
@@ -154,7 +159,7 @@ func (c *client) GetChangeProof(
 				changeProofResp.RangeProof,
 				int(req.KeyLimit),
 				req.StartKey,
-				req.EndKey,
+				endKey,
 				req.EndRootHash,
 			)
 			if err != nil {
@@ -191,7 +196,7 @@ func parseAndVerifyRangeProof(
 	rangeProofProto *pb.RangeProof,
 	keyLimit int,
 	start []byte,
-	end []byte,
+	end merkledb.Maybe[[]byte],
 	rootBytes []byte,
 ) (*merkledb.RangeProof, error) {
 	root, err := ids.ToID(rootBytes)
@@ -243,12 +248,17 @@ func (c *client) GetRangeProof(
 			return nil, err
 		}
 
+		endKey := merkledb.Nothing[[]byte]()
+		if req.EndKey != nil && !req.EndKey.IsNothing {
+			endKey = merkledb.Some(req.EndKey.Value)
+		}
+
 		return parseAndVerifyRangeProof(
 			ctx,
 			&rangeProofProto,
 			int(req.KeyLimit),
 			req.StartKey,
-			req.EndKey,
+			endKey,
 			req.RootHash,
 		)
 	}

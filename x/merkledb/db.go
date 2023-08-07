@@ -72,7 +72,7 @@ type ChangeProofer interface {
 	//   - [proof] is non-empty.
 	//   - All keys in [proof.KeyValues] and [proof.DeletedKeys] are in [start, end].
 	//     If [start] is empty, all keys are considered > [start].
-	//     If [end] is empty, all keys are considered < [end].
+	//     If [end] is nothing, all keys are considered < [end].
 	//   - [proof.KeyValues] and [proof.DeletedKeys] are sorted in order of increasing key.
 	//   - [proof.StartProof] and [proof.EndProof] are well-formed.
 	//   - When the keys in [proof.KeyValues] are added to [db] and the keys in [proof.DeletedKeys]
@@ -84,7 +84,7 @@ type ChangeProofer interface {
 		ctx context.Context,
 		proof *ChangeProof,
 		start []byte,
-		end []byte,
+		end Maybe[[]byte],
 		expectedEndRootID ids.ID,
 	) error
 
@@ -578,20 +578,22 @@ func (db *merkleDB) GetChangeProof(
 		})
 	}
 
-	largestKey := end
+	largestKey := Nothing[[]byte]()
 	if len(result.KeyChanges) > 0 {
-		largestKey = result.KeyChanges[len(result.KeyChanges)-1].Key
+		largestKey = Some(result.KeyChanges[len(result.KeyChanges)-1].Key)
+	} else if len(end) > 0 {
+		largestKey = Some(end)
 	}
 
 	// Since we hold [db.commitlock] we must still have sufficient
 	// history to recreate the trie at [endRootID].
-	historicalView, err := db.getHistoricalViewForRange(endRootID, start, largestKey)
+	historicalView, err := db.getHistoricalViewForRange(endRootID, start, largestKey.Value())
 	if err != nil {
 		return nil, err
 	}
 
-	if len(largestKey) > 0 {
-		endProof, err := historicalView.getProof(ctx, largestKey)
+	if largestKey.HasValue() {
+		endProof, err := historicalView.getProof(ctx, largestKey.Value())
 		if err != nil {
 			return nil, err
 		}
@@ -955,15 +957,15 @@ func (db *merkleDB) VerifyChangeProof(
 	ctx context.Context,
 	proof *ChangeProof,
 	start []byte,
-	end []byte,
+	end Maybe[[]byte],
 	expectedEndRootID ids.ID,
 ) error {
 	switch {
-	case len(end) > 0 && bytes.Compare(start, end) > 0:
+	case end.HasValue() && bytes.Compare(start, end.Value()) > 0:
 		return ErrStartAfterEnd
 	case proof.Empty():
 		return ErrNoMerkleProof
-	case len(end) > 0 && len(proof.EndProof) == 0:
+	case end.HasValue() && len(proof.EndProof) == 0:
 		// We requested an end proof but didn't get one.
 		return ErrNoEndProof
 	case len(start) > 0 && len(proof.StartProof) == 0 && len(proof.EndProof) == 0:
@@ -989,17 +991,18 @@ func (db *merkleDB) VerifyChangeProof(
 	// Find the greatest key in [proof.KeyChanges]
 	// Note that [proof.EndProof] is a proof for this key.
 	// [largestPath] is also used when we add children of proof nodes to [trie] below.
-	largestKey := end
+	largestPath := Nothing[path]()
 	if len(proof.KeyChanges) > 0 {
 		// If [proof] has key-value pairs, we should insert children
 		// greater than [end] to ancestors of the node containing [end]
 		// so that we get the expected root ID.
-		largestKey = proof.KeyChanges[len(proof.KeyChanges)-1].Key
+		largestPath = Some(newPath(proof.KeyChanges[len(proof.KeyChanges)-1].Key))
+	} else if end.HasValue() {
+		largestPath = Some(newPath(end.Value()))
 	}
-	largestPath := newPath(largestKey)
 
 	// Make sure the end proof, if given, is well-formed.
-	if err := verifyProofPath(proof.EndProof, largestPath); err != nil {
+	if err := verifyProofPath(proof.EndProof, largestPath.Value()); err != nil {
 		return err
 	}
 
@@ -1059,15 +1062,11 @@ func (db *merkleDB) VerifyChangeProof(
 	if len(smallestPath) > 0 {
 		insertChildrenLessThan = Some(smallestPath)
 	}
-	insertChildrenGreaterThan := Nothing[path]()
-	if len(largestPath) > 0 {
-		insertChildrenGreaterThan = Some(largestPath)
-	}
 	if err := addPathInfo(
 		view,
 		proof.StartProof,
 		insertChildrenLessThan,
-		insertChildrenGreaterThan,
+		largestPath,
 	); err != nil {
 		return err
 	}
@@ -1075,7 +1074,7 @@ func (db *merkleDB) VerifyChangeProof(
 		view,
 		proof.EndProof,
 		insertChildrenLessThan,
-		insertChildrenGreaterThan,
+		largestPath,
 	); err != nil {
 		return err
 	}
