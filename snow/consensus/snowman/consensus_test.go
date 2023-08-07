@@ -539,7 +539,7 @@ func RecordPollSplitVoteNoChangeTest(t *testing.T, factory Factory) {
 	// The first poll will accept shared bits
 	require.NoError(sm.RecordPoll(context.Background(), votes))
 	require.Equal(firstBlock.ID(), sm.Preference())
-	require.False(sm.NumProcessing() == 1)
+	require.False(sm.NumProcessing() > 0)
 
 	metrics := gatherCounterGauge(t, registerer)
 	require.Zero(metrics["polls_failed"])
