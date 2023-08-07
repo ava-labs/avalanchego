@@ -106,7 +106,7 @@ func main() {
 	stopNetworkCmd := &cobra.Command{
 		Use:   "stop-network",
 		Short: "Stop a local network",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(*cobra.Command, []string) error {
 			if len(networkDir) == 0 {
 				return errNetworkDirRequired
 			}
