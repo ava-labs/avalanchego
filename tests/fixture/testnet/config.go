@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -21,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
+	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 )
@@ -68,6 +70,32 @@ func (f FlagsMap) GetStringVal(key string) (string, error) {
 		return "", fmt.Errorf("failed to cast value for %q: %w", key, err)
 	}
 	return val, nil
+}
+
+// Write simplifies writing a FlagsMap to the provided path. The
+// description is used in error messages.
+func (f FlagsMap) Write(path string, description string) error {
+	bytes, err := DefaultJSONMarshal(f)
+	if err != nil {
+		return fmt.Errorf("failed to marshal %s: %w", description, err)
+	}
+	if err := os.WriteFile(path, bytes, perms.ReadWrite); err != nil {
+		return fmt.Errorf("failed to write %s: %w", description, err)
+	}
+	return nil
+}
+
+// Utility function simplifying construction of a FlagsMap from a file.
+func ReadFlagsMap(path string, description string) (*FlagsMap, error) {
+	bytes, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read %s: %w", description, err)
+	}
+	flagsMap := &FlagsMap{}
+	if err := json.Unmarshal(bytes, flagsMap); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal %s: %w", description, err)
+	}
+	return flagsMap, nil
 }
 
 // Marshal to json with default prefix and indent.
@@ -134,15 +162,12 @@ func (nc *NodeConfig) SetNetworkingConfigDefaults(
 	bootstrapIDs []string,
 	bootstrapIPs []string,
 ) {
-	startDefaults := FlagsMap{
-		cfg.HTTPPortKey:    httpPort,
-		cfg.StakingPortKey: stakingPort,
-	}
-	if len(bootstrapIDs) > 0 {
-		startDefaults[cfg.BootstrapIDsKey] = strings.Join(bootstrapIDs, ",")
-		startDefaults[cfg.BootstrapIPsKey] = strings.Join(bootstrapIPs, ",")
-	}
-	nc.Flags.SetDefaults(startDefaults)
+	nc.Flags.SetDefaults(FlagsMap{
+		cfg.HTTPPortKey:     httpPort,
+		cfg.StakingPortKey:  stakingPort,
+		cfg.BootstrapIDsKey: strings.Join(bootstrapIDs, ","),
+		cfg.BootstrapIPsKey: strings.Join(bootstrapIPs, ","),
+	})
 }
 
 // Ensures staking and signing keys are generated if not already present and

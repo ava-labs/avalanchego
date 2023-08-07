@@ -271,7 +271,7 @@ func (n *LocalNode) Stop() error {
 
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("failed to see node process stop %q before timeout", n.NodeID)
+			return fmt.Errorf("failed to see node process stop %q before timeout: %w", n.NodeID, ctx.Err())
 		case <-ticker.C:
 		}
 	}
@@ -325,7 +325,7 @@ func (n *LocalNode) WaitForProcessContext(ctx context.Context) error {
 
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("failed to load process context for node %q before timeout", n.NodeID)
+			return fmt.Errorf("failed to load process context for node %q before timeout: %w", n.NodeID, ctx.Err())
 		case <-ticker.C:
 		}
 	}

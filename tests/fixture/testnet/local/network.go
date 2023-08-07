@@ -94,7 +94,7 @@ func (ln *LocalNetwork) GetConfig() testnet.NetworkConfig {
 
 // Returns the nodes of the network in backend-agnostic form.
 func (ln *LocalNetwork) GetNodes() []testnet.Node {
-	nodes := []testnet.Node{}
+	nodes := make([]testnet.Node, 0, len(ln.Nodes))
 	for _, node := range ln.Nodes {
 		nodes = append(nodes, node)
 	}
@@ -212,7 +212,7 @@ func (ln *LocalNetwork) PopulateLocalNetworkConfig(networkID uint32, nodeCount i
 
 	if nodeCount > 0 {
 		// Add the specified number of nodes
-		nodes := []*LocalNode{}
+		nodes := make([]*LocalNode, 0, nodeCount)
 		for i := 0; i < nodeCount; i++ {
 			nodes = append(nodes, NewLocalNode(""))
 		}
@@ -229,7 +229,7 @@ func (ln *LocalNetwork) PopulateLocalNetworkConfig(networkID uint32, nodeCount i
 	}
 
 	// Assume all initial nodes are validator ids
-	validatorIDs := []ids.NodeID{}
+	validatorIDs := make([]ids.NodeID, 0, len(ln.Nodes))
 	for _, node := range ln.Nodes {
 		validatorIDs = append(validatorIDs, node.NodeID)
 	}
@@ -237,7 +237,7 @@ func (ln *LocalNetwork) PopulateLocalNetworkConfig(networkID uint32, nodeCount i
 	if keyCount > 0 {
 		// Ensure there are keys for genesis generation to fund
 		factory := secp256k1.Factory{}
-		keys := []*secp256k1.PrivateKey{}
+		keys := make([]*secp256k1.PrivateKey, 0, keyCount)
 		for i := 0; i < keyCount; i++ {
 			key, err := factory.NewPrivateKey()
 			if err != nil {
@@ -324,8 +324,8 @@ func (ln *LocalNetwork) Start(w io.Writer) error {
 	// 3rd node: 1st and 2nd nodes
 	// ...
 	//
-	bootstrapIDs := []string{}
-	bootstrapIPs := []string{}
+	bootstrapIDs := make([]string, 0, len(ln.Nodes))
+	bootstrapIPs := make([]string, 0, len(ln.Nodes))
 
 	// Configure networking and start each node
 	for _, node := range ln.Nodes {
@@ -392,7 +392,7 @@ func (ln *LocalNetwork) WaitForHealthy(ctx context.Context, w io.Writer) error {
 // Retrieve API URIs for all nodes in the network. Assumes nodes have
 // been loaded.
 func (ln *LocalNetwork) GetURIs() []string {
-	uris := []string{}
+	uris := make([]string, 0, len(ln.Nodes))
 	for _, node := range ln.Nodes {
 		// Only append URIs that are not empty. A node may have an
 		// empty URI if it was not running at the time
@@ -478,15 +478,11 @@ func (ln *LocalNetwork) GetCChainConfigPath() string {
 }
 
 func (ln *LocalNetwork) ReadCChainConfig() error {
-	bytes, err := os.ReadFile(ln.GetCChainConfigPath())
+	chainConfig, err := testnet.ReadFlagsMap(ln.GetCChainConfigPath(), "C-Chain config")
 	if err != nil {
-		return fmt.Errorf("failed to read C-Chain config: %w", err)
+		return err
 	}
-	cChainConfig := testnet.FlagsMap{}
-	if err := json.Unmarshal(bytes, &cChainConfig); err != nil {
-		return fmt.Errorf("failed to unmarshal C-Chain config: %w", err)
-	}
-	ln.CChainConfig = cChainConfig
+	ln.CChainConfig = *chainConfig
 	return nil
 }
 
@@ -496,14 +492,7 @@ func (ln *LocalNetwork) WriteCChainConfig() error {
 	if err := os.MkdirAll(dir, perms.ReadWriteExecute); err != nil {
 		return fmt.Errorf("failed to create C-Chain config dir: %w", err)
 	}
-	bytes, err := testnet.DefaultJSONMarshal(ln.CChainConfig)
-	if err != nil {
-		return fmt.Errorf("failed to marshal C-Chain config: %w", err)
-	}
-	if err := os.WriteFile(path, bytes, perms.ReadWrite); err != nil {
-		return fmt.Errorf("failed to write C-Chain config: %w", err)
-	}
-	return nil
+	return ln.CChainConfig.Write(path, "C-Chain config")
 }
 
 // Used to marshal/unmarshal persistent local network defaults.

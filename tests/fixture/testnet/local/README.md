@@ -13,10 +13,11 @@ The functionality in this package is grouped by logical purpose into
 the following non-test files:
 
 | Filename   | Types              | Purpose                                       |
-|:-----------|--------------------|:----------------------------------------------|
+|:-----------|:-------------------|:----------------------------------------------|
 | config.go  | <none>             | Common configuration                          |
 | network.go | LocalNetwork       | Network-level orchestration and configuration |
 | node.go    | Local{Config,Node} | Node-level orchestration and configuration    |
+
 
 This package depends on its parent package for implementation-agnostic
 network and node configuration. Only configuration and code specific
@@ -133,7 +134,7 @@ A local network relies on configuration written to disk in the following structu
 HOME
 └── .testnetctl                                          // Root path for tool
     └── networks                                         // Default parent directory for local networks
-        └── 1000                                         // Network path with form [network-id] starting from 1000
+        └── 1000                                         // The networkID is used to name the network dir and starts at 1000
             ├── NodeID-37E8UK3x2YFsHE3RdALmfWcppcZ1eTuj9 // The ID of a node is the name of its data dir
             │   ├── chainData
             │   │   └── ...

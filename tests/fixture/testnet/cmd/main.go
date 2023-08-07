@@ -26,16 +26,10 @@ var (
 )
 
 func main() {
-	var (
-		networkDir string
-		rootDir    string
-	)
 	rootCmd := &cobra.Command{
 		Use:   "testnetctl",
 		Short: "testnetctl commands",
 	}
-	rootCmd.PersistentFlags().StringVar(&networkDir, "network-dir", os.Getenv(local.NetworkDirEnvName), "The path to the configuration directory of a local network")
-	rootCmd.PersistentFlags().StringVar(&rootDir, "root-dir", os.Getenv(local.RootDirEnvName), "The path to the root directory for local networks")
 
 	versionCmd := &cobra.Command{
 		Use:   "version",
@@ -52,6 +46,7 @@ func main() {
 	rootCmd.AddCommand(versionCmd)
 
 	var (
+		rootDir        string
 		execPath       string
 		nodeCount      uint8
 		fundedKeyCount uint8
@@ -97,12 +92,13 @@ func main() {
 			return nil
 		},
 	}
+	startNetworkCmd.PersistentFlags().StringVar(&rootDir, "root-dir", os.Getenv(local.RootDirEnvName), "The path to the root directory for local networks")
 	startNetworkCmd.PersistentFlags().StringVar(&execPath, "avalanchego-path", os.Getenv(local.AvalancheGoPathEnvName), "The path to an avalanchego binary")
 	startNetworkCmd.PersistentFlags().Uint8Var(&nodeCount, "node-count", testnet.DefaultNodeCount, "Number of nodes the network should initially consist of")
 	startNetworkCmd.PersistentFlags().Uint8Var(&fundedKeyCount, "funded-key-count", testnet.DefaultFundedKeyCount, "Number of funded keys the network should start with")
-
 	rootCmd.AddCommand(startNetworkCmd)
 
+	var networkDir string
 	stopNetworkCmd := &cobra.Command{
 		Use:   "stop-network",
 		Short: "Stop a local network",
@@ -117,6 +113,7 @@ func main() {
 			return nil
 		},
 	}
+	stopNetworkCmd.PersistentFlags().StringVar(&networkDir, "network-dir", os.Getenv(local.NetworkDirEnvName), "The path to the configuration directory of a local network")
 	rootCmd.AddCommand(stopNetworkCmd)
 
 	if err := rootCmd.Execute(); err != nil {
