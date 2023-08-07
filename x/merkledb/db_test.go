@@ -775,10 +775,6 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 
 			rangeProof, err := db.GetRangeProofAtRoot(context.Background(), root, step.key, end, 100)
 			require.NoError(err)
-			end := Nothing[[]byte]()
-			if len(step.value) > 0 {
-				end = Some(step.value)
-			}
 			require.NoError(rangeProof.Verify(
 				context.Background(),
 				step.key,
