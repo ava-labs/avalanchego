@@ -110,12 +110,13 @@ into prometheus metrics or json (it implements [serde::Serialize])
 ### Seasoned milestone
 This milestone will add support for proposals, including proposed future
 branches, with a cache to make committing these branches efficiently.
-- [ ] Be able to support multiple proposed revisions against latest committed
+- [x] Be able to support multiple proposed revisions against latest committed
 version.
-- [ ] Be able to propose a batch against the existing committed revision, or
+- [x] Be able to propose a batch against the existing committed revision, or
 propose a batch against any existing proposed revision.
-- [ ] Be able to quickly commit a batch that has been proposed. Note that this
-invalidates all other proposals that are not children of the committed proposed batch.
+- [x] Commit a batch that has been proposed will invalidate all other proposals
+that are not children of the committed proposed batch.
+- [ ] Be able to quickly commit a batch that has been proposed.
 - [ ] Add metric reporting
 - [ ] Refactor `Shale` to be more idiomatic
 
