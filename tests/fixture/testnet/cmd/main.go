@@ -40,7 +40,7 @@ func main() {
 	versionCmd := &cobra.Command{
 		Use:   "version",
 		Short: "Print version details",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(*cobra.Command, []string) error {
 			msg := cliVersion
 			if len(version.GitCommit) > 0 {
 				msg += ", commit=" + version.GitCommit
