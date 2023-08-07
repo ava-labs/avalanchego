@@ -5,11 +5,12 @@ package merkledb
 
 import (
 	"bytes"
-	"github.com/ava-labs/avalanchego/database"
 	"math/rand"
 	"sort"
 	"testing"
 	"time"
+
+	"github.com/ava-labs/avalanchego/database"
 
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/maps"

@@ -5,11 +5,12 @@ package sync
 
 import (
 	"context"
-	"github.com/ava-labs/avalanchego/database"
 	"math/rand"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/ava-labs/avalanchego/database"
 
 	"github.com/golang/mock/gomock"
 	"github.com/prometheus/client_golang/prometheus"

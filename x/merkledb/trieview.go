@@ -91,12 +91,6 @@ type trieView struct {
 	// but will when their ID is recalculated.
 	changes *changeSummary
 
-	// Key/value pairs that have been inserted/removed but not
-	// yet reflected in the trie's structure. This allows us to
-	// defer the cost of updating the trie until we calculate node IDs.
-	// A Nothing value indicates that the key has been removed.
-	unappliedValueChanges map[path]Maybe[[]byte]
-
 	db *merkleDB
 
 	// The root of the trie represented by this view.
@@ -153,11 +147,10 @@ func newTrieView(
 	}
 
 	newView := &trieView{
-		root:                  root,
-		db:                    db,
-		parentTrie:            parentTrie,
-		changes:               newChangeSummary(len(batchOps)),
-		unappliedValueChanges: make(map[path]Maybe[[]byte], len(batchOps)),
+		root:       root,
+		db:         db,
+		parentTrie: parentTrie,
+		changes:    newChangeSummary(len(batchOps)),
 	}
 
 	for _, op := range batchOps {
@@ -190,11 +183,10 @@ func newTrieViewWithChanges(
 	}
 
 	return &trieView{
-		root:                  passedRootChange.after,
-		db:                    db,
-		parentTrie:            parentTrie,
-		changes:               changes,
-		unappliedValueChanges: map[path]Maybe[[]byte]{},
+		root:       passedRootChange.after,
+		db:         db,
+		parentTrie: parentTrie,
+		changes:    changes,
 	}, nil
 }
 
@@ -221,10 +213,6 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 	// ensure that the view under this one is up-to-date before potentially pulling in nodes from it
 	// getting the Merkle root forces any unupdated nodes to recalculate their ids
 	if _, err := t.getParentTrie().GetMerkleRoot(ctx); err != nil {
-		return err
-	}
-
-	if err := t.applyChangedValuesToTrie(ctx); err != nil {
 		return err
 	}
 
@@ -796,8 +784,11 @@ func (t *trieView) insert(key []byte, value []byte) error {
 	t.invalidateChildren()
 
 	valCopy := slices.Clone(value)
-
-	if err := t.recordValueChange(newPath(key), Some(valCopy)); err != nil {
+	path, val := newPath(key), Some(valCopy)
+	if err := t.recordValueChange(path, val); err != nil {
+		return err
+	}
+	if _, err := t.insertIntoTrie(path, val); err != nil {
 		return err
 	}
 
@@ -822,36 +813,18 @@ func (t *trieView) remove(key []byte) error {
 
 	// the trie has been changed, so invalidate all children and remove them from tracking
 	t.invalidateChildren()
-
-	if err := t.recordValueChange(newPath(key), Nothing[[]byte]()); err != nil {
+	path := newPath(key)
+	if err := t.recordValueChange(path, Nothing[[]byte]()); err != nil {
 		return err
 	}
-
+	if err := t.removeFromTrie(path); err != nil {
+		return err
+	}
 	// ensure no ancestor changes occurred during execution
 	if t.isInvalid() {
 		return ErrInvalid
 	}
 
-	return nil
-}
-
-// Assumes [t.lock] is held.
-func (t *trieView) applyChangedValuesToTrie(ctx context.Context) error {
-	_, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.applyChangedValuesToTrie")
-	defer span.End()
-
-	unappliedValues := t.unappliedValueChanges
-	t.unappliedValueChanges = make(map[path]Maybe[[]byte], len(unappliedValues))
-
-	for key, change := range unappliedValues {
-		if change.IsNothing() {
-			if err := t.removeFromTrie(key); err != nil {
-				return err
-			}
-		} else if _, err := t.insertIntoTrie(key, change); err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
@@ -1138,10 +1111,6 @@ func (t *trieView) recordKeyChange(key path, after *node) error {
 // Assumes [t.lock] is held.
 func (t *trieView) recordValueChange(key path, value Maybe[[]byte]) error {
 	t.needsRecalculation = true
-
-	// record the value change so that it can be inserted
-	// into a trie nodes later
-	t.unappliedValueChanges[key] = value
 
 	// update the existing change if it exists
 	if existing, ok := t.changes.values[key]; ok {

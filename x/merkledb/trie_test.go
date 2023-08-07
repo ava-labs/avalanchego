@@ -5,11 +5,12 @@ package merkledb
 
 import (
 	"context"
-	"github.com/stretchr/testify/require"
 	"math/rand"
 	"strconv"
 	"sync"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -464,7 +465,8 @@ func Test_Trie_HashCountOnDelete(t *testing.T) {
 	view, err := trie.NewView([]database.BatchOp{
 		{Key: []byte("k"), Delete: true},
 		{Key: []byte("ke"), Delete: true},
-		{Key: []byte("key"), Delete: true}})
+		{Key: []byte("key"), Delete: true},
+	})
 	require.NoError(err)
 	require.NoError(view.CommitToDB(context.Background()))
 
