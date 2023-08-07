@@ -9,6 +9,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 	"github.com/ava-labs/avalanchego/x/sync"
 
@@ -82,7 +83,7 @@ func (s *DBServer) VerifyChangeProof(
 
 	// TODO there's probably a better way to do this.
 	var errString string
-	if err := s.db.VerifyChangeProof(ctx, &proof, req.StartKey, merkledb.Some(req.EndKey), rootID); err != nil {
+	if err := s.db.VerifyChangeProof(ctx, &proof, req.StartKey, maybe.Some(req.EndKey), rootID); err != nil {
 		errString = err.Error()
 	}
 	return &pb.VerifyChangeProofResponse{

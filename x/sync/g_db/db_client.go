@@ -10,6 +10,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 	"github.com/ava-labs/avalanchego/x/sync"
 
@@ -63,7 +64,7 @@ func (c *DBClient) VerifyChangeProof(
 	ctx context.Context,
 	proof *merkledb.ChangeProof,
 	startKey []byte,
-	endKey merkledb.Maybe[[]byte],
+	endKey maybe.Maybe[[]byte],
 	expectedRootID ids.ID,
 ) error {
 	resp, err := c.client.VerifyChangeProof(ctx, &pb.VerifyChangeProofRequest{

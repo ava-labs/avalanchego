@@ -13,6 +13,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/maybe"
 )
 
 func Test_History_Simple(t *testing.T) {
@@ -36,7 +37,7 @@ func Test_History_Simple(t *testing.T) {
 	require.NoError(err)
 	require.NotNil(origProof)
 	origRootID := db.root.id
-	require.NoError(origProof.Verify(context.Background(), []byte("k"), Some([]byte("key3")), origRootID))
+	require.NoError(origProof.Verify(context.Background(), []byte("k"), maybe.Some([]byte("key3")), origRootID))
 
 	batch = db.NewBatch()
 	require.NoError(batch.Put([]byte("key"), []byte("value0")))
@@ -44,7 +45,7 @@ func Test_History_Simple(t *testing.T) {
 	newProof, err := db.GetRangeProofAtRoot(context.Background(), origRootID, []byte("k"), []byte("key3"), 10)
 	require.NoError(err)
 	require.NotNil(newProof)
-	require.NoError(newProof.Verify(context.Background(), []byte("k"), Some([]byte("key3")), origRootID))
+	require.NoError(newProof.Verify(context.Background(), []byte("k"), maybe.Some([]byte("key3")), origRootID))
 
 	batch = db.NewBatch()
 	require.NoError(batch.Put([]byte("key1"), []byte("value1")))
@@ -53,7 +54,7 @@ func Test_History_Simple(t *testing.T) {
 	newProof, err = db.GetRangeProofAtRoot(context.Background(), origRootID, []byte("k"), []byte("key3"), 10)
 	require.NoError(err)
 	require.NotNil(newProof)
-	require.NoError(newProof.Verify(context.Background(), []byte("k"), Some([]byte("key3")), origRootID))
+	require.NoError(newProof.Verify(context.Background(), []byte("k"), maybe.Some([]byte("key3")), origRootID))
 
 	batch = db.NewBatch()
 	require.NoError(batch.Put([]byte("k"), []byte("v")))
@@ -61,7 +62,7 @@ func Test_History_Simple(t *testing.T) {
 	newProof, err = db.GetRangeProofAtRoot(context.Background(), origRootID, []byte("k"), []byte("key3"), 10)
 	require.NoError(err)
 	require.NotNil(newProof)
-	require.NoError(newProof.Verify(context.Background(), []byte("k"), Some([]byte("key3")), origRootID))
+	require.NoError(newProof.Verify(context.Background(), []byte("k"), maybe.Some([]byte("key3")), origRootID))
 
 	batch = db.NewBatch()
 	require.NoError(batch.Delete([]byte("k")))
@@ -77,7 +78,7 @@ func Test_History_Simple(t *testing.T) {
 	newProof, err = db.GetRangeProofAtRoot(context.Background(), origRootID, []byte("k"), []byte("key3"), 10)
 	require.NoError(err)
 	require.NotNil(newProof)
-	require.NoError(newProof.Verify(context.Background(), []byte("k"), Some([]byte("key3")), origRootID))
+	require.NoError(newProof.Verify(context.Background(), []byte("k"), maybe.Some([]byte("key3")), origRootID))
 }
 
 func Test_History_Large(t *testing.T) {
@@ -137,7 +138,7 @@ func Test_History_Large(t *testing.T) {
 		require.NoError(err)
 		require.NotNil(proof)
 
-		require.NoError(proof.Verify(context.Background(), nil, Nothing[[]byte](), roots[0]))
+		require.NoError(proof.Verify(context.Background(), nil, maybe.Nothing[[]byte](), roots[0]))
 	}
 }
 
@@ -233,7 +234,7 @@ func Test_History_Trigger_History_Queue_Looping(t *testing.T) {
 	require.NoError(origProof.Verify(
 		context.Background(),
 		[]byte("k"),
-		Some([]byte("key3")),
+		maybe.Some([]byte("key3")),
 		origRootID,
 	))
 
@@ -249,7 +250,7 @@ func Test_History_Trigger_History_Queue_Looping(t *testing.T) {
 	require.NoError(newProof.Verify(
 		context.Background(),
 		[]byte("k"),
-		Some([]byte("key3")),
+		maybe.Some([]byte("key3")),
 		origRootID,
 	))
 
@@ -308,9 +309,9 @@ func Test_History_Values_Lookup_Over_Queue_Break(t *testing.T) {
 	changes, err := db.history.getValueChanges(startRoot, endRoot, nil, nil, 10)
 	require.NoError(err)
 	require.Contains(changes.values, newPath([]byte("key1")))
-	require.Equal([]byte("value1"), changes.values[newPath([]byte("key1"))].after.value)
+	require.Equal([]byte("value1"), changes.values[newPath([]byte("key1"))].after.Value())
 	require.Contains(changes.values, newPath([]byte("key2")))
-	require.Equal([]byte("value3"), changes.values[newPath([]byte("key2"))].after.value)
+	require.Equal([]byte("value3"), changes.values[newPath([]byte("key2"))].after.Value())
 }
 
 func Test_History_RepeatedRoot(t *testing.T) {
@@ -332,7 +333,7 @@ func Test_History_RepeatedRoot(t *testing.T) {
 	require.NoError(err)
 	require.NotNil(origProof)
 	origRootID := db.root.id
-	require.NoError(origProof.Verify(context.Background(), []byte("k"), Some([]byte("key3")), origRootID))
+	require.NoError(origProof.Verify(context.Background(), []byte("k"), maybe.Some([]byte("key3")), origRootID))
 
 	batch = db.NewBatch()
 	require.NoError(batch.Put([]byte("key1"), []byte("other")))
@@ -342,7 +343,7 @@ func Test_History_RepeatedRoot(t *testing.T) {
 	newProof, err := db.GetRangeProofAtRoot(context.Background(), origRootID, []byte("k"), []byte("key3"), 10)
 	require.NoError(err)
 	require.NotNil(newProof)
-	require.NoError(newProof.Verify(context.Background(), []byte("k"), Some([]byte("key3")), origRootID))
+	require.NoError(newProof.Verify(context.Background(), []byte("k"), maybe.Some([]byte("key3")), origRootID))
 
 	// revert state to be the same as in orig proof
 	batch = db.NewBatch()
@@ -354,7 +355,7 @@ func Test_History_RepeatedRoot(t *testing.T) {
 	newProof, err = db.GetRangeProofAtRoot(context.Background(), origRootID, []byte("k"), []byte("key3"), 10)
 	require.NoError(err)
 	require.NotNil(newProof)
-	require.NoError(newProof.Verify(context.Background(), []byte("k"), Some([]byte("key3")), origRootID))
+	require.NoError(newProof.Verify(context.Background(), []byte("k"), maybe.Some([]byte("key3")), origRootID))
 }
 
 func Test_History_ExcessDeletes(t *testing.T) {
@@ -374,7 +375,7 @@ func Test_History_ExcessDeletes(t *testing.T) {
 	require.NoError(err)
 	require.NotNil(origProof)
 	origRootID := db.root.id
-	require.NoError(origProof.Verify(context.Background(), []byte("k"), Some([]byte("key3")), origRootID))
+	require.NoError(origProof.Verify(context.Background(), []byte("k"), maybe.Some([]byte("key3")), origRootID))
 
 	batch = db.NewBatch()
 	require.NoError(batch.Delete([]byte("key1")))
@@ -386,7 +387,7 @@ func Test_History_ExcessDeletes(t *testing.T) {
 	newProof, err := db.GetRangeProofAtRoot(context.Background(), origRootID, []byte("k"), []byte("key3"), 10)
 	require.NoError(err)
 	require.NotNil(newProof)
-	require.NoError(newProof.Verify(context.Background(), []byte("k"), Some([]byte("key3")), origRootID))
+	require.NoError(newProof.Verify(context.Background(), []byte("k"), maybe.Some([]byte("key3")), origRootID))
 }
 
 func Test_History_DontIncludeAllNodes(t *testing.T) {
@@ -406,7 +407,7 @@ func Test_History_DontIncludeAllNodes(t *testing.T) {
 	require.NoError(err)
 	require.NotNil(origProof)
 	origRootID := db.root.id
-	require.NoError(origProof.Verify(context.Background(), []byte("k"), Some([]byte("key3")), origRootID))
+	require.NoError(origProof.Verify(context.Background(), []byte("k"), maybe.Some([]byte("key3")), origRootID))
 
 	batch = db.NewBatch()
 	require.NoError(batch.Put([]byte("z"), []byte("z")))
@@ -414,7 +415,7 @@ func Test_History_DontIncludeAllNodes(t *testing.T) {
 	newProof, err := db.GetRangeProofAtRoot(context.Background(), origRootID, []byte("k"), []byte("key3"), 10)
 	require.NoError(err)
 	require.NotNil(newProof)
-	require.NoError(newProof.Verify(context.Background(), []byte("k"), Some([]byte("key3")), origRootID))
+	require.NoError(newProof.Verify(context.Background(), []byte("k"), maybe.Some([]byte("key3")), origRootID))
 }
 
 func Test_History_Branching2Nodes(t *testing.T) {
@@ -434,7 +435,7 @@ func Test_History_Branching2Nodes(t *testing.T) {
 	require.NoError(err)
 	require.NotNil(origProof)
 	origRootID := db.root.id
-	require.NoError(origProof.Verify(context.Background(), []byte("k"), Some([]byte("key3")), origRootID))
+	require.NoError(origProof.Verify(context.Background(), []byte("k"), maybe.Some([]byte("key3")), origRootID))
 
 	batch = db.NewBatch()
 	require.NoError(batch.Put([]byte("k"), []byte("v")))
@@ -442,7 +443,7 @@ func Test_History_Branching2Nodes(t *testing.T) {
 	newProof, err := db.GetRangeProofAtRoot(context.Background(), origRootID, []byte("k"), []byte("key3"), 10)
 	require.NoError(err)
 	require.NotNil(newProof)
-	require.NoError(newProof.Verify(context.Background(), []byte("k"), Some([]byte("key3")), origRootID))
+	require.NoError(newProof.Verify(context.Background(), []byte("k"), maybe.Some([]byte("key3")), origRootID))
 }
 
 func Test_History_Branching3Nodes(t *testing.T) {
@@ -462,7 +463,7 @@ func Test_History_Branching3Nodes(t *testing.T) {
 	require.NoError(err)
 	require.NotNil(origProof)
 	origRootID := db.root.id
-	require.NoError(origProof.Verify(context.Background(), []byte("k"), Some([]byte("key3")), origRootID))
+	require.NoError(origProof.Verify(context.Background(), []byte("k"), maybe.Some([]byte("key3")), origRootID))
 
 	batch = db.NewBatch()
 	require.NoError(batch.Put([]byte("key321"), []byte("value321")))
@@ -470,7 +471,7 @@ func Test_History_Branching3Nodes(t *testing.T) {
 	newProof, err := db.GetRangeProofAtRoot(context.Background(), origRootID, []byte("k"), []byte("key3"), 10)
 	require.NoError(err)
 	require.NotNil(newProof)
-	require.NoError(newProof.Verify(context.Background(), []byte("k"), Some([]byte("key3")), origRootID))
+	require.NoError(newProof.Verify(context.Background(), []byte("k"), maybe.Some([]byte("key3")), origRootID))
 }
 
 func Test_History_MaxLength(t *testing.T) {
@@ -629,10 +630,10 @@ func TestHistoryGetChangesToRoot(t *testing.T) {
 					after:  &node{id: ids.GenerateTestID()},
 				},
 			},
-			values: map[path]*change[Maybe[[]byte]]{
+			values: map[path]*change[maybe.Maybe[[]byte]]{
 				newPath([]byte{byte(i)}): {
-					before: Some([]byte{byte(i)}),
-					after:  Some([]byte{byte(i + 1)}),
+					before: maybe.Some([]byte{byte(i)}),
+					after:  maybe.Some([]byte{byte(i + 1)}),
 				},
 			},
 		})

@@ -11,6 +11,7 @@ import (
 	"github.com/google/btree"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/maybe"
 )
 
 var (
@@ -53,13 +54,13 @@ type changeSummaryAndIndex struct {
 type changeSummary struct {
 	rootID ids.ID
 	nodes  map[path]*change[*node]
-	values map[path]*change[Maybe[[]byte]]
+	values map[path]*change[maybe.Maybe[[]byte]]
 }
 
 func newChangeSummary(estimatedSize int) *changeSummary {
 	return &changeSummary{
 		nodes:  make(map[path]*change[*node], estimatedSize),
-		values: make(map[path]*change[Maybe[[]byte]], estimatedSize),
+		values: make(map[path]*change[maybe.Maybe[[]byte]], estimatedSize),
 	}
 }
 
@@ -166,14 +167,14 @@ func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start, end []b
 				// so update its before value with the earlier before value
 				if existing, ok := combinedChanges.values[key]; ok {
 					existing.after = valueChange.after
-					if existing.before.hasValue == existing.after.hasValue &&
-						bytes.Equal(existing.before.value, existing.after.value) {
+					if existing.before.HasValue() == existing.after.HasValue() &&
+						bytes.Equal(existing.before.Value(), existing.after.Value()) {
 						// The change to this key is a no-op, so remove it from [combinedChanges].
 						delete(combinedChanges.values, key)
 						sortedKeys.Delete(key)
 					}
 				} else {
-					combinedChanges.values[key] = &change[Maybe[[]byte]]{
+					combinedChanges.values[key] = &change[maybe.Maybe[[]byte]]{
 						before: valueChange.before,
 						after:  valueChange.after,
 					}
@@ -231,7 +232,7 @@ func (th *trieHistory) getChangesToGetToRoot(rootID ids.ID, start, end []byte) (
 					if existing, ok := combinedChanges.values[key]; ok {
 						existing.after = valueChange.before
 					} else {
-						combinedChanges.values[key] = &change[Maybe[[]byte]]{
+						combinedChanges.values[key] = &change[maybe.Maybe[[]byte]]{
 							before: valueChange.after,
 							after:  valueChange.before,
 						}

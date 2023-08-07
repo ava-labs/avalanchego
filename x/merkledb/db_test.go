@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
@@ -51,7 +52,7 @@ func Test_MerkleDB_Get_Safety(t *testing.T) {
 	val[0] = 1
 
 	// node's value shouldn't be affected by the edit
-	require.NotEqual(val, n.value.value)
+	require.NotEqual(val, n.value.Value())
 }
 
 func Test_MerkleDB_GetValues_Safety(t *testing.T) {
@@ -770,9 +771,9 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 			}
 			rangeProof, err := db.GetRangeProofAtRoot(context.Background(), root, step.key, step.value, 100)
 			require.NoError(err)
-			end := Nothing[[]byte]()
+			end := maybe.Nothing[[]byte]()
 			if len(step.value) > 0 {
-				end = Some(step.value)
+				end = maybe.Some(step.value)
 			}
 			require.NoError(rangeProof.Verify(
 				context.Background(),
@@ -795,9 +796,9 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 			require.NoError(err)
 			changeProofDB, err := getBasicDB()
 			require.NoError(err)
-			end := Nothing[[]byte]()
+			end := maybe.Nothing[[]byte]()
 			if len(step.value) > 0 {
-				end = Some(step.value)
+				end = maybe.Some(step.value)
 			}
 			require.NoError(changeProofDB.VerifyChangeProof(
 				context.Background(),
