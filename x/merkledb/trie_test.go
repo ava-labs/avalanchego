@@ -434,12 +434,12 @@ func Test_Trie_HashCountOnBranch(t *testing.T) {
 
 	// force a new node to generate with common prefix "key1" and have these two nodes as children
 	require.NoError(trie.insert([]byte("key12"), []byte("value12")))
-	trie.calculateNodeIDs(context.Background())
+	require.NoError(trie.calculateNodeIDs(context.Background()))
 	oldCount := dbTrie.metrics.(*mockMetrics).hashCount
 	require.NoError(trie.insert([]byte("key134"), []byte("value134")))
 	// only hashes the new branch node, the new child node, and root
 	// shouldn't hash the existing node
-	trie.calculateNodeIDs(context.Background())
+	require.NoError(trie.calculateNodeIDs(context.Background()))
 	require.Equal(oldCount+3, dbTrie.metrics.(*mockMetrics).hashCount)
 }
 
