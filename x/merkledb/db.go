@@ -235,27 +235,25 @@ func (db *merkleDB) rebuild(ctx context.Context) error {
 	it := db.nodeDB.NewIterator()
 	defer it.Release()
 
-	currentViewSize := 0
 	viewSizeLimit := math.Max(
 		db.nodeCache.maxSize/rebuildViewSizeFractionOfCacheSize,
 		minRebuildViewSizePerCommit,
 	)
-
-	currentView, err := db.newUntrackedView(nil)
-	if err != nil {
-		return err
-	}
+	currentOps := make([]database.BatchOp, 0, viewSizeLimit)
 
 	for it.Next() {
-		if currentViewSize >= viewSizeLimit {
-			if err := currentView.commitToDB(ctx); err != nil {
-				return err
-			}
-			currentView, err = db.newUntrackedView(nil)
+		if len(currentOps) >= viewSizeLimit {
+			view, err := db.newUntrackedView(currentOps)
 			if err != nil {
 				return err
 			}
-			currentViewSize = 0
+			if err := view.commitToDB(ctx); err != nil {
+				return err
+			}
+			if err != nil {
+				return err
+			}
+			currentOps = make([]database.BatchOp, 0, viewSizeLimit)
 		}
 
 		key := it.Key()
@@ -265,20 +263,18 @@ func (db *merkleDB) rebuild(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		if n.hasValue() {
-			serializedPath := path.Serialize()
-			if err := currentView.Insert(ctx, serializedPath.Value, n.value.value); err != nil {
-				return err
-			}
-			currentViewSize++
-		} else if err := db.nodeDB.Delete(key); err != nil {
-			return err
-		}
+
+		currentOps = append(currentOps, database.BatchOp{Key: path.Serialize().Value, Value: n.value.Value(), Delete: n.hasValue()})
+
 	}
 	if err := it.Error(); err != nil {
 		return err
 	}
-	if err := currentView.commitToDB(ctx); err != nil {
+	view, err := db.newUntrackedView(currentOps)
+	if err != nil {
+		return err
+	}
+	if err := view.commitToDB(ctx); err != nil {
 		return err
 	}
 	return db.nodeDB.Compact(nil, nil)

@@ -114,6 +114,7 @@ func Test_MerkleDB_DB_Load_Root_From_DB(t *testing.T) {
 		ops = append(ops, database.BatchOp{Key: k, Value: hashing.ComputeHash256(k)})
 	}
 	view, err := db.NewView(ops)
+	require.NoError(err)
 	require.NoError(view.commitToDB(context.Background()))
 
 	root, err := db.GetMerkleRoot(context.Background())
