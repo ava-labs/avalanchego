@@ -55,8 +55,8 @@ func Clone(m Maybe[[]byte]) Maybe[[]byte] {
 	return Some(slices.Clone(m.value))
 }
 
-// MaybeBytesEquals returns true iff [a] and [b] are equal.
-func MaybeBytesEquals(a, b Maybe[[]byte]) bool {
+// BytesEquals returns true iff [a] and [b] are equal.
+func BytesEquals(a, b Maybe[[]byte]) bool {
 	aNothing := a.IsNothing()
 	bNothing := b.IsNothing()
 
