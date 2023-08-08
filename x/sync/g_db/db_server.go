@@ -9,6 +9,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 	"github.com/ava-labs/avalanchego/x/sync"
 
@@ -52,12 +53,16 @@ func (s *DBServer) GetChangeProof(
 	if err != nil {
 		return nil, err
 	}
+	end := maybe.Nothing[[]byte]()
+	if req.EndKey != nil && !req.EndKey.IsNothing {
+		end = maybe.Some(req.EndKey.Value)
+	}
 	changeProof, err := s.db.GetChangeProof(
 		ctx,
 		startRootID,
 		endRootID,
 		req.StartKey,
-		req.EndKey,
+		end,
 		int(req.KeyLimit),
 	)
 	if err != nil {
@@ -82,7 +87,7 @@ func (s *DBServer) VerifyChangeProof(
 
 	// TODO there's probably a better way to do this.
 	var errString string
-	if err := s.db.VerifyChangeProof(ctx, &proof, req.StartKey, merkledb.Some(req.EndKey), rootID); err != nil {
+	if err := s.db.VerifyChangeProof(ctx, &proof, req.StartKey, maybe.Some(req.EndKey), rootID); err != nil {
 		errString = err.Error()
 	}
 	return &pb.VerifyChangeProofResponse{
@@ -125,8 +130,11 @@ func (s *DBServer) GetRangeProof(
 	if err != nil {
 		return nil, err
 	}
-
-	proof, err := s.db.GetRangeProofAtRoot(ctx, rootID, req.StartKey, req.EndKey, int(req.KeyLimit))
+	end := maybe.Nothing[[]byte]()
+	if req.EndKey != nil && !req.EndKey.IsNothing {
+		end = maybe.Some(req.EndKey.Value)
+	}
+	proof, err := s.db.GetRangeProofAtRoot(ctx, rootID, req.StartKey, end, int(req.KeyLimit))
 	if err != nil {
 		return nil, err
 	}
