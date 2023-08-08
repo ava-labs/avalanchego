@@ -32,7 +32,7 @@ func (i *iterator) Value() []byte {
 	if i.current == nil {
 		return nil
 	}
-	return i.current.value.value
+	return i.current.value.Value()
 }
 
 func (i *iterator) Next() bool {
