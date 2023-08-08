@@ -18,7 +18,7 @@ func TestMaybeClone(t *testing.T) {
 		val := []byte{1, 2, 3}
 		originalVal := slices.Clone(val)
 		m := Some(val)
-		mClone := Clone(m)
+		mClone := BindMaybe(m, slices.Clone[[]byte])
 		m.value[0] = 0
 		require.NotEqual(mClone.value, m.value)
 		require.Equal(originalVal, mClone.value)
@@ -27,7 +27,7 @@ func TestMaybeClone(t *testing.T) {
 	// Case: Value is nothing
 	{
 		m := Nothing[[]byte]()
-		mClone := Clone(m)
+		mClone := BindMaybe(m, slices.Clone[[]byte])
 		require.True(mClone.IsNothing())
 	}
 }

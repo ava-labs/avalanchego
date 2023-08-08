@@ -131,6 +131,13 @@ func (s *NetworkServer) AppRequest(
 	return nil
 }
 
+func maybeBytesToMaybe(mb *pb.MaybeBytes) merkledb.Maybe[[]byte] {
+	if mb != nil && !mb.IsNothing {
+		return merkledb.Some(mb.Value)
+	}
+	return merkledb.Nothing[[]byte]()
+}
+
 // Generates a change proof and sends it to [nodeID].
 func (s *NetworkServer) HandleChangeProofRequest(
 	ctx context.Context,
@@ -164,10 +171,7 @@ func (s *NetworkServer) HandleChangeProofRequest(
 	if bytesLimit > maxByteSizeLimit {
 		bytesLimit = maxByteSizeLimit
 	}
-	end := merkledb.Nothing[[]byte]()
-	if req.EndKey != nil && !req.EndKey.IsNothing {
-		end = merkledb.Some(req.EndKey.Value)
-	}
+	end := maybeBytesToMaybe(req.EndKey)
 
 	// attempt to get a proof within the bytes limit
 	for keyLimit > 0 {
@@ -251,10 +255,7 @@ func (s *NetworkServer) HandleRangeProofRequest(
 	if bytesLimit > maxByteSizeLimit {
 		bytesLimit = maxByteSizeLimit
 	}
-	end := merkledb.Nothing[[]byte]()
-	if req.EndKey != nil && !req.EndKey.IsNothing {
-		end = merkledb.Some(req.EndKey.Value)
-	}
+	end := maybeBytesToMaybe(req.EndKey)
 
 	for keyLimit > 0 {
 		root, err := ids.ToID(req.RootHash)

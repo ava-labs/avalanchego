@@ -5,8 +5,6 @@ package merkledb
 
 import (
 	"bytes"
-
-	"golang.org/x/exp/slices"
 )
 
 // Maybe T = Some T | Nothing.
@@ -20,7 +18,7 @@ type Maybe[T any] struct {
 	value    T
 }
 
-// Returns a new Maybe[T] with the value val.
+// Some returns a new Maybe[T] with the value val.
 func Some[T any](val T) Maybe[T] {
 	return Maybe[T]{
 		value:    val,
@@ -28,31 +26,24 @@ func Some[T any](val T) Maybe[T] {
 	}
 }
 
-// Returns a new Maybe[T] with no value.
+// Nothing returns a new Maybe[T] with no value.
 func Nothing[T any]() Maybe[T] {
 	return Maybe[T]{}
 }
 
-// Returns false iff [m] has a value.
+// IsNothing returns false iff [m] has a value.
 func (m Maybe[T]) IsNothing() bool {
 	return !m.hasValue
 }
 
-// Returns true iff [m] has a value.
+// HasValue returns true iff [m] has a value.
 func (m Maybe[T]) HasValue() bool {
 	return m.hasValue
 }
 
-// Returns the value of [m].
+// Value returns the value of [m].
 func (m Maybe[T]) Value() T {
 	return m.value
-}
-
-func Clone(m Maybe[[]byte]) Maybe[[]byte] {
-	if !m.hasValue {
-		return Nothing[[]byte]()
-	}
-	return Some(slices.Clone(m.value))
 }
 
 // MaybeBytesEquals returns true iff [a] and [b] are equal.
@@ -71,7 +62,7 @@ func MaybeBytesEquals(a, b Maybe[[]byte]) bool {
 	return bytes.Equal(a.Value(), b.Value())
 }
 
-// If [m] is Nothing, returns Nothing.
+// BindMaybe returns Nothing, if [m] is Nothing.
 // Otherwise applies [f] to the value of [m] and returns the result as a Some.
 func BindMaybe[T, U any](m Maybe[T], f func(T) U) Maybe[U] {
 	if m.IsNothing() {
