@@ -10,12 +10,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/avalanchego/database"
-
 	"github.com/stretchr/testify/require"
 
 	"golang.org/x/exp/maps"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 )
 

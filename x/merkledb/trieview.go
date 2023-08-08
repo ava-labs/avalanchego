@@ -786,8 +786,11 @@ func (t *trieView) insert(key []byte, value []byte) error {
 	// the trie has been changed, so invalidate all children and remove them from tracking
 	t.invalidateChildren()
 
-	valCopy := slices.Clone(value)
-	path, val := newPath(key), maybe.Some(valCopy)
+	var (
+		path    = newPath(key)
+		valCopy = slices.Clone(value)
+		val     = maybe.Some(valCopy)
+	)
 	if err := t.recordValueChange(path, val); err != nil {
 		return err
 	}
