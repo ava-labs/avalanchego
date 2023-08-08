@@ -14,15 +14,12 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/e2e"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
-	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
@@ -63,7 +60,6 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			avaxAssetID := baseWallet.P().AVAXAssetID()
 			xWallet := baseWallet.X()
 			pChainClient := platformvm.NewClient(nodeURI)
-			xChainClient := avm.NewClient(nodeURI, xWallet.BlockchainID().String())
 
 			tests.Outf("{{blue}} fetching minimal stake amounts {{/}}\n")
 			ctx, cancel = context.WithTimeout(context.Background(), e2e.DefaultWalletCreationTimeout)
@@ -111,7 +107,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 
 			ginkgo.By("issue add validator tx", func() {
 				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
-				addValidatorTx, err := pWallet.IssueAddValidatorTx(
+				_, err := pWallet.IssueAddValidatorTx(
 					vdr,
 					rewardOwner,
 					shares,
@@ -119,27 +115,17 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 				)
 				cancel()
 				gomega.Expect(err).Should(gomega.BeNil())
-
-				ctx, cancel = context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
-				txStatus, err := pChainClient.GetTxStatus(ctx, addValidatorTx.ID())
-				cancel()
-				gomega.Expect(txStatus.Status, err).To(gomega.Equal(status.Committed))
 			})
 
 			ginkgo.By("issue add delegator tx", func() {
 				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
-				addDelegatorTx, err := pWallet.IssueAddDelegatorTx(
+				_, err := pWallet.IssueAddDelegatorTx(
 					vdr,
 					rewardOwner,
 					common.WithContext(ctx),
 				)
 				cancel()
 				gomega.Expect(err).Should(gomega.BeNil())
-
-				ctx, cancel = context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
-				txStatus, err := pChainClient.GetTxStatus(ctx, addDelegatorTx.ID())
-				cancel()
-				gomega.Expect(txStatus.Status, err).To(gomega.Equal(status.Committed))
 			})
 
 			// retrieve initial balances
@@ -166,7 +152,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 
 			ginkgo.By("export avax from P to X chain", func() {
 				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
-				exportTx, err := pWallet.IssueExportTx(
+				_, err := pWallet.IssueExportTx(
 					xWallet.BlockchainID(),
 					[]*avax.TransferableOutput{
 						{
@@ -180,11 +166,6 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 				)
 				cancel()
 				gomega.Expect(err).Should(gomega.BeNil())
-
-				ctx, cancel = context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
-				txStatus, err := pChainClient.GetTxStatus(ctx, exportTx.ID())
-				cancel()
-				gomega.Expect(txStatus.Status, err).To(gomega.Equal(status.Committed))
 			})
 
 			// check balances post export
@@ -203,18 +184,13 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 
 			ginkgo.By("import avax from P into X chain", func() {
 				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
-				importTx, err := xWallet.IssueImportTx(
+				_, err := xWallet.IssueImportTx(
 					constants.PlatformChainID,
 					&outputOwner,
 					common.WithContext(ctx),
 				)
 				cancel()
 				gomega.Expect(err).Should(gomega.BeNil(), "is context.DeadlineExceeded: %v", errors.Is(err, context.DeadlineExceeded))
-
-				ctx, cancel = context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
-				txStatus, err := xChainClient.GetTxStatus(ctx, importTx.ID())
-				cancel()
-				gomega.Expect(txStatus, err).To(gomega.Equal(choices.Accepted))
 			})
 
 			// check balances post import

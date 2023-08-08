@@ -19,7 +19,6 @@ import (
 func TestGetBlock(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	statelessBlk, err := blocks.NewApricotCommitBlock(ids.GenerateTestID() /*parent*/, 2 /*height*/)
 	require.NoError(err)

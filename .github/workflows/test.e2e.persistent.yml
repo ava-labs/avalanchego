@@ -1,0 +1,31 @@
+name: Test e2e with persistent network
+
+on:
+  push:
+    tags:
+      - "*"
+    branches:
+      - master
+      - dev
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test_e2e_persistent:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v3
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: '~1.19.12'
+          check-latest: true
+      - name: Build the avalanchego binary
+        shell: bash
+        run: ./scripts/build.sh -r
+      - name: Run e2e tests with persistent network
+        shell: bash
+        run: ./scripts/tests.e2e.persistent.sh ./build/avalanchego

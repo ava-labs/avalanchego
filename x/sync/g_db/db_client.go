@@ -63,13 +63,13 @@ func (c *DBClient) VerifyChangeProof(
 	ctx context.Context,
 	proof *merkledb.ChangeProof,
 	startKey []byte,
-	endKey []byte,
+	endKey merkledb.Maybe[[]byte],
 	expectedRootID ids.ID,
 ) error {
 	resp, err := c.client.VerifyChangeProof(ctx, &pb.VerifyChangeProofRequest{
 		Proof:            proof.ToProto(),
 		StartKey:         startKey,
-		EndKey:           endKey,
+		EndKey:           endKey.Value(),
 		ExpectedRootHash: expectedRootID[:],
 	})
 	if err != nil {
