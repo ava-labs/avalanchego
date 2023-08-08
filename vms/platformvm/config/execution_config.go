@@ -16,6 +16,7 @@ var DefaultExecutionConfig = ExecutionConfig{
 	RewardUTXOsCacheSize:         2048,
 	ChainCacheSize:               2048,
 	ChainDBCacheSize:             2048,
+	BlockIDCacheSize:             8192,
 	ChecksumsEnabled:             false,
 }
 
