@@ -290,17 +290,15 @@ func Test_Trie_Delete(t *testing.T) {
 	require.NoError(err)
 	require.NotNil(dbTrie)
 
-	trieIntF, err := dbTrie.NewView(nil)
+	trie, err := dbTrie.NewView([]database.BatchOp{{Key: []byte("key"), Value: []byte("value0")}})
 	require.NoError(err)
-	trie := trieIntF.(*trieView)
-
-	require.NoError(trie.insert([]byte("key"), []byte("value0")))
 
 	value, err := getNodeValue(trie, "key")
 	require.NoError(err)
 	require.Equal([]byte("value0"), value)
 
-	require.NoError(trie.remove([]byte("key")))
+	trie, err = dbTrie.NewView([]database.BatchOp{{Key: []byte("key"), Delete: true}})
+	require.NoError(err)
 
 	value, err = getNodeValue(trie, "key")
 	require.ErrorIs(err, database.ErrNotFound)
@@ -514,12 +512,10 @@ func Test_Trie_CommitChanges(t *testing.T) {
 	db, err := getBasicDB()
 	require.NoError(err)
 
-	view1Intf, err := db.NewView(nil)
+	view1Intf, err := db.NewView([]database.BatchOp{{Key: []byte{1}, Value: []byte{1}}})
 	require.NoError(err)
 	require.IsType(&trieView{}, view1Intf)
 	view1 := view1Intf.(*trieView)
-
-	require.NoError(view1.insert([]byte{1}, []byte{1}))
 
 	// view1
 	//   |
@@ -551,13 +547,13 @@ func Test_Trie_CommitChanges(t *testing.T) {
 	require.ErrorIs(err, ErrInvalid)
 
 	// Make more views atop the existing one
-	view2Intf, err := view1.NewView(nil)
+	view2Intf, err := view1.NewView([]database.BatchOp{
+		{Key: []byte{2}, Value: []byte{2}},
+		{Key: []byte{1}, Delete: true},
+	})
 	require.NoError(err)
 	require.IsType(&trieView{}, view2Intf)
 	view2 := view2Intf.(*trieView)
-
-	require.NoError(view2.insert([]byte{2}, []byte{2}))
-	require.NoError(view2.remove([]byte{1}))
 
 	view2Root, err := view2.getMerkleRoot(context.Background())
 	require.NoError(err)

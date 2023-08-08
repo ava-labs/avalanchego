@@ -654,22 +654,28 @@ func (db *merkleDB) GetChangeProof(
 
 // NewView returns a new view on top of this trie.
 // Changes made to the view will only be reflected in the original trie if Commit is called.
-// Assumes [db.commitLock] isn't held.
+// Assumes [db.commitLock] and [db.lock] aren't held.
 func (db *merkleDB) NewView(batchOps []database.BatchOp) (TrieView, error) {
-	db.commitLock.Lock()
-	defer db.commitLock.Unlock()
+	// ensure the db doesn't change while creating the new view
+	db.commitLock.RLock()
+	defer db.commitLock.RUnlock()
 
 	newView, err := db.newUntrackedView(batchOps)
 	if err != nil {
 		return nil, err
 	}
+
+	// ensure access to childViews is protected
+	db.lock.Lock()
+	defer db.lock.Unlock()
+
 	db.childViews = append(db.childViews, newView)
 	return newView, nil
 }
 
 // Returns a new view that isn't tracked in [db.childViews].
 // For internal use only, namely in methods that create short-lived views.
-// Assumes [db.lock] and/or [db.commitLock] is read locked.
+// Assumes [db.lock] isn't held and [db.commitLock] is read locked.
 func (db *merkleDB) newUntrackedView(batchOps []database.BatchOp) (*trieView, error) {
 	if db.closed {
 		return nil, database.ErrClosed
@@ -1060,21 +1066,17 @@ func (db *merkleDB) VerifyChangeProof(
 		return err
 	}
 
-	// Don't need to lock [view] because nobody else has a reference to it.
-	view, err := db.newUntrackedView(nil)
-	if err != nil {
-		return err
-	}
+	ops := make([]database.BatchOp, 0, len(proof.KeyChanges))
 
 	// Insert the key-value pairs into the trie.
 	for _, kv := range proof.KeyChanges {
-		if kv.Value.IsNothing() {
-			if err := view.removeFromTrie(newPath(kv.Key)); err != nil {
-				return err
-			}
-		} else if _, err := view.insertIntoTrie(newPath(kv.Key), kv.Value); err != nil {
-			return err
-		}
+		ops = append(ops, database.BatchOp{Key: kv.Key, Value: kv.Value.Value(), Delete: kv.Value.IsNothing()})
+	}
+
+	// Don't need to lock [view] because nobody else has a reference to it.
+	view, err := db.newUntrackedView(ops)
+	if err != nil {
+		return err
 	}
 
 	// For all the nodes along the edges of the proof, insert the children whose

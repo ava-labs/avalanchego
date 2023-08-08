@@ -169,12 +169,12 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID) error {
 	}
 
 	// Don't bother locking [view] -- nobody else has a reference to it.
-	view, err := getEmptyTrieView(ctx)
+	view, err := getTrieView(ctx, nil)
 	if err != nil {
 		return err
 	}
 
-	// Insert all of the proof nodes.
+	// Insert all proof nodes.
 	// [provenPath] is the path that we are proving exists, or the path
 	// that is where the path we are proving doesn't exist should be.
 	provenPath := Some(proof.Path[len(proof.Path)-1].KeyPath.deserialize())
@@ -339,17 +339,16 @@ func (proof *RangeProof) Verify(
 		return err
 	}
 
-	// Don't need to lock [view] because nobody else has a reference to it.
-	view, err := getEmptyTrieView(ctx)
-	if err != nil {
-		return err
-	}
-
+	ops := make([]database.BatchOp, 0, len(proof.KeyValues))
 	// Insert all key-value pairs into the trie.
 	for _, kv := range proof.KeyValues {
-		if _, err := view.insertIntoTrie(newPath(kv.Key), Some(kv.Value)); err != nil {
-			return err
-		}
+		ops = append(ops, database.BatchOp{Key: kv.Key, Value: kv.Value})
+	}
+
+	// Don't need to lock [view] because nobody else has a reference to it.
+	view, err := getTrieView(ctx, ops)
+	if err != nil {
+		return err
 	}
 
 	// For all the nodes along the edges of the proof, insert children
@@ -804,7 +803,7 @@ func addPathInfo(
 	return nil
 }
 
-func getEmptyTrieView(ctx context.Context) (*trieView, error) {
+func getTrieView(ctx context.Context, ops []database.BatchOp) (*trieView, error) {
 	tracer, err := trace.New(trace.Config{Enabled: false})
 	if err != nil {
 		return nil, err
@@ -823,5 +822,5 @@ func getEmptyTrieView(ctx context.Context) (*trieView, error) {
 		return nil, err
 	}
 
-	return db.newUntrackedView(nil)
+	return db.newUntrackedView(ops)
 }
