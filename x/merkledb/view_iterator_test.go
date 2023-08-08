@@ -13,7 +13,10 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 
 	"github.com/stretchr/testify/require"
+
 	"golang.org/x/exp/maps"
+
+	"github.com/ava-labs/avalanchego/utils/maybe"
 )
 
 func Test_TrieView_Iterator(t *testing.T) {
@@ -178,7 +181,7 @@ func Test_TrieView_Iterator_Random(t *testing.T) {
 		_, _ = rand.Read(value)
 		keyChanges = append(keyChanges, KeyChange{
 			Key:   key,
-			Value: Some(value),
+			Value: maybe.Some(value),
 		})
 	}
 
@@ -186,12 +189,12 @@ func Test_TrieView_Iterator_Random(t *testing.T) {
 	require.NoError(err)
 
 	for i := 0; i < numKeyChanges/4; i++ {
-		require.NoError(db.Put(keyChanges[i].Key, keyChanges[i].Value.value))
+		require.NoError(db.Put(keyChanges[i].Key, keyChanges[i].Value.Value()))
 	}
 
 	ops := make([]database.BatchOp, 0, numKeyChanges/4)
 	for i := numKeyChanges / 4; i < 2*numKeyChanges/4; i++ {
-		ops = append(ops, database.BatchOp{Key: keyChanges[i].Key, Value: keyChanges[i].Value.value})
+		ops = append(ops, database.BatchOp{Key: keyChanges[i].Key, Value: keyChanges[i].Value.Value()})
 	}
 
 	view1, err := db.NewView(ops)
@@ -199,7 +202,7 @@ func Test_TrieView_Iterator_Random(t *testing.T) {
 
 	ops = make([]database.BatchOp, 0, numKeyChanges/4)
 	for i := 2 * numKeyChanges / 4; i < 3*numKeyChanges/4; i++ {
-		ops = append(ops, database.BatchOp{Key: keyChanges[i].Key, Value: keyChanges[i].Value.value})
+		ops = append(ops, database.BatchOp{Key: keyChanges[i].Key, Value: keyChanges[i].Value.Value()})
 	}
 
 	view2, err := view1.NewView(ops)
@@ -207,7 +210,7 @@ func Test_TrieView_Iterator_Random(t *testing.T) {
 
 	ops = make([]database.BatchOp, 0, numKeyChanges/4)
 	for i := 3 * numKeyChanges / 4; i < numKeyChanges; i++ {
-		ops = append(ops, database.BatchOp{Key: keyChanges[i].Key, Value: keyChanges[i].Value.value})
+		ops = append(ops, database.BatchOp{Key: keyChanges[i].Key, Value: keyChanges[i].Value.Value()})
 	}
 
 	view3, err := view2.NewView(ops)
@@ -216,7 +219,7 @@ func Test_TrieView_Iterator_Random(t *testing.T) {
 	// Might have introduced duplicates, so only expect the latest value.
 	uniqueKeyChanges := make(map[string][]byte)
 	for _, keyChange := range keyChanges {
-		uniqueKeyChanges[string(keyChange.Key)] = keyChange.Value.value
+		uniqueKeyChanges[string(keyChange.Key)] = keyChange.Value.Value()
 	}
 
 	iter := view3.NewIterator()

@@ -17,6 +17,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 
@@ -111,9 +112,9 @@ func (c *client) GetChangeProof(ctx context.Context, req *pb.SyncGetChangeProofR
 			return nil, err
 		}
 
-		endKey := merkledb.Nothing[[]byte]()
+		endKey := maybe.Nothing[[]byte]()
 		if req.EndKey != nil && !req.EndKey.IsNothing {
-			endKey = merkledb.Some(req.EndKey.Value)
+			endKey = maybe.Some(req.EndKey.Value)
 		}
 
 		if err := db.VerifyChangeProof(ctx, &changeProof, req.StartKey, endKey, endRoot); err != nil {
@@ -162,9 +163,9 @@ func (c *client) GetRangeProof(ctx context.Context, req *pb.SyncGetRangeProofReq
 			return nil, err
 		}
 
-		endKey := merkledb.Nothing[[]byte]()
+		endKey := maybe.Nothing[[]byte]()
 		if req.EndKey != nil && !req.EndKey.IsNothing {
-			endKey = merkledb.Some(req.EndKey.Value)
+			endKey = maybe.Some(req.EndKey.Value)
 		}
 
 		if err := rangeProof.Verify(

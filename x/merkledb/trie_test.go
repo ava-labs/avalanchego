@@ -33,7 +33,7 @@ func getNodeValue(t ReadOnlyTrie, key string) ([]byte, error) {
 			return nil, database.ErrNotFound
 		}
 
-		return closestNode.value.value, nil
+		return closestNode.value.Value(), nil
 	}
 	if asDatabases, ok := t.(*merkleDB); ok {
 		view, err := asDatabases.NewView(nil)
@@ -50,7 +50,7 @@ func getNodeValue(t ReadOnlyTrie, key string) ([]byte, error) {
 			return nil, database.ErrNotFound
 		}
 
-		return closestNode.value.value, nil
+		return closestNode.value.Value(), nil
 	}
 	return nil, nil
 }
@@ -261,7 +261,7 @@ func Test_Trie_WriteToDB(t *testing.T) {
 
 	node, err := parseNode(p, rawBytes)
 	require.NoError(err)
-	require.Equal([]byte("value"), node.value.value)
+	require.Equal([]byte("value"), node.value.Value())
 }
 
 func Test_Trie_InsertAndRetrieve(t *testing.T) {

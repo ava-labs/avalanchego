@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -61,7 +62,7 @@ type ChangeProofer interface {
 		startRootID ids.ID,
 		endRootID ids.ID,
 		start []byte,
-		end []byte,
+		end maybe.Maybe[[]byte],
 		maxLength int,
 	) (*ChangeProof, error)
 
@@ -83,7 +84,7 @@ type ChangeProofer interface {
 		ctx context.Context,
 		proof *ChangeProof,
 		start []byte,
-		end Maybe[[]byte],
+		end maybe.Maybe[[]byte],
 		expectedEndRootID ids.ID,
 	) error
 
@@ -97,8 +98,8 @@ type RangeProofer interface {
 	GetRangeProofAtRoot(
 		ctx context.Context,
 		rootID ids.ID,
-		start,
-		end []byte,
+		start []byte,
+		end maybe.Maybe[[]byte],
 		maxLength int,
 	) (*RangeProof, error)
 
@@ -201,7 +202,7 @@ func newDatabase(
 	// add current root to history (has no changes)
 	trieDB.history.record(&changeSummary{
 		rootID: root,
-		values: map[path]*change[Maybe[[]byte]]{},
+		values: map[path]*change[maybe.Maybe[[]byte]]{},
 		nodes:  map[path]*change[*node]{},
 	})
 
@@ -294,7 +295,7 @@ func (db *merkleDB) CommitChangeProof(ctx context.Context, proof *ChangeProof) e
 	}
 	ops := make([]database.BatchOp, 0, len(proof.KeyChanges))
 	for _, kv := range proof.KeyChanges {
-		ops = append(ops, database.BatchOp{Key: kv.Key, Value: kv.Value.value, Delete: kv.Value.IsNothing()})
+		ops = append(ops, database.BatchOp{Key: kv.Key, Value: kv.Value.Value(), Delete: kv.Value.IsNothing()})
 	}
 
 	view, err := db.newUntrackedView(ops)
@@ -450,7 +451,7 @@ func (db *merkleDB) getValue(key path, lock bool) ([]byte, error) {
 	if n.value.IsNothing() {
 		return nil, database.ErrNotFound
 	}
-	return n.value.value, nil
+	return n.value.Value(), nil
 }
 
 func (db *merkleDB) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
@@ -497,8 +498,8 @@ func (db *merkleDB) getProof(ctx context.Context, key []byte) (*Proof, error) {
 // [start, end].
 func (db *merkleDB) GetRangeProof(
 	ctx context.Context,
-	start,
-	end []byte,
+	start []byte,
+	end maybe.Maybe[[]byte],
 	maxLength int,
 ) (*RangeProof, error) {
 	db.commitLock.RLock()
@@ -512,8 +513,8 @@ func (db *merkleDB) GetRangeProof(
 func (db *merkleDB) GetRangeProofAtRoot(
 	ctx context.Context,
 	rootID ids.ID,
-	start,
-	end []byte,
+	start []byte,
+	end maybe.Maybe[[]byte],
 	maxLength int,
 ) (*RangeProof, error) {
 	db.commitLock.RLock()
@@ -526,8 +527,8 @@ func (db *merkleDB) GetRangeProofAtRoot(
 func (db *merkleDB) getRangeProofAtRoot(
 	ctx context.Context,
 	rootID ids.ID,
-	start,
-	end []byte,
+	start []byte,
+	end maybe.Maybe[[]byte],
 	maxLength int,
 ) (*RangeProof, error) {
 	if db.closed {
@@ -549,10 +550,10 @@ func (db *merkleDB) GetChangeProof(
 	startRootID ids.ID,
 	endRootID ids.ID,
 	start []byte,
-	end []byte,
+	end maybe.Maybe[[]byte],
 	maxLength int,
 ) (*ChangeProof, error) {
-	if len(end) > 0 && bytes.Compare(start, end) == 1 {
+	if end.HasValue() && bytes.Compare(start, end.Value()) == 1 {
 		return nil, ErrStartAfterEnd
 	}
 	if startRootID == endRootID {
@@ -595,20 +596,18 @@ func (db *merkleDB) GetChangeProof(
 		result.KeyChanges = append(result.KeyChanges, KeyChange{
 			Key: serializedKey,
 			// create a copy so edits of the []byte don't affect the db
-			Value: Clone(change.after),
+			Value: maybe.Bind(change.after, slices.Clone[[]byte]),
 		})
 	}
 
-	largestKey := Nothing[[]byte]()
+	largestKey := end
 	if len(result.KeyChanges) > 0 {
-		largestKey = Some(result.KeyChanges[len(result.KeyChanges)-1].Key)
-	} else if len(end) > 0 {
-		largestKey = Some(end)
+		largestKey = maybe.Some(result.KeyChanges[len(result.KeyChanges)-1].Key)
 	}
 
 	// Since we hold [db.commitlock] we must still have sufficient
 	// history to recreate the trie at [endRootID].
-	historicalView, err := db.getHistoricalViewForRange(endRootID, start, largestKey.Value())
+	historicalView, err := db.getHistoricalViewForRange(endRootID, start, largestKey)
 	if err != nil {
 		return nil, err
 	}
@@ -971,7 +970,7 @@ func (db *merkleDB) VerifyChangeProof(
 	ctx context.Context,
 	proof *ChangeProof,
 	start []byte,
-	end Maybe[[]byte],
+	end maybe.Maybe[[]byte],
 	expectedEndRootID ids.ID,
 ) error {
 	if end.HasValue() && bytes.Compare(start, end.Value()) > 0 {
@@ -1017,14 +1016,12 @@ func (db *merkleDB) VerifyChangeProof(
 	// Find the greatest key in [proof.KeyChanges]
 	// Note that [proof.EndProof] is a proof for this key.
 	// [largestPath] is also used when we add children of proof nodes to [trie] below.
-	largestPath := Nothing[path]()
+	largestPath := maybe.Bind(end, newPath)
 	if len(proof.KeyChanges) > 0 {
 		// If [proof] has key-value pairs, we should insert children
 		// greater than [end] to ancestors of the node containing [end]
 		// so that we get the expected root ID.
-		largestPath = Some(newPath(proof.KeyChanges[len(proof.KeyChanges)-1].Key))
-	} else if end.HasValue() {
-		largestPath = Some(newPath(end.Value()))
+		largestPath = maybe.Some(newPath(proof.KeyChanges[len(proof.KeyChanges)-1].Key))
 	}
 
 	// Make sure the end proof, if given, is well-formed.
@@ -1032,7 +1029,7 @@ func (db *merkleDB) VerifyChangeProof(
 		return err
 	}
 
-	keyValues := make(map[path]Maybe[[]byte], len(proof.KeyChanges))
+	keyValues := make(map[path]maybe.Maybe[[]byte], len(proof.KeyChanges))
 	for _, keyValue := range proof.KeyChanges {
 		keyValues[newPath(keyValue.Key)] = keyValue.Value
 	}
@@ -1080,9 +1077,9 @@ func (db *merkleDB) VerifyChangeProof(
 	// keys are less than [insertChildrenLessThan] or whose keys are greater
 	// than [insertChildrenGreaterThan] into the trie so that we get the
 	// expected root ID (if this proof is valid).
-	insertChildrenLessThan := Nothing[path]()
+	insertChildrenLessThan := maybe.Nothing[path]()
 	if len(smallestPath) > 0 {
-		insertChildrenLessThan = Some(smallestPath)
+		insertChildrenLessThan = maybe.Some(smallestPath)
 	}
 	if err := addPathInfo(
 		view,
@@ -1176,7 +1173,7 @@ func (db *merkleDB) initializeRootIfNeeded() (ids.ID, error) {
 func (db *merkleDB) getHistoricalViewForRange(
 	rootID ids.ID,
 	start []byte,
-	end []byte,
+	end maybe.Maybe[[]byte],
 ) (*trieView, error) {
 	currentRootID := db.getMerkleRoot()
 
