@@ -250,9 +250,6 @@ func (db *merkleDB) rebuild(ctx context.Context) error {
 			if err := view.commitToDB(ctx); err != nil {
 				return err
 			}
-			if err != nil {
-				return err
-			}
 			currentOps = make([]database.BatchOp, 0, viewSizeLimit)
 		}
 
