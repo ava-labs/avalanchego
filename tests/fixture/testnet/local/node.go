@@ -20,7 +20,7 @@ import (
 	"github.com/spf13/cast"
 
 	"github.com/ava-labs/avalanchego/api/health"
-	cfg "github.com/ava-labs/avalanchego/config"
+	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/node"
 	"github.com/ava-labs/avalanchego/tests/fixture/testnet"
@@ -49,14 +49,14 @@ type LocalNode struct {
 	LocalConfig
 	node.NodeProcessContext
 
-	// Configuration is intended to be stored at the path identified in NodeConfig.Flags[cfg.DataDirKey]
+	// Configuration is intended to be stored at the path identified in NodeConfig.Flags[config.DataDirKey]
 }
 
 func NewLocalNode(dataDir string) *LocalNode {
 	return &LocalNode{
 		NodeConfig: testnet.NodeConfig{
 			Flags: testnet.FlagsMap{
-				cfg.DataDirKey: dataDir,
+				config.DataDirKey: dataDir,
 			},
 		},
 	}
@@ -89,7 +89,7 @@ func (n *LocalNode) GetProcessContext() node.NodeProcessContext {
 }
 
 func (n *LocalNode) GetDataDir() string {
-	return cast.ToString(n.Flags[cfg.DataDirKey])
+	return cast.ToString(n.Flags[config.DataDirKey])
 }
 
 func (n *LocalNode) GetConfigPath() string {
@@ -130,7 +130,7 @@ func (n *LocalNode) WriteConfig() error {
 }
 
 func (n *LocalNode) GetProcessContextPath() string {
-	return filepath.Join(n.GetDataDir(), cfg.ProcessContextFilename)
+	return filepath.Join(n.GetDataDir(), config.ProcessContextFilename)
 }
 
 func (n *LocalNode) ReadProcessContext() error {

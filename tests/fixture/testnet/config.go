@@ -14,7 +14,7 @@ import (
 
 	"github.com/spf13/cast"
 
-	cfg "github.com/ava-labs/avalanchego/config"
+	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/staking"
@@ -38,9 +38,9 @@ var (
 	errInvalidNetworkIDForGenesis  = errors.New("network ID can't be mainnet, testnet or local network ID")
 	errMissingValidatorsForGenesis = errors.New("no genesis validators provided")
 	errMissingBalancesForGenesis   = errors.New("no genesis balances given")
-	errMissingTLSKeyForNodeID      = fmt.Errorf("failed to ensure node ID: missing value for %q", cfg.StakingTLSKeyContentKey)
-	errMissingCertForNodeID        = fmt.Errorf("failed to ensure node ID: missing value for %q", cfg.StakingCertContentKey)
-	errInvalidKeypair              = fmt.Errorf("%q and %q must be provided together or not at all", cfg.StakingTLSKeyContentKey, cfg.StakingCertContentKey)
+	errMissingTLSKeyForNodeID      = fmt.Errorf("failed to ensure node ID: missing value for %q", config.StakingTLSKeyContentKey)
+	errMissingCertForNodeID        = fmt.Errorf("failed to ensure node ID: missing value for %q", config.StakingCertContentKey)
+	errInvalidKeypair              = fmt.Errorf("%q and %q must be provided together or not at all", config.StakingTLSKeyContentKey, config.StakingCertContentKey)
 )
 
 // Defines a mapping of flag keys to values intended to be supplied to
@@ -163,10 +163,10 @@ func (nc *NodeConfig) SetNetworkingConfigDefaults(
 	bootstrapIPs []string,
 ) {
 	nc.Flags.SetDefaults(FlagsMap{
-		cfg.HTTPPortKey:     httpPort,
-		cfg.StakingPortKey:  stakingPort,
-		cfg.BootstrapIDsKey: strings.Join(bootstrapIDs, ","),
-		cfg.BootstrapIPsKey: strings.Join(bootstrapIPs, ","),
+		config.HTTPPortKey:     httpPort,
+		config.StakingPortKey:  stakingPort,
+		config.BootstrapIDsKey: strings.Join(bootstrapIDs, ","),
+		config.BootstrapIPsKey: strings.Join(bootstrapIPs, ","),
 	})
 }
 
@@ -186,7 +186,7 @@ func (nc *NodeConfig) EnsureKeys() error {
 // Ensures a BLS signing key is generated if not already present.
 func (nc *NodeConfig) EnsureBLSSigningKey() error {
 	// Attempt to retrieve an existing key
-	existingKey, err := nc.Flags.GetStringVal(cfg.StakingSignerKeyContentKey)
+	existingKey, err := nc.Flags.GetStringVal(config.StakingSignerKeyContentKey)
 	if err != nil {
 		return err
 	}
@@ -200,14 +200,14 @@ func (nc *NodeConfig) EnsureBLSSigningKey() error {
 	if err != nil {
 		return fmt.Errorf("failed to generate staking signer key: %w", err)
 	}
-	nc.Flags[cfg.StakingSignerKeyContentKey] = base64.StdEncoding.EncodeToString(newKey.Serialize())
+	nc.Flags[config.StakingSignerKeyContentKey] = base64.StdEncoding.EncodeToString(newKey.Serialize())
 	return nil
 }
 
 // Ensures a staking keypair is generated if not already present.
 func (nc *NodeConfig) EnsureStakingKeypair() error {
-	keyKey := cfg.StakingTLSKeyContentKey
-	certKey := cfg.StakingCertContentKey
+	keyKey := config.StakingTLSKeyContentKey
+	certKey := config.StakingCertContentKey
 
 	key, err := nc.Flags.GetStringVal(keyKey)
 	if err != nil {
@@ -242,8 +242,8 @@ func (nc *NodeConfig) EnsureStakingKeypair() error {
 
 // Attempt to derive the node ID from the node configuration.
 func (nc *NodeConfig) EnsureNodeID() error {
-	keyKey := cfg.StakingTLSKeyContentKey
-	certKey := cfg.StakingCertContentKey
+	keyKey := config.StakingTLSKeyContentKey
+	certKey := config.StakingCertContentKey
 
 	key, err := nc.Flags.GetStringVal(keyKey)
 	if err != nil {

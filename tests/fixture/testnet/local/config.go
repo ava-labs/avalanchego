@@ -6,7 +6,7 @@ package local
 import (
 	"time"
 
-	cfg "github.com/ava-labs/avalanchego/config"
+	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/tests/fixture/testnet"
 )
 
@@ -27,17 +27,17 @@ const (
 func LocalFlags() testnet.FlagsMap {
 	// Supply only non-default configuration to ensure that default values will be used.
 	return testnet.FlagsMap{
-		cfg.NetworkPeerListGossipFreqKey: "250ms",
-		cfg.NetworkMaxReconnectDelayKey:  "1s",
-		cfg.PublicIPKey:                  "127.0.0.1",
-		cfg.HTTPHostKey:                  "127.0.0.1",
-		cfg.StakingHostKey:               "127.0.0.1",
-		cfg.HealthCheckFreqKey:           "2s",
-		cfg.AdminAPIEnabledKey:           true,
-		cfg.IpcAPIEnabledKey:             true,
-		cfg.IndexEnabledKey:              true,
-		cfg.LogDisplayLevelKey:           "INFO",
-		cfg.LogLevelKey:                  "DEBUG",
+		config.NetworkPeerListGossipFreqKey: "250ms",
+		config.NetworkMaxReconnectDelayKey:  "1s",
+		config.PublicIPKey:                  "127.0.0.1",
+		config.HTTPHostKey:                  "127.0.0.1",
+		config.StakingHostKey:               "127.0.0.1",
+		config.HealthCheckFreqKey:           "2s",
+		config.AdminAPIEnabledKey:           true,
+		config.IpcAPIEnabledKey:             true,
+		config.IndexEnabledKey:              true,
+		config.LogDisplayLevelKey:           "INFO",
+		config.LogLevelKey:                  "DEBUG",
 	}
 }
 

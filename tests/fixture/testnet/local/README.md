@@ -97,18 +97,18 @@ network, _ := local.StartNetwork(
             ExecPath: "/path/to/avalanchego",
         },
         Nodes: []*LocalNode{
-            {                                                    // node1 configuration is customized
-                Flags: FlagsMap{                                 // Any and all node flags can be configured here
-                    cfg.DataDirKey: "/custom/path/to/node/data",
+            {                                                       // node1 configuration is customized
+                Flags: FlagsMap{                                    // Any and all node flags can be configured here
+                    config.DataDirKey: "/custom/path/to/node/data",
                 }
             },
         },
-        {},                                                      // node2 uses default configuration
-        {},                                                      // node3 uses default configuration
-        {},                                                      // node4 uses default configuration
-        {},                                                      // node5 uses default configuration
+        {},                                                         // node2 uses default configuration
+        {},                                                         // node3 uses default configuration
+        {},                                                         // node4 uses default configuration
+        {},                                                         // node5 uses default configuration
     },
-    0,                                                           // Node count must be zero when setting node config
+    0,                                                              // Node count must be zero when setting node config
     50,
 )
 ```

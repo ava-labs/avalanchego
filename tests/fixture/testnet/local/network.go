@@ -14,7 +14,7 @@ import (
 	"path/filepath"
 	"time"
 
-	cfg "github.com/ava-labs/avalanchego/config"
+	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests/fixture/testnet"
@@ -281,12 +281,12 @@ func (ln *LocalNetwork) PopulateNodeConfig(node *LocalNode) error {
 	// Set values common to all nodes
 	flags.SetDefaults(ln.DefaultFlags)
 	flags.SetDefaults(testnet.FlagsMap{
-		cfg.GenesisFileKey:    ln.GetGenesisPath(),
-		cfg.ChainConfigDirKey: ln.GetChainConfigDir(),
+		config.GenesisFileKey:    ln.GetGenesisPath(),
+		config.ChainConfigDirKey: ln.GetChainConfigDir(),
 	})
 
 	// Convert the network id to a string to ensure consistency in JSON round-tripping.
-	flags[cfg.NetworkNameKey] = fmt.Sprintf("%d", ln.Genesis.NetworkID)
+	flags[config.NetworkNameKey] = fmt.Sprintf("%d", ln.Genesis.NetworkID)
 
 	// Ensure keys are added if necessary
 	if err := node.EnsureKeys(); err != nil {
@@ -298,7 +298,7 @@ func (ln *LocalNetwork) PopulateNodeConfig(node *LocalNode) error {
 	if len(dataDir) == 0 {
 		// NodeID will have been set by EnsureKeys
 		dataDir = filepath.Join(ln.Dir, node.NodeID.String())
-		flags[cfg.DataDirKey] = dataDir
+		flags[config.DataDirKey] = dataDir
 	}
 
 	return nil
