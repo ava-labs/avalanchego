@@ -238,9 +238,9 @@ func Test_Trie_WriteToDB(t *testing.T) {
 	require.NoError(err)
 	require.NotNil(dbTrie)
 
-	trieIntF, err := dbTrie.NewView(nil)
+	trieIntf, err := dbTrie.NewView(nil)
 	require.NoError(err)
-	trie := trieIntF.(*trieView)
+	trie := trieIntf.(*trieView)
 
 	// value hasn't been inserted so shouldn't exist
 	value, err := trie.GetValue(context.Background(), []byte("key"))
@@ -321,9 +321,9 @@ func Test_Trie_ExpandOnKeyPath(t *testing.T) {
 	dbTrie, err := getBasicDB()
 	require.NoError(err)
 	require.NotNil(dbTrie)
-	trieIntF, err := dbTrie.NewView(nil)
+	trieIntf, err := dbTrie.NewView(nil)
 	require.NoError(err)
-	trie := trieIntF.(*trieView)
+	trie := trieIntf.(*trieView)
 
 	require.NoError(trie.insert([]byte("key"), []byte("value0")))
 
@@ -362,9 +362,9 @@ func Test_Trie_CompressedPaths(t *testing.T) {
 	dbTrie, err := getBasicDB()
 	require.NoError(err)
 	require.NotNil(dbTrie)
-	trieIntF, err := dbTrie.NewView(nil)
+	trieIntf, err := dbTrie.NewView(nil)
 	require.NoError(err)
-	trie := trieIntF.(*trieView)
+	trie := trieIntf.(*trieView)
 
 	require.NoError(trie.insert([]byte("key12"), []byte("value12")))
 
@@ -426,9 +426,9 @@ func Test_Trie_HashCountOnBranch(t *testing.T) {
 	dbTrie, err := getBasicDB()
 	require.NoError(err)
 	require.NotNil(dbTrie)
-	trieIntF, err := dbTrie.NewView(nil)
+	trieIntf, err := dbTrie.NewView(nil)
 	require.NoError(err)
-	trie := trieIntF.(*trieView)
+	trie := trieIntf.(*trieView)
 
 	// force a new node to generate with common prefix "key1" and have these two nodes as children
 	require.NoError(trie.insert([]byte("key12"), []byte("value12")))

@@ -731,7 +731,12 @@ func (db *merkleDB) Insert(ctx context.Context, k, v []byte) error {
 		return database.ErrClosed
 	}
 
-	view, err := db.newUntrackedView([]database.BatchOp{{Key: k, Value: v}})
+	view, err := db.newUntrackedView([]database.BatchOp{
+		{
+			Key:   k,
+			Value: v,
+		},
+	})
 	if err != nil {
 		return err
 	}
@@ -846,7 +851,12 @@ func (db *merkleDB) Remove(ctx context.Context, key []byte) error {
 		return database.ErrClosed
 	}
 
-	view, err := db.newUntrackedView([]database.BatchOp{{Key: key, Delete: true}})
+	view, err := db.newUntrackedView([]database.BatchOp{
+		{
+			Key:    key,
+			Delete: true,
+		},
+	})
 	if err != nil {
 		return err
 	}
