@@ -429,12 +429,12 @@ func RecordPollAcceptSingleBlockTest(t *testing.T, factory Factory) {
 	votes.Add(block.ID())
 	require.NoError(sm.RecordPoll(context.Background(), votes))
 	require.Equal(block.ID(), sm.Preference())
-	require.False(sm.Finalized())
+	require.False(!(sm.NumProcessing() > 0))
 	require.Equal(choices.Processing, block.Status())
 
 	require.NoError(sm.RecordPoll(context.Background(), votes))
 	require.Equal(block.ID(), sm.Preference())
-	require.True(sm.Finalized())
+	require.True(!(sm.NumProcessing() > 0))
 	require.Equal(choices.Accepted, block.Status())
 }
 
@@ -481,13 +481,13 @@ func RecordPollAcceptAndRejectTest(t *testing.T, factory Factory) {
 
 	require.NoError(sm.RecordPoll(context.Background(), votes))
 	require.Equal(firstBlock.ID(), sm.Preference())
-	require.False(sm.Finalized())
+	require.False(!(sm.NumProcessing() > 0))
 	require.Equal(choices.Processing, firstBlock.Status())
 	require.Equal(choices.Processing, secondBlock.Status())
 
 	require.NoError(sm.RecordPoll(context.Background(), votes))
 	require.Equal(firstBlock.ID(), sm.Preference())
-	require.True(sm.Finalized())
+	require.True(!(sm.NumProcessing() > 0))
 	require.Equal(choices.Accepted, firstBlock.Status())
 	require.Equal(choices.Rejected, secondBlock.Status())
 }
@@ -576,7 +576,7 @@ func RecordPollWhenFinalizedTest(t *testing.T, factory Factory) {
 	votes := bag.Bag[ids.ID]{}
 	votes.Add(GenesisID)
 	require.NoError(sm.RecordPoll(context.Background(), votes))
-	require.True(sm.Finalized())
+	require.True(!(sm.NumProcessing() > 0))
 	require.Equal(GenesisID, sm.Preference())
 }
 
@@ -643,7 +643,7 @@ func RecordPollRejectTransitivelyTest(t *testing.T, factory Factory) {
 	// 0
 	// Tail = 0
 
-	require.True(sm.Finalized())
+	require.True(!(sm.NumProcessing() > 0))
 	require.Equal(block0.ID(), sm.Preference())
 	require.Equal(choices.Accepted, block0.Status())
 	require.Equal(choices.Rejected, block1.Status())
@@ -716,22 +716,22 @@ func RecordPollTransitivelyResetConfidenceTest(t *testing.T, factory Factory) {
 	votesFor2 := bag.Bag[ids.ID]{}
 	votesFor2.Add(block2.ID())
 	require.NoError(sm.RecordPoll(context.Background(), votesFor2))
-	require.False(sm.Finalized())
+	require.False(!(sm.NumProcessing() > 0))
 	require.Equal(block2.ID(), sm.Preference())
 
 	emptyVotes := bag.Bag[ids.ID]{}
 	require.NoError(sm.RecordPoll(context.Background(), emptyVotes))
-	require.False(sm.Finalized())
+	require.False(!(sm.NumProcessing() > 0))
 	require.Equal(block2.ID(), sm.Preference())
 
 	require.NoError(sm.RecordPoll(context.Background(), votesFor2))
-	require.False(sm.Finalized())
+	require.False(!(sm.NumProcessing() > 0))
 	require.Equal(block2.ID(), sm.Preference())
 
 	votesFor3 := bag.Bag[ids.ID]{}
 	votesFor3.Add(block3.ID())
 	require.NoError(sm.RecordPoll(context.Background(), votesFor3))
-	require.False(sm.Finalized())
+	require.False(!(sm.NumProcessing() > 0))
 	require.Equal(block2.ID(), sm.Preference())
 
 	require.NoError(sm.RecordPoll(context.Background(), votesFor3))
