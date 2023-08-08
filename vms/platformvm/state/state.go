@@ -2378,20 +2378,12 @@ func (s *state) PruneAndIndex(lock sync.Locker, log logging.Logger) error {
 
 	log.Info("starting state pruning and indexing")
 
-	blkBytes := blockIterator.Value()
-	blk, _, _, err := parseStoredBlock(blkBytes)
-	if err != nil {
-		return err
-	}
-	blkID := blk.ID()
-
 	var (
-		startTime     = time.Now()
-		lastCommit    = startTime
-		lastUpdate    = startTime
-		numPruned     = 0
-		numIndexed    = 0
-		startProgress = timer.ProgressFromHash(blkID[:])
+		startTime  = time.Now()
+		lastCommit = startTime
+		lastUpdate = startTime
+		numPruned  = 0
+		numIndexed = 0
 	)
 
 	for blockIterator.Next() {
@@ -2459,8 +2451,8 @@ func (s *state) PruneAndIndex(lock sync.Locker, log logging.Logger) error {
 				progress := timer.ProgressFromHash(blkID[:])
 				eta := timer.EstimateETA(
 					startTime,
-					progress-startProgress,
-					stdmath.MaxUint64-startProgress,
+					progress,
+					stdmath.MaxUint64,
 				)
 
 				log.Info("committing state pruning and indexing",
