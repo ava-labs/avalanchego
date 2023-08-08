@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/x/merkledb"
@@ -52,12 +53,12 @@ func sendRangeRequest(
 
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	sender := common.NewMockSender(ctrl)
 	handler := NewNetworkServer(sender, db, logging.NoLog{})
 	clientNodeID, serverNodeID := ids.GenerateTestNodeID(), ids.GenerateTestNodeID()
-	networkClient := NewNetworkClient(sender, clientNodeID, 1, logging.NoLog{})
+	networkClient, err := NewNetworkClient(sender, clientNodeID, 1, logging.NoLog{}, "", prometheus.NewRegistry())
+	require.NoError(err)
 	require.NoError(networkClient.Connected(context.Background(), serverNodeID, version.CurrentApp))
 	client := NewClient(&ClientConfig{
 		NetworkClient: networkClient,
@@ -69,8 +70,7 @@ func sendRangeRequest(
 	deadline := time.Now().Add(1 * time.Hour) // enough time to complete a request
 	defer cancel()                            // avoid leaking a goroutine
 
-	expectedSendNodeIDs := set.NewSet[ids.NodeID](1)
-	expectedSendNodeIDs.Add(serverNodeID)
+	expectedSendNodeIDs := set.Of(serverNodeID)
 	sender.EXPECT().SendAppRequest(
 		gomock.Any(),        // ctx
 		expectedSendNodeIDs, // {serverNodeID}
@@ -202,8 +202,8 @@ func TestGetRangeProof(t *testing.T) {
 			db: largeTrieDB,
 			request: &pb.SyncGetRangeProofRequest{
 				RootHash:   largeTrieRoot[:],
-				StartKey:   largeTrieKeys[1000], // Set the range for 1000 leafs in an intermediate range of the trie
-				EndKey:     largeTrieKeys[1099], // (inclusive range)
+				StartKey:   largeTrieKeys[1000],                        // Set the range for 1000 leafs in an intermediate range of the trie
+				EndKey:     &pb.MaybeBytes{Value: largeTrieKeys[1099]}, // (inclusive range)
 				KeyLimit:   defaultRequestKeyLimit,
 				BytesLimit: defaultRequestByteSizeLimit,
 			},
@@ -232,7 +232,7 @@ func TestGetRangeProof(t *testing.T) {
 				start := response.KeyValues[1].Key
 				rootID, err := largeTrieDB.GetMerkleRoot(context.Background())
 				require.NoError(t, err)
-				proof, err := largeTrieDB.GetRangeProofAtRoot(context.Background(), rootID, start, nil, defaultRequestKeyLimit)
+				proof, err := largeTrieDB.GetRangeProofAtRoot(context.Background(), rootID, start, maybe.Nothing[[]byte](), defaultRequestKeyLimit)
 				require.NoError(t, err)
 				response.KeyValues = proof.KeyValues
 				response.StartProof = proof.StartProof
@@ -312,12 +312,12 @@ func sendChangeRequest(
 
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	sender := common.NewMockSender(ctrl)
 	handler := NewNetworkServer(sender, db, logging.NoLog{})
 	clientNodeID, serverNodeID := ids.GenerateTestNodeID(), ids.GenerateTestNodeID()
-	networkClient := NewNetworkClient(sender, clientNodeID, 1, logging.NoLog{})
+	networkClient, err := NewNetworkClient(sender, clientNodeID, 1, logging.NoLog{}, "", prometheus.NewRegistry())
+	require.NoError(err)
 	require.NoError(networkClient.Connected(context.Background(), serverNodeID, version.CurrentApp))
 	client := NewClient(&ClientConfig{
 		NetworkClient: networkClient,
@@ -329,8 +329,7 @@ func sendChangeRequest(
 	deadline := time.Now().Add(1 * time.Hour) // enough time to complete a request
 	defer cancel()                            // avoid leaking a goroutine
 
-	expectedSendNodeIDs := set.NewSet[ids.NodeID](1)
-	expectedSendNodeIDs.Add(serverNodeID)
+	expectedSendNodeIDs := set.Of(serverNodeID)
 	sender.EXPECT().SendAppRequest(
 		gomock.Any(),        // ctx
 		expectedSendNodeIDs, // {serverNodeID}
