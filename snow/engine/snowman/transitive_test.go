@@ -1977,7 +1977,7 @@ func TestEngineRejectionAmplification(t *testing.T) {
 
 	require.NoError(te.Chits(context.Background(), vdr, reqID, acceptedBlk.ID(), acceptedBlk.ID()))
 
-	require.True(te.Consensus.Finalized())
+	require.True(!(te.Consensus.NumProcessing() > 0))
 
 	queried = false
 	var asked bool
@@ -2080,11 +2080,11 @@ func TestEngineTransitiveRejectionAmplificationDueToRejectedParent(t *testing.T)
 
 	require.NoError(te.Chits(context.Background(), vdr, reqID, acceptedBlk.ID(), acceptedBlk.ID()))
 
-	require.True(te.Consensus.Finalized())
+	require.True(!(te.Consensus.NumProcessing() > 0))
 
 	require.NoError(te.Put(context.Background(), vdr, 0, pendingBlk.Bytes()))
 
-	require.True(te.Consensus.Finalized())
+	require.True(!(te.Consensus.NumProcessing() > 0))
 
 	require.Empty(te.pending)
 }
@@ -2177,7 +2177,7 @@ func TestEngineTransitiveRejectionAmplificationDueToInvalidParent(t *testing.T) 
 	require.NoError(te.Chits(context.Background(), vdr, reqID, acceptedBlk.ID(), acceptedBlk.ID()))
 
 	require.NoError(te.Put(context.Background(), vdr, 0, pendingBlk.Bytes()))
-	require.True(te.Consensus.Finalized())
+	require.True(!(te.Consensus.NumProcessing() > 0))
 	require.Empty(te.pending)
 }
 
