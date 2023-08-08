@@ -798,6 +798,7 @@ func Test_Trie_MultipleStates(t *testing.T) {
 				ops = append(ops, database.BatchOp{Key: k, Value: hashing.ComputeHash256(k)})
 			}
 			root, err := db.NewView(ops)
+			require.NoError(err)
 
 			// Get initial root
 			_, err = root.GetMerkleRoot(context.Background())
