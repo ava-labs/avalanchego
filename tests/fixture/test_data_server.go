@@ -11,6 +11,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -39,7 +40,7 @@ type testDataServer struct {
 	TestData
 
 	// Synchronizes access to test data
-	mutex sync.Mutex
+	lock sync.Mutex
 }
 
 // Type used to marshal/unmarshal a set of test keys for transmission over http.
@@ -63,8 +64,8 @@ func (s *testDataServer) allocateKeys(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Ensure a key will be allocated at most once
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
+	s.lock.Lock()
+	defer s.lock.Unlock()
 
 	// Only fulfill requests for available keys
 	if keyCount > len(s.FundedKeys) {
@@ -111,6 +112,7 @@ func ServeTestData(testData TestData) (string, error) {
 	}
 
 	go func() {
+		// Serve always returns a non-nil error and closes l.
 		if err := httpServer.Serve(listener); err != http.ErrServerClosed {
 			panic(fmt.Sprintf("unexpected error closing test data server: %v", err))
 		}
@@ -121,12 +123,19 @@ func ServeTestData(testData TestData) (string, error) {
 
 // Retrieve the specified number of funded test keys from the provided URI. A given
 // key is allocated at most once during the life of the test data server.
-func AllocateFundedKeys(uri string, count int) ([]*secp256k1.PrivateKey, error) {
+func AllocateFundedKeys(baseURI string, count int) ([]*secp256k1.PrivateKey, error) {
 	if count <= 0 {
 		return nil, errInvalidKeyCount
 	}
-	query := fmt.Sprintf("%s%s?%s=%d", uri, allocateKeysPath, keyCountParameterName, count)
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, query, nil)
+	uri, err := url.Parse(baseURI)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse uri: %w", err)
+	}
+	uri.RawQuery = url.Values{
+		keyCountParameterName: {strconv.Itoa(count)},
+	}.Encode()
+	uri.Path = allocateKeysPath
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, uri.String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to construct request: %w", err)
 	}

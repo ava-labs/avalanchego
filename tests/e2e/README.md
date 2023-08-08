@@ -71,8 +71,8 @@ ginkgo -v ./tests/e2e -- \
     --use-persistent-network \
     --network-dir=/path/to/network
 
-# Also possible to set the AVALANCHEGO_PATH env var instead of supplying --avalanchego-path
-# Also possible to set the TESTNETCTL_NETWORK_DIR env var instead of supplying --network-dir
+# It is also possible to set the AVALANCHEGO_PATH env var instead of supplying --avalanchego-path
+# and to set TESTNETCTL_NETWORK_DIR instead of supplying --network-dir.
 ```
 
 See the testnet fixture [README](../fixture/testnet/README.md) for more details.

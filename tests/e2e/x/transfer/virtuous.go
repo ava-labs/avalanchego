@@ -50,7 +50,7 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 			// test avoids the case of a previous test having initiated block
 			// processing but not having completed it.
 			gomega.Eventually(func() bool {
-				allNodeMetrics, err := tests.GetMetricsForNodes(rpcEps, metricBlksProcessing)
+				allNodeMetrics, err := tests.GetNodesMetrics(rpcEps, metricBlksProcessing)
 				gomega.Expect(err).Should(gomega.BeNil())
 				for _, metrics := range allNodeMetrics {
 					if metrics[metricBlksProcessing] > 0 {
@@ -110,7 +110,7 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 					)
 				}
 
-				metricsBeforeTx, err := tests.GetMetricsForNodes(rpcEps, allMetrics...)
+				metricsBeforeTx, err := tests.GetNodesMetrics(rpcEps, allMetrics...)
 				gomega.Expect(err).Should(gomega.BeNil())
 				for _, uri := range rpcEps {
 					tests.Outf("{{green}}metrics at %q:{{/}} %v\n", uri, metricsBeforeTx[uri])
@@ -256,7 +256,7 @@ RECEIVER  NEW BALANCE (AFTER) : %21d AVAX
 					gomega.Expect(err).Should(gomega.BeNil())
 					gomega.Expect(status).Should(gomega.Equal(choices.Accepted))
 
-					mm, err := tests.GetMetricsForNode(u, allMetrics...)
+					mm, err := tests.GetNodeMetrics(u, allMetrics...)
 					gomega.Expect(err).Should(gomega.BeNil())
 
 					prev := metricsBeforeTx[u]

@@ -19,18 +19,18 @@ type NodeMetrics map[string]float64
 // URI -> "metric name" -> "metric value"
 type NodesMetrics map[string]NodeMetrics
 
-// GetMetricsForNode retrieves the specified metrics the provided node URI.
-func GetMetricsForNode(nodeURI string, metricNames ...string) (NodeMetrics, error) {
+// GetNodeMetrics retrieves the specified metrics the provided node URI.
+func GetNodeMetrics(nodeURI string, metricNames ...string) (NodeMetrics, error) {
 	uri := nodeURI + "/ext/metrics"
 	return GetMetricsValue(uri, metricNames...)
 }
 
-// GetMetricsForNodes retrieves the specified metrics for the provided node URIs.
-func GetMetricsForNodes(nodeURIs []string, metricNames ...string) (NodesMetrics, error) {
+// GetNodesMetrics retrieves the specified metrics for the provided node URIs.
+func GetNodesMetrics(nodeURIs []string, metricNames ...string) (NodesMetrics, error) {
 	metrics := make(NodesMetrics)
 	for _, u := range nodeURIs {
 		var err error
-		metrics[u], err = GetMetricsForNode(u, metricNames...)
+		metrics[u], err = GetNodeMetrics(u, metricNames...)
 		if err != nil {
 			return nil, fmt.Errorf("failed to retrieve metrics for %s: %w", u, err)
 		}
