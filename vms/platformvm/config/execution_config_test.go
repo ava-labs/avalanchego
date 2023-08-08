@@ -45,6 +45,7 @@ func TestExecutionConfigUnmarshal(t *testing.T) {
 			"reward-utxos-cache-size": 5,
 			"chain-cache-size": 6,
 			"chain-db-cache-size": 7,
+			"block-id-cache-size": 8,
 			"checksums-enabled": true
 		}`)
 		ec, err := GetExecutionConfig(b)
@@ -56,6 +57,7 @@ func TestExecutionConfigUnmarshal(t *testing.T) {
 			RewardUTXOsCacheSize:         5,
 			ChainCacheSize:               6,
 			ChainDBCacheSize:             7,
+			BlockIDCacheSize:             8,
 			ChecksumsEnabled:             true,
 		}
 		require.Equal(expected, ec)
