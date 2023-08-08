@@ -46,6 +46,23 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 		func() {
 			rpcEps := e2e.Env.URIs
 
+			// Waiting for ongoing blocks to have completed before starting this
+			// test avoids the case of a previous test having initiated block
+			// processing but not having completed it.
+			gomega.Eventually(func() bool {
+				allNodeMetrics, err := tests.GetMetricsForNodes(rpcEps, metricBlksProcessing)
+				gomega.Expect(err).Should(gomega.BeNil())
+				for _, metrics := range allNodeMetrics {
+					if metrics[metricBlksProcessing] > 0 {
+						return false
+					}
+				}
+				return true
+			}).
+				WithTimeout(e2e.DefaultTimeout).
+				WithPolling(e2e.DefaultPollingInterval).
+				Should(gomega.BeTrue(), "The cluster is generating ongoing blocks. Is this test being run in parallel?")
+
 			allMetrics := []string{
 				metricBlksProcessing,
 				metricBlksAccepted,
@@ -93,20 +110,10 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 					)
 				}
 
-				// URI -> "metric name" -> "metric value"
-				metricsBeforeTx := make(map[string]map[string]float64)
-				for _, u := range rpcEps {
-					ep := u + "/ext/metrics"
-
-					mm, err := tests.GetMetricsValue(ep, allMetrics...)
-					gomega.Expect(err).Should(gomega.BeNil())
-					tests.Outf("{{green}}metrics at %q:{{/}} %v\n", ep, mm)
-
-					if mm[metricBlksProcessing] > 0 {
-						ginkgo.Fail("%s the cluster has already ongoing blocks. Is this test being run in parallel?")
-					}
-
-					metricsBeforeTx[u] = mm
+				metricsBeforeTx, err := tests.GetMetricsForNodes(rpcEps, allMetrics...)
+				gomega.Expect(err).Should(gomega.BeNil())
+				for _, uri := range rpcEps {
+					tests.Outf("{{green}}metrics at %q:{{/}} %v\n", uri, metricsBeforeTx[uri])
 				}
 
 				testBalances := make([]uint64, 0)
@@ -249,8 +256,7 @@ RECEIVER  NEW BALANCE (AFTER) : %21d AVAX
 					gomega.Expect(err).Should(gomega.BeNil())
 					gomega.Expect(status).Should(gomega.Equal(choices.Accepted))
 
-					ep := u + "/ext/metrics"
-					mm, err := tests.GetMetricsValue(ep, allMetrics...)
+					mm, err := tests.GetMetricsForNode(u, allMetrics...)
 					gomega.Expect(err).Should(gomega.BeNil())
 
 					prev := metricsBeforeTx[u]

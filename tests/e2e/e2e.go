@@ -29,6 +29,10 @@ const (
 	// unlikely to induce flaking due to unexpected resource
 	// contention.
 	DefaultTimeout = 2 * time.Minute
+
+	// Interval appropriate for network operations that should be
+	// retried periodically but not too often.
+	DefaultPollingInterval = 1 * time.Millisecond
 )
 
 // Env is used to access shared test fixture. Intended to be
