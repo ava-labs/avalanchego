@@ -163,7 +163,7 @@ func Test_RangeProof_Extra_Value(t *testing.T) {
 	require.NoError(err)
 	require.Equal([]byte{2}, val)
 
-	proof, err := db.GetRangeProof(context.Background(), []byte{1}, []byte{5, 5}, 10)
+	proof, err := db.GetRangeProof(context.Background(), []byte{1}, Some([]byte{5, 5}), 10)
 	require.NoError(err)
 	require.NotNil(proof)
 
@@ -236,7 +236,7 @@ func Test_RangeProof_Verify_Bad_Data(t *testing.T) {
 			require.NoError(err)
 			writeBasicBatch(t, db)
 
-			proof, err := db.GetRangeProof(context.Background(), []byte{2}, []byte{3, 0}, 50)
+			proof, err := db.GetRangeProof(context.Background(), []byte{2}, Some([]byte{3, 0}), 50)
 			require.NoError(err)
 			require.NotNil(proof)
 
@@ -257,10 +257,10 @@ func Test_RangeProof_MaxLength(t *testing.T) {
 	trie, err := dbTrie.NewView()
 	require.NoError(err)
 
-	_, err = trie.GetRangeProof(context.Background(), nil, nil, -1)
+	_, err = trie.GetRangeProof(context.Background(), nil, Nothing[[]byte](), -1)
 	require.ErrorIs(err, ErrInvalidMaxLength)
 
-	_, err = trie.GetRangeProof(context.Background(), nil, nil, 0)
+	_, err = trie.GetRangeProof(context.Background(), nil, Nothing[[]byte](), 0)
 	require.ErrorIs(err, ErrInvalidMaxLength)
 }
 
@@ -489,7 +489,7 @@ func Test_RangeProof(t *testing.T) {
 	require.NoError(err)
 	writeBasicBatch(t, db)
 
-	proof, err := db.GetRangeProof(context.Background(), []byte{1}, []byte{3, 5}, 10)
+	proof, err := db.GetRangeProof(context.Background(), []byte{1}, Some([]byte{3, 5}), 10)
 	require.NoError(err)
 	require.NotNil(proof)
 	require.Len(proof.KeyValues, 3)
@@ -524,7 +524,7 @@ func Test_RangeProof_BadBounds(t *testing.T) {
 	require.NoError(err)
 
 	// non-nil start/end
-	proof, err := db.GetRangeProof(context.Background(), []byte{4}, []byte{3}, 50)
+	proof, err := db.GetRangeProof(context.Background(), []byte{4}, Some([]byte{3}), 50)
 	require.ErrorIs(err, ErrStartAfterEnd)
 	require.Nil(proof)
 }
@@ -545,7 +545,7 @@ func Test_RangeProof_NilStart(t *testing.T) {
 	require.NoError(err)
 	require.Equal([]byte("value1"), val)
 
-	proof, err := db.GetRangeProof(context.Background(), nil, []byte("key35"), 2)
+	proof, err := db.GetRangeProof(context.Background(), nil, Some([]byte("key35")), 2)
 	require.NoError(err)
 	require.NotNil(proof)
 
@@ -577,7 +577,7 @@ func Test_RangeProof_NilEnd(t *testing.T) {
 	writeBasicBatch(t, db)
 	require.NoError(err)
 
-	proof, err := db.GetRangeProof(context.Background(), []byte{1}, nil, 2)
+	proof, err := db.GetRangeProof(context.Background(), []byte{1}, Nothing[[]byte](), 2)
 	require.NoError(err)
 	require.NotNil(proof)
 
@@ -618,7 +618,7 @@ func Test_RangeProof_EmptyValues(t *testing.T) {
 	require.NoError(err)
 	require.Equal([]byte("value1"), val)
 
-	proof, err := db.GetRangeProof(context.Background(), []byte("key1"), []byte("key2"), 10)
+	proof, err := db.GetRangeProof(context.Background(), []byte("key1"), Some([]byte("key2")), 10)
 	require.NoError(err)
 	require.NotNil(proof)
 
@@ -653,7 +653,7 @@ func Test_ChangeProof_Missing_History_For_EndRoot(t *testing.T) {
 	startRoot, err := db.GetMerkleRoot(context.Background())
 	require.NoError(err)
 
-	proof, err := db.GetChangeProof(context.Background(), startRoot, ids.Empty, nil, nil, 50)
+	proof, err := db.GetChangeProof(context.Background(), startRoot, ids.Empty, nil, Nothing[[]byte](), 50)
 	require.NoError(err)
 	require.NotNil(proof)
 	require.False(proof.HadRootsInHistory)
@@ -676,7 +676,7 @@ func Test_ChangeProof_BadBounds(t *testing.T) {
 	require.NoError(err)
 
 	// non-nil start/end
-	proof, err := db.GetChangeProof(context.Background(), startRoot, endRoot, []byte("key4"), []byte("key3"), 50)
+	proof, err := db.GetChangeProof(context.Background(), startRoot, endRoot, []byte("key4"), Some([]byte("key3")), 50)
 	require.ErrorIs(err, ErrStartAfterEnd)
 	require.Nil(proof)
 }
@@ -732,21 +732,21 @@ func Test_ChangeProof_Verify(t *testing.T) {
 	require.NoError(err)
 
 	// non-nil start/end
-	proof, err := db.GetChangeProof(context.Background(), startRoot, endRoot, []byte("key21"), []byte("key30"), 50)
+	proof, err := db.GetChangeProof(context.Background(), startRoot, endRoot, []byte("key21"), Some([]byte("key30")), 50)
 	require.NoError(err)
 	require.NotNil(proof)
 
 	require.NoError(dbClone.VerifyChangeProof(context.Background(), proof, []byte("key21"), Some([]byte("key30")), db.getMerkleRoot()))
 
 	// low maxLength
-	proof, err = db.GetChangeProof(context.Background(), startRoot, endRoot, nil, nil, 5)
+	proof, err = db.GetChangeProof(context.Background(), startRoot, endRoot, nil, Nothing[[]byte](), 5)
 	require.NoError(err)
 	require.NotNil(proof)
 
 	require.NoError(dbClone.VerifyChangeProof(context.Background(), proof, nil, Nothing[[]byte](), db.getMerkleRoot()))
 
 	// nil start/end
-	proof, err = db.GetChangeProof(context.Background(), startRoot, endRoot, nil, nil, 50)
+	proof, err = db.GetChangeProof(context.Background(), startRoot, endRoot, nil, Nothing[[]byte](), 50)
 	require.NoError(err)
 	require.NotNil(proof)
 
@@ -757,7 +757,7 @@ func Test_ChangeProof_Verify(t *testing.T) {
 	require.NoError(err)
 	require.Equal(endRoot, newRoot)
 
-	proof, err = db.GetChangeProof(context.Background(), startRoot, endRoot, []byte("key20"), []byte("key30"), 50)
+	proof, err = db.GetChangeProof(context.Background(), startRoot, endRoot, []byte("key20"), Some([]byte("key30")), 50)
 	require.NoError(err)
 	require.NotNil(proof)
 
@@ -819,7 +819,7 @@ func Test_ChangeProof_Verify_Bad_Data(t *testing.T) {
 			dbClone, err := getBasicDB()
 			require.NoError(err)
 
-			proof, err := db.GetChangeProof(context.Background(), startRoot, endRoot, []byte{2}, []byte{3, 0}, 50)
+			proof, err := db.GetChangeProof(context.Background(), startRoot, endRoot, []byte{2}, Some([]byte{3, 0}), 50)
 			require.NoError(err)
 			require.NotNil(proof)
 
@@ -1691,14 +1691,18 @@ func FuzzRangeProofInvariants(f *testing.F) {
 	f.Fuzz(func(
 		t *testing.T,
 		start []byte,
-		end []byte,
+		endBytes []byte,
 		maxProofLen uint,
 	) {
 		require := require.New(t)
 
 		// Make sure proof bounds are valid
-		if len(end) != 0 && bytes.Compare(start, end) > 0 {
+		if len(endBytes) != 0 && bytes.Compare(start, endBytes) > 0 {
 			return
+		}
+		end := Nothing[[]byte]()
+		if len(endBytes) > 0 {
+			end = Some(endBytes)
 		}
 		// Make sure proof length is valid
 		if maxProofLen == 0 {
@@ -1728,7 +1732,7 @@ func FuzzRangeProofInvariants(f *testing.F) {
 
 		// Make sure the EndProof invariant is maintained
 		switch {
-		case len(end) == 0:
+		case end.IsNothing():
 			if len(rangeProof.KeyValues) == 0 {
 				if len(rangeProof.StartProof) == 0 {
 					require.Len(rangeProof.EndProof, 1) // Just the root
@@ -1742,7 +1746,7 @@ func FuzzRangeProofInvariants(f *testing.F) {
 
 			// EndProof should be a proof for upper range bound.
 			value := Nothing[[]byte]()
-			upperRangeBoundVal, err := db.Get(end)
+			upperRangeBoundVal, err := db.Get(endBytes)
 			if err != nil {
 				require.ErrorIs(err, database.ErrNotFound)
 			} else {
@@ -1751,7 +1755,7 @@ func FuzzRangeProofInvariants(f *testing.F) {
 
 			proof := Proof{
 				Path:  rangeProof.EndProof,
-				Key:   end,
+				Key:   endBytes,
 				Value: value,
 			}
 
