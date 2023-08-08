@@ -29,6 +29,9 @@ type Consensus interface {
 	) error
 
 	// Returns the number of blocks processing
+	// There being only 1 processing block means all decisions have been finalized.
+	// Note that, it is possible that after returning, a new decision may be added such
+	// that this instance is no longer finalized.
 	NumProcessing() int
 
 	// Adds a new decision. Assumes the dependency has already been added.
