@@ -69,8 +69,7 @@ func sendRangeRequest(
 	deadline := time.Now().Add(1 * time.Hour) // enough time to complete a request
 	defer cancel()                            // avoid leaking a goroutine
 
-	expectedSendNodeIDs := set.NewSet[ids.NodeID](1)
-	expectedSendNodeIDs.Add(serverNodeID)
+	expectedSendNodeIDs := set.Of(serverNodeID)
 	sender.EXPECT().SendAppRequest(
 		gomock.Any(),        // ctx
 		expectedSendNodeIDs, // {serverNodeID}
@@ -202,8 +201,8 @@ func TestGetRangeProof(t *testing.T) {
 			db: largeTrieDB,
 			request: &pb.SyncGetRangeProofRequest{
 				RootHash:   largeTrieRoot[:],
-				StartKey:   largeTrieKeys[1000], // Set the range for 1000 leafs in an intermediate range of the trie
-				EndKey:     largeTrieKeys[1099], // (inclusive range)
+				StartKey:   largeTrieKeys[1000],                        // Set the range for 1000 leafs in an intermediate range of the trie
+				EndKey:     &pb.MaybeBytes{Value: largeTrieKeys[1099]}, // (inclusive range)
 				KeyLimit:   defaultRequestKeyLimit,
 				BytesLimit: defaultRequestByteSizeLimit,
 			},
@@ -329,8 +328,7 @@ func sendChangeRequest(
 	deadline := time.Now().Add(1 * time.Hour) // enough time to complete a request
 	defer cancel()                            // avoid leaking a goroutine
 
-	expectedSendNodeIDs := set.NewSet[ids.NodeID](1)
-	expectedSendNodeIDs.Add(serverNodeID)
+	expectedSendNodeIDs := set.Of(serverNodeID)
 	sender.EXPECT().SendAppRequest(
 		gomock.Any(),        // ctx
 		expectedSendNodeIDs, // {serverNodeID}

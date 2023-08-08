@@ -402,7 +402,7 @@ func (mr *MockMerkleDBMockRecorder) Remove(arg0, arg1 interface{}) *gomock.Call 
 }
 
 // VerifyChangeProof mocks base method.
-func (m *MockMerkleDB) VerifyChangeProof(arg0 context.Context, arg1 *ChangeProof, arg2, arg3 []byte, arg4 ids.ID) error {
+func (m *MockMerkleDB) VerifyChangeProof(arg0 context.Context, arg1 *ChangeProof, arg2 []byte, arg3 Maybe[[]byte], arg4 ids.ID) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "VerifyChangeProof", arg0, arg1, arg2, arg3, arg4)
 	ret0, _ := ret[0].(error)
