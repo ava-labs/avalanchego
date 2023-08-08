@@ -735,7 +735,7 @@ func RecordPollTransitivelyResetConfidenceTest(t *testing.T, factory Factory) {
 	require.Equal(block2.ID(), sm.Preference())
 
 	require.NoError(sm.RecordPoll(context.Background(), votesFor3))
-	require.True(sm.Finalized())
+	require.True(!(sm.NumProcessing() > 0))
 	require.Equal(block3.ID(), sm.Preference())
 	require.Equal(choices.Rejected, block0.Status())
 	require.Equal(choices.Accepted, block1.Status())
@@ -781,7 +781,7 @@ func RecordPollInvalidVoteTest(t *testing.T, factory Factory) {
 	invalidVotes.Add(unknownBlockID)
 	require.NoError(sm.RecordPoll(context.Background(), invalidVotes))
 	require.NoError(sm.RecordPoll(context.Background(), validVotes))
-	require.False(sm.Finalized())
+	require.False(!(sm.NumProcessing() > 0))
 	require.Equal(block.ID(), sm.Preference())
 }
 
@@ -876,7 +876,7 @@ func RecordPollTransitiveVotingTest(t *testing.T, factory Factory) {
 	// 2   4
 	// Tail = 2
 
-	require.False(sm.Finalized())
+	require.False(!(sm.NumProcessing() > 0))
 	require.Equal(block2.ID(), sm.Preference())
 	require.Equal(choices.Accepted, block0.Status())
 	require.Equal(choices.Processing, block1.Status())
@@ -892,7 +892,7 @@ func RecordPollTransitiveVotingTest(t *testing.T, factory Factory) {
 	//   2
 	// Tail = 2
 
-	require.True(sm.Finalized())
+	require.True(!(sm.NumProcessing() > 0))
 	require.Equal(block2.ID(), sm.Preference())
 	require.Equal(choices.Accepted, block0.Status())
 	require.Equal(choices.Accepted, block1.Status())
@@ -1482,7 +1482,7 @@ func RandomizedConsistencyTest(t *testing.T, factory Factory) {
 		require.NoError(n.AddNode(factory.New()))
 	}
 
-	for !n.Finalized() {
+	for n.NumProcessing() > 0 {
 		require.NoError(n.Round())
 	}
 
