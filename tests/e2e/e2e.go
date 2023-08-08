@@ -32,7 +32,7 @@ const (
 
 	// Interval appropriate for network operations that should be
 	// retried periodically but not too often.
-	DefaultPollingInterval = 1 * time.Millisecond
+	DefaultPollingInterval = 500 * time.Millisecond
 )
 
 // Env is used to access shared test fixture. Intended to be

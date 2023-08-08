@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 )
 
@@ -32,21 +33,21 @@ func TestAllocateFundedKeys(t *testing.T) {
 	testCases := []struct {
 		name              string
 		count             int
-		expectedAddresses []string
+		expectedAddresses []ids.ShortID
 	}{{
 		name:  "single key",
 		count: 1,
-		expectedAddresses: []string{
-			keys[4].Address().String(),
+		expectedAddresses: []ids.ShortID{
+			keys[4].Address(),
 		},
 	}, {
 		name:  "multiple keys",
 		count: 4,
-		expectedAddresses: []string{
-			keys[0].Address().String(),
-			keys[1].Address().String(),
-			keys[2].Address().String(),
-			keys[3].Address().String(),
+		expectedAddresses: []ids.ShortID{
+			keys[0].Address(),
+			keys[1].Address(),
+			keys[2].Address(),
+			keys[3].Address(),
 		},
 	}, {
 		name:  "insufficient keys available",
@@ -59,9 +60,9 @@ func TestAllocateFundedKeys(t *testing.T) {
 				require.ErrorIs(err, errRequestedKeyCountExceedsAvailable)
 			} else {
 				require.NoError(err)
-				addresses := []string{}
+				addresses := []ids.ShortID{}
 				for _, key := range keys {
-					addresses = append(addresses, key.Address().String())
+					addresses = append(addresses, key.Address())
 				}
 				require.Equal(tc.expectedAddresses, addresses)
 			}
