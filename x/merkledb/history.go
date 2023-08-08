@@ -79,7 +79,7 @@ func newTrieHistory(maxHistoryLookback int) *trieHistory {
 
 // Returns up to [maxLength] key-value pair changes with keys in [start, end] that
 // occurred between [startRoot] and [endRoot].
-func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start, end []byte, maxLength int) (*changeSummary, error) {
+func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start []byte, end maybe.Maybe[[]byte], maxLength int) (*changeSummary, error) {
 	if maxLength <= 0 {
 		return nil, fmt.Errorf("%w but was %d", ErrInvalidMaxLength, maxLength)
 	}
@@ -133,7 +133,7 @@ func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start, end []b
 	)
 
 	startPath := newPath(start)
-	endPath := newPath(end)
+	endPath := maybe.Bind(end, newPath)
 
 	// For each element in the history in the range between [startRoot]'s
 	// last appearance (exclusive) and [endRoot]'s last appearance (inclusive),
@@ -159,7 +159,7 @@ func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start, end []b
 			for key, valueChange := range item.values {
 				// The key is outside the range [start, end].
 				if (len(startPath) > 0 && key.Compare(startPath) < 0) ||
-					(len(endPath) > 0 && key.Compare(endPath) > 0) {
+					(end.HasValue() && key.Compare(endPath.Value()) > 0) {
 					continue
 				}
 
@@ -199,7 +199,7 @@ func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start, end []b
 // for the keys in [start, end].
 // If [start] is nil, all keys are considered > [start].
 // If  [end] is nil, all keys are considered < [end].
-func (th *trieHistory) getChangesToGetToRoot(rootID ids.ID, start, end []byte) (*changeSummary, error) {
+func (th *trieHistory) getChangesToGetToRoot(rootID ids.ID, start []byte, end maybe.Maybe[[]byte]) (*changeSummary, error) {
 	// [lastRootChange] is the last change in the history resulting in [rootID].
 	lastRootChange, ok := th.lastChanges[rootID]
 	if !ok {
@@ -208,7 +208,7 @@ func (th *trieHistory) getChangesToGetToRoot(rootID ids.ID, start, end []byte) (
 
 	var (
 		startPath       = newPath(start)
-		endPath         = newPath(end)
+		endPath         = maybe.Bind(end, newPath)
 		combinedChanges = newChangeSummary(defaultPreallocationSize)
 	)
 
@@ -228,7 +228,7 @@ func (th *trieHistory) getChangesToGetToRoot(rootID ids.ID, start, end []byte) (
 
 			for key, valueChange := range item.values {
 				if (len(startPath) == 0 || key.Compare(startPath) >= 0) &&
-					(len(endPath) == 0 || key.Compare(endPath) <= 0) {
+					(endPath.IsNothing() || key.Compare(endPath.Value()) <= 0) {
 					if existing, ok := combinedChanges.values[key]; ok {
 						existing.after = valueChange.before
 					} else {

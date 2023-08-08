@@ -260,7 +260,7 @@ func Test_MerkleDB_Commit_Proof_To_Empty_Trie(t *testing.T) {
 	require.NoError(batch.Put([]byte("key3"), []byte("3")))
 	require.NoError(batch.Write())
 
-	proof, err := db.GetRangeProof(context.Background(), []byte("key1"), []byte("key3"), 10)
+	proof, err := db.GetRangeProof(context.Background(), []byte("key1"), maybe.Some([]byte("key3")), 10)
 	require.NoError(err)
 
 	freshDB, err := getBasicDB()
@@ -290,7 +290,7 @@ func Test_MerkleDB_Commit_Proof_To_Filled_Trie(t *testing.T) {
 	require.NoError(batch.Put([]byte("key3"), []byte("3")))
 	require.NoError(batch.Write())
 
-	proof, err := db.GetRangeProof(context.Background(), []byte("key1"), []byte("key3"), 10)
+	proof, err := db.GetRangeProof(context.Background(), []byte("key1"), maybe.Some([]byte("key3")), 10)
 	require.NoError(err)
 
 	freshDB, err := getBasicDB()
@@ -769,12 +769,13 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 			if len(pastRoots) > 0 {
 				root = pastRoots[r.Intn(len(pastRoots))]
 			}
-			rangeProof, err := db.GetRangeProofAtRoot(context.Background(), root, step.key, step.value, 100)
-			require.NoError(err)
 			end := maybe.Nothing[[]byte]()
 			if len(step.value) > 0 {
 				end = maybe.Some(step.value)
 			}
+
+			rangeProof, err := db.GetRangeProofAtRoot(context.Background(), root, step.key, end, 100)
+			require.NoError(err)
 			require.NoError(rangeProof.Verify(
 				context.Background(),
 				step.key,
@@ -788,7 +789,12 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 			if len(pastRoots) > 1 {
 				root = pastRoots[r.Intn(len(pastRoots))]
 			}
-			changeProof, err := db.GetChangeProof(context.Background(), startRoot, root, step.key, step.value, 100)
+			end := maybe.Nothing[[]byte]()
+			if len(step.value) > 0 {
+				end = maybe.Some(step.value)
+			}
+
+			changeProof, err := db.GetChangeProof(context.Background(), startRoot, root, step.key, end, 100)
 			if startRoot == root {
 				require.ErrorIs(err, errSameRoot)
 				continue
@@ -796,10 +802,7 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 			require.NoError(err)
 			changeProofDB, err := getBasicDB()
 			require.NoError(err)
-			end := maybe.Nothing[[]byte]()
-			if len(step.value) > 0 {
-				end = maybe.Some(step.value)
-			}
+
 			require.NoError(changeProofDB.VerifyChangeProof(
 				context.Background(),
 				changeProof,

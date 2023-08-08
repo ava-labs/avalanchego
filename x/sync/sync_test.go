@@ -47,7 +47,7 @@ func (client *mockClient) GetChangeProof(ctx context.Context, request *pb.SyncGe
 	if err != nil {
 		return nil, err
 	}
-	return client.db.GetChangeProof(ctx, startRoot, endRoot, request.StartKey, request.EndKey.Value, int(request.KeyLimit))
+	return client.db.GetChangeProof(ctx, startRoot, endRoot, request.StartKey, maybeBytesToMaybe(request.EndKey), int(request.KeyLimit))
 }
 
 func (client *mockClient) GetRangeProof(ctx context.Context, request *pb.SyncGetRangeProofRequest) (*merkledb.RangeProof, error) {
@@ -55,7 +55,7 @@ func (client *mockClient) GetRangeProof(ctx context.Context, request *pb.SyncGet
 	if err != nil {
 		return nil, err
 	}
-	return client.db.GetRangeProofAtRoot(ctx, root, request.StartKey, request.EndKey.Value, int(request.KeyLimit))
+	return client.db.GetRangeProofAtRoot(ctx, root, request.StartKey, maybeBytesToMaybe(request.EndKey), int(request.KeyLimit))
 }
 
 func Test_Creation(t *testing.T) {
@@ -217,7 +217,7 @@ func Test_Sync_FindNextKey_InSync(t *testing.T) {
 		require.NoError(syncer.Start(context.Background()))
 		require.NoError(syncer.Wait(context.Background()))
 
-		proof, err := dbToSync.GetRangeProof(context.Background(), nil, nil, 500)
+		proof, err := dbToSync.GetRangeProof(context.Background(), nil, maybe.Nothing[[]byte](), 500)
 		require.NoError(err)
 
 		// the two dbs should be in sync, so next key should be nil
@@ -402,7 +402,7 @@ func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 		require.NoError(syncer.Start(context.Background()))
 		require.NoError(syncer.Wait(context.Background()))
 
-		proof, err := dbToSync.GetRangeProof(context.Background(), nil, nil, 500)
+		proof, err := dbToSync.GetRangeProof(context.Background(), nil, maybe.Nothing[[]byte](), 500)
 		require.NoError(err)
 
 		// add an extra value to local db
@@ -422,7 +422,7 @@ func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 
 		require.NoError(dbToSync.Put(midpoint, []byte{1}))
 
-		proof, err = dbToSync.GetRangeProof(context.Background(), nil, lastKey, 500)
+		proof, err = dbToSync.GetRangeProof(context.Background(), nil, maybe.Some(lastKey), 500)
 		require.NoError(err)
 
 		// next key at prefix of newly added point
@@ -521,7 +521,7 @@ func Test_Sync_FindNextKey_DifferentChild(t *testing.T) {
 		require.NoError(syncer.Start(context.Background()))
 		require.NoError(syncer.Wait(context.Background()))
 
-		proof, err := dbToSync.GetRangeProof(context.Background(), nil, nil, 100)
+		proof, err := dbToSync.GetRangeProof(context.Background(), nil, maybe.Nothing[[]byte](), 100)
 		require.NoError(err)
 		lastKey := proof.KeyValues[len(proof.KeyValues)-1].Key
 
@@ -531,7 +531,7 @@ func Test_Sync_FindNextKey_DifferentChild(t *testing.T) {
 
 		require.NoError(dbToSync.Put(lastKey, []byte{2}))
 
-		proof, err = dbToSync.GetRangeProof(context.Background(), nil, proof.KeyValues[len(proof.KeyValues)-1].Key, 100)
+		proof, err = dbToSync.GetRangeProof(context.Background(), nil, maybe.Some(proof.KeyValues[len(proof.KeyValues)-1].Key), 100)
 		require.NoError(err)
 
 		nextKey, err := syncer.findNextKey(context.Background(), proof.KeyValues[len(proof.KeyValues)-1].Key, nil, proof.EndProof)
@@ -603,7 +603,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 		remoteProof, err := remoteDB.GetRangeProof(
 			context.Background(),
 			rangeStart,
-			rangeEnd,
+			maybe.Some(rangeEnd),
 			rand.Intn(maxProofLen)+1,
 		)
 		require.NoError(err)
@@ -901,7 +901,7 @@ func Test_Sync_Error_During_Sync(t *testing.T) {
 			require.NoError(err)
 			endRoot, err := ids.ToID(request.EndRootHash)
 			require.NoError(err)
-			return dbToSync.GetChangeProof(ctx, startRoot, endRoot, request.StartKey, request.EndKey.Value, int(request.KeyLimit))
+			return dbToSync.GetChangeProof(ctx, startRoot, endRoot, request.StartKey, maybeBytesToMaybe(request.EndKey), int(request.KeyLimit))
 		},
 	).AnyTimes()
 
@@ -979,7 +979,7 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 				<-updatedRootChan
 				root, err := ids.ToID(request.RootHash)
 				require.NoError(err)
-				return dbToSync.GetRangeProofAtRoot(ctx, root, request.StartKey, request.EndKey.Value, int(request.KeyLimit))
+				return dbToSync.GetRangeProofAtRoot(ctx, root, request.StartKey, maybeBytesToMaybe(request.EndKey), int(request.KeyLimit))
 			},
 		).AnyTimes()
 		client.EXPECT().GetChangeProof(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
@@ -989,7 +989,7 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 				require.NoError(err)
 				endRoot, err := ids.ToID(request.EndRootHash)
 				require.NoError(err)
-				return dbToSync.GetChangeProof(ctx, startRoot, endRoot, request.StartKey, request.EndKey.Value, int(request.KeyLimit))
+				return dbToSync.GetChangeProof(ctx, startRoot, endRoot, request.StartKey, maybeBytesToMaybe(request.EndKey), int(request.KeyLimit))
 			},
 		).AnyTimes()
 

@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/maybe"
 )
 
 func getNodeValue(t ReadOnlyTrie, key string) ([]byte, error) {
@@ -1391,7 +1392,7 @@ func Test_Trie_ConcurrentInsertAndRangeProof(t *testing.T) {
 
 	require.Eventually(
 		func() bool {
-			rangeProof, err := newTrie.GetRangeProof(context.Background(), []byte("key1"), []byte("key3"), 3)
+			rangeProof, err := newTrie.GetRangeProof(context.Background(), []byte("key1"), maybe.Some([]byte("key3")), 3)
 			require.NoError(err)
 			require.NotNil(rangeProof)
 

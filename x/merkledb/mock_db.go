@@ -126,7 +126,7 @@ func (mr *MockMerkleDBMockRecorder) Get(arg0 interface{}) *gomock.Call {
 }
 
 // GetChangeProof mocks base method.
-func (m *MockMerkleDB) GetChangeProof(arg0 context.Context, arg1, arg2 ids.ID, arg3, arg4 []byte, arg5 int) (*ChangeProof, error) {
+func (m *MockMerkleDB) GetChangeProof(arg0 context.Context, arg1, arg2 ids.ID, arg3 []byte, arg4 maybe.Maybe[[]uint8], arg5 int) (*ChangeProof, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetChangeProof", arg0, arg1, arg2, arg3, arg4, arg5)
 	ret0, _ := ret[0].(*ChangeProof)
@@ -171,7 +171,7 @@ func (mr *MockMerkleDBMockRecorder) GetProof(arg0, arg1 interface{}) *gomock.Cal
 }
 
 // GetRangeProof mocks base method.
-func (m *MockMerkleDB) GetRangeProof(arg0 context.Context, arg1, arg2 []byte, arg3 int) (*RangeProof, error) {
+func (m *MockMerkleDB) GetRangeProof(arg0 context.Context, arg1 []byte, arg2 maybe.Maybe[[]uint8], arg3 int) (*RangeProof, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetRangeProof", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(*RangeProof)
@@ -186,7 +186,7 @@ func (mr *MockMerkleDBMockRecorder) GetRangeProof(arg0, arg1, arg2, arg3 interfa
 }
 
 // GetRangeProofAtRoot mocks base method.
-func (m *MockMerkleDB) GetRangeProofAtRoot(arg0 context.Context, arg1 ids.ID, arg2, arg3 []byte, arg4 int) (*RangeProof, error) {
+func (m *MockMerkleDB) GetRangeProofAtRoot(arg0 context.Context, arg1 ids.ID, arg2 []byte, arg3 maybe.Maybe[[]uint8], arg4 int) (*RangeProof, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetRangeProofAtRoot", arg0, arg1, arg2, arg3, arg4)
 	ret0, _ := ret[0].(*RangeProof)
