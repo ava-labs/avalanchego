@@ -2353,6 +2353,8 @@ func (s *state) PruneAndIndex(lock sync.Locker, log logging.Logger) error {
 	}
 	if !shouldPrune {
 		lock.Unlock()
+
+		log.Info("state already pruned and indexed")
 		return nil
 	}
 
