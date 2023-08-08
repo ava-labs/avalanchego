@@ -2657,14 +2657,14 @@ func (s *Service) GetBlockByHeight(_ *http.Request, args *api.GetBlockByHeightAr
 		zap.String("service", "platform"),
 		zap.String("method", "getBlockByHeight"),
 		zap.Uint64("height", uint64(args.Height)),
+		zap.Stringer("encoding", args.Encoding),
 	)
-
-	response.Encoding = args.Encoding
 
 	blockID, err := s.vm.state.GetBlockIDAtHeight(uint64(args.Height))
 	if err != nil {
 		return fmt.Errorf("couldn't get block at height %d: %w", args.Height, err)
 	}
+
 	block, err := s.vm.manager.GetStatelessBlock(blockID)
 	if err != nil {
 		s.vm.ctx.Log.Error("couldn't get accepted block",
@@ -2673,6 +2673,7 @@ func (s *Service) GetBlockByHeight(_ *http.Request, args *api.GetBlockByHeightAr
 		)
 		return fmt.Errorf("couldn't get block with id %s: %w", blockID, err)
 	}
+	response.Encoding = args.Encoding
 
 	if args.Encoding == formatting.JSON {
 		block.InitCtx(s.vm.ctx)
@@ -2682,7 +2683,7 @@ func (s *Service) GetBlockByHeight(_ *http.Request, args *api.GetBlockByHeightAr
 
 	response.Block, err = formatting.Encode(args.Encoding, block.Bytes())
 	if err != nil {
-		return fmt.Errorf("couldn't encode block %s as string: %w", blockID, err)
+		return fmt.Errorf("couldn't encode block %s as %s: %w", blockID, args.Encoding, err)
 	}
 
 	return nil
