@@ -16,13 +16,6 @@ import (
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
-func maybeBytesToMaybe(mb *pb.MaybeBytes) merkledb.Maybe[[]byte] {
-	if mb != nil && !mb.IsNothing {
-		return merkledb.Some(mb.Value)
-	}
-	return merkledb.Nothing[[]byte]()
-}
-
 var _ sync.DB = (*DBClient)(nil)
 
 func NewDBClient(client pb.DBClient) *DBClient {
