@@ -10,6 +10,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"go.uber.org/zap"
 
 	"golang.org/x/sync/semaphore"
@@ -73,15 +75,22 @@ func NewNetworkClient(
 	myNodeID ids.NodeID,
 	maxActiveRequests int64,
 	log logging.Logger,
-) NetworkClient {
+	metricsNamespace string,
+	registerer prometheus.Registerer,
+) (NetworkClient, error) {
+	peerTracker, err := newPeerTracker(log, metricsNamespace, registerer)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create peer tracker: %w", err)
+	}
+
 	return &networkClient{
 		appSender:                  appSender,
 		myNodeID:                   myNodeID,
 		outstandingRequestHandlers: make(map[uint32]ResponseHandler),
 		activeRequests:             semaphore.NewWeighted(maxActiveRequests),
-		peers:                      newPeerTracker(log),
+		peers:                      peerTracker,
 		log:                        log,
-	}
+	}, nil
 }
 
 // Always returns nil because the engine considers errors
@@ -178,17 +187,14 @@ func (c *networkClient) RequestAny(
 	}
 	defer c.activeRequests.Release(1)
 
-	c.lock.Lock()
 	nodeID, ok := c.peers.GetAnyPeer(minVersion)
 	if !ok {
-		c.lock.Unlock()
 		return ids.EmptyNodeID, nil, fmt.Errorf(
 			"no peers found matching version %s out of %d peers",
 			minVersion, c.peers.Size(),
 		)
 	}
 
-	// Note [c.request] releases [c.lock].
 	response, err := c.request(ctx, nodeID, request)
 	return nodeID, response, err
 }
@@ -208,8 +214,6 @@ func (c *networkClient) Request(
 	}
 	defer c.activeRequests.Release(1)
 
-	c.lock.Lock()
-	// Note [c.request] releases [c.lock].
 	return c.request(ctx, nodeID, request)
 }
 
@@ -219,12 +223,13 @@ func (c *networkClient) Request(
 // Releases active requests semaphore if there was an error in sending the request.
 // Assumes [nodeID] is never [c.myNodeID] since we guarantee
 // [c.myNodeID] will not be added to [c.peers].
-// Assumes [c.lock] is held and unlocks [c.lock] before returning.
+// Assumes [c.lock] is not held and unlocks [c.lock] before returning.
 func (c *networkClient) request(
 	ctx context.Context,
 	nodeID ids.NodeID,
 	request []byte,
 ) ([]byte, error) {
+	c.lock.Lock()
 	c.log.Debug("sending request to peer",
 		zap.Stringer("nodeID", nodeID),
 		zap.Int("requestLen", len(request)),
@@ -234,8 +239,7 @@ func (c *networkClient) request(
 	requestID := c.requestID
 	c.requestID++
 
-	nodeIDs := set.NewSet[ids.NodeID](1)
-	nodeIDs.Add(nodeID)
+	nodeIDs := set.Of(nodeID)
 
 	// Send an app request to the peer.
 	if err := c.appSender.SendAppRequest(ctx, nodeIDs, requestID, request); err != nil {
@@ -246,12 +250,12 @@ func (c *networkClient) request(
 	handler := newResponseHandler()
 	c.outstandingRequestHandlers[requestID] = handler
 
+	c.lock.Unlock() // unlock so response can be received
+
 	var (
 		response  []byte
 		startTime = time.Now()
 	)
-
-	c.lock.Unlock() // unlock so response can be received
 
 	select {
 	case <-ctx.Done():
@@ -283,9 +287,6 @@ func (c *networkClient) Connected(
 	nodeID ids.NodeID,
 	nodeVersion *version.Application,
 ) error {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
 	if nodeID == c.myNodeID {
 		c.log.Debug("skipping registering self as peer")
 		return nil
@@ -298,9 +299,6 @@ func (c *networkClient) Connected(
 
 // Disconnected removes given [nodeID] from the peer list.
 func (c *networkClient) Disconnected(_ context.Context, nodeID ids.NodeID) error {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
 	if nodeID == c.myNodeID {
 		c.log.Debug("skipping deregistering self as peer")
 		return nil
