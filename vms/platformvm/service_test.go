@@ -15,6 +15,7 @@ import (
 	stdjson "encoding/json"
 
 	"github.com/golang/mock/gomock"
+
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/api"
@@ -821,7 +822,6 @@ func TestGetValidatorsAtReplyMarshalling(t *testing.T) {
 
 func TestServiceGetBlockByHeight(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	blockID := ids.GenerateTestID()
 	blockHeight := uint64(1337)
