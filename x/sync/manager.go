@@ -592,7 +592,7 @@ func (m *Manager) setError(err error) {
 // Assumes [m.workLock] is not held.
 func (m *Manager) completeWorkItem(ctx context.Context, work *workItem, largestHandledKey merkledb.Maybe[[]byte], rootID ids.ID, proofOfLargestKey []merkledb.ProofNode) {
 	// if the last key is equal to the end, then the full range is completed
-	if !merkledb.MaybeBytesEquals(largestHandledKey, work.end) {
+	if !merkledb.MaybeEqual(largestHandledKey, work.end, bytes.Equal) {
 		// find the next key to start querying by comparing the proofs for the last completed key
 		nextStartKey, err := m.findNextKey(ctx, largestHandledKey.Value(), work.end.Value(), proofOfLargestKey)
 		if err != nil {
@@ -677,7 +677,7 @@ func (m *Manager) enqueueWork(work *workItem) {
 
 // find the midpoint between two keys
 // start is expected to be less than end
-// nil on start is treated as all 0's
+// nil on start or end is treated as all 0's
 // nothing on end is treated as all 255's
 func midPoint(start []byte, end merkledb.Maybe[[]byte]) []byte {
 	length := len(start)
@@ -694,7 +694,7 @@ func midPoint(start []byte, end merkledb.Maybe[[]byte]) []byte {
 	}
 
 	// This check deals with cases where the end has a 255(or is nothing which is treated as all 255s) and the start key ends 255.
-	// For example, midPoint([255], nil) should be [255, 127], not [255].
+	// For example, midPoint([255], nothing) should be [255, 127], not [255].
 	// The result needs the extra byte added on to the end to deal with the fact that the naive midpoint between 255 and 255 would be 255
 	if (len(start) > 0 && start[len(start)-1] == 255) && (len(end.Value()) == 0 || end.Value()[len(end.Value())-1] == 255) {
 		length++

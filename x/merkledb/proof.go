@@ -164,7 +164,7 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID) error {
 	// Note odd length keys can never match the [proof.Key] since it's bytes,
 	// and thus an even number of nibbles.
 	if (lastNode.KeyPath.hasOddLength() || !bytes.Equal(proof.Key, lastNode.KeyPath.Value)) &&
-		!proof.Value.IsNothing() {
+		proof.Value.HasValue() {
 		return ErrProofValueDoesntMatch
 	}
 
@@ -194,11 +194,9 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID) error {
 }
 
 func (proof *Proof) ToProto() *pb.Proof {
-	value := &pb.MaybeBytes{}
-	if !proof.Value.IsNothing() {
-		value.Value = proof.Value.Value()
-	} else {
-		value.IsNothing = true
+	value := &pb.MaybeBytes{
+		Value:     proof.Value.Value(),
+		IsNothing: proof.Value.IsNothing(),
 	}
 
 	pbProof := &pb.Proof{
@@ -303,14 +301,12 @@ func (proof *RangeProof) Verify(
 		return err
 	}
 
-	largestPath := Nothing[path]()
+	largestPath := MaybeBind(end, newPath)
 	if len(proof.KeyValues) > 0 {
 		// If [proof] has key-value pairs, we should insert children
 		// greater than [largestKey] to ancestors of the node containing
 		// [largestKey] so that we get the expected root ID.
 		largestPath = Some(newPath(proof.KeyValues[len(proof.KeyValues)-1].Key))
-	} else if end.HasValue() {
-		largestPath = Some(newPath(end.Value()))
 	}
 
 	// The key-value pairs (allegedly) proven by [proof].
@@ -454,7 +450,7 @@ func verifyAllRangeProofKeyValuesPresent(proof []ProofNode, start path, end Mayb
 		// Skip odd length keys since they cannot have a value (enforced by [verifyProofPath]).
 		if !nodeKey.hasOddLength() && nodePath.Compare(start) >= 0 && (end.IsNothing() || nodePath.Compare(end.Value()) <= 0) {
 			value, ok := keysValues[nodePath]
-			if !ok && !node.ValueOrHash.IsNothing() {
+			if !ok && node.ValueOrHash.HasValue() {
 				// We didn't get a key-value pair for this key, but the proof node has a value.
 				return ErrProofNodeHasUnincludedValue
 			}

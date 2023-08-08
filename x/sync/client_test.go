@@ -231,7 +231,7 @@ func TestGetRangeProof(t *testing.T) {
 				start := response.KeyValues[1].Key
 				rootID, err := largeTrieDB.GetMerkleRoot(context.Background())
 				require.NoError(t, err)
-				proof, err := largeTrieDB.GetRangeProofAtRoot(context.Background(), rootID, start, nil, defaultRequestKeyLimit)
+				proof, err := largeTrieDB.GetRangeProofAtRoot(context.Background(), rootID, start, merkledb.Nothing[[]byte](), defaultRequestKeyLimit)
 				require.NoError(t, err)
 				response.KeyValues = proof.KeyValues
 				response.StartProof = proof.StartProof
