@@ -770,10 +770,14 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 			}
 			rangeProof, err := db.GetRangeProofAtRoot(context.Background(), root, step.key, step.value, 100)
 			require.NoError(err)
+			end := Nothing[[]byte]()
+			if len(step.value) > 0 {
+				end = Some(step.value)
+			}
 			require.NoError(rangeProof.Verify(
 				context.Background(),
 				step.key,
-				step.value,
+				end,
 				root,
 			))
 			require.LessOrEqual(len(rangeProof.KeyValues), 100)
@@ -791,11 +795,15 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 			require.NoError(err)
 			changeProofDB, err := getBasicDB()
 			require.NoError(err)
+			end := Nothing[[]byte]()
+			if len(step.value) > 0 {
+				end = Some(step.value)
+			}
 			require.NoError(changeProofDB.VerifyChangeProof(
 				context.Background(),
 				changeProof,
 				step.key,
-				step.value,
+				end,
 				root,
 			))
 			require.LessOrEqual(len(changeProof.KeyChanges), 100)
