@@ -19,8 +19,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 
@@ -132,6 +132,13 @@ func (s *NetworkServer) AppRequest(
 	return nil
 }
 
+func maybeBytesToMaybe(mb *pb.MaybeBytes) maybe.Maybe[[]byte] {
+	if mb != nil && !mb.IsNothing {
+		return maybe.Some(mb.Value)
+	}
+	return maybe.Nothing[[]byte]()
+}
+
 // Generates a change proof and sends it to [nodeID].
 func (s *NetworkServer) HandleChangeProofRequest(
 	ctx context.Context,
@@ -139,11 +146,14 @@ func (s *NetworkServer) HandleChangeProofRequest(
 	requestID uint32,
 	req *pb.SyncGetChangeProofRequest,
 ) error {
+	if req.EndKey == nil {
+		req.EndKey = &pb.MaybeBytes{IsNothing: true}
+	}
 	if req.BytesLimit == 0 ||
 		req.KeyLimit == 0 ||
-		len(req.StartRootHash) != hashing.HashLen ||
-		len(req.EndRootHash) != hashing.HashLen ||
-		(len(req.EndKey) > 0 && bytes.Compare(req.StartKey, req.EndKey) > 0) {
+		len(req.StartRootHash) != ids.IDLen ||
+		len(req.EndRootHash) != ids.IDLen ||
+		(!req.EndKey.IsNothing && bytes.Compare(req.StartKey, req.EndKey.Value) > 0) {
 		s.log.Debug(
 			"dropping invalid change proof request",
 			zap.Stringer("nodeID", nodeID),
@@ -162,6 +172,7 @@ func (s *NetworkServer) HandleChangeProofRequest(
 	if bytesLimit > maxByteSizeLimit {
 		bytesLimit = maxByteSizeLimit
 	}
+	end := maybeBytesToMaybe(req.EndKey)
 
 	// attempt to get a proof within the bytes limit
 	for keyLimit > 0 {
@@ -173,7 +184,7 @@ func (s *NetworkServer) HandleChangeProofRequest(
 		if err != nil {
 			return err
 		}
-		changeProof, err := s.db.GetChangeProof(ctx, startRoot, endRoot, req.StartKey, req.EndKey, int(keyLimit))
+		changeProof, err := s.db.GetChangeProof(ctx, startRoot, endRoot, req.StartKey, end, int(keyLimit))
 		if err != nil {
 			// handle expected errors so clients cannot cause servers to spam warning logs.
 			if errors.Is(err, merkledb.ErrRootIDNotPresent) || errors.Is(err, merkledb.ErrStartRootNotFound) {
@@ -220,10 +231,13 @@ func (s *NetworkServer) HandleRangeProofRequest(
 	requestID uint32,
 	req *pb.SyncGetRangeProofRequest,
 ) error {
+	if req.EndKey == nil {
+		req.EndKey = &pb.MaybeBytes{IsNothing: true}
+	}
 	if req.BytesLimit == 0 ||
 		req.KeyLimit == 0 ||
-		len(req.RootHash) != hashing.HashLen ||
-		(len(req.EndKey) > 0 && bytes.Compare(req.StartKey, req.EndKey) > 0) {
+		len(req.RootHash) != ids.IDLen ||
+		(!req.EndKey.IsNothing && bytes.Compare(req.StartKey, req.EndKey.Value) > 0) {
 		s.log.Debug(
 			"dropping invalid range proof request",
 			zap.Stringer("nodeID", nodeID),
@@ -242,12 +256,14 @@ func (s *NetworkServer) HandleRangeProofRequest(
 	if bytesLimit > maxByteSizeLimit {
 		bytesLimit = maxByteSizeLimit
 	}
+	end := maybeBytesToMaybe(req.EndKey)
+
 	for keyLimit > 0 {
 		root, err := ids.ToID(req.RootHash)
 		if err != nil {
 			return err
 		}
-		rangeProof, err := s.db.GetRangeProofAtRoot(ctx, root, req.StartKey, req.EndKey, int(keyLimit))
+		rangeProof, err := s.db.GetRangeProofAtRoot(ctx, root, req.StartKey, end, int(keyLimit))
 		if err != nil {
 			// handle expected errors so clients cannot cause servers to spam warning logs.
 			if errors.Is(err, merkledb.ErrRootIDNotPresent) {

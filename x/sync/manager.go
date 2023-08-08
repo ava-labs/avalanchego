@@ -14,6 +14,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
@@ -50,12 +51,12 @@ const (
 // If we have no local root for this range, [localRootID] is ids.Empty.
 type workItem struct {
 	start       []byte
-	end         []byte
+	end         maybe.Maybe[[]byte]
 	priority    priority
 	localRootID ids.ID
 }
 
-func newWorkItem(localRootID ids.ID, start, end []byte, priority priority) *workItem {
+func newWorkItem(localRootID ids.ID, start []byte, end maybe.Maybe[[]byte], priority priority) *workItem {
 	return &workItem{
 		localRootID: localRootID,
 		start:       start,
@@ -145,7 +146,7 @@ func (m *Manager) Start(ctx context.Context) error {
 
 	// Add work item to fetch the entire key range.
 	// Note that this will be the first work item to be processed.
-	m.unprocessedWork.Insert(newWorkItem(ids.Empty, nil, nil, lowPriority))
+	m.unprocessedWork.Insert(newWorkItem(ids.Empty, nil, maybe.Nothing[[]byte](), lowPriority))
 
 	m.syncing = true
 	ctx, m.cancelCtx = context.WithCancel(ctx)
@@ -259,9 +260,12 @@ func (m *Manager) getAndApplyChangeProof(ctx context.Context, work *workItem) {
 			StartRootHash: work.localRootID[:],
 			EndRootHash:   targetRootID[:],
 			StartKey:      work.start,
-			EndKey:        work.end,
-			KeyLimit:      defaultRequestKeyLimit,
-			BytesLimit:    defaultRequestByteSizeLimit,
+			EndKey: &pb.MaybeBytes{
+				Value:     work.end.Value(),
+				IsNothing: work.end.IsNothing(),
+			},
+			KeyLimit:   defaultRequestKeyLimit,
+			BytesLimit: defaultRequestByteSizeLimit,
 		},
 		m.config.DB,
 	)
@@ -293,7 +297,7 @@ func (m *Manager) getAndApplyChangeProof(ctx context.Context, work *workItem) {
 			m.setError(err)
 			return
 		}
-		largestHandledKey = changeProof.KeyChanges[len(changeProof.KeyChanges)-1].Key
+		largestHandledKey = maybe.Some(changeProof.KeyChanges[len(changeProof.KeyChanges)-1].Key)
 	}
 
 	m.completeWorkItem(ctx, work, largestHandledKey, targetRootID, changeProof.EndProof)
@@ -305,9 +309,12 @@ func (m *Manager) getAndApplyRangeProof(ctx context.Context, work *workItem) {
 	targetRootID := m.getTargetRoot()
 	proof, err := m.config.Client.GetRangeProof(ctx,
 		&pb.SyncGetRangeProofRequest{
-			RootHash:   targetRootID[:],
-			StartKey:   work.start,
-			EndKey:     work.end,
+			RootHash: targetRootID[:],
+			StartKey: work.start,
+			EndKey: &pb.MaybeBytes{
+				Value:     work.end.Value(),
+				IsNothing: work.end.IsNothing(),
+			},
 			KeyLimit:   defaultRequestKeyLimit,
 			BytesLimit: defaultRequestByteSizeLimit,
 		},
@@ -332,7 +339,7 @@ func (m *Manager) getAndApplyRangeProof(ctx context.Context, work *workItem) {
 			return
 		}
 
-		largestHandledKey = proof.KeyValues[len(proof.KeyValues)-1].Key
+		largestHandledKey = maybe.Some(proof.KeyValues[len(proof.KeyValues)-1].Key)
 	}
 
 	m.completeWorkItem(ctx, work, largestHandledKey, targetRootID, proof.EndProof)
@@ -526,6 +533,9 @@ func (m *Manager) Wait(ctx context.Context) error {
 }
 
 func (m *Manager) UpdateSyncTarget(syncTargetRoot ids.ID) error {
+	m.syncTargetLock.Lock()
+	defer m.syncTargetLock.Unlock()
+
 	m.workLock.Lock()
 	defer m.workLock.Unlock()
 
@@ -534,9 +544,6 @@ func (m *Manager) UpdateSyncTarget(syncTargetRoot ids.ID) error {
 		return ErrAlreadyClosed
 	default:
 	}
-
-	m.syncTargetLock.Lock()
-	defer m.syncTargetLock.Unlock()
 
 	if m.config.TargetRoot == syncTargetRoot {
 		// the target hasn't changed, so there is nothing to do
@@ -584,11 +591,11 @@ func (m *Manager) setError(err error) {
 
 // Mark the range [start, end] as synced up to [rootID].
 // Assumes [m.workLock] is not held.
-func (m *Manager) completeWorkItem(ctx context.Context, work *workItem, largestHandledKey []byte, rootID ids.ID, proofOfLargestKey []merkledb.ProofNode) {
+func (m *Manager) completeWorkItem(ctx context.Context, work *workItem, largestHandledKey maybe.Maybe[[]byte], rootID ids.ID, proofOfLargestKey []merkledb.ProofNode) {
 	// if the last key is equal to the end, then the full range is completed
-	if !bytes.Equal(largestHandledKey, work.end) {
+	if !maybe.Equal(largestHandledKey, work.end, bytes.Equal) {
 		// find the next key to start querying by comparing the proofs for the last completed key
-		nextStartKey, err := m.findNextKey(ctx, largestHandledKey, work.end, proofOfLargestKey)
+		nextStartKey, err := m.findNextKey(ctx, largestHandledKey.Value(), work.end.Value(), proofOfLargestKey)
 		if err != nil {
 			m.setError(err)
 			return
@@ -600,24 +607,33 @@ func (m *Manager) completeWorkItem(ctx context.Context, work *workItem, largestH
 		} else {
 			// the full range wasn't completed, so enqueue a new work item for the range [nextStartKey, workItem.end]
 			m.enqueueWork(newWorkItem(work.localRootID, nextStartKey, work.end, work.priority))
-			largestHandledKey = nextStartKey
+			largestHandledKey = maybe.Some(nextStartKey)
 		}
+	}
+
+	// Process [work] while holding [syncTargetLock] to ensure that object
+	// is added to the right queue, even if a target update is triggered
+	m.syncTargetLock.RLock()
+	defer m.syncTargetLock.RUnlock()
+
+	stale := m.config.TargetRoot != rootID
+	if stale {
+		// the root has changed, so reinsert with high priority
+		m.enqueueWork(newWorkItem(rootID, work.start, largestHandledKey, highPriority))
+	} else {
+		m.workLock.Lock()
+		defer m.workLock.Unlock()
+
+		m.processedWork.MergeInsert(newWorkItem(rootID, work.start, largestHandledKey, work.priority))
 	}
 
 	// completed the range [work.start, lastKey], log and record in the completed work heap
 	m.config.Log.Info("completed range",
 		zap.Binary("start", work.start),
-		zap.Binary("end", largestHandledKey),
+		zap.Binary("end", largestHandledKey.Value()),
+		zap.Stringer("rootID", rootID),
+		zap.Bool("stale", stale),
 	)
-	if m.getTargetRoot() == rootID {
-		m.workLock.Lock()
-		defer m.workLock.Unlock()
-
-		m.processedWork.MergeInsert(newWorkItem(rootID, work.start, largestHandledKey, work.priority))
-	} else {
-		// the root has changed, so reinsert with high priority
-		m.enqueueWork(newWorkItem(rootID, work.start, largestHandledKey, highPriority))
-	}
 }
 
 // Queue the given key range to be fetched and applied.
@@ -641,7 +657,7 @@ func (m *Manager) enqueueWork(work *workItem) {
 	// Find the middle point.
 	mid := midPoint(work.start, work.end)
 
-	if bytes.Equal(work.start, mid) || bytes.Equal(mid, work.end) {
+	if bytes.Equal(work.start, mid) || bytes.Equal(mid, work.end.Value()) {
 		// The range is too small to split.
 		// If we didn't have this check we would add work items
 		// [start, start] and [start, end]. Since start <= end, this would
@@ -653,7 +669,7 @@ func (m *Manager) enqueueWork(work *workItem) {
 
 	// first item gets higher priority than the second to encourage finished ranges to grow
 	// rather than start a new range that is not contiguous with existing completed ranges
-	first := newWorkItem(work.localRootID, work.start, mid, medPriority)
+	first := newWorkItem(work.localRootID, work.start, maybe.Some(mid), medPriority)
 	second := newWorkItem(work.localRootID, mid, work.end, lowPriority)
 
 	m.unprocessedWork.Insert(first)
@@ -661,21 +677,27 @@ func (m *Manager) enqueueWork(work *workItem) {
 }
 
 // find the midpoint between two keys
-// nil on start is treated as all 0's
-// nil on end is treated as all 255's
-func midPoint(start, end []byte) []byte {
+// start is expected to be less than end
+// nil on start or end is treated as all 0's
+// nothing on end is treated as all 255's
+func midPoint(start []byte, end maybe.Maybe[[]byte]) []byte {
 	length := len(start)
-	if len(end) > length {
-		length = len(end)
-	}
-	if length == 0 {
-		return []byte{127}
+	if len(end.Value()) > length {
+		length = len(end.Value())
 	}
 
-	// This check deals with cases where the end has a 255(or is nil which is treated as all 255s) and the start key ends 255.
-	// For example, midPoint([255], nil) should be [255, 127], not [255].
+	if length == 0 {
+		if end.IsNothing() {
+			return []byte{127}
+		} else if len(end.Value()) == 0 {
+			return nil
+		}
+	}
+
+	// This check deals with cases where the end has a 255(or is nothing which is treated as all 255s) and the start key ends 255.
+	// For example, midPoint([255], nothing) should be [255, 127], not [255].
 	// The result needs the extra byte added on to the end to deal with the fact that the naive midpoint between 255 and 255 would be 255
-	if (len(start) > 0 && start[len(start)-1] == 255) && (len(end) == 0 || end[len(end)-1] == 255) {
+	if (len(start) > 0 && start[len(start)-1] == 255) && (len(end.Value()) == 0 || end.Value()[len(end.Value())-1] == 255) {
 		length++
 	}
 
@@ -688,11 +710,11 @@ func midPoint(start, end []byte) []byte {
 		}
 
 		endVal := 0
-		if len(end) == 0 {
+		if end.IsNothing() {
 			endVal = 255
 		}
-		if i < len(end) {
-			endVal = int(end[i])
+		if i < len(end.Value()) {
+			endVal = int(end.Value()[i])
 		}
 
 		total := startVal + endVal + leftover
