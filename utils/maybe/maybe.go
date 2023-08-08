@@ -42,7 +42,7 @@ func (m Maybe[T]) Value() T {
 	return m.value
 }
 
-// Bind returns Nothing fif [m] is Nothing.
+// Bind returns Nothing iff [m] is Nothing.
 // Otherwise applies [f] to the value of [m] and returns the result as a Some.
 func Bind[T, U any](m Maybe[T], f func(T) U) Maybe[U] {
 	if m.IsNothing() {
