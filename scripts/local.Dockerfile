@@ -9,7 +9,7 @@
 # Dockerfile
 # README.md
 # go.mod
-FROM golang:1.19.12-bullseye
+FROM golang:1.20.7-bullseye
 
 RUN mkdir -p /go/src/github.com/ava-labs
 

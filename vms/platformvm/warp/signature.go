@@ -121,7 +121,7 @@ func (s *BitSetSignature) Verify(
 	// Parse the aggregate signature
 	aggSig, err := bls.SignatureFromBytes(s.Signature[:])
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrParseSignature, err)
+		return fmt.Errorf("%w: %w", ErrParseSignature, err)
 	}
 
 	// Create the aggregate public key

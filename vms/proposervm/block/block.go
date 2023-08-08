@@ -94,7 +94,7 @@ func (b *statelessBlock) initialize(bytes []byte) error {
 
 	cert, err := x509.ParseCertificate(b.StatelessBlock.Certificate)
 	if err != nil {
-		return fmt.Errorf("%w: %s", errInvalidCertificate, err)
+		return fmt.Errorf("%w: %w", errInvalidCertificate, err)
 	}
 
 	b.cert = cert

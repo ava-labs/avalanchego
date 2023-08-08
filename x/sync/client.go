@@ -118,7 +118,7 @@ func (c *client) GetChangeProof(ctx context.Context, req *pb.SyncGetChangeProofR
 		}
 
 		if err := db.VerifyChangeProof(ctx, &changeProof, req.StartKey, endKey, endRoot); err != nil {
-			return nil, fmt.Errorf("%s due to %w", errInvalidRangeProof, err)
+			return nil, fmt.Errorf("%w due to %w", errInvalidRangeProof, err)
 		}
 		return &changeProof, nil
 	}
@@ -174,7 +174,7 @@ func (c *client) GetRangeProof(ctx context.Context, req *pb.SyncGetRangeProofReq
 			endKey,
 			root,
 		); err != nil {
-			return nil, fmt.Errorf("%s due to %w", errInvalidRangeProof, err)
+			return nil, fmt.Errorf("%w due to %w", errInvalidRangeProof, err)
 		}
 		return &rangeProof, nil
 	}
@@ -235,7 +235,7 @@ func getAndParse[T any](
 			if lastErr != nil {
 				// prefer reporting [lastErr] if it's not nil.
 				return nil, fmt.Errorf(
-					"request failed after %d attempts with last error %w and ctx error %s",
+					"request failed after %d attempts with last error %w and ctx error %w",
 					attempt, lastErr, ctx.Err(),
 				)
 			}
