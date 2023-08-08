@@ -10,6 +10,8 @@ import (
 	"sync"
 	"time"
 
+	stdmath "math"
+
 	"github.com/google/btree"
 
 	"go.uber.org/zap"
@@ -33,6 +35,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
@@ -2375,12 +2378,20 @@ func (s *state) PruneAndIndex(lock sync.Locker, log logging.Logger) error {
 
 	log.Info("starting state pruning and indexing")
 
+	blkBytes := blockIterator.Value()
+	blk, _, _, err := parseStoredBlock(blkBytes)
+	if err != nil {
+		return err
+	}
+	blkID := blk.ID()
+
 	var (
-		startTime  = time.Now()
-		lastCommit = startTime
-		lastUpdate = startTime
-		numPruned  = 0
-		numIndexed = 0
+		startTime     = time.Now()
+		lastCommit    = startTime
+		lastUpdate    = startTime
+		numPruned     = 0
+		numIndexed    = 0
+		startProgress = timer.ProgressFromHash(blkID[:])
 	)
 
 	for blockIterator.Next() {
@@ -2445,9 +2456,17 @@ func (s *state) PruneAndIndex(lock sync.Locker, log logging.Logger) error {
 			if now.Sub(lastUpdate) > pruneUpdateFrequency {
 				lastUpdate = now
 
+				progress := timer.ProgressFromHash(blkID[:])
+				eta := timer.EstimateETA(
+					startTime,
+					progress-startProgress,
+					stdmath.MaxUint64-startProgress,
+				)
+
 				log.Info("committing state pruning and indexing",
 					zap.Int("numPruned", numPruned),
 					zap.Int("numIndexed", numIndexed),
+					zap.Duration("eta", eta),
 				)
 			}
 
