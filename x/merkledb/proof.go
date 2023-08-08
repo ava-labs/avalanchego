@@ -470,27 +470,71 @@ type KeyChange struct {
 	Value maybe.Maybe[[]byte]
 }
 
+// A change proof proves that a set of key-value changes occurred
+// between two trie roots, where each key-value pair's key is
+// between some lower and upper bound (inclusive).
 type ChangeProof struct {
+	// Invariant: At least one of [StartProof], [EndProof], or
+	// [KeyChanges] is non-empty.
+
 	// If false, the node that created this doesn't have
 	// sufficient history to generate a change proof and
 	// all other fields must be empty.
 	// Otherwise at least one other field is non-empty.
 	HadRootsInHistory bool
+
 	// A proof that the smallest key in the requested range does/doesn't
 	// exist in the trie with the requested start root.
 	// Empty if no lower bound on the requested range was given.
 	// Note that this may not be an entire proof -- nodes are omitted if
 	// they are also in [EndProof].
 	StartProof []ProofNode
-	// A proof that the largest key in [KeyValues] and [DeletedKeys]
-	// does/doesn't exist in the trie with the requested start root.
-	// Empty iff no upper bound on the requested range was given
-	// and [KeyValues] and [DeletedKeys] are empty.
+
+	// If [KeyChanges] is non-empty, this is a proof of the largest key
+	// in [KeyChanges].
+	//
+	// If [KeyChanges] is empty and an upper range bound was given,
+	// this is a proof of the upper range bound.
+	//
+	// If [KeyChanges] is empty and no upper range bound was given,
+	// this is empty.
 	EndProof []ProofNode
-	// A subset of key-values that were added, removed, or had their values modified
-	// between the requested start root (exclusive) and the requested
+
+	// A subset of key-values that were added, removed, or had their values
+	// modified between the requested start root (exclusive) and the requested
 	// end root (inclusive).
-	// Sorted by increasing key.
+	// Each key is in the requested range (inclusive).
+	// The first key-value is the first key-value at/after the range start.
+	// The key-value pairs are consecutive. That is, if keys k1 and k2 are
+	// in [KeyChanges] then there is no k3 that was modified between the start and
+	// end roots such that k1 < k3 < k2.
+	// This is a subset of the requested key-value range, rather than the entire
+	// range, because otherwise the proof may be too large.
+	// Sorted by increasing key and with no duplicate keys.
+	//
+	// Example: Suppose that between the start root and the end root, the following
+	// key-value pairs were added, removed, or modified:
+	//
+	// [kv1, kv2, kv3, kv4, kv5]
+	// where start <= kv1 < ... < kv5 <= end.
+	//
+	// The following are possible values of [KeyChanges]:
+	//
+	// []
+	// [kv1]
+	// [kv1, kv2]
+	// [kv1, kv2, kv3]
+	// [kv1, kv2, kv3, kv4]
+	// [kv1, kv2, kv3, kv4, kv5]
+	//
+	// The following values of [KeyChanges] are always invalid, for example:
+	//
+	// [kv2] (Doesn't include kv1, the first key-value at/after the range start)
+	// [kv1, kv3] (Doesn't include kv2, the key-value between kv1 and kv3)
+	// [kv1, kv3, kv2] (Not sorted by increasing key)
+	// [kv1, kv1] (Duplicate key-value pairs)
+	// [kv0, kv1] (For some kv1 < start)
+	// [kv1, kv2, kv3, kv4, kv5, kv6] (For some kv6 > end)
 	KeyChanges []KeyChange
 }
 
