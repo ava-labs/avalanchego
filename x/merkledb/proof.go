@@ -170,7 +170,7 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID) error {
 	}
 
 	// Don't bother locking [view] -- nobody else has a reference to it.
-	view, err := getTrieView(ctx, nil)
+	view, err := getStandaloneTrieView(ctx, nil)
 	if err != nil {
 		return err
 	}
@@ -346,7 +346,7 @@ func (proof *RangeProof) Verify(
 	}
 
 	// Don't need to lock [view] because nobody else has a reference to it.
-	view, err := getTrieView(ctx, ops)
+	view, err := getStandaloneTrieView(ctx, ops)
 	if err != nil {
 		return err
 	}
@@ -847,7 +847,8 @@ func addPathInfo(
 	return nil
 }
 
-func getTrieView(ctx context.Context, ops []database.BatchOp) (*trieView, error) {
+// getStandaloneTrieView returns a new view that has nothing in it besides the changes due to [ops]
+func getStandaloneTrieView(ctx context.Context, ops []database.BatchOp) (*trieView, error) {
 	tracer, err := trace.New(trace.Config{Enabled: false})
 	if err != nil {
 		return nil, err

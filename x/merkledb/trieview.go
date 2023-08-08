@@ -819,13 +819,52 @@ func (t *trieView) remove(key []byte) error {
 
 	// the trie has been changed, so invalidate all children and remove them from tracking
 	t.invalidateChildren()
+
 	path := newPath(key)
 	if err := t.recordValueChange(path, maybe.Nothing[[]byte]()); err != nil {
 		return err
 	}
-	if err := t.removeFromTrie(path); err != nil {
+
+	nodePath, err := t.getPathTo(path)
+	if err != nil {
 		return err
 	}
+
+	nodeToDelete := nodePath[len(nodePath)-1]
+
+	if nodeToDelete.key.Compare(path) != 0 || !nodeToDelete.hasValue() {
+		// the key wasn't in the trie or doesn't have a value so there's nothing to do
+		return nil
+	}
+
+	// A node with ancestry [nodePath] is being deleted, so we need to recalculate
+	// all the nodes in this path.
+	for _, node := range nodePath {
+		if err := t.recordNodeChange(node); err != nil {
+			return err
+		}
+	}
+
+	nodeToDelete.setValue(maybe.Nothing[[]byte]())
+	if err := t.recordNodeChange(nodeToDelete); err != nil {
+		return err
+	}
+
+	// if the removed node has no children, the node can be removed from the trie
+	if len(nodeToDelete.children) == 0 {
+		return t.deleteEmptyNodes(nodePath)
+	}
+
+	if len(nodePath) == 1 {
+		return nil
+	}
+	parent := nodePath[len(nodePath)-2]
+
+	// merge this node and its descendants into a single node if possible
+	if err = t.compressNodePath(parent, nodeToDelete); err != nil {
+		return err
+	}
+
 	// ensure no ancestor changes occurred during execution
 	if t.isInvalid() {
 		return ErrInvalid
@@ -1141,48 +1180,6 @@ func (t *trieView) recordValueChange(key path, value maybe.Maybe[[]byte]) error 
 		after:  value,
 	}
 	return nil
-}
-
-// Removes the provided [key] from the trie.
-// Assumes [t.lock] write lock is held.
-func (t *trieView) removeFromTrie(key path) error {
-	nodePath, err := t.getPathTo(key)
-	if err != nil {
-		return err
-	}
-
-	nodeToDelete := nodePath[len(nodePath)-1]
-
-	if nodeToDelete.key.Compare(key) != 0 || !nodeToDelete.hasValue() {
-		// the key wasn't in the trie or doesn't have a value so there's nothing to do
-		return nil
-	}
-
-	// A node with ancestry [nodePath] is being deleted, so we need to recalculate
-	// all the nodes in this path.
-	for _, node := range nodePath {
-		if err := t.recordNodeChange(node); err != nil {
-			return err
-		}
-	}
-
-	nodeToDelete.setValue(maybe.Nothing[[]byte]())
-	if err := t.recordNodeChange(nodeToDelete); err != nil {
-		return err
-	}
-
-	// if the removed node has no children, the node can be removed from the trie
-	if len(nodeToDelete.children) == 0 {
-		return t.deleteEmptyNodes(nodePath)
-	}
-
-	if len(nodePath) == 1 {
-		return nil
-	}
-	parent := nodePath[len(nodePath)-2]
-
-	// merge this node and its descendants into a single node if possible
-	return t.compressNodePath(parent, nodeToDelete)
 }
 
 // Retrieves the node with the given [key], which is a child of [parent], and
