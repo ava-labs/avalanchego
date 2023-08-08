@@ -58,6 +58,7 @@ func TestAllocateFundedKeys(t *testing.T) {
 			if tc.expectedAddresses == nil {
 				require.ErrorIs(err, errRequestedKeyCountExceedsAvailable)
 			} else {
+				require.NoError(err)
 				addresses := []string{}
 				for _, key := range keys {
 					addresses = append(addresses, key.Address().String())
