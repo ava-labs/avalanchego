@@ -42,7 +42,7 @@ func (m Maybe[T]) Value() T {
 	return m.value
 }
 
-// Bind returns Nothing, if [m] is Nothing.
+// Bind returns Nothing fif [m] is Nothing.
 // Otherwise applies [f] to the value of [m] and returns the result as a Some.
 func Bind[T, U any](m Maybe[T], f func(T) U) Maybe[U] {
 	if m.IsNothing() {
@@ -51,8 +51,8 @@ func Bind[T, U any](m Maybe[T], f func(T) U) Maybe[U] {
 	return Some(f(m.Value()))
 }
 
-// Equal returns true if both m1 and m2 are nothing or have the same value according to the equality function
-func Equal[T any](m1 Maybe[T], m2 Maybe[T], equality func(T, T) bool) bool {
+// Equal returns true if both m1 and m2 are nothing or have the same value according to [equalFunc].
+func Equal[T any](m1 Maybe[T], m2 Maybe[T], equalFunc func(T, T) bool) bool {
 	if m1.IsNothing() {
 		return m2.IsNothing()
 	}
@@ -60,5 +60,5 @@ func Equal[T any](m1 Maybe[T], m2 Maybe[T], equality func(T, T) bool) bool {
 	if m2.IsNothing() {
 		return false
 	}
-	return equality(m1.Value(), m2.Value())
+	return equalFunc(m1.Value(), m2.Value())
 }
