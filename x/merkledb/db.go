@@ -262,7 +262,11 @@ func (db *merkleDB) rebuild(ctx context.Context) error {
 			return err
 		}
 
-		currentOps = append(currentOps, database.BatchOp{Key: path.Serialize().Value, Value: n.value.Value(), Delete: !n.hasValue()})
+		currentOps = append(currentOps, database.BatchOp{
+			Key:    path.Serialize().Value,
+			Value:  n.value.Value(),
+			Delete: !n.hasValue(),
+		})
 	}
 	if err := it.Error(); err != nil {
 		return err
@@ -293,9 +297,13 @@ func (db *merkleDB) CommitChangeProof(ctx context.Context, proof *ChangeProof) e
 	if db.closed {
 		return database.ErrClosed
 	}
-	ops := make([]database.BatchOp, 0, len(proof.KeyChanges))
-	for _, kv := range proof.KeyChanges {
-		ops = append(ops, database.BatchOp{Key: kv.Key, Value: kv.Value.Value(), Delete: kv.Value.IsNothing()})
+	ops := make([]database.BatchOp, len(proof.KeyChanges))
+	for i, kv := range proof.KeyChanges {
+		ops[i] = database.BatchOp{
+			Key:    kv.Key,
+			Value:  kv.Value.Value(),
+			Delete: kv.Value.IsNothing(),
+		}
 	}
 
 	view, err := db.newUntrackedView(ops)
@@ -312,12 +320,15 @@ func (db *merkleDB) CommitRangeProof(ctx context.Context, start []byte, proof *R
 	if db.closed {
 		return database.ErrClosed
 	}
-	ops := make([]database.BatchOp, 0, len(proof.KeyValues))
 
+	ops := make([]database.BatchOp, len(proof.KeyValues))
 	keys := set.NewSet[string](len(proof.KeyValues))
-	for _, kv := range proof.KeyValues {
+	for i, kv := range proof.KeyValues {
 		keys.Add(string(kv.Key))
-		ops = append(ops, database.BatchOp{Key: kv.Key, Value: kv.Value})
+		ops[i] = database.BatchOp{
+			Key:   kv.Key,
+			Value: kv.Value,
+		}
 	}
 
 	var largestKey []byte
@@ -329,7 +340,10 @@ func (db *merkleDB) CommitRangeProof(ctx context.Context, start []byte, proof *R
 		return err
 	}
 	for _, keyToDelete := range keysToDelete {
-		ops = append(ops, database.BatchOp{Key: keyToDelete, Delete: true})
+		ops = append(ops, database.BatchOp{
+			Key:    keyToDelete,
+			Delete: true,
+		})
 	}
 
 	// Don't need to lock [view] because nobody else has a reference to it.
@@ -1060,11 +1074,14 @@ func (db *merkleDB) VerifyChangeProof(
 		return err
 	}
 
-	ops := make([]database.BatchOp, 0, len(proof.KeyChanges))
-
 	// Insert the key-value pairs into the trie.
-	for _, kv := range proof.KeyChanges {
-		ops = append(ops, database.BatchOp{Key: kv.Key, Value: kv.Value.Value(), Delete: kv.Value.IsNothing()})
+	ops := make([]database.BatchOp, len(proof.KeyChanges))
+	for i, kv := range proof.KeyChanges {
+		ops[i] = database.BatchOp{
+			Key:    kv.Key,
+			Value:  kv.Value.Value(),
+			Delete: kv.Value.IsNothing(),
+		}
 	}
 
 	// Don't need to lock [view] because nobody else has a reference to it.

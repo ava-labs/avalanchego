@@ -336,10 +336,13 @@ func (proof *RangeProof) Verify(
 		return err
 	}
 
-	ops := make([]database.BatchOp, 0, len(proof.KeyValues))
 	// Insert all key-value pairs into the trie.
-	for _, kv := range proof.KeyValues {
-		ops = append(ops, database.BatchOp{Key: kv.Key, Value: kv.Value})
+	ops := make([]database.BatchOp, len(proof.KeyValues))
+	for i, kv := range proof.KeyValues {
+		ops[i] = database.BatchOp{
+			Key:   kv.Key,
+			Value: kv.Value,
+		}
 	}
 
 	// Don't need to lock [view] because nobody else has a reference to it.
