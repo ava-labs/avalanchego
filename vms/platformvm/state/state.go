@@ -2483,6 +2483,15 @@ func (s *state) PruneAndIndex(lock sync.Locker, log logging.Logger) error {
 		}
 	}
 
+	// Ensure we fully iterated over all blocks before writing that pruning has
+	// finished.
+	//
+	// Note: This is needed because a transient read error could cause the
+	// iterator to stop early.
+	if err := blockIterator.Error(); err != nil {
+		return err
+	}
+
 	if err := s.donePrune(); err != nil {
 		return err
 	}
@@ -2492,12 +2501,6 @@ func (s *state) PruneAndIndex(lock sync.Locker, log logging.Logger) error {
 	// accepted.
 	lock.Lock()
 	defer lock.Unlock()
-
-	errs := wrappers.Errs{}
-	errs.Add(
-		s.Commit(),
-		blockIterator.Error(),
-	)
 
 	// Make sure we flush the original cache before re-enabling it to prevent
 	// surfacing any stale data.
@@ -2510,5 +2513,5 @@ func (s *state) PruneAndIndex(lock sync.Locker, log logging.Logger) error {
 		zap.Duration("duration", time.Since(startTime)),
 	)
 
-	return errs.Err
+	return s.Commit()
 }
