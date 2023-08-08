@@ -29,6 +29,13 @@ var (
 
 var _ codec.Codec = (*genericCodec)(nil)
 
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
 type TypeCodec interface {
 	// UnpackPrefix unpacks the prefix of an interface from the given packer.
 	// The prefix specifies the concrete type that the interface should be
@@ -374,14 +381,19 @@ func (c *genericCodec) marshal(value reflect.Value, p *wrappers.Packer, maxSlice
 			bytes []byte
 		}
 
+		keyPacker := wrappers.Packer{
+			MaxSize: max(
+				p.MaxSize-p.Offset,
+				len(p.Bytes)-p.Offset,
+			),
+			Bytes: make([]byte, 0, 128),
+		}
+
 		sortedKeys := make([]keyTuple, len(keys))
+		lastKeyPosition := 0
 		for i, key := range keys {
 			// Note this [p] shadows the outer [p]
-			p := wrappers.Packer{
-				MaxSize: int(c.maxSliceLen),
-				Bytes:   make([]byte, 0, 128),
-			}
-			if err := c.marshal(key, &p, c.maxSliceLen); err != nil {
+			if err := c.marshal(key, &keyPacker, c.maxSliceLen); err != nil {
 				return err
 			}
 			if p.Err != nil {
@@ -389,8 +401,9 @@ func (c *genericCodec) marshal(value reflect.Value, p *wrappers.Packer, maxSlice
 			}
 			sortedKeys[i] = keyTuple{
 				key:   key,
-				bytes: p.Bytes,
+				bytes: keyPacker.Bytes[lastKeyPosition:],
 			}
+			lastKeyPosition = keyPacker.Offset
 		}
 
 		slices.SortFunc(sortedKeys, func(a, b keyTuple) bool {
