@@ -317,8 +317,8 @@ func (proof *RangeProof) Verify(
 	largestProvenPath := maybe.Bind(end, newPath)
 	if len(proof.KeyValues) > 0 {
 		// If [proof] has key-value pairs, we should insert children
-		// greater than [largestKey] to ancestors of the node containing
-		// [largestKey] so that we get the expected root ID.
+		// greater than [largestProvenPath] to ancestors of the node containing
+		// [largestProvenPath] so that we get the expected root ID.
 		largestProvenPath = maybe.Some(newPath(proof.KeyValues[len(proof.KeyValues)-1].Key))
 	}
 
