@@ -3,10 +3,6 @@
 
 package merkledb
 
-import (
-	"bytes"
-)
-
 // Maybe T = Some T | Nothing.
 // A data wrapper that allows values to be something [Some T] or nothing [Nothing].
 // Maybe is used to wrap types:
@@ -46,27 +42,23 @@ func (m Maybe[T]) Value() T {
 	return m.value
 }
 
-// MaybeBytesEquals returns true iff [a] and [b] are equal.
-func MaybeBytesEquals(a, b Maybe[[]byte]) bool {
-	aNothing := a.IsNothing()
-	bNothing := b.IsNothing()
-
-	if aNothing {
-		return bNothing
-	}
-
-	if bNothing {
-		return false
-	}
-
-	return bytes.Equal(a.Value(), b.Value())
-}
-
-// BindMaybe returns Nothing, if [m] is Nothing.
+// MaybeBind returns Nothing, if [m] is Nothing.
 // Otherwise applies [f] to the value of [m] and returns the result as a Some.
-func BindMaybe[T, U any](m Maybe[T], f func(T) U) Maybe[U] {
+func MaybeBind[T, U any](m Maybe[T], f func(T) U) Maybe[U] {
 	if m.IsNothing() {
 		return Nothing[U]()
 	}
 	return Some(f(m.Value()))
+}
+
+// MaybeEqual returns true if both m1 and m2 are nothing or have the same value according to the equality function
+func MaybeEqual[T any](m1 Maybe[T], m2 Maybe[T], equality func(T, T) bool) bool {
+	if m1.IsNothing() {
+		return m2.IsNothing()
+	}
+
+	if m2.IsNothing() {
+		return false
+	}
+	return equality(m1.Value(), m2.Value())
 }

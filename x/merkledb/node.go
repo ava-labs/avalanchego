@@ -195,7 +195,7 @@ func (n *node) asProofNode() ProofNode {
 	pn := ProofNode{
 		KeyPath:     n.key.Serialize(),
 		Children:    make(map[byte]ids.ID, len(n.children)),
-		ValueOrHash: BindMaybe(n.valueDigest, slices.Clone[[]byte]),
+		ValueOrHash: MaybeBind(n.valueDigest, slices.Clone[[]byte]),
 	}
 	for index, entry := range n.children {
 		pn.Children[index] = entry.id

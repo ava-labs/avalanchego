@@ -301,7 +301,7 @@ func (proof *RangeProof) Verify(
 		return err
 	}
 
-	largestPath := BindMaybe(end, newPath)
+	largestPath := MaybeBind(end, newPath)
 	if len(proof.KeyValues) > 0 {
 		// If [proof] has key-value pairs, we should insert children
 		// greater than [largestKey] to ancestors of the node containing

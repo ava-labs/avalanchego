@@ -578,7 +578,7 @@ func (db *merkleDB) GetChangeProof(
 		result.KeyChanges = append(result.KeyChanges, KeyChange{
 			Key: serializedKey,
 			// create a copy so edits of the []byte don't affect the db
-			Value: BindMaybe(change.after, slices.Clone[[]byte]),
+			Value: MaybeBind(change.after, slices.Clone[[]byte]),
 		})
 	}
 
@@ -1004,7 +1004,7 @@ func (db *merkleDB) VerifyChangeProof(
 	// Find the greatest key in [proof.KeyChanges]
 	// Note that [proof.EndProof] is a proof for this key.
 	// [largestPath] is also used when we add children of proof nodes to [trie] below.
-	largestPath := BindMaybe(end, newPath)
+	largestPath := MaybeBind(end, newPath)
 	if len(proof.KeyChanges) > 0 {
 		// If [proof] has key-value pairs, we should insert children
 		// greater than [end] to ancestors of the node containing [end]

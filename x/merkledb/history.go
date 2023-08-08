@@ -132,7 +132,7 @@ func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start []byte, 
 	)
 
 	startPath := newPath(start)
-	endPath := BindMaybe(end, newPath)
+	endPath := MaybeBind(end, newPath)
 
 	// For each element in the history in the range between [startRoot]'s
 	// last appearance (exclusive) and [endRoot]'s last appearance (inclusive),
@@ -207,7 +207,7 @@ func (th *trieHistory) getChangesToGetToRoot(rootID ids.ID, start []byte, end Ma
 
 	var (
 		startPath       = newPath(start)
-		endPath         = BindMaybe(end, newPath)
+		endPath         = MaybeBind(end, newPath)
 		combinedChanges = newChangeSummary(defaultPreallocationSize)
 	)
 
