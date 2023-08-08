@@ -31,3 +31,19 @@ func TestMaybeClone(t *testing.T) {
 		require.True(mClone.IsNothing())
 	}
 }
+
+func TestMaybeEquality(t *testing.T) {
+	require := require.New(t)
+	require.True(MaybeEqual(Nothing[int](), Nothing[int](), func(i int, i2 int) bool {
+		return i == i2
+	}))
+	require.False(MaybeEqual(Nothing[int](), Some(1), func(i int, i2 int) bool {
+		return i == i2
+	}))
+	require.False(MaybeEqual(Some(1), Nothing[int](), func(i int, i2 int) bool {
+		return i == i2
+	}))
+	require.True(MaybeEqual(Some(1), Some(1), func(i int, i2 int) bool {
+		return i == i2
+	}))
+}
