@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package merkledb
+package maybe
 
 import (
 	"testing"
@@ -18,7 +18,7 @@ func TestMaybeClone(t *testing.T) {
 		val := []byte{1, 2, 3}
 		originalVal := slices.Clone(val)
 		m := Some(val)
-		mClone := MaybeBind(m, slices.Clone[[]byte])
+		mClone := Bind(m, slices.Clone[[]byte])
 		m.value[0] = 0
 		require.NotEqual(mClone.value, m.value)
 		require.Equal(originalVal, mClone.value)
@@ -27,23 +27,23 @@ func TestMaybeClone(t *testing.T) {
 	// Case: Value is nothing
 	{
 		m := Nothing[[]byte]()
-		mClone := MaybeBind(m, slices.Clone[[]byte])
+		mClone := Bind(m, slices.Clone[[]byte])
 		require.True(mClone.IsNothing())
 	}
 }
 
 func TestMaybeEquality(t *testing.T) {
 	require := require.New(t)
-	require.True(MaybeEqual(Nothing[int](), Nothing[int](), func(i int, i2 int) bool {
+	require.True(Equal(Nothing[int](), Nothing[int](), func(i int, i2 int) bool {
 		return i == i2
 	}))
-	require.False(MaybeEqual(Nothing[int](), Some(1), func(i int, i2 int) bool {
+	require.False(Equal(Nothing[int](), Some(1), func(i int, i2 int) bool {
 		return i == i2
 	}))
-	require.False(MaybeEqual(Some(1), Nothing[int](), func(i int, i2 int) bool {
+	require.False(Equal(Some(1), Nothing[int](), func(i int, i2 int) bool {
 		return i == i2
 	}))
-	require.True(MaybeEqual(Some(1), Some(1), func(i int, i2 int) bool {
+	require.True(Equal(Some(1), Some(1), func(i int, i2 int) bool {
 		return i == i2
 	}))
 }

@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/x/merkledb"
@@ -231,7 +232,7 @@ func TestGetRangeProof(t *testing.T) {
 				start := response.KeyValues[1].Key
 				rootID, err := largeTrieDB.GetMerkleRoot(context.Background())
 				require.NoError(t, err)
-				proof, err := largeTrieDB.GetRangeProofAtRoot(context.Background(), rootID, start, merkledb.Nothing[[]byte](), defaultRequestKeyLimit)
+				proof, err := largeTrieDB.GetRangeProofAtRoot(context.Background(), rootID, start, maybe.Nothing[[]byte](), defaultRequestKeyLimit)
 				require.NoError(t, err)
 				response.KeyValues = proof.KeyValues
 				response.StartProof = proof.StartProof

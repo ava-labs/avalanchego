@@ -10,6 +10,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 	"github.com/ava-labs/avalanchego/x/sync"
 
@@ -39,7 +40,7 @@ func (c *DBClient) GetChangeProof(
 	startRootID ids.ID,
 	endRootID ids.ID,
 	startKey []byte,
-	endKey merkledb.Maybe[[]byte],
+	endKey maybe.Maybe[[]byte],
 	keyLimit int,
 ) (*merkledb.ChangeProof, error) {
 	resp, err := c.client.GetChangeProof(ctx, &pb.GetChangeProofRequest{
@@ -63,7 +64,7 @@ func (c *DBClient) VerifyChangeProof(
 	ctx context.Context,
 	proof *merkledb.ChangeProof,
 	startKey []byte,
-	endKey merkledb.Maybe[[]byte],
+	endKey maybe.Maybe[[]byte],
 	expectedRootID ids.ID,
 ) error {
 	resp, err := c.client.VerifyChangeProof(ctx, &pb.VerifyChangeProofRequest{
@@ -109,7 +110,7 @@ func (c *DBClient) GetRangeProofAtRoot(
 	ctx context.Context,
 	rootID ids.ID,
 	startKey []byte,
-	endKey merkledb.Maybe[[]byte],
+	endKey maybe.Maybe[[]byte],
 	keyLimit int,
 ) (*merkledb.RangeProof, error) {
 	resp, err := c.client.GetRangeProof(ctx, &pb.GetRangeProofRequest{

@@ -14,6 +14,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
@@ -50,12 +51,12 @@ const (
 // If we have no local root for this range, [localRootID] is ids.Empty.
 type workItem struct {
 	start       []byte
-	end         merkledb.Maybe[[]byte]
+	end         maybe.Maybe[[]byte]
 	priority    priority
 	localRootID ids.ID
 }
 
-func newWorkItem(localRootID ids.ID, start []byte, end merkledb.Maybe[[]byte], priority priority) *workItem {
+func newWorkItem(localRootID ids.ID, start []byte, end maybe.Maybe[[]byte], priority priority) *workItem {
 	return &workItem{
 		localRootID: localRootID,
 		start:       start,
@@ -145,7 +146,7 @@ func (m *Manager) Start(ctx context.Context) error {
 
 	// Add work item to fetch the entire key range.
 	// Note that this will be the first work item to be processed.
-	m.unprocessedWork.Insert(newWorkItem(ids.Empty, nil, merkledb.Nothing[[]byte](), lowPriority))
+	m.unprocessedWork.Insert(newWorkItem(ids.Empty, nil, maybe.Nothing[[]byte](), lowPriority))
 
 	m.syncing = true
 	ctx, m.cancelCtx = context.WithCancel(ctx)
@@ -296,7 +297,7 @@ func (m *Manager) getAndApplyChangeProof(ctx context.Context, work *workItem) {
 			m.setError(err)
 			return
 		}
-		largestHandledKey = merkledb.Some(changeProof.KeyChanges[len(changeProof.KeyChanges)-1].Key)
+		largestHandledKey = maybe.Some(changeProof.KeyChanges[len(changeProof.KeyChanges)-1].Key)
 	}
 
 	m.completeWorkItem(ctx, work, largestHandledKey, targetRootID, changeProof.EndProof)
@@ -338,7 +339,7 @@ func (m *Manager) getAndApplyRangeProof(ctx context.Context, work *workItem) {
 			return
 		}
 
-		largestHandledKey = merkledb.Some(proof.KeyValues[len(proof.KeyValues)-1].Key)
+		largestHandledKey = maybe.Some(proof.KeyValues[len(proof.KeyValues)-1].Key)
 	}
 
 	m.completeWorkItem(ctx, work, largestHandledKey, targetRootID, proof.EndProof)
@@ -590,9 +591,9 @@ func (m *Manager) setError(err error) {
 
 // Mark the range [start, end] as synced up to [rootID].
 // Assumes [m.workLock] is not held.
-func (m *Manager) completeWorkItem(ctx context.Context, work *workItem, largestHandledKey merkledb.Maybe[[]byte], rootID ids.ID, proofOfLargestKey []merkledb.ProofNode) {
+func (m *Manager) completeWorkItem(ctx context.Context, work *workItem, largestHandledKey maybe.Maybe[[]byte], rootID ids.ID, proofOfLargestKey []merkledb.ProofNode) {
 	// if the last key is equal to the end, then the full range is completed
-	if !merkledb.MaybeEqual(largestHandledKey, work.end, bytes.Equal) {
+	if !maybe.Equal(largestHandledKey, work.end, bytes.Equal) {
 		// find the next key to start querying by comparing the proofs for the last completed key
 		nextStartKey, err := m.findNextKey(ctx, largestHandledKey.Value(), work.end.Value(), proofOfLargestKey)
 		if err != nil {
@@ -606,7 +607,7 @@ func (m *Manager) completeWorkItem(ctx context.Context, work *workItem, largestH
 		} else {
 			// the full range wasn't completed, so enqueue a new work item for the range [nextStartKey, workItem.end]
 			m.enqueueWork(newWorkItem(work.localRootID, nextStartKey, work.end, work.priority))
-			largestHandledKey = merkledb.Some(nextStartKey)
+			largestHandledKey = maybe.Some(nextStartKey)
 		}
 	}
 
@@ -668,7 +669,7 @@ func (m *Manager) enqueueWork(work *workItem) {
 
 	// first item gets higher priority than the second to encourage finished ranges to grow
 	// rather than start a new range that is not contiguous with existing completed ranges
-	first := newWorkItem(work.localRootID, work.start, merkledb.Some(mid), medPriority)
+	first := newWorkItem(work.localRootID, work.start, maybe.Some(mid), medPriority)
 	second := newWorkItem(work.localRootID, mid, work.end, lowPriority)
 
 	m.unprocessedWork.Insert(first)
@@ -679,7 +680,7 @@ func (m *Manager) enqueueWork(work *workItem) {
 // start is expected to be less than end
 // nil on start or end is treated as all 0's
 // nothing on end is treated as all 255's
-func midPoint(start []byte, end merkledb.Maybe[[]byte]) []byte {
+func midPoint(start []byte, end maybe.Maybe[[]byte]) []byte {
 	length := len(start)
 	if len(end.Value()) > length {
 		length = len(end.Value())

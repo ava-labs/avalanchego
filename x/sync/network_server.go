@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 
@@ -131,11 +132,11 @@ func (s *NetworkServer) AppRequest(
 	return nil
 }
 
-func maybeBytesToMaybe(mb *pb.MaybeBytes) merkledb.Maybe[[]byte] {
+func maybeBytesToMaybe(mb *pb.MaybeBytes) maybe.Maybe[[]byte] {
 	if mb != nil && !mb.IsNothing {
-		return merkledb.Some(mb.Value)
+		return maybe.Some(mb.Value)
 	}
-	return merkledb.Nothing[[]byte]()
+	return maybe.Nothing[[]byte]()
 }
 
 // Generates a change proof and sends it to [nodeID].

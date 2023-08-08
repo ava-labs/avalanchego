@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
@@ -117,46 +118,46 @@ func Test_Completion(t *testing.T) {
 func Test_Midpoint(t *testing.T) {
 	require := require.New(t)
 
-	mid := midPoint(nil, merkledb.Some[[]byte](nil))
+	mid := midPoint(nil, maybe.Some[[]byte](nil))
 	require.Nil(mid)
 
-	mid = midPoint([]byte{1, 255}, merkledb.Some([]byte{2, 1}))
+	mid = midPoint([]byte{1, 255}, maybe.Some([]byte{2, 1}))
 	require.Equal([]byte{2, 0}, mid)
 
-	mid = midPoint([]byte{1, 255}, merkledb.Some([]byte{2, 1}))
+	mid = midPoint([]byte{1, 255}, maybe.Some([]byte{2, 1}))
 	require.Equal([]byte{2, 0}, mid)
 
-	mid = midPoint(nil, merkledb.Some([]byte{255, 255, 0}))
+	mid = midPoint(nil, maybe.Some([]byte{255, 255, 0}))
 	require.Equal([]byte{127, 255, 128}, mid)
 
-	mid = midPoint([]byte{255, 255}, merkledb.Some([]byte{255, 255, 255}))
+	mid = midPoint([]byte{255, 255}, maybe.Some([]byte{255, 255, 255}))
 	require.Equal([]byte{255, 255, 127, 128}, mid)
 
-	mid = midPoint(nil, merkledb.Some([]byte{255}))
+	mid = midPoint(nil, maybe.Some([]byte{255}))
 	require.Equal([]byte{127, 127}, mid)
 
-	mid = midPoint([]byte{1, 255}, merkledb.Some([]byte{255, 1}))
+	mid = midPoint([]byte{1, 255}, maybe.Some([]byte{255, 1}))
 	require.Equal([]byte{128, 128}, mid)
 
-	mid = midPoint([]byte{140, 255}, merkledb.Some([]byte{141, 0}))
+	mid = midPoint([]byte{140, 255}, maybe.Some([]byte{141, 0}))
 	require.Equal([]byte{140, 255, 127}, mid)
 
-	mid = midPoint([]byte{126, 255}, merkledb.Some([]byte{127}))
+	mid = midPoint([]byte{126, 255}, maybe.Some([]byte{127}))
 	require.Equal([]byte{126, 255, 127}, mid)
 
-	mid = midPoint(nil, merkledb.Nothing[[]byte]())
+	mid = midPoint(nil, maybe.Nothing[[]byte]())
 	require.Equal([]byte{127}, mid)
 
-	low := midPoint(nil, merkledb.Some(mid))
+	low := midPoint(nil, maybe.Some(mid))
 	require.Equal([]byte{63, 127}, low)
 
-	high := midPoint(mid, merkledb.Nothing[[]byte]())
+	high := midPoint(mid, maybe.Nothing[[]byte]())
 	require.Equal([]byte{191}, high)
 
-	mid = midPoint([]byte{255, 255}, merkledb.Nothing[[]byte]())
+	mid = midPoint([]byte{255, 255}, maybe.Nothing[[]byte]())
 	require.Equal([]byte{255, 255, 127, 127}, mid)
 
-	mid = midPoint([]byte{255}, merkledb.Nothing[[]byte]())
+	mid = midPoint([]byte{255}, maybe.Nothing[[]byte]())
 	require.Equal([]byte{255, 127, 127}, mid)
 
 	for i := 0; i < 5000; i++ {
@@ -179,7 +180,7 @@ func Test_Midpoint(t *testing.T) {
 			start, end = end, start
 		}
 
-		mid = midPoint(start, merkledb.Some(end))
+		mid = midPoint(start, maybe.Some(end))
 		require.Equal(-1, bytes.Compare(start, mid))
 		require.Equal(-1, bytes.Compare(mid, end))
 	}
@@ -216,7 +217,7 @@ func Test_Sync_FindNextKey_InSync(t *testing.T) {
 		require.NoError(syncer.Start(context.Background()))
 		require.NoError(syncer.Wait(context.Background()))
 
-		proof, err := dbToSync.GetRangeProof(context.Background(), nil, merkledb.Nothing[[]byte](), 500)
+		proof, err := dbToSync.GetRangeProof(context.Background(), nil, maybe.Nothing[[]byte](), 500)
 		require.NoError(err)
 
 		// the two dbs should be in sync, so next key should be nil
@@ -226,7 +227,7 @@ func Test_Sync_FindNextKey_InSync(t *testing.T) {
 		require.Nil(nextKey)
 
 		// add an extra value to sync db past the last key returned
-		newKey := midPoint(lastKey, merkledb.Nothing[[]byte]())
+		newKey := midPoint(lastKey, maybe.Nothing[[]byte]())
 		require.NoError(db.Put(newKey, []byte{1}))
 
 		// create a range endpoint that is before the newly added key, but after the last key
@@ -401,12 +402,12 @@ func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 		require.NoError(syncer.Start(context.Background()))
 		require.NoError(syncer.Wait(context.Background()))
 
-		proof, err := dbToSync.GetRangeProof(context.Background(), nil, merkledb.Nothing[[]byte](), 500)
+		proof, err := dbToSync.GetRangeProof(context.Background(), nil, maybe.Nothing[[]byte](), 500)
 		require.NoError(err)
 
 		// add an extra value to local db
 		lastKey := proof.KeyValues[len(proof.KeyValues)-1].Key
-		midpoint := midPoint(lastKey, merkledb.Nothing[[]byte]())
+		midpoint := midPoint(lastKey, maybe.Nothing[[]byte]())
 
 		require.NoError(db.Put(midpoint, []byte{1}))
 
@@ -421,7 +422,7 @@ func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 
 		require.NoError(dbToSync.Put(midpoint, []byte{1}))
 
-		proof, err = dbToSync.GetRangeProof(context.Background(), nil, merkledb.Some(lastKey), 500)
+		proof, err = dbToSync.GetRangeProof(context.Background(), nil, maybe.Some(lastKey), 500)
 		require.NoError(err)
 
 		// next key at prefix of newly added point
@@ -520,7 +521,7 @@ func Test_Sync_FindNextKey_DifferentChild(t *testing.T) {
 		require.NoError(syncer.Start(context.Background()))
 		require.NoError(syncer.Wait(context.Background()))
 
-		proof, err := dbToSync.GetRangeProof(context.Background(), nil, merkledb.Nothing[[]byte](), 100)
+		proof, err := dbToSync.GetRangeProof(context.Background(), nil, maybe.Nothing[[]byte](), 100)
 		require.NoError(err)
 		lastKey := proof.KeyValues[len(proof.KeyValues)-1].Key
 
@@ -530,7 +531,7 @@ func Test_Sync_FindNextKey_DifferentChild(t *testing.T) {
 
 		require.NoError(dbToSync.Put(lastKey, []byte{2}))
 
-		proof, err = dbToSync.GetRangeProof(context.Background(), nil, merkledb.Some(proof.KeyValues[len(proof.KeyValues)-1].Key), 100)
+		proof, err = dbToSync.GetRangeProof(context.Background(), nil, maybe.Some(proof.KeyValues[len(proof.KeyValues)-1].Key), 100)
 		require.NoError(err)
 
 		nextKey, err := syncer.findNextKey(context.Background(), proof.KeyValues[len(proof.KeyValues)-1].Key, nil, proof.EndProof)
@@ -602,7 +603,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 		remoteProof, err := remoteDB.GetRangeProof(
 			context.Background(),
 			rangeStart,
-			merkledb.Some(rangeEnd),
+			maybe.Some(rangeEnd),
 			rand.Intn(maxProofLen)+1,
 		)
 		require.NoError(err)
@@ -1045,7 +1046,7 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 	// moves the work to [m.unprocessedWork].
 	item := &workItem{
 		start:       []byte{1},
-		end:         merkledb.Some([]byte{2}),
+		end:         maybe.Some([]byte{2}),
 		localRootID: ids.GenerateTestID(),
 	}
 	m.processedWork.Insert(item)

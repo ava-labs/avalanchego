@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/maybe"
 )
 
 const (
@@ -19,13 +20,13 @@ const (
 // the values that go into the node's id
 type hashValues struct {
 	Children map[byte]child
-	Value    Maybe[[]byte]
+	Value    maybe.Maybe[[]byte]
 	Key      SerializedPath
 }
 
 // Representation of a node stored in the database.
 type dbNode struct {
-	value    Maybe[[]byte]
+	value    maybe.Maybe[[]byte]
 	children map[byte]child
 }
 
@@ -40,7 +41,7 @@ type node struct {
 	id          ids.ID
 	key         path
 	nodeBytes   []byte
-	valueDigest Maybe[[]byte]
+	valueDigest maybe.Maybe[[]byte]
 }
 
 // Returns a new node with the given [key] and no value.
@@ -123,17 +124,17 @@ func (n *node) calculateID(metrics merkleMetrics) error {
 }
 
 // Set [n]'s value to [val].
-func (n *node) setValue(val Maybe[[]byte]) {
+func (n *node) setValue(val maybe.Maybe[[]byte]) {
 	n.onNodeChanged()
 	n.value = val
 	n.setValueDigest()
 }
 
 func (n *node) setValueDigest() {
-	if n.value.IsNothing() || len(n.value.value) < HashLength {
+	if n.value.IsNothing() || len(n.value.Value()) < HashLength {
 		n.valueDigest = n.value
 	} else {
-		n.valueDigest = Some(hashing.ComputeHash256(n.value.value))
+		n.valueDigest = maybe.Some(hashing.ComputeHash256(n.value.Value()))
 	}
 }
 
@@ -195,7 +196,7 @@ func (n *node) asProofNode() ProofNode {
 	pn := ProofNode{
 		KeyPath:     n.key.Serialize(),
 		Children:    make(map[byte]ids.ID, len(n.children)),
-		ValueOrHash: MaybeBind(n.valueDigest, slices.Clone[[]byte]),
+		ValueOrHash: maybe.Bind(n.valueDigest, slices.Clone[[]byte]),
 	}
 	for index, entry := range n.children {
 		pn.Children[index] = entry.id
