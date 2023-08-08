@@ -181,6 +181,8 @@ override the default by setting an explicit value for
 `--chain-config-dir` and ensuring the C-Chain config file exists at
 `[chain-config-dir]/C/config.json`.
 
+TODO(marun) Enable configuration of X-Chain and P-Chain.
+
 ### Network env
 
 A shell script that sets the `TESTNETCTL_NETWORK_DIR` env var to the
