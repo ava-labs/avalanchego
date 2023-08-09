@@ -19,6 +19,9 @@ type Cacher[K comparable, V any] interface {
 	// Flush removes all entries from the cache
 	Flush()
 
+	// Returns the number of elements currently in the cache
+	Len() int
+
 	// Returns fraction of cache currently filled (0 --> 1)
 	PortionFilled() float64
 }
