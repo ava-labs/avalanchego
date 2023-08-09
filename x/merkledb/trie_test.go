@@ -10,6 +10,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/utils/maybe"
+
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -118,7 +120,10 @@ func TestTrieViewGetPathTo(t *testing.T) {
 
 	// Insert a key
 	key1 := []byte{0}
-	require.NoError(trie.insert(key1, []byte("value")))
+	trieIntf, err = trie.NewView([]database.BatchOp{{Key: key1, Value: []byte("value")}})
+	require.NoError(err)
+	require.IsType(&trieView{}, trieIntf)
+	trie = trieIntf.(*trieView)
 	require.NoError(trie.calculateNodeIDs(context.Background()))
 
 	path, err = trie.getPathTo(newPath(key1))
@@ -131,7 +136,10 @@ func TestTrieViewGetPathTo(t *testing.T) {
 
 	// Insert another key which is a child of the first
 	key2 := []byte{0, 1}
-	require.NoError(trie.insert(key2, []byte("value")))
+	trieIntf, err = trie.NewView([]database.BatchOp{{Key: key2, Value: []byte("value")}})
+	require.NoError(err)
+	require.IsType(&trieView{}, trieIntf)
+	trie = trieIntf.(*trieView)
 	require.NoError(trie.calculateNodeIDs(context.Background()))
 
 	path, err = trie.getPathTo(newPath(key2))
@@ -143,7 +151,10 @@ func TestTrieViewGetPathTo(t *testing.T) {
 
 	// Insert a key which shares no prefix with the others
 	key3 := []byte{255}
-	require.NoError(trie.insert(key3, []byte("value")))
+	trieIntf, err = trie.NewView([]database.BatchOp{{Key: key3, Value: []byte("value")}})
+	require.NoError(err)
+	require.IsType(&trieView{}, trieIntf)
+	trie = trieIntf.(*trieView)
 	require.NoError(trie.calculateNodeIDs(context.Background()))
 
 	path, err = trie.getPathTo(newPath(key3))
@@ -247,7 +258,9 @@ func Test_Trie_WriteToDB(t *testing.T) {
 	require.ErrorIs(err, database.ErrNotFound)
 	require.Nil(value)
 
-	require.NoError(trie.insert([]byte("key"), []byte("value")))
+	trieIntf, err = trie.NewView([]database.BatchOp{{Key: []byte("key"), Value: []byte("value")}})
+	require.NoError(err)
+	trie = trieIntf.(*trieView)
 
 	value, err = getNodeValue(trie, "key")
 	require.NoError(err)
@@ -321,17 +334,17 @@ func Test_Trie_ExpandOnKeyPath(t *testing.T) {
 	dbTrie, err := getBasicDB()
 	require.NoError(err)
 	require.NotNil(dbTrie)
-	trieIntf, err := dbTrie.NewView(nil)
+	trieIntf, err := dbTrie.NewView([]database.BatchOp{{Key: []byte("key"), Value: []byte("value0")}})
 	require.NoError(err)
 	trie := trieIntf.(*trieView)
-
-	require.NoError(trie.insert([]byte("key"), []byte("value0")))
 
 	value, err := getNodeValue(trie, "key")
 	require.NoError(err)
 	require.Equal([]byte("value0"), value)
 
-	require.NoError(trie.insert([]byte("key1"), []byte("value1")))
+	trieIntf, err = trie.NewView([]database.BatchOp{{Key: []byte("key1"), Value: []byte("value1")}})
+	require.NoError(err)
+	trie = trieIntf.(*trieView)
 
 	value, err = getNodeValue(trie, "key")
 	require.NoError(err)
@@ -341,7 +354,9 @@ func Test_Trie_ExpandOnKeyPath(t *testing.T) {
 	require.NoError(err)
 	require.Equal([]byte("value1"), value)
 
-	require.NoError(trie.insert([]byte("key12"), []byte("value12")))
+	trieIntf, err = trie.NewView([]database.BatchOp{{Key: []byte("key12"), Value: []byte("value12")}})
+	require.NoError(err)
+	trie = trieIntf.(*trieView)
 
 	value, err = getNodeValue(trie, "key")
 	require.NoError(err)
@@ -362,17 +377,17 @@ func Test_Trie_CompressedPaths(t *testing.T) {
 	dbTrie, err := getBasicDB()
 	require.NoError(err)
 	require.NotNil(dbTrie)
-	trieIntf, err := dbTrie.NewView(nil)
+	trieIntf, err := dbTrie.NewView([]database.BatchOp{{Key: []byte("key12"), Value: []byte("value12")}})
 	require.NoError(err)
 	trie := trieIntf.(*trieView)
-
-	require.NoError(trie.insert([]byte("key12"), []byte("value12")))
 
 	value, err := getNodeValue(trie, "key12")
 	require.NoError(err)
 	require.Equal([]byte("value12"), value)
 
-	require.NoError(trie.insert([]byte("key1"), []byte("value1")))
+	trieIntf, err = trie.NewView([]database.BatchOp{{Key: []byte("key1"), Value: []byte("value1")}})
+	require.NoError(err)
+	trie = trieIntf.(*trieView)
 
 	value, err = getNodeValue(trie, "key12")
 	require.NoError(err)
@@ -382,7 +397,9 @@ func Test_Trie_CompressedPaths(t *testing.T) {
 	require.NoError(err)
 	require.Equal([]byte("value1"), value)
 
-	require.NoError(trie.insert([]byte("key"), []byte("value")))
+	trieIntf, err = trie.NewView([]database.BatchOp{{Key: []byte("key"), Value: []byte("value")}})
+	require.NoError(err)
+	trie = trieIntf.(*trieView)
 
 	value, err = getNodeValue(trie, "key12")
 	require.NoError(err)
@@ -431,10 +448,12 @@ func Test_Trie_HashCountOnBranch(t *testing.T) {
 	trie := trieIntf.(*trieView)
 
 	// force a new node to generate with common prefix "key1" and have these two nodes as children
-	require.NoError(trie.insert([]byte("key12"), []byte("value12")))
+	_, err = trie.insert(newPath([]byte("key12")), maybe.Some([]byte("value12")))
+	require.NoError(err)
 	require.NoError(trie.calculateNodeIDs(context.Background()))
 	oldCount := dbTrie.metrics.(*mockMetrics).hashCount
-	require.NoError(trie.insert([]byte("key134"), []byte("value134")))
+	_, err = trie.insert(newPath([]byte("key134")), maybe.Some([]byte("value134")))
+	require.NoError(err)
 	// only hashes the new branch node, the new child node, and root
 	// shouldn't hash the existing node
 	require.NoError(trie.calculateNodeIDs(context.Background()))
@@ -661,34 +680,6 @@ func Test_Trie_ChainDeletion(t *testing.T) {
 	require.Empty(root.children)
 }
 
-func Test_Trie_Invalidate_Children_On_Edits(t *testing.T) {
-	require := require.New(t)
-
-	dbTrie, err := getBasicDB()
-	require.NoError(err)
-	require.NotNil(dbTrie)
-
-	trie, err := dbTrie.NewView(nil)
-	require.NoError(err)
-
-	childTrie1, err := trie.NewView(nil)
-	require.NoError(err)
-	childTrie2, err := trie.NewView(nil)
-	require.NoError(err)
-	childTrie3, err := trie.NewView(nil)
-	require.NoError(err)
-
-	require.False(childTrie1.(*trieView).isInvalid())
-	require.False(childTrie2.(*trieView).isInvalid())
-	require.False(childTrie3.(*trieView).isInvalid())
-
-	require.NoError(trie.(*trieView).insert([]byte{0}, []byte{0}))
-
-	require.True(childTrie1.(*trieView).isInvalid())
-	require.True(childTrie2.(*trieView).isInvalid())
-	require.True(childTrie3.(*trieView).isInvalid())
-}
-
 func Test_Trie_Invalidate_Siblings_On_Commit(t *testing.T) {
 	require := require.New(t)
 
@@ -699,7 +690,7 @@ func Test_Trie_Invalidate_Siblings_On_Commit(t *testing.T) {
 	baseView, err := dbTrie.NewView(nil)
 	require.NoError(err)
 
-	viewToCommit, err := baseView.NewView(nil)
+	viewToCommit, err := baseView.NewView([]database.BatchOp{{Key: []byte{0}, Value: []byte{0}}})
 	require.NoError(err)
 
 	sibling1, err := baseView.NewView(nil)
@@ -710,7 +701,6 @@ func Test_Trie_Invalidate_Siblings_On_Commit(t *testing.T) {
 	require.False(sibling1.(*trieView).isInvalid())
 	require.False(sibling2.(*trieView).isInvalid())
 
-	require.NoError(viewToCommit.(*trieView).insert([]byte{0}, []byte{0}))
 	require.NoError(viewToCommit.CommitToDB(context.Background()))
 
 	require.True(sibling1.(*trieView).isInvalid())
@@ -883,7 +873,8 @@ func TestNewViewOnCommittedView(t *testing.T) {
 	require.Contains(db.childViews, view1)
 	require.Equal(db, view1.parentTrie)
 
-	require.NoError(view1.insert([]byte{1}, []byte{1}))
+	_, err = view1.insert(newPath([]byte{1}), maybe.Some([]byte{1}))
+	require.NoError(err)
 
 	// Commit the view
 	require.NoError(view1.CommitToDB(context.Background()))

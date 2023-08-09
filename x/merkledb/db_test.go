@@ -499,12 +499,13 @@ func TestDatabaseCommitChanges(t *testing.T) {
 	require.NoError(db.Put([]byte{2}, []byte{2}))
 
 	// Make a view and insert/delete a key-value pair.
-	view1Intf, err := db.NewView(nil)
+	view1Intf, err := db.NewView([]database.BatchOp{
+		{Key: []byte{3}, Value: []byte{3}},
+		{Key: []byte{1}, Delete: true},
+	})
 	require.NoError(err)
 	require.IsType(&trieView{}, view1Intf)
 	view1 := view1Intf.(*trieView)
-	require.NoError(view1.insert([]byte{3}, []byte{3}))
-	require.NoError(view1.remove([]byte{1}))
 	view1Root, err := view1.getMerkleRoot(context.Background())
 	require.NoError(err)
 

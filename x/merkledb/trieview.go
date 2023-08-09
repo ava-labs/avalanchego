@@ -160,7 +160,7 @@ func newTrieView(
 				return nil, err
 			}
 		} else {
-			if err := newView.insert(op.Key, op.Value); err != nil {
+			if _, err := newView.insert(newPath(op.Key), maybe.Some(slices.Clone(op.Value))); err != nil {
 				return nil, err
 			}
 		}
@@ -775,39 +775,6 @@ func (t *trieView) getValue(key path, lock bool) ([]byte, error) {
 
 // Assumes [t.lock] is held.
 // Assumes [t.validityTrackingLock] isn't held.
-func (t *trieView) insert(key []byte, value []byte) error {
-	if t.committed {
-		return ErrCommitted
-	}
-	if t.isInvalid() {
-		return ErrInvalid
-	}
-
-	// the trie has been changed, so invalidate all children and remove them from tracking
-	t.invalidateChildren()
-
-	var (
-		path    = newPath(key)
-		valCopy = slices.Clone(value)
-		val     = maybe.Some(valCopy)
-	)
-	if err := t.recordValueChange(path, val); err != nil {
-		return err
-	}
-	if _, err := t.insertIntoTrie(path, val); err != nil {
-		return err
-	}
-
-	// ensure no ancestor changes occurred during execution
-	if t.isInvalid() {
-		return ErrInvalid
-	}
-
-	return nil
-}
-
-// Assumes [t.lock] is held.
-// Assumes [t.validityTrackingLock] isn't held.
 func (t *trieView) remove(key []byte) error {
 	if t.committed {
 		return ErrCommitted
@@ -1016,10 +983,14 @@ func (t *trieView) getEditableNode(key path) (*node, error) {
 
 // Inserts a key/value pair into the trie.
 // Assumes [t.lock] is held.
-func (t *trieView) insertIntoTrie(
+func (t *trieView) insert(
 	key path,
 	value maybe.Maybe[[]byte],
 ) (*node, error) {
+	if err := t.recordValueChange(key, value); err != nil {
+		return nil, err
+	}
+
 	// find the node that most closely matches [key]
 	pathToNode, err := t.getPathTo(key)
 	if err != nil {

@@ -815,7 +815,7 @@ func addPathInfo(
 
 		// load the node associated with the key or create a new one
 		// pass nothing because we are going to overwrite the value digest below
-		n, err := t.insertIntoTrie(keyPath, maybe.Nothing[[]byte]())
+		n, err := t.insert(keyPath, maybe.Nothing[[]byte]())
 		if err != nil {
 			return err
 		}
