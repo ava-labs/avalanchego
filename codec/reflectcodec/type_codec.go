@@ -13,6 +13,7 @@ import (
 	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/codec"
+	safe_math "github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
@@ -28,13 +29,6 @@ var (
 )
 
 var _ codec.Codec = (*genericCodec)(nil)
-
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
 
 type TypeCodec interface {
 	// UnpackPrefix unpacks the prefix of an interface from the given packer.
@@ -382,7 +376,7 @@ func (c *genericCodec) marshal(value reflect.Value, p *wrappers.Packer, maxSlice
 		}
 
 		keyPacker := wrappers.Packer{
-			MaxSize: max(
+			MaxSize: safe_math.Max(
 				p.MaxSize-p.Offset,
 				len(p.Bytes)-p.Offset,
 			),
