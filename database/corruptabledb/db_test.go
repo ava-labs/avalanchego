@@ -118,7 +118,8 @@ func TestIterator(t *testing.T) {
 			expectedErr:       errTest,
 			modifyIter:        func(ctrl *gomock.Controller, iter *iterator) {},
 			op: func(require *require.Assertions, iter *iterator) {
-				require.ErrorIs(iter.Error(), errTest)
+				err := iter.Error()
+				require.ErrorIs(err, errTest)
 			},
 		},
 		{
@@ -131,7 +132,8 @@ func TestIterator(t *testing.T) {
 				iter.innerIter = mockInnerIter
 			},
 			op: func(require *require.Assertions, iter *iterator) {
-				require.ErrorIs(iter.Error(), errIter)
+				err := iter.Error()
+				require.ErrorIs(err, errIter)
 			},
 		},
 		{
@@ -232,7 +234,8 @@ func TestIterator(t *testing.T) {
 			// Do an iterator operation
 			tt.op(require, iter)
 
-			require.ErrorIs(corruptableDB.corrupted(), tt.expectedErr)
+			err := corruptableDB.corrupted()
+			require.ErrorIs(err, tt.expectedErr)
 		})
 	}
 }
