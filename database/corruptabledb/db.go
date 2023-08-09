@@ -127,3 +127,69 @@ func (b *batch) Write() error {
 	}
 	return b.db.handleError(b.Batch.Write())
 }
+
+func (db *Database) NewIterator() database.Iterator {
+	return &iterator{
+		db:        db,
+		innerIter: db.Database.NewIterator(),
+	}
+}
+
+func (db *Database) NewIteratorWithStart(start []byte) database.Iterator {
+	return &iterator{
+		db:        db,
+		innerIter: db.Database.NewIteratorWithStart(start),
+	}
+}
+
+func (db *Database) NewIteratorWithPrefix(prefix []byte) database.Iterator {
+	return &iterator{
+		db:        db,
+		innerIter: db.Database.NewIteratorWithPrefix(prefix),
+	}
+}
+
+func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database.Iterator {
+	return &iterator{
+		db:        db,
+		innerIter: db.Database.NewIteratorWithStartAndPrefix(start, prefix),
+	}
+}
+
+type iterator struct {
+	db        *Database
+	innerIter database.Iterator
+}
+
+func (it *iterator) Next() bool {
+	if err := it.db.corrupted(); err != nil {
+		return false
+	}
+	val := it.innerIter.Next()
+	_ = it.db.handleError(it.innerIter.Error())
+	return val
+}
+
+func (it *iterator) Error() error {
+	if err := it.db.corrupted(); err != nil {
+		return err
+	}
+	return it.db.handleError(it.innerIter.Error())
+}
+
+func (it *iterator) Key() []byte {
+	key := it.innerIter.Key()
+	_ = it.db.handleError(it.innerIter.Error())
+	return key
+}
+
+func (it *iterator) Value() []byte {
+	val := it.innerIter.Value()
+	_ = it.db.handleError(it.innerIter.Error())
+	return val
+}
+
+func (it *iterator) Release() {
+	it.innerIter.Release()
+	_ = it.db.handleError(it.innerIter.Error())
+}
