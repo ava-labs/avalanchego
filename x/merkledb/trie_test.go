@@ -296,6 +296,30 @@ func Test_Trie_InsertAndRetrieve(t *testing.T) {
 	require.Equal([]byte("value"), value)
 }
 
+func Test_Trie_Overwrite(t *testing.T) {
+	require := require.New(t)
+
+	dbTrie, err := getBasicDB()
+	require.NoError(err)
+	require.NotNil(dbTrie)
+	trie, err := dbTrie.NewView([]database.BatchOp{
+		{Key: []byte("key"), Value: []byte("value0")},
+		{Key: []byte("key"), Value: []byte("value1")},
+	})
+	require.NoError(err)
+	value, err := getNodeValue(trie, "key")
+	require.NoError(err)
+	require.Equal([]byte("value1"), value)
+
+	trie, err = dbTrie.NewView([]database.BatchOp{
+		{Key: []byte("key"), Value: []byte("value2")},
+	})
+	require.NoError(err)
+	value, err = getNodeValue(trie, "key")
+	require.NoError(err)
+	require.Equal([]byte("value2"), value)
+}
+
 func Test_Trie_Delete(t *testing.T) {
 	require := require.New(t)
 
