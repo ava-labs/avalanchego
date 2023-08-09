@@ -140,7 +140,6 @@ func TestNetworkAppGossip(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 
 			parser, err := txs.NewParser([]fxs.Fx{
 				&secp256k1fx.Fx{},
@@ -280,7 +279,6 @@ func TestNetworkIssueTx(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 
 			parser, err := txs.NewParser([]fxs.Fx{
 				&secp256k1fx.Fx{},
@@ -307,7 +305,6 @@ func TestNetworkIssueTx(t *testing.T) {
 func TestNetworkGossipTx(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	parser, err := txs.NewParser([]fxs.Fx{
 		&secp256k1fx.Fx{},

@@ -704,8 +704,7 @@ func (t *Transitive) pullQuery(ctx context.Context, blkID ids.ID) {
 	t.RequestID++
 	if t.polls.Add(t.RequestID, vdrBag) {
 		vdrList := vdrBag.List()
-		vdrSet := set.NewSet[ids.NodeID](len(vdrList))
-		vdrSet.Add(vdrList...)
+		vdrSet := set.Of(vdrList...)
 		t.Sender.SendPullQuery(ctx, vdrSet, t.RequestID, blkID)
 	}
 }
@@ -735,8 +734,7 @@ func (t *Transitive) sendQuery(ctx context.Context, blk snowman.Block, push bool
 	t.RequestID++
 	if t.polls.Add(t.RequestID, vdrBag) {
 		vdrs := vdrBag.List()
-		sendTo := set.NewSet[ids.NodeID](len(vdrs))
-		sendTo.Add(vdrs...)
+		sendTo := set.Of(vdrs...)
 
 		if push {
 			t.Sender.SendPushQuery(ctx, sendTo, t.RequestID, blk.Bytes())
