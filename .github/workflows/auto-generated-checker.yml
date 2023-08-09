@@ -15,6 +15,10 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: bufbuild/buf-setup-action@v1.23.1
+      - name: Installing protoc-gen-go
+        run: |
+          go install github.com/golang/protobuf/protoc-gen-go@v1.30.0
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.3.0
       - shell: bash
         run: scripts/protobuf_codegen.sh
       - shell: bash
