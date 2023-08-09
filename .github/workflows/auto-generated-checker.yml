@@ -1,0 +1,38 @@
+name: Auto-Generated Code Checker
+on:
+  push:
+    tags:
+      - "*"
+    branches:
+      - master
+      - dev
+  pull_request:
+
+jobs:
+  protobuf_codegen:
+    name: Protobuf
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Generate Protobuf Files
+        shell: bash
+        run: scripts/protobuf_codegen.sh
+      - name: Check for uncommitted changes
+        shell: bash
+        run: scripts/check-clean-branch.sh
+  mock_gen:
+    name: Mocks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Generate Mocks
+        shell: bash
+        run: scripts/mock.gen.sh
+      - name: Remove gomock_reflect dirs
+        shell: bash
+        run: rm -rf gomock_reflect*
+      - name: Check for uncommitted changes
+        shell: bash
+        run: scripts/check-clean-branch.sh
