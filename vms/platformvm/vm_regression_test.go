@@ -2218,6 +2218,8 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 
+	// Generating the validator set should not error when re-introducing a
+	// subnet validator whose primary network validator was also removed.
 	_, err = vm.State.GetValidatorSet(context.Background(), subnetStartHeight, subnetID)
 	require.NoError(err)
 }
