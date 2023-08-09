@@ -1325,7 +1325,7 @@ func (m *manager) registerBootstrappedHealthChecks() error {
 		return fmt.Errorf("couldn't register bootstrapped health check: %w", err)
 	}
 
-	// We should only report unhealth if the node is partially syncing the
+	// We should only report unhealthy if the node is partially syncing the
 	// primary network and is a validator.
 	if !m.PartialSyncPrimaryNetwork {
 		return nil
