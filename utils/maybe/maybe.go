@@ -1,13 +1,7 @@
 // Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package merkledb
-
-import (
-	"bytes"
-
-	"golang.org/x/exp/slices"
-)
+package maybe
 
 // Maybe T = Some T | Nothing.
 // A data wrapper that allows values to be something [Some T] or nothing [Nothing].
@@ -20,7 +14,7 @@ type Maybe[T any] struct {
 	value    T
 }
 
-// Returns a new Maybe[T] with the value val.
+// Some returns a new Maybe[T] with the value val.
 func Some[T any](val T) Maybe[T] {
 	return Maybe[T]{
 		value:    val,
@@ -28,45 +22,43 @@ func Some[T any](val T) Maybe[T] {
 	}
 }
 
-// Returns a new Maybe[T] with no value.
+// Nothing returns a new Maybe[T] with no value.
 func Nothing[T any]() Maybe[T] {
 	return Maybe[T]{}
 }
 
-// Returns false iff [m] has a value.
+// IsNothing returns false iff [m] has a value.
 func (m Maybe[T]) IsNothing() bool {
 	return !m.hasValue
 }
 
-// Returns true iff [m] has a value.
+// HasValue returns true iff [m] has a value.
 func (m Maybe[T]) HasValue() bool {
 	return m.hasValue
 }
 
-// Returns the value of [m].
+// Value returns the value of [m].
 func (m Maybe[T]) Value() T {
 	return m.value
 }
 
-func Clone(m Maybe[[]byte]) Maybe[[]byte] {
-	if !m.hasValue {
-		return Nothing[[]byte]()
+// Bind returns Nothing iff [m] is Nothing.
+// Otherwise applies [f] to the value of [m] and returns the result as a Some.
+func Bind[T, U any](m Maybe[T], f func(T) U) Maybe[U] {
+	if m.IsNothing() {
+		return Nothing[U]()
 	}
-	return Some(slices.Clone(m.value))
+	return Some(f(m.Value()))
 }
 
-// MaybeBytesEquals returns true iff [a] and [b] are equal.
-func MaybeBytesEquals(a, b Maybe[[]byte]) bool {
-	aNothing := a.IsNothing()
-	bNothing := b.IsNothing()
-
-	if aNothing {
-		return bNothing
+// Equal returns true if both m1 and m2 are nothing or have the same value according to [equalFunc].
+func Equal[T any](m1 Maybe[T], m2 Maybe[T], equalFunc func(T, T) bool) bool {
+	if m1.IsNothing() {
+		return m2.IsNothing()
 	}
 
-	if bNothing {
+	if m2.IsNothing() {
 		return false
 	}
-
-	return bytes.Equal(a.Value(), b.Value())
+	return equalFunc(m1.Value(), m2.Value())
 }
