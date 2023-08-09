@@ -54,6 +54,7 @@ import (
 
 var (
 	_ block.ChainVM              = (*VM)(nil)
+	_ block.HeightIndexedChainVM = (*VM)(nil)
 	_ secp256k1fx.VM             = (*VM)(nil)
 	_ validators.State           = (*VM)(nil)
 	_ validators.SubnetConnector = (*VM)(nil)
@@ -88,6 +89,9 @@ type VM struct {
 
 	txBuilder txbuilder.Builder
 	manager   blockexecutor.Manager
+
+	// TODO: Remove after v1.11.x is activated
+	pruned utils.Atomic[bool]
 }
 
 // Initialize this blockchain.
@@ -222,6 +226,8 @@ func (vm *VM) Initialize(
 				zap.Error(err),
 			)
 		}
+
+		vm.pruned.Set(true)
 	}()
 
 	return nil
@@ -466,4 +472,16 @@ func (vm *VM) Clock() *mockable.Clock {
 
 func (vm *VM) Logger() logging.Logger {
 	return vm.ctx.Log
+}
+
+func (vm *VM) VerifyHeightIndex(_ context.Context) error {
+	if vm.pruned.Get() {
+		return nil
+	}
+
+	return block.ErrIndexIncomplete
+}
+
+func (vm *VM) GetBlockIDAtHeight(_ context.Context, height uint64) (ids.ID, error) {
+	return vm.state.GetBlockIDAtHeight(height)
 }
