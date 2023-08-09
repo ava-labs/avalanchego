@@ -26,7 +26,7 @@ jobs:
       - shell: bash
         run: scripts/protobuf_codegen.sh
       - shell: bash
-        run: scripts/check-clean-branch.sh
+        run: .github/workflows/check-clean-branch.sh
   mock_gen:
     name: Mocks
     runs-on: ubuntu-latest
@@ -42,4 +42,4 @@ jobs:
       - shell: bash
         run: rm -rf gomock_reflect*
       - shell: bash
-        run: scripts/check-clean-branch.sh
+        run: .github/workflows/check-clean-branch.sh
