@@ -14,12 +14,22 @@ pub struct File {
     fd: Fd,
 }
 
+#[derive(PartialEq, Eq)]
+pub enum Options {
+    Truncate,
+    NoTruncate,
+}
+
 impl File {
-    pub fn open_file(rootpath: PathBuf, fname: &str, truncate: bool) -> Result<Fd, std::io::Error> {
+    pub fn open_file(
+        rootpath: PathBuf,
+        fname: &str,
+        options: Options,
+    ) -> Result<Fd, std::io::Error> {
         let mut filepath = rootpath;
         filepath.push(fname);
         Ok(std::fs::File::options()
-            .truncate(truncate)
+            .truncate(options == Options::Truncate)
             .read(true)
             .write(true)
             .mode(0o600)
@@ -45,7 +55,8 @@ impl File {
 
     pub fn new<P: AsRef<Path>>(fid: u64, _flen: u64, rootdir: P) -> Result<Self, std::io::Error> {
         let fname = Self::_get_fname(fid);
-        let fd = match Self::open_file(rootdir.as_ref().to_path_buf(), &fname, false) {
+        let fd = match Self::open_file(rootdir.as_ref().to_path_buf(), &fname, Options::NoTruncate)
+        {
             Ok(fd) => fd,
             Err(e) => match e.kind() {
                 ErrorKind::NotFound => Self::create_file(rootdir.as_ref().to_path_buf(), &fname)?,
@@ -79,22 +90,18 @@ pub fn touch_dir(dirname: &str, rootdir: &Path) -> Result<PathBuf, std::io::Erro
 
 pub fn open_dir<P: AsRef<Path>>(
     path: P,
-    truncate: bool,
+    options: Options,
 ) -> Result<(PathBuf, bool), std::io::Error> {
-    let mut reset_header = truncate;
+    let truncate = options == Options::Truncate;
+
     if truncate {
         let _ = std::fs::remove_dir_all(path.as_ref());
     }
+
     match std::fs::create_dir(path.as_ref()) {
-        Err(e) => {
-            if truncate || e.kind() != ErrorKind::AlreadyExists {
-                return Err(e);
-            }
-        }
-        Ok(_) => {
-            // the DB did not exist
-            reset_header = true
-        }
+        Err(e) if truncate || e.kind() != ErrorKind::AlreadyExists => Err(e),
+        // the DB already exists
+        Err(_) => Ok((path.as_ref().to_path_buf(), false)),
+        Ok(_) => Ok((path.as_ref().to_path_buf(), true)),
     }
-    Ok((PathBuf::from(path.as_ref()), reset_header))
 }

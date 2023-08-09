@@ -640,7 +640,7 @@ mod tests {
 
         // TODO: Run the test in a separate standalone directory for concurrency reasons
         let path = std::path::PathBuf::from(r"/tmp/firewood");
-        let (root_db_path, reset) = crate::file::open_dir(path, true).unwrap();
+        let (root_db_path, reset) = file::open_dir(path, file::Options::Truncate).unwrap();
 
         // file descriptor of the state directory
         let state_path = file::touch_dir("state", &root_db_path).unwrap();
@@ -728,7 +728,7 @@ mod tests {
         // TODO: Run the test in a separate standalone directory for concurrency reasons
         let tmp_dir = TempDir::new("firewood").unwrap();
         let path = get_file_path(tmp_dir.path(), file!(), line!());
-        let (root_db_path, reset) = crate::file::open_dir(path, true).unwrap();
+        let (root_db_path, reset) = file::open_dir(path, file::Options::Truncate).unwrap();
 
         // file descriptor of the state directory
         let state_path = file::touch_dir("state", &root_db_path).unwrap();
@@ -812,7 +812,7 @@ mod tests {
 
         let tmp_dir = TempDir::new("firewood").unwrap();
         let path = get_file_path(tmp_dir.path(), file!(), line!());
-        let (root_db_path, reset) = crate::file::open_dir(path, true).unwrap();
+        let (root_db_path, reset) = file::open_dir(path, file::Options::Truncate).unwrap();
 
         // file descriptor of the state directory
         let state_path = file::touch_dir("state", &root_db_path).unwrap();

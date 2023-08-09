@@ -472,7 +472,14 @@ impl Db<Store, SharedStore> {
         if cfg.truncate {
             let _ = std::fs::remove_dir_all(db_path.as_ref());
         }
-        let (db_path, reset) = file::open_dir(db_path, cfg.truncate)?;
+
+        let open_options = if cfg.truncate {
+            file::Options::Truncate
+        } else {
+            file::Options::NoTruncate
+        };
+
+        let (db_path, reset) = file::open_dir(db_path, open_options)?;
 
         let merkle_path = file::touch_dir("merkle", &db_path)?;
         let merkle_meta_path = file::touch_dir("meta", &merkle_path)?;
