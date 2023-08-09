@@ -2102,7 +2102,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 }
 
 func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
-	// A primary network validator and a subnet validator arre running.
+	// A primary network validator and a subnet validator are running.
 	// Primary network validator terminates its first staking cycle.
 	// Querying the validator set when the subnet validator existed should
 	// succeed.
