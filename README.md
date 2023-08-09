@@ -159,7 +159,7 @@ To install the buf dependencies:
 
 ```sh
 go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.30.0
-go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.2.0
+go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.3.0
 ```
 
 If you have not already, you may need to add `$GOPATH/bin` to your `$PATH`:
