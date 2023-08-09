@@ -473,7 +473,7 @@ func TestBlockVerify(t *testing.T) {
 							parentID: {
 								onAcceptState:  mockParentState,
 								statelessBlock: mockParentBlock,
-								importedInputs: set.Set[ids.ID]{inputID: struct{}{}},
+								importedInputs: set.Of(inputID),
 							},
 						},
 						clk:          &mockable.Clock{},
@@ -561,7 +561,6 @@ func TestBlockVerify(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 
 			b := tt.blockFunc(ctrl)
 			err := b.Verify(context.Background())
@@ -792,7 +791,6 @@ func TestBlockAccept(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 
 			b := tt.blockFunc(ctrl)
 			err := b.Accept(context.Background())
@@ -951,7 +949,6 @@ func TestBlockReject(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 
 			b := tt.blockFunc(ctrl)
 			require.NoError(b.Reject(context.Background()))
@@ -1055,7 +1052,6 @@ func TestBlockStatus(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 
 			b := tt.blockFunc(ctrl)
 			require.Equal(tt.expected, b.Status())

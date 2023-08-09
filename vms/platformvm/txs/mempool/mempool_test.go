@@ -15,7 +15,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -220,13 +219,13 @@ func createTestDecisionTxs(count int) ([]*txs.Tx, error) {
 
 // Proposal txs are sorted by decreasing start time
 func createTestProposalTxs(count int) ([]*txs.Tx, error) {
-	var clk mockable.Clock
+	now := time.Now()
 	proposalTxs := make([]*txs.Tx, 0, count)
 	for i := 0; i < count; i++ {
 		utx := &txs.AddValidatorTx{
 			BaseTx: txs.BaseTx{},
 			Validator: txs.Validator{
-				Start: uint64(clk.Time().Add(time.Duration(count-i) * time.Second).Unix()),
+				Start: uint64(now.Add(time.Duration(count-i) * time.Second).Unix()),
 			},
 			StakeOuts:        nil,
 			RewardsOwner:     &secp256k1fx.OutputOwners{},
