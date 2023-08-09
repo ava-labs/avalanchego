@@ -101,7 +101,7 @@ func (it *viewIterator) Next() bool {
 			// Otherwise go to next loop iteration.
 			if !nextKeyValue.Value.IsNothing() {
 				it.key = nextKeyValue.Key
-				it.value = nextKeyValue.Value.value
+				it.value = nextKeyValue.Value.Value()
 				return true
 			}
 		case len(it.sortedChanges) == 0:
@@ -125,7 +125,7 @@ func (it *viewIterator) Next() bool {
 				// Otherwise go to next loop iteration.
 				if !memValue.IsNothing() {
 					it.key = memKey
-					it.value = slices.Clone(memValue.value)
+					it.value = slices.Clone(memValue.Value())
 					return true
 				}
 			case 1:
@@ -142,7 +142,7 @@ func (it *viewIterator) Next() bool {
 
 				if !memValue.IsNothing() {
 					it.key = memKey
-					it.value = slices.Clone(memValue.value)
+					it.value = slices.Clone(memValue.Value())
 					return true
 				}
 			}

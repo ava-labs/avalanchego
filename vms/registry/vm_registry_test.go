@@ -27,7 +27,6 @@ func TestReload_Success(t *testing.T) {
 	require := require.New(t)
 
 	resources := initVMRegistryTest(t)
-	defer resources.ctrl.Finish()
 
 	factory1 := vms.NewMockFactory(resources.ctrl)
 	factory2 := vms.NewMockFactory(resources.ctrl)
@@ -68,7 +67,6 @@ func TestReload_GetNewVMsFails(t *testing.T) {
 	require := require.New(t)
 
 	resources := initVMRegistryTest(t)
-	defer resources.ctrl.Finish()
 
 	resources.mockVMGetter.EXPECT().Get().Times(1).Return(nil, nil, errTest)
 
@@ -83,7 +81,6 @@ func TestReload_PartialRegisterFailure(t *testing.T) {
 	require := require.New(t)
 
 	resources := initVMRegistryTest(t)
-	defer resources.ctrl.Finish()
 
 	factory1 := vms.NewMockFactory(resources.ctrl)
 	factory2 := vms.NewMockFactory(resources.ctrl)
@@ -126,7 +123,6 @@ func TestReloadWithReadLock_Success(t *testing.T) {
 	require := require.New(t)
 
 	resources := initVMRegistryTest(t)
-	defer resources.ctrl.Finish()
 
 	factory1 := vms.NewMockFactory(resources.ctrl)
 	factory2 := vms.NewMockFactory(resources.ctrl)
@@ -167,7 +163,6 @@ func TestReloadWithReadLock_GetNewVMsFails(t *testing.T) {
 	require := require.New(t)
 
 	resources := initVMRegistryTest(t)
-	defer resources.ctrl.Finish()
 
 	resources.mockVMGetter.EXPECT().Get().Times(1).Return(nil, nil, errTest)
 
@@ -182,7 +177,6 @@ func TestReloadWithReadLock_PartialRegisterFailure(t *testing.T) {
 	require := require.New(t)
 
 	resources := initVMRegistryTest(t)
-	defer resources.ctrl.Finish()
 
 	factory1 := vms.NewMockFactory(resources.ctrl)
 	factory2 := vms.NewMockFactory(resources.ctrl)

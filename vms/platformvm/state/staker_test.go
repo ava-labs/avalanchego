@@ -135,7 +135,6 @@ func TestStakerLess(t *testing.T) {
 func TestNewCurrentStaker(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	txID := ids.GenerateTestID()
 	nodeID := ids.GenerateTestNodeID()
@@ -181,7 +180,6 @@ func TestNewCurrentStaker(t *testing.T) {
 func TestNewPendingStaker(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	txID := ids.GenerateTestID()
 	nodeID := ids.GenerateTestNodeID()

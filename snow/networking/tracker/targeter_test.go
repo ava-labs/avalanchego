@@ -18,7 +18,6 @@ import (
 func TestNewTargeter(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	config := &TargeterConfig{
 		VdrAlloc:           10,
@@ -43,7 +42,6 @@ func TestNewTargeter(t *testing.T) {
 
 func TestTarget(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	vdr := ids.NodeID{1}
 	vdrWeight := uint64(1)

@@ -398,7 +398,6 @@ func TestHandlerSubnetConnector(t *testing.T) {
 	)
 	require.NoError(err)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 	connector := validators.NewMockSubnetConnector(ctrl)
 
 	nodeID := ids.GenerateTestNodeID()
@@ -621,7 +620,7 @@ func TestDynamicEngineTypeDispatch(t *testing.T) {
 			}
 
 			handler.Start(context.Background(), false)
-			handler.Push(context.TODO(), Message{
+			handler.Push(context.Background(), Message{
 				InboundMessage: message.InboundChits(
 					ids.Empty,
 					uint32(0),
