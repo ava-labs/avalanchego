@@ -109,6 +109,7 @@ func (b *blockBuilder) needToBuild() bool {
 func (b *blockBuilder) markBuilding() {
 	// If the engine has not called BuildBlock, no need to send another message.
 	if b.buildSent {
+		log.Debug("previous PendingTxs notification still pending in consensus")
 		return
 	}
 	b.buildBlockTimer.Cancel() // Cancel any future attempt from the timer to send a PendingTxs message
