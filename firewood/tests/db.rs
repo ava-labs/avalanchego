@@ -231,8 +231,15 @@ impl<P: AsRef<Path> + ?Sized> DerefMut for Db<'_, P> {
     }
 }
 
+macro_rules! assert_val {
+    ($rev: ident, $key:literal, $expected_val:literal) => {
+        let actual = $rev.kv_get($key.as_bytes()).unwrap();
+        assert_eq!(actual, $expected_val.as_bytes().to_vec());
+    };
+}
+
 #[test]
-fn db_proposal() {
+fn db_proposal() -> Result<(), DbError> {
     let cfg = DbConfig::builder().wal(WalConfig::builder().max_revisions(10).build());
 
     let db = Db::new("test_db_proposal", &cfg.clone().truncate(true).build())
@@ -246,52 +253,47 @@ fn db_proposal() {
         BatchOp::Delete { key: b"z" },
     ];
 
-    let proposal = Arc::new(db.new_proposal(batch).unwrap());
+    let proposal = Arc::new(db.new_proposal(batch)?);
     let rev = proposal.get_revision();
-    let val = rev.kv_get(b"k");
-    assert_eq!(val.unwrap(), "v".as_bytes().to_vec());
+    assert_val!(rev, "k", "v");
 
     let batch_2 = vec![BatchOp::Put {
         key: b"k2",
         value: "v2".as_bytes().to_vec(),
     }];
-    let proposal_2 = proposal.clone().propose(batch_2).unwrap();
+    let proposal_2 = proposal.clone().propose(batch_2)?;
     let rev = proposal_2.get_revision();
-    let val = rev.kv_get(b"k");
-    assert_eq!(val.unwrap(), "v".as_bytes().to_vec());
-    let val = rev.kv_get(b"k2");
-    assert_eq!(val.unwrap(), "v2".as_bytes().to_vec());
+    assert_val!(rev, "k", "v");
+    assert_val!(rev, "k2", "v2");
 
-    proposal.commit().unwrap();
-    proposal_2.commit().unwrap();
+    proposal.commit()?;
+    proposal_2.commit()?;
 
     std::thread::scope(|scope| {
-        scope.spawn(|| {
+        scope.spawn(|| -> Result<(), DbError> {
             let another_batch = vec![BatchOp::Put {
                 key: b"another_k",
                 value: "another_v".as_bytes().to_vec(),
             }];
-            let another_proposal = proposal.clone().propose(another_batch).unwrap();
+            let another_proposal = proposal.clone().propose(another_batch)?;
             let rev = another_proposal.get_revision();
-            let val = rev.kv_get(b"k");
-            assert_eq!(val.unwrap(), "v".as_bytes().to_vec());
-            let val = rev.kv_get(b"another_k");
-            assert_eq!(val.unwrap(), "another_v".as_bytes().to_vec());
+            assert_val!(rev, "k", "v");
+            assert_val!(rev, "another_k", "another_v");
             // The proposal is invalid and cannot be committed
             assert!(another_proposal.commit().is_err());
+            Ok(())
         });
 
-        scope.spawn(|| {
+        scope.spawn(|| -> Result<(), DbError> {
             let another_batch = vec![BatchOp::Put {
                 key: b"another_k_1",
                 value: "another_v_1".as_bytes().to_vec(),
             }];
-            let another_proposal = proposal.clone().propose(another_batch).unwrap();
+            let another_proposal = proposal.clone().propose(another_batch)?;
             let rev = another_proposal.get_revision();
-            let val = rev.kv_get(b"k");
-            assert_eq!(val.unwrap(), "v".as_bytes().to_vec());
-            let val = rev.kv_get(b"another_k_1");
-            assert_eq!(val.unwrap(), "another_v_1".as_bytes().to_vec());
+            assert_val!(rev, "k", "v");
+            assert_val!(rev, "another_k_1", "another_v_1");
+            Ok(())
         });
     });
 
@@ -301,29 +303,23 @@ fn db_proposal() {
         key: b"k3",
         value: "v3".as_bytes().to_vec(),
     }];
-    let proposal = Arc::new(db.new_proposal(batch).unwrap());
+    let proposal = Arc::new(db.new_proposal(batch)?);
     let rev = proposal.get_revision();
-    let val = rev.kv_get(b"k");
-    assert_eq!(val.unwrap(), "v".as_bytes().to_vec());
-    let val = rev.kv_get(b"k2");
-    assert_eq!(val.unwrap(), "v2".as_bytes().to_vec());
-    let val = rev.kv_get(b"k3");
-    assert_eq!(val.unwrap(), "v3".as_bytes().to_vec());
+    assert_val!(rev, "k", "v");
+    assert_val!(rev, "k2", "v2");
+    assert_val!(rev, "k3", "v3");
 
     let batch_2 = vec![BatchOp::Put {
         key: b"k4",
         value: "v4".as_bytes().to_vec(),
     }];
-    let proposal_2 = proposal.clone().propose(batch_2).unwrap();
+    let proposal_2 = proposal.clone().propose(batch_2)?;
     let rev = proposal_2.get_revision();
-    let val = rev.kv_get(b"k");
-    assert_eq!(val.unwrap(), "v".as_bytes().to_vec());
-    let val = rev.kv_get(b"k2");
-    assert_eq!(val.unwrap(), "v2".as_bytes().to_vec());
-    let val = rev.kv_get(b"k3");
-    assert_eq!(val.unwrap(), "v3".as_bytes().to_vec());
-    let val = rev.kv_get(b"k4");
-    assert_eq!(val.unwrap(), "v4".as_bytes().to_vec());
+    assert_val!(rev, "k", "v");
+    assert_val!(rev, "k2", "v2");
+    assert_val!(rev, "k3", "v3");
+    assert_val!(rev, "k4", "v4");
 
-    proposal_2.commit().unwrap();
+    proposal_2.commit()?;
+    Ok(())
 }
