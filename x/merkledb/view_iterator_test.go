@@ -12,7 +12,10 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+
 	"golang.org/x/exp/maps"
+
+	"github.com/ava-labs/avalanchego/utils/maybe"
 )
 
 func Test_TrieView_Iterator(t *testing.T) {
@@ -177,7 +180,7 @@ func Test_TrieView_Iterator_Random(t *testing.T) {
 		_, _ = rand.Read(value)
 		keyChanges = append(keyChanges, KeyChange{
 			Key:   key,
-			Value: Some(value),
+			Value: maybe.Some(value),
 		})
 	}
 
@@ -185,34 +188,34 @@ func Test_TrieView_Iterator_Random(t *testing.T) {
 	require.NoError(err)
 
 	for i := 0; i < numKeyChanges/4; i++ {
-		require.NoError(db.Put(keyChanges[i].Key, keyChanges[i].Value.value))
+		require.NoError(db.Put(keyChanges[i].Key, keyChanges[i].Value.Value()))
 	}
 
 	view1, err := db.NewView()
 	require.NoError(err)
 
 	for i := numKeyChanges / 4; i < 2*numKeyChanges/4; i++ {
-		require.NoError(view1.Insert(context.Background(), keyChanges[i].Key, keyChanges[i].Value.value))
+		require.NoError(view1.Insert(context.Background(), keyChanges[i].Key, keyChanges[i].Value.Value()))
 	}
 
 	view2, err := view1.NewView()
 	require.NoError(err)
 
 	for i := 2 * numKeyChanges / 4; i < 3*numKeyChanges/4; i++ {
-		require.NoError(view2.Insert(context.Background(), keyChanges[i].Key, keyChanges[i].Value.value))
+		require.NoError(view2.Insert(context.Background(), keyChanges[i].Key, keyChanges[i].Value.Value()))
 	}
 
 	view3, err := view2.NewView()
 	require.NoError(err)
 
 	for i := 3 * numKeyChanges / 4; i < numKeyChanges; i++ {
-		require.NoError(view3.Insert(context.Background(), keyChanges[i].Key, keyChanges[i].Value.value))
+		require.NoError(view3.Insert(context.Background(), keyChanges[i].Key, keyChanges[i].Value.Value()))
 	}
 
 	// Might have introduced duplicates, so only expect the latest value.
 	uniqueKeyChanges := make(map[string][]byte)
 	for _, keyChange := range keyChanges {
-		uniqueKeyChanges[string(keyChange.Key)] = keyChange.Value.value
+		uniqueKeyChanges[string(keyChange.Key)] = keyChange.Value.Value()
 	}
 
 	iter := view3.NewIterator()

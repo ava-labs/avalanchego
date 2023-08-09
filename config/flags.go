@@ -30,6 +30,8 @@ const (
 
 	AvalancheGoDataDirVar    = "AVALANCHEGO_DATA_DIR"
 	defaultUnexpandedDataDir = "$" + AvalancheGoDataDirVar
+
+	ProcessContextFilename = "process.json"
 )
 
 var (
@@ -50,7 +52,7 @@ var (
 	defaultSubnetConfigDir      = filepath.Join(defaultConfigDir, "subnets")
 	defaultPluginDir            = filepath.Join(defaultUnexpandedDataDir, "plugins")
 	defaultChainDataDir         = filepath.Join(defaultUnexpandedDataDir, "chainData")
-	defaultProcessContextPath   = filepath.Join(defaultUnexpandedDataDir, "process.json")
+	defaultProcessContextPath   = filepath.Join(defaultUnexpandedDataDir, ProcessContextFilename)
 )
 
 func deprecateFlags(fs *pflag.FlagSet) error {

@@ -16,6 +16,7 @@ var DefaultExecutionConfig = ExecutionConfig{
 	RewardUTXOsCacheSize:         2048,
 	ChainCacheSize:               2048,
 	ChainDBCacheSize:             2048,
+	BlockIDCacheSize:             8192,
 	ChecksumsEnabled:             false,
 }
 
@@ -27,6 +28,7 @@ type ExecutionConfig struct {
 	RewardUTXOsCacheSize         int  `json:"reward-utxos-cache-size"`
 	ChainCacheSize               int  `json:"chain-cache-size"`
 	ChainDBCacheSize             int  `json:"chain-db-cache-size"`
+	BlockIDCacheSize             int  `json:"block-id-cache-size"`
 	ChecksumsEnabled             bool `json:"checksums-enabled"`
 }
 

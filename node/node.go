@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net"
 	"os"
 	"path/filepath"
@@ -476,7 +477,7 @@ func (n *Node) Dispatch() error {
 
 	// Remove the process context file to communicate to an orchestrator
 	// that the node is no longer running.
-	if err := os.Remove(n.Config.ProcessContextFilePath); err != nil && !os.IsNotExist(err) {
+	if err := os.Remove(n.Config.ProcessContextFilePath); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		n.Log.Error("removal of process context file failed",
 			zap.String("path", n.Config.ProcessContextFilePath),
 			zap.Error(err),

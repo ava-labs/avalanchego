@@ -133,7 +133,7 @@ func (p path) Serialize() SerializedPath {
 		keyIndex++
 	}
 
-	// if there is was a odd number of nibbles, grab the last one
+	// if there is an odd number of nibbles, grab the last one
 	if result.hasOddLength() {
 		result.Value[keyIndex] = p[keyIndex<<1] << 4
 	}
