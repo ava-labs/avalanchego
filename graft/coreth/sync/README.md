@@ -28,7 +28,7 @@ State sync code is structured as follows:
   - `CodeRequestHandler`: handles requests for contract code
   - `BlockRequestHandler`: handles requests for blocks
   - _Note: There are response size and time limits in place so peers joining the network do not overload peers providing data.  Additionally, the engine tracks the CPU usage of each peer for such messsages and throttles inbound requests accordingly._
-- `sync/client`: Validates reponses from peers and provides support for syncing tries.
+- `sync/client`: Validates responses from peers and provides support for syncing tries.
 - `sync/statesync`: Uses `sync/client` to sync EVM related state: Accounts, storage tries, and contract code.
 - `plugin/evm/atomicSyncer`: Uses `sync/client` to sync the atomic trie.
 - `plugin/evm/`: The engine expects the VM to implement `StateSyncableVM` interface,
