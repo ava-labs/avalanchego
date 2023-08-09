@@ -91,7 +91,7 @@ var (
 	errCreatePlatformVM        = errors.New("attempted to create a chain running the PlatformVM")
 	errNotBootstrapped         = errors.New("subnets not bootstrapped")
 	errNoPrimaryNetworkConfig  = errors.New("no subnet config for primary network found")
-	errNoLiteSyncForValidators = errors.New("lite sync cannot be configured for a validator")
+	errPartialSyncAsAValidator = errors.New("partial sync should not be configured for a validator")
 
 	_ Manager = (*manager)(nil)
 )
@@ -184,9 +184,9 @@ type ManagerConfig struct {
 	Router                      router.Router              // Routes incoming messages to the appropriate chain
 	Net                         network.Network            // Sends consensus messages to other validators
 	Validators                  validators.Manager         // Validators validating on this chain
-	LiteSyncPrimaryNetwork      bool
-	NodeID                      ids.NodeID    // The ID of this node
-	NetworkID                   uint32        // ID of the network this node is connected to
+	NodeID                      ids.NodeID                 // The ID of this node
+	NetworkID                   uint32                     // ID of the network this node is connected to
+	PartialSyncPrimaryNetwork   bool
 	Server                      server.Server // Handles HTTP API calls
 	Keystore                    keystore.Keystore
 	AtomicMemory                *atomic.Memory
@@ -1214,7 +1214,7 @@ func (m *manager) createSnowmanChain(
 		Validators:    vdrs,
 		Params:        consensusParams,
 		Consensus:     consensus,
-		LiteSync:      m.LiteSyncPrimaryNetwork && commonCfg.Ctx.ChainID == constants.PlatformChainID,
+		PartialSync:   m.PartialSyncPrimaryNetwork && commonCfg.Ctx.ChainID == constants.PlatformChainID,
 	}
 	engine, err := smeng.New(engineConfig)
 	if err != nil {
@@ -1325,13 +1325,13 @@ func (m *manager) registerBootstrappedHealthChecks() error {
 		return fmt.Errorf("couldn't register bootstrapped health check: %w", err)
 	}
 
-	// If the node is not lite syncing the Primary Network, there is no reason
-	// to shutdown if it is a validator.
-	if !m.LiteSyncPrimaryNetwork {
+	// We should only report unhealth if the node is partially syncing the
+	// primary network and is a validator.
+	if !m.PartialSyncPrimaryNetwork {
 		return nil
 	}
 
-	liteSyncCheck := health.CheckerFunc(func(ctx context.Context) (interface{}, error) {
+	partialSyncCheck := health.CheckerFunc(func(ctx context.Context) (interface{}, error) {
 		// Note: The health check is skipped during bootstrapping to allow a
 		// node to sync the network even if it was previously a validator.
 		if !m.IsBootstrapped(constants.PlatformChainID) {
@@ -1341,14 +1341,13 @@ func (m *manager) registerBootstrappedHealthChecks() error {
 			return "node is not a primary network validator", nil
 		}
 
-		m.Log.Fatal("node is a primary network validator. Shutting down...",
-			zap.Error(errNoLiteSyncForValidators),
+		m.Log.Warn("node is a primary network validator",
+			zap.Error(errPartialSyncAsAValidator),
 		)
-		go m.ShutdownNodeFunc(1)
-		return "node is a primary network validator", errNoLiteSyncForValidators
+		return "node is a primary network validator", errPartialSyncAsAValidator
 	})
 
-	if err := m.Health.RegisterHealthCheck("validation", liteSyncCheck, health.ApplicationTag); err != nil {
+	if err := m.Health.RegisterHealthCheck("validation", partialSyncCheck, health.ApplicationTag); err != nil {
 		return fmt.Errorf("couldn't register validation health check: %w", err)
 	}
 	return nil

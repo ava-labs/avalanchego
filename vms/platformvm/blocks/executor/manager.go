@@ -55,7 +55,7 @@ func NewManager(
 		},
 		rejector: &rejector{
 			backend:         backend,
-			addTxsToMempool: !txExecutorBackend.Config.LiteSyncPrimaryNetwork,
+			addTxsToMempool: !txExecutorBackend.Config.PartialSyncPrimaryNetwork,
 		},
 	}
 }

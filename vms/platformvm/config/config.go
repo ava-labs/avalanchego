@@ -36,7 +36,7 @@ type Config struct {
 	SybilProtectionEnabled bool
 
 	// If true, only the P-chain will be instantiated on the primary network.
-	LiteSyncPrimaryNetwork bool
+	PartialSyncPrimaryNetwork bool
 
 	// Set of subnets that this node is validating
 	TrackedSubnets set.Set[ids.ID]

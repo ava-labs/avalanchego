@@ -138,7 +138,9 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 		utxoIDs[i] = utxoID[:]
 	}
 
-	if e.Bootstrapped.Get() && !e.Config.LiteSyncPrimaryNetwork {
+	// Skip verification of the shared memory inputs if the other primary
+	// network chains are not guaranteed to be up-to-date.
+	if e.Bootstrapped.Get() && !e.Config.PartialSyncPrimaryNetwork {
 		if err := verify.SameSubnet(context.TODO(), e.Ctx, tx.SourceChain); err != nil {
 			return err
 		}
@@ -297,8 +299,8 @@ func (e *StandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	avax.Consume(e.State, tx.Ins)
 	avax.Produce(e.State, txID, tx.Outs)
 
-	if e.Config.LiteSyncPrimaryNetwork && tx.Validator.NodeID == e.Ctx.NodeID {
-		e.Ctx.Log.Warn("verified transaction that would shutdown this node",
+	if e.Config.PartialSyncPrimaryNetwork && tx.Validator.NodeID == e.Ctx.NodeID {
+		e.Ctx.Log.Warn("verified transaction that would cause this node to become unhealthy",
 			zap.String("reason", "primary network is not being fully synced"),
 			zap.Stringer("txID", txID),
 			zap.String("txType", "addValidator"),
@@ -451,10 +453,10 @@ func (e *StandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionl
 	avax.Consume(e.State, tx.Ins)
 	avax.Produce(e.State, txID, tx.Outs)
 
-	if e.Config.LiteSyncPrimaryNetwork &&
+	if e.Config.PartialSyncPrimaryNetwork &&
 		tx.Subnet == constants.PrimaryNetworkID &&
 		tx.Validator.NodeID == e.Ctx.NodeID {
-		e.Ctx.Log.Warn("verified transaction that would shutdown this node",
+		e.Ctx.Log.Warn("verified transaction that would cause this node to become unhealthy",
 			zap.String("reason", "primary network is not being fully synced"),
 			zap.Stringer("txID", txID),
 			zap.String("txType", "addPermissionlessValidator"),
