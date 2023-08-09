@@ -389,10 +389,8 @@ func TestBootstrapperTxDependencies(t *testing.T) {
 			IDV:     txID1,
 			StatusV: choices.Processing,
 		},
-		DependenciesV: set.Set[ids.ID]{
-			innerTx0.IDV: struct{}{},
-		},
-		BytesV: txBytes1,
+		DependenciesV: set.Of(innerTx0.IDV),
+		BytesV:        txBytes1,
 	}
 
 	tx0 := &testTx{

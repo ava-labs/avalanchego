@@ -10,6 +10,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"go.uber.org/zap"
 
 	"golang.org/x/sync/semaphore"
@@ -95,15 +97,22 @@ func NewNetworkClient(
 	myNodeID ids.NodeID,
 	maxActiveRequests int64,
 	log logging.Logger,
-) NetworkClient {
+	metricsNamespace string,
+	registerer prometheus.Registerer,
+) (NetworkClient, error) {
+	peerTracker, err := newPeerTracker(log, metricsNamespace, registerer)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create peer tracker: %w", err)
+	}
+
 	return &networkClient{
 		appSender:                  appSender,
 		myNodeID:                   myNodeID,
 		outstandingRequestHandlers: make(map[uint32]ResponseHandler),
 		activeRequests:             semaphore.NewWeighted(maxActiveRequests),
-		peers:                      newPeerTracker(log),
+		peers:                      peerTracker,
 		log:                        log,
-	}
+	}, nil
 }
 
 func (c *networkClient) AppResponse(
@@ -240,8 +249,7 @@ func (c *networkClient) request(
 	requestID := c.requestID
 	c.requestID++
 
-	nodeIDs := set.NewSet[ids.NodeID](1)
-	nodeIDs.Add(nodeID)
+	nodeIDs := set.Of(nodeID)
 
 	// Send an app request to the peer.
 	if err := c.appSender.SendAppRequest(ctx, nodeIDs, requestID, request); err != nil {

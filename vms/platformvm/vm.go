@@ -211,7 +211,20 @@ func (vm *VM) Initialize(
 	chainCtx.Log.Info("initializing last accepted",
 		zap.Stringer("blkID", lastAcceptedID),
 	)
-	return vm.SetPreference(ctx, lastAcceptedID)
+	if err := vm.SetPreference(ctx, lastAcceptedID); err != nil {
+		return err
+	}
+
+	go func() {
+		err := vm.state.PruneAndIndex(&vm.ctx.Lock, vm.ctx.Log)
+		if err != nil {
+			vm.ctx.Log.Error("state pruning and height indexing failed",
+				zap.Error(err),
+			)
+		}
+	}()
+
+	return nil
 }
 
 // Create all chains that exist that this node validates.
