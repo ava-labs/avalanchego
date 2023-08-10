@@ -12,7 +12,7 @@ import (
 	reflect "reflect"
 
 	block "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockWithVerifyContext is a mock of WithVerifyContext interface.

@@ -13,7 +13,7 @@ import (
 
 	snow "github.com/ava-labs/avalanchego/snow"
 	common "github.com/ava-labs/avalanchego/snow/engine/common"
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockServer is a mock of Server interface.

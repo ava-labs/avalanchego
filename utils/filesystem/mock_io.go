@@ -11,7 +11,7 @@ import (
 	fs "io/fs"
 	reflect "reflect"
 
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockReader is a mock of Reader interface.
