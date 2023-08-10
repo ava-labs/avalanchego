@@ -87,10 +87,11 @@ var (
 	// Bootstrapping prefixes for ChainVMs
 	bootstrappingDB = []byte("bs")
 
-	errUnknownVMType          = errors.New("the vm should have type avalanche.DAGVM or snowman.ChainVM")
-	errCreatePlatformVM       = errors.New("attempted to create a chain running the PlatformVM")
-	errNotBootstrapped        = errors.New("subnets not bootstrapped")
-	errNoPrimaryNetworkConfig = errors.New("no subnet config for primary network found")
+	errUnknownVMType           = errors.New("the vm should have type avalanche.DAGVM or snowman.ChainVM")
+	errCreatePlatformVM        = errors.New("attempted to create a chain running the PlatformVM")
+	errNotBootstrapped         = errors.New("subnets not bootstrapped")
+	errNoPrimaryNetworkConfig  = errors.New("no subnet config for primary network found")
+	errPartialSyncAsAValidator = errors.New("partial sync should not be configured for a validator")
 
 	_ Manager = (*manager)(nil)
 )
@@ -185,7 +186,8 @@ type ManagerConfig struct {
 	Validators                  validators.Manager         // Validators validating on this chain
 	NodeID                      ids.NodeID                 // The ID of this node
 	NetworkID                   uint32                     // ID of the network this node is connected to
-	Server                      server.Server              // Handles HTTP API calls
+	PartialSyncPrimaryNetwork   bool
+	Server                      server.Server // Handles HTTP API calls
 	Keystore                    keystore.Keystore
 	AtomicMemory                *atomic.Memory
 	AVAXAssetID                 ids.ID
@@ -1212,6 +1214,7 @@ func (m *manager) createSnowmanChain(
 		Validators:    vdrs,
 		Params:        consensusParams,
 		Consensus:     consensus,
+		PartialSync:   m.PartialSyncPrimaryNetwork && commonCfg.Ctx.ChainID == constants.PlatformChainID,
 	}
 	engine, err := smeng.New(engineConfig)
 	if err != nil {
@@ -1320,6 +1323,32 @@ func (m *manager) registerBootstrappedHealthChecks() error {
 	}
 	if err := m.Health.RegisterHealthCheck("bootstrapped", bootstrappedCheck, health.ApplicationTag); err != nil {
 		return fmt.Errorf("couldn't register bootstrapped health check: %w", err)
+	}
+
+	// We should only report unhealthy if the node is partially syncing the
+	// primary network and is a validator.
+	if !m.PartialSyncPrimaryNetwork {
+		return nil
+	}
+
+	partialSyncCheck := health.CheckerFunc(func(ctx context.Context) (interface{}, error) {
+		// Note: The health check is skipped during bootstrapping to allow a
+		// node to sync the network even if it was previously a validator.
+		if !m.IsBootstrapped(constants.PlatformChainID) {
+			return "node is currently bootstrapping", nil
+		}
+		if !validators.Contains(m.Validators, constants.PrimaryNetworkID, m.NodeID) {
+			return "node is not a primary network validator", nil
+		}
+
+		m.Log.Warn("node is a primary network validator",
+			zap.Error(errPartialSyncAsAValidator),
+		)
+		return "node is a primary network validator", errPartialSyncAsAValidator
+	})
+
+	if err := m.Health.RegisterHealthCheck("validation", partialSyncCheck, health.ApplicationTag); err != nil {
+		return fmt.Errorf("couldn't register validation health check: %w", err)
 	}
 	return nil
 }
