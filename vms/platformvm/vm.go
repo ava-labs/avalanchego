@@ -219,6 +219,19 @@ func (vm *VM) Initialize(
 		return err
 	}
 
+	shouldPrune, err := vm.state.ShouldPrune()
+	if err != nil {
+		return fmt.Errorf(
+			"failed to check if the database should be pruned: %w",
+			err,
+		)
+	}
+	if !shouldPrune {
+		chainCtx.Log.Info("state already pruned and indexed")
+		vm.pruned.Set(true)
+		return nil
+	}
+
 	go func() {
 		err := vm.state.PruneAndIndex(&vm.ctx.Lock, vm.ctx.Log)
 		if err != nil {
