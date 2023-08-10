@@ -478,9 +478,9 @@ func New(
 		return nil, err
 	}
 	if shouldPrune {
-		// Note: If the pruned key is on disk, we must delete it to ensure our
-		// disk can't get into a partially pruned state if the node restarts
-		// mid-way through pruning.
+		// If the pruned key is on disk, we must delete it to ensure our disk
+		// can't get into a partially pruned state if the node restarts mid-way
+		// through pruning.
 		if err := s.singletonDB.Delete(prunedKey); err != nil {
 			return nil, fmt.Errorf("failed to remove prunedKey from singletonDB: %w", err)
 		}
