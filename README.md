@@ -117,8 +117,6 @@ propose a batch against any existing proposed revision.
 - [x] Commit a batch that has been proposed will invalidate all other proposals
 that are not children of the committed proposed batch.
 - [ ] Be able to quickly commit a batch that has been proposed.
-- [ ] Add metric reporting
-- [ ] Refactor `Shale` to be more idiomatic
 
 ### Dried milestone
 The focus of this milestone will be to support synchronization to other
@@ -130,6 +128,8 @@ verify the correctness of the data.
 corresponding range proofs that verify the correctness of the data.
 - [ ] Enforce limits on the size of the range proof as well as keys to make
   synchronization easier for clients.
+- [ ] Add metric reporting
+- [ ] Refactor `Shale` to be more idiomatic
 
 ## Build
 Firewood currently is Linux-only, as it has a dependency on the asynchronous
