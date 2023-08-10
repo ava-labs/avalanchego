@@ -390,8 +390,8 @@ func (c *genericCodec) marshal(value reflect.Value, p *wrappers.Packer, maxSlice
 			if err := c.marshal(key, &keyPacker, c.maxSliceLen); err != nil {
 				return err
 			}
-			if p.Err != nil {
-				return fmt.Errorf("couldn't marshal map key %+v: %w ", key, p.Err)
+			if keyPacker.Err != nil {
+				return fmt.Errorf("couldn't marshal map key %+v: %w ", key, keyPacker.Err)
 			}
 			sortedKeys[i] = keyTuple{
 				key:   key,
