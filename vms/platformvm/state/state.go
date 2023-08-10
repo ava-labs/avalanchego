@@ -747,6 +747,33 @@ func (s *state) doneInit() error {
 	return s.singletonDB.Put(initializedKey, nil)
 }
 
+func (s *state) ShouldPrune() (bool, error) {
+	has, err := s.singletonDB.Has(prunedKey)
+	if err != nil {
+		return true, err
+	}
+
+	// If [prunedKey] is not in [singletonDB], [PruneAndIndex()] did not finish
+	// execution.
+	if !has {
+		return true, nil
+	}
+
+	// To ensure the db was not modified since we last ran [PruneAndIndex()], we
+	// must verify that [s.lastAccepted] is height indexed.
+	blk, err := s.GetStatelessBlock(s.lastAccepted)
+	if err != nil {
+		return true, err
+	}
+
+	_, err = s.GetBlockIDAtHeight(blk.Height())
+	if err == database.ErrNotFound {
+		return true, nil
+	}
+
+	return false, err
+}
+
 func (s *state) donePrune() error {
 	return s.singletonDB.Put(prunedKey, nil)
 }
@@ -2321,33 +2348,6 @@ func parseStoredBlock(blkBytes []byte) (blocks.Block, choices.Status, bool, erro
 	}
 
 	return blkState.Blk, blkState.Status, true, nil
-}
-
-func (s *state) ShouldPrune() (bool, error) {
-	has, err := s.singletonDB.Has(prunedKey)
-	if err != nil {
-		return true, err
-	}
-
-	// If [prunedKey] is not in [singletonDB], [PruneAndIndex()] did not finish
-	// execution.
-	if !has {
-		return true, nil
-	}
-
-	// To ensure the db was not modified since we last ran [PruneAndIndex()], we
-	// must verify that [s.lastAccepted] is height indexed.
-	blk, err := s.GetStatelessBlock(s.lastAccepted)
-	if err != nil {
-		return true, err
-	}
-
-	_, err = s.GetBlockIDAtHeight(blk.Height())
-	if err == database.ErrNotFound {
-		return true, nil
-	}
-
-	return false, err
 }
 
 func (s *state) PruneAndIndex(lock sync.Locker, log logging.Logger) error {
