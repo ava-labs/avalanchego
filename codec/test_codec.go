@@ -106,6 +106,7 @@ type myStruct struct {
 	MyMap3       map[MyInnerStruct2][]int32 `serialize:"true"`
 	MyMap4       map[int32]*int32           `serialize:"true"`
 	MyMap5       map[int32]int32            `serialize:"true"`
+	MyMap6       map[[5]int32]int32         `serialize:"true"`
 }
 
 // Test marshaling/unmarshaling a complicated struct
@@ -122,6 +123,10 @@ func TestStruct(codec GeneralCodec, t testing.TB) {
 	one := int32(1)
 	myMap4[0] = &zero
 	myMap4[1] = &one
+
+	myMap6 := make(map[[5]int32]int32)
+	myMap6[[5]int32{0, 1, 2, 3, 4}] = 1
+	myMap6[[5]int32{1, 2, 3, 4, 5}] = 2
 
 	myStructInstance := myStruct{
 		InnerStruct:  MyInnerStruct{"hello"},
@@ -185,6 +190,7 @@ func TestStruct(codec GeneralCodec, t testing.TB) {
 		},
 		MyMap3: myMap3,
 		MyMap4: myMap4,
+		MyMap6: myMap6,
 	}
 
 	manager := NewDefaultManager()
