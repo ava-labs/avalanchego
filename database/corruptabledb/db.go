@@ -178,18 +178,13 @@ func (it *iterator) Error() error {
 }
 
 func (it *iterator) Key() []byte {
-	key := it.innerIter.Key()
-	_ = it.db.handleError(it.innerIter.Error())
-	return key
+	return it.innerIter.Key()
 }
 
 func (it *iterator) Value() []byte {
-	val := it.innerIter.Value()
-	_ = it.db.handleError(it.innerIter.Error())
-	return val
+	return it.innerIter.Value()
 }
 
 func (it *iterator) Release() {
 	it.innerIter.Release()
-	_ = it.db.handleError(it.innerIter.Error())
 }
