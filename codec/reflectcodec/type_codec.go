@@ -15,21 +15,19 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 
-	safe_math "github.com/ava-labs/avalanchego/utils/math"
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-const (
-	// DefaultTagName that enables serialization.
-	DefaultTagName = "serialize"
-)
+// DefaultTagName that enables serialization.
+const DefaultTagName = "serialize"
 
 var (
+	_ codec.Codec = (*genericCodec)(nil)
+
 	errMarshalNil   = errors.New("can't marshal nil pointer or interface")
 	errUnmarshalNil = errors.New("can't unmarshal nil")
 	errNeedPointer  = errors.New("argument to unmarshal must be a pointer")
 )
-
-var _ codec.Codec = (*genericCodec)(nil)
 
 type TypeCodec interface {
 	// UnpackPrefix unpacks the prefix of an interface from the given packer.
@@ -210,23 +208,67 @@ func (c *genericCodec) size(value reflect.Value) (int, bool, error) {
 		return size, constSize, nil
 
 	case reflect.Map:
-		size := wrappers.IntLen
-		constSize := true
-		// add the length of each key and value
-		for _, key := range value.MapKeys() {
-			innerSize, _, err := c.size(key)
-			if err != nil {
-				return 0, false, err
-			}
-			size += innerSize
-			innerSize, innerConstSize, err := c.size(value.MapIndex(key))
-			if err != nil {
-				return 0, false, err
-			}
-			constSize = constSize && innerConstSize
-			size += innerSize
+		iter := value.MapRange()
+		if !iter.Next() {
+			return wrappers.IntLen, false, nil
 		}
-		return size, constSize, nil
+
+		keySize, keyConstSize, err := c.size(iter.Key())
+		if err != nil {
+			return 0, false, err
+		}
+		valueSize, valueConstSize, err := c.size(iter.Value())
+		if err != nil {
+			return 0, false, err
+		}
+
+		switch {
+		case keyConstSize && valueConstSize:
+			numElts := value.Len()
+			return wrappers.IntLen + numElts*(keySize+valueSize), false, nil
+		case keyConstSize:
+			var (
+				numElts        = 1
+				totalValueSize = valueSize
+			)
+			for iter.Next() {
+				valueSize, _, err := c.size(iter.Value())
+				if err != nil {
+					return 0, false, err
+				}
+				totalValueSize += valueSize
+				numElts++
+			}
+			return wrappers.IntLen + numElts*keySize + totalValueSize, false, nil
+		case valueConstSize:
+			var (
+				numElts      = 1
+				totalKeySize = keySize
+			)
+			for iter.Next() {
+				keySize, _, err := c.size(iter.Key())
+				if err != nil {
+					return 0, false, err
+				}
+				totalKeySize += keySize
+				numElts++
+			}
+			return wrappers.IntLen + totalKeySize + numElts*valueSize, false, nil
+		default:
+			totalSize := wrappers.IntLen + keySize + valueSize
+			for iter.Next() {
+				keySize, _, err := c.size(iter.Key())
+				if err != nil {
+					return 0, false, err
+				}
+				valueSize, _, err := c.size(iter.Value())
+				if err != nil {
+					return 0, false, err
+				}
+				totalSize += keySize + valueSize
+			}
+			return totalSize, false, nil
+		}
 
 	default:
 		return 0, false, fmt.Errorf("can't evaluate marshal length of unknown kind %s", valueKind)
@@ -379,7 +421,7 @@ func (c *genericCodec) marshal(value reflect.Value, p *wrappers.Packer, maxSlice
 		}
 
 		keyPacker := wrappers.Packer{
-			MaxSize: safe_math.Max(
+			MaxSize: safemath.Max(
 				p.MaxSize-p.Offset,
 				len(p.Bytes)-p.Offset,
 			),
@@ -389,7 +431,6 @@ func (c *genericCodec) marshal(value reflect.Value, p *wrappers.Packer, maxSlice
 		sortedKeys := make([]keyTuple, len(keys))
 		lastKeyPosition := 0
 		for i, key := range keys {
-			// Note this [p] shadows the outer [p]
 			if err := c.marshal(key, &keyPacker, c.maxSliceLen); err != nil {
 				return err
 			}
@@ -641,13 +682,14 @@ func (c *genericCodec) unmarshal(p *wrappers.Packer, value reflect.Value, maxSli
 				return fmt.Errorf("couldn't unmarshal map key (%s): %w", mapKeyType, err)
 			}
 
-			// Get the key's byte representation and check that the new key
-			// is actually bigger (according to bytes.Compare) than
-			// the previous key.
+			// Get the key's byte representation and check that the new key is
+			// actually bigger (according to bytes.Compare) than the previous
+			// key.
 			//
-			// We do this to enforce that key-value pairs are sorted by increasing key.
+			// We do this to enforce that key-value pairs are sorted by
+			// increasing key.
 			//
-			// See for context: https://github.com/ava-labs/avalanchego/pull/1790#discussion_r1283656558
+			// Ref: https://github.com/ava-labs/avalanchego/pull/1790#discussion_r1283656558
 			keyBytes := p.Bytes[keyStartOffset:p.Offset]
 			if i != 0 && bytes.Compare(keyBytes, prevKey) <= 0 {
 				return fmt.Errorf("keys aren't sorted: (%s, %s)", prevKey, mapKey)
@@ -665,7 +707,6 @@ func (c *genericCodec) unmarshal(p *wrappers.Packer, value reflect.Value, maxSli
 		}
 
 		return nil
-
 	default:
 		return fmt.Errorf("can't unmarshal unknown type %s", value.Kind().String())
 	}
