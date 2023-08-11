@@ -210,6 +210,7 @@ func (c *genericCodec) size(value reflect.Value) (int, bool, error) {
 
 	case reflect.Map:
 		size := wrappers.IntLen
+		constSize := true
 		// add the length of each key and value
 		for _, key := range value.MapKeys() {
 			innerSize, _, err := c.size(key)
@@ -217,13 +218,14 @@ func (c *genericCodec) size(value reflect.Value) (int, bool, error) {
 				return 0, false, err
 			}
 			size += innerSize
-			innerSize, _, err = c.size(value.MapIndex(key))
+			innerSize, innerConstSize, err := c.size(value.MapIndex(key))
 			if err != nil {
 				return 0, false, err
 			}
+			constSize = constSize && innerConstSize
 			size += innerSize
 		}
-		return size, false, nil
+		return size, constSize, nil
 
 	default:
 		return 0, false, fmt.Errorf("can't evaluate marshal length of unknown kind %s", valueKind)
