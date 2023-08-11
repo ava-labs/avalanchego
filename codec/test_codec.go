@@ -220,7 +220,7 @@ func TestStruct(codec GeneralCodec, t testing.TB) {
 
 	// In myStructInstance MyMap4 is nil and in myStructUnmarshaled MyMap4 is an
 	// empty map
-	require.Zero(len(myStructUnmarshaled.MyMap5))
+	require.Empty(myStructUnmarshaled.MyMap5)
 	myStructUnmarshaled.MyMap5 = nil
 
 	require.Zero(version)
