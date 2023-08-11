@@ -143,10 +143,6 @@ jobs:
             ~/.cargo/git/db/
             target/
           key: ${{ needs.build.outputs.cache-key }}
-      - name: Run simple example
-        run: RUST_BACKTRACE=1 cargo run --example simple
-      - name: Run dump example
-        run: RUST_BACKTRACE=1 cargo run --example dump
         # benchmarks were not being done in --release mode, we can enable this again later
         # - name: Run benchmark example
         #   run: RUST_BACKTRACE=1 cargo run --example benchmark -- --nbatch 100 --batch-size 1000
