@@ -53,8 +53,6 @@ test-case = "3.1.0"
 [features]
 # proof API
 proof = []
-# eth API
-eth = []
 
 [[bench]]
 name = "hashops"

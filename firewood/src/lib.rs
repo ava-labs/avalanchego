@@ -194,8 +194,6 @@
 //! No change is required for other historical ghost space instances. Finally, we can phase out
 //! some very old ghost space to keep the size of the rolling window invariant.
 //!
-#[cfg(feature = "eth")]
-pub(crate) mod account;
 pub mod db;
 pub(crate) mod file;
 pub mod merkle;

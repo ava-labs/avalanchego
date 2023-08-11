@@ -3,11 +3,6 @@
 
 use std::io::Write;
 
-#[cfg(feature = "eth")]
-use crate::account::Account;
-#[cfg(feature = "eth")]
-use primitive_types::U256;
-
 use crate::db::{DbError, DbRevConfig};
 use crate::merkle::TrieHash;
 #[cfg(feature = "proof")]
@@ -45,22 +40,4 @@ where
         keys: Vec<K>,
         values: Vec<K>,
     );
-    #[cfg(feature = "eth")]
-    async fn get_balance<K: AsRef<[u8]> + Send + Sync>(&self, key: K) -> Result<U256, DbError>;
-    #[cfg(feature = "eth")]
-    async fn get_code<K: AsRef<[u8]> + Send + Sync>(&self, key: K) -> Result<Vec<u8>, DbError>;
-    #[cfg(feature = "eth")]
-    async fn get_nonce<K: AsRef<[u8]> + Send + Sync>(&self, key: K) -> Result<Nonce, DbError>;
-    #[cfg(feature = "eth")]
-    async fn get_state<K: AsRef<[u8]> + Send + Sync>(
-        &self,
-        key: K,
-        sub_key: K,
-    ) -> Result<Vec<u8>, DbError>;
-    #[cfg(feature = "eth")]
-    async fn dump_account<W: Write + Send + Sync, K: AsRef<[u8]> + Send + Sync>(
-        &self,
-        key: K,
-        writer: W,
-    ) -> Result<(), DbError>;
 }

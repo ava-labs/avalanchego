@@ -1,8 +1,6 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-#[cfg(feature = "eth")]
-use crate::account::{Account, AccountRlp, Blob, BlobStash};
 pub use crate::config::{DbConfig, DbRevConfig};
 pub use crate::storage::{buffer::DiskBufferConfig, WalConfig};
 use crate::storage::{
@@ -18,8 +16,6 @@ use crate::{
 use bytemuck::{cast_slice, AnyBitPattern};
 use metered::{metered, HitCount};
 use parking_lot::{Mutex, RwLock};
-#[cfg(feature = "eth")]
-use primitive_types::U256;
 use shale::compact::CompactSpace;
 use shale::ShaleStore;
 use shale::{
@@ -52,8 +48,6 @@ type SharedStore = CompactSpace<Node, StoreRevShared>;
 pub enum DbError {
     InvalidParams,
     Merkle(MerkleError),
-    #[cfg(feature = "eth")]
-    Blob(crate::account::BlobError),
     System(nix::Error),
     KeyNotFound,
     CreateError,
@@ -67,8 +61,6 @@ impl fmt::Display for DbError {
         match self {
             DbError::InvalidParams => write!(f, "invalid parameters provided"),
             DbError::Merkle(e) => write!(f, "merkle error: {e:?}"),
-            #[cfg(feature = "eth")]
-            DbError::Blob(e) => write!(f, "storage error: {e:?}"),
             DbError::System(e) => write!(f, "system error: {e:?}"),
             DbError::KeyNotFound => write!(f, "not found"),
             DbError::CreateError => write!(f, "database create error"),
@@ -282,24 +274,15 @@ impl<T: MemStoreR + 'static> Universe<Arc<T>> {
 pub struct DbRev<S> {
     header: shale::Obj<DbHeader>,
     merkle: Merkle<S>,
-    #[cfg(feature = "eth")]
-    blob: BlobStash<S>,
 }
 
 impl<S: ShaleStore<Node> + Send + Sync> DbRev<S> {
     fn flush_dirty(&mut self) -> Option<()> {
         self.header.flush_dirty();
         self.merkle.flush_dirty()?;
-        #[cfg(feature = "eth")]
-        self.blob.flush_dirty()?;
         Some(())
     }
 
-    #[cfg(feature = "eth")]
-    fn borrow_split(&mut self) -> (&mut shale::Obj<DbHeader>, &mut Merkle<S>, &mut BlobStash<S>) {
-        (&mut self.header, &mut self.merkle, &mut self.blob)
-    }
-    #[cfg(not(feature = "eth"))]
     fn borrow_split(&mut self) -> (&mut shale::Obj<DbHeader>, &mut Merkle<S>) {
         (&mut self.header, &mut self.merkle)
     }
@@ -352,80 +335,6 @@ impl<S: ShaleStore<Node> + Send + Sync> DbRev<S> {
         Ok(match self.merkle.get(key, self.header.acc_root) {
             Ok(r) => r.is_some(),
             Err(e) => return Err(DbError::Merkle(e)),
-        })
-    }
-}
-
-#[cfg(feature = "eth")]
-impl<S: ShaleStore<Node> + Send + Sync> DbRev<S> {
-    /// Get nonce of the account.
-    pub fn get_nonce<K: AsRef<[u8]>>(&self, key: K) -> Result<u64, DbError> {
-        Ok(self.get_account(key)?.nonce)
-    }
-
-    /// Get the state value indexed by `sub_key` in the account indexed by `key`.
-    pub fn get_state<K: AsRef<[u8]>>(&self, key: K, sub_key: K) -> Result<Vec<u8>, DbError> {
-        let root = self.get_account(key)?.root;
-        if root.is_null() {
-            return Ok(Vec::new());
-        }
-        Ok(match self.merkle.get(sub_key, root) {
-            Ok(Some(v)) => v.to_vec(),
-            Ok(None) => Vec::new(),
-            Err(e) => return Err(DbError::Merkle(e)),
-        })
-    }
-
-    /// Get root hash of the world state of all accounts.
-    pub fn root_hash(&self) -> Result<TrieHash, DbError> {
-        self.merkle
-            .root_hash::<AccountRlp>(self.header.acc_root)
-            .map_err(DbError::Merkle)
-    }
-
-    /// Dump the Trie of the entire account model storage.
-    pub fn dump(&self, w: &mut dyn Write) -> Result<(), DbError> {
-        self.merkle
-            .dump(self.header.acc_root, w)
-            .map_err(DbError::Merkle)
-    }
-
-    fn get_account<K: AsRef<[u8]>>(&self, key: K) -> Result<Account, DbError> {
-        Ok(match self.merkle.get(key, self.header.acc_root) {
-            Ok(Some(bytes)) => Account::deserialize(&bytes),
-            Ok(None) => Account::default(),
-            Err(e) => return Err(DbError::Merkle(e)),
-        })
-    }
-
-    /// Dump the Trie of the state storage under an account.
-    pub fn dump_account<K: AsRef<[u8]>>(&self, key: K, w: &mut dyn Write) -> Result<(), DbError> {
-        let acc = match self.merkle.get(key, self.header.acc_root) {
-            Ok(Some(bytes)) => Account::deserialize(&bytes),
-            Ok(None) => Account::default(),
-            Err(e) => return Err(DbError::Merkle(e)),
-        };
-        writeln!(w, "{acc:?}").unwrap();
-        if !acc.root.is_null() {
-            self.merkle.dump(acc.root, w).map_err(DbError::Merkle)?;
-        }
-        Ok(())
-    }
-
-    /// Get balance of the account.
-    pub fn get_balance<K: AsRef<[u8]>>(&self, key: K) -> Result<U256, DbError> {
-        Ok(self.get_account(key)?.balance)
-    }
-
-    /// Get code of the account.
-    pub fn get_code<K: AsRef<[u8]>>(&self, key: K) -> Result<Vec<u8>, DbError> {
-        let code = self.get_account(key)?.code;
-        if code.is_null() {
-            return Ok(Vec::new());
-        }
-        let b = self.blob.get_blob(code).map_err(DbError::Blob)?;
-        Ok(match &**b {
-            Blob::Code(code) => code.clone(),
         })
     }
 }
@@ -749,29 +658,11 @@ impl Db<SharedStore> {
             shale::compact::CompactHeader::MSIZE,
         )?;
 
-        #[cfg(feature = "eth")]
-        let blob_payload_header_ref = StoredView::ptr_to_obj(
-            &store.blob.meta,
-            blob_payload_header,
-            shale::compact::CompactHeader::MSIZE,
-        )?;
-
         let merkle_space = shale::compact::CompactSpace::new(
             Arc::new(store.merkle.meta.clone()),
             Arc::new(store.merkle.payload.clone()),
             merkle_payload_header_ref,
             shale::ObjCache::new(cfg.merkle_ncached_objs),
-            payload_max_walk,
-            payload_regn_nbit,
-        )
-        .unwrap();
-
-        #[cfg(feature = "eth")]
-        let blob_space = shale::compact::CompactSpace::new(
-            Arc::new(store.blob.meta.clone()),
-            Arc::new(store.blob.payload.clone()),
-            blob_payload_header_ref,
-            shale::ObjCache::new(cfg.blob_ncached_objs),
             payload_max_walk,
             payload_regn_nbit,
         )
@@ -794,8 +685,6 @@ impl Db<SharedStore> {
         Ok(DbRev {
             header: db_header_ref,
             merkle: Merkle::new(Box::new(merkle_space)),
-            #[cfg(feature = "eth")]
-            blob: BlobStash::new(Box::new(blob_space)),
         })
     }
 
@@ -849,17 +738,6 @@ impl Db<SharedStore> {
         )
         .unwrap();
 
-        #[cfg(feature = "eth")]
-        let blob_space = shale::compact::CompactSpace::new(
-            Arc::new(store.blob.meta.clone()),
-            Arc::new(store.blob.payload.clone()),
-            blob_payload_header_ref,
-            shale::ObjCache::new(cfg.blob_ncached_objs),
-            payload_max_walk,
-            payload_regn_nbit,
-        )
-        .unwrap();
-
         if db_header_ref.acc_root.is_null() {
             let mut err = Ok(());
             // create the sentinel node
@@ -877,8 +755,6 @@ impl Db<SharedStore> {
         Ok(DbRev {
             header: db_header_ref,
             merkle: Merkle::new(Box::new(merkle_space)),
-            #[cfg(feature = "eth")]
-            blob: BlobStash::new(Box::new(blob_space)),
         })
     }
 
@@ -904,9 +780,6 @@ impl Db<SharedStore> {
         data.into_iter().try_for_each(|op| -> Result<(), DbError> {
             match op {
                 BatchOp::Put { key, value } => {
-                    #[cfg(feature = "eth")]
-                    let (header, merkle, _) = rev.borrow_split();
-                    #[cfg(not(feature = "eth"))]
                     let (header, merkle) = rev.borrow_split();
                     merkle
                         .insert(key, value, header.kv_root)
@@ -914,9 +787,6 @@ impl Db<SharedStore> {
                     Ok(())
                 }
                 BatchOp::Delete { key } => {
-                    #[cfg(feature = "eth")]
-                    let (header, merkle, _) = rev.borrow_split();
-                    #[cfg(not(feature = "eth"))]
                     let (header, merkle) = rev.borrow_split();
                     merkle
                         .remove(key, header.kv_root)
@@ -1124,9 +994,6 @@ impl Proposal<Store, SharedStore> {
         data.into_iter().try_for_each(|op| -> Result<(), DbError> {
             match op {
                 BatchOp::Put { key, value } => {
-                    #[cfg(feature = "eth")]
-                    let (header, merkle, _) = rev.borrow_split();
-                    #[cfg(not(feature = "eth"))]
                     let (header, merkle) = rev.borrow_split();
                     merkle
                         .insert(key, value, header.kv_root)
@@ -1134,9 +1001,6 @@ impl Proposal<Store, SharedStore> {
                     Ok(())
                 }
                 BatchOp::Delete { key } => {
-                    #[cfg(feature = "eth")]
-                    let (header, merkle, _) = rev.borrow_split();
-                    #[cfg(not(feature = "eth"))]
                     let (header, merkle) = rev.borrow_split();
                     merkle
                         .remove(key, header.kv_root)
@@ -1195,9 +1059,6 @@ impl Proposal<Store, SharedStore> {
                 }
             }
         };
-
-        #[cfg(feature = "eth")]
-        self.rev.root_hash().ok();
 
         let kv_root_hash = self.rev.kv_root_hash().ok();
         let kv_root_hash = kv_root_hash.expect("kv_root_hash should not be none");
