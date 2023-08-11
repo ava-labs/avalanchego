@@ -14,8 +14,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-
-	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 // DefaultTagName that enables serialization.
@@ -416,41 +414,43 @@ func (c *genericCodec) marshal(value reflect.Value, p *wrappers.Packer, maxSlice
 
 		// pack key-value pairs sorted by increasing key
 		type keyTuple struct {
-			key   reflect.Value
-			bytes []byte
-		}
-
-		keyPacker := wrappers.Packer{
-			MaxSize: safemath.Max(
-				p.MaxSize-p.Offset,
-				len(p.Bytes)-p.Offset,
-			),
-			Bytes: make([]byte, 0, 128),
+			key        reflect.Value
+			startIndex int
+			endIndex   int
 		}
 
 		sortedKeys := make([]keyTuple, len(keys))
-		lastKeyPosition := 0
+		startOffset := p.Offset
+		endOffset := p.Offset
 		for i, key := range keys {
-			if err := c.marshal(key, &keyPacker, c.maxSliceLen); err != nil {
+			if err := c.marshal(key, p, c.maxSliceLen); err != nil {
 				return err
 			}
-			if keyPacker.Err != nil {
-				return fmt.Errorf("couldn't marshal map key %+v: %w ", key, keyPacker.Err)
+			if p.Err != nil {
+				return fmt.Errorf("couldn't marshal map key %+v: %w ", key, p.Err)
 			}
 			sortedKeys[i] = keyTuple{
-				key:   key,
-				bytes: keyPacker.Bytes[lastKeyPosition:],
+				key:        key,
+				startIndex: endOffset,
+				endIndex:   p.Offset,
 			}
-			lastKeyPosition = keyPacker.Offset
+			endOffset = p.Offset
 		}
 
 		slices.SortFunc(sortedKeys, func(a, b keyTuple) bool {
-			return bytes.Compare(a.bytes, b.bytes) < 0
+			aBytes := p.Bytes[a.startIndex:a.endIndex]
+			bBytes := p.Bytes[b.startIndex:b.endIndex]
+			return bytes.Compare(aBytes, bBytes) < 0
 		})
 
+		allKeyBytes := slices.Clone(p.Bytes[startOffset:p.Offset])
+		p.Offset = startOffset
 		for _, key := range sortedKeys {
 			// pack key
-			p.PackFixedBytes(key.bytes)
+			startIndex := key.startIndex - startOffset
+			endIndex := key.endIndex - startOffset
+			keyBytes := allKeyBytes[startIndex:endIndex]
+			p.PackFixedBytes(keyBytes)
 			if p.Err != nil {
 				return p.Err
 			}
