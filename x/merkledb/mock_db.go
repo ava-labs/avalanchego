@@ -14,7 +14,7 @@ import (
 	database "github.com/ava-labs/avalanchego/database"
 	ids "github.com/ava-labs/avalanchego/ids"
 	maybe "github.com/ava-labs/avalanchego/utils/maybe"
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockMerkleDB is a mock of MerkleDB interface.

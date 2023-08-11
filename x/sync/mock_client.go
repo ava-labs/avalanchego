@@ -13,7 +13,7 @@ import (
 
 	sync "github.com/ava-labs/avalanchego/proto/pb/sync"
 	merkledb "github.com/ava-labs/avalanchego/x/merkledb"
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockClient is a mock of Client interface.
