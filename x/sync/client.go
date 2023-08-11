@@ -70,14 +70,13 @@ type ClientConfig struct {
 }
 
 func NewClient(config *ClientConfig) Client {
-	c := &client{
+	return &client{
 		networkClient:       config.NetworkClient,
 		stateSyncNodes:      config.StateSyncNodeIDs,
 		stateSyncMinVersion: config.StateSyncMinVersion,
 		log:                 config.Log,
 		metrics:             config.Metrics,
 	}
-	return c
 }
 
 // GetChangeProof synchronously retrieves the change proof given by [req].
@@ -196,6 +195,8 @@ func (c *client) GetRangeProof(ctx context.Context, req *pb.SyncGetRangeProofReq
 // [parseFn] parses the raw response.
 // If the request is unsuccessful or the response can't be parsed,
 // retries the request to a different peer until [ctx] expires.
+// Returns [errAppRequestSendFailed] if we fail to send an AppRequest.
+// This should be treated as a fatal error.
 func getAndParse[T any](
 	ctx context.Context,
 	client *client,
@@ -213,6 +214,11 @@ func getAndParse[T any](
 			if response, err = parseFn(ctx, responseBytes); err == nil {
 				return response, nil
 			}
+		}
+
+		if errors.Is(err, errAppRequestSendFailed) {
+			// Failing to send an AppRequest is a fatal error.
+			return nil, err
 		}
 
 		client.log.Debug("request failed, retrying",
@@ -249,6 +255,8 @@ func getAndParse[T any](
 // until the node receives a response, failure notification
 // or [ctx] is canceled.
 // Returns the peer's NodeID and response.
+// Returns [errAppRequestSendFailed] if we failed to send an AppRequest.
+// This should be treated as fatal.
 // It's safe to call this method multiple times concurrently.
 func (c *client) get(ctx context.Context, request []byte) (ids.NodeID, []byte, error) {
 	var (

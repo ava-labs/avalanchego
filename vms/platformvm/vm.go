@@ -54,6 +54,7 @@ import (
 
 var (
 	_ block.ChainVM              = (*VM)(nil)
+	_ block.HeightIndexedChainVM = (*VM)(nil)
 	_ secp256k1fx.VM             = (*VM)(nil)
 	_ validators.State           = (*VM)(nil)
 	_ validators.SubnetConnector = (*VM)(nil)
@@ -88,6 +89,9 @@ type VM struct {
 
 	txBuilder txbuilder.Builder
 	manager   blockexecutor.Manager
+
+	// TODO: Remove after v1.11.x is activated
+	pruned utils.Atomic[bool]
 }
 
 // Initialize this blockchain.
@@ -211,12 +215,42 @@ func (vm *VM) Initialize(
 	chainCtx.Log.Info("initializing last accepted",
 		zap.Stringer("blkID", lastAcceptedID),
 	)
-	return vm.SetPreference(ctx, lastAcceptedID)
+	if err := vm.SetPreference(ctx, lastAcceptedID); err != nil {
+		return err
+	}
+
+	shouldPrune, err := vm.state.ShouldPrune()
+	if err != nil {
+		return fmt.Errorf(
+			"failed to check if the database should be pruned: %w",
+			err,
+		)
+	}
+	if !shouldPrune {
+		chainCtx.Log.Info("state already pruned and indexed")
+		vm.pruned.Set(true)
+		return nil
+	}
+
+	go func() {
+		err := vm.state.PruneAndIndex(&vm.ctx.Lock, vm.ctx.Log)
+		if err != nil {
+			vm.ctx.Log.Error("state pruning and height indexing failed",
+				zap.Error(err),
+			)
+		}
+
+		vm.pruned.Set(true)
+	}()
+
+	return nil
 }
 
 // Create all chains that exist that this node validates.
 func (vm *VM) initBlockchains() error {
-	if err := vm.createSubnet(constants.PrimaryNetworkID); err != nil {
+	if vm.Config.PartialSyncPrimaryNetwork {
+		vm.ctx.Log.Info("skipping primary network chain creation")
+	} else if err := vm.createSubnet(constants.PrimaryNetworkID); err != nil {
 		return err
 	}
 
@@ -453,4 +487,16 @@ func (vm *VM) Clock() *mockable.Clock {
 
 func (vm *VM) Logger() logging.Logger {
 	return vm.ctx.Log
+}
+
+func (vm *VM) VerifyHeightIndex(_ context.Context) error {
+	if vm.pruned.Get() {
+		return nil
+	}
+
+	return block.ErrIndexIncomplete
+}
+
+func (vm *VM) GetBlockIDAtHeight(_ context.Context, height uint64) (ids.ID, error) {
+	return vm.state.GetBlockIDAtHeight(height)
 }
