@@ -3,7 +3,7 @@
 
 use clap::Parser;
 use criterion::Criterion;
-use firewood::db::{Db, DbConfig, WalConfig};
+use firewood::db::{BatchOp, Db, DbConfig, WalConfig};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
 #[derive(Parser, Debug)]
@@ -50,13 +50,17 @@ fn main() {
                 let db = Db::new("benchmark_db", &cfg.clone().truncate(true).build()).unwrap();
 
                 for batch in workload.iter() {
-                    let mut wb = db.new_writebatch();
+                    let mut wb = Vec::new();
 
                     for (k, v) in batch {
-                        wb = wb.kv_insert(k, v.to_vec()).unwrap();
+                        let write = BatchOp::Put {
+                            key: k,
+                            value: v.to_vec(),
+                        };
+                        wb.push(write);
                     }
-
-                    wb.commit();
+                    let proposal = db.new_proposal(wb).unwrap();
+                    proposal.commit().unwrap();
                 }
             })
         },

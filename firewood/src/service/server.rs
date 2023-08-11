@@ -10,17 +10,7 @@ use tokio::sync::mpsc::Receiver;
 
 use crate::db::{Db, DbConfig, DbError};
 
-use super::{BatchId, BatchRequest, Request, RevId};
-
-macro_rules! get_batch {
-    ($active_batch: expr, $handle: ident, $lastid: ident, $respond_to: expr) => {{
-        if $handle != $lastid.load(Ordering::Relaxed) - 1 || $active_batch.is_none() {
-            let _ = $respond_to.send(Err(DbError::InvalidParams));
-            continue;
-        }
-        $active_batch.take().unwrap()
-    }};
-}
+use super::{Request, RevId};
 
 macro_rules! get_rev {
     ($rev: ident, $handle: ident, $out: expr) => {
@@ -39,7 +29,6 @@ pub struct FirewoodService {}
 impl FirewoodService {
     pub fn new(mut receiver: Receiver<Request>, owned_path: PathBuf, cfg: DbConfig) -> Self {
         let db = Db::new(owned_path, &cfg).unwrap();
-        let mut active_batch = None;
         let mut revs = HashMap::new();
         let lastid = AtomicU32::new(0);
         loop {
@@ -48,11 +37,6 @@ impl FirewoodService {
                 None => break,
             };
             match msg {
-                Request::NewBatch { respond_to } => {
-                    let id: BatchId = lastid.fetch_add(1, Ordering::Relaxed);
-                    active_batch = Some(db.new_writebatch());
-                    let _ = respond_to.send(id);
-                }
                 Request::NewRevision {
                     root_hash,
                     cfg,
@@ -97,129 +81,6 @@ impl FirewoodService {
                     }
                     super::RevRequest::Drop { handle } => {
                         revs.remove(&handle);
-                    }
-                },
-                Request::BatchRequest(req) => match req {
-                    BatchRequest::Commit { handle, respond_to } => {
-                        let batch = get_batch!(active_batch, handle, lastid, respond_to);
-                        batch.commit();
-                        let _ = respond_to.send(Ok(()));
-                    }
-                    BatchRequest::KvInsert {
-                        handle,
-                        key,
-                        val,
-                        respond_to,
-                    } => {
-                        let batch = get_batch!(active_batch, handle, lastid, respond_to);
-                        let resp = match batch.kv_insert(key, val) {
-                            Ok(v) => {
-                                active_batch = Some(v);
-                                Ok(())
-                            }
-                            Err(e) => Err(e),
-                        };
-                        respond_to.send(resp).unwrap();
-                    }
-                    BatchRequest::KvRemove {
-                        handle,
-                        key,
-                        respond_to,
-                    } => {
-                        let batch = get_batch!(active_batch, handle, lastid, respond_to);
-                        let resp = match batch.kv_remove(key) {
-                            Ok(v) => {
-                                active_batch = Some(v.0);
-                                Ok(v.1)
-                            }
-                            Err(e) => Err(e),
-                        };
-                        respond_to.send(resp).unwrap();
-                    }
-                    #[cfg(feature = "eth")]
-                    BatchRequest::SetBalance {
-                        handle,
-                        key,
-                        balance,
-                        respond_to,
-                    } => {
-                        let batch = get_batch!(active_batch, handle, lastid, respond_to);
-                        let resp = match batch.set_balance(key.as_ref(), balance) {
-                            Ok(v) => {
-                                active_batch = Some(v);
-                                Ok(())
-                            }
-                            Err(e) => Err(e),
-                        };
-                        respond_to.send(resp).unwrap();
-                    }
-                    #[cfg(feature = "eth")]
-                    BatchRequest::SetCode {
-                        handle,
-                        key,
-                        code,
-                        respond_to,
-                    } => {
-                        let batch = get_batch!(active_batch, handle, lastid, respond_to);
-                        let resp = match batch.set_code(key.as_ref(), code.as_ref()) {
-                            Ok(v) => {
-                                active_batch = Some(v);
-                                Ok(())
-                            }
-                            Err(e) => Err(e),
-                        };
-                        respond_to.send(resp).unwrap();
-                    }
-                    #[cfg(feature = "eth")]
-                    BatchRequest::SetNonce {
-                        handle,
-                        key,
-                        nonce,
-                        respond_to,
-                    } => {
-                        let batch = get_batch!(active_batch, handle, lastid, respond_to);
-                        let resp = match batch.set_nonce(key.as_ref(), nonce) {
-                            Ok(v) => {
-                                active_batch = Some(v);
-                                Ok(())
-                            }
-                            Err(e) => Err(e),
-                        };
-                        respond_to.send(resp).unwrap();
-                    }
-                    #[cfg(feature = "eth")]
-                    BatchRequest::SetState {
-                        handle,
-                        key,
-                        sub_key,
-                        state,
-                        respond_to,
-                    } => {
-                        let batch = get_batch!(active_batch, handle, lastid, respond_to);
-                        let resp = match batch.set_state(key.as_ref(), sub_key.as_ref(), state) {
-                            Ok(v) => {
-                                active_batch = Some(v);
-                                Ok(())
-                            }
-                            Err(e) => Err(e),
-                        };
-                        respond_to.send(resp).unwrap();
-                    }
-                    #[cfg(feature = "eth")]
-                    BatchRequest::CreateAccount {
-                        handle,
-                        key,
-                        respond_to,
-                    } => {
-                        let batch = get_batch!(active_batch, handle, lastid, respond_to);
-                        let resp = match batch.create_account(key.as_ref()) {
-                            Ok(v) => {
-                                active_batch = Some(v);
-                                Ok(())
-                            }
-                            Err(e) => Err(e),
-                        };
-                        respond_to.send(resp).unwrap();
                     }
                 },
             }

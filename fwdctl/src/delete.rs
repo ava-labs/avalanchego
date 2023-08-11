@@ -3,7 +3,7 @@
 
 use anyhow::{Error, Result};
 use clap::Args;
-use firewood::db::{Db, DbConfig, WalConfig};
+use firewood::db::{BatchOp, Db, DbConfig, WalConfig};
 use log;
 
 #[derive(Debug, Args)]
@@ -30,9 +30,11 @@ pub fn run(opts: &Options) -> Result<()> {
         .wal(WalConfig::builder().max_revisions(10).build());
 
     let db = Db::new(opts.db.as_str(), &cfg.build()).map_err(Error::msg)?;
-    db.new_writebatch()
-        .kv_remove(&opts.key)
-        .map_err(Error::msg)?;
+
+    let batch = vec![BatchOp::Delete { key: &opts.key }];
+    let proposal = db.new_proposal(batch).map_err(Error::msg)?;
+    proposal.commit().map_err(Error::msg)?;
+
     println!("key {} deleted successfully", opts.key);
     Ok(())
 }

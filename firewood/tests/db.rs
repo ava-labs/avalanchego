@@ -1,7 +1,7 @@
 use firewood::{
     db::{BatchOp, Db as PersistedDb, DbConfig, DbError, WalConfig},
     merkle::{Node, TrieHash},
-    storage::{StoreRevMut, StoreRevShared},
+    storage::StoreRevShared,
 };
 use firewood_shale::compact::CompactSpace;
 use std::{
@@ -16,15 +16,15 @@ use std::{
 macro_rules! kv_dump {
     ($e: ident) => {{
         let mut s = Vec::new();
+        $e.kv_root_hash().unwrap();
         $e.kv_dump(&mut s).unwrap();
         String::from_utf8(s).unwrap()
     }};
 }
 
-type Store = CompactSpace<Node, StoreRevMut>;
 type SharedStore = CompactSpace<Node, StoreRevShared>;
 
-struct Db<'a, P: AsRef<Path> + ?Sized>(PersistedDb<Store, SharedStore>, &'a P);
+struct Db<'a, P: AsRef<Path> + ?Sized>(PersistedDb<SharedStore>, &'a P);
 
 impl<'a, P: AsRef<Path> + ?Sized> Db<'a, P> {
     fn new(path: &'a P, cfg: &DbConfig) -> Result<Self, DbError> {
@@ -106,14 +106,19 @@ fn test_revisions() {
         let mut hashes: VecDeque<TrieHash> = VecDeque::new();
         for _ in 0..10 {
             {
-                let mut wb = db.new_writebatch();
+                let mut batch = Vec::new();
                 let m = rng.borrow_mut().gen_range(1..20);
                 for _ in 0..m {
                     let key = keygen();
                     let val: Vec<u8> = (0..8).map(|_| rng.borrow_mut().gen()).collect();
-                    wb = wb.kv_insert(key, val.to_vec()).unwrap();
+                    let write = BatchOp::Put {
+                        key,
+                        value: val.to_vec(),
+                    };
+                    batch.push(write);
                 }
-                wb.commit();
+                let proposal = db.new_proposal(batch).unwrap();
+                proposal.commit().unwrap();
             }
             while dumped.len() > 10 {
                 dumped.pop_back();
@@ -171,8 +176,6 @@ fn create_db_issue_proof() {
 
     let db = Db::new("test_db_proof", &cfg.truncate(true).build()).unwrap();
 
-    let mut wb = db.new_writebatch();
-
     let items = vec![
         ("d", "verb"),
         ("do", "verb"),
@@ -180,20 +183,30 @@ fn create_db_issue_proof() {
         ("e", "coin"),
     ];
 
+    let mut batch = Vec::new();
     for (k, v) in items {
-        wb = wb.kv_insert(k.as_bytes(), v.as_bytes().to_vec()).unwrap();
+        let write = BatchOp::Put {
+            key: k.as_bytes(),
+            value: v.as_bytes().to_vec(),
+        };
+        batch.push(write);
     }
-    wb.commit();
+    let proposal = db.new_proposal(batch).unwrap();
+    proposal.commit().unwrap();
+
     let root_hash = db.kv_root_hash().unwrap();
 
-    // Add second commit due to API restrictions
-    let mut wb = db.new_writebatch();
+    // Add second commit
+    let mut batch = Vec::new();
     for (k, v) in Vec::from([("x", "two")]).iter() {
-        wb = wb
-            .kv_insert(k.to_string().as_bytes(), v.as_bytes().to_vec())
-            .unwrap();
+        let write = BatchOp::Put {
+            key: k.to_string().as_bytes().to_vec(),
+            value: v.as_bytes().to_vec(),
+        };
+        batch.push(write);
     }
-    wb.commit();
+    let proposal = db.new_proposal(batch).unwrap();
+    proposal.commit().unwrap();
 
     let rev = db.get_revision(&root_hash, None).unwrap();
     let key = "doe".as_bytes();
@@ -218,7 +231,7 @@ fn create_db_issue_proof() {
 }
 
 impl<P: AsRef<Path> + ?Sized> Deref for Db<'_, P> {
-    type Target = PersistedDb<Store, SharedStore>;
+    type Target = PersistedDb<SharedStore>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -226,7 +239,7 @@ impl<P: AsRef<Path> + ?Sized> Deref for Db<'_, P> {
 }
 
 impl<P: AsRef<Path> + ?Sized> DerefMut for Db<'_, P> {
-    fn deref_mut(&mut self) -> &mut PersistedDb<Store, SharedStore> {
+    fn deref_mut(&mut self) -> &mut PersistedDb<SharedStore> {
         &mut self.0
     }
 }

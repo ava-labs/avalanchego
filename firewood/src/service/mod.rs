@@ -15,12 +15,6 @@ pub type BatchId = u32;
 pub type RevId = u32;
 
 #[derive(Debug)]
-pub struct BatchHandle {
-    sender: mpsc::Sender<Request>,
-    id: u32,
-}
-
-#[derive(Debug)]
 pub struct RevisionHandle {
     sender: mpsc::Sender<Request>,
     id: u32,
@@ -29,76 +23,18 @@ pub struct RevisionHandle {
 /// Client side request object
 #[derive(Debug)]
 pub enum Request {
-    NewBatch {
-        respond_to: oneshot::Sender<BatchId>,
-    },
     NewRevision {
         root_hash: TrieHash,
         cfg: Option<DbRevConfig>,
         respond_to: oneshot::Sender<Option<RevId>>,
     },
 
-    BatchRequest(BatchRequest),
     RevRequest(RevRequest),
 }
 
 type OwnedKey = Vec<u8>;
 #[allow(dead_code)]
 type OwnedVal = Vec<u8>;
-
-#[derive(Debug)]
-pub enum BatchRequest {
-    KvRemove {
-        handle: BatchId,
-        key: OwnedKey,
-        respond_to: oneshot::Sender<Result<Option<Vec<u8>>, DbError>>,
-    },
-    KvInsert {
-        handle: BatchId,
-        key: OwnedKey,
-        val: OwnedKey,
-        respond_to: oneshot::Sender<Result<(), DbError>>,
-    },
-    Commit {
-        handle: BatchId,
-        respond_to: oneshot::Sender<Result<(), DbError>>,
-    },
-    #[cfg(feature = "eth")]
-    SetBalance {
-        handle: BatchId,
-        key: OwnedKey,
-        balance: primitive_types::U256,
-        respond_to: oneshot::Sender<Result<(), DbError>>,
-    },
-    #[cfg(feature = "eth")]
-    SetCode {
-        handle: BatchId,
-        key: OwnedKey,
-        code: OwnedVal,
-        respond_to: oneshot::Sender<Result<(), DbError>>,
-    },
-    #[cfg(feature = "eth")]
-    SetNonce {
-        handle: BatchId,
-        key: OwnedKey,
-        nonce: u64,
-        respond_to: oneshot::Sender<Result<(), DbError>>,
-    },
-    #[cfg(feature = "eth")]
-    SetState {
-        handle: BatchId,
-        key: OwnedKey,
-        sub_key: OwnedVal,
-        state: OwnedVal,
-        respond_to: oneshot::Sender<Result<(), DbError>>,
-    },
-    #[cfg(feature = "eth")]
-    CreateAccount {
-        handle: BatchId,
-        key: OwnedKey,
-        respond_to: oneshot::Sender<Result<(), DbError>>,
-    },
-}
 
 #[derive(Debug)]
 pub enum RevRequest {

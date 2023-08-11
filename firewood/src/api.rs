@@ -18,75 +18,8 @@ use async_trait::async_trait;
 pub type Nonce = u64;
 
 #[async_trait]
-pub trait Db<B: WriteBatch, R: Revision> {
-    async fn new_writebatch(&self) -> B;
+pub trait Db<R: Revision> {
     async fn get_revision(&self, root_hash: TrieHash, cfg: Option<DbRevConfig>) -> Option<R>;
-}
-
-#[async_trait]
-pub trait WriteBatch
-where
-    Self: Sized,
-{
-    async fn kv_insert<K: AsRef<[u8]> + Send + Sync, V: AsRef<[u8]> + Send + Sync>(
-        self,
-        key: K,
-        val: V,
-    ) -> Result<Self, DbError>;
-    /// Remove an item from the generic key-value storage. `val` will be set to the value that is
-    /// removed from the storage if it exists.
-    async fn kv_remove<K: AsRef<[u8]> + Send + Sync>(
-        self,
-        key: K,
-    ) -> Result<(Self, Option<Vec<u8>>), DbError>;
-
-    /// Set balance of the account
-    #[cfg(feature = "eth")]
-    async fn set_balance<K: AsRef<[u8]> + Send + Sync>(
-        self,
-        key: K,
-        balance: U256,
-    ) -> Result<Self, DbError>;
-    /// Set code of the account
-    #[cfg(feature = "eth")]
-    async fn set_code<K: AsRef<[u8]> + Send + Sync, V: AsRef<[u8]> + Send + Sync>(
-        self,
-        key: K,
-        code: V,
-    ) -> Result<Self, DbError>;
-    /// Set nonce of the account.
-    #[cfg(feature = "eth")]
-    async fn set_nonce<K: AsRef<[u8]> + Send + Sync>(
-        self,
-        key: K,
-        nonce: u64,
-    ) -> Result<Self, DbError>;
-    /// Set the state value indexed by `sub_key` in the account indexed by `key`.
-    #[cfg(feature = "eth")]
-    async fn set_state<
-        K: AsRef<[u8]> + Send + Sync,
-        SK: AsRef<[u8]> + Send + Sync,
-        V: AsRef<[u8]> + Send + Sync,
-    >(
-        self,
-        key: K,
-        sub_key: SK,
-        val: V,
-    ) -> Result<Self, DbError>;
-    /// Create an account.
-    #[cfg(feature = "eth")]
-    async fn create_account<K: AsRef<[u8]> + Send + Sync>(self, key: K) -> Result<Self, DbError>;
-    /// Delete an account.
-    #[cfg(feature = "eth")]
-    async fn delete_account<K: AsRef<[u8]> + Send + Sync>(
-        self,
-        key: K,
-        acc: &mut Option<Account>,
-    ) -> Result<Self, DbError>;
-
-    /// Persist all changes to the DB. The atomicity of the [WriteBatch] guarantees all changes are
-    /// either retained on disk or lost together during a crash.
-    async fn commit(self);
 }
 
 #[async_trait]

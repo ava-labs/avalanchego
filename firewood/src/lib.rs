@@ -118,7 +118,7 @@
 //! space. To reduce the overhead and be friendly to the disk, we partition the entire 64-bit
 //! virtual space into pages (yeah it appears to be more and more like an OS) and keep track of the
 //! dirty pages in some `CachedStore` instantiation (see `storage::StoreRevMut`). When a
-//! [`db::WriteBatch`] commits, both the recorded interval writes and the aggregated in-memory
+//! [`db::Proposal`] commits, both the recorded interval writes and the aggregated in-memory
 //! dirty pages induced by this write batch are taken out from the linear space. Although they are
 //! mathematically equivalent, interval writes are more compact than pages (which are 4K in size,
 //! become dirty even if a single byte is touched upon) . So interval writes are fed into the WAL

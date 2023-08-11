@@ -4,7 +4,7 @@
 use std::{collections::VecDeque, path::Path};
 
 use firewood::{
-    db::{Db, DbConfig, Revision, WalConfig, WriteBatch},
+    db::{BatchOp, Db, DbConfig, Proposal, Revision, WalConfig},
     merkle::{Node, TrieHash},
     proof::Proof,
     storage::{StoreRevMut, StoreRevShared},
@@ -21,25 +21,6 @@ fn main() {
     let db = Db::new("rev_db", &cfg.clone().truncate(true).build())
         .expect("db initiation should succeed");
     let items = vec![("dof", "verb"), ("doe", "reindeer"), ("dog", "puppy")];
-
-    std::thread::scope(|scope| {
-        scope.spawn(|| {
-            db.new_writebatch()
-                .kv_insert("k1", "v1".into())
-                .unwrap()
-                .commit();
-        });
-
-        scope.spawn(|| {
-            db.new_writebatch()
-                .kv_insert("k2", "v2".into())
-                .unwrap()
-                .commit();
-        });
-    });
-
-    assert_eq!("v1".as_bytes().to_vec(), db.kv_get("k1").unwrap());
-    assert_eq!("v2".as_bytes().to_vec(), db.kv_get("k2").unwrap());
 
     let mut revision_tracker = RevisionTracker::new(db);
 
@@ -126,11 +107,11 @@ fn main() {
 
 struct RevisionTracker {
     hashes: VecDeque<TrieHash>,
-    db: Db<Store, SharedStore>,
+    db: Db<SharedStore>,
 }
 
 impl RevisionTracker {
-    fn new(db: Db<Store, SharedStore>) -> Self {
+    fn new(db: Db<SharedStore>) -> Self {
         Self {
             hashes: VecDeque::new(),
             db,
@@ -150,17 +131,19 @@ impl RevisionTracker {
         K: AsRef<[u8]>,
         V: AsRef<[u8]>,
     {
-        self.db
-            .new_writebatch()
-            .kv_insert(k, v.as_ref().to_vec())
-            .unwrap()
-            .commit();
+        let batch = vec![BatchOp::Put {
+            key: k,
+            value: v.as_ref().to_vec(),
+        }];
+        let proposal = self.db.new_proposal(batch).unwrap();
+        proposal.commit().unwrap();
+
         let hash = self.db.kv_root_hash().expect("root-hash should exist");
         self.hashes.push_front(hash);
     }
 
-    fn commit_batch(&mut self, batch: WriteBatch<Store, SharedStore>) {
-        batch.commit();
+    fn commit_proposal(&mut self, proposal: Proposal<Store, SharedStore>) {
+        proposal.commit().unwrap();
         let hash = self.db.kv_root_hash().expect("root-hash should exist");
         self.hashes.push_front(hash);
     }
@@ -203,7 +186,7 @@ fn verify_root_hashes(revision_tracker: &mut RevisionTracker) {
         .kv_root_hash()
         .expect("root-hash for current state should exist");
 
-    // The following is true as long as there are no dirty-writes.
+    // The following should always hold.
     assert_eq!(revision_root_hash, current_root_hash);
 
     let revision = revision_tracker.get_revision(2);
@@ -219,11 +202,11 @@ fn verify_root_hashes(revision_tracker: &mut RevisionTracker) {
         .expect("root-hash for revision-1 should exist");
     println!("{revision_root_hash:?}");
 
-    let write = revision_tracker
-        .db
-        .new_writebatch()
-        .kv_insert("k", vec![b'v'])
-        .unwrap();
+    let batch = vec![BatchOp::Put {
+        key: "k",
+        value: vec![b'v'],
+    }];
+    let proposal = revision_tracker.db.new_proposal(batch).unwrap();
 
     let actual_revision_root_hash = revision_tracker
         .get_revision(1)
@@ -231,11 +214,10 @@ fn verify_root_hashes(revision_tracker: &mut RevisionTracker) {
         .expect("root-hash for revision-1 should exist");
     assert_eq!(revision_root_hash, actual_revision_root_hash);
 
-    // Read the uncommitted value while the batch is still active.
-    let val = revision_tracker.db.kv_get("k").unwrap();
-    assert_eq!("v".as_bytes().to_vec(), val);
+    // Uncommitted changes of proposal cannot be seen from db.
+    assert!(revision_tracker.db.kv_get("k").is_err());
 
-    revision_tracker.commit_batch(write);
+    revision_tracker.commit_proposal(proposal);
 
     let new_revision_root_hash = revision_tracker
         .get_revision(1)

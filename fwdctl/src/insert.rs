@@ -3,7 +3,7 @@
 
 use anyhow::{anyhow, Error, Result};
 use clap::Args;
-use firewood::db::{Db, DbConfig, WalConfig};
+use firewood::db::{BatchOp, Db, DbConfig, WalConfig};
 use log;
 
 #[derive(Debug, Args)]
@@ -38,11 +38,13 @@ pub fn run(opts: &Options) -> Result<()> {
         Err(_) => return Err(anyhow!("error opening database")),
     };
 
-    let insertion_batch = db
-        .new_writebatch()
-        .kv_insert(opts.key.clone(), opts.value.bytes().collect())
-        .map_err(Error::msg)?;
-    insertion_batch.commit();
+    let batch = vec![BatchOp::Put {
+        key: &opts.key,
+        value: opts.value.bytes().collect(),
+    }];
+    let proposal = db.new_proposal(batch).map_err(Error::msg)?;
+    proposal.commit().map_err(Error::msg)?;
+
     println!("{}", opts.key);
     Ok(())
 }
