@@ -306,7 +306,7 @@ func (g *gossipTracker) GetUnknown(peerID ids.NodeID, limit int) ([]ValidatorID,
 	defer g.lock.RUnlock()
 
 	// return false if this peer isn't tracked
-	knownPeers, ok := g.trackedPeers[peerID]
+	knownValidators, ok := g.trackedPeers[peerID]
 	if !ok {
 		return nil, false
 	}
@@ -314,14 +314,14 @@ func (g *gossipTracker) GetUnknown(peerID ids.NodeID, limit int) ([]ValidatorID,
 	// Calculate the unknown information we need to send to this peer. We do
 	// this by computing the difference between the validators we know about
 	// and the validators we know we've sent to [peerID].
-	unknownPeers := set.SampleableSet[ValidatorID]{}
+	unknownValidators := set.SampleableSet[ValidatorID]{}
 	for i, validatorID := range g.validatorIDs {
-		if !knownPeers.Contains(i) {
-			unknownPeers.Add(validatorID)
+		if !knownValidators.Contains(i) {
+			unknownValidators.Add(validatorID)
 		}
 	}
 
 	// We select a random sample of validators to gossip to avoid starving out a
 	// validator from being gossiped for an extended period of time.
-	return unknownPeers.Sample(limit), true
+	return unknownValidators.Sample(limit), true
 }
