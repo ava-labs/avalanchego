@@ -688,8 +688,6 @@ func (c *genericCodec) unmarshal(p *wrappers.Packer, value reflect.Value, maxSli
 			//
 			// We do this to enforce that key-value pairs are sorted by
 			// increasing key.
-			//
-			// Ref: https://github.com/ava-labs/avalanchego/pull/1790#discussion_r1283656558
 			keyBytes := p.Bytes[keyStartOffset:p.Offset]
 			if i != 0 && bytes.Compare(keyBytes, prevKey) <= 0 {
 				return fmt.Errorf("keys aren't sorted: (%s, %s)", prevKey, mapKey)
