@@ -15,7 +15,7 @@ import (
 	ids "github.com/ava-labs/avalanchego/ids"
 	snow "github.com/ava-labs/avalanchego/snow"
 	txs "github.com/ava-labs/avalanchego/vms/avm/txs"
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockBlock is a mock of Block interface.
