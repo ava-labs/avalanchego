@@ -8,7 +8,7 @@ The plugin version is unchanged at `27` and compatible with versions `v1.10.5 - 
 
 **This update changes the local network genesis. This version will not be able to join local networks with prior versions.**
 
-**The first startup of the P-Chain will perform indexing operations. This indexing runs in the background and does not impact restart time.**
+**The first startup of the P-Chain will perform indexing operations. This indexing runs in the background and does not impact restart time. During this indexing the node will report increased CPU, memory, and disk usage.**
 
 ### APIs
 
