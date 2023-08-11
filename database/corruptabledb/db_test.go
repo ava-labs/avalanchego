@@ -107,7 +107,7 @@ func TestIterator(t *testing.T) {
 				mockInnerIter := database.NewMockIterator(ctrl)
 				mockInnerIter.EXPECT().Next().Return(false)
 				mockInnerIter.EXPECT().Error().Return(errIter)
-				iter.innerIter = mockInnerIter
+				iter.Iterator = mockInnerIter
 			},
 			op: func(require *require.Assertions, iter *iterator) {
 				require.False(iter.Next())
@@ -130,7 +130,7 @@ func TestIterator(t *testing.T) {
 			modifyIter: func(ctrl *gomock.Controller, iter *iterator) {
 				mockInnerIter := database.NewMockIterator(ctrl)
 				mockInnerIter.EXPECT().Error().Return(errIter)
-				iter.innerIter = mockInnerIter
+				iter.Iterator = mockInnerIter
 			},
 			op: func(require *require.Assertions, iter *iterator) {
 				err := iter.Error()
@@ -183,8 +183,8 @@ func TestIterator(t *testing.T) {
 
 			// Make an iterator
 			iter := &iterator{
-				db:        corruptableDB,
-				innerIter: corruptableDB.NewIterator(),
+				Iterator: corruptableDB.NewIterator(),
+				db:       corruptableDB,
 			}
 
 			// Modify the iterator (optional)
