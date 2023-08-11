@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package merkledb
+package maybe
 
 // Maybe T = Some T | Nothing.
 // A data wrapper that allows values to be something [Some T] or nothing [Nothing].
@@ -42,17 +42,17 @@ func (m Maybe[T]) Value() T {
 	return m.value
 }
 
-// MaybeBind returns Nothing, if [m] is Nothing.
+// Bind returns Nothing iff [m] is Nothing.
 // Otherwise applies [f] to the value of [m] and returns the result as a Some.
-func MaybeBind[T, U any](m Maybe[T], f func(T) U) Maybe[U] {
+func Bind[T, U any](m Maybe[T], f func(T) U) Maybe[U] {
 	if m.IsNothing() {
 		return Nothing[U]()
 	}
 	return Some(f(m.Value()))
 }
 
-// MaybeEqual returns true if both m1 and m2 are nothing or have the same value according to the equality function
-func MaybeEqual[T any](m1 Maybe[T], m2 Maybe[T], equality func(T, T) bool) bool {
+// Equal returns true if both m1 and m2 are nothing or have the same value according to [equalFunc].
+func Equal[T any](m1 Maybe[T], m2 Maybe[T], equalFunc func(T, T) bool) bool {
 	if m1.IsNothing() {
 		return m2.IsNothing()
 	}
@@ -60,5 +60,5 @@ func MaybeEqual[T any](m1 Maybe[T], m2 Maybe[T], equality func(T, T) bool) bool 
 	if m2.IsNothing() {
 		return false
 	}
-	return equality(m1.Value(), m2.Value())
+	return equalFunc(m1.Value(), m2.Value())
 }

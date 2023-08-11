@@ -306,6 +306,11 @@ func (vm *VM) SetState(ctx context.Context, newState snow.State) error {
 func (vm *VM) BuildBlock(ctx context.Context) (snowman.Block, error) {
 	preferredBlock, err := vm.getBlock(ctx, vm.preferred)
 	if err != nil {
+		vm.ctx.Log.Error("unexpected build block failure",
+			zap.String("reason", "failed to fetch preferred block"),
+			zap.Stringer("parentID", vm.preferred),
+			zap.Error(err),
+		)
 		return nil, err
 	}
 

@@ -13,6 +13,7 @@ import (
 	"sync"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/maybe"
 )
 
 const (
@@ -274,7 +275,7 @@ func (c *codecImpl) encodeInt64(dst io.Writer, value int64) error {
 	return err
 }
 
-func (c *codecImpl) encodeMaybeByteSlice(dst io.Writer, maybeValue Maybe[[]byte]) error {
+func (c *codecImpl) encodeMaybeByteSlice(dst io.Writer, maybeValue maybe.Maybe[[]byte]) error {
 	if err := c.encodeBool(dst, !maybeValue.IsNothing()); err != nil {
 		return err
 	}
@@ -284,21 +285,21 @@ func (c *codecImpl) encodeMaybeByteSlice(dst io.Writer, maybeValue Maybe[[]byte]
 	return c.encodeByteSlice(dst, maybeValue.Value())
 }
 
-func (c *codecImpl) decodeMaybeByteSlice(src *bytes.Reader) (Maybe[[]byte], error) {
+func (c *codecImpl) decodeMaybeByteSlice(src *bytes.Reader) (maybe.Maybe[[]byte], error) {
 	if minMaybeByteSliceLen > src.Len() {
-		return Nothing[[]byte](), io.ErrUnexpectedEOF
+		return maybe.Nothing[[]byte](), io.ErrUnexpectedEOF
 	}
 
 	if hasValue, err := c.decodeBool(src); err != nil || !hasValue {
-		return Nothing[[]byte](), err
+		return maybe.Nothing[[]byte](), err
 	}
 
 	bytes, err := c.decodeByteSlice(src)
 	if err != nil {
-		return Nothing[[]byte](), err
+		return maybe.Nothing[[]byte](), err
 	}
 
-	return Some(bytes), nil
+	return maybe.Some(bytes), nil
 }
 
 func (c *codecImpl) decodeByteSlice(src *bytes.Reader) ([]byte, error) {

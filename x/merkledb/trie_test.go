@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/maybe"
 )
 
 func getNodeValue(t ReadOnlyTrie, key string) ([]byte, error) {
@@ -34,7 +35,7 @@ func getNodeValue(t ReadOnlyTrie, key string) ([]byte, error) {
 			return nil, database.ErrNotFound
 		}
 
-		return closestNode.value.value, nil
+		return closestNode.value.Value(), nil
 	}
 	if asDatabases, ok := t.(*merkleDB); ok {
 		view, err := asDatabases.NewView()
@@ -51,7 +52,7 @@ func getNodeValue(t ReadOnlyTrie, key string) ([]byte, error) {
 			return nil, database.ErrNotFound
 		}
 
-		return closestNode.value.value, nil
+		return closestNode.value.Value(), nil
 	}
 	return nil, nil
 }
@@ -270,7 +271,7 @@ func Test_Trie_WriteToDB(t *testing.T) {
 
 	node, err := parseNode(p, rawBytes)
 	require.NoError(err)
-	require.Equal([]byte("value"), node.value.value)
+	require.Equal([]byte("value"), node.value.Value())
 }
 
 func Test_Trie_InsertAndRetrieve(t *testing.T) {
@@ -1353,12 +1354,12 @@ func Test_Trie_ConcurrentInsertProveCommit(t *testing.T) {
 			require.NoError(err)
 			require.NotNil(proof)
 
-			if proof.Value.value == nil {
+			if proof.Value.Value() == nil {
 				// this is an exclusion proof since the value is nil
 				// return false to keep waiting for Insert to complete.
 				return false
 			}
-			require.Equal([]byte("value2"), proof.Value.value)
+			require.Equal([]byte("value2"), proof.Value.Value())
 
 			require.NoError(newTrie.CommitToDB(context.Background()))
 			return true
@@ -1391,7 +1392,7 @@ func Test_Trie_ConcurrentInsertAndRangeProof(t *testing.T) {
 
 	require.Eventually(
 		func() bool {
-			rangeProof, err := newTrie.GetRangeProof(context.Background(), []byte("key1"), Some([]byte("key3")), 3)
+			rangeProof, err := newTrie.GetRangeProof(context.Background(), []byte("key1"), maybe.Some([]byte("key3")), 3)
 			require.NoError(err)
 			require.NotNil(rangeProof)
 

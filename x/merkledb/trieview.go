@@ -20,6 +20,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/maybe"
 )
 
 const (
@@ -95,7 +96,7 @@ type trieView struct {
 	// yet reflected in the trie's structure. This allows us to
 	// defer the cost of updating the trie until we calculate node IDs.
 	// A Nothing value indicates that the key has been removed.
-	unappliedValueChanges map[path]Maybe[[]byte]
+	unappliedValueChanges map[path]maybe.Maybe[[]byte]
 
 	db *merkleDB
 
@@ -172,7 +173,7 @@ func newTrieView(
 		parentTrie:            parentTrie,
 		changes:               newChangeSummary(estimatedSize),
 		estimatedSize:         estimatedSize,
-		unappliedValueChanges: make(map[path]Maybe[[]byte], estimatedSize),
+		unappliedValueChanges: make(map[path]maybe.Maybe[[]byte], estimatedSize),
 	}, nil
 }
 
@@ -198,7 +199,7 @@ func newTrieViewWithChanges(
 		parentTrie:            parentTrie,
 		changes:               changes,
 		estimatedSize:         estimatedSize,
-		unappliedValueChanges: make(map[path]Maybe[[]byte], estimatedSize),
+		unappliedValueChanges: make(map[path]maybe.Maybe[[]byte], estimatedSize),
 	}, nil
 }
 
@@ -361,7 +362,7 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 
 	if closestNode.key.Compare(keyPath) == 0 {
 		// There is a node with the given [key].
-		proof.Value = MaybeBind(closestNode.value, slices.Clone[[]byte])
+		proof.Value = maybe.Bind(closestNode.value, slices.Clone[[]byte])
 		return proof, nil
 	}
 
@@ -392,7 +393,7 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 func (t *trieView) GetRangeProof(
 	ctx context.Context,
 	start []byte,
-	end Maybe[[]byte],
+	end maybe.Maybe[[]byte],
 	maxLength int,
 ) (*RangeProof, error) {
 	ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.GetRangeProof")
@@ -552,7 +553,7 @@ func (t *trieView) commitChanges(ctx context.Context, trieToCommit *trieView) er
 		if existing, ok := t.changes.values[key]; ok {
 			existing.after = valueChange.after
 		} else {
-			t.changes.values[key] = &change[Maybe[[]byte]]{
+			t.changes.values[key] = &change[maybe.Maybe[[]byte]]{
 				before: valueChange.before,
 				after:  valueChange.after,
 			}
@@ -770,7 +771,7 @@ func (t *trieView) getValue(key path, lock bool) ([]byte, error) {
 		if change.after.IsNothing() {
 			return nil, database.ErrNotFound
 		}
-		return change.after.value, nil
+		return change.after.Value(), nil
 	}
 	t.db.metrics.ViewValueCacheMiss()
 
@@ -811,7 +812,7 @@ func (t *trieView) insert(key []byte, value []byte) error {
 
 	valCopy := slices.Clone(value)
 
-	if err := t.recordValueChange(newPath(key), Some(valCopy)); err != nil {
+	if err := t.recordValueChange(newPath(key), maybe.Some(valCopy)); err != nil {
 		return err
 	}
 
@@ -845,7 +846,7 @@ func (t *trieView) remove(key []byte) error {
 	// the trie has been changed, so invalidate all children and remove them from tracking
 	t.invalidateChildren()
 
-	if err := t.recordValueChange(newPath(key), Nothing[[]byte]()); err != nil {
+	if err := t.recordValueChange(newPath(key), maybe.Nothing[[]byte]()); err != nil {
 		return err
 	}
 
@@ -863,7 +864,7 @@ func (t *trieView) applyChangedValuesToTrie(ctx context.Context) error {
 	defer span.End()
 
 	unappliedValues := t.unappliedValueChanges
-	t.unappliedValueChanges = make(map[path]Maybe[[]byte], t.estimatedSize)
+	t.unappliedValueChanges = make(map[path]maybe.Maybe[[]byte], t.estimatedSize)
 
 	for key, change := range unappliedValues {
 		if change.IsNothing() {
@@ -1022,7 +1023,7 @@ func (t *trieView) getEditableNode(key path) (*node, error) {
 // Assumes [t.lock] is held.
 func (t *trieView) insertIntoTrie(
 	key path,
-	value Maybe[[]byte],
+	value maybe.Maybe[[]byte],
 ) (*node, error) {
 	// find the node that most closely matches [key]
 	pathToNode, err := t.getPathTo(key)
@@ -1158,7 +1159,7 @@ func (t *trieView) recordKeyChange(key path, after *node) error {
 // Doesn't actually change the trie data structure.
 // That's deferred until we calculate node IDs.
 // Assumes [t.lock] is held.
-func (t *trieView) recordValueChange(key path, value Maybe[[]byte]) error {
+func (t *trieView) recordValueChange(key path, value maybe.Maybe[[]byte]) error {
 	t.needsRecalculation = true
 
 	// record the value change so that it can be inserted
@@ -1172,18 +1173,18 @@ func (t *trieView) recordValueChange(key path, value Maybe[[]byte]) error {
 	}
 
 	// grab the before value
-	var beforeMaybe Maybe[[]byte]
+	var beforeMaybe maybe.Maybe[[]byte]
 	before, err := t.getParentTrie().getValue(key, true /*lock*/)
 	switch err {
 	case nil:
-		beforeMaybe = Some(before)
+		beforeMaybe = maybe.Some(before)
 	case database.ErrNotFound:
-		beforeMaybe = Nothing[[]byte]()
+		beforeMaybe = maybe.Nothing[[]byte]()
 	default:
 		return err
 	}
 
-	t.changes.values[key] = &change[Maybe[[]byte]]{
+	t.changes.values[key] = &change[maybe.Maybe[[]byte]]{
 		before: beforeMaybe,
 		after:  value,
 	}
@@ -1213,7 +1214,7 @@ func (t *trieView) removeFromTrie(key path) error {
 		}
 	}
 
-	nodeToDelete.setValue(Nothing[[]byte]())
+	nodeToDelete.setValue(maybe.Nothing[[]byte]())
 	if err := t.recordNodeChange(nodeToDelete); err != nil {
 		return err
 	}

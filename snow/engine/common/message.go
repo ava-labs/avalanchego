@@ -11,9 +11,13 @@ import "fmt"
 type Message uint32
 
 const (
-	// PendingTxs notifies a consensus engine that
-	// its VM has pending transactions
-	// (i.e. it would like to add a new block/vertex to consensus)
+	// PendingTxs notifies a consensus engine that its VM has pending
+	// transactions.
+	//
+	// The consensus engine must eventually call BuildBlock at least once after
+	// receiving this message. If the consensus engine receives multiple
+	// PendingTxs messages between calls to BuildBlock, the engine may only call
+	// BuildBlock once.
 	PendingTxs Message = iota + 1
 
 	// StateSyncDone notifies the state syncer engine that the VM has finishing
