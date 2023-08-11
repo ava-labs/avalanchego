@@ -38,7 +38,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
-	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
@@ -671,7 +670,8 @@ func (n *network) Disconnected(nodeID ids.NodeID) {
 
 func (n *network) Peers(peerID ids.NodeID) ([]ips.ClaimedIPPort, error) {
 	// Only select validators that we haven't already sent to this peer
-	unknownValidators, ok := n.gossipTracker.GetUnknown(peerID)
+	unknownValidators, ok := n.gossipTracker.GetUnknown(peerID,
+		int(n.config.PeerListNumValidatorIPs))
 	if !ok {
 		n.peerConfig.Log.Debug(
 			"unable to find peer to gossip to",
@@ -680,20 +680,9 @@ func (n *network) Peers(peerID ids.NodeID) ([]ips.ClaimedIPPort, error) {
 		return nil, nil
 	}
 
-	// We select a random sample of validators to gossip to avoid starving out a
-	// validator from being gossiped for an extended period of time.
-	s := sampler.NewUniform()
-	s.Initialize(uint64(len(unknownValidators)))
-
 	// Calculate the unknown information we need to send to this peer.
-	validatorIPs := make([]ips.ClaimedIPPort, 0, int(n.config.PeerListNumValidatorIPs))
-	for i := 0; i < len(unknownValidators) && len(validatorIPs) < int(n.config.PeerListNumValidatorIPs); i++ {
-		drawn, err := s.Next()
-		if err != nil {
-			return nil, err
-		}
-
-		validator := unknownValidators[drawn]
+	validatorIPs := make([]ips.ClaimedIPPort, 0, len(unknownValidators))
+	for _, validator := range unknownValidators {
 		n.peersLock.RLock()
 		_, isConnected := n.connectedPeers.GetByID(validator.NodeID)
 		peerIP := n.peerIPs[validator.NodeID]

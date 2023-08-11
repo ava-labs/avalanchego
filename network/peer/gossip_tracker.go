@@ -80,11 +80,13 @@ type GossipTracker interface {
 		knownTxIDs []ids.ID,
 		txIDs []ids.ID,
 	) ([]ids.ID, bool)
-	// GetUnknown gets the peers that we haven't sent to this peer
+	// GetUnknown gets a random sample of peers that we haven't sent to this
+	// peer.
 	// Returns:
-	// 	[]ValidatorID: a slice of ValidatorIDs that [peerID] doesn't know about.
+	// 	[]ValidatorID: a slice of up to [limit] ValidatorIDs that [peerID]
+	// 	doesn't know about.
 	// 	bool: False if [peerID] is not tracked. True otherwise.
-	GetUnknown(peerID ids.NodeID) ([]ValidatorID, bool)
+	GetUnknown(peerID ids.NodeID, limit int) ([]ValidatorID, bool)
 }
 
 type gossipTracker struct {
@@ -299,7 +301,7 @@ func (g *gossipTracker) AddKnown(
 	return validatorTxIDs, true
 }
 
-func (g *gossipTracker) GetUnknown(peerID ids.NodeID) ([]ValidatorID, bool) {
+func (g *gossipTracker) GetUnknown(peerID ids.NodeID, limit int) ([]ValidatorID, bool) {
 	g.lock.RLock()
 	defer g.lock.RUnlock()
 
@@ -312,12 +314,14 @@ func (g *gossipTracker) GetUnknown(peerID ids.NodeID) ([]ValidatorID, bool) {
 	// Calculate the unknown information we need to send to this peer. We do
 	// this by computing the difference between the validators we know about
 	// and the validators we know we've sent to [peerID].
-	result := make([]ValidatorID, 0, len(g.validatorIDs))
+	unknownPeers := set.SampleableSet[ValidatorID]{}
 	for i, validatorID := range g.validatorIDs {
 		if !knownPeers.Contains(i) {
-			result = append(result, validatorID)
+			unknownPeers.Add(validatorID)
 		}
 	}
 
-	return result, true
+	// We select a random sample of validators to gossip to avoid starving out a
+	// validator from being gossiped for an extended period of time.
+	return unknownPeers.Sample(limit), true
 }

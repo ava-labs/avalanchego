@@ -4,6 +4,7 @@
 package peer
 
 import (
+	"math"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -32,6 +33,8 @@ var (
 		NodeID: ids.GenerateTestNodeID(),
 		TxID:   ids.GenerateTestID(),
 	}
+
+	limit = 10
 )
 
 func TestGossipTracker_Contains(t *testing.T) {
@@ -301,7 +304,7 @@ func TestGossipTracker_ResetValidator(t *testing.T) {
 				require.True(g.AddValidator(v))
 				g.AddKnown(p1, []ids.ID{v.TxID}, nil)
 
-				unknown, ok := g.GetUnknown(p1)
+				unknown, ok := g.GetUnknown(p1, limit)
 				require.True(ok)
 				require.NotContains(unknown, v)
 			}
@@ -309,7 +312,7 @@ func TestGossipTracker_ResetValidator(t *testing.T) {
 			require.Equal(test.expected, g.ResetValidator(test.args.id))
 
 			for _, v := range test.validators {
-				unknown, ok := g.GetUnknown(p1)
+				unknown, ok := g.GetUnknown(p1, limit)
 				require.True(ok)
 				require.Contains(unknown, v)
 			}
@@ -405,6 +408,7 @@ func TestGossipTracker_GetUnknown(t *testing.T) {
 	tests := []struct {
 		name            string
 		peerID          ids.NodeID
+		limit           int
 		peersToTrack    []ids.NodeID
 		validators      []ValidatorID
 		expectedUnknown []ValidatorID
@@ -412,6 +416,7 @@ func TestGossipTracker_GetUnknown(t *testing.T) {
 	}{
 		{
 			name:            "non tracked peer",
+			limit:           limit,
 			peerID:          p1,
 			validators:      []ValidatorID{v2},
 			peersToTrack:    []ids.NodeID{},
@@ -420,6 +425,7 @@ func TestGossipTracker_GetUnknown(t *testing.T) {
 		},
 		{
 			name:            "only validators",
+			limit:           limit,
 			peerID:          p1,
 			peersToTrack:    []ids.NodeID{p1},
 			validators:      []ValidatorID{v2},
@@ -428,6 +434,7 @@ func TestGossipTracker_GetUnknown(t *testing.T) {
 		},
 		{
 			name:            "only non-validators",
+			limit:           limit,
 			peerID:          p1,
 			peersToTrack:    []ids.NodeID{p1, p2},
 			validators:      []ValidatorID{},
@@ -436,6 +443,7 @@ func TestGossipTracker_GetUnknown(t *testing.T) {
 		},
 		{
 			name:            "validators and non-validators",
+			limit:           limit,
 			peerID:          p1,
 			peersToTrack:    []ids.NodeID{p1, p3},
 			validators:      []ValidatorID{v2},
@@ -444,6 +452,7 @@ func TestGossipTracker_GetUnknown(t *testing.T) {
 		},
 		{
 			name:            "same as limit",
+			limit:           limit,
 			peerID:          p1,
 			peersToTrack:    []ids.NodeID{p1},
 			validators:      []ValidatorID{v2, v3},
@@ -471,7 +480,7 @@ func TestGossipTracker_GetUnknown(t *testing.T) {
 			}
 
 			// get the unknown peers for this peer
-			result, ok := g.GetUnknown(test.peerID)
+			result, ok := g.GetUnknown(test.peerID, limit)
 			require.Equal(test.expectedOk, ok)
 			require.Len(result, len(test.expectedUnknown))
 			for _, v := range test.expectedUnknown {
@@ -492,7 +501,7 @@ func TestGossipTracker_E2E(t *testing.T) {
 	require.True(g.AddValidator(v2))
 
 	// we should get an empty unknown since we're not tracking anything
-	unknown, ok := g.GetUnknown(p1)
+	unknown, ok := g.GetUnknown(p1, limit)
 	require.False(ok)
 	require.Nil(unknown)
 
@@ -501,7 +510,7 @@ func TestGossipTracker_E2E(t *testing.T) {
 	require.True(g.Tracked(p1))
 
 	// check p1's unknown
-	unknown, ok = g.GetUnknown(p1)
+	unknown, ok = g.GetUnknown(p1, limit)
 	require.True(ok)
 	require.Contains(unknown, v1)
 	require.Contains(unknown, v2)
@@ -509,7 +518,7 @@ func TestGossipTracker_E2E(t *testing.T) {
 
 	// Check p2's unknown. We should get nothing since we're not tracking it
 	// yet.
-	unknown, ok = g.GetUnknown(p2)
+	unknown, ok = g.GetUnknown(p2, limit)
 	require.False(ok)
 	require.Nil(unknown)
 
@@ -517,7 +526,7 @@ func TestGossipTracker_E2E(t *testing.T) {
 	require.True(g.StartTrackingPeer(p2))
 
 	// check p2's unknown
-	unknown, ok = g.GetUnknown(p2)
+	unknown, ok = g.GetUnknown(p2, limit)
 	require.True(ok)
 	require.Contains(unknown, v1)
 	require.Contains(unknown, v2)
@@ -530,13 +539,13 @@ func TestGossipTracker_E2E(t *testing.T) {
 	require.Equal([]ids.ID{v1.TxID}, txIDs)
 
 	// p1 should have an unknown of [v2], since it knows v1
-	unknown, ok = g.GetUnknown(p1)
+	unknown, ok = g.GetUnknown(p1, limit)
 	require.True(ok)
 	require.Contains(unknown, v2)
 	require.Len(unknown, 1)
 
 	// p2 should have a unknown of [v1, v2], since it knows nothing
-	unknown, ok = g.GetUnknown(p2)
+	unknown, ok = g.GetUnknown(p2, limit)
 	require.True(ok)
 	require.Contains(unknown, v1)
 	require.Contains(unknown, v2)
@@ -554,14 +563,14 @@ func TestGossipTracker_E2E(t *testing.T) {
 	require.Equal([]ids.ID{v1.TxID, v2.TxID, v3.TxID}, txIDs)
 
 	// p1 doesn't know about [v2, v3]
-	unknown, ok = g.GetUnknown(p1)
+	unknown, ok = g.GetUnknown(p1, limit)
 	require.True(ok)
 	require.Contains(unknown, v2)
 	require.Contains(unknown, v3)
 	require.Len(unknown, 2)
 
 	// p2 doesn't know about [v1, v2, v3]
-	unknown, ok = g.GetUnknown(p2)
+	unknown, ok = g.GetUnknown(p2, limit)
 	require.True(ok)
 	require.Contains(unknown, v1)
 	require.Contains(unknown, v2)
@@ -569,19 +578,19 @@ func TestGossipTracker_E2E(t *testing.T) {
 	require.Len(unknown, 3)
 
 	// p3 knows about everyone
-	unknown, ok = g.GetUnknown(p3)
+	unknown, ok = g.GetUnknown(p3, limit)
 	require.True(ok)
 	require.Empty(unknown)
 
 	// stop tracking p2
 	require.True(g.StopTrackingPeer(p2))
-	unknown, ok = g.GetUnknown(p2)
+	unknown, ok = g.GetUnknown(p2, limit)
 	require.False(ok)
 	require.Nil(unknown)
 
 	// p1 doesn't know about [v2, v3] because v2 is still registered as
 	// a validator
-	unknown, ok = g.GetUnknown(p1)
+	unknown, ok = g.GetUnknown(p1, limit)
 	require.True(ok)
 	require.Contains(unknown, v2)
 	require.Contains(unknown, v3)
@@ -591,13 +600,13 @@ func TestGossipTracker_E2E(t *testing.T) {
 	require.True(g.RemoveValidator(v2.NodeID))
 
 	// p1 doesn't know about [v3] since v2 left the validator set
-	unknown, ok = g.GetUnknown(p1)
+	unknown, ok = g.GetUnknown(p1, limit)
 	require.True(ok)
 	require.Contains(unknown, v3)
 	require.Len(unknown, 1)
 
 	// p3 knows about everyone since it learned about v1 and v3 earlier.
-	unknown, ok = g.GetUnknown(p3)
+	unknown, ok = g.GetUnknown(p3, limit)
 	require.Empty(unknown)
 	require.True(ok)
 }
@@ -617,4 +626,48 @@ func TestGossipTracker_Regression_IncorrectTxIDDeletion(t *testing.T) {
 		NodeID: ids.GenerateTestNodeID(),
 		TxID:   v2.TxID,
 	}))
+}
+
+func TestGossipTracker_GetUnknown_Sampling(t *testing.T) {
+	tests := []struct {
+		name       string
+		validators []ValidatorID
+		limit      int
+	}{
+		{
+			name:       "less unknown validators than limit",
+			validators: []ValidatorID{v1, v2, v3},
+			limit:      4,
+		},
+		{
+			name:       "equal amount of unknown validators as limit",
+			validators: []ValidatorID{v1, v2, v3},
+			limit:      3,
+		},
+		{
+			name:       "more amount of unknown validators as limit",
+			validators: []ValidatorID{v1, v2, v3},
+			limit:      2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+
+			g, err := NewGossipTracker(prometheus.NewRegistry(), "foobar")
+			require.NoError(err)
+
+			require.True(g.StartTrackingPeer(p1))
+
+			for _, v := range tt.validators {
+				require.True(g.AddValidator(v))
+			}
+
+			unknown, ok := g.GetUnknown(p1, tt.limit)
+			require.True(ok)
+			require.Len(unknown, int(math.Min(float64(tt.limit), float64(len(tt.validators)))))
+			require.Subset(tt.validators, unknown)
+		})
+	}
 }
