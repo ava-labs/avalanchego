@@ -13,8 +13,9 @@ import (
 	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/codec"
-	safe_math "github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	
+	safe_math "github.com/ava-labs/avalanchego/utils/math"
 )
 
 const (
