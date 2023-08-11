@@ -85,28 +85,29 @@ type MyInnerStruct3 struct {
 }
 
 type myStruct struct {
-	InnerStruct  MyInnerStruct              `serialize:"true"`
-	InnerStruct2 *MyInnerStruct             `serialize:"true"`
-	Member1      int64                      `serialize:"true"`
-	Member2      uint16                     `serialize:"true"`
-	MyArray2     [5]string                  `serialize:"true"`
-	MyArray3     [3]MyInnerStruct           `serialize:"true"`
-	MyArray4     [2]*MyInnerStruct2         `serialize:"true"`
-	MySlice      []byte                     `serialize:"true"`
-	MySlice2     []string                   `serialize:"true"`
-	MySlice3     []MyInnerStruct            `serialize:"true"`
-	MySlice4     []*MyInnerStruct2          `serialize:"true"`
-	MyArray      [4]byte                    `serialize:"true"`
-	MyInterface  Foo                        `serialize:"true"`
-	MySlice5     []Foo                      `serialize:"true"`
-	InnerStruct3 MyInnerStruct3             `serialize:"true"`
-	MyPointer    *Foo                       `serialize:"true"`
-	MyMap1       map[string]string          `serialize:"true"`
-	MyMap2       map[int32][]MyInnerStruct3 `serialize:"true"`
-	MyMap3       map[MyInnerStruct2][]int32 `serialize:"true"`
-	MyMap4       map[int32]*int32           `serialize:"true"`
-	MyMap5       map[int32]int32            `serialize:"true"`
-	MyMap6       map[[5]int32]int32         `serialize:"true"`
+	InnerStruct  MyInnerStruct               `serialize:"true"`
+	InnerStruct2 *MyInnerStruct              `serialize:"true"`
+	Member1      int64                       `serialize:"true"`
+	Member2      uint16                      `serialize:"true"`
+	MyArray2     [5]string                   `serialize:"true"`
+	MyArray3     [3]MyInnerStruct            `serialize:"true"`
+	MyArray4     [2]*MyInnerStruct2          `serialize:"true"`
+	MySlice      []byte                      `serialize:"true"`
+	MySlice2     []string                    `serialize:"true"`
+	MySlice3     []MyInnerStruct             `serialize:"true"`
+	MySlice4     []*MyInnerStruct2           `serialize:"true"`
+	MyArray      [4]byte                     `serialize:"true"`
+	MyInterface  Foo                         `serialize:"true"`
+	MySlice5     []Foo                       `serialize:"true"`
+	InnerStruct3 MyInnerStruct3              `serialize:"true"`
+	MyPointer    *Foo                        `serialize:"true"`
+	MyMap1       map[string]string           `serialize:"true"`
+	MyMap2       map[int32][]MyInnerStruct3  `serialize:"true"`
+	MyMap3       map[MyInnerStruct2][]int32  `serialize:"true"`
+	MyMap4       map[int32]*int32            `serialize:"true"`
+	MyMap5       map[int32]int32             `serialize:"true"`
+	MyMap6       map[[5]int32]int32          `serialize:"true"`
+	MyMap7       map[interface{}]interface{} `serialize:"true"`
 }
 
 // Test marshaling/unmarshaling a complicated struct
@@ -127,6 +128,10 @@ func TestStruct(codec GeneralCodec, t testing.TB) {
 	myMap6 := make(map[[5]int32]int32)
 	myMap6[[5]int32{0, 1, 2, 3, 4}] = 1
 	myMap6[[5]int32{1, 2, 3, 4, 5}] = 2
+
+	myMap7 := make(map[interface{}]interface{})
+	myMap7["key"] = "value"
+	myMap7[int32(1)] = int32(2)
 
 	myStructInstance := myStruct{
 		InnerStruct:  MyInnerStruct{"hello"},
@@ -191,12 +196,15 @@ func TestStruct(codec GeneralCodec, t testing.TB) {
 		MyMap3: myMap3,
 		MyMap4: myMap4,
 		MyMap6: myMap6,
+		MyMap7: myMap7,
 	}
 
 	manager := NewDefaultManager()
 	// Register the types that may be unmarshaled into interfaces
 	require.NoError(codec.RegisterType(&MyInnerStruct{}))
 	require.NoError(codec.RegisterType(&MyInnerStruct2{}))
+	require.NoError(codec.RegisterType(""))
+	require.NoError(codec.RegisterType(int32(0)))
 	require.NoError(manager.RegisterCodec(0, codec))
 
 	myStructBytes, err := manager.Marshal(0, myStructInstance)
