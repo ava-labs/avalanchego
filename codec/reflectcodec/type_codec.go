@@ -14,7 +14,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	
+
 	safe_math "github.com/ava-labs/avalanchego/utils/math"
 )
 
