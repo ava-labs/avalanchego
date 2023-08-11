@@ -670,8 +670,8 @@ func (n *network) Disconnected(nodeID ids.NodeID) {
 
 func (n *network) Peers(peerID ids.NodeID) ([]ips.ClaimedIPPort, error) {
 	// Only select validators that we haven't already sent to this peer
-	unknownValidators, ok := n.gossipTracker.GetUnknown(peerID,
-		int(n.config.PeerListNumValidatorIPs))
+	limit := int(n.config.PeerListNumValidatorIPs)
+	unknownValidators, ok := n.gossipTracker.GetUnknown(peerID, limit)
 	if !ok {
 		n.peerConfig.Log.Debug(
 			"unable to find peer to gossip to",
