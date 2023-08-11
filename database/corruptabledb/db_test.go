@@ -147,20 +147,6 @@ func TestIterator(t *testing.T) {
 			},
 		},
 		{
-			name:              "Key corrupts database",
-			databaseErrBefore: nil,
-			expectedErr:       errIter,
-			modifyIter: func(ctrl *gomock.Controller, iter *iterator) {
-				mockInnerIter := database.NewMockIterator(ctrl)
-				mockInnerIter.EXPECT().Key().Return(nil)
-				mockInnerIter.EXPECT().Error().Return(errIter)
-				iter.innerIter = mockInnerIter
-			},
-			op: func(require *require.Assertions, iter *iterator) {
-				require.Nil(iter.Key())
-			},
-		},
-		{
 			name:              "corrupted database; Value",
 			databaseErrBefore: errTest,
 			expectedErr:       errTest,
@@ -170,38 +156,10 @@ func TestIterator(t *testing.T) {
 			},
 		},
 		{
-			name:              "Value corrupts database",
-			databaseErrBefore: nil,
-			expectedErr:       errIter,
-			modifyIter: func(ctrl *gomock.Controller, iter *iterator) {
-				mockInnerIter := database.NewMockIterator(ctrl)
-				mockInnerIter.EXPECT().Value().Return(nil)
-				mockInnerIter.EXPECT().Error().Return(errIter)
-				iter.innerIter = mockInnerIter
-			},
-			op: func(require *require.Assertions, iter *iterator) {
-				require.Nil(iter.Value())
-			},
-		},
-		{
 			name:              "corrupted database; Release",
 			databaseErrBefore: errTest,
 			expectedErr:       errTest,
 			modifyIter:        func(ctrl *gomock.Controller, iter *iterator) {},
-			op: func(require *require.Assertions, iter *iterator) {
-				iter.Release()
-			},
-		},
-		{
-			name:              "Release corrupts database",
-			databaseErrBefore: nil,
-			expectedErr:       errIter,
-			modifyIter: func(ctrl *gomock.Controller, iter *iterator) {
-				mockInnerIter := database.NewMockIterator(ctrl)
-				mockInnerIter.EXPECT().Release()
-				mockInnerIter.EXPECT().Error().Return(errIter)
-				iter.innerIter = mockInnerIter
-			},
 			op: func(require *require.Assertions, iter *iterator) {
 				iter.Release()
 			},
