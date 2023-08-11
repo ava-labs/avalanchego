@@ -16,6 +16,7 @@ var _ blocks.Visitor = (*rejector)(nil)
 // being shutdown.
 type rejector struct {
 	*backend
+	addTxsToMempool bool
 }
 
 func (r *rejector) BanffAbortBlock(b *blocks.BanffAbortBlock) error {
@@ -65,6 +66,10 @@ func (r *rejector) rejectBlock(b blocks.Block, blockType string) error {
 		zap.Uint64("height", b.Height()),
 		zap.Stringer("parentID", b.Parent()),
 	)
+
+	if !r.addTxsToMempool {
+		return nil
+	}
 
 	for _, tx := range b.Txs() {
 		if err := r.Mempool.Add(tx); err != nil {

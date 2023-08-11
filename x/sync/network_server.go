@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 
@@ -131,6 +132,13 @@ func (s *NetworkServer) AppRequest(
 	return nil
 }
 
+func maybeBytesToMaybe(mb *pb.MaybeBytes) maybe.Maybe[[]byte] {
+	if mb != nil && !mb.IsNothing {
+		return maybe.Some(mb.Value)
+	}
+	return maybe.Nothing[[]byte]()
+}
+
 // Generates a change proof and sends it to [nodeID].
 func (s *NetworkServer) HandleChangeProofRequest(
 	ctx context.Context,
@@ -165,6 +173,7 @@ func (s *NetworkServer) HandleChangeProofRequest(
 	if bytesLimit > maxByteSizeLimit {
 		bytesLimit = maxByteSizeLimit
 	}
+	end := maybeBytesToMaybe(req.EndKey)
 
 	startRoot, err := ids.ToID(req.StartRootHash)
 	if err != nil {
@@ -177,7 +186,7 @@ func (s *NetworkServer) HandleChangeProofRequest(
 	}
 
 	for keyLimit > 0 {
-		changeProof, err := s.db.GetChangeProof(ctx, startRoot, endRoot, req.StartKey, req.EndKey.Value, int(keyLimit))
+		changeProof, err := s.db.GetChangeProof(ctx, startRoot, endRoot, req.StartKey, end, int(keyLimit))
 		if err != nil {
 			if !errors.Is(err, merkledb.ErrInsufficientHistory) {
 				return err
@@ -304,7 +313,7 @@ func getRangeProof(
 			ctx,
 			root,
 			req.StartKey,
-			req.EndKey.Value,
+			maybeBytesToMaybe(req.EndKey),
 			keyLimit,
 		)
 		if err != nil {

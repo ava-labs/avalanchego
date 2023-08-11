@@ -11,6 +11,7 @@ import (
 	"github.com/google/btree"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/maybe"
 )
 
 var ErrInsufficientHistory = errors.New("insufficient history to generate proof")
@@ -50,13 +51,13 @@ type changeSummaryAndIndex struct {
 type changeSummary struct {
 	rootID ids.ID
 	nodes  map[path]*change[*node]
-	values map[path]*change[Maybe[[]byte]]
+	values map[path]*change[maybe.Maybe[[]byte]]
 }
 
 func newChangeSummary(estimatedSize int) *changeSummary {
 	return &changeSummary{
 		nodes:  make(map[path]*change[*node], estimatedSize),
-		values: make(map[path]*change[Maybe[[]byte]], estimatedSize),
+		values: make(map[path]*change[maybe.Maybe[[]byte]], estimatedSize),
 	}
 }
 
@@ -81,7 +82,7 @@ func (th *trieHistory) getValueChanges(
 	startRoot ids.ID,
 	endRoot ids.ID,
 	start []byte,
-	end []byte,
+	end maybe.Maybe[[]byte],
 	maxLength int,
 ) (*changeSummary, error) {
 	if maxLength <= 0 {
@@ -140,7 +141,7 @@ func (th *trieHistory) getValueChanges(
 	)
 
 	startPath := newPath(start)
-	endPath := newPath(end)
+	endPath := maybe.Bind(end, newPath)
 
 	// For each element in the history in the range between [startRoot]'s
 	// last appearance (exclusive) and [endRoot]'s last appearance (inclusive),
@@ -166,7 +167,7 @@ func (th *trieHistory) getValueChanges(
 			for key, valueChange := range item.values {
 				// The key is outside the range [start, end].
 				if (len(startPath) > 0 && key.Compare(startPath) < 0) ||
-					(len(endPath) > 0 && key.Compare(endPath) > 0) {
+					(end.HasValue() && key.Compare(endPath.Value()) > 0) {
 					continue
 				}
 
@@ -174,14 +175,14 @@ func (th *trieHistory) getValueChanges(
 				// so update its before value with the earlier before value
 				if existing, ok := combinedChanges.values[key]; ok {
 					existing.after = valueChange.after
-					if existing.before.hasValue == existing.after.hasValue &&
-						bytes.Equal(existing.before.value, existing.after.value) {
+					if existing.before.HasValue() == existing.after.HasValue() &&
+						bytes.Equal(existing.before.Value(), existing.after.Value()) {
 						// The change to this key is a no-op, so remove it from [combinedChanges].
 						delete(combinedChanges.values, key)
 						sortedKeys.Delete(key)
 					}
 				} else {
-					combinedChanges.values[key] = &change[Maybe[[]byte]]{
+					combinedChanges.values[key] = &change[maybe.Maybe[[]byte]]{
 						before: valueChange.before,
 						after:  valueChange.after,
 					}
@@ -206,7 +207,7 @@ func (th *trieHistory) getValueChanges(
 // for the keys in [start, end].
 // If [start] is nil, all keys are considered > [start].
 // If  [end] is nil, all keys are considered < [end].
-func (th *trieHistory) getChangesToGetToRoot(rootID ids.ID, start, end []byte) (*changeSummary, error) {
+func (th *trieHistory) getChangesToGetToRoot(rootID ids.ID, start []byte, end maybe.Maybe[[]byte]) (*changeSummary, error) {
 	// [lastRootChange] is the last change in the history resulting in [rootID].
 	lastRootChange, ok := th.lastChanges[rootID]
 	if !ok {
@@ -215,7 +216,7 @@ func (th *trieHistory) getChangesToGetToRoot(rootID ids.ID, start, end []byte) (
 
 	var (
 		startPath       = newPath(start)
-		endPath         = newPath(end)
+		endPath         = maybe.Bind(end, newPath)
 		combinedChanges = newChangeSummary(defaultPreallocationSize)
 	)
 
@@ -235,11 +236,11 @@ func (th *trieHistory) getChangesToGetToRoot(rootID ids.ID, start, end []byte) (
 
 			for key, valueChange := range item.values {
 				if (len(startPath) == 0 || key.Compare(startPath) >= 0) &&
-					(len(endPath) == 0 || key.Compare(endPath) <= 0) {
+					(endPath.IsNothing() || key.Compare(endPath.Value()) <= 0) {
 					if existing, ok := combinedChanges.values[key]; ok {
 						existing.after = valueChange.before
 					} else {
-						combinedChanges.values[key] = &change[Maybe[[]byte]]{
+						combinedChanges.values[key] = &change[maybe.Maybe[[]byte]]{
 							before: valueChange.after,
 							after:  valueChange.before,
 						}

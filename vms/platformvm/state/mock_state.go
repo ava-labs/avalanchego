@@ -10,11 +10,13 @@ package state
 import (
 	context "context"
 	reflect "reflect"
+	sync "sync"
 	time "time"
 
 	database "github.com/ava-labs/avalanchego/database"
 	ids "github.com/ava-labs/avalanchego/ids"
 	validators "github.com/ava-labs/avalanchego/snow/validators"
+	logging "github.com/ava-labs/avalanchego/utils/logging"
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
 	blocks "github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	status "github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -284,6 +286,21 @@ func (m *MockState) DeleteUTXO(arg0 ids.ID) {
 func (mr *MockStateMockRecorder) DeleteUTXO(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteUTXO", reflect.TypeOf((*MockState)(nil).DeleteUTXO), arg0)
+}
+
+// GetBlockIDAtHeight mocks base method.
+func (m *MockState) GetBlockIDAtHeight(arg0 uint64) (ids.ID, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetBlockIDAtHeight", arg0)
+	ret0, _ := ret[0].(ids.ID)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetBlockIDAtHeight indicates an expected call of GetBlockIDAtHeight.
+func (mr *MockStateMockRecorder) GetBlockIDAtHeight(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlockIDAtHeight", reflect.TypeOf((*MockState)(nil).GetBlockIDAtHeight), arg0)
 }
 
 // GetChains mocks base method.
@@ -571,6 +588,20 @@ func (mr *MockStateMockRecorder) GetUptime(arg0, arg1 interface{}) *gomock.Call 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUptime", reflect.TypeOf((*MockState)(nil).GetUptime), arg0, arg1)
 }
 
+// PruneAndIndex mocks base method.
+func (m *MockState) PruneAndIndex(arg0 sync.Locker, arg1 logging.Logger) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PruneAndIndex", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// PruneAndIndex indicates an expected call of PruneAndIndex.
+func (mr *MockStateMockRecorder) PruneAndIndex(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PruneAndIndex", reflect.TypeOf((*MockState)(nil).PruneAndIndex), arg0, arg1)
+}
+
 // PutCurrentDelegator mocks base method.
 func (m *MockState) PutCurrentDelegator(arg0 *Staker) {
 	m.ctrl.T.Helper()
@@ -693,6 +724,21 @@ func (m *MockState) SetUptime(arg0 ids.NodeID, arg1 ids.ID, arg2 time.Duration, 
 func (mr *MockStateMockRecorder) SetUptime(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetUptime", reflect.TypeOf((*MockState)(nil).SetUptime), arg0, arg1, arg2, arg3)
+}
+
+// ShouldPrune mocks base method.
+func (m *MockState) ShouldPrune() (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ShouldPrune")
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ShouldPrune indicates an expected call of ShouldPrune.
+func (mr *MockStateMockRecorder) ShouldPrune() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ShouldPrune", reflect.TypeOf((*MockState)(nil).ShouldPrune))
 }
 
 // UTXOIDs mocks base method.

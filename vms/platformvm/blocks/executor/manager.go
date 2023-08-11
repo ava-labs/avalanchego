@@ -53,7 +53,10 @@ func NewManager(
 			validators:   validatorManager,
 			bootstrapped: txExecutorBackend.Bootstrapped,
 		},
-		rejector: &rejector{backend: backend},
+		rejector: &rejector{
+			backend:         backend,
+			addTxsToMempool: !txExecutorBackend.Config.PartialSyncPrimaryNetwork,
+		},
 	}
 }
 
