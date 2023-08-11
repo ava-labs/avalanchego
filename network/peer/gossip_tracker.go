@@ -10,6 +10,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -314,14 +316,22 @@ func (g *gossipTracker) GetUnknown(peerID ids.NodeID, limit int) ([]ValidatorID,
 	// Calculate the unknown information we need to send to this peer. We do
 	// this by computing the difference between the validators we know about
 	// and the validators we know we've sent to [peerID].
-	unknownValidators := set.SampleableSet[ValidatorID]{}
-	for i, validatorID := range g.validatorIDs {
-		if !knownValidators.Contains(i) {
-			unknownValidators.Add(validatorID)
-		}
-	}
-
+	//
 	// We select a random sample of validators to gossip to avoid starving out a
 	// validator from being gossiped for an extended period of time.
-	return unknownValidators.Sample(limit), true
+	numValidators := len(g.validatorIDs)
+	s := sampler.NewUniform()
+	s.Initialize(uint64(numValidators))
+	indices, _ := s.Sample(math.Min(limit, numValidators))
+
+	unknownValidators := make([]ValidatorID, 0, len(indices))
+	for _, index := range indices {
+		if knownValidators.Contains(int(index)) {
+			continue
+		}
+
+		unknownValidators = append(unknownValidators, g.validatorIDs[index])
+	}
+
+	return unknownValidators, true
 }
