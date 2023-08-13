@@ -51,6 +51,8 @@ type Consensus interface {
 	// Returns the ID of the tail of the strongly preferred sequence of
 	// decisions.
 	Preference() ids.ID
+	// Returns the preference height.
+	PreferenceHeight() uint64
 
 	// RecordPoll collects the results of a network poll. Assumes all decisions
 	// have been previously added. Returns if a critical error has occurred.

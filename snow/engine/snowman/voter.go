@@ -74,6 +74,7 @@ func (v *voter) Update(ctx context.Context) {
 		return
 	}
 
+	// TODO: track preference by height
 	if err := v.t.VM.SetPreference(ctx, v.t.Consensus.Preference()); err != nil {
 		v.t.errs.Add(err)
 		return

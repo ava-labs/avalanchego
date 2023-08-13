@@ -58,9 +58,8 @@ type Topological struct {
 
 	// head is the last accepted block
 	head ids.ID
-
-	// height is the height of the last accepted block
-	height uint64
+	// headHeight is the height of the last accepted block
+	headHeight uint64
 
 	// blocks stores the last accepted block and all the pending blocks
 	blocks map[ids.ID]*snowmanBlock // blockID -> snowmanBlock
@@ -70,6 +69,8 @@ type Topological struct {
 
 	// tail is the preferred block with no children
 	tail ids.ID
+	// tailHeight is the height of the preferred block
+	tailHeight uint64
 
 	// Used in [calculateInDegree] and.
 	// Should only be accessed in that method.
@@ -135,14 +136,15 @@ func (ts *Topological) Initialize(ctx *snow.ConsensusContext, params snowball.Pa
 	ts.ctx = ctx
 	ts.params = params
 	ts.head = rootID
-	ts.height = rootHeight
+	ts.headHeight = rootHeight
 	ts.blocks = map[ids.ID]*snowmanBlock{
 		rootID: {params: ts.params},
 	}
 	ts.tail = rootID
+	ts.tailHeight = rootHeight
 
 	// Initially set the metrics for the last accepted block.
-	ts.Height.Accepted(ts.height)
+	ts.Height.Accepted(ts.headHeight)
 	ts.Timestamp.Accepted(rootTime)
 
 	return nil
@@ -189,6 +191,7 @@ func (ts *Topological) Add(ctx context.Context, blk Block) error {
 	// If we are extending the tail, this is the new tail
 	if ts.tail == parentID {
 		ts.tail = blkID
+		ts.tailHeight = blk.Height()
 		ts.preferredIDs.Add(blkID)
 	}
 	return nil
@@ -201,7 +204,7 @@ func (ts *Topological) Decided(blk Block) bool {
 	}
 	// If the block is marked as fetched, we can check if it has been
 	// transitively rejected.
-	return blk.Status() == choices.Processing && blk.Height() <= ts.height
+	return blk.Status() == choices.Processing && blk.Height() <= ts.headHeight
 }
 
 func (ts *Topological) Processing(blkID ids.ID) bool {
@@ -230,6 +233,10 @@ func (ts *Topological) LastAccepted() ids.ID {
 
 func (ts *Topological) Preference() ids.ID {
 	return ts.tail
+}
+
+func (ts *Topological) PreferenceHeight() uint64 {
+	return ts.tailHeight
 }
 
 // The votes bag contains at most K votes for blocks in the tree. If there is a
@@ -293,6 +300,9 @@ func (ts *Topological) RecordPoll(ctx context.Context, voteBag bag.Bag[ids.ID]) 
 
 	ts.tail = preferred
 	startBlock := ts.blocks[ts.tail]
+	if startBlock != nil && startBlock.blk != nil {
+		ts.tailHeight = startBlock.blk.Height()
+	}
 
 	// Runtime = |live set| ; Space = Constant
 	// Traverse from the preferred ID to the last accepted ancestor.
@@ -304,6 +314,8 @@ func (ts *Topological) RecordPoll(ctx context.Context, voteBag bag.Bag[ids.ID]) 
 	// children.
 	for block := startBlock; block.sb != nil; block = ts.blocks[ts.tail] {
 		ts.tail = block.sb.Preference()
+		// +1 since the tail is the preferred child
+		ts.tailHeight = block.blk.Height() + 1
 		ts.preferredIDs.Add(ts.tail)
 	}
 	return nil
@@ -606,13 +618,13 @@ func (ts *Topological) acceptPreferredChild(ctx context.Context, n *snowmanBlock
 
 	// Because this is the newest accepted block, this is the new head.
 	ts.head = pref
-	ts.height = child.Height()
+	ts.headHeight = child.Height()
 	// Remove the decided block from the set of processing IDs, as its status
 	// now implies its preferredness.
 	ts.preferredIDs.Remove(pref)
 
 	ts.Latency.Accepted(pref, ts.pollNumber, len(bytes))
-	ts.Height.Accepted(ts.height)
+	ts.Height.Accepted(ts.headHeight)
 	ts.Timestamp.Accepted(child.Timestamp())
 
 	// Because ts.blocks contains the last accepted block, we don't delete the
