@@ -20,9 +20,10 @@ import (
 // default number of heights to index before committing
 const (
 	defaultCommitFrequency = 1024
-	// Sleep [sleepDurationMultiplier]x (5x) the amount of time we spend processing the block
-	// to ensure the async indexing does not bottleneck the node.
-	sleepDurationMultiplier = 5
+	// Sleep [sleepDurationMultiplier]x (10x) the amount of time we spend
+	// processing the block to ensure the async indexing does not bottleneck the
+	// node.
+	sleepDurationMultiplier = 10
 )
 
 var _ HeightIndexer = (*heightIndexer)(nil)
