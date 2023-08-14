@@ -333,6 +333,10 @@ func (vm *VM) Initialize(
 	if err := vm.config.Validate(); err != nil {
 		return err
 	}
+	// We should deprecate config flags as the first thing, before we do anything else
+	// because this can set old flags to new flags. log the message after we have
+	// initialized the logger.
+	deprecateMsg := vm.config.Deprecate()
 
 	vm.ctx = chainCtx
 
@@ -354,6 +358,10 @@ func (vm *VM) Initialize(
 	vm.logger = corethLogger
 
 	log.Info("Initializing Coreth VM", "Version", Version, "Config", vm.config)
+
+	if deprecateMsg != "" {
+		log.Warn("Deprecation Warning", "msg", deprecateMsg)
+	}
 
 	if len(fxs) > 0 {
 		return errUnsupportedFXs
@@ -1156,8 +1164,8 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]*commonEng.HTTPHandler
 	enabledAPIs = append(enabledAPIs, "avax")
 	apis[avaxEndpoint] = avaxAPI
 
-	if vm.config.CorethAdminAPIEnabled {
-		adminAPI, err := newHandler("admin", NewAdminService(vm, os.ExpandEnv(fmt.Sprintf("%s_coreth_performance_%s", vm.config.CorethAdminAPIDir, primaryAlias))))
+	if vm.config.AdminAPIEnabled {
+		adminAPI, err := newHandler("admin", NewAdminService(vm, os.ExpandEnv(fmt.Sprintf("%s_coreth_performance_%s", vm.config.AdminAPIDir, primaryAlias))))
 		if err != nil {
 			return nil, fmt.Errorf("failed to register service for admin API due to %w", err)
 		}
