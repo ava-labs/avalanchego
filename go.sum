@@ -61,10 +61,10 @@ github.com/antihax/optional v1.0.0/go.mod h1:uupD/76wgC+ih3iEmQUL+0Ugr19nfwCT1kd
 github.com/armon/consul-api v0.0.0-20180202201655-eb2c6b5be1b6/go.mod h1:grANhF5doyWs3UAsr3K4I6qtAmlQcZDesFNEHPZAzj8=
 github.com/ava-labs/avalanche-network-runner v1.7.1 h1:XRC2NcchESSxSlJEgb47lAkTG5eF1t2sMs8CoJKeAuE=
 github.com/ava-labs/avalanche-network-runner v1.7.1/go.mod h1:q/2ws64daRXXsiq08bVA1iESRY1CNOQQQDKPeMauZrc=
-github.com/ava-labs/avalanchego v1.10.6-rc.4 h1:MRQ0wGoLrvL2iYzGmhfee/j3uCY6epXyzpUMTa3Y9ww=
-github.com/ava-labs/avalanchego v1.10.6-rc.4/go.mod h1:e8LdGy0xM+QejpMoEK6wOFu2O5HMlAHPJiBPjhoTG78=
-github.com/ava-labs/coreth v0.12.5-rc.0 h1:9eqJS30tIDtBWzhQ2cXMe1Ul8AUabI89CVhdXUWU4E8=
-github.com/ava-labs/coreth v0.12.5-rc.0/go.mod h1:Wwctj2j/x4FVhePD5jlVbQ2TTOetihP6iJlQ9j8NLhw=
+github.com/ava-labs/avalanchego v1.10.8 h1:fUudA4J37y8wyNG3iiX0kpoZXunsWpCgvsGDgIsi0NY=
+github.com/ava-labs/avalanchego v1.10.8/go.mod h1:2zuce+beHe25wQ5RlrEeDpa+SqY/sjEOjDky+Q1NxfU=
+github.com/ava-labs/coreth v0.12.5-rc.1 h1:rLJ6mT/44jgc+vPpKaspGpxDIdQGLkSK6wDSmKgYPxY=
+github.com/ava-labs/coreth v0.12.5-rc.1/go.mod h1:K7Xm2jqx90wxKZXfLvkLEL+zlM5843gGq9XkqVDwKds=
 github.com/aymerick/raymond v2.0.3-0.20180322193309-b565731e1464+incompatible/go.mod h1:osfaiScAUVup+UC9Nfq76eWqDhXlp+4UYaA8uhTBO6g=
 github.com/benbjohnson/clock v1.3.0 h1:ip6w0uFQkncKQ979AypyG0ER7mqUSBdKLOgAle/AT8A=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
@@ -589,8 +589,8 @@ github.com/stretchr/testify v1.8.3 h1:RP3t2pwF7cMEbC1dqtB6poj3niw/9gnV4Cjg5oW5gt
 github.com/stretchr/testify v1.8.3/go.mod h1:sz/lmYIOXD/1dqDmKjjqLyZ2RngseejIcXlSw2iwfAo=
 github.com/subosito/gotenv v1.3.0 h1:mjC+YW8QpAdXibNi+vNWgzmgBH4+5l5dCXv8cNysBLI=
 github.com/subosito/gotenv v1.3.0/go.mod h1:YzJjq/33h7nrwdY+iHMhEOEEbW0ovIz0tB6t6PwAXzs=
-github.com/supranational/blst v0.3.11-0.20230406105308-e9dfc5ee724b h1:u49mjRnygnB34h8OKbnNJFVUtWSKIKb1KukdV8bILUM=
-github.com/supranational/blst v0.3.11-0.20230406105308-e9dfc5ee724b/go.mod h1:jZJtfjgudtNl4en1tzwPIV3KjUnQUvG3/j+w+fVonLw=
+github.com/supranational/blst v0.3.11 h1:LyU6FolezeWAhvQk0k6O/d49jqgO52MSDDfYgbeoEm4=
+github.com/supranational/blst v0.3.11/go.mod h1:jZJtfjgudtNl4en1tzwPIV3KjUnQUvG3/j+w+fVonLw=
 github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7/go.mod h1:q4W45IWZaF22tdD+VEXcAWRA037jwmWEB5VWYORlTpc=
 github.com/syndtr/goleveldb v1.0.1-0.20220614013038-64ee5596c38a h1:1ur3QoCqvE5fl+nylMaIr9PVV1w343YRDtsy+Rwu7XI=
 github.com/syndtr/goleveldb v1.0.1-0.20220614013038-64ee5596c38a/go.mod h1:RRCYJbIwD5jmqPI9XoAFR0OcDxqUctll6zUj/+B4S48=
