@@ -140,7 +140,7 @@ func (n *pushGossiper) queueExecutableTxs(state *state.StateDB, baseFee *big.Int
 		}
 
 		// Don't try to regossip a transaction too frequently
-		if time.Since(tx.FirstSeen()) < n.config.TxRegossipFrequency.Duration {
+		if time.Since(tx.FirstSeen()) < n.config.RegossipFrequency.Duration {
 			continue
 		}
 
@@ -197,14 +197,14 @@ func (n *pushGossiper) queueRegossipTxs() types.Transactions {
 		)
 		return nil
 	}
-	localQueued := n.queueExecutableTxs(state, tip.BaseFee, localTxs, n.config.TxRegossipMaxSize)
+	localQueued := n.queueExecutableTxs(state, tip.BaseFee, localTxs, n.config.RegossipMaxTxs)
 	localCount := len(localQueued)
 	n.stats.IncEthTxsRegossipQueuedLocal(localCount)
-	if localCount >= n.config.TxRegossipMaxSize {
+	if localCount >= n.config.RegossipMaxTxs {
 		n.stats.IncEthTxsRegossipQueued()
 		return localQueued
 	}
-	remoteQueued := n.queueExecutableTxs(state, tip.BaseFee, remoteTxs, n.config.TxRegossipMaxSize-localCount)
+	remoteQueued := n.queueExecutableTxs(state, tip.BaseFee, remoteTxs, n.config.RegossipMaxTxs-localCount)
 	n.stats.IncEthTxsRegossipQueuedRemote(len(remoteQueued))
 	if localCount+len(remoteQueued) > 0 {
 		// only increment the regossip stat when there are any txs queued
@@ -220,7 +220,7 @@ func (n *pushGossiper) awaitEthTxGossip() {
 	go n.ctx.Log.RecoverAndPanic(func() {
 		var (
 			gossipTicker   = time.NewTicker(ethTxsGossipInterval)
-			regossipTicker = time.NewTicker(n.config.TxRegossipFrequency.Duration)
+			regossipTicker = time.NewTicker(n.config.RegossipFrequency.Duration)
 		)
 		defer func() {
 			gossipTicker.Stop()
@@ -349,7 +349,7 @@ func (n *pushGossiper) gossipEthTxs(force bool) (int, error) {
 			continue
 		}
 
-		if n.config.RemoteTxGossipOnlyEnabled && n.txPool.HasLocal(txHash) {
+		if n.config.RemoteGossipOnlyEnabled && n.txPool.HasLocal(txHash) {
 			continue
 		}
 
