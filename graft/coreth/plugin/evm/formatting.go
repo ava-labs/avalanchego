@@ -14,6 +14,17 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
+// ParseServiceAddress get address ID from address string, being it either localized (using address manager,
+// doing also components validations), or not localized.
+// If both attempts fail, reports error from localized address parsing
+func (vm *VM) ParseServiceAddress(addrStr string) (ids.ShortID, error) {
+	addr, err := ids.ShortFromString(addrStr)
+	if err == nil {
+		return addr, nil
+	}
+	return vm.ParseLocalAddress(addrStr)
+}
+
 // ParseLocalAddress takes in an address for this chain and produces the ID
 func (vm *VM) ParseLocalAddress(addrStr string) (ids.ShortID, error) {
 	chainID, addr, err := vm.ParseAddress(addrStr)
