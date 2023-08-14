@@ -92,7 +92,7 @@ var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
 
 			var subnetAssetID ids.ID
 			ginkgo.By("create a custom asset for the permissionless subnet", func() {
-				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultTimeout)
+				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
 				subnetAssetTx, err := xWallet.IssueCreateAssetTx(
 					"RnM",
 					"RNM",
@@ -118,7 +118,7 @@ var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
 			})
 
 			ginkgo.By(fmt.Sprintf("Send 100 MegaAvax of asset %s to the P-chain", subnetAssetID), func() {
-				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultTimeout)
+				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
 				_, err := xWallet.IssueExportTx(
 					constants.PlatformChainID,
 					[]*avax.TransferableOutput{
@@ -139,7 +139,7 @@ var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
 			})
 
 			ginkgo.By(fmt.Sprintf("Import the 100 MegaAvax of asset %s from the X-chain into the P-chain", subnetAssetID), func() {
-				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultTimeout)
+				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
 				_, err := pWallet.IssueImportTx(
 					xChainID,
 					owner,
