@@ -44,8 +44,6 @@ var (
 	numCPU = runtime.NumCPU()
 )
 
-// Editable view of a trie, collects changes on top of a parent trie.
-// Delays adding key/value pairs to the trie.
 type trieView struct {
 	// Must be held when reading/writing fields except validity tracking fields:
 	// [childViews], [parentTrie], and [invalidated].
@@ -97,9 +95,6 @@ type trieView struct {
 	// The root of the trie represented by this view.
 	root *node
 
-	// True if the IDs of nodes in this view need to be recalculated.
-	needsRecalculation bool
-
 	// If true, this view has been committed and cannot be edited.
 	// Calls to Insert and Remove will return ErrCommitted.
 	committed bool
@@ -137,6 +132,7 @@ func (t *trieView) NewView(batchOps []database.BatchOp) (TrieView, error) {
 }
 
 // Creates a new view with the given [parentTrie].
+// Assumes [parentTrie] is read locked.
 func newTrieView(
 	db *merkleDB,
 	parentTrie TrieView,
@@ -165,7 +161,8 @@ func newTrieView(
 			}
 		}
 	}
-	return newView, nil
+
+	return newView, newView.calculateNodeIDs(context.TODO())
 }
 
 // Creates a new view with the given [parentTrie].
@@ -194,14 +191,10 @@ func newTrieViewWithChanges(
 // Recalculates the node IDs for all changed nodes in the trie.
 // Assumes [t.lock] is held.
 func (t *trieView) calculateNodeIDs(ctx context.Context) error {
-	switch {
-	case t.isInvalid():
+	if t.isInvalid() {
 		return ErrInvalid
-	case !t.needsRecalculation:
-		return nil
-	case t.committed:
-		// Note that this should never happen. If a view is committed, it should
-		// never be edited, so [t.needsRecalculation] should always be false.
+	}
+	if t.committed {
 		return ErrCommitted
 	}
 
@@ -210,15 +203,6 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 	// per key modified even though IDs are not re-calculated).
 	ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.calculateNodeIDs")
 	defer span.End()
-
-	// ensure that the view under this one is up-to-date before potentially pulling in nodes from it
-	// getting the Merkle root forces any unupdated nodes to recalculate their ids
-	if _, err := t.getParentTrie().GetMerkleRoot(ctx); err != nil {
-		return err
-	}
-
-	_, helperSpan := t.db.tracer.Start(ctx, "MerkleDB.trieview.calculateNodeIDsHelper")
-	defer helperSpan.End()
 
 	// [eg] limits the number of goroutines we start.
 	var eg errgroup.Group
@@ -229,10 +213,9 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 	if err := eg.Wait(); err != nil {
 		return err
 	}
-	t.needsRecalculation = false
 	t.changes.rootID = t.root.id
 
-	// ensure no ancestor changes occurred during execution
+	// ensure we didn't become invalid while calculating node IDs
 	if t.isInvalid() {
 		return ErrInvalid
 	}
@@ -302,18 +285,6 @@ func (t *trieView) GetProof(ctx context.Context, key []byte) (*Proof, error) {
 
 	t.lock.RLock()
 	defer t.lock.RUnlock()
-
-	// only need full lock if nodes ids need to be calculated
-	// looped to ensure that the value didn't change after the lock was released
-	for t.needsRecalculation {
-		t.lock.RUnlock()
-		t.lock.Lock()
-		if err := t.calculateNodeIDs(ctx); err != nil {
-			return nil, err
-		}
-		t.lock.Unlock()
-		t.lock.RLock()
-	}
 
 	return t.getProof(ctx, key)
 }
@@ -394,21 +365,10 @@ func (t *trieView) GetRangeProof(
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
-	// only need full lock if nodes ids need to be calculated
-	// looped to ensure that the value didn't change after the lock was released
-	for t.needsRecalculation {
-		t.lock.RUnlock()
-		t.lock.Lock()
-		if err := t.calculateNodeIDs(ctx); err != nil {
-			return nil, err
-		}
-		t.lock.Unlock()
-		t.lock.RLock()
+	result := RangeProof{
+		KeyValues: make([]KeyValue, 0, initKeyValuesSize),
 	}
 
-	var result RangeProof
-
-	result.KeyValues = make([]KeyValue, 0, initKeyValuesSize)
 	it := t.NewIteratorWithStart(start)
 	for it.Next() && len(result.KeyValues) < maxLength && (end.IsNothing() || bytes.Compare(it.Key(), end.Value()) <= 0) {
 		// clone the value to prevent editing of the values stored within the trie
@@ -518,10 +478,6 @@ func (t *trieView) commitChanges(ctx context.Context, trieToCommit *trieView) er
 	// to uphold the invariant on [t.invalidated].
 	t.invalidateChildrenExcept(trieToCommit)
 
-	if err := trieToCommit.calculateNodeIDs(ctx); err != nil {
-		return err
-	}
-
 	for key, nodeChange := range trieToCommit.changes.nodes {
 		if existing, ok := t.changes.nodes[key]; ok {
 			existing.after = nodeChange.after
@@ -568,8 +524,8 @@ func (t *trieView) CommitToParent(ctx context.Context) error {
 	return t.commitToParent(ctx)
 }
 
-// commitToParent commits the changes from this view to its parent Trie
-// assumes [t.lock] is held
+// commitToParent commits the changes from this view to its parent trie.
+// Assumes [t.lock] is held
 func (t *trieView) commitToParent(ctx context.Context) error {
 	ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.commitToParent")
 	defer span.End()
@@ -581,15 +537,11 @@ func (t *trieView) commitToParent(ctx context.Context) error {
 		return ErrCommitted
 	}
 
-	// ensure all of this view's changes have been calculated
-	if err := t.calculateNodeIDs(ctx); err != nil {
-		return err
-	}
-
 	// write this view's changes into its parent
 	if err := t.getParentTrie().commitChanges(ctx, t); err != nil {
 		return err
 	}
+
 	if t.isInvalid() {
 		return ErrInvalid
 	}
@@ -1099,8 +1051,6 @@ func (t *trieView) recordNodeDeleted(after *node) error {
 // Records that the node associated with the given key has been changed.
 // Assumes [t.lock] is held.
 func (t *trieView) recordKeyChange(key path, after *node) error {
-	t.needsRecalculation = true
-
 	if existing, ok := t.changes.nodes[key]; ok {
 		existing.after = after
 		return nil
@@ -1126,8 +1076,6 @@ func (t *trieView) recordKeyChange(key path, after *node) error {
 // That's deferred until we calculate node IDs.
 // Assumes [t.lock] is held.
 func (t *trieView) recordValueChange(key path, value maybe.Maybe[[]byte]) error {
-	t.needsRecalculation = true
-
 	// update the existing change if it exists
 	if existing, ok := t.changes.values[key]; ok {
 		existing.after = value
