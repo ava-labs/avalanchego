@@ -10,7 +10,7 @@ package database
 import (
 	reflect "reflect"
 
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockBatch is a mock of Batch interface.

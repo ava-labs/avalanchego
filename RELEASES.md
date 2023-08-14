@@ -1,5 +1,67 @@
 # Release Notes
 
+## [v1.10.8](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.8)
+
+This version is backwards compatible to [v1.10.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0). It is optional, but encouraged.
+
+The plugin version is unchanged at `27` and compatible with versions `v1.10.5 - v1.10.7`.
+
+**This update changes the local network genesis. This version will not be able to join local networks with prior versions.**
+
+**The first startup of the P-Chain will perform indexing operations. This indexing runs in the background and does not impact restart time. During this indexing the node will report increased CPU, memory, and disk usage.**
+
+### APIs
+
+- Added `platform.getBlockByHeight`
+
+### Configs
+
+- Added `--partial-sync-primary-network` flag to enable non-validators to optionally sync only the P-chain on the primary network
+- Added P-chain cache size configuration `block-id-cache-size`
+
+### Fixes
+
+- Fixed P-chain GetValidatorSet regression for subnets
+- Changed `x/sync` range/change proof bounds from `[]byte` to `Maybe[[]byte]`
+- Fixed `x/sync` error handling from failure to send app messages
+
+### What's Changed
+
+- Removes calls to ctrl.Finish by @darioush in https://github.com/ava-labs/avalanchego/pull/1803
+- e2e: Remove unnecessary transaction status checking by @marun in https://github.com/ava-labs/avalanchego/pull/1786
+- fix p2p mockgen location by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/1806
+- fix end proof verification by @danlaine in https://github.com/ava-labs/avalanchego/pull/1801
+- `merkledb` -- add proof fuzz test by @danlaine in https://github.com/ava-labs/avalanchego/pull/1804
+- `sync` -- re-add network client metrics by @danlaine in https://github.com/ava-labs/avalanchego/pull/1787
+- Add function to initialize set from elements by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/1808
+- Add Maybe to the end bound of proofs (Part 1) by @dboehm-avalabs in https://github.com/ava-labs/avalanchego/pull/1793
+- add go version to --version by @amirhasanzadehpy in https://github.com/ava-labs/avalanchego/pull/1819
+- e2e: Add local network fixture by @marun in https://github.com/ava-labs/avalanchego/pull/1700
+- Fix test flake in TestProposalTxsInMempool by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1822
+- `sync` -- remove todo by @danlaine in https://github.com/ava-labs/avalanchego/pull/1788
+- Add Maybe to the end bound of proofs (Part 2) by @dboehm-avalabs in https://github.com/ava-labs/avalanchego/pull/1813
+- Move Maybe to its own package by @danlaine in https://github.com/ava-labs/avalanchego/pull/1817
+- `merkledb` -- clarify/improve change proof invariants by @danlaine in https://github.com/ava-labs/avalanchego/pull/1810
+- P-chain state prune + height index by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/1719
+- Update maintainer of the debian packages by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1825
+- Make platformvm implement `block.HeightIndexedChainVM` by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/1746
+- Add P-chain `GetBlockByHeight` API method by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/1747
+- Update local genesis startTime by @ceyonur in https://github.com/ava-labs/avalanchego/pull/1811
+- `sync` -- add handling for fatal error by @danlaine in https://github.com/ava-labs/avalanchego/pull/1690
+- Add error logs for unexpected proposervm BuildBlock failures by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1832
+- Fix subnet validator set public key initialization by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1833
+- Document PendingTxs + BuildBlock consensus engine requirement by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1835
+- Bump github.com/supranational/blst from 0.3.11-0.20230406105308-e9dfc5ee724b to 0.3.11 by @dependabot in https://github.com/ava-labs/avalanchego/pull/1831
+- Add Primary Network Lite Sync Option by @abi87 in https://github.com/ava-labs/avalanchego/pull/1769
+- Check P-chain ShouldPrune during Initialize by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1836
+
+### New Contributors
+
+- @amirhasanzadehpy made their first contribution in https://github.com/ava-labs/avalanchego/pull/1819
+- @dependabot made their first contribution in https://github.com/ava-labs/avalanchego/pull/1831
+
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.10.7...v1.10.8
+
 ## [v1.10.7](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.7)
 
 This version is backwards compatible to [v1.10.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0). This release contains meaningful performance improvements and we recommend updating as soon as possible.

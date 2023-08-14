@@ -12,7 +12,7 @@ import (
 
 	ids "github.com/ava-labs/avalanchego/ids"
 	vms "github.com/ava-labs/avalanchego/vms"
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockVMGetter is a mock of VMGetter interface.

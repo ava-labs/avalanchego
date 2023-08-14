@@ -13,7 +13,7 @@ import (
 
 	ids "github.com/ava-labs/avalanchego/ids"
 	logging "github.com/ava-labs/avalanchego/utils/logging"
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockFactory is a mock of Factory interface.

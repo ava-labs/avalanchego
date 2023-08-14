@@ -18,7 +18,7 @@ import (
 	blocks "github.com/ava-labs/avalanchego/vms/avm/blocks"
 	txs "github.com/ava-labs/avalanchego/vms/avm/txs"
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockChain is a mock of Chain interface.

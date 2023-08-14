@@ -36,7 +36,6 @@ const (
 var (
 	_ validators.State = (*manager)(nil)
 
-	ErrMissingValidator    = errors.New("missing validator")
 	ErrMissingValidatorSet = errors.New("missing validator set")
 )
 
@@ -338,19 +337,15 @@ func (m *manager) makeSubnetValidatorSet(
 
 	// Update the subnet validator set to include the public keys at
 	// [currentHeight]. When we apply the public key diffs, we will convert
-	// these keys to represent the public keys at [targetHeight].
+	// these keys to represent the public keys at [targetHeight]. If the subnet
+	// validator is not currently a primary network validator, it doesn't have a
+	// key at [currentHeight].
 	for nodeID, vdr := range subnetValidatorSet {
-		primaryVdr, ok := primaryValidatorSet[nodeID]
-		if !ok {
-			// This should never happen
-			m.log.Error(ErrMissingValidator.Error(),
-				zap.Stringer("subnetID", subnetID),
-				zap.Stringer("nodeID", vdr.NodeID),
-			)
-			return nil, 0, ErrMissingValidator
+		if primaryVdr, ok := primaryValidatorSet[nodeID]; ok {
+			vdr.PublicKey = primaryVdr.PublicKey
+		} else {
+			vdr.PublicKey = nil
 		}
-
-		vdr.PublicKey = primaryVdr.PublicKey
 	}
 
 	err = m.state.ApplyValidatorPublicKeyDiffs(
