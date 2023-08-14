@@ -22,7 +22,7 @@ The minimum recommended hardware specification for nodes connected to Mainnet is
 
 If you plan to build AvalancheGo from source, you will also need the following software:
 
-- [Go](https://golang.org/doc/install) version >= 1.19.6
+- [Go](https://golang.org/doc/install) version >= 1.19.12
 - [gcc](https://gcc.gnu.org/)
 - g++
 
@@ -188,7 +188,7 @@ docker run -t -i -v $(pwd):/opt/avalanche -w/opt/avalanche avalanche:protobuf_co
 
 ### Running mock codegen
 
-To regenerate the [gomock](https://github.com/golang/mock) code, run `scripts/mock.gen.sh` from the root of the repo.
+To regenerate the [gomock](https://github.com/uber-go/mock) code, run `scripts/mock.gen.sh` from the root of the repo.
 
 This should only be necessary when modifying exported interfaces or after modifying `scripts/mock.mockgen.txt`.
 

@@ -8,11 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
-
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/stretchr/testify/require"
+
+	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
@@ -26,8 +26,6 @@ const engineType = p2p.EngineType_ENGINE_TYPE_SNOWMAN
 
 func TestQueue(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	require := require.New(t)
 	cpuTracker := tracker.NewMockTracker(ctrl)
 	vdrs := validators.NewSet()

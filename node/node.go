@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net"
 	"os"
 	"path/filepath"
@@ -476,7 +477,7 @@ func (n *Node) Dispatch() error {
 
 	// Remove the process context file to communicate to an orchestrator
 	// that the node is no longer running.
-	if err := os.Remove(n.Config.ProcessContextFilePath); err != nil && !os.IsNotExist(err) {
+	if err := os.Remove(n.Config.ProcessContextFilePath); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		n.Log.Error("removal of process context file failed",
 			zap.String("path", n.Config.ProcessContextFilePath),
 			zap.Error(err),
@@ -817,6 +818,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		Router:                                  n.Config.ConsensusRouter,
 		Net:                                     n.Net,
 		Validators:                              n.vdrs,
+		PartialSyncPrimaryNetwork:               n.Config.PartialSyncPrimaryNetwork,
 		NodeID:                                  n.ID,
 		NetworkID:                               n.Config.NetworkID,
 		Server:                                  n.APIServer,
@@ -885,6 +887,7 @@ func (n *Node) initVMs() error {
 				Validators:                    vdrs,
 				UptimeLockedCalculator:        n.uptimeCalculator,
 				SybilProtectionEnabled:        n.Config.SybilProtectionEnabled,
+				PartialSyncPrimaryNetwork:     n.Config.PartialSyncPrimaryNetwork,
 				TrackedSubnets:                n.Config.TrackedSubnets,
 				TxFee:                         n.Config.TxFee,
 				CreateAssetTxFee:              n.Config.CreateAssetTxFee,
