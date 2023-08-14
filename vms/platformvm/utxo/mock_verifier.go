@@ -14,7 +14,7 @@ import (
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
 	verify "github.com/ava-labs/avalanchego/vms/components/verify"
 	txs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockVerifier is a mock of Verifier interface.

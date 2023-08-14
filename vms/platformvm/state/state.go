@@ -183,6 +183,12 @@ type State interface {
 	// Discard uncommitted changes to the database.
 	Abort()
 
+	// Returns if the state should be pruned and indexed to remove rejected
+	// blocks and generate the block height index.
+	//
+	// TODO: Remove after v1.11.x is activated
+	ShouldPrune() (bool, error)
+
 	// Removes rejected blocks from disk and indexes accepted blocks by height. This
 	// function supports being (and is recommended to be) called asynchronously.
 	//
@@ -467,11 +473,14 @@ func New(
 	// to be run.
 	//
 	// TODO: Cleanup after v1.11.x is activated
-	shouldPrune, err := s.shouldPrune()
+	shouldPrune, err := s.ShouldPrune()
 	if err != nil {
 		return nil, err
 	}
 	if shouldPrune {
+		// If the pruned key is on disk, we must delete it to ensure our disk
+		// can't get into a partially pruned state if the node restarts mid-way
+		// through pruning.
 		if err := s.singletonDB.Delete(prunedKey); err != nil {
 			return nil, fmt.Errorf("failed to remove prunedKey from singletonDB: %w", err)
 		}
@@ -738,7 +747,7 @@ func (s *state) doneInit() error {
 	return s.singletonDB.Put(initializedKey, nil)
 }
 
-func (s *state) shouldPrune() (bool, error) {
+func (s *state) ShouldPrune() (bool, error) {
 	has, err := s.singletonDB.Has(prunedKey)
 	if err != nil {
 		return true, err
@@ -2343,21 +2352,6 @@ func parseStoredBlock(blkBytes []byte) (blocks.Block, choices.Status, bool, erro
 
 func (s *state) PruneAndIndex(lock sync.Locker, log logging.Logger) error {
 	lock.Lock()
-	shouldPrune, err := s.shouldPrune()
-	if err != nil {
-		lock.Unlock()
-		return fmt.Errorf(
-			"failed to check if the database should be pruned: %w",
-			err,
-		)
-	}
-	if !shouldPrune {
-		lock.Unlock()
-
-		log.Info("state already pruned and indexed")
-		return nil
-	}
-
 	// It is possible that new blocks are added after grabbing this iterator. New
 	// blocks are guaranteed to be accepted and height-indexed, so we don't need to
 	// check them.
