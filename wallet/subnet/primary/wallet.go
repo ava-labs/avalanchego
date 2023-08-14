@@ -6,6 +6,10 @@ package primary
 import (
 	"context"
 
+	"github.com/ava-labs/coreth/plugin/evm"
+
+	ethcommon "github.com/ethereum/go-ethereum/common"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/keychain"
@@ -89,7 +93,7 @@ type WalletConfig struct {
 // The wallet manages all state locally, and performs all tx signing locally.
 func MakeWallet(ctx context.Context, config *WalletConfig) (Wallet, error) {
 	addrs := config.Keychain.Addresses()
-	pCTX, xCTX, _, utxos, err := FetchState(ctx, config.URI, addrs)
+	pCTX, xCTX, cCTX, utxos, err := FetchState(ctx, config.URI, addrs)
 	if err != nil {
 		return nil, err
 	}
@@ -124,9 +128,16 @@ func MakeWallet(ctx context.Context, config *WalletConfig) (Wallet, error) {
 	xSigner := x.NewSigner(config.Keychain, xBackend)
 	xClient := avm.NewClient(config.URI, "X")
 
+	cChainID := cCTX.BlockchainID()
+	cUTXOs := NewChainUTXOs(cChainID, utxos)
+	cBackend := c.NewBackend(cCTX, cUTXOs, make(map[ethcommon.Address]*c.Account))
+	cBuilder := c.NewBuilder(addrs, set.Set[ethcommon.Address]{}, cBackend)
+	cSigner := c.NewSigner(config.Keychain, nil, cBackend)
+	cClient := evm.NewCChainClient(config.URI)
+
 	return NewWallet(
 		p.NewWallet(pBuilder, pSigner, pClient, pBackend),
 		x.NewWallet(xBuilder, xSigner, xClient, xBackend),
-		nil,
+		c.NewWallet(cBuilder, cSigner, cClient, cBackend),
 	), nil
 }

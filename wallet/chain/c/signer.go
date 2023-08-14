@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -209,7 +208,7 @@ func sign(tx *evm.Tx, signHash bool, txSigners [][]keychain.Signer) error {
 		}
 	}
 
-	signedBytes, err := txs.Codec.Marshal(txs.Version, tx)
+	signedBytes, err := evm.Codec.Marshal(version, tx)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal tx: %w", err)
 	}

@@ -226,13 +226,13 @@ func (b *builder) NewImportTx(
 		return nil, err
 	}
 
-	gasUsedWithoutChange, err := tx.GasUsed(true /*=IsApricotPhase5*/)
+	gasUsedWithoutOutput, err := tx.GasUsed(true /*=IsApricotPhase5*/)
 	if err != nil {
 		return nil, err
 	}
-	gasUsedWithChange := gasUsedWithoutChange + evm.EVMOutputGas
+	gasUsedWithOutput := gasUsedWithoutOutput + evm.EVMOutputGas
 
-	txFee, err := evm.CalculateDynamicFee(gasUsedWithChange, baseFee)
+	txFee, err := evm.CalculateDynamicFee(gasUsedWithOutput, baseFee)
 	if err != nil {
 		return nil, err
 	}
