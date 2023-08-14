@@ -9,6 +9,7 @@ import (
 	"time"
 
 	ginkgo "github.com/onsi/ginkgo/v2"
+
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/tests/fixture"
@@ -51,7 +52,7 @@ type TestEnvironment struct {
 // Retrieve a random URI to naively attempt to spread API load across
 // nodes.
 func (te *TestEnvironment) GetRandomNodeURI() string {
-	r := rand.New(rand.NewSource(time.Now().Unix())) //nolint:gosec
+	r := rand.New(rand.NewSource(time.Now().Unix())) //#nosec G404
 	return te.URIs[r.Intn(len(te.URIs))]
 }
 

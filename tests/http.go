@@ -27,7 +27,7 @@ func GetNodeMetrics(nodeURI string, metricNames ...string) (NodeMetrics, error) 
 
 // GetNodesMetrics retrieves the specified metrics for the provided node URIs.
 func GetNodesMetrics(nodeURIs []string, metricNames ...string) (NodesMetrics, error) {
-	metrics := make(NodesMetrics)
+	metrics := make(NodesMetrics, len(nodeURIs))
 	for _, u := range nodeURIs {
 		var err error
 		metrics[u], err = GetNodeMetrics(u, metricNames...)
