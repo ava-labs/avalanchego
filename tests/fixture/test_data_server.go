@@ -17,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 )
 
@@ -37,15 +38,14 @@ type TestData struct {
 
 // http server allocating resources to tests potentially executing in parallel
 type testDataServer struct {
-	TestData
-
 	// Synchronizes access to test data
 	lock sync.Mutex
+	TestData
 }
 
 // Type used to marshal/unmarshal a set of test keys for transmission over http.
 type keysDocument struct {
-	Keys []*secp256k1.PrivateKey
+	Keys []*secp256k1.PrivateKey `json:"keys"`
 }
 
 func (s *testDataServer) allocateKeys(w http.ResponseWriter, r *http.Request) {
@@ -74,20 +74,21 @@ func (s *testDataServer) allocateKeys(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Allocate the requested number of keys
+	remainingKeys := len(s.FundedKeys) - keyCount
+	allocatedKeys := s.FundedKeys[remainingKeys:]
+
 	keysDoc := &keysDocument{
-		Keys: s.FundedKeys[len(s.FundedKeys)-keyCount:],
+		Keys: allocatedKeys,
 	}
 	if err := json.NewEncoder(w).Encode(keysDoc); err != nil {
-		http.Error(w, fmt.Sprintf("failed to encode test keys: %v", err), http.StatusInternalServerError)
+		msg := fmt.Sprintf("failed to encode test keys: %v", err)
+		http.Error(w, msg, http.StatusInternalServerError)
 		return
 	}
 
 	// Forget the allocated keys
-	for i := len(s.FundedKeys) - keyCount; i < len(s.FundedKeys); i++ {
-		// Ensure the key can be garbage collected
-		s.FundedKeys[i] = nil
-	}
-	s.FundedKeys = s.FundedKeys[:len(s.FundedKeys)-keyCount]
+	utils.ZeroSlice(allocatedKeys)
+	s.FundedKeys = s.FundedKeys[:remainingKeys]
 }
 
 // Serve test data via http to ensure allocation is synchronized even when
@@ -127,6 +128,7 @@ func AllocateFundedKeys(baseURI string, count int) ([]*secp256k1.PrivateKey, err
 	if count <= 0 {
 		return nil, errInvalidKeyCount
 	}
+
 	uri, err := url.Parse(baseURI)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse uri: %w", err)
@@ -139,13 +141,13 @@ func AllocateFundedKeys(baseURI string, count int) ([]*secp256k1.PrivateKey, err
 	if err != nil {
 		return nil, fmt.Errorf("failed to construct request: %w", err)
 	}
+
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to request funded keys: %w", err)
 	}
-	if resp.Body != nil {
-		defer resp.Body.Close()
-	}
+	defer resp.Body.Close()
+
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response for funded keys: %w", err)
@@ -156,6 +158,7 @@ func AllocateFundedKeys(baseURI string, count int) ([]*secp256k1.PrivateKey, err
 		}
 		return nil, fmt.Errorf("test data server returned unexpected status code %d: %v", resp.StatusCode, body)
 	}
+
 	keysDoc := &keysDocument{}
 	if err := json.Unmarshal(body, keysDoc); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal funded keys: %w", err)

@@ -94,8 +94,8 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 
 			// Use a random node ID to ensure that repeated test runs
 			// will succeed against a persistent network.
-			randomShortID, _ := ids.ToShortID(utils.RandomBytes(20))
-			validatorID := ids.NodeID(randomShortID)
+			validatorID, err := ids.ToNodeID(utils.RandomBytes(ids.NodeIDLen))
+			gomega.Expect(err).Should(gomega.BeNil())
 
 			vdr := &txs.Validator{
 				NodeID: validatorID,
