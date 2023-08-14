@@ -5,8 +5,12 @@ package primary
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/ava-labs/coreth/ethclient"
 	"github.com/ava-labs/coreth/plugin/evm"
+
+	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/codec"
@@ -119,6 +123,39 @@ func FetchState(
 		}
 	}
 	return pCTX, xCTX, cCTX, utxos, nil
+}
+
+func FetchEthState(
+	ctx context.Context,
+	uri string,
+	addrs set.Set[common.Address],
+) (map[common.Address]*c.Account, error) {
+	path := fmt.Sprintf(
+		"%s/ext/%s/C/rpc",
+		uri,
+		constants.ChainAliasPrefix,
+	)
+	client, err := ethclient.Dial(path)
+	if err != nil {
+		return nil, err
+	}
+
+	accounts := make(map[common.Address]*c.Account, addrs.Len())
+	for addr := range addrs {
+		balance, err := client.BalanceAt(ctx, addr, nil)
+		if err != nil {
+			return nil, err
+		}
+		nonce, err := client.NonceAt(ctx, addr, nil)
+		if err != nil {
+			return nil, err
+		}
+		accounts[addr] = &c.Account{
+			Balance: balance,
+			Nonce:   nonce,
+		}
+	}
+	return accounts, nil
 }
 
 // AddAllUTXOs fetches all the UTXOs referenced by [addresses] that were sent

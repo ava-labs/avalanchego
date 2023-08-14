@@ -73,8 +73,9 @@ var _ = e2e.DescribeXChain("[Virtuous Transfer Tx AVAX]", func() {
 					// 5-second is enough to fetch initial UTXOs for test cluster in "primary.NewWallet"
 					ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultWalletCreationTimeout)
 					baseWallet, err = primary.MakeWallet(ctx, &primary.WalletConfig{
-						URI:      walletURI,
-						Keychain: keyChain,
+						URI:          walletURI,
+						AVAXKeychain: keyChain,
+						EthKeychain:  keyChain,
 					})
 					cancel()
 					gomega.Expect(err).Should(gomega.BeNil())

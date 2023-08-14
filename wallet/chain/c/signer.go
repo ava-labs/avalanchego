@@ -4,9 +4,10 @@
 package c
 
 import (
-	stdcontext "context"
 	"errors"
 	"fmt"
+
+	stdcontext "context"
 
 	"github.com/ava-labs/coreth/plugin/evm"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/keychain"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -41,7 +43,11 @@ type Signer interface {
 }
 
 type EthKeychain interface {
-	Get(addr ethcommon.Address) (keychain.Signer, bool)
+	// The returned Signer can provide a signature for [addr]
+	GetEth(addr ethcommon.Address) (keychain.Signer, bool)
+	// Returns the set of addresses for which the accessor keeps an associated
+	// signer
+	EthAddresses() set.Set[ethcommon.Address]
 }
 
 type SignerBackend interface {
@@ -134,7 +140,7 @@ func (s *txSigner) getExportSigners(ins []evm.EVMInput) [][]keychain.Signer {
 		inputSigners := make([]keychain.Signer, 1)
 		txSigners[credIndex] = inputSigners
 
-		key, ok := s.ethKC.Get(input.Address)
+		key, ok := s.ethKC.GetEth(input.Address)
 		if !ok {
 			// If we don't have access to the key, then we can't sign this
 			// transaction. However, we can attempt to partially sign it.

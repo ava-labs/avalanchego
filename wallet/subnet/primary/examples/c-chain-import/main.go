@@ -9,7 +9,7 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/ava-labs/coreth/plugin/evm"
 
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
@@ -24,8 +24,9 @@ func main() {
 	key := genesis.EWOQKey
 	uri := primary.LocalAPIURI
 	kc := secp256k1fx.NewKeychain(key)
-	addr := key.Address()
-	baseFee := big.NewInt(1e12)
+	avaxAddr := key.Address()
+	ethAddr := evm.PublicKeyToEthAddress(key.PublicKey())
+	baseFee := big.NewInt(1e12) // Should typically be calculated base on the current chain fee
 
 	ctx := context.Background()
 
@@ -33,8 +34,9 @@ func main() {
 	// [uri] is hosting.
 	walletSyncStartTime := time.Now()
 	wallet, err := primary.MakeWallet(ctx, &primary.WalletConfig{
-		URI:      uri,
-		Keychain: kc,
+		URI:          uri,
+		AVAXKeychain: kc,
+		EthKeychain:  kc,
 	})
 	if err != nil {
 		log.Fatalf("failed to initialize wallet: %s\n", err)
@@ -51,7 +53,7 @@ func main() {
 	owner := secp256k1fx.OutputOwners{
 		Threshold: 1,
 		Addrs: []ids.ShortID{
-			addr,
+			avaxAddr,
 		},
 	}
 
@@ -69,9 +71,9 @@ func main() {
 	log.Printf("issued export %s in %s\n", exportTx.ID(), time.Since(exportStartTime))
 
 	importStartTime := time.Now()
-	importTx, err := cWallet.IssueImportTx(constants.PlatformChainID, common.Address{}, baseFee)
+	importTx, err := cWallet.IssueImportTx(constants.PlatformChainID, ethAddr, baseFee)
 	if err != nil {
 		log.Fatalf("failed to issue import transaction: %s\n", err)
 	}
-	log.Printf("issued import %s in %s\n", importTx.ID(), time.Since(importStartTime))
+	log.Printf("issued import %s to %s in %s\n", importTx.ID(), ethAddr.Hex(), time.Since(importStartTime))
 }

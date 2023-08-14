@@ -58,8 +58,9 @@ var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
 				var err error
 				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultWalletCreationTimeout)
 				baseWallet, err = primary.MakeWallet(ctx, &primary.WalletConfig{
-					URI:      nodeURI,
-					Keychain: keyChain,
+					URI:          nodeURI,
+					AVAXKeychain: keyChain,
+					EthKeychain:  keyChain,
 				})
 				cancel()
 				gomega.Expect(err).Should(gomega.BeNil())

@@ -8,8 +8,6 @@ import (
 
 	"github.com/ava-labs/coreth/plugin/evm"
 
-	ethcommon "github.com/ethereum/go-ethereum/common"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/keychain"
@@ -72,7 +70,8 @@ type WalletConfig struct {
 	// Base URI to use for all node requests.
 	URI string // requireed
 	// Keys to use for signing all transactions.
-	Keychain keychain.Keychain // requireed
+	AVAXKeychain keychain.Keychain // requireed
+	EthKeychain  c.EthKeychain     // requireed
 	// Set of P-chain transactions that the wallet should know about to be able
 	// to generate transactions.
 	PChainTxs map[ids.ID]*txs.Tx // optional
@@ -92,8 +91,14 @@ type WalletConfig struct {
 //
 // The wallet manages all state locally, and performs all tx signing locally.
 func MakeWallet(ctx context.Context, config *WalletConfig) (Wallet, error) {
-	addrs := config.Keychain.Addresses()
-	pCTX, xCTX, cCTX, utxos, err := FetchState(ctx, config.URI, addrs)
+	avaxAddrs := config.AVAXKeychain.Addresses()
+	pCTX, xCTX, cCTX, utxos, err := FetchState(ctx, config.URI, avaxAddrs)
+	if err != nil {
+		return nil, err
+	}
+
+	ethAddrs := config.EthKeychain.EthAddresses()
+	accounts, err := FetchEthState(ctx, config.URI, ethAddrs)
 	if err != nil {
 		return nil, err
 	}
@@ -118,21 +123,21 @@ func MakeWallet(ctx context.Context, config *WalletConfig) (Wallet, error) {
 
 	pUTXOs := NewChainUTXOs(constants.PlatformChainID, utxos)
 	pBackend := p.NewBackend(pCTX, pUTXOs, pChainTxs)
-	pBuilder := p.NewBuilder(addrs, pBackend)
-	pSigner := p.NewSigner(config.Keychain, pBackend)
+	pBuilder := p.NewBuilder(avaxAddrs, pBackend)
+	pSigner := p.NewSigner(config.AVAXKeychain, pBackend)
 
 	xChainID := xCTX.BlockchainID()
 	xUTXOs := NewChainUTXOs(xChainID, utxos)
 	xBackend := x.NewBackend(xCTX, xUTXOs)
-	xBuilder := x.NewBuilder(addrs, xBackend)
-	xSigner := x.NewSigner(config.Keychain, xBackend)
+	xBuilder := x.NewBuilder(avaxAddrs, xBackend)
+	xSigner := x.NewSigner(config.AVAXKeychain, xBackend)
 	xClient := avm.NewClient(config.URI, "X")
 
 	cChainID := cCTX.BlockchainID()
 	cUTXOs := NewChainUTXOs(cChainID, utxos)
-	cBackend := c.NewBackend(cCTX, cUTXOs, make(map[ethcommon.Address]*c.Account))
-	cBuilder := c.NewBuilder(addrs, set.Set[ethcommon.Address]{}, cBackend)
-	cSigner := c.NewSigner(config.Keychain, nil, cBackend)
+	cBackend := c.NewBackend(cCTX, cUTXOs, accounts)
+	cBuilder := c.NewBuilder(avaxAddrs, ethAddrs, cBackend)
+	cSigner := c.NewSigner(config.AVAXKeychain, config.EthKeychain, cBackend)
 	cClient := evm.NewCChainClient(config.URI)
 
 	return NewWallet(
