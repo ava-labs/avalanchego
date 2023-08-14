@@ -14,7 +14,7 @@ import (
 	ids "github.com/ava-labs/avalanchego/ids"
 	secp256k1 "github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	txs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockBuilder is a mock of Builder interface.
