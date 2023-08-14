@@ -2,6 +2,7 @@ github.com/ava-labs/avalanchego/api/server=Server=api/server/mock_server.go
 github.com/ava-labs/avalanchego/chains/atomic=SharedMemory=chains/atomic/mock_shared_memory.go
 github.com/ava-labs/avalanchego/codec=Manager=codec/mock_manager.go
 github.com/ava-labs/avalanchego/database=Batch=database/mock_batch.go
+github.com/ava-labs/avalanchego/database=Iterator=database/mock_iterator.go
 github.com/ava-labs/avalanchego/message=OutboundMessage=message/mock_message.go
 github.com/ava-labs/avalanchego/message=OutboundMsgBuilder=message/mock_outbound_message_builder.go
 github.com/ava-labs/avalanchego/network/peer=GossipTracker=network/peer/mock_gossip_tracker.go
