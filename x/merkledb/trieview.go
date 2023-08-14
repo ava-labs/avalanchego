@@ -180,12 +180,14 @@ func newTrieViewWithChanges(
 		return nil, ErrNoValidRoot
 	}
 
-	return &trieView{
+	view := &trieView{
 		root:       passedRootChange.after,
 		db:         db,
 		parentTrie: parentTrie,
 		changes:    changes,
-	}, nil
+	}
+
+	return view, view.calculateNodeIDs(context.TODO())
 }
 
 // Recalculates the node IDs for all changed nodes in the trie.
@@ -657,9 +659,6 @@ func (t *trieView) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
 // Returns the ID of the root node of this trie.
 // Assumes [t.lock] is held.
 func (t *trieView) getMerkleRoot(ctx context.Context) (ids.ID, error) {
-	if err := t.calculateNodeIDs(ctx); err != nil {
-		return ids.Empty, err
-	}
 	return t.root.id, nil
 }
 

@@ -691,11 +691,7 @@ func (db *merkleDB) newUntrackedView(batchOps []database.BatchOp) (*trieView, er
 		return nil, database.ErrClosed
 	}
 
-	newView, err := newTrieView(db, db, db.root.clone(), batchOps)
-	if err != nil {
-		return nil, err
-	}
-	return newView, nil
+	return newTrieView(db, db, db.root.clone(), batchOps)
 }
 
 func (db *merkleDB) Has(k []byte) (bool, error) {
