@@ -1064,7 +1064,7 @@ func FuzzStructUnmarshal(codec GeneralCodec, f *testing.F) {
 		if err != nil {
 			return
 		}
-		require.Equal(uint16(0), version)
+		require.Zero(version)
 
 		marshalled, err := manager.Marshal(version, myParsedStruct)
 		require.NoError(err)
