@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/wallet/chain/c"
 	"github.com/ava-labs/avalanchego/wallet/chain/p"
 	"github.com/ava-labs/avalanchego/wallet/chain/x"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
@@ -23,11 +24,13 @@ var _ Wallet = (*wallet)(nil)
 type Wallet interface {
 	P() p.Wallet
 	X() x.Wallet
+	C() c.Wallet
 }
 
 type wallet struct {
 	p p.Wallet
 	x x.Wallet
+	c c.Wallet
 }
 
 func (w *wallet) P() p.Wallet {
@@ -36,6 +39,10 @@ func (w *wallet) P() p.Wallet {
 
 func (w *wallet) X() x.Wallet {
 	return w.x
+}
+
+func (w *wallet) C() c.Wallet {
+	return w.c
 }
 
 // NewWalletFromURI returns a wallet that supports issuing transactions to the
@@ -48,16 +55,16 @@ func (w *wallet) X() x.Wallet {
 //
 // The wallet manages all UTXOs locally, and performs all tx signing locally.
 func NewWalletFromURI(ctx context.Context, uri string, kc keychain.Keychain) (Wallet, error) {
-	pCTX, xCTX, utxos, err := FetchState(ctx, uri, kc.Addresses())
+	pCTX, xCTX, cCTX, utxos, err := FetchState(ctx, uri, kc.Addresses())
 	if err != nil {
 		return nil, err
 	}
-	return NewWalletWithState(uri, pCTX, xCTX, utxos, kc), nil
+	return NewWalletWithState(uri, pCTX, xCTX, cCTX, utxos, kc), nil
 }
 
 // Creates a wallet with pre-loaded/cached P-chain transactions.
 func NewWalletWithTxs(ctx context.Context, uri string, kc keychain.Keychain, preloadTXs ...ids.ID) (Wallet, error) {
-	pCTX, xCTX, utxos, err := FetchState(ctx, uri, kc.Addresses())
+	pCTX, xCTX, cCTX, utxos, err := FetchState(ctx, uri, kc.Addresses())
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +81,7 @@ func NewWalletWithTxs(ctx context.Context, uri string, kc keychain.Keychain, pre
 		}
 		pTXs[id] = tx
 	}
-	return NewWalletWithTxsAndState(uri, pCTX, xCTX, utxos, kc, pTXs), nil
+	return NewWalletWithTxsAndState(uri, pCTX, xCTX, cCTX, utxos, kc, pTXs), nil
 }
 
 // Creates a wallet with pre-loaded/cached P-chain transactions and state.
@@ -82,6 +89,7 @@ func NewWalletWithTxsAndState(
 	uri string,
 	pCTX p.Context,
 	xCTX x.Context,
+	cCTX c.Context,
 	utxos UTXOs,
 	kc keychain.Keychain,
 	pTXs map[ids.ID]*txs.Tx,
@@ -103,6 +111,7 @@ func NewWalletWithTxsAndState(
 	return NewWallet(
 		p.NewWallet(pBuilder, pSigner, pClient, pBackend),
 		x.NewWallet(xBuilder, xSigner, xClient, xBackend),
+		nil,
 	)
 }
 
@@ -111,11 +120,12 @@ func NewWalletWithState(
 	uri string,
 	pCTX p.Context,
 	xCTX x.Context,
+	cCTX c.Context,
 	utxos UTXOs,
 	kc keychain.Keychain,
 ) Wallet {
 	pTXs := make(map[ids.ID]*txs.Tx)
-	return NewWalletWithTxsAndState(uri, pCTX, xCTX, utxos, kc, pTXs)
+	return NewWalletWithTxsAndState(uri, pCTX, xCTX, cCTX, utxos, kc, pTXs)
 }
 
 // Creates a Wallet with the given set of options
@@ -123,13 +133,15 @@ func NewWalletWithOptions(w Wallet, options ...common.Option) Wallet {
 	return NewWallet(
 		p.NewWalletWithOptions(w.P(), options...),
 		x.NewWalletWithOptions(w.X(), options...),
+		c.NewWalletWithOptions(w.C(), options...),
 	)
 }
 
 // Creates a new default wallet
-func NewWallet(p p.Wallet, x x.Wallet) Wallet {
+func NewWallet(p p.Wallet, x x.Wallet, c c.Wallet) Wallet {
 	return &wallet{
 		p: p,
 		x: x,
+		c: c,
 	}
 }

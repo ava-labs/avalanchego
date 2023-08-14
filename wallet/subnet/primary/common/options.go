@@ -7,6 +7,8 @@ import (
 	"context"
 	"time"
 
+	ethcommon "github.com/ethereum/go-ethereum/common"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -21,6 +23,9 @@ type Options struct {
 
 	customAddressesSet bool
 	customAddresses    set.Set[ids.ShortID]
+
+	customEthAddressesSet bool
+	customEthAddresses    set.Set[ethcommon.Address]
 
 	minIssuanceTimeSet bool
 	minIssuanceTime    uint64
@@ -71,6 +76,13 @@ func (o *Options) Addresses(defaultAddresses set.Set[ids.ShortID]) set.Set[ids.S
 	return defaultAddresses
 }
 
+func (o *Options) EthAddresses(defaultAddresses set.Set[ethcommon.Address]) set.Set[ethcommon.Address] {
+	if o.customEthAddressesSet {
+		return o.customEthAddresses
+	}
+	return defaultAddresses
+}
+
 func (o *Options) MinIssuanceTime() uint64 {
 	if o.minIssuanceTimeSet {
 		return o.minIssuanceTime
@@ -114,6 +126,13 @@ func WithCustomAddresses(addrs set.Set[ids.ShortID]) Option {
 	return func(o *Options) {
 		o.customAddressesSet = true
 		o.customAddresses = addrs
+	}
+}
+
+func WithCustomEthAddresses(addrs set.Set[ethcommon.Address]) Option {
+	return func(o *Options) {
+		o.customEthAddressesSet = true
+		o.customEthAddresses = addrs
 	}
 }
 

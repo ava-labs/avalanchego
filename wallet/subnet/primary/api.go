@@ -6,6 +6,8 @@ package primary
 import (
 	"context"
 
+	"github.com/ava-labs/coreth/plugin/evm"
+
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
@@ -16,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/wallet/chain/c"
 	"github.com/ava-labs/avalanchego/wallet/chain/p"
 	"github.com/ava-labs/avalanchego/wallet/chain/x"
 )
@@ -47,18 +50,33 @@ type UTXOClient interface {
 	) ([][]byte, ids.ShortID, ids.ID, error)
 }
 
-func FetchState(ctx context.Context, uri string, addrs set.Set[ids.ShortID]) (p.Context, x.Context, UTXOs, error) {
+func FetchState(
+	ctx context.Context,
+	uri string,
+	addrs set.Set[ids.ShortID],
+) (
+	p.Context,
+	x.Context,
+	c.Context,
+	UTXOs,
+	error,
+) {
 	infoClient := info.NewClient(uri)
 	xClient := avm.NewClient(uri, "X")
 
 	pCTX, err := p.NewContextFromClients(ctx, infoClient, xClient)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
 	xCTX, err := x.NewContextFromClients(ctx, infoClient, xClient)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
+	}
+
+	cCTX, err := c.NewContextFromClients(ctx, infoClient, xClient)
+	if err != nil {
+		return nil, nil, nil, nil, err
 	}
 
 	utxos := NewUTXOs()
@@ -78,6 +96,11 @@ func FetchState(ctx context.Context, uri string, addrs set.Set[ids.ShortID]) (p.
 			client: xClient,
 			codec:  x.Parser.Codec(),
 		},
+		{
+			id:     cCTX.BlockchainID(),
+			client: evm.NewCChainClient(uri),
+			codec:  evm.Codec,
+		},
 	}
 	for _, destinationChain := range chains {
 		for _, sourceChain := range chains {
@@ -91,11 +114,11 @@ func FetchState(ctx context.Context, uri string, addrs set.Set[ids.ShortID]) (p.
 				addrList,
 			)
 			if err != nil {
-				return nil, nil, nil, err
+				return nil, nil, nil, nil, err
 			}
 		}
 	}
-	return pCTX, xCTX, utxos, nil
+	return pCTX, xCTX, cCTX, utxos, nil
 }
 
 // AddAllUTXOs fetches all the UTXOs referenced by [addresses] that were sent
