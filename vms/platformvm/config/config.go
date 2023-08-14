@@ -35,6 +35,9 @@ type Config struct {
 	// True if the node is being run with staking enabled
 	SybilProtectionEnabled bool
 
+	// If true, only the P-chain will be instantiated on the primary network.
+	PartialSyncPrimaryNetwork bool
+
 	// Set of subnets that this node is validating
 	TrackedSubnets set.Set[ids.ID]
 

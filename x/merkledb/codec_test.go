@@ -14,6 +14,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/maybe"
 )
 
 // TODO add more codec tests
@@ -36,7 +37,7 @@ func newRandomProofNode(r *rand.Rand) ProofNode {
 	}
 
 	hasValue := rand.Intn(2) == 1 // #nosec G404
-	var valueOrHash Maybe[[]byte]
+	var valueOrHash maybe.Maybe[[]byte]
 	if hasValue {
 		// use the hash instead when length is greater than the hash length
 		if len(val) >= HashLength {
@@ -50,7 +51,7 @@ func newRandomProofNode(r *rand.Rand) ProofNode {
 			// variable on the struct
 			val = nil
 		}
-		valueOrHash = Some(val)
+		valueOrHash = maybe.Some(val)
 	}
 
 	return ProofNode{
@@ -229,7 +230,7 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 
 			r := rand.New(rand.NewSource(int64(randSeed))) // #nosec G404
 
-			value := Nothing[[]byte]()
+			value := maybe.Nothing[[]byte]()
 			if hasValue {
 				if len(valueBytes) == 0 {
 					// We do this because when we encode a value of []byte{}
@@ -240,7 +241,7 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 					// private variable on the struct
 					valueBytes = nil
 				}
-				value = Some(valueBytes)
+				value = maybe.Some(valueBytes)
 			}
 
 			numChildren := r.Intn(NodeBranchFactor) // #nosec G404
@@ -294,7 +295,7 @@ func TestCodec_DecodeDBNode(t *testing.T) {
 	require.ErrorIs(err, io.ErrUnexpectedEOF)
 
 	proof := dbNode{
-		value:    Some([]byte{1}),
+		value:    maybe.Some([]byte{1}),
 		children: map[byte]child{},
 	}
 

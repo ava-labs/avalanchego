@@ -13,7 +13,7 @@ import (
 	ids "github.com/ava-labs/avalanchego/ids"
 	bls "github.com/ava-labs/avalanchego/utils/crypto/bls"
 	set "github.com/ava-labs/avalanchego/utils/set"
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockSet is a mock of Set interface.

@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
-
 	"github.com/stretchr/testify/require"
+
+	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -138,7 +138,6 @@ func TestStakerLess(t *testing.T) {
 func TestNewCurrentStakerPreContinuousStakingFork(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	txID := ids.GenerateTestID()
 	nodeID := ids.GenerateTestNodeID()
@@ -232,7 +231,6 @@ func TestNewCurrentStaker(t *testing.T) {
 func TestNewPendingStaker(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	txID := ids.GenerateTestID()
 	nodeID := ids.GenerateTestNodeID()

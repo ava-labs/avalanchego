@@ -147,14 +147,18 @@ func (b *builder) AddUnverifiedTx(tx *txs.Tx) error {
 		return err
 	}
 
-	// Add tx with current chain time to handle
-	// Continuous Staking fork in the mempool
-	preferred, err := b.Preferred()
-	if err != nil {
-		return err
-	}
-	if err := b.Mempool.Add(tx, preferred.Timestamp()); err != nil {
-		return err
+	// If we are partially syncing the Primary Network, we should not be
+	// maintaining the transaction mempool locally.
+	if !b.txExecutorBackend.Config.PartialSyncPrimaryNetwork {
+		// Add tx with current chain time to handle
+		// Continuous Staking fork in the mempool
+		preferred, err := b.Preferred()
+		if err != nil {
+			return err
+		}
+		if err := b.Mempool.Add(tx, preferred.Timestamp()); err != nil {
+			return err
+		}
 	}
 	return b.GossipTx(tx)
 }

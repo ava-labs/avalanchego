@@ -10,7 +10,7 @@ import (
 
 	ids "github.com/ava-labs/avalanchego/ids"
 	bls "github.com/ava-labs/avalanchego/utils/crypto/bls"
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockPreContinuousStakingStaker is a mock of PreContinuousStakingStaker interface.
@@ -50,6 +50,20 @@ func (mr *MockPreContinuousStakingStakerMockRecorder) CurrentPriority() *gomock.
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CurrentPriority", reflect.TypeOf((*MockPreContinuousStakingStaker)(nil).CurrentPriority))
 }
 
+// EndTime mocks base method.
+func (m *MockPreContinuousStakingStaker) EndTime() time.Time {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "EndTime")
+	ret0, _ := ret[0].(time.Time)
+	return ret0
+}
+
+// EndTime indicates an expected call of EndTime.
+func (mr *MockPreContinuousStakingStakerMockRecorder) EndTime() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EndTime", reflect.TypeOf((*MockPreContinuousStakingStaker)(nil).EndTime))
+}
+
 // NodeID mocks base method.
 func (m *MockPreContinuousStakingStaker) NodeID() ids.NodeID {
 	m.ctrl.T.Helper()
@@ -78,34 +92,6 @@ func (mr *MockPreContinuousStakingStakerMockRecorder) PendingPriority() *gomock.
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PendingPriority", reflect.TypeOf((*MockPreContinuousStakingStaker)(nil).PendingPriority))
 }
 
-// EndTime mocks base method.
-func (m *MockPreContinuousStakingStaker) EndTime() time.Time {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "EndTime")
-	ret0, _ := ret[0].(time.Time)
-	return ret0
-}
-
-// EndTime indicates an expected call of EndTime.
-func (mr *MockPreContinuousStakingStakerMockRecorder) EndTime() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EndTime", reflect.TypeOf((*MockPreContinuousStakingStaker)(nil).EndTime))
-}
-
-// StartTime mocks base method.
-func (m *MockPreContinuousStakingStaker) StartTime() time.Time {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "StartTime")
-	ret0, _ := ret[0].(time.Time)
-	return ret0
-}
-
-// StartTime indicates an expected call of StartTime.
-func (mr *MockPreContinuousStakingStakerMockRecorder) StartTime() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StartTime", reflect.TypeOf((*MockPreContinuousStakingStaker)(nil).StartTime))
-}
-
 // PublicKey mocks base method.
 func (m *MockPreContinuousStakingStaker) PublicKey() (*bls.PublicKey, bool, error) {
 	m.ctrl.T.Helper()
@@ -120,6 +106,20 @@ func (m *MockPreContinuousStakingStaker) PublicKey() (*bls.PublicKey, bool, erro
 func (mr *MockPreContinuousStakingStakerMockRecorder) PublicKey() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PublicKey", reflect.TypeOf((*MockPreContinuousStakingStaker)(nil).PublicKey))
+}
+
+// StartTime mocks base method.
+func (m *MockPreContinuousStakingStaker) StartTime() time.Time {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "StartTime")
+	ret0, _ := ret[0].(time.Time)
+	return ret0
+}
+
+// StartTime indicates an expected call of StartTime.
+func (mr *MockPreContinuousStakingStakerMockRecorder) StartTime() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StartTime", reflect.TypeOf((*MockPreContinuousStakingStaker)(nil).StartTime))
 }
 
 // SubnetID mocks base method.

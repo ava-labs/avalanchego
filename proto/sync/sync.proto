@@ -55,7 +55,7 @@ message SyncGetChangeProofRequest {
   bytes start_root_hash = 1;
   bytes end_root_hash = 2;
   bytes start_key = 3;
-  bytes end_key = 4;
+  MaybeBytes end_key = 4;
   uint32 key_limit = 5;
   uint32 bytes_limit = 6;
 }
@@ -71,7 +71,7 @@ message GetChangeProofRequest {
   bytes start_root_hash = 1;
   bytes end_root_hash = 2;
   bytes start_key = 3;
-  bytes end_key = 4;
+  MaybeBytes end_key = 4;
   uint32 key_limit = 5;
 }
 
@@ -96,7 +96,7 @@ message CommitChangeProofRequest {
 message SyncGetRangeProofRequest {
   bytes root_hash = 1;
   bytes start_key = 2;
-  bytes end_key = 3;
+  MaybeBytes end_key = 3;
   uint32 key_limit = 4;
   uint32 bytes_limit = 5;
 }
@@ -104,7 +104,7 @@ message SyncGetRangeProofRequest {
 message GetRangeProofRequest {
   bytes root_hash = 1;
   bytes start_key = 2;
-  bytes end_key = 3;
+  MaybeBytes end_key = 3;
   uint32 key_limit = 4;
 }
 
