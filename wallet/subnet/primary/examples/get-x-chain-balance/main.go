@@ -30,7 +30,7 @@ func main() {
 	ctx := context.Background()
 
 	fetchStartTime := time.Now()
-	_, xCtx, utxos, err := primary.FetchState(ctx, uri, addresses)
+	_, xCtx, _, utxos, err := primary.FetchState(ctx, uri, addresses)
 	if err != nil {
 		log.Fatalf("failed to fetch state: %s\n", err)
 	}
