@@ -89,6 +89,34 @@ func (db *Database) NewBatch() database.Batch {
 	}
 }
 
+func (db *Database) NewIterator() database.Iterator {
+	return &iterator{
+		Iterator: db.Database.NewIterator(),
+		db:       db,
+	}
+}
+
+func (db *Database) NewIteratorWithStart(start []byte) database.Iterator {
+	return &iterator{
+		Iterator: db.Database.NewIteratorWithStart(start),
+		db:       db,
+	}
+}
+
+func (db *Database) NewIteratorWithPrefix(prefix []byte) database.Iterator {
+	return &iterator{
+		Iterator: db.Database.NewIteratorWithPrefix(prefix),
+		db:       db,
+	}
+}
+
+func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database.Iterator {
+	return &iterator{
+		Iterator: db.Database.NewIteratorWithStartAndPrefix(start, prefix),
+		db:       db,
+	}
+}
+
 func (db *Database) corrupted() error {
 	db.errorLock.RLock()
 	defer db.errorLock.RUnlock()
@@ -126,4 +154,25 @@ func (b *batch) Write() error {
 		return err
 	}
 	return b.db.handleError(b.Batch.Write())
+}
+
+type iterator struct {
+	database.Iterator
+	db *Database
+}
+
+func (it *iterator) Next() bool {
+	if err := it.db.corrupted(); err != nil {
+		return false
+	}
+	val := it.Iterator.Next()
+	_ = it.db.handleError(it.Iterator.Error())
+	return val
+}
+
+func (it *iterator) Error() error {
+	if err := it.db.corrupted(); err != nil {
+		return err
+	}
+	return it.db.handleError(it.Iterator.Error())
 }
