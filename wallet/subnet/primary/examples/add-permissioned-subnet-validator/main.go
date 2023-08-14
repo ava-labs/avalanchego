@@ -41,10 +41,13 @@ func main() {
 	}
 	log.Printf("fetched node ID %s in %s\n", nodeID, time.Since(nodeInfoStartTime))
 
-	// NewWalletWithTxs fetches the available UTXOs owned by [kc] on the network
-	// that [uri] is hosting and registers [subnetID].
+	// MakeWallet fetches the available UTXOs owned by [kc] on the network that
+	// [uri] is hosting and registers [subnetID].
 	walletSyncStartTime := time.Now()
-	wallet, err := primary.NewWalletWithTxs(ctx, uri, kc, subnetID)
+	wallet, err := primary.MakeWallet(ctx, &primary.WalletConfig{
+		URI:      uri,
+		Keychain: kc,
+	})
 	if err != nil {
 		log.Fatalf("failed to initialize wallet: %s\n", err)
 	}
