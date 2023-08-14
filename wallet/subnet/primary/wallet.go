@@ -57,15 +57,15 @@ func NewWalletWithOptions(w Wallet, options ...common.Option) Wallet {
 
 type WalletConfig struct {
 	// Base URI to use for all node requests.
-	URI string
+	URI string // requireed
 	// Keys to use for signing all transactions.
-	Keychain keychain.Keychain
+	Keychain keychain.Keychain // requireed
 	// Set of P-chain transactions that the wallet should know about to be able
 	// to generate transactions.
-	PChainTxs map[ids.ID]*txs.Tx
+	PChainTxs map[ids.ID]*txs.Tx // optional
 	// Set of P-chain transactions that the wallet should fetch be able to
 	// generate transactions.
-	PChainTxsToFetch set.Set[ids.ID]
+	PChainTxsToFetch set.Set[ids.ID] // optional
 }
 
 // MakeWallet returns a wallet that supports issuing transactions to the chains
