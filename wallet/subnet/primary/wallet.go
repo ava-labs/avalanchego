@@ -39,20 +39,20 @@ func (w *wallet) X() x.Wallet {
 	return w.x
 }
 
-// Creates a Wallet with the given set of options
-func NewWalletWithOptions(w Wallet, options ...common.Option) Wallet {
-	return NewWallet(
-		p.NewWalletWithOptions(w.P(), options...),
-		x.NewWalletWithOptions(w.X(), options...),
-	)
-}
-
 // Creates a new default wallet
 func NewWallet(p p.Wallet, x x.Wallet) Wallet {
 	return &wallet{
 		p: p,
 		x: x,
 	}
+}
+
+// Creates a Wallet with the given set of options
+func NewWalletWithOptions(w Wallet, options ...common.Option) Wallet {
+	return NewWallet(
+		p.NewWalletWithOptions(w.P(), options...),
+		x.NewWalletWithOptions(w.X(), options...),
+	)
 }
 
 type WalletConfig struct {
