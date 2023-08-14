@@ -17,6 +17,7 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -489,9 +490,7 @@ func TestGetChangeProof(t *testing.T) {
 
 	// create changes
 	for x := 0; x < defaultRequestKeyLimit/2; x++ {
-		view, err := serverDB.NewView()
-		require.NoError(t, err)
-
+		ops := make([]database.BatchOp, 0, 11)
 		// add some key/values
 		for i := 0; i < 10; i++ {
 			key := make([]byte, r.Intn(100))
@@ -502,7 +501,7 @@ func TestGetChangeProof(t *testing.T) {
 			_, err = r.Read(val)
 			require.NoError(t, err)
 
-			require.NoError(t, view.Insert(context.Background(), key, val))
+			ops = append(ops, database.BatchOp{Key: key, Value: val})
 		}
 
 		// delete a key
@@ -512,11 +511,13 @@ func TestGetChangeProof(t *testing.T) {
 
 		it := serverDB.NewIteratorWithStart(deleteKeyStart)
 		if it.Next() {
-			require.NoError(t, view.Remove(context.Background(), it.Key()))
+			ops = append(ops, database.BatchOp{Key: it.Key(), Delete: true})
 		}
 		require.NoError(t, it.Error())
 		it.Release()
 
+		view, err := serverDB.NewView(ops)
+		require.NoError(t, err)
 		require.NoError(t, view.CommitToDB(context.Background()))
 	}
 
