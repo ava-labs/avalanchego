@@ -255,7 +255,7 @@ func Test_RangeProof_MaxLength(t *testing.T) {
 	dbTrie, err := getBasicDB()
 	require.NoError(err)
 	require.NotNil(dbTrie)
-	trie, err := dbTrie.NewView()
+	trie, err := dbTrie.NewView(nil)
 	require.NoError(err)
 
 	_, err = trie.GetRangeProof(context.Background(), nil, maybe.Nothing[[]byte](), -1)
@@ -271,14 +271,14 @@ func Test_Proof(t *testing.T) {
 	dbTrie, err := getBasicDB()
 	require.NoError(err)
 	require.NotNil(dbTrie)
-	trie, err := dbTrie.NewView()
+	trie, err := dbTrie.NewView([]database.BatchOp{
+		{Key: []byte("key0"), Value: []byte("value0")},
+		{Key: []byte("key1"), Value: []byte("value1")},
+		{Key: []byte("key2"), Value: []byte("value2")},
+		{Key: []byte("key3"), Value: []byte("value3")},
+		{Key: []byte("key4"), Value: []byte("value4")},
+	})
 	require.NoError(err)
-
-	require.NoError(trie.Insert(context.Background(), []byte("key0"), []byte("value0")))
-	require.NoError(trie.Insert(context.Background(), []byte("key1"), []byte("value1")))
-	require.NoError(trie.Insert(context.Background(), []byte("key2"), []byte("value2")))
-	require.NoError(trie.Insert(context.Background(), []byte("key3"), []byte("value3")))
-	require.NoError(trie.Insert(context.Background(), []byte("key4"), []byte("value4")))
 
 	_, err = trie.GetMerkleRoot(context.Background())
 	require.NoError(err)

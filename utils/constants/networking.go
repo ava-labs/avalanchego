@@ -50,7 +50,7 @@ const (
 	DefaultNetworkTimeoutCoefficient    = 2
 	DefaultNetworkReadHandshakeTimeout  = 15 * time.Second
 
-	DefaultNetworkCompressionType           = compression.TypeGzip
+	DefaultNetworkCompressionType           = compression.TypeZstd
 	DefaultNetworkMaxClockDifference        = time.Minute
 	DefaultNetworkRequireValidatorToConnect = false
 	DefaultNetworkPeerReadBufferSize        = 8 * units.KiB

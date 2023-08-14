@@ -13,8 +13,8 @@ import (
 
 	blocks "github.com/ava-labs/avalanchego/vms/avm/blocks"
 	txs "github.com/ava-labs/avalanchego/vms/avm/txs"
-	gomock "github.com/golang/mock/gomock"
 	rpc "github.com/gorilla/rpc/v2"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockMetrics is a mock of Metrics interface.
