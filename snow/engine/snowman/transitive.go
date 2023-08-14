@@ -455,7 +455,9 @@ func (t *Transitive) GetBlock(ctx context.Context, blkID ids.ID) (snowman.Block,
 
 func (t *Transitive) sendChits(ctx context.Context, nodeID ids.NodeID, requestID uint32) {
 	lastAccepted := t.Consensus.LastAccepted()
-	if t.Ctx.StateSyncing.Get() {
+	// If we aren't fully verifying blocks, only vote for blocks that are widely
+	// preferred by the validator set.
+	if t.Ctx.StateSyncing.Get() || t.Config.PartialSync {
 		t.Sender.SendChits(ctx, nodeID, requestID, lastAccepted, lastAccepted)
 	} else {
 		t.Sender.SendChits(ctx, nodeID, requestID, t.Consensus.Preference(), lastAccepted)
@@ -704,8 +706,7 @@ func (t *Transitive) pullQuery(ctx context.Context, blkID ids.ID) {
 	t.RequestID++
 	if t.polls.Add(t.RequestID, vdrBag) {
 		vdrList := vdrBag.List()
-		vdrSet := set.NewSet[ids.NodeID](len(vdrList))
-		vdrSet.Add(vdrList...)
+		vdrSet := set.Of(vdrList...)
 		t.Sender.SendPullQuery(ctx, vdrSet, t.RequestID, blkID)
 	}
 }
@@ -735,8 +736,7 @@ func (t *Transitive) sendQuery(ctx context.Context, blk snowman.Block, push bool
 	t.RequestID++
 	if t.polls.Add(t.RequestID, vdrBag) {
 		vdrs := vdrBag.List()
-		sendTo := set.NewSet[ids.NodeID](len(vdrs))
-		sendTo.Add(vdrs...)
+		sendTo := set.Of(vdrs...)
 
 		if push {
 			t.Sender.SendPushQuery(ctx, sendTo, t.RequestID, blk.Bytes())

@@ -9,11 +9,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
+	"github.com/stretchr/testify/require"
+
+	"go.uber.org/mock/gomock"
 
 	"google.golang.org/protobuf/proto"
-
-	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -72,7 +72,7 @@ func Test_Server_GetRangeProof(t *testing.T) {
 				KeyLimit:   defaultRequestKeyLimit,
 				BytesLimit: defaultRequestByteSizeLimit,
 				StartKey:   []byte{1},
-				EndKey:     []byte{0},
+				EndKey:     &pb.MaybeBytes{Value: []byte{0}},
 			},
 			proofNil: true,
 		},
@@ -219,7 +219,7 @@ func Test_Server_GetChangeProof(t *testing.T) {
 				KeyLimit:      defaultRequestKeyLimit,
 				BytesLimit:    defaultRequestByteSizeLimit,
 				StartKey:      []byte{1},
-				EndKey:        []byte{0},
+				EndKey:        &pb.MaybeBytes{Value: []byte{0}},
 			},
 			proofNil: true,
 		},

@@ -98,7 +98,7 @@ func (wh *workHeap) MergeInsert(item *workItem) {
 	wh.sortedItems.DescendLessOrEqual(
 		searchItem,
 		func(beforeItem *heapItem) bool {
-			if item.localRootID == beforeItem.workItem.localRootID && bytes.Equal(beforeItem.workItem.end, item.start) {
+			if item.localRootID == beforeItem.workItem.localRootID && bytes.Equal(beforeItem.workItem.end.Value(), item.start) {
 				// [beforeItem.start, beforeItem.end] and [item.start, item.end] are
 				// merged into [beforeItem.start, item.end]
 				beforeItem.workItem.end = item.end
@@ -114,7 +114,7 @@ func (wh *workHeap) MergeInsert(item *workItem) {
 	wh.sortedItems.AscendGreaterOrEqual(
 		searchItem,
 		func(afterItem *heapItem) bool {
-			if item.localRootID == afterItem.workItem.localRootID && bytes.Equal(afterItem.workItem.start, item.end) {
+			if item.localRootID == afterItem.workItem.localRootID && bytes.Equal(afterItem.workItem.start, item.end.Value()) {
 				// [item.start, item.end] and [afterItem.start, afterItem.end] are merged into
 				// [item.start, afterItem.end].
 				afterItem.workItem.start = item.start

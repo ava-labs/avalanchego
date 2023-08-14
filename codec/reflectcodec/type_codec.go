@@ -4,27 +4,28 @@
 package reflectcodec
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"math"
 	"reflect"
 
+	"golang.org/x/exp/slices"
+
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-const (
-	// DefaultTagName that enables serialization.
-	DefaultTagName = "serialize"
-)
+// DefaultTagName that enables serialization.
+const DefaultTagName = "serialize"
 
 var (
+	_ codec.Codec = (*genericCodec)(nil)
+
 	errMarshalNil   = errors.New("can't marshal nil pointer or interface")
 	errUnmarshalNil = errors.New("can't unmarshal nil")
 	errNeedPointer  = errors.New("argument to unmarshal must be a pointer")
 )
-
-var _ codec.Codec = (*genericCodec)(nil)
 
 type TypeCodec interface {
 	// UnpackPrefix unpacks the prefix of an interface from the given packer.
@@ -56,8 +57,8 @@ type TypeCodec interface {
 //     `{tagName}:"true"` to it. `{tagName}` defaults to `serialize`.
 //  3. These typed members of a struct may be serialized:
 //     bool, string, uint[8,16,32,64], int[8,16,32,64],
-//     structs, slices, arrays, interface.
-//     structs, slices and arrays can only be serialized if their constituent
+//     structs, slices, arrays, maps, interface.
+//     structs, slices, maps and arrays can only be serialized if their constituent
 //     values can be.
 //  4. To marshal an interface, you must pass a pointer to the value
 //  5. To unmarshal an interface, you must call
@@ -204,6 +205,69 @@ func (c *genericCodec) size(value reflect.Value) (int, bool, error) {
 		}
 		return size, constSize, nil
 
+	case reflect.Map:
+		iter := value.MapRange()
+		if !iter.Next() {
+			return wrappers.IntLen, false, nil
+		}
+
+		keySize, keyConstSize, err := c.size(iter.Key())
+		if err != nil {
+			return 0, false, err
+		}
+		valueSize, valueConstSize, err := c.size(iter.Value())
+		if err != nil {
+			return 0, false, err
+		}
+
+		switch {
+		case keyConstSize && valueConstSize:
+			numElts := value.Len()
+			return wrappers.IntLen + numElts*(keySize+valueSize), false, nil
+		case keyConstSize:
+			var (
+				numElts        = 1
+				totalValueSize = valueSize
+			)
+			for iter.Next() {
+				valueSize, _, err := c.size(iter.Value())
+				if err != nil {
+					return 0, false, err
+				}
+				totalValueSize += valueSize
+				numElts++
+			}
+			return wrappers.IntLen + numElts*keySize + totalValueSize, false, nil
+		case valueConstSize:
+			var (
+				numElts      = 1
+				totalKeySize = keySize
+			)
+			for iter.Next() {
+				keySize, _, err := c.size(iter.Key())
+				if err != nil {
+					return 0, false, err
+				}
+				totalKeySize += keySize
+				numElts++
+			}
+			return wrappers.IntLen + totalKeySize + numElts*valueSize, false, nil
+		default:
+			totalSize := wrappers.IntLen + keySize + valueSize
+			for iter.Next() {
+				keySize, _, err := c.size(iter.Key())
+				if err != nil {
+					return 0, false, err
+				}
+				valueSize, _, err := c.size(iter.Value())
+				if err != nil {
+					return 0, false, err
+				}
+				totalSize += keySize + valueSize
+			}
+			return totalSize, false, nil
+		}
+
 	default:
 		return 0, false, fmt.Errorf("can't evaluate marshal length of unknown kind %s", valueKind)
 	}
@@ -332,6 +396,71 @@ func (c *genericCodec) marshal(value reflect.Value, p *wrappers.Packer, maxSlice
 				return err
 			}
 		}
+		return nil
+	case reflect.Map:
+		keys := value.MapKeys()
+		numElts := len(keys)
+		if uint32(numElts) > maxSliceLen {
+			return fmt.Errorf("%w; map length, %d, exceeds maximum length, %d",
+				codec.ErrMaxSliceLenExceeded,
+				numElts,
+				maxSliceLen,
+			)
+		}
+		p.PackInt(uint32(numElts)) // pack # elements
+		if p.Err != nil {
+			return p.Err
+		}
+
+		// pack key-value pairs sorted by increasing key
+		type keyTuple struct {
+			key        reflect.Value
+			startIndex int
+			endIndex   int
+		}
+
+		sortedKeys := make([]keyTuple, len(keys))
+		startOffset := p.Offset
+		endOffset := p.Offset
+		for i, key := range keys {
+			if err := c.marshal(key, p, c.maxSliceLen); err != nil {
+				return err
+			}
+			if p.Err != nil {
+				return fmt.Errorf("couldn't marshal map key %+v: %w ", key, p.Err)
+			}
+			sortedKeys[i] = keyTuple{
+				key:        key,
+				startIndex: endOffset,
+				endIndex:   p.Offset,
+			}
+			endOffset = p.Offset
+		}
+
+		slices.SortFunc(sortedKeys, func(a, b keyTuple) bool {
+			aBytes := p.Bytes[a.startIndex:a.endIndex]
+			bBytes := p.Bytes[b.startIndex:b.endIndex]
+			return bytes.Compare(aBytes, bBytes) < 0
+		})
+
+		allKeyBytes := slices.Clone(p.Bytes[startOffset:p.Offset])
+		p.Offset = startOffset
+		for _, key := range sortedKeys {
+			// pack key
+			startIndex := key.startIndex - startOffset
+			endIndex := key.endIndex - startOffset
+			keyBytes := allKeyBytes[startIndex:endIndex]
+			p.PackFixedBytes(keyBytes)
+			if p.Err != nil {
+				return p.Err
+			}
+
+			// serialize and pack value
+			if err := c.marshal(value.MapIndex(key.key), p, c.maxSliceLen); err != nil {
+				return err
+			}
+		}
+
 		return nil
 	default:
 		return fmt.Errorf("%w: %s", codec.ErrUnsupportedType, valueKind)
@@ -519,6 +648,62 @@ func (c *genericCodec) unmarshal(p *wrappers.Packer, value reflect.Value, maxSli
 		}
 		// Assign to the top-level struct's member
 		value.Set(v)
+		return nil
+	case reflect.Map:
+		numElts32 := p.UnpackInt()
+		if p.Err != nil {
+			return fmt.Errorf("couldn't unmarshal map: %w", p.Err)
+		}
+		if numElts32 > c.maxSliceLen {
+			return fmt.Errorf("%w; map length, %d, exceeds maximum length, %d",
+				codec.ErrMaxSliceLenExceeded,
+				numElts32,
+				c.maxSliceLen,
+			)
+		}
+
+		var (
+			numElts      = int(numElts32)
+			mapType      = value.Type()
+			mapKeyType   = mapType.Key()
+			mapValueType = mapType.Elem()
+			prevKey      []byte
+		)
+
+		// Set [value] to be a new map of the appropriate type.
+		value.Set(reflect.MakeMapWithSize(mapType, numElts))
+
+		for i := 0; i < numElts; i++ {
+			mapKey := reflect.New(mapKeyType).Elem()
+
+			keyStartOffset := p.Offset
+
+			if err := c.unmarshal(p, mapKey, c.maxSliceLen); err != nil {
+				return fmt.Errorf("couldn't unmarshal map key (%s): %w", mapKeyType, err)
+			}
+
+			// Get the key's byte representation and check that the new key is
+			// actually bigger (according to bytes.Compare) than the previous
+			// key.
+			//
+			// We do this to enforce that key-value pairs are sorted by
+			// increasing key.
+			keyBytes := p.Bytes[keyStartOffset:p.Offset]
+			if i != 0 && bytes.Compare(keyBytes, prevKey) <= 0 {
+				return fmt.Errorf("keys aren't sorted: (%s, %s)", prevKey, mapKey)
+			}
+			prevKey = keyBytes
+
+			// Get the value
+			mapValue := reflect.New(mapValueType).Elem()
+			if err := c.unmarshal(p, mapValue, c.maxSliceLen); err != nil {
+				return fmt.Errorf("couldn't unmarshal map value for key %s: %w", mapKey, err)
+			}
+
+			// Assign the key-value pair in the map
+			value.SetMapIndex(mapKey, mapValue)
+		}
+
 		return nil
 	default:
 		return fmt.Errorf("can't unmarshal unknown type %s", value.Kind().String())

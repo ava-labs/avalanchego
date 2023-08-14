@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
-
 	"github.com/stretchr/testify/require"
+
+	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
@@ -473,7 +473,7 @@ func TestBlockVerify(t *testing.T) {
 							parentID: {
 								onAcceptState:  mockParentState,
 								statelessBlock: mockParentBlock,
-								importedInputs: set.Set[ids.ID]{inputID: struct{}{}},
+								importedInputs: set.Of(inputID),
 							},
 						},
 						clk:          &mockable.Clock{},
