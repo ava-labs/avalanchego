@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	stdmath "math"
 
 	"go.uber.org/zap"
@@ -16,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -52,27 +55,56 @@ type peerTracker struct {
 	// Peers that we're connected to that responded to the last request they were sent.
 	responsivePeers set.Set[ids.NodeID]
 	// Max heap that contains the average bandwidth of peers.
-	bandwidthHeap    math.AveragerHeap
-	averageBandwidth math.Averager
-	log              logging.Logger
-	// numTrackedPeers        prometheus.Gauge
-	// numResponsivePeers     prometheus.Gauge
-	// averageBandwidthMetric prometheus.Gauge
+	bandwidthHeap          math.AveragerHeap
+	averageBandwidth       math.Averager
+	log                    logging.Logger
+	numTrackedPeers        prometheus.Gauge
+	numResponsivePeers     prometheus.Gauge
+	averageBandwidthMetric prometheus.Gauge
 }
 
-func newPeerTracker(log logging.Logger) *peerTracker {
-	// TODO: initialize metrics
-	return &peerTracker{
+func newPeerTracker(
+	log logging.Logger,
+	metricsNamespace string,
+	registerer prometheus.Registerer,
+) (*peerTracker, error) {
+	t := &peerTracker{
 		peers:            make(map[ids.NodeID]*peerInfo),
 		trackedPeers:     make(set.Set[ids.NodeID]),
 		responsivePeers:  make(set.Set[ids.NodeID]),
 		bandwidthHeap:    math.NewMaxAveragerHeap(),
 		averageBandwidth: math.NewAverager(0, bandwidthHalflife, time.Now()),
 		log:              log,
-		// numTrackedPeers:        metrics.GetOrRegisterGauge("net_tracked_peers", nil),
-		// numResponsivePeers:     metrics.GetOrRegisterGauge("net_responsive_peers", nil),
-		// averageBandwidthMetric: metrics.GetOrRegisterGaugeFloat64("net_average_bandwidth", nil),
+		numTrackedPeers: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Namespace: metricsNamespace,
+				Name:      "num_tracked_peers",
+				Help:      "number of tracked peers",
+			},
+		),
+		numResponsivePeers: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Namespace: metricsNamespace,
+				Name:      "num_responsive_peers",
+				Help:      "number of responsive peers",
+			},
+		),
+		averageBandwidthMetric: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Namespace: metricsNamespace,
+				Name:      "average_bandwidth",
+				Help:      "average sync bandwidth used by peers",
+			},
+		),
 	}
+
+	errs := wrappers.Errs{}
+	errs.Add(
+		registerer.Register(t.numTrackedPeers),
+		registerer.Register(t.numResponsivePeers),
+		registerer.Register(t.averageBandwidthMetric),
+	)
+	return t, errs.Err
 }
 
 // Returns true if we're not connected to enough peers.
@@ -158,7 +190,7 @@ func (p *peerTracker) TrackPeer(nodeID ids.NodeID) {
 	defer p.lock.Unlock()
 
 	p.trackedPeers.Add(nodeID)
-	// p.numTrackedPeers.Set(float64(p.trackedPeers.Len()))
+	p.numTrackedPeers.Set(float64(p.trackedPeers.Len()))
 }
 
 // Record that we observed that [nodeID]'s bandwidth is [bandwidth].
@@ -189,9 +221,9 @@ func (p *peerTracker) TrackBandwidth(nodeID ids.NodeID, bandwidth float64) {
 		// TODO danlaine: shouldn't we add the observation of 0
 		// to the average bandwidth in the if statement?
 		p.averageBandwidth.Observe(bandwidth, now)
-		// p.averageBandwidthMetric.Set(p.averageBandwidth.Read())
+		p.averageBandwidthMetric.Set(p.averageBandwidth.Read())
 	}
-	// p.numResponsivePeers.Set(float64(p.responsivePeers.Len()))
+	p.numResponsivePeers.Set(float64(p.responsivePeers.Len()))
 }
 
 // Connected should be called when [nodeID] connects to this node
@@ -236,9 +268,9 @@ func (p *peerTracker) Disconnected(nodeID ids.NodeID) {
 
 	p.bandwidthHeap.Remove(nodeID)
 	p.trackedPeers.Remove(nodeID)
-	// p.numTrackedPeers.Set(float64(p.trackedPeers.Len()))
+	p.numTrackedPeers.Set(float64(p.trackedPeers.Len()))
 	p.responsivePeers.Remove(nodeID)
-	// p.numResponsivePeers.Set(float64(p.responsivePeers.Len()))
+	p.numResponsivePeers.Set(float64(p.responsivePeers.Len()))
 	delete(p.peers, nodeID)
 }
 

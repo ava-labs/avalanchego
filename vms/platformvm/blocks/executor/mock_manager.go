@@ -14,7 +14,7 @@ import (
 	snowman "github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	blocks "github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	state "github.com/ava-labs/avalanchego/vms/platformvm/state"
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockManager is a mock of Manager interface.

@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
-
 	"github.com/stretchr/testify/require"
+
+	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -1390,7 +1390,6 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 
 			unsignedTx, executor := tt.newExecutor(ctrl)
 			err := executor.RemoveSubnetValidatorTx(unsignedTx)
@@ -1682,7 +1681,6 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 
 			unsignedTx, executor := tt.newExecutor(ctrl)
 			err := executor.TransformSubnetTx(unsignedTx)
