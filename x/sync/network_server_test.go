@@ -9,11 +9,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
+	"github.com/stretchr/testify/require"
+
+	"go.uber.org/mock/gomock"
 
 	"google.golang.org/protobuf/proto"
-
-	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"

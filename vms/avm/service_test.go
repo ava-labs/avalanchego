@@ -13,11 +13,11 @@ import (
 
 	"github.com/btcsuite/btcd/btcutil/bech32"
 
-	"github.com/golang/mock/gomock"
-
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/stretchr/testify/require"
+
+	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/chains/atomic"

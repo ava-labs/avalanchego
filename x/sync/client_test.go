@@ -9,15 +9,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/avalanchego/database"
-
-	"github.com/golang/mock/gomock"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/stretchr/testify/require"
 
+	"go.uber.org/mock/gomock"
+
 	"google.golang.org/protobuf/proto"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"

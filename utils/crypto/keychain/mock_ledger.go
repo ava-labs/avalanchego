@@ -12,7 +12,7 @@ import (
 
 	ids "github.com/ava-labs/avalanchego/ids"
 	version "github.com/ava-labs/avalanchego/version"
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockLedger is a mock of Ledger interface.
