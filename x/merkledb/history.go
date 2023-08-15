@@ -194,9 +194,9 @@ func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start []byte, 
 	// Keep only the smallest [maxLength] items in [combinedChanges.values].
 	sortedChangedKeys := changedKeys.List()
 	utils.Sort(sortedChangedKeys)
-	for changedKeys.Len() > maxLength {
+	for len(sortedChangedKeys) > maxLength {
 		greatestKey := sortedChangedKeys[len(sortedChangedKeys)-1]
-		sortedChangedKeys = sortedChangedKeys[:len(changedKeys)-1]
+		sortedChangedKeys = sortedChangedKeys[:len(sortedChangedKeys)-1]
 		delete(combinedChanges.values, greatestKey)
 	}
 
