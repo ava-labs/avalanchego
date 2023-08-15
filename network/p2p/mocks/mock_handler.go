@@ -40,11 +40,9 @@ func (m *MockHandler) EXPECT() *MockHandlerMockRecorder {
 }
 
 // AppGossip mocks base method.
-func (m *MockHandler) AppGossip(arg0 context.Context, arg1 ids.NodeID, arg2 []byte) error {
+func (m *MockHandler) AppGossip(arg0 context.Context, arg1 ids.NodeID, arg2 []byte) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AppGossip", arg0, arg1, arg2)
-	ret0, _ := ret[0].(error)
-	return ret0
+	m.ctrl.Call(m, "AppGossip", arg0, arg1, arg2)
 }
 
 // AppGossip indicates an expected call of AppGossip.
@@ -54,12 +52,11 @@ func (mr *MockHandlerMockRecorder) AppGossip(arg0, arg1, arg2 interface{}) *gomo
 }
 
 // AppRequest mocks base method.
-func (m *MockHandler) AppRequest(arg0 context.Context, arg1 ids.NodeID, arg2 time.Time, arg3 []byte) ([]byte, error) {
+func (m *MockHandler) AppRequest(arg0 context.Context, arg1 ids.NodeID, arg2 time.Time, arg3 []byte) []byte {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AppRequest", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].([]byte)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	return ret0
 }
 
 // AppRequest indicates an expected call of AppRequest.
@@ -69,12 +66,11 @@ func (mr *MockHandlerMockRecorder) AppRequest(arg0, arg1, arg2, arg3 interface{}
 }
 
 // CrossChainAppRequest mocks base method.
-func (m *MockHandler) CrossChainAppRequest(arg0 context.Context, arg1 ids.ID, arg2 time.Time, arg3 []byte) ([]byte, error) {
+func (m *MockHandler) CrossChainAppRequest(arg0 context.Context, arg1 ids.ID, arg2 time.Time, arg3 []byte) []byte {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CrossChainAppRequest", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].([]byte)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	return ret0
 }
 
 // CrossChainAppRequest indicates an expected call of CrossChainAppRequest.

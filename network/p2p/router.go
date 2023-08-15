@@ -144,7 +144,8 @@ func (r *Router) AppGossip(ctx context.Context, nodeID ids.NodeID, gossip []byte
 		return nil
 	}
 
-	return handler.AppGossip(ctx, nodeID, parsedMsg)
+	handler.AppGossip(ctx, nodeID, parsedMsg)
+	return nil
 }
 
 func (r *Router) CrossChainAppRequest(
