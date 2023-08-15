@@ -54,7 +54,8 @@ $ ./build/testnetctl stop-network --network-dir=/path/to/network
 Note the export of the path ending in `latest`. This is a symlink that
 set to the last network created by `testnetctl start-network`. Setting
 the `TESTNETCTL_NETWORK_DIR` env var to this symlink ensures that
-`testnetctl` commands will target the most recently deployed
+`testnetctl` commands and e2e execution with
+`--use-persistent-network` will target the most recently deployed
 local network.
 
 ### Via code
