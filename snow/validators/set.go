@@ -15,95 +15,20 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"golang.org/x/exp/maps"
 )
 
 var (
-	_ Set = (*vdrSet)(nil)
-
 	errZeroWeight         = errors.New("weight must be non-zero")
 	errDuplicateValidator = errors.New("duplicate validator")
 	errMissingValidator   = errors.New("missing validator")
 )
 
-// Set of validators that can be sampled
-type Set interface {
-	formatting.PrefixedStringer
-
-	// Add a new staker to the set.
-	// Returns an error if:
-	// - [weight] is 0
-	// - [nodeID] is already in the validator set
-	// - the total weight of the validator set would overflow uint64
-	// If an error is returned, the set will be unmodified.
-	Add(nodeID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) error
-
-	// AddWeight to an existing staker.
-	// Returns an error if:
-	// - [weight] is 0
-	// - [nodeID] is not already in the validator set
-	// - the total weight of the validator set would overflow uint64
-	// If an error is returned, the set will be unmodified.
-	AddWeight(nodeID ids.NodeID, weight uint64) error
-
-	// GetWeight retrieves the validator weight from the set.
-	GetWeight(ids.NodeID) uint64
-
-	// Get returns the validator tied to the specified ID.
-	Get(ids.NodeID) (*Validator, bool)
-
-	// SubsetWeight returns the sum of the weights of the validators.
-	SubsetWeight(set.Set[ids.NodeID]) uint64
-
-	// RemoveWeight from a staker. If the staker's weight becomes 0, the staker
-	// will be removed from the validator set.
-	// Returns an error if:
-	// - [weight] is 0
-	// - [nodeID] is not already in the validator set
-	// - the weight of the validator would become negative
-	// If an error is returned, the set will be unmodified.
-	RemoveWeight(nodeID ids.NodeID, weight uint64) error
-
-	// Contains returns true if there is a validator with the specified ID
-	// currently in the set.
-	Contains(ids.NodeID) bool
-
-	// Len returns the number of validators currently in the set.
-	Len() int
-
-	// Map of the validators in this set
-	Map() map[ids.NodeID]*GetValidatorOutput
-
-	// Weight returns the cumulative weight of all validators in the set.
-	Weight() uint64
-
-	// Sample returns a collection of validatorIDs, potentially with duplicates.
-	// If sampling the requested size isn't possible, an error will be returned.
-	Sample(size int) ([]ids.NodeID, error)
-
-	// When a validator's weight changes, or a validator is added/removed,
-	// this listener is called.
-	RegisterCallbackListener(SetCallbackListener)
-}
-
-type SetCallbackListener interface {
-	OnValidatorAdded(validatorID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64)
-	OnValidatorRemoved(validatorID ids.NodeID, weight uint64)
-	OnValidatorWeightChanged(validatorID ids.NodeID, oldWeight, newWeight uint64)
-}
-
-// NewSet returns a new, empty set of validators.
-func NewSet() Set {
+// newSet returns a new, empty set of validators.
+func newSet() *vdrSet {
 	return &vdrSet{
 		vdrs:    make(map[ids.NodeID]*Validator),
 		sampler: sampler.NewWeightedWithoutReplacement(),
-	}
-}
-
-// NewBestSet returns a new, empty set of validators.
-func NewBestSet(expectedSampleSize int) Set {
-	return &vdrSet{
-		vdrs:    make(map[ids.NodeID]*Validator),
-		sampler: sampler.NewBestWeightedWithoutReplacement(expectedSampleSize),
 	}
 }
 
@@ -318,19 +243,11 @@ func (s *vdrSet) len() int {
 	return len(s.vdrSlice)
 }
 
-func (s *vdrSet) Map() map[ids.NodeID]*GetValidatorOutput {
+func (s *vdrSet) getValidatorIDs() []ids.NodeID {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
-	set := make(map[ids.NodeID]*GetValidatorOutput, len(s.vdrSlice))
-	for _, vdr := range s.vdrSlice {
-		set[vdr.NodeID] = &GetValidatorOutput{
-			NodeID:    vdr.NodeID,
-			PublicKey: vdr.PublicKey,
-			Weight:    vdr.Weight,
-		}
-	}
-	return set
+	return maps.Keys(s.vdrs)
 }
 
 func (s *vdrSet) Sample(size int) ([]ids.NodeID, error) {

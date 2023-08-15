@@ -9,11 +9,12 @@ import (
 	"strings"
 	"sync"
 
-	"golang.org/x/exp/maps"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/set"
+	"golang.org/x/exp/maps"
 )
 
 var (
@@ -22,25 +23,76 @@ var (
 	ErrMissingValidators = errors.New("missing validators")
 )
 
+type SetCallbackListener interface {
+	OnValidatorAdded(validatorID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64)
+	OnValidatorRemoved(validatorID ids.NodeID, weight uint64)
+	OnValidatorWeightChanged(validatorID ids.NodeID, oldWeight, newWeight uint64)
+}
+
 // Manager holds the validator set of each subnet
 type Manager interface {
-	fmt.Stringer
+	formatting.PrefixedStringer
 
-	// Add a subnet's validator set to the manager.
-	//
-	// If the subnet had previously registered a validator set, false will be
-	// returned and the manager will not be modified.
-	Add(subnetID ids.ID, set Set) bool
+	// Add a new staker to the subnet.
+	// Returns an error if:
+	// - [weight] is 0
+	// - [nodeID] is already in the validator set
+	// - the total weight of the validator set would overflow uint64
+	// If an error is returned, the set will be unmodified.
+	AddStaker(subnetID ids.ID, nodeID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) error
 
-	// Get returns the validator set for the given subnet
-	// Returns false if the subnet doesn't exist
-	Get(ids.ID) (Set, bool)
+	// AddWeight to an existing staker to the subnet.
+	// Returns an error if:
+	// - [weight] is 0
+	// - [nodeID] is not already in the validator set
+	// - the total weight of the validator set would overflow uint64
+	// If an error is returned, the set will be unmodified.
+	AddWeight(subnetID ids.ID, nodeID ids.NodeID, weight uint64) error
+
+	// GetWeight retrieves the validator weight from the subnet.
+	GetWeight(subnetID ids.ID, validatorID ids.NodeID) uint64
+
+	// GetValidator returns the validator tied to the specified ID in subnet.
+	GetValidator(subnetID ids.ID, validatorID ids.NodeID) (*Validator, bool)
+
+	// GetValidatoIDs returns the validator IDs in the subnet.
+	GetValidatorIDs(subnetID ids.ID) []ids.NodeID
+
+	// SubsetWeight returns the sum of the weights of the validators in the subnet.
+	SubsetWeight(subnetID ids.ID, validatorIDs set.Set[ids.NodeID]) uint64
+
+	// RemoveWeight from a staker in the subnet. If the staker's weight becomes 0, the staker
+	// will be removed from the subnet set.
+	// Returns an error if:
+	// - [weight] is 0
+	// - [nodeID] is not already in the subnet set
+	// - the weight of the validator would become negative
+	// If an error is returned, the set will be unmodified.
+	RemoveWeight(subnetID ids.ID, nodeID ids.NodeID, weight uint64) error
+
+	// Contains returns true if there is a validator with the specified ID
+	// currently in the subnet.
+	Contains(subnetID ids.ID, validatorID ids.NodeID) bool
+
+	// Len returns the number of validators currently in the subnet.
+	Len(subnetID ids.ID) int
+
+	// Weight returns the cumulative weight of all validators in the subnet.
+	Weight(subnetID ids.ID) uint64
+
+	// Sample returns a collection of validatorIDs in the subnet, potentially with duplicates.
+	// If sampling the requested size isn't possible, an error will be returned.
+	Sample(subnetID ids.ID, size int) ([]ids.NodeID, error)
+
+	// When a validator's weight changes, or a validator is added/removed,
+	// this listener is called.
+	RegisterCallbackListener(subnetID ids.ID, listener SetCallbackListener)
 }
 
 // NewManager returns a new, empty manager
 func NewManager() Manager {
 	return &manager{
-		subnetToVdrs: make(map[ids.ID]Set),
+		subnetToVdrs: make(map[ids.ID]*vdrSet),
 	}
 }
 
@@ -49,30 +101,169 @@ type manager struct {
 
 	// Key: Subnet ID
 	// Value: The validators that validate the subnet
-	subnetToVdrs map[ids.ID]Set
+	subnetToVdrs map[ids.ID]*vdrSet
 }
 
-func (m *manager) Add(subnetID ids.ID, set Set) bool {
+func (m *manager) AddStaker(subnetID ids.ID, nodeID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	if _, exists := m.subnetToVdrs[subnetID]; exists {
-		return false
+	set, exists := m.subnetToVdrs[subnetID]
+	if !exists {
+		set = newSet()
+		m.subnetToVdrs[subnetID] = set
 	}
 
-	m.subnetToVdrs[subnetID] = set
-	return true
+	return set.Add(nodeID, pk, txID, weight)
 }
 
-func (m *manager) Get(subnetID ids.ID) (Set, bool) {
+func (m *manager) AddWeight(subnetID ids.ID, nodeID ids.NodeID, weight uint64) error {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
-	vdrs, ok := m.subnetToVdrs[subnetID]
-	return vdrs, ok
+	set, exists := m.subnetToVdrs[subnetID]
+	if !exists {
+		return errMissingValidator
+	}
+
+	return set.AddWeight(nodeID, weight)
+}
+
+func (m *manager) GetWeight(subnetID ids.ID, validatorID ids.NodeID) uint64 {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	set, exists := m.subnetToVdrs[subnetID]
+	if !exists {
+		return 0
+	}
+
+	return set.GetWeight(validatorID)
+}
+
+func (m *manager) GetValidator(subnetID ids.ID, validatorID ids.NodeID) (*Validator, bool) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	set, exists := m.subnetToVdrs[subnetID]
+	if !exists {
+		return nil, false
+	}
+
+	return set.Get(validatorID)
+}
+
+func (m *manager) GetValidatorIDs(subnetID ids.ID) []ids.NodeID {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	vdrs, exists := m.subnetToVdrs[subnetID]
+	if !exists {
+		return []ids.NodeID{}
+	}
+
+	return vdrs.getValidatorIDs()
+}
+
+func (m *manager) SubsetWeight(subnetID ids.ID, validatorIDs set.Set[ids.NodeID]) uint64 {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	set, exists := m.subnetToVdrs[subnetID]
+	if !exists {
+		return 0
+	}
+
+	return set.SubsetWeight(validatorIDs)
+}
+
+func (m *manager) RemoveWeight(subnetID ids.ID, nodeID ids.NodeID, weight uint64) error {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	set, exists := m.subnetToVdrs[subnetID]
+	if !exists {
+		return errMissingValidator
+	}
+
+	if err := set.RemoveWeight(nodeID, weight); err != nil {
+		return err
+	}
+
+	// If this was the last validator in the subnet, remove the subnet
+	if set.Len() == 0 {
+		delete(m.subnetToVdrs, subnetID)
+	}
+
+	return nil
+}
+
+func (m *manager) Contains(subnetID ids.ID, validatorID ids.NodeID) bool {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	set, exists := m.subnetToVdrs[subnetID]
+	if !exists {
+		return false
+	}
+
+	return set.Contains(validatorID)
+}
+
+func (m *manager) Len(subnetID ids.ID) int {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	set, exists := m.subnetToVdrs[subnetID]
+	if !exists {
+		return 0
+	}
+
+	return set.Len()
+}
+
+func (m *manager) Weight(subnetID ids.ID) uint64 {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	set, exists := m.subnetToVdrs[subnetID]
+	if !exists {
+		return 0
+	}
+
+	return set.Weight()
+}
+
+func (m *manager) Sample(subnetID ids.ID, size int) ([]ids.NodeID, error) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	set, exists := m.subnetToVdrs[subnetID]
+	if !exists {
+		return nil, errMissingValidator
+	}
+
+	return set.Sample(size)
+}
+
+func (m *manager) RegisterCallbackListener(subnetID ids.ID, listener SetCallbackListener) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	set, exists := m.subnetToVdrs[subnetID]
+	if !exists {
+		set = newSet()
+		m.subnetToVdrs[subnetID] = set
+	}
+
+	set.RegisterCallbackListener(listener)
 }
 
 func (m *manager) String() string {
+	return m.PrefixedString("    ")
+}
+
+func (m *manager) PrefixedString(prefix string) string {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
@@ -87,71 +278,12 @@ func (m *manager) String() string {
 	for _, subnetID := range subnets {
 		vdrs := m.subnetToVdrs[subnetID]
 		sb.WriteString(fmt.Sprintf(
-			"\n    Subnet[%s]: %s",
+			"\n%sSubnet[%s]: %s",
+			prefix,
 			subnetID,
-			vdrs.PrefixedString("    "),
+			vdrs.PrefixedString(prefix),
 		))
 	}
 
 	return sb.String()
-}
-
-// Add is a helper that fetches the validator set of [subnetID] from [m] and
-// adds [nodeID] to the validator set.
-// Returns an error if:
-// - [subnetID] does not have a registered validator set in [m]
-// - adding [nodeID] to the validator set returns an error
-func Add(m Manager, subnetID ids.ID, nodeID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) error {
-	vdrs, ok := m.Get(subnetID)
-	if !ok {
-		return fmt.Errorf("%w: %s", ErrMissingValidators, subnetID)
-	}
-	return vdrs.Add(nodeID, pk, txID, weight)
-}
-
-// AddWeight is a helper that fetches the validator set of [subnetID] from [m]
-// and adds [weight] to [nodeID] in the validator set.
-// Returns an error if:
-// - [subnetID] does not have a registered validator set in [m]
-// - adding [weight] to [nodeID] in the validator set returns an error
-func AddWeight(m Manager, subnetID ids.ID, nodeID ids.NodeID, weight uint64) error {
-	vdrs, ok := m.Get(subnetID)
-	if !ok {
-		return fmt.Errorf("%w: %s", ErrMissingValidators, subnetID)
-	}
-	return vdrs.AddWeight(nodeID, weight)
-}
-
-// RemoveWeight is a helper that fetches the validator set of [subnetID] from
-// [m] and removes [weight] from [nodeID] in the validator set.
-// Returns an error if:
-// - [subnetID] does not have a registered validator set in [m]
-// - removing [weight] from [nodeID] in the validator set returns an error
-func RemoveWeight(m Manager, subnetID ids.ID, nodeID ids.NodeID, weight uint64) error {
-	vdrs, ok := m.Get(subnetID)
-	if !ok {
-		return fmt.Errorf("%w: %s", ErrMissingValidators, subnetID)
-	}
-	return vdrs.RemoveWeight(nodeID, weight)
-}
-
-// Contains is a helper that fetches the validator set of [subnetID] from [m]
-// and returns if the validator set contains [nodeID]. If [m] does not contain a
-// validator set for [subnetID], false is returned.
-func Contains(m Manager, subnetID ids.ID, nodeID ids.NodeID) bool {
-	vdrs, ok := m.Get(subnetID)
-	if !ok {
-		return false
-	}
-	return vdrs.Contains(nodeID)
-}
-
-func NodeIDs(m Manager, subnetID ids.ID) ([]ids.NodeID, error) {
-	vdrs, exist := m.Get(subnetID)
-	if !exist {
-		return nil, fmt.Errorf("%w: %s", ErrMissingValidators, subnetID)
-	}
-
-	vdrsMap := vdrs.Map()
-	return maps.Keys(vdrsMap), nil
 }
