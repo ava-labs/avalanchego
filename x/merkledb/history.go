@@ -147,19 +147,21 @@ func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start []byte, 
 		},
 	)
 
-	startPath := newPath(start)
-	endPath := maybe.Bind(end, newPath)
-
-	// For each element in the history in the range between [startRoot]'s
-	// last appearance (exclusive) and [endRoot]'s last appearance (inclusive),
-	// add the changes to keys in [start, end] to [combinedChanges].
-	// Only the key-value pairs with the greatest [maxLength] keys will be kept.
-	combinedChanges := newChangeSummary(maxLength)
+	var (
+		startPath = newPath(start)
+		endPath   = maybe.Bind(end, newPath)
+		// For each element in the history in the range between [startRoot]'s
+		// last appearance (exclusive) and [endRoot]'s last appearance (inclusive),
+		// add the changes to keys in [start, end] to [combinedChanges].
+		// Only the key-value pairs with the greatest [maxLength] keys will be kept.
+		combinedChanges = newChangeSummary(maxLength)
+		offset          = int(endRootChanges.insertNumber - startRootChanges.insertNumber)
+		endRootIndex    = startRootIndex + offset
+	)
 
 	// For each change after [startRootChanges] up to and including
 	// [endRootChanges], record the change in [combinedChanges].
-	offset := int(endRootChanges.insertNumber - startRootChanges.insertNumber)
-	for i := startRootIndex + 1; i <= startRootIndex+offset; i++ {
+	for i := startRootIndex + 1; i <= endRootIndex; i++ {
 		changes, _ := th.history.Index(i)
 
 		// Add the changes from this commit to [combinedChanges].
