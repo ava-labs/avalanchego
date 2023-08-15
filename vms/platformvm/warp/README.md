@@ -45,14 +45,17 @@ Unsigned Message:
 BitSetSignature:
 ```
 +-----------+----------+---------------------------+
+|   type_id :   uint32 |                   4 bytes |
++-----------+----------+---------------------------+
 |   signers :   []byte |          4 + len(signers) |
 +-----------+----------+---------------------------+
 | signature : [96]byte |                  96 bytes |
 +-----------+----------+---------------------------+
-                       | 100 + size(signers) bytes |
+                       | 104 + size(signers) bytes |
                        +---------------------------+
 ```
 
+- `typeID` is the ID of this signature type, which is `0x00000000`
 - `signers` encodes a bitset of which validators' signatures are included (a bitset is a byte array where each bit indicates membership of the element at that index in the set)
 - `signature` is an aggregated BLS Multi-Signature of the Unsigned Message
 
