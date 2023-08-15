@@ -255,7 +255,7 @@ func Test_RangeProof_MaxLength(t *testing.T) {
 	dbTrie, err := getBasicDB()
 	require.NoError(err)
 	require.NotNil(dbTrie)
-	trie, err := dbTrie.NewView()
+	trie, err := dbTrie.NewView(nil)
 	require.NoError(err)
 
 	_, err = trie.GetRangeProof(context.Background(), nil, maybe.Nothing[[]byte](), -1)
@@ -271,14 +271,14 @@ func Test_Proof(t *testing.T) {
 	dbTrie, err := getBasicDB()
 	require.NoError(err)
 	require.NotNil(dbTrie)
-	trie, err := dbTrie.NewView()
+	trie, err := dbTrie.NewView([]database.BatchOp{
+		{Key: []byte("key0"), Value: []byte("value0")},
+		{Key: []byte("key1"), Value: []byte("value1")},
+		{Key: []byte("key2"), Value: []byte("value2")},
+		{Key: []byte("key3"), Value: []byte("value3")},
+		{Key: []byte("key4"), Value: []byte("value4")},
+	})
 	require.NoError(err)
-
-	require.NoError(trie.Insert(context.Background(), []byte("key0"), []byte("value0")))
-	require.NoError(trie.Insert(context.Background(), []byte("key1"), []byte("value1")))
-	require.NoError(trie.Insert(context.Background(), []byte("key2"), []byte("value2")))
-	require.NoError(trie.Insert(context.Background(), []byte("key3"), []byte("value3")))
-	require.NoError(trie.Insert(context.Background(), []byte("key4"), []byte("value4")))
 
 	_, err = trie.GetMerkleRoot(context.Background())
 	require.NoError(err)
@@ -1691,32 +1691,43 @@ func FuzzRangeProofInvariants(f *testing.F) {
 
 	f.Fuzz(func(
 		t *testing.T,
-		start []byte,
+		startBytes []byte,
 		endBytes []byte,
 		maxProofLen uint,
 	) {
 		require := require.New(t)
 
 		// Make sure proof bounds are valid
-		if len(endBytes) != 0 && bytes.Compare(start, endBytes) > 0 {
+		if len(endBytes) != 0 && bytes.Compare(startBytes, endBytes) > 0 {
 			return
-		}
-		end := maybe.Nothing[[]byte]()
-		if len(endBytes) > 0 {
-			end = maybe.Some(endBytes)
 		}
 		// Make sure proof length is valid
 		if maxProofLen == 0 {
 			return
 		}
 
+		end := maybe.Nothing[[]byte]()
+		if len(endBytes) != 0 {
+			end = maybe.Some(endBytes)
+		}
+
 		rangeProof, err := db.GetRangeProof(
 			context.Background(),
-			start,
+			startBytes,
 			end,
 			int(maxProofLen),
 		)
 		require.NoError(err)
+
+		rootID, err := db.GetMerkleRoot(context.Background())
+		require.NoError(err)
+
+		require.NoError(rangeProof.Verify(
+			context.Background(),
+			startBytes,
+			end,
+			rootID,
+		))
 
 		// Make sure the start proof doesn't contain any nodes
 		// that are in the end proof.
