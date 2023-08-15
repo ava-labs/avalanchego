@@ -28,4 +28,9 @@ jobs:
         run: ./scripts/build.sh -r
       - name: Run e2e tests with persistent network
         shell: bash
-        run: ./scripts/tests.e2e.persistent.sh ./build/avalanchego
+        run: ARCHIVE_NETWORK_DIR_ON_TEARDOWN=1 ./scripts/tests.e2e.persistent.sh ./build/avalanchego
+      - name: Upload archive of testnet fixture dir
+        uses: actions/upload-artifact@v3
+        with:
+          name: testnet-data
+          path: testnet.tar.xz

@@ -9,6 +9,8 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"testing"
 
 	ginkgo "github.com/onsi/ginkgo/v2"
@@ -36,9 +38,10 @@ func TestE2E(t *testing.T) {
 }
 
 var (
-	avalancheGoExecPath  string
-	persistentNetworkDir string
-	usePersistentNetwork bool
+	avalancheGoExecPath         string
+	persistentNetworkDir        string
+	usePersistentNetwork        bool
+	archiveNetworkDirOnTeardown bool
 )
 
 func init() {
@@ -60,12 +63,26 @@ func init() {
 		false,
 		"[optional] whether to target the persistent network identified by --network-dir.",
 	)
+	flag.BoolVar(
+		&archiveNetworkDirOnTeardown,
+		"archive-network-dir-on-teardown",
+		false,
+		"[optional] whether to archive the network on teardown. Only valid for a test-managed network.",
+	)
 }
 
 var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// Run only once in the first ginkgo process
 
 	require := require.New(ginkgo.GinkgoT())
+
+	// Archiving of a network dir should be performed after network shutdown, and
+	// whatever is responsible for shutting down a persistent network should also be
+	// responsible for archiving its network dir.
+	require.False(
+		usePersistentNetwork && archiveNetworkDirOnTeardown,
+		"the network dir of a persistent network cannot be archived on teardown",
+	)
 
 	if usePersistentNetwork && len(persistentNetworkDir) == 0 {
 		persistentNetworkDir = os.Getenv(local.NetworkDirEnvName)
@@ -101,6 +118,16 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 		ginkgo.DeferCleanup(func() {
 			tests.Outf("Shutting down network\n")
 			require.NoError(network.Stop())
+			if archiveNetworkDirOnTeardown {
+				archivePath, err := filepath.Abs("../../testnet.tar.xz")
+				require.NoError(err)
+				tests.Outf("Archiving network dir %s to %s\n", network.Dir, archivePath)
+				cmd := exec.Command(
+					// Specifying -C ensures that the archive will exclude the path containing the network dir.
+					"tar", "cjf", archivePath, "-C", filepath.Dir(network.Dir), filepath.Base(network.Dir),
+				)
+				require.NoError(cmd.Run())
+			}
 		})
 
 		tests.Outf("{{green}}Successfully started network{{/}}\n")

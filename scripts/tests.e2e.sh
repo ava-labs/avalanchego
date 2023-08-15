@@ -40,6 +40,9 @@ else
   echo "running e2e tests against an ephemeral local cluster deployed with ${AVALANCHEGO_PATH}"
   AVALANCHEGO_PATH="$(realpath ${AVALANCHEGO_PATH})"
   E2E_ARGS="--avalanchego-path=${AVALANCHEGO_PATH}"
+  if [[ -n "${ARCHIVE_NETWORK_DIR_ON_TEARDOWN:-}" ]]; then
+    E2E_ARGS="${E2E_ARGS} --archive-network-dir-on-teardown"
+  fi
 fi
 
 #################################

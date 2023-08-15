@@ -39,6 +39,13 @@ function cleanup {
   echo "cleaning up persistent network"
   if [[ -n "${TESTNETCTL_NETWORK_DIR:-}" ]]; then
     ./build/testnetctl stop-network
+    if [[ -n "${ARCHIVE_NETWORK_DIR_ON_TEARDOWN:-}" ]]; then
+      local archive_filename="testnet.tar.xz"
+      echo "Archiving network dir ${TESTNETCTL_NETWORK_DIR} to ${archive_filename}"
+      local network_dir="$(dirname ${TESTNETCTL_NETWORK_DIR})"
+      local network_base="$(basename ${TESTNETCTL_NETWORK_DIR})"
+      tar cjf "${archive_filename}" -C "${network_dir}" "${network_base}"
+    fi
   fi
   rm -r "${ROOT_DIR}"
 }
