@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/e2e"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -37,18 +38,16 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 		// use this for filtering tests by labels
 		// ref. https://onsi.github.io/ginkgo/#spec-labels
 		ginkgo.Label(
-			"require-network-runner",
 			"xp",
 			"workflow",
 		),
 		ginkgo.FlakeAttempts(2),
 		func() {
-			rpcEps := e2e.Env.GetURIs()
-			gomega.Expect(rpcEps).ShouldNot(gomega.BeEmpty())
-			nodeURI := rpcEps[0]
+			nodeURI := e2e.Env.GetRandomNodeURI()
 
 			tests.Outf("{{blue}} setting up keys {{/}}\n")
-			_, testKeyAddrs, keyChain := e2e.Env.GetTestKeys()
+			keys := e2e.Env.AllocateFundedKeys(2)
+			keyChain := secp256k1fx.NewKeychain(keys...)
 
 			tests.Outf("{{blue}} setting up wallet {{/}}\n")
 			ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultWalletCreationTimeout)
@@ -81,8 +80,8 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			// amount to transfer from P to X chain
 			toTransfer := 1 * units.Avax
 
-			pShortAddr := testKeyAddrs[0]
-			xTargetAddr := testKeyAddrs[1]
+			pShortAddr := keys[0].Address()
+			xTargetAddr := keys[1].Address()
 			ginkgo.By("check selected keys have sufficient funds", func() {
 				pBalances, err := pWallet.Builder().GetBalance()
 				pBalance := pBalances[avaxAssetID]
@@ -93,8 +92,13 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			validatorStartTimeDiff := 30 * time.Second
 			vdrStartTime := time.Now().Add(validatorStartTimeDiff)
 
+			// Use a random node ID to ensure that repeated test runs
+			// will succeed against a persistent network.
+			validatorID, err := ids.ToNodeID(utils.RandomBytes(ids.NodeIDLen))
+			gomega.Expect(err).Should(gomega.BeNil())
+
 			vdr := &txs.Validator{
-				NodeID: ids.GenerateTestNodeID(),
+				NodeID: validatorID,
 				Start:  uint64(vdrStartTime.Unix()),
 				End:    uint64(vdrStartTime.Add(72 * time.Hour).Unix()),
 				Wght:   minValStake,
