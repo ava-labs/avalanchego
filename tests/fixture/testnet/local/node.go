@@ -130,7 +130,7 @@ func (n *LocalNode) WriteConfig() error {
 }
 
 func (n *LocalNode) GetProcessContextPath() string {
-	return filepath.Join(n.GetDataDir(), config.ProcessContextFilename)
+	return filepath.Join(n.GetDataDir(), config.DefaultProcessContextFilename)
 }
 
 func (n *LocalNode) ReadProcessContext() error {
