@@ -39,11 +39,10 @@ impl FirewoodService {
             match msg {
                 Request::NewRevision {
                     root_hash,
-                    cfg,
                     respond_to,
                 } => {
                     let id: RevId = lastid.fetch_add(1, Ordering::Relaxed);
-                    let msg = match db.get_revision(&root_hash, cfg) {
+                    let msg = match db.get_revision(&root_hash) {
                         Some(rev) => {
                             revs.insert(id, rev);
                             Some(id)

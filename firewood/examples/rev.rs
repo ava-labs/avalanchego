@@ -162,7 +162,7 @@ impl RevisionTracker {
 
     fn get_revision(&self, index: usize) -> Revision<SharedStore> {
         self.db
-            .get_revision(&self.hashes[index], None)
+            .get_revision(&self.hashes[index])
             .unwrap_or_else(|| panic!("revision-{index} should exist"))
     }
 }

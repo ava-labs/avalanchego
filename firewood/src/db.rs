@@ -806,11 +806,7 @@ impl Db<SharedStore> {
     ///
     /// If no revision with matching root hash found, returns None.
     // #[measure([HitCount])]
-    pub fn get_revision(
-        &self,
-        root_hash: &TrieHash,
-        cfg: Option<DbRevConfig>,
-    ) -> Option<Revision<SharedStore>> {
+    pub fn get_revision(&self, root_hash: &TrieHash) -> Option<Revision<SharedStore>> {
         let mut revisions = self.revisions.lock();
         let inner_lock = self.inner.read();
 
@@ -883,8 +879,6 @@ impl Db<SharedStore> {
         // Release the lock after we find the revision
         drop(inner_lock);
 
-        let cfg = cfg.as_ref().unwrap_or(&self.cfg.rev);
-
         let db_header_ref = Db::get_db_header_ref(&space.merkle.meta).unwrap();
 
         let merkle_payload_header_ref =
@@ -906,7 +900,7 @@ impl Db<SharedStore> {
                 (space.blob.meta.clone(), space.blob.payload.clone()),
                 self.payload_regn_nbit,
                 0,
-                cfg,
+                &self.cfg.rev,
             )
             .unwrap(),
         }

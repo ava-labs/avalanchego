@@ -130,7 +130,7 @@ fn test_revisions() {
             dumped
                 .iter()
                 .zip(hashes.iter().cloned())
-                .map(|(data, hash)| (data, db.get_revision(&hash, None).unwrap()))
+                .map(|(data, hash)| (data, db.get_revision(&hash).unwrap()))
                 .map(|(data, rev)| (data, kv_dump!(rev)))
                 .for_each(|(b, a)| {
                     if &a != b {
@@ -144,7 +144,7 @@ fn test_revisions() {
         dumped
             .iter()
             .zip(hashes.iter().cloned())
-            .map(|(data, hash)| (data, db.get_revision(&hash, None).unwrap()))
+            .map(|(data, hash)| (data, db.get_revision(&hash).unwrap()))
             .map(|(data, rev)| (data, kv_dump!(rev)))
             .for_each(|(previous_dump, after_reopen_dump)| {
                 if &after_reopen_dump != previous_dump {
@@ -208,7 +208,7 @@ fn create_db_issue_proof() {
     let proposal = db.new_proposal(batch).unwrap();
     proposal.commit().unwrap();
 
-    let rev = db.get_revision(&root_hash, None).unwrap();
+    let rev = db.get_revision(&root_hash).unwrap();
     let key = "doe".as_bytes();
     let root_hash = rev.kv_root_hash();
 

@@ -3,7 +3,7 @@
 
 use std::io::Write;
 
-use crate::db::{DbError, DbRevConfig};
+use crate::db::DbError;
 use crate::merkle::TrieHash;
 #[cfg(feature = "proof")]
 use crate::{merkle::MerkleError, proof::Proof};
@@ -14,7 +14,7 @@ pub type Nonce = u64;
 
 #[async_trait]
 pub trait Db<R: Revision> {
-    async fn get_revision(&self, root_hash: TrieHash, cfg: Option<DbRevConfig>) -> Option<R>;
+    async fn get_revision(&self, root_hash: TrieHash) -> Option<R>;
 }
 
 #[async_trait]

@@ -3,10 +3,7 @@
 
 use tokio::sync::{mpsc, oneshot};
 
-use crate::{
-    db::{DbError, DbRevConfig},
-    merkle::TrieHash,
-};
+use crate::{db::DbError, merkle::TrieHash};
 
 mod client;
 mod server;
@@ -25,7 +22,6 @@ pub struct RevisionHandle {
 pub enum Request {
     NewRevision {
         root_hash: TrieHash,
-        cfg: Option<DbRevConfig>,
         respond_to: oneshot::Sender<Option<RevId>>,
     },
 

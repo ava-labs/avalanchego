@@ -12,7 +12,7 @@ use std::{path::Path, thread};
 use tokio::sync::{mpsc, oneshot};
 
 use crate::api::Revision;
-use crate::db::DbRevConfig;
+
 use crate::{
     db::{DbConfig, DbError},
     merkle::TrieHash,
@@ -181,15 +181,10 @@ impl crate::api::Db<RevisionHandle> for Connection
 where
     tokio::sync::mpsc::Sender<Request>: From<tokio::sync::mpsc::Sender<Request>>,
 {
-    async fn get_revision(
-        &self,
-        root_hash: TrieHash,
-        cfg: Option<DbRevConfig>,
-    ) -> Option<RevisionHandle> {
+    async fn get_revision(&self, root_hash: TrieHash) -> Option<RevisionHandle> {
         let (send, recv) = oneshot::channel();
         let msg = Request::NewRevision {
             root_hash,
-            cfg,
             respond_to: send,
         };
         self.sender
