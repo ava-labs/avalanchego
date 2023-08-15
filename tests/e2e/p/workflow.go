@@ -51,7 +51,10 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 
 			tests.Outf("{{blue}} setting up wallet {{/}}\n")
 			ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultWalletCreationTimeout)
-			baseWallet, err := primary.NewWalletFromURI(ctx, nodeURI, keyChain)
+			baseWallet, err := primary.MakeWallet(ctx, &primary.WalletConfig{
+				URI:      nodeURI,
+				Keychain: keyChain,
+			})
 			cancel()
 			gomega.Expect(err).Should(gomega.BeNil())
 
