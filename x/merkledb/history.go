@@ -8,11 +8,11 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/google/btree"
-
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/buffer"
 	"github.com/ava-labs/avalanchego/utils/maybe"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var (
@@ -103,7 +103,7 @@ func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start []byte, 
 	var startRootIndex int
 
 	if startRootChanges.insertNumber > endRootChanges.insertNumber {
-		// [startRootChanges] happened after [endRootChange].
+		// [startRootChanges] happened after [endRootChanges].
 		// However, that is just the *latest* change resulting in [startRoot].
 		// Attempt to find a change resulting in [starRoot] before [endRootChanges].
 		//
@@ -111,23 +111,24 @@ func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start []byte, 
 		// backward from [endRootChanges].
 		var (
 			// The insert number of the last element in [th.history].
+			// Note that [th.nextInsertNumber] > 1.
 			mostRecentChangeInsertNumber = th.nextInsertNumber - 1
-			// The index within [th.history] of the last element.
+			// The index within [th.history] of its last element.
+			// Note that th.history.Len() > 0.
 			mostRecentChangeIndex = th.history.Len() - 1
 			// The difference between the last index in [th.history] and the
 			// index of [endRootChanges].
 			offset = int(mostRecentChangeInsertNumber - endRootChanges.insertNumber)
-			// The index in [th.history] of the latest change resulting in [endRoot].
-			endRootIndex = mostRecentChangeIndex - offset
+			// The index in [th.history] of [endRootChanges].
+			endRootChangesIndex = mostRecentChangeIndex - offset
 		)
 
-		for i := endRootIndex - 1; i >= 0; i-- {
-			changes, ok := th.history.Index(i)
-			if !ok {
-				return nil, ErrStartRootNotFound
-			}
+		for i := endRootChangesIndex - 1; i >= 0; i-- {
+			changes, _ := th.history.Index(i)
 
 			if changes.rootID == startRoot {
+				// [startRootChanges] is now the last change resulting in
+				// [startRoot] before [endRootChanges].
 				startRootChanges = changes
 				startRootIndex = i
 				break
@@ -139,27 +140,24 @@ func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start []byte, 
 		}
 	}
 
-	// Keep changes sorted so the largest can be removed in order to stay within the maxLength limit.
-	sortedKeys := btree.NewG(
-		2,
-		func(a, b path) bool {
-			return a.Compare(b) < 0
-		},
+	var (
+		// Keep track of changed keys so the largest can be removed
+		// in order to stay within the [maxLength] limit if necessary.
+		changedKeys = set.Set[path]{}
+		startPath   = newPath(start)
+		endPath     = maybe.Bind(end, newPath)
+		// For each element in the history in the range between [startRoot]'s
+		// last appearance (exclusive) and [endRoot]'s last appearance (inclusive),
+		// add the changes to keys in [start, end] to [combinedChanges].
+		// Only the key-value pairs with the greatest [maxLength] keys will be kept.
+		combinedChanges = newChangeSummary(maxLength)
+		offset          = int(endRootChanges.insertNumber - startRootChanges.insertNumber)
+		endRootIndex    = startRootIndex + offset
 	)
-
-	startPath := newPath(start)
-	endPath := maybe.Bind(end, newPath)
-
-	// For each element in the history in the range between [startRoot]'s
-	// last appearance (exclusive) and [endRoot]'s last appearance (inclusive),
-	// add the changes to keys in [start, end] to [combinedChanges].
-	// Only the key-value pairs with the greatest [maxLength] keys will be kept.
-	combinedChanges := newChangeSummary(maxLength)
 
 	// For each change after [startRootChanges] up to and including
 	// [endRootChanges], record the change in [combinedChanges].
-	offset := int(endRootChanges.insertNumber - startRootChanges.insertNumber)
-	for i := startRootIndex + 1; i <= startRootIndex+offset; i++ {
+	for i := startRootIndex + 1; i <= endRootIndex; i++ {
 		changes, _ := th.history.Index(i)
 
 		// Add the changes from this commit to [combinedChanges].
@@ -178,23 +176,25 @@ func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start []byte, 
 					bytes.Equal(existing.before.Value(), existing.after.Value()) {
 					// The change to this key is a no-op, so remove it from [combinedChanges].
 					delete(combinedChanges.values, key)
-					sortedKeys.Delete(key)
+					changedKeys.Remove(key)
 				}
 			} else {
 				combinedChanges.values[key] = &change[maybe.Maybe[[]byte]]{
 					before: valueChange.before,
 					after:  valueChange.after,
 				}
-				sortedKeys.ReplaceOrInsert(key)
+				changedKeys.Add(key)
 			}
 		}
 	}
 
 	// Keep only the smallest [maxLength] items in [combinedChanges.values].
-	for sortedKeys.Len() > maxLength {
-		if greatestKey, found := sortedKeys.DeleteMax(); found {
-			delete(combinedChanges.values, greatestKey)
-		}
+	sortedChangedKeys := changedKeys.List()
+	utils.Sort(sortedChangedKeys)
+	for changedKeys.Len() > maxLength {
+		greatestKey := sortedChangedKeys[len(sortedChangedKeys)-1]
+		sortedChangedKeys = sortedChangedKeys[:len(changedKeys)-1]
+		delete(combinedChanges.values, greatestKey)
 	}
 
 	return combinedChanges, nil
