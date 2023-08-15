@@ -12,7 +12,6 @@ import (
 
 	"github.com/onsi/gomega"
 
-	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/tests"
@@ -22,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -35,28 +35,20 @@ var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
 		// use this for filtering tests by labels
 		// ref. https://onsi.github.io/ginkgo/#spec-labels
 		ginkgo.Label(
-			"require-network-runner",
 			"xp",
 			"permissionless-subnets",
 		),
 		func() {
-			ginkgo.By("reload initial snapshot for test independence", func() {
-				err := e2e.Env.RestoreInitialState(true /*switchOffNetworkFirst*/)
-				gomega.Expect(err).Should(gomega.BeNil())
-			})
-
-			rpcEps := e2e.Env.GetURIs()
-			gomega.Expect(rpcEps).ShouldNot(gomega.BeEmpty())
-			nodeURI := rpcEps[0]
+			nodeURI := e2e.Env.GetRandomNodeURI()
 
 			tests.Outf("{{blue}} setting up keys {{/}}\n")
-			testKey := genesis.EWOQKey
+			testKey := e2e.Env.AllocateFundedKey()
 			keyChain := secp256k1fx.NewKeychain(testKey)
 
 			var baseWallet primary.Wallet
 			ginkgo.By("setup wallet", func() {
 				var err error
-				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultWalletCreationTimeout)
+				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultTimeout)
 				baseWallet, err = primary.NewWalletFromURI(ctx, nodeURI, keyChain)
 				cancel()
 				gomega.Expect(err).Should(gomega.BeNil())
@@ -66,6 +58,17 @@ var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
 			xWallet := baseWallet.X()
 			xChainClient := avm.NewClient(nodeURI, xWallet.BlockchainID().String())
 			xChainID := xWallet.BlockchainID()
+
+			var validatorID ids.NodeID
+			ginkgo.By("retrieving the node ID of a primary network validator", func() {
+				pChainClient := platformvm.NewClient(nodeURI)
+				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultTimeout)
+				validatorIDs, err := pChainClient.SampleValidators(ctx, constants.PrimaryNetworkID, 1)
+				cancel()
+				gomega.Expect(err).Should(gomega.BeNil())
+				gomega.Expect(validatorIDs).Should(gomega.HaveLen(1))
+				validatorID = validatorIDs[0]
+			})
 
 			owner := &secp256k1fx.OutputOwners{
 				Threshold: 1,
@@ -175,7 +178,7 @@ var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
 				_, err := pWallet.IssueAddPermissionlessValidatorTx(
 					&txs.SubnetValidator{
 						Validator: txs.Validator{
-							NodeID: genesis.LocalConfig.InitialStakers[0].NodeID,
+							NodeID: validatorID,
 							Start:  uint64(validatorStartTime.Unix()),
 							End:    uint64(validatorStartTime.Add(5 * time.Second).Unix()),
 							Wght:   25 * units.MegaAvax,
@@ -199,7 +202,7 @@ var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
 				_, err := pWallet.IssueAddPermissionlessDelegatorTx(
 					&txs.SubnetValidator{
 						Validator: txs.Validator{
-							NodeID: genesis.LocalConfig.InitialStakers[0].NodeID,
+							NodeID: validatorID,
 							Start:  uint64(delegatorStartTime.Unix()),
 							End:    uint64(delegatorStartTime.Add(5 * time.Second).Unix()),
 							Wght:   25 * units.MegaAvax,
