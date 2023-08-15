@@ -53,7 +53,7 @@ type responder struct {
 func (r *responder) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, request []byte) error {
 	appResponse := r.handler.AppRequest(ctx, nodeID, deadline, request)
 	if len(appResponse) == 0 {
-		r.log.Debug("failed to handle message",
+		r.log.Debug("dropping empty response",
 			zap.Stringer("messageOp", message.AppRequestOp),
 			zap.Stringer("nodeID", nodeID),
 			zap.Uint32("requestID", requestID),
@@ -74,7 +74,7 @@ func (r *responder) AppGossip(ctx context.Context, nodeID ids.NodeID, msg []byte
 func (r *responder) CrossChainAppRequest(ctx context.Context, chainID ids.ID, requestID uint32, deadline time.Time, request []byte) error {
 	appResponse := r.handler.CrossChainAppRequest(ctx, chainID, deadline, request)
 	if len(appResponse) == 0 {
-		r.log.Debug("failed to handle message",
+		r.log.Debug("dropping empty response",
 			zap.Stringer("messageOp", message.CrossChainAppRequestOp),
 			zap.Stringer("chainID", chainID),
 			zap.Uint32("requestID", requestID),
