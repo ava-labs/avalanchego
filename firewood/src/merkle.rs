@@ -842,6 +842,7 @@ macro_rules! write_node {
     };
 }
 
+#[derive(Debug)]
 pub struct Merkle<S> {
     store: Box<S>,
 }

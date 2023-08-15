@@ -516,14 +516,16 @@ impl<T> Storable for ObjPtr<T> {
     }
 }
 
-pub struct ObjCacheInner<T: ?Sized + Send + Sync> {
+#[derive(Debug)]
+pub struct ObjCacheInner<T: Send + Sync> {
     cached: lru::LruCache<ObjPtr<T>, Obj<T>>,
     pinned: HashMap<ObjPtr<T>, bool>,
     dirty: HashSet<ObjPtr<T>>,
 }
 
 /// [ObjRef] pool that is used by [ShaleStore] implementation to construct [ObjRef]s.
-pub struct ObjCache<T: ?Sized + Send + Sync>(Arc<RwLock<ObjCacheInner<T>>>);
+#[derive(Debug)]
+pub struct ObjCache<T: Send + Sync>(Arc<RwLock<ObjCacheInner<T>>>);
 
 impl<T: Send + Sync> ObjCache<T> {
     pub fn new(capacity: usize) -> Self {

@@ -102,7 +102,7 @@ struct DbParams {
     root_hash_file_nbit: u64,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 /// Necessary linear space instances bundled for a `CompactSpace`.
 struct SubUniverse<T> {
     meta: T,
@@ -221,7 +221,7 @@ impl Storable for DbHeader {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 /// Necessary linear space instances bundled for the state of the entire DB.
 struct Universe<T> {
     merkle: SubUniverse<T>,
@@ -273,6 +273,7 @@ impl<T: MemStoreR + 'static> Universe<Arc<T>> {
 }
 
 /// Some readable version of the DB.
+#[derive(Debug)]
 pub struct DbRev<S> {
     header: shale::Obj<DbHeader>,
     merkle: Merkle<S>,
@@ -341,6 +342,7 @@ impl<S: ShaleStore<Node> + Send + Sync> DbRev<S> {
     }
 }
 
+#[derive(Debug)]
 struct DbInner {
     disk_requester: DiskBufferRequester,
     disk_thread: Option<JoinHandle<()>>,
@@ -357,6 +359,7 @@ impl Drop for DbInner {
     }
 }
 
+#[derive(Debug)]
 pub struct DbRevInner<T> {
     inner: VecDeque<Universe<StoreRevShared>>,
     root_hashes: VecDeque<TrieHash>,
@@ -366,6 +369,7 @@ pub struct DbRevInner<T> {
 }
 
 /// Firewood database handle.
+#[derive(Debug)]
 pub struct Db<S> {
     inner: Arc<RwLock<DbInner>>,
     revisions: Arc<Mutex<DbRevInner<S>>>,

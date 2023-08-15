@@ -133,6 +133,7 @@ pub struct CompactSpaceHeader {
     alloc_addr: ObjPtr<CompactDescriptor>,
 }
 
+#[derive(Debug)]
 struct CompactSpaceHeaderSliced {
     meta_space_tail: Obj<U64Field>,
     compact_space_tail: Obj<U64Field>,
@@ -293,6 +294,7 @@ impl std::ops::DerefMut for U64Field {
     }
 }
 
+#[derive(Debug)]
 struct CompactSpaceInner<T: Send + Sync, M> {
     meta_space: Arc<M>,
     compact_space: Arc<M>,
@@ -562,6 +564,7 @@ impl<T: Storable + Send + Sync, M: CachedStore> CompactSpaceInner<T, M> {
     }
 }
 
+#[derive(Debug)]
 pub struct CompactSpace<T: Send + Sync, M> {
     inner: RwLock<CompactSpaceInner<T, M>>,
 }
