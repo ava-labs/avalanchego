@@ -114,19 +114,18 @@ func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start []byte, 
 	)
 
 	if startRootChanges.insertNumber > endRootChanges.insertNumber {
-		// [startRootChanges] happened after [endRootChange].
+		// [startRootChanges] happened after [endRootChanges].
 		// However, that is just the *latest* change resulting in [startRoot].
 		// Attempt to find a change resulting in [startRoot] before [endRootChanges].
 		//
 		// Translate the insert number to the index in [th.history] so we can iterate
 		// backward from [endRootChanges].
 		for i := endRootIndex - 1; i >= 0; i-- {
-			changes, ok := th.history.Index(i)
-			if !ok {
-				return nil, ErrStartRootNotFound
-			}
+			changes, _ := th.history.Index(i)
 
 			if changes.rootID == startRoot {
+				// [startRootChanges] is now the last change resulting in
+				// [startRoot] before [endRootChanges].
 				startRootChanges = changes
 				break
 			}
