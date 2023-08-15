@@ -238,3 +238,24 @@ func TestSigning(t *testing.T) {
 		})
 	}
 }
+
+func FuzzVerifySignature(f *testing.F) {
+	factory := Factory{}
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		require := require.New(t)
+
+		privateKey, err := factory.NewPrivateKey()
+		require.NoError(err)
+
+		publicKey := privateKey.PublicKey()
+
+		sig, err := privateKey.Sign(data)
+		require.NoError(err)
+
+		recoveredPublicKey, err := factory.RecoverPublicKey(data, sig)
+		require.NoError(err)
+
+		require.Equal(publicKey.Bytes(), recoveredPublicKey.Bytes())
+	})
+}

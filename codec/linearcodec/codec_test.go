@@ -22,3 +22,10 @@ func TestMultipleTags(t *testing.T) {
 		test(c, t)
 	}
 }
+
+func FuzzVectors(f *testing.F) {
+	for _, test := range codec.FuzzTests {
+		c := NewDefault()
+		test(c, f)
+	}
+}

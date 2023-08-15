@@ -98,39 +98,35 @@ func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start []byte, 
 	if !ok {
 		return nil, ErrStartRootNotFound
 	}
-	// The index of the last change resulting in [startRoot]
-	// which occurs before [endRootChanges].
-	var startRootIndex int
+
+	var (
+		// The insert number of the last element in [th.history].
+		mostRecentChangeInsertNumber = th.nextInsertNumber - 1
+
+		// The index within [th.history] of its last element.
+		mostRecentChangeIndex = th.history.Len() - 1
+
+		// The difference between the last index in [th.history] and the index of [endRootChanges].
+		endToMostRecentOffset = int(mostRecentChangeInsertNumber - endRootChanges.insertNumber)
+
+		// The index in [th.history] of the latest change resulting in [endRoot].
+		endRootIndex = mostRecentChangeIndex - endToMostRecentOffset
+	)
 
 	if startRootChanges.insertNumber > endRootChanges.insertNumber {
 		// [startRootChanges] happened after [endRootChanges].
 		// However, that is just the *latest* change resulting in [startRoot].
-		// Attempt to find a change resulting in [starRoot] before [endRootChanges].
+		// Attempt to find a change resulting in [startRoot] before [endRootChanges].
 		//
 		// Translate the insert number to the index in [th.history] so we can iterate
 		// backward from [endRootChanges].
-		var (
-			// The insert number of the last element in [th.history].
-			// Note that [th.nextInsertNumber] > 1.
-			mostRecentChangeInsertNumber = th.nextInsertNumber - 1
-			// The index within [th.history] of its last element.
-			// Note that th.history.Len() > 0.
-			mostRecentChangeIndex = th.history.Len() - 1
-			// The difference between the last index in [th.history] and the
-			// index of [endRootChanges].
-			offset = int(mostRecentChangeInsertNumber - endRootChanges.insertNumber)
-			// The index in [th.history] of [endRootChanges].
-			endRootChangesIndex = mostRecentChangeIndex - offset
-		)
-
-		for i := endRootChangesIndex - 1; i >= 0; i-- {
+		for i := endRootIndex - 1; i >= 0; i-- {
 			changes, _ := th.history.Index(i)
 
 			if changes.rootID == startRoot {
 				// [startRootChanges] is now the last change resulting in
 				// [startRoot] before [endRootChanges].
 				startRootChanges = changes
-				startRootIndex = i
 				break
 			}
 
@@ -144,15 +140,22 @@ func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start []byte, 
 		// Keep track of changed keys so the largest can be removed
 		// in order to stay within the [maxLength] limit if necessary.
 		changedKeys = set.Set[path]{}
-		startPath   = newPath(start)
-		endPath     = maybe.Bind(end, newPath)
+
+		startPath = newPath(start)
+		endPath   = maybe.Bind(end, newPath)
+
 		// For each element in the history in the range between [startRoot]'s
 		// last appearance (exclusive) and [endRoot]'s last appearance (inclusive),
 		// add the changes to keys in [start, end] to [combinedChanges].
 		// Only the key-value pairs with the greatest [maxLength] keys will be kept.
 		combinedChanges = newChangeSummary(maxLength)
-		offset          = int(endRootChanges.insertNumber - startRootChanges.insertNumber)
-		endRootIndex    = startRootIndex + offset
+
+		// The difference between the index of [startRootChanges] and [endRootChanges] in [th.history].
+		startToEndOffset = int(endRootChanges.insertNumber - startRootChanges.insertNumber)
+
+		// The index of the last change resulting in [startRoot]
+		// which occurs before [endRootChanges].
+		startRootIndex = endRootIndex - startToEndOffset
 	)
 
 	// For each change after [startRootChanges] up to and including
@@ -262,6 +265,7 @@ func (th *trieHistory) record(changes *changeSummary) {
 		// This change causes us to go over our lookback limit.
 		// Remove the oldest set of changes.
 		oldestEntry, _ := th.history.PopLeft()
+
 		latestChange := th.lastChanges[oldestEntry.rootID]
 		if latestChange == oldestEntry {
 			// The removed change was the most recent resulting in this root ID.
