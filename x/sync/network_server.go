@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/x/merkledb"
@@ -164,16 +165,11 @@ func (s *NetworkServer) HandleChangeProofRequest(
 	}
 
 	// override limits if they exceed caps
-	keyLimit := req.KeyLimit
-	if keyLimit > maxKeyValuesLimit {
-		keyLimit = maxKeyValuesLimit
-	}
-
-	bytesLimit := int(req.BytesLimit)
-	if bytesLimit > maxByteSizeLimit {
-		bytesLimit = maxByteSizeLimit
-	}
-	end := maybeBytesToMaybe(req.EndKey)
+	var (
+		keyLimit   = math.Min(req.KeyLimit, maxKeyValuesLimit)
+		bytesLimit = math.Min(int(req.BytesLimit), maxByteSizeLimit)
+		end        = maybeBytesToMaybe(req.EndKey)
+	)
 
 	startRoot, err := ids.ToID(req.StartRootHash)
 	if err != nil {
@@ -236,7 +232,7 @@ func (s *NetworkServer) HandleChangeProofRequest(
 		}
 
 		// The proof was too large. Try to shrink it.
-		keyLimit /= 2
+		keyLimit = uint32(len(changeProof.KeyChanges)) / 2
 	}
 	return ErrMinProofSizeIsTooLarge
 }
@@ -266,13 +262,8 @@ func (s *NetworkServer) HandleRangeProofRequest(
 	}
 
 	// override limits if they exceed caps
-	if req.KeyLimit > maxKeyValuesLimit {
-		req.KeyLimit = maxKeyValuesLimit
-	}
-
-	if req.BytesLimit > maxByteSizeLimit {
-		req.BytesLimit = maxByteSizeLimit
-	}
+	req.KeyLimit = math.Min(req.KeyLimit, maxKeyValuesLimit)
+	req.BytesLimit = math.Min(req.BytesLimit, maxByteSizeLimit)
 
 	proofBytes, err := getRangeProof(
 		ctx,
@@ -295,6 +286,8 @@ func (s *NetworkServer) HandleRangeProofRequest(
 // the proof is smaller than [req.BytesLimit].
 // When a sufficiently small proof is generated, returns it.
 // If no sufficiently small proof can be generated, returns [ErrMinProofSizeIsTooLarge].
+// TODO improve range proof generation so we don't need to iteratively
+// reduce the key limit.
 func getRangeProof(
 	ctx context.Context,
 	db DB,
