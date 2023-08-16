@@ -92,12 +92,6 @@ type trieView struct {
 	// but will when their ID is recalculated.
 	changes *changeSummary
 
-	// Key/value pairs that have been inserted/removed but not
-	// yet reflected in the trie's structure. This allows us to
-	// defer the cost of updating the trie until we calculate node IDs.
-	// A Nothing value indicates that the key has been removed.
-	unappliedValueChanges map[path]maybe.Maybe[[]byte]
-
 	db *merkleDB
 
 	// The root of the trie represented by this view.
@@ -109,26 +103,12 @@ type trieView struct {
 	// If true, this view has been committed and cannot be edited.
 	// Calls to Insert and Remove will return ErrCommitted.
 	committed bool
-
-	estimatedSize int
 }
 
 // NewView returns a new view on top of this one.
 // Adds the new view to [t.childViews].
 // Assumes [t.lock] is not held.
-func (t *trieView) NewView() (TrieView, error) {
-	return t.NewPreallocatedView(defaultPreallocationSize)
-}
-
-// NewPreallocatedView returns a new view on top of this one with memory allocated to store the
-// [estimatedChanges] number of key/value changes.
-// If this view is already committed, the new view's parent will
-// be set to the parent of the current view.
-// Otherwise, adds the new view to [t.childViews].
-// Assumes [t.lock] is not held.
-func (t *trieView) NewPreallocatedView(
-	estimatedChanges int,
-) (TrieView, error) {
+func (t *trieView) NewView(batchOps []database.BatchOp) (TrieView, error) {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
@@ -137,10 +117,10 @@ func (t *trieView) NewPreallocatedView(
 	}
 
 	if t.committed {
-		return t.getParentTrie().NewPreallocatedView(estimatedChanges)
+		return t.getParentTrie().NewView(batchOps)
 	}
 
-	newView, err := newTrieView(t.db, t, t.root.clone(), estimatedChanges)
+	newView, err := newTrieView(t.db, t, t.root.clone(), batchOps)
 	if err != nil {
 		return nil, err
 	}
@@ -161,20 +141,31 @@ func newTrieView(
 	db *merkleDB,
 	parentTrie TrieView,
 	root *node,
-	estimatedSize int,
+	batchOps []database.BatchOp,
 ) (*trieView, error) {
 	if root == nil {
 		return nil, ErrNoValidRoot
 	}
 
-	return &trieView{
-		root:                  root,
-		db:                    db,
-		parentTrie:            parentTrie,
-		changes:               newChangeSummary(estimatedSize),
-		estimatedSize:         estimatedSize,
-		unappliedValueChanges: make(map[path]maybe.Maybe[[]byte], estimatedSize),
-	}, nil
+	newView := &trieView{
+		root:       root,
+		db:         db,
+		parentTrie: parentTrie,
+		changes:    newChangeSummary(len(batchOps)),
+	}
+
+	for _, op := range batchOps {
+		if op.Delete {
+			if err := newView.remove(op.Key); err != nil {
+				return nil, err
+			}
+		} else {
+			if _, err := newView.insert(newPath(op.Key), maybe.Some(slices.Clone(op.Value))); err != nil {
+				return nil, err
+			}
+		}
+	}
+	return newView, nil
 }
 
 // Creates a new view with the given [parentTrie].
@@ -182,7 +173,6 @@ func newTrieViewWithChanges(
 	db *merkleDB,
 	parentTrie TrieView,
 	changes *changeSummary,
-	estimatedSize int,
 ) (*trieView, error) {
 	if changes == nil {
 		return nil, ErrNoValidRoot
@@ -194,12 +184,10 @@ func newTrieViewWithChanges(
 	}
 
 	return &trieView{
-		root:                  passedRootChange.after,
-		db:                    db,
-		parentTrie:            parentTrie,
-		changes:               changes,
-		estimatedSize:         estimatedSize,
-		unappliedValueChanges: make(map[path]maybe.Maybe[[]byte], estimatedSize),
+		root:       passedRootChange.after,
+		db:         db,
+		parentTrie: parentTrie,
+		changes:    changes,
 	}, nil
 }
 
@@ -226,10 +214,6 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 	// ensure that the view under this one is up-to-date before potentially pulling in nodes from it
 	// getting the Merkle root forces any unupdated nodes to recalculate their ids
 	if _, err := t.getParentTrie().GetMerkleRoot(ctx); err != nil {
-		return err
-	}
-
-	if err := t.applyChangedValuesToTrie(ctx); err != nil {
 		return err
 	}
 
@@ -571,19 +555,6 @@ func (t *trieView) commitChanges(ctx context.Context, trieToCommit *trieView) er
 	return nil
 }
 
-// CommitToParent commits the changes from this view to its parent Trie
-func (t *trieView) CommitToParent(ctx context.Context) error {
-	// TODO: Only lock the commitlock when the parent is the DB
-	// TODO: fix concurrency bugs with CommitToParent
-	t.db.commitLock.Lock()
-	defer t.db.commitLock.Unlock()
-
-	t.lock.Lock()
-	defer t.lock.Unlock()
-
-	return t.commitToParent(ctx)
-}
-
 // commitToParent commits the changes from this view to its parent Trie
 // assumes [t.lock] is held
 func (t *trieView) commitToParent(ctx context.Context) error {
@@ -789,49 +760,6 @@ func (t *trieView) getValue(key path, lock bool) ([]byte, error) {
 	return value, nil
 }
 
-// Insert will upsert the key/value pair into the trie.
-func (t *trieView) Insert(_ context.Context, key []byte, value []byte) error {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-
-	return t.insert(key, value)
-}
-
-// Assumes [t.lock] is held.
-// Assumes [t.validityTrackingLock] isn't held.
-func (t *trieView) insert(key []byte, value []byte) error {
-	if t.committed {
-		return ErrCommitted
-	}
-	if t.isInvalid() {
-		return ErrInvalid
-	}
-
-	// the trie has been changed, so invalidate all children and remove them from tracking
-	t.invalidateChildren()
-
-	valCopy := slices.Clone(value)
-
-	if err := t.recordValueChange(newPath(key), maybe.Some(valCopy)); err != nil {
-		return err
-	}
-
-	// ensure no ancestor changes occurred during execution
-	if t.isInvalid() {
-		return ErrInvalid
-	}
-
-	return nil
-}
-
-// Remove will delete the value associated with [key] from this trie.
-func (t *trieView) Remove(_ context.Context, key []byte) error {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-
-	return t.remove(key)
-}
-
 // Assumes [t.lock] is held.
 // Assumes [t.validityTrackingLock] isn't held.
 func (t *trieView) remove(key []byte) error {
@@ -846,7 +774,48 @@ func (t *trieView) remove(key []byte) error {
 	// the trie has been changed, so invalidate all children and remove them from tracking
 	t.invalidateChildren()
 
-	if err := t.recordValueChange(newPath(key), maybe.Nothing[[]byte]()); err != nil {
+	path := newPath(key)
+	if err := t.recordValueChange(path, maybe.Nothing[[]byte]()); err != nil {
+		return err
+	}
+
+	nodePath, err := t.getPathTo(path)
+	if err != nil {
+		return err
+	}
+
+	nodeToDelete := nodePath[len(nodePath)-1]
+
+	if nodeToDelete.key.Compare(path) != 0 || !nodeToDelete.hasValue() {
+		// the key wasn't in the trie or doesn't have a value so there's nothing to do
+		return nil
+	}
+
+	// A node with ancestry [nodePath] is being deleted, so we need to recalculate
+	// all the nodes in this path.
+	for _, node := range nodePath {
+		if err := t.recordNodeChange(node); err != nil {
+			return err
+		}
+	}
+
+	nodeToDelete.setValue(maybe.Nothing[[]byte]())
+	if err := t.recordNodeChange(nodeToDelete); err != nil {
+		return err
+	}
+
+	// if the removed node has no children, the node can be removed from the trie
+	if len(nodeToDelete.children) == 0 {
+		return t.deleteEmptyNodes(nodePath)
+	}
+
+	if len(nodePath) == 1 {
+		return nil
+	}
+	parent := nodePath[len(nodePath)-2]
+
+	// merge this node and its descendants into a single node if possible
+	if err = t.compressNodePath(parent, nodeToDelete); err != nil {
 		return err
 	}
 
@@ -855,26 +824,6 @@ func (t *trieView) remove(key []byte) error {
 		return ErrInvalid
 	}
 
-	return nil
-}
-
-// Assumes [t.lock] is held.
-func (t *trieView) applyChangedValuesToTrie(ctx context.Context) error {
-	_, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.applyChangedValuesToTrie")
-	defer span.End()
-
-	unappliedValues := t.unappliedValueChanges
-	t.unappliedValueChanges = make(map[path]maybe.Maybe[[]byte], t.estimatedSize)
-
-	for key, change := range unappliedValues {
-		if change.IsNothing() {
-			if err := t.removeFromTrie(key); err != nil {
-				return err
-			}
-		} else if _, err := t.insertIntoTrie(key, change); err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
@@ -1021,10 +970,14 @@ func (t *trieView) getEditableNode(key path) (*node, error) {
 
 // Inserts a key/value pair into the trie.
 // Assumes [t.lock] is held.
-func (t *trieView) insertIntoTrie(
+func (t *trieView) insert(
 	key path,
 	value maybe.Maybe[[]byte],
 ) (*node, error) {
+	if err := t.recordValueChange(key, value); err != nil {
+		return nil, err
+	}
+
 	// find the node that most closely matches [key]
 	pathToNode, err := t.getPathTo(key)
 	if err != nil {
@@ -1162,10 +1115,6 @@ func (t *trieView) recordKeyChange(key path, after *node) error {
 func (t *trieView) recordValueChange(key path, value maybe.Maybe[[]byte]) error {
 	t.needsRecalculation = true
 
-	// record the value change so that it can be inserted
-	// into a trie nodes later
-	t.unappliedValueChanges[key] = value
-
 	// update the existing change if it exists
 	if existing, ok := t.changes.values[key]; ok {
 		existing.after = value
@@ -1189,48 +1138,6 @@ func (t *trieView) recordValueChange(key path, value maybe.Maybe[[]byte]) error 
 		after:  value,
 	}
 	return nil
-}
-
-// Removes the provided [key] from the trie.
-// Assumes [t.lock] write lock is held.
-func (t *trieView) removeFromTrie(key path) error {
-	nodePath, err := t.getPathTo(key)
-	if err != nil {
-		return err
-	}
-
-	nodeToDelete := nodePath[len(nodePath)-1]
-
-	if nodeToDelete.key.Compare(key) != 0 || !nodeToDelete.hasValue() {
-		// the key wasn't in the trie or doesn't have a value so there's nothing to do
-		return nil
-	}
-
-	// A node with ancestry [nodePath] is being deleted, so we need to recalculate
-	// all the nodes in this path.
-	for _, node := range nodePath {
-		if err := t.recordNodeChange(node); err != nil {
-			return err
-		}
-	}
-
-	nodeToDelete.setValue(maybe.Nothing[[]byte]())
-	if err := t.recordNodeChange(nodeToDelete); err != nil {
-		return err
-	}
-
-	// if the removed node has no children, the node can be removed from the trie
-	if len(nodeToDelete.children) == 0 {
-		return t.deleteEmptyNodes(nodePath)
-	}
-
-	if len(nodePath) == 1 {
-		return nil
-	}
-	parent := nodePath[len(nodePath)-2]
-
-	// merge this node and its descendants into a single node if possible
-	return t.compressNodePath(parent, nodeToDelete)
 }
 
 // Retrieves the node with the given [key], which is a child of [parent], and

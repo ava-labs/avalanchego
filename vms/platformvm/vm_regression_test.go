@@ -2101,6 +2101,129 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	}
 }
 
+func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
+	// A primary network validator and a subnet validator are running.
+	// Primary network validator terminates its staking cycle.
+	// Querying the validator set when the subnet validator existed should
+	// succeed.
+
+	// setup
+	require := require.New(t)
+	vm, _, _ := defaultVM(t)
+	vm.ctx.Lock.Lock()
+	defer func() {
+		require.NoError(vm.Shutdown(context.Background()))
+
+		vm.ctx.Lock.Unlock()
+	}()
+	subnetID := testSubnet1.TxID
+
+	// setup time
+	currentTime := defaultGenesisTime
+	vm.clock.Set(currentTime)
+	vm.state.SetTimestamp(currentTime)
+
+	// A primary network validator stake twice
+	var (
+		primaryStartTime1 = currentTime.Add(executor.SyncBound)
+		subnetStartTime   = primaryStartTime1.Add(executor.SyncBound)
+		subnetEndTime     = subnetStartTime.Add(defaultMinStakingDuration)
+		primaryEndTime1   = subnetEndTime.Add(time.Second)
+	)
+
+	// Add a primary network validator with no BLS key
+	nodeID := ids.GenerateTestNodeID()
+	addr := keys[0].PublicKey().Address()
+	primaryTx1, err := vm.txBuilder.NewAddValidatorTx(
+		vm.MinValidatorStake,
+		uint64(primaryStartTime1.Unix()),
+		uint64(primaryEndTime1.Unix()),
+		nodeID,
+		addr,
+		reward.PercentDenominator,
+		[]*secp256k1.PrivateKey{keys[0]},
+		addr,
+	)
+	require.NoError(err)
+
+	require.NoError(vm.Builder.AddUnverifiedTx(primaryTx1))
+	require.NoError(buildAndAcceptStandardBlock(vm))
+
+	// move time ahead, promoting primary validator to current
+	currentTime = primaryStartTime1
+	vm.clock.Set(currentTime)
+	vm.state.SetTimestamp(currentTime)
+	require.NoError(buildAndAcceptStandardBlock(vm))
+
+	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+	require.NoError(err)
+
+	// insert the subnet validator
+	subnetTx, err := vm.txBuilder.NewAddSubnetValidatorTx(
+		1,                              // Weight
+		uint64(subnetStartTime.Unix()), // Start time
+		uint64(subnetEndTime.Unix()),   // end time
+		nodeID,                         // Node ID
+		subnetID,
+		[]*secp256k1.PrivateKey{keys[0], keys[1]},
+		addr,
+	)
+	require.NoError(err)
+
+	require.NoError(vm.Builder.AddUnverifiedTx(subnetTx))
+	require.NoError(buildAndAcceptStandardBlock(vm))
+
+	// move time ahead, promoting the subnet validator to current
+	currentTime = subnetStartTime
+	vm.clock.Set(currentTime)
+	vm.state.SetTimestamp(currentTime)
+	require.NoError(buildAndAcceptStandardBlock(vm))
+
+	_, err = vm.state.GetCurrentValidator(subnetID, nodeID)
+	require.NoError(err)
+
+	subnetStartHeight, err := vm.GetCurrentHeight(context.Background())
+	require.NoError(err)
+
+	// move time ahead, terminating the subnet validator
+	currentTime = subnetEndTime
+	vm.clock.Set(currentTime)
+	vm.state.SetTimestamp(currentTime)
+	require.NoError(buildAndAcceptStandardBlock(vm))
+
+	_, err = vm.state.GetCurrentValidator(subnetID, nodeID)
+	require.ErrorIs(err, database.ErrNotFound)
+
+	// move time ahead, terminating primary network validator
+	currentTime = primaryEndTime1
+	vm.clock.Set(currentTime)
+	vm.state.SetTimestamp(currentTime)
+
+	blk, err := vm.Builder.BuildBlock(context.Background()) // must be a proposal block rewarding the primary validator
+	require.NoError(err)
+	require.NoError(blk.Verify(context.Background()))
+
+	proposalBlk := blk.(snowman.OracleBlock)
+	options, err := proposalBlk.Options(context.Background())
+	require.NoError(err)
+
+	commit := options[0].(*blockexecutor.Block)
+	require.IsType(&blocks.BanffCommitBlock{}, commit.Block)
+
+	require.NoError(blk.Accept(context.Background()))
+	require.NoError(commit.Verify(context.Background()))
+	require.NoError(commit.Accept(context.Background()))
+	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
+
+	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+	require.ErrorIs(err, database.ErrNotFound)
+
+	// Generating the validator set should not error when re-introducing a
+	// subnet validator whose primary network validator was also removed.
+	_, err = vm.State.GetValidatorSet(context.Background(), subnetStartHeight, subnetID)
+	require.NoError(err)
+}
+
 func buildAndAcceptStandardBlock(vm *VM) error {
 	blk, err := vm.Builder.BuildBlock(context.Background())
 	if err != nil {

@@ -129,6 +129,7 @@ const (
 	SnowOptimalProcessingKey                           = "snow-optimal-processing"
 	SnowMaxProcessingKey                               = "snow-max-processing"
 	SnowMaxTimeProcessingKey                           = "snow-max-time-processing"
+	PartialSyncPrimaryNetworkKey                       = "partial-sync-primary-network"
 	TrackSubnetsKey                                    = "track-subnets"
 	AdminAPIEnabledKey                                 = "api-admin-enabled"
 	InfoAPIEnabledKey                                  = "api-info-enabled"

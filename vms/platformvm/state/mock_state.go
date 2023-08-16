@@ -21,7 +21,7 @@ import (
 	blocks "github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	status "github.com/ava-labs/avalanchego/vms/platformvm/status"
 	txs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockState is a mock of State interface.
@@ -724,6 +724,21 @@ func (m *MockState) SetUptime(arg0 ids.NodeID, arg1 ids.ID, arg2 time.Duration, 
 func (mr *MockStateMockRecorder) SetUptime(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetUptime", reflect.TypeOf((*MockState)(nil).SetUptime), arg0, arg1, arg2, arg3)
+}
+
+// ShouldPrune mocks base method.
+func (m *MockState) ShouldPrune() (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ShouldPrune")
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ShouldPrune indicates an expected call of ShouldPrune.
+func (mr *MockStateMockRecorder) ShouldPrune() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ShouldPrune", reflect.TypeOf((*MockState)(nil).ShouldPrune))
 }
 
 // UTXOIDs mocks base method.

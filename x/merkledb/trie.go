@@ -53,17 +53,8 @@ type ReadOnlyTrie interface {
 type Trie interface {
 	ReadOnlyTrie
 
-	// Remove will delete a key from the Trie
-	Remove(ctx context.Context, key []byte) error
-
-	// NewPreallocatedView returns a new view on top of this Trie with space allocated for changes
-	NewPreallocatedView(estimatedChanges int) (TrieView, error)
-
-	// NewView returns a new view on top of this Trie
-	NewView() (TrieView, error)
-
-	// Insert a key/value pair into the Trie
-	Insert(ctx context.Context, key, value []byte) error
+	// NewView returns a new view on top of this Trie with the specified changes
+	NewView(batchOps []database.BatchOp) (TrieView, error)
 }
 
 type TrieView interface {
@@ -73,10 +64,6 @@ type TrieView interface {
 	// until all changes in the stack commit to the database
 	// Takes the DB commit lock
 	CommitToDB(ctx context.Context) error
-
-	// CommitToParent takes changes of this TrieView and commits them to its parent Trie
-	// Takes the DB commit lock
-	CommitToParent(ctx context.Context) error
 
 	// commits changes in the trie to its parent
 	// then commits the combined changes down the stack until all changes in the stack commit to the database
