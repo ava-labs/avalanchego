@@ -89,9 +89,12 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 				ginkgo.By("setting up a base wallet", func() {
 					walletURI := e2e.Env.GetRandomNodeURI()
 
-					// 5-second is enough to fetch initial UTXOs for test cluster in "primary.NewWallet"
+					// 5-second is enough to fetch initial UTXOs for test cluster in "primary.MakeWallet"
 					ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultWalletCreationTimeout)
-					baseWallet, err = primary.NewWalletFromURI(ctx, walletURI, keyChain)
+					baseWallet, err = primary.MakeWallet(ctx, &primary.WalletConfig{
+						URI:      walletURI,
+						Keychain: keyChain,
+					})
 					cancel()
 					gomega.Expect(err).Should(gomega.BeNil())
 				})
