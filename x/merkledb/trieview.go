@@ -163,7 +163,7 @@ func newTrieView(
 }
 
 // Creates a new view with the given [parentTrie].
-func newTrieViewWithChanges(
+func newHistoricalTrieView(
 	db *merkleDB,
 	parentTrie TrieView,
 	changes *changeSummary,
@@ -177,12 +177,15 @@ func newTrieViewWithChanges(
 		return nil, ErrNoValidRoot
 	}
 
-	return &trieView{
+	newView := &trieView{
 		root:       passedRootChange.after,
 		db:         db,
 		parentTrie: parentTrie,
 		changes:    changes,
-	}, nil
+	}
+	// the changes have already been calculated, don't need to do it again later
+	newView.calculateNodesOnce.Do(func() {})
+	return newView, nil
 }
 
 // Recalculates the node IDs for all changed nodes in the trie.
