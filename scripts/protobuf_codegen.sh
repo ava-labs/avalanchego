@@ -1,5 +1,9 @@
 #!/bin/bash
 
+set -o errexit
+set -o nounset
+set -o pipefail
+
 if ! [[ "$0" =~ scripts/protobuf_codegen.sh ]]; then
   echo "must be run from repository root"
   exit 255

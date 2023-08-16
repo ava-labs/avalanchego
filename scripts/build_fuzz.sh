@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 
+set -o errexit
+set -o nounset
+set -o pipefail
+
 # Mostly taken from https://github.com/golang/go/issues/46312#issuecomment-1153345129
 
 # Directory above this script
