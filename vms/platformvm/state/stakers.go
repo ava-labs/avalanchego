@@ -248,14 +248,10 @@ func (v *baseStakers) PutDelegator(staker *Staker) {
 	v.stakers.ReplaceOrInsert(staker)
 
 	validatorDiff := getOrCreateDiff(v.validatorDiffs, staker.SubnetID, staker.NodeID)
-	if validatorDiff.addedDelegators == nil {
-		validatorDiff.addedDelegators = btree.NewG(defaultTreeDegree, (*Staker).Less)
-	}
 	validatorDiff.delegators[staker.TxID] = stakerAndStatus{
 		staker: staker,
 		status: added,
 	}
-	validatorDiff.addedDelegators.ReplaceOrInsert(staker)
 }
 
 func (v *baseStakers) UpdateDelegator(staker *Staker) error {
@@ -313,16 +309,9 @@ func (v *baseStakers) DeleteDelegator(staker *Staker) {
 	v.pruneValidator(delegatorToDelete.SubnetID, delegatorToDelete.NodeID)
 
 	validatorDiff := getOrCreateDiff(v.validatorDiffs, delegatorToDelete.SubnetID, delegatorToDelete.NodeID)
-	if _, found := validatorDiff.delegators[delegatorToDelete.TxID]; found {
-		validatorDiff.delegators[delegatorToDelete.TxID] = stakerAndStatus{
-			staker: nil,
-			status: unmodified,
-		}
-	} else {
-		validatorDiff.delegators[delegatorToDelete.TxID] = stakerAndStatus{
-			staker: delegatorToDelete,
-			status: deleted,
-		}
+	validatorDiff.delegators[delegatorToDelete.TxID] = stakerAndStatus{
+		staker: delegatorToDelete,
+		status: deleted,
 	}
 
 	v.stakers.Delete(delegatorToDelete)
@@ -411,9 +400,10 @@ type diffValidator struct {
 	validator stakerAndStatus
 
 	// delegators groups all delegators associated with validator, by their TxID.
-	// the added delegators are also stored in the addedDelegators tree to speed up
+	delegators map[ids.ID]stakerAndStatus
+
+	// addedDelegators tree stores all delegators whose state is added. This speeds up
 	// iteration (instead of building the tree upon iteration)
-	delegators      map[ids.ID]stakerAndStatus
 	addedDelegators *btree.BTreeG[*Staker]
 }
 
