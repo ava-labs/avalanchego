@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 
-set -o errexit
-set -o nounset
-set -o pipefail
+set -euo pipefail
 
 if ! [[ "$0" =~ scripts/lint.sh ]]; then
   echo "must be run from repository root"
