@@ -4,11 +4,8 @@
 package state
 
 import (
-	"math"
 	"time"
 
-	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -20,28 +17,7 @@ import (
 // [preDelegateeRewardMetadata].
 //
 // CodecVersionLen + UpDurationLen + LastUpdatedLen + PotentialRewardLen
-const (
-	preDelegateeRewardSize = wrappers.ShortLen + 3*wrappers.LongLen
-
-	v0tag                    = "v0"
-	validatorMetadataCodecV0 = uint16(0)
-)
-
-var (
-	_ validatorState = (*metadata)(nil)
-
-	validatorMetadataCodec codec.Manager
-)
-
-func init() {
-	c := linearcodec.New([]string{v0tag}, linearcodec.DefaultMaxSliceLength)
-	validatorMetadataCodec = codec.NewManager(math.MaxInt32)
-
-	err := validatorMetadataCodec.RegisterCodec(validatorMetadataCodecV0, c)
-	if err != nil {
-		panic(err)
-	}
-}
+const preDelegateeRewardSize = wrappers.ShortLen + 3*wrappers.LongLen
 
 type preDelegateeRewardMetadata struct {
 	UpDuration      time.Duration `v0:"true"`
@@ -80,7 +56,7 @@ func parseValidatorMetadata(bytes []byte, metadata *validatorMetadata) error {
 		// potential reward and uptime was stored but potential delegatee reward
 		// was not
 		tmp := preDelegateeRewardMetadata{}
-		if _, err := validatorMetadataCodec.Unmarshal(bytes, &tmp); err != nil {
+		if _, err := metadataCodec.Unmarshal(bytes, &tmp); err != nil {
 			return err
 		}
 
@@ -89,7 +65,7 @@ func parseValidatorMetadata(bytes []byte, metadata *validatorMetadata) error {
 		metadata.PotentialReward = tmp.PotentialReward
 	default:
 		// everything was stored
-		if _, err := validatorMetadataCodec.Unmarshal(bytes, metadata); err != nil {
+		if _, err := metadataCodec.Unmarshal(bytes, metadata); err != nil {
 			return err
 		}
 	}
@@ -258,7 +234,7 @@ func (m *metadata) WriteValidatorMetadata(
 			metadata := m.metadata[vdrID][subnetID]
 			metadata.LastUpdated = uint64(metadata.lastUpdated.Unix())
 
-			metadataBytes, err := validatorMetadataCodec.Marshal(validatorMetadataCodecV0, metadata)
+			metadataBytes, err := metadataCodec.Marshal(v0, metadata)
 			if err != nil {
 				return err
 			}
