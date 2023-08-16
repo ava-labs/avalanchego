@@ -53,8 +53,14 @@ func (c *DBClient) GetChangeProof(
 	if err != nil {
 		return nil, err
 	}
+
+	// TODO handle merkledb.ErrInvalidMaxLength
+	if resp.GetRootNotPresent() {
+		return nil, merkledb.ErrInsufficientHistory
+	}
+
 	var proof merkledb.ChangeProof
-	if err := proof.UnmarshalProto(resp); err != nil {
+	if err := proof.UnmarshalProto(resp.GetChangeProof()); err != nil {
 		return nil, err
 	}
 	return &proof, nil

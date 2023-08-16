@@ -35,7 +35,7 @@ const (
 type DBClient interface {
 	GetMerkleRoot(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetMerkleRootResponse, error)
 	GetProof(ctx context.Context, in *GetProofRequest, opts ...grpc.CallOption) (*GetProofResponse, error)
-	GetChangeProof(ctx context.Context, in *GetChangeProofRequest, opts ...grpc.CallOption) (*ChangeProof, error)
+	GetChangeProof(ctx context.Context, in *GetChangeProofRequest, opts ...grpc.CallOption) (*GetChangeProofResponse, error)
 	VerifyChangeProof(ctx context.Context, in *VerifyChangeProofRequest, opts ...grpc.CallOption) (*VerifyChangeProofResponse, error)
 	CommitChangeProof(ctx context.Context, in *CommitChangeProofRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	GetRangeProof(ctx context.Context, in *GetRangeProofRequest, opts ...grpc.CallOption) (*GetRangeProofResponse, error)
@@ -68,8 +68,8 @@ func (c *dBClient) GetProof(ctx context.Context, in *GetProofRequest, opts ...gr
 	return out, nil
 }
 
-func (c *dBClient) GetChangeProof(ctx context.Context, in *GetChangeProofRequest, opts ...grpc.CallOption) (*ChangeProof, error) {
-	out := new(ChangeProof)
+func (c *dBClient) GetChangeProof(ctx context.Context, in *GetChangeProofRequest, opts ...grpc.CallOption) (*GetChangeProofResponse, error) {
+	out := new(GetChangeProofResponse)
 	err := c.cc.Invoke(ctx, DB_GetChangeProof_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -119,7 +119,7 @@ func (c *dBClient) CommitRangeProof(ctx context.Context, in *CommitRangeProofReq
 type DBServer interface {
 	GetMerkleRoot(context.Context, *emptypb.Empty) (*GetMerkleRootResponse, error)
 	GetProof(context.Context, *GetProofRequest) (*GetProofResponse, error)
-	GetChangeProof(context.Context, *GetChangeProofRequest) (*ChangeProof, error)
+	GetChangeProof(context.Context, *GetChangeProofRequest) (*GetChangeProofResponse, error)
 	VerifyChangeProof(context.Context, *VerifyChangeProofRequest) (*VerifyChangeProofResponse, error)
 	CommitChangeProof(context.Context, *CommitChangeProofRequest) (*emptypb.Empty, error)
 	GetRangeProof(context.Context, *GetRangeProofRequest) (*GetRangeProofResponse, error)
@@ -137,7 +137,7 @@ func (UnimplementedDBServer) GetMerkleRoot(context.Context, *emptypb.Empty) (*Ge
 func (UnimplementedDBServer) GetProof(context.Context, *GetProofRequest) (*GetProofResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetProof not implemented")
 }
-func (UnimplementedDBServer) GetChangeProof(context.Context, *GetChangeProofRequest) (*ChangeProof, error) {
+func (UnimplementedDBServer) GetChangeProof(context.Context, *GetChangeProofRequest) (*GetChangeProofResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetChangeProof not implemented")
 }
 func (UnimplementedDBServer) VerifyChangeProof(context.Context, *VerifyChangeProofRequest) (*VerifyChangeProofResponse, error) {

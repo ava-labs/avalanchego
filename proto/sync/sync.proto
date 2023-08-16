@@ -23,7 +23,7 @@ service DB {
 
   rpc GetProof(GetProofRequest) returns (GetProofResponse);
 
-  rpc GetChangeProof(GetChangeProofRequest) returns (ChangeProof);
+  rpc GetChangeProof(GetChangeProofRequest) returns (GetChangeProofResponse);
   rpc VerifyChangeProof(VerifyChangeProofRequest) returns (VerifyChangeProofResponse);
   rpc CommitChangeProof(CommitChangeProofRequest) returns (google.protobuf.Empty);
 
@@ -75,6 +75,14 @@ message GetChangeProofRequest {
   uint32 key_limit = 5;
 }
 
+message GetChangeProofResponse {
+  oneof response {
+    ChangeProof change_proof = 1;
+    // True iff server errored with merkledb.ErrInsufficientHistory.
+    bool root_not_present = 2;
+  }
+}
+
 message VerifyChangeProofRequest {
   ChangeProof proof = 1;
   bytes start_key = 2;
@@ -118,10 +126,9 @@ message CommitRangeProofRequest {
 }
 
 message ChangeProof {
-  bool had_roots_in_history = 1; // TODO remove
-  repeated ProofNode start_proof = 2;
-  repeated ProofNode end_proof = 3;
-  repeated KeyChange key_changes = 4;
+  repeated ProofNode start_proof = 1;
+  repeated ProofNode end_proof = 2;
+  repeated KeyChange key_changes = 3;
 }
 
 message RangeProof {

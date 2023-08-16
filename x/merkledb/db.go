@@ -57,6 +57,8 @@ type ChangeProofer interface {
 	// GetChangeProof returns a proof for a subset of the key/value changes in key range
 	// [start, end] that occurred between [startRootID] and [endRootID].
 	// Returns at most [maxLength] key/value pairs.
+	// Returns [ErrInsufficientHistory] if this node has insufficient history
+	// to generate the proof.
 	GetChangeProof(
 		ctx context.Context,
 		startRootID ids.ID,
@@ -68,7 +70,7 @@ type ChangeProofer interface {
 
 	// Returns nil iff all of the following hold:
 	//   - [start] <= [end].
-	//   - [proof] is non-empty iff [proof.HadRootsInHistory].
+	//   - [proof] is non-empty.
 	//   - All keys in [proof.KeyValues] and [proof.DeletedKeys] are in [start, end].
 	//     If [start] is empty, all keys are considered > [start].
 	//     If [end] is nothing, all keys are considered < [end].
@@ -77,7 +79,6 @@ type ChangeProofer interface {
 	//   - When the keys in [proof.KeyValues] are added to [db] and the keys in [proof.DeletedKeys]
 	//     are removed from [db], the root ID of [db] is [expectedEndRootID].
 	//
-	// Assumes [db.lock] isn't held.
 	// This is defined on Database instead of ChangeProof because it accesses
 	// database internals.
 	VerifyChangeProof(
@@ -581,14 +582,7 @@ func (db *merkleDB) GetChangeProof(
 		return nil, database.ErrClosed
 	}
 
-	result := &ChangeProof{
-		HadRootsInHistory: true,
-	}
 	changes, err := db.history.getValueChanges(startRootID, endRootID, start, end, maxLength)
-	if err == ErrRootIDNotPresent {
-		result.HadRootsInHistory = false
-		return result, nil
-	}
 	if err != nil {
 		return nil, err
 	}
@@ -599,7 +593,9 @@ func (db *merkleDB) GetChangeProof(
 	changedKeys := maps.Keys(changes.values)
 	utils.Sort(changedKeys)
 
-	result.KeyChanges = make([]KeyChange, 0, len(changedKeys))
+	result := &ChangeProof{
+		KeyChanges: make([]KeyChange, 0, len(changedKeys)),
+	}
 
 	for _, key := range changedKeys {
 		change := changes.values[key]
@@ -988,6 +984,7 @@ func (*merkleDB) CommitToDB(context.Context) error {
 	return nil
 }
 
+// Assumes [db.lock] isn't held.
 func (db *merkleDB) VerifyChangeProof(
 	ctx context.Context,
 	proof *ChangeProof,
@@ -995,21 +992,9 @@ func (db *merkleDB) VerifyChangeProof(
 	end maybe.Maybe[[]byte],
 	expectedEndRootID ids.ID,
 ) error {
-	if end.HasValue() && bytes.Compare(start, end.Value()) > 0 {
-		return ErrStartAfterEnd
-	}
-
-	if !proof.HadRootsInHistory {
-		// The node we requested the proof from didn't have sufficient
-		// history to fulfill this request.
-		if !proof.Empty() {
-			// cannot have any changes if the root was missing
-			return ErrDataInMissingRootProof
-		}
-		return nil
-	}
-
 	switch {
+	case end.HasValue() && bytes.Compare(start, end.Value()) > 0:
+		return ErrStartAfterEnd
 	case proof.Empty():
 		return ErrNoMerkleProof
 	case end.HasValue() && len(proof.KeyChanges) == 0 && len(proof.EndProof) == 0:
