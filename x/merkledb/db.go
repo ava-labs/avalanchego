@@ -591,9 +591,7 @@ func (db *merkleDB) GetChangeProof(
 	// values modified between [startRootID] to [endRootID] sorted in increasing
 	// order.
 	changedKeys := maps.Keys(changes.values)
-	slices.SortFunc(changedKeys, func(i, j path) bool {
-		return i.Compare(j) < 0
-	})
+	utils.Sort(changedKeys)
 
 	result := &ChangeProof{
 		KeyChanges: make([]KeyChange, 0, len(changedKeys)),

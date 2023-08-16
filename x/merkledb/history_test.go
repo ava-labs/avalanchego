@@ -560,13 +560,15 @@ func TestHistoryRecord(t *testing.T) {
 		changes = append(changes, &changeSummary{rootID: ids.GenerateTestID()})
 
 		th.record(changes[i])
-		require.Equal(uint64(i+1), th.nextIndex)
+		require.Equal(uint64(i+1), th.nextInsertNumber)
 		require.Equal(i+1, th.history.Len())
 		require.Len(th.lastChanges, i+1)
 		require.Contains(th.lastChanges, changes[i].rootID)
 		changeAndIndex := th.lastChanges[changes[i].rootID]
-		require.Equal(uint64(i), changeAndIndex.index)
-		require.True(th.history.Has(changeAndIndex))
+		require.Equal(uint64(i), changeAndIndex.insertNumber)
+		got, ok := th.history.Index(int(changeAndIndex.insertNumber))
+		require.True(ok)
+		require.Equal(changes[i], got.changeSummary)
 	}
 	// history is [changes[0], changes[1], changes[2]]
 
@@ -574,18 +576,21 @@ func TestHistoryRecord(t *testing.T) {
 	change3 := &changeSummary{rootID: ids.GenerateTestID()}
 	th.record(change3)
 	// history is [changes[1], changes[2], change3]
-	require.Equal(uint64(maxHistoryLen+1), th.nextIndex)
+	require.Equal(uint64(maxHistoryLen+1), th.nextInsertNumber)
 	require.Equal(maxHistoryLen, th.history.Len())
 	require.Len(th.lastChanges, maxHistoryLen)
 	require.Contains(th.lastChanges, change3.rootID)
 	changeAndIndex := th.lastChanges[change3.rootID]
-	require.Equal(uint64(maxHistoryLen), changeAndIndex.index)
-	require.True(th.history.Has(changeAndIndex))
+	require.Equal(uint64(maxHistoryLen), changeAndIndex.insertNumber)
+	got, ok := th.history.PeekRight()
+	require.True(ok)
+	require.Equal(change3, got.changeSummary)
 
-	// Make sure the oldest change was evicted
+	// // Make sure the oldest change was evicted
 	require.NotContains(th.lastChanges, changes[0].rootID)
-	minChange, _ := th.history.Min()
-	require.Equal(uint64(1), minChange.index)
+	oldestChange, ok := th.history.PeekLeft()
+	require.True(ok)
+	require.Equal(uint64(1), oldestChange.insertNumber)
 
 	// Add another change which was the same root ID as changes[2]
 	change4 := &changeSummary{rootID: changes[2].rootID}
@@ -601,18 +606,21 @@ func TestHistoryRecord(t *testing.T) {
 	require.Len(th.lastChanges, maxHistoryLen)
 	require.Contains(th.lastChanges, changes[2].rootID)
 	changeAndIndex = th.lastChanges[changes[2].rootID]
-	require.Equal(uint64(maxHistoryLen+1), changeAndIndex.index)
+	require.Equal(uint64(maxHistoryLen+1), changeAndIndex.insertNumber)
 
 	// Make sure [t.history] is right.
 	require.Equal(maxHistoryLen, th.history.Len())
-	got, _ := th.history.DeleteMin()
-	require.Equal(uint64(maxHistoryLen), got.index)
+	got, ok = th.history.PopLeft()
+	require.True(ok)
+	require.Equal(uint64(maxHistoryLen), got.insertNumber)
 	require.Equal(change3.rootID, got.rootID)
-	got, _ = th.history.DeleteMin()
-	require.Equal(uint64(maxHistoryLen+1), got.index)
+	got, ok = th.history.PopLeft()
+	require.True(ok)
+	require.Equal(uint64(maxHistoryLen+1), got.insertNumber)
 	require.Equal(change4.rootID, got.rootID)
-	got, _ = th.history.DeleteMin()
-	require.Equal(uint64(maxHistoryLen+2), got.index)
+	got, ok = th.history.PopLeft()
+	require.True(ok)
+	require.Equal(uint64(maxHistoryLen+2), got.insertNumber)
 	require.Equal(change5.rootID, got.rootID)
 }
 

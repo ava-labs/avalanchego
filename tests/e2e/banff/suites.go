@@ -40,7 +40,10 @@ var _ = ginkgo.Describe("[Banff]", func() {
 				// 5-second is enough to fetch initial UTXOs for test cluster in "primary.NewWallet"
 				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultWalletCreationTimeout)
 				var err error
-				wallet, err = primary.NewWalletFromURI(ctx, walletURI, kc)
+				wallet, err = primary.MakeWallet(ctx, &primary.WalletConfig{
+					URI:      walletURI,
+					Keychain: kc,
+				})
 				cancel()
 				gomega.Expect(err).Should(gomega.BeNil())
 

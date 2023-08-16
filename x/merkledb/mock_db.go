@@ -260,20 +260,6 @@ func (mr *MockMerkleDBMockRecorder) HealthCheck(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HealthCheck", reflect.TypeOf((*MockMerkleDB)(nil).HealthCheck), arg0)
 }
 
-// Insert mocks base method.
-func (m *MockMerkleDB) Insert(arg0 context.Context, arg1, arg2 []byte) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Insert", arg0, arg1, arg2)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Insert indicates an expected call of Insert.
-func (mr *MockMerkleDBMockRecorder) Insert(arg0, arg1, arg2 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Insert", reflect.TypeOf((*MockMerkleDB)(nil).Insert), arg0, arg1, arg2)
-}
-
 // NewBatch mocks base method.
 func (m *MockMerkleDB) NewBatch() database.Batch {
 	m.ctrl.T.Helper()
@@ -344,34 +330,19 @@ func (mr *MockMerkleDBMockRecorder) NewIteratorWithStartAndPrefix(arg0, arg1 int
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewIteratorWithStartAndPrefix", reflect.TypeOf((*MockMerkleDB)(nil).NewIteratorWithStartAndPrefix), arg0, arg1)
 }
 
-// NewPreallocatedView mocks base method.
-func (m *MockMerkleDB) NewPreallocatedView(arg0 int) (TrieView, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "NewPreallocatedView", arg0)
-	ret0, _ := ret[0].(TrieView)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// NewPreallocatedView indicates an expected call of NewPreallocatedView.
-func (mr *MockMerkleDBMockRecorder) NewPreallocatedView(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewPreallocatedView", reflect.TypeOf((*MockMerkleDB)(nil).NewPreallocatedView), arg0)
-}
-
 // NewView mocks base method.
-func (m *MockMerkleDB) NewView() (TrieView, error) {
+func (m *MockMerkleDB) NewView(arg0 []database.BatchOp) (TrieView, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "NewView")
+	ret := m.ctrl.Call(m, "NewView", arg0)
 	ret0, _ := ret[0].(TrieView)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // NewView indicates an expected call of NewView.
-func (mr *MockMerkleDBMockRecorder) NewView() *gomock.Call {
+func (mr *MockMerkleDBMockRecorder) NewView(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewView", reflect.TypeOf((*MockMerkleDB)(nil).NewView))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewView", reflect.TypeOf((*MockMerkleDB)(nil).NewView), arg0)
 }
 
 // Put mocks base method.
@@ -386,20 +357,6 @@ func (m *MockMerkleDB) Put(arg0, arg1 []byte) error {
 func (mr *MockMerkleDBMockRecorder) Put(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Put", reflect.TypeOf((*MockMerkleDB)(nil).Put), arg0, arg1)
-}
-
-// Remove mocks base method.
-func (m *MockMerkleDB) Remove(arg0 context.Context, arg1 []byte) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Remove", arg0, arg1)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Remove indicates an expected call of Remove.
-func (mr *MockMerkleDBMockRecorder) Remove(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Remove", reflect.TypeOf((*MockMerkleDB)(nil).Remove), arg0, arg1)
 }
 
 // VerifyChangeProof mocks base method.
