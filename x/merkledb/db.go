@@ -597,9 +597,7 @@ func (db *merkleDB) GetChangeProof(
 	// values modified between [startRootID] to [endRootID] sorted in increasing
 	// order.
 	changedKeys := maps.Keys(changes.values)
-	slices.SortFunc(changedKeys, func(i, j path) bool {
-		return i.Compare(j) < 0
-	})
+	utils.Sort(changedKeys)
 
 	result.KeyChanges = make([]KeyChange, 0, len(changedKeys))
 
@@ -1014,7 +1012,7 @@ func (db *merkleDB) VerifyChangeProof(
 	switch {
 	case proof.Empty():
 		return ErrNoMerkleProof
-	case end.HasValue() && len(proof.EndProof) == 0:
+	case end.HasValue() && len(proof.KeyChanges) == 0 && len(proof.EndProof) == 0:
 		// We requested an end proof but didn't get one.
 		return ErrNoEndProof
 	case len(start) > 0 && len(proof.StartProof) == 0 && len(proof.EndProof) == 0:
