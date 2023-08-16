@@ -295,7 +295,7 @@ func TestGetRangeProof(t *testing.T) {
 			},
 			expectedErr: merkledb.ErrInvalidProof,
 		},
-		"all proof keys removed from response": {
+		"start and end proof nodes removed": {
 			db: largeTrieDB,
 			request: &pb.SyncGetRangeProofRequest{
 				RootHash:   largeTrieRoot[:],
@@ -306,7 +306,33 @@ func TestGetRangeProof(t *testing.T) {
 				response.StartProof = nil
 				response.EndProof = nil
 			},
-			expectedErr: merkledb.ErrInvalidProof,
+			expectedErr: merkledb.ErrNoEndProof,
+		},
+		"end proof nodes removed": {
+			db: largeTrieDB,
+			request: &pb.SyncGetRangeProofRequest{
+				RootHash:   largeTrieRoot[:],
+				KeyLimit:   defaultRequestKeyLimit,
+				BytesLimit: defaultRequestByteSizeLimit,
+			},
+			modifyResponse: func(response *merkledb.RangeProof) {
+				response.EndProof = nil
+			},
+			expectedErr: merkledb.ErrNoEndProof,
+		},
+		"empty proof": {
+			db: largeTrieDB,
+			request: &pb.SyncGetRangeProofRequest{
+				RootHash:   largeTrieRoot[:],
+				KeyLimit:   defaultRequestKeyLimit,
+				BytesLimit: defaultRequestByteSizeLimit,
+			},
+			modifyResponse: func(response *merkledb.RangeProof) {
+				response.KeyValues = nil
+				response.StartProof = nil
+				response.EndProof = nil
+			},
+			expectedErr: merkledb.ErrNoMerkleProof,
 		},
 	}
 
