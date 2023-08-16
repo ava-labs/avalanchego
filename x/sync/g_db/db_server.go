@@ -54,11 +54,10 @@ func (s *DBServer) GetChangeProof(
 	if err != nil {
 		return nil, err
 	}
-	start := maybe.Nothing[[]byte]() // TODO change when StartKey is a Maybe
-	if req.StartKey != nil && len(req.StartKey) > 0 {
-		start = maybe.Some(req.StartKey)
+	start := maybe.Nothing[[]byte]() // TODO use helper function for this?
+	if req.StartKey != nil && !req.StartKey.IsNothing {
+		start = maybe.Some(req.StartKey.Value)
 	}
-
 	end := maybe.Nothing[[]byte]() // TODO use helper function for this?
 	if req.EndKey != nil && !req.EndKey.IsNothing {
 		end = maybe.Some(req.EndKey.Value)

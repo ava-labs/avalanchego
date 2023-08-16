@@ -46,9 +46,15 @@ func (c *DBClient) GetChangeProof(
 	resp, err := c.client.GetChangeProof(ctx, &pb.GetChangeProofRequest{
 		StartRootHash: startRootID[:],
 		EndRootHash:   endRootID[:],
-		StartKey:      startKey.Value(), // TODO fix when this is a maybe
-		EndKey:        &pb.MaybeBytes{IsNothing: endKey.IsNothing(), Value: endKey.Value()},
-		KeyLimit:      uint32(keyLimit),
+		StartKey: &pb.MaybeBytes{
+			IsNothing: startKey.IsNothing(),
+			Value:     startKey.Value(),
+		},
+		EndKey: &pb.MaybeBytes{
+			IsNothing: endKey.IsNothing(),
+			Value:     endKey.Value(),
+		},
+		KeyLimit: uint32(keyLimit),
 	})
 	if err != nil {
 		return nil, err
