@@ -194,19 +194,9 @@ func (v *baseStakers) UpdateValidator(staker *Staker) error {
 	v.stakers.ReplaceOrInsert(staker)
 
 	validatorDiff := getOrCreateDiff(v.validatorDiffs, staker.SubnetID, staker.NodeID)
-	if validatorDiff.validator.status == added {
-		// validator was added and is being immediately updated.
-		// This should not currently happen, but for sake of generality,
-		// we mark it as added as we do for diffs.
-		validatorDiff.validator = stakerAndStatus{
-			staker: staker,
-			status: added,
-		}
-	} else {
-		validatorDiff.validator = stakerAndStatus{
-			staker: staker,
-			status: updated,
-		}
+	validatorDiff.validator = stakerAndStatus{
+		staker: staker,
+		status: updated,
 	}
 
 	return nil
@@ -226,25 +216,14 @@ func (v *baseStakers) DeleteValidator(staker *Staker) {
 	validator.validator = nil
 	v.pruneValidator(subnetID, nodeID)
 
-	// for sake of generality, we assume we could insert and immediately delete
-	// a validator.validator. We need to handle this case separately to avoid
-	// messing validators set.
-	// Also, for sake of generality, we assume we could delete an updated version
+	// For sake of generality, we assume we could delete an updated version
 	// of validator.validator. We explicitly remove the currently stored
 	// version of the staker to handle this case.
-	validatorDiff := getOrCreateDiff(v.validatorDiffs, subnetID, nodeID)
-	if validatorDiff.validator.status == added {
-		validatorDiff.validator = stakerAndStatus{
-			staker: nil,
-			status: unmodified,
-		}
-	} else {
-		validatorDiff.validator = stakerAndStatus{
-			staker: storedStaker,
-			status: deleted,
-		}
+	validatorDiff := getOrCreateDiff(v.validatorDiffs, staker.SubnetID, staker.NodeID)
+	validatorDiff.validator = stakerAndStatus{
+		staker: storedStaker,
+		status: deleted,
 	}
-
 	v.stakers.Delete(storedStaker)
 }
 
@@ -305,19 +284,9 @@ func (v *baseStakers) UpdateDelegator(staker *Staker) error {
 	v.stakers.ReplaceOrInsert(staker)
 
 	validatorDiff := getOrCreateDiff(v.validatorDiffs, staker.SubnetID, staker.NodeID)
-	if del, found := validatorDiff.delegators[staker.TxID]; found && del.status == added {
-		// updating a staker just added. Keep it as added
-		validatorDiff.delegators[staker.TxID] = stakerAndStatus{
-			staker: staker,
-			status: added,
-		}
-		validatorDiff.addedDelegators.Delete(prevDelegator)
-		validatorDiff.addedDelegators.ReplaceOrInsert(staker)
-	} else {
-		validatorDiff.delegators[staker.TxID] = stakerAndStatus{
-			staker: staker,
-			status: updated,
-		}
+	validatorDiff.delegators[staker.TxID] = stakerAndStatus{
+		staker: staker,
+		status: updated,
 	}
 	return nil
 }
