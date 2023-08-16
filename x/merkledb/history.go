@@ -191,6 +191,11 @@ func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start []byte, 
 		}
 	}
 
+	// If we have <= [maxLength] elements, we're done.
+	if changedKeys.Len() <= maxLength {
+		return combinedChanges, nil
+	}
+
 	// Keep only the smallest [maxLength] items in [combinedChanges.values].
 	sortedChangedKeys := changedKeys.List()
 	utils.Sort(sortedChangedKeys)
