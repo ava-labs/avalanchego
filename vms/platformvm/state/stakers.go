@@ -194,19 +194,9 @@ func (v *baseStakers) UpdateValidator(staker *Staker) error {
 	v.stakers.ReplaceOrInsert(staker)
 
 	validatorDiff := getOrCreateDiff(v.validatorDiffs, staker.SubnetID, staker.NodeID)
-	if validatorDiff.validator.status == added {
-		// validator was added and is being immediately updated.
-		// This should not currently happen, but for sake of generality,
-		// we mark it as added as we do for diffs.
-		validatorDiff.validator = stakerAndStatus{
-			staker: staker,
-			status: added,
-		}
-	} else {
-		validatorDiff.validator = stakerAndStatus{
-			staker: staker,
-			status: updated,
-		}
+	validatorDiff.validator = stakerAndStatus{
+		staker: staker,
+		status: updated,
 	}
 
 	return nil
@@ -226,25 +216,14 @@ func (v *baseStakers) DeleteValidator(staker *Staker) {
 	validator.validator = nil
 	v.pruneValidator(subnetID, nodeID)
 
-	// for sake of generality, we assume we could insert and immediately delete
-	// a validator.validator. We need to handle this case separately to avoid
-	// messing validators set.
-	// Also, for sake of generality, we assume we could delete an updated version
+	// For sake of generality, we assume we could delete an updated version
 	// of validator.validator. We explicitly remove the currently stored
 	// version of the staker to handle this case.
-	validatorDiff := getOrCreateDiff(v.validatorDiffs, subnetID, nodeID)
-	if validatorDiff.validator.status == added {
-		validatorDiff.validator = stakerAndStatus{
-			staker: nil,
-			status: unmodified,
-		}
-	} else {
-		validatorDiff.validator = stakerAndStatus{
-			staker: storedStaker,
-			status: deleted,
-		}
+	validatorDiff := getOrCreateDiff(v.validatorDiffs, staker.SubnetID, staker.NodeID)
+	validatorDiff.validator = stakerAndStatus{
+		staker: storedStaker,
+		status: deleted,
 	}
-
 	v.stakers.Delete(storedStaker)
 }
 
@@ -269,14 +248,10 @@ func (v *baseStakers) PutDelegator(staker *Staker) {
 	v.stakers.ReplaceOrInsert(staker)
 
 	validatorDiff := getOrCreateDiff(v.validatorDiffs, staker.SubnetID, staker.NodeID)
-	if validatorDiff.addedDelegators == nil {
-		validatorDiff.addedDelegators = btree.NewG(defaultTreeDegree, (*Staker).Less)
-	}
 	validatorDiff.delegators[staker.TxID] = stakerAndStatus{
 		staker: staker,
 		status: added,
 	}
-	validatorDiff.addedDelegators.ReplaceOrInsert(staker)
 }
 
 func (v *baseStakers) UpdateDelegator(staker *Staker) error {
@@ -305,19 +280,9 @@ func (v *baseStakers) UpdateDelegator(staker *Staker) error {
 	v.stakers.ReplaceOrInsert(staker)
 
 	validatorDiff := getOrCreateDiff(v.validatorDiffs, staker.SubnetID, staker.NodeID)
-	if del, found := validatorDiff.delegators[staker.TxID]; found && del.status == added {
-		// updating a staker just added. Keep it as added
-		validatorDiff.delegators[staker.TxID] = stakerAndStatus{
-			staker: staker,
-			status: added,
-		}
-		validatorDiff.addedDelegators.Delete(prevDelegator)
-		validatorDiff.addedDelegators.ReplaceOrInsert(staker)
-	} else {
-		validatorDiff.delegators[staker.TxID] = stakerAndStatus{
-			staker: staker,
-			status: updated,
-		}
+	validatorDiff.delegators[staker.TxID] = stakerAndStatus{
+		staker: staker,
+		status: updated,
 	}
 	return nil
 }
@@ -344,16 +309,9 @@ func (v *baseStakers) DeleteDelegator(staker *Staker) {
 	v.pruneValidator(delegatorToDelete.SubnetID, delegatorToDelete.NodeID)
 
 	validatorDiff := getOrCreateDiff(v.validatorDiffs, delegatorToDelete.SubnetID, delegatorToDelete.NodeID)
-	if _, found := validatorDiff.delegators[delegatorToDelete.TxID]; found {
-		validatorDiff.delegators[delegatorToDelete.TxID] = stakerAndStatus{
-			staker: nil,
-			status: unmodified,
-		}
-	} else {
-		validatorDiff.delegators[delegatorToDelete.TxID] = stakerAndStatus{
-			staker: delegatorToDelete,
-			status: deleted,
-		}
+	validatorDiff.delegators[delegatorToDelete.TxID] = stakerAndStatus{
+		staker: delegatorToDelete,
+		status: deleted,
 	}
 
 	v.stakers.Delete(delegatorToDelete)
@@ -442,9 +400,10 @@ type diffValidator struct {
 	validator stakerAndStatus
 
 	// delegators groups all delegators associated with validator, by their TxID.
-	// the added delegators are also stored in the addedDelegators tree to speed up
+	delegators map[ids.ID]stakerAndStatus
+
+	// addedDelegators tree stores all delegators whose state is added. This speeds up
 	// iteration (instead of building the tree upon iteration)
-	delegators      map[ids.ID]stakerAndStatus
 	addedDelegators *btree.BTreeG[*Staker]
 }
 

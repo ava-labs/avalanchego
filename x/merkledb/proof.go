@@ -170,12 +170,12 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID) error {
 	}
 
 	// Don't bother locking [view] -- nobody else has a reference to it.
-	view, err := getEmptyTrieView(ctx)
+	view, err := getStandaloneTrieView(ctx, nil)
 	if err != nil {
 		return err
 	}
 
-	// Insert all of the proof nodes.
+	// Insert all proof nodes.
 	// [provenPath] is the path that we are proving exists, or the path
 	// that is where the path we are proving doesn't exist should be.
 	provenPath := maybe.Some(proof.Path[len(proof.Path)-1].KeyPath.deserialize())
@@ -356,17 +356,19 @@ func (proof *RangeProof) Verify(
 		return err
 	}
 
-	// Don't need to lock [view] because nobody else has a reference to it.
-	view, err := getEmptyTrieView(ctx)
-	if err != nil {
-		return err
+	// Insert all key-value pairs into the trie.
+	ops := make([]database.BatchOp, len(proof.KeyValues))
+	for i, kv := range proof.KeyValues {
+		ops[i] = database.BatchOp{
+			Key:   kv.Key,
+			Value: kv.Value,
+		}
 	}
 
-	// Insert all key-value pairs into the trie.
-	for _, kv := range proof.KeyValues {
-		if _, err := view.insertIntoTrie(newPath(kv.Key), maybe.Some(kv.Value)); err != nil {
-			return err
-		}
+	// Don't need to lock [view] because nobody else has a reference to it.
+	view, err := getStandaloneTrieView(ctx, ops)
+	if err != nil {
+		return err
 	}
 
 	// For all the nodes along the edges of the proof, insert children
@@ -833,7 +835,7 @@ func addPathInfo(
 
 		// load the node associated with the key or create a new one
 		// pass nothing because we are going to overwrite the value digest below
-		n, err := t.insertIntoTrie(keyPath, maybe.Nothing[[]byte]())
+		n, err := t.insert(keyPath, maybe.Nothing[[]byte]())
 		if err != nil {
 			return err
 		}
@@ -865,7 +867,8 @@ func addPathInfo(
 	return nil
 }
 
-func getEmptyTrieView(ctx context.Context) (*trieView, error) {
+// getStandaloneTrieView returns a new view that has nothing in it besides the changes due to [ops]
+func getStandaloneTrieView(ctx context.Context, ops []database.BatchOp) (*trieView, error) {
 	tracer, err := trace.New(trace.Config{Enabled: false})
 	if err != nil {
 		return nil, err
@@ -884,5 +887,5 @@ func getEmptyTrieView(ctx context.Context) (*trieView, error) {
 		return nil, err
 	}
 
-	return db.newUntrackedView(defaultPreallocationSize)
+	return db.newUntrackedView(ops)
 }

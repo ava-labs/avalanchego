@@ -5,7 +5,6 @@ package merkledb
 
 import (
 	"bytes"
-	"context"
 	"math/rand"
 	"sort"
 	"testing"
@@ -15,6 +14,7 @@ import (
 
 	"golang.org/x/exp/maps"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 )
 
@@ -191,26 +191,29 @@ func Test_TrieView_Iterator_Random(t *testing.T) {
 		require.NoError(db.Put(keyChanges[i].Key, keyChanges[i].Value.Value()))
 	}
 
-	view1, err := db.NewView()
-	require.NoError(err)
-
+	ops := make([]database.BatchOp, 0, numKeyChanges/4)
 	for i := numKeyChanges / 4; i < 2*numKeyChanges/4; i++ {
-		require.NoError(view1.Insert(context.Background(), keyChanges[i].Key, keyChanges[i].Value.Value()))
+		ops = append(ops, database.BatchOp{Key: keyChanges[i].Key, Value: keyChanges[i].Value.Value()})
 	}
 
-	view2, err := view1.NewView()
+	view1, err := db.NewView(ops)
 	require.NoError(err)
 
+	ops = make([]database.BatchOp, 0, numKeyChanges/4)
 	for i := 2 * numKeyChanges / 4; i < 3*numKeyChanges/4; i++ {
-		require.NoError(view2.Insert(context.Background(), keyChanges[i].Key, keyChanges[i].Value.Value()))
+		ops = append(ops, database.BatchOp{Key: keyChanges[i].Key, Value: keyChanges[i].Value.Value()})
 	}
 
-	view3, err := view2.NewView()
+	view2, err := view1.NewView(ops)
 	require.NoError(err)
 
+	ops = make([]database.BatchOp, 0, numKeyChanges/4)
 	for i := 3 * numKeyChanges / 4; i < numKeyChanges; i++ {
-		require.NoError(view3.Insert(context.Background(), keyChanges[i].Key, keyChanges[i].Value.Value()))
+		ops = append(ops, database.BatchOp{Key: keyChanges[i].Key, Value: keyChanges[i].Value.Value()})
 	}
+
+	view3, err := view2.NewView(ops)
+	require.NoError(err)
 
 	// Might have introduced duplicates, so only expect the latest value.
 	uniqueKeyChanges := make(map[string][]byte)
