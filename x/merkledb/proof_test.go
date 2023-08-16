@@ -348,11 +348,20 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 			expectedErr: ErrShouldJustBeRoot,
 		},
 		{
-			name:  "no end proof",
+			name:  "no end proof; has end bound",
 			start: []byte{1},
 			end:   maybe.Some([]byte{1}),
 			proof: &RangeProof{
 				StartProof: []ProofNode{{}},
+			},
+			expectedErr: ErrNoEndProof,
+		},
+		{
+			name:  "no end proof; has key-values",
+			start: []byte{1},
+			end:   maybe.Nothing[[]byte](),
+			proof: &RangeProof{
+				KeyValues: []KeyValue{{}},
 			},
 			expectedErr: ErrNoEndProof,
 		},
@@ -365,6 +374,7 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 					{Key: []byte{1}, Value: []byte{1}},
 					{Key: []byte{0}, Value: []byte{0}},
 				},
+				EndProof: []ProofNode{{}},
 			},
 			expectedErr: ErrNonIncreasingValues,
 		},
@@ -376,6 +386,7 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 				KeyValues: []KeyValue{
 					{Key: []byte{0}, Value: []byte{0}},
 				},
+				EndProof: []ProofNode{{}},
 			},
 			expectedErr: ErrStateFromOutsideOfRange,
 		},
@@ -407,6 +418,7 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 						KeyPath: newPath([]byte{1}).Serialize(),
 					},
 				},
+				EndProof: []ProofNode{{}},
 			},
 			expectedErr: ErrProofNodeNotForKey,
 		},
@@ -429,6 +441,7 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 						KeyPath: newPath([]byte{1, 2, 3, 4}).Serialize(),
 					},
 				},
+				EndProof: []ProofNode{{}},
 			},
 			expectedErr: ErrProofNodeNotForKey,
 		},
@@ -654,12 +667,8 @@ func Test_ChangeProof_Missing_History_For_EndRoot(t *testing.T) {
 	startRoot, err := db.GetMerkleRoot(context.Background())
 	require.NoError(err)
 
-	proof, err := db.GetChangeProof(context.Background(), startRoot, ids.Empty, nil, maybe.Nothing[[]byte](), 50)
-	require.NoError(err)
-	require.NotNil(proof)
-	require.False(proof.HadRootsInHistory)
-
-	require.NoError(db.VerifyChangeProof(context.Background(), proof, nil, maybe.Nothing[[]byte](), db.getMerkleRoot()))
+	_, err = db.GetChangeProof(context.Background(), startRoot, ids.Empty, nil, maybe.Nothing[[]byte](), 50)
+	require.ErrorIs(err, ErrInsufficientHistory)
 }
 
 func Test_ChangeProof_BadBounds(t *testing.T) {
@@ -850,59 +859,8 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 			expectedErr: ErrStartAfterEnd,
 		},
 		{
-			name: "no roots in history and non-empty key-values",
-			proof: &ChangeProof{
-				HadRootsInHistory: false,
-				KeyChanges:        []KeyChange{{Key: []byte{1}, Value: maybe.Some([]byte{1})}},
-			},
-			start:       []byte{0},
-			end:         maybe.Nothing[[]byte](), // Also tests start can be after end if end is nothing
-			expectedErr: ErrDataInMissingRootProof,
-		},
-		{
-			name: "no roots in history and non-empty deleted keys",
-			proof: &ChangeProof{
-				HadRootsInHistory: false,
-				KeyChanges:        []KeyChange{{Key: []byte{1}}},
-			},
-			start:       nil,
-			end:         maybe.Nothing[[]byte](),
-			expectedErr: ErrDataInMissingRootProof,
-		},
-		{
-			name: "no roots in history and non-empty start proof",
-			proof: &ChangeProof{
-				HadRootsInHistory: false,
-				StartProof:        []ProofNode{{}},
-			},
-			start:       nil,
-			end:         maybe.Nothing[[]byte](),
-			expectedErr: ErrDataInMissingRootProof,
-		},
-		{
-			name: "no roots in history and non-empty end proof",
-			proof: &ChangeProof{
-				HadRootsInHistory: false,
-				EndProof:          []ProofNode{{}},
-			},
-			start:       nil,
-			end:         maybe.Nothing[[]byte](),
-			expectedErr: ErrDataInMissingRootProof,
-		},
-		{
-			name: "no roots in history; empty",
-			proof: &ChangeProof{
-				HadRootsInHistory: false,
-			},
-			start:       nil,
-			end:         maybe.Nothing[[]byte](),
-			expectedErr: nil,
-		},
-		{
-			name: "root in history; empty",
-			proof: &ChangeProof{
-				HadRootsInHistory: true,
-			},
+			name:        "empty",
+			proof:       &ChangeProof{},
 			start:       nil,
 			end:         maybe.Nothing[[]byte](),
 			expectedErr: ErrNoMerkleProof,
@@ -910,8 +868,7 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 		{
 			name: "no end proof",
 			proof: &ChangeProof{
-				HadRootsInHistory: true,
-				StartProof:        []ProofNode{{}},
+				StartProof: []ProofNode{{}},
 			},
 			start:       nil,
 			end:         maybe.Some([]byte{1}),
@@ -920,8 +877,7 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 		{
 			name: "no start proof",
 			proof: &ChangeProof{
-				HadRootsInHistory: true,
-				KeyChanges:        []KeyChange{{Key: []byte{1}}},
+				KeyChanges: []KeyChange{{Key: []byte{1}}},
 			},
 			start:       []byte{1},
 			end:         maybe.Nothing[[]byte](),
@@ -930,7 +886,6 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 		{
 			name: "non-increasing key-values",
 			proof: &ChangeProof{
-				HadRootsInHistory: true,
 				KeyChanges: []KeyChange{
 					{Key: []byte{1}},
 					{Key: []byte{0}},
@@ -943,8 +898,7 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 		{
 			name: "key-value too low",
 			proof: &ChangeProof{
-				HadRootsInHistory: true,
-				StartProof:        []ProofNode{{}},
+				StartProof: []ProofNode{{}},
 				KeyChanges: []KeyChange{
 					{Key: []byte{0}},
 				},
@@ -956,8 +910,7 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 		{
 			name: "key-value too great",
 			proof: &ChangeProof{
-				HadRootsInHistory: true,
-				EndProof:          []ProofNode{{}},
+				EndProof: []ProofNode{{}},
 				KeyChanges: []KeyChange{
 					{Key: []byte{2}},
 				},
@@ -969,7 +922,6 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 		{
 			name: "duplicate key",
 			proof: &ChangeProof{
-				HadRootsInHistory: true,
 				KeyChanges: []KeyChange{
 					{Key: []byte{1}},
 					{Key: []byte{1}},
@@ -982,7 +934,6 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 		{
 			name: "start proof node has wrong prefix",
 			proof: &ChangeProof{
-				HadRootsInHistory: true,
 				StartProof: []ProofNode{
 					{KeyPath: newPath([]byte{2}).Serialize()},
 					{KeyPath: newPath([]byte{2, 3}).Serialize()},
@@ -995,7 +946,6 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 		{
 			name: "start proof non-increasing",
 			proof: &ChangeProof{
-				HadRootsInHistory: true,
 				StartProof: []ProofNode{
 					{KeyPath: newPath([]byte{1}).Serialize()},
 					{KeyPath: newPath([]byte{2, 3}).Serialize()},
@@ -1008,7 +958,6 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 		{
 			name: "end proof node has wrong prefix",
 			proof: &ChangeProof{
-				HadRootsInHistory: true,
 				KeyChanges: []KeyChange{
 					{Key: []byte{1, 2}, Value: maybe.Some([]byte{0})},
 				},
@@ -1024,7 +973,6 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 		{
 			name: "end proof non-increasing",
 			proof: &ChangeProof{
-				HadRootsInHistory: true,
 				KeyChanges: []KeyChange{
 					{Key: []byte{1, 2, 3}},
 				},
@@ -1846,5 +1794,99 @@ func FuzzProof(f *testing.F) {
 		iter.Release()
 
 		require.NoError(db.Delete(deleteKey))
+	})
+}
+
+// Generate change proofs and verify that they are valid.
+func FuzzChangeProof(f *testing.F) {
+	now := time.Now().UnixNano()
+	f.Logf("seed: %d", now)
+	rand := rand.New(rand.NewSource(now)) // #nosec G404
+
+	const (
+		numKeyValues  = defaultHistoryLength / 2
+		deletePortion = 0.25
+	)
+
+	db, err := getBasicDB()
+	require.NoError(f, err)
+
+	startRootID, err := db.GetMerkleRoot(context.Background())
+	require.NoError(f, err)
+
+	// Insert a bunch of random key values.
+	// Don't insert so many that we have insufficient history.
+	insertRandomKeyValues(
+		require.New(f),
+		rand,
+		[]database.Database{db},
+		numKeyValues,
+		deletePortion,
+	)
+
+	endRootID, err := db.GetMerkleRoot(context.Background())
+	require.NoError(f, err)
+
+	f.Fuzz(func(
+		t *testing.T,
+		startBytes []byte,
+		endBytes []byte,
+		maxProofLen uint,
+	) {
+		require := require.New(t)
+
+		// Make sure proof bounds are valid
+		if len(endBytes) != 0 && bytes.Compare(startBytes, endBytes) > 0 {
+			return
+		}
+		// Make sure proof length is valid
+		if maxProofLen == 0 {
+			return
+		}
+
+		end := maybe.Nothing[[]byte]()
+		if len(endBytes) != 0 {
+			end = maybe.Some(endBytes)
+		}
+
+		changeProof, err := db.GetChangeProof(
+			context.Background(),
+			startRootID,
+			endRootID,
+			startBytes,
+			end,
+			int(maxProofLen),
+		)
+		require.NoError(err)
+
+		require.NoError(db.VerifyChangeProof(
+			context.Background(),
+			changeProof,
+			startBytes,
+			end,
+			endRootID,
+		))
+
+		// Insert another key-value pair
+		newKey := make([]byte, 32)
+		_, _ = rand.Read(newKey) // #nosec G404
+		newValue := make([]byte, 32)
+		_, _ = rand.Read(newValue) // #nosec G404
+		require.NoError(db.Put(newKey, newValue))
+
+		// Delete a key-value pair so database doesn't grow too large
+		iter := db.NewIterator()
+		require.NoError(db.Delete(iter.Key()))
+		iter.Release()
+
+		oldEndRootID := endRootID
+		endRootID, err = db.GetMerkleRoot(context.Background())
+		require.NoError(err)
+		if oldEndRootID != endRootID {
+			// Need this check because if we insert and then immediately
+			// delete a key-value pair, the root ID won't change and we'll
+			// error because start root ID == end root ID.
+			startRootID = oldEndRootID
+		}
 	})
 }

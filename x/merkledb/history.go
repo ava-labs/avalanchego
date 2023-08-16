@@ -15,10 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-var (
-	ErrStartRootNotFound = errors.New("start root is not before end root in history")
-	ErrRootIDNotPresent  = errors.New("root id is not present in history")
-)
+var ErrInsufficientHistory = errors.New("insufficient history to generate proof")
 
 // stores previous trie states
 type trieHistory struct {
@@ -74,9 +71,17 @@ func newTrieHistory(maxHistoryLookback int) *trieHistory {
 	}
 }
 
-// Returns up to [maxLength] key-value pair changes with keys in [start, end] that
-// occurred between [startRoot] and [endRoot].
-func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start []byte, end maybe.Maybe[[]byte], maxLength int) (*changeSummary, error) {
+// Returns up to [maxLength] key-value pair changes with keys in
+// [start, end] that occurred between [startRoot] and [endRoot].
+// Returns [ErrInsufficientHistory] if the history is insufficient
+// to generate the proof.
+func (th *trieHistory) getValueChanges(
+	startRoot ids.ID,
+	endRoot ids.ID,
+	start []byte,
+	end maybe.Maybe[[]byte],
+	maxLength int,
+) (*changeSummary, error) {
 	if maxLength <= 0 {
 		return nil, fmt.Errorf("%w but was %d", ErrInvalidMaxLength, maxLength)
 	}
@@ -86,9 +91,13 @@ func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start []byte, 
 	}
 
 	// [endRootChanges] is the last change in the history resulting in [endRoot].
+	// TODO when we update to minimum go version 1.20.X, make this return another
+	// wrapped error ErrNoEndRoot. In NetworkServer.HandleChangeProofRequest, if we return
+	// that error, we know we shouldn't try to generate a range proof since we
+	// lack the necessary history.
 	endRootChanges, ok := th.lastChanges[endRoot]
 	if !ok {
-		return nil, ErrRootIDNotPresent
+		return nil, fmt.Errorf("%w: end root %s not found", ErrInsufficientHistory, endRoot)
 	}
 
 	// Confirm there's a change resulting in [startRoot] before
@@ -96,7 +105,7 @@ func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start []byte, 
 	// [startRootChanges] is the last appearance of [startRoot].
 	startRootChanges, ok := th.lastChanges[startRoot]
 	if !ok {
-		return nil, ErrStartRootNotFound
+		return nil, fmt.Errorf("%w: start root %s not found", ErrInsufficientHistory, startRoot)
 	}
 
 	var (
@@ -131,7 +140,10 @@ func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start []byte, 
 			}
 
 			if i == 0 {
-				return nil, ErrStartRootNotFound
+				return nil, fmt.Errorf(
+					"%w: start root %s not found before end root %s",
+					ErrInsufficientHistory, startRoot, endRoot,
+				)
 			}
 		}
 	}
@@ -216,7 +228,7 @@ func (th *trieHistory) getChangesToGetToRoot(rootID ids.ID, start []byte, end ma
 	// [lastRootChange] is the last change in the history resulting in [rootID].
 	lastRootChange, ok := th.lastChanges[rootID]
 	if !ok {
-		return nil, ErrRootIDNotPresent
+		return nil, ErrInsufficientHistory
 	}
 
 	var (
