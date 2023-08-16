@@ -102,11 +102,18 @@ func (s *DBServer) VerifyChangeProof(
 	if err != nil {
 		return nil, err
 	}
+	startKey := maybe.Nothing[[]byte]()
+	if req.StartKey != nil && !req.StartKey.IsNothing {
+		startKey = maybe.Some(req.StartKey.Value)
+	}
+	endKey := maybe.Nothing[[]byte]()
+	if req.EndKey != nil && !req.EndKey.IsNothing {
+		endKey = maybe.Some(req.EndKey.Value)
+	}
 
 	// TODO there's probably a better way to do this.
 	var errString string
-	// TODO properly set maybes passed in below
-	if err := s.db.VerifyChangeProof(ctx, &proof, maybe.Some(req.StartKey), maybe.Some(req.EndKey), rootID); err != nil {
+	if err := s.db.VerifyChangeProof(ctx, &proof, startKey, endKey, rootID); err != nil {
 		errString = err.Error()
 	}
 	return &pb.VerifyChangeProofResponse{

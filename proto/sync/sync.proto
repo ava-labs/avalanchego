@@ -85,8 +85,8 @@ message GetChangeProofResponse {
 
 message VerifyChangeProofRequest {
   ChangeProof proof = 1;
-  bytes start_key = 2;
-  bytes end_key = 3;
+  MaybeBytes start_key = 2;
+  MaybeBytes end_key = 3;
   bytes expected_root_hash = 4;
 }
 

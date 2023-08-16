@@ -80,9 +80,15 @@ func (c *DBClient) VerifyChangeProof(
 	expectedRootID ids.ID,
 ) error {
 	resp, err := c.client.VerifyChangeProof(ctx, &pb.VerifyChangeProofRequest{
-		Proof:            proof.ToProto(),
-		StartKey:         startKey.Value(),
-		EndKey:           endKey.Value(),
+		Proof: proof.ToProto(),
+		StartKey: &pb.MaybeBytes{
+			Value:     startKey.Value(),
+			IsNothing: startKey.IsNothing(),
+		},
+		EndKey: &pb.MaybeBytes{
+			Value:     endKey.Value(),
+			IsNothing: endKey.IsNothing(),
+		},
 		ExpectedRootHash: expectedRootID[:],
 	})
 	if err != nil {
