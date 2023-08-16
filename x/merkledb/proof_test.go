@@ -348,11 +348,20 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 			expectedErr: ErrShouldJustBeRoot,
 		},
 		{
-			name:  "no end proof",
+			name:  "no end proof; has end bound",
 			start: []byte{1},
 			end:   maybe.Some([]byte{1}),
 			proof: &RangeProof{
 				StartProof: []ProofNode{{}},
+			},
+			expectedErr: ErrNoEndProof,
+		},
+		{
+			name:  "no end proof; has key-values",
+			start: []byte{1},
+			end:   maybe.Nothing[[]byte](),
+			proof: &RangeProof{
+				KeyValues: []KeyValue{{}},
 			},
 			expectedErr: ErrNoEndProof,
 		},
@@ -365,6 +374,7 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 					{Key: []byte{1}, Value: []byte{1}},
 					{Key: []byte{0}, Value: []byte{0}},
 				},
+				EndProof: []ProofNode{{}},
 			},
 			expectedErr: ErrNonIncreasingValues,
 		},
@@ -376,6 +386,7 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 				KeyValues: []KeyValue{
 					{Key: []byte{0}, Value: []byte{0}},
 				},
+				EndProof: []ProofNode{{}},
 			},
 			expectedErr: ErrStateFromOutsideOfRange,
 		},
@@ -407,6 +418,7 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 						KeyPath: newPath([]byte{1}).Serialize(),
 					},
 				},
+				EndProof: []ProofNode{{}},
 			},
 			expectedErr: ErrProofNodeNotForKey,
 		},
@@ -429,6 +441,7 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 						KeyPath: newPath([]byte{1, 2, 3, 4}).Serialize(),
 					},
 				},
+				EndProof: []ProofNode{{}},
 			},
 			expectedErr: ErrProofNodeNotForKey,
 		},
@@ -1846,5 +1859,99 @@ func FuzzProof(f *testing.F) {
 		iter.Release()
 
 		require.NoError(db.Delete(deleteKey))
+	})
+}
+
+// Generate change proofs and verify that they are valid.
+func FuzzChangeProof(f *testing.F) {
+	now := time.Now().UnixNano()
+	f.Logf("seed: %d", now)
+	rand := rand.New(rand.NewSource(now)) // #nosec G404
+
+	const (
+		numKeyValues  = defaultHistoryLength / 2
+		deletePortion = 0.25
+	)
+
+	db, err := getBasicDB()
+	require.NoError(f, err)
+
+	startRootID, err := db.GetMerkleRoot(context.Background())
+	require.NoError(f, err)
+
+	// Insert a bunch of random key values.
+	// Don't insert so many that we have insufficient history.
+	insertRandomKeyValues(
+		require.New(f),
+		rand,
+		[]database.Database{db},
+		numKeyValues,
+		deletePortion,
+	)
+
+	endRootID, err := db.GetMerkleRoot(context.Background())
+	require.NoError(f, err)
+
+	f.Fuzz(func(
+		t *testing.T,
+		startBytes []byte,
+		endBytes []byte,
+		maxProofLen uint,
+	) {
+		require := require.New(t)
+
+		// Make sure proof bounds are valid
+		if len(endBytes) != 0 && bytes.Compare(startBytes, endBytes) > 0 {
+			return
+		}
+		// Make sure proof length is valid
+		if maxProofLen == 0 {
+			return
+		}
+
+		end := maybe.Nothing[[]byte]()
+		if len(endBytes) != 0 {
+			end = maybe.Some(endBytes)
+		}
+
+		changeProof, err := db.GetChangeProof(
+			context.Background(),
+			startRootID,
+			endRootID,
+			startBytes,
+			end,
+			int(maxProofLen),
+		)
+		require.NoError(err)
+
+		require.NoError(db.VerifyChangeProof(
+			context.Background(),
+			changeProof,
+			startBytes,
+			end,
+			endRootID,
+		))
+
+		// Insert another key-value pair
+		newKey := make([]byte, 32)
+		_, _ = rand.Read(newKey) // #nosec G404
+		newValue := make([]byte, 32)
+		_, _ = rand.Read(newValue) // #nosec G404
+		require.NoError(db.Put(newKey, newValue))
+
+		// Delete a key-value pair so database doesn't grow too large
+		iter := db.NewIterator()
+		require.NoError(db.Delete(iter.Key()))
+		iter.Release()
+
+		oldEndRootID := endRootID
+		endRootID, err = db.GetMerkleRoot(context.Background())
+		require.NoError(err)
+		if oldEndRootID != endRootID {
+			// Need this check because if we insert and then immediately
+			// delete a key-value pair, the root ID won't change and we'll
+			// error because start root ID == end root ID.
+			startRootID = oldEndRootID
+		}
 	})
 }
