@@ -348,11 +348,20 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 			expectedErr: ErrShouldJustBeRoot,
 		},
 		{
-			name:  "no end proof",
+			name:  "no end proof; has end bound",
 			start: []byte{1},
 			end:   maybe.Some([]byte{1}),
 			proof: &RangeProof{
 				StartProof: []ProofNode{{}},
+			},
+			expectedErr: ErrNoEndProof,
+		},
+		{
+			name:  "no end proof; has key-values",
+			start: []byte{1},
+			end:   maybe.Nothing[[]byte](),
+			proof: &RangeProof{
+				KeyValues: []KeyValue{{}},
 			},
 			expectedErr: ErrNoEndProof,
 		},
@@ -365,6 +374,7 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 					{Key: []byte{1}, Value: []byte{1}},
 					{Key: []byte{0}, Value: []byte{0}},
 				},
+				EndProof: []ProofNode{{}},
 			},
 			expectedErr: ErrNonIncreasingValues,
 		},
@@ -376,6 +386,7 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 				KeyValues: []KeyValue{
 					{Key: []byte{0}, Value: []byte{0}},
 				},
+				EndProof: []ProofNode{{}},
 			},
 			expectedErr: ErrStateFromOutsideOfRange,
 		},
@@ -407,6 +418,7 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 						KeyPath: newPath([]byte{1}).Serialize(),
 					},
 				},
+				EndProof: []ProofNode{{}},
 			},
 			expectedErr: ErrProofNodeNotForKey,
 		},
@@ -429,6 +441,7 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 						KeyPath: newPath([]byte{1, 2, 3, 4}).Serialize(),
 					},
 				},
+				EndProof: []ProofNode{{}},
 			},
 			expectedErr: ErrProofNodeNotForKey,
 		},
