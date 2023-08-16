@@ -47,6 +47,8 @@ var (
 // Editable view of a trie, collects changes on top of a parent trie.
 // Delays adding key/value pairs to the trie.
 type trieView struct {
+	commitLock sync.RWMutex
+
 	calculateNodesOnce sync.Once
 
 	// Controls the trie's validity related fields.
@@ -106,6 +108,8 @@ func (t *trieView) NewView(ctx context.Context, batchOps []database.BatchOp) (Tr
 		return nil, ErrInvalid
 	}
 
+	t.commitLock.RLock()
+	defer t.commitLock.RUnlock()
 	if t.committed {
 		return t.getParentTrie().NewView(ctx, batchOps)
 	}
@@ -192,14 +196,8 @@ func newHistoricalTrieView(
 func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 	var err error
 	t.calculateNodesOnce.Do(func() {
-		switch {
-		case t.isInvalid():
+		if t.isInvalid() {
 			err = ErrInvalid
-			return
-		case t.committed:
-			// Note that this should never happen. If a view is committed, it should
-			// have already had its nodes calculated
-			err = ErrCommitted
 			return
 		}
 
@@ -522,6 +520,9 @@ func (t *trieView) commitChanges(ctx context.Context, trieToCommit *trieView) er
 
 // commitToParent commits the changes from this view to its parent Trie
 func (t *trieView) commitToParent(ctx context.Context) error {
+
+	t.commitLock.Lock()
+	defer t.commitLock.Unlock()
 	ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.commitToParent")
 	defer span.End()
 
@@ -711,10 +712,6 @@ func (t *trieView) getValue(key path) ([]byte, error) {
 
 // Assumes [t.validityTrackingLock] isn't held.
 func (t *trieView) remove(key []byte) error {
-	if t.committed {
-		return ErrCommitted
-	}
-
 	if t.isInvalid() {
 		return ErrInvalid
 	}
