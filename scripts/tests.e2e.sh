@@ -11,18 +11,7 @@ if ! [[ "$0" =~ scripts/tests.e2e.sh ]]; then
   exit 255
 fi
 
-AVALANCHEGO_PATH="${1-}"
-if [[ -z "${AVALANCHEGO_PATH}" ]]; then
-  echo "Missing AVALANCHEGO_PATH argument!"
-  echo "Usage: ${0} [AVALANCHEGO_PATH]" >>/dev/stderr
-  exit 255
-fi
-
 #################################
-echo "installing avalanche-network-runner"
-ANR_WORKDIR="/tmp"
-./scripts/install_anr.sh
-
 # Sourcing constants.sh ensures that the necessary CGO flags are set to
 # build the portable version of BLST. Without this, ginkgo may fail to
 # build the test binary if run on a host (e.g. github worker) that lacks
@@ -37,27 +26,29 @@ ACK_GINKGO_RC=true ginkgo build ./tests/e2e
 ./tests/e2e/e2e.test --help
 
 #################################
-# run "avalanche-network-runner" server
-echo "launch avalanche-network-runner in the background"
-$ANR_WORKDIR/avalanche-network-runner \
-  server \
-  --log-level debug \
-  --port=":12342" \
-  --disable-grpc-gateway &
-PID=${!}
+E2E_USE_PERSISTENT_NETWORK="${E2E_USE_PERSISTENT_NETWORK:-}"
+TESTNETCTL_NETWORK_DIR="${TESTNETCTL_NETWORK_DIR:-}"
+if [[ -n "${E2E_USE_PERSISTENT_NETWORK}" && -n "${TESTNETCTL_NETWORK_DIR}" ]]; then
+  echo "running e2e tests against a persistent network configured at ${TESTNETCTL_NETWORK_DIR}"
+  E2E_ARGS="--use-persistent-network"
+else
+  AVALANCHEGO_PATH="${1-${AVALANCHEGO_PATH:-}}"
+  if [[ -z "${AVALANCHEGO_PATH}" ]]; then
+    echo "Missing AVALANCHEGO_PATH argument!"
+    echo "Usage: ${0} [AVALANCHEGO_PATH]" >>/dev/stderr
+    exit 255
+  fi
+  echo "running e2e tests against an ephemeral local cluster deployed with ${AVALANCHEGO_PATH}"
+  AVALANCHEGO_PATH="$(realpath ${AVALANCHEGO_PATH})"
+  E2E_ARGS="--avalanchego-path=${AVALANCHEGO_PATH}"
+fi
 
 #################################
-echo "running e2e tests against the local cluster with ${AVALANCHEGO_PATH}"
-./tests/e2e/e2e.test \
-  --ginkgo.v \
-  --log-level debug \
-  --network-runner-grpc-endpoint="0.0.0.0:12342" \
-  --network-runner-avalanchego-path=${AVALANCHEGO_PATH} \
-  --network-runner-avalanchego-log-level="WARN" \
-  --test-keys-file=tests/test.insecure.secp256k1.keys &&
-  EXIT_CODE=$? || EXIT_CODE=$?
-
-kill ${PID}
+# - Execute in parallel (-p) with the ginkgo cli to minimize execution time.
+#   The test binary by itself isn't capable of running specs in parallel.
+# - Execute in random order to identify unwanted dependency
+ginkgo -p -v --randomize-all ./tests/e2e/e2e.test -- ${E2E_ARGS} \
+&& EXIT_CODE=$? || EXIT_CODE=$?
 
 if [[ ${EXIT_CODE} -gt 0 ]]; then
   echo "FAILURE with exit code ${EXIT_CODE}"

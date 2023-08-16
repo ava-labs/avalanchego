@@ -57,6 +57,7 @@ func FindNextNetworkID(rootDir string) (uint32, string, error) {
 	for {
 		_, reserved := constants.NetworkIDToNetworkName[networkID]
 		if reserved {
+			networkID++
 			continue
 		}
 
