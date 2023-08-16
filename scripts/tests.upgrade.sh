@@ -96,7 +96,7 @@ echo "running upgrade tests against the local cluster with ${NEW_BINARY}"
 pkill -P ${PID} || true
 kill -2 ${PID}
 
-if [[ ${EXIT_CODE} -gt 0 ]]; then
+if [[ "${EXIT_CODE:-}" -gt 0 ]]; then
   echo "FAILURE with exit code ${EXIT_CODE}"
   exit ${EXIT_CODE}
 else
