@@ -207,9 +207,6 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 		ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.calculateNodeIDs")
 		defer span.End()
 
-		_, helperSpan := t.db.tracer.Start(ctx, "MerkleDB.trieview.calculateNodeIDsHelper")
-		defer helperSpan.End()
-
 		// [eg] limits the number of goroutines we start.
 		var eg errgroup.Group
 		eg.SetLimit(numCPU)
