@@ -383,7 +383,7 @@ func (m *MockMerkleDB) getEditableNode(arg0 path) (*node, error) {
 }
 
 // getEditableNode indicates an expected call of getEditableNode.
-func (mr *MockMerkleDBMockRecorder) getEditableNode(arg0 interface{}) *gomock.Call {
+func (mr *MockMerkleDBMockRecorder) getEditableNode(arg0 path) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "getEditableNode", reflect.TypeOf((*MockMerkleDB)(nil).getEditableNode), arg0)
 }

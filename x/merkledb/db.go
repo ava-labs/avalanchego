@@ -420,7 +420,7 @@ func (db *merkleDB) GetValues(ctx context.Context, keys [][]byte) ([][]byte, []e
 	values := make([][]byte, len(keys))
 	errors := make([]error, len(keys))
 	for i, key := range keys {
-		values[i], errors[i] = db.getValueCopy(newPath(key), false /*lock*/)
+		values[i], errors[i] = db.getValueCopy(newPath(key))
 	}
 	return values, errors
 }
@@ -431,13 +431,13 @@ func (db *merkleDB) GetValue(ctx context.Context, key []byte) ([]byte, error) {
 	_, span := db.tracer.Start(ctx, "MerkleDB.GetValue")
 	defer span.End()
 
-	return db.getValueCopy(newPath(key), true /*lock*/)
+	return db.getValueCopy(newPath(key))
 }
 
 // getValueCopy returns a copy of the value for the given [key].
 // Returns database.ErrNotFound if it doesn't exist.
-func (db *merkleDB) getValueCopy(key path, lock bool) ([]byte, error) {
-	val, err := db.getValue(key, lock)
+func (db *merkleDB) getValueCopy(key path) ([]byte, error) {
+	val, err := db.getValue(key)
 	if err != nil {
 		return nil, err
 	}
@@ -448,11 +448,9 @@ func (db *merkleDB) getValueCopy(key path, lock bool) ([]byte, error) {
 // Returns database.ErrNotFound if it doesn't exist.
 // If [lock], [db.lock]'s read lock is acquired.
 // Otherwise, assumes [db.lock] is already held.
-func (db *merkleDB) getValue(key path, lock bool) ([]byte, error) {
-	if lock {
-		db.lock.RLock()
-		defer db.lock.RUnlock()
-	}
+func (db *merkleDB) getValue(key path) ([]byte, error) {
+	db.lock.RLock()
+	defer db.lock.RUnlock()
 
 	if db.closed {
 		return nil, database.ErrClosed
@@ -663,7 +661,7 @@ func (db *merkleDB) GetChangeProof(
 // NewView returns a new view on top of this trie.
 // Changes made to the view will only be reflected in the original trie if Commit is called.
 // Assumes [db.commitLock] and [db.lock] aren't held.
-func (db *merkleDB) NewView(batchOps []database.BatchOp) (TrieView, error) {
+func (db *merkleDB) NewView(_ context.Context, batchOps []database.BatchOp) (TrieView, error) {
 	// ensure the db doesn't change while creating the new view
 	db.commitLock.RLock()
 	defer db.commitLock.RUnlock()
@@ -704,7 +702,7 @@ func (db *merkleDB) Has(k []byte) (bool, error) {
 		return false, database.ErrClosed
 	}
 
-	_, err := db.getValue(newPath(k), false /*lock*/)
+	_, err := db.getValue(newPath(k))
 	if err == database.ErrNotFound {
 		return false, nil
 	}
