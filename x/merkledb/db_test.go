@@ -23,6 +23,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
+const defaultHistoryLength = 300
+
 func newNoopTracer() trace.Tracer {
 	tracer, _ := trace.New(trace.Config{Enabled: false})
 	return tracer
@@ -31,7 +33,7 @@ func newNoopTracer() trace.Tracer {
 func newDefaultConfig() Config {
 	return Config{
 		EvictionBatchSize: 100,
-		HistoryLength:     300,
+		HistoryLength:     defaultHistoryLength,
 		NodeCacheSize:     1_000,
 		Reg:               prometheus.NewRegistry(),
 		Tracer:            newNoopTracer(),
