@@ -72,7 +72,6 @@ const (
 	latestFork        activeFork = cortinaFork
 
 	defaultWeight = 10000
-	trackChecksum = false
 )
 
 var (

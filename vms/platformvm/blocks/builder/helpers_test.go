@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/chains"
@@ -61,7 +60,6 @@ type activeFork uint8
 
 const (
 	defaultWeight = 10000
-	trackChecksum = false
 
 	apricotPhase3Fork activeFork = 0
 	apricotPhase5Fork activeFork = 1
