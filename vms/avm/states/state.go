@@ -91,6 +91,8 @@ type State interface {
 	IsInitialized() (bool, error)
 	SetInitialized() error
 
+	SetRandom() error
+
 	// InitializeChainState is called after the VM has been linearized. Calling
 	// [GetLastAccepted] or [GetTimestamp] before calling this function will
 	// return uninitialized data.
@@ -260,6 +262,10 @@ func New(
 		trackChecksum: trackChecksums,
 	}
 	return s, s.initTxChecksum()
+}
+
+func (s *state) SetRandom() error {
+	return nil
 }
 
 func (s *state) GetUTXO(utxoID ids.ID) (*avax.UTXO, error) {

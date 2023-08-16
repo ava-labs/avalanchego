@@ -153,6 +153,13 @@ message MaybeBytes {
   bool is_nothing = 2;
 }
 
+message MaybeBytes2 {
+  bytes value = 1;
+  // If false, this is None.
+  // Otherwise this is Some.
+  bool is_nothing = 2;
+}
+
 message KeyValue {
   bytes key = 1;
   bytes value = 2;
