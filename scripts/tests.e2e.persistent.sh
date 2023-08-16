@@ -61,4 +61,6 @@ else
 fi
 
 print_separator
-# TODO(marun) Enable e2e testing
+# Setting E2E_USE_PERSISTENT_NETWORK configures tests.e2e.sh to use
+# the persistent network identified by TESTNETCTL_NETWORK_DIR.
+E2E_USE_PERSISTENT_NETWORK=1 ./scripts/tests.e2e.sh

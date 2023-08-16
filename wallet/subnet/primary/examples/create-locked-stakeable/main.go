@@ -33,10 +33,13 @@ func main() {
 
 	ctx := context.Background()
 
-	// NewWalletFromURI fetches the available UTXOs owned by [kc] on the network
-	// that [uri] is hosting.
+	// MakeWallet fetches the available UTXOs owned by [kc] on the network that
+	// [uri] is hosting.
 	walletSyncStartTime := time.Now()
-	wallet, err := primary.NewWalletFromURI(ctx, uri, kc)
+	wallet, err := primary.MakeWallet(ctx, &primary.WalletConfig{
+		URI:      uri,
+		Keychain: kc,
+	})
 	if err != nil {
 		log.Fatalf("failed to initialize wallet: %s\n", err)
 	}
