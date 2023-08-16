@@ -236,27 +236,22 @@ func (db *merkleDB) rebuild(ctx context.Context) error {
 	it := db.nodeDB.NewIterator()
 	defer it.Release()
 
-	currentViewSize := 0
 	viewSizeLimit := math.Max(
 		db.nodeCache.maxSize/rebuildViewSizeFractionOfCacheSize,
 		minRebuildViewSizePerCommit,
 	)
-
-	currentView, err := db.newUntrackedView(viewSizeLimit)
-	if err != nil {
-		return err
-	}
+	currentOps := make([]database.BatchOp, 0, viewSizeLimit)
 
 	for it.Next() {
-		if currentViewSize >= viewSizeLimit {
-			if err := currentView.commitToDB(ctx); err != nil {
-				return err
-			}
-			currentView, err = db.newUntrackedView(viewSizeLimit)
+		if len(currentOps) >= viewSizeLimit {
+			view, err := db.newUntrackedView(currentOps)
 			if err != nil {
 				return err
 			}
-			currentViewSize = 0
+			if err := view.commitToDB(ctx); err != nil {
+				return err
+			}
+			currentOps = make([]database.BatchOp, 0, viewSizeLimit)
 		}
 
 		key := it.Key()
@@ -266,20 +261,21 @@ func (db *merkleDB) rebuild(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		if n.hasValue() {
-			serializedPath := path.Serialize()
-			if err := currentView.Insert(ctx, serializedPath.Value, n.value.Value()); err != nil {
-				return err
-			}
-			currentViewSize++
-		} else if err := db.nodeDB.Delete(key); err != nil {
-			return err
-		}
+
+		currentOps = append(currentOps, database.BatchOp{
+			Key:    path.Serialize().Value,
+			Value:  n.value.Value(),
+			Delete: !n.hasValue(),
+		})
 	}
 	if err := it.Error(); err != nil {
 		return err
 	}
-	if err := currentView.commitToDB(ctx); err != nil {
+	view, err := db.newUntrackedView(currentOps)
+	if err != nil {
+		return err
+	}
+	if err := view.commitToDB(ctx); err != nil {
 		return err
 	}
 	return db.nodeDB.Compact(nil, nil)
@@ -301,8 +297,16 @@ func (db *merkleDB) CommitChangeProof(ctx context.Context, proof *ChangeProof) e
 	if db.closed {
 		return database.ErrClosed
 	}
+	ops := make([]database.BatchOp, len(proof.KeyChanges))
+	for i, kv := range proof.KeyChanges {
+		ops[i] = database.BatchOp{
+			Key:    kv.Key,
+			Value:  kv.Value.Value(),
+			Delete: kv.Value.IsNothing(),
+		}
+	}
 
-	view, err := db.prepareChangeProofView(proof)
+	view, err := db.newUntrackedView(ops)
 	if err != nil {
 		return err
 	}
@@ -317,10 +321,37 @@ func (db *merkleDB) CommitRangeProof(ctx context.Context, start []byte, proof *R
 		return database.ErrClosed
 	}
 
-	view, err := db.prepareRangeProofView(start, proof)
+	ops := make([]database.BatchOp, len(proof.KeyValues))
+	keys := set.NewSet[string](len(proof.KeyValues))
+	for i, kv := range proof.KeyValues {
+		keys.Add(string(kv.Key))
+		ops[i] = database.BatchOp{
+			Key:   kv.Key,
+			Value: kv.Value,
+		}
+	}
+
+	var largestKey []byte
+	if len(proof.KeyValues) > 0 {
+		largestKey = proof.KeyValues[len(proof.KeyValues)-1].Key
+	}
+	keysToDelete, err := db.getKeysNotInSet(start, largestKey, keys)
 	if err != nil {
 		return err
 	}
+	for _, keyToDelete := range keysToDelete {
+		ops = append(ops, database.BatchOp{
+			Key:    keyToDelete,
+			Delete: true,
+		})
+	}
+
+	// Don't need to lock [view] because nobody else has a reference to it.
+	view, err := db.newUntrackedView(ops)
+	if err != nil {
+		return err
+	}
+
 	return view.commitToDB(ctx)
 }
 
@@ -469,7 +500,7 @@ func (db *merkleDB) getProof(ctx context.Context, key []byte) (*Proof, error) {
 		return nil, database.ErrClosed
 	}
 
-	view, err := db.newUntrackedView(defaultPreallocationSize)
+	view, err := db.newUntrackedView(nil)
 	if err != nil {
 		return nil, err
 	}
@@ -633,35 +664,37 @@ func (db *merkleDB) GetChangeProof(
 
 // NewView returns a new view on top of this trie.
 // Changes made to the view will only be reflected in the original trie if Commit is called.
-// Assumes [db.lock] isn't held.
-func (db *merkleDB) NewView() (TrieView, error) {
-	return db.NewPreallocatedView(defaultPreallocationSize)
+// Assumes [db.commitLock] and [db.lock] aren't held.
+func (db *merkleDB) NewView(batchOps []database.BatchOp) (TrieView, error) {
+	// ensure the db doesn't change while creating the new view
+	db.commitLock.RLock()
+	defer db.commitLock.RUnlock()
+
+	newView, err := db.newUntrackedView(batchOps)
+	if err != nil {
+		return nil, err
+	}
+
+	// ensure access to childViews is protected
+	db.lock.Lock()
+	defer db.lock.Unlock()
+
+	db.childViews = append(db.childViews, newView)
+	return newView, nil
 }
 
 // Returns a new view that isn't tracked in [db.childViews].
 // For internal use only, namely in methods that create short-lived views.
-// Assumes [db.lock] and/or [db.commitLock] is read locked.
-func (db *merkleDB) newUntrackedView(estimatedSize int) (*trieView, error) {
-	return newTrieView(db, db, db.root.clone(), estimatedSize)
-}
-
-// NewPreallocatedView returns a new view with memory allocated to hold at least [estimatedSize] value changes at a time.
-// If more changes are made, additional memory will be allocated.
-// The returned view is added to [db.childViews].
-// Assumes [db.lock] isn't held.
-func (db *merkleDB) NewPreallocatedView(estimatedSize int) (TrieView, error) {
-	db.lock.Lock()
-	defer db.lock.Unlock()
-
+// Assumes [db.lock] isn't held and [db.commitLock] is read locked.
+func (db *merkleDB) newUntrackedView(batchOps []database.BatchOp) (*trieView, error) {
 	if db.closed {
 		return nil, database.ErrClosed
 	}
 
-	newView, err := newTrieView(db, db, db.root.clone(), estimatedSize)
+	newView, err := newTrieView(db, db, db.root.clone(), batchOps)
 	if err != nil {
 		return nil, err
 	}
-	db.childViews = append(db.childViews, newView)
 	return newView, nil
 }
 
@@ -698,12 +731,13 @@ func (db *merkleDB) Insert(ctx context.Context, k, v []byte) error {
 		return database.ErrClosed
 	}
 
-	view, err := db.newUntrackedView(defaultPreallocationSize)
+	view, err := db.newUntrackedView([]database.BatchOp{
+		{
+			Key:   k,
+			Value: v,
+		},
+	})
 	if err != nil {
-		return err
-	}
-	// Don't need to lock [view] because nobody else has a reference to it.
-	if err := view.insert(k, v); err != nil {
 		return err
 	}
 	return view.commitToDB(ctx)
@@ -817,12 +851,13 @@ func (db *merkleDB) Remove(ctx context.Context, key []byte) error {
 		return database.ErrClosed
 	}
 
-	view, err := db.newUntrackedView(defaultPreallocationSize)
+	view, err := db.newUntrackedView([]database.BatchOp{
+		{
+			Key:    key,
+			Delete: true,
+		},
+	})
 	if err != nil {
-		return err
-	}
-	// Don't need to lock [view] because nobody else has a reference to it.
-	if err = view.remove(key); err != nil {
 		return err
 	}
 	return view.commitToDB(ctx)
@@ -836,7 +871,7 @@ func (db *merkleDB) commitBatch(ops []database.BatchOp) error {
 		return database.ErrClosed
 	}
 
-	view, err := db.prepareBatchView(ops)
+	view, err := db.newUntrackedView(ops)
 	if err != nil {
 		return err
 	}
@@ -1049,21 +1084,20 @@ func (db *merkleDB) VerifyChangeProof(
 		return err
 	}
 
-	// Don't need to lock [view] because nobody else has a reference to it.
-	view, err := db.newUntrackedView(len(proof.KeyChanges))
-	if err != nil {
-		return err
+	// Insert the key-value pairs into the trie.
+	ops := make([]database.BatchOp, len(proof.KeyChanges))
+	for i, kv := range proof.KeyChanges {
+		ops[i] = database.BatchOp{
+			Key:    kv.Key,
+			Value:  kv.Value.Value(),
+			Delete: kv.Value.IsNothing(),
+		}
 	}
 
-	// Insert the key-value pairs into the trie.
-	for _, kv := range proof.KeyChanges {
-		if kv.Value.IsNothing() {
-			if err := view.removeFromTrie(newPath(kv.Key)); err != nil {
-				return err
-			}
-		} else if _, err := view.insertIntoTrie(newPath(kv.Key), kv.Value); err != nil {
-			return err
-		}
+	// Don't need to lock [view] because nobody else has a reference to it.
+	view, err := db.newUntrackedView(ops)
+	if err != nil {
+		return err
 	}
 
 	// For all the nodes along the edges of the proof, insert the children whose
@@ -1172,14 +1206,14 @@ func (db *merkleDB) getHistoricalViewForRange(
 
 	// looking for the trie's current root id, so return the trie unmodified
 	if currentRootID == rootID {
-		return newTrieView(db, db, db.root.clone(), 100)
+		return newTrieView(db, db, db.root.clone(), nil)
 	}
 
 	changeHistory, err := db.history.getChangesToGetToRoot(rootID, start, end)
 	if err != nil {
 		return nil, err
 	}
-	return newTrieViewWithChanges(db, db, changeHistory, len(changeHistory.nodes))
+	return newTrieViewWithChanges(db, db, changeHistory)
 }
 
 // Returns all keys in range [start, end] that aren't in [keySet].
@@ -1260,82 +1294,4 @@ func (db *merkleDB) getNode(key path) (*node, error) {
 
 	err = db.nodeCache.Put(key, node)
 	return node, err
-}
-
-// Returns a new view atop [db] with the changes in [ops] applied to it.
-// Assumes [db.commitLock] is read locked.
-func (db *merkleDB) prepareBatchView(ops []database.BatchOp) (*trieView, error) {
-	view, err := db.newUntrackedView(len(ops))
-	if err != nil {
-		return nil, err
-	}
-	// Don't need to lock [view] because nobody else has a reference to it.
-
-	// write into the trie
-	for _, op := range ops {
-		if op.Delete {
-			if err := view.remove(op.Key); err != nil {
-				return nil, err
-			}
-		} else if err := view.insert(op.Key, op.Value); err != nil {
-			return nil, err
-		}
-	}
-
-	return view, nil
-}
-
-// Returns a new view atop [db] with the key/value pairs in [proof.KeyValues]
-// inserted and the key/value pairs in [proof.DeletedKeys] removed.
-// Assumes [db.commitLock] is locked.
-func (db *merkleDB) prepareChangeProofView(proof *ChangeProof) (*trieView, error) {
-	view, err := db.newUntrackedView(len(proof.KeyChanges))
-	if err != nil {
-		return nil, err
-	}
-	// Don't need to lock [view] because nobody else has a reference to it.
-
-	for _, kv := range proof.KeyChanges {
-		if kv.Value.IsNothing() {
-			if err := view.remove(kv.Key); err != nil {
-				return nil, err
-			}
-		} else if err := view.insert(kv.Key, kv.Value.Value()); err != nil {
-			return nil, err
-		}
-	}
-	return view, nil
-}
-
-// Returns a new view atop [db] with the key/value pairs in [proof.KeyValues] added and
-// any existing key-value pairs in the proof's range but not in the proof removed.
-// Assumes [db.commitLock] is locked.
-func (db *merkleDB) prepareRangeProofView(start []byte, proof *RangeProof) (*trieView, error) {
-	// Don't need to lock [view] because nobody else has a reference to it.
-	view, err := db.newUntrackedView(len(proof.KeyValues))
-	if err != nil {
-		return nil, err
-	}
-	keys := set.NewSet[string](len(proof.KeyValues))
-	for _, kv := range proof.KeyValues {
-		keys.Add(string(kv.Key))
-		if err := view.insert(kv.Key, kv.Value); err != nil {
-			return nil, err
-		}
-	}
-
-	var largestKey []byte
-	if len(proof.KeyValues) > 0 {
-		largestKey = proof.KeyValues[len(proof.KeyValues)-1].Key
-	}
-	keysToDelete, err := db.getKeysNotInSet(start, largestKey, keys)
-	if err != nil {
-		return nil, err
-	}
-	for _, keyToDelete := range keysToDelete {
-		if err := view.remove(keyToDelete); err != nil {
-			return nil, err
-		}
-	}
-	return view, nil
 }
