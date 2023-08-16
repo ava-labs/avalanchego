@@ -19,6 +19,8 @@ import (
 // CodecVersionLen + UpDurationLen + LastUpdatedLen + PotentialRewardLen
 const preDelegateeRewardSize = wrappers.ShortLen + 3*wrappers.LongLen
 
+var _ validatorState = (*metadata)(nil)
+
 type preDelegateeRewardMetadata struct {
 	UpDuration      time.Duration `v0:"true"`
 	LastUpdated     uint64        `v0:"true"` // Unix time in seconds

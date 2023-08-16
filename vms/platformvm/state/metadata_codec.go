@@ -15,11 +15,7 @@ const (
 	v0    = uint16(0)
 )
 
-var (
-	_ validatorState = (*metadata)(nil)
-
-	metadataCodec codec.Manager
-)
+var metadataCodec codec.Manager
 
 func init() {
 	c := linearcodec.New([]string{v0tag}, linearcodec.DefaultMaxSliceLength)
