@@ -38,7 +38,7 @@ Unsigned Message:
 ```
 
 - `networkID` is the unique ID of an Avalanche Network (Mainnet/Testnet) and provides replay protection for BLS Signers across different Avalanche Networks
-- `sourceChainID` is the `blockchainID` of the blockchain sending a message. This ensures that each blockchain can only sign a message with its own `blockchainID`. Note: the `blockchainID` is the hash of the transaction that created the blockchain on the Avalanche P-Chain. It serves as the unique identifier for the blockchain across the Avalanche Network.
+- `sourceChainID` is the hash of the transaction that created the blockchain on the Avalanche P-Chain. It serves as the unique identifier for the blockchain across the Avalanche Network so that each blockchain can only sign a message with its own id.
 - `payload` provides an arbitrary byte array containing the contents of the message. VMs define their own message types to include in the `payload`
 
 
@@ -59,7 +59,7 @@ BitSetSignature:
 - `signers` encodes a bitset of which validators' signatures are included (a bitset is a byte array where each bit indicates membership of the element at that index in the set)
 - `signature` is an aggregated BLS Multi-Signature of the Unsigned Message
 
-BitSetSignatures are verified within the context of a specific P-Chain height. At a specific P-Chain height, the PlatformVM serves a canonically ordered validator set for the source subnet (validator set is ordered lexicographically by the BLS public key bytes). The signers bitset encodes which validators' signature was included. A value of 1 at index i in `signers` claims that a signature from the validator at index i in the canonical validator set is included in the aggregate signature.
+BitSetSignatures are verified within the context of a specific P-Chain height. At any given P-Chain height, the PlatformVM serves a canonically ordered validator set for the source subnet (validator set is ordered lexicographically by the BLS public key's byte representation). The `signers` bitset encodes which validator signatures were included. A value of `1` at index `i` in `signers` bitset indicates that a corresponding signature from the same validator at index `i` in the canonical validator set was included in the aggregate signature.
 
 The bitset tells the verifier which BLS public keys should be aggregated to verify the warp message.
 
@@ -78,23 +78,23 @@ Signed Message:
 
 A blockchain on Avalanche sends an Avalanche Warp Message by coming to agreement on the message that every validator should be willing to sign. As an example, the VM of a blockchain may define that once a block is accepted, the VM should be willing to sign a message including the block hash in the payload to attest to any other Subnet that the block was accepted. The contents of the payload, how to aggregate the signature (VM-to-VM communication, off-chain relayer, etc.), is left to the VM.
 
-Once the validator set of a blockchain is willing to sign the message M, an aggregator performs the following process:
+Once the validator set of a blockchain is willing to sign an arbitrary message `M`, an aggregator performs the following process:
 
-1. Gather signatures of the message M from N validators (where the N validators meet the required threshold of stake on the destination chain)
-2. Aggregate the N signatures into a multi-signature
+1. Gather signatures of the message `M` from `N` validators (where the `N` validators meet the required threshold of stake on the destination chain)
+2. Aggregate the `N` signatures into a multi-signature
 3. Look up the canonical validator set at the P-Chain height where the message will be verified
-4. Encode the selection of the N validators included in the signature in a bitset
-5. Construct the Signed Message from the aggregate signature, bitset, and unsigned message
+4. Encode the selection of the `N` validators included in the signature in a bitset
+5. Construct the signed message from the aggregate signature, bitset, and original unsigned message
 
 ## Verifying / Receiving an Avalanche Warp Message
 
-Avalanache Warp Messages are verified within the context of a specific P-Chain height included in the [ProposerVM](../../proposervm/README.md)'s header. The P-Chain height is provided as context to the wrapped VM when verifying the VM's internal blocks (implemented by the optional interface [WithVerifyContext](../../../snow/engine/snowman/block/block_context_vm.go)).
+Avalanache Warp Messages are verified within the context of a specific P-Chain height included in the [ProposerVM](../../proposervm/README.md)'s header. The P-Chain height is provided as context to the underlying VM when verifying the underlying VM's blocks (implemented by the optional interface [WithVerifyContext](../../../snow/engine/snowman/block/block_context_vm.go)).
 
-To verify the message, the wrapped VM utilizes this Warp package to perform the following steps:
+To verify the message, the underlying VM utilizes this `warp` package to perform the following steps:
 
 1. Lookup the canonical validator set of the Subnet sending the message at the P-Chain height
 2. Filter the canonical validator set to only the validators claimed by the signature
-3. Verify the weight of the included validators meets the required threshold (threshold defined by the receiving VM)
+3. Verify the weight of the included validators meets the required threshold defined by the receiving VM
 4. Aggregate the public keys of the claimed validators into a single aggregate public key
 5. Verify the aggregate signature of the unsigned message against the aggregate public key
 
@@ -104,15 +104,15 @@ Once a message is verified, it is left to the VM to define the semantics of deli
 
 ### Processing Historical Avalanche Warp Messages
 
-Verifying an Avalanche Warp Message requires a lookup of validator sets at a specific P-Chain height. The P-Chain serves lookups by maintaining reverse diffs that can be iterated in order to re-create the validator set of any Subnet at a specific height.
+Verifying an Avalanche Warp Message requires a lookup of validator sets at a specific P-Chain height. The P-Chain serves lookups maintaining validator set diffs that can be applied in-order to reconstruct the validator set of any Subnet at any height.
 
-As a chain moves forward, the number of reverse diffs that need to be computed in order to look up the validator set needed to verify an Avalanche Warp Messages increases over time.
+As the P-Chain grows, the number of validator set diffs that needs to be applied in order to reconstruct the validator set needed to verify an Avalanche Warp Messages increases over time.
 
 Therefore, in order to support verifying historical Avalanche Warp Messages, VMs should provide a mechanism to determine whether an Avalanche Warp Message was treated as valid or invalid within a historical block.
 
 When nodes bootstrap in the future, they bootstrap blocks that have already been marked as accepted by the network, so they can assume the block was verified by the validators of the network when it was first accepted.
 
-Therefore, the new bootstrapping node can assume the block was valid to determine whether an Avalanche Warp Message should be treated as valid / invalid within the execution of that block.
+Therefore, the new bootstrapping node can assume the block was valid to determine whether an Avalanche Warp Message should be treated as valid/invalid within the execution of that block.
 
 Two strategies to provide that mechanism are:
 
