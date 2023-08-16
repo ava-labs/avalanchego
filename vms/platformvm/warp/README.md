@@ -33,7 +33,7 @@ Unsigned Message:
 +-----------------+----------+--------------------------+
 |         payload :   []byte |       4 + size(payload)  |
 +-----------------+----------+--------------------------+
-                             |  38 + size(payload) bytes|
+                             |  40 + size(payload) bytes|
                              +--------------------------+
 ```
 
@@ -76,7 +76,7 @@ Signed Message:
 
 ## Sending an Avalanche Warp Message
 
-A Blockchain on Avalanche sends an Avalanche Warp Message by coming to agreement on the message that every validator should be willing to sign. As an example, the VM of a Blockchain may define that once a block is accepted, the VM should be willing to sign a message including the block hash in the payload to attest to any other Subnet that the block was accepted. The contents of the payload, how to aggregate the signature (VM-to-VM communication, off-chain relayer, etc.), is left to the VM.
+A blockchain on Avalanche sends an Avalanche Warp Message by coming to agreement on the message that every validator should be willing to sign. As an example, the VM of a blockchain may define that once a block is accepted, the VM should be willing to sign a message including the block hash in the payload to attest to any other Subnet that the block was accepted. The contents of the payload, how to aggregate the signature (VM-to-VM communication, off-chain relayer, etc.), is left to the VM.
 
 Once the validator set of a blockchain is willing to sign the message M, an aggregator performs the following process:
 
