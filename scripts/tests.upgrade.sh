@@ -10,14 +10,14 @@ if ! [[ "$0" =~ scripts/tests.upgrade.sh ]]; then
   exit 255
 fi
 
-VERSION=$1
+VERSION="${1:-}"
 if [[ -z "${VERSION}" ]]; then
   echo "Missing version argument!"
   echo "Usage: ${0} [VERSION] [NEW-BINARY]" >>/dev/stderr
   exit 255
 fi
 
-NEW_BINARY=$2
+NEW_BINARY="${2:-}"
 if [[ -z "${NEW_BINARY}" ]]; then
   echo "Missing new binary path argument!"
   echo "Usage: ${0} [VERSION] [NEW-BINARY]" >>/dev/stderr
