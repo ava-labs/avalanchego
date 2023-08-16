@@ -35,6 +35,4 @@ jobs:
       - shell: bash
         run: scripts/mock.gen.sh
       - shell: bash
-        run: rm -rf gomock_reflect*
-      - shell: bash
         run: .github/workflows/check-clean-branch.sh
