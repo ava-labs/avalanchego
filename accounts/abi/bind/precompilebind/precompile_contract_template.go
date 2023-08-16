@@ -67,6 +67,8 @@ var (
 	_ = abi.JSON
 	_ = errors.New
 	_ = big.NewInt
+	_ = vmerrs.ErrOutOfGas
+	_ = common.Big0
 )
 
 // Singleton StatefulPrecompiledContract and signatures.
@@ -159,7 +161,7 @@ func Pack{{.Normalized.Name}}(inputStruct {{capitalise .Normalized.Name}}Input) 
 func Unpack{{capitalise .Normalized.Name}}Input(input []byte)({{$bindedType}}, error) {
 res, err := {{$contract.Type}}ABI.UnpackInput("{{$method.Original.Name}}", input)
 if err != nil {
-	return *new({{$bindedType}}), err
+	return {{bindtypenew $input.Type $structs}}, err
 }
 unpacked := *abi.ConvertType(res[0], new({{$bindedType}})).(*{{$bindedType}})
 return unpacked, nil
@@ -190,6 +192,15 @@ func Pack{{capitalise .Normalized.Name}}Output (outputStruct {{capitalise .Norma
 	)
 }
 
+// Unpack{{capitalise .Normalized.Name}}Output attempts to unpack [output] as {{capitalise .Normalized.Name}}Output
+// assumes that [output] does not include selector (omits first 4 func signature bytes)
+func Unpack{{capitalise .Normalized.Name}}Output(output []byte) ({{capitalise .Normalized.Name}}Output, error) {
+	outputStruct := {{capitalise .Normalized.Name}}Output{}
+	err := {{$contract.Type}}ABI.UnpackIntoInterface(&outputStruct, "{{.Original.Name}}", output)
+
+	return outputStruct, err
+}
+
 {{else if len .Normalized.Outputs | eq 1 }}
 {{$method := .}}
 {{$output := index $method.Normalized.Outputs 0}}
@@ -198,6 +209,17 @@ func Pack{{capitalise .Normalized.Name}}Output (outputStruct {{capitalise .Norma
 // to conform the ABI outputs.
 func Pack{{$method.Normalized.Name}}Output ({{decapitalise $output.Name}} {{$bindedType}}) ([]byte, error) {
 	return {{$contract.Type}}ABI.PackOutput("{{$method.Original.Name}}", {{decapitalise $output.Name}})
+}
+
+// Unpack{{capitalise .Normalized.Name}}Output attempts to unpack given [output] into the {{$bindedType}} type output
+// assumes that [output] does not include selector (omits first 4 func signature bytes)
+func Unpack{{capitalise .Normalized.Name}}Output(output []byte)({{$bindedType}}, error) {
+	res, err := {{$contract.Type}}ABI.Unpack("{{$method.Original.Name}}", output)
+	if err != nil {
+		return {{bindtypenew $output.Type $structs}}, err
+	}
+	unpacked := *abi.ConvertType(res[0], new({{$bindedType}})).(*{{$bindedType}})
+	return unpacked, nil
 }
 {{end}}
 

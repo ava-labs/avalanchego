@@ -53,7 +53,7 @@ const (
 	LangGo Lang = iota
 )
 
-func isKeyWord(arg string) bool {
+func IsKeyWord(arg string) bool {
 	switch arg {
 	case "break":
 	case "case":
@@ -165,7 +165,7 @@ func BindHelper(types []string, abis []string, bytecodes []string, fsigs []map[s
 			normalized.Inputs = make([]abi.Argument, len(original.Inputs))
 			copy(normalized.Inputs, original.Inputs)
 			for j, input := range normalized.Inputs {
-				if input.Name == "" || isKeyWord(input.Name) {
+				if input.Name == "" || IsKeyWord(input.Name) {
 					normalized.Inputs[j].Name = fmt.Sprintf("arg%d", j)
 				}
 				if hasStruct(input.Type) {
@@ -209,7 +209,7 @@ func BindHelper(types []string, abis []string, bytecodes []string, fsigs []map[s
 			normalized.Inputs = make([]abi.Argument, len(original.Inputs))
 			copy(normalized.Inputs, original.Inputs)
 			for j, input := range normalized.Inputs {
-				if input.Name == "" || isKeyWord(input.Name) {
+				if input.Name == "" || IsKeyWord(input.Name) {
 					normalized.Inputs[j].Name = fmt.Sprintf("arg%d", j)
 				}
 				// Event is a bit special, we need to define event struct in binding,
@@ -298,6 +298,7 @@ func BindHelper(types []string, abis []string, bytecodes []string, fsigs []map[s
 
 	funcs := map[string]interface{}{
 		"bindtype":      bindType[lang],
+		"bindtypenew":   bindTypeNew[lang],
 		"bindtopictype": bindTopicType[lang],
 		"namedtype":     namedType[lang],
 		"capitalise":    capitalise,
@@ -328,6 +329,10 @@ var bindType = map[Lang]func(kind abi.Type, structs map[string]*TmplStruct) stri
 	LangGo: bindTypeGo,
 }
 
+var bindTypeNew = map[Lang]func(kind abi.Type, structs map[string]*TmplStruct) string{
+	LangGo: bindTypeNewGo,
+}
+
 // bindBasicTypeGo converts basic solidity types(except array, slice and tuple) to Go ones.
 func bindBasicTypeGo(kind abi.Type) string {
 	switch kind.T {
@@ -349,6 +354,39 @@ func bindBasicTypeGo(kind abi.Type) string {
 	default:
 		// string, bool types
 		return kind.String()
+	}
+}
+
+// bindNewTypeNewGo converts new types to Go ones.
+func bindTypeNewGo(kind abi.Type, structs map[string]*TmplStruct) string {
+	switch kind.T {
+	case abi.TupleTy:
+		return structs[kind.TupleRawName+kind.String()].Name + "{}"
+	case abi.ArrayTy:
+		return fmt.Sprintf("[%d]", kind.Size) + bindTypeGo(*kind.Elem, structs) + "{}"
+	case abi.SliceTy:
+		return "nil"
+	case abi.AddressTy:
+		return "common.Address{}"
+	case abi.IntTy, abi.UintTy:
+		parts := regexp.MustCompile(`(u)?int([0-9]*)`).FindStringSubmatch(kind.String())
+		switch parts[2] {
+		case "8", "16", "32", "64":
+			return "0"
+		}
+		return "new(big.Int)"
+	case abi.FixedBytesTy:
+		return fmt.Sprintf("[%d]byte", kind.Size) + "{}"
+	case abi.BytesTy:
+		return "[]byte{}"
+	case abi.FunctionTy:
+		return "[24]byte{}"
+	case abi.BoolTy:
+		return "false"
+	case abi.StringTy:
+		return `""`
+	default:
+		return "nil"
 	}
 }
 
