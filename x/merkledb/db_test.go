@@ -788,7 +788,7 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 			require.NoError(changeProofDB.VerifyChangeProof(
 				context.Background(),
 				changeProof,
-				step.key,
+				start,
 				end,
 				root,
 			))

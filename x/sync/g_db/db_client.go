@@ -75,13 +75,13 @@ func (c *DBClient) GetChangeProof(
 func (c *DBClient) VerifyChangeProof(
 	ctx context.Context,
 	proof *merkledb.ChangeProof,
-	startKey []byte,
+	startKey maybe.Maybe[[]byte],
 	endKey maybe.Maybe[[]byte],
 	expectedRootID ids.ID,
 ) error {
 	resp, err := c.client.VerifyChangeProof(ctx, &pb.VerifyChangeProofRequest{
 		Proof:            proof.ToProto(),
-		StartKey:         startKey,
+		StartKey:         startKey.Value(),
 		EndKey:           endKey.Value(),
 		ExpectedRootHash: expectedRootID[:],
 	})

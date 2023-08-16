@@ -54,11 +54,11 @@ func (s *DBServer) GetChangeProof(
 	if err != nil {
 		return nil, err
 	}
-	start := maybe.Nothing[[]byte]() // TODO use helper function for this?
+	start := maybe.Nothing[[]byte]()
 	if req.StartKey != nil && !req.StartKey.IsNothing {
 		start = maybe.Some(req.StartKey.Value)
 	}
-	end := maybe.Nothing[[]byte]() // TODO use helper function for this?
+	end := maybe.Nothing[[]byte]()
 	if req.EndKey != nil && !req.EndKey.IsNothing {
 		end = maybe.Some(req.EndKey.Value)
 	}
@@ -105,7 +105,8 @@ func (s *DBServer) VerifyChangeProof(
 
 	// TODO there's probably a better way to do this.
 	var errString string
-	if err := s.db.VerifyChangeProof(ctx, &proof, req.StartKey, maybe.Some(req.EndKey), rootID); err != nil {
+	// TODO properly set maybes passed in below
+	if err := s.db.VerifyChangeProof(ctx, &proof, maybe.Some(req.StartKey), maybe.Some(req.EndKey), rootID); err != nil {
 		errString = err.Error()
 	}
 	return &pb.VerifyChangeProofResponse{

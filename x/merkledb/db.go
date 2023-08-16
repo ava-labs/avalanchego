@@ -84,7 +84,7 @@ type ChangeProofer interface {
 	VerifyChangeProof(
 		ctx context.Context,
 		proof *ChangeProof,
-		start []byte,
+		start maybe.Maybe[[]byte],
 		end maybe.Maybe[[]byte],
 		expectedEndRootID ids.ID,
 	) error
@@ -988,19 +988,19 @@ func (*merkleDB) CommitToDB(context.Context) error {
 func (db *merkleDB) VerifyChangeProof(
 	ctx context.Context,
 	proof *ChangeProof,
-	start []byte,
+	start maybe.Maybe[[]byte],
 	end maybe.Maybe[[]byte],
 	expectedEndRootID ids.ID,
 ) error {
 	switch {
-	case end.HasValue() && bytes.Compare(start, end.Value()) > 0:
+	case start.HasValue() && end.HasValue() && bytes.Compare(start.Value(), end.Value()) > 0:
 		return ErrStartAfterEnd
 	case proof.Empty():
 		return ErrNoMerkleProof
 	case end.HasValue() && len(proof.KeyChanges) == 0 && len(proof.EndProof) == 0:
 		// We requested an end proof but didn't get one.
 		return ErrNoEndProof
-	case len(start) > 0 && len(proof.StartProof) == 0 && len(proof.EndProof) == 0:
+	case start.HasValue() && len(proof.StartProof) == 0 && len(proof.EndProof) == 0:
 		// We requested a start proof but didn't get one.
 		// Note that we also have to check that [proof.EndProof] is empty
 		// to handle the case that the start proof is empty because all
@@ -1013,7 +1013,8 @@ func (db *merkleDB) VerifyChangeProof(
 		return err
 	}
 
-	smallestPath := newPath(start)
+	// Note that if [start] is Nothing, smallestPath is the empty path.
+	smallestPath := newPath(start.Value())
 
 	// Make sure the start proof, if given, is well-formed.
 	if err := verifyProofPath(proof.StartProof, smallestPath); err != nil {

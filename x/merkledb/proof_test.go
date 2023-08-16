@@ -746,21 +746,21 @@ func Test_ChangeProof_Verify(t *testing.T) {
 	require.NoError(err)
 	require.NotNil(proof)
 
-	require.NoError(dbClone.VerifyChangeProof(context.Background(), proof, []byte("key21"), maybe.Some([]byte("key30")), db.getMerkleRoot()))
+	require.NoError(dbClone.VerifyChangeProof(context.Background(), proof, maybe.Some([]byte("key21")), maybe.Some([]byte("key30")), db.getMerkleRoot()))
 
 	// low maxLength
 	proof, err = db.GetChangeProof(context.Background(), startRoot, endRoot, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 5)
 	require.NoError(err)
 	require.NotNil(proof)
 
-	require.NoError(dbClone.VerifyChangeProof(context.Background(), proof, nil, maybe.Nothing[[]byte](), db.getMerkleRoot()))
+	require.NoError(dbClone.VerifyChangeProof(context.Background(), proof, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), db.getMerkleRoot()))
 
 	// nil start/end
 	proof, err = db.GetChangeProof(context.Background(), startRoot, endRoot, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 50)
 	require.NoError(err)
 	require.NotNil(proof)
 
-	require.NoError(dbClone.VerifyChangeProof(context.Background(), proof, nil, maybe.Nothing[[]byte](), endRoot))
+	require.NoError(dbClone.VerifyChangeProof(context.Background(), proof, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), endRoot))
 	require.NoError(dbClone.CommitChangeProof(context.Background(), proof))
 
 	newRoot, err := dbClone.GetMerkleRoot(context.Background())
@@ -771,7 +771,7 @@ func Test_ChangeProof_Verify(t *testing.T) {
 	require.NoError(err)
 	require.NotNil(proof)
 
-	require.NoError(dbClone.VerifyChangeProof(context.Background(), proof, []byte("key20"), maybe.Some([]byte("key30")), db.getMerkleRoot()))
+	require.NoError(dbClone.VerifyChangeProof(context.Background(), proof, maybe.Some([]byte("key20")), maybe.Some([]byte("key30")), db.getMerkleRoot()))
 }
 
 func Test_ChangeProof_Verify_Bad_Data(t *testing.T) {
@@ -835,7 +835,7 @@ func Test_ChangeProof_Verify_Bad_Data(t *testing.T) {
 
 			tt.malform(proof)
 
-			err = dbClone.VerifyChangeProof(context.Background(), proof, []byte{2}, maybe.Some([]byte{3, 0}), db.getMerkleRoot())
+			err = dbClone.VerifyChangeProof(context.Background(), proof, maybe.Some([]byte{2}), maybe.Some([]byte{3, 0}), db.getMerkleRoot())
 			require.ErrorIs(err, tt.expectedErr)
 		})
 	}
@@ -845,7 +845,7 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 	type test struct {
 		name        string
 		proof       *ChangeProof
-		start       []byte
+		start       maybe.Maybe[[]byte]
 		end         maybe.Maybe[[]byte]
 		expectedErr error
 	}
@@ -854,14 +854,14 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 		{
 			name:        "start after end",
 			proof:       nil,
-			start:       []byte{1},
+			start:       maybe.Some([]byte{1}),
 			end:         maybe.Some([]byte{0}),
 			expectedErr: ErrStartAfterEnd,
 		},
 		{
 			name:        "empty",
 			proof:       &ChangeProof{},
-			start:       nil,
+			start:       maybe.Nothing[[]byte](),
 			end:         maybe.Nothing[[]byte](),
 			expectedErr: ErrNoMerkleProof,
 		},
@@ -870,7 +870,7 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 			proof: &ChangeProof{
 				StartProof: []ProofNode{{}},
 			},
-			start:       nil,
+			start:       maybe.Nothing[[]byte](),
 			end:         maybe.Some([]byte{1}),
 			expectedErr: ErrNoEndProof,
 		},
@@ -879,7 +879,7 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 			proof: &ChangeProof{
 				KeyChanges: []KeyChange{{Key: []byte{1}}},
 			},
-			start:       []byte{1},
+			start:       maybe.Some([]byte{1}),
 			end:         maybe.Nothing[[]byte](),
 			expectedErr: ErrNoStartProof,
 		},
@@ -891,7 +891,7 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 					{Key: []byte{0}},
 				},
 			},
-			start:       nil,
+			start:       maybe.Nothing[[]byte](),
 			end:         maybe.Nothing[[]byte](),
 			expectedErr: ErrNonIncreasingValues,
 		},
@@ -903,7 +903,7 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 					{Key: []byte{0}},
 				},
 			},
-			start:       []byte{1},
+			start:       maybe.Some([]byte{1}),
 			end:         maybe.Nothing[[]byte](),
 			expectedErr: ErrStateFromOutsideOfRange,
 		},
@@ -915,7 +915,7 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 					{Key: []byte{2}},
 				},
 			},
-			start:       nil,
+			start:       maybe.Nothing[[]byte](),
 			end:         maybe.Some([]byte{1}),
 			expectedErr: ErrStateFromOutsideOfRange,
 		},
@@ -927,7 +927,7 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 					{Key: []byte{1}},
 				},
 			},
-			start:       nil,
+			start:       maybe.Nothing[[]byte](),
 			end:         maybe.Nothing[[]byte](),
 			expectedErr: ErrNonIncreasingValues,
 		},
@@ -939,7 +939,7 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 					{KeyPath: newPath([]byte{2, 3}).Serialize()},
 				},
 			},
-			start:       []byte{1, 2, 3},
+			start:       maybe.Some([]byte{1, 2, 3}),
 			end:         maybe.Nothing[[]byte](),
 			expectedErr: ErrProofNodeNotForKey,
 		},
@@ -951,7 +951,7 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 					{KeyPath: newPath([]byte{2, 3}).Serialize()},
 				},
 			},
-			start:       []byte{1, 2, 3},
+			start:       maybe.Some([]byte{1, 2, 3}),
 			end:         maybe.Nothing[[]byte](),
 			expectedErr: ErrNonIncreasingProofNodes,
 		},
@@ -966,7 +966,7 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 					{KeyPath: newPath([]byte{2, 3}).Serialize()},
 				},
 			},
-			start:       nil,
+			start:       maybe.Nothing[[]byte](),
 			end:         maybe.Nothing[[]byte](),
 			expectedErr: ErrProofNodeNotForKey,
 		},
@@ -981,7 +981,7 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 					{KeyPath: newPath([]byte{2, 3}).Serialize()},
 				},
 			},
-			start:       nil,
+			start:       maybe.Nothing[[]byte](),
 			end:         maybe.Nothing[[]byte](),
 			expectedErr: ErrNonIncreasingProofNodes,
 		},
@@ -1867,7 +1867,7 @@ func FuzzChangeProof(f *testing.F) {
 		require.NoError(db.VerifyChangeProof(
 			context.Background(),
 			changeProof,
-			startBytes,
+			start,
 			end,
 			endRootID,
 		))

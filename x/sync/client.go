@@ -139,7 +139,7 @@ func (c *client) GetChangeProof(
 			if err := db.VerifyChangeProof(
 				ctx,
 				&changeProof,
-				startKey.Value(), // TODO pass maybe
+				startKey,
 				endKey,
 				endRoot,
 			); err != nil {
