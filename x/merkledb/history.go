@@ -8,11 +8,11 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/google/btree"
-
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/buffer"
 	"github.com/ava-labs/avalanchego/utils/maybe"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var (
@@ -136,15 +136,11 @@ func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start []byte, 
 		}
 	}
 
-	// Keep changes sorted so the largest can be removed in order to stay within the maxLength limit.
-	sortedKeys := btree.NewG(
-		2,
-		func(a, b path) bool {
-			return a.Compare(b) < 0
-		},
-	)
-
 	var (
+		// Keep track of changed keys so the largest can be removed
+		// in order to stay within the [maxLength] limit if necessary.
+		changedKeys = set.Set[path]{}
+
 		startPath = newPath(start)
 		endPath   = maybe.Bind(end, newPath)
 
@@ -183,23 +179,30 @@ func (th *trieHistory) getValueChanges(startRoot, endRoot ids.ID, start []byte, 
 					bytes.Equal(existing.before.Value(), existing.after.Value()) {
 					// The change to this key is a no-op, so remove it from [combinedChanges].
 					delete(combinedChanges.values, key)
-					sortedKeys.Delete(key)
+					changedKeys.Remove(key)
 				}
 			} else {
 				combinedChanges.values[key] = &change[maybe.Maybe[[]byte]]{
 					before: valueChange.before,
 					after:  valueChange.after,
 				}
-				sortedKeys.ReplaceOrInsert(key)
+				changedKeys.Add(key)
 			}
 		}
 	}
 
+	// If we have <= [maxLength] elements, we're done.
+	if changedKeys.Len() <= maxLength {
+		return combinedChanges, nil
+	}
+
 	// Keep only the smallest [maxLength] items in [combinedChanges.values].
-	for sortedKeys.Len() > maxLength {
-		if greatestKey, found := sortedKeys.DeleteMax(); found {
-			delete(combinedChanges.values, greatestKey)
-		}
+	sortedChangedKeys := changedKeys.List()
+	utils.Sort(sortedChangedKeys)
+	for len(sortedChangedKeys) > maxLength {
+		greatestKey := sortedChangedKeys[len(sortedChangedKeys)-1]
+		sortedChangedKeys = sortedChangedKeys[:len(sortedChangedKeys)-1]
+		delete(combinedChanges.values, greatestKey)
 	}
 
 	return combinedChanges, nil

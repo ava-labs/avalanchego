@@ -93,6 +93,10 @@ func (p path) Compare(other path) int {
 	return strings.Compare(string(p), string(other))
 }
 
+func (p path) Less(other path) bool {
+	return p.Compare(other) < 0
+}
+
 // Invariant: The returned value must not be modified.
 func (p path) Bytes() []byte {
 	// avoid copying during the conversion
