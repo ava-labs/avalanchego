@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -x
+echo "PATH is $PATH"
 if ! [[ "$0" =~ scripts/protobuf_codegen.sh ]]; then
   echo "must be run from repository root"
   exit 255
