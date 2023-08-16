@@ -222,7 +222,7 @@ func Test_Server_GetChangeProof(t *testing.T) {
 				EndRootHash:   endRoot[:],
 				KeyLimit:      defaultRequestKeyLimit,
 				BytesLimit:    defaultRequestByteSizeLimit,
-				StartKey:      []byte{1},
+				StartKey:      &pb.MaybeBytes{Value: []byte{1}},
 				EndKey:        &pb.MaybeBytes{Value: []byte{0}},
 			},
 			proofNil: true,

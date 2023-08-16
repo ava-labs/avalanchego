@@ -254,12 +254,20 @@ func (m *Manager) getAndApplyChangeProof(ctx context.Context, work *workItem) {
 		return
 	}
 
+	// TODO remove when work.start is a maybe
+	var startKey pb.MaybeBytes
+	if work.start == nil {
+		startKey.IsNothing = true
+	} else {
+		startKey.Value = work.start
+	}
+
 	changeOrRangeProof, err := m.config.Client.GetChangeProof(
 		ctx,
 		&pb.SyncGetChangeProofRequest{
 			StartRootHash: work.localRootID[:],
 			EndRootHash:   targetRootID[:],
-			StartKey:      work.start,
+			StartKey:      &startKey,
 			EndKey: &pb.MaybeBytes{
 				Value:     work.end.Value(),
 				IsNothing: work.end.IsNothing(),

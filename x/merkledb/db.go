@@ -63,7 +63,7 @@ type ChangeProofer interface {
 		ctx context.Context,
 		startRootID ids.ID,
 		endRootID ids.ID,
-		start []byte,
+		start maybe.Maybe[[]byte],
 		end maybe.Maybe[[]byte],
 		maxLength int,
 	) (*ChangeProof, error)
@@ -564,11 +564,11 @@ func (db *merkleDB) GetChangeProof(
 	ctx context.Context,
 	startRootID ids.ID,
 	endRootID ids.ID,
-	start []byte,
+	start maybe.Maybe[[]byte],
 	end maybe.Maybe[[]byte],
 	maxLength int,
 ) (*ChangeProof, error) {
-	if end.HasValue() && bytes.Compare(start, end.Value()) == 1 {
+	if start.HasValue() && end.HasValue() && bytes.Compare(start.Value(), end.Value()) == 1 {
 		return nil, ErrStartAfterEnd
 	}
 	if startRootID == endRootID {
@@ -582,7 +582,7 @@ func (db *merkleDB) GetChangeProof(
 		return nil, database.ErrClosed
 	}
 
-	changes, err := db.history.getValueChanges(startRootID, endRootID, start, end, maxLength)
+	changes, err := db.history.getValueChanges(startRootID, endRootID, start.Value() /* TODO pass maybe */, end, maxLength)
 	if err != nil {
 		return nil, err
 	}
@@ -615,7 +615,7 @@ func (db *merkleDB) GetChangeProof(
 
 	// Since we hold [db.commitlock] we must still have sufficient
 	// history to recreate the trie at [endRootID].
-	historicalView, err := db.getHistoricalViewForRange(endRootID, start, largestKey)
+	historicalView, err := db.getHistoricalViewForRange(endRootID, start.Value() /* TODO pass maybe */, largestKey)
 	if err != nil {
 		return nil, err
 	}
@@ -628,8 +628,8 @@ func (db *merkleDB) GetChangeProof(
 		result.EndProof = endProof.Path
 	}
 
-	if len(start) > 0 {
-		startProof, err := historicalView.getProof(ctx, start)
+	if start.HasValue() {
+		startProof, err := historicalView.getProof(ctx, start.Value())
 		if err != nil {
 			return nil, err
 		}

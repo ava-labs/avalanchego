@@ -59,7 +59,7 @@ func newCallthroughSyncClient(ctrl *gomock.Controller, db merkledb.MerkleDB) *Mo
 				context.Background(),
 				startRoot,
 				endRoot,
-				request.StartKey,
+				maybeBytesToMaybe(request.StartKey),
 				maybeBytesToMaybe(request.EndKey),
 				int(request.KeyLimit),
 			)
@@ -940,7 +940,7 @@ func Test_Sync_Error_During_Sync(t *testing.T) {
 			endRoot, err := ids.ToID(request.EndRootHash)
 			require.NoError(err)
 
-			changeProof, err := dbToSync.GetChangeProof(ctx, startRoot, endRoot, request.StartKey, maybeBytesToMaybe(request.EndKey), int(request.KeyLimit))
+			changeProof, err := dbToSync.GetChangeProof(ctx, startRoot, endRoot, maybeBytesToMaybe(request.StartKey), maybeBytesToMaybe(request.EndKey), int(request.KeyLimit))
 			if err != nil {
 				return nil, err
 			}
@@ -1038,7 +1038,7 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 				endRoot, err := ids.ToID(request.EndRootHash)
 				require.NoError(err)
 
-				changeProof, err := dbToSync.GetChangeProof(ctx, startRoot, endRoot, request.StartKey, maybeBytesToMaybe(request.EndKey), int(request.KeyLimit))
+				changeProof, err := dbToSync.GetChangeProof(ctx, startRoot, endRoot, maybeBytesToMaybe(request.StartKey), maybeBytesToMaybe(request.EndKey), int(request.KeyLimit))
 				if err != nil {
 					return nil, err
 				}

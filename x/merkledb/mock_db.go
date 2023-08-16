@@ -126,7 +126,7 @@ func (mr *MockMerkleDBMockRecorder) Get(arg0 interface{}) *gomock.Call {
 }
 
 // GetChangeProof mocks base method.
-func (m *MockMerkleDB) GetChangeProof(arg0 context.Context, arg1, arg2 ids.ID, arg3 []byte, arg4 maybe.Maybe[[]uint8], arg5 int) (*ChangeProof, error) {
+func (m *MockMerkleDB) GetChangeProof(arg0 context.Context, arg1, arg2 ids.ID, arg3, arg4 maybe.Maybe[[]uint8], arg5 int) (*ChangeProof, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetChangeProof", arg0, arg1, arg2, arg3, arg4, arg5)
 	ret0, _ := ret[0].(*ChangeProof)

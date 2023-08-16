@@ -667,7 +667,7 @@ func Test_ChangeProof_Missing_History_For_EndRoot(t *testing.T) {
 	startRoot, err := db.GetMerkleRoot(context.Background())
 	require.NoError(err)
 
-	_, err = db.GetChangeProof(context.Background(), startRoot, ids.Empty, nil, maybe.Nothing[[]byte](), 50)
+	_, err = db.GetChangeProof(context.Background(), startRoot, ids.Empty, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 50)
 	require.ErrorIs(err, ErrInsufficientHistory)
 }
 
@@ -686,7 +686,7 @@ func Test_ChangeProof_BadBounds(t *testing.T) {
 	require.NoError(err)
 
 	// non-nil start/end
-	proof, err := db.GetChangeProof(context.Background(), startRoot, endRoot, []byte("key4"), maybe.Some([]byte("key3")), 50)
+	proof, err := db.GetChangeProof(context.Background(), startRoot, endRoot, maybe.Some([]byte("key4")), maybe.Some([]byte("key3")), 50)
 	require.ErrorIs(err, ErrStartAfterEnd)
 	require.Nil(proof)
 }
@@ -742,21 +742,21 @@ func Test_ChangeProof_Verify(t *testing.T) {
 	require.NoError(err)
 
 	// non-nil start/end
-	proof, err := db.GetChangeProof(context.Background(), startRoot, endRoot, []byte("key21"), maybe.Some([]byte("key30")), 50)
+	proof, err := db.GetChangeProof(context.Background(), startRoot, endRoot, maybe.Some([]byte("key21")), maybe.Some([]byte("key30")), 50)
 	require.NoError(err)
 	require.NotNil(proof)
 
 	require.NoError(dbClone.VerifyChangeProof(context.Background(), proof, []byte("key21"), maybe.Some([]byte("key30")), db.getMerkleRoot()))
 
 	// low maxLength
-	proof, err = db.GetChangeProof(context.Background(), startRoot, endRoot, nil, maybe.Nothing[[]byte](), 5)
+	proof, err = db.GetChangeProof(context.Background(), startRoot, endRoot, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 5)
 	require.NoError(err)
 	require.NotNil(proof)
 
 	require.NoError(dbClone.VerifyChangeProof(context.Background(), proof, nil, maybe.Nothing[[]byte](), db.getMerkleRoot()))
 
 	// nil start/end
-	proof, err = db.GetChangeProof(context.Background(), startRoot, endRoot, nil, maybe.Nothing[[]byte](), 50)
+	proof, err = db.GetChangeProof(context.Background(), startRoot, endRoot, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 50)
 	require.NoError(err)
 	require.NotNil(proof)
 
@@ -767,7 +767,7 @@ func Test_ChangeProof_Verify(t *testing.T) {
 	require.NoError(err)
 	require.Equal(endRoot, newRoot)
 
-	proof, err = db.GetChangeProof(context.Background(), startRoot, endRoot, []byte("key20"), maybe.Some([]byte("key30")), 50)
+	proof, err = db.GetChangeProof(context.Background(), startRoot, endRoot, maybe.Some([]byte("key20")), maybe.Some([]byte("key30")), 50)
 	require.NoError(err)
 	require.NotNil(proof)
 
@@ -829,7 +829,7 @@ func Test_ChangeProof_Verify_Bad_Data(t *testing.T) {
 			dbClone, err := getBasicDB()
 			require.NoError(err)
 
-			proof, err := db.GetChangeProof(context.Background(), startRoot, endRoot, []byte{2}, maybe.Some([]byte{3, 0}), 50)
+			proof, err := db.GetChangeProof(context.Background(), startRoot, endRoot, maybe.Some([]byte{2}), maybe.Some([]byte{3, 0}), 50)
 			require.NoError(err)
 			require.NotNil(proof)
 
@@ -1844,6 +1844,11 @@ func FuzzChangeProof(f *testing.F) {
 			return
 		}
 
+		start := maybe.Nothing[[]byte]()
+		if len(startBytes) != 0 {
+			start = maybe.Some(startBytes)
+		}
+
 		end := maybe.Nothing[[]byte]()
 		if len(endBytes) != 0 {
 			end = maybe.Some(endBytes)
@@ -1853,7 +1858,7 @@ func FuzzChangeProof(f *testing.F) {
 			context.Background(),
 			startRootID,
 			endRootID,
-			startBytes,
+			start,
 			end,
 			int(maxProofLen),
 		)

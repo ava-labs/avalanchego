@@ -771,8 +771,12 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 			if len(step.value) > 0 {
 				end = maybe.Some(step.value)
 			}
+			start := maybe.Nothing[[]byte]()
+			if len(step.key) > 0 {
+				start = maybe.Some(step.key)
+			}
 
-			changeProof, err := db.GetChangeProof(context.Background(), startRoot, root, step.key, end, 100)
+			changeProof, err := db.GetChangeProof(context.Background(), startRoot, root, start, end, 100)
 			if startRoot == root {
 				require.ErrorIs(err, errSameRoot)
 				continue
