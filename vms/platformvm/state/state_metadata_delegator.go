@@ -25,7 +25,7 @@ func parseDelegatorMetadata(bytes []byte, metadata *delegatorMetadata) error {
 		}
 
 	default:
-		_, err := stakersMetadataCodec.Unmarshal(bytes, metadata)
+		_, err := metadataCodec.Unmarshal(bytes, metadata)
 		if err != nil {
 			return err
 		}

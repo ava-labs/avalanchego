@@ -2059,7 +2059,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 
 				// Let's start using V1 as soon as we deploy code. No need to
 				// wait till Continuous staking fork activation to do that.
-				metadataBytes, err := stakersMetadataCodec.Marshal(stakerMetadataCodecV1, metadata)
+				metadataBytes, err := metadataCodec.Marshal(v1, metadata)
 				if err != nil {
 					return fmt.Errorf("failed to serialize validator metadata: %w", err)
 				}
@@ -2142,7 +2142,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 				metadata.LastUpdated = uint64(metadata.StakerStartTime)
 				metadata.UpdatedWeight = validator.Weight
 
-				metadataBytes, err = stakersMetadataCodec.Marshal(stakerMetadataCodecV1, metadata)
+				metadataBytes, err = metadataCodec.Marshal(v1, metadata)
 				if err != nil {
 					return fmt.Errorf("failed to serialize validator metadata: %w", err)
 				}
@@ -2267,7 +2267,7 @@ func writeCurrentDelegatorDiff(
 				StakerEndTime:       delegator.EndTime.Unix(),
 				UpdatedWeight:       delegator.Weight,
 			}
-			metadataBytes, err := stakersMetadataCodec.Marshal(stakerMetadataCodecV1, metadata)
+			metadataBytes, err := metadataCodec.Marshal(v1, metadata)
 			if err != nil {
 				return fmt.Errorf("failed marshalling delegators metadata: %w", err)
 			}
@@ -2313,7 +2313,7 @@ func writeCurrentDelegatorDiff(
 			metadata.StakerEndTime = delegator.EndTime.Unix()
 			metadata.UpdatedWeight = delegator.Weight
 
-			metadataBytes, err = stakersMetadataCodec.Marshal(stakerMetadataCodecV1, metadata)
+			metadataBytes, err = metadataCodec.Marshal(v1, metadata)
 			if err != nil {
 				return fmt.Errorf("failed to serialize delegator metadata: %w", err)
 			}
