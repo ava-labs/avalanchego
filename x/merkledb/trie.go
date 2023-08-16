@@ -65,10 +65,6 @@ type TrieView interface {
 	// Takes the DB commit lock
 	CommitToDB(ctx context.Context) error
 
-	// CommitToParent takes changes of this TrieView and commits them to its parent Trie
-	// Takes the DB commit lock
-	CommitToParent(ctx context.Context) error
-
 	// commits changes in the trie to its parent
 	// then commits the combined changes down the stack until all changes in the stack commit to the database
 	commitToDB(ctx context.Context) error
