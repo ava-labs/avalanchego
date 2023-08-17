@@ -604,8 +604,8 @@ func TestRewardsChecksRewardDelegator(t *testing.T) {
 		nodeID   = ids.GenerateTestNodeID()
 		subnetID = constants.PrimaryNetworkID
 
-		validationDuration = defaultMaxStakingDuration
-		delegationDuration = defaultMaxStakingDuration / 128
+		delegationDuration = defaultMinStakingDuration
+		validationDuration = delegationDuration * 256
 		dummyStartTime     = time.Unix(0, 0)
 
 		delegatorAuthKey = preFundedKeys[4]
@@ -854,8 +854,8 @@ func TestShiftChecksRewardDelegator(t *testing.T) {
 		nodeID   = ids.GenerateTestNodeID()
 		subnetID = constants.PrimaryNetworkID
 
-		validatorDuration = defaultMaxStakingDuration
-		delegatorDuration = validatorDuration / 128
+		delegatorDuration = defaultMinStakingDuration
+		validatorDuration = delegatorDuration * 256
 		dummyStartTime    = time.Unix(0, 0)
 
 		authKey = preFundedKeys[4]
