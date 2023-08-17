@@ -5,6 +5,7 @@ package gdb
 
 import (
 	"context"
+	"errors"
 
 	"google.golang.org/protobuf/types/known/emptypb"
 
@@ -44,7 +45,7 @@ func (s *DBServer) GetMerkleRoot(
 func (s *DBServer) GetChangeProof(
 	ctx context.Context,
 	req *pb.GetChangeProofRequest,
-) (*pb.ChangeProof, error) {
+) (*pb.GetChangeProofResponse, error) {
 	startRootID, err := ids.ToID(req.StartRootHash)
 	if err != nil {
 		return nil, err
@@ -66,9 +67,21 @@ func (s *DBServer) GetChangeProof(
 		int(req.KeyLimit),
 	)
 	if err != nil {
-		return nil, err
+		if !errors.Is(err, merkledb.ErrInsufficientHistory) {
+			return nil, err
+		}
+		return &pb.GetChangeProofResponse{
+			Response: &pb.GetChangeProofResponse_RootNotPresent{
+				RootNotPresent: true,
+			},
+		}, nil
 	}
-	return changeProof.ToProto(), nil
+
+	return &pb.GetChangeProofResponse{
+		Response: &pb.GetChangeProofResponse_ChangeProof{
+			ChangeProof: changeProof.ToProto(),
+		},
+	}, nil
 }
 
 func (s *DBServer) VerifyChangeProof(

@@ -192,7 +192,7 @@ func Test_History_Bad_GetValueChanges_Input(t *testing.T) {
 	require.ErrorIs(err, ErrInvalidMaxLength)
 
 	_, err = db.history.getValueChanges(endRoot, startRoot, nil, maybe.Nothing[[]byte](), 1)
-	require.ErrorIs(err, ErrStartRootNotFound)
+	require.ErrorIs(err, ErrInsufficientHistory)
 
 	// trigger the first root to be deleted by exiting the lookback window
 	batch = db.NewBatch()
@@ -201,7 +201,7 @@ func Test_History_Bad_GetValueChanges_Input(t *testing.T) {
 
 	// now this root should no longer be present
 	_, err = db.history.getValueChanges(toBeDeletedRoot, endRoot, nil, maybe.Nothing[[]byte](), 1)
-	require.ErrorIs(err, ErrStartRootNotFound)
+	require.ErrorIs(err, ErrInsufficientHistory)
 
 	// same start/end roots should yield an empty changelist
 	changes, err := db.history.getValueChanges(endRoot, endRoot, nil, maybe.Nothing[[]byte](), 10)
@@ -261,7 +261,7 @@ func Test_History_Trigger_History_Queue_Looping(t *testing.T) {
 
 	// proof from first root shouldn't be generatable since it should have been removed from the history
 	_, err = db.GetRangeProofAtRoot(context.Background(), origRootID, []byte("k"), maybe.Some([]byte("key3")), 10)
-	require.ErrorIs(err, ErrRootIDNotPresent)
+	require.ErrorIs(err, ErrInsufficientHistory)
 }
 
 func Test_History_Values_Lookup_Over_Queue_Break(t *testing.T) {
@@ -661,7 +661,7 @@ func TestHistoryGetChangesToRoot(t *testing.T) {
 		{
 			name:        "unknown root ID",
 			rootID:      ids.GenerateTestID(),
-			expectedErr: ErrRootIDNotPresent,
+			expectedErr: ErrInsufficientHistory,
 		},
 		{
 			name:   "most recent change",

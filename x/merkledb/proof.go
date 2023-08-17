@@ -499,12 +499,6 @@ type ChangeProof struct {
 	// Invariant: At least one of [StartProof], [EndProof], or
 	// [KeyChanges] is non-empty.
 
-	// If false, the node that created this doesn't have
-	// sufficient history to generate a change proof and
-	// all other fields must be empty.
-	// Otherwise at least one other field is non-empty.
-	HadRootsInHistory bool
-
 	// A proof that the smallest key in the requested range does/doesn't
 	// exist in the trie with the requested start root.
 	// Empty if no lower bound on the requested range was given.
@@ -592,10 +586,9 @@ func (proof *ChangeProof) ToProto() *pb.ChangeProof {
 	}
 
 	return &pb.ChangeProof{
-		HadRootsInHistory: proof.HadRootsInHistory,
-		StartProof:        startProof,
-		EndProof:          endProof,
-		KeyChanges:        keyChanges,
+		StartProof: startProof,
+		EndProof:   endProof,
+		KeyChanges: keyChanges,
 	}
 }
 
@@ -603,8 +596,6 @@ func (proof *ChangeProof) UnmarshalProto(pbProof *pb.ChangeProof) error {
 	if pbProof == nil {
 		return ErrNilChangeProof
 	}
-
-	proof.HadRootsInHistory = pbProof.HadRootsInHistory
 
 	proof.StartProof = make([]ProofNode, len(pbProof.StartProof))
 	for i, protoNode := range pbProof.StartProof {
@@ -690,6 +681,12 @@ func verifyAllChangeProofKeyValuesPresent(
 func (proof *ChangeProof) Empty() bool {
 	return len(proof.KeyChanges) == 0 &&
 		len(proof.StartProof) == 0 && len(proof.EndProof) == 0
+}
+
+// Exactly one of [ChangeProof] or [RangeProof] is non-nil.
+type ChangeOrRangeProof struct {
+	ChangeProof *ChangeProof
+	RangeProof  *RangeProof
 }
 
 // Returns nil iff both hold:
