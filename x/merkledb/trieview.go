@@ -44,8 +44,6 @@ var (
 	numCPU = runtime.NumCPU()
 )
 
-// Editable view of a trie, collects changes on top of a parent trie.
-// Delays adding key/value pairs to the trie.
 type trieView struct {
 	commitLock sync.RWMutex
 
@@ -96,8 +94,7 @@ type trieView struct {
 	// The root of the trie represented by this view.
 	root *node
 
-	// If true, this view has been committed and cannot be edited.
-	// Calls to Insert and Remove will return ErrCommitted.
+	// If true, this view has been committed.
 	committed bool
 }
 
@@ -851,9 +848,8 @@ func getLengthOfCommonPrefix(first, second path) int {
 	return commonIndex
 }
 
-// Get a copy of the node matching the passed key from the trie
-// Used by views to get nodes from their ancestors
-// assumes that [t.needsRecalculation] is false
+// Get a copy of the node matching the passed key from the trie.
+// Used by views to get nodes from their ancestors.
 func (t *trieView) getEditableNode(key path) (*node, error) {
 	if t.isInvalid() {
 		return nil, ErrInvalid
