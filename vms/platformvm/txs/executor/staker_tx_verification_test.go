@@ -1330,7 +1330,7 @@ func TestVerifyAddContinuousDelegatorTx(t *testing.T) {
 			txF: func() *txs.AddContinuousDelegatorTx {
 				return &verifiedTx
 			},
-			expectedErr: ErrCantContinuousDelegateToPendingValidator,
+			expectedErr: ErrContinuousDelegatorToNonContinuousValidator,
 		},
 		{
 			name: "delegator staking period larger than validator one",

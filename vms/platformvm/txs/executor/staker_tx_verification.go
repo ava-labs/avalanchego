@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -22,31 +21,31 @@ import (
 )
 
 var (
-	ErrWeightTooSmall                           = errors.New("weight of this validator is too low")
-	ErrWeightTooLarge                           = errors.New("weight of this validator is too large")
-	ErrInsufficientDelegationFee                = errors.New("staker charges an insufficient delegation fee")
-	ErrStakeTooShort                            = errors.New("staking period is too short")
-	ErrStakeTooLong                             = errors.New("staking period is too long")
-	ErrFlowCheckFailed                          = errors.New("flow check failed")
-	ErrFutureStakeTime                          = fmt.Errorf("staker is attempting to start staking more than %s ahead of the current chain time", MaxFutureStartTime)
-	ErrValidatorSubset                          = errors.New("all subnets' staking period must be a subset of the primary network")
-	ErrNotValidator                             = errors.New("isn't a current or pending validator")
-	ErrRemovePermissionlessValidator            = errors.New("attempting to remove permissionless validator")
-	ErrStakeOverflow                            = errors.New("validator stake exceeds limit")
-	ErrPeriodMismatch                           = errors.New("proposed staking period is not inside dependant staking period")
-	ErrOverDelegated                            = errors.New("validator would be over delegated")
-	ErrIsNotTransformSubnetTx                   = errors.New("is not a transform subnet tx")
-	ErrTimestampNotBeforeStartTime              = errors.New("chain timestamp not before start time")
-	ErrAlreadyValidator                         = errors.New("already a validator")
-	ErrDuplicateValidator                       = errors.New("duplicate validator")
-	ErrDelegateToPermissionedValidator          = errors.New("delegation to permissioned validator")
-	ErrWrongStakedAssetID                       = errors.New("incorrect staked assetID")
-	ErrUnauthorizedStakerStopping               = errors.New("unauthorized staker stopping")
-	ErrTxUnacceptableBeforeFork                 = errors.New("tx unacceptable before fork")
-	ErrSubnetValidatorToContinuousValidator     = errors.New("cannot assign subnet validator to continuous validator")
-	ErrFiniteDelegatorToContinuousValidator     = errors.New("cannot assign finite delegator to continuous validator")
-	ErrCantContinuousDelegateToPendingValidator = errors.New("cannot do continuous delegation to pending validator")
-	ErrNoStakerToStop                           = errors.New("could not find staker to stop")
+	ErrWeightTooSmall                              = errors.New("weight of this validator is too low")
+	ErrWeightTooLarge                              = errors.New("weight of this validator is too large")
+	ErrInsufficientDelegationFee                   = errors.New("staker charges an insufficient delegation fee")
+	ErrStakeTooShort                               = errors.New("staking period is too short")
+	ErrStakeTooLong                                = errors.New("staking period is too long")
+	ErrFlowCheckFailed                             = errors.New("flow check failed")
+	ErrFutureStakeTime                             = fmt.Errorf("staker is attempting to start staking more than %s ahead of the current chain time", MaxFutureStartTime)
+	ErrValidatorSubset                             = errors.New("all subnets' staking period must be a subset of the primary network")
+	ErrNotValidator                                = errors.New("isn't a current or pending validator")
+	ErrRemovePermissionlessValidator               = errors.New("attempting to remove permissionless validator")
+	ErrStakeOverflow                               = errors.New("validator stake exceeds limit")
+	ErrPeriodMismatch                              = errors.New("proposed staking period is not inside dependant staking period")
+	ErrOverDelegated                               = errors.New("validator would be over delegated")
+	ErrIsNotTransformSubnetTx                      = errors.New("is not a transform subnet tx")
+	ErrTimestampNotBeforeStartTime                 = errors.New("chain timestamp not before start time")
+	ErrAlreadyValidator                            = errors.New("already a validator")
+	ErrDuplicateValidator                          = errors.New("duplicate validator")
+	ErrDelegateToPermissionedValidator             = errors.New("delegation to permissioned validator")
+	ErrWrongStakedAssetID                          = errors.New("incorrect staked assetID")
+	ErrUnauthorizedStakerStopping                  = errors.New("unauthorized staker stopping")
+	ErrTxUnacceptableBeforeFork                    = errors.New("tx unacceptable before fork")
+	ErrSubnetValidatorToContinuousValidator        = errors.New("cannot assign subnet validator to continuous validator")
+	ErrFiniteDelegatorToContinuousValidator        = errors.New("cannot assign finite delegator to continuous validator")
+	ErrContinuousDelegatorToNonContinuousValidator = errors.New("cannot assign continuous delegator to non continuous validator")
+	ErrNoStakerToStop                              = errors.New("could not find staker to stop")
 )
 
 // verifyAddValidatorTx carries out the validation for an AddValidatorTx.
@@ -237,7 +236,7 @@ func verifyAddSubnetValidatorTx(
 			err,
 		)
 	}
-	if primaryNetworkValidator.Priority.IsContinuousStaker() {
+	if primaryNetworkValidator.Priority.IsContinuousValidator() {
 		// TODO: consider activation in subsequent PRs
 		return ErrSubnetValidatorToContinuousValidator
 	}
@@ -424,7 +423,7 @@ func verifyAddDelegatorTx(
 			err,
 		)
 	}
-	if primaryNetworkValidator.Priority.IsContinuousStaker() {
+	if primaryNetworkValidator.Priority.IsContinuousValidator() {
 		// TODO: consider activation in subsequent PRs
 		return nil, ErrFiniteDelegatorToContinuousValidator
 	}
@@ -596,7 +595,7 @@ func verifyAddPermissionlessValidatorTx(
 				err,
 			)
 		}
-		if primaryNetworkValidator.Priority.IsContinuousStaker() {
+		if primaryNetworkValidator.Priority.IsContinuousValidator() {
 			// TODO: consider activation in subsequent PRs
 			return ErrSubnetValidatorToContinuousValidator
 		}
@@ -729,7 +728,7 @@ func verifyAddPermissionlessDelegatorTx(
 			err,
 		)
 	}
-	if validator.Priority.IsContinuousStaker() {
+	if validator.Priority.IsContinuousValidator() {
 		// TODO: consider activation in subsequent PRs
 		return ErrFiniteDelegatorToContinuousValidator
 	}
@@ -948,18 +947,14 @@ func verifyAddContinuousDelegatorTx(
 				err,
 			)
 		}
-		if validator.Priority.IsPending() {
-			return time.Time{}, ErrCantContinuousDelegateToPendingValidator
+		if !validator.Priority.IsContinuousValidator() {
+			return time.Time{}, ErrContinuousDelegatorToNonContinuousValidator
 		}
 
 		// We do not forbid AddContinuousDelegatorTx to create a delegator
-		// for an already stopped or a finite validator. We do make sure,
+		// for an already stopped continuous validator. We do make sure,
 		// however that the delegator won't outlive its validator.
-		endTime := mockable.MaxTime
-		if endTime.After(validator.EndTime) {
-			endTime = validator.EndTime
-		}
-		return endTime, nil
+		return validator.EndTime, nil
 	}
 
 	currentTimestamp := chainState.GetTimestamp()
@@ -1008,8 +1003,8 @@ func verifyAddContinuousDelegatorTx(
 			err,
 		)
 	}
-	if validator.Priority.IsPending() {
-		return time.Time{}, ErrCantContinuousDelegateToPendingValidator
+	if !validator.Priority.IsContinuousValidator() {
+		return time.Time{}, ErrContinuousDelegatorToNonContinuousValidator
 	}
 
 	maximumWeight, err := math.Mul64(
@@ -1021,10 +1016,7 @@ func verifyAddContinuousDelegatorTx(
 	}
 	maximumWeight = math.Min(maximumWeight, delegatorRules.maxValidatorStake)
 
-	delegatorEndTime := mockable.MaxTime
-	if delegatorEndTime.After(validator.EndTime) {
-		delegatorEndTime = validator.EndTime
-	}
+	delegatorEndTime := validator.EndTime
 
 	// potential reward does not matter
 	newStaker, err := state.NewCurrentStaker(sTx.ID(), tx, currentTimestamp, delegatorEndTime, 0)
