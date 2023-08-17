@@ -61,7 +61,7 @@ func TestAppRequestResponse(t *testing.T) {
 					require.Equal(t, response, actualResponse)
 				}
 
-				require.NoError(t, client.AppRequestAny(context.Background(), request, callback))
+				require.NoError(t, client.AppRequestAny(context.Background(), request, callback, 1))
 			},
 		},
 		{
