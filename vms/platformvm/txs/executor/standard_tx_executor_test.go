@@ -1127,6 +1127,175 @@ func TestStandardTxExecutorAddContinuousValidator(t *testing.T) {
 	require.Equal(mockable.MaxTime, val.EndTime)
 }
 
+func TestStandardTxExecutorNoFiniteStakersAddedToContinuousValidator(t *testing.T) {
+	// Add a continuous primary network validator and show that no finite delegators
+	// nor finite subnet validators can be assigned to it
+	require := require.New(t)
+	env := newEnvironment(t, continuousStakingFork)
+	env.ctx.Lock.Lock()
+	defer func() {
+		require.NoError(shutdownEnvironment(env))
+	}()
+
+	var (
+		nodeID            = ids.GenerateTestNodeID()
+		validatorDuration = defaultMinStakingDuration
+		dummyStartTime    = time.Unix(0, 0)
+		dummyEndTime      = time.Unix(0, 0).Add(validatorDuration)
+		addr              = preFundedKeys[0].PublicKey().Address()
+	)
+
+	blsSK, err := bls.NewSecretKey()
+	require.NoError(err)
+	blsPOP := signer.NewProofOfPossession(blsSK)
+
+	utxosHandler := utxo.NewHandler(env.ctx, env.clk, env.fx)
+	ins, unstakedOuts, stakedOuts, signers, err := utxosHandler.Spend(
+		env.state,
+		preFundedKeys,
+		env.config.MinValidatorStake, // stakeAmount
+		env.config.AddPrimaryNetworkValidatorFee,
+		addr, // changeAddr
+	)
+	require.NoError(err)
+
+	utx := &txs.AddContinuousValidatorTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    env.ctx.NetworkID,
+			BlockchainID: env.ctx.ChainID,
+			Ins:          ins,
+			Outs:         unstakedOuts,
+		}},
+		Validator: txs.Validator{
+			NodeID: nodeID,
+			Start:  uint64(dummyStartTime.Unix()),
+			End:    uint64(dummyEndTime.Unix()),
+			Wght:   env.config.MinValidatorStake,
+		},
+		Signer: blsPOP,
+		ValidatorAuthKey: &secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+		},
+		StakeOuts: stakedOuts,
+		ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
+			Addrs:     []ids.ShortID{addr},
+			Threshold: 1,
+		},
+		ValidatorRewardRestakeShares: 0,
+		DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
+			Addrs:     []ids.ShortID{addr},
+			Threshold: 1,
+		},
+		DelegationShares: 20_000,
+	}
+	addContinuousValTx, err := txs.NewSigned(utx, txs.Codec, signers)
+	require.NoError(err)
+	require.NoError(addContinuousValTx.SyntacticVerify(env.ctx))
+
+	onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
+	require.NoError(err)
+
+	executor := StandardTxExecutor{
+		Backend: &env.backend,
+		State:   onAcceptState,
+		Tx:      addContinuousValTx,
+	}
+	require.NoError(addContinuousValTx.Unsigned.Visit(&executor))
+	val, err := onAcceptState.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+	require.NoError(err)
+
+	// Try adding a permissioned delegator
+	{
+		addFiniteDelegatorTx, err := env.txBuilder.NewAddDelegatorTx(
+			env.config.MinDelegatorStake,
+			uint64(val.StartTime.Unix()),
+			uint64(val.NextTime.Unix()),
+			val.NodeID,
+			addr,
+			preFundedKeys,
+			addr,
+		)
+		require.NoError(err)
+
+		executor = StandardTxExecutor{
+			Backend: &env.backend,
+			State:   onAcceptState,
+			Tx:      addFiniteDelegatorTx,
+		}
+		err = addFiniteDelegatorTx.Unsigned.Visit(&executor)
+		require.ErrorIs(err, ErrFiniteDelegatorToContinuousValidator)
+	}
+
+	// Try adding a permissionless delegator
+	{
+		ins, unstakedOuts, stakedOuts, signers, err := utxosHandler.Spend(
+			env.state,
+			preFundedKeys,
+			env.config.MinValidatorStake, // stakeAmount
+			env.config.AddPrimaryNetworkValidatorFee,
+			addr, // changeAddr
+		)
+		require.NoError(err)
+
+		utx := &txs.AddPermissionlessDelegatorTx{
+			BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+				NetworkID:    env.ctx.NetworkID,
+				BlockchainID: env.ctx.ChainID,
+				Ins:          ins,
+				Outs:         unstakedOuts,
+			}},
+			Validator: txs.Validator{
+				NodeID: nodeID,
+				Start:  uint64(dummyStartTime.Unix()),
+				End:    uint64(dummyEndTime.Unix()),
+				Wght:   env.config.MinValidatorStake,
+			},
+			Subnet:    val.SubnetID,
+			StakeOuts: stakedOuts,
+			DelegationRewardsOwner: &secp256k1fx.OutputOwners{
+				Addrs:     []ids.ShortID{addr},
+				Threshold: 1,
+			},
+		}
+		addPermissionlessDelegatorTx, err := txs.NewSigned(utx, txs.Codec, signers)
+		require.NoError(err)
+		require.NoError(addPermissionlessDelegatorTx.SyntacticVerify(env.ctx))
+
+		executor = StandardTxExecutor{
+			Backend: &env.backend,
+			State:   onAcceptState,
+			Tx:      addPermissionlessDelegatorTx,
+		}
+		err = addPermissionlessDelegatorTx.Unsigned.Visit(&executor)
+		require.ErrorIs(err, ErrFiniteDelegatorToContinuousValidator)
+	}
+
+	// try adding a permissioned subnet validator
+	{
+		addSubnetValidatorTx, err := env.txBuilder.NewAddSubnetValidatorTx(
+			env.config.MinValidatorStake,
+			uint64(val.StartTime.Unix()),
+			uint64(val.NextTime.Unix()),
+			val.NodeID,
+			env.defaultSubnetID,
+			preFundedKeys,
+			addr,
+		)
+		require.NoError(err)
+
+		executor = StandardTxExecutor{
+			Backend: &env.backend,
+			State:   onAcceptState,
+			Tx:      addSubnetValidatorTx,
+		}
+		err = addSubnetValidatorTx.Unsigned.Visit(&executor)
+		require.ErrorIs(err, ErrSubnetValidatorToContinuousValidator)
+	}
+
+	// TODO ABENEGIA: test failure for permissioness validator as well
+}
+
 func TestStandardTxExecutorStopContinuousValidator(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(t, continuousStakingFork)

@@ -99,20 +99,21 @@ type mutableSharedMemory struct {
 }
 
 type environment struct {
-	isBootstrapped *utils.Atomic[bool]
-	config         *config.Config
-	clk            *mockable.Clock
-	baseDB         *versiondb.Database
-	ctx            *snow.Context
-	msm            *mutableSharedMemory
-	fx             fx.Fx
-	state          state.State
-	states         map[ids.ID]state.Chain
-	atomicUTXOs    avax.AtomicUTXOManager
-	uptimes        uptime.Manager
-	utxosHandler   utxo.Handler
-	txBuilder      builder.Builder
-	backend        Backend
+	isBootstrapped  *utils.Atomic[bool]
+	config          *config.Config
+	clk             *mockable.Clock
+	baseDB          *versiondb.Database
+	ctx             *snow.Context
+	msm             *mutableSharedMemory
+	fx              fx.Fx
+	state           state.State
+	states          map[ids.ID]state.Chain
+	atomicUTXOs     avax.AtomicUTXOManager
+	uptimes         uptime.Manager
+	utxosHandler    utxo.Handler
+	txBuilder       builder.Builder
+	backend         Backend
+	defaultSubnetID ids.ID
 }
 
 func (e *environment) GetState(blkID ids.ID) (state.Chain, bool) {
@@ -234,6 +235,7 @@ func addSubnet(
 	require.NoError(env.state.Commit())
 
 	defaultBalance -= env.config.GetCreateSubnetTxFee(env.clk.Time())
+	env.defaultSubnetID = testSubnet1.TxID
 }
 
 func defaultState(

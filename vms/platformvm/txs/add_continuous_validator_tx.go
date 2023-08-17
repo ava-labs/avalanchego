@@ -45,6 +45,8 @@ type AddContinuousValidatorTx struct {
 	// how much of validation reward is restaked in next staking period,
 	// along with previuosly staked amount
 	ValidatorRewardRestakeShares uint32 `serialize:"true" json:"validationRewardsRestakeShares"`
+	// Maximum amount of delegation weight that this validator permits.
+	DelegationMaxWeight uint64 `serialize:"true" json:"delegationMaxWeight"`
 	// Where to send delegation rewards when done validating
 	DelegatorRewardsOwner fx.Owner `serialize:"true" json:"delegationRewardsOwner"`
 	// Fee this validator charges delegators as a percentage, times 10,000
@@ -134,9 +136,9 @@ func (tx *AddContinuousValidatorTx) SyntacticVerify(ctx *snow.Context) error {
 	if err := verify.All(
 		&tx.Validator,
 		tx.Signer,
+		tx.ValidatorAuthKey,
 		tx.ValidatorRewardsOwner,
 		tx.DelegatorRewardsOwner,
-		tx.ValidatorAuthKey,
 	); err != nil {
 		return fmt.Errorf("failed to verify validator, signer, rewards or staker owners: %w", err)
 	}
@@ -158,9 +160,11 @@ func (tx *AddContinuousValidatorTx) SyntacticVerify(ctx *snow.Context) error {
 		}
 	}
 
-	firstStakeOutput := tx.StakeOuts[0]
-	stakedAssetID := firstStakeOutput.AssetID()
-	totalStakeWeight := firstStakeOutput.Output().Amount()
+	var (
+		firstStakeOutput = tx.StakeOuts[0]
+		stakedAssetID    = firstStakeOutput.AssetID()
+		totalStakeWeight = firstStakeOutput.Output().Amount()
+	)
 	for _, out := range tx.StakeOuts[1:] {
 		newWeight, err := math.Add64(totalStakeWeight, out.Output().Amount())
 		if err != nil {

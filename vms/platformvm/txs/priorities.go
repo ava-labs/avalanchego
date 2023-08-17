@@ -71,6 +71,13 @@ func (p Priority) IsPermissionedValidator() bool {
 		p == SubnetPermissionedValidatorPendingPriority
 }
 
+func (p Priority) IsContinuousStaker() bool {
+	return p == PrimaryNetworkContinuousValidatorCurrentPriority ||
+		p == PrimaryNetworkContinuousDelegatorCurrentPriority /*||
+		p == SubnetContinuousValidatorCurrentPriority ||
+		p == SubnetContinuousDelegatorCurrentPriority*/
+}
+
 func (p Priority) IsDelegator() bool {
 	return p.IsCurrentDelegator() || p.IsPendingDelegator()
 }

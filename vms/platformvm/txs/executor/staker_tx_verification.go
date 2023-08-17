@@ -43,6 +43,8 @@ var (
 	ErrWrongStakedAssetID                       = errors.New("incorrect staked assetID")
 	ErrUnauthorizedStakerStopping               = errors.New("unauthorized staker stopping")
 	ErrTxUnacceptableBeforeFork                 = errors.New("tx unacceptable before fork")
+	ErrSubnetValidatorToContinuousValidator     = errors.New("cannot assign subnet validator to continuous validator")
+	ErrFiniteDelegatorToContinuousValidator     = errors.New("cannot assign finite delegator to continuous validator")
 	ErrCantContinuousDelegateToPendingValidator = errors.New("cannot do continuous delegation to pending validator")
 	ErrNoStakerToStop                           = errors.New("could not find staker to stop")
 )
@@ -235,6 +237,10 @@ func verifyAddSubnetValidatorTx(
 			err,
 		)
 	}
+	if primaryNetworkValidator.Priority.IsContinuousStaker() {
+		// TODO: consider activation in subsequent PRs
+		return ErrSubnetValidatorToContinuousValidator
+	}
 
 	// Ensure that the period this validator validates the specified subnet
 	// is a subset of the time they validate the primary network.
@@ -418,6 +424,10 @@ func verifyAddDelegatorTx(
 			err,
 		)
 	}
+	if primaryNetworkValidator.Priority.IsContinuousStaker() {
+		// TODO: consider activation in subsequent PRs
+		return nil, ErrFiniteDelegatorToContinuousValidator
+	}
 
 	maximumWeight, err := math.Mul64(MaxValidatorWeightFactor, primaryNetworkValidator.Weight)
 	if err != nil {
@@ -520,7 +530,7 @@ func verifyAddPermissionlessValidatorTx(
 
 	validatorRules, err := getValidatorRules(backend, chainState, tx.Subnet)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed retrieving validator rules for subnet %v: %w", tx.Subnet, err)
 	}
 
 	var (
@@ -585,6 +595,10 @@ func verifyAddPermissionlessValidatorTx(
 				tx.Validator.NodeID,
 				err,
 			)
+		}
+		if primaryNetworkValidator.Priority.IsContinuousStaker() {
+			// TODO: consider activation in subsequent PRs
+			return ErrSubnetValidatorToContinuousValidator
 		}
 
 		// Ensure that the period this validator validates the specified subnet
@@ -758,6 +772,10 @@ func verifyAddPermissionlessDelegatorTx(
 			tx.Subnet,
 			err,
 		)
+	}
+	if validator.Priority.IsContinuousStaker() {
+		// TODO: consider activation in subsequent PRs
+		return ErrFiniteDelegatorToContinuousValidator
 	}
 
 	maximumWeight, err := math.Mul64(
@@ -951,16 +969,17 @@ func verifyAddContinuousValidatorTx(
 		)
 	}
 
-	_, err = GetValidator(chainState, subnetID, tx.Validator.NodeID)
-	if err == nil {
+	switch _, err = GetValidator(chainState, subnetID, tx.Validator.NodeID); err {
+	case nil:
 		return fmt.Errorf(
 			"%w: %s on %s",
 			ErrDuplicateValidator,
 			tx.Validator.NodeID,
 			subnetID,
 		)
-	}
-	if err != database.ErrNotFound {
+	case database.ErrNotFound:
+		// not a double registration. It's fine
+	default:
 		return fmt.Errorf(
 			"failed to find whether %s is a validator on %s: %w",
 			tx.Validator.NodeID,

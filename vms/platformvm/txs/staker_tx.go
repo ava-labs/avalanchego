@@ -52,6 +52,12 @@ type commonStaker interface {
 	CurrentPriority() Priority
 }
 
+type ContinuousStaker interface {
+	Staker
+	ManagementKey() fx.Owner
+	RestakeShares() uint32
+}
+
 type Staker interface {
 	commonStaker
 	StakingPeriod() time.Duration
@@ -62,10 +68,4 @@ type PreContinuousStakingStaker interface {
 	PendingPriority() Priority
 	StartTime() time.Time
 	EndTime() time.Time
-}
-
-type ContinuousStaker interface {
-	Staker
-	ManagementKey() fx.Owner
-	RestakeShares() uint32
 }
