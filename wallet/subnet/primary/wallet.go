@@ -6,14 +6,10 @@ package primary
 import (
 	"context"
 
-	"github.com/ava-labs/coreth/plugin/evm"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/keychain"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/avm"
-	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/wallet/chain/c"
 	"github.com/ava-labs/avalanchego/wallet/chain/p"
@@ -108,9 +104,8 @@ func MakeWallet(ctx context.Context, config *WalletConfig) (Wallet, error) {
 		pChainTxs = make(map[ids.ID]*txs.Tx)
 	}
 
-	pClient := platformvm.NewClient(config.URI)
 	for txID := range config.PChainTxsToFetch {
-		txBytes, err := pClient.GetTx(ctx, txID)
+		txBytes, err := avaxState.PClient.GetTx(ctx, txID)
 		if err != nil {
 			return nil, err
 		}
@@ -131,18 +126,16 @@ func MakeWallet(ctx context.Context, config *WalletConfig) (Wallet, error) {
 	xBackend := x.NewBackend(avaxState.XCTX, xUTXOs)
 	xBuilder := x.NewBuilder(avaxAddrs, xBackend)
 	xSigner := x.NewSigner(config.AVAXKeychain, xBackend)
-	xClient := avm.NewClient(config.URI, "X")
 
 	cChainID := avaxState.CCTX.BlockchainID()
 	cUTXOs := NewChainUTXOs(cChainID, avaxState.UTXOs)
 	cBackend := c.NewBackend(avaxState.CCTX, cUTXOs, ethState.Accounts)
 	cBuilder := c.NewBuilder(avaxAddrs, ethAddrs, cBackend)
 	cSigner := c.NewSigner(config.AVAXKeychain, config.EthKeychain, cBackend)
-	cAVAXClient := evm.NewCChainClient(config.URI)
 
 	return NewWallet(
-		p.NewWallet(pBuilder, pSigner, pClient, pBackend),
-		x.NewWallet(xBuilder, xSigner, xClient, xBackend),
-		c.NewWallet(cBuilder, cSigner, cAVAXClient, ethState.Client, cBackend),
+		p.NewWallet(pBuilder, pSigner, avaxState.PClient, pBackend),
+		x.NewWallet(xBuilder, xSigner, avaxState.XClient, xBackend),
+		c.NewWallet(cBuilder, cSigner, avaxState.CClient, ethState.Client, cBackend),
 	), nil
 }
