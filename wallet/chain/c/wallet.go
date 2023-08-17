@@ -161,14 +161,18 @@ func (w *wallet) IssueAtomicTx(
 
 	for {
 		status, err := w.client.GetAtomicTxStatus(ctx, txID)
-		if err == nil {
-			switch status {
-			case evm.Accepted:
-				return w.Backend.AcceptAtomicTx(ctx, tx)
-			case evm.Dropped, evm.Unknown:
-				return errNotCommitted
-			}
+		if err != nil {
+			return err
 		}
+
+		switch status {
+		case evm.Accepted:
+			return w.Backend.AcceptAtomicTx(ctx, tx)
+		case evm.Dropped, evm.Unknown:
+			return errNotCommitted
+		}
+
+		// The tx is Processing.
 
 		select {
 		case <-ticker.C:
