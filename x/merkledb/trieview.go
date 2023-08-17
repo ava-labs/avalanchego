@@ -517,7 +517,6 @@ func (t *trieView) commitChanges(ctx context.Context, trieToCommit *trieView) er
 
 // commitToParent commits the changes from this view to its parent Trie
 func (t *trieView) commitToParent(ctx context.Context) error {
-
 	t.commitLock.Lock()
 	defer t.commitLock.Unlock()
 	ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.commitToParent")
