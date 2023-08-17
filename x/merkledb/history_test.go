@@ -183,15 +183,15 @@ func Test_History_Bad_GetValueChanges_Input(t *testing.T) {
 	endRoot := db.getMerkleRoot()
 
 	// ensure these start as valid calls
-	_, err = db.history.getValueChanges(toBeDeletedRoot, endRoot, nil, maybe.Nothing[[]byte](), 1)
+	_, err = db.history.getValueChanges(toBeDeletedRoot, endRoot, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 1)
 	require.NoError(err)
-	_, err = db.history.getValueChanges(startRoot, endRoot, nil, maybe.Nothing[[]byte](), 1)
+	_, err = db.history.getValueChanges(startRoot, endRoot, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 1)
 	require.NoError(err)
 
-	_, err = db.history.getValueChanges(startRoot, endRoot, nil, maybe.Nothing[[]byte](), -1)
+	_, err = db.history.getValueChanges(startRoot, endRoot, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), -1)
 	require.ErrorIs(err, ErrInvalidMaxLength)
 
-	_, err = db.history.getValueChanges(endRoot, startRoot, nil, maybe.Nothing[[]byte](), 1)
+	_, err = db.history.getValueChanges(endRoot, startRoot, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 1)
 	require.ErrorIs(err, ErrInsufficientHistory)
 
 	// trigger the first root to be deleted by exiting the lookback window
@@ -200,11 +200,11 @@ func Test_History_Bad_GetValueChanges_Input(t *testing.T) {
 	require.NoError(batch.Write())
 
 	// now this root should no longer be present
-	_, err = db.history.getValueChanges(toBeDeletedRoot, endRoot, nil, maybe.Nothing[[]byte](), 1)
+	_, err = db.history.getValueChanges(toBeDeletedRoot, endRoot, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 1)
 	require.ErrorIs(err, ErrInsufficientHistory)
 
 	// same start/end roots should yield an empty changelist
-	changes, err := db.history.getValueChanges(endRoot, endRoot, nil, maybe.Nothing[[]byte](), 10)
+	changes, err := db.history.getValueChanges(endRoot, endRoot, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 10)
 	require.NoError(err)
 	require.Empty(changes.values)
 }
@@ -306,7 +306,7 @@ func Test_History_Values_Lookup_Over_Queue_Break(t *testing.T) {
 	endRoot := db.getMerkleRoot()
 
 	// changes should still be collectable even though the history has had to loop due to hitting max size
-	changes, err := db.history.getValueChanges(startRoot, endRoot, nil, maybe.Nothing[[]byte](), 10)
+	changes, err := db.history.getValueChanges(startRoot, endRoot, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 10)
 	require.NoError(err)
 	require.Contains(changes.values, newPath([]byte("key1")))
 	require.Equal([]byte("value1"), changes.values[newPath([]byte("key1"))].after.Value())
@@ -544,7 +544,7 @@ func Test_Change_List(t *testing.T) {
 	endRoot, err := db.GetMerkleRoot(context.Background())
 	require.NoError(err)
 
-	changes, err := db.history.getValueChanges(startRoot, endRoot, nil, maybe.Nothing[[]byte](), 8)
+	changes, err := db.history.getValueChanges(startRoot, endRoot, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 8)
 	require.NoError(err)
 	require.Len(changes.values, 8)
 }

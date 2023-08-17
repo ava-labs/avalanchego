@@ -276,8 +276,8 @@ type RangeProof struct {
 //   - [proof] proves the key-value pairs in [proof.KeyValues] are in the trie
 //     whose root is [expectedRootID].
 //   - All keys in [proof.KeyValues] are in the range [start, end].
-//     If [start] is empty, all keys are considered > [start].
-//     If [end] is empty, all keys are considered < [end].
+//     If [start] is Nothing, all keys are considered > [start].
+//     If [end] is Nothing, all keys are considered < [end].
 func (proof *RangeProof) Verify(
 	ctx context.Context,
 	start maybe.Maybe[[]byte],

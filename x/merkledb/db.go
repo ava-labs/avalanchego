@@ -72,7 +72,7 @@ type ChangeProofer interface {
 	//   - [start] <= [end].
 	//   - [proof] is non-empty.
 	//   - All keys in [proof.KeyValues] and [proof.DeletedKeys] are in [start, end].
-	//     If [start] is empty, all keys are considered > [start].
+	//     If [start] is nothing, all keys are considered > [start].
 	//     If [end] is nothing, all keys are considered < [end].
 	//   - [proof.KeyValues] and [proof.DeletedKeys] are sorted in order of increasing key.
 	//   - [proof.StartProof] and [proof.EndProof] are well-formed.
@@ -96,6 +96,8 @@ type ChangeProofer interface {
 type RangeProofer interface {
 	// GetRangeProofAtRoot returns a proof for the key/value pairs in this trie within the range
 	// [start, end] when the root of the trie was [rootID].
+	// If [start] is Nothing, there's no lower bound on the range.
+	// If [end] is Nothing, there's no upper bound on the range.
 	GetRangeProofAtRoot(
 		ctx context.Context,
 		rootID ids.ID,
@@ -509,8 +511,6 @@ func (db *merkleDB) getProof(ctx context.Context, key []byte) (*Proof, error) {
 	return view.getProof(ctx, key)
 }
 
-// GetRangeProof returns a proof for the key/value pairs in this trie within the range
-// [start, end].
 func (db *merkleDB) GetRangeProof(
 	ctx context.Context,
 	start maybe.Maybe[[]byte],
@@ -523,8 +523,6 @@ func (db *merkleDB) GetRangeProof(
 	return db.getRangeProofAtRoot(ctx, db.getMerkleRoot(), start, end, maxLength)
 }
 
-// GetRangeProofAtRoot returns a proof for the key/value pairs in this trie within the range
-// [start, end] when the root of the trie was [rootID].
 func (db *merkleDB) GetRangeProofAtRoot(
 	ctx context.Context,
 	rootID ids.ID,
@@ -582,7 +580,7 @@ func (db *merkleDB) GetChangeProof(
 		return nil, database.ErrClosed
 	}
 
-	changes, err := db.history.getValueChanges(startRootID, endRootID, start.Value() /* TODO pass maybe */, end, maxLength)
+	changes, err := db.history.getValueChanges(startRootID, endRootID, start, end, maxLength)
 	if err != nil {
 		return nil, err
 	}
@@ -1180,6 +1178,8 @@ func (db *merkleDB) initializeRootIfNeeded() (ids.ID, error) {
 }
 
 // Returns a view of the trie as it was when it had root [rootID] for keys within range [start, end].
+// If [start] is Nothing, there's no lower bound on the range.
+// If [end] is Nothing, there's no upper bound on the range.
 // Assumes [db.commitLock] is read locked.
 func (db *merkleDB) getHistoricalViewForRange(
 	rootID ids.ID,
