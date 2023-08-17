@@ -147,6 +147,7 @@ func maybeBytesToMaybe(mb *pb.MaybeBytes) maybe.Maybe[[]byte] {
 }
 
 // Generates a change proof and sends it to [nodeID].
+// If [errAppSendFailed] is returned, this should be considered fatal.
 func (s *NetworkServer) HandleChangeProofRequest(
 	ctx context.Context,
 	nodeID ids.NodeID,
@@ -262,7 +263,7 @@ func (s *NetworkServer) HandleChangeProofRequest(
 }
 
 // Generates a range proof and sends it to [nodeID].
-// TODO danlaine how should we handle context cancellation?
+// If [errAppSendFailed] is returned, this should be considered fatal.
 func (s *NetworkServer) HandleRangeProofRequest(
 	ctx context.Context,
 	nodeID ids.NodeID,
