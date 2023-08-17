@@ -154,34 +154,22 @@ func (b *builder) GetImportableBalance(
 		addrs           = ops.Addresses(b.avaxAddrs)
 		minIssuanceTime = ops.MinIssuanceTime()
 		avaxAssetID     = b.backend.AVAXAssetID()
-		amount          uint64
+		balance         uint64
 	)
 	for _, utxo := range utxos {
-		if utxo.Asset.ID != avaxAssetID {
-			// Only AVAX can be imported
-			continue
-		}
-
-		out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
+		amount, _, ok := getSpendableAmount(utxo, addrs, minIssuanceTime, avaxAssetID)
 		if !ok {
-			// Can't import an unknown transfer output type
 			continue
 		}
 
-		_, ok = common.MatchOwners(&out.OutputOwners, addrs, minIssuanceTime)
-		if !ok {
-			// We couldn't spend this UTXO, so we skip to the next one
-			continue
-		}
-
-		newAmount, err := math.Add64(amount, out.Amt)
+		newBalance, err := math.Add64(balance, amount)
 		if err != nil {
 			return 0, err
 		}
-		amount = newAmount
+		balance = newBalance
 	}
 
-	return amount, nil
+	return balance, nil
 }
 
 func (b *builder) NewImportTx(
@@ -205,20 +193,8 @@ func (b *builder) NewImportTx(
 		importedAmount uint64
 	)
 	for _, utxo := range utxos {
-		if utxo.Asset.ID != avaxAssetID {
-			// Only AVAX can be imported
-			continue
-		}
-
-		out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
+		amount, inputSigIndices, ok := getSpendableAmount(utxo, addrs, minIssuanceTime, avaxAssetID)
 		if !ok {
-			// Can't import an unknown transfer output type
-			continue
-		}
-
-		inputSigIndices, ok := common.MatchOwners(&out.OutputOwners, addrs, minIssuanceTime)
-		if !ok {
-			// We couldn't spend this UTXO, so we skip to the next one
 			continue
 		}
 
@@ -226,14 +202,14 @@ func (b *builder) NewImportTx(
 			UTXOID: utxo.UTXOID,
 			Asset:  utxo.Asset,
 			In: &secp256k1fx.TransferInput{
-				Amt: out.Amt,
+				Amt: amount,
 				Input: secp256k1fx.Input{
 					SigIndices: inputSigIndices,
 				},
 			},
 		})
 
-		newImportedAmount, err := math.Add64(importedAmount, out.Amt)
+		newImportedAmount, err := math.Add64(importedAmount, amount)
 		if err != nil {
 			return nil, err
 		}
@@ -401,4 +377,25 @@ func (b *builder) NewExportTx(
 	utils.Sort(inputs)
 	tx.Ins = inputs
 	return tx, nil
+}
+
+func getSpendableAmount(
+	utxo *avax.UTXO,
+	addrs set.Set[ids.ShortID],
+	minIssuanceTime uint64,
+	avaxAssetID ids.ID,
+) (uint64, []uint32, bool) {
+	if utxo.Asset.ID != avaxAssetID {
+		// Only AVAX can be imported
+		return 0, nil, false
+	}
+
+	out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
+	if !ok {
+		// Can't import an unknown transfer output type
+		return 0, nil, false
+	}
+
+	inputSigIndices, ok := common.MatchOwners(&out.OutputOwners, addrs, minIssuanceTime)
+	return out.Amt, inputSigIndices, ok
 }
