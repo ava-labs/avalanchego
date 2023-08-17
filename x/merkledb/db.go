@@ -440,8 +440,9 @@ func (db *merkleDB) GetValue(ctx context.Context, key []byte) ([]byte, error) {
 
 // getValueCopy returns a copy of the value for the given [key].
 // Returns database.ErrNotFound if it doesn't exist.
+// Assumes [db.lock] is read locked.
 func (db *merkleDB) getValueCopy(key path) ([]byte, error) {
-	val, err := db.getVal(key)
+	val, err := db.getValueWithoutLock(key)
 	if err != nil {
 		return nil, err
 	}
@@ -450,18 +451,18 @@ func (db *merkleDB) getValueCopy(key path) ([]byte, error) {
 
 // getValue returns the value for the given [key].
 // Returns database.ErrNotFound if it doesn't exist.
-// [db.lock]'s read lock is acquired.
+// Assumes [db.lock] isn't held.
 func (db *merkleDB) getValue(key path) ([]byte, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	return db.getVal(key)
+	return db.getValueWithoutLock(key)
 }
 
-// getVal returns the value for the given [key].
+// getValueWithoutLock returns the value for the given [key].
 // Returns database.ErrNotFound if it doesn't exist.
-// Otherwise, assumes [db.lock] read or write is already held.
-func (db *merkleDB) getVal(key path) ([]byte, error) {
+// Assumes [db.lock] is read locked.
+func (db *merkleDB) getValueWithoutLock(key path) ([]byte, error) {
 	if db.closed {
 		return nil, database.ErrClosed
 	}
