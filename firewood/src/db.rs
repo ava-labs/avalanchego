@@ -370,16 +370,16 @@ pub struct DbRevInner<T> {
 
 /// Firewood database handle.
 #[derive(Debug)]
-pub struct Db<S> {
+pub struct Db {
     inner: Arc<RwLock<DbInner>>,
-    revisions: Arc<Mutex<DbRevInner<S>>>,
+    revisions: Arc<Mutex<DbRevInner<SharedStore>>>,
     payload_regn_nbit: u64,
     metrics: Arc<DbMetrics>,
     cfg: DbConfig,
 }
 
 // #[metered(registry = DbMetrics, visibility = pub)]
-impl Db<SharedStore> {
+impl Db {
     const PARAM_SIZE: u64 = size_of::<DbParams>() as u64;
 
     /// Open a database.
@@ -909,7 +909,7 @@ impl Db<SharedStore> {
 }
 
 #[metered(registry = DbMetrics, visibility = pub)]
-impl<S: ShaleStore<Node> + Send + Sync> Db<S> {
+impl Db {
     /// Dump the Trie of the latest generic key-value storage.
     pub fn kv_dump(&self, w: &mut dyn Write) -> Result<(), DbError> {
         self.revisions.lock().base_revision.kv_dump(w)

@@ -1,9 +1,8 @@
 use firewood::{
     db::{BatchOp, Db as PersistedDb, DbConfig, DbError, WalConfig},
-    merkle::{Node, TrieHash},
-    storage::StoreRevShared,
+    merkle::TrieHash,
 };
-use firewood_shale::compact::CompactSpace;
+
 use std::{
     collections::VecDeque,
     fs::remove_dir_all,
@@ -22,9 +21,7 @@ macro_rules! kv_dump {
     }};
 }
 
-type SharedStore = CompactSpace<Node, StoreRevShared>;
-
-struct Db<'a, P: AsRef<Path> + ?Sized>(PersistedDb<SharedStore>, &'a P);
+struct Db<'a, P: AsRef<Path> + ?Sized>(PersistedDb, &'a P);
 
 impl<'a, P: AsRef<Path> + ?Sized> Db<'a, P> {
     fn new(path: &'a P, cfg: &DbConfig) -> Result<Self, DbError> {
@@ -231,7 +228,7 @@ fn create_db_issue_proof() {
 }
 
 impl<P: AsRef<Path> + ?Sized> Deref for Db<'_, P> {
-    type Target = PersistedDb<SharedStore>;
+    type Target = PersistedDb;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -239,7 +236,7 @@ impl<P: AsRef<Path> + ?Sized> Deref for Db<'_, P> {
 }
 
 impl<P: AsRef<Path> + ?Sized> DerefMut for Db<'_, P> {
-    fn deref_mut(&mut self) -> &mut PersistedDb<SharedStore> {
+    fn deref_mut(&mut self) -> &mut PersistedDb {
         &mut self.0
     }
 }
