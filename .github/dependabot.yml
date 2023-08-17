@@ -13,4 +13,4 @@ updates:
       timezone: America/Los_Angeles
     open-pull-requests-limit: 10
     allow:
-      dependency-type: all
+      dependency-type: "all"
