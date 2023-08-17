@@ -41,6 +41,7 @@ type Client struct {
 	handlerPrefix []byte
 	router        *Router
 	sender        common.AppSender
+	nodeSampler   NodeSampler
 }
 
 // AppRequestAny issues an AppRequest to an arbitrary node decided by Client.
@@ -51,15 +52,20 @@ func (c *Client) AppRequestAny(
 	appRequestBytes []byte,
 	onResponse AppResponseCallback,
 ) error {
-	c.router.lock.RLock()
-	peers := c.router.peers.Sample(1)
-	c.router.lock.RUnlock()
+	sampled, err := c.nodeSampler.Sample(1)
+	if err != nil {
+		return fmt.Errorf("failed to sample peers: %w", err)
+	}
 
-	if len(peers) != 1 {
+	if len(sampled) != 1 {
 		return ErrNoPeers
 	}
 
-	nodeIDs := set.Of(peers[0])
+	nodeIDs := set.NewSet[ids.NodeID](len(sampled))
+	for _, s := range sampled {
+		nodeIDs.Add(s)
+	}
+
 	return c.AppRequest(ctx, nodeIDs, appRequestBytes, onResponse)
 }
 
