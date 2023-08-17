@@ -95,11 +95,13 @@ type trieView struct {
 	root *node
 
 	// If true, this view has been committed.
+	// [commitLock] must be held while accessing this field.
 	committed bool
 }
 
 // NewView returns a new view on top of this one.
 // Adds the new view to [t.childViews].
+// Assumes [t.commitLock] isn't held.
 func (t *trieView) NewView(ctx context.Context, batchOps []database.BatchOp) (TrieView, error) {
 	if t.isInvalid() {
 		return nil, ErrInvalid
@@ -107,6 +109,7 @@ func (t *trieView) NewView(ctx context.Context, batchOps []database.BatchOp) (Tr
 
 	t.commitLock.RLock()
 	defer t.commitLock.RUnlock()
+
 	if t.committed {
 		return t.getParentTrie().NewView(ctx, batchOps)
 	}
