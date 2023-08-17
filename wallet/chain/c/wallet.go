@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/ava-labs/coreth/ethclient"
 	"github.com/ava-labs/coreth/plugin/evm"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
@@ -37,11 +38,9 @@ type Wallet interface {
 	//
 	// - [chainID] specifies the chain to be importing funds from.
 	// - [to] specifies where to send the imported funds to.
-	// - [baseFee] specifies the fee price willing to be paid by this tx.
 	IssueImportTx(
 		chainID ids.ID,
 		to ethcommon.Address,
-		baseFee *big.Int,
 		options ...common.Option,
 	) (*evm.Tx, error)
 
@@ -50,11 +49,9 @@ type Wallet interface {
 	//
 	// - [chainID] specifies the chain to be exporting the funds to.
 	// - [outputs] specifies the outputs to send to the [chainID].
-	// - [baseFee] specifies the fee price willing to be paid by this tx.
 	IssueExportTx(
 		chainID ids.ID,
 		outputs []*secp256k1fx.TransferOutput,
-		baseFee *big.Int,
 		options ...common.Option,
 	) (*evm.Tx, error)
 
@@ -74,22 +71,25 @@ type Wallet interface {
 func NewWallet(
 	builder Builder,
 	signer Signer,
-	client evm.Client,
+	avaxClient evm.Client,
+	ethClient ethclient.Client,
 	backend Backend,
 ) Wallet {
 	return &wallet{
-		Backend: backend,
-		builder: builder,
-		signer:  signer,
-		client:  client,
+		Backend:    backend,
+		builder:    builder,
+		signer:     signer,
+		avaxClient: avaxClient,
+		ethClient:  ethClient,
 	}
 }
 
 type wallet struct {
 	Backend
-	builder Builder
-	signer  Signer
-	client  evm.Client
+	builder    Builder
+	signer     Signer
+	avaxClient evm.Client
+	ethClient  ethclient.Client
 }
 
 func (w *wallet) Builder() Builder {
@@ -103,9 +103,13 @@ func (w *wallet) Signer() Signer {
 func (w *wallet) IssueImportTx(
 	chainID ids.ID,
 	to ethcommon.Address,
-	baseFee *big.Int,
 	options ...common.Option,
 ) (*evm.Tx, error) {
+	baseFee, err := w.baseFee(options...)
+	if err != nil {
+		return nil, err
+	}
+
 	utx, err := w.builder.NewImportTx(chainID, to, baseFee, options...)
 	if err != nil {
 		return nil, err
@@ -116,9 +120,13 @@ func (w *wallet) IssueImportTx(
 func (w *wallet) IssueExportTx(
 	chainID ids.ID,
 	outputs []*secp256k1fx.TransferOutput,
-	baseFee *big.Int,
 	options ...common.Option,
 ) (*evm.Tx, error) {
+	baseFee, err := w.baseFee(options...)
+	if err != nil {
+		return nil, err
+	}
+
 	utx, err := w.builder.NewExportTx(chainID, outputs, baseFee, options...)
 	if err != nil {
 		return nil, err
@@ -146,7 +154,7 @@ func (w *wallet) IssueAtomicTx(
 ) error {
 	ops := common.NewOptions(options)
 	ctx := ops.Context()
-	txID, err := w.client.IssueTx(ctx, tx.SignedBytes())
+	txID, err := w.avaxClient.IssueTx(ctx, tx.SignedBytes())
 	if err != nil {
 		return err
 	}
@@ -160,7 +168,7 @@ func (w *wallet) IssueAtomicTx(
 	defer ticker.Stop()
 
 	for {
-		status, err := w.client.GetAtomicTxStatus(ctx, txID)
+		status, err := w.avaxClient.GetAtomicTxStatus(ctx, txID)
 		if err != nil {
 			return err
 		}
@@ -180,4 +188,15 @@ func (w *wallet) IssueAtomicTx(
 			return ctx.Err()
 		}
 	}
+}
+
+func (w *wallet) baseFee(options ...common.Option) (*big.Int, error) {
+	ops := common.NewOptions(options)
+	baseFee := ops.BaseFee(nil)
+	if baseFee != nil {
+		return baseFee, nil
+	}
+
+	ctx := ops.Context()
+	return w.ethClient.EstimateBaseFee(ctx)
 }

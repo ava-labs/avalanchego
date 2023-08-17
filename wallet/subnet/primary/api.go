@@ -54,33 +54,42 @@ type UTXOClient interface {
 	) ([][]byte, ids.ShortID, ids.ID, error)
 }
 
+type AVAXState struct {
+	PClient platformvm.Client
+	PCTX    p.Context
+	XClient avm.Client
+	XCTX    x.Context
+	CClient evm.Client
+	CCTX    c.Context
+	UTXOs   UTXOs
+}
+
 func FetchState(
 	ctx context.Context,
 	uri string,
 	addrs set.Set[ids.ShortID],
 ) (
-	p.Context,
-	x.Context,
-	c.Context,
-	UTXOs,
+	*AVAXState,
 	error,
 ) {
 	infoClient := info.NewClient(uri)
+	pClient := platformvm.NewClient(uri)
 	xClient := avm.NewClient(uri, "X")
+	cClient := evm.NewCChainClient(uri)
 
 	pCTX, err := p.NewContextFromClients(ctx, infoClient, xClient)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, err
 	}
 
 	xCTX, err := x.NewContextFromClients(ctx, infoClient, xClient)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, err
 	}
 
 	cCTX, err := c.NewContextFromClients(ctx, infoClient, xClient)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, err
 	}
 
 	utxos := NewUTXOs()
@@ -92,7 +101,7 @@ func FetchState(
 	}{
 		{
 			id:     constants.PlatformChainID,
-			client: platformvm.NewClient(uri),
+			client: pClient,
 			codec:  txs.Codec,
 		},
 		{
@@ -102,7 +111,7 @@ func FetchState(
 		},
 		{
 			id:     cCTX.BlockchainID(),
-			client: evm.NewCChainClient(uri),
+			client: cClient,
 			codec:  evm.Codec,
 		},
 	}
@@ -118,18 +127,31 @@ func FetchState(
 				addrList,
 			)
 			if err != nil {
-				return nil, nil, nil, nil, err
+				return nil, err
 			}
 		}
 	}
-	return pCTX, xCTX, cCTX, utxos, nil
+	return &AVAXState{
+		PClient: pClient,
+		PCTX:    pCTX,
+		XClient: xClient,
+		XCTX:    xCTX,
+		CClient: cClient,
+		CCTX:    cCTX,
+		UTXOs:   utxos,
+	}, nil
+}
+
+type EthState struct {
+	Client   ethclient.Client
+	Accounts map[common.Address]*c.Account
 }
 
 func FetchEthState(
 	ctx context.Context,
 	uri string,
 	addrs set.Set[common.Address],
-) (map[common.Address]*c.Account, error) {
+) (*EthState, error) {
 	path := fmt.Sprintf(
 		"%s/ext/%s/C/rpc",
 		uri,
@@ -155,7 +177,10 @@ func FetchEthState(
 			Nonce:   nonce,
 		}
 	}
-	return accounts, nil
+	return &EthState{
+		Client:   client,
+		Accounts: accounts,
+	}, nil
 }
 
 // AddAllUTXOs fetches all the UTXOs referenced by [addresses] that were sent

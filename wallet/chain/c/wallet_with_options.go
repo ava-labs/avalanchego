@@ -4,8 +4,6 @@
 package c
 
 import (
-	"math/big"
-
 	"github.com/ava-labs/coreth/plugin/evm"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
@@ -42,13 +40,11 @@ func (w *walletWithOptions) Builder() Builder {
 func (w *walletWithOptions) IssueImportTx(
 	chainID ids.ID,
 	to ethcommon.Address,
-	baseFee *big.Int,
 	options ...common.Option,
 ) (*evm.Tx, error) {
 	return w.Wallet.IssueImportTx(
 		chainID,
 		to,
-		baseFee,
 		common.UnionOptions(w.options, options)...,
 	)
 }
@@ -56,13 +52,11 @@ func (w *walletWithOptions) IssueImportTx(
 func (w *walletWithOptions) IssueExportTx(
 	chainID ids.ID,
 	outputs []*secp256k1fx.TransferOutput,
-	baseFee *big.Int,
 	options ...common.Option,
 ) (*evm.Tx, error) {
 	return w.Wallet.IssueExportTx(
 		chainID,
 		outputs,
-		baseFee,
 		common.UnionOptions(w.options, options)...,
 	)
 }
