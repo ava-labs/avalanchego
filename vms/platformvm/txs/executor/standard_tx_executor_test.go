@@ -1419,7 +1419,7 @@ func TestStandardTxExecutorStopContinuousStakers(t *testing.T) {
 	var (
 		nodeID            = ids.GenerateTestNodeID()
 		validatorDuration = defaultMaxStakingDuration
-		delegatorDuration = defaultMinStakingDuration
+		delegatorDuration = validatorDuration / 4
 		dummyStartTime    = time.Unix(0, 0)
 
 		stakerAuthPrivateKey = preFundedKeys[4]
@@ -1596,10 +1596,16 @@ func TestStandardTxExecutorAddContinuousDelegator(t *testing.T) {
 	}()
 
 	// Add a primary network continuous validator
-	chainTime := env.state.GetTimestamp()
 	blsSK, err := bls.NewSecretKey()
 	require.NoError(err)
-	blsPOP := signer.NewProofOfPossession(blsSK)
+
+	var (
+		blsPOP          = signer.NewProofOfPossession(blsSK)
+		chainTime       = env.state.GetTimestamp()
+		validatorPeriod = env.config.MinStakeDuration
+		delegatorPeriod = validatorPeriod
+	)
+
 	primaryValidator := &state.Staker{
 		TxID:      ids.GenerateTestID(),
 		NodeID:    ids.GenerateTestNodeID(),
@@ -1608,21 +1614,20 @@ func TestStandardTxExecutorAddContinuousDelegator(t *testing.T) {
 		Weight:    env.config.MinValidatorStake,
 
 		StartTime:       chainTime,
-		StakingPeriod:   env.config.MaxStakeDuration,
+		StakingPeriod:   validatorPeriod,
 		EndTime:         mockable.MaxTime,
 		PotentialReward: uint64(0), // not relevant for this test
-		NextTime:        chainTime.Add(env.config.MinStakeDuration),
+		NextTime:        chainTime.Add(validatorPeriod),
 		Priority:        txs.PrimaryNetworkContinuousValidatorCurrentPriority,
 	}
 	env.state.PutCurrentValidator(primaryValidator)
 
 	// Create continuous delegator
 	var (
-		nodeID            = primaryValidator.NodeID
-		validatorDuration = defaultMinStakingDuration
-		dummyStartTime    = time.Unix(0, 0)
-		dummyEndTime      = time.Unix(0, 0).Add(validatorDuration)
-		addr              = preFundedKeys[0].PublicKey().Address()
+		nodeID         = primaryValidator.NodeID
+		dummyStartTime = time.Unix(0, 0)
+		dummyEndTime   = time.Unix(0, 0).Add(delegatorPeriod)
+		addr           = preFundedKeys[0].PublicKey().Address()
 	)
 	utxosHandler := utxo.NewHandler(env.ctx, env.clk, env.fx)
 	ins, unstakedOuts, stakedOuts, signers, err := utxosHandler.Spend(
@@ -1683,7 +1688,7 @@ func TestStandardTxExecutorAddContinuousDelegator(t *testing.T) {
 
 	require.Equal(addContinuousDelegatorTx.ID(), delegator.TxID)
 	require.Equal(env.state.GetTimestamp(), delegator.StartTime)
-	require.Equal(validatorDuration, delegator.StakingPeriod)
+	require.Equal(delegatorPeriod, delegator.StakingPeriod)
 	require.Equal(delegator.StartTime.Add(delegator.StakingPeriod), delegator.NextTime)
 	require.Equal(mockable.MaxTime, delegator.EndTime)
 }

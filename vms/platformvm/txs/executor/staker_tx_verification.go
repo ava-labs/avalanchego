@@ -1024,6 +1024,9 @@ func verifyAddContinuousDelegatorTx(
 		return time.Time{}, err
 	}
 
+	// Candidate delegator period checks:
+	// * delegator first period must be bounded by validator first period
+	// * delegator period must be a power of two divisor of validator period
 	if !txs.BoundedBy(
 		newStaker.StartTime,
 		newStaker.NextTime,
@@ -1032,6 +1035,10 @@ func verifyAddContinuousDelegatorTx(
 	) {
 		return time.Time{}, ErrPeriodMismatch
 	}
+	if err := checkContinuousDelegatorPeriod(validator.StakingPeriod, newStaker.StakingPeriod); err != nil {
+		return time.Time{}, err
+	}
+
 	overDelegated, err := overDelegated(chainState, validator, maximumWeight, newStaker)
 	if err != nil {
 		return time.Time{}, err

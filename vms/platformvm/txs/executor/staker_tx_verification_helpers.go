@@ -4,6 +4,7 @@
 package executor
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -255,4 +256,24 @@ func GetMaxWeight(
 	// be at the end of the delegation window. Make sure that the max weight is
 	// updated accordingly.
 	return math.Max(currentMax, currentWeight), nil
+}
+
+// checkContinuousDelegatorPeriod assumes [delegatorPeriod] <= [validatorPeriod]
+func checkContinuousDelegatorPeriod(validatorPeriod, delegatorPeriod time.Duration) error {
+	if validatorPeriod == delegatorPeriod {
+		return nil
+	}
+
+	res := int(validatorPeriod) / int(delegatorPeriod)
+	rem := validatorPeriod % delegatorPeriod
+	if rem != 0 || (res&(res-1)) != 0 {
+		return fmt.Errorf("validator period %d, delegator period %d, result %d, remainder %d: %w",
+			validatorPeriod,
+			delegatorPeriod,
+			res,
+			rem,
+			ErrPeriodMismatch,
+		)
+	}
+	return nil
 }
