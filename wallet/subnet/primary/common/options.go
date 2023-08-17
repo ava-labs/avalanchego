@@ -5,6 +5,7 @@ package common
 
 import (
 	"context"
+	"math/big"
 	"time"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
@@ -26,6 +27,8 @@ type Options struct {
 
 	customEthAddressesSet bool
 	customEthAddresses    set.Set[ethcommon.Address]
+
+	baseFee *big.Int
 
 	minIssuanceTimeSet bool
 	minIssuanceTime    uint64
@@ -83,6 +86,13 @@ func (o *Options) EthAddresses(defaultAddresses set.Set[ethcommon.Address]) set.
 	return defaultAddresses
 }
 
+func (o *Options) BaseFee(defaultBaseFee *big.Int) *big.Int {
+	if o.baseFee != nil {
+		return o.baseFee
+	}
+	return defaultBaseFee
+}
+
 func (o *Options) MinIssuanceTime() uint64 {
 	if o.minIssuanceTimeSet {
 		return o.minIssuanceTime
@@ -133,6 +143,12 @@ func WithCustomEthAddresses(addrs set.Set[ethcommon.Address]) Option {
 	return func(o *Options) {
 		o.customEthAddressesSet = true
 		o.customEthAddresses = addrs
+	}
+}
+
+func WithBaseFee(baseFee *big.Int) Option {
+	return func(o *Options) {
+		o.baseFee = baseFee
 	}
 }
 

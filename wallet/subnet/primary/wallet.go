@@ -92,13 +92,13 @@ type WalletConfig struct {
 // The wallet manages all state locally, and performs all tx signing locally.
 func MakeWallet(ctx context.Context, config *WalletConfig) (Wallet, error) {
 	avaxAddrs := config.AVAXKeychain.Addresses()
-	pCTX, xCTX, cCTX, utxos, err := FetchState(ctx, config.URI, avaxAddrs)
+	avaxState, err := FetchState(ctx, config.URI, avaxAddrs)
 	if err != nil {
 		return nil, err
 	}
 
 	ethAddrs := config.EthKeychain.EthAddresses()
-	accounts, err := FetchEthState(ctx, config.URI, ethAddrs)
+	ethState, err := FetchEthState(ctx, config.URI, ethAddrs)
 	if err != nil {
 		return nil, err
 	}
@@ -121,28 +121,28 @@ func MakeWallet(ctx context.Context, config *WalletConfig) (Wallet, error) {
 		pChainTxs[txID] = tx
 	}
 
-	pUTXOs := NewChainUTXOs(constants.PlatformChainID, utxos)
-	pBackend := p.NewBackend(pCTX, pUTXOs, pChainTxs)
+	pUTXOs := NewChainUTXOs(constants.PlatformChainID, avaxState.UTXOs)
+	pBackend := p.NewBackend(avaxState.PCTX, pUTXOs, pChainTxs)
 	pBuilder := p.NewBuilder(avaxAddrs, pBackend)
 	pSigner := p.NewSigner(config.AVAXKeychain, pBackend)
 
-	xChainID := xCTX.BlockchainID()
-	xUTXOs := NewChainUTXOs(xChainID, utxos)
-	xBackend := x.NewBackend(xCTX, xUTXOs)
+	xChainID := avaxState.XCTX.BlockchainID()
+	xUTXOs := NewChainUTXOs(xChainID, avaxState.UTXOs)
+	xBackend := x.NewBackend(avaxState.XCTX, xUTXOs)
 	xBuilder := x.NewBuilder(avaxAddrs, xBackend)
 	xSigner := x.NewSigner(config.AVAXKeychain, xBackend)
 	xClient := avm.NewClient(config.URI, "X")
 
-	cChainID := cCTX.BlockchainID()
-	cUTXOs := NewChainUTXOs(cChainID, utxos)
-	cBackend := c.NewBackend(cCTX, cUTXOs, accounts)
+	cChainID := avaxState.CCTX.BlockchainID()
+	cUTXOs := NewChainUTXOs(cChainID, avaxState.UTXOs)
+	cBackend := c.NewBackend(avaxState.CCTX, cUTXOs, ethState.Accounts)
 	cBuilder := c.NewBuilder(avaxAddrs, ethAddrs, cBackend)
 	cSigner := c.NewSigner(config.AVAXKeychain, config.EthKeychain, cBackend)
-	cClient := evm.NewCChainClient(config.URI)
+	cAVAXClient := evm.NewCChainClient(config.URI)
 
 	return NewWallet(
 		p.NewWallet(pBuilder, pSigner, pClient, pBackend),
 		x.NewWallet(xBuilder, xSigner, xClient, xBackend),
-		c.NewWallet(cBuilder, cSigner, cClient, cBackend),
+		c.NewWallet(cBuilder, cSigner, cAVAXClient, ethState.Client, cBackend),
 	), nil
 }

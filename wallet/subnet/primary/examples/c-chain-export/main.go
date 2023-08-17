@@ -6,7 +6,6 @@ package main
 import (
 	"context"
 	"log"
-	"math/big"
 	"time"
 
 	"github.com/ava-labs/avalanchego/genesis"
@@ -22,7 +21,6 @@ func main() {
 	uri := primary.LocalAPIURI
 	kc := secp256k1fx.NewKeychain(key)
 	avaxAddr := key.Address()
-	baseFee := big.NewInt(1e12) // Should typically be calculated base on the current chain fee
 
 	ctx := context.Background()
 
@@ -59,7 +57,6 @@ func main() {
 			Amt:          units.Avax,
 			OutputOwners: owner,
 		}},
-		baseFee,
 	)
 	if err != nil {
 		log.Fatalf("failed to issue export transaction: %s\n", err)

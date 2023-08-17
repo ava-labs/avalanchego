@@ -6,7 +6,6 @@ package main
 import (
 	"context"
 	"log"
-	"math/big"
 	"time"
 
 	"github.com/ava-labs/coreth/plugin/evm"
@@ -26,7 +25,6 @@ func main() {
 	kc := secp256k1fx.NewKeychain(key)
 	avaxAddr := key.Address()
 	ethAddr := evm.PublicKeyToEthAddress(key.PublicKey())
-	baseFee := big.NewInt(1e12) // Should typically be calculated base on the current chain fee
 
 	ctx := context.Background()
 
@@ -71,7 +69,7 @@ func main() {
 	log.Printf("issued export %s in %s\n", exportTx.ID(), time.Since(exportStartTime))
 
 	importStartTime := time.Now()
-	importTx, err := cWallet.IssueImportTx(constants.PlatformChainID, ethAddr, baseFee)
+	importTx, err := cWallet.IssueImportTx(constants.PlatformChainID, ethAddr)
 	if err != nil {
 		log.Fatalf("failed to issue import transaction: %s\n", err)
 	}
