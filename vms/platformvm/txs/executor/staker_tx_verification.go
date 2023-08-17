@@ -923,48 +923,36 @@ func verifyAddContinuousValidatorTx(
 }
 
 // verifyAddContinuousDelegatorTx carries out the validation for an
-// AddContinuousDelegatorTx. It returns the end time for the delegator
-// to be created if verification passes.
+// AddContinuousDelegatorTx. It returns the validator start time and
+// the end time for the delegator to be created if verification passes.
 func verifyAddContinuousDelegatorTx(
 	backend *Backend,
 	chainState state.Chain,
 	sTx *txs.Tx,
 	tx *txs.AddContinuousDelegatorTx,
-) (time.Time, error) {
+) (
+	time.Time, // validator start time
+	time.Time, // delegator end time
+	time.Duration, // min staking duration
+	error,
+) {
 	// Verify the tx is well-formed
 	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
-		return time.Time{}, err
+		return time.Time{}, time.Time{}, 0, err
 	}
 
-	subnetID := constants.PrimaryNetworkID
-	if !backend.Bootstrapped.Get() {
-		validator, err := GetValidator(chainState, subnetID, tx.Validator.NodeID)
-		if err != nil {
-			return time.Time{}, fmt.Errorf(
-				"failed to fetch the validator for %s on %s: %w",
-				tx.Validator.NodeID,
-				subnetID,
-				err,
-			)
-		}
-		if !validator.Priority.IsContinuousValidator() {
-			return time.Time{}, ErrContinuousDelegatorToNonContinuousValidator
-		}
+	var (
+		subnetID         = constants.PrimaryNetworkID
+		currentTimestamp = chainState.GetTimestamp()
+	)
 
-		// We do not forbid AddContinuousDelegatorTx to create a delegator
-		// for an already stopped continuous validator. We do make sure,
-		// however that the delegator won't outlive its validator.
-		return validator.EndTime, nil
-	}
-
-	currentTimestamp := chainState.GetTimestamp()
-	if !backend.Config.IsContinuousStakingActivated(currentTimestamp) {
-		return time.Time{}, ErrTxUnacceptableBeforeFork
+	if backend.Bootstrapped.Get() && !backend.Config.IsContinuousStakingActivated(currentTimestamp) {
+		return time.Time{}, time.Time{}, 0, ErrTxUnacceptableBeforeFork
 	}
 
 	delegatorRules, err := getDelegatorRules(backend, chainState, subnetID)
 	if err != nil {
-		return time.Time{}, err
+		return time.Time{}, time.Time{}, 0, err
 	}
 
 	var (
@@ -974,19 +962,19 @@ func verifyAddContinuousDelegatorTx(
 	switch {
 	case tx.Validator.Wght < delegatorRules.minDelegatorStake:
 		// Ensure delegator is staking at least the minimum amount
-		return time.Time{}, ErrWeightTooSmall
+		return time.Time{}, time.Time{}, 0, ErrWeightTooSmall
 
 	case stakingPeriod < delegatorRules.minStakeDuration:
 		// Ensure staking length is not too short
-		return time.Time{}, ErrStakeTooShort
+		return time.Time{}, time.Time{}, 0, ErrStakeTooShort
 
 	case stakingPeriod > delegatorRules.maxStakeDuration:
 		// Ensure staking length is not too long
-		return time.Time{}, ErrStakeTooLong
+		return time.Time{}, time.Time{}, 0, ErrStakeTooLong
 
 	case stakedAssetID != delegatorRules.assetID:
 		// Wrong assetID used
-		return time.Time{}, fmt.Errorf(
+		return time.Time{}, time.Time{}, 0, fmt.Errorf(
 			"%w: %s != %s",
 			ErrWrongStakedAssetID,
 			delegatorRules.assetID,
@@ -996,7 +984,7 @@ func verifyAddContinuousDelegatorTx(
 
 	validator, err := GetValidator(chainState, subnetID, tx.Validator.NodeID)
 	if err != nil {
-		return time.Time{}, fmt.Errorf(
+		return time.Time{}, time.Time{}, 0, fmt.Errorf(
 			"failed to fetch the validator for %s on %s: %w",
 			tx.Validator.NodeID,
 			subnetID,
@@ -1004,7 +992,12 @@ func verifyAddContinuousDelegatorTx(
 		)
 	}
 	if !validator.Priority.IsContinuousValidator() {
-		return time.Time{}, ErrContinuousDelegatorToNonContinuousValidator
+		return time.Time{}, time.Time{}, 0, ErrContinuousDelegatorToNonContinuousValidator
+	}
+	delegatorEndTime := validator.EndTime
+
+	if !backend.Bootstrapped.Get() {
+		return validator.StartTime, delegatorEndTime, delegatorRules.minStakeDuration, nil
 	}
 
 	maximumWeight, err := math.Mul64(
@@ -1016,12 +1009,10 @@ func verifyAddContinuousDelegatorTx(
 	}
 	maximumWeight = math.Min(maximumWeight, delegatorRules.maxValidatorStake)
 
-	delegatorEndTime := validator.EndTime
-
 	// potential reward does not matter
 	newStaker, err := state.NewCurrentStaker(sTx.ID(), tx, currentTimestamp, delegatorEndTime, 0)
 	if err != nil {
-		return time.Time{}, err
+		return time.Time{}, time.Time{}, 0, err
 	}
 
 	// Candidate delegator period checks:
@@ -1033,18 +1024,18 @@ func verifyAddContinuousDelegatorTx(
 		validator.StartTime,
 		validator.NextTime,
 	) {
-		return time.Time{}, ErrPeriodMismatch
+		return time.Time{}, time.Time{}, 0, ErrPeriodMismatch
 	}
 	if err := checkContinuousDelegatorPeriod(validator.StakingPeriod, newStaker.StakingPeriod); err != nil {
-		return time.Time{}, err
+		return time.Time{}, time.Time{}, 0, err
 	}
 
 	overDelegated, err := overDelegated(chainState, validator, maximumWeight, newStaker)
 	if err != nil {
-		return time.Time{}, err
+		return time.Time{}, time.Time{}, 0, err
 	}
 	if overDelegated {
-		return time.Time{}, ErrOverDelegated
+		return time.Time{}, time.Time{}, 0, ErrOverDelegated
 	}
 
 	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.StakeOuts))
@@ -1064,10 +1055,10 @@ func verifyAddContinuousDelegatorTx(
 			backend.Ctx.AVAXAssetID: txFee,
 		},
 	); err != nil {
-		return time.Time{}, fmt.Errorf("%w: %v", ErrFlowCheckFailed, err)
+		return time.Time{}, time.Time{}, 0, fmt.Errorf("%w: %v", ErrFlowCheckFailed, err)
 	}
 
-	return delegatorEndTime, nil
+	return validator.StartTime, delegatorEndTime, delegatorRules.minStakeDuration, nil
 }
 
 func verifyStopStakerTx(

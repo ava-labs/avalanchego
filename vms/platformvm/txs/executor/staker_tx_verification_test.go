@@ -1124,6 +1124,7 @@ func TestVerifyAddContinuousDelegatorTx(t *testing.T) {
 			},
 			stateF: func(ctrl *gomock.Controller) state.Chain {
 				mockState := state.NewMockChain(ctrl)
+				mockState.EXPECT().GetTimestamp().Return(chainTime)
 				mockState.EXPECT().GetCurrentValidator(verifiedTx.SubnetID(), verifiedTx.NodeID()).Return(primaryValidator, nil)
 				return mockState
 			},
@@ -1588,7 +1589,7 @@ func TestVerifyAddContinuousDelegatorTx(t *testing.T) {
 				tx      = tt.txF()
 			)
 
-			endTime, err := verifyAddContinuousDelegatorTx(backend, state, sTx, tx)
+			_, endTime, _, err := verifyAddContinuousDelegatorTx(backend, state, sTx, tx)
 			require.ErrorIs(t, err, tt.expectedErr)
 			require.Equal(t, tt.expectedEndTime, endTime)
 		})
