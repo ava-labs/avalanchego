@@ -7,11 +7,10 @@ use firewood::{
     db::{BatchOp, Db, DbConfig, Proposal, Revision, WalConfig},
     merkle::{Node, TrieHash},
     proof::Proof,
-    storage::{StoreRevMut, StoreRevShared},
+    storage::StoreRevShared,
 };
 use firewood_shale::compact::CompactSpace;
 
-type Store = CompactSpace<Node, StoreRevMut>;
 type SharedStore = CompactSpace<Node, StoreRevShared>;
 
 /// cargo run --example rev
@@ -142,7 +141,7 @@ impl RevisionTracker {
         self.hashes.push_front(hash);
     }
 
-    fn commit_proposal(&mut self, proposal: Proposal<Store, SharedStore>) {
+    fn commit_proposal(&mut self, proposal: Proposal) {
         proposal.commit().unwrap();
         let hash = self.db.kv_root_hash().expect("root-hash should exist");
         self.hashes.push_front(hash);

@@ -750,10 +750,7 @@ impl Db {
     }
 
     /// Create a proposal.
-    pub fn new_proposal<K: AsRef<[u8]>>(
-        &self,
-        data: Batch<K>,
-    ) -> Result<Proposal<Store, SharedStore>, DbError> {
+    pub fn new_proposal<K: AsRef<[u8]>>(&self, data: Batch<K>) -> Result<Proposal, DbError> {
         let mut inner = self.inner.write();
         let reset_store_headers = inner.reset_store_headers;
         let (store, mut rev) = Db::new_store(
@@ -963,32 +960,29 @@ pub type Batch<K> = Vec<BatchOp<K>>;
 /// latest committed revision at the same time. [Proposal] is immutable meaning
 /// the internal batch cannot be altered after creation. Committing a proposal
 /// invalidates all other proposals that are not children of the committed one.
-pub struct Proposal<S, T> {
+pub struct Proposal {
     // State of the Db
     m: Arc<RwLock<DbInner>>,
-    r: Arc<Mutex<DbRevInner<T>>>,
+    r: Arc<Mutex<DbRevInner<SharedStore>>>,
     cfg: DbConfig,
 
     // State of the proposal
-    rev: DbRev<S>,
+    rev: DbRev<Store>,
     store: Universe<Arc<StoreRevMut>>,
     committed: Arc<Mutex<bool>>,
 
-    parent: ProposalBase<S, T>,
+    parent: ProposalBase,
 }
 
-pub enum ProposalBase<S, T> {
-    Proposal(Arc<Proposal<S, T>>),
-    View(Arc<DbRev<T>>),
+pub enum ProposalBase {
+    Proposal(Arc<Proposal>),
+    View(Arc<DbRev<SharedStore>>),
 }
 
-impl Proposal<Store, SharedStore> {
+impl Proposal {
     // Propose a new proposal from this proposal. The new proposal will be
     // the child of it.
-    pub fn propose<K: AsRef<[u8]>>(
-        self: Arc<Self>,
-        data: Batch<K>,
-    ) -> Result<Proposal<Store, SharedStore>, DbError> {
+    pub fn propose<K: AsRef<[u8]>>(self: Arc<Self>, data: Batch<K>) -> Result<Proposal, DbError> {
         let store = self.store.new_from_other();
 
         let m = Arc::clone(&self.m);
@@ -1236,13 +1230,13 @@ impl Proposal<Store, SharedStore> {
     }
 }
 
-impl<S: ShaleStore<Node> + Send + Sync, T: ShaleStore<Node> + Send + Sync> Proposal<S, T> {
-    pub fn get_revision(&self) -> &DbRev<S> {
+impl Proposal {
+    pub fn get_revision(&self) -> &DbRev<Store> {
         &self.rev
     }
 }
 
-impl<S, T> Drop for Proposal<S, T> {
+impl Drop for Proposal {
     fn drop(&mut self) {
         if !*self.committed.lock() {
             // drop the staging changes
