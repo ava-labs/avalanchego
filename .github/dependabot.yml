@@ -12,3 +12,5 @@ updates:
       time: "05:00"
       timezone: America/Los_Angeles
     open-pull-requests-limit: 10
+    allow:
+      dependency-type: all
