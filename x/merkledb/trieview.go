@@ -515,12 +515,17 @@ func (t *trieView) commitChanges(ctx context.Context, trieToCommit *trieView) er
 	return nil
 }
 
-// commitToParent commits the changes from this view to its parent Trie
-func (t *trieView) commitToParent(ctx context.Context) error {
+// Commits the changes from [trieToCommit] to this view,
+// this view to its parent, and so on until committing to the db.
+// Assumes [t.db.commitLock] is held.
+func (t *trieView) commitToDB(ctx context.Context) error {
+	ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.commitToDB", oteltrace.WithAttributes(
+		attribute.Int("changeCount", len(t.changes.values)),
+	))
+	defer span.End()
+
 	t.commitLock.Lock()
 	defer t.commitLock.Unlock()
-	ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.commitToParent")
-	defer span.End()
 
 	if t.isInvalid() {
 		return ErrInvalid
@@ -543,23 +548,6 @@ func (t *trieView) commitToParent(ctx context.Context) error {
 	}
 
 	t.committed = true
-
-	return nil
-}
-
-// Commits the changes from [trieToCommit] to this view,
-// this view to its parent, and so on until committing to the db.
-// Assumes [t.db.commitLock] is held.
-func (t *trieView) commitToDB(ctx context.Context) error {
-	ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.commitToDB", oteltrace.WithAttributes(
-		attribute.Int("changeCount", len(t.changes.values)),
-	))
-	defer span.End()
-
-	// first merge changes into the parent trie
-	if err := t.commitToParent(ctx); err != nil {
-		return err
-	}
 
 	// now commit the parent trie to the db
 	return t.getParentTrie().commitToDB(ctx)
@@ -587,12 +575,6 @@ func (t *trieView) invalidate() {
 
 	// after invalidating the children, they no longer need to be tracked
 	t.childViews = make([]*trieView, 0, defaultPreallocationSize)
-}
-
-// Invalidates all children of this view.
-// Assumes [t.validityTrackingLock] isn't held.
-func (t *trieView) invalidateChildren() {
-	t.invalidateChildrenExcept(nil)
 }
 
 // moveChildViewsToView removes any child views from the trieToCommit and moves them to the current trie view
@@ -708,13 +690,6 @@ func (t *trieView) getValue(key path) ([]byte, error) {
 
 // Assumes [t.validityTrackingLock] isn't held.
 func (t *trieView) remove(key []byte) error {
-	if t.isInvalid() {
-		return ErrInvalid
-	}
-
-	// the trie has been changed, so invalidate all children and remove them from tracking
-	t.invalidateChildren()
-
 	path := newPath(key)
 	if err := t.recordValueChange(path, maybe.Nothing[[]byte]()); err != nil {
 		return err
@@ -758,11 +733,6 @@ func (t *trieView) remove(key []byte) error {
 	// merge this node and its descendants into a single node if possible
 	if err = t.compressNodePath(parent, nodeToDelete); err != nil {
 		return err
-	}
-
-	// ensure no ancestor changes occurred during execution
-	if t.isInvalid() {
-		return ErrInvalid
 	}
 
 	return nil
