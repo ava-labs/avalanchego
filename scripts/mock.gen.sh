@@ -1,6 +1,6 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-set -e
+set -euo pipefail
 
 if ! [[ "$0" =~ scripts/mock.gen.sh ]]; then
   echo "must be run from repository root"
