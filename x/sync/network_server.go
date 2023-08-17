@@ -58,7 +58,7 @@ func NewNetworkServer(appSender common.AppSender, db DB, log logging.Logger) *Ne
 }
 
 // AppRequest is called by avalanchego -> VM when there is an incoming AppRequest from a peer.
-// Never returns errors as they are considered fatal.
+// Returns a non-nil error iff we fail to send an app message. This is a fatal error.
 // Sends a response back to the sender if length of response returned by the handler > 0.
 func (s *NetworkServer) AppRequest(
 	ctx context.Context,
@@ -121,14 +121,20 @@ func (s *NetworkServer) AppRequest(
 		return nil
 	}
 
-	if err != nil && !isTimeout(err) {
-		// log unexpected errors instead of returning them, since they are fatal.
-		s.log.Warn(
-			"unexpected error handling AppRequest",
-			zap.Stringer("nodeID", nodeID),
-			zap.Uint32("requestID", requestID),
-			zap.Error(err),
-		)
+	if err != nil {
+		if errors.Is(err, errAppSendFailed) {
+			return err
+		}
+
+		if !isTimeout(err) {
+			// log unexpected errors instead of returning them, since they are fatal.
+			s.log.Warn(
+				"unexpected error handling AppRequest",
+				zap.Stringer("nodeID", nodeID),
+				zap.Uint32("requestID", requestID),
+				zap.Error(err),
+			)
+		}
 	}
 	return nil
 }
@@ -212,8 +218,17 @@ func (s *NetworkServer) HandleChangeProofRequest(
 				return err
 			}
 
-			// TODO handle this fatal error
-			return s.appSender.SendAppResponse(ctx, nodeID, requestID, proofBytes)
+			if err := s.appSender.SendAppResponse(ctx, nodeID, requestID, proofBytes); err != nil {
+				s.log.Fatal(
+					"failed to send app response",
+					zap.Stringer("nodeID", nodeID),
+					zap.Uint32("requestID", requestID),
+					zap.Int("responseLen", len(proofBytes)),
+					zap.Error(err),
+				)
+				return fmt.Errorf("%w: %s", errAppSendFailed, err)
+			}
+			return nil
 		}
 
 		// We generated a change proof. See if it's small enough.
@@ -227,8 +242,17 @@ func (s *NetworkServer) HandleChangeProofRequest(
 		}
 
 		if len(proofBytes) < bytesLimit {
-			// TODO handle this fatal error
-			return s.appSender.SendAppResponse(ctx, nodeID, requestID, proofBytes)
+			if err := s.appSender.SendAppResponse(ctx, nodeID, requestID, proofBytes); err != nil {
+				s.log.Fatal(
+					"failed to send app response",
+					zap.Stringer("nodeID", nodeID),
+					zap.Uint32("requestID", requestID),
+					zap.Int("responseLen", len(proofBytes)),
+					zap.Error(err),
+				)
+				return fmt.Errorf("%w: %s", errAppSendFailed, err)
+			}
+			return nil
 		}
 
 		// The proof was too large. Try to shrink it.
@@ -276,8 +300,17 @@ func (s *NetworkServer) HandleRangeProofRequest(
 	if err != nil {
 		return err
 	}
-	// TODO handle this fatal error
-	return s.appSender.SendAppResponse(ctx, nodeID, requestID, proofBytes)
+	if err := s.appSender.SendAppResponse(ctx, nodeID, requestID, proofBytes); err != nil {
+		s.log.Fatal(
+			"failed to send app response",
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint32("requestID", requestID),
+			zap.Int("responseLen", len(proofBytes)),
+			zap.Error(err),
+		)
+		return fmt.Errorf("%w: %s", errAppSendFailed, err)
+	}
+	return nil
 }
 
 // Get the range proof specified by [req].

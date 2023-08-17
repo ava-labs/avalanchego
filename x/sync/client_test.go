@@ -794,18 +794,18 @@ func TestAppRequestSendFailed(t *testing.T) {
 		gomock.Any(),
 		gomock.Any(),
 		gomock.Any(),
-	).Return(ids.NodeID{}, nil, errAppRequestSendFailed).Times(2)
+	).Return(ids.NodeID{}, nil, errAppSendFailed).Times(2)
 
 	_, err := client.GetChangeProof(
 		context.Background(),
 		&pb.SyncGetChangeProofRequest{},
 		nil, // database is unused
 	)
-	require.ErrorIs(err, errAppRequestSendFailed)
+	require.ErrorIs(err, errAppSendFailed)
 
 	_, err = client.GetRangeProof(
 		context.Background(),
 		&pb.SyncGetRangeProofRequest{},
 	)
-	require.ErrorIs(err, errAppRequestSendFailed)
+	require.ErrorIs(err, errAppSendFailed)
 }
