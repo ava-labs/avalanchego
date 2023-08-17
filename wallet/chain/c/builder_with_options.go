@@ -36,6 +36,14 @@ func NewBuilderWithOptions(builder Builder, options ...common.Option) Builder {
 	}
 }
 
+func (b *builderWithOptions) GetBalance(
+	options ...common.Option,
+) (*big.Int, error) {
+	return b.Builder.GetBalance(
+		common.UnionOptions(b.options, options)...,
+	)
+}
+
 func (b *builderWithOptions) GetImportableBalance(
 	chainID ids.ID,
 	options ...common.Option,

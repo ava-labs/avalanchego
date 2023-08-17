@@ -37,6 +37,7 @@ type Wallet interface {
 	//
 	// - [chainID] specifies the chain to be importing funds from.
 	// - [to] specifies where to send the imported funds to.
+	// - [baseFee] specifies the fee price willing to be paid by this tx.
 	IssueImportTx(
 		chainID ids.ID,
 		to ethcommon.Address,
@@ -49,6 +50,7 @@ type Wallet interface {
 	//
 	// - [chainID] specifies the chain to be exporting the funds to.
 	// - [outputs] specifies the outputs to send to the [chainID].
+	// - [baseFee] specifies the fee price willing to be paid by this tx.
 	IssueExportTx(
 		chainID ids.ID,
 		outputs []*secp256k1fx.TransferOutput,

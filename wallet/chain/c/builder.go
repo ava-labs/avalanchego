@@ -39,9 +39,15 @@ var (
 	avaxConversionRate = big.NewInt(avaxConversionRateInt)
 )
 
-// Builder provides a convenient interface for building unsigned X-chain
+// Builder provides a convenient interface for building unsigned C-chain
 // transactions.
 type Builder interface {
+	// GetBalance calculates the amount of AVAX that this builder has control
+	// over.
+	GetBalance(
+		options ...common.Option,
+	) (*big.Int, error)
+
 	// GetImportableBalance calculates the amount of AVAX that this builder
 	// could import from the provided chain.
 	//
@@ -56,6 +62,7 @@ type Builder interface {
 	//
 	// - [chainID] specifies the chain to be importing funds from.
 	// - [to] specifies where to send the imported funds to.
+	// - [baseFee] specifies the fee price willing to be paid by this tx.
 	NewImportTx(
 		chainID ids.ID,
 		to ethcommon.Address,
@@ -68,6 +75,7 @@ type Builder interface {
 	//
 	// - [chainID] specifies the chain to be exporting the funds to.
 	// - [outputs] specifies the outputs to send to the [chainID].
+	// - [baseFee] specifies the fee price willing to be paid by this tx.
 	NewExportTx(
 		chainID ids.ID,
 		outputs []*secp256k1fx.TransferOutput,
@@ -77,7 +85,7 @@ type Builder interface {
 }
 
 // BuilderBackend specifies the required information needed to build unsigned
-// X-chain transactions.
+// C-chain transactions.
 type BuilderBackend interface {
 	Context
 
@@ -94,8 +102,10 @@ type builder struct {
 
 // NewBuilder returns a new transaction builder.
 //
-//   - [addrs] is the set of addresses that the builder assumes can be used when
-//     signing the transactions in the future.
+//   - [avaxAddrs] is the set of addresses in the AVAX format that the builder
+//     assumes can be used when signing the transactions in the future.
+//   - [ethAddrs] is the set of addresses in the Eth format that the builder
+//     assumes can be used when signing the transactions in the future.
 //   - [backend] provides the required access to the chain's context and state
 //     to build out the transactions.
 func NewBuilder(
@@ -108,6 +118,26 @@ func NewBuilder(
 		ethAddrs:  ethAddrs,
 		backend:   backend,
 	}
+}
+
+func (b *builder) GetBalance(
+	options ...common.Option,
+) (*big.Int, error) {
+	var (
+		ops          = common.NewOptions(options)
+		ctx          = ops.Context()
+		addrs        = ops.EthAddresses(b.ethAddrs)
+		totalBalance = new(big.Int)
+	)
+	for addr := range addrs {
+		balance, err := b.backend.Balance(ctx, addr)
+		if err != nil {
+			return nil, err
+		}
+		totalBalance.Add(totalBalance, balance)
+	}
+
+	return totalBalance, nil
 }
 
 func (b *builder) GetImportableBalance(
@@ -126,7 +156,6 @@ func (b *builder) GetImportableBalance(
 		avaxAssetID     = b.backend.AVAXAssetID()
 		amount          uint64
 	)
-	// Iterate over the unlocked UTXOs
 	for _, utxo := range utxos {
 		if utxo.Asset.ID != avaxAssetID {
 			// Only AVAX can be imported
@@ -175,7 +204,6 @@ func (b *builder) NewImportTx(
 		importedInputs = make([]*avax.TransferableInput, 0, len(utxos))
 		importedAmount uint64
 	)
-	// Iterate over the unlocked UTXOs
 	for _, utxo := range utxos {
 		if utxo.Asset.ID != avaxAssetID {
 			// Only AVAX can be imported
@@ -212,7 +240,7 @@ func (b *builder) NewImportTx(
 		importedAmount = newImportedAmount
 	}
 
-	utils.Sort(importedInputs) // sort imported inputs
+	utils.Sort(importedInputs)
 	tx := &evm.UnsignedImportTx{
 		NetworkID:      b.backend.NetworkID(),
 		BlockchainID:   b.backend.BlockchainID(),
