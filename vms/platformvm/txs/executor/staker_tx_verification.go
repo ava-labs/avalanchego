@@ -1022,7 +1022,7 @@ func verifyAddContinuousDelegatorTx(
 		newStaker.StartTime,
 		newStaker.NextTime,
 		validator.StartTime,
-		validator.NextTime,
+		validator.EndTime,
 	) {
 		return time.Time{}, time.Time{}, 0, ErrPeriodMismatch
 	}

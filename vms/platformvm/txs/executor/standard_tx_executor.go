@@ -568,7 +568,6 @@ func (e *StandardTxExecutor) AddContinuousDelegatorTx(tx *txs.AddContinuousDeleg
 
 	avax.Consume(e.State, tx.Ins)
 	avax.Produce(e.State, txID, tx.Outs)
-
 	return nil
 }
 
