@@ -1,3 +1,7 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
 AVALANCHE_ROOT=$PKG_ROOT/avalanchego-$TAG
 
 mkdir -p $AVALANCHE_ROOT
