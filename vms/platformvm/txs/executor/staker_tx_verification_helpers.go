@@ -258,7 +258,7 @@ func GetMaxWeight(
 	return math.Max(currentMax, currentWeight), nil
 }
 
-// checkContinuousDelegatorPeriod assumes [delegatorPeriod] <= [validatorPeriod]
+// checkContinuousDelegatorPeriod assumes that [delegatorPeriod], [validatorPeriod] >= 0
 func checkContinuousDelegatorPeriod(validatorPeriod, delegatorPeriod time.Duration) error {
 	if validatorPeriod == delegatorPeriod {
 		return nil
@@ -266,7 +266,7 @@ func checkContinuousDelegatorPeriod(validatorPeriod, delegatorPeriod time.Durati
 
 	res := int(validatorPeriod) / int(delegatorPeriod)
 	rem := validatorPeriod % delegatorPeriod
-	if rem != 0 || (res&(res-1)) != 0 {
+	if rem != 0 || !math.IsPowerOfTwo(res) {
 		return fmt.Errorf("validator period %d, delegator period %d, result %d, remainder %d: %w",
 			validatorPeriod,
 			delegatorPeriod,

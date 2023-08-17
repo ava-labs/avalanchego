@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -979,12 +980,14 @@ func TestVerifyAddContinuousDelegatorTx(t *testing.T) {
 			MinValidatorStake:     1,
 			MinDelegatorStake:     1,
 			MaxValidatorStake:     2,
-			MinStakeDuration:      3 * time.Second,
-			MaxStakeDuration:      4 * time.Second,
+			MinStakeDuration:      1 * time.Second,
+			MaxStakeDuration:      100 * time.Second,
 			MinDelegationFee:      5,
 		}
 
 		chainTime        = time.Now().Truncate(time.Second)
+		delegatorPeriod  = primaryNetworkCfg.MinStakeDuration
+		validatorPeriod  = delegatorPeriod * 16
 		primaryValidator = &state.Staker{
 			TxID:      ids.GenerateTestID(),
 			NodeID:    ids.GenerateTestNodeID(),
@@ -993,10 +996,10 @@ func TestVerifyAddContinuousDelegatorTx(t *testing.T) {
 			Weight:    primaryNetworkCfg.MinValidatorStake,
 
 			StartTime:       chainTime,
-			StakingPeriod:   primaryNetworkCfg.MinStakeDuration,
+			StakingPeriod:   validatorPeriod,
 			EndTime:         mockable.MaxTime,
 			PotentialReward: uint64(0), // not relevant for this test
-			NextTime:        chainTime.Add(primaryNetworkCfg.MinStakeDuration),
+			NextTime:        chainTime.Add(validatorPeriod),
 			Priority:        txs.PrimaryNetworkContinuousValidatorCurrentPriority,
 		}
 
@@ -1015,7 +1018,7 @@ func TestVerifyAddContinuousDelegatorTx(t *testing.T) {
 			Validator: txs.Validator{
 				NodeID: primaryValidator.NodeID,
 				Start:  uint64(dummyTime.Unix()),
-				End:    uint64(dummyTime.Add(primaryNetworkCfg.MinStakeDuration).Unix()),
+				End:    uint64(dummyTime.Add(delegatorPeriod).Unix()),
 				Wght:   primaryNetworkCfg.MinValidatorStake,
 			},
 			StakeOuts: []*avax.TransferableOutput{
@@ -1245,6 +1248,71 @@ func TestVerifyAddContinuousDelegatorTx(t *testing.T) {
 			expectedErr: ErrStakeTooLong,
 		},
 		{
+			name: "duration not divisor of validator period",
+			backendF: func(*gomock.Controller) *Backend {
+				bootstrapped := &utils.Atomic[bool]{}
+				bootstrapped.Set(true)
+				return &Backend{
+					Ctx:          snow.DefaultContextTest(),
+					Config:       &primaryNetworkCfg,
+					Bootstrapped: bootstrapped,
+				}
+			},
+			stateF: func(ctrl *gomock.Controller) state.Chain {
+				mockState := state.NewMockChain(ctrl)
+				mockState.EXPECT().GetTimestamp().Return(time.Unix(0, 0))
+				mockState.EXPECT().GetCurrentValidator(verifiedTx.SubnetID(), verifiedTx.NodeID()).Return(primaryValidator, nil)
+				return mockState
+			},
+			sTxF: func() *txs.Tx {
+				return &verifiedSignedTx
+			},
+			txF: func() *txs.AddContinuousDelegatorTx {
+				// pick delegator period that is *not* divisor of validator period
+				wrongDelegatorPeriod := delegatorPeriod + 2*time.Second
+				require.True(t, validatorPeriod%wrongDelegatorPeriod != 0)
+
+				tx := verifiedTx // Note that this copies [verifiedTx]
+				tx.Validator.Start = uint64(dummyTime.Unix())
+				tx.Validator.End = uint64(dummyTime.Add(wrongDelegatorPeriod).Unix())
+				return &tx
+			},
+			expectedErr: ErrPeriodMismatch,
+		},
+		{
+			name: "duration not power of two divisor of validator period",
+			backendF: func(*gomock.Controller) *Backend {
+				bootstrapped := &utils.Atomic[bool]{}
+				bootstrapped.Set(true)
+				return &Backend{
+					Ctx:          snow.DefaultContextTest(),
+					Config:       &primaryNetworkCfg,
+					Bootstrapped: bootstrapped,
+				}
+			},
+			stateF: func(ctrl *gomock.Controller) state.Chain {
+				mockState := state.NewMockChain(ctrl)
+				mockState.EXPECT().GetTimestamp().Return(time.Unix(0, 0))
+				mockState.EXPECT().GetCurrentValidator(verifiedTx.SubnetID(), verifiedTx.NodeID()).Return(primaryValidator, nil)
+				return mockState
+			},
+			sTxF: func() *txs.Tx {
+				return &verifiedSignedTx
+			},
+			txF: func() *txs.AddContinuousDelegatorTx {
+				// pick delegator period that is *not* power of two divisor of validator period
+				wrongDelegatorPeriod := validatorPeriod / 5
+				require.True(t, validatorPeriod%wrongDelegatorPeriod == 0)
+				require.False(t, safemath.IsPowerOfTwo(int(validatorPeriod/wrongDelegatorPeriod)))
+
+				tx := verifiedTx // Note that this copies [verifiedTx]
+				tx.Validator.Start = uint64(dummyTime.Unix())
+				tx.Validator.End = uint64(dummyTime.Add(wrongDelegatorPeriod).Unix())
+				return &tx
+			},
+			expectedErr: ErrPeriodMismatch,
+		},
+		{
 			name: "wrong assetID",
 			backendF: func(*gomock.Controller) *Backend {
 				bootstrapped := &utils.Atomic[bool]{}
@@ -1320,6 +1388,35 @@ func TestVerifyAddContinuousDelegatorTx(t *testing.T) {
 
 				pendValidator := *primaryValidator
 				pendValidator.Priority = txs.PrimaryNetworkValidatorPendingPriority
+				s.EXPECT().GetCurrentValidator(verifiedTx.SubnetID(), verifiedTx.NodeID()).Return(nil, database.ErrNotFound)
+				s.EXPECT().GetPendingValidator(verifiedTx.SubnetID(), verifiedTx.NodeID()).Return(&pendValidator, nil)
+				return s
+			},
+			sTxF: func() *txs.Tx {
+				return &verifiedSignedTx
+			},
+			txF: func() *txs.AddContinuousDelegatorTx {
+				return &verifiedTx
+			},
+			expectedErr: ErrContinuousDelegatorToNonContinuousValidator,
+		},
+		{
+			name: "validator is not continuous",
+			backendF: func(*gomock.Controller) *Backend {
+				bootstrapped := &utils.Atomic[bool]{}
+				bootstrapped.Set(true)
+				return &Backend{
+					Ctx:          snow.DefaultContextTest(),
+					Config:       &primaryNetworkCfg,
+					Bootstrapped: bootstrapped,
+				}
+			},
+			stateF: func(ctrl *gomock.Controller) state.Chain {
+				s := state.NewMockChain(ctrl)
+				s.EXPECT().GetTimestamp().Return(time.Unix(0, 0))
+
+				pendValidator := *primaryValidator
+				pendValidator.Priority = txs.PrimaryNetworkValidatorCurrentPriority
 				s.EXPECT().GetCurrentValidator(verifiedTx.SubnetID(), verifiedTx.NodeID()).Return(nil, database.ErrNotFound)
 				s.EXPECT().GetPendingValidator(verifiedTx.SubnetID(), verifiedTx.NodeID()).Return(&pendValidator, nil)
 				return s

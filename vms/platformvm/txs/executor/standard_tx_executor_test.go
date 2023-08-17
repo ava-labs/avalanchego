@@ -1408,6 +1408,112 @@ func TestStandardTxExecutorStopContinuousValidator(t *testing.T) {
 	require.Equal(val.NextTime, stoppedVal.EndTime)
 }
 
+func TestStandardTxExecutorAddContinuousDelegator(t *testing.T) {
+	require := require.New(t)
+	env := newEnvironment(t, continuousStakingFork)
+	env.ctx.Lock.Lock()
+	defer func() {
+		require.NoError(shutdownEnvironment(env))
+	}()
+
+	// Add a primary network continuous validator
+	blsSK, err := bls.NewSecretKey()
+	require.NoError(err)
+
+	var (
+		blsPOP          = signer.NewProofOfPossession(blsSK)
+		chainTime       = env.state.GetTimestamp()
+		validatorPeriod = env.config.MinStakeDuration
+		delegatorPeriod = validatorPeriod
+	)
+
+	primaryValidator := &state.Staker{
+		TxID:      ids.GenerateTestID(),
+		NodeID:    ids.GenerateTestNodeID(),
+		PublicKey: blsPOP.Key(),
+		SubnetID:  constants.PlatformChainID,
+		Weight:    env.config.MinValidatorStake,
+
+		StartTime:       chainTime,
+		StakingPeriod:   validatorPeriod,
+		EndTime:         mockable.MaxTime,
+		PotentialReward: uint64(0), // not relevant for this test
+		NextTime:        chainTime.Add(validatorPeriod),
+		Priority:        txs.PrimaryNetworkContinuousValidatorCurrentPriority,
+	}
+	env.state.PutCurrentValidator(primaryValidator)
+
+	// Create continuous delegator
+	var (
+		nodeID         = primaryValidator.NodeID
+		dummyStartTime = time.Unix(0, 0)
+		dummyEndTime   = time.Unix(0, 0).Add(delegatorPeriod)
+		addr           = preFundedKeys[0].PublicKey().Address()
+	)
+	utxosHandler := utxo.NewHandler(env.ctx, env.clk, env.fx)
+	ins, unstakedOuts, stakedOuts, signers, err := utxosHandler.Spend(
+		env.state,
+		preFundedKeys,
+		env.config.MinValidatorStake, // stakeAmount
+		env.config.AddPrimaryNetworkValidatorFee,
+		addr, // changeAddr
+	)
+	require.NoError(err)
+
+	// Create the tx
+	utx := &txs.AddContinuousDelegatorTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    env.ctx.NetworkID,
+			BlockchainID: env.ctx.ChainID,
+			Ins:          ins,
+			Outs:         unstakedOuts,
+		}},
+		Validator: txs.Validator{
+			NodeID: nodeID,
+			Start:  uint64(dummyStartTime.Unix()),
+			End:    uint64(dummyEndTime.Unix()),
+			Wght:   env.config.MinValidatorStake,
+		},
+		DelegatorAuthKey: &secp256k1fx.OutputOwners{
+			Addrs:     []ids.ShortID{addr},
+			Threshold: 1,
+		},
+		StakeOuts: stakedOuts,
+		DelegationRewardsOwner: &secp256k1fx.OutputOwners{
+			Addrs:     []ids.ShortID{addr},
+			Threshold: 1,
+		},
+		DelegatorRewardRestakeShares: 0,
+	}
+	addContinuousDelegatorTx, err := txs.NewSigned(utx, txs.Codec, signers)
+	require.NoError(err)
+	require.NoError(addContinuousDelegatorTx.SyntacticVerify(env.ctx))
+
+	onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
+	require.NoError(err)
+
+	executor := StandardTxExecutor{
+		Backend: &env.backend,
+		State:   onAcceptState,
+		Tx:      addContinuousDelegatorTx,
+	}
+	require.NoError(addContinuousDelegatorTx.Unsigned.Visit(&executor))
+
+	// Check that a current validator is added
+	it, err := onAcceptState.GetCurrentDelegatorIterator(constants.PrimaryNetworkID, nodeID)
+	require.NoError(err)
+	require.True(it.Next())
+
+	delegator := *it.Value()
+	it.Release()
+
+	require.Equal(addContinuousDelegatorTx.ID(), delegator.TxID)
+	require.Equal(env.state.GetTimestamp(), delegator.StartTime)
+	require.Equal(delegatorPeriod, delegator.StakingPeriod)
+	require.Equal(delegator.StartTime.Add(delegator.StakingPeriod), delegator.NextTime)
+	require.Equal(mockable.MaxTime, delegator.EndTime)
+}
+
 func TestStandardTxExecutorStopContinuousStakers(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(t, continuousStakingFork)
@@ -1585,112 +1691,6 @@ func TestStandardTxExecutorStopContinuousStakers(t *testing.T) {
 	stoppedDel := delIt.Value()
 	require.Equal(del.NextTime, stoppedDel.NextTime)
 	require.Equal(stoppedVal.EndTime, stoppedDel.EndTime)
-}
-
-func TestStandardTxExecutorAddContinuousDelegator(t *testing.T) {
-	require := require.New(t)
-	env := newEnvironment(t, continuousStakingFork)
-	env.ctx.Lock.Lock()
-	defer func() {
-		require.NoError(shutdownEnvironment(env))
-	}()
-
-	// Add a primary network continuous validator
-	blsSK, err := bls.NewSecretKey()
-	require.NoError(err)
-
-	var (
-		blsPOP          = signer.NewProofOfPossession(blsSK)
-		chainTime       = env.state.GetTimestamp()
-		validatorPeriod = env.config.MinStakeDuration
-		delegatorPeriod = validatorPeriod
-	)
-
-	primaryValidator := &state.Staker{
-		TxID:      ids.GenerateTestID(),
-		NodeID:    ids.GenerateTestNodeID(),
-		PublicKey: blsPOP.Key(),
-		SubnetID:  constants.PlatformChainID,
-		Weight:    env.config.MinValidatorStake,
-
-		StartTime:       chainTime,
-		StakingPeriod:   validatorPeriod,
-		EndTime:         mockable.MaxTime,
-		PotentialReward: uint64(0), // not relevant for this test
-		NextTime:        chainTime.Add(validatorPeriod),
-		Priority:        txs.PrimaryNetworkContinuousValidatorCurrentPriority,
-	}
-	env.state.PutCurrentValidator(primaryValidator)
-
-	// Create continuous delegator
-	var (
-		nodeID         = primaryValidator.NodeID
-		dummyStartTime = time.Unix(0, 0)
-		dummyEndTime   = time.Unix(0, 0).Add(delegatorPeriod)
-		addr           = preFundedKeys[0].PublicKey().Address()
-	)
-	utxosHandler := utxo.NewHandler(env.ctx, env.clk, env.fx)
-	ins, unstakedOuts, stakedOuts, signers, err := utxosHandler.Spend(
-		env.state,
-		preFundedKeys,
-		env.config.MinValidatorStake, // stakeAmount
-		env.config.AddPrimaryNetworkValidatorFee,
-		addr, // changeAddr
-	)
-	require.NoError(err)
-
-	// Create the tx
-	utx := &txs.AddContinuousDelegatorTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    env.ctx.NetworkID,
-			BlockchainID: env.ctx.ChainID,
-			Ins:          ins,
-			Outs:         unstakedOuts,
-		}},
-		Validator: txs.Validator{
-			NodeID: nodeID,
-			Start:  uint64(dummyStartTime.Unix()),
-			End:    uint64(dummyEndTime.Unix()),
-			Wght:   env.config.MinValidatorStake,
-		},
-		DelegatorAuthKey: &secp256k1fx.OutputOwners{
-			Addrs:     []ids.ShortID{addr},
-			Threshold: 1,
-		},
-		StakeOuts: stakedOuts,
-		DelegationRewardsOwner: &secp256k1fx.OutputOwners{
-			Addrs:     []ids.ShortID{addr},
-			Threshold: 1,
-		},
-		DelegatorRewardRestakeShares: 0,
-	}
-	addContinuousDelegatorTx, err := txs.NewSigned(utx, txs.Codec, signers)
-	require.NoError(err)
-	require.NoError(addContinuousDelegatorTx.SyntacticVerify(env.ctx))
-
-	onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
-	require.NoError(err)
-
-	executor := StandardTxExecutor{
-		Backend: &env.backend,
-		State:   onAcceptState,
-		Tx:      addContinuousDelegatorTx,
-	}
-	require.NoError(addContinuousDelegatorTx.Unsigned.Visit(&executor))
-
-	// Check that a current validator is added
-	it, err := onAcceptState.GetCurrentDelegatorIterator(constants.PrimaryNetworkID, nodeID)
-	require.NoError(err)
-	require.True(it.Next())
-
-	delegator := *it.Value()
-	it.Release()
-
-	require.Equal(addContinuousDelegatorTx.ID(), delegator.TxID)
-	require.Equal(env.state.GetTimestamp(), delegator.StartTime)
-	require.Equal(delegatorPeriod, delegator.StakingPeriod)
-	require.Equal(delegator.StartTime.Add(delegator.StakingPeriod), delegator.NextTime)
-	require.Equal(mockable.MaxTime, delegator.EndTime)
 }
 
 // Returns a RemoveSubnetValidatorTx that passes syntactic verification.
