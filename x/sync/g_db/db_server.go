@@ -156,11 +156,15 @@ func (s *DBServer) GetRangeProof(
 	if err != nil {
 		return nil, err
 	}
+	start := maybe.Nothing[[]byte]()
+	if req.StartKey != nil && !req.StartKey.IsNothing {
+		start = maybe.Some(req.StartKey.Value)
+	}
 	end := maybe.Nothing[[]byte]()
 	if req.EndKey != nil && !req.EndKey.IsNothing {
 		end = maybe.Some(req.EndKey.Value)
 	}
-	proof, err := s.db.GetRangeProofAtRoot(ctx, rootID, req.StartKey, end, int(req.KeyLimit))
+	proof, err := s.db.GetRangeProofAtRoot(ctx, rootID, start, end, int(req.KeyLimit))
 	if err != nil {
 		return nil, err
 	}
@@ -197,6 +201,11 @@ func (s *DBServer) CommitRangeProof(
 		return nil, err
 	}
 
-	err := s.db.CommitRangeProof(ctx, req.StartKey, &proof)
+	start := maybe.Nothing[[]byte]()
+	if req.StartKey != nil && !req.StartKey.IsNothing {
+		start = maybe.Some(req.StartKey.Value)
+	}
+
+	err := s.db.CommitRangeProof(ctx, start, &proof)
 	return &emptypb.Empty{}, err
 }

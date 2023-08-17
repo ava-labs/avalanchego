@@ -224,7 +224,7 @@ func (th *trieHistory) getValueChanges(
 // for the keys in [start, end].
 // If [start] is nil, all keys are considered > [start].
 // If  [end] is nil, all keys are considered < [end].
-func (th *trieHistory) getChangesToGetToRoot(rootID ids.ID, start []byte, end maybe.Maybe[[]byte]) (*changeSummary, error) {
+func (th *trieHistory) getChangesToGetToRoot(rootID ids.ID, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte]) (*changeSummary, error) {
 	// [lastRootChange] is the last change in the history resulting in [rootID].
 	lastRootChange, ok := th.lastChanges[rootID]
 	if !ok {
@@ -232,7 +232,7 @@ func (th *trieHistory) getChangesToGetToRoot(rootID ids.ID, start []byte, end ma
 	}
 
 	var (
-		startPath                    = newPath(start)
+		startPath                    = maybe.Bind(start, newPath)
 		endPath                      = maybe.Bind(end, newPath)
 		combinedChanges              = newChangeSummary(defaultPreallocationSize)
 		mostRecentChangeInsertNumber = th.nextInsertNumber - 1
@@ -254,7 +254,7 @@ func (th *trieHistory) getChangesToGetToRoot(rootID ids.ID, start []byte, end ma
 		}
 
 		for key, valueChange := range changes.values {
-			if (len(startPath) == 0 || key.Compare(startPath) >= 0) &&
+			if (startPath.IsNothing() || key.Compare(startPath.Value()) >= 0) &&
 				(endPath.IsNothing() || key.Compare(endPath.Value()) <= 0) {
 				if existing, ok := combinedChanges.values[key]; ok {
 					existing.after = valueChange.before

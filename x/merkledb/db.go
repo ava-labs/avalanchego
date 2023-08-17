@@ -99,14 +99,14 @@ type RangeProofer interface {
 	GetRangeProofAtRoot(
 		ctx context.Context,
 		rootID ids.ID,
-		start []byte,
+		start maybe.Maybe[[]byte],
 		end maybe.Maybe[[]byte],
 		maxLength int,
 	) (*RangeProof, error)
 
 	// CommitRangeProof commits the key/value pairs within the [proof] to the db.
 	// [start] is the smallest key in the range this [proof] covers.
-	CommitRangeProof(ctx context.Context, start []byte, proof *RangeProof) error
+	CommitRangeProof(ctx context.Context, start maybe.Maybe[[]byte], proof *RangeProof) error
 }
 
 type MerkleDB interface {
@@ -314,7 +314,7 @@ func (db *merkleDB) CommitChangeProof(ctx context.Context, proof *ChangeProof) e
 	return view.commitToDB(ctx)
 }
 
-func (db *merkleDB) CommitRangeProof(ctx context.Context, start []byte, proof *RangeProof) error {
+func (db *merkleDB) CommitRangeProof(ctx context.Context, start maybe.Maybe[[]byte], proof *RangeProof) error {
 	db.commitLock.Lock()
 	defer db.commitLock.Unlock()
 
@@ -336,7 +336,7 @@ func (db *merkleDB) CommitRangeProof(ctx context.Context, start []byte, proof *R
 	if len(proof.KeyValues) > 0 {
 		largestKey = proof.KeyValues[len(proof.KeyValues)-1].Key
 	}
-	keysToDelete, err := db.getKeysNotInSet(start, largestKey, keys)
+	keysToDelete, err := db.getKeysNotInSet(start.Value(), largestKey, keys)
 	if err != nil {
 		return err
 	}
@@ -513,7 +513,7 @@ func (db *merkleDB) getProof(ctx context.Context, key []byte) (*Proof, error) {
 // [start, end].
 func (db *merkleDB) GetRangeProof(
 	ctx context.Context,
-	start []byte,
+	start maybe.Maybe[[]byte],
 	end maybe.Maybe[[]byte],
 	maxLength int,
 ) (*RangeProof, error) {
@@ -528,7 +528,7 @@ func (db *merkleDB) GetRangeProof(
 func (db *merkleDB) GetRangeProofAtRoot(
 	ctx context.Context,
 	rootID ids.ID,
-	start []byte,
+	start maybe.Maybe[[]byte],
 	end maybe.Maybe[[]byte],
 	maxLength int,
 ) (*RangeProof, error) {
@@ -542,7 +542,7 @@ func (db *merkleDB) GetRangeProofAtRoot(
 func (db *merkleDB) getRangeProofAtRoot(
 	ctx context.Context,
 	rootID ids.ID,
-	start []byte,
+	start maybe.Maybe[[]byte],
 	end maybe.Maybe[[]byte],
 	maxLength int,
 ) (*RangeProof, error) {
@@ -615,7 +615,7 @@ func (db *merkleDB) GetChangeProof(
 
 	// Since we hold [db.commitlock] we must still have sufficient
 	// history to recreate the trie at [endRootID].
-	historicalView, err := db.getHistoricalViewForRange(endRootID, start.Value() /* TODO pass maybe */, largestKey)
+	historicalView, err := db.getHistoricalViewForRange(endRootID, start, largestKey)
 	if err != nil {
 		return nil, err
 	}
@@ -1183,7 +1183,7 @@ func (db *merkleDB) initializeRootIfNeeded() (ids.ID, error) {
 // Assumes [db.commitLock] is read locked.
 func (db *merkleDB) getHistoricalViewForRange(
 	rootID ids.ID,
-	start []byte,
+	start maybe.Maybe[[]byte],
 	end maybe.Maybe[[]byte],
 ) (*trieView, error) {
 	currentRootID := db.getMerkleRoot()

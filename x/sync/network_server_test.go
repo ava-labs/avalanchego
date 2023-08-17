@@ -72,7 +72,7 @@ func Test_Server_GetRangeProof(t *testing.T) {
 				RootHash:   smallTrieRoot[:],
 				KeyLimit:   defaultRequestKeyLimit,
 				BytesLimit: defaultRequestByteSizeLimit,
-				StartKey:   []byte{1},
+				StartKey:   &pb.MaybeBytes{Value: []byte{1}},
 				EndKey:     &pb.MaybeBytes{Value: []byte{0}},
 			},
 			proofNil: true,

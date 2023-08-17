@@ -202,7 +202,7 @@ func (s *NetworkServer) HandleChangeProofRequest(
 				s.db,
 				&pb.SyncGetRangeProofRequest{
 					RootHash:   req.EndRootHash,
-					StartKey:   req.StartKey.Value, // TODO pass Maybe instead
+					StartKey:   req.StartKey,
 					EndKey:     req.EndKey,
 					KeyLimit:   req.KeyLimit,
 					BytesLimit: req.BytesLimit,
@@ -252,20 +252,15 @@ func (s *NetworkServer) HandleRangeProofRequest(
 	requestID uint32,
 	req *pb.SyncGetRangeProofRequest,
 ) error {
-	if req.EndKey == nil {
-		req.EndKey = &pb.MaybeBytes{IsNothing: true}
-	}
-	if req.BytesLimit == 0 ||
-		req.KeyLimit == 0 ||
-		len(req.RootHash) != ids.IDLen ||
-		(!req.EndKey.IsNothing && bytes.Compare(req.StartKey, req.EndKey.Value) > 0) {
+	if err := validateRangeProofRequest(req); err != nil {
 		s.log.Debug(
 			"dropping invalid range proof request",
 			zap.Stringer("nodeID", nodeID),
 			zap.Uint32("requestID", requestID),
 			zap.Stringer("req", req),
+			zap.Error(err),
 		)
-		return nil // dropping request
+		return nil // drop request
 	}
 
 	// override limits if they exceed caps
@@ -312,7 +307,7 @@ func getRangeProof(
 		rangeProof, err := db.GetRangeProofAtRoot(
 			ctx,
 			root,
-			req.StartKey,
+			maybeBytesToMaybe(req.StartKey),
 			maybeBytesToMaybe(req.EndKey),
 			keyLimit,
 		)
@@ -374,24 +369,23 @@ func validateChangeProofRequest(req *pb.SyncGetChangeProofRequest) error {
 	}
 }
 
-// TODO uncomment and use
 // Returns nil iff [req] is well-formed.
-// func validateRangeProofRequest(req *pb.SyncGetRangeProofRequest) error {
-// 	switch {
-// 	case req.BytesLimit == 0:
-// 		return errInvalidBytesLimit
-// 	case req.KeyLimit == 0:
-// 		return errInvalidKeyLimit
-// 	case len(req.RootHash) != ids.IDLen:
-// 		return errInvalidRootHash
-// 	case req.StartKey != nil && req.StartKey.IsNothing && len(req.StartKey.Value) > 0:
-// 		return errInvalidStartKey
-// 	case req.EndKey != nil && req.EndKey.IsNothing && len(req.EndKey.Value) > 0:
-// 		return errInvalidEndKey
-// 	case req.StartKey != nil && req.EndKey != nil && !req.StartKey.IsNothing &&
-// 		!req.EndKey.IsNothing && bytes.Compare(req.StartKey.Value, req.EndKey.Value) > 0:
-// 		return errInvalidBounds
-// 	default:
-// 		return nil
-// 	}
-// }
+func validateRangeProofRequest(req *pb.SyncGetRangeProofRequest) error {
+	switch {
+	case req.BytesLimit == 0:
+		return errInvalidBytesLimit
+	case req.KeyLimit == 0:
+		return errInvalidKeyLimit
+	case len(req.RootHash) != ids.IDLen:
+		return errInvalidRootHash
+	case req.StartKey != nil && req.StartKey.IsNothing && len(req.StartKey.Value) > 0:
+		return errInvalidStartKey
+	case req.EndKey != nil && req.EndKey.IsNothing && len(req.EndKey.Value) > 0:
+		return errInvalidEndKey
+	case req.StartKey != nil && req.EndKey != nil && !req.StartKey.IsNothing &&
+		!req.EndKey.IsNothing && bytes.Compare(req.StartKey.Value, req.EndKey.Value) > 0:
+		return errInvalidBounds
+	default:
+		return nil
+	}
+}

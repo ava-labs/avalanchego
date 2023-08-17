@@ -280,12 +280,12 @@ type RangeProof struct {
 //     If [end] is empty, all keys are considered < [end].
 func (proof *RangeProof) Verify(
 	ctx context.Context,
-	start []byte,
+	start maybe.Maybe[[]byte],
 	end maybe.Maybe[[]byte],
 	expectedRootID ids.ID,
 ) error {
 	switch {
-	case end.HasValue() && bytes.Compare(start, end.Value()) > 0:
+	case start.HasValue() && end.HasValue() && bytes.Compare(start.Value(), end.Value()) > 0:
 		return ErrStartAfterEnd
 	case len(proof.KeyValues) == 0 && len(proof.StartProof) == 0 && len(proof.EndProof) == 0:
 		return ErrNoMerkleProof
@@ -309,10 +309,7 @@ func (proof *RangeProof) Verify(
 	// If [largestProvenPath] is Nothing, [proof] should
 	// provide and prove all keys > [smallestProvenPath].
 	// If both are Nothing, [proof] should prove the entire trie.
-	smallestProvenPath := maybe.Nothing[path]()
-	if start != nil {
-		smallestProvenPath = maybe.Some(newPath(start))
-	}
+	smallestProvenPath := maybe.Bind(start, newPath)
 
 	largestProvenPath := maybe.Bind(end, newPath)
 	if len(proof.KeyValues) > 0 {
@@ -722,14 +719,15 @@ func verifyKeyChanges(kvs []KeyChange, start maybe.Maybe[[]byte], end maybe.Mayb
 // If [start] is nil, there is no lower bound on acceptable keys.
 // If [end] is nothing, there is no upper bound on acceptable keys.
 // If [kvs] is empty, returns nil.
-func verifyKeyValues(kvs []KeyValue, start []byte, end maybe.Maybe[[]byte]) error {
-	hasLowerBound := len(start) > 0
+func verifyKeyValues(kvs []KeyValue, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte]) error {
+	hasLowerBound := start.HasValue()
+	hasUpperBound := end.HasValue()
 	for i := 0; i < len(kvs); i++ {
 		if i < len(kvs)-1 && bytes.Compare(kvs[i].Key, kvs[i+1].Key) >= 0 {
 			return ErrNonIncreasingValues
 		}
-		if (hasLowerBound && bytes.Compare(kvs[i].Key, start) < 0) ||
-			(end.HasValue() && bytes.Compare(kvs[i].Key, end.Value()) > 0) {
+		if (hasLowerBound && bytes.Compare(kvs[i].Key, start.Value()) < 0) ||
+			(hasUpperBound && bytes.Compare(kvs[i].Key, end.Value()) > 0) {
 			return ErrStateFromOutsideOfRange
 		}
 	}

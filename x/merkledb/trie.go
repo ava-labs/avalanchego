@@ -45,7 +45,7 @@ type ReadOnlyTrie interface {
 	getEditableNode(key path) (*node, error)
 
 	// GetRangeProof generates a proof of up to maxLength smallest key/values with keys between start and end
-	GetRangeProof(ctx context.Context, start []byte, end maybe.Maybe[[]byte], maxLength int) (*RangeProof, error)
+	GetRangeProof(ctx context.Context, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], maxLength int) (*RangeProof, error)
 
 	database.Iteratee
 }

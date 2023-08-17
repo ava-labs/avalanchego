@@ -103,7 +103,7 @@ message CommitChangeProofRequest {
 // the response. GetRangeProof in the DB service doesn't.
 message SyncGetRangeProofRequest {
   bytes root_hash = 1;
-  bytes start_key = 2;
+  MaybeBytes start_key = 2;
   MaybeBytes end_key = 3;
   uint32 key_limit = 4;
   uint32 bytes_limit = 5;
@@ -111,7 +111,7 @@ message SyncGetRangeProofRequest {
 
 message GetRangeProofRequest {
   bytes root_hash = 1;
-  bytes start_key = 2;
+  MaybeBytes start_key = 2;
   MaybeBytes end_key = 3;
   uint32 key_limit = 4;
 }
@@ -121,7 +121,7 @@ message GetRangeProofResponse {
 }
 
 message CommitRangeProofRequest {
-  bytes start_key = 1;
+  MaybeBytes start_key = 1;
   RangeProof range_proof = 2;
 }
 
