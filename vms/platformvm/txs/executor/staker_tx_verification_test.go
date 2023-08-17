@@ -961,13 +961,16 @@ func TestVerifyStopContinuousValidatorTx(t *testing.T) {
 
 func TestVerifyAddContinuousDelegatorTx(t *testing.T) {
 	type test struct {
-		name            string
-		backendF        func(*gomock.Controller) *Backend
-		stateF          func(*gomock.Controller) state.Chain
-		sTxF            func() *txs.Tx
-		txF             func() *txs.AddContinuousDelegatorTx
-		expectedEndTime time.Time
-		expectedErr     error
+		name     string
+		backendF func(*gomock.Controller) *Backend
+		stateF   func(*gomock.Controller) state.Chain
+		sTxF     func() *txs.Tx
+		txF      func() *txs.AddContinuousDelegatorTx
+
+		expectedValTime            time.Time
+		expectedEndTime            time.Time
+		expectedMinStakingDuration time.Duration
+		expectedErr                error
 	}
 
 	blsSK, err := bls.NewSecretKey()
@@ -1091,8 +1094,10 @@ func TestVerifyAddContinuousDelegatorTx(t *testing.T) {
 			txF: func() *txs.AddContinuousDelegatorTx {
 				return &verifiedTx
 			},
-			expectedEndTime: mockable.MaxTime,
-			expectedErr:     nil,
+			expectedValTime:            primaryValidator.StartTime,
+			expectedEndTime:            mockable.MaxTime,
+			expectedMinStakingDuration: primaryNetworkCfg.MinStakeDuration,
+			expectedErr:                nil,
 		},
 		{
 			name: "fail syntactic verification",
@@ -1134,8 +1139,10 @@ func TestVerifyAddContinuousDelegatorTx(t *testing.T) {
 			txF: func() *txs.AddContinuousDelegatorTx {
 				return &verifiedTx
 			},
-			expectedEndTime: mockable.MaxTime,
-			expectedErr:     nil,
+			expectedValTime:            primaryValidator.StartTime,
+			expectedEndTime:            mockable.MaxTime,
+			expectedMinStakingDuration: primaryNetworkCfg.MinStakeDuration,
+			expectedErr:                nil,
 		},
 		{
 			name: "tx not accepted pre continuous fork",
@@ -1589,9 +1596,11 @@ func TestVerifyAddContinuousDelegatorTx(t *testing.T) {
 				tx      = tt.txF()
 			)
 
-			_, endTime, _, err := verifyAddContinuousDelegatorTx(backend, state, sTx, tx)
+			valTime, endTime, minStakingDuration, err := verifyAddContinuousDelegatorTx(backend, state, sTx, tx)
 			require.ErrorIs(t, err, tt.expectedErr)
+			require.Equal(t, tt.expectedValTime, valTime)
 			require.Equal(t, tt.expectedEndTime, endTime)
+			require.Equal(t, tt.expectedMinStakingDuration, minStakingDuration)
 		})
 	}
 }
