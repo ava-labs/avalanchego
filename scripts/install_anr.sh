@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-set -e
-set -o nounset
-set -o pipefail
+
+set -euo pipefail
 
 # Avalanche root directory
 AVALANCHE_PATH=$(

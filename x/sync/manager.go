@@ -254,7 +254,7 @@ func (m *Manager) getAndApplyChangeProof(ctx context.Context, work *workItem) {
 		return
 	}
 
-	changeProof, err := m.config.Client.GetChangeProof(
+	changeOrRangeProof, err := m.config.Client.GetChangeProof(
 		ctx,
 		&pb.SyncGetChangeProofRequest{
 			StartRootHash: work.localRootID[:],
@@ -281,26 +281,36 @@ func (m *Manager) getAndApplyChangeProof(ctx context.Context, work *workItem) {
 	default:
 	}
 
-	// The start or end root IDs are not present in other nodes' history.
-	// Add this range as a fresh uncompleted work item to the work heap.
-	// TODO danlaine send range proof instead of failure notification
-	if !changeProof.HadRootsInHistory {
-		work.localRootID = ids.Empty
-		m.enqueueWork(work)
+	if changeOrRangeProof.ChangeProof != nil {
+		// The server had sufficient history to respond with a change proof.
+		changeProof := changeOrRangeProof.ChangeProof
+		largestHandledKey := work.end
+		// if the proof wasn't empty, apply changes to the sync DB
+		if len(changeProof.KeyChanges) > 0 {
+			if err := m.config.DB.CommitChangeProof(ctx, changeProof); err != nil {
+				m.setError(err)
+				return
+			}
+			largestHandledKey = maybe.Some(changeProof.KeyChanges[len(changeProof.KeyChanges)-1].Key)
+		}
+
+		m.completeWorkItem(ctx, work, largestHandledKey, targetRootID, changeProof.EndProof)
 		return
 	}
 
+	// The server responded with a range proof.
+	rangeProof := changeOrRangeProof.RangeProof
 	largestHandledKey := work.end
-	// if the proof wasn't empty, apply changes to the sync DB
-	if len(changeProof.KeyChanges) > 0 {
-		if err := m.config.DB.CommitChangeProof(ctx, changeProof); err != nil {
+	if len(rangeProof.KeyValues) > 0 {
+		// Add all the key-value pairs we got to the database.
+		if err := m.config.DB.CommitRangeProof(ctx, work.start, rangeProof); err != nil {
 			m.setError(err)
 			return
 		}
-		largestHandledKey = maybe.Some(changeProof.KeyChanges[len(changeProof.KeyChanges)-1].Key)
+		largestHandledKey = maybe.Some(rangeProof.KeyValues[len(rangeProof.KeyValues)-1].Key)
 	}
 
-	m.completeWorkItem(ctx, work, largestHandledKey, targetRootID, changeProof.EndProof)
+	m.completeWorkItem(ctx, work, largestHandledKey, targetRootID, rangeProof.EndProof)
 }
 
 // Fetch and apply the range proof given by [work].
