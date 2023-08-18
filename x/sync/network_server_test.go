@@ -359,7 +359,7 @@ func TestAppRequestErrAppSendFailed(t *testing.T) {
 					ChangeProofRequest: &pb.SyncGetChangeProofRequest{
 						StartRootHash: startRootID[:],
 						EndRootHash:   endRootID[:],
-						StartKey:      []byte{1},
+						StartKey:      &pb.MaybeBytes{Value: []byte{1}},
 						EndKey:        &pb.MaybeBytes{Value: []byte{2}},
 						KeyLimit:      100,
 						BytesLimit:    100,
@@ -395,7 +395,7 @@ func TestAppRequestErrAppSendFailed(t *testing.T) {
 				Message: &pb.Request_RangeProofRequest{
 					RangeProofRequest: &pb.SyncGetRangeProofRequest{
 						RootHash:   endRootID[:],
-						StartKey:   []byte{1},
+						StartKey:   &pb.MaybeBytes{Value: []byte{1}},
 						EndKey:     &pb.MaybeBytes{Value: []byte{2}},
 						KeyLimit:   100,
 						BytesLimit: 100,
