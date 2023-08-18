@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-# Archives a testnet network dir to the current working directory.
+# Archives a testnet network dir to the root of the repo.
 
 TESTNETCTL_NETWORK_DIR="${1:-}"
 if [[ -z "${TESTNETCTL_NETWORK_DIR}" ]]; then
