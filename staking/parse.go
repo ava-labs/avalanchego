@@ -25,5 +25,13 @@ func ParseCertificate(der []byte) (*Certificate, error) {
 		return nil, err
 	}
 
+	// Verifying that the signature algorithm is in the expected set isn't
+	// technically required here. However, it ensure that avalanchego will only
+	// connect to peers with certificates that it considers valid.
+	_, ok := signatureAlgorithmVerificationDetails[cert.SignatureAlgorithm]
+	if !ok {
+		return nil, ErrUnsupportedAlgorithm
+	}
+
 	return CertificateFromX509(cert), nil
 }
