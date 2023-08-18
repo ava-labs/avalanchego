@@ -222,8 +222,11 @@ func TestGetRangeProof(t *testing.T) {
 		"full response from near end of trie to end of trie (less than leaf limit)": {
 			db: largeTrieDB,
 			request: &pb.SyncGetRangeProofRequest{
-				RootHash:   largeTrieRoot[:],
-				StartKey:   largeTrieKeys[len(largeTrieKeys)-30], // Set start 30 keys from the end of the large trie
+				RootHash: largeTrieRoot[:],
+				StartKey: &pb.MaybeBytes{
+					Value:     largeTrieKeys[len(largeTrieKeys)-30], // Set start 30 keys from the end of the large trie
+					IsNothing: false,
+				},
 				KeyLimit:   defaultRequestKeyLimit,
 				BytesLimit: defaultRequestByteSizeLimit,
 			},
@@ -232,8 +235,11 @@ func TestGetRangeProof(t *testing.T) {
 		"full response for intermediate range of trie (less than leaf limit)": {
 			db: largeTrieDB,
 			request: &pb.SyncGetRangeProofRequest{
-				RootHash:   largeTrieRoot[:],
-				StartKey:   largeTrieKeys[1000],                        // Set the range for 1000 leafs in an intermediate range of the trie
+				RootHash: largeTrieRoot[:],
+				StartKey: &pb.MaybeBytes{
+					Value:     largeTrieKeys[1000], // Set the range for 1000 leafs in an intermediate range of the trie
+					IsNothing: false,
+				},
 				EndKey:     &pb.MaybeBytes{Value: largeTrieKeys[1099]}, // (inclusive range)
 				KeyLimit:   defaultRequestKeyLimit,
 				BytesLimit: defaultRequestByteSizeLimit,
@@ -260,7 +266,7 @@ func TestGetRangeProof(t *testing.T) {
 				BytesLimit: defaultRequestByteSizeLimit,
 			},
 			modifyResponse: func(response *merkledb.RangeProof) {
-				start := response.KeyValues[1].Key
+				start := maybe.Some(response.KeyValues[1].Key)
 				rootID, err := largeTrieDB.GetMerkleRoot(context.Background())
 				require.NoError(t, err)
 				proof, err := largeTrieDB.GetRangeProofAtRoot(context.Background(), rootID, start, maybe.Nothing[[]byte](), defaultRequestKeyLimit)
@@ -794,18 +800,18 @@ func TestAppRequestSendFailed(t *testing.T) {
 		gomock.Any(),
 		gomock.Any(),
 		gomock.Any(),
-	).Return(ids.NodeID{}, nil, errAppRequestSendFailed).Times(2)
+	).Return(ids.NodeID{}, nil, errAppSendFailed).Times(2)
 
 	_, err := client.GetChangeProof(
 		context.Background(),
 		&pb.SyncGetChangeProofRequest{},
 		nil, // database is unused
 	)
-	require.ErrorIs(err, errAppRequestSendFailed)
+	require.ErrorIs(err, errAppSendFailed)
 
 	_, err = client.GetRangeProof(
 		context.Background(),
 		&pb.SyncGetRangeProofRequest{},
 	)
-	require.ErrorIs(err, errAppRequestSendFailed)
+	require.ErrorIs(err, errAppSendFailed)
 }

@@ -376,14 +376,14 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 // [maxLength] must be > 0.
 func (t *trieView) GetRangeProof(
 	ctx context.Context,
-	start []byte,
+	start maybe.Maybe[[]byte],
 	end maybe.Maybe[[]byte],
 	maxLength int,
 ) (*RangeProof, error) {
 	ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.GetRangeProof")
 	defer span.End()
 
-	if end.HasValue() && bytes.Compare(start, end.Value()) == 1 {
+	if start.HasValue() && end.HasValue() && bytes.Compare(start.Value(), end.Value()) == 1 {
 		return nil, ErrStartAfterEnd
 	}
 
@@ -409,7 +409,7 @@ func (t *trieView) GetRangeProof(
 	var result RangeProof
 
 	result.KeyValues = make([]KeyValue, 0, initKeyValuesSize)
-	it := t.NewIteratorWithStart(start)
+	it := t.NewIteratorWithStart(start.Value())
 	for it.Next() && len(result.KeyValues) < maxLength && (end.IsNothing() || bytes.Compare(it.Key(), end.Value()) <= 0) {
 		// clone the value to prevent editing of the values stored within the trie
 		result.KeyValues = append(result.KeyValues, KeyValue{
@@ -445,8 +445,8 @@ func (t *trieView) GetRangeProof(
 		result.EndProof = endProof.Path
 	}
 
-	if len(start) > 0 {
-		startProof, err := t.getProof(ctx, start)
+	if start.HasValue() {
+		startProof, err := t.getProof(ctx, start.Value())
 		if err != nil {
 			return nil, err
 		}

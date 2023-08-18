@@ -29,9 +29,9 @@ const minRequestHandlingDuration = 100 * time.Millisecond
 var (
 	_ NetworkClient = (*networkClient)(nil)
 
-	errAcquiringSemaphore   = errors.New("error acquiring semaphore")
-	errRequestFailed        = errors.New("request failed")
-	errAppRequestSendFailed = errors.New("failed to send AppRequest")
+	errAcquiringSemaphore = errors.New("error acquiring semaphore")
+	errRequestFailed      = errors.New("request failed")
+	errAppSendFailed      = errors.New("failed to send app message")
 )
 
 // NetworkClient defines ability to send request / response through the Network
@@ -189,6 +189,7 @@ func (c *networkClient) getRequestHandler(requestID uint32) (ResponseHandler, bo
 	return handler, true
 }
 
+// If [errAppSendFailed] is returned this should be considered fatal.
 func (c *networkClient) RequestAny(
 	ctx context.Context,
 	minVersion *version.Application,
@@ -212,6 +213,7 @@ func (c *networkClient) RequestAny(
 	return nodeID, response, err
 }
 
+// If [errAppSendFailed] is returned this should be considered fatal.
 func (c *networkClient) Request(
 	ctx context.Context,
 	nodeID ids.NodeID,
@@ -229,6 +231,7 @@ func (c *networkClient) Request(
 
 // Sends [request] to [nodeID] and returns the response.
 // Returns an error if the request failed or [ctx] is canceled.
+// If [errAppSendFailed] is returned this should be considered fatal.
 // Blocks until a response is received or the [ctx] is canceled fails.
 // Releases active requests semaphore if there was an error in sending the request.
 // Assumes [nodeID] is never [c.myNodeID] since we guarantee
@@ -254,7 +257,13 @@ func (c *networkClient) request(
 	// Send an app request to the peer.
 	if err := c.appSender.SendAppRequest(ctx, nodeIDs, requestID, request); err != nil {
 		c.lock.Unlock()
-		return nil, fmt.Errorf("%w: %s", errAppRequestSendFailed, err)
+		c.log.Fatal(
+			"failed to send app request",
+			zap.Stringer("nodeID", nodeID),
+			zap.Int("requestLen", len(request)),
+			zap.Error(err),
+		)
+		return nil, fmt.Errorf("%w: %s", errAppSendFailed, err)
 	}
 
 	handler := newResponseHandler()
