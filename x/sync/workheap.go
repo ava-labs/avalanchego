@@ -111,15 +111,14 @@ func (wh *workHeap) MergeInsert(item *workItem) {
 	wh.sortedItems.DescendLessOrEqual(
 		searchItem,
 		func(beforeItem *heapItem) bool {
-			if item.localRootID == beforeItem.workItem.localRootID {
-				if maybe.Equal(item.start, beforeItem.workItem.end, bytes.Equal) {
-					// [beforeItem.start, beforeItem.end] and [item.start, item.end] are
-					// merged into [beforeItem.start, item.end]
-					beforeItem.workItem.end = item.end
-					beforeItem.workItem.priority = math.Max(item.priority, beforeItem.workItem.priority)
-					heap.Fix(&wh.innerHeap, beforeItem.heapIndex)
-					mergedBefore = beforeItem
-				}
+			if item.localRootID == beforeItem.workItem.localRootID &&
+				maybe.Equal(item.start, beforeItem.workItem.end, bytes.Equal) {
+				// [beforeItem.start, beforeItem.end] and [item.start, item.end] are
+				// merged into [beforeItem.start, item.end]
+				beforeItem.workItem.end = item.end
+				beforeItem.workItem.priority = math.Max(item.priority, beforeItem.workItem.priority)
+				heap.Fix(&wh.innerHeap, beforeItem.heapIndex)
+				mergedBefore = beforeItem
 			}
 			return false
 		})
@@ -129,15 +128,14 @@ func (wh *workHeap) MergeInsert(item *workItem) {
 	wh.sortedItems.AscendGreaterOrEqual(
 		searchItem,
 		func(afterItem *heapItem) bool {
-			if item.localRootID == afterItem.workItem.localRootID {
-				if maybe.Equal(item.end, afterItem.workItem.start, bytes.Equal) {
-					// [item.start, item.end] and [afterItem.start, afterItem.end] are merged into
-					// [item.start, afterItem.end].
-					afterItem.workItem.start = item.start
-					afterItem.workItem.priority = math.Max(item.priority, afterItem.workItem.priority)
-					heap.Fix(&wh.innerHeap, afterItem.heapIndex)
-					mergedAfter = afterItem
-				}
+			if item.localRootID == afterItem.workItem.localRootID &&
+				maybe.Equal(item.end, afterItem.workItem.start, bytes.Equal) {
+				// [item.start, item.end] and [afterItem.start, afterItem.end] are merged into
+				// [item.start, afterItem.end].
+				afterItem.workItem.start = item.start
+				afterItem.workItem.priority = math.Max(item.priority, afterItem.workItem.priority)
+				heap.Fix(&wh.innerHeap, afterItem.heapIndex)
+				mergedAfter = afterItem
 			}
 			return false
 		})
