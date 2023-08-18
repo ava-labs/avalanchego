@@ -203,7 +203,7 @@ func TestValidatorsSampleCaching(t *testing.T) {
 			}
 			mockValidators.EXPECT().GetValidatorSet(gomock.Any(), height, subnetID).Return(validatorSet, nil).Times(tt.expectedCalls)
 
-			v := Validators{
+			v := &Validators{
 				subnetID:                 subnetID,
 				validators:               mockValidators,
 				maxValidatorSetStaleness: tt.maxStaleness,
