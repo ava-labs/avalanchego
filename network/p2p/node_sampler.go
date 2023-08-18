@@ -53,7 +53,7 @@ type Validators struct {
 	maxValidatorSetStaleness time.Duration
 }
 
-func (v Validators) getRecentValidatorIDs() ([]ids.NodeID, error) {
+func (v *Validators) getRecentValidatorIDs() ([]ids.NodeID, error) {
 	if time.Since(v.lastUpdated) < v.maxValidatorSetStaleness {
 		return v.recentValidatorIDs, nil
 	}
@@ -72,7 +72,7 @@ func (v Validators) getRecentValidatorIDs() ([]ids.NodeID, error) {
 	return v.recentValidatorIDs, nil
 }
 
-func (v Validators) Sample(n int) ([]ids.NodeID, error) {
+func (v *Validators) Sample(n int) ([]ids.NodeID, error) {
 	validatorIDs, err := v.getRecentValidatorIDs()
 	if err != nil {
 		return nil, err
