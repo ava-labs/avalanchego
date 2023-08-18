@@ -229,7 +229,7 @@ func TestVMUpgradeBytesPrecompile(t *testing.T) {
 // 	}
 // }
 
-func TestVMUpgradeBytesNetworkUpgradesWithGenesis(t *testing.T) {
+func TestMandatoryUpgradesEnforced(t *testing.T) {
 	// make genesis w/ fork at block 5
 	// but this should not be used because we are enforcing
 	// network upgrades within the code
@@ -247,12 +247,14 @@ func TestVMUpgradeBytesNetworkUpgradesWithGenesis(t *testing.T) {
 	// initialize the VM with these upgrade bytes
 	_, vm, _, _ := GenesisVM(t, true, string(genesisBytes), "", "")
 
+	defer func() {
+		if err := vm.Shutdown(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
 	// verify upgrade is rescheduled
 	require.True(t, vm.chainConfig.IsSubnetEVM(0))
-
-	if err := vm.Shutdown(context.Background()); err != nil {
-		t.Fatal(err)
-	}
 }
 
 func mustMarshal(t *testing.T, v interface{}) string {

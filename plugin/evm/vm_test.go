@@ -2967,28 +2967,6 @@ func TestSkipChainConfigCheckCompatible(t *testing.T) {
 	require.NoError(t, reinitVM.Shutdown(context.Background()))
 }
 
-func TestMandatoryUpgrades(t *testing.T) {
-	modifiedSubnetEVMGenesis := &core.Genesis{}
-	err := json.Unmarshal([]byte(genesisJSONSubnetEVM), &modifiedSubnetEVMGenesis)
-	require.NoError(t, err)
-	modifiedSubnetEVMGenesis.Config.SubnetEVMTimestamp = utils.NewUint64(1)
-	modifiedSubnetEVMGenesisBytes, err := json.Marshal(modifiedSubnetEVMGenesis)
-	modifiedSubnetEVMGenesisString := string(modifiedSubnetEVMGenesisBytes)
-	require.NoError(t, err)
-	require.Contains(t, modifiedSubnetEVMGenesisString, `"subnetEVMTimestamp":1`)
-	// use modified genesis to set SubnetEVM timestamp to 1
-	_, vm, _, _ := GenesisVM(t, true, modifiedSubnetEVMGenesisString, "", "")
-
-	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
-			t.Fatal(err)
-		}
-	}()
-
-	// modification to genesis for mandatory upgrades should have no effect on the VM
-	require.Equal(t, *vm.chainConfig.SubnetEVMTimestamp, uint64(0))
-}
-
 func TestCrossChainMessagestoVM(t *testing.T) {
 	crossChainCodec := message.CrossChainCodec
 	require := require.New(t)
