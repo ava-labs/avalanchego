@@ -321,7 +321,7 @@ func TestWorkHeapMergeInsert(t *testing.T) {
 			require.Equal(i, h.Len())
 
 			h.MergeInsert(&workItem{
-				start:       r.start,
+				start:       maybe.Some(r.start),
 				end:         maybe.Some(r.end),
 				priority:    lowPriority,
 				localRootID: rootID,
@@ -331,7 +331,7 @@ func TestWorkHeapMergeInsert(t *testing.T) {
 		// Insert an item that should be merged with the first item.
 		// This tests merging where a range has a nil start.
 		h.MergeInsert(&workItem{
-			start:       nil,
+			start:       maybe.Nothing[[]byte](),
 			end:         maybe.Some(ranges[0].start),
 			priority:    lowPriority,
 			localRootID: rootID,
@@ -342,7 +342,7 @@ func TestWorkHeapMergeInsert(t *testing.T) {
 		// Insert an item that should be merged with the last item.
 		// This tests merging where a range has a Nothing end.
 		h.MergeInsert(&workItem{
-			start:       ranges[len(ranges)-1].end,
+			start:       maybe.Some(ranges[len(ranges)-1].end),
 			end:         maybe.Nothing[[]byte](),
 			priority:    lowPriority,
 			localRootID: rootID,
@@ -360,7 +360,7 @@ func TestWorkHeapMergeInsert(t *testing.T) {
 		for i := 0; i < len(ranges)-1; i++ {
 			// Merge ranges[i] with ranges[i+1]
 			h.MergeInsert(&workItem{
-				start:       ranges[i].end,
+				start:       maybe.Some(ranges[i].end),
 				end:         maybe.Some(ranges[i+1].start),
 				priority:    lowPriority,
 				localRootID: rootID,
@@ -368,7 +368,7 @@ func TestWorkHeapMergeInsert(t *testing.T) {
 			require.Equal(len(ranges)-i-1, h.Len())
 		}
 		got := h.GetWork()
-		require.Nil(got.start)
+		require.True(got.start.IsNothing())
 		require.True(got.end.IsNothing())
 	}
 
@@ -380,7 +380,7 @@ func TestWorkHeapMergeInsert(t *testing.T) {
 			newEnd := slices.Clone(ranges[i].end)
 			newEnd = append(newEnd, 0)
 			h.MergeInsert(&workItem{
-				start:       ranges[i].end,
+				start:       maybe.Some(ranges[i].end),
 				end:         maybe.Some(newEnd),
 				priority:    lowPriority,
 				localRootID: rootID,
@@ -389,9 +389,9 @@ func TestWorkHeapMergeInsert(t *testing.T) {
 			// Shouldn't cause number of elements to change
 			require.Equal(len(ranges), h.Len())
 
-			start := ranges[i].start
+			start := maybe.Some(ranges[i].start)
 			if i == 0 {
-				start = nil
+				start = maybe.Nothing[[]byte]()
 			}
 			// Make sure end is updated
 			got, ok := h.sortedItems.Get(&heapItem{
@@ -413,7 +413,7 @@ func TestWorkHeapMergeInsert(t *testing.T) {
 			newStart = newStart[:len(newStart)-1]
 
 			h.MergeInsert(&workItem{
-				start:       newStart,
+				start:       maybe.Some(newStart),
 				end:         maybe.Some(ranges[i].start),
 				priority:    lowPriority,
 				localRootID: rootID,
@@ -425,11 +425,11 @@ func TestWorkHeapMergeInsert(t *testing.T) {
 			// Make sure start is updated
 			got, ok := h.sortedItems.Get(&heapItem{
 				workItem: &workItem{
-					start: newStart,
+					start: maybe.Some(newStart),
 				},
 			})
 			require.True(ok)
-			require.Equal(newStart, got.workItem.start)
+			require.Equal(newStart, got.workItem.start.Value())
 		}
 	}
 }
