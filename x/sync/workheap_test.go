@@ -276,7 +276,7 @@ func Test_WorkHeap_Merge_Insert(t *testing.T) {
 	require.Equal(t, 1, syncHeap.Len())
 }
 
-func TestWorkHeapMergeInsert(t *testing.T) {
+func TestWorkHeapMergeInsertRandom(t *testing.T) {
 	var (
 		require   = require.New(t)
 		seed      = time.Now().UnixNano()
@@ -295,61 +295,34 @@ func TestWorkHeapMergeInsert(t *testing.T) {
 	}
 	utils.SortBytes(bounds)
 
-	type startAndEnd struct {
-		start []byte
-		end   []byte
-	}
-
 	// Note that start < end for all ranges.
 	// It is possible but extremely unlikely that
 	// two elements of [bounds] are equal.
-	ranges := []startAndEnd{}
+	ranges := []workItem{}
 	for i := 0; i < numRanges/2; i++ {
 		start := bounds[i*2]
 		end := bounds[i*2+1]
-		ranges = append(ranges, startAndEnd{
-			start: start,
-			end:   end,
+		ranges = append(ranges, workItem{
+			start:    maybe.Some(start),
+			end:      maybe.Some(end),
+			priority: lowPriority,
+			// Note they all share the same root ID.
+			localRootID: rootID,
 		})
 	}
+	// Set beginning of first range to Nothing.
+	ranges[0].start = maybe.Nothing[[]byte]()
+	// Set end of last range to Nothing.
+	ranges[len(ranges)-1].end = maybe.Nothing[[]byte]()
 
 	setup := func() *workHeap {
 		// Insert all the ranges into the heap.
-		// Note they all share the same root ID.
 		h := newWorkHeap()
 		for i, r := range ranges {
 			require.Equal(i, h.Len())
-
-			h.MergeInsert(&workItem{
-				start:       maybe.Some(r.start),
-				end:         maybe.Some(r.end),
-				priority:    lowPriority,
-				localRootID: rootID,
-			})
+			rCopy := r
+			h.MergeInsert(&rCopy)
 		}
-
-		// Insert an item that should be merged with the first item.
-		// This tests merging where a range has a nil start.
-		h.MergeInsert(&workItem{
-			start:       maybe.Nothing[[]byte](),
-			end:         maybe.Some(ranges[0].start),
-			priority:    lowPriority,
-			localRootID: rootID,
-		})
-		// Should've merged with existing first item.
-		require.Len(h.innerHeap, len(ranges))
-
-		// Insert an item that should be merged with the last item.
-		// This tests merging where a range has a Nothing end.
-		h.MergeInsert(&workItem{
-			start:       maybe.Some(ranges[len(ranges)-1].end),
-			end:         maybe.Nothing[[]byte](),
-			priority:    lowPriority,
-			localRootID: rootID,
-		})
-		// Should've merged with existing last item.
-		require.Equal(len(ranges), h.Len())
-
 		return h
 	}
 
@@ -360,8 +333,8 @@ func TestWorkHeapMergeInsert(t *testing.T) {
 		for i := 0; i < len(ranges)-1; i++ {
 			// Merge ranges[i] with ranges[i+1]
 			h.MergeInsert(&workItem{
-				start:       maybe.Some(ranges[i].end),
-				end:         maybe.Some(ranges[i+1].start),
+				start:       ranges[i].end,
+				end:         ranges[i+1].start,
 				priority:    lowPriority,
 				localRootID: rootID,
 			})
@@ -377,10 +350,10 @@ func TestWorkHeapMergeInsert(t *testing.T) {
 		h := setup()
 		for i := 0; i < len(ranges)-1; i++ {
 			// Extend end of ranges[i]
-			newEnd := slices.Clone(ranges[i].end)
+			newEnd := slices.Clone(ranges[i].end.Value())
 			newEnd = append(newEnd, 0)
 			h.MergeInsert(&workItem{
-				start:       maybe.Some(ranges[i].end),
+				start:       ranges[i].end,
 				end:         maybe.Some(newEnd),
 				priority:    lowPriority,
 				localRootID: rootID,
@@ -389,7 +362,7 @@ func TestWorkHeapMergeInsert(t *testing.T) {
 			// Shouldn't cause number of elements to change
 			require.Equal(len(ranges), h.Len())
 
-			start := maybe.Some(ranges[i].start)
+			start := ranges[i].start
 			if i == 0 {
 				start = maybe.Nothing[[]byte]()
 			}
@@ -409,12 +382,13 @@ func TestWorkHeapMergeInsert(t *testing.T) {
 		h := setup()
 		for i := 1; i < len(ranges); i++ {
 			// Extend start of ranges[i]
-			newStart := slices.Clone(ranges[i].start)
-			newStart = newStart[:len(newStart)-1]
+			newStartBytes := slices.Clone(ranges[i].start.Value())
+			newStartBytes = newStartBytes[:len(newStartBytes)-1]
+			newStart := maybe.Some(newStartBytes)
 
 			h.MergeInsert(&workItem{
-				start:       maybe.Some(newStart),
-				end:         maybe.Some(ranges[i].start),
+				start:       newStart,
+				end:         ranges[i].start,
 				priority:    lowPriority,
 				localRootID: rootID,
 			})
@@ -425,11 +399,11 @@ func TestWorkHeapMergeInsert(t *testing.T) {
 			// Make sure start is updated
 			got, ok := h.sortedItems.Get(&heapItem{
 				workItem: &workItem{
-					start: maybe.Some(newStart),
+					start: newStart,
 				},
 			})
 			require.True(ok)
-			require.Equal(newStart, got.workItem.start.Value())
+			require.Equal(newStartBytes, got.workItem.start.Value())
 		}
 	}
 }
