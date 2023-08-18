@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"golang.org/x/exp/maps"
 
@@ -16,6 +17,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
+)
+
+const (
+	maxValidatorSetStaleness = time.Minute
 )
 
 var (
@@ -31,23 +36,47 @@ type NodeSampler interface {
 	Sample(n int) ([]ids.NodeID, error)
 }
 
-type Validators struct {
-	SubnetID   ids.ID
-	Validators validators.State
+func NewValidators(subnetID ids.ID, validators validators.State) *Validators {
+	return &Validators{
+		subnetID:                 subnetID,
+		validators:               validators,
+		maxValidatorSetStaleness: maxValidatorSetStaleness,
+	}
 }
 
-func (v Validators) Sample(n int) ([]ids.NodeID, error) {
-	currentHeight, err := v.Validators.GetCurrentHeight(context.TODO())
+type Validators struct {
+	subnetID   ids.ID
+	validators validators.State
+
+	recentValidatorIDs       []ids.NodeID
+	lastUpdated              time.Time
+	maxValidatorSetStaleness time.Duration
+}
+
+func (v Validators) getRecentValidatorIDs() ([]ids.NodeID, error) {
+	if time.Since(v.lastUpdated) < v.maxValidatorSetStaleness {
+		return v.recentValidatorIDs, nil
+	}
+
+	height, err := v.validators.GetCurrentHeight(context.TODO())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current height: %w", err)
 	}
 
-	validatorSet, err := v.Validators.GetValidatorSet(context.TODO(), currentHeight, v.SubnetID)
+	validatorSet, err := v.validators.GetValidatorSet(context.TODO(), height, v.subnetID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current validator set: %w", err)
 	}
 
-	validatorIDs := maps.Keys(validatorSet)
+	v.recentValidatorIDs = maps.Keys(validatorSet)
+	return v.recentValidatorIDs, nil
+}
+
+func (v Validators) Sample(n int) ([]ids.NodeID, error) {
+	validatorIDs, err := v.getRecentValidatorIDs()
+	if err != nil {
+		return nil, err
+	}
 
 	s := sampler.NewUniform()
 	s.Initialize(uint64(len(validatorIDs)))

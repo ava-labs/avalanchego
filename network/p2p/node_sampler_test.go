@@ -6,6 +6,7 @@ package p2p
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -145,18 +146,72 @@ func TestValidatorsSample(t *testing.T) {
 			validatorSet := make(map[ids.NodeID]*validators.GetValidatorOutput, 0)
 			for _, validator := range tt.validators {
 				validatorSet[validator] = nil
-
 			}
 			mockValidators.EXPECT().GetValidatorSet(gomock.Any(), height, subnetID).Return(validatorSet, nil)
 
 			v := Validators{
-				SubnetID:   subnetID,
-				Validators: mockValidators,
+				subnetID:   subnetID,
+				validators: mockValidators,
 			}
 
 			sampled, err := v.Sample(tt.n)
 			require.NoError(err)
 			require.Len(sampled, safemath.Min(tt.n, len(tt.validators)))
+		})
+	}
+}
+
+// invariant: we should only call GetValidatorSet when it passes a max staleness
+// threshold
+func TestValidatorsSampleCaching(t *testing.T) {
+	tests := []struct {
+		name          string
+		validators    []ids.NodeID
+		maxStaleness  time.Duration
+		elapsed       time.Duration
+		expectedCalls int
+	}{
+		{
+			name:         "within max threshold",
+			validators:   []ids.NodeID{ids.GenerateTestNodeID()},
+			maxStaleness: time.Hour,
+			elapsed:      time.Second,
+		},
+		{
+			name:          "beyond max threshold",
+			validators:    []ids.NodeID{ids.GenerateTestNodeID()},
+			maxStaleness:  time.Hour,
+			elapsed:       time.Hour + 1,
+			expectedCalls: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+			ctrl := gomock.NewController(t)
+
+			subnetID := ids.GenerateTestID()
+
+			height := uint64(1234)
+			mockValidators := validators.NewMockState(ctrl)
+			mockValidators.EXPECT().GetCurrentHeight(gomock.Any()).Return(height, nil).Times(tt.expectedCalls)
+
+			validatorSet := make(map[ids.NodeID]*validators.GetValidatorOutput, 0)
+			for _, validator := range tt.validators {
+				validatorSet[validator] = nil
+			}
+			mockValidators.EXPECT().GetValidatorSet(gomock.Any(), height, subnetID).Return(validatorSet, nil).Times(tt.expectedCalls)
+
+			v := Validators{
+				subnetID:                 subnetID,
+				validators:               mockValidators,
+				maxValidatorSetStaleness: tt.maxStaleness,
+			}
+			v.lastUpdated = time.Now().Add(-tt.elapsed)
+
+			_, err := v.Sample(1)
+			require.NoError(err)
 		})
 	}
 }
