@@ -105,7 +105,7 @@ func (w *wallet) IssueImportTx(
 	to ethcommon.Address,
 	options ...common.Option,
 ) (*evm.Tx, error) {
-	baseFee, err := w.baseFee(options...)
+	baseFee, err := w.baseFee(options)
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +122,7 @@ func (w *wallet) IssueExportTx(
 	outputs []*secp256k1fx.TransferOutput,
 	options ...common.Option,
 ) (*evm.Tx, error) {
-	baseFee, err := w.baseFee(options...)
+	baseFee, err := w.baseFee(options)
 	if err != nil {
 		return nil, err
 	}
@@ -190,7 +190,7 @@ func (w *wallet) IssueAtomicTx(
 	}
 }
 
-func (w *wallet) baseFee(options ...common.Option) (*big.Int, error) {
+func (w *wallet) baseFee(options []common.Option) (*big.Int, error) {
 	ops := common.NewOptions(options)
 	baseFee := ops.BaseFee(nil)
 	if baseFee != nil {
