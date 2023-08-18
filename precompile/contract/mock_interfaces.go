@@ -7,7 +7,7 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/subnet-evm/commontype"
+	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
 )
 
 // TODO: replace with gomock library
@@ -36,13 +36,15 @@ type mockAccessibleState struct {
 	state        StateDB
 	blockContext *mockBlockContext
 	snowContext  *snow.Context
+	chainConfig  precompileconfig.ChainConfig
 }
 
-func NewMockAccessibleState(state StateDB, blockContext *mockBlockContext, snowContext *snow.Context) *mockAccessibleState {
+func NewMockAccessibleState(state StateDB, blockContext *mockBlockContext, snowContext *snow.Context, chainConfig precompileconfig.ChainConfig) *mockAccessibleState {
 	return &mockAccessibleState{
 		state:        state,
 		blockContext: blockContext,
 		snowContext:  snowContext,
+		chainConfig:  chainConfig,
 	}
 }
 
@@ -52,17 +54,4 @@ func (m *mockAccessibleState) GetBlockContext() BlockContext { return m.blockCon
 
 func (m *mockAccessibleState) GetSnowContext() *snow.Context { return m.snowContext }
 
-type mockChainState struct {
-	feeConfig            commontype.FeeConfig
-	allowedFeeRecipients bool
-}
-
-func (m *mockChainState) GetFeeConfig() commontype.FeeConfig { return m.feeConfig }
-func (m *mockChainState) AllowedFeeRecipients() bool         { return m.allowedFeeRecipients }
-
-func NewMockChainState(feeConfig commontype.FeeConfig, allowedFeeRecipients bool) *mockChainState {
-	return &mockChainState{
-		feeConfig:            feeConfig,
-		allowedFeeRecipients: allowedFeeRecipients,
-	}
-}
+func (m *mockAccessibleState) GetChainConfig() precompileconfig.ChainConfig { return m.chainConfig }

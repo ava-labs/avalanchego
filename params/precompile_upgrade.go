@@ -79,7 +79,7 @@ func (c *ChainConfig) verifyPrecompileUpgrades() error {
 
 	// verify genesis precompiles
 	for key, config := range c.GenesisPrecompiles {
-		if err := config.Verify(); err != nil {
+		if err := config.Verify(c); err != nil {
 			return err
 		}
 		// if the precompile is disabled at genesis, skip it.
@@ -132,7 +132,7 @@ func (c *ChainConfig) verifyPrecompileUpgrades() error {
 			return fmt.Errorf("PrecompileUpgrade (%s) at [%d]: config block timestamp (%v) <= previous timestamp (%v) of same key", key, i, *upgradeTimestamp, *lastTimestamp)
 		}
 
-		if err := upgrade.Verify(); err != nil {
+		if err := upgrade.Verify(c); err != nil {
 			return err
 		}
 

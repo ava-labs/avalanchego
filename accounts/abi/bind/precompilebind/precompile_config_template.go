@@ -63,10 +63,10 @@ func NewDisableConfig(blockTimestamp *uint64) *Config {
 func (*Config) Key() string { return ConfigKey }
 
 // Verify tries to verify Config and returns an error accordingly.
-func (c *Config) Verify() error {
+func (c *Config) Verify(chainConfig precompileconfig.ChainConfig) error {
 	{{- if .Contract.AllowList}}
 	// Verify AllowList first
-	if err := c.AllowListConfig.Verify(); err != nil {
+	if err := c.AllowListConfig.Verify(chainConfig); err != nil {
 		return err
 	}
 	{{- end}}

@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/subnet-evm/precompile/contract"
+	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -52,7 +53,7 @@ func areEqualAddressLists(current []common.Address, other []common.Address) bool
 }
 
 // Verify returns an error if there is an overlapping address between admin and enabled roles
-func (c *AllowListConfig) Verify() error {
+func (c *AllowListConfig) Verify(precompileconfig.ChainConfig) error {
 	addressMap := make(map[common.Address]Role) // tracks which addresses we have seen and their role
 
 	// check for duplicates in enabled list

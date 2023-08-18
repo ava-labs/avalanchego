@@ -13,6 +13,7 @@ import (
 // ConfigVerifyTest is a test case for verifying a config
 type ConfigVerifyTest struct {
 	Config        precompileconfig.Config
+	ChainConfig   precompileconfig.ChainConfig
 	ExpectedError string
 }
 
@@ -29,7 +30,7 @@ func RunVerifyTests(t *testing.T, tests map[string]ConfigVerifyTest) {
 			t.Helper()
 			require := require.New(t)
 
-			err := test.Config.Verify()
+			err := test.Config.Verify(test.ChainConfig)
 			if test.ExpectedError == "" {
 				require.NoError(err)
 			} else {

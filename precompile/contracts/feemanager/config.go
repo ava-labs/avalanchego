@@ -66,8 +66,8 @@ func (c *Config) Equal(cfg precompileconfig.Config) bool {
 	return c.InitialFeeConfig.Equal(other.InitialFeeConfig)
 }
 
-func (c *Config) Verify() error {
-	if err := c.AllowListConfig.Verify(); err != nil {
+func (c *Config) Verify(chainConfig precompileconfig.ChainConfig) error {
+	if err := c.AllowListConfig.Verify(chainConfig); err != nil {
 		return err
 	}
 	if c.InitialFeeConfig == nil {

@@ -5,13 +5,16 @@
 package precompileconfig
 
 import (
+	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ethereum/go-ethereum/common"
 )
 
-var _ Config = &noopStatefulPrecompileConfig{}
+var (
+	_ Config      = &noopStatefulPrecompileConfig{}
+	_ ChainConfig = &mockChainConfig{}
+)
 
-type noopStatefulPrecompileConfig struct {
-}
+type noopStatefulPrecompileConfig struct{}
 
 func NewNoopStatefulPrecompileConfig() *noopStatefulPrecompileConfig {
 	return &noopStatefulPrecompileConfig{}
@@ -37,6 +40,21 @@ func (n *noopStatefulPrecompileConfig) Equal(Config) bool {
 	return false
 }
 
-func (n *noopStatefulPrecompileConfig) Verify() error {
+func (n *noopStatefulPrecompileConfig) Verify(ChainConfig) error {
 	return nil
+}
+
+type mockChainConfig struct {
+	feeConfig            commontype.FeeConfig
+	allowedFeeRecipients bool
+}
+
+func (m *mockChainConfig) GetFeeConfig() commontype.FeeConfig { return m.feeConfig }
+func (m *mockChainConfig) AllowedFeeRecipients() bool         { return m.allowedFeeRecipients }
+
+func NewMockChainConfig(feeConfig commontype.FeeConfig, allowedFeeRecipients bool) *mockChainConfig {
+	return &mockChainConfig{
+		feeConfig:            feeConfig,
+		allowedFeeRecipients: allowedFeeRecipients,
+	}
 }

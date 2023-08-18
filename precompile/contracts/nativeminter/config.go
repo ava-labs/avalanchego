@@ -80,7 +80,7 @@ func (c *Config) Equal(cfg precompileconfig.Config) bool {
 	return true
 }
 
-func (c *Config) Verify() error {
+func (c *Config) Verify(chainConfig precompileconfig.ChainConfig) error {
 	// ensure that all of the initial mint values in the map are non-nil positive values
 	for addr, amount := range c.InitialMint {
 		if amount == nil {
@@ -91,5 +91,5 @@ func (c *Config) Verify() error {
 			return fmt.Errorf("initial mint cannot contain invalid amount %v for address %s", bigIntAmount, addr)
 		}
 	}
-	return c.AllowListConfig.Verify()
+	return c.AllowListConfig.Verify(chainConfig)
 }

@@ -43,7 +43,7 @@ func (d *dummyConfigurator) MakeConfig() precompileconfig.Config {
 }
 
 func (d *dummyConfigurator) Configure(
-	chainConfig contract.ChainConfig,
+	chainConfig precompileconfig.ChainConfig,
 	precompileConfig precompileconfig.Config,
 	state contract.StateDB,
 	blockContext contract.BlockContext,

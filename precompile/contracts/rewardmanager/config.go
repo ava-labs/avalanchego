@@ -86,13 +86,13 @@ func NewDisableConfig(blockTimestamp *uint64) *Config {
 
 func (*Config) Key() string { return ConfigKey }
 
-func (c *Config) Verify() error {
+func (c *Config) Verify(chainConfig precompileconfig.ChainConfig) error {
 	if c.InitialRewardConfig != nil {
 		if err := c.InitialRewardConfig.Verify(); err != nil {
 			return err
 		}
 	}
-	return c.AllowListConfig.Verify()
+	return c.AllowListConfig.Verify(chainConfig)
 }
 
 // Equal returns true if [cfg] is a [*RewardManagerConfig] and it has been configured identical to [c].

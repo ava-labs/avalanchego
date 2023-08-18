@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
+	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -28,7 +29,7 @@ type Config interface {
 	// Equal returns true if the provided argument configures the same precompile with the same parameters.
 	Equal(Config) bool
 	// Verify is called on startup and an error is treated as fatal. Configure can assume the Config has passed verification.
-	Verify() error
+	Verify(ChainConfig) error
 }
 
 // PrecompilePredicateContext is the context passed in to the PrecompilePredicater interface.
@@ -95,4 +96,14 @@ type AcceptContext struct {
 // rely on this. Designed for use only by precompiles that ship with subnet-evm.
 type Accepter interface {
 	Accept(acceptCtx *AcceptContext, txHash common.Hash, logIndex int, topics []common.Hash, logData []byte) error
+}
+
+// ChainContext defines an interface that provides information to a stateful precompile
+// about the chain configuration. The precompile can access this information to initialize
+// its state.
+type ChainConfig interface {
+	// GetFeeConfig returns the original FeeConfig that was set in the genesis.
+	GetFeeConfig() commontype.FeeConfig
+	// AllowedFeeRecipients returns true if fee recipients are allowed in the genesis.
+	AllowedFeeRecipients() bool
 }

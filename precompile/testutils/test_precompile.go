@@ -17,6 +17,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var DefaultChainConfig = precompileconfig.NewMockChainConfig(commontype.ValidTestFeeConfig, false)
+
 // PrecompileTest is a test case for a precompile
 type PrecompileTest struct {
 	// Caller is the address of the precompile caller
@@ -46,6 +48,9 @@ type PrecompileTest struct {
 	ExpectedErr string
 	// BlockNumber is the block number to use for the precompile's block context
 	BlockNumber int64
+	// ChainConfig is the chain config to use for the precompile's block context
+	// If nil, the default chain config will be used.
+	ChainConfig precompileconfig.ChainConfig
 }
 
 type PrecompileRunparams struct {
@@ -85,8 +90,12 @@ func (test PrecompileTest) setup(t testing.TB, module modules.Module, state cont
 	}
 
 	blockContext := contract.NewMockBlockContext(big.NewInt(test.BlockNumber), 0)
-	accesibleState := contract.NewMockAccessibleState(state, blockContext, snow.DefaultContextTest())
-	chainConfig := contract.NewMockChainState(commontype.ValidTestFeeConfig, false)
+	chainConfig := test.ChainConfig
+	if chainConfig == nil {
+		chainConfig = DefaultChainConfig
+	}
+
+	accessibleState := contract.NewMockAccessibleState(state, blockContext, snow.DefaultContextTest(), chainConfig)
 
 	if test.Config != nil {
 		err := module.Configure(chainConfig, test.Config, state, blockContext)
@@ -99,7 +108,7 @@ func (test PrecompileTest) setup(t testing.TB, module modules.Module, state cont
 	}
 
 	return PrecompileRunparams{
-		AccessibleState: accesibleState,
+		AccessibleState: accessibleState,
 		Caller:          test.Caller,
 		ContractAddress: contractAddress,
 		Input:           input,
