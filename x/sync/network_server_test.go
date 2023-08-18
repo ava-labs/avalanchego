@@ -72,7 +72,7 @@ func Test_Server_GetRangeProof(t *testing.T) {
 				RootHash:   smallTrieRoot[:],
 				KeyLimit:   defaultRequestKeyLimit,
 				BytesLimit: defaultRequestByteSizeLimit,
-				StartKey:   []byte{1},
+				StartKey:   &pb.MaybeBytes{Value: []byte{1}},
 				EndKey:     &pb.MaybeBytes{Value: []byte{0}},
 			},
 			proofNil: true,
@@ -222,7 +222,7 @@ func Test_Server_GetChangeProof(t *testing.T) {
 				EndRootHash:   endRoot[:],
 				KeyLimit:      defaultRequestKeyLimit,
 				BytesLimit:    defaultRequestByteSizeLimit,
-				StartKey:      []byte{1},
+				StartKey:      &pb.MaybeBytes{Value: []byte{1}},
 				EndKey:        &pb.MaybeBytes{Value: []byte{0}},
 			},
 			proofNil: true,
@@ -334,6 +334,115 @@ func Test_Server_GetChangeProof(t *testing.T) {
 			if test.expectedMaxResponseBytes > 0 {
 				require.LessOrEqual(len(proofBytes), test.expectedMaxResponseBytes)
 			}
+		})
+	}
+}
+
+// Test that AppRequest returns a non-nil error if we fail to send
+// an AppRequest or AppResponse.
+func TestAppRequestErrAppSendFailed(t *testing.T) {
+	startRootID := ids.GenerateTestID()
+	endRootID := ids.GenerateTestID()
+
+	type test struct {
+		name        string
+		request     *pb.Request
+		handlerFunc func(*gomock.Controller) *NetworkServer
+		expectedErr error
+	}
+
+	tests := []test{
+		{
+			name: "GetChangeProof",
+			request: &pb.Request{
+				Message: &pb.Request_ChangeProofRequest{
+					ChangeProofRequest: &pb.SyncGetChangeProofRequest{
+						StartRootHash: startRootID[:],
+						EndRootHash:   endRootID[:],
+						StartKey:      &pb.MaybeBytes{Value: []byte{1}},
+						EndKey:        &pb.MaybeBytes{Value: []byte{2}},
+						KeyLimit:      100,
+						BytesLimit:    100,
+					},
+				},
+			},
+			handlerFunc: func(ctrl *gomock.Controller) *NetworkServer {
+				sender := common.NewMockSender(ctrl)
+				sender.EXPECT().SendAppResponse(
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+				).Return(errAppSendFailed).AnyTimes()
+
+				db := merkledb.NewMockMerkleDB(ctrl)
+				db.EXPECT().GetChangeProof(
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+				).Return(&merkledb.ChangeProof{}, nil).Times(1)
+
+				return NewNetworkServer(sender, db, logging.NoLog{})
+			},
+			expectedErr: errAppSendFailed,
+		},
+		{
+			name: "GetRangeProof",
+			request: &pb.Request{
+				Message: &pb.Request_RangeProofRequest{
+					RangeProofRequest: &pb.SyncGetRangeProofRequest{
+						RootHash:   endRootID[:],
+						StartKey:   &pb.MaybeBytes{Value: []byte{1}},
+						EndKey:     &pb.MaybeBytes{Value: []byte{2}},
+						KeyLimit:   100,
+						BytesLimit: 100,
+					},
+				},
+			},
+			handlerFunc: func(ctrl *gomock.Controller) *NetworkServer {
+				sender := common.NewMockSender(ctrl)
+				sender.EXPECT().SendAppResponse(
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+				).Return(errAppSendFailed).AnyTimes()
+
+				db := merkledb.NewMockMerkleDB(ctrl)
+				db.EXPECT().GetRangeProofAtRoot(
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+				).Return(&merkledb.RangeProof{}, nil).Times(1)
+
+				return NewNetworkServer(sender, db, logging.NoLog{})
+			},
+			expectedErr: errAppSendFailed,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+			ctrl := gomock.NewController(t)
+
+			handler := tt.handlerFunc(ctrl)
+			requestBytes, err := proto.Marshal(tt.request)
+			require.NoError(err)
+
+			err = handler.AppRequest(
+				context.Background(),
+				ids.EmptyNodeID,
+				0,
+				time.Now().Add(10*time.Second),
+				requestBytes,
+			)
+			require.ErrorIs(err, tt.expectedErr)
 		})
 	}
 }

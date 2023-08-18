@@ -39,16 +39,22 @@ func (c *DBClient) GetChangeProof(
 	ctx context.Context,
 	startRootID ids.ID,
 	endRootID ids.ID,
-	startKey []byte,
+	startKey maybe.Maybe[[]byte],
 	endKey maybe.Maybe[[]byte],
 	keyLimit int,
 ) (*merkledb.ChangeProof, error) {
 	resp, err := c.client.GetChangeProof(ctx, &pb.GetChangeProofRequest{
 		StartRootHash: startRootID[:],
 		EndRootHash:   endRootID[:],
-		StartKey:      startKey,
-		EndKey:        &pb.MaybeBytes{IsNothing: endKey.IsNothing(), Value: endKey.Value()},
-		KeyLimit:      uint32(keyLimit),
+		StartKey: &pb.MaybeBytes{
+			IsNothing: startKey.IsNothing(),
+			Value:     startKey.Value(),
+		},
+		EndKey: &pb.MaybeBytes{
+			IsNothing: endKey.IsNothing(),
+			Value:     endKey.Value(),
+		},
+		KeyLimit: uint32(keyLimit),
 	})
 	if err != nil {
 		return nil, err
@@ -69,14 +75,20 @@ func (c *DBClient) GetChangeProof(
 func (c *DBClient) VerifyChangeProof(
 	ctx context.Context,
 	proof *merkledb.ChangeProof,
-	startKey []byte,
+	startKey maybe.Maybe[[]byte],
 	endKey maybe.Maybe[[]byte],
 	expectedRootID ids.ID,
 ) error {
 	resp, err := c.client.VerifyChangeProof(ctx, &pb.VerifyChangeProofRequest{
-		Proof:            proof.ToProto(),
-		StartKey:         startKey,
-		EndKey:           endKey.Value(),
+		Proof: proof.ToProto(),
+		StartKey: &pb.MaybeBytes{
+			Value:     startKey.Value(),
+			IsNothing: startKey.IsNothing(),
+		},
+		EndKey: &pb.MaybeBytes{
+			Value:     endKey.Value(),
+			IsNothing: endKey.IsNothing(),
+		},
 		ExpectedRootHash: expectedRootID[:],
 	})
 	if err != nil {
@@ -115,14 +127,20 @@ func (c *DBClient) GetProof(ctx context.Context, key []byte) (*merkledb.Proof, e
 func (c *DBClient) GetRangeProofAtRoot(
 	ctx context.Context,
 	rootID ids.ID,
-	startKey []byte,
+	startKey maybe.Maybe[[]byte],
 	endKey maybe.Maybe[[]byte],
 	keyLimit int,
 ) (*merkledb.RangeProof, error) {
 	resp, err := c.client.GetRangeProof(ctx, &pb.GetRangeProofRequest{
 		RootHash: rootID[:],
-		StartKey: startKey,
-		EndKey:   &pb.MaybeBytes{IsNothing: endKey.IsNothing(), Value: endKey.Value()},
+		StartKey: &pb.MaybeBytes{
+			IsNothing: startKey.IsNothing(),
+			Value:     startKey.Value(),
+		},
+		EndKey: &pb.MaybeBytes{
+			IsNothing: endKey.IsNothing(),
+			Value:     endKey.Value(),
+		},
 		KeyLimit: uint32(keyLimit),
 	})
 	if err != nil {
@@ -138,11 +156,14 @@ func (c *DBClient) GetRangeProofAtRoot(
 
 func (c *DBClient) CommitRangeProof(
 	ctx context.Context,
-	startKey []byte,
+	startKey maybe.Maybe[[]byte],
 	proof *merkledb.RangeProof,
 ) error {
 	_, err := c.client.CommitRangeProof(ctx, &pb.CommitRangeProofRequest{
-		StartKey:   startKey,
+		StartKey: &pb.MaybeBytes{
+			IsNothing: startKey.IsNothing(),
+			Value:     startKey.Value(),
+		},
 		RangeProof: proof.ToProto(),
 	})
 	return err

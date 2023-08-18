@@ -266,13 +266,13 @@ func Test_MerkleDB_Commit_Proof_To_Empty_Trie(t *testing.T) {
 	require.NoError(batch.Put([]byte("key3"), []byte("3")))
 	require.NoError(batch.Write())
 
-	proof, err := db.GetRangeProof(context.Background(), []byte("key1"), maybe.Some([]byte("key3")), 10)
+	proof, err := db.GetRangeProof(context.Background(), maybe.Some([]byte("key1")), maybe.Some([]byte("key3")), 10)
 	require.NoError(err)
 
 	freshDB, err := getBasicDB()
 	require.NoError(err)
 
-	require.NoError(freshDB.CommitRangeProof(context.Background(), []byte("key1"), proof))
+	require.NoError(freshDB.CommitRangeProof(context.Background(), maybe.Some([]byte("key1")), proof))
 
 	value, err := freshDB.Get([]byte("key2"))
 	require.NoError(err)
@@ -296,7 +296,7 @@ func Test_MerkleDB_Commit_Proof_To_Filled_Trie(t *testing.T) {
 	require.NoError(batch.Put([]byte("key3"), []byte("3")))
 	require.NoError(batch.Write())
 
-	proof, err := db.GetRangeProof(context.Background(), []byte("key1"), maybe.Some([]byte("key3")), 10)
+	proof, err := db.GetRangeProof(context.Background(), maybe.Some([]byte("key1")), maybe.Some([]byte("key3")), 10)
 	require.NoError(err)
 
 	freshDB, err := getBasicDB()
@@ -308,7 +308,7 @@ func Test_MerkleDB_Commit_Proof_To_Filled_Trie(t *testing.T) {
 	require.NoError(batch.Put([]byte("key25"), []byte("5")))
 	require.NoError(batch.Write())
 
-	require.NoError(freshDB.CommitRangeProof(context.Background(), []byte("key1"), proof))
+	require.NoError(freshDB.CommitRangeProof(context.Background(), maybe.Some([]byte("key1")), proof))
 
 	value, err := freshDB.Get([]byte("key2"))
 	require.NoError(err)
@@ -747,16 +747,20 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 			if len(pastRoots) > 0 {
 				root = pastRoots[r.Intn(len(pastRoots))]
 			}
+			start := maybe.Nothing[[]byte]()
+			if len(step.key) > 0 {
+				start = maybe.Some(step.key)
+			}
 			end := maybe.Nothing[[]byte]()
 			if len(step.value) > 0 {
 				end = maybe.Some(step.value)
 			}
 
-			rangeProof, err := db.GetRangeProofAtRoot(context.Background(), root, step.key, end, 100)
+			rangeProof, err := db.GetRangeProofAtRoot(context.Background(), root, start, end, 100)
 			require.NoError(err)
 			require.NoError(rangeProof.Verify(
 				context.Background(),
-				step.key,
+				start,
 				end,
 				root,
 			))
@@ -771,8 +775,12 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 			if len(step.value) > 0 {
 				end = maybe.Some(step.value)
 			}
+			start := maybe.Nothing[[]byte]()
+			if len(step.key) > 0 {
+				start = maybe.Some(step.key)
+			}
 
-			changeProof, err := db.GetChangeProof(context.Background(), startRoot, root, step.key, end, 100)
+			changeProof, err := db.GetChangeProof(context.Background(), startRoot, root, start, end, 100)
 			if startRoot == root {
 				require.ErrorIs(err, errSameRoot)
 				continue
@@ -784,7 +792,7 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 			require.NoError(changeProofDB.VerifyChangeProof(
 				context.Background(),
 				changeProof,
-				step.key,
+				start,
 				end,
 				root,
 			))
