@@ -17,9 +17,8 @@ pub struct PlainMem {
 
 impl PlainMem {
     pub fn new(size: u64, id: SpaceId) -> Self {
-        let mut space: Vec<u8> = Vec::new();
-        space.resize(size as usize, 0);
-        let space = Arc::new(RwLock::new(space));
+        // TODO: this could cause problems on a 32-bit system
+        let space = Arc::new(RwLock::new(vec![0; size as usize]));
         Self { space, id }
     }
 }
