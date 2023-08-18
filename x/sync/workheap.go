@@ -31,7 +31,7 @@ type workHeap struct {
 	// i.e. heap.Pop returns highest priority item.
 	innerHeap innerHeap
 	// The heap items sorted by range start.
-	// A nil start is considered to be the smallest.
+	// A Nothing start is considered to be the smallest.
 	sortedItems *btree.BTreeG[*heapItem]
 	closed      bool
 }
