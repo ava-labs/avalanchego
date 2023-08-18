@@ -61,11 +61,7 @@ func (c *Client) AppRequestAny(
 		return ErrNoPeers
 	}
 
-	nodeIDs := set.NewSet[ids.NodeID](len(sampled))
-	for _, s := range sampled {
-		nodeIDs.Add(s)
-	}
-
+	nodeIDs := set.Of(sampled...)
 	return c.AppRequest(ctx, nodeIDs, appRequestBytes, onResponse)
 }
 
