@@ -8,13 +8,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/maybe"
-	"golang.org/x/exp/slices"
-
 	"github.com/stretchr/testify/require"
 
+	"golang.org/x/exp/slices"
+
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/maybe"
 )
 
 // Tests heap.Interface methods Push, Pop, Swap, Len, Less.
