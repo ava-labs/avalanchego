@@ -119,14 +119,11 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 			tests.Outf("Shutting down network\n")
 			require.NoError(network.Stop())
 			if archiveNetworkDirOnTeardown {
-				archivePath, err := filepath.Abs("../../testnet.tar.xz")
+				scriptPath, err := filepath.Abs("../../scripts/archive_network_dir.sh")
 				require.NoError(err)
-				tests.Outf("Archiving network dir %s to %s\n", network.Dir, archivePath)
-				cmd := exec.Command(
-					// Specifying -C ensures that the archive will exclude the path containing the network dir.
-					"tar", "cjf", archivePath, "-C", filepath.Dir(network.Dir), filepath.Base(network.Dir),
-				)
-				require.NoError(cmd.Run())
+				output, err := exec.Command(scriptPath, network.Dir).Output()
+				require.NoError(err)
+				tests.Outf("%s", output)
 			}
 		})
 
