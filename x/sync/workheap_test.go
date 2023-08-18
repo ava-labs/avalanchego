@@ -4,9 +4,13 @@
 package sync
 
 import (
+	"math/rand"
 	"testing"
+	"time"
 
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/maybe"
+	"golang.org/x/exp/slices"
 
 	"github.com/stretchr/testify/require"
 
@@ -270,4 +274,162 @@ func Test_WorkHeap_Merge_Insert(t *testing.T) {
 
 	syncHeap.MergeInsert(&workItem{start: []byte{63}, end: maybe.Some([]byte{127}), priority: lowPriority})
 	require.Equal(t, 1, syncHeap.Len())
+}
+
+func TestWorkHeapMergeInsert(t *testing.T) {
+	var (
+		require   = require.New(t)
+		seed      = time.Now().UnixNano()
+		rand      = rand.New(rand.NewSource(seed))
+		numRanges = 1_000
+		bounds    = [][]byte{}
+		rootID    = ids.GenerateTestID()
+	)
+	t.Logf("seed: %d", seed)
+
+	// Create start and end bounds
+	for i := 0; i < numRanges; i++ {
+		bound := make([]byte, 32)
+		_, _ = rand.Read(bound)
+		bounds = append(bounds, bound)
+	}
+	utils.SortBytes(bounds)
+
+	type startAndEnd struct {
+		start []byte
+		end   []byte
+	}
+
+	// Note that start < end for all ranges.
+	// It is possible but extremely unlikely that
+	// two elements of [bounds] are equal.
+	ranges := []startAndEnd{}
+	for i := 0; i < numRanges/2; i++ {
+		start := bounds[i*2]
+		end := bounds[i*2+1]
+		ranges = append(ranges, startAndEnd{
+			start: start,
+			end:   end,
+		})
+	}
+
+	setup := func() *workHeap {
+		// Insert all the ranges into the heap.
+		// Note they all share the same root ID.
+		h := newWorkHeap()
+		for i, r := range ranges {
+			require.Equal(i, h.Len())
+
+			h.MergeInsert(&workItem{
+				start:       r.start,
+				end:         maybe.Some(r.end),
+				priority:    lowPriority,
+				localRootID: rootID,
+			})
+		}
+
+		// Insert an item that should be merged with the first item.
+		// This tests merging where a range has a nil start.
+		h.MergeInsert(&workItem{
+			start:       nil,
+			end:         maybe.Some(ranges[0].start),
+			priority:    lowPriority,
+			localRootID: rootID,
+		})
+		// Should've merged with existing first item.
+		require.Len(h.innerHeap, len(ranges))
+
+		// Insert an item that should be merged with the last item.
+		// This tests merging where a range has a Nothing end.
+		h.MergeInsert(&workItem{
+			start:       ranges[len(ranges)-1].end,
+			end:         maybe.Nothing[[]byte](),
+			priority:    lowPriority,
+			localRootID: rootID,
+		})
+		// Should've merged with existing last item.
+		require.Equal(len(ranges), h.Len())
+
+		return h
+	}
+
+	{
+		// Case 1: Merging an item with the range before and after
+		h := setup()
+		// Keep merging ranges until there's only one range left.
+		for i := 0; i < len(ranges)-1; i++ {
+			// Merge ranges[i] with ranges[i+1]
+			h.MergeInsert(&workItem{
+				start:       ranges[i].end,
+				end:         maybe.Some(ranges[i+1].start),
+				priority:    lowPriority,
+				localRootID: rootID,
+			})
+			require.Equal(len(ranges)-i-1, h.Len())
+		}
+		got := h.GetWork()
+		require.Nil(got.start)
+		require.True(got.end.IsNothing())
+	}
+
+	{
+		// Case 2: Merging an item with the range before
+		h := setup()
+		for i := 0; i < len(ranges)-1; i++ {
+			// Extend end of ranges[i]
+			newEnd := slices.Clone(ranges[i].end)
+			newEnd = append(newEnd, 0)
+			h.MergeInsert(&workItem{
+				start:       ranges[i].end,
+				end:         maybe.Some(newEnd),
+				priority:    lowPriority,
+				localRootID: rootID,
+			})
+
+			// Shouldn't cause number of elements to change
+			require.Equal(len(ranges), h.Len())
+
+			start := ranges[i].start
+			if i == 0 {
+				start = nil
+			}
+			// Make sure end is updated
+			got, ok := h.sortedItems.Get(&heapItem{
+				workItem: &workItem{
+					start: start,
+				},
+			})
+			require.True(ok)
+			require.Equal(newEnd, got.workItem.end.Value())
+		}
+	}
+
+	{
+		// Case 3: Merging an item with the range after
+		h := setup()
+		for i := 1; i < len(ranges); i++ {
+			// Extend start of ranges[i]
+			newStart := slices.Clone(ranges[i].start)
+			newStart = newStart[:len(newStart)-1]
+
+			h.MergeInsert(&workItem{
+				start:       newStart,
+				end:         maybe.Some(ranges[i].start),
+				priority:    lowPriority,
+				localRootID: rootID,
+			})
+
+			// Shouldn't cause number of elements to change
+			require.Equal(len(ranges), h.Len())
+
+			// Make sure start is updated
+			got, ok := h.sortedItems.Get(&heapItem{
+				workItem: &workItem{
+					start: newStart,
+				},
+			})
+			require.True(ok)
+			require.Equal(newStart, got.workItem.start)
+		}
+	}
 }
