@@ -80,7 +80,7 @@ func TestPeersSample(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			sampler := Peers{}
+			sampler := &Peers{}
 
 			for connected := range tt.connected {
 				require.NoError(sampler.Connected(context.Background(), connected, nil))
@@ -149,7 +149,7 @@ func TestValidatorsSample(t *testing.T) {
 			}
 			mockValidators.EXPECT().GetValidatorSet(gomock.Any(), height, subnetID).Return(validatorSet, nil)
 
-			v := Validators{
+			v := &Validators{
 				subnetID:   subnetID,
 				validators: mockValidators,
 			}
