@@ -41,7 +41,7 @@ func (*configurator) MakeConfig() precompileconfig.Config {
 }
 
 // Configure configures [state] with the desired admins based on [cfg].
-func (*configurator) Configure(_ precompileconfig.ChainConfig, cfg precompileconfig.Config, state contract.StateDB, _ contract.BlockContext) error {
+func (*configurator) Configure(chainConfig precompileconfig.ChainConfig, cfg precompileconfig.Config, state contract.StateDB, blockContext contract.BlockContext) error {
 	config, ok := cfg.(*Config)
 	if !ok {
 		return fmt.Errorf("incorrect config %T: %v", config, config)
@@ -53,5 +53,5 @@ func (*configurator) Configure(_ precompileconfig.ChainConfig, cfg precompilecon
 		}
 	}
 
-	return config.AllowListConfig.Configure(state, ContractAddress)
+	return config.AllowListConfig.Configure(chainConfig, ContractAddress, state, blockContext)
 }

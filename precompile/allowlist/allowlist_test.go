@@ -49,7 +49,7 @@ func (d *dummyConfigurator) Configure(
 	blockContext contract.BlockContext,
 ) error {
 	cfg := precompileConfig.(*dummyConfig)
-	return cfg.Configure(state, dummyAddr)
+	return cfg.AllowListConfig.Configure(chainConfig, dummyAddr, state, blockContext)
 }
 
 func TestAllowListRun(t *testing.T) {

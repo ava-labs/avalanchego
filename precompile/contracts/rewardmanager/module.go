@@ -40,7 +40,7 @@ func (*configurator) MakeConfig() precompileconfig.Config {
 }
 
 // Configure configures [state] with the initial state for the precompile.
-func (*configurator) Configure(chainConfig precompileconfig.ChainConfig, cfg precompileconfig.Config, state contract.StateDB, _ contract.BlockContext) error {
+func (*configurator) Configure(chainConfig precompileconfig.ChainConfig, cfg precompileconfig.Config, state contract.StateDB, blockContext contract.BlockContext) error {
 	config, ok := cfg.(*Config)
 	if !ok {
 		return fmt.Errorf("incorrect config %T: %v", config, config)
@@ -57,5 +57,5 @@ func (*configurator) Configure(chainConfig precompileconfig.ChainConfig, cfg pre
 		// default to disabling rewards
 		DisableFeeRewards(state)
 	}
-	return config.Configure(state, ContractAddress)
+	return config.AllowListConfig.Configure(chainConfig, ContractAddress, state, blockContext)
 }

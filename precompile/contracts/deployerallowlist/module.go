@@ -40,10 +40,10 @@ func (*configurator) MakeConfig() precompileconfig.Config {
 }
 
 // Configure configures [state] with the given [cfg] config.
-func (c *configurator) Configure(_ precompileconfig.ChainConfig, cfg precompileconfig.Config, state contract.StateDB, _ contract.BlockContext) error {
+func (c *configurator) Configure(chainConfig precompileconfig.ChainConfig, cfg precompileconfig.Config, state contract.StateDB, blockContext contract.BlockContext) error {
 	config, ok := cfg.(*Config)
 	if !ok {
 		return fmt.Errorf("incorrect config %T: %v", config, config)
 	}
-	return config.AllowListConfig.Configure(state, ContractAddress)
+	return config.AllowListConfig.Configure(chainConfig, ContractAddress, state, blockContext)
 }

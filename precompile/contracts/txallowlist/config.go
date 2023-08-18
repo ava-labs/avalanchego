@@ -52,3 +52,7 @@ func (c *Config) Equal(cfg precompileconfig.Config) bool {
 	}
 	return c.Upgrade.Equal(&other.Upgrade) && c.AllowListConfig.Equal(&other.AllowListConfig)
 }
+
+func (c *Config) Verify(chainConfig precompileconfig.ChainConfig) error {
+	return c.AllowListConfig.Verify(chainConfig)
+}

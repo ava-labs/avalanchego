@@ -59,7 +59,7 @@ func (*configurator) MakeConfig() precompileconfig.Config {
 // This function is called by the EVM once per precompile contract activation.
 // You can use this function to set up your precompile contract's initial state,
 // by using the [cfg] config and [state] stateDB.
-func (*configurator) Configure(chainConfig precompileconfig.ChainConfig, cfg precompileconfig.Config, state contract.StateDB, _ contract.BlockContext) error {
+func (*configurator) Configure(chainConfig precompileconfig.ChainConfig, cfg precompileconfig.Config, state contract.StateDB, blockContext contract.BlockContext) error {
 	config, ok := cfg.(*Config)
 	if !ok {
 		return fmt.Errorf("incorrect config %T: %v", config, config)
@@ -67,7 +67,7 @@ func (*configurator) Configure(chainConfig precompileconfig.ChainConfig, cfg pre
 	// CUSTOM CODE STARTS HERE
 	{{- if .Contract.AllowList}}
 	// AllowList is activated for this precompile. Configuring allowlist addresses here.
-	return config.AllowListConfig.Configure(state, ContractAddress)
+	return config.AllowListConfig.Configure(chainConfig, ContractAddress, state, blockContext)
 	{{- else}}
 	return nil
 	{{- end}}
