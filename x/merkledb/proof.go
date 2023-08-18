@@ -276,16 +276,16 @@ type RangeProof struct {
 //   - [proof] proves the key-value pairs in [proof.KeyValues] are in the trie
 //     whose root is [expectedRootID].
 //   - All keys in [proof.KeyValues] are in the range [start, end].
-//     If [start] is empty, all keys are considered > [start].
-//     If [end] is empty, all keys are considered < [end].
+//     If [start] is Nothing, all keys are considered > [start].
+//     If [end] is Nothing, all keys are considered < [end].
 func (proof *RangeProof) Verify(
 	ctx context.Context,
-	start []byte,
+	start maybe.Maybe[[]byte],
 	end maybe.Maybe[[]byte],
 	expectedRootID ids.ID,
 ) error {
 	switch {
-	case end.HasValue() && bytes.Compare(start, end.Value()) > 0:
+	case start.HasValue() && end.HasValue() && bytes.Compare(start.Value(), end.Value()) > 0:
 		return ErrStartAfterEnd
 	case len(proof.KeyValues) == 0 && len(proof.StartProof) == 0 && len(proof.EndProof) == 0:
 		return ErrNoMerkleProof
@@ -309,10 +309,7 @@ func (proof *RangeProof) Verify(
 	// If [largestProvenPath] is Nothing, [proof] should
 	// provide and prove all keys > [smallestProvenPath].
 	// If both are Nothing, [proof] should prove the entire trie.
-	smallestProvenPath := maybe.Nothing[path]()
-	if start != nil {
-		smallestProvenPath = maybe.Some(newPath(start))
-	}
+	smallestProvenPath := maybe.Bind(start, newPath)
 
 	largestProvenPath := maybe.Bind(end, newPath)
 	if len(proof.KeyValues) > 0 {
@@ -692,10 +689,10 @@ type ChangeOrRangeProof struct {
 // Returns nil iff both hold:
 // 1. [kvs] is sorted by key in increasing order.
 // 2. All keys in [kvs] are in the range [start, end].
-// If [start] is nil, there is no lower bound on acceptable keys.
-// If [end] is nothing, there is no upper bound on acceptable keys.
+// If [start] is Nothing, there is no lower bound on acceptable keys.
+// If [end] is Nothing, there is no upper bound on acceptable keys.
 // If [kvs] is empty, returns nil.
-func verifyKeyChanges(kvs []KeyChange, start []byte, end maybe.Maybe[[]byte]) error {
+func verifyKeyChanges(kvs []KeyChange, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte]) error {
 	if len(kvs) == 0 {
 		return nil
 	}
@@ -708,7 +705,7 @@ func verifyKeyChanges(kvs []KeyChange, start []byte, end maybe.Maybe[[]byte]) er
 	}
 
 	// ensure that the keys are within the range [start, end]
-	if (len(start) > 0 && bytes.Compare(kvs[0].Key, start) < 0) ||
+	if (start.HasValue() && bytes.Compare(kvs[0].Key, start.Value()) < 0) ||
 		(end.HasValue() && bytes.Compare(kvs[len(kvs)-1].Key, end.Value()) > 0) {
 		return ErrStateFromOutsideOfRange
 	}
@@ -722,14 +719,15 @@ func verifyKeyChanges(kvs []KeyChange, start []byte, end maybe.Maybe[[]byte]) er
 // If [start] is nil, there is no lower bound on acceptable keys.
 // If [end] is nothing, there is no upper bound on acceptable keys.
 // If [kvs] is empty, returns nil.
-func verifyKeyValues(kvs []KeyValue, start []byte, end maybe.Maybe[[]byte]) error {
-	hasLowerBound := len(start) > 0
+func verifyKeyValues(kvs []KeyValue, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte]) error {
+	hasLowerBound := start.HasValue()
+	hasUpperBound := end.HasValue()
 	for i := 0; i < len(kvs); i++ {
 		if i < len(kvs)-1 && bytes.Compare(kvs[i].Key, kvs[i+1].Key) >= 0 {
 			return ErrNonIncreasingValues
 		}
-		if (hasLowerBound && bytes.Compare(kvs[i].Key, start) < 0) ||
-			(end.HasValue() && bytes.Compare(kvs[i].Key, end.Value()) > 0) {
+		if (hasLowerBound && bytes.Compare(kvs[i].Key, start.Value()) < 0) ||
+			(hasUpperBound && bytes.Compare(kvs[i].Key, end.Value()) > 0) {
 			return ErrStateFromOutsideOfRange
 		}
 	}

@@ -111,10 +111,8 @@ func (c *client) GetChangeProof(
 			return nil, err
 		}
 
-		endKey := maybe.Nothing[[]byte]()
-		if req.EndKey != nil && !req.EndKey.IsNothing {
-			endKey = maybe.Some(req.EndKey.Value)
-		}
+		startKey := maybeBytesToMaybe(req.StartKey)
+		endKey := maybeBytesToMaybe(req.EndKey)
 
 		switch changeProofResp := changeProofResp.Response.(type) {
 		case *pb.SyncGetChangeProofResponse_ChangeProof:
@@ -141,7 +139,7 @@ func (c *client) GetChangeProof(
 			if err := db.VerifyChangeProof(
 				ctx,
 				&changeProof,
-				req.StartKey,
+				startKey,
 				endKey,
 				endRoot,
 			); err != nil {
@@ -158,7 +156,7 @@ func (c *client) GetChangeProof(
 				ctx,
 				changeProofResp.RangeProof,
 				int(req.KeyLimit),
-				req.StartKey,
+				startKey,
 				endKey,
 				req.EndRootHash,
 			)
@@ -195,7 +193,7 @@ func parseAndVerifyRangeProof(
 	ctx context.Context,
 	rangeProofProto *pb.RangeProof,
 	keyLimit int,
-	start []byte,
+	start maybe.Maybe[[]byte],
 	end maybe.Maybe[[]byte],
 	rootBytes []byte,
 ) (*merkledb.RangeProof, error) {
@@ -248,16 +246,14 @@ func (c *client) GetRangeProof(
 			return nil, err
 		}
 
-		endKey := maybe.Nothing[[]byte]()
-		if req.EndKey != nil && !req.EndKey.IsNothing {
-			endKey = maybe.Some(req.EndKey.Value)
-		}
+		startKey := maybeBytesToMaybe(req.StartKey)
+		endKey := maybeBytesToMaybe(req.EndKey)
 
 		return parseAndVerifyRangeProof(
 			ctx,
 			&rangeProofProto,
 			int(req.KeyLimit),
-			req.StartKey,
+			startKey,
 			endKey,
 			req.RootHash,
 		)

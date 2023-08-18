@@ -73,12 +73,14 @@ func newTrieHistory(maxHistoryLookback int) *trieHistory {
 
 // Returns up to [maxLength] key-value pair changes with keys in
 // [start, end] that occurred between [startRoot] and [endRoot].
+// If [start] is Nothing, there's no lower bound on the range.
+// If [end] is Nothing, there's no upper bound on the range.
 // Returns [ErrInsufficientHistory] if the history is insufficient
 // to generate the proof.
 func (th *trieHistory) getValueChanges(
 	startRoot ids.ID,
 	endRoot ids.ID,
-	start []byte,
+	start maybe.Maybe[[]byte],
 	end maybe.Maybe[[]byte],
 	maxLength int,
 ) (*changeSummary, error) {
@@ -153,7 +155,7 @@ func (th *trieHistory) getValueChanges(
 		// in order to stay within the [maxLength] limit if necessary.
 		changedKeys = set.Set[path]{}
 
-		startPath = newPath(start)
+		startPath = maybe.Bind(start, newPath)
 		endPath   = maybe.Bind(end, newPath)
 
 		// For each element in the history in the range between [startRoot]'s
@@ -178,7 +180,7 @@ func (th *trieHistory) getValueChanges(
 		// Add the changes from this commit to [combinedChanges].
 		for key, valueChange := range changes.values {
 			// The key is outside the range [start, end].
-			if (len(startPath) > 0 && key.Compare(startPath) < 0) ||
+			if (startPath.HasValue() && key.Compare(startPath.Value()) < 0) ||
 				(end.HasValue() && key.Compare(endPath.Value()) > 0) {
 				continue
 			}
@@ -222,9 +224,9 @@ func (th *trieHistory) getValueChanges(
 
 // Returns the changes to go from the current trie state back to the requested [rootID]
 // for the keys in [start, end].
-// If [start] is nil, all keys are considered > [start].
-// If  [end] is nil, all keys are considered < [end].
-func (th *trieHistory) getChangesToGetToRoot(rootID ids.ID, start []byte, end maybe.Maybe[[]byte]) (*changeSummary, error) {
+// If [start] is Nothing, all keys are considered > [start].
+// If [end] is Nothing, all keys are considered < [end].
+func (th *trieHistory) getChangesToGetToRoot(rootID ids.ID, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte]) (*changeSummary, error) {
 	// [lastRootChange] is the last change in the history resulting in [rootID].
 	lastRootChange, ok := th.lastChanges[rootID]
 	if !ok {
@@ -232,7 +234,7 @@ func (th *trieHistory) getChangesToGetToRoot(rootID ids.ID, start []byte, end ma
 	}
 
 	var (
-		startPath                    = newPath(start)
+		startPath                    = maybe.Bind(start, newPath)
 		endPath                      = maybe.Bind(end, newPath)
 		combinedChanges              = newChangeSummary(defaultPreallocationSize)
 		mostRecentChangeInsertNumber = th.nextInsertNumber - 1
@@ -254,7 +256,7 @@ func (th *trieHistory) getChangesToGetToRoot(rootID ids.ID, start []byte, end ma
 		}
 
 		for key, valueChange := range changes.values {
-			if (len(startPath) == 0 || key.Compare(startPath) >= 0) &&
+			if (startPath.IsNothing() || key.Compare(startPath.Value()) >= 0) &&
 				(endPath.IsNothing() || key.Compare(endPath.Value()) <= 0) {
 				if existing, ok := combinedChanges.values[key]; ok {
 					existing.after = valueChange.before
