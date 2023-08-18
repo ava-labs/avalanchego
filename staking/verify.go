@@ -39,9 +39,8 @@ var (
 // Ref: https://github.com/golang/go/blob/go1.19.12/src/crypto/x509/x509.go#L793-L797
 // Ref: https://github.com/golang/go/blob/go1.19.12/src/crypto/x509/x509.go#L816-L879
 func CheckSignature(cert *Certificate, msg []byte, signature []byte) error {
-	pubkeyAlgo, ok := signatureAlgorithmVerificationDetails[cert.SignatureAlgorithm]
-	if !ok {
-		return ErrUnsupportedAlgorithm
+	if err := validateCertificate(cert); err != nil {
+		return err
 	}
 
 	hasher := crypto.SHA256.New()
@@ -53,22 +52,38 @@ func CheckSignature(cert *Certificate, msg []byte, signature []byte) error {
 
 	switch pub := cert.PublicKey.(type) {
 	case *rsa.PublicKey:
+		return rsa.VerifyPKCS1v15(pub, crypto.SHA256, hashed, signature)
+	case *ecdsa.PublicKey:
+		if !ecdsa.VerifyASN1(pub, hashed, signature) {
+			return ErrECDSAVerificationFailure
+		}
+		return nil
+	default:
+		return ErrUnsupportedAlgorithm
+	}
+}
+
+func validateCertificate(cert *Certificate) error {
+	pubkeyAlgo, ok := signatureAlgorithmVerificationDetails[cert.SignatureAlgorithm]
+	if !ok {
+		return ErrUnsupportedAlgorithm
+	}
+
+	switch pub := cert.PublicKey.(type) {
+	case *rsa.PublicKey:
 		if pubkeyAlgo != x509.RSA {
 			return signaturePublicKeyAlgoMismatchError(pubkeyAlgo, pub)
 		}
 		if bitLen := pub.N.BitLen(); bitLen > MaxRSAKeyBitLen {
 			return fmt.Errorf("%w: bitLen=%d > maxBitLen=%d", ErrInvalidRSAPublicKey, bitLen, MaxRSAKeyBitLen)
 		}
-		return rsa.VerifyPKCS1v15(pub, crypto.SHA256, hashed, signature)
+		return nil
 	case *ecdsa.PublicKey:
 		if pubkeyAlgo != x509.ECDSA {
 			return signaturePublicKeyAlgoMismatchError(pubkeyAlgo, pub)
 		}
 		if pub.Curve != elliptic.P256() {
 			return ErrInvalidECDSAPublicKey
-		}
-		if !ecdsa.VerifyASN1(pub, hashed, signature) {
-			return ErrECDSAVerificationFailure
 		}
 		return nil
 	default:
