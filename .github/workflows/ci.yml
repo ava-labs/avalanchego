@@ -75,6 +75,12 @@ jobs:
       - name: NPM Clean Install
         run: npm ci
         working-directory: ./contracts
+      - name: Hardhat Clean
+        run: npx hardhat clean
+        working-directory: ./contracts
+      - name: Hardhat Compile
+        run: npx hardhat compile
+        working-directory: ./contracts
       - name: Install AvalancheGo Release
         shell: bash
         run: BASEDIR=/tmp/e2e-test AVALANCHEGO_BUILD_PATH=/tmp/e2e-test/avalanchego ./scripts/install_avalanchego_release.sh

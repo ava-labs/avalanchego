@@ -24,10 +24,10 @@ It is also helpful to have a basic understanding of [Solidity](https://docs.soli
 
 Clone the repo and install the necessary packages via `yarn`.
 
-```zsh
-$ git clone https://github.com/ava-labs/subnet-evm.git
-$ cd contracts
-$ npm install
+```bash
+git clone https://github.com/ava-labs/subnet-evm.git
+cd contracts
+npm install
 ```
 
 ## Write Contracts
@@ -52,9 +52,9 @@ In Subnet-EVM, we provide a pre-configured file [hardhat.config.ts](https://gith
 
 The HardHat config file includes a single network configuration: `local`. `local` defaults to using the following values for the RPC URL and the Chain ID:
 
-```
-var local_rpc_uri = process.env.RPC_URI || "http://127.0.0.1:9650/ext/bc/C/rpc"
-var local_chain_id = process.env.CHAIN_ID || 99999
+```js
+var local_rpc_uri = process.env.RPC_URI || "http://127.0.0.1:9650/ext/bc/C/rpc";
+var local_chain_id = process.env.CHAIN_ID || 99999;
 ```
 
 You can use this network configuration by providing the environment variables and specifying the `--network` flag, as Subnet-EVM does in its testing suite:
