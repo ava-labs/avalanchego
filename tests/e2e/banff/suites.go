@@ -41,8 +41,9 @@ var _ = ginkgo.Describe("[Banff]", func() {
 				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultWalletCreationTimeout)
 				var err error
 				wallet, err = primary.MakeWallet(ctx, &primary.WalletConfig{
-					URI:      walletURI,
-					Keychain: kc,
+					URI:          walletURI,
+					AVAXKeychain: kc,
+					EthKeychain:  kc,
 				})
 				cancel()
 				gomega.Expect(err).Should(gomega.BeNil())

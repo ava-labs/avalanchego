@@ -10,8 +10,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 )
@@ -20,7 +20,7 @@ func main() {
 	key := genesis.EWOQKey
 	uri := primary.LocalAPIURI
 	kc := secp256k1fx.NewKeychain(key)
-	subnetOwner := key.Address()
+	avaxAddr := key.Address()
 
 	ctx := context.Background()
 
@@ -37,33 +37,36 @@ func main() {
 	}
 	log.Printf("synced wallet in %s\n", time.Since(walletSyncStartTime))
 
-	// Get the X-chain wallet
-	xWallet := wallet.X()
+	// Get the P-chain wallet
+	pWallet := wallet.P()
+	cWallet := wallet.C()
 
 	// Pull out useful constants to use when issuing transactions.
-	owner := &secp256k1fx.OutputOwners{
+	cChainID := cWallet.BlockchainID()
+	owner := secp256k1fx.OutputOwners{
 		Threshold: 1,
 		Addrs: []ids.ShortID{
-			subnetOwner,
+			avaxAddr,
 		},
 	}
 
-	createAssetStartTime := time.Now()
-	createAssetTx, err := xWallet.IssueCreateAssetTx(
-		"HI",
-		"HI",
-		1,
-		map[uint32][]verify.State{
-			0: {
-				&secp256k1fx.TransferOutput{
-					Amt:          units.Schmeckle,
-					OutputOwners: *owner,
-				},
-			},
-		},
+	exportStartTime := time.Now()
+	exportTx, err := cWallet.IssueExportTx(
+		constants.PlatformChainID,
+		[]*secp256k1fx.TransferOutput{{
+			Amt:          units.Avax,
+			OutputOwners: owner,
+		}},
 	)
 	if err != nil {
-		log.Fatalf("failed to issue create asset transaction: %s\n", err)
+		log.Fatalf("failed to issue export transaction: %s\n", err)
 	}
-	log.Printf("created new asset %s in %s\n", createAssetTx.ID(), time.Since(createAssetStartTime))
+	log.Printf("issued export %s in %s\n", exportTx.ID(), time.Since(exportStartTime))
+
+	importStartTime := time.Now()
+	importTx, err := pWallet.IssueImportTx(cChainID, &owner)
+	if err != nil {
+		log.Fatalf("failed to issue import transaction: %s\n", err)
+	}
+	log.Printf("issued import %s in %s\n", importTx.ID(), time.Since(importStartTime))
 }
