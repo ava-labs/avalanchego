@@ -20,11 +20,13 @@ import (
 //
 // https://github.com/golang/go/blob/go1.19.12/src/crypto/tls/handshake_client.go#L860-L862
 const (
-	MaxRSAKeyByteLen = units.KiB
-	MaxRSAKeyBitLen  = 8 * MaxRSAKeyByteLen
+	MaxCertificateLen = 16 * units.KiB
+	MaxRSAKeyByteLen  = units.KiB
+	MaxRSAKeyBitLen   = 8 * MaxRSAKeyByteLen
 )
 
 var (
+	ErrCertificateTooLarge        = fmt.Errorf("staking: certificate length is greater than %d", MaxCertificateLen)
 	ErrUnsupportedAlgorithm       = errors.New("staking: cannot verify signature: unsupported algorithm")
 	ErrPublicKeyAlgoMismatch      = errors.New("staking: signature algorithm specified different public key type")
 	ErrInvalidRSAPublicKey        = errors.New("staking: invalid RSA public key")
@@ -39,7 +41,7 @@ var (
 // Ref: https://github.com/golang/go/blob/go1.19.12/src/crypto/x509/x509.go#L793-L797
 // Ref: https://github.com/golang/go/blob/go1.19.12/src/crypto/x509/x509.go#L816-L879
 func CheckSignature(cert *Certificate, msg []byte, signature []byte) error {
-	if err := validateCertificate(cert); err != nil {
+	if err := ValidateCertificate(cert); err != nil {
 		return err
 	}
 
@@ -63,7 +65,13 @@ func CheckSignature(cert *Certificate, msg []byte, signature []byte) error {
 	}
 }
 
-func validateCertificate(cert *Certificate) error {
+// ValidateCertificate verifies that this certificate conforms to the required
+// staking format assuming that it was already able to be parsed.
+func ValidateCertificate(cert *Certificate) error {
+	if len(cert.Raw) > MaxCertificateLen {
+		return ErrCertificateTooLarge
+	}
+
 	pubkeyAlgo, ok := signatureAlgorithmVerificationDetails[cert.SignatureAlgorithm]
 	if !ok {
 		return ErrUnsupportedAlgorithm

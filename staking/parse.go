@@ -3,31 +3,13 @@
 
 package staking
 
-import (
-	"crypto/x509"
-	"fmt"
-
-	"github.com/ava-labs/avalanchego/utils/units"
-)
-
-const MaxCertificateLen = 16 * units.KiB
-
-var ErrCertificateTooLarge = fmt.Errorf("staking: certificate length is greater than %d", MaxCertificateLen)
+import "crypto/x509"
 
 // ParseCertificate parses a single certificate from the given ASN.1 DER data.
 func ParseCertificate(der []byte) (*Certificate, error) {
-	if len(der) > MaxCertificateLen {
-		return nil, ErrCertificateTooLarge
-	}
-
-	tlsCert, err := x509.ParseCertificate(der)
+	cert, err := x509.ParseCertificate(der)
 	if err != nil {
 		return nil, err
 	}
-
-	cert := CertificateFromX509(tlsCert)
-	// Validating the certificate isn't technically required here. However, it
-	// ensures that avalanchego will only connect to peers with certificates
-	// that it considers valid.
-	return cert, validateCertificate(cert)
+	return CertificateFromX509(cert), nil
 }

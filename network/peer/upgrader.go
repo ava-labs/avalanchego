@@ -65,9 +65,17 @@ func connToIDAndCert(conn *tls.Conn) (ids.NodeID, net.Conn, *staking.Certificate
 	tlsCert := state.PeerCertificates[0]
 	// Invariant: ParseCertificate is used rather than CertificateFromX509 to
 	// ensure that signature verification can assume the certificate was
-	// parseable.
+	// parseable according the staking package's parser.
 	peerCert, err := staking.ParseCertificate(tlsCert.Raw)
 	if err != nil {
+		return ids.NodeID{}, nil, nil, errNoCert
+	}
+
+	// We validate the certificate here to attempt to make the validity of the
+	// peer certificate as clear as possible. Specifically, a node running a
+	// prior version using an invalid certificate should not be able to report
+	// healthy.
+	if err := staking.ValidateCertificate(peerCert); err != nil {
 		return ids.NodeID{}, nil, nil, errNoCert
 	}
 
