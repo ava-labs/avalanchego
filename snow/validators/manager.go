@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"golang.org/x/exp/maps"
 )
@@ -31,7 +30,7 @@ type SetCallbackListener interface {
 
 // Manager holds the validator set of each subnet
 type Manager interface {
-	formatting.PrefixedStringer
+	fmt.Stringer
 
 	// Add a new staker to the subnet.
 	// Returns an error if:
@@ -56,7 +55,7 @@ type Manager interface {
 	GetValidator(subnetID ids.ID, validatorID ids.NodeID) (*Validator, bool)
 
 	// GetValidatoIDs returns the validator IDs in the subnet.
-	GetValidatorIDs(subnetID ids.ID) []ids.NodeID
+	GetValidatorIDs(subnetID ids.ID) ([]ids.NodeID, error)
 
 	// SubsetWeight returns the sum of the weights of the validators in the subnet.
 	SubsetWeight(subnetID ids.ID, validatorIDs set.Set[ids.NodeID]) uint64
@@ -83,6 +82,9 @@ type Manager interface {
 	// Sample returns a collection of validatorIDs in the subnet, potentially with duplicates.
 	// If sampling the requested size isn't possible, an error will be returned.
 	Sample(subnetID ids.ID, size int) ([]ids.NodeID, error)
+
+	// Map of the validators in this subnet
+	GetMap(subnetID ids.ID) map[ids.NodeID]*GetValidatorOutput
 
 	// When a validator's weight changes, or a validator is added/removed,
 	// this listener is called.
@@ -153,18 +155,6 @@ func (m *manager) GetValidator(subnetID ids.ID, validatorID ids.NodeID) (*Valida
 	return set.Get(validatorID)
 }
 
-func (m *manager) GetValidatorIDs(subnetID ids.ID) []ids.NodeID {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
-
-	vdrs, exists := m.subnetToVdrs[subnetID]
-	if !exists {
-		return []ids.NodeID{}
-	}
-
-	return vdrs.getValidatorIDs()
-}
-
 func (m *manager) SubsetWeight(subnetID ids.ID, validatorIDs set.Set[ids.NodeID]) uint64 {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
@@ -190,8 +180,9 @@ func (m *manager) RemoveWeight(subnetID ids.ID, nodeID ids.NodeID, weight uint64
 		return err
 	}
 
-	// If this was the last validator in the subnet, remove the subnet
-	if set.Len() == 0 {
+	// If this was the last validator in the subnet
+	// and no callback listeners are registered, remove the subnet
+	if set.Len() == 0 && !set.HasCallbackRegistered() {
 		delete(m.subnetToVdrs, subnetID)
 	}
 
@@ -246,6 +237,18 @@ func (m *manager) Sample(subnetID ids.ID, size int) ([]ids.NodeID, error) {
 	return set.Sample(size)
 }
 
+func (m *manager) GetMap(subnetID ids.ID) map[ids.NodeID]*GetValidatorOutput {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	set, exists := m.subnetToVdrs[subnetID]
+	if !exists {
+		return nil
+	}
+
+	return set.Map()
+}
+
 func (m *manager) RegisterCallbackListener(subnetID ids.ID, listener SetCallbackListener) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
@@ -260,10 +263,6 @@ func (m *manager) RegisterCallbackListener(subnetID ids.ID, listener SetCallback
 }
 
 func (m *manager) String() string {
-	return m.PrefixedString("    ")
-}
-
-func (m *manager) PrefixedString(prefix string) string {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
@@ -278,12 +277,21 @@ func (m *manager) PrefixedString(prefix string) string {
 	for _, subnetID := range subnets {
 		vdrs := m.subnetToVdrs[subnetID]
 		sb.WriteString(fmt.Sprintf(
-			"\n%sSubnet[%s]: %s",
-			prefix,
+			"\n    Subnet[%s]: %s",
 			subnetID,
-			vdrs.PrefixedString(prefix),
+			vdrs.PrefixedString("    "),
 		))
 	}
 
 	return sb.String()
+}
+
+func (m *manager) GetValidatorIDs(subnetID ids.ID) ([]ids.NodeID, error) {
+	vdrs, exist := m.subnetToVdrs[subnetID]
+	if !exist {
+		return nil, fmt.Errorf("%w: %s", ErrMissingValidators, subnetID)
+	}
+
+	vdrsMap := vdrs.Map()
+	return maps.Keys(vdrsMap), nil
 }

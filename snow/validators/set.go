@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"golang.org/x/exp/maps"
 )
 
 var (
@@ -243,11 +242,26 @@ func (s *vdrSet) len() int {
 	return len(s.vdrSlice)
 }
 
-func (s *vdrSet) getValidatorIDs() []ids.NodeID {
+func (s *vdrSet) HasCallbackRegistered() bool {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
-	return maps.Keys(s.vdrs)
+	return len(s.callbackListeners) > 0
+}
+
+func (s *vdrSet) Map() map[ids.NodeID]*GetValidatorOutput {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	set := make(map[ids.NodeID]*GetValidatorOutput, len(s.vdrSlice))
+	for _, vdr := range s.vdrSlice {
+		set[vdr.NodeID] = &GetValidatorOutput{
+			NodeID:    vdr.NodeID,
+			PublicKey: vdr.PublicKey,
+			Weight:    vdr.Weight,
+		}
+	}
+	return set
 }
 
 func (s *vdrSet) Sample(size int) ([]ids.NodeID, error) {
