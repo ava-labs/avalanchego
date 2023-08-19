@@ -124,7 +124,7 @@ func (b *backend) AcceptAtomicTx(ctx stdcontext.Context, tx *evm.Tx) error {
 			if err != nil {
 				return err
 			}
-			input.Nonce = newNonce
+			account.Nonce = newNonce
 		}
 	default:
 		return fmt.Errorf("%w: %T", errUnknownTxType, tx)
