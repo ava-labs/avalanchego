@@ -24,7 +24,7 @@ import (
 var (
 	_ Backend = (*backend)(nil)
 
-	errUknownTxType = errors.New("unknown tx type")
+	errUnknownTxType = errors.New("unknown tx type")
 )
 
 // Backend defines the full interface required to support a C-chain wallet.
@@ -127,7 +127,7 @@ func (b *backend) AcceptAtomicTx(ctx stdcontext.Context, tx *evm.Tx) error {
 			input.Nonce = newNonce
 		}
 	default:
-		return fmt.Errorf("%w: %T", errUknownTxType, tx)
+		return fmt.Errorf("%w: %T", errUnknownTxType, tx)
 	}
 	return nil
 }

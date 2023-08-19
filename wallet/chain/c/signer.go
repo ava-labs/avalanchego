@@ -85,7 +85,7 @@ func (s *txSigner) SignAtomic(ctx stdcontext.Context, tx *evm.Tx) error {
 		signers := s.getExportSigners(utx.Ins)
 		return sign(tx, true, signers)
 	default:
-		return fmt.Errorf("%w: %T", errUknownTxType, tx)
+		return fmt.Errorf("%w: %T", errUnknownTxType, tx)
 	}
 }
 
