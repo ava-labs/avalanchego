@@ -5,6 +5,8 @@
 package e2e
 
 import (
+	"context"
+	"encoding/json"
 	"math/rand"
 	"time"
 
@@ -12,10 +14,13 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture"
 	"github.com/ava-labs/avalanchego/tests/fixture/testnet"
 	"github.com/ava-labs/avalanchego/tests/fixture/testnet/local"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 )
 
 const (
@@ -38,7 +43,7 @@ const (
 
 // Env is used to access shared test fixture. Intended to be
 // initialized by SynchronizedBeforeSuite.
-var Env TestEnvironment
+var Env *TestEnvironment
 
 type TestEnvironment struct {
 	// The directory where the test network configuration is stored
@@ -47,6 +52,17 @@ type TestEnvironment struct {
 	URIs []string
 	// The URI used to access the http server that allocates test data
 	TestDataServerURI string
+
+	require *require.Assertions
+}
+
+func InitTestEnvironment(envBytes []byte) {
+	require := require.New(ginkgo.GinkgoT())
+	require.Nil(Env, "env already initialized")
+	Env = &TestEnvironment{
+		require: require,
+	}
+	require.NoError(json.Unmarshal(envBytes, Env))
 }
 
 // Retrieve a random URI to naively attempt to spread API load across
@@ -59,18 +75,39 @@ func (te *TestEnvironment) GetRandomNodeURI() string {
 // Retrieve the network to target for testing.
 func (te *TestEnvironment) GetNetwork() testnet.Network {
 	network, err := local.ReadNetwork(te.NetworkDir)
-	require.NoError(ginkgo.GinkgoT(), err)
+	te.require.NoError(err)
 	return network
 }
 
 // Retrieve the specified number of funded keys allocated for the caller's exclusive use.
 func (te *TestEnvironment) AllocateFundedKeys(count int) []*secp256k1.PrivateKey {
 	keys, err := fixture.AllocateFundedKeys(te.TestDataServerURI, count)
-	require.NoError(ginkgo.GinkgoT(), err)
+	te.require.NoError(err)
 	return keys
 }
 
 // Retrieve a funded key allocated for the caller's exclusive use.
 func (te *TestEnvironment) AllocateFundedKey() *secp256k1.PrivateKey {
 	return te.AllocateFundedKeys(1)[0]
+}
+
+// Create a new keychain with the specified number of test keys.
+func (te *TestEnvironment) NewKeychain(count int) *secp256k1fx.Keychain {
+	tests.Outf("{{blue}} initializing keychain with %d keys {{/}}\n", count)
+	keys := te.AllocateFundedKeys(count)
+	return secp256k1fx.NewKeychain(keys...)
+}
+
+// Create a new wallet for the provided keychain.
+func (te *TestEnvironment) NewWallet(keychain *secp256k1fx.Keychain) primary.Wallet {
+	tests.Outf("{{blue}} initializing a new wallet {{/}}\n")
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
+	defer cancel()
+	wallet, err := primary.MakeWallet(ctx, &primary.WalletConfig{
+		URI:          te.GetRandomNodeURI(),
+		AVAXKeychain: keychain,
+		EthKeychain:  keychain,
+	})
+	te.require.NoError(err)
+	return wallet
 }

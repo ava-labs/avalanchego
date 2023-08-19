@@ -23,7 +23,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
@@ -44,20 +43,8 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 		ginkgo.FlakeAttempts(2),
 		func() {
 			nodeURI := e2e.Env.GetRandomNodeURI()
-
-			tests.Outf("{{blue}} setting up keys {{/}}\n")
-			keys := e2e.Env.AllocateFundedKeys(2)
-			keyChain := secp256k1fx.NewKeychain(keys...)
-
-			tests.Outf("{{blue}} setting up wallet {{/}}\n")
-			ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultWalletCreationTimeout)
-			baseWallet, err := primary.MakeWallet(ctx, &primary.WalletConfig{
-				URI:          nodeURI,
-				AVAXKeychain: keyChain,
-				EthKeychain:  keyChain,
-			})
-			cancel()
-			gomega.Expect(err).Should(gomega.BeNil())
+			keychain := e2e.Env.NewKeychain(2)
+			baseWallet := e2e.Env.NewWallet(keychain)
 
 			pWallet := baseWallet.P()
 			avaxAssetID := baseWallet.P().AVAXAssetID()
@@ -65,7 +52,7 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			pChainClient := platformvm.NewClient(nodeURI)
 
 			tests.Outf("{{blue}} fetching minimal stake amounts {{/}}\n")
-			ctx, cancel = context.WithTimeout(context.Background(), e2e.DefaultWalletCreationTimeout)
+			ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultWalletCreationTimeout)
 			minValStake, minDelStake, err := pChainClient.GetMinStake(ctx, constants.PlatformChainID)
 			cancel()
 			gomega.Expect(err).Should(gomega.BeNil())
@@ -84,8 +71,8 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 			// amount to transfer from P to X chain
 			toTransfer := 1 * units.Avax
 
-			pShortAddr := keys[0].Address()
-			xTargetAddr := keys[1].Address()
+			pShortAddr := keychain.Keys[0].Address()
+			xTargetAddr := keychain.Keys[1].Address()
 			ginkgo.By("check selected keys have sufficient funds", func() {
 				pBalances, err := pWallet.Builder().GetBalance()
 				pBalance := pBalances[avaxAssetID]
