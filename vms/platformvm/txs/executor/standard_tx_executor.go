@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
-	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
@@ -514,11 +513,10 @@ func (e *StandardTxExecutor) addStakerFromStakerTx(
 				return err
 			}
 
-			rewardCfg, err := e.State.GetRewardConfig(subnetID)
+			rewards, err := GetRewardsCalculator(e.Backend, e.State, subnetID)
 			if err != nil {
 				return err
 			}
-			rewards := reward.NewCalculator(rewardCfg)
 
 			potentialReward = rewards.Calculate(
 				stakeDuration,

@@ -109,14 +109,12 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	onParentAccept.EXPECT().GetTx(addValTx.ID()).Return(addValTx, status.Committed, nil)
 	onParentAccept.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).Return(uint64(1000), nil).AnyTimes()
 	onParentAccept.EXPECT().GetDelegateeReward(constants.PrimaryNetworkID, utx.NodeID()).Return(uint64(0), nil).AnyTimes()
-	onParentAccept.EXPECT().GetRewardConfig(gomock.Any()).Return(env.config.RewardConfig, nil).AnyTimes()
 
 	env.mockedState.EXPECT().GetUptime(gomock.Any(), constants.PrimaryNetworkID).Return(
 		time.Microsecond, /*upDuration*/
 		time.Time{},      /*lastUpdated*/
 		nil,              /*err*/
 	).AnyTimes()
-	env.mockedState.EXPECT().GetRewardConfig(gomock.Any()).Return(env.config.RewardConfig, nil).AnyTimes()
 
 	// wrong height
 	statelessProposalBlock, err := blocks.NewApricotProposalBlock(
@@ -173,7 +171,6 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	onParentAccept := state.NewMockDiff(ctrl)
 	onParentAccept.EXPECT().GetTimestamp().Return(parentTime).AnyTimes()
 	onParentAccept.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).Return(uint64(1000), nil).AnyTimes()
-	onParentAccept.EXPECT().GetRewardConfig(gomock.Any()).Return(env.config.RewardConfig, nil).AnyTimes()
 
 	env.blkManager.(*manager).blkIDToState[parentID] = &blockState{
 		statelessBlock: banffParentBlk,

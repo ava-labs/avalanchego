@@ -47,7 +47,6 @@ func TestVerifierVisitApricotProposalBlock(t *testing.T) {
 	timestamp := time.Now()
 	// One call for each of onCommitState and onAbortState.
 	parentOnAcceptState.EXPECT().GetTimestamp().Return(timestamp).Times(2)
-	parentOnAcceptState.EXPECT().GetRewardConfig(gomock.Any()).Return(config.RewardConfig, nil).AnyTimes()
 
 	backend := &backend{
 		lastAccepted: parentID,
@@ -226,7 +225,6 @@ func TestVerifierVisitApricotStandardBlock(t *testing.T) {
 	parentID := ids.GenerateTestID()
 	parentStatelessBlk := blocks.NewMockBlock(ctrl)
 	parentState := state.NewMockDiff(ctrl)
-	parentState.EXPECT().GetRewardConfig(gomock.Any()).Return(config.RewardConfig, nil).AnyTimes()
 
 	backend := &backend{
 		blkIDToState: map[ids.ID]*blockState{
@@ -786,7 +784,6 @@ func TestVerifierVisitStandardBlockWithDuplicateInputs(t *testing.T) {
 	timestamp := time.Now()
 	parentStatelessBlk.EXPECT().Height().Return(uint64(1)).Times(1)
 	parentState.EXPECT().GetTimestamp().Return(timestamp).Times(1)
-	parentState.EXPECT().GetRewardConfig(gomock.Any()).Return(config.RewardConfig, nil).AnyTimes()
 	parentStatelessBlk.EXPECT().Parent().Return(grandParentID).Times(1)
 
 	err = verifier.ApricotStandardBlock(blk)

@@ -165,6 +165,7 @@ func newEnvironment(t *testing.T, fork activeFork) *environment {
 		Fx:           fx,
 		FlowChecker:  utxoHandler,
 		Uptimes:      uptimes,
+		Rewards:      rewards,
 	}
 
 	env := &environment{

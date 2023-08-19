@@ -10,9 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
@@ -20,9 +18,8 @@ import (
 var (
 	_ Diff = (*diff)(nil)
 
-	ErrMissingParentState     = errors.New("missing parent state")
-	ErrUpdatingPendingStaker  = errors.New("trying to update pending staker")
-	errIsNotTransformSubnetTx = errors.New("is not a transform subnet tx")
+	ErrMissingParentState    = errors.New("missing parent state")
+	ErrUpdatingPendingStaker = errors.New("trying to update pending staker")
 )
 
 type Diff interface {
@@ -416,41 +413,6 @@ func (d *diff) AddTx(tx *txs.Tx, status status.Status) {
 	} else {
 		d.addedTxs[txID] = txStatus
 	}
-}
-
-func (d *diff) GetRewardConfig(subnetID ids.ID) (reward.Config, error) {
-	parentState, ok := d.stateVersions.GetState(d.parentID)
-	if !ok {
-		return reward.Config{}, fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
-	}
-
-	parentCfg, errParent := parentState.GetRewardConfig(subnetID)
-	if errParent != nil && errParent != ErrElasticSubnetConfigNotFound {
-		return reward.Config{}, errParent
-	}
-
-	if subnetID == constants.PrimaryNetworkID {
-		return parentCfg, nil
-	}
-
-	transformSubnetIntf, exists := d.transformedSubnets[subnetID]
-	if !exists {
-		return parentCfg, errParent
-	}
-
-	// this diff contains a tx transforming requested subnet into elastic one
-	// Duly update its config.
-	transformSubnet, ok := transformSubnetIntf.Unsigned.(*txs.TransformSubnetTx)
-	if !ok {
-		return reward.Config{}, errIsNotTransformSubnetTx
-	}
-
-	return reward.Config{
-		MaxConsumptionRate: transformSubnet.MaxConsumptionRate,
-		MinConsumptionRate: transformSubnet.MinConsumptionRate,
-		MintingPeriod:      parentCfg.MintingPeriod,
-		SupplyCap:          transformSubnet.MaximumSupply,
-	}, nil
 }
 
 func (d *diff) GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error) {
