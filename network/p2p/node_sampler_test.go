@@ -34,45 +34,45 @@ func TestPeersSample(t *testing.T) {
 		},
 		{
 			name:      "one peer connected",
-			connected: set.Of[ids.NodeID](nodeID1),
+			connected: set.Of(nodeID1),
 			n:         1,
 		},
 		{
 			name:      "multiple peers connected",
-			connected: set.Of[ids.NodeID](nodeID1, nodeID2, nodeID3),
+			connected: set.Of(nodeID1, nodeID2, nodeID3),
 			n:         1,
 		},
 		{
 			name:         "peer connects and disconnects - 1",
-			connected:    set.Of[ids.NodeID](nodeID1),
-			disconnected: set.Of[ids.NodeID](nodeID1),
+			connected:    set.Of(nodeID1),
+			disconnected: set.Of(nodeID1),
 			n:            1,
 		},
 		{
 			name:         "peer connects and disconnects - 2",
-			connected:    set.Of[ids.NodeID](nodeID1, nodeID2),
-			disconnected: set.Of[ids.NodeID](nodeID2),
+			connected:    set.Of(nodeID1, nodeID2),
+			disconnected: set.Of(nodeID2),
 			n:            1,
 		},
 		{
 			name:         "peer connects and disconnects - 2",
-			connected:    set.Of[ids.NodeID](nodeID1, nodeID2, nodeID3),
-			disconnected: set.Of[ids.NodeID](nodeID1, nodeID2),
+			connected:    set.Of(nodeID1, nodeID2, nodeID3),
+			disconnected: set.Of(nodeID1, nodeID2),
 			n:            1,
 		},
 		{
 			name:      "less than n peers",
-			connected: set.Of[ids.NodeID](nodeID1, nodeID2, nodeID3),
+			connected: set.Of(nodeID1, nodeID2, nodeID3),
 			n:         4,
 		},
 		{
 			name:      "n peers",
-			connected: set.Of[ids.NodeID](nodeID1, nodeID2, nodeID3),
+			connected: set.Of(nodeID1, nodeID2, nodeID3),
 			n:         3,
 		},
 		{
 			name:      "more than n peers",
-			connected: set.Of[ids.NodeID](nodeID1, nodeID2, nodeID3),
+			connected: set.Of(nodeID1, nodeID2, nodeID3),
 			n:         2,
 		},
 	}
@@ -149,10 +149,7 @@ func TestValidatorsSample(t *testing.T) {
 			}
 			mockValidators.EXPECT().GetValidatorSet(gomock.Any(), height, subnetID).Return(validatorSet, nil)
 
-			v := &Validators{
-				subnetID:   subnetID,
-				validators: mockValidators,
-			}
+			v := NewValidators(subnetID, mockValidators)
 
 			sampled, err := v.Sample(tt.n)
 			require.NoError(err)
@@ -203,11 +200,8 @@ func TestValidatorsSampleCaching(t *testing.T) {
 			}
 			mockValidators.EXPECT().GetValidatorSet(gomock.Any(), height, subnetID).Return(validatorSet, nil).Times(tt.expectedCalls)
 
-			v := &Validators{
-				subnetID:                 subnetID,
-				validators:               mockValidators,
-				maxValidatorSetStaleness: tt.maxStaleness,
-			}
+			v := NewValidators(subnetID, mockValidators)
+			v.maxValidatorSetStaleness = tt.maxStaleness
 			v.lastUpdated = time.Now().Add(-tt.elapsed)
 
 			_, err := v.Sample(1)
