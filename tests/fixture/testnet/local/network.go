@@ -649,6 +649,8 @@ func (ln *LocalNetwork) AddLocalNode(w io.Writer, node *LocalNode) (*LocalNode, 
 	// Assume network configuration has been written to disk and is current in memory
 
 	if node == nil {
+		// Set an empty data dir so that PopulateNodeConfig will know
+		// to set the default of `[network dir]/[node id]`.
 		node = NewLocalNode("")
 	}
 	if err := ln.PopulateNodeConfig(node); err != nil {

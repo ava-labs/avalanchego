@@ -192,7 +192,7 @@ func (n *LocalNode) Start(w io.Writer, defaultExecPath string) error {
 	if isTemporaryNode {
 		// Qualify the description for a temporary node with its path
 		// since it won't be stored in the network's directory.
-		nodeDescription = fmt.Sprintf("temporary node %q @ %s", n.NodeID, n.GetDataDir())
+		nodeDescription = fmt.Sprintf("temporary node %q with path: %s", n.NodeID, n.GetDataDir())
 	} else {
 		nodeDescription = fmt.Sprintf("node %q", n.NodeID)
 	}
