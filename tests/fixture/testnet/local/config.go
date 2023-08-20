@@ -37,6 +37,9 @@ func LocalFlags() testnet.FlagsMap {
 		config.IndexEnabledKey:              true,
 		config.LogDisplayLevelKey:           "INFO",
 		config.LogLevelKey:                  "DEBUG",
+
+		// A short min stake duration enables testing of staking logic.
+		config.MinStakeDurationKey: "1s",
 	}
 }
 

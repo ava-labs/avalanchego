@@ -59,6 +59,10 @@ const (
 	// checks. Useful for speeding up iteration during test
 	// development.
 	SkipBootstrapChecksEnvName = "E2E_SKIP_BOOTSTRAP_CHECKS"
+
+	// Start time must be a minimum of 15s ahead of the current time
+	// or validator addition will fail.
+	DefaultValidatorStartTimeDiff = 20 * time.Second
 )
 
 // Env is used to access shared test fixture. Intended to be
