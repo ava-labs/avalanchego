@@ -5,6 +5,7 @@ set -euo pipefail
 # e.g.,
 # ./scripts/build.sh
 # ./scripts/tests.e2e.sh ./build/avalanchego
+# E2E_SERIAL=1 ./scripts/tests.e2e.sh ./build/avalanchego
 if ! [[ "$0" =~ scripts/tests.e2e.sh ]]; then
   echo "must be run from repository root"
   exit 255
@@ -54,9 +55,10 @@ if [[ -n "${E2E_SERIAL:-}" ]]; then
   # on powerful development workstations.
   echo "tests will be executed serially to minimize resource requirements"
 else
-  # Enable parallel execution of specs defined in the test binary, which
-  # requires invoking the binary via the ginkgo cli. The test binary by
-  # itself isn't capable of executing specs in parallel.
+  # Enable parallel execution of specs defined in the test binary by
+  # default. This requires invoking the binary via the ginkgo cli
+  # since the test binary isn't capable of executing specs in
+  # parallel.
   echo "tests will be executed in parallel"
   GINKGO_ARGS="-p"
 fi
