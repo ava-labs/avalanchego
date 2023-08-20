@@ -128,7 +128,7 @@ func (v *MempoolTxVerifier) standardBaseState() (state.Diff, error) {
 
 	// next tx would be included into a Banff block
 	// so we verify it against duly updated chain state
-	changes, err := AdvanceTimeTo(state, nextBlkTime)
+	changes, err := AdvanceTimeTo(v.Backend, state, nextBlkTime)
 	if err != nil {
 		return nil, err
 	}

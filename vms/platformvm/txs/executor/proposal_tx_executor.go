@@ -300,7 +300,7 @@ func (e *ProposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 		return err
 	}
 
-	changes, err := AdvanceTimeTo(e.OnCommitState, newChainTime)
+	changes, err := AdvanceTimeTo(e.Backend, e.OnCommitState, newChainTime)
 	if err != nil {
 		return err
 	}
@@ -412,19 +412,19 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 	// here both commit and abort state supplies are correct. We can remove or
 	// shift staker, with the right potential reward in the second case
 	if _, ok := stakerTx.Unsigned.(txs.ValidatorTx); ok {
-		if err := handleValidatorShift(e.OnCommitState, stakerToReward, rewardToRestake); err != nil {
+		if err := handleValidatorShift(e.Backend, e.OnCommitState, stakerToReward, rewardToRestake); err != nil {
 			return err
 		}
 
 		// no reward to restake on abort
-		if err := handleValidatorShift(e.OnAbortState, stakerToReward, 0); err != nil {
+		if err := handleValidatorShift(e.Backend, e.OnAbortState, stakerToReward, 0); err != nil {
 			return err
 		}
 	} else { // must be txs.DelegatorTx due to switch check above
-		if err := handleDelegatorShift(e.OnCommitState, stakerToReward, rewardToRestake); err != nil {
+		if err := handleDelegatorShift(e.Backend, e.OnCommitState, stakerToReward, rewardToRestake); err != nil {
 			return err
 		}
-		if err := handleDelegatorShift(e.OnAbortState, stakerToReward, 0); err != nil {
+		if err := handleDelegatorShift(e.Backend, e.OnAbortState, stakerToReward, 0); err != nil {
 			return err
 		}
 	}
@@ -569,6 +569,7 @@ func (e *ProposalTxExecutor) rewardValidatorTx(
 }
 
 func handleValidatorShift(
+	backend *Backend,
 	baseState state.Chain,
 	validator *state.Staker,
 	rewardToRestake uint64,
@@ -583,6 +584,7 @@ func handleValidatorShift(
 	state.ShiftStakerAheadInPlace(&shiftedStaker, shiftedStaker.NextTime)
 
 	currentSupply, potentialReward, err := calculatePotentialReward(
+		backend,
 		baseState,
 		shiftedStaker.SubnetID,
 		shiftedStaker.StakingPeriod,
@@ -767,6 +769,7 @@ func (e *ProposalTxExecutor) rewardDelegatorTx(
 }
 
 func handleDelegatorShift(
+	backend *Backend,
 	baseState state.Chain,
 	delegator *state.Staker,
 	rewardToRestake uint64,
@@ -804,6 +807,7 @@ func handleDelegatorShift(
 	}
 
 	currentSupply, potentialReward, err := calculatePotentialReward(
+		backend,
 		baseState,
 		shiftedStaker.SubnetID,
 		shiftedStaker.StakingPeriod,

@@ -18,7 +18,6 @@ import (
 	validators "github.com/ava-labs/avalanchego/snow/validators"
 	logging "github.com/ava-labs/avalanchego/utils/logging"
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
-	reward "github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	blocks "github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	status "github.com/ava-labs/avalanchego/vms/platformvm/status"
 	txs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -228,22 +227,6 @@ func (mr *MockStateMockRecorder) CommitBatch() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CommitBatch", reflect.TypeOf((*MockState)(nil).CommitBatch))
 }
-
-// GetRewardConfig mocks base method.
-func (m *MockState) GetRewardConfig(arg0 ids.ID) (reward.Config, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetRewardConfig", arg0)
-	ret0, _ := ret[0].(reward.Config)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetRewardConfig indicates an expected call of GetRewardConfig.
-func (mr *MockStateMockRecorder) GetRewardConfig(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRewardConfig", reflect.TypeOf((*MockChain)(nil).GetRewardConfig), arg0)
-}
-
 
 // DeleteCurrentDelegator mocks base method.
 func (m *MockState) DeleteCurrentDelegator(arg0 *Staker) {

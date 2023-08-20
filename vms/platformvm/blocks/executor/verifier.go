@@ -71,7 +71,11 @@ func (v *verifier) BanffProposalBlock(b *blocks.BanffProposalBlock) error {
 
 	// Apply the changes, if any, from advancing the chain time.
 	nextChainTime := b.Timestamp()
-	changes, err := executor.AdvanceTimeTo(onCommitState, nextChainTime)
+	changes, err := executor.AdvanceTimeTo(
+		v.txExecutorBackend,
+		onCommitState,
+		nextChainTime,
+	)
 	if err != nil {
 		return err
 	}
@@ -98,7 +102,11 @@ func (v *verifier) BanffStandardBlock(b *blocks.BanffStandardBlock) error {
 
 	// Apply the changes, if any, from advancing the chain time.
 	nextChainTime := b.Timestamp()
-	changes, err := executor.AdvanceTimeTo(onAcceptState, nextChainTime)
+	changes, err := executor.AdvanceTimeTo(
+		v.txExecutorBackend,
+		onAcceptState,
+		nextChainTime,
+	)
 	if err != nil {
 		return err
 	}

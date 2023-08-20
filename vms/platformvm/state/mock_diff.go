@@ -13,7 +13,6 @@ import (
 
 	ids "github.com/ava-labs/avalanchego/ids"
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
-	reward "github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	status "github.com/ava-labs/avalanchego/vms/platformvm/status"
 	txs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	gomock "go.uber.org/mock/gomock"
@@ -321,21 +320,6 @@ func (m *MockDiff) GetPendingValidator(arg0 ids.ID, arg1 ids.NodeID) (*Staker, e
 func (mr *MockDiffMockRecorder) GetPendingValidator(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPendingValidator", reflect.TypeOf((*MockDiff)(nil).GetPendingValidator), arg0, arg1)
-}
-
-// GetRewardConfig mocks base method.
-func (m *MockDiff) GetRewardConfig(arg0 ids.ID) (reward.Config, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetRewardConfig", arg0)
-	ret0, _ := ret[0].(reward.Config)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetRewardConfig indicates an expected call of GetRewardConfig.
-func (mr *MockDiffMockRecorder) GetRewardConfig(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRewardConfig", reflect.TypeOf((*MockDiff)(nil).GetRewardConfig), arg0)
 }
 
 // GetRewardUTXOs mocks base method.

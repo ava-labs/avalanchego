@@ -174,6 +174,7 @@ func internalNewEnv(t *testing.T, fork activeFork, noGenesisValidator bool) *env
 		Fx:           fx,
 		FlowChecker:  utxoHandler,
 		Uptimes:      uptimes,
+		Rewards:      rewards,
 	}
 
 	env := &environment{

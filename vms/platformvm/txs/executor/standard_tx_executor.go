@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
-	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
@@ -634,7 +633,7 @@ func (e *StandardTxExecutor) addStakerFromStakerTx(
 				stakeDuration = stakerTx.StakingPeriod()
 				stakerWeight  = stakerTx.Weight()
 			)
-			currentSupply, potentialReward, err = calculatePotentialReward(e.State, subnetID, stakeDuration, stakerWeight)
+			currentSupply, potentialReward, err = calculatePotentialReward(e.Backend, e.State, subnetID, stakeDuration, stakerWeight)
 			if err != nil {
 				return nil, err
 			}
@@ -669,6 +668,7 @@ func (e *StandardTxExecutor) addStakerFromStakerTx(
 }
 
 func calculatePotentialReward(
+	backend *Backend,
 	baseState state.Chain,
 	subnetID ids.ID,
 	stakingPeriod time.Duration,
@@ -679,11 +679,10 @@ func calculatePotentialReward(
 		return 0, 0, err
 	}
 
-	rewardCfg, err := baseState.GetRewardConfig(subnetID)
+	rewards, err := GetRewardsCalculator(backend, baseState, subnetID)
 	if err != nil {
 		return 0, 0, err
 	}
-	rewards := reward.NewCalculator(rewardCfg)
 
 	potentialReward := rewards.Calculate(
 		stakingPeriod,
