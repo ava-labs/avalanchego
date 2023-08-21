@@ -26,8 +26,8 @@ import (
 )
 
 const (
-	initKeyValuesSize        = 256
-	defaultPreallocationSize = 100
+	initKeyValuesSize           = 256
+	childViewsPreallocationSize = 5
 )
 
 var (
@@ -49,10 +49,16 @@ var (
 )
 
 type trieView struct {
+	// If true, this view has been committed.
+	// [commitLock] must be held while accessing this field.
+	committed  bool
 	commitLock sync.RWMutex
 
-	calculateNodesOnce     sync.Once
+	// tracking bool to enforce that no changes are made to the trie after the nodes have been calculated
 	nodesAlreadyCalculated utils.Atomic[bool]
+
+	// calculateNodesOnce is a once to ensure that node calculation only occurs a single time
+	calculateNodesOnce sync.Once
 
 	// Controls the trie's validity related fields.
 	// Must be held while reading/writing [childViews], [invalidated], and [parentTrie].
@@ -98,10 +104,6 @@ type trieView struct {
 
 	// The root of the trie represented by this view.
 	root *node
-
-	// If true, this view has been committed.
-	// [commitLock] must be held while accessing this field.
-	committed bool
 
 	// Key-value pairs that have been changed in this view
 	// but aren't yet in the trie structure.
@@ -523,7 +525,7 @@ func (t *trieView) invalidate() {
 	}
 
 	// after invalidating the children, they no longer need to be tracked
-	t.childViews = make([]*trieView, 0, defaultPreallocationSize)
+	t.childViews = make([]*trieView, 0, childViewsPreallocationSize)
 }
 
 func (t *trieView) updateParent(newParent TrieView) {
@@ -541,7 +543,7 @@ func (t *trieView) invalidateChildrenExcept(exception *trieView) {
 	childrenToInvalidate := t.childViews
 
 	// after invalidating the children, they no longer need to be tracked
-	t.childViews = make([]*trieView, 0, defaultPreallocationSize)
+	t.childViews = make([]*trieView, 0, childViewsPreallocationSize)
 	// add back in the exception view since it is still valid
 	if exception != nil {
 		t.childViews = append(t.childViews, exception)
