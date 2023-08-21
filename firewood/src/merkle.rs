@@ -878,11 +878,9 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
         Self { store }
     }
 
-    pub fn init_root(
-        root: &mut DiskAddress,
-        store: &dyn ShaleStore<Node>,
-    ) -> Result<(), MerkleError> {
-        *root = store
+    pub fn init_root(&self, root: &mut DiskAddress) -> Result<(), MerkleError> {
+        *root = self
+            .store
             .put_item(
                 Node::new(NodeType::Branch(BranchNode {
                     chd: [None; NBRANCH],

@@ -729,14 +729,16 @@ impl Db {
         )
         .unwrap();
 
+        let merkle = Merkle::new(Box::new(merkle_space));
+
         if db_header_ref.acc_root.is_null() {
             let mut err = Ok(());
             // create the sentinel node
             db_header_ref
                 .write(|r| {
                     err = (|| {
-                        Merkle::<Store>::init_root(&mut r.acc_root, &merkle_space)?;
-                        Merkle::<Store>::init_root(&mut r.kv_root, &merkle_space)
+                        merkle.init_root(&mut r.acc_root)?;
+                        merkle.init_root(&mut r.kv_root)
                     })();
                 })
                 .unwrap();
@@ -745,7 +747,7 @@ impl Db {
 
         Ok(DbRev {
             header: db_header_ref,
-            merkle: Merkle::new(Box::new(merkle_space)),
+            merkle,
         })
     }
 

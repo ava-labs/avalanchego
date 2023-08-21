@@ -143,9 +143,9 @@ pub fn new_merkle(
         shale::compact::CompactSpace::new(mem_meta, mem_payload, compact_header, cache, 10, 16)
             .expect("CompactSpace init fail");
     let mut root = DiskAddress::null();
-    Merkle::<CompactSpace<Node, DynamicMem>>::init_root(&mut root, &space).unwrap();
-    MerkleSetup {
-        root,
-        merkle: Merkle::new(Box::new(space)),
-    }
+
+    let merkle = Merkle::new(Box::new(space));
+    merkle.init_root(&mut root).unwrap();
+
+    MerkleSetup { root, merkle }
 }
