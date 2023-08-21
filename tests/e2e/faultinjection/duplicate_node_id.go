@@ -44,7 +44,7 @@ var _ = ginkgo.Describe("Duplicate node handling", func() {
 		}
 		node2 := e2e.AddEphemeralNode(network, node2Flags)
 
-		ginkgo.By("checking that the second new node fails to become healthy within timeout")
+		ginkgo.By("checking that the second new node fails to become healthy before timeout")
 		ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultNodeStartTimeout)
 		defer cancel()
 		err := node2.WaitForHealthy(ctx)
