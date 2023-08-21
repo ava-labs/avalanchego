@@ -11,7 +11,7 @@ import (
 	// Explicitly import for the crypto.RegisterHash init side-effects.
 	//
 	// Ref: https://github.com/golang/go/blob/go1.19.12/src/crypto/x509/x509.go#L30-L34
-	_ "crypto/sha256" // initializes SHA256
+	_ "crypto/sha256"
 )
 
 // Ref: https://github.com/golang/go/blob/go1.19.12/src/crypto/x509/x509.go#L326-L350
