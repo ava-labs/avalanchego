@@ -571,7 +571,7 @@ func (e *StandardTxExecutor) AddContinuousDelegatorTx(tx *txs.AddContinuousDeleg
 }
 
 func (e *StandardTxExecutor) StopStakerTx(tx *txs.StopStakerTx) error {
-	stakers, stopTime, err := verifyStopStakerTx(
+	stakerToStop, err := verifyStopStakerTx(
 		e.Backend,
 		e.State,
 		e.Tx,
@@ -581,16 +581,18 @@ func (e *StandardTxExecutor) StopStakerTx(tx *txs.StopStakerTx) error {
 		return err
 	}
 
-	for _, toStop := range stakers {
-		state.MarkStakerForRemovalInPlaceBeforeTime(toStop, stopTime)
-		if toStop.Priority.IsValidator() {
-			err = e.State.UpdateCurrentValidator(toStop)
-		} else {
-			err = e.State.UpdateCurrentDelegator(toStop)
-		}
-		if err != nil {
-			return err
-		}
+	state.MarkStakerForRemovalInPlaceBeforeTime(stakerToStop, stakerToStop.NextTime)
+	if stakerToStop.Priority.IsValidator() {
+		// Note: if stakerToStop is a validator it may have delegators associated with it
+		// (we currently explicitly forbid subnet validators/delegators). Delegators should
+		// be marked as stopped following their validator stop. We do this lazily in when handling
+		// delegators rewards
+		err = e.State.UpdateCurrentValidator(stakerToStop)
+	} else {
+		err = e.State.UpdateCurrentDelegator(stakerToStop)
+	}
+	if err != nil {
+		return err
 	}
 
 	txID := e.Tx.ID()

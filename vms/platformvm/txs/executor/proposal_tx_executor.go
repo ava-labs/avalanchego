@@ -371,6 +371,12 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		return fmt.Errorf("failed to get next removed staker tx: %w", err)
 	}
 
+	// stop delegator if needed. We do this lazily here, instead of stopping all
+	// delegators when a validator is stopped
+	if err := e.lazyStakersStop(stakerToReward); err != nil {
+		return err
+	}
+
 	rewardToRestake := uint64(0)
 
 	// Invariant: A [txs.DelegatorTx] does not also implement the
@@ -435,6 +441,32 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 	}
 
 	e.PrefersCommit = shouldCommit
+	return nil
+}
+
+func (e *ProposalTxExecutor) lazyStakersStop(staker *state.Staker) error {
+	if !staker.Priority.IsDelegator() {
+		// no need to lazily stop validators
+		return nil
+	}
+
+	vdr, err := e.OnCommitState.GetCurrentValidator(staker.SubnetID, staker.NodeID)
+	if err != nil {
+		return fmt.Errorf("can't find validator for delegator %v: %w", staker.TxID, err)
+	}
+
+	if vdr.ShouldRestake() {
+		// validator not stopped yet, no need to stop the delegator
+		return nil
+	}
+
+	state.MarkStakerForRemovalInPlaceBeforeTime(staker, vdr.NextTime)
+	if err := e.OnCommitState.UpdateCurrentDelegator(staker); err != nil {
+		return fmt.Errorf("failed lazily stopping delegator %v: %w", staker.TxID, err)
+	}
+	if err := e.OnAbortState.UpdateCurrentDelegator(staker); err != nil {
+		return fmt.Errorf("failed lazily stopping delegator %v: %w", staker.TxID, err)
+	}
 	return nil
 }
 

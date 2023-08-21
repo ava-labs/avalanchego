@@ -1070,25 +1070,26 @@ func verifyStopStakerTx(
 	chainState state.Chain,
 	sTx *txs.Tx,
 	tx *txs.StopStakerTx,
-) ([]*state.Staker, time.Time, error) {
+) (*state.Staker, error) {
 	// Verify the tx is well-formed
 	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
-		return nil, time.Time{}, err
+		return nil, err
 	}
 
 	currentTimestamp := chainState.GetTimestamp()
 	if !backend.Config.IsContinuousStakingActivated(currentTimestamp) {
-		return nil, time.Time{}, ErrTxUnacceptableBeforeFork
+		return nil, ErrTxUnacceptableBeforeFork
 	}
 
 	// retrieve staker to be stopped
+	// TODO: consider introducing a GetStaker(txID) method in state.Chain
 	var (
 		txID         = tx.TxID
 		stakerToStop *state.Staker
 	)
 	theStakerIt, err := chainState.GetCurrentStakerIterator()
 	if err != nil {
-		return nil, time.Time{}, err
+		return nil, err
 	}
 	defer theStakerIt.Release()
 	for theStakerIt.Next() {
@@ -1100,82 +1101,55 @@ func verifyStopStakerTx(
 	}
 
 	if stakerToStop == nil {
-		return nil, time.Time{}, ErrNoStakerToStop
+		return nil, ErrNoStakerToStop
 	}
 
-	if backend.Bootstrapped.Get() {
-		if !stakerToStop.ShouldRestake() {
-			// As a general rule we don't allow double stopping. There is an exception:
-			// a delegator may be stopped as result of its validator stopping.
-			// In such a casa we do allow stopping the delegator again if stopping time
-			// is changed. Otherwise no double stopping.
-			return nil, time.Time{}, fmt.Errorf("%w, staker id %v", ErrStakerAlreadyStopped, tx.TxID)
-		}
+	if !backend.Bootstrapped.Get() {
+		return stakerToStop, nil
+	}
 
-		// Validators can't be stopped if they're too close to end of current staking period
-		var minStakingPeriod time.Duration
-		if stakerToStop.Priority.IsValidator() {
-			rules, err := getValidatorRules(backend, chainState, stakerToStop.SubnetID)
-			if err != nil {
-				return nil, time.Time{}, err
-			}
-			minStakingPeriod = rules.minStakeDuration
+	if !stakerToStop.ShouldRestake() {
+		// As a general rule we don't allow double stopping. There is an exception:
+		// a delegator may be stopped as result of its validator stopping.
+		// In such a casa we do allow stopping the delegator again if stopping time
+		// is changed. Otherwise no double stopping.
+		return nil, fmt.Errorf("%w, staker id %v", ErrStakerAlreadyStopped, tx.TxID)
+	}
 
-			evalPeriod := state.CalculateEvaluationPeriod(stakerToStop, minStakingPeriod)
-			if !currentTimestamp.Before(stakerToStop.NextTime.Add(-evalPeriod)) {
-				return nil, time.Time{}, ErrValidatorLateStopping
-			}
-		}
-
-		// We can skip full verification during bootstrap.
-		baseTxCreds, err := verifyStopStakerAuthorization(backend, chainState, sTx, txID, tx.StakerAuth)
+	// Validators can't be stopped if they're too close to end of current staking period
+	var minStakingPeriod time.Duration
+	if stakerToStop.Priority.IsValidator() {
+		rules, err := getValidatorRules(backend, chainState, stakerToStop.SubnetID)
 		if err != nil {
-			return nil, time.Time{}, err
+			return nil, fmt.Errorf("failed retrieving validation rule for validator %v: %w", txID, err)
 		}
+		minStakingPeriod = rules.minStakeDuration
 
-		// Verify the flowcheck
-		if err := backend.FlowChecker.VerifySpend(
-			tx,
-			chainState,
-			tx.Ins,
-			tx.Outs,
-			baseTxCreds,
-			map[ids.ID]uint64{
-				backend.Ctx.AVAXAssetID: backend.Config.TxFee,
-			},
-		); err != nil {
-			return nil, time.Time{}, fmt.Errorf("%w: %v", ErrFlowCheckFailed, err)
+		evalPeriod := state.CalculateEvaluationPeriod(stakerToStop, minStakingPeriod)
+		if !currentTimestamp.Before(stakerToStop.NextTime.Add(-evalPeriod)) {
+			return nil, ErrValidatorLateStopping
 		}
 	}
 
-	candidateStopTime := stakerToStop.NextTime
-	if !stakerToStop.Priority.IsValidator() {
-		return []*state.Staker{stakerToStop}, candidateStopTime, nil
-	}
-
-	// primary network validators are special since, when stopping them, we need to handle
-	// their delegators and subnet validators/delegator as well, to make sure they don't
-	// outlive the primary network validators.
-	res := []*state.Staker{stakerToStop}
-	allStakersIt, err := chainState.GetCurrentStakerIterator()
+	baseTxCreds, err := verifyStopStakerAuthorization(backend, chainState, sTx, txID, tx.StakerAuth)
 	if err != nil {
-		return nil, time.Time{}, err
-	}
-	defer allStakersIt.Release()
-	for allStakersIt.Next() {
-		staker := allStakersIt.Value()
-		if staker.NodeID != stakerToStop.NodeID {
-			continue
-		}
-		if staker.TxID != stakerToStop.TxID {
-			res = append(res, staker)
-		}
-		if candidateStopTime.Before(staker.NextTime) {
-			candidateStopTime = candidateStopTime.Add(stakerToStop.StakingPeriod)
-		}
+		return nil, err
 	}
 
-	return res, candidateStopTime, nil
+	if err := backend.FlowChecker.VerifySpend(
+		tx,
+		chainState,
+		tx.Ins,
+		tx.Outs,
+		baseTxCreds,
+		map[ids.ID]uint64{
+			backend.Ctx.AVAXAssetID: backend.Config.TxFee,
+		},
+	); err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrFlowCheckFailed, err)
+	}
+
+	return stakerToStop, nil
 }
 
 func verifyStopStakerAuthorization(

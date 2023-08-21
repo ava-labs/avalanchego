@@ -1740,18 +1740,19 @@ func TestStandardTxExecutorStopContinuousStakers(t *testing.T) {
 	}
 	require.NoError(stopValTx.Unsigned.Visit(&executor))
 
-	// Check that validator and delegator have their end time duly set
+	// Check that validator have their end time duly set
 	stoppedVal, err := onAcceptState.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.NoError(err)
 	require.Equal(val.NextTime, stoppedVal.NextTime)
 	require.Equal(val.NextTime, stoppedVal.EndTime)
 
+	// Check that delegators not stopped (We update them lazily while processing rewardTx)
 	delIt, err = onAcceptState.GetCurrentDelegatorIterator(constants.PrimaryNetworkID, nodeID)
 	require.NoError(err)
 	require.True(delIt.Next())
-	stoppedDel := delIt.Value()
-	require.Equal(del.NextTime, stoppedDel.NextTime)
-	require.Equal(stoppedVal.EndTime, stoppedDel.EndTime)
+	nonStoppedDel := delIt.Value()
+	require.Equal(del.NextTime, nonStoppedDel.NextTime)
+	require.Equal(mockable.MaxTime, nonStoppedDel.EndTime)
 }
 
 // Returns a RemoveSubnetValidatorTx that passes syntactic verification.

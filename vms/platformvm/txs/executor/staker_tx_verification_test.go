@@ -484,14 +484,13 @@ func TestVerifyAddContinuousValidatorTx(t *testing.T) {
 
 func TestVerifyStopContinuousValidatorTx(t *testing.T) {
 	type test struct {
-		name                    string
-		backendF                func(*gomock.Controller) *Backend
-		stateF                  func(*gomock.Controller) state.Chain
-		sTxF                    func() *txs.Tx
-		txF                     func() *txs.StopStakerTx
-		expectedStoppingStakers []*state.Staker
-		expectedStopTime        time.Time
-		expectedErr             error
+		name                   string
+		backendF               func(*gomock.Controller) *Backend
+		stateF                 func(*gomock.Controller) state.Chain
+		sTxF                   func() *txs.Tx
+		txF                    func() *txs.StopStakerTx
+		expectedStoppingStaker *state.Staker
+		expectedErr            error
 	}
 
 	blsSK, err := bls.NewSecretKey()
@@ -599,15 +598,10 @@ func TestVerifyStopContinuousValidatorTx(t *testing.T) {
 				mockState.EXPECT().GetTimestamp().Return(time.Unix(0, 0))
 				currentStakerIter := state.NewMockStakerIterator(ctrl)
 
-				// first round to find staker to stop
+				// round to find staker to stop
 				currentStakerIter.EXPECT().Next().Return(true)
 				currentStakerIter.EXPECT().Value().Return(primaryValidator)
 				currentStakerIter.EXPECT().Release()
-
-				// second round to find all stakers to stop. Bare minimum mocks to pass
-				currentStakerIter.EXPECT().Next().Return(false)
-				currentStakerIter.EXPECT().Release()
-
 				mockState.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil).AnyTimes()
 
 				mockState.EXPECT().GetTx(signedPrimaryValidatorTx.ID()).Return(&signedPrimaryValidatorTx, status.Committed, nil)
@@ -619,9 +613,8 @@ func TestVerifyStopContinuousValidatorTx(t *testing.T) {
 			txF: func() *txs.StopStakerTx {
 				return &verifiedTx
 			},
-			expectedStoppingStakers: []*state.Staker{primaryValidator},
-			expectedStopTime:        primaryValidator.NextTime,
-			expectedErr:             nil,
+			expectedStoppingStaker: primaryValidator,
+			expectedErr:            nil,
 		},
 		{
 			name: "fail syntactic verification",
@@ -661,15 +654,10 @@ func TestVerifyStopContinuousValidatorTx(t *testing.T) {
 				mockState.EXPECT().GetTimestamp().Return(time.Unix(0, 0))
 				currentStakerIter := state.NewMockStakerIterator(ctrl)
 
-				// first round to find staker to stop
+				// round to find staker to stop
 				currentStakerIter.EXPECT().Next().Return(true)
 				currentStakerIter.EXPECT().Value().Return(primaryValidator)
 				currentStakerIter.EXPECT().Release()
-
-				// second round to find all stakers to stop. Bare minimum mocks to pass
-				currentStakerIter.EXPECT().Next().Return(false)
-				currentStakerIter.EXPECT().Release()
-
 				mockState.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil).AnyTimes()
 				return mockState
 			},
@@ -679,9 +667,8 @@ func TestVerifyStopContinuousValidatorTx(t *testing.T) {
 			txF: func() *txs.StopStakerTx {
 				return &verifiedTx
 			},
-			expectedStoppingStakers: []*state.Staker{primaryValidator},
-			expectedStopTime:        primaryValidator.NextTime,
-			expectedErr:             nil,
+			expectedStoppingStaker: primaryValidator,
+			expectedErr:            nil,
 		},
 		{
 			name: "tx not accepted pre continuous fork",
@@ -1023,10 +1010,9 @@ func TestVerifyStopContinuousValidatorTx(t *testing.T) {
 				tx      = tt.txF()
 			)
 
-			stoppingStakers, stoppingTime, err := verifyStopStakerTx(backend, state, sTx, tx)
+			stoppingStaker, err := verifyStopStakerTx(backend, state, sTx, tx)
 			require.ErrorIs(t, err, tt.expectedErr)
-			require.Equal(t, tt.expectedStoppingStakers, stoppingStakers)
-			require.Equal(t, tt.expectedStopTime, stoppingTime)
+			require.Equal(t, tt.expectedStoppingStaker, stoppingStaker)
 		})
 	}
 }
@@ -1679,14 +1665,13 @@ func TestVerifyAddContinuousDelegatorTx(t *testing.T) {
 
 func TestVerifyStopContinuousDelegatorTx(t *testing.T) {
 	type test struct {
-		name                    string
-		backendF                func(*gomock.Controller) *Backend
-		stateF                  func(*gomock.Controller) state.Chain
-		sTxF                    func() *txs.Tx
-		txF                     func() *txs.StopStakerTx
-		expectedStoppingStakers []*state.Staker
-		expectedStopTime        time.Time
-		expectedErr             error
+		name                  string
+		backendF              func(*gomock.Controller) *Backend
+		stateF                func(*gomock.Controller) state.Chain
+		sTxF                  func() *txs.Tx
+		txF                   func() *txs.StopStakerTx
+		expectedStoppedStaker *state.Staker
+		expectedErr           error
 	}
 
 	primaryNetworkCfg := config.Config{
@@ -1805,9 +1790,8 @@ func TestVerifyStopContinuousDelegatorTx(t *testing.T) {
 			txF: func() *txs.StopStakerTx {
 				return &verifiedTx
 			},
-			expectedStoppingStakers: []*state.Staker{primaryDelegator},
-			expectedStopTime:        primaryDelegator.NextTime,
-			expectedErr:             nil,
+			expectedStoppedStaker: primaryDelegator,
+			expectedErr:           nil,
 		},
 		{
 			name: "fail syntactic verification",
@@ -1860,9 +1844,8 @@ func TestVerifyStopContinuousDelegatorTx(t *testing.T) {
 			txF: func() *txs.StopStakerTx {
 				return &verifiedTx
 			},
-			expectedStoppingStakers: []*state.Staker{primaryDelegator},
-			expectedStopTime:        primaryDelegator.NextTime,
-			expectedErr:             nil,
+			expectedStoppedStaker: primaryDelegator,
+			expectedErr:           nil,
 		},
 		{
 			name: "tx not accepted pre continuous fork",
@@ -2131,10 +2114,9 @@ func TestVerifyStopContinuousDelegatorTx(t *testing.T) {
 				tx      = tt.txF()
 			)
 
-			stoppingStakers, stoppingTime, err := verifyStopStakerTx(backend, state, sTx, tx)
+			stoppedStaker, err := verifyStopStakerTx(backend, state, sTx, tx)
 			require.ErrorIs(t, err, tt.expectedErr)
-			require.Equal(t, tt.expectedStoppingStakers, stoppingStakers)
-			require.Equal(t, tt.expectedStopTime, stoppingTime)
+			require.Equal(t, tt.expectedStoppedStaker, stoppedStaker)
 		})
 	}
 }
