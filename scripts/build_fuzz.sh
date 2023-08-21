@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 
+set -euo pipefail
+
 # Mostly taken from https://github.com/golang/go/issues/46312#issuecomment-1153345129
 
+# Directory above this script
+AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
 # Load the constants
 source "$AVALANCHE_PATH"/scripts/constants.sh
 

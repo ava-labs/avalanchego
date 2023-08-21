@@ -1,8 +1,6 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-set -o errexit
-set -o nounset
-set -o pipefail
+set -euo pipefail
 
 echo "Building docker image based off of most recent local commits of avalanchego and coreth"
 

@@ -9,106 +9,75 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
 const (
-	startWeightKeyLength  = hashing.HashLen + database.Uint64Size
-	weightKeyLength       = startWeightKeyLength + hashing.AddrLen
-	weightKeyHeightOffset = hashing.HashLen
-	weightKeyNodeIDOffset = weightKeyHeightOffset + database.Uint64Size
+	// startDiffKey = [subnetID] + [inverseHeight]
+	startDiffKeyLength = ids.IDLen + database.Uint64Size
+	// diffKey = [subnetID] + [inverseHeight] + [nodeID]
+	diffKeyLength = startDiffKeyLength + ids.NodeIDLen
+	// diffKeyNodeIDOffset = [subnetIDLen] + [inverseHeightLen]
+	diffKeyNodeIDOffset = ids.IDLen + database.Uint64Size
 
-	weightValueLength = 1 + database.Uint64Size
-	weightValueTrue   = 0x01
-
-	startBLSKeyLength  = database.Uint64Size
-	blsKeyLength       = startBLSKeyLength + hashing.AddrLen
-	blsKeyNodeIDOffset = database.Uint64Size
+	// weightValue = [isNegative] + [weight]
+	weightValueLength = database.BoolSize + database.Uint64Size
 )
 
 var (
-	errUnexpectedWeightKeyLength   = fmt.Errorf("expected weight key length %d", weightKeyLength)
+	errUnexpectedDiffKeyLength     = fmt.Errorf("expected diff key length %d", diffKeyLength)
 	errUnexpectedWeightValueLength = fmt.Errorf("expected weight value length %d", weightValueLength)
-	errUnexpectedBLSKeyLength      = fmt.Errorf("expected bls key length %d", blsKeyLength)
 )
 
-// getStartWeightKey is used to determine the starting key when iterating.
+// marshalStartDiffKey is used to determine the starting key when iterating.
 //
-// Note: the result should be a prefix of [getWeightKey] if called with the same
-// arguments.
-func getStartWeightKey(subnetID ids.ID, height uint64) []byte {
-	key := make([]byte, startWeightKeyLength)
+// Invariant: the result is a prefix of [marshalDiffKey] when called with the
+// same arguments.
+func marshalStartDiffKey(subnetID ids.ID, height uint64) []byte {
+	key := make([]byte, startDiffKeyLength)
 	copy(key, subnetID[:])
-	packIterableHeight(key[weightKeyHeightOffset:], height)
+	packIterableHeight(key[ids.IDLen:], height)
 	return key
 }
 
-func getWeightKey(subnetID ids.ID, height uint64, nodeID ids.NodeID) []byte {
-	key := make([]byte, weightKeyLength)
+func marshalDiffKey(subnetID ids.ID, height uint64, nodeID ids.NodeID) []byte {
+	key := make([]byte, diffKeyLength)
 	copy(key, subnetID[:])
-	packIterableHeight(key[weightKeyHeightOffset:], height)
-	copy(key[weightKeyNodeIDOffset:], nodeID[:])
+	packIterableHeight(key[ids.IDLen:], height)
+	copy(key[diffKeyNodeIDOffset:], nodeID[:])
 	return key
 }
 
-func parseWeightKey(key []byte) (ids.ID, uint64, ids.NodeID, error) {
-	if len(key) != weightKeyLength {
-		return ids.Empty, 0, ids.EmptyNodeID, errUnexpectedWeightKeyLength
+func unmarshalDiffKey(key []byte) (ids.ID, uint64, ids.NodeID, error) {
+	if len(key) != diffKeyLength {
+		return ids.Empty, 0, ids.EmptyNodeID, errUnexpectedDiffKeyLength
 	}
 	var (
 		subnetID ids.ID
 		nodeID   ids.NodeID
 	)
 	copy(subnetID[:], key)
-	height := unpackIterableHeight(key[weightKeyHeightOffset:])
-	copy(nodeID[:], key[weightKeyNodeIDOffset:])
+	height := unpackIterableHeight(key[ids.IDLen:])
+	copy(nodeID[:], key[diffKeyNodeIDOffset:])
 	return subnetID, height, nodeID, nil
 }
 
-func getWeightValue(diff *ValidatorWeightDiff) []byte {
+func marshalWeightDiff(diff *ValidatorWeightDiff) []byte {
 	value := make([]byte, weightValueLength)
 	if diff.Decrease {
-		value[0] = weightValueTrue
+		value[0] = database.BoolTrue
 	}
-	binary.BigEndian.PutUint64(value[1:], diff.Amount)
+	binary.BigEndian.PutUint64(value[database.BoolSize:], diff.Amount)
 	return value
 }
 
-func parseWeightValue(value []byte) (*ValidatorWeightDiff, error) {
+func unmarshalWeightDiff(value []byte) (*ValidatorWeightDiff, error) {
 	if len(value) != weightValueLength {
 		return nil, errUnexpectedWeightValueLength
 	}
 	return &ValidatorWeightDiff{
-		Decrease: value[0] == weightValueTrue,
-		Amount:   binary.BigEndian.Uint64(value[1:]),
+		Decrease: value[0] == database.BoolTrue,
+		Amount:   binary.BigEndian.Uint64(value[database.BoolSize:]),
 	}, nil
-}
-
-// getStartBLSKey is used to determine the starting key when iterating.
-//
-// Note: the result should be a prefix of [getBLSKey] if called with the same
-// arguments.
-func getStartBLSKey(height uint64) []byte {
-	key := make([]byte, startBLSKeyLength)
-	packIterableHeight(key, height)
-	return key
-}
-
-func getBLSKey(height uint64, nodeID ids.NodeID) []byte {
-	key := make([]byte, blsKeyLength)
-	packIterableHeight(key, height)
-	copy(key[blsKeyNodeIDOffset:], nodeID[:])
-	return key
-}
-
-func parseBLSKey(key []byte) (uint64, ids.NodeID, error) {
-	if len(key) != blsKeyLength {
-		return 0, ids.EmptyNodeID, errUnexpectedBLSKeyLength
-	}
-	var nodeID ids.NodeID
-	height := unpackIterableHeight(key)
-	copy(nodeID[:], key[blsKeyNodeIDOffset:])
-	return height, nodeID, nil
 }
 
 // Note: [height] is encoded as a bit flipped big endian number so that

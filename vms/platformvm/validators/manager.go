@@ -42,7 +42,6 @@ const (
 var (
 	_ validators.State = (*manager)(nil)
 
-	ErrMissingValidator    = errors.New("missing validator")
 	ErrMissingValidatorSet = errors.New("missing validator set")
 )
 
@@ -67,11 +66,11 @@ type State interface {
 	ValidatorSet(subnetID ids.ID, vdrs validators.Set) error
 
 	// ApplyValidatorWeightDiffs iterates from [startHeight] towards the genesis
-	// block until it has applied all of the diffs through [endHeight]. Applying
-	// the diffs results in modifying [validators].
+	// block until it has applied all of the diffs up to and including
+	// [endHeight]. Applying the diffs modifies [validators].
 	//
 	// Invariant: If attempting to generate the validator set for
-	// [endHeight - 1], [validators] should initially contain the validator
+	// [endHeight - 1], [validators] must initially contain the validator
 	// weights for [startHeight].
 	//
 	// Note: Because this function iterates towards the genesis, [startHeight]
@@ -85,12 +84,12 @@ type State interface {
 	) error
 
 	// ApplyValidatorPublicKeyDiffs iterates from [startHeight] towards the
-	// genesis block until it has applied all of the diffs through [endHeight].
-	// Applying the diffs results in modifying [validators].
+	// genesis block until it has applied all of the diffs up to and including
+	// [endHeight]. Applying the diffs modifies [validators].
 	//
 	// Invariant: If attempting to generate the validator set for
-	// [endHeight - 1], [validators] should initially contain the validators for
-	// [endHeight - 1] and the public keys for [startHeight].
+	// [endHeight - 1], [validators] must initially contain the validator
+	// weights for [startHeight].
 	//
 	// Note: Because this function iterates towards the genesis, [startHeight]
 	// should normally be greater than or equal to [endHeight].
@@ -131,6 +130,8 @@ func NewManager(
 	}
 }
 
+// TODO: Remove requirement for the P-chain's context lock to be held when
+// calling exported functions.
 type manager struct {
 	log        logging.Logger
 	cfg        config.Config
@@ -304,8 +305,10 @@ func (m *manager) makePrimaryNetworkValidatorSet(
 
 	// Rebuild primary network validators at [targetHeight]
 	//
-	// Note: Height h contains the diffs from height h-1 to h. So, to rebuild
-	// validators state at height h, we apply diffs till height h+1.
+	// Note: Since we are attempting to generate the validator set at
+	// [targetHeight], we want to apply the diffs from
+	// (targetHeight, currentHeight]. Because the state interface is implemented
+	// to be inclusive, we apply diffs in [targetHeight + 1, currentHeight].
 	lastDiffHeight := targetHeight + 1
 	err = m.state.ApplyValidatorWeightDiffs(
 		ctx,
@@ -361,8 +364,10 @@ func (m *manager) makeSubnetValidatorSet(
 
 	// Rebuild subnet validators at [targetHeight]
 	//
-	// Note: Height h contains the diffs from height h-1 to h. So, to rebuild
-	// validators state at height h, we apply diffs till height h+1.
+	// Note: Since we are attempting to generate the validator set at
+	// [targetHeight], we want to apply the diffs from
+	// (targetHeight, currentHeight]. Because the state interface is implemented
+	// to be inclusive, we apply diffs in [targetHeight + 1, currentHeight].
 	lastDiffHeight := targetHeight + 1
 	err = m.state.ApplyValidatorWeightDiffs(
 		ctx,
@@ -375,18 +380,17 @@ func (m *manager) makeSubnetValidatorSet(
 		return nil, 0, err
 	}
 
+	// Update the subnet validator set to include the public keys at
+	// [currentHeight]. When we apply the public key diffs, we will convert
+	// these keys to represent the public keys at [targetHeight]. If the subnet
+	// validator is not currently a primary network validator, it doesn't have a
+	// key at [currentHeight].
 	for nodeID, vdr := range subnetValidatorSet {
-		primaryVdr, ok := primaryValidatorSet[nodeID]
-		if !ok {
-			// This should never happen
-			m.log.Error(ErrMissingValidator.Error(),
-				zap.Stringer("subnetID", subnetID),
-				zap.Stringer("nodeID", vdr.NodeID),
-			)
-			return nil, 0, ErrMissingValidator
+		if primaryVdr, ok := primaryValidatorSet[nodeID]; ok {
+			vdr.PublicKey = primaryVdr.PublicKey
+		} else {
+			vdr.PublicKey = nil
 		}
-
-		vdr.PublicKey = primaryVdr.PublicKey
 	}
 
 	err = m.state.ApplyValidatorPublicKeyDiffs(

@@ -93,6 +93,10 @@ func (p path) Compare(other path) int {
 	return strings.Compare(string(p), string(other))
 }
 
+func (p path) Less(other path) bool {
+	return p.Compare(other) < 0
+}
+
 // Invariant: The returned value must not be modified.
 func (p path) Bytes() []byte {
 	// avoid copying during the conversion
@@ -133,7 +137,7 @@ func (p path) Serialize() SerializedPath {
 		keyIndex++
 	}
 
-	// if there is was a odd number of nibbles, grab the last one
+	// if there is an odd number of nibbles, grab the last one
 	if result.hasOddLength() {
 		result.Value[keyIndex] = p[keyIndex<<1] << 4
 	}

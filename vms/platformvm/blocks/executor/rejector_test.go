@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
-
 	"github.com/stretchr/testify/require"
+
+	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -115,7 +115,6 @@ func TestRejectBlock(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 
 			blk, err := tt.newBlockFunc()
 			require.NoError(err)
@@ -135,6 +134,7 @@ func TestRejectBlock(t *testing.T) {
 					Mempool:      mempool,
 					state:        state,
 				},
+				addTxsToMempool: true,
 			}
 
 			// Set expected calls on dependencies.

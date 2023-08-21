@@ -13,11 +13,11 @@ import (
 
 	"github.com/btcsuite/btcd/btcutil/bech32"
 
-	"github.com/golang/mock/gomock"
-
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/stretchr/testify/require"
+
+	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/chains/atomic"
@@ -1957,7 +1957,6 @@ func TestImport(t *testing.T) {
 
 func TestServiceGetBlock(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	blockID := ids.GenerateTestID()
 
@@ -2119,7 +2118,6 @@ func TestServiceGetBlock(t *testing.T) {
 
 func TestServiceGetBlockByHeight(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	blockID := ids.GenerateTestID()
 	blockHeight := uint64(1337)
@@ -2322,7 +2320,6 @@ func TestServiceGetBlockByHeight(t *testing.T) {
 
 func TestServiceGetHeight(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	blockID := ids.GenerateTestID()
 	blockHeight := uint64(1337)

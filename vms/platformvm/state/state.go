@@ -7,9 +7,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
+	stdmath "math"
+
 	"github.com/google/btree"
+
+	"go.uber.org/zap"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -33,7 +38,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
@@ -45,7 +52,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
-const pointerOverhead = wrappers.LongLen
+const (
+	pruneCommitLimit           = 1024
+	pruneCommitSleepMultiplier = 5
+	pruneCommitSleepCap        = 10 * time.Second
+	pruneUpdateFrequency       = 30 * time.Second
+)
 
 var (
 	_ State = (*state)(nil)
@@ -55,6 +67,7 @@ var (
 	errValidatorSetAlreadyPopulated = errors.New("validator set already populated")
 	errDuplicateValidatorSet        = errors.New("duplicate validator set")
 
+	blockIDPrefix                       = []byte("blockID")
 	blockPrefix                         = []byte("block")
 	validatorsPrefix                    = []byte("validators")
 	currentPrefix                       = []byte("current")
@@ -81,6 +94,7 @@ var (
 	lastAcceptedKey   = []byte("last accepted")
 	heightsIndexedKey = []byte("heights indexed")
 	initializedKey    = []byte("initialized")
+	prunedKey         = []byte("pruned")
 )
 
 // Chain collects all methods to manage the state of the chain for block
@@ -126,20 +140,23 @@ type State interface {
 	// Invariant: [block] is an accepted block.
 	AddStatelessBlock(block blocks.Block)
 
+	GetBlockIDAtHeight(height uint64) (ids.ID, error)
+
 	// ValidatorSet adds all the validators and delegators of [subnetID] into
 	// [vdrs].
 	ValidatorSet(subnetID ids.ID, vdrs validators.Set) error
 
 	// ApplyValidatorWeightDiffs iterates from [startHeight] towards the genesis
-	// block until it has applied all of the diffs through [endHeight]. Applying
-	// the diffs results in modifying [validators].
+	// block until it has applied all of the diffs up to and including
+	// [endHeight]. Applying the diffs modifies [validators].
 	//
 	// Invariant: If attempting to generate the validator set for
-	// [endHeight - 1], [validators] should initially contain the validator
+	// [endHeight - 1], [validators] must initially contain the validator
 	// weights for [startHeight].
 	//
 	// Note: Because this function iterates towards the genesis, [startHeight]
-	// should normally be greater than or equal to [endHeight].
+	// will typically be greater than or equal to [endHeight]. If [startHeight]
+	// is less than [endHeight], no diffs will be applied.
 	ApplyValidatorWeightDiffs(
 		ctx context.Context,
 		validators map[ids.NodeID]*validators.GetValidatorOutput,
@@ -149,15 +166,16 @@ type State interface {
 	) error
 
 	// ApplyValidatorPublicKeyDiffs iterates from [startHeight] towards the
-	// genesis block until it has applied all of the diffs through [endHeight].
-	// Applying the diffs results in modifying [validators].
+	// genesis block until it has applied all of the diffs up to and including
+	// [endHeight]. Applying the diffs modifies [validators].
 	//
 	// Invariant: If attempting to generate the validator set for
-	// [endHeight - 1], [validators] should initially contain the validators for
-	// [endHeight - 1] and the public keys for [startHeight].
+	// [endHeight - 1], [validators] must initially contain the validator
+	// weights for [startHeight].
 	//
 	// Note: Because this function iterates towards the genesis, [startHeight]
-	// should normally be greater than or equal to [endHeight].
+	// will typically be greater than or equal to [endHeight]. If [startHeight]
+	// is less than [endHeight], no diffs will be applied.
 	ApplyValidatorPublicKeyDiffs(
 		ctx context.Context,
 		validators map[ids.NodeID]*validators.GetValidatorOutput,
@@ -169,6 +187,18 @@ type State interface {
 
 	// Discard uncommitted changes to the database.
 	Abort()
+
+	// Returns if the state should be pruned and indexed to remove rejected
+	// blocks and generate the block height index.
+	//
+	// TODO: Remove after v1.11.x is activated
+	ShouldPrune() (bool, error)
+
+	// Removes rejected blocks from disk and indexes accepted blocks by height. This
+	// function supports being (and is recommended to be) called asynchronously.
+	//
+	// TODO: Remove after v1.11.x is activated
+	PruneAndIndex(sync.Locker, logging.Logger) error
 
 	// Commit changes to the base database.
 	Commit() error
@@ -218,10 +248,20 @@ type stateBlk struct {
  * | | '-. subnetDelegator
  * | |   '-. list
  * | |     '-- txID -> nil
- * | |-. weight diffs
+ * | |-. nested weight diffs TODO: Remove once only the flat db is needed
+ * | | '-. height+subnet
+ * | |   '-. list
+ * | |     '-- nodeID -> weightChange
+ * | |-. nested pub key diffs TODO: Remove once only the flat db is needed
+ * | | '-. height
+ * | |   '-. list
+ * | |     '-- nodeID -> compressed public key
+ * | |-. flat weight diffs
  * | | '-- subnet+height+nodeID -> weightChange
- * | '-. pub key diffs
- * |   '-- height+nodeID -> public key or nil
+ * | '-. flat pub key diffs
+ * |   '-- subnet+height+nodeID -> uncompressed public key or nil
+ * |-. blockIDs
+ * | '-- height -> blockID
  * |-. blocks
  * | '-- blockID -> block bytes
  * |-. txs
@@ -241,6 +281,7 @@ type stateBlk struct {
  * |     '-- txID -> nil
  * '-. singletons
  *   |-- initializedKey -> nil
+ *   |-- prunedKey -> nil
  *   |-- timestampKey -> timestamp
  *   |-- currentSupplyKey -> currentSupply
  *   |-- lastAcceptedKey -> lastAccepted
@@ -262,6 +303,10 @@ type state struct {
 	pendingStakers *baseStakers
 
 	currentHeight uint64
+
+	addedBlockIDs map[uint64]ids.ID            // map of height -> blockID
+	blockIDCache  cache.Cacher[uint64, ids.ID] // cache of height -> blockID. If the entry is ids.Empty, it is not in the database
+	blockIDDB     database.Database
 
 	addedBlocks map[ids.ID]blocks.Block            // map of blockID -> Block
 	blockCache  cache.Cacher[ids.ID, blocks.Block] // cache of blockID -> Block. If the entry is nil, it is not in the database
@@ -333,6 +378,9 @@ type state struct {
 
 // heightRange is used to track which heights are safe to use the native DB
 // iterator for querying validator diffs.
+//
+// TODO: Remove once we are guaranteed nodes can not rollback to not support the
+// new indexing mechanism.
 type heightRange struct {
 	LowerBound uint64 `serialize:"true"`
 	UpperBound uint64 `serialize:"true"`
@@ -374,25 +422,25 @@ type txAndStatus struct {
 	status status.Status
 }
 
-func txSize(tx *txs.Tx) int {
+func txSize(_ ids.ID, tx *txs.Tx) int {
 	if tx == nil {
-		return pointerOverhead
+		return ids.IDLen + constants.PointerOverhead
 	}
-	return len(tx.Bytes()) + pointerOverhead
+	return ids.IDLen + len(tx.Bytes()) + constants.PointerOverhead
 }
 
-func txAndStatusSize(t *txAndStatus) int {
+func txAndStatusSize(_ ids.ID, t *txAndStatus) int {
 	if t == nil {
-		return pointerOverhead
+		return ids.IDLen + constants.PointerOverhead
 	}
-	return len(t.tx.Bytes()) + wrappers.IntLen + pointerOverhead
+	return ids.IDLen + len(t.tx.Bytes()) + wrappers.IntLen + 2*constants.PointerOverhead
 }
 
-func blockSize(blk blocks.Block) int {
+func blockSize(_ ids.ID, blk blocks.Block) int {
 	if blk == nil {
-		return pointerOverhead
+		return ids.IDLen + constants.PointerOverhead
 	}
-	return len(blk.Bytes()) + pointerOverhead
+	return ids.IDLen + len(blk.Bytes()) + constants.PointerOverhead
 }
 
 func New(
@@ -429,6 +477,27 @@ func New(
 		return nil, err
 	}
 
+	// Before we start accepting new blocks, we check if the pruning process needs
+	// to be run.
+	//
+	// TODO: Cleanup after v1.11.x is activated
+	shouldPrune, err := s.ShouldPrune()
+	if err != nil {
+		return nil, err
+	}
+	if shouldPrune {
+		// If the pruned key is on disk, we must delete it to ensure our disk
+		// can't get into a partially pruned state if the node restarts mid-way
+		// through pruning.
+		if err := s.singletonDB.Delete(prunedKey); err != nil {
+			return nil, fmt.Errorf("failed to remove prunedKey from singletonDB: %w", err)
+		}
+
+		if err := s.Commit(); err != nil {
+			return nil, fmt.Errorf("failed to commit to baseDB: %w", err)
+		}
+	}
+
 	return s, nil
 }
 
@@ -443,6 +512,15 @@ func newState(
 	bootstrapped *utils.Atomic[bool],
 	tracer trace.Tracer,
 ) (*state, error) {
+	blockIDCache, err := metercacher.New[uint64, ids.ID](
+		"block_id_cache",
+		metricsReg,
+		&cache.LRU[uint64, ids.ID]{Size: execCfg.BlockIDCacheSize},
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	blockCache, err := metercacher.New[ids.ID, blocks.Block](
 		"block_cache",
 		metricsReg,
@@ -546,6 +624,10 @@ func newState(
 		bootstrapped: bootstrapped,
 		tracer:       tracer,
 		baseDB:       baseDB,
+
+		addedBlockIDs: make(map[uint64]ids.ID),
+		blockIDCache:  blockIDCache,
+		blockIDDB:     prefixdb.New(blockIDPrefix, baseDB),
 
 		addedBlocks: make(map[ids.ID]blocks.Block),
 		blockCache:  blockCache,
@@ -673,6 +755,37 @@ func (s *state) shouldInit() (bool, error) {
 
 func (s *state) doneInit() error {
 	return s.singletonDB.Put(initializedKey, nil)
+}
+
+func (s *state) ShouldPrune() (bool, error) {
+	has, err := s.singletonDB.Has(prunedKey)
+	if err != nil {
+		return true, err
+	}
+
+	// If [prunedKey] is not in [singletonDB], [PruneAndIndex()] did not finish
+	// execution.
+	if !has {
+		return true, nil
+	}
+
+	// To ensure the db was not modified since we last ran [PruneAndIndex()], we
+	// must verify that [s.lastAccepted] is height indexed.
+	blk, err := s.GetStatelessBlock(s.lastAccepted)
+	if err != nil {
+		return true, err
+	}
+
+	_, err = s.GetBlockIDAtHeight(blk.Height())
+	if err == database.ErrNotFound {
+		return true, nil
+	}
+
+	return false, err
+}
+
+func (s *state) donePrune() error {
+	return s.singletonDB.Put(prunedKey, nil)
 }
 
 func (s *state) GetSubnets() ([]*txs.Tx, error) {
@@ -991,7 +1104,7 @@ func (s *state) ApplyValidatorWeightDiffs(
 	defer span.End()
 
 	diffIter := s.flatValidatorWeightDiffsDB.NewIteratorWithStartAndPrefix(
-		getStartWeightKey(subnetID, startHeight),
+		marshalStartDiffKey(subnetID, startHeight),
 		subnetID[:],
 	)
 	defer diffIter.Release()
@@ -1011,7 +1124,7 @@ func (s *state) ApplyValidatorWeightDiffs(
 			return err
 		}
 
-		_, parsedHeight, nodeID, err := parseWeightKey(diffIter.Key())
+		_, parsedHeight, nodeID, err := unmarshalDiffKey(diffIter.Key())
 		if err != nil {
 			return err
 		}
@@ -1023,7 +1136,7 @@ func (s *state) ApplyValidatorWeightDiffs(
 
 		prevHeight = parsedHeight
 
-		weightDiff, err := parseWeightValue(diffIter.Value())
+		weightDiff, err := unmarshalWeightDiff(diffIter.Value())
 		if err != nil {
 			return err
 		}
@@ -1031,6 +1144,10 @@ func (s *state) ApplyValidatorWeightDiffs(
 		if err := applyWeightDiff(validators, nodeID, weightDiff); err != nil {
 			return err
 		}
+	}
+
+	if err := diffIter.Error(); err != nil {
+		return err
 	}
 
 	ctx, span = s.tracer.Start(ctx, "iterateOldValidatorWeightDiffs", oteltrace.WithAttributes(
@@ -1079,7 +1196,7 @@ func (s *state) ApplyValidatorWeightDiffs(
 		}
 	}
 
-	return diffIter.Error()
+	return nil
 }
 
 func applyWeightDiff(
@@ -1131,8 +1248,9 @@ func (s *state) ApplyValidatorPublicKeyDiffs(
 	))
 	defer span.End()
 
-	diffIter := s.flatValidatorPublicKeyDiffsDB.NewIteratorWithStart(
-		getStartBLSKey(startHeight),
+	diffIter := s.flatValidatorPublicKeyDiffsDB.NewIteratorWithStartAndPrefix(
+		marshalStartDiffKey(constants.PrimaryNetworkID, startHeight),
+		constants.PrimaryNetworkID[:],
 	)
 	defer diffIter.Release()
 
@@ -1147,7 +1265,7 @@ func (s *state) ApplyValidatorPublicKeyDiffs(
 			return err
 		}
 
-		parsedHeight, nodeID, err := parseBLSKey(diffIter.Key())
+		_, parsedHeight, nodeID, err := unmarshalDiffKey(diffIter.Key())
 		if err != nil {
 			return err
 		}
@@ -1170,6 +1288,12 @@ func (s *state) ApplyValidatorPublicKeyDiffs(
 
 		vdr.PublicKey = new(bls.PublicKey).Deserialize(pkBytes)
 	}
+
+	// Note: this does not fallback to the linkeddb index because the linkeddb
+	// index does not contain entries for when to remove the public key.
+	//
+	// Nodes may see inconsistent public keys for heights before the new public
+	// key index was populated.
 	return diffIter.Error()
 }
 
@@ -1610,6 +1734,7 @@ func (s *state) Close() error {
 		s.chainDB.Close(),
 		s.singletonDB.Close(),
 		s.blockDB.Close(),
+		s.blockIDDB.Close(),
 	)
 	return errs.Err
 }
@@ -1669,11 +1794,16 @@ func (s *state) init(genesisBytes []byte) error {
 }
 
 func (s *state) AddStatelessBlock(block blocks.Block) {
-	s.addedBlocks[block.ID()] = block
+	blkID := block.ID()
+	s.addedBlockIDs[block.Height()] = blkID
+	s.addedBlocks[blkID] = block
 }
 
 func (s *state) SetHeight(height uint64) {
 	if s.indexedHeights == nil {
+		// If indexedHeights hasn't been created yet, then we are newly tracking
+		// the range. This means we should initialize the LowerBound to the
+		// current height.
 		s.indexedHeights = &heightRange{
 			LowerBound: height,
 		}
@@ -1712,17 +1842,14 @@ func (s *state) CommitBatch() (database.Batch, error) {
 func (s *state) writeBlocks() error {
 	for blkID, blk := range s.addedBlocks {
 		blkID := blkID
+		blkBytes := blk.Bytes()
+		blkHeight := blk.Height()
+		heightKey := database.PackUInt64(blkHeight)
 
-		stBlk := stateBlk{
-			Blk:    blk,
-			Bytes:  blk.Bytes(),
-			Status: choices.Accepted,
-		}
-
-		// Note: blocks to be stored are verified, so it's safe to marshal them with GenesisCodec
-		blockBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, &stBlk)
-		if err != nil {
-			return fmt.Errorf("failed to marshal block %s to store: %w", blkID, err)
+		delete(s.addedBlockIDs, blkHeight)
+		s.blockIDCache.Put(blkHeight, blkID)
+		if err := database.PutID(s.blockIDDB, heightKey, blkID); err != nil {
+			return fmt.Errorf("failed to add blockID: %w", err)
 		}
 
 		delete(s.addedBlocks, blkID)
@@ -1730,7 +1857,7 @@ func (s *state) writeBlocks() error {
 		// referencing additional data (because of shared byte slices) that
 		// would not be properly accounted for in the cache sizing.
 		s.blockCache.Evict(blkID)
-		if err := s.blockDB.Put(blkID[:], blockBytes); err != nil {
+		if err := s.blockDB.Put(blkID[:], blkBytes); err != nil {
 			return fmt.Errorf("failed to write block %s: %w", blkID, err)
 		}
 	}
@@ -1772,10 +1899,37 @@ func (s *state) GetStatelessBlock(blockID ids.ID) (blocks.Block, error) {
 	return blk, nil
 }
 
+func (s *state) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
+	if blkID, exists := s.addedBlockIDs[height]; exists {
+		return blkID, nil
+	}
+	if blkID, cached := s.blockIDCache.Get(height); cached {
+		if blkID == ids.Empty {
+			return ids.Empty, database.ErrNotFound
+		}
+
+		return blkID, nil
+	}
+
+	heightKey := database.PackUInt64(height)
+
+	blkID, err := database.GetID(s.blockIDDB, heightKey)
+	if err == database.ErrNotFound {
+		s.blockIDCache.Put(height, ids.Empty)
+		return ids.Empty, database.ErrNotFound
+	}
+	if err != nil {
+		return ids.Empty, err
+	}
+
+	s.blockIDCache.Put(height, blkID)
+	return blkID, nil
+}
+
 func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error {
 	heightBytes := database.PackUInt64(height)
-	rawPublicKeyDiffDB := prefixdb.New(heightBytes, s.nestedValidatorPublicKeyDiffsDB)
-	pkDiffDB := linkeddb.NewDefault(rawPublicKeyDiffDB)
+	rawNestedPublicKeyDiffDB := prefixdb.New(heightBytes, s.nestedValidatorPublicKeyDiffsDB)
+	nestedPKDiffDB := linkeddb.NewDefault(rawNestedPublicKeyDiffDB)
 
 	for subnetID, validatorDiffs := range s.currentStakers.validatorDiffs {
 		delete(s.currentStakers.validatorDiffs, subnetID)
@@ -1796,8 +1950,8 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 		if err != nil {
 			return fmt.Errorf("failed to create prefix bytes: %w", err)
 		}
-		rawWeightDiffDB := prefixdb.New(prefixBytes, s.nestedValidatorWeightDiffsDB)
-		weightDiffDB := linkeddb.NewDefault(rawWeightDiffDB)
+		rawNestedWeightDiffDB := prefixdb.New(prefixBytes, s.nestedValidatorWeightDiffsDB)
+		nestedWeightDiffDB := linkeddb.NewDefault(rawNestedWeightDiffDB)
 
 		// Record the change in weight and/or public key for each validator.
 		for nodeID, validatorDiff := range validatorDiffs {
@@ -1819,7 +1973,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 					// added. This means the prior value for the public key was
 					// nil.
 					err := s.flatValidatorPublicKeyDiffsDB.Put(
-						getBLSKey(height, nodeID),
+						marshalDiffKey(constants.PrimaryNetworkID, height, nodeID),
 						nil,
 					)
 					if err != nil {
@@ -1858,9 +2012,15 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 				// Invariant: Only the Primary Network contains non-nil public
 				// keys.
 				if staker.PublicKey != nil {
-					// Record the public key of the validator being removed.
+					// Record that the public key for the validator is being
+					// removed. This means we must record the prior value of the
+					// public key.
+					//
+					// Note: We store the uncompressed public key here as it is
+					// significantly more efficient to parse when applying
+					// diffs.
 					err := s.flatValidatorPublicKeyDiffsDB.Put(
-						getBLSKey(height, nodeID),
+						marshalDiffKey(constants.PrimaryNetworkID, height, nodeID),
 						staker.PublicKey.Serialize(),
 					)
 					if err != nil {
@@ -1869,8 +2029,10 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 
 					// TODO: Remove this once we no longer support version
 					// rollbacks.
+					//
+					// Note: We store the compressed public key here.
 					pkBytes := bls.PublicKeyToBytes(staker.PublicKey)
-					if err := pkDiffDB.Put(nodeID[:], pkBytes); err != nil {
+					if err := nestedPKDiffDB.Put(nodeID[:], pkBytes); err != nil {
 						return err
 					}
 				}
@@ -1897,8 +2059,8 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 			}
 
 			err = s.flatValidatorWeightDiffsDB.Put(
-				getWeightKey(subnetID, height, nodeID),
-				getWeightValue(weightDiff),
+				marshalDiffKey(subnetID, height, nodeID),
+				marshalWeightDiff(weightDiff),
 			)
 			if err != nil {
 				return err
@@ -1909,7 +2071,7 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 			if err != nil {
 				return fmt.Errorf("failed to serialize validator weight diff: %w", err)
 			}
-			if err := weightDiffDB.Put(nodeID[:], weightDiffBytes); err != nil {
+			if err := nestedWeightDiffDB.Put(nodeID[:], weightDiffBytes); err != nil {
 				return err
 			}
 
@@ -2230,4 +2392,164 @@ func parseStoredBlock(blkBytes []byte) (blocks.Block, choices.Status, bool, erro
 	}
 
 	return blkState.Blk, blkState.Status, true, nil
+}
+
+func (s *state) PruneAndIndex(lock sync.Locker, log logging.Logger) error {
+	lock.Lock()
+	// It is possible that new blocks are added after grabbing this iterator. New
+	// blocks are guaranteed to be accepted and height-indexed, so we don't need to
+	// check them.
+	blockIterator := s.blockDB.NewIterator()
+	// Releasing is done using a closure to ensure that updating blockIterator will
+	// result in having the most recent iterator released when executing the
+	// deferred function.
+	defer func() {
+		blockIterator.Release()
+	}()
+
+	// While we are pruning the disk, we disable caching of the data we are
+	// modifying. Caching is re-enabled when pruning finishes.
+	//
+	// Note: If an unexpected error occurs the caches are never re-enabled.
+	// That's fine as the node is going to be in an unhealthy state regardless.
+	oldBlockIDCache := s.blockIDCache
+	s.blockIDCache = &cache.Empty[uint64, ids.ID]{}
+	lock.Unlock()
+
+	log.Info("starting state pruning and indexing")
+
+	var (
+		startTime  = time.Now()
+		lastCommit = startTime
+		lastUpdate = startTime
+		numPruned  = 0
+		numIndexed = 0
+	)
+
+	for blockIterator.Next() {
+		blkBytes := blockIterator.Value()
+
+		blk, status, isStateBlk, err := parseStoredBlock(blkBytes)
+		if err != nil {
+			return err
+		}
+
+		if status != choices.Accepted {
+			// Remove non-accepted blocks from disk.
+			if err := s.blockDB.Delete(blockIterator.Key()); err != nil {
+				return fmt.Errorf("failed to delete block: %w", err)
+			}
+
+			numPruned++
+
+			// We don't index the height of non-accepted blocks.
+			continue
+		}
+
+		blkHeight := blk.Height()
+		blkID := blk.ID()
+
+		// Populate the map of height -> blockID.
+		heightKey := database.PackUInt64(blkHeight)
+		if err := database.PutID(s.blockIDDB, heightKey, blkID); err != nil {
+			return fmt.Errorf("failed to add blockID: %w", err)
+		}
+
+		// Since we only store accepted blocks on disk, we only need to store a map of
+		// ids.ID to Block.
+		if isStateBlk {
+			if err := s.blockDB.Put(blkID[:], blkBytes); err != nil {
+				return fmt.Errorf("failed to write block: %w", err)
+			}
+		}
+
+		numIndexed++
+
+		if numIndexed%pruneCommitLimit == 0 {
+			// We must hold the lock during committing to make sure we don't
+			// attempt to commit to disk while a block is concurrently being
+			// accepted.
+			lock.Lock()
+			errs := wrappers.Errs{}
+			errs.Add(
+				s.Commit(),
+				blockIterator.Error(),
+			)
+			lock.Unlock()
+			if errs.Errored() {
+				return errs.Err
+			}
+
+			// We release the iterator here to allow the underlying database to
+			// clean up deleted state.
+			blockIterator.Release()
+
+			now := time.Now()
+			if now.Sub(lastUpdate) > pruneUpdateFrequency {
+				lastUpdate = now
+
+				progress := timer.ProgressFromHash(blkID[:])
+				eta := timer.EstimateETA(
+					startTime,
+					progress,
+					stdmath.MaxUint64,
+				)
+
+				log.Info("committing state pruning and indexing",
+					zap.Int("numPruned", numPruned),
+					zap.Int("numIndexed", numIndexed),
+					zap.Duration("eta", eta),
+				)
+			}
+
+			// We take the minimum here because it's possible that the node is
+			// currently bootstrapping. This would mean that grabbing the lock
+			// could take an extremely long period of time; which we should not
+			// delay processing for.
+			pruneDuration := now.Sub(lastCommit)
+			sleepDuration := math.Min(
+				pruneCommitSleepMultiplier*pruneDuration,
+				pruneCommitSleepCap,
+			)
+			time.Sleep(sleepDuration)
+
+			// Make sure not to include the sleep duration into the next prune
+			// duration.
+			lastCommit = time.Now()
+
+			blockIterator = s.blockDB.NewIteratorWithStart(blkID[:])
+		}
+	}
+
+	// Ensure we fully iterated over all blocks before writing that pruning has
+	// finished.
+	//
+	// Note: This is needed because a transient read error could cause the
+	// iterator to stop early.
+	if err := blockIterator.Error(); err != nil {
+		return err
+	}
+
+	if err := s.donePrune(); err != nil {
+		return err
+	}
+
+	// We must hold the lock during committing to make sure we don't
+	// attempt to commit to disk while a block is concurrently being
+	// accepted.
+	lock.Lock()
+	defer lock.Unlock()
+
+	// Make sure we flush the original cache before re-enabling it to prevent
+	// surfacing any stale data.
+	oldBlockIDCache.Flush()
+	s.blockIDCache = oldBlockIDCache
+
+	log.Info("finished state pruning and indexing",
+		zap.Int("numPruned", numPruned),
+		zap.Int("numIndexed", numIndexed),
+		zap.Duration("duration", time.Since(startTime)),
+	)
+
+	return s.Commit()
 }

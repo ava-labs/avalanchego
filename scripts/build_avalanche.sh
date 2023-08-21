@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 
-set -o errexit
-set -o nounset
-set -o pipefail
+set -euo pipefail
 
 print_usage() {
   printf "Usage: build_avalanche [OPTIONS]
@@ -30,7 +28,7 @@ done
 # Dockerfile
 # README.md
 # go.mod
-go_version_minimum="1.19.6"
+go_version_minimum="1.19.12"
 
 go_version() {
     go version | sed -nE -e 's/[^0-9.]+([0-9.]+).+/\1/p'

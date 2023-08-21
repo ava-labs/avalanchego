@@ -30,6 +30,8 @@ const (
 
 	AvalancheGoDataDirVar    = "AVALANCHEGO_DATA_DIR"
 	defaultUnexpandedDataDir = "$" + AvalancheGoDataDirVar
+
+	DefaultProcessContextFilename = "process.json"
 )
 
 var (
@@ -50,7 +52,7 @@ var (
 	defaultSubnetConfigDir      = filepath.Join(defaultConfigDir, "subnets")
 	defaultPluginDir            = filepath.Join(defaultUnexpandedDataDir, "plugins")
 	defaultChainDataDir         = filepath.Join(defaultUnexpandedDataDir, "chainData")
-	defaultProcessContextPath   = filepath.Join(defaultUnexpandedDataDir, "process.json")
+	defaultProcessContextPath   = filepath.Join(defaultUnexpandedDataDir, DefaultProcessContextFilename)
 )
 
 func deprecateFlags(fs *pflag.FlagSet) error {
@@ -149,7 +151,10 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.String(NetworkCompressionTypeKey, constants.DefaultNetworkCompressionType.String(), fmt.Sprintf("Compression type for outbound messages. Must be one of [%s, %s, %s]", compression.TypeGzip, compression.TypeZstd, compression.TypeNone))
 
 	fs.Duration(NetworkMaxClockDifferenceKey, constants.DefaultNetworkMaxClockDifference, "Max allowed clock difference value between this node and peers")
-	fs.Bool(NetworkAllowPrivateIPsKey, constants.DefaultNetworkAllowPrivateIPs, "Allows the node to initiate outbound connection attempts to peers with private IPs")
+	// Note: The default value is set to false here because the default
+	// networkID is mainnet. The real default value of NetworkAllowPrivateIPs is
+	// based on the networkID.
+	fs.Bool(NetworkAllowPrivateIPsKey, false, fmt.Sprintf("Allows the node to initiate outbound connection attempts to peers with private IPs. If the provided --%s is one of [%s, %s] the default is false. Oterhwise, the default is true", NetworkNameKey, constants.MainnetName, constants.FujiName))
 	fs.Bool(NetworkRequireValidatorToConnectKey, constants.DefaultNetworkRequireValidatorToConnect, "If true, this node will only maintain a connection with another node if this node is a validator, the other node is a validator, or the other node is a beacon")
 	fs.Uint(NetworkPeerReadBufferSizeKey, constants.DefaultNetworkPeerReadBufferSize, "Size, in bytes, of the buffer that we read peer messages into (there is one buffer per peer)")
 	fs.Uint(NetworkPeerWriteBufferSizeKey, constants.DefaultNetworkPeerWriteBufferSize, "Size, in bytes, of the buffer that we write peer messages into (there is one buffer per peer)")
@@ -256,6 +261,7 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.String(StakingSignerKeyContentKey, "", "Specifies base64 encoded signer private key for staking")
 	fs.Bool(SybilProtectionEnabledKey, true, "Enables sybil protection. If enabled, Network TLS is required")
 	fs.Uint64(SybilProtectionDisabledWeightKey, 100, "Weight to provide to each peer when sybil protection is disabled")
+	fs.Bool(PartialSyncPrimaryNetworkKey, false, "Only sync the P-chain on the Primary Network. If the node is a Primary Network validator, it will report unhealthy")
 	// Uptime Requirement
 	fs.Float64(UptimeRequirementKey, genesis.LocalParams.UptimeRequirement, "Fraction of time a validator must be online to receive rewards")
 	// Minimum Stake required to validate the Primary Network

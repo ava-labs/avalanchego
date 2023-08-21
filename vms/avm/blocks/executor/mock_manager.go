@@ -16,7 +16,7 @@ import (
 	blocks "github.com/ava-labs/avalanchego/vms/avm/blocks"
 	states "github.com/ava-labs/avalanchego/vms/avm/states"
 	txs "github.com/ava-labs/avalanchego/vms/avm/txs"
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockManager is a mock of Manager interface.
