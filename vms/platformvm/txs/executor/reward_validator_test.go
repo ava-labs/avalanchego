@@ -32,7 +32,7 @@ import (
 )
 
 func TestRewardsBounds(t *testing.T) {
-	// validator and delegators compounding should not breach weight constraits.
+	// validator and delegators compounding should not breach weight constraints.
 	// This test checks it
 	require := require.New(t)
 	env := newEnvironmentNoValidator(t, latestFork)

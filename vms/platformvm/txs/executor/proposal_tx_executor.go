@@ -698,8 +698,6 @@ func (e *ProposalTxExecutor) rewardDelegatorTx(
 	}
 
 	// Calculate split of reward between delegator/delegatee
-	// The delegator gives stake to the validatee
-	// Delay rounding as long as possible for small numbers
 	delegatorReward, delegateeReward := splitAmountByShares(delegator.PotentialReward, vdrTx.Shares())
 
 	// following Continuous staking fork activation multiple rewards UTXOS
@@ -889,14 +887,14 @@ func (e *ProposalTxExecutor) calculateProposalPreference(stakerToReward, primary
 }
 
 func splitAmountByShares(totalAmount uint64, shares uint32) (uint64, uint64) {
-	// Calculate split of reward between delegator/delegatee
-	// The delegator gives stake to the validatee
-	remainderShares := reward.PercentDenominator - uint64(shares)                  // validatorShares <= reward.PercentDenominator so no underflow
-	remainderAmount := remainderShares * (totalAmount / reward.PercentDenominator) // delegatorShares <= reward.PercentDenominator so no overflow
+	remainderShares := reward.PercentDenominator - uint64(shares)
+	remainderAmount := remainderShares * (totalAmount / reward.PercentDenominator)
+
 	// Delay rounding as long as possible for small numbers
 	if optimisticReward, err := math.Mul64(remainderShares, totalAmount); err == nil {
 		remainderAmount = optimisticReward / reward.PercentDenominator
 	}
-	amountFromShares := totalAmount - remainderAmount // delegatorReward <= reward so no underflow
+
+	amountFromShares := totalAmount - remainderAmount
 	return remainderAmount, amountFromShares
 }
