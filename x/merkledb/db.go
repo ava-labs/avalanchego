@@ -189,7 +189,7 @@ func newDatabase(
 		metadataDB:        prefixdb.New(metadataPrefix, db),
 		history:           newTrieHistory(config.HistoryLength),
 		tracer:            config.Tracer,
-		childViews:        make([]*trieView, 0, defaultPreallocationSize),
+		childViews:        make([]*trieView, 0, childViewsPreallocationSize),
 		evictionBatchSize: config.EvictionBatchSize,
 	}
 
@@ -876,11 +876,6 @@ func (db *merkleDB) commitBatch(ops []database.BatchOp) error {
 		return err
 	}
 	return view.commitToDB(context.Background())
-}
-
-// commitToDB is a no-op for the db because it is the db
-func (*merkleDB) commitToDB(context.Context) error {
-	return nil
 }
 
 // commitChanges commits the changes in [trieToCommit] to [db].
