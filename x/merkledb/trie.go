@@ -66,7 +66,4 @@ type TrieView interface {
 	// CommitToDB writes the changes in this view to the database.
 	// Takes the DB commit lock.
 	CommitToDB(ctx context.Context) error
-
-	// Same as CommitToDB but doesn't take the DB commit lock.
-	commitToDB(ctx context.Context) error
 }
