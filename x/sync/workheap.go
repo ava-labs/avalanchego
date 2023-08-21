@@ -8,6 +8,7 @@ import (
 	"container/heap"
 
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/maybe"
 
 	"github.com/google/btree"
 )
@@ -30,7 +31,7 @@ type workHeap struct {
 	// i.e. heap.Pop returns highest priority item.
 	innerHeap innerHeap
 	// The heap items sorted by range start.
-	// A nil start is considered to be the smallest.
+	// A Nothing start is considered to be the smallest.
 	sortedItems *btree.BTreeG[*heapItem]
 	closed      bool
 }
@@ -40,7 +41,19 @@ func newWorkHeap() *workHeap {
 		sortedItems: btree.NewG(
 			2,
 			func(a, b *heapItem) bool {
-				return bytes.Compare(a.workItem.start, b.workItem.start) < 0
+				aNothing := a.workItem.start.IsNothing()
+				bNothing := b.workItem.start.IsNothing()
+				if aNothing {
+					// [a] is Nothing, so if [b] is Nothing, they're equal.
+					// Otherwise, [b] is greater.
+					return !bNothing
+				}
+				if bNothing {
+					// [a] has a value and [b] doesn't so [a] is greater.
+					return false
+				}
+				// [a] and [b] both contain values. Compare the values.
+				return bytes.Compare(a.workItem.start.Value(), b.workItem.start.Value()) < 0
 			},
 		),
 	}
@@ -98,7 +111,8 @@ func (wh *workHeap) MergeInsert(item *workItem) {
 	wh.sortedItems.DescendLessOrEqual(
 		searchItem,
 		func(beforeItem *heapItem) bool {
-			if item.localRootID == beforeItem.workItem.localRootID && bytes.Equal(beforeItem.workItem.end.Value(), item.start) {
+			if item.localRootID == beforeItem.workItem.localRootID &&
+				maybe.Equal(item.start, beforeItem.workItem.end, bytes.Equal) {
 				// [beforeItem.start, beforeItem.end] and [item.start, item.end] are
 				// merged into [beforeItem.start, item.end]
 				beforeItem.workItem.end = item.end
@@ -114,7 +128,8 @@ func (wh *workHeap) MergeInsert(item *workItem) {
 	wh.sortedItems.AscendGreaterOrEqual(
 		searchItem,
 		func(afterItem *heapItem) bool {
-			if item.localRootID == afterItem.workItem.localRootID && bytes.Equal(afterItem.workItem.start, item.end.Value()) {
+			if item.localRootID == afterItem.workItem.localRootID &&
+				maybe.Equal(item.end, afterItem.workItem.start, bytes.Equal) {
 				// [item.start, item.end] and [afterItem.start, afterItem.end] are merged into
 				// [item.start, afterItem.end].
 				afterItem.workItem.start = item.start

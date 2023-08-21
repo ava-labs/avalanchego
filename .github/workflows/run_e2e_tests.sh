@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 
-set -o errexit
-set -o nounset
-set -o pipefail
+set -euo pipefail
 
 # Testing specific variables
 avalanche_testing_repo="avaplatform/avalanche-testing"
