@@ -71,7 +71,4 @@ type TrieView interface {
 	// commits changes in the trie to its parent
 	// then commits the combined changes down the stack until all changes in the stack commit to the database
 	commitToDB(ctx context.Context) error
-
-	// commits changes in the trieToCommit into the current trie
-	commitChanges(ctx context.Context, trieToCommit *trieView) error
 }
