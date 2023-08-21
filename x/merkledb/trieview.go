@@ -500,13 +500,12 @@ func (t *trieView) commitToDB(ctx context.Context) error {
 	))
 	defer span.End()
 
-	if t.isInvalid() {
+	switch {
+	case t.isInvalid():
 		return ErrInvalid
-	}
-	if t.committed {
+	case t.committed:
 		return ErrCommitted
-	}
-	if t.db != t.getParentTrie() {
+	case t.db != t.getParentTrie():
 		return ErrParentNotDatabase
 	}
 
