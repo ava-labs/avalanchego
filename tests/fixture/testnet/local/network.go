@@ -662,14 +662,14 @@ func (ln *LocalNetwork) AddLocalNode(w io.Writer, node *LocalNode, isEphemeral b
 	// Default to a data dir of [network-dir]/[node-ID]
 	nodeParentDir := ln.Dir
 	if isEphemeral {
-		// For an ephemeral node, default to a data dir of [network-dir]/[ephemeral-dir][node-ID]
+		// For an ephemeral node, default to a data dir of [network-dir]/[ephemeral-dir]/[node-ID]
 		// to provide a clear separation between nodes that are expected to expose stable API
 		// endpoints and those that will live for only a short time (e.g. a node started by a test
-		// and stopped on test teardown).
+		// and stopped on teardown).
 		//
-		// The data for an ephemeral node is still in the file tree rooted at the network dir to
-		// ensure that archiving the network dir in CI will collect all node data used for a test
-		// run. Otherwise the data dir of ephemeral nodes could be stored in a random temp dir.
+		// The data for an ephemeral node is still stored in the file tree rooted at the network
+		// dir to ensure that recursively archiving the network dir in CI will collect all node
+		// data used for a test run.
 		nodeParentDir = filepath.Join(ln.Dir, defaultEphemeralDirName)
 	}
 
