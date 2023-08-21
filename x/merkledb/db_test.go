@@ -486,7 +486,7 @@ func TestDatabaseCommitChanges(t *testing.T) {
 	dbRoot := db.getMerkleRoot()
 
 	// Committing a nil view should be a no-op.
-	require.NoError(db.commitToDB(context.Background()))
+	require.NoError(db.CommitToDB(context.Background()))
 	require.Equal(dbRoot, db.getMerkleRoot()) // Root didn't change
 
 	// Committing an invalid view should fail.
