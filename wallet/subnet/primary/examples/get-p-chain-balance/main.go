@@ -32,14 +32,14 @@ func main() {
 	ctx := context.Background()
 
 	fetchStartTime := time.Now()
-	pCtx, _, utxos, err := primary.FetchState(ctx, uri, addresses)
+	state, err := primary.FetchState(ctx, uri, addresses)
 	if err != nil {
 		log.Fatalf("failed to fetch state: %s\n", err)
 	}
 	log.Printf("fetched state of %s in %s\n", addrStr, time.Since(fetchStartTime))
 
-	pUTXOs := primary.NewChainUTXOs(constants.PlatformChainID, utxos)
-	pBackend := p.NewBackend(pCtx, pUTXOs, make(map[ids.ID]*txs.Tx))
+	pUTXOs := primary.NewChainUTXOs(constants.PlatformChainID, state.UTXOs)
+	pBackend := p.NewBackend(state.PCTX, pUTXOs, make(map[ids.ID]*txs.Tx))
 	pBuilder := p.NewBuilder(addresses, pBackend)
 
 	currentBalances, err := pBuilder.GetBalance()
@@ -47,7 +47,7 @@ func main() {
 		log.Fatalf("failed to get the balance: %s\n", err)
 	}
 
-	avaxID := pCtx.AVAXAssetID()
+	avaxID := state.PCTX.AVAXAssetID()
 	avaxBalance := currentBalances[avaxID]
 	log.Printf("current AVAX balance of %s is %d nAVAX\n", addrStr, avaxBalance)
 }

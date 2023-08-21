@@ -1,5 +1,6 @@
-set -o pipefail
-set -e
+#!/usr/bin/env bash
+
+set -euo pipefail
 
 SUCCESS=1
 

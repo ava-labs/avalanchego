@@ -99,3 +99,21 @@ func Test_SerializedPath_Equal(t *testing.T) {
 	prefix = SerializedPath{Value: []byte("FirstKey"), NibbleLength: 15}
 	require.True(first.Equal(prefix))
 }
+
+func FuzzPath(f *testing.F) {
+	f.Fuzz(func(t *testing.T, pathBytes []byte) {
+		require := require.New(t)
+
+		path := newPath(pathBytes)
+
+		serializedPath := path.Serialize()
+		require.Equal(pathBytes, serializedPath.Value)
+		require.Equal(2*len(pathBytes), serializedPath.NibbleLength)
+
+		deserializedPath := serializedPath.deserialize()
+		require.Equal(path, deserializedPath)
+
+		reserializedPath := deserializedPath.Serialize()
+		require.Equal(serializedPath, reserializedPath)
+	})
+}
