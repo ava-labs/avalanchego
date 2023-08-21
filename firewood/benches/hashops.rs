@@ -7,9 +7,8 @@ use firewood::{
     storage::StoreRevMut,
 };
 use firewood_shale::{
-    cached::PlainMem,
-    compact::{CompactSpace, CompactSpaceHeader},
-    CachedStore, ObjPtr, Storable, StoredView,
+    cached::PlainMem, compact::CompactSpace, disk_address::DiskAddress, CachedStore, Storable,
+    StoredView,
 };
 use rand::{distributions::Alphanumeric, Rng, SeedableRng};
 
@@ -33,7 +32,7 @@ fn bench_hydrate(b: &mut Bencher) {
 
 fn bench_insert(b: &mut Bencher) {
     const TEST_MEM_SIZE: u64 = 20_000_000;
-    let merkle_payload_header: ObjPtr<CompactSpaceHeader> = ObjPtr::new_from_addr(0);
+    let merkle_payload_header = DiskAddress::null();
 
     let merkle_payload_header_ref = StoredView::ptr_to_obj(
         &PlainMem::new(2 * firewood_shale::compact::CompactHeader::MSIZE, 9),
@@ -52,7 +51,7 @@ fn bench_insert(b: &mut Bencher) {
     )
     .unwrap();
     let mut merkle = Merkle::new(Box::new(store));
-    let mut root = ObjPtr::null();
+    let mut root = DiskAddress::null();
     Merkle::<CompactSpace<Node, StoreRevMut>>::init_root(&mut root, merkle.get_store()).unwrap();
     let mut rng = rand::rngs::StdRng::seed_from_u64(1234);
     const KEY_LEN: usize = 4;

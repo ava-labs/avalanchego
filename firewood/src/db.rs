@@ -20,7 +20,8 @@ use metered::{metered, HitCount};
 use parking_lot::{Mutex, RwLock};
 use shale::{
     compact::{CompactSpace, CompactSpaceHeader},
-    CachedStore, Obj, ObjPtr, ShaleError, ShaleStore, SpaceId, Storable, StoredView,
+    disk_address::DiskAddress,
+    CachedStore, Obj, ShaleError, ShaleStore, SpaceId, Storable, StoredView,
 };
 use std::{
     collections::VecDeque,
@@ -28,6 +29,7 @@ use std::{
     fmt,
     io::{Cursor, Write},
     mem::size_of,
+    num::NonZeroUsize,
     path::Path,
     sync::Arc,
     thread::JoinHandle,
@@ -177,9 +179,9 @@ fn get_sub_universe_from_empty_delta(
 struct DbHeader {
     /// The root node of the account model storage. (Where the values are [Account] objects, which
     /// may contain the root for the secondary trie.)
-    acc_root: ObjPtr<Node>,
+    acc_root: DiskAddress,
     /// The root node of the generic key-value store.
-    kv_root: ObjPtr<Node>,
+    kv_root: DiskAddress,
 }
 
 impl DbHeader {
@@ -187,25 +189,23 @@ impl DbHeader {
 
     pub fn new_empty() -> Self {
         Self {
-            acc_root: ObjPtr::null(),
-            kv_root: ObjPtr::null(),
+            acc_root: DiskAddress::null(),
+            kv_root: DiskAddress::null(),
         }
     }
 }
 
 impl Storable for DbHeader {
-    fn hydrate<T: CachedStore>(addr: u64, mem: &T) -> Result<Self, shale::ShaleError> {
+    fn hydrate<T: CachedStore>(addr: usize, mem: &T) -> Result<Self, shale::ShaleError> {
         let raw = mem
             .get_view(addr, Self::MSIZE)
             .ok_or(ShaleError::InvalidCacheView {
                 offset: addr,
                 size: Self::MSIZE,
             })?;
-        let acc_root = u64::from_le_bytes(raw.as_deref()[..8].try_into().expect("invalid slice"));
-        let kv_root = u64::from_le_bytes(raw.as_deref()[8..].try_into().expect("invalid slice"));
         Ok(Self {
-            acc_root: ObjPtr::new_from_addr(acc_root),
-            kv_root: ObjPtr::new_from_addr(kv_root),
+            acc_root: raw.as_deref()[..8].into(),
+            kv_root: raw.as_deref()[8..].into(),
         })
     }
 
@@ -215,8 +215,8 @@ impl Storable for DbHeader {
 
     fn dehydrate(&self, to: &mut [u8]) -> Result<(), ShaleError> {
         let mut cur = Cursor::new(to);
-        cur.write_all(&self.acc_root.addr().to_le_bytes())?;
-        cur.write_all(&self.kv_root.addr().to_le_bytes())?;
+        cur.write_all(&self.acc_root.to_le_bytes())?;
+        cur.write_all(&self.kv_root.to_le_bytes())?;
         Ok(())
     }
 }
@@ -561,7 +561,7 @@ impl Db {
         let merkle_payload_header_ref =
             Db::get_payload_header_ref(&base.merkle.meta, Db::PARAM_SIZE + DbHeader::MSIZE)?;
 
-        let blob_payload_header_ref = Db::get_payload_header_ref(&base.blob.meta, 0)?;
+        let blob_payload_header_ref = Db::get_payload_header_ref(&base.blob.meta, DbHeader::MSIZE)?;
 
         let header_refs = (
             db_header_ref,
@@ -606,13 +606,13 @@ impl Db {
         payload_regn_nbit: u64,
         cfg: &DbConfig,
     ) -> Result<(Universe<Arc<StoreRevMut>>, DbRev<Store>), DbError> {
-        let mut offset = Db::PARAM_SIZE;
-        let db_header: ObjPtr<DbHeader> = ObjPtr::new_from_addr(offset);
-        offset += DbHeader::MSIZE;
-        let merkle_payload_header: ObjPtr<CompactSpaceHeader> = ObjPtr::new_from_addr(offset);
-        offset += CompactSpaceHeader::MSIZE;
-        assert!(offset <= SPACE_RESERVED);
-        let blob_payload_header: ObjPtr<CompactSpaceHeader> = ObjPtr::new_from_addr(0);
+        let mut offset = Db::PARAM_SIZE as usize;
+        let db_header: DiskAddress = DiskAddress::from(offset);
+        offset += DbHeader::MSIZE as usize;
+        let merkle_payload_header: DiskAddress = DiskAddress::from(offset);
+        offset += CompactSpaceHeader::MSIZE as usize;
+        assert!(offset <= SPACE_RESERVED as usize);
+        let blob_payload_header: DiskAddress = DiskAddress::null();
 
         let mut merkle_meta_store = StoreRevMut::new(cached_space.merkle.meta.clone());
         let mut blob_meta_store = StoreRevMut::new(cached_space.blob.meta.clone());
@@ -620,21 +620,21 @@ impl Db {
         if reset_store_headers {
             // initialize store headers
             merkle_meta_store.write(
-                merkle_payload_header.addr(),
+                merkle_payload_header.into(),
                 &shale::to_dehydrated(&shale::compact::CompactSpaceHeader::new(
-                    SPACE_RESERVED,
-                    SPACE_RESERVED,
+                    NonZeroUsize::new(SPACE_RESERVED as usize).unwrap(),
+                    NonZeroUsize::new(SPACE_RESERVED as usize).unwrap(),
                 ))?,
             );
             merkle_meta_store.write(
-                db_header.addr(),
+                db_header.into(),
                 &shale::to_dehydrated(&DbHeader::new_empty())?,
             );
             blob_meta_store.write(
-                blob_payload_header.addr(),
+                blob_payload_header.into(),
                 &shale::to_dehydrated(&shale::compact::CompactSpaceHeader::new(
-                    SPACE_RESERVED,
-                    SPACE_RESERVED,
+                    NonZeroUsize::new(SPACE_RESERVED as usize).unwrap(),
+                    NonZeroUsize::new(SPACE_RESERVED as usize).unwrap(),
                 ))?,
             );
         }
@@ -682,7 +682,7 @@ impl Db {
         meta_ref: &K,
         header_offset: u64,
     ) -> Result<Obj<CompactSpaceHeader>, DbError> {
-        let payload_header = ObjPtr::<CompactSpaceHeader>::new_from_addr(header_offset);
+        let payload_header = DiskAddress::from(header_offset as usize);
         StoredView::ptr_to_obj(
             meta_ref,
             payload_header,
@@ -692,7 +692,7 @@ impl Db {
     }
 
     fn get_db_header_ref<K: CachedStore>(meta_ref: &K) -> Result<Obj<DbHeader>, DbError> {
-        let db_header = ObjPtr::<DbHeader>::new_from_addr(Db::PARAM_SIZE);
+        let db_header = DiskAddress::from(Db::PARAM_SIZE as usize);
         StoredView::ptr_to_obj(meta_ref, db_header, DbHeader::MSIZE).map_err(Into::into)
     }
 

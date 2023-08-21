@@ -26,10 +26,10 @@ impl PlainMem {
 impl CachedStore for PlainMem {
     fn get_view(
         &self,
-        offset: u64,
+        offset: usize,
         length: u64,
     ) -> Option<Box<dyn CachedView<DerefReturn = Vec<u8>>>> {
-        let offset = offset as usize;
+        let offset = offset;
         let length = length as usize;
         if offset + length > self.space.read().unwrap().len() {
             None
@@ -52,8 +52,8 @@ impl CachedStore for PlainMem {
         }))
     }
 
-    fn write(&mut self, offset: u64, change: &[u8]) {
-        let offset = offset as usize;
+    fn write(&mut self, offset: usize, change: &[u8]) {
+        let offset = offset;
         let length = change.len();
         let mut vect = self.space.deref().write().unwrap();
         vect.as_mut_slice()[offset..offset + length].copy_from_slice(change);
@@ -113,10 +113,10 @@ impl DynamicMem {
 impl CachedStore for DynamicMem {
     fn get_view(
         &self,
-        offset: u64,
+        offset: usize,
         length: u64,
     ) -> Option<Box<dyn CachedView<DerefReturn = Vec<u8>>>> {
-        let offset = offset as usize;
+        let offset = offset;
         let length = length as usize;
         let size = offset + length;
         let mut space = self.space.write().unwrap();
@@ -143,8 +143,8 @@ impl CachedStore for DynamicMem {
         }))
     }
 
-    fn write(&mut self, offset: u64, change: &[u8]) {
-        let offset = offset as usize;
+    fn write(&mut self, offset: usize, change: &[u8]) {
+        let offset = offset;
         let length = change.len();
         let size = offset + length;
 

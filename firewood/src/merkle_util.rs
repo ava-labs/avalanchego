@@ -6,11 +6,10 @@ use crate::{
     proof::{Proof, ProofError},
 };
 use shale::{
-    cached::DynamicMem,
-    compact::{CompactSpace, CompactSpaceHeader},
-    CachedStore, ObjPtr, ShaleStore, StoredView,
+    cached::DynamicMem, compact::CompactSpace, disk_address::DiskAddress, CachedStore, ShaleStore,
+    StoredView,
 };
-use std::sync::Arc;
+use std::{num::NonZeroUsize, sync::Arc};
 use thiserror::Error;
 
 #[derive(Error, Debug, PartialEq)]
@@ -36,7 +35,7 @@ pub enum DataStoreError {
 }
 
 pub struct MerkleSetup<S> {
-    root: ObjPtr<Node>,
+    root: DiskAddress,
     merkle: Merkle<S>,
 }
 
@@ -65,7 +64,7 @@ impl<S: ShaleStore<Node> + Send + Sync> MerkleSetup<S> {
             .map_err(|_err| DataStoreError::GetError)
     }
 
-    pub fn get_root(&self) -> ObjPtr<Node> {
+    pub fn get_root(&self) -> DiskAddress {
         self.root
     }
 
@@ -121,15 +120,18 @@ pub fn new_merkle(
     meta_size: u64,
     compact_size: u64,
 ) -> MerkleSetup<CompactSpace<Node, DynamicMem>> {
-    const RESERVED: u64 = 0x1000;
-    assert!(meta_size > RESERVED);
-    assert!(compact_size > RESERVED);
+    const RESERVED: usize = 0x1000;
+    assert!(meta_size as usize > RESERVED);
+    assert!(compact_size as usize > RESERVED);
     let mut dm = DynamicMem::new(meta_size, 0);
-    let compact_header: ObjPtr<CompactSpaceHeader> = ObjPtr::new_from_addr(0x0);
+    let compact_header = DiskAddress::null();
     dm.write(
-        compact_header.addr(),
-        &shale::to_dehydrated(&shale::compact::CompactSpaceHeader::new(RESERVED, RESERVED))
-            .unwrap(),
+        compact_header.into(),
+        &shale::to_dehydrated(&shale::compact::CompactSpaceHeader::new(
+            NonZeroUsize::new(RESERVED).unwrap(),
+            NonZeroUsize::new(RESERVED).unwrap(),
+        ))
+        .unwrap(),
     );
     let compact_header =
         StoredView::ptr_to_obj(&dm, compact_header, shale::compact::CompactHeader::MSIZE).unwrap();
@@ -140,7 +142,7 @@ pub fn new_merkle(
     let space =
         shale::compact::CompactSpace::new(mem_meta, mem_payload, compact_header, cache, 10, 16)
             .expect("CompactSpace init fail");
-    let mut root = ObjPtr::null();
+    let mut root = DiskAddress::null();
     Merkle::<CompactSpace<Node, DynamicMem>>::init_root(&mut root, &space).unwrap();
     MerkleSetup {
         root,

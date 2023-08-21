@@ -4,7 +4,7 @@
 use crate::proof::Proof;
 use enum_as_inner::EnumAsInner;
 use sha3::Digest;
-use shale::{CachedStore, ObjPtr, ObjRef, ShaleError, ShaleStore, Storable};
+use shale::{disk_address::DiskAddress, CachedStore, ObjRef, ShaleError, ShaleStore, Storable};
 use std::{
     collections::HashMap,
     error::Error,
@@ -60,7 +60,7 @@ impl std::ops::Deref for TrieHash {
 }
 
 impl Storable for TrieHash {
-    fn hydrate<T: CachedStore>(addr: u64, mem: &T) -> Result<Self, ShaleError> {
+    fn hydrate<T: CachedStore>(addr: usize, mem: &T) -> Result<Self, ShaleError> {
         let raw = mem
             .get_view(addr, Self::MSIZE)
             .ok_or(ShaleError::InvalidCacheView {
@@ -160,7 +160,7 @@ impl std::ops::Deref for Data {
 
 #[derive(PartialEq, Eq, Clone)]
 pub struct BranchNode {
-    chd: [Option<ObjPtr<Node>>; NBRANCH],
+    chd: [Option<DiskAddress>; NBRANCH],
     value: Option<Data>,
     chd_eth_rlp: [Option<Vec<u8>>; NBRANCH],
 }
@@ -170,7 +170,7 @@ impl Debug for BranchNode {
         write!(f, "[Branch")?;
         for (i, c) in self.chd.iter().enumerate() {
             if let Some(c) = c {
-                write!(f, " ({i:x} {c})")?;
+                write!(f, " ({i:x} {c:?})")?;
             }
         }
         for (i, c) in self.chd_eth_rlp.iter().enumerate() {
@@ -190,7 +190,7 @@ impl Debug for BranchNode {
 }
 
 impl BranchNode {
-    fn single_child(&self) -> (Option<(ObjPtr<Node>, u8)>, bool) {
+    fn single_child(&self) -> (Option<(DiskAddress, u8)>, bool) {
         let mut has_chd = false;
         let mut only_chd = None;
         for (i, c) in self.chd.iter().enumerate() {
@@ -248,7 +248,7 @@ impl BranchNode {
     }
 
     pub fn new(
-        chd: [Option<ObjPtr<Node>>; NBRANCH],
+        chd: [Option<DiskAddress>; NBRANCH],
         value: Option<Vec<u8>>,
         chd_eth_rlp: [Option<Vec<u8>>; NBRANCH],
     ) -> Self {
@@ -263,11 +263,11 @@ impl BranchNode {
         &self.value
     }
 
-    pub fn chd(&self) -> &[Option<ObjPtr<Node>>; NBRANCH] {
+    pub fn chd(&self) -> &[Option<DiskAddress>; NBRANCH] {
         &self.chd
     }
 
-    pub fn chd_mut(&mut self) -> &mut [Option<ObjPtr<Node>>; NBRANCH] {
+    pub fn chd_mut(&mut self) -> &mut [Option<DiskAddress>; NBRANCH] {
         &mut self.chd
     }
 
@@ -312,11 +312,11 @@ impl LeafNode {
 }
 
 #[derive(PartialEq, Eq, Clone)]
-pub struct ExtNode(PartialPath, ObjPtr<Node>, Option<Vec<u8>>);
+pub struct ExtNode(PartialPath, DiskAddress, Option<Vec<u8>>);
 
 impl Debug for ExtNode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        write!(f, "[Extension {:?} {} {:?}]", self.0, self.1, self.2)
+        write!(f, "[Extension {:?} {:?} {:?}]", self.0, self.1, self.2)
     }
 }
 
@@ -352,7 +352,7 @@ impl ExtNode {
         stream.out().into()
     }
 
-    pub fn new(path: Vec<u8>, chd: ObjPtr<Node>, chd_eth_rlp: Option<Vec<u8>>) -> Self {
+    pub fn new(path: Vec<u8>, chd: DiskAddress, chd_eth_rlp: Option<Vec<u8>>) -> Self {
         ExtNode(PartialPath(path), chd, chd_eth_rlp)
     }
 
@@ -360,11 +360,11 @@ impl ExtNode {
         &self.0
     }
 
-    pub fn chd(&self) -> ObjPtr<Node> {
+    pub fn chd(&self) -> DiskAddress {
         self.1
     }
 
-    pub fn chd_mut(&mut self) -> &mut ObjPtr<Node> {
+    pub fn chd_mut(&mut self) -> &mut DiskAddress {
         &mut self.1
     }
 
@@ -415,6 +415,7 @@ impl Clone for Node {
 }
 
 #[derive(PartialEq, Eq, Clone, Debug, EnumAsInner)]
+#[allow(clippy::large_enum_variant)]
 pub enum NodeType {
     Branch(BranchNode),
     Leaf(LeafNode),
@@ -444,7 +445,7 @@ impl Node {
                 eth_rlp_long: OnceLock::new(),
                 eth_rlp: OnceLock::new(),
                 inner: NodeType::Branch(BranchNode {
-                    chd: [Some(ObjPtr::null()); NBRANCH],
+                    chd: [Some(DiskAddress::null()); NBRANCH],
                     value: Some(Data(Vec::new())),
                     chd_eth_rlp: Default::default(),
                 }),
@@ -525,14 +526,14 @@ impl Node {
 }
 
 impl Storable for Node {
-    fn hydrate<T: CachedStore>(addr: u64, mem: &T) -> Result<Self, ShaleError> {
-        const META_SIZE: u64 = 32 + 1 + 1;
-        let meta_raw = mem
-            .get_view(addr, META_SIZE)
-            .ok_or(ShaleError::InvalidCacheView {
-                offset: addr,
-                size: META_SIZE,
-            })?;
+    fn hydrate<T: CachedStore>(addr: usize, mem: &T) -> Result<Self, ShaleError> {
+        const META_SIZE: usize = 32 + 1 + 1;
+        let meta_raw =
+            mem.get_view(addr, META_SIZE as u64)
+                .ok_or(ShaleError::InvalidCacheView {
+                    offset: addr,
+                    size: META_SIZE as u64,
+                })?;
         let attrs = meta_raw.as_deref()[32];
         let root_hash = if attrs & Node::ROOT_HASH_VALID_BIT == 0 {
             None
@@ -562,9 +563,9 @@ impl Storable for Node {
                 let mut buff = [0; 8];
                 for chd in chd.iter_mut() {
                     cur.read_exact(&mut buff)?;
-                    let addr = u64::from_le_bytes(buff);
+                    let addr = usize::from_le_bytes(buff);
                     if addr != 0 {
-                        *chd = Some(ObjPtr::new_from_addr(addr))
+                        *chd = Some(DiskAddress::from(addr))
                     }
                 }
                 cur.read_exact(&mut buff[..4])?;
@@ -574,9 +575,9 @@ impl Storable for Node {
                     None
                 } else {
                     Some(Data(
-                        mem.get_view(addr + META_SIZE + branch_header_size, raw_len)
+                        mem.get_view(addr + META_SIZE + branch_header_size as usize, raw_len)
                             .ok_or(ShaleError::InvalidCacheView {
-                                offset: addr + META_SIZE + branch_header_size,
+                                offset: addr + META_SIZE + branch_header_size as usize,
                                 size: raw_len,
                             })?
                             .as_deref(),
@@ -584,9 +585,9 @@ impl Storable for Node {
                 };
                 let mut chd_eth_rlp: [Option<Vec<u8>>; NBRANCH] = Default::default();
                 let offset = if raw_len == u32::MAX as u64 {
-                    addr + META_SIZE + branch_header_size
+                    addr + META_SIZE + branch_header_size as usize
                 } else {
-                    addr + META_SIZE + branch_header_size + raw_len
+                    addr + META_SIZE + branch_header_size as usize + raw_len as usize
                 };
                 let mut cur_rlp_len = 0;
                 for chd_rlp in chd_eth_rlp.iter_mut() {
@@ -610,7 +611,7 @@ impl Storable for Node {
                         )?;
                         let rlp: Vec<u8> = rlp_raw.as_deref()[0..].to_vec();
                         *chd_rlp = Some(rlp);
-                        cur_rlp_len += rlp_len
+                        cur_rlp_len += rlp_len as usize
                     }
                 }
 
@@ -640,9 +641,9 @@ impl Storable for Node {
                 let ptr = u64::from_le_bytes(buff);
 
                 let nibbles: Vec<u8> = mem
-                    .get_view(addr + META_SIZE + ext_header_size, path_len)
+                    .get_view(addr + META_SIZE + ext_header_size as usize, path_len)
                     .ok_or(ShaleError::InvalidCacheView {
-                        offset: addr + META_SIZE + ext_header_size,
+                        offset: addr + META_SIZE + ext_header_size as usize,
                         size: path_len,
                     })?
                     .as_deref()
@@ -654,9 +655,12 @@ impl Storable for Node {
 
                 let mut buff = [0_u8; 1];
                 let rlp_len_raw = mem
-                    .get_view(addr + META_SIZE + ext_header_size + path_len, 1)
+                    .get_view(
+                        addr + META_SIZE + ext_header_size as usize + path_len as usize,
+                        1,
+                    )
                     .ok_or(ShaleError::InvalidCacheView {
-                        offset: addr + META_SIZE + ext_header_size + path_len,
+                        offset: addr + META_SIZE + ext_header_size as usize + path_len as usize,
                         size: 1,
                     })?;
                 cur = Cursor::new(rlp_len_raw.as_deref());
@@ -664,9 +668,16 @@ impl Storable for Node {
                 let rlp_len = buff[0] as u64;
                 let rlp: Option<Vec<u8>> = if rlp_len != 0 {
                     let rlp_raw = mem
-                        .get_view(addr + META_SIZE + ext_header_size + path_len + 1, rlp_len)
+                        .get_view(
+                            addr + META_SIZE + ext_header_size as usize + path_len as usize + 1,
+                            rlp_len,
+                        )
                         .ok_or(ShaleError::InvalidCacheView {
-                            offset: addr + META_SIZE + ext_header_size + path_len + 1,
+                            offset: addr
+                                + META_SIZE
+                                + ext_header_size as usize
+                                + path_len as usize
+                                + 1,
                             size: rlp_len,
                         })?;
 
@@ -678,7 +689,7 @@ impl Storable for Node {
                 Ok(Self::new_from_hash(
                     root_hash,
                     eth_rlp_long,
-                    NodeType::Extension(ExtNode(path, ObjPtr::new_from_addr(ptr), rlp)),
+                    NodeType::Extension(ExtNode(path, DiskAddress::from(ptr as usize), rlp)),
                 ))
             }
             Self::LEAF_NODE => {
@@ -696,9 +707,12 @@ impl Storable for Node {
                 cur.read_exact(&mut buff)?;
                 let data_len = u32::from_le_bytes(buff) as u64;
                 let remainder = mem
-                    .get_view(addr + META_SIZE + leaf_header_size, path_len + data_len)
+                    .get_view(
+                        addr + META_SIZE + leaf_header_size as usize,
+                        path_len + data_len,
+                    )
                     .ok_or(ShaleError::InvalidCacheView {
-                        offset: addr + META_SIZE + leaf_header_size,
+                        offset: addr + META_SIZE + leaf_header_size as usize,
                         size: path_len + data_len,
                     })?;
 
@@ -778,7 +792,7 @@ impl Storable for Node {
                 cur.write_all(&[Self::BRANCH_NODE]).unwrap();
                 for c in n.chd.iter() {
                     cur.write_all(&match c {
-                        Some(p) => p.addr().to_le_bytes(),
+                        Some(p) => p.to_le_bytes(),
                         None => 0u64.to_le_bytes(),
                     })?;
                 }
@@ -808,7 +822,7 @@ impl Storable for Node {
                 cur.write_all(&[Self::EXT_NODE])?;
                 let path: Vec<u8> = from_nibbles(&n.0.encode(false)).collect();
                 cur.write_all(&[path.len() as u8])?;
-                cur.write_all(&n.1.addr().to_le_bytes())?;
+                cur.write_all(&n.1.to_le_bytes())?;
                 cur.write_all(&path)?;
                 if n.2.is_some() {
                     let rlp = n.2.as_ref().unwrap();
@@ -848,13 +862,13 @@ pub struct Merkle<S> {
 }
 
 impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
-    pub fn get_node(&self, ptr: ObjPtr<Node>) -> Result<ObjRef<Node>, MerkleError> {
+    pub fn get_node(&self, ptr: DiskAddress) -> Result<ObjRef<Node>, MerkleError> {
         self.store.get_item(ptr).map_err(MerkleError::Shale)
     }
     pub fn new_node(&self, item: Node) -> Result<ObjRef<Node>, MerkleError> {
         self.store.put_item(item, 0).map_err(MerkleError::Shale)
     }
-    fn free_node(&mut self, ptr: ObjPtr<Node>) -> Result<(), MerkleError> {
+    fn free_node(&mut self, ptr: DiskAddress) -> Result<(), MerkleError> {
         self.store.free_item(ptr).map_err(MerkleError::Shale)
     }
 }
@@ -865,7 +879,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
     }
 
     pub fn init_root(
-        root: &mut ObjPtr<Node>,
+        root: &mut DiskAddress,
         store: &dyn ShaleStore<Node>,
     ) -> Result<(), MerkleError> {
         *root = store
@@ -900,7 +914,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
 
     pub fn root_hash<T: ValueTransformer>(
         &self,
-        root: ObjPtr<Node>,
+        root: DiskAddress,
     ) -> Result<TrieHash, MerkleError> {
         let root = self
             .get_node(root)?
@@ -921,12 +935,11 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
         })
     }
 
-    fn dump_(&self, u: ObjPtr<Node>, w: &mut dyn Write) -> Result<(), MerkleError> {
+    fn dump_(&self, u: DiskAddress, w: &mut dyn Write) -> Result<(), MerkleError> {
         let u_ref = self.get_node(u)?;
         write!(
             w,
-            "{} => {}: ",
-            u,
+            "{u:?} => {}: ",
             match u_ref.root_hash.get() {
                 Some(h) => hex::encode(**h),
                 None => "<lazy>".to_string(),
@@ -949,7 +962,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
         Ok(())
     }
 
-    pub fn dump(&self, root: ObjPtr<Node>, w: &mut dyn Write) -> Result<(), MerkleError> {
+    pub fn dump(&self, root: DiskAddress, w: &mut dyn Write) -> Result<(), MerkleError> {
         if root.is_null() {
             write!(w, "<Empty>").map_err(MerkleError::Format)?;
         } else {
@@ -958,7 +971,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
         Ok(())
     }
 
-    fn set_parent(&self, new_chd: ObjPtr<Node>, parents: &mut [(ObjRef<'_, Node>, u8)]) {
+    fn set_parent(&self, new_chd: DiskAddress, parents: &mut [(ObjRef<'_, Node>, u8)]) {
         let (p_ref, idx) = parents.last_mut().unwrap();
         p_ref
             .write(|p| {
@@ -981,7 +994,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
         n_path: Vec<u8>,
         n_value: Option<Data>,
         val: Vec<u8>,
-        deleted: &mut Vec<ObjPtr<Node>>,
+        deleted: &mut Vec<DiskAddress>,
     ) -> Result<Option<Vec<u8>>, MerkleError> {
         let u_ptr = u_ref.as_ptr();
         let new_chd = match rem_path.iter().zip(n_path.iter()).position(|(a, b)| a != b) {
@@ -1153,7 +1166,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
         &mut self,
         key: K,
         val: Vec<u8>,
-        root: ObjPtr<Node>,
+        root: DiskAddress,
     ) -> Result<(), MerkleError> {
         // as we split a node, we need to track deleted nodes and parents
         let mut deleted = Vec::new();
@@ -1335,7 +1348,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
     fn after_remove_leaf(
         &self,
         parents: &mut Vec<(ObjRef<'_, Node>, u8)>,
-        deleted: &mut Vec<ObjPtr<Node>>,
+        deleted: &mut Vec<DiskAddress>,
     ) -> Result<(), MerkleError> {
         let (b_chd, val) = {
             let (mut b_ref, b_idx) = parents.pop().unwrap();
@@ -1510,9 +1523,9 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
 
     fn after_remove_branch(
         &self,
-        (c_ptr, idx): (ObjPtr<Node>, u8),
+        (c_ptr, idx): (DiskAddress, u8),
         parents: &mut Vec<(ObjRef<'_, Node>, u8)>,
-        deleted: &mut Vec<ObjPtr<Node>>,
+        deleted: &mut Vec<DiskAddress>,
     ) -> Result<(), MerkleError> {
         // [b] -> [u] -> [c]
         let (mut b_ref, b_idx) = parents.pop().unwrap();
@@ -1623,7 +1636,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
     pub fn remove<K: AsRef<[u8]>>(
         &mut self,
         key: K,
-        root: ObjPtr<Node>,
+        root: DiskAddress,
     ) -> Result<Option<Vec<u8>>, MerkleError> {
         let mut chunks = vec![0];
         chunks.extend(key.as_ref().iter().copied().flat_map(to_nibble_array));
@@ -1715,8 +1728,8 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
 
     fn remove_tree_(
         &self,
-        u: ObjPtr<Node>,
-        deleted: &mut Vec<ObjPtr<Node>>,
+        u: DiskAddress,
+        deleted: &mut Vec<DiskAddress>,
     ) -> Result<(), MerkleError> {
         let u_ref = self.get_node(u)?;
         match &u_ref.inner {
@@ -1732,7 +1745,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
         Ok(())
     }
 
-    pub fn remove_tree(&mut self, root: ObjPtr<Node>) -> Result<(), MerkleError> {
+    pub fn remove_tree(&mut self, root: DiskAddress) -> Result<(), MerkleError> {
         let mut deleted = Vec::new();
         if root.is_null() {
             return Ok(());
@@ -1747,7 +1760,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
     pub fn get_mut<K: AsRef<[u8]>>(
         &mut self,
         key: K,
-        root: ObjPtr<Node>,
+        root: DiskAddress,
     ) -> Result<Option<RefMut<S>>, MerkleError> {
         let mut chunks = vec![0];
         chunks.extend(key.as_ref().iter().copied().flat_map(to_nibble_array));
@@ -1819,7 +1832,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
     /// If the trie does not contain a value for key, the returned proof contains
     /// all nodes of the longest existing prefix of the key, ending with the node
     /// that proves the absence of the key (at least the root node).
-    pub fn prove<K, T>(&self, key: K, root: ObjPtr<Node>) -> Result<Proof, MerkleError>
+    pub fn prove<K, T>(&self, key: K, root: DiskAddress) -> Result<Proof, MerkleError>
     where
         K: AsRef<[u8]>,
         T: ValueTransformer,
@@ -1845,14 +1858,14 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
         };
 
         let mut nskip = 0;
-        let mut nodes: Vec<ObjPtr<Node>> = Vec::new();
+        let mut nodes: Vec<DiskAddress> = Vec::new();
         for (i, nib) in chunks.iter().enumerate() {
             if nskip > 0 {
                 nskip -= 1;
                 continue;
             }
             nodes.push(u_ref.as_ptr());
-            let next_ptr: ObjPtr<Node> = match &u_ref.inner {
+            let next_ptr: DiskAddress = match &u_ref.inner {
                 NodeType::Branch(n) => match n.chd[*nib as usize] {
                     Some(c) => c,
                     None => break,
@@ -1902,9 +1915,9 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
     pub fn get<K: AsRef<[u8]>>(
         &self,
         key: K,
-        root: ObjPtr<Node>,
+        root: DiskAddress,
     ) -> Result<Option<Ref>, MerkleError> {
-        // TODO: Make this NonNull<ObjPtr<Node>> or something similar
+        // TODO: Make this NonNull<DiskAddress> or something similar
         if root.is_null() {
             return Ok(None);
         }
@@ -1970,8 +1983,8 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
 pub struct Ref<'a>(ObjRef<'a, Node>);
 
 pub struct RefMut<'a, S> {
-    ptr: ObjPtr<Node>,
-    parents: Vec<(ObjPtr<Node>, u8)>,
+    ptr: DiskAddress,
+    parents: Vec<(DiskAddress, u8)>,
     merkle: &'a mut Merkle<S>,
 }
 
@@ -1987,7 +2000,7 @@ impl<'a> std::ops::Deref for Ref<'a> {
 }
 
 impl<'a, S: ShaleStore<Node> + Send + Sync> RefMut<'a, S> {
-    fn new(ptr: ObjPtr<Node>, parents: Vec<(ObjPtr<Node>, u8)>, merkle: &'a mut Merkle<S>) -> Self {
+    fn new(ptr: DiskAddress, parents: Vec<(DiskAddress, u8)>, merkle: &'a mut Merkle<S>) -> Self {
         Self {
             ptr,
             parents,
@@ -2128,7 +2141,7 @@ mod test {
         let chd0 = [None; NBRANCH];
         let mut chd1 = chd0;
         for node in chd1.iter_mut().take(NBRANCH / 2) {
-            *node = Some(ObjPtr::new_from_addr(0xa));
+            *node = Some(DiskAddress::from(0xa));
         }
         let mut chd_eth_rlp: [Option<Vec<u8>>; NBRANCH] = Default::default();
         for rlp in chd_eth_rlp.iter_mut().take(NBRANCH / 2) {
@@ -2148,7 +2161,7 @@ mod test {
                 None,
                 NodeType::Extension(ExtNode(
                     PartialPath(vec![0x1, 0x2, 0x3]),
-                    ObjPtr::new_from_addr(0x42),
+                    DiskAddress::from(0x42),
                     None,
                 )),
             ),
@@ -2157,7 +2170,7 @@ mod test {
                 None,
                 NodeType::Extension(ExtNode(
                     PartialPath(vec![0x1, 0x2, 0x3]),
-                    ObjPtr::null(),
+                    DiskAddress::null(),
                     Some(vec![0x1, 0x2, 0x3]),
                 )),
             ),

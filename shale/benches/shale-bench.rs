@@ -8,11 +8,12 @@ use rand::Rng;
 use shale::{
     cached::{DynamicMem, PlainMem},
     compact::CompactSpaceHeader,
-    CachedStore, ObjPtr, StoredView,
+    disk_address::DiskAddress,
+    CachedStore, Obj, StoredView,
 };
 use std::{fs::File, os::raw::c_int, path::Path};
 
-const BENCH_MEM_SIZE: u64 = 2_000_000;
+const BENCH_MEM_SIZE: usize = 2_000_000;
 
 // To enable flamegraph output
 // cargo bench --bench shale-bench -- --profile-time=N
@@ -59,7 +60,7 @@ fn get_view<C: CachedStore>(b: &mut Bencher, mut cached: C) {
         let len = rng.gen_range(0..26);
         let rdata = black_box(&"abcdefghijklmnopqrstuvwxyz".as_bytes()[..len]);
 
-        let offset = rng.gen_range(0..BENCH_MEM_SIZE - len as u64);
+        let offset = rng.gen_range(0..BENCH_MEM_SIZE - len);
 
         cached.write(offset, rdata);
         let view = cached
@@ -72,8 +73,8 @@ fn get_view<C: CachedStore>(b: &mut Bencher, mut cached: C) {
 }
 
 fn serialize<T: CachedStore>(m: &T) {
-    let compact_header_obj: ObjPtr<CompactSpaceHeader> = ObjPtr::new_from_addr(0x0);
-    let _compact_header =
+    let compact_header_obj: DiskAddress = DiskAddress::from(0x0);
+    let _: Obj<CompactSpaceHeader> =
         StoredView::ptr_to_obj(m, compact_header_obj, shale::compact::CompactHeader::MSIZE)
             .unwrap();
 }
@@ -81,11 +82,11 @@ fn serialize<T: CachedStore>(m: &T) {
 fn bench_cursors(c: &mut Criterion) {
     let mut group = c.benchmark_group("shale-bench");
     group.bench_function("PlainMem", |b| {
-        let mem = PlainMem::new(BENCH_MEM_SIZE, 0);
+        let mem = PlainMem::new(BENCH_MEM_SIZE as u64, 0);
         get_view(b, mem)
     });
     group.bench_function("DynamicMem", |b| {
-        let mem = DynamicMem::new(BENCH_MEM_SIZE, 0);
+        let mem = DynamicMem::new(BENCH_MEM_SIZE as u64, 0);
         get_view(b, mem)
     });
 }

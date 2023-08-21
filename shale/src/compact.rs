@@ -1,6 +1,8 @@
-use super::{CachedStore, Obj, ObjPtr, ObjRef, ShaleError, ShaleStore, Storable, StoredView};
+use super::disk_address::DiskAddress;
+use super::{CachedStore, Obj, ObjRef, ShaleError, ShaleStore, Storable, StoredView};
 use std::fmt::Debug;
 use std::io::{Cursor, Write};
+use std::num::NonZeroUsize;
 use std::ops::DerefMut;
 use std::sync::{Arc, RwLock};
 
@@ -8,7 +10,7 @@ use std::sync::{Arc, RwLock};
 pub struct CompactHeader {
     payload_size: u64,
     is_freed: bool,
-    desc_addr: ObjPtr<CompactDescriptor>,
+    desc_addr: DiskAddress,
 }
 
 impl CompactHeader {
@@ -23,7 +25,7 @@ impl CompactHeader {
 }
 
 impl Storable for CompactHeader {
-    fn hydrate<T: CachedStore>(addr: u64, mem: &T) -> Result<Self, ShaleError> {
+    fn hydrate<T: CachedStore>(addr: usize, mem: &T) -> Result<Self, ShaleError> {
         let raw = mem
             .get_view(addr, Self::MSIZE)
             .ok_or(ShaleError::InvalidCacheView {
@@ -34,11 +36,11 @@ impl Storable for CompactHeader {
             u64::from_le_bytes(raw.as_deref()[..8].try_into().expect("invalid slice"));
         let is_freed = raw.as_deref()[8] != 0;
         let desc_addr =
-            u64::from_le_bytes(raw.as_deref()[9..17].try_into().expect("invalid slice"));
+            usize::from_le_bytes(raw.as_deref()[9..17].try_into().expect("invalid slice"));
         Ok(Self {
             payload_size,
             is_freed,
-            desc_addr: ObjPtr::new(desc_addr),
+            desc_addr: DiskAddress(NonZeroUsize::new(desc_addr)),
         })
     }
 
@@ -50,7 +52,7 @@ impl Storable for CompactHeader {
         let mut cur = Cursor::new(to);
         cur.write_all(&self.payload_size.to_le_bytes())?;
         cur.write_all(&[if self.is_freed { 1 } else { 0 }])?;
-        cur.write_all(&self.desc_addr.addr().to_le_bytes())?;
+        cur.write_all(&self.desc_addr.to_le_bytes())?;
         Ok(())
     }
 }
@@ -65,7 +67,7 @@ impl CompactFooter {
 }
 
 impl Storable for CompactFooter {
-    fn hydrate<T: CachedStore>(addr: u64, mem: &T) -> Result<Self, ShaleError> {
+    fn hydrate<T: CachedStore>(addr: usize, mem: &T) -> Result<Self, ShaleError> {
         let raw = mem
             .get_view(addr, Self::MSIZE)
             .ok_or(ShaleError::InvalidCacheView {
@@ -89,7 +91,7 @@ impl Storable for CompactFooter {
 #[derive(Clone, Copy, Debug)]
 struct CompactDescriptor {
     payload_size: u64,
-    haddr: u64, // pointer to the payload of freed space
+    haddr: usize, // disk address of the free space
 }
 
 impl CompactDescriptor {
@@ -97,7 +99,7 @@ impl CompactDescriptor {
 }
 
 impl Storable for CompactDescriptor {
-    fn hydrate<T: CachedStore>(addr: u64, mem: &T) -> Result<Self, ShaleError> {
+    fn hydrate<T: CachedStore>(addr: usize, mem: &T) -> Result<Self, ShaleError> {
         let raw = mem
             .get_view(addr, Self::MSIZE)
             .ok_or(ShaleError::InvalidCacheView {
@@ -106,7 +108,7 @@ impl Storable for CompactDescriptor {
             })?;
         let payload_size =
             u64::from_le_bytes(raw.as_deref()[..8].try_into().expect("invalid slice"));
-        let haddr = u64::from_le_bytes(raw.as_deref()[8..].try_into().expect("invalid slice"));
+        let haddr = usize::from_le_bytes(raw.as_deref()[8..].try_into().expect("invalid slice"));
         Ok(Self {
             payload_size,
             haddr,
@@ -127,18 +129,18 @@ impl Storable for CompactDescriptor {
 
 #[derive(Debug)]
 pub struct CompactSpaceHeader {
-    meta_space_tail: u64,
-    compact_space_tail: u64,
-    base_addr: ObjPtr<CompactDescriptor>,
-    alloc_addr: ObjPtr<CompactDescriptor>,
+    meta_space_tail: DiskAddress,
+    compact_space_tail: DiskAddress,
+    base_addr: DiskAddress,
+    alloc_addr: DiskAddress,
 }
 
 #[derive(Debug)]
 struct CompactSpaceHeaderSliced {
-    meta_space_tail: Obj<U64Field>,
-    compact_space_tail: Obj<U64Field>,
-    base_addr: Obj<ObjPtr<CompactDescriptor>>,
-    alloc_addr: Obj<ObjPtr<CompactDescriptor>>,
+    meta_space_tail: Obj<DiskAddress>,
+    compact_space_tail: Obj<DiskAddress>,
+    base_addr: Obj<DiskAddress>,
+    alloc_addr: Obj<DiskAddress>,
 }
 
 impl CompactSpaceHeaderSliced {
@@ -153,19 +155,19 @@ impl CompactSpaceHeaderSliced {
 impl CompactSpaceHeader {
     pub const MSIZE: u64 = 32;
 
-    pub fn new(meta_base: u64, compact_base: u64) -> Self {
+    pub fn new(meta_base: NonZeroUsize, compact_base: NonZeroUsize) -> Self {
         Self {
-            meta_space_tail: meta_base,
-            compact_space_tail: compact_base,
-            base_addr: ObjPtr::new_from_addr(meta_base),
-            alloc_addr: ObjPtr::new_from_addr(meta_base),
+            meta_space_tail: DiskAddress::new(meta_base),
+            compact_space_tail: DiskAddress::new(compact_base),
+            base_addr: DiskAddress::new(meta_base),
+            alloc_addr: DiskAddress::new(meta_base),
         }
     }
 
     fn into_fields(r: Obj<Self>) -> Result<CompactSpaceHeaderSliced, ShaleError> {
         Ok(CompactSpaceHeaderSliced {
-            meta_space_tail: StoredView::slice(&r, 0, 8, U64Field(r.meta_space_tail))?,
-            compact_space_tail: StoredView::slice(&r, 8, 8, U64Field(r.compact_space_tail))?,
+            meta_space_tail: StoredView::slice(&r, 0, 8, r.meta_space_tail)?,
+            compact_space_tail: StoredView::slice(&r, 8, 8, r.compact_space_tail)?,
             base_addr: StoredView::slice(&r, 16, 8, r.base_addr)?,
             alloc_addr: StoredView::slice(&r, 24, 8, r.alloc_addr)?,
         })
@@ -173,26 +175,22 @@ impl CompactSpaceHeader {
 }
 
 impl Storable for CompactSpaceHeader {
-    fn hydrate<T: CachedStore + Debug>(addr: u64, mem: &T) -> Result<Self, ShaleError> {
+    fn hydrate<T: CachedStore + Debug>(addr: usize, mem: &T) -> Result<Self, ShaleError> {
         let raw = mem
             .get_view(addr, Self::MSIZE)
             .ok_or(ShaleError::InvalidCacheView {
                 offset: addr,
                 size: Self::MSIZE,
             })?;
-        let meta_space_tail =
-            u64::from_le_bytes(raw.as_deref()[..8].try_into().expect("invalid slice"));
-        let compact_space_tail =
-            u64::from_le_bytes(raw.as_deref()[8..16].try_into().expect("invalid slice"));
-        let base_addr =
-            u64::from_le_bytes(raw.as_deref()[16..24].try_into().expect("invalid slice"));
-        let alloc_addr =
-            u64::from_le_bytes(raw.as_deref()[24..].try_into().expect("invalid slice"));
+        let meta_space_tail = raw.as_deref()[..8].into();
+        let compact_space_tail = raw.as_deref()[8..16].into();
+        let base_addr = raw.as_deref()[16..24].into();
+        let alloc_addr = raw.as_deref()[24..].into();
         Ok(Self {
             meta_space_tail,
             compact_space_tail,
-            base_addr: ObjPtr::new_from_addr(base_addr),
-            alloc_addr: ObjPtr::new_from_addr(alloc_addr),
+            base_addr,
+            alloc_addr,
         })
     }
 
@@ -204,34 +202,32 @@ impl Storable for CompactSpaceHeader {
         let mut cur = Cursor::new(to);
         cur.write_all(&self.meta_space_tail.to_le_bytes())?;
         cur.write_all(&self.compact_space_tail.to_le_bytes())?;
-        cur.write_all(&self.base_addr.addr().to_le_bytes())?;
-        cur.write_all(&self.alloc_addr.addr().to_le_bytes())?;
+        cur.write_all(&self.base_addr.to_le_bytes())?;
+        cur.write_all(&self.alloc_addr.to_le_bytes())?;
         Ok(())
     }
 }
 
-struct ObjPtrField<T>(ObjPtr<T>);
+struct ObjPtrField(DiskAddress);
 
-impl<T> ObjPtrField<T> {
+impl ObjPtrField {
     const MSIZE: u64 = 8;
 }
 
-impl<T> Storable for ObjPtrField<T> {
-    fn hydrate<U: CachedStore>(addr: u64, mem: &U) -> Result<Self, ShaleError> {
+impl Storable for ObjPtrField {
+    fn hydrate<U: CachedStore>(addr: usize, mem: &U) -> Result<Self, ShaleError> {
         let raw = mem
             .get_view(addr, Self::MSIZE)
             .ok_or(ShaleError::InvalidCacheView {
                 offset: addr,
                 size: Self::MSIZE,
             })?;
-        let obj_ptr = ObjPtr::new_from_addr(u64::from_le_bytes(
-            <[u8; 8]>::try_from(&raw.as_deref()[0..8]).expect("invalid slice"),
-        ));
+        let obj_ptr = raw.as_deref()[0..8].into();
         Ok(Self(obj_ptr))
     }
 
     fn dehydrate(&self, to: &mut [u8]) -> Result<(), ShaleError> {
-        Cursor::new(to).write_all(&self.0.addr().to_le_bytes())?;
+        Cursor::new(to).write_all(&self.to_le_bytes())?;
         Ok(())
     }
 
@@ -240,15 +236,15 @@ impl<T> Storable for ObjPtrField<T> {
     }
 }
 
-impl<T> std::ops::Deref for ObjPtrField<T> {
-    type Target = ObjPtr<T>;
-    fn deref(&self) -> &ObjPtr<T> {
+impl std::ops::Deref for ObjPtrField {
+    type Target = DiskAddress;
+    fn deref(&self) -> &DiskAddress {
         &self.0
     }
 }
 
-impl<T> std::ops::DerefMut for ObjPtrField<T> {
-    fn deref_mut(&mut self) -> &mut ObjPtr<T> {
+impl std::ops::DerefMut for ObjPtrField {
+    fn deref_mut(&mut self) -> &mut DiskAddress {
         &mut self.0
     }
 }
@@ -261,7 +257,7 @@ impl U64Field {
 }
 
 impl Storable for U64Field {
-    fn hydrate<U: CachedStore>(addr: u64, mem: &U) -> Result<Self, ShaleError> {
+    fn hydrate<U: CachedStore>(addr: usize, mem: &U) -> Result<Self, ShaleError> {
         let raw = mem
             .get_view(addr, Self::MSIZE)
             .ok_or(ShaleError::InvalidCacheView {
@@ -305,57 +301,54 @@ struct CompactSpaceInner<T: Send + Sync, M> {
 }
 
 impl<T: Storable + Send + Sync, M: CachedStore> CompactSpaceInner<T, M> {
-    fn get_descriptor(
-        &self,
-        ptr: ObjPtr<CompactDescriptor>,
-    ) -> Result<Obj<CompactDescriptor>, ShaleError> {
+    fn get_descriptor(&self, ptr: DiskAddress) -> Result<Obj<CompactDescriptor>, ShaleError> {
         StoredView::ptr_to_obj(self.meta_space.as_ref(), ptr, CompactDescriptor::MSIZE)
     }
 
     fn get_data_ref<U: Storable + Debug + Send + Sync + 'static>(
         &self,
-        ptr: ObjPtr<U>,
+        ptr: DiskAddress,
         len_limit: u64,
     ) -> Result<Obj<U>, ShaleError> {
         StoredView::ptr_to_obj(self.compact_space.as_ref(), ptr, len_limit)
     }
 
-    fn get_header(&self, ptr: ObjPtr<CompactHeader>) -> Result<Obj<CompactHeader>, ShaleError> {
+    fn get_header(&self, ptr: DiskAddress) -> Result<Obj<CompactHeader>, ShaleError> {
         self.get_data_ref::<CompactHeader>(ptr, CompactHeader::MSIZE)
     }
 
-    fn get_footer(&self, ptr: ObjPtr<CompactFooter>) -> Result<Obj<CompactFooter>, ShaleError> {
+    fn get_footer(&self, ptr: DiskAddress) -> Result<Obj<CompactFooter>, ShaleError> {
         self.get_data_ref::<CompactFooter>(ptr, CompactFooter::MSIZE)
     }
 
-    fn del_desc(&mut self, desc_addr: ObjPtr<CompactDescriptor>) -> Result<(), ShaleError> {
+    fn del_desc(&mut self, desc_addr: DiskAddress) -> Result<(), ShaleError> {
         let desc_size = CompactDescriptor::MSIZE;
-        debug_assert!((desc_addr.addr - self.header.base_addr.addr) % desc_size == 0);
+        // TODO: subtracting two disk addresses is only used here, probably can rewrite this
+        // debug_assert!((desc_addr.0 - self.header.base_addr.value.into()) % desc_size == 0);
         self.header
             .meta_space_tail
-            .write(|r| **r -= desc_size)
+            .write(|r| *r -= desc_size as usize)
             .unwrap();
 
-        if desc_addr.addr != **self.header.meta_space_tail {
-            let desc_last =
-                self.get_descriptor(ObjPtr::new_from_addr(**self.header.meta_space_tail))?;
-            let mut desc = self.get_descriptor(ObjPtr::new_from_addr(desc_addr.addr))?;
+        if desc_addr != DiskAddress(**self.header.meta_space_tail) {
+            let desc_last = self.get_descriptor(**self.header.meta_space_tail.value)?;
+            let mut desc = self.get_descriptor(desc_addr)?;
             desc.write(|r| *r = *desc_last).unwrap();
-            let mut header = self.get_header(ObjPtr::new(desc.haddr))?;
+            let mut header = self.get_header(desc.haddr.into())?;
             header.write(|h| h.desc_addr = desc_addr).unwrap();
         }
 
         Ok(())
     }
 
-    fn new_desc(&mut self) -> Result<ObjPtr<CompactDescriptor>, ShaleError> {
+    fn new_desc(&mut self) -> Result<DiskAddress, ShaleError> {
         let addr = **self.header.meta_space_tail;
         self.header
             .meta_space_tail
-            .write(|r| **r += CompactDescriptor::MSIZE)
+            .write(|r| *r += CompactDescriptor::MSIZE as usize)
             .unwrap();
 
-        Ok(ObjPtr::new_from_addr(addr))
+        Ok(DiskAddress(addr))
     }
 
     fn free(&mut self, addr: u64) -> Result<(), ShaleError> {
@@ -365,7 +358,7 @@ impl<T: Storable + Send + Sync, M: CachedStore> CompactSpaceInner<T, M> {
 
         let mut offset = addr - hsize;
         let header_payload_size = {
-            let header = self.get_header(ObjPtr::new(offset))?;
+            let header = self.get_header(DiskAddress::from(offset as usize))?;
             assert!(!header.is_freed);
             header.payload_size
         };
@@ -376,9 +369,9 @@ impl<T: Storable + Send + Sync, M: CachedStore> CompactSpaceInner<T, M> {
             // merge with lower data segment
             offset -= fsize;
             let (pheader_is_freed, pheader_payload_size, pheader_desc_addr) = {
-                let pfooter = self.get_footer(ObjPtr::new(offset))?;
+                let pfooter = self.get_footer(DiskAddress::from(offset as usize))?;
                 offset -= pfooter.payload_size + hsize;
-                let pheader = self.get_header(ObjPtr::new(offset))?;
+                let pheader = self.get_header(DiskAddress::from(offset as usize))?;
                 (pheader.is_freed, pheader.payload_size, pheader.desc_addr)
             };
             if pheader_is_freed {
@@ -391,20 +384,20 @@ impl<T: Storable + Send + Sync, M: CachedStore> CompactSpaceInner<T, M> {
         offset = addr + header_payload_size;
         let mut f = offset;
 
-        if offset + fsize < **self.header.compact_space_tail
+        if offset + fsize < self.header.compact_space_tail.unwrap().get() as u64
             && (regn_size - (offset & (regn_size - 1))) >= fsize + hsize
         {
             // merge with higher data segment
             offset += fsize;
             let (nheader_is_freed, nheader_payload_size, nheader_desc_addr) = {
-                let nheader = self.get_header(ObjPtr::new(offset))?;
+                let nheader = self.get_header(DiskAddress::from(offset as usize))?;
                 (nheader.is_freed, nheader.payload_size, nheader.desc_addr)
             };
             if nheader_is_freed {
                 offset += hsize + nheader_payload_size;
                 f = offset;
                 {
-                    let nfooter = self.get_footer(ObjPtr::new(offset))?;
+                    let nfooter = self.get_footer(DiskAddress::from(offset as usize))?;
                     assert!(nheader_payload_size == nfooter.payload_size);
                 }
                 payload_size += hsize + fsize + nheader_payload_size;
@@ -417,12 +410,12 @@ impl<T: Storable + Send + Sync, M: CachedStore> CompactSpaceInner<T, M> {
             let mut desc = self.get_descriptor(desc_addr)?;
             desc.write(|d| {
                 d.payload_size = payload_size;
-                d.haddr = h;
+                d.haddr = h as usize;
             })
             .unwrap();
         }
-        let mut h = self.get_header(ObjPtr::new(h))?;
-        let mut f = self.get_footer(ObjPtr::new(f))?;
+        let mut h = self.get_header(DiskAddress::from(h as usize))?;
+        let mut f = self.get_footer(DiskAddress::from(f as usize))?;
         h.write(|h| {
             h.payload_size = payload_size;
             h.is_freed = true;
@@ -435,44 +428,44 @@ impl<T: Storable + Send + Sync, M: CachedStore> CompactSpaceInner<T, M> {
     }
 
     fn alloc_from_freed(&mut self, length: u64) -> Result<Option<u64>, ShaleError> {
-        let tail = **self.header.meta_space_tail;
-        if tail == self.header.base_addr.addr {
+        let tail = *self.header.meta_space_tail;
+        if tail == *self.header.base_addr {
             return Ok(None);
         }
 
-        let hsize = CompactHeader::MSIZE;
-        let fsize = CompactFooter::MSIZE;
-        let dsize = CompactDescriptor::MSIZE;
+        let hsize = CompactHeader::MSIZE as usize;
+        let fsize = CompactFooter::MSIZE as usize;
+        let dsize = CompactDescriptor::MSIZE as usize;
 
         let mut old_alloc_addr = *self.header.alloc_addr;
 
-        if old_alloc_addr.addr >= tail {
+        if old_alloc_addr >= tail {
             old_alloc_addr = *self.header.base_addr;
         }
 
         let mut ptr = old_alloc_addr;
         let mut res: Option<u64> = None;
         for _ in 0..self.alloc_max_walk {
-            assert!(ptr.addr < tail);
+            assert!(ptr < tail);
             let (desc_payload_size, desc_haddr) = {
                 let desc = self.get_descriptor(ptr)?;
-                (desc.payload_size, desc.haddr)
+                (desc.payload_size as usize, desc.haddr)
             };
-            let exit = if desc_payload_size == length {
+            let exit = if desc_payload_size == length as usize {
                 // perfect match
                 {
-                    let mut header = self.get_header(ObjPtr::new(desc_haddr))?;
-                    assert_eq!(header.payload_size, desc_payload_size);
+                    let mut header = self.get_header(DiskAddress::from(desc_haddr))?;
+                    assert_eq!(header.payload_size as usize, desc_payload_size);
                     assert!(header.is_freed);
                     header.write(|h| h.is_freed = false).unwrap();
                 }
                 self.del_desc(ptr)?;
                 true
-            } else if desc_payload_size > length + hsize + fsize {
+            } else if desc_payload_size > length as usize + hsize + fsize {
                 // able to split
                 {
-                    let mut lheader = self.get_header(ObjPtr::new(desc_haddr))?;
-                    assert_eq!(lheader.payload_size, desc_payload_size);
+                    let mut lheader = self.get_header(DiskAddress::from(desc_haddr))?;
+                    assert_eq!(lheader.payload_size as usize, desc_payload_size);
                     assert!(lheader.is_freed);
                     lheader
                         .write(|h| {
@@ -482,37 +475,40 @@ impl<T: Storable + Send + Sync, M: CachedStore> CompactSpaceInner<T, M> {
                         .unwrap();
                 }
                 {
-                    let mut lfooter = self.get_footer(ObjPtr::new(desc_haddr + hsize + length))?;
+                    let mut lfooter =
+                        self.get_footer(DiskAddress::from(desc_haddr + hsize + length as usize))?;
                     //assert!(lfooter.payload_size == desc_payload_size);
                     lfooter.write(|f| f.payload_size = length).unwrap();
                 }
 
-                let offset = desc_haddr + hsize + length + fsize;
-                let rpayload_size = desc_payload_size - length - fsize - hsize;
+                let offset = desc_haddr + hsize + length as usize + fsize;
+                let rpayload_size = desc_payload_size - length as usize - fsize - hsize;
                 let rdesc_addr = self.new_desc()?;
                 {
                     let mut rdesc = self.get_descriptor(rdesc_addr)?;
                     rdesc
                         .write(|rd| {
-                            rd.payload_size = rpayload_size;
+                            rd.payload_size = rpayload_size as u64;
                             rd.haddr = offset;
                         })
                         .unwrap();
                 }
                 {
-                    let mut rheader = self.get_header(ObjPtr::new(offset))?;
+                    let mut rheader = self.get_header(DiskAddress::from(offset))?;
                     rheader
                         .write(|rh| {
                             rh.is_freed = true;
-                            rh.payload_size = rpayload_size;
+                            rh.payload_size = rpayload_size as u64;
                             rh.desc_addr = rdesc_addr;
                         })
                         .unwrap();
                 }
                 {
                     let mut rfooter =
-                        self.get_footer(ObjPtr::new(offset + hsize + rpayload_size))?;
-                    rfooter.write(|f| f.payload_size = rpayload_size).unwrap();
+                        self.get_footer(DiskAddress::from(offset + hsize + rpayload_size))?;
+                    rfooter
+                        .write(|f| f.payload_size = rpayload_size as u64)
+                        .unwrap();
                 }
                 self.del_desc(ptr)?;
                 true
@@ -521,11 +517,11 @@ impl<T: Storable + Send + Sync, M: CachedStore> CompactSpaceInner<T, M> {
             };
             if exit {
                 self.header.alloc_addr.write(|r| *r = ptr).unwrap();
-                res = Some(desc_haddr + hsize);
+                res = Some((desc_haddr + hsize) as u64);
                 break;
             }
-            ptr.addr += dsize;
-            if ptr.addr >= tail {
+            ptr += dsize;
+            if ptr >= tail {
                 ptr = *self.header.base_addr;
             }
             if ptr == old_alloc_addr {
@@ -538,29 +534,29 @@ impl<T: Storable + Send + Sync, M: CachedStore> CompactSpaceInner<T, M> {
     fn alloc_new(&mut self, length: u64) -> Result<u64, ShaleError> {
         let regn_size = 1 << self.regn_nbit;
         let total_length = CompactHeader::MSIZE + length + CompactFooter::MSIZE;
-        let mut offset = **self.header.compact_space_tail;
+        let mut offset = *self.header.compact_space_tail;
         self.header
             .compact_space_tail
             .write(|r| {
                 // an item is always fully in one region
-                let rem = regn_size - (offset & (regn_size - 1));
-                if rem < total_length {
+                let rem = regn_size - (offset & (regn_size - 1)).get();
+                if rem < total_length as usize {
                     offset += rem;
-                    **r += rem;
+                    *r += rem;
                 }
-                **r += total_length
+                *r += total_length as usize
             })
             .unwrap();
-        let mut h = self.get_header(ObjPtr::new(offset))?;
-        let mut f = self.get_footer(ObjPtr::new(offset + CompactHeader::MSIZE + length))?;
+        let mut h = self.get_header(offset)?;
+        let mut f = self.get_footer(offset + CompactHeader::MSIZE as usize + length as usize)?;
         h.write(|h| {
             h.payload_size = length;
             h.is_freed = false;
-            h.desc_addr = ObjPtr::new(0);
+            h.desc_addr = DiskAddress::null();
         })
         .unwrap();
         f.write(|f| f.payload_size = length).unwrap();
-        Ok(offset + CompactHeader::MSIZE)
+        Ok((offset + CompactHeader::MSIZE as usize).0.unwrap().get() as u64)
     }
 }
 
@@ -597,7 +593,7 @@ impl<T: Storable + Send + Sync + Debug + 'static, M: CachedStore + Send + Sync> 
 {
     fn put_item<'a>(&'a self, item: T, extra: u64) -> Result<ObjRef<'a, T>, ShaleError> {
         let size = item.dehydrated_len() + extra;
-        let ptr: ObjPtr<T> = {
+        let ptr: DiskAddress = {
             let mut inner = self.inner.write().unwrap();
             let addr = if let Some(addr) = inner.alloc_from_freed(size)? {
                 addr
@@ -605,13 +601,13 @@ impl<T: Storable + Send + Sync + Debug + 'static, M: CachedStore + Send + Sync> 
                 inner.alloc_new(size)?
             };
 
-            ObjPtr::new_from_addr(addr)
+            DiskAddress::from(addr as usize)
         };
         let inner = self.inner.read().unwrap();
 
         let mut u: ObjRef<'a, T> = inner.obj_cache.put(StoredView::item_to_obj(
             inner.compact_space.as_ref(),
-            ptr.addr(),
+            ptr.into(),
             size,
             item,
         )?);
@@ -621,13 +617,13 @@ impl<T: Storable + Send + Sync + Debug + 'static, M: CachedStore + Send + Sync> 
         Ok(u)
     }
 
-    fn free_item(&mut self, ptr: ObjPtr<T>) -> Result<(), ShaleError> {
+    fn free_item(&mut self, ptr: DiskAddress) -> Result<(), ShaleError> {
         let mut inner = self.inner.write().unwrap();
         inner.obj_cache.pop(ptr);
-        inner.free(ptr.addr())
+        inner.free(ptr.unwrap().get() as u64)
     }
 
-    fn get_item(&self, ptr: ObjPtr<T>) -> Result<ObjRef<'_, T>, ShaleError> {
+    fn get_item(&self, ptr: DiskAddress) -> Result<ObjRef<'_, T>, ShaleError> {
         let inner = {
             let inner = self.inner.read().unwrap();
             let obj_ref = inner
@@ -641,15 +637,15 @@ impl<T: Storable + Send + Sync + Debug + 'static, M: CachedStore + Send + Sync> 
             inner
         };
 
-        if ptr.addr() < CompactSpaceHeader::MSIZE {
+        if ptr < DiskAddress::from(CompactSpaceHeader::MSIZE as usize) {
             return Err(ShaleError::InvalidAddressLength {
-                expected: CompactSpaceHeader::MSIZE,
-                found: ptr.addr(),
+                expected: DiskAddress::from(CompactSpaceHeader::MSIZE as usize),
+                found: ptr.0.unwrap().get() as u64,
             });
         }
 
         let payload_size = inner
-            .get_header(ObjPtr::new(ptr.addr() - CompactHeader::MSIZE))?
+            .get_header(ptr - CompactHeader::MSIZE as usize)?
             .payload_size;
 
         Ok(inner.obj_cache.put(inner.get_data_ref(ptr, payload_size)?))
@@ -688,7 +684,7 @@ mod tests {
     }
 
     impl Storable for Hash {
-        fn hydrate<T: CachedStore>(addr: u64, mem: &T) -> Result<Self, ShaleError> {
+        fn hydrate<T: CachedStore>(addr: usize, mem: &T) -> Result<Self, ShaleError> {
             let raw = mem
                 .get_view(addr, Self::MSIZE)
                 .ok_or(ShaleError::InvalidCacheView {
@@ -715,22 +711,26 @@ mod tests {
 
     #[test]
     fn test_space_item() {
-        const META_SIZE: u64 = 0x10000;
-        const COMPACT_SIZE: u64 = 0x10000;
-        const RESERVED: u64 = 0x1000;
+        let meta_size: NonZeroUsize = NonZeroUsize::new(0x10000).unwrap();
+        let compact_size: NonZeroUsize = NonZeroUsize::new(0x10000).unwrap();
+        let reserved: DiskAddress = 0x1000.into();
 
-        let mut dm = DynamicMem::new(META_SIZE, 0x0);
+        let mut dm = DynamicMem::new(meta_size.get() as u64, 0x0);
 
         // initialize compact space
-        let compact_header: ObjPtr<CompactSpaceHeader> = ObjPtr::new_from_addr(0x1);
+        let compact_header = DiskAddress::from(0x1);
         dm.write(
-            compact_header.addr(),
-            &crate::to_dehydrated(&CompactSpaceHeader::new(RESERVED, RESERVED)).unwrap(),
+            compact_header.unwrap().get(),
+            &crate::to_dehydrated(&CompactSpaceHeader::new(
+                reserved.0.unwrap(),
+                reserved.0.unwrap(),
+            ))
+            .unwrap(),
         );
         let compact_header =
             StoredView::ptr_to_obj(&dm, compact_header, CompactHeader::MSIZE).unwrap();
         let mem_meta = Arc::new(dm);
-        let mem_payload = Arc::new(DynamicMem::new(COMPACT_SIZE, 0x1));
+        let mem_payload = Arc::new(DynamicMem::new(compact_size.get() as u64, 0x1));
 
         let cache: ObjCache<Hash> = ObjCache::new(1);
         let space =
@@ -740,9 +740,9 @@ mod tests {
         let data = b"hello world";
         let hash: [u8; HASH_SIZE] = sha3::Keccak256::digest(data).into();
         let obj_ref = space.put_item(Hash(hash), 0).unwrap();
-        assert_eq!(obj_ref.as_ptr().addr(), 4113);
+        assert_eq!(obj_ref.as_ptr(), DiskAddress::from(4113));
         // create hash ptr from address and attempt to read dirty write.
-        let hash_ref = space.get_item(ObjPtr::new_from_addr(4113)).unwrap();
+        let hash_ref = space.get_item(DiskAddress::from(4113)).unwrap();
         // read before flush results in zeroed hash
         assert_eq!(hash_ref.as_ref(), ZERO_HASH.as_ref());
         // not cached
@@ -750,29 +750,26 @@ mod tests {
             .cache
             .lock()
             .cached
-            .get(&ObjPtr::new_from_addr(4113))
+            .get(&DiskAddress::from(4113))
             .is_none());
         // pinned
         assert!(obj_ref
             .cache
             .lock()
             .pinned
-            .get(&ObjPtr::new_from_addr(4113))
+            .get(&DiskAddress::from(4113))
             .is_some());
         // dirty
         assert!(obj_ref
             .cache
             .lock()
             .dirty
-            .get(&ObjPtr::new_from_addr(4113))
+            .get(&DiskAddress::from(4113))
             .is_some());
         drop(obj_ref);
         // write is visible
         assert_eq!(
-            space
-                .get_item(ObjPtr::new_from_addr(4113))
-                .unwrap()
-                .as_ref(),
+            space.get_item(DiskAddress::from(4113)).unwrap().as_ref(),
             hash
         );
     }

@@ -8,7 +8,7 @@ use crate::merkle_util::*;
 use nix::errno::Errno;
 use serde::{Deserialize, Serialize};
 use sha3::Digest;
-use shale::ObjPtr;
+use shale::disk_address::DiskAddress;
 use shale::ShaleError;
 use shale::ShaleStore;
 
@@ -561,7 +561,7 @@ impl Proof {
         key: &[u8],
         buf: &[u8],
         end_node: bool,
-    ) -> Result<(ObjPtr<Node>, Option<SubProof>, usize), ProofError> {
+    ) -> Result<(DiskAddress, Option<SubProof>, usize), ProofError> {
         let rlp = rlp::Rlp::new(buf);
         let size = rlp.item_count()?;
 
@@ -681,11 +681,11 @@ fn get_ext_ptr<S: ShaleStore<Node> + Send + Sync>(
     term: bool,
     Data(data): Data,
     CurKey(cur_key): CurKey,
-) -> Result<ObjPtr<Node>, ProofError> {
+) -> Result<DiskAddress, ProofError> {
     let node = if term {
         NodeType::Leaf(LeafNode::new(cur_key, data))
     } else {
-        NodeType::Extension(ExtNode::new(cur_key, ObjPtr::null(), Some(data)))
+        NodeType::Extension(ExtNode::new(cur_key, DiskAddress::null(), Some(data)))
     };
 
     merkle
@@ -698,7 +698,7 @@ fn build_branch_ptr<S: ShaleStore<Node> + Send + Sync>(
     merkle: &Merkle<S>,
     value: Option<Vec<u8>>,
     chd_eth_rlp: [Option<Vec<u8>>; NBRANCH],
-) -> Result<ObjPtr<Node>, ProofError> {
+) -> Result<DiskAddress, ProofError> {
     let node = BranchNode::new([None; NBRANCH], value, chd_eth_rlp);
     let node = NodeType::Branch(node);
     let node = Node::new(node);
@@ -736,7 +736,7 @@ fn unset_internal<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync>(
     let root = merkle_setup.get_root();
     let merkle = merkle_setup.get_merkle_mut();
     let mut u_ref = merkle.get_node(root).map_err(|_| ProofError::NoSuchNode)?;
-    let mut parent = ObjPtr::null();
+    let mut parent = DiskAddress::null();
 
     let mut fork_left: Ordering = Ordering::Equal;
     let mut fork_right: Ordering = Ordering::Equal;
@@ -922,7 +922,7 @@ fn unset_internal<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync>(
                 p_ref
                     .write(|p| match p.inner_mut() {
                         NodeType::Extension(n) => {
-                            *n.chd_mut() = ObjPtr::null();
+                            *n.chd_mut() = DiskAddress::null();
                             *n.chd_eth_rlp_mut() = None;
                         }
                         NodeType::Branch(n) => {
@@ -969,8 +969,8 @@ fn unset_internal<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync>(
 //     unset the entire branch.
 fn unset_node_ref<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync>(
     merkle: &Merkle<S>,
-    parent: ObjPtr<Node>,
-    node: Option<ObjPtr<Node>>,
+    parent: DiskAddress,
+    node: Option<DiskAddress>,
     key: K,
     index: usize,
     remove_left: bool,
@@ -1084,7 +1084,7 @@ fn unset_node_ref<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync>(
                 p_ref
                     .write(|p| match p.inner_mut() {
                         NodeType::Extension(n) => {
-                            *n.chd_mut() = ObjPtr::null();
+                            *n.chd_mut() = DiskAddress::null();
                             *n.chd_eth_rlp_mut() = None;
                         }
                         NodeType::Branch(n) => {

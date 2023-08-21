@@ -363,10 +363,10 @@ impl StoreRevShared {
 impl CachedStore for StoreRevShared {
     fn get_view(
         &self,
-        offset: u64,
+        offset: usize,
         length: u64,
     ) -> Option<Box<dyn CachedView<DerefReturn = Vec<u8>>>> {
-        let data = self.0.get_slice(offset, length)?;
+        let data = self.0.get_slice(offset as u64, length)?;
         Some(Box::new(StoreRef { data }))
     }
 
@@ -374,7 +374,7 @@ impl CachedStore for StoreRevShared {
         Box::new(StoreShared(self.clone()))
     }
 
-    fn write(&mut self, _offset: u64, _change: &[u8]) {
+    fn write(&mut self, _offset: usize, _change: &[u8]) {
         // StoreRevShared is a read-only view version of CachedStore
         // Writes could be induced by lazy hashing and we can just ignore those
     }
@@ -499,17 +499,17 @@ impl StoreRevMut {
 impl CachedStore for StoreRevMut {
     fn get_view(
         &self,
-        offset: u64,
+        offset: usize,
         length: u64,
     ) -> Option<Box<dyn CachedView<DerefReturn = Vec<u8>>>> {
         let data = if length == 0 {
             Vec::new()
         } else {
-            let end = offset + length - 1;
-            let s_pid = offset >> PAGE_SIZE_NBIT;
-            let s_off = (offset & PAGE_MASK) as usize;
-            let e_pid = end >> PAGE_SIZE_NBIT;
-            let e_off = (end & PAGE_MASK) as usize;
+            let end = offset + length as usize - 1;
+            let s_pid = (offset >> PAGE_SIZE_NBIT) as u64;
+            let s_off = offset & PAGE_MASK as usize;
+            let e_pid = (end >> PAGE_SIZE_NBIT) as u64;
+            let e_off = end & PAGE_MASK as usize;
             let deltas = &self.deltas.read().pages;
             let prev_deltas = &self.prev_deltas.read().pages;
             if s_pid == e_pid {
@@ -517,7 +517,7 @@ impl CachedStore for StoreRevMut {
                     Some(p) => p[s_off..e_off + 1].to_vec(),
                     None => match prev_deltas.get(&s_pid) {
                         Some(p) => p[s_off..e_off + 1].to_vec(),
-                        None => self.base_space.get_slice(offset, length)?,
+                        None => self.base_space.get_slice(offset as u64, length)?,
                     },
                 }
             } else {
@@ -527,7 +527,7 @@ impl CachedStore for StoreRevMut {
                         Some(p) => p[s_off..].to_vec(),
                         None => self
                             .base_space
-                            .get_slice(offset, PAGE_SIZE - s_off as u64)?,
+                            .get_slice(offset as u64, PAGE_SIZE - s_off as u64)?,
                     },
                 };
                 for p in s_pid + 1..e_pid {
@@ -561,20 +561,21 @@ impl CachedStore for StoreRevMut {
         Box::new(StoreShared(self.clone()))
     }
 
-    fn write(&mut self, offset: u64, mut change: &[u8]) {
+    fn write(&mut self, offset: usize, mut change: &[u8]) {
         let length = change.len() as u64;
-        let end = offset + length - 1;
+        let end = offset + length as usize - 1;
         let s_pid = offset >> PAGE_SIZE_NBIT;
-        let s_off = (offset & PAGE_MASK) as usize;
+        let s_off = offset & PAGE_MASK as usize;
         let e_pid = end >> PAGE_SIZE_NBIT;
-        let e_off = (end & PAGE_MASK) as usize;
+        let e_off = end & PAGE_MASK as usize;
         let mut undo: Vec<u8> = Vec::new();
         let redo: Box<[u8]> = change.into();
 
         if s_pid == e_pid {
             let mut deltas = self.deltas.write();
-            let slice = &mut self.get_page_mut(deltas.deref_mut(), &self.prev_deltas.read(), s_pid)
-                [s_off..e_off + 1];
+            let slice =
+                &mut self.get_page_mut(deltas.deref_mut(), &self.prev_deltas.read(), s_pid as u64)
+                    [s_off..e_off + 1];
             undo.extend(&*slice);
             slice.copy_from_slice(change)
         } else {
@@ -582,9 +583,11 @@ impl CachedStore for StoreRevMut {
 
             {
                 let mut deltas = self.deltas.write();
-                let slice =
-                    &mut self.get_page_mut(deltas.deref_mut(), &self.prev_deltas.read(), s_pid)
-                        [s_off..];
+                let slice = &mut self.get_page_mut(
+                    deltas.deref_mut(),
+                    &self.prev_deltas.read(),
+                    s_pid as u64,
+                )[s_off..];
                 undo.extend(&*slice);
                 slice.copy_from_slice(&change[..len]);
             }
@@ -593,14 +596,16 @@ impl CachedStore for StoreRevMut {
 
             let mut deltas = self.deltas.write();
             for p in s_pid + 1..e_pid {
-                let slice = self.get_page_mut(deltas.deref_mut(), &self.prev_deltas.read(), p);
+                let slice =
+                    self.get_page_mut(deltas.deref_mut(), &self.prev_deltas.read(), p as u64);
                 undo.extend(&*slice);
                 slice.copy_from_slice(&change[..PAGE_SIZE as usize]);
                 change = &change[PAGE_SIZE as usize..];
             }
 
-            let slice = &mut self.get_page_mut(deltas.deref_mut(), &self.prev_deltas.read(), e_pid)
-                [..e_off + 1];
+            let slice =
+                &mut self.get_page_mut(deltas.deref_mut(), &self.prev_deltas.read(), e_pid as u64)
+                    [..e_off + 1];
             undo.extend(&*slice);
             slice.copy_from_slice(change);
         }
@@ -608,10 +613,13 @@ impl CachedStore for StoreRevMut {
         let plain = &mut self.deltas.write().plain;
         assert!(undo.len() == redo.len());
         plain.undo.push(SpaceWrite {
-            offset,
+            offset: offset as u64,
             data: undo.into(),
         });
-        plain.redo.push(SpaceWrite { offset, data: redo });
+        plain.redo.push(SpaceWrite {
+            offset: offset as u64,
+            data: redo,
+        });
     }
 
     fn id(&self) -> SpaceId {
@@ -664,14 +672,20 @@ fn test_from_ash() {
         let rev = StoreRevShared::from_ash(z, &writes);
         println!("{rev:?}");
         assert_eq!(
-            rev.get_view(min, max - min).as_deref().unwrap().as_deref(),
+            rev.get_view(min as usize, max - min)
+                .as_deref()
+                .unwrap()
+                .as_deref(),
             canvas
         );
         for _ in 0..2 * n {
             let l = rng.gen_range(min..max);
             let r = rng.gen_range(l + 1..max);
             assert_eq!(
-                rev.get_view(l, r - l).as_deref().unwrap().as_deref(),
+                rev.get_view(l as usize, r - l)
+                    .as_deref()
+                    .unwrap()
+                    .as_deref(),
                 canvas[(l - min) as usize..(r - min) as usize]
             );
         }
