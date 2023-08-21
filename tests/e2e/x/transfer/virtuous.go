@@ -82,22 +82,9 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 						testKeys[i], testKeys[j] = testKeys[j], testKeys[i]
 					})
 				}
-				keyChain := secp256k1fx.NewKeychain(testKeys...)
 
-				var baseWallet primary.Wallet
-				var err error
-				ginkgo.By("setting up a base wallet", func() {
-					walletURI := e2e.Env.GetRandomNodeURI()
-
-					// 5-second is enough to fetch initial UTXOs for test cluster in "primary.MakeWallet"
-					ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultWalletCreationTimeout)
-					baseWallet, err = primary.MakeWallet(ctx, &primary.WalletConfig{
-						URI:      walletURI,
-						Keychain: keyChain,
-					})
-					cancel()
-					gomega.Expect(err).Should(gomega.BeNil())
-				})
+				keychain := secp256k1fx.NewKeychain(testKeys...)
+				baseWallet := e2e.Env.NewWallet(keychain)
 				avaxAssetID := baseWallet.X().AVAXAssetID()
 
 				wallets := make([]primary.Wallet, len(testKeys))
@@ -167,7 +154,7 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 
 				ginkgo.By("X-Chain transfer with wrong amount must fail", func() {
 					ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
-					_, err = wallets[fromIdx].X().IssueBaseTx(
+					_, err := wallets[fromIdx].X().IssueBaseTx(
 						[]*avax.TransferableOutput{{
 							Asset: avax.Asset{
 								ID: avaxAssetID,

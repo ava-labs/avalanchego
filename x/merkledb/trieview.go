@@ -36,10 +36,11 @@ var (
 	ErrOddLengthWithValue = errors.New(
 		"the underlying db only supports whole number of byte keys, so cannot record changes with odd nibble length",
 	)
-	ErrGetPathToFailure = errors.New("GetPathTo failed to return the closest node")
-	ErrStartAfterEnd    = errors.New("start key > end key")
-	ErrViewIsNotAChild  = errors.New("passed in view is required to be a child of the current view")
-	ErrNoValidRoot      = errors.New("a valid root was not provided to the trieView constructor")
+	ErrGetPathToFailure  = errors.New("GetPathTo failed to return the closest node")
+	ErrStartAfterEnd     = errors.New("start key > end key")
+	ErrViewIsNotAChild   = errors.New("passed in view is required to be a child of the current view")
+	ErrNoValidRoot       = errors.New("a valid root was not provided to the trieView constructor")
+	ErrParentNotDatabase = errors.New("parent trie is not database")
 
 	numCPU = runtime.NumCPU()
 )
@@ -487,105 +488,6 @@ func (t *trieView) CommitToDB(ctx context.Context) error {
 	return t.commitToDB(ctx)
 }
 
-// Adds the changes from [trieToCommit] to this trie.
-// Assumes [trieToCommit.lock] is held if trieToCommit is not nil.
-func (t *trieView) commitChanges(ctx context.Context, trieToCommit *trieView) error {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-
-	_, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.commitChanges", oteltrace.WithAttributes(
-		attribute.Int("changeCount", len(t.changes.values)),
-	))
-	defer span.End()
-
-	switch {
-	case t.isInvalid():
-		// don't apply changes to an invalid view
-		return ErrInvalid
-	case trieToCommit == nil:
-		// no changes to apply
-		return nil
-	case trieToCommit.getParentTrie() != t:
-		// trieToCommit needs to be a child of t, otherwise the changes merge would not work
-		return ErrViewIsNotAChild
-	case trieToCommit.isInvalid():
-		// don't apply changes from an invalid view
-		return ErrInvalid
-	}
-
-	// Invalidate all child views except the view being committed.
-	// Note that we invalidate children before modifying their ancestor [t]
-	// to uphold the invariant on [t.invalidated].
-	t.invalidateChildrenExcept(trieToCommit)
-
-	if err := trieToCommit.calculateNodeIDs(ctx); err != nil {
-		return err
-	}
-
-	for key, nodeChange := range trieToCommit.changes.nodes {
-		if existing, ok := t.changes.nodes[key]; ok {
-			existing.after = nodeChange.after
-		} else {
-			t.changes.nodes[key] = &change[*node]{
-				before: nodeChange.before,
-				after:  nodeChange.after,
-			}
-		}
-	}
-
-	for key, valueChange := range trieToCommit.changes.values {
-		if existing, ok := t.changes.values[key]; ok {
-			existing.after = valueChange.after
-		} else {
-			t.changes.values[key] = &change[maybe.Maybe[[]byte]]{
-				before: valueChange.before,
-				after:  valueChange.after,
-			}
-		}
-	}
-	// update this view's root info to match the newly committed root
-	t.root = trieToCommit.root
-	t.changes.rootID = trieToCommit.changes.rootID
-
-	// move the children from the incoming trieview to the current trieview
-	// do this after the current view has been updated
-	// this allows child views calls to their parent to remain consistent during the move
-	t.moveChildViewsToView(trieToCommit)
-
-	return nil
-}
-
-// commitToParent commits the changes from this view to its parent Trie
-// assumes [t.lock] is held
-func (t *trieView) commitToParent(ctx context.Context) error {
-	ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.commitToParent")
-	defer span.End()
-
-	if t.isInvalid() {
-		return ErrInvalid
-	}
-	if t.committed {
-		return ErrCommitted
-	}
-
-	// ensure all of this view's changes have been calculated
-	if err := t.calculateNodeIDs(ctx); err != nil {
-		return err
-	}
-
-	// write this view's changes into its parent
-	if err := t.getParentTrie().commitChanges(ctx, t); err != nil {
-		return err
-	}
-	if t.isInvalid() {
-		return ErrInvalid
-	}
-
-	t.committed = true
-
-	return nil
-}
-
 // Commits the changes from [trieToCommit] to this view,
 // this view to its parent, and so on until committing to the db.
 // Assumes [t.db.commitLock] is held.
@@ -598,13 +500,19 @@ func (t *trieView) commitToDB(ctx context.Context) error {
 	))
 	defer span.End()
 
-	// first merge changes into the parent trie
-	if err := t.commitToParent(ctx); err != nil {
+	// Call this here instead of in [t.db.commitChanges]
+	// because doing so there would be a deadlock.
+	if err := t.calculateNodeIDs(ctx); err != nil {
 		return err
 	}
 
-	// now commit the parent trie to the db
-	return t.getParentTrie().commitToDB(ctx)
+	if err := t.db.commitChanges(ctx, t); err != nil {
+		return err
+	}
+
+	t.committed = true
+
+	return nil
 }
 
 // Assumes [t.validityTrackingLock] isn't held.
@@ -635,21 +543,6 @@ func (t *trieView) invalidate() {
 // Assumes [t.validityTrackingLock] isn't held.
 func (t *trieView) invalidateChildren() {
 	t.invalidateChildrenExcept(nil)
-}
-
-// moveChildViewsToView removes any child views from the trieToCommit and moves them to the current trie view
-func (t *trieView) moveChildViewsToView(trieToCommit *trieView) {
-	t.validityTrackingLock.Lock()
-	defer t.validityTrackingLock.Unlock()
-
-	trieToCommit.validityTrackingLock.Lock()
-	defer trieToCommit.validityTrackingLock.Unlock()
-
-	for _, childView := range trieToCommit.childViews {
-		childView.updateParent(t)
-		t.childViews = append(t.childViews, childView)
-	}
-	trieToCommit.childViews = make([]*trieView, 0, defaultPreallocationSize)
 }
 
 func (t *trieView) updateParent(newParent TrieView) {

@@ -128,6 +128,5 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// Run in every ginkgo process
 
 	// Initialize the local test environment from the global state
-	e2e.Env = e2e.TestEnvironment{}
-	require.NoError(ginkgo.GinkgoT(), json.Unmarshal(envBytes, &e2e.Env))
+	e2e.InitTestEnvironment(envBytes)
 })
