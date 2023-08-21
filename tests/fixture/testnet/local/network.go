@@ -106,8 +106,8 @@ func (ln *LocalNetwork) GetNodes() []testnet.Node {
 	return nodes
 }
 
-// Internal method supporting AddNode and AddEphemeralNode in creating a backend-agnostic node.
-func (ln *LocalNetwork) addNode(w io.Writer, flags testnet.FlagsMap, isEphemeral bool) (testnet.Node, error) {
+// Adds a backend-agnostic ephemeral node to the network
+func (ln *LocalNetwork) AddEphemeralNode(w io.Writer, flags testnet.FlagsMap) (testnet.Node, error) {
 	if flags == nil {
 		flags = testnet.FlagsMap{}
 	}
@@ -115,17 +115,7 @@ func (ln *LocalNetwork) addNode(w io.Writer, flags testnet.FlagsMap, isEphemeral
 		NodeConfig: testnet.NodeConfig{
 			Flags: flags,
 		},
-	}, isEphemeral)
-}
-
-// Adds a backend-agnostic node to the network
-func (ln *LocalNetwork) AddNode(w io.Writer, flags testnet.FlagsMap) (testnet.Node, error) {
-	return ln.addNode(w, flags, false /* isEphemeral */)
-}
-
-// Adds a backend-agnostic ephemeral node to the network
-func (ln *LocalNetwork) AddEphemeralNode(w io.Writer, flags testnet.FlagsMap) (testnet.Node, error) {
-	return ln.addNode(w, flags, true /* isEphemeral */)
+	}, true /* isEphemeral */)
 }
 
 // Starts a new network stored under the provided root dir. Required
