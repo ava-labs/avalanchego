@@ -31,6 +31,94 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
+func TestRewardsBounds(t *testing.T) {
+	// validator and delegators compounding should not breach weight constraits.
+	// This test checks it
+	require := require.New(t)
+	env := newEnvironmentNoValidator(t, latestFork)
+	defer func() {
+		_ = shutdownEnvironment(env)
+	}()
+
+	var (
+		nodeID          = ids.GenerateTestNodeID()
+		restakeFraction = uint32(reward.PercentDenominator)
+
+		delegatorDuration = defaultMinStakingDuration
+		validatorDuration = delegatorDuration * 256
+		dummyStartTime    = time.Unix(0, 0)
+
+		authKey = preFundedKeys[4]
+		addr    = authKey.PublicKey().Address()
+	)
+
+	// Add a continuous validator
+	validatorData := txs.Validator{
+		NodeID: nodeID,
+		Start:  uint64(dummyStartTime.Unix()),
+		End:    uint64(dummyStartTime.Add(validatorDuration).Unix()),
+		Wght:   env.config.MaxValidatorStake - env.config.MinDelegatorStake,
+	}
+	_, _, err := addContinuousValidator(
+		env,
+		validatorData,
+		restakeFraction,
+		authKey,
+		addr,
+		addr,
+	)
+	require.NoError(err)
+
+	// Create the delegator tx
+	delegatorData := txs.Validator{
+		NodeID: nodeID,
+		Start:  uint64(dummyStartTime.Unix()),
+		End:    uint64(dummyStartTime.Add(delegatorDuration).Unix()),
+		Wght:   env.config.MinDelegatorStake,
+	}
+	_, continuousDelTxID, err := addContinuousDelegator(
+		env,
+		delegatorData,
+		restakeFraction,
+		authKey,
+		addr,
+		addr,
+	)
+	require.NoError(err)
+
+	// check total validator weight does not exceed MaxValidatorStake
+	val, err := env.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+	require.NoError(err)
+
+	delIt, err := env.state.GetCurrentDelegatorIterator(constants.PrimaryNetworkID, nodeID)
+	require.NoError(err)
+	require.True(delIt.Next())
+	del := delIt.Value()
+	delIt.Release()
+
+	require.True(val.Weight+del.Weight <= env.config.MaxValidatorStake)
+
+	// advance time
+	chainTime := env.state.GetTimestamp()
+	nextChainTime := chainTime.Add(delegatorDuration)
+	env.state.SetTimestamp(nextChainTime)
+
+	// create and execute reward tx
+	require.NoError(issueReward(env, continuousDelTxID, true /*commit*/))
+
+	// check total validator weight does not exceed MaxValidatorStake
+	val, err = env.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+	require.NoError(err)
+
+	delIt, err = env.state.GetCurrentDelegatorIterator(constants.PrimaryNetworkID, nodeID)
+	require.NoError(err)
+	require.True(delIt.Next())
+	del = delIt.Value()
+	delIt.Release()
+
+	require.True(val.Weight+del.Weight <= env.config.MaxValidatorStake)
+}
+
 func TestRewardsChecksRewardValidatorAndDelegator(t *testing.T) {
 	properties := gopter.NewProperties(nil)
 
