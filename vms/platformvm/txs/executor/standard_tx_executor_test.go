@@ -1306,7 +1306,7 @@ func TestStandardTxExecutorStopContinuousValidator(t *testing.T) {
 
 	var (
 		nodeID            = ids.GenerateTestNodeID()
-		validatorDuration = defaultMinStakingDuration
+		validatorDuration = defaultMinStakingDuration * 2 // times 2 to allow clean stopping
 		dummyStartTime    = time.Unix(0, 0)
 		dummyEndTime      = time.Unix(0, 0).Add(validatorDuration)
 

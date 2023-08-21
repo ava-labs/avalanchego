@@ -46,6 +46,8 @@ var (
 	ErrFiniteDelegatorToContinuousValidator        = errors.New("cannot assign finite delegator to continuous validator")
 	ErrContinuousDelegatorToNonContinuousValidator = errors.New("cannot assign continuous delegator to non continuous validator")
 	ErrNoStakerToStop                              = errors.New("could not find staker to stop")
+	ErrStakerAlreadyStopped                        = errors.New("staker already stopped")
+	ErrValidatorLateStopping                       = errors.New("cannot stop validator too close to end of current staking period")
 )
 
 // verifyAddValidatorTx carries out the validation for an AddValidatorTx.
@@ -1017,7 +1019,7 @@ func verifyAddContinuousDelegatorTx(
 
 	// Candidate delegator period checks:
 	// * delegator first period must be bounded by validator first period
-	// * delegator period must be a power of two divisor of validator period
+	// * delegator period must be a power of two multiple of validator evaluation Period
 	if !txs.BoundedBy(
 		newStaker.StartTime,
 		newStaker.NextTime,
@@ -1026,7 +1028,9 @@ func verifyAddContinuousDelegatorTx(
 	) {
 		return time.Time{}, time.Time{}, 0, ErrPeriodMismatch
 	}
-	if err := checkContinuousDelegatorPeriod(validator.StakingPeriod, newStaker.StakingPeriod); err != nil {
+
+	validatorEvaluationPeriod := state.CalculateEvaluationPeriod(validator, delegatorRules.minStakeDuration)
+	if err := checkContinuousDelegatorPeriod(newStaker.StakingPeriod, validatorEvaluationPeriod); err != nil {
 		return time.Time{}, time.Time{}, 0, err
 	}
 
@@ -1100,6 +1104,29 @@ func verifyStopStakerTx(
 	}
 
 	if backend.Bootstrapped.Get() {
+		if !stakerToStop.ShouldRestake() {
+			// As a general rule we don't allow double stopping. There is an exception:
+			// a delegator may be stopped as result of its validator stopping.
+			// In such a casa we do allow stopping the delegator again if stopping time
+			// is changed. Otherwise no double stopping.
+			return nil, time.Time{}, fmt.Errorf("%w, staker id %v", ErrStakerAlreadyStopped, tx.TxID)
+		}
+
+		// Validators can't be stopped if they're too close to end of current staking period
+		var minStakingPeriod time.Duration
+		if stakerToStop.Priority.IsValidator() {
+			rules, err := getValidatorRules(backend, chainState, stakerToStop.SubnetID)
+			if err != nil {
+				return nil, time.Time{}, err
+			}
+			minStakingPeriod = rules.minStakeDuration
+
+			evalPeriod := state.CalculateEvaluationPeriod(stakerToStop, minStakingPeriod)
+			if !currentTimestamp.Before(stakerToStop.NextTime.Add(-evalPeriod)) {
+				return nil, time.Time{}, ErrValidatorLateStopping
+			}
+		}
+
 		// We can skip full verification during bootstrap.
 		baseTxCreds, err := verifyStopStakerAuthorization(backend, chainState, sTx, txID, tx.StakerAuth)
 		if err != nil {

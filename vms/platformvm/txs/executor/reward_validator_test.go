@@ -269,7 +269,7 @@ func TestRewardsChecksRewardValidator(t *testing.T) {
 		nodeID   = ids.GenerateTestNodeID()
 		subnetID = constants.PrimaryNetworkID
 
-		stakingPeriod  = defaultMinStakingDuration
+		stakingPeriod  = defaultMinStakingDuration * 2 // times 2 to allow stopping
 		dummyStartTime = time.Unix(0, 0)
 
 		authKey   = preFundedKeys[4]
@@ -353,7 +353,7 @@ func TestRewardsChecksRewardValidator(t *testing.T) {
 					return "unexpected preShiftStakeBalance"
 				}
 
-				// check reward is fully (for now) given back while shifting
+				// check reward is fully given back while shifting
 				postShiftRewardBalance, err := avax.GetBalance(env.state, rewardOwners)
 				if err != nil {
 					return err.Error()
@@ -461,7 +461,7 @@ func TestShiftChecksRewardValidator(t *testing.T) {
 		nodeID   = ids.GenerateTestNodeID()
 		subnetID = constants.PrimaryNetworkID
 
-		validatorDuration = defaultMinStakingDuration
+		validatorDuration = defaultMinStakingDuration * 2 // times 2 to allow stopping
 		dummyStartTime    = time.Unix(0, 0)
 
 		authKey = preFundedKeys[4]

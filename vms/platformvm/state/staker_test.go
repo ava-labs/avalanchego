@@ -427,3 +427,35 @@ func TestNonPrimaryNetworkValidatorStopTimes(t *testing.T) {
 	require.Equal(stopTime, staker.NextTime)
 	require.Equal(stopTime, staker.EndTime)
 }
+
+func TestEvaluationPeriod(t *testing.T) {
+	var (
+		minStakingDuration = time.Hour * 24 * 14 // two weeks
+		dummyStart         = time.Now()
+		dummyEnd           = mockable.MaxTime
+	)
+
+	// test: stakingPeriod --> evaluationPeriod
+	tests := map[time.Duration]time.Duration{
+		minStakingDuration:                 minStakingDuration,
+		2 * minStakingDuration:             minStakingDuration,
+		2*minStakingDuration + time.Second: 2*minStakingDuration + time.Second,
+		3 * minStakingDuration:             3 * minStakingDuration / 2,
+		4*minStakingDuration - time.Second: 4*minStakingDuration - time.Second,
+		4 * minStakingDuration:             minStakingDuration,
+		16 * minStakingDuration:            minStakingDuration,
+		time.Hour * 24 * 365:               22*24*time.Hour + 19*time.Hour + 30*time.Minute,
+	}
+
+	for period, expectedEvalPeriod := range tests {
+		staker := &Staker{
+			Priority:      txs.PrimaryNetworkContinuousValidatorCurrentPriority,
+			StartTime:     dummyStart,
+			StakingPeriod: period,
+			NextTime:      dummyStart.Add(period),
+			EndTime:       dummyEnd,
+		}
+		evalPeriod := CalculateEvaluationPeriod(staker, minStakingDuration)
+		require.Equal(t, expectedEvalPeriod, evalPeriod)
+	}
+}

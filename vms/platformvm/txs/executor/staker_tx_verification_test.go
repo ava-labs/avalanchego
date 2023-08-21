@@ -774,6 +774,78 @@ func TestVerifyStopContinuousValidatorTx(t *testing.T) {
 			expectedErr: ErrNoStakerToStop,
 		},
 		{
+			name: "staker already stopped",
+			backendF: func(ctrl *gomock.Controller) *Backend {
+				bootstrapped := &utils.Atomic[bool]{}
+				bootstrapped.Set(true)
+
+				return &Backend{
+					Config:       &primaryNetworkCfg,
+					Ctx:          snow.DefaultContextTest(),
+					Bootstrapped: bootstrapped,
+				}
+			},
+			stateF: func(ctrl *gomock.Controller) state.Chain {
+				mockState := state.NewMockChain(ctrl)
+				mockState.EXPECT().GetTimestamp().Return(time.Unix(0, 0))
+				currentStakerIter := state.NewMockStakerIterator(ctrl)
+
+				stoppedValidator := *primaryValidator
+				stoppedValidator.EndTime = stoppedValidator.NextTime
+
+				// round to find staker to stop
+				currentStakerIter.EXPECT().Next().Return(true)
+				currentStakerIter.EXPECT().Value().Return(&stoppedValidator)
+				currentStakerIter.EXPECT().Release()
+
+				mockState.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil).AnyTimes()
+				return mockState
+			},
+			sTxF: func() *txs.Tx {
+				return &verifiedSignedTx
+			},
+			txF: func() *txs.StopStakerTx {
+				return &verifiedTx
+			},
+			expectedErr: ErrStakerAlreadyStopped,
+		},
+		{
+			name: "cannot stop staker too close to end of current staking period",
+			backendF: func(ctrl *gomock.Controller) *Backend {
+				bootstrapped := &utils.Atomic[bool]{}
+				bootstrapped.Set(true)
+
+				return &Backend{
+					Config:       &primaryNetworkCfg,
+					Ctx:          snow.DefaultContextTest(),
+					Bootstrapped: bootstrapped,
+				}
+			},
+			stateF: func(ctrl *gomock.Controller) state.Chain {
+				mockState := state.NewMockChain(ctrl)
+
+				evalPeriod := state.CalculateEvaluationPeriod(primaryValidator, primaryNetworkCfg.MinStakeDuration)
+				chainTime := primaryValidator.NextTime.Add(-evalPeriod)
+				mockState.EXPECT().GetTimestamp().Return(chainTime)
+				currentStakerIter := state.NewMockStakerIterator(ctrl)
+
+				// round to find staker to stop
+				currentStakerIter.EXPECT().Next().Return(true)
+				currentStakerIter.EXPECT().Value().Return(primaryValidator)
+				currentStakerIter.EXPECT().Release()
+
+				mockState.EXPECT().GetCurrentStakerIterator().Return(currentStakerIter, nil).AnyTimes()
+				return mockState
+			},
+			sTxF: func() *txs.Tx {
+				return &verifiedSignedTx
+			},
+			txF: func() *txs.StopStakerTx {
+				return &verifiedTx
+			},
+			expectedErr: ErrValidatorLateStopping,
+		},
+		{
 			name: "failed staker stop verification",
 			backendF: func(ctrl *gomock.Controller) *Backend {
 				bootstrapped := &utils.Atomic[bool]{}

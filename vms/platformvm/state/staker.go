@@ -136,11 +136,6 @@ func NewCurrentStaker(
 
 	stakingPeriod := stakerTx.StakingPeriod()
 	nextTime := startTime.Add(stakingPeriod)
-	if nextTime.After(endTime) {
-		// delegators may be sometimes shorten up to avoid
-		// possibly outliving their validator
-		nextTime = endTime
-	}
 
 	return &Staker{
 		TxID:            txID,
@@ -210,6 +205,35 @@ func IncreaseStakerWeightInPlace(s *Staker, newStakerWeight uint64) {
 	}
 
 	s.Weight = newStakerWeight
+}
+
+func CalculateEvaluationPeriod(s *Staker, minStakingDuration time.Duration) time.Duration {
+	if !s.Priority.IsContinuousValidator() {
+		// evaluation period concept does not apply. Consider erroing
+		return minStakingDuration
+	}
+
+	var (
+		divisor    = int64(1)
+		evalPeriod = s.StakingPeriod
+	)
+
+	// evaluation period is the smallest power of 2 divisor of s.StakingPeriod
+	// which is larger than minStakingDuration
+	for {
+		div := time.Second * time.Duration(divisor)
+		if s.StakingPeriod%div != 0 {
+			break
+		}
+		candidateEvalPeriod := s.StakingPeriod / time.Duration(divisor)
+		if candidateEvalPeriod < minStakingDuration {
+			break
+		}
+		divisor *= 2
+		evalPeriod = candidateEvalPeriod
+	}
+
+	return evalPeriod
 }
 
 func NewPendingStaker(txID ids.ID, stakerTx txs.PreContinuousStakingStaker) (*Staker, error) {
