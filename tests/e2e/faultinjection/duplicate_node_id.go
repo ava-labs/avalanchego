@@ -5,12 +5,13 @@ package faultinjection
 
 import (
 	"context"
+	"fmt"
 
 	ginkgo "github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/api/info"
-	cfg "github.com/ava-labs/avalanchego/config"
+	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/testnet"
@@ -25,7 +26,7 @@ var _ = ginkgo.Describe("Duplicate node handling", func() {
 		nodes := network.GetNodes()
 
 		ginkgo.By("creating new node")
-		node1 := e2e.AddTemporaryNode(network, testnet.FlagsMap{})
+		node1 := e2e.AddEphemeralNode(network, testnet.FlagsMap{})
 		e2e.WaitForHealthy(node1)
 
 		ginkgo.By("checking that the new node is connected to its peers")
@@ -34,10 +35,14 @@ var _ = ginkgo.Describe("Duplicate node handling", func() {
 		ginkgo.By("creating a second new node with the same staking keypair as the first new node")
 		node1Flags := node1.GetConfig().Flags
 		node2Flags := testnet.FlagsMap{
-			cfg.StakingTLSKeyContentKey: node1Flags[cfg.StakingTLSKeyContentKey],
-			cfg.StakingCertContentKey:   node1Flags[cfg.StakingCertContentKey],
+			config.StakingTLSKeyContentKey: node1Flags[config.StakingTLSKeyContentKey],
+			config.StakingCertContentKey:   node1Flags[config.StakingCertContentKey],
+			// Construct a unique data dir to ensure the two nodes' data will be stored
+			// separately. Usually the dir name is the node ID but in this one case the nodes have
+			// the same node ID.
+			config.DataDirKey: fmt.Sprintf("%s-second", node1Flags[config.DataDirKey]),
 		}
-		node2 := e2e.AddTemporaryNode(network, node2Flags)
+		node2 := e2e.AddEphemeralNode(network, node2Flags)
 
 		ginkgo.By("checking that the second new node fails to become healthy within timeout")
 		ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultNodeStartTimeout)

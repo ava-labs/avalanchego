@@ -186,15 +186,16 @@ func (n *LocalNode) Start(w io.Writer, defaultExecPath string) error {
 		return err
 	}
 
-	// A temporary node directory won't match its node name.
-	isTemporaryNode := filepath.Base(n.GetDataDir()) != n.NodeID.String()
-	var nodeDescription string
-	if isTemporaryNode {
-		// Qualify the description for a temporary node with its path
-		// since it won't be stored in the network's directory.
-		nodeDescription = fmt.Sprintf("temporary node %q with path: %s", n.NodeID, n.GetDataDir())
-	} else {
-		nodeDescription = fmt.Sprintf("node %q", n.NodeID)
+	// Determine appropriate level of node description detail
+	nodeDescription := fmt.Sprintf("node %q", n.NodeID)
+	isEphemeralNode := filepath.Base(filepath.Dir(n.GetDataDir())) == defaultEphemeralDirName
+	if isEphemeralNode {
+		nodeDescription = "ephemeral " + nodeDescription
+	}
+	nonDefaultNodeDir := filepath.Base(n.GetDataDir()) != n.NodeID.String()
+	if nonDefaultNodeDir {
+		// Only include the data dir if its base is not the default (the node ID)
+		nodeDescription = fmt.Sprintf("%s with path: %s", nodeDescription, n.GetDataDir())
 	}
 
 	go func() {
@@ -364,18 +365,6 @@ func (n *LocalNode) WaitForProcessContext(ctx context.Context) error {
 			return fmt.Errorf("failed to load process context for node %q before timeout: %w", n.NodeID, ctx.Err())
 		case <-ticker.C:
 		}
-	}
-	return nil
-}
-
-// Ensure the node is stopped and its configuration removed.
-func (n *LocalNode) Remove() error {
-	// Ensure the node is stopped before removing its configuration
-	if err := n.Stop(); err != nil {
-		return fmt.Errorf("failed to stop node %q: %w", n.NodeID, err)
-	}
-	if err := os.RemoveAll(n.GetDataDir()); err != nil {
-		return fmt.Errorf("failed to remove configuration for node %q: %w", n.NodeID, err)
 	}
 	return nil
 }

@@ -16,6 +16,7 @@ type Network interface {
 	GetConfig() NetworkConfig
 	GetNodes() []Node
 	AddNode(w io.Writer, flags FlagsMap) (Node, error)
+	AddEphemeralNode(w io.Writer, flags FlagsMap) (Node, error)
 }
 
 // Defines node capabilities supportable regardless of how a network is orchestrated.
@@ -26,5 +27,4 @@ type Node interface {
 	IsHealthy(ctx context.Context) (bool, error)
 	WaitForHealthy(ctx context.Context) error
 	Stop() error
-	Remove() error
 }

@@ -174,23 +174,20 @@ func Eventually(condition func() bool, waitFor time.Duration, tick time.Duration
 	}
 }
 
-// Add a temporary node that is only intended to be used by a single test. Its ID and
+// Add an ephemeral node that is only intended to be used by a single test. Its ID and
 // URI are not intended to be returned from the Network instance to minimize
 // accessibility from other tests.
-func AddTemporaryNode(network testnet.Network, flags testnet.FlagsMap) testnet.Node {
+func AddEphemeralNode(network testnet.Network, flags testnet.FlagsMap) testnet.Node {
 	require := require.New(ginkgo.GinkgoT())
 
-	// A temporary location ensures the node won't be accessible from
-	// the Network instance.
-	flags[config.DataDirKey] = ginkgo.GinkgoT().TempDir()
-
-	node, err := network.AddNode(ginkgo.GinkgoWriter, flags)
+	node, err := network.AddEphemeralNode(ginkgo.GinkgoWriter, flags)
 	require.NoError(err)
 
-	// Ensure node is stopped and its configuration removed on teardown
+	// Ensure node is stopped on teardown. It's configuration is not removed to enable
+	// collection in CI to aid in troubleshooting failures.
 	ginkgo.DeferCleanup(func() {
-		tests.Outf("Shutting down temporary node %s\n", node.GetID())
-		require.NoError(node.Remove())
+		tests.Outf("Shutting down ephemeral node %s\n", node.GetID())
+		require.NoError(node.Stop())
 	})
 
 	return node

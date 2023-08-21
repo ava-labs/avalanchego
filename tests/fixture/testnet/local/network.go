@@ -24,10 +24,14 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-// This interval was chosen to avoid spamming node APIs during
-// startup, as smaller intervals (e.g. 50ms) seemed to noticeably
-// increase the time for a network's nodes to be seen as healthy.
-const networkHealthCheckInterval = 200 * time.Millisecond
+const (
+	// This interval was chosen to avoid spamming node APIs during
+	// startup, as smaller intervals (e.g. 50ms) seemed to noticeably
+	// increase the time for a network's nodes to be seen as healthy.
+	networkHealthCheckInterval = 200 * time.Millisecond
+
+	defaultEphemeralDirName = "ephemeral"
+)
 
 var (
 	errInvalidNodeCount      = errors.New("failed to populate local network config: non-zero node count is only valid for a network without nodes")
@@ -102,8 +106,8 @@ func (ln *LocalNetwork) GetNodes() []testnet.Node {
 	return nodes
 }
 
-// Adds a backend-agnostic node to the network
-func (ln *LocalNetwork) AddNode(w io.Writer, flags testnet.FlagsMap) (testnet.Node, error) {
+// Internal method supporting AddNode and AddEphemeralNode in creating a backend-agnostic node.
+func (ln *LocalNetwork) addNode(w io.Writer, flags testnet.FlagsMap, isEphemeral bool) (testnet.Node, error) {
 	if flags == nil {
 		flags = testnet.FlagsMap{}
 	}
@@ -111,7 +115,17 @@ func (ln *LocalNetwork) AddNode(w io.Writer, flags testnet.FlagsMap) (testnet.No
 		NodeConfig: testnet.NodeConfig{
 			Flags: flags,
 		},
-	})
+	}, isEphemeral)
+}
+
+// Adds a backend-agnostic node to the network
+func (ln *LocalNetwork) AddNode(w io.Writer, flags testnet.FlagsMap) (testnet.Node, error) {
+	return ln.addNode(w, flags, false /* isEphemeral */)
+}
+
+// Adds a backend-agnostic ephemeral node to the network
+func (ln *LocalNetwork) AddEphemeralNode(w io.Writer, flags testnet.FlagsMap) (testnet.Node, error) {
+	return ln.addNode(w, flags, true /* isEphemeral */)
 }
 
 // Starts a new network stored under the provided root dir. Required
@@ -278,7 +292,7 @@ func (ln *LocalNetwork) PopulateLocalNetworkConfig(networkID uint32, nodeCount i
 	for _, node := range ln.Nodes {
 		// Ensure the node is configured for use with the network and
 		// knows where to write its configuration.
-		if err := ln.PopulateNodeConfig(node); err != nil {
+		if err := ln.PopulateNodeConfig(node, ln.Dir); err != nil {
 			return err
 		}
 	}
@@ -286,9 +300,10 @@ func (ln *LocalNetwork) PopulateLocalNetworkConfig(networkID uint32, nodeCount i
 	return nil
 }
 
-// Ensure the provided node has the configuration it needs to
-// start. Requires that the network has valid genesis data.
-func (ln *LocalNetwork) PopulateNodeConfig(node *LocalNode) error {
+// Ensure the provided node has the configuration it needs to start. If the data dir is
+// not set, it will be defaulted to [nodeParentDir]/[node ID]. Requires that the
+// network has valid genesis data.
+func (ln *LocalNetwork) PopulateNodeConfig(node *LocalNode, nodeParentDir string) error {
 	flags := node.Flags
 
 	// Set values common to all nodes
@@ -310,7 +325,7 @@ func (ln *LocalNetwork) PopulateNodeConfig(node *LocalNode) error {
 	dataDir := node.GetDataDir()
 	if len(dataDir) == 0 {
 		// NodeID will have been set by EnsureKeys
-		dataDir = filepath.Join(ln.Dir, node.NodeID.String())
+		dataDir = filepath.Join(nodeParentDir, node.NodeID.String())
 		flags[config.DataDirKey] = dataDir
 	}
 
@@ -645,7 +660,7 @@ func (ln *LocalNetwork) ReadAll() error {
 	return ln.ReadNodes()
 }
 
-func (ln *LocalNetwork) AddLocalNode(w io.Writer, node *LocalNode) (*LocalNode, error) {
+func (ln *LocalNetwork) AddLocalNode(w io.Writer, node *LocalNode, isEphemeral bool) (*LocalNode, error) {
 	// Assume network configuration has been written to disk and is current in memory
 
 	if node == nil {
@@ -653,7 +668,22 @@ func (ln *LocalNetwork) AddLocalNode(w io.Writer, node *LocalNode) (*LocalNode, 
 		// to set the default of `[network dir]/[node id]`.
 		node = NewLocalNode("")
 	}
-	if err := ln.PopulateNodeConfig(node); err != nil {
+
+	// Default to a data dir of [network-dir]/[node-ID]
+	nodeParentDir := ln.Dir
+	if isEphemeral {
+		// For an ephemeral node, default to a data dir of [network-dir]/[ephemeral-dir][node-ID]
+		// to provide a clear separation between nodes that are expected to expose stable API
+		// endpoints and those that will live for only a short time (e.g. a node started by a test
+		// and stopped on test teardown).
+		//
+		// The data for an ephemeral node is still in the file tree rooted at the network dir to
+		// ensure that archiving the network dir in CI will collect all node data used for a test
+		// run. Otherwise the data dir of ephemeral nodes could be stored in a random temp dir.
+		nodeParentDir = filepath.Join(ln.Dir, defaultEphemeralDirName)
+	}
+
+	if err := ln.PopulateNodeConfig(node, nodeParentDir); err != nil {
 		return nil, err
 	}
 
