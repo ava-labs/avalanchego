@@ -654,6 +654,17 @@ func verifyAddPermissionlessValidatorTx(
 	return nil
 }
 
+func validatorMaxWeight(validatorWeight uint64, maxValidatorWeightFactor byte, maxValidatorStake uint64) uint64 {
+	maximumWeight, err := math.Mul64(
+		uint64(maxValidatorWeightFactor),
+		validatorWeight,
+	)
+	if err != nil {
+		maximumWeight = stdmath.MaxUint64
+	}
+	return math.Min(maximumWeight, maxValidatorStake)
+}
+
 // verifyAddPermissionlessDelegatorTx carries out the validation for an
 // AddPermissionlessDelegatorTx.
 func verifyAddPermissionlessDelegatorTx(
@@ -735,15 +746,6 @@ func verifyAddPermissionlessDelegatorTx(
 		return ErrFiniteDelegatorToContinuousValidator
 	}
 
-	maximumWeight, err := math.Mul64(
-		uint64(delegatorRules.maxValidatorWeightFactor),
-		validator.Weight,
-	)
-	if err != nil {
-		maximumWeight = stdmath.MaxUint64
-	}
-	maximumWeight = math.Min(maximumWeight, delegatorRules.maxValidatorStake)
-
 	txID := sTx.ID()
 	var newStaker *state.Staker
 	if isContinuousStakingForkActive {
@@ -764,6 +766,11 @@ func verifyAddPermissionlessDelegatorTx(
 	) {
 		return ErrPeriodMismatch
 	}
+
+	maximumWeight := validatorMaxWeight(validator.Weight,
+		delegatorRules.maxValidatorWeightFactor,
+		delegatorRules.maxValidatorStake,
+	)
 	overDelegated, err := overDelegated(chainState, validator, maximumWeight, newStaker)
 	if err != nil {
 		return err
@@ -1002,15 +1009,6 @@ func verifyAddContinuousDelegatorTx(
 		return validator.StartTime, delegatorEndTime, delegatorRules.minStakeDuration, nil
 	}
 
-	maximumWeight, err := math.Mul64(
-		uint64(delegatorRules.maxValidatorWeightFactor),
-		validator.Weight,
-	)
-	if err != nil {
-		maximumWeight = stdmath.MaxUint64
-	}
-	maximumWeight = math.Min(maximumWeight, delegatorRules.maxValidatorStake)
-
 	// potential reward does not matter
 	newStaker, err := state.NewCurrentStaker(sTx.ID(), tx, currentTimestamp, delegatorEndTime, 0)
 	if err != nil {
@@ -1034,6 +1032,10 @@ func verifyAddContinuousDelegatorTx(
 		return time.Time{}, time.Time{}, 0, err
 	}
 
+	maximumWeight := validatorMaxWeight(validator.Weight,
+		delegatorRules.maxValidatorWeightFactor,
+		delegatorRules.maxValidatorStake,
+	)
 	overDelegated, err := overDelegated(chainState, validator, maximumWeight, newStaker)
 	if err != nil {
 		return time.Time{}, time.Time{}, 0, err
