@@ -536,7 +536,7 @@ func (t *trieView) commitChanges(ctx context.Context, trieToCommit *trieView) er
 func (t *trieView) commitToDB(ctx context.Context) error {
 	t.commitLock.Lock()
 	defer t.commitLock.Unlock()
-	
+
 	ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.commitToDB", oteltrace.WithAttributes(
 		attribute.Int("changeCount", len(t.changes.values)),
 	))
