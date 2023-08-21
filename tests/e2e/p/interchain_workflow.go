@@ -9,11 +9,14 @@ import (
 
 	ginkgo "github.com/onsi/ginkgo/v2"
 
+	"github.com/spf13/cast"
+
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/coreth/plugin/evm"
 
 	"github.com/ava-labs/avalanchego/api/info"
+	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/testnet"
@@ -37,6 +40,12 @@ var _ = e2e.DescribeXChain("[Interchain Workflow]", func() {
 	)
 
 	ginkgo.It("should ensure that funds can be transferred from the P-Chain to the X-Chain and the C-Chain", func() {
+		ginkgo.By("checking that the network has a compatible minimum stake duration", func() {
+			network := e2e.Env.GetNetwork()
+			minStakeDuration := cast.ToDuration(network.GetConfig().DefaultFlags[config.MinStakeDurationKey])
+			require.Equal(testnet.DefaultMinStakeDuration, minStakeDuration)
+		})
+
 		ginkgo.By("creating wallet with a funded key to send from and recipient key to deliver to")
 		factory := secp256k1.Factory{}
 		recipientKey, err := factory.NewPrivateKey()
