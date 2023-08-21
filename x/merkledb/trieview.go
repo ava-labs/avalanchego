@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/ava-labs/avalanchego/utils"
 	"runtime"
 	"sync"
 
@@ -36,11 +37,12 @@ var (
 	ErrOddLengthWithValue = errors.New(
 		"the underlying db only supports whole number of byte keys, so cannot record changes with odd nibble length",
 	)
-	ErrGetPathToFailure  = errors.New("GetPathTo failed to return the closest node")
-	ErrStartAfterEnd     = errors.New("start key > end key")
-	ErrViewIsNotAChild   = errors.New("passed in view is required to be a child of the current view")
-	ErrNoValidRoot       = errors.New("a valid root was not provided to the trieView constructor")
-	ErrParentNotDatabase = errors.New("parent trie is not database")
+	ErrGetPathToFailure       = errors.New("GetPathTo failed to return the closest node")
+	ErrStartAfterEnd          = errors.New("start key > end key")
+	ErrViewIsNotAChild        = errors.New("passed in view is required to be a child of the current view")
+	ErrNoValidRoot            = errors.New("a valid root was not provided to the trieView constructor")
+	ErrParentNotDatabase      = errors.New("parent trie is not database")
+	ErrNodesAlreadyCalculated = errors.New("cannot modify the trie after the node changes have been calculated")
 
 	numCPU = runtime.NumCPU()
 )
@@ -48,7 +50,8 @@ var (
 type trieView struct {
 	commitLock sync.RWMutex
 
-	calculateNodesOnce sync.Once
+	calculateNodesOnce     sync.Once
+	nodesAlreadyCalculated utils.Atomic[bool]
 
 	// Controls the trie's validity related fields.
 	// Must be held while reading/writing [childViews], [invalidated], and [parentTrie].
@@ -205,6 +208,7 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 			err = ErrInvalid
 			return
 		}
+		defer t.nodesAlreadyCalculated.Set(true)
 
 		// We wait to create the span until after checking that we need to actually
 		// calculateNodeIDs to make traces more useful (otherwise there may be a span
@@ -619,6 +623,10 @@ func (t *trieView) getValue(key path) ([]byte, error) {
 
 // Must not be called after [calculateNodeIDs] has returned.
 func (t *trieView) remove(key path) error {
+	if t.nodesAlreadyCalculated.Get() {
+		return ErrNodesAlreadyCalculated
+	}
+
 	nodePath, err := t.getPathTo(key)
 	if err != nil {
 		return err
@@ -803,6 +811,10 @@ func (t *trieView) insert(
 	key path,
 	value maybe.Maybe[[]byte],
 ) (*node, error) {
+	if t.nodesAlreadyCalculated.Get() {
+		return nil, ErrNodesAlreadyCalculated
+	}
+
 	// find the node that most closely matches [key]
 	pathToNode, err := t.getPathTo(key)
 	if err != nil {
@@ -911,6 +923,10 @@ func (t *trieView) recordNodeDeleted(after *node) error {
 // Records that the node associated with the given key has been changed.
 // Must not be called after [calculateNodeIDs] has returned.
 func (t *trieView) recordKeyChange(key path, after *node) error {
+	if t.nodesAlreadyCalculated.Get() {
+		return ErrNodesAlreadyCalculated
+	}
+
 	if existing, ok := t.changes.nodes[key]; ok {
 		existing.after = after
 		return nil
@@ -936,6 +952,10 @@ func (t *trieView) recordKeyChange(key path, after *node) error {
 // That's deferred until we call [calculateNodeIDs].
 // Must not be called after [calculateNodeIDs] has returned.
 func (t *trieView) recordValueChange(key path, value maybe.Maybe[[]byte]) error {
+	if t.nodesAlreadyCalculated.Get() {
+		return ErrNodesAlreadyCalculated
+	}
+
 	t.unaddedValues[key] = value
 
 	// update the existing change if it exists

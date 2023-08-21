@@ -1075,7 +1075,7 @@ func TestTrieCommitToDB(t *testing.T) {
 		require := require.New(t)
 
 		trie := tt.trieFunc()
-		err := trie.commitToDB(context.Background())
+		err := trie.CommitToDB(context.Background())
 		require.ErrorIs(err, tt.expectedErr)
 	}
 

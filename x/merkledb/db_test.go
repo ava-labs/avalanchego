@@ -118,7 +118,7 @@ func Test_MerkleDB_DB_Load_Root_From_DB(t *testing.T) {
 	}
 	view, err := db.NewView(context.Background(), ops)
 	require.NoError(err)
-	require.NoError(view.commitToDB(context.Background()))
+	require.NoError(view.CommitToDB(context.Background()))
 
 	root, err := db.GetMerkleRoot(context.Background())
 	require.NoError(err)
@@ -493,7 +493,7 @@ func TestDatabaseCommitChanges(t *testing.T) {
 	invalidView, err := db.NewView(context.Background(), nil)
 	require.NoError(err)
 	invalidView.(*trieView).invalidate()
-	err = invalidView.commitToDB(context.Background())
+	err = invalidView.CommitToDB(context.Background())
 	require.ErrorIs(err, ErrInvalid)
 
 	// Add key-value pairs to the database
