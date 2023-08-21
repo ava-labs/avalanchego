@@ -99,6 +99,9 @@ type trieView struct {
 	// [commitLock] must be held while accessing this field.
 	committed bool
 
+	// Key-value pairs that have been changed in this view
+	// but aren't yet in the trie structure.
+	// They're put into the trie in [calculateNodeIDs].
 	unaddedValues map[path]maybe.Maybe[[]byte]
 }
 
@@ -614,6 +617,7 @@ func (t *trieView) getValue(key path) ([]byte, error) {
 	return value, nil
 }
 
+// Must not be called after [calculateNodeIDs] has returned.
 func (t *trieView) remove(key path) error {
 	nodePath, err := t.getPathTo(key)
 	if err != nil {
@@ -793,7 +797,8 @@ func (t *trieView) getEditableNode(key path) (*node, error) {
 	return n.clone(), nil
 }
 
-// insert a key/value pair into the correct node of the trie
+// insert a key/value pair into the correct node of the trie.
+// Must not be called after [calculateNodeIDs] has returned.
 func (t *trieView) insert(
 	key path,
 	value maybe.Maybe[[]byte],
@@ -888,11 +893,13 @@ func (t *trieView) insert(
 }
 
 // Records that a node has been changed.
+// Must not be called after [calculateNodeIDs] has returned.
 func (t *trieView) recordNodeChange(after *node) error {
 	return t.recordKeyChange(after.key, after)
 }
 
 // Records that the node associated with the given key has been deleted.
+// Must not be called after [calculateNodeIDs] has returned.
 func (t *trieView) recordNodeDeleted(after *node) error {
 	// don't delete the root.
 	if len(after.key) == 0 {
@@ -902,6 +909,7 @@ func (t *trieView) recordNodeDeleted(after *node) error {
 }
 
 // Records that the node associated with the given key has been changed.
+// Must not be called after [calculateNodeIDs] has returned.
 func (t *trieView) recordKeyChange(key path, after *node) error {
 	if existing, ok := t.changes.nodes[key]; ok {
 		existing.after = after
@@ -925,7 +933,8 @@ func (t *trieView) recordKeyChange(key path, after *node) error {
 
 // Records that a key's value has been added or updated.
 // Doesn't actually change the trie data structure.
-// That's deferred until we calculate node IDs.
+// That's deferred until we call [calculateNodeIDs].
+// Must not be called after [calculateNodeIDs] has returned.
 func (t *trieView) recordValueChange(key path, value maybe.Maybe[[]byte]) error {
 	t.unaddedValues[key] = value
 
