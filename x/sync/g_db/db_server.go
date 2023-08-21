@@ -54,15 +54,20 @@ func (s *DBServer) GetChangeProof(
 	if err != nil {
 		return nil, err
 	}
+	start := maybe.Nothing[[]byte]()
+	if req.StartKey != nil && !req.StartKey.IsNothing {
+		start = maybe.Some(req.StartKey.Value)
+	}
 	end := maybe.Nothing[[]byte]()
 	if req.EndKey != nil && !req.EndKey.IsNothing {
 		end = maybe.Some(req.EndKey.Value)
 	}
+
 	changeProof, err := s.db.GetChangeProof(
 		ctx,
 		startRootID,
 		endRootID,
-		req.StartKey,
+		start,
 		end,
 		int(req.KeyLimit),
 	)
@@ -97,10 +102,18 @@ func (s *DBServer) VerifyChangeProof(
 	if err != nil {
 		return nil, err
 	}
+	startKey := maybe.Nothing[[]byte]()
+	if req.StartKey != nil && !req.StartKey.IsNothing {
+		startKey = maybe.Some(req.StartKey.Value)
+	}
+	endKey := maybe.Nothing[[]byte]()
+	if req.EndKey != nil && !req.EndKey.IsNothing {
+		endKey = maybe.Some(req.EndKey.Value)
+	}
 
 	// TODO there's probably a better way to do this.
 	var errString string
-	if err := s.db.VerifyChangeProof(ctx, &proof, req.StartKey, maybe.Some(req.EndKey), rootID); err != nil {
+	if err := s.db.VerifyChangeProof(ctx, &proof, startKey, endKey, rootID); err != nil {
 		errString = err.Error()
 	}
 	return &pb.VerifyChangeProofResponse{
@@ -143,11 +156,15 @@ func (s *DBServer) GetRangeProof(
 	if err != nil {
 		return nil, err
 	}
+	start := maybe.Nothing[[]byte]()
+	if req.StartKey != nil && !req.StartKey.IsNothing {
+		start = maybe.Some(req.StartKey.Value)
+	}
 	end := maybe.Nothing[[]byte]()
 	if req.EndKey != nil && !req.EndKey.IsNothing {
 		end = maybe.Some(req.EndKey.Value)
 	}
-	proof, err := s.db.GetRangeProofAtRoot(ctx, rootID, req.StartKey, end, int(req.KeyLimit))
+	proof, err := s.db.GetRangeProofAtRoot(ctx, rootID, start, end, int(req.KeyLimit))
 	if err != nil {
 		return nil, err
 	}
@@ -184,6 +201,11 @@ func (s *DBServer) CommitRangeProof(
 		return nil, err
 	}
 
-	err := s.db.CommitRangeProof(ctx, req.StartKey, &proof)
+	start := maybe.Nothing[[]byte]()
+	if req.StartKey != nil && !req.StartKey.IsNothing {
+		start = maybe.Some(req.StartKey.Value)
+	}
+
+	err := s.db.CommitRangeProof(ctx, start, &proof)
 	return &emptypb.Empty{}, err
 }

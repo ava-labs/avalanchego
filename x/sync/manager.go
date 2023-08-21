@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"go.uber.org/zap"
+	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -50,13 +51,13 @@ const (
 // [localRootID] is the ID of the root of this range in our database.
 // If we have no local root for this range, [localRootID] is ids.Empty.
 type workItem struct {
-	start       []byte
+	start       maybe.Maybe[[]byte]
 	end         maybe.Maybe[[]byte]
 	priority    priority
 	localRootID ids.ID
 }
 
-func newWorkItem(localRootID ids.ID, start []byte, end maybe.Maybe[[]byte], priority priority) *workItem {
+func newWorkItem(localRootID ids.ID, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], priority priority) *workItem {
 	return &workItem{
 		localRootID: localRootID,
 		start:       start,
@@ -146,7 +147,7 @@ func (m *Manager) Start(ctx context.Context) error {
 
 	// Add work item to fetch the entire key range.
 	// Note that this will be the first work item to be processed.
-	m.unprocessedWork.Insert(newWorkItem(ids.Empty, nil, maybe.Nothing[[]byte](), lowPriority))
+	m.unprocessedWork.Insert(newWorkItem(ids.Empty, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), lowPriority))
 
 	m.syncing = true
 	ctx, m.cancelCtx = context.WithCancel(ctx)
@@ -259,7 +260,10 @@ func (m *Manager) getAndApplyChangeProof(ctx context.Context, work *workItem) {
 		&pb.SyncGetChangeProofRequest{
 			StartRootHash: work.localRootID[:],
 			EndRootHash:   targetRootID[:],
-			StartKey:      work.start,
+			StartKey: &pb.MaybeBytes{
+				Value:     work.start.Value(),
+				IsNothing: work.start.IsNothing(),
+			},
 			EndKey: &pb.MaybeBytes{
 				Value:     work.end.Value(),
 				IsNothing: work.end.IsNothing(),
@@ -320,7 +324,10 @@ func (m *Manager) getAndApplyRangeProof(ctx context.Context, work *workItem) {
 	proof, err := m.config.Client.GetRangeProof(ctx,
 		&pb.SyncGetRangeProofRequest{
 			RootHash: targetRootID[:],
-			StartKey: work.start,
+			StartKey: &pb.MaybeBytes{
+				Value:     work.start.Value(),
+				IsNothing: work.start.IsNothing(),
+			},
 			EndKey: &pb.MaybeBytes{
 				Value:     work.end.Value(),
 				IsNothing: work.end.IsNothing(),
@@ -355,30 +362,31 @@ func (m *Manager) getAndApplyRangeProof(ctx context.Context, work *workItem) {
 	m.completeWorkItem(ctx, work, largestHandledKey, targetRootID, proof.EndProof)
 }
 
-// findNextKey returns the start of the key range that should be fetched next.
-// Returns nil if there are no more keys to fetch  up to [rangeEnd].
-//
-// If the last proof received contained at least one key-value pair, then
-// [lastReceivedKey] is the greatest key in the key-value pairs received.
-// Otherwise it's the end of the range for the last proof received.
+// findNextKey returns the start of the key range that should be fetched next
+// given that we just received a range/change proof that proved a range of
+// key-value pairs ending at [lastReceivedKey].
 //
 // [rangeEnd] is the end of the range that we want to fetch.
 //
+// Returns Nothing if there are no more keys to fetch in [lastReceivedKey, rangeEnd].
+//
 // [endProof] is the end proof of the last proof received.
-// Namely it's an inclusion/exclusion proof for [lastReceivedKey].
 //
 // Invariant: [lastReceivedKey] < [rangeEnd].
+// If [rangeEnd] is Nothing it's considered > [lastReceivedKey].
 func (m *Manager) findNextKey(
 	ctx context.Context,
 	lastReceivedKey []byte,
-	rangeEnd []byte,
+	rangeEnd maybe.Maybe[[]byte],
 	endProof []merkledb.ProofNode,
-) ([]byte, error) {
+) (maybe.Maybe[[]byte], error) {
 	if len(endProof) == 0 {
 		// We try to find the next key to fetch by looking at the end proof.
 		// If the end proof is empty, we have no information to use.
 		// Start fetching from the next key after [lastReceivedKey].
-		return append(lastReceivedKey, 0), nil
+		nextKey := lastReceivedKey
+		nextKey = append(nextKey, 0)
+		return maybe.Some(nextKey), nil
 	}
 
 	// We want the first key larger than the [lastReceivedKey].
@@ -405,7 +413,7 @@ func (m *Manager) findNextKey(
 	// get a proof for the same key as the received proof from the local db
 	localProofOfKey, err := m.config.DB.GetProof(ctx, proofKeyPath.Value)
 	if err != nil {
-		return nil, err
+		return maybe.Nothing[[]byte](), err
 	}
 	localProofNodes := localProofOfKey.Path
 
@@ -415,13 +423,13 @@ func (m *Manager) findNextKey(
 		localProofNodes = localProofNodes[:len(localProofNodes)-1]
 	}
 
-	var nextKey []byte
+	nextKey := maybe.Nothing[[]byte]()
 
 	localProofNodeIndex := len(localProofNodes) - 1
 	receivedProofNodeIndex := len(endProof) - 1
 
 	// traverse the two proofs from the deepest nodes up to the root until a difference is found
-	for localProofNodeIndex >= 0 && receivedProofNodeIndex >= 0 && nextKey == nil {
+	for localProofNodeIndex >= 0 && receivedProofNodeIndex >= 0 && nextKey.IsNothing() {
 		localProofNode := localProofNodes[localProofNodeIndex]
 		receivedProofNode := endProof[receivedProofNodeIndex]
 
@@ -481,7 +489,7 @@ func (m *Manager) findNextKey(
 
 		// determine if there are any differences in the children for the deepest unhandled node of the two proofs
 		if childIndex, hasDifference := findChildDifference(deepestNode, deepestNodeFromOtherProof, startingChildNibble); hasDifference {
-			nextKey = deepestNode.KeyPath.AppendNibble(childIndex).Value
+			nextKey = maybe.Some(deepestNode.KeyPath.AppendNibble(childIndex).Value)
 			break
 		}
 	}
@@ -490,15 +498,15 @@ func (m *Manager) findNextKey(
 	// then we couldn't find a better answer than the [lastReceivedKey].
 	// Set the nextKey to [lastReceivedKey] + 0, which is the first key in
 	// the open range (lastReceivedKey, rangeEnd).
-	if nextKey != nil && bytes.Compare(nextKey, lastReceivedKey) <= 0 {
-		nextKey = lastReceivedKey
-		nextKey = append(nextKey, 0)
+	if nextKey.HasValue() && bytes.Compare(nextKey.Value(), lastReceivedKey) <= 0 {
+		nextKeyVal := slices.Clone(lastReceivedKey)
+		nextKeyVal = append(nextKeyVal, 0)
+		nextKey = maybe.Some(nextKeyVal)
 	}
 
-	// If the nextKey is larger than the end of the range,
-	// return nil to signal that there is no next key in range.
-	if len(rangeEnd) > 0 && bytes.Compare(nextKey, rangeEnd) >= 0 {
-		return nil, nil
+	// If the [nextKey] is larger than the end of the range, return Nothing to signal that there is no next key in range
+	if rangeEnd.HasValue() && bytes.Compare(nextKey.Value(), rangeEnd.Value()) >= 0 {
+		return maybe.Nothing[[]byte](), nil
 	}
 
 	// the nextKey is within the open range (lastReceivedKey, rangeEnd), so return it
@@ -599,25 +607,41 @@ func (m *Manager) setError(err error) {
 	go m.Close()
 }
 
-// Mark the range [start, end] as synced up to [rootID].
+// Mark that we've fetched all the key-value pairs in the range
+// [workItem.start, largestHandledKey] for the trie with root [rootID].
+//
+// If [workItem.start] is Nothing, then we've fetched all the key-value
+// pairs up to and including [largestHandledKey].
+//
+// If [largestHandledKey] is Nothing, then we've fetched all the key-value
+// pairs at and after [workItem.start].
+//
+// [proofOfLargestKey] is the end proof for the range/change proof
+// that gave us the range up to and including [largestHandledKey].
+//
 // Assumes [m.workLock] is not held.
 func (m *Manager) completeWorkItem(ctx context.Context, work *workItem, largestHandledKey maybe.Maybe[[]byte], rootID ids.ID, proofOfLargestKey []merkledb.ProofNode) {
-	// if the last key is equal to the end, then the full range is completed
 	if !maybe.Equal(largestHandledKey, work.end, bytes.Equal) {
-		// find the next key to start querying by comparing the proofs for the last completed key
-		nextStartKey, err := m.findNextKey(ctx, largestHandledKey.Value(), work.end.Value(), proofOfLargestKey)
+		// The largest handled key isn't equal to the end of the work item.
+		// Find the start of the next key range to fetch.
+		// Note that [largestHandledKey] can't be Nothing.
+		// Proof: Suppose it is. That means that we got a range/change proof that proved up to the
+		// greatest key-value pair in the database. That means we requested a proof with no upper
+		// bound. That is, [workItem.end] is Nothing. Since we're here, [bothNothing] is false,
+		// which means [workItem.end] isn't Nothing. Contradiction.
+		nextStartKey, err := m.findNextKey(ctx, largestHandledKey.Value(), work.end, proofOfLargestKey)
 		if err != nil {
 			m.setError(err)
 			return
 		}
 
-		// nextStartKey being nil indicates that the entire range has been completed
-		if nextStartKey == nil {
+		// nextStartKey being Nothing indicates that the entire range has been completed
+		if nextStartKey.IsNothing() {
 			largestHandledKey = work.end
 		} else {
 			// the full range wasn't completed, so enqueue a new work item for the range [nextStartKey, workItem.end]
 			m.enqueueWork(newWorkItem(work.localRootID, nextStartKey, work.end, work.priority))
-			largestHandledKey = maybe.Some(nextStartKey)
+			largestHandledKey = nextStartKey
 		}
 	}
 
@@ -639,8 +663,8 @@ func (m *Manager) completeWorkItem(ctx context.Context, work *workItem, largestH
 
 	// completed the range [work.start, lastKey], log and record in the completed work heap
 	m.config.Log.Info("completed range",
-		zap.Binary("start", work.start),
-		zap.Binary("end", largestHandledKey.Value()),
+		zap.Stringer("start", work.start),
+		zap.Stringer("end", largestHandledKey),
 		zap.Stringer("rootID", rootID),
 		zap.Bool("stale", stale),
 	)
@@ -667,7 +691,7 @@ func (m *Manager) enqueueWork(work *workItem) {
 	// Find the middle point.
 	mid := midPoint(work.start, work.end)
 
-	if bytes.Equal(work.start, mid) || bytes.Equal(mid, work.end.Value()) {
+	if maybe.Equal(work.start, mid, bytes.Equal) || maybe.Equal(mid, work.end, bytes.Equal) {
 		// The range is too small to split.
 		// If we didn't have this check we would add work items
 		// [start, start] and [start, end]. Since start <= end, this would
@@ -679,7 +703,7 @@ func (m *Manager) enqueueWork(work *workItem) {
 
 	// first item gets higher priority than the second to encourage finished ranges to grow
 	// rather than start a new range that is not contiguous with existing completed ranges
-	first := newWorkItem(work.localRootID, work.start, maybe.Some(mid), medPriority)
+	first := newWorkItem(work.localRootID, work.start, mid, medPriority)
 	second := newWorkItem(work.localRootID, mid, work.end, lowPriority)
 
 	m.unprocessedWork.Insert(first)
@@ -688,26 +712,28 @@ func (m *Manager) enqueueWork(work *workItem) {
 
 // find the midpoint between two keys
 // start is expected to be less than end
-// nil on start or end is treated as all 0's
-// nothing on end is treated as all 255's
-func midPoint(start []byte, end maybe.Maybe[[]byte]) []byte {
+// Nothing/nil [start] is treated as all 0's
+// Nothing/nil [end] is treated as all 255's
+func midPoint(startMaybe, endMaybe maybe.Maybe[[]byte]) maybe.Maybe[[]byte] {
+	start := startMaybe.Value()
+	end := endMaybe.Value()
 	length := len(start)
-	if len(end.Value()) > length {
-		length = len(end.Value())
+	if len(end) > length {
+		length = len(end)
 	}
 
 	if length == 0 {
-		if end.IsNothing() {
-			return []byte{127}
-		} else if len(end.Value()) == 0 {
-			return nil
+		if endMaybe.IsNothing() {
+			return maybe.Some([]byte{127})
+		} else if len(end) == 0 {
+			return maybe.Nothing[[]byte]()
 		}
 	}
 
 	// This check deals with cases where the end has a 255(or is nothing which is treated as all 255s) and the start key ends 255.
 	// For example, midPoint([255], nothing) should be [255, 127], not [255].
 	// The result needs the extra byte added on to the end to deal with the fact that the naive midpoint between 255 and 255 would be 255
-	if (len(start) > 0 && start[len(start)-1] == 255) && (len(end.Value()) == 0 || end.Value()[len(end.Value())-1] == 255) {
+	if (len(start) > 0 && start[len(start)-1] == 255) && (len(end) == 0 || end[len(end)-1] == 255) {
 		length++
 	}
 
@@ -720,11 +746,11 @@ func midPoint(start []byte, end maybe.Maybe[[]byte]) []byte {
 		}
 
 		endVal := 0
-		if end.IsNothing() {
+		if endMaybe.IsNothing() {
 			endVal = 255
 		}
-		if i < len(end.Value()) {
-			endVal = int(end.Value()[i])
+		if i < len(end) {
+			endVal = int(end[i])
 		}
 
 		total := startVal + endVal + leftover
@@ -755,7 +781,7 @@ func midPoint(start []byte, end maybe.Maybe[[]byte]) []byte {
 	} else {
 		midpoint = midpoint[0:length]
 	}
-	return midpoint
+	return maybe.Some(midpoint)
 }
 
 // findChildDifference returns the first child index that is different between node 1 and node 2 if one exists and
