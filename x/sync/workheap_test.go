@@ -19,7 +19,7 @@ func Test_WorkHeap_InnerHeap(t *testing.T) {
 
 	lowPriorityItem := &heapItem{
 		workItem: &workItem{
-			start:       []byte{1},
+			start:       maybe.Some([]byte{1}),
 			end:         maybe.Some([]byte{2}),
 			priority:    lowPriority,
 			localRootID: ids.GenerateTestID(),
@@ -28,7 +28,7 @@ func Test_WorkHeap_InnerHeap(t *testing.T) {
 
 	mediumPriorityItem := &heapItem{
 		workItem: &workItem{
-			start:       []byte{3},
+			start:       maybe.Some([]byte{3}),
 			end:         maybe.Some([]byte{4}),
 			priority:    medPriority,
 			localRootID: ids.GenerateTestID(),
@@ -37,7 +37,7 @@ func Test_WorkHeap_InnerHeap(t *testing.T) {
 
 	highPriorityItem := &heapItem{
 		workItem: &workItem{
-			start:       []byte{5},
+			start:       maybe.Some([]byte{5}),
 			end:         maybe.Some([]byte{6}),
 			priority:    highPriority,
 			localRootID: ids.GenerateTestID(),
@@ -115,19 +115,19 @@ func Test_WorkHeap_Insert_GetWork(t *testing.T) {
 	h := newWorkHeap()
 
 	lowPriorityItem := &workItem{
-		start:       []byte{4},
+		start:       maybe.Some([]byte{4}),
 		end:         maybe.Some([]byte{5}),
 		priority:    lowPriority,
 		localRootID: ids.GenerateTestID(),
 	}
 	mediumPriorityItem := &workItem{
-		start:       []byte{0},
+		start:       maybe.Some([]byte{0}),
 		end:         maybe.Some([]byte{1}),
 		priority:    medPriority,
 		localRootID: ids.GenerateTestID(),
 	}
 	highPriorityItem := &workItem{
-		start:       []byte{2},
+		start:       maybe.Some([]byte{2}),
 		end:         maybe.Some([]byte{3}),
 		priority:    highPriority,
 		localRootID: ids.GenerateTestID(),
@@ -169,21 +169,21 @@ func Test_WorkHeap_remove(t *testing.T) {
 	h := newWorkHeap()
 
 	lowPriorityItem := &workItem{
-		start:       []byte{0},
+		start:       maybe.Some([]byte{0}),
 		end:         maybe.Some([]byte{1}),
 		priority:    lowPriority,
 		localRootID: ids.GenerateTestID(),
 	}
 
 	mediumPriorityItem := &workItem{
-		start:       []byte{2},
+		start:       maybe.Some([]byte{2}),
 		end:         maybe.Some([]byte{3}),
 		priority:    medPriority,
 		localRootID: ids.GenerateTestID(),
 	}
 
 	highPriorityItem := &workItem{
-		start:       []byte{4},
+		start:       maybe.Some([]byte{4}),
 		end:         maybe.Some([]byte{5}),
 		priority:    highPriority,
 		localRootID: ids.GenerateTestID(),
@@ -232,42 +232,42 @@ func Test_WorkHeap_Merge_Insert(t *testing.T) {
 	// merge with range before
 	syncHeap := newWorkHeap()
 
-	syncHeap.MergeInsert(&workItem{start: nil, end: maybe.Some([]byte{63})})
+	syncHeap.MergeInsert(&workItem{start: maybe.Nothing[[]byte](), end: maybe.Some([]byte{63})})
 	require.Equal(t, 1, syncHeap.Len())
 
-	syncHeap.MergeInsert(&workItem{start: []byte{127}, end: maybe.Some([]byte{192})})
+	syncHeap.MergeInsert(&workItem{start: maybe.Some([]byte{127}), end: maybe.Some([]byte{192})})
 	require.Equal(t, 2, syncHeap.Len())
 
-	syncHeap.MergeInsert(&workItem{start: []byte{193}, end: maybe.Nothing[[]byte]()})
+	syncHeap.MergeInsert(&workItem{start: maybe.Some([]byte{193}), end: maybe.Nothing[[]byte]()})
 	require.Equal(t, 3, syncHeap.Len())
 
-	syncHeap.MergeInsert(&workItem{start: []byte{63}, end: maybe.Some([]byte{126}), priority: lowPriority})
+	syncHeap.MergeInsert(&workItem{start: maybe.Some([]byte{63}), end: maybe.Some([]byte{126}), priority: lowPriority})
 	require.Equal(t, 3, syncHeap.Len())
 
 	// merge with range after
 	syncHeap = newWorkHeap()
 
-	syncHeap.MergeInsert(&workItem{start: nil, end: maybe.Some([]byte{63})})
+	syncHeap.MergeInsert(&workItem{start: maybe.Nothing[[]byte](), end: maybe.Some([]byte{63})})
 	require.Equal(t, 1, syncHeap.Len())
 
-	syncHeap.MergeInsert(&workItem{start: []byte{127}, end: maybe.Some([]byte{192})})
+	syncHeap.MergeInsert(&workItem{start: maybe.Some([]byte{127}), end: maybe.Some([]byte{192})})
 	require.Equal(t, 2, syncHeap.Len())
 
-	syncHeap.MergeInsert(&workItem{start: []byte{193}, end: maybe.Nothing[[]byte]()})
+	syncHeap.MergeInsert(&workItem{start: maybe.Some([]byte{193}), end: maybe.Nothing[[]byte]()})
 	require.Equal(t, 3, syncHeap.Len())
 
-	syncHeap.MergeInsert(&workItem{start: []byte{64}, end: maybe.Some([]byte{127}), priority: lowPriority})
+	syncHeap.MergeInsert(&workItem{start: maybe.Some([]byte{64}), end: maybe.Some([]byte{127}), priority: lowPriority})
 	require.Equal(t, 3, syncHeap.Len())
 
 	// merge both sides at the same time
 	syncHeap = newWorkHeap()
 
-	syncHeap.MergeInsert(&workItem{start: nil, end: maybe.Some([]byte{63})})
+	syncHeap.MergeInsert(&workItem{start: maybe.Nothing[[]byte](), end: maybe.Some([]byte{63})})
 	require.Equal(t, 1, syncHeap.Len())
 
-	syncHeap.MergeInsert(&workItem{start: []byte{127}, end: maybe.Nothing[[]byte]()})
+	syncHeap.MergeInsert(&workItem{start: maybe.Some([]byte{127}), end: maybe.Nothing[[]byte]()})
 	require.Equal(t, 2, syncHeap.Len())
 
-	syncHeap.MergeInsert(&workItem{start: []byte{63}, end: maybe.Some([]byte{127}), priority: lowPriority})
+	syncHeap.MergeInsert(&workItem{start: maybe.Some([]byte{63}), end: maybe.Some([]byte{127}), priority: lowPriority})
 	require.Equal(t, 1, syncHeap.Len())
 }
