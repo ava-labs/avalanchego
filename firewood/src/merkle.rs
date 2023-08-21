@@ -1,7 +1,7 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use crate::proof::Proof;
+use crate::{nibbles::Nibbles, proof::Proof};
 use enum_as_inner::EnumAsInner;
 use sha3::Digest;
 use shale::{disk_address::DiskAddress, CachedStore, ObjRef, ShaleError, ShaleStore, Storable};
@@ -1170,10 +1170,10 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
         let mut deleted = Vec::new();
         let mut parents = Vec::new();
 
-        // TODO: Explain why this always starts with a 0 chunk
-        // I think this may have to do with avoiding moving the root
-        let mut chunked_key = vec![0];
-        chunked_key.extend(key.as_ref().iter().copied().flat_map(to_nibble_array));
+        // we use Nibbles::<1> so that 1 zero nibble is at the front
+        // this is for the sentinel node, which avoids moving the root
+        // and always only has one child
+        let key_nibbles = Nibbles::<1>(key.as_ref());
 
         let mut next_node = Some(self.get_node(root)?);
         let mut nskip = 0;
@@ -1184,7 +1184,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
         let mut val = Some(val);
 
         // walk down the merkle tree starting from next_node, currently the root
-        for (key_nib_offset, key_nib) in chunked_key.iter().enumerate() {
+        for (key_nib_offset, key_nib) in key_nibbles.iter().enumerate() {
             // special handling for extension nodes
             if nskip > 0 {
                 nskip -= 1;
@@ -1200,21 +1200,21 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                 // For a Branch node, we look at the child pointer. If it points
                 // to another node, we walk down that. Otherwise, we can store our
                 // value as a leaf and we're done
-                NodeType::Branch(n) => match n.chd[*key_nib as usize] {
+                NodeType::Branch(n) => match n.chd[key_nib as usize] {
                     Some(c) => c,
                     None => {
                         // insert the leaf to the empty slot
                         // create a new leaf
                         let leaf_ptr = self
                             .new_node(Node::new(NodeType::Leaf(LeafNode(
-                                PartialPath(chunked_key[key_nib_offset + 1..].to_vec()),
+                                PartialPath(key_nibbles.skip(key_nib_offset + 1).iter().collect()),
                                 Data(val.take().unwrap()),
                             ))))?
                             .as_ptr();
                         // set the current child to point to this leaf
                         node.write(|u| {
                             let uu = u.inner.as_branch_mut().unwrap();
-                            uu.chd[*key_nib as usize] = Some(leaf_ptr);
+                            uu.chd[key_nib as usize] = Some(leaf_ptr);
                             u.rehash();
                         })
                         .unwrap();
@@ -1226,10 +1226,11 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                     // of the stored key to pass into split
                     let n_path = n.0.to_vec();
                     let n_value = Some(n.1.clone());
+                    let rem_path = key_nibbles.skip(key_nib_offset).iter().collect::<Vec<_>>();
                     self.split(
                         node,
                         &mut parents,
-                        &chunked_key[key_nib_offset..],
+                        &rem_path,
                         n_path,
                         n_value,
                         val.take().unwrap(),
@@ -1241,10 +1242,12 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                     let n_path = n.0.to_vec();
                     let n_ptr = n.1;
                     nskip = n_path.len() - 1;
+                    let rem_path = key_nibbles.skip(key_nib_offset).iter().collect::<Vec<_>>();
+
                     if let Some(v) = self.split(
                         node,
                         &mut parents,
-                        &chunked_key[key_nib_offset..],
+                        &rem_path,
                         n_path,
                         None,
                         val.take().unwrap(),
@@ -1263,7 +1266,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                 }
             };
             // push another parent, and follow the next pointer
-            parents.push((node, *key_nib));
+            parents.push((node, key_nib));
             next_node = Some(self.get_node(next_node_ptr)?);
         }
         if val.is_some() {
@@ -1835,8 +1838,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
         K: AsRef<[u8]>,
         T: ValueTransformer,
     {
-        let mut chunks = Vec::new();
-        chunks.extend(key.as_ref().iter().copied().flat_map(to_nibble_array));
+        let key_nibbles = Nibbles::<0>(key.as_ref());
 
         let mut proofs: HashMap<[u8; TRIE_HASH_LEN], Vec<u8>> = HashMap::new();
         if root.is_null() {
@@ -1857,29 +1859,37 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
 
         let mut nskip = 0;
         let mut nodes: Vec<DiskAddress> = Vec::new();
-        for (i, nib) in chunks.iter().enumerate() {
+        for (i, nib) in key_nibbles.iter().enumerate() {
             if nskip > 0 {
                 nskip -= 1;
                 continue;
             }
             nodes.push(u_ref.as_ptr());
             let next_ptr: DiskAddress = match &u_ref.inner {
-                NodeType::Branch(n) => match n.chd[*nib as usize] {
+                NodeType::Branch(n) => match n.chd[nib as usize] {
                     Some(c) => c,
                     None => break,
                 },
                 NodeType::Leaf(_) => break,
                 NodeType::Extension(n) => {
+                    // the key passed in must match the entire remainder of this
+                    // extension node, otherwise we break out
                     let n_path = &*n.0;
-                    let remaining_path = &chunks[i..];
-                    if remaining_path.len() < n_path.len()
-                        || &remaining_path[..n_path.len()] != n_path
-                    {
+                    let remaining_path = key_nibbles.skip(i);
+                    if remaining_path.len() < n_path.len() {
+                        // all bytes aren't there
                         break;
-                    } else {
-                        nskip = n_path.len() - 1;
-                        n.1
                     }
+                    if !remaining_path
+                        .iter()
+                        .take(n_path.len())
+                        .eq(n_path.iter().cloned())
+                    {
+                        // contents aren't the same
+                        break;
+                    }
+                    nskip = n_path.len() - 1;
+                    n.1
                 }
             };
             u_ref = self.get_node(next_ptr)?;
