@@ -68,7 +68,7 @@ func connToIDAndCert(conn *tls.Conn) (ids.NodeID, net.Conn, *staking.Certificate
 	// parseable according the staking package's parser.
 	peerCert, err := staking.ParseCertificate(tlsCert.Raw)
 	if err != nil {
-		return ids.NodeID{}, nil, nil, errNoCert
+		return ids.NodeID{}, nil, nil, err
 	}
 
 	// We validate the certificate here to attempt to make the validity of the
@@ -76,7 +76,7 @@ func connToIDAndCert(conn *tls.Conn) (ids.NodeID, net.Conn, *staking.Certificate
 	// prior version using an invalid certificate should not be able to report
 	// healthy.
 	if err := staking.ValidateCertificate(peerCert); err != nil {
-		return ids.NodeID{}, nil, nil, errNoCert
+		return ids.NodeID{}, nil, nil, err
 	}
 
 	nodeID := ids.NodeIDFromCert(peerCert)
