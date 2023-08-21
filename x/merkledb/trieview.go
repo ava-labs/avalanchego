@@ -500,13 +500,10 @@ func (t *trieView) commitToDB(ctx context.Context) error {
 	))
 	defer span.End()
 
-	switch {
-	case t.isInvalid():
-		return ErrInvalid
-	case t.committed:
-		return ErrCommitted
-	case t.db != t.getParentTrie():
-		return ErrParentNotDatabase
+	// Call this here instead of in [t.db.commitChanges]
+	// because doing so there would be a deadlock.
+	if err := t.calculateNodeIDs(ctx); err != nil {
+		return err
 	}
 
 	if err := t.db.commitChanges(ctx, t); err != nil {

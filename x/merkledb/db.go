@@ -875,7 +875,8 @@ func (*merkleDB) commitToDB(context.Context) error {
 	return nil
 }
 
-// commitChanges commits the changes in trieToCommit to the db
+// commitChanges commits the changes in [trieToCommit] to [db].
+// Assumes [trieToCommit]'s node IDs have been calculated.
 func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
@@ -887,6 +888,10 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 		return nil
 	case trieToCommit.isInvalid():
 		return ErrInvalid
+	case trieToCommit.committed:
+		return ErrCommitted
+	case trieToCommit.db != trieToCommit.getParentTrie():
+		return ErrParentNotDatabase
 	}
 
 	changes := trieToCommit.changes
