@@ -38,6 +38,9 @@ func (b *Block) Verify(context.Context) error {
 }
 
 func (b *Block) Accept(context.Context) error {
+	b.manager.backend.acceptLock.Lock()
+	defer b.manager.backend.acceptLock.Unlock()
+
 	return b.Visit(b.manager.acceptor)
 }
 

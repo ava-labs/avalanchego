@@ -4,6 +4,8 @@
 package executor
 
 import (
+	"sync"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
@@ -29,6 +31,7 @@ type Manager interface {
 func NewManager(
 	mempool mempool.Mempool,
 	metrics metrics.Metrics,
+	acceptLock sync.Locker,
 	s state.State,
 	txExecutorBackend *executor.Backend,
 	validatorManager validators.Manager,
@@ -36,6 +39,7 @@ func NewManager(
 	backend := &backend{
 		Mempool:      mempool,
 		lastAccepted: s.GetLastAccepted(),
+		acceptLock:   acceptLock,
 		state:        s,
 		ctx:          txExecutorBackend.Ctx,
 		blkIDToState: map[ids.ID]*blockState{},

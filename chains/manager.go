@@ -1057,16 +1057,10 @@ func (m *manager) createSnowmanChain(
 			valState = validators.Trace(valState, "platformvm", m.Tracer)
 		}
 
-		// Notice that this context is left unlocked. This is because the
-		// lock will already be held when accessing these values on the
-		// P-chain.
 		ctx.ValidatorState = valState
 
 		// Initialize the validator state for future chains.
-		m.validatorState = validators.NewLockedState(&ctx.Lock, valState)
-		if m.TracingEnabled {
-			m.validatorState = validators.Trace(m.validatorState, "lockedState", m.Tracer)
-		}
+		m.validatorState = valState
 
 		if !m.ManagerConfig.SybilProtectionEnabled {
 			m.validatorState = validators.NewNoValidatorsState(m.validatorState)

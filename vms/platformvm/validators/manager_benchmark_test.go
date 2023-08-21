@@ -6,6 +6,7 @@ package validators
 import (
 	"context"
 	"math/rand"
+	"sync"
 	"testing"
 	"time"
 
@@ -139,6 +140,7 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 		config.Config{
 			Validators: vdrs,
 		},
+		&sync.Mutex{},
 		s,
 		metrics,
 		new(mockable.Clock),

@@ -5,12 +5,9 @@ package validators
 
 import (
 	"context"
-	"sync"
 
 	"github.com/ava-labs/avalanchego/ids"
 )
-
-var _ State = (*lockedState)(nil)
 
 // State allows the lookup of validator sets on specified subnets at the
 // requested P-chain height.
@@ -32,50 +29,6 @@ type State interface {
 		height uint64,
 		subnetID ids.ID,
 	) (map[ids.NodeID]*GetValidatorOutput, error)
-}
-
-type lockedState struct {
-	lock sync.Locker
-	s    State
-}
-
-func NewLockedState(lock sync.Locker, s State) State {
-	return &lockedState{
-		lock: lock,
-		s:    s,
-	}
-}
-
-func (s *lockedState) GetMinimumHeight(ctx context.Context) (uint64, error) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	return s.s.GetMinimumHeight(ctx)
-}
-
-func (s *lockedState) GetCurrentHeight(ctx context.Context) (uint64, error) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	return s.s.GetCurrentHeight(ctx)
-}
-
-func (s *lockedState) GetSubnetID(ctx context.Context, chainID ids.ID) (ids.ID, error) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	return s.s.GetSubnetID(ctx, chainID)
-}
-
-func (s *lockedState) GetValidatorSet(
-	ctx context.Context,
-	height uint64,
-	subnetID ids.ID,
-) (map[ids.NodeID]*GetValidatorOutput, error) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	return s.s.GetValidatorSet(ctx, height, subnetID)
 }
 
 type noValidators struct {

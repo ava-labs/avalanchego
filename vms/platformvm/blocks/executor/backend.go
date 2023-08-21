@@ -4,6 +4,7 @@
 package executor
 
 import (
+	"sync"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -27,6 +28,7 @@ type backend struct {
 	// Note that Genesis block is a commit block so no need to update
 	// blkIDToState with it upon backend creation (Genesis is already accepted)
 	blkIDToState map[ids.ID]*blockState
+	acceptLock   sync.Locker
 	state        state.State
 
 	ctx *snow.Context
