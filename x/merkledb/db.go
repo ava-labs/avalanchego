@@ -706,7 +706,7 @@ func (db *merkleDB) Has(k []byte) (bool, error) {
 		return false, database.ErrClosed
 	}
 
-	_, err := db.getValue(newPath(k))
+	_, err := db.getValueWithoutLock(newPath(k))
 	if err == database.ErrNotFound {
 		return false, nil
 	}
