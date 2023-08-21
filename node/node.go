@@ -1345,7 +1345,7 @@ func (n *Node) Initialize(
 	logger logging.Logger,
 	logFactory logging.Factory,
 ) error {
-	tlsCert := n.Config.StakingTLSCert.Leaf
+	tlsCert := config.StakingTLSCert.Leaf
 	stakingCert := staking.CertificateFromX509(tlsCert)
 	if err := staking.ValidateCertificate(stakingCert); err != nil {
 		return fmt.Errorf("invalid staking certificate: %w", err)
