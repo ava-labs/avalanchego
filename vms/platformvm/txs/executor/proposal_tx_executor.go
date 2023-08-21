@@ -356,6 +356,7 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		)
 	}
 
+	// retrieve primaryNetworkValidator before possibly removing it.
 	primaryNetworkValidator, err := e.OnCommitState.GetCurrentValidator(
 		constants.PrimaryNetworkID,
 		stakerToReward.NodeID,
