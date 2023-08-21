@@ -322,7 +322,11 @@ func (n *LocalNode) IsHealthy(ctx context.Context) (bool, error) {
 	return false, fmt.Errorf("failed to query node health: %w", err)
 }
 
+// WaitForHealthy blocks until IsHealthy returns true or an error (including context timeout) is observed.
 func (n *LocalNode) WaitForHealthy(ctx context.Context) error {
+	if _, ok := ctx.Deadline(); !ok {
+		return fmt.Errorf("unable to wait for health for node %q with a context without a deadline", n.NodeID)
+	}
 	ticker := time.NewTicker(DefaultNodeTickerInterval)
 	defer ticker.Stop()
 
