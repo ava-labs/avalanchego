@@ -5,13 +5,10 @@
 package banff
 
 import (
-	"context"
-
 	ginkgo "github.com/onsi/ginkgo/v2"
 
 	"github.com/onsi/gomega"
 
-	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/e2e"
@@ -20,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 )
 
 var _ = ginkgo.Describe("[Banff]", func() {
@@ -28,33 +24,12 @@ var _ = ginkgo.Describe("[Banff]", func() {
 		// use this for filtering tests by labels
 		// ref. https://onsi.github.io/ginkgo/#spec-labels
 		ginkgo.Label(
-			"require-network-runner",
 			"xp",
 			"banff",
 		),
 		func() {
-			ginkgo.By("reload initial snapshot for test independence", func() {
-				err := e2e.Env.RestoreInitialState(true /*switchOffNetworkFirst*/)
-				gomega.Expect(err).Should(gomega.BeNil())
-			})
-
-			uris := e2e.Env.GetURIs()
-			gomega.Expect(uris).ShouldNot(gomega.BeEmpty())
-
-			kc := secp256k1fx.NewKeychain(genesis.EWOQKey)
-			var wallet primary.Wallet
-			ginkgo.By("initialize wallet", func() {
-				walletURI := uris[0]
-
-				// 5-second is enough to fetch initial UTXOs for test cluster in "primary.NewWallet"
-				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultWalletCreationTimeout)
-				var err error
-				wallet, err = primary.NewWalletFromURI(ctx, walletURI, kc)
-				cancel()
-				gomega.Expect(err).Should(gomega.BeNil())
-
-				tests.Outf("{{green}}created wallet{{/}}\n")
-			})
+			keychain := e2e.Env.NewKeychain(1)
+			wallet := e2e.Env.NewWallet(keychain)
 
 			// Get the P-chain and the X-chain wallets
 			pWallet := wallet.P()
@@ -65,7 +40,7 @@ var _ = ginkgo.Describe("[Banff]", func() {
 			owner := &secp256k1fx.OutputOwners{
 				Threshold: 1,
 				Addrs: []ids.ShortID{
-					genesis.EWOQKey.PublicKey().Address(),
+					keychain.Keys[0].Address(),
 				},
 			}
 

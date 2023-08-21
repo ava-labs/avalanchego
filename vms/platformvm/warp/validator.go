@@ -26,6 +26,12 @@ var (
 	ErrWeightOverflow   = errors.New("weight overflowed")
 )
 
+// ValidatorState defines the functions that must be implemented to get
+// the canonical validator set for warp message validation.
+type ValidatorState interface {
+	GetValidatorSet(ctx context.Context, height uint64, subnetID ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error)
+}
+
 type Validator struct {
 	PublicKey      *bls.PublicKey
 	PublicKeyBytes []byte
@@ -42,7 +48,7 @@ func (v *Validator) Less(o *Validator) bool {
 // [subnetID].
 func GetCanonicalValidatorSet(
 	ctx context.Context,
-	pChainState validators.State,
+	pChainState ValidatorState,
 	pChainHeight uint64,
 	subnetID ids.ID,
 ) ([]*Validator, uint64, error) {

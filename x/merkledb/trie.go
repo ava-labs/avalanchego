@@ -44,8 +44,11 @@ type ReadOnlyTrie interface {
 	// get an editable copy of the node with the given key path
 	getEditableNode(key path) (*node, error)
 
-	// GetRangeProof generates a proof of up to maxLength smallest key/values with keys between start and end
-	GetRangeProof(ctx context.Context, start []byte, end maybe.Maybe[[]byte], maxLength int) (*RangeProof, error)
+	// GetRangeProof returns a proof of up to [maxLength] key-value pairs with
+	// keys in range [start, end].
+	// If [start] is Nothing, there's no lower bound on the range.
+	// If [end] is Nothing, there's no upper bound on the range.
+	GetRangeProof(ctx context.Context, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], maxLength int) (*RangeProof, error)
 
 	database.Iteratee
 }
@@ -64,10 +67,6 @@ type TrieView interface {
 	// until all changes in the stack commit to the database
 	// Takes the DB commit lock
 	CommitToDB(ctx context.Context) error
-
-	// CommitToParent takes changes of this TrieView and commits them to its parent Trie
-	// Takes the DB commit lock
-	CommitToParent(ctx context.Context) error
 
 	// commits changes in the trie to its parent
 	// then commits the combined changes down the stack until all changes in the stack commit to the database

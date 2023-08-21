@@ -10,43 +10,49 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var Tests = []func(c GeneralCodec, t testing.TB){
-	TestStruct,
-	TestRegisterStructTwice,
-	TestUInt32,
-	TestUIntPtr,
-	TestSlice,
-	TestMaxSizeSlice,
-	TestBool,
-	TestArray,
-	TestBigArray,
-	TestPointerToStruct,
-	TestSliceOfStruct,
-	TestInterface,
-	TestSliceOfInterface,
-	TestArrayOfInterface,
-	TestPointerToInterface,
-	TestString,
-	TestNilSlice,
-	TestSerializeUnexportedField,
-	TestSerializeOfNoSerializeField,
-	TestNilSliceSerialization,
-	TestEmptySliceSerialization,
-	TestSliceWithEmptySerialization,
-	TestSliceWithEmptySerializationOutOfMemory,
-	TestSliceTooLarge,
-	TestNegativeNumbers,
-	TestTooLargeUnmarshal,
-	TestUnmarshalInvalidInterface,
-	TestRestrictedSlice,
-	TestExtraSpace,
-	TestSliceLengthOverflow,
-	TestMap,
-}
+var (
+	Tests = []func(c GeneralCodec, t testing.TB){
+		TestStruct,
+		TestRegisterStructTwice,
+		TestUInt32,
+		TestUIntPtr,
+		TestSlice,
+		TestMaxSizeSlice,
+		TestBool,
+		TestArray,
+		TestBigArray,
+		TestPointerToStruct,
+		TestSliceOfStruct,
+		TestInterface,
+		TestSliceOfInterface,
+		TestArrayOfInterface,
+		TestPointerToInterface,
+		TestString,
+		TestNilSlice,
+		TestSerializeUnexportedField,
+		TestSerializeOfNoSerializeField,
+		TestNilSliceSerialization,
+		TestEmptySliceSerialization,
+		TestSliceWithEmptySerialization,
+		TestSliceWithEmptySerializationOutOfMemory,
+		TestSliceTooLarge,
+		TestNegativeNumbers,
+		TestTooLargeUnmarshal,
+		TestUnmarshalInvalidInterface,
+		TestRestrictedSlice,
+		TestExtraSpace,
+		TestSliceLengthOverflow,
+		TestMap,
+	}
 
-var MultipleTagsTests = []func(c GeneralCodec, t testing.TB){
-	TestMultipleTags,
-}
+	MultipleTagsTests = []func(c GeneralCodec, t testing.TB){
+		TestMultipleTags,
+	}
+
+	FuzzTests = []func(c GeneralCodec, f *testing.F){
+		FuzzStructUnmarshal,
+	}
+)
 
 // The below structs and interfaces exist
 // for the sake of testing
@@ -108,6 +114,16 @@ type myStruct struct {
 	MyMap5       map[int32]int32             `serialize:"true"`
 	MyMap6       map[[5]int32]int32          `serialize:"true"`
 	MyMap7       map[interface{}]interface{} `serialize:"true"`
+	Uint8        uint8                       `serialize:"true"`
+	Int8         int8                        `serialize:"true"`
+	Uint16       uint16                      `serialize:"true"`
+	Int16        int16                       `serialize:"true"`
+	Uint32       uint32                      `serialize:"true"`
+	Int32        int32                       `serialize:"true"`
+	Uint64       uint64                      `serialize:"true"`
+	Int64        int64                       `serialize:"true"`
+	Bool         bool                        `serialize:"true"`
+	String       string                      `serialize:"true"`
 }
 
 // Test marshaling/unmarshaling a complicated struct
@@ -1029,4 +1045,33 @@ func TestMap(codec GeneralCodec, t testing.TB) {
 	outerArraySize, err := manager.Size(0, outerArray)
 	require.NoError(err)
 	require.Len(outerArrayBytes, outerArraySize)
+}
+
+func FuzzStructUnmarshal(codec GeneralCodec, f *testing.F) {
+	manager := NewDefaultManager()
+	// Register the types that may be unmarshaled into interfaces
+	require.NoError(f, codec.RegisterType(&MyInnerStruct{}))
+	require.NoError(f, codec.RegisterType(&MyInnerStruct2{}))
+	require.NoError(f, codec.RegisterType(""))
+	require.NoError(f, codec.RegisterType(int32(0)))
+	require.NoError(f, manager.RegisterCodec(0, codec))
+
+	f.Fuzz(func(t *testing.T, bytes []byte) {
+		require := require.New(t)
+
+		myParsedStruct := &myStruct{}
+		version, err := manager.Unmarshal(bytes, myParsedStruct)
+		if err != nil {
+			return
+		}
+		require.Zero(version)
+
+		marshalled, err := manager.Marshal(version, myParsedStruct)
+		require.NoError(err)
+		require.Equal(bytes, marshalled)
+
+		size, err := manager.Size(version, myParsedStruct)
+		require.NoError(err)
+		require.Len(bytes, size)
+	})
 }

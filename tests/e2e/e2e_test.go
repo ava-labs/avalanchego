@@ -4,19 +4,28 @@
 package e2e_test
 
 import (
+	"context"
+	"encoding/json"
 	"flag"
+	"fmt"
+	"os"
 	"testing"
 
 	ginkgo "github.com/onsi/ginkgo/v2"
 
 	"github.com/onsi/gomega"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/e2e"
+	"github.com/ava-labs/avalanchego/tests/fixture"
+	"github.com/ava-labs/avalanchego/tests/fixture/testnet"
+	"github.com/ava-labs/avalanchego/tests/fixture/testnet/local"
 
 	// ensure test packages are scanned by ginkgo
 	_ "github.com/ava-labs/avalanchego/tests/e2e/banff"
 	_ "github.com/ava-labs/avalanchego/tests/e2e/p"
-	_ "github.com/ava-labs/avalanchego/tests/e2e/ping"
 	_ "github.com/ava-labs/avalanchego/tests/e2e/static-handlers"
 	_ "github.com/ava-labs/avalanchego/tests/e2e/x/transfer"
 )
@@ -27,91 +36,97 @@ func TestE2E(t *testing.T) {
 }
 
 var (
-	// helpers to parse test flags
-	logLevel string
-
-	networkRunnerGRPCEp              string
-	networkRunnerAvalancheGoExecPath string
-	networkRunnerAvalancheGoLogLevel string
-
-	uris string
-
-	testKeysFile string
+	avalancheGoExecPath  string
+	persistentNetworkDir string
+	usePersistentNetwork bool
 )
 
 func init() {
 	flag.StringVar(
-		&logLevel,
-		"log-level",
-		"info",
-		"log level",
+		&avalancheGoExecPath,
+		"avalanchego-path",
+		os.Getenv(local.AvalancheGoPathEnvName),
+		fmt.Sprintf("avalanchego executable path (required if not using a persistent network). Also possible to configure via the %s env variable.", local.AvalancheGoPathEnvName),
 	)
-
 	flag.StringVar(
-		&networkRunnerGRPCEp,
-		"network-runner-grpc-endpoint",
+		&persistentNetworkDir,
+		"network-dir",
 		"",
-		"[optional] gRPC server endpoint for network-runner (only required for local network-runner tests)",
+		fmt.Sprintf("[optional] the dir containing the configuration of a persistent network to target for testing. Useful for speeding up test development. Also possible to configure via the %s env variable.", local.NetworkDirEnvName),
 	)
-	flag.StringVar(
-		&networkRunnerAvalancheGoExecPath,
-		"network-runner-avalanchego-path",
-		"",
-		"[optional] avalanchego executable path (only required for local network-runner tests)",
-	)
-	flag.StringVar(
-		&networkRunnerAvalancheGoLogLevel,
-		"network-runner-avalanchego-log-level",
-		"INFO",
-		"[optional] avalanchego log-level (only required for local network-runner tests)",
-	)
-
-	// e.g., custom network HTTP RPC endpoints
-	flag.StringVar(
-		&uris,
-		"uris",
-		"",
-		"HTTP RPC endpoint URIs for avalanche node (comma-separated, required to run against existing cluster)",
-	)
-
-	// file that contains a list of new-line separated secp256k1 private keys
-	flag.StringVar(
-		&testKeysFile,
-		"test-keys-file",
-		"",
-		"file that contains a list of new-line separated hex-encoded secp256k1 private keys (assume test keys are pre-funded, for test networks)",
+	flag.BoolVar(
+		&usePersistentNetwork,
+		"use-persistent-network",
+		false,
+		"[optional] whether to target the persistent network identified by --network-dir.",
 	)
 }
 
-var _ = ginkgo.BeforeSuite(func() {
-	err := e2e.Env.ConfigCluster(
-		logLevel,
-		networkRunnerGRPCEp,
-		networkRunnerAvalancheGoExecPath,
-		networkRunnerAvalancheGoLogLevel,
-		uris,
-		testKeysFile,
-	)
-	gomega.Expect(err).Should(gomega.BeNil())
+var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
+	// Run only once in the first ginkgo process
 
-	// check cluster can be started
-	err = e2e.Env.StartCluster()
-	gomega.Expect(err).Should(gomega.BeNil())
+	require := require.New(ginkgo.GinkgoT())
 
-	// load keys
-	err = e2e.Env.LoadKeys()
-	gomega.Expect(err).Should(gomega.BeNil())
+	if usePersistentNetwork && len(persistentNetworkDir) == 0 {
+		persistentNetworkDir = os.Getenv(local.NetworkDirEnvName)
+	}
 
-	// take initial snapshot. cluster will be switched off
-	err = e2e.Env.SnapInitialState()
-	gomega.Expect(err).Should(gomega.BeNil())
+	// Load or create a test network
+	var network *local.LocalNetwork
+	if len(persistentNetworkDir) > 0 {
+		tests.Outf("{{yellow}}Using a pre-existing network configured at %s{{/}}\n", persistentNetworkDir)
 
-	// restart cluster
-	err = e2e.Env.RestoreInitialState(false /*switchOffNetworkFirst*/)
-	gomega.Expect(err).Should(gomega.BeNil())
-})
+		var err error
+		network, err = local.ReadNetwork(persistentNetworkDir)
+		require.NoError(err)
+	} else {
+		tests.Outf("{{magenta}}Starting network with %q{{/}}\n", avalancheGoExecPath)
 
-var _ = ginkgo.AfterSuite(func() {
-	err := e2e.Env.ShutdownCluster()
-	gomega.Expect(err).Should(gomega.BeNil())
+		ctx, cancel := context.WithTimeout(context.Background(), local.DefaultNetworkStartTimeout)
+		defer cancel()
+		var err error
+		network, err = local.StartNetwork(
+			ctx,
+			ginkgo.GinkgoWriter,
+			ginkgo.GinkgoT().TempDir(),
+			&local.LocalNetwork{
+				LocalConfig: local.LocalConfig{
+					ExecPath: avalancheGoExecPath,
+				},
+			},
+			testnet.DefaultNodeCount,
+			testnet.DefaultFundedKeyCount,
+		)
+		require.NoError(err)
+		ginkgo.DeferCleanup(func() {
+			tests.Outf("Shutting down network\n")
+			require.NoError(network.Stop())
+		})
+
+		tests.Outf("{{green}}Successfully started network{{/}}\n")
+	}
+
+	uris := network.GetURIs()
+	require.NotEmpty(uris, "network contains no nodes")
+	tests.Outf("{{green}}network URIs: {{/}} %+v\n", uris)
+
+	testDataServerURI, err := fixture.ServeTestData(fixture.TestData{
+		FundedKeys: network.FundedKeys,
+	})
+	tests.Outf("{{green}}test data server URI: {{/}} %+v\n", testDataServerURI)
+	require.NoError(err)
+
+	env := &e2e.TestEnvironment{
+		NetworkDir:        network.Dir,
+		URIs:              uris,
+		TestDataServerURI: testDataServerURI,
+	}
+	bytes, err := json.Marshal(env)
+	require.NoError(err)
+	return bytes
+}, func(envBytes []byte) {
+	// Run in every ginkgo process
+
+	// Initialize the local test environment from the global state
+	e2e.InitTestEnvironment(envBytes)
 })
