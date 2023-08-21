@@ -97,6 +97,8 @@ type trieView struct {
 	// If true, this view has been committed.
 	// [commitLock] must be held while accessing this field.
 	committed bool
+
+	unaddedValues map[path]maybe.Maybe[[]byte]
 }
 
 // NewView returns a new view on top of this one.
@@ -146,21 +148,20 @@ func newTrieView(
 	}
 
 	newView := &trieView{
-		root:       root,
-		db:         db,
-		parentTrie: parentTrie,
-		changes:    newChangeSummary(len(batchOps)),
+		root:          root,
+		db:            db,
+		parentTrie:    parentTrie,
+		changes:       newChangeSummary(len(batchOps)),
+		unaddedValues: make(map[path]maybe.Maybe[[]byte], len(batchOps)),
 	}
 
 	for _, op := range batchOps {
-		if op.Delete {
-			if err := newView.remove(op.Key); err != nil {
-				return nil, err
-			}
-		} else {
-			if _, err := newView.insert(newPath(op.Key), maybe.Some(slices.Clone(op.Value))); err != nil {
-				return nil, err
-			}
+		newVal := maybe.Nothing[[]byte]()
+		if !op.Delete {
+			newVal = maybe.Some(slices.Clone(op.Value))
+		}
+		if err := newView.recordValueChange(newPath(op.Key), newVal); err != nil {
+			return nil, err
 		}
 	}
 	return newView, nil
@@ -206,6 +207,20 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 		// per key modified even though IDs are not re-calculated).
 		ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.calculateNodeIDs")
 		defer span.End()
+
+		// add all the changed key/values to the nodes of the trie
+		for key, value := range t.unaddedValues {
+			if value.IsNothing() {
+				if err = t.remove(key); err != nil {
+					return
+				}
+			} else {
+				if _, err = t.insert(key, value); err != nil {
+					return
+				}
+			}
+		}
+		t.unaddedValues = nil
 
 		// [eg] limits the number of goroutines we start.
 		var eg errgroup.Group
@@ -688,21 +703,15 @@ func (t *trieView) getValue(key path) ([]byte, error) {
 	return value, nil
 }
 
-// Assumes [t.validityTrackingLock] isn't held.
-func (t *trieView) remove(key []byte) error {
-	path := newPath(key)
-	if err := t.recordValueChange(path, maybe.Nothing[[]byte]()); err != nil {
-		return err
-	}
-
-	nodePath, err := t.getPathTo(path)
+func (t *trieView) remove(key path) error {
+	nodePath, err := t.getPathTo(key)
 	if err != nil {
 		return err
 	}
 
 	nodeToDelete := nodePath[len(nodePath)-1]
 
-	if nodeToDelete.key.Compare(path) != 0 || !nodeToDelete.hasValue() {
+	if nodeToDelete.key.Compare(key) != 0 || !nodeToDelete.hasValue() {
 		// the key wasn't in the trie or doesn't have a value so there's nothing to do
 		return nil
 	}
@@ -873,15 +882,11 @@ func (t *trieView) getEditableNode(key path) (*node, error) {
 	return n.clone(), nil
 }
 
-// Inserts a key/value pair into the trie.
+// insert a key/value pair into the correct node of the trie
 func (t *trieView) insert(
 	key path,
 	value maybe.Maybe[[]byte],
 ) (*node, error) {
-	if err := t.recordValueChange(key, value); err != nil {
-		return nil, err
-	}
-
 	// find the node that most closely matches [key]
 	pathToNode, err := t.getPathTo(key)
 	if err != nil {
@@ -1011,6 +1016,8 @@ func (t *trieView) recordKeyChange(key path, after *node) error {
 // Doesn't actually change the trie data structure.
 // That's deferred until we calculate node IDs.
 func (t *trieView) recordValueChange(key path, value maybe.Maybe[[]byte]) error {
+	t.unaddedValues[key] = value
+
 	// update the existing change if it exists
 	if existing, ok := t.changes.values[key]; ok {
 		existing.after = value
