@@ -189,7 +189,7 @@ func newDatabase(
 		metadataDB:        prefixdb.New(metadataPrefix, db),
 		history:           newTrieHistory(config.HistoryLength),
 		tracer:            config.Tracer,
-		childViews:        make([]*trieView, 0, childViewsPreallocationSize),
+		childViews:        make([]*trieView, 0, defaultPreallocationSize),
 		evictionBatchSize: config.EvictionBatchSize,
 	}
 

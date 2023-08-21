@@ -26,8 +26,8 @@ import (
 )
 
 const (
-	initKeyValuesSize           = 256
-	childViewsPreallocationSize = 5
+	initKeyValuesSize        = 256
+	defaultPreallocationSize = 100
 )
 
 var (
@@ -525,7 +525,7 @@ func (t *trieView) invalidate() {
 	}
 
 	// after invalidating the children, they no longer need to be tracked
-	t.childViews = make([]*trieView, 0, childViewsPreallocationSize)
+	t.childViews = make([]*trieView, 0, defaultPreallocationSize)
 }
 
 func (t *trieView) updateParent(newParent TrieView) {
@@ -543,7 +543,7 @@ func (t *trieView) invalidateChildrenExcept(exception *trieView) {
 	childrenToInvalidate := t.childViews
 
 	// after invalidating the children, they no longer need to be tracked
-	t.childViews = make([]*trieView, 0, childViewsPreallocationSize)
+	t.childViews = make([]*trieView, 0, defaultPreallocationSize)
 	// add back in the exception view since it is still valid
 	if exception != nil {
 		t.childViews = append(t.childViews, exception)
