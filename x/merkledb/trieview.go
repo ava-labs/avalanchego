@@ -535,35 +535,8 @@ func (t *trieView) updateParent(newParent TrieView) {
 	t.parentTrie = newParent
 }
 
-// Invalidates all children of this view except [exception].
-// [t.childViews] will only contain the exception after invalidation is complete.
-// Assumes [t.validityTrackingLock] isn't held.
-func (t *trieView) invalidateChildrenExcept(exception *trieView) {
-	t.validityTrackingLock.Lock()
-	childrenToInvalidate := t.childViews
-
-	// after invalidating the children, they no longer need to be tracked
-	t.childViews = make([]*trieView, 0, defaultPreallocationSize)
-	// add back in the exception view since it is still valid
-	if exception != nil {
-		t.childViews = append(t.childViews, exception)
-	}
-	t.validityTrackingLock.Unlock()
-
-	for _, childView := range childrenToInvalidate {
-		if childView != exception {
-			childView.invalidate()
-		}
-	}
-}
-
 // GetMerkleRoot returns the ID of the root of this trie.
 func (t *trieView) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
-	return t.getMerkleRoot(ctx)
-}
-
-// Returns the ID of the root node of this trie.
-func (t *trieView) getMerkleRoot(ctx context.Context) (ids.ID, error) {
 	if err := t.calculateNodeIDs(ctx); err != nil {
 		return ids.Empty, err
 	}

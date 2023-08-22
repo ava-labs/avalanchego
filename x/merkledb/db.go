@@ -1111,7 +1111,7 @@ func (db *merkleDB) VerifyChangeProof(
 	}
 
 	// Make sure we get the expected root.
-	calculatedRoot, err := view.getMerkleRoot(ctx)
+	calculatedRoot, err := view.GetMerkleRoot(ctx)
 	if err != nil {
 		return err
 	}

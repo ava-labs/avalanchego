@@ -954,42 +954,6 @@ func TestTrieViewInvalidate(t *testing.T) {
 	require.True(view3.invalidated)
 }
 
-func TestTrieViewInvalidChildrenExcept(t *testing.T) {
-	require := require.New(t)
-
-	db, err := getBasicDB()
-	require.NoError(err)
-
-	// Create a view
-	view1Intf, err := db.NewView(context.Background(), nil)
-	require.NoError(err)
-	require.IsType(&trieView{}, view1Intf)
-	view1 := view1Intf.(*trieView)
-
-	// Create 2 views atop view1
-	view2Intf, err := view1.NewView(context.Background(), nil)
-	require.NoError(err)
-	require.IsType(&trieView{}, view2Intf)
-	view2 := view2Intf.(*trieView)
-
-	view3Intf, err := view1.NewView(context.Background(), nil)
-	require.NoError(err)
-	require.IsType(&trieView{}, view3Intf)
-	view3 := view3Intf.(*trieView)
-
-	view1.invalidateChildrenExcept(view2)
-
-	require.False(view2.invalidated)
-	require.True(view3.invalidated)
-	require.Contains(view1.childViews, view2)
-	require.Len(view1.childViews, 1)
-
-	view1.invalidateChildrenExcept(nil)
-	require.True(view2.invalidated)
-	require.True(view3.invalidated)
-	require.Empty(view1.childViews)
-}
-
 func Test_Trie_ConcurrentNewViewAndCommit(t *testing.T) {
 	require := require.New(t)
 

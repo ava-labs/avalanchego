@@ -508,7 +508,7 @@ func TestDatabaseCommitChanges(t *testing.T) {
 	require.NoError(err)
 	require.IsType(&trieView{}, view1Intf)
 	view1 := view1Intf.(*trieView)
-	view1Root, err := view1.getMerkleRoot(context.Background())
+	view1Root, err := view1.GetMerkleRoot(context.Background())
 	require.NoError(err)
 
 	// Make a second view
