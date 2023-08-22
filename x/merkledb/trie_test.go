@@ -212,36 +212,6 @@ func Test_Trie_ViewOnCommitedView(t *testing.T) {
 	require.Equal([]byte{1}, val1)
 }
 
-func Test_Trie_Partial_Commit_Leaves_Valid_Tries(t *testing.T) {
-	require := require.New(t)
-
-	dbTrie, err := getBasicDB()
-	require.NoError(err)
-	require.NotNil(dbTrie)
-
-	trie2, err := dbTrie.NewView([]database.BatchOp{{Key: []byte("key"), Value: []byte("value")}})
-	require.NoError(err)
-
-	trie3, err := trie2.NewView([]database.BatchOp{{Key: []byte("key1"), Value: []byte("value1")}})
-	require.NoError(err)
-
-	trie4, err := trie3.NewView([]database.BatchOp{{Key: []byte("key2"), Value: []byte("value2")}})
-	require.NoError(err)
-
-	_, err = trie4.NewView([]database.BatchOp{{Key: []byte("key3"), Value: []byte("value3")}})
-	require.NoError(err)
-
-	require.NoError(trie3.CommitToDB(context.Background()))
-
-	root, err := trie3.GetMerkleRoot(context.Background())
-	require.NoError(err)
-
-	dbRoot, err := dbTrie.GetMerkleRoot(context.Background())
-	require.NoError(err)
-
-	require.Equal(root, dbRoot)
-}
-
 func Test_Trie_WriteToDB(t *testing.T) {
 	require := require.New(t)
 
@@ -249,24 +219,25 @@ func Test_Trie_WriteToDB(t *testing.T) {
 	require.NoError(err)
 	require.NotNil(dbTrie)
 
-	trieIntf, err := dbTrie.NewView(nil)
+	trieIntf1, err := dbTrie.NewView(nil)
 	require.NoError(err)
-	trie := trieIntf.(*trieView)
+	trie1 := trieIntf1.(*trieView)
 
 	// value hasn't been inserted so shouldn't exist
-	value, err := trie.GetValue(context.Background(), []byte("key"))
+	value, err := trie1.GetValue(context.Background(), []byte("key"))
 	require.ErrorIs(err, database.ErrNotFound)
 	require.Nil(value)
 
-	trieIntf, err = trie.NewView([]database.BatchOp{{Key: []byte("key"), Value: []byte("value")}})
+	trieIntf2, err := trie1.NewView([]database.BatchOp{{Key: []byte("key"), Value: []byte("value")}})
 	require.NoError(err)
-	trie = trieIntf.(*trieView)
+	trie2 := trieIntf2.(*trieView)
 
-	value, err = getNodeValue(trie, "key")
+	value, err = getNodeValue(trie2, "key")
 	require.NoError(err)
 	require.Equal([]byte("value"), value)
 
-	require.NoError(trie.CommitToDB(context.Background()))
+	require.NoError(trie1.CommitToDB(context.Background()))
+	require.NoError(trie2.CommitToDB(context.Background()))
 
 	p := newPath([]byte("key"))
 	rawBytes, err := dbTrie.nodeDB.Get(p.Bytes())
@@ -549,100 +520,6 @@ func Test_Trie_NoExistingResidual(t *testing.T) {
 	require.Equal([]byte("4"), value)
 }
 
-func Test_Trie_CommitChanges(t *testing.T) {
-	require := require.New(t)
-
-	db, err := getBasicDB()
-	require.NoError(err)
-
-	view1Intf, err := db.NewView([]database.BatchOp{{Key: []byte{1}, Value: []byte{1}}})
-	require.NoError(err)
-	require.IsType(&trieView{}, view1Intf)
-	view1 := view1Intf.(*trieView)
-
-	// view1
-	//   |
-	//  db
-
-	// Case: Committing to an invalid view
-	view1.invalidated = true
-	err = view1.commitChanges(context.Background(), &trieView{})
-	require.ErrorIs(err, ErrInvalid)
-	view1.invalidated = false // Reset
-
-	// Case: Committing a nil view is a no-op
-	oldRoot, err := view1.getMerkleRoot(context.Background())
-	require.NoError(err)
-	require.NoError(view1.commitChanges(context.Background(), nil))
-	newRoot, err := view1.getMerkleRoot(context.Background())
-	require.NoError(err)
-	require.Equal(oldRoot, newRoot)
-
-	// Case: Committing a view with the wrong parent.
-	err = view1.commitChanges(context.Background(), &trieView{})
-	require.ErrorIs(err, ErrViewIsNotAChild)
-
-	// Case: Committing a view which is invalid
-	err = view1.commitChanges(context.Background(), &trieView{
-		parentTrie:  view1,
-		invalidated: true,
-	})
-	require.ErrorIs(err, ErrInvalid)
-
-	// Make more views atop the existing one
-	view2Intf, err := view1.NewView([]database.BatchOp{
-		{Key: []byte{2}, Value: []byte{2}},
-		{Key: []byte{1}, Delete: true},
-	})
-	require.NoError(err)
-	require.IsType(&trieView{}, view2Intf)
-	view2 := view2Intf.(*trieView)
-
-	view2Root, err := view2.getMerkleRoot(context.Background())
-	require.NoError(err)
-
-	// view1 has 1 --> 1
-	// view2 has 2 --> 2
-
-	view3Intf, err := view1.NewView(nil)
-	require.NoError(err)
-	require.IsType(&trieView{}, view3Intf)
-	view3 := view3Intf.(*trieView)
-
-	view4Intf, err := view2.NewView(nil)
-	require.NoError(err)
-	require.IsType(&trieView{}, view4Intf)
-	view4 := view4Intf.(*trieView)
-
-	// view4
-	//   |
-	// view2  view3
-	//   |   /
-	// view1
-	//   |
-	//  db
-
-	// Commit view2 to view1
-	require.NoError(view1.commitChanges(context.Background(), view2))
-
-	// All siblings of view2 should be invalidated
-	require.True(view3.invalidated)
-
-	// Children of view2 are now children of view1
-	require.Equal(view1, view4.parentTrie)
-	require.Contains(view1.childViews, view4)
-
-	// Value changes from view2 are reflected in view1
-	newView1Root, err := view1.getMerkleRoot(context.Background())
-	require.NoError(err)
-	require.Equal(view2Root, newView1Root)
-	_, err = view1.GetValue(context.Background(), []byte{1})
-	require.ErrorIs(err, database.ErrNotFound)
-	got, err := view1.GetValue(context.Background(), []byte{2})
-	require.NoError(err)
-	require.Equal([]byte{2}, got)
-}
-
 func Test_Trie_BatchApply(t *testing.T) {
 	require := require.New(t)
 
@@ -711,25 +588,27 @@ func Test_Trie_Invalidate_Siblings_On_Commit(t *testing.T) {
 	require.NoError(err)
 	require.NotNil(dbTrie)
 
-	baseView, err := dbTrie.NewView(nil)
+	view1, err := dbTrie.NewView(nil)
 	require.NoError(err)
 
-	viewToCommit, err := baseView.NewView([]database.BatchOp{{Key: []byte{0}, Value: []byte{0}}})
+	view2, err := view1.NewView([]database.BatchOp{{Key: []byte{0}, Value: []byte{0}}})
 	require.NoError(err)
 
-	sibling1, err := baseView.NewView(nil)
+	// Siblings of view2
+	sibling1, err := view1.NewView(nil)
 	require.NoError(err)
-	sibling2, err := baseView.NewView(nil)
+	sibling2, err := view1.NewView(nil)
 	require.NoError(err)
 
 	require.False(sibling1.(*trieView).isInvalid())
 	require.False(sibling2.(*trieView).isInvalid())
 
-	require.NoError(viewToCommit.CommitToDB(context.Background()))
+	require.NoError(view1.CommitToDB(context.Background()))
+	require.NoError(view2.CommitToDB(context.Background()))
 
 	require.True(sibling1.(*trieView).isInvalid())
 	require.True(sibling2.(*trieView).isInvalid())
-	require.False(viewToCommit.(*trieView).isInvalid())
+	require.False(view2.(*trieView).isInvalid())
 }
 
 func Test_Trie_NodeCollapse(t *testing.T) {
@@ -1077,46 +956,6 @@ func TestTrieViewInvalidate(t *testing.T) {
 	require.True(view3.invalidated)
 }
 
-func TestTrieViewMoveChildViewsToView(t *testing.T) {
-	require := require.New(t)
-
-	db, err := getBasicDB()
-	require.NoError(err)
-
-	// Create a view
-	view1Intf, err := db.NewView(nil)
-	require.NoError(err)
-	require.IsType(&trieView{}, view1Intf)
-	view1 := view1Intf.(*trieView)
-
-	// Create a view atop view1
-	view2Intf, err := view1.NewView(nil)
-	require.NoError(err)
-	require.IsType(&trieView{}, view2Intf)
-	view2 := view2Intf.(*trieView)
-
-	// Create a view atop view2
-	view3Intf, err := view1.NewView(nil)
-	require.NoError(err)
-	require.IsType(&trieView{}, view3Intf)
-	view3 := view3Intf.(*trieView)
-
-	// view3
-	//   |
-	// view2
-	//   |
-	// view1
-	//   |
-	//   db
-
-	view1.moveChildViewsToView(view2)
-
-	require.Equal(view1, view3.parentTrie)
-	require.Contains(view1.childViews, view3)
-	require.Contains(view1.childViews, view2)
-	require.Len(view1.childViews, 2)
-}
-
 func TestTrieViewInvalidChildrenExcept(t *testing.T) {
 	require := require.New(t)
 
@@ -1177,4 +1016,100 @@ func Test_Trie_ConcurrentNewViewAndCommit(t *testing.T) {
 	newView, err := newTrie.NewView(nil)
 	require.NoError(err)
 	require.NotNil(newView)
+}
+
+func TestTrieCommitToDB(t *testing.T) {
+	r := require.New(t)
+
+	type test struct {
+		name        string
+		trieFunc    func() TrieView
+		expectedErr error
+	}
+
+	// Make a database
+	db, err := getBasicDB()
+	r.NoError(err)
+
+	tests := []test{
+		{
+			name: "invalid",
+			trieFunc: func() TrieView {
+				view, err := db.NewView(nil)
+				r.NoError(err)
+
+				// Invalidate the view
+				view.(*trieView).invalidate()
+
+				return view
+			},
+			expectedErr: ErrInvalid,
+		},
+		{
+			name: "committed",
+			trieFunc: func() TrieView {
+				view, err := db.NewView(nil)
+				r.NoError(err)
+
+				// Commit the view
+				r.NoError(view.CommitToDB(context.Background()))
+
+				return view
+			},
+			expectedErr: ErrCommitted,
+		},
+		{
+			name: "parent not database",
+			trieFunc: func() TrieView {
+				view, err := db.NewView(nil)
+				r.NoError(err)
+
+				// Change the parent
+				view.(*trieView).parentTrie = &trieView{}
+
+				return view
+			},
+			expectedErr: ErrParentNotDatabase,
+		},
+	}
+
+	for _, tt := range tests {
+		require := require.New(t)
+
+		trie := tt.trieFunc()
+		err := trie.commitToDB(context.Background())
+		require.ErrorIs(err, tt.expectedErr)
+	}
+
+	// Put 2 key-value pairs
+	key1, value1 := []byte("key1"), []byte("value1")
+	key2, value2 := []byte("key2"), []byte("value2")
+	r.NoError(db.Put(key1, value1))
+	r.NoError(db.Put(key2, value2))
+
+	// Make a view
+	key3, value3 := []byte("key3"), []byte("value3")
+	// Delete a key-value pair, modify a key-value pair,
+	// and insert a new key-value pair
+	view, err := db.NewView([]database.BatchOp{
+		{Key: key1, Delete: true},
+		{Key: key2, Value: value3},
+		{Key: key3, Value: value3},
+	})
+	r.NoError(err)
+
+	// Commit the view
+	r.NoError(view.CommitToDB(context.Background()))
+
+	// Make sure the database has the right values
+	_, err = db.Get(key1)
+	r.ErrorIs(err, database.ErrNotFound)
+
+	got, err := db.Get(key2)
+	r.NoError(err)
+	r.Equal(value3, got)
+
+	got, err = db.Get(key3)
+	r.NoError(err)
+	r.Equal(value3, got)
 }

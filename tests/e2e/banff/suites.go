@@ -5,8 +5,6 @@
 package banff
 
 import (
-	"context"
-
 	ginkgo "github.com/onsi/ginkgo/v2"
 
 	"github.com/onsi/gomega"
@@ -19,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 )
 
 var _ = ginkgo.Describe("[Banff]", func() {
@@ -31,24 +28,8 @@ var _ = ginkgo.Describe("[Banff]", func() {
 			"banff",
 		),
 		func() {
-			key := e2e.Env.AllocateFundedKey()
-			kc := secp256k1fx.NewKeychain(key)
-			var wallet primary.Wallet
-			ginkgo.By("initialize wallet", func() {
-				walletURI := e2e.Env.GetRandomNodeURI()
-
-				// 5-second is enough to fetch initial UTXOs for test cluster in "primary.NewWallet"
-				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultWalletCreationTimeout)
-				var err error
-				wallet, err = primary.MakeWallet(ctx, &primary.WalletConfig{
-					URI:      walletURI,
-					Keychain: kc,
-				})
-				cancel()
-				gomega.Expect(err).Should(gomega.BeNil())
-
-				tests.Outf("{{green}}created wallet{{/}}\n")
-			})
+			keychain := e2e.Env.NewKeychain(1)
+			wallet := e2e.Env.NewWallet(keychain)
 
 			// Get the P-chain and the X-chain wallets
 			pWallet := wallet.P()
@@ -59,7 +40,7 @@ var _ = ginkgo.Describe("[Banff]", func() {
 			owner := &secp256k1fx.OutputOwners{
 				Threshold: 1,
 				Addrs: []ids.ShortID{
-					key.Address(),
+					keychain.Keys[0].Address(),
 				},
 			}
 
