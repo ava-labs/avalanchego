@@ -54,6 +54,7 @@ func (v *Validators) refresh(ctx context.Context) {
 	}
 
 	v.validatorIDs = maps.Keys(validatorSet)
+	v.lastUpdated = time.Now()
 }
 
 func (v *Validators) Sample(ctx context.Context, limit int) []ids.NodeID {
