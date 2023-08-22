@@ -469,7 +469,7 @@ func (e *ProposalTxExecutor) rewardValidatorTx(uValidatorTx txs.ValidatorTx, val
 		validator.SubnetID,
 		validator.NodeID,
 	)
-	if err != nil && err != database.ErrNotFound {
+	if err != nil {
 		return fmt.Errorf("failed to fetch accrued delegatee rewards: %w", err)
 	}
 
