@@ -191,7 +191,8 @@ func newHistoricalTrieView(
 		parentTrie: parentTrie,
 		changes:    changes,
 	}
-	// the changes have already been calculated, don't need to do it again later
+	// since this is a set of historical changes, all nodes have already been calculated
+	// since no new changes have occurred, no new calculations need to be done
 	newView.calculateNodesOnce.Do(func() {})
 	newView.nodesAlreadyCalculated.Set(true)
 	return newView, nil
