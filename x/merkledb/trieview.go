@@ -170,10 +170,9 @@ func newTrieView(
 	return newView, nil
 }
 
-// Creates a new view with the given [parentTrie].
+// Creates a new view with the given changes to create a view of the db at a historical root
 func newHistoricalTrieView(
 	db *merkleDB,
-	parentTrie TrieView,
 	changes *changeSummary,
 ) (*trieView, error) {
 	if changes == nil {
@@ -188,7 +187,7 @@ func newHistoricalTrieView(
 	newView := &trieView{
 		root:       passedRootChange.after,
 		db:         db,
-		parentTrie: parentTrie,
+		parentTrie: db,
 		changes:    changes,
 	}
 	// since this is a set of historical changes, all nodes have already been calculated

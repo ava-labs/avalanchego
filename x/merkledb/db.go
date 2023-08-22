@@ -1200,7 +1200,7 @@ func (db *merkleDB) getHistoricalViewForRange(
 	if err != nil {
 		return nil, err
 	}
-	return newHistoricalTrieView(db, db, changeHistory)
+	return newHistoricalTrieView(db, changeHistory)
 }
 
 // Returns all keys in range [start, end] that aren't in [keySet].
