@@ -11,6 +11,8 @@ type multiLock struct {
 	locks []sync.Locker
 }
 
+// NewMultiLock returns a locker that will acquire the provided locks in the
+// order they are provided.
 func NewMultiLock(locks ...sync.Locker) sync.Locker {
 	return &multiLock{
 		locks: locks,
