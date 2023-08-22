@@ -34,8 +34,8 @@ type Config struct {
 	// If <= 0 never samples.
 	TraceSampleRate float64 `json:"traceSampleRate"`
 
-	AppName string
-	Version string
+	AppName string `json:"appName"`
+	Version string `json:"version"`
 }
 
 type Tracer interface {
