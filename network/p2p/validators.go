@@ -8,12 +8,9 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/exp/maps"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/math"
-	"github.com/ava-labs/avalanchego/utils/sampler"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 const maxValidatorSetStaleness = time.Minute
@@ -34,7 +31,7 @@ type Validators struct {
 	validators validators.State
 
 	lock                     sync.Mutex
-	validatorIDs             []ids.NodeID
+	validatorIDs             set.SampleableSet[ids.NodeID]
 	lastUpdated              time.Time
 	maxValidatorSetStaleness time.Duration
 }
@@ -53,7 +50,10 @@ func (v *Validators) refresh(ctx context.Context) {
 		return
 	}
 
-	v.validatorIDs = maps.Keys(validatorSet)
+	v.validatorIDs = set.NewSampleableSet[ids.NodeID](len(validatorSet))
+	for nodeID := range validatorSet {
+		v.validatorIDs.Add(nodeID)
+	}
 	v.lastUpdated = time.Now()
 }
 
@@ -63,14 +63,14 @@ func (v *Validators) Sample(ctx context.Context, limit int) []ids.NodeID {
 
 	v.refresh(ctx)
 
-	s := sampler.NewUniform()
-	s.Initialize(uint64(len(v.validatorIDs)))
+	return v.validatorIDs.Sample(limit)
+}
 
-	indices, _ := s.Sample(math.Min(len(v.validatorIDs), limit))
-	sampled := make([]ids.NodeID, 0, len(indices))
-	for _, i := range indices {
-		sampled = append(sampled, v.validatorIDs[i])
-	}
+func (v *Validators) Has(ctx context.Context, nodeID ids.NodeID) bool {
+	v.lock.Lock()
+	defer v.lock.Unlock()
 
-	return sampled
+	v.refresh(ctx)
+
+	return v.validatorIDs.Contains(nodeID)
 }
