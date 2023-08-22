@@ -43,6 +43,7 @@ func NewTLSServerUpgrader(
 	return &tlsServerUpgrader{
 		config:       config,
 		invalidCerts: invalidCerts,
+		log:          log,
 	}
 }
 
@@ -68,6 +69,7 @@ func NewTLSClientUpgrader(
 	return &tlsClientUpgrader{
 		config:       config,
 		invalidCerts: invalidCerts,
+		log:          log,
 	}
 }
 
