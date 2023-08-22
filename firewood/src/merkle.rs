@@ -1207,7 +1207,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                         // create a new leaf
                         let leaf_ptr = self
                             .new_node(Node::new(NodeType::Leaf(LeafNode(
-                                PartialPath(key_nibbles.skip(key_nib_offset + 1).iter().collect()),
+                                PartialPath(key_nibbles.iter().skip(key_nib_offset + 1).collect()),
                                 Data(val.take().unwrap()),
                             ))))?
                             .as_ptr();
@@ -1226,7 +1226,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                     // of the stored key to pass into split
                     let n_path = n.0.to_vec();
                     let n_value = Some(n.1.clone());
-                    let rem_path = key_nibbles.skip(key_nib_offset).iter().collect::<Vec<_>>();
+                    let rem_path = key_nibbles.iter().skip(key_nib_offset).collect::<Vec<_>>();
                     self.split(
                         node,
                         &mut parents,
@@ -1242,7 +1242,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                     let n_path = n.0.to_vec();
                     let n_ptr = n.1;
                     nskip = n_path.len() - 1;
-                    let rem_path = key_nibbles.skip(key_nib_offset).iter().collect::<Vec<_>>();
+                    let rem_path = key_nibbles.iter().skip(key_nib_offset).collect::<Vec<_>>();
 
                     if let Some(v) = self.split(
                         node,
@@ -1875,16 +1875,12 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                     // the key passed in must match the entire remainder of this
                     // extension node, otherwise we break out
                     let n_path = &*n.0;
-                    let remaining_path = key_nibbles.skip(i);
-                    if remaining_path.len() < n_path.len() {
+                    let remaining_path = key_nibbles.iter().skip(i);
+                    if remaining_path.size_hint().0 < n_path.len() {
                         // all bytes aren't there
                         break;
                     }
-                    if !remaining_path
-                        .iter()
-                        .take(n_path.len())
-                        .eq(n_path.iter().cloned())
-                    {
+                    if !remaining_path.take(n_path.len()).eq(n_path.iter().cloned()) {
                         // contents aren't the same
                         break;
                     }

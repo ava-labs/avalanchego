@@ -24,7 +24,7 @@ static NIBBLES: [u8; 16] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15
 ///
 /// // nibbles can be efficiently advanced without rendering the
 /// // intermediate values
-/// assert_eq!(nib.skip(3).iter().collect::<Vec<_>>(), [0x8]);
+/// assert_eq!(nib.iter().skip(3).collect::<Vec<_>>(), [0x8]);
 ///
 /// // nibbles can also be indexed
 ///
@@ -54,16 +54,6 @@ impl<'a, const LEADING_ZEROES: usize> Nibbles<'a, LEADING_ZEROES> {
         NibblesIterator { data: self, pos: 0 }
     }
 
-    /// Efficently skip some values
-    #[must_use]
-    pub fn skip(&self, at: usize) -> NibblesSlice<'a> {
-        assert!(at >= LEADING_ZEROES, "Cannot split before LEADING_ZEROES (requested split at {at} is less than the {LEADING_ZEROES} leading zero(es)");
-        NibblesSlice {
-            skipfirst: (at - LEADING_ZEROES) % 2 != 0,
-            nibbles: Nibbles(&self.0[(at - LEADING_ZEROES) / 2..]),
-        }
-    }
-
     #[must_use]
     pub fn len(&self) -> usize {
         LEADING_ZEROES + 2 * self.0.len()
@@ -75,35 +65,7 @@ impl<'a, const LEADING_ZEROES: usize> Nibbles<'a, LEADING_ZEROES> {
     }
 }
 
-/// NibblesSlice is created by [Nibbles::skip]. This is
-/// used to create an interator that starts at some particular
-/// nibble
-#[derive(Debug)]
-pub struct NibblesSlice<'a> {
-    nibbles: Nibbles<'a, 0>,
-    skipfirst: bool,
-}
-
-impl<'a> NibblesSlice<'a> {
-    /// Returns an iterator over this subset of nibbles
-    pub fn iter(&self) -> NibblesIterator<'_, 0> {
-        let pos = if self.skipfirst { 1 } else { 0 };
-        NibblesIterator {
-            data: &self.nibbles,
-            pos,
-        }
-    }
-
-    pub fn len(&self) -> usize {
-        self.nibbles.len() - if self.skipfirst { 1 } else { 0 }
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.len() > 0
-    }
-}
-
-/// An interator returned by [Nibbles::iter] or [NibblesSlice::iter].
+/// An interator returned by [Nibbles::iter]
 /// See their documentation for details.
 #[derive(Debug)]
 pub struct NibblesIterator<'a, const LEADING_ZEROES: usize> {
@@ -123,12 +85,23 @@ impl<'a, const LEADING_ZEROES: usize> Iterator for NibblesIterator<'a, LEADING_Z
         self.pos += 1;
         result
     }
+
+    fn nth(&mut self, n: usize) -> Option<Self::Item> {
+        self.pos += n;
+        self.next()
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let remaining = self.data.len() - self.pos;
+        (remaining, Some(remaining))
+    }
 }
 
 #[cfg(test)]
 mod test {
-    use super::*;
+    use super::Nibbles;
     static TEST_BYTES: [u8; 4] = [0xdeu8, 0xad, 0xbe, 0xef];
+
     #[test]
     fn happy_regular_nibbles() {
         let nib = Nibbles::<0>(&TEST_BYTES);
@@ -137,6 +110,7 @@ mod test {
             assert_eq!(nib[v.0], v.1, "{v:?}");
         }
     }
+
     #[test]
     fn leadingzero_nibbles_index() {
         let nib = Nibbles::<1>(&TEST_BYTES);
@@ -155,36 +129,50 @@ mod test {
     #[test]
     fn skip_zero() {
         let nib = Nibbles::<0>(&TEST_BYTES);
-        let slice = nib.skip(0);
-        assert!(nib.iter().eq(slice.iter()));
+        assert!(nib.iter().skip(0).eq(nib.iter()));
     }
-    #[test]
-    fn skip_one() {
-        let nib = Nibbles::<0>(&TEST_BYTES);
-        let slice = nib.skip(1);
-        assert!(nib.iter().skip(1).eq(slice.iter()));
-    }
+
     #[test]
     fn skip_skips_zeroes() {
-        let nib = Nibbles::<1>(&TEST_BYTES);
-        let slice = nib.skip(1);
-        assert!(nib.iter().skip(1).eq(slice.iter()));
+        let nib1 = Nibbles::<1>(&TEST_BYTES);
+        let nib0 = Nibbles::<0>(&TEST_BYTES);
+        assert!(nib1.iter().skip(1).eq(nib0.iter()));
     }
+
     #[test]
     #[should_panic]
-    fn test_out_of_bounds_panics() {
+    fn out_of_bounds_panics() {
         let nib = Nibbles::<0>(&TEST_BYTES);
         let _ = nib[8];
     }
+
     #[test]
-    fn test_last_nibble() {
+    fn skip_before_zeroes() {
+        let nib = Nibbles::<1>(&TEST_BYTES);
+        assert!(nib.iter().skip(0).eq(nib.iter()));
+    }
+
+    #[test]
+    fn last_nibble() {
         let nib = Nibbles::<0>(&TEST_BYTES);
         assert_eq!(nib[7], 0xf);
     }
+
     #[test]
-    #[should_panic]
-    fn test_skip_before_zeroes_panics() {
+    fn size_hint_0() {
+        let nib = Nibbles::<0>(&TEST_BYTES);
+        let mut nib_iter = nib.iter();
+        assert_eq!((8, Some(8)), nib_iter.size_hint());
+        let _ = nib_iter.next();
+        assert_eq!((7, Some(7)), nib_iter.size_hint());
+    }
+
+    #[test]
+    fn size_hint_1() {
         let nib = Nibbles::<1>(&TEST_BYTES);
-        let _ = nib.skip(0);
+        let mut nib_iter = nib.iter();
+        assert_eq!((9, Some(9)), nib_iter.size_hint());
+        let _ = nib_iter.next();
+        assert_eq!((8, Some(8)), nib_iter.size_hint());
     }
 }
