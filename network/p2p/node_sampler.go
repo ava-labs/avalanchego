@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-// NodeSampler samples members of the p2p network.
+// NodeSampler samples nodes in network
 type NodeSampler interface {
 	// Sample returns at most [limit] nodes. This may return fewer nodes if
 	// fewer than [limit] are available.
