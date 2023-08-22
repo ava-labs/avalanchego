@@ -12,18 +12,12 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/wallet/chain/p"
-	"github.com/ava-labs/avalanchego/wallet/chain/x"
+	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
 var (
-	_ UTXOs      = (*utxos)(nil)
-	_ ChainUTXOs = (*chainUTXOs)(nil)
-
-	// TODO: refactor ChainUTXOs definition to allow the client implementations
-	//       to perform their own assertions.
-	_ ChainUTXOs = p.ChainUTXOs(nil)
-	_ ChainUTXOs = x.ChainUTXOs(nil)
+	_ UTXOs             = (*utxos)(nil)
+	_ common.ChainUTXOs = (*chainUTXOs)(nil)
 )
 
 type UTXOs interface {
@@ -34,21 +28,13 @@ type UTXOs interface {
 	GetUTXO(ctx context.Context, sourceChainID, destinationChainID, utxoID ids.ID) (*avax.UTXO, error)
 }
 
-type ChainUTXOs interface {
-	AddUTXO(ctx context.Context, destinationChainID ids.ID, utxo *avax.UTXO) error
-	RemoveUTXO(ctx context.Context, sourceChainID, utxoID ids.ID) error
-
-	UTXOs(ctx context.Context, sourceChainID ids.ID) ([]*avax.UTXO, error)
-	GetUTXO(ctx context.Context, sourceChainID, utxoID ids.ID) (*avax.UTXO, error)
-}
-
 func NewUTXOs() UTXOs {
 	return &utxos{
 		sourceToDestToUTXOIDToUTXO: make(map[ids.ID]map[ids.ID]map[ids.ID]*avax.UTXO),
 	}
 }
 
-func NewChainUTXOs(chainID ids.ID, utxos UTXOs) ChainUTXOs {
+func NewChainUTXOs(chainID ids.ID, utxos UTXOs) common.ChainUTXOs {
 	return &chainUTXOs{
 		utxos:   utxos,
 		chainID: chainID,

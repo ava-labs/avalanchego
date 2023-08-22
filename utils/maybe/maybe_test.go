@@ -32,6 +32,23 @@ func TestMaybeClone(t *testing.T) {
 	}
 }
 
+func TestMaybeString(t *testing.T) {
+	require := require.New(t)
+
+	// Case: Value is maybe
+	{
+		val := []int{1, 2, 3}
+		m := Some(val)
+		require.Equal("Some[[]int]{[1 2 3]}", m.String())
+	}
+
+	// Case: Value is nothing
+	{
+		m := Nothing[int]()
+		require.Equal("Nothing[int]", m.String())
+	}
+}
+
 func TestMaybeEquality(t *testing.T) {
 	require := require.New(t)
 	require.True(Equal(Nothing[int](), Nothing[int](), func(i int, i2 int) bool {
