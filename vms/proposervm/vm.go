@@ -787,7 +787,6 @@ func (vm *VM) acceptPostForkBlock(blk PostForkBlock) error {
 	if err := vm.State.SetLastAccepted(blkID); err != nil {
 		return err
 	}
-
 	if err := vm.State.PutBlock(blk.getStatelessBlk(), choices.Accepted); err != nil {
 		return err
 	}
