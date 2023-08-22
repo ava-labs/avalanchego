@@ -392,9 +392,14 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 	}
 	e.OnAbortState.SetCurrentSupply(stakerToReward.SubnetID, newSupply)
 
-	// handle staker lifecycle
-	e.OnCommitState.DeleteCurrentValidator(stakerToReward)
-	e.OnAbortState.DeleteCurrentValidator(stakerToReward)
+	// here both commit and abort state supplies are correct. Handle staker lifecycle.
+	if _, ok := stakerTx.Unsigned.(txs.ValidatorTx); ok {
+		e.OnCommitState.DeleteCurrentValidator(stakerToReward)
+		e.OnAbortState.DeleteCurrentValidator(stakerToReward)
+	} else { // must be txs.DelegatorTx due to switch check above
+		e.OnCommitState.DeleteCurrentDelegator(stakerToReward)
+		e.OnAbortState.DeleteCurrentDelegator(stakerToReward)
+	}
 
 	// handle option preference
 	shouldCommit, err := e.calculateProposalPreference(stakerToReward, primaryNetworkValidator)
@@ -559,9 +564,6 @@ func (e *ProposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, del
 	// Calculate split of reward between delegator/delegatee
 	delegatorReward, delegateeReward := splitAmountByShares(delegator.PotentialReward, vdrTx.Shares(), math.MaxUint64)
 
-	// following Continuous staking fork activation multiple rewards UTXOS
-	// can be cumulated, each related to a different staking period. We make
-	// sure to index the reward UTXOs correctly by appending them to previous ones.
 	utxosOffset := len(outputs) + len(stake)
 	currentRewardUTXOs, err := e.OnCommitState.GetRewardUTXOs(delegator.TxID)
 	if err != nil {
