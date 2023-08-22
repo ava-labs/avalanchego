@@ -105,13 +105,23 @@ var _ = e2e.DescribeCChain("[Interchain Workflow]", func() {
 			},
 		}
 
-		ginkgo.By("exporting AVAX from the C-Chain to the X-Chain")
-		_, err = cWallet.IssueExportTx(xWallet.BlockchainID(), exportOutputs, e2e.WithDefaultContext())
-		require.NoError(err)
+		ginkgo.By("exporting AVAX from the C-Chain to the X-Chain", func() {
+			_, err := cWallet.IssueExportTx(
+				xWallet.BlockchainID(),
+				exportOutputs,
+				e2e.WithDefaultContext(),
+			)
+			require.NoError(err)
+		})
 
-		ginkgo.By("importing AVAX from the C-Chain to the X-Chain")
-		_, err = xWallet.IssueImportTx(cWallet.BlockchainID(), &recipientOwner, e2e.WithDefaultContext())
-		require.NoError(err)
+		ginkgo.By("importing AVAX from the C-Chain to the X-Chain", func() {
+			_, err := xWallet.IssueImportTx(
+				cWallet.BlockchainID(),
+				&recipientOwner,
+				e2e.WithDefaultContext(),
+			)
+			require.NoError(err)
+		})
 
 		ginkgo.By("checking that the recipient address has received imported funds on the X-Chain", func() {
 			balances, err := xWallet.Builder().GetFTBalance(common.WithCustomAddresses(set.Of(
@@ -121,13 +131,23 @@ var _ = e2e.DescribeCChain("[Interchain Workflow]", func() {
 			require.Greater(balances[avaxAssetID], uint64(0))
 		})
 
-		ginkgo.By("exporting AVAX from the C-Chain to the P-Chain")
-		_, err = cWallet.IssueExportTx(constants.PlatformChainID, exportOutputs, e2e.WithDefaultContext())
-		require.NoError(err)
+		ginkgo.By("exporting AVAX from the C-Chain to the P-Chain", func() {
+			_, err := cWallet.IssueExportTx(
+				constants.PlatformChainID,
+				exportOutputs,
+				e2e.WithDefaultContext(),
+			)
+			require.NoError(err)
+		})
 
-		ginkgo.By("importing AVAX from the C-Chain to the P-Chain")
-		_, err = pWallet.IssueImportTx(cWallet.BlockchainID(), &recipientOwner, e2e.WithDefaultContext())
-		require.NoError(err)
+		ginkgo.By("importing AVAX from the C-Chain to the P-Chain", func() {
+			_, err = pWallet.IssueImportTx(
+				cWallet.BlockchainID(),
+				&recipientOwner,
+				e2e.WithDefaultContext(),
+			)
+			require.NoError(err)
+		})
 
 		ginkgo.By("checking that the recipient address has received imported funds on the P-Chain", func() {
 			balances, err := pWallet.Builder().GetBalance(common.WithCustomAddresses(set.Of(

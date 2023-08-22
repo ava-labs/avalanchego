@@ -35,9 +35,18 @@ import (
 const (
 	DefaultNodeCount      = 5
 	DefaultFundedKeyCount = 50
+
+	DefaultGasLimit = uint64(10_0000_000) // Arbitrary gas limit is arbitrary
+
+	// Arbitrarily large amount of AVAX to fund keys on the X-Chain for testing
+	DefaultFundedKeyXChainAmount = 30 * units.MegaAvax
 )
 
 var (
+	// The actual value needs to be set in init() because it's not
+	// possible to statically define a value large enough for C-Chain.
+	DefaultFundedKeyCChainAmount big.Int
+
 	errEmptyValidatorsForGenesis   = errors.New("failed to generate genesis: empty validator IDs")
 	errNoKeysForGenesis            = errors.New("failed to generate genesis: no keys to fund")
 	errInvalidNetworkIDForGenesis  = errors.New("network ID can't be mainnet, testnet or local network ID")
@@ -47,6 +56,11 @@ var (
 	errMissingCertForNodeID        = fmt.Errorf("failed to ensure node ID: missing value for %q", config.StakingCertContentKey)
 	errInvalidKeypair              = fmt.Errorf("%q and %q must be provided together or not at all", config.StakingTLSKeyContentKey, config.StakingCertContentKey)
 )
+
+func init() {
+	// Arbitrarily large amount of AVAX (10^30) to fund keys on the C-Chain for testing
+	DefaultFundedKeyCChainAmount.Exp(big.NewInt(10), big.NewInt(30), nil)
+}
 
 // Defines a mapping of flag keys to values intended to be supplied to
 // an invocation of an AvalancheGo node.
@@ -133,11 +147,11 @@ func (c *NetworkConfig) EnsureGenesis(networkID uint32, validatorIDs []ids.NodeI
 	// Ensure pre-funded keys have arbitrary large balances on both chains to support testing
 	xChainBalances := make(XChainBalanceMap, len(c.FundedKeys))
 	cChainBalances := make(core.GenesisAlloc, len(c.FundedKeys))
-	var cchainBalance big.Int
-	cchainBalance.Exp(big.NewInt(10), big.NewInt(30), nil)
 	for _, key := range c.FundedKeys {
-		xChainBalances[key.Address()] = 30 * units.MegaAvax
-		cChainBalances[evm.GetEthAddress(key)] = core.GenesisAccount{Balance: &cchainBalance}
+		xChainBalances[key.Address()] = DefaultFundedKeyXChainAmount
+		cChainBalances[evm.GetEthAddress(key)] = core.GenesisAccount{
+			Balance: &DefaultFundedKeyCChainAmount,
+		}
 	}
 
 	genesis, err := NewTestGenesis(networkID, xChainBalances, cChainBalances, validatorIDs)
@@ -382,8 +396,8 @@ func NewTestGenesis(
 		Config: &params.ChainConfig{
 			ChainID: big.NewInt(43112), // Arbitrary chain ID is arbitrary
 		},
-		Difficulty: big.NewInt(0),     // Difficulty is a mandatory field
-		GasLimit:   uint64(0x5f5e100), // Arbitrary gas limit is arbitrary
+		Difficulty: big.NewInt(0), // Difficulty is a mandatory field
+		GasLimit:   DefaultGasLimit,
 		Alloc:      cChainBalances,
 	}
 	cChainGenesisBytes, err := json.Marshal(cChainGenesis)
