@@ -10,9 +10,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"golang.org/x/exp/maps"
-
 	"go.uber.org/mock/gomock"
+	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
