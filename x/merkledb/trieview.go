@@ -104,11 +104,6 @@ type trieView struct {
 
 	// The root of the trie represented by this view.
 	root *node
-
-	// Key-value pairs that have been changed in this view
-	// but aren't yet in the trie structure.
-	// They're put into the trie in [calculateNodeIDs].
-	unaddedValues map[path]maybe.Maybe[[]byte]
 }
 
 // NewView returns a new view on top of this one.
@@ -118,7 +113,6 @@ func (t *trieView) NewView(ctx context.Context, batchOps []database.BatchOp) (Tr
 	if t.isInvalid() {
 		return nil, ErrInvalid
 	}
-
 	t.commitLock.RLock()
 	defer t.commitLock.RUnlock()
 
@@ -158,11 +152,10 @@ func newTrieView(
 	}
 
 	newView := &trieView{
-		root:          root,
-		db:            db,
-		parentTrie:    parentTrie,
-		changes:       newChangeSummary(len(batchOps)),
-		unaddedValues: make(map[path]maybe.Maybe[[]byte], len(batchOps)),
+		root:       root,
+		db:         db,
+		parentTrie: parentTrie,
+		changes:    newChangeSummary(len(batchOps)),
 	}
 
 	for _, op := range batchOps {
@@ -220,18 +213,17 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 		defer span.End()
 
 		// add all the changed key/values to the nodes of the trie
-		for key, value := range t.unaddedValues {
-			if value.IsNothing() {
+		for key, change := range t.changes.values {
+			if change.after.IsNothing() {
 				if err = t.remove(key); err != nil {
 					return
 				}
 			} else {
-				if _, err = t.insert(key, value); err != nil {
+				if _, err = t.insert(key, change.after); err != nil {
 					return
 				}
 			}
 		}
-		t.unaddedValues = nil
 
 		// [eg] limits the number of goroutines we start.
 		var eg errgroup.Group
@@ -931,8 +923,6 @@ func (t *trieView) recordValueChange(key path, value maybe.Maybe[[]byte]) error 
 	if t.nodesAlreadyCalculated.Get() {
 		return ErrNodesAlreadyCalculated
 	}
-
-	t.unaddedValues[key] = value
 
 	// update the existing change if it exists
 	if existing, ok := t.changes.values[key]; ok {
