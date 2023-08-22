@@ -142,7 +142,7 @@ func TestAppRequestAnyNodeSelection(t *testing.T) {
 			require.NoError(err)
 
 			err = client.AppRequestAny(context.Background(), []byte("foobar"), nil)
-			require.ErrorIs(err, ErrNoPeers)
+			require.ErrorIs(err, tt.expected)
 		})
 	}
 }
