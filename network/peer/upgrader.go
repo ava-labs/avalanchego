@@ -10,8 +10,11 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 var (
@@ -29,9 +32,14 @@ type Upgrader interface {
 type tlsServerUpgrader struct {
 	config       *tls.Config
 	invalidCerts prometheus.Counter
+	log          logging.Logger
 }
 
-func NewTLSServerUpgrader(config *tls.Config, invalidCerts prometheus.Counter) Upgrader {
+func NewTLSServerUpgrader(
+	config *tls.Config,
+	invalidCerts prometheus.Counter,
+	log logging.Logger,
+) Upgrader {
 	return &tlsServerUpgrader{
 		config:       config,
 		invalidCerts: invalidCerts,
@@ -39,15 +47,24 @@ func NewTLSServerUpgrader(config *tls.Config, invalidCerts prometheus.Counter) U
 }
 
 func (t *tlsServerUpgrader) Upgrade(conn net.Conn) (ids.NodeID, net.Conn, *staking.Certificate, error) {
-	return connToIDAndCert(tls.Server(conn, t.config), t.invalidCerts)
+	return connToIDAndCert(
+		tls.Server(conn, t.config),
+		t.invalidCerts,
+		t.log,
+	)
 }
 
 type tlsClientUpgrader struct {
 	config       *tls.Config
 	invalidCerts prometheus.Counter
+	log          logging.Logger
 }
 
-func NewTLSClientUpgrader(config *tls.Config, invalidCerts prometheus.Counter) Upgrader {
+func NewTLSClientUpgrader(
+	config *tls.Config,
+	invalidCerts prometheus.Counter,
+	log logging.Logger,
+) Upgrader {
 	return &tlsClientUpgrader{
 		config:       config,
 		invalidCerts: invalidCerts,
@@ -55,10 +72,18 @@ func NewTLSClientUpgrader(config *tls.Config, invalidCerts prometheus.Counter) U
 }
 
 func (t *tlsClientUpgrader) Upgrade(conn net.Conn) (ids.NodeID, net.Conn, *staking.Certificate, error) {
-	return connToIDAndCert(tls.Client(conn, t.config), t.invalidCerts)
+	return connToIDAndCert(
+		tls.Client(conn, t.config),
+		t.invalidCerts,
+		t.log,
+	)
 }
 
-func connToIDAndCert(conn *tls.Conn, invalidCerts prometheus.Counter) (ids.NodeID, net.Conn, *staking.Certificate, error) {
+func connToIDAndCert(
+	conn *tls.Conn,
+	invalidCerts prometheus.Counter,
+	log logging.Logger,
+) (ids.NodeID, net.Conn, *staking.Certificate, error) {
 	if err := conn.Handshake(); err != nil {
 		return ids.NodeID{}, nil, nil, err
 	}
@@ -74,6 +99,12 @@ func connToIDAndCert(conn *tls.Conn, invalidCerts prometheus.Counter) (ids.NodeI
 	// parseable according the staking package's parser.
 	peerCert, err := staking.ParseCertificate(tlsCert.Raw)
 	if err != nil {
+		log.Warn("failed to parse TLS cert",
+			zap.Stringer("sigAlgo", tlsCert.SignatureAlgorithm),
+			zap.Stringer("pkAlgo", tlsCert.PublicKeyAlgorithm),
+			zap.Int("len", len(tlsCert.Raw)),
+			zap.Error(err),
+		)
 		invalidCerts.Inc()
 		return ids.NodeID{}, nil, nil, err
 	}
@@ -83,6 +114,12 @@ func connToIDAndCert(conn *tls.Conn, invalidCerts prometheus.Counter) (ids.NodeI
 	// prior version using an invalid certificate should not be able to report
 	// healthy.
 	if err := staking.ValidateCertificate(peerCert); err != nil {
+		log.Warn("failed to verify TLS cert",
+			zap.Stringer("sigAlgo", tlsCert.SignatureAlgorithm),
+			zap.Stringer("pkAlgo", tlsCert.PublicKeyAlgorithm),
+			zap.Int("len", len(tlsCert.Raw)),
+			zap.Error(err),
+		)
 		invalidCerts.Inc()
 		return ids.NodeID{}, nil, nil, err
 	}
