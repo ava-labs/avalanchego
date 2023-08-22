@@ -191,9 +191,9 @@ func TestAppRequestResponse(t *testing.T) {
 			sender := common.NewMockSender(ctrl)
 			handler := mocks.NewMockHandler(ctrl)
 			router := NewRouter(logging.NoLog{}, sender)
-			sampler := &Peers{}
-			require.NoError(sampler.Connected(context.Background(), nodeID, nil))
-			client, err := router.RegisterAppProtocol(handlerID, handler, sampler)
+			peers := &Peers{}
+			require.NoError(peers.Connected(context.Background(), nodeID, nil))
+			client, err := router.RegisterAppProtocol(handlerID, handler, peers)
 			require.NoError(err)
 
 			wg := &sync.WaitGroup{}
@@ -329,9 +329,9 @@ func TestAppRequestDuplicateRequestIDs(t *testing.T) {
 		}).AnyTimes()
 	sender.EXPECT().SendAppResponse(gomock.Any(), gomock.Any(), gomock.Any(), response)
 
-	sampler := &Peers{}
-	require.NoError(sampler.Connected(context.Background(), nodeID, nil))
-	client, err := router.RegisterAppProtocol(0x1, handler, sampler)
+	peers := &Peers{}
+	require.NoError(peers.Connected(context.Background(), nodeID, nil))
+	client, err := router.RegisterAppProtocol(0x1, handler, peers)
 	require.NoError(err)
 
 	require.NoError(client.AppRequest(context.Background(), set.Of(nodeID), []byte{}, nil))

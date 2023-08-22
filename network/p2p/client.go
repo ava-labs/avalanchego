@@ -52,11 +52,7 @@ func (c *Client) AppRequestAny(
 	appRequestBytes []byte,
 	onResponse AppResponseCallback,
 ) error {
-	sampled, err := c.nodeSampler.Sample(1)
-	if err != nil {
-		return fmt.Errorf("failed to sample peers: %w", err)
-	}
-
+	sampled := c.nodeSampler.Sample(ctx, 1)
 	if len(sampled) != 1 {
 		return ErrNoPeers
 	}
