@@ -436,11 +436,6 @@ func (e *ProposalTxExecutor) rewardValidatorTx(uValidatorTx txs.ValidatorTx, val
 	}
 
 	utxosOffset := len(outputs) + len(stake)
-	currentRewardUTXOs, err := e.OnCommitState.GetRewardUTXOs(txID)
-	if err != nil {
-		return fmt.Errorf("failed to create output: %w", err)
-	}
-	utxosOffset += len(currentRewardUTXOs)
 
 	// Provide the reward here
 	rewardToPayBack := validator.PotentialReward
@@ -565,11 +560,6 @@ func (e *ProposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, del
 	delegatorReward, delegateeReward := splitAmountByShares(delegator.PotentialReward, vdrTx.Shares(), math.MaxUint64)
 
 	utxosOffset := len(outputs) + len(stake)
-	currentRewardUTXOs, err := e.OnCommitState.GetRewardUTXOs(delegator.TxID)
-	if err != nil {
-		return fmt.Errorf("failed to create output: %w", err)
-	}
-	utxosOffset += len(currentRewardUTXOs)
 
 	// Reward the delegator here
 	delRewardToPayBack := delegatorReward
