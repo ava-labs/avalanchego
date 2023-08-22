@@ -170,7 +170,7 @@ func newTrieView(
 	return newView, nil
 }
 
-// Creates a new view with the given changes to create a view of the db at a historical root
+// Creates a view of the db at a historical root using the provided changes
 func newHistoricalTrieView(
 	db *merkleDB,
 	changes *changeSummary,
