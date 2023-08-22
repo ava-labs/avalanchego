@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-set -e
+
+set -euo pipefail
 
 # e.g.,
 # ./scripts/build.sh
@@ -9,14 +10,14 @@ if ! [[ "$0" =~ scripts/tests.upgrade.sh ]]; then
   exit 255
 fi
 
-VERSION=$1
+VERSION="${1:-}"
 if [[ -z "${VERSION}" ]]; then
   echo "Missing version argument!"
   echo "Usage: ${0} [VERSION] [NEW-BINARY]" >>/dev/stderr
   exit 255
 fi
 
-NEW_BINARY=$2
+NEW_BINARY="${2:-}"
 if [[ -z "${NEW_BINARY}" ]]; then
   echo "Missing new binary path argument!"
   echo "Usage: ${0} [VERSION] [NEW-BINARY]" >>/dev/stderr
@@ -95,7 +96,7 @@ echo "running upgrade tests against the local cluster with ${NEW_BINARY}"
 pkill -P ${PID} || true
 kill -2 ${PID}
 
-if [[ ${EXIT_CODE} -gt 0 ]]; then
+if [[ "${EXIT_CODE:-}" -gt 0 ]]; then
   echo "FAILURE with exit code ${EXIT_CODE}"
   exit ${EXIT_CODE}
 else
