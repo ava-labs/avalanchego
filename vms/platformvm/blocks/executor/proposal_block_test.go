@@ -117,6 +117,12 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	onParentAccept.EXPECT().GetRewardUTXOs(gomock.Any()).Return([]*avax.UTXO{}, nil).AnyTimes()
 	onParentAccept.EXPECT().GetDelegateeReward(constants.PrimaryNetworkID, utx.NodeID()).Return(uint64(0), nil).AnyTimes()
 
+	noDelegatorsIt := state.NewMockStakerIterator(ctrl)
+	noDelegatorsIt.EXPECT().Next().Return(false).AnyTimes() // no current delegators
+	noDelegatorsIt.EXPECT().Release().AnyTimes()
+	onParentAccept.EXPECT().GetCurrentDelegatorIterator(gomock.Any(), gomock.Any()).Return(noDelegatorsIt, nil).AnyTimes()
+	onParentAccept.EXPECT().GetPendingDelegatorIterator(gomock.Any(), gomock.Any()).Return(noDelegatorsIt, nil).AnyTimes()
+
 	env.mockedState.EXPECT().GetUptime(gomock.Any(), constants.PrimaryNetworkID).Return(
 		time.Microsecond, /*upDuration*/
 		time.Time{},      /*lastUpdated*/
@@ -243,6 +249,12 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	pendingStakersIt.EXPECT().Next().Return(false).AnyTimes() // no pending stakers
 	pendingStakersIt.EXPECT().Release().AnyTimes()
 	onParentAccept.EXPECT().GetPendingStakerIterator().Return(pendingStakersIt, nil).AnyTimes()
+
+	noDelegatorsIt := state.NewMockStakerIterator(ctrl)
+	noDelegatorsIt.EXPECT().Next().Return(false).AnyTimes() // no current delegators
+	noDelegatorsIt.EXPECT().Release().AnyTimes()
+	onParentAccept.EXPECT().GetCurrentDelegatorIterator(gomock.Any(), gomock.Any()).Return(noDelegatorsIt, nil).AnyTimes()
+	onParentAccept.EXPECT().GetPendingDelegatorIterator(gomock.Any(), gomock.Any()).Return(noDelegatorsIt, nil).AnyTimes()
 
 	env.mockedState.EXPECT().GetUptime(gomock.Any(), gomock.Any()).Return(
 		time.Microsecond, /*upDuration*/

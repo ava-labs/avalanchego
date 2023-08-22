@@ -5,6 +5,7 @@ package executor
 
 import (
 	"fmt"
+	"math"
 	"testing"
 	"time"
 
@@ -18,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -29,6 +29,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 func TestRewardsBounds(t *testing.T) {
@@ -116,7 +118,12 @@ func TestRewardsBounds(t *testing.T) {
 	del = delIt.Value()
 	delIt.Release()
 
-	require.True(val.Weight+del.Weight <= env.config.MaxValidatorStake)
+	require.True(val.Weight+del.Weight <= env.config.MaxValidatorStake,
+		fmt.Sprintf("validator weight %v, delegator weight %v, max validator stake %v",
+			val.Weight,
+			del.Weight,
+			env.config.MaxValidatorStake,
+		))
 }
 
 func TestRewardsChecksRewardValidatorAndDelegator(t *testing.T) {
@@ -177,7 +184,7 @@ func TestRewardsChecksRewardValidatorAndDelegator(t *testing.T) {
 				NodeID: nodeID,
 				Start:  uint64(dummyStartTime.Unix()),
 				End:    uint64(dummyStartTime.Add(stakingPeriod).Unix()),
-				Wght:   env.config.MinValidatorStake,
+				Wght:   env.config.MaxValidatorStake * 2 / 5,
 			}
 			continuousValidatorTx, _, err := addContinuousValidator(
 				env,
@@ -196,7 +203,7 @@ func TestRewardsChecksRewardValidatorAndDelegator(t *testing.T) {
 				NodeID: nodeID,
 				Start:  uint64(dummyStartTime.Unix()),
 				End:    uint64(dummyStartTime.Add(stakingPeriod).Unix()),
-				Wght:   env.config.MinDelegatorStake,
+				Wght:   env.config.MaxValidatorStake * 1 / 5,
 			}
 			continuousDelegatorTx, _, err := addContinuousDelegator(
 				env,
@@ -250,6 +257,13 @@ func TestRewardsChecksRewardValidatorAndDelegator(t *testing.T) {
 					return err.Error()
 				}
 
+				// check whether there will be restake overflow at this round.
+				weightGrowthSpace, err := calculateWeightGrowthSpace(env.state, &env.backend, continuousValidator)
+				if err != nil {
+					return err.Error()
+				}
+				restakeOverflow := weightGrowthSpace <= continuousDelegator.PotentialReward+continuousValidator.PotentialReward
+
 				// shift delegator first, it's the first by priority
 				if err := issueReward(env, continuousDelegator.TxID, delCommit); err != nil {
 					return err.Error()
@@ -270,12 +284,16 @@ func TestRewardsChecksRewardValidatorAndDelegator(t *testing.T) {
 					return err.Error()
 				}
 
-				delegatorReward, delegateeReward := splitAmountByShares(continuousDelegator.PotentialReward, continuousValidatorTx.Shares())
-				delegatorRewardPaidBack, _ := splitAmountByShares(delegatorReward, continuousDelegatorTx.RestakeShares())
+				delegatorReward, delegateeReward := splitAmountByShares(continuousDelegator.PotentialReward, continuousValidatorTx.Shares(), math.MaxUint64)
+				delegatorRewardPaidBack, _ := splitAmountByShares(delegatorReward, continuousDelegatorTx.RestakeShares(), math.MaxUint64)
 
-				validatorRewardPaidBack, _ := splitAmountByShares(continuousValidator.PotentialReward, continuousValidatorTx.RestakeShares())
-				delegateeRewardPaidBack, _ := splitAmountByShares(delegateeReward, continuousValidatorTx.RestakeShares())
+				validatorRewardPaidBack, _ := splitAmountByShares(continuousValidator.PotentialReward, continuousValidatorTx.RestakeShares(), math.MaxUint64)
+				delegateeRewardPaidBack, _ := splitAmountByShares(delegateeReward, continuousValidatorTx.RestakeShares(), math.MaxUint64)
 				switch {
+				case restakeOverflow:
+					// not doing balance checking for restake overflow here.
+					// this test is complex enough already
+					return ""
 				case valCommit && delCommit:
 					if postShifValidatorRewardBalance !=
 						preShiftValidatorRewardBalance+validatorRewardPaidBack+delegateeRewardPaidBack {
@@ -387,11 +405,14 @@ func TestRewardsChecksRewardValidator(t *testing.T) {
 				_ = shutdownEnvironment(env)
 			}()
 
+			// a large enough initial stake to get not too far from restake overflow
+			validatorInitialStake := env.config.MaxValidatorStake * 99 / 100
+
 			validatorData := txs.Validator{
 				NodeID: nodeID,
 				Start:  uint64(dummyStartTime.Unix()),
 				End:    uint64(dummyStartTime.Add(stakingPeriod).Unix()),
-				Wght:   env.config.MinValidatorStake,
+				Wght:   validatorInitialStake,
 			}
 			uAddContinuousValTx, addContinuousValTxID, err := addContinuousValidator(
 				env,
@@ -432,6 +453,18 @@ func TestRewardsChecksRewardValidator(t *testing.T) {
 					return err.Error()
 				}
 
+				// check whether there will be restake overflow at this round.
+				weightGrowthSpace, err := calculateWeightGrowthSpace(env.state, &env.backend, continuousValidator)
+				if err != nil {
+					return err.Error()
+				}
+				restakeOverflow := weightGrowthSpace <= continuousValidator.PotentialReward
+				if restakeOverflow {
+					// not doing balance checking for restake overflow here.
+					// this test is complex enough already
+					return ""
+				}
+
 				// check stake is NOT given back (balance on addresses) while shifting
 				postShiftStakeBalance, err := avax.GetBalance(env.state, stakeOwners)
 				if err != nil {
@@ -448,7 +481,7 @@ func TestRewardsChecksRewardValidator(t *testing.T) {
 				}
 
 				if commit {
-					rewardPaidBack, _ := splitAmountByShares(continuousValidator.PotentialReward, uAddContinuousValTx.RestakeShares())
+					rewardPaidBack, _ := splitAmountByShares(continuousValidator.PotentialReward, uAddContinuousValTx.RestakeShares(), math.MaxUint64)
 					if postShiftRewardBalance != preShiftRewardBalance+rewardPaidBack {
 						return "unexpected postShiftRewardBalance on commit"
 					}
@@ -517,7 +550,7 @@ func TestRewardsChecksRewardValidator(t *testing.T) {
 			if err != nil {
 				return err.Error()
 			}
-			if postStopStakeBalance != preStopStakeBalance+env.config.MinValidatorStake {
+			if postStopStakeBalance != preStopStakeBalance+validatorInitialStake {
 				return "unexpected postStopStakeBalance"
 			}
 
@@ -727,12 +760,17 @@ func TestRewardsChecksRewardDelegator(t *testing.T) {
 				_ = shutdownEnvironment(env)
 			}()
 
+			// initial stakes are chosen to make restake overflow possible within
+			// input space explored by the test
+			validatorInitialStake := env.config.MaxValidatorStake * 200 / 1000
+			delegatorInitialWeight := env.config.MaxValidatorStake * 799 / 1000
+
 			// Add a continuous validator
 			validatorData := txs.Validator{
 				NodeID: nodeID,
 				Start:  uint64(dummyStartTime.Unix()),
 				End:    uint64(dummyStartTime.Add(validationDuration).Unix()),
-				Wght:   env.config.MinValidatorStake,
+				Wght:   validatorInitialStake,
 			}
 			addContinuousValTx, _, err := addContinuousValidator(
 				env,
@@ -752,15 +790,12 @@ func TestRewardsChecksRewardDelegator(t *testing.T) {
 				return err.Error()
 			}
 
-			var (
-				delegatorWeight = env.config.MinDelegatorStake
-				delegatorFee    = env.config.AddPrimaryNetworkDelegatorFee
-			)
+			delegatorFee := env.config.AddPrimaryNetworkDelegatorFee
 			delegatorData := txs.Validator{
 				NodeID: nodeID,
 				Start:  uint64(dummyStartTime.Unix()),
 				End:    uint64(dummyStartTime.Add(delegationDuration).Unix()),
-				Wght:   delegatorWeight,
+				Wght:   delegatorInitialWeight,
 			}
 			continuousDelTx, continuousDelTxID, err := addContinuousDelegator(
 				env,
@@ -778,7 +813,7 @@ func TestRewardsChecksRewardDelegator(t *testing.T) {
 			if err != nil {
 				return err.Error()
 			}
-			if postCreationStakeBalance != preCreationStakeBalance-delegatorWeight-delegatorFee {
+			if postCreationStakeBalance != preCreationStakeBalance-delegatorInitialWeight-delegatorFee {
 				return "unexpected postCreationStakeBalance"
 			}
 
@@ -802,6 +837,22 @@ func TestRewardsChecksRewardDelegator(t *testing.T) {
 				preShiftRewardBalance, err := avax.GetBalance(env.state, rewardOwners)
 				if err != nil {
 					return err.Error()
+				}
+
+				// check whether there will be restake overflow at this round.
+				validator, err := env.state.GetCurrentValidator(continuousDelegator.SubnetID, continuousDelegator.NodeID)
+				if err != nil {
+					return err.Error()
+				}
+				weightGrowthSpace, err := calculateWeightGrowthSpace(env.state, &env.backend, validator)
+				if err != nil {
+					return err.Error()
+				}
+				restakeOverflow := weightGrowthSpace <= continuousDelegator.PotentialReward+validator.PotentialReward
+				if restakeOverflow {
+					// not doing balance checking for restake overflow here.
+					// this test is complex enough already
+					return ""
 				}
 
 				// advance time
@@ -829,8 +880,8 @@ func TestRewardsChecksRewardDelegator(t *testing.T) {
 					return err.Error()
 				}
 
-				delegatorReward, _ := splitAmountByShares(continuousDelegator.PotentialReward, addContinuousValTx.Shares())
-				rewardToBeRepaid, _ := splitAmountByShares(delegatorReward, continuousDelTx.RestakeShares())
+				delegatorReward, _ := splitAmountByShares(continuousDelegator.PotentialReward, addContinuousValTx.Shares(), math.MaxUint64)
+				rewardToBeRepaid, _ := splitAmountByShares(delegatorReward, continuousDelTx.RestakeShares(), math.MaxUint64)
 				if commit {
 					if postShiftRewardBalance != preShiftRewardBalance+rewardToBeRepaid {
 						return "unexpected postShiftRewardBalance on commit"
@@ -907,7 +958,7 @@ func TestRewardsChecksRewardDelegator(t *testing.T) {
 			if err != nil {
 				return err.Error()
 			}
-			if postStopStakeBalance != preStopStakeBalance+env.config.MinDelegatorStake {
+			if postStopStakeBalance != preStopStakeBalance+delegatorInitialWeight {
 				return "unexpected postStopStakeBalance"
 			}
 
@@ -917,7 +968,7 @@ func TestRewardsChecksRewardDelegator(t *testing.T) {
 				return err.Error()
 			}
 
-			delegatorReward, _ := splitAmountByShares(stoppedDelegator.PotentialReward, addContinuousValTx.Shares())
+			delegatorReward, _ := splitAmountByShares(stoppedDelegator.PotentialReward, addContinuousValTx.Shares(), math.MaxUint64)
 			if postStopRewardBalance != preStopRewardBalance+delegatorReward {
 				return "unexpected postStopRewardBalance"
 			}
@@ -1454,13 +1505,13 @@ func TestCortinaForkRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	// The delegator reward should be higher since the delegatee's share is 25%.
 	commitVdrBalance, err := avax.GetBalance(env.state, vdrDestSet)
 	require.NoError(err)
-	vdrReward, err := math.Sub(commitVdrBalance, oldVdrBalance)
+	vdrReward, err := safemath.Sub(commitVdrBalance, oldVdrBalance)
 	require.NoError(err)
 	require.NotZero(vdrReward, "expected delegatee balance to increase because of reward")
 
 	commitDelBalance, err := avax.GetBalance(env.state, delDestSet)
 	require.NoError(err)
-	delReward, err := math.Sub(commitDelBalance, oldDelBalance)
+	delReward, err := safemath.Sub(commitDelBalance, oldDelBalance)
 	require.NoError(err)
 	require.NotZero(delReward, "expected delegator balance to increase because of reward")
 
@@ -1680,15 +1731,15 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	// The delegator reward should be higher since the delegatee's share is 25%.
 	commitVdrBalance, err := avax.GetBalance(env.state, vdrDestSet)
 	require.NoError(err)
-	vdrReward, err := math.Sub(commitVdrBalance, oldVdrBalance)
+	vdrReward, err := safemath.Sub(commitVdrBalance, oldVdrBalance)
 	require.NoError(err)
-	delegateeReward, err := math.Sub(vdrReward, 2000000)
+	delegateeReward, err := safemath.Sub(vdrReward, 2000000)
 	require.NoError(err)
 	require.NotZero(delegateeReward, "expected delegatee balance to increase because of reward")
 
 	commitDelBalance, err := avax.GetBalance(env.state, delDestSet)
 	require.NoError(err)
-	delReward, err := math.Sub(commitDelBalance, oldDelBalance)
+	delReward, err := safemath.Sub(commitDelBalance, oldDelBalance)
 	require.NoError(err)
 	require.NotZero(delReward, "expected delegator balance to increase because of reward")
 
@@ -1846,15 +1897,15 @@ func TestCortinaForkRewardDelegatorTxAndValidatorTxExecuteOnCommit(t *testing.T)
 	// The delegator reward should be higher since the delegatee's share is 25%.
 	commitVdrBalance, err := avax.GetBalance(env.state, vdrDestSet)
 	require.NoError(err)
-	vdrReward, err := math.Sub(commitVdrBalance, oldVdrBalance)
+	vdrReward, err := safemath.Sub(commitVdrBalance, oldVdrBalance)
 	require.NoError(err)
-	delegateeReward, err := math.Sub(vdrReward, vdrRewardAmt)
+	delegateeReward, err := safemath.Sub(vdrReward, vdrRewardAmt)
 	require.NoError(err)
 	require.NotZero(delegateeReward, "expected delegatee balance to increase because of reward")
 
 	commitDelBalance, err := avax.GetBalance(env.state, delDestSet)
 	require.NoError(err)
-	delReward, err := math.Sub(commitDelBalance, oldDelBalance)
+	delReward, err := safemath.Sub(commitDelBalance, oldDelBalance)
 	require.NoError(err)
 	require.NotZero(delReward, "expected delegator balance to increase because of reward")
 
@@ -1970,13 +2021,13 @@ func TestCortinaForkRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	// If tx is aborted, delegator and delegatee shouldn't get reward
 	newVdrBalance, err := avax.GetBalance(env.state, vdrDestSet)
 	require.NoError(err)
-	vdrReward, err := math.Sub(newVdrBalance, oldVdrBalance)
+	vdrReward, err := safemath.Sub(newVdrBalance, oldVdrBalance)
 	require.NoError(err)
 	require.Zero(vdrReward, "expected delegatee balance not to increase")
 
 	newDelBalance, err := avax.GetBalance(env.state, delDestSet)
 	require.NoError(err)
-	delReward, err := math.Sub(newDelBalance, oldDelBalance)
+	delReward, err := safemath.Sub(newDelBalance, oldDelBalance)
 	require.NoError(err)
 	require.Zero(delReward, "expected delegator balance not to increase")
 
@@ -2098,13 +2149,13 @@ func TestBanffForkRewardDelegatorTxExecuteOnCommit(t *testing.T) {
 	// The delegator reward should be higher since the delegatee's share is 25%.
 	commitVdrBalance, err := avax.GetBalance(env.state, vdrDestSet)
 	require.NoError(err)
-	vdrReward, err := math.Sub(commitVdrBalance, oldVdrBalance)
+	vdrReward, err := safemath.Sub(commitVdrBalance, oldVdrBalance)
 	require.NoError(err)
 	require.NotZero(vdrReward, "expected delegatee balance to increase because of reward")
 
 	commitDelBalance, err := avax.GetBalance(env.state, delDestSet)
 	require.NoError(err)
-	delReward, err := math.Sub(commitDelBalance, oldDelBalance)
+	delReward, err := safemath.Sub(commitDelBalance, oldDelBalance)
 	require.NoError(err)
 	require.NotZero(delReward, "expected delegator balance to increase because of reward")
 

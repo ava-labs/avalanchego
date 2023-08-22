@@ -6,17 +6,19 @@ package executor
 import (
 	"errors"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 const (
@@ -410,7 +412,7 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 	if err != nil {
 		return err
 	}
-	newSupply, err := math.Sub(currentSupply, stakerToReward.PotentialReward)
+	newSupply, err := safemath.Sub(currentSupply, stakerToReward.PotentialReward)
 	if err != nil {
 		return err
 	}
@@ -500,6 +502,11 @@ func (e *ProposalTxExecutor) rewardValidatorTx(
 		}
 	}
 
+	weightGrowthSpace, err := calculateWeightGrowthSpace(e.OnCommitState, e.Backend, validator)
+	if err != nil {
+		return 0, err
+	}
+
 	// following Continuous staking fork activation multiple rewards UTXOS
 	// can be cumulated, each related to a different staking period. We make
 	// sure to index the reward UTXOs correctly by appending them to previous ones.
@@ -516,7 +523,8 @@ func (e *ProposalTxExecutor) rewardValidatorTx(
 	if validator.ShouldRestake() {
 		continuousStaker, ok := uValidatorTx.(txs.ContinuousStaker)
 		if ok {
-			rewardToPayBack, rewardToRestake = splitAmountByShares(rewardToPayBack, continuousStaker.RestakeShares())
+			rewardToPayBack, rewardToRestake = splitAmountByShares(rewardToPayBack, continuousStaker.RestakeShares(), weightGrowthSpace)
+			weightGrowthSpace -= rewardToRestake
 		}
 	}
 
@@ -558,7 +566,7 @@ func (e *ProposalTxExecutor) rewardValidatorTx(
 		continuousStaker, ok := uValidatorTx.(txs.ContinuousStaker)
 		if ok {
 			delegateeRewardToRestake := uint64(0)
-			delegateeRewardToPayBack, delegateeRewardToRestake = splitAmountByShares(delegateeRewardToPayBack, continuousStaker.RestakeShares())
+			delegateeRewardToPayBack, delegateeRewardToRestake = splitAmountByShares(delegateeRewardToPayBack, continuousStaker.RestakeShares(), weightGrowthSpace)
 			rewardToRestake += delegateeRewardToRestake
 		}
 	}
@@ -668,25 +676,14 @@ func (e *ProposalTxExecutor) rewardDelegatorTx(
 
 	// We're (possibly) rewarding a delegator, so we need to fetch
 	// the validator they are delegated to.
-	vdrStaker, err := e.OnCommitState.GetCurrentValidator(
-		delegator.SubnetID,
-		delegator.NodeID,
-	)
+	validator, err := e.OnCommitState.GetCurrentValidator(delegator.SubnetID, delegator.NodeID)
 	if err != nil {
-		return 0, fmt.Errorf(
-			"failed to get whether %s is a validator: %w",
-			delegator.NodeID,
-			err,
-		)
+		return 0, fmt.Errorf("failed to get whether %s is a validator: %w", delegator.NodeID, err)
 	}
 
-	vdrTxIntf, _, err := e.OnCommitState.GetTx(vdrStaker.TxID)
+	vdrTxIntf, _, err := e.OnCommitState.GetTx(validator.TxID)
 	if err != nil {
-		return 0, fmt.Errorf(
-			"failed to get whether %s is a validator: %w",
-			delegator.NodeID,
-			err,
-		)
+		return 0, fmt.Errorf("failed to get whether %s is a validator: %w", delegator.NodeID, err)
 	}
 
 	// Invariant: Delegators must only be able to reference validator
@@ -699,7 +696,7 @@ func (e *ProposalTxExecutor) rewardDelegatorTx(
 	}
 
 	// Calculate split of reward between delegator/delegatee
-	delegatorReward, delegateeReward := splitAmountByShares(delegator.PotentialReward, vdrTx.Shares())
+	delegatorReward, delegateeReward := splitAmountByShares(delegator.PotentialReward, vdrTx.Shares(), math.MaxUint64)
 
 	// following Continuous staking fork activation multiple rewards UTXOS
 	// can be cumulated, each related to a different staking period. We make
@@ -717,7 +714,12 @@ func (e *ProposalTxExecutor) rewardDelegatorTx(
 	if delegator.ShouldRestake() {
 		continuousStaker, ok := uDelegatorTx.(txs.ContinuousStaker)
 		if ok {
-			delRewardToPayBack, delRewardToRestake = splitAmountByShares(delRewardToPayBack, continuousStaker.RestakeShares())
+			weightGrowthSpace, err := calculateWeightGrowthSpace(e.OnCommitState, e.Backend, validator)
+			if err != nil {
+				return 0, err
+			}
+
+			delRewardToPayBack, delRewardToRestake = splitAmountByShares(delRewardToPayBack, continuousStaker.RestakeShares(), weightGrowthSpace)
 		}
 	}
 	if delRewardToPayBack > 0 {
@@ -747,10 +749,10 @@ func (e *ProposalTxExecutor) rewardDelegatorTx(
 
 	// Reward the delegatee here
 	if delegateeReward > 0 {
-		if vdrStaker.StartTime.After(e.Config.CortinaTime) {
+		if validator.StartTime.After(e.Config.CortinaTime) {
 			previousDelegateeReward, err := e.OnCommitState.GetDelegateeReward(
-				vdrStaker.SubnetID,
-				vdrStaker.NodeID,
+				validator.SubnetID,
+				validator.NodeID,
 			)
 			if err != nil {
 				return 0, fmt.Errorf("failed to get delegatee reward: %w", err)
@@ -764,8 +766,8 @@ func (e *ProposalTxExecutor) rewardDelegatorTx(
 			// For any validators starting after [CortinaTime], we defer rewarding the
 			// [rewardToPayBack] until their staking period is over.
 			err = e.OnCommitState.SetDelegateeReward(
-				vdrStaker.SubnetID,
-				vdrStaker.NodeID,
+				validator.SubnetID,
+				validator.NodeID,
 				newDelegateeReward,
 			)
 			if err != nil {
@@ -887,15 +889,35 @@ func (e *ProposalTxExecutor) calculateProposalPreference(stakerToReward, primary
 	return uptime >= expectedUptimePercentage, nil
 }
 
-func splitAmountByShares(totalAmount uint64, shares uint32) (uint64, uint64) {
+func calculateWeightGrowthSpace(parentState state.Chain, backend *Backend, validator *state.Staker) (uint64, error) {
+	// following Continuous Staking activation both validator and delegators weight can grow in time
+	// Let's calculate first the maximal allowed growth to make sure we don't break weight constraints
+	delegatorRules, err := getDelegatorRules(backend, parentState, validator.SubnetID)
+	if err != nil {
+		return 0, err
+	}
+	weightGrowthSpace := validatorMaxWeight(validator.Weight, delegatorRules.maxValidatorWeightFactor, delegatorRules.maxValidatorStake)
+	maxWeight, err := GetMaxWeight(parentState, validator, validator.StartTime, validator.EndTime)
+	if err != nil {
+		return 0, fmt.Errorf("failed to calculate validator %v max weight: %w", validator.TxID, err)
+	}
+	weightGrowthSpace -= maxWeight
+	return weightGrowthSpace, nil
+}
+
+func splitAmountByShares(totalAmount uint64, shares uint32, sharesAmountCap uint64) (uint64, uint64) {
 	remainderShares := reward.PercentDenominator - uint64(shares)
 	remainderAmount := remainderShares * (totalAmount / reward.PercentDenominator)
 
 	// Delay rounding as long as possible for small numbers
-	if optimisticReward, err := math.Mul64(remainderShares, totalAmount); err == nil {
+	if optimisticReward, err := safemath.Mul64(remainderShares, totalAmount); err == nil {
 		remainderAmount = optimisticReward / reward.PercentDenominator
 	}
 
 	amountFromShares := totalAmount - remainderAmount
+	if amountFromShares > sharesAmountCap {
+		remainderAmount += amountFromShares - sharesAmountCap
+		amountFromShares = sharesAmountCap
+	}
 	return remainderAmount, amountFromShares
 }
