@@ -1171,7 +1171,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
         // we use Nibbles::<1> so that 1 zero nibble is at the front
         // this is for the sentinel node, which avoids moving the root
         // and always only has one child
-        let key_nibbles = Nibbles::<1>(key.as_ref());
+        let key_nibbles = Nibbles::<1>::new(key.as_ref());
 
         let mut next_node = Some(self.get_node(root)?);
         let mut nskip = 0;
@@ -1836,7 +1836,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
         K: AsRef<[u8]>,
         T: ValueTransformer,
     {
-        let key_nibbles = Nibbles::<0>(key.as_ref());
+        let key_nibbles = Nibbles::<0>::new(key.as_ref());
 
         let mut proofs: HashMap<[u8; TRIE_HASH_LEN], Vec<u8>> = HashMap::new();
         if root.is_null() {
