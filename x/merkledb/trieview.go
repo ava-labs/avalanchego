@@ -193,6 +193,7 @@ func newHistoricalTrieView(
 	}
 	// the changes have already been calculated, don't need to do it again later
 	newView.calculateNodesOnce.Do(func() {})
+	newView.nodesAlreadyCalculated.Set(true)
 	return newView, nil
 }
 
