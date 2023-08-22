@@ -10,7 +10,6 @@ use std::{
     error::Error,
     fmt::{self, Debug},
     io::{Cursor, Read, Write},
-    iter,
     sync::{
         atomic::{AtomicBool, Ordering},
         OnceLock,
@@ -1919,38 +1918,38 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
         key: K,
         root: DiskAddress,
     ) -> Result<Option<Ref>, MerkleError> {
-        // TODO: Make this NonNull<DiskAddress> or something similar
         if root.is_null() {
             return Ok(None);
         }
 
-        let chunks: Vec<u8> = iter::once(0)
-            .chain(key.as_ref().iter().copied().flat_map(to_nibble_array))
-            .collect();
+        let key_nibbles = Nibbles::<1>::new(key.as_ref());
 
         let mut u_ref = self.get_node(root)?;
         let mut nskip = 0;
 
-        for (i, nib) in chunks.iter().enumerate() {
+        for (i, nib) in key_nibbles.iter().enumerate() {
             if nskip > 0 {
                 nskip -= 1;
                 continue;
             }
             let next_ptr = match &u_ref.inner {
-                NodeType::Branch(n) => match n.chd[*nib as usize] {
+                NodeType::Branch(n) => match n.chd[nib as usize] {
                     Some(c) => c,
                     None => return Ok(None),
                 },
                 NodeType::Leaf(n) => {
-                    if chunks[i..] != *n.0 {
+                    if !key_nibbles.iter().skip(i).eq(n.0.iter().cloned()) {
                         return Ok(None);
                     }
                     return Ok(Some(Ref(u_ref)));
                 }
                 NodeType::Extension(n) => {
                     let n_path = &*n.0;
-                    let rem_path = &chunks[i..];
-                    if rem_path.len() < n_path.len() || &rem_path[..n_path.len()] != n_path {
+                    let rem_path = key_nibbles.iter().skip(i);
+                    if rem_path.size_hint().0 < n_path.len() {
+                        return Ok(None);
+                    }
+                    if !rem_path.take(n_path.len()).eq(n_path.iter().cloned()) {
                         return Ok(None);
                     }
                     nskip = n_path.len() - 1;
