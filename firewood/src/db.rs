@@ -737,8 +737,9 @@ impl Db {
             db_header_ref
                 .write(|r| {
                     err = (|| {
-                        merkle.init_root(&mut r.acc_root)?;
-                        merkle.init_root(&mut r.kv_root)
+                        r.acc_root = merkle.init_root()?;
+                        r.kv_root = merkle.init_root()?;
+                        Ok(())
                     })();
                 })
                 .unwrap();

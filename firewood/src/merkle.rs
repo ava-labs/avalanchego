@@ -878,9 +878,8 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
         Self { store }
     }
 
-    pub fn init_root(&self, root: &mut DiskAddress) -> Result<(), MerkleError> {
-        *root = self
-            .store
+    pub fn init_root(&self) -> Result<DiskAddress, MerkleError> {
+        self.store
             .put_item(
                 Node::new(NodeType::Branch(BranchNode {
                     chd: [None; NBRANCH],
@@ -889,9 +888,8 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                 })),
                 Node::max_branch_node_size(),
             )
-            .map_err(MerkleError::Shale)?
-            .as_ptr();
-        Ok(())
+            .map_err(MerkleError::Shale)
+            .map(|node| node.as_ptr())
     }
 
     pub fn get_store(&self) -> &dyn ShaleStore<Node> {

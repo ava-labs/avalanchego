@@ -558,6 +558,16 @@ impl<T: Storable + Send + Sync, M: CachedStore> CompactSpaceInner<T, M> {
         f.write(|f| f.payload_size = length).unwrap();
         Ok((offset + CompactHeader::MSIZE as usize).0.unwrap().get() as u64)
     }
+
+    fn alloc(&mut self, length: u64) -> Result<u64, ShaleError> {
+        self.alloc_from_freed(length).and_then(|addr| {
+            if let Some(addr) = addr {
+                Ok(addr)
+            } else {
+                self.alloc_new(length)
+            }
+        })
+    }
 }
 
 #[derive(Debug)]
@@ -591,27 +601,20 @@ impl<T: Storable + Send + Sync, M: CachedStore> CompactSpace<T, M> {
 impl<T: Storable + Send + Sync + Debug + 'static, M: CachedStore + Send + Sync> ShaleStore<T>
     for CompactSpace<T, M>
 {
-    fn put_item<'a>(&'a self, item: T, extra: u64) -> Result<ObjRef<'a, T>, ShaleError> {
+    fn put_item(&self, item: T, extra: u64) -> Result<ObjRef<'_, T>, ShaleError> {
         let size = item.dehydrated_len() + extra;
-        let ptr: DiskAddress = {
-            let mut inner = self.inner.write().unwrap();
-            let addr = if let Some(addr) = inner.alloc_from_freed(size)? {
-                addr
-            } else {
-                inner.alloc_new(size)?
-            };
+        let addr = self.inner.write().unwrap().alloc(size)?;
 
-            DiskAddress::from(addr as usize)
+        let mut u = {
+            let inner = self.inner.read().unwrap();
+            let compact_space = inner.compact_space.as_ref();
+            let view =
+                StoredView::item_to_obj(compact_space, addr.try_into().unwrap(), size, item)?;
+
+            inner.obj_cache.put(view)
         };
-        let inner = self.inner.read().unwrap();
 
-        let mut u: ObjRef<'a, T> = inner.obj_cache.put(StoredView::item_to_obj(
-            inner.compact_space.as_ref(),
-            ptr.into(),
-            size,
-            item,
-        )?);
-
+        // should this use a `?` instead of `unwrap`?
         u.write(|_| {}).unwrap();
 
         Ok(u)
