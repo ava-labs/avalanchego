@@ -646,7 +646,12 @@ func (t *trieView) remove(key path) error {
 // Assumes at least one of the following is true:
 // * [node] has a value.
 // * [node] has children.
+// Must not be called after [calculateNodeIDs] has returned.
 func (t *trieView) compressNodePath(parent, node *node) error {
+	if t.nodesAlreadyCalculated.Get() {
+		return ErrNodesAlreadyCalculated
+	}
+
 	// don't collapse into this node if it's the root, doesn't have 1 child, or has a value
 	if len(node.children) != 1 || node.hasValue() {
 		return nil
@@ -675,7 +680,12 @@ func (t *trieView) compressNodePath(parent, node *node) error {
 // and deletes each node that has no value and no children.
 // Stops when a node with a value or children is reached.
 // Assumes [nodePath] is a path from the root to a node.
+// Must not be called after [calculateNodeIDs] has returned.
 func (t *trieView) deleteEmptyNodes(nodePath []*node) error {
+	if t.nodesAlreadyCalculated.Get() {
+		return ErrNodesAlreadyCalculated
+	}
+
 	node := nodePath[len(nodePath)-1]
 	nextParentIndex := len(nodePath) - 2
 
