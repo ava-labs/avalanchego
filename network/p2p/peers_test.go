@@ -141,7 +141,8 @@ func TestAppRequestAnyNodeSelection(t *testing.T) {
 			client, err := r.RegisterAppProtocol(1, nil, peers)
 			require.NoError(err)
 
-			require.ErrorIs(client.AppRequestAny(context.Background(), []byte("foobar"), nil), tt.expected)
+			err = client.AppRequestAny(context.Background(), []byte("foobar"), nil)
+			require.ErrorIs(err, ErrNoPeers)
 		})
 	}
 }
