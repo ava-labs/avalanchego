@@ -16,18 +16,14 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/version"
 )
 
 var (
 	ErrExistingAppProtocol = errors.New("existing app protocol")
 	ErrUnrequestedResponse = errors.New("unrequested response")
 
-	_ common.AppHandler    = (*Router)(nil)
-	_ validators.Connector = (*Router)(nil)
+	_ common.AppHandler = (*Router)(nil)
 )
 
 // Router routes incoming application messages to the corresponding registered
@@ -42,7 +38,6 @@ type Router struct {
 	pendingAppRequests           map[uint32]AppResponseCallback
 	pendingCrossChainAppRequests map[uint32]CrossChainAppResponseCallback
 	requestID                    uint32
-	peers                        set.SampleableSet[ids.NodeID]
 }
 
 // NewRouter returns a new instance of Router
@@ -56,26 +51,10 @@ func NewRouter(log logging.Logger, sender common.AppSender) *Router {
 	}
 }
 
-func (r *Router) Connected(_ context.Context, nodeID ids.NodeID, _ *version.Application) error {
-	r.lock.Lock()
-	defer r.lock.Unlock()
-
-	r.peers.Add(nodeID)
-	return nil
-}
-
-func (r *Router) Disconnected(_ context.Context, nodeID ids.NodeID) error {
-	r.lock.Lock()
-	defer r.lock.Unlock()
-
-	r.peers.Remove(nodeID)
-	return nil
-}
-
 // RegisterAppProtocol reserves an identifier for an application protocol and
 // returns a Client that can be used to send messages for the corresponding
 // protocol.
-func (r *Router) RegisterAppProtocol(handlerID uint64, handler Handler) (*Client, error) {
+func (r *Router) RegisterAppProtocol(handlerID uint64, handler Handler, nodeSampler NodeSampler) (*Client, error) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
@@ -94,6 +73,7 @@ func (r *Router) RegisterAppProtocol(handlerID uint64, handler Handler) (*Client
 		handlerPrefix: binary.AppendUvarint(nil, handlerID),
 		sender:        r.sender,
 		router:        r,
+		nodeSampler:   nodeSampler,
 	}, nil
 }
 
