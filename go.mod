@@ -2,7 +2,6 @@ module github.com/ava-labs/avalanchego
 
 // Changes to the minimum golang version must also be replicated in
 // scripts/build_avalanche.sh
-// scripts/local.Dockerfile
 // Dockerfile
 // README.md
 // go.mod (here, only major.minor can be specified)
