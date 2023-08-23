@@ -15,6 +15,7 @@ import (
 var _ Throttler = (*TokenBucketThrottler)(nil)
 
 type Throttler interface {
+	// Throttle blocks until there is [tokens] capacity for [nodeID]
 	Throttle(ctx context.Context, nodeID ids.NodeID, tokens int) error
 }
 
