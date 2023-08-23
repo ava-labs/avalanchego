@@ -33,7 +33,6 @@ var (
 	trueBytes  = []byte{trueByte}
 	falseBytes = []byte{falseByte}
 
-	errEncodeNil            = errors.New("can't encode nil pointer or interface")
 	errDecodeNil            = errors.New("can't decode nil")
 	errNegativeNumChildren  = errors.New("number of children is negative")
 	errTooManyChildren      = fmt.Errorf("length of children list is larger than branching factor of %d", NodeBranchFactor)
@@ -55,8 +54,8 @@ type encoderDecoder interface {
 }
 
 type encoder interface {
-	encodeDBNode(n *dbNode) ([]byte, error)
-	encodeHashValues(hv *hashValues) ([]byte, error)
+	encodeDBNode(n *dbNode) []byte
+	encodeHashValues(hv *hashValues) []byte
 }
 
 type decoder interface {
@@ -78,11 +77,8 @@ type codecImpl struct {
 	varIntPool sync.Pool
 }
 
-func (c *codecImpl) encodeDBNode(n *dbNode) ([]byte, error) {
-	if n == nil {
-		return nil, errEncodeNil
-	}
-
+// Assumes [n] is non-nil.
+func (c *codecImpl) encodeDBNode(n *dbNode) []byte {
 	buf := &bytes.Buffer{}
 	c.encodeMaybeByteSlice(buf, n.value)
 	childrenLength := len(n.children)
@@ -95,14 +91,11 @@ func (c *codecImpl) encodeDBNode(n *dbNode) ([]byte, error) {
 			_, _ = buf.Write(entry.id[:])
 		}
 	}
-	return buf.Bytes(), nil
+	return buf.Bytes()
 }
 
-func (c *codecImpl) encodeHashValues(hv *hashValues) ([]byte, error) {
-	if hv == nil {
-		return nil, errEncodeNil
-	}
-
+// Assumes [hv] is non-nil.
+func (c *codecImpl) encodeHashValues(hv *hashValues) []byte {
 	buf := &bytes.Buffer{}
 
 	length := len(hv.Children)
@@ -118,7 +111,7 @@ func (c *codecImpl) encodeHashValues(hv *hashValues) ([]byte, error) {
 	c.encodeMaybeByteSlice(buf, hv.Value)
 	c.encodeSerializedPath(hv.Key, buf)
 
-	return buf.Bytes(), nil
+	return buf.Bytes()
 }
 
 func (c *codecImpl) decodeDBNode(b []byte, n *dbNode) error {

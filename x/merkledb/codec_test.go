@@ -211,8 +211,7 @@ func FuzzCodecDBNodeCanonical(f *testing.F) {
 			}
 
 			// Encoding [node] should be the same as [b].
-			buf, err := codec.encodeDBNode(node)
-			require.NoError(err)
+			buf := codec.encodeDBNode(node)
 			require.Equal(b, buf)
 		},
 	)
@@ -264,8 +263,7 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 				children: children,
 			}
 
-			nodeBytes, err := codec.encodeDBNode(&node)
-			require.NoError(err)
+			nodeBytes := codec.encodeDBNode(&node)
 
 			var gotNode dbNode
 			require.NoError(codec.decodeDBNode(nodeBytes, &gotNode))
@@ -274,8 +272,7 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 			nilEmptySlices(&gotNode)
 			require.Equal(node, gotNode)
 
-			nodeBytes2, err := codec.encodeDBNode(&gotNode)
-			require.NoError(err)
+			nodeBytes2 := codec.encodeDBNode(&gotNode)
 			require.Equal(nodeBytes, nodeBytes2)
 		},
 	)
@@ -299,8 +296,7 @@ func TestCodec_DecodeDBNode(t *testing.T) {
 		children: map[byte]child{},
 	}
 
-	nodeBytes, err := codec.encodeDBNode(&proof)
-	require.NoError(err)
+	nodeBytes := codec.encodeDBNode(&proof)
 
 	// Remove num children (0) from end
 	nodeBytes = nodeBytes[:len(nodeBytes)-minVarIntLen]
