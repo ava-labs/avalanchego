@@ -109,7 +109,6 @@ var (
 
 	_ block.ChainVM                  = &VM{}
 	_ block.StateSyncableVM          = &VM{}
-	_ block.HeightIndexedChainVM     = &VM{}
 	_ statesyncclient.EthBlockParser = &VM{}
 )
 
