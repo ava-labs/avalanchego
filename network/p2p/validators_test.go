@@ -11,59 +11,138 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
-	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/math"
 )
 
-// Sample should always return up to [limit] validators, and less if fewer than
-// [limit] validators are available.
 func TestValidatorsSample(t *testing.T) {
-	tests := []struct {
-		name  string
+	errFoobar := errors.New("foobar")
+	nodeID1 := ids.GenerateTestNodeID()
+	nodeID2 := ids.GenerateTestNodeID()
+
+	type call struct {
 		limit int
 
-		currentHeight       uint64
+		time time.Time
+
+		height              uint64
 		getCurrentHeightErr error
 
-		validatorSet       map[ids.NodeID]*validators.GetValidatorOutput
+		validators         []ids.NodeID
 		getValidatorSetErr error
+
+		// superset of possible values in the result
+		expected []ids.NodeID
+	}
+
+	tests := []struct {
+		name         string
+		maxStaleness time.Duration
+		calls        []call
 	}{
 		{
-			name:  "less than limit validators",
-			limit: 2,
-			validatorSet: map[ids.NodeID]*validators.GetValidatorOutput{
-				ids.GenerateTestNodeID(): nil,
+			// if we don't have as many validators as requested by the caller,
+			// we should return all the validators we have
+			name:         "less than limit validators",
+			maxStaleness: time.Hour,
+			calls: []call{
+				{
+					time:       time.Time{}.Add(time.Second),
+					limit:      2,
+					height:     1,
+					validators: []ids.NodeID{nodeID1},
+					expected:   []ids.NodeID{nodeID1},
+				},
 			},
 		},
 		{
-			name:  "equal to limit validators",
-			limit: 2,
-			validatorSet: map[ids.NodeID]*validators.GetValidatorOutput{
-				ids.GenerateTestNodeID(): nil,
-				ids.GenerateTestNodeID(): nil,
+			// if we have as many validators as requested by the caller, we
+			// should return all the validators we have
+			name:         "equal to limit validators",
+			maxStaleness: time.Hour,
+			calls: []call{
+				{
+					time:       time.Time{}.Add(time.Second),
+					limit:      1,
+					height:     1,
+					validators: []ids.NodeID{nodeID1},
+					expected:   []ids.NodeID{nodeID1},
+				},
 			},
 		},
 		{
-			name:  "greater than limit validators",
-			limit: 2,
-			validatorSet: map[ids.NodeID]*validators.GetValidatorOutput{
-				ids.GenerateTestNodeID(): nil,
-				ids.GenerateTestNodeID(): nil,
-				ids.GenerateTestNodeID(): nil,
+			// if we have less validators than requested by the caller, we
+			// should return a subset of the validators that we have
+			name:         "less than limit validators",
+			maxStaleness: time.Hour,
+			calls: []call{
+				{
+					time:       time.Time{}.Add(time.Second),
+					limit:      1,
+					height:     1,
+					validators: []ids.NodeID{nodeID1, nodeID2},
+					expected:   []ids.NodeID{nodeID1, nodeID2},
+				},
 			},
 		},
 		{
-			name:                "fail to get current height",
-			limit:               2,
-			getCurrentHeightErr: errors.New("foobar"),
+			name:         "within max staleness threshold",
+			maxStaleness: time.Hour,
+			calls: []call{
+				{
+					time:       time.Time{}.Add(time.Second),
+					limit:      1,
+					height:     1,
+					validators: []ids.NodeID{nodeID1},
+					expected:   []ids.NodeID{nodeID1},
+				},
+			},
 		},
 		{
-			name:                "fail to get validator set",
-			limit:               2,
-			getCurrentHeightErr: errors.New("foobar"),
+			name:         "beyond max staleness threshold",
+			maxStaleness: time.Hour,
+			calls: []call{
+				{
+					limit:      1,
+					time:       time.Time{}.Add(time.Hour),
+					height:     1,
+					validators: []ids.NodeID{nodeID1},
+					expected:   []ids.NodeID{nodeID1},
+				},
+			},
+		},
+		{
+			name:         "fail to get current height",
+			maxStaleness: time.Second,
+			calls: []call{
+				{
+					limit:               1,
+					time:                time.Time{}.Add(time.Hour),
+					getCurrentHeightErr: errFoobar,
+					expected:            []ids.NodeID{},
+				},
+			},
+		},
+		{
+			name:         "second get validator set call fails",
+			maxStaleness: time.Minute,
+			calls: []call{
+				{
+					limit:      1,
+					time:       time.Time{}.Add(time.Second),
+					height:     1,
+					validators: []ids.NodeID{nodeID1},
+					expected:   []ids.NodeID{nodeID1},
+				},
+				{
+					limit:              1,
+					time:               time.Time{}.Add(time.Hour),
+					height:             1,
+					getValidatorSetErr: errFoobar,
+					expected:           []ids.NodeID{},
+				},
+			},
 		},
 	}
 
@@ -73,71 +152,36 @@ func TestValidatorsSample(t *testing.T) {
 			ctrl := gomock.NewController(t)
 
 			subnetID := ids.GenerateTestID()
-
 			mockValidators := validators.NewMockState(ctrl)
-			mockValidators.EXPECT().GetCurrentHeight(gomock.Any()).Return(tt.currentHeight, tt.getCurrentHeightErr)
 
-			getValidatorSetExpectedCalls := 0
-			if tt.getCurrentHeightErr == nil {
-				getValidatorSetExpectedCalls = 1
+			calls := make([]*gomock.Call, 0)
+			for _, call := range tt.calls {
+				calls = append(calls, mockValidators.EXPECT().
+					GetCurrentHeight(gomock.Any()).Return(call.height, call.getCurrentHeightErr))
+
+				if call.getCurrentHeightErr != nil {
+					continue
+				}
+
+				validatorSet := make(map[ids.NodeID]*validators.GetValidatorOutput, 0)
+				for _, validator := range call.validators {
+					validatorSet[validator] = nil
+				}
+
+				calls = append(calls,
+					mockValidators.EXPECT().
+						GetValidatorSet(gomock.Any(), gomock.Any(), subnetID).
+						Return(validatorSet, call.getValidatorSetErr))
 			}
-			mockValidators.EXPECT().GetValidatorSet(gomock.Any(), tt.currentHeight, subnetID).Return(tt.validatorSet, tt.getValidatorSetErr).Times(getValidatorSetExpectedCalls)
+			gomock.InOrder(calls...)
 
-			v := NewValidators(subnetID, mockValidators)
-
-			sampled := v.Sample(context.Background(), tt.limit)
-			require.Len(sampled, math.Min(tt.limit, len(tt.validatorSet)))
-			require.Subset(maps.Keys(tt.validatorSet), sampled)
-		})
-	}
-}
-
-// invariant: we should only call GetValidatorSet when it passes a max staleness
-// threshold
-func TestValidatorsSampleCaching(t *testing.T) {
-	tests := []struct {
-		name          string
-		validators    []ids.NodeID
-		maxStaleness  time.Duration
-		elapsed       time.Duration
-		expectedCalls int
-	}{
-		{
-			name:         "within max threshold",
-			validators:   []ids.NodeID{ids.GenerateTestNodeID()},
-			maxStaleness: time.Hour,
-			elapsed:      time.Second,
-		},
-		{
-			name:          "beyond max threshold",
-			validators:    []ids.NodeID{ids.GenerateTestNodeID()},
-			maxStaleness:  time.Hour,
-			elapsed:       time.Hour + 1,
-			expectedCalls: 1,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-
-			subnetID := ids.GenerateTestID()
-
-			height := uint64(1234)
-			mockValidators := validators.NewMockState(ctrl)
-			mockValidators.EXPECT().GetCurrentHeight(gomock.Any()).Return(height, nil).Times(tt.expectedCalls)
-
-			validatorSet := make(map[ids.NodeID]*validators.GetValidatorOutput, 0)
-			for _, validator := range tt.validators {
-				validatorSet[validator] = nil
+			v := NewValidators(subnetID, mockValidators, tt.maxStaleness)
+			for _, call := range tt.calls {
+				v.lastUpdated = call.time
+				sampled := v.Sample(context.Background(), call.limit)
+				require.LessOrEqual(len(sampled), call.limit)
+				require.Subset(call.expected, sampled)
 			}
-			mockValidators.EXPECT().GetValidatorSet(gomock.Any(), height, subnetID).Return(validatorSet, nil).Times(tt.expectedCalls)
-
-			v := NewValidators(subnetID, mockValidators)
-			v.maxValidatorSetStaleness = tt.maxStaleness
-			v.lastUpdated = time.Now().Add(-tt.elapsed)
-
-			v.Sample(context.Background(), 1)
 		})
 	}
 }
