@@ -12,10 +12,11 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
-var (
-	ErrHeightIndexedVMNotImplemented = errors.New("vm does not implement HeightIndexedChainVM interface")
-	ErrIndexIncomplete               = errors.New("query failed because height index is incomplete")
-)
+// ErrIndexIncomplete is used to indicate that the VM is currently repairing its
+// index.
+//
+// TODO: Remove after v1.11.x activates.
+var ErrIndexIncomplete = errors.New("query failed because height index is incomplete")
 
 // ChainVM defines the required functionality of a Snowman VM.
 //
@@ -60,6 +61,7 @@ type ChainVM interface {
 	// - ErrIndexIncomplete if the height index is not currently available.
 	// - Any other non-standard error that may have occurred when verifying the
 	//   index.
+	// TODO: Remove after v1.11.x activates.
 	VerifyHeightIndex(context.Context) error
 
 	// GetBlockIDAtHeight returns:
