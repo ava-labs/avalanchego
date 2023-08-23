@@ -85,11 +85,15 @@ func (c *codecImpl) encodeDBNode(n *dbNode) []byte {
 	c.encodeMaybeByteSlice(buf, n.value)
 	childrenLength := len(n.children)
 	c.encodeInt(buf, childrenLength)
-	for index, child := range n.children {
-		c.encodeInt(buf, int(index))
-		path := child.compressedPath.Serialize()
-		c.encodeSerializedPath(buf, path)
-		_, _ = buf.Write(child.id[:])
+	// Note we insert children in order of increasing index
+	// for determinism.
+	for index := byte(0); index < NodeBranchFactor; index++ {
+		if entry, ok := n.children[index]; ok {
+			c.encodeInt(buf, int(index))
+			path := entry.compressedPath.Serialize()
+			c.encodeSerializedPath(buf, path)
+			_, _ = buf.Write(entry.id[:])
+		}
 	}
 	return buf.Bytes()
 }
