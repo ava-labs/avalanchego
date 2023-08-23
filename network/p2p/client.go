@@ -41,7 +41,8 @@ type Client struct {
 	handlerPrefix []byte
 	router        *Router
 	sender        common.AppSender
-	nodeSampler   NodeSampler
+	// nodeSampler is used to select nodes to route AppRequestAny to
+	nodeSampler NodeSampler
 }
 
 // AppRequestAny issues an AppRequest to an arbitrary node decided by Client.

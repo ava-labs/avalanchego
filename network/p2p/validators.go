@@ -13,11 +13,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-const maxValidatorSetStaleness = time.Minute
-
 var _ NodeSampler = (*Validators)(nil)
 
-func NewValidators(subnetID ids.ID, validators validators.State) *Validators {
+func NewValidators(subnetID ids.ID, validators validators.State, maxValidatorSetStaleness time.Duration) *Validators {
 	return &Validators{
 		subnetID:                 subnetID,
 		validators:               validators,
@@ -41,6 +39,8 @@ func (v *Validators) refresh(ctx context.Context) {
 		return
 	}
 
+	v.validatorIDs.Clear()
+
 	height, err := v.validators.GetCurrentHeight(ctx)
 	if err != nil {
 		return
@@ -50,10 +50,10 @@ func (v *Validators) refresh(ctx context.Context) {
 		return
 	}
 
-	v.validatorIDs = set.NewSampleableSet[ids.NodeID](len(validatorSet))
 	for nodeID := range validatorSet {
 		v.validatorIDs.Add(nodeID)
 	}
+
 	v.lastUpdated = time.Now()
 }
 
