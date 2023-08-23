@@ -148,7 +148,7 @@ func Test_MerkleDB_DB_Rebuild(t *testing.T) {
 	config := newDefaultConfig()
 	config.NodeCacheSize = initialSize
 
-	db, err := New(
+	db, err := newDB(
 		context.Background(),
 		rdb,
 		config,
