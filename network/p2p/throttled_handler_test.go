@@ -14,40 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-func TestThrottledHandlerAppGossip(t *testing.T) {
-	tests := []struct {
-		name      string
-		Throttler Throttler
-		wantErr   bool
-	}{
-		{
-			name:      "throttled",
-			Throttler: NewTokenBucketThrottler(rate.Every(time.Second), 1),
-		},
-		{
-			name:      "throttler errors",
-			Throttler: NewTokenBucketThrottler(rate.Every(time.Second), 0),
-			wantErr:   true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
-
-			handler := ThrottledHandler{
-				Handler:   NoOpHandler{},
-				Throttler: tt.Throttler,
-			}
-			err := handler.AppGossip(context.Background(), ids.GenerateTestNodeID(), []byte("foobar"))
-			if tt.wantErr {
-				require.NotNil(err)
-			} else {
-				require.Nil(err)
-			}
-		})
-	}
-}
-
 func TestThrottledHandlerAppRequest(t *testing.T) {
 	tests := []struct {
 		name      string

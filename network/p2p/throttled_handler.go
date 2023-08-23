@@ -17,14 +17,6 @@ type ThrottledHandler struct {
 	Throttler Throttler
 }
 
-func (t ThrottledHandler) AppGossip(ctx context.Context, nodeID ids.NodeID, gossipBytes []byte) error {
-	if err := t.Throttler.Throttle(ctx, nodeID, 1); err != nil {
-		return err
-	}
-
-	return t.Handler.AppGossip(ctx, nodeID, gossipBytes)
-}
-
 func (t ThrottledHandler) AppRequest(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, error) {
 	if err := t.Throttler.Throttle(ctx, nodeID, 1); err != nil {
 		return nil, err
