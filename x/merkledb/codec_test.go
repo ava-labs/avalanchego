@@ -185,7 +185,7 @@ func FuzzCodecSerializedPath(f *testing.F) {
 
 			// Encoding [got] should be the same as [b].
 			var buf bytes.Buffer
-			codec.encodeSerializedPath(got, &buf)
+			codec.encodeSerializedPath(&buf, got)
 			bufBytes := buf.Bytes()
 			require.Len(bufBytes, numRead)
 			require.Equal(b[:numRead], bufBytes)
