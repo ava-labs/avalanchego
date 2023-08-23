@@ -917,6 +917,9 @@ func TestExpiredBuildBlock(t *testing.T) {
 		toScheduler = toEngineChan
 		return nil
 	}
+	coreVM.VerifyHeightIndexF = func(context.Context) error {
+		return nil
+	}
 
 	// make sure that DBs are compressed correctly
 	require.NoError(proVM.Initialize(
@@ -1201,6 +1204,9 @@ func TestInnerVMRollback(t *testing.T) {
 	) error {
 		return nil
 	}
+	coreVM.VerifyHeightIndexF = func(context.Context) error {
+		return nil
+	}
 
 	dbManager := manager.NewMemDB(version.Semantic1_0_0)
 
@@ -1226,7 +1232,6 @@ func TestInnerVMRollback(t *testing.T) {
 	))
 
 	require.NoError(proVM.SetState(context.Background(), snow.NormalOp))
-
 	require.NoError(proVM.SetPreference(context.Background(), coreGenBlk.IDV))
 
 	coreBlk := &snowman.TestBlock{
@@ -2168,7 +2173,15 @@ func TestVMInnerBlkCache(t *testing.T) {
 		gomock.Any(),
 		gomock.Any(),
 	).Return(nil)
+	innerVM.EXPECT().VerifyHeightIndex(gomock.Any()).Return(nil)
 	innerVM.EXPECT().Shutdown(gomock.Any()).Return(nil)
+
+	{
+		innerBlk := snowman.NewMockBlock(ctrl)
+		innerBlkID := ids.GenerateTestID()
+		innerVM.EXPECT().LastAccepted(gomock.Any()).Return(innerBlkID, nil)
+		innerVM.EXPECT().GetBlock(gomock.Any(), innerBlkID).Return(innerBlk, nil)
+	}
 
 	ctx := snow.DefaultContextTest()
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
@@ -2392,7 +2405,15 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 		gomock.Any(),
 		gomock.Any(),
 	).Return(nil)
+	innerVM.EXPECT().VerifyHeightIndex(gomock.Any()).Return(nil)
 	innerVM.EXPECT().Shutdown(gomock.Any()).Return(nil)
+
+	{
+		innerBlk := snowman.NewMockBlock(ctrl)
+		innerBlkID := ids.GenerateTestID()
+		innerVM.EXPECT().LastAccepted(gomock.Any()).Return(innerBlkID, nil)
+		innerVM.EXPECT().GetBlock(gomock.Any(), innerBlkID).Return(innerBlk, nil)
+	}
 
 	snowCtx := snow.DefaultContextTest()
 	snowCtx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
