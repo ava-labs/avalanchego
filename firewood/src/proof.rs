@@ -128,10 +128,10 @@ impl Proof {
         key: K,
         root_hash: [u8; 32],
     ) -> Result<Option<Vec<u8>>, ProofError> {
-        let mut chunks = Vec::new();
-        chunks.extend(key.as_ref().iter().copied().flat_map(to_nibble_array));
+        let mut key_nibbles = Vec::new();
+        key_nibbles.extend(key.as_ref().iter().copied().flat_map(to_nibble_array));
 
-        let mut cur_key: &[u8] = &chunks;
+        let mut remaining_key_nibbles: &[u8] = &key_nibbles;
         let mut cur_hash = root_hash;
         let proofs_map = &self.0;
         let mut index = 0;
@@ -140,17 +140,17 @@ impl Proof {
             let cur_proof = proofs_map
                 .get(&cur_hash)
                 .ok_or(ProofError::ProofNodeMissing)?;
-            let (sub_proof, size) = self.locate_subproof(cur_key, cur_proof)?;
+            let (sub_proof, size) = self.locate_subproof(remaining_key_nibbles, cur_proof)?;
             index += size;
 
             match sub_proof {
                 // Return when reaching the end of the key.
-                Some(p) if index == chunks.len() => return Ok(Some(p.rlp)),
+                Some(p) if index == key_nibbles.len() => return Ok(Some(p.rlp)),
                 // The trie doesn't contain the key.
                 Some(SubProof { hash: None, .. }) | None => return Ok(None),
                 Some(p) => {
                     cur_hash = p.hash.unwrap();
-                    cur_key = &chunks[index..];
+                    remaining_key_nibbles = &key_nibbles[index..];
                 }
             }
         }
@@ -158,15 +158,14 @@ impl Proof {
 
     fn locate_subproof(
         &self,
-        key: &[u8],
-        buf: &[u8],
+        key_nibbles: &[u8],
+        rlp_encoded_node: &[u8],
     ) -> Result<(Option<SubProof>, usize), ProofError> {
-        let rlp = rlp::Rlp::new(buf);
+        let rlp = rlp::Rlp::new(rlp_encoded_node);
 
-        // TODO: handle error in match statement instead of unwrapping
-        match rlp.item_count().unwrap() {
-            EXT_NODE_SIZE => {
-                let cur_key_path: Vec<_> = rlp
+        match rlp.item_count() {
+            Ok(EXT_NODE_SIZE) => {
+                let decoded_key_nibbles: Vec<_> = rlp
                     .at(0)
                     .unwrap()
                     .as_val::<Vec<u8>>()
@@ -174,7 +173,7 @@ impl Proof {
                     .into_iter()
                     .flat_map(to_nibble_array)
                     .collect();
-                let (cur_key_path, term) = PartialPath::decode(cur_key_path);
+                let (cur_key_path, term) = PartialPath::decode(decoded_key_nibbles);
                 let cur_key = cur_key_path.into_inner();
 
                 let rlp = rlp.at(1).unwrap();
@@ -186,7 +185,7 @@ impl Proof {
                 };
 
                 // Check if the key of current node match with the given key.
-                if key.len() < cur_key.len() || key[..cur_key.len()] != cur_key {
+                if key_nibbles.len() < cur_key.len() || key_nibbles[..cur_key.len()] != cur_key {
                     return Ok((None, 0));
                 }
 
@@ -204,10 +203,10 @@ impl Proof {
                 }
             }
 
-            BRANCH_NODE_SIZE if key.is_empty() => Err(ProofError::NoSuchNode),
+            Ok(BRANCH_NODE_SIZE) if key_nibbles.is_empty() => Err(ProofError::NoSuchNode),
 
-            BRANCH_NODE_SIZE => {
-                let index = key[0];
+            Ok(BRANCH_NODE_SIZE) => {
+                let index = key_nibbles[0];
                 let rlp = rlp.at(index as usize).unwrap();
 
                 let data = if rlp.is_data() {
