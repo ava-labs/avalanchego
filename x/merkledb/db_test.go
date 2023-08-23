@@ -25,6 +25,15 @@ import (
 
 const defaultHistoryLength = 300
 
+// newDB returns a new merkle database with the underlying type so that tests can access unexported fields
+func newDB(ctx context.Context, db database.Database, config Config) (*merkleDB, error) {
+	db, err := New(ctx, db, config)
+	if err != nil {
+		return nil, err
+	}
+	return db.(*merkleDB), nil
+}
+
 func newNoopTracer() trace.Tracer {
 	tracer, _ := trace.New(trace.Config{Enabled: false})
 	return tracer
@@ -148,7 +157,7 @@ func Test_MerkleDB_DB_Rebuild(t *testing.T) {
 	config := newDefaultConfig()
 	config.NodeCacheSize = initialSize
 
-	db, err := New(
+	db, err := newDB(
 		context.Background(),
 		rdb,
 		config,
