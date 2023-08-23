@@ -112,7 +112,7 @@ func (c *codecImpl) encodeHashValues(hv *hashValues) ([]byte, error) {
 	for index := byte(0); index < NodeBranchFactor; index++ {
 		if entry, ok := hv.Children[index]; ok {
 			c.encodeInt(buf, int(index))
-			buf.Write(entry.id[:])
+			_, _ = buf.Write(entry.id[:])
 		}
 	}
 	c.encodeMaybeByteSlice(buf, hv.Value)
