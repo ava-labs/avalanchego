@@ -61,6 +61,7 @@ type ChainVM interface {
 	// - ErrIndexIncomplete if the height index is not currently available.
 	// - Any other non-standard error that may have occurred when verifying the
 	//   index.
+	//
 	// TODO: Remove after v1.11.x activates.
 	VerifyHeightIndex(context.Context) error
 
