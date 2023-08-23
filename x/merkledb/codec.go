@@ -33,7 +33,6 @@ var (
 	trueBytes  = []byte{trueByte}
 	falseBytes = []byte{falseByte}
 
-	errDecodeNil            = errors.New("can't decode nil")
 	errNegativeNumChildren  = errors.New("number of children is negative")
 	errTooManyChildren      = fmt.Errorf("length of children list is larger than branching factor of %d", NodeBranchFactor)
 	errChildIndexTooLarge   = fmt.Errorf("invalid child index. Must be less than branching factor of %d", NodeBranchFactor)
@@ -61,6 +60,7 @@ type encoder interface {
 }
 
 type decoder interface {
+	// Assumes [n] is non-nil.
 	decodeDBNode(bytes []byte, n *dbNode) error
 }
 
@@ -118,21 +118,17 @@ func (c *codecImpl) encodeHashValues(hv *hashValues) []byte {
 }
 
 func (c *codecImpl) decodeDBNode(b []byte, n *dbNode) error {
-	if n == nil {
-		return errDecodeNil
-	}
 	if minDBNodeLen > len(b) {
 		return io.ErrUnexpectedEOF
 	}
 
-	var (
-		src = bytes.NewReader(b)
-		err error
-	)
+	src := bytes.NewReader(b)
 
-	if n.value, err = c.decodeMaybeByteSlice(src); err != nil {
+	value, err := c.decodeMaybeByteSlice(src)
+	if err != nil {
 		return err
 	}
+	n.value = value
 
 	numChildren, err := c.decodeInt(src)
 	switch {
@@ -174,7 +170,7 @@ func (c *codecImpl) decodeDBNode(b []byte, n *dbNode) error {
 	if src.Len() != 0 {
 		return errExtraSpace
 	}
-	return err
+	return nil
 }
 
 func (*codecImpl) encodeBool(dst *bytes.Buffer, value bool) {
