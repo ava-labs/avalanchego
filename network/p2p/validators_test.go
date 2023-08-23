@@ -14,6 +14,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 func TestValidatorsSample(t *testing.T) {
@@ -175,7 +176,7 @@ func TestValidatorsSample(t *testing.T) {
 			}
 			gomock.InOrder(calls...)
 
-			v := NewValidators(subnetID, mockValidators, tt.maxStaleness)
+			v := NewValidators(logging.NoLog{}, subnetID, mockValidators, tt.maxStaleness)
 			for _, call := range tt.calls {
 				v.lastUpdated = call.time
 				sampled := v.Sample(context.Background(), call.limit)
