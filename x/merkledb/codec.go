@@ -54,7 +54,9 @@ type encoderDecoder interface {
 }
 
 type encoder interface {
+	// Assumes [n] is non-nil.
 	encodeDBNode(n *dbNode) []byte
+	// Assumes [hv] is non-nil.
 	encodeHashValues(hv *hashValues) []byte
 }
 
@@ -78,7 +80,6 @@ type codecImpl struct {
 	varIntPool sync.Pool
 }
 
-// Assumes [n] is non-nil.
 func (c *codecImpl) encodeDBNode(n *dbNode) []byte {
 	buf := &bytes.Buffer{}
 	c.encodeMaybeByteSlice(buf, n.value)
@@ -95,7 +96,6 @@ func (c *codecImpl) encodeDBNode(n *dbNode) []byte {
 	return buf.Bytes()
 }
 
-// Assumes [hv] is non-nil.
 func (c *codecImpl) encodeHashValues(hv *hashValues) []byte {
 	buf := &bytes.Buffer{}
 
