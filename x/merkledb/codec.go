@@ -72,7 +72,8 @@ func newCodec() encoderDecoder {
 	}
 }
 
-// Note that buyes.Buffer.Write always returns nil.
+// Note that bytes.Buffer.Write always returns nil so we
+// can ignore its return values in [codecImpl] methods.
 type codecImpl struct {
 	varIntPool sync.Pool
 }
