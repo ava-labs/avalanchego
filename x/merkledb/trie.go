@@ -39,7 +39,7 @@ type ReadOnlyTrie interface {
 
 	// get the value associated with the key in path form
 	// database.ErrNotFound if the key is not present
-	getValue(key path, lock bool) ([]byte, error)
+	getValue(key path) ([]byte, error)
 
 	// get an editable copy of the node with the given key path
 	getEditableNode(key path) (*node, error)
@@ -57,21 +57,13 @@ type Trie interface {
 	ReadOnlyTrie
 
 	// NewView returns a new view on top of this Trie with the specified changes
-	NewView(batchOps []database.BatchOp) (TrieView, error)
+	NewView(ctx context.Context, batchOps []database.BatchOp) (TrieView, error)
 }
 
 type TrieView interface {
 	Trie
 
-	// CommitToDB takes the changes of this trie and commits them down the view stack
-	// until all changes in the stack commit to the database
-	// Takes the DB commit lock
+	// CommitToDB writes the changes in this view to the database.
+	// Takes the DB commit lock.
 	CommitToDB(ctx context.Context) error
-
-	// commits changes in the trie to its parent
-	// then commits the combined changes down the stack until all changes in the stack commit to the database
-	commitToDB(ctx context.Context) error
-
-	// commits changes in the trieToCommit into the current trie
-	commitChanges(ctx context.Context, trieToCommit *trieView) error
 }

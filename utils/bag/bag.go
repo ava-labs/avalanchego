@@ -94,8 +94,6 @@ func (b *Bag[T]) Equals(other Bag[T]) bool {
 
 // Mode returns the most common element in the bag and the count of that element.
 // If there's a tie, any of the tied element may be returned.
-// TODO for Stephen: Does the above violate an assumption made by Snowball?
-// If the bag is empty, the zero value and 0 are returned.
 func (b *Bag[T]) Mode() (T, int) {
 	var (
 		mode     T
