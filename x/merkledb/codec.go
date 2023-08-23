@@ -250,10 +250,9 @@ func (c *codecImpl) encodeInt64(dst *bytes.Buffer, value int64) {
 
 func (c *codecImpl) encodeMaybeByteSlice(dst *bytes.Buffer, maybeValue maybe.Maybe[[]byte]) {
 	c.encodeBool(dst, !maybeValue.IsNothing())
-	if maybeValue.IsNothing() {
-		return
+	if maybeValue.HasValue() {
+		c.encodeByteSlice(dst, maybeValue.Value())
 	}
-	c.encodeByteSlice(dst, maybeValue.Value())
 }
 
 func (c *codecImpl) decodeMaybeByteSlice(src *bytes.Reader) (maybe.Maybe[[]byte], error) {
