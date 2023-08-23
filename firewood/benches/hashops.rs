@@ -1,70 +1,128 @@
 // hash benchmarks; run with 'cargo bench'
-use std::ops::Deref;
 
-use bencher::{benchmark_group, benchmark_main, Bencher};
+use criterion::{criterion_group, criterion_main, profiler::Profiler, BatchSize, Criterion};
 use firewood::merkle::{Merkle, TrieHash, TRIE_HASH_LEN};
 use firewood_shale::{
-    cached::PlainMem, disk_address::DiskAddress, CachedStore, Storable, StoredView,
+    cached::PlainMem,
+    compact::{CompactHeader, CompactSpace},
+    disk_address::DiskAddress,
+    CachedStore, ObjCache, Storable, StoredView,
 };
-use rand::{distributions::Alphanumeric, Rng, SeedableRng};
+use pprof::ProfilerGuard;
+use rand::{distributions::Alphanumeric, rngs::StdRng, Rng, SeedableRng};
+use std::{fs::File, iter::repeat_with, ops::Deref, os::raw::c_int, path::Path};
 
 const ZERO_HASH: TrieHash = TrieHash([0u8; TRIE_HASH_LEN]);
 
-fn bench_dehydrate(b: &mut Bencher) {
-    let mut to = [1u8; TRIE_HASH_LEN];
-    b.iter(|| {
-        ZERO_HASH.dehydrate(&mut to).unwrap();
-    });
+// To enable flamegraph output
+// cargo bench --bench shale-bench -- --profile-time=N
+enum FlamegraphProfiler {
+    Init(c_int),
+    Active(ProfilerGuard<'static>),
 }
 
-fn bench_hydrate(b: &mut Bencher) {
-    let mut store = PlainMem::new(TRIE_HASH_LEN as u64, 0u8);
-    store.write(0, ZERO_HASH.deref());
-
-    b.iter(|| {
-        TrieHash::hydrate(0, &store).unwrap();
-    });
+fn file_error_panic<T, U>(path: &Path) -> impl FnOnce(T) -> U + '_ {
+    |_| panic!("Error on file `{}`", path.display())
 }
 
-fn bench_insert(b: &mut Bencher) {
-    const TEST_MEM_SIZE: u64 = 20_000_000;
-    let merkle_payload_header = DiskAddress::null();
+impl Profiler for FlamegraphProfiler {
+    fn start_profiling(&mut self, _benchmark_id: &str, _benchmark_dir: &Path) {
+        if let Self::Init(frequency) = self {
+            let guard = ProfilerGuard::new(*frequency).unwrap();
+            *self = Self::Active(guard);
+        }
+    }
 
-    let merkle_payload_header_ref = StoredView::ptr_to_obj(
-        &PlainMem::new(2 * firewood_shale::compact::CompactHeader::MSIZE, 9),
-        merkle_payload_header,
-        firewood_shale::compact::CompactHeader::MSIZE,
-    )
-    .unwrap();
+    fn stop_profiling(&mut self, _benchmark_id: &str, benchmark_dir: &Path) {
+        std::fs::create_dir_all(benchmark_dir).unwrap();
+        let filename = "firewood-flamegraph.svg";
+        let flamegraph_path = benchmark_dir.join(filename);
+        let flamegraph_file =
+            File::create(&flamegraph_path).unwrap_or_else(file_error_panic(&flamegraph_path));
 
-    let store = firewood_shale::compact::CompactSpace::new(
-        PlainMem::new(TEST_MEM_SIZE, 0).into(),
-        PlainMem::new(TEST_MEM_SIZE, 1).into(),
-        merkle_payload_header_ref,
-        firewood_shale::ObjCache::new(1 << 20),
-        4096,
-        4096,
-    )
-    .unwrap();
-    let mut merkle = Merkle::new(Box::new(store));
-    let root = merkle.init_root().unwrap();
-
-    let mut rng = rand::rngs::StdRng::seed_from_u64(1234);
-    const KEY_LEN: usize = 4;
-    b.iter(|| {
-        // generate a random key
-        let k = (&mut rng)
-            .sample_iter(&Alphanumeric)
-            .take(KEY_LEN)
-            .collect::<Vec<u8>>();
-        merkle.insert(k, vec![b'v'], root).unwrap();
-    });
-    #[cfg(trace)]
-    {
-        merkle.dump(root, &mut io::std::stdout().lock()).unwrap();
-        println!("done\n---\n\n");
+        if let Self::Active(profiler) = self {
+            profiler
+                .report()
+                .build()
+                .unwrap()
+                .flamegraph(flamegraph_file)
+                .unwrap_or_else(file_error_panic(&flamegraph_path));
+        }
     }
 }
 
-benchmark_group!(benches, bench_dehydrate, bench_hydrate, bench_insert);
-benchmark_main!(benches);
+fn bench_trie_hash(criterion: &mut Criterion) {
+    let mut to = [1u8; TRIE_HASH_LEN];
+    let mut store = PlainMem::new(TRIE_HASH_LEN as u64, 0u8);
+    store.write(0, ZERO_HASH.deref());
+
+    criterion
+        .benchmark_group("TrieHash")
+        .bench_function("dehydrate", |b| {
+            b.iter(|| ZERO_HASH.dehydrate(&mut to).unwrap());
+        })
+        .bench_function("hydrate", |b| {
+            b.iter(|| TrieHash::hydrate(0, &store).unwrap());
+        });
+}
+
+fn bench_merkle<const N: usize>(criterion: &mut Criterion) {
+    const TEST_MEM_SIZE: u64 = 20_000_000;
+    const KEY_LEN: usize = 4;
+    let mut rng = StdRng::seed_from_u64(1234);
+
+    criterion
+        .benchmark_group("Merkle")
+        .sample_size(30)
+        .bench_function("insert", |b| {
+            b.iter_batched(
+                || {
+                    let merkle_payload_header = DiskAddress::from(0);
+
+                    let merkle_payload_header_ref = StoredView::ptr_to_obj(
+                        &PlainMem::new(2 * CompactHeader::MSIZE, 9),
+                        merkle_payload_header,
+                        CompactHeader::MSIZE,
+                    )
+                    .unwrap();
+
+                    let store = CompactSpace::new(
+                        PlainMem::new(TEST_MEM_SIZE, 0).into(),
+                        PlainMem::new(TEST_MEM_SIZE, 1).into(),
+                        merkle_payload_header_ref,
+                        ObjCache::new(1 << 20),
+                        4096,
+                        4096,
+                    )
+                    .unwrap();
+
+                    let merkle = Merkle::new(Box::new(store));
+                    let root = merkle.init_root().unwrap();
+
+                    let keys: Vec<Vec<u8>> = repeat_with(|| {
+                        (&mut rng)
+                            .sample_iter(&Alphanumeric)
+                            .take(KEY_LEN)
+                            .collect()
+                    })
+                    .take(N)
+                    .collect();
+
+                    (merkle, root, keys)
+                },
+                |(mut merkle, root, keys)| {
+                    keys.into_iter()
+                        .for_each(|key| merkle.insert(key, vec![b'v'], root).unwrap())
+                },
+                BatchSize::SmallInput,
+            );
+        });
+}
+
+criterion_group! {
+    name = benches;
+    config = Criterion::default().with_profiler(FlamegraphProfiler::Init(100));
+    targets = bench_trie_hash, bench_merkle::<1>
+}
+
+criterion_main!(benches);

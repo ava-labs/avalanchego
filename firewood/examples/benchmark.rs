@@ -2,7 +2,7 @@
 // See the file LICENSE.md for licensing terms.
 
 use clap::Parser;
-use criterion::Criterion;
+use criterion::{Criterion, SamplingMode, Throughput};
 use firewood::db::{BatchOp, Db, DbConfig, WalConfig};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
@@ -35,12 +35,10 @@ fn main() {
 
     println!("workload prepared");
 
-    group
-        .sampling_mode(criterion::SamplingMode::Flat)
-        .sample_size(10);
+    group.sampling_mode(SamplingMode::Flat).sample_size(10);
 
     let total = (args.nbatch * args.batch_size) as u64;
-    group.throughput(criterion::Throughput::Elements(total));
+    group.throughput(Throughput::Elements(total));
 
     group.bench_with_input(
         format!("nbatch={} batch_size={}", args.nbatch, args.batch_size),
