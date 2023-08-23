@@ -15,45 +15,82 @@ import (
 )
 
 func TestThrottler(t *testing.T) {
+	type call struct {
+		tokens      int
+		expectedErr bool
+	}
+
 	tests := []struct {
 		name string
 
 		refill rate.Limit
 		burst  int
 
-		tokens      int
-		expectedErr bool
+		calls []call
 	}{
 		{
 			name:   "take less than burst tokens",
 			refill: rate.Every(time.Second),
 			burst:  10,
-			tokens: 9,
+			calls: []call{
+				{
+					tokens: 9,
+				},
+			},
 		},
 		{
 			name:   "take burst tokens",
 			refill: rate.Every(time.Second),
 			burst:  10,
-			tokens: 10,
+			calls: []call{
+				{
+					tokens: 10,
+				},
+			},
 		},
 		{
-			name:        "take more than burst tokens",
-			refill:      rate.Every(time.Second),
-			burst:       10,
-			tokens:      11,
-			expectedErr: true,
+			name:   "take more than burst tokens",
+			refill: rate.Every(time.Second),
+			burst:  10,
+			calls: []call{
+				{
+					tokens:      11,
+					expectedErr: true,
+				},
+			},
 		},
 		{
 			name:   "take zero tokens",
 			refill: rate.Every(time.Second),
 			burst:  10,
-			tokens: 0,
+			calls: []call{
+				{
+					tokens: 0,
+				},
+			},
 		},
 		{
 			name:   "take negative tokens",
 			refill: rate.Every(time.Second),
 			burst:  10,
-			tokens: -1,
+			calls: []call{
+				{
+					tokens: -1,
+				},
+			},
+		},
+		{
+			name:   "take tokens twice",
+			refill: rate.Every(time.Second),
+			burst:  10,
+			calls: []call{
+				{
+					tokens: 1,
+				},
+				{
+					tokens: 1,
+				},
+			},
 		},
 	}
 
@@ -64,11 +101,13 @@ func TestThrottler(t *testing.T) {
 			throttler := NewTokenBucketThrottler(tt.refill, tt.burst)
 
 			nodeID := ids.GenerateTestNodeID()
-			err := throttler.Throttle(context.Background(), nodeID, tt.tokens)
-			if tt.expectedErr {
-				require.NotNil(err)
-			} else {
-				require.Nil(err)
+			for _, call := range tt.calls {
+				err := throttler.Throttle(context.Background(), nodeID, call.tokens)
+				if call.expectedErr {
+					require.NotNil(err)
+				} else {
+					require.Nil(err)
+				}
 			}
 		})
 	}
