@@ -25,6 +25,9 @@ const (
 	minByteSliceLen      = minVarIntLen
 	minDBNodeLen         = minMaybeByteSliceLen + minVarIntLen
 	minChildLen          = minVarIntLen + minSerializedPathLen + ids.IDLen
+
+	defaultNodeAllocSize       = 256
+	defaultHashValuesAllocSize = 256
 )
 
 var (
@@ -81,7 +84,7 @@ type codecImpl struct {
 }
 
 func (c *codecImpl) encodeDBNode(n *dbNode) []byte {
-	buf := &bytes.Buffer{}
+	buf := bytes.NewBuffer(make([]byte, 0, defaultNodeAllocSize))
 	c.encodeMaybeByteSlice(buf, n.value)
 	childrenLength := len(n.children)
 	c.encodeInt(buf, childrenLength)
@@ -97,7 +100,7 @@ func (c *codecImpl) encodeDBNode(n *dbNode) []byte {
 }
 
 func (c *codecImpl) encodeHashValues(hv *hashValues) []byte {
-	buf := &bytes.Buffer{}
+	buf := bytes.NewBuffer(make([]byte, 0, defaultHashValuesAllocSize))
 
 	length := len(hv.Children)
 	c.encodeInt(buf, length)
