@@ -240,7 +240,7 @@ func Test_Trie_WriteToDB(t *testing.T) {
 	require.NoError(trie2.CommitToDB(context.Background()))
 
 	p := []byte("key")
-	rawBytes, err := dbTrie.baseDB.Get(dbTrie.valueNodesDB.prefixedKey(p))
+	rawBytes, err := dbTrie.baseDB.Get(dbTrie.valueNodeDB.prefixedKey(p))
 	require.NoError(err)
 
 	node, err := parseNode(newPath(p), rawBytes)
