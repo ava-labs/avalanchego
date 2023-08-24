@@ -177,6 +177,15 @@ type merkleDB struct {
 	childViews []*trieView
 }
 
+// New returns a new merkle database.
+func New(ctx context.Context, db database.Database, config Config) (MerkleDB, error) {
+	metrics, err := newMetrics("merkleDB", config.Reg)
+	if err != nil {
+		return nil, err
+	}
+	return newDatabase(ctx, db, config, metrics)
+}
+
 func newDatabase(
 	ctx context.Context,
 	db database.Database,
@@ -284,15 +293,6 @@ func (db *merkleDB) rebuild(ctx context.Context) error {
 	return db.nodeDB.Compact(nil, nil)
 }
 
-// New returns a new merkle database.
-func New(ctx context.Context, db database.Database, config Config) (MerkleDB, error) {
-	metrics, err := newMetrics("merkleDB", config.Reg)
-	if err != nil {
-		return nil, err
-	}
-	return newDatabase(ctx, db, config, metrics)
-}
-
 func (db *merkleDB) CommitChangeProof(ctx context.Context, proof *ChangeProof) error {
 	db.commitLock.Lock()
 	defer db.commitLock.Unlock()
@@ -396,12 +396,6 @@ func (db *merkleDB) Close() error {
 
 	// Successfully wrote intermediate nodes.
 	return db.metadataDB.Put(cleanShutdownKey, hadCleanShutdown)
-}
-
-func (db *merkleDB) Delete(key []byte) error {
-	// this is a duplicate because the database interface doesn't support
-	// contexts, which are used for tracing
-	return db.Remove(context.Background(), key)
 }
 
 func (db *merkleDB) Get(key []byte) ([]byte, error) {
@@ -723,26 +717,6 @@ func (db *merkleDB) HealthCheck(ctx context.Context) (interface{}, error) {
 	return db.nodeDB.HealthCheck(ctx)
 }
 
-func (db *merkleDB) Insert(ctx context.Context, k, v []byte) error {
-	db.commitLock.Lock()
-	defer db.commitLock.Unlock()
-
-	if db.closed {
-		return database.ErrClosed
-	}
-
-	view, err := db.newUntrackedView([]database.BatchOp{
-		{
-			Key:   k,
-			Value: v,
-		},
-	})
-	if err != nil {
-		return err
-	}
-	return view.commitToDB(ctx)
-}
-
 func (db *merkleDB) NewBatch() database.Batch {
 	return &batch{
 		db: db,
@@ -834,12 +808,36 @@ func writeNodeToBatch(batch database.Batch, n *node) error {
 	return batch.Put(n.key.Bytes(), nodeBytes)
 }
 
-// Put upserts the key/value pair into the db.
 func (db *merkleDB) Put(k, v []byte) error {
-	return db.Insert(context.Background(), k, v)
+	return db.PutContext(context.Background(), k, v)
 }
 
-func (db *merkleDB) Remove(ctx context.Context, key []byte) error {
+// Same as [Put] but takes in a context used for tracing.
+func (db *merkleDB) PutContext(ctx context.Context, k, v []byte) error {
+	db.commitLock.Lock()
+	defer db.commitLock.Unlock()
+
+	if db.closed {
+		return database.ErrClosed
+	}
+
+	view, err := db.newUntrackedView([]database.BatchOp{
+		{
+			Key:   k,
+			Value: v,
+		},
+	})
+	if err != nil {
+		return err
+	}
+	return view.commitToDB(ctx)
+}
+
+func (db *merkleDB) Delete(key []byte) error {
+	return db.DeleteContext(context.Background(), key)
+}
+
+func (db *merkleDB) DeleteContext(ctx context.Context, key []byte) error {
 	db.commitLock.Lock()
 	defer db.commitLock.Unlock()
 
