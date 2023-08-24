@@ -58,7 +58,7 @@ type Manager interface {
 	GetValidatorIDs(subnetID ids.ID) ([]ids.NodeID, error)
 
 	// SubsetWeight returns the sum of the weights of the validators in the subnet.
-	SubsetWeight(subnetID ids.ID, validatorIDs set.Set[ids.NodeID]) uint64
+	SubsetWeight(subnetID ids.ID, validatorIDs set.Set[ids.NodeID]) (uint64, error)
 
 	// RemoveWeight from a staker in the subnet. If the staker's weight becomes 0, the staker
 	// will be removed from the subnet set.
@@ -77,7 +77,7 @@ type Manager interface {
 	Len(subnetID ids.ID) int
 
 	// Weight returns the cumulative weight of all validators in the subnet.
-	Weight(subnetID ids.ID) uint64
+	Weight(subnetID ids.ID) (uint64, error)
 
 	// Sample returns a collection of validatorIDs in the subnet, potentially with duplicates.
 	// If sampling the requested size isn't possible, an error will be returned.
@@ -155,13 +155,13 @@ func (m *manager) GetValidator(subnetID ids.ID, validatorID ids.NodeID) (*Valida
 	return set.Get(validatorID)
 }
 
-func (m *manager) SubsetWeight(subnetID ids.ID, validatorIDs set.Set[ids.NodeID]) uint64 {
+func (m *manager) SubsetWeight(subnetID ids.ID, validatorIDs set.Set[ids.NodeID]) (uint64, error) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
 	set, exists := m.subnetToVdrs[subnetID]
 	if !exists {
-		return 0
+		return 0, nil
 	}
 
 	return set.SubsetWeight(validatorIDs)
@@ -213,13 +213,13 @@ func (m *manager) Len(subnetID ids.ID) int {
 	return set.Len()
 }
 
-func (m *manager) Weight(subnetID ids.ID) uint64 {
+func (m *manager) Weight(subnetID ids.ID) (uint64, error) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
 	set, exists := m.subnetToVdrs[subnetID]
 	if !exists {
-		return 0
+		return 0, nil
 	}
 
 	return set.Weight()

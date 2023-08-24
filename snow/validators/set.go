@@ -6,6 +6,7 @@ package validators
 import (
 	"errors"
 	"fmt"
+	"math/big"
 	"strings"
 	"sync"
 
@@ -18,16 +19,18 @@ import (
 )
 
 var (
-	errZeroWeight         = errors.New("weight must be non-zero")
-	errDuplicateValidator = errors.New("duplicate validator")
-	errMissingValidator   = errors.New("missing validator")
+	errZeroWeight           = errors.New("weight must be non-zero")
+	errDuplicateValidator   = errors.New("duplicate validator")
+	errMissingValidator     = errors.New("missing validator")
+	errTotalWeightNotUint64 = errors.New("total weight is not a uint64")
 )
 
 // newSet returns a new, empty set of validators.
 func newSet() *vdrSet {
 	return &vdrSet{
-		vdrs:    make(map[ids.NodeID]*Validator),
-		sampler: sampler.NewWeightedWithoutReplacement(),
+		vdrs:        make(map[ids.NodeID]*Validator),
+		sampler:     sampler.NewWeightedWithoutReplacement(),
+		totalWeight: new(big.Int),
 	}
 }
 
@@ -36,7 +39,7 @@ type vdrSet struct {
 	vdrs        map[ids.NodeID]*Validator
 	vdrSlice    []*Validator
 	weights     []uint64
-	totalWeight uint64
+	totalWeight *big.Int
 
 	samplerInitialized bool
 	sampler            sampler.WeightedWithoutReplacement
@@ -61,13 +64,6 @@ func (s *vdrSet) add(nodeID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight u
 		return errDuplicateValidator
 	}
 
-	// We first calculate the new total weight of the set, as this guarantees
-	// that none of the following operations can overflow.
-	newTotalWeight, err := math.Add64(s.totalWeight, weight)
-	if err != nil {
-		return err
-	}
-
 	vdr := &Validator{
 		NodeID:    nodeID,
 		PublicKey: pk,
@@ -78,7 +74,7 @@ func (s *vdrSet) add(nodeID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight u
 	s.vdrs[nodeID] = vdr
 	s.vdrSlice = append(s.vdrSlice, vdr)
 	s.weights = append(s.weights, weight)
-	s.totalWeight = newTotalWeight
+	s.totalWeight.Add(s.totalWeight, new(big.Int).SetUint64(weight))
 	s.samplerInitialized = false
 
 	s.callValidatorAddedCallbacks(nodeID, pk, txID, weight)
@@ -102,17 +98,14 @@ func (s *vdrSet) addWeight(nodeID ids.NodeID, weight uint64) error {
 		return errMissingValidator
 	}
 
-	// We first calculate the new total weight of the set, as this guarantees
-	// that none of the following operations can overflow.
-	newTotalWeight, err := math.Add64(s.totalWeight, weight)
+	oldWeight := vdr.Weight
+	newWeight, err := math.Add64(oldWeight, weight)
 	if err != nil {
 		return err
 	}
-
-	oldWeight := vdr.Weight
-	vdr.Weight += weight
-	s.weights[vdr.index] += weight
-	s.totalWeight = newTotalWeight
+	vdr.Weight = newWeight
+	s.weights[vdr.index] = newWeight
+	s.totalWeight.Add(s.totalWeight, new(big.Int).SetUint64(weight))
 	s.samplerInitialized = false
 
 	s.callWeightChangeCallbacks(nodeID, oldWeight, vdr.Weight)
@@ -133,21 +126,23 @@ func (s *vdrSet) getWeight(nodeID ids.NodeID) uint64 {
 	return 0
 }
 
-func (s *vdrSet) SubsetWeight(subset set.Set[ids.NodeID]) uint64 {
+func (s *vdrSet) SubsetWeight(subset set.Set[ids.NodeID]) (uint64, error) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
 	return s.subsetWeight(subset)
 }
 
-func (s *vdrSet) subsetWeight(subset set.Set[ids.NodeID]) uint64 {
+func (s *vdrSet) subsetWeight(subset set.Set[ids.NodeID]) (uint64, error) {
 	var totalWeight uint64
+	var err error
 	for nodeID := range subset {
-		// Because [totalWeight] will be <= [s.totalWeight], we are guaranteed
-		// this will not overflow.
-		totalWeight += s.getWeight(nodeID)
+		totalWeight, err = math.Add64(totalWeight, s.getWeight(nodeID))
+		if err != nil {
+			return 0, err
+		}
 	}
-	return totalWeight
+	return totalWeight, nil
 }
 
 func (s *vdrSet) RemoveWeight(nodeID ids.NodeID, weight uint64) error {
@@ -198,7 +193,7 @@ func (s *vdrSet) removeWeight(nodeID ids.NodeID, weight uint64) error {
 
 		s.callWeightChangeCallbacks(nodeID, oldWeight, newWeight)
 	}
-	s.totalWeight -= weight
+	s.totalWeight.Sub(s.totalWeight, new(big.Int).SetUint64(weight))
 	s.samplerInitialized = false
 	return nil
 }
@@ -295,11 +290,15 @@ func (s *vdrSet) sample(size int) ([]ids.NodeID, error) {
 	return list, nil
 }
 
-func (s *vdrSet) Weight() uint64 {
+func (s *vdrSet) Weight() (uint64, error) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
-	return s.totalWeight
+	if !s.totalWeight.IsUint64() {
+		return 0, fmt.Errorf("%w: %s", errTotalWeightNotUint64, s.totalWeight.String())
+	}
+
+	return s.totalWeight.Uint64(), nil
 }
 
 func (s *vdrSet) String() string {
