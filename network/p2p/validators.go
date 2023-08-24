@@ -16,7 +16,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-var _ NodeSampler = (*Validators)(nil)
+var _ ValidatorSet = (*Validators)(nil)
+
+type ValidatorSet interface {
+	NodeSampler
+	Has(ctx context.Context, nodeID ids.NodeID) bool
+}
 
 func NewValidators(log logging.Logger, subnetID ids.ID, validators validators.State, maxValidatorSetStaleness time.Duration) *Validators {
 	return &Validators{
