@@ -3,7 +3,11 @@
 
 package worker
 
-import "sync"
+import (
+	"sync"
+
+	"github.com/ava-labs/avalanchego/utils"
+)
 
 var _ Pool = (*pool)(nil)
 
@@ -27,9 +31,9 @@ type Pool interface {
 type pool struct {
 	requests chan Request
 
-	// [shutdown] helps making Send request no-op
+	// [noMoreSends] helps making Send request no-op
 	// is issued after Shutdown
-	shutdown bool
+	noMoreSends utils.Atomic[bool]
 
 	// [shutdownOnce] ensures Shutdown idempotency
 	shutdownOnce sync.Once
@@ -71,14 +75,14 @@ func (p *pool) runWorker() {
 }
 
 func (p *pool) Send(msg Request) {
-	if p.shutdown {
+	if p.noMoreSends.Get() {
 		return
 	}
 
 	select {
 	case p.requests <- msg:
 	case <-p.quit:
-		p.shutdown = true
+		p.noMoreSends.Set(true)
 	}
 }
 
