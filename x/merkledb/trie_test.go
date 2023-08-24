@@ -320,7 +320,7 @@ func Test_Trie_DeleteMissingKey(t *testing.T) {
 	require.NoError(err)
 	require.NotNil(trie)
 
-	require.NoError(trie.Remove(context.Background(), []byte("key")))
+	require.NoError(trie.DeleteContext(context.Background(), []byte("key")))
 }
 
 func Test_Trie_ExpandOnKeyPath(t *testing.T) {
