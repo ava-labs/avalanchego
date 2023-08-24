@@ -76,11 +76,8 @@ type ChangeProofer interface {
 	//     If [end] is nothing, all keys are considered < [end].
 	//   - [proof.KeyValues] and [proof.DeletedKeys] are sorted in order of increasing key.
 	//   - [proof.StartProof] and [proof.EndProof] are well-formed.
-	//   - When the keys in [proof.KeyValues] are added to [db] and the keys in [proof.DeletedKeys]
-	//     are removed from [db], the root ID of [db] is [expectedEndRootID].
-	//
-	// This is defined on Database instead of ChangeProof because it accesses
-	// database internals.
+	//   - When the changes in [proof.KeyChanes] are applied,
+	//     the root ID of the database is [expectedEndRootID].
 	VerifyChangeProof(
 		ctx context.Context,
 		proof *ChangeProof,
@@ -146,6 +143,7 @@ type merkleDB struct {
 	// Should be held before taking [db.lock]
 	commitLock sync.RWMutex
 
+	// Stores this trie's nodes.
 	nodeDB database.Database
 
 	// Stores data about the database's current state.
@@ -155,7 +153,8 @@ type merkleDB struct {
 	// Note that a call to Put may cause a node to be evicted
 	// from the cache, which will call [OnEviction].
 	// A non-nil error returned from Put is considered fatal.
-	nodeCache         onEvictCache[path, *node]
+	nodeCache onEvictCache[path, *node]
+	// Stores any error returned by [onEviction].
 	onEvictionErr     utils.Atomic[error]
 	evictionBatchSize int
 
@@ -979,6 +978,8 @@ func (*merkleDB) CommitToDB(context.Context) error {
 	return nil
 }
 
+// This is defined on merkleDB instead of ChangeProof
+// because it accesses database internals.
 // Assumes [db.lock] isn't held.
 func (db *merkleDB) VerifyChangeProof(
 	ctx context.Context,
