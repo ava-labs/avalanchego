@@ -4,15 +4,10 @@
 package worker
 
 import (
-	"errors"
 	"sync"
 )
 
-var (
-	_ Pool = (*pool)(nil)
-
-	ErrNoWorkers = errors.New("attempting to create worker pool with less than 1 worker")
-)
+var _ Pool = (*pool)(nil)
 
 type Request func()
 
@@ -32,10 +27,13 @@ type Pool interface {
 }
 
 type pool struct {
-	workersCount int
-	requests     chan Request
+	requests chan Request
 
-	shutdown     bool
+	// [shutdown] helps making Send request no-op
+	// is issued after Shutdown
+	shutdown bool
+
+	// [shutdownOnce] ensures Shutdown idempotency
 	shutdownOnce sync.Once
 
 	// [shutdownWG] makes sure all workers have stopped before Shutdown returns
@@ -45,23 +43,18 @@ type pool struct {
 	quit chan struct{}
 }
 
-func NewPool(workersCount int) (Pool, error) {
-	if workersCount <= 0 {
-		return nil, ErrNoWorkers
-	}
-
+func NewPool(workersCount int) Pool {
 	p := &pool{
-		workersCount: workersCount,
-		requests:     make(chan Request),
-		quit:         make(chan struct{}),
+		requests: make(chan Request),
+		quit:     make(chan struct{}),
 	}
 
-	p.shutdownWG.Add(p.workersCount)
-	for w := 0; w < p.workersCount; w++ {
+	for w := 0; w < workersCount; w++ {
+		p.shutdownWG.Add(1)
 		go p.runWorker()
 	}
 
-	return p, nil
+	return p
 }
 
 func (p *pool) runWorker() {
