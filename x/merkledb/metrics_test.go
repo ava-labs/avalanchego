@@ -19,7 +19,7 @@ func Test_Metrics_Basic_Usage(t *testing.T) {
 	// merkledb.
 	config.Reg = nil
 
-	db, err := New(
+	db, err := newDB(
 		context.Background(),
 		memdb.New(),
 		config,
