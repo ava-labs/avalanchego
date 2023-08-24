@@ -76,11 +76,8 @@ type ChangeProofer interface {
 	//     If [end] is nothing, all keys are considered < [end].
 	//   - [proof.KeyValues] and [proof.DeletedKeys] are sorted in order of increasing key.
 	//   - [proof.StartProof] and [proof.EndProof] are well-formed.
-	//   - When the keys in [proof.KeyValues] are added to [db] and the keys in [proof.DeletedKeys]
-	//     are removed from [db], the root ID of [db] is [expectedEndRootID].
-	//
-	// This is defined on Database instead of ChangeProof because it accesses
-	// database internals.
+	//   - When the changes in [proof.KeyChanes] are applied,
+	//     the root ID of the database is [expectedEndRootID].
 	VerifyChangeProof(
 		ctx context.Context,
 		proof *ChangeProof,
@@ -146,6 +143,7 @@ type merkleDB struct {
 	// Should be held before taking [db.lock]
 	commitLock sync.RWMutex
 
+	// Stores this trie's nodes.
 	nodeDB database.Database
 
 	// Stores data about the database's current state.
@@ -155,7 +153,8 @@ type merkleDB struct {
 	// Note that a call to Put may cause a node to be evicted
 	// from the cache, which will call [OnEviction].
 	// A non-nil error returned from Put is considered fatal.
-	nodeCache         onEvictCache[path, *node]
+	nodeCache onEvictCache[path, *node]
+	// Stores any error returned by [onEviction].
 	onEvictionErr     utils.Atomic[error]
 	evictionBatchSize int
 
@@ -175,6 +174,15 @@ type merkleDB struct {
 
 	// Valid children of this trie.
 	childViews []*trieView
+}
+
+// New returns a new merkle database.
+func New(ctx context.Context, db database.Database, config Config) (MerkleDB, error) {
+	metrics, err := newMetrics("merkleDB", config.Reg)
+	if err != nil {
+		return nil, err
+	}
+	return newDatabase(ctx, db, config, metrics)
 }
 
 func newDatabase(
@@ -284,15 +292,6 @@ func (db *merkleDB) rebuild(ctx context.Context) error {
 	return db.nodeDB.Compact(nil, nil)
 }
 
-// New returns a new merkle database.
-func New(ctx context.Context, db database.Database, config Config) (MerkleDB, error) {
-	metrics, err := newMetrics("merkleDB", config.Reg)
-	if err != nil {
-		return nil, err
-	}
-	return newDatabase(ctx, db, config, metrics)
-}
-
 func (db *merkleDB) CommitChangeProof(ctx context.Context, proof *ChangeProof) error {
 	db.commitLock.Lock()
 	defer db.commitLock.Unlock()
@@ -396,12 +395,6 @@ func (db *merkleDB) Close() error {
 
 	// Successfully wrote intermediate nodes.
 	return db.metadataDB.Put(cleanShutdownKey, hadCleanShutdown)
-}
-
-func (db *merkleDB) Delete(key []byte) error {
-	// this is a duplicate because the database interface doesn't support
-	// contexts, which are used for tracing
-	return db.Remove(context.Background(), key)
 }
 
 func (db *merkleDB) Get(key []byte) ([]byte, error) {
@@ -723,26 +716,6 @@ func (db *merkleDB) HealthCheck(ctx context.Context) (interface{}, error) {
 	return db.nodeDB.HealthCheck(ctx)
 }
 
-func (db *merkleDB) Insert(ctx context.Context, k, v []byte) error {
-	db.commitLock.Lock()
-	defer db.commitLock.Unlock()
-
-	if db.closed {
-		return database.ErrClosed
-	}
-
-	view, err := db.newUntrackedView([]database.BatchOp{
-		{
-			Key:   k,
-			Value: v,
-		},
-	})
-	if err != nil {
-		return err
-	}
-	return view.commitToDB(ctx)
-}
-
 func (db *merkleDB) NewBatch() database.Batch {
 	return &batch{
 		db: db,
@@ -834,12 +807,36 @@ func writeNodeToBatch(batch database.Batch, n *node) error {
 	return batch.Put(n.key.Bytes(), nodeBytes)
 }
 
-// Put upserts the key/value pair into the db.
 func (db *merkleDB) Put(k, v []byte) error {
-	return db.Insert(context.Background(), k, v)
+	return db.PutContext(context.Background(), k, v)
 }
 
-func (db *merkleDB) Remove(ctx context.Context, key []byte) error {
+// Same as [Put] but takes in a context used for tracing.
+func (db *merkleDB) PutContext(ctx context.Context, k, v []byte) error {
+	db.commitLock.Lock()
+	defer db.commitLock.Unlock()
+
+	if db.closed {
+		return database.ErrClosed
+	}
+
+	view, err := db.newUntrackedView([]database.BatchOp{
+		{
+			Key:   k,
+			Value: v,
+		},
+	})
+	if err != nil {
+		return err
+	}
+	return view.commitToDB(ctx)
+}
+
+func (db *merkleDB) Delete(key []byte) error {
+	return db.DeleteContext(context.Background(), key)
+}
+
+func (db *merkleDB) DeleteContext(ctx context.Context, key []byte) error {
 	db.commitLock.Lock()
 	defer db.commitLock.Unlock()
 
@@ -981,6 +978,8 @@ func (*merkleDB) CommitToDB(context.Context) error {
 	return nil
 }
 
+// This is defined on merkleDB instead of ChangeProof
+// because it accesses database internals.
 // Assumes [db.lock] isn't held.
 func (db *merkleDB) VerifyChangeProof(
 	ctx context.Context,

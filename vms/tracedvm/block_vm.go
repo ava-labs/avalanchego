@@ -24,7 +24,6 @@ var (
 	_ block.ChainVM                      = (*blockVM)(nil)
 	_ block.BuildBlockWithContextChainVM = (*blockVM)(nil)
 	_ block.BatchedChainVM               = (*blockVM)(nil)
-	_ block.HeightIndexedChainVM         = (*blockVM)(nil)
 	_ block.StateSyncableVM              = (*blockVM)(nil)
 )
 
@@ -32,7 +31,6 @@ type blockVM struct {
 	block.ChainVM
 	buildBlockVM block.BuildBlockWithContextChainVM
 	batchedVM    block.BatchedChainVM
-	hVM          block.HeightIndexedChainVM
 	ssVM         block.StateSyncableVM
 	// ChainVM tags
 	initializeTag              string
@@ -67,13 +65,11 @@ type blockVM struct {
 func NewBlockVM(vm block.ChainVM, name string, tracer trace.Tracer) block.ChainVM {
 	buildBlockVM, _ := vm.(block.BuildBlockWithContextChainVM)
 	batchedVM, _ := vm.(block.BatchedChainVM)
-	hVM, _ := vm.(block.HeightIndexedChainVM)
 	ssVM, _ := vm.(block.StateSyncableVM)
 	return &blockVM{
 		ChainVM:                       vm,
 		buildBlockVM:                  buildBlockVM,
 		batchedVM:                     batchedVM,
-		hVM:                           hVM,
 		ssVM:                          ssVM,
 		initializeTag:                 fmt.Sprintf("%s.initialize", name),
 		buildBlockTag:                 fmt.Sprintf("%s.buildBlock", name),
@@ -179,4 +175,20 @@ func (vm *blockVM) LastAccepted(ctx context.Context) (ids.ID, error) {
 	defer span.End()
 
 	return vm.ChainVM.LastAccepted(ctx)
+}
+
+func (vm *blockVM) VerifyHeightIndex(ctx context.Context) error {
+	ctx, span := vm.tracer.Start(ctx, vm.verifyHeightIndexTag)
+	defer span.End()
+
+	return vm.ChainVM.VerifyHeightIndex(ctx)
+}
+
+func (vm *blockVM) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, error) {
+	ctx, span := vm.tracer.Start(ctx, vm.getBlockIDAtHeightTag, oteltrace.WithAttributes(
+		attribute.Int64("height", int64(height)),
+	))
+	defer span.End()
+
+	return vm.ChainVM.GetBlockIDAtHeight(ctx, height)
 }

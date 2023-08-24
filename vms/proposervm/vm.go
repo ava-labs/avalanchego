@@ -51,10 +51,9 @@ const (
 )
 
 var (
-	_ block.ChainVM              = (*VM)(nil)
-	_ block.BatchedChainVM       = (*VM)(nil)
-	_ block.HeightIndexedChainVM = (*VM)(nil)
-	_ block.StateSyncableVM      = (*VM)(nil)
+	_ block.ChainVM         = (*VM)(nil)
+	_ block.BatchedChainVM  = (*VM)(nil)
+	_ block.StateSyncableVM = (*VM)(nil)
 
 	// TODO: remove after the X-chain supports height indexing.
 	mainnetXChainID ids.ID
@@ -84,7 +83,6 @@ type VM struct {
 	block.ChainVM
 	blockBuilderVM block.BuildBlockWithContextChainVM
 	batchedVM      block.BatchedChainVM
-	hVM            block.HeightIndexedChainVM
 	ssVM           block.StateSyncableVM
 
 	activationTime      time.Time
@@ -142,13 +140,11 @@ func New(
 ) *VM {
 	blockBuilderVM, _ := vm.(block.BuildBlockWithContextChainVM)
 	batchedVM, _ := vm.(block.BatchedChainVM)
-	hVM, _ := vm.(block.HeightIndexedChainVM)
 	ssVM, _ := vm.(block.StateSyncableVM)
 	return &VM{
 		ChainVM:        vm,
 		blockBuilderVM: blockBuilderVM,
 		batchedVM:      batchedVM,
-		hVM:            hVM,
 		ssVM:           ssVM,
 
 		activationTime:      activationTime,
@@ -394,12 +390,7 @@ func (vm *VM) LastAccepted(ctx context.Context) (ids.ID, error) {
 // repair makes sure that vm and innerVM chains are in sync.
 // Moreover it fixes vm's height index if defined.
 func (vm *VM) repair(ctx context.Context) error {
-	if vm.hVM == nil {
-		// height index not defined. Just sync vms and innerVM chains.
-		return vm.repairAcceptedChainByIteration(ctx)
-	}
-
-	switch vm.hVM.VerifyHeightIndex(ctx) {
+	switch err := vm.ChainVM.VerifyHeightIndex(ctx); err {
 	case nil:
 		// InnerVM height index is complete. We can immediately verify
 		// and repair this VM height index.
@@ -414,7 +405,7 @@ func (vm *VM) repair(ctx context.Context) error {
 		}
 	case block.ErrIndexIncomplete:
 	default:
-		return nil
+		return err
 	}
 
 	// innerVM height index is incomplete. Sync vm and innerVM chains first.
@@ -431,7 +422,7 @@ func (vm *VM) repair(ctx context.Context) error {
 		for {
 			// The underlying VM expects the lock to be held here.
 			vm.ctx.Lock.Lock()
-			err := vm.hVM.VerifyHeightIndex(ctx)
+			err := vm.ChainVM.VerifyHeightIndex(ctx)
 			vm.ctx.Lock.Unlock()
 
 			if err == nil {
