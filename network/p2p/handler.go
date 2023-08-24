@@ -5,9 +5,12 @@ package p2p
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"time"
 
 	"go.uber.org/zap"
+	"golang.org/x/time/rate"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
@@ -15,7 +18,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-var _ Handler = (*NoOpHandler)(nil)
+var (
+	ErrRateLimitExceeded = errors.New("rate limit exceeded")
+
+	_ Handler = (*NoOpHandler)(nil)
+	_ Handler = (*RateLimiterHandler)(nil)
+)
 
 // Handler is the server-side logic for virtual machine application protocols.
 type Handler interface {
@@ -56,6 +64,36 @@ func (NoOpHandler) AppRequest(context.Context, ids.NodeID, time.Time, []byte) ([
 
 func (NoOpHandler) CrossChainAppRequest(context.Context, ids.ID, time.Time, []byte) ([]byte, error) {
 	return nil, nil
+}
+
+// RateLimiterHandler enforces a rate limit on the underlying handler
+type RateLimiterHandler struct {
+	Handler
+	RateLimiter *rate.Limiter
+}
+
+func (r RateLimiterHandler) AppGossip(ctx context.Context, nodeID ids.NodeID, gossipBytes []byte) error {
+	if !r.RateLimiter.Allow() {
+		return fmt.Errorf("dropping app gossip message from %s: %w", nodeID, ErrRateLimitExceeded)
+	}
+
+	return r.Handler.AppGossip(ctx, nodeID, gossipBytes)
+}
+
+func (r RateLimiterHandler) AppRequest(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, error) {
+	if !r.RateLimiter.Allow() {
+		return nil, fmt.Errorf("dropping app request from %s: %w", nodeID, ErrRateLimitExceeded)
+	}
+
+	return r.Handler.AppRequest(ctx, nodeID, deadline, requestBytes)
+}
+
+func (r RateLimiterHandler) CrossChainAppRequest(ctx context.Context, chainID ids.ID, deadline time.Time, requestBytes []byte) ([]byte, error) {
+	if !r.RateLimiter.Allow() {
+		return nil, fmt.Errorf("dropping cross-chain app request from %s: %w", chainID, ErrRateLimitExceeded)
+	}
+
+	return r.Handler.CrossChainAppRequest(ctx, chainID, deadline, requestBytes)
 }
 
 // responder automatically sends the response for a given request
