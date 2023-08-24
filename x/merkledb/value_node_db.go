@@ -114,16 +114,6 @@ func (db *valueNodeDB) Get(key path) (*node, error) {
 	return n, err
 }
 
-func (db *valueNodeDB) Delete(key path) error {
-	_ = db.nodeCache.Put(key, nil)
-
-	prefixedKey := db.prefixedKey(key.Serialize().Value)
-	db.metrics.IOKeyWrite()
-	err := db.underlyingDB.Delete(prefixedKey)
-	db.bufferPool.Put(prefixedKey)
-	return err
-}
-
 // Batch of database operations
 type valueNodeBatch struct {
 	db  *valueNodeDB

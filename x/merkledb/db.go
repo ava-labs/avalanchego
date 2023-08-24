@@ -229,12 +229,6 @@ func newDatabase(
 // TODO: make this more efficient by only clearing out the stale portions of the trie.
 func (db *merkleDB) rebuild(ctx context.Context) error {
 	db.root = newNode(nil, RootPath)
-	if err := db.intermediateNodesDB.Delete(RootPath); err != nil {
-		return err
-	}
-	if err := db.valueNodesDB.Delete(RootPath); err != nil {
-		return err
-	}
 
 	opsSizeLimit := math.Max(
 		db.valueNodesDB.nodeCache.maxSize/rebuildViewSizeFractionOfCacheSize,
