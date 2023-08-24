@@ -285,7 +285,7 @@ func (db *merkleDB) rebuild(ctx context.Context) error {
 }
 
 // New returns a new merkle database.
-func New(ctx context.Context, db database.Database, config Config) (*merkleDB, error) {
+func New(ctx context.Context, db database.Database, config Config) (MerkleDB, error) {
 	metrics, err := newMetrics("merkleDB", config.Reg)
 	if err != nil {
 		return nil, err

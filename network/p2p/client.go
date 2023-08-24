@@ -41,6 +41,8 @@ type Client struct {
 	handlerPrefix []byte
 	router        *Router
 	sender        common.AppSender
+	// nodeSampler is used to select nodes to route AppRequestAny to
+	nodeSampler NodeSampler
 }
 
 // AppRequestAny issues an AppRequest to an arbitrary node decided by Client.
@@ -51,15 +53,12 @@ func (c *Client) AppRequestAny(
 	appRequestBytes []byte,
 	onResponse AppResponseCallback,
 ) error {
-	c.router.lock.RLock()
-	peers := c.router.peers.Sample(1)
-	c.router.lock.RUnlock()
-
-	if len(peers) != 1 {
+	sampled := c.nodeSampler.Sample(ctx, 1)
+	if len(sampled) != 1 {
 		return ErrNoPeers
 	}
 
-	nodeIDs := set.Of(peers[0])
+	nodeIDs := set.Of(sampled...)
 	return c.AppRequest(ctx, nodeIDs, appRequestBytes, onResponse)
 }
 
