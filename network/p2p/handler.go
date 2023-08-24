@@ -15,6 +15,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
+var _ Handler = (*NoOpHandler)(nil)
+
 // Handler is the server-side logic for virtual machine application protocols.
 type Handler interface {
 	// AppGossip is called when handling an AppGossip message.
@@ -40,6 +42,20 @@ type Handler interface {
 		deadline time.Time,
 		requestBytes []byte,
 	) ([]byte, error)
+}
+
+type NoOpHandler struct{}
+
+func (NoOpHandler) AppGossip(context.Context, ids.NodeID, []byte) error {
+	return nil
+}
+
+func (NoOpHandler) AppRequest(context.Context, ids.NodeID, time.Time, []byte) ([]byte, error) {
+	return nil, nil
+}
+
+func (NoOpHandler) CrossChainAppRequest(context.Context, ids.ID, time.Time, []byte) ([]byte, error) {
+	return nil, nil
 }
 
 // responder automatically sends the response for a given request

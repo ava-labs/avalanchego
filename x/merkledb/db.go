@@ -285,7 +285,7 @@ func (db *merkleDB) rebuild(ctx context.Context) error {
 }
 
 // New returns a new merkle database.
-func New(ctx context.Context, db database.Database, config Config) (*merkleDB, error) {
+func New(ctx context.Context, db database.Database, config Config) (MerkleDB, error) {
 	metrics, err := newMetrics("merkleDB", config.Reg)
 	if err != nil {
 		return nil, err
@@ -830,11 +830,7 @@ func (db *merkleDB) onEviction(n *node) error {
 
 // Writes [n] to [batch]. Assumes [n] is non-nil.
 func writeNodeToBatch(batch database.Batch, n *node) error {
-	nodeBytes, err := n.marshal()
-	if err != nil {
-		return err
-	}
-
+	nodeBytes := n.marshal()
 	return batch.Put(n.key.Bytes(), nodeBytes)
 }
 
@@ -1167,12 +1163,8 @@ func (db *merkleDB) initializeRootIfNeeded() (ids.ID, error) {
 	}
 
 	// write the newly constructed root to the DB
-	rootBytes, err := db.root.marshal()
-	if err != nil {
-		return ids.Empty, err
-	}
-
 	batch := db.nodeDB.NewBatch()
+	rootBytes := db.root.marshal()
 	if err := batch.Put(rootKey, rootBytes); err != nil {
 		return ids.Empty, err
 	}
