@@ -78,7 +78,6 @@ var (
 	_ block.ChainVM                      = (*VMClient)(nil)
 	_ block.BuildBlockWithContextChainVM = (*VMClient)(nil)
 	_ block.BatchedChainVM               = (*VMClient)(nil)
-	_ block.HeightIndexedChainVM         = (*VMClient)(nil)
 	_ block.StateSyncableVM              = (*VMClient)(nil)
 	_ prometheus.Gatherer                = (*VMClient)(nil)
 

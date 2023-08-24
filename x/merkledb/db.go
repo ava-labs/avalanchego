@@ -76,11 +76,8 @@ type ChangeProofer interface {
 	//     If [end] is nothing, all keys are considered < [end].
 	//   - [proof.KeyValues] and [proof.DeletedKeys] are sorted in order of increasing key.
 	//   - [proof.StartProof] and [proof.EndProof] are well-formed.
-	//   - When the keys in [proof.KeyValues] are added to [db] and the keys in [proof.DeletedKeys]
-	//     are removed from [db], the root ID of [db] is [expectedEndRootID].
-	//
-	// This is defined on Database instead of ChangeProof because it accesses
-	// database internals.
+	//   - When the changes in [proof.KeyChanes] are applied,
+	//     the root ID of the database is [expectedEndRootID].
 	VerifyChangeProof(
 		ctx context.Context,
 		proof *ChangeProof,
@@ -146,6 +143,7 @@ type merkleDB struct {
 	// Should be held before taking [db.lock]
 	commitLock sync.RWMutex
 
+	// Stores this trie's nodes.
 	nodeDB database.Database
 
 	// Stores data about the database's current state.
@@ -155,7 +153,8 @@ type merkleDB struct {
 	// Note that a call to Put may cause a node to be evicted
 	// from the cache, which will call [OnEviction].
 	// A non-nil error returned from Put is considered fatal.
-	nodeCache         onEvictCache[path, *node]
+	nodeCache onEvictCache[path, *node]
+	// Stores any error returned by [onEviction].
 	onEvictionErr     utils.Atomic[error]
 	evictionBatchSize int
 
@@ -175,6 +174,15 @@ type merkleDB struct {
 
 	// Valid children of this trie.
 	childViews []*trieView
+}
+
+// New returns a new merkle database.
+func New(ctx context.Context, db database.Database, config Config) (MerkleDB, error) {
+	metrics, err := newMetrics("merkleDB", config.Reg)
+	if err != nil {
+		return nil, err
+	}
+	return newDatabase(ctx, db, config, metrics)
 }
 
 func newDatabase(
@@ -284,15 +292,6 @@ func (db *merkleDB) rebuild(ctx context.Context) error {
 	return db.nodeDB.Compact(nil, nil)
 }
 
-// New returns a new merkle database.
-func New(ctx context.Context, db database.Database, config Config) (*merkleDB, error) {
-	metrics, err := newMetrics("merkleDB", config.Reg)
-	if err != nil {
-		return nil, err
-	}
-	return newDatabase(ctx, db, config, metrics)
-}
-
 func (db *merkleDB) CommitChangeProof(ctx context.Context, proof *ChangeProof) error {
 	db.commitLock.Lock()
 	defer db.commitLock.Unlock()
@@ -398,12 +397,6 @@ func (db *merkleDB) Close() error {
 	return db.metadataDB.Put(cleanShutdownKey, hadCleanShutdown)
 }
 
-func (db *merkleDB) Delete(key []byte) error {
-	// this is a duplicate because the database interface doesn't support
-	// contexts, which are used for tracing
-	return db.Remove(context.Background(), key)
-}
-
 func (db *merkleDB) Get(key []byte) ([]byte, error) {
 	// this is a duplicate because the database interface doesn't support
 	// contexts, which are used for tracing
@@ -423,7 +416,7 @@ func (db *merkleDB) GetValues(ctx context.Context, keys [][]byte) ([][]byte, []e
 	values := make([][]byte, len(keys))
 	errors := make([]error, len(keys))
 	for i, key := range keys {
-		values[i], errors[i] = db.getValueCopy(newPath(key), false /*lock*/)
+		values[i], errors[i] = db.getValueCopy(newPath(key))
 	}
 	return values, errors
 }
@@ -434,13 +427,17 @@ func (db *merkleDB) GetValue(ctx context.Context, key []byte) ([]byte, error) {
 	_, span := db.tracer.Start(ctx, "MerkleDB.GetValue")
 	defer span.End()
 
-	return db.getValueCopy(newPath(key), true /*lock*/)
+	db.lock.RLock()
+	defer db.lock.RUnlock()
+
+	return db.getValueCopy(newPath(key))
 }
 
 // getValueCopy returns a copy of the value for the given [key].
 // Returns database.ErrNotFound if it doesn't exist.
-func (db *merkleDB) getValueCopy(key path, lock bool) ([]byte, error) {
-	val, err := db.getValue(key, lock)
+// Assumes [db.lock] is read locked.
+func (db *merkleDB) getValueCopy(key path) ([]byte, error) {
+	val, err := db.getValueWithoutLock(key)
 	if err != nil {
 		return nil, err
 	}
@@ -449,14 +446,18 @@ func (db *merkleDB) getValueCopy(key path, lock bool) ([]byte, error) {
 
 // getValue returns the value for the given [key].
 // Returns database.ErrNotFound if it doesn't exist.
-// If [lock], [db.lock]'s read lock is acquired.
-// Otherwise, assumes [db.lock] is already held.
-func (db *merkleDB) getValue(key path, lock bool) ([]byte, error) {
-	if lock {
-		db.lock.RLock()
-		defer db.lock.RUnlock()
-	}
+// Assumes [db.lock] isn't held.
+func (db *merkleDB) getValue(key path) ([]byte, error) {
+	db.lock.RLock()
+	defer db.lock.RUnlock()
 
+	return db.getValueWithoutLock(key)
+}
+
+// getValueWithoutLock returns the value for the given [key].
+// Returns database.ErrNotFound if it doesn't exist.
+// Assumes [db.lock] is read locked.
+func (db *merkleDB) getValueWithoutLock(key path) ([]byte, error) {
 	if db.closed {
 		return nil, database.ErrClosed
 	}
@@ -657,7 +658,7 @@ func (db *merkleDB) GetChangeProof(
 // NewView returns a new view on top of this trie.
 // Changes made to the view will only be reflected in the original trie if Commit is called.
 // Assumes [db.commitLock] and [db.lock] aren't held.
-func (db *merkleDB) NewView(batchOps []database.BatchOp) (TrieView, error) {
+func (db *merkleDB) NewView(_ context.Context, batchOps []database.BatchOp) (TrieView, error) {
 	// ensure the db doesn't change while creating the new view
 	db.commitLock.RLock()
 	defer db.commitLock.RUnlock()
@@ -698,7 +699,7 @@ func (db *merkleDB) Has(k []byte) (bool, error) {
 		return false, database.ErrClosed
 	}
 
-	_, err := db.getValue(newPath(k), false /*lock*/)
+	_, err := db.getValueWithoutLock(newPath(k))
 	if err == database.ErrNotFound {
 		return false, nil
 	}
@@ -713,26 +714,6 @@ func (db *merkleDB) HealthCheck(ctx context.Context) (interface{}, error) {
 		return nil, database.ErrClosed
 	}
 	return db.nodeDB.HealthCheck(ctx)
-}
-
-func (db *merkleDB) Insert(ctx context.Context, k, v []byte) error {
-	db.commitLock.Lock()
-	defer db.commitLock.Unlock()
-
-	if db.closed {
-		return database.ErrClosed
-	}
-
-	view, err := db.newUntrackedView([]database.BatchOp{
-		{
-			Key:   k,
-			Value: v,
-		},
-	})
-	if err != nil {
-		return err
-	}
-	return view.commitToDB(ctx)
 }
 
 func (db *merkleDB) NewBatch() database.Batch {
@@ -822,20 +803,40 @@ func (db *merkleDB) onEviction(n *node) error {
 
 // Writes [n] to [batch]. Assumes [n] is non-nil.
 func writeNodeToBatch(batch database.Batch, n *node) error {
-	nodeBytes, err := n.marshal()
-	if err != nil {
-		return err
-	}
-
+	nodeBytes := n.marshal()
 	return batch.Put(n.key.Bytes(), nodeBytes)
 }
 
-// Put upserts the key/value pair into the db.
 func (db *merkleDB) Put(k, v []byte) error {
-	return db.Insert(context.Background(), k, v)
+	return db.PutContext(context.Background(), k, v)
 }
 
-func (db *merkleDB) Remove(ctx context.Context, key []byte) error {
+// Same as [Put] but takes in a context used for tracing.
+func (db *merkleDB) PutContext(ctx context.Context, k, v []byte) error {
+	db.commitLock.Lock()
+	defer db.commitLock.Unlock()
+
+	if db.closed {
+		return database.ErrClosed
+	}
+
+	view, err := db.newUntrackedView([]database.BatchOp{
+		{
+			Key:   k,
+			Value: v,
+		},
+	})
+	if err != nil {
+		return err
+	}
+	return view.commitToDB(ctx)
+}
+
+func (db *merkleDB) Delete(key []byte) error {
+	return db.DeleteContext(context.Background(), key)
+}
+
+func (db *merkleDB) DeleteContext(ctx context.Context, key []byte) error {
 	db.commitLock.Lock()
 	defer db.commitLock.Unlock()
 
@@ -868,11 +869,6 @@ func (db *merkleDB) commitBatch(ops []database.BatchOp) error {
 		return err
 	}
 	return view.commitToDB(context.Background())
-}
-
-// commitToDB is a no-op for the db because it is the db
-func (*merkleDB) commitToDB(context.Context) error {
-	return nil
 }
 
 // commitChanges commits the changes in [trieToCommit] to [db].
@@ -982,6 +978,8 @@ func (*merkleDB) CommitToDB(context.Context) error {
 	return nil
 }
 
+// This is defined on merkleDB instead of ChangeProof
+// because it accesses database internals.
 // Assumes [db.lock] isn't held.
 func (db *merkleDB) VerifyChangeProof(
 	ctx context.Context,
@@ -1108,7 +1106,7 @@ func (db *merkleDB) VerifyChangeProof(
 	}
 
 	// Make sure we get the expected root.
-	calculatedRoot, err := view.getMerkleRoot(ctx)
+	calculatedRoot, err := view.GetMerkleRoot(ctx)
 	if err != nil {
 		return err
 	}
@@ -1164,12 +1162,8 @@ func (db *merkleDB) initializeRootIfNeeded() (ids.ID, error) {
 	}
 
 	// write the newly constructed root to the DB
-	rootBytes, err := db.root.marshal()
-	if err != nil {
-		return ids.Empty, err
-	}
-
 	batch := db.nodeDB.NewBatch()
+	rootBytes := db.root.marshal()
 	if err := batch.Put(rootKey, rootBytes); err != nil {
 		return ids.Empty, err
 	}
@@ -1197,7 +1191,7 @@ func (db *merkleDB) getHistoricalViewForRange(
 	if err != nil {
 		return nil, err
 	}
-	return newTrieViewWithChanges(db, db, changeHistory)
+	return newHistoricalTrieView(db, changeHistory)
 }
 
 // Returns all keys in range [start, end] that aren't in [keySet].

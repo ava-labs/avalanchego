@@ -231,6 +231,21 @@ func (mr *MockLinearizableVMMockRecorder) GetBlock(arg0, arg1 interface{}) *gomo
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlock", reflect.TypeOf((*MockLinearizableVM)(nil).GetBlock), arg0, arg1)
 }
 
+// GetBlockIDAtHeight mocks base method.
+func (m *MockLinearizableVM) GetBlockIDAtHeight(arg0 context.Context, arg1 uint64) (ids.ID, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetBlockIDAtHeight", arg0, arg1)
+	ret0, _ := ret[0].(ids.ID)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetBlockIDAtHeight indicates an expected call of GetBlockIDAtHeight.
+func (mr *MockLinearizableVMMockRecorder) GetBlockIDAtHeight(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlockIDAtHeight", reflect.TypeOf((*MockLinearizableVM)(nil).GetBlockIDAtHeight), arg0, arg1)
+}
+
 // HealthCheck mocks base method.
 func (m *MockLinearizableVM) HealthCheck(arg0 context.Context) (interface{}, error) {
 	m.ctrl.T.Helper()
@@ -359,6 +374,20 @@ func (m *MockLinearizableVM) Shutdown(arg0 context.Context) error {
 func (mr *MockLinearizableVMMockRecorder) Shutdown(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Shutdown", reflect.TypeOf((*MockLinearizableVM)(nil).Shutdown), arg0)
+}
+
+// VerifyHeightIndex mocks base method.
+func (m *MockLinearizableVM) VerifyHeightIndex(arg0 context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "VerifyHeightIndex", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// VerifyHeightIndex indicates an expected call of VerifyHeightIndex.
+func (mr *MockLinearizableVMMockRecorder) VerifyHeightIndex(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyHeightIndex", reflect.TypeOf((*MockLinearizableVM)(nil).VerifyHeightIndex), arg0)
 }
 
 // Version mocks base method.
