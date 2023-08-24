@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -23,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -48,11 +50,12 @@ var (
 	merkleStatePrefix      = []byte{0x0}
 	merkleSingletonPrefix  = []byte{0x1}
 	merkleBlockPrefix      = []byte{0x2}
-	merkleTxPrefix         = []byte{0x3}
-	merkleIndexUTXOsPrefix = []byte{0x4} // to serve UTXOIDs(addr)
-	merkleUptimesPrefix    = []byte{0x5} // locally measured uptimes
-	merkleWeightDiffPrefix = []byte{0x6} // non-merklelized validators weight diff. TODO: should we merklelize them?
-	merkleBlsKeyDiffPrefix = []byte{0x7}
+	merkleBlockIDsPrefix   = []byte{0x3}
+	merkleTxPrefix         = []byte{0x4}
+	merkleIndexUTXOsPrefix = []byte{0x5} // to serve UTXOIDs(addr)
+	merkleUptimesPrefix    = []byte{0x6} // locally measured uptimes
+	merkleWeightDiffPrefix = []byte{0x7} // non-merklelized validators weight diff. TODO: should we merklelize them?
+	merkleBlsKeyDiffPrefix = []byte{0x8}
 
 	// merkle db sections
 	metadataSectionPrefix      = []byte{0x0}
@@ -115,15 +118,16 @@ func newMerklsState(
 	bootstrapped *utils.Atomic[bool],
 ) (*merkleState, error) {
 	var (
-		baseDB            = versiondb.New(rawDB)
-		baseMerkleDB      = prefixdb.New(merkleStatePrefix, baseDB)
-		singletonDB       = prefixdb.New(merkleSingletonPrefix, baseDB)
-		blockDB           = prefixdb.New(merkleBlockPrefix, baseDB)
-		txDB              = prefixdb.New(merkleTxPrefix, baseDB)
-		indexedUTXOsDB    = prefixdb.New(merkleIndexUTXOsPrefix, baseDB)
-		localUptimesDB    = prefixdb.New(merkleUptimesPrefix, baseDB)
-		localWeightDiffDB = prefixdb.New(merkleWeightDiffPrefix, baseDB)
-		localBlsKeyDiffDB = prefixdb.New(merkleBlsKeyDiffPrefix, baseDB)
+		baseDB                        = versiondb.New(rawDB)
+		baseMerkleDB                  = prefixdb.New(merkleStatePrefix, baseDB)
+		singletonDB                   = prefixdb.New(merkleSingletonPrefix, baseDB)
+		blockDB                       = prefixdb.New(merkleBlockPrefix, baseDB)
+		blockIDsDB                    = prefixdb.New(merkleBlockIDsPrefix, baseDB)
+		txDB                          = prefixdb.New(merkleTxPrefix, baseDB)
+		indexedUTXOsDB                = prefixdb.New(merkleIndexUTXOsPrefix, baseDB)
+		localUptimesDB                = prefixdb.New(merkleUptimesPrefix, baseDB)
+		flatValidatorWeightDiffsDB    = prefixdb.New(merkleWeightDiffPrefix, baseDB)
+		flatValidatorPublicKeyDiffsDB = prefixdb.New(merkleBlsKeyDiffPrefix, baseDB)
 	)
 
 	traceCtx := context.TODO()
@@ -187,28 +191,19 @@ func newMerklsState(
 		return nil, err
 	}
 
+	blockIDCache, err := metercacher.New[uint64, ids.ID](
+		"block_id_cache",
+		metricsReg,
+		&cache.LRU[uint64, ids.ID]{Size: execCfg.BlockIDCacheSize},
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	txCache, err := metercacher.New(
 		"tx_cache",
 		metricsReg,
 		cache.NewSizedLRU[ids.ID, *txAndStatus](execCfg.TxCacheSize, txAndStatusSize),
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	validatorWeightDiffsCache, err := metercacher.New[heightWithSubnet, map[ids.NodeID]*ValidatorWeightDiff](
-		"validator_weight_diffs_cache",
-		metricsReg,
-		&cache.LRU[heightWithSubnet, map[ids.NodeID]*ValidatorWeightDiff]{Size: execCfg.ValidatorDiffsCacheSize},
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	validatorBlsKeyDiffsCache, err := metercacher.New[uint64, map[ids.NodeID]*bls.PublicKey](
-		"validator_pub_key_diffs_cache",
-		metricsReg,
-		&cache.LRU[uint64, map[ids.NodeID]*bls.PublicKey]{Size: execCfg.ValidatorDiffsCacheSize},
 	)
 	if err != nil {
 		return nil, err
@@ -255,17 +250,18 @@ func newMerklsState(
 		blockCache:  blockCache,
 		blockDB:     blockDB,
 
+		addedBlockIDs: make(map[uint64]ids.ID),
+		blockIDCache:  blockIDCache,
+		blockIDDB:     blockIDsDB,
+
 		indexedUTXOsDB: indexedUTXOsDB,
 
 		localUptimesCache:    make(map[ids.NodeID]map[ids.ID]*uptimes),
 		modifiedLocalUptimes: make(map[ids.NodeID]set.Set[ids.ID]),
 		localUptimesDB:       localUptimesDB,
 
-		validatorWeightDiffsCache: validatorWeightDiffsCache,
-		localWeightDiffDB:         localWeightDiffDB,
-
-		validatorBlsKeyDiffsCache: validatorBlsKeyDiffsCache,
-		localBlsKeyDiffDB:         localBlsKeyDiffDB,
+		flatValidatorWeightDiffsDB:    flatValidatorWeightDiffsDB,
+		flatValidatorPublicKeyDiffsDB: flatValidatorPublicKeyDiffsDB,
 	}, nil
 }
 
@@ -318,6 +314,10 @@ type merkleState struct {
 	blockCache  cache.Cacher[ids.ID, blocks.Block] // cache of blockID -> Block. If the entry is nil, it is not in the database
 	blockDB     database.Database
 
+	addedBlockIDs map[uint64]ids.ID            // map of height -> blockID
+	blockIDCache  cache.Cacher[uint64, ids.ID] // cache of height -> blockID. If the entry is ids.Empty, it is not in the database
+	blockIDDB     database.Database
+
 	// Txs section
 	// FIND a way to reduce use of these. No use in verification of addedTxs
 	// a limited windows to support APIs
@@ -331,11 +331,8 @@ type merkleState struct {
 	modifiedLocalUptimes map[ids.NodeID]set.Set[ids.ID]     // vdrID -> subnetIDs
 	localUptimesDB       database.Database
 
-	validatorWeightDiffsCache cache.Cacher[heightWithSubnet, map[ids.NodeID]*ValidatorWeightDiff] // heightWithSubnet -> map[ids.NodeID]*ValidatorWeightDiff
-	localWeightDiffDB         database.Database
-
-	validatorBlsKeyDiffsCache cache.Cacher[uint64, map[ids.NodeID]*bls.PublicKey] // cache of height -> map[ids.NodeID]*bls.PublicKey
-	localBlsKeyDiffDB         database.Database
+	flatValidatorWeightDiffsDB    database.Database
+	flatValidatorPublicKeyDiffsDB database.Database
 }
 
 // STAKERS section
@@ -803,6 +800,41 @@ func (ms *merkleState) AddStatelessBlock(block blocks.Block) {
 	ms.addedBlocks[block.ID()] = block
 }
 
+func (ms *merkleState) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
+	if blkID, exists := ms.addedBlockIDs[height]; exists {
+		return blkID, nil
+	}
+	if blkID, cached := ms.blockIDCache.Get(height); cached {
+		if blkID == ids.Empty {
+			return ids.Empty, database.ErrNotFound
+		}
+
+		return blkID, nil
+	}
+
+	heightKey := database.PackUInt64(height)
+
+	blkID, err := database.GetID(ms.blockIDDB, heightKey)
+	if err == database.ErrNotFound {
+		ms.blockIDCache.Put(height, ids.Empty)
+		return ids.Empty, database.ErrNotFound
+	}
+	if err != nil {
+		return ids.Empty, err
+	}
+
+	ms.blockIDCache.Put(height, blkID)
+	return blkID, nil
+}
+
+func (*merkleState) ShouldPrune() (bool, error) {
+	return false, nil // Nothing to do
+}
+
+func (*merkleState) PruneAndIndex(sync.Locker, logging.Logger) error {
+	return nil // Nothing to do
+}
+
 // UPTIMES SECTION
 func (ms *merkleState) GetUptime(vdrID ids.NodeID, subnetID ids.ID) (upDuration time.Duration, lastUpdated time.Time, err error) {
 	nodeUptimes, exists := ms.localUptimesCache[vdrID]
@@ -887,63 +919,91 @@ func (ms *merkleState) ValidatorSet(subnetID ids.ID, vdrs validators.Set) error 
 	return nil
 }
 
-// TODO: very inefficient implementation until ValidatorDiff optimization is merged in
-func (ms *merkleState) GetValidatorWeightDiffs(height uint64, subnetID ids.ID) (map[ids.NodeID]*ValidatorWeightDiff, error) {
-	cacheKey := heightWithSubnet{
-		Height:   height,
-		SubnetID: subnetID,
-	}
-	if weightDiffs, ok := ms.validatorWeightDiffsCache.Get(cacheKey); ok {
-		return weightDiffs, nil
-	}
+func (ms *merkleState) ApplyValidatorWeightDiffs(
+	ctx context.Context,
+	validators map[ids.NodeID]*validators.GetValidatorOutput,
+	startHeight uint64,
+	endHeight uint64,
+	subnetID ids.ID,
+) error {
+	diffIter := ms.flatValidatorWeightDiffsDB.NewIteratorWithStartAndPrefix(
+		marshalStartDiffKey(subnetID, startHeight),
+		subnetID[:],
+	)
+	defer diffIter.Release()
 
-	// here check in the db
-	res := make(map[ids.NodeID]*ValidatorWeightDiff)
-	iter := ms.localWeightDiffDB.NewIteratorWithPrefix(subnetID[:])
-	defer iter.Release()
-	for iter.Next() {
-		_, nodeID, retrievedHeight, err := splitMerkleWeightDiffKey(iter.Key())
-		switch {
-		case err != nil:
-			return nil, err
-		case retrievedHeight != height:
-			continue // loop them all, we'll worry about efficiency after correctness
-		default:
-			val := &ValidatorWeightDiff{}
-			if _, err := blocks.GenesisCodec.Unmarshal(iter.Value(), val); err != nil {
-				return nil, err
-			}
+	for diffIter.Next() {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 
-			res[nodeID] = val
+		_, parsedHeight, nodeID, err := unmarshalDiffKey(diffIter.Key())
+		if err != nil {
+			return err
+		}
+		// If the parsedHeight is less than our target endHeight, then we have
+		// fully processed the diffs from startHeight through endHeight.
+		if parsedHeight < endHeight {
+			return diffIter.Error()
+		}
+
+		weightDiff, err := unmarshalWeightDiff(diffIter.Value())
+		if err != nil {
+			return err
+		}
+
+		if err := applyWeightDiff(validators, nodeID, weightDiff); err != nil {
+			return err
 		}
 	}
-	return res, iter.Error()
+	if err := diffIter.Error(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
-// TODO: very inefficient implementation until ValidatorDiff optimization is merged in
-func (ms *merkleState) GetValidatorPublicKeyDiffs(height uint64) (map[ids.NodeID]*bls.PublicKey, error) {
-	if weightDiffs, ok := ms.validatorBlsKeyDiffsCache.Get(height); ok {
-		return weightDiffs, nil
-	}
+func (ms *merkleState) ApplyValidatorPublicKeyDiffs(
+	ctx context.Context,
+	validators map[ids.NodeID]*validators.GetValidatorOutput,
+	startHeight uint64,
+	endHeight uint64,
+) error {
+	diffIter := ms.flatValidatorPublicKeyDiffsDB.NewIteratorWithStartAndPrefix(
+		marshalStartDiffKey(constants.PrimaryNetworkID, startHeight),
+		constants.PrimaryNetworkID[:],
+	)
+	defer diffIter.Release()
 
-	// here check in the db
-	res := make(map[ids.NodeID]*bls.PublicKey)
-	iter := ms.localBlsKeyDiffDB.NewIterator()
-	defer iter.Release()
-	for iter.Next() {
-		nodeID, retrievedHeight := splitMerkleBlsKeyDiffKey(iter.Key())
-		if retrievedHeight != height {
-			continue // loop them all, we'll worry about efficiency after correctness
+	for diffIter.Next() {
+		if err := ctx.Err(); err != nil {
+			return err
 		}
 
-		pkBytes := iter.Value()
-		val, err := bls.PublicKeyFromBytes(pkBytes)
+		_, parsedHeight, nodeID, err := unmarshalDiffKey(diffIter.Key())
 		if err != nil {
-			return nil, err
+			return err
 		}
-		res[nodeID] = val
+		// If the parsedHeight is less than our target endHeight, then we have
+		// fully processed the diffs from startHeight through endHeight.
+		if parsedHeight < endHeight {
+			break
+		}
+
+		vdr, ok := validators[nodeID]
+		if !ok {
+			continue
+		}
+
+		pkBytes := diffIter.Value()
+		if len(pkBytes) == 0 {
+			vdr.PublicKey = nil
+			continue
+		}
+
+		vdr.PublicKey = new(bls.PublicKey).Deserialize(pkBytes)
 	}
-	return res, iter.Error()
+	return diffIter.Error()
 }
 
 // DB Operations
@@ -976,12 +1036,13 @@ func (*merkleState) Checksum() ids.ID {
 func (ms *merkleState) Close() error {
 	errs := wrappers.Errs{}
 	errs.Add(
-		ms.localBlsKeyDiffDB.Close(),
-		ms.localWeightDiffDB.Close(),
+		ms.flatValidatorWeightDiffsDB.Close(),
+		ms.flatValidatorPublicKeyDiffsDB.Close(),
 		ms.localUptimesDB.Close(),
 		ms.indexedUTXOsDB.Close(),
 		ms.txDB.Close(),
 		ms.blockDB.Close(),
+		ms.blockIDDB.Close(),
 		ms.merkleDB.Close(),
 		ms.baseMerkleDB.Close(),
 	)
@@ -1046,6 +1107,7 @@ func (ms *merkleState) processCurrentStakers() (
 					txID            = validatorDiff.validator.TxID
 					potentialReward = validatorDiff.validator.PotentialReward
 					weight          = validatorDiff.validator.Weight
+					blkKey          = validatorDiff.validator.PublicKey
 				)
 				tx, _, err := ms.GetTx(txID)
 				if err != nil {
@@ -1057,6 +1119,13 @@ func (ms *merkleState) processCurrentStakers() (
 					PotentialReward: potentialReward,
 				}
 				outputWeights[weightKey].Amount = weight
+
+				if blkKey != nil {
+					// Record that the public key for the validator is being
+					// added. This means the prior value for the public key was
+					// nil.
+					outputBlsKey[nodeID] = nil
+				}
 
 			case deleted:
 				var (
@@ -1071,6 +1140,9 @@ func (ms *merkleState) processCurrentStakers() (
 				outputWeights[weightKey].Amount = weight
 
 				if blkKey != nil {
+					// Record that the public key for the validator is being
+					// removed. This means we must record the prior value of the
+					// public key.
 					outputBlsKey[nodeID] = blkKey
 				}
 			}
@@ -1157,43 +1229,50 @@ func (ms *merkleState) processPendingStakers() (map[ids.ID]*stakersData, error) 
 }
 
 func (ms *merkleState) writeMerkleState(currentData, pendingData map[ids.ID]*stakersData) error {
-	errs := wrappers.Errs{}
-	view, err := ms.merkleDB.NewView()
-	if err != nil {
-		return err
+	var (
+		errs     = wrappers.Errs{}
+		batchOps = make([]database.BatchOp, 0)
+	)
+
+	errs.Add(
+		ms.writeMetadata(&batchOps),
+		ms.writePermissionedSubnets(&batchOps),
+		ms.writeElasticSubnets(&batchOps),
+		ms.writeChains(&batchOps),
+		ms.writeCurrentStakers(&batchOps, currentData),
+		ms.writePendingStakers(&batchOps, pendingData),
+		ms.writeDelegateeRewards(&batchOps),
+		ms.writeUTXOs(&batchOps),
+		ms.writeRewardUTXOs(&batchOps),
+	)
+	if errs.Err != nil {
+		return errs.Err
 	}
 
 	ctx := context.TODO()
-	errs.Add(
-		ms.writeMetadata(view, ctx),
-		ms.writePermissionedSubnets(view, ctx),
-		ms.writeElasticSubnets(view, ctx),
-		ms.writeChains(view, ctx),
-		ms.writeCurrentStakers(view, ctx, currentData),
-		ms.writePendingStakers(view, ctx, pendingData),
-		ms.writeDelegateeRewards(view, ctx),
-		ms.writeUTXOs(view, ctx),
-		ms.writeRewardUTXOs(view, ctx),
-	)
-	if errs.Err != nil {
+	view, err := ms.merkleDB.NewView(ctx, batchOps)
+	if err != nil {
 		return err
 	}
 
 	return view.CommitToDB(ctx)
 }
 
-func (ms *merkleState) writeMetadata(view merkledb.TrieView, ctx context.Context) error {
+func (ms *merkleState) writeMetadata(batchOps *[]database.BatchOp) error {
 	encodedChainTime, err := ms.chainTime.MarshalBinary()
 	if err != nil {
 		return fmt.Errorf("failed to encoding chainTime: %w", err)
 	}
-	if err := view.Insert(ctx, merkleChainTimeKey, encodedChainTime); err != nil {
-		return fmt.Errorf("failed to write chainTime: %w", err)
-	}
 
-	if err := view.Insert(ctx, merkleLastAcceptedBlkIDKey, ms.lastAcceptedBlkID[:]); err != nil {
-		return fmt.Errorf("failed to write last accepted: %w", err)
-	}
+	*batchOps = append(*batchOps, database.BatchOp{
+		Key:   merkleChainTimeKey,
+		Value: encodedChainTime,
+	})
+
+	*batchOps = append(*batchOps, database.BatchOp{
+		Key:   merkleLastAcceptedBlkIDKey,
+		Value: ms.lastAcceptedBlkID[:],
+	})
 
 	// lastAcceptedBlockHeight not persisted yet in merkleDB state.
 	// TODO: Consider if it should be
@@ -1204,30 +1283,33 @@ func (ms *merkleState) writeMetadata(view merkledb.TrieView, ctx context.Context
 		ms.suppliesCache.Put(subnetID, &supply)
 
 		key := merkleSuppliesKey(subnetID)
-		if err := view.Insert(ctx, key, database.PackUInt64(supply)); err != nil {
-			return fmt.Errorf("failed to write subnet %v supply: %w", subnetID, err)
-		}
+		*batchOps = append(*batchOps, database.BatchOp{
+			Key:   key,
+			Value: database.PackUInt64(supply),
+		})
 	}
 	return nil
 }
 
-func (ms *merkleState) writePermissionedSubnets(view merkledb.TrieView, ctx context.Context) error {
+func (ms *merkleState) writePermissionedSubnets(batchOps *[]database.BatchOp) error { //nolint:golint,unparam
 	for _, subnetTx := range ms.addedPermissionedSubnets {
 		key := merklePermissionedSubnetKey(subnetTx.ID())
-		if err := view.Insert(ctx, key, subnetTx.Bytes()); err != nil {
-			return fmt.Errorf("failed to write subnetTx: %w", err)
-		}
+		*batchOps = append(*batchOps, database.BatchOp{
+			Key:   key,
+			Value: subnetTx.Bytes(),
+		})
 	}
 	ms.addedPermissionedSubnets = make([]*txs.Tx, 0)
 	return nil
 }
 
-func (ms *merkleState) writeElasticSubnets(view merkledb.TrieView, ctx context.Context) error {
+func (ms *merkleState) writeElasticSubnets(batchOps *[]database.BatchOp) error { //nolint:golint,unparam
 	for subnetID, transforkSubnetTx := range ms.addedElasticSubnets {
 		key := merkleElasticSubnetKey(subnetID)
-		if err := view.Insert(ctx, key, transforkSubnetTx.Bytes()); err != nil {
-			return fmt.Errorf("failed to write subnetTx: %w", err)
-		}
+		*batchOps = append(*batchOps, database.BatchOp{
+			Key:   key,
+			Value: transforkSubnetTx.Bytes(),
+		})
 		delete(ms.addedElasticSubnets, subnetID)
 
 		// Note: Evict is used rather than Put here because tx may end up
@@ -1238,27 +1320,29 @@ func (ms *merkleState) writeElasticSubnets(view merkledb.TrieView, ctx context.C
 	return nil
 }
 
-func (ms *merkleState) writeChains(view merkledb.TrieView, ctx context.Context) error {
+func (ms *merkleState) writeChains(batchOps *[]database.BatchOp) error { //nolint:golint,unparam
 	for subnetID, chains := range ms.addedChains {
 		for _, chainTx := range chains {
 			key := merkleChainKey(subnetID, chainTx.ID())
-			if err := view.Insert(ctx, key, chainTx.Bytes()); err != nil {
-				return fmt.Errorf("failed to write chain: %w", err)
-			}
+			*batchOps = append(*batchOps, database.BatchOp{
+				Key:   key,
+				Value: chainTx.Bytes(),
+			})
 		}
 		delete(ms.addedChains, subnetID)
 	}
 	return nil
 }
 
-func (*merkleState) writeCurrentStakers(view merkledb.TrieView, ctx context.Context, currentData map[ids.ID]*stakersData) error {
+func (*merkleState) writeCurrentStakers(batchOps *[]database.BatchOp, currentData map[ids.ID]*stakersData) error {
 	for stakerTxID, data := range currentData {
 		key := merkleCurrentStakersKey(stakerTxID)
 
 		if data.TxBytes == nil {
-			if err := view.Remove(ctx, key); err != nil {
-				return fmt.Errorf("failed to remove current stakers data, stakerTxID %v: %w", stakerTxID, err)
-			}
+			*batchOps = append(*batchOps, database.BatchOp{
+				Key:    key,
+				Delete: true,
+			})
 			continue
 		}
 
@@ -1266,21 +1350,23 @@ func (*merkleState) writeCurrentStakers(view merkledb.TrieView, ctx context.Cont
 		if err != nil {
 			return fmt.Errorf("failed to serialize current stakers data, stakerTxID %v: %w", stakerTxID, err)
 		}
-		if err := view.Insert(ctx, key, dataBytes); err != nil {
-			return fmt.Errorf("failed to write current stakers data, stakerTxID %v: %w", stakerTxID, err)
-		}
+		*batchOps = append(*batchOps, database.BatchOp{
+			Key:   key,
+			Value: dataBytes,
+		})
 	}
 	return nil
 }
 
-func (*merkleState) writePendingStakers(view merkledb.TrieView, ctx context.Context, pendingData map[ids.ID]*stakersData) error {
+func (*merkleState) writePendingStakers(batchOps *[]database.BatchOp, pendingData map[ids.ID]*stakersData) error {
 	for stakerTxID, data := range pendingData {
 		key := merklePendingStakersKey(stakerTxID)
 
 		if data.TxBytes == nil {
-			if err := view.Remove(ctx, key); err != nil {
-				return fmt.Errorf("failed to write pending stakers data, stakerTxID %v: %w", stakerTxID, err)
-			}
+			*batchOps = append(*batchOps, database.BatchOp{
+				Key:    key,
+				Delete: true,
+			})
 			continue
 		}
 
@@ -1288,14 +1374,15 @@ func (*merkleState) writePendingStakers(view merkledb.TrieView, ctx context.Cont
 		if err != nil {
 			return fmt.Errorf("failed to serialize pending stakers data, stakerTxID %v: %w", stakerTxID, err)
 		}
-		if err := view.Insert(ctx, key, dataBytes); err != nil {
-			return fmt.Errorf("failed to write pending stakers data, stakerTxID %v: %w", stakerTxID, err)
-		}
+		*batchOps = append(*batchOps, database.BatchOp{
+			Key:   key,
+			Value: dataBytes,
+		})
 	}
 	return nil
 }
 
-func (ms *merkleState) writeUTXOs(view merkledb.TrieView, ctx context.Context) error {
+func (ms *merkleState) writeUTXOs(batchOps *[]database.BatchOp) error {
 	for utxoID, utxo := range ms.modifiedUTXOs {
 		delete(ms.modifiedUTXOs, utxoID)
 		key := merkleUtxoIDKey(utxoID)
@@ -1303,9 +1390,10 @@ func (ms *merkleState) writeUTXOs(view merkledb.TrieView, ctx context.Context) e
 			switch utxo, err := ms.GetUTXO(utxoID); err {
 			case nil:
 				ms.utxoCache.Put(utxoID, nil)
-				if err := view.Remove(ctx, key); err != nil {
-					return err
-				}
+				*batchOps = append(*batchOps, database.BatchOp{
+					Key:    key,
+					Delete: true,
+				})
 				// store the index
 				if err := ms.writeUTXOsIndex(utxo, false /*insertUtxo*/); err != nil {
 					return err
@@ -1327,9 +1415,10 @@ func (ms *merkleState) writeUTXOs(view merkledb.TrieView, ctx context.Context) e
 		if err != nil {
 			return err
 		}
-		if err := view.Insert(ctx, key, utxoBytes); err != nil {
-			return err
-		}
+		*batchOps = append(*batchOps, database.BatchOp{
+			Key:   key,
+			Value: utxoBytes,
+		})
 
 		// store the index
 		if err := ms.writeUTXOsIndex(utxo, true /*insertUtxo*/); err != nil {
@@ -1339,7 +1428,7 @@ func (ms *merkleState) writeUTXOs(view merkledb.TrieView, ctx context.Context) e
 	return nil
 }
 
-func (ms *merkleState) writeRewardUTXOs(view merkledb.TrieView, ctx context.Context) error {
+func (ms *merkleState) writeRewardUTXOs(batchOps *[]database.BatchOp) error {
 	for txID, utxos := range ms.addedRewardUTXOs {
 		delete(ms.addedRewardUTXOs, txID)
 		ms.rewardUTXOsCache.Put(txID, utxos)
@@ -1350,24 +1439,26 @@ func (ms *merkleState) writeRewardUTXOs(view merkledb.TrieView, ctx context.Cont
 			}
 
 			key := merkleRewardUtxoIDKey(txID, utxo.InputID())
-			if err := view.Insert(ctx, key, utxoBytes); err != nil {
-				return fmt.Errorf("failed to add reward UTXO: %w", err)
-			}
+			*batchOps = append(*batchOps, database.BatchOp{
+				Key:   key,
+				Value: utxoBytes,
+			})
 		}
 	}
 	return nil
 }
 
-func (ms *merkleState) writeDelegateeRewards(view merkledb.TrieView, ctx context.Context) error {
+func (ms *merkleState) writeDelegateeRewards(batchOps *[]database.BatchOp) error { //nolint:golint,unparam
 	for nodeID, nodeDelegateeRewards := range ms.modifiedDelegateeReward {
 		nodeDelegateeRewardsList := nodeDelegateeRewards.List()
 		for _, subnetID := range nodeDelegateeRewardsList {
 			delegateeReward := ms.delegateeRewardCache[nodeID][subnetID]
 
 			key := merkleDelegateeRewardsKey(nodeID, subnetID)
-			if err := view.Insert(ctx, key, database.PackUInt64(delegateeReward)); err != nil {
-				return fmt.Errorf("failed to add reward UTXO: %w", err)
-			}
+			*batchOps = append(*batchOps, database.BatchOp{
+				Key:   key,
+				Value: database.PackUInt64(delegateeReward),
+			})
 		}
 		delete(ms.modifiedDelegateeReward, nodeID)
 	}
@@ -1376,7 +1467,16 @@ func (ms *merkleState) writeDelegateeRewards(view merkledb.TrieView, ctx context
 
 func (ms *merkleState) writeBlocks() error {
 	for blkID, blk := range ms.addedBlocks {
-		blkID := blkID
+		var (
+			blkID     = blkID
+			blkHeight = blk.Height()
+		)
+
+		delete(ms.addedBlockIDs, blkHeight)
+		ms.blockIDCache.Put(blkHeight, blkID)
+		if err := database.PutID(ms.blockIDDB, database.PackUInt64(blkHeight), blkID); err != nil {
+			return fmt.Errorf("failed to write block height index: %w", err)
+		}
 
 		delete(ms.addedBlocks, blkID)
 		// Note: Evict is used rather than Put here because blk may end up
@@ -1469,37 +1569,26 @@ func (ms *merkleState) writeWeightDiffs(height uint64, weightDiffs map[weightDif
 			continue
 		}
 
-		key := merkleWeightDiffKey(weightKey.subnetID, weightKey.nodeID, height)
-		weightDiffBytes, err := blocks.GenesisCodec.Marshal(blocks.Version, weightDiff)
-		if err != nil {
-			return fmt.Errorf("failed to serialize validator weight diff: %w", err)
-		}
-
-		if err := ms.localWeightDiffDB.Put(key, weightDiffBytes); err != nil {
+		key := marshalDiffKey(weightKey.subnetID, height, weightKey.nodeID)
+		weightDiffBytes := marshalWeightDiff(weightDiff)
+		if err := ms.flatValidatorWeightDiffsDB.Put(key, weightDiffBytes); err != nil {
 			return fmt.Errorf("failed to add weight diffs: %w", err)
 		}
-
-		// update the cache
-		cacheKey := heightWithSubnet{
-			Height:   height,
-			SubnetID: weightKey.subnetID,
-		}
-		cacheValue, found := ms.validatorWeightDiffsCache.Get(cacheKey)
-		if !found {
-			cacheValue = make(map[ids.NodeID]*ValidatorWeightDiff)
-		}
-		cacheValue[weightKey.nodeID] = weightDiff
-		ms.validatorWeightDiffsCache.Put(cacheKey, cacheValue)
 	}
 	return nil
 }
 
 func (ms *merkleState) writeBlsKeyDiffs(height uint64, blsKeyDiffs map[ids.NodeID]*bls.PublicKey) error {
 	for nodeID, blsKey := range blsKeyDiffs {
-		key := merkleBlsKeytDiffKey(nodeID, height)
-		blsKeyBytes := bls.PublicKeyToBytes(blsKey)
-
-		if err := ms.localBlsKeyDiffDB.Put(key, blsKeyBytes); err != nil {
+		key := marshalDiffKey(constants.PrimaryNetworkID, height, nodeID)
+		blsKeyBytes := []byte{}
+		if blsKey != nil {
+			// Note: We store the uncompressed public key here as it is
+			// significantly more efficient to parse when applying
+			// diffs.
+			blsKeyBytes = blsKey.Serialize()
+		}
+		if err := ms.flatValidatorPublicKeyDiffsDB.Put(key, blsKeyBytes); err != nil {
 			return fmt.Errorf("failed to add bls key diffs: %w", err)
 		}
 	}

@@ -18,7 +18,7 @@ import (
 	snowman "github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	common "github.com/ava-labs/avalanchego/snow/engine/common"
 	version "github.com/ava-labs/avalanchego/version"
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockChainVM is a mock of ChainVM interface.

@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/maybe"
 )
 
 var errNoNewRoot = errors.New("there was no updated root in change list")
@@ -38,13 +39,16 @@ type ReadOnlyTrie interface {
 
 	// get the value associated with the key in path form
 	// database.ErrNotFound if the key is not present
-	getValue(key path, lock bool) ([]byte, error)
+	getValue(key path) ([]byte, error)
 
 	// get an editable copy of the node with the given key path
 	getEditableNode(key path) (*node, error)
 
-	// GetRangeProof generates a proof of up to maxLength smallest key/values with keys between start and end
-	GetRangeProof(ctx context.Context, start, end []byte, maxLength int) (*RangeProof, error)
+	// GetRangeProof returns a proof of up to [maxLength] key-value pairs with
+	// keys in range [start, end].
+	// If [start] is Nothing, there's no lower bound on the range.
+	// If [end] is Nothing, there's no upper bound on the range.
+	GetRangeProof(ctx context.Context, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], maxLength int) (*RangeProof, error)
 
 	database.Iteratee
 }
@@ -52,35 +56,14 @@ type ReadOnlyTrie interface {
 type Trie interface {
 	ReadOnlyTrie
 
-	// Remove will delete a key from the Trie
-	Remove(ctx context.Context, key []byte) error
-
-	// NewPreallocatedView returns a new view on top of this Trie with space allocated for changes
-	NewPreallocatedView(estimatedChanges int) (TrieView, error)
-
-	// NewView returns a new view on top of this Trie
-	NewView() (TrieView, error)
-
-	// Insert a key/value pair into the Trie
-	Insert(ctx context.Context, key, value []byte) error
+	// NewView returns a new view on top of this Trie with the specified changes
+	NewView(ctx context.Context, batchOps []database.BatchOp) (TrieView, error)
 }
 
 type TrieView interface {
 	Trie
 
-	// CommitToDB takes the changes of this trie and commits them down the view stack
-	// until all changes in the stack commit to the database
-	// Takes the DB commit lock
+	// CommitToDB writes the changes in this view to the database.
+	// Takes the DB commit lock.
 	CommitToDB(ctx context.Context) error
-
-	// CommitToParent takes changes of this TrieView and commits them to its parent Trie
-	// Takes the DB commit lock
-	CommitToParent(ctx context.Context) error
-
-	// commits changes in the trie to its parent
-	// then commits the combined changes down the stack until all changes in the stack commit to the database
-	commitToDB(ctx context.Context) error
-
-	// commits changes in the trieToCommit into the current trie
-	commitChanges(ctx context.Context, trieToCommit *trieView) error
 }

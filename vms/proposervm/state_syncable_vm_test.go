@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/avalanchego/vms/proposervm/summary"
 
 	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
@@ -205,7 +206,7 @@ func TestStateSyncGetOngoingSyncStateSummary(t *testing.T) {
 			status:   choices.Accepted,
 		},
 	}
-	require.NoError(vm.storePostForkBlock(proBlk))
+	require.NoError(vm.acceptPostForkBlock(proBlk))
 
 	summary, err = vm.GetOngoingSyncStateSummary(context.Background())
 	require.NoError(err)
@@ -290,7 +291,7 @@ func TestStateSyncGetLastStateSummary(t *testing.T) {
 			status:   choices.Accepted,
 		},
 	}
-	require.NoError(vm.storePostForkBlock(proBlk))
+	require.NoError(vm.acceptPostForkBlock(proBlk))
 
 	summary, err = vm.GetLastStateSummary(context.Background())
 	require.NoError(err)
@@ -378,7 +379,7 @@ func TestStateSyncGetStateSummary(t *testing.T) {
 			status:   choices.Accepted,
 		},
 	}
-	require.NoError(vm.storePostForkBlock(proBlk))
+	require.NoError(vm.acceptPostForkBlock(proBlk))
 
 	summary, err = vm.GetStateSummary(context.Background(), reqHeight)
 	require.NoError(err)
@@ -451,7 +452,7 @@ func TestParseStateSummary(t *testing.T) {
 			status:   choices.Accepted,
 		},
 	}
-	require.NoError(vm.storePostForkBlock(proBlk))
+	require.NoError(vm.acceptPostForkBlock(proBlk))
 	require.NoError(vm.SetForkHeight(innerSummary.Height() - 1))
 	summary, err = vm.GetStateSummary(context.Background(), reqHeight)
 	require.NoError(err)
@@ -487,14 +488,6 @@ func TestStateSummaryAccept(t *testing.T) {
 		TimestampV: vm.Time(),
 		HeightV:    innerSummary.Height(),
 	}
-	innerVM.GetStateSummaryF = func(_ context.Context, h uint64) (block.StateSummary, error) {
-		require.Equal(reqHeight, h)
-		return innerSummary, nil
-	}
-	innerVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
-		require.Equal(innerBlk.Bytes(), b)
-		return innerBlk, nil
-	}
 
 	slb, err := statelessblock.Build(
 		vm.preferred,
@@ -506,17 +499,20 @@ func TestStateSummaryAccept(t *testing.T) {
 		vm.stakingLeafSigner,
 	)
 	require.NoError(err)
-	proBlk := &postForkBlock{
-		SignedBlock: slb,
-		postForkCommonComponents: postForkCommonComponents{
-			vm:       vm,
-			innerBlk: innerBlk,
-			status:   choices.Accepted,
-		},
-	}
-	require.NoError(vm.storePostForkBlock(proBlk))
 
-	summary, err := vm.GetStateSummary(context.Background(), reqHeight)
+	statelessSummary, err := summary.Build(innerSummary.Height()-1, slb.Bytes(), innerSummary.Bytes())
+	require.NoError(err)
+
+	innerVM.ParseStateSummaryF = func(ctx context.Context, summaryBytes []byte) (block.StateSummary, error) {
+		require.Equal(innerSummary.BytesV, summaryBytes)
+		return innerSummary, nil
+	}
+	innerVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
+		require.Equal(innerBlk.Bytes(), b)
+		return innerBlk, nil
+	}
+
+	summary, err := vm.ParseStateSummary(context.Background(), statelessSummary.Bytes())
 	require.NoError(err)
 
 	// test Accept accepted
@@ -591,7 +587,7 @@ func TestStateSummaryAcceptOlderBlock(t *testing.T) {
 			status:   choices.Accepted,
 		},
 	}
-	require.NoError(vm.storePostForkBlock(proBlk))
+	require.NoError(vm.acceptPostForkBlock(proBlk))
 
 	summary, err := vm.GetStateSummary(context.Background(), reqHeight)
 	require.NoError(err)

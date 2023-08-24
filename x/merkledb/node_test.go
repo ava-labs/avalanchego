@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/utils/maybe"
 )
 
 func Test_Node_Marshal(t *testing.T) {
@@ -16,14 +18,13 @@ func Test_Node_Marshal(t *testing.T) {
 
 	fullpath := newPath([]byte("key"))
 	childNode := newNode(root, fullpath)
-	childNode.setValue(Some([]byte("value")))
+	childNode.setValue(maybe.Some([]byte("value")))
 	require.NotNil(t, childNode)
 
 	require.NoError(t, childNode.calculateID(&mockMetrics{}))
 	root.addChild(childNode)
 
-	data, err := root.marshal()
-	require.NoError(t, err)
+	data := root.marshal()
 	rootParsed, err := parseNode(newPath([]byte("")), data)
 	require.NoError(t, err)
 	require.Len(t, rootParsed.children, 1)
@@ -41,7 +42,7 @@ func Test_Node_Marshal_Errors(t *testing.T) {
 
 	fullpath := newPath([]byte{255})
 	childNode1 := newNode(root, fullpath)
-	childNode1.setValue(Some([]byte("value1")))
+	childNode1.setValue(maybe.Some([]byte("value1")))
 	require.NotNil(t, childNode1)
 
 	require.NoError(t, childNode1.calculateID(&mockMetrics{}))
@@ -49,18 +50,17 @@ func Test_Node_Marshal_Errors(t *testing.T) {
 
 	fullpath = newPath([]byte{237})
 	childNode2 := newNode(root, fullpath)
-	childNode2.setValue(Some([]byte("value2")))
+	childNode2.setValue(maybe.Some([]byte("value2")))
 	require.NotNil(t, childNode2)
 
 	require.NoError(t, childNode2.calculateID(&mockMetrics{}))
 	root.addChild(childNode2)
 
-	data, err := root.marshal()
-	require.NoError(t, err)
+	data := root.marshal()
 
 	for i := 1; i < len(data); i++ {
 		broken := data[:i]
-		_, err = parseNode(newPath([]byte("")), broken)
+		_, err := parseNode(newPath([]byte("")), broken)
 		require.ErrorIs(t, err, io.ErrUnexpectedEOF)
 	}
 }

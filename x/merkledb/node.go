@@ -5,9 +5,11 @@ package merkledb
 
 import (
 	"golang.org/x/exp/maps"
+	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/maybe"
 )
 
 const (
@@ -18,13 +20,13 @@ const (
 // the values that go into the node's id
 type hashValues struct {
 	Children map[byte]child
-	Value    Maybe[[]byte]
+	Value    maybe.Maybe[[]byte]
 	Key      SerializedPath
 }
 
 // Representation of a node stored in the database.
 type dbNode struct {
-	value    Maybe[[]byte]
+	value    maybe.Maybe[[]byte]
 	children map[byte]child
 }
 
@@ -39,7 +41,7 @@ type node struct {
 	id          ids.ID
 	key         path
 	nodeBytes   []byte
-	valueDigest Maybe[[]byte]
+	valueDigest maybe.Maybe[[]byte]
 }
 
 // Returns a new node with the given [key] and no value.
@@ -79,17 +81,12 @@ func (n *node) hasValue() bool {
 }
 
 // Returns the byte representation of this node.
-func (n *node) marshal() ([]byte, error) {
-	if n.nodeBytes != nil {
-		return n.nodeBytes, nil
+func (n *node) marshal() []byte {
+	if n.nodeBytes == nil {
+		n.nodeBytes = codec.encodeDBNode(&n.dbNode)
 	}
 
-	nodeBytes, err := codec.encodeDBNode(&n.dbNode)
-	if err != nil {
-		return nil, err
-	}
-	n.nodeBytes = nodeBytes
-	return n.nodeBytes, nil
+	return n.nodeBytes
 }
 
 // clear the cached values that will need to be recalculated whenever the node changes
@@ -111,28 +108,24 @@ func (n *node) calculateID(metrics merkleMetrics) error {
 		Key:      n.key.Serialize(),
 	}
 
-	bytes, err := codec.encodeHashValues(hv)
-	if err != nil {
-		return err
-	}
-
+	bytes := codec.encodeHashValues(hv)
 	metrics.HashCalculated()
 	n.id = hashing.ComputeHash256Array(bytes)
 	return nil
 }
 
 // Set [n]'s value to [val].
-func (n *node) setValue(val Maybe[[]byte]) {
+func (n *node) setValue(val maybe.Maybe[[]byte]) {
 	n.onNodeChanged()
 	n.value = val
 	n.setValueDigest()
 }
 
 func (n *node) setValueDigest() {
-	if n.value.IsNothing() || len(n.value.value) < HashLength {
+	if n.value.IsNothing() || len(n.value.Value()) < HashLength {
 		n.valueDigest = n.value
 	} else {
-		n.valueDigest = Some(hashing.ComputeHash256(n.value.value))
+		n.valueDigest = maybe.Some(hashing.ComputeHash256(n.value.Value()))
 	}
 }
 
@@ -194,7 +187,7 @@ func (n *node) asProofNode() ProofNode {
 	pn := ProofNode{
 		KeyPath:     n.key.Serialize(),
 		Children:    make(map[byte]ids.ID, len(n.children)),
-		ValueOrHash: Clone(n.valueDigest),
+		ValueOrHash: maybe.Bind(n.valueDigest, slices.Clone[[]byte]),
 	}
 	for index, entry := range n.children {
 		pn.Children[index] = entry.id

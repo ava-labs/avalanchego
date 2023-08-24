@@ -14,7 +14,7 @@ import (
 	message "github.com/ava-labs/avalanchego/message"
 	subnets "github.com/ava-labs/avalanchego/subnets"
 	set "github.com/ava-labs/avalanchego/utils/set"
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockExternalSender is a mock of ExternalSender interface.

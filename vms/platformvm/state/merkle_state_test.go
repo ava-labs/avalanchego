@@ -4,7 +4,6 @@
 package state
 
 import (
-	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -157,33 +156,4 @@ func TestDelegateeRewardsKey(t *testing.T) {
 	require.Equal(prefix, key[0:len(prefix)])
 	require.Equal(nodeID[:], key[len(prefix):len(prefix)+len(nodeID[:])])
 	require.Equal(subnetID[:], key[len(prefix)+len(nodeID[:]):])
-}
-
-func TestWeightDiffKey(t *testing.T) {
-	require := require.New(t)
-
-	subnetID := ids.GenerateTestID()
-	nodeID := ids.GenerateTestNodeID()
-	height := rand.Uint64() // #nosec G404
-
-	key := merkleWeightDiffKey(subnetID, nodeID, height)
-	rSubnetID, rNodeID, rHeight, err := splitMerkleWeightDiffKey(key)
-
-	require.NoError(err)
-	require.Equal(subnetID, rSubnetID)
-	require.Equal(nodeID, rNodeID)
-	require.Equal(height, rHeight)
-}
-
-func TestBlsKeyDiffKey(t *testing.T) {
-	require := require.New(t)
-
-	nodeID := ids.GenerateTestNodeID()
-	height := rand.Uint64() // #nosec G404
-
-	key := merkleBlsKeytDiffKey(nodeID, height)
-	rNodeID, rHeight := splitMerkleBlsKeyDiffKey(key)
-
-	require.Equal(nodeID, rNodeID)
-	require.Equal(height, rHeight)
 }

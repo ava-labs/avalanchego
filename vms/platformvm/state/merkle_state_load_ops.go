@@ -154,9 +154,6 @@ func (ms *merkleState) syncGenesis(genesisBlk blocks.Block, genesis *genesis.Sta
 func (ms *merkleState) load() error {
 	errs := wrappers.Errs{}
 	errs.Add(
-		// ms.loadMetadata(),
-		// ms.loadCurrentValidators(),
-		// ms.loadPendingValidators(),
 		ms.loadMerkleMetadata(),
 		ms.loadCurrentStakers(),
 		ms.loadPendingStakers(),

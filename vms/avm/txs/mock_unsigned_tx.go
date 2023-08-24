@@ -14,7 +14,7 @@ import (
 	snow "github.com/ava-labs/avalanchego/snow"
 	set "github.com/ava-labs/avalanchego/utils/set"
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockUnsignedTx is a mock of UnsignedTx interface.

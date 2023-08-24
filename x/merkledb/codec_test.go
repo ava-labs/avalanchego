@@ -14,6 +14,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/maybe"
 )
 
 // TODO add more codec tests
@@ -36,7 +37,7 @@ func newRandomProofNode(r *rand.Rand) ProofNode {
 	}
 
 	hasValue := rand.Intn(2) == 1 // #nosec G404
-	var valueOrHash Maybe[[]byte]
+	var valueOrHash maybe.Maybe[[]byte]
 	if hasValue {
 		// use the hash instead when length is greater than the hash length
 		if len(val) >= HashLength {
@@ -50,7 +51,7 @@ func newRandomProofNode(r *rand.Rand) ProofNode {
 			// variable on the struct
 			val = nil
 		}
-		valueOrHash = Some(val)
+		valueOrHash = maybe.Some(val)
 	}
 
 	return ProofNode{
@@ -128,7 +129,7 @@ func FuzzCodecBool(f *testing.F) {
 
 			// Encoding [got] should be the same as [b].
 			var buf bytes.Buffer
-			require.NoError(codec.encodeBool(&buf, got))
+			codec.encodeBool(&buf, got)
 			bufBytes := buf.Bytes()
 			require.Len(bufBytes, numRead)
 			require.Equal(b[:numRead], bufBytes)
@@ -156,7 +157,7 @@ func FuzzCodecInt(f *testing.F) {
 
 			// Encoding [got] should be the same as [b].
 			var buf bytes.Buffer
-			require.NoError(codec.encodeInt(&buf, got))
+			codec.encodeInt(&buf, got)
 			bufBytes := buf.Bytes()
 			require.Len(bufBytes, numRead)
 			require.Equal(b[:numRead], bufBytes)
@@ -184,7 +185,7 @@ func FuzzCodecSerializedPath(f *testing.F) {
 
 			// Encoding [got] should be the same as [b].
 			var buf bytes.Buffer
-			require.NoError(codec.encodeSerializedPath(got, &buf))
+			codec.encodeSerializedPath(got, &buf)
 			bufBytes := buf.Bytes()
 			require.Len(bufBytes, numRead)
 			require.Equal(b[:numRead], bufBytes)
@@ -210,8 +211,7 @@ func FuzzCodecDBNodeCanonical(f *testing.F) {
 			}
 
 			// Encoding [node] should be the same as [b].
-			buf, err := codec.encodeDBNode(node)
-			require.NoError(err)
+			buf := codec.encodeDBNode(node)
 			require.Equal(b, buf)
 		},
 	)
@@ -229,7 +229,7 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 
 			r := rand.New(rand.NewSource(int64(randSeed))) // #nosec G404
 
-			value := Nothing[[]byte]()
+			value := maybe.Nothing[[]byte]()
 			if hasValue {
 				if len(valueBytes) == 0 {
 					// We do this because when we encode a value of []byte{}
@@ -240,7 +240,7 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 					// private variable on the struct
 					valueBytes = nil
 				}
-				value = Some(valueBytes)
+				value = maybe.Some(valueBytes)
 			}
 
 			numChildren := r.Intn(NodeBranchFactor) // #nosec G404
@@ -263,8 +263,7 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 				children: children,
 			}
 
-			nodeBytes, err := codec.encodeDBNode(&node)
-			require.NoError(err)
+			nodeBytes := codec.encodeDBNode(&node)
 
 			var gotNode dbNode
 			require.NoError(codec.decodeDBNode(nodeBytes, &gotNode))
@@ -273,8 +272,7 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 			nilEmptySlices(&gotNode)
 			require.Equal(node, gotNode)
 
-			nodeBytes2, err := codec.encodeDBNode(&gotNode)
-			require.NoError(err)
+			nodeBytes2 := codec.encodeDBNode(&gotNode)
 			require.Equal(nodeBytes, nodeBytes2)
 		},
 	)
@@ -294,18 +292,17 @@ func TestCodec_DecodeDBNode(t *testing.T) {
 	require.ErrorIs(err, io.ErrUnexpectedEOF)
 
 	proof := dbNode{
-		value:    Some([]byte{1}),
+		value:    maybe.Some([]byte{1}),
 		children: map[byte]child{},
 	}
 
-	nodeBytes, err := codec.encodeDBNode(&proof)
-	require.NoError(err)
+	nodeBytes := codec.encodeDBNode(&proof)
 
 	// Remove num children (0) from end
 	nodeBytes = nodeBytes[:len(nodeBytes)-minVarIntLen]
 	proofBytesBuf := bytes.NewBuffer(nodeBytes)
 	// Put num children -1 at end
-	require.NoError(codec.(*codecImpl).encodeInt(proofBytesBuf, -1))
+	codec.(*codecImpl).encodeInt(proofBytesBuf, -1)
 
 	err = codec.decodeDBNode(proofBytesBuf.Bytes(), &parsedDBNode)
 	require.ErrorIs(err, errNegativeNumChildren)
@@ -315,7 +312,7 @@ func TestCodec_DecodeDBNode(t *testing.T) {
 	nodeBytes = nodeBytes[:len(nodeBytes)-minVarIntLen]
 	proofBytesBuf = bytes.NewBuffer(nodeBytes)
 	// Put num children NodeBranchFactor+1 at end
-	require.NoError(codec.(*codecImpl).encodeInt(proofBytesBuf, NodeBranchFactor+1))
+	codec.(*codecImpl).encodeInt(proofBytesBuf, NodeBranchFactor+1)
 
 	err = codec.decodeDBNode(proofBytesBuf.Bytes(), &parsedDBNode)
 	require.ErrorIs(err, errTooManyChildren)
