@@ -32,5 +32,5 @@ jobs:
       - name: Upload testnet network dir
         uses: actions/upload-artifact@v3
         with:
-          name: testnet.zip
+          name: testnet-data
           path: ~/.testnetctl/networks/1000
