@@ -16,9 +16,7 @@ mod node;
 mod partial_path;
 mod trie_hash;
 
-pub use node::{
-    BranchNode, Data, ExtNode, IdTrans, LeafNode, Node, NodeType, ValueTransformer, NBRANCH,
-};
+pub use node::{BranchNode, Data, ExtNode, LeafNode, Node, NodeType, NBRANCH};
 pub use partial_path::PartialPath;
 pub use trie_hash::{TrieHash, TRIE_HASH_LEN};
 
@@ -113,10 +111,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
         })
     }
 
-    pub fn root_hash<T: ValueTransformer>(
-        &self,
-        root: DiskAddress,
-    ) -> Result<TrieHash, MerkleError> {
+    pub fn root_hash(&self, root: DiskAddress) -> Result<TrieHash, MerkleError> {
         let root = self
             .get_node(root)?
             .inner
@@ -125,7 +120,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
             .chd[0];
         Ok(if let Some(root) = root {
             let mut node = self.get_node(root)?;
-            let res = node.get_root_hash::<T, S>(self.store.as_ref()).clone();
+            let res = node.get_root_hash::<S>(self.store.as_ref()).clone();
             if node.lazy_dirty.load(Ordering::Relaxed) {
                 node.write(|_| {}).unwrap();
                 node.lazy_dirty.store(false, Ordering::Relaxed);
@@ -1036,10 +1031,9 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
     /// If the trie does not contain a value for key, the returned proof contains
     /// all nodes of the longest existing prefix of the key, ending with the node
     /// that proves the absence of the key (at least the root node).
-    pub fn prove<K, T>(&self, key: K, root: DiskAddress) -> Result<Proof, MerkleError>
+    pub fn prove<K: AsRef<[u8]>>(&self, key: K, root: DiskAddress) -> Result<Proof, MerkleError>
     where
         K: AsRef<[u8]>,
-        T: ValueTransformer,
     {
         let key_nibbles = Nibbles::<0>::new(key.as_ref());
 
@@ -1112,7 +1106,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
         // Get the hashes of the nodes.
         for node in nodes {
             let node = self.get_node(node)?;
-            let rlp = <&[u8]>::clone(&node.get_eth_rlp::<T, S>(self.store.as_ref()));
+            let rlp = <&[u8]>::clone(&node.get_eth_rlp::<S>(self.store.as_ref()));
             let hash: [u8; TRIE_HASH_LEN] = sha3::Keccak256::digest(rlp).into();
             proofs.insert(hash, rlp.to_vec());
         }

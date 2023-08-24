@@ -369,7 +369,7 @@ impl<F: WalFile + 'static, S: WalStore<F>> WalFilePool<F, S> {
             let mut last_h: Option<
                 Pin<Box<dyn Future<Output = Result<WalFileHandle<'a, F, S>, WalError>> + 'a>>,
             > = None;
-            for ((next_fid, wl), h) in meta.into_iter().zip(files.into_iter()) {
+            for ((next_fid, wl), h) in meta.into_iter().zip(files) {
                 if let Some(lh) = last_h.take() {
                     if next_fid != fid {
                         lh.await?

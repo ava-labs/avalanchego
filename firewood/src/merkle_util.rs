@@ -2,7 +2,7 @@
 // See the file LICENSE.md for licensing terms.
 
 use crate::{
-    merkle::{IdTrans, Merkle, Node, Ref, RefMut, TrieHash},
+    merkle::{Merkle, Node, Ref, RefMut, TrieHash},
     proof::{Proof, ProofError},
 };
 use shale::{
@@ -74,7 +74,7 @@ impl<S: ShaleStore<Node> + Send + Sync> MerkleSetup<S> {
 
     pub fn root_hash(&self) -> Result<TrieHash, DataStoreError> {
         self.merkle
-            .root_hash::<IdTrans>(self.root)
+            .root_hash(self.root)
             .map_err(|_err| DataStoreError::RootHashError)
     }
 
@@ -88,7 +88,7 @@ impl<S: ShaleStore<Node> + Send + Sync> MerkleSetup<S> {
 
     pub fn prove<K: AsRef<[u8]>>(&self, key: K) -> Result<Proof, DataStoreError> {
         self.merkle
-            .prove::<K, IdTrans>(key, self.root)
+            .prove(key, self.root)
             .map_err(|_err| DataStoreError::ProofError)
     }
 

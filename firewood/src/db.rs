@@ -7,7 +7,7 @@ pub use crate::{
 };
 use crate::{
     file,
-    merkle::{IdTrans, Merkle, MerkleError, Node, TrieHash, TRIE_HASH_LEN},
+    merkle::{Merkle, MerkleError, Node, TrieHash, TRIE_HASH_LEN},
     proof::{Proof, ProofError},
     storage::{
         buffer::{BufferWrite, DiskBuffer, DiskBufferRequester},
@@ -293,7 +293,7 @@ impl<S: ShaleStore<Node> + Send + Sync> DbRev<S> {
     /// Get root hash of the generic key-value storage.
     pub fn kv_root_hash(&self) -> Result<TrieHash, DbError> {
         self.merkle
-            .root_hash::<IdTrans>(self.header.kv_root)
+            .root_hash(self.header.kv_root)
             .map_err(DbError::Merkle)
     }
 
@@ -315,8 +315,7 @@ impl<S: ShaleStore<Node> + Send + Sync> DbRev<S> {
 
     /// Provides a proof that a key is in the Trie.
     pub fn prove<K: AsRef<[u8]>>(&self, key: K) -> Result<Proof, MerkleError> {
-        self.merkle
-            .prove::<&[u8], IdTrans>(key.as_ref(), self.header.kv_root)
+        self.merkle.prove(key, self.header.kv_root)
     }
 
     /// Verifies a range proof is valid for a set of keys.
