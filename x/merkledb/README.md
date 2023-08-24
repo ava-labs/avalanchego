@@ -221,26 +221,24 @@ A `Merkle Node` holds the IDs of its children, its value, as well as any path ex
 
 ### Validity
 
-A `trieView` is built atop another trie, and that trie could change at any point.  If it does, all descendants of the trie will be marked invalid before the edit of the trie occurs.  If an operation is performed on an invalid trie, an ErrInvalid error will be returned instead of the expected result.  When a view is committed, all of its sibling views (the views that share the same parent) are marked invalid and any child views of the view have their parent updated to exclude any committed views between them and the db.
+A `trieView` is built atop another trie, and there may be other `trieView`s built atop the same trie. We call these *siblings*. If one sibling is committed to database, we *invalidate* all other siblings and their descendants. Operations on an invalid trie return `ErrInvalid`. The children of the committed `trieView` are updated so that their new `parentTrie` is the database.
 
 ### Locking
 
-`Database` has a `RWMutex` named `lock`. Its read operations don't store data in a map, so a read lock suffices for read operations.
-`Database` has a `Mutex` named `commitLock`.  It enforces that only a single view/batch is attempting to commit to the database at one time.  `lock` is insufficient because there is a period of view preparation where read access should still be allowed, followed by a period where a full write lock is needed.  The `commitLock` ensures that only a single goroutine makes the transition from read => write.
+`merkleDB` has a `RWMutex` named `lock`. Its read operations don't store data in a map, so a read lock suffices for read operations.
+`merkleDB` has a `Mutex` named `commitLock`. It enforces that only a single view/batch is attempting to commit to the database at one time.  `lock` is insufficient because there is a period of view preparation where read access should still be allowed, followed by a period where a full write lock is needed. The `commitLock` ensures that only a single goroutine makes the transition from read => write.
 
-A `trieView` is built atop another trie, which may be the underlying `Database` or another `trieView`.
-It's important to guarantee atomicity/consistency of trie operations.
-That is, if a view method is executing, the views/database underneath the view shouldn't be changing.
-To prevent this, we need to use locking.
+A `trieView` is built atop another trie, which may be the underlying `merkleDB` or another `trieView`.
+We use locking to guarantee atomicity/consistency of trie operations.
 
-`trieView` has a `RWMutex` named `lock` that's held when methods that access the trie's structure are executing.  It is responsible for ensuring that writing/reading from a `trieView` or from any *ancestor* is safe.
-It also has a `RWMutex` named `validityTrackingLock` that is held during methods that change the view's validity, tracking of child views' validity, or of the `trieView` parent trie.  This lock ensures that writing/reading from `trieView` or any of its *descendants* is safe.
-The `Commit` function also grabs the `Database`'s `commitLock` lock. This is the only `trieView` method that modifies the underlying `Database`.  If an ancestor is modified during this time, the commit will error with ErrInvalid.
+`trieView` has a `RWMutex` named `commitLock` which ensures that we don't create a view atop the `trieView` while it's being committed.
+It also has a `RWMutex` named `validityTrackingLock` that is held during methods that change the view's validity, tracking of child views' validity, or of the `trieView` parent trie.  This lock ensures that writing/reading from `trieView` or any of its descendants is safe.
+The `CommitToDB` method grabs the `merkleDB`'s `commitLock`. This is the only `trieView` method that modifies the underlying `merkleDB`.
 
-In some of `Database`'s methods, we create a `trieView` and call unexported methods on it without locking it.
-We do so because the exported counterpart of the method read locks the `Database`, which is already locked.
-This pattern is safe because the `Database` is locked, so no data under the view is changing, and nobody else has a reference to the view, so there can't be any concurrent access.
+In some of `merkleDB`'s methods, we create a `trieView` and call unexported methods on it without locking it.
+We do so because the exported counterpart of the method read locks the `merkleDB`, which is already locked.
+This pattern is safe because the `merkleDB` is locked, so no data under the view is changing, and nobody else has a reference to the view, so there can't be any concurrent access.
 
-To prevent deadlocks, `trieView` and `Database` never acquire the `lock` of any descendant views that are built atop it.
-That is, locking is always done from a view down to the underlying `Database`, never the other way around.
-The `validityTrackingLock` goes the opposite way.  Views can validityTrackingLock their children, but not their ancestors. Because of this, any function that takes the `validityTrackingLock` should avoid taking the `lock` as this will likely trigger a deadlock.  Keeping `lock` solely in the ancestor direction and `validityTrackingLock` solely in the descendant direction prevents deadlocks from occurring.
+To prevent deadlocks, `trieView` and `merkleDB` never acquire the `commitLock` of descendant views.
+That is, locking is always done from a view toward to the underlying `merkleDB`, never the other way around.
+The `validityTrackingLock` goes the opposite way. A view can lock the `validityTrackingLock` of its children, but not its ancestors. Because of this, any function that takes the `validityTrackingLock` must not take the `commitLock` as this may cause a deadlock. Keeping `commitLock` solely in the ancestor direction and `validityTrackingLock` solely in the descendant direction prevents deadlocks from occurring.
