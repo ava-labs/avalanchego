@@ -156,7 +156,7 @@ func TestOnEvictCacheOnEvictionError(t *testing.T) {
 	var (
 		require    = require.New(t)
 		evicted    = []int{}
-		onEviction = func(key, n int) error {
+		onEviction = func(_, n int) error {
 			// Evicting even keys errors
 			evicted = append(evicted, n)
 			if n%2 == 0 {

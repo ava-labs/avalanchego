@@ -10,18 +10,18 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 )
 
-var valueNodePrefixBytes = []byte{0}
-
 const (
 	valueNodePrefixLen = 1
 )
+
+var valueNodePrefixBytes = []byte{0}
 
 type valueNodeDB struct {
 	// Holds unused []byte
 	bufferPool sync.Pool
 
 	// The underlying storage
-	underlyingDB database.Database
+	baseDB database.Database
 
 	// If a value is nil, the corresponding key isn't in the trie.
 	// A non-nil error returned from Put is considered fatal.
@@ -33,8 +33,8 @@ type valueNodeDB struct {
 
 func newValueNodeDB(db database.Database, metrics merkleMetrics, size int) *valueNodeDB {
 	result := &valueNodeDB{
-		metrics:      metrics,
-		underlyingDB: db,
+		metrics: metrics,
+		baseDB:  db,
 		bufferPool: sync.Pool{
 			New: func() interface{} {
 				return make([]byte, 0, DefaultBufferLength)
@@ -52,7 +52,7 @@ func (db *valueNodeDB) newIteratorWithStartAndPrefix(start, prefix []byte) datab
 	prefixedPrefix := db.prefixedKey(prefix)
 	i := &iterator{
 		db:       db,
-		nodeIter: db.underlyingDB.NewIteratorWithStartAndPrefix(prefixedStart, prefixedPrefix),
+		nodeIter: db.baseDB.NewIteratorWithStartAndPrefix(prefixedStart, prefixedPrefix),
 	}
 	db.bufferPool.Put(prefixedStart)
 	db.bufferPool.Put(prefixedPrefix)
@@ -99,7 +99,7 @@ func (db *valueNodeDB) Get(key path) (*node, error) {
 
 	prefixedKey := db.prefixedKey(key.Serialize().Value)
 	db.metrics.IOKeyRead()
-	val, err := db.underlyingDB.Get(prefixedKey)
+	val, err := db.baseDB.Get(prefixedKey)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +129,7 @@ func (b *valueNodeBatch) Delete(key path) {
 
 // Write flushes any accumulated data to the underlying database.
 func (b *valueNodeBatch) Write() error {
-	dbBatch := b.db.underlyingDB.NewBatch()
+	dbBatch := b.db.baseDB.NewBatch()
 	for key, n := range b.ops {
 		b.db.metrics.IOKeyWrite()
 		// err cant happen since OnEviction is a noop

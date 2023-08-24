@@ -9,19 +9,19 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 )
 
-var intermediateNodePrefixBytes = []byte{1}
-
 const (
 	DefaultBufferLength       = 256
 	intermediateNodePrefixLen = 1
 )
+
+var intermediateNodePrefixBytes = []byte{1}
 
 type intermediateNodeDB struct {
 	// Holds unused []byte
 	bufferPool sync.Pool
 
 	// The underlying storage
-	underlyingDB database.Database
+	baseDB database.Database
 
 	// If a value is nil, the corresponding key isn't in the trie.
 	// Note that a call to Put may cause a node to be evicted
@@ -34,8 +34,8 @@ type intermediateNodeDB struct {
 
 func newIntermediateNodeDB(db database.Database, metrics merkleMetrics, size int, evictionBatchSize int) *intermediateNodeDB {
 	result := &intermediateNodeDB{
-		metrics:      metrics,
-		underlyingDB: db,
+		metrics: metrics,
+		baseDB:  db,
 		bufferPool: sync.Pool{
 			New: func() interface{} {
 				return make([]byte, 0, DefaultBufferLength)
@@ -65,7 +65,7 @@ func (db *intermediateNodeDB) prefixedKey(key []byte) []byte {
 }
 
 func (db *intermediateNodeDB) onEviction(key path, n *node) error {
-	writeBatch := db.underlyingDB.NewBatch()
+	writeBatch := db.baseDB.NewBatch()
 
 	if err := db.addToBatch(writeBatch, key, n); err != nil {
 		return err
@@ -87,7 +87,7 @@ func (db *intermediateNodeDB) onEviction(key path, n *node) error {
 		}
 	}
 	if err := writeBatch.Write(); err != nil {
-		_ = db.underlyingDB.Close()
+		_ = db.baseDB.Close()
 		return err
 	}
 	return nil
@@ -122,7 +122,7 @@ func (db *intermediateNodeDB) Get(key path) (*node, error) {
 
 	prefixedKey := db.prefixedKey(key.Bytes())
 	db.metrics.IOKeyRead()
-	val, err := db.underlyingDB.Get(prefixedKey)
+	val, err := db.baseDB.Get(prefixedKey)
 	if err != nil {
 		return nil, err
 	}

@@ -142,10 +142,10 @@ type merkleDB struct {
 	// Should be held before taking [db.lock]
 	commitLock sync.RWMutex
 
-	underlyingDB database.Database
+	baseDB database.Database
 
-	valueNodesDB        *valueNodeDB
-	intermediateNodesDB *intermediateNodeDB
+	valueNodeDB        *valueNodeDB
+	intermediateNodeDB *intermediateNodeDB
 
 	// Stores change lists. Used to serve change proofs and construct
 	// historical views of the trie.
@@ -181,13 +181,13 @@ func newDatabase(
 	metrics merkleMetrics,
 ) (*merkleDB, error) {
 	trieDB := &merkleDB{
-		metrics:             metrics,
-		underlyingDB:        db,
-		valueNodesDB:        newValueNodeDB(db, metrics, config.ValueNodeCacheSize),
-		intermediateNodesDB: newIntermediateNodeDB(db, metrics, config.IntermediateNodeCacheSize, config.EvictionBatchSize),
-		history:             newTrieHistory(config.HistoryLength),
-		tracer:              config.Tracer,
-		childViews:          make([]*trieView, 0, defaultPreallocationSize),
+		metrics:            metrics,
+		baseDB:             db,
+		valueNodeDB:        newValueNodeDB(db, metrics, config.ValueNodeCacheSize),
+		intermediateNodeDB: newIntermediateNodeDB(db, metrics, config.IntermediateNodeCacheSize, config.EvictionBatchSize),
+		history:            newTrieHistory(config.HistoryLength),
+		tracer:             config.Tracer,
+		childViews:         make([]*trieView, 0, defaultPreallocationSize),
 	}
 
 	root, err := trieDB.initializeRootIfNeeded()
@@ -202,7 +202,7 @@ func newDatabase(
 		nodes:  map[path]*change[*node]{},
 	})
 
-	shutdownType, err := trieDB.underlyingDB.Get(cleanShutdownKey)
+	shutdownType, err := trieDB.baseDB.Get(cleanShutdownKey)
 	switch err {
 	case nil:
 		if bytes.Equal(shutdownType, didNotHaveCleanShutdown) {
@@ -218,7 +218,7 @@ func newDatabase(
 	}
 
 	// mark that the db has not yet been cleanly closed
-	err = trieDB.underlyingDB.Put(cleanShutdownKey, didNotHaveCleanShutdown)
+	err = trieDB.baseDB.Put(cleanShutdownKey, didNotHaveCleanShutdown)
 	return trieDB, err
 }
 
@@ -228,12 +228,12 @@ func (db *merkleDB) rebuild(ctx context.Context) error {
 	db.root = newNode(nil, RootPath)
 
 	opsSizeLimit := math.Max(
-		db.valueNodesDB.nodeCache.maxSize/rebuildViewSizeFractionOfCacheSize,
+		db.valueNodeDB.nodeCache.maxSize/rebuildViewSizeFractionOfCacheSize,
 		minRebuildViewSizePerCommit,
 	)
-	intermediateNodeIt := db.underlyingDB.NewIteratorWithPrefix(intermediateNodePrefixBytes)
+	intermediateNodeIt := db.baseDB.NewIteratorWithPrefix(intermediateNodePrefixBytes)
 	defer intermediateNodeIt.Release()
-	intermediateBatch := db.underlyingDB.NewBatch()
+	intermediateBatch := db.baseDB.NewBatch()
 	count := 0
 	// delete all intermediate nodes
 	for intermediateNodeIt.Next() {
@@ -241,7 +241,7 @@ func (db *merkleDB) rebuild(ctx context.Context) error {
 			if err := intermediateBatch.Write(); err != nil {
 				return err
 			}
-			intermediateBatch = db.underlyingDB.NewBatch()
+			intermediateBatch = db.baseDB.NewBatch()
 		}
 		if err := intermediateBatch.Delete(intermediateNodeIt.Key()); err != nil {
 			return err
@@ -357,7 +357,7 @@ func (db *merkleDB) Compact(start []byte, limit []byte) error {
 	if db.Closed() {
 		return database.ErrClosed
 	}
-	return db.underlyingDB.Compact(start, limit)
+	return db.baseDB.Compact(start, limit)
 }
 
 func (db *merkleDB) Closed() bool {
@@ -379,16 +379,16 @@ func (db *merkleDB) Close() error {
 	}
 
 	db.closed = true
-	db.valueNodesDB.Close()
+	db.valueNodeDB.Close()
 	// Flush [nodeCache] to persist intermediary nodes to disk.
-	if err := db.intermediateNodesDB.Flush(); err != nil {
+	if err := db.intermediateNodeDB.Flush(); err != nil {
 		// There was an error during cache eviction.
 		// Don't commit to disk.
 		return err
 	}
 
 	// Successfully wrote intermediate nodes.
-	return db.underlyingDB.Put(cleanShutdownKey, hadCleanShutdown)
+	return db.baseDB.Put(cleanShutdownKey, hadCleanShutdown)
 }
 
 func (db *merkleDB) Get(key []byte) ([]byte, error) {
@@ -709,7 +709,7 @@ func (db *merkleDB) HealthCheck(ctx context.Context) (interface{}, error) {
 	if db.closed {
 		return nil, database.ErrClosed
 	}
-	return db.underlyingDB.HealthCheck(ctx)
+	return db.baseDB.HealthCheck(ctx)
 }
 
 func (db *merkleDB) NewBatch() database.Batch {
@@ -731,7 +731,7 @@ func (db *merkleDB) NewIteratorWithPrefix(prefix []byte) database.Iterator {
 }
 
 func (db *merkleDB) NewIteratorWithStartAndPrefix(start, prefix []byte) database.Iterator {
-	return db.valueNodesDB.newIteratorWithStartAndPrefix(start, prefix)
+	return db.valueNodeDB.newIteratorWithStartAndPrefix(start, prefix)
 }
 
 func (db *merkleDB) Put(k, v []byte) error {
@@ -840,7 +840,7 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 		return errNoNewRoot
 	}
 
-	currentValueNodeBatch := db.valueNodesDB.NewBatch()
+	currentValueNodeBatch := db.valueNodeDB.NewBatch()
 
 	_, nodesSpan := db.tracer.Start(ctx, "MerkleDB.commitChanges.writeNodes")
 	for key, nodeChange := range changes.nodes {
@@ -853,7 +853,7 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 				currentValueNodeBatch.Delete(key)
 			default:
 				// the node didn't have a value before, delete from the intermediate node db
-				if err := db.intermediateNodesDB.Delete(key); err != nil {
+				if err := db.intermediateNodeDB.Delete(key); err != nil {
 					nodesSpan.End()
 					return err
 				}
@@ -867,7 +867,7 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 
 			// the node didn't have a value before, delete from the intermediate node db
 			if nodeChange.before != nil && !nodeChange.before.hasValue() {
-				if err := db.intermediateNodesDB.Delete(key); err != nil {
+				if err := db.intermediateNodeDB.Delete(key); err != nil {
 					nodesSpan.End()
 					return err
 				}
@@ -876,7 +876,7 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 		}
 
 		// the node is not nil and has no value, add to the intermediate node db
-		if err := db.intermediateNodesDB.Put(key, nodeChange.after); err != nil {
+		if err := db.intermediateNodeDB.Put(key, nodeChange.after); err != nil {
 			nodesSpan.End()
 			return err
 		}
@@ -1082,9 +1082,9 @@ func (db *merkleDB) initializeRootIfNeeded() (ids.ID, error) {
 	// not sure if the root exists or had a value or not
 	// check under both prefixes
 	var err error
-	db.root, err = db.intermediateNodesDB.Get(RootPath)
+	db.root, err = db.intermediateNodeDB.Get(RootPath)
 	if err == database.ErrNotFound {
-		db.root, err = db.valueNodesDB.Get(RootPath)
+		db.root, err = db.valueNodeDB.Get(RootPath)
 	}
 	if err == nil {
 		// Root already exists, so calculate its id
@@ -1105,7 +1105,7 @@ func (db *merkleDB) initializeRootIfNeeded() (ids.ID, error) {
 		return ids.Empty, err
 	}
 
-	if err := db.intermediateNodesDB.Put(RootPath, db.root); err != nil {
+	if err := db.intermediateNodeDB.Put(RootPath, db.root); err != nil {
 		return ids.Empty, err
 	}
 
@@ -1185,7 +1185,7 @@ func (db *merkleDB) getNode(key path, hasValue bool) (*node, error) {
 		return db.root, nil
 	}
 	if hasValue {
-		return db.valueNodesDB.Get(key)
+		return db.valueNodeDB.Get(key)
 	}
-	return db.intermediateNodesDB.Get(key)
+	return db.intermediateNodeDB.Get(key)
 }
