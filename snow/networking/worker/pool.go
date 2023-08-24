@@ -6,8 +6,6 @@ package worker
 import (
 	"errors"
 	"sync"
-
-	"github.com/ava-labs/avalanchego/utils"
 )
 
 var (
@@ -47,10 +45,7 @@ type pool struct {
 	startOnce    sync.Once
 	shutdownOnce sync.Once
 
-	// [started] guards against callin Send/Shutdown before Start
-	started utils.Atomic[bool]
-
-	// [shutdownWG] make sure all workers have stopped before Shutdown returns
+	// [shutdownWG] makes sure all workers have stopped before Shutdown returns
 	shutdownWG sync.WaitGroup
 
 	// closing [quit] tells the workers to stop working
@@ -64,19 +59,22 @@ func NewPool(workersCount int) (Pool, error) {
 
 	p := &pool{
 		workersCount: workersCount,
-		requests:     make(chan Request),
-		quit:         make(chan struct{}),
 	}
+
+	// Note: we instantiate requests and quit channels
+	// only when start is called.
 	return p, nil
 }
 
 func (p *pool) Start() {
 	p.startOnce.Do(func() {
+		p.requests = make(chan Request)
+		p.quit = make(chan struct{})
+
 		p.shutdownWG.Add(p.workersCount)
 		for w := 0; w < p.workersCount; w++ {
 			go p.runWorker()
 		}
-		p.started.Set(true)
 	})
 }
 
@@ -96,7 +94,8 @@ func (p *pool) runWorker() {
 }
 
 func (p *pool) Send(msg Request) {
-	if !p.started.Get() {
+	if p.requests == nil {
+		// out of order Send, Start has not been called yet
 		return
 	}
 
@@ -107,7 +106,8 @@ func (p *pool) Send(msg Request) {
 }
 
 func (p *pool) Shutdown() {
-	if !p.started.Get() {
+	if p.quit == nil {
+		// out of order Shutdown, Start has not been called yet
 		return
 	}
 
