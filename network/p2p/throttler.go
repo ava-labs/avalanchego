@@ -18,13 +18,6 @@ type Throttler interface {
 	Handle(nodeID ids.NodeID) bool
 }
 
-// window is used internally by SlidingWindowThrottler to represent the amount
-// of hits from a node in a given evaluation period
-type window struct {
-	start time.Time
-	hits  map[ids.NodeID]int
-}
-
 // NewSlidingWindowThrottler returns a new instance of SlidingWindowThrottler
 func NewSlidingWindowThrottler(period time.Duration, limit int) *SlidingWindowThrottler {
 	now := time.Now()
@@ -42,6 +35,13 @@ func NewSlidingWindowThrottler(period time.Duration, limit int) *SlidingWindowTh
 	}
 }
 
+// window is used internally by SlidingWindowThrottler to represent the amount
+// of hits from a node in a given evaluation period
+type window struct {
+	start time.Time
+	hits  map[ids.NodeID]int
+}
+
 // SlidingWindowThrottler is an implementation of the sliding window throttling
 // algorithm.
 type SlidingWindowThrottler struct {
@@ -54,9 +54,10 @@ type SlidingWindowThrottler struct {
 	clock    mockable.Clock
 }
 
-// Handle estimates the amount of requests made in the last two windows.
-// This is computed as the amount of calls made in the current evaluation +
-// the weighted amount of calls made in the previous evaluation period
+// Handle estimates the amount of requests made in the last two evaluation
+// periods.
+// This is computed as a weighted sum of the amount of calls made in the current
+// and previous evaluation periods.
 func (s *SlidingWindowThrottler) Handle(nodeID ids.NodeID) bool {
 	s.lock.Lock()
 	defer s.lock.Unlock()
