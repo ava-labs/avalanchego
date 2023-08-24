@@ -255,7 +255,7 @@ func Test_RangeProof_MaxLength(t *testing.T) {
 	dbTrie, err := getBasicDB()
 	require.NoError(err)
 	require.NotNil(dbTrie)
-	trie, err := dbTrie.NewView(nil)
+	trie, err := dbTrie.NewView(context.Background(), nil)
 	require.NoError(err)
 
 	_, err = trie.GetRangeProof(context.Background(), maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), -1)
@@ -271,7 +271,7 @@ func Test_Proof(t *testing.T) {
 	dbTrie, err := getBasicDB()
 	require.NoError(err)
 	require.NotNil(dbTrie)
-	trie, err := dbTrie.NewView([]database.BatchOp{
+	trie, err := dbTrie.NewView(context.Background(), []database.BatchOp{
 		{Key: []byte("key0"), Value: []byte("value0")},
 		{Key: []byte("key1"), Value: []byte("value1")},
 		{Key: []byte("key2"), Value: []byte("value2")},
