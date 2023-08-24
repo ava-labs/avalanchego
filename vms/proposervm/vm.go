@@ -6,7 +6,6 @@ package proposervm
 import (
 	"context"
 	"crypto"
-	"crypto/x509"
 	"fmt"
 	"time"
 
@@ -27,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
@@ -91,7 +91,7 @@ type VM struct {
 	// block signer
 	stakingLeafSigner crypto.Signer
 	// block certificate
-	stakingCertLeaf *x509.Certificate
+	stakingCertLeaf *staking.Certificate
 
 	state.State
 	hIndexer indexer.HeightIndexer
@@ -136,7 +136,7 @@ func New(
 	minimumPChainHeight uint64,
 	minBlkDelay time.Duration,
 	stakingLeafSigner crypto.Signer,
-	stakingCertLeaf *x509.Certificate,
+	stakingCertLeaf *staking.Certificate,
 ) *VM {
 	blockBuilderVM, _ := vm.(block.BuildBlockWithContextChainVM)
 	batchedVM, _ := vm.(block.BatchedChainVM)
