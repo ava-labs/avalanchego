@@ -239,11 +239,11 @@ func Test_Trie_WriteToDB(t *testing.T) {
 	require.NoError(trie1.CommitToDB(context.Background()))
 	require.NoError(trie2.CommitToDB(context.Background()))
 
-	p := newPath([]byte("key"))
-	rawBytes, err := dbTrie.nodeDB.Get(p.Bytes())
+	p := []byte("key")
+	rawBytes, err := dbTrie.underlyingDB.Get(dbTrie.valueNodesDB.prefixedKey(p))
 	require.NoError(err)
 
-	node, err := parseNode(p, rawBytes)
+	node, err := parseNode(newPath(p), rawBytes)
 	require.NoError(err)
 	require.Equal([]byte("value"), node.value.Value())
 }
@@ -445,12 +445,17 @@ func Test_Trie_HashCountOnBranch(t *testing.T) {
 	// force a new node to generate with common prefix "key1" and have these two nodes as children
 	_, err = trie.insert(newPath([]byte("key12")), maybe.Some([]byte("value12")))
 	require.NoError(err)
-	_, err = trie.insert(newPath([]byte("key134")), maybe.Some([]byte("value134")))
+	view2, err := trie.NewView(context.Background(), []database.BatchOp{{Key: []byte("key134"), Value: []byte("value134")}})
+	require.NoError(err)
+
+	// clear the hash count to ignore setup
+	dbTrie.metrics.(*mockMetrics).hashCount = 0
+	// force the new root to calculate
+	_, err = view2.GetMerkleRoot(context.Background())
 	require.NoError(err)
 	// only hashes the new branch node, the new child node, and root
 	// shouldn't hash the existing node
-	require.NoError(trie.calculateNodeIDs(context.Background()))
-	require.Equal(int64(5), dbTrie.metrics.(*mockMetrics).hashCount)
+	require.Equal(int64(3), dbTrie.metrics.(*mockMetrics).hashCount)
 }
 
 func Test_Trie_HashCountOnDelete(t *testing.T) {
@@ -561,7 +566,7 @@ func Test_Trie_ChainDeletion(t *testing.T) {
 	require.NoError(err)
 
 	require.NoError(newTrie.(*trieView).calculateNodeIDs(context.Background()))
-	root, err := newTrie.getEditableNode(EmptyPath)
+	root, err := newTrie.getEditableNode(EmptyPath, false)
 	require.NoError(err)
 	require.Len(root.children, 1)
 
@@ -573,7 +578,7 @@ func Test_Trie_ChainDeletion(t *testing.T) {
 	})
 	require.NoError(err)
 	require.NoError(newTrie.(*trieView).calculateNodeIDs(context.Background()))
-	root, err = newTrie.getEditableNode(EmptyPath)
+	root, err = newTrie.getEditableNode(EmptyPath, false)
 	require.NoError(err)
 	// since all values have been deleted, the nodes should have been cleaned up
 	require.Empty(root.children)
@@ -626,15 +631,15 @@ func Test_Trie_NodeCollapse(t *testing.T) {
 	require.NoError(err)
 
 	require.NoError(trie.(*trieView).calculateNodeIDs(context.Background()))
-	root, err := trie.getEditableNode(EmptyPath)
+	root, err := trie.getEditableNode(EmptyPath, false)
 	require.NoError(err)
 	require.Len(root.children, 1)
 
-	root, err = trie.getEditableNode(EmptyPath)
+	root, err = trie.getEditableNode(EmptyPath, false)
 	require.NoError(err)
 	require.Len(root.children, 1)
 
-	firstNode, err := trie.getEditableNode(root.getSingleChildPath())
+	firstNode, err := trie.getEditableNode(getSingleChildPath(root), true)
 	require.NoError(err)
 	require.Len(firstNode.children, 1)
 
@@ -647,11 +652,11 @@ func Test_Trie_NodeCollapse(t *testing.T) {
 	require.NoError(err)
 	require.NoError(trie.(*trieView).calculateNodeIDs(context.Background()))
 
-	root, err = trie.getEditableNode(EmptyPath)
+	root, err = trie.getEditableNode(EmptyPath, false)
 	require.NoError(err)
 	require.Len(root.children, 1)
 
-	firstNode, err = trie.getEditableNode(root.getSingleChildPath())
+	firstNode, err = trie.getEditableNode(getSingleChildPath(root), true)
 	require.NoError(err)
 	require.Len(firstNode.children, 2)
 }
@@ -978,6 +983,15 @@ func Test_Trie_ConcurrentNewViewAndCommit(t *testing.T) {
 	newView, err := newTrie.NewView(context.Background(), nil)
 	require.NoError(err)
 	require.NotNil(newView)
+}
+
+// Returns the path of the only child of this node.
+// Assumes this node has exactly one child.
+func getSingleChildPath(n *node) path {
+	for index, entry := range n.children {
+		return n.key + path(index) + entry.compressedPath
+	}
+	return ""
 }
 
 func TestTrieCommitToDB(t *testing.T) {

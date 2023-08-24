@@ -854,7 +854,7 @@ func addPathInfo(
 			childPath := keyPath.Append(index) + compressedPath
 			if (shouldInsertLeftChildren && childPath.Compare(insertChildrenLessThan.Value()) < 0) ||
 				(shouldInsertRightChildren && childPath.Compare(insertChildrenGreaterThan.Value()) > 0) {
-				n.addChildWithoutNode(index, compressedPath, childID)
+				n.addChildWithoutNode(index, compressedPath, childID, false)
 			}
 		}
 	}
@@ -872,9 +872,10 @@ func getStandaloneTrieView(ctx context.Context, ops []database.BatchOp) (*trieVi
 		ctx,
 		memdb.New(),
 		Config{
-			EvictionBatchSize: DefaultEvictionBatchSize,
-			Tracer:            tracer,
-			NodeCacheSize:     verificationCacheSize,
+			EvictionBatchSize:         DefaultEvictionBatchSize,
+			Tracer:                    tracer,
+			ValueNodeCacheSize:        verificationCacheSize,
+			IntermediateNodeCacheSize: verificationCacheSize,
 		},
 		&mockMetrics{},
 	)

@@ -32,11 +32,12 @@ func newNoopTracer() trace.Tracer {
 
 func newDefaultConfig() Config {
 	return Config{
-		EvictionBatchSize: 100,
-		HistoryLength:     defaultHistoryLength,
-		NodeCacheSize:     1_000,
-		Reg:               prometheus.NewRegistry(),
-		Tracer:            newNoopTracer(),
+		EvictionBatchSize:         10,
+		HistoryLength:             defaultHistoryLength,
+		ValueNodeCacheSize:        1_000,
+		IntermediateNodeCacheSize: 1_000,
+		Reg:                       prometheus.NewRegistry(),
+		Tracer:                    newNoopTracer(),
 	}
 }
 
@@ -49,7 +50,7 @@ func Test_MerkleDB_Get_Safety(t *testing.T) {
 
 	val, err := db.Get([]byte{0})
 	require.NoError(err)
-	n, err := db.getNode(newPath([]byte{0}))
+	n, err := db.getNode(newPath([]byte{0}), true)
 	require.NoError(err)
 	val[0] = 1
 
@@ -125,7 +126,7 @@ func Test_MerkleDB_DB_Load_Root_From_DB(t *testing.T) {
 
 	require.NoError(db.Close())
 
-	// reloading the DB, should set the root back to the one that was saved to the memdb
+	// reloading the db, should set the root back to the one that was saved to the memdb
 	db, err = New(
 		context.Background(),
 		rdb,
@@ -146,7 +147,8 @@ func Test_MerkleDB_DB_Rebuild(t *testing.T) {
 	initialSize := 10_000
 
 	config := newDefaultConfig()
-	config.NodeCacheSize = initialSize
+	config.ValueNodeCacheSize = initialSize
+	config.IntermediateNodeCacheSize = initialSize
 
 	db, err := New(
 		context.Background(),

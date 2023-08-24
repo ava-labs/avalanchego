@@ -42,7 +42,7 @@ type ReadOnlyTrie interface {
 	getValue(key path) ([]byte, error)
 
 	// get an editable copy of the node with the given key path
-	getEditableNode(key path) (*node, error)
+	getEditableNode(key path, hadValue bool) (*node, error)
 
 	// GetRangeProof returns a proof of up to [maxLength] key-value pairs with
 	// keys in range [start, end].

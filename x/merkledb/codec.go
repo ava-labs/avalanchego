@@ -102,6 +102,9 @@ func (c *codecImpl) encodeDBNode(n *dbNode) ([]byte, error) {
 			if _, err := buf.Write(entry.id[:]); err != nil {
 				return nil, err
 			}
+			if err := c.encodeBool(buf, entry.hasValue); err != nil {
+				return nil, err
+			}
 		}
 	}
 	return buf.Bytes(), nil
@@ -172,8 +175,13 @@ func (c *codecImpl) decodeDBNode(b []byte, n *dbNode) error {
 
 	n.children = make(map[byte]child, NodeBranchFactor)
 	previousChild := -1
+	var (
+		index          int
+		childID        ids.ID
+		hasValue       bool
+		compressedPath SerializedPath
+	)
 	for i := 0; i < numChildren; i++ {
-		var index int
 		if index, err = c.decodeInt(src); err != nil {
 			return err
 		}
@@ -182,17 +190,19 @@ func (c *codecImpl) decodeDBNode(b []byte, n *dbNode) error {
 		}
 		previousChild = index
 
-		var compressedPath SerializedPath
 		if compressedPath, err = c.decodeSerializedPath(src); err != nil {
 			return err
 		}
-		var childID ids.ID
 		if childID, err = c.decodeID(src); err != nil {
+			return err
+		}
+		if hasValue, err = c.decodeBool(src); err != nil {
 			return err
 		}
 		n.children[byte(index)] = child{
 			compressedPath: compressedPath.deserialize(),
 			id:             childID,
+			hasValue:       hasValue,
 		}
 	}
 	if src.Len() != 0 {

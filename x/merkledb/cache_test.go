@@ -16,7 +16,7 @@ func TestNewOnEvictCache(t *testing.T) {
 	require := require.New(t)
 
 	called := false
-	onEviction := func(int) error {
+	onEviction := func(int, int) error {
 		called = true
 		return nil
 	}
@@ -28,7 +28,7 @@ func TestNewOnEvictCache(t *testing.T) {
 	require.Zero(cache.fifo.Len())
 	// Can't test function equality directly so do this
 	// to make sure it was assigned correctly
-	require.NoError(cache.onEviction(0))
+	require.NoError(cache.onEviction(0, 0))
 	require.True(called)
 }
 
@@ -39,7 +39,7 @@ func TestOnEvictCacheNoOnEvictionError(t *testing.T) {
 	require := require.New(t)
 
 	evicted := []int{}
-	onEviction := func(n int) error {
+	onEviction := func(key int, n int) error {
 		evicted = append(evicted, n)
 		return nil
 	}
@@ -156,7 +156,7 @@ func TestOnEvictCacheOnEvictionError(t *testing.T) {
 	var (
 		require    = require.New(t)
 		evicted    = []int{}
-		onEviction = func(n int) error {
+		onEviction = func(key, n int) error {
 			// Evicting even keys errors
 			evicted = append(evicted, n)
 			if n%2 == 0 {
