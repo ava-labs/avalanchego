@@ -861,8 +861,8 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 			continue
 		}
 
-		// the node is not nil and has a value, add to the value node db
 		if nodeChange.after.hasValue() {
+		// the node is not nil and has a value. Add to the value node db
 			currentValueNodeBatch.Put(key, nodeChange.after)
 
 			// the node didn't have a value before, delete from the intermediate node db
