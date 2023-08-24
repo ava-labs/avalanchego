@@ -69,8 +69,6 @@ type VMServer struct {
 	// If nil, the underlying VM doesn't implement the interface.
 	bVM block.BuildBlockWithContextChainVM
 	// If nil, the underlying VM doesn't implement the interface.
-	hVM block.HeightIndexedChainVM
-	// If nil, the underlying VM doesn't implement the interface.
 	ssVM block.StateSyncableVM
 
 	processMetrics prometheus.Gatherer
@@ -87,12 +85,10 @@ type VMServer struct {
 // NewServer returns a vm instance connected to a remote vm instance
 func NewServer(vm block.ChainVM) *VMServer {
 	bVM, _ := vm.(block.BuildBlockWithContextChainVM)
-	hVM, _ := vm.(block.HeightIndexedChainVM)
 	ssVM, _ := vm.(block.StateSyncableVM)
 	return &VMServer{
 		vm:   vm,
 		bVM:  bVM,
-		hVM:  hVM,
 		ssVM: ssVM,
 	}
 }
@@ -687,13 +683,7 @@ func (vm *VMServer) BatchedParseBlock(
 }
 
 func (vm *VMServer) VerifyHeightIndex(ctx context.Context, _ *emptypb.Empty) (*vmpb.VerifyHeightIndexResponse, error) {
-	var err error
-	if vm.hVM != nil {
-		err = vm.hVM.VerifyHeightIndex(ctx)
-	} else {
-		err = block.ErrHeightIndexedVMNotImplemented
-	}
-
+	err := vm.vm.VerifyHeightIndex(ctx)
 	return &vmpb.VerifyHeightIndexResponse{
 		Err: errorToErrEnum[err],
 	}, errorToRPCError(err)
@@ -703,16 +693,7 @@ func (vm *VMServer) GetBlockIDAtHeight(
 	ctx context.Context,
 	req *vmpb.GetBlockIDAtHeightRequest,
 ) (*vmpb.GetBlockIDAtHeightResponse, error) {
-	var (
-		blkID ids.ID
-		err   error
-	)
-	if vm.hVM != nil {
-		blkID, err = vm.hVM.GetBlockIDAtHeight(ctx, req.Height)
-	} else {
-		err = block.ErrHeightIndexedVMNotImplemented
-	}
-
+	blkID, err := vm.vm.GetBlockIDAtHeight(ctx, req.Height)
 	return &vmpb.GetBlockIDAtHeightResponse{
 		BlkId: blkID[:],
 		Err:   errorToErrEnum[err],

@@ -34,9 +34,6 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 				T: t,
 			},
 		},
-		TestHeightIndexedVM: &block.TestHeightIndexedVM{
-			T: t,
-		},
 		TestStateSyncableVM: &block.TestStateSyncableVM{
 			T: t,
 		},
