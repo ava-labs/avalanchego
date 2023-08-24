@@ -21,9 +21,6 @@ type valueNodeDB struct {
 	// Holds unused []byte
 	bufferPool sync.Pool
 
-	// lock needs to be held during Close to guarantee db will not be set to nil
-	// concurrently with another operation. All other operations can hold RLock.
-	lock sync.RWMutex
 	// The underlying storage
 	underlyingDB database.Database
 
@@ -143,8 +140,6 @@ func (b *valueNodeBatch) Delete(key path) {
 
 // Write flushes any accumulated data to the underlying database.
 func (b *valueNodeBatch) Write() error {
-	b.db.lock.Lock()
-	defer b.db.lock.Unlock()
 	dbBatch := b.db.underlyingDB.NewBatch()
 	for key, n := range b.ops {
 		b.db.metrics.IOKeyWrite()

@@ -22,9 +22,6 @@ type intermediateNodeDB struct {
 	// Holds unused []byte
 	bufferPool sync.Pool
 
-	// lock needs to be held during Close to guarantee db will not be set to nil
-	// concurrently with another operation. All other operations can hold RLock.
-	lock sync.RWMutex
 	// The underlying storage
 	underlyingDB database.Database
 
