@@ -19,7 +19,8 @@ type Request func()
 type Pool interface {
 	// Starts the worker pool.
 	//
-	// This method should be called before Send and Shutdown.
+	// This method must be called before Send
+	// THis method should be called before Shutdown.
 	Start()
 
 	// Send the request to the worker pool.
@@ -84,7 +85,6 @@ func (p *pool) runWorker() {
 	for {
 		select {
 		case <-p.quit:
-			p.requests = nil
 			return // stop worker
 		case request := <-p.requests:
 			if request != nil {
