@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/utils"
 )
 
 var intermediateNodePrefixBytes = []byte(intermediateNodePrefix)
@@ -30,7 +29,6 @@ type intermediateNodeDB struct {
 	// from the cache, which will call [OnEviction].
 	// A non-nil error returned from Put is considered fatal.
 	nodeCache         onEvictCache[path, *node]
-	onEvictionErr     utils.Atomic[error]
 	evictionBatchSize int
 	metrics           merkleMetrics
 }
@@ -88,7 +86,6 @@ func (db *intermediateNodeDB) onEviction(key path, n *node) error {
 		if err := db.addToBatch(writeBatch, key, n); err != nil {
 			return err
 		}
-
 	}
 	if err := writeBatch.Write(); err != nil {
 		_ = db.underlyingDB.Close()

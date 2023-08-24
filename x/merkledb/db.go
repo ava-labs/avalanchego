@@ -243,7 +243,9 @@ func (db *merkleDB) rebuild(ctx context.Context) error {
 			}
 			intermediateBatch = db.underlyingDB.NewBatch()
 		}
-		intermediateBatch.Delete(intermediateNodeIt.Key())
+		if err := intermediateBatch.Delete(intermediateNodeIt.Key()); err != nil {
+			return err
+		}
 	}
 	if err := intermediateNodeIt.Error(); err != nil {
 		return err
@@ -854,12 +856,13 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 	_, nodesSpan := db.tracer.Start(ctx, "MerkleDB.commitChanges.writeNodes")
 	for key, nodeChange := range changes.nodes {
 		if nodeChange.after == nil {
-			if nodeChange.before == nil {
+			switch {
+			case nodeChange.before == nil:
 				// before and after are both nil, this is a noop
-			} else if nodeChange.before.hasValue() {
+			case nodeChange.before.hasValue():
 				// the node had a value before, delete from the value node db
 				currentValueNodeBatch.Delete(key)
-			} else {
+			default:
 				// the node didn't have a value before, delete from the intermediate node db
 				if err := db.intermediateNodesDB.Delete(key); err != nil {
 					nodesSpan.End()
