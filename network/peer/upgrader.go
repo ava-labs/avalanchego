@@ -8,6 +8,8 @@ import (
 	"errors"
 	"net"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/staking"
 )
@@ -25,34 +27,38 @@ type Upgrader interface {
 }
 
 type tlsServerUpgrader struct {
-	config *tls.Config
+	config       *tls.Config
+	invalidCerts prometheus.Counter
 }
 
-func NewTLSServerUpgrader(config *tls.Config) Upgrader {
-	return tlsServerUpgrader{
-		config: config,
+func NewTLSServerUpgrader(config *tls.Config, invalidCerts prometheus.Counter) Upgrader {
+	return &tlsServerUpgrader{
+		config:       config,
+		invalidCerts: invalidCerts,
 	}
 }
 
-func (t tlsServerUpgrader) Upgrade(conn net.Conn) (ids.NodeID, net.Conn, *staking.Certificate, error) {
-	return connToIDAndCert(tls.Server(conn, t.config))
+func (t *tlsServerUpgrader) Upgrade(conn net.Conn) (ids.NodeID, net.Conn, *staking.Certificate, error) {
+	return connToIDAndCert(tls.Server(conn, t.config), t.invalidCerts)
 }
 
 type tlsClientUpgrader struct {
-	config *tls.Config
+	config       *tls.Config
+	invalidCerts prometheus.Counter
 }
 
-func NewTLSClientUpgrader(config *tls.Config) Upgrader {
-	return tlsClientUpgrader{
-		config: config,
+func NewTLSClientUpgrader(config *tls.Config, invalidCerts prometheus.Counter) Upgrader {
+	return &tlsClientUpgrader{
+		config:       config,
+		invalidCerts: invalidCerts,
 	}
 }
 
-func (t tlsClientUpgrader) Upgrade(conn net.Conn) (ids.NodeID, net.Conn, *staking.Certificate, error) {
-	return connToIDAndCert(tls.Client(conn, t.config))
+func (t *tlsClientUpgrader) Upgrade(conn net.Conn) (ids.NodeID, net.Conn, *staking.Certificate, error) {
+	return connToIDAndCert(tls.Client(conn, t.config), t.invalidCerts)
 }
 
-func connToIDAndCert(conn *tls.Conn) (ids.NodeID, net.Conn, *staking.Certificate, error) {
+func connToIDAndCert(conn *tls.Conn, invalidCerts prometheus.Counter) (ids.NodeID, net.Conn, *staking.Certificate, error) {
 	if err := conn.Handshake(); err != nil {
 		return ids.NodeID{}, nil, nil, err
 	}
@@ -68,6 +74,7 @@ func connToIDAndCert(conn *tls.Conn) (ids.NodeID, net.Conn, *staking.Certificate
 	// parseable according the staking package's parser.
 	peerCert, err := staking.ParseCertificate(tlsCert.Raw)
 	if err != nil {
+		invalidCerts.Inc()
 		return ids.NodeID{}, nil, nil, err
 	}
 
@@ -76,6 +83,7 @@ func connToIDAndCert(conn *tls.Conn) (ids.NodeID, net.Conn, *staking.Certificate
 	// prior version using an invalid certificate should not be able to report
 	// healthy.
 	if err := staking.ValidateCertificate(peerCert); err != nil {
+		invalidCerts.Inc()
 		return ids.NodeID{}, nil, nil, err
 	}
 
