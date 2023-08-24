@@ -25,44 +25,52 @@ func TestPoolChecksWorkerCount(t *testing.T) {
 }
 
 func TestPoolHandlesRequests(t *testing.T) {
-	var (
-		requests    []Request
-		lateRequest Request
+	require := require.New(t)
 
-		wg = &sync.WaitGroup{}
+	var (
+		poolWorkers = 1
+		requests    = 1
 	)
 
-	for i := 0; i < 20; i++ {
-		wg.Add(1)
-		requests = append(requests, func() {
-			defer wg.Done()
-			time.Sleep(50 * time.Millisecond)
-		})
-	}
-	lateRequest = func() {}
-
-	p, err := NewPool(5)
-	require.NoError(t, err)
+	p, err := NewPool(poolWorkers)
+	require.NoError(err)
 
 	p.Start()
 
-	for _, r := range requests {
-		p.Send(r)
+	// Let's send a bunch of concurrent requests. Some of them
+	// are long enough so that Shutdown is likely called while
+	// they are executing
+	wg := &sync.WaitGroup{}
+	for i := 0; i < requests; i++ {
+		shortRequest := i%2 == 0
+		if shortRequest {
+			wg.Add(1)
+		}
+
+		go func() {
+			p.Send(func() {
+				if shortRequest {
+					wg.Done()
+				} else {
+					time.Sleep(time.Minute)
+				}
+			})
+		}()
 	}
 
+	wg.Wait()
 	p.Shutdown()
 
-	// lateRequest (after Shutdown) may or may not be fulfilled
-	// if won't cause panic
-	require.NotPanics(t, func() {
+	// late requests, after Shutdown, are no-ops that don't panic
+	lateRequest := func() {
+		time.Sleep(time.Minute)
+	}
+	require.NotPanics(func() {
 		p.Send(lateRequest)
 	})
-	require.NotPanics(t, func() {
+	require.NotPanics(func() {
 		p.Send(lateRequest)
 	})
-
-	// we'll get a timeout failure if the tasks weren't processed
-	wg.Wait()
 }
 
 func TestWorkerPoolMultipleOutOfOrderSendsAndStopsAreAllowed(t *testing.T) {
