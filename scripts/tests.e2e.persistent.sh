@@ -25,9 +25,6 @@ fi
 # of script execution.
 export AVALANCHEGO_PATH="$(realpath ${AVALANCHEGO_PATH})"
 
-# Create a temporary directory to store persistent network
-ROOT_DIR="$(mktemp -d -t e2e-testnet.XXXXX)"
-
 # Provide visual separation between testing and setup/teardown
 function print_separator {
   printf '%*s\n' "${COLUMNS:-80}" '' | tr ' ' ─
@@ -39,21 +36,17 @@ function cleanup {
   echo "cleaning up persistent network"
   if [[ -n "${TESTNETCTL_NETWORK_DIR:-}" ]]; then
     ./build/testnetctl stop-network
-    if [[ -n "${ARCHIVE_NETWORK_DIR_ON_TEARDOWN:-}" ]]; then
-      ./scripts/archive_network_dir.sh "${TESTNETCTL_NETWORK_DIR}"
-    fi
   fi
-  rm -r "${ROOT_DIR}"
 }
 trap cleanup EXIT
 
 # Start a persistent network
 ./scripts/build_testnetctl.sh
 print_separator
-./build/testnetctl start-network --root-dir="${ROOT_DIR}"
+./build/testnetctl start-network
 
 # Determine the network configuration path from the latest symlink
-LATEST_SYMLINK_PATH="${ROOT_DIR}/latest"
+LATEST_SYMLINK_PATH="${HOME}/.testnetctl/networks/latest"
 if [[ -h "${LATEST_SYMLINK_PATH}" ]]; then
   export TESTNETCTL_NETWORK_DIR="$(realpath ${LATEST_SYMLINK_PATH})"
 else

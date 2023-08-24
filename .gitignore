@@ -62,6 +62,3 @@ tests/upgrade/upgrade.test
 vendor
 
 **/testdata
-
-# Name of network dir archive produced after e2e execution for upload as a CI artifact
-testnet.tar.xz

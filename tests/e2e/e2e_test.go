@@ -9,8 +9,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"os/exec"
-	"path/filepath"
 	"testing"
 
 	ginkgo "github.com/onsi/ginkgo/v2"
@@ -38,10 +36,9 @@ func TestE2E(t *testing.T) {
 }
 
 var (
-	avalancheGoExecPath         string
-	persistentNetworkDir        string
-	usePersistentNetwork        bool
-	archiveNetworkDirOnTeardown bool
+	avalancheGoExecPath  string
+	persistentNetworkDir string
+	usePersistentNetwork bool
 )
 
 func init() {
@@ -63,26 +60,12 @@ func init() {
 		false,
 		"[optional] whether to target the persistent network identified by --network-dir.",
 	)
-	flag.BoolVar(
-		&archiveNetworkDirOnTeardown,
-		"archive-network-dir-on-teardown",
-		false,
-		"[optional] whether to archive the network on teardown. Only valid for a test-managed network.",
-	)
 }
 
 var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// Run only once in the first ginkgo process
 
 	require := require.New(ginkgo.GinkgoT())
-
-	// Archiving of a network dir should be performed after network shutdown, and
-	// whatever is responsible for shutting down a persistent network should also be
-	// responsible for archiving its network dir.
-	require.False(
-		usePersistentNetwork && archiveNetworkDirOnTeardown,
-		"the network dir of a persistent network cannot be archived on teardown",
-	)
 
 	if usePersistentNetwork && len(persistentNetworkDir) == 0 {
 		persistentNetworkDir = os.Getenv(local.NetworkDirEnvName)
@@ -105,7 +88,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 		network, err = local.StartNetwork(
 			ctx,
 			ginkgo.GinkgoWriter,
-			ginkgo.GinkgoT().TempDir(),
+			"", // Use the default path to ensure a predictable target for github's upload-artifact action
 			&local.LocalNetwork{
 				LocalConfig: local.LocalConfig{
 					ExecPath: avalancheGoExecPath,
@@ -118,13 +101,6 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 		ginkgo.DeferCleanup(func() {
 			tests.Outf("Shutting down network\n")
 			require.NoError(network.Stop())
-			if archiveNetworkDirOnTeardown {
-				scriptPath, err := filepath.Abs("../../scripts/archive_network_dir.sh")
-				require.NoError(err)
-				output, err := exec.Command(scriptPath, network.Dir).Output()
-				require.NoError(err)
-				tests.Outf("%s", output)
-			}
 		})
 
 		tests.Outf("{{green}}Successfully started network{{/}}\n")
