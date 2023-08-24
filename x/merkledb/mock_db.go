@@ -331,18 +331,18 @@ func (mr *MockMerkleDBMockRecorder) NewIteratorWithStartAndPrefix(arg0, arg1 int
 }
 
 // NewView mocks base method.
-func (m *MockMerkleDB) NewView(arg0 []database.BatchOp) (TrieView, error) {
+func (m *MockMerkleDB) NewView(arg0 context.Context, arg1 []database.BatchOp) (TrieView, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "NewView", arg0)
+	ret := m.ctrl.Call(m, "NewView", arg0, arg1)
 	ret0, _ := ret[0].(TrieView)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // NewView indicates an expected call of NewView.
-func (mr *MockMerkleDBMockRecorder) NewView(arg0 interface{}) *gomock.Call {
+func (mr *MockMerkleDBMockRecorder) NewView(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewView", reflect.TypeOf((*MockMerkleDB)(nil).NewView), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewView", reflect.TypeOf((*MockMerkleDB)(nil).NewView), arg0, arg1)
 }
 
 // Put mocks base method.
@@ -389,16 +389,16 @@ func (mr *MockMerkleDBMockRecorder) getEditableNode(arg0 interface{}) *gomock.Ca
 }
 
 // getValue mocks base method.
-func (m *MockMerkleDB) getValue(arg0 path, arg1 bool) ([]byte, error) {
+func (m *MockMerkleDB) getValue(arg0 path) ([]byte, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "getValue", arg0, arg1)
+	ret := m.ctrl.Call(m, "getValue", arg0)
 	ret0, _ := ret[0].([]byte)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // getValue indicates an expected call of getValue.
-func (mr *MockMerkleDBMockRecorder) getValue(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockMerkleDBMockRecorder) getValue(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "getValue", reflect.TypeOf((*MockMerkleDB)(nil).getValue), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "getValue", reflect.TypeOf((*MockMerkleDB)(nil).getValue), arg0)
 }
