@@ -65,9 +65,13 @@ func newSignatureAggregationJob(
 
 // Execute aggregates signatures for the requested message
 func (a *signatureAggregationJob) Execute(ctx context.Context) (*AggregateSignatureResult, error) {
+	log.Info("Fetching signature", "subnetID", a.subnetID, "height", a.height)
 	validators, totalWeight, err := avalancheWarp.GetCanonicalValidatorSet(ctx, a.state, a.height, a.subnetID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get validator set: %w", err)
+	}
+	if len(validators) == 0 {
+		return nil, fmt.Errorf("cannot aggregate signatures from subnet with no validators (SubnetID: %s, Height: %d)", a.subnetID, a.height)
 	}
 	signatureJobs := make([]*signatureJob, 0, len(validators))
 	for _, validator := range validators {
