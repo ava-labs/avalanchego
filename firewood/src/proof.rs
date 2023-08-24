@@ -1,6 +1,16 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
+use std::cmp::Ordering;
+use std::ops::Deref;
+
+use nix::errno::Errno;
+use sha3::Digest;
+use shale::disk_address::DiskAddress;
+use shale::ShaleError;
+use shale::ShaleStore;
+use thiserror::Error;
+
 use crate::{
     db::DbError,
     merkle::{
@@ -8,40 +18,48 @@ use crate::{
         PartialPath, NBRANCH,
     },
     merkle_util::{new_merkle, DataStoreError, MerkleSetup},
+    v2::api::Proof,
 };
-use nix::errno::Errno;
-use sha3::Digest;
-use shale::disk_address::DiskAddress;
-use shale::ShaleError;
-use shale::ShaleStore;
 
-use std::cmp::Ordering;
-use std::error::Error;
-use std::fmt;
-use std::ops::Deref;
-
-use crate::v2::api::Proof;
-
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum ProofError {
-    DecodeError,
+    #[error("decoding error")]
+    DecodeError(#[from] rlp::DecoderError),
+    #[error("no such node")]
     NoSuchNode,
+    #[error("proof node missing")]
     ProofNodeMissing,
+    #[error("inconsistent proof data")]
     InconsistentProofData,
+    #[error("non-monotonic range increase")]
     NonMonotonicIncreaseRange,
+    #[error("range has deletion")]
     RangeHasDeletion,
+    #[error("invalid data")]
     InvalidData,
+    #[error("invalid proof")]
     InvalidProof,
+    #[error("invalid edge keys")]
     InvalidEdgeKeys,
+    #[error("inconsisent edge keys")]
     InconsistentEdgeKeys,
+    #[error("node insertion error")]
     NodesInsertionError,
+    #[error("node not in trie")]
     NodeNotInTrie,
-    InvalidNode(MerkleError),
+    #[error("invalid node {0:?}")]
+    InvalidNode(#[from] MerkleError),
+    #[error("empty range")]
     EmptyRange,
+    #[error("fork left")]
     ForkLeft,
+    #[error("fork right")]
     ForkRight,
+    #[error("system error: {0:?}")]
     SystemError(Errno),
+    #[error("shale error: {0:?}")]
     Shale(ShaleError),
+    #[error("invalid root hash")]
     InvalidRootHash,
 }
 
@@ -72,40 +90,6 @@ impl From<DbError> for ProofError {
         }
     }
 }
-
-impl From<rlp::DecoderError> for ProofError {
-    fn from(_: rlp::DecoderError) -> ProofError {
-        ProofError::DecodeError
-    }
-}
-
-impl fmt::Display for ProofError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            ProofError::DecodeError => write!(f, "decoding"),
-            ProofError::NoSuchNode => write!(f, "no such node"),
-            ProofError::ProofNodeMissing => write!(f, "proof node missing"),
-            ProofError::InconsistentProofData => write!(f, "inconsistent proof data"),
-            ProofError::NonMonotonicIncreaseRange => write!(f, "nonmonotonic range increase"),
-            ProofError::RangeHasDeletion => write!(f, "range has deletion"),
-            ProofError::InvalidData => write!(f, "invalid data"),
-            ProofError::InvalidProof => write!(f, "invalid proof"),
-            ProofError::InvalidEdgeKeys => write!(f, "invalid edge keys"),
-            ProofError::InconsistentEdgeKeys => write!(f, "inconsistent edge keys"),
-            ProofError::NodesInsertionError => write!(f, "node insertion error"),
-            ProofError::NodeNotInTrie => write!(f, "node not in trie"),
-            ProofError::InvalidNode(e) => write!(f, "invalid node: {e:?}"),
-            ProofError::EmptyRange => write!(f, "empty range"),
-            ProofError::ForkLeft => write!(f, "fork left"),
-            ProofError::ForkRight => write!(f, "fork right"),
-            ProofError::SystemError(e) => write!(f, "system error: {e:?}"),
-            ProofError::InvalidRootHash => write!(f, "invalid root hash provided"),
-            ProofError::Shale(e) => write!(f, "shale error: {e:?}"),
-        }
-    }
-}
-
-impl Error for ProofError {}
 
 const EXT_NODE_SIZE: usize = 2;
 const BRANCH_NODE_SIZE: usize = 17;
@@ -222,7 +206,8 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
                     .map(|subproof| (Some(subproof), 1))
             }
 
-            _ => Err(ProofError::DecodeError),
+            Ok(_) => Err(ProofError::DecodeError(rlp::DecoderError::RlpInvalidLength)),
+            Err(e) => Err(ProofError::DecodeError(e)),
         }
     }
 
@@ -244,7 +229,7 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
                     hash: Some(sub_hash),
                 })
             }
-            _ => Err(ProofError::DecodeError),
+            _ => Err(ProofError::DecodeError(rlp::DecoderError::RlpInvalidLength)),
         }
     }
 
@@ -438,9 +423,7 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
                 _ => return Err(ProofError::InvalidNode(MerkleError::ParentLeafBranch)),
             };
 
-            u_ref = merkle
-                .get_node(chd_ptr)
-                .map_err(|_| ProofError::DecodeError)?;
+            u_ref = merkle.get_node(chd_ptr)?;
 
             // If the new parent is a branch node, record the index to correctly link the next child to it.
             if u_ref.inner().as_branch().is_some() {
@@ -512,9 +495,7 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
 
                         drop(u_ref);
 
-                        let c_ref = merkle
-                            .get_node(chd_ptr)
-                            .map_err(|_| ProofError::DecodeError)?;
+                        let c_ref = merkle.get_node(chd_ptr)?;
 
                         match &c_ref.inner() {
                             NodeType::Branch(n) => {
@@ -670,7 +651,7 @@ impl<N: AsRef<[u8]> + Send> Proof<N> {
             }
 
             // RLP length can only be the two cases above.
-            _ => Err(ProofError::DecodeError),
+            _ => Err(ProofError::DecodeError(rlp::DecoderError::RlpInvalidLength)),
         }
     }
 }
@@ -693,7 +674,7 @@ fn get_ext_ptr<S: ShaleStore<Node> + Send + Sync>(
     merkle
         .new_node(Node::new(node))
         .map(|node| node.as_ptr())
-        .map_err(|_| ProofError::DecodeError)
+        .map_err(ProofError::InvalidNode)
 }
 
 fn build_branch_ptr<S: ShaleStore<Node> + Send + Sync>(
@@ -759,9 +740,7 @@ fn unset_internal<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync>(
                 };
 
                 parent = u_ref.as_ptr();
-                u_ref = merkle
-                    .get_node(left_node.unwrap())
-                    .map_err(|_| ProofError::DecodeError)?;
+                u_ref = merkle.get_node(left_node.unwrap())?;
                 index += 1;
             }
 
@@ -787,9 +766,7 @@ fn unset_internal<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync>(
                 }
 
                 parent = u_ref.as_ptr();
-                u_ref = merkle
-                    .get_node(n.chd())
-                    .map_err(|_| ProofError::DecodeError)?;
+                u_ref = merkle.get_node(n.chd())?;
                 index += cur_key.len();
             }
 
