@@ -128,12 +128,7 @@ func (db *intermediateNodeDB) Get(key path) (*node, error) {
 	}
 	db.bufferPool.Put(prefixedKey)
 
-	n, err := parseNode(key, val)
-	if err != nil {
-		return nil, err
-	}
-
-	return n, err
+	return parseNode(key, val)
 }
 
 func (db *intermediateNodeDB) Put(key path, n *node) error {
