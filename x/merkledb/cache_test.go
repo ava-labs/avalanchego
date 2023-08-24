@@ -39,7 +39,7 @@ func TestOnEvictCacheNoOnEvictionError(t *testing.T) {
 	require := require.New(t)
 
 	evicted := []int{}
-	onEviction := func(key int, n int) error {
+	onEviction := func(_, n int) error {
 		evicted = append(evicted, n)
 		return nil
 	}
