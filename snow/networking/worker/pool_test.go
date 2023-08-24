@@ -25,8 +25,12 @@ func TestPoolChecksWorkerCount(t *testing.T) {
 }
 
 func TestPoolHandlesRequests(t *testing.T) {
-	var requests []Request
-	wg := &sync.WaitGroup{}
+	var (
+		requests    []Request
+		lateRequest Request
+
+		wg = &sync.WaitGroup{}
+	)
 
 	for i := 0; i < 20; i++ {
 		wg.Add(1)
@@ -35,6 +39,7 @@ func TestPoolHandlesRequests(t *testing.T) {
 			time.Sleep(50 * time.Millisecond)
 		})
 	}
+	lateRequest = func() {}
 
 	p, err := NewPool(5)
 	require.NoError(t, err)
@@ -46,6 +51,15 @@ func TestPoolHandlesRequests(t *testing.T) {
 	}
 
 	p.Shutdown()
+
+	// lateRequest (after Shutdown) may or may not be fulfilled
+	// if won't cause panic
+	require.NotPanics(t, func() {
+		p.Send(lateRequest)
+	})
+	require.NotPanics(t, func() {
+		p.Send(lateRequest)
+	})
 
 	// we'll get a timeout failure if the tasks weren't processed
 	wg.Wait()

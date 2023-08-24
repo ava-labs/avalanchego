@@ -84,6 +84,7 @@ func (p *pool) runWorker() {
 	for {
 		select {
 		case <-p.quit:
+			p.requests = nil
 			return // stop worker
 		case request := <-p.requests:
 			if request != nil {
