@@ -399,7 +399,7 @@ func (vm *VM) repair(ctx context.Context) error {
 		return vm.repairAcceptedChainByIteration(ctx)
 	}
 
-	switch vm.hVM.VerifyHeightIndex(ctx) {
+	switch err := vm.hVM.VerifyHeightIndex(ctx); err {
 	case nil:
 		// InnerVM height index is complete. We can immediately verify
 		// and repair this VM height index.
@@ -414,7 +414,7 @@ func (vm *VM) repair(ctx context.Context) error {
 		}
 	case block.ErrIndexIncomplete:
 	default:
-		return nil
+		return err
 	}
 
 	// innerVM height index is incomplete. Sync vm and innerVM chains first.
