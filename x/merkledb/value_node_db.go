@@ -88,13 +88,13 @@ func (db *valueNodeDB) prefixedKey(key []byte) []byte {
 
 func (db *valueNodeDB) Get(key path) (*node, error) {
 	if cachedValue, isCached := db.nodeCache.Get(key); isCached {
-		db.metrics.DBValueNodeCacheHit()
+		db.metrics.ValueNodeCacheHit()
 		if cachedValue == nil {
 			return nil, database.ErrNotFound
 		}
 		return cachedValue, nil
 	}
-	db.metrics.DBIntermediateNodeCacheMiss()
+	db.metrics.IntermediateNodeCacheMiss()
 
 	prefixedKey := db.prefixedKey(key.Serialize().Value)
 	db.metrics.IOKeyRead()

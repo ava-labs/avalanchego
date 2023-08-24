@@ -566,7 +566,7 @@ func (db *merkleDB) GetChangeProof(
 	db.commitLock.RLock()
 	defer db.commitLock.RUnlock()
 
-	if db.c {
+	if db.closed {
 		return nil, database.ErrClosed
 	}
 
@@ -881,7 +881,7 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 	}
 	nodesSpan.End()
 
-	_, commitSpan := db.tracer.Start(ctx, "MerkleDB.commitChanges.dbCommit")
+	_, commitSpan := db.tracer.Start(ctx, "MerkleDB.commitChanges.valueNodeDBCommit")
 	err := currentValueNodeBatch.Write()
 	commitSpan.End()
 	if err != nil {
@@ -1152,6 +1152,7 @@ func (db *merkleDB) getKeysNotInSet(start, end []byte, keySet set.Set[string]) (
 }
 
 // Returns a copy of the node with the given [key].
+// hasValue determines which db the key is looked up in (intermediateNodeDB or valueNodeDB)
 // This copy may be edited by the caller without affecting the database state.
 // Returns database.ErrNotFound if the node doesn't exist.
 // Assumes [db.lock] isn't held.
@@ -1167,17 +1168,17 @@ func (db *merkleDB) getEditableNode(key path, hasValue bool) (*node, error) {
 }
 
 // Returns the node with the given [key].
+// hasValue determines which db the key is looked up in (intermediateNodeDB or valueNodeDB)
 // Editing the returned node affects the database state.
 // Returns database.ErrNotFound if the node doesn't exist.
 // Assumes [db.lock] is read locked.
 func (db *merkleDB) getNode(key path, hasValue bool) (*node, error) {
-	if db.closed {
+	switch {
+	case db.closed:
 		return nil, database.ErrClosed
-	}
-	if key == RootPath {
+	case key == RootPath:
 		return db.root, nil
-	}
-	if hasValue {
+	case hasValue:
 		return db.valueNodeDB.Get(key)
 	}
 	return db.intermediateNodeDB.Get(key)

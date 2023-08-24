@@ -112,13 +112,13 @@ func (db *intermediateNodeDB) addToBatch(b database.Batch, key path, n *node) er
 
 func (db *intermediateNodeDB) Get(key path) (*node, error) {
 	if cachedValue, isCached := db.nodeCache.Get(key); isCached {
-		db.metrics.DBIntermediateNodeCacheHit()
+		db.metrics.IntermediateNodeCacheHit()
 		if cachedValue == nil {
 			return nil, database.ErrNotFound
 		}
 		return cachedValue, nil
 	}
-	db.metrics.DBIntermediateNodeCacheMiss()
+	db.metrics.IntermediateNodeCacheMiss()
 
 	prefixedKey := db.prefixedKey(key.Bytes())
 	db.metrics.IOKeyRead()

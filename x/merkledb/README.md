@@ -60,6 +60,8 @@ The node serialization format is as follows:
 +----------------------------------------------------+
 | Child ID (32 bytes)                                |
 +----------------------------------------------------+
+| Child has value (1 bytes)                          |
++----------------------------------------------------+
 | Child index (varint)                               |
 +----------------------------------------------------+
 | Child compressed path length (varint)              |
@@ -67,6 +69,8 @@ The node serialization format is as follows:
 | Child compressed path (variable length bytes)      |
 +----------------------------------------------------+
 | Child ID (32 bytes)                                |
++----------------------------------------------------+
+| Child has value (1 bytes)                          |
 +----------------------------------------------------+
 |...                                                 |
 +----------------------------------------------------+
@@ -81,6 +85,7 @@ Where:
 * `Child compressed path length` is the length of the child node's compressed path.
 * `Child compressed path` is the child node's compressed path.
 * `Child ID` is the child node's ID.
+* `Child has value` indicates if that child has a value.
 
 For each child of the node, we have an additional:
 
@@ -93,6 +98,8 @@ For each child of the node, we have an additional:
 | Child compressed path (variable length bytes)      |
 +----------------------------------------------------+
 | Child ID (32 bytes)                                |
++----------------------------------------------------+
+| Child has value (1 bytes)                          |
 +----------------------------------------------------+
 ```
 

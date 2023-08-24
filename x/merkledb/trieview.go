@@ -983,6 +983,7 @@ func (t *trieView) recordValueChange(key path, value maybe.Maybe[[]byte]) error 
 
 // Retrieves the node with the given [key], which is a child of [parent], and
 // uses the [parent] node to initialize the child node's ID.
+// If the node is loaded from the baseDB, the hasValue will determine which database the node is stored in
 // Returns database.ErrNotFound if the child doesn't exist.
 func (t *trieView) getNodeFromParent(parent *node, key path, hasValue bool) (*node, error) {
 	// confirm the child exists and get its ID before attempting to load it
@@ -996,8 +997,9 @@ func (t *trieView) getNodeFromParent(parent *node, key path, hasValue bool) (*no
 // Retrieves a node with the given [key].
 // If the node is fetched from [t.parentTrie] and [id] isn't empty,
 // sets the node's ID to [id].
+// If the node is loaded from the baseDB, the hasValue will determine which database the node is stored in
 // Returns database.ErrNotFound if the node doesn't exist.
-func (t *trieView) getNodeWithID(id ids.ID, key path, hadValue bool) (*node, error) {
+func (t *trieView) getNodeWithID(id ids.ID, key path, hasValue bool) (*node, error) {
 	// check for the key within the changed nodes
 	if nodeChange, isChanged := t.changes.nodes[key]; isChanged {
 		t.db.metrics.ViewNodeCacheHit()
@@ -1008,7 +1010,7 @@ func (t *trieView) getNodeWithID(id ids.ID, key path, hadValue bool) (*node, err
 	}
 
 	// get the node from the parent trie and store a local copy
-	parentTrieNode, err := t.getParentTrie().getEditableNode(key, hadValue)
+	parentTrieNode, err := t.getParentTrie().getEditableNode(key, hasValue)
 	if err != nil {
 		return nil, err
 	}

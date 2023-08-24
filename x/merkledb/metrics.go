@@ -20,10 +20,10 @@ type merkleMetrics interface {
 	IOKeyRead()
 	IOKeyWrite()
 	HashCalculated()
-	DBValueNodeCacheHit()
-	DBValueNodeCacheMiss()
-	DBIntermediateNodeCacheHit()
-	DBIntermediateNodeCacheMiss()
+	ValueNodeCacheHit()
+	ValueNodeCacheMiss()
+	IntermediateNodeCacheHit()
+	IntermediateNodeCacheMiss()
 	ViewNodeCacheHit()
 	ViewNodeCacheMiss()
 	ViewValueCacheHit()
@@ -94,28 +94,28 @@ func (m *mockMetrics) ViewValueCacheMiss() {
 	m.viewValueCacheMiss++
 }
 
-func (m *mockMetrics) DBValueNodeCacheHit() {
+func (m *mockMetrics) ValueNodeCacheHit() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
 	m.dbValueNodeCacheHit++
 }
 
-func (m *mockMetrics) DBValueNodeCacheMiss() {
+func (m *mockMetrics) ValueNodeCacheMiss() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
 	m.dbValueNodeCacheMiss++
 }
 
-func (m *mockMetrics) DBIntermediateNodeCacheHit() {
+func (m *mockMetrics) IntermediateNodeCacheHit() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
 	m.dbIntermediateNodeCacheHit++
 }
 
-func (m *mockMetrics) DBIntermediateNodeCacheMiss() {
+func (m *mockMetrics) IntermediateNodeCacheMiss() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -159,22 +159,22 @@ func newMetrics(namespace string, reg prometheus.Registerer) (merkleMetrics, err
 		}),
 		dbValueNodeCacheHit: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
-			Name:      "db_value_node_cache_hit",
+			Name:      "value_node_cache_hit",
 			Help:      "cumulative amount of hits on the db value node cache",
 		}),
 		dbValueNodeCacheMiss: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
-			Name:      "db_value_node_cache_miss",
+			Name:      "value_node_cache_miss",
 			Help:      "cumulative amount of misses on the db value node cache",
 		}),
 		dbIntermediateNodeCacheHit: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
-			Name:      "db_intermediate_node_cache_hit",
+			Name:      "intermediate_node_cache_hit",
 			Help:      "cumulative amount of hits on the db intermediate node cache",
 		}),
 		dbIntermediateNodeCacheMiss: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
-			Name:      "db_intermediate_node_cache_miss",
+			Name:      "intermediate_node_cache_miss",
 			Help:      "cumulative amount of misses on the db intermediate node cache",
 		}),
 		viewNodeCacheHit: prometheus.NewCounter(prometheus.CounterOpts{
@@ -243,18 +243,18 @@ func (m *metrics) ViewValueCacheMiss() {
 	m.viewValueCacheMiss.Inc()
 }
 
-func (m *metrics) DBIntermediateNodeCacheHit() {
+func (m *metrics) IntermediateNodeCacheHit() {
 	m.dbIntermediateNodeCacheHit.Inc()
 }
 
-func (m *metrics) DBIntermediateNodeCacheMiss() {
+func (m *metrics) IntermediateNodeCacheMiss() {
 	m.dbIntermediateNodeCacheMiss.Inc()
 }
 
-func (m *metrics) DBValueNodeCacheHit() {
+func (m *metrics) ValueNodeCacheHit() {
 	m.dbValueNodeCacheHit.Inc()
 }
 
-func (m *metrics) DBValueNodeCacheMiss() {
+func (m *metrics) ValueNodeCacheMiss() {
 	m.dbValueNodeCacheMiss.Inc()
 }
