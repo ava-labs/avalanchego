@@ -19,7 +19,7 @@ import (
 func Test_History_Simple(t *testing.T) {
 	require := require.New(t)
 
-	db, err := New(
+	db, err := newDB(
 		context.Background(),
 		memdb.New(),
 		newDefaultConfig(),
@@ -148,7 +148,7 @@ func Test_History_Bad_GetValueChanges_Input(t *testing.T) {
 	config := newDefaultConfig()
 	config.HistoryLength = 5
 
-	db, err := New(
+	db, err := newDB(
 		context.Background(),
 		memdb.New(),
 		config,
@@ -215,7 +215,7 @@ func Test_History_Trigger_History_Queue_Looping(t *testing.T) {
 	config := newDefaultConfig()
 	config.HistoryLength = 2
 
-	db, err := New(
+	db, err := newDB(
 		context.Background(),
 		memdb.New(),
 		config,
@@ -269,7 +269,7 @@ func Test_History_Values_Lookup_Over_Queue_Break(t *testing.T) {
 
 	config := newDefaultConfig()
 	config.HistoryLength = 4
-	db, err := New(
+	db, err := newDB(
 		context.Background(),
 		memdb.New(),
 		config,
@@ -317,7 +317,7 @@ func Test_History_Values_Lookup_Over_Queue_Break(t *testing.T) {
 func Test_History_RepeatedRoot(t *testing.T) {
 	require := require.New(t)
 
-	db, err := New(
+	db, err := newDB(
 		context.Background(),
 		memdb.New(),
 		newDefaultConfig(),
@@ -361,7 +361,7 @@ func Test_History_RepeatedRoot(t *testing.T) {
 func Test_History_ExcessDeletes(t *testing.T) {
 	require := require.New(t)
 
-	db, err := New(
+	db, err := newDB(
 		context.Background(),
 		memdb.New(),
 		newDefaultConfig(),
@@ -393,7 +393,7 @@ func Test_History_ExcessDeletes(t *testing.T) {
 func Test_History_DontIncludeAllNodes(t *testing.T) {
 	require := require.New(t)
 
-	db, err := New(
+	db, err := newDB(
 		context.Background(),
 		memdb.New(),
 		newDefaultConfig(),
@@ -421,7 +421,7 @@ func Test_History_DontIncludeAllNodes(t *testing.T) {
 func Test_History_Branching2Nodes(t *testing.T) {
 	require := require.New(t)
 
-	db, err := New(
+	db, err := newDB(
 		context.Background(),
 		memdb.New(),
 		newDefaultConfig(),
@@ -449,7 +449,7 @@ func Test_History_Branching2Nodes(t *testing.T) {
 func Test_History_Branching3Nodes(t *testing.T) {
 	require := require.New(t)
 
-	db, err := New(
+	db, err := newDB(
 		context.Background(),
 		memdb.New(),
 		newDefaultConfig(),
@@ -479,7 +479,7 @@ func Test_History_MaxLength(t *testing.T) {
 
 	config := newDefaultConfig()
 	config.HistoryLength = 2
-	db, err := New(
+	db, err := newDB(
 		context.Background(),
 		memdb.New(),
 		config,
@@ -509,7 +509,7 @@ func Test_History_MaxLength(t *testing.T) {
 func Test_Change_List(t *testing.T) {
 	require := require.New(t)
 
-	db, err := New(
+	db, err := newDB(
 		context.Background(),
 		memdb.New(),
 		newDefaultConfig(),
