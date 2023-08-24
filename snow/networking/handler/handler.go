@@ -157,6 +157,7 @@ func New(
 	}
 
 	var err error
+
 	h.metrics, err = newMetrics("handler", h.ctx.Registerer)
 	if err != nil {
 		return nil, fmt.Errorf("initializing handler metrics errored with: %w", err)
