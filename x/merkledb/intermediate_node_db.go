@@ -9,12 +9,11 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 )
 
-var intermediateNodePrefixBytes = []byte(intermediateNodePrefix)
+var intermediateNodePrefixBytes = []byte{1}
 
 const (
 	DefaultBufferLength       = 256
-	intermediateNodePrefix    = "intermediateNode"
-	intermediateNodePrefixLen = len(intermediateNodePrefix)
+	intermediateNodePrefixLen = 1
 )
 
 type intermediateNodeDB struct {

@@ -10,11 +10,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 )
 
-var valueNodePrefixBytes = []byte(valueNodePrefix)
+var valueNodePrefixBytes = []byte{0}
 
 const (
-	valueNodePrefix    = "valueNode"
-	valueNodePrefixLen = len(valueNodePrefix)
+	valueNodePrefixLen = 1
 )
 
 type valueNodeDB struct {

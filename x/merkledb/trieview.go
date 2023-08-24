@@ -664,8 +664,10 @@ func (t *trieView) compressNodePath(parent, node *node) error {
 
 		// there is only one child, but we don't know the index
 		// "cycle" over the key/values to find the only child
-		var childEntry child
-		var childPath path
+		var (
+			childEntry child
+			childPath  path
+		)
 		for index, entry := range node.children {
 			childPath = node.key + path(index) + entry.compressedPath
 			childEntry = entry
@@ -931,16 +933,17 @@ func (t *trieView) recordKeyChange(key path, after *node, hadValue bool, newNode
 		after: after,
 	}
 
-	if !newNode {
-		var err error
-		t.changes.nodes[key].before, err = t.getParentTrie().getEditableNode(key, hadValue)
-		if err != nil {
-			if err != database.ErrNotFound {
-				return err
-			}
-		}
+	if newNode {
+		return nil
 	}
 
+	var err error
+	t.changes.nodes[key].before, err = t.getParentTrie().getEditableNode(key, hadValue)
+	if err != nil {
+		if err != database.ErrNotFound {
+			return err
+		}
+	}
 	return nil
 }
 
