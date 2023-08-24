@@ -224,8 +224,6 @@ func (h *handler) Start(ctx context.Context, recoverPanic bool) {
 	h.ctx.Lock.Lock()
 	defer h.ctx.Lock.Unlock()
 
-	h.asyncMessagePool.Start()
-
 	gear, err := h.selectStartingGear(ctx)
 	if err != nil {
 		h.ctx.Log.Error("chain failed to select starting gear",

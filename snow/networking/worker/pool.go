@@ -17,14 +17,8 @@ var (
 type Request func()
 
 type Pool interface {
-	// Starts the worker pool.
-	//
-	// THis method should be called before Send and Shutdown.
-	Start()
-
 	// Send the request to the worker pool.
 	//
-	// Send can be safely called before [Start] and it'll be no-op.
 	// Send can be safely called after [Shutdown] and it'll be no-op.
 	Send(Request)
 
@@ -33,7 +27,6 @@ type Pool interface {
 	// This method will block until all workers have finished their current
 	// tasks.
 	//
-	// Shutdown can be safely called before [Start] and it'll be no-op.
 	// Shutdown can be safely called multiple times.
 	Shutdown()
 }
@@ -42,7 +35,7 @@ type pool struct {
 	workersCount int
 	requests     chan Request
 
-	startOnce    sync.Once
+	shutdown     bool
 	shutdownOnce sync.Once
 
 	// [shutdownWG] makes sure all workers have stopped before Shutdown returns
@@ -59,23 +52,16 @@ func NewPool(workersCount int) (Pool, error) {
 
 	p := &pool{
 		workersCount: workersCount,
+		requests:     make(chan Request),
+		quit:         make(chan struct{}),
 	}
 
-	// Note: we instantiate requests and quit channels
-	// only when start is called.
+	p.shutdownWG.Add(p.workersCount)
+	for w := 0; w < p.workersCount; w++ {
+		go p.runWorker()
+	}
+
 	return p, nil
-}
-
-func (p *pool) Start() {
-	p.startOnce.Do(func() {
-		p.requests = make(chan Request)
-		p.quit = make(chan struct{})
-
-		p.shutdownWG.Add(p.workersCount)
-		for w := 0; w < p.workersCount; w++ {
-			go p.runWorker()
-		}
-	})
 }
 
 func (p *pool) runWorker() {
@@ -94,23 +80,18 @@ func (p *pool) runWorker() {
 }
 
 func (p *pool) Send(msg Request) {
-	if p.requests == nil {
-		// out of order Send, Start has not been called yet
+	if p.shutdown {
 		return
 	}
 
 	select {
 	case p.requests <- msg:
 	case <-p.quit:
+		p.shutdown = true
 	}
 }
 
 func (p *pool) Shutdown() {
-	if p.quit == nil {
-		// out of order Shutdown, Start has not been called yet
-		return
-	}
-
 	p.shutdownOnce.Do(func() {
 		close(p.quit)
 		// We don't close requests channel to avoid panics

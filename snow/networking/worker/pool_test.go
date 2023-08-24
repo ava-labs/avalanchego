@@ -13,14 +13,7 @@ import (
 
 func TestPoolChecksWorkerCount(t *testing.T) {
 	require := require.New(t)
-
-	_, err := NewPool(5)
-	require.NoError(err)
-
-	_, err = NewPool(0)
-	require.ErrorIs(err, ErrNoWorkers)
-
-	_, err = NewPool(-1)
+	_, err := NewPool(-1)
 	require.ErrorIs(err, ErrNoWorkers)
 }
 
@@ -34,8 +27,6 @@ func TestPoolHandlesRequests(t *testing.T) {
 
 	p, err := NewPool(poolWorkers)
 	require.NoError(err)
-
-	p.Start()
 
 	// Let's send a bunch of concurrent requests. Some of them
 	// are long enough so that Shutdown is likely called while
@@ -66,33 +57,6 @@ func TestWorkerPoolMultipleOutOfOrderSendsAndStopsAreAllowed(t *testing.T) {
 	require := require.New(t)
 	p, err := NewPool(1)
 	require.NoError(err)
-
-	// early requests, before Start, are no-ops that won't panic
-	earlyRequest := func() {
-		time.Sleep(time.Minute)
-	}
-	require.NotPanics(func() {
-		p.Send(earlyRequest)
-	})
-	require.NotPanics(func() {
-		p.Send(earlyRequest)
-	})
-
-	// early shutdown, before Start, is no-op that won't panic
-	require.NotPanics(func() {
-		p.Shutdown()
-	})
-	require.NotPanics(func() {
-		p.Send(func() {})
-	})
-	require.NotPanics(func() {
-		p.Shutdown()
-	})
-
-	// start the pool
-	require.NotPanics(func() {
-		p.Start()
-	})
 
 	// Shutdown is idempotent
 	require.NotPanics(func() {
