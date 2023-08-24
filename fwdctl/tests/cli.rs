@@ -1,9 +1,7 @@
 use anyhow::{anyhow, Result};
 use assert_cmd::Command;
-
 use predicates::prelude::*;
 use serial_test::serial;
-
 use std::fs::remove_dir_all;
 
 const PRG: &str = "fwdctl";

@@ -1,5 +1,5 @@
 [package]
-name = "firewood-libaio"
+name = "libaio"
 version = "0.0.3"
 edition = "2021"
 keywords = ["libaio", "aio", "async", "futures"]

@@ -207,5 +207,3 @@ pub mod nibbles;
 pub mod service;
 
 pub mod v2;
-
-extern crate firewood_shale as shale;

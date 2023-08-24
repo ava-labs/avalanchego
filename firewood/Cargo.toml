@@ -20,9 +20,9 @@ aquamarine = "0.3.1"
 async-trait = "0.1.57"
 bytemuck = { version = "1.13.1", features = ["derive"] }
 enum-as-inner = "0.6.0"
-firewood-growth-ring = { version = "0.0.3", path = "../growth-ring" }
-firewood-libaio = {version = "0.0.3", path = "../libaio" }
-firewood-shale = { version = "0.0.3", path = "../shale" }
+growth-ring = { version = "0.0.3", path = "../growth-ring" }
+libaio = {version = "0.0.3", path = "../libaio" }
+shale = { version = "0.0.3", path = "../shale" }
 futures = "0.3.24"
 hex = "0.4.3"
 lru = "0.11.0"

@@ -9,7 +9,7 @@ use firewood::{
     proof::Proof,
     storage::StoreRevShared,
 };
-use firewood_shale::compact::CompactSpace;
+use shale::compact::CompactSpace;
 
 type SharedStore = CompactSpace<Node, StoreRevShared>;
 

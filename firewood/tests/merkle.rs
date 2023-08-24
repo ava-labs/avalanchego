@@ -1,10 +1,10 @@
 use firewood::{
     merkle::Node,
-    merkle_util::*,
+    merkle_util::{new_merkle, DataStoreError, MerkleSetup},
     proof::{Proof, ProofError},
 };
-use firewood_shale::{cached::DynamicMem, compact::CompactSpace};
 use rand::Rng;
+use shale::{cached::DynamicMem, compact::CompactSpace};
 use std::collections::HashMap;
 
 type Store = CompactSpace<Node, DynamicMem>;

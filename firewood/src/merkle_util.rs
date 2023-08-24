@@ -2,7 +2,7 @@
 // See the file LICENSE.md for licensing terms.
 
 use crate::{
-    merkle::*,
+    merkle::{IdTrans, Merkle, Node, Ref, RefMut, TrieHash},
     proof::{Proof, ProofError},
 };
 use shale::{

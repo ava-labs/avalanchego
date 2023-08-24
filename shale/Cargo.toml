@@ -1,5 +1,5 @@
 [package]
-name = "firewood-shale"
+name = "shale"
 version = "0.0.3"
 edition = "2021"
 description = "Useful abstraction and light-weight implemenation for a key-value store."

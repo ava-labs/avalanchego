@@ -1,5 +1,5 @@
 [package]
-name = "firewood-growth-ring"
+name = "growth-ring"
 version = "0.0.3"
 edition = "2021"
 keywords = ["wal", "db", "futures"]
