@@ -292,7 +292,7 @@ func (db *merkleDB) CommitChangeProof(ctx context.Context, proof *ChangeProof) e
 	db.commitLock.Lock()
 	defer db.commitLock.Unlock()
 
-	if db.Closed() {
+	if db.closed {
 		return database.ErrClosed
 	}
 	ops := make([]database.BatchOp, len(proof.KeyChanges))
@@ -315,7 +315,7 @@ func (db *merkleDB) CommitRangeProof(ctx context.Context, start maybe.Maybe[[]by
 	db.commitLock.Lock()
 	defer db.commitLock.Unlock()
 
-	if db.Closed() {
+	if db.closed {
 		return database.ErrClosed
 	}
 
@@ -354,17 +354,10 @@ func (db *merkleDB) CommitRangeProof(ctx context.Context, start maybe.Maybe[[]by
 }
 
 func (db *merkleDB) Compact(start []byte, limit []byte) error {
-	if db.Closed() {
+	if db.closed {
 		return database.ErrClosed
 	}
 	return db.baseDB.Compact(start, limit)
-}
-
-func (db *merkleDB) Closed() bool {
-	db.lock.RLock()
-	defer db.lock.RUnlock()
-
-	return db.closed
 }
 
 func (db *merkleDB) Close() error {
@@ -495,7 +488,7 @@ func (db *merkleDB) GetProof(ctx context.Context, key []byte) (*Proof, error) {
 // Assumes [db.commitLock] is read locked.
 // Assumes [db.lock] is not held
 func (db *merkleDB) getProof(ctx context.Context, key []byte) (*Proof, error) {
-	if db.Closed() {
+	if db.closed {
 		return nil, database.ErrClosed
 	}
 
@@ -541,7 +534,7 @@ func (db *merkleDB) getRangeProofAtRoot(
 	end maybe.Maybe[[]byte],
 	maxLength int,
 ) (*RangeProof, error) {
-	if db.Closed() {
+	if db.closed {
 		return nil, database.ErrClosed
 	}
 	if maxLength <= 0 {
@@ -573,7 +566,7 @@ func (db *merkleDB) GetChangeProof(
 	db.commitLock.RLock()
 	defer db.commitLock.RUnlock()
 
-	if db.Closed() {
+	if db.c {
 		return nil, database.ErrClosed
 	}
 
@@ -676,7 +669,7 @@ func (db *merkleDB) NewView(_ context.Context, batchOps []database.BatchOp) (Tri
 // For internal use only, namely in methods that create short-lived views.
 // Assumes [db.lock] isn't held and [db.commitLock] is read locked.
 func (db *merkleDB) newUntrackedView(batchOps []database.BatchOp) (*trieView, error) {
-	if db.Closed() {
+	if db.closed {
 		return nil, database.ErrClosed
 	}
 
@@ -767,7 +760,7 @@ func (db *merkleDB) DeleteContext(ctx context.Context, key []byte) error {
 	db.commitLock.Lock()
 	defer db.commitLock.Unlock()
 
-	if db.Closed() {
+	if db.closed {
 		return database.ErrClosed
 	}
 
@@ -788,7 +781,7 @@ func (db *merkleDB) commitBatch(ops []database.BatchOp) error {
 	db.commitLock.Lock()
 	defer db.commitLock.Unlock()
 
-	if db.Closed() {
+	if db.closed {
 		return database.ErrClosed
 	}
 
@@ -862,7 +855,7 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 		}
 
 		if nodeChange.after.hasValue() {
-		// the node is not nil and has a value. Add to the value node db
+			// the node is not nil and has a value. Add to the value node db
 			currentValueNodeBatch.Put(key, nodeChange.after)
 
 			// the node didn't have a value before, delete from the intermediate node db
