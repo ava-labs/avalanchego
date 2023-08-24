@@ -6,17 +6,14 @@ This version is backwards compatible to [v1.10.0](https://github.com/ava-labs/av
 
 The plugin version is updated to `28` all plugins must update to be compatible.
 
-### APIs
-
--
-
 ### Configs
 
--
+- Changed the default value of `--network-compression-type` from `gzip` to `zstd`
 
 ### Fixes
 
--
+- Marked corruptabledb as corrupted after encountering an error during iteration
+- Fixed proposervm error handling during startup
 
 ### What's Changed
 
