@@ -4,27 +4,18 @@
 package worker
 
 import (
-	"errors"
 	"sync"
+
+	"github.com/ava-labs/avalanchego/utils"
 )
 
-var (
-	_ Pool = (*pool)(nil)
-
-	ErrNoWorkers = errors.New("attempting to create worker pool with less than 1 worker")
-)
+var _ Pool = (*pool)(nil)
 
 type Request func()
 
 type Pool interface {
-	// Starts the worker pool.
-	//
-	// This method should be called before Send and Shutdown.
-	Start()
-
 	// Send the request to the worker pool.
 	//
-	// Send can be safely called before [Start] and it'll be no-op.
 	// Send can be safely called after [Shutdown] and it'll be no-op.
 	Send(Request)
 
@@ -33,16 +24,18 @@ type Pool interface {
 	// This method will block until all workers have finished their current
 	// tasks.
 	//
-	// Shutdown can be safely called before [Start] and it'll be no-op.
 	// Shutdown can be safely called multiple times.
 	Shutdown()
 }
 
 type pool struct {
-	workersCount int
-	requests     chan Request
+	requests chan Request
 
-	startOnce    sync.Once
+	// [noMoreSends] helps making Send request no-op
+	// is issued after Shutdown
+	noMoreSends utils.Atomic[bool]
+
+	// [shutdownOnce] ensures Shutdown idempotency
 	shutdownOnce sync.Once
 
 	// [shutdownWG] makes sure all workers have stopped before Shutdown returns
@@ -52,30 +45,18 @@ type pool struct {
 	quit chan struct{}
 }
 
-func NewPool(workersCount int) (Pool, error) {
-	if workersCount <= 0 {
-		return nil, ErrNoWorkers
-	}
-
+func NewPool(workersCount int) Pool {
 	p := &pool{
-		workersCount: workersCount,
+		requests: make(chan Request),
+		quit:     make(chan struct{}),
 	}
 
-	// Note: we instantiate requests and quit channels
-	// only when start is called.
-	return p, nil
-}
+	for w := 0; w < workersCount; w++ {
+		p.shutdownWG.Add(1)
+		go p.runWorker()
+	}
 
-func (p *pool) Start() {
-	p.startOnce.Do(func() {
-		p.requests = make(chan Request)
-		p.quit = make(chan struct{})
-
-		p.shutdownWG.Add(p.workersCount)
-		for w := 0; w < p.workersCount; w++ {
-			go p.runWorker()
-		}
-	})
+	return p
 }
 
 func (p *pool) runWorker() {
@@ -94,23 +75,18 @@ func (p *pool) runWorker() {
 }
 
 func (p *pool) Send(msg Request) {
-	if p.requests == nil {
-		// out of order Send, Start has not been called yet
+	if p.noMoreSends.Get() {
 		return
 	}
 
 	select {
 	case p.requests <- msg:
 	case <-p.quit:
+		p.noMoreSends.Set(true)
 	}
 }
 
 func (p *pool) Shutdown() {
-	if p.quit == nil {
-		// out of order Shutdown, Start has not been called yet
-		return
-	}
-
 	p.shutdownOnce.Do(func() {
 		close(p.quit)
 		// We don't close requests channel to avoid panics

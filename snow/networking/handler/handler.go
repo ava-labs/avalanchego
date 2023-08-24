@@ -140,18 +140,13 @@ func New(
 	subnet subnets.Subnet,
 	peerTracker commontracker.Peers,
 ) (Handler, error) {
-	asyncMessagePool, err := worker.NewPool(threadPoolSize)
-	if err != nil {
-		return nil, fmt.Errorf("initializing async message pool errored with: %w", err)
-	}
-
 	h := &handler{
 		ctx:              ctx,
 		validators:       validators,
 		msgFromVMChan:    msgFromVMChan,
 		preemptTimeouts:  subnet.OnBootstrapCompleted(),
 		gossipFrequency:  gossipFrequency,
-		asyncMessagePool: asyncMessagePool,
+		asyncMessagePool: worker.NewPool(threadPoolSize),
 		timeouts:         make(chan struct{}, 1),
 		closingChan:      make(chan struct{}),
 		closed:           make(chan struct{}),
@@ -160,6 +155,8 @@ func New(
 		subnet:           subnet,
 		peerTracker:      peerTracker,
 	}
+
+	var err error
 
 	h.metrics, err = newMetrics("handler", h.ctx.Registerer)
 	if err != nil {
@@ -223,8 +220,6 @@ func (h *handler) selectStartingGear(ctx context.Context) (common.Engine, error)
 func (h *handler) Start(ctx context.Context, recoverPanic bool) {
 	h.ctx.Lock.Lock()
 	defer h.ctx.Lock.Unlock()
-
-	h.asyncMessagePool.Start()
 
 	gear, err := h.selectStartingGear(ctx)
 	if err != nil {
