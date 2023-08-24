@@ -105,12 +105,7 @@ func (db *valueNodeDB) Get(key path) (*node, error) {
 	}
 	db.bufferPool.Put(prefixedKey)
 
-	n, err := parseNode(key, val)
-	if err != nil {
-		return nil, err
-	}
-
-	return n, err
+	return parseNode(key, val)
 }
 
 // Batch of database operations
