@@ -150,17 +150,13 @@ func (b *valueNodeBatch) Write() error {
 			if err := dbBatch.Delete(prefixedKey); err != nil {
 				return err
 			}
-		} else {
-			nodeBytes, err := n.marshal()
-			if err != nil {
-				return err
-			}
-			if err := dbBatch.Put(prefixedKey, nodeBytes); err != nil {
-				return err
-			}
+		} else if err := dbBatch.Put(prefixedKey, n.marshal()); err != nil {
+			return err
 		}
+
 		b.db.bufferPool.Put(prefixedKey)
 	}
+	
 	return dbBatch.Write()
 }
 
