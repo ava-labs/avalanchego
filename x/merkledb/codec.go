@@ -25,6 +25,14 @@ const (
 	minByteSliceLen      = minVarIntLen
 	minDBNodeLen         = minMaybeByteSliceLen + minVarIntLen
 	minChildLen          = minVarIntLen + minSerializedPathLen + ids.IDLen
+
+	estimatedKeyLen            = 64
+	estimatedValueLen          = 64
+	estimatedCompressedPathLen = 8
+	// Child index, child compressed path, child ID
+	estimatedNodeChildLen = minVarIntLen + estimatedCompressedPathLen + ids.IDLen
+	// Child index, child ID
+	hashValuesChildLen = minVarIntLen + ids.IDLen
 )
 
 var (
@@ -81,10 +89,15 @@ type codecImpl struct {
 }
 
 func (c *codecImpl) encodeDBNode(n *dbNode) []byte {
-	buf := &bytes.Buffer{}
+	var (
+		numChildren = len(n.children)
+		// Estimate size of [n] to prevent memory allocations
+		estimatedLen = estimatedValueLen + minVarIntLen + estimatedNodeChildLen*numChildren
+		buf          = bytes.NewBuffer(make([]byte, 0, estimatedLen))
+	)
+
 	c.encodeMaybeByteSlice(buf, n.value)
-	childrenLength := len(n.children)
-	c.encodeInt(buf, childrenLength)
+	c.encodeInt(buf, numChildren)
 	// Note we insert children in order of increasing index
 	// for determinism.
 	for index := byte(0); index < NodeBranchFactor; index++ {
@@ -99,10 +112,14 @@ func (c *codecImpl) encodeDBNode(n *dbNode) []byte {
 }
 
 func (c *codecImpl) encodeHashValues(hv *hashValues) []byte {
-	buf := &bytes.Buffer{}
+	var (
+		numChildren = len(hv.Children)
+		// Estimate size [hv] to prevent memory allocations
+		estimatedLen = minVarIntLen + numChildren*hashValuesChildLen + estimatedValueLen + estimatedKeyLen
+		buf          = bytes.NewBuffer(make([]byte, 0, estimatedLen))
+	)
 
-	length := len(hv.Children)
-	c.encodeInt(buf, length)
+	c.encodeInt(buf, numChildren)
 
 	// ensure that the order of entries is consistent
 	for index := byte(0); index < NodeBranchFactor; index++ {
