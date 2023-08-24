@@ -8,7 +8,6 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
-	"crypto/x509"
 	"testing"
 	"time"
 
@@ -22,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 )
@@ -65,7 +65,7 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 			Log:            logging.NoLog{},
 		},
 		Windower:          windower,
-		stakingCertLeaf:   &x509.Certificate{},
+		stakingCertLeaf:   &staking.Certificate{},
 		stakingLeafSigner: pk,
 	}
 
