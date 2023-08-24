@@ -8,12 +8,13 @@ pub use crate::{
 use crate::{
     file,
     merkle::{Merkle, MerkleError, Node, TrieHash, TRIE_HASH_LEN},
-    proof::{Proof, ProofError},
+    proof::ProofError,
     storage::{
         buffer::{BufferWrite, DiskBuffer, DiskBufferRequester},
         AshRecord, CachedSpace, MemStoreR, SpaceWrite, StoreConfig, StoreDelta, StoreRevMut,
         StoreRevShared, ZeroStore, PAGE_SIZE_NBIT,
     },
+    v2::api::Proof,
 };
 use bytemuck::{cast_slice, AnyBitPattern};
 use metered::{metered, HitCount};
@@ -313,15 +314,14 @@ impl<S: ShaleStore<Node> + Send + Sync> DbRev<S> {
             .map_err(DbError::Merkle)
     }
 
-    /// Provides a proof that a key is in the Trie.
-    pub fn prove<K: AsRef<[u8]>>(&self, key: K) -> Result<Proof, MerkleError> {
-        self.merkle.prove(key, self.header.kv_root)
+    pub fn prove<K: AsRef<[u8]>>(&self, key: K) -> Result<Proof<Vec<u8>>, MerkleError> {
+        self.merkle.prove::<K>(key, self.header.kv_root)
     }
 
     /// Verifies a range proof is valid for a set of keys.
-    pub fn verify_range_proof<K: AsRef<[u8]>, V: AsRef<[u8]>>(
+    pub fn verify_range_proof<N: AsRef<[u8]> + Send, K: AsRef<[u8]>, V: AsRef<[u8]>>(
         &self,
-        proof: Proof,
+        proof: Proof<N>,
         first_key: K,
         last_key: K,
         keys: Vec<K>,

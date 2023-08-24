@@ -6,8 +6,8 @@ use std::{collections::VecDeque, path::Path};
 use firewood::{
     db::{BatchOp, Db, DbConfig, Proposal, Revision, WalConfig},
     merkle::{Node, TrieHash},
-    proof::Proof,
     storage::StoreRevShared,
+    v2::api::Proof,
 };
 use shale::compact::CompactSpace;
 
@@ -166,7 +166,7 @@ impl RevisionTracker {
     }
 }
 
-fn build_proof(revision: &Revision<SharedStore>, items: &[(&str, &str)]) -> Proof {
+fn build_proof(revision: &Revision<SharedStore>, items: &[(&str, &str)]) -> Proof<Vec<u8>> {
     let mut proof = revision.prove(items[0].0).unwrap();
     let end = revision.prove(items.last().unwrap().0).unwrap();
     proof.concat_proofs(end);

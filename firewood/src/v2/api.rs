@@ -76,8 +76,10 @@ pub struct RangeProof<K: KeyType, V: ValueType> {
 }
 
 /// A proof that a single key is present
+///
+/// The generic N represents the storage for the node data
 #[derive(Debug)]
-pub struct Proof<V>(pub HashMap<HashKey, V>);
+pub struct Proof<N: Send>(pub HashMap<HashKey, N>);
 
 /// The database interface, which includes a type for a static view of
 /// the database (the DbView). The most common implementation of the DbView

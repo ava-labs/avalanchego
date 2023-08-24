@@ -1,7 +1,7 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use crate::{nibbles::Nibbles, proof::Proof};
+use crate::{nibbles::Nibbles, v2::api::Proof};
 use sha3::Digest;
 use shale::{disk_address::DiskAddress, ObjRef, ShaleError, ShaleStore};
 use std::{
@@ -1031,13 +1031,13 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
     /// If the trie does not contain a value for key, the returned proof contains
     /// all nodes of the longest existing prefix of the key, ending with the node
     /// that proves the absence of the key (at least the root node).
-    pub fn prove<K: AsRef<[u8]>>(&self, key: K, root: DiskAddress) -> Result<Proof, MerkleError>
+    pub fn prove<K>(&self, key: K, root: DiskAddress) -> Result<Proof<Vec<u8>>, MerkleError>
     where
         K: AsRef<[u8]>,
     {
         let key_nibbles = Nibbles::<0>::new(key.as_ref());
 
-        let mut proofs: HashMap<[u8; TRIE_HASH_LEN], Vec<u8>> = HashMap::new();
+        let mut proofs = HashMap::new();
         if root.is_null() {
             return Ok(Proof(proofs));
         }

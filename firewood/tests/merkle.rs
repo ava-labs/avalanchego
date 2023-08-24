@@ -1,7 +1,8 @@
 use firewood::{
     merkle::Node,
     merkle_util::{new_merkle, DataStoreError, MerkleSetup},
-    proof::{Proof, ProofError},
+    proof::ProofError,
+    v2::api::Proof,
 };
 use rand::Rng;
 use shale::{cached::DynamicMem, compact::CompactSpace};
@@ -679,7 +680,7 @@ fn test_all_elements_proof() -> Result<(), ProofError> {
     let keys: Vec<&[u8; 32]> = item_iter.clone().map(|item| item.0).collect();
     let vals: Vec<&[u8; 20]> = item_iter.map(|item| item.1).collect();
 
-    let empty_proof = Proof(HashMap::new());
+    let empty_proof = Proof(HashMap::<[u8; 32], Vec<u8>>::new());
     let empty_key: [u8; 32] = [0; 32];
     merkle.verify_range_proof(
         &empty_proof,

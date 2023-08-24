@@ -209,7 +209,7 @@ fn create_db_issue_proof() {
     let key = "doe".as_bytes();
     let root_hash = rev.kv_root_hash();
 
-    match rev.prove(key) {
+    match rev.prove::<&[u8]>(key) {
         Ok(proof) => {
             let verification = proof.verify_proof(key, *root_hash.unwrap()).unwrap();
             assert!(verification.is_some());

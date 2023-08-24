@@ -3,7 +3,8 @@
 
 use crate::{
     merkle::{Merkle, Node, Ref, RefMut, TrieHash},
-    proof::{Proof, ProofError},
+    proof::ProofError,
+    v2::api::Proof,
 };
 use shale::{
     cached::DynamicMem, compact::CompactSpace, disk_address::DiskAddress, CachedStore, ShaleStore,
@@ -86,16 +87,16 @@ impl<S: ShaleStore<Node> + Send + Sync> MerkleSetup<S> {
         String::from_utf8(s).map_err(|_err| DataStoreError::UTF8Error)
     }
 
-    pub fn prove<K: AsRef<[u8]>>(&self, key: K) -> Result<Proof, DataStoreError> {
+    pub fn prove<K: AsRef<[u8]>>(&self, key: K) -> Result<Proof<Vec<u8>>, DataStoreError> {
         self.merkle
             .prove(key, self.root)
             .map_err(|_err| DataStoreError::ProofError)
     }
 
-    pub fn verify_proof<K: AsRef<[u8]>>(
+    pub fn verify_proof<N: AsRef<[u8]> + Send, K: AsRef<[u8]>>(
         &self,
         key: K,
-        proof: &Proof,
+        proof: &Proof<N>,
     ) -> Result<Option<Vec<u8>>, DataStoreError> {
         let hash: [u8; 32] = *self.root_hash()?;
         proof
@@ -103,9 +104,9 @@ impl<S: ShaleStore<Node> + Send + Sync> MerkleSetup<S> {
             .map_err(|_err| DataStoreError::ProofVerificationError)
     }
 
-    pub fn verify_range_proof<K: AsRef<[u8]>, V: AsRef<[u8]>>(
+    pub fn verify_range_proof<N: AsRef<[u8]> + Send, K: AsRef<[u8]>, V: AsRef<[u8]>>(
         &self,
-        proof: &Proof,
+        proof: &Proof<N>,
         first_key: K,
         last_key: K,
         keys: Vec<K>,

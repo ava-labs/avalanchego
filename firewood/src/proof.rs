@@ -10,14 +10,17 @@ use crate::{
     merkle_util::{new_merkle, DataStoreError, MerkleSetup},
 };
 use nix::errno::Errno;
-use serde::{Deserialize, Serialize};
 use sha3::Digest;
-use shale::{disk_address::DiskAddress, ShaleError, ShaleStore};
-use std::{cmp::Ordering, collections::HashMap, error::Error, fmt, ops::Deref};
+use shale::disk_address::DiskAddress;
+use shale::ShaleError;
+use shale::ShaleStore;
 
-/// Hash -> RLP encoding map
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Proof(pub HashMap<[u8; 32], Vec<u8>>);
+use std::cmp::Ordering;
+use std::error::Error;
+use std::fmt;
+use std::ops::Deref;
+
+use crate::v2::api::Proof;
 
 #[derive(Debug)]
 pub enum ProofError {
@@ -116,10 +119,12 @@ pub struct SubProof {
     hash: Option<[u8; 32]>,
 }
 
-impl Proof {
+impl<N: AsRef<[u8]> + Send> Proof<N> {
     /// verify_proof checks merkle proofs. The given proof must contain the value for
     /// key in a trie with the given root hash. VerifyProof returns an error if the
     /// proof contains invalid trie nodes or the wrong value.
+    ///
+    /// The generic N represents the storage for the node data
     pub fn verify_proof<K: AsRef<[u8]>>(
         &self,
         key: K,
@@ -137,7 +142,8 @@ impl Proof {
             let cur_proof = proofs_map
                 .get(&cur_hash)
                 .ok_or(ProofError::ProofNodeMissing)?;
-            let (sub_proof, size) = self.locate_subproof(remaining_key_nibbles, cur_proof)?;
+            let (sub_proof, size) =
+                self.locate_subproof(remaining_key_nibbles, cur_proof.as_ref())?;
             index += size;
 
             match sub_proof {
@@ -242,7 +248,7 @@ impl Proof {
         }
     }
 
-    pub fn concat_proofs(&mut self, other: Proof) {
+    pub fn concat_proofs(&mut self, other: Proof<N>) {
         self.0.extend(other.0)
     }
 
@@ -290,7 +296,7 @@ impl Proof {
         // ensure there are no more accounts / slots in the trie.
         if keys.is_empty() {
             let proof_to_path =
-                self.proof_to_path(first_key.as_ref(), root_hash, &mut merkle_setup, true)?;
+                self.proof_to_path(first_key, root_hash, &mut merkle_setup, true)?;
             return match proof_to_path {
                 Some(_) => Err(ProofError::InvalidData),
                 None => Ok(false),
@@ -365,9 +371,9 @@ impl Proof {
     /// necessary nodes will be resolved and leave the remaining as hashnode.
     ///
     /// The given edge proof is allowed to be an existent or non-existent proof.
-    fn proof_to_path<K: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync>(
+    fn proof_to_path<KV: AsRef<[u8]>, S: ShaleStore<Node> + Send + Sync>(
         &self,
-        key: K,
+        key: KV,
         root_hash: [u8; 32],
         merkle_setup: &mut MerkleSetup<S>,
         allow_non_existent_node: bool,
@@ -392,7 +398,7 @@ impl Proof {
                 .ok_or(ProofError::ProofNodeMissing)?;
             // TODO(Hao): (Optimization) If a node is alreay decode we don't need to decode again.
             let (mut chd_ptr, sub_proof, size) =
-                self.decode_node(merkle, cur_key, cur_proof, false)?;
+                self.decode_node(merkle, cur_key, cur_proof.as_ref(), false)?;
 
             // Link the child to the parent based on the node type.
             match &u_ref.inner() {
@@ -464,7 +470,7 @@ impl Proof {
                             let proof =
                                 proofs_map.get(p_hash).ok_or(ProofError::ProofNodeMissing)?;
 
-                            chd_ptr = self.decode_node(merkle, cur_key, proof, true)?.0;
+                            chd_ptr = self.decode_node(merkle, cur_key, proof.as_ref(), true)?.0;
 
                             // Link the child to the parent based on the node type.
                             match &u_ref.inner() {
