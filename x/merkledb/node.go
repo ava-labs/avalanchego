@@ -81,17 +81,12 @@ func (n *node) hasValue() bool {
 }
 
 // Returns the byte representation of this node.
-func (n *node) marshal() ([]byte, error) {
-	if n.nodeBytes != nil {
-		return n.nodeBytes, nil
+func (n *node) marshal() []byte {
+	if n.nodeBytes == nil {
+		n.nodeBytes = codec.encodeDBNode(&n.dbNode)
 	}
 
-	nodeBytes, err := codec.encodeDBNode(&n.dbNode)
-	if err != nil {
-		return nil, err
-	}
-	n.nodeBytes = nodeBytes
-	return n.nodeBytes, nil
+	return n.nodeBytes
 }
 
 // clear the cached values that will need to be recalculated whenever the node changes
@@ -113,11 +108,7 @@ func (n *node) calculateID(metrics merkleMetrics) error {
 		Key:      n.key.Serialize(),
 	}
 
-	bytes, err := codec.encodeHashValues(hv)
-	if err != nil {
-		return err
-	}
-
+	bytes := codec.encodeHashValues(hv)
 	metrics.HashCalculated()
 	n.id = hashing.ComputeHash256Array(bytes)
 	return nil
