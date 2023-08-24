@@ -96,7 +96,7 @@ mod tests {
 
         assert_eq!(proposal.val(b"k").await.unwrap().unwrap(), b"v");
 
-        assert!(matches!(proposal.val(b"z").await.unwrap(), None));
+        assert!(proposal.val(b"z").await.unwrap().is_none());
 
         Ok(())
     }
@@ -129,7 +129,7 @@ mod tests {
         assert_eq!(proposal1.val(b"k").await.unwrap().unwrap(), b"v");
         assert_eq!(proposal2.val(b"k").await.unwrap().unwrap(), b"v");
         // only proposal1 doesn't have z
-        assert!(matches!(proposal1.val(b"z").await.unwrap(), None));
+        assert!(proposal1.val(b"z").await.unwrap().is_none());
         // proposal2 has z with value "undo"
         assert_eq!(proposal2.val(b"z").await.unwrap().unwrap(), b"undo");
 

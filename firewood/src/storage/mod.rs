@@ -93,7 +93,7 @@ impl growthring::wal::Record for AshRecord {
                     undo.offset
                         .to_le_bytes()
                         .into_iter()
-                        .chain(undo_data_len.to_le_bytes().into_iter())
+                        .chain(undo_data_len.to_le_bytes())
                         .chain(undo.data.iter().copied())
                         .chain(redo.data.iter().copied())
                 });
@@ -103,7 +103,7 @@ impl growthring::wal::Record for AshRecord {
             .flat_map(|(space_id_bytes, undo_len, ash_bytes)| {
                 space_id_bytes
                     .into_iter()
-                    .chain(undo_len.to_le_bytes().into_iter())
+                    .chain(undo_len.to_le_bytes())
                     .chain(ash_bytes)
             });
 

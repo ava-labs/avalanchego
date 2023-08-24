@@ -658,7 +658,7 @@ impl<F: WalFile + 'static, S: WalStore<F>> WalWriter<F, S> {
             .collect();
 
         res.into_iter()
-            .zip(records.into_iter())
+            .zip(records)
             .map(|((ringid, blks), rec)| {
                 future::try_join_all(blks.into_iter().map(|idx| writes[idx].clone()))
                     .or_else(|_| future::ready(Err(())))

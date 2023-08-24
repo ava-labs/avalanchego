@@ -730,7 +730,7 @@ fn test_empty_range_proof() -> Result<(), ProofError> {
     items.sort();
     let merkle = merkle_build_test(items.clone(), 0x10000, 0x10000)?;
 
-    let cases = vec![(items.len() - 1, false)];
+    let cases = [(items.len() - 1, false)];
     for (_, c) in cases.iter().enumerate() {
         let first = increase_key(items[c.0].0);
         let proof = merkle.prove(first)?;
@@ -940,10 +940,7 @@ fn test_empty_value_range_proof() -> Result<(), ProofError> {
     let mid_index = items.len() / 2;
     let key = increase_key(items[mid_index - 1].0);
     let empty_data: [u8; 20] = [0; 20];
-    items.splice(
-        mid_index..mid_index,
-        vec![(&key, &empty_data)].iter().cloned(),
-    );
+    items.splice(mid_index..mid_index, [(&key, &empty_data)].iter().cloned());
 
     let start = 1;
     let end = items.len() - 1;
@@ -978,10 +975,7 @@ fn test_all_elements_empty_value_range_proof() -> Result<(), ProofError> {
     let mid_index = items.len() / 2;
     let key = increase_key(items[mid_index - 1].0);
     let empty_data: [u8; 20] = [0; 20];
-    items.splice(
-        mid_index..mid_index,
-        vec![(&key, &empty_data)].iter().cloned(),
-    );
+    items.splice(mid_index..mid_index, [(&key, &empty_data)].iter().cloned());
 
     let start = 0;
     let end = items.len() - 1;
