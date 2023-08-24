@@ -19,8 +19,7 @@ type Request func()
 type Pool interface {
 	// Starts the worker pool.
 	//
-	// This method must be called before Send
-	// THis method should be called before Shutdown.
+	// THis method should be called before Send and Shutdown.
 	Start()
 
 	// Send the request to the worker pool.

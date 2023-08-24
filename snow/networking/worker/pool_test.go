@@ -60,17 +60,6 @@ func TestPoolHandlesRequests(t *testing.T) {
 
 	wg.Wait()
 	p.Shutdown()
-
-	// late requests, after Shutdown, are no-ops that don't panic
-	lateRequest := func() {
-		time.Sleep(time.Minute)
-	}
-	require.NotPanics(func() {
-		p.Send(lateRequest)
-	})
-	require.NotPanics(func() {
-		p.Send(lateRequest)
-	})
 }
 
 func TestWorkerPoolMultipleOutOfOrderSendsAndStopsAreAllowed(t *testing.T) {
@@ -78,8 +67,18 @@ func TestWorkerPoolMultipleOutOfOrderSendsAndStopsAreAllowed(t *testing.T) {
 	p, err := NewPool(1)
 	require.NoError(err)
 
-	// check it's fine to send and shutdown
-	// multiple times before starting the pool
+	// early requests, before Start, are no-ops that won't panic
+	earlyRequest := func() {
+		time.Sleep(time.Minute)
+	}
+	require.NotPanics(func() {
+		p.Send(earlyRequest)
+	})
+	require.NotPanics(func() {
+		p.Send(earlyRequest)
+	})
+
+	// early shutdown, before Start, is no-op that won't panic
 	require.NotPanics(func() {
 		p.Shutdown()
 	})
@@ -95,12 +94,22 @@ func TestWorkerPoolMultipleOutOfOrderSendsAndStopsAreAllowed(t *testing.T) {
 		p.Start()
 	})
 
-	// check that it's fine stopping the pool
-	// multiple times
+	// Shutdown is idempotent
 	require.NotPanics(func() {
 		p.Shutdown()
 	})
 	require.NotPanics(func() {
 		p.Shutdown()
+	})
+
+	// late requests, after Shutdown, are no-ops that won't panic
+	lateRequest := func() {
+		time.Sleep(time.Minute)
+	}
+	require.NotPanics(func() {
+		p.Send(lateRequest)
+	})
+	require.NotPanics(func() {
+		p.Send(lateRequest)
 	})
 }
