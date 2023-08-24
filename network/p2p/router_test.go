@@ -192,9 +192,9 @@ func TestAppRequestResponse(t *testing.T) {
 			sender := common.NewMockSender(ctrl)
 			handler := mocks.NewMockHandler(ctrl)
 			router := NewRouter(logging.NoLog{}, sender)
-			require.NoError(router.Connected(context.Background(), nodeID, nil))
-
-			client, err := router.RegisterAppProtocol(handlerID, handler)
+			peers := &Peers{}
+			require.NoError(peers.Connected(context.Background(), nodeID, nil))
+			client, err := router.RegisterAppProtocol(handlerID, handler, peers)
 			require.NoError(err)
 
 			wg := &sync.WaitGroup{}
@@ -330,7 +330,9 @@ func TestAppRequestDuplicateRequestIDs(t *testing.T) {
 		}).AnyTimes()
 	sender.EXPECT().SendAppResponse(gomock.Any(), gomock.Any(), gomock.Any(), response)
 
-	client, err := router.RegisterAppProtocol(0x1, handler)
+	peers := &Peers{}
+	require.NoError(peers.Connected(context.Background(), nodeID, nil))
+	client, err := router.RegisterAppProtocol(0x1, handler, peers)
 	require.NoError(err)
 
 	require.NoError(client.AppRequest(context.Background(), set.Of(nodeID), []byte{}, nil))
@@ -344,82 +346,4 @@ func TestAppRequestDuplicateRequestIDs(t *testing.T) {
 	require.ErrorIs(err, ErrRequestPending)
 
 	timeout.Done()
-}
-
-func TestRouterConnected(t *testing.T) {
-	tests := []struct {
-		name       string
-		connect    []ids.NodeID
-		disconnect []ids.NodeID
-	}{
-		{
-			name: "empty",
-		},
-		{
-			name: "connect and disconnect",
-			connect: []ids.NodeID{
-				{0x0},
-			},
-			disconnect: []ids.NodeID{
-				{0x0},
-			},
-		},
-		{
-			name: "two nodes connect",
-			connect: []ids.NodeID{
-				{0x0, 0x1},
-			},
-		},
-		{
-			name: "two nodes connect, last one disconnects",
-			connect: []ids.NodeID{
-				{0x0, 0x1},
-			},
-			disconnect: []ids.NodeID{
-				{0x1},
-			},
-		},
-		{
-			name: "two nodes connect, first one disconnects",
-			connect: []ids.NodeID{
-				{0x0, 0x1},
-			},
-			disconnect: []ids.NodeID{
-				{0x0},
-			},
-		},
-		{
-			name: "two nodes connect and disconnect",
-			connect: []ids.NodeID{
-				{0x0, 0x1},
-			},
-			disconnect: []ids.NodeID{
-				{0x0, 0x1},
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
-			router := NewRouter(logging.NoLog{}, nil)
-
-			expected := set.Set[ids.NodeID]{}
-
-			for _, connect := range tt.connect {
-				expected.Add(connect)
-				require.NoError(router.Connected(context.Background(), connect, nil))
-			}
-
-			for _, disconnect := range tt.disconnect {
-				expected.Remove(disconnect)
-				require.NoError(router.Disconnected(context.Background(), disconnect))
-			}
-
-			require.Len(expected, router.peers.Len())
-			for _, peer := range router.peers.List() {
-				require.Contains(expected, peer)
-			}
-		})
-	}
 }

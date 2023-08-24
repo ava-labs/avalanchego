@@ -33,7 +33,6 @@ var (
 	trueBytes  = []byte{trueByte}
 	falseBytes = []byte{falseByte}
 
-	errEncodeNil            = errors.New("can't encode nil pointer or interface")
 	errDecodeNil            = errors.New("can't decode nil")
 	errNegativeNumChildren  = errors.New("number of children is negative")
 	errTooManyChildren      = fmt.Errorf("length of children list is larger than branching factor of %d", NodeBranchFactor)
@@ -55,8 +54,10 @@ type encoderDecoder interface {
 }
 
 type encoder interface {
-	encodeDBNode(n *dbNode) ([]byte, error)
-	encodeHashValues(hv *hashValues) ([]byte, error)
+	// Assumes [n] is non-nil.
+	encodeDBNode(n *dbNode) []byte
+	// Assumes [hv] is non-nil.
+	encodeHashValues(hv *hashValues) []byte
 }
 
 type decoder interface {
@@ -73,71 +74,45 @@ func newCodec() encoderDecoder {
 	}
 }
 
+// Note that bytes.Buffer.Write always returns nil so we
+// can ignore its return values in [codecImpl] methods.
 type codecImpl struct {
 	varIntPool sync.Pool
 }
 
-func (c *codecImpl) encodeDBNode(n *dbNode) ([]byte, error) {
-	if n == nil {
-		return nil, errEncodeNil
-	}
-
+func (c *codecImpl) encodeDBNode(n *dbNode) []byte {
 	buf := &bytes.Buffer{}
-	if err := c.encodeMaybeByteSlice(buf, n.value); err != nil {
-		return nil, err
-	}
+	c.encodeMaybeByteSlice(buf, n.value)
 	childrenLength := len(n.children)
-	if err := c.encodeInt(buf, childrenLength); err != nil {
-		return nil, err
-	}
+	c.encodeInt(buf, childrenLength)
 	for index := byte(0); index < NodeBranchFactor; index++ {
 		if entry, ok := n.children[index]; ok {
-			if err := c.encodeInt(buf, int(index)); err != nil {
-				return nil, err
-			}
+			c.encodeInt(buf, int(index))
 			path := entry.compressedPath.Serialize()
-			if err := c.encodeSerializedPath(path, buf); err != nil {
-				return nil, err
-			}
-			if _, err := buf.Write(entry.id[:]); err != nil {
-				return nil, err
-			}
+			c.encodeSerializedPath(path, buf)
+			_, _ = buf.Write(entry.id[:])
 		}
 	}
-	return buf.Bytes(), nil
+	return buf.Bytes()
 }
 
-func (c *codecImpl) encodeHashValues(hv *hashValues) ([]byte, error) {
-	if hv == nil {
-		return nil, errEncodeNil
-	}
-
+func (c *codecImpl) encodeHashValues(hv *hashValues) []byte {
 	buf := &bytes.Buffer{}
 
 	length := len(hv.Children)
-	if err := c.encodeInt(buf, length); err != nil {
-		return nil, err
-	}
+	c.encodeInt(buf, length)
 
 	// ensure that the order of entries is consistent
 	for index := byte(0); index < NodeBranchFactor; index++ {
 		if entry, ok := hv.Children[index]; ok {
-			if err := c.encodeInt(buf, int(index)); err != nil {
-				return nil, err
-			}
-			if _, err := buf.Write(entry.id[:]); err != nil {
-				return nil, err
-			}
+			c.encodeInt(buf, int(index))
+			_, _ = buf.Write(entry.id[:])
 		}
 	}
-	if err := c.encodeMaybeByteSlice(buf, hv.Value); err != nil {
-		return nil, err
-	}
-	if err := c.encodeSerializedPath(hv.Key, buf); err != nil {
-		return nil, err
-	}
+	c.encodeMaybeByteSlice(buf, hv.Value)
+	c.encodeSerializedPath(hv.Key, buf)
 
-	return buf.Bytes(), nil
+	return buf.Bytes()
 }
 
 func (c *codecImpl) decodeDBNode(b []byte, n *dbNode) error {
@@ -201,13 +176,12 @@ func (c *codecImpl) decodeDBNode(b []byte, n *dbNode) error {
 	return err
 }
 
-func (*codecImpl) encodeBool(dst io.Writer, value bool) error {
+func (*codecImpl) encodeBool(dst *bytes.Buffer, value bool) {
 	bytesValue := falseBytes
 	if value {
 		bytesValue = trueBytes
 	}
-	_, err := dst.Write(bytesValue)
-	return err
+	_, _ = dst.Write(bytesValue)
 }
 
 func (*codecImpl) decodeBool(src *bytes.Reader) (bool, error) {
@@ -228,8 +202,8 @@ func (*codecImpl) decodeBool(src *bytes.Reader) (bool, error) {
 	}
 }
 
-func (c *codecImpl) encodeInt(dst io.Writer, value int) error {
-	return c.encodeInt64(dst, int64(value))
+func (c *codecImpl) encodeInt(dst *bytes.Buffer, value int) {
+	c.encodeInt64(dst, int64(value))
 }
 
 func (*codecImpl) decodeInt(src *bytes.Reader) (int, error) {
@@ -267,22 +241,18 @@ func (*codecImpl) decodeInt(src *bytes.Reader) (int, error) {
 	return int(val64), nil
 }
 
-func (c *codecImpl) encodeInt64(dst io.Writer, value int64) error {
+func (c *codecImpl) encodeInt64(dst *bytes.Buffer, value int64) {
 	buf := c.varIntPool.Get().([]byte)
 	size := binary.PutVarint(buf, value)
-	_, err := dst.Write(buf[:size])
+	_, _ = dst.Write(buf[:size])
 	c.varIntPool.Put(buf)
-	return err
 }
 
-func (c *codecImpl) encodeMaybeByteSlice(dst io.Writer, maybeValue maybe.Maybe[[]byte]) error {
-	if err := c.encodeBool(dst, !maybeValue.IsNothing()); err != nil {
-		return err
+func (c *codecImpl) encodeMaybeByteSlice(dst *bytes.Buffer, maybeValue maybe.Maybe[[]byte]) {
+	c.encodeBool(dst, !maybeValue.IsNothing())
+	if maybeValue.HasValue() {
+		c.encodeByteSlice(dst, maybeValue.Value())
 	}
-	if maybeValue.IsNothing() {
-		return nil
-	}
-	return c.encodeByteSlice(dst, maybeValue.Value())
 }
 
 func (c *codecImpl) decodeMaybeByteSlice(src *bytes.Reader) (maybe.Maybe[[]byte], error) {
@@ -338,16 +308,11 @@ func (c *codecImpl) decodeByteSlice(src *bytes.Reader) ([]byte, error) {
 	return result, nil
 }
 
-func (c *codecImpl) encodeByteSlice(dst io.Writer, value []byte) error {
-	if err := c.encodeInt(dst, len(value)); err != nil {
-		return err
-	}
+func (c *codecImpl) encodeByteSlice(dst *bytes.Buffer, value []byte) {
+	c.encodeInt(dst, len(value))
 	if value != nil {
-		if _, err := dst.Write(value); err != nil {
-			return err
-		}
+		_, _ = dst.Write(value)
 	}
-	return nil
 }
 
 func (*codecImpl) decodeID(src *bytes.Reader) (ids.ID, error) {
@@ -365,12 +330,9 @@ func (*codecImpl) decodeID(src *bytes.Reader) (ids.ID, error) {
 	return id, nil
 }
 
-func (c *codecImpl) encodeSerializedPath(s SerializedPath, dst io.Writer) error {
-	if err := c.encodeInt(dst, s.NibbleLength); err != nil {
-		return err
-	}
-	_, err := dst.Write(s.Value)
-	return err
+func (c *codecImpl) encodeSerializedPath(s SerializedPath, dst *bytes.Buffer) {
+	c.encodeInt(dst, s.NibbleLength)
+	_, _ = dst.Write(s.Value)
 }
 
 func (c *codecImpl) decodeSerializedPath(src *bytes.Reader) (SerializedPath, error) {
