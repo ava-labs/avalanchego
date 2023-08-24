@@ -51,11 +51,113 @@ func TestSlidingWindowThrottlerHandle(t *testing.T) {
 					expected: true,
 				},
 				{
-					time:     currentWindowStartTime.Add(period).Add(time.Second),
+					time:     currentWindowStartTime.Add(period),
 					expected: true,
 				},
 				{
-					time: currentWindowStartTime.Add(period).Add(time.Second),
+					time:     currentWindowStartTime.Add(2 * period),
+					expected: true,
+				},
+				{
+					time:     currentWindowStartTime.Add(2 * period).Add(time.Second),
+					expected: true,
+				},
+			},
+		},
+		{
+			name:  "throttled over multiple evaluation periods",
+			limit: 5,
+			calls: []call{
+				{
+					time:     currentWindowStartTime.Add(30 * time.Second),
+					expected: true,
+				},
+				{
+					time:     currentWindowStartTime.Add(period).Add(1 * time.Second),
+					expected: true,
+				},
+				{
+					time:     currentWindowStartTime.Add(period).Add(2 * time.Second),
+					expected: true,
+				},
+				{
+					time:     currentWindowStartTime.Add(period).Add(3 * time.Second),
+					expected: true,
+				},
+				{
+					time:     currentWindowStartTime.Add(period).Add(4 * time.Second),
+					expected: true,
+				},
+				{
+					time:     currentWindowStartTime.Add(period).Add(30 * time.Second),
+					expected: true,
+				},
+				{
+					time: currentWindowStartTime.Add(period).Add(30 * time.Second),
+				},
+				{
+					time:     currentWindowStartTime.Add(5 * period),
+					expected: true,
+				},
+			},
+		},
+		{
+			name:  "not throttled over multiple evaluation periods",
+			limit: 2,
+			calls: []call{
+				{
+					time:     currentWindowStartTime,
+					expected: true,
+				},
+				{
+					time:     currentWindowStartTime.Add(period),
+					expected: true,
+				},
+				{
+					time:     currentWindowStartTime.Add(2 * period),
+					expected: true,
+				},
+				{
+					time:     currentWindowStartTime.Add(3 * period),
+					expected: true,
+				},
+				{
+					time:     currentWindowStartTime.Add(4 * period),
+					expected: true,
+				},
+				{
+					time:     currentWindowStartTime.Add(5 * period),
+					expected: true,
+				},
+			},
+		},
+		{
+			name:  "sparse hits",
+			limit: 2,
+			calls: []call{
+				{
+					time:     currentWindowStartTime,
+					expected: true,
+				},
+				{
+					time:     currentWindowStartTime.Add(period),
+					expected: true,
+				},
+				{
+					time:     currentWindowStartTime.Add(2 * period),
+					expected: true,
+				},
+				{
+					time:     currentWindowStartTime.Add(5 * period),
+					expected: true,
+				},
+				{
+					time:     currentWindowStartTime.Add(6 * period),
+					expected: true,
+				},
+				{
+					time:     currentWindowStartTime.Add(7 * period),
+					expected: true,
 				},
 			},
 		},

@@ -65,6 +65,13 @@ func (s *SlidingWindowThrottler) Handle(nodeID ids.NodeID) bool {
 	// check if the current evaluation period is over
 	now := s.clock.Time()
 	if now.After(s.current.start.Add(s.period)) {
+		// discard the current window if it's too old
+		if s.clock.Time().Sub(s.current.start) > s.period {
+			s.current = window{
+				start: now.Add(-s.period),
+				hits:  make(map[ids.NodeID]int),
+			}
+		}
 		s.previous = s.current
 		s.current = window{
 			start: now,
@@ -72,7 +79,7 @@ func (s *SlidingWindowThrottler) Handle(nodeID ids.NodeID) bool {
 		}
 	}
 
-	offset := s.clock.Time().Sub(s.current.start)
+	offset := now.Sub(s.current.start)
 	weight := float64(s.period-offset) / float64(s.period)
 
 	if weight*float64(s.previous.hits[nodeID])+float64(s.current.hits[nodeID]) < float64(s.limit) {
