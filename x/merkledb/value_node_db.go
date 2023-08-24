@@ -32,7 +32,7 @@ type valueNodeDB struct {
 }
 
 func newValueNodeDB(db database.Database, metrics merkleMetrics, size int) *valueNodeDB {
-	result := &valueNodeDB{
+	return &valueNodeDB{
 		metrics:      metrics,
 		underlyingDB: db,
 		bufferPool: sync.Pool{
@@ -40,11 +40,10 @@ func newValueNodeDB(db database.Database, metrics merkleMetrics, size int) *valu
 				return make([]byte, 0, DefaultBufferLength)
 			},
 		},
+		nodeCache: newOnEvictCache[path](size, func(path, *node) error {
+			return nil
+		}),
 	}
-	result.nodeCache = newOnEvictCache[path](size, func(path, *node) error {
-		return nil
-	})
-	return result
 }
 
 func (db *valueNodeDB) newIteratorWithStartAndPrefix(start, prefix []byte) database.Iterator {
