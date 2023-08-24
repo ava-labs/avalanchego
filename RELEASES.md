@@ -62,6 +62,12 @@ The plugin version is updated to `28` all plugins must update to be compatible.
 - `merkledb` -- codec nits/cleanup by @danlaine in https://github.com/ava-labs/avalanchego/pull/1904
 - `merkledb` -- preallocate `bytes.Buffer` in codec by @danlaine in https://github.com/ava-labs/avalanchego/pull/1900
 - Proposervm height index repair fix by @abi87 in https://github.com/ava-labs/avalanchego/pull/1915
+- `merkledb` -- move and rename methods by @danlaine in https://github.com/ava-labs/avalanchego/pull/1919
+- Remove optional height indexing interface by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1896
+- `merkledb` -- nits by @danlaine in https://github.com/ava-labs/avalanchego/pull/1916
+- Fix code owners file by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1922
+- Drop invalid TLS certs during initial handshake by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1923
+- Restricted tls metrics by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1924
 
 ### New Contributors
 
