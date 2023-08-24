@@ -56,8 +56,8 @@ func Test_Proof_Simple(t *testing.T) {
 	require.NoError(err)
 
 	ctx := context.Background()
-	require.NoError(db.Insert(ctx, []byte{}, []byte{1}))
-	require.NoError(db.Insert(ctx, []byte{0}, []byte{2}))
+	require.NoError(db.PutContext(ctx, []byte{}, []byte{1}))
+	require.NoError(db.PutContext(ctx, []byte{0}, []byte{2}))
 
 	expectedRoot, err := db.GetMerkleRoot(ctx)
 	require.NoError(err)
@@ -680,7 +680,7 @@ func Test_ChangeProof_BadBounds(t *testing.T) {
 	startRoot, err := db.GetMerkleRoot(context.Background())
 	require.NoError(err)
 
-	require.NoError(db.Insert(context.Background(), []byte{0}, []byte{0}))
+	require.NoError(db.PutContext(context.Background(), []byte{0}, []byte{0}))
 
 	endRoot, err := db.GetMerkleRoot(context.Background())
 	require.NoError(err)
