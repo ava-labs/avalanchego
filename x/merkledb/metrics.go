@@ -35,10 +35,10 @@ type mockMetrics struct {
 	keyReadCount                int64
 	keyWriteCount               int64
 	hashCount                   int64
-	dbValueNodeCacheHit         int64
-	dbValueNodeCacheMiss        int64
-	dbIntermediateNodeCacheHit  int64
-	dbIntermediateNodeCacheMiss int64
+	valueNodeCacheHit         int64
+	valueNodeCacheMiss        int64
+	intermediateNodeCacheHit  int64
+	intermediateNodeCacheMiss int64
 	viewNodeCacheHit            int64
 	viewNodeCacheMiss           int64
 	viewValueCacheHit           int64
