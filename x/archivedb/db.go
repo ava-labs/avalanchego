@@ -69,17 +69,14 @@ func (db *archiveDB) Get(key []byte, height uint64) ([]byte, uint64, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	internalKey, err := NewKey(key, height)
-	if err != nil {
-		return nil, 0, err
-	}
-	iterator := db.rawDB.NewIteratorWithStart(internalKey.Bytes)
+	internalKey := NewKey(key, height)
+	iterator := db.rawDB.NewIteratorWithStart(internalKey.Bytes())
 	if !iterator.Next() {
 		// There is no available key with the requested prefix
 		return nil, 0, database.ErrNotFound
 	}
 
-	internalKey, err = ParseKey(iterator.Key())
+	internalKey, err := ParseKey(iterator.Key())
 	if err != nil {
 		return nil, 0, err
 	}
@@ -119,24 +116,15 @@ func (c *batchWithHeight) Write() error {
 
 // Delete any previous state that may be stored in the database
 func (c *batchWithHeight) Delete(key []byte) error {
-	internalKey, err := NewKey(key, c.height)
-	if err != nil {
-		return err
-	}
-	if err = internalKey.SetDeleted(); err != nil {
-		return err
-	}
-	return c.batch.Put(internalKey.Bytes, []byte{})
+	internalKey := NewKey(key, c.height)
+	internalKey.IsDeleted = true
+	return c.batch.Put(internalKey.Bytes(), []byte{})
 }
 
 // Queues an insert for a key with a given
 func (c *batchWithHeight) Put(key []byte, value []byte) error {
-	internalKey, err := NewKey(key, c.height)
-	if err != nil {
-		return err
-	}
-
-	return c.batch.Put(internalKey.Bytes, value)
+	internalKey := NewKey(key, c.height)
+	return c.batch.Put(internalKey.Bytes(), value)
 }
 
 // Returns the sizes to be committed in the database
