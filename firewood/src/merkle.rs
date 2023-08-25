@@ -6,11 +6,10 @@ use sha3::Digest;
 use shale::{disk_address::DiskAddress, ObjRef, ShaleError, ShaleStore};
 use std::{
     collections::HashMap,
-    error::Error,
-    fmt::{self, Debug},
     io::Write,
     sync::{atomic::Ordering, OnceLock},
 };
+use thiserror::Error;
 
 mod node;
 mod partial_path;
@@ -20,31 +19,21 @@ pub use node::{BranchNode, Data, ExtNode, LeafNode, Node, NodeType, NBRANCH};
 pub use partial_path::PartialPath;
 pub use trie_hash::{TrieHash, TRIE_HASH_LEN};
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum MerkleError {
-    Shale(ShaleError),
+    #[error("merkle datastore error: {0:?}")]
+    Shale(#[from] ShaleError),
+    #[error("read only")]
     ReadOnly,
+    #[error("node not a branch node")]
     NotBranchNode,
-    Format(std::io::Error),
+    #[error("format error: {0:?}")]
+    Format(#[from] std::io::Error),
+    #[error("parent should not be a leaf branch")]
     ParentLeafBranch,
+    #[error("removing internal node references failed")]
     UnsetInternal,
 }
-
-impl fmt::Display for MerkleError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            MerkleError::Shale(e) => write!(f, "merkle datastore error: {e:?}"),
-            MerkleError::ReadOnly => write!(f, "error: read only"),
-            MerkleError::NotBranchNode => write!(f, "error: node is not a branch node"),
-            MerkleError::Format(e) => write!(f, "format error: {e:?}"),
-            MerkleError::ParentLeafBranch => write!(f, "parent should not be a leaf branch"),
-            MerkleError::UnsetInternal => write!(f, "removing internal node references failed"),
-        }
-    }
-}
-
-// TODO: use thiserror
-impl Error for MerkleError {}
 
 macro_rules! write_node {
     ($self: expr, $r: expr, $modify: expr, $parents: expr, $deleted: expr) => {
@@ -66,13 +55,13 @@ pub struct Merkle<S> {
 
 impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
     pub fn get_node(&self, ptr: DiskAddress) -> Result<ObjRef<Node>, MerkleError> {
-        self.store.get_item(ptr).map_err(MerkleError::Shale)
+        self.store.get_item(ptr).map_err(Into::into)
     }
     pub fn new_node(&self, item: Node) -> Result<ObjRef<Node>, MerkleError> {
-        self.store.put_item(item, 0).map_err(MerkleError::Shale)
+        self.store.put_item(item, 0).map_err(Into::into)
     }
     fn free_node(&mut self, ptr: DiskAddress) -> Result<(), MerkleError> {
-        self.store.free_item(ptr).map_err(MerkleError::Shale)
+        self.store.free_item(ptr).map_err(Into::into)
     }
 }
 
@@ -140,18 +129,17 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
                 Some(h) => hex::encode(**h),
                 None => "<lazy>".to_string(),
             }
-        )
-        .map_err(MerkleError::Format)?;
+        )?;
         match &u_ref.inner {
             NodeType::Branch(n) => {
-                writeln!(w, "{n:?}").map_err(MerkleError::Format)?;
+                writeln!(w, "{n:?}")?;
                 for c in n.chd.iter().flatten() {
                     self.dump_(*c, w)?
                 }
             }
             NodeType::Leaf(n) => writeln!(w, "{n:?}").unwrap(),
             NodeType::Extension(n) => {
-                writeln!(w, "{n:?}").map_err(MerkleError::Format)?;
+                writeln!(w, "{n:?}")?;
                 self.dump_(n.1, w)?
             }
         }
@@ -160,7 +148,7 @@ impl<S: ShaleStore<Node> + Send + Sync> Merkle<S> {
 
     pub fn dump(&self, root: DiskAddress, w: &mut dyn Write) -> Result<(), MerkleError> {
         if root.is_null() {
-            write!(w, "<Empty>").map_err(MerkleError::Format)?;
+            write!(w, "<Empty>")?;
         } else {
             self.dump_(root, w)?;
         };
