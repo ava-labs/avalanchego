@@ -1,5 +1,6 @@
 // Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
+
 package archivedb
 
 import (
@@ -48,7 +49,7 @@ type archiveDB struct {
 
 var (
 	currentHeightKey = "archivedb.height"
-	ErrUnknownHeight = errors.New("Unknown height")
+	ErrUnknownHeight = errors.New("unknown height")
 )
 
 type batchWithHeight struct {
@@ -64,13 +65,12 @@ func NewArchiveDB(
 	var currentHeight uint64
 	height, err := db.Get([]byte(currentHeightKey))
 	if err != nil {
-		if errors.Is(err, database.ErrNotFound) {
-			currentHeight = 0
-		} else {
+		if !errors.Is(err, database.ErrNotFound) {
 			return nil, err
 		}
+		currentHeight = 0
 	} else {
-		currentHeight = binary.BigEndian.Uint64(height[:])
+		currentHeight = binary.BigEndian.Uint64(height)
 	}
 
 	return &archiveDB{
@@ -128,18 +128,21 @@ func (db *archiveDB) Get(key []byte, height uint64) ([]byte, uint64, error) {
 }
 
 // Creates a new batch to append database changes in a given height
-func (db *archiveDB) NewBatch() batchWithHeight {
+func (db *archiveDB) NewBatch() (batchWithHeight, error) {
 	var nextHeightBytes [8]byte
 
 	batch := db.rawDB.NewBatch()
 	nextHeight := db.currentHeight + 1
 	binary.BigEndian.PutUint64(nextHeightBytes[:], nextHeight)
-	batch.Put([]byte(currentHeightKey), nextHeightBytes[:])
+	err := batch.Put([]byte(currentHeightKey), nextHeightBytes[:])
+	if err != nil {
+		return batchWithHeight{}, err
+	}
 	return batchWithHeight{
 		db:     db,
 		height: nextHeight,
 		batch:  batch,
-	}
+	}, nil
 }
 
 func (c *batchWithHeight) Height() uint64 {

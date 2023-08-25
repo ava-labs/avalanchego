@@ -1,5 +1,6 @@
 // Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
+
 package archivedb
 
 import (
@@ -44,7 +45,7 @@ func newKey(key []byte, height uint64) *keyInternal {
 func (k *keyInternal) Bytes() []byte {
 	prefixLen := len(k.Prefix)
 	bytes := make([]byte, prefixLen+longLen+boolLen)
-	copy(bytes[0:], k.Prefix[:])
+	copy(bytes[0:], k.Prefix)
 	binary.BigEndian.PutUint64(bytes[prefixLen:], math.MaxUint64-k.Height)
 	if k.IsDeleted {
 		bytes[prefixLen+longLen] = 1
