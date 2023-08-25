@@ -385,7 +385,7 @@ func (ln *LocalNetwork) WaitForHealthy(ctx context.Context, w io.Writer) error {
 			}
 
 			healthy, err := node.IsHealthy(ctx)
-			if err != nil && !errors.Is(err, errProcessNotRunning) {
+			if err != nil && !errors.Is(err, testnet.ErrNotRunning) {
 				return err
 			}
 			if !healthy {

@@ -197,5 +197,5 @@ func AddEphemeralNode(network testnet.Network, flags testnet.FlagsMap) testnet.N
 func WaitForHealthy(node testnet.Node) {
 	ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
 	defer cancel()
-	require.NoError(ginkgo.GinkgoT(), node.WaitForHealthy(ctx))
+	require.NoError(ginkgo.GinkgoT(), testnet.WaitForHealthy(ctx, node))
 }

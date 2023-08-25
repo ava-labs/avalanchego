@@ -27,10 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/perms"
 )
 
-var (
-	errProcessNotRunning  = errors.New("process not running")
-	errNodeAlreadyRunning = errors.New("failed to start local node: node is already running")
-)
+var errNodeAlreadyRunning = errors.New("failed to start local node: node is already running")
 
 // Defines local-specific node configuration. Supports setting default
 // and node-specific values.
@@ -268,7 +265,7 @@ func (n *LocalNode) Stop() error {
 	}
 
 	// Wait for the node process to stop
-	ticker := time.NewTicker(DefaultNodeTickerInterval)
+	ticker := time.NewTicker(testnet.DefaultNodeTickerInterval)
 	defer ticker.Stop()
 	ctx, cancel := context.WithTimeout(context.Background(), DefaultNodeStopTimeout)
 	defer cancel()
@@ -298,7 +295,7 @@ func (n *LocalNode) IsHealthy(ctx context.Context) (bool, error) {
 		return false, fmt.Errorf("failed to determine process status: %w", err)
 	}
 	if proc == nil {
-		return false, errProcessNotRunning
+		return false, testnet.ErrNotRunning
 	}
 
 	// Check that the node is reporting healthy
@@ -323,33 +320,8 @@ func (n *LocalNode) IsHealthy(ctx context.Context) (bool, error) {
 	return false, fmt.Errorf("failed to query node health: %w", err)
 }
 
-// WaitForHealthy blocks until IsHealthy returns true or an error (including context timeout) is observed.
-func (n *LocalNode) WaitForHealthy(ctx context.Context) error {
-	if _, ok := ctx.Deadline(); !ok {
-		return fmt.Errorf("unable to wait for health for node %q with a context without a deadline", n.NodeID)
-	}
-	ticker := time.NewTicker(DefaultNodeTickerInterval)
-	defer ticker.Stop()
-
-	for {
-		healthy, err := n.IsHealthy(ctx)
-		if err != nil && !errors.Is(err, errProcessNotRunning) {
-			return fmt.Errorf("failed to wait for health of node %q: %w", n.NodeID, err)
-		}
-		if healthy {
-			return nil
-		}
-
-		select {
-		case <-ctx.Done():
-			return fmt.Errorf("failed to wait for health of node %q before timeout: %w", n.NodeID, ctx.Err())
-		case <-ticker.C:
-		}
-	}
-}
-
 func (n *LocalNode) WaitForProcessContext(ctx context.Context) error {
-	ticker := time.NewTicker(DefaultNodeTickerInterval)
+	ticker := time.NewTicker(testnet.DefaultNodeTickerInterval)
 	defer ticker.Stop()
 
 	ctx, cancel := context.WithTimeout(ctx, DefaultNodeInitTimeout)

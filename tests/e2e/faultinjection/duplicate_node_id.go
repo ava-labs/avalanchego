@@ -47,7 +47,7 @@ var _ = ginkgo.Describe("Duplicate node handling", func() {
 		ginkgo.By("checking that the second new node fails to become healthy before timeout")
 		ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultNodeStartTimeout)
 		defer cancel()
-		err := node2.WaitForHealthy(ctx)
+		err := testnet.WaitForHealthy(ctx, node2)
 		require.ErrorIs(err, context.DeadlineExceeded)
 
 		ginkgo.By("stopping the first new node")
