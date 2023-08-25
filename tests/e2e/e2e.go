@@ -103,11 +103,16 @@ func (te *TestEnvironment) NewKeychain(count int) *secp256k1fx.Keychain {
 	return secp256k1fx.NewKeychain(keys...)
 }
 
-// Create a new wallet for the provided keychain.
+// Create a new wallet for the provided keychain against a random node URI.
 func (te *TestEnvironment) NewWallet(keychain *secp256k1fx.Keychain) primary.Wallet {
+	return te.NewWalletForURI(keychain, te.GetRandomNodeURI())
+}
+
+// Create a new wallet for the provided keychain against the specified node URI.
+func (te *TestEnvironment) NewWalletForURI(keychain *secp256k1fx.Keychain, uri string) primary.Wallet {
 	tests.Outf("{{blue}} initializing a new wallet {{/}}\n")
 	wallet, err := primary.MakeWallet(DefaultContext(), &primary.WalletConfig{
-		URI:          te.GetRandomNodeURI(),
+		URI:          uri,
 		AVAXKeychain: keychain,
 		EthKeychain:  keychain,
 	})
@@ -117,7 +122,11 @@ func (te *TestEnvironment) NewWallet(keychain *secp256k1fx.Keychain) primary.Wal
 
 // Create a new eth client targeting a random node.
 func (te *TestEnvironment) NewEthClient() ethclient.Client {
-	nodeURI := te.GetRandomNodeURI()
+	return te.NewEthClientForURI(te.GetRandomNodeURI())
+}
+
+// Create a new eth client targeting the specified node URI.
+func (te *TestEnvironment) NewEthClientForURI(nodeURI string) ethclient.Client {
 	nodeAddress := strings.Split(nodeURI, "//")[1]
 	uri := fmt.Sprintf("ws://%s/ext/bc/C/ws", nodeAddress)
 	client, err := ethclient.Dial(uri)
