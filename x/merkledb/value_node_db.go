@@ -10,9 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 )
 
-const (
-	valueNodePrefixLen = 1
-)
+const valueNodePrefixLen = 1
 
 var valueNodePrefixBytes = []byte{0}
 
