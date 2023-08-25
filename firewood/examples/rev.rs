@@ -4,7 +4,7 @@
 use std::{collections::VecDeque, path::Path};
 
 use firewood::{
-    db::{BatchOp, Db, DbConfig, Proposal, Revision, WalConfig},
+    db::{BatchOp, Db, DbConfig, DbError, Proposal, Revision, WalConfig},
     merkle::{Node, TrieHash},
     storage::StoreRevShared,
     v2::api::Proof,
@@ -14,7 +14,7 @@ use shale::compact::CompactSpace;
 type SharedStore = CompactSpace<Node, StoreRevShared>;
 
 /// cargo run --example rev
-fn main() {
+fn main() -> Result<(), DbError> {
     let cfg = DbConfig::builder().wal(WalConfig::builder().max_revisions(10).build());
 
     let db = Db::new("rev_db", &cfg.clone().truncate(true).build())
@@ -23,9 +23,9 @@ fn main() {
 
     let mut revision_tracker = RevisionTracker::new(db);
 
-    revision_tracker.create_revisions(items.into_iter());
+    revision_tracker.create_revisions(items.into_iter())?;
 
-    revision_tracker.db.kv_dump(&mut std::io::stdout()).unwrap();
+    revision_tracker.db.kv_dump(&mut std::io::stdout())?;
 
     verify_root_hashes(&mut revision_tracker);
 
@@ -102,6 +102,7 @@ fn main() {
                 .unwrap();
         });
     });
+    Ok(())
 }
 
 struct RevisionTracker {
@@ -117,15 +118,15 @@ impl RevisionTracker {
         }
     }
 
-    fn create_revisions<K, V>(&mut self, iter: impl Iterator<Item = (K, V)>)
+    fn create_revisions<K, V>(&mut self, iter: impl Iterator<Item = (K, V)>) -> Result<(), DbError>
     where
         K: AsRef<[u8]>,
         V: AsRef<[u8]>,
     {
-        iter.for_each(|(k, v)| self.create_revision(k, v));
+        iter.map(|(k, v)| self.create_revision(k, v)).collect()
     }
 
-    fn create_revision<K, V>(&mut self, k: K, v: V)
+    fn create_revision<K, V>(&mut self, k: K, v: V) -> Result<(), DbError>
     where
         K: AsRef<[u8]>,
         V: AsRef<[u8]>,
@@ -134,11 +135,11 @@ impl RevisionTracker {
             key: k,
             value: v.as_ref().to_vec(),
         }];
-        let proposal = self.db.new_proposal(batch).unwrap();
-        proposal.commit().unwrap();
+        self.db.new_proposal(batch)?.commit()?;
 
         let hash = self.db.kv_root_hash().expect("root-hash should exist");
         self.hashes.push_front(hash);
+        Ok(())
     }
 
     fn commit_proposal(&mut self, proposal: Proposal) {
