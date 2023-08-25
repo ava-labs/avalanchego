@@ -35,7 +35,7 @@ func TestPoolHandlesRequests(t *testing.T) {
 
 	wg.Wait()
 	for i, res := range jobsDone {
-		require.True(t, res, fmt.Sprintf("job %v not done", i))
+		require.True(t, res, "job %d not done", i)
 	}
 	p.Shutdown()
 }
