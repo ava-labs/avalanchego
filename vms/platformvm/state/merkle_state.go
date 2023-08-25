@@ -1642,5 +1642,12 @@ func (ms *merkleState) updateValidatorSet(
 			return fmt.Errorf("failed to update validator weight: %w", err)
 		}
 	}
+
+	primaryValidators, ok := ms.cfg.Validators.Get(constants.PrimaryNetworkID)
+	if !ok {
+		return nil
+	}
+	ms.metrics.SetLocalStake(primaryValidators.GetWeight(ms.ctx.NodeID))
+	ms.metrics.SetTotalStake(primaryValidators.Weight())
 	return nil
 }
