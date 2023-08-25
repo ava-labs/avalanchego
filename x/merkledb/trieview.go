@@ -918,7 +918,7 @@ func (t *trieView) recordNodeDeleted(after *node) error {
 }
 
 // Records that the node associated with the given key has been changed.
-// if it is an existing node, record what its value was before it was changed
+// If it is an existing node, record what its value was before it was changed.
 // Must not be called after [calculateNodeIDs] has returned.
 func (t *trieView) recordKeyChange(key path, after *node, hadValue bool, newNode bool) error {
 	if t.nodesAlreadyCalculated.Get() {
