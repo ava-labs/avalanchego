@@ -1,4 +1,4 @@
-use std::ops::Index;
+use std::{iter::FusedIterator, ops::Index};
 
 static NIBBLES: [u8; 16] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 
@@ -29,6 +29,9 @@ static NIBBLES: [u8; 16] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15
 /// // nibbles can also be indexed
 ///
 /// assert_eq!(nib[1], 0x6);
+///
+/// // or reversed
+/// assert_eq!(nib.iter().rev().next(), Some(0x8));
 /// # }
 /// ```
 #[derive(Debug)]
@@ -51,7 +54,11 @@ impl<'a, const LEADING_ZEROES: usize> Index<usize> for Nibbles<'a, LEADING_ZEROE
 impl<'a, const LEADING_ZEROES: usize> Nibbles<'a, LEADING_ZEROES> {
     #[must_use]
     pub fn iter(&self) -> NibblesIterator<'_, LEADING_ZEROES> {
-        NibblesIterator { data: self, pos: 0 }
+        NibblesIterator {
+            data: self,
+            head: 0,
+            tail: self.len(),
+        }
     }
 
     #[must_use]
@@ -71,33 +78,57 @@ impl<'a, const LEADING_ZEROES: usize> Nibbles<'a, LEADING_ZEROES> {
 
 /// An interator returned by [Nibbles::iter]
 /// See their documentation for details.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct NibblesIterator<'a, const LEADING_ZEROES: usize> {
     data: &'a Nibbles<'a, LEADING_ZEROES>,
-    pos: usize,
+    head: usize,
+    tail: usize,
 }
+
+impl<'a, const LEADING_ZEROES: usize> FusedIterator for NibblesIterator<'a, LEADING_ZEROES> {}
 
 impl<'a, const LEADING_ZEROES: usize> Iterator for NibblesIterator<'a, LEADING_ZEROES> {
     type Item = u8;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let result = if self.pos >= LEADING_ZEROES + self.data.0.len() * 2 {
-            None
-        } else {
-            Some(self.data[self.pos])
-        };
-        self.pos += 1;
+        if self.is_empty() {
+            return None;
+        }
+        let result = Some(self.data[self.head]);
+        self.head += 1;
         result
     }
 
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        self.pos += n;
+        self.head += std::cmp::min(n, self.tail - self.head);
         self.next()
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let remaining = self.data.len() - self.pos;
+        let remaining = self.tail - self.head;
         (remaining, Some(remaining))
+    }
+}
+
+impl<'a, const LEADING_ZEROES: usize> NibblesIterator<'a, LEADING_ZEROES> {
+    #[inline(always)]
+    fn is_empty(&self) -> bool {
+        self.head == self.tail
+    }
+}
+
+impl<'a, const LEADING_ZEROES: usize> DoubleEndedIterator for NibblesIterator<'a, LEADING_ZEROES> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        if self.is_empty() {
+            return None;
+        }
+        self.tail -= 1;
+        Some(self.data[self.tail])
+    }
+
+    fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
+        self.tail -= std::cmp::min(n, self.tail - self.head);
+        self.next_back()
     }
 }
 
@@ -166,5 +197,14 @@ mod test {
         assert_eq!((9, Some(9)), nib_iter.size_hint());
         let _ = nib_iter.next();
         assert_eq!((8, Some(8)), nib_iter.size_hint());
+    }
+
+    #[test]
+    fn backwards() {
+        let nib = Nibbles::<1>(&TEST_BYTES);
+        let nib_iter = nib.iter().rev();
+        let expected = [0xf, 0xe, 0xe, 0xb, 0xd, 0xa, 0xe, 0xd, 0x0];
+
+        assert!(nib_iter.eq(expected));
     }
 }
