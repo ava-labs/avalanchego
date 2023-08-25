@@ -25,6 +25,14 @@ const (
 	minByteSliceLen      = minVarIntLen
 	minDBNodeLen         = minMaybeByteSliceLen + minVarIntLen
 	minChildLen          = minVarIntLen + minSerializedPathLen + ids.IDLen
+
+	estimatedKeyLen            = 64
+	estimatedValueLen          = 64
+	estimatedCompressedPathLen = 8
+	// Child index, child compressed path, child ID
+	estimatedNodeChildLen = minVarIntLen + estimatedCompressedPathLen + ids.IDLen
+	// Child index, child ID
+	hashValuesChildLen = minVarIntLen + ids.IDLen
 )
 
 var (
@@ -33,7 +41,6 @@ var (
 	trueBytes  = []byte{trueByte}
 	falseBytes = []byte{falseByte}
 
-	errDecodeNil            = errors.New("can't decode nil")
 	errNegativeNumChildren  = errors.New("number of children is negative")
 	errTooManyChildren      = fmt.Errorf("length of children list is larger than branching factor of %d", NodeBranchFactor)
 	errChildIndexTooLarge   = fmt.Errorf("invalid child index. Must be less than branching factor of %d", NodeBranchFactor)
@@ -61,6 +68,7 @@ type encoder interface {
 }
 
 type decoder interface {
+	// Assumes [n] is non-nil.
 	decodeDBNode(bytes []byte, n *dbNode) error
 }
 
@@ -81,15 +89,22 @@ type codecImpl struct {
 }
 
 func (c *codecImpl) encodeDBNode(n *dbNode) []byte {
-	buf := &bytes.Buffer{}
+	var (
+		numChildren = len(n.children)
+		// Estimate size of [n] to prevent memory allocations
+		estimatedLen = estimatedValueLen + minVarIntLen + estimatedNodeChildLen*numChildren
+		buf          = bytes.NewBuffer(make([]byte, 0, estimatedLen))
+	)
+
 	c.encodeMaybeByteSlice(buf, n.value)
-	childrenLength := len(n.children)
-	c.encodeInt(buf, childrenLength)
+	c.encodeInt(buf, numChildren)
+	// Note we insert children in order of increasing index
+	// for determinism.
 	for index := byte(0); index < NodeBranchFactor; index++ {
 		if entry, ok := n.children[index]; ok {
 			c.encodeInt(buf, int(index))
 			path := entry.compressedPath.Serialize()
-			c.encodeSerializedPath(path, buf)
+			c.encodeSerializedPath(buf, path)
 			_, _ = buf.Write(entry.id[:])
 		}
 	}
@@ -97,10 +112,14 @@ func (c *codecImpl) encodeDBNode(n *dbNode) []byte {
 }
 
 func (c *codecImpl) encodeHashValues(hv *hashValues) []byte {
-	buf := &bytes.Buffer{}
+	var (
+		numChildren = len(hv.Children)
+		// Estimate size [hv] to prevent memory allocations
+		estimatedLen = minVarIntLen + numChildren*hashValuesChildLen + estimatedValueLen + estimatedKeyLen
+		buf          = bytes.NewBuffer(make([]byte, 0, estimatedLen))
+	)
 
-	length := len(hv.Children)
-	c.encodeInt(buf, length)
+	c.encodeInt(buf, numChildren)
 
 	// ensure that the order of entries is consistent
 	for index := byte(0); index < NodeBranchFactor; index++ {
@@ -110,33 +129,28 @@ func (c *codecImpl) encodeHashValues(hv *hashValues) []byte {
 		}
 	}
 	c.encodeMaybeByteSlice(buf, hv.Value)
-	c.encodeSerializedPath(hv.Key, buf)
+	c.encodeSerializedPath(buf, hv.Key)
 
 	return buf.Bytes()
 }
 
 func (c *codecImpl) decodeDBNode(b []byte, n *dbNode) error {
-	if n == nil {
-		return errDecodeNil
-	}
 	if minDBNodeLen > len(b) {
 		return io.ErrUnexpectedEOF
 	}
 
-	var (
-		src = bytes.NewReader(b)
-		err error
-	)
+	src := bytes.NewReader(b)
 
-	if n.value, err = c.decodeMaybeByteSlice(src); err != nil {
-		return err
-	}
-
-	numChildren, err := c.decodeInt(src)
+	value, err := c.decodeMaybeByteSlice(src)
 	if err != nil {
 		return err
 	}
+	n.value = value
+
+	numChildren, err := c.decodeInt(src)
 	switch {
+	case err != nil:
+		return err
 	case numChildren < 0:
 		return errNegativeNumChildren
 	case numChildren > NodeBranchFactor:
@@ -148,21 +162,21 @@ func (c *codecImpl) decodeDBNode(b []byte, n *dbNode) error {
 	n.children = make(map[byte]child, NodeBranchFactor)
 	previousChild := -1
 	for i := 0; i < numChildren; i++ {
-		var index int
-		if index, err = c.decodeInt(src); err != nil {
+		index, err := c.decodeInt(src)
+		if err != nil {
 			return err
 		}
-		if index <= previousChild || index > NodeBranchFactor-1 {
+		if index <= previousChild || index >= NodeBranchFactor {
 			return errChildIndexTooLarge
 		}
 		previousChild = index
 
-		var compressedPath SerializedPath
-		if compressedPath, err = c.decodeSerializedPath(src); err != nil {
+		compressedPath, err := c.decodeSerializedPath(src)
+		if err != nil {
 			return err
 		}
-		var childID ids.ID
-		if childID, err = c.decodeID(src); err != nil {
+		childID, err := c.decodeID(src)
+		if err != nil {
 			return err
 		}
 		n.children[byte(index)] = child{
@@ -173,7 +187,7 @@ func (c *codecImpl) decodeDBNode(b []byte, n *dbNode) error {
 	if src.Len() != 0 {
 		return errExtraSpace
 	}
-	return err
+	return nil
 }
 
 func (*codecImpl) encodeBool(dst *bytes.Buffer, value bool) {
@@ -186,16 +200,14 @@ func (*codecImpl) encodeBool(dst *bytes.Buffer, value bool) {
 
 func (*codecImpl) decodeBool(src *bytes.Reader) (bool, error) {
 	boolByte, err := src.ReadByte()
-	if err == io.EOF {
+	switch {
+	case err == io.EOF:
 		return false, io.ErrUnexpectedEOF
-	}
-	if err != nil {
+	case err != nil:
 		return false, err
-	}
-	switch boolByte {
-	case trueByte:
+	case boolByte == trueByte:
 		return true, nil
-	case falseByte:
+	case boolByte == falseByte:
 		return false, nil
 	default:
 		return false, errInvalidBool
@@ -249,8 +261,9 @@ func (c *codecImpl) encodeInt64(dst *bytes.Buffer, value int64) {
 }
 
 func (c *codecImpl) encodeMaybeByteSlice(dst *bytes.Buffer, maybeValue maybe.Maybe[[]byte]) {
-	c.encodeBool(dst, !maybeValue.IsNothing())
-	if maybeValue.HasValue() {
+	hasValue := maybeValue.HasValue()
+	c.encodeBool(dst, hasValue)
+	if hasValue {
 		c.encodeByteSlice(dst, maybeValue.Value())
 	}
 }
@@ -277,19 +290,12 @@ func (c *codecImpl) decodeByteSlice(src *bytes.Reader) ([]byte, error) {
 		return nil, io.ErrUnexpectedEOF
 	}
 
-	var (
-		length int
-		err    error
-		result []byte
-	)
-	if length, err = c.decodeInt(src); err != nil {
-		if err == io.EOF {
-			return nil, io.ErrUnexpectedEOF
-		}
-		return nil, err
-	}
-
+	length, err := c.decodeInt(src)
 	switch {
+	case err == io.EOF:
+		return nil, io.ErrUnexpectedEOF
+	case err != nil:
+		return nil, err
 	case length < 0:
 		return nil, errNegativeSliceLength
 	case length == 0:
@@ -298,14 +304,12 @@ func (c *codecImpl) decodeByteSlice(src *bytes.Reader) ([]byte, error) {
 		return nil, io.ErrUnexpectedEOF
 	}
 
-	result = make([]byte, length)
-	if _, err := io.ReadFull(src, result); err != nil {
-		if err == io.EOF {
-			err = io.ErrUnexpectedEOF
-		}
-		return nil, err
+	result := make([]byte, length)
+	_, err = io.ReadFull(src, result)
+	if err == io.EOF {
+		err = io.ErrUnexpectedEOF
 	}
-	return result, nil
+	return result, err
 }
 
 func (c *codecImpl) encodeByteSlice(dst *bytes.Buffer, value []byte) {
@@ -321,16 +325,14 @@ func (*codecImpl) decodeID(src *bytes.Reader) (ids.ID, error) {
 	}
 
 	var id ids.ID
-	if _, err := io.ReadFull(src, id[:]); err != nil {
-		if err == io.EOF {
-			err = io.ErrUnexpectedEOF
-		}
-		return id, err
+	_, err := io.ReadFull(src, id[:])
+	if err == io.EOF {
+		err = io.ErrUnexpectedEOF
 	}
-	return id, nil
+	return id, err
 }
 
-func (c *codecImpl) encodeSerializedPath(s SerializedPath, dst *bytes.Buffer) {
+func (c *codecImpl) encodeSerializedPath(dst *bytes.Buffer, s SerializedPath) {
 	c.encodeInt(dst, s.NibbleLength)
 	_, _ = dst.Write(s.Value)
 }
@@ -345,10 +347,10 @@ func (c *codecImpl) decodeSerializedPath(src *bytes.Reader) (SerializedPath, err
 		err    error
 	)
 	if result.NibbleLength, err = c.decodeInt(src); err != nil {
-		return result, err
+		return SerializedPath{}, err
 	}
 	if result.NibbleLength < 0 {
-		return result, errNegativeNibbleLength
+		return SerializedPath{}, errNegativeNibbleLength
 	}
 	pathBytesLen := result.NibbleLength >> 1
 	hasOddLen := result.hasOddLength()
@@ -356,19 +358,19 @@ func (c *codecImpl) decodeSerializedPath(src *bytes.Reader) (SerializedPath, err
 		pathBytesLen++
 	}
 	if pathBytesLen > src.Len() {
-		return result, io.ErrUnexpectedEOF
+		return SerializedPath{}, io.ErrUnexpectedEOF
 	}
 	result.Value = make([]byte, pathBytesLen)
 	if _, err := io.ReadFull(src, result.Value); err != nil {
 		if err == io.EOF {
 			err = io.ErrUnexpectedEOF
 		}
-		return result, err
+		return SerializedPath{}, err
 	}
 	if hasOddLen {
 		paddedNibble := result.Value[pathBytesLen-1] & 0x0F
 		if paddedNibble != 0 {
-			return result, errNonZeroNibblePadding
+			return SerializedPath{}, errNonZeroNibblePadding
 		}
 	}
 	return result, nil

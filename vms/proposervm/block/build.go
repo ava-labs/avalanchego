@@ -6,10 +6,10 @@ package block
 import (
 	"crypto"
 	"crypto/rand"
-	"crypto/x509"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -42,7 +42,7 @@ func Build(
 	parentID ids.ID,
 	timestamp time.Time,
 	pChainHeight uint64,
-	cert *x509.Certificate,
+	cert *staking.Certificate,
 	blockBytes []byte,
 	chainID ids.ID,
 	key crypto.Signer,
