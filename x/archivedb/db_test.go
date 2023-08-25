@@ -13,7 +13,7 @@ import (
 )
 
 func getBasicDB() (*archiveDB, error) {
-	return newDatabase(
+	return NewArchiveDB(
 		context.Background(),
 		memdb.New(),
 	)
