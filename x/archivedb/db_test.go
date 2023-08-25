@@ -1,5 +1,6 @@
 // Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
+
 package archivedb
 
 import (
@@ -23,30 +24,36 @@ func TestDbEntries(t *testing.T) {
 	db, err := getBasicDB()
 	require.NoError(t, err)
 
-	writer := db.NewBatch()
+	writer, err := db.NewBatch()
+	require.NoError(t, err)
 	require.Equal(t, writer.Height(), uint64(1))
 	require.NoError(t, writer.Write())
 
-	writer = db.NewBatch()
+	writer, err = db.NewBatch()
+	require.NoError(t, err)
 	require.NoError(t, writer.Put([]byte("key1"), []byte("value1@10")))
 	require.NoError(t, writer.Put([]byte("key2"), []byte("value2@10")))
 	require.Equal(t, writer.Height(), uint64(2))
 	require.NoError(t, writer.Write())
 
-	writer = db.NewBatch()
+	writer, err = db.NewBatch()
+	require.NoError(t, err)
 	require.Equal(t, writer.Height(), uint64(3))
 	require.NoError(t, writer.Write())
 
-	writer = db.NewBatch()
+	writer, err = db.NewBatch()
+	require.NoError(t, err)
 	require.NoError(t, writer.Put([]byte("key1"), []byte("value1@100")))
 	require.Equal(t, writer.Height(), uint64(4))
 	require.NoError(t, writer.Write())
 
-	writer = db.NewBatch()
+	writer, err = db.NewBatch()
+	require.NoError(t, err)
 	require.Equal(t, writer.Height(), uint64(5))
 	require.NoError(t, writer.Write())
 
-	writer = db.NewBatch()
+	writer, err = db.NewBatch()
+	require.NoError(t, err)
 	require.NoError(t, writer.Put([]byte("key1"), []byte("value1@1000")))
 	require.NoError(t, writer.Put([]byte("key2"), []byte("value2@1000")))
 	require.Equal(t, writer.Height(), uint64(6))
@@ -83,18 +90,21 @@ func TestDelete(t *testing.T) {
 	db, err := getBasicDB()
 	require.NoError(t, err)
 
-	writer := db.NewBatch()
+	writer, err := db.NewBatch()
+	require.NoError(t, err)
 	require.NoError(t, writer.Put([]byte("key1"), []byte("value1@10")))
 	require.NoError(t, writer.Put([]byte("key2"), []byte("value2@10")))
 	require.Equal(t, writer.Height(), uint64(1))
 	require.NoError(t, writer.Write())
 
-	writer = db.NewBatch()
+	writer, err = db.NewBatch()
+	require.NoError(t, err)
 	require.Equal(t, writer.Height(), uint64(2))
 	require.NoError(t, writer.Put([]byte("key1"), []byte("value1@100")))
 	require.NoError(t, writer.Write())
 
-	writer = db.NewBatch()
+	writer, err = db.NewBatch()
+	require.NoError(t, err)
 	require.Equal(t, writer.Height(), uint64(3))
 	require.NoError(t, writer.Delete([]byte("key1")))
 	require.NoError(t, writer.Delete([]byte("key2")))
