@@ -330,19 +330,34 @@ func (mr *MockMerkleDBMockRecorder) NewIteratorWithStartAndPrefix(arg0, arg1 int
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewIteratorWithStartAndPrefix", reflect.TypeOf((*MockMerkleDB)(nil).NewIteratorWithStartAndPrefix), arg0, arg1)
 }
 
-// NewView mocks base method.
-func (m *MockMerkleDB) NewView(arg0 context.Context, arg1 []database.BatchOp) (TrieView, error) {
+// NewViewFromBatchOps mocks base method.
+func (m *MockMerkleDB) NewViewFromBatchOps(arg0 context.Context, arg1 []database.BatchOp, arg2 bool) (TrieView, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "NewView", arg0, arg1)
+	ret := m.ctrl.Call(m, "NewViewFromBatchOps", arg0, arg1, arg2)
 	ret0, _ := ret[0].(TrieView)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// NewView indicates an expected call of NewView.
-func (mr *MockMerkleDBMockRecorder) NewView(arg0, arg1 interface{}) *gomock.Call {
+// NewViewFromBatchOps indicates an expected call of NewViewFromBatchOps.
+func (mr *MockMerkleDBMockRecorder) NewViewFromBatchOps(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewView", reflect.TypeOf((*MockMerkleDB)(nil).NewView), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewViewFromBatchOps", reflect.TypeOf((*MockMerkleDB)(nil).NewViewFromBatchOps), arg0, arg1, arg2)
+}
+
+// NewViewFromMap mocks base method.
+func (m *MockMerkleDB) NewViewFromMap(arg0 context.Context, arg1 map[string]ChangeOp, arg2 bool) (TrieView, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "NewViewFromMap", arg0, arg1, arg2)
+	ret0, _ := ret[0].(TrieView)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// NewViewFromMap indicates an expected call of NewViewFromMap.
+func (mr *MockMerkleDBMockRecorder) NewViewFromMap(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewViewFromMap", reflect.TypeOf((*MockMerkleDB)(nil).NewViewFromMap), arg0, arg1, arg2)
 }
 
 // Put mocks base method.
