@@ -5,14 +5,11 @@ package merkledb
 
 import (
 	"context"
-	"errors"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 )
-
-var errNoNewRoot = errors.New("there was no updated root in change list")
 
 type MerkleRootGetter interface {
 	// GetMerkleRoot returns the merkle root of the Trie
@@ -62,10 +59,7 @@ type Trie interface {
 
 	// NewViewFromMap returns a new view on top of this Trie where the passed changes have been applied
 	// if copyBytes is true, code will duplicate any passed []byte so that editing in calling code is safe
-	NewViewFromMap(ctx context.Context, changes map[string]struct {
-		Value  []byte
-		Delete bool
-	}, copyBytes bool) (TrieView, error)
+	NewViewFromMap(ctx context.Context, changes map[string]ChangeOp, copyBytes bool) (TrieView, error)
 }
 
 type TrieView interface {

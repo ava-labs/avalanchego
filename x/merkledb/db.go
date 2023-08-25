@@ -49,8 +49,14 @@ var (
 	hadCleanShutdown        = []byte{1}
 	didNotHaveCleanShutdown = []byte{0}
 
-	errSameRoot = errors.New("start and end root are the same")
+	errSameRoot  = errors.New("start and end root are the same")
+	errNoNewRoot = errors.New("there was no updated root in change list")
 )
+
+type ChangeOp struct {
+	Value  []byte
+	Delete bool
+}
 
 type ChangeProofer interface {
 	// GetChangeProof returns a proof for a subset of the key/value changes in key range
@@ -675,11 +681,7 @@ func (db *merkleDB) newUntrackedView(batchOps []database.BatchOp, copyBytes bool
 // Changes made to the view will only be reflected in the original trie if Commit is called.
 // if copyBytes is true, code will duplicate any passed []byte so that editing in calling code is safe
 // Assumes [db.commitLock] and [db.lock] aren't held.
-func (db *merkleDB) NewViewFromMap(_ context.Context, changes map[string]struct {
-	Value  []byte
-	Delete bool
-}, copyBytes bool,
-) (TrieView, error) {
+func (db *merkleDB) NewViewFromMap(_ context.Context, changes map[string]ChangeOp, copyBytes bool) (TrieView, error) {
 	return db.newView(func() (*trieView, error) {
 		return newTrieViewFromMap(db, db, db.root.clone(), changes, copyBytes)
 	})
