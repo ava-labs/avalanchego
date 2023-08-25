@@ -28,7 +28,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -63,7 +62,6 @@ var (
 	errBootstrapping             = errors.New("chain is currently bootstrapping")
 
 	_ vertex.LinearizableVMWithEngine = (*VM)(nil)
-	_ block.HeightIndexedChainVM      = (*VM)(nil)
 )
 
 type VM struct {
