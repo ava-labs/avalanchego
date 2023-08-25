@@ -56,11 +56,6 @@ var (
 	errInvalidKeypair              = fmt.Errorf("%q and %q must be provided together or not at all", config.StakingTLSKeyContentKey, config.StakingCertContentKey)
 )
 
-func init() {
-	// Arbitrarily large amount of AVAX (10^30) to fund keys on the C-Chain for testing
-	DefaultFundedKeyCChainAmount.Exp(big.NewInt(10), big.NewInt(30), nil)
-}
-
 // Defines a mapping of flag keys to values intended to be supplied to
 // an invocation of an AvalancheGo node.
 type FlagsMap map[string]interface{}
@@ -149,7 +144,7 @@ func (c *NetworkConfig) EnsureGenesis(networkID uint32, validatorIDs []ids.NodeI
 	for _, key := range c.FundedKeys {
 		xChainBalances[key.Address()] = DefaultFundedKeyXChainAmount
 		cChainBalances[evm.GetEthAddress(key)] = core.GenesisAccount{
-			Balance: &DefaultFundedKeyCChainAmount,
+			Balance: DefaultFundedKeyCChainAmount,
 		}
 	}
 
