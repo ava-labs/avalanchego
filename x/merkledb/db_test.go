@@ -855,10 +855,10 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 			for key, value := range values {
 				ops = append(ops, database.BatchOp{Key: key.Serialize().Value, Value: value})
 			}
-			NewViewFromBatchOps, err := dbTrie.NewViewFromBatchOps(context.Background(), ops, true)
+			newView, err := dbTrie.NewViewFromBatchOps(context.Background(), ops, true)
 			require.NoError(err)
 
-			calculatedRoot, err := NewViewFromBatchOps.GetMerkleRoot(context.Background())
+			calculatedRoot, err := newView.GetMerkleRoot(context.Background())
 			require.NoError(err)
 			dbRoot, err := db.GetMerkleRoot(context.Background())
 			require.NoError(err)
