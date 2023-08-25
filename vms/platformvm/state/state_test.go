@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -170,7 +171,9 @@ func newStateFromDB(require *require.Assertions, db database.Database) State {
 			Validators: vdrs,
 		},
 		execCfg,
-		&snow.Context{},
+		&snow.Context{
+			Log: logging.NoLog{},
+		},
 		prometheus.NewRegistry(),
 		reward.NewCalculator(reward.Config{
 			MaxConsumptionRate: .12 * reward.PercentDenominator,

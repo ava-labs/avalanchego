@@ -158,6 +158,8 @@ func (ms *merkleState) load() error {
 		ms.loadCurrentStakers(),
 		ms.loadPendingStakers(),
 		ms.initValidatorSets(),
+
+		ms.logMerkleRoot(),
 	)
 	return errs.Err
 }

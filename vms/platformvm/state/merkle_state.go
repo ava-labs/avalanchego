@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/cache/metercacher"
@@ -1244,6 +1245,8 @@ func (ms *merkleState) writeMerkleState(currentData, pendingData map[ids.ID]*sta
 		ms.writeDelegateeRewards(&batchOps),
 		ms.writeUTXOs(&batchOps),
 		ms.writeRewardUTXOs(&batchOps),
+
+		ms.logMerkleRoot(),
 	)
 	if errs.Err != nil {
 		return errs.Err
@@ -1252,7 +1255,7 @@ func (ms *merkleState) writeMerkleState(currentData, pendingData map[ids.ID]*sta
 	ctx := context.TODO()
 	view, err := ms.merkleDB.NewView(ctx, batchOps)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed creating merkleDB view: %w", err)
 	}
 
 	return view.CommitToDB(ctx)
@@ -1649,5 +1652,30 @@ func (ms *merkleState) updateValidatorSet(
 	}
 	ms.metrics.SetLocalStake(primaryValidators.GetWeight(ms.ctx.NodeID))
 	ms.metrics.SetTotalStake(primaryValidators.Weight())
+	return nil
+}
+
+func (ms *merkleState) logMerkleRoot() error {
+	ctx := context.TODO()
+	view, err := ms.merkleDB.NewView(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed creating merkleDB view: %w", err)
+	}
+	root, err := view.GetMerkleRoot(ctx)
+	if err != nil {
+		return fmt.Errorf("failed pulling merkle root: %w", err)
+	}
+
+	// get current Height
+	blk, err := ms.GetStatelessBlock(ms.GetLastAccepted())
+	if err != nil {
+		// may happen in tests. Let's just skip
+		return nil
+	}
+
+	ms.ctx.Log.Info("merkle root",
+		zap.Uint64("height", blk.Height()),
+		zap.String("merkle root", root.String()),
+	)
 	return nil
 }
