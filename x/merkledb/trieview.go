@@ -106,10 +106,7 @@ type trieView struct {
 	root *node
 }
 
-// NewView returns a new view on top of this one.
-// Adds the new view to [t.childViews].
-// Assumes [t.commitLock] isn't held.
-func (t *trieView) NewView(ctx context.Context, batchOps []database.BatchOp) (TrieView, error) {
+func (t *trieView) commonNewView(ctx context.Context, applyToParent func() (TrieView, error), newView func() (*trieView, error)) (TrieView, error) {
 	if t.isInvalid() {
 		return nil, ErrInvalid
 	}
@@ -117,14 +114,14 @@ func (t *trieView) NewView(ctx context.Context, batchOps []database.BatchOp) (Tr
 	defer t.commitLock.RUnlock()
 
 	if t.committed {
-		return t.getParentTrie().NewView(ctx, batchOps)
+		return applyToParent()
 	}
 
 	if err := t.calculateNodeIDs(ctx); err != nil {
 		return nil, err
 	}
 
-	newView, err := newTrieView(t.db, t, t.root.clone(), batchOps)
+	nv, err := newView()
 	if err != nil {
 		return nil, err
 	}
@@ -135,17 +132,91 @@ func (t *trieView) NewView(ctx context.Context, batchOps []database.BatchOp) (Tr
 	if t.invalidated {
 		return nil, ErrInvalid
 	}
-	t.childViews = append(t.childViews, newView)
+	t.childViews = append(t.childViews, nv)
 
+	return nv, nil
+}
+
+// NewViewFromMap returns a new view on top of this one.
+// if copyBytes is true, code will duplicate any passed []byte so that editing in calling code is safe
+// Adds the new view to [t.childViews].
+// Assumes [t.commitLock] isn't held.
+func (t *trieView) NewViewFromMap(
+	ctx context.Context, changes map[string]struct {
+		Value  []byte
+		Delete bool
+	},
+	copyBytes bool,
+) (TrieView, error) {
+	return t.commonNewView(
+		ctx,
+		func() (TrieView, error) {
+			return t.getParentTrie().NewViewFromMap(ctx, changes, copyBytes)
+		},
+		func() (*trieView, error) {
+			return newTrieViewFromMap(t.db, t, t.root.clone(), changes, copyBytes)
+		})
+}
+
+func newTrieViewFromMap(
+	db *merkleDB,
+	parentTrie TrieView,
+	root *node,
+	changes map[string]struct {
+		Value  []byte
+		Delete bool
+	},
+	copyBytes bool,
+) (*trieView, error) {
+	if root == nil {
+		return nil, ErrNoValidRoot
+	}
+
+	newView := &trieView{
+		root:       root,
+		db:         db,
+		parentTrie: parentTrie,
+		changes:    newChangeSummary(len(changes)),
+	}
+
+	for key, op := range changes {
+		newVal := maybe.Nothing[[]byte]()
+		if !op.Delete {
+			val := op.Value
+			if copyBytes {
+				val = slices.Clone(op.Value)
+			}
+			newVal = maybe.Some(val)
+		}
+		if err := newView.recordValueChange(newPath([]byte(key)), newVal); err != nil {
+			return nil, err
+		}
+	}
 	return newView, nil
 }
 
+// NewViewFromBatchOps returns a new view on top of this one.
+// if copyBytes is true, code will duplicate any passed []byte so that editing in calling code is safe
+// Adds the new view to [t.childViews].
+// Assumes [t.commitLock] isn't held.
+func (t *trieView) NewViewFromBatchOps(ctx context.Context, batchOps []database.BatchOp, copyBytes bool) (TrieView, error) {
+	return t.commonNewView(
+		ctx,
+		func() (TrieView, error) {
+			return t.getParentTrie().NewViewFromBatchOps(ctx, batchOps, copyBytes)
+		},
+		func() (*trieView, error) {
+			return newTrieViewFromBatchOps(t.db, t, t.root.clone(), batchOps, copyBytes)
+		})
+}
+
 // Creates a new view with the given [parentTrie].
-func newTrieView(
+func newTrieViewFromBatchOps(
 	db *merkleDB,
 	parentTrie TrieView,
 	root *node,
 	batchOps []database.BatchOp,
+	copyBytes bool,
 ) (*trieView, error) {
 	if root == nil {
 		return nil, ErrNoValidRoot
@@ -161,7 +232,11 @@ func newTrieView(
 	for _, op := range batchOps {
 		newVal := maybe.Nothing[[]byte]()
 		if !op.Delete {
-			newVal = maybe.Some(slices.Clone(op.Value))
+			val := op.Value
+			if copyBytes {
+				val = slices.Clone(op.Value)
+			}
+			newVal = maybe.Some(val)
 		}
 		if err := newView.recordValueChange(newPath(op.Key), newVal); err != nil {
 			return nil, err
@@ -219,10 +294,8 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 				if err = t.remove(key); err != nil {
 					return
 				}
-			} else {
-				if _, err = t.insert(key, change.after); err != nil {
-					return
-				}
+			} else if _, err = t.insert(key, change.after); err != nil {
+				return
 			}
 		}
 

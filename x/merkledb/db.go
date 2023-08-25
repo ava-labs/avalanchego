@@ -38,7 +38,6 @@ const (
 )
 
 var (
-	_ TrieView = (*merkleDB)(nil)
 	_ MerkleDB = (*merkleDB)(nil)
 
 	codec = newCodec()
@@ -255,7 +254,7 @@ func (db *merkleDB) rebuild(ctx context.Context) error {
 
 	for it.Next() {
 		if len(currentOps) >= viewSizeLimit {
-			view, err := db.newUntrackedView(currentOps)
+			view, err := db.newUntrackedView(currentOps, false)
 			if err != nil {
 				return err
 			}
@@ -282,7 +281,7 @@ func (db *merkleDB) rebuild(ctx context.Context) error {
 	if err := it.Error(); err != nil {
 		return err
 	}
-	view, err := db.newUntrackedView(currentOps)
+	view, err := db.newUntrackedView(currentOps, false)
 	if err != nil {
 		return err
 	}
@@ -308,7 +307,7 @@ func (db *merkleDB) CommitChangeProof(ctx context.Context, proof *ChangeProof) e
 		}
 	}
 
-	view, err := db.newUntrackedView(ops)
+	view, err := db.newUntrackedView(ops, true)
 	if err != nil {
 		return err
 	}
@@ -349,7 +348,7 @@ func (db *merkleDB) CommitRangeProof(ctx context.Context, start maybe.Maybe[[]by
 	}
 
 	// Don't need to lock [view] because nobody else has a reference to it.
-	view, err := db.newUntrackedView(ops)
+	view, err := db.newUntrackedView(ops, true)
 	if err != nil {
 		return err
 	}
@@ -504,7 +503,7 @@ func (db *merkleDB) getProof(ctx context.Context, key []byte) (*Proof, error) {
 		return nil, database.ErrClosed
 	}
 
-	view, err := db.newUntrackedView(nil)
+	view, err := db.newUntrackedView(nil, false)
 	if err != nil {
 		return nil, err
 	}
@@ -655,15 +654,51 @@ func (db *merkleDB) GetChangeProof(
 	return result, nil
 }
 
-// NewView returns a new view on top of this trie.
+// NewViewFromBatchOps returns a new view on top of this trie.
+// Changes made to the view will only be reflected in the original trie if Commit is called.
+// if copyBytes is true, code will duplicate any passed []byte so that editing in calling code is safe
+// Assumes [db.commitLock] and [db.lock] aren't held.
+func (db *merkleDB) NewViewFromBatchOps(_ context.Context, batchOps []database.BatchOp, copyBytes bool) (TrieView, error) {
+	return db.newView(func() (*trieView, error) {
+		return newTrieViewFromBatchOps(db, db, db.root.clone(), batchOps, copyBytes)
+	})
+}
+
+// Returns a new view that isn't tracked in [db.childViews].
+// For internal use only, namely in methods that create short-lived views.
+// Assumes [db.lock] isn't held and [db.commitLock] is read locked.
+func (db *merkleDB) newUntrackedView(batchOps []database.BatchOp, copyBytes bool) (*trieView, error) {
+	return newTrieViewFromBatchOps(db, db, db.root.clone(), batchOps, copyBytes)
+}
+
+// NewViewFromMap returns a new view on top of this trie.
+// Changes made to the view will only be reflected in the original trie if Commit is called.
+// if copyBytes is true, code will duplicate any passed []byte so that editing in calling code is safe
+// Assumes [db.commitLock] and [db.lock] aren't held.
+func (db *merkleDB) NewViewFromMap(_ context.Context, changes map[string]struct {
+	Value  []byte
+	Delete bool
+}, copyBytes bool,
+) (TrieView, error) {
+	return db.newView(func() (*trieView, error) {
+		return newTrieViewFromMap(db, db, db.root.clone(), changes, copyBytes)
+	})
+}
+
+// newView returns a new view on top of this trie that has been added to childViews
+// Wrapper function for NewViewFromMap and NewViewFromBatchOps
 // Changes made to the view will only be reflected in the original trie if Commit is called.
 // Assumes [db.commitLock] and [db.lock] aren't held.
-func (db *merkleDB) NewView(_ context.Context, batchOps []database.BatchOp) (TrieView, error) {
+func (db *merkleDB) newView(createView func() (*trieView, error)) (TrieView, error) {
 	// ensure the db doesn't change while creating the new view
 	db.commitLock.RLock()
 	defer db.commitLock.RUnlock()
 
-	newView, err := db.newUntrackedView(batchOps)
+	if db.closed {
+		return nil, database.ErrClosed
+	}
+
+	newView, err := createView()
 	if err != nil {
 		return nil, err
 	}
@@ -673,21 +708,6 @@ func (db *merkleDB) NewView(_ context.Context, batchOps []database.BatchOp) (Tri
 	defer db.lock.Unlock()
 
 	db.childViews = append(db.childViews, newView)
-	return newView, nil
-}
-
-// Returns a new view that isn't tracked in [db.childViews].
-// For internal use only, namely in methods that create short-lived views.
-// Assumes [db.lock] isn't held and [db.commitLock] is read locked.
-func (db *merkleDB) newUntrackedView(batchOps []database.BatchOp) (*trieView, error) {
-	if db.closed {
-		return nil, database.ErrClosed
-	}
-
-	newView, err := newTrieView(db, db, db.root.clone(), batchOps)
-	if err != nil {
-		return nil, err
-	}
 	return newView, nil
 }
 
@@ -825,7 +845,8 @@ func (db *merkleDB) PutContext(ctx context.Context, k, v []byte) error {
 			Key:   k,
 			Value: v,
 		},
-	})
+	},
+		true)
 	if err != nil {
 		return err
 	}
@@ -849,7 +870,7 @@ func (db *merkleDB) DeleteContext(ctx context.Context, key []byte) error {
 			Key:    key,
 			Delete: true,
 		},
-	})
+	}, false)
 	if err != nil {
 		return err
 	}
@@ -864,7 +885,7 @@ func (db *merkleDB) commitBatch(ops []database.BatchOp) error {
 		return database.ErrClosed
 	}
 
-	view, err := db.newUntrackedView(ops)
+	view, err := db.newUntrackedView(ops, true)
 	if err != nil {
 		return err
 	}
@@ -1075,7 +1096,7 @@ func (db *merkleDB) VerifyChangeProof(
 	}
 
 	// Don't need to lock [view] because nobody else has a reference to it.
-	view, err := db.newUntrackedView(ops)
+	view, err := db.newUntrackedView(ops, true)
 	if err != nil {
 		return err
 	}
@@ -1184,7 +1205,8 @@ func (db *merkleDB) getHistoricalViewForRange(
 
 	// looking for the trie's current root id, so return the trie unmodified
 	if currentRootID == rootID {
-		return newTrieView(db, db, db.root.clone(), nil)
+		// create an empty trie
+		return newTrieViewFromBatchOps(db, db, db.root.clone(), nil, false)
 	}
 
 	changeHistory, err := db.history.getChangesToGetToRoot(rootID, start, end)

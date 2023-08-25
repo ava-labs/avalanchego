@@ -56,8 +56,16 @@ type ReadOnlyTrie interface {
 type Trie interface {
 	ReadOnlyTrie
 
-	// NewView returns a new view on top of this Trie with the specified changes
-	NewView(ctx context.Context, batchOps []database.BatchOp) (TrieView, error)
+	// NewViewFromBatchOps returns a new view on top of this Trie where the passed batchOps have been applied
+	// if copyBytes is true, code will duplicate any passed []byte so that editing in calling code is safe
+	NewViewFromBatchOps(ctx context.Context, batchOps []database.BatchOp, copyBytes bool) (TrieView, error)
+
+	// NewViewFromMap returns a new view on top of this Trie where the passed changes have been applied
+	// if copyBytes is true, code will duplicate any passed []byte so that editing in calling code is safe
+	NewViewFromMap(ctx context.Context, changes map[string]struct {
+		Value  []byte
+		Delete bool
+	}, copyBytes bool) (TrieView, error)
 }
 
 type TrieView interface {

@@ -179,7 +179,7 @@ func Test_Server_GetChangeProof(t *testing.T) {
 		require.NoError(t, it.Error())
 		it.Release()
 
-		view, err := trieDB.NewView(context.Background(), ops)
+		view, err := trieDB.NewViewFromBatchOps(context.Background(), ops, true)
 		require.NoError(t, err)
 		require.NoError(t, view.CommitToDB(context.Background()))
 	}

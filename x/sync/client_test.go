@@ -548,7 +548,7 @@ func TestGetChangeProof(t *testing.T) {
 		require.NoError(t, it.Error())
 		it.Release()
 
-		view, err := serverDB.NewView(context.Background(), ops)
+		view, err := serverDB.NewViewFromBatchOps(context.Background(), ops, true)
 		require.NoError(t, err)
 		require.NoError(t, view.CommitToDB(context.Background()))
 	}
