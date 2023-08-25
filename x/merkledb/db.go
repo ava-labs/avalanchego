@@ -251,6 +251,7 @@ func (db *merkleDB) rebuild(ctx context.Context) error {
 			}
 			intermediateBatch = db.baseDB.NewBatch()
 		}
+		count++
 		if err := intermediateBatch.Delete(intermediateNodeIt.Key()); err != nil {
 			return err
 		}
