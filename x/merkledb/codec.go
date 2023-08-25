@@ -17,6 +17,7 @@ import (
 )
 
 const (
+	boolLen              = 1
 	trueByte             = 1
 	falseByte            = 0
 	minVarIntLen         = 1
@@ -24,13 +25,13 @@ const (
 	minSerializedPathLen = minVarIntLen
 	minByteSliceLen      = minVarIntLen
 	minDBNodeLen         = minMaybeByteSliceLen + minVarIntLen
-	minChildLen          = minVarIntLen + minSerializedPathLen + ids.IDLen + 1
+	minChildLen          = minVarIntLen + minSerializedPathLen + ids.IDLen + boolLen
 
 	estimatedKeyLen            = 64
 	estimatedValueLen          = 64
 	estimatedCompressedPathLen = 8
 	// Child index, child compressed path, child ID
-	estimatedNodeChildLen = minVarIntLen + estimatedCompressedPathLen + ids.IDLen + 1
+	estimatedNodeChildLen = minVarIntLen + estimatedCompressedPathLen + ids.IDLen + boolLen
 	// Child index, child ID
 	hashValuesChildLen = minVarIntLen + ids.IDLen
 )
