@@ -49,6 +49,12 @@ type Config struct {
 	// this node will index per chain. If set to 0, the node will index all
 	// snowman++ blocks.
 	//
+	// Invariant: This value must be set such that the proposervm never needs to
+	// roll back more blocks than have been deleted. On startup, the proposervm
+	// rolls back it's accepted chain to match the innerVM's accepted chain. If
+	// the innerVM is not persisting its last accepted block quickly enough, the
+	// database can become corrupted.
+	//
 	// TODO: Move this flag once the proposervm is configurable on a per-chain
 	// basis.
 	ProposerNumHistoricalBlocks uint64 `json:"proposerNumHistoricalBlocks" yaml:"proposerNumHistoricalBlocks"`
