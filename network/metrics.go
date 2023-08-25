@@ -28,6 +28,7 @@ type metrics struct {
 	acceptFailed                    prometheus.Counter
 	inboundConnRateLimited          prometheus.Counter
 	inboundConnAllowed              prometheus.Counter
+	tlsConnRejected                 prometheus.Counter
 	numUselessPeerListBytes         prometheus.Counter
 	nodeUptimeWeightedAverage       prometheus.Gauge
 	nodeUptimeRewardingStake        prometheus.Gauge
@@ -95,6 +96,11 @@ func newMetrics(namespace string, registerer prometheus.Registerer, initialSubne
 			Name:      "inbound_conn_throttler_allowed",
 			Help:      "Times this node allowed (attempted to upgrade) an inbound connection",
 		}),
+		tlsConnRejected: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "tls_conn_rejected",
+			Help:      "Times this node rejected a connection due to an unsupported TLS certificate",
+		}),
 		numUselessPeerListBytes: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "num_useless_peerlist_bytes",
@@ -153,6 +159,7 @@ func newMetrics(namespace string, registerer prometheus.Registerer, initialSubne
 		registerer.Register(m.disconnected),
 		registerer.Register(m.acceptFailed),
 		registerer.Register(m.inboundConnAllowed),
+		registerer.Register(m.tlsConnRejected),
 		registerer.Register(m.numUselessPeerListBytes),
 		registerer.Register(m.inboundConnRateLimited),
 		registerer.Register(m.nodeUptimeWeightedAverage),

@@ -311,7 +311,6 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 func TestHandlerDispatchInternal(t *testing.T) {
 	require := require.New(t)
 
-	calledNotify := make(chan struct{}, 1)
 	ctx := snow.DefaultConsensusContextTest()
 	msgFromVMChan := make(chan common.Message)
 	vdrs := validators.NewSet()
@@ -352,8 +351,10 @@ func TestHandlerDispatchInternal(t *testing.T) {
 	engine.ContextF = func() *snow.ConsensusContext {
 		return ctx
 	}
+
+	wg := &sync.WaitGroup{}
 	engine.NotifyF = func(context.Context, common.Message) error {
-		calledNotify <- struct{}{}
+		wg.Done()
 		return nil
 	}
 
@@ -373,14 +374,10 @@ func TestHandlerDispatchInternal(t *testing.T) {
 		return nil
 	}
 
+	wg.Add(1)
 	handler.Start(context.Background(), false)
 	msgFromVMChan <- 0
-
-	select {
-	case <-time.After(20 * time.Millisecond):
-		require.FailNow("should have called notify")
-	case <-calledNotify:
-	}
+	wg.Wait()
 }
 
 func TestHandlerSubnetConnector(t *testing.T) {

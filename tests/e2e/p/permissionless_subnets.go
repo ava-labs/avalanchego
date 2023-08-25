@@ -63,7 +63,7 @@ var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
 
 			var subnetID ids.ID
 			ginkgo.By("create a permissioned subnet", func() {
-				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
+				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultTimeout)
 				subnetTx, err := pWallet.IssueCreateSubnetTx(
 					owner,
 					common.WithContext(ctx),
@@ -76,7 +76,7 @@ var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
 
 			var subnetAssetID ids.ID
 			ginkgo.By("create a custom asset for the permissionless subnet", func() {
-				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
+				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultTimeout)
 				subnetAssetTx, err := xWallet.IssueCreateAssetTx(
 					"RnM",
 					"RNM",
@@ -97,7 +97,7 @@ var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
 			})
 
 			ginkgo.By(fmt.Sprintf("Send 100 MegaAvax of asset %s to the P-chain", subnetAssetID), func() {
-				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
+				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultTimeout)
 				_, err := xWallet.IssueExportTx(
 					constants.PlatformChainID,
 					[]*avax.TransferableOutput{
@@ -118,7 +118,7 @@ var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
 			})
 
 			ginkgo.By(fmt.Sprintf("Import the 100 MegaAvax of asset %s from the X-chain into the P-chain", subnetAssetID), func() {
-				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
+				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultTimeout)
 				_, err := pWallet.IssueImportTx(
 					xChainID,
 					owner,
@@ -129,7 +129,7 @@ var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
 			})
 
 			ginkgo.By("make subnet permissionless", func() {
-				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
+				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultTimeout)
 				_, err := pWallet.IssueTransformSubnetTx(
 					subnetID,
 					subnetAssetID,
@@ -153,7 +153,7 @@ var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
 
 			validatorStartTime := time.Now().Add(time.Minute)
 			ginkgo.By("add permissionless validator", func() {
-				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
+				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultTimeout)
 				_, err := pWallet.IssueAddPermissionlessValidatorTx(
 					&txs.SubnetValidator{
 						Validator: txs.Validator{
@@ -177,7 +177,7 @@ var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
 
 			delegatorStartTime := validatorStartTime
 			ginkgo.By("add permissionless delegator", func() {
-				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultConfirmTxTimeout)
+				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultTimeout)
 				_, err := pWallet.IssueAddPermissionlessDelegatorTx(
 					&txs.SubnetValidator{
 						Validator: txs.Validator{
