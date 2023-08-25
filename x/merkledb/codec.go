@@ -29,7 +29,7 @@ const (
 	estimatedKeyLen            = 64
 	estimatedValueLen          = 64
 	estimatedCompressedPathLen = 8
-	// Child index, child compressed path, child ID
+	// Child index, child compressed path, child ID, child has value
 	estimatedNodeChildLen = minVarIntLen + estimatedCompressedPathLen + ids.IDLen + 1
 	// Child index, child ID
 	hashValuesChildLen = minVarIntLen + ids.IDLen
