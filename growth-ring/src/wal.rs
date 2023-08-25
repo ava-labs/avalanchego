@@ -254,8 +254,6 @@ impl<F: WalFile + 'static, S: WalStore<F>> WalFilePool<F, S> {
         block_nbit: u64,
         cache_size: NonZeroUsize,
     ) -> Result<Self, WalError> {
-        let file_nbit = file_nbit;
-        let block_nbit = block_nbit;
         let header_file = store.open_file("HEAD", true).await?;
         header_file.truncate(HEADER_SIZE).await?;
         Ok(WalFilePool {
@@ -1131,8 +1129,8 @@ impl WalLoader {
                                     die!()
                                 }
                                 chunks.push(chunk);
-                                let mut payload = Vec::new();
-                                payload.resize(chunks.iter().fold(0, |acc, v| acc + v.len()), 0);
+                                let mut payload =
+                                    vec![0; chunks.iter().fold(0, |acc, v| acc + v.len())];
                                 let mut ps = &mut payload[..];
                                 for c in chunks {
                                     ps[..c.len()].copy_from_slice(&c);

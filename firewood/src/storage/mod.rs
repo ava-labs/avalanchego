@@ -655,8 +655,7 @@ fn test_from_ash() {
     let max = rng.gen_range(min + PAGE_SIZE..min + 100 * PAGE_SIZE);
     for _ in 0..20 {
         let n = 20;
-        let mut canvas = Vec::new();
-        canvas.resize((max - min) as usize, 0);
+        let mut canvas = vec![0; (max - min) as usize];
         let mut writes: Vec<_> = Vec::new();
         for _ in 0..n {
             let l = rng.gen_range(min..max);

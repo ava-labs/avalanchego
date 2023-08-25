@@ -441,9 +441,7 @@ impl AioManager {
 
     pub fn read(&self, fd: RawFd, offset: u64, length: usize, priority: Option<u16>) -> AioFuture {
         let priority = priority.unwrap_or(0);
-        let mut data = Vec::new();
-        data.resize(length, 0);
-        let data = data.into_boxed_slice();
+        let data = vec![0; length].into_boxed_slice();
         let aio = Aio::new(
             self.scheduler_in.next_id(),
             fd,
@@ -481,8 +479,8 @@ impl AioManager {
         let w = self.notifier.waiting.lock();
         w.get(&aio_id).map(|state| {
             match state {
-                AioState::FutureInit(aio, _) => &**aio.data.as_ref().unwrap(),
-                AioState::FuturePending(aio, _, _) => &**aio.data.as_ref().unwrap(),
+                AioState::FutureInit(aio, _) => aio.data.as_ref().unwrap(),
+                AioState::FuturePending(aio, _, _) => aio.data.as_ref().unwrap(),
                 AioState::FutureDone(res) => &res.1,
             }
             .to_vec()

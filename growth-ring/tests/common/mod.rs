@@ -331,10 +331,8 @@ pub struct Canvas {
 
 impl Canvas {
     pub fn new(size: usize) -> Self {
-        let mut canvas = Vec::new();
-        // fill the backgroudn color 0
-        canvas.resize(size, 0);
-        let canvas = canvas.into_boxed_slice();
+        let canvas = vec![0; size].into_boxed_slice();
+        // fill the background color 0
         Canvas {
             waiting: HashMap::new(),
             queue: IndexMap::new(),

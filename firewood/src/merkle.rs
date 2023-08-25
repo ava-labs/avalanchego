@@ -1318,8 +1318,7 @@ mod test {
     #[test]
     fn test_merkle_node_encoding() {
         let check = |node: Node| {
-            let mut bytes = Vec::new();
-            bytes.resize(node.dehydrated_len() as usize, 0);
+            let mut bytes = vec![0; node.dehydrated_len() as usize];
             node.dehydrate(&mut bytes).unwrap();
 
             let mut mem = PlainMem::new(bytes.len() as u64, 0x0);
