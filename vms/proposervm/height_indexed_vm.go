@@ -176,6 +176,7 @@ func (vm *VM) storeHeightEntry(height uint64, blkID ids.ID) error {
 	return nil
 }
 
+// TODO: Support async deletion of old blocks.
 func (vm *VM) pruneOldBlocks() error {
 	if vm.numHistoricalBlocks == 0 {
 		return nil
@@ -187,6 +188,7 @@ func (vm *VM) pruneOldBlocks() error {
 		return nil
 	}
 
+	// TODO: Refactor to use DB iterators and commit periodically.
 	for vm.lastAcceptedHeight-height > vm.numHistoricalBlocks {
 		blockToDelete, err := vm.State.GetBlockIDAtHeight(height)
 		if err != nil {
