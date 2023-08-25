@@ -98,10 +98,7 @@ func (db *intermediateNodeDB) addToBatch(b database.Batch, key path, n *node) er
 	defer db.bufferPool.Put(prefixedKey)
 	if n == nil {
 		db.metrics.IOKeyWrite()
-		if err := b.Delete(prefixedKey); err != nil {
-			return err
-		}
-		return nil
+		return b.Delete(prefixedKey)
 	}
 	db.metrics.IOKeyWrite()
 	if err := b.Put(prefixedKey, n.marshal()); err != nil {
