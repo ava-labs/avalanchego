@@ -29,3 +29,8 @@ jobs:
       - name: Run e2e tests with persistent network
         shell: bash
         run: ./scripts/tests.e2e.persistent.sh ./build/avalanchego
+      - name: Upload testnet network dir
+        uses: actions/upload-artifact@v3
+        with:
+          name: testnet-data
+          path: ~/.testnetctl/networks/1000
