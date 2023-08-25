@@ -1,76 +1,70 @@
 package archivedb
 
 import (
+	"encoding/binary"
 	"errors"
 	"math"
 )
 
-var errBadVersion = errors.New("invalid version")
+var (
+	ErrInsufficientLength = errors.New("packer has insufficient length for input")
+	longLen               = 8
+	boolLen               = 1
+)
 
-// Key
+// keyInternal
 //
 // The keys contains a few extra information alongside the given key. The key is
 // what is known outside of this internal scope as the key, but this struct has
-// more information compacted inside the Key to take advantage of natural
+// more information compacted inside the keyInternal to take advantage of natural
 // sorting. The inversed height is stored right after the Prefix, which is
 // MaxUint64 minus the desired Height. An extra byte is also packed inside the
 // key to indicate if the key is a deletion of any previous value (because
 // archivedb is an append only database).
 //
 // Any other property are to not serialized but they are useful when parsing a
-// Key struct from the database
-type Key struct {
-	Prefix         []byte `serialize:"true"`
-	HeightReversed uint64 `serialize:"true"`
-	IsDeleted      bool   `serialize:"true"`
-	Height         uint64
-	Bytes          []byte
+// keyInternal struct from the database
+type keyInternal struct {
+	Prefix    []byte
+	Height    uint64
+	IsDeleted bool
 }
 
 // Creates a new Key struct with a given key and its height
-func NewKey(key []byte, height uint64) (Key, error) {
-	internalKey := Key{
-		Prefix:         key,
-		HeightReversed: math.MaxUint64 - height,
-		IsDeleted:      false,
-		Height:         height,
+func NewKey(key []byte, height uint64) keyInternal {
+	return keyInternal{
+		Prefix:    key,
+		IsDeleted: false,
+		Height:    height,
 	}
-
-	bytes, err := Codec.Marshal(Version, &internalKey)
-	if err != nil {
-		return Key{}, err
-	}
-
-	internalKey.Bytes = bytes
-
-	return internalKey, nil
 }
 
-// Flag the current Key sturct as a deletion. If this happens the entry Value is
-// not important and it will usually an empty vector of bytes
-func (k *Key) SetDeleted() error {
-	k.IsDeleted = true
-	bytes, err := Codec.Marshal(Version, &k)
-	if err != nil {
-		return err
+func (k *keyInternal) Bytes() []byte {
+	prefixLen := len(k.Prefix)
+	bytes := make([]byte, prefixLen+longLen+boolLen)
+	copy(bytes[0:], k.Prefix[:])
+	binary.BigEndian.PutUint64(bytes[prefixLen:], math.MaxUint64-k.Height)
+	if k.IsDeleted {
+		bytes[prefixLen+longLen] = 1
+	} else {
+		bytes[prefixLen+longLen] = 0
 	}
-	k.Bytes = bytes
-	return nil
+	return bytes
 }
 
 // Takes a vector of bytes and returns a Key struct
-func ParseKey(keyBytes []byte) (Key, error) {
-	var key Key
-	version, err := Codec.Unmarshal(keyBytes, &key)
-	if err != nil {
-		return Key{}, err
-	}
-	if version != Version {
-		return Key{}, errBadVersion
+func ParseKey(keyBytes []byte) (keyInternal, error) {
+	var key keyInternal
+	if longLen+boolLen >= len(keyBytes) {
+		return keyInternal{}, ErrInsufficientLength
 	}
 
-	key.Height = math.MaxUint64 - key.HeightReversed
-	key.Bytes = keyBytes
+	prefixLen := len(keyBytes) - longLen - boolLen
+
+	key.Prefix = make([]byte, prefixLen)
+	key.Height = math.MaxUint64 - binary.BigEndian.Uint64(keyBytes[prefixLen:])
+	key.IsDeleted = keyBytes[prefixLen+longLen] == 1
+	copy(key.Prefix, keyBytes[0:prefixLen])
 
 	return key, nil
 }
