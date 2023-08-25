@@ -1,3 +1,5 @@
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
 package archivedb
 
 import (
@@ -52,7 +54,7 @@ func (k *keyInternal) Bytes() []byte {
 	return bytes
 }
 
-// Takes a vector of bytes and returns a Key struct
+// Takes a slice of bytes and returns a Key struct
 func ParseKey(keyBytes []byte) (keyInternal, error) {
 	var key keyInternal
 	if longLen+boolLen >= len(keyBytes) {

@@ -1,8 +1,12 @@
+// Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
 package archivedb
 
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
+	"errors"
 	"sync"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -41,8 +45,15 @@ type archiveDB struct {
 
 	ctx context.Context
 
+	currentHeight uint64
+
 	rawDB database.Database
 }
+
+var (
+	currentHeightKey = "archivedb.height"
+	ErrUnknownHeight = errors.New("Unknown height")
+)
 
 type batchWithHeight struct {
 	db     *archiveDB
@@ -54,10 +65,28 @@ func newDatabase(
 	ctx context.Context,
 	db database.Database,
 ) (*archiveDB, error) {
+	var currentHeight uint64
+	height, err := db.Get([]byte(currentHeightKey))
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			currentHeight = 0
+		} else {
+			return nil, err
+		}
+	} else {
+		currentHeight = binary.BigEndian.Uint64(height[:])
+	}
+
 	return &archiveDB{
-		ctx:   ctx,
-		rawDB: db,
+		ctx:           ctx,
+		currentHeight: currentHeight,
+		rawDB:         db,
 	}, nil
+}
+
+// Tiny wrapper on top Get() passing the last stored height
+func (db *archiveDB) GetLastBlock(key []byte) ([]byte, uint64, error) {
+	return db.Get(key, db.currentHeight)
 }
 
 // Fetches the value of a given prefix at a given height.
@@ -69,8 +98,15 @@ func (db *archiveDB) Get(key []byte, height uint64) ([]byte, uint64, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
+	if height > db.currentHeight || height == 0 {
+		return nil, db.currentHeight, ErrUnknownHeight
+	}
+
 	internalKey := NewKey(key, height)
 	iterator := db.rawDB.NewIteratorWithStart(internalKey.Bytes())
+
+	defer iterator.Release()
+
 	if !iterator.Next() {
 		// There is no available key with the requested prefix
 		return nil, 0, database.ErrNotFound
@@ -99,19 +135,34 @@ func (db *archiveDB) Get(key []byte, height uint64) ([]byte, uint64, error) {
 }
 
 // Creates a new batch to append database changes in a given height
-func (db *archiveDB) NewBatch(height uint64) batchWithHeight {
+func (db *archiveDB) NewBatch() batchWithHeight {
+	var nextHeightBytes [8]byte
+
+	batch := db.rawDB.NewBatch()
+	nextHeight := db.currentHeight + 1
+	binary.BigEndian.PutUint64(nextHeightBytes[:], nextHeight)
+	batch.Put([]byte(currentHeightKey), nextHeightBytes[:])
 	return batchWithHeight{
 		db:     db,
-		height: height,
-		batch:  db.rawDB.NewBatch(),
+		height: nextHeight,
+		batch:  batch,
 	}
+}
+
+func (c *batchWithHeight) Height() uint64 {
+	return c.height
 }
 
 // Writes the changes to the database
 func (c *batchWithHeight) Write() error {
 	c.db.lock.Lock()
 	defer c.db.lock.Unlock()
-	return c.batch.Write()
+	err := c.batch.Write()
+	if err != nil {
+		return err
+	}
+	c.db.currentHeight = c.height
+	return nil
 }
 
 // Delete any previous state that may be stored in the database
