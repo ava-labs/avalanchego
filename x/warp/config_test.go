@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/subnet-evm/precompile/testutils"
 	"github.com/ava-labs/subnet-evm/utils"
+	"go.uber.org/mock/gomock"
 )
 
 func TestVerify(t *testing.T) {
@@ -46,7 +47,7 @@ func TestEqualWarpConfig(t *testing.T) {
 
 		"different type": {
 			Config:   NewDefaultConfig(utils.NewUint64(3)),
-			Other:    precompileconfig.NewNoopStatefulPrecompileConfig(),
+			Other:    precompileconfig.NewMockConfig(gomock.NewController(t)),
 			Expected: false,
 		},
 

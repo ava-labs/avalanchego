@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/subnet-evm/vmerrs"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 )
 
 var (
@@ -96,7 +97,9 @@ var (
 			SuppliedGas: SetFeeConfigGasCost,
 			ReadOnly:    false,
 			ExpectedRes: []byte{},
-			BlockNumber: testBlockNumber.Int64(),
+			SetupBlockContext: func(mbc *contract.MockBlockContext) {
+				mbc.EXPECT().Number().Return(testBlockNumber).AnyTimes()
+			},
 			AfterHook: func(t testing.TB, state contract.StateDB) {
 				feeConfig := GetStoredFeeConfig(state)
 				require.Equal(t, testFeeConfig, feeConfig)
@@ -107,8 +110,10 @@ var (
 		"get fee config from non-enabled address": {
 			Caller: allowlist.TestNoRoleAddr,
 			BeforeHook: func(t testing.TB, state contract.StateDB) {
+				blockContext := contract.NewMockBlockContext(gomock.NewController(t))
+				blockContext.EXPECT().Number().Return(big.NewInt(6)).Times(1)
 				allowlist.SetDefaultRoles(Module.Address)(t, state)
-				err := StoreFeeConfig(state, testFeeConfig, contract.NewMockBlockContext(big.NewInt(6), 0))
+				err := StoreFeeConfig(state, testFeeConfig, blockContext)
 				require.NoError(t, err)
 			},
 			Input:       PackGetFeeConfigInput(),
@@ -144,7 +149,9 @@ var (
 				}
 				return res
 			}(),
-			BlockNumber: testBlockNumber.Int64(),
+			SetupBlockContext: func(mbc *contract.MockBlockContext) {
+				mbc.EXPECT().Number().Return(testBlockNumber)
+			},
 			AfterHook: func(t testing.TB, state contract.StateDB) {
 				feeConfig := GetStoredFeeConfig(state)
 				lastChangedAt := GetFeeConfigLastChangedAt(state)
@@ -155,8 +162,10 @@ var (
 		"get last changed at from non-enabled address": {
 			Caller: allowlist.TestNoRoleAddr,
 			BeforeHook: func(t testing.TB, state contract.StateDB) {
+				blockContext := contract.NewMockBlockContext(gomock.NewController(t))
+				blockContext.EXPECT().Number().Return(testBlockNumber).Times(1)
 				allowlist.SetDefaultRoles(Module.Address)(t, state)
-				err := StoreFeeConfig(state, testFeeConfig, contract.NewMockBlockContext(testBlockNumber, 0))
+				err := StoreFeeConfig(state, testFeeConfig, blockContext)
 				require.NoError(t, err)
 			},
 			Input:       PackGetLastChangedAtInput(),

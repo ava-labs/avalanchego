@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/subnet-evm/precompile/testutils"
 	"github.com/ava-labs/subnet-evm/utils"
 	"github.com/ethereum/go-ethereum/common"
+	"go.uber.org/mock/gomock"
 )
 
 func TestVerify(t *testing.T) {
@@ -28,7 +29,7 @@ func TestEqual(t *testing.T) {
 		},
 		"different type": {
 			Config:   NewConfig(nil, nil, nil),
-			Other:    precompileconfig.NewNoopStatefulPrecompileConfig(),
+			Other:    precompileconfig.NewMockConfig(gomock.NewController(t)),
 			Expected: false,
 		},
 		"different timestamp": {
