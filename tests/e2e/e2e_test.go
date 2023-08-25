@@ -88,7 +88,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 		network, err = local.StartNetwork(
 			ctx,
 			ginkgo.GinkgoWriter,
-			ginkgo.GinkgoT().TempDir(),
+			"", // Use the default path to ensure a predictable target for github's upload-artifact action
 			&local.LocalNetwork{
 				LocalConfig: local.LocalConfig{
 					ExecPath: avalancheGoExecPath,
