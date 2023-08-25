@@ -23,6 +23,9 @@ type blockMetrics struct {
 	verifyErr,
 	accept,
 	reject,
+	// Height metrics
+	verifyHeightIndex,
+	getBlockIDAtHeight,
 	// Block verification with context metrics
 	shouldVerifyWithContext,
 	verifyWithContext,
@@ -33,9 +36,6 @@ type blockMetrics struct {
 	// Batched metrics
 	getAncestors,
 	batchedParseBlock,
-	// Height metrics
-	verifyHeightIndex,
-	getBlockIDAtHeight,
 	// State sync metrics
 	stateSyncEnabled,
 	getOngoingSyncStateSummary,
@@ -49,7 +49,6 @@ type blockMetrics struct {
 func (m *blockMetrics) Initialize(
 	supportsBlockBuildingWithContext bool,
 	supportsBatchedFetching bool,
-	supportsHeightIndexing bool,
 	supportsStateSync bool,
 	namespace string,
 	reg prometheus.Registerer,
@@ -70,6 +69,8 @@ func (m *blockMetrics) Initialize(
 	m.shouldVerifyWithContext = newAverager(namespace, "should_verify_with_context", reg, &errs)
 	m.verifyWithContext = newAverager(namespace, "verify_with_context", reg, &errs)
 	m.verifyWithContextErr = newAverager(namespace, "verify_with_context_err", reg, &errs)
+	m.verifyHeightIndex = newAverager(namespace, "verify_height_index", reg, &errs)
+	m.getBlockIDAtHeight = newAverager(namespace, "get_block_id_at_height", reg, &errs)
 
 	if supportsBlockBuildingWithContext {
 		m.buildBlockWithContext = newAverager(namespace, "build_block_with_context", reg, &errs)
@@ -78,10 +79,6 @@ func (m *blockMetrics) Initialize(
 	if supportsBatchedFetching {
 		m.getAncestors = newAverager(namespace, "get_ancestors", reg, &errs)
 		m.batchedParseBlock = newAverager(namespace, "batched_parse_block", reg, &errs)
-	}
-	if supportsHeightIndexing {
-		m.verifyHeightIndex = newAverager(namespace, "verify_height_index", reg, &errs)
-		m.getBlockIDAtHeight = newAverager(namespace, "get_block_id_at_height", reg, &errs)
 	}
 	if supportsStateSync {
 		m.stateSyncEnabled = newAverager(namespace, "state_sync_enabled", reg, &errs)
