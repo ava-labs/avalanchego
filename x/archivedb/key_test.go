@@ -11,10 +11,10 @@ import (
 )
 
 func TestNaturalDescSortingForSameKey(t *testing.T) {
-	key0 := NewKey(make([]byte, 0), 0)
-	key1 := NewKey(make([]byte, 0), 1)
-	key2 := NewKey(make([]byte, 0), 2)
-	key3 := NewKey(make([]byte, 0), 3)
+	key0 := newKey(make([]byte, 0), 0)
+	key1 := newKey(make([]byte, 0), 1)
+	key2 := newKey(make([]byte, 0), 2)
+	key3 := newKey(make([]byte, 0), 3)
 
 	entry := [][]byte{key0.Bytes(), key1.Bytes(), key2.Bytes(), key3.Bytes()}
 	expected := [][]byte{key3.Bytes(), key2.Bytes(), key1.Bytes(), key0.Bytes()}
@@ -27,10 +27,10 @@ func TestNaturalDescSortingForSameKey(t *testing.T) {
 }
 
 func TestSortingDifferentPrefix(t *testing.T) {
-	key0 := NewKey([]byte{0}, 0)
-	key1 := NewKey([]byte{0}, 1)
-	key2 := NewKey([]byte{1}, 0)
-	key3 := NewKey([]byte{1}, 1)
+	key0 := newKey([]byte{0}, 0)
+	key1 := newKey([]byte{0}, 1)
+	key2 := newKey([]byte{1}, 0)
+	key3 := newKey([]byte{1}, 1)
 
 	entry := [][]byte{key0.Bytes(), key1.Bytes(), key2.Bytes(), key3.Bytes()}
 	expected := [][]byte{key1.Bytes(), key0.Bytes(), key3.Bytes(), key2.Bytes()}
@@ -43,8 +43,8 @@ func TestSortingDifferentPrefix(t *testing.T) {
 }
 
 func TestDeleteKeyIsDifferent(t *testing.T) {
-	key0 := NewKey([]byte{0}, 0)
-	key1 := NewKey([]byte{0}, 0)
+	key0 := newKey([]byte{0}, 0)
+	key1 := newKey([]byte{0}, 0)
 
 	require.Equal(t, key0.Bytes(), key1.Bytes())
 	key1.IsDeleted = true
@@ -52,12 +52,12 @@ func TestDeleteKeyIsDifferent(t *testing.T) {
 }
 
 func TestParseBack(t *testing.T) {
-	key0 := NewKey([]byte{0, 1, 2, 3, 4, 5}, 102310)
-	key1, err := ParseKey(key0.Bytes())
+	key0 := newKey([]byte{0, 1, 2, 3, 4, 5}, 102310)
+	key1, err := parseKey(key0.Bytes())
 	require.NoError(t, err)
 	require.Equal(t, key0, key1)
 	key0.IsDeleted = true
-	key1, err = ParseKey(key0.Bytes())
+	key1, err = parseKey(key0.Bytes())
 	require.NoError(t, err)
 	require.Equal(t, key0, key1)
 	require.Equal(t, key1.Prefix, []byte{0, 1, 2, 3, 4, 5})

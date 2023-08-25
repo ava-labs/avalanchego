@@ -33,8 +33,8 @@ type keyInternal struct {
 }
 
 // Creates a new Key struct with a given key and its height
-func NewKey(key []byte, height uint64) keyInternal {
-	return keyInternal{
+func newKey(key []byte, height uint64) *keyInternal {
+	return &keyInternal{
 		Prefix:    key,
 		IsDeleted: false,
 		Height:    height,
@@ -55,10 +55,10 @@ func (k *keyInternal) Bytes() []byte {
 }
 
 // Takes a slice of bytes and returns a Key struct
-func ParseKey(keyBytes []byte) (keyInternal, error) {
+func parseKey(keyBytes []byte) (*keyInternal, error) {
 	var key keyInternal
 	if longLen+boolLen >= len(keyBytes) {
-		return keyInternal{}, ErrInsufficientLength
+		return nil, ErrInsufficientLength
 	}
 
 	prefixLen := len(keyBytes) - longLen - boolLen
@@ -68,5 +68,5 @@ func ParseKey(keyBytes []byte) (keyInternal, error) {
 	key.IsDeleted = keyBytes[prefixLen+longLen] == 1
 	copy(key.Prefix, keyBytes[0:prefixLen])
 
-	return key, nil
+	return &key, nil
 }
