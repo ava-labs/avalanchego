@@ -109,7 +109,8 @@ func (vm *VM) updateHeightIndex(height uint64, blkID ids.ID) error {
 }
 
 func (vm *VM) storeHeightEntry(height uint64, blkID ids.ID) error {
-	switch _, err := vm.State.GetForkHeight(); err {
+	forkHeight, err := vm.State.GetForkHeight()
+	switch err {
 	case nil:
 		// The fork was already reached. Just update the index.
 
@@ -118,14 +119,95 @@ func (vm *VM) storeHeightEntry(height uint64, blkID ids.ID) error {
 		if err := vm.State.SetForkHeight(height); err != nil {
 			return fmt.Errorf("failed storing fork height: %w", err)
 		}
+		forkHeight = height
 
 	default:
 		return fmt.Errorf("failed to load fork height: %w", err)
+	}
+
+	if err := vm.State.SetBlockIDAtHeight(height, blkID); err != nil {
+		return err
 	}
 
 	vm.ctx.Log.Debug("indexed block",
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", height),
 	)
-	return vm.State.SetBlockIDAtHeight(height, blkID)
+
+	if vm.numHistoricalBlocks == 0 {
+		return nil
+	}
+
+	blocksSinceFork := height - forkHeight
+	// Note: The last accepted block is not considered a historical block. Which
+	// is why <= is used rather than <. This prevents the user from only storing
+	// the last accepted block, which can never be safe due to the non-atomic
+	// commits between the proposervm database and the innerVM's database.
+	if blocksSinceFork <= vm.numHistoricalBlocks {
+		return nil
+	}
+
+	// Note: heightToDelete is >= forkHeight, so it is guaranteed not to
+	// underflow.
+	heightToDelete := height - vm.numHistoricalBlocks - 1
+	blockToDelete, err := vm.State.GetBlockIDAtHeight(heightToDelete)
+	if err == database.ErrNotFound {
+		// Block may have already been deleted. This can happen due to a
+		// proposervm rollback, the node having recently state-synced, or the
+		// user reconfiguring the node to store more historical blocks than a
+		// prior run.
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	if err := vm.State.DeleteBlockIDAtHeight(heightToDelete); err != nil {
+		return err
+	}
+	if err := vm.State.DeleteBlock(blockToDelete); err != nil {
+		return err
+	}
+
+	vm.ctx.Log.Debug("deleted block",
+		zap.Stringer("blkID", blockToDelete),
+		zap.Uint64("height", heightToDelete),
+	)
+	return nil
+}
+
+func (vm *VM) pruneOldBlocks() error {
+	if vm.numHistoricalBlocks == 0 {
+		return nil
+	}
+
+	height, err := vm.State.GetMinimumHeight()
+	if err == database.ErrNotFound {
+		// Chain hasn't forked yet
+		return nil
+	}
+
+	for vm.lastAcceptedHeight-height > vm.numHistoricalBlocks {
+		blockToDelete, err := vm.State.GetBlockIDAtHeight(height)
+		if err != nil {
+			return err
+		}
+
+		if err := vm.State.DeleteBlockIDAtHeight(height); err != nil {
+			return err
+		}
+		if err := vm.State.DeleteBlock(blockToDelete); err != nil {
+			return err
+		}
+
+		vm.ctx.Log.Debug("deleted block",
+			zap.Stringer("blkID", blockToDelete),
+			zap.Uint64("height", height),
+		)
+
+		// Note: height is < vm.lastAcceptedHeight, so it is guaranteed not to
+		// overflow.
+		height++
+	}
+	return vm.db.Commit()
 }

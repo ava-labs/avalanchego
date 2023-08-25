@@ -136,6 +136,7 @@ func initTestProposerVM(
 		proBlkStartTime,
 		minPChainHeight,
 		DefaultMinBlockDelay,
+		DefaultNumHistoricalBlocks,
 		pTestSigner,
 		pTestCert,
 	)
@@ -874,6 +875,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 		time.Time{},
 		0,
 		DefaultMinBlockDelay,
+		DefaultNumHistoricalBlocks,
 		pTestSigner,
 		pTestCert,
 	)
@@ -1216,6 +1218,7 @@ func TestInnerVMRollback(t *testing.T) {
 		time.Time{},
 		0,
 		DefaultMinBlockDelay,
+		DefaultNumHistoricalBlocks,
 		pTestSigner,
 		pTestCert,
 	)
@@ -1302,6 +1305,7 @@ func TestInnerVMRollback(t *testing.T) {
 		time.Time{},
 		0,
 		DefaultMinBlockDelay,
+		DefaultNumHistoricalBlocks,
 		pTestSigner,
 		pTestCert,
 	)
@@ -1793,6 +1797,7 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 		time.Time{},
 		0,
 		DefaultMinBlockDelay,
+		DefaultNumHistoricalBlocks,
 		pTestSigner,
 		pTestCert,
 	)
@@ -1996,6 +2001,7 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 		time.Time{},
 		0,
 		DefaultMinBlockDelay,
+		DefaultNumHistoricalBlocks,
 		pTestSigner,
 		pTestCert,
 	)
@@ -2155,6 +2161,7 @@ func TestVMInnerBlkCache(t *testing.T) {
 		time.Time{}, // fork is active
 		0,           // minimum P-Chain height
 		DefaultMinBlockDelay,
+		DefaultNumHistoricalBlocks,
 		pTestSigner,
 		pTestCert,
 	)
@@ -2387,6 +2394,7 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 		time.Time{}, // fork is active
 		0,           // minimum P-Chain height
 		DefaultMinBlockDelay,
+		DefaultNumHistoricalBlocks,
 		pTestSigner,
 		pTestCert,
 	)
