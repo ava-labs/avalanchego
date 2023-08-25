@@ -232,12 +232,12 @@ func defaultState(
 	genesisBytes := buildGenesisTest(t, ctx)
 	state, err := state.NewMerkleState(
 		db,
-		metrics.Noop,
 		genesisBytes,
+		prometheus.NewRegistry(),
 		cfg,
 		execCfg,
 		ctx,
-		prometheus.NewRegistry(),
+		metrics.Noop,
 		rewards,
 		&utils.Atomic[bool]{},
 	)

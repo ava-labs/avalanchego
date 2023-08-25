@@ -80,12 +80,12 @@ func buildChainState(baseDB database.Database, trackedSubnets []ids.ID) (State, 
 	rewardsCalc := reward.NewCalculator(cfg.RewardConfig)
 	return NewMerkleState(
 		baseDB,
-		metrics.Noop,
 		genesisBytes,
+		prometheus.NewRegistry(),
 		cfg,
 		execConfig,
 		ctx,
-		prometheus.NewRegistry(),
+		metrics.Noop,
 		rewardsCalc,
 		&utils.Atomic[bool]{},
 	)

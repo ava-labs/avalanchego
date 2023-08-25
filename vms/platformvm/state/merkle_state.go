@@ -75,12 +75,12 @@ var (
 
 func NewMerkleState(
 	rawDB database.Database,
-	metrics metrics.Metrics,
 	genesisBytes []byte,
+	metricsReg prometheus.Registerer,
 	cfg *config.Config,
 	execCfg *config.ExecutionConfig,
 	ctx *snow.Context,
-	metricsReg prometheus.Registerer,
+	metrics metrics.Metrics,
 	rewards reward.Calculator,
 	bootstrapped *utils.Atomic[bool],
 ) (State, error) {

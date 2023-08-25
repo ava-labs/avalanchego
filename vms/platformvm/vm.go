@@ -139,12 +139,12 @@ func (vm *VM) Initialize(
 
 	vm.state, err = state.NewMerkleState(
 		vm.dbManager.Current().Database,
-		vm.metrics,
 		genesisBytes,
+		registerer,
 		&vm.Config,
 		execConfig,
 		vm.ctx,
-		registerer,
+		vm.metrics,
 		rewards,
 		&vm.bootstrapped,
 	)

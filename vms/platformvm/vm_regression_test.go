@@ -657,12 +657,12 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	execCfg, _ := config.GetExecutionConfig(nil)
 	newState, err := state.NewMerkleState(
 		vm.dbManager.Current().Database,
-		metrics.Noop,
 		nil,
+		prometheus.NewRegistry(),
 		&vm.Config,
 		execCfg,
 		vm.ctx,
-		prometheus.NewRegistry(),
+		metrics.Noop,
 		reward.NewCalculator(vm.Config.RewardConfig),
 		&utils.Atomic[bool]{},
 	)
@@ -967,12 +967,12 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	execCfg, _ := config.GetExecutionConfig(nil)
 	newState, err := state.NewMerkleState(
 		vm.dbManager.Current().Database,
-		metrics.Noop,
 		nil,
+		prometheus.NewRegistry(),
 		&vm.Config,
 		execCfg,
 		vm.ctx,
-		prometheus.NewRegistry(),
+		metrics.Noop,
 		reward.NewCalculator(vm.Config.RewardConfig),
 		&utils.Atomic[bool]{},
 	)
