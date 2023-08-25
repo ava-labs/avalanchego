@@ -983,7 +983,7 @@ func (t *trieView) recordValueChange(key path, value maybe.Maybe[[]byte]) error 
 
 // Retrieves the node with the given [key], which is a child of [parent], and
 // uses the [parent] node to initialize the child node's ID.
-// If the node is loaded from the baseDB, the hasValue will determine which database the node is stored in
+// If the node is loaded from the baseDB, [hasValue] determines which database the node is stored in.
 // Returns database.ErrNotFound if the child doesn't exist.
 func (t *trieView) getNodeFromParent(parent *node, key path, hasValue bool) (*node, error) {
 	// confirm the child exists and get its ID before attempting to load it
