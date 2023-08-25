@@ -126,10 +126,10 @@ type metrics struct {
 	ioKeyWrite                  prometheus.Counter
 	ioKeyRead                   prometheus.Counter
 	hashCount                   prometheus.Counter
-	dbIntermediateNodeCacheHit  prometheus.Counter
-	dbIntermediateNodeCacheMiss prometheus.Counter
-	dbValueNodeCacheHit         prometheus.Counter
-	dbValueNodeCacheMiss        prometheus.Counter
+	intermediateNodeCacheHit  prometheus.Counter
+	intermediateNodeCacheMiss prometheus.Counter
+	valueNodeCacheHit         prometheus.Counter
+	valueNodeCacheMiss        prometheus.Counter
 	viewNodeCacheHit            prometheus.Counter
 	viewNodeCacheMiss           prometheus.Counter
 	viewValueCacheHit           prometheus.Counter
