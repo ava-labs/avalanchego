@@ -35,7 +35,7 @@ func newValueNodeDB(db database.Database, metrics merkleMetrics, size int) *valu
 		baseDB:  db,
 		bufferPool: sync.Pool{
 			New: func() interface{} {
-				return make([]byte, 0, DefaultBufferLength)
+				return make([]byte, 0, defaultBufferLength)
 			},
 		},
 		nodeCache: newOnEvictCache[path](size, func(path, *node) error {
@@ -63,7 +63,7 @@ func (db *valueNodeDB) Close() {
 func (db *valueNodeDB) NewBatch() *valueNodeBatch {
 	return &valueNodeBatch{
 		db:  db,
-		ops: make(map[path]*node, DefaultBufferLength),
+		ops: make(map[path]*node, defaultBufferLength),
 	}
 }
 

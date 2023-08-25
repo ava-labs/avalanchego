@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	DefaultBufferLength       = 256
+	defaultBufferLength       = 256
 	intermediateNodePrefixLen = 1
 )
 
@@ -38,7 +38,7 @@ func newIntermediateNodeDB(db database.Database, metrics merkleMetrics, size int
 		baseDB:  db,
 		bufferPool: sync.Pool{
 			New: func() interface{} {
-				return make([]byte, 0, DefaultBufferLength)
+				return make([]byte, 0, defaultBufferLength)
 			},
 		},
 		evictionBatchSize: evictionBatchSize,
@@ -125,7 +125,7 @@ func (db *intermediateNodeDB) Get(key path) (*node, error) {
 	}
 	db.bufferPool.Put(prefixedKey)
 
-	return parseNode(key, val)
+	return parseNode(key, nodeBytes)
 }
 
 func (db *intermediateNodeDB) Put(key path, n *node) error {
