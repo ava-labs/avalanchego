@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/subnet-evm/interfaces"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/plugin/evm"
+	"github.com/ava-labs/subnet-evm/tests/utils"
 	"github.com/ava-labs/subnet-evm/tests/utils/runner"
 	predicateutils "github.com/ava-labs/subnet-evm/utils/predicate"
 	warpBackend "github.com/ava-labs/subnet-evm/warp"
@@ -34,6 +35,8 @@ import (
 	ginkgo "github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
+
+const fundedKeyStr = "56289e99c94b6912bfc12adc093c9b51124f0dc54ac7a766b2bc5ccf558d8027"
 
 var (
 	config              = runner.NewDefaultANRConfig()
@@ -102,6 +105,22 @@ var _ = ginkgo.BeforeSuite(func() {
 		},
 	)
 	gomega.Expect(err).Should(gomega.BeNil())
+
+	// Issue transactions to activate the proposerVM fork on the receiving chain
+	chainID := big.NewInt(99999)
+	fundedKey, err := crypto.HexToECDSA(fundedKeyStr)
+	gomega.Expect(err).Should(gomega.BeNil())
+	subnetB := manager.GetSubnets()[1]
+	subnetBDetails, ok := manager.GetSubnet(subnetB)
+	gomega.Expect(ok).Should(gomega.BeTrue())
+
+	chainBID := subnetBDetails.BlockchainID
+	uri := toWebsocketURI(subnetBDetails.ValidatorURIs[0], chainBID.String())
+	client, err := ethclient.Dial(uri)
+	gomega.Expect(err).Should(gomega.BeNil())
+
+	err = utils.IssueTxsToActivateProposerVMFork(ctx, chainID, fundedKey, client)
+	gomega.Expect(err).Should(gomega.BeNil())
 })
 
 var _ = ginkgo.AfterSuite(func() {
@@ -127,7 +146,7 @@ var _ = ginkgo.Describe("[Warp]", ginkgo.Ordered, func() {
 		err                            error
 	)
 
-	fundedKey, err = crypto.HexToECDSA("56289e99c94b6912bfc12adc093c9b51124f0dc54ac7a766b2bc5ccf558d8027")
+	fundedKey, err = crypto.HexToECDSA(fundedKeyStr)
 	if err != nil {
 		panic(err)
 	}
@@ -177,6 +196,9 @@ var _ = ginkgo.Describe("[Warp]", ginkgo.Ordered, func() {
 		gomega.Expect(err).Should(gomega.BeNil())
 		defer sub.Unsubscribe()
 
+		startingNonce, err := chainAWSClient.NonceAt(ctx, fundedAddress, nil)
+		gomega.Expect(err).Should(gomega.BeNil())
+
 		packedInput, err := warp.PackSendWarpMessage(warp.SendWarpMessageInput{
 			DestinationChainID: common.Hash(blockchainIDB),
 			DestinationAddress: fundedAddress,
@@ -185,7 +207,7 @@ var _ = ginkgo.Describe("[Warp]", ginkgo.Ordered, func() {
 		gomega.Expect(err).Should(gomega.BeNil())
 		tx := types.NewTx(&types.DynamicFeeTx{
 			ChainID:   chainID,
-			Nonce:     0,
+			Nonce:     startingNonce,
 			To:        &warp.Module.Address,
 			Gas:       200_000,
 			GasFeeCap: big.NewInt(225 * params.GWei),
@@ -318,31 +340,8 @@ var _ = ginkgo.Describe("[Warp]", ginkgo.Ordered, func() {
 		gomega.Expect(err).Should(gomega.BeNil())
 		defer sub.Unsubscribe()
 
-		// Trigger building of a new block at the current timestamp.
-		// This timestamp should be after the ProposerVM activation time or ApricotPhase4 block timestamp.
-		// This should generate a PostForkBlock because its parent block (genesis) has a timestamp (0) that is greater than or equal
-		// to the fork activation time of 0.
-		// Therefore, when we build a subsequent block it should be built with BuildBlockWithContext
 		nonce, err := chainBWSClient.NonceAt(ctx, fundedAddress, nil)
 		gomega.Expect(err).Should(gomega.BeNil())
-
-		triggerTx, err := types.SignTx(types.NewTransaction(nonce, fundedAddress, common.Big1, 21_000, big.NewInt(225*params.GWei), nil), txSigner, fundedKey)
-		gomega.Expect(err).Should(gomega.BeNil())
-
-		err = chainBWSClient.SendTransaction(ctx, triggerTx)
-		gomega.Expect(err).Should(gomega.BeNil())
-		newHead := <-newHeads
-		log.Info("Transaction triggered new block", "blockHash", newHead.Hash())
-		nonce++
-
-		triggerTx, err = types.SignTx(types.NewTransaction(nonce, fundedAddress, common.Big1, 21_000, big.NewInt(225*params.GWei), nil), txSigner, fundedKey)
-		gomega.Expect(err).Should(gomega.BeNil())
-
-		err = chainBWSClient.SendTransaction(ctx, triggerTx)
-		gomega.Expect(err).Should(gomega.BeNil())
-		newHead = <-newHeads
-		log.Info("Transaction triggered new block", "blockHash", newHead.Hash())
-		nonce++
 
 		packedInput, err := warp.PackGetVerifiedWarpMessage()
 		gomega.Expect(err).Should(gomega.BeNil())
@@ -368,7 +367,7 @@ var _ = ginkgo.Describe("[Warp]", ginkgo.Ordered, func() {
 		gomega.Expect(err).Should(gomega.BeNil())
 
 		log.Info("Waiting for new block confirmation")
-		newHead = <-newHeads
+		newHead := <-newHeads
 		blockHash := newHead.Hash()
 		log.Info("Fetching relevant warp logs and receipts from new block")
 		logs, err := chainBWSClient.FilterLogs(ctx, interfaces.FilterQuery{
