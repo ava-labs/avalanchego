@@ -53,10 +53,6 @@ func (vm *VM) shouldHeightIndexBeRepaired(ctx context.Context) (bool, error) {
 
 // vm.ctx.Lock should be held
 func (vm *VM) VerifyHeightIndex(context.Context) error {
-	if vm.hVM == nil {
-		return block.ErrHeightIndexedVMNotImplemented
-	}
-
 	if !vm.hIndexer.IsRepaired() {
 		return block.ErrIndexIncomplete
 	}
@@ -74,13 +70,13 @@ func (vm *VM) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, er
 	switch forkHeight, err := vm.State.GetForkHeight(); err {
 	case nil:
 		if height < forkHeight {
-			return vm.hVM.GetBlockIDAtHeight(ctx, height)
+			return vm.ChainVM.GetBlockIDAtHeight(ctx, height)
 		}
 		return vm.State.GetBlockIDAtHeight(height)
 
 	case database.ErrNotFound:
 		// fork not reached yet. Block must be pre-fork
-		return vm.hVM.GetBlockIDAtHeight(ctx, height)
+		return vm.ChainVM.GetBlockIDAtHeight(ctx, height)
 
 	default:
 		return ids.Empty, err
