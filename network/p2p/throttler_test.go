@@ -20,8 +20,8 @@ func TestSlidingWindowThrottlerHandle(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 
 	type call struct {
-		time     time.Time
-		expected bool
+		time      time.Time
+		throttled bool
 	}
 
 	tests := []struct {
@@ -34,11 +34,11 @@ func TestSlidingWindowThrottlerHandle(t *testing.T) {
 			limit: 1,
 			calls: []call{
 				{
-					time:     currentWindowStartTime,
-					expected: true,
+					time: currentWindowStartTime,
 				},
 				{
-					time: currentWindowStartTime,
+					time:      currentWindowStartTime,
+					throttled: true,
 				},
 			},
 		},
@@ -47,20 +47,14 @@ func TestSlidingWindowThrottlerHandle(t *testing.T) {
 			limit: 2,
 			calls: []call{
 				{
-					time:     currentWindowStartTime,
-					expected: true,
+					time: previousWindowStartTime,
 				},
 				{
-					time:     currentWindowStartTime.Add(period),
-					expected: true,
+					time: previousWindowStartTime.Add(period),
 				},
 				{
-					time:     currentWindowStartTime.Add(2 * period),
-					expected: true,
-				},
-				{
-					time:     currentWindowStartTime.Add(2 * period).Add(time.Second),
-					expected: true,
+					time:      currentWindowStartTime.Add(time.Second),
+					throttled: true,
 				},
 			},
 		},
@@ -69,35 +63,29 @@ func TestSlidingWindowThrottlerHandle(t *testing.T) {
 			limit: 5,
 			calls: []call{
 				{
-					time:     currentWindowStartTime.Add(30 * time.Second),
-					expected: true,
+					time: currentWindowStartTime.Add(30 * time.Second),
 				},
 				{
-					time:     currentWindowStartTime.Add(period).Add(1 * time.Second),
-					expected: true,
+					time: currentWindowStartTime.Add(period).Add(1 * time.Second),
 				},
 				{
-					time:     currentWindowStartTime.Add(period).Add(2 * time.Second),
-					expected: true,
+					time: currentWindowStartTime.Add(period).Add(2 * time.Second),
 				},
 				{
-					time:     currentWindowStartTime.Add(period).Add(3 * time.Second),
-					expected: true,
+					time: currentWindowStartTime.Add(period).Add(3 * time.Second),
 				},
 				{
-					time:     currentWindowStartTime.Add(period).Add(4 * time.Second),
-					expected: true,
-				},
-				{
-					time:     currentWindowStartTime.Add(period).Add(30 * time.Second),
-					expected: true,
+					time: currentWindowStartTime.Add(period).Add(4 * time.Second),
 				},
 				{
 					time: currentWindowStartTime.Add(period).Add(30 * time.Second),
 				},
 				{
-					time:     currentWindowStartTime.Add(5 * period),
-					expected: true,
+					time:      currentWindowStartTime.Add(period).Add(30 * time.Second),
+					throttled: true,
+				},
+				{
+					time: currentWindowStartTime.Add(5 * period),
 				},
 			},
 		},
@@ -106,28 +94,22 @@ func TestSlidingWindowThrottlerHandle(t *testing.T) {
 			limit: 2,
 			calls: []call{
 				{
-					time:     currentWindowStartTime,
-					expected: true,
+					time: currentWindowStartTime,
 				},
 				{
-					time:     currentWindowStartTime.Add(period),
-					expected: true,
+					time: currentWindowStartTime.Add(period),
 				},
 				{
-					time:     currentWindowStartTime.Add(2 * period),
-					expected: true,
+					time: currentWindowStartTime.Add(2 * period),
 				},
 				{
-					time:     currentWindowStartTime.Add(3 * period),
-					expected: true,
+					time: currentWindowStartTime.Add(3 * period),
 				},
 				{
-					time:     currentWindowStartTime.Add(4 * period),
-					expected: true,
+					time: currentWindowStartTime.Add(4 * period),
 				},
 				{
-					time:     currentWindowStartTime.Add(5 * period),
-					expected: true,
+					time: currentWindowStartTime.Add(5 * period),
 				},
 			},
 		},
@@ -136,28 +118,22 @@ func TestSlidingWindowThrottlerHandle(t *testing.T) {
 			limit: 2,
 			calls: []call{
 				{
-					time:     currentWindowStartTime,
-					expected: true,
+					time: currentWindowStartTime,
 				},
 				{
-					time:     currentWindowStartTime.Add(period),
-					expected: true,
+					time: currentWindowStartTime.Add(period),
 				},
 				{
-					time:     currentWindowStartTime.Add(2 * period),
-					expected: true,
+					time: currentWindowStartTime.Add(2 * period),
 				},
 				{
-					time:     currentWindowStartTime.Add(5 * period),
-					expected: true,
+					time: currentWindowStartTime.Add(5 * period),
 				},
 				{
-					time:     currentWindowStartTime.Add(6 * period),
-					expected: true,
+					time: currentWindowStartTime.Add(6 * period),
 				},
 				{
-					time:     currentWindowStartTime.Add(7 * period),
-					expected: true,
+					time: currentWindowStartTime.Add(7 * period),
 				},
 			},
 		},
@@ -172,7 +148,7 @@ func TestSlidingWindowThrottlerHandle(t *testing.T) {
 
 			for _, call := range tt.calls {
 				throttler.clock.Set(call.time)
-				require.Equal(call.expected, throttler.Handle(nodeID))
+				require.Equal(call.throttled, !throttler.Handle(nodeID))
 			}
 		})
 	}
