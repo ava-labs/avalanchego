@@ -181,20 +181,21 @@ func (i *iterator) Next() bool {
 	if i.Error() != nil || i.db.closed.Get() {
 		return false
 	}
-	if i.nodeIter.Next() {
-		i.db.metrics.IOKeyRead()
-		key := i.nodeIter.Key()
-		key = key[valueNodePrefixLen:]
-		n, err := parseNode(newPath(key), i.nodeIter.Value())
-		if err != nil {
-			i.err = err
-			return false
-		}
-
-		i.current = n
-		return true
+	if !i.nodeIter.Next() {
+		return false
 	}
-	return false
+
+	i.db.metrics.IOKeyRead()
+	key := i.nodeIter.Key()
+	key = key[valueNodePrefixLen:]
+	n, err := parseNode(newPath(key), i.nodeIter.Value())
+	if err != nil {
+		i.err = err
+		return false
+	}
+
+	i.current = n
+	return true
 }
 
 func (i *iterator) Release() {
