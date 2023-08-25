@@ -31,7 +31,8 @@ jobs:
           token: ${{ secrets.AVALANCHE_PAT }}
       - uses: actions/setup-go@v3
         with:
-          go-version: "1.19"
+          go-version: '~1.19.12'
+          check-latest: true
       - name: change avalanchego dep
         if: ${{ github.event_name == 'workflow_dispatch' }}
         run: |
@@ -51,7 +52,6 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        go: ['1.19']
         os: [macos-11.0, ubuntu-20.04, windows-latest]
     steps:
     - uses: actions/checkout@v3
@@ -65,7 +65,8 @@ jobs:
         token: ${{ secrets.AVALANCHE_PAT }}
     - uses: actions/setup-go@v3
       with:
-        go-version: ${{ matrix.go }}
+        go-version: '~1.19.12'
+        check-latest: true
     - name: change avalanchego dep
       if: ${{ github.event_name == 'workflow_dispatch' }}
       run: |
@@ -84,7 +85,6 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        go: ['1.19']
         os: [ubuntu-20.04]
     steps:
     - uses: actions/checkout@v3
@@ -98,7 +98,8 @@ jobs:
         token: ${{ secrets.AVALANCHE_PAT }}
     - uses: actions/setup-go@v3
       with:
-        go-version: ${{ matrix.go }}
+        go-version: '~1.19.12'
+        check-latest: true
     - name: change avalanchego dep
       if: ${{ github.event_name == 'workflow_dispatch' }}
       run: |
@@ -115,7 +116,6 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        go: [ '1.19' ]
         os: [ ubuntu-20.04 ]
     steps:
     - uses: actions/checkout@v3
@@ -129,7 +129,8 @@ jobs:
         token: ${{ secrets.AVALANCHE_PAT }}
     - uses: actions/setup-go@v3
       with:
-        go-version: ${{ matrix.go }}
+        go-version: '~1.19.12'
+        check-latest: true
     - name: change avalanchego dep
       if: ${{ github.event_name == 'workflow_dispatch' }}
       run: |
