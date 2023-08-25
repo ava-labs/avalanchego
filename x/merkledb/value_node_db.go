@@ -102,7 +102,7 @@ func (db *valueNodeDB) Get(key path) (*node, error) {
 	}
 	db.bufferPool.Put(prefixedKey)
 
-	return parseNode(key, val)
+	return parseNode(key, nodeBytes)
 }
 
 // Batch of database operations
