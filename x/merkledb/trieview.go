@@ -997,7 +997,7 @@ func (t *trieView) getNodeFromParent(parent *node, key path, hasValue bool) (*no
 // Retrieves a node with the given [key].
 // If the node is fetched from [t.parentTrie] and [id] isn't empty,
 // sets the node's ID to [id].
-// If the node is loaded from the baseDB, the hasValue will determine which database the node is stored in
+// If the node is loaded from the baseDB, [hasValue] determines which database the node is stored in.
 // Returns database.ErrNotFound if the node doesn't exist.
 func (t *trieView) getNodeWithID(id ids.ID, key path, hasValue bool) (*node, error) {
 	// check for the key within the changed nodes

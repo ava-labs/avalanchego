@@ -10,9 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 )
 
-const (
-	valueNodePrefixLen = 1
-)
+const valueNodePrefixLen = 1
 
 var valueNodePrefixBytes = []byte{0}
 
@@ -98,7 +96,7 @@ func (db *valueNodeDB) Get(key path) (*node, error) {
 
 	prefixedKey := db.prefixedKey(key.Serialize().Value)
 	db.metrics.IOKeyRead()
-	val, err := db.baseDB.Get(prefixedKey)
+	nodeBytes, err := db.baseDB.Get(prefixedKey)
 	if err != nil {
 		return nil, err
 	}
