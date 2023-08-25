@@ -182,7 +182,6 @@ func newDatabase(
 	config Config,
 	metrics merkleMetrics,
 ) (*merkleDB, error) {
-
 	bufferPool := sync.Pool{
 		New: func() interface{} {
 			return make([]byte, 0, defaultBufferLength)
@@ -192,8 +191,8 @@ func newDatabase(
 		metrics:            metrics,
 		baseDB:             db,
 		bufferPool:         bufferPool,
-		valueNodeDB:        newValueNodeDB(db, bufferPool, metrics, config.ValueNodeCacheSize),
-		intermediateNodeDB: newIntermediateNodeDB(db, bufferPool, metrics, config.IntermediateNodeCacheSize, config.EvictionBatchSize),
+		valueNodeDB:        newValueNodeDB(db, &bufferPool, metrics, config.ValueNodeCacheSize),
+		intermediateNodeDB: newIntermediateNodeDB(db, &bufferPool, metrics, config.IntermediateNodeCacheSize, config.EvictionBatchSize),
 		history:            newTrieHistory(config.HistoryLength),
 		tracer:             config.Tracer,
 		childViews:         make([]*trieView, 0, defaultPreallocationSize),

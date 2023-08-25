@@ -16,7 +16,7 @@ var valueNodePrefixBytes = []byte{0}
 
 type valueNodeDB struct {
 	// Holds unused []byte
-	bufferPool sync.Pool
+	bufferPool *sync.Pool
 
 	// The underlying storage
 	baseDB database.Database
@@ -29,7 +29,7 @@ type valueNodeDB struct {
 	closed utils.Atomic[bool]
 }
 
-func newValueNodeDB(db database.Database, bufferPool sync.Pool, metrics merkleMetrics, size int) *valueNodeDB {
+func newValueNodeDB(db database.Database, bufferPool *sync.Pool, metrics merkleMetrics, size int) *valueNodeDB {
 	return &valueNodeDB{
 		metrics:    metrics,
 		baseDB:     db,

@@ -18,7 +18,7 @@ var intermediateNodePrefixBytes = []byte{1}
 
 type intermediateNodeDB struct {
 	// Holds unused []byte
-	bufferPool sync.Pool
+	bufferPool *sync.Pool
 
 	// The underlying storage
 	baseDB database.Database
@@ -32,7 +32,7 @@ type intermediateNodeDB struct {
 	metrics           merkleMetrics
 }
 
-func newIntermediateNodeDB(db database.Database, bufferPool sync.Pool, metrics merkleMetrics, size int, evictionBatchSize int) *intermediateNodeDB {
+func newIntermediateNodeDB(db database.Database, bufferPool *sync.Pool, metrics merkleMetrics, size int, evictionBatchSize int) *intermediateNodeDB {
 	result := &intermediateNodeDB{
 		metrics:           metrics,
 		baseDB:            db,
