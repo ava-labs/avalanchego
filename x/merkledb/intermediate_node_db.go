@@ -32,15 +32,11 @@ type intermediateNodeDB struct {
 	metrics           merkleMetrics
 }
 
-func newIntermediateNodeDB(db database.Database, metrics merkleMetrics, size int, evictionBatchSize int) *intermediateNodeDB {
+func newIntermediateNodeDB(db database.Database, bufferPool sync.Pool, metrics merkleMetrics, size int, evictionBatchSize int) *intermediateNodeDB {
 	result := &intermediateNodeDB{
-		metrics: metrics,
-		baseDB:  db,
-		bufferPool: sync.Pool{
-			New: func() interface{} {
-				return make([]byte, 0, defaultBufferLength)
-			},
-		},
+		metrics:           metrics,
+		baseDB:            db,
+		bufferPool:        bufferPool,
 		evictionBatchSize: evictionBatchSize,
 	}
 	result.nodeCache = newOnEvictCache[path](size, result.onEviction)

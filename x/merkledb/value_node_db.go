@@ -29,15 +29,11 @@ type valueNodeDB struct {
 	closed utils.Atomic[bool]
 }
 
-func newValueNodeDB(db database.Database, metrics merkleMetrics, size int) *valueNodeDB {
+func newValueNodeDB(db database.Database, bufferPool sync.Pool, metrics merkleMetrics, size int) *valueNodeDB {
 	return &valueNodeDB{
-		metrics: metrics,
-		baseDB:  db,
-		bufferPool: sync.Pool{
-			New: func() interface{} {
-				return make([]byte, 0, defaultBufferLength)
-			},
-		},
+		metrics:    metrics,
+		baseDB:     db,
+		bufferPool: bufferPool,
 		nodeCache: newOnEvictCache[path](size, func(path, *node) error {
 			return nil
 		}),
