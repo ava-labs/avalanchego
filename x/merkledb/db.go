@@ -164,7 +164,7 @@ type merkleDB struct {
 	// Valid children of this trie.
 	childViews []*trieView
 
-	bufferPool sync.Pool
+	bufferPool *sync.Pool
 }
 
 // New returns a new merkle database.
@@ -190,7 +190,7 @@ func newDatabase(
 	trieDB := &merkleDB{
 		metrics:            metrics,
 		baseDB:             db,
-		bufferPool:         *bufferPool,
+		bufferPool:         bufferPool,
 		valueNodeDB:        newValueNodeDB(db, bufferPool, metrics, config.ValueNodeCacheSize),
 		intermediateNodeDB: newIntermediateNodeDB(db, bufferPool, metrics, config.IntermediateNodeCacheSize, config.EvictionBatchSize),
 		history:            newTrieHistory(config.HistoryLength),
