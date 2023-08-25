@@ -165,17 +165,17 @@ func newMetrics(namespace string, reg prometheus.Registerer) (merkleMetrics, err
 		dbValueNodeCacheMiss: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "value_node_cache_miss",
-			Help:      "cumulative amount of misses on the db value node cache",
+			Help:      "cumulative amount of misses on the value db node cache",
 		}),
 		dbIntermediateNodeCacheHit: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "intermediate_node_cache_hit",
-			Help:      "cumulative amount of hits on the db intermediate node cache",
+			Help:      "cumulative amount of hits on the intermediate db node cache",
 		}),
 		dbIntermediateNodeCacheMiss: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "intermediate_node_cache_miss",
-			Help:      "cumulative amount of misses on the db intermediate node cache",
+			Help:      "cumulative amount of misses on the intermediate db node cache",
 		}),
 		viewNodeCacheHit: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,

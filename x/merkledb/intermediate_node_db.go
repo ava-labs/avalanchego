@@ -101,10 +101,7 @@ func (db *intermediateNodeDB) addToBatch(b database.Batch, key path, n *node) er
 		return b.Delete(prefixedKey)
 	}
 	db.metrics.IOKeyWrite()
-	if err := b.Put(prefixedKey, n.marshal()); err != nil {
-		return err
-	}
-	return nil
+	return b.Put(prefixedKey, n.marshal())
 }
 
 func (db *intermediateNodeDB) Get(key path) (*node, error) {
