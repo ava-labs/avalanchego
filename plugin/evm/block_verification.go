@@ -57,20 +57,26 @@ func (v blockValidator) SyntacticVerify(b *Block, rules params.Rules) error {
 		return fmt.Errorf("invalid mix digest: %v", ethHeader.MixDigest)
 	}
 
-	if rules.IsSubnetEVM {
-		expectedExtraDataSize := params.ExtraDataSize
-		if headerExtraDataSize := len(ethHeader.Extra); headerExtraDataSize != expectedExtraDataSize {
+	switch {
+	case rules.IsDUpgrade:
+		if len(ethHeader.Extra) < params.DynamicFeeExtraDataSize {
 			return fmt.Errorf(
-				"expected header ExtraData to be %d but got %d",
-				expectedExtraDataSize, headerExtraDataSize,
+				"expected header ExtraData to be len >= %d but got %d",
+				params.DynamicFeeExtraDataSize, len(ethHeader.Extra),
 			)
 		}
-	} else {
-		headerExtraDataSize := uint64(len(ethHeader.Extra))
-		if headerExtraDataSize > params.MaximumExtraDataSize {
+	case rules.IsSubnetEVM:
+		if len(ethHeader.Extra) != params.DynamicFeeExtraDataSize {
+			return fmt.Errorf(
+				"expected header ExtraData to be len %d but got %d",
+				params.DynamicFeeExtraDataSize, len(ethHeader.Extra),
+			)
+		}
+	default:
+		if len(ethHeader.Extra) > int(params.MaximumExtraDataSize) {
 			return fmt.Errorf(
 				"expected header ExtraData to be <= %d but got %d",
-				params.MaximumExtraDataSize, headerExtraDataSize,
+				params.MaximumExtraDataSize, len(ethHeader.Extra),
 			)
 		}
 	}

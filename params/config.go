@@ -52,8 +52,8 @@ var (
 	TestInitialBaseFee int64 = 225_000_000_000
 	TestMaxBaseFee     int64 = 225_000_000_000
 
-	ExtraDataSize        = 80
-	RollupWindow  uint64 = 10
+	DynamicFeeExtraDataSize        = 80
+	RollupWindow            uint64 = 10
 
 	DefaultFeeConfig = commontype.FeeConfig{
 		GasLimit:        big.NewInt(8_000_000),
