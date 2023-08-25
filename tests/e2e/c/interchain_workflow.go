@@ -133,7 +133,7 @@ var _ = e2e.DescribeCChain("[Interchain Workflow]", func() {
 				recipientKey.Address(),
 			)))
 			require.NoError(err)
-			require.Greater(balances[avaxAssetID], uint64(0))
+			require.Positive(balances[avaxAssetID])
 		})
 
 		ginkgo.By("exporting AVAX from the C-Chain to the P-Chain", func() {
