@@ -43,9 +43,8 @@ const (
 )
 
 var (
-	// The actual value needs to be set in init() because it's not
-	// possible to statically define a value large enough for C-Chain.
-	DefaultFundedKeyCChainAmount big.Int
+	// Arbitrarily large amount of AVAX (10^12) to fund keys on the C-Chain for testing
+	DefaultFundedKeyCChainAmount = new(big.Int).Exp(big.NewInt(10), big.NewInt(30), nil)
 
 	errEmptyValidatorsForGenesis   = errors.New("failed to generate genesis: empty validator IDs")
 	errNoKeysForGenesis            = errors.New("failed to generate genesis: no keys to fund")
