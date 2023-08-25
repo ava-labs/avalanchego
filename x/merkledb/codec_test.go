@@ -185,7 +185,7 @@ func FuzzCodecSerializedPath(f *testing.F) {
 
 			// Encoding [got] should be the same as [b].
 			var buf bytes.Buffer
-			codec.encodeSerializedPath(got, &buf)
+			codec.encodeSerializedPath(&buf, got)
 			bufBytes := buf.Bytes()
 			require.Len(bufBytes, numRead)
 			require.Equal(b[:numRead], bufBytes)
@@ -281,14 +281,11 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 func TestCodec_DecodeDBNode(t *testing.T) {
 	require := require.New(t)
 
-	err := codec.decodeDBNode([]byte{1}, nil)
-	require.ErrorIs(err, errDecodeNil)
-
 	var (
 		parsedDBNode  dbNode
 		tooShortBytes = make([]byte, minDBNodeLen-1)
 	)
-	err = codec.decodeDBNode(tooShortBytes, &parsedDBNode)
+	err := codec.decodeDBNode(tooShortBytes, &parsedDBNode)
 	require.ErrorIs(err, io.ErrUnexpectedEOF)
 
 	proof := dbNode{
