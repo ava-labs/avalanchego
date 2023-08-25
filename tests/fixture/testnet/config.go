@@ -36,7 +36,7 @@ const (
 	DefaultNodeCount      = 5
 	DefaultFundedKeyCount = 50
 
-	DefaultGasLimit = uint64(10_0000_000) // Arbitrary gas limit is arbitrary
+	DefaultGasLimit = uint64(100_000_000) // Gas limit is arbitrary
 
 	// Arbitrarily large amount of AVAX to fund keys on the X-Chain for testing
 	DefaultFundedKeyXChainAmount = 30 * units.MegaAvax
