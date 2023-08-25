@@ -142,7 +142,7 @@ func (t *trieView) commonNewView(ctx context.Context, applyToParent func() (Trie
 // Adds the new view to [t.childViews].
 // Assumes [t.commitLock] isn't held.
 func (t *trieView) NewViewFromMap(
-	ctx context.Context, changes map[string]ChangeOp,
+	ctx context.Context, changes map[string]*ChangeOp,
 	copyBytes bool,
 ) (TrieView, error) {
 	return t.commonNewView(
@@ -159,7 +159,7 @@ func newTrieViewFromMap(
 	db *merkleDB,
 	parentTrie TrieView,
 	root *node,
-	changes map[string]ChangeOp,
+	changes map[string]*ChangeOp,
 	copyBytes bool,
 ) (*trieView, error) {
 	if root == nil {

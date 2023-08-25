@@ -346,7 +346,7 @@ func (mr *MockMerkleDBMockRecorder) NewViewFromBatchOps(arg0, arg1, arg2 interfa
 }
 
 // NewViewFromMap mocks base method.
-func (m *MockMerkleDB) NewViewFromMap(arg0 context.Context, arg1 map[string]ChangeOp, arg2 bool) (TrieView, error) {
+func (m *MockMerkleDB) NewViewFromMap(arg0 context.Context, arg1 map[string]*ChangeOp, arg2 bool) (TrieView, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "NewViewFromMap", arg0, arg1, arg2)
 	ret0, _ := ret[0].(TrieView)

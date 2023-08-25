@@ -681,7 +681,7 @@ func (db *merkleDB) newUntrackedView(batchOps []database.BatchOp, copyBytes bool
 // Changes made to the view will only be reflected in the original trie if Commit is called.
 // if copyBytes is true, code will duplicate any passed []byte so that editing in calling code is safe
 // Assumes [db.commitLock] and [db.lock] aren't held.
-func (db *merkleDB) NewViewFromMap(_ context.Context, changes map[string]ChangeOp, copyBytes bool) (TrieView, error) {
+func (db *merkleDB) NewViewFromMap(_ context.Context, changes map[string]*ChangeOp, copyBytes bool) (TrieView, error) {
 	return db.newView(func() (*trieView, error) {
 		return newTrieViewFromMap(db, db, db.root.clone(), changes, copyBytes)
 	})
