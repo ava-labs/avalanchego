@@ -4,7 +4,6 @@
 package worker
 
 import (
-	"fmt"
 	"sync"
 	"testing"
 
