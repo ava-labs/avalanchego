@@ -665,10 +665,8 @@ func (vm *VM) buildBlockWithContext(ctx context.Context, proposerVMBlockCtx *blo
 	} else {
 		log.Debug("Building block without context")
 	}
-	predicateCtx := &precompileconfig.ProposerPredicateContext{
-		PrecompilePredicateContext: precompileconfig.PrecompilePredicateContext{
-			SnowCtx: vm.ctx,
-		},
+	predicateCtx := &precompileconfig.PredicateContext{
+		SnowCtx:            vm.ctx,
 		ProposerVMBlockCtx: proposerVMBlockCtx,
 	}
 

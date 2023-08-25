@@ -171,19 +171,17 @@ func (b *Block) syntacticVerify() error {
 
 // Verify implements the snowman.Block interface
 func (b *Block) Verify(context.Context) error {
-	return b.verify(&precompileconfig.ProposerPredicateContext{
-		PrecompilePredicateContext: precompileconfig.PrecompilePredicateContext{
-			SnowCtx: b.vm.ctx,
-		},
+	return b.verify(&precompileconfig.PredicateContext{
+		SnowCtx:            b.vm.ctx,
 		ProposerVMBlockCtx: nil,
 	}, true)
 }
 
 // ShouldVerifyWithContext implements the block.WithVerifyContext interface
 func (b *Block) ShouldVerifyWithContext(context.Context) (bool, error) {
-	proposerPredicates := b.vm.chainConfig.AvalancheRules(b.ethBlock.Number(), b.ethBlock.Timestamp()).ProposerPredicates
-	// Short circuit early if there are no proposer predicates to verify
-	if len(proposerPredicates) == 0 {
+	predicates := b.vm.chainConfig.AvalancheRules(b.ethBlock.Number(), b.ethBlock.Timestamp()).Predicates
+	// Short circuit early if there are no predicates to verify
+	if len(predicates) == 0 {
 		return false, nil
 	}
 
@@ -191,7 +189,7 @@ func (b *Block) ShouldVerifyWithContext(context.Context) (bool, error) {
 	// the ProposerVMBlockCtx.
 	for _, tx := range b.ethBlock.Transactions() {
 		for _, accessTuple := range tx.AccessList() {
-			if _, ok := proposerPredicates[accessTuple.Address]; ok {
+			if _, ok := predicates[accessTuple.Address]; ok {
 				log.Debug("Block verification requires proposerVM context", "block", b.ID(), "height", b.Height())
 				return true, nil
 			}
@@ -204,10 +202,8 @@ func (b *Block) ShouldVerifyWithContext(context.Context) (bool, error) {
 
 // VerifyWithContext implements the block.WithVerifyContext interface
 func (b *Block) VerifyWithContext(ctx context.Context, proposerVMBlockCtx *block.Context) error {
-	return b.verify(&precompileconfig.ProposerPredicateContext{
-		PrecompilePredicateContext: precompileconfig.PrecompilePredicateContext{
-			SnowCtx: b.vm.ctx,
-		},
+	return b.verify(&precompileconfig.PredicateContext{
+		SnowCtx:            b.vm.ctx,
 		ProposerVMBlockCtx: proposerVMBlockCtx,
 	}, true)
 }
@@ -215,7 +211,7 @@ func (b *Block) VerifyWithContext(ctx context.Context, proposerVMBlockCtx *block
 // Verify the block is valid.
 // Enforces that the predicates are valid within [predicateContext].
 // Writes the block details to disk and the state to the trie manager iff writes=true.
-func (b *Block) verify(predicateContext *precompileconfig.ProposerPredicateContext, writes bool) error {
+func (b *Block) verify(predicateContext *precompileconfig.PredicateContext, writes bool) error {
 	if predicateContext.ProposerVMBlockCtx != nil {
 		log.Debug("Verifying block with context", "block", b.ID(), "height", b.Height())
 	} else {
@@ -248,7 +244,7 @@ func (b *Block) verify(predicateContext *precompileconfig.ProposerPredicateConte
 }
 
 // verifyPredicates verifies the predicates in the block are valid according to predicateContext.
-func (b *Block) verifyPredicates(predicateContext *precompileconfig.ProposerPredicateContext) error {
+func (b *Block) verifyPredicates(predicateContext *precompileconfig.PredicateContext) error {
 	rules := b.vm.chainConfig.AvalancheRules(b.ethBlock.Number(), b.ethBlock.Timestamp())
 
 	for _, tx := range b.ethBlock.Transactions() {

@@ -69,7 +69,7 @@ type environment struct {
 	size     uint64
 
 	rules            params.Rules
-	predicateContext *precompileconfig.ProposerPredicateContext
+	predicateContext *precompileconfig.PredicateContext
 
 	start time.Time // Time that block building began
 }
@@ -117,7 +117,7 @@ func (w *worker) setEtherbase(addr common.Address) {
 }
 
 // commitNewWork generates several new sealing tasks based on the parent block.
-func (w *worker) commitNewWork(predicateContext *precompileconfig.ProposerPredicateContext) (*types.Block, error) {
+func (w *worker) commitNewWork(predicateContext *precompileconfig.PredicateContext) (*types.Block, error) {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 
@@ -219,7 +219,7 @@ func (w *worker) commitNewWork(predicateContext *precompileconfig.ProposerPredic
 	return w.commit(env)
 }
 
-func (w *worker) createCurrentEnvironment(predicateContext *precompileconfig.ProposerPredicateContext, parent *types.Header, header *types.Header, tstart time.Time) (*environment, error) {
+func (w *worker) createCurrentEnvironment(predicateContext *precompileconfig.PredicateContext, parent *types.Header, header *types.Header, tstart time.Time) (*environment, error) {
 	state, err := w.chain.StateAt(parent.Root)
 	if err != nil {
 		return nil, err

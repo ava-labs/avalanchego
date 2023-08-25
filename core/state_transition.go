@@ -144,7 +144,8 @@ func accessListGas(rules params.Rules, accessList types.AccessList) (uint64, err
 
 	for _, accessTuple := range accessList {
 		address := accessTuple.Address
-		if !rules.PredicateExists(address) {
+		predicate, ok := rules.Predicates[address]
+		if !ok {
 			// Previous access list gas calculation does not use safemath because an overflow would not be possible with
 			// the size of access lists that could be included in a block and standard access list gas costs.
 			// Therefore, we only check for overflow when adding to [totalGas], which could include the sum of values
@@ -156,7 +157,7 @@ func accessListGas(rules params.Rules, accessList types.AccessList) (uint64, err
 			}
 			gas = totalGas
 		} else {
-			predicateGas, err := applyPredicateGas(rules, accessTuple)
+			predicateGas, err := predicate.PredicateGas(predicateutils.HashSliceToBytes(accessTuple.StorageKeys))
 			if err != nil {
 				return 0, err
 			}
@@ -178,18 +179,6 @@ func toWordSize(size uint64) uint64 {
 	}
 
 	return (size + 31) / 32
-}
-
-func applyPredicateGas(rules params.Rules, accessTuple types.AccessTuple) (uint64, error) {
-	predicate, ok := rules.PredicatePrecompiles[accessTuple.Address]
-	if ok {
-		return predicate.PredicateGas(predicateutils.HashSliceToBytes(accessTuple.StorageKeys))
-	}
-	proposerPredicate, ok := rules.ProposerPredicates[accessTuple.Address]
-	if !ok {
-		return 0, nil
-	}
-	return proposerPredicate.PredicateGas(predicateutils.HashSliceToBytes(accessTuple.StorageKeys))
 }
 
 // A Message contains the data derived from a single transaction that is relevant to state

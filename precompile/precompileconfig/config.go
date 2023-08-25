@@ -32,44 +32,26 @@ type Config interface {
 	Verify(ChainConfig) error
 }
 
-// PrecompilePredicateContext is the context passed in to the PrecompilePredicater interface.
-type PrecompilePredicateContext struct {
-	SnowCtx *snow.Context
-}
-
-// PrecompilePredicater is an optional interface for StatefulPrecompileContracts to implement.
+// Predicater is an optional interface for StatefulPrecompileContracts to implement.
 // If implemented, the predicate will be enforced on every transaction in a block, prior to
 // the block's execution.
 // If VerifyPredicate returns an error, the block will fail verification with no further processing.
 // WARNING: If you are implementing a custom precompile, beware that subnet-evm
 // will not maintain backwards compatibility of this interface and your code should not
 // rely on this. Designed for use only by precompiles that ship with subnet-evm.
-type PrecompilePredicater interface {
+type Predicater interface {
 	PredicateGas(storageSlots []byte) (uint64, error)
-	VerifyPredicate(predicateContext *PrecompilePredicateContext, storageSlots []byte) error
+	VerifyPredicate(predicateContext *PredicateContext, storageSlots []byte) error
 }
 
-// ProposerPredicateContext is the context passed in to the ProposerPredicater interface to verify
-// a precompile predicate within a specific ProposerVM wrapper.
-type ProposerPredicateContext struct {
-	PrecompilePredicateContext
+// PredicateContext is the context passed in to the Predicater interface to verify
+// a precompile predicate within a specific ProposerVM header.
+// If the block is not verified within a ProposerVM header, then ProposerVMBlockCtx
+// may be nil.
+type PredicateContext struct {
+	SnowCtx *snow.Context
 	// ProposerVMBlockCtx defines the ProposerVM context the predicate is verified within
 	ProposerVMBlockCtx *block.Context
-}
-
-// ProposerPredicater is an optional interface for StatefulPrecompiledContracts to implement.
-// If implemented, the predicate will be enforced on every transaction in a block, prior to
-// the block's execution.
-// If VerifyPredicate returns an error, the block will fail verification with no further processing.
-// Note: ProposerVMBlockCtx is guaranteed to be non-nil.
-// Precompiles should use ProposerPredicater instead of PrecompilePredicater iff their execution
-// depends on the ProposerVM Block Context.
-// WARNING: If you are implementing a custom precompile, beware that subnet-evm
-// will not maintain backwards compatibility of this interface and your code should not
-// rely on this. Designed for use only by precompiles that ship with subnet-evm.
-type ProposerPredicater interface {
-	PredicateGas(storageSlots []byte) (uint64, error)
-	VerifyPredicate(proposerPredicateContext *ProposerPredicateContext, storageSlots []byte) error
 }
 
 // SharedMemoryWriter defines an interface to allow a precompile's Accepter to write operations

@@ -15,7 +15,7 @@ import (
 type PredicateTest struct {
 	Config precompileconfig.Config
 
-	ProposerPredicateContext *precompileconfig.ProposerPredicateContext
+	PredicateContext *precompileconfig.PredicateContext
 
 	StorageSlots         []byte
 	Gas                  uint64
@@ -29,7 +29,7 @@ func (test PredicateTest) Run(t testing.TB) {
 	var (
 		gas                  uint64
 		gasErr, predicateErr error
-		predicate            = test.Config.(precompileconfig.ProposerPredicater)
+		predicate            = test.Config.(precompileconfig.Predicater)
 	)
 
 	gas, gasErr = predicate.PredicateGas(test.StorageSlots)
@@ -43,7 +43,7 @@ func (test PredicateTest) Run(t testing.TB) {
 	}
 	require.Equal(test.Gas, gas)
 
-	predicateErr = predicate.VerifyPredicate(test.ProposerPredicateContext, test.StorageSlots)
+	predicateErr = predicate.VerifyPredicate(test.PredicateContext, test.StorageSlots)
 	if test.PredicateErr == nil {
 		require.NoError(predicateErr)
 	} else {

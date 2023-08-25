@@ -64,7 +64,7 @@ func (miner *Miner) SetEtherbase(addr common.Address) {
 	miner.worker.setEtherbase(addr)
 }
 
-func (miner *Miner) GenerateBlock(predicateContext *precompileconfig.ProposerPredicateContext) (*types.Block, error) {
+func (miner *Miner) GenerateBlock(predicateContext *precompileconfig.PredicateContext) (*types.Block, error) {
 	return miner.worker.commitNewWork(predicateContext)
 }
 

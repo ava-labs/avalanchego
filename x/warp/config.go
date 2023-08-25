@@ -20,9 +20,9 @@ import (
 )
 
 var (
-	_ precompileconfig.Config             = &Config{}
-	_ precompileconfig.ProposerPredicater = &Config{}
-	_ precompileconfig.Accepter           = &Config{}
+	_ precompileconfig.Config     = &Config{}
+	_ precompileconfig.Predicater = &Config{}
+	_ precompileconfig.Accepter   = &Config{}
 )
 
 var (
@@ -108,7 +108,7 @@ func (c *Config) Accept(acceptCtx *precompileconfig.AcceptContext, txHash common
 
 // verifyWarpMessage checks that [warpMsg] can be parsed as an addressed payload and verifies the Warp Message Signature
 // within [predicateContext].
-func (c *Config) verifyWarpMessage(predicateContext *precompileconfig.ProposerPredicateContext, warpMsg *warp.Message) error {
+func (c *Config) verifyWarpMessage(predicateContext *precompileconfig.PredicateContext, warpMsg *warp.Message) error {
 	// Use default quorum numerator unless config specifies a non-default option
 	quorumNumerator := params.WarpDefaultQuorumNumerator
 	if c.QuorumNumerator != 0 {
@@ -199,7 +199,7 @@ func (c *Config) PredicateGas(predicateBytes []byte) (uint64, error) {
 }
 
 // VerifyPredicate verifies the predicate represents a valid signed and properly formatted Avalanche Warp Message.
-func (c *Config) VerifyPredicate(predicateContext *precompileconfig.ProposerPredicateContext, predicateBytes []byte) error {
+func (c *Config) VerifyPredicate(predicateContext *precompileconfig.PredicateContext, predicateBytes []byte) error {
 	if predicateContext.ProposerVMBlockCtx == nil {
 		return errNoProposerCtxPredicate
 	}
