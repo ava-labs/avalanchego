@@ -12,9 +12,11 @@ import (
 
 // A cache that calls [onEviction] on the evicted element.
 type onEvictCache[K comparable, V any] struct {
-	lock       sync.RWMutex
-	maxSize    int
-	fifo       linkedhashmap.LinkedHashmap[K, V]
+	lock    sync.RWMutex
+	maxSize int
+	fifo    linkedhashmap.LinkedHashmap[K, V]
+	// Must not call any method that grabs [c.lock]
+	// because this would cause a deadlock.
 	onEviction func(V) error
 }
 
@@ -27,6 +29,7 @@ func newOnEvictCache[K comparable, V any](maxSize int, onEviction func(V) error)
 }
 
 // removeOldest returns and removes the oldest element from this cache.
+// Assumes [c.lock] is held.
 func (c *onEvictCache[K, V]) removeOldest() (K, V, bool) {
 	k, v, exists := c.fifo.Oldest()
 	if exists {

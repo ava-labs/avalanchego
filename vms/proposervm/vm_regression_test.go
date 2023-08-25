@@ -5,7 +5,6 @@ package proposervm
 
 import (
 	"context"
-	"crypto"
 	"errors"
 	"testing"
 	"time"
@@ -28,9 +27,6 @@ func TestProposerVMInitializeShouldFailIfInnerVMCantVerifyItsHeightIndex(t *test
 				T: t,
 			},
 		},
-		TestHeightIndexedVM: &block.TestHeightIndexedVM{
-			T: t,
-		},
 	}
 
 	// let innerVM fail verifying its height index with
@@ -52,8 +48,8 @@ func TestProposerVMInitializeShouldFailIfInnerVMCantVerifyItsHeightIndex(t *test
 		time.Time{},
 		0,
 		DefaultMinBlockDelay,
-		pTestCert.PrivateKey.(crypto.Signer),
-		pTestCert.Leaf,
+		pTestSigner,
+		pTestCert,
 	)
 	defer func() {
 		// avoids leaking goroutines

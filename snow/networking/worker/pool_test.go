@@ -4,28 +4,39 @@
 package worker
 
 import (
+	"fmt"
+	"sync"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 )
 
-func TestPoolHandlesRequests(_ *testing.T) {
+func TestPoolHandlesRequests(t *testing.T) {
 	var (
 		poolWorkers = 5
-		requests    = 15
+		requests    = 5
+
+		jobsDone = make([]bool, requests)
 
 		p = NewPool(poolWorkers)
 	)
 
-	for i := 0; i < requests; i++ {
+	wg := sync.WaitGroup{}
+	for i := range jobsDone {
+		wg.Add(1)
+		idx := i
 		go func() {
 			p.Send(func() {
-				time.Sleep(20 * time.Second)
+				jobsDone[idx] = true
+				wg.Done()
 			})
 		}()
 	}
 
+	wg.Wait()
+	for i, res := range jobsDone {
+		require.True(t, res, fmt.Sprintf("job %v not done", i))
+	}
 	p.Shutdown()
 }
 
@@ -42,13 +53,17 @@ func TestWorkerPoolMultipleOutOfOrderSendsAndStopsAreAllowed(t *testing.T) {
 	})
 
 	// late requests, after Shutdown, are no-ops that won't panic
+	jobDone := false
 	lateRequest := func() {
-		time.Sleep(time.Minute)
+		jobDone = true
 	}
 	require.NotPanics(func() {
 		p.Send(lateRequest)
 	})
+	require.False(jobDone)
+
 	require.NotPanics(func() {
 		p.Send(lateRequest)
 	})
+	require.False(jobDone)
 }
