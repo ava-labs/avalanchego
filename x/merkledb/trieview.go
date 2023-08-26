@@ -142,7 +142,7 @@ func (t *trieView) commonNewView(ctx context.Context, applyToParent func() (Trie
 // Adds the new view to [t.childViews].
 // Assumes [t.commitLock] isn't held.
 func (t *trieView) NewViewFromMap(
-	ctx context.Context, changes map[string]*ChangeOp,
+	ctx context.Context, changes map[string]maybe.Maybe[[]byte],
 	copyBytes bool,
 ) (TrieView, error) {
 	return t.commonNewView(
@@ -159,7 +159,7 @@ func newTrieViewFromMap(
 	db *merkleDB,
 	parentTrie TrieView,
 	root *node,
-	changes map[string]*ChangeOp,
+	changes map[string]maybe.Maybe[[]byte],
 	copyBytes bool,
 ) (*trieView, error) {
 	if root == nil {
@@ -173,16 +173,12 @@ func newTrieViewFromMap(
 		changes:    newChangeSummary(len(changes)),
 	}
 
-	for key, op := range changes {
-		newVal := maybe.Nothing[[]byte]()
-		if !op.Delete {
-			val := op.Value
-			if copyBytes {
-				val = slices.Clone(op.Value)
-			}
-			newVal = maybe.Some(val)
+	for key, val := range changes {
+		if copyBytes {
+			val = maybe.Bind(val, slices.Clone[[]byte])
 		}
-		if err := newView.recordValueChange(newPath([]byte(key)), newVal); err != nil {
+
+		if err := newView.recordValueChange(newPath([]byte(key)), val); err != nil {
 			return nil, err
 		}
 	}

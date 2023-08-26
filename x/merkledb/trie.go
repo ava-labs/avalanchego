@@ -59,7 +59,7 @@ type Trie interface {
 
 	// NewViewFromMap returns a new view on top of this Trie where the passed changes have been applied
 	// if copyBytes is true, code will duplicate any passed []byte so that editing in calling code is safe
-	NewViewFromMap(ctx context.Context, changes map[string]*ChangeOp, copyBytes bool) (TrieView, error)
+	NewViewFromMap(ctx context.Context, changes map[string]maybe.Maybe[[]byte], copyBytes bool) (TrieView, error)
 }
 
 type TrieView interface {
