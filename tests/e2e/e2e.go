@@ -18,7 +18,6 @@ import (
 
 	"github.com/ava-labs/coreth/ethclient"
 
-	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture"
 	"github.com/ava-labs/avalanchego/tests/fixture/testnet"
