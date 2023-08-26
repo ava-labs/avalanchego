@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	ginkgo "github.com/onsi/ginkgo/v2"
+
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/api/info"

@@ -677,16 +677,20 @@ func (ln *LocalNetwork) AddLocalNode(w io.Writer, node *LocalNode, isEphemeral b
 		return nil, err
 	}
 
-	// Use dynamic port allocation.
-	var httpPort uint16 = 0
-	var stakingPort uint16 = 0
-
 	// Collect staking addresses of running nodes for use in bootstraping the new node
 	if err := ln.ReadNodes(); err != nil {
 		return nil, fmt.Errorf("failed to read local network nodes: %w", err)
 	}
-	bootstrapIPs := make([]string, 0, len(ln.Nodes))
-	bootstrapIDs := make([]string, 0, len(ln.Nodes))
+
+	var (
+		// Use dynamic port allocation.
+		httpPort    uint16 = 0
+		stakingPort uint16 = 0
+
+		bootstrapIPs = make([]string, 0, len(ln.Nodes))
+		bootstrapIDs = make([]string, 0, len(ln.Nodes))
+	)
+
 	for _, node := range ln.Nodes {
 		if len(node.StakingAddress) == 0 {
 			// Node is not running
