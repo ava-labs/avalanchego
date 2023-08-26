@@ -7,12 +7,16 @@ package e2e
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"math/rand"
+	"strings"
 	"time"
 
 	ginkgo "github.com/onsi/ginkgo/v2"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/coreth/ethclient"
 
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture"
@@ -21,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
+	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
 const (
@@ -98,16 +103,68 @@ func (te *TestEnvironment) NewKeychain(count int) *secp256k1fx.Keychain {
 	return secp256k1fx.NewKeychain(keys...)
 }
 
-// Create a new wallet for the provided keychain.
+// Create a new wallet for the provided keychain against a random node URI.
 func (te *TestEnvironment) NewWallet(keychain *secp256k1fx.Keychain) primary.Wallet {
+	return te.NewWalletForURI(keychain, te.GetRandomNodeURI())
+}
+
+// Create a new wallet for the provided keychain against the specified node URI.
+func (te *TestEnvironment) NewWalletForURI(keychain *secp256k1fx.Keychain, uri string) primary.Wallet {
 	tests.Outf("{{blue}} initializing a new wallet {{/}}\n")
-	ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
-	defer cancel()
-	wallet, err := primary.MakeWallet(ctx, &primary.WalletConfig{
-		URI:          te.GetRandomNodeURI(),
+	wallet, err := primary.MakeWallet(DefaultContext(), &primary.WalletConfig{
+		URI:          uri,
 		AVAXKeychain: keychain,
 		EthKeychain:  keychain,
 	})
 	te.require.NoError(err)
 	return wallet
+}
+
+// Create a new eth client targeting a random node.
+func (te *TestEnvironment) NewEthClient() ethclient.Client {
+	return te.NewEthClientForURI(te.GetRandomNodeURI())
+}
+
+// Create a new eth client targeting the specified node URI.
+func (te *TestEnvironment) NewEthClientForURI(nodeURI string) ethclient.Client {
+	nodeAddress := strings.Split(nodeURI, "//")[1]
+	uri := fmt.Sprintf("ws://%s/ext/bc/C/ws", nodeAddress)
+	client, err := ethclient.Dial(uri)
+	te.require.NoError(err)
+	return client
+}
+
+// Helper simplifying use of a timed context by canceling the context on ginkgo teardown.
+func ContextWithTimeout(duration time.Duration) context.Context {
+	ctx, cancel := context.WithTimeout(context.Background(), duration)
+	ginkgo.DeferCleanup(cancel)
+	return ctx
+}
+
+// Helper simplifying use of a timed context configured with the default timeout.
+func DefaultContext() context.Context {
+	return ContextWithTimeout(DefaultTimeout)
+}
+
+// Helper simplifying use via an option of a timed context configured with the default timeout.
+func WithDefaultContext() common.Option {
+	return common.WithContext(DefaultContext())
+}
+
+// Re-implementation of testify/require.Eventually that is compatible with ginkgo. testify's
+// version calls the condition function with a goroutine and ginkgo assertions don't work
+// properly in goroutines.
+func Eventually(condition func() bool, waitFor time.Duration, tick time.Duration, msg string) {
+	ticker := time.NewTicker(tick)
+	defer ticker.Stop()
+
+	ctx, cancel := context.WithTimeout(context.Background(), waitFor)
+	defer cancel()
+	for !condition() {
+		select {
+		case <-ctx.Done():
+			require.Fail(ginkgo.GinkgoT(), msg)
+		case <-ticker.C:
+		}
+	}
 }

@@ -28,4 +28,9 @@ jobs:
         run: ./scripts/build.sh -r
       - name: Run e2e tests
         shell: bash
-        run: scripts/tests.e2e.sh ./build/avalanchego
+        run: ./scripts/tests.e2e.sh ./build/avalanchego
+      - name: Upload testnet network dir
+        uses: actions/upload-artifact@v3
+        with:
+          name: testnet-data
+          path: ~/.testnetctl/networks/1000
