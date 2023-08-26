@@ -1245,8 +1245,6 @@ func (ms *merkleState) writeMerkleState(currentData, pendingData map[ids.ID]*sta
 		ms.writeDelegateeRewards(&batchOps),
 		ms.writeUTXOs(&batchOps),
 		ms.writeRewardUTXOs(&batchOps),
-
-		ms.logMerkleRoot(),
 	)
 	if errs.Err != nil {
 		return errs.Err
@@ -1257,8 +1255,11 @@ func (ms *merkleState) writeMerkleState(currentData, pendingData map[ids.ID]*sta
 	if err != nil {
 		return fmt.Errorf("failed creating merkleDB view: %w", err)
 	}
+	if err := view.CommitToDB(ctx); err != nil {
+		return fmt.Errorf("failed committing merkleDB view: %w", err)
+	}
 
-	return view.CommitToDB(ctx)
+	return ms.logMerkleRoot()
 }
 
 func (ms *merkleState) writeMetadata(batchOps *[]database.BatchOp) error {
