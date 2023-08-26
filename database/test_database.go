@@ -6,6 +6,7 @@ package database
 import (
 	"bytes"
 	"io"
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -942,7 +943,7 @@ func TestClear(t *testing.T, db Database) {
 	require.NoError(err)
 	require.Equal(3, count)
 
-	require.NoError(Clear(db, db))
+	require.NoError(Clear(db, math.MaxInt))
 
 	count, err = Count(db)
 	require.NoError(err)
@@ -972,7 +973,7 @@ func TestClearPrefix(t *testing.T, db Database) {
 	require.NoError(err)
 	require.Equal(3, count)
 
-	require.NoError(ClearPrefix(db, db, []byte("hello")))
+	require.NoError(ClearPrefix(db, []byte("hello"), math.MaxInt))
 
 	count, err = Count(db)
 	require.NoError(err)
