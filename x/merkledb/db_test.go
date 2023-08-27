@@ -249,10 +249,9 @@ func Test_MerkleDB_Invalidate_Siblings_On_Commit(t *testing.T) {
 	viewToCommit, err := dbTrie.NewView(
 		context.Background(),
 		ViewChanges{
-			BatchOps: []database.BatchOp{{
-				Key:   []byte{0},
-				Value: []byte{0},
-			}},
+			BatchOps: []database.BatchOp{
+				{Key: []byte{0}, Value: []byte{0}},
+			},
 		},
 	)
 	require.NoError(err)
@@ -486,10 +485,9 @@ func TestDatabaseNewViewFromBatchOpsTracked(t *testing.T) {
 	view, err := db.NewView(
 		context.Background(),
 		ViewChanges{
-			BatchOps: []database.BatchOp{{
-				Key:   []byte{1},
-				Value: []byte{1},
-			}},
+			BatchOps: []database.BatchOp{
+				{Key: []byte{1}, Value: []byte{1}},
+			},
 		},
 	)
 	require.NoError(err)
