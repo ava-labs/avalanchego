@@ -548,7 +548,10 @@ func TestGetChangeProof(t *testing.T) {
 		require.NoError(t, it.Error())
 		it.Release()
 
-		view, err := serverDB.NewView(context.Background(), ops)
+		view, err := serverDB.NewView(
+			context.Background(),
+			merkledb.ViewChanges{BatchOps: ops},
+		)
 		require.NoError(t, err)
 		require.NoError(t, view.CommitToDB(context.Background()))
 	}
