@@ -1057,6 +1057,10 @@ func (db *merkleDB) VerifyChangeProof(
 	db.commitLock.RLock()
 	defer db.commitLock.RUnlock()
 
+	if db.closed {
+		return database.ErrClosed
+	}
+
 	if err := verifyAllChangeProofKeyValuesPresent(
 		ctx,
 		db,
