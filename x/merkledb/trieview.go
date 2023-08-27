@@ -128,7 +128,7 @@ func (t *trieView) NewView(
 		return nil, err
 	}
 
-	nv, err := newTrieView(t.db, t, t.root.clone(), changes)
+	newView, err := newTrieView(t.db, t, t.root.clone(), changes)
 	if err != nil {
 		return nil, err
 	}
@@ -139,9 +139,9 @@ func (t *trieView) NewView(
 	if t.invalidated {
 		return nil, ErrInvalid
 	}
-	t.childViews = append(t.childViews, nv)
+	t.childViews = append(t.childViews, newView)
 
-	return nv, nil
+	return newView, nil
 }
 
 // Creates a new view with the given [parentTrie].
