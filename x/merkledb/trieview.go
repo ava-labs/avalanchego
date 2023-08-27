@@ -106,7 +106,11 @@ type trieView struct {
 	root *node
 }
 
-func (t *trieView) commonNewView(ctx context.Context, applyToParent func() (TrieView, error), newView func() (*trieView, error)) (TrieView, error) {
+func (t *trieView) commonNewView(
+	ctx context.Context,
+	applyToParent func() (TrieView, error),
+	newView func() (*trieView, error),
+) (TrieView, error) {
 	if t.isInvalid() {
 		return nil, ErrInvalid
 	}
@@ -142,7 +146,8 @@ func (t *trieView) commonNewView(ctx context.Context, applyToParent func() (Trie
 // Adds the new view to [t.childViews].
 // Assumes [t.commitLock] isn't held.
 func (t *trieView) NewViewFromMap(
-	ctx context.Context, changes map[string]maybe.Maybe[[]byte],
+	ctx context.Context,
+	changes map[string]maybe.Maybe[[]byte],
 	copyBytes bool,
 ) (TrieView, error) {
 	return t.commonNewView(
@@ -152,7 +157,8 @@ func (t *trieView) NewViewFromMap(
 		},
 		func() (*trieView, error) {
 			return newTrieViewFromMap(t.db, t, t.root.clone(), changes, copyBytes)
-		})
+		},
+	)
 }
 
 func newTrieViewFromMap(

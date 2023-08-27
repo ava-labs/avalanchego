@@ -659,7 +659,11 @@ func (db *merkleDB) GetChangeProof(
 // Changes made to the view will only be reflected in the original trie if Commit is called.
 // if copyBytes is true, code will duplicate any passed []byte so that editing in calling code is safe
 // Assumes [db.commitLock] and [db.lock] aren't held.
-func (db *merkleDB) NewViewFromBatchOps(_ context.Context, batchOps []database.BatchOp, copyBytes bool) (TrieView, error) {
+func (db *merkleDB) NewViewFromBatchOps(
+	_ context.Context,
+	batchOps []database.BatchOp,
+	copyBytes bool,
+) (TrieView, error) {
 	return db.newView(func() (*trieView, error) {
 		return newTrieViewFromBatchOps(db, db, db.root.clone(), batchOps, copyBytes)
 	})
@@ -676,7 +680,11 @@ func (db *merkleDB) newUntrackedView(batchOps []database.BatchOp, copyBytes bool
 // Changes made to the view will only be reflected in the original trie if Commit is called.
 // if copyBytes is true, code will duplicate any passed []byte so that editing in calling code is safe
 // Assumes [db.commitLock] and [db.lock] aren't held.
-func (db *merkleDB) NewViewFromMap(_ context.Context, changes map[string]maybe.Maybe[[]byte], copyBytes bool) (TrieView, error) {
+func (db *merkleDB) NewViewFromMap(
+	_ context.Context,
+	changes map[string]maybe.Maybe[[]byte],
+	copyBytes bool,
+) (TrieView, error) {
 	return db.newView(func() (*trieView, error) {
 		return newTrieViewFromMap(db, db, db.root.clone(), changes, copyBytes)
 	})
@@ -837,13 +845,13 @@ func (db *merkleDB) PutContext(ctx context.Context, k, v []byte) error {
 		return database.ErrClosed
 	}
 
-	view, err := db.newUntrackedView([]database.BatchOp{
-		{
+	view, err := db.newUntrackedView(
+		[]database.BatchOp{{
 			Key:   k,
 			Value: v,
-		},
-	},
-		true)
+		}},
+		true,
+	)
 	if err != nil {
 		return err
 	}
@@ -862,18 +870,21 @@ func (db *merkleDB) DeleteContext(ctx context.Context, key []byte) error {
 		return database.ErrClosed
 	}
 
-	view, err := db.newUntrackedView([]database.BatchOp{
-		{
+	view, err := db.newUntrackedView(
+		[]database.BatchOp{{
 			Key:    key,
 			Delete: true,
-		},
-	}, false)
+		}},
+		false,
+	)
 	if err != nil {
 		return err
 	}
 	return view.commitToDB(ctx)
 }
 
+// Assumes values inside of [ops] are safe to reference after the function
+// returns.
 func (db *merkleDB) commitBatch(ops []database.BatchOp) error {
 	db.commitLock.Lock()
 	defer db.commitLock.Unlock()
@@ -882,7 +893,7 @@ func (db *merkleDB) commitBatch(ops []database.BatchOp) error {
 		return database.ErrClosed
 	}
 
-	view, err := db.newUntrackedView(ops, true)
+	view, err := db.newUntrackedView(ops, false)
 	if err != nil {
 		return err
 	}
@@ -1093,7 +1104,7 @@ func (db *merkleDB) VerifyChangeProof(
 	}
 
 	// Don't need to lock [view] because nobody else has a reference to it.
-	view, err := db.newUntrackedView(ops, true)
+	view, err := db.newUntrackedView(ops, false)
 	if err != nil {
 		return err
 	}
