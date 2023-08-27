@@ -63,6 +63,11 @@ const (
 	// Start time must be a minimum of 15s ahead of the current time
 	// or validator addition will fail.
 	DefaultValidatorStartTimeDiff = 20 * time.Second
+
+	// Setting this env will disable post-test bootstrap
+	// checks. Useful for speeding up iteration during test
+	// development.
+	SkipBootstrapChecksEnvName = "E2E_SKIP_BOOTSTRAP_CHECKS"
 )
 
 // Env is used to access shared test fixture. Intended to be

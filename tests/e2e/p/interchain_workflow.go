@@ -40,8 +40,9 @@ var _ = e2e.DescribeXChain("[Interchain Workflow]", func() {
 	)
 
 	ginkgo.It("should ensure that funds can be transferred from the P-Chain to the X-Chain and the C-Chain", func() {
+		network := e2e.Env.GetNetwork()
+
 		ginkgo.By("checking that the network has a compatible minimum stake duration", func() {
-			network := e2e.Env.GetNetwork()
 			minStakeDuration := cast.ToDuration(network.GetConfig().DefaultFlags[config.MinStakeDurationKey])
 			require.Equal(testnet.DefaultMinStakeDuration, minStakeDuration)
 		})
@@ -87,7 +88,6 @@ var _ = e2e.DescribeXChain("[Interchain Workflow]", func() {
 		}
 
 		ginkgo.By("adding new node and waiting for it to report healthy")
-		network := e2e.Env.GetNetwork()
 		node := e2e.AddEphemeralNode(network, testnet.FlagsMap{})
 		e2e.WaitForHealthy(node)
 
@@ -208,5 +208,10 @@ var _ = e2e.DescribeXChain("[Interchain Workflow]", func() {
 			require.NoError(err)
 			return balance.Cmp(big.NewInt(0)) > 0
 		}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "failed to see recipient address funded before timeout")
+
+		ginkgo.By("stopping validator node to free up resources for a bootstrap check")
+		require.NoError(node.Stop())
+
+		e2e.CheckBootstrapIsPossible(network)
 	})
 })
