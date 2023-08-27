@@ -902,8 +902,7 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 	db.moveChildViewsToDB(trieToCommit)
 
 	// see if any changes need to be applied to the db
-	// use changed values and not changed nodes because the root should always be present in changes.nodes
-	if len(changes.values) == 0 {
+	if len(changes.nodes) == 0 {
 		return nil
 	}
 

@@ -165,12 +165,6 @@ func newTrieView(
 		changes:    newChangeSummary(len(changes.BatchOps) + len(changes.MapOps)),
 	}
 
-	// record that the root of this trie will be changing
-	// ensures that the root is present in the newView's t.changes.nodes
-	if err := newView.recordNodeChange(root); err != nil {
-		return nil, err
-	}
-
 	for _, op := range changes.BatchOps {
 		newVal := maybe.Nothing[[]byte]()
 		if !op.Delete {
