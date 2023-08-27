@@ -189,6 +189,9 @@ func (vm *VM) pruneOldBlocks() error {
 	}
 
 	// TODO: Refactor to use DB iterators and commit periodically.
+	//
+	// Note: vm.lastAcceptedHeight is guaranteed to be >= height, so the
+	// subtraction can never underflow.
 	for vm.lastAcceptedHeight-height > vm.numHistoricalBlocks {
 		blockToDelete, err := vm.State.GetBlockIDAtHeight(height)
 		if err != nil {
