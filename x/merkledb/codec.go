@@ -21,7 +21,7 @@ const (
 	trueByte             = 1
 	falseByte            = 0
 	minVarIntLen         = 1
-	minMaybeByteSliceLen = 1
+	minMaybeByteSliceLen = boolLen
 	minSerializedPathLen = minVarIntLen
 	minByteSliceLen      = minVarIntLen
 	minDBNodeLen         = minMaybeByteSliceLen + minVarIntLen

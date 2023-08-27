@@ -41,7 +41,7 @@ func TestOnEvictCacheNoOnEvictionError(t *testing.T) {
 	evictedKey := []int{}
 	evictedValue := []int{}
 	onEviction := func(k, n int) error {
-		evictedKey = append(evictedKey, n)
+		evictedKey = append(evictedKey, k)
 		evictedValue = append(evictedValue, n)
 		return nil
 	}

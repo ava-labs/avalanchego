@@ -145,9 +145,6 @@ func Test_MerkleDB_DB_Load_Root_From_DB(t *testing.T) {
 func Test_MerkleDB_DB_Rebuild(t *testing.T) {
 	require := require.New(t)
 
-	rdb := memdb.New()
-	defer rdb.Close()
-
 	initialSize := 10_000
 
 	config := newDefaultConfig()
@@ -156,7 +153,7 @@ func Test_MerkleDB_DB_Rebuild(t *testing.T) {
 
 	db, err := newDB(
 		context.Background(),
-		rdb,
+		memdb.New(),
 		config,
 	)
 	require.NoError(err)
@@ -174,10 +171,17 @@ func Test_MerkleDB_DB_Rebuild(t *testing.T) {
 
 	root, err := db.GetMerkleRoot(context.Background())
 	require.NoError(err)
-
 	require.NoError(db.rebuild(context.Background()))
-
 	rebuiltRoot, err := db.GetMerkleRoot(context.Background())
+	require.NoError(err)
+	require.Equal(root, rebuiltRoot)
+
+	// add variation where root has a value
+	require.NoError(db.Put(nil, []byte{}))
+	root, err = db.GetMerkleRoot(context.Background())
+	require.NoError(err)
+	require.NoError(db.rebuild(context.Background()))
+	rebuiltRoot, err = db.GetMerkleRoot(context.Background())
 	require.NoError(err)
 	require.Equal(root, rebuiltRoot)
 }

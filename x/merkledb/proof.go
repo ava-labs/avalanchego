@@ -854,6 +854,8 @@ func addPathInfo(
 			childPath := keyPath.Append(index) + compressedPath
 			if (shouldInsertLeftChildren && childPath.Compare(insertChildrenLessThan.Value()) < 0) ||
 				(shouldInsertRightChildren && childPath.Compare(insertChildrenGreaterThan.Value()) > 0) {
+				// we don't know if the child had a value or not, but it doesn't matter
+				// we only need the ids to be correct so that the calculated hash is correct
 				n.addChildWithoutNode(index, compressedPath, childID, false /*hasValue*/)
 			}
 		}

@@ -565,14 +565,12 @@ func Test_Trie_HashCountOnBranch(t *testing.T) {
 	dbTrie, err := getBasicDB()
 	require.NoError(err)
 	require.NotNil(dbTrie)
-	trieIntf, err := dbTrie.NewView(context.Background(), ViewChanges{})
+	trieIntf, err := dbTrie.NewView(context.Background(), ViewChanges{BatchOps: []database.BatchOp{{Key: []byte("key12"), Value: []byte("value12")}}})
 	require.NoError(err)
 	trie := trieIntf.(*trieView)
 
 	// force a new node to generate with common prefix "key1" and have these two nodes as children
-	_, err = trie.insert(newPath([]byte("key12")), maybe.Some([]byte("value12")))
-	require.NoError(err)
-	view2, err := trie.NewView(context.Background(), []database.BatchOp{{Key: []byte("key134"), Value: []byte("value134")}})
+	view2, err := trie.NewView(context.Background(), ViewChanges{BatchOps: []database.BatchOp{{Key: []byte("key134"), Value: []byte("value134")}}})
 	require.NoError(err)
 
 	// clear the hash count to ignore setup

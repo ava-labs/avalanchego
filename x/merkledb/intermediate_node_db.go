@@ -14,7 +14,7 @@ const (
 	intermediateNodePrefixLen = 1
 )
 
-var intermediateNodePrefixBytes = []byte{1}
+var intermediateNodePrefix = []byte{2}
 
 type intermediateNodeDB struct {
 	// Holds unused []byte
@@ -55,7 +55,7 @@ func (db *intermediateNodeDB) prefixedKey(key []byte) []byte {
 		db.bufferPool.Put(prefixedKey)
 		prefixedKey = make([]byte, keyLen)
 	}
-	copy(prefixedKey, intermediateNodePrefixBytes)
+	copy(prefixedKey, intermediateNodePrefix)
 	copy(prefixedKey[intermediateNodePrefixLen:], key)
 	return prefixedKey
 }

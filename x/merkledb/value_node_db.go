@@ -12,7 +12,7 @@ import (
 
 const valueNodePrefixLen = 1
 
-var valueNodePrefixBytes = []byte{0}
+var valueNodePrefix = []byte{1}
 
 type valueNodeDB struct {
 	// Holds unused []byte
@@ -75,7 +75,7 @@ func (db *valueNodeDB) prefixedKey(key []byte) []byte {
 		db.bufferPool.Put(prefixedKey)
 		prefixedKey = make([]byte, keyLen)
 	}
-	copy(prefixedKey, valueNodePrefixBytes)
+	copy(prefixedKey, valueNodePrefix)
 	copy(prefixedKey[valueNodePrefixLen:], key)
 	return prefixedKey
 }

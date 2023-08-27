@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"sync"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -34,6 +35,7 @@ const (
 	// TODO: name better
 	rebuildViewSizeFractionOfCacheSize = 50
 	minRebuildViewSizePerCommit        = 1000
+	clearPrefixWriteSize               = 10 * units.KiB
 )
 
 var (
@@ -41,8 +43,7 @@ var (
 
 	codec = newCodec()
 
-	rootKey                 []byte
-	metadataPrefix          = []byte("metadata")
+	metadataPrefix          = []byte{0}
 	cleanShutdownKey        = []byte(string(metadataPrefix) + "cleanShutdown")
 	hadCleanShutdown        = []byte{1}
 	didNotHaveCleanShutdown = []byte{0}
@@ -243,27 +244,9 @@ func (db *merkleDB) rebuild(ctx context.Context) error {
 		db.valueNodeDB.nodeCache.maxSize/rebuildViewSizeFractionOfCacheSize,
 		minRebuildViewSizePerCommit,
 	)
-	intermediateNodeIt := db.baseDB.NewIteratorWithPrefix(intermediateNodePrefixBytes)
+	intermediateNodeIt := db.baseDB.NewIteratorWithPrefix(intermediateNodePrefix)
 	defer intermediateNodeIt.Release()
-	intermediateBatch := db.baseDB.NewBatch()
-	count := 0
-	// delete all intermediate nodes
-	for intermediateNodeIt.Next() {
-		if count >= opsSizeLimit {
-			if err := intermediateBatch.Write(); err != nil {
-				return err
-			}
-			intermediateBatch = db.baseDB.NewBatch()
-		}
-		count++
-		if err := intermediateBatch.Delete(intermediateNodeIt.Key()); err != nil {
-			return err
-		}
-	}
-	if err := intermediateNodeIt.Error(); err != nil {
-		return err
-	}
-	if err := intermediateBatch.Write(); err != nil {
+	if err := database.ClearPrefix(db.baseDB, db.baseDB, intermediateNodePrefix); err != nil {
 		return err
 	}
 
