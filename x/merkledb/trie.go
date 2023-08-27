@@ -50,25 +50,22 @@ type ReadOnlyTrie interface {
 	database.Iteratee
 }
 
+type ViewChanges struct {
+	BatchOps []database.BatchOp
+	MapOps   map[string]maybe.Maybe[[]byte]
+	// OwnBytes when set to true will skip copying of bytes and assume ownership
+	// of the provided bytes.
+	OwnBytes bool
+}
+
 type Trie interface {
 	ReadOnlyTrie
 
-	// NewViewFromBatchOps returns a new view on top of this Trie where the
-	// passed batchOps have been applied. If copyBytes is true, code will
-	// duplicate any passed []byte so that editing in calling code is safe.
-	NewViewFromBatchOps(
+	// NewView returns a new view on top of this Trie where the passed changes
+	// have been applied.
+	NewView(
 		ctx context.Context,
-		batchOps []database.BatchOp,
-		copyBytes bool,
-	) (TrieView, error)
-
-	// NewViewFromMap returns a new view on top of this Trie where the passed
-	// changes have been applied. If copyBytes is true, code will duplicate any
-	// passed []byte so that editing in calling code is safe.
-	NewViewFromMap(
-		ctx context.Context,
-		changes map[string]maybe.Maybe[[]byte],
-		copyBytes bool,
+		changes ViewChanges,
 	) (TrieView, error)
 }
 

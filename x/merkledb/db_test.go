@@ -125,7 +125,7 @@ func Test_MerkleDB_DB_Load_Root_From_DB(t *testing.T) {
 		k := []byte(strconv.Itoa(i))
 		ops = append(ops, database.BatchOp{Key: k, Value: hashing.ComputeHash256(k)})
 	}
-	view, err := db.NewViewFromBatchOps(context.Background(), ops, true)
+	view, err := db.NewView(context.Background(), ViewChanges{BatchOps: ops})
 	require.NoError(err)
 	require.NoError(view.CommitToDB(context.Background()))
 
@@ -171,7 +171,7 @@ func Test_MerkleDB_DB_Rebuild(t *testing.T) {
 		k := []byte(strconv.Itoa(i))
 		ops = append(ops, database.BatchOp{Key: k, Value: hashing.ComputeHash256(k)})
 	}
-	view, err := db.NewViewFromBatchOps(context.Background(), ops, true)
+	view, err := db.NewView(context.Background(), ViewChanges{BatchOps: ops})
 	require.NoError(err)
 	require.NoError(view.CommitToDB(context.Background()))
 
@@ -246,12 +246,20 @@ func Test_MerkleDB_Invalidate_Siblings_On_Commit(t *testing.T) {
 	require.NoError(err)
 	require.NotNil(dbTrie)
 
-	viewToCommit, err := dbTrie.NewViewFromBatchOps(context.Background(), []database.BatchOp{{Key: []byte{0}, Value: []byte{0}}}, true)
+	viewToCommit, err := dbTrie.NewView(
+		context.Background(),
+		ViewChanges{
+			BatchOps: []database.BatchOp{{
+				Key:   []byte{0},
+				Value: []byte{0},
+			}},
+		},
+	)
 	require.NoError(err)
 
-	sibling1, err := dbTrie.NewViewFromBatchOps(context.Background(), nil, true)
+	sibling1, err := dbTrie.NewView(context.Background(), ViewChanges{})
 	require.NoError(err)
-	sibling2, err := dbTrie.NewViewFromBatchOps(context.Background(), nil, true)
+	sibling2, err := dbTrie.NewView(context.Background(), ViewChanges{})
 	require.NoError(err)
 
 	require.False(sibling1.(*trieView).isInvalid())
@@ -475,7 +483,15 @@ func TestDatabaseNewViewFromBatchOpsTracked(t *testing.T) {
 	require.NoError(err)
 
 	// Create a new tracked view.
-	view, err := db.NewViewFromBatchOps(context.Background(), []database.BatchOp{{Key: []byte{1}, Value: []byte{1}}}, true)
+	view, err := db.NewView(
+		context.Background(),
+		ViewChanges{
+			BatchOps: []database.BatchOp{{
+				Key:   []byte{1},
+				Value: []byte{1},
+			}},
+		},
+	)
 	require.NoError(err)
 	require.Len(db.childViews, 1)
 
@@ -499,7 +515,7 @@ func TestDatabaseCommitChanges(t *testing.T) {
 	require.Equal(dbRoot, db.getMerkleRoot()) // Root didn't change
 
 	// Committing an invalid view should fail.
-	invalidView, err := db.NewViewFromBatchOps(context.Background(), nil, true)
+	invalidView, err := db.NewView(context.Background(), ViewChanges{})
 	require.NoError(err)
 	invalidView.(*trieView).invalidate()
 	err = invalidView.CommitToDB(context.Background())
@@ -510,10 +526,15 @@ func TestDatabaseCommitChanges(t *testing.T) {
 	require.NoError(db.Put([]byte{2}, []byte{2}))
 
 	// Make a view and insert/delete a key-value pair.
-	view1Intf, err := db.NewViewFromBatchOps(context.Background(), []database.BatchOp{
-		{Key: []byte{3}, Value: []byte{3}},
-		{Key: []byte{1}, Delete: true},
-	}, true)
+	view1Intf, err := db.NewView(
+		context.Background(),
+		ViewChanges{
+			BatchOps: []database.BatchOp{
+				{Key: []byte{3}, Value: []byte{3}},
+				{Key: []byte{1}, Delete: true},
+			},
+		},
+	)
 	require.NoError(err)
 	require.IsType(&trieView{}, view1Intf)
 	view1 := view1Intf.(*trieView)
@@ -521,13 +542,13 @@ func TestDatabaseCommitChanges(t *testing.T) {
 	require.NoError(err)
 
 	// Make a second view
-	view2Intf, err := db.NewViewFromBatchOps(context.Background(), nil, true)
+	view2Intf, err := db.NewView(context.Background(), ViewChanges{})
 	require.NoError(err)
 	require.IsType(&trieView{}, view2Intf)
 	view2 := view2Intf.(*trieView)
 
 	// Make a view atop a view
-	view3Intf, err := view1.NewViewFromBatchOps(context.Background(), nil, true)
+	view3Intf, err := view1.NewView(context.Background(), ViewChanges{})
 	require.NoError(err)
 	require.IsType(&trieView{}, view3Intf)
 	view3 := view3Intf.(*trieView)
@@ -577,17 +598,17 @@ func TestDatabaseInvalidateChildrenExcept(t *testing.T) {
 	require.NoError(err)
 
 	// Create children
-	view1Intf, err := db.NewViewFromBatchOps(context.Background(), nil, true)
+	view1Intf, err := db.NewView(context.Background(), ViewChanges{})
 	require.NoError(err)
 	require.IsType(&trieView{}, view1Intf)
 	view1 := view1Intf.(*trieView)
 
-	view2Intf, err := db.NewViewFromBatchOps(context.Background(), nil, true)
+	view2Intf, err := db.NewView(context.Background(), ViewChanges{})
 	require.NoError(err)
 	require.IsType(&trieView{}, view2Intf)
 	view2 := view2Intf.(*trieView)
 
-	view3Intf, err := db.NewViewFromBatchOps(context.Background(), nil, true)
+	view3Intf, err := db.NewView(context.Background(), ViewChanges{})
 	require.NoError(err)
 	require.IsType(&trieView{}, view3Intf)
 	view3 := view3Intf.(*trieView)
@@ -668,7 +689,7 @@ func Test_MerkleDB_Random_Insert_Ordering(t *testing.T) {
 		}
 		db, err := getBasicDB()
 		require.NoError(err)
-		result, err := db.NewViewFromBatchOps(context.Background(), ops, true)
+		result, err := db.NewView(context.Background(), ViewChanges{BatchOps: ops})
 		require.NoError(err)
 		primaryRoot, err := result.GetMerkleRoot(context.Background())
 		require.NoError(err)
@@ -676,7 +697,7 @@ func Test_MerkleDB_Random_Insert_Ordering(t *testing.T) {
 			r.Shuffle(totalState, func(i, j int) {
 				ops[i], ops[j] = ops[j], ops[i]
 			})
-			result, err := db.NewViewFromBatchOps(context.Background(), ops, true)
+			result, err := db.NewView(context.Background(), ViewChanges{BatchOps: ops})
 			require.NoError(err)
 			newRoot, err := result.GetMerkleRoot(context.Background())
 			require.NoError(err)
@@ -855,7 +876,7 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 			for key, value := range values {
 				ops = append(ops, database.BatchOp{Key: key.Serialize().Value, Value: value})
 			}
-			newView, err := dbTrie.NewViewFromBatchOps(context.Background(), ops, true)
+			newView, err := dbTrie.NewView(context.Background(), ViewChanges{BatchOps: ops})
 			require.NoError(err)
 
 			calculatedRoot, err := newView.GetMerkleRoot(context.Background())

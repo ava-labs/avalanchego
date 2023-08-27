@@ -655,46 +655,32 @@ func (db *merkleDB) GetChangeProof(
 	return result, nil
 }
 
-// NewViewFromBatchOps returns a new view on top of this trie.
-// Changes made to the view will only be reflected in the original trie if Commit is called.
-// if copyBytes is true, code will duplicate any passed []byte so that editing in calling code is safe
-// Assumes [db.commitLock] and [db.lock] aren't held.
-func (db *merkleDB) NewViewFromBatchOps(
-	_ context.Context,
-	batchOps []database.BatchOp,
-	copyBytes bool,
-) (TrieView, error) {
-	return db.newView(func() (*trieView, error) {
-		return newTrieViewFromBatchOps(db, db, db.root.clone(), batchOps, copyBytes)
-	})
-}
-
 // Returns a new view that isn't tracked in [db.childViews].
 // For internal use only, namely in methods that create short-lived views.
 // Assumes [db.lock] isn't held and [db.commitLock] is read locked.
 func (db *merkleDB) newUntrackedView(batchOps []database.BatchOp, copyBytes bool) (*trieView, error) {
-	return newTrieViewFromBatchOps(db, db, db.root.clone(), batchOps, copyBytes)
+	return newTrieView(
+		db,
+		db,
+		db.root.clone(),
+		ViewChanges{
+			BatchOps: batchOps,
+			OwnBytes: !copyBytes,
+		},
+	)
 }
 
-// NewViewFromMap returns a new view on top of this trie.
-// Changes made to the view will only be reflected in the original trie if Commit is called.
-// if copyBytes is true, code will duplicate any passed []byte so that editing in calling code is safe
+// NewView returns a new view on top of this Trie where the passed changes
+// have been applied.
+//
+// Changes made to the view will only be reflected in the original trie if
+// Commit is called.
+//
 // Assumes [db.commitLock] and [db.lock] aren't held.
-func (db *merkleDB) NewViewFromMap(
+func (db *merkleDB) NewView(
 	_ context.Context,
-	changes map[string]maybe.Maybe[[]byte],
-	copyBytes bool,
+	changes ViewChanges,
 ) (TrieView, error) {
-	return db.newView(func() (*trieView, error) {
-		return newTrieViewFromMap(db, db, db.root.clone(), changes, copyBytes)
-	})
-}
-
-// newView returns a new view on top of this trie that has been added to childViews
-// Wrapper function for NewViewFromMap and NewViewFromBatchOps
-// Changes made to the view will only be reflected in the original trie if Commit is called.
-// Assumes [db.commitLock] and [db.lock] aren't held.
-func (db *merkleDB) newView(createView func() (*trieView, error)) (TrieView, error) {
 	// ensure the db doesn't change while creating the new view
 	db.commitLock.RLock()
 	defer db.commitLock.RUnlock()
@@ -703,7 +689,7 @@ func (db *merkleDB) newView(createView func() (*trieView, error)) (TrieView, err
 		return nil, database.ErrClosed
 	}
 
-	newView, err := createView()
+	newView, err := newTrieView(db, db, db.root.clone(), changes)
 	if err != nil {
 		return nil, err
 	}
@@ -1214,7 +1200,7 @@ func (db *merkleDB) getHistoricalViewForRange(
 	// looking for the trie's current root id, so return the trie unmodified
 	if currentRootID == rootID {
 		// create an empty trie
-		return newTrieViewFromBatchOps(db, db, db.root.clone(), nil, false)
+		return newTrieView(db, db, db.root.clone(), ViewChanges{})
 	}
 
 	changeHistory, err := db.history.getChangesToGetToRoot(rootID, start, end)

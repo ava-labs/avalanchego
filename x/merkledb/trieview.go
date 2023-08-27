@@ -106,10 +106,13 @@ type trieView struct {
 	root *node
 }
 
-func (t *trieView) commonNewView(
+// NewView returns a new view on top of this Trie where the passed changes
+// have been applied.
+// Adds the new view to [t.childViews].
+// Assumes [t.commitLock] isn't held.
+func (t *trieView) NewView(
 	ctx context.Context,
-	applyToParent func() (TrieView, error),
-	newView func() (*trieView, error),
+	changes ViewChanges,
 ) (TrieView, error) {
 	if t.isInvalid() {
 		return nil, ErrInvalid
@@ -118,14 +121,14 @@ func (t *trieView) commonNewView(
 	defer t.commitLock.RUnlock()
 
 	if t.committed {
-		return applyToParent()
+		return t.getParentTrie().NewView(ctx, changes)
 	}
 
 	if err := t.calculateNodeIDs(ctx); err != nil {
 		return nil, err
 	}
 
-	nv, err := newView()
+	nv, err := newTrieView(t.db, t, t.root.clone(), changes)
 	if err != nil {
 		return nil, err
 	}
@@ -141,78 +144,12 @@ func (t *trieView) commonNewView(
 	return nv, nil
 }
 
-// NewViewFromMap returns a new view on top of this one.
-// if copyBytes is true, code will duplicate any passed []byte so that editing in calling code is safe
-// Adds the new view to [t.childViews].
-// Assumes [t.commitLock] isn't held.
-func (t *trieView) NewViewFromMap(
-	ctx context.Context,
-	changes map[string]maybe.Maybe[[]byte],
-	copyBytes bool,
-) (TrieView, error) {
-	return t.commonNewView(
-		ctx,
-		func() (TrieView, error) {
-			return t.getParentTrie().NewViewFromMap(ctx, changes, copyBytes)
-		},
-		func() (*trieView, error) {
-			return newTrieViewFromMap(t.db, t, t.root.clone(), changes, copyBytes)
-		},
-	)
-}
-
-func newTrieViewFromMap(
-	db *merkleDB,
-	parentTrie TrieView,
-	root *node,
-	changes map[string]maybe.Maybe[[]byte],
-	copyBytes bool,
-) (*trieView, error) {
-	if root == nil {
-		return nil, ErrNoValidRoot
-	}
-
-	newView := &trieView{
-		root:       root,
-		db:         db,
-		parentTrie: parentTrie,
-		changes:    newChangeSummary(len(changes)),
-	}
-
-	for key, val := range changes {
-		if copyBytes {
-			val = maybe.Bind(val, slices.Clone[[]byte])
-		}
-
-		if err := newView.recordValueChange(newPath([]byte(key)), val); err != nil {
-			return nil, err
-		}
-	}
-	return newView, nil
-}
-
-// NewViewFromBatchOps returns a new view on top of this one.
-// if copyBytes is true, code will duplicate any passed []byte so that editing in calling code is safe
-// Adds the new view to [t.childViews].
-// Assumes [t.commitLock] isn't held.
-func (t *trieView) NewViewFromBatchOps(ctx context.Context, batchOps []database.BatchOp, copyBytes bool) (TrieView, error) {
-	return t.commonNewView(
-		ctx,
-		func() (TrieView, error) {
-			return t.getParentTrie().NewViewFromBatchOps(ctx, batchOps, copyBytes)
-		},
-		func() (*trieView, error) {
-			return newTrieViewFromBatchOps(t.db, t, t.root.clone(), batchOps, copyBytes)
-		})
-}
-
 // Creates a new view with the given [parentTrie].
-func newTrieViewFromBatchOps(
+func newTrieView(
 	db *merkleDB,
 	parentTrie TrieView,
 	root *node,
-	batchOps []database.BatchOp,
-	copyBytes bool,
+	changes ViewChanges,
 ) (*trieView, error) {
 	if root == nil {
 		return nil, ErrNoValidRoot
@@ -222,19 +159,27 @@ func newTrieViewFromBatchOps(
 		root:       root,
 		db:         db,
 		parentTrie: parentTrie,
-		changes:    newChangeSummary(len(batchOps)),
+		changes:    newChangeSummary(len(changes.BatchOps) + len(changes.MapOps)),
 	}
 
-	for _, op := range batchOps {
+	for _, op := range changes.BatchOps {
 		newVal := maybe.Nothing[[]byte]()
 		if !op.Delete {
 			val := op.Value
-			if copyBytes {
+			if !changes.OwnBytes {
 				val = slices.Clone(op.Value)
 			}
 			newVal = maybe.Some(val)
 		}
 		if err := newView.recordValueChange(newPath(op.Key), newVal); err != nil {
+			return nil, err
+		}
+	}
+	for key, val := range changes.MapOps {
+		if !changes.OwnBytes {
+			val = maybe.Bind(val, slices.Clone[[]byte])
+		}
+		if err := newView.recordValueChange(newPath([]byte(key)), val); err != nil {
 			return nil, err
 		}
 	}
