@@ -536,7 +536,12 @@ func (t *trieView) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
 	return t.root.id, nil
 }
 
-func (t *trieView) GetValues(_ context.Context, keys [][]byte) ([][]byte, []error) {
+func (t *trieView) GetValues(ctx context.Context, keys [][]byte) ([][]byte, []error) {
+	_, span := t.db.debugTracer.Start(ctx, "MerkleDB.trieview.GetValues", oteltrace.WithAttributes(
+		attribute.Int("keyCount", len(keys)),
+	))
+	defer span.End()
+
 	results := make([][]byte, len(keys))
 	valueErrors := make([]error, len(keys))
 
@@ -548,7 +553,10 @@ func (t *trieView) GetValues(_ context.Context, keys [][]byte) ([][]byte, []erro
 
 // GetValue returns the value for the given [key].
 // Returns database.ErrNotFound if it doesn't exist.
-func (t *trieView) GetValue(_ context.Context, key []byte) ([]byte, error) {
+func (t *trieView) GetValue(ctx context.Context, key []byte) ([]byte, error) {
+	ctx, span := t.db.debugTracer.Start(ctx, "MerkleDB.trieview.GetValue")
+	defer span.End()
+
 	return t.getValueCopy(newPath(key))
 }
 
