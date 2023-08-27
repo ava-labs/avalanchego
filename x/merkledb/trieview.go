@@ -166,7 +166,7 @@ func newTrieView(
 		newVal := maybe.Nothing[[]byte]()
 		if !op.Delete {
 			val := op.Value
-			if !changes.OwnBytes {
+			if !changes.ConsumeBytes {
 				val = slices.Clone(op.Value)
 			}
 			newVal = maybe.Some(val)
@@ -176,7 +176,7 @@ func newTrieView(
 		}
 	}
 	for key, val := range changes.MapOps {
-		if !changes.OwnBytes {
+		if !changes.ConsumeBytes {
 			val = maybe.Bind(val, slices.Clone[[]byte])
 		}
 		if err := newView.recordValueChange(newPath([]byte(key)), val); err != nil {

@@ -696,8 +696,8 @@ func (db *merkleDB) newUntrackedView(batchOps []database.BatchOp, copyBytes bool
 		db,
 		db.root.clone(),
 		ViewChanges{
-			BatchOps: batchOps,
-			OwnBytes: !copyBytes,
+			BatchOps:     batchOps,
+			ConsumeBytes: !copyBytes,
 		},
 	)
 }
