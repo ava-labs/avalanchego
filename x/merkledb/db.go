@@ -655,21 +655,6 @@ func (db *merkleDB) GetChangeProof(
 	return result, nil
 }
 
-// Returns a new view that isn't tracked in [db.childViews].
-// For internal use only, namely in methods that create short-lived views.
-// Assumes [db.lock] isn't held and [db.commitLock] is read locked.
-func (db *merkleDB) newUntrackedView(batchOps []database.BatchOp, copyBytes bool) (*trieView, error) {
-	return newTrieView(
-		db,
-		db,
-		db.root.clone(),
-		ViewChanges{
-			BatchOps: batchOps,
-			OwnBytes: !copyBytes,
-		},
-	)
-}
-
 // NewView returns a new view on top of this Trie where the passed changes
 // have been applied.
 //
@@ -700,6 +685,21 @@ func (db *merkleDB) NewView(
 
 	db.childViews = append(db.childViews, newView)
 	return newView, nil
+}
+
+// Returns a new view that isn't tracked in [db.childViews].
+// For internal use only, namely in methods that create short-lived views.
+// Assumes [db.lock] isn't held and [db.commitLock] is read locked.
+func (db *merkleDB) newUntrackedView(batchOps []database.BatchOp, copyBytes bool) (*trieView, error) {
+	return newTrieView(
+		db,
+		db,
+		db.root.clone(),
+		ViewChanges{
+			BatchOps: batchOps,
+			OwnBytes: !copyBytes,
+		},
+	)
 }
 
 func (db *merkleDB) Has(k []byte) (bool, error) {
