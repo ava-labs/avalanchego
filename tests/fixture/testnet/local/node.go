@@ -27,10 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/perms"
 )
 
-var (
-	errProcessNotRunning  = errors.New("process not running")
-	errNodeAlreadyRunning = errors.New("failed to start local node: node is already running")
-)
+var errNodeAlreadyRunning = errors.New("failed to start local node: node is already running")
 
 // Defines local-specific node configuration. Supports setting default
 // and node-specific values.
@@ -186,13 +183,25 @@ func (n *LocalNode) Start(w io.Writer, defaultExecPath string) error {
 		return err
 	}
 
+	// Determine appropriate level of node description detail
+	nodeDescription := fmt.Sprintf("node %q", n.NodeID)
+	isEphemeralNode := filepath.Base(filepath.Dir(n.GetDataDir())) == defaultEphemeralDirName
+	if isEphemeralNode {
+		nodeDescription = "ephemeral " + nodeDescription
+	}
+	nonDefaultNodeDir := filepath.Base(n.GetDataDir()) != n.NodeID.String()
+	if nonDefaultNodeDir {
+		// Only include the data dir if its base is not the default (the node ID)
+		nodeDescription = fmt.Sprintf("%s with path: %s", nodeDescription, n.GetDataDir())
+	}
+
 	go func() {
 		if err := cmd.Wait(); err != nil {
 			if err.Error() != "signal: killed" {
-				_, _ = fmt.Fprintf(w, "node %q finished with error: %v\n", n.NodeID, err)
+				_, _ = fmt.Fprintf(w, "%s finished with error: %v\n", nodeDescription, err)
 			}
 		}
-		_, _ = fmt.Fprintf(w, "node %q exited\n", n.NodeID)
+		_, _ = fmt.Fprintf(w, "%s exited\n", nodeDescription)
 	}()
 
 	// A node writes a process context file on start. If the file is not
@@ -202,7 +211,7 @@ func (n *LocalNode) Start(w io.Writer, defaultExecPath string) error {
 		return fmt.Errorf("failed to start local node: %w", err)
 	}
 
-	_, err = fmt.Fprintf(w, "Started %s\n", n.NodeID)
+	_, err = fmt.Fprintf(w, "Started %s\n", nodeDescription)
 	return err
 }
 
@@ -256,7 +265,7 @@ func (n *LocalNode) Stop() error {
 	}
 
 	// Wait for the node process to stop
-	ticker := time.NewTicker(DefaultNodeTickerInterval)
+	ticker := time.NewTicker(testnet.DefaultNodeTickerInterval)
 	defer ticker.Stop()
 	ctx, cancel := context.WithTimeout(context.Background(), DefaultNodeStopTimeout)
 	defer cancel()
@@ -286,7 +295,7 @@ func (n *LocalNode) IsHealthy(ctx context.Context) (bool, error) {
 		return false, fmt.Errorf("failed to determine process status: %w", err)
 	}
 	if proc == nil {
-		return false, errProcessNotRunning
+		return false, testnet.ErrNotRunning
 	}
 
 	// Check that the node is reporting healthy
@@ -308,11 +317,11 @@ func (n *LocalNode) IsHealthy(ctx context.Context) (bool, error) {
 		}
 	}
 	// Assume all other errors are not recoverable
-	return false, err
+	return false, fmt.Errorf("failed to query node health: %w", err)
 }
 
 func (n *LocalNode) WaitForProcessContext(ctx context.Context) error {
-	ticker := time.NewTicker(DefaultNodeTickerInterval)
+	ticker := time.NewTicker(testnet.DefaultNodeTickerInterval)
 	defer ticker.Stop()
 
 	ctx, cancel := context.WithTimeout(ctx, DefaultNodeInitTimeout)

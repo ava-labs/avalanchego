@@ -864,16 +864,12 @@ func addPathInfo(
 
 // getStandaloneTrieView returns a new view that has nothing in it besides the changes due to [ops]
 func getStandaloneTrieView(ctx context.Context, ops []database.BatchOp) (*trieView, error) {
-	tracer, err := trace.New(trace.Config{Enabled: false})
-	if err != nil {
-		return nil, err
-	}
 	db, err := newDatabase(
 		ctx,
 		memdb.New(),
 		Config{
 			EvictionBatchSize: DefaultEvictionBatchSize,
-			Tracer:            tracer,
+			Tracer:            trace.Noop,
 			NodeCacheSize:     verificationCacheSize,
 		},
 		&mockMetrics{},
@@ -882,5 +878,5 @@ func getStandaloneTrieView(ctx context.Context, ops []database.BatchOp) (*trieVi
 		return nil, err
 	}
 
-	return db.newUntrackedView(ops)
+	return db.newUntrackedView(ops, true)
 }
