@@ -5,14 +5,11 @@ package merkledb
 
 import (
 	"context"
-	"errors"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 )
-
-var errNoNewRoot = errors.New("there was no updated root in change list")
 
 type MerkleRootGetter interface {
 	// GetMerkleRoot returns the merkle root of the Trie
@@ -53,11 +50,23 @@ type ReadOnlyTrie interface {
 	database.Iteratee
 }
 
+type ViewChanges struct {
+	BatchOps []database.BatchOp
+	MapOps   map[string]maybe.Maybe[[]byte]
+	// ConsumeBytes when set to true will skip copying of bytes and assume
+	// ownership of the provided bytes.
+	ConsumeBytes bool
+}
+
 type Trie interface {
 	ReadOnlyTrie
 
-	// NewView returns a new view on top of this Trie with the specified changes
-	NewView(ctx context.Context, batchOps []database.BatchOp) (TrieView, error)
+	// NewView returns a new view on top of this Trie where the passed changes
+	// have been applied.
+	NewView(
+		ctx context.Context,
+		changes ViewChanges,
+	) (TrieView, error)
 }
 
 type TrieView interface {

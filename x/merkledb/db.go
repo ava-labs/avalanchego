@@ -37,7 +37,6 @@ const (
 )
 
 var (
-	_ TrieView = (*merkleDB)(nil)
 	_ MerkleDB = (*merkleDB)(nil)
 
 	codec = newCodec()
@@ -48,7 +47,8 @@ var (
 	hadCleanShutdown        = []byte{1}
 	didNotHaveCleanShutdown = []byte{0}
 
-	errSameRoot = errors.New("start and end root are the same")
+	errSameRoot  = errors.New("start and end root are the same")
+	errNoNewRoot = errors.New("there was no updated root in change list")
 )
 
 type ChangeProofer interface {
@@ -127,8 +127,9 @@ type Config struct {
 	// If [Reg] is nil, metrics are collected locally but not exported through
 	// Prometheus.
 	// This may be useful for testing.
-	Reg    prometheus.Registerer
-	Tracer trace.Tracer
+	Reg        prometheus.Registerer
+	TraceLevel TraceLevel
+	Tracer     trace.Tracer
 }
 
 // merkleDB can only be edited by committing changes from a trieView.
@@ -156,7 +157,8 @@ type merkleDB struct {
 
 	metrics merkleMetrics
 
-	tracer trace.Tracer
+	debugTracer trace.Tracer
+	infoTracer  trace.Tracer
 
 	// The root of this trie.
 	root *node
@@ -182,6 +184,7 @@ func newDatabase(
 	config Config,
 	metrics merkleMetrics,
 ) (*merkleDB, error) {
+
 	bufferPool := &sync.Pool{
 		New: func() interface{} {
 			return make([]byte, 0, defaultBufferLength)
@@ -194,7 +197,8 @@ func newDatabase(
 		valueNodeDB:        newValueNodeDB(db, bufferPool, metrics, config.ValueNodeCacheSize),
 		intermediateNodeDB: newIntermediateNodeDB(db, bufferPool, metrics, config.IntermediateNodeCacheSize, config.EvictionBatchSize),
 		history:            newTrieHistory(config.HistoryLength),
-		tracer:             config.Tracer,
+		debugTracer:        getTracerIfEnabled(config.TraceLevel, DebugTrace, config.Tracer),
+		infoTracer:         getTracerIfEnabled(config.TraceLevel, InfoTrace, config.Tracer),
 		childViews:         make([]*trieView, 0, defaultPreallocationSize),
 	}
 
@@ -269,7 +273,7 @@ func (db *merkleDB) rebuild(ctx context.Context) error {
 	defer valueIt.Release()
 	for valueIt.Next() {
 		if len(currentOps) >= opsSizeLimit {
-			view, err := db.newUntrackedView(currentOps)
+			view, err := db.newUntrackedView(currentOps, true)
 			if err != nil {
 				return err
 			}
@@ -287,7 +291,7 @@ func (db *merkleDB) rebuild(ctx context.Context) error {
 	if err := valueIt.Error(); err != nil {
 		return err
 	}
-	view, err := db.newUntrackedView(currentOps)
+	view, err := db.newUntrackedView(currentOps, true)
 	if err != nil {
 		return err
 	}
@@ -313,7 +317,7 @@ func (db *merkleDB) CommitChangeProof(ctx context.Context, proof *ChangeProof) e
 		}
 	}
 
-	view, err := db.newUntrackedView(ops)
+	view, err := db.newUntrackedView(ops, false)
 	if err != nil {
 		return err
 	}
@@ -354,7 +358,7 @@ func (db *merkleDB) CommitRangeProof(ctx context.Context, start maybe.Maybe[[]by
 	}
 
 	// Don't need to lock [view] because nobody else has a reference to it.
-	view, err := db.newUntrackedView(ops)
+	view, err := db.newUntrackedView(ops, false)
 	if err != nil {
 		return err
 	}
@@ -400,7 +404,7 @@ func (db *merkleDB) Get(key []byte) ([]byte, error) {
 }
 
 func (db *merkleDB) GetValues(ctx context.Context, keys [][]byte) ([][]byte, []error) {
-	_, span := db.tracer.Start(ctx, "MerkleDB.GetValues", oteltrace.WithAttributes(
+	_, span := db.debugTracer.Start(ctx, "MerkleDB.GetValues", oteltrace.WithAttributes(
 		attribute.Int("keyCount", len(keys)),
 	))
 	defer span.End()
@@ -420,7 +424,7 @@ func (db *merkleDB) GetValues(ctx context.Context, keys [][]byte) ([][]byte, []e
 // GetValue returns the value associated with [key].
 // Returns database.ErrNotFound if it doesn't exist.
 func (db *merkleDB) GetValue(ctx context.Context, key []byte) ([]byte, error) {
-	_, span := db.tracer.Start(ctx, "MerkleDB.GetValue")
+	_, span := db.debugTracer.Start(ctx, "MerkleDB.GetValue")
 	defer span.End()
 
 	db.lock.RLock()
@@ -469,7 +473,7 @@ func (db *merkleDB) getValueWithoutLock(key path) ([]byte, error) {
 }
 
 func (db *merkleDB) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
-	_, span := db.tracer.Start(ctx, "MerkleDB.GetMerkleRoot")
+	_, span := db.infoTracer.Start(ctx, "MerkleDB.GetMerkleRoot")
 	defer span.End()
 
 	db.lock.RLock()
@@ -501,7 +505,7 @@ func (db *merkleDB) getProof(ctx context.Context, key []byte) (*Proof, error) {
 		return nil, database.ErrClosed
 	}
 
-	view, err := db.newUntrackedView(nil)
+	view, err := db.newUntrackedView(nil, true)
 	if err != nil {
 		return nil, err
 	}
@@ -653,15 +657,26 @@ func (db *merkleDB) GetChangeProof(
 	return result, nil
 }
 
-// NewView returns a new view on top of this trie.
-// Changes made to the view will only be reflected in the original trie if Commit is called.
+// NewView returns a new view on top of this Trie where the passed changes
+// have been applied.
+//
+// Changes made to the view will only be reflected in the original trie if
+// Commit is called.
+//
 // Assumes [db.commitLock] and [db.lock] aren't held.
-func (db *merkleDB) NewView(_ context.Context, batchOps []database.BatchOp) (TrieView, error) {
+func (db *merkleDB) NewView(
+	_ context.Context,
+	changes ViewChanges,
+) (TrieView, error) {
 	// ensure the db doesn't change while creating the new view
 	db.commitLock.RLock()
 	defer db.commitLock.RUnlock()
 
-	newView, err := db.newUntrackedView(batchOps)
+	if db.closed {
+		return nil, database.ErrClosed
+	}
+
+	newView, err := newTrieView(db, db, db.root.clone(), changes)
 	if err != nil {
 		return nil, err
 	}
@@ -677,16 +692,16 @@ func (db *merkleDB) NewView(_ context.Context, batchOps []database.BatchOp) (Tri
 // Returns a new view that isn't tracked in [db.childViews].
 // For internal use only, namely in methods that create short-lived views.
 // Assumes [db.lock] isn't held and [db.commitLock] is read locked.
-func (db *merkleDB) newUntrackedView(batchOps []database.BatchOp) (*trieView, error) {
-	if db.closed {
-		return nil, database.ErrClosed
-	}
-
-	newView, err := newTrieView(db, db, db.root.clone(), batchOps)
-	if err != nil {
-		return nil, err
-	}
-	return newView, nil
+func (db *merkleDB) newUntrackedView(batchOps []database.BatchOp, consumeBytes bool) (*trieView, error) {
+	return newTrieView(
+		db,
+		db,
+		db.root.clone(),
+		ViewChanges{
+			BatchOps:     batchOps,
+			ConsumeBytes: consumeBytes,
+		},
+	)
 }
 
 func (db *merkleDB) Has(k []byte) (bool, error) {
@@ -749,12 +764,13 @@ func (db *merkleDB) PutContext(ctx context.Context, k, v []byte) error {
 		return database.ErrClosed
 	}
 
-	view, err := db.newUntrackedView([]database.BatchOp{
-		{
+	view, err := db.newUntrackedView(
+		[]database.BatchOp{{
 			Key:   k,
 			Value: v,
-		},
-	})
+		}},
+		false,
+	)
 	if err != nil {
 		return err
 	}
@@ -773,19 +789,21 @@ func (db *merkleDB) DeleteContext(ctx context.Context, key []byte) error {
 		return database.ErrClosed
 	}
 
-	view, err := db.newUntrackedView([]database.BatchOp{
-		{
+	view, err := db.newUntrackedView(
+		[]database.BatchOp{{
 			Key:    key,
 			Delete: true,
-		},
-	})
+		}},
+		true,
+	)
 	if err != nil {
 		return err
 	}
 	return view.commitToDB(ctx)
 }
 
-// Assumes [db.lock] is not held
+// Assumes values inside of [ops] are safe to reference after the function
+// returns.
 func (db *merkleDB) commitBatch(ops []database.BatchOp) error {
 	db.commitLock.Lock()
 	defer db.commitLock.Unlock()
@@ -794,7 +812,7 @@ func (db *merkleDB) commitBatch(ops []database.BatchOp) error {
 		return database.ErrClosed
 	}
 
-	view, err := db.newUntrackedView(ops)
+	view, err := db.newUntrackedView(ops, true)
 	if err != nil {
 		return err
 	}
@@ -821,7 +839,7 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 	}
 
 	changes := trieToCommit.changes
-	_, span := db.tracer.Start(ctx, "MerkleDB.commitChanges", oteltrace.WithAttributes(
+	_, span := db.infoTracer.Start(ctx, "MerkleDB.commitChanges", oteltrace.WithAttributes(
 		attribute.Int("nodesChanged", len(changes.nodes)),
 		attribute.Int("valuesChanged", len(changes.values)),
 	))
@@ -844,7 +862,7 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 
 	currentValueNodeBatch := db.valueNodeDB.NewBatch()
 
-	_, nodesSpan := db.tracer.Start(ctx, "MerkleDB.commitChanges.writeNodes")
+	_, nodesSpan := db.infoTracer.Start(ctx, "MerkleDB.commitChanges.writeNodes")
 	for key, nodeChange := range changes.nodes {
 		if nodeChange.after == nil {
 			switch {
@@ -890,7 +908,7 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 	}
 	nodesSpan.End()
 
-	_, commitSpan := db.tracer.Start(ctx, "MerkleDB.commitChanges.valueNodeDBCommit")
+	_, commitSpan := db.infoTracer.Start(ctx, "MerkleDB.commitChanges.valueNodeDBCommit")
 	err := currentValueNodeBatch.Write()
 	commitSpan.End()
 	if err != nil {
@@ -987,6 +1005,10 @@ func (db *merkleDB) VerifyChangeProof(
 	db.commitLock.RLock()
 	defer db.commitLock.RUnlock()
 
+	if db.closed {
+		return database.ErrClosed
+	}
+
 	if err := verifyAllChangeProofKeyValuesPresent(
 		ctx,
 		db,
@@ -1020,7 +1042,7 @@ func (db *merkleDB) VerifyChangeProof(
 	}
 
 	// Don't need to lock [view] because nobody else has a reference to it.
-	view, err := db.newUntrackedView(ops)
+	view, err := db.newUntrackedView(ops, true)
 	if err != nil {
 		return err
 	}
@@ -1127,7 +1149,8 @@ func (db *merkleDB) getHistoricalViewForRange(
 
 	// looking for the trie's current root id, so return the trie unmodified
 	if currentRootID == rootID {
-		return newTrieView(db, db, db.root.clone(), nil)
+		// create an empty trie
+		return newTrieView(db, db, db.root.clone(), ViewChanges{})
 	}
 
 	changeHistory, err := db.history.getChangesToGetToRoot(rootID, start, end)
