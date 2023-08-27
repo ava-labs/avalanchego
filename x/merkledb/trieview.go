@@ -128,7 +128,7 @@ func (t *trieView) NewView(
 		return nil, err
 	}
 
-	newView, err := newTrieView(t.db, t, t.root.clone(), changes)
+	newView, err := newTrieView(t.db, t, changes)
 	if err != nil {
 		return nil, err
 	}
@@ -148,11 +148,14 @@ func (t *trieView) NewView(
 func newTrieView(
 	db *merkleDB,
 	parentTrie TrieView,
-	root *node,
 	changes ViewChanges,
 ) (*trieView, error) {
-	if root == nil {
-		return nil, ErrNoValidRoot
+	root, err := parentTrie.getEditableNode(RootPath)
+	if err != nil {
+		if err == database.ErrNotFound {
+			return nil, ErrNoValidRoot
+		}
+		return nil, err
 	}
 
 	newView := &trieView{
