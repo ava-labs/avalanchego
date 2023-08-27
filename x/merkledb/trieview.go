@@ -226,7 +226,7 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 		// We wait to create the span until after checking that we need to actually
 		// calculateNodeIDs to make traces more useful (otherwise there may be a span
 		// per key modified even though IDs are not re-calculated).
-		ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.calculateNodeIDs")
+		ctx, span := t.db.infoTracer.Start(ctx, "MerkleDB.trieview.calculateNodeIDs")
 		defer span.End()
 
 		// add all the changed key/values to the nodes of the trie
@@ -317,7 +317,7 @@ func (t *trieView) calculateNodeIDsHelper(ctx context.Context, n *node, eg *errg
 
 // GetProof returns a proof that [bytesPath] is in or not in trie [t].
 func (t *trieView) GetProof(ctx context.Context, key []byte) (*Proof, error) {
-	_, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.GetProof")
+	_, span := t.db.infoTracer.Start(ctx, "MerkleDB.trieview.GetProof")
 	defer span.End()
 
 	if err := t.calculateNodeIDs(ctx); err != nil {
@@ -329,7 +329,7 @@ func (t *trieView) GetProof(ctx context.Context, key []byte) (*Proof, error) {
 
 // Returns a proof that [bytesPath] is in or not in trie [t].
 func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
-	_, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.getProof")
+	_, span := t.db.infoTracer.Start(ctx, "MerkleDB.trieview.getProof")
 	defer span.End()
 
 	proof := &Proof{
@@ -388,7 +388,7 @@ func (t *trieView) GetRangeProof(
 	end maybe.Maybe[[]byte],
 	maxLength int,
 ) (*RangeProof, error) {
-	ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.GetRangeProof")
+	ctx, span := t.db.infoTracer.Start(ctx, "MerkleDB.trieview.GetRangeProof")
 	defer span.End()
 
 	if start.HasValue() && end.HasValue() && bytes.Compare(start.Value(), end.Value()) == 1 {
@@ -475,7 +475,7 @@ func (t *trieView) GetRangeProof(
 
 // CommitToDB commits changes from this trie to the underlying DB.
 func (t *trieView) CommitToDB(ctx context.Context) error {
-	ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.CommitToDB")
+	ctx, span := t.db.infoTracer.Start(ctx, "MerkleDB.trieview.CommitToDB")
 	defer span.End()
 
 	t.db.commitLock.Lock()
@@ -491,7 +491,7 @@ func (t *trieView) commitToDB(ctx context.Context) error {
 	t.commitLock.Lock()
 	defer t.commitLock.Unlock()
 
-	ctx, span := t.db.tracer.Start(ctx, "MerkleDB.trieview.commitToDB", oteltrace.WithAttributes(
+	ctx, span := t.db.infoTracer.Start(ctx, "MerkleDB.trieview.commitToDB", oteltrace.WithAttributes(
 		attribute.Int("changeCount", len(t.changes.values)),
 	))
 	defer span.End()
@@ -550,7 +550,12 @@ func (t *trieView) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
 	return t.root.id, nil
 }
 
-func (t *trieView) GetValues(_ context.Context, keys [][]byte) ([][]byte, []error) {
+func (t *trieView) GetValues(ctx context.Context, keys [][]byte) ([][]byte, []error) {
+	_, span := t.db.debugTracer.Start(ctx, "MerkleDB.trieview.GetValues", oteltrace.WithAttributes(
+		attribute.Int("keyCount", len(keys)),
+	))
+	defer span.End()
+
 	results := make([][]byte, len(keys))
 	valueErrors := make([]error, len(keys))
 
@@ -562,7 +567,10 @@ func (t *trieView) GetValues(_ context.Context, keys [][]byte) ([][]byte, []erro
 
 // GetValue returns the value for the given [key].
 // Returns database.ErrNotFound if it doesn't exist.
-func (t *trieView) GetValue(_ context.Context, key []byte) ([]byte, error) {
+func (t *trieView) GetValue(ctx context.Context, key []byte) ([]byte, error) {
+	_, span := t.db.debugTracer.Start(ctx, "MerkleDB.trieview.GetValue")
+	defer span.End()
+
 	return t.getValueCopy(newPath(key))
 }
 

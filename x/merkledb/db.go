@@ -128,8 +128,9 @@ type Config struct {
 	// If [Reg] is nil, metrics are collected locally but not exported through
 	// Prometheus.
 	// This may be useful for testing.
-	Reg    prometheus.Registerer
-	Tracer trace.Tracer
+	Reg        prometheus.Registerer
+	TraceLevel TraceLevel
+	Tracer     trace.Tracer
 }
 
 // merkleDB can only be edited by committing changes from a trieView.
@@ -167,7 +168,8 @@ type merkleDB struct {
 
 	metrics merkleMetrics
 
-	tracer trace.Tracer
+	debugTracer trace.Tracer
+	infoTracer  trace.Tracer
 
 	// The root of this trie.
 	root *node
@@ -196,7 +198,8 @@ func newDatabase(
 		nodeDB:            prefixdb.New(nodePrefix, db),
 		metadataDB:        prefixdb.New(metadataPrefix, db),
 		history:           newTrieHistory(config.HistoryLength),
-		tracer:            config.Tracer,
+		debugTracer:       getTracerIfEnabled(config.TraceLevel, DebugTrace, config.Tracer),
+		infoTracer:        getTracerIfEnabled(config.TraceLevel, InfoTrace, config.Tracer),
 		childViews:        make([]*trieView, 0, defaultPreallocationSize),
 		evictionBatchSize: config.EvictionBatchSize,
 	}
@@ -404,7 +407,7 @@ func (db *merkleDB) Get(key []byte) ([]byte, error) {
 }
 
 func (db *merkleDB) GetValues(ctx context.Context, keys [][]byte) ([][]byte, []error) {
-	_, span := db.tracer.Start(ctx, "MerkleDB.GetValues", oteltrace.WithAttributes(
+	_, span := db.debugTracer.Start(ctx, "MerkleDB.GetValues", oteltrace.WithAttributes(
 		attribute.Int("keyCount", len(keys)),
 	))
 	defer span.End()
@@ -424,7 +427,7 @@ func (db *merkleDB) GetValues(ctx context.Context, keys [][]byte) ([][]byte, []e
 // GetValue returns the value associated with [key].
 // Returns database.ErrNotFound if it doesn't exist.
 func (db *merkleDB) GetValue(ctx context.Context, key []byte) ([]byte, error) {
-	_, span := db.tracer.Start(ctx, "MerkleDB.GetValue")
+	_, span := db.debugTracer.Start(ctx, "MerkleDB.GetValue")
 	defer span.End()
 
 	db.lock.RLock()
@@ -473,7 +476,7 @@ func (db *merkleDB) getValueWithoutLock(key path) ([]byte, error) {
 }
 
 func (db *merkleDB) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
-	_, span := db.tracer.Start(ctx, "MerkleDB.GetMerkleRoot")
+	_, span := db.infoTracer.Start(ctx, "MerkleDB.GetMerkleRoot")
 	defer span.End()
 
 	db.lock.RLock()
@@ -906,7 +909,7 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 	}
 
 	changes := trieToCommit.changes
-	_, span := db.tracer.Start(ctx, "MerkleDB.commitChanges", oteltrace.WithAttributes(
+	_, span := db.infoTracer.Start(ctx, "MerkleDB.commitChanges", oteltrace.WithAttributes(
 		attribute.Int("nodesChanged", len(changes.nodes)),
 		attribute.Int("valuesChanged", len(changes.values)),
 	))
@@ -929,7 +932,7 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 
 	batch := db.nodeDB.NewBatch()
 
-	_, nodesSpan := db.tracer.Start(ctx, "MerkleDB.commitChanges.writeNodes")
+	_, nodesSpan := db.infoTracer.Start(ctx, "MerkleDB.commitChanges.writeNodes")
 	for key, nodeChange := range changes.nodes {
 		if nodeChange.after == nil {
 			db.metrics.IOKeyWrite()
@@ -953,7 +956,7 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 	}
 	nodesSpan.End()
 
-	_, commitSpan := db.tracer.Start(ctx, "MerkleDB.commitChanges.dbCommit")
+	_, commitSpan := db.infoTracer.Start(ctx, "MerkleDB.commitChanges.dbCommit")
 	err := batch.Write()
 	commitSpan.End()
 	if err != nil {

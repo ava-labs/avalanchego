@@ -34,18 +34,13 @@ func newDB(ctx context.Context, db database.Database, config Config) (*merkleDB,
 	return db.(*merkleDB), nil
 }
 
-func newNoopTracer() trace.Tracer {
-	tracer, _ := trace.New(trace.Config{Enabled: false})
-	return tracer
-}
-
 func newDefaultConfig() Config {
 	return Config{
 		EvictionBatchSize: 100,
 		HistoryLength:     defaultHistoryLength,
 		NodeCacheSize:     1_000,
 		Reg:               prometheus.NewRegistry(),
-		Tracer:            newNoopTracer(),
+		Tracer:            trace.Noop,
 	}
 }
 

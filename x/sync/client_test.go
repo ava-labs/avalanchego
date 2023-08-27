@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/version"
@@ -35,7 +36,7 @@ func newDefaultDBConfig() merkledb.Config {
 		HistoryLength:     defaultRequestKeyLimit,
 		NodeCacheSize:     defaultRequestKeyLimit,
 		Reg:               prometheus.NewRegistry(),
-		Tracer:            newNoopTracer(),
+		Tracer:            trace.Noop,
 	}
 }
 
