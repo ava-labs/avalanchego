@@ -106,10 +106,14 @@ type trieView struct {
 	root *node
 }
 
-// NewView returns a new view on top of this one.
+// NewView returns a new view on top of this Trie where the passed changes
+// have been applied.
 // Adds the new view to [t.childViews].
 // Assumes [t.commitLock] isn't held.
-func (t *trieView) NewView(ctx context.Context, batchOps []database.BatchOp) (TrieView, error) {
+func (t *trieView) NewView(
+	ctx context.Context,
+	changes ViewChanges,
+) (TrieView, error) {
 	if t.isInvalid() {
 		return nil, ErrInvalid
 	}
@@ -117,14 +121,14 @@ func (t *trieView) NewView(ctx context.Context, batchOps []database.BatchOp) (Tr
 	defer t.commitLock.RUnlock()
 
 	if t.committed {
-		return t.getParentTrie().NewView(ctx, batchOps)
+		return t.getParentTrie().NewView(ctx, changes)
 	}
 
 	if err := t.calculateNodeIDs(ctx); err != nil {
 		return nil, err
 	}
 
-	newView, err := newTrieView(t.db, t, t.root.clone(), batchOps)
+	newView, err := newTrieView(t.db, t, t.root.clone(), changes)
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +149,7 @@ func newTrieView(
 	db *merkleDB,
 	parentTrie TrieView,
 	root *node,
-	batchOps []database.BatchOp,
+	changes ViewChanges,
 ) (*trieView, error) {
 	if root == nil {
 		return nil, ErrNoValidRoot
@@ -155,15 +159,27 @@ func newTrieView(
 		root:       root,
 		db:         db,
 		parentTrie: parentTrie,
-		changes:    newChangeSummary(len(batchOps)),
+		changes:    newChangeSummary(len(changes.BatchOps) + len(changes.MapOps)),
 	}
 
-	for _, op := range batchOps {
+	for _, op := range changes.BatchOps {
 		newVal := maybe.Nothing[[]byte]()
 		if !op.Delete {
-			newVal = maybe.Some(slices.Clone(op.Value))
+			val := op.Value
+			if !changes.ConsumeBytes {
+				val = slices.Clone(op.Value)
+			}
+			newVal = maybe.Some(val)
 		}
 		if err := newView.recordValueChange(newPath(op.Key), newVal); err != nil {
+			return nil, err
+		}
+	}
+	for key, val := range changes.MapOps {
+		if !changes.ConsumeBytes {
+			val = maybe.Bind(val, slices.Clone[[]byte])
+		}
+		if err := newView.recordValueChange(newPath([]byte(key)), val); err != nil {
 			return nil, err
 		}
 	}
@@ -219,10 +235,8 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 				if err = t.remove(key); err != nil {
 					return
 				}
-			} else {
-				if _, err = t.insert(key, change.after); err != nil {
-					return
-				}
+			} else if _, err = t.insert(key, change.after); err != nil {
+				return
 			}
 		}
 
