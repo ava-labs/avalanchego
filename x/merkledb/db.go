@@ -255,7 +255,7 @@ func (db *merkleDB) rebuild(ctx context.Context) error {
 
 	for it.Next() {
 		if len(currentOps) >= viewSizeLimit {
-			view, err := db.newUntrackedView(currentOps, false)
+			view, err := db.newUntrackedView(currentOps, true)
 			if err != nil {
 				return err
 			}
@@ -282,7 +282,7 @@ func (db *merkleDB) rebuild(ctx context.Context) error {
 	if err := it.Error(); err != nil {
 		return err
 	}
-	view, err := db.newUntrackedView(currentOps, false)
+	view, err := db.newUntrackedView(currentOps, true)
 	if err != nil {
 		return err
 	}
@@ -308,7 +308,7 @@ func (db *merkleDB) CommitChangeProof(ctx context.Context, proof *ChangeProof) e
 		}
 	}
 
-	view, err := db.newUntrackedView(ops, true)
+	view, err := db.newUntrackedView(ops, false)
 	if err != nil {
 		return err
 	}
@@ -349,7 +349,7 @@ func (db *merkleDB) CommitRangeProof(ctx context.Context, start maybe.Maybe[[]by
 	}
 
 	// Don't need to lock [view] because nobody else has a reference to it.
-	view, err := db.newUntrackedView(ops, true)
+	view, err := db.newUntrackedView(ops, false)
 	if err != nil {
 		return err
 	}
@@ -504,7 +504,7 @@ func (db *merkleDB) getProof(ctx context.Context, key []byte) (*Proof, error) {
 		return nil, database.ErrClosed
 	}
 
-	view, err := db.newUntrackedView(nil, false)
+	view, err := db.newUntrackedView(nil, true)
 	if err != nil {
 		return nil, err
 	}
@@ -690,14 +690,14 @@ func (db *merkleDB) NewView(
 // Returns a new view that isn't tracked in [db.childViews].
 // For internal use only, namely in methods that create short-lived views.
 // Assumes [db.lock] isn't held and [db.commitLock] is read locked.
-func (db *merkleDB) newUntrackedView(batchOps []database.BatchOp, copyBytes bool) (*trieView, error) {
+func (db *merkleDB) newUntrackedView(batchOps []database.BatchOp, consumeBytes bool) (*trieView, error) {
 	return newTrieView(
 		db,
 		db,
 		db.root.clone(),
 		ViewChanges{
 			BatchOps:     batchOps,
-			ConsumeBytes: !copyBytes,
+			ConsumeBytes: consumeBytes,
 		},
 	)
 }
@@ -836,7 +836,7 @@ func (db *merkleDB) PutContext(ctx context.Context, k, v []byte) error {
 			Key:   k,
 			Value: v,
 		}},
-		true,
+		false,
 	)
 	if err != nil {
 		return err
@@ -861,7 +861,7 @@ func (db *merkleDB) DeleteContext(ctx context.Context, key []byte) error {
 			Key:    key,
 			Delete: true,
 		}},
-		false,
+		true,
 	)
 	if err != nil {
 		return err
@@ -879,7 +879,7 @@ func (db *merkleDB) commitBatch(ops []database.BatchOp) error {
 		return database.ErrClosed
 	}
 
-	view, err := db.newUntrackedView(ops, false)
+	view, err := db.newUntrackedView(ops, true)
 	if err != nil {
 		return err
 	}
@@ -1094,7 +1094,7 @@ func (db *merkleDB) VerifyChangeProof(
 	}
 
 	// Don't need to lock [view] because nobody else has a reference to it.
-	view, err := db.newUntrackedView(ops, false)
+	view, err := db.newUntrackedView(ops, true)
 	if err != nil {
 		return err
 	}
