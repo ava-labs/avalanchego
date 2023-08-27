@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime"
 	"sync"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -118,6 +119,12 @@ type MerkleDB interface {
 }
 
 type Config struct {
+	// RootGenConcurrency is the number of goroutines to use when
+	// generating a new state root.
+	//
+	// If 0 is specified, [runtime.NumCPU] will be used. If -1 is specified,
+	// no limit will be used.
+	RootGenConcurrency int
 	// The number of nodes that are evicted from the cache and written to
 	// disk at a time.
 	EvictionBatchSize int
@@ -176,6 +183,13 @@ type merkleDB struct {
 
 	// Valid children of this trie.
 	childViews []*trieView
+
+	// rootGenConcurrency is the number of goroutines to use when
+	// generating a new state root.
+	//
+	// TODO: Limit concurrency across all views, instead of only within
+	// a single view (see `workers` in hypersdk)
+	rootGenConcurrency int
 }
 
 // New returns a new merkle database.
@@ -193,15 +207,20 @@ func newDatabase(
 	config Config,
 	metrics merkleMetrics,
 ) (*merkleDB, error) {
+	rootGenConcurrency := runtime.NumCPU()
+	if config.RootGenConcurrency != 0 {
+		rootGenConcurrency = config.RootGenConcurrency
+	}
 	trieDB := &merkleDB{
-		metrics:           metrics,
-		nodeDB:            prefixdb.New(nodePrefix, db),
-		metadataDB:        prefixdb.New(metadataPrefix, db),
-		history:           newTrieHistory(config.HistoryLength),
-		debugTracer:       getTracerIfEnabled(config.TraceLevel, DebugTrace, config.Tracer),
-		infoTracer:        getTracerIfEnabled(config.TraceLevel, InfoTrace, config.Tracer),
-		childViews:        make([]*trieView, 0, defaultPreallocationSize),
-		evictionBatchSize: config.EvictionBatchSize,
+		metrics:            metrics,
+		nodeDB:             prefixdb.New(nodePrefix, db),
+		metadataDB:         prefixdb.New(metadataPrefix, db),
+		history:            newTrieHistory(config.HistoryLength),
+		debugTracer:        getTracerIfEnabled(config.TraceLevel, DebugTrace, config.Tracer),
+		infoTracer:         getTracerIfEnabled(config.TraceLevel, InfoTrace, config.Tracer),
+		childViews:         make([]*trieView, 0, defaultPreallocationSize),
+		evictionBatchSize:  config.EvictionBatchSize,
+		rootGenConcurrency: rootGenConcurrency,
 	}
 
 	// Note: trieDB.OnEviction is responsible for writing intermediary nodes to
