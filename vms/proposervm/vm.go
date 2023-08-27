@@ -601,14 +601,16 @@ func (vm *VM) repairAcceptedChainByHeight(ctx context.Context) error {
 		return nil
 	}
 
-	// The inner vm must be behind the proposer vm, so we must roll the proposervm back.
+	// The inner vm must be behind the proposer vm, so we must roll the
+	// proposervm back.
 	forkHeight, err := vm.State.GetForkHeight()
 	if err != nil {
 		return err
 	}
 
 	if forkHeight > innerLastAcceptedHeight {
-		// We are rolling back past the fork, so we should just forget about all of our proposervm indices.
+		// We are rolling back past the fork, so we should just forget about all
+		// of our proposervm indices.
 		if err := vm.State.DeleteLastAccepted(); err != nil {
 			return err
 		}
@@ -617,7 +619,10 @@ func (vm *VM) repairAcceptedChainByHeight(ctx context.Context) error {
 
 	newProLastAcceptedID, err := vm.State.GetBlockIDAtHeight(innerLastAcceptedHeight)
 	if err != nil {
-		return err
+		// This fatal error can happen if NumHistoricalBlocks is set too
+		// aggressively and the inner vm rolled back before the oldest
+		// proposervm block.
+		return fmt.Errorf("proposervm failed to rollback last accepted block to height (%d): %w", innerLastAcceptedHeight, err)
 	}
 
 	if err := vm.State.SetLastAccepted(newProLastAcceptedID); err != nil {
