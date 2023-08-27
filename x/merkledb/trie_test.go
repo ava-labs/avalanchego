@@ -10,8 +10,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/utils/maybe"
-
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -565,19 +563,28 @@ func Test_Trie_HashCountOnBranch(t *testing.T) {
 	dbTrie, err := getBasicDB()
 	require.NoError(err)
 	require.NotNil(dbTrie)
-	trieIntf, err := dbTrie.NewView(context.Background(), ViewChanges{})
+	trieIntf, err := dbTrie.NewView(
+		context.Background(),
+		ViewChanges{
+			BatchOps: []database.BatchOp{
+				{Key: []byte("key12"), Value: []byte("value12")},
+			},
+		})
 	require.NoError(err)
 	trie := trieIntf.(*trieView)
 
-	// force a new node to generate with common prefix "key1" and have these two nodes as children
-	_, err = trie.insert(newPath([]byte("key12")), maybe.Some([]byte("value12")))
+	// force a new branch node to generate with common prefix "key1" and have this node and the "key12" node as children
+	trieIntf, err = trie.NewView(context.Background(), ViewChanges{BatchOps: []database.BatchOp{
+		{Key: []byte("key134"), Value: []byte("value134")},
+	}})
 	require.NoError(err)
-	_, err = trie.insert(newPath([]byte("key134")), maybe.Some([]byte("value134")))
-	require.NoError(err)
+	trie = trieIntf.(*trieView)
+	dbTrie.metrics.(*mockMetrics).hashCount = 0
+	require.NoError(trie.calculateNodeIDs(context.Background()))
+
 	// only hashes the new branch node, the new child node, and root
 	// shouldn't hash the existing node
-	require.NoError(trie.calculateNodeIDs(context.Background()))
-	require.Equal(int64(5), dbTrie.metrics.(*mockMetrics).hashCount)
+	require.Equal(int64(3), dbTrie.metrics.(*mockMetrics).hashCount)
 }
 
 func Test_Trie_HashCountOnDelete(t *testing.T) {
@@ -945,7 +952,7 @@ func TestNewViewOnCommittedView(t *testing.T) {
 	require.NoError(err)
 
 	// Create a view
-	view1Intf, err := db.NewView(context.Background(), ViewChanges{})
+	view1Intf, err := db.NewView(context.Background(), ViewChanges{BatchOps: []database.BatchOp{{Key: []byte{1}, Value: []byte{1}}}})
 	require.NoError(err)
 	require.IsType(&trieView{}, view1Intf)
 	view1 := view1Intf.(*trieView)
@@ -957,9 +964,6 @@ func TestNewViewOnCommittedView(t *testing.T) {
 	require.Len(db.childViews, 1)
 	require.Contains(db.childViews, view1)
 	require.Equal(db, view1.parentTrie)
-
-	_, err = view1.insert(newPath([]byte{1}), maybe.Some([]byte{1}))
-	require.NoError(err)
 
 	// Commit the view
 	require.NoError(view1.CommitToDB(context.Background()))

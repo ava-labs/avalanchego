@@ -844,7 +844,8 @@ func (db *merkleDB) DeleteContext(ctx context.Context, key []byte) error {
 				Key:    key,
 				Delete: true,
 			}},
-			ConsumeBytes: true})
+			ConsumeBytes: true,
+		})
 	if err != nil {
 		return err
 	}
@@ -900,7 +901,9 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 	// move any child views of the committed trie onto the db
 	db.moveChildViewsToDB(trieToCommit)
 
-	if len(changes.nodes) == 0 {
+	// see if any changes need to be applied to the db
+	// use changed values and not changed nodes because the root should always be present in changes.nodes
+	if len(changes.values) == 0 {
 		return nil
 	}
 
