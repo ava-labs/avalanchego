@@ -709,9 +709,5 @@ func (ln *LocalNetwork) AddLocalNode(w io.Writer, node *LocalNode, isEphemeral b
 	if err := node.WriteConfig(); err != nil {
 		return nil, err
 	}
-	if err := node.Start(w, ln.ExecPath); err != nil {
-		return nil, err
-	}
-
-	return node, nil
+	return node, node.Start(w, ln.ExecPath)
 }
