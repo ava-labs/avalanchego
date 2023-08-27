@@ -162,6 +162,8 @@ var _ = e2e.DescribeCChainSerial("[Dynamic Fees]", func() {
 			require.NoError(ethClient.SendTransaction(e2e.DefaultContext(), signedTx))
 			_ = awaitTransaction(ethClient, signedTx)
 		})
+
+		e2e.CheckBootstrapIsPossible(e2e.Env.GetNetwork())
 	})
 })
 
