@@ -14,15 +14,18 @@ import (
 
 const valueNodePrefixLen = 1
 
+var _ database.Iterator = (*iterator)(nil)
+
 type valueNodeDB struct {
 	// Holds unused []byte
 	bufferPool *sync.Pool
 
-	// The underlying storage
+	// The underlying storage.
+	// Keys written to [baseDB] are prefixed with [valueNodePrefix].
 	baseDB database.Database
 
 	// If a value is nil, the corresponding key isn't in the trie.
-	// A non-nil error returned from Put is considered fatal.
+	// Paths in [nodeCache] aren't prefixed with [valueNodePrefix].
 	nodeCache cache.LRU[path, *node]
 	metrics   merkleMetrics
 
@@ -69,15 +72,16 @@ func (db *valueNodeDB) Get(key path) (*node, error) {
 		}
 		return cachedValue, nil
 	}
-	db.metrics.IntermediateNodeCacheMiss()
+	db.metrics.ValueNodeCacheMiss()
 
 	prefixedKey := addPrefixToKey(db.bufferPool, valueNodePrefix, key.Serialize().Value)
+	defer db.bufferPool.Put(prefixedKey)
+
 	db.metrics.DatabaseNodeRead()
 	nodeBytes, err := db.baseDB.Get(prefixedKey)
 	if err != nil {
 		return nil, err
 	}
-	db.bufferPool.Put(prefixedKey)
 
 	return parseNode(key, nodeBytes)
 }
@@ -116,8 +120,6 @@ func (b *valueNodeBatch) Write() error {
 
 	return dbBatch.Write()
 }
-
-var _ database.Iterator = (*iterator)(nil)
 
 type iterator struct {
 	db       *valueNodeDB
