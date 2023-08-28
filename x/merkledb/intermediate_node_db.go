@@ -79,7 +79,7 @@ func (db *intermediateNodeDB) onEviction(key path, n *node) error {
 func (db *intermediateNodeDB) addToBatch(b database.Batch, key path, n *node) error {
 	prefixedKey := addPrefixToKey(db.bufferPool, intermediateNodePrefix, key.Bytes())
 	defer db.bufferPool.Put(prefixedKey)
-	db.metrics.IOKeyWrite()
+	db.metrics.DatabaseNodeWrite()
 	if n == nil {
 		return b.Delete(prefixedKey)
 	}
@@ -97,7 +97,7 @@ func (db *intermediateNodeDB) Get(key path) (*node, error) {
 	db.metrics.IntermediateNodeCacheMiss()
 
 	prefixedKey := addPrefixToKey(db.bufferPool, intermediateNodePrefix, key.Bytes())
-	db.metrics.IOKeyRead()
+	db.metrics.DatabaseNodeRead()
 	nodeBytes, err := db.baseDB.Get(prefixedKey)
 	if err != nil {
 		return nil, err
