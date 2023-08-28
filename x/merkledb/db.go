@@ -11,6 +11,8 @@ import (
 	"runtime"
 	"sync"
 
+	"github.com/ava-labs/avalanchego/utils/units"
+
 	"github.com/prometheus/client_golang/prometheus"
 
 	"golang.org/x/exp/maps"
@@ -33,8 +35,9 @@ const (
 	DefaultEvictionBatchSize = 100
 	RootPath                 = EmptyPath
 	// TODO: name better
-	rebuildViewSizeFractionOfCacheSize = 50
-	minRebuildViewSizePerCommit        = 1000
+	rebuildViewSizeFractionOfCacheSize   = 50
+	minRebuildViewSizePerCommit          = 1000
+	rebuildIntermediateDeletionWriteSize = 10 * units.KiB
 )
 
 var (
@@ -267,7 +270,7 @@ func (db *merkleDB) rebuild(ctx context.Context, cacheSize int) error {
 	)
 
 	// Delete intermediate nodes.
-	if err := database.ClearPrefix(db.baseDB, db.baseDB, intermediateNodePrefix); err != nil {
+	if err := database.ClearPrefix(db.baseDB, intermediateNodePrefix, rebuildIntermediateDeletionWriteSize); err != nil {
 		return err
 	}
 
