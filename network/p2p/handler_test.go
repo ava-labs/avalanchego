@@ -75,17 +75,17 @@ func TestValidatorHandlerAppRequest(t *testing.T) {
 		expected     error
 	}{
 		{
-			name:     "message dropped",
-			nodeID:   nodeID,
-			expected: ErrNotValidator,
+			name:         "message dropped",
+			validatorSet: testValidatorSet{},
+			nodeID:       nodeID,
+			expected:     ErrNotValidator,
 		},
 		{
 			name: "message handled",
 			validatorSet: testValidatorSet{
 				validators: validatorSet,
 			},
-			nodeID:   nodeID,
-			expected: ErrNotValidator,
+			nodeID: nodeID,
 		},
 	}
 
