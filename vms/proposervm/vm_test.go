@@ -2544,6 +2544,7 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 		BytesV:     utils.RandomBytes(1024),
 	}
 	acceptedBlocks := []snowman.Block{coreGenBlk}
+	currentHeight := uint64(0)
 
 	initialState := []byte("genesis state")
 	coreVM := &block.TestVM{
@@ -2554,7 +2555,7 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 			},
 		},
 		LastAcceptedF: func(context.Context) (ids.ID, error) {
-			return acceptedBlocks[len(acceptedBlocks)-1].ID(), nil
+			return acceptedBlocks[currentHeight].ID(), nil
 		},
 		GetBlockF: func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 			for _, blk := range acceptedBlocks {
@@ -2632,7 +2633,7 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 	require.NoError(proVM.VerifyHeightIndex(context.Background()))
 
 	issueBlock := func() {
-		lastAcceptedBlock := acceptedBlocks[len(acceptedBlocks)-1]
+		lastAcceptedBlock := acceptedBlocks[currentHeight]
 		innerBlock := &snowman.TestBlock{
 			TestDecidable: choices.TestDecidable{
 				IDV:     ids.GenerateTestID(),
@@ -2655,6 +2656,7 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 		require.NoError(proBlock.Accept(context.Background()))
 
 		acceptedBlocks = append(acceptedBlocks, innerBlock)
+		currentHeight++
 	}
 
 	requireHeights := func(start, end uint64) {
@@ -2671,33 +2673,82 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 		}
 	}
 
+	requireNumHeights := func(numIndexed uint64) {
+		requireHeights(0, 0)
+		requireMissingHeights(1, currentHeight-numIndexed-1)
+		requireHeights(currentHeight-numIndexed, currentHeight)
+	}
+
 	// Because block pruning is disabled by default, the heights should be
 	// populated for every accepted block.
-	requireHeights(0, 0)
+	requireHeights(0, currentHeight)
 
 	issueBlock()
-	requireHeights(0, 1)
+	requireHeights(0, currentHeight)
 
 	issueBlock()
-	requireHeights(0, 2)
+	requireHeights(0, currentHeight)
 
 	issueBlock()
-	requireHeights(0, 3)
+	requireHeights(0, currentHeight)
 
 	issueBlock()
-	requireHeights(0, 4)
+	requireHeights(0, currentHeight)
 
 	issueBlock()
-	requireHeights(0, 5)
+	requireHeights(0, currentHeight)
 
 	require.NoError(proVM.Shutdown(context.Background()))
 
+	numHistoricalBlocks := uint64(2)
 	proVM = New(
 		coreVM,
 		time.Time{},
 		0,
 		DefaultMinBlockDelay,
-		2,
+		numHistoricalBlocks,
+		pTestSigner,
+		pTestCert,
+	)
+
+	require.NoError(proVM.Initialize(
+		context.Background(),
+		ctx,
+		dummyDBManager,
+		initialState,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+	))
+
+	lastAcceptedID, err = proVM.LastAccepted(context.Background())
+	require.NoError(err)
+
+	require.NoError(proVM.SetState(context.Background(), snow.NormalOp))
+	require.NoError(proVM.SetPreference(context.Background(), lastAcceptedID))
+	require.NoError(proVM.VerifyHeightIndex(context.Background()))
+
+	// Verify that old blocks were pruned during startup
+	requireNumHeights(numHistoricalBlocks)
+
+	// As we issue new blocks, the oldest indexed height should be pruned.
+	issueBlock()
+	requireNumHeights(numHistoricalBlocks)
+
+	issueBlock()
+	requireNumHeights(numHistoricalBlocks)
+
+	require.NoError(proVM.Shutdown(context.Background()))
+
+	newNumHistoricalBlocks := numHistoricalBlocks + 2
+	proVM = New(
+		coreVM,
+		time.Time{},
+		0,
+		DefaultMinBlockDelay,
+		newNumHistoricalBlocks,
 		pTestSigner,
 		pTestCert,
 	)
@@ -2724,19 +2775,17 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 	require.NoError(proVM.SetPreference(context.Background(), lastAcceptedID))
 	require.NoError(proVM.VerifyHeightIndex(context.Background()))
 
-	// Verify that old blocks were pruned during startup
-	requireHeights(0, 0) // The inner VM exposes their height index
-	requireMissingHeights(1, 2)
-	requireHeights(3, 5)
+	// The height index shouldn't be modified at this point
+	requireNumHeights(numHistoricalBlocks)
 
-	// As we issue new blocks, the oldest indexed height should be pruned.
+	// As we issue new blocks, the number of indexed blocks should increase
+	// until we hit our target again.
 	issueBlock()
-	requireHeights(0, 0)
-	requireMissingHeights(1, 3)
-	requireHeights(4, 6)
+	requireNumHeights(numHistoricalBlocks + 1)
 
 	issueBlock()
-	requireHeights(0, 0)
-	requireMissingHeights(1, 4)
-	requireHeights(5, 7)
+	requireNumHeights(newNumHistoricalBlocks)
+
+	issueBlock()
+	requireNumHeights(newNumHistoricalBlocks)
 }
