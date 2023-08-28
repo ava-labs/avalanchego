@@ -174,6 +174,7 @@ func Clear(readerDB Iteratee, deleterDB KeyValueDeleter) error {
 	return ClearPrefix(readerDB, deleterDB, nil)
 }
 
+// Deletes from [deleterDB] all keys in [readerDB] that have the given [prefix].
 func ClearPrefix(readerDB Iteratee, deleterDB KeyValueDeleter, prefix []byte) error {
 	iterator := readerDB.NewIteratorWithPrefix(prefix)
 	defer iterator.Release()

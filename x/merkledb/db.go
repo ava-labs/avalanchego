@@ -202,6 +202,8 @@ func newDatabase(
 		rootGenConcurrency = config.RootGenConcurrency
 	}
 
+	// Share a sync.Pool of []byte between the intermediateNodeDB and valueNodeDB
+	// to reduce memory allocations.
 	bufferPool := &sync.Pool{
 		New: func() interface{} {
 			return make([]byte, 0, defaultBufferLength)
