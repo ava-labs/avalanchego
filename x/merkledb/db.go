@@ -856,43 +856,28 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 
 	_, nodesSpan := db.infoTracer.Start(ctx, "MerkleDB.commitChanges.writeNodes")
 	for key, nodeChange := range changes.nodes {
-		switch {
-		case nodeChange.after == nil:
-			switch {
-			case nodeChange.before == nil:
-				// Before and after are both nil. This is a noop.
-			case nodeChange.before.hasValue():
-				// The node had a value before. Delete from the value node db.
-				currentValueNodeBatch.Delete(key)
-			default:
-				// the node didn't have a value before. Delete from the intermediate node db.
-				if err := db.intermediateNodeDB.Delete(key); err != nil {
-					nodesSpan.End()
-					return err
-				}
-			}
-		case nodeChange.after.hasValue():
-			// The node is not nil and has a value. Add to the value node db.
-			currentValueNodeBatch.Put(key, nodeChange.after)
+		shouldAddIntermediate := nodeChange.after != nil && !nodeChange.after.hasValue()
+		shouldDeleteIntermediate := !shouldAddIntermediate && nodeChange.before != nil && !nodeChange.before.hasValue()
 
-			if nodeChange.before != nil && !nodeChange.before.hasValue() {
-				// The node didn't have a value before. Delete from the intermediate node db.
-				if err := db.intermediateNodeDB.Delete(key); err != nil {
-					nodesSpan.End()
-					return err
-				}
-			}
-		default:
-			// The node has value. Add it to the intermediate node db.
+		shouldAddValue := nodeChange.after != nil && nodeChange.after.hasValue()
+		shouldDeleteValue := !shouldAddValue && nodeChange.before != nil && nodeChange.before.hasValue()
+
+		if shouldAddIntermediate {
 			if err := db.intermediateNodeDB.Put(key, nodeChange.after); err != nil {
 				nodesSpan.End()
 				return err
 			}
-
-			// The node had a value before. Delete from the value node db.
-			if nodeChange.before != nil && nodeChange.before.hasValue() {
-				currentValueNodeBatch.Delete(key)
+		} else if shouldDeleteIntermediate {
+			if err := db.intermediateNodeDB.Delete(key); err != nil {
+				nodesSpan.End()
+				return err
 			}
+		}
+
+		if shouldAddValue {
+			currentValueNodeBatch.Put(key, nodeChange.after)
+		} else if shouldDeleteValue {
+			currentValueNodeBatch.Delete(key)
 		}
 	}
 	nodesSpan.End()
