@@ -264,17 +264,16 @@ func newDatabase(
 func (db *merkleDB) rebuild(ctx context.Context, cacheSize int) error {
 	db.root = newNode(nil, RootPath)
 
-	opsSizeLimit := math.Max(
-		cacheSize/rebuildViewSizeFractionOfCacheSize,
-		minRebuildViewSizePerCommit,
-	)
-
 	// Delete intermediate nodes.
 	if err := database.ClearPrefix(db.baseDB, intermediateNodePrefix, rebuildIntermediateDeletionWriteSize); err != nil {
 		return err
 	}
 
 	// Add all key-value pairs back into the database.
+	opsSizeLimit := math.Max(
+		cacheSize/rebuildViewSizeFractionOfCacheSize,
+		minRebuildViewSizePerCommit,
+	)
 	currentOps := make([]database.BatchOp, 0, opsSizeLimit)
 	valueIt := db.NewIterator()
 	defer valueIt.Release()
