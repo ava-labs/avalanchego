@@ -27,7 +27,13 @@ type intermediateNodeDB struct {
 	metrics           merkleMetrics
 }
 
-func newIntermediateNodeDB(db database.Database, bufferPool *sync.Pool, metrics merkleMetrics, size int, evictionBatchSize int) *intermediateNodeDB {
+func newIntermediateNodeDB(
+	db database.Database,
+	bufferPool *sync.Pool,
+	metrics merkleMetrics,
+	size int,
+	evictionBatchSize int,
+) *intermediateNodeDB {
 	result := &intermediateNodeDB{
 		metrics:           metrics,
 		baseDB:            db,
@@ -38,10 +44,12 @@ func newIntermediateNodeDB(db database.Database, bufferPool *sync.Pool, metrics 
 	return result
 }
 
+// A non-nil error is considered fatal and closes [db.baseDB].
 func (db *intermediateNodeDB) onEviction(key path, n *node) error {
 	writeBatch := db.baseDB.NewBatch()
 
 	if err := db.addToBatch(writeBatch, key, n); err != nil {
+		_ = db.baseDB.Close()
 		return err
 	}
 
@@ -57,6 +65,7 @@ func (db *intermediateNodeDB) onEviction(key path, n *node) error {
 			break
 		}
 		if err := db.addToBatch(writeBatch, key, n); err != nil {
+			_ = db.baseDB.Close()
 			return err
 		}
 	}
