@@ -9,10 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 )
 
-const (
-	defaultBufferLength       = 256
-	intermediateNodePrefixLen = 1
-)
+const defaultBufferLength = 256
 
 var intermediateNodePrefix = []byte{2}
 
