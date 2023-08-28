@@ -202,6 +202,8 @@ func newDatabase(
 		rootGenConcurrency = config.RootGenConcurrency
 	}
 
+	// Share a sync.Pool of []byte between the intermediateNodeDB and valueNodeDB
+	// to reduce memory allocations.
 	bufferPool := &sync.Pool{
 		New: func() interface{} {
 			return make([]byte, 0, defaultBufferLength)
@@ -260,13 +262,13 @@ func (db *merkleDB) rebuild(ctx context.Context, cacheSize int) error {
 		cacheSize/rebuildViewSizeFractionOfCacheSize,
 		minRebuildViewSizePerCommit,
 	)
-	intermediateNodeIt := db.baseDB.NewIteratorWithPrefix(intermediateNodePrefix)
-	defer intermediateNodeIt.Release()
+
+	// Delete intermediate nodes.
 	if err := database.ClearPrefix(db.baseDB, db.baseDB, intermediateNodePrefix); err != nil {
 		return err
 	}
 
-	// add all key/values back into the database
+	// Add all key-value pairs back into the database.
 	currentOps := make([]database.BatchOp, 0, opsSizeLimit)
 	valueIt := db.NewIterator()
 	defer valueIt.Release()
