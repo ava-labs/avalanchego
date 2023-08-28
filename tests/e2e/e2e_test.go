@@ -26,6 +26,7 @@ import (
 	// ensure test packages are scanned by ginkgo
 	_ "github.com/ava-labs/avalanchego/tests/e2e/banff"
 	_ "github.com/ava-labs/avalanchego/tests/e2e/c"
+	_ "github.com/ava-labs/avalanchego/tests/e2e/faultinjection"
 	_ "github.com/ava-labs/avalanchego/tests/e2e/p"
 	_ "github.com/ava-labs/avalanchego/tests/e2e/static-handlers"
 	_ "github.com/ava-labs/avalanchego/tests/e2e/x"
