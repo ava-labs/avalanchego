@@ -39,7 +39,7 @@ func TestFilter(t *testing.T) {
 			},
 		},
 	}}}
-	addrBytes := addrID[:]
+	addrBytes := addrID.Bytes()
 
 	fp := pubsub.NewFilterParam()
 	require.NoError(fp.Add(addrBytes))

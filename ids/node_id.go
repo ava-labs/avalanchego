@@ -28,6 +28,11 @@ var (
 
 type NodeID ShortID
 
+// Writeable is an helper which helps modifiying ShortID content
+func WritableNode(id *NodeID) []byte {
+	return id[:]
+}
+
 func (id NodeID) Bytes() []byte {
 	return id[:]
 }

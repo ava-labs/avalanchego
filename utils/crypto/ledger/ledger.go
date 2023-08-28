@@ -54,7 +54,7 @@ func (l *Ledger) Addresses(addressIndices []uint32) ([]ids.ShortID, error) {
 		if err != nil {
 			return nil, err
 		}
-		copy(addresses[i][:], hash)
+		copy(ids.WritableShort(&(addresses[i])), hash)
 	}
 	return addresses, nil
 }

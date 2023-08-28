@@ -26,6 +26,11 @@ var (
 // ShortID wraps a 20 byte hash as an identifier
 type ShortID [ShortIDLen]byte
 
+// Writeable is an helper which helps modifiying ShortID content
+func WritableShort(id *ShortID) []byte {
+	return id[:]
+}
+
 // Bytes returns the 20 byte hash as a slice. It is assumed this slice is not
 // modified.
 func (id ShortID) Bytes() []byte {

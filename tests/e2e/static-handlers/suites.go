@@ -42,7 +42,7 @@ var _ = ginkgo.Describe("[StaticHandlers]", func() {
 			} {
 				addr, err := ids.ShortFromString(addrStr)
 				gomega.Expect(err).Should(gomega.BeNil())
-				addrMap[addrStr], err = address.FormatBech32(constants.NetworkIDToHRP[constants.LocalID], addr[:])
+				addrMap[addrStr], err = address.FormatBech32(constants.NetworkIDToHRP[constants.LocalID], addr.Bytes())
 				gomega.Expect(err).Should(gomega.BeNil())
 			}
 			avmArgs := avm.BuildGenesisArgs{

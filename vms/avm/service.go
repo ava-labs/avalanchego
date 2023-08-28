@@ -260,7 +260,7 @@ func (s *Service) GetAddressTxs(_ *http.Request, args *GetAddressTxsArgs, reply 
 	)
 
 	// Read transactions from the indexer
-	reply.TxIDs, err = s.vm.addressTxsIndexer.Read(address[:], assetID, cursor, pageSize)
+	reply.TxIDs, err = s.vm.addressTxsIndexer.Read(address.Bytes(), assetID, cursor, pageSize)
 	if err != nil {
 		return err
 	}
