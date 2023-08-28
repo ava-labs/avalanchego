@@ -37,7 +37,7 @@ const (
 	// TODO: name better
 	rebuildViewSizeFractionOfCacheSize   = 50
 	minRebuildViewSizePerCommit          = 1000
-	rebuildIntermediateDeletionWriteSize = 10 * units.KiB
+	rebuildIntermediateDeletionWriteSize = units.MiB
 )
 
 var (
