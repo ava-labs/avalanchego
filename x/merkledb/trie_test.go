@@ -293,11 +293,14 @@ func Test_Trie_WriteToDB(t *testing.T) {
 	require.NoError(trie1.CommitToDB(context.Background()))
 	require.NoError(trie2.CommitToDB(context.Background()))
 
-	p := []byte("key")
-	rawBytes, err := dbTrie.baseDB.Get(addPrefixToKey(dbTrie.bufferPool, valueNodePrefix, p))
+	key := []byte("key")
+	prefixedKey := make([]byte, len(key)+valueNodePrefixLen)
+	copy(prefixedKey, valueNodePrefix)
+	copy(prefixedKey[valueNodePrefixLen:], key)
+	rawBytes, err := dbTrie.baseDB.Get(prefixedKey)
 	require.NoError(err)
 
-	node, err := parseNode(newPath(p), rawBytes)
+	node, err := parseNode(newPath(key), rawBytes)
 	require.NoError(err)
 	require.Equal([]byte("value"), node.value.Value())
 }

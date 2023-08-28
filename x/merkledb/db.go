@@ -149,6 +149,8 @@ type merkleDB struct {
 	// Should be held before taking [db.lock]
 	commitLock sync.RWMutex
 
+	// Contains all of the key-value pairs stored by this database,
+	// including metadata, intermediate nodes and value nodes.
 	baseDB database.Database
 
 	valueNodeDB        *valueNodeDB
@@ -171,8 +173,6 @@ type merkleDB struct {
 
 	// Valid children of this trie.
 	childViews []*trieView
-
-	bufferPool *sync.Pool
 
 	// rootGenConcurrency is the number of goroutines to use when
 	// generating a new state root.
@@ -210,7 +210,6 @@ func newDatabase(
 	trieDB := &merkleDB{
 		metrics:            metrics,
 		baseDB:             db,
-		bufferPool:         bufferPool,
 		valueNodeDB:        newValueNodeDB(db, bufferPool, metrics, config.ValueNodeCacheSize),
 		intermediateNodeDB: newIntermediateNodeDB(db, bufferPool, metrics, config.IntermediateNodeCacheSize, config.EvictionBatchSize),
 		history:            newTrieHistory(config.HistoryLength),
