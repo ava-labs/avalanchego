@@ -31,6 +31,7 @@ jobs:
         run: E2E_SERIAL=1 ./scripts/tests.e2e.sh ./build/avalanchego
       - name: Upload testnet network dir
         uses: actions/upload-artifact@v3
+        if: always()
         with:
           name: testnet-data
           path: ~/.testnetctl/networks/1000
