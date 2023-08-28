@@ -62,7 +62,8 @@ func (s *SlidingWindowThrottler) Handle(nodeID ids.NodeID) bool {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	// check if the current evaluation period is over
+	// the current window becomes the previous window if the current evaluation
+	// period is over
 	now := s.clock.Time()
 	if now.After(s.current.start.Add(s.period)) {
 		// discard the current window if it's too old
