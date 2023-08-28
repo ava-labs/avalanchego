@@ -7,7 +7,7 @@ on:
 #        description: 'Tag to create AMI from'
 #        required: true
   push:
-    tags:
+    branches:
       - "cwyse-testing"
 
 jobs:
