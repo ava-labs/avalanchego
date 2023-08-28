@@ -31,7 +31,7 @@ func newRandomProofNode(r *rand.Rand) ProofNode {
 	for j := 0; j < NodeBranchFactor; j++ {
 		if r.Float64() < 0.5 {
 			var childID ids.ID
-			_, _ = r.Read(childID[:]) // #nosec G404
+			_, _ = r.Read(ids.Writable(&childID)) // #nosec G404
 			children[byte(j)] = childID
 		}
 	}
@@ -248,7 +248,7 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 			children := map[byte]child{}
 			for i := 0; i < numChildren; i++ {
 				var childID ids.ID
-				_, _ = r.Read(childID[:]) // #nosec G404
+				_, _ = r.Read(ids.Writable(&childID)) // #nosec G404
 
 				childPathBytes := make([]byte, r.Intn(32)) // #nosec G404
 				_, _ = r.Read(childPathBytes)              // #nosec G404

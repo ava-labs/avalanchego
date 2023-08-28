@@ -77,7 +77,7 @@ func TestDiffIteration(t *testing.T) {
 	require.NoError(db.Put(subnetID1Height1NodeID1, nil))
 
 	{
-		it := db.NewIteratorWithStartAndPrefix(marshalStartDiffKey(subnetID0, 0), subnetID0[:])
+		it := db.NewIteratorWithStartAndPrefix(marshalStartDiffKey(subnetID0, 0), subnetID0.Bytes())
 		defer it.Release()
 
 		expectedKeys := [][]byte{
@@ -92,7 +92,7 @@ func TestDiffIteration(t *testing.T) {
 	}
 
 	{
-		it := db.NewIteratorWithStartAndPrefix(marshalStartDiffKey(subnetID0, 1), subnetID0[:])
+		it := db.NewIteratorWithStartAndPrefix(marshalStartDiffKey(subnetID0, 1), subnetID0.Bytes())
 		defer it.Release()
 
 		expectedKeys := [][]byte{

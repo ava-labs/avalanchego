@@ -30,7 +30,7 @@ func TestBuildGenesis(t *testing.T) {
 	for _, addrStr := range addrStrArray {
 		addr, err := ids.ShortFromString(addrStr)
 		require.NoError(err)
-		addrMap[addrStr], err = address.FormatBech32(constants.UnitTestHRP, addr[:])
+		addrMap[addrStr], err = address.FormatBech32(constants.UnitTestHRP, addr.Bytes())
 		require.NoError(err)
 	}
 	args := BuildGenesisArgs{

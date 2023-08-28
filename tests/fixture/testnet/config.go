@@ -362,7 +362,7 @@ func NewTestGenesis(
 
 	// Set X-Chain balances
 	for xChainAddress, balance := range xChainBalances {
-		avaxAddr, err := address.Format("X", constants.GetHRP(networkID), xChainAddress[:])
+		avaxAddr, err := address.Format("X", constants.GetHRP(networkID), xChainAddress.Bytes())
 		if err != nil {
 			return nil, fmt.Errorf("failed to format X-Chain address: %w", err)
 		}

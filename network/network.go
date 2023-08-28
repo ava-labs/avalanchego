@@ -595,7 +595,7 @@ func (n *network) Track(peerID ids.NodeID, claimedIPPorts []*ips.ClaimedIPPort) 
 	for i, txID := range txIDsToAck {
 		txID := txID
 		peerAcks[i] = &p2p.PeerAck{
-			TxId: txID[:],
+			TxId: txID.Bytes(),
 			// By responding with the highest timestamp, not just the timestamp
 			// the peer provided us, we may be able to avoid some unnecessary
 			// gossip in the case that the peer is about to update this

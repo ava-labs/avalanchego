@@ -329,7 +329,7 @@ func (s *state) getStatus(id ids.ID) (choices.Status, error) {
 		return *status, nil
 	}
 
-	val, err := database.GetUInt32(s.statusDB, id[:])
+	val, err := database.GetUInt32(s.statusDB, id.Bytes())
 	if err == database.ErrNotFound {
 		s.statusCache.Put(id, nil)
 		return choices.Unknown, database.ErrNotFound
@@ -357,7 +357,7 @@ func (s *state) getTx(txID ids.ID) (*txs.Tx, error) {
 		return tx, nil
 	}
 
-	txBytes, err := s.txDB.Get(txID[:])
+	txBytes, err := s.txDB.Get(txID.Bytes())
 	if err == database.ErrNotFound {
 		s.txCache.Put(txID, nil)
 		return nil, database.ErrNotFound
@@ -421,7 +421,7 @@ func (s *state) GetBlock(blkID ids.ID) (blocks.Block, error) {
 		return blk, nil
 	}
 
-	blkBytes, err := s.blockDB.Get(blkID[:])
+	blkBytes, err := s.blockDB.Get(blkID.Bytes())
 	if err == database.ErrNotFound {
 		s.blockCache.Put(blkID, nil)
 		return nil, database.ErrNotFound
@@ -572,10 +572,10 @@ func (s *state) writeTxs() error {
 		delete(s.addedTxs, txID)
 		s.txCache.Put(txID, tx)
 		s.statusCache.Put(txID, nil)
-		if err := s.txDB.Put(txID[:], txBytes); err != nil {
+		if err := s.txDB.Put(txID.Bytes(), txBytes); err != nil {
 			return fmt.Errorf("failed to add tx: %w", err)
 		}
-		if err := s.statusDB.Delete(txID[:]); err != nil {
+		if err := s.statusDB.Delete(txID.Bytes()); err != nil {
 			return fmt.Errorf("failed to delete status: %w", err)
 		}
 	}
@@ -602,7 +602,7 @@ func (s *state) writeBlocks() error {
 
 		delete(s.addedBlocks, blkID)
 		s.blockCache.Put(blkID, blk)
-		if err := s.blockDB.Put(blkID[:], blkBytes); err != nil {
+		if err := s.blockDB.Put(blkID.Bytes(), blkBytes); err != nil {
 			return fmt.Errorf("failed to add block: %w", err)
 		}
 	}

@@ -28,6 +28,10 @@ var (
 
 type NodeID ShortID
 
+func (id NodeID) Bytes() []byte {
+	return id[:]
+}
+
 // ToNodeID attempt to convert a byte slice into a node id
 func ToNodeID(bytes []byte) (NodeID, error) {
 	nodeID, err := ToShortID(bytes)
@@ -79,10 +83,6 @@ func (id *NodeID) UnmarshalText(text []byte) error {
 
 func (id NodeID) Less(other NodeID) bool {
 	return bytes.Compare(id[:], other[:]) == -1
-}
-
-func (id NodeID) Bytes() []byte {
-	return id[:]
 }
 
 func NodeIDFromCert(cert *staking.Certificate) NodeID {

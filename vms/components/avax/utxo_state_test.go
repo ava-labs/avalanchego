@@ -65,7 +65,7 @@ func TestUTXOState(t *testing.T) {
 
 	require.NoError(s.PutUTXO(utxo))
 
-	utxoIDs, err := s.UTXOIDs(addr[:], ids.Empty, 5)
+	utxoIDs, err := s.UTXOIDs(addr.Bytes(), ids.Empty, 5)
 	require.NoError(err)
 	require.Equal([]ids.ID{utxoID}, utxoIDs)
 
@@ -88,7 +88,7 @@ func TestUTXOState(t *testing.T) {
 	require.Equal(utxoID, readUTXO.InputID())
 	require.Equal(utxo, readUTXO)
 
-	utxoIDs, err = s.UTXOIDs(addr[:], ids.Empty, 5)
+	utxoIDs, err = s.UTXOIDs(addr.Bytes(), ids.Empty, 5)
 	require.NoError(err)
 	require.Equal([]ids.ID{utxoID}, utxoIDs)
 }

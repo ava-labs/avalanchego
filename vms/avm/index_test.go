@@ -175,7 +175,7 @@ func TestIndexer_Read(t *testing.T) {
 		pageSize uint64 = 5
 	)
 	for cursor < 25 {
-		txIDs, err := env.vm.addressTxsIndexer.Read(addr[:], assetID, cursor, pageSize)
+		txIDs, err := env.vm.addressTxsIndexer.Read(addr.Bytes(), assetID, cursor, pageSize)
 		require.NoError(err)
 		require.Len(txIDs, 5)
 		require.Equal(txIDs, testTxs[cursor:cursor+pageSize])
@@ -288,8 +288,8 @@ func buildTX(utxoID avax.UTXOID, txAssetID avax.Asset, address ...ids.ShortID) *
 func assertLatestIdx(t *testing.T, db database.Database, sourceAddress ids.ShortID, assetID ids.ID, expectedIdx uint64) {
 	require := require.New(t)
 
-	addressDB := prefixdb.New(sourceAddress[:], db)
-	assetDB := prefixdb.New(assetID[:], addressDB)
+	addressDB := prefixdb.New(sourceAddress.Bytes(), db)
+	assetDB := prefixdb.New(assetID.Bytes(), addressDB)
 
 	expectedIdxBytes := database.PackUInt64(expectedIdx)
 	idxBytes, err := assetDB.Get([]byte("idx"))
@@ -300,8 +300,8 @@ func assertLatestIdx(t *testing.T, db database.Database, sourceAddress ids.Short
 func assertIndexedTX(t *testing.T, db database.Database, index uint64, sourceAddress ids.ShortID, assetID ids.ID, transactionID ids.ID) {
 	require := require.New(t)
 
-	addressDB := prefixdb.New(sourceAddress[:], db)
-	assetDB := prefixdb.New(assetID[:], addressDB)
+	addressDB := prefixdb.New(sourceAddress.Bytes(), db)
+	assetDB := prefixdb.New(assetID.Bytes(), addressDB)
 
 	idxBytes := database.PackUInt64(index)
 	txID, err := database.GetID(assetDB, idxBytes)
@@ -325,13 +325,13 @@ func initTestTxIndex(t *testing.T, db *versiondb.Database, address ids.ShortID, 
 		testTxs[i] = ids.GenerateTestID()
 	}
 
-	addressPrefixDB := prefixdb.New(address[:], db)
-	assetPrefixDB := prefixdb.New(assetID[:], addressPrefixDB)
+	addressPrefixDB := prefixdb.New(address.Bytes(), db)
+	assetPrefixDB := prefixdb.New(assetID.Bytes(), addressPrefixDB)
 
 	for i, txID := range testTxs {
 		idxBytes := database.PackUInt64(uint64(i))
 		txID := txID
-		require.NoError(assetPrefixDB.Put(idxBytes, txID[:]))
+		require.NoError(assetPrefixDB.Put(idxBytes, txID.Bytes()))
 	}
 	_, err := db.CommitBatch()
 	require.NoError(err)

@@ -33,7 +33,7 @@ func (s *Server) Lookup(
 		return nil, err
 	}
 	return &aliasreaderpb.ID{
-		Id: id[:],
+		Id: id.Bytes(),
 	}, nil
 }
 

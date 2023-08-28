@@ -750,7 +750,7 @@ func (p *peer) getUptimes() (uint32, []*p2p.SubnetUptime) {
 
 		subnetID := subnetID
 		subnetUptimes = append(subnetUptimes, &p2p.SubnetUptime{
-			SubnetId: subnetID[:],
+			SubnetId: subnetID.Bytes(),
 			Uptime:   uint32(subnetUptime * 100),
 		})
 	}

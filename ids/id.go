@@ -32,6 +32,24 @@ var (
 // ID wraps a 32 byte hash used as an identifier
 type ID [IDLen]byte
 
+// FromRawBytes sets ID content to exactly the bytes in src
+// This is different from ToID, which creates the ID of an
+// arbitrary-long slice of bytes.
+func FromRawBytes(src [IDLen]byte) ID {
+	return src
+}
+
+// Writeable is an helper which helps modifiying ID content
+func Writable(id *ID) []byte {
+	return id[:]
+}
+
+// Any modification to Bytes will be lost since id is passed-by-value
+// Use Writable(ID) is you need to modify the ID
+func (id ID) Bytes() []byte {
+	return id[:]
+}
+
 // ToID attempt to convert a byte slice into an id
 func ToID(bytes []byte) (ID, error) {
 	return hashing.ToHash256(bytes)

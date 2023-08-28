@@ -135,7 +135,7 @@ func (e *StandardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 		utxoID := in.UTXOID.InputID()
 
 		e.Inputs.Add(utxoID)
-		utxoIDs[i] = utxoID[:]
+		utxoIDs[i] = utxoID.Bytes()
 	}
 
 	// Skip verification of the shared memory inputs if the other primary
@@ -258,7 +258,7 @@ func (e *StandardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 		}
 		utxoID := utxo.InputID()
 		elem := &atomic.Element{
-			Key:   utxoID[:],
+			Key:   utxoID.Bytes(),
 			Value: utxoBytes,
 		}
 		if out, ok := utxo.Out.(avax.Addressable); ok {

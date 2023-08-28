@@ -208,7 +208,7 @@ func TestGetTxStatus(t *testing.T) {
 		service.vm.ctx.ChainID: {
 			PutRequests: []*atomic.Element{
 				{
-					Key:   inputID[:],
+					Key:   inputID.Bytes(),
 					Value: utxoBytes,
 					Traits: [][]byte{
 						recipientKey.PublicKey().Address().Bytes(),

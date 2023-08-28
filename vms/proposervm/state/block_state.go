@@ -89,7 +89,7 @@ func (s *blockState) GetBlock(blkID ids.ID) (block.Block, choices.Status, error)
 		return blk.block, blk.Status, nil
 	}
 
-	blkWrapperBytes, err := s.db.Get(blkID[:])
+	blkWrapperBytes, err := s.db.Get(blkID.Bytes())
 	if err == database.ErrNotFound {
 		s.blkCache.Put(blkID, nil)
 		return nil, choices.Unknown, database.ErrNotFound
@@ -132,5 +132,5 @@ func (s *blockState) PutBlock(blk block.Block, status choices.Status) error {
 
 	blkID := blk.ID()
 	s.blkCache.Put(blkID, &blkWrapper)
-	return s.db.Put(blkID[:], bytes)
+	return s.db.Put(blkID.Bytes(), bytes)
 }

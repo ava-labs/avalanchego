@@ -135,7 +135,7 @@ func (i *index) Accept(ctx *snow.ConsensusContext, containerID ids.ID, container
 	// as accepted and then the node shut down before the VM committed [containerID] as accepted.
 	// In that case, when the node restarts Accept will be called with the same container.
 	// Make sure we don't index the same container twice in that event.
-	_, err := i.containerToIndex.Get(containerID[:])
+	_, err := i.containerToIndex.Get(containerID.Bytes())
 	if err == nil {
 		ctx.Log.Debug("not indexing already accepted container",
 			zap.Stringer("containerID", containerID),
@@ -165,7 +165,7 @@ func (i *index) Accept(ctx *snow.ConsensusContext, containerID ids.ID, container
 	}
 
 	// Persist container ID --> index
-	if err := i.containerToIndex.Put(containerID[:], nextAcceptedIndexBytes); err != nil {
+	if err := i.containerToIndex.Put(containerID.Bytes(), nextAcceptedIndexBytes); err != nil {
 		return fmt.Errorf("couldn't map container %s to index: %w", containerID, err)
 	}
 
@@ -260,7 +260,7 @@ func (i *index) GetIndex(id ids.ID) (uint64, error) {
 	i.lock.RLock()
 	defer i.lock.RUnlock()
 
-	return database.GetUInt64(i.containerToIndex, id[:])
+	return database.GetUInt64(i.containerToIndex, id.Bytes())
 }
 
 func (i *index) GetContainerByID(id ids.ID) (Container, error) {
@@ -268,7 +268,7 @@ func (i *index) GetContainerByID(id ids.ID) (Container, error) {
 	defer i.lock.RUnlock()
 
 	// Read index from database
-	indexBytes, err := i.containerToIndex.Get(id[:])
+	indexBytes, err := i.containerToIndex.Get(id.Bytes())
 	if err != nil {
 		return Container{}, err
 	}

@@ -242,9 +242,9 @@ func TestUTXOLess(t *testing.T) {
 		smallerAddr = ids.ShortID{}
 		largerAddr  = ids.ShortID{1}
 	)
-	smallerAddrStr, err := address.FormatBech32("avax", smallerAddr[:])
+	smallerAddrStr, err := address.FormatBech32("avax", smallerAddr.Bytes())
 	require.NoError(t, err)
-	largerAddrStr, err := address.FormatBech32("avax", largerAddr[:])
+	largerAddrStr, err := address.FormatBech32("avax", largerAddr.Bytes())
 	require.NoError(t, err)
 
 	type test struct {

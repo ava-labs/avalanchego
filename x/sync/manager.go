@@ -258,8 +258,8 @@ func (m *Manager) getAndApplyChangeProof(ctx context.Context, work *workItem) {
 	changeOrRangeProof, err := m.config.Client.GetChangeProof(
 		ctx,
 		&pb.SyncGetChangeProofRequest{
-			StartRootHash: work.localRootID[:],
-			EndRootHash:   targetRootID[:],
+			StartRootHash: work.localRootID.Bytes(),
+			EndRootHash:   targetRootID.Bytes(),
 			StartKey: &pb.MaybeBytes{
 				Value:     work.start.Value(),
 				IsNothing: work.start.IsNothing(),
@@ -323,7 +323,7 @@ func (m *Manager) getAndApplyRangeProof(ctx context.Context, work *workItem) {
 	targetRootID := m.getTargetRoot()
 	proof, err := m.config.Client.GetRangeProof(ctx,
 		&pb.SyncGetRangeProofRequest{
-			RootHash: targetRootID[:],
+			RootHash: targetRootID.Bytes(),
 			StartKey: &pb.MaybeBytes{
 				Value:     work.start.Value(),
 				IsNothing: work.start.IsNothing(),

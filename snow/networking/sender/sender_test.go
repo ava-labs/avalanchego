@@ -654,7 +654,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 			assertMsgToMyself: func(require *require.Assertions, msg message.InboundMessage) {
 				require.IsType(&p2p.GetStateSummaryFrontier{}, msg.Message())
 				innerMsg := msg.Message().(*p2p.GetStateSummaryFrontier)
-				require.Equal(chainID[:], innerMsg.ChainId)
+				require.Equal(chainID.Bytes(), innerMsg.ChainId)
 				require.Equal(requestID, innerMsg.RequestId)
 				require.Equal(uint64(deadline), innerMsg.Deadline)
 			},
@@ -695,7 +695,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 			assertMsgToMyself: func(require *require.Assertions, msg message.InboundMessage) {
 				require.IsType(&p2p.GetAcceptedStateSummary{}, msg.Message())
 				innerMsg := msg.Message().(*p2p.GetAcceptedStateSummary)
-				require.Equal(chainID[:], innerMsg.ChainId)
+				require.Equal(chainID.Bytes(), innerMsg.ChainId)
 				require.Equal(requestID, innerMsg.RequestId)
 				require.Equal(uint64(deadline), innerMsg.Deadline)
 				require.Equal(heights, innerMsg.Heights)
@@ -735,7 +735,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 			assertMsgToMyself: func(require *require.Assertions, msg message.InboundMessage) {
 				require.IsType(&p2p.GetAcceptedFrontier{}, msg.Message())
 				innerMsg := msg.Message().(*p2p.GetAcceptedFrontier)
-				require.Equal(chainID[:], innerMsg.ChainId)
+				require.Equal(chainID.Bytes(), innerMsg.ChainId)
 				require.Equal(requestID, innerMsg.RequestId)
 				require.Equal(uint64(deadline), innerMsg.Deadline)
 				require.Equal(engineType, innerMsg.EngineType)
@@ -776,7 +776,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 			assertMsgToMyself: func(require *require.Assertions, msg message.InboundMessage) {
 				require.IsType(&p2p.GetAccepted{}, msg.Message())
 				innerMsg := msg.Message().(*p2p.GetAccepted)
-				require.Equal(chainID[:], innerMsg.ChainId)
+				require.Equal(chainID.Bytes(), innerMsg.ChainId)
 				require.Equal(requestID, innerMsg.RequestId)
 				require.Equal(uint64(deadline), innerMsg.Deadline)
 				require.Equal(engineType, innerMsg.EngineType)
@@ -922,7 +922,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 			assertMsgToMyself: func(require *require.Assertions, msg message.InboundMessage) {
 				require.IsType(&p2p.StateSummaryFrontier{}, msg.Message())
 				innerMsg := msg.Message().(*p2p.StateSummaryFrontier)
-				require.Equal(chainID[:], innerMsg.ChainId)
+				require.Equal(chainID.Bytes(), innerMsg.ChainId)
 				require.Equal(requestID, innerMsg.RequestId)
 				require.Equal(summary, innerMsg.Summary)
 			},
@@ -950,10 +950,10 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 			assertMsgToMyself: func(require *require.Assertions, msg message.InboundMessage) {
 				require.IsType(&p2p.AcceptedStateSummary{}, msg.Message())
 				innerMsg := msg.Message().(*p2p.AcceptedStateSummary)
-				require.Equal(chainID[:], innerMsg.ChainId)
+				require.Equal(chainID.Bytes(), innerMsg.ChainId)
 				require.Equal(requestID, innerMsg.RequestId)
 				for i, summaryID := range summaryIDs {
-					require.Equal(summaryID[:], innerMsg.SummaryIds[i])
+					require.Equal(summaryID.Bytes(), innerMsg.SummaryIds[i])
 				}
 			},
 			setExternalSenderExpect: func(externalSender *MockExternalSender) {
@@ -980,9 +980,9 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 			assertMsgToMyself: func(require *require.Assertions, msg message.InboundMessage) {
 				require.IsType(&p2p.AcceptedFrontier{}, msg.Message())
 				innerMsg := msg.Message().(*p2p.AcceptedFrontier)
-				require.Equal(chainID[:], innerMsg.ChainId)
+				require.Equal(chainID.Bytes(), innerMsg.ChainId)
 				require.Equal(requestID, innerMsg.RequestId)
-				require.Equal(summaryIDs[0][:], innerMsg.ContainerId)
+				require.Equal(summaryIDs[0].Bytes(), innerMsg.ContainerId)
 			},
 			setExternalSenderExpect: func(externalSender *MockExternalSender) {
 				externalSender.EXPECT().Send(
@@ -1008,10 +1008,10 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 			assertMsgToMyself: func(require *require.Assertions, msg message.InboundMessage) {
 				require.IsType(&p2p.Accepted{}, msg.Message())
 				innerMsg := msg.Message().(*p2p.Accepted)
-				require.Equal(chainID[:], innerMsg.ChainId)
+				require.Equal(chainID.Bytes(), innerMsg.ChainId)
 				require.Equal(requestID, innerMsg.RequestId)
 				for i, summaryID := range summaryIDs {
-					require.Equal(summaryID[:], innerMsg.ContainerIds[i])
+					require.Equal(summaryID.Bytes(), innerMsg.ContainerIds[i])
 				}
 			},
 			setExternalSenderExpect: func(externalSender *MockExternalSender) {

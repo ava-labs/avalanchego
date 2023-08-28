@@ -24,7 +24,7 @@ func NewClient(client pb.SignerClient) *Client {
 func (c *Client) Sign(unsignedMsg *warp.UnsignedMessage) ([]byte, error) {
 	resp, err := c.client.Sign(context.Background(), &pb.SignRequest{
 		NetworkId:     unsignedMsg.NetworkID,
-		SourceChainId: unsignedMsg.SourceChainID[:],
+		SourceChainId: unsignedMsg.SourceChainID.Bytes(),
 		Payload:       unsignedMsg.Payload,
 	})
 	if err != nil {

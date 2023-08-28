@@ -44,7 +44,7 @@ func Test_Server_GetRangeProof(t *testing.T) {
 	}{
 		"proof too large": {
 			request: &pb.SyncGetRangeProofRequest{
-				RootHash:   smallTrieRoot[:],
+				RootHash:   smallTrieRoot.Bytes(),
 				KeyLimit:   defaultRequestKeyLimit,
 				BytesLimit: 1000,
 			},
@@ -53,7 +53,7 @@ func Test_Server_GetRangeProof(t *testing.T) {
 		},
 		"byteslimit is 0": {
 			request: &pb.SyncGetRangeProofRequest{
-				RootHash:   smallTrieRoot[:],
+				RootHash:   smallTrieRoot.Bytes(),
 				KeyLimit:   defaultRequestKeyLimit,
 				BytesLimit: 0,
 			},
@@ -61,7 +61,7 @@ func Test_Server_GetRangeProof(t *testing.T) {
 		},
 		"keylimit is 0": {
 			request: &pb.SyncGetRangeProofRequest{
-				RootHash:   smallTrieRoot[:],
+				RootHash:   smallTrieRoot.Bytes(),
 				KeyLimit:   defaultRequestKeyLimit,
 				BytesLimit: 0,
 			},
@@ -69,7 +69,7 @@ func Test_Server_GetRangeProof(t *testing.T) {
 		},
 		"keys out of order": {
 			request: &pb.SyncGetRangeProofRequest{
-				RootHash:   smallTrieRoot[:],
+				RootHash:   smallTrieRoot.Bytes(),
 				KeyLimit:   defaultRequestKeyLimit,
 				BytesLimit: defaultRequestByteSizeLimit,
 				StartKey:   &pb.MaybeBytes{Value: []byte{1}},
@@ -79,7 +79,7 @@ func Test_Server_GetRangeProof(t *testing.T) {
 		},
 		"key limit too large": {
 			request: &pb.SyncGetRangeProofRequest{
-				RootHash:   smallTrieRoot[:],
+				RootHash:   smallTrieRoot.Bytes(),
 				KeyLimit:   2 * defaultRequestKeyLimit,
 				BytesLimit: defaultRequestByteSizeLimit,
 			},
@@ -87,7 +87,7 @@ func Test_Server_GetRangeProof(t *testing.T) {
 		},
 		"bytes limit too large": {
 			request: &pb.SyncGetRangeProofRequest{
-				RootHash:   smallTrieRoot[:],
+				RootHash:   smallTrieRoot.Bytes(),
 				KeyLimit:   defaultRequestKeyLimit,
 				BytesLimit: 2 * defaultRequestByteSizeLimit,
 			},
@@ -203,8 +203,8 @@ func Test_Server_GetChangeProof(t *testing.T) {
 	}{
 		"byteslimit is 0": {
 			request: &pb.SyncGetChangeProofRequest{
-				StartRootHash: startRoot[:],
-				EndRootHash:   endRoot[:],
+				StartRootHash: startRoot.Bytes(),
+				EndRootHash:   endRoot.Bytes(),
 				KeyLimit:      defaultRequestKeyLimit,
 				BytesLimit:    0,
 			},
@@ -212,8 +212,8 @@ func Test_Server_GetChangeProof(t *testing.T) {
 		},
 		"keylimit is 0": {
 			request: &pb.SyncGetChangeProofRequest{
-				StartRootHash: startRoot[:],
-				EndRootHash:   endRoot[:],
+				StartRootHash: startRoot.Bytes(),
+				EndRootHash:   endRoot.Bytes(),
 				KeyLimit:      defaultRequestKeyLimit,
 				BytesLimit:    0,
 			},
@@ -221,8 +221,8 @@ func Test_Server_GetChangeProof(t *testing.T) {
 		},
 		"keys out of order": {
 			request: &pb.SyncGetChangeProofRequest{
-				StartRootHash: startRoot[:],
-				EndRootHash:   endRoot[:],
+				StartRootHash: startRoot.Bytes(),
+				EndRootHash:   endRoot.Bytes(),
 				KeyLimit:      defaultRequestKeyLimit,
 				BytesLimit:    defaultRequestByteSizeLimit,
 				StartKey:      &pb.MaybeBytes{Value: []byte{1}},
@@ -232,8 +232,8 @@ func Test_Server_GetChangeProof(t *testing.T) {
 		},
 		"key limit too large": {
 			request: &pb.SyncGetChangeProofRequest{
-				StartRootHash: startRoot[:],
-				EndRootHash:   endRoot[:],
+				StartRootHash: startRoot.Bytes(),
+				EndRootHash:   endRoot.Bytes(),
 				KeyLimit:      2 * defaultRequestKeyLimit,
 				BytesLimit:    defaultRequestByteSizeLimit,
 			},
@@ -241,8 +241,8 @@ func Test_Server_GetChangeProof(t *testing.T) {
 		},
 		"bytes limit too large": {
 			request: &pb.SyncGetChangeProofRequest{
-				StartRootHash: startRoot[:],
-				EndRootHash:   endRoot[:],
+				StartRootHash: startRoot.Bytes(),
+				EndRootHash:   endRoot.Bytes(),
 				KeyLimit:      defaultRequestKeyLimit,
 				BytesLimit:    2 * defaultRequestByteSizeLimit,
 			},
@@ -252,8 +252,8 @@ func Test_Server_GetChangeProof(t *testing.T) {
 			request: &pb.SyncGetChangeProofRequest{
 				// This root doesn't exist so server has insufficient history
 				// to serve a change proof
-				StartRootHash: ids.Empty[:],
-				EndRootHash:   endRoot[:],
+				StartRootHash: ids.Empty.Bytes(),
+				EndRootHash:   endRoot.Bytes(),
 				KeyLimit:      defaultRequestKeyLimit,
 				BytesLimit:    defaultRequestByteSizeLimit,
 			},
@@ -264,8 +264,8 @@ func Test_Server_GetChangeProof(t *testing.T) {
 			request: &pb.SyncGetChangeProofRequest{
 				// These roots don't exist so server has insufficient history
 				// to serve a change proof
-				StartRootHash: ids.Empty[:],
-				EndRootHash:   fakeRootID[:],
+				StartRootHash: ids.Empty.Bytes(),
+				EndRootHash:   fakeRootID.Bytes(),
 				KeyLimit:      defaultRequestKeyLimit,
 				BytesLimit:    defaultRequestByteSizeLimit,
 			},
@@ -360,8 +360,8 @@ func TestAppRequestErrAppSendFailed(t *testing.T) {
 			request: &pb.Request{
 				Message: &pb.Request_ChangeProofRequest{
 					ChangeProofRequest: &pb.SyncGetChangeProofRequest{
-						StartRootHash: startRootID[:],
-						EndRootHash:   endRootID[:],
+						StartRootHash: startRootID.Bytes(),
+						EndRootHash:   endRootID.Bytes(),
 						StartKey:      &pb.MaybeBytes{Value: []byte{1}},
 						EndKey:        &pb.MaybeBytes{Value: []byte{2}},
 						KeyLimit:      100,
@@ -397,7 +397,7 @@ func TestAppRequestErrAppSendFailed(t *testing.T) {
 			request: &pb.Request{
 				Message: &pb.Request_RangeProofRequest{
 					RangeProofRequest: &pb.SyncGetRangeProofRequest{
-						RootHash:   endRootID[:],
+						RootHash:   endRootID.Bytes(),
 						StartKey:   &pb.MaybeBytes{Value: []byte{1}},
 						EndKey:     &pb.MaybeBytes{Value: []byte{2}},
 						KeyLimit:   100,

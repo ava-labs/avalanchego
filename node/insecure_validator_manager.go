@@ -23,7 +23,7 @@ func (i *insecureValidatorManager) Connected(vdrID ids.NodeID, nodeVersion *vers
 		// peer as a validator. Because each validator needs a txID associated
 		// with it, we hack one together by padding the nodeID with zeroes.
 		dummyTxID := ids.Empty
-		copy(dummyTxID[:], vdrID[:])
+		copy(ids.Writable(&dummyTxID), vdrID.Bytes())
 
 		// Add will only error here if the total weight of the set would go over
 		// [math.MaxUint64]. In this case, we will just not mark this new peer

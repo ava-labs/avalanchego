@@ -38,7 +38,7 @@ func (s *chainState) SetLastAccepted(blkID ids.ID) error {
 		return nil
 	}
 	s.lastAccepted = blkID
-	return s.db.Put(lastAcceptedKey, blkID[:])
+	return s.db.Put(lastAcceptedKey, blkID.Bytes())
 }
 
 func (s *chainState) DeleteLastAccepted() error {

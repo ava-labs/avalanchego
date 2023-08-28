@@ -26,6 +26,12 @@ var (
 // ShortID wraps a 20 byte hash as an identifier
 type ShortID [ShortIDLen]byte
 
+// Bytes returns the 20 byte hash as a slice. It is assumed this slice is not
+// modified.
+func (id ShortID) Bytes() []byte {
+	return id[:]
+}
+
 // ToShortID attempt to convert a byte slice into an id
 func ToShortID(bytes []byte) (ShortID, error) {
 	return hashing.ToHash160(bytes)
@@ -96,12 +102,6 @@ func ShortFromPrefixedString(idStr, prefix string) (ShortID, error) {
 		return ShortID{}, fmt.Errorf("ID: %s is missing the prefix: %s", idStr, prefix)
 	}
 	return ShortFromString(strings.TrimPrefix(idStr, prefix))
-}
-
-// Bytes returns the 20 byte hash as a slice. It is assumed this slice is not
-// modified.
-func (id ShortID) Bytes() []byte {
-	return id[:]
 }
 
 // Hex returns a hex encoded string of this id.

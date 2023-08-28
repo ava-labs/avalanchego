@@ -100,7 +100,7 @@ func (outs *innerSortTransferableOutputs) Less(i, j int) bool {
 	iAssetID := iOut.AssetID()
 	jAssetID := jOut.AssetID()
 
-	switch bytes.Compare(iAssetID[:], jAssetID[:]) {
+	switch bytes.Compare(iAssetID.Bytes(), jAssetID.Bytes()) {
 	case -1:
 		return true
 	case 1:
@@ -174,7 +174,7 @@ func (ins *innerSortTransferableInputsWithSigners) Less(i, j int) bool {
 	iID, iIndex := ins.ins[i].InputSource()
 	jID, jIndex := ins.ins[j].InputSource()
 
-	switch bytes.Compare(iID[:], jID[:]) {
+	switch bytes.Compare(iID.Bytes(), jID.Bytes()) {
 	case -1:
 		return true
 	case 0:

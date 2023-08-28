@@ -38,7 +38,7 @@ func TestLedger(t *testing.T) {
 	// Get Fuji Address
 	addr, err := device.Address(hrp, 0)
 	require.NoError(err)
-	paddr, err := address.Format(chainAlias, hrp, addr[:])
+	paddr, err := address.Format(chainAlias, hrp, addr.Bytes())
 	require.NoError(err)
 	t.Logf("address: %s shortID: %s\n", paddr, addr)
 
@@ -46,7 +46,7 @@ func TestLedger(t *testing.T) {
 	addresses, err := device.Addresses([]uint32{0, 1, 2, 3, 4, 5, 6, 7, 8, 9})
 	require.NoError(err)
 	for i, taddr := range addresses {
-		paddr, err := address.Format(chainAlias, hrp, taddr[:])
+		paddr, err := address.Format(chainAlias, hrp, taddr.Bytes())
 		require.NoError(err)
 		t.Logf("address(%d): %s shortID: %s\n", i, paddr, taddr)
 

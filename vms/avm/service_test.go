@@ -1164,7 +1164,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 		require.NoError(t, err)
 		utxoID := utxo.InputID()
 		elems[i] = &atomic.Element{
-			Key:   utxoID[:],
+			Key:   utxoID.Bytes(),
 			Value: utxoBytes,
 			Traits: [][]byte{
 				rawAddr.Bytes(),
@@ -1930,7 +1930,7 @@ func TestImport(t *testing.T) {
 			require.NoError(peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{
 				env.vm.ctx.ChainID: {
 					PutRequests: []*atomic.Element{{
-						Key:   utxoID[:],
+						Key:   utxoID.Bytes(),
 						Value: utxoBytes,
 						Traits: [][]byte{
 							addr0.Bytes(),

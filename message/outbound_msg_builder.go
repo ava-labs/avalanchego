@@ -261,7 +261,7 @@ func (b *outMsgBuilder) PeerList(peers []ips.ClaimedIPPort, bypassThrottling boo
 			IpPort:          uint32(p.IPPort.Port),
 			Timestamp:       p.Timestamp,
 			Signature:       p.Signature,
-			TxId:            p.TxID[:],
+			TxId:            p.TxID.Bytes(),
 		}
 	}
 	return b.builder.createOutbound(
@@ -300,7 +300,7 @@ func (b *outMsgBuilder) GetStateSummaryFrontier(
 		&p2p.Message{
 			Message: &p2p.Message_GetStateSummaryFrontier{
 				GetStateSummaryFrontier: &p2p.GetStateSummaryFrontier{
-					ChainId:   chainID[:],
+					ChainId:   chainID.Bytes(),
 					RequestId: requestID,
 					Deadline:  uint64(deadline),
 				},
@@ -320,7 +320,7 @@ func (b *outMsgBuilder) StateSummaryFrontier(
 		&p2p.Message{
 			Message: &p2p.Message_StateSummaryFrontier_{
 				StateSummaryFrontier_: &p2p.StateSummaryFrontier{
-					ChainId:   chainID[:],
+					ChainId:   chainID.Bytes(),
 					RequestId: requestID,
 					Summary:   summary,
 				},
@@ -341,7 +341,7 @@ func (b *outMsgBuilder) GetAcceptedStateSummary(
 		&p2p.Message{
 			Message: &p2p.Message_GetAcceptedStateSummary{
 				GetAcceptedStateSummary: &p2p.GetAcceptedStateSummary{
-					ChainId:   chainID[:],
+					ChainId:   chainID.Bytes(),
 					RequestId: requestID,
 					Deadline:  uint64(deadline),
 					Heights:   heights,
@@ -364,7 +364,7 @@ func (b *outMsgBuilder) AcceptedStateSummary(
 		&p2p.Message{
 			Message: &p2p.Message_AcceptedStateSummary_{
 				AcceptedStateSummary_: &p2p.AcceptedStateSummary{
-					ChainId:    chainID[:],
+					ChainId:    chainID.Bytes(),
 					RequestId:  requestID,
 					SummaryIds: summaryIDBytes,
 				},
@@ -385,7 +385,7 @@ func (b *outMsgBuilder) GetAcceptedFrontier(
 		&p2p.Message{
 			Message: &p2p.Message_GetAcceptedFrontier{
 				GetAcceptedFrontier: &p2p.GetAcceptedFrontier{
-					ChainId:    chainID[:],
+					ChainId:    chainID.Bytes(),
 					RequestId:  requestID,
 					Deadline:   uint64(deadline),
 					EngineType: engineType,
@@ -406,9 +406,9 @@ func (b *outMsgBuilder) AcceptedFrontier(
 		&p2p.Message{
 			Message: &p2p.Message_AcceptedFrontier_{
 				AcceptedFrontier_: &p2p.AcceptedFrontier{
-					ChainId:     chainID[:],
+					ChainId:     chainID.Bytes(),
 					RequestId:   requestID,
-					ContainerId: containerID[:],
+					ContainerId: containerID.Bytes(),
 				},
 			},
 		},
@@ -430,7 +430,7 @@ func (b *outMsgBuilder) GetAccepted(
 		&p2p.Message{
 			Message: &p2p.Message_GetAccepted{
 				GetAccepted: &p2p.GetAccepted{
-					ChainId:      chainID[:],
+					ChainId:      chainID.Bytes(),
 					RequestId:    requestID,
 					Deadline:     uint64(deadline),
 					ContainerIds: containerIDBytes,
@@ -454,7 +454,7 @@ func (b *outMsgBuilder) Accepted(
 		&p2p.Message{
 			Message: &p2p.Message_Accepted_{
 				Accepted_: &p2p.Accepted{
-					ChainId:      chainID[:],
+					ChainId:      chainID.Bytes(),
 					RequestId:    requestID,
 					ContainerIds: containerIDBytes,
 				},
@@ -476,10 +476,10 @@ func (b *outMsgBuilder) GetAncestors(
 		&p2p.Message{
 			Message: &p2p.Message_GetAncestors{
 				GetAncestors: &p2p.GetAncestors{
-					ChainId:     chainID[:],
+					ChainId:     chainID.Bytes(),
 					RequestId:   requestID,
 					Deadline:    uint64(deadline),
-					ContainerId: containerID[:],
+					ContainerId: containerID.Bytes(),
 					EngineType:  engineType,
 				},
 			},
@@ -498,7 +498,7 @@ func (b *outMsgBuilder) Ancestors(
 		&p2p.Message{
 			Message: &p2p.Message_Ancestors_{
 				Ancestors_: &p2p.Ancestors{
-					ChainId:    chainID[:],
+					ChainId:    chainID.Bytes(),
 					RequestId:  requestID,
 					Containers: containers,
 				},
@@ -520,10 +520,10 @@ func (b *outMsgBuilder) Get(
 		&p2p.Message{
 			Message: &p2p.Message_Get{
 				Get: &p2p.Get{
-					ChainId:     chainID[:],
+					ChainId:     chainID.Bytes(),
 					RequestId:   requestID,
 					Deadline:    uint64(deadline),
-					ContainerId: containerID[:],
+					ContainerId: containerID.Bytes(),
 					EngineType:  engineType,
 				},
 			},
@@ -543,7 +543,7 @@ func (b *outMsgBuilder) Put(
 		&p2p.Message{
 			Message: &p2p.Message_Put{
 				Put: &p2p.Put{
-					ChainId:    chainID[:],
+					ChainId:    chainID.Bytes(),
 					RequestId:  requestID,
 					Container:  container,
 					EngineType: engineType,
@@ -566,7 +566,7 @@ func (b *outMsgBuilder) PushQuery(
 		&p2p.Message{
 			Message: &p2p.Message_PushQuery{
 				PushQuery: &p2p.PushQuery{
-					ChainId:    chainID[:],
+					ChainId:    chainID.Bytes(),
 					RequestId:  requestID,
 					Deadline:   uint64(deadline),
 					Container:  container,
@@ -590,10 +590,10 @@ func (b *outMsgBuilder) PullQuery(
 		&p2p.Message{
 			Message: &p2p.Message_PullQuery{
 				PullQuery: &p2p.PullQuery{
-					ChainId:     chainID[:],
+					ChainId:     chainID.Bytes(),
 					RequestId:   requestID,
 					Deadline:    uint64(deadline),
-					ContainerId: containerID[:],
+					ContainerId: containerID.Bytes(),
 					EngineType:  engineType,
 				},
 			},
@@ -613,10 +613,10 @@ func (b *outMsgBuilder) Chits(
 		&p2p.Message{
 			Message: &p2p.Message_Chits{
 				Chits: &p2p.Chits{
-					ChainId:     chainID[:],
+					ChainId:     chainID.Bytes(),
 					RequestId:   requestID,
-					PreferredId: preferredID[:],
-					AcceptedId:  acceptedID[:],
+					PreferredId: preferredID.Bytes(),
+					AcceptedId:  acceptedID.Bytes(),
 				},
 			},
 		},
@@ -635,7 +635,7 @@ func (b *outMsgBuilder) AppRequest(
 		&p2p.Message{
 			Message: &p2p.Message_AppRequest{
 				AppRequest: &p2p.AppRequest{
-					ChainId:   chainID[:],
+					ChainId:   chainID.Bytes(),
 					RequestId: requestID,
 					Deadline:  uint64(deadline),
 					AppBytes:  msg,
@@ -652,7 +652,7 @@ func (b *outMsgBuilder) AppResponse(chainID ids.ID, requestID uint32, msg []byte
 		&p2p.Message{
 			Message: &p2p.Message_AppResponse{
 				AppResponse: &p2p.AppResponse{
-					ChainId:   chainID[:],
+					ChainId:   chainID.Bytes(),
 					RequestId: requestID,
 					AppBytes:  msg,
 				},
@@ -668,7 +668,7 @@ func (b *outMsgBuilder) AppGossip(chainID ids.ID, msg []byte) (OutboundMessage, 
 		&p2p.Message{
 			Message: &p2p.Message_AppGossip{
 				AppGossip: &p2p.AppGossip{
-					ChainId:  chainID[:],
+					ChainId:  chainID.Bytes(),
 					AppBytes: msg,
 				},
 			},

@@ -27,7 +27,7 @@ func NewClient(client sharedmemorypb.SharedMemoryClient) *Client {
 
 func (c *Client) Get(peerChainID ids.ID, keys [][]byte) ([][]byte, error) {
 	resp, err := c.client.Get(context.Background(), &sharedmemorypb.GetRequest{
-		PeerChainId: peerChainID[:],
+		PeerChainId: peerChainID.Bytes(),
 		Keys:        keys,
 	})
 	if err != nil {
@@ -49,7 +49,7 @@ func (c *Client) Indexed(
 	error,
 ) {
 	resp, err := c.client.Indexed(context.Background(), &sharedmemorypb.IndexedRequest{
-		PeerChainId: peerChainID[:],
+		PeerChainId: peerChainID.Bytes(),
 		Traits:      traits,
 		StartTrait:  startTrait,
 		StartKey:    startKey,
@@ -72,7 +72,7 @@ func (c *Client) Apply(requests map[ids.ID]*atomic.Requests, batches ...database
 		chainReq := &sharedmemorypb.AtomicRequest{
 			RemoveRequests: value.RemoveRequests,
 			PutRequests:    make([]*sharedmemorypb.Element, len(value.PutRequests)),
-			PeerChainId:    key[:],
+			PeerChainId:    key.Bytes(),
 		}
 		for i, v := range value.PutRequests {
 			chainReq.PutRequests[i] = &sharedmemorypb.Element{

@@ -38,8 +38,8 @@ func TestMessageQueue(t *testing.T) {
 		m, err := mc.Ping(
 			uint32(i),
 			[]*p2p.SubnetUptime{
-				{SubnetId: testID[:], Uptime: uint32(i)},
-				{SubnetId: testID2[:], Uptime: uint32(i)},
+				{SubnetId: testID.Bytes(), Uptime: uint32(i)},
+				{SubnetId: testID2.Bytes(), Uptime: uint32(i)},
 			})
 		require.NoError(err)
 		msgs = append(msgs, m)

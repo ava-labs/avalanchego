@@ -44,8 +44,8 @@ func (c *DBClient) GetChangeProof(
 	keyLimit int,
 ) (*merkledb.ChangeProof, error) {
 	resp, err := c.client.GetChangeProof(ctx, &pb.GetChangeProofRequest{
-		StartRootHash: startRootID[:],
-		EndRootHash:   endRootID[:],
+		StartRootHash: startRootID.Bytes(),
+		EndRootHash:   endRootID.Bytes(),
 		StartKey: &pb.MaybeBytes{
 			IsNothing: startKey.IsNothing(),
 			Value:     startKey.Value(),
@@ -89,7 +89,7 @@ func (c *DBClient) VerifyChangeProof(
 			Value:     endKey.Value(),
 			IsNothing: endKey.IsNothing(),
 		},
-		ExpectedRootHash: expectedRootID[:],
+		ExpectedRootHash: expectedRootID.Bytes(),
 	})
 	if err != nil {
 		return err
@@ -132,7 +132,7 @@ func (c *DBClient) GetRangeProofAtRoot(
 	keyLimit int,
 ) (*merkledb.RangeProof, error) {
 	resp, err := c.client.GetRangeProof(ctx, &pb.GetRangeProofRequest{
-		RootHash: rootID[:],
+		RootHash: rootID.Bytes(),
 		StartKey: &pb.MaybeBytes{
 			IsNothing: startKey.IsNothing(),
 			Value:     startKey.Value(),

@@ -32,10 +32,10 @@ func (s *state) Vertex(id ids.ID) vertex.StatelessVertex {
 		return vtx
 	}
 
-	bytes, err := s.db.Get(id[:])
+	bytes, err := s.db.Get(id.Bytes())
 	if err != nil {
 		s.log.Verbo("failed to get vertex from database",
-			zap.Binary("key", id[:]),
+			zap.Binary("key", id.Bytes()),
 			zap.Error(err),
 		)
 		s.dbCache.Put(id, nil)
@@ -45,7 +45,7 @@ func (s *state) Vertex(id ids.ID) vertex.StatelessVertex {
 	vtx, err := s.serializer.parseVertex(bytes)
 	if err != nil {
 		s.log.Error("failed parsing saved vertex",
-			zap.Binary("key", id[:]),
+			zap.Binary("key", id.Bytes()),
 			zap.Binary("vertex", bytes),
 			zap.Error(err),
 		)
@@ -63,10 +63,10 @@ func (s *state) SetVertex(id ids.ID, vtx vertex.StatelessVertex) error {
 	s.dbCache.Put(id, vtx)
 
 	if vtx == nil {
-		return s.db.Delete(id[:])
+		return s.db.Delete(id.Bytes())
 	}
 
-	return s.db.Put(id[:], vtx.Bytes())
+	return s.db.Put(id.Bytes(), vtx.Bytes())
 }
 
 func (s *state) Status(id ids.ID) choices.Status {
@@ -75,7 +75,7 @@ func (s *state) Status(id ids.ID) choices.Status {
 		return status
 	}
 
-	if val, err := database.GetUInt32(s.db, id[:]); err == nil {
+	if val, err := database.GetUInt32(s.db, id.Bytes()); err == nil {
 		// The key was in the database
 		status := choices.Status(val)
 		s.dbCache.Put(id, status)
@@ -91,9 +91,9 @@ func (s *state) SetStatus(id ids.ID, status choices.Status) error {
 	s.dbCache.Put(id, status)
 
 	if status == choices.Unknown {
-		return s.db.Delete(id[:])
+		return s.db.Delete(id.Bytes())
 	}
-	return database.PutUInt32(s.db, id[:], uint32(status))
+	return database.PutUInt32(s.db, id.Bytes(), uint32(status))
 }
 
 func (s *state) Edge(id ids.ID) []ids.ID {
@@ -102,7 +102,7 @@ func (s *state) Edge(id ids.ID) []ids.ID {
 		return frontier
 	}
 
-	if b, err := s.db.Get(id[:]); err == nil {
+	if b, err := s.db.Get(id.Bytes()); err == nil {
 		p := wrappers.Packer{Bytes: b}
 
 		frontierSize := p.UnpackInt()
@@ -118,7 +118,7 @@ func (s *state) Edge(id ids.ID) []ids.ID {
 			return frontier
 		}
 		s.log.Error("failed parsing saved edge",
-			zap.Binary("key", id[:]),
+			zap.Binary("key", id.Bytes()),
 			zap.Binary("edge", b),
 			zap.Error(err),
 		)
@@ -133,15 +133,15 @@ func (s *state) SetEdge(id ids.ID, frontier []ids.ID) error {
 	s.dbCache.Put(id, frontier)
 
 	if len(frontier) == 0 {
-		return s.db.Delete(id[:])
+		return s.db.Delete(id.Bytes())
 	}
 
 	size := wrappers.IntLen + ids.IDLen*len(frontier)
 	p := wrappers.Packer{Bytes: make([]byte, size)}
 	p.PackInt(uint32(len(frontier)))
 	for _, id := range frontier {
-		p.PackFixedBytes(id[:])
+		p.PackFixedBytes(id.Bytes())
 	}
 
-	return s.db.Put(id[:], p.Bytes)
+	return s.db.Put(id.Bytes(), p.Bytes)
 }

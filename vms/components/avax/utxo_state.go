@@ -151,7 +151,7 @@ func (s *utxoState) GetUTXO(utxoID ids.ID) (*UTXO, error) {
 		return utxo, nil
 	}
 
-	bytes, err := s.utxoDB.Get(utxoID[:])
+	bytes, err := s.utxoDB.Get(utxoID.Bytes())
 	if err == database.ErrNotFound {
 		s.utxoCache.Put(utxoID, nil)
 		return nil, database.ErrNotFound
@@ -180,7 +180,7 @@ func (s *utxoState) PutUTXO(utxo *UTXO) error {
 	s.updateChecksum(utxoID)
 
 	s.utxoCache.Put(utxoID, utxo)
-	if err := s.utxoDB.Put(utxoID[:], utxoBytes); err != nil {
+	if err := s.utxoDB.Put(utxoID.Bytes(), utxoBytes); err != nil {
 		return err
 	}
 
@@ -192,7 +192,7 @@ func (s *utxoState) PutUTXO(utxo *UTXO) error {
 	addresses := addressable.Addresses()
 	for _, addr := range addresses {
 		indexList := s.getIndexDB(addr)
-		if err := indexList.Put(utxoID[:], nil); err != nil {
+		if err := indexList.Put(utxoID.Bytes(), nil); err != nil {
 			return err
 		}
 	}
@@ -211,7 +211,7 @@ func (s *utxoState) DeleteUTXO(utxoID ids.ID) error {
 	s.updateChecksum(utxoID)
 
 	s.utxoCache.Put(utxoID, nil)
-	if err := s.utxoDB.Delete(utxoID[:]); err != nil {
+	if err := s.utxoDB.Delete(utxoID.Bytes()); err != nil {
 		return err
 	}
 
@@ -223,7 +223,7 @@ func (s *utxoState) DeleteUTXO(utxoID ids.ID) error {
 	addresses := addressable.Addresses()
 	for _, addr := range addresses {
 		indexList := s.getIndexDB(addr)
-		if err := indexList.Delete(utxoID[:]); err != nil {
+		if err := indexList.Delete(utxoID.Bytes()); err != nil {
 			return err
 		}
 	}
@@ -232,7 +232,7 @@ func (s *utxoState) DeleteUTXO(utxoID ids.ID) error {
 
 func (s *utxoState) UTXOIDs(addr []byte, start ids.ID, limit int) ([]ids.ID, error) {
 	indexList := s.getIndexDB(addr)
-	iter := indexList.NewIteratorWithStart(start[:])
+	iter := indexList.NewIteratorWithStart(start.Bytes())
 	defer iter.Release()
 
 	utxoIDs := []ids.ID(nil)

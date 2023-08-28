@@ -30,7 +30,7 @@ var (
 )
 
 func PutID(db KeyValueWriter, key []byte, val ids.ID) error {
-	return db.Put(key, val[:])
+	return db.Put(key, val.Bytes())
 }
 
 func GetID(db KeyValueReader, key []byte) (ids.ID, error) {

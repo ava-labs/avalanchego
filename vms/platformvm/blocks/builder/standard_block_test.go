@@ -56,7 +56,7 @@ func TestAtomicTxImports(t *testing.T) {
 	inputID := utxo.InputID()
 	require.NoError(peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{
 		env.ctx.ChainID: {PutRequests: []*atomic.Element{{
-			Key:   inputID[:],
+			Key:   inputID.Bytes(),
 			Value: utxoBytes,
 			Traits: [][]byte{
 				recipientKey.PublicKey().Address().Bytes(),

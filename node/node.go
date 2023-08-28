@@ -299,7 +299,7 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 		// a validator. Because each validator needs a txID associated with it,
 		// we hack one together by just padding our nodeID with zeroes.
 		dummyTxID := ids.Empty
-		copy(dummyTxID[:], n.ID[:])
+		copy(ids.Writable(&dummyTxID), n.ID.Bytes())
 
 		err := primaryNetVdrs.Add(
 			n.ID,

@@ -583,7 +583,7 @@ func TestIssueImportTx(t *testing.T) {
 	require.NoError(peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{
 		env.vm.ctx.ChainID: {
 			PutRequests: []*atomic.Element{{
-				Key:   inputID[:],
+				Key:   inputID.Bytes(),
 				Value: utxoBytes,
 				Traits: [][]byte{
 					key.PublicKey().Address().Bytes(),
@@ -598,7 +598,7 @@ func TestIssueImportTx(t *testing.T) {
 	assertLatestIdx(t, env.vm.db, key.PublicKey().Address(), avaxID, 1)
 
 	id := utxoID.InputID()
-	_, err = env.vm.ctx.SharedMemory.Get(constants.PlatformChainID, [][]byte{id[:]})
+	_, err = env.vm.ctx.SharedMemory.Get(constants.PlatformChainID, [][]byte{id.Bytes()})
 	require.ErrorIs(err, database.ErrNotFound)
 }
 
@@ -668,7 +668,7 @@ func TestForceAcceptImportTx(t *testing.T) {
 	assertLatestIdx(t, env.vm.db, key.PublicKey().Address(), avaxID, 1)
 
 	id := utxoID.InputID()
-	_, err = env.vm.ctx.SharedMemory.Get(constants.PlatformChainID, [][]byte{id[:]})
+	_, err = env.vm.ctx.SharedMemory.Get(constants.PlatformChainID, [][]byte{id.Bytes()})
 	require.ErrorIs(err, database.ErrNotFound)
 }
 
@@ -805,16 +805,16 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	peerSharedMemory := env.sharedMemory.NewSharedMemory(constants.PlatformChainID)
 	require.NoError(peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{
 		env.vm.ctx.ChainID: {
-			RemoveRequests: [][]byte{utxoID[:]},
+			RemoveRequests: [][]byte{utxoID.Bytes()},
 		},
 	}))
 
-	_, err := peerSharedMemory.Get(env.vm.ctx.ChainID, [][]byte{utxoID[:]})
+	_, err := peerSharedMemory.Get(env.vm.ctx.ChainID, [][]byte{utxoID.Bytes()})
 	require.ErrorIs(err, database.ErrNotFound)
 
 	issueAndAccept(require, env.vm, env.issuer, tx)
 
-	_, err = peerSharedMemory.Get(env.vm.ctx.ChainID, [][]byte{utxoID[:]})
+	_, err = peerSharedMemory.Get(env.vm.ctx.ChainID, [][]byte{utxoID.Bytes()})
 	require.ErrorIs(err, database.ErrNotFound)
 
 	assertIndexedTX(t, env.vm.db, 0, key.PublicKey().Address(), assetID.AssetID(), tx.ID())

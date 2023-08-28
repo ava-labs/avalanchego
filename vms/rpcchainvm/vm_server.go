@@ -281,8 +281,8 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 	}
 	parentID := blk.Parent()
 	return &vmpb.InitializeResponse{
-		LastAcceptedId:       lastAccepted[:],
-		LastAcceptedParentId: parentID[:],
+		LastAcceptedId:       lastAccepted.Bytes(),
+		LastAcceptedParentId: parentID.Bytes(),
 		Height:               blk.Height(),
 		Bytes:                blk.Bytes(),
 		Timestamp:            grpcutils.TimestampFromTime(blk.Timestamp()),
@@ -307,8 +307,8 @@ func (vm *VMServer) SetState(ctx context.Context, stateReq *vmpb.SetStateRequest
 
 	parentID := blk.Parent()
 	return &vmpb.SetStateResponse{
-		LastAcceptedId:       lastAccepted[:],
-		LastAcceptedParentId: parentID[:],
+		LastAcceptedId:       lastAccepted.Bytes(),
+		LastAcceptedParentId: parentID.Bytes(),
 		Height:               blk.Height(),
 		Bytes:                blk.Bytes(),
 		Timestamp:            grpcutils.TimestampFromTime(blk.Timestamp()),
@@ -438,8 +438,8 @@ func (vm *VMServer) BuildBlock(ctx context.Context, req *vmpb.BuildBlockRequest)
 		parentID = blk.Parent()
 	)
 	return &vmpb.BuildBlockResponse{
-		Id:                blkID[:],
-		ParentId:          parentID[:],
+		Id:                blkID.Bytes(),
+		ParentId:          parentID.Bytes(),
 		Bytes:             blk.Bytes(),
 		Height:            blk.Height(),
 		Timestamp:         grpcutils.TimestampFromTime(blk.Timestamp()),
@@ -466,8 +466,8 @@ func (vm *VMServer) ParseBlock(ctx context.Context, req *vmpb.ParseBlockRequest)
 		parentID = blk.Parent()
 	)
 	return &vmpb.ParseBlockResponse{
-		Id:                blkID[:],
-		ParentId:          parentID[:],
+		Id:                blkID.Bytes(),
+		ParentId:          parentID.Bytes(),
 		Status:            vmpb.Status(blk.Status()),
 		Height:            blk.Height(),
 		Timestamp:         grpcutils.TimestampFromTime(blk.Timestamp()),
@@ -497,7 +497,7 @@ func (vm *VMServer) GetBlock(ctx context.Context, req *vmpb.GetBlockRequest) (*v
 
 	parentID := blk.Parent()
 	return &vmpb.GetBlockResponse{
-		ParentId:          parentID[:],
+		ParentId:          parentID.Bytes(),
 		Bytes:             blk.Bytes(),
 		Status:            vmpb.Status(blk.Status()),
 		Height:            blk.Height(),
@@ -695,7 +695,7 @@ func (vm *VMServer) GetBlockIDAtHeight(
 ) (*vmpb.GetBlockIDAtHeightResponse, error) {
 	blkID, err := vm.vm.GetBlockIDAtHeight(ctx, req.Height)
 	return &vmpb.GetBlockIDAtHeightResponse{
-		BlkId: blkID[:],
+		BlkId: blkID.Bytes(),
 		Err:   errorToErrEnum[err],
 	}, errorToRPCError(err)
 }
@@ -737,7 +737,7 @@ func (vm *VMServer) GetOngoingSyncStateSummary(
 
 	summaryID := summary.ID()
 	return &vmpb.GetOngoingSyncStateSummaryResponse{
-		Id:     summaryID[:],
+		Id:     summaryID.Bytes(),
 		Height: summary.Height(),
 		Bytes:  summary.Bytes(),
 	}, nil
@@ -762,7 +762,7 @@ func (vm *VMServer) GetLastStateSummary(ctx context.Context, _ *emptypb.Empty) (
 
 	summaryID := summary.ID()
 	return &vmpb.GetLastStateSummaryResponse{
-		Id:     summaryID[:],
+		Id:     summaryID.Bytes(),
 		Height: summary.Height(),
 		Bytes:  summary.Bytes(),
 	}, nil
@@ -790,7 +790,7 @@ func (vm *VMServer) ParseStateSummary(
 
 	summaryID := summary.ID()
 	return &vmpb.ParseStateSummaryResponse{
-		Id:     summaryID[:],
+		Id:     summaryID.Bytes(),
 		Height: summary.Height(),
 	}, nil
 }
@@ -817,7 +817,7 @@ func (vm *VMServer) GetStateSummary(
 
 	summaryID := summary.ID()
 	return &vmpb.GetStateSummaryResponse{
-		Id:    summaryID[:],
+		Id:    summaryID.Bytes(),
 		Bytes: summary.Bytes(),
 	}, nil
 }

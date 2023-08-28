@@ -1212,7 +1212,7 @@ func TestAtomicImport(t *testing.T) {
 		vm.ctx.ChainID: {
 			PutRequests: []*atomic.Element{
 				{
-					Key:   inputID[:],
+					Key:   inputID.Bytes(),
 					Value: utxoBytes,
 					Traits: [][]byte{
 						recipientKey.PublicKey().Address().Bytes(),
@@ -1244,7 +1244,7 @@ func TestAtomicImport(t *testing.T) {
 	require.Equal(status.Committed, txStatus)
 
 	inputID = utxoID.InputID()
-	_, err = vm.ctx.SharedMemory.Get(vm.ctx.XChainID, [][]byte{inputID[:]})
+	_, err = vm.ctx.SharedMemory.Get(vm.ctx.XChainID, [][]byte{inputID.Bytes()})
 	require.ErrorIs(err, database.ErrNotFound)
 }
 

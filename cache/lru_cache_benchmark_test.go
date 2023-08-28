@@ -18,7 +18,7 @@ func BenchmarkLRUCachePutSmall(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		for i := 0; i < smallLen; i++ {
 			var id ids.ID
-			_, err := rand.Read(id[:])
+			_, err := rand.Read(ids.Writable(&id))
 			require.NoError(b, err)
 			cache.Put(id, n)
 		}
@@ -34,7 +34,7 @@ func BenchmarkLRUCachePutMedium(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		for i := 0; i < mediumLen; i++ {
 			var id ids.ID
-			_, err := rand.Read(id[:])
+			_, err := rand.Read(ids.Writable(&id))
 			require.NoError(b, err)
 			cache.Put(id, n)
 		}
@@ -50,7 +50,7 @@ func BenchmarkLRUCachePutLarge(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		for i := 0; i < largeLen; i++ {
 			var id ids.ID
-			_, err := rand.Read(id[:])
+			_, err := rand.Read(ids.Writable(&id))
 			require.NoError(b, err)
 			cache.Put(id, n)
 		}

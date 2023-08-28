@@ -53,7 +53,7 @@ func (m *Memory) NewSharedMemory(chainID ids.ID) SharedMemory {
 func (m *Memory) GetSharedDatabase(db database.Database, sharedID ids.ID) database.Database {
 	lock := m.makeLock(sharedID)
 	lock.Lock()
-	return prefixdb.NewNested(sharedID[:], db)
+	return prefixdb.NewNested(sharedID.Bytes(), db)
 }
 
 // ReleaseSharedDatabase unlocks the provided DB
@@ -103,7 +103,7 @@ func (m *Memory) releaseLock(sharedID ids.ID) *sync.Mutex {
 // sharedID calculates the ID of the shared memory space
 func sharedID(id1, id2 ids.ID) ids.ID {
 	// Swap IDs locally to ensure id1 <= id2.
-	if bytes.Compare(id1[:], id2[:]) == 1 {
+	if bytes.Compare(id1.Bytes(), id2.Bytes()) == 1 {
 		id1, id2 = id2, id1
 	}
 
