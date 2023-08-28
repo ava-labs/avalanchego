@@ -56,8 +56,8 @@ func Test_Proof_Simple(t *testing.T) {
 	require.NoError(err)
 
 	ctx := context.Background()
-	require.NoError(db.Insert(ctx, []byte{}, []byte{1}))
-	require.NoError(db.Insert(ctx, []byte{0}, []byte{2}))
+	require.NoError(db.PutContext(ctx, []byte{}, []byte{1}))
+	require.NoError(db.PutContext(ctx, []byte{0}, []byte{2}))
 
 	expectedRoot, err := db.GetMerkleRoot(ctx)
 	require.NoError(err)
@@ -255,7 +255,7 @@ func Test_RangeProof_MaxLength(t *testing.T) {
 	dbTrie, err := getBasicDB()
 	require.NoError(err)
 	require.NotNil(dbTrie)
-	trie, err := dbTrie.NewView(context.Background(), nil)
+	trie, err := dbTrie.NewView(context.Background(), ViewChanges{})
 	require.NoError(err)
 
 	_, err = trie.GetRangeProof(context.Background(), maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), -1)
@@ -271,13 +271,18 @@ func Test_Proof(t *testing.T) {
 	dbTrie, err := getBasicDB()
 	require.NoError(err)
 	require.NotNil(dbTrie)
-	trie, err := dbTrie.NewView(context.Background(), []database.BatchOp{
-		{Key: []byte("key0"), Value: []byte("value0")},
-		{Key: []byte("key1"), Value: []byte("value1")},
-		{Key: []byte("key2"), Value: []byte("value2")},
-		{Key: []byte("key3"), Value: []byte("value3")},
-		{Key: []byte("key4"), Value: []byte("value4")},
-	})
+	trie, err := dbTrie.NewView(
+		context.Background(),
+		ViewChanges{
+			BatchOps: []database.BatchOp{
+				{Key: []byte("key0"), Value: []byte("value0")},
+				{Key: []byte("key1"), Value: []byte("value1")},
+				{Key: []byte("key2"), Value: []byte("value2")},
+				{Key: []byte("key3"), Value: []byte("value3")},
+				{Key: []byte("key4"), Value: []byte("value4")},
+			},
+		},
+	)
 	require.NoError(err)
 
 	_, err = trie.GetMerkleRoot(context.Background())
@@ -680,7 +685,7 @@ func Test_ChangeProof_BadBounds(t *testing.T) {
 	startRoot, err := db.GetMerkleRoot(context.Background())
 	require.NoError(err)
 
-	require.NoError(db.Insert(context.Background(), []byte{0}, []byte{0}))
+	require.NoError(db.PutContext(context.Background(), []byte{0}, []byte{0}))
 
 	endRoot, err := db.GetMerkleRoot(context.Background())
 	require.NoError(err)
