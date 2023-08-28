@@ -27,7 +27,7 @@ futures = "0.3.24"
 hex = "0.4.3"
 lru = "0.11.0"
 metered = "0.9.0"
-nix = "0.26.1"
+nix = {version = "0.27.1", features = ["fs", "uio"]}
 parking_lot = "0.12.1"
 primitive-types = { version = "0.12.0", features = ["impl-rlp"] }
 rlp = "0.5.2"

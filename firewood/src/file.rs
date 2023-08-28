@@ -3,15 +3,14 @@
 
 // Copied from CedrusDB
 
-use std::os::fd::IntoRawFd;
-pub(crate) use std::os::unix::io::RawFd as Fd;
+use std::ops::Deref;
+use std::os::fd::OwnedFd;
+
 use std::path::{Path, PathBuf};
 use std::{io::ErrorKind, os::unix::prelude::OpenOptionsExt};
 
-use nix::unistd::close;
-
 pub struct File {
-    fd: Fd,
+    fd: OwnedFd,
 }
 
 #[derive(PartialEq, Eq)]
@@ -25,7 +24,7 @@ impl File {
         rootpath: PathBuf,
         fname: &str,
         options: Options,
-    ) -> Result<Fd, std::io::Error> {
+    ) -> Result<OwnedFd, std::io::Error> {
         let mut filepath = rootpath;
         filepath.push(fname);
         Ok(std::fs::File::options()
@@ -34,10 +33,10 @@ impl File {
             .write(true)
             .mode(0o600)
             .open(filepath)?
-            .into_raw_fd())
+            .into())
     }
 
-    pub fn create_file(rootpath: PathBuf, fname: &str) -> Result<Fd, std::io::Error> {
+    pub fn create_file(rootpath: PathBuf, fname: &str) -> Result<OwnedFd, std::io::Error> {
         let mut filepath = rootpath;
         filepath.push(fname);
         Ok(std::fs::File::options()
@@ -46,7 +45,7 @@ impl File {
             .write(true)
             .mode(0o600)
             .open(filepath)?
-            .into_raw_fd())
+            .into())
     }
 
     fn _get_fname(fid: u64) -> String {
@@ -65,15 +64,13 @@ impl File {
         };
         Ok(File { fd })
     }
-
-    pub fn get_fd(&self) -> Fd {
-        self.fd
-    }
 }
 
-impl Drop for File {
-    fn drop(&mut self) {
-        close(self.fd).unwrap();
+impl Deref for File {
+    type Target = OwnedFd;
+
+    fn deref(&self) -> &Self::Target {
+        &self.fd
     }
 }
 

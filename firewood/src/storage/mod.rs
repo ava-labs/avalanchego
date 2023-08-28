@@ -9,6 +9,7 @@ use std::{
     fmt::{self, Debug},
     num::NonZeroUsize,
     ops::{Deref, DerefMut},
+    os::fd::{AsFd, AsRawFd},
     path::PathBuf,
     sync::Arc,
 };
@@ -779,7 +780,7 @@ impl CachedSpaceInner {
                         let mut page: Page = Page::new([0; PAGE_SIZE as usize]);
 
                         nix::sys::uio::pread(
-                            file.get_fd(),
+                            file.as_fd(),
                             page.deref_mut(),
                             (poff & (file_size - 1)) as nix::libc::off_t,
                         )
@@ -901,7 +902,7 @@ impl FilePool {
             rootdir: rootdir.to_path_buf(),
         };
         let f0 = s.get_file(0)?;
-        if flock(f0.get_fd(), FlockArg::LockExclusiveNonblock).is_err() {
+        if flock(f0.as_raw_fd(), FlockArg::LockExclusiveNonblock).is_err() {
             return Err(StoreError::Init("the store is busy".into()));
         }
         Ok(s)
@@ -931,7 +932,7 @@ impl FilePool {
 impl Drop for FilePool {
     fn drop(&mut self) {
         let f0 = self.get_file(0).unwrap();
-        flock(f0.get_fd(), FlockArg::UnlockNonblock).ok();
+        flock(f0.as_raw_fd(), FlockArg::UnlockNonblock).ok();
     }
 }
 

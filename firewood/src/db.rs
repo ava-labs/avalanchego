@@ -31,6 +31,7 @@ use std::{
     io::{Cursor, Write},
     mem::size_of,
     num::NonZeroUsize,
+    os::fd::AsFd,
     path::Path,
     sync::Arc,
     thread::JoinHandle,
@@ -407,7 +408,7 @@ impl Db {
         let root_hash_path = file::touch_dir("root_hash", &db_path)?;
 
         let file0 = crate::file::File::new(0, SPACE_RESERVED, &merkle_meta_path)?;
-        let fd0 = file0.get_fd();
+        let fd0 = file0.as_fd();
 
         if reset {
             // initialize dbparams
