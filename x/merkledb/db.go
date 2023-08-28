@@ -237,7 +237,7 @@ func newDatabase(
 	switch err {
 	case nil:
 		if bytes.Equal(shutdownType, didNotHaveCleanShutdown) {
-			if err := trieDB.rebuild(ctx); err != nil {
+			if err := trieDB.rebuild(ctx, config.ValueNodeCacheSize); err != nil {
 				return nil, err
 			}
 		}
@@ -255,11 +255,11 @@ func newDatabase(
 
 // Deletes every intermediate node and rebuilds them by re-adding every key/value.
 // TODO: make this more efficient by only clearing out the stale portions of the trie.
-func (db *merkleDB) rebuild(ctx context.Context) error {
+func (db *merkleDB) rebuild(ctx context.Context, cacheSize int) error {
 	db.root = newNode(nil, RootPath)
 
 	opsSizeLimit := math.Max(
-		db.valueNodeDB.nodeCache.maxSize/rebuildViewSizeFractionOfCacheSize,
+		cacheSize/rebuildViewSizeFractionOfCacheSize,
 		minRebuildViewSizePerCommit,
 	)
 
