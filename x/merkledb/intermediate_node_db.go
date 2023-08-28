@@ -11,8 +11,6 @@ import (
 
 const defaultBufferLength = 256
 
-var intermediateNodePrefix = []byte{2}
-
 type intermediateNodeDB struct {
 	// Holds unused []byte
 	bufferPool *sync.Pool

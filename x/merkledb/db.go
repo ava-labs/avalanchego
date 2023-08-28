@@ -42,7 +42,10 @@ var (
 
 	codec = newCodec()
 
-	metadataPrefix          = []byte{0}
+	metadataPrefix         = []byte{0}
+	valueNodePrefix        = []byte{1}
+	intermediateNodePrefix = []byte{2}
+
 	cleanShutdownKey        = []byte(string(metadataPrefix) + "cleanShutdown")
 	hadCleanShutdown        = []byte{1}
 	didNotHaveCleanShutdown = []byte{0}

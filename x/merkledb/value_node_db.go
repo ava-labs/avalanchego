@@ -14,8 +14,6 @@ import (
 
 const valueNodePrefixLen = 1
 
-var valueNodePrefix = []byte{1}
-
 type valueNodeDB struct {
 	// Holds unused []byte
 	bufferPool *sync.Pool
