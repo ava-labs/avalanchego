@@ -223,7 +223,6 @@ func SetupGenesisBlock(
 		rawdb.WriteChainConfig(db, stored, newcfg)
 		return newcfg, stored, nil
 	}
-	storedData, _ := json.Marshal(storedcfg)
 	// Check config compatibility and write the config. Compatibility errors
 	// are returned to the caller unless we're already at block zero.
 	// we use last accepted block for cfg compatibility check. Note this allows
@@ -249,10 +248,9 @@ func SetupGenesisBlock(
 			return newcfg, stored, compatErr
 		}
 	}
-	// Don't overwrite if the old is identical to the new
-	if newData, _ := json.Marshal(newcfg); !bytes.Equal(storedData, newData) {
-		rawdb.WriteChainConfig(db, stored, newcfg)
-	}
+	// Required to write the chain config to disk to ensure both the chain config and upgrade bytes are persisted to disk.
+	// Note: this intentionally removes an extra check from upstream.
+	rawdb.WriteChainConfig(db, stored, newcfg)
 	return newcfg, stored, nil
 }
 
