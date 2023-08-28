@@ -4,8 +4,9 @@
 package merkledb
 
 import (
-	"github.com/ava-labs/avalanchego/cache"
 	"sync"
+
+	"github.com/ava-labs/avalanchego/cache"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils"
