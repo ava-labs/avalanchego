@@ -17,8 +17,8 @@ var (
 )
 
 type merkleMetrics interface {
-	IOKeyRead()
-	IOKeyWrite()
+	DatabaseNodeRead()
+	DatabaseNodeWrite()
 	HashCalculated()
 	ValueNodeCacheHit()
 	ValueNodeCacheMiss()
@@ -52,14 +52,14 @@ func (m *mockMetrics) HashCalculated() {
 	m.hashCount++
 }
 
-func (m *mockMetrics) IOKeyRead() {
+func (m *mockMetrics) DatabaseNodeRead() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
 	m.keyReadCount++
 }
 
-func (m *mockMetrics) IOKeyWrite() {
+func (m *mockMetrics) DatabaseNodeWrite() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -215,11 +215,11 @@ func newMetrics(namespace string, reg prometheus.Registerer) (merkleMetrics, err
 	return &m, errs.Err
 }
 
-func (m *metrics) IOKeyRead() {
+func (m *metrics) DatabaseNodeRead() {
 	m.ioKeyRead.Inc()
 }
 
-func (m *metrics) IOKeyWrite() {
+func (m *metrics) DatabaseNodeWrite() {
 	m.ioKeyWrite.Inc()
 }
 

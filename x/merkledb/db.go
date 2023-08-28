@@ -42,7 +42,10 @@ var (
 
 	codec = newCodec()
 
-	metadataPrefix          = []byte{0}
+	metadataPrefix         = []byte{0}
+	valueNodePrefix        = []byte{1}
+	intermediateNodePrefix = []byte{2}
+
 	cleanShutdownKey        = []byte(string(metadataPrefix) + "cleanShutdown")
 	hadCleanShutdown        = []byte{1}
 	didNotHaveCleanShutdown = []byte{0}
@@ -1200,6 +1203,9 @@ func (db *merkleDB) getNode(key path, hasValue bool) (*node, error) {
 	return db.intermediateNodeDB.Get(key)
 }
 
+// Returns [key] prefixed by [prefix].
+// The returned []byte is taken from [bufferPool] and
+// should be returned to it when the caller is done with it.
 func addPrefixToKey(bufferPool *sync.Pool, prefix []byte, key []byte) []byte {
 	prefixedKey := bufferPool.Get().([]byte)
 	prefixLen := len(prefix)

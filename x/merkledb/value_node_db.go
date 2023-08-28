@@ -14,8 +14,6 @@ import (
 
 const valueNodePrefixLen = 1
 
-var valueNodePrefix = []byte{1}
-
 type valueNodeDB struct {
 	// Holds unused []byte
 	bufferPool *sync.Pool
@@ -74,7 +72,7 @@ func (db *valueNodeDB) Get(key path) (*node, error) {
 	db.metrics.IntermediateNodeCacheMiss()
 
 	prefixedKey := addPrefixToKey(db.bufferPool, valueNodePrefix, key.Serialize().Value)
-	db.metrics.IOKeyRead()
+	db.metrics.DatabaseNodeRead()
 	nodeBytes, err := db.baseDB.Get(prefixedKey)
 	if err != nil {
 		return nil, err
@@ -102,7 +100,7 @@ func (b *valueNodeBatch) Delete(key path) {
 func (b *valueNodeBatch) Write() error {
 	dbBatch := b.db.baseDB.NewBatch()
 	for key, n := range b.ops {
-		b.db.metrics.IOKeyWrite()
+		b.db.metrics.DatabaseNodeWrite()
 		b.db.nodeCache.Put(key, n)
 		prefixedKey := addPrefixToKey(b.db.bufferPool, valueNodePrefix, key.Serialize().Value)
 		if n == nil {
@@ -161,7 +159,7 @@ func (i *iterator) Next() bool {
 		return false
 	}
 
-	i.db.metrics.IOKeyRead()
+	i.db.metrics.DatabaseNodeRead()
 	key := i.nodeIter.Key()
 	key = key[valueNodePrefixLen:]
 	n, err := parseNode(newPath(key), i.nodeIter.Value())

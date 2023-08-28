@@ -11,25 +11,34 @@ import (
 
 const defaultBufferLength = 256
 
-var intermediateNodePrefix = []byte{2}
-
+// Holds intermediate nodes. That is, those without values.
+// Changes to this database aren't written to [baseDB] until
+// they're evicted from the [nodeCache] or Flush is called..
 type intermediateNodeDB struct {
 	// Holds unused []byte
 	bufferPool *sync.Pool
 
-	// The underlying storage
+	// The underlying storage.
+	// Keys written to [baseDB] are prefixed with [intermediateNodePrefix].
 	baseDB database.Database
 
 	// If a value is nil, the corresponding key isn't in the trie.
 	// Note that a call to Put may cause a node to be evicted
 	// from the cache, which will call [OnEviction].
 	// A non-nil error returned from Put is considered fatal.
+	// Keys in [nodeCache] aren't prefixed with [intermediateNodePrefix].
 	nodeCache         onEvictCache[path, *node]
 	evictionBatchSize int
 	metrics           merkleMetrics
 }
 
-func newIntermediateNodeDB(db database.Database, bufferPool *sync.Pool, metrics merkleMetrics, size int, evictionBatchSize int) *intermediateNodeDB {
+func newIntermediateNodeDB(
+	db database.Database,
+	bufferPool *sync.Pool,
+	metrics merkleMetrics,
+	size int,
+	evictionBatchSize int,
+) *intermediateNodeDB {
 	result := &intermediateNodeDB{
 		metrics:           metrics,
 		baseDB:            db,
@@ -40,10 +49,12 @@ func newIntermediateNodeDB(db database.Database, bufferPool *sync.Pool, metrics 
 	return result
 }
 
+// A non-nil error is considered fatal and closes [db.baseDB].
 func (db *intermediateNodeDB) onEviction(key path, n *node) error {
 	writeBatch := db.baseDB.NewBatch()
 
 	if err := db.addToBatch(writeBatch, key, n); err != nil {
+		_ = db.baseDB.Close()
 		return err
 	}
 
@@ -59,6 +70,7 @@ func (db *intermediateNodeDB) onEviction(key path, n *node) error {
 			break
 		}
 		if err := db.addToBatch(writeBatch, key, n); err != nil {
+			_ = db.baseDB.Close()
 			return err
 		}
 	}
@@ -72,7 +84,7 @@ func (db *intermediateNodeDB) onEviction(key path, n *node) error {
 func (db *intermediateNodeDB) addToBatch(b database.Batch, key path, n *node) error {
 	prefixedKey := addPrefixToKey(db.bufferPool, intermediateNodePrefix, key.Bytes())
 	defer db.bufferPool.Put(prefixedKey)
-	db.metrics.IOKeyWrite()
+	db.metrics.DatabaseNodeWrite()
 	if n == nil {
 		return b.Delete(prefixedKey)
 	}
@@ -90,7 +102,7 @@ func (db *intermediateNodeDB) Get(key path) (*node, error) {
 	db.metrics.IntermediateNodeCacheMiss()
 
 	prefixedKey := addPrefixToKey(db.bufferPool, intermediateNodePrefix, key.Bytes())
-	db.metrics.IOKeyRead()
+	db.metrics.DatabaseNodeRead()
 	nodeBytes, err := db.baseDB.Get(prefixedKey)
 	if err != nil {
 		return nil, err
