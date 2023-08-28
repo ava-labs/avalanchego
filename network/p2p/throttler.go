@@ -36,7 +36,7 @@ func NewSlidingWindowThrottler(period time.Duration, limit int) *SlidingWindowTh
 }
 
 // window is used internally by SlidingWindowThrottler to represent the amount
-// of hits from a node in a given evaluation period
+// of hits from a node in the evaluation period beginning at [start]
 type window struct {
 	start time.Time
 	hits  map[ids.NodeID]int
