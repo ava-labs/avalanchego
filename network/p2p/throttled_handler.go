@@ -5,12 +5,17 @@ package p2p
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-var _ Handler = (*ThrottledHandler)(nil)
+var (
+	ErrThrottled         = errors.New("throttled")
+	_            Handler = (*ThrottledHandler)(nil)
+)
 
 type ThrottledHandler struct {
 	Handler
@@ -18,16 +23,16 @@ type ThrottledHandler struct {
 }
 
 func (t ThrottledHandler) AppGossip(ctx context.Context, nodeID ids.NodeID, gossipBytes []byte) error {
-	if err := t.Throttler.Throttle(ctx, nodeID, 1); err != nil {
-		return err
+	if !t.Throttler.Handle(nodeID) {
+		return fmt.Errorf("dropping message from %s: %w", nodeID, ErrThrottled)
 	}
 
 	return t.Handler.AppGossip(ctx, nodeID, gossipBytes)
 }
 
 func (t ThrottledHandler) AppRequest(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, error) {
-	if err := t.Throttler.Throttle(ctx, nodeID, 1); err != nil {
-		return nil, err
+	if !t.Throttler.Handle(nodeID) {
+		return nil, fmt.Errorf("dropping message from %s: %w", nodeID, ErrThrottled)
 	}
 
 	return t.Handler.AppRequest(ctx, nodeID, deadline, requestBytes)

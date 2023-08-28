@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"golang.org/x/time/rate"
 
 	"github.com/ava-labs/avalanchego/ids"
 )
@@ -22,11 +21,11 @@ func TestThrottledHandlerAppGossip(t *testing.T) {
 	}{
 		{
 			name:      "throttled",
-			Throttler: NewTokenBucketThrottler(rate.Every(time.Second), 1),
+			Throttler: NewSlidingWindowThrottler(time.Second, 1),
 		},
 		{
 			name:      "throttler errors",
-			Throttler: NewTokenBucketThrottler(rate.Every(time.Second), 0),
+			Throttler: NewSlidingWindowThrottler(time.Second, 0),
 			wantErr:   true,
 		},
 	}
@@ -56,11 +55,11 @@ func TestThrottledHandlerAppRequest(t *testing.T) {
 	}{
 		{
 			name:      "throttled",
-			Throttler: NewTokenBucketThrottler(rate.Every(time.Second), 1),
+			Throttler: NewSlidingWindowThrottler(time.Second, 1),
 		},
 		{
 			name:      "throttler errors",
-			Throttler: NewTokenBucketThrottler(rate.Every(time.Second), 0),
+			Throttler: NewSlidingWindowThrottler(time.Second, 0),
 			wantErr:   true,
 		},
 	}
