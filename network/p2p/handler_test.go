@@ -17,11 +17,7 @@ import (
 var _ ValidatorSet = (*testValidatorSet)(nil)
 
 type testValidatorSet struct {
-	validators set.SampleableSet[ids.NodeID]
-}
-
-func (t testValidatorSet) Sample(_ context.Context, limit int) []ids.NodeID {
-	return t.validators.Sample(limit)
+	validators set.Set[ids.NodeID]
 }
 
 func (t testValidatorSet) Has(_ context.Context, nodeID ids.NodeID) bool {
