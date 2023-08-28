@@ -468,7 +468,7 @@ func (db *merkleDB) getValueWithoutLock(key path) ([]byte, error) {
 		return nil, database.ErrClosed
 	}
 
-	n, err := db.getNode(key, true)
+	n, err := db.getNode(key, true /* hasValue */)
 	if err != nil {
 		return nil, err
 	}
@@ -850,46 +850,43 @@ func (db *merkleDB) commitChanges(ctx context.Context, trieToCommit *trieView) e
 
 	_, nodesSpan := db.infoTracer.Start(ctx, "MerkleDB.commitChanges.writeNodes")
 	for key, nodeChange := range changes.nodes {
-		if nodeChange.after == nil {
+		switch {
+		case nodeChange.after == nil:
 			switch {
 			case nodeChange.before == nil:
-				// before and after are both nil, this is a noop
+				// Before and after are both nil. This is a noop.
 			case nodeChange.before.hasValue():
-				// the node had a value before, delete from the value node db
+				// The node had a value before. Delete from the value node db.
 				currentValueNodeBatch.Delete(key)
 			default:
-				// the node didn't have a value before, delete from the intermediate node db
+				// the node didn't have a value before. Delete from the intermediate node db.
 				if err := db.intermediateNodeDB.Delete(key); err != nil {
 					nodesSpan.End()
 					return err
 				}
 			}
-			continue
-		}
-
-		if nodeChange.after.hasValue() {
-			// the node is not nil and has a value. Add to the value node db
+		case nodeChange.after.hasValue():
+			// The node is not nil and has a value. Add to the value node db.
 			currentValueNodeBatch.Put(key, nodeChange.after)
 
-			// the node didn't have a value before, delete from the intermediate node db
+			// The node didn't have a value before. Delete from the intermediate node db.
 			if nodeChange.before != nil && !nodeChange.before.hasValue() {
 				if err := db.intermediateNodeDB.Delete(key); err != nil {
 					nodesSpan.End()
 					return err
 				}
 			}
-			continue
-		}
+		default:
+			// The node has value. Add it to the intermediate node db.
+			if err := db.intermediateNodeDB.Put(key, nodeChange.after); err != nil {
+				nodesSpan.End()
+				return err
+			}
 
-		// the node is not nil and has no value, add to the intermediate node db
-		if err := db.intermediateNodeDB.Put(key, nodeChange.after); err != nil {
-			nodesSpan.End()
-			return err
-		}
-
-		// the node had a value before, delete from the value node db
-		if nodeChange.before != nil && nodeChange.before.hasValue() {
-			currentValueNodeBatch.Delete(key)
+			// The node had a value before. Delete from the value node db.
+			if nodeChange.before != nil && nodeChange.before.hasValue() {
+				currentValueNodeBatch.Delete(key)
+			}
 		}
 	}
 	nodesSpan.End()
