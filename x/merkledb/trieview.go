@@ -8,7 +8,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"runtime"
 	"sync"
 
 	"github.com/ava-labs/avalanchego/utils"
@@ -44,8 +43,6 @@ var (
 	ErrNoValidRoot            = errors.New("a valid root was not provided to the trieView constructor")
 	ErrParentNotDatabase      = errors.New("parent trie is not database")
 	ErrNodesAlreadyCalculated = errors.New("cannot modify the trie after the node changes have been calculated")
-
-	numCPU = runtime.NumCPU()
 )
 
 type trieView struct {
@@ -128,7 +125,7 @@ func (t *trieView) NewView(
 		return nil, err
 	}
 
-	newView, err := newTrieView(t.db, t, t.root.clone(), changes)
+	newView, err := newTrieView(t.db, t, changes)
 	if err != nil {
 		return nil, err
 	}
@@ -148,11 +145,14 @@ func (t *trieView) NewView(
 func newTrieView(
 	db *merkleDB,
 	parentTrie TrieView,
-	root *node,
 	changes ViewChanges,
 ) (*trieView, error) {
-	if root == nil {
-		return nil, ErrNoValidRoot
+	root, err := parentTrie.getEditableNode(RootPath)
+	if err != nil {
+		if err == database.ErrNotFound {
+			return nil, ErrNoValidRoot
+		}
+		return nil, err
 	}
 
 	newView := &trieView{
@@ -242,7 +242,7 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 
 		// [eg] limits the number of goroutines we start.
 		var eg errgroup.Group
-		eg.SetLimit(numCPU)
+		eg.SetLimit(t.db.rootGenConcurrency)
 		if err = t.calculateNodeIDsHelper(ctx, t.root, &eg); err != nil {
 			return
 		}

@@ -878,5 +878,5 @@ func getStandaloneTrieView(ctx context.Context, ops []database.BatchOp) (*trieVi
 		return nil, err
 	}
 
-	return db.newUntrackedView(ops, true)
+	return newTrieView(db, db, ViewChanges{BatchOps: ops, ConsumeBytes: true})
 }

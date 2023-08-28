@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime"
 	"sync"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -118,6 +119,12 @@ type MerkleDB interface {
 }
 
 type Config struct {
+	// RootGenConcurrency is the number of goroutines to use when
+	// generating a new state root.
+	//
+	// If 0 is specified, [runtime.NumCPU] will be used. If -1 is specified,
+	// no limit will be used.
+	RootGenConcurrency int
 	// The number of nodes that are evicted from the cache and written to
 	// disk at a time.
 	EvictionBatchSize int
@@ -176,6 +183,13 @@ type merkleDB struct {
 
 	// Valid children of this trie.
 	childViews []*trieView
+
+	// rootGenConcurrency is the number of goroutines to use when
+	// generating a new state root.
+	//
+	// TODO: Limit concurrency across all views, instead of only within
+	// a single view (see `workers` in hypersdk)
+	rootGenConcurrency int
 }
 
 // New returns a new merkle database.
@@ -193,15 +207,20 @@ func newDatabase(
 	config Config,
 	metrics merkleMetrics,
 ) (*merkleDB, error) {
+	rootGenConcurrency := runtime.NumCPU()
+	if config.RootGenConcurrency != 0 {
+		rootGenConcurrency = config.RootGenConcurrency
+	}
 	trieDB := &merkleDB{
-		metrics:           metrics,
-		nodeDB:            prefixdb.New(nodePrefix, db),
-		metadataDB:        prefixdb.New(metadataPrefix, db),
-		history:           newTrieHistory(config.HistoryLength),
-		debugTracer:       getTracerIfEnabled(config.TraceLevel, DebugTrace, config.Tracer),
-		infoTracer:        getTracerIfEnabled(config.TraceLevel, InfoTrace, config.Tracer),
-		childViews:        make([]*trieView, 0, defaultPreallocationSize),
-		evictionBatchSize: config.EvictionBatchSize,
+		metrics:            metrics,
+		nodeDB:             prefixdb.New(nodePrefix, db),
+		metadataDB:         prefixdb.New(metadataPrefix, db),
+		history:            newTrieHistory(config.HistoryLength),
+		debugTracer:        getTracerIfEnabled(config.TraceLevel, DebugTrace, config.Tracer),
+		infoTracer:         getTracerIfEnabled(config.TraceLevel, InfoTrace, config.Tracer),
+		childViews:         make([]*trieView, 0, defaultPreallocationSize),
+		evictionBatchSize:  config.EvictionBatchSize,
+		rootGenConcurrency: rootGenConcurrency,
 	}
 
 	// Note: trieDB.OnEviction is responsible for writing intermediary nodes to
@@ -258,7 +277,7 @@ func (db *merkleDB) rebuild(ctx context.Context) error {
 
 	for it.Next() {
 		if len(currentOps) >= viewSizeLimit {
-			view, err := db.newUntrackedView(currentOps, true)
+			view, err := newTrieView(db, db, ViewChanges{BatchOps: currentOps, ConsumeBytes: true})
 			if err != nil {
 				return err
 			}
@@ -285,7 +304,7 @@ func (db *merkleDB) rebuild(ctx context.Context) error {
 	if err := it.Error(); err != nil {
 		return err
 	}
-	view, err := db.newUntrackedView(currentOps, true)
+	view, err := newTrieView(db, db, ViewChanges{BatchOps: currentOps, ConsumeBytes: true})
 	if err != nil {
 		return err
 	}
@@ -311,7 +330,7 @@ func (db *merkleDB) CommitChangeProof(ctx context.Context, proof *ChangeProof) e
 		}
 	}
 
-	view, err := db.newUntrackedView(ops, false)
+	view, err := newTrieView(db, db, ViewChanges{BatchOps: ops})
 	if err != nil {
 		return err
 	}
@@ -352,7 +371,7 @@ func (db *merkleDB) CommitRangeProof(ctx context.Context, start maybe.Maybe[[]by
 	}
 
 	// Don't need to lock [view] because nobody else has a reference to it.
-	view, err := db.newUntrackedView(ops, false)
+	view, err := newTrieView(db, db, ViewChanges{BatchOps: ops})
 	if err != nil {
 		return err
 	}
@@ -507,7 +526,7 @@ func (db *merkleDB) getProof(ctx context.Context, key []byte) (*Proof, error) {
 		return nil, database.ErrClosed
 	}
 
-	view, err := db.newUntrackedView(nil, true)
+	view, err := newTrieView(db, db, ViewChanges{})
 	if err != nil {
 		return nil, err
 	}
@@ -677,7 +696,7 @@ func (db *merkleDB) NewView(
 		return nil, database.ErrClosed
 	}
 
-	newView, err := newTrieView(db, db, db.root.clone(), changes)
+	newView, err := newTrieView(db, db, changes)
 	if err != nil {
 		return nil, err
 	}
@@ -688,21 +707,6 @@ func (db *merkleDB) NewView(
 
 	db.childViews = append(db.childViews, newView)
 	return newView, nil
-}
-
-// Returns a new view that isn't tracked in [db.childViews].
-// For internal use only, namely in methods that create short-lived views.
-// Assumes [db.lock] isn't held and [db.commitLock] is read locked.
-func (db *merkleDB) newUntrackedView(batchOps []database.BatchOp, consumeBytes bool) (*trieView, error) {
-	return newTrieView(
-		db,
-		db,
-		db.root.clone(),
-		ViewChanges{
-			BatchOps:     batchOps,
-			ConsumeBytes: consumeBytes,
-		},
-	)
 }
 
 func (db *merkleDB) Has(k []byte) (bool, error) {
@@ -834,13 +838,7 @@ func (db *merkleDB) PutContext(ctx context.Context, k, v []byte) error {
 		return database.ErrClosed
 	}
 
-	view, err := db.newUntrackedView(
-		[]database.BatchOp{{
-			Key:   k,
-			Value: v,
-		}},
-		false,
-	)
+	view, err := newTrieView(db, db, ViewChanges{BatchOps: []database.BatchOp{{Key: k, Value: v}}})
 	if err != nil {
 		return err
 	}
@@ -859,13 +857,14 @@ func (db *merkleDB) DeleteContext(ctx context.Context, key []byte) error {
 		return database.ErrClosed
 	}
 
-	view, err := db.newUntrackedView(
-		[]database.BatchOp{{
-			Key:    key,
-			Delete: true,
-		}},
-		true,
-	)
+	view, err := newTrieView(db, db,
+		ViewChanges{
+			BatchOps: []database.BatchOp{{
+				Key:    key,
+				Delete: true,
+			}},
+			ConsumeBytes: true,
+		})
 	if err != nil {
 		return err
 	}
@@ -882,7 +881,7 @@ func (db *merkleDB) commitBatch(ops []database.BatchOp) error {
 		return database.ErrClosed
 	}
 
-	view, err := db.newUntrackedView(ops, true)
+	view, err := newTrieView(db, db, ViewChanges{BatchOps: ops, ConsumeBytes: true})
 	if err != nil {
 		return err
 	}
@@ -1097,7 +1096,7 @@ func (db *merkleDB) VerifyChangeProof(
 	}
 
 	// Don't need to lock [view] because nobody else has a reference to it.
-	view, err := db.newUntrackedView(ops, true)
+	view, err := newTrieView(db, db, ViewChanges{BatchOps: ops, ConsumeBytes: true})
 	if err != nil {
 		return err
 	}
@@ -1207,7 +1206,7 @@ func (db *merkleDB) getHistoricalViewForRange(
 	// looking for the trie's current root id, so return the trie unmodified
 	if currentRootID == rootID {
 		// create an empty trie
-		return newTrieView(db, db, db.root.clone(), ViewChanges{})
+		return newTrieView(db, db, ViewChanges{})
 	}
 
 	changeHistory, err := db.history.getChangesToGetToRoot(rootID, start, end)
