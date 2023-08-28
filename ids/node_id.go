@@ -28,7 +28,14 @@ var (
 
 type NodeID ShortID
 
-// Writeable is an helper which helps modifiying ShortID content
+// NodeIDFromRawBytes sets NodeID content to exactly the bytes in src
+// This is different from ToNodeID, which creates the NodeID of an
+// arbitrary-long slice of bytes.
+func NodeIDFromRawBytes(src [NodeIDLen]byte) NodeID {
+	return src
+}
+
+// WritableNode is an helper which helps modifiying NodeID content
 func WritableNode(id *NodeID) []byte {
 	return id[:]
 }

@@ -26,6 +26,13 @@ var (
 // ShortID wraps a 20 byte hash as an identifier
 type ShortID [ShortIDLen]byte
 
+// ShortIDFromRawBytes sets ShortID content to exactly the bytes in src
+// This is different from ToShortID, which creates the ShortID of an
+// arbitrary-long slice of bytes.
+func ShortIDFromRawBytes(src [ShortIDLen]byte) ShortID {
+	return src
+}
+
 // Writeable is an helper which helps modifiying ShortID content
 func WritableShort(id *ShortID) []byte {
 	return id[:]

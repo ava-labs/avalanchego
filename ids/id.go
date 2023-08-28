@@ -32,10 +32,10 @@ var (
 // ID wraps a 32 byte hash used as an identifier
 type ID [IDLen]byte
 
-// FromRawBytes sets ID content to exactly the bytes in src
+// IDFromRawBytes sets ID content to exactly the bytes in src
 // This is different from ToID, which creates the ID of an
 // arbitrary-long slice of bytes.
-func FromRawBytes(src [IDLen]byte) ID {
+func IDFromRawBytes(src [IDLen]byte) ID {
 	return src
 }
 
