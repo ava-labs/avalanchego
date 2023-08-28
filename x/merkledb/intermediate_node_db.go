@@ -92,11 +92,10 @@ func (db *intermediateNodeDB) onEviction(key path, n *node) error {
 func (db *intermediateNodeDB) addToBatch(b database.Batch, key path, n *node) error {
 	prefixedKey := db.prefixedKey(key.Bytes())
 	defer db.bufferPool.Put(prefixedKey)
+	db.metrics.IOKeyWrite()
 	if n == nil {
-		db.metrics.IOKeyWrite()
 		return b.Delete(prefixedKey)
 	}
-	db.metrics.IOKeyWrite()
 	return b.Put(prefixedKey, n.marshal())
 }
 
