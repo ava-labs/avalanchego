@@ -24,6 +24,19 @@ func TestID(t *testing.T) {
 	require.Equal(prefixed, id.Prefix(0))
 }
 
+func TestIDBytesAndWritableIsolation(t *testing.T) {
+	require := require.New(t)
+
+	id := UnsafeToID([]byte{24})
+	idBytes := id.Bytes()
+	idBytes[0] = 25
+	require.Equal(UnsafeToID([]byte{24}), id)
+
+	idBytes = Writable(&id)
+	idBytes[0] = 25
+	require.Equal(UnsafeToID([]byte{25}), id)
+}
+
 func TestIDXOR(t *testing.T) {
 	require := require.New(t)
 

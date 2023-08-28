@@ -43,6 +43,16 @@ func ToNodeID(bytes []byte) (NodeID, error) {
 	return NodeID(nodeID), err
 }
 
+// UnsafeToNodeID attempt to convert a byte slice into a node id
+// It's up to caller to make sure bytes are well formatted.
+// Should be used in tests only.
+func UnsafeToNodeID(bytes []byte) NodeID {
+	rightLenSlice := make([]byte, NodeIDLen)
+	copy(rightLenSlice, bytes)
+	res := UnsafeToShortID(rightLenSlice)
+	return NodeID(res)
+}
+
 func (id NodeID) String() string {
 	return ShortID(id).PrefixedString(NodeIDPrefix)
 }
