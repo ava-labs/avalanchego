@@ -66,7 +66,7 @@ func (s *SlidingWindowThrottler) Handle(nodeID ids.NodeID) bool {
 	now := s.clock.Time()
 	if now.After(s.current.start.Add(s.period)) {
 		// discard the current window if it's too old
-		if s.clock.Time().Sub(s.current.start) > s.period {
+		if now.Sub(s.current.start) > s.period {
 			s.current = window{
 				start: now.Add(-s.period),
 				hits:  make(map[ids.NodeID]int),
