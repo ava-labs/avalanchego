@@ -16,10 +16,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-var _ ValidatorSet = (*Validators)(nil)
+var (
+	_ ValidatorSet = (*Validators)(nil)
+	_ NodeSampler  = (*Validators)(nil)
+)
 
 type ValidatorSet interface {
-	NodeSampler
 	Has(ctx context.Context, nodeID ids.NodeID) bool
 }
 
