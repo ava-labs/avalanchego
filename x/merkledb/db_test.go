@@ -171,7 +171,7 @@ func Test_MerkleDB_DB_Rebuild(t *testing.T) {
 
 	root, err := db.GetMerkleRoot(context.Background())
 	require.NoError(err)
-	require.NoError(db.rebuild(context.Background()))
+	require.NoError(db.rebuild(context.Background(), initialSize))
 	rebuiltRoot, err := db.GetMerkleRoot(context.Background())
 	require.NoError(err)
 	require.Equal(root, rebuiltRoot)
@@ -180,7 +180,7 @@ func Test_MerkleDB_DB_Rebuild(t *testing.T) {
 	require.NoError(db.Put(nil, []byte{}))
 	root, err = db.GetMerkleRoot(context.Background())
 	require.NoError(err)
-	require.NoError(db.rebuild(context.Background()))
+	require.NoError(db.rebuild(context.Background(), initialSize))
 	rebuiltRoot, err = db.GetMerkleRoot(context.Background())
 	require.NoError(err)
 	require.Equal(root, rebuiltRoot)

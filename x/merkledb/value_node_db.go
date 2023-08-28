@@ -4,6 +4,7 @@
 package merkledb
 
 import (
+	"github.com/ava-labs/avalanchego/cache"
 	"sync"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -23,7 +24,7 @@ type valueNodeDB struct {
 
 	// If a value is nil, the corresponding key isn't in the trie.
 	// A non-nil error returned from Put is considered fatal.
-	nodeCache onEvictCache[path, *node]
+	nodeCache cache.LRU[path, *node]
 	metrics   merkleMetrics
 
 	closed utils.Atomic[bool]
@@ -34,9 +35,7 @@ func newValueNodeDB(db database.Database, bufferPool *sync.Pool, metrics merkleM
 		metrics:    metrics,
 		baseDB:     db,
 		bufferPool: bufferPool,
-		nodeCache: newOnEvictCache[path](size, func(path, *node) error {
-			return nil
-		}),
+		nodeCache:  cache.LRU[path, *node]{Size: size},
 	}
 }
 
@@ -103,8 +102,7 @@ func (b *valueNodeBatch) Write() error {
 	dbBatch := b.db.baseDB.NewBatch()
 	for key, n := range b.ops {
 		b.db.metrics.IOKeyWrite()
-		// err cant happen since OnEviction is a noop
-		_ = b.db.nodeCache.Put(key, n)
+		b.db.nodeCache.Put(key, n)
 		prefixedKey := addPrefixToKey(b.db.bufferPool, valueNodePrefix, key.Serialize().Value)
 		if n == nil {
 			if err := dbBatch.Delete(prefixedKey); err != nil {
