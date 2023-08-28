@@ -43,23 +43,6 @@ func newIntermediateNodeDB(db database.Database, bufferPool *sync.Pool, metrics 
 	return result
 }
 
-func (db *intermediateNodeDB) prefixedKey(key []byte) []byte {
-	prefixedKey := db.bufferPool.Get().([]byte)
-	keyLen := intermediateNodePrefixLen + len(key)
-	if cap(prefixedKey) >= keyLen {
-		// The [] byte we got from the pool is big enough to hold the prefixed key
-		prefixedKey = prefixedKey[:keyLen]
-	} else {
-		// The []byte from the pool wasn't big enough.
-		// Put it back and allocate a new, bigger one
-		db.bufferPool.Put(prefixedKey)
-		prefixedKey = make([]byte, keyLen)
-	}
-	copy(prefixedKey, intermediateNodePrefix)
-	copy(prefixedKey[intermediateNodePrefixLen:], key)
-	return prefixedKey
-}
-
 func (db *intermediateNodeDB) onEviction(key path, n *node) error {
 	writeBatch := db.baseDB.NewBatch()
 
@@ -90,7 +73,7 @@ func (db *intermediateNodeDB) onEviction(key path, n *node) error {
 }
 
 func (db *intermediateNodeDB) addToBatch(b database.Batch, key path, n *node) error {
-	prefixedKey := db.prefixedKey(key.Bytes())
+	prefixedKey := addPrefixToKey(db.bufferPool, intermediateNodePrefix, key.Bytes())
 	defer db.bufferPool.Put(prefixedKey)
 	if n == nil {
 		db.metrics.IOKeyWrite()
@@ -110,7 +93,7 @@ func (db *intermediateNodeDB) Get(key path) (*node, error) {
 	}
 	db.metrics.IntermediateNodeCacheMiss()
 
-	prefixedKey := db.prefixedKey(key.Bytes())
+	prefixedKey := addPrefixToKey(db.bufferPool, intermediateNodePrefix, key.Bytes())
 	db.metrics.IOKeyRead()
 	nodeBytes, err := db.baseDB.Get(prefixedKey)
 	if err != nil {

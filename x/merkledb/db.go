@@ -8,10 +8,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/ava-labs/avalanchego/utils/units"
-
 	"runtime"
 	"sync"
+
+	"github.com/ava-labs/avalanchego/utils/units"
 
 	"go.opentelemetry.io/otel/attribute"
 
@@ -284,6 +284,11 @@ func (db *merkleDB) rebuild(ctx context.Context) error {
 				return err
 			}
 			currentOps = make([]database.BatchOp, 0, opsSizeLimit)
+			// reset the iterator to prevent memory bloat
+			nextValue := valueIt.Key()
+			valueIt.Release()
+			valueIt = db.NewIteratorWithStart(nextValue)
+			continue
 		}
 
 		currentOps = append(currentOps, database.BatchOp{
@@ -1217,4 +1222,22 @@ func (db *merkleDB) getNode(key path, hasValue bool) (*node, error) {
 		return db.valueNodeDB.Get(key)
 	}
 	return db.intermediateNodeDB.Get(key)
+}
+
+func addPrefixToKey(bufferPool *sync.Pool, prefix []byte, key []byte) []byte {
+	prefixedKey := bufferPool.Get().([]byte)
+	prefixLen := len(prefix)
+	keyLen := prefixLen + len(key)
+	if cap(prefixedKey) >= keyLen {
+		// The [] byte we got from the pool is big enough to hold the prefixed key
+		prefixedKey = prefixedKey[:keyLen]
+	} else {
+		// The []byte from the pool wasn't big enough.
+		// Put it back and allocate a new, bigger one
+		bufferPool.Put(prefixedKey)
+		prefixedKey = make([]byte, keyLen)
+	}
+	copy(prefixedKey, prefix)
+	copy(prefixedKey[prefixLen:], key)
+	return prefixedKey
 }

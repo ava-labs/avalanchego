@@ -41,8 +41,8 @@ func newValueNodeDB(db database.Database, bufferPool *sync.Pool, metrics merkleM
 }
 
 func (db *valueNodeDB) newIteratorWithStartAndPrefix(start, prefix []byte) database.Iterator {
-	prefixedStart := db.prefixedKey(start)
-	prefixedPrefix := db.prefixedKey(prefix)
+	prefixedStart := addPrefixToKey(db.bufferPool, valueNodePrefix, start)
+	prefixedPrefix := addPrefixToKey(db.bufferPool, valueNodePrefix, prefix)
 	i := &iterator{
 		db:       db,
 		nodeIter: db.baseDB.NewIteratorWithStartAndPrefix(prefixedStart, prefixedPrefix),
@@ -63,23 +63,6 @@ func (db *valueNodeDB) NewBatch() *valueNodeBatch {
 	}
 }
 
-func (db *valueNodeDB) prefixedKey(key []byte) []byte {
-	prefixedKey := db.bufferPool.Get().([]byte)
-	keyLen := valueNodePrefixLen + len(key)
-	if cap(prefixedKey) >= keyLen {
-		// The [] byte we got from the pool is big enough to hold the prefixed key
-		prefixedKey = prefixedKey[:keyLen]
-	} else {
-		// The []byte from the pool wasn't big enough.
-		// Put it back and allocate a new, bigger one
-		db.bufferPool.Put(prefixedKey)
-		prefixedKey = make([]byte, keyLen)
-	}
-	copy(prefixedKey, valueNodePrefix)
-	copy(prefixedKey[valueNodePrefixLen:], key)
-	return prefixedKey
-}
-
 func (db *valueNodeDB) Get(key path) (*node, error) {
 	if cachedValue, isCached := db.nodeCache.Get(key); isCached {
 		db.metrics.ValueNodeCacheHit()
@@ -90,7 +73,7 @@ func (db *valueNodeDB) Get(key path) (*node, error) {
 	}
 	db.metrics.IntermediateNodeCacheMiss()
 
-	prefixedKey := db.prefixedKey(key.Serialize().Value)
+	prefixedKey := addPrefixToKey(db.bufferPool, valueNodePrefix, key.Serialize().Value)
 	db.metrics.IOKeyRead()
 	nodeBytes, err := db.baseDB.Get(prefixedKey)
 	if err != nil {
@@ -122,7 +105,7 @@ func (b *valueNodeBatch) Write() error {
 		b.db.metrics.IOKeyWrite()
 		// err cant happen since OnEviction is a noop
 		_ = b.db.nodeCache.Put(key, n)
-		prefixedKey := b.db.prefixedKey(key.Serialize().Value)
+		prefixedKey := addPrefixToKey(b.db.bufferPool, valueNodePrefix, key.Serialize().Value)
 		if n == nil {
 			if err := dbBatch.Delete(prefixedKey); err != nil {
 				return err
