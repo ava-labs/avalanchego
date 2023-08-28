@@ -688,8 +688,9 @@ func (t *trieView) compressNodePath(parent, node *node) error {
 			childEntry child
 			childPath  path
 		)
-		// there is only one child, but we don't know the index
-		// "cycle" over the key/values to find the only child
+		// There is only one child, but we don't know the index.
+		// "Cycle" over the key/values to find the only child.
+		// Note this iteration once because len(node.children) == 1.
 		for index, entry := range node.children {
 			childPath = node.key + path(index) + entry.compressedPath
 			childEntry = entry

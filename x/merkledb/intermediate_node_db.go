@@ -11,17 +11,22 @@ import (
 
 const defaultBufferLength = 256
 
+// Holds intermediate nodes. That is, those without values.
+// Changes to this database aren't written to [baseDB] until
+// they're evicted from the [nodeCache] or Flush is called..
 type intermediateNodeDB struct {
 	// Holds unused []byte
 	bufferPool *sync.Pool
 
-	// The underlying storage
+	// The underlying storage.
+	// Keys written to [baseDB] are prefixed with [intermediateNodePrefix].
 	baseDB database.Database
 
 	// If a value is nil, the corresponding key isn't in the trie.
 	// Note that a call to Put may cause a node to be evicted
 	// from the cache, which will call [OnEviction].
 	// A non-nil error returned from Put is considered fatal.
+	// Keys in [nodeCache] aren't prefixed with [intermediateNodePrefix].
 	nodeCache         onEvictCache[path, *node]
 	evictionBatchSize int
 	metrics           merkleMetrics
