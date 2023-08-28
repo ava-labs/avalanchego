@@ -6,6 +6,7 @@ package queue
 import (
 	"bytes"
 	"context"
+	"math"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -451,7 +452,7 @@ func TestInitializeNumJobs(t *testing.T) {
 	require.Equal(uint64(2), jobs.state.numJobs)
 
 	require.NoError(jobs.Commit())
-	require.NoError(database.Clear(jobs.state.metadataDB, jobs.state.metadataDB))
+	require.NoError(database.Clear(jobs.state.metadataDB, math.MaxInt))
 	require.NoError(jobs.Commit())
 
 	jobs, err = NewWithMissing(db, "", prometheus.NewRegistry())
