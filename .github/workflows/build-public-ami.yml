@@ -6,7 +6,7 @@ on:
 #      tag:
 #        description: 'Tag to create AMI from'
 #        required: true
-#  push:
+  push:
     tags:
       - "cwyse-testing"
 
