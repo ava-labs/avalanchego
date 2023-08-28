@@ -10,8 +10,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/ava-labs/avalanchego/utils"
-
 	"go.opentelemetry.io/otel/attribute"
 
 	oteltrace "go.opentelemetry.io/otel/trace"
@@ -21,6 +19,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 )
 
@@ -124,7 +123,7 @@ func (t *trieView) NewView(
 		return nil, err
 	}
 
-	newView, err := newTrieView(t.db, t, t.root.clone(), changes)
+	newView, err := newTrieView(t.db, t, changes)
 	if err != nil {
 		return nil, err
 	}
@@ -144,11 +143,14 @@ func (t *trieView) NewView(
 func newTrieView(
 	db *merkleDB,
 	parentTrie TrieView,
-	root *node,
 	changes ViewChanges,
 ) (*trieView, error) {
-	if root == nil {
-		return nil, ErrNoValidRoot
+	root, err := parentTrie.getEditableNode(RootPath, false /* hasValue */)
+	if err != nil {
+		if err == database.ErrNotFound {
+			return nil, ErrNoValidRoot
+		}
+		return nil, err
 	}
 
 	newView := &trieView{

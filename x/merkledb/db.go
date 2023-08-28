@@ -11,16 +11,14 @@ import (
 	"runtime"
 	"sync"
 
-	"github.com/ava-labs/avalanchego/utils/units"
-
-	"go.opentelemetry.io/otel/attribute"
-
-	oteltrace "go.opentelemetry.io/otel/trace"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 
-	"github.com/prometheus/client_golang/prometheus"
+	"go.opentelemetry.io/otel/attribute"
+
+	oteltrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -29,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/units"
 )
 
 const (
@@ -276,7 +275,7 @@ func (db *merkleDB) rebuild(ctx context.Context) error {
 	defer valueIt.Release()
 	for valueIt.Next() {
 		if len(currentOps) >= opsSizeLimit {
-			view, err := db.newUntrackedView(currentOps, true)
+			view, err := newTrieView(db, db, ViewChanges{BatchOps: currentOps, ConsumeBytes: true})
 			if err != nil {
 				return err
 			}
@@ -299,7 +298,7 @@ func (db *merkleDB) rebuild(ctx context.Context) error {
 	if err := valueIt.Error(); err != nil {
 		return err
 	}
-	view, err := db.newUntrackedView(currentOps, true)
+	view, err := newTrieView(db, db, ViewChanges{BatchOps: currentOps, ConsumeBytes: true})
 	if err != nil {
 		return err
 	}
@@ -325,7 +324,7 @@ func (db *merkleDB) CommitChangeProof(ctx context.Context, proof *ChangeProof) e
 		}
 	}
 
-	view, err := db.newUntrackedView(ops, false)
+	view, err := newTrieView(db, db, ViewChanges{BatchOps: ops})
 	if err != nil {
 		return err
 	}
@@ -366,7 +365,7 @@ func (db *merkleDB) CommitRangeProof(ctx context.Context, start maybe.Maybe[[]by
 	}
 
 	// Don't need to lock [view] because nobody else has a reference to it.
-	view, err := db.newUntrackedView(ops, false)
+	view, err := newTrieView(db, db, ViewChanges{BatchOps: ops})
 	if err != nil {
 		return err
 	}
@@ -513,7 +512,7 @@ func (db *merkleDB) getProof(ctx context.Context, key []byte) (*Proof, error) {
 		return nil, database.ErrClosed
 	}
 
-	view, err := db.newUntrackedView(nil, true)
+	view, err := newTrieView(db, db, ViewChanges{})
 	if err != nil {
 		return nil, err
 	}
@@ -684,7 +683,7 @@ func (db *merkleDB) NewView(
 		return nil, database.ErrClosed
 	}
 
-	newView, err := newTrieView(db, db, db.root.clone(), changes)
+	newView, err := newTrieView(db, db, changes)
 	if err != nil {
 		return nil, err
 	}
@@ -695,21 +694,6 @@ func (db *merkleDB) NewView(
 
 	db.childViews = append(db.childViews, newView)
 	return newView, nil
-}
-
-// Returns a new view that isn't tracked in [db.childViews].
-// For internal use only, namely in methods that create short-lived views.
-// Assumes [db.lock] isn't held and [db.commitLock] is read locked.
-func (db *merkleDB) newUntrackedView(batchOps []database.BatchOp, consumeBytes bool) (*trieView, error) {
-	return newTrieView(
-		db,
-		db,
-		db.root.clone(),
-		ViewChanges{
-			BatchOps:     batchOps,
-			ConsumeBytes: consumeBytes,
-		},
-	)
 }
 
 func (db *merkleDB) Has(k []byte) (bool, error) {
@@ -772,13 +756,7 @@ func (db *merkleDB) PutContext(ctx context.Context, k, v []byte) error {
 		return database.ErrClosed
 	}
 
-	view, err := db.newUntrackedView(
-		[]database.BatchOp{{
-			Key:   k,
-			Value: v,
-		}},
-		false,
-	)
+	view, err := newTrieView(db, db, ViewChanges{BatchOps: []database.BatchOp{{Key: k, Value: v}}})
 	if err != nil {
 		return err
 	}
@@ -797,13 +775,14 @@ func (db *merkleDB) DeleteContext(ctx context.Context, key []byte) error {
 		return database.ErrClosed
 	}
 
-	view, err := db.newUntrackedView(
-		[]database.BatchOp{{
-			Key:    key,
-			Delete: true,
-		}},
-		true,
-	)
+	view, err := newTrieView(db, db,
+		ViewChanges{
+			BatchOps: []database.BatchOp{{
+				Key:    key,
+				Delete: true,
+			}},
+			ConsumeBytes: true,
+		})
 	if err != nil {
 		return err
 	}
@@ -820,7 +799,7 @@ func (db *merkleDB) commitBatch(ops []database.BatchOp) error {
 		return database.ErrClosed
 	}
 
-	view, err := db.newUntrackedView(ops, true)
+	view, err := newTrieView(db, db, ViewChanges{BatchOps: ops, ConsumeBytes: true})
 	if err != nil {
 		return err
 	}
@@ -1050,7 +1029,7 @@ func (db *merkleDB) VerifyChangeProof(
 	}
 
 	// Don't need to lock [view] because nobody else has a reference to it.
-	view, err := db.newUntrackedView(ops, true)
+	view, err := newTrieView(db, db, ViewChanges{BatchOps: ops, ConsumeBytes: true})
 	if err != nil {
 		return err
 	}
@@ -1158,7 +1137,7 @@ func (db *merkleDB) getHistoricalViewForRange(
 	// looking for the trie's current root id, so return the trie unmodified
 	if currentRootID == rootID {
 		// create an empty trie
-		return newTrieView(db, db, db.root.clone(), ViewChanges{})
+		return newTrieView(db, db, ViewChanges{})
 	}
 
 	changeHistory, err := db.history.getChangesToGetToRoot(rootID, start, end)
