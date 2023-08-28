@@ -24,6 +24,8 @@ var (
 )
 
 type HeightIndexGetter interface {
+	// GetMinimumHeight return the smallest height of an indexed blockID. If
+	// there are no indexed blockIDs, ErrNotFound will be returned.
 	GetMinimumHeight() (uint64, error)
 	GetBlockIDAtHeight(height uint64) (ids.ID, error)
 
