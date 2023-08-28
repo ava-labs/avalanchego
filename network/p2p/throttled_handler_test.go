@@ -38,7 +38,7 @@ func TestThrottledHandlerAppGossip(t *testing.T) {
 				Throttler: tt.Throttler,
 			}
 			err := handler.AppGossip(context.Background(), ids.GenerateTestNodeID(), []byte("foobar"))
-			require.Error(err, tt.expectedErr)
+			require.ErrorIs(err, tt.expectedErr)
 		})
 	}
 }
@@ -54,9 +54,9 @@ func TestThrottledHandlerAppRequest(t *testing.T) {
 			Throttler: NewSlidingWindowThrottler(time.Second, 1),
 		},
 		{
-			name:      "throttler errors",
-			Throttler: NewSlidingWindowThrottler(time.Second, 0),
-			wantErr:   true,
+			name:        "throttler errors",
+			Throttler:   NewSlidingWindowThrottler(time.Second, 0),
+			expectedErr: ErrThrottled,
 		},
 	}
 	for _, tt := range tests {
@@ -68,7 +68,7 @@ func TestThrottledHandlerAppRequest(t *testing.T) {
 				Throttler: tt.Throttler,
 			}
 			_, err := handler.AppRequest(context.Background(), ids.GenerateTestNodeID(), time.Time{}, []byte("foobar"))
-			require.Error(err, tt.expectedErr)
+			require.ErrorIs(err, tt.expectedErr)
 		})
 	}
 }
