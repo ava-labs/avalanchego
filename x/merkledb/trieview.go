@@ -140,6 +140,7 @@ func (t *trieView) NewView(
 }
 
 // Creates a new view with the given [parentTrie].
+// Assumes [parentTrie] isn't locked.
 func newTrieView(
 	db *merkleDB,
 	parentTrie TrieView,

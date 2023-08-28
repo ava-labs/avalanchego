@@ -392,7 +392,7 @@ func (db *merkleDB) Close() error {
 
 	db.closed = true
 	db.valueNodeDB.Close()
-	// Flush [nodeCache] to persist intermediary nodes to disk.
+	// Flush intermediary nodes to disk.
 	if err := db.intermediateNodeDB.Flush(); err != nil {
 		// There was an error during cache eviction.
 		// Don't commit to disk.
@@ -789,7 +789,7 @@ func (db *merkleDB) DeleteContext(ctx context.Context, key []byte) error {
 }
 
 // Assumes values inside of [ops] are safe to reference after the function
-// returns.
+// returns. Assumes [db.lock] isn't held.
 func (db *merkleDB) commitBatch(ops []database.BatchOp) error {
 	db.commitLock.Lock()
 	defer db.commitLock.Unlock()
@@ -1126,6 +1126,7 @@ func (db *merkleDB) initializeRootIfNeeded() (ids.ID, error) {
 // If [start] is Nothing, there's no lower bound on the range.
 // If [end] is Nothing, there's no upper bound on the range.
 // Assumes [db.commitLock] is read locked.
+// Assumes [db.lock] isn't held.
 func (db *merkleDB) getHistoricalViewForRange(
 	rootID ids.ID,
 	start maybe.Maybe[[]byte],
