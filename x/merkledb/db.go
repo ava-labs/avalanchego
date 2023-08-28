@@ -1200,6 +1200,9 @@ func (db *merkleDB) getNode(key path, hasValue bool) (*node, error) {
 	return db.intermediateNodeDB.Get(key)
 }
 
+// Returns [key] prefixed by [prefix].
+// The returned []byte is taken from [bufferPool] and
+// should be returned to it when the caller is done with it.
 func addPrefixToKey(bufferPool *sync.Pool, prefix []byte, key []byte) []byte {
 	prefixedKey := bufferPool.Get().([]byte)
 	prefixLen := len(prefix)
