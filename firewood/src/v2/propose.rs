@@ -125,12 +125,12 @@ impl<T: api::DbView + Send + Sync> api::DbView for Proposal<T> {
         todo!()
     }
 
-    async fn range_proof<KT: KeyType, VT: ValueType>(
+    async fn range_proof<KT: KeyType, VT, NT>(
         &self,
         _first_key: Option<KT>,
         _last_key: Option<KT>,
         _limit: usize,
-    ) -> Result<Option<api::RangeProof<KT, VT>>, api::Error> {
+    ) -> Result<Option<api::RangeProof<KT, VT, NT>>, api::Error> {
         todo!()
     }
 }
