@@ -188,10 +188,14 @@ func AtomicClearPrefix(readerDB Iteratee, deleterDB KeyValueDeleter, prefix []by
 	return iterator.Error()
 }
 
+// Remove all key-value pairs from [db].
+// Writes each batch when it reaches [writeSize].
 func Clear(db Database, writeSize int) error {
 	return ClearPrefix(db, nil, writeSize)
 }
 
+// Removes all keys with the given [prefix] from [db].
+// Writes each batch when it reaches [writeSize].
 func ClearPrefix(db Database, prefix []byte, writeSize int) error {
 	b := db.NewBatch()
 	it := db.NewIteratorWithPrefix(prefix)
