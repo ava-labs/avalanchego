@@ -15,18 +15,18 @@ import (
 
 func TestThrottledHandlerAppGossip(t *testing.T) {
 	tests := []struct {
-		name      string
-		Throttler Throttler
-		wantErr   bool
+		name        string
+		Throttler   Throttler
+		expectedErr error
 	}{
 		{
 			name:      "throttled",
 			Throttler: NewSlidingWindowThrottler(time.Second, 1),
 		},
 		{
-			name:      "throttler errors",
-			Throttler: NewSlidingWindowThrottler(time.Second, 0),
-			wantErr:   true,
+			name:        "throttler errors",
+			Throttler:   NewSlidingWindowThrottler(time.Second, 0),
+			expectedErr: ErrThrottled,
 		},
 	}
 	for _, tt := range tests {
@@ -38,20 +38,16 @@ func TestThrottledHandlerAppGossip(t *testing.T) {
 				Throttler: tt.Throttler,
 			}
 			err := handler.AppGossip(context.Background(), ids.GenerateTestNodeID(), []byte("foobar"))
-			if tt.wantErr {
-				require.NotNil(err)
-			} else {
-				require.Nil(err)
-			}
+			require.Error(err, tt.expectedErr)
 		})
 	}
 }
 
 func TestThrottledHandlerAppRequest(t *testing.T) {
 	tests := []struct {
-		name      string
-		Throttler Throttler
-		wantErr   bool
+		name        string
+		Throttler   Throttler
+		expectedErr error
 	}{
 		{
 			name:      "throttled",
@@ -72,11 +68,7 @@ func TestThrottledHandlerAppRequest(t *testing.T) {
 				Throttler: tt.Throttler,
 			}
 			_, err := handler.AppRequest(context.Background(), ids.GenerateTestNodeID(), time.Time{}, []byte("foobar"))
-			if tt.wantErr {
-				require.NotNil(err)
-			} else {
-				require.Nil(err)
-			}
+			require.Error(err, tt.expectedErr)
 		})
 	}
 }
