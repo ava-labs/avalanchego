@@ -26,9 +26,7 @@ func (t testValidatorSet) Has(_ context.Context, nodeID ids.NodeID) bool {
 
 func TestValidatorHandlerAppGossip(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
-
-	validatorSet := set.SampleableSet[ids.NodeID]{}
-	validatorSet.Add(nodeID)
+	validatorSet := set.Of(nodeID)
 
 	tests := []struct {
 		name         string
@@ -68,9 +66,7 @@ func TestValidatorHandlerAppGossip(t *testing.T) {
 
 func TestValidatorHandlerAppRequest(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
-
-	validatorSet := set.SampleableSet[ids.NodeID]{}
-	validatorSet.Add(nodeID)
+	validatorSet := set.Of(nodeID)
 
 	tests := []struct {
 		name         string
