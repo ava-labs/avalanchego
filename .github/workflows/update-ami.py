@@ -51,7 +51,7 @@ def update_ami(amifile, amiid):
   global tag
   global product_id
   global role_arn
-
+  print(parse_amichange(amifile,amiid,role_arn,tag))
   try:
     response = client.start_change_set(
       Catalog='AWSMarketplace',
