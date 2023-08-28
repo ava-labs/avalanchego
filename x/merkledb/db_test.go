@@ -458,11 +458,14 @@ func TestDatabaseNewUntrackedView(t *testing.T) {
 	require.NoError(err)
 
 	// Create a new untracked view.
-	view, err := db.newUntrackedView(
-		[]database.BatchOp{
-			{Key: []byte{1}, Value: []byte{1}},
+	view, err := newTrieView(
+		db,
+		db,
+		ViewChanges{
+			BatchOps: []database.BatchOp{
+				{Key: []byte{1}, Value: []byte{1}},
+			},
 		},
-		false,
 	)
 	require.NoError(err)
 	require.Empty(db.childViews)
