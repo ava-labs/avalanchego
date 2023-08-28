@@ -37,6 +37,13 @@ func ToID(bytes []byte) (ID, error) {
 	return hashing.ToHash256(bytes)
 }
 
+func (id ID) String() string {
+	// We assume that the maximum size of a byte slice that
+	// can be stringified is at least the length of an ID
+	s, _ := cb58.Encode(id[:])
+	return s
+}
+
 // FromString is the inverse of ID.String()
 func FromString(idStr string) (ID, error) {
 	bytes, err := cb58.Decode(idStr)
@@ -76,8 +83,16 @@ func (id *ID) UnmarshalJSON(b []byte) error {
 	return err
 }
 
+func (id ID) MarshalText() ([]byte, error) {
+	return []byte(id.String()), nil
+}
+
 func (id *ID) UnmarshalText(text []byte) error {
 	return id.UnmarshalJSON(text)
+}
+
+func (id ID) Less(other ID) bool {
+	return bytes.Compare(id[:], other[:]) < 0
 }
 
 // Prefix this id to create a more selective id. This can be used to store
@@ -132,19 +147,4 @@ func (id ID) Bit(i uint) int {
 // Hex returns a hex encoded string of this id.
 func (id ID) Hex() string {
 	return hex.EncodeToString(id[:])
-}
-
-func (id ID) String() string {
-	// We assume that the maximum size of a byte slice that
-	// can be stringified is at least the length of an ID
-	s, _ := cb58.Encode(id[:])
-	return s
-}
-
-func (id ID) MarshalText() ([]byte, error) {
-	return []byte(id.String()), nil
-}
-
-func (id ID) Less(other ID) bool {
-	return bytes.Compare(id[:], other[:]) < 0
 }

@@ -31,6 +31,13 @@ func ToShortID(bytes []byte) (ShortID, error) {
 	return hashing.ToHash160(bytes)
 }
 
+func (id ShortID) String() string {
+	// We assume that the maximum size of a byte slice that
+	// can be stringified is at least the length of an ID
+	str, _ := cb58.Encode(id.Bytes())
+	return str
+}
+
 // ShortFromString is the inverse of ShortID.String()
 func ShortFromString(idStr string) (ShortID, error) {
 	bytes, err := cb58.Decode(idStr)
@@ -38,15 +45,6 @@ func ShortFromString(idStr string) (ShortID, error) {
 		return ShortID{}, err
 	}
 	return ToShortID(bytes)
-}
-
-// ShortFromPrefixedString returns a ShortID assuming the cb58 format is
-// prefixed
-func ShortFromPrefixedString(idStr, prefix string) (ShortID, error) {
-	if !strings.HasPrefix(idStr, prefix) {
-		return ShortID{}, fmt.Errorf("ID: %s is missing the prefix: %s", idStr, prefix)
-	}
-	return ShortFromString(strings.TrimPrefix(idStr, prefix))
 }
 
 func (id ShortID) MarshalJSON() ([]byte, error) {
@@ -79,8 +77,25 @@ func (id *ShortID) UnmarshalJSON(b []byte) error {
 	return err
 }
 
+func (id ShortID) MarshalText() ([]byte, error) {
+	return []byte(id.String()), nil
+}
+
 func (id *ShortID) UnmarshalText(text []byte) error {
 	return id.UnmarshalJSON(text)
+}
+
+func (id ShortID) Less(other ShortID) bool {
+	return bytes.Compare(id[:], other[:]) == -1
+}
+
+// ShortFromPrefixedString returns a ShortID assuming the cb58 format is
+// prefixed
+func ShortFromPrefixedString(idStr, prefix string) (ShortID, error) {
+	if !strings.HasPrefix(idStr, prefix) {
+		return ShortID{}, fmt.Errorf("ID: %s is missing the prefix: %s", idStr, prefix)
+	}
+	return ShortFromString(strings.TrimPrefix(idStr, prefix))
 }
 
 // Bytes returns the 20 byte hash as a slice. It is assumed this slice is not
@@ -94,24 +109,9 @@ func (id ShortID) Hex() string {
 	return hex.EncodeToString(id.Bytes())
 }
 
-func (id ShortID) String() string {
-	// We assume that the maximum size of a byte slice that
-	// can be stringified is at least the length of an ID
-	str, _ := cb58.Encode(id.Bytes())
-	return str
-}
-
 // PrefixedString returns the String representation with a prefix added
 func (id ShortID) PrefixedString(prefix string) string {
 	return prefix + id.String()
-}
-
-func (id ShortID) MarshalText() ([]byte, error) {
-	return []byte(id.String()), nil
-}
-
-func (id ShortID) Less(other ShortID) bool {
-	return bytes.Compare(id[:], other[:]) == -1
 }
 
 // ShortIDsToStrings converts an array of shortIDs to an array of their string
