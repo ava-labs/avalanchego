@@ -952,20 +952,21 @@ func (t *trieView) recordKeyChange(key path, after *node, hadValue bool, newNode
 		existing.after = after
 		return nil
 	}
-	t.changes.nodes[key] = &change[*node]{
-		after: after,
-	}
 
 	if newNode {
+		t.changes.nodes[key] = &change[*node]{
+			after: after,
+		}
 		return nil
 	}
 
-	var err error
-	t.changes.nodes[key].before, err = t.getParentTrie().getEditableNode(key, hadValue)
-	if err != nil {
-		if err != database.ErrNotFound {
-			return err
-		}
+	before, err := t.getParentTrie().getEditableNode(key, hadValue)
+	if err != nil && err != database.ErrNotFound {
+		return err
+	}
+	t.changes.nodes[key] = &change[*node]{
+		before: before,
+		after:  after,
 	}
 	return nil
 }
