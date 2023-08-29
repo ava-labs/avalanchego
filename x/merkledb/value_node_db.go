@@ -12,8 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 )
 
-const valueNodePrefixLen = 1
-
 var _ database.Iterator = (*iterator)(nil)
 
 type valueNodeDB struct {

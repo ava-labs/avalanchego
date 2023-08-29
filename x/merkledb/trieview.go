@@ -858,8 +858,8 @@ func (t *trieView) insert(
 	remainingKey := key[closestNodeKeyLength+1:]
 
 	existingChildEntry, hasChild := closestNode.children[key[closestNodeKeyLength]]
-	// there are no existing nodes along the path [fullPath], so create a new node to insert [value]
 	if !hasChild {
+		// there are no existing nodes along the path [fullPath], so create a new node to insert [value]
 		newNode := newNode(
 			closestNode,
 			key,
