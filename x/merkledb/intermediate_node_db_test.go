@@ -7,10 +7,11 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/utils/maybe"
-	"github.com/stretchr/testify/require"
 )
 
 // Tests:
@@ -109,7 +110,7 @@ func TestIntermediateNodeDB(t *testing.T) {
 	require.NoError(db.Flush())
 
 	// Assert the cache is empty
-	require.Equal(0, db.nodeCache.fifo.Len())
+	require.Zero(db.nodeCache.fifo.Len())
 
 	// Assert all [cacheSize]+1 elements evicted were written to disk with prefix.
 	it := baseDB.NewIteratorWithPrefix(intermediateNodePrefix)
