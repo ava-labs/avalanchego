@@ -301,6 +301,7 @@ func (h *handler) RegisterTimeout(d time.Duration) {
 }
 
 // Note: It is possible for Stop to be called before/concurrently with Start.
+// Also Stop should never block.
 func (h *handler) Stop(ctx context.Context) {
 	h.closeOnce.Do(func() {
 		h.startClosingTime = h.clock.Time()
@@ -309,7 +310,6 @@ func (h *handler) Stop(ctx context.Context) {
 		// we check the value of [h.closing] after the call to [Signal].
 		h.syncMessageQueue.Shutdown()
 		h.asyncMessageQueue.Shutdown()
-		h.asyncMessagePool.Shutdown()
 		close(h.closingChan)
 
 		// TODO: switch this to use a [context.Context] with a cancel function.
