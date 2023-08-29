@@ -55,7 +55,7 @@ type Config struct {
 	// database and the innerVM's database.
 	//
 	// Invariant: This value must be set such that the proposervm never needs to
-	// roll back more blocks than have been deleted. On startup, the proposervm
+	// rollback more blocks than have been deleted. On startup, the proposervm
 	// rolls back its accepted chain to match the innerVM's accepted chain. If
 	// the innerVM is not persisting its last accepted block quickly enough, the
 	// database can become corrupted.

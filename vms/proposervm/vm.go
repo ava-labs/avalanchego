@@ -601,6 +601,11 @@ func (vm *VM) repairAcceptedChainByHeight(ctx context.Context) error {
 		return nil
 	}
 
+	vm.ctx.Log.Info("repairing accepted chain by height",
+		zap.Uint64("outerHeight", proLastAcceptedHeight),
+		zap.Uint64("innerHeight", innerLastAcceptedHeight),
+	)
+
 	// The inner vm must be behind the proposer vm, so we must roll the
 	// proposervm back.
 	forkHeight, err := vm.State.GetForkHeight()

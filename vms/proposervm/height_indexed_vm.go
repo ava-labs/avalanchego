@@ -14,6 +14,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
+const pruneCommitPeriod = 1024
+
 // shouldHeightIndexBeRepaired checks if index needs repairing and stores a
 // checkpoint if repairing is needed.
 //
@@ -188,7 +190,7 @@ func (vm *VM) pruneOldBlocks() error {
 		return nil
 	}
 
-	// TODO: Refactor to use DB iterators and commit periodically.
+	// TODO: Refactor to use DB iterators.
 	//
 	// Note: vm.lastAcceptedHeight is guaranteed to be >= height, so the
 	// subtraction can never underflow.
@@ -213,6 +215,13 @@ func (vm *VM) pruneOldBlocks() error {
 		// Note: height is < vm.lastAcceptedHeight, so it is guaranteed not to
 		// overflow.
 		height++
+		if height%pruneCommitPeriod != 0 {
+			continue
+		}
+
+		if err := vm.db.Commit(); err != nil {
+			return err
+		}
 	}
 	return vm.db.Commit()
 }
