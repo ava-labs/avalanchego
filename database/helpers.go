@@ -170,11 +170,11 @@ func IsEmpty(db Iteratee) (bool, error) {
 	return !iterator.Next(), iterator.Error()
 }
 
-func Clear(readerDB Iteratee, deleterDB KeyValueDeleter) error {
-	return ClearPrefix(readerDB, deleterDB, nil)
+func AtomicClear(readerDB Iteratee, deleterDB KeyValueDeleter) error {
+	return AtomicClearPrefix(readerDB, deleterDB, nil)
 }
 
-func ClearPrefix(readerDB Iteratee, deleterDB KeyValueDeleter, prefix []byte) error {
+func AtomicClearPrefix(readerDB Iteratee, deleterDB KeyValueDeleter, prefix []byte) error {
 	iterator := readerDB.NewIteratorWithPrefix(prefix)
 	defer iterator.Release()
 
@@ -185,4 +185,48 @@ func ClearPrefix(readerDB Iteratee, deleterDB KeyValueDeleter, prefix []byte) er
 		}
 	}
 	return iterator.Error()
+}
+
+func Clear(db Database, writeSize int) error {
+	return ClearPrefix(db, nil, writeSize)
+}
+
+func ClearPrefix(db Database, prefix []byte, writeSize int) error {
+	b := db.NewBatch()
+	it := db.NewIteratorWithPrefix(prefix)
+	// Defer the release of the iterator inside a closure to guarantee that the
+	// latest, not the first, iterator is released on return.
+	defer func() {
+		it.Release()
+	}()
+
+	for it.Next() {
+		key := it.Key()
+		if err := b.Delete(key); err != nil {
+			return err
+		}
+
+		// Avoid too much memory pressure by periodically writing to the
+		// database.
+		if b.Size() < writeSize {
+			continue
+		}
+
+		if err := b.Write(); err != nil {
+			return err
+		}
+		b.Reset()
+
+		// Reset the iterator to release references to now deleted keys.
+		if err := it.Error(); err != nil {
+			return err
+		}
+		it.Release()
+		it = db.NewIteratorWithPrefix(prefix)
+	}
+
+	if err := b.Write(); err != nil {
+		return err
+	}
+	return it.Error()
 }
