@@ -11,8 +11,6 @@ import (
 	"runtime"
 	"sync"
 
-	"github.com/ava-labs/avalanchego/utils/units"
-
 	"github.com/prometheus/client_golang/prometheus"
 
 	"golang.org/x/exp/maps"
@@ -29,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/units"
 )
 
 const (
