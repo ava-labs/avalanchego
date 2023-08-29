@@ -42,6 +42,7 @@ func writeBasicBatch(t *testing.T, db *merkleDB) {
 	require.NoError(batch.Put([]byte{4}, []byte{4}))
 	require.NoError(batch.Write())
 }
+
 func newRandomProofNode(r *rand.Rand) ProofNode {
 	key := make([]byte, r.Intn(32)) // #nosec G404
 	_, _ = r.Read(key)              // #nosec G404
