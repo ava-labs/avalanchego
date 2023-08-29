@@ -50,19 +50,21 @@ pub fn vec_into_batch<K: KeyType, V: ValueType>(value: Vec<(K, V)>) -> Batch<K, 
 }
 
 /// Errors returned through the API
-#[derive(Debug)]
+#[derive(thiserror::Error, Debug)]
 #[non_exhaustive]
 pub enum Error {
     /// A given hash key is not available in the database
-    HashNotFound {
-        provided: HashKey,
-    },
+    #[error("Hash not found for key: {provided:?}")]
+    HashNotFound { provided: HashKey },
+
     /// Incorrect root hash for commit
-    IncorrectRootHash {
-        provided: HashKey,
-        current: HashKey,
-    },
+    #[error("Incorrect root hash for commit: {provided:?} != {current:?}")]
+    IncorrectRootHash { provided: HashKey, current: HashKey },
+
+    #[error("IO error: {0}")]
     IO(std::io::Error),
+
+    #[error("Invalid proposal")]
     InvalidProposal,
 }
 
