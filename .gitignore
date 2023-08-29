@@ -45,6 +45,7 @@ awscpu
 bin/
 build/
 
+cmd/evm/evm
 cmd/simulator/.simulator/*
 cmd/simulator/simulator
 
