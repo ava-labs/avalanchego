@@ -398,8 +398,6 @@ func (db *merkleDB) Close() error {
 	db.valueNodeDB.Close()
 	// Flush intermediary nodes to disk.
 	if err := db.intermediateNodeDB.Flush(); err != nil {
-		// There was an error during cache eviction.
-		// Don't commit to disk.
 		return err
 	}
 
