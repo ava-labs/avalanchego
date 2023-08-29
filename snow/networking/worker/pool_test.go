@@ -20,6 +20,8 @@ func TestPoolHandlesRequests(t *testing.T) {
 		p = NewPool(poolWorkers)
 	)
 
+	p.Start()
+
 	wg := sync.WaitGroup{}
 	for i := range jobsDone {
 		wg.Add(1)
@@ -42,6 +44,12 @@ func TestPoolHandlesRequests(t *testing.T) {
 func TestWorkerPoolMultipleOutOfOrderSendsAndStopsAreAllowed(t *testing.T) {
 	require := require.New(t)
 	p := NewPool(1)
+
+	require.NotPanics(func() {
+		p.Shutdown()
+	})
+
+	p.Start()
 
 	// Shutdown is idempotent
 	require.NotPanics(func() {

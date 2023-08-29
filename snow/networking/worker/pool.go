@@ -10,6 +10,12 @@ var _ Pool = (*pool)(nil)
 type Request func()
 
 type Pool interface {
+	// Starts the worker pool.
+	//
+	// Start should be called before Send, otherwise Send would hang.
+	// Start must be called once.
+	Start()
+
 	// Send the request to the worker pool.
 	//
 	// Send is a no-op if [Shutdown] has been called.
@@ -25,7 +31,8 @@ type Pool interface {
 }
 
 type pool struct {
-	requests chan Request
+	workersCount int
+	requests     chan Request
 
 	shutdownOnce sync.Once
 	shutdownWG   sync.WaitGroup
@@ -34,15 +41,18 @@ type pool struct {
 
 func NewPool(workersCount int) Pool {
 	p := &pool{
-		requests: make(chan Request),
-		quit:     make(chan struct{}),
+		workersCount: workersCount,
+		requests:     make(chan Request),
+		quit:         make(chan struct{}),
 	}
+	return p
+}
 
-	for w := 0; w < workersCount; w++ {
+func (p *pool) Start() {
+	for w := 0; w < p.workersCount; w++ {
 		p.shutdownWG.Add(1)
 		go p.runWorker()
 	}
-	return p
 }
 
 func (p *pool) runWorker() {
