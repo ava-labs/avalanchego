@@ -14,15 +14,15 @@ import (
 
 var (
 	ErrThrottled         = errors.New("throttled")
-	_            Handler = (*ThrottledHandler)(nil)
+	_            Handler = (*ThrottlerHandler)(nil)
 )
 
-type ThrottledHandler struct {
+type ThrottlerHandler struct {
 	Handler
 	Throttler Throttler
 }
 
-func (t ThrottledHandler) AppGossip(ctx context.Context, nodeID ids.NodeID, gossipBytes []byte) error {
+func (t ThrottlerHandler) AppGossip(ctx context.Context, nodeID ids.NodeID, gossipBytes []byte) error {
 	if !t.Throttler.Handle(nodeID) {
 		return fmt.Errorf("dropping message from %s: %w", nodeID, ErrThrottled)
 	}
@@ -30,7 +30,7 @@ func (t ThrottledHandler) AppGossip(ctx context.Context, nodeID ids.NodeID, goss
 	return t.Handler.AppGossip(ctx, nodeID, gossipBytes)
 }
 
-func (t ThrottledHandler) AppRequest(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, error) {
+func (t ThrottlerHandler) AppRequest(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, error) {
 	if !t.Throttler.Handle(nodeID) {
 		return nil, fmt.Errorf("dropping message from %s: %w", nodeID, ErrThrottled)
 	}

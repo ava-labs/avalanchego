@@ -33,7 +33,7 @@ func TestThrottledHandlerAppGossip(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			handler := ThrottledHandler{
+			handler := ThrottlerHandler{
 				Handler:   NoOpHandler{},
 				Throttler: tt.Throttler,
 			}
@@ -63,7 +63,7 @@ func TestThrottledHandlerAppRequest(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			handler := ThrottledHandler{
+			handler := ThrottlerHandler{
 				Handler:   NoOpHandler{},
 				Throttler: tt.Throttler,
 			}
