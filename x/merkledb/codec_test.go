@@ -15,8 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/maybe"
 )
 
-// TODO add more codec tests
-
 func FuzzCodecBool(f *testing.F) {
 	f.Fuzz(
 		func(
