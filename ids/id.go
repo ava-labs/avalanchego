@@ -48,16 +48,6 @@ func ToID(bytes []byte) (ID, error) {
 	return hashing.ToHash256(bytes)
 }
 
-// UnsafeToID attempt to convert a byte slice into an id
-// It's up to caller to make sure bytes are well formatted.
-// Should be used in tests only.
-func UnsafeToID(bytes []byte) ID {
-	rightLenSlice := make([]byte, IDLen)
-	copy(rightLenSlice, bytes)
-	res, _ := hashing.ToHash256(rightLenSlice)
-	return res
-}
-
 func (id ID) String() string {
 	// We assume that the maximum size of a byte slice that
 	// can be stringified is at least the length of an ID

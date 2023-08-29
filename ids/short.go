@@ -42,16 +42,6 @@ func ToShortID(bytes []byte) (ShortID, error) {
 	return hashing.ToHash160(bytes)
 }
 
-// UnsafeToNodeID attempt to convert a byte slice into a node id
-// It's up to caller to make sure bytes are well formatted.
-// Should be used in tests only.
-func UnsafeToShortID(bytes []byte) ShortID {
-	rightLenSlice := make([]byte, ShortIDLen)
-	copy(rightLenSlice, bytes)
-	res, _ := ToShortID(rightLenSlice)
-	return res
-}
-
 func (id ShortID) String() string {
 	// We assume that the maximum size of a byte slice that
 	// can be stringified is at least the length of an ID

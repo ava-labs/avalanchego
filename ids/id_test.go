@@ -27,14 +27,14 @@ func TestID(t *testing.T) {
 func TestIDBytesAndWritableIsolation(t *testing.T) {
 	require := require.New(t)
 
-	id := UnsafeToID([]byte{24})
+	id := ID{24}
 	idBytes := id.Bytes()
 	idBytes[0] = 25
-	require.Equal(UnsafeToID([]byte{24}), id)
+	require.Equal(ID{24}, id)
 
 	idBytes = Writable(&id)
 	idBytes[0] = 25
-	require.Equal(UnsafeToID([]byte{25}), id)
+	require.Equal(ID{25}, id)
 }
 
 func TestIDXOR(t *testing.T) {
