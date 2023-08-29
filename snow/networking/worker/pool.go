@@ -10,9 +10,15 @@ var _ Pool = (*pool)(nil)
 type Request func()
 
 type Pool interface {
+	// Starts the worker pool.
+	//
+	// Start should be called before Send, otherwise Send would hang.
+	// Start must be called once.
+	Start()
+
 	// Send the request to the worker pool.
 	//
-	// Send can be safely called after [Shutdown] and it'll be no-op.
+	// Send is a no-op if [Shutdown] has been called.
 	Send(Request)
 
 	// Shutdown the worker pool.
@@ -25,30 +31,28 @@ type Pool interface {
 }
 
 type pool struct {
-	requests chan Request
+	workersCount int
+	requests     chan Request
 
-	// [shutdownOnce] ensures Shutdown idempotency
 	shutdownOnce sync.Once
-
-	// [shutdownWG] makes sure all workers have stopped before Shutdown returns
-	shutdownWG sync.WaitGroup
-
-	// closing [quit] tells the workers to stop working
-	quit chan struct{}
+	shutdownWG   sync.WaitGroup
+	quit         chan struct{}
 }
 
 func NewPool(workersCount int) Pool {
 	p := &pool{
-		requests: make(chan Request),
-		quit:     make(chan struct{}),
+		workersCount: workersCount,
+		requests:     make(chan Request),
+		quit:         make(chan struct{}),
 	}
+	return p
+}
 
-	for w := 0; w < workersCount; w++ {
+func (p *pool) Start() {
+	for w := 0; w < p.workersCount; w++ {
 		p.shutdownWG.Add(1)
 		go p.runWorker()
 	}
-
-	return p
 }
 
 func (p *pool) runWorker() {
@@ -57,11 +61,9 @@ func (p *pool) runWorker() {
 	for {
 		select {
 		case <-p.quit:
-			return // stop worker
+			return
 		case request := <-p.requests:
-			if request != nil {
-				request()
-			}
+			request()
 		}
 	}
 }
@@ -76,8 +78,8 @@ func (p *pool) Send(msg Request) {
 func (p *pool) Shutdown() {
 	p.shutdownOnce.Do(func() {
 		close(p.quit)
-		// We don't close requests channel to avoid panics
-		// upon sending request over a closed channel.
+		// Note: we don't close [p.requests] to avoid panics
+		// upon [p.Send] begin called with a closed channel.
 	})
 	p.shutdownWG.Wait()
 }

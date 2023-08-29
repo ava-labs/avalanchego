@@ -221,6 +221,9 @@ func (h *handler) Start(ctx context.Context, recoverPanic bool) {
 	h.ctx.Lock.Lock()
 	defer h.ctx.Lock.Unlock()
 
+	// h.asyncMessagePool must be started before async dispatch
+	h.asyncMessagePool.Start()
+
 	gear, err := h.selectStartingGear(ctx)
 	if err != nil {
 		h.ctx.Log.Error("chain failed to select starting gear",
@@ -301,6 +304,7 @@ func (h *handler) RegisterTimeout(d time.Duration) {
 }
 
 // Note: It is possible for Stop to be called before/concurrently with Start.
+// Also Stop should never block.
 func (h *handler) Stop(ctx context.Context) {
 	h.closeOnce.Do(func() {
 		h.startClosingTime = h.clock.Time()
@@ -309,7 +313,6 @@ func (h *handler) Stop(ctx context.Context) {
 		// we check the value of [h.closing] after the call to [Signal].
 		h.syncMessageQueue.Shutdown()
 		h.asyncMessageQueue.Shutdown()
-		h.asyncMessagePool.Shutdown()
 		close(h.closingChan)
 
 		// TODO: switch this to use a [context.Context] with a cancel function.

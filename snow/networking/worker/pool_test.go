@@ -4,7 +4,6 @@
 package worker
 
 import (
-	"fmt"
 	"sync"
 	"testing"
 
@@ -21,6 +20,8 @@ func TestPoolHandlesRequests(t *testing.T) {
 		p = NewPool(poolWorkers)
 	)
 
+	p.Start()
+
 	wg := sync.WaitGroup{}
 	for i := range jobsDone {
 		wg.Add(1)
@@ -35,7 +36,7 @@ func TestPoolHandlesRequests(t *testing.T) {
 
 	wg.Wait()
 	for i, res := range jobsDone {
-		require.True(t, res, fmt.Sprintf("job %v not done", i))
+		require.True(t, res, "job %d not done", i)
 	}
 	p.Shutdown()
 }
@@ -43,6 +44,12 @@ func TestPoolHandlesRequests(t *testing.T) {
 func TestWorkerPoolMultipleOutOfOrderSendsAndStopsAreAllowed(t *testing.T) {
 	require := require.New(t)
 	p := NewPool(1)
+
+	require.NotPanics(func() {
+		p.Shutdown()
+	})
+
+	p.Start()
 
 	// Shutdown is idempotent
 	require.NotPanics(func() {
