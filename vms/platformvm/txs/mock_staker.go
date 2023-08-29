@@ -13,7 +13,7 @@ import (
 
 	ids "github.com/ava-labs/avalanchego/ids"
 	bls "github.com/ava-labs/avalanchego/utils/crypto/bls"
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockStaker is a mock of Staker interface.

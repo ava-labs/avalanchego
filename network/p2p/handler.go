@@ -5,6 +5,7 @@ package p2p
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"go.uber.org/zap"
@@ -13,6 +14,13 @@ import (
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
+)
+
+var (
+	ErrNotValidator = errors.New("not a validator")
+
+	_ Handler = (*NoOpHandler)(nil)
+	_ Handler = (*ValidatorHandler)(nil)
 )
 
 // Handler is the server-side logic for virtual machine application protocols.
@@ -40,6 +48,42 @@ type Handler interface {
 		deadline time.Time,
 		requestBytes []byte,
 	) ([]byte, error)
+}
+
+type NoOpHandler struct{}
+
+func (NoOpHandler) AppGossip(context.Context, ids.NodeID, []byte) error {
+	return nil
+}
+
+func (NoOpHandler) AppRequest(context.Context, ids.NodeID, time.Time, []byte) ([]byte, error) {
+	return nil, nil
+}
+
+func (NoOpHandler) CrossChainAppRequest(context.Context, ids.ID, time.Time, []byte) ([]byte, error) {
+	return nil, nil
+}
+
+// ValidatorHandler drops messages from non-validators
+type ValidatorHandler struct {
+	Handler
+	ValidatorSet ValidatorSet
+}
+
+func (v ValidatorHandler) AppGossip(ctx context.Context, nodeID ids.NodeID, gossipBytes []byte) error {
+	if !v.ValidatorSet.Has(ctx, nodeID) {
+		return ErrNotValidator
+	}
+
+	return v.Handler.AppGossip(ctx, nodeID, gossipBytes)
+}
+
+func (v ValidatorHandler) AppRequest(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, error) {
+	if !v.ValidatorSet.Has(ctx, nodeID) {
+		return nil, ErrNotValidator
+	}
+
+	return v.Handler.AppRequest(ctx, nodeID, deadline, requestBytes)
 }
 
 // responder automatically sends the response for a given request

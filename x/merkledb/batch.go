@@ -7,15 +7,12 @@ import "github.com/ava-labs/avalanchego/database"
 
 var _ database.Batch = (*batch)(nil)
 
-// batch is a write-only database that commits changes to its host database
-// when Write is called.
 type batch struct {
 	database.BatchOps
 
 	db *merkleDB
 }
 
-// apply all operations in order to the database and write the result to disk
 func (b *batch) Write() error {
 	return b.db.commitBatch(b.Ops)
 }
