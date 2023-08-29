@@ -25,14 +25,16 @@ func NewSlidingWindowThrottler(period time.Duration, limit int) *SlidingWindowTh
 	now := time.Now()
 	return &SlidingWindowThrottler{
 		period: period,
-		limit:  limit,
-		current: window{
-			start: now,
-			hits:  make(map[ids.NodeID]int),
-		},
-		previous: window{
-			start: now.Add(-period),
-			hits:  make(map[ids.NodeID]int),
+		limit:  float64(limit),
+		windows: [2]window{
+			{
+				start: now,
+				hits:  make(map[ids.NodeID]float64),
+			},
+			{
+				start: now.Add(-period),
+				hits:  make(map[ids.NodeID]float64),
+			},
 		},
 	}
 }
@@ -41,19 +43,19 @@ func NewSlidingWindowThrottler(period time.Duration, limit int) *SlidingWindowTh
 // of hits from a node in the evaluation period beginning at [start]
 type window struct {
 	start time.Time
-	hits  map[ids.NodeID]int
+	hits  map[ids.NodeID]float64
 }
 
 // SlidingWindowThrottler is an implementation of the sliding window throttling
 // algorithm.
 type SlidingWindowThrottler struct {
 	period time.Duration
-	limit  int
+	limit  float64
+	clock  mockable.Clock
 
-	lock     sync.Mutex
-	current  window
-	previous window
-	clock    mockable.Clock
+	lock    sync.Mutex
+	current int
+	windows [2]window
 }
 
 // Handle returns true if the amount of calls received in the last [s.period]
@@ -64,31 +66,37 @@ type SlidingWindowThrottler struct {
 func (s *SlidingWindowThrottler) Handle(nodeID ids.NodeID) bool {
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	// the current window becomes the previous window if the current evaluation
+
+	// The current window becomes the previous window if the current evaluation
 	// period is over
 	now := s.clock.Time()
-	if now.After(s.current.start.Add(s.period)) {
-		// discard the current window if it's too old
-		if now.Sub(s.current.start) > s.period {
-			s.current = window{
-				start: now.Add(-s.period),
-				hits:  make(map[ids.NodeID]int),
-			}
-		}
-		s.previous = s.current
-		s.current = window{
-			start: now,
-			hits:  make(map[ids.NodeID]int),
-		}
+	sinceUpdate := now.Sub(s.windows[s.current].start)
+	if sinceUpdate >= 2*s.period {
+		s.rotate(now.Add(-s.period))
+	}
+	if sinceUpdate >= s.period {
+		s.rotate(now)
+		sinceUpdate = 0
 	}
 
-	offset := now.Sub(s.current.start)
-	weight := float64(s.period-offset) / float64(s.period)
-
-	if weight*float64(s.previous.hits[nodeID])+float64(s.current.hits[nodeID]) < float64(s.limit) {
-		s.current.hits[nodeID]++
-		return true
+	currentHits := s.windows[s.current].hits
+	current := currentHits[nodeID]
+	previousFraction := float64(s.period-sinceUpdate) / float64(s.period)
+	previous := s.windows[1-s.current].hits[nodeID]
+	estimatedHits := current + previousFraction*previous
+	if estimatedHits >= s.limit {
+		// The peer has sent too many requests, drop this request.
+		return false
 	}
 
-	return false
+	currentHits[nodeID]++
+	return true
+}
+
+func (s *SlidingWindowThrottler) rotate(t time.Time) {
+	s.current = 1 - s.current
+	s.windows[s.current] = window{
+		start: t,
+		hits:  make(map[ids.NodeID]float64),
+	}
 }
