@@ -7,6 +7,7 @@ package e2e
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/rand"
 	"strings"
@@ -16,8 +17,13 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/ethclient"
+	"github.com/ava-labs/coreth/interfaces"
 
+	"golang.org/x/exp/maps"
+
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture"
 	"github.com/ava-labs/avalanchego/tests/fixture/testnet"
@@ -58,7 +64,7 @@ type TestEnvironment struct {
 	// The directory where the test network configuration is stored
 	NetworkDir string
 	// URIs used to access the API endpoints of nodes of the network
-	URIs []string
+	URIs map[ids.NodeID]string
 	// The URI used to access the http server that allocates test data
 	TestDataServerURI string
 
@@ -78,7 +84,11 @@ func InitTestEnvironment(envBytes []byte) {
 // nodes.
 func (te *TestEnvironment) GetRandomNodeURI() string {
 	r := rand.New(rand.NewSource(time.Now().Unix())) //#nosec G404
-	return te.URIs[r.Intn(len(te.URIs))]
+	nodeIDs := maps.Keys(te.URIs)
+	nodeID := nodeIDs[r.Intn(len(nodeIDs))]
+	uri := te.URIs[nodeID]
+	tests.Outf("{{blue}} targeting node %s with URI: %s{{/}}\n", nodeID, uri)
+	return uri
 }
 
 // Retrieve the network to target for testing.
@@ -92,6 +102,7 @@ func (te *TestEnvironment) GetNetwork() testnet.Network {
 func (te *TestEnvironment) AllocateFundedKeys(count int) []*secp256k1.PrivateKey {
 	keys, err := fixture.AllocateFundedKeys(te.TestDataServerURI, count)
 	te.require.NoError(err)
+	tests.Outf("{{blue}} allocated funded key(s): %+v{{/}}\n", keys)
 	return keys
 }
 
@@ -102,19 +113,14 @@ func (te *TestEnvironment) AllocateFundedKey() *secp256k1.PrivateKey {
 
 // Create a new keychain with the specified number of test keys.
 func (te *TestEnvironment) NewKeychain(count int) *secp256k1fx.Keychain {
-	tests.Outf("{{blue}} initializing keychain with %d keys {{/}}\n", count)
 	keys := te.AllocateFundedKeys(count)
+	tests.Outf("{{blue}} initializing keychain with %d key(s) {{/}}\n", count)
 	return secp256k1fx.NewKeychain(keys...)
 }
 
-// Create a new wallet for the provided keychain against a random node URI.
-func (te *TestEnvironment) NewWallet(keychain *secp256k1fx.Keychain) primary.Wallet {
-	return te.NewWalletForURI(keychain, te.GetRandomNodeURI())
-}
-
 // Create a new wallet for the provided keychain against the specified node URI.
-func (te *TestEnvironment) NewWalletForURI(keychain *secp256k1fx.Keychain, uri string) primary.Wallet {
-	tests.Outf("{{blue}} initializing a new wallet {{/}}\n")
+func (te *TestEnvironment) NewWallet(keychain *secp256k1fx.Keychain, uri string) primary.Wallet {
+	tests.Outf("{{blue}} initializing a new wallet for URI: %s {{/}}\n", uri)
 	wallet, err := primary.MakeWallet(DefaultContext(), &primary.WalletConfig{
 		URI:          uri,
 		AVAXKeychain: keychain,
@@ -124,13 +130,9 @@ func (te *TestEnvironment) NewWalletForURI(keychain *secp256k1fx.Keychain, uri s
 	return wallet
 }
 
-// Create a new eth client targeting a random node.
-func (te *TestEnvironment) NewEthClient() ethclient.Client {
-	return te.NewEthClientForURI(te.GetRandomNodeURI())
-}
-
 // Create a new eth client targeting the specified node URI.
-func (te *TestEnvironment) NewEthClientForURI(nodeURI string) ethclient.Client {
+func (te *TestEnvironment) NewEthClient(nodeURI string) ethclient.Client {
+	tests.Outf("{{blue}} initializing a new eth client for URI: %s {{/}}\n", nodeURI)
 	nodeAddress := strings.Split(nodeURI, "//")[1]
 	uri := fmt.Sprintf("ws://%s/ext/bc/C/ws", nodeAddress)
 	client, err := ethclient.Dial(uri)
@@ -197,4 +199,52 @@ func WaitForHealthy(node testnet.Node) {
 	ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
 	defer cancel()
 	require.NoError(ginkgo.GinkgoT(), testnet.WaitForHealthy(ctx, node))
+}
+
+// Interface to allow logging any type of transaction that has an ID method.
+type LoggableTx interface {
+	ID() ids.ID
+}
+
+// Ensures transaction id is logged if the transaction is non-nil. Should be
+// called before checking for an error to ensure traceability in the event
+// of a transaction being submitted but failing to be accepted.
+func LogTx(tx LoggableTx) {
+	if tx != nil {
+		tests.Outf(" tx id: %s\n", tx.ID())
+	}
+}
+
+// Ensures transaction id is logged if the transaction is non-nil and check
+// if an error occurred.
+func LogTxAndCheck(tx LoggableTx, err error) {
+	LogTx(tx)
+	require.NoError(ginkgo.GinkgoT(), err)
+}
+
+// Sends an eth transaction, waits for the transaction receipt to be issued
+// and checks that the receipt indicates success.
+func SendEthTransaction(ethClient ethclient.Client, signedTx *types.Transaction) *types.Receipt {
+	require := require.New(ginkgo.GinkgoT())
+
+	txID := signedTx.Hash()
+	tests.Outf(" eth tx id: %s\n", txID)
+
+	require.NoError(ethClient.SendTransaction(DefaultContext(), signedTx))
+
+	// Wait for the receipt
+	var receipt *types.Receipt
+	Eventually(func() bool {
+		var err error
+		receipt, err = ethClient.TransactionReceipt(DefaultContext(), txID)
+		if errors.Is(err, interfaces.NotFound) {
+			return false // Transaction is still pending
+		}
+		require.NoError(err)
+		return true
+	}, DefaultTimeout, DefaultPollingInterval, "failed to see transaction acceptance before timeout")
+
+	// Retrieve the contract address
+	require.Equal(receipt.Status, types.ReceiptStatusSuccessful)
+	return receipt
 }

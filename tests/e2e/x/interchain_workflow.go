@@ -29,13 +29,15 @@ var _ = e2e.DescribeXChain("[Interchain Workflow]", func() {
 	const transferAmount = 10 * units.Avax
 
 	ginkgo.It("should ensure that funds can be transferred from the X-Chain to the C-Chain and the P-Chain", func() {
+		nodeURI := e2e.Env.GetRandomNodeURI()
+
 		ginkgo.By("creating wallet with a funded key to send from and recipient key to deliver to")
 		factory := secp256k1.Factory{}
 		recipientKey, err := factory.NewPrivateKey()
 		require.NoError(err)
 		keychain := e2e.Env.NewKeychain(1)
 		keychain.Add(recipientKey)
-		baseWallet := e2e.Env.NewWallet(keychain)
+		baseWallet := e2e.Env.NewWallet(keychain, nodeURI)
 		xWallet := baseWallet.X()
 		cWallet := baseWallet.C()
 		pWallet := baseWallet.P()
@@ -69,19 +71,20 @@ var _ = e2e.DescribeXChain("[Interchain Workflow]", func() {
 		}
 
 		ginkgo.By("sending funds from one address to another on the X-Chain", func() {
-			_, err = xWallet.IssueBaseTx(
-				[]*avax.TransferableOutput{{
-					Asset: avax.Asset{
-						ID: avaxAssetID,
-					},
-					Out: &secp256k1fx.TransferOutput{
-						Amt:          transferAmount,
-						OutputOwners: recipientOwner,
-					},
-				}},
-				e2e.WithDefaultContext(),
+			e2e.LogTxAndCheck(
+				xWallet.IssueBaseTx(
+					[]*avax.TransferableOutput{{
+						Asset: avax.Asset{
+							ID: avaxAssetID,
+						},
+						Out: &secp256k1fx.TransferOutput{
+							Amt:          transferAmount,
+							OutputOwners: recipientOwner,
+						},
+					}},
+					e2e.WithDefaultContext(),
+				),
 			)
-			require.NoError(err)
 		})
 
 		ginkgo.By("checking that the X-Chain recipient address has received the sent funds", func() {
@@ -93,25 +96,27 @@ var _ = e2e.DescribeXChain("[Interchain Workflow]", func() {
 		})
 
 		ginkgo.By("exporting AVAX from the X-Chain to the C-Chain", func() {
-			_, err := xWallet.IssueExportTx(
-				cWallet.BlockchainID(),
-				exportOutputs,
-				e2e.WithDefaultContext(),
+			e2e.LogTxAndCheck(
+				xWallet.IssueExportTx(
+					cWallet.BlockchainID(),
+					exportOutputs,
+					e2e.WithDefaultContext(),
+				),
 			)
-			require.NoError(err)
 		})
 
 		ginkgo.By("importing AVAX from the X-Chain to the C-Chain", func() {
-			_, err := cWallet.IssueImportTx(
-				xWallet.BlockchainID(),
-				recipientEthAddress,
-				e2e.WithDefaultContext(),
+			e2e.LogTxAndCheck(
+				cWallet.IssueImportTx(
+					xWallet.BlockchainID(),
+					recipientEthAddress,
+					e2e.WithDefaultContext(),
+				),
 			)
-			require.NoError(err)
 		})
 
 		ginkgo.By("checking that the recipient address has received imported funds on the C-Chain")
-		ethClient := e2e.Env.NewEthClient()
+		ethClient := e2e.Env.NewEthClient(nodeURI)
 		e2e.Eventually(func() bool {
 			balance, err := ethClient.BalanceAt(e2e.DefaultContext(), recipientEthAddress, nil)
 			require.NoError(err)
@@ -119,21 +124,23 @@ var _ = e2e.DescribeXChain("[Interchain Workflow]", func() {
 		}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "failed to see recipient address funded before timeout")
 
 		ginkgo.By("exporting AVAX from the X-Chain to the P-Chain", func() {
-			_, err := xWallet.IssueExportTx(
-				constants.PlatformChainID,
-				exportOutputs,
-				e2e.WithDefaultContext(),
+			e2e.LogTxAndCheck(
+				xWallet.IssueExportTx(
+					constants.PlatformChainID,
+					exportOutputs,
+					e2e.WithDefaultContext(),
+				),
 			)
-			require.NoError(err)
 		})
 
 		ginkgo.By("importing AVAX from the X-Chain to the P-Chain", func() {
-			_, err := pWallet.IssueImportTx(
-				xWallet.BlockchainID(),
-				&recipientOwner,
-				e2e.WithDefaultContext(),
+			e2e.LogTxAndCheck(
+				pWallet.IssueImportTx(
+					xWallet.BlockchainID(),
+					&recipientOwner,
+					e2e.WithDefaultContext(),
+				),
 			)
-			require.NoError(err)
 		})
 
 		ginkgo.By("checking that the recipient address has received imported funds on the P-Chain", func() {
