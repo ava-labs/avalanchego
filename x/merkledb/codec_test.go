@@ -187,8 +187,6 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 					// we will later decode it as nil.
 					// Doing this prevents inconsistency when comparing the
 					// encoded and decoded values below.
-					// Calling nilEmptySlices doesn't set this because it is a
-					// private variable on the struct
 					valueBytes = nil
 				}
 				value = maybe.Some(valueBytes)
