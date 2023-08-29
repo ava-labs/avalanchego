@@ -143,8 +143,8 @@ func TestSlidingWindowThrottlerHandle(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 			throttler := NewSlidingWindowThrottler(period, tt.limit)
-			throttler.previous.start = previousWindowStartTime
-			throttler.current.start = currentWindowStartTime
+			throttler.windows[throttler.current].start = currentWindowStartTime
+			throttler.windows[1-throttler.current].start = previousWindowStartTime
 
 			for _, call := range tt.calls {
 				throttler.clock.Set(call.time)
