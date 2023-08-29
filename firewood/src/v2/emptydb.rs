@@ -8,15 +8,13 @@ use super::propose::{Proposal, ProposalBase};
 /// An EmptyDb is a simple implementation of api::Db
 /// that doesn't store any data. It contains a single
 /// HistoricalImpl that has no keys or values
-#[derive(Debug, Default)]
-struct EmptyDb {
-    root: Arc<HistoricalImpl>,
-}
+#[derive(Debug)]
+pub struct EmptyDb;
 
 /// HistoricalImpl is always empty, and there is only one,
 /// since nothing can be committed to an EmptyDb.
-#[derive(Debug, Default)]
-struct HistoricalImpl;
+#[derive(Debug)]
+pub struct HistoricalImpl;
 
 /// This is the hash of the [EmptyDb] root
 const ROOT_HASH: [u8; 32] = [0; 32];
@@ -29,7 +27,7 @@ impl Db for EmptyDb {
 
     async fn revision(&self, hash_key: HashKey) -> Result<Arc<Self::Historical>, Error> {
         if hash_key == ROOT_HASH {
-            Ok(self.root.clone())
+            Ok(HistoricalImpl.into())
         } else {
             Err(Error::HashNotFound { provided: hash_key })
         }
@@ -44,7 +42,10 @@ impl Db for EmptyDb {
         K: KeyType,
         V: ValueType,
     {
-        Ok(Proposal::new(ProposalBase::View(self.root.clone()), data))
+        Ok(Proposal::new(
+            ProposalBase::View(HistoricalImpl.into()),
+            data,
+        ))
     }
 }
 
@@ -82,7 +83,7 @@ mod tests {
 
     #[tokio::test]
     async fn basic_proposal() -> Result<(), Error> {
-        let db = Arc::new(EmptyDb::default());
+        let db = Arc::new(EmptyDb);
 
         let batch = vec![
             BatchOp::Put {
@@ -103,7 +104,7 @@ mod tests {
 
     #[tokio::test]
     async fn nested_proposal() -> Result<(), Error> {
-        let db = Arc::new(EmptyDb::default());
+        let db = Arc::new(EmptyDb);
 
         // create proposal1 which adds key "k" with value "v" and deletes "z"
         let batch = vec![
