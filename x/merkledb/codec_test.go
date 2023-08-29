@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"io"
 	"math/rand"
-	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -58,54 +57,6 @@ func newRandomProofNode(r *rand.Rand) ProofNode {
 		KeyPath:     serializedKey,
 		ValueOrHash: valueOrHash,
 		Children:    children,
-	}
-}
-
-func nilEmptySlices(dest interface{}) {
-	if dest == nil {
-		return
-	}
-
-	destPtr := reflect.ValueOf(dest)
-	if destPtr.Kind() != reflect.Ptr {
-		return
-	}
-	nilEmptySlicesRec(destPtr.Elem())
-}
-
-func nilEmptySlicesRec(value reflect.Value) {
-	switch value.Kind() {
-	case reflect.Slice:
-		if value.Len() == 0 {
-			newValue := reflect.Zero(value.Type())
-			value.Set(newValue)
-			return
-		}
-
-		for i := 0; i < value.Len(); i++ {
-			f := value.Index(i)
-			nilEmptySlicesRec(f)
-		}
-	case reflect.Array:
-		for i := 0; i < value.Len(); i++ {
-			f := value.Index(i)
-			nilEmptySlicesRec(f)
-		}
-	case reflect.Interface, reflect.Ptr:
-		if value.IsNil() {
-			return
-		}
-		nilEmptySlicesRec(value.Elem())
-	case reflect.Struct:
-		t := value.Type()
-		numFields := value.NumField()
-		for i := 0; i < numFields; i++ {
-			tField := t.Field(i)
-			if tField.IsExported() {
-				field := value.Field(i)
-				nilEmptySlicesRec(field)
-			}
-		}
 	}
 }
 
@@ -236,8 +187,6 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 					// we will later decode it as nil.
 					// Doing this prevents inconsistency when comparing the
 					// encoded and decoded values below.
-					// Calling nilEmptySlices doesn't set this because it is a
-					// private variable on the struct
 					valueBytes = nil
 				}
 				value = maybe.Some(valueBytes)
@@ -267,9 +216,6 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 
 			var gotNode dbNode
 			require.NoError(codec.decodeDBNode(nodeBytes, &gotNode))
-
-			nilEmptySlices(&node)
-			nilEmptySlices(&gotNode)
 			require.Equal(node, gotNode)
 
 			nodeBytes2 := codec.encodeDBNode(&gotNode)
