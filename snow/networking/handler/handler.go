@@ -17,6 +17,8 @@ import (
 
 	"go.uber.org/zap"
 
+	"golang.org/x/sync/errgroup"
+
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
@@ -24,7 +26,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
-	"github.com/ava-labs/avalanchego/snow/networking/worker"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils"
@@ -108,7 +109,7 @@ type handler struct {
 	// [unprocessedAsyncMsgsCond.L] must be held while accessing [asyncMessageQueue].
 	asyncMessageQueue MessageQueue
 	// Worker pool for handling asynchronous consensus messages
-	asyncMessagePool worker.Pool
+	asyncMessagePool errgroup.Group
 	timeouts         chan struct{}
 
 	closeOnce            sync.Once
@@ -141,20 +142,20 @@ func New(
 	peerTracker commontracker.Peers,
 ) (Handler, error) {
 	h := &handler{
-		ctx:              ctx,
-		validators:       validators,
-		msgFromVMChan:    msgFromVMChan,
-		preemptTimeouts:  subnet.OnBootstrapCompleted(),
-		gossipFrequency:  gossipFrequency,
-		asyncMessagePool: worker.NewPool(threadPoolSize),
-		timeouts:         make(chan struct{}, 1),
-		closingChan:      make(chan struct{}),
-		closed:           make(chan struct{}),
-		resourceTracker:  resourceTracker,
-		subnetConnector:  subnetConnector,
-		subnet:           subnet,
-		peerTracker:      peerTracker,
+		ctx:             ctx,
+		validators:      validators,
+		msgFromVMChan:   msgFromVMChan,
+		preemptTimeouts: subnet.OnBootstrapCompleted(),
+		gossipFrequency: gossipFrequency,
+		timeouts:        make(chan struct{}, 1),
+		closingChan:     make(chan struct{}),
+		closed:          make(chan struct{}),
+		resourceTracker: resourceTracker,
+		subnetConnector: subnetConnector,
+		subnet:          subnet,
+		peerTracker:     peerTracker,
 	}
+	h.asyncMessagePool.SetLimit(threadPoolSize)
 
 	var err error
 
@@ -301,6 +302,8 @@ func (h *handler) RegisterTimeout(d time.Duration) {
 }
 
 // Note: It is possible for Stop to be called before/concurrently with Start.
+//
+// Invariant: Stop must never block.
 func (h *handler) Stop(ctx context.Context) {
 	h.closeOnce.Do(func() {
 		h.startClosingTime = h.clock.Time()
@@ -381,7 +384,9 @@ func (h *handler) dispatchSync(ctx context.Context) {
 
 func (h *handler) dispatchAsync(ctx context.Context) {
 	defer func() {
-		h.asyncMessagePool.Shutdown()
+		// We never return an error in any of our functions, so it is safe to
+		// drop any error here.
+		_ = h.asyncMessagePool.Wait()
 		h.closeDispatcher(ctx)
 	}()
 
@@ -760,7 +765,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 }
 
 func (h *handler) handleAsyncMsg(ctx context.Context, msg Message) {
-	h.asyncMessagePool.Send(func() {
+	h.asyncMessagePool.Go(func() error {
 		if err := h.executeAsyncMsg(ctx, msg); err != nil {
 			h.StopWithError(ctx, fmt.Errorf(
 				"%w while processing async message: %s",
@@ -768,6 +773,7 @@ func (h *handler) handleAsyncMsg(ctx context.Context, msg Message) {
 				msg,
 			))
 		}
+		return nil
 	})
 }
 
