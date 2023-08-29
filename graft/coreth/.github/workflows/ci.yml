@@ -148,3 +148,26 @@ jobs:
         DOCKER_PASS: ${{ secrets.DOCKER_PASS }}
         KURTOSIS_CLIENT_ID: ${{ secrets.KURTOSIS_CLIENT_ID }}
         KURTOSIS_CLIENT_SECRET: ${{ secrets.KURTOSIS_CLIENT_SECRET }}
+  avalanchego_e2e:
+    name: AvalancheGo E2E Tests v${{ matrix.go }} (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ ubuntu-20.04 ]
+    steps:
+    - uses: actions/checkout@v3
+    - name: check out ${{ github.event.inputs.avalanchegoRepo }} ${{ github.event.inputs.avalanchegoBranch }}
+      if: ${{ github.event_name == 'workflow_dispatch' }}
+      uses: actions/checkout@v3
+      with:
+        repository: ${{ github.event.inputs.avalanchegoRepo }}
+        ref: ${{ github.event.inputs.avalanchegoBranch }}
+        path: avalanchego
+        token: ${{ secrets.AVALANCHE_PAT }}
+    - uses: actions/setup-go@v3
+      with:
+        go-version: '~1.19.12'
+        check-latest: true
+    - name: Run e2e tests
+      run: E2E_SERIAL=1 ./scripts/tests.e2e.sh
+      shell: bash

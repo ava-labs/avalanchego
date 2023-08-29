@@ -44,3 +44,6 @@ awscpu
 
 bin/
 build/
+
+# Used for e2e testing
+avalanchego
