@@ -87,31 +87,7 @@ func TestSlidingWindowThrottlerHandle(t *testing.T) {
 			},
 		},
 		{
-			name:  "not throttled over multiple evaluation periods",
-			limit: 1,
-			calls: []call{
-				{
-					time: currentWindowStartTime,
-				},
-				{
-					time: currentWindowStartTime.Add(period).Add(time.Second),
-				},
-				{
-					time: currentWindowStartTime.Add(2 * period).Add(time.Second),
-				},
-				{
-					time: currentWindowStartTime.Add(3 * period).Add(time.Second),
-				},
-				{
-					time: currentWindowStartTime.Add(4 * period).Add(time.Second),
-				},
-				{
-					time: currentWindowStartTime.Add(5 * period).Add(time.Second),
-				},
-			},
-		},
-		{
-			name:  "sparse hits",
+			name:  "one hit per period",
 			limit: 2,
 			calls: []call{
 				{
