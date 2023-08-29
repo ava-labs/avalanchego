@@ -21,6 +21,7 @@ type Throttler interface {
 // NewSlidingWindowThrottler returns a new instance of SlidingWindowThrottler.
 // Nodes are throttled if they exceed [limit] messages during an interval of
 // time over [period].
+// [period] and [limit] should both be > 0.
 func NewSlidingWindowThrottler(period time.Duration, limit int) *SlidingWindowThrottler {
 	now := time.Now()
 	return &SlidingWindowThrottler{
