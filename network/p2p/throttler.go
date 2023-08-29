@@ -18,7 +18,9 @@ type Throttler interface {
 	Handle(nodeID ids.NodeID) bool
 }
 
-// NewSlidingWindowThrottler returns a new instance of SlidingWindowThrottler
+// NewSlidingWindowThrottler returns a new instance of SlidingWindowThrottler.
+// Nodes are throttled if they exceed [limit] messages during an interval of
+// time over [period].
 func NewSlidingWindowThrottler(period time.Duration, limit int) *SlidingWindowThrottler {
 	now := time.Now()
 	return &SlidingWindowThrottler{
@@ -54,14 +56,14 @@ type SlidingWindowThrottler struct {
 	clock    mockable.Clock
 }
 
-// Handle estimates the amount of requests made in the last two evaluation
-// periods.
-// This is computed as a weighted sum of the amount of calls made in the current
-// and previous evaluation periods.
+// Handle returns true if the amount of calls received in the last [s.period]
+// time is less than [s.limit]
+//
+// This is calculated by adding the current period's count to a weighted count
+// of the previous period.
 func (s *SlidingWindowThrottler) Handle(nodeID ids.NodeID) bool {
 	s.lock.Lock()
 	defer s.lock.Unlock()
-
 	// the current window becomes the previous window if the current evaluation
 	// period is over
 	now := s.clock.Time()
