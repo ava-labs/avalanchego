@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-func TestThrottledHandlerAppGossip(t *testing.T) {
+func TestThrottlerHandlerAppGossip(t *testing.T) {
 	tests := []struct {
 		name        string
 		Throttler   Throttler
@@ -43,7 +43,7 @@ func TestThrottledHandlerAppGossip(t *testing.T) {
 	}
 }
 
-func TestThrottledHandlerAppRequest(t *testing.T) {
+func TestThrottlerHandlerAppRequest(t *testing.T) {
 	tests := []struct {
 		name        string
 		Throttler   Throttler
