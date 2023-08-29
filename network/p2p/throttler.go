@@ -14,7 +14,7 @@ import (
 var _ Throttler = (*SlidingWindowThrottler)(nil)
 
 type Throttler interface {
-	// Handle returns if a message from [nodeID] should be handled or not.
+	// Handle returns true if a message from [nodeID] should be handled.
 	Handle(nodeID ids.NodeID) bool
 }
 
