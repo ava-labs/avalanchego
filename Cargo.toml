@@ -1,10 +1,11 @@
 [workspace]
 members = [
-  "growth-ring",
-  "libaio",
-  "shale",
   "firewood",
   "fwdctl",
+  "growth-ring",
+  "libaio",
+  "rpc",
+  "shale",
 ]
 resolver = "2"
 

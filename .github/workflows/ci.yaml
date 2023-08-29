@@ -19,6 +19,7 @@ jobs:
         with:
           toolchain: stable
           override: true
+      - uses: arduino/setup-protoc@v2
       - name: Restore Cargo Cache
         id: cargo-cache
         uses: actions/cache/restore@v3
@@ -83,6 +84,7 @@ jobs:
           toolchain: stable
           override: true
           components: rustfmt, clippy
+      - uses: arduino/setup-protoc@v2
       - name: Restore Check Deps
         id: cache-build-deps-restore
         uses: actions/cache/restore@v3
@@ -109,6 +111,7 @@ jobs:
         with:
           toolchain: stable
           override: true
+      - uses: arduino/setup-protoc@v2
       - name: Restore Check Deps
         id: cache-build-deps-restore
         uses: actions/cache/restore@v3
@@ -132,6 +135,7 @@ jobs:
         with:
           toolchain: stable
           override: true
+      - uses: arduino/setup-protoc@v2
       - name: Restore Check Deps
         id: cache-build-deps-restore
         uses: actions/cache/restore@v3
@@ -158,6 +162,7 @@ jobs:
         with:
           toolchain: stable
           override: true
+      - uses: arduino/setup-protoc@v2
       - name: Restore Check Deps
         id: cache-build-deps-restore
         uses: actions/cache/restore@v3
