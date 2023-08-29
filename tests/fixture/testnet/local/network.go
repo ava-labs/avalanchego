@@ -24,17 +24,21 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-// This interval was chosen to avoid spamming node APIs during
-// startup, as smaller intervals (e.g. 50ms) seemed to noticeably
-// increase the time for a network's nodes to be seen as healthy.
-const networkHealthCheckInterval = 200 * time.Millisecond
+const (
+	// This interval was chosen to avoid spamming node APIs during
+	// startup, as smaller intervals (e.g. 50ms) seemed to noticeably
+	// increase the time for a network's nodes to be seen as healthy.
+	networkHealthCheckInterval = 200 * time.Millisecond
+
+	defaultEphemeralDirName = "ephemeral"
+)
 
 var (
-	errInvalidNodeCount        = errors.New("failed to populate local network config: non-zero node count is only valid for a network without nodes")
-	errInvalidKeyCount         = errors.New("failed to populate local network config: non-zero key count is only valid for a network without keys")
-	errLocalNetworkDirNotSet   = errors.New("local network directory not set - has Create() been called?")
-	errInvalidNetworkDir       = errors.New("failed to write local network: invalid network directory")
-	errNotHealthyBeforeTimeout = errors.New("failed to see all nodes healthy before timeout")
+	errInvalidNodeCount      = errors.New("failed to populate local network config: non-zero node count is only valid for a network without nodes")
+	errInvalidKeyCount       = errors.New("failed to populate local network config: non-zero key count is only valid for a network without keys")
+	errLocalNetworkDirNotSet = errors.New("local network directory not set - has Create() been called?")
+	errInvalidNetworkDir     = errors.New("failed to write local network: invalid network directory")
+	errMissingBootstrapNodes = errors.New("failed to add node due to missing bootstrap nodes")
 )
 
 // Default root dir for storing networks and their configuration.
@@ -100,6 +104,18 @@ func (ln *LocalNetwork) GetNodes() []testnet.Node {
 		nodes = append(nodes, node)
 	}
 	return nodes
+}
+
+// Adds a backend-agnostic ephemeral node to the network
+func (ln *LocalNetwork) AddEphemeralNode(w io.Writer, flags testnet.FlagsMap) (testnet.Node, error) {
+	if flags == nil {
+		flags = testnet.FlagsMap{}
+	}
+	return ln.AddLocalNode(w, &LocalNode{
+		NodeConfig: testnet.NodeConfig{
+			Flags: flags,
+		},
+	}, true /* isEphemeral */)
 }
 
 // Starts a new network stored under the provided root dir. Required
@@ -266,7 +282,7 @@ func (ln *LocalNetwork) PopulateLocalNetworkConfig(networkID uint32, nodeCount i
 	for _, node := range ln.Nodes {
 		// Ensure the node is configured for use with the network and
 		// knows where to write its configuration.
-		if err := ln.PopulateNodeConfig(node); err != nil {
+		if err := ln.PopulateNodeConfig(node, ln.Dir); err != nil {
 			return err
 		}
 	}
@@ -274,9 +290,10 @@ func (ln *LocalNetwork) PopulateLocalNetworkConfig(networkID uint32, nodeCount i
 	return nil
 }
 
-// Ensure the provided node has the configuration it needs to
-// start. Requires that the network has valid genesis data.
-func (ln *LocalNetwork) PopulateNodeConfig(node *LocalNode) error {
+// Ensure the provided node has the configuration it needs to start. If the data dir is
+// not set, it will be defaulted to [nodeParentDir]/[node ID]. Requires that the
+// network has valid genesis data.
+func (ln *LocalNetwork) PopulateNodeConfig(node *LocalNode, nodeParentDir string) error {
 	flags := node.Flags
 
 	// Set values common to all nodes
@@ -298,7 +315,7 @@ func (ln *LocalNetwork) PopulateNodeConfig(node *LocalNode) error {
 	dataDir := node.GetDataDir()
 	if len(dataDir) == 0 {
 		// NodeID will have been set by EnsureKeys
-		dataDir = filepath.Join(ln.Dir, node.NodeID.String())
+		dataDir = filepath.Join(nodeParentDir, node.NodeID.String())
 		flags[config.DataDirKey] = dataDir
 	}
 
@@ -368,7 +385,7 @@ func (ln *LocalNetwork) WaitForHealthy(ctx context.Context, w io.Writer) error {
 			}
 
 			healthy, err := node.IsHealthy(ctx)
-			if err != nil && !errors.Is(err, errProcessNotRunning) {
+			if err != nil && !errors.Is(err, testnet.ErrNotRunning) {
 				return err
 			}
 			if !healthy {
@@ -383,7 +400,7 @@ func (ln *LocalNetwork) WaitForHealthy(ctx context.Context, w io.Writer) error {
 
 		select {
 		case <-ctx.Done():
-			return errNotHealthyBeforeTimeout
+			return fmt.Errorf("failed to see all nodes healthy before timeout: %w", ctx.Err())
 		case <-ticker.C:
 		}
 	}
@@ -631,4 +648,66 @@ func (ln *LocalNetwork) ReadAll() error {
 		return err
 	}
 	return ln.ReadNodes()
+}
+
+func (ln *LocalNetwork) AddLocalNode(w io.Writer, node *LocalNode, isEphemeral bool) (*LocalNode, error) {
+	// Assume network configuration has been written to disk and is current in memory
+
+	if node == nil {
+		// Set an empty data dir so that PopulateNodeConfig will know
+		// to set the default of `[network dir]/[node id]`.
+		node = NewLocalNode("")
+	}
+
+	// Default to a data dir of [network-dir]/[node-ID]
+	nodeParentDir := ln.Dir
+	if isEphemeral {
+		// For an ephemeral node, default to a data dir of [network-dir]/[ephemeral-dir]/[node-ID]
+		// to provide a clear separation between nodes that are expected to expose stable API
+		// endpoints and those that will live for only a short time (e.g. a node started by a test
+		// and stopped on teardown).
+		//
+		// The data for an ephemeral node is still stored in the file tree rooted at the network
+		// dir to ensure that recursively archiving the network dir in CI will collect all node
+		// data used for a test run.
+		nodeParentDir = filepath.Join(ln.Dir, defaultEphemeralDirName)
+	}
+
+	if err := ln.PopulateNodeConfig(node, nodeParentDir); err != nil {
+		return nil, err
+	}
+
+	// Collect staking addresses of running nodes for use in bootstraping the new node
+	if err := ln.ReadNodes(); err != nil {
+		return nil, fmt.Errorf("failed to read local network nodes: %w", err)
+	}
+
+	var (
+		// Use dynamic port allocation.
+		httpPort    uint16 = 0
+		stakingPort uint16 = 0
+
+		bootstrapIPs = make([]string, 0, len(ln.Nodes))
+		bootstrapIDs = make([]string, 0, len(ln.Nodes))
+	)
+
+	for _, node := range ln.Nodes {
+		if len(node.StakingAddress) == 0 {
+			// Node is not running
+			continue
+		}
+
+		bootstrapIPs = append(bootstrapIPs, node.StakingAddress)
+		bootstrapIDs = append(bootstrapIDs, node.NodeID.String())
+	}
+	if len(bootstrapIDs) == 0 {
+		return nil, errMissingBootstrapNodes
+	}
+
+	node.SetNetworkingConfigDefaults(httpPort, stakingPort, bootstrapIDs, bootstrapIPs)
+
+	if err := node.WriteConfig(); err != nil {
+		return nil, err
+	}
+	return node, node.Start(w, ln.ExecPath)
 }
