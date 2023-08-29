@@ -49,6 +49,11 @@ type Config struct {
 	// this node will index per chain. If set to 0, the node will index all
 	// snowman++ blocks.
 	//
+	// Note: The last accepted block is not considered a historical block. This
+	// prevents the user from only storing the last accepted block, which can
+	// never be safe due to the non-atomic commits between the proposervm
+	// database and the innerVM's database.
+	//
 	// Invariant: This value must be set such that the proposervm never needs to
 	// roll back more blocks than have been deleted. On startup, the proposervm
 	// rolls back its accepted chain to match the innerVM's accepted chain. If
