@@ -854,7 +854,9 @@ func addPathInfo(
 			childPath := keyPath.Append(index) + compressedPath
 			if (shouldInsertLeftChildren && childPath.Compare(insertChildrenLessThan.Value()) < 0) ||
 				(shouldInsertRightChildren && childPath.Compare(insertChildrenGreaterThan.Value()) > 0) {
-				n.addChildWithoutNode(index, compressedPath, childID)
+				// We don't know if the child had a value or not, but it doesn't matter.
+				// We only need the IDs to be correct so that the calculated hash is correct.
+				n.addChildWithoutNode(index, compressedPath, childID, false /*hasValue*/)
 			}
 		}
 	}
@@ -868,9 +870,10 @@ func getStandaloneTrieView(ctx context.Context, ops []database.BatchOp) (*trieVi
 		ctx,
 		memdb.New(),
 		Config{
-			EvictionBatchSize: DefaultEvictionBatchSize,
-			Tracer:            trace.Noop,
-			NodeCacheSize:     verificationCacheSize,
+			EvictionBatchSize:         DefaultEvictionBatchSize,
+			Tracer:                    trace.Noop,
+			ValueNodeCacheSize:        verificationCacheSize,
+			IntermediateNodeCacheSize: verificationCacheSize,
 		},
 		&mockMetrics{},
 	)
