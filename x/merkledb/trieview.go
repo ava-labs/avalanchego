@@ -921,13 +921,13 @@ func (t *trieView) insert(
 // Records that a node has been created.
 // Must not be called after [calculateNodeIDs] has returned.
 func (t *trieView) recordNewNode(after *node) error {
-	return t.recordKeyChange(after.key, after, after.hasValue(), true)
+	return t.recordKeyChange(after.key, after, after.hasValue(), true /* newNode */)
 }
 
 // Records that an existing node has been changed.
 // Must not be called after [calculateNodeIDs] has returned.
 func (t *trieView) recordNodeChange(after *node) error {
-	return t.recordKeyChange(after.key, after, after.hasValue(), false)
+	return t.recordKeyChange(after.key, after, after.hasValue(), false /* newNode */)
 }
 
 // Records that the node associated with the given key has been deleted.
@@ -935,9 +935,9 @@ func (t *trieView) recordNodeChange(after *node) error {
 func (t *trieView) recordNodeDeleted(after *node) error {
 	// don't delete the root.
 	if len(after.key) == 0 {
-		return t.recordKeyChange(after.key, after, after.hasValue(), false)
+		return t.recordKeyChange(after.key, after, after.hasValue(), false /* newNode */)
 	}
-	return t.recordKeyChange(after.key, nil, after.hasValue(), false)
+	return t.recordKeyChange(after.key, nil, after.hasValue(), false /* newNode */)
 }
 
 // Records that the node associated with the given key has been changed.
