@@ -210,5 +210,6 @@ func TestValueNodeDBIterator(t *testing.T) {
 	require.NoError(it.Error())
 	db.Close()
 	require.False(it.Next())
-	require.Error(it.Error())
+	err := it.Error()
+	require.ErrorIs(err, database.ErrClosed)
 }
