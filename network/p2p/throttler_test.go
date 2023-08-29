@@ -44,16 +44,13 @@ func TestSlidingWindowThrottlerHandle(t *testing.T) {
 		},
 		{
 			name:  "throttled from previous window",
-			limit: 2,
+			limit: 1,
 			calls: []call{
 				{
 					time: previousWindowStartTime,
 				},
 				{
-					time: previousWindowStartTime.Add(period),
-				},
-				{
-					time:      currentWindowStartTime.Add(time.Second),
+					time:      currentWindowStartTime,
 					throttled: true,
 				},
 			},
@@ -91,25 +88,25 @@ func TestSlidingWindowThrottlerHandle(t *testing.T) {
 		},
 		{
 			name:  "not throttled over multiple evaluation periods",
-			limit: 2,
+			limit: 1,
 			calls: []call{
 				{
 					time: currentWindowStartTime,
 				},
 				{
-					time: currentWindowStartTime.Add(period),
+					time: currentWindowStartTime.Add(period).Add(time.Second),
 				},
 				{
-					time: currentWindowStartTime.Add(2 * period),
+					time: currentWindowStartTime.Add(2 * period).Add(time.Second),
 				},
 				{
-					time: currentWindowStartTime.Add(3 * period),
+					time: currentWindowStartTime.Add(3 * period).Add(time.Second),
 				},
 				{
-					time: currentWindowStartTime.Add(4 * period),
+					time: currentWindowStartTime.Add(4 * period).Add(time.Second),
 				},
 				{
-					time: currentWindowStartTime.Add(5 * period),
+					time: currentWindowStartTime.Add(5 * period).Add(time.Second),
 				},
 			},
 		},
@@ -121,19 +118,30 @@ func TestSlidingWindowThrottlerHandle(t *testing.T) {
 					time: currentWindowStartTime,
 				},
 				{
-					time: currentWindowStartTime.Add(period),
+					time: currentWindowStartTime.Add(period).Add(time.Second),
 				},
 				{
-					time: currentWindowStartTime.Add(2 * period),
+					time: currentWindowStartTime.Add(2 * period).Add(time.Second),
 				},
 				{
-					time: currentWindowStartTime.Add(5 * period),
+					time: currentWindowStartTime.Add(3 * period).Add(time.Second),
 				},
 				{
-					time: currentWindowStartTime.Add(6 * period),
+					time: currentWindowStartTime.Add(4 * period).Add(time.Second),
+				},
+			},
+		},
+		{
+			// if too much time passes by, a current window might not be a
+			// valid previous window.
+			name:  "current window needs to be reset",
+			limit: 1,
+			calls: []call{
+				{
+					time: currentWindowStartTime,
 				},
 				{
-					time: currentWindowStartTime.Add(7 * period),
+					time: currentWindowStartTime.Add(10 * period),
 				},
 			},
 		},
