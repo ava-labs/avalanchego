@@ -4,8 +4,6 @@
 package merkledb
 
 import (
-	"unsafe"
-
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 
@@ -17,10 +15,6 @@ import (
 const (
 	NodeBranchFactor = 16
 	HashLength       = 32
-	intSize          = int(unsafe.Sizeof(0))
-	boolSize         = int(unsafe.Sizeof(true))
-	byteSize         = 1
-	maybeSize        = boolSize + int(unsafe.Sizeof(uintptr(0)))
 )
 
 // the values that go into the node's id
@@ -49,7 +43,6 @@ type node struct {
 	key         path
 	nodeBytes   []byte
 	valueDigest maybe.Maybe[[]byte]
-	size        int
 }
 
 // Returns a new node with the given [key] and no value.
@@ -61,8 +54,6 @@ func newNode(parent *node, key path) *node {
 		},
 		key: key,
 	}
-	// size of key + the empty value + id + size + children map
-	newNode.size = len(key) + maybeSize + HashLength + intSize + NodeBranchFactor
 	if parent != nil {
 		parent.addChild(newNode)
 	}
@@ -81,12 +72,6 @@ func parseNode(key path, nodeBytes []byte) (*node, error) {
 		nodeBytes: nodeBytes,
 	}
 
-	// size of bytes + key + the value + id + size + children map
-	result.size = len(nodeBytes) + len(result.key) + len(n.value.Value()) + maybeSize + HashLength + intSize + NodeBranchFactor
-	for _, c := range result.children {
-		result.size += byteSize + HashLength + len(c.compressedPath)
-	}
-
 	result.setValueDigest()
 	return result, nil
 }
@@ -100,7 +85,6 @@ func (n *node) hasValue() bool {
 func (n *node) marshal() []byte {
 	if n.nodeBytes == nil {
 		n.nodeBytes = codec.encodeDBNode(&n.dbNode)
-		n.size += len(n.nodeBytes)
 	}
 	return n.nodeBytes
 }
@@ -109,7 +93,6 @@ func (n *node) marshal() []byte {
 // for example, node ID and byte representation
 func (n *node) onNodeChanged() {
 	n.id = ids.Empty
-	n.size -= len(n.nodeBytes)
 	n.nodeBytes = nil
 }
 
@@ -134,9 +117,7 @@ func (n *node) calculateID(metrics merkleMetrics) error {
 // Set [n]'s value to [val].
 func (n *node) setValue(val maybe.Maybe[[]byte]) {
 	n.onNodeChanged()
-	n.size -= len(n.value.Value())
 	n.value = val
-	n.size += len(val.Value())
 	n.setValueDigest()
 }
 
@@ -144,9 +125,7 @@ func (n *node) setValueDigest() {
 	if n.value.IsNothing() || len(n.value.Value()) < HashLength {
 		n.valueDigest = n.value
 	} else {
-		n.size -= len(n.valueDigest.Value())
 		n.valueDigest = maybe.Some(hashing.ComputeHash256(n.value.Value()))
-		n.size += len(n.valueDigest.Value())
 	}
 }
 
@@ -165,24 +144,18 @@ func (n *node) addChild(child *node) {
 // Adds a child to [n] without a reference to the child node.
 func (n *node) addChildWithoutNode(index byte, compressedPath path, childID ids.ID, hasValue bool) {
 	n.onNodeChanged()
-	if existing, ok := n.children[index]; ok {
-		n.size -= HashLength + len(existing.compressedPath)
-	}
 	n.children[index] = child{
 		compressedPath: compressedPath,
 		id:             childID,
 		hasValue:       hasValue,
 	}
-
-	n.size += HashLength + len(compressedPath)
 }
 
 // Removes [child] from [n]'s children.
 func (n *node) removeChild(child *node) {
 	n.onNodeChanged()
 	index := child.key[len(n.key)]
-	if existing, ok := n.children[index]; ok {
-		n.size -= byteSize + HashLength + len(existing.compressedPath)
+	if _, ok := n.children[index]; ok {
 		delete(n.children, index)
 	}
 }
@@ -199,7 +172,6 @@ func (n *node) clone() *node {
 			children: maps.Clone(n.children),
 		},
 		valueDigest: n.valueDigest,
-		size:        n.size,
 		nodeBytes:   n.nodeBytes,
 	}
 }
