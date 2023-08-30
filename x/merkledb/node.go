@@ -79,7 +79,7 @@ func parseNode(key path, nodeBytes []byte) (*node, error) {
 		nodeBytes: nodeBytes,
 	}
 
-	result.size = len(n.value.Value()) + len(result.key) + boolSize + HashLength + intSize
+	result.size = len(nodeBytes) + len(n.value.Value()) + len(result.key) + boolSize + HashLength + intSize
 	for _, c := range result.children {
 		result.size += byteSize + HashLength + len(c.compressedPath)
 	}
