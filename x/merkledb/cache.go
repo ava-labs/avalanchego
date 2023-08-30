@@ -17,10 +17,10 @@ type onEvictCache[K comparable, V any] struct {
 	fifo    linkedhashmap.LinkedHashmap[K, V]
 	// Must not call any method that grabs [c.lock]
 	// because this would cause a deadlock.
-	onEviction func(V) error
+	onEviction func(K, V) error
 }
 
-func newOnEvictCache[K comparable, V any](maxSize int, onEviction func(V) error) onEvictCache[K, V] {
+func newOnEvictCache[K comparable, V any](maxSize int, onEviction func(K, V) error) onEvictCache[K, V] {
 	return onEvictCache[K, V]{
 		maxSize:    maxSize,
 		fifo:       linkedhashmap.New[K, V](),
@@ -58,7 +58,7 @@ func (c *onEvictCache[K, V]) Put(key K, value V) error {
 	if c.fifo.Len() > c.maxSize {
 		oldestKey, oldestVal, _ := c.fifo.Oldest()
 		c.fifo.Delete(oldestKey)
-		return c.onEviction(oldestVal)
+		return c.onEviction(oldestKey, oldestVal)
 	}
 	return nil
 }
@@ -78,12 +78,12 @@ func (c *onEvictCache[K, V]) Flush() error {
 	// modifies [c.fifo], which violates the iterator's invariant.
 	var errs wrappers.Errs
 	for {
-		_, node, exists := c.removeOldest()
+		key, value, exists := c.removeOldest()
 		if !exists {
 			// The cache is empty.
 			return errs.Err
 		}
 
-		errs.Add(c.onEviction(node))
+		errs.Add(c.onEviction(key, value))
 	}
 }
