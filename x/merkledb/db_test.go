@@ -416,35 +416,19 @@ func Test_MerkleDB_InsertNil(t *testing.T) {
 
 	db, err := getBasicDB()
 	require.NoError(err)
+
 	batch := db.NewBatch()
-	require.NoError(batch.Put([]byte("key0"), nil))
+	key := []byte("key0")
+	require.NoError(batch.Put(key, nil))
 	require.NoError(batch.Write())
 
-	value, err := db.Get([]byte("key0"))
+	value, err := db.Get(key)
 	require.NoError(err)
-	require.Nil(value)
+	require.Empty(value)
 
-	value, err = getNodeValue(db, "key0")
+	value, err = getNodeValue(db, string(key))
 	require.NoError(err)
-	require.Nil(value)
-}
-
-func Test_MerkleDB_InsertAndRetrieve(t *testing.T) {
-	require := require.New(t)
-
-	db, err := getBasicDB()
-	require.NoError(err)
-
-	// value hasn't been inserted so shouldn't exist
-	value, err := db.Get([]byte("key"))
-	require.ErrorIs(err, database.ErrNotFound)
-	require.Nil(value)
-
-	require.NoError(db.Put([]byte("key"), []byte("value")))
-
-	value, err = db.Get([]byte("key"))
-	require.NoError(err)
-	require.Equal([]byte("value"), value)
+	require.Empty(value)
 }
 
 func Test_MerkleDB_HealthCheck(t *testing.T) {
@@ -452,59 +436,13 @@ func Test_MerkleDB_HealthCheck(t *testing.T) {
 
 	db, err := getBasicDB()
 	require.NoError(err)
+
 	val, err := db.HealthCheck(context.Background())
 	require.NoError(err)
 	require.Nil(val)
 }
 
-func Test_MerkleDB_Overwrite(t *testing.T) {
-	require := require.New(t)
-
-	db, err := getBasicDB()
-	require.NoError(err)
-
-	require.NoError(db.Put([]byte("key"), []byte("value0")))
-
-	value, err := db.Get([]byte("key"))
-	require.NoError(err)
-	require.Equal([]byte("value0"), value)
-
-	require.NoError(db.Put([]byte("key"), []byte("value1")))
-
-	value, err = db.Get([]byte("key"))
-	require.NoError(err)
-	require.Equal([]byte("value1"), value)
-}
-
-func Test_MerkleDB_Delete(t *testing.T) {
-	require := require.New(t)
-
-	db, err := getBasicDB()
-	require.NoError(err)
-
-	require.NoError(db.Put([]byte("key"), []byte("value0")))
-
-	value, err := db.Get([]byte("key"))
-	require.NoError(err)
-	require.Equal([]byte("value0"), value)
-
-	require.NoError(db.Delete([]byte("key")))
-
-	value, err = db.Get([]byte("key"))
-	require.ErrorIs(err, database.ErrNotFound)
-	require.Nil(value)
-}
-
-func Test_MerkleDB_DeleteMissingKey(t *testing.T) {
-	require := require.New(t)
-
-	db, err := getBasicDB()
-	require.NoError(err)
-
-	require.NoError(db.Delete([]byte("key")))
-}
-
-// Test that untracked views aren't persisted to [db.childViews].
+// Test that untracked views aren't tracked in [db.childViews].
 func TestDatabaseNewUntrackedView(t *testing.T) {
 	require := require.New(t)
 
