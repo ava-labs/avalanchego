@@ -35,7 +35,6 @@ const (
 
 	// TODO: name better
 	rebuildViewSizeFractionOfCacheSize   = 50
-	defaultEvictionBatchSize             = units.MiB
 	minRebuildViewSizePerCommit          = 1000
 	rebuildIntermediateDeletionWriteSize = units.MiB
 	valueNodePrefixLen                   = 1
