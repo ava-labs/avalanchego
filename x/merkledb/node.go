@@ -86,6 +86,7 @@ func (n *node) marshal() []byte {
 	if n.nodeBytes == nil {
 		n.nodeBytes = codec.encodeDBNode(&n.dbNode)
 	}
+	
 	return n.nodeBytes
 }
 
@@ -154,10 +155,7 @@ func (n *node) addChildWithoutNode(index byte, compressedPath path, childID ids.
 // Removes [child] from [n]'s children.
 func (n *node) removeChild(child *node) {
 	n.onNodeChanged()
-	index := child.key[len(n.key)]
-	if _, ok := n.children[index]; ok {
-		delete(n.children, index)
-	}
+	delete(n.children, child.key[len(n.key)])
 }
 
 // clone Returns a copy of [n].
