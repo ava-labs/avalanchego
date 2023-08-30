@@ -311,7 +311,8 @@ type merkleState struct {
 	chainCache  cache.Cacher[ids.ID, []*txs.Tx] // cache of subnetID -> the chains after all local modifications []*txs.Tx
 
 	// Blocks section
-	addedBlocks map[ids.ID]blocks.Block            // map of blockID -> Block
+	// Note: addedBlocks is a list because multiple blocks can be committed at one (proposal + accepted option)
+	addedBlocks map[ids.ID]blocks.Block            // map of blockID -> Block.
 	blockCache  cache.Cacher[ids.ID, blocks.Block] // cache of blockID -> Block. If the entry is nil, it is not in the database
 	blockDB     database.Database
 
@@ -1186,6 +1187,8 @@ func (ms *merkleState) processPendingStakers() (map[ids.ID]*stakersData, error) 
 	for subnetID, subnetValidatorDiffs := range ms.pendingStakers.validatorDiffs {
 		delete(ms.pendingStakers.validatorDiffs, subnetID)
 		for _, validatorDiff := range subnetValidatorDiffs {
+			// validatorDiff.validator is not guaranteed to be non-nil here.
+			// Access it only if validatorDiff.validatorStatus is added or deleted
 			switch validatorDiff.validatorStatus {
 			case added:
 				txID := validatorDiff.validator.TxID
@@ -1250,16 +1253,20 @@ func (ms *merkleState) writeMerkleState(currentData, pendingData map[ids.ID]*sta
 		return errs.Err
 	}
 
-	ctx := context.TODO()
-	view, err := ms.merkleDB.NewView(ctx, batchOps)
-	if err != nil {
-		return fmt.Errorf("failed creating merkleDB view: %w", err)
-	}
-	if err := view.CommitToDB(ctx); err != nil {
-		return fmt.Errorf("failed committing merkleDB view: %w", err)
+	if len(batchOps) != 0 {
+		// do commit only if there are changes to merkle state
+		ctx := context.TODO()
+		view, err := ms.merkleDB.NewView(ctx, batchOps)
+		if err != nil {
+			return fmt.Errorf("failed creating merkleDB view: %w", err)
+		}
+		if err := view.CommitToDB(ctx); err != nil {
+			return fmt.Errorf("failed committing merkleDB view: %w", err)
+		}
 	}
 
-	return ms.logMerkleRoot()
+	// log whether we had changes or not
+	return ms.logMerkleRoot(len(batchOps) != 0)
 }
 
 func (ms *merkleState) writeMetadata(batchOps *[]database.BatchOp) error {
@@ -1656,7 +1663,23 @@ func (ms *merkleState) updateValidatorSet(
 	return nil
 }
 
-func (ms *merkleState) logMerkleRoot() error {
+func (ms *merkleState) logMerkleRoot(hasChanges bool) error {
+	// get current Height
+	blk, err := ms.GetStatelessBlock(ms.GetLastAccepted())
+	if err != nil {
+		// may happen in tests. Let's just skip
+		return nil
+	}
+
+	if !hasChanges {
+		ms.ctx.Log.Info("merkle root",
+			zap.Uint64("height", blk.Height()),
+			zap.Stringer("blkID", blk.ID()),
+			zap.String("merkle root", "no changes to merkle state"),
+		)
+		return nil
+	}
+
 	ctx := context.TODO()
 	view, err := ms.merkleDB.NewView(ctx, nil)
 	if err != nil {
@@ -1667,15 +1690,9 @@ func (ms *merkleState) logMerkleRoot() error {
 		return fmt.Errorf("failed pulling merkle root: %w", err)
 	}
 
-	// get current Height
-	blk, err := ms.GetStatelessBlock(ms.GetLastAccepted())
-	if err != nil {
-		// may happen in tests. Let's just skip
-		return nil
-	}
-
 	ms.ctx.Log.Info("merkle root",
 		zap.Uint64("height", blk.Height()),
+		zap.Stringer("blkID", blk.ID()),
 		zap.String("merkle root", root.String()),
 	)
 	return nil
