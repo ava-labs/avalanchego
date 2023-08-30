@@ -91,7 +91,7 @@ func (db *intermediateNodeDB) addToBatch(b database.Batch, key path, n *node) er
 	if n == nil {
 		return b.Delete(prefixedKey)
 	}
-	return b.Put(prefixedKey, n.marshal())
+	return b.Put(prefixedKey, n.bytes())
 }
 
 func (db *intermediateNodeDB) Get(key path) (*node, error) {
