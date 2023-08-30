@@ -88,4 +88,6 @@ type ChainConfig interface {
 	GetFeeConfig() commontype.FeeConfig
 	// AllowedFeeRecipients returns true if fee recipients are allowed in the genesis.
 	AllowedFeeRecipients() bool
+	// IsDUpgrade returns true if the time is after the DUpgrade.
+	IsDUpgrade(time uint64) bool
 }
