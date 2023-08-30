@@ -4,9 +4,10 @@
 package merkledb
 
 import (
+	"unsafe"
+
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
-	"unsafe"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -97,7 +98,7 @@ func (n *node) marshal() []byte {
 	if n.nodeBytes == nil {
 		n.nodeBytes = codec.encodeDBNode(&n.dbNode)
 	}
-
+	n.size += len(n.nodeBytes)
 	return n.nodeBytes
 }
 
@@ -106,7 +107,7 @@ func (n *node) marshal() []byte {
 func (n *node) onNodeChanged() {
 	n.id = ids.Empty
 	n.nodeBytes = nil
-
+	n.size -= len(n.nodeBytes)
 }
 
 // Returns and caches the ID of this node.

@@ -4,9 +4,10 @@
 package merkledb
 
 import (
-	"github.com/ava-labs/avalanchego/database"
 	"sync"
 	"testing"
+
+	"github.com/ava-labs/avalanchego/database"
 
 	"github.com/stretchr/testify/require"
 
