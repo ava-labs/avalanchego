@@ -70,7 +70,7 @@ func TestIntermediateNodeDB(t *testing.T) {
 	// Assert the key-node pair was deleted
 	require.Equal(database.ErrNotFound, err)
 
-	// Put [cacheSize] elements in the cache
+	// Put elements in the cache until it is full.
 	expectedSize := cacheEntrySize(key, nil)
 	added := 0
 	for {
@@ -82,6 +82,7 @@ func TestIntermediateNodeDB(t *testing.T) {
 		}
 		newExpectedSize := expectedSize + cacheEntrySize(key, node)
 		if newExpectedSize > cacheSize {
+			// Don't trigger eviction.
 			break
 		}
 
@@ -121,7 +122,7 @@ func TestIntermediateNodeDB(t *testing.T) {
 	// Assert the cache is empty
 	require.Zero(db.nodeCache.fifo.Len())
 
-	// Assert all [cacheSize]+1 elements evicted were written to disk with prefix.
+	// Assert the evicted cache elements were written to disk with prefix.
 	it := baseDB.NewIteratorWithPrefix(intermediateNodePrefix)
 	defer it.Release()
 
