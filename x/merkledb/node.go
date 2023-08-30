@@ -33,6 +33,7 @@ type dbNode struct {
 type child struct {
 	compressedPath path
 	id             ids.ID
+	hasValue       bool
 }
 
 // node holds additional information on top of the dbNode that makes calulcations easier to do
@@ -137,25 +138,18 @@ func (n *node) addChild(child *node) {
 		child.key[len(n.key)],
 		child.key[len(n.key)+1:],
 		child.id,
+		child.hasValue(),
 	)
 }
 
 // Adds a child to [n] without a reference to the child node.
-func (n *node) addChildWithoutNode(index byte, compressedPath path, childID ids.ID) {
+func (n *node) addChildWithoutNode(index byte, compressedPath path, childID ids.ID, hasValue bool) {
 	n.onNodeChanged()
 	n.children[index] = child{
 		compressedPath: compressedPath,
 		id:             childID,
+		hasValue:       hasValue,
 	}
-}
-
-// Returns the path of the only child of this node.
-// Assumes this node has exactly one child.
-func (n *node) getSingleChildPath() path {
-	for index, entry := range n.children {
-		return n.key + path(index) + entry.compressedPath
-	}
-	return ""
 }
 
 // Removes [child] from [n]'s children.

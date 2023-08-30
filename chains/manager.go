@@ -751,14 +751,19 @@ func (m *manager) createAvalancheChain(
 	}
 
 	// Initialize the ProposerVM and the vm wrapped inside it
-	minBlockDelay := proposervm.DefaultMinBlockDelay
+	var (
+		minBlockDelay       = proposervm.DefaultMinBlockDelay
+		numHistoricalBlocks = proposervm.DefaultNumHistoricalBlocks
+	)
 	if subnetCfg, ok := m.SubnetConfigs[ctx.SubnetID]; ok {
 		minBlockDelay = subnetCfg.ProposerMinBlockDelay
+		numHistoricalBlocks = subnetCfg.ProposerNumHistoricalBlocks
 	}
 	m.Log.Info("creating proposervm wrapper",
 		zap.Time("activationTime", m.ApricotPhase4Time),
 		zap.Uint64("minPChainHeight", m.ApricotPhase4MinPChainHeight),
 		zap.Duration("minBlockDelay", minBlockDelay),
+		zap.Uint64("numHistoricalBlocks", numHistoricalBlocks),
 	)
 
 	chainAlias := m.PrimaryAliasOrDefault(ctx.ChainID)
@@ -778,6 +783,7 @@ func (m *manager) createAvalancheChain(
 		m.ApricotPhase4Time,
 		m.ApricotPhase4MinPChainHeight,
 		minBlockDelay,
+		numHistoricalBlocks,
 		m.stakingSigner,
 		m.stakingCert,
 	)
@@ -1100,14 +1106,19 @@ func (m *manager) createSnowmanChain(
 		return nil, fmt.Errorf("error while fetching chain config: %w", err)
 	}
 
-	minBlockDelay := proposervm.DefaultMinBlockDelay
+	var (
+		minBlockDelay       = proposervm.DefaultMinBlockDelay
+		numHistoricalBlocks = proposervm.DefaultNumHistoricalBlocks
+	)
 	if subnetCfg, ok := m.SubnetConfigs[ctx.SubnetID]; ok {
 		minBlockDelay = subnetCfg.ProposerMinBlockDelay
+		numHistoricalBlocks = subnetCfg.ProposerNumHistoricalBlocks
 	}
 	m.Log.Info("creating proposervm wrapper",
 		zap.Time("activationTime", m.ApricotPhase4Time),
 		zap.Uint64("minPChainHeight", m.ApricotPhase4MinPChainHeight),
 		zap.Duration("minBlockDelay", minBlockDelay),
+		zap.Uint64("numHistoricalBlocks", numHistoricalBlocks),
 	)
 
 	chainAlias := m.PrimaryAliasOrDefault(ctx.ChainID)
@@ -1120,6 +1131,7 @@ func (m *manager) createSnowmanChain(
 		m.ApricotPhase4Time,
 		m.ApricotPhase4MinPChainHeight,
 		minBlockDelay,
+		numHistoricalBlocks,
 		m.stakingSigner,
 		m.stakingCert,
 	)

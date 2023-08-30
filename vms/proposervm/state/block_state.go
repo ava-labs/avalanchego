@@ -31,6 +31,7 @@ var (
 type BlockState interface {
 	GetBlock(blkID ids.ID) (block.Block, choices.Status, error)
 	PutBlock(blk block.Block, status choices.Status) error
+	DeleteBlock(blkID ids.ID) error
 }
 
 type blockState struct {
@@ -133,4 +134,9 @@ func (s *blockState) PutBlock(blk block.Block, status choices.Status) error {
 	blkID := blk.ID()
 	s.blkCache.Put(blkID, &blkWrapper)
 	return s.db.Put(blkID[:], bytes)
+}
+
+func (s *blockState) DeleteBlock(blkID ids.ID) error {
+	s.blkCache.Evict(blkID)
+	return s.db.Delete(blkID[:])
 }
