@@ -16,7 +16,7 @@ func TestNewOnEvictCache(t *testing.T) {
 	require := require.New(t)
 
 	called := false
-	onEviction := func(int) error {
+	onEviction := func(int, int) error {
 		called = true
 		return nil
 	}
@@ -28,7 +28,7 @@ func TestNewOnEvictCache(t *testing.T) {
 	require.Zero(cache.fifo.Len())
 	// Can't test function equality directly so do this
 	// to make sure it was assigned correctly
-	require.NoError(cache.onEviction(0))
+	require.NoError(cache.onEviction(0, 0))
 	require.True(called)
 }
 
@@ -38,9 +38,11 @@ func TestNewOnEvictCache(t *testing.T) {
 func TestOnEvictCacheNoOnEvictionError(t *testing.T) {
 	require := require.New(t)
 
-	evicted := []int{}
-	onEviction := func(n int) error {
-		evicted = append(evicted, n)
+	evictedKey := []int{}
+	evictedValue := []int{}
+	onEviction := func(k, n int) error {
+		evictedKey = append(evictedKey, k)
+		evictedValue = append(evictedValue, n)
 		return nil
 	}
 	maxSize := 3
@@ -69,15 +71,17 @@ func TestOnEvictCacheNoOnEvictionError(t *testing.T) {
 		require.NoError(cache.Put(i, i))
 		require.Equal(i+1, cache.fifo.Len())
 	}
-	require.Empty(evicted)
-
+	require.Empty(evictedKey)
+	require.Empty(evictedValue)
 	// Cache has [0,1,2]
 
 	// Put another key. This should evict the oldest inserted key (0).
 	require.NoError(cache.Put(maxSize, maxSize))
 	require.Equal(maxSize, cache.fifo.Len())
-	require.Len(evicted, 1)
-	require.Zero(evicted[0])
+	require.Len(evictedKey, 1)
+	require.Zero(evictedKey[0])
+	require.Len(evictedValue, 1)
+	require.Zero(evictedValue[0])
 
 	// Cache has [1,2,3]
 	iter := cache.fifo.NewIterator()
@@ -119,8 +123,10 @@ func TestOnEvictCacheNoOnEvictionError(t *testing.T) {
 	// Put another key to evict the oldest inserted key (1).
 	require.NoError(cache.Put(maxSize+1, maxSize+1))
 	require.Equal(maxSize, cache.fifo.Len())
-	require.Len(evicted, 2)
-	require.Equal(1, evicted[1])
+	require.Len(evictedKey, 2)
+	require.Equal(1, evictedKey[1])
+	require.Len(evictedValue, 2)
+	require.Equal(1, evictedValue[1])
 
 	// Cache has [2,3,4]
 	iter = cache.fifo.NewIterator()
@@ -143,8 +149,10 @@ func TestOnEvictCacheNoOnEvictionError(t *testing.T) {
 
 	// Cache should be empty
 	require.Zero(cache.fifo.Len())
-	require.Len(evicted, 5)
-	require.Equal([]int{0, 1, 2, 3, 4}, evicted)
+	require.Len(evictedKey, 5)
+	require.Equal([]int{0, 1, 2, 3, 4}, evictedKey)
+	require.Len(evictedValue, 5)
+	require.Equal([]int{0, 1, 2, 3, 4}, evictedValue)
 	require.Zero(cache.fifo.Len())
 	require.Equal(maxSize, cache.maxSize) // Should be unchanged
 }
@@ -156,7 +164,7 @@ func TestOnEvictCacheOnEvictionError(t *testing.T) {
 	var (
 		require    = require.New(t)
 		evicted    = []int{}
-		onEviction = func(n int) error {
+		onEviction = func(_, n int) error {
 			// Evicting even keys errors
 			evicted = append(evicted, n)
 			if n%2 == 0 {

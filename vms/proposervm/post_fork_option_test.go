@@ -664,6 +664,7 @@ func TestOptionTimestampValidity(t *testing.T) {
 		time.Time{},
 		0,
 		DefaultMinBlockDelay,
+		DefaultNumHistoricalBlocks,
 		pTestSigner,
 		pTestCert,
 	)
