@@ -97,8 +97,8 @@ func (n *node) hasValue() bool {
 func (n *node) marshal() []byte {
 	if n.nodeBytes == nil {
 		n.nodeBytes = codec.encodeDBNode(&n.dbNode)
+		n.size += len(n.nodeBytes)
 	}
-	n.size += len(n.nodeBytes)
 	return n.nodeBytes
 }
 
@@ -106,8 +106,8 @@ func (n *node) marshal() []byte {
 // for example, node ID and byte representation
 func (n *node) onNodeChanged() {
 	n.id = ids.Empty
-	n.nodeBytes = nil
 	n.size -= len(n.nodeBytes)
+	n.nodeBytes = nil
 }
 
 // Returns and caches the ID of this node.
