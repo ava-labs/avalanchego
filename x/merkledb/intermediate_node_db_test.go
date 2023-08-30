@@ -23,7 +23,7 @@ import (
 func TestIntermediateNodeDB(t *testing.T) {
 	require := require.New(t)
 
-	cacheSize := 10
+	cacheSize := 100
 	evictionBatchSize := cacheSize
 	baseDB := memdb.New()
 	db := newIntermediateNodeDB(
@@ -71,21 +71,31 @@ func TestIntermediateNodeDB(t *testing.T) {
 	require.Equal(database.ErrNotFound, err)
 
 	// Put [cacheSize] elements in the cache
-	for i := byte(0); i < byte(cacheSize); i++ {
-		key := newPath([]byte{i})
+	expectedSize := cacheEntrySize(key, nil)
+	added := 0
+	for {
+		key := newPath([]byte{byte(added)})
 		node := &node{
 			dbNode: dbNode{
-				value: maybe.Some([]byte{i}),
+				value: maybe.Some([]byte{byte(added)}),
 			},
 		}
+		newExpectedSize := expectedSize + cacheEntrySize(key, node)
+		if newExpectedSize > cacheSize {
+			break
+		}
+
 		require.NoError(db.Put(key, node))
+		expectedSize = newExpectedSize
+		added++
 	}
 
 	// Assert cache has expected number of elements
-	require.Equal(cacheSize, db.nodeCache.fifo.Len())
+	require.Equal(added, db.nodeCache.fifo.Len())
 
 	// Put one more element in the cache, which should trigger an eviction
-	// of all but 1 element
+	// of all but 2 elements. 2 elements remain rather than 1 element because of
+	// the added key prefix increasing the size tracked by the batch.
 	key = newPath([]byte{byte(cacheSize)})
 	node := &node{
 		dbNode: dbNode{
@@ -95,11 +105,10 @@ func TestIntermediateNodeDB(t *testing.T) {
 	require.NoError(db.Put(key, node))
 
 	// Assert cache has expected number of elements
-	require.Equal(1, db.nodeCache.fifo.Len())
-	gotKey, gotNode, ok := db.nodeCache.fifo.Oldest()
+	require.Equal(2, db.nodeCache.fifo.Len())
+	gotKey, _, ok := db.nodeCache.fifo.Oldest()
 	require.True(ok)
-	require.Equal(key, gotKey)
-	require.Equal(node, gotNode)
+	require.Equal(newPath([]byte{byte(added - 1)}), gotKey)
 
 	// Get a node from the base database (not cache)
 	nodeRead, err := db.Get(newPath([]byte{0x03}))
@@ -121,5 +130,5 @@ func TestIntermediateNodeDB(t *testing.T) {
 		count++
 	}
 	require.NoError(it.Error())
-	require.Equal(cacheSize+1, count)
+	require.Equal(added+1, count)
 }
