@@ -4,12 +4,12 @@
 package merkledb
 
 import (
+	"github.com/ava-labs/avalanchego/database"
 	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 )
@@ -23,7 +23,8 @@ import (
 func TestIntermediateNodeDB(t *testing.T) {
 	require := require.New(t)
 
-	cacheSize := 100
+	// use exact multiple of node size so require.Equal(1, db.nodeCache.fifo.Len()) is correct later
+	cacheSize := 132
 	evictionBatchSize := cacheSize
 	baseDB := memdb.New()
 	db := newIntermediateNodeDB(
@@ -38,11 +39,8 @@ func TestIntermediateNodeDB(t *testing.T) {
 
 	// Put a key-node pair
 	key := newPath([]byte{0x01})
-	node1 := &node{
-		dbNode: dbNode{
-			value: maybe.Some([]byte{0x01}),
-		},
-	}
+	node1 := newNode(nil, key)
+	node1.setValue(maybe.Some([]byte{byte(0x01)}))
 	require.NoError(db.Put(key, node1))
 
 	// Get the key-node pair from cache
@@ -51,11 +49,8 @@ func TestIntermediateNodeDB(t *testing.T) {
 	require.Equal(node1, node1Read)
 
 	// Overwrite the key-node pair
-	node1Updated := &node{
-		dbNode: dbNode{
-			value: maybe.Some([]byte{0x02}),
-		},
-	}
+	node1Updated := newNode(nil, key)
+	node1Updated.setValue(maybe.Some([]byte{byte(0x02)}))
 	require.NoError(db.Put(key, node1Updated))
 
 	// Assert the key-node pair was overwritten
@@ -71,15 +66,12 @@ func TestIntermediateNodeDB(t *testing.T) {
 	require.Equal(database.ErrNotFound, err)
 
 	// Put elements in the cache until it is full.
-	expectedSize := cacheEntrySize(key, nil)
+	expectedSize := 0
 	added := 0
 	for {
 		key := newPath([]byte{byte(added)})
-		node := &node{
-			dbNode: dbNode{
-				value: maybe.Some([]byte{byte(added)}),
-			},
-		}
+		node := newNode(nil, EmptyPath)
+		node.setValue(maybe.Some([]byte{byte(added)}))
 		newExpectedSize := expectedSize + cacheEntrySize(key, node)
 		if newExpectedSize > cacheSize {
 			// Don't trigger eviction.
@@ -97,24 +89,22 @@ func TestIntermediateNodeDB(t *testing.T) {
 	// Put one more element in the cache, which should trigger an eviction
 	// of all but 2 elements. 2 elements remain rather than 1 element because of
 	// the added key prefix increasing the size tracked by the batch.
-	key = newPath([]byte{byte(cacheSize)})
-	node := &node{
-		dbNode: dbNode{
-			value: maybe.Some([]byte{byte(cacheSize)}),
-		},
-	}
+	key = newPath([]byte{byte(added)})
+	node := newNode(nil, EmptyPath)
+	node.setValue(maybe.Some([]byte{byte(added)}))
 	require.NoError(db.Put(key, node))
 
 	// Assert cache has expected number of elements
-	require.Equal(2, db.nodeCache.fifo.Len())
+	require.Equal(1, db.nodeCache.fifo.Len())
 	gotKey, _, ok := db.nodeCache.fifo.Oldest()
 	require.True(ok)
-	require.Equal(newPath([]byte{byte(added - 1)}), gotKey)
+	require.Equal(newPath([]byte{byte(added)}), gotKey)
 
-	// Get a node from the base database (not cache)
-	nodeRead, err := db.Get(newPath([]byte{0x03}))
+	// Get a node from the base database
+	// Use an early key that has been evicted from the cache
+	nodeRead, err := db.Get(newPath([]byte{0x01}))
 	require.NoError(err)
-	require.Equal(maybe.Some([]byte{0x03}), nodeRead.value)
+	require.Equal(maybe.Some([]byte{0x01}), nodeRead.value)
 
 	// Flush the cache.
 	require.NoError(db.Flush())

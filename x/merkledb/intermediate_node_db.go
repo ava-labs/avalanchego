@@ -57,6 +57,7 @@ func newIntermediateNodeDB(
 func (db *intermediateNodeDB) onEviction(key path, n *node) error {
 	writeBatch := db.baseDB.NewBatch()
 
+	totalSize := cacheEntrySize(key, n)
 	if err := db.addToBatch(writeBatch, key, n); err != nil {
 		_ = db.baseDB.Close()
 		return err
@@ -66,12 +67,13 @@ func (db *intermediateNodeDB) onEviction(key path, n *node) error {
 	// and write them to disk. We write a batch of them, rather than
 	// just [n], so that we don't immediately evict and write another
 	// node, because each time this method is called we do a disk write.
-	for writeBatch.Size() < db.evictionBatchSize {
+	for totalSize < db.evictionBatchSize {
 		key, n, exists := db.nodeCache.removeOldest()
 		if !exists {
 			// The cache is empty.
 			break
 		}
+		totalSize += cacheEntrySize(key, n)
 		if err := db.addToBatch(writeBatch, key, n); err != nil {
 			_ = db.baseDB.Close()
 			return err
