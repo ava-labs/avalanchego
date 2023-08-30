@@ -232,8 +232,8 @@ func newMerklsState(
 		addedRewardUTXOs: make(map[ids.ID][]*avax.UTXO),
 		rewardUTXOsCache: rewardUTXOsCache,
 
-		supplies:      make(map[ids.ID]uint64),
-		suppliesCache: suppliesCache,
+		modifiedSupplies: make(map[ids.ID]uint64),
+		suppliesCache:    suppliesCache,
 
 		addedPermissionedSubnets: make([]*txs.Tx, 0),
 		permissionedSubnetCache:  nil, // created first time GetSubnets is called
@@ -294,11 +294,11 @@ type merkleState struct {
 	rewardUTXOsCache cache.Cacher[ids.ID, []*avax.UTXO] // txID -> []*UTXO
 
 	// Metadata section
-	chainTime          time.Time
-	lastAcceptedBlkID  ids.ID
-	lastAcceptedHeight uint64                        // TODO: Should this be written to state??
-	supplies           map[ids.ID]uint64             // map of subnetID -> current supply
-	suppliesCache      cache.Cacher[ids.ID, *uint64] // cache of subnetID -> current supply if the entry is nil, it is not in the database
+	chainTime, latestComittedChainTime                  time.Time
+	lastAcceptedBlkID, latestCommittedLastAcceptedBlkID ids.ID
+	lastAcceptedHeight                                  uint64                        // TODO: Should this be written to state??
+	modifiedSupplies                                    map[ids.ID]uint64             // map of subnetID -> current supply
+	suppliesCache                                       cache.Cacher[ids.ID, *uint64] // cache of subnetID -> current supply if the entry is nil, it is not in the database
 
 	// Subnets section
 	addedPermissionedSubnets []*txs.Tx                     // added SubnetTxs, waiting to be committed
@@ -575,7 +575,7 @@ func (ms *merkleState) SetHeight(height uint64) {
 }
 
 func (ms *merkleState) GetCurrentSupply(subnetID ids.ID) (uint64, error) {
-	supply, ok := ms.supplies[subnetID]
+	supply, ok := ms.modifiedSupplies[subnetID]
 	if ok {
 		return supply, nil
 	}
@@ -608,7 +608,7 @@ func (ms *merkleState) GetCurrentSupply(subnetID ids.ID) (uint64, error) {
 }
 
 func (ms *merkleState) SetCurrentSupply(subnetID ids.ID, cs uint64) {
-	ms.supplies[subnetID] = cs
+	ms.modifiedSupplies[subnetID] = cs
 }
 
 // SUBNETS Section
@@ -1270,27 +1270,33 @@ func (ms *merkleState) writeMerkleState(currentData, pendingData map[ids.ID]*sta
 }
 
 func (ms *merkleState) writeMetadata(batchOps *[]database.BatchOp) error {
-	encodedChainTime, err := ms.chainTime.MarshalBinary()
-	if err != nil {
-		return fmt.Errorf("failed to encoding chainTime: %w", err)
+	if !ms.chainTime.Equal(ms.latestComittedChainTime) {
+		encodedChainTime, err := ms.chainTime.MarshalBinary()
+		if err != nil {
+			return fmt.Errorf("failed to encoding chainTime: %w", err)
+		}
+
+		*batchOps = append(*batchOps, database.BatchOp{
+			Key:   merkleChainTimeKey,
+			Value: encodedChainTime,
+		})
+		ms.latestComittedChainTime = ms.chainTime
 	}
 
-	*batchOps = append(*batchOps, database.BatchOp{
-		Key:   merkleChainTimeKey,
-		Value: encodedChainTime,
-	})
-
-	*batchOps = append(*batchOps, database.BatchOp{
-		Key:   merkleLastAcceptedBlkIDKey,
-		Value: ms.lastAcceptedBlkID[:],
-	})
+	if ms.lastAcceptedBlkID != ms.latestCommittedLastAcceptedBlkID {
+		*batchOps = append(*batchOps, database.BatchOp{
+			Key:   merkleLastAcceptedBlkIDKey,
+			Value: ms.lastAcceptedBlkID[:],
+		})
+		ms.latestCommittedLastAcceptedBlkID = ms.lastAcceptedBlkID
+	}
 
 	// lastAcceptedBlockHeight not persisted yet in merkleDB state.
 	// TODO: Consider if it should be
 
-	for subnetID, supply := range ms.supplies {
+	for subnetID, supply := range ms.modifiedSupplies {
 		supply := supply
-		delete(ms.supplies, subnetID)
+		delete(ms.modifiedSupplies, subnetID) // clear up ms.supplies to avoid potential double commits
 		ms.suppliesCache.Put(subnetID, &supply)
 
 		key := merkleSuppliesKey(subnetID)

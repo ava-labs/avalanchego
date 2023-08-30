@@ -9,7 +9,6 @@ import (
 
 	"github.com/google/btree"
 
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -174,6 +173,7 @@ func (ms *merkleState) loadMerkleMetadata() error {
 	if err := chainTime.UnmarshalBinary(chainTimeBytes); err != nil {
 		return err
 	}
+	ms.latestComittedChainTime = chainTime
 	ms.SetTimestamp(chainTime)
 
 	// load last accepted block
@@ -183,21 +183,13 @@ func (ms *merkleState) loadMerkleMetadata() error {
 	}
 	lastAcceptedBlkID := ids.Empty
 	copy(lastAcceptedBlkID[:], blkIDBytes)
+	ms.latestCommittedLastAcceptedBlkID = lastAcceptedBlkID
 	ms.SetLastAccepted(lastAcceptedBlkID)
 
-	// load supplies
-	suppliedPrefix := merkleSuppliesKeyPrefix()
-	iter := ms.merkleDB.NewIteratorWithPrefix(suppliedPrefix)
-	defer iter.Release()
-	for iter.Next() {
-		_, subnetID := splitMerkleSuppliesKey(iter.Key())
-		supply, err := database.ParseUInt64(iter.Value())
-		if err != nil {
-			return err
-		}
-		ms.supplies[subnetID] = supply
-	}
-	return iter.Error()
+	// wen don't need to load supplies. Unlike chainTime and lastBlkID
+	// which have the persisted* attribute, we signal supplies have not
+	// been modified by having an empty map.
+	return nil
 }
 
 func (ms *merkleState) loadCurrentStakers() error {
