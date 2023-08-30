@@ -24,7 +24,7 @@ type valueNodeDB struct {
 
 	// If a value is nil, the corresponding key isn't in the trie.
 	// Paths in [nodeCache] aren't prefixed with [valueNodePrefix].
-	nodeCache cache.LRU[path, *node]
+	nodeCache cache.Cacher[path, *node]
 	metrics   merkleMetrics
 
 	closed utils.Atomic[bool]
@@ -35,7 +35,7 @@ func newValueNodeDB(db database.Database, bufferPool *sync.Pool, metrics merkleM
 		metrics:    metrics,
 		baseDB:     db,
 		bufferPool: bufferPool,
-		nodeCache:  cache.LRU[path, *node]{Size: size},
+		nodeCache:  cache.NewSizedLRU(size, cacheEntrySize),
 	}
 }
 
