@@ -144,8 +144,6 @@ There are several examples, in the examples directory, that simulate real world
 use-cases. Try running them via the command-line, via `cargo run --release
 --example simple`.
 
-To integrate firewood into a custom VM or other project, see the [firewood-connection](./firewood-connection/README.md) for a straightforward way to use firewood via custom message-passing.
-
 ## Release
 See the [release documentation](./RELEASE.md) for detailed information on how to release firewood. 
 
