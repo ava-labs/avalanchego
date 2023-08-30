@@ -48,7 +48,17 @@ type archiveDB struct {
 }
 
 var (
-	currentHeightKey = "archivedb.height"
+	// Meta key that stores the current height of the database. This height is
+	// being incremented everytime a new batch is inserted
+	currentHeightKey = []byte("archivedb:height")
+	// A secondary index is built to keep track of all the known keys. This
+	// index cna be used to iterate and get all the defined keys by a given
+	// prefix. The alternative, would be to read a key, then read the next key
+	// by leveraging the natural ordering of keys, but that would imply random
+	// reads instead of a cheap sequential read of all keys
+	secondaryKeysIndexPrefix = []byte("archivedb:keys:")
+	// The requested height is not yet defined therefore it is unknown to the
+	// database
 	ErrUnknownHeight = errors.New("unknown height")
 )
 
@@ -63,7 +73,7 @@ func NewArchiveDB(
 	db database.Database,
 ) (*archiveDB, error) {
 	var currentHeight uint64
-	height, err := db.Get([]byte(currentHeightKey))
+	height, err := db.Get(currentHeightKey)
 	if err != nil {
 		if !errors.Is(err, database.ErrNotFound) {
 			return nil, err
@@ -83,6 +93,32 @@ func NewArchiveDB(
 // Tiny wrapper on top Get() passing the last stored height
 func (db *archiveDB) GetLastBlock(key []byte) ([]byte, uint64, error) {
 	return db.Get(key, db.currentHeight)
+}
+
+// Returns an iterator with all keys defined under a given prefix. The iterator
+// will return the key with the value being the height at which the key has been
+// defined for the first time
+func (db *archiveDB) GetKeysByPrefix(prefix []byte) keysIterator {
+	uniqueKeyIndexKey := make([]byte, 0, len(secondaryKeysIndexPrefix)+len(prefix))
+	uniqueKeyIndexKey = append(uniqueKeyIndexKey, secondaryKeysIndexPrefix...)
+	uniqueKeyIndexKey = append(uniqueKeyIndexKey, prefix...)
+	return keysIterator{
+		iterator: db.rawDB.NewIteratorWithPrefix(uniqueKeyIndexKey),
+	}
+}
+
+// Returns all the keys defined at a given height.
+//
+// The result is an iteration that will list all the defined keys at a given
+// height, their value and the height at which those values were set
+func (db *archiveDB) GetAllAtHeight(prefix []byte, height uint64) allKeysAtHeightIterator {
+	return allKeysAtHeightIterator{
+		db:          db,
+		keyIterator: db.GetKeysByPrefix(prefix),
+		height:      height,
+		lastKey:     []byte{},
+		lastValue:   []byte{},
+	}
 }
 
 // Fetches the value of a given prefix at a given height.
@@ -107,19 +143,19 @@ func (db *archiveDB) Get(key []byte, height uint64) ([]byte, uint64, error) {
 			return nil, 0, database.ErrNotFound
 		}
 
-		internalKey, err := parseKey(iterator.Key())
+		parsedKey, err := parseKey(iterator.Key())
 		if err != nil {
 			return nil, 0, err
 		}
 
-		if !bytes.Equal(internalKey.key, key) {
-			if keyLength < len(internalKey.key) {
+		if !bytes.Equal(parsedKey.key, key) {
+			if keyLength < len(parsedKey.key) {
 				// The current key is a longer than the requested key, now check
 				// if they match at the same length as `key`, if that is the
 				// case we should continue to the next key, until the exact
 				// requested key is found or anothe prefix is found and by that
 				// point it would exit
-				if bytes.Equal(internalKey.key[0:keyLength], key) {
+				if bytes.Equal(parsedKey.key[0:keyLength], key) {
 					// Same prefix, read the next key until the prefix is
 					// different or the exact requested key is found
 					continue
@@ -131,14 +167,14 @@ func (db *archiveDB) Get(key []byte, height uint64) ([]byte, uint64, error) {
 			return nil, 0, database.ErrNotFound
 		}
 
-		if internalKey.isDeleted {
+		if parsedKey.isDeleted {
 			// The database is append only, so when removing a record creates a new
 			// record with an special flag is being created. Before returning the
 			// value we check if the deleted flag is present or not.
 			return nil, 0, database.ErrNotFound
 		}
 
-		return iterator.Value(), internalKey.height, nil
+		return iterator.Value(), parsedKey.height, nil
 	}
 }
 
@@ -149,7 +185,7 @@ func (db *archiveDB) NewBatch() (batchWithHeight, error) {
 	batch := db.rawDB.NewBatch()
 	nextHeight := db.currentHeight + 1
 	binary.BigEndian.PutUint64(nextHeightBytes[:], nextHeight)
-	err := batch.Put([]byte(currentHeightKey), nextHeightBytes[:])
+	err := batch.Put(currentHeightKey, nextHeightBytes[:])
 	if err != nil {
 		return batchWithHeight{}, err
 	}
@@ -183,6 +219,31 @@ func (c *batchWithHeight) Delete(key []byte) error {
 
 // Queues an insert for a key with a given
 func (c *batchWithHeight) Put(key []byte, value []byte) error {
+	uniqueKeyIndexKey := make([]byte, 0, len(secondaryKeysIndexPrefix)+len(key))
+	uniqueKeyIndexKey = append(uniqueKeyIndexKey, secondaryKeysIndexPrefix...)
+	uniqueKeyIndexKey = append(uniqueKeyIndexKey, key...)
+
+	keyAlreadyExists, err := c.db.rawDB.Has(uniqueKeyIndexKey)
+	if err != nil {
+		return err
+	}
+	if !keyAlreadyExists {
+		// The key has not being seeing before
+		//
+		// It must be stored in the database with a special prefix. This is sort
+		// of a secondary index that will allow to iterate and fetch all keys
+		// given a prefix, and get all their values defined at a given height.
+		//
+		// This section of the code should happen once for each new key. Keys
+		// updating their values should not trigger this section of the code,
+		// since the sole responsibility of this secondary index is to get a
+		// list of all known keys, to query by a given prefix later
+		var heightBytes [8]byte
+		binary.BigEndian.PutUint64(heightBytes[:], c.height)
+		if err := c.batch.Put(uniqueKeyIndexKey, heightBytes[:]); err != nil {
+			return err
+		}
+	}
 	internalKey := newInternalKey(key, c.height)
 	return c.batch.Put(internalKey.Bytes(), value)
 }
