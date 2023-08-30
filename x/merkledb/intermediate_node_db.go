@@ -45,7 +45,11 @@ func newIntermediateNodeDB(
 		bufferPool:        bufferPool,
 		evictionBatchSize: evictionBatchSize,
 	}
-	result.nodeCache = newOnEvictCache[path](size, result.onEviction)
+	result.nodeCache = newOnEvictCache(
+		size,
+		cacheEntrySize,
+		result.onEviction,
+	)
 	return result
 }
 
@@ -62,8 +66,7 @@ func (db *intermediateNodeDB) onEviction(key path, n *node) error {
 	// and write them to disk. We write a batch of them, rather than
 	// just [n], so that we don't immediately evict and write another
 	// node, because each time this method is called we do a disk write.
-	// we have already removed the passed n, so the remove count starts at 1
-	for removedCount := 1; removedCount < db.evictionBatchSize; removedCount++ {
+	for writeBatch.Size() < db.evictionBatchSize {
 		key, n, exists := db.nodeCache.removeOldest()
 		if !exists {
 			// The cache is empty.
