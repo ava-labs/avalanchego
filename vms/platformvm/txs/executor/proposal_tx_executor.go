@@ -402,7 +402,7 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 	}
 
 	// handle option preference
-	shouldCommit, err := e.calculateProposalPreference(stakerToReward, primaryNetworkValidator)
+	shouldCommit, err := e.shouldBeRewarded(stakerToReward, primaryNetworkValidator)
 	if err != nil {
 		return err
 	}
@@ -438,10 +438,10 @@ func (e *ProposalTxExecutor) rewardValidatorTx(uValidatorTx txs.ValidatorTx, val
 	utxosOffset := len(outputs) + len(stake)
 
 	// Provide the reward here
-	rewardToPayBack := validator.PotentialReward
-	if rewardToPayBack > 0 {
+	reward := validator.PotentialReward
+	if reward > 0 {
 		validationRewardsOwner := uValidatorTx.ValidationRewardsOwner()
-		outIntf, err := e.Fx.CreateOutput(rewardToPayBack, validationRewardsOwner)
+		outIntf, err := e.Fx.CreateOutput(reward, validationRewardsOwner)
 		if err != nil {
 			return fmt.Errorf("failed to create output: %w", err)
 		}
@@ -465,7 +465,7 @@ func (e *ProposalTxExecutor) rewardValidatorTx(uValidatorTx txs.ValidatorTx, val
 	}
 
 	// Provide the accrued delegatee rewards from successful delegations here.
-	delegateeRewardToPayBack, err := e.OnCommitState.GetDelegateeReward(
+	delegateeReward, err := e.OnCommitState.GetDelegateeReward(
 		validator.SubnetID,
 		validator.NodeID,
 	)
@@ -473,9 +473,9 @@ func (e *ProposalTxExecutor) rewardValidatorTx(uValidatorTx txs.ValidatorTx, val
 		return fmt.Errorf("failed to fetch accrued delegatee rewards: %w", err)
 	}
 
-	if delegateeRewardToPayBack > 0 {
+	if delegateeReward > 0 {
 		delegationRewardsOwner := uValidatorTx.DelegationRewardsOwner()
-		outIntf, err := e.Fx.CreateOutput(delegateeRewardToPayBack, delegationRewardsOwner)
+		outIntf, err := e.Fx.CreateOutput(delegateeReward, delegationRewardsOwner)
 		if err != nil {
 			return fmt.Errorf("failed to create output: %w", err)
 		}
@@ -562,10 +562,10 @@ func (e *ProposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, del
 	utxosOffset := len(outputs) + len(stake)
 
 	// Reward the delegator here
-	delRewardToPayBack := delegatorReward
-	if delRewardToPayBack > 0 {
+	reward := delegatorReward
+	if reward > 0 {
 		rewardsOwner := uDelegatorTx.RewardsOwner()
-		outIntf, err := e.Fx.CreateOutput(delRewardToPayBack, rewardsOwner)
+		outIntf, err := e.Fx.CreateOutput(reward, rewardsOwner)
 		if err != nil {
 			return fmt.Errorf("failed to create output: %w", err)
 		}
@@ -605,7 +605,7 @@ func (e *ProposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, del
 			newDelegateeReward := previousDelegateeReward + delegateeReward
 
 			// For any validators starting after [CortinaTime], we defer rewarding the
-			// [rewardToPayBack] until their staking period is over.
+			// [reward] until their staking period is over.
 			err = e.OnCommitState.SetDelegateeReward(
 				validator.SubnetID,
 				validator.NodeID,
@@ -642,7 +642,7 @@ func (e *ProposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, del
 	return nil
 }
 
-func (e *ProposalTxExecutor) calculateProposalPreference(stakerToReward, primaryNetworkValidator *state.Staker) (bool, error) {
+func (e *ProposalTxExecutor) shouldBeRewarded(stakerToReward, primaryNetworkValidator *state.Staker) (bool, error) {
 	var expectedUptimePercentage float64
 	if stakerToReward.SubnetID != constants.PrimaryNetworkID {
 		transformSubnetIntf, err := e.OnCommitState.GetSubnetTransformation(stakerToReward.SubnetID)
@@ -651,7 +651,7 @@ func (e *ProposalTxExecutor) calculateProposalPreference(stakerToReward, primary
 		}
 		transformSubnet, ok := transformSubnetIntf.Unsigned.(*txs.TransformSubnetTx)
 		if !ok {
-			return false, fmt.Errorf("failed to calculate uptime: %w", err)
+			return false, fmt.Errorf("failed to calculate uptime: %w", ErrIsNotTransformSubnetTx)
 		}
 
 		expectedUptimePercentage = float64(transformSubnet.UptimeRequirement) / reward.PercentDenominator
