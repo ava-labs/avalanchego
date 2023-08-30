@@ -870,7 +870,7 @@ func getStandaloneTrieView(ctx context.Context, ops []database.BatchOp) (*trieVi
 		ctx,
 		memdb.New(),
 		Config{
-			EvictionBatchSize:         DefaultEvictionBatchSize,
+			EvictionBatchSize:         defaultEvictionBatchSize,
 			Tracer:                    trace.Noop,
 			ValueNodeCacheSize:        verificationCacheSize,
 			IntermediateNodeCacheSize: verificationCacheSize,

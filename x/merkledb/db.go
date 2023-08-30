@@ -31,11 +31,11 @@ import (
 )
 
 const (
-	DefaultEvictionBatchSize = 256 * units.KiB
-	RootPath                 = EmptyPath
+	RootPath = EmptyPath
 
 	// TODO: name better
 	rebuildViewSizeFractionOfCacheSize   = 50
+	defaultEvictionBatchSize             = units.MiB
 	minRebuildViewSizePerCommit          = 1000
 	rebuildIntermediateDeletionWriteSize = units.MiB
 	valueNodePrefixLen                   = 1
