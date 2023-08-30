@@ -61,7 +61,7 @@ func newNode(parent *node, key path) *node {
 		},
 		key: key,
 	}
-	// size of key + the bool from value + id + size + children map
+	// size of key + the empty value + id + size + children map
 	newNode.size = len(key) + maybeSize + HashLength + intSize + NodeBranchFactor
 	if parent != nil {
 		parent.addChild(newNode)
@@ -81,7 +81,8 @@ func parseNode(key path, nodeBytes []byte) (*node, error) {
 		nodeBytes: nodeBytes,
 	}
 
-	result.size = len(nodeBytes) + len(n.value.Value()) + len(result.key) + maybeSize + HashLength + intSize + NodeBranchFactor
+	// size of bytes + key + the value + id + size + children map
+	result.size = len(nodeBytes) + len(result.key) + len(n.value.Value()) + maybeSize + HashLength + intSize + NodeBranchFactor
 	for _, c := range result.children {
 		result.size += byteSize + HashLength + len(c.compressedPath)
 	}
