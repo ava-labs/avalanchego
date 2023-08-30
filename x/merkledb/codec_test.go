@@ -7,107 +7,13 @@ import (
 	"bytes"
 	"io"
 	"math/rand"
-	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 )
-
-// TODO add more codec tests
-
-func newRandomProofNode(r *rand.Rand) ProofNode {
-	key := make([]byte, r.Intn(32)) // #nosec G404
-	_, _ = r.Read(key)              // #nosec G404
-	serializedKey := newPath(key).Serialize()
-
-	val := make([]byte, r.Intn(64)) // #nosec G404
-	_, _ = r.Read(val)              // #nosec G404
-
-	children := map[byte]ids.ID{}
-	for j := 0; j < NodeBranchFactor; j++ {
-		if r.Float64() < 0.5 {
-			var childID ids.ID
-			_, _ = r.Read(childID[:]) // #nosec G404
-			children[byte(j)] = childID
-		}
-	}
-
-	hasValue := rand.Intn(2) == 1 // #nosec G404
-	var valueOrHash maybe.Maybe[[]byte]
-	if hasValue {
-		// use the hash instead when length is greater than the hash length
-		if len(val) >= HashLength {
-			val = hashing.ComputeHash256(val)
-		} else if len(val) == 0 {
-			// We do this because when we encode a value of []byte{} we will later
-			// decode it as nil.
-			// Doing this prevents inconsistency when comparing the encoded and
-			// decoded values.
-			// Calling nilEmptySlices doesn't set this because it is a private
-			// variable on the struct
-			val = nil
-		}
-		valueOrHash = maybe.Some(val)
-	}
-
-	return ProofNode{
-		KeyPath:     serializedKey,
-		ValueOrHash: valueOrHash,
-		Children:    children,
-	}
-}
-
-func nilEmptySlices(dest interface{}) {
-	if dest == nil {
-		return
-	}
-
-	destPtr := reflect.ValueOf(dest)
-	if destPtr.Kind() != reflect.Ptr {
-		return
-	}
-	nilEmptySlicesRec(destPtr.Elem())
-}
-
-func nilEmptySlicesRec(value reflect.Value) {
-	switch value.Kind() {
-	case reflect.Slice:
-		if value.Len() == 0 {
-			newValue := reflect.Zero(value.Type())
-			value.Set(newValue)
-			return
-		}
-
-		for i := 0; i < value.Len(); i++ {
-			f := value.Index(i)
-			nilEmptySlicesRec(f)
-		}
-	case reflect.Array:
-		for i := 0; i < value.Len(); i++ {
-			f := value.Index(i)
-			nilEmptySlicesRec(f)
-		}
-	case reflect.Interface, reflect.Ptr:
-		if value.IsNil() {
-			return
-		}
-		nilEmptySlicesRec(value.Elem())
-	case reflect.Struct:
-		t := value.Type()
-		numFields := value.NumField()
-		for i := 0; i < numFields; i++ {
-			tField := t.Field(i)
-			if tField.IsExported() {
-				field := value.Field(i)
-				nilEmptySlicesRec(field)
-			}
-		}
-	}
-}
 
 func FuzzCodecBool(f *testing.F) {
 	f.Fuzz(
@@ -236,8 +142,6 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 					// we will later decode it as nil.
 					// Doing this prevents inconsistency when comparing the
 					// encoded and decoded values below.
-					// Calling nilEmptySlices doesn't set this because it is a
-					// private variable on the struct
 					valueBytes = nil
 				}
 				value = maybe.Some(valueBytes)
@@ -267,9 +171,6 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 
 			var gotNode dbNode
 			require.NoError(codec.decodeDBNode(nodeBytes, &gotNode))
-
-			nilEmptySlices(&node)
-			nilEmptySlices(&gotNode)
 			require.Equal(node, gotNode)
 
 			nodeBytes2 := codec.encodeDBNode(&gotNode)
@@ -278,7 +179,7 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 	)
 }
 
-func TestCodec_DecodeDBNode(t *testing.T) {
+func TestCodecDecodeDBNode(t *testing.T) {
 	require := require.New(t)
 
 	var (
@@ -313,4 +214,60 @@ func TestCodec_DecodeDBNode(t *testing.T) {
 
 	err = codec.decodeDBNode(proofBytesBuf.Bytes(), &parsedDBNode)
 	require.ErrorIs(err, errTooManyChildren)
+}
+
+// Ensure that encodeHashValues is deterministic
+func FuzzEncodeHashValues(f *testing.F) {
+	codec1 := newCodec()
+	codec2 := newCodec()
+
+	f.Fuzz(
+		func(
+			t *testing.T,
+			randSeed int,
+		) {
+			require := require.New(t)
+
+			// Create a random *hashValues
+			r := rand.New(rand.NewSource(int64(randSeed))) // #nosec G404
+
+			children := map[byte]child{}
+			numChildren := r.Intn(NodeBranchFactor) // #nosec G404
+			for i := 0; i < numChildren; i++ {
+				compressedPathLen := r.Intn(32) // #nosec G404
+				compressedPathBytes := make([]byte, compressedPathLen)
+				_, _ = r.Read(compressedPathBytes) // #nosec G404
+
+				children[byte(i)] = child{
+					compressedPath: newPath(compressedPathBytes),
+					id:             ids.GenerateTestID(),
+					hasValue:       r.Intn(2) == 1, // #nosec G404
+				}
+			}
+
+			hasValue := r.Intn(2) == 1 // #nosec G404
+			value := maybe.Nothing[[]byte]()
+			if hasValue {
+				valueBytes := make([]byte, r.Intn(64)) // #nosec G404
+				_, _ = r.Read(valueBytes)              // #nosec G404
+				value = maybe.Some(valueBytes)
+			}
+
+			key := make([]byte, r.Intn(32)) // #nosec G404
+			_, _ = r.Read(key)              // #nosec G404
+
+			hv := &hashValues{
+				Children: children,
+				Value:    value,
+				Key:      newPath(key).Serialize(),
+			}
+
+			// Serialize the *hashValues with both codecs
+			hvBytes1 := codec1.encodeHashValues(hv)
+			hvBytes2 := codec2.encodeHashValues(hv)
+
+			// Make sure they're the same
+			require.Equal(hvBytes1, hvBytes2)
+		},
+	)
 }

@@ -3,8 +3,6 @@
 ## TODOs
 
 - [ ] Remove special casing around the root node from the physical structure of the hashed tree.
-- [ ] Analyze performance impact of needing to skip intermediate nodes when generating range and change proofs
-  - [ ] Consider moving nodes with values to a separate db prefix
 - [ ] Analyze performance of using database snapshots rather than in-memory history
 - [ ] Improve intermediate node regeneration after ungraceful shutdown by reusing successfully written subtrees
 
@@ -60,6 +58,8 @@ The node serialization format is as follows:
 +----------------------------------------------------+
 | Child ID (32 bytes)                                |
 +----------------------------------------------------+
+| Child has value (1 bytes)                          |
++----------------------------------------------------+
 | Child index (varint)                               |
 +----------------------------------------------------+
 | Child compressed path length (varint)              |
@@ -67,6 +67,8 @@ The node serialization format is as follows:
 | Child compressed path (variable length bytes)      |
 +----------------------------------------------------+
 | Child ID (32 bytes)                                |
++----------------------------------------------------+
+| Child has value (1 bytes)                          |
 +----------------------------------------------------+
 |...                                                 |
 +----------------------------------------------------+
@@ -81,6 +83,7 @@ Where:
 * `Child compressed path length` is the length of the child node's compressed path.
 * `Child compressed path` is the child node's compressed path.
 * `Child ID` is the child node's ID.
+* `Child has value` indicates if that child has a value.
 
 For each child of the node, we have an additional:
 
@@ -93,6 +96,8 @@ For each child of the node, we have an additional:
 | Child compressed path (variable length bytes)      |
 +----------------------------------------------------+
 | Child ID (32 bytes)                                |
++----------------------------------------------------+
+| Child has value (1 bytes)                          |
 +----------------------------------------------------+
 ```
 
@@ -213,7 +218,12 @@ Bytes are encoded by simply copying them onto the buffer.
 ### []byte copying
 Nodes contain a []byte which represents its value.  This slice should never be edited internally.  This allows usage without having to make copies of it for safety.
 Anytime these values leave the library, for example in `Get`, `GetValue`, `GetProof`, `GetRangeProof`, etc, they need to be copied into a new slice to prevent
-edits made outside of the library from being reflected in the DB/TrieViews.
+edits made outside the library from being reflected in the DB/TrieViews.
+
+### Split Node Storage
+The nodes are stored under two different prefixes depending on if the node contains a value.  
+If it does contain a value it is stored within the ValueNodeDB and if it doesn't it is stored in the IntermediateNodeDB.
+By splitting the nodes up by value, it allows better key/value iteration and a more compact key format.
 
 ### Single node type
 

@@ -17,20 +17,21 @@ import (
 )
 
 const (
+	boolLen              = 1
 	trueByte             = 1
 	falseByte            = 0
 	minVarIntLen         = 1
-	minMaybeByteSliceLen = 1
+	minMaybeByteSliceLen = boolLen
 	minSerializedPathLen = minVarIntLen
 	minByteSliceLen      = minVarIntLen
 	minDBNodeLen         = minMaybeByteSliceLen + minVarIntLen
-	minChildLen          = minVarIntLen + minSerializedPathLen + ids.IDLen
+	minChildLen          = minVarIntLen + minSerializedPathLen + ids.IDLen + boolLen
 
 	estimatedKeyLen            = 64
 	estimatedValueLen          = 64
 	estimatedCompressedPathLen = 8
-	// Child index, child compressed path, child ID
-	estimatedNodeChildLen = minVarIntLen + estimatedCompressedPathLen + ids.IDLen
+	// Child index, child compressed path, child ID, child has value
+	estimatedNodeChildLen = minVarIntLen + estimatedCompressedPathLen + ids.IDLen + boolLen
 	// Child index, child ID
 	hashValuesChildLen = minVarIntLen + ids.IDLen
 )
@@ -106,6 +107,7 @@ func (c *codecImpl) encodeDBNode(n *dbNode) []byte {
 			path := entry.compressedPath.Serialize()
 			c.encodeSerializedPath(buf, path)
 			_, _ = buf.Write(entry.id[:])
+			c.encodeBool(buf, entry.hasValue)
 		}
 	}
 	return buf.Bytes()
@@ -179,9 +181,14 @@ func (c *codecImpl) decodeDBNode(b []byte, n *dbNode) error {
 		if err != nil {
 			return err
 		}
+		hasValue, err := c.decodeBool(src)
+		if err != nil {
+			return err
+		}
 		n.children[byte(index)] = child{
 			compressedPath: compressedPath.deserialize(),
 			id:             childID,
+			hasValue:       hasValue,
 		}
 	}
 	if src.Len() != 0 {

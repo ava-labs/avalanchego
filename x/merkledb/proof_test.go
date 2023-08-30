@@ -43,6 +43,46 @@ func writeBasicBatch(t *testing.T, db *merkleDB) {
 	require.NoError(batch.Write())
 }
 
+func newRandomProofNode(r *rand.Rand) ProofNode {
+	key := make([]byte, r.Intn(32)) // #nosec G404
+	_, _ = r.Read(key)              // #nosec G404
+	serializedKey := newPath(key).Serialize()
+
+	val := make([]byte, r.Intn(64)) // #nosec G404
+	_, _ = r.Read(val)              // #nosec G404
+
+	children := map[byte]ids.ID{}
+	for j := 0; j < NodeBranchFactor; j++ {
+		if r.Float64() < 0.5 {
+			var childID ids.ID
+			_, _ = r.Read(childID[:]) // #nosec G404
+			children[byte(j)] = childID
+		}
+	}
+
+	hasValue := rand.Intn(2) == 1 // #nosec G404
+	var valueOrHash maybe.Maybe[[]byte]
+	if hasValue {
+		// use the hash instead when length is greater than the hash length
+		if len(val) >= HashLength {
+			val = hashing.ComputeHash256(val)
+		} else if len(val) == 0 {
+			// We do this because when we encode a value of []byte{} we will later
+			// decode it as nil.
+			// Doing this prevents inconsistency when comparing the encoded and
+			// decoded values.
+			val = nil
+		}
+		valueOrHash = maybe.Some(val)
+	}
+
+	return ProofNode{
+		KeyPath:     serializedKey,
+		ValueOrHash: valueOrHash,
+		Children:    children,
+	}
+}
+
 func Test_Proof_Empty(t *testing.T) {
 	proof := &Proof{}
 	err := proof.Verify(context.Background(), ids.Empty)
