@@ -20,6 +20,7 @@ const (
 	intSize          = int(unsafe.Sizeof(0))
 	boolSize         = int(unsafe.Sizeof(true))
 	byteSize         = 1
+	maybeSize        = boolSize + int(unsafe.Sizeof(uintptr(0)))
 )
 
 // the values that go into the node's id
@@ -60,7 +61,8 @@ func newNode(parent *node, key path) *node {
 		},
 		key: key,
 	}
-	newNode.size = len(key) + boolSize + HashLength + intSize
+	// size of key + the bool from value + id + size + children map
+	newNode.size = len(key) + maybeSize + HashLength + intSize + NodeBranchFactor
 	if parent != nil {
 		parent.addChild(newNode)
 	}
@@ -79,7 +81,7 @@ func parseNode(key path, nodeBytes []byte) (*node, error) {
 		nodeBytes: nodeBytes,
 	}
 
-	result.size = len(nodeBytes) + len(n.value.Value()) + len(result.key) + boolSize + HashLength + intSize
+	result.size = len(nodeBytes) + len(n.value.Value()) + len(result.key) + maybeSize + HashLength + intSize + NodeBranchFactor
 	for _, c := range result.children {
 		result.size += byteSize + HashLength + len(c.compressedPath)
 	}
@@ -163,7 +165,7 @@ func (n *node) addChild(child *node) {
 func (n *node) addChildWithoutNode(index byte, compressedPath path, childID ids.ID, hasValue bool) {
 	n.onNodeChanged()
 	if existing, ok := n.children[index]; ok {
-		n.size -= byteSize + HashLength + len(existing.compressedPath)
+		n.size -= HashLength + len(existing.compressedPath)
 	}
 	n.children[index] = child{
 		compressedPath: compressedPath,
@@ -171,7 +173,7 @@ func (n *node) addChildWithoutNode(index byte, compressedPath path, childID ids.
 		hasValue:       hasValue,
 	}
 
-	n.size += byteSize + HashLength + len(compressedPath)
+	n.size += HashLength + len(compressedPath)
 }
 
 // Removes [child] from [n]'s children.
