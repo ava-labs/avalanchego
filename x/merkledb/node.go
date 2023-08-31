@@ -86,7 +86,7 @@ func (n *node) bytes() []byte {
 	if n.nodeBytes == nil {
 		n.nodeBytes = codec.encodeDBNode(&n.dbNode)
 	}
-	
+
 	return n.nodeBytes
 }
 
