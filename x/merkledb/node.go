@@ -161,6 +161,7 @@ func (n *node) removeChild(child *node) {
 // clone Returns a copy of [n].
 // Note: value isn't cloned because it is never edited, only overwritten
 // if this ever changes, value will need to be copied as well
+// it is safe to clone all fields because they are only written/read while one or both of the db locks are held
 func (n *node) clone() *node {
 	return &node{
 		id:  n.id,
