@@ -437,10 +437,10 @@ func (c *genericCodec) marshal(value reflect.Value, p *wrappers.Packer, maxSlice
 			endOffset = p.Offset
 		}
 
-		slices.SortFunc(sortedKeys, func(a, b keyTuple) bool {
+		slices.SortFunc(sortedKeys, func(a, b keyTuple) int {
 			aBytes := p.Bytes[a.startIndex:a.endIndex]
 			bBytes := p.Bytes[b.startIndex:b.endIndex]
-			return bytes.Compare(aBytes, bBytes) < 0
+			return bytes.Compare(aBytes, bBytes)
 		})
 
 		allKeyBytes := slices.Clone(p.Bytes[startOffset:p.Offset])

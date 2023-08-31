@@ -37,8 +37,8 @@ func (t *trieView) NewIteratorWithStartAndPrefix(start, prefix []byte) database.
 	}
 
 	// sort [changes] so they can be merged with the parent trie's state
-	slices.SortFunc(changes, func(a, b KeyChange) bool {
-		return bytes.Compare(a.Key, b.Key) == -1
+	slices.SortFunc(changes, func(a, b KeyChange) int {
+		return bytes.Compare(a.Key, b.Key)
 	})
 
 	return &viewIterator{
