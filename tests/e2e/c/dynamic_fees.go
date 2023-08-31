@@ -4,7 +4,6 @@
 package c
 
 import (
-	"errors"
 	"math/big"
 	"strings"
 
@@ -16,8 +15,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/ava-labs/coreth/core/types"
-	"github.com/ava-labs/coreth/ethclient"
-	"github.com/ava-labs/coreth/interfaces"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/plugin/evm"
 
@@ -76,8 +73,7 @@ var _ = e2e.DescribeCChainSerial("[Dynamic Fees]", func() {
 
 			// Send the transaction and wait for acceptance
 			signedTx := sign(tx)
-			require.NoError(ethClient.SendTransaction(e2e.DefaultContext(), signedTx))
-			receipt := awaitTransaction(ethClient, signedTx)
+			receipt := e2e.SendEthTransaction(ethClient, signedTx)
 
 			contractAddress = receipt.ContractAddress
 		})
@@ -119,8 +115,7 @@ var _ = e2e.DescribeCChainSerial("[Dynamic Fees]", func() {
 
 				// Send the transaction and wait for acceptance
 				signedTx := sign(tx)
-				require.NoError(ethClient.SendTransaction(e2e.DefaultContext(), signedTx))
-				_ = awaitTransaction(ethClient, signedTx)
+				_ = e2e.SendEthTransaction(ethClient, signedTx)
 
 				// The gas price will be checked at the start of the next iteration
 				return false
@@ -159,30 +154,9 @@ var _ = e2e.DescribeCChainSerial("[Dynamic Fees]", func() {
 
 			// Send the transaction and wait for acceptance
 			signedTx := sign(tx)
-			require.NoError(ethClient.SendTransaction(e2e.DefaultContext(), signedTx))
-			_ = awaitTransaction(ethClient, signedTx)
+			e2e.SendEthTransaction(ethClient, signedTx)
 		})
 
 		e2e.CheckBootstrapIsPossible(e2e.Env.GetNetwork())
 	})
 })
-
-// Waits for the transaction receipt to be issued and checks that it indicates success.
-func awaitTransaction(ethClient ethclient.Client, signedTx *types.Transaction) *types.Receipt {
-	require := require.New(ginkgo.GinkgoT())
-
-	var receipt *types.Receipt
-	e2e.Eventually(func() bool {
-		var err error
-		receipt, err = ethClient.TransactionReceipt(e2e.DefaultContext(), signedTx.Hash())
-		if errors.Is(err, interfaces.NotFound) {
-			return false // Transaction is still pending
-		}
-		require.NoError(err)
-		return true
-	}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "failed to see transaction acceptance before timeout")
-
-	// Retrieve the contract address
-	require.Equal(receipt.Status, types.ReceiptStatusSuccessful)
-	return receipt
-}
