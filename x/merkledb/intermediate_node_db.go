@@ -27,7 +27,8 @@ type intermediateNodeDB struct {
 	// from the cache, which will call [OnEviction].
 	// A non-nil error returned from Put is considered fatal.
 	// Keys in [nodeCache] aren't prefixed with [intermediateNodePrefix].
-	nodeCache         onEvictCache[path, *node]
+	nodeCache onEvictCache[path, *node]
+	// the number of bytes to evict during an eviction batch
 	evictionBatchSize int
 	metrics           merkleMetrics
 }
@@ -57,6 +58,7 @@ func newIntermediateNodeDB(
 func (db *intermediateNodeDB) onEviction(key path, n *node) error {
 	writeBatch := db.baseDB.NewBatch()
 
+	totalSize := cacheEntrySize(key, n)
 	if err := db.addToBatch(writeBatch, key, n); err != nil {
 		_ = db.baseDB.Close()
 		return err
@@ -66,12 +68,14 @@ func (db *intermediateNodeDB) onEviction(key path, n *node) error {
 	// and write them to disk. We write a batch of them, rather than
 	// just [n], so that we don't immediately evict and write another
 	// node, because each time this method is called we do a disk write.
-	for writeBatch.Size() < db.evictionBatchSize {
+	// Evicts a total number of bytes, rather than a number of nodes
+	for totalSize < db.evictionBatchSize {
 		key, n, exists := db.nodeCache.removeOldest()
 		if !exists {
 			// The cache is empty.
 			break
 		}
+		totalSize += cacheEntrySize(key, n)
 		if err := db.addToBatch(writeBatch, key, n); err != nil {
 			_ = db.baseDB.Close()
 			return err
