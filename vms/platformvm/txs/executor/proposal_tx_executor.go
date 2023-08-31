@@ -435,7 +435,7 @@ func (e *ProposalTxExecutor) rewardValidatorTx(uValidatorTx txs.ValidatorTx, val
 		e.OnAbortState.AddUTXO(utxo)
 	}
 
-	utxosOffset := len(outputs) + len(stake)
+	utxosOffset := 0
 
 	// Provide the reward here
 	reward := validator.PotentialReward
@@ -453,7 +453,7 @@ func (e *ProposalTxExecutor) rewardValidatorTx(uValidatorTx txs.ValidatorTx, val
 		utxo := &avax.UTXO{
 			UTXOID: avax.UTXOID{
 				TxID:        txID,
-				OutputIndex: uint32(utxosOffset),
+				OutputIndex: uint32(len(outputs) + len(stake)),
 			},
 			Asset: stakeAsset,
 			Out:   out,
@@ -487,7 +487,7 @@ func (e *ProposalTxExecutor) rewardValidatorTx(uValidatorTx txs.ValidatorTx, val
 		onCommitUtxo := &avax.UTXO{
 			UTXOID: avax.UTXOID{
 				TxID:        txID,
-				OutputIndex: uint32(utxosOffset),
+				OutputIndex: uint32(len(outputs) + len(stake) + utxosOffset),
 			},
 			Asset: stakeAsset,
 			Out:   out,
@@ -500,7 +500,7 @@ func (e *ProposalTxExecutor) rewardValidatorTx(uValidatorTx txs.ValidatorTx, val
 		onAbortUtxo := &avax.UTXO{
 			UTXOID: avax.UTXOID{
 				TxID:        txID,
-				OutputIndex: uint32(utxosOffset - 1),
+				OutputIndex: uint32(len(outputs) + len(stake)),
 			},
 			Asset: stakeAsset,
 			Out:   out,
@@ -559,7 +559,7 @@ func (e *ProposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, del
 	// Calculate split of reward between delegator/delegatee
 	delegatorReward, delegateeReward := splitAmountByShares(delegator.PotentialReward, vdrTx.Shares(), math.MaxUint64)
 
-	utxosOffset := len(outputs) + len(stake)
+	utxosOffset := 0
 
 	// Reward the delegator here
 	reward := delegatorReward
@@ -576,7 +576,7 @@ func (e *ProposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, del
 		utxo := &avax.UTXO{
 			UTXOID: avax.UTXOID{
 				TxID:        txID,
-				OutputIndex: uint32(utxosOffset),
+				OutputIndex: uint32(len(outputs) + len(stake)),
 			},
 			Asset: stakeAsset,
 			Out:   out,
@@ -629,7 +629,7 @@ func (e *ProposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, del
 			utxo := &avax.UTXO{
 				UTXOID: avax.UTXOID{
 					TxID:        txID,
-					OutputIndex: uint32(utxosOffset),
+					OutputIndex: uint32(len(outputs) + len(stake) + utxosOffset),
 				},
 				Asset: stakeAsset,
 				Out:   out,
