@@ -19,6 +19,7 @@ jobs:
         with:
           toolchain: stable
           override: true
+      - uses: arduino/setup-protoc@v2
       - name: Restore Cargo Cache
         id: cargo-cache
         uses: actions/cache/restore@v3
