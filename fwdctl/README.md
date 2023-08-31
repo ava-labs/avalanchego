@@ -2,11 +2,6 @@
 
 `fwdctl` is a small CLI designed to make it easy to experiment with firewood locally. 
 
-> Note: firewood has two separate storage areas in the database. One is a generic key-value store. 
-The other is EVM-based account model storage, based on Merkle-Patricia Tries. The generic key-value
-store is being written to by the cli currently. Support for commands that use the account based storage
-will be supported in a future release of firewood.  
-
 ## Building locally
 *Note: fwdctl is linux-only*
 ```
