@@ -727,21 +727,33 @@ func Test_MerkleDB_Random_Insert_Ordering(t *testing.T) {
 func Test_MerkleDB_RandomCases(t *testing.T) {
 	require := require.New(t)
 
-	for i := 150; i < 500; i += 10 {
+	const (
+		minSize             = 150
+		maxSize             = 500
+		hashTrieProbability = 0.01
+	)
+
+	for i := minSize; i < maxSize; i += 10 {
 		now := time.Now().UnixNano()
 		t.Logf("seed for iter %d: %d", i, now)
 		r := rand.New(rand.NewSource(now)) // #nosec G404
-		runRandDBTest(require, r, generate(require, r, i, .01))
+		runRandDBTest(require, r, generateRandTest(require, r, i, hashTrieProbability))
 	}
 }
 
 func Test_MerkleDB_RandomCases_InitialValues(t *testing.T) {
 	require := require.New(t)
 
+	const (
+		initialValues       = 1_000
+		updates             = 2_500
+		hashTrieProbability = 0
+	)
+
 	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)
 	r := rand.New(rand.NewSource(now)) // #nosec G404
-	runRandDBTest(require, r, generateInitialValues(require, r, 1000, 2500, 0.0))
+	runRandDBTest(require, r, generateInitialValues(require, r, initialValues, updates, hashTrieProbability))
 }
 
 // randTest performs random trie operations.
@@ -1019,7 +1031,7 @@ func generateInitialValues(require *require.Assertions, r *rand.Rand, initialVal
 	return steps
 }
 
-func generate(require *require.Assertions, r *rand.Rand, size int, percentChanceToFullHash float64) randTest {
+func generateRandTest(require *require.Assertions, r *rand.Rand, size int, percentChanceToFullHash float64) randTest {
 	var allKeys [][]byte
 	return generateWithKeys(require, allKeys, r, size, percentChanceToFullHash)
 }
