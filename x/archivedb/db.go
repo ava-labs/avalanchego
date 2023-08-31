@@ -97,34 +97,49 @@ func (db *archiveDB) Get(key []byte, height uint64) ([]byte, uint64, error) {
 
 	internalKey := newKey(key, height)
 	iterator := db.rawDB.NewIteratorWithStart(internalKey.Bytes())
+	keyLength := len(key)
 
 	defer iterator.Release()
 
-	if !iterator.Next() {
-		// There is no available key with the requested prefix
-		return nil, 0, database.ErrNotFound
-	}
+	for {
+		if !iterator.Next() {
+			// There is no available key with the requested prefix
+			return nil, 0, database.ErrNotFound
+		}
 
-	internalKey, err := parseKey(iterator.Key())
-	if err != nil {
-		return nil, 0, err
-	}
+		internalKey, err := parseKey(iterator.Key())
+		if err != nil {
+			return nil, 0, err
+		}
 
-	if !bytes.Equal(internalKey.Prefix, key) || internalKey.IsDeleted {
-		// The current key has either a different prefix or the found key has a
-		// deleted flag.
-		//
-		// The previous key that was found does has another prefix, because the
-		// iterator is not aware of prefixes. If this happens it means the
-		// prefix at the requested height does not exists.
-		//
-		// The database is append only, so when removing a record creates a new
-		// record with an special flag is being created. Before returning the
-		// value we check if the deleted flag is present or not.
-		return nil, 0, database.ErrNotFound
-	}
+		if !bytes.Equal(internalKey.Prefix, key) {
+			if keyLength < len(internalKey.Prefix) {
+				// The current key is a longer than the requested key, now check
+				// if they match at the same length as `key`, if that is the
+				// case we should continue to the next key, until the exact
+				// requested key is found or anothe prefix is found and by that
+				// point it would exit
+				if bytes.Equal(internalKey.Prefix[0:keyLength], key) {
+					// Same prefix, read the next key until the prefix is
+					// different or the exact requested key is found
+					continue
+				}
+			}
+			// The previous key that was found does has another prefix, because the
+			// iterator is not aware of prefixes. If this happens it means the
+			// prefix at the requested height does not exists.
+			return nil, 0, database.ErrNotFound
+		}
 
-	return iterator.Value(), internalKey.Height, nil
+		if internalKey.IsDeleted {
+			// The database is append only, so when removing a record creates a new
+			// record with an special flag is being created. Before returning the
+			// value we check if the deleted flag is present or not.
+			return nil, 0, database.ErrNotFound
+		}
+
+		return iterator.Value(), internalKey.Height, nil
+	}
 }
 
 // Creates a new batch to append database changes in a given height
