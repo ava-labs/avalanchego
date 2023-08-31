@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/maybe"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
@@ -491,7 +492,7 @@ func TestDatabaseNewViewFromBatchOpsTracked(t *testing.T) {
 	// Commit the view
 	require.NoError(view.CommitToDB(context.Background()))
 
-	// The untracked view should be tracked by the parent database.
+	// The view should be tracked by the parent database.
 	require.Contains(db.childViews, view)
 	require.Len(db.childViews, 1)
 }
@@ -515,16 +516,18 @@ func TestDatabaseCommitChanges(t *testing.T) {
 	require.ErrorIs(err, ErrInvalid)
 
 	// Add key-value pairs to the database
-	require.NoError(db.Put([]byte{1}, []byte{1}))
-	require.NoError(db.Put([]byte{2}, []byte{2}))
+	key1, key2, key3 := []byte{1}, []byte{2}, []byte{3}
+	value1, value2, value3 := []byte{1}, []byte{2}, []byte{3}
+	require.NoError(db.Put(key1, value1))
+	require.NoError(db.Put(key2, value2))
 
 	// Make a view and insert/delete a key-value pair.
 	view1Intf, err := db.NewView(
 		context.Background(),
 		ViewChanges{
 			BatchOps: []database.BatchOp{
-				{Key: []byte{3}, Value: []byte{3}},
-				{Key: []byte{1}, Delete: true},
+				{Key: key3, Value: value3}, // New k-v pair
+				{Key: key1, Delete: true},  // Delete k-v pair
 			},
 		},
 	)
@@ -556,14 +559,14 @@ func TestDatabaseCommitChanges(t *testing.T) {
 	require.NoError(view1.commitToDB(context.Background()))
 
 	// Make sure the key-value pairs are correct.
-	_, err = db.Get([]byte{1})
+	_, err = db.Get(key1)
 	require.ErrorIs(err, database.ErrNotFound)
-	value, err := db.Get([]byte{2})
+	gotValue, err := db.Get(key2)
 	require.NoError(err)
-	require.Equal([]byte{2}, value)
-	value, err = db.Get([]byte{3})
+	require.Equal(value2, gotValue)
+	gotValue, err = db.Get(key3)
 	require.NoError(err)
-	require.Equal([]byte{3}, value)
+	require.Equal(value3, gotValue)
 
 	// Make sure the root is right
 	require.Equal(view1Root, db.getMerkleRoot())
@@ -631,70 +634,92 @@ func TestDatabaseInvalidateChildrenExcept(t *testing.T) {
 func Test_MerkleDB_Random_Insert_Ordering(t *testing.T) {
 	require := require.New(t)
 
-	totalState := 1000
 	var (
-		allKeys [][]byte
-		keyMap  map[string]struct{}
+		numRuns             = 3
+		numShuffles         = 3
+		numKeyValues        = 1_000
+		prefixProbability   = .1
+		nilValueProbability = 0.05
+		keys                [][]byte
+		keysSet             set.Set[string]
 	)
+
+	// Returns a random key.
+	// With probability approximately [prefixProbability], the returned key
+	// will be a prefix of a previously returned key.
 	genKey := func(r *rand.Rand) []byte {
-		count := 0
 		for {
 			var key []byte
-			if len(allKeys) > 2 && r.Intn(100) < 10 {
-				// new prefixed key
-				prefix := allKeys[r.Intn(len(allKeys))]
+			shouldPrefix := r.Float64() < prefixProbability
+			if len(keys) > 2 && shouldPrefix {
+				// Return a key that is a prefix of a previously returned key.
+				prefix := keys[r.Intn(len(keys))]
 				key = make([]byte, r.Intn(50)+len(prefix))
 				copy(key, prefix)
-				_, err := r.Read(key[len(prefix):])
-				require.NoError(err)
+				_, _ = r.Read(key[len(prefix):])
 			} else {
 				key = make([]byte, r.Intn(50))
-				_, err := r.Read(key)
-				require.NoError(err)
+				_, _ = r.Read(key)
 			}
-			if _, ok := keyMap[string(key)]; !ok {
-				allKeys = append(allKeys, key)
-				keyMap[string(key)] = struct{}{}
+
+			// If the key has already been returned, try again.
+			// This test would flake if we allowed duplicate keys
+			// because then the order of insertion matters.
+			if !keysSet.Contains(string(key)) {
+				keysSet.Add(string(key))
+				keys = append(keys, key)
 				return key
 			}
-			count++
 		}
 	}
 
-	for i := 0; i < 3; i++ {
+	for i := 0; i < numRuns; i++ {
 		now := time.Now().UnixNano()
 		t.Logf("seed for iter %d: %d", i, now)
 		r := rand.New(rand.NewSource(now)) // #nosec G404
 
-		ops := make([]database.BatchOp, 0, totalState)
-		allKeys = [][]byte{}
-		keyMap = map[string]struct{}{}
-		for x := 0; x < totalState; x++ {
+		// Insert key-value pairs into a database.
+		ops := make([]database.BatchOp, 0, numKeyValues)
+		keys = [][]byte{}
+		for x := 0; x < numKeyValues; x++ {
 			key := genKey(r)
 			value := make([]byte, r.Intn(51))
-			if len(value) == 51 {
+			if r.Float64() < nilValueProbability {
 				value = nil
 			} else {
-				_, err := r.Read(value)
-				require.NoError(err)
+				_, _ = r.Read(value)
 			}
-			ops = append(ops, database.BatchOp{Key: key, Value: value})
+			ops = append(ops, database.BatchOp{
+				Key:   key,
+				Value: value,
+			})
 		}
+
 		db, err := getBasicDB()
 		require.NoError(err)
-		result, err := db.NewView(context.Background(), ViewChanges{BatchOps: ops})
+
+		view1, err := db.NewView(context.Background(), ViewChanges{BatchOps: ops})
 		require.NoError(err)
-		primaryRoot, err := result.GetMerkleRoot(context.Background())
+
+		// Get the root of the trie after applying [ops].
+		view1Root, err := view1.GetMerkleRoot(context.Background())
 		require.NoError(err)
-		for shuffleIndex := 0; shuffleIndex < 3; shuffleIndex++ {
-			r.Shuffle(totalState, func(i, j int) {
+
+		// Assert that the same operations applied in a different order
+		// result in the same root. Note this is only true because
+		// all keys inserted are unique.
+		for shuffleIndex := 0; shuffleIndex < numShuffles; shuffleIndex++ {
+			r.Shuffle(numKeyValues, func(i, j int) {
 				ops[i], ops[j] = ops[j], ops[i]
 			})
-			result, err := db.NewView(context.Background(), ViewChanges{BatchOps: ops})
+
+			view2, err := db.NewView(context.Background(), ViewChanges{BatchOps: ops})
 			require.NoError(err)
-			newRoot, err := result.GetMerkleRoot(context.Background())
+
+			view2Root, err := view2.GetMerkleRoot(context.Background())
 			require.NoError(err)
-			require.Equal(primaryRoot, newRoot)
+
+			require.Equal(view1Root, view2Root)
 		}
 	}
 }
