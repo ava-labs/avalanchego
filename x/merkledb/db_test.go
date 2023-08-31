@@ -1038,41 +1038,45 @@ func generateRandTestWithKeys(
 func generateInitialValues(
 	require *require.Assertions,
 	r *rand.Rand,
-	initialValues int,
+	numInitialKeyValues int,
 	size int,
 	percentChanceToFullHash float64,
 ) randTest {
+	const (
+		prefixProbability   = 0.1
+		nilValueProbability = 0.05
+	)
+
 	var allKeys [][]byte
 	genKey := func() []byte {
 		// new prefixed key
-		if len(allKeys) > 2 && r.Intn(100) < 10 {
+		if len(allKeys) > 2 && r.Float64() < prefixProbability {
 			prefix := allKeys[r.Intn(len(allKeys))]
 			key := make([]byte, r.Intn(50)+len(prefix))
 			copy(key, prefix)
-			_, err := r.Read(key[len(prefix):])
-			require.NoError(err)
+			_, _ = r.Read(key[len(prefix):])
 			allKeys = append(allKeys, key)
 			return key
 		}
 
 		// new key
 		key := make([]byte, r.Intn(50))
-		_, err := r.Read(key)
-		require.NoError(err)
+		_, _ = r.Read(key)
 		allKeys = append(allKeys, key)
 		return key
 	}
 
 	var steps randTest
-	for i := 0; i < initialValues; i++ {
-		step := randTestStep{op: opUpdate}
-		step.key = genKey()
-		step.value = make([]byte, r.Intn(51))
-		if len(step.value) == 51 {
+	for i := 0; i < numInitialKeyValues; i++ {
+		step := randTestStep{
+			op:    opUpdate,
+			key:   genKey(),
+			value: make([]byte, r.Intn(50)),
+		}
+		if rand.Float64() < nilValueProbability {
 			step.value = nil
 		} else {
-			_, err := r.Read(step.value)
-			require.NoError(err)
+			_, _ = r.Read(step.value)
 		}
 		steps = append(steps, step)
 	}
@@ -1082,8 +1086,7 @@ func generateInitialValues(
 }
 
 func generateRandTest(require *require.Assertions, r *rand.Rand, size int, percentChanceToFullHash float64) randTest {
-	var allKeys [][]byte
-	return generateRandTestWithKeys(require, r, allKeys, size, percentChanceToFullHash)
+	return generateRandTestWithKeys(require, r, [][]byte{}, size, percentChanceToFullHash)
 }
 
 // Inserts [n] random key/value pairs into each database.
