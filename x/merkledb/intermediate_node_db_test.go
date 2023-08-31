@@ -7,10 +7,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/database"
-
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 )
@@ -39,29 +38,29 @@ func TestIntermediateNodeDB(t *testing.T) {
 	)
 
 	// Put a key-node pair
-	key := newPath([]byte{0x01})
-	node1 := newNode(nil, key)
+	node1Key := newPath([]byte{0x01})
+	node1 := newNode(nil, node1Key)
 	node1.setValue(maybe.Some([]byte{byte(0x01)}))
-	require.NoError(db.Put(key, node1))
+	require.NoError(db.Put(node1Key, node1))
 
 	// Get the key-node pair from cache
-	node1Read, err := db.Get(key)
+	node1Read, err := db.Get(node1Key)
 	require.NoError(err)
 	require.Equal(node1, node1Read)
 
 	// Overwrite the key-node pair
-	node1Updated := newNode(nil, key)
+	node1Updated := newNode(nil, node1Key)
 	node1Updated.setValue(maybe.Some([]byte{byte(0x02)}))
-	require.NoError(db.Put(key, node1Updated))
+	require.NoError(db.Put(node1Key, node1Updated))
 
 	// Assert the key-node pair was overwritten
-	node1Read, err = db.Get(key)
+	node1Read, err = db.Get(node1Key)
 	require.NoError(err)
 	require.Equal(node1Updated, node1Read)
 
 	// Delete the key-node pair
-	require.NoError(db.Delete(key))
-	_, err = db.Get(key)
+	require.NoError(db.Delete(node1Key))
+	_, err = db.Get(node1Key)
 
 	// Assert the key-node pair was deleted
 	require.Equal(database.ErrNotFound, err)
@@ -90,7 +89,7 @@ func TestIntermediateNodeDB(t *testing.T) {
 	// Put one more element in the cache, which should trigger an eviction
 	// of all but 2 elements. 2 elements remain rather than 1 element because of
 	// the added key prefix increasing the size tracked by the batch.
-	key = newPath([]byte{byte(added)})
+	key := newPath([]byte{byte(added)})
 	node := newNode(nil, EmptyPath)
 	node.setValue(maybe.Some([]byte{byte(added)}))
 	require.NoError(db.Put(key, node))
@@ -103,7 +102,9 @@ func TestIntermediateNodeDB(t *testing.T) {
 
 	// Get a node from the base database
 	// Use an early key that has been evicted from the cache
-	nodeRead, err := db.Get(newPath([]byte{0x01}))
+	_, inCache := db.nodeCache.Get(node1Key)
+	require.False(inCache)
+	nodeRead, err := db.Get(node1Key)
 	require.NoError(err)
 	require.Equal(maybe.Some([]byte{0x01}), nodeRead.value)
 
