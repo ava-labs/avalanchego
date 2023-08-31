@@ -126,3 +126,45 @@ func TestDelete(t *testing.T) {
 	_, _, err = db.Get([]byte("key1"), 3)
 	require.ErrorIs(t, err, database.ErrNotFound)
 }
+
+func TestDBKeySpace(t *testing.T) {
+	require := require.New(t)
+
+	var (
+		key1   = []byte("key1")
+		key2   = newKey([]byte("key1"), 2).Bytes()
+		key3   = []byte("key3")
+		value1 = []byte("value1@1")
+		value2 = []byte("value2@2")
+		value3 = []byte("value3@3")
+	)
+	require.NotEqual(key1, key2)
+	require.NotEqual(key1, key3)
+	require.NotEqual(key2, key3)
+
+	db, err := getBasicDB()
+	require.NoError(err)
+
+	writer, err := db.NewBatch()
+	require.NoError(err)
+	require.NoError(writer.Put(key1, value1))
+	require.Equal(uint64(1), writer.Height())
+	require.NoError(writer.Write())
+
+	writer, err = db.NewBatch()
+	require.NoError(err)
+	require.NoError(writer.Put(key2, value2))
+	require.Equal(uint64(2), writer.Height())
+	require.NoError(writer.Write())
+
+	writer, err = db.NewBatch()
+	require.NoError(err)
+	require.NoError(writer.Put(key3, value3))
+	require.Equal(uint64(3), writer.Height())
+	require.NoError(writer.Write())
+
+	val, height, err := db.Get(key1, 3)
+	require.NoError(err)
+	require.Equal(uint64(1), height)
+	require.Equal(value1, val)
+}
