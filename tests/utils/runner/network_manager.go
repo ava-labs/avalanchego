@@ -103,6 +103,11 @@ func (n *NetworkManager) startServer(ctx context.Context) (<-chan struct{}, erro
 		return nil, fmt.Errorf("failed to make server log: %w", err)
 	}
 
+	logLevel, err := logging.ToLevel(n.ANRConfig.LogLevel)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse ANR log level: %w", err)
+	}
+
 	n.anrServer, err = runner_server.New(
 		runner_server.Config{
 			Port:                ":12352",
@@ -111,6 +116,7 @@ func (n *NetworkManager) startServer(ctx context.Context) (<-chan struct{}, erro
 			DialTimeout:         10 * time.Second,
 			RedirectNodesOutput: true,
 			SnapshotsDir:        "",
+			LogLevel:            logLevel,
 		},
 		zapServerLog,
 	)
