@@ -47,10 +47,8 @@ func Serve(ctx context.Context, vm block.ChainVM, opts ...grpcutils.ServerOption
 			select {
 			case s := <-signals:
 				switch s {
-				case syscall.SIGINT:
-					fmt.Println("runtime engine: ignoring signal: SIGINT")
-				case syscall.SIGTERM:
-					fmt.Println("runtime engine: received shutdown signal: SIGTERM")
+				case syscall.SIGINT, syscall.SIGTERM:
+					fmt.Printf("runtime engine: received %s signal: SIGTERM\n", s)
 					return
 				}
 			case <-ctx.Done():
