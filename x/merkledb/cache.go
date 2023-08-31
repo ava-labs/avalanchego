@@ -4,38 +4,38 @@
 package merkledb
 
 import (
+	"errors"
 	"sync"
 
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
+var errEmptyCacheTooLarge = errors.New("cache is empty yet still too large")
+
 // A cache that calls [onEviction] on the evicted element.
 type onEvictCache[K comparable, V any] struct {
-	lock    sync.RWMutex
-	maxSize int
-	fifo    linkedhashmap.LinkedHashmap[K, V]
+	lock        sync.RWMutex
+	maxSize     int
+	currentSize int
+	fifo        linkedhashmap.LinkedHashmap[K, V]
+	size        func(K, V) int
 	// Must not call any method that grabs [c.lock]
 	// because this would cause a deadlock.
 	onEviction func(K, V) error
 }
 
-func newOnEvictCache[K comparable, V any](maxSize int, onEviction func(K, V) error) onEvictCache[K, V] {
+func newOnEvictCache[K comparable, V any](
+	maxSize int,
+	size func(K, V) int,
+	onEviction func(K, V) error,
+) onEvictCache[K, V] {
 	return onEvictCache[K, V]{
 		maxSize:    maxSize,
 		fifo:       linkedhashmap.New[K, V](),
+		size:       size,
 		onEviction: onEviction,
 	}
-}
-
-// removeOldest returns and removes the oldest element from this cache.
-// Assumes [c.lock] is held.
-func (c *onEvictCache[K, V]) removeOldest() (K, V, bool) {
-	k, v, exists := c.fifo.Oldest()
-	if exists {
-		c.fifo.Delete(k)
-	}
-	return k, v, exists
 }
 
 // Get an element from this cache.
@@ -53,14 +53,14 @@ func (c *onEvictCache[K, V]) Put(key K, value V) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
+	if oldValue, replaced := c.fifo.Get(key); replaced {
+		c.currentSize -= c.size(key, oldValue)
+	}
+
+	c.currentSize += c.size(key, value)
 	c.fifo.Put(key, value) // Mark as MRU
 
-	if c.fifo.Len() > c.maxSize {
-		oldestKey, oldestVal, _ := c.fifo.Oldest()
-		c.fifo.Delete(oldestKey)
-		return c.onEviction(oldestKey, oldestVal)
-	}
-	return nil
+	return c.resize(c.maxSize)
 }
 
 // Flush removes all elements from the cache.
@@ -74,16 +74,37 @@ func (c *onEvictCache[K, V]) Flush() error {
 		c.lock.Unlock()
 	}()
 
+	return c.resize(0)
+}
+
+// removeOldest returns and removes the oldest element from this cache.
+//
+// Assumes [c.lock] is held.
+func (c *onEvictCache[K, V]) removeOldest() (K, V, bool) {
+	k, v, exists := c.fifo.Oldest()
+	if exists {
+		c.currentSize -= c.size(k, v)
+		c.fifo.Delete(k)
+	}
+	return k, v, exists
+}
+
+// resize removes the oldest elements from the cache until the cache is not
+// larger than the provided target.
+//
+// Assumes [c.lock] is held.
+func (c *onEvictCache[K, V]) resize(target int) error {
 	// Note that we can't use [c.fifo]'s iterator because [c.onEviction]
 	// modifies [c.fifo], which violates the iterator's invariant.
 	var errs wrappers.Errs
-	for {
-		key, value, exists := c.removeOldest()
+	for c.currentSize > target {
+		k, v, exists := c.removeOldest()
 		if !exists {
-			// The cache is empty.
-			return errs.Err
+			// This should really never happen unless the size of an entry
+			// changed or the target size is negative.
+			return errEmptyCacheTooLarge
 		}
-
-		errs.Add(c.onEviction(key, value))
+		errs.Add(c.onEviction(k, v))
 	}
+	return errs.Err
 }
