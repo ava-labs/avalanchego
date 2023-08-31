@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -19,7 +20,10 @@ import (
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
-const verificationCacheSize = 2_000
+const (
+	verificationEvictionBatchSize = 0
+	verificationCacheSize         = math.MaxInt
+)
 
 var (
 	ErrInvalidProof                = errors.New("proof obtained an invalid root ID")
@@ -870,7 +874,7 @@ func getStandaloneTrieView(ctx context.Context, ops []database.BatchOp) (*trieVi
 		ctx,
 		memdb.New(),
 		Config{
-			EvictionBatchSize:         DefaultEvictionBatchSize,
+			EvictionBatchSize:         verificationEvictionBatchSize,
 			Tracer:                    trace.Noop,
 			ValueNodeCacheSize:        verificationCacheSize,
 			IntermediateNodeCacheSize: verificationCacheSize,
