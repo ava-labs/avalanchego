@@ -1253,19 +1253,19 @@ func (ms *merkleState) writeMerkleState(currentData, pendingData map[ids.ID]*sta
 		return errs.Err
 	}
 
-	if len(batchOps) != 0 {
-		// do commit only if there are changes to merkle state
-		ctx := context.TODO()
-		view, err := ms.merkleDB.NewView(ctx, batchOps)
-		if err != nil {
-			return fmt.Errorf("failed creating merkleDB view: %w", err)
-		}
-		if err := view.CommitToDB(ctx); err != nil {
-			return fmt.Errorf("failed committing merkleDB view: %w", err)
-		}
+	if len(batchOps) == 0 {
+		// nothing to commit
+		return nil
 	}
 
-	// log whether we had changes or not
+	ctx := context.TODO()
+	view, err := ms.merkleDB.NewView(ctx, batchOps)
+	if err != nil {
+		return fmt.Errorf("failed creating merkleDB view: %w", err)
+	}
+	if err := view.CommitToDB(ctx); err != nil {
+		return fmt.Errorf("failed committing merkleDB view: %w", err)
+	}
 	return ms.logMerkleRoot(len(batchOps) != 0)
 }
 
