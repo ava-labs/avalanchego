@@ -729,16 +729,16 @@ func Test_MerkleDB_RandomCases(t *testing.T) {
 	require := require.New(t)
 
 	const (
-		minSize             = 150
-		maxSize             = 500
-		hashTrieProbability = 0.01
+		minSize              = 150
+		maxSize              = 500
+		checkHashProbability = 0.01
 	)
 
 	for size := minSize; size < maxSize; size += 10 {
 		now := time.Now().UnixNano()
 		t.Logf("seed for iter %d: %d", size, now)
 		r := rand.New(rand.NewSource(now)) // #nosec G404
-		runRandDBTest(require, r, generateRandTest(require, r, size, hashTrieProbability))
+		runRandDBTest(require, r, generateRandTest(require, r, size, checkHashProbability))
 	}
 }
 
@@ -746,15 +746,15 @@ func Test_MerkleDB_RandomCases_InitialValues(t *testing.T) {
 	require := require.New(t)
 
 	const (
-		initialValues       = 1_000
-		updates             = 2_500
-		hashTrieProbability = 0
+		initialValues        = 1_000
+		updates              = 2_500
+		checkHashProbability = 0
 	)
 
 	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)
 	r := rand.New(rand.NewSource(now)) // #nosec G404
-	runRandDBTest(require, r, generateInitialValues(require, r, initialValues, updates, hashTrieProbability))
+	runRandDBTest(require, r, generateInitialValues(require, r, initialValues, updates, checkHashProbability))
 }
 
 // randTest performs random trie operations.
@@ -782,14 +782,21 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 	db, err := getBasicDB()
 	require.NoError(err)
 
+	const (
+		maxProofLen  = 100
+		maxPastRoots = defaultHistoryLength
+	)
+
+	var (
+		values               = make(map[path][]byte) // tracks content of the trie
+		currentBatch         = db.NewBatch()
+		uncommittedKeyValues = make(map[path][]byte)
+		uncommittedDeletes   = set.Set[path]{}
+		pastRoots            = []ids.ID{}
+	)
+
 	startRoot, err := db.GetMerkleRoot(context.Background())
 	require.NoError(err)
-
-	values := make(map[path][]byte) // tracks content of the trie
-	currentBatch := db.NewBatch()
-	currentValues := make(map[path][]byte)
-	deleteValues := set.Set[path]{}
-	pastRoots := []ids.ID{}
 
 	for i, step := range rt {
 		require.LessOrEqual(i, len(rt))
@@ -797,13 +804,13 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 		case opUpdate:
 			require.NoError(currentBatch.Put(step.key, step.value))
 
-			currentValues[newPath(step.key)] = step.value
-			deleteValues.Remove(newPath(step.key))
+			uncommittedKeyValues[newPath(step.key)] = step.value
+			uncommittedDeletes.Remove(newPath(step.key))
 		case opDelete:
 			require.NoError(currentBatch.Delete(step.key))
 
-			deleteValues.Add(newPath(step.key))
-			delete(currentValues, newPath(step.key))
+			uncommittedDeletes.Add(newPath(step.key))
+			delete(uncommittedKeyValues, newPath(step.key))
 		case opGenerateRangeProof:
 			root, err := db.GetMerkleRoot(context.Background())
 			require.NoError(err)
@@ -821,8 +828,9 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 				end = maybe.Some(step.value)
 			}
 
-			rangeProof, err := db.GetRangeProofAtRoot(context.Background(), root, start, end, 100)
+			rangeProof, err := db.GetRangeProofAtRoot(context.Background(), root, start, end, maxProofLen)
 			require.NoError(err)
+			require.LessOrEqual(len(rangeProof.KeyValues), maxProofLen)
 
 			require.NoError(rangeProof.Verify(
 				context.Background(),
@@ -830,8 +838,6 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 				end,
 				root,
 			))
-
-			require.LessOrEqual(len(rangeProof.KeyValues), 100)
 		case opGenerateChangeProof:
 			root, err := db.GetMerkleRoot(context.Background())
 			require.NoError(err)
@@ -840,22 +846,23 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 				root = pastRoots[r.Intn(len(pastRoots))]
 			}
 
-			end := maybe.Nothing[[]byte]()
-			if len(step.value) > 0 {
-				end = maybe.Some(step.value)
-			}
-
 			start := maybe.Nothing[[]byte]()
 			if len(step.key) > 0 {
 				start = maybe.Some(step.key)
 			}
 
-			changeProof, err := db.GetChangeProof(context.Background(), startRoot, root, start, end, 100)
+			end := maybe.Nothing[[]byte]()
+			if len(step.value) > 0 {
+				end = maybe.Some(step.value)
+			}
+
+			changeProof, err := db.GetChangeProof(context.Background(), startRoot, root, start, end, maxProofLen)
 			if startRoot == root {
 				require.ErrorIs(err, errSameRoot)
 				continue
 			}
 			require.NoError(err)
+			require.LessOrEqual(len(changeProof.KeyChanges), maxProofLen)
 
 			changeProofDB, err := getBasicDB()
 			require.NoError(err)
@@ -867,38 +874,37 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 				end,
 				root,
 			))
-			require.LessOrEqual(len(changeProof.KeyChanges), 100)
 		case opWriteBatch:
 			oldRoot, err := db.GetMerkleRoot(context.Background())
 			require.NoError(err)
 
 			require.NoError(currentBatch.Write())
+			currentBatch.Reset()
 
-			for key, value := range currentValues {
-				values[key] = value
-			}
-
-			for key := range deleteValues {
-				delete(values, key)
-			}
-
-			if len(currentValues) == 0 && len(deleteValues) == 0 {
+			if len(uncommittedKeyValues) == 0 && len(uncommittedDeletes) == 0 {
 				continue
 			}
+
+			for key, value := range uncommittedKeyValues {
+				values[key] = value
+			}
+			maps.Clear(uncommittedKeyValues)
+
+			for key := range uncommittedDeletes {
+				delete(values, key)
+			}
+			uncommittedDeletes.Clear()
 
 			newRoot, err := db.GetMerkleRoot(context.Background())
 			require.NoError(err)
 
 			if oldRoot != newRoot {
 				pastRoots = append(pastRoots, newRoot)
-				if len(pastRoots) > 300 {
-					pastRoots = pastRoots[len(pastRoots)-300:]
+				if len(pastRoots) > maxPastRoots {
+					pastRoots = pastRoots[len(pastRoots)-maxPastRoots:]
 				}
 			}
 
-			maps.Clear(currentValues)
-			deleteValues.Clear()
-			currentBatch = db.NewBatch()
 		case opGet:
 			v, err := db.Get(step.key)
 			if err != nil {
@@ -915,7 +921,8 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 
 			require.True(bytes.Equal(want, trieValue)) // Use bytes.Equal so nil treated equal to []byte{}
 		case opCheckhash:
-			dbTrie, err := newDatabase(
+			// Create a view with the same key-values as [db]
+			newDB, err := newDatabase(
 				context.Background(),
 				memdb.New(),
 				newDefaultConfig(),
@@ -931,15 +938,16 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 				})
 			}
 
-			newView, err := dbTrie.NewView(context.Background(), ViewChanges{BatchOps: ops})
+			newView, err := newDB.NewView(context.Background(), ViewChanges{BatchOps: ops})
 			require.NoError(err)
 
-			calculatedRoot, err := newView.GetMerkleRoot(context.Background())
+			// Check that the root of the view is the same as the root of [db]
+			newRoot, err := newView.GetMerkleRoot(context.Background())
 			require.NoError(err)
 
 			dbRoot, err := db.GetMerkleRoot(context.Background())
 			require.NoError(err)
-			require.Equal(dbRoot, calculatedRoot)
+			require.Equal(dbRoot, newRoot)
 		default:
 			require.FailNow("unknown op")
 		}
@@ -951,8 +959,11 @@ func generateRandTestWithKeys(
 	r *rand.Rand,
 	allKeys [][]byte,
 	size int,
-	percentChanceToFullHash float64,
+	checkHashProbability float64,
 ) randTest {
+
+	const nilEndProbability = 0.1
+
 	genKey := func() []byte {
 		if len(allKeys) < 2 || r.Intn(100) < 10 {
 			// new key
@@ -977,8 +988,7 @@ func generateRandTestWithKeys(
 	}
 
 	genEnd := func(key []byte) []byte {
-		shouldBeNil := r.Intn(10)
-		if shouldBeNil == 0 {
+		if rand.Float64() < nilEndProbability {
 			return nil
 		}
 
@@ -1013,7 +1023,7 @@ func generateRandTestWithKeys(
 			step.value = genEnd(step.key)
 		case opCheckhash:
 			// this gets really expensive so control how often it happens
-			if r.Float64() >= percentChanceToFullHash {
+			if r.Float64() < checkHashProbability {
 				continue
 			}
 		}
