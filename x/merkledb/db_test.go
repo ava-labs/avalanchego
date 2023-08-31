@@ -962,7 +962,6 @@ func generateRandTestWithKeys(
 	size int,
 	checkHashProbability float64,
 ) randTest {
-
 	const nilEndProbability = 0.1
 
 	genKey := func() []byte {
@@ -989,7 +988,10 @@ func generateRandTestWithKeys(
 	}
 
 	genEnd := func(key []byte) []byte {
-		if rand.Float64() < nilEndProbability {
+		// got is defined because if a rand method is used
+		// in an if statement, the nosec directive doesn't work.
+		got := rand.Float64() // #nosec G404
+		if got < nilEndProbability {
 			return nil
 		}
 
@@ -1074,7 +1076,10 @@ func generateInitialValues(
 			key:   genKey(),
 			value: make([]byte, r.Intn(50)),
 		}
-		if rand.Float64() < nilValueProbability {
+		// got is defined because if a rand method is used
+		// in an if statement, the nosec directive doesn't work.
+		got := rand.Float64() // #nosec G404
+		if got < nilValueProbability {
 			step.value = nil
 		} else {
 			_, _ = r.Read(step.value)
