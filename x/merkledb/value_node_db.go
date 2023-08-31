@@ -109,7 +109,7 @@ func (b *valueNodeBatch) Write() error {
 			if err := dbBatch.Delete(prefixedKey); err != nil {
 				return err
 			}
-		} else if err := dbBatch.Put(prefixedKey, n.marshal()); err != nil {
+		} else if err := dbBatch.Put(prefixedKey, n.bytes()); err != nil {
 			return err
 		}
 

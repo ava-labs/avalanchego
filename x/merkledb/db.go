@@ -1215,5 +1215,5 @@ func cacheEntrySize(p path, n *node) int {
 	if n == nil {
 		return len(p)
 	}
-	return len(p) + 2*len(n.marshal())
+	return len(p) + 2*len(n.bytes())
 }

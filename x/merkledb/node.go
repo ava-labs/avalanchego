@@ -82,7 +82,7 @@ func (n *node) hasValue() bool {
 }
 
 // Returns the byte representation of this node.
-func (n *node) marshal() []byte {
+func (n *node) bytes() []byte {
 	if n.nodeBytes == nil {
 		n.nodeBytes = codec.encodeDBNode(&n.dbNode)
 	}
