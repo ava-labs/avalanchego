@@ -24,13 +24,13 @@ func Test_Node_Marshal(t *testing.T) {
 	require.NoError(t, childNode.calculateID(&mockMetrics{}))
 	root.addChild(childNode)
 
-	data := root.marshal()
+	data := root.bytes()
 	rootParsed, err := parseNode(newPath([]byte("")), data)
 	require.NoError(t, err)
 	require.Len(t, rootParsed.children, 1)
 
-	rootIndex := root.getSingleChildPath()[len(root.key)]
-	parsedIndex := rootParsed.getSingleChildPath()[len(rootParsed.key)]
+	rootIndex := getSingleChildPath(root)[len(root.key)]
+	parsedIndex := getSingleChildPath(rootParsed)[len(rootParsed.key)]
 	rootChildEntry := root.children[rootIndex]
 	parseChildEntry := rootParsed.children[parsedIndex]
 	require.Equal(t, rootChildEntry.id, parseChildEntry.id)
@@ -56,7 +56,7 @@ func Test_Node_Marshal_Errors(t *testing.T) {
 	require.NoError(t, childNode2.calculateID(&mockMetrics{}))
 	root.addChild(childNode2)
 
-	data := root.marshal()
+	data := root.bytes()
 
 	for i := 1; i < len(data); i++ {
 		broken := data[:i]
