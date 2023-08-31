@@ -51,12 +51,6 @@ var (
 	// Meta key that stores the current height of the database. This height is
 	// being incremented everytime a new batch is inserted
 	currentHeightKey = []byte("archivedb:height")
-	// A secondary index is built to keep track of all the known keys. This
-	// index cna be used to iterate and get all the defined keys by a given
-	// prefix. The alternative, would be to read a key, then read the next key
-	// by leveraging the natural ordering of keys, but that would imply random
-	// reads instead of a cheap sequential read of all keys
-	secondaryKeysIndexPrefix = []byte("archivedb:keys:")
 	// The requested height is not yet defined therefore it is unknown to the
 	// database
 	ErrUnknownHeight = errors.New("unknown height")
@@ -99,11 +93,11 @@ func (db *archiveDB) GetLastBlock(key []byte) ([]byte, uint64, error) {
 // will return the key with the value being the height at which the key has been
 // defined for the first time
 func (db *archiveDB) GetKeysByPrefix(prefix []byte) keysIterator {
-	uniqueKeyIndexKey := make([]byte, 0, len(secondaryKeysIndexPrefix)+len(prefix))
-	uniqueKeyIndexKey = append(uniqueKeyIndexKey, secondaryKeysIndexPrefix...)
-	uniqueKeyIndexKey = append(uniqueKeyIndexKey, prefix...)
+	prefixKey := newInternalKey(prefix, 0)
+	bytes := prefixKey.Bytes()
 	return keysIterator{
-		iterator: db.rawDB.NewIteratorWithPrefix(uniqueKeyIndexKey),
+		db:     db,
+		prefix: bytes[0 : len(bytes)-prefixKey.MetadataLen()],
 	}
 }
 
@@ -219,31 +213,6 @@ func (c *batchWithHeight) Delete(key []byte) error {
 
 // Queues an insert for a key with a given
 func (c *batchWithHeight) Put(key []byte, value []byte) error {
-	uniqueKeyIndexKey := make([]byte, 0, len(secondaryKeysIndexPrefix)+len(key))
-	uniqueKeyIndexKey = append(uniqueKeyIndexKey, secondaryKeysIndexPrefix...)
-	uniqueKeyIndexKey = append(uniqueKeyIndexKey, key...)
-
-	keyAlreadyExists, err := c.db.rawDB.Has(uniqueKeyIndexKey)
-	if err != nil {
-		return err
-	}
-	if !keyAlreadyExists {
-		// The key has not being seeing before
-		//
-		// It must be stored in the database with a special prefix. This is sort
-		// of a secondary index that will allow to iterate and fetch all keys
-		// given a prefix, and get all their values defined at a given height.
-		//
-		// This section of the code should happen once for each new key. Keys
-		// updating their values should not trigger this section of the code,
-		// since the sole responsibility of this secondary index is to get a
-		// list of all known keys, to query by a given prefix later
-		var heightBytes [8]byte
-		binary.BigEndian.PutUint64(heightBytes[:], c.height)
-		if err := c.batch.Put(uniqueKeyIndexKey, heightBytes[:]); err != nil {
-			return err
-		}
-	}
 	internalKey := newInternalKey(key, c.height)
 	return c.batch.Put(internalKey.Bytes(), value)
 }

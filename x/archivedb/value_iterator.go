@@ -3,36 +3,7 @@
 
 package archivedb
 
-import (
-	"encoding/binary"
-
-	"github.com/ava-labs/avalanchego/database"
-)
-
-type keysIterator struct {
-	iterator database.Iterator
-}
-
-func (i *keysIterator) Next() bool {
-	return i.iterator.Next()
-}
-
-func (i *keysIterator) Error() error {
-	return i.iterator.Error()
-}
-
-func (i *keysIterator) Key() []byte {
-	key := i.iterator.Key()
-	return key[len(secondaryKeysIndexPrefix):]
-}
-
-func (i *keysIterator) Value() uint64 {
-	return binary.BigEndian.Uint64(i.iterator.Value())
-}
-
-func (i *keysIterator) Release() {
-	i.iterator.Release()
-}
+import "github.com/ava-labs/avalanchego/database"
 
 type allKeysAtHeightIterator struct {
 	db          *archiveDB
