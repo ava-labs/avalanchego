@@ -13,6 +13,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -733,11 +734,11 @@ func Test_MerkleDB_RandomCases(t *testing.T) {
 		hashTrieProbability = 0.01
 	)
 
-	for i := minSize; i < maxSize; i += 10 {
+	for size := minSize; size < maxSize; size += 10 {
 		now := time.Now().UnixNano()
-		t.Logf("seed for iter %d: %d", i, now)
+		t.Logf("seed for iter %d: %d", size, now)
 		r := rand.New(rand.NewSource(now)) // #nosec G404
-		runRandDBTest(require, r, generateRandTest(require, r, i, hashTrieProbability))
+		runRandDBTest(require, r, generateRandTest(require, r, size, hashTrieProbability))
 	}
 }
 
@@ -787,7 +788,7 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 	values := make(map[path][]byte) // tracks content of the trie
 	currentBatch := db.NewBatch()
 	currentValues := make(map[path][]byte)
-	deleteValues := make(map[path]struct{})
+	deleteValues := set.Set[path]{}
 	pastRoots := []ids.ID{}
 
 	for i, step := range rt {
@@ -795,18 +796,22 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 		switch step.op {
 		case opUpdate:
 			require.NoError(currentBatch.Put(step.key, step.value))
+
 			currentValues[newPath(step.key)] = step.value
-			delete(deleteValues, newPath(step.key))
+			deleteValues.Remove(newPath(step.key))
 		case opDelete:
 			require.NoError(currentBatch.Delete(step.key))
-			deleteValues[newPath(step.key)] = struct{}{}
+
+			deleteValues.Add(newPath(step.key))
 			delete(currentValues, newPath(step.key))
 		case opGenerateRangeProof:
 			root, err := db.GetMerkleRoot(context.Background())
 			require.NoError(err)
+
 			if len(pastRoots) > 0 {
 				root = pastRoots[r.Intn(len(pastRoots))]
 			}
+
 			start := maybe.Nothing[[]byte]()
 			if len(step.key) > 0 {
 				start = maybe.Some(step.key)
@@ -818,23 +823,28 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 
 			rangeProof, err := db.GetRangeProofAtRoot(context.Background(), root, start, end, 100)
 			require.NoError(err)
+
 			require.NoError(rangeProof.Verify(
 				context.Background(),
 				start,
 				end,
 				root,
 			))
+
 			require.LessOrEqual(len(rangeProof.KeyValues), 100)
 		case opGenerateChangeProof:
 			root, err := db.GetMerkleRoot(context.Background())
 			require.NoError(err)
+
 			if len(pastRoots) > 1 {
 				root = pastRoots[r.Intn(len(pastRoots))]
 			}
+
 			end := maybe.Nothing[[]byte]()
 			if len(step.value) > 0 {
 				end = maybe.Some(step.value)
 			}
+
 			start := maybe.Nothing[[]byte]()
 			if len(step.key) > 0 {
 				start = maybe.Some(step.key)
@@ -846,6 +856,7 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 				continue
 			}
 			require.NoError(err)
+
 			changeProofDB, err := getBasicDB()
 			require.NoError(err)
 
@@ -860,10 +871,13 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 		case opWriteBatch:
 			oldRoot, err := db.GetMerkleRoot(context.Background())
 			require.NoError(err)
+
 			require.NoError(currentBatch.Write())
+
 			for key, value := range currentValues {
 				values[key] = value
 			}
+
 			for key := range deleteValues {
 				delete(values, key)
 			}
@@ -871,28 +885,34 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 			if len(currentValues) == 0 && len(deleteValues) == 0 {
 				continue
 			}
+
 			newRoot, err := db.GetMerkleRoot(context.Background())
 			require.NoError(err)
+
 			if oldRoot != newRoot {
 				pastRoots = append(pastRoots, newRoot)
 				if len(pastRoots) > 300 {
 					pastRoots = pastRoots[len(pastRoots)-300:]
 				}
 			}
-			currentValues = map[path][]byte{}
-			deleteValues = map[path]struct{}{}
+
+			maps.Clear(currentValues)
+			deleteValues.Clear()
 			currentBatch = db.NewBatch()
 		case opGet:
 			v, err := db.Get(step.key)
 			if err != nil {
 				require.ErrorIs(err, database.ErrNotFound)
 			}
+
 			want := values[newPath(step.key)]
 			require.True(bytes.Equal(want, v)) // Use bytes.Equal so nil treated equal to []byte{}
+
 			trieValue, err := getNodeValue(db, string(step.key))
 			if err != nil {
 				require.ErrorIs(err, database.ErrNotFound)
 			}
+
 			require.True(bytes.Equal(want, trieValue)) // Use bytes.Equal so nil treated equal to []byte{}
 		case opCheckhash:
 			dbTrie, err := newDatabase(
@@ -902,23 +922,37 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 				&mockMetrics{},
 			)
 			require.NoError(err)
+
 			ops := make([]database.BatchOp, 0, len(values))
 			for key, value := range values {
-				ops = append(ops, database.BatchOp{Key: key.Serialize().Value, Value: value})
+				ops = append(ops, database.BatchOp{
+					Key:   key.Serialize().Value,
+					Value: value,
+				})
 			}
+
 			newView, err := dbTrie.NewView(context.Background(), ViewChanges{BatchOps: ops})
 			require.NoError(err)
 
 			calculatedRoot, err := newView.GetMerkleRoot(context.Background())
 			require.NoError(err)
+
 			dbRoot, err := db.GetMerkleRoot(context.Background())
 			require.NoError(err)
 			require.Equal(dbRoot, calculatedRoot)
+		default:
+			require.FailNow("unknown op")
 		}
 	}
 }
 
-func generateWithKeys(require *require.Assertions, allKeys [][]byte, r *rand.Rand, size int, percentChanceToFullHash float64) randTest {
+func generateRandTestWithKeys(
+	require *require.Assertions,
+	r *rand.Rand,
+	allKeys [][]byte,
+	size int,
+	percentChanceToFullHash float64,
+) randTest {
 	genKey := func() []byte {
 		if len(allKeys) < 2 || r.Intn(100) < 10 {
 			// new key
@@ -991,7 +1025,13 @@ func generateWithKeys(require *require.Assertions, allKeys [][]byte, r *rand.Ran
 	return steps
 }
 
-func generateInitialValues(require *require.Assertions, r *rand.Rand, initialValues int, size int, percentChanceToFullHash float64) randTest {
+func generateInitialValues(
+	require *require.Assertions,
+	r *rand.Rand,
+	initialValues int,
+	size int,
+	percentChanceToFullHash float64,
+) randTest {
 	var allKeys [][]byte
 	genKey := func() []byte {
 		// new prefixed key
@@ -1027,13 +1067,13 @@ func generateInitialValues(require *require.Assertions, r *rand.Rand, initialVal
 		steps = append(steps, step)
 	}
 	steps = append(steps, randTestStep{op: opWriteBatch})
-	steps = append(steps, generateWithKeys(require, allKeys, r, size, percentChanceToFullHash)...)
+	steps = append(steps, generateRandTestWithKeys(require, r, allKeys, size, percentChanceToFullHash)...)
 	return steps
 }
 
 func generateRandTest(require *require.Assertions, r *rand.Rand, size int, percentChanceToFullHash float64) randTest {
 	var allKeys [][]byte
-	return generateWithKeys(require, allKeys, r, size, percentChanceToFullHash)
+	return generateRandTestWithKeys(require, r, allKeys, size, percentChanceToFullHash)
 }
 
 // Inserts [n] random key/value pairs into each database.
