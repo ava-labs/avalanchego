@@ -20,6 +20,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/e2e"
+	"github.com/ava-labs/avalanchego/tests/fixture/testnet"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 )
 
@@ -39,12 +40,20 @@ var _ = e2e.DescribeCChainSerial("[Dynamic Fees]", func() {
 	gasTip := big.NewInt(1000 * params.GWei)
 
 	ginkgo.It("should ensure that the gas price is affected by load", func() {
+		ginkgo.By("creating a new private network to ensure isolation from other tests")
+		privateNetwork := e2e.Env.NewPrivateNetwork()
+
 		ginkgo.By("allocating a pre-funded key")
-		key := e2e.Env.AllocateFundedKey()
+		key := privateNetwork.GetConfig().FundedKeys[0]
 		ethAddress := evm.GetEthAddress(key)
 
 		ginkgo.By("initializing a coreth client")
-		ethClient := e2e.Env.NewEthClient(e2e.Env.GetRandomNodeURI())
+		node := privateNetwork.GetNodes()[0]
+		nodeURI := testnet.NodeURI{
+			NodeID: node.GetID(),
+			URI:    node.GetProcessContext().URI,
+		}
+		ethClient := e2e.Env.NewEthClient(nodeURI)
 
 		ginkgo.By("initializing a transaction signer")
 		cChainID, err := ethClient.ChainID(e2e.DefaultContext())
@@ -157,6 +166,6 @@ var _ = e2e.DescribeCChainSerial("[Dynamic Fees]", func() {
 			e2e.SendEthTransaction(ethClient, signedTx)
 		})
 
-		e2e.CheckBootstrapIsPossible(e2e.Env.GetNetwork())
+		e2e.CheckBootstrapIsPossible(privateNetwork)
 	})
 })
