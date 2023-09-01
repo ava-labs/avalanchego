@@ -71,20 +71,19 @@ var _ = e2e.DescribeXChain("[Interchain Workflow]", func() {
 		}
 
 		ginkgo.By("sending funds from one address to another on the X-Chain", func() {
-			e2e.LogTxAndCheck(
-				xWallet.IssueBaseTx(
-					[]*avax.TransferableOutput{{
-						Asset: avax.Asset{
-							ID: avaxAssetID,
-						},
-						Out: &secp256k1fx.TransferOutput{
-							Amt:          transferAmount,
-							OutputOwners: recipientOwner,
-						},
-					}},
-					e2e.WithDefaultContext(),
-				),
+			_, err = xWallet.IssueBaseTx(
+				[]*avax.TransferableOutput{{
+					Asset: avax.Asset{
+						ID: avaxAssetID,
+					},
+					Out: &secp256k1fx.TransferOutput{
+						Amt:          transferAmount,
+						OutputOwners: recipientOwner,
+					},
+				}},
+				e2e.WithDefaultContext(),
 			)
+			require.NoError(err)
 		})
 
 		ginkgo.By("checking that the X-Chain recipient address has received the sent funds", func() {
@@ -96,27 +95,25 @@ var _ = e2e.DescribeXChain("[Interchain Workflow]", func() {
 		})
 
 		ginkgo.By("exporting AVAX from the X-Chain to the C-Chain", func() {
-			e2e.LogTxAndCheck(
-				xWallet.IssueExportTx(
-					cWallet.BlockchainID(),
-					exportOutputs,
-					e2e.WithDefaultContext(),
-				),
+			_, err := xWallet.IssueExportTx(
+				cWallet.BlockchainID(),
+				exportOutputs,
+				e2e.WithDefaultContext(),
 			)
+			require.NoError(err)
 		})
 
 		ginkgo.By("initializing a new eth client")
 		ethClient := e2e.Env.NewEthClient(nodeURI)
 
 		ginkgo.By("importing AVAX from the X-Chain to the C-Chain", func() {
-			e2e.LogTxAndCheck(
-				cWallet.IssueImportTx(
-					xWallet.BlockchainID(),
-					recipientEthAddress,
-					e2e.WithDefaultContext(),
-					e2e.WithSuggestedGasPrice(ethClient),
-				),
+			_, err := cWallet.IssueImportTx(
+				xWallet.BlockchainID(),
+				recipientEthAddress,
+				e2e.WithDefaultContext(),
+				e2e.WithSuggestedGasPrice(ethClient),
 			)
+			require.NoError(err)
 		})
 
 		ginkgo.By("checking that the recipient address has received imported funds on the C-Chain")
@@ -127,23 +124,21 @@ var _ = e2e.DescribeXChain("[Interchain Workflow]", func() {
 		}, e2e.DefaultTimeout, e2e.DefaultPollingInterval, "failed to see recipient address funded before timeout")
 
 		ginkgo.By("exporting AVAX from the X-Chain to the P-Chain", func() {
-			e2e.LogTxAndCheck(
-				xWallet.IssueExportTx(
-					constants.PlatformChainID,
-					exportOutputs,
-					e2e.WithDefaultContext(),
-				),
+			_, err := xWallet.IssueExportTx(
+				constants.PlatformChainID,
+				exportOutputs,
+				e2e.WithDefaultContext(),
 			)
+			require.NoError(err)
 		})
 
 		ginkgo.By("importing AVAX from the X-Chain to the P-Chain", func() {
-			e2e.LogTxAndCheck(
-				pWallet.IssueImportTx(
-					xWallet.BlockchainID(),
-					&recipientOwner,
-					e2e.WithDefaultContext(),
-				),
+			_, err := pWallet.IssueImportTx(
+				xWallet.BlockchainID(),
+				&recipientOwner,
+				e2e.WithDefaultContext(),
 			)
+			require.NoError(err)
 		})
 
 		ginkgo.By("checking that the recipient address has received imported funds on the P-Chain", func() {

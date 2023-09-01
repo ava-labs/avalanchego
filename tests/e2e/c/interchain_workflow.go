@@ -111,24 +111,22 @@ var _ = e2e.DescribeCChain("[Interchain Workflow]", func() {
 		}
 
 		ginkgo.By("exporting AVAX from the C-Chain to the X-Chain", func() {
-			e2e.LogTxAndCheck(
-				cWallet.IssueExportTx(
-					xWallet.BlockchainID(),
-					exportOutputs,
-					e2e.WithDefaultContext(),
-					e2e.WithSuggestedGasPrice(ethClient),
-				),
+			_, err := cWallet.IssueExportTx(
+				xWallet.BlockchainID(),
+				exportOutputs,
+				e2e.WithDefaultContext(),
+				e2e.WithSuggestedGasPrice(ethClient),
 			)
+			require.NoError(err)
 		})
 
 		ginkgo.By("importing AVAX from the C-Chain to the X-Chain", func() {
-			e2e.LogTxAndCheck(
-				xWallet.IssueImportTx(
-					cWallet.BlockchainID(),
-					&recipientOwner,
-					e2e.WithDefaultContext(),
-				),
+			_, err := xWallet.IssueImportTx(
+				cWallet.BlockchainID(),
+				&recipientOwner,
+				e2e.WithDefaultContext(),
 			)
+			require.NoError(err)
 		})
 
 		ginkgo.By("checking that the recipient address has received imported funds on the X-Chain", func() {
@@ -140,24 +138,22 @@ var _ = e2e.DescribeCChain("[Interchain Workflow]", func() {
 		})
 
 		ginkgo.By("exporting AVAX from the C-Chain to the P-Chain", func() {
-			e2e.LogTxAndCheck(
-				cWallet.IssueExportTx(
-					constants.PlatformChainID,
-					exportOutputs,
-					e2e.WithDefaultContext(),
-					e2e.WithSuggestedGasPrice(ethClient),
-				),
+			_, err := cWallet.IssueExportTx(
+				constants.PlatformChainID,
+				exportOutputs,
+				e2e.WithDefaultContext(),
+				e2e.WithSuggestedGasPrice(ethClient),
 			)
+			require.NoError(err)
 		})
 
 		ginkgo.By("importing AVAX from the C-Chain to the P-Chain", func() {
-			e2e.LogTxAndCheck(
-				pWallet.IssueImportTx(
-					cWallet.BlockchainID(),
-					&recipientOwner,
-					e2e.WithDefaultContext(),
-				),
+			_, err = pWallet.IssueImportTx(
+				cWallet.BlockchainID(),
+				&recipientOwner,
+				e2e.WithDefaultContext(),
 			)
+			require.NoError(err)
 		})
 
 		ginkgo.By("checking that the recipient address has received imported funds on the P-Chain", func() {

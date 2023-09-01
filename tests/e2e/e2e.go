@@ -201,27 +201,6 @@ func WaitForHealthy(node testnet.Node) {
 	require.NoError(ginkgo.GinkgoT(), testnet.WaitForHealthy(ctx, node))
 }
 
-// Interface to allow logging any type of transaction that has an ID method.
-type LoggableTx interface {
-	ID() ids.ID
-}
-
-// Ensures transaction id is logged if the transaction is non-nil. Should be
-// called before checking for an error to ensure traceability in the event
-// of a transaction being submitted but failing to be accepted.
-func LogTx(tx LoggableTx) {
-	if tx != nil {
-		tests.Outf(" tx id: %s\n", tx.ID())
-	}
-}
-
-// Ensures transaction id is logged if the transaction is non-nil and check
-// if an error occurred.
-func LogTxAndCheck(tx LoggableTx, err error) {
-	LogTx(tx)
-	require.NoError(ginkgo.GinkgoT(), err)
-}
-
 // Sends an eth transaction, waits for the transaction receipt to be issued
 // and checks that the receipt indicates success.
 func SendEthTransaction(ethClient ethclient.Client, signedTx *types.Transaction) *types.Receipt {
