@@ -4,6 +4,8 @@
 package archivedb
 
 import (
+	"fmt"
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -40,7 +42,7 @@ func store(t *testing.T, db *archiveDB, changes []changes) uint64 {
 
 type keyResultSet struct {
 	key        []byte
-	firstSetAt uint64
+	lastSeenAt uint64
 }
 
 func consumeAllKeys(t *testing.T, i keysIterator) []keyResultSet {
@@ -65,6 +67,40 @@ func getDBWithState(t *testing.T, state [][]changes) *archiveDB {
 	}
 
 	return db
+}
+
+func isPrime(num int) bool {
+	if num < 2 {
+		return false
+	}
+	sqroot := int(math.Sqrt(float64(num)))
+	for i := 2; i <= sqroot; i++ {
+		if num%i == 0 {
+			return false
+		}
+	}
+	return true
+}
+
+func getDBWithDefaultState(t *testing.T) *archiveDB {
+	var allChanges [][]changes
+	for i := 1; i <= 10000; i++ {
+		var block []changes
+		value := fmt.Sprintf("value of %d", i)
+		if isPrime(i) {
+			block = append(block, entry(fmt.Sprintf("prime:%d", i), value))
+			block = append(block, entry("last:prime", value))
+		}
+		if i%2 == 0 {
+			block = append(block, entry(fmt.Sprintf("even:%d", i), value))
+			block = append(block, entry("last:even", value))
+		} else {
+			block = append(block, entry(fmt.Sprintf("odd:%d", i), value))
+			block = append(block, entry("last:odd", value))
+		}
+		allChanges = append(allChanges, block)
+	}
+	return getDBWithState(t, allChanges)
 }
 
 func TestGetAllKeysByPrefix(t *testing.T) {
@@ -101,4 +137,16 @@ func TestGetAllKeysByPrefix(t *testing.T) {
 	require.Equal(t, []keyResultSet{
 		{[]byte("suffix:ac"), 8},
 	}, consumeAllKeys(t, db.GetKeysByPrefix([]byte("s"))))
+}
+
+func TestGetAllKeysByPrefixBenchmark(t *testing.T) {
+	db := getDBWithDefaultState(t)
+	allPrimes := consumeAllKeys(t, db.GetKeysByPrefix([]byte("prime:")))
+	require.Len(t, allPrimes, 1229)
+	require.Equal(t, []byte("prime:1009"), allPrimes[0].key)
+	lastVars := consumeAllKeys(t, db.GetKeysByPrefix([]byte("last:")))
+	require.Len(t, lastVars, 3)
+	require.Equal(t, []byte("last:even"), lastVars[0].key)
+	require.Equal(t, []byte("last:odd"), lastVars[1].key)
+	require.Equal(t, []byte("last:prime"), lastVars[2].key)
 }

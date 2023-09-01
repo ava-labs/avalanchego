@@ -71,7 +71,7 @@ func (k *keyInternal) Bytes() []byte {
 }
 
 // Returns the internal bytes representation of the key without any aditional metadata
-func (k *keyInternal) MetadataLen() int {
+func (*keyInternal) MetadataLen() int {
 	return longLen + boolLen
 }
 

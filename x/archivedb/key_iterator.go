@@ -3,9 +3,7 @@
 
 package archivedb
 
-import (
-	"github.com/ava-labs/avalanchego/database"
-)
+import "github.com/ava-labs/avalanchego/database"
 
 type keysIterator struct {
 	db        *archiveDB

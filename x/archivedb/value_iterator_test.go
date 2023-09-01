@@ -81,3 +81,23 @@ func TestGetAllValuesAtHeight(t *testing.T) {
 		consumeAllValues(t, db.GetAllAtHeight([]byte("prefix:"), 1)),
 	)
 }
+
+func TestGetAllValuesAtHeightWithState(t *testing.T) {
+	db := getDBWithDefaultState(t)
+	values := consumeAllValues(t, db.GetAllAtHeight([]byte("last:"), 1))
+	require.Equal(t, []valueResultSet{
+		{[]byte("last:odd"), 1, []byte("value of 1")},
+	}, values)
+	values = consumeAllValues(t, db.GetAllAtHeight([]byte("last:"), 2))
+	require.Equal(t, []valueResultSet{
+		{[]byte("last:even"), 2, []byte("value of 2")},
+		{[]byte("last:odd"), 1, []byte("value of 1")},
+		{[]byte("last:prime"), 2, []byte("value of 2")},
+	}, values)
+	values = consumeAllValues(t, db.GetAllAtHeight([]byte("last:"), 10000))
+	require.Equal(t, []valueResultSet{
+		{[]byte("last:even"), 10000, []byte("value of 10000")},
+		{[]byte("last:odd"), 9999, []byte("value of 9999")},
+		{[]byte("last:prime"), 9973, []byte("value of 9973")},
+	}, values)
+}
