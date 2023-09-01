@@ -32,10 +32,12 @@ var _ = e2e.DescribeCChain("[Interchain Workflow]", func() {
 	)
 
 	ginkgo.It("should ensure that funds can be transferred from the C-Chain to the X-Chain and the P-Chain", func() {
+		ginkgo.By("initializing a new eth client")
 		// Select a random node URI to use for both the eth client and
 		// the wallet to avoid having to verify that all nodes are at
 		// the same height before initializing the wallet.
 		nodeURI := e2e.Env.GetRandomNodeURI()
+		ethClient := e2e.Env.NewEthClient(nodeURI)
 
 		ginkgo.By("allocating a pre-funded key to send from and a recipient key to deliver to")
 		senderKey := e2e.Env.AllocateFundedKey()
@@ -44,8 +46,6 @@ var _ = e2e.DescribeCChain("[Interchain Workflow]", func() {
 		recipientKey, err := factory.NewPrivateKey()
 		require.NoError(err)
 		recipientEthAddress := evm.GetEthAddress(recipientKey)
-
-		ethClient := e2e.Env.NewEthClient(nodeURI)
 
 		ginkgo.By("sending funds from one address to another on the C-Chain", func() {
 			// Create transaction

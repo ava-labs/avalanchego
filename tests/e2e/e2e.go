@@ -115,7 +115,6 @@ func (te *TestEnvironment) AllocateFundedKey() *secp256k1.PrivateKey {
 // Create a new keychain with the specified number of test keys.
 func (te *TestEnvironment) NewKeychain(count int) *secp256k1fx.Keychain {
 	keys := te.AllocateFundedKeys(count)
-	tests.Outf("{{blue}} initializing keychain with %d key(s) {{/}}\n", count)
 	return secp256k1fx.NewKeychain(keys...)
 }
 
