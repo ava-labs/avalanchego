@@ -119,7 +119,7 @@ pub trait TypedView<T: ?Sized + Send + Sync>:
 
 /// A wrapper of `TypedView` to enable writes. The direct construction (by [Obj::from_typed_view]
 /// or [StoredView::ptr_to_obj]) could be useful for some unsafe access to a low-level item (e.g.
-/// headers/metadata at bootstrap or part of [ShaleStore] implementation) stored at a given [ObjPtr]
+/// headers/metadata at bootstrap or part of [ShaleStore] implementation) stored at a given [DiskAddress]
 /// . Users of [ShaleStore] implementation, however, will only use [ObjRef] for safeguarded access.
 #[derive(Debug)]
 pub struct Obj<T: ?Sized + Send + Sync> {
@@ -237,7 +237,7 @@ impl<'a, T: Send + Sync> Drop for ObjRef<'a, T> {
 /// A persistent item storage backed by linear logical space. New items can be created and old
 /// items could be retrieved or dropped.
 pub trait ShaleStore<T: Send + Sync> {
-    /// Dereference [ObjPtr] to a unique handle that allows direct access to the item in memory.
+    /// Dereference [DiskAddress] to a unique handle that allows direct access to the item in memory.
     fn get_item(&'_ self, ptr: DiskAddress) -> Result<ObjRef<'_, T>, ShaleError>;
     /// Allocate a new item.
     fn put_item(&'_ self, item: T, extra: u64) -> Result<ObjRef<'_, T>, ShaleError>;

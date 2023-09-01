@@ -16,7 +16,7 @@
 //! generic KV store such as LevelDB/RocksDB. Like a B+-tree based store, firewood directly uses
 //! the tree structure as the index on disk. Thus, there is no additional "emulation" of the
 //! logical trie to flatten out the data structure to feed into the underlying DB that is unaware
-//! of the data being stored.
+//! of the data being stored. It provides generic trie storage for arbitrary keys and values.
 //!
 //! Firewood provides OS-level crash recovery via a write-ahead log (WAL). The WAL guarantees
 //! atomicity and durability in the database, but also offers "reversibility": some portion
@@ -24,13 +24,6 @@
 //! some past versions of the entire store back in memory. While running the store, new changes
 //! will also contribute to the configured window of changes (at batch granularity) to access any past
 //! versions with no additional cost at all.
-//!
-//! Firewood provides two isolated storage spaces which can be both or selectively used the user.
-//! The account model portion of the storage offers something very similar to `StateDB` in geth,
-//! which captures the address-"state key" style of two-level access for an account's (smart contract's) state.
-//! Therefore, it takes minimal effort to delegate all state storage from an EVM implementation to firewood. The other
-//! portion of the storage supports generic trie storage for arbitrary keys and values. When unused,
-//! there is no additional cost.
 //!
 //! # Design Philosophy & Overview
 //!
@@ -86,8 +79,7 @@
 //!   and recycled throughout their life cycles (there is a disk-friendly, malloc-style kind of
 //!   basic implementation in `shale` crate, but one can always define his/her own `ShaleStore`).
 //!
-//! - Data structure: in Firewood, one or more tries are maintained by invoking
-//!   `ShaleStore` (see `src/merkle.rs`; another stash for code objects is in `src/account.rs`).
+//! - Data structure: in Firewood, one trie is maintained by invoking `ShaleStore` (see `src/merkle.rs`).
 //!   The data structure code is totally unaware of how its objects (i.e., nodes) are organized or
 //!   persisted on disk. It is as if they're just in memory, which makes it much easier to write
 //!   and maintain the code.
@@ -107,7 +99,7 @@
 //! separate the logical data from its physical representation, greatly simplifies the storage
 //! management, and allows reusing the code. It is still a very versatile abstraction, as in theory
 //! any persistent data could be stored this way -- sometimes you need to swap in a different
-//! `MemShale` or `CachedStore` implementation, but without having to touch the code for the persisted
+//! `ShaleStore` or `CachedStore` implementation, but without having to touch the code for the persisted
 //! data structure.
 //!
 //! ## Page-based Shadowing and Revisions
@@ -142,11 +134,11 @@
 //!
 //! - Writes to nodes are converted into interval writes to the stagging `StoreRevMut` space that
 //!   overlays atop `CachedSpace`, so all dirty pages during the current write batch will be
-//!   exactly captured in `StoreRevMut` (see `StoreRevMut::take_delta`).
+//!   exactly captured in `StoreRevMut` (see `StoreRevMut::delta`).
 //!
 //! - Finally:
 //!
-//!   - Abort: when the write batch is dropped without invoking `db::WriteBatch::commit`, all in-memory
+//!   - Abort: when the write batch is dropped without invoking `db::Proposal::commit`, all in-memory
 //!     changes will be discarded, the dirty pages from `StoreRevMut` will be dropped and the merkle
 //!     will "revert" back to its original state without actually having to rollback anything.
 //!
