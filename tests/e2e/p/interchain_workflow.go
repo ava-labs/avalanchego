@@ -109,27 +109,26 @@ var _ = e2e.DescribeXChain("[Interchain Workflow]", func() {
 			delegationPercent := 0.10 // 10%
 			delegationFee := uint32(reward.PercentDenominator * delegationPercent)
 
-			e2e.LogTxAndCheck(
-				pWallet.IssueAddPermissionlessValidatorTx(
-					&txs.SubnetValidator{Validator: txs.Validator{
-						NodeID: nodeID,
-						Start:  uint64(startTime.Unix()),
-						End:    uint64(endTime.Unix()),
-						Wght:   weight,
-					}},
-					nodePOP,
-					pWallet.AVAXAssetID(),
-					&secp256k1fx.OutputOwners{
-						Threshold: 1,
-						Addrs:     []ids.ShortID{rewardKey.Address()},
-					},
-					&secp256k1fx.OutputOwners{
-						Threshold: 1,
-						Addrs:     []ids.ShortID{rewardKey.Address()},
-					},
-					delegationFee,
-				),
+			_, err = pWallet.IssueAddPermissionlessValidatorTx(
+				&txs.SubnetValidator{Validator: txs.Validator{
+					NodeID: nodeID,
+					Start:  uint64(startTime.Unix()),
+					End:    uint64(endTime.Unix()),
+					Wght:   weight,
+				}},
+				nodePOP,
+				pWallet.AVAXAssetID(),
+				&secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{rewardKey.Address()},
+				},
+				&secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{rewardKey.Address()},
+				},
+				delegationFee,
 			)
+			require.NoError(err)
 		})
 
 		ginkgo.By("adding a delegator to the new node", func() {
@@ -142,40 +141,39 @@ var _ = e2e.DescribeXChain("[Interchain Workflow]", func() {
 			rewardKey, err := factory.NewPrivateKey()
 			require.NoError(err)
 
-			e2e.LogTxAndCheck(
-				pWallet.IssueAddPermissionlessDelegatorTx(
-					&txs.SubnetValidator{Validator: txs.Validator{
-						NodeID: nodeID,
-						Start:  uint64(startTime.Unix()),
-						End:    uint64(endTime.Unix()),
-						Wght:   weight,
-					}},
-					pWallet.AVAXAssetID(),
-					&secp256k1fx.OutputOwners{
-						Threshold: 1,
-						Addrs:     []ids.ShortID{rewardKey.Address()},
-					},
-				),
+			_, err = pWallet.IssueAddPermissionlessDelegatorTx(
+				&txs.SubnetValidator{Validator: txs.Validator{
+					NodeID: nodeID,
+					Start:  uint64(startTime.Unix()),
+					End:    uint64(endTime.Unix()),
+					Wght:   weight,
+				}},
+				pWallet.AVAXAssetID(),
+				&secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{rewardKey.Address()},
+				},
 			)
+			require.NoError(err)
 		})
 
-		ginkgo.By("exporting AVAX from the P-Chain to the X-Chain")
-		e2e.LogTxAndCheck(
-			pWallet.IssueExportTx(
+		ginkgo.By("exporting AVAX from the P-Chain to the X-Chain", func() {
+			_, err := pWallet.IssueExportTx(
 				xWallet.BlockchainID(),
 				exportOutputs,
 				e2e.WithDefaultContext(),
-			),
-		)
+			)
+			require.NoError(err)
+		})
 
-		ginkgo.By("importing AVAX from the P-Chain to the X-Chain")
-		e2e.LogTxAndCheck(
-			xWallet.IssueImportTx(
+		ginkgo.By("importing AVAX from the P-Chain to the X-Chain", func() {
+			_, err := xWallet.IssueImportTx(
 				constants.PlatformChainID,
 				&recipientOwner,
 				e2e.WithDefaultContext(),
-			),
-		)
+			)
+			require.NoError(err)
+		})
 
 		ginkgo.By("checking that the recipient address has received imported funds on the X-Chain", func() {
 			balances, err := xWallet.Builder().GetFTBalance(common.WithCustomAddresses(set.Of(
@@ -185,27 +183,27 @@ var _ = e2e.DescribeXChain("[Interchain Workflow]", func() {
 			require.Positive(balances[avaxAssetID])
 		})
 
-		ginkgo.By("exporting AVAX from the P-Chain to the C-Chain")
-		e2e.LogTxAndCheck(
-			pWallet.IssueExportTx(
+		ginkgo.By("exporting AVAX from the P-Chain to the C-Chain", func() {
+			_, err := pWallet.IssueExportTx(
 				cWallet.BlockchainID(),
 				exportOutputs,
 				e2e.WithDefaultContext(),
-			),
-		)
+			)
+			require.NoError(err)
+		})
 
 		ginkgo.By("initializing a new eth client")
 		ethClient := e2e.Env.NewEthClient(nodeURI)
 
-		ginkgo.By("importing AVAX from the P-Chain to the C-Chain")
-		e2e.LogTxAndCheck(
-			cWallet.IssueImportTx(
+		ginkgo.By("importing AVAX from the P-Chain to the C-Chain", func() {
+			_, err := cWallet.IssueImportTx(
 				constants.PlatformChainID,
 				recipientEthAddress,
 				e2e.WithDefaultContext(),
 				e2e.WithSuggestedGasPrice(ethClient),
-			),
-		)
+			)
+			require.NoError(err)
+		})
 
 		ginkgo.By("checking that the recipient address has received imported funds on the C-Chain")
 		e2e.Eventually(func() bool {
