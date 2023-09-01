@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
 	"math/rand"
 	"strings"
 	"time"
@@ -247,4 +248,22 @@ func SendEthTransaction(ethClient ethclient.Client, signedTx *types.Transaction)
 	// Retrieve the contract address
 	require.Equal(receipt.Status, types.ReceiptStatusSuccessful)
 	return receipt
+}
+
+// Determines the suggested gas price for the configured client that will
+// maximize the chances of transaction acceptance.
+func SuggestGasPrice(ethClient ethclient.Client) *big.Int {
+	gasPrice, err := ethClient.SuggestGasPrice(DefaultContext())
+	require.NoError(ginkgo.GinkgoT(), err)
+	// Double the suggested gas price to maximize the chances of
+	// acceptance. Maybe this can be revisited pending resolution of
+	// https://github.com/ava-labs/coreth/issues/314.
+	gasPrice.Add(gasPrice, gasPrice)
+	return gasPrice
+}
+
+// Helper simplifying use via an option of a gas price appropriate for testing.
+func WithSuggestedGasPrice(ethClient ethclient.Client) common.Option {
+	baseFee := SuggestGasPrice(ethClient)
+	return common.WithBaseFee(baseFee)
 }

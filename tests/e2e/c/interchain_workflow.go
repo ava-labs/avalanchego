@@ -51,8 +51,7 @@ var _ = e2e.DescribeCChain("[Interchain Workflow]", func() {
 			// Create transaction
 			acceptedNonce, err := ethClient.AcceptedNonceAt(e2e.DefaultContext(), senderEthAddress)
 			require.NoError(err)
-			gasPrice, err := ethClient.SuggestGasPrice(e2e.DefaultContext())
-			require.NoError(err)
+			gasPrice := e2e.SuggestGasPrice(ethClient)
 			tx := types.NewTransaction(
 				acceptedNonce,
 				recipientEthAddress,
@@ -117,6 +116,7 @@ var _ = e2e.DescribeCChain("[Interchain Workflow]", func() {
 					xWallet.BlockchainID(),
 					exportOutputs,
 					e2e.WithDefaultContext(),
+					e2e.WithSuggestedGasPrice(ethClient),
 				),
 			)
 		})
@@ -145,6 +145,7 @@ var _ = e2e.DescribeCChain("[Interchain Workflow]", func() {
 					constants.PlatformChainID,
 					exportOutputs,
 					e2e.WithDefaultContext(),
+					e2e.WithSuggestedGasPrice(ethClient),
 				),
 			)
 		})
