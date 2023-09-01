@@ -1,12 +1,11 @@
 use aiofut::AioBuilder;
-use futures::executor::LocalPool;
-use futures::future::FutureExt;
-use futures::task::LocalSpawnExt;
-use std::os::unix::io::AsRawFd;
-use std::path::Path;
+use futures::{executor::LocalPool, future::FutureExt, task::LocalSpawnExt};
+use std::{os::unix::io::AsRawFd, path::PathBuf};
 
-fn tmp_dir() -> &'static Path {
-    Path::new(option_env!("CARGO_TARGET_TMPDIR").unwrap_or("/tmp"))
+fn tmp_dir() -> PathBuf {
+    option_env!("CARGO_TARGET_TMPDIR")
+        .map(PathBuf::from)
+        .unwrap_or(std::env::temp_dir())
 }
 
 #[test]

@@ -2,10 +2,11 @@ use anyhow::{anyhow, Result};
 use assert_cmd::Command;
 use predicates::prelude::*;
 use serial_test::serial;
-use std::fs::remove_dir_all;
+use std::{fs::remove_dir_all, path::PathBuf};
 
 const PRG: &str = "fwdctl";
 const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 // Removes the firewood database on disk
 fn fwdctl_delete_db() -> Result<()> {
     if let Err(e) = remove_dir_all(tmpdb::path()) {
@@ -215,35 +216,16 @@ fn fwdctl_dump() -> Result<()> {
 // of this in different directories will have different databases
 
 mod tmpdb {
-    use std::{
-        ffi,
-        path::{Path, PathBuf},
-    };
+    use super::*;
 
     const FIREWOOD_TEST_DB_NAME: &str = "test_firewood";
     const TARGET_TMP_DIR: Option<&str> = option_env!("CARGO_TARGET_TMPDIR");
 
-    #[derive(Debug)]
-    pub struct DbPath {
-        path: PathBuf,
-    }
-
-    impl AsRef<ffi::OsStr> for DbPath {
-        fn as_ref(&self) -> &ffi::OsStr {
-            self.path.as_os_str()
-        }
-    }
-    impl AsRef<Path> for DbPath {
-        fn as_ref(&self) -> &Path {
-            &self.path
-        }
-    }
-    pub fn path() -> DbPath {
-        let path = Path::new(
-            TARGET_TMP_DIR.unwrap_or(&std::env::var("TMPDIR").unwrap_or("/tmp".to_string())),
-        )
-        .join(FIREWOOD_TEST_DB_NAME);
-
-        DbPath { path }
+    pub fn path() -> PathBuf {
+        TARGET_TMP_DIR
+            .map(PathBuf::from)
+            .or_else(|| std::env::var("TMPDIR").ok().map(PathBuf::from))
+            .unwrap_or(std::env::temp_dir())
+            .join(FIREWOOD_TEST_DB_NAME)
     }
 }

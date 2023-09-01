@@ -118,12 +118,15 @@ impl RevisionTracker {
         }
     }
 
-    fn create_revisions<K, V>(&mut self, iter: impl Iterator<Item = (K, V)>) -> Result<(), DbError>
+    fn create_revisions<K, V>(
+        &mut self,
+        mut iter: impl Iterator<Item = (K, V)>,
+    ) -> Result<(), DbError>
     where
         K: AsRef<[u8]>,
         V: AsRef<[u8]>,
     {
-        iter.map(|(k, v)| self.create_revision(k, v)).collect()
+        iter.try_for_each(|(k, v)| self.create_revision(k, v))
     }
 
     fn create_revision<K, V>(&mut self, k: K, v: V) -> Result<(), DbError>

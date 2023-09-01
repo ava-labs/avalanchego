@@ -349,7 +349,9 @@ mod tests {
     }
 
     fn get_temp_walfile_path(file: &str, line: u32) -> PathBuf {
-        let path = option_env!("CARGO_TARGET_TMPDIR").unwrap_or("/tmp");
-        Path::new(path).join(format!("{}_{}", file.replace('/', "-"), line))
+        let path = option_env!("CARGO_TARGET_TMPDIR")
+            .map(PathBuf::from)
+            .unwrap_or(std::env::temp_dir());
+        path.join(format!("{}_{}", file.replace('/', "-"), line))
     }
 }

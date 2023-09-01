@@ -635,17 +635,17 @@ mod tests {
     #[test]
     #[ignore = "ref: https://github.com/ava-labs/firewood/issues/45"]
     fn test_buffer_with_undo() {
-        let tmpdb = [
-            &std::env::var("CARGO_TARGET_DIR").unwrap_or("/tmp".to_string()),
-            "sender_api_test_db",
-        ];
+        let temp_dir = option_env!("CARGO_TARGET_DIR")
+            .map(PathBuf::from)
+            .unwrap_or(std::env::temp_dir());
+        let tmpdb = [temp_dir.to_str().unwrap(), "sender_api_test_db"];
 
         let buf_cfg = DiskBufferConfig::builder().max_buffered(1).build();
         let wal_cfg = WalConfig::builder().build();
         let disk_requester = init_buffer(buf_cfg, wal_cfg);
 
         // TODO: Run the test in a separate standalone directory for concurrency reasons
-        let path = std::path::PathBuf::from(r"/tmp/firewood");
+        let path = temp_dir.join("firewood");
         let (root_db_path, reset) = file::open_dir(path, file::Options::Truncate).unwrap();
 
         // file descriptor of the state directory
