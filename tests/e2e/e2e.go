@@ -121,13 +121,20 @@ func (te *TestEnvironment) NewKeychain(count int) *secp256k1fx.Keychain {
 // Create a new wallet for the provided keychain against the specified node URI.
 func (te *TestEnvironment) NewWallet(keychain *secp256k1fx.Keychain, uri string) primary.Wallet {
 	tests.Outf("{{blue}} initializing a new wallet for URI: %s {{/}}\n", uri)
-	wallet, err := primary.MakeWallet(DefaultContext(), &primary.WalletConfig{
+	baseWallet, err := primary.MakeWallet(DefaultContext(), &primary.WalletConfig{
 		URI:          uri,
 		AVAXKeychain: keychain,
 		EthKeychain:  keychain,
 	})
 	te.require.NoError(err)
-	return wallet
+	return primary.NewWalletWithOptions(
+		baseWallet,
+		common.WithLogTxFunc(
+			func(id ids.ID) {
+				tests.Outf(" tx id: %s\n", id)
+			},
+		),
+	)
 }
 
 // Create a new eth client targeting the specified node URI.

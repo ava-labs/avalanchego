@@ -159,6 +159,10 @@ func (w *wallet) IssueAtomicTx(
 		return err
 	}
 
+	if logFunc := ops.LogTxIDFunc(); logFunc != nil {
+		logFunc(txID)
+	}
+
 	if ops.AssumeDecided() {
 		return w.Backend.AcceptAtomicTx(ctx, tx)
 	}

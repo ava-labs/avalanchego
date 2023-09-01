@@ -17,6 +17,8 @@ import (
 
 const defaultPollFrequency = 100 * time.Millisecond
 
+type LogTxIDFunc func(ids.ID)
+
 type Option func(*Options)
 
 type Options struct {
@@ -43,6 +45,8 @@ type Options struct {
 
 	pollFrequencySet bool
 	pollFrequency    time.Duration
+
+	logTxIDFunc LogTxIDFunc
 }
 
 func NewOptions(ops []Option) *Options {
@@ -126,6 +130,10 @@ func (o *Options) PollFrequency() time.Duration {
 	return defaultPollFrequency
 }
 
+func (o *Options) LogTxIDFunc() LogTxIDFunc {
+	return o.logTxIDFunc
+}
+
 func WithContext(ctx context.Context) Option {
 	return func(o *Options) {
 		o.ctx = ctx
@@ -187,5 +195,11 @@ func WithPollFrequency(pollFrequency time.Duration) Option {
 	return func(o *Options) {
 		o.pollFrequencySet = true
 		o.pollFrequency = pollFrequency
+	}
+}
+
+func WithLogTxFunc(logFunc LogTxIDFunc) Option {
+	return func(o *Options) {
+		o.logTxIDFunc = logFunc
 	}
 }
