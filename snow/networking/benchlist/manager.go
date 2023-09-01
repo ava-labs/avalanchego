@@ -115,30 +115,19 @@ func (m *manager) RegisterChain(ctx *snow.ConsensusContext) error {
 		return nil
 	}
 
-	var (
-		vdrs validators.Set
-		ok   bool
-	)
-	if m.config.SybilProtectionEnabled {
-		vdrs, ok = m.config.Validators.Get(ctx.SubnetID)
-	} else {
-		// If sybil protection is disabled, everyone validates every chain
-		vdrs, ok = m.config.Validators.Get(constants.PrimaryNetworkID)
-	}
-	if !ok {
-		return errUnknownValidators
+	vdrs := m.config.Validators
+	if !m.config.SybilProtectionEnabled {
+		vdrs = validators.NewOverriddenManager(constants.PrimaryNetworkID, vdrs)
 	}
 
 	benchlist, err := NewBenchlist(
-		ctx.ChainID,
-		ctx.Log,
+		ctx,
 		m.config.Benchable,
 		vdrs,
 		m.config.Threshold,
 		m.config.MinimumFailingDuration,
 		m.config.Duration,
 		m.config.MaxPortion,
-		ctx.Registerer,
 	)
 	if err != nil {
 		return err

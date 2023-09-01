@@ -134,8 +134,8 @@ type Config struct {
 	TLSKey crypto.Signer `json:"-"`
 
 	// TrackedSubnets of the node.
-	TrackedSubnets set.Set[ids.ID] `json:"-"`
-	Beacons        validators.Set  `json:"-"`
+	TrackedSubnets set.Set[ids.ID]    `json:"-"`
+	Beacons        validators.Manager `json:"-"`
 
 	// Validators are the current validators in the Avalanche network
 	Validators validators.Manager `json:"-"`

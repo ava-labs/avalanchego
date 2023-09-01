@@ -708,9 +708,6 @@ func TestTimestampListGenerator(t *testing.T) {
 // to make sure it won't pollute our tests
 func buildVM(t *testing.T) (*VM, ids.ID, error) {
 	vdrs := validators.NewManager()
-	primaryVdrs := validators.NewSet()
-	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
-
 	forkTime := defaultGenesisTime
 	vm := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,

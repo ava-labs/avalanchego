@@ -347,8 +347,6 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 	atomicDB := prefixdb.New([]byte{1}, baseDBManager.Current().Database)
 
 	vdrs := validators.NewManager()
-	primaryVdrs := validators.NewSet()
-	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 	vm := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
 		Validators:             vdrs,
@@ -653,7 +651,6 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 
 	// Force a reload of the state from the database.
 	vm.Config.Validators = validators.NewManager()
-	vm.Config.Validators.Add(constants.PrimaryNetworkID, validators.NewSet())
 	execCfg, _ := config.GetExecutionConfig(nil)
 	newState, err := state.New(
 		vm.dbManager.Current().Database,
@@ -963,7 +960,6 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	// Force a reload of the state from the database.
 	vm.Config.Validators = validators.NewManager()
-	vm.Config.Validators.Add(constants.PrimaryNetworkID, validators.NewSet())
 	execCfg, _ := config.GetExecutionConfig(nil)
 	newState, err := state.New(
 		vm.dbManager.Current().Database,
@@ -1404,10 +1400,8 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 	vm.TrackedSubnets.Add(createSubnetTx.ID())
-	subnetValidators := validators.NewSet()
+	subnetValidators := validators.NewManager()
 	require.NoError(vm.state.ValidatorSet(createSubnetTx.ID(), subnetValidators))
-
-	require.True(vm.Validators.Add(createSubnetTx.ID(), subnetValidators))
 
 	addSubnetValidatorTx, err := vm.txBuilder.NewAddSubnetValidatorTx(
 		defaultMaxValidatorStake,

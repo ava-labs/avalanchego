@@ -32,7 +32,6 @@ import (
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
-	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/ips"
@@ -189,11 +188,6 @@ func NewNetwork(
 	dialer dialer.Dialer,
 	router router.ExternalHandler,
 ) (Network, error) {
-	primaryNetworkValidators, ok := config.Validators.Get(constants.PrimaryNetworkID)
-	if !ok {
-		return nil, errMissingPrimaryValidators
-	}
-
 	if config.ProxyEnabled {
 		// Wrap the listener to process the proxy header.
 		listener = &proxyproto.Listener{
@@ -220,7 +214,7 @@ func NewNetwork(
 		log,
 		config.Namespace,
 		metricsRegisterer,
-		primaryNetworkValidators,
+		config.Validators,
 		config.ThrottlerConfig.InboundMsgThrottlerConfig,
 		config.ResourceTracker,
 		config.CPUTargeter,
@@ -234,7 +228,7 @@ func NewNetwork(
 		log,
 		config.Namespace,
 		metricsRegisterer,
-		primaryNetworkValidators,
+		config.Validators,
 		config.ThrottlerConfig.OutboundMsgThrottlerConfig,
 	)
 	if err != nil {
@@ -468,7 +462,7 @@ func (n *network) Connected(nodeID ids.NodeID) {
 // peer is a validator/beacon.
 func (n *network) AllowConnection(nodeID ids.NodeID) bool {
 	return !n.config.RequireValidatorToConnect ||
-		validators.Contains(n.config.Validators, constants.PrimaryNetworkID, n.config.MyNodeID) ||
+		n.config.Validators.Contains(constants.PrimaryNetworkID, n.config.MyNodeID) ||
 		n.WantsConnection(nodeID)
 }
 
@@ -807,7 +801,7 @@ func (n *network) WantsConnection(nodeID ids.NodeID) bool {
 }
 
 func (n *network) wantsConnection(nodeID ids.NodeID) bool {
-	return validators.Contains(n.config.Validators, constants.PrimaryNetworkID, nodeID) ||
+	return n.config.Validators.Contains(constants.PrimaryNetworkID, nodeID) ||
 		n.manuallyTrackedIDs.Contains(nodeID)
 }
 
@@ -862,7 +856,7 @@ func (n *network) getPeers(
 			continue
 		}
 
-		isValidator := validators.Contains(n.config.Validators, subnetID, nodeID)
+		isValidator := n.config.Validators.Contains(subnetID, nodeID)
 		// check if the peer is allowed to connect to the subnet
 		if !allower.IsAllowed(nodeID, isValidator) {
 			continue
@@ -881,14 +875,9 @@ func (n *network) samplePeers(
 	numPeersToSample int,
 	allower subnets.Allower,
 ) []peer.Peer {
-	subnetValidators, ok := n.config.Validators.Get(subnetID)
-	if !ok {
-		return nil
-	}
-
 	// If there are fewer validators than [numValidatorsToSample], then only
 	// sample [numValidatorsToSample] validators.
-	subnetValidatorsLen := subnetValidators.Len()
+	subnetValidatorsLen := n.config.Validators.Len(subnetID)
 	if subnetValidatorsLen < numValidatorsToSample {
 		numValidatorsToSample = subnetValidatorsLen
 	}
@@ -906,7 +895,7 @@ func (n *network) samplePeers(
 			}
 
 			peerID := p.ID()
-			isValidator := subnetValidators.Contains(peerID)
+			isValidator := n.config.Validators.Contains(subnetID, peerID)
 			// check if the peer is allowed to connect to the subnet
 			if !allower.IsAllowed(peerID, isValidator) {
 				return false
@@ -1340,18 +1329,18 @@ func (n *network) NodeUptime(subnetID ids.ID) (UptimeResult, error) {
 		return UptimeResult{}, errNotTracked
 	}
 
-	validators, ok := n.config.Validators.Get(subnetID)
-	if !ok {
-		return UptimeResult{}, errSubnetNotExist
-	}
-
-	myStake := validators.GetWeight(n.config.MyNodeID)
+	myStake := n.config.Validators.GetWeight(subnetID, n.config.MyNodeID)
 	if myStake == 0 {
 		return UptimeResult{}, errNotValidator
 	}
 
+	totalWeightInt, err := n.config.Validators.TotalWeight(subnetID)
+	if err != nil {
+		return UptimeResult{}, err
+	}
+
 	var (
-		totalWeight          = float64(validators.Weight())
+		totalWeight          = float64(totalWeightInt)
 		totalWeightedPercent = 100 * float64(myStake)
 		rewardingStake       = float64(myStake)
 	)
@@ -1363,7 +1352,7 @@ func (n *network) NodeUptime(subnetID ids.ID) (UptimeResult, error) {
 		peer, _ := n.connectedPeers.GetByIndex(i)
 
 		nodeID := peer.ID()
-		weight := validators.GetWeight(nodeID)
+		weight := n.config.Validators.GetWeight(subnetID, nodeID)
 		if weight == 0 {
 			// this is not a validator skip it.
 			continue

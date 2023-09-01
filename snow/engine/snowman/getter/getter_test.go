@@ -36,7 +36,7 @@ func testSetup(
 ) (StateSyncEnabledMock, *common.SenderTest, common.Config) {
 	ctx := snow.DefaultConsensusContextTest()
 
-	peers := validators.NewSet()
+	peers := validators.NewManager()
 	sender := &common.SenderTest{}
 	vm := StateSyncEnabledMock{
 		TestVM:              &block.TestVM{},
@@ -61,13 +61,15 @@ func testSetup(
 	sender.CantSendGetAcceptedFrontier = false
 
 	peer := ids.GenerateTestNodeID()
-	require.NoError(t, peers.Add(peer, nil, ids.Empty, 1))
+	require.NoError(t, peers.AddStaker(ctx.SubnetID, peer, nil, ids.Empty, 1))
+	totalWeight, err := peers.TotalWeight(ctx.SubnetID)
+	require.NoError(t, err)
 
 	commonConfig := common.Config{
 		Ctx:                            ctx,
 		Beacons:                        peers,
-		SampleK:                        peers.Len(),
-		Alpha:                          peers.Weight()/2 + 1,
+		SampleK:                        peers.Len(ctx.SubnetID),
+		Alpha:                          totalWeight/2 + 1,
 		Sender:                         sender,
 		BootstrapTracker:               bootstrapTracker,
 		Timer:                          &common.TimerTest{},

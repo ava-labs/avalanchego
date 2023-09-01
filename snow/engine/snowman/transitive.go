@@ -108,7 +108,7 @@ func newTransitive(config Config) (*Transitive, error) {
 	}
 
 	acceptedFrontiers := tracker.NewAccepted()
-	config.Validators.RegisterCallbackListener(acceptedFrontiers)
+	config.Validators.RegisterCallbackListener(config.Ctx.SubnetID, acceptedFrontiers)
 
 	factory := poll.NewEarlyTermNoTraversalFactory(config.Params.Alpha)
 	t := &Transitive{
@@ -691,7 +691,7 @@ func (t *Transitive) pullQuery(ctx context.Context, blkID ids.ID) {
 		zap.Stringer("validators", t.Validators),
 	)
 	// The validators we will query
-	vdrIDs, err := t.Validators.Sample(t.Params.K)
+	vdrIDs, err := t.Validators.Sample(t.Ctx.SubnetID, t.Params.K)
 	if err != nil {
 		t.Ctx.Log.Error("dropped query for block",
 			zap.String("reason", "insufficient number of validators"),
@@ -721,7 +721,7 @@ func (t *Transitive) sendQuery(ctx context.Context, blk snowman.Block, push bool
 	)
 
 	blkID := blk.ID()
-	vdrIDs, err := t.Validators.Sample(t.Params.K)
+	vdrIDs, err := t.Validators.Sample(t.Ctx.SubnetID, t.Params.K)
 	if err != nil {
 		t.Ctx.Log.Error("dropped query for block",
 			zap.String("reason", "insufficient number of validators"),

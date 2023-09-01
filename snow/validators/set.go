@@ -290,7 +290,7 @@ func (s *vdrSet) sample(size int) ([]ids.NodeID, error) {
 	return list, nil
 }
 
-func (s *vdrSet) Weight() (uint64, error) {
+func (s *vdrSet) TotalWeight() (uint64, error) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 

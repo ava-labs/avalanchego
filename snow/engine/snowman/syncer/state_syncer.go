@@ -59,7 +59,7 @@ type stateSyncer struct {
 	// Holds the beacons that were sampled for the accepted frontier
 	// Won't be consumed as seeders are reached out. Used to rescale
 	// alpha for frontiers
-	frontierSeeders validators.Set
+	frontierSeeders validators.Manager
 	// IDs of validators we should request state summary frontier from.
 	// Will be consumed seeders are reached out for frontier.
 	targetSeeders set.Set[ids.NodeID]
@@ -191,10 +191,21 @@ func (ss *stateSyncer) receivedStateSummaryFrontier(ctx context.Context) error {
 	// If we got too many timeouts, we restart state syncing hoping that network
 	// problems will go away and we can collect a qualified frontier.
 	// We assume the frontier is qualified after an alpha proportion of frontier seeders have responded
-	frontierAlpha := float64(ss.frontierSeeders.Weight()*ss.Alpha) / float64(ss.StateSyncBeacons.Weight())
-	failedBeaconWeight := ss.StateSyncBeacons.SubsetWeight(ss.failedSeeders)
+	frontiersTotalWeight, err := ss.frontierSeeders.TotalWeight(ss.Ctx.SubnetID)
+	if err != nil {
+		return fmt.Errorf("failed to get total weight of frontier seeders: %w", err)
+	}
+	beaconsTotalWeight, err := ss.StateSyncBeacons.TotalWeight(ss.Ctx.SubnetID)
+	if err != nil {
+		return fmt.Errorf("failed to get total weight of state sync beacons: %w", err)
+	}
+	frontierAlpha := float64(frontiersTotalWeight*ss.Alpha) / float64(beaconsTotalWeight)
+	failedBeaconWeight, err := ss.StateSyncBeacons.SubsetWeight(ss.Ctx.SubnetID, ss.failedSeeders)
+	if err != nil {
+		return fmt.Errorf("failed to get total weight of failed beacons: %w", err)
+	}
 
-	frontierStake := ss.frontierSeeders.Weight() - failedBeaconWeight
+	frontierStake := frontiersTotalWeight - failedBeaconWeight
 	if float64(frontierStake) < frontierAlpha {
 		ss.Ctx.Log.Debug("didn't receive enough frontiers",
 			zap.Int("numFailedValidators", ss.failedSeeders.Len()),
@@ -233,7 +244,7 @@ func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.Node
 	// Mark that we received a response from [nodeID]
 	ss.pendingVoters.Remove(nodeID)
 
-	weight := ss.StateSyncBeacons.GetWeight(nodeID)
+	weight := ss.StateSyncBeacons.GetWeight(ss.Ctx.SubnetID, nodeID)
 	for _, summaryID := range summaryIDs {
 		ws, ok := ss.weightedSummaries[summaryID]
 		if !ok {
@@ -281,18 +292,25 @@ func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.Node
 	size := len(ss.weightedSummaries)
 	if size == 0 {
 		// retry the state sync if the weight is not enough to state sync
-		failedBeaconWeight := ss.StateSyncBeacons.SubsetWeight(ss.failedVoters)
+		failedVotersWeight, err := ss.StateSyncBeacons.SubsetWeight(ss.Ctx.SubnetID, ss.failedVoters)
+		if err != nil {
+			return fmt.Errorf("failed to get total weight of failed voters: %w", err)
+		}
 
 		// if we had too many timeouts when asking for validator votes, we should restart
 		// state sync hoping for the network problems to go away; otherwise, we received
 		// enough (>= ss.Alpha) responses, but no state summary was supported by a majority
 		// of validators (i.e. votes are split between minorities supporting different state
 		// summaries), so there is no point in retrying state sync; we should move ahead to bootstrapping
-		votingStakes := ss.StateSyncBeacons.Weight() - failedBeaconWeight
+		beaconsTotalWeight, err := ss.StateSyncBeacons.TotalWeight(ss.Ctx.SubnetID)
+		if err != nil {
+			return fmt.Errorf("failed to get total weight of state sync beacons: %w", err)
+		}
+		votingStakes := beaconsTotalWeight - failedVotersWeight
 		if ss.Config.RetryBootstrap && votingStakes < ss.Alpha {
 			ss.Ctx.Log.Debug("restarting state sync",
 				zap.String("reason", "not enough votes received"),
-				zap.Int("numBeacons", ss.StateSyncBeacons.Len()),
+				zap.Int("numBeacons", ss.StateSyncBeacons.Len(ss.Ctx.SubnetID)),
 				zap.Int("numFailedSyncers", ss.failedVoters.Len()),
 				zap.Int("numAttempts", ss.attempts),
 			)
@@ -427,18 +445,18 @@ func (ss *stateSyncer) startup(ctx context.Context) error {
 	ss.failedVoters.Clear()
 
 	// sample K beacons to retrieve frontier from
-	beaconIDs, err := ss.StateSyncBeacons.Sample(ss.Config.SampleK)
+	beaconIDs, err := ss.StateSyncBeacons.Sample(ss.Ctx.SubnetID, ss.Config.SampleK)
 	if err != nil {
 		return err
 	}
 
-	ss.frontierSeeders = validators.NewSet()
+	ss.frontierSeeders = validators.NewManager()
 	for _, nodeID := range beaconIDs {
-		if !ss.frontierSeeders.Contains(nodeID) {
+		if !ss.frontierSeeders.Contains(ss.Ctx.SubnetID, nodeID) {
 			// Invariant: We never use the TxID or BLS keys populated here.
-			err = ss.frontierSeeders.Add(nodeID, nil, ids.Empty, 1)
+			err = ss.frontierSeeders.AddStaker(ss.Ctx.SubnetID, nodeID, nil, ids.Empty, 1)
 		} else {
-			err = ss.frontierSeeders.AddWeight(nodeID, 1)
+			err = ss.frontierSeeders.AddWeight(ss.Ctx.SubnetID, nodeID, 1)
 		}
 		if err != nil {
 			return err
@@ -447,7 +465,7 @@ func (ss *stateSyncer) startup(ctx context.Context) error {
 	}
 
 	// list all beacons, to reach them for voting on frontier
-	for nodeID := range ss.StateSyncBeacons.Map() {
+	for nodeID := range ss.StateSyncBeacons.GetMap(ss.Ctx.SubnetID) {
 		ss.targetVoters.Add(nodeID)
 	}
 

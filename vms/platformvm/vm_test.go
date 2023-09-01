@@ -299,8 +299,6 @@ func defaultVM(t *testing.T) (*VM, database.Database, *mutableSharedMemory) {
 	require := require.New(t)
 
 	vdrs := validators.NewManager()
-	primaryVdrs := validators.NewSet()
-	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 	vm := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
@@ -425,13 +423,11 @@ func TestGenesis(t *testing.T) {
 	}
 
 	// Ensure current validator set of primary network is correct
-	vdrSet, ok := vm.Validators.Get(constants.PrimaryNetworkID)
-	require.True(ok)
-	require.Len(genesisState.Validators, vdrSet.Len())
+	require.Len(genesisState.Validators, vm.Validators.Len(constants.PrimaryNetworkID))
 
 	for _, key := range keys {
 		nodeID := ids.NodeID(key.PublicKey().Address())
-		require.True(vdrSet.Contains(nodeID))
+		require.True(vm.Validators.Contains(constants.PrimaryNetworkID, nodeID))
 	}
 
 	// Ensure the new subnet we created exists
@@ -1317,8 +1313,6 @@ func TestRestartFullyAccepted(t *testing.T) {
 
 	firstDB := db.NewPrefixDBManager([]byte{})
 	firstVdrs := validators.NewManager()
-	firstPrimaryVdrs := validators.NewSet()
-	_ = firstVdrs.Add(constants.PrimaryNetworkID, firstPrimaryVdrs)
 	firstVM := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
 		Validators:             firstVdrs,
@@ -1405,8 +1399,6 @@ func TestRestartFullyAccepted(t *testing.T) {
 	firstCtx.Lock.Unlock()
 
 	secondVdrs := validators.NewManager()
-	secondPrimaryVdrs := validators.NewSet()
-	_ = secondVdrs.Add(constants.PrimaryNetworkID, secondPrimaryVdrs)
 	secondVM := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
 		Validators:             secondVdrs,
@@ -1459,8 +1451,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	require.NoError(err)
 
 	vdrs := validators.NewManager()
-	primaryVdrs := validators.NewSet()
-	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 	vm := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
 		Validators:             vdrs,
@@ -1540,8 +1530,8 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	advanceTimeBlkBytes := advanceTimeBlk.Bytes()
 
 	peerID := ids.NodeID{1, 2, 3, 4, 5, 4, 3, 2, 1}
-	beacons := validators.NewSet()
-	require.NoError(beacons.Add(peerID, nil, ids.Empty, 1))
+	beacons := validators.NewManager()
+	require.NoError(beacons.AddStaker(ctx.SubnetID, peerID, nil, ids.Empty, 1))
 
 	benchlist := benchlist.NewNoBenchlist()
 	timeoutManager, err := timeout.NewManager(
@@ -1626,17 +1616,19 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 
 	peers := tracker.NewPeers()
-	startup := tracker.NewStartup(peers, (beacons.Weight()+1)/2)
-	beacons.RegisterCallbackListener(startup)
+	totalWeight, err := beacons.TotalWeight(ctx.SubnetID)
+	require.NoError(err)
+	startup := tracker.NewStartup(peers, (totalWeight+1)/2)
+	beacons.RegisterCallbackListener(ctx.SubnetID, startup)
 
 	// The engine handles consensus
 	consensus := &smcon.Topological{}
 	commonCfg := common.Config{
 		Ctx:                            consensusCtx,
 		Beacons:                        beacons,
-		SampleK:                        beacons.Len(),
+		SampleK:                        beacons.Len(ctx.SubnetID),
 		StartupTracker:                 startup,
-		Alpha:                          (beacons.Weight() + 1) / 2,
+		Alpha:                          (totalWeight + 1) / 2,
 		Sender:                         sender,
 		BootstrapTracker:               bootstrapTracker,
 		AncestorsMaxContainersSent:     2000,
@@ -1779,8 +1771,6 @@ func TestUnverifiedParent(t *testing.T) {
 	dbManager := manager.NewMemDB(version.Semantic1_0_0)
 
 	vdrs := validators.NewManager()
-	primaryVdrs := validators.NewSet()
-	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 	vm := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
 		Validators:             vdrs,
@@ -1940,8 +1930,6 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 
 	firstDB := db.NewPrefixDBManager([]byte{})
 	firstVdrs := validators.NewManager()
-	firstPrimaryVdrs := validators.NewSet()
-	_ = firstVdrs.Add(constants.PrimaryNetworkID, firstPrimaryVdrs)
 	firstVM := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
 		UptimePercentage:       .2,
@@ -1982,8 +1970,6 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 
 	secondDB := db.NewPrefixDBManager([]byte{})
 	secondVdrs := validators.NewManager()
-	secondPrimaryVdrs := validators.NewSet()
-	_ = secondVdrs.Add(constants.PrimaryNetworkID, secondPrimaryVdrs)
 	secondVM := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
 		UptimePercentage:       .21,
@@ -2113,8 +2099,6 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	db := manager.NewMemDB(version.Semantic1_0_0)
 
 	vdrs := validators.NewManager()
-	primaryVdrs := validators.NewSet()
-	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 	vm := &VM{Config: config.Config{
 		Chains:                 chains.TestManager,
 		UptimePercentage:       .2,

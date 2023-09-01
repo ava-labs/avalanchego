@@ -7,16 +7,14 @@ import (
 	"context"
 	"sync"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
@@ -60,9 +58,9 @@ type messageQueue struct {
 	clock   mockable.Clock
 	metrics messageQueueMetrics
 
-	log logging.Logger
+	ctx *snow.ConsensusContext
 	// Validator set for the chain associated with this
-	vdrs validators.Set
+	vdrs validators.Manager
 	// Tracks CPU utilization of each node
 	cpuTracker tracker.Tracker
 
@@ -75,21 +73,20 @@ type messageQueue struct {
 }
 
 func NewMessageQueue(
-	log logging.Logger,
-	vdrs validators.Set,
+	ctx *snow.ConsensusContext,
+	vdrs validators.Manager,
 	cpuTracker tracker.Tracker,
 	metricsNamespace string,
-	metricsRegisterer prometheus.Registerer,
 	ops []message.Op,
 ) (MessageQueue, error) {
 	m := &messageQueue{
-		log:                   log,
+		ctx:                   ctx,
 		vdrs:                  vdrs,
 		cpuTracker:            cpuTracker,
 		cond:                  sync.NewCond(&sync.Mutex{}),
 		nodeToUnprocessedMsgs: make(map[ids.NodeID]int),
 	}
-	return m, m.metrics.initialize(metricsNamespace, metricsRegisterer, ops)
+	return m, m.metrics.initialize(metricsNamespace, ctx.Registerer, ops)
 }
 
 func (m *messageQueue) Push(ctx context.Context, msg Message) {
@@ -137,7 +134,7 @@ func (m *messageQueue) Pop() (context.Context, Message, bool) {
 	i := 0
 	for {
 		if i == n {
-			m.log.Debug("canPop is false for all unprocessed messages",
+			m.ctx.Log.Debug("canPop is false for all unprocessed messages",
 				zap.Int("numMessages", n),
 			)
 		}
@@ -218,11 +215,19 @@ func (m *messageQueue) canPop(msg message.InboundMessage) bool {
 	// the number of nodes with unprocessed messages.
 	baseMaxCPU := 1 / float64(len(m.nodeToUnprocessedMsgs))
 	nodeID := msg.NodeID()
-	weight := m.vdrs.GetWeight(nodeID)
+	weight := m.vdrs.GetWeight(m.ctx.SubnetID, nodeID)
 	// The sum of validator weights should never be 0, but handle
 	// that case for completeness here to avoid divide by 0.
 	portionWeight := float64(0)
-	totalVdrsWeight := m.vdrs.Weight()
+	totalVdrsWeight, err := m.vdrs.TotalWeight(m.ctx.SubnetID)
+	if err != nil {
+		m.ctx.Log.Error("failed to get total weight of validators",
+			zap.Stringer("subnetID", m.ctx.SubnetID),
+			zap.Error(err),
+		)
+		return false
+	}
+
 	if totalVdrsWeight != 0 {
 		portionWeight = float64(weight) / float64(totalVdrsWeight)
 	}

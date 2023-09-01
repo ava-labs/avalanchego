@@ -36,7 +36,6 @@ type Manager interface {
 	// Returns an error if:
 	// - [weight] is 0
 	// - [nodeID] is already in the validator set
-	// - the total weight of the validator set would overflow uint64
 	// If an error is returned, the set will be unmodified.
 	AddStaker(subnetID ids.ID, nodeID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) error
 
@@ -44,7 +43,6 @@ type Manager interface {
 	// Returns an error if:
 	// - [weight] is 0
 	// - [nodeID] is not already in the validator set
-	// - the total weight of the validator set would overflow uint64
 	// If an error is returned, the set will be unmodified.
 	AddWeight(subnetID ids.ID, nodeID ids.NodeID, weight uint64) error
 
@@ -76,8 +74,8 @@ type Manager interface {
 	// Len returns the number of validators currently in the subnet.
 	Len(subnetID ids.ID) int
 
-	// Weight returns the cumulative weight of all validators in the subnet.
-	Weight(subnetID ids.ID) (uint64, error)
+	// TotalWeight returns the cumulative weight of all validators in the subnet.
+	TotalWeight(subnetID ids.ID) (uint64, error)
 
 	// Sample returns a collection of validatorIDs in the subnet, potentially with duplicates.
 	// If sampling the requested size isn't possible, an error will be returned.
@@ -213,7 +211,7 @@ func (m *manager) Len(subnetID ids.ID) int {
 	return set.Len()
 }
 
-func (m *manager) Weight(subnetID ids.ID) (uint64, error) {
+func (m *manager) TotalWeight(subnetID ids.ID) (uint64, error) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
@@ -222,7 +220,7 @@ func (m *manager) Weight(subnetID ids.ID) (uint64, error) {
 		return 0, nil
 	}
 
-	return set.Weight()
+	return set.TotalWeight()
 }
 
 func (m *manager) Sample(subnetID ids.ID, size int) ([]ids.NodeID, error) {
@@ -287,10 +285,12 @@ func (m *manager) String() string {
 }
 
 func (m *manager) GetValidatorIDs(subnetID ids.ID) ([]ids.NodeID, error) {
+	m.lock.RLock()
 	vdrs, exist := m.subnetToVdrs[subnetID]
 	if !exist {
 		return nil, fmt.Errorf("%w: %s", ErrMissingValidators, subnetID)
 	}
+	m.lock.RUnlock()
 
 	vdrsMap := vdrs.Map()
 	return maps.Keys(vdrsMap), nil

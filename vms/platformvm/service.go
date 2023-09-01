@@ -1119,15 +1119,7 @@ func (s *Service) SampleValidators(_ *http.Request, args *SampleValidatorsArgs, 
 		zap.Uint16("size", uint16(args.Size)),
 	)
 
-	validators, ok := s.vm.Validators.Get(args.SubnetID)
-	if !ok {
-		return fmt.Errorf(
-			"couldn't get validators of subnet %q. Is it being validated?",
-			args.SubnetID,
-		)
-	}
-
-	sample, err := validators.Sample(int(args.Size))
+	sample, err := s.vm.Validators.Sample(args.SubnetID, int(args.Size))
 	if err != nil {
 		return fmt.Errorf("sampling errored with %w", err)
 	}
@@ -1935,12 +1927,7 @@ func (s *Service) nodeValidates(blockchainID ids.ID) bool {
 		return false
 	}
 
-	validators, ok := s.vm.Validators.Get(chain.SubnetID)
-	if !ok {
-		return false
-	}
-
-	return validators.Contains(s.vm.ctx.NodeID)
+	return s.vm.Validators.Contains(chain.SubnetID, s.vm.ctx.NodeID)
 }
 
 func (s *Service) chainExists(ctx context.Context, blockID ids.ID, chainID ids.ID) (bool, error) {
@@ -2413,11 +2400,11 @@ func (s *Service) GetTotalStake(_ *http.Request, args *GetTotalStakeArgs, reply 
 		zap.String("method", "getTotalStake"),
 	)
 
-	vdrs, ok := s.vm.Validators.Get(args.SubnetID)
-	if !ok {
-		return errMissingValidatorSet
+	totalWeight, err := s.vm.Validators.TotalWeight(args.SubnetID)
+	if err != nil {
+		return fmt.Errorf("couldn't get total weight: %w", err)
 	}
-	weight := json.Uint64(vdrs.Weight())
+	weight := json.Uint64(totalWeight)
 	reply.Weight = weight
 	reply.Stake = weight
 	return nil

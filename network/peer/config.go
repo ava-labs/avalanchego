@@ -34,7 +34,7 @@ type Config struct {
 	Router               router.InboundHandler
 	VersionCompatibility version.Compatibility
 	MySubnets            set.Set[ids.ID]
-	Beacons              validators.Set
+	Beacons              validators.Manager
 	NetworkID            uint32
 	PingFrequency        time.Duration
 	PongTimeout          time.Duration

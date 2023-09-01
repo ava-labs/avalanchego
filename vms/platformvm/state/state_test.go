@@ -157,8 +157,6 @@ func newUninitializedState(require *require.Assertions) (State, database.Databas
 
 func newStateFromDB(require *require.Assertions, db database.Database) State {
 	vdrs := validators.NewManager()
-	primaryVdrs := validators.NewSet()
-	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 
 	execCfg, _ := config.GetExecutionConfig(nil)
 	state, err := newState(

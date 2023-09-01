@@ -288,8 +288,6 @@ func defaultConfig(postBanff, postCortina bool) config.Config {
 	}
 
 	vdrs := validators.NewManager()
-	primaryVdrs := validators.NewSet()
-	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 	return config.Config{
 		Chains:                 chains.TestManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
@@ -428,7 +426,7 @@ func buildGenesisTest(ctx *snow.Context) []byte {
 
 func shutdownEnvironment(env *environment) error {
 	if env.isBootstrapped.Get() {
-		validatorIDs, err := validators.NodeIDs(env.config.Validators, constants.PrimaryNetworkID)
+		validatorIDs, err := env.config.Validators.GetValidatorIDs(constants.PrimaryNetworkID)
 		if err != nil {
 			return err
 		}
@@ -438,7 +436,7 @@ func shutdownEnvironment(env *environment) error {
 		}
 
 		for subnetID := range env.config.TrackedSubnets {
-			validatorIDs, err := validators.NodeIDs(env.config.Validators, subnetID)
+			validatorIDs, err := env.config.Validators.GetValidatorIDs(subnetID)
 			if errors.Is(err, validators.ErrMissingValidators) {
 				return nil
 			}

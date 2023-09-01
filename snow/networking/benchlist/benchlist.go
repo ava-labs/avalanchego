@@ -10,13 +10,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -95,8 +93,7 @@ type failureStreak struct {
 type benchlist struct {
 	lock sync.RWMutex
 	// This is the benchlist for chain [chainID]
-	chainID ids.ID
-	log     logging.Logger
+	ctx     *snow.ConsensusContext
 	metrics metrics
 
 	// Fires when the next validator should leave the bench
@@ -110,7 +107,7 @@ type benchlist struct {
 	benchable Benchable
 
 	// Validator set of the network
-	vdrs validators.Set
+	vdrs validators.Manager
 
 	// Validator ID --> Consecutive failure information
 	// [streaklock] must be held when touching [failureStreaks]
@@ -140,22 +137,19 @@ type benchlist struct {
 
 // NewBenchlist returns a new Benchlist
 func NewBenchlist(
-	chainID ids.ID,
-	log logging.Logger,
+	ctx *snow.ConsensusContext,
 	benchable Benchable,
-	validators validators.Set,
+	validators validators.Manager,
 	threshold int,
 	minimumFailingDuration,
 	duration time.Duration,
 	maxPortion float64,
-	registerer prometheus.Registerer,
 ) (Benchlist, error) {
 	if maxPortion < 0 || maxPortion >= 1 {
 		return nil, fmt.Errorf("max portion of benched stake must be in [0,1) but got %f", maxPortion)
 	}
 	benchlist := &benchlist{
-		chainID:                chainID,
-		log:                    log,
+		ctx:                    ctx,
 		failureStreaks:         make(map[ids.NodeID]failureStreak),
 		benchlistSet:           set.Set[ids.NodeID]{},
 		benchable:              benchable,
@@ -167,7 +161,7 @@ func NewBenchlist(
 	}
 	benchlist.timer = timer.NewTimer(benchlist.update)
 	go benchlist.timer.Dispatch()
-	return benchlist, benchlist.metrics.Initialize(registerer)
+	return benchlist, benchlist.metrics.Initialize(ctx.Registerer)
 }
 
 // Update removes benched validators whose time on the bench is over
@@ -194,16 +188,23 @@ func (b *benchlist) update() {
 func (b *benchlist) remove(node *benchData) {
 	// Update state
 	id := node.nodeID
-	b.log.Debug("removing node from benchlist",
+	b.ctx.Log.Debug("removing node from benchlist",
 		zap.Stringer("nodeID", id),
 	)
 	heap.Remove(&b.benchedQueue, node.index)
 	b.benchlistSet.Remove(id)
-	b.benchable.Unbenched(b.chainID, id)
+	b.benchable.Unbenched(b.ctx.ChainID, id)
 
 	// Update metrics
 	b.metrics.numBenched.Set(float64(b.benchedQueue.Len()))
-	benchedStake := b.vdrs.SubsetWeight(b.benchlistSet)
+	benchedStake, err := b.vdrs.SubsetWeight(b.ctx.SubnetID, b.benchlistSet)
+	if err != nil {
+		b.ctx.Log.Error("error calculating benched stake",
+			zap.Stringer("subnetID", b.ctx.SubnetID),
+			zap.Error(err),
+		)
+		return
+	}
 	b.metrics.weightBenched.Set(float64(benchedStake))
 }
 
@@ -290,28 +291,44 @@ func (b *benchlist) RegisterFailure(nodeID ids.NodeID) {
 // Assumes [b.lock] is held
 // Assumes [nodeID] is not already benched
 func (b *benchlist) bench(nodeID ids.NodeID) {
-	validatorStake := b.vdrs.GetWeight(nodeID)
+	validatorStake := b.vdrs.GetWeight(b.ctx.SubnetID, nodeID)
 	if validatorStake == 0 {
 		// We might want to bench a non-validator because they don't respond to
 		// my Get requests, but we choose to only bench validators.
 		return
 	}
 
-	benchedStake := b.vdrs.SubsetWeight(b.benchlistSet)
+	benchedStake, err := b.vdrs.SubsetWeight(b.ctx.SubnetID, b.benchlistSet)
+	if err != nil {
+		b.ctx.Log.Error("error calculating benched stake",
+			zap.Stringer("subnetID", b.ctx.SubnetID),
+			zap.Error(err),
+		)
+		return
+	}
+
 	newBenchedStake, err := safemath.Add64(benchedStake, validatorStake)
 	if err != nil {
 		// This should never happen
-		b.log.Error("overflow calculating new benched stake",
+		b.ctx.Log.Error("overflow calculating new benched stake",
 			zap.Stringer("nodeID", nodeID),
 		)
 		return
 	}
 
-	totalStake := b.vdrs.Weight()
+	totalStake, err := b.vdrs.TotalWeight(b.ctx.SubnetID)
+	if err != nil {
+		b.ctx.Log.Error("error calculating total stake",
+			zap.Stringer("subnetID", b.ctx.SubnetID),
+			zap.Error(err),
+		)
+		return
+	}
+
 	maxBenchedStake := float64(totalStake) * b.maxPortion
 
 	if float64(newBenchedStake) > maxBenchedStake {
-		b.log.Debug("not benching node",
+		b.ctx.Log.Debug("not benching node",
 			zap.String("reason", "benched stake would exceed max"),
 			zap.Stringer("nodeID", nodeID),
 			zap.Float64("benchedStake", float64(newBenchedStake)),
@@ -330,7 +347,7 @@ func (b *benchlist) bench(nodeID ids.NodeID) {
 
 	// Add to benchlist times with randomized delay
 	b.benchlistSet.Add(nodeID)
-	b.benchable.Benched(b.chainID, nodeID)
+	b.benchable.Benched(b.ctx.ChainID, nodeID)
 
 	b.streaklock.Lock()
 	delete(b.failureStreaks, nodeID)
@@ -340,7 +357,7 @@ func (b *benchlist) bench(nodeID ids.NodeID) {
 		&b.benchedQueue,
 		&benchData{nodeID: nodeID, benchedUntil: benchedUntil},
 	)
-	b.log.Debug("benching validator after consecutive failed queries",
+	b.ctx.Log.Debug("benching validator after consecutive failed queries",
 		zap.Stringer("nodeID", nodeID),
 		zap.Duration("benchDuration", benchedUntil.Sub(now)),
 		zap.Int("numFailedQueries", b.threshold),

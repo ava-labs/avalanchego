@@ -46,8 +46,9 @@ const (
 func TestShutdown(t *testing.T) {
 	require := require.New(t)
 
-	vdrs := validators.NewSet()
-	require.NoError(vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
+	chainCtx := snow.DefaultConsensusContextTest()
+	vdrs := validators.NewManager()
+	require.NoError(vdrs.AddStaker(chainCtx.SubnetID, ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 	benchlist := benchlist.NewNoBenchlist()
 	tm, err := timeout.NewManager(
 		&timer.AdaptiveTimeoutConfig{
@@ -81,7 +82,6 @@ func TestShutdown(t *testing.T) {
 
 	shutdownCalled := make(chan struct{}, 1)
 
-	chainCtx := snow.DefaultConsensusContextTest()
 	resourceTracker, err := tracker.NewResourceTracker(
 		prometheus.NewRegistry(),
 		resource.NoUsage,
@@ -182,9 +182,10 @@ func TestShutdown(t *testing.T) {
 func TestShutdownTimesOut(t *testing.T) {
 	require := require.New(t)
 
+	ctx := snow.DefaultConsensusContextTest()
 	nodeID := ids.EmptyNodeID
-	vdrs := validators.NewSet()
-	require.NoError(vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
+	vdrs := validators.NewManager()
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 	benchlist := benchlist.NewNoBenchlist()
 	metrics := prometheus.NewRegistry()
 	// Ensure that the Ancestors request does not timeout
@@ -219,7 +220,6 @@ func TestShutdownTimesOut(t *testing.T) {
 		metrics,
 	))
 
-	ctx := snow.DefaultConsensusContextTest()
 	resourceTracker, err := tracker.NewResourceTracker(
 		prometheus.NewRegistry(),
 		resource.NoUsage,
@@ -371,8 +371,8 @@ func TestRouterTimeout(t *testing.T) {
 	)
 
 	ctx := snow.DefaultConsensusContextTest()
-	vdrs := validators.NewSet()
-	require.NoError(vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
+	vdrs := validators.NewManager()
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 
 	resourceTracker, err := tracker.NewResourceTracker(
 		prometheus.NewRegistry(),
@@ -841,8 +841,8 @@ func TestRouterClearTimeouts(t *testing.T) {
 
 	// Create bootstrapper, engine and handler
 	ctx := snow.DefaultConsensusContextTest()
-	vdrs := validators.NewSet()
-	require.NoError(vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
+	vdrs := validators.NewManager()
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 
 	resourceTracker, err := tracker.NewResourceTracker(
 		prometheus.NewRegistry(),
@@ -1133,9 +1133,9 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 
 	ctx := snow.DefaultConsensusContextTest()
 	sb := subnets.New(ctx.NodeID, subnets.Config{ValidatorOnly: true})
-	vdrs := validators.NewSet()
+	vdrs := validators.NewManager()
 	vID := ids.GenerateTestNodeID()
-	require.NoError(vdrs.Add(vID, nil, ids.Empty, 1))
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, vID, nil, ids.Empty, 1))
 	resourceTracker, err := tracker.NewResourceTracker(
 		prometheus.NewRegistry(),
 		resource.NoUsage,
@@ -1277,8 +1277,9 @@ func TestRouterCrossChainMessages(t *testing.T) {
 	))
 
 	// Set up validators
-	vdrs := validators.NewSet()
-	require.NoError(vdrs.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
+	ctx := snow.DefaultConsensusContextTest()
+	vdrs := validators.NewManager()
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 
 	// Create bootstrapper, engine and handler
 	requester := snow.DefaultConsensusContextTest()
@@ -1308,7 +1309,7 @@ func TestRouterCrossChainMessages(t *testing.T) {
 	)
 	require.NoError(err)
 
-	responder := snow.DefaultConsensusContextTest()
+	responder := ctx
 	responder.ChainID = ids.GenerateTestID()
 	responder.Registerer = prometheus.NewRegistry()
 	responder.Metrics = metrics.NewOptionalGatherer()
@@ -1550,9 +1551,9 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 	allowedSet := set.Of(allowedID)
 	sb := subnets.New(ctx.NodeID, subnets.Config{ValidatorOnly: true, AllowedNodes: allowedSet})
 
-	vdrs := validators.NewSet()
+	vdrs := validators.NewManager()
 	vID := ids.GenerateTestNodeID()
-	require.NoError(vdrs.Add(vID, nil, ids.Empty, 1))
+	require.NoError(vdrs.AddStaker(ctx.SubnetID, vID, nil, ids.Empty, 1))
 
 	resourceTracker, err := tracker.NewResourceTracker(
 		prometheus.NewRegistry(),

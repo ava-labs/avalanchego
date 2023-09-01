@@ -9,8 +9,6 @@ import (
 	"fmt"
 	"time"
 
-	"go.uber.org/zap"
-
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -57,7 +55,7 @@ type State interface {
 
 	// ValidatorSet adds all the validators and delegators of [subnetID] into
 	// [vdrs].
-	ValidatorSet(subnetID ids.ID, vdrs validators.Set) error
+	ValidatorSet(subnetID ids.ID, vdrs validators.Manager) error
 
 	// ApplyValidatorWeightDiffs iterates from [startHeight] towards the genesis
 	// block until it has applied all of the diffs up to and including
@@ -291,17 +289,8 @@ func (m *manager) makePrimaryNetworkValidatorSet(
 func (m *manager) getCurrentPrimaryValidatorSet(
 	ctx context.Context,
 ) (map[ids.NodeID]*validators.GetValidatorOutput, uint64, error) {
-	currentValidators, ok := m.cfg.Validators.Get(constants.PrimaryNetworkID)
-	if !ok {
-		// This should never happen
-		m.log.Error(ErrMissingValidatorSet.Error(),
-			zap.Stringer("subnetID", constants.PrimaryNetworkID),
-		)
-		return nil, 0, ErrMissingValidatorSet
-	}
-
 	currentHeight, err := m.getCurrentHeight(ctx)
-	return currentValidators.Map(), currentHeight, err
+	return m.cfg.Validators.GetMap(constants.PrimaryNetworkID), currentHeight, err
 }
 
 func (m *manager) makeSubnetValidatorSet(
@@ -361,28 +350,10 @@ func (m *manager) getCurrentValidatorSets(
 	ctx context.Context,
 	subnetID ids.ID,
 ) (map[ids.NodeID]*validators.GetValidatorOutput, map[ids.NodeID]*validators.GetValidatorOutput, uint64, error) {
-	currentSubnetValidators, ok := m.cfg.Validators.Get(subnetID)
-	if !ok {
-		// TODO: Require that the current validator set for all subnets is
-		// included in the validator manager.
-		currentSubnetValidators = validators.NewSet()
-		err := m.state.ValidatorSet(subnetID, currentSubnetValidators)
-		if err != nil {
-			return nil, nil, 0, err
-		}
-	}
-
-	currentPrimaryValidators, ok := m.cfg.Validators.Get(constants.PrimaryNetworkID)
-	if !ok {
-		// This should never happen
-		m.log.Error(ErrMissingValidatorSet.Error(),
-			zap.Stringer("subnetID", constants.PrimaryNetworkID),
-		)
-		return nil, nil, 0, ErrMissingValidatorSet
-	}
-
 	currentHeight, err := m.getCurrentHeight(ctx)
-	return currentSubnetValidators.Map(), currentPrimaryValidators.Map(), currentHeight, err
+	subnetMap := m.cfg.Validators.GetMap(subnetID)
+	primaryMap := m.cfg.Validators.GetMap(constants.PrimaryNetworkID)
+	return subnetMap, primaryMap, currentHeight, err
 }
 
 func (m *manager) GetSubnetID(_ context.Context, chainID ids.ID) (ids.ID, error) {

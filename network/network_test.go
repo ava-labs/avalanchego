@@ -134,12 +134,14 @@ func init() {
 
 func newDefaultTargeter(t tracker.Tracker) tracker.Targeter {
 	return tracker.NewTargeter(
+		ids.Empty,
+		logging.NoLog{},
 		&tracker.TargeterConfig{
 			VdrAlloc:           10,
 			MaxNonVdrUsage:     10,
 			MaxNonVdrNodeUsage: 10,
 		},
-		validators.NewSet(),
+		validators.NewManager(),
 		t,
 	)
 }
@@ -222,23 +224,20 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 			GossipTracker: g,
 		}
 
-		beacons := validators.NewSet()
-		require.NoError(beacons.Add(nodeIDs[0], nil, ids.GenerateTestID(), 1))
+		beacons := validators.NewManager()
+		require.NoError(beacons.AddStaker(constants.PrimaryNetworkID, nodeIDs[0], nil, ids.GenerateTestID(), 1))
 
-		primaryVdrs := validators.NewSet()
-		primaryVdrs.RegisterCallbackListener(&gossipTrackerCallback)
+		primaryVdrs := validators.NewManager()
+		primaryVdrs.RegisterCallbackListener(constants.PrimaryNetworkID, &gossipTrackerCallback)
 		for _, nodeID := range nodeIDs {
-			require.NoError(primaryVdrs.Add(nodeID, nil, ids.GenerateTestID(), 1))
+			require.NoError(primaryVdrs.AddStaker(constants.PrimaryNetworkID, nodeID, nil, ids.GenerateTestID(), 1))
 		}
-
-		vdrs := validators.NewManager()
-		_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 
 		config := config
 
 		config.GossipTracker = g
 		config.Beacons = beacons
-		config.Validators = vdrs
+		config.Validators = primaryVdrs
 
 		var connected set.Set[ids.NodeID]
 		net, err := NewNetwork(
@@ -405,7 +404,7 @@ func TestTrackVerifiesSignatures(t *testing.T) {
 
 	network := networks[0].(*network)
 	nodeID, tlsCert, _ := getTLS(t, 1)
-	require.NoError(validators.Add(network.config.Validators, constants.PrimaryNetworkID, nodeID, nil, ids.Empty, 1))
+	require.NoError(network.config.Validators.AddStaker(constants.PrimaryNetworkID, nodeID, nil, ids.Empty, 1))
 
 	_, err := network.Track(ids.EmptyNodeID, []*ips.ClaimedIPPort{{
 		Cert: staking.CertificateFromX509(tlsCert.Leaf),
@@ -448,23 +447,20 @@ func TestTrackDoesNotDialPrivateIPs(t *testing.T) {
 			GossipTracker: g,
 		}
 
-		beacons := validators.NewSet()
-		require.NoError(beacons.Add(nodeIDs[0], nil, ids.GenerateTestID(), 1))
+		beacons := validators.NewManager()
+		require.NoError(beacons.AddStaker(constants.PrimaryNetworkID, nodeIDs[0], nil, ids.GenerateTestID(), 1))
 
-		primaryVdrs := validators.NewSet()
-		primaryVdrs.RegisterCallbackListener(&gossipTrackerCallback)
+		primaryVdrs := validators.NewManager()
+		primaryVdrs.RegisterCallbackListener(constants.PrimaryNetworkID, &gossipTrackerCallback)
 		for _, nodeID := range nodeIDs {
-			require.NoError(primaryVdrs.Add(nodeID, nil, ids.GenerateTestID(), 1))
+			require.NoError(primaryVdrs.AddStaker(constants.PrimaryNetworkID, nodeID, nil, ids.GenerateTestID(), 1))
 		}
-
-		vdrs := validators.NewManager()
-		_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 
 		config := config
 
 		config.GossipTracker = g
 		config.Beacons = beacons
-		config.Validators = vdrs
+		config.Validators = primaryVdrs
 		config.AllowPrivateIPs = false
 
 		net, err := NewNetwork(
@@ -527,9 +523,9 @@ func TestDialDeletesNonValidators(t *testing.T) {
 
 	dialer, listeners, nodeIDs, configs := newTestNetwork(t, 2)
 
-	primaryVdrs := validators.NewSet()
+	primaryVdrs := validators.NewManager()
 	for _, nodeID := range nodeIDs {
-		require.NoError(primaryVdrs.Add(nodeID, nil, ids.GenerateTestID(), 1))
+		require.NoError(primaryVdrs.AddStaker(constants.PrimaryNetworkID, nodeID, nil, ids.GenerateTestID(), 1))
 	}
 
 	networks := make([]Network, len(configs))
@@ -546,19 +542,16 @@ func TestDialDeletesNonValidators(t *testing.T) {
 			GossipTracker: g,
 		}
 
-		beacons := validators.NewSet()
-		require.NoError(beacons.Add(nodeIDs[0], nil, ids.GenerateTestID(), 1))
+		beacons := validators.NewManager()
+		require.NoError(beacons.AddStaker(constants.PrimaryNetworkID, nodeIDs[0], nil, ids.GenerateTestID(), 1))
 
-		primaryVdrs.RegisterCallbackListener(&gossipTrackerCallback)
-
-		vdrs := validators.NewManager()
-		_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
+		primaryVdrs.RegisterCallbackListener(constants.PrimaryNetworkID, &gossipTrackerCallback)
 
 		config := config
 
 		config.GossipTracker = g
 		config.Beacons = beacons
-		config.Validators = vdrs
+		config.Validators = primaryVdrs
 		config.AllowPrivateIPs = false
 
 		net, err := NewNetwork(
@@ -613,7 +606,7 @@ func TestDialDeletesNonValidators(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 
 	network := networks[1].(*network)
-	require.NoError(primaryVdrs.RemoveWeight(nodeIDs[0], 1))
+	require.NoError(primaryVdrs.RemoveWeight(constants.PrimaryNetworkID, nodeIDs[0], 1))
 	require.Eventually(
 		func() bool {
 			network.peersLock.RLock()

@@ -283,8 +283,6 @@ func defaultCtx(db database.Database) (*snow.Context, *mutableSharedMemory) {
 
 func defaultConfig() *config.Config {
 	vdrs := validators.NewManager()
-	primaryVdrs := validators.NewSet()
-	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
 	return &config.Config{
 		Chains:                 chains.TestManager,
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
@@ -410,7 +408,7 @@ func buildGenesisTest(t *testing.T, ctx *snow.Context) []byte {
 
 func shutdownEnvironment(env *environment) error {
 	if env.isBootstrapped.Get() {
-		validatorIDs, err := validators.NodeIDs(env.config.Validators, constants.PrimaryNetworkID)
+		validatorIDs, err := env.config.Validators.GetValidatorIDs(constants.PrimaryNetworkID)
 		if err != nil {
 			return err
 		}

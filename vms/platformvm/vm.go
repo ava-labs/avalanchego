@@ -306,7 +306,7 @@ func (vm *VM) onNormalOperationsStarted() error {
 		return err
 	}
 
-	primaryVdrIDs, err := validators.NodeIDs(vm.Validators, constants.PrimaryNetworkID)
+	primaryVdrIDs, err := vm.Validators.GetValidatorIDs(constants.PrimaryNetworkID)
 	if err != nil {
 		return err
 	}
@@ -315,7 +315,7 @@ func (vm *VM) onNormalOperationsStarted() error {
 	}
 
 	for subnetID := range vm.TrackedSubnets {
-		vdrIDs, err := validators.NodeIDs(vm.Validators, subnetID)
+		vdrIDs, err := vm.Validators.GetValidatorIDs(subnetID)
 		if err != nil {
 			return err
 		}
@@ -353,7 +353,7 @@ func (vm *VM) Shutdown(context.Context) error {
 	vm.Builder.Shutdown()
 
 	if vm.bootstrapped.Get() {
-		primaryVdrIDs, err := validators.NodeIDs(vm.Validators, constants.PrimaryNetworkID)
+		primaryVdrIDs, err := vm.Validators.GetValidatorIDs(constants.PrimaryNetworkID)
 		if err != nil {
 			return err
 		}
@@ -362,7 +362,7 @@ func (vm *VM) Shutdown(context.Context) error {
 		}
 
 		for subnetID := range vm.TrackedSubnets {
-			vdrIDs, err := validators.NodeIDs(vm.Validators, subnetID)
+			vdrIDs, err := vm.Validators.GetValidatorIDs(subnetID)
 			if err != nil {
 				return err
 			}

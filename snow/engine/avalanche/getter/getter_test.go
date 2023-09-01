@@ -17,15 +17,16 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var errUnknownVertex = errors.New("unknown vertex")
 
 func testSetup(t *testing.T) (*vertex.TestManager, *common.SenderTest, common.Config) {
-	peers := validators.NewSet()
+	vdrs := validators.NewManager()
 	peer := ids.GenerateTestNodeID()
-	require.NoError(t, peers.Add(peer, nil, ids.Empty, 1))
+	require.NoError(t, vdrs.AddStaker(constants.PrimaryNetworkID, peer, nil, ids.Empty, 1))
 
 	sender := &common.SenderTest{T: t}
 	sender.Default(true)
@@ -42,11 +43,14 @@ func testSetup(t *testing.T) (*vertex.TestManager, *common.SenderTest, common.Co
 		},
 	}
 
+	totalWeight, err := vdrs.TotalWeight(constants.PrimaryNetworkID)
+	require.NoError(t, err)
+
 	commonConfig := common.Config{
 		Ctx:                            snow.DefaultConsensusContextTest(),
-		Beacons:                        peers,
-		SampleK:                        peers.Len(),
-		Alpha:                          peers.Weight()/2 + 1,
+		Beacons:                        vdrs,
+		SampleK:                        vdrs.Len(constants.PrimaryNetworkID),
+		Alpha:                          totalWeight/2 + 1,
 		Sender:                         sender,
 		BootstrapTracker:               bootstrapTracker,
 		Timer:                          &common.TimerTest{},
