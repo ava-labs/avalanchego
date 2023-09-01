@@ -53,9 +53,9 @@ type State interface {
 	GetLastAccepted() ids.ID
 	GetStatelessBlock(blockID ids.ID) (blocks.Block, error)
 
-	// ValidatorSet adds all the validators and delegators of [subnetID] into
-	// [vdrs].
-	ValidatorSet(subnetID ids.ID, vdrs validators.Manager) error
+	// ApplyCurrentValidators adds all the current
+	// validators and delegators of [subnetID] into [vdrs].
+	ApplyCurrentValidators(subnetID ids.ID, vdrs validators.Manager) error
 
 	// ApplyValidatorWeightDiffs iterates from [startHeight] towards the genesis
 	// block until it has applied all of the diffs up to and including

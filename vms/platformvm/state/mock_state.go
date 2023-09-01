@@ -756,16 +756,16 @@ func (mr *MockStateMockRecorder) UTXOIDs(arg0, arg1, arg2 interface{}) *gomock.C
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UTXOIDs", reflect.TypeOf((*MockState)(nil).UTXOIDs), arg0, arg1, arg2)
 }
 
-// ValidatorSet mocks base method.
-func (m *MockState) ValidatorSet(arg0 ids.ID, arg1 validators.Manager) error {
+// ApplyCurrentValidators mocks base method.
+func (m *MockState) ApplyCurrentValidators(arg0 ids.ID, arg1 validators.Manager) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ValidatorSet", arg0, arg1)
+	ret := m.ctrl.Call(m, "ApplyCurrentValidators", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// ValidatorSet indicates an expected call of ValidatorSet.
-func (mr *MockStateMockRecorder) ValidatorSet(arg0, arg1 interface{}) *gomock.Call {
+// ApplyCurrentValidators indicates an expected call of ApplyCurrentValidators.
+func (mr *MockStateMockRecorder) ApplyCurrentValidators(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ValidatorSet", reflect.TypeOf((*MockState)(nil).ValidatorSet), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ApplyCurrentValidators", reflect.TypeOf((*MockState)(nil).ApplyCurrentValidators), arg0, arg1)
 }

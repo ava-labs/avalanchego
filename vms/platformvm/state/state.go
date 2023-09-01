@@ -137,9 +137,9 @@ type State interface {
 
 	GetBlockIDAtHeight(height uint64) (ids.ID, error)
 
-	// ValidatorSet adds all the validators and delegators of [subnetID] into
-	// [vdrs].
-	ValidatorSet(subnetID ids.ID, vdrs validators.Manager) error
+	// ApplyCurrentValidators adds all the current
+	// validators and delegators of [subnetID] into [vdrs].
+	ApplyCurrentValidators(subnetID ids.ID, vdrs validators.Manager) error
 
 	// ApplyValidatorWeightDiffs iterates from [startHeight] towards the genesis
 	// block until it has applied all of the diffs up to and including
@@ -1059,7 +1059,7 @@ func (s *state) SetCurrentSupply(subnetID ids.ID, cs uint64) {
 	}
 }
 
-func (s *state) ValidatorSet(subnetID ids.ID, vdrs validators.Manager) error {
+func (s *state) ApplyCurrentValidators(subnetID ids.ID, vdrs validators.Manager) error {
 	for nodeID, validator := range s.currentStakers.validators[subnetID] {
 		staker := validator.validator
 		if err := vdrs.AddStaker(subnetID, nodeID, staker.PublicKey, staker.TxID, staker.Weight); err != nil {
@@ -1616,7 +1616,7 @@ func (s *state) initValidatorSets() error {
 		// Enforce the invariant that the validator set is empty here.
 		return errValidatorSetAlreadyPopulated
 	}
-	err := s.ValidatorSet(constants.PrimaryNetworkID, s.cfg.Validators)
+	err := s.ApplyCurrentValidators(constants.PrimaryNetworkID, s.cfg.Validators)
 	if err != nil {
 		return err
 	}
@@ -1629,7 +1629,7 @@ func (s *state) initValidatorSets() error {
 	s.metrics.SetTotalStake(totalWeight)
 
 	for subnetID := range s.cfg.TrackedSubnets {
-		err := s.ValidatorSet(subnetID, s.cfg.Validators)
+		err := s.ApplyCurrentValidators(subnetID, s.cfg.Validators)
 		if err != nil {
 			return err
 		}
