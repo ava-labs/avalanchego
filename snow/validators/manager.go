@@ -44,6 +44,9 @@ type Manager interface {
 	// - [weight] is 0
 	// - [nodeID] is not already in the validator set
 	// If an error is returned, the set will be unmodified.
+	// AddWeight can result in a total weight that overflows uint64.
+	// In this case no error will be returned for this call.
+	// However, the next TotalWeight call will return an error.
 	AddWeight(subnetID ids.ID, nodeID ids.NodeID, weight uint64) error
 
 	// GetWeight retrieves the validator weight from the subnet.
@@ -57,6 +60,7 @@ type Manager interface {
 	GetValidatorIDs(subnetID ids.ID) []ids.NodeID
 
 	// SubsetWeight returns the sum of the weights of the validators in the subnet.
+	// Returns err if subset weight overflows uint64.
 	SubsetWeight(subnetID ids.ID, validatorIDs set.Set[ids.NodeID]) (uint64, error)
 
 	// RemoveWeight from a staker in the subnet. If the staker's weight becomes 0, the staker
@@ -76,6 +80,7 @@ type Manager interface {
 	Len(subnetID ids.ID) int
 
 	// TotalWeight returns the cumulative weight of all validators in the subnet.
+	// Returns err if total weight overflows uint64.
 	TotalWeight(subnetID ids.ID) (uint64, error)
 
 	// Sample returns a collection of validatorIDs in the subnet, potentially with duplicates.
