@@ -193,11 +193,11 @@ func (ss *stateSyncer) receivedStateSummaryFrontier(ctx context.Context) error {
 	// We assume the frontier is qualified after an alpha proportion of frontier seeders have responded
 	frontiersTotalWeight, err := ss.frontierSeeders.TotalWeight(ss.Ctx.SubnetID)
 	if err != nil {
-		return fmt.Errorf("failed to get total weight of frontier seeders: %w", err)
+		return fmt.Errorf("failed to get total weight of frontier seeders for subnet %s: %w", ss.Ctx.SubnetID, err)
 	}
 	beaconsTotalWeight, err := ss.StateSyncBeacons.TotalWeight(ss.Ctx.SubnetID)
 	if err != nil {
-		return fmt.Errorf("failed to get total weight of state sync beacons: %w", err)
+		return fmt.Errorf("failed to get total weight of state sync beacons for subnet %s: %w", ss.Ctx.SubnetID, err)
 	}
 	frontierAlpha := float64(frontiersTotalWeight*ss.Alpha) / float64(beaconsTotalWeight)
 	failedBeaconWeight, err := ss.StateSyncBeacons.SubsetWeight(ss.Ctx.SubnetID, ss.failedSeeders)
@@ -304,7 +304,7 @@ func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.Node
 		// summaries), so there is no point in retrying state sync; we should move ahead to bootstrapping
 		beaconsTotalWeight, err := ss.StateSyncBeacons.TotalWeight(ss.Ctx.SubnetID)
 		if err != nil {
-			return fmt.Errorf("failed to get total weight of state sync beacons: %w", err)
+			return fmt.Errorf("failed to get total weight of state sync beacons for for subnet %s: %w", ss.Ctx.SubnetID, err)
 		}
 		votingStakes := beaconsTotalWeight - failedVotersWeight
 		if ss.Config.RetryBootstrap && votingStakes < ss.Alpha {

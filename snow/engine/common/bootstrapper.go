@@ -150,11 +150,11 @@ func (b *bootstrapper) markAcceptedFrontierReceived(ctx context.Context, nodeID 
 	// newAlpha := totalSampledWeight * b.Alpha / totalWeight
 	totalSampledWeight, err := b.sampledBeacons.TotalWeight(b.Ctx.SubnetID)
 	if err != nil {
-		return fmt.Errorf("failed to get total weight of sampled beacons: %w", err)
+		return fmt.Errorf("failed to get total weight of sampled beacons for subnet %s: %w", b.Ctx.SubnetID, err)
 	}
 	beaconsTotalWeight, err := b.Beacons.TotalWeight(b.Ctx.SubnetID)
 	if err != nil {
-		return fmt.Errorf("failed to get total weight of beacons: %w", err)
+		return fmt.Errorf("failed to get total weight of beacons for subnet %s: %w", b.Ctx.SubnetID, err)
 	}
 	newAlpha := float64(totalSampledWeight*b.Alpha) / float64(beaconsTotalWeight)
 
@@ -250,11 +250,11 @@ func (b *bootstrapper) Accepted(ctx context.Context, nodeID ids.NodeID, requestI
 		// between minorities supporting different frontiers).
 		beaconTotalWeight, err := b.Beacons.TotalWeight(b.Ctx.SubnetID)
 		if err != nil {
-			return fmt.Errorf("failed to get total weight of beacons: %w", err)
+			return fmt.Errorf("failed to get total weight of beacons for subnet %s: %w", b.Ctx.SubnetID, err)
 		}
 		failedBeaconWeight, err := b.Beacons.SubsetWeight(b.Ctx.SubnetID, b.failedAccepted)
 		if err != nil {
-			return fmt.Errorf("failed to get total weight of failed beacons: %w", err)
+			return fmt.Errorf("failed to get total weight of failed beacons for subnet %s: %w", b.Ctx.SubnetID, err)
 		}
 		votingStakes := beaconTotalWeight - failedBeaconWeight
 		if b.Config.RetryBootstrap && votingStakes < b.Alpha {

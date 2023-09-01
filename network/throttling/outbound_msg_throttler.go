@@ -92,6 +92,7 @@ func (t *outboundMsgThrottler) Acquire(msg message.OutboundMessage, nodeID ids.N
 		totalWeight, err := t.vdrs.TotalWeight(constants.PrimaryNetworkID)
 		if err != nil {
 			t.log.Error("Failed to get total weight of primary network validators",
+				zap.Stringer("subnetID", constants.PrimaryNetworkID),
 				zap.Error(err),
 			)
 			t.metrics.acquireFailures.Inc()

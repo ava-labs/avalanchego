@@ -58,7 +58,7 @@ func NewConfig(
 		}
 		stateSyncingWeight, err := stateSyncBeacons.TotalWeight(commonCfg.Ctx.SubnetID)
 		if err != nil {
-			return Config{}, fmt.Errorf("failed to calculate total weight of state sync beacons: %w", err)
+			return Config{}, fmt.Errorf("failed to calculate total weight of state sync beacons for subnet %s: %w", commonCfg.Ctx.SubnetID, err)
 		}
 		if uint64(syncSampleK) > stateSyncingWeight {
 			syncSampleK = int(stateSyncingWeight)

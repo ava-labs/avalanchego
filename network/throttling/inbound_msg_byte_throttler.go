@@ -136,6 +136,7 @@ func (t *inboundMsgByteThrottler) Acquire(ctx context.Context, msgSize uint64, n
 	totalWeight, err := t.vdrs.TotalWeight(constants.PrimaryNetworkID)
 	if err != nil {
 		t.log.Error("Failed to get total weight of primary network validators",
+			zap.Stringer("subnetID", constants.PrimaryNetworkID),
 			zap.Error(err),
 		)
 		t.lock.Unlock()

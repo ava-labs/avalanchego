@@ -809,7 +809,7 @@ func (m *manager) createAvalancheChain(
 
 	bootstrapWeight, err := vdrs.TotalWeight(ctx.SubnetID)
 	if err != nil {
-		return nil, fmt.Errorf("error while fetching subnet's weight: %w", err)
+		return nil, fmt.Errorf("error while fetching weight for subnet %s:%w", ctx.SubnetID, err)
 	}
 
 	consensusParams := sb.Config().ConsensusParameters
@@ -1160,7 +1160,7 @@ func (m *manager) createSnowmanChain(
 
 	bootstrapWeight, err := beacons.TotalWeight(ctx.SubnetID)
 	if err != nil {
-		return nil, fmt.Errorf("error while fetching subnet's weight: %w", err)
+		return nil, fmt.Errorf("error while fetching weight for subnet %s:%w", ctx.SubnetID, err)
 	}
 
 	consensusParams := sb.Config().ConsensusParameters
