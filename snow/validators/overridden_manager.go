@@ -106,6 +106,6 @@ func (o *overriddenManager) String() string {
 	return sb.String()
 }
 
-func (o *overriddenManager) GetValidatorIDs(_ ids.ID) ([]ids.NodeID, error) {
+func (o *overriddenManager) GetValidatorIDs(_ ids.ID) []ids.NodeID {
 	return o.manager.GetValidatorIDs(o.subnetID)
 }

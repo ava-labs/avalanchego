@@ -461,10 +461,7 @@ func shutdownEnvironment(t *environment) error {
 	}
 
 	if t.isBootstrapped.Get() {
-		validatorIDs, err := validators.NewManager().GetValidatorIDs(constants.PrimaryNetworkID)
-		if err != nil {
-			return err
-		}
+		validatorIDs := validators.NewManager().GetValidatorIDs(constants.PrimaryNetworkID)
 
 		if err := t.uptimes.StopTracking(validatorIDs, constants.PrimaryNetworkID); err != nil {
 			return err

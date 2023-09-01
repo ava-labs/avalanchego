@@ -426,23 +426,14 @@ func buildGenesisTest(ctx *snow.Context) []byte {
 
 func shutdownEnvironment(env *environment) error {
 	if env.isBootstrapped.Get() {
-		validatorIDs, err := env.config.Validators.GetValidatorIDs(constants.PrimaryNetworkID)
-		if err != nil {
-			return err
-		}
+		validatorIDs := env.config.Validators.GetValidatorIDs(constants.PrimaryNetworkID)
 
 		if err := env.uptimes.StopTracking(validatorIDs, constants.PrimaryNetworkID); err != nil {
 			return err
 		}
 
 		for subnetID := range env.config.TrackedSubnets {
-			validatorIDs, err := env.config.Validators.GetValidatorIDs(subnetID)
-			if errors.Is(err, validators.ErrMissingValidators) {
-				return nil
-			}
-			if err != nil {
-				return err
-			}
+			validatorIDs := env.config.Validators.GetValidatorIDs(subnetID)
 
 			if err := env.uptimes.StopTracking(validatorIDs, subnetID); err != nil {
 				return err

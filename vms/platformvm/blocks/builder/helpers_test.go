@@ -408,10 +408,7 @@ func buildGenesisTest(t *testing.T, ctx *snow.Context) []byte {
 
 func shutdownEnvironment(env *environment) error {
 	if env.isBootstrapped.Get() {
-		validatorIDs, err := env.config.Validators.GetValidatorIDs(constants.PrimaryNetworkID)
-		if err != nil {
-			return err
-		}
+		validatorIDs := env.config.Validators.GetValidatorIDs(constants.PrimaryNetworkID)
 
 		if err := env.uptimes.StopTracking(validatorIDs, constants.PrimaryNetworkID); err != nil {
 			return err

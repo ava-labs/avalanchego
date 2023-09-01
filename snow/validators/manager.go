@@ -50,10 +50,11 @@ type Manager interface {
 	GetWeight(subnetID ids.ID, validatorID ids.NodeID) uint64
 
 	// GetValidator returns the validator tied to the specified ID in subnet.
+	// If the validator doesn't exist, returns false.
 	GetValidator(subnetID ids.ID, validatorID ids.NodeID) (*Validator, bool)
 
 	// GetValidatoIDs returns the validator IDs in the subnet.
-	GetValidatorIDs(subnetID ids.ID) ([]ids.NodeID, error)
+	GetValidatorIDs(subnetID ids.ID) []ids.NodeID
 
 	// SubsetWeight returns the sum of the weights of the validators in the subnet.
 	SubsetWeight(subnetID ids.ID, validatorIDs set.Set[ids.NodeID]) (uint64, error)
@@ -284,14 +285,14 @@ func (m *manager) String() string {
 	return sb.String()
 }
 
-func (m *manager) GetValidatorIDs(subnetID ids.ID) ([]ids.NodeID, error) {
+func (m *manager) GetValidatorIDs(subnetID ids.ID) []ids.NodeID {
 	m.lock.RLock()
 	vdrs, exist := m.subnetToVdrs[subnetID]
 	if !exist {
-		return nil, fmt.Errorf("%w: %s", ErrMissingValidators, subnetID)
+		return nil
 	}
 	m.lock.RUnlock()
 
 	vdrsMap := vdrs.Map()
-	return maps.Keys(vdrsMap), nil
+	return maps.Keys(vdrsMap)
 }
