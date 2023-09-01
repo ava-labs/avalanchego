@@ -194,17 +194,20 @@ var _ = e2e.DescribeXChain("[Interchain Workflow]", func() {
 			),
 		)
 
+		ginkgo.By("initializing a new eth client")
+		ethClient := e2e.Env.NewEthClient(nodeURI)
+
 		ginkgo.By("importing AVAX from the P-Chain to the C-Chain")
 		e2e.LogTxAndCheck(
 			cWallet.IssueImportTx(
 				constants.PlatformChainID,
 				recipientEthAddress,
 				e2e.WithDefaultContext(),
+				e2e.WithSuggestedGasPrice(ethClient),
 			),
 		)
 
 		ginkgo.By("checking that the recipient address has received imported funds on the C-Chain")
-		ethClient := e2e.Env.NewEthClient(nodeURI)
 		e2e.Eventually(func() bool {
 			balance, err := ethClient.BalanceAt(e2e.DefaultContext(), recipientEthAddress, nil)
 			require.NoError(err)
