@@ -1,7 +1,11 @@
 // hash benchmarks; run with 'cargo bench'
 
 use criterion::{criterion_group, criterion_main, profiler::Profiler, BatchSize, Criterion};
-use firewood::merkle::{Merkle, TrieHash, TRIE_HASH_LEN};
+use firewood::{
+    db::{BatchOp, Db, DbConfig},
+    merkle::{Merkle, TrieHash, TRIE_HASH_LEN},
+    storage::WalConfig,
+};
 use pprof::ProfilerGuard;
 use rand::{distributions::Alphanumeric, rngs::StdRng, Rng, SeedableRng};
 use shale::{
@@ -119,10 +123,51 @@ fn bench_merkle<const N: usize>(criterion: &mut Criterion) {
         });
 }
 
+fn bench_db<const N: usize>(criterion: &mut Criterion) {
+    const KEY_LEN: usize = 4;
+    let mut rng = StdRng::seed_from_u64(1234);
+
+    criterion
+        .benchmark_group("Db")
+        .sample_size(30)
+        .bench_function("commit", |b| {
+            b.iter_batched(
+                || {
+                    let cfg =
+                        DbConfig::builder().wal(WalConfig::builder().max_revisions(10).build());
+
+                    let batch_ops: Vec<_> = repeat_with(|| {
+                        (&mut rng)
+                            .sample_iter(&Alphanumeric)
+                            .take(KEY_LEN)
+                            .collect()
+                    })
+                    .map(|key: Vec<_>| BatchOp::Put {
+                        key,
+                        value: vec![b'v'],
+                    })
+                    .take(N)
+                    .collect();
+                    let db_path = dbg!(std::env::temp_dir());
+                    let db_path = db_path.join("benchmark_db");
+
+                    let db = Db::new(db_path, &cfg.clone().truncate(true).build()).unwrap();
+
+                    (db, batch_ops)
+                },
+                |(db, batch_ops)| {
+                    let proposal = db.new_proposal(batch_ops).unwrap();
+                    proposal.commit().unwrap();
+                },
+                BatchSize::SmallInput,
+            );
+        });
+}
+
 criterion_group! {
     name = benches;
     config = Criterion::default().with_profiler(FlamegraphProfiler::Init(100));
-    targets = bench_trie_hash, bench_merkle::<1>
+    targets = bench_trie_hash, bench_merkle::<3>, bench_db::<100>
 }
 
 criterion_main!(benches);
