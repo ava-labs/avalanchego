@@ -95,7 +95,7 @@ func (db *archiveDB) Get(key []byte, height uint64) ([]byte, uint64, error) {
 		return nil, db.currentHeight, ErrUnknownHeight
 	}
 
-	internalKey := newKey(key, height)
+	internalKey := newInternalKey(key, height)
 	iterator := db.rawDB.NewIteratorWithStart(internalKey.Bytes())
 	keyLength := len(key)
 
@@ -112,14 +112,14 @@ func (db *archiveDB) Get(key []byte, height uint64) ([]byte, uint64, error) {
 			return nil, 0, err
 		}
 
-		if !bytes.Equal(internalKey.prefix, key) {
-			if keyLength < len(internalKey.prefix) {
+		if !bytes.Equal(internalKey.key, key) {
+			if keyLength < len(internalKey.key) {
 				// The current key is a longer than the requested key, now check
 				// if they match at the same length as `key`, if that is the
 				// case we should continue to the next key, until the exact
 				// requested key is found or anothe prefix is found and by that
 				// point it would exit
-				if bytes.Equal(internalKey.prefix[0:keyLength], key) {
+				if bytes.Equal(internalKey.key[0:keyLength], key) {
 					// Same prefix, read the next key until the prefix is
 					// different or the exact requested key is found
 					continue
@@ -176,14 +176,14 @@ func (c *batchWithHeight) Write() error {
 
 // Delete any previous state that may be stored in the database
 func (c *batchWithHeight) Delete(key []byte) error {
-	internalKey := newKey(key, c.height)
+	internalKey := newInternalKey(key, c.height)
 	internalKey.isDeleted = true
 	return c.batch.Put(internalKey.Bytes(), []byte{})
 }
 
 // Queues an insert for a key with a given
 func (c *batchWithHeight) Put(key []byte, value []byte) error {
-	internalKey := newKey(key, c.height)
+	internalKey := newInternalKey(key, c.height)
 	return c.batch.Put(internalKey.Bytes(), value)
 }
 

@@ -40,25 +40,25 @@ var (
 // Any other property are to not serialized but they are useful when parsing a
 // keyInternal struct from the database
 type keyInternal struct {
-	prefix    []byte
+	key       []byte
 	height    uint64
 	isDeleted bool
 }
 
 // Creates a new Key struct with a given key and its height
-func newKey(key []byte, height uint64) *keyInternal {
+func newInternalKey(key []byte, height uint64) *keyInternal {
 	return &keyInternal{
-		prefix:    key,
+		key:       key,
 		isDeleted: false,
 		height:    height,
 	}
 }
 
 func (k *keyInternal) Bytes() []byte {
-	prefixLen := len(k.prefix)
+	prefixLen := len(k.key)
 	bytes := make([]byte, prefixLen+longLen+boolLen+dataPrefixLen)
 	copy(bytes[0:], dataPrefix)
-	copy(bytes[dataPrefixLen:], k.prefix)
+	copy(bytes[dataPrefixLen:], k.key)
 	binary.BigEndian.PutUint64(bytes[dataPrefixLen+prefixLen:], math.MaxUint64-k.height)
 	if k.isDeleted {
 		bytes[dataPrefixLen+prefixLen+longLen] = 1
@@ -77,10 +77,10 @@ func parseKey(keyBytes []byte) (*keyInternal, error) {
 
 	prefixLen := len(keyBytes) - longLen - boolLen
 
-	key.prefix = make([]byte, prefixLen-dataPrefixLen)
+	key.key = make([]byte, prefixLen-dataPrefixLen)
 	key.height = math.MaxUint64 - binary.BigEndian.Uint64(keyBytes[prefixLen:])
 	key.isDeleted = keyBytes[prefixLen+longLen] == 1
-	copy(key.prefix, keyBytes[dataPrefixLen:dataPrefixLen+prefixLen])
+	copy(key.key, keyBytes[dataPrefixLen:dataPrefixLen+prefixLen])
 
 	return &key, nil
 }
