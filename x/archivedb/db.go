@@ -112,14 +112,14 @@ func (db *archiveDB) Get(key []byte, height uint64) ([]byte, uint64, error) {
 			return nil, 0, err
 		}
 
-		if !bytes.Equal(internalKey.Prefix, key) {
-			if keyLength < len(internalKey.Prefix) {
+		if !bytes.Equal(internalKey.prefix, key) {
+			if keyLength < len(internalKey.prefix) {
 				// The current key is a longer than the requested key, now check
 				// if they match at the same length as `key`, if that is the
 				// case we should continue to the next key, until the exact
 				// requested key is found or anothe prefix is found and by that
 				// point it would exit
-				if bytes.Equal(internalKey.Prefix[0:keyLength], key) {
+				if bytes.Equal(internalKey.prefix[0:keyLength], key) {
 					// Same prefix, read the next key until the prefix is
 					// different or the exact requested key is found
 					continue
@@ -131,14 +131,14 @@ func (db *archiveDB) Get(key []byte, height uint64) ([]byte, uint64, error) {
 			return nil, 0, database.ErrNotFound
 		}
 
-		if internalKey.IsDeleted {
+		if internalKey.isDeleted {
 			// The database is append only, so when removing a record creates a new
 			// record with an special flag is being created. Before returning the
 			// value we check if the deleted flag is present or not.
 			return nil, 0, database.ErrNotFound
 		}
 
-		return iterator.Value(), internalKey.Height, nil
+		return iterator.Value(), internalKey.height, nil
 	}
 }
 
@@ -177,7 +177,7 @@ func (c *batchWithHeight) Write() error {
 // Delete any previous state that may be stored in the database
 func (c *batchWithHeight) Delete(key []byte) error {
 	internalKey := newKey(key, c.height)
-	internalKey.IsDeleted = true
+	internalKey.isDeleted = true
 	return c.batch.Put(internalKey.Bytes(), []byte{})
 }
 
