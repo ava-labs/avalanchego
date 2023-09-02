@@ -36,7 +36,7 @@ type child struct {
 	hasValue       bool
 }
 
-// node holds additional information on top of the dbNode that makes calulcations easier to do
+// node holds additional information on top of the dbNode that makes calculations easier to do
 type node struct {
 	dbNode
 	id          ids.ID
@@ -159,11 +159,9 @@ func (n *node) removeChild(child *node) {
 }
 
 // clone Returns a copy of [n].
-// nodeBytes is intentionally not included because it can cause a race.
-// nodes being evicted by the cache can write nodeBytes,
-// so reading them during the cloning would be a data race.
 // Note: value isn't cloned because it is never edited, only overwritten
 // if this ever changes, value will need to be copied as well
+// it is safe to clone all fields because they are only written/read while one or both of the db locks are held
 func (n *node) clone() *node {
 	return &node{
 		id:  n.id,
@@ -173,6 +171,7 @@ func (n *node) clone() *node {
 			children: maps.Clone(n.children),
 		},
 		valueDigest: n.valueDigest,
+		nodeBytes:   n.nodeBytes,
 	}
 }
 
