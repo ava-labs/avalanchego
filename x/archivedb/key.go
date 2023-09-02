@@ -13,6 +13,18 @@ var (
 	ErrInsufficientLength = errors.New("packer has insufficient length for input")
 	longLen               = 8
 	boolLen               = 1
+	// This default prefix is used as the internal default prefix for all keys.
+	// By doing so the database can safely accept keys from untrusted sources,
+	// by using a common prefix no matter how the keys are crafted externally
+	// they won't interfiere with the database
+	//
+	// Having this commong prefix also also allows to store metadata that may be
+	// needed, without polluting the key spaces.
+	//
+	// Another side effect is that migrations are possible, by changing the
+	// prefix namespace, pulling the old prefix and migrating to the new one.
+	dataPrefix    = []byte("v1")
+	dataPrefixLen = len(dataPrefix)
 )
 
 // keyInternal
@@ -28,29 +40,30 @@ var (
 // Any other property are to not serialized but they are useful when parsing a
 // keyInternal struct from the database
 type keyInternal struct {
-	Prefix    []byte
-	Height    uint64
-	IsDeleted bool
+	prefix    []byte
+	height    uint64
+	isDeleted bool
 }
 
 // Creates a new Key struct with a given key and its height
 func newKey(key []byte, height uint64) *keyInternal {
 	return &keyInternal{
-		Prefix:    key,
-		IsDeleted: false,
-		Height:    height,
+		prefix:    key,
+		isDeleted: false,
+		height:    height,
 	}
 }
 
 func (k *keyInternal) Bytes() []byte {
-	prefixLen := len(k.Prefix)
-	bytes := make([]byte, prefixLen+longLen+boolLen)
-	copy(bytes[0:], k.Prefix)
-	binary.BigEndian.PutUint64(bytes[prefixLen:], math.MaxUint64-k.Height)
-	if k.IsDeleted {
-		bytes[prefixLen+longLen] = 1
+	prefixLen := len(k.prefix)
+	bytes := make([]byte, prefixLen+longLen+boolLen+dataPrefixLen)
+	copy(bytes[0:], dataPrefix)
+	copy(bytes[dataPrefixLen:], k.prefix)
+	binary.BigEndian.PutUint64(bytes[dataPrefixLen+prefixLen:], math.MaxUint64-k.height)
+	if k.isDeleted {
+		bytes[dataPrefixLen+prefixLen+longLen] = 1
 	} else {
-		bytes[prefixLen+longLen] = 0
+		bytes[dataPrefixLen+prefixLen+longLen] = 0
 	}
 	return bytes
 }
@@ -58,16 +71,16 @@ func (k *keyInternal) Bytes() []byte {
 // Takes a slice of bytes and returns a Key struct
 func parseKey(keyBytes []byte) (*keyInternal, error) {
 	var key keyInternal
-	if longLen+boolLen >= len(keyBytes) {
+	if longLen+boolLen+dataPrefixLen >= len(keyBytes) {
 		return nil, ErrInsufficientLength
 	}
 
 	prefixLen := len(keyBytes) - longLen - boolLen
 
-	key.Prefix = make([]byte, prefixLen)
-	key.Height = math.MaxUint64 - binary.BigEndian.Uint64(keyBytes[prefixLen:])
-	key.IsDeleted = keyBytes[prefixLen+longLen] == 1
-	copy(key.Prefix, keyBytes[0:prefixLen])
+	key.prefix = make([]byte, prefixLen-dataPrefixLen)
+	key.height = math.MaxUint64 - binary.BigEndian.Uint64(keyBytes[prefixLen:])
+	key.isDeleted = keyBytes[prefixLen+longLen] == 1
+	copy(key.prefix, keyBytes[dataPrefixLen:dataPrefixLen+prefixLen])
 
 	return &key, nil
 }
