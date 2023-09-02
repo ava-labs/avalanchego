@@ -48,7 +48,7 @@ func TestDeleteKeyIsDifferent(t *testing.T) {
 	key1 := newKey([]byte{0}, 0)
 
 	require.Equal(t, key0.Bytes(), key1.Bytes())
-	key1.IsDeleted = true
+	key1.isDeleted = true
 	require.NotEqual(t, key0.Bytes(), key1.Bytes())
 }
 
@@ -57,10 +57,10 @@ func TestParseBack(t *testing.T) {
 	key1, err := parseKey(key0.Bytes())
 	require.NoError(t, err)
 	require.Equal(t, key0, key1)
-	key0.IsDeleted = true
+	key0.isDeleted = true
 	key1, err = parseKey(key0.Bytes())
 	require.NoError(t, err)
 	require.Equal(t, key0, key1)
-	require.Equal(t, key1.Prefix, []byte{0, 1, 2, 3, 4, 5})
-	require.Equal(t, key1.Height, uint64(102310))
+	require.Equal(t, key1.prefix, []byte{0, 1, 2, 3, 4, 5})
+	require.Equal(t, key1.height, uint64(102310))
 }
