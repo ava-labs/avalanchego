@@ -1211,9 +1211,11 @@ func addPrefixToKey(bufferPool *sync.Pool, prefix []byte, key []byte) []byte {
 	return prefixedKey
 }
 
+// cacheEntrySize returns a rough approximation of the memory consumed by storing the path and node
 func cacheEntrySize(p path, n *node) int {
 	if n == nil {
 		return len(p)
 	}
-	return len(p) + len(n.bytes())
+	// nodes cache their bytes representation so the total memory consumed is roughly twice that
+	return len(p) + 2*len(n.bytes())
 }
