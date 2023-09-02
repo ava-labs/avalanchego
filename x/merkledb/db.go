@@ -31,8 +31,7 @@ import (
 )
 
 const (
-	DefaultEvictionBatchSize = 100
-	RootPath                 = EmptyPath
+	RootPath = EmptyPath
 
 	// TODO: name better
 	rebuildViewSizeFractionOfCacheSize   = 50
@@ -129,13 +128,15 @@ type Config struct {
 	// If 0 is specified, [runtime.NumCPU] will be used. If -1 is specified,
 	// no limit will be used.
 	RootGenConcurrency int
-	// The number of nodes that are evicted from the cache and written to
-	// disk at a time.
+	// The number of bytes to write to disk when intermediate nodes are evicted
+	// from their cache and written to disk.
 	EvictionBatchSize int
 	// The number of changes to the database that we store in memory in order to
 	// serve change proofs.
-	HistoryLength             int
-	ValueNodeCacheSize        int
+	HistoryLength int
+	// The number of bytes to cache nodes with values.
+	ValueNodeCacheSize int
+	// The number of bytes to cache nodes without values.
 	IntermediateNodeCacheSize int
 	// If [Reg] is nil, metrics are collected locally but not exported through
 	// Prometheus.
@@ -1208,4 +1209,13 @@ func addPrefixToKey(bufferPool *sync.Pool, prefix []byte, key []byte) []byte {
 	copy(prefixedKey, prefix)
 	copy(prefixedKey[prefixLen:], key)
 	return prefixedKey
+}
+
+// cacheEntrySize returns a rough approximation of the memory consumed by storing the path and node
+func cacheEntrySize(p path, n *node) int {
+	if n == nil {
+		return len(p)
+	}
+	// nodes cache their bytes representation so the total memory consumed is roughly twice that
+	return len(p) + 2*len(n.bytes())
 }
