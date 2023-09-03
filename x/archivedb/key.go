@@ -16,10 +16,10 @@ var (
 	// This default prefix is used as the internal default prefix for all keys.
 	// By doing so the database can safely accept keys from untrusted sources,
 	// by using a common prefix no matter how the keys are crafted externally
-	// they won't interfiere with the database
+	// they won't interfere with the database
 	//
-	// Having this commong prefix also also allows to store metadata that may be
-	// needed, without polluting the key spaces.
+	// Having this common prefix also also allows archivedb to store metadata
+	// that may be needed, without polluting the key space.
 	//
 	// Another side effect is that migrations are possible, by changing the
 	// prefix namespace, pulling the old prefix and migrating to the new one.
