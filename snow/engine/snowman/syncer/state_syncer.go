@@ -234,6 +234,11 @@ func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.Node
 	ss.pendingVoters.Remove(nodeID)
 
 	weight := ss.StateSyncBeacons.GetWeight(nodeID)
+	ss.Ctx.Log.Debug("adding weight to summaries",
+		zap.Stringer("nodeID", nodeID),
+		zap.Stringers("summaryIDs", summaryIDs),
+		zap.Uint64("weight", weight),
+	)
 	for _, summaryID := range summaryIDs {
 		ws, ok := ss.weightedSummaries[summaryID]
 		if !ok {
@@ -248,12 +253,21 @@ func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.Node
 		newWeight, err := math.Add64(weight, ws.weight)
 		if err != nil {
 			ss.Ctx.Log.Error("failed to calculate the Accepted votes",
+				zap.Stringer("summaryID", summaryID),
+				zap.Uint64("height", ws.summary.Height()),
 				zap.Uint64("weight", weight),
 				zap.Uint64("previousWeight", ws.weight),
 				zap.Error(err),
 			)
 			newWeight = stdmath.MaxUint64
 		}
+
+		ss.Ctx.Log.Debug("adding weight to summary",
+			zap.Stringer("summaryID", summaryID),
+			zap.Uint64("height", ws.summary.Height()),
+			zap.Uint64("previousWeight", ws.weight),
+			zap.Uint64("newWeight", newWeight),
+		)
 		ws.weight = newWeight
 	}
 
@@ -270,6 +284,8 @@ func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.Node
 		if ws.weight < ss.Alpha {
 			ss.Ctx.Log.Debug("removing summary",
 				zap.String("reason", "insufficient weight"),
+				zap.Stringer("summaryID", summaryID),
+				zap.Uint64("height", ws.summary.Height()),
 				zap.Uint64("currentWeight", ws.weight),
 				zap.Uint64("requiredWeight", ss.Alpha),
 			)
