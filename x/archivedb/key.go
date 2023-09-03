@@ -23,8 +23,10 @@ var (
 	//
 	// Another side effect is that migrations are possible, by changing the
 	// prefix namespace, pulling the old prefix and migrating to the new one.
-	dataPrefix    = []byte("v1")
-	dataPrefixLen = len(dataPrefix)
+	internalKeyPrefix    = []byte("v1")
+	internalKeyPrefixLen = len(internalKeyPrefix)
+	// The length of the suffix data of the key
+	internalKeySuffixLen = longLen + boolLen
 )
 
 // keyInternal
@@ -55,32 +57,32 @@ func newInternalKey(key []byte, height uint64) *keyInternal {
 }
 
 func (k *keyInternal) Bytes() []byte {
-	prefixLen := len(k.key)
-	bytes := make([]byte, prefixLen+longLen+boolLen+dataPrefixLen)
-	copy(bytes[0:], dataPrefix)
-	copy(bytes[dataPrefixLen:], k.key)
-	binary.BigEndian.PutUint64(bytes[dataPrefixLen+prefixLen:], math.MaxUint64-k.height)
+	keyLen := len(k.key)
+	bytes := make([]byte, keyLen+internalKeySuffixLen+internalKeyPrefixLen)
+	copy(bytes[0:], internalKeyPrefix)
+	copy(bytes[internalKeyPrefixLen:], k.key)
+	binary.BigEndian.PutUint64(bytes[internalKeyPrefixLen+keyLen:], math.MaxUint64-k.height)
 	if k.isDeleted {
-		bytes[dataPrefixLen+prefixLen+longLen] = 1
+		bytes[internalKeyPrefixLen+keyLen+longLen] = 1
 	} else {
-		bytes[dataPrefixLen+prefixLen+longLen] = 0
+		bytes[internalKeyPrefixLen+keyLen+longLen] = 0
 	}
 	return bytes
 }
 
 // Takes a slice of bytes and returns a Key struct
-func parseKey(keyBytes []byte) (*keyInternal, error) {
+func parseKey(rawKey []byte) (*keyInternal, error) {
 	var key keyInternal
-	if longLen+boolLen+dataPrefixLen >= len(keyBytes) {
+	if internalKeySuffixLen+internalKeyPrefixLen >= len(rawKey) {
 		return nil, ErrInsufficientLength
 	}
 
-	prefixLen := len(keyBytes) - longLen - boolLen
+	keyWithPrefixLen := len(rawKey) - internalKeySuffixLen
 
-	key.key = make([]byte, prefixLen-dataPrefixLen)
-	key.height = math.MaxUint64 - binary.BigEndian.Uint64(keyBytes[prefixLen:])
-	key.isDeleted = keyBytes[prefixLen+longLen] == 1
-	copy(key.key, keyBytes[dataPrefixLen:dataPrefixLen+prefixLen])
+	key.key = make([]byte, keyWithPrefixLen-internalKeyPrefixLen)
+	key.height = math.MaxUint64 - binary.BigEndian.Uint64(rawKey[keyWithPrefixLen:])
+	key.isDeleted = rawKey[keyWithPrefixLen+longLen] == 1
+	copy(key.key, rawKey[internalKeyPrefixLen:internalKeyPrefixLen+keyWithPrefixLen])
 
 	return &key, nil
 }
