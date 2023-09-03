@@ -70,11 +70,6 @@ func (k *keyInternal) Bytes() []byte {
 	return bytes
 }
 
-// Returns the internal bytes representation of the key without any aditional metadata
-func (*keyInternal) MetadataLen() int {
-	return longLen + boolLen
-}
-
 // Takes a slice of bytes and returns a Key struct
 func parseKey(rawKey []byte) (*keyInternal, error) {
 	var key keyInternal

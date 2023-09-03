@@ -97,7 +97,7 @@ func (db *archiveDB) GetKeysByPrefix(prefix []byte) keysIterator {
 	bytes := prefixKey.Bytes()
 	return keysIterator{
 		db:     db,
-		prefix: bytes[0 : len(bytes)-prefixKey.MetadataLen()],
+		prefix: bytes[0 : len(bytes)-internalKeySuffixLen],
 	}
 }
 
