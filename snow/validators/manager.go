@@ -230,12 +230,16 @@ func (m *manager) TotalWeight(subnetID ids.ID) (uint64, error) {
 }
 
 func (m *manager) Sample(subnetID ids.ID, size int) ([]ids.NodeID, error) {
+	if size == 0 {
+		return nil, nil
+	}
+
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
 	set, exists := m.subnetToVdrs[subnetID]
 	if !exists {
-		return nil, errMissingValidator
+		return nil, nil
 	}
 
 	return set.Sample(size)
@@ -247,7 +251,7 @@ func (m *manager) GetMap(subnetID ids.ID) map[ids.NodeID]*GetValidatorOutput {
 
 	set, exists := m.subnetToVdrs[subnetID]
 	if !exists {
-		return nil
+		return make(map[ids.NodeID]*GetValidatorOutput)
 	}
 
 	return set.Map()
@@ -283,7 +287,7 @@ func (m *manager) String() string {
 		sb.WriteString(fmt.Sprintf(
 			"\n    Subnet[%s]: %s",
 			subnetID,
-			vdrs.PrefixedString("    "),
+			vdrs.PrefixedString(""),
 		))
 	}
 

@@ -350,8 +350,21 @@ func (m *manager) getCurrentValidatorSets(
 	ctx context.Context,
 	subnetID ids.ID,
 ) (map[ids.NodeID]*validators.GetValidatorOutput, map[ids.NodeID]*validators.GetValidatorOutput, uint64, error) {
+	subnetManager := m.cfg.Validators
+	if m.cfg.Validators.Len(subnetID) == 0 {
+		// If there are no validators in the subnet, we need to add the current
+		// validators to the subnet validator manager. But we don't want to modify
+		// the existing manager as it would reapply weights. So we create a new
+		// manager and add the current validators to it.
+		// TODO: remove this once we guarantee all subnets are included in the
+		// validator manager.
+		subnetManager = validators.NewManager()
+		if err := m.state.ApplyCurrentValidators(subnetID, subnetManager); err != nil {
+			return nil, nil, 0, err
+		}
+	}
 	currentHeight, err := m.getCurrentHeight(ctx)
-	subnetMap := m.cfg.Validators.GetMap(subnetID)
+	subnetMap := subnetManager.GetMap(subnetID)
 	primaryMap := m.cfg.Validators.GetMap(constants.PrimaryNetworkID)
 	return subnetMap, primaryMap, currentHeight, err
 }

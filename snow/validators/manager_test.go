@@ -43,13 +43,21 @@ func TestAddOverflow(t *testing.T) {
 
 	m := NewManager()
 	subnetID := ids.GenerateTestID()
-	require.NoError(m.AddStaker(subnetID, ids.GenerateTestNodeID(), nil, ids.Empty, 1))
+	nodeID1 := ids.GenerateTestNodeID()
+	nodeID2 := ids.GenerateTestNodeID()
+	require.NoError(m.AddStaker(subnetID, nodeID1, nil, ids.Empty, 1))
 
-	err := m.AddStaker(subnetID, ids.GenerateTestNodeID(), nil, ids.Empty, stdmath.MaxUint64)
+	err := m.AddStaker(subnetID, nodeID2, nil, ids.Empty, stdmath.MaxUint64)
 	require.NoError(err)
 
 	_, err = m.TotalWeight(subnetID)
 	require.ErrorIs(err, errTotalWeightNotUint64)
+
+	set := set.Set[ids.NodeID]{}
+	set.Add(nodeID1)
+	set.Add(nodeID2)
+	_, err = m.SubsetWeight(subnetID, set)
+	require.ErrorIs(err, math.ErrOverflow)
 }
 
 func TestAddWeightZeroWeight(t *testing.T) {
@@ -76,11 +84,10 @@ func TestAddWeightOverflow(t *testing.T) {
 	require.NoError(m.AddStaker(subnetID, nodeID, nil, ids.Empty, 1))
 
 	err := m.AddWeight(subnetID, nodeID, stdmath.MaxUint64-1)
-	require.ErrorIs(err, math.ErrOverflow)
-
-	totalWeight, err := m.TotalWeight(subnetID)
 	require.NoError(err)
-	require.Equal(uint64(2), totalWeight)
+
+	_, err = m.TotalWeight(subnetID)
+	require.ErrorIs(err, errTotalWeightNotUint64)
 }
 
 func TestGetWeight(t *testing.T) {
@@ -401,14 +408,22 @@ func TestString(t *testing.T) {
 	}
 
 	m := NewManager()
-	subnetID := ids.GenerateTestID()
+	subnetID, err := ids.FromString("TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES")
+	require.NoError(err)
 	require.NoError(m.AddStaker(subnetID, nodeID0, nil, ids.Empty, 1))
 
 	require.NoError(m.AddStaker(subnetID, nodeID1, nil, ids.Empty, stdmath.MaxInt64-1))
 
-	expected := "Validator Set: (Size = 2, Weight = 9223372036854775807)\n" +
+	subnetID2, err := ids.FromString("2mcwQKiD8VEspmMJpL1dc7okQQ5dDVAWeCBZ7FWBFAbxpv3t7w")
+	require.NoError(err)
+	require.NoError(m.AddStaker(subnetID2, nodeID1, nil, ids.Empty, 1))
+
+	expected := "Validator Manager: (Size = 2)\n" +
+		"    Subnet[TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES]: Validator Set: (Size = 2, Weight = 9223372036854775807)\n" +
 		"    Validator[0]: NodeID-111111111111111111116DBWJs, 1\n" +
-		"    Validator[1]: NodeID-QLbz7JHiBTspS962RLKV8GndWFwdYhk6V, 9223372036854775806"
+		"    Validator[1]: NodeID-QLbz7JHiBTspS962RLKV8GndWFwdYhk6V, 9223372036854775806\n" +
+		"    Subnet[2mcwQKiD8VEspmMJpL1dc7okQQ5dDVAWeCBZ7FWBFAbxpv3t7w]: Validator Set: (Size = 1, Weight = 1)\n" +
+		"    Validator[0]: NodeID-QLbz7JHiBTspS962RLKV8GndWFwdYhk6V, 1"
 	result := m.String()
 	require.Equal(expected, result)
 }

@@ -221,7 +221,7 @@ type Node struct {
 
 // Initialize the networking layer.
 // Assumes [n.CPUTracker] and [n.CPUTargeter] have been initialized.
-func (n *Node) initNetworking(primaryNetVdrs validators.Manager) error {
+func (n *Node) initNetworking(vdrs validators.Manager) error {
 	currentIPPort := n.Config.IPPort.IPPort()
 
 	// Providing either loopback address - `::1` for ipv6 and `127.0.0.1` for ipv4 - as the listen
@@ -301,7 +301,7 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Manager) error {
 		dummyTxID := ids.Empty
 		copy(dummyTxID[:], n.ID[:])
 
-		err := primaryNetVdrs.AddStaker(
+		err := vdrs.AddStaker(
 			constants.PrimaryNetworkID,
 			n.ID,
 			bls.PublicFromSecretKey(n.Config.StakingSigningKey),
@@ -313,9 +313,11 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Manager) error {
 		}
 
 		consensusRouter = &insecureValidatorManager{
-			Router: consensusRouter,
-			vdrs:   primaryNetVdrs,
-			weight: n.Config.SybilProtectionDisabledWeight,
+			subnetID: constants.PrimaryNetworkID,
+			log:      n.Log,
+			Router:   consensusRouter,
+			vdrs:     vdrs,
+			weight:   n.Config.SybilProtectionDisabledWeight,
 		}
 	}
 
@@ -341,6 +343,7 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Manager) error {
 
 		consensusRouter = &beaconManager{
 			Router:        consensusRouter,
+			subnetID:      constants.PrimaryNetworkID,
 			timer:         timer,
 			beacons:       n.bootstrappers,
 			requiredConns: int64(requiredConns),
@@ -354,7 +357,7 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Manager) error {
 	}
 
 	// keep gossip tracker synchronized with the validator set
-	primaryNetVdrs.RegisterCallbackListener(constants.PrimaryNetworkID, &peer.GossipTrackerCallback{
+	vdrs.RegisterCallbackListener(constants.PrimaryNetworkID, &peer.GossipTrackerCallback{
 		Log:           n.Log,
 		GossipTracker: gossipTracker,
 	})
@@ -1305,10 +1308,11 @@ func (n *Node) initResourceManager(reg prometheus.Registerer) error {
 // Initialize [n.cpuTargeter].
 // Assumes [n.resourceTracker] is already initialized.
 func (n *Node) initCPUTargeter(
+	subnetID ids.ID,
 	config *tracker.TargeterConfig,
 ) {
 	n.cpuTargeter = tracker.NewTargeter(
-		constants.PrimaryNetworkID,
+		subnetID,
 		n.Log,
 		config,
 		n.vdrs,
@@ -1319,10 +1323,11 @@ func (n *Node) initCPUTargeter(
 // Initialize [n.diskTargeter].
 // Assumes [n.resourceTracker] is already initialized.
 func (n *Node) initDiskTargeter(
+	subnetID ids.ID,
 	config *tracker.TargeterConfig,
 ) {
 	n.diskTargeter = tracker.NewTargeter(
-		constants.PrimaryNetworkID,
+		subnetID,
 		n.Log,
 		config,
 		n.vdrs,
@@ -1420,8 +1425,8 @@ func (n *Node) Initialize(
 	if err := n.initResourceManager(n.MetricsRegisterer); err != nil {
 		return fmt.Errorf("problem initializing resource manager: %w", err)
 	}
-	n.initCPUTargeter(&config.CPUTargeterConfig)
-	n.initDiskTargeter(&config.DiskTargeterConfig)
+	n.initCPUTargeter(constants.PrimaryNetworkID, &config.CPUTargeterConfig)
+	n.initDiskTargeter(constants.PrimaryNetworkID, &config.DiskTargeterConfig)
 	if err := n.initNetworking(n.vdrs); err != nil { // Set up networking layer.
 		return fmt.Errorf("problem initializing networking: %w", err)
 	}

@@ -260,10 +260,6 @@ func (s *vdrSet) Map() map[ids.NodeID]*GetValidatorOutput {
 }
 
 func (s *vdrSet) Sample(size int) ([]ids.NodeID, error) {
-	if size == 0 {
-		return nil, nil
-	}
-
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -295,7 +291,7 @@ func (s *vdrSet) TotalWeight() (uint64, error) {
 	defer s.lock.RUnlock()
 
 	if !s.totalWeight.IsUint64() {
-		return 0, fmt.Errorf("%w: %s", errTotalWeightNotUint64, s.totalWeight.String())
+		return 0, fmt.Errorf("%w, total weight: %s", errTotalWeightNotUint64, s.totalWeight.String())
 	}
 
 	return s.totalWeight.Uint64(), nil

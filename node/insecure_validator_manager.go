@@ -7,28 +7,35 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
+	"go.uber.org/zap"
 )
 
 type insecureValidatorManager struct {
 	router.Router
-	vdrs   validators.Manager
-	weight uint64
+	log      logging.Logger
+	subnetID ids.ID
+	vdrs     validators.Manager
+	weight   uint64
 }
 
 func (i *insecureValidatorManager) Connected(vdrID ids.NodeID, nodeVersion *version.Application, subnetID ids.ID) {
-	if constants.PrimaryNetworkID == subnetID {
+	if i.subnetID == subnetID {
 		// Sybil protection is disabled so we don't have a txID that added the
 		// peer as a validator. Because each validator needs a txID associated
 		// with it, we hack one together by padding the nodeID with zeroes.
 		dummyTxID := ids.Empty
 		copy(dummyTxID[:], vdrID[:])
 
-		// Add will only error here if the total weight of the set would go over
-		// [math.MaxUint64]. In this case, we will just not mark this new peer
-		// as a validator.
-		_ = i.vdrs.AddStaker(constants.PrimaryNetworkID, vdrID, nil, dummyTxID, i.weight)
+		err := i.vdrs.AddStaker(i.subnetID, vdrID, nil, dummyTxID, i.weight)
+		if err != nil {
+			i.log.Error("failed to add validator",
+				zap.Stringer("nodeID", vdrID),
+				zap.Stringer("subnetID", i.subnetID),
+				zap.Error(err),
+			)
+		}
 	}
 	i.Router.Connected(vdrID, nodeVersion, subnetID)
 }
@@ -36,6 +43,13 @@ func (i *insecureValidatorManager) Connected(vdrID ids.NodeID, nodeVersion *vers
 func (i *insecureValidatorManager) Disconnected(vdrID ids.NodeID) {
 	// RemoveWeight will only error here if there was an error reported during
 	// Add.
-	_ = i.vdrs.RemoveWeight(constants.PrimaryNetworkID, vdrID, i.weight)
+	err := i.vdrs.RemoveWeight(i.subnetID, vdrID, i.weight)
+	if err != nil {
+		i.log.Error("failed to add validator",
+			zap.Stringer("nodeID", vdrID),
+			zap.Stringer("subnetID", i.subnetID),
+			zap.Error(err),
+		)
+	}
 	i.Router.Disconnected(vdrID)
 }

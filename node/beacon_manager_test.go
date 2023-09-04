@@ -43,6 +43,7 @@ func TestBeaconManager_DataRace(t *testing.T) {
 	b := beaconManager{
 		Router:        mockRouter,
 		timer:         timer.NewTimer(nil),
+		subnetID:      constants.PrimaryNetworkID,
 		beacons:       validatorSet,
 		requiredConns: numValidators,
 	}

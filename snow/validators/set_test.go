@@ -44,11 +44,10 @@ func TestSetAddOverflow(t *testing.T) {
 	require.NoError(s.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 
 	err := s.Add(ids.GenerateTestNodeID(), nil, ids.Empty, stdmath.MaxUint64)
-	require.ErrorIs(err, math.ErrOverflow)
-
-	totalWeight, err := s.TotalWeight()
 	require.NoError(err)
-	require.Equal(uint64(1), totalWeight)
+
+	_, err = s.TotalWeight()
+	require.ErrorIs(err, errTotalWeightNotUint64)
 }
 
 func TestSetAddWeightZeroWeight(t *testing.T) {
@@ -74,11 +73,10 @@ func TestSetAddWeightOverflow(t *testing.T) {
 	require.NoError(s.Add(nodeID, nil, ids.Empty, 1))
 
 	err := s.AddWeight(nodeID, stdmath.MaxUint64-1)
-	require.ErrorIs(err, math.ErrOverflow)
-
-	totalWeight, err := s.TotalWeight()
 	require.NoError(err)
-	require.Equal(uint64(2), totalWeight)
+
+	_, err = s.TotalWeight()
+	require.ErrorIs(err, errTotalWeightNotUint64)
 }
 
 func TestSetGetWeight(t *testing.T) {
@@ -443,6 +441,7 @@ func TestSetAddCallback(t *testing.T) {
 
 	s := newSet()
 	callCount := 0
+	require.False(s.HasCallbackRegistered())
 	s.RegisterCallbackListener(&callbackListener{
 		t: t,
 		onAdd: func(nodeID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) {
@@ -453,6 +452,7 @@ func TestSetAddCallback(t *testing.T) {
 			callCount++
 		},
 	})
+	require.True(s.HasCallbackRegistered())
 	require.NoError(s.Add(nodeID0, pk0, txID0, weight0))
 	require.Equal(1, callCount)
 }
@@ -469,6 +469,7 @@ func TestSetAddWeightCallback(t *testing.T) {
 	require.NoError(s.Add(nodeID0, nil, txID0, weight0))
 
 	callCount := 0
+	require.False(s.HasCallbackRegistered())
 	s.RegisterCallbackListener(&callbackListener{
 		t: t,
 		onAdd: func(nodeID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) {
@@ -485,6 +486,7 @@ func TestSetAddWeightCallback(t *testing.T) {
 			callCount++
 		},
 	})
+	require.True(s.HasCallbackRegistered())
 	require.NoError(s.AddWeight(nodeID0, weight1))
 	require.Equal(2, callCount)
 }
@@ -501,6 +503,7 @@ func TestSetRemoveWeightCallback(t *testing.T) {
 	require.NoError(s.Add(nodeID0, nil, txID0, weight0))
 
 	callCount := 0
+	require.False(s.HasCallbackRegistered())
 	s.RegisterCallbackListener(&callbackListener{
 		t: t,
 		onAdd: func(nodeID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) {
@@ -517,6 +520,7 @@ func TestSetRemoveWeightCallback(t *testing.T) {
 			callCount++
 		},
 	})
+	require.True(s.HasCallbackRegistered())
 	require.NoError(s.RemoveWeight(nodeID0, weight1))
 	require.Equal(2, callCount)
 }
@@ -532,6 +536,7 @@ func TestSetValidatorRemovedCallback(t *testing.T) {
 	require.NoError(s.Add(nodeID0, nil, txID0, weight0))
 
 	callCount := 0
+	require.False(s.HasCallbackRegistered())
 	s.RegisterCallbackListener(&callbackListener{
 		t: t,
 		onAdd: func(nodeID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) {
@@ -547,6 +552,7 @@ func TestSetValidatorRemovedCallback(t *testing.T) {
 			callCount++
 		},
 	})
+	require.True(s.HasCallbackRegistered())
 	require.NoError(s.RemoveWeight(nodeID0, weight0))
 	require.Equal(2, callCount)
 }

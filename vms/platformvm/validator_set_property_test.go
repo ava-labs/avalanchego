@@ -66,8 +66,8 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 	properties := gopter.NewProperties(nil)
 
 	// to reproduce a given scenario do something like this:
-	// parameters := gopter.DefaultTestParametersWithSeed(1685887576153675816)
-	// properties := gopter.NewProperties(parameters)
+	parameters := gopter.DefaultTestParametersWithSeed(1693594401218916000)
+	properties = gopter.NewProperties(parameters)
 
 	properties.Property("check GetValidatorSet", prop.ForAll(
 		func(events []uint8) string {
@@ -252,7 +252,7 @@ func takeValidatorsSnapshotAtCurrentHeightAndTest(vm *VM, validatorsSetByHeightA
 				return fmt.Errorf("failed GetValidatorSet: %w", err)
 			}
 			if !reflect.DeepEqual(validatorsSet, res) {
-				return errors.New("failed validators set comparison")
+				return fmt.Errorf("failed validators set comparison, expected: %v, got: %v", validatorsSet, res)
 			}
 		}
 	}
