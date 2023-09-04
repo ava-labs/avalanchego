@@ -94,10 +94,9 @@ func (db *archiveDB) GetLastBlock(key []byte) ([]byte, uint64, error) {
 // defined for the first time
 func (db *archiveDB) GetKeysByPrefix(prefix []byte) keysIterator {
 	prefixKey := newInternalKey(prefix, 0)
-	bytes := prefixKey.Bytes()
 	return keysIterator{
 		db:     db,
-		prefix: bytes[0 : len(bytes)-internalKeySuffixLen],
+		prefix: prefixKey.PrefixBytes(),
 	}
 }
 

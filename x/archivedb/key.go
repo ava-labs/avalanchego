@@ -56,6 +56,16 @@ func newInternalKey(key []byte, height uint64) *keyInternal {
 	}
 }
 
+// Returns the key bytes but only the prefix bytes
+func (k *keyInternal) PrefixBytes() []byte {
+	keyLen := len(k.key)
+	bytes := make([]byte, keyLen+internalKeyPrefixLen)
+	copy(bytes[0:], internalKeyPrefix)
+	copy(bytes[internalKeyPrefixLen:], k.key)
+	return bytes
+}
+
+// Return the key bytes, the prefix and suffix
 func (k *keyInternal) Bytes() []byte {
 	keyLen := len(k.key)
 	bytes := make([]byte, keyLen+internalKeySuffixLen+internalKeyPrefixLen)
