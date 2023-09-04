@@ -43,10 +43,9 @@ func TestSetAddOverflow(t *testing.T) {
 	s := newSet()
 	require.NoError(s.Add(ids.GenerateTestNodeID(), nil, ids.Empty, 1))
 
-	err := s.Add(ids.GenerateTestNodeID(), nil, ids.Empty, stdmath.MaxUint64)
-	require.NoError(err)
+	require.NoError(s.Add(ids.GenerateTestNodeID(), nil, ids.Empty, stdmath.MaxUint64))
 
-	_, err = s.TotalWeight()
+	_, err := s.TotalWeight()
 	require.ErrorIs(err, errTotalWeightNotUint64)
 }
 
@@ -72,10 +71,9 @@ func TestSetAddWeightOverflow(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 	require.NoError(s.Add(nodeID, nil, ids.Empty, 1))
 
-	err := s.AddWeight(nodeID, stdmath.MaxUint64-1)
-	require.NoError(err)
+	require.NoError(s.AddWeight(nodeID, stdmath.MaxUint64-1))
 
-	_, err = s.TotalWeight()
+	_, err := s.TotalWeight()
 	require.ErrorIs(err, errTotalWeightNotUint64)
 }
 

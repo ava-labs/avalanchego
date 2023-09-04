@@ -47,10 +47,9 @@ func TestAddOverflow(t *testing.T) {
 	nodeID2 := ids.GenerateTestNodeID()
 	require.NoError(m.AddStaker(subnetID, nodeID1, nil, ids.Empty, 1))
 
-	err := m.AddStaker(subnetID, nodeID2, nil, ids.Empty, stdmath.MaxUint64)
-	require.NoError(err)
+	require.NoError(m.AddStaker(subnetID, nodeID2, nil, ids.Empty, stdmath.MaxUint64))
 
-	_, err = m.TotalWeight(subnetID)
+	_, err := m.TotalWeight(subnetID)
 	require.ErrorIs(err, errTotalWeightNotUint64)
 
 	set := set.Set[ids.NodeID]{}
@@ -83,10 +82,9 @@ func TestAddWeightOverflow(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 	require.NoError(m.AddStaker(subnetID, nodeID, nil, ids.Empty, 1))
 
-	err := m.AddWeight(subnetID, nodeID, stdmath.MaxUint64-1)
-	require.NoError(err)
+	require.NoError(m.AddWeight(subnetID, nodeID, stdmath.MaxUint64-1))
 
-	_, err = m.TotalWeight(subnetID)
+	_, err := m.TotalWeight(subnetID)
 	require.ErrorIs(err, errTotalWeightNotUint64)
 }
 
