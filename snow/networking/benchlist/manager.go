@@ -4,7 +4,6 @@
 package benchlist
 
 import (
-	"errors"
 	"sync"
 	"time"
 
@@ -14,11 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
-var (
-	errUnknownValidators = errors.New("unknown validator set for provided chain")
-
-	_ Manager = (*manager)(nil)
-)
+var _ Manager = (*manager)(nil)
 
 // Manager provides an interface for a benchlist to register whether
 // queries have been successful or unsuccessful and place validators with

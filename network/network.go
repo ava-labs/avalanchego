@@ -54,12 +54,10 @@ var (
 	_ sender.ExternalSender = (*network)(nil)
 	_ Network               = (*network)(nil)
 
-	errMissingPrimaryValidators = errors.New("missing primary validator set")
-	errNotValidator             = errors.New("node is not a validator")
-	errNotTracked               = errors.New("subnet is not tracked")
-	errSubnetNotExist           = errors.New("subnet does not exist")
-	errExpectedProxy            = errors.New("expected proxy")
-	errExpectedTCPProtocol      = errors.New("expected TCP protocol")
+	errNotValidator        = errors.New("node is not a validator")
+	errNotTracked          = errors.New("subnet is not tracked")
+	errExpectedProxy       = errors.New("expected proxy")
+	errExpectedTCPProtocol = errors.New("expected TCP protocol")
 )
 
 // Network defines the functionality of the networking library.

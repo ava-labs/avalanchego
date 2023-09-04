@@ -57,11 +57,8 @@ const (
 var (
 	_ State = (*state)(nil)
 
-	ErrDelegatorSubset              = errors.New("delegator's time range must be a subset of the validator's time range")
-	errMissingValidatorSet          = errors.New("missing validator set")
-	errValidatorSetAlreadyPopulated = errors.New("validator set already populated")
-	errDuplicateValidatorSet        = errors.New("duplicate validator set")
-
+	ErrDelegatorSubset                  = errors.New("delegator's time range must be a subset of the validator's time range")
+	errValidatorSetAlreadyPopulated     = errors.New("validator set already populated")
 	blockIDPrefix                       = []byte("blockID")
 	blockPrefix                         = []byte("block")
 	validatorsPrefix                    = []byte("validators")

@@ -5,7 +5,6 @@ package validators
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -31,11 +30,7 @@ const (
 	recentlyAcceptedWindowTTL     = 2 * time.Minute
 )
 
-var (
-	_ validators.State = (*manager)(nil)
-
-	ErrMissingValidatorSet = errors.New("missing validator set")
-)
+var _ validators.State = (*manager)(nil)
 
 // Manager adds the ability to introduce newly acceted blocks IDs to the State
 // interface.
