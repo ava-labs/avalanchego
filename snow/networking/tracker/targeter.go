@@ -6,10 +6,11 @@ package tracker
 import (
 	"math"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"go.uber.org/zap"
 )
 
 var _ Targeter = (*targeter)(nil)
