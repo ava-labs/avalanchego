@@ -18,7 +18,6 @@ github.com/ava-labs/avalanchego/snow/networking/timeout=Manager=snow/networking/
 github.com/ava-labs/avalanchego/snow/networking/tracker=Targeter=snow/networking/tracker/mock_targeter.go
 github.com/ava-labs/avalanchego/snow/networking/tracker=Tracker=snow/networking/tracker/mock_resource_tracker.go
 github.com/ava-labs/avalanchego/snow/uptime=Calculator=snow/uptime/mock_calculator.go
-github.com/ava-labs/avalanchego/snow/validators=Manager=snow/validators/mock_manager.go
 github.com/ava-labs/avalanchego/snow/validators=State=snow/validators/mock_state.go
 github.com/ava-labs/avalanchego/snow/validators=SubnetConnector=snow/validators/mock_subnet_connector.go
 github.com/ava-labs/avalanchego/utils/crypto/keychain=Ledger=utils/crypto/keychain/mock_ledger.go
