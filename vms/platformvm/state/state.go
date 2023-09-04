@@ -1631,6 +1631,10 @@ func (s *state) initValidatorSets() error {
 	s.metrics.SetTotalStake(totalWeight)
 
 	for subnetID := range s.cfg.TrackedSubnets {
+		if s.cfg.Validators.Len(subnetID) != 0 {
+			// Enforce the invariant that the validator set is empty here.
+			return errValidatorSetAlreadyPopulated
+		}
 		err := s.ApplyCurrentValidators(subnetID, s.cfg.Validators)
 		if err != nil {
 			return err

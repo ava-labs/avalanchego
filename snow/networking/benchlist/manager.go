@@ -112,6 +112,7 @@ func (m *manager) RegisterChain(ctx *snow.ConsensusContext) error {
 
 	vdrs := m.config.Validators
 	if !m.config.SybilProtectionEnabled {
+		// If sybil protection is disabled, everyone validates every chain
 		vdrs = validators.NewOverriddenManager(constants.PrimaryNetworkID, vdrs)
 	}
 

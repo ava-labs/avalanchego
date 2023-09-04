@@ -34,6 +34,7 @@ func TestInboundMsgByteThrottlerCancelContextDeadlock(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 		vdrs,
+		constants.PrimaryNetworkID,
 		config,
 	)
 	require.NoError(err)
@@ -64,6 +65,7 @@ func TestInboundMsgByteThrottlerCancelContext(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 		vdrs,
+		constants.PrimaryNetworkID,
 		config,
 	)
 	require.NoError(err)
@@ -122,6 +124,7 @@ func TestInboundMsgByteThrottler(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 		vdrs,
+		constants.PrimaryNetworkID,
 		config,
 	)
 	require.NoError(err)
@@ -337,6 +340,7 @@ func TestSybilMsgThrottlerMaxNonVdr(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 		vdrs,
+		constants.PrimaryNetworkID,
 		config,
 	)
 	require.NoError(err)
@@ -388,6 +392,7 @@ func TestMsgThrottlerNextMsg(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 		vdrs,
+		constants.PrimaryNetworkID,
 		config,
 	)
 	require.NoError(err)
