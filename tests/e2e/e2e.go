@@ -22,8 +22,6 @@ import (
 	"github.com/ava-labs/coreth/ethclient"
 	"github.com/ava-labs/coreth/interfaces"
 
-	"golang.org/x/exp/maps"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture"
@@ -65,7 +63,7 @@ type TestEnvironment struct {
 	// The directory where the test network configuration is stored
 	NetworkDir string
 	// URIs used to access the API endpoints of nodes of the network
-	URIs map[ids.NodeID]string
+	URIs []testnet.NodeURI
 	// The URI used to access the http server that allocates test data
 	TestDataServerURI string
 
@@ -83,13 +81,11 @@ func InitTestEnvironment(envBytes []byte) {
 
 // Retrieve a random URI to naively attempt to spread API load across
 // nodes.
-func (te *TestEnvironment) GetRandomNodeURI() string {
+func (te *TestEnvironment) GetRandomNodeURI() testnet.NodeURI {
 	r := rand.New(rand.NewSource(time.Now().Unix())) //#nosec G404
-	nodeIDs := maps.Keys(te.URIs)
-	nodeID := nodeIDs[r.Intn(len(nodeIDs))]
-	uri := te.URIs[nodeID]
-	tests.Outf("{{blue}} targeting node %s with URI: %s{{/}}\n", nodeID, uri)
-	return uri
+	nodeURI := te.URIs[r.Intn(len(te.URIs))]
+	tests.Outf("{{blue}} targeting node %s with URI: %s{{/}}\n", nodeURI.NodeID, nodeURI.URI)
+	return nodeURI
 }
 
 // Retrieve the network to target for testing.
@@ -119,10 +115,10 @@ func (te *TestEnvironment) NewKeychain(count int) *secp256k1fx.Keychain {
 }
 
 // Create a new wallet for the provided keychain against the specified node URI.
-func (te *TestEnvironment) NewWallet(keychain *secp256k1fx.Keychain, uri string) primary.Wallet {
-	tests.Outf("{{blue}} initializing a new wallet for URI: %s {{/}}\n", uri)
+func (te *TestEnvironment) NewWallet(keychain *secp256k1fx.Keychain, nodeURI testnet.NodeURI) primary.Wallet {
+	tests.Outf("{{blue}} initializing a new wallet for node %s with URI: %s {{/}}\n", nodeURI.NodeID, nodeURI.URI)
 	baseWallet, err := primary.MakeWallet(DefaultContext(), &primary.WalletConfig{
-		URI:          uri,
+		URI:          nodeURI.URI,
 		AVAXKeychain: keychain,
 		EthKeychain:  keychain,
 	})
@@ -138,9 +134,9 @@ func (te *TestEnvironment) NewWallet(keychain *secp256k1fx.Keychain, uri string)
 }
 
 // Create a new eth client targeting the specified node URI.
-func (te *TestEnvironment) NewEthClient(nodeURI string) ethclient.Client {
-	tests.Outf("{{blue}} initializing a new eth client for URI: %s {{/}}\n", nodeURI)
-	nodeAddress := strings.Split(nodeURI, "//")[1]
+func (te *TestEnvironment) NewEthClient(nodeURI testnet.NodeURI) ethclient.Client {
+	tests.Outf("{{blue}} initializing a new eth client for node %s with URI: %s {{/}}\n", nodeURI.NodeID, nodeURI.URI)
+	nodeAddress := strings.Split(nodeURI.URI, "//")[1]
 	uri := fmt.Sprintf("ws://%s/ext/bc/C/ws", nodeAddress)
 	client, err := ethclient.Dial(uri)
 	te.require.NoError(err)

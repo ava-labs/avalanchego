@@ -46,7 +46,7 @@ var _ = e2e.DescribePChain("[Permissionless Subnets]", func() {
 
 			var validatorID ids.NodeID
 			ginkgo.By("retrieving the node ID of a primary network validator", func() {
-				pChainClient := platformvm.NewClient(nodeURI)
+				pChainClient := platformvm.NewClient(nodeURI.URI)
 				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultTimeout)
 				validatorIDs, err := pChainClient.SampleValidators(ctx, constants.PrimaryNetworkID, 1)
 				cancel()
