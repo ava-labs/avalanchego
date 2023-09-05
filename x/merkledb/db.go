@@ -127,7 +127,7 @@ type Config struct {
 	//
 	// If 0 is specified, [runtime.NumCPU] will be used. If -1 is specified,
 	// no limit will be used.
-	RootGenConcurrency uint
+	RootGenConcurrency int
 	// The number of bytes to write to disk when intermediate nodes are evicted
 	// from their cache and written to disk.
 	EvictionBatchSize uint
@@ -207,7 +207,7 @@ func newDatabase(
 ) (*merkleDB, error) {
 	rootGenConcurrency := runtime.NumCPU()
 	if config.RootGenConcurrency != 0 {
-		rootGenConcurrency = int(config.RootGenConcurrency)
+		rootGenConcurrency = config.RootGenConcurrency
 	}
 
 	// Share a sync.Pool of []byte between the intermediateNodeDB and valueNodeDB
