@@ -127,7 +127,7 @@ func (te *TestEnvironment) NewWallet(keychain *secp256k1fx.Keychain, nodeURI tes
 		baseWallet,
 		common.WithPostIssuanceFunc(
 			func(id ids.ID) {
-				tests.Outf(" tx id: %s\n", id)
+				tests.Outf(" issued transaction with ID: %s\n", id)
 			},
 		),
 	)
@@ -210,7 +210,7 @@ func SendEthTransaction(ethClient ethclient.Client, signedTx *types.Transaction)
 	require := require.New(ginkgo.GinkgoT())
 
 	txID := signedTx.Hash()
-	tests.Outf(" eth tx id: %s\n", txID)
+	tests.Outf(" sending eth transaction with ID: %s\n", txID)
 
 	require.NoError(ethClient.SendTransaction(DefaultContext(), signedTx))
 
