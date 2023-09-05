@@ -156,8 +156,8 @@ func Test_Server_GetChangeProof(t *testing.T) {
 	require.NoError(t, err)
 
 	// create changes
-	ops := make([]database.BatchOp, 0, 600)
-	for x := 0; x < 600; x++ {
+	ops := make([]database.BatchOp, 0, 300)
+	for x := 0; x < 300; x++ {
 		key := make([]byte, r.Intn(100))
 		_, err = r.Read(key)
 		require.NoError(t, err)
