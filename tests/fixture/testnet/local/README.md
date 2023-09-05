@@ -54,7 +54,8 @@ $ ./build/testnetctl stop-network --network-dir=/path/to/network
 Note the export of the path ending in `latest`. This is a symlink that
 set to the last network created by `testnetctl start-network`. Setting
 the `TESTNETCTL_NETWORK_DIR` env var to this symlink ensures that
-`testnetctl` commands will target the most recently deployed
+`testnetctl` commands and e2e execution with
+`--use-persistent-network` will target the most recently deployed
 local network.
 
 ### Via code
@@ -151,7 +152,10 @@ HOME
             │       └── config.json                      // C-Chain config for all nodes
             ├── defaults.json                            // Default flags and configuration for network
             ├── genesis.json                             // Genesis for all nodes
-            └── network.env                              // Sets network dir env to simplify use of network
+            ├── network.env                              // Sets network dir env to simplify use of network
+            └── ephemeral                                // Parent directory for ephemeral nodes (e.g. created by tests)
+                └─ NodeID-FdxnAvr4jK9XXAwsYZPgWAHW2QnwSZ // Data dir for an ephemeral node
+                   └── ...
 
 ```
 

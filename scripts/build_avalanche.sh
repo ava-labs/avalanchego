@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 
-set -o errexit
-set -o nounset
-set -o pipefail
+set -euo pipefail
 
 print_usage() {
   printf "Usage: build_avalanche [OPTIONS]
@@ -26,7 +24,6 @@ done
 
 # Changes to the minimum golang version must also be replicated in
 # scripts/build_avalanche.sh (here)
-# scripts/local.Dockerfile
 # Dockerfile
 # README.md
 # go.mod

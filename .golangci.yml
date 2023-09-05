@@ -57,6 +57,7 @@ linters-settings:
     packages-with-error-message:
       - io/ioutil: 'io/ioutil is deprecated. Use package io or os instead.'
       - github.com/stretchr/testify/assert: 'github.com/stretchr/testify/require should be used instead.'
+      - github.com/golang/mock/gomock: 'go.uber.org/mock/gomock should be used instead.'
     include-go-root: true
   errorlint:
     # Check for plain type assertions and type switches.

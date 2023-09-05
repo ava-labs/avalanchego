@@ -15,10 +15,12 @@ import (
 )
 
 var (
-	errBuildBlock   = errors.New("unexpectedly called BuildBlock")
-	errParseBlock   = errors.New("unexpectedly called ParseBlock")
-	errGetBlock     = errors.New("unexpectedly called GetBlock")
-	errLastAccepted = errors.New("unexpectedly called LastAccepted")
+	errBuildBlock         = errors.New("unexpectedly called BuildBlock")
+	errParseBlock         = errors.New("unexpectedly called ParseBlock")
+	errGetBlock           = errors.New("unexpectedly called GetBlock")
+	errLastAccepted       = errors.New("unexpectedly called LastAccepted")
+	errVerifyHeightIndex  = errors.New("unexpectedly called VerifyHeightIndex")
+	errGetBlockIDAtHeight = errors.New("unexpectedly called GetBlockIDAtHeight")
 
 	_ ChainVM = (*TestVM)(nil)
 )
@@ -31,13 +33,17 @@ type TestVM struct {
 	CantParseBlock,
 	CantGetBlock,
 	CantSetPreference,
-	CantLastAccepted bool
+	CantLastAccepted,
+	CantVerifyHeightIndex,
+	CantGetBlockIDAtHeight bool
 
-	BuildBlockF    func(context.Context) (snowman.Block, error)
-	ParseBlockF    func(context.Context, []byte) (snowman.Block, error)
-	GetBlockF      func(context.Context, ids.ID) (snowman.Block, error)
-	SetPreferenceF func(context.Context, ids.ID) error
-	LastAcceptedF  func(context.Context) (ids.ID, error)
+	BuildBlockF         func(context.Context) (snowman.Block, error)
+	ParseBlockF         func(context.Context, []byte) (snowman.Block, error)
+	GetBlockF           func(context.Context, ids.ID) (snowman.Block, error)
+	SetPreferenceF      func(context.Context, ids.ID) error
+	LastAcceptedF       func(context.Context) (ids.ID, error)
+	VerifyHeightIndexF  func(context.Context) error
+	GetBlockIDAtHeightF func(ctx context.Context, height uint64) (ids.ID, error)
 }
 
 func (vm *TestVM) Default(cant bool) {
@@ -98,4 +104,24 @@ func (vm *TestVM) LastAccepted(ctx context.Context) (ids.ID, error) {
 		require.FailNow(vm.T, errLastAccepted.Error())
 	}
 	return ids.ID{}, errLastAccepted
+}
+
+func (vm *TestVM) VerifyHeightIndex(ctx context.Context) error {
+	if vm.VerifyHeightIndexF != nil {
+		return vm.VerifyHeightIndexF(ctx)
+	}
+	if vm.CantVerifyHeightIndex && vm.T != nil {
+		require.FailNow(vm.T, errVerifyHeightIndex.Error())
+	}
+	return errVerifyHeightIndex
+}
+
+func (vm *TestVM) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, error) {
+	if vm.GetBlockIDAtHeightF != nil {
+		return vm.GetBlockIDAtHeightF(ctx, height)
+	}
+	if vm.CantGetBlockIDAtHeight && vm.T != nil {
+		require.FailNow(vm.T, errGetAncestor.Error())
+	}
+	return ids.Empty, errGetBlockIDAtHeight
 }

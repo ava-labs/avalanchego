@@ -1,5 +1,142 @@
 # Release Notes
 
+## [v1.10.9](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.9)
+
+This version is backwards compatible to [v1.10.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0). It is optional, but encouraged.
+
+The plugin version is updated to `28` all plugins must update to be compatible.
+
+### Configs
+
+- Changed the default value of `--network-compression-type` from `gzip` to `zstd`
+
+### Fixes
+
+- Marked corruptabledb as corrupted after encountering an error during iteration
+- Fixed proposervm error handling during startup
+
+### What's Changed
+
+- `merkledb` -- verify range proof in fuzz test; fix bound error by @danlaine in https://github.com/ava-labs/avalanchego/pull/1789
+- Update default compression type to zstd by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1839
+- Migrate to `uber-go/mock` by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/1840
+- `corruptabledb` -- corrupt on iterator error by @danlaine in https://github.com/ava-labs/avalanchego/pull/1829
+- Add support for Maps to the reflect_codec by @nytzuga in https://github.com/ava-labs/avalanchego/pull/1790
+- Make linter fail if `github.com/golang/mock/gomock` is used by @danlaine in https://github.com/ava-labs/avalanchego/pull/1843
+- Firewoodize merkle db Part 1: Make Views ReadOnly by @dboehm-avalabs in https://github.com/ava-labs/avalanchego/pull/1816
+- E2E tests -- use appropriate timeouts by @danlaine in https://github.com/ava-labs/avalanchego/pull/1851
+- e2e: Switch to testnet fixture by @marun in https://github.com/ava-labs/avalanchego/pull/1709
+- `secp256k1` -- add fuzz tests by @danlaine in https://github.com/ava-labs/avalanchego/pull/1809
+- Add fuzz test for complex codec unmarshalling by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1846
+- Simplify exported interface of the primary wallet by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1849
+- Regenerate mocks by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/1860
+- Remove history btree by @danlaine in https://github.com/ava-labs/avalanchego/pull/1861
+- `merkledb` -- Remove `CommitToParent` by @danlaine in https://github.com/ava-labs/avalanchego/pull/1854
+- `merkledb` -- remove other history btree by @danlaine in https://github.com/ava-labs/avalanchego/pull/1862
+- `merkledb` -- add path fuzz test by @danlaine in https://github.com/ava-labs/avalanchego/pull/1852
+- fix range proof verification case by @danlaine in https://github.com/ava-labs/avalanchego/pull/1834
+- `merkledb` -- add change proof fuzz test; fix change proof verification by @danlaine in https://github.com/ava-labs/avalanchego/pull/1802
+- Warp readme by @aaronbuchwald in https://github.com/ava-labs/avalanchego/pull/1780
+- CODEOWNERS: add marun to tests by @hexfusion in https://github.com/ava-labs/avalanchego/pull/1863
+- Add CI check that auto-generated code is up to date by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/1828
+- `sync` -- change proof request can return range proof by @danlaine in https://github.com/ava-labs/avalanchego/pull/1772
+- Ensure consistent use of best-practice `set -o` in all scripts by @marun in https://github.com/ava-labs/avalanchego/pull/1864
+- GetCanonicalValidatorSet minimal ValidatorState iface by @darioush in https://github.com/ava-labs/avalanchego/pull/1875
+- `sync` -- handle fatal error by @danlaine in https://github.com/ava-labs/avalanchego/pull/1874
+- `merkledb` -- use `Maybe` for start bounds by @danlaine in https://github.com/ava-labs/avalanchego/pull/1872
+- Add C-chain wallet to the primary network by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1850
+- e2e: Refactor keychain and wallet creation to test helpers by @marun in https://github.com/ava-labs/avalanchego/pull/1870
+- Update account nonce on exportTx accept by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1881
+- `sync` -- add workheap test by @danlaine in https://github.com/ava-labs/avalanchego/pull/1879
+- `merkledb` -- commit to db only by @danlaine in https://github.com/ava-labs/avalanchego/pull/1885
+- Remove node/value lock from trieview by @dboehm-avalabs in https://github.com/ava-labs/avalanchego/pull/1865
+- remove old todo by @danlaine in https://github.com/ava-labs/avalanchego/pull/1892
+- Fix race in TestHandlerDispatchInternal by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/1895
+- Remove duplicate code from proposervm block acceptance by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1894
+- e2e: Bump permissionless subnets timeouts by @marun in https://github.com/ava-labs/avalanchego/pull/1897
+- `merkledb` -- codec remove err checks by @danlaine in https://github.com/ava-labs/avalanchego/pull/1899
+- Merkle db fix new return type by @dboehm-avalabs in https://github.com/ava-labs/avalanchego/pull/1898
+- Add SDK Sampling interface by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/1877
+- Add NoOpHandler implementation to SDK by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/1903
+- Remove unused scripts by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1908
+- `merkledb` -- codec nits/cleanup by @danlaine in https://github.com/ava-labs/avalanchego/pull/1904
+- `merkledb` -- preallocate `bytes.Buffer` in codec by @danlaine in https://github.com/ava-labs/avalanchego/pull/1900
+- Proposervm height index repair fix by @abi87 in https://github.com/ava-labs/avalanchego/pull/1915
+- `merkledb` -- move and rename methods by @danlaine in https://github.com/ava-labs/avalanchego/pull/1919
+- Remove optional height indexing interface by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1896
+- `merkledb` -- nits by @danlaine in https://github.com/ava-labs/avalanchego/pull/1916
+- Fix code owners file by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1922
+- Drop invalid TLS certs during initial handshake by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1923
+- Restricted tls metrics by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1924
+
+### New Contributors
+
+- @nytzuga made their first contribution in https://github.com/ava-labs/avalanchego/pull/1790
+
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.10.8...v1.10.9
+
+## [v1.10.8](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.8)
+
+This version is backwards compatible to [v1.10.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0). It is optional, but encouraged.
+
+The plugin version is unchanged at `27` and compatible with versions `v1.10.5 - v1.10.7`.
+
+**This update changes the local network genesis. This version will not be able to join local networks with prior versions.**
+
+**The first startup of the P-Chain will perform indexing operations. This indexing runs in the background and does not impact restart time. During this indexing the node will report increased CPU, memory, and disk usage.**
+
+### APIs
+
+- Added `platform.getBlockByHeight`
+
+### Configs
+
+- Added `--partial-sync-primary-network` flag to enable non-validators to optionally sync only the P-chain on the primary network
+- Added P-chain cache size configuration `block-id-cache-size`
+
+### Fixes
+
+- Fixed P-chain GetValidatorSet regression for subnets
+- Changed `x/sync` range/change proof bounds from `[]byte` to `Maybe[[]byte]`
+- Fixed `x/sync` error handling from failure to send app messages
+
+### What's Changed
+
+- Removes calls to ctrl.Finish by @darioush in https://github.com/ava-labs/avalanchego/pull/1803
+- e2e: Remove unnecessary transaction status checking by @marun in https://github.com/ava-labs/avalanchego/pull/1786
+- fix p2p mockgen location by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/1806
+- fix end proof verification by @danlaine in https://github.com/ava-labs/avalanchego/pull/1801
+- `merkledb` -- add proof fuzz test by @danlaine in https://github.com/ava-labs/avalanchego/pull/1804
+- `sync` -- re-add network client metrics by @danlaine in https://github.com/ava-labs/avalanchego/pull/1787
+- Add function to initialize set from elements by @joshua-kim in https://github.com/ava-labs/avalanchego/pull/1808
+- Add Maybe to the end bound of proofs (Part 1) by @dboehm-avalabs in https://github.com/ava-labs/avalanchego/pull/1793
+- add go version to --version by @amirhasanzadehpy in https://github.com/ava-labs/avalanchego/pull/1819
+- e2e: Add local network fixture by @marun in https://github.com/ava-labs/avalanchego/pull/1700
+- Fix test flake in TestProposalTxsInMempool by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1822
+- `sync` -- remove todo by @danlaine in https://github.com/ava-labs/avalanchego/pull/1788
+- Add Maybe to the end bound of proofs (Part 2) by @dboehm-avalabs in https://github.com/ava-labs/avalanchego/pull/1813
+- Move Maybe to its own package by @danlaine in https://github.com/ava-labs/avalanchego/pull/1817
+- `merkledb` -- clarify/improve change proof invariants by @danlaine in https://github.com/ava-labs/avalanchego/pull/1810
+- P-chain state prune + height index by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/1719
+- Update maintainer of the debian packages by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1825
+- Make platformvm implement `block.HeightIndexedChainVM` by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/1746
+- Add P-chain `GetBlockByHeight` API method by @dhrubabasu in https://github.com/ava-labs/avalanchego/pull/1747
+- Update local genesis startTime by @ceyonur in https://github.com/ava-labs/avalanchego/pull/1811
+- `sync` -- add handling for fatal error by @danlaine in https://github.com/ava-labs/avalanchego/pull/1690
+- Add error logs for unexpected proposervm BuildBlock failures by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1832
+- Fix subnet validator set public key initialization by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1833
+- Document PendingTxs + BuildBlock consensus engine requirement by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1835
+- Bump github.com/supranational/blst from 0.3.11-0.20230406105308-e9dfc5ee724b to 0.3.11 by @dependabot in https://github.com/ava-labs/avalanchego/pull/1831
+- Add Primary Network Lite Sync Option by @abi87 in https://github.com/ava-labs/avalanchego/pull/1769
+- Check P-chain ShouldPrune during Initialize by @StephenButtolph in https://github.com/ava-labs/avalanchego/pull/1836
+
+### New Contributors
+
+- @amirhasanzadehpy made their first contribution in https://github.com/ava-labs/avalanchego/pull/1819
+- @dependabot made their first contribution in https://github.com/ava-labs/avalanchego/pull/1831
+
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.10.7...v1.10.8
+
 ## [v1.10.7](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.7)
 
 This version is backwards compatible to [v1.10.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0). This release contains meaningful performance improvements and we recommend updating as soon as possible.

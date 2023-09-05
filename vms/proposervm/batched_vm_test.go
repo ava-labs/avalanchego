@@ -6,7 +6,6 @@ package proposervm
 import (
 	"bytes"
 	"context"
-	"crypto"
 	"testing"
 	"time"
 
@@ -1014,14 +1013,18 @@ func initTestRemoteProposerVM(
 			return nil, errUnknownBlock
 		}
 	}
+	coreVM.VerifyHeightIndexF = func(context.Context) error {
+		return nil
+	}
 
 	proVM := New(
 		coreVM,
 		proBlkStartTime,
 		0,
 		DefaultMinBlockDelay,
-		pTestCert.PrivateKey.(crypto.Signer),
-		pTestCert.Leaf,
+		DefaultNumHistoricalBlocks,
+		pTestSigner,
+		pTestCert,
 	)
 
 	valState := &validators.TestState{
@@ -1055,7 +1058,7 @@ func initTestRemoteProposerVM(
 	}
 
 	ctx := snow.DefaultContextTest()
-	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
+	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
 	ctx.ValidatorState = valState
 
 	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)

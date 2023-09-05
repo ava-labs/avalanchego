@@ -777,6 +777,7 @@ func getStakingConfig(v *viper.Viper, networkID uint32) (node.StakingConfig, err
 	config := node.StakingConfig{
 		SybilProtectionEnabled:        v.GetBool(SybilProtectionEnabledKey),
 		SybilProtectionDisabledWeight: v.GetUint64(SybilProtectionDisabledWeightKey),
+		PartialSyncPrimaryNetwork:     v.GetBool(PartialSyncPrimaryNetworkKey),
 		StakingKeyPath:                GetExpandedArg(v, StakingTLSKeyPathKey),
 		StakingCertPath:               GetExpandedArg(v, StakingCertPathKey),
 		StakingSignerPath:             GetExpandedArg(v, StakingSignerKeyPathKey),
@@ -1160,10 +1161,11 @@ func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]sub
 
 func getDefaultSubnetConfig(v *viper.Viper) subnets.Config {
 	return subnets.Config{
-		ConsensusParameters:   getConsensusConfig(v),
-		ValidatorOnly:         false,
-		GossipConfig:          getGossipConfig(v),
-		ProposerMinBlockDelay: proposervm.DefaultMinBlockDelay,
+		ConsensusParameters:         getConsensusConfig(v),
+		ValidatorOnly:               false,
+		GossipConfig:                getGossipConfig(v),
+		ProposerMinBlockDelay:       proposervm.DefaultMinBlockDelay,
+		ProposerNumHistoricalBlocks: proposervm.DefaultNumHistoricalBlocks,
 	}
 }
 

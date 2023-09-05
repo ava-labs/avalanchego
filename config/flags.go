@@ -31,7 +31,7 @@ const (
 	AvalancheGoDataDirVar    = "AVALANCHEGO_DATA_DIR"
 	defaultUnexpandedDataDir = "$" + AvalancheGoDataDirVar
 
-	ProcessContextFilename = "process.json"
+	DefaultProcessContextFilename = "process.json"
 )
 
 var (
@@ -52,7 +52,7 @@ var (
 	defaultSubnetConfigDir      = filepath.Join(defaultConfigDir, "subnets")
 	defaultPluginDir            = filepath.Join(defaultUnexpandedDataDir, "plugins")
 	defaultChainDataDir         = filepath.Join(defaultUnexpandedDataDir, "chainData")
-	defaultProcessContextPath   = filepath.Join(defaultUnexpandedDataDir, ProcessContextFilename)
+	defaultProcessContextPath   = filepath.Join(defaultUnexpandedDataDir, DefaultProcessContextFilename)
 )
 
 func deprecateFlags(fs *pflag.FlagSet) error {
@@ -260,6 +260,7 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.String(StakingSignerKeyContentKey, "", "Specifies base64 encoded signer private key for staking")
 	fs.Bool(SybilProtectionEnabledKey, true, "Enables sybil protection. If enabled, Network TLS is required")
 	fs.Uint64(SybilProtectionDisabledWeightKey, 100, "Weight to provide to each peer when sybil protection is disabled")
+	fs.Bool(PartialSyncPrimaryNetworkKey, false, "Only sync the P-chain on the Primary Network. If the node is a Primary Network validator, it will report unhealthy")
 	// Uptime Requirement
 	fs.Float64(UptimeRequirementKey, genesis.LocalParams.UptimeRequirement, "Fraction of time a validator must be online to receive rewards")
 	// Minimum Stake required to validate the Primary Network

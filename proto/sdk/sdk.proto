@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package sdk;
+
+option go_package = "github.com/ava-labs/avalanchego/proto/pb/sdk";
+
+message PullGossipRequest {
+  bytes filter = 1;
+  bytes salt = 2;
+}
+
+message PullGossipResponse {
+  repeated bytes gossip = 1;
+}
