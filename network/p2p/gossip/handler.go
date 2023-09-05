@@ -9,6 +9,7 @@ import (
 	"time"
 
 	bloomfilter "github.com/holiman/bloomfilter/v2"
+
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/ids"
