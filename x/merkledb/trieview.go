@@ -241,7 +241,7 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 			}
 		}
 
-		_ = t.db.calculateNodeIDsSema.Acquire(ctx, 1)
+		_ = t.db.calculateNodeIDsSema.Acquire(context.Background(), 1)
 		t.calculateNodeIDsHelper(ctx, t.root)
 		t.db.calculateNodeIDsSema.Release(1)
 		t.changes.rootID = t.root.id
