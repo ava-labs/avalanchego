@@ -132,7 +132,7 @@ func (g *Gossiper[T, U]) handleResponse(
 			g.log.Debug(
 				"failed to add gossip to the known set",
 				zap.Stringer("nodeID", nodeID),
-				zap.Binary("id", hash[:]),
+				zap.Stringer("id", hash),
 				zap.Error(err),
 			)
 			continue
