@@ -465,7 +465,7 @@ func (ss *stateSyncer) startup(ctx context.Context) error {
 	}
 
 	// list all beacons, to reach them for voting on frontier
-	for nodeID := range ss.StateSyncBeacons.GetMap(ss.Ctx.SubnetID) {
+	for _, nodeID := range ss.StateSyncBeacons.GetValidatorIDs(ss.Ctx.SubnetID) {
 		ss.targetVoters.Add(nodeID)
 	}
 
