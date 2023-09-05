@@ -42,18 +42,18 @@ func (h Handler[T]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, req
 		return nil, err
 	}
 
-	if len(request.Salt) != ids.IDLen {
-		return nil, ErrInvalidID
+	salt, err := ids.ToID(request.Salt)
+	if err != nil {
+		return nil, err
 	}
+
 	filter := &BloomFilter{
 		Bloom: &bloomfilter.Filter{},
-		Salt:  ids.ID{},
+		Salt:  salt,
 	}
 	if err := filter.Bloom.UnmarshalBinary(request.Filter); err != nil {
 		return nil, err
 	}
-
-	copy(filter.Salt[:], request.Salt)
 
 	var (
 		err          error
