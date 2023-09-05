@@ -55,9 +55,11 @@ func (h Handler[T]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, req
 
 	copy(filter.Salt[:], request.Salt)
 
-	var err error
-	responseSize := 0
-	gossipBytes := make([][]byte, 0)
+	var (
+		err          error
+		responseSize = 0
+		gossipBytes  = make([][]byte, 0)
+	)
 
 	h.set.Iterate(func(gossipable T) bool {
 		// filter out what the requesting peer already knows about
