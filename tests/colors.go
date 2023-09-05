@@ -4,7 +4,7 @@
 package tests
 
 import (
-	"fmt"
+	ginkgo "github.com/onsi/ginkgo/v2"
 
 	"github.com/onsi/ginkgo/v2/formatter"
 )
@@ -20,5 +20,5 @@ import (
 // for an exhaustive list of color options.
 func Outf(format string, args ...interface{}) {
 	s := formatter.F(format, args...)
-	fmt.Fprint(formatter.ColorableStdOut, s)
+	ginkgo.GinkgoWriter.Print(s)
 }
