@@ -23,12 +23,6 @@ var _ = ginkgo.Describe("[Banff]", func() {
 	require := require.New(ginkgo.GinkgoT())
 
 	ginkgo.It("can send custom assets X->P and P->X",
-		// use this for filtering tests by labels
-		// ref. https://onsi.github.io/ginkgo/#spec-labels
-		ginkgo.Label(
-			"xp",
-			"banff",
-		),
 		func() {
 			keychain := e2e.Env.NewKeychain(1)
 			wallet := e2e.Env.NewWallet(keychain, e2e.Env.GetRandomNodeURI())

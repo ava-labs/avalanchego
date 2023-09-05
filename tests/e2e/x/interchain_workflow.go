@@ -23,7 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
-var _ = e2e.DescribeXChain("[Interchain Workflow]", func() {
+var _ = e2e.DescribeXChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainLabel), func() {
 	require := require.New(ginkgo.GinkgoT())
 
 	const transferAmount = 10 * units.Avax

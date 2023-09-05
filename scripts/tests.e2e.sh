@@ -3,9 +3,10 @@
 set -euo pipefail
 
 # e.g.,
-# ./scripts/build.sh
-# ./scripts/tests.e2e.sh ./build/avalanchego
-# E2E_SERIAL=1 ./scripts/tests.e2e.sh ./build/avalanchego
+# ./scripts/tests.e2e.sh
+# ./scripts/tests.e2e.sh --ginkgo.label-filter=x               # All arguments are supplied to ginkgo
+# E2E_SERIAL=1 ./scripts/tests.e2e.sh                          # Run tests serially
+# AVALANCHEGO_PATH=./build/avalanchego ./scripts/tests.e2e.sh  # Customization of avalanchego path
 if ! [[ "$0" =~ scripts/tests.e2e.sh ]]; then
   echo "must be run from repository root"
   exit 255
@@ -32,10 +33,9 @@ if [[ -n "${E2E_USE_PERSISTENT_NETWORK}" && -n "${TESTNETCTL_NETWORK_DIR}" ]]; t
   echo "running e2e tests against a persistent network configured at ${TESTNETCTL_NETWORK_DIR}"
   E2E_ARGS="--use-persistent-network"
 else
-  AVALANCHEGO_PATH="${1-${AVALANCHEGO_PATH:-}}"
+  AVALANCHEGO_PATH="${AVALANCHEGO_PATH:-./build/avalanchego}"
   if [[ -z "${AVALANCHEGO_PATH}" ]]; then
-    echo "Missing AVALANCHEGO_PATH argument!"
-    echo "Usage: ${0} [AVALANCHEGO_PATH]" >>/dev/stderr
+    echo "Empty AVALANCHEGO_PATH env var!"
     exit 255
   fi
   echo "running e2e tests against an ephemeral local cluster deployed with ${AVALANCHEGO_PATH}"
@@ -65,12 +65,4 @@ fi
 
 #################################
 # - Execute in random order to identify unwanted dependency
-ginkgo ${GINKGO_ARGS} -v --randomize-all ./tests/e2e/e2e.test -- ${E2E_ARGS} \
-&& EXIT_CODE=$? || EXIT_CODE=$?
-
-if [[ ${EXIT_CODE} -gt 0 ]]; then
-  echo "FAILURE with exit code ${EXIT_CODE}"
-  exit ${EXIT_CODE}
-else
-  echo "ALL SUCCESS!"
-fi
+ginkgo -p -v --randomize-all ./tests/e2e/e2e.test -- ${E2E_ARGS} "${@}"

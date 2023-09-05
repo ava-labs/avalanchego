@@ -9,16 +9,17 @@ set -euo pipefail
 
 # e.g.,
 # ./scripts/build.sh
-# ./scripts/tests.e2e.persistent_network.sh ./build/avalanchego
+# ./scripts/tests.e2e.persistent.sh --ginkgo.label-filter=x               # All arguments are supplied to ginkgo
+# E2E_SERIAL=1 ./scripts/tests.e2e.sh                                     # Run tests serially
+# AVALANCHEGO_PATH=./build/avalanchego ./scripts/tests.e2e.persistent.sh  # Customization of avalanchego path
 if ! [[ "$0" =~ scripts/tests.e2e.persistent.sh ]]; then
   echo "must be run from repository root"
   exit 255
 fi
 
-AVALANCHEGO_PATH="${1-${AVALANCHEGO_PATH:-}}"
+AVALANCHEGO_PATH="${AVALANCHEGO_PATH:-./build/avalanchego}"
 if [[ -z "${AVALANCHEGO_PATH}" ]]; then
-  echo "Missing AVALANCHEGO_PATH argument!"
-  echo "Usage: ${0} [AVALANCHEGO_PATH]" >>/dev/stderr
+  echo "Empty AVALANCHEGO_PATH env var!"
   exit 255
 fi
 # Ensure an absolute path to avoid dependency on the working directory
@@ -55,6 +56,10 @@ else
 fi
 
 print_separator
-# Setting E2E_USE_PERSISTENT_NETWORK configures tests.e2e.sh to use
-# the persistent network identified by TESTNETCTL_NETWORK_DIR.
-E2E_USE_PERSISTENT_NETWORK=1 ./scripts/tests.e2e.sh
+# - Setting E2E_USE_PERSISTENT_NETWORK configures tests.e2e.sh to use
+#   the persistent network identified by TESTNETCTL_NETWORK_DIR.
+# - Only a single test is required to validate that a persistent
+#   network can be used by an e2e test suite run. Executing more tests
+#   would be duplicative of the testing performed against an ephemeral
+#   test network.
+E2E_USE_PERSISTENT_NETWORK=1 ./scripts/tests.e2e.sh --ginkgo.focus-file=permissionless_subnets.go
