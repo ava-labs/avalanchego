@@ -26,6 +26,10 @@ func NewBloomFilter(
 		maxExpectedElements,
 		falsePositiveProbability,
 	)
+	if err != nil {
+		return nil, err
+	}
+
 	salt, err := randomSalt()
 	return &BloomFilter{
 		Bloom: bloom,
