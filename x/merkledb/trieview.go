@@ -258,7 +258,7 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 // Calculates the ID of all descendants of [n] which need to be recalculated,
 // and then calculates the ID of [n] itself.
 func (t *trieView) calculateNodeIDsHelper(ctx context.Context, n *node) {
-	_, span := t.db.infoTracer.Start(ctx, "MerkleDB.trieview.calculateNodeIDsHelper")
+	_, span := t.db.debugTracer.Start(ctx, "MerkleDB.trieview.calculateNodeIDsHelper")
 	defer span.End()
 
 	var (
