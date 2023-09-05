@@ -127,8 +127,7 @@ type Config struct {
 	// generating a new state root.
 	//
 	// If 0 is specified, [runtime.NumCPU] will be used.
-	// Must be non-negative.
-	RootGenConcurrency int
+	RootGenConcurrency uint
 	// The number of bytes to write to disk when intermediate nodes are evicted
 	// from their cache and written to disk.
 	EvictionBatchSize int
@@ -203,7 +202,7 @@ func newDatabase(
 	config Config,
 	metrics merkleMetrics,
 ) (*merkleDB, error) {
-	rootGenConcurrency := runtime.NumCPU()
+	rootGenConcurrency := uint(runtime.NumCPU())
 	if config.RootGenConcurrency != 0 {
 		rootGenConcurrency = config.RootGenConcurrency
 	}
