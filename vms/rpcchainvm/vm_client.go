@@ -365,7 +365,7 @@ func (vm *VMClient) Shutdown(ctx context.Context) error {
 
 	vm.runtime.Stop(ctx)
 
-	defer vm.processTracker.UntrackProcess(vm.pid)
+	vm.processTracker.UntrackProcess(vm.pid)
 	return errs.Err
 }
 
