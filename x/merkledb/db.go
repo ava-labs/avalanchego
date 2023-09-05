@@ -15,6 +15,7 @@ import (
 
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
+	"golang.org/x/sync/semaphore"
 
 	"go.opentelemetry.io/otel/attribute"
 
@@ -125,9 +126,8 @@ type Config struct {
 	// RootGenConcurrency is the number of goroutines to use when
 	// generating a new state root.
 	//
-	// If 0 is specified, [runtime.NumCPU] will be used. If -1 is specified,
-	// no limit will be used.
-	RootGenConcurrency int
+	// If 0 is specified, [runtime.NumCPU] will be used.
+	RootGenConcurrency uint
 	// The number of bytes to write to disk when intermediate nodes are evicted
 	// from their cache and written to disk.
 	EvictionBatchSize int
@@ -182,12 +182,9 @@ type merkleDB struct {
 	// Valid children of this trie.
 	childViews []*trieView
 
-	// rootGenConcurrency is the number of goroutines to use when
-	// generating a new state root.
-	//
-	// TODO: Limit concurrency across all views, instead of only within
-	// a single view (see `workers` in hypersdk)
-	rootGenConcurrency int
+	// calculateNodeIDsSema controls the number of goroutines inside
+	// [calculateNodeIDsHelper] at any given time.
+	calculateNodeIDsSema *semaphore.Weighted
 }
 
 // New returns a new merkle database.
@@ -205,7 +202,7 @@ func newDatabase(
 	config Config,
 	metrics merkleMetrics,
 ) (*merkleDB, error) {
-	rootGenConcurrency := runtime.NumCPU()
+	rootGenConcurrency := uint(runtime.NumCPU())
 	if config.RootGenConcurrency != 0 {
 		rootGenConcurrency = config.RootGenConcurrency
 	}
@@ -218,15 +215,15 @@ func newDatabase(
 		},
 	}
 	trieDB := &merkleDB{
-		metrics:            metrics,
-		baseDB:             db,
-		valueNodeDB:        newValueNodeDB(db, bufferPool, metrics, config.ValueNodeCacheSize),
-		intermediateNodeDB: newIntermediateNodeDB(db, bufferPool, metrics, config.IntermediateNodeCacheSize, config.EvictionBatchSize),
-		history:            newTrieHistory(config.HistoryLength),
-		debugTracer:        getTracerIfEnabled(config.TraceLevel, DebugTrace, config.Tracer),
-		infoTracer:         getTracerIfEnabled(config.TraceLevel, InfoTrace, config.Tracer),
-		childViews:         make([]*trieView, 0, defaultPreallocationSize),
-		rootGenConcurrency: rootGenConcurrency,
+		metrics:              metrics,
+		baseDB:               db,
+		valueNodeDB:          newValueNodeDB(db, bufferPool, metrics, config.ValueNodeCacheSize),
+		intermediateNodeDB:   newIntermediateNodeDB(db, bufferPool, metrics, config.IntermediateNodeCacheSize, config.EvictionBatchSize),
+		history:              newTrieHistory(config.HistoryLength),
+		debugTracer:          getTracerIfEnabled(config.TraceLevel, DebugTrace, config.Tracer),
+		infoTracer:           getTracerIfEnabled(config.TraceLevel, InfoTrace, config.Tracer),
+		childViews:           make([]*trieView, 0, defaultPreallocationSize),
+		calculateNodeIDsSema: semaphore.NewWeighted(int64(rootGenConcurrency)),
 	}
 
 	root, err := trieDB.initializeRootIfNeeded()
