@@ -300,7 +300,7 @@ func (t *trieView) calculateNodeIDsHelper(ctx context.Context, n *node) error {
 	wg.Wait()
 	close(updatedChildren)
 
-	// check for errors from updateChild function
+	// check for errors from [calculateChild]
 	if updateErr != nil {
 		return updateErr
 	}
