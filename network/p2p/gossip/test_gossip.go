@@ -3,7 +3,10 @@
 
 package gossip
 
-import "github.com/ava-labs/avalanchego/utils/set"
+import (
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/set"
+)
 
 var (
 	_ Gossipable   = (*testTx)(nil)
@@ -11,20 +14,20 @@ var (
 )
 
 type testTx struct {
-	hash Hash
+	id ids.ID
 }
 
-func (t *testTx) GetHash() Hash {
-	return t.hash
+func (t *testTx) GetID() ids.ID {
+	return t.id
 }
 
 func (t *testTx) Marshal() ([]byte, error) {
-	return t.hash[:], nil
+	return t.id[:], nil
 }
 
 func (t *testTx) Unmarshal(bytes []byte) error {
-	t.hash = Hash{}
-	copy(t.hash[:], bytes)
+	t.id = ids.ID{}
+	copy(t.id[:], bytes)
 	return nil
 }
 
@@ -44,16 +47,12 @@ func (t testSet) Add(gossipable *testTx) error {
 	return nil
 }
 
-func (t testSet) Get(filter func(gossipable *testTx) bool) []*testTx {
-	result := make([]*testTx, 0)
+func (t testSet) Iterate(f func(gossipable *testTx) bool) {
 	for tx := range t.set {
-		if !filter(tx) {
-			continue
+		if !f(tx) {
+			return
 		}
-		result = append(result, tx)
 	}
-
-	return result
 }
 
 func (t testSet) GetFilter() ([]byte, []byte, error) {

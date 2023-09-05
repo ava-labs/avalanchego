@@ -7,10 +7,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
 
-	"github.com/ava-labs/avalanchego/network/p2p/gossip/proto/pb"
+	"github.com/ava-labs/avalanchego/proto/pb/sdk"
 	"github.com/ava-labs/avalanchego/utils/logging"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -73,7 +73,7 @@ func (g *Gossiper[_, _]) gossip(ctx context.Context) error {
 		return err
 	}
 
-	request := &pb.PullGossipRequest{
+	request := &sdk.PullGossipRequest{
 		Filter: bloom,
 		Salt:   salt,
 	}
@@ -105,7 +105,7 @@ func (g *Gossiper[T, U]) handleResponse(
 		return
 	}
 
-	response := &pb.PullGossipResponse{}
+	response := &sdk.PullGossipResponse{}
 	if err := proto.Unmarshal(responseBytes, response); err != nil {
 		g.log.Debug("failed to unmarshal gossip response", zap.Error(err))
 		return
@@ -122,7 +122,7 @@ func (g *Gossiper[T, U]) handleResponse(
 			continue
 		}
 
-		hash := gossipable.GetHash()
+		hash := gossipable.GetID()
 		g.log.Debug(
 			"received gossip",
 			zap.Stringer("nodeID", nodeID),

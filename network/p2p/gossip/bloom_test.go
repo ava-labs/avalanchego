@@ -8,34 +8,36 @@ import (
 
 	bloomfilter "github.com/holiman/bloomfilter/v2"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/ids"
 )
 
 func TestBloomFilterRefresh(t *testing.T) {
 	tests := []struct {
-		name         string
-		refreshRatio float64
-		add          []*testTx
-		expected     []*testTx
+		name                     string
+		falsePositiveProbability float64
+		add                      []*testTx
+		expected                 []*testTx
 	}{
 		{
-			name:         "no refresh",
-			refreshRatio: 1,
+			name:                     "no refresh",
+			falsePositiveProbability: 1,
 			add: []*testTx{
-				{hash: Hash{0}},
+				{id: ids.ID{0}},
 			},
 			expected: []*testTx{
-				{hash: Hash{0}},
+				{id: ids.ID{0}},
 			},
 		},
 		{
-			name:         "refresh",
-			refreshRatio: 0.1,
+			name:                     "refresh",
+			falsePositiveProbability: 0.1,
 			add: []*testTx{
-				{hash: Hash{0}},
-				{hash: Hash{1}},
+				{id: ids.ID{0}},
+				{id: ids.ID{1}},
 			},
 			expected: []*testTx{
-				{hash: Hash{1}},
+				{id: ids.ID{1}},
 			},
 		},
 	}
@@ -50,7 +52,7 @@ func TestBloomFilterRefresh(t *testing.T) {
 			}
 
 			for _, item := range tt.add {
-				_ = ResetBloomFilterIfNeeded(&bloom, tt.refreshRatio)
+				_ = ResetBloomFilterIfNeeded(&bloom, tt.falsePositiveProbability)
 				bloom.Add(item)
 			}
 

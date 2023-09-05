@@ -10,17 +10,15 @@ import (
 
 	bloomfilter "github.com/holiman/bloomfilter/v2"
 	"golang.org/x/exp/rand"
-)
 
-const hashLength = 32
+	"github.com/ava-labs/avalanchego/ids"
+)
 
 var _ hash.Hash64 = (*hasher)(nil)
 
-type Hash [hashLength]byte
-
 // NewBloomFilter returns a new instance of a bloom filter with at most
-// [maxExpectedElements] elements anticipated at any moment, and a collision
-// rate of [falsePositiveProbability].
+// [maxExpectedElements] elements anticipated at any moment, and a false
+// positive probability of [falsePositiveProbability].
 func NewBloomFilter(
 	maxExpectedElements uint64,
 	falsePositiveProbability float64,
@@ -45,11 +43,11 @@ type BloomFilter struct {
 	// Salt is provided to eventually unblock collisions in Bloom. It's possible
 	// that conflicting Gossipable items collide in the bloom filter, so a salt
 	// is generated to eventually resolve collisions.
-	Salt Hash
+	Salt ids.ID
 }
 
 func (b *BloomFilter) Add(gossipable Gossipable) {
-	h := gossipable.GetHash()
+	h := gossipable.GetID()
 	salted := &hasher{
 		hash: h[:],
 		salt: b.Salt,
@@ -58,7 +56,7 @@ func (b *BloomFilter) Add(gossipable Gossipable) {
 }
 
 func (b *BloomFilter) Has(gossipable Gossipable) bool {
-	h := gossipable.GetHash()
+	h := gossipable.GetID()
 	salted := &hasher{
 		hash: h[:],
 		salt: b.Salt,
@@ -66,13 +64,13 @@ func (b *BloomFilter) Has(gossipable Gossipable) bool {
 	return b.Bloom.Contains(salted)
 }
 
-// ResetBloomFilterIfNeeded resets a bloom filter if it breaches a ratio of
-// filled elements. Returns true if the bloom filter was reset.
+// ResetBloomFilterIfNeeded resets a bloom filter if it breaches a target false
+// positive probability. Returns true if the bloom filter was reset.
 func ResetBloomFilterIfNeeded(
 	bloomFilter *BloomFilter,
-	maxFilledRatio float64,
+	falsePositiveProbability float64,
 ) bool {
-	if bloomFilter.Bloom.PreciseFilledRatio() < maxFilledRatio {
+	if bloomFilter.Bloom.FalsePosititveProbability() < falsePositiveProbability {
 		return false
 	}
 
@@ -84,8 +82,8 @@ func ResetBloomFilterIfNeeded(
 	return true
 }
 
-func randomSalt() Hash {
-	salt := Hash{}
+func randomSalt() ids.ID {
+	salt := ids.ID{}
 	r := rand.New(rand.NewSource(uint64(time.Now().Nanosecond())))
 	_, _ = r.Read(salt[:])
 	return salt
@@ -93,7 +91,7 @@ func randomSalt() Hash {
 
 type hasher struct {
 	hash []byte
-	salt Hash
+	salt ids.ID
 }
 
 func (h *hasher) Write(p []byte) (n int, err error) {
@@ -107,17 +105,16 @@ func (h *hasher) Sum(b []byte) []byte {
 }
 
 func (h *hasher) Reset() {
-	reset := Hash{}
-	h.hash = reset[:]
+	h.hash = ids.Empty[:]
 }
 
 func (*hasher) BlockSize() int {
-	return hashLength
+	return ids.IDLen
 }
 
 func (h *hasher) Sum64() uint64 {
-	salted := Hash{}
-	for i := 0; i < len(h.hash) && i < hashLength; i++ {
+	salted := ids.ID{}
+	for i := 0; i < len(h.hash) && i < ids.IDLen; i++ {
 		salted[i] = h.hash[i] ^ h.salt[i]
 	}
 

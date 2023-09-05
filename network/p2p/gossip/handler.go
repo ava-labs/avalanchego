@@ -8,19 +8,18 @@ import (
 	"errors"
 	"time"
 
-	"github.com/golang/protobuf/proto"
-
 	bloomfilter "github.com/holiman/bloomfilter/v2"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
-	"github.com/ava-labs/avalanchego/network/p2p/gossip/proto/pb"
+	"github.com/ava-labs/avalanchego/proto/pb/sdk"
 )
 
 var (
 	_ p2p.Handler = (*Handler[Gossipable])(nil)
 
-	ErrInvalidHash = errors.New("invalid hash")
+	ErrInvalidID = errors.New("invalid id")
 )
 
 func NewHandler[T Gossipable](set Set[T], maxResponseSize int) *Handler[T] {
@@ -38,17 +37,17 @@ type Handler[T Gossipable] struct {
 }
 
 func (h Handler[T]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, requestBytes []byte) ([]byte, error) {
-	request := &pb.PullGossipRequest{}
+	request := &sdk.PullGossipRequest{}
 	if err := proto.Unmarshal(requestBytes, request); err != nil {
 		return nil, err
 	}
 
-	if len(request.Salt) != hashLength {
-		return nil, ErrInvalidHash
+	if len(request.Salt) != ids.IDLen {
+		return nil, ErrInvalidID
 	}
 	filter := &BloomFilter{
 		Bloom: &bloomfilter.Filter{},
-		Salt:  Hash{},
+		Salt:  ids.ID{},
 	}
 	if err := filter.Bloom.UnmarshalBinary(request.Filter); err != nil {
 		return nil, err
@@ -56,28 +55,38 @@ func (h Handler[T]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, req
 
 	copy(filter.Salt[:], request.Salt)
 
-	// filter out what the requesting peer already knows about
-	unknown := h.set.Get(func(gossipable T) bool {
-		return !filter.Has(gossipable)
-	})
-
+	var err error
 	responseSize := 0
-	gossipBytes := make([][]byte, 0, len(unknown))
-	for _, gossipable := range unknown {
-		bytes, err := gossipable.Marshal()
-		if err != nil {
-			return nil, err
+	gossipBytes := make([][]byte, 0)
+
+	h.set.Iterate(func(gossipable T) bool {
+		// filter out what the requesting peer already knows about
+		if filter.Has(gossipable) {
+			return true
 		}
 
+		var bytes []byte
+		bytes, err = gossipable.Marshal()
+		if err != nil {
+			return false
+		}
+
+		// check that this doesn't exceed our maximum configured response size
 		responseSize += len(bytes)
 		if responseSize > h.maxResponseSize {
-			break
+			return false
 		}
 
 		gossipBytes = append(gossipBytes, bytes)
+
+		return true
+	})
+
+	if err != nil {
+		return nil, err
 	}
 
-	response := &pb.PullGossipResponse{
+	response := &sdk.PullGossipResponse{
 		Gossip: gossipBytes,
 	}
 

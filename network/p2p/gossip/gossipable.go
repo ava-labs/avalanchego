@@ -3,10 +3,11 @@
 
 package gossip
 
+import "github.com/ava-labs/avalanchego/ids"
+
 // Gossipable is an item that can be gossiped across the network
 type Gossipable interface {
-	// GetHash represents the unique hash of this item
-	GetHash() Hash
+	GetID() ids.ID
 	Marshal() ([]byte, error)
 	Unmarshal(bytes []byte) error
 }
@@ -15,8 +16,8 @@ type Gossipable interface {
 type Set[T Gossipable] interface {
 	// Add adds a Gossipable to the set
 	Add(gossipable T) error
-	// Get returns elements that match the provided filter function
-	Get(filter func(gossipable T) bool) []T
+	// Iterate iterates over elements until [f] returns false
+	Iterate(f func(gossipable T) bool)
 	// GetFilter returns the byte representation of bloom filter and its
 	// corresponding salt.
 	GetFilter() (bloom []byte, salt []byte, err error)
