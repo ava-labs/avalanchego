@@ -5,8 +5,10 @@ package resource
 
 import (
 	"math"
+	"os"
 	"strconv"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -54,6 +56,9 @@ type ProcessTracker interface {
 	// TrackProcess adds [pid] to the list of processes that this tracker is
 	// currently managing. Duplicate requests are dropped.
 	TrackProcess(pid int)
+
+	// HasProcess returns true if [pid] is currently being tracked and still exists.
+	HasProcess(pid int) bool
 
 	// UntrackProcess removes [pid] from the list of processes that this tracker
 	// is currently managing. Untracking a currently untracked [pid] is a noop.
@@ -148,6 +153,22 @@ func (m *manager) TrackProcess(pid int) {
 	m.processesLock.Lock()
 	m.processes[pid] = process
 	m.processesLock.Unlock()
+}
+
+func (m *manager) HasProcess(pid int) bool {
+	m.processesLock.Lock()
+	defer m.processesLock.Unlock()
+	proc, ok := m.processes[pid]
+	if !ok {
+		return false
+	}
+	p, err := os.FindProcess(int(proc.p.Pid))
+	if err != nil {
+		return false
+	}
+	// To properly check if a process exists, we need to send signal 0.
+	// https://pkg.go.dev/os#FindProcess
+	return p.Signal(syscall.Signal(0)) == nil
 }
 
 func (m *manager) UntrackProcess(pid int) {

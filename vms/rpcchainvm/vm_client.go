@@ -40,6 +40,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators/gvalidators"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -107,12 +108,15 @@ type VMClient struct {
 	conns        []*grpc.ClientConn
 
 	grpcServerMetrics *grpc_prometheus.ServerMetrics
+
+	log logging.Logger
 }
 
 // NewClient returns a VM connected to a remote VM
-func NewClient(client vmpb.VMClient) *VMClient {
+func NewClient(client vmpb.VMClient, log logging.Logger) *VMClient {
 	return &VMClient{
 		client: client,
+		log:    log,
 	}
 }
 
@@ -352,6 +356,10 @@ func (vm *VMClient) SetState(ctx context.Context, state snow.State) error {
 }
 
 func (vm *VMClient) Shutdown(ctx context.Context) error {
+	if !vm.processTracker.HasProcess(vm.pid) {
+		vm.log.Fatal("vm process killed before shutdown")
+	}
+
 	errs := wrappers.Errs{}
 	_, err := vm.client.Shutdown(ctx, &emptypb.Empty{})
 	errs.Add(err)
