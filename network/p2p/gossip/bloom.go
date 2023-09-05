@@ -72,8 +72,7 @@ func ResetBloomFilterIfNeeded(
 
 	// it's not possible for this to error assuming that the original
 	// bloom filter's parameters were valid
-	fresh, _ := bloomfilter.New(bloomFilter.Bloom.M(), bloomFilter.Bloom.K())
-	bloomFilter.Bloom = fresh
+	bloomFilter.Bloom, _ = bloomfilter.New(bloomFilter.Bloom.M(), bloomFilter.Bloom.K())
 	bloomFilter.Salt = randomSalt()
 	return true
 }
