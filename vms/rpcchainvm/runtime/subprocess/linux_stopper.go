@@ -30,14 +30,19 @@ func NewCmd(path string, args ...string) *exec.Cmd {
 func stop(ctx context.Context, log logging.Logger, cmd *exec.Cmd) {
 	waitChan := make(chan error)
 	go func() {
-		// attempt graceful shutdown
+		defer close(waitChan)
+		// check if process is already stopped by sending signal 0.
+		if err := cmd.Process.Signal(syscall.Signal(0)); err != nil {
+			waitChan <- nil
+			return
+		}
 		errs := wrappers.Errs{}
+		// attempt graceful shutdown
 		err := cmd.Process.Signal(syscall.SIGTERM)
 		errs.Add(err)
 		_, err = cmd.Process.Wait()
 		errs.Add(err)
 		waitChan <- errs.Err
-		close(waitChan)
 	}()
 
 	ctx, cancel := context.WithTimeout(ctx, runtime.DefaultGracefulTimeout)

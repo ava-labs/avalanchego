@@ -163,7 +163,7 @@ func (m *manager) HasProcess(pid int) bool {
 		return false
 	}
 	p, _ := os.FindProcess(int(proc.p.Pid))
-	// To properly check if a process exists, we need to send a 0 signal.
+	// To properly check if a process exists, we need to send signal 0.
 	// https://pkg.go.dev/os#FindProcess
 	return p.Signal(syscall.Signal(0)) == nil
 }
