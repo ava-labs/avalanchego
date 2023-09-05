@@ -233,27 +233,43 @@ func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.Node
 	// Mark that we received a response from [nodeID]
 	ss.pendingVoters.Remove(nodeID)
 
-	weight := ss.StateSyncBeacons.GetWeight(nodeID)
+	nodeWeight := ss.StateSyncBeacons.GetWeight(nodeID)
+	ss.Ctx.Log.Debug("adding weight to summaries",
+		zap.Stringer("nodeID", nodeID),
+		zap.Stringers("summaryIDs", summaryIDs),
+		zap.Uint64("nodeWeight", nodeWeight),
+	)
 	for _, summaryID := range summaryIDs {
 		ws, ok := ss.weightedSummaries[summaryID]
 		if !ok {
 			ss.Ctx.Log.Debug("skipping summary",
-				zap.String("reason", "received a vote from validator for unknown summary"),
+				zap.String("reason", "unknown summary"),
 				zap.Stringer("nodeID", nodeID),
 				zap.Stringer("summaryID", summaryID),
 			)
 			continue
 		}
 
-		newWeight, err := math.Add64(weight, ws.weight)
+		newWeight, err := math.Add64(nodeWeight, ws.weight)
 		if err != nil {
-			ss.Ctx.Log.Error("failed to calculate the Accepted votes",
-				zap.Uint64("weight", weight),
+			ss.Ctx.Log.Error("failed to calculate new summary weight",
+				zap.Stringer("nodeID", nodeID),
+				zap.Stringer("summaryID", summaryID),
+				zap.Uint64("height", ws.summary.Height()),
+				zap.Uint64("nodeWeight", nodeWeight),
 				zap.Uint64("previousWeight", ws.weight),
 				zap.Error(err),
 			)
 			newWeight = stdmath.MaxUint64
 		}
+
+		ss.Ctx.Log.Verbo("updating summary weight",
+			zap.Stringer("nodeID", nodeID),
+			zap.Stringer("summaryID", summaryID),
+			zap.Uint64("height", ws.summary.Height()),
+			zap.Uint64("previousWeight", ws.weight),
+			zap.Uint64("newWeight", newWeight),
+		)
 		ws.weight = newWeight
 	}
 
@@ -270,6 +286,8 @@ func (ss *stateSyncer) AcceptedStateSummary(ctx context.Context, nodeID ids.Node
 		if ws.weight < ss.Alpha {
 			ss.Ctx.Log.Debug("removing summary",
 				zap.String("reason", "insufficient weight"),
+				zap.Stringer("summaryID", summaryID),
+				zap.Uint64("height", ws.summary.Height()),
 				zap.Uint64("currentWeight", ws.weight),
 				zap.Uint64("requiredWeight", ss.Alpha),
 			)
