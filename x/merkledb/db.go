@@ -11,12 +11,11 @@ import (
 	"runtime"
 	"sync"
 
-	"golang.org/x/sync/errgroup"
-
 	"github.com/prometheus/client_golang/prometheus"
 
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
+	"golang.org/x/sync/errgroup"
 
 	"go.opentelemetry.io/otel/attribute"
 
@@ -184,8 +183,8 @@ type merkleDB struct {
 	// Valid children of this trie.
 	childViews []*trieView
 
-	// rootGenConcurrency is the number of goroutines to use when
-	// generating a new state root.
+	// rootGenConcurrency is the max number of goroutines to use when
+	// generating new state roots. Shared across all views.
 	rootGenConcurrency errgroup.Group
 }
 
