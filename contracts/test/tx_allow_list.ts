@@ -35,7 +35,7 @@ describe("ExampleTxAllowList", function () {
 
   test("contract should report test address has on admin role", "step_noRoleIsNotAdmin")
 
-  test("contract should report admin address has admin role", "step_exmapleAllowListReturnsTestIsAdmin")
+  test("contract should report admin address has admin role", "step_exampleAllowListReturnsTestIsAdmin")
 
   test("should not let test address submit txs", [
     {

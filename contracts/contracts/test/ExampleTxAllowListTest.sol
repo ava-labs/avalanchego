@@ -33,7 +33,7 @@ contract ExampleTxAllowListTest is AllowListTest {
     assertTrue(!example.isAdmin(address(other)));
   }
 
-  function step_exmapleAllowListReturnsTestIsAdmin() public {
+  function step_exampleAllowListReturnsTestIsAdmin() public {
     ExampleTxAllowList example = new ExampleTxAllowList();
     assertTrue(example.isAdmin(address(this)));
   }
