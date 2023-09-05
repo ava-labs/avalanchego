@@ -242,9 +242,7 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 		// [eg] limits the number of goroutines we start.
 		var eg errgroup.Group
 		eg.SetLimit(t.db.rootGenConcurrency)
-		if err = t.calculateNodeIDsHelper(ctx, t.root, &eg); err != nil {
-			return
-		}
+		t.calculateNodeIDsHelper(ctx, t.root, &eg)
 		if err = eg.Wait(); err != nil {
 			return
 		}
@@ -261,7 +259,7 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 
 // Calculates the ID of all descendants of [n] which need to be recalculated,
 // and then calculates the ID of [n] itself.
-func (t *trieView) calculateNodeIDsHelper(ctx context.Context, n *node, eg *errgroup.Group) error {
+func (t *trieView) calculateNodeIDsHelper(ctx context.Context, n *node, eg *errgroup.Group) {
 	var (
 		// We use [wg] to wait until all descendants of [n] have been updated.
 		// Note we can't wait on [eg] because [eg] may have started goroutines
@@ -281,24 +279,22 @@ func (t *trieView) calculateNodeIDsHelper(ctx context.Context, n *node, eg *errg
 		}
 
 		wg.Add(1)
-		updateChild := func() error {
+		updateChild := func() {
 			defer wg.Done()
 
-			if err := t.calculateNodeIDsHelper(ctx, childNodeChange.after, eg); err != nil {
-				return err
-			}
+			t.calculateNodeIDsHelper(ctx, childNodeChange.after, eg)
 
 			// Note that this will never block
 			updatedChildren <- childNodeChange.after
-			return nil
 		}
 
 		// Try updating the child and its descendants in a goroutine.
-		if ok := eg.TryGo(updateChild); !ok {
+		if ok := eg.TryGo(func() error {
+			updateChild()
+			return nil
+		}); !ok {
 			// We're at the goroutine limit; do the work in this goroutine.
-			if err := updateChild(); err != nil {
-				return err
-			}
+			updateChild()
 		}
 	}
 
@@ -311,7 +307,7 @@ func (t *trieView) calculateNodeIDsHelper(ctx context.Context, n *node, eg *errg
 	}
 
 	// The IDs [n]'s descendants are up to date so we can calculate [n]'s ID.
-	return n.calculateID(t.db.metrics)
+	n.calculateID(t.db.metrics)
 }
 
 // GetProof returns a proof that [bytesPath] is in or not in trie [t].
