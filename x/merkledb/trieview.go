@@ -287,8 +287,10 @@ func (t *trieView) calculateNodeIDsHelper(ctx context.Context, n *node) {
 
 		// Try updating the child and its descendants in a goroutine.
 		if ok := t.db.calculateNodeIDsSema.TryAcquire(1); ok {
-			go calculateChildID()
-			t.db.calculateNodeIDsSema.Release(1)
+			go func() {
+				calculateChildID()
+				t.db.calculateNodeIDsSema.Release(1)
+			}()
 		} else {
 			// We're at the goroutine limit; do the work in this goroutine.
 			calculateChildID()
