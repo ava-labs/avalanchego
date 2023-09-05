@@ -14,13 +14,11 @@ import (
 
 	oteltrace "go.opentelemetry.io/otel/trace"
 
-	"golang.org/x/exp/slices"
-	"golang.org/x/sync/errgroup"
-
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/maybe"
+	"golang.org/x/exp/slices"
 )
 
 const (
@@ -239,13 +237,7 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 			}
 		}
 
-		// [eg] limits the number of goroutines we start.
-		var eg errgroup.Group
-		eg.SetLimit(t.db.rootGenConcurrency)
-		if err = t.calculateNodeIDsHelper(ctx, t.root, &eg); err != nil {
-			return
-		}
-		if err = eg.Wait(); err != nil {
+		if err = t.calculateNodeIDsHelper(ctx, t.root); err != nil {
 			return
 		}
 		t.changes.rootID = t.root.id
@@ -261,19 +253,31 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 
 // Calculates the ID of all descendants of [n] which need to be recalculated,
 // and then calculates the ID of [n] itself.
-func (t *trieView) calculateNodeIDsHelper(ctx context.Context, n *node, eg *errgroup.Group) error {
+func (t *trieView) calculateNodeIDsHelper(ctx context.Context, n *node) error {
 	var (
 		// We use [wg] to wait until all descendants of [n] have been updated.
-		// Note we can't wait on [eg] because [eg] may have started goroutines
-		// that aren't calculating IDs for descendants of [n].
 		wg              sync.WaitGroup
 		updatedChildren = make(chan *node, len(n.children))
+		errOnce         sync.Once
+		updateErr       error
 	)
 
-	for childIndex, child := range n.children {
-		childIndex, child := childIndex, child
+	// Wrap calculating children nodes, so we can run it in a separate goroutine
+	calculateChild := func(changedNode *node) {
+		defer wg.Done()
 
-		childPath := n.key + path(childIndex) + child.compressedPath
+		if err := t.calculateNodeIDsHelper(ctx, changedNode); err != nil {
+			errOnce.Do(func() {
+				updateErr = err
+			})
+		}
+
+		// Note that this will never block
+		updatedChildren <- changedNode
+	}
+
+	for childIndex, childEntry := range n.children {
+		childPath := n.key + path(childIndex) + childEntry.compressedPath
 		childNodeChange, ok := t.changes.nodes[childPath]
 		if !ok {
 			// This child wasn't changed.
@@ -281,24 +285,14 @@ func (t *trieView) calculateNodeIDsHelper(ctx context.Context, n *node, eg *errg
 		}
 
 		wg.Add(1)
-		updateChild := func() error {
-			defer wg.Done()
-
-			if err := t.calculateNodeIDsHelper(ctx, childNodeChange.after, eg); err != nil {
-				return err
-			}
-
-			// Note that this will never block
-			updatedChildren <- childNodeChange.after
-			return nil
-		}
 
 		// Try updating the child and its descendants in a goroutine.
-		if ok := eg.TryGo(updateChild); !ok {
-			// We're at the goroutine limit; do the work in this goroutine.
-			if err := updateChild(); err != nil {
-				return err
-			}
+		if ok := t.db.rootGenConcurrency.TryGo(func() error {
+			calculateChild(childNodeChange.after)
+			return nil
+		}); !ok {
+			// We're at the goroutine limit; do the work in the current goroutine.
+			calculateChild(childNodeChange.after)
 		}
 	}
 
@@ -306,11 +300,17 @@ func (t *trieView) calculateNodeIDsHelper(ctx context.Context, n *node, eg *errg
 	wg.Wait()
 	close(updatedChildren)
 
+	// check for errors from updateChild function
+	if updateErr != nil {
+		return updateErr
+	}
+
+	// there were no errors, so update ids for all recalculated children
 	for child := range updatedChildren {
 		n.addChild(child)
 	}
 
-	// The IDs [n]'s descendants are up to date so we can calculate [n]'s ID.
+	// The IDs of [n]'s descendants are up to date so we can calculate [n]'s ID.
 	return n.calculateID(t.db.metrics)
 }
 

@@ -11,6 +11,8 @@ import (
 	"runtime"
 	"sync"
 
+	"golang.org/x/sync/errgroup"
+
 	"github.com/prometheus/client_golang/prometheus"
 
 	"golang.org/x/exp/maps"
@@ -184,10 +186,7 @@ type merkleDB struct {
 
 	// rootGenConcurrency is the number of goroutines to use when
 	// generating a new state root.
-	//
-	// TODO: Limit concurrency across all views, instead of only within
-	// a single view (see `workers` in hypersdk)
-	rootGenConcurrency int
+	rootGenConcurrency errgroup.Group
 }
 
 // New returns a new merkle database.
@@ -226,8 +225,8 @@ func newDatabase(
 		debugTracer:        getTracerIfEnabled(config.TraceLevel, DebugTrace, config.Tracer),
 		infoTracer:         getTracerIfEnabled(config.TraceLevel, InfoTrace, config.Tracer),
 		childViews:         make([]*trieView, 0, defaultPreallocationSize),
-		rootGenConcurrency: rootGenConcurrency,
 	}
+	trieDB.rootGenConcurrency.SetLimit(rootGenConcurrency)
 
 	root, err := trieDB.initializeRootIfNeeded()
 	if err != nil {
