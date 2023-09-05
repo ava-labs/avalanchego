@@ -23,4 +23,4 @@ tokio = { version = "1.32.0", features = ["sync", "rt-multi-thread"] }
 tonic = { version = "0.9.2", features = ["tls"] }
 
 [build-dependencies]
-tonic-build = "0.9.2"
+tonic-build = "0.10.0"
