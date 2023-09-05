@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"sync"
 
+	"golang.org/x/exp/slices"
+
 	"go.opentelemetry.io/otel/attribute"
 
 	oteltrace "go.opentelemetry.io/otel/trace"
@@ -18,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/maybe"
-	"golang.org/x/exp/slices"
 )
 
 const (
