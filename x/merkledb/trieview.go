@@ -15,7 +15,6 @@ import (
 	oteltrace "go.opentelemetry.io/otel/trace"
 
 	"golang.org/x/exp/slices"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -213,6 +212,7 @@ func newHistoricalTrieView(
 }
 
 // Recalculates the node IDs for all changed nodes in the trie.
+// Cancelling [ctx] doesn't cancel calculation. It's used only for tracing.
 func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 	var err error
 	t.calculateNodesOnce.Do(func() {
@@ -231,21 +231,19 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 		// add all the changed key/values to the nodes of the trie
 		for key, change := range t.changes.values {
 			if change.after.IsNothing() {
+				// Note we're setting [err] defined outside this function.
 				if err = t.remove(key); err != nil {
 					return
 				}
+				// Note we're setting [err] defined outside this function.
 			} else if _, err = t.insert(key, change.after); err != nil {
 				return
 			}
 		}
 
-		// [eg] limits the number of goroutines we start.
-		var eg errgroup.Group
-		eg.SetLimit(t.db.rootGenConcurrency)
-		t.calculateNodeIDsHelper(ctx, t.root, &eg)
-		if err = eg.Wait(); err != nil {
-			return
-		}
+		_ = t.db.calculateNodeIDsSema.Acquire(ctx, 1)
+		t.calculateNodeIDsHelper(ctx, t.root)
+		t.db.calculateNodeIDsSema.Release(1)
 		t.changes.rootID = t.root.id
 
 		// ensure no ancestor changes occurred during execution
@@ -259,18 +257,17 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 
 // Calculates the ID of all descendants of [n] which need to be recalculated,
 // and then calculates the ID of [n] itself.
-func (t *trieView) calculateNodeIDsHelper(ctx context.Context, n *node, eg *errgroup.Group) {
+func (t *trieView) calculateNodeIDsHelper(ctx context.Context, n *node) {
+	_, span := t.db.infoTracer.Start(ctx, "MerkleDB.trieview.calculateNodeIDsHelper")
+	defer span.End()
+
 	var (
 		// We use [wg] to wait until all descendants of [n] have been updated.
-		// Note we can't wait on [eg] because [eg] may have started goroutines
-		// that aren't calculating IDs for descendants of [n].
 		wg              sync.WaitGroup
 		updatedChildren = make(chan *node, len(n.children))
 	)
 
 	for childIndex, child := range n.children {
-		childIndex, child := childIndex, child
-
 		childPath := n.key + path(childIndex) + child.compressedPath
 		childNodeChange, ok := t.changes.nodes[childPath]
 		if !ok {
@@ -279,23 +276,22 @@ func (t *trieView) calculateNodeIDsHelper(ctx context.Context, n *node, eg *errg
 		}
 
 		wg.Add(1)
-		// Must return an error to pass it into [eg.TryGo].
-		updateChild := func() {
+		calculateChildID := func() {
 			defer wg.Done()
 
-			t.calculateNodeIDsHelper(ctx, childNodeChange.after, eg)
+			t.calculateNodeIDsHelper(ctx, childNodeChange.after)
 
 			// Note that this will never block
 			updatedChildren <- childNodeChange.after
 		}
 
 		// Try updating the child and its descendants in a goroutine.
-		if ok := eg.TryGo(func() error {
-			updateChild()
-			return nil
-		}); !ok {
+		if ok := t.db.calculateNodeIDsSema.TryAcquire(1); ok {
+			go calculateChildID()
+			t.db.calculateNodeIDsSema.Release(1)
+		} else {
 			// We're at the goroutine limit; do the work in this goroutine.
-			updateChild()
+			calculateChildID()
 		}
 	}
 
