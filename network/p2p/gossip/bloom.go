@@ -91,8 +91,6 @@ func randomSalt() Hash {
 	return salt
 }
 
-var _ hash.Hash64 = (*hasher)(nil)
-
 type hasher struct {
 	hash []byte
 	salt Hash
