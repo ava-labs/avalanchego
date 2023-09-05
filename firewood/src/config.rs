@@ -63,7 +63,4 @@ pub struct DbRevConfig {
     /// Maximum cached Trie objects.
     #[builder(default = 1 << 20)]
     pub merkle_ncached_objs: usize,
-    /// Maximum cached Blob (currently just `Account`) objects.
-    #[builder(default = 4096)]
-    pub blob_ncached_objs: usize,
 }

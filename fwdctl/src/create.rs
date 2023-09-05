@@ -269,7 +269,6 @@ pub fn initialize_db_config(opts: &Options) -> DbConfig {
         truncate: opts.truncate,
         rev: DbRevConfig {
             merkle_ncached_objs: opts.merkle_ncached_objs,
-            blob_ncached_objs: opts.blob_ncached_objs,
         },
         buffer: DiskBufferConfig {
             max_buffered: opts.max_buffered,

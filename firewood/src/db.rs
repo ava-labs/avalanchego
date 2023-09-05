@@ -45,9 +45,7 @@ use self::proposal::ProposalBase;
 
 const MERKLE_META_SPACE: SpaceId = 0x0;
 const MERKLE_PAYLOAD_SPACE: SpaceId = 0x1;
-const BLOB_META_SPACE: SpaceId = 0x2;
-const BLOB_PAYLOAD_SPACE: SpaceId = 0x3;
-const ROOT_HASH_SPACE: SpaceId = 0x4;
+const ROOT_HASH_SPACE: SpaceId = 0x2;
 const SPACE_RESERVED: u64 = 0x1000;
 
 const MAGIC_STR: &[u8; 16] = b"firewood v0.1\0\0\0";
@@ -233,14 +231,12 @@ impl Storable for DbHeader {
 /// Necessary linear space instances bundled for the state of the entire DB.
 struct Universe<T> {
     merkle: SubUniverse<T>,
-    blob: SubUniverse<T>,
 }
 
 impl Universe<StoreRevShared> {
     fn to_mem_store_r(&self) -> Universe<Arc<impl MemStoreR>> {
         Universe {
             merkle: self.merkle.to_mem_store_r(),
-            blob: self.blob.to_mem_store_r(),
         }
     }
 }
@@ -249,7 +245,6 @@ impl Universe<Arc<StoreRevMut>> {
     fn new_from_other(&self) -> Universe<Arc<StoreRevMut>> {
         Universe {
             merkle: self.merkle.new_from_other(),
-            blob: self.blob.new_from_other(),
         }
     }
 }
@@ -258,7 +253,6 @@ impl Universe<Arc<CachedSpace>> {
     fn to_mem_store_r(&self) -> Universe<Arc<impl MemStoreR>> {
         Universe {
             merkle: self.merkle.to_mem_store_r(),
-            blob: self.blob.to_mem_store_r(),
         }
     }
 }
@@ -268,14 +262,11 @@ impl<T: MemStoreR + 'static> Universe<Arc<T>> {
         &self,
         merkle_meta_writes: &[SpaceWrite],
         merkle_payload_writes: &[SpaceWrite],
-        blob_meta_writes: &[SpaceWrite],
-        blob_payload_writes: &[SpaceWrite],
     ) -> Universe<StoreRevShared> {
         Universe {
             merkle: self
                 .merkle
                 .rewind(merkle_meta_writes, merkle_payload_writes),
-            blob: self.blob.rewind(blob_meta_writes, blob_payload_writes),
         }
     }
 }
@@ -338,14 +329,6 @@ impl<S: ShaleStore<Node> + Send + Sync> DbRev<S> {
         let valid = proof.verify_range_proof(hash, first_key, last_key, keys, values)?;
         Ok(valid)
     }
-
-    /// Check if the account exists.
-    pub fn exist<K: AsRef<[u8]>>(&self, key: K) -> Result<bool, DbError> {
-        Ok(match self.merkle.get(key, self.header.acc_root) {
-            Ok(r) => r.is_some(),
-            Err(e) => return Err(DbError::Merkle(e)),
-        })
-    }
 }
 
 #[derive(Debug)]
@@ -406,10 +389,6 @@ impl Db {
         let merkle_path = file::touch_dir("merkle", &db_path)?;
         let merkle_meta_path = file::touch_dir("meta", &merkle_path)?;
         let merkle_payload_path = file::touch_dir("compact", &merkle_path)?;
-
-        let blob_path = file::touch_dir("blob", &db_path)?;
-        let blob_meta_path = file::touch_dir("meta", &blob_path)?;
-        let blob_payload_path = file::touch_dir("compact", &blob_path)?;
 
         let root_hash_path = file::touch_dir("root_hash", &db_path)?;
 
@@ -509,41 +488,11 @@ impl Db {
                     .unwrap(),
                 ),
             ),
-            blob: SubUniverse::new(
-                Arc::new(
-                    CachedSpace::new(
-                        &StoreConfig::builder()
-                            .ncached_pages(cfg.meta_ncached_pages)
-                            .ncached_files(cfg.meta_ncached_files)
-                            .space_id(BLOB_META_SPACE)
-                            .file_nbit(params.meta_file_nbit)
-                            .rootdir(blob_meta_path)
-                            .build(),
-                        disk_requester.clone(),
-                    )
-                    .unwrap(),
-                ),
-                Arc::new(
-                    CachedSpace::new(
-                        &StoreConfig::builder()
-                            .ncached_pages(cfg.payload_ncached_pages)
-                            .ncached_files(cfg.payload_ncached_files)
-                            .space_id(BLOB_PAYLOAD_SPACE)
-                            .file_nbit(params.payload_file_nbit)
-                            .rootdir(blob_payload_path)
-                            .build(),
-                        disk_requester.clone(),
-                    )
-                    .unwrap(),
-                ),
-            ),
         };
 
         [
             data_cache.merkle.meta.as_ref(),
             data_cache.merkle.payload.as_ref(),
-            data_cache.blob.meta.as_ref(),
-            data_cache.blob.payload.as_ref(),
             root_hash_cache.as_ref(),
         ]
         .into_iter()
@@ -559,7 +508,6 @@ impl Db {
 
         let base = Universe {
             merkle: get_sub_universe_from_empty_delta(&data_cache.merkle),
-            blob: get_sub_universe_from_empty_delta(&data_cache.blob),
         };
 
         let db_header_ref = Db::get_db_header_ref(&base.merkle.meta)?;
@@ -567,18 +515,11 @@ impl Db {
         let merkle_payload_header_ref =
             Db::get_payload_header_ref(&base.merkle.meta, Db::PARAM_SIZE + DbHeader::MSIZE)?;
 
-        let blob_payload_header_ref = Db::get_payload_header_ref(&base.blob.meta, DbHeader::MSIZE)?;
-
-        let header_refs = (
-            db_header_ref,
-            merkle_payload_header_ref,
-            blob_payload_header_ref,
-        );
+        let header_refs = (db_header_ref, merkle_payload_header_ref);
 
         let base_revision = Db::new_revision(
             header_refs,
             (base.merkle.meta.clone(), base.merkle.payload.clone()),
-            (base.blob.meta.clone(), base.blob.payload.clone()),
             params.payload_regn_nbit,
             cfg.payload_max_walk,
             &cfg.rev,
@@ -618,10 +559,8 @@ impl Db {
         let merkle_payload_header: DiskAddress = DiskAddress::from(offset);
         offset += CompactSpaceHeader::MSIZE as usize;
         assert!(offset <= SPACE_RESERVED as usize);
-        let blob_payload_header: DiskAddress = DiskAddress::null();
 
         let mut merkle_meta_store = StoreRevMut::new(cached_space.merkle.meta.clone());
-        let mut blob_meta_store = StoreRevMut::new(cached_space.blob.meta.clone());
 
         if reset_store_headers {
             // initialize store headers
@@ -636,23 +575,12 @@ impl Db {
                 db_header.into(),
                 &shale::to_dehydrated(&DbHeader::new_empty())?,
             );
-            blob_meta_store.write(
-                blob_payload_header.into(),
-                &shale::to_dehydrated(&shale::compact::CompactSpaceHeader::new(
-                    NonZeroUsize::new(SPACE_RESERVED as usize).unwrap(),
-                    NonZeroUsize::new(SPACE_RESERVED as usize).unwrap(),
-                ))?,
-            );
         }
 
         let store = Universe {
             merkle: SubUniverse::new(
                 Arc::new(merkle_meta_store),
                 Arc::new(StoreRevMut::new(cached_space.merkle.payload.clone())),
-            ),
-            blob: SubUniverse::new(
-                Arc::new(blob_meta_store),
-                Arc::new(StoreRevMut::new(cached_space.blob.payload.clone())),
             ),
         };
 
@@ -663,18 +591,11 @@ impl Db {
             Db::PARAM_SIZE + DbHeader::MSIZE,
         )?;
 
-        let blob_payload_header_ref = Db::get_payload_header_ref(store.blob.meta.as_ref(), 0)?;
-
-        let header_refs = (
-            db_header_ref,
-            merkle_payload_header_ref,
-            blob_payload_header_ref,
-        );
+        let header_refs = (db_header_ref, merkle_payload_header_ref);
 
         let mut rev: DbRev<CompactSpace<Node, StoreRevMut>> = Db::new_revision(
             header_refs,
             (store.merkle.meta.clone(), store.merkle.payload.clone()),
-            (store.blob.meta.clone(), store.blob.payload.clone()),
             payload_regn_nbit,
             cfg.payload_max_walk,
             &cfg.rev,
@@ -703,13 +624,8 @@ impl Db {
     }
 
     fn new_revision<K: CachedStore, T: Into<Arc<K>>>(
-        header_refs: (
-            Obj<DbHeader>,
-            Obj<CompactSpaceHeader>,
-            Obj<CompactSpaceHeader>,
-        ),
+        header_refs: (Obj<DbHeader>, Obj<CompactSpaceHeader>),
         merkle: (T, T),
-        _blob: (T, T),
         payload_regn_nbit: u64,
         payload_max_walk: u64,
         cfg: &DbRevConfig,
@@ -737,7 +653,7 @@ impl Db {
 
         let merkle = Merkle::new(Box::new(merkle_space));
 
-        if db_header_ref.acc_root.is_null() {
+        if db_header_ref.kv_root.is_null() {
             let mut err = Ok(());
             // create the sentinel node
             db_header_ref
@@ -863,14 +779,10 @@ impl Db {
                     Some(u) => u.to_mem_store_r().rewind(
                         &ash.0[&MERKLE_META_SPACE].undo,
                         &ash.0[&MERKLE_PAYLOAD_SPACE].undo,
-                        &ash.0[&BLOB_META_SPACE].undo,
-                        &ash.0[&BLOB_PAYLOAD_SPACE].undo,
                     ),
                     None => inner_lock.cached_space.to_mem_store_r().rewind(
                         &ash.0[&MERKLE_META_SPACE].undo,
                         &ash.0[&MERKLE_PAYLOAD_SPACE].undo,
-                        &ash.0[&BLOB_META_SPACE].undo,
-                        &ash.0[&BLOB_PAYLOAD_SPACE].undo,
                     ),
                 };
                 revisions.inner.push_back(u);
@@ -891,19 +803,12 @@ impl Db {
             Db::get_payload_header_ref(&space.merkle.meta, Db::PARAM_SIZE + DbHeader::MSIZE)
                 .unwrap();
 
-        let blob_payload_header_ref = Db::get_payload_header_ref(&space.blob.meta, 0).unwrap();
-
-        let header_refs = (
-            db_header_ref,
-            merkle_payload_header_ref,
-            blob_payload_header_ref,
-        );
+        let header_refs = (db_header_ref, merkle_payload_header_ref);
 
         Revision {
             rev: Db::new_revision(
                 header_refs,
                 (space.merkle.meta.clone(), space.merkle.payload.clone()),
-                (space.blob.meta.clone(), space.blob.payload.clone()),
                 self.payload_regn_nbit,
                 0,
                 &self.cfg.rev,

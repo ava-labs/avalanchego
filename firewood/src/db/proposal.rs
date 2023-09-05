@@ -1,7 +1,7 @@
 use super::{
     get_sub_universe_from_deltas, get_sub_universe_from_empty_delta, Db, DbConfig, DbError,
-    DbHeader, DbInner, DbRev, DbRevInner, SharedStore, Store, Universe, BLOB_META_SPACE,
-    BLOB_PAYLOAD_SPACE, MERKLE_META_SPACE, MERKLE_PAYLOAD_SPACE, ROOT_HASH_SPACE,
+    DbHeader, DbInner, DbRev, DbRevInner, SharedStore, Store, Universe, MERKLE_META_SPACE,
+    MERKLE_PAYLOAD_SPACE, ROOT_HASH_SPACE,
 };
 use crate::{
     merkle::{TrieHash, TRIE_HASH_LEN},
@@ -64,18 +64,11 @@ impl Proposal {
             Db::PARAM_SIZE + DbHeader::MSIZE,
         )?;
 
-        let blob_payload_header_ref = Db::get_payload_header_ref(store.blob.meta.as_ref(), 0)?;
-
-        let header_refs = (
-            db_header_ref,
-            merkle_payload_header_ref,
-            blob_payload_header_ref,
-        );
+        let header_refs = (db_header_ref, merkle_payload_header_ref);
 
         let mut rev = Db::new_revision(
             header_refs,
             (store.merkle.meta.clone(), store.merkle.payload.clone()),
-            (store.blob.meta.clone(), store.blob.payload.clone()),
             cfg.payload_regn_nbit,
             cfg.payload_max_walk,
             &cfg.rev,
@@ -155,8 +148,6 @@ impl Proposal {
         // clear the staging layer and apply changes to the CachedSpace
         let (merkle_payload_redo, merkle_payload_wal) = self.store.merkle.payload.delta();
         let (merkle_meta_redo, merkle_meta_wal) = self.store.merkle.meta.delta();
-        let (blob_payload_redo, blob_payload_wal) = self.store.blob.payload.delta();
-        let (blob_meta_redo, blob_meta_wal) = self.store.blob.meta.delta();
 
         let mut rev_inner = self.m.write();
         let merkle_meta_undo = rev_inner
@@ -171,18 +162,6 @@ impl Proposal {
             .payload
             .update(&merkle_payload_redo)
             .unwrap();
-        let blob_meta_undo = rev_inner
-            .cached_space
-            .blob
-            .meta
-            .update(&blob_meta_redo)
-            .unwrap();
-        let blob_payload_undo = rev_inner
-            .cached_space
-            .blob
-            .payload
-            .update(&blob_payload_redo)
-            .unwrap();
 
         // update the rolling window of past revisions
         let latest_past = Universe {
@@ -190,11 +169,6 @@ impl Proposal {
                 &rev_inner.cached_space.merkle,
                 merkle_meta_undo,
                 merkle_payload_undo,
-            ),
-            blob: get_sub_universe_from_deltas(
-                &rev_inner.cached_space.blob,
-                blob_meta_undo,
-                blob_payload_undo,
             ),
         };
 
@@ -206,12 +180,6 @@ impl Proposal {
             rev.merkle
                 .payload
                 .set_base_space(latest_past.merkle.payload.inner().clone());
-            rev.blob
-                .meta
-                .set_base_space(latest_past.blob.meta.inner().clone());
-            rev.blob
-                .payload
-                .set_base_space(latest_past.blob.payload.inner().clone());
         }
         revisions.inner.push_front(latest_past);
         while revisions.inner.len() > max_revisions {
@@ -220,7 +188,6 @@ impl Proposal {
 
         let base = Universe {
             merkle: get_sub_universe_from_empty_delta(&rev_inner.cached_space.merkle),
-            blob: get_sub_universe_from_empty_delta(&rev_inner.cached_space.blob),
         };
 
         let db_header_ref = Db::get_db_header_ref(&base.merkle.meta)?;
@@ -228,18 +195,11 @@ impl Proposal {
         let merkle_payload_header_ref =
             Db::get_payload_header_ref(&base.merkle.meta, Db::PARAM_SIZE + DbHeader::MSIZE)?;
 
-        let blob_payload_header_ref = Db::get_payload_header_ref(&base.blob.meta, 0)?;
-
-        let header_refs = (
-            db_header_ref,
-            merkle_payload_header_ref,
-            blob_payload_header_ref,
-        );
+        let header_refs = (db_header_ref, merkle_payload_header_ref);
 
         let base_revision = Db::new_revision(
             header_refs,
             (base.merkle.meta.clone(), base.merkle.payload.clone()),
-            (base.blob.meta.clone(), base.blob.payload.clone()),
             0,
             self.cfg.payload_max_walk,
             &self.cfg.rev,
@@ -270,14 +230,6 @@ impl Proposal {
                     delta: merkle_meta_redo,
                 },
                 BufferWrite {
-                    space_id: self.store.blob.payload.id(),
-                    delta: blob_payload_redo,
-                },
-                BufferWrite {
-                    space_id: self.store.blob.meta.id(),
-                    delta: blob_meta_redo,
-                },
-                BufferWrite {
                     space_id: rev_inner.root_hash_staging.id(),
                     delta: root_hash_redo,
                 },
@@ -286,8 +238,6 @@ impl Proposal {
                 [
                     (MERKLE_META_SPACE, merkle_meta_wal),
                     (MERKLE_PAYLOAD_SPACE, merkle_payload_wal),
-                    (BLOB_META_SPACE, blob_meta_wal),
-                    (BLOB_PAYLOAD_SPACE, blob_payload_wal),
                     (ROOT_HASH_SPACE, root_hash_wal),
                 ]
                 .into(),
@@ -310,8 +260,6 @@ impl Drop for Proposal {
             // drop the staging changes
             self.store.merkle.payload.reset_deltas();
             self.store.merkle.meta.reset_deltas();
-            self.store.blob.payload.reset_deltas();
-            self.store.blob.meta.reset_deltas();
             self.m.read().root_hash_staging.reset_deltas();
         }
     }
