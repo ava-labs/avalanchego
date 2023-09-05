@@ -98,21 +98,18 @@ func (n *node) onNodeChanged() {
 }
 
 // Returns and caches the ID of this node.
-func (n *node) calculateID(metrics merkleMetrics) error {
+func (n *node) calculateID(metrics merkleMetrics) {
 	if n.id != ids.Empty {
-		return nil
+		return
 	}
 
-	hv := &hashValues{
+	metrics.HashCalculated()
+	bytes := codec.encodeHashValues(&hashValues{
 		Children: n.children,
 		Value:    n.valueDigest,
 		Key:      n.key.Serialize(),
-	}
-
-	bytes := codec.encodeHashValues(hv)
-	metrics.HashCalculated()
+	})
 	n.id = hashing.ComputeHash256Array(bytes)
-	return nil
 }
 
 // Set [n]'s value to [val].
