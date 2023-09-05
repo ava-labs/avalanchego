@@ -225,7 +225,7 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 		// We wait to create the span until after checking that we need to actually
 		// calculateNodeIDs to make traces more useful (otherwise there may be a span
 		// per key modified even though IDs are not re-calculated).
-		ctx, span := t.db.infoTracer.Start(ctx, "MerkleDB.trieview.calculateNodeIDs")
+		_, span := t.db.infoTracer.Start(ctx, "MerkleDB.trieview.calculateNodeIDs")
 		defer span.End()
 
 		// add all the changed key/values to the nodes of the trie
@@ -242,7 +242,7 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 		}
 
 		_ = t.db.calculateNodeIDsSema.Acquire(context.Background(), 1)
-		t.calculateNodeIDsHelper(ctx, t.root)
+		t.calculateNodeIDsHelper(t.root)
 		t.db.calculateNodeIDsSema.Release(1)
 		t.changes.rootID = t.root.id
 
@@ -257,10 +257,7 @@ func (t *trieView) calculateNodeIDs(ctx context.Context) error {
 
 // Calculates the ID of all descendants of [n] which need to be recalculated,
 // and then calculates the ID of [n] itself.
-func (t *trieView) calculateNodeIDsHelper(ctx context.Context, n *node) {
-	_, span := t.db.debugTracer.Start(ctx, "MerkleDB.trieview.calculateNodeIDsHelper")
-	defer span.End()
-
+func (t *trieView) calculateNodeIDsHelper(n *node) {
 	var (
 		// We use [wg] to wait until all descendants of [n] have been updated.
 		wg              sync.WaitGroup
@@ -279,7 +276,7 @@ func (t *trieView) calculateNodeIDsHelper(ctx context.Context, n *node) {
 		calculateChildID := func() {
 			defer wg.Done()
 
-			t.calculateNodeIDsHelper(ctx, childNodeChange.after)
+			t.calculateNodeIDsHelper(childNodeChange.after)
 
 			// Note that this will never block
 			updatedChildren <- childNodeChange.after

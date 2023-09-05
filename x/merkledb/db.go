@@ -182,8 +182,8 @@ type merkleDB struct {
 	// Valid children of this trie.
 	childViews []*trieView
 
-	// calculateNodeIDsSema controls the number of goroutines calculating
-	// node IDs. Shared across all views.
+	// calculateNodeIDsSema controls the number of goroutines inside
+	// [calculateNodeIDsHelper] at any given time.
 	calculateNodeIDsSema *semaphore.Weighted
 }
 
