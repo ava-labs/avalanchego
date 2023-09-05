@@ -11,6 +11,11 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 )
 
+var (
+	_ database.Batch          = (*batchWithHeight)(nil)
+	_ database.KeyValueReader = (*dbHeightReader)(nil)
+)
+
 // ArchiveDb
 //
 // Creates a thin database layer on top of database.Database. ArchiveDb is an
@@ -168,4 +173,12 @@ func (c *batchWithHeight) Size() int {
 // Removed all pending writes and deletes to the database
 func (c *batchWithHeight) Reset() {
 	c.batch.Reset()
+}
+
+func (c *batchWithHeight) Inner() database.Batch {
+	return c.batch
+}
+
+func (c *batchWithHeight) Replay(w database.KeyValueWriterDeleter) error {
+	return c.batch.Replay(w)
 }
