@@ -56,12 +56,8 @@ func (h Handler[T]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, req
 		return nil, err
 	}
 
-	var (
-		err          error
-		responseSize = 0
-		gossipBytes  = make([][]byte, 0)
-	)
-
+	responseSize := 0
+	gossipBytes := make([][]byte, 0)
 	h.set.Iterate(func(gossipable T) bool {
 		// filter out what the requesting peer already knows about
 		if filter.Has(gossipable) {
