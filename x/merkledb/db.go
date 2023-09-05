@@ -127,17 +127,17 @@ type Config struct {
 	//
 	// If 0 is specified, [runtime.NumCPU] will be used. If -1 is specified,
 	// no limit will be used.
-	RootGenConcurrency int
+	RootGenConcurrency uint
 	// The number of bytes to write to disk when intermediate nodes are evicted
 	// from their cache and written to disk.
-	EvictionBatchSize int
+	EvictionBatchSize uint
 	// The number of changes to the database that we store in memory in order to
 	// serve change proofs.
-	HistoryLength int
+	HistoryLength uint
 	// The number of bytes to cache nodes with values.
-	ValueNodeCacheSize int
+	ValueNodeCacheSize uint
 	// The number of bytes to cache nodes without values.
-	IntermediateNodeCacheSize int
+	IntermediateNodeCacheSize uint
 	// If [Reg] is nil, metrics are collected locally but not exported through
 	// Prometheus.
 	// This may be useful for testing.
@@ -207,7 +207,7 @@ func newDatabase(
 ) (*merkleDB, error) {
 	rootGenConcurrency := runtime.NumCPU()
 	if config.RootGenConcurrency != 0 {
-		rootGenConcurrency = config.RootGenConcurrency
+		rootGenConcurrency = int(config.RootGenConcurrency)
 	}
 
 	// Share a sync.Pool of []byte between the intermediateNodeDB and valueNodeDB
@@ -220,9 +220,9 @@ func newDatabase(
 	trieDB := &merkleDB{
 		metrics:            metrics,
 		baseDB:             db,
-		valueNodeDB:        newValueNodeDB(db, bufferPool, metrics, config.ValueNodeCacheSize),
-		intermediateNodeDB: newIntermediateNodeDB(db, bufferPool, metrics, config.IntermediateNodeCacheSize, config.EvictionBatchSize),
-		history:            newTrieHistory(config.HistoryLength),
+		valueNodeDB:        newValueNodeDB(db, bufferPool, metrics, int(config.ValueNodeCacheSize)),
+		intermediateNodeDB: newIntermediateNodeDB(db, bufferPool, metrics, int(config.IntermediateNodeCacheSize), int(config.EvictionBatchSize)),
+		history:            newTrieHistory(int(config.HistoryLength)),
 		debugTracer:        getTracerIfEnabled(config.TraceLevel, DebugTrace, config.Tracer),
 		infoTracer:         getTracerIfEnabled(config.TraceLevel, InfoTrace, config.Tracer),
 		childViews:         make([]*trieView, 0, defaultPreallocationSize),
@@ -245,7 +245,7 @@ func newDatabase(
 	switch err {
 	case nil:
 		if bytes.Equal(shutdownType, didNotHaveCleanShutdown) {
-			if err := trieDB.rebuild(ctx, config.ValueNodeCacheSize); err != nil {
+			if err := trieDB.rebuild(ctx, int(config.ValueNodeCacheSize)); err != nil {
 				return nil, err
 			}
 		}
