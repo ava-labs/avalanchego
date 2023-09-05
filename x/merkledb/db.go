@@ -126,8 +126,8 @@ type Config struct {
 	// RootGenConcurrency is the number of goroutines to use when
 	// generating a new state root.
 	//
-	// If 0 is specified, [runtime.NumCPU] will be used. If -1 is specified,
-	// no limit will be used.
+	// If 0 is specified, [runtime.NumCPU] will be used.
+	// Must be non-negative.
 	RootGenConcurrency int
 	// The number of bytes to write to disk when intermediate nodes are evicted
 	// from their cache and written to disk.
