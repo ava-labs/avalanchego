@@ -28,15 +28,10 @@ func NewBloomFilter(
 		maxExpectedElements,
 		falsePositiveProbability,
 	)
-	if err != nil {
-		return nil, err
-	}
-
-	bloomFilter := &BloomFilter{
+	return &BloomFilter{
 		Bloom: bloom,
 		Salt:  randomSalt(),
-	}
-	return bloomFilter, nil
+	}, err
 }
 
 type BloomFilter struct {
