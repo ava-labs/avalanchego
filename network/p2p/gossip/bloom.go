@@ -73,14 +73,18 @@ func ResetBloomFilterIfNeeded(
 		return false, nil
 	}
 
-	// it's not possible for this to error assuming that the original
-	// bloom filter's parameters were valid
-	bloomFilter.Bloom, _ = bloomfilter.New(bloomFilter.Bloom.M(), bloomFilter.Bloom.K())
-
+	newBloom, err := bloomfilter.New(bloomFilter.Bloom.M(), bloomFilter.Bloom.K())
+	if err != nil {
+		return false, err
+	}
 	salt, err := randomSalt()
-	bloomFilter.Salt = salt
+	if err != nil {
+		return false, err
+	}
 
-	return true, err
+	bloomFilter.Bloom = newBloom
+	bloomFilter.Salt = salt
+	return true, nil
 }
 
 func randomSalt() (ids.ID, error) {
