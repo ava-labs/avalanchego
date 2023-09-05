@@ -126,7 +126,7 @@ func (g *Gossiper[T, U]) handleResponse(
 		g.log.Debug(
 			"received gossip",
 			zap.Stringer("nodeID", nodeID),
-			zap.Binary("hash", hash[:]),
+			zap.Stringer("id", hash),
 		)
 		if err := g.set.Add(gossipable); err != nil {
 			g.log.Debug(
