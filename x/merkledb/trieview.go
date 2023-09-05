@@ -279,7 +279,6 @@ func (t *trieView) calculateNodeIDsHelper(ctx context.Context, n *node, eg *errg
 		}
 
 		wg.Add(1)
-		// Must return an error to pass it into [eg.TryGo].
 		updateChild := func() {
 			defer wg.Done()
 
