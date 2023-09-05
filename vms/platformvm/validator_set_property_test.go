@@ -64,6 +64,11 @@ var errEmptyEventsList = errors.New("empty events list")
 // the right BLS key version at all relevant heights.
 func TestGetValidatorsSetProperty(t *testing.T) {
 	properties := gopter.NewProperties(nil)
+
+	// to reproduce a given scenario do something like this:
+	// parameters := gopter.DefaultTestParametersWithSeed(1685887576153675816)
+	// properties := gopter.NewProperties(parameters)
+
 	properties.Property("check GetValidatorSet", prop.ForAll(
 		func(events []uint8) string {
 			vm, subnetID, err := buildVM(t)
