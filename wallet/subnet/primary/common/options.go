@@ -17,7 +17,9 @@ import (
 
 const defaultPollFrequency = 100 * time.Millisecond
 
-type LogTxIDFunc func(ids.ID)
+// Signature of the function that will be called after a transaction
+// has been issued with the ID of the issued transaction.
+type PostIssuanceFunc func(ids.ID)
 
 type Option func(*Options)
 
@@ -46,7 +48,7 @@ type Options struct {
 	pollFrequencySet bool
 	pollFrequency    time.Duration
 
-	logTxIDFunc LogTxIDFunc
+	postIssuanceFunc PostIssuanceFunc
 }
 
 func NewOptions(ops []Option) *Options {
@@ -130,8 +132,8 @@ func (o *Options) PollFrequency() time.Duration {
 	return defaultPollFrequency
 }
 
-func (o *Options) LogTxIDFunc() LogTxIDFunc {
-	return o.logTxIDFunc
+func (o *Options) PostIssuanceFunc() PostIssuanceFunc {
+	return o.postIssuanceFunc
 }
 
 func WithContext(ctx context.Context) Option {
@@ -198,8 +200,8 @@ func WithPollFrequency(pollFrequency time.Duration) Option {
 	}
 }
 
-func WithLogTxFunc(logFunc LogTxIDFunc) Option {
+func WithPostIssuanceFunc(f PostIssuanceFunc) Option {
 	return func(o *Options) {
-		o.logTxIDFunc = logFunc
+		o.postIssuanceFunc = f
 	}
 }

@@ -159,8 +159,8 @@ func (w *wallet) IssueAtomicTx(
 		return err
 	}
 
-	if logFunc := ops.LogTxIDFunc(); logFunc != nil {
-		logFunc(txID)
+	if f := ops.PostIssuanceFunc(); f != nil {
+		f(txID)
 	}
 
 	if ops.AssumeDecided() {

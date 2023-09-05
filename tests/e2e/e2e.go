@@ -125,7 +125,7 @@ func (te *TestEnvironment) NewWallet(keychain *secp256k1fx.Keychain, nodeURI tes
 	te.require.NoError(err)
 	return primary.NewWalletWithOptions(
 		baseWallet,
-		common.WithLogTxFunc(
+		common.WithPostIssuanceFunc(
 			func(id ids.ID) {
 				tests.Outf(" tx id: %s\n", id)
 			},
