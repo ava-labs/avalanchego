@@ -4,13 +4,11 @@
 package gossip
 
 import (
+	"crypto/rand"
 	"encoding/binary"
 	"hash"
-	"time"
 
 	bloomfilter "github.com/holiman/bloomfilter/v2"
-
-	"golang.org/x/exp/rand"
 
 	"github.com/ava-labs/avalanchego/ids"
 )
@@ -28,9 +26,10 @@ func NewBloomFilter(
 		maxExpectedElements,
 		falsePositiveProbability,
 	)
+	salt, err := randomSalt()
 	return &BloomFilter{
 		Bloom: bloom,
-		Salt:  randomSalt(),
+		Salt:  salt,
 	}, err
 }
 
@@ -65,23 +64,25 @@ func (b *BloomFilter) Has(gossipable Gossipable) bool {
 func ResetBloomFilterIfNeeded(
 	bloomFilter *BloomFilter,
 	falsePositiveProbability float64,
-) bool {
+) (bool, error) {
 	if bloomFilter.Bloom.FalsePosititveProbability() < falsePositiveProbability {
-		return false
+		return false, nil
 	}
 
 	// it's not possible for this to error assuming that the original
 	// bloom filter's parameters were valid
 	bloomFilter.Bloom, _ = bloomfilter.New(bloomFilter.Bloom.M(), bloomFilter.Bloom.K())
-	bloomFilter.Salt = randomSalt()
-	return true
+
+	salt, err := randomSalt()
+	bloomFilter.Salt = salt
+
+	return true, err
 }
 
-func randomSalt() ids.ID {
+func randomSalt() (ids.ID, error) {
 	salt := ids.ID{}
-	r := rand.New(rand.NewSource(uint64(time.Now().Nanosecond())))
-	_, _ = r.Read(salt[:])
-	return salt
+	_, err := rand.Read(salt[:])
+	return salt, err
 }
 
 type hasher struct {

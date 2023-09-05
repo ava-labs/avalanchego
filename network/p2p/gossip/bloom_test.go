@@ -53,7 +53,8 @@ func TestBloomFilterRefresh(t *testing.T) {
 			}
 
 			for _, item := range tt.add {
-				_ = ResetBloomFilterIfNeeded(&bloom, tt.falsePositiveProbability)
+				_, err = ResetBloomFilterIfNeeded(&bloom, tt.falsePositiveProbability)
+				require.NoError(err)
 				bloom.Add(item)
 			}
 
