@@ -126,7 +126,7 @@ jobs:
       - name: Run tests
         run: cargo test --verbose
 
-  e2e:
+  examples:
     needs: build
     runs-on: ubuntu-latest
     steps:
@@ -174,7 +174,4 @@ jobs:
             ~/.cargo/git/db/
             target/
           key: ${{ needs.build.outputs.cache-key }}
-      - name: Lint intra docs links
-        run: cargo rustdoc -p firewood --lib -- -D rustdoc::broken-intra-doc-links
-      - name: Lint missing crate-level docs
-        run: cargo rustdoc -p firewood --lib -- -D rustdoc::missing-crate-level-docs
+      - run: RUSTDOCFLAGS="-D warnings" cargo doc --all --document-private-items --no-deps

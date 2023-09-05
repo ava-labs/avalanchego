@@ -183,7 +183,7 @@ fn get_sub_universe_from_empty_delta(
 /// DB-wide metadata, it keeps track of the roots of the top-level tries.
 #[derive(Debug)]
 struct DbHeader {
-    /// The root node of the account model storage. (Where the values are [Account] objects, which
+    /// The root node of the account model storage. (Where the values are `Account` objects, which
     /// may contain the root for the secondary trie.)
     acc_root: DiskAddress,
     /// The root node of the generic key-value store.
