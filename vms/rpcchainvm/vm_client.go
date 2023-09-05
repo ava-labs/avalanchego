@@ -352,6 +352,12 @@ func (vm *VMClient) SetState(ctx context.Context, state snow.State) error {
 }
 
 func (vm *VMClient) Shutdown(ctx context.Context) error {
+	defer vm.processTracker.UntrackProcess(vm.pid)
+
+	if !vm.processTracker.HasProcess(vm.pid) {
+		return nil
+	}
+
 	errs := wrappers.Errs{}
 	_, err := vm.client.Shutdown(ctx, &emptypb.Empty{})
 	errs.Add(err)
@@ -363,7 +369,6 @@ func (vm *VMClient) Shutdown(ctx context.Context) error {
 
 	vm.runtime.Stop(ctx)
 
-	vm.processTracker.UntrackProcess(vm.pid)
 	return errs.Err
 }
 
