@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/blocks"
@@ -39,8 +40,9 @@ import (
 )
 
 const (
-	HistoryLength = int(256)    // from HyperSDK
-	NodeCacheSize = int(65_536) // from HyperSDK
+	HistoryLength             = int(256)
+	valueNodeCacheSize        = 2 * units.GiB
+	intermediateNodeCacheSize = 2 * units.GiB
 
 	utxoCacheSize = 8192 // from avax/utxo_state.go
 )
@@ -138,10 +140,11 @@ func newMerklsState(
 	}
 
 	merkleDB, err := merkledb.New(traceCtx, baseMerkleDB, merkledb.Config{
-		HistoryLength: HistoryLength,
-		NodeCacheSize: NodeCacheSize,
-		Reg:           prometheus.NewRegistry(),
-		Tracer:        noOpTracer,
+		HistoryLength:             HistoryLength,
+		ValueNodeCacheSize:        valueNodeCacheSize,
+		IntermediateNodeCacheSize: intermediateNodeCacheSize,
+		Reg:                       prometheus.NewRegistry(),
+		Tracer:                    noOpTracer,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed creating merkleDB: %w", err)
@@ -1259,7 +1262,7 @@ func (ms *merkleState) writeMerkleState(currentData, pendingData map[ids.ID]*sta
 	}
 
 	ctx := context.TODO()
-	view, err := ms.merkleDB.NewView(ctx, batchOps)
+	view, err := ms.merkleDB.NewView(ctx, merkledb.ViewChanges{BatchOps: batchOps})
 	if err != nil {
 		return fmt.Errorf("failed creating merkleDB view: %w", err)
 	}
@@ -1687,7 +1690,7 @@ func (ms *merkleState) logMerkleRoot(hasChanges bool) error {
 	}
 
 	ctx := context.TODO()
-	view, err := ms.merkleDB.NewView(ctx, nil)
+	view, err := ms.merkleDB.NewView(ctx, merkledb.ViewChanges{})
 	if err != nil {
 		return fmt.Errorf("failed creating merkleDB view: %w", err)
 	}

@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -19,7 +20,10 @@ import (
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
-const verificationCacheSize = 2_000
+const (
+	verificationEvictionBatchSize = 0
+	verificationCacheSize         = math.MaxInt
+)
 
 var (
 	ErrInvalidProof                = errors.New("proof obtained an invalid root ID")
@@ -854,7 +858,9 @@ func addPathInfo(
 			childPath := keyPath.Append(index) + compressedPath
 			if (shouldInsertLeftChildren && childPath.Compare(insertChildrenLessThan.Value()) < 0) ||
 				(shouldInsertRightChildren && childPath.Compare(insertChildrenGreaterThan.Value()) > 0) {
-				n.addChildWithoutNode(index, compressedPath, childID)
+				// We don't know if the child had a value or not, but it doesn't matter.
+				// We only need the IDs to be correct so that the calculated hash is correct.
+				n.addChildWithoutNode(index, compressedPath, childID, false /*hasValue*/)
 			}
 		}
 	}
@@ -864,17 +870,14 @@ func addPathInfo(
 
 // getStandaloneTrieView returns a new view that has nothing in it besides the changes due to [ops]
 func getStandaloneTrieView(ctx context.Context, ops []database.BatchOp) (*trieView, error) {
-	tracer, err := trace.New(trace.Config{Enabled: false})
-	if err != nil {
-		return nil, err
-	}
 	db, err := newDatabase(
 		ctx,
 		memdb.New(),
 		Config{
-			EvictionBatchSize: DefaultEvictionBatchSize,
-			Tracer:            tracer,
-			NodeCacheSize:     verificationCacheSize,
+			EvictionBatchSize:         verificationEvictionBatchSize,
+			Tracer:                    trace.Noop,
+			ValueNodeCacheSize:        verificationCacheSize,
+			IntermediateNodeCacheSize: verificationCacheSize,
 		},
 		&mockMetrics{},
 	)
@@ -882,5 +885,5 @@ func getStandaloneTrieView(ctx context.Context, ops []database.BatchOp) (*trieVi
 		return nil, err
 	}
 
-	return db.newUntrackedView(ops)
+	return newTrieView(db, db, ViewChanges{BatchOps: ops, ConsumeBytes: true})
 }
