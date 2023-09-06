@@ -27,7 +27,10 @@ type txMetrics struct {
 	numRemoveSubnetValidatorTxs,
 	numTransformSubnetTxs,
 	numAddPermissionlessValidatorTxs,
-	numAddPermissionlessDelegatorTxs prometheus.Counter
+	numAddPermissionlessDelegatorTxs,
+	numAddContinuousValidatorTxs,
+	numAddContinuousDelegatorTxs,
+	numStopStakerTxs prometheus.Counter
 }
 
 func newTxMetrics(
@@ -49,6 +52,9 @@ func newTxMetrics(
 		numTransformSubnetTxs:            newTxMetric(namespace, "transform_subnet", registerer, &errs),
 		numAddPermissionlessValidatorTxs: newTxMetric(namespace, "add_permissionless_validator", registerer, &errs),
 		numAddPermissionlessDelegatorTxs: newTxMetric(namespace, "add_permissionless_delegator", registerer, &errs),
+		numAddContinuousValidatorTxs:     newTxMetric(namespace, "add_continuous_validator", registerer, &errs),
+		numAddContinuousDelegatorTxs:     newTxMetric(namespace, "add_continuous_delegator", registerer, &errs),
+		numStopStakerTxs:                 newTxMetric(namespace, "stop_staker_tx", registerer, &errs),
 	}
 	return m, errs.Err
 }
@@ -130,5 +136,20 @@ func (m *txMetrics) AddPermissionlessValidatorTx(*txs.AddPermissionlessValidator
 
 func (m *txMetrics) AddPermissionlessDelegatorTx(*txs.AddPermissionlessDelegatorTx) error {
 	m.numAddPermissionlessDelegatorTxs.Inc()
+	return nil
+}
+
+func (m *txMetrics) AddContinuousValidatorTx(*txs.AddContinuousValidatorTx) error {
+	m.numAddContinuousValidatorTxs.Inc()
+	return nil
+}
+
+func (m *txMetrics) AddContinuousDelegatorTx(*txs.AddContinuousDelegatorTx) error {
+	m.numAddContinuousDelegatorTxs.Inc()
+	return nil
+}
+
+func (m *txMetrics) StopStakerTx(*txs.StopStakerTx) error {
+	m.numStopStakerTxs.Inc()
 	return nil
 }

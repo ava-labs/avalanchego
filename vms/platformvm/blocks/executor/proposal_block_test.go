@@ -6,6 +6,7 @@ package executor
 import (
 	"context"
 	"fmt"
+	"math"
 	"testing"
 	"time"
 
@@ -28,6 +29,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
+
+// time.Duration underlying type is currently int64
+const stakerMaxDuration time.Duration = math.MaxInt64
 
 func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	require := require.New(t)
@@ -96,6 +100,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 		SubnetID:  utx.SubnetID(),
 		StartTime: utx.StartTime(),
 		EndTime:   chainTime,
+		NextTime:  chainTime,
 	})
 	currentStakersIt.EXPECT().Release()
 	onParentAccept.EXPECT().GetCurrentStakerIterator().Return(currentStakersIt, nil)
@@ -105,10 +110,18 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 		SubnetID:  utx.SubnetID(),
 		StartTime: utx.StartTime(),
 		EndTime:   chainTime,
+		NextTime:  chainTime,
 	}, nil)
 	onParentAccept.EXPECT().GetTx(addValTx.ID()).Return(addValTx, status.Committed, nil)
 	onParentAccept.EXPECT().GetCurrentSupply(constants.PrimaryNetworkID).Return(uint64(1000), nil).AnyTimes()
+	onParentAccept.EXPECT().GetRewardUTXOs(gomock.Any()).Return([]*avax.UTXO{}, nil).AnyTimes()
 	onParentAccept.EXPECT().GetDelegateeReward(constants.PrimaryNetworkID, utx.NodeID()).Return(uint64(0), nil).AnyTimes()
+
+	noDelegatorsIt := state.NewMockStakerIterator(ctrl)
+	noDelegatorsIt.EXPECT().Next().Return(false).AnyTimes() // no current delegators
+	noDelegatorsIt.EXPECT().Release().AnyTimes()
+	onParentAccept.EXPECT().GetCurrentDelegatorIterator(gomock.Any(), gomock.Any()).Return(noDelegatorsIt, nil).AnyTimes()
+	onParentAccept.EXPECT().GetPendingDelegatorIterator(gomock.Any(), gomock.Any()).Return(noDelegatorsIt, nil).AnyTimes()
 
 	env.mockedState.EXPECT().GetUptime(gomock.Any(), constants.PrimaryNetworkID).Return(
 		time.Microsecond, /*upDuration*/
@@ -229,12 +242,19 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	currentStakersIt.EXPECT().Release().AnyTimes()
 	onParentAccept.EXPECT().GetCurrentStakerIterator().Return(currentStakersIt, nil).AnyTimes()
 
+	onParentAccept.EXPECT().GetRewardUTXOs(gomock.Any()).Return([]*avax.UTXO{}, nil).AnyTimes()
 	onParentAccept.EXPECT().GetDelegateeReward(constants.PrimaryNetworkID, unsignedNextStakerTx.NodeID()).Return(uint64(0), nil).AnyTimes()
 
 	pendingStakersIt := state.NewMockStakerIterator(ctrl)
 	pendingStakersIt.EXPECT().Next().Return(false).AnyTimes() // no pending stakers
 	pendingStakersIt.EXPECT().Release().AnyTimes()
 	onParentAccept.EXPECT().GetPendingStakerIterator().Return(pendingStakersIt, nil).AnyTimes()
+
+	noDelegatorsIt := state.NewMockStakerIterator(ctrl)
+	noDelegatorsIt.EXPECT().Next().Return(false).AnyTimes() // no current delegators
+	noDelegatorsIt.EXPECT().Release().AnyTimes()
+	onParentAccept.EXPECT().GetCurrentDelegatorIterator(gomock.Any(), gomock.Any()).Return(noDelegatorsIt, nil).AnyTimes()
+	onParentAccept.EXPECT().GetPendingDelegatorIterator(gomock.Any(), gomock.Any()).Return(noDelegatorsIt, nil).AnyTimes()
 
 	env.mockedState.EXPECT().GetUptime(gomock.Any(), gomock.Any()).Return(
 		time.Microsecond, /*upDuration*/
@@ -396,7 +416,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 		nodeID:        ids.NodeID(staker0RewardAddress),
 		rewardAddress: staker0RewardAddress,
 		startTime:     defaultGenesisTime,
-		endTime:       time.Time{}, // actual endTime depends on specific test
+		stakingPeriod: stakerMaxDuration,
 	}
 
 	staker1RewardAddress := ids.GenerateTestShortID()
@@ -404,7 +424,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 		nodeID:        ids.NodeID(staker1RewardAddress),
 		rewardAddress: staker1RewardAddress,
 		startTime:     defaultGenesisTime.Add(1 * time.Minute),
-		endTime:       defaultGenesisTime.Add(10 * defaultMinStakingDuration).Add(1 * time.Minute),
+		stakingPeriod: 10*defaultMinStakingDuration + time.Minute,
 	}
 
 	staker2RewardAddress := ids.ShortID{1}
@@ -412,7 +432,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 		nodeID:        ids.NodeID(staker2RewardAddress),
 		rewardAddress: staker2RewardAddress,
 		startTime:     staker1.startTime.Add(1 * time.Minute),
-		endTime:       staker1.startTime.Add(1 * time.Minute).Add(defaultMinStakingDuration),
+		stakingPeriod: defaultMinStakingDuration + time.Minute,
 	}
 
 	staker3RewardAddress := ids.GenerateTestShortID()
@@ -420,14 +440,14 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 		nodeID:        ids.NodeID(staker3RewardAddress),
 		rewardAddress: staker3RewardAddress,
 		startTime:     staker2.startTime.Add(1 * time.Minute),
-		endTime:       staker2.endTime.Add(1 * time.Minute),
+		stakingPeriod: staker2.stakingPeriod,
 	}
 
 	staker3Sub := staker{
 		nodeID:        staker3.nodeID,
 		rewardAddress: staker3.rewardAddress,
 		startTime:     staker3.startTime.Add(1 * time.Minute),
-		endTime:       staker3.endTime.Add(-1 * time.Minute),
+		stakingPeriod: staker3.stakingPeriod - time.Minute,
 	}
 
 	staker4RewardAddress := ids.GenerateTestShortID()
@@ -435,15 +455,15 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 		nodeID:        ids.NodeID(staker4RewardAddress),
 		rewardAddress: staker4RewardAddress,
 		startTime:     staker3.startTime,
-		endTime:       staker3.endTime,
+		stakingPeriod: staker3.stakingPeriod,
 	}
 
 	staker5RewardAddress := ids.GenerateTestShortID()
 	staker5 := staker{
 		nodeID:        ids.NodeID(staker5RewardAddress),
 		rewardAddress: staker5RewardAddress,
-		startTime:     staker2.endTime,
-		endTime:       staker2.endTime.Add(defaultMinStakingDuration),
+		startTime:     staker2.startTime.Add(staker2.stakingPeriod),
+		stakingPeriod: defaultMinStakingDuration,
 	}
 
 	tests := []test{
@@ -569,10 +589,12 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 			env.config.Validators.Add(subnetID, validators.NewSet())
 
 			for _, staker := range test.stakers {
+				start := staker.startTime.Unix()
+				end := staker.startTime.Add(staker.stakingPeriod).Unix()
 				tx, err := env.txBuilder.NewAddValidatorTx(
 					env.config.MinValidatorStake,
-					uint64(staker.startTime.Unix()),
-					uint64(staker.endTime.Unix()),
+					uint64(start),
+					uint64(end),
 					staker.nodeID,
 					staker.rewardAddress,
 					reward.PercentDenominator,
@@ -593,10 +615,12 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 			}
 
 			for _, subStaker := range test.subnetStakers {
+				start := subStaker.startTime.Unix()
+				end := subStaker.startTime.Add(subStaker.stakingPeriod).Unix()
 				tx, err := env.txBuilder.NewAddSubnetValidatorTx(
 					env.config.MaxValidatorStake, // Weight
-					uint64(subStaker.startTime.Unix()),
-					uint64(subStaker.endTime.Unix()),
+					uint64(start),
+					uint64(end),
 					subStaker.nodeID, // validator ID
 					subnetID,         // Subnet ID
 					[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
@@ -620,11 +644,11 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 
 				// add Staker0 (with the right end time) to state
 				// so to allow proposalBlk issuance
-				staker0.endTime = newTime
+				staker0.stakingPeriod = newTime.Sub(staker0.startTime)
 				addStaker0, err := env.txBuilder.NewAddValidatorTx(
 					10,
 					uint64(staker0.startTime.Unix()),
-					uint64(staker0.endTime.Unix()),
+					uint64(staker0.startTime.Add(staker0.stakingPeriod).Unix()),
 					staker0.nodeID,
 					staker0.rewardAddress,
 					reward.PercentDenominator,
@@ -639,6 +663,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 					addStaker0.ID(),
 					addValTx,
 					addValTx.StartTime(),
+					addValTx.EndTime(),
 					0,
 				)
 				require.NoError(err)
@@ -742,6 +767,7 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 		tx.ID(),
 		addSubnetValTx,
 		addSubnetValTx.StartTime(),
+		addSubnetValTx.EndTime(),
 		0,
 	)
 	require.NoError(err)
@@ -802,6 +828,7 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 		addStaker0.ID(),
 		addValTx,
 		addValTx.StartTime(),
+		addValTx.EndTime(),
 		0,
 	)
 	require.NoError(err)
@@ -915,6 +942,7 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 				addStaker0.ID(),
 				addValTx,
 				addValTx.StartTime(),
+				addValTx.EndTime(),
 				0,
 			)
 			require.NoError(err)
@@ -1001,6 +1029,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 		addStaker0.ID(),
 		addValTx,
 		addValTx.StartTime(),
+		addValTx.EndTime(),
 		0,
 	)
 	require.NoError(err)
@@ -1096,6 +1125,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 		addStaker0.ID(),
 		addValTx,
 		addValTx.StartTime(),
+		addValTx.EndTime(),
 		0,
 	)
 	require.NoError(err)
@@ -1188,6 +1218,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 		addStaker0.ID(),
 		addValTx,
 		addValTx.StartTime(),
+		addValTx.EndTime(),
 		0,
 	)
 	require.NoError(err)
@@ -1282,6 +1313,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 		addStaker0.ID(),
 		addValTx,
 		addValTx.StartTime(),
+		addValTx.EndTime(),
 		0,
 	)
 	require.NoError(err)

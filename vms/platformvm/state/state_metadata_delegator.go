@@ -10,6 +10,7 @@ type delegatorMetadata struct {
 
 	StakerStartTime     int64  `v1:"true"`
 	StakerStakingPeriod int64  `v1:"true"`
+	StakerEndTime       int64  `v1:"true"`
 	UpdatedWeight       uint64 `v1:"true"`
 }
 

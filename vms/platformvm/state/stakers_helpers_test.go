@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
@@ -36,8 +37,6 @@ var (
 	defaultMinStakingDuration = 24 * time.Hour
 	defaultMaxStakingDuration = 365 * 24 * time.Hour
 	defaultGenesisTime        = time.Date(1997, 1, 1, 0, 0, 0, 0, time.UTC)
-	defaultValidateStartTime  = defaultGenesisTime
-	defaultValidateEndTime    = defaultValidateStartTime.Add(10 * defaultMinStakingDuration)
 	defaultTxFee              = uint64(100)
 )
 
@@ -62,7 +61,7 @@ func buildStateCtx() *snow.Context {
 }
 
 func buildChainState(baseDB database.Database, trackedSubnets []ids.ID) (State, error) {
-	cfg := defaultConfig()
+	cfg := defaultConfig(latestFork)
 	cfg.TrackedSubnets.Add(trackedSubnets...)
 
 	execConfig, err := config.GetExecutionConfig(nil)
@@ -91,7 +90,40 @@ func buildChainState(baseDB database.Database, trackedSubnets []ids.ID) (State, 
 	)
 }
 
-func defaultConfig() *config.Config {
+func defaultConfig(fork activeFork) *config.Config { //nolint:unparam
+	var (
+		apricotPhase3Time     = mockable.MaxTime
+		apricotPhase5Time     = mockable.MaxTime
+		banffTime             = mockable.MaxTime
+		cortinaTime           = mockable.MaxTime
+		continuousStakingTime = mockable.MaxTime
+	)
+
+	switch fork {
+	case apricotPhase3Fork:
+		apricotPhase3Time = defaultGenesisTime
+	case apricotPhase5Fork:
+		apricotPhase5Time = defaultGenesisTime
+		apricotPhase3Time = defaultGenesisTime
+	case banffFork:
+		banffTime = defaultGenesisTime
+		apricotPhase5Time = defaultGenesisTime
+		apricotPhase3Time = defaultGenesisTime
+	case cortinaFork:
+		cortinaTime = defaultGenesisTime
+		banffTime = defaultGenesisTime
+		apricotPhase5Time = defaultGenesisTime
+		apricotPhase3Time = defaultGenesisTime
+	case continuousStakingFork:
+		continuousStakingTime = defaultGenesisTime
+		cortinaTime = defaultGenesisTime
+		banffTime = defaultGenesisTime
+		apricotPhase5Time = defaultGenesisTime
+		apricotPhase3Time = defaultGenesisTime
+	default:
+		panic(fmt.Errorf("unhandled fork %d", fork))
+	}
+
 	vdrs := validators.NewManager()
 	primaryVdrs := validators.NewSet()
 	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
@@ -113,11 +145,11 @@ func defaultConfig() *config.Config {
 			MintingPeriod:      defaultMaxStakingDuration,
 			SupplyCap:          720 * units.MegaAvax,
 		},
-		ApricotPhase3Time:     defaultValidateEndTime,
-		ApricotPhase5Time:     defaultValidateEndTime,
-		BanffTime:             defaultValidateEndTime,
-		CortinaTime:           defaultValidateEndTime,
-		ContinuousStakingTime: defaultValidateEndTime,
+		ApricotPhase3Time:     apricotPhase3Time,
+		ApricotPhase5Time:     apricotPhase5Time,
+		BanffTime:             banffTime,
+		CortinaTime:           cortinaTime,
+		ContinuousStakingTime: continuousStakingTime,
 	}
 }
 

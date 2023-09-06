@@ -127,3 +127,21 @@ func TestAbsDiff(t *testing.T) {
 	require.Zero(AbsDiff(uint64(1), uint64(1)))
 	require.Zero(AbsDiff(uint64(0), uint64(0)))
 }
+
+func TestIsPowerOfTwo(t *testing.T) {
+	require := require.New(t)
+
+	require.True(IsPowerOfTwo(-8))
+	require.False(IsPowerOfTwo(-6))
+	require.True(IsPowerOfTwo(-4))
+	require.False(IsPowerOfTwo(-3))
+	require.True(IsPowerOfTwo(-2))
+	require.True(IsPowerOfTwo(-1))
+	require.False(IsPowerOfTwo(0))
+	require.True(IsPowerOfTwo(1))
+	require.True(IsPowerOfTwo(2))
+	require.False(IsPowerOfTwo(3))
+	require.True(IsPowerOfTwo(4))
+	require.False(IsPowerOfTwo(6))
+	require.True(IsPowerOfTwo(8))
+}

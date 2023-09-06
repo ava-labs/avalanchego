@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -289,8 +290,12 @@ func (e *StandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 		return err
 	}
 
-	txID := e.Tx.ID()
-	if err := e.addStakerFromStakerTx(tx, e.State.GetTimestamp()); err != nil {
+	var (
+		txID      = e.Tx.ID()
+		startTime = e.State.GetTimestamp()
+		endTime   = startTime.Add(tx.StakingPeriod())
+	)
+	if _, err := e.addStakerFromStakerTx(tx, startTime, endTime); err != nil {
 		return err
 	}
 
@@ -309,17 +314,22 @@ func (e *StandardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 }
 
 func (e *StandardTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
-	if err := verifyAddSubnetValidatorTx(
+	err := verifyAddSubnetValidatorTx(
 		e.Backend,
 		e.State,
 		e.Tx,
 		tx,
-	); err != nil {
+	)
+	if err != nil {
 		return err
 	}
 
-	txID := e.Tx.ID()
-	if err := e.addStakerFromStakerTx(tx, e.State.GetTimestamp()); err != nil {
+	var (
+		txID      = e.Tx.ID()
+		startTime = e.State.GetTimestamp()
+		endTime   = startTime.Add(tx.StakingPeriod())
+	)
+	if _, err := e.addStakerFromStakerTx(tx, startTime, endTime); err != nil {
 		return err
 	}
 
@@ -329,17 +339,22 @@ func (e *StandardTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 }
 
 func (e *StandardTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
-	if _, err := verifyAddDelegatorTx(
+	_, err := verifyAddDelegatorTx(
 		e.Backend,
 		e.State,
 		e.Tx,
 		tx,
-	); err != nil {
+	)
+	if err != nil {
 		return err
 	}
 
-	txID := e.Tx.ID()
-	if err := e.addStakerFromStakerTx(tx, e.State.GetTimestamp()); err != nil {
+	var (
+		txID      = e.Tx.ID()
+		startTime = e.State.GetTimestamp()
+		endTime   = startTime.Add(tx.StakingPeriod())
+	)
+	if _, err := e.addStakerFromStakerTx(tx, startTime, endTime); err != nil {
 		return err
 	}
 
@@ -426,17 +441,22 @@ func (e *StandardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 }
 
 func (e *StandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
-	if err := verifyAddPermissionlessValidatorTx(
+	err := verifyAddPermissionlessValidatorTx(
 		e.Backend,
 		e.State,
 		e.Tx,
 		tx,
-	); err != nil {
+	)
+	if err != nil {
 		return err
 	}
 
-	txID := e.Tx.ID()
-	if err := e.addStakerFromStakerTx(tx, e.State.GetTimestamp()); err != nil {
+	var (
+		txID      = e.Tx.ID()
+		startTime = e.State.GetTimestamp()
+		endTime   = startTime.Add(tx.StakingPeriod())
+	)
+	if _, err := e.addStakerFromStakerTx(tx, startTime, endTime); err != nil {
 		return err
 	}
 
@@ -458,20 +478,124 @@ func (e *StandardTxExecutor) AddPermissionlessValidatorTx(tx *txs.AddPermissionl
 }
 
 func (e *StandardTxExecutor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
-	if err := verifyAddPermissionlessDelegatorTx(
+	err := verifyAddPermissionlessDelegatorTx(
 		e.Backend,
 		e.State,
 		e.Tx,
 		tx,
-	); err != nil {
+	)
+	if err != nil {
+		return err
+	}
+
+	var (
+		txID      = e.Tx.ID()
+		startTime = e.State.GetTimestamp()
+		endTime   = startTime.Add(tx.StakingPeriod())
+	)
+	if _, err := e.addStakerFromStakerTx(tx, startTime, endTime); err != nil {
+		return err
+	}
+
+	avax.Consume(e.State, tx.Ins)
+	avax.Produce(e.State, txID, tx.Outs)
+
+	return nil
+}
+
+func (e *StandardTxExecutor) AddContinuousValidatorTx(tx *txs.AddContinuousValidatorTx) error {
+	err := verifyAddContinuousValidatorTx(
+		e.Backend,
+		e.State,
+		e.Tx,
+		tx,
+	)
+	if err != nil {
+		return err
+	}
+
+	var (
+		txID      = e.Tx.ID()
+		startTime = e.State.GetTimestamp()
+	)
+	if _, err := e.addStakerFromStakerTx(tx, startTime, mockable.MaxTime); err != nil {
+		return err
+	}
+
+	avax.Consume(e.State, tx.Ins)
+	avax.Produce(e.State, txID, tx.Outs)
+
+	return nil
+}
+
+func (e *StandardTxExecutor) AddContinuousDelegatorTx(tx *txs.AddContinuousDelegatorTx) error {
+	valStartTime, endTime, minStakingDuration, err := verifyAddContinuousDelegatorTx(
+		e.Backend,
+		e.State,
+		e.Tx,
+		tx,
+	)
+	if err != nil {
+		return err
+	}
+
+	var (
+		txID      = e.Tx.ID()
+		startTime = e.State.GetTimestamp()
+	)
+
+	staker, err := e.addStakerFromStakerTx(tx, startTime, endTime)
+	if err != nil {
+		return err
+	}
+
+	// continuous delegator first period (aka ramp up period) may be
+	// extended or shortened to align with its continuous validator.
+	// We pick the shortest correction wrt to selected staking period
+	// provided that we don't end up with a staking period shorter than
+	// the minimal allowed staking duration.
+	// Note: staker.StakingPeriod is guaranteed to be validator.StakingPeriod divisor
+	var (
+		misalignment = staker.StartTime.Sub(valStartTime) % staker.StakingPeriod
+		rampUpPeriod = staker.StakingPeriod - misalignment
+	)
+
+	if rampUpPeriod < minStakingDuration || misalignment > staker.StakingPeriod/2 {
+		rampUpPeriod = 2*staker.StakingPeriod - misalignment
+	}
+	state.UpdateStakingPeriodInPlace(staker, rampUpPeriod)
+
+	avax.Consume(e.State, tx.Ins)
+	avax.Produce(e.State, txID, tx.Outs)
+	return nil
+}
+
+func (e *StandardTxExecutor) StopStakerTx(tx *txs.StopStakerTx) error {
+	stakerToStop, err := verifyStopStakerTx(
+		e.Backend,
+		e.State,
+		e.Tx,
+		tx,
+	)
+	if err != nil {
+		return err
+	}
+
+	state.MarkStakerForRemovalInPlaceBeforeTime(stakerToStop, stakerToStop.NextTime)
+	if stakerToStop.Priority.IsValidator() {
+		// Note: if stakerToStop is a validator it may have delegators associated with it
+		// (we currently explicitly forbid subnet validators/delegators). Delegators should
+		// be marked as stopped following their validator stop. We do this lazily in when handling
+		// delegators rewards
+		err = e.State.UpdateCurrentValidator(stakerToStop)
+	} else {
+		err = e.State.UpdateCurrentDelegator(stakerToStop)
+	}
+	if err != nil {
 		return err
 	}
 
 	txID := e.Tx.ID()
-	if err := e.addStakerFromStakerTx(tx, e.State.GetTimestamp()); err != nil {
-		return err
-	}
-
 	avax.Consume(e.State, tx.Ins)
 	avax.Produce(e.State, txID, tx.Outs)
 
@@ -482,8 +606,9 @@ func (e *StandardTxExecutor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionl
 // Post Continuous Staking fork activation it has updates current supply in state
 func (e *StandardTxExecutor) addStakerFromStakerTx(
 	stakerTx txs.Staker,
-	chainTime time.Time,
-) error {
+	startTime time.Time,
+	endTime time.Time,
+) (*state.Staker, error) {
 	// Pre Continuous Staking fork, stakers are added as pending first, then promoted
 	// to current when chainTime reaches their start time.
 	// Post Continuous Staking fork, stakers are immediately marked as current.
@@ -495,43 +620,40 @@ func (e *StandardTxExecutor) addStakerFromStakerTx(
 		err    error
 	)
 
-	if !e.Config.IsContinuousStakingActivated(chainTime) {
+	if !e.Config.IsContinuousStakingActivated(startTime) {
 		preContinuousStakingStakerTx, ok := stakerTx.(txs.PreContinuousStakingStaker)
 		if !ok {
-			return fmt.Errorf("expected tx type txs.PreContinuousStakingStaker but got %T", stakerTx)
+			return nil, fmt.Errorf("expected tx type txs.PreContinuousStakingStaker but got %T", stakerTx)
 		}
 		staker, err = state.NewPendingStaker(txID, preContinuousStakingStakerTx)
 	} else {
-		var (
-			potentialReward = uint64(0)
-			stakeDuration   = stakerTx.Duration()
-		)
+		potentialReward := uint64(0)
 		if stakerTx.CurrentPriority() != txs.SubnetPermissionedValidatorCurrentPriority {
-			subnetID := stakerTx.SubnetID()
-			currentSupply, err := e.State.GetCurrentSupply(subnetID)
-			if err != nil {
-				return err
-			}
-
-			rewards, err := GetRewardsCalculator(e.Backend, e.State, subnetID)
-			if err != nil {
-				return err
-			}
-
-			potentialReward = rewards.Calculate(
-				stakeDuration,
-				stakerTx.Weight(),
-				currentSupply,
+			var (
+				currentSupply uint64
+				subnetID      = stakerTx.SubnetID()
+				stakeDuration = stakerTx.StakingPeriod()
+				stakerWeight  = stakerTx.Weight()
 			)
+			currentSupply, potentialReward, err = calculatePotentialReward(e.Backend, e.State, subnetID, stakeDuration, stakerWeight)
+			if err != nil {
+				return nil, err
+			}
 
 			updatedSupply := currentSupply + potentialReward
 			e.State.SetCurrentSupply(subnetID, updatedSupply)
 		}
-		staker, err = state.NewCurrentStaker(txID, stakerTx, chainTime, potentialReward)
+		staker, err = state.NewCurrentStaker(
+			txID,
+			stakerTx,
+			startTime,
+			endTime,
+			potentialReward,
+		)
 	}
 
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	switch priority := staker.Priority; {
@@ -544,5 +666,30 @@ func (e *StandardTxExecutor) addStakerFromStakerTx(
 	case priority.IsPendingDelegator():
 		e.State.PutPendingDelegator(staker)
 	}
-	return nil
+	return staker, nil
+}
+
+func calculatePotentialReward(
+	backend *Backend,
+	baseState state.Chain,
+	subnetID ids.ID,
+	stakingPeriod time.Duration,
+	stakerWeight uint64,
+) (uint64, uint64, error) {
+	currentSupply, err := baseState.GetCurrentSupply(subnetID)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	rewards, err := GetRewardsCalculator(backend, baseState, subnetID)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	potentialReward := rewards.Calculate(
+		stakingPeriod,
+		stakerWeight,
+		currentSupply,
+	)
+	return currentSupply, potentialReward, nil
 }

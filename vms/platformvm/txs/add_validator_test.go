@@ -139,7 +139,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	stx, err = NewSigned(addValidatorTx, Codec, signers)
 	require.NoError(err)
 	err = stx.SyntacticVerify(ctx)
-	require.ErrorIs(err, errTooManyShares)
+	require.ErrorIs(err, errTooManyDelegatorsShares)
 	addValidatorTx.DelegationShares--
 }
 

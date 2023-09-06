@@ -26,8 +26,10 @@ import (
 type generatorPriorityType uint8
 
 const (
-	permissionlessValidator generatorPriorityType = iota
+	continuousValidator generatorPriorityType = iota
+	permissionlessValidator
 	permissionedValidator
+	continuousDelegator
 	permissionlessDelegator
 	permissionedDelegator
 )
@@ -49,17 +51,101 @@ func stakerTxGenerator(
 	maxWeight uint64, // helps avoiding overflows in delegator tests
 ) gopter.Gen {
 	switch priority {
-	case permissionedValidator:
-		return addValidatorTxGenerator(ctx, nodeID, maxWeight)
-	case permissionedDelegator:
-		return addDelegatorTxGenerator(ctx, nodeID, maxWeight)
+	case continuousValidator:
+		return addContinuousValidatorTxGenerator(ctx, nodeID, maxWeight)
 	case permissionlessValidator:
 		return addPermissionlessValidatorTxGenerator(ctx, subnetID, nodeID, maxWeight)
+	case permissionedValidator:
+		return addValidatorTxGenerator(ctx, nodeID, maxWeight)
+	case continuousDelegator:
+		return addContinuousDelegatorTxGenerator(ctx, nodeID, maxWeight)
 	case permissionlessDelegator:
 		return addPermissionlessDelegatorTxGenerator(ctx, subnetID, nodeID, maxWeight)
+	case permissionedDelegator:
+		return addDelegatorTxGenerator(ctx, nodeID, maxWeight)
 	default:
 		panic(fmt.Sprintf("unhandled tx priority %v", priority))
 	}
+}
+
+func addContinuousValidatorTxGenerator(
+	ctx *snow.Context,
+	nodeID *ids.NodeID,
+	maxWeight uint64,
+) gopter.Gen {
+	return stakerDataGenerator(nodeID, maxWeight).FlatMap(
+		func(v interface{}) gopter.Gen {
+			fullBlsKeyGen := gen.SliceOfN(32, gen.UInt8()).FlatMap(
+				func(v interface{}) gopter.Gen {
+					bytes := v.([]byte)
+					sk1 := blst.KeyGen(bytes)
+					return gen.Const(signer.NewProofOfPossession(sk1))
+				},
+				reflect.TypeOf(&signer.ProofOfPossession{}),
+			)
+
+			stakerData := v.(txs.Validator)
+
+			specificGen := gen.StructPtr(reflect.TypeOf(&txs.AddContinuousValidatorTx{}), map[string]gopter.Gen{
+				"BaseTx": gen.Const(txs.BaseTx{
+					BaseTx: avax.BaseTx{
+						NetworkID:    ctx.NetworkID,
+						BlockchainID: ctx.ChainID,
+						Ins:          []*avax.TransferableInput{},
+						Outs:         []*avax.TransferableOutput{},
+					},
+				}),
+				"Validator": gen.Const(stakerData),
+				"Signer":    fullBlsKeyGen,
+				"ValidatorAuthKey": gen.Const(
+					&secp256k1fx.OutputOwners{
+						Addrs: []ids.ShortID{},
+					},
+				),
+				"StakeOuts": gen.Const([]*avax.TransferableOutput{
+					{
+						Asset: avax.Asset{
+							ID: ctx.AVAXAssetID,
+						},
+						Out: &secp256k1fx.TransferOutput{
+							Amt: stakerData.Weight(),
+						},
+					},
+				}),
+				"ValidatorRewardsOwner": gen.Const(
+					&secp256k1fx.OutputOwners{
+						Addrs: []ids.ShortID{},
+					},
+				),
+				"ValidatorRewardRestakeShares": gen.UInt32Range(0, reward.PercentDenominator),
+				"DelegatorRewardsOwner": gen.Const(
+					&secp256k1fx.OutputOwners{
+						Addrs: []ids.ShortID{},
+					},
+				),
+				"DelegationShares": gen.UInt32Range(0, reward.PercentDenominator),
+			})
+
+			return specificGen.FlatMap(
+				func(v interface{}) gopter.Gen {
+					stakerTx := v.(*txs.AddContinuousValidatorTx)
+
+					if err := stakerTx.SyntacticVerify(ctx); err != nil {
+						panic(fmt.Errorf("failed syntax verification in tx generator, %w", err))
+					}
+
+					// Note: we don't sign the tx here, since we want the freedom to modify
+					// the stakerTx just before testing while avoid having the wrong txID.
+					// We use txs.Tx as a box to return a txs.StakerTx interface.
+					sTx := &txs.Tx{Unsigned: stakerTx}
+
+					return gen.Const(sTx)
+				},
+				reflect.TypeOf(&txs.AddContinuousValidatorTx{}),
+			)
+		},
+		reflect.TypeOf(&txs.AddContinuousValidatorTx{}),
+	)
 }
 
 func addPermissionlessValidatorTxGenerator(
@@ -203,6 +289,69 @@ func addValidatorTxGenerator(
 					return gen.Const(sTx)
 				},
 				reflect.TypeOf(&txs.AddValidatorTx{}),
+			)
+		},
+		reflect.TypeOf(txs.Validator{}),
+	)
+}
+
+func addContinuousDelegatorTxGenerator(
+	ctx *snow.Context,
+	nodeID *ids.NodeID,
+	maxWeight uint64, // helps avoiding overflows in delegator tests
+) gopter.Gen {
+	return stakerDataGenerator(nodeID, maxWeight).FlatMap(
+		func(v interface{}) gopter.Gen {
+			stakerData := v.(txs.Validator)
+			delGen := gen.StructPtr(reflect.TypeOf(txs.AddContinuousDelegatorTx{}), map[string]gopter.Gen{
+				"BaseTx": gen.Const(txs.BaseTx{
+					BaseTx: avax.BaseTx{
+						NetworkID:    ctx.NetworkID,
+						BlockchainID: ctx.ChainID,
+						Ins:          []*avax.TransferableInput{},
+						Outs:         []*avax.TransferableOutput{},
+					},
+				}),
+				"Validator": gen.Const(stakerData),
+				"DelegatorAuthKey": gen.Const(
+					&secp256k1fx.OutputOwners{
+						Addrs: []ids.ShortID{},
+					},
+				),
+				"StakeOuts": gen.Const([]*avax.TransferableOutput{
+					{
+						Asset: avax.Asset{
+							ID: ctx.AVAXAssetID,
+						},
+						Out: &secp256k1fx.TransferOutput{
+							Amt: stakerData.Weight(),
+						},
+					},
+				}),
+				"DelegationRewardsOwner": gen.Const(
+					&secp256k1fx.OutputOwners{
+						Addrs: []ids.ShortID{},
+					},
+				),
+				"DelegatorRewardRestakeShares": gen.UInt32Range(0, reward.PercentDenominator),
+			})
+
+			return delGen.FlatMap(
+				func(v interface{}) gopter.Gen {
+					stakerTx := v.(*txs.AddContinuousDelegatorTx)
+
+					if err := stakerTx.SyntacticVerify(ctx); err != nil {
+						panic(fmt.Errorf("failed syntax verification in tx generator, %w", err))
+					}
+
+					// Note: we don't sign the tx here, since we want the freedom to modify
+					// the stakerTx just before testing while avoid having the wrong txID.
+					// We use txs.Tx as a box to return a txs.StakerTx interface.
+					sTx := &txs.Tx{Unsigned: stakerTx}
+
+					return gen.Const(sTx)
+				},
+				reflect.TypeOf(&txs.AddContinuousDelegatorTx{}),
 			)
 		},
 		reflect.TypeOf(txs.Validator{}),

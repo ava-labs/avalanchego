@@ -164,6 +164,18 @@ func (s *signerVisitor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDe
 	return sign(s.tx, true, txSigners)
 }
 
+func (*signerVisitor) AddContinuousValidatorTx(*txs.AddContinuousValidatorTx) error {
+	return errors.New("not yet implemented")
+}
+
+func (*signerVisitor) AddContinuousDelegatorTx(*txs.AddContinuousDelegatorTx) error {
+	return errors.New("not yet implemented")
+}
+
+func (*signerVisitor) StopStakerTx(*txs.StopStakerTx) error {
+	return errors.New("not yet implemented")
+}
+
 func (s *signerVisitor) getSigners(sourceChainID ids.ID, ins []*avax.TransferableInput) ([][]keychain.Signer, error) {
 	txSigners := make([][]keychain.Signer, len(ins))
 	for credIndex, transferInput := range ins {

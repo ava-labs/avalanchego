@@ -5,6 +5,7 @@ package p
 
 import (
 	stdcontext "context"
+	"errors"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -96,6 +97,18 @@ func (b *backendVisitor) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessV
 
 func (b *backendVisitor) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
 	return b.baseTx(&tx.BaseTx)
+}
+
+func (*backendVisitor) AddContinuousValidatorTx(*txs.AddContinuousValidatorTx) error {
+	return errors.New("not yet implemented")
+}
+
+func (*backendVisitor) AddContinuousDelegatorTx(*txs.AddContinuousDelegatorTx) error {
+	return errors.New("not yet implemented")
+}
+
+func (*backendVisitor) StopStakerTx(*txs.StopStakerTx) error {
+	return errors.New("not yet implemented")
 }
 
 func (b *backendVisitor) baseTx(tx *txs.BaseTx) error {

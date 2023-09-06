@@ -81,3 +81,18 @@ func (*remover) RewardValidatorTx(*txs.RewardValidatorTx) error {
 	// this tx is never in mempool
 	return nil
 }
+
+func (r *remover) AddContinuousValidatorTx(*txs.AddContinuousValidatorTx) error {
+	r.m.removeDecisionTxs([]*txs.Tx{r.tx})
+	return nil
+}
+
+func (r *remover) AddContinuousDelegatorTx(*txs.AddContinuousDelegatorTx) error {
+	r.m.removeDecisionTxs([]*txs.Tx{r.tx})
+	return nil
+}
+
+func (r *remover) StopStakerTx(*txs.StopStakerTx) error {
+	r.m.removeDecisionTxs([]*txs.Tx{r.tx})
+	return nil
+}

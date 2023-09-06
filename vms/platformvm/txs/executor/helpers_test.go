@@ -99,20 +99,21 @@ type mutableSharedMemory struct {
 }
 
 type environment struct {
-	isBootstrapped *utils.Atomic[bool]
-	config         *config.Config
-	clk            *mockable.Clock
-	baseDB         *versiondb.Database
-	ctx            *snow.Context
-	msm            *mutableSharedMemory
-	fx             fx.Fx
-	state          state.State
-	states         map[ids.ID]state.Chain
-	atomicUTXOs    avax.AtomicUTXOManager
-	uptimes        uptime.Manager
-	utxosHandler   utxo.Handler
-	txBuilder      builder.Builder
-	backend        Backend
+	isBootstrapped  *utils.Atomic[bool]
+	config          *config.Config
+	clk             *mockable.Clock
+	baseDB          *versiondb.Database
+	ctx             *snow.Context
+	msm             *mutableSharedMemory
+	fx              fx.Fx
+	state           state.State
+	states          map[ids.ID]state.Chain
+	atomicUTXOs     avax.AtomicUTXOManager
+	uptimes         uptime.Manager
+	utxosHandler    utxo.Handler
+	txBuilder       builder.Builder
+	backend         Backend
+	defaultSubnetID ids.ID
 }
 
 func (e *environment) GetState(blkID ids.ID) (state.Chain, bool) {
@@ -128,6 +129,14 @@ func (e *environment) SetState(blkID ids.ID, chainState state.Chain) {
 }
 
 func newEnvironment(t *testing.T, fork activeFork) *environment {
+	return internalNewEnv(t, fork, false /*noGenesisValidator*/)
+}
+
+func newEnvironmentNoValidator(t *testing.T, fork activeFork) *environment { //nolint:unparam
+	return internalNewEnv(t, fork, true /*noGenesisValidator*/)
+}
+
+func internalNewEnv(t *testing.T, fork activeFork, noGenesisValidator bool) *environment {
 	var isBootstrapped utils.Atomic[bool]
 	isBootstrapped.Set(true)
 
@@ -141,7 +150,7 @@ func newEnvironment(t *testing.T, fork activeFork) *environment {
 	fx := defaultFx(clk, ctx.Log, isBootstrapped.Get())
 
 	rewards := reward.NewCalculator(config.RewardConfig)
-	baseState := defaultState(config, ctx, baseDB, rewards)
+	baseState := defaultState(config, ctx, baseDB, rewards, noGenesisValidator)
 
 	atomicUTXOs := avax.NewAtomicUTXOManager(ctx.SharedMemory, txs.Codec)
 	uptimes := uptime.NewManager(baseState)
@@ -227,6 +236,7 @@ func addSubnet(
 	require.NoError(env.state.Commit())
 
 	defaultBalance -= env.config.GetCreateSubnetTxFee(env.clk.Time())
+	env.defaultSubnetID = testSubnet1.TxID
 }
 
 func defaultState(
@@ -234,8 +244,9 @@ func defaultState(
 	ctx *snow.Context,
 	db database.Database,
 	rewards reward.Calculator,
+	noGenesisValidator bool,
 ) state.State {
-	genesisBytes := buildGenesisTest(ctx)
+	genesisBytes := buildGenesisTest(ctx, noGenesisValidator)
 	execCfg, _ := config.GetExecutionConfig(nil)
 	state, err := state.New(
 		db,
@@ -252,11 +263,6 @@ func defaultState(
 		panic(err)
 	}
 
-	// persist and reload to init a bunch of in-memory stuff
-	state.SetHeight(0)
-	if err := state.Commit(); err != nil {
-		panic(err)
-	}
 	lastAcceptedID = state.GetLastAccepted()
 	return state
 }
@@ -399,7 +405,7 @@ func defaultFx(clk *mockable.Clock, log logging.Logger, isBootstrapped bool) fx.
 	return res
 }
 
-func buildGenesisTest(ctx *snow.Context) []byte {
+func buildGenesisTest(ctx *snow.Context, noGenesisValidator bool) []byte {
 	genesisUTXOs := make([]api.UTXO, len(preFundedKeys))
 	for i, key := range preFundedKeys {
 		id := key.PublicKey().Address()
@@ -413,28 +419,31 @@ func buildGenesisTest(ctx *snow.Context) []byte {
 		}
 	}
 
-	genesisValidators := make([]api.PermissionlessValidator, len(preFundedKeys))
-	for i, key := range preFundedKeys {
-		nodeID := ids.NodeID(key.PublicKey().Address())
-		addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
-		if err != nil {
-			panic(err)
-		}
-		genesisValidators[i] = api.PermissionlessValidator{
-			Staker: api.Staker{
-				StartTime: json.Uint64(defaultValidateStartTime.Unix()),
-				EndTime:   json.Uint64(defaultValidateEndTime.Unix()),
-				NodeID:    nodeID,
-			},
-			RewardOwner: &api.Owner{
-				Threshold: 1,
-				Addresses: []string{addr},
-			},
-			Staked: []api.UTXO{{
-				Amount:  json.Uint64(defaultWeight),
-				Address: addr,
-			}},
-			DelegationFee: reward.PercentDenominator,
+	genesisValidators := make([]api.PermissionlessValidator, 0, len(preFundedKeys))
+	if !noGenesisValidator {
+		for _, key := range preFundedKeys {
+			nodeID := ids.NodeID(key.PublicKey().Address())
+			addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
+			if err != nil {
+				panic(err)
+			}
+			val := api.PermissionlessValidator{
+				Staker: api.Staker{
+					StartTime: json.Uint64(defaultValidateStartTime.Unix()),
+					EndTime:   json.Uint64(defaultValidateEndTime.Unix()),
+					NodeID:    nodeID,
+				},
+				RewardOwner: &api.Owner{
+					Threshold: 1,
+					Addresses: []string{addr},
+				},
+				Staked: []api.UTXO{{
+					Amount:  json.Uint64(defaultWeight),
+					Address: addr,
+				}},
+				DelegationFee: reward.PercentDenominator,
+			}
+			genesisValidators = append(genesisValidators, val)
 		}
 	}
 

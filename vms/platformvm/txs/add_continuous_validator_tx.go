@@ -4,7 +4,6 @@
 package txs
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -21,47 +20,45 @@ import (
 )
 
 var (
-	_ ValidatorTx                = (*AddPermissionlessValidatorTx)(nil)
-	_ PreContinuousStakingStaker = (*AddPermissionlessDelegatorTx)(nil)
+	_ ValidatorTx      = (*AddContinuousValidatorTx)(nil)
+	_ ContinuousStaker = (*AddContinuousValidatorTx)(nil)
 
-	errEmptyNodeID             = errors.New("validator nodeID cannot be empty")
-	errNoStake                 = errors.New("no stake")
-	errInvalidSigner           = errors.New("invalid signer")
-	errMultipleStakedAssets    = errors.New("multiple staked assets")
-	errValidatorWeightMismatch = errors.New("validator weight mismatch")
+	errTooRestakeShares = fmt.Errorf("a staker can only restake at most %d shares of its validation reward", reward.PercentDenominator)
 )
 
-// AddPermissionlessValidatorTx is an unsigned addPermissionlessValidatorTx
-type AddPermissionlessValidatorTx struct {
+type AddContinuousValidatorTx struct {
 	// Metadata, inputs and outputs
 	BaseTx `serialize:"true"`
 	// Describes the validator
 	Validator `serialize:"true" json:"validator"`
-	// ID of the subnet this validator is validating
-	Subnet ids.ID `serialize:"true" json:"subnetID"`
-	// If the [Subnet] is the primary network, [Signer] is the BLS key for this
-	// validator. If the [Subnet] is not the primary network, this value is the
-	// empty signer
+	// [Signer] is the BLS key for this validator.
 	// Note: We do not enforce that the BLS key is unique across all validators.
 	//       This means that validators can share a key if they so choose.
 	//       However, a NodeID does uniquely map to a BLS key
 	Signer signer.Signer `serialize:"true" json:"signer"`
+	// Who is authorized to manage this validator
+	ValidatorAuthKey fx.Owner `serialize:"true" json:"validatorAuthorizationKey"`
 	// Where to send staked tokens when done validating
 	StakeOuts []*avax.TransferableOutput `serialize:"true" json:"stake"`
 	// Where to send validation rewards when done validating
 	ValidatorRewardsOwner fx.Owner `serialize:"true" json:"validationRewardsOwner"`
+	// how much of validation reward is restaked in next staking period,
+	// along with previuosly staked amount
+	ValidatorRewardRestakeShares uint32 `serialize:"true" json:"validationRewardsRestakeShares"`
+	// Maximum amount of delegation weight that this validator permits.
+	DelegationMaxWeight uint64 `serialize:"true" json:"delegationMaxWeight"`
 	// Where to send delegation rewards when done validating
 	DelegatorRewardsOwner fx.Owner `serialize:"true" json:"delegationRewardsOwner"`
 	// Fee this validator charges delegators as a percentage, times 10,000
 	// For example, if this validator has DelegationShares=300,000 then they
 	// take 30% of rewards from delegators
-	DelegationShares uint32 `serialize:"true" json:"shares"`
+	DelegationShares uint32 `serialize:"true" json:"Delegationshares"`
 }
 
 // InitCtx sets the FxID fields in the inputs and outputs of this
-// [AddPermissionlessValidatorTx]. Also sets the [ctx] to the given [vm.ctx] so
+// [AddContinuousValidatorTx]. Also sets the [ctx] to the given [vm.ctx] so
 // that the addresses can be json marshalled into human readable format
-func (tx *AddPermissionlessValidatorTx) InitCtx(ctx *snow.Context) {
+func (tx *AddContinuousValidatorTx) InitCtx(ctx *snow.Context) {
 	tx.BaseTx.InitCtx(ctx)
 	for _, out := range tx.StakeOuts {
 		out.FxID = secp256k1fx.ID
@@ -69,17 +66,18 @@ func (tx *AddPermissionlessValidatorTx) InitCtx(ctx *snow.Context) {
 	}
 	tx.ValidatorRewardsOwner.InitCtx(ctx)
 	tx.DelegatorRewardsOwner.InitCtx(ctx)
+	tx.ValidatorAuthKey.InitCtx(ctx)
 }
 
-func (tx *AddPermissionlessValidatorTx) SubnetID() ids.ID {
-	return tx.Subnet
+func (*AddContinuousValidatorTx) SubnetID() ids.ID {
+	return constants.PlatformChainID
 }
 
-func (tx *AddPermissionlessValidatorTx) NodeID() ids.NodeID {
+func (tx *AddContinuousValidatorTx) NodeID() ids.NodeID {
 	return tx.Validator.NodeID
 }
 
-func (tx *AddPermissionlessValidatorTx) PublicKey() (*bls.PublicKey, bool, error) {
+func (tx *AddContinuousValidatorTx) PublicKey() (*bls.PublicKey, bool, error) {
 	if err := tx.Signer.Verify(); err != nil {
 		return nil, false, err
 	}
@@ -87,38 +85,36 @@ func (tx *AddPermissionlessValidatorTx) PublicKey() (*bls.PublicKey, bool, error
 	return key, key != nil, nil
 }
 
-func (tx *AddPermissionlessValidatorTx) PendingPriority() Priority {
-	if tx.Subnet == constants.PrimaryNetworkID {
-		return PrimaryNetworkValidatorPendingPriority
-	}
-	return SubnetPermissionlessValidatorPendingPriority
+func (tx *AddContinuousValidatorTx) ManagementKey() fx.Owner {
+	return tx.ValidatorAuthKey
 }
 
-func (tx *AddPermissionlessValidatorTx) CurrentPriority() Priority {
-	if tx.Subnet == constants.PrimaryNetworkID {
-		return PrimaryNetworkValidatorCurrentPriority
-	}
-	return SubnetPermissionlessValidatorCurrentPriority
+func (tx *AddContinuousValidatorTx) RestakeShares() uint32 {
+	return tx.ValidatorRewardRestakeShares
 }
 
-func (tx *AddPermissionlessValidatorTx) Stake() []*avax.TransferableOutput {
+func (*AddContinuousValidatorTx) CurrentPriority() Priority {
+	return PrimaryNetworkContinuousValidatorCurrentPriority
+}
+
+func (tx *AddContinuousValidatorTx) Stake() []*avax.TransferableOutput {
 	return tx.StakeOuts
 }
 
-func (tx *AddPermissionlessValidatorTx) ValidationRewardsOwner() fx.Owner {
+func (tx *AddContinuousValidatorTx) ValidationRewardsOwner() fx.Owner {
 	return tx.ValidatorRewardsOwner
 }
 
-func (tx *AddPermissionlessValidatorTx) DelegationRewardsOwner() fx.Owner {
+func (tx *AddContinuousValidatorTx) DelegationRewardsOwner() fx.Owner {
 	return tx.DelegatorRewardsOwner
 }
 
-func (tx *AddPermissionlessValidatorTx) Shares() uint32 {
+func (tx *AddContinuousValidatorTx) Shares() uint32 {
 	return tx.DelegationShares
 }
 
 // SyntacticVerify returns nil iff [tx] is valid
-func (tx *AddPermissionlessValidatorTx) SyntacticVerify(ctx *snow.Context) error {
+func (tx *AddContinuousValidatorTx) SyntacticVerify(ctx *snow.Context) error {
 	switch {
 	case tx == nil:
 		return ErrNilTx
@@ -128,6 +124,8 @@ func (tx *AddPermissionlessValidatorTx) SyntacticVerify(ctx *snow.Context) error
 		return errEmptyNodeID
 	case len(tx.StakeOuts) == 0: // Ensure there is provided stake
 		return errNoStake
+	case tx.ValidatorRewardRestakeShares > reward.PercentDenominator:
+		return errTooRestakeShares
 	case tx.DelegationShares > reward.PercentDenominator:
 		return errTooManyDelegatorsShares
 	}
@@ -135,12 +133,18 @@ func (tx *AddPermissionlessValidatorTx) SyntacticVerify(ctx *snow.Context) error
 	if err := tx.BaseTx.SyntacticVerify(ctx); err != nil {
 		return fmt.Errorf("failed to verify BaseTx: %w", err)
 	}
-	if err := verify.All(&tx.Validator, tx.Signer, tx.ValidatorRewardsOwner, tx.DelegatorRewardsOwner); err != nil {
-		return fmt.Errorf("failed to verify validator, signer, or rewards owners: %w", err)
+	if err := verify.All(
+		&tx.Validator,
+		tx.Signer,
+		tx.ValidatorAuthKey,
+		tx.ValidatorRewardsOwner,
+		tx.DelegatorRewardsOwner,
+	); err != nil {
+		return fmt.Errorf("failed to verify validator, signer, rewards or staker owners: %w", err)
 	}
 
+	isPrimaryNetwork := true // tx.Subnet == constants.PrimaryNetworkID
 	hasKey := tx.Signer.Key() != nil
-	isPrimaryNetwork := tx.Subnet == constants.PrimaryNetworkID
 	if hasKey != isPrimaryNetwork {
 		return fmt.Errorf(
 			"%w: hasKey=%v != isPrimaryNetwork=%v",
@@ -156,9 +160,11 @@ func (tx *AddPermissionlessValidatorTx) SyntacticVerify(ctx *snow.Context) error
 		}
 	}
 
-	firstStakeOutput := tx.StakeOuts[0]
-	stakedAssetID := firstStakeOutput.AssetID()
-	totalStakeWeight := firstStakeOutput.Output().Amount()
+	var (
+		firstStakeOutput = tx.StakeOuts[0]
+		stakedAssetID    = firstStakeOutput.AssetID()
+		totalStakeWeight = firstStakeOutput.Output().Amount()
+	)
 	for _, out := range tx.StakeOuts[1:] {
 		newWeight, err := math.Add64(totalStakeWeight, out.Output().Amount())
 		if err != nil {
@@ -184,6 +190,6 @@ func (tx *AddPermissionlessValidatorTx) SyntacticVerify(ctx *snow.Context) error
 	return nil
 }
 
-func (tx *AddPermissionlessValidatorTx) Visit(visitor Visitor) error {
-	return visitor.AddPermissionlessValidatorTx(tx)
+func (tx *AddContinuousValidatorTx) Visit(visitor Visitor) error {
+	return visitor.AddContinuousValidatorTx(tx)
 }

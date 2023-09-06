@@ -19,6 +19,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
@@ -104,7 +105,13 @@ func TestMaskIteratorProperties(t *testing.T) {
 				}
 
 				stakerTx := signedTx.Unsigned.(txs.StakerTx)
-				staker, err := NewCurrentStaker(signedTx.ID(), stakerTx, startTime, uint64(100))
+				staker, err := NewCurrentStaker(
+					signedTx.ID(),
+					stakerTx,
+					startTime,
+					mockable.MaxTime,
+					uint64(100),
+				)
 				if err != nil {
 					return err.Error()
 				}
@@ -145,7 +152,13 @@ func TestMaskIteratorProperties(t *testing.T) {
 				}
 
 				stakerTx := signedTx.Unsigned.(txs.StakerTx)
-				staker, err := NewCurrentStaker(signedTx.ID(), stakerTx, startTime, uint64(100))
+				staker, err := NewCurrentStaker(
+					signedTx.ID(),
+					stakerTx,
+					startTime,
+					mockable.MaxTime,
+					uint64(100),
+				)
 				if err != nil {
 					return err.Error()
 				}
@@ -185,7 +198,13 @@ func TestMaskIteratorProperties(t *testing.T) {
 				}
 
 				stakerTx := signedTx.Unsigned.(txs.StakerTx)
-				staker, err := NewCurrentStaker(signedTx.ID(), stakerTx, startTime, uint64(100))
+				staker, err := NewCurrentStaker(
+					signedTx.ID(),
+					stakerTx,
+					startTime,
+					mockable.MaxTime,
+					uint64(100),
+				)
 				if err != nil {
 					return err.Error()
 				}
@@ -280,7 +299,7 @@ func buildMaskedIterator(parentStakers []*Staker, deletedIndexes []int, updatedI
 	updatedStakers := make(map[ids.ID]*Staker)
 	for _, idx := range updatedIndexes {
 		s := parentStakers[idx]
-		ShiftStakerAheadInPlace(s, s.EndTime)
+		ShiftStakerAheadInPlace(s, s.NextTime)
 		updatedStakers[s.TxID] = s
 	}
 

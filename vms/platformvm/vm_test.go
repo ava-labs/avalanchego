@@ -1174,7 +1174,7 @@ func TestCreateSubnet(t *testing.T) {
 	require.NoError(err)
 
 	require.NoError(blk.Verify(context.Background()))
-	require.NoError(blk.Accept(context.Background())) // add the validator to pending validator set
+	require.NoError(blk.Accept(context.Background())) // add the validator to validator set
 	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
 
 	txID := blk.(blocks.Block).Txs()[0].ID()

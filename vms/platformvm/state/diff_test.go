@@ -36,9 +36,12 @@ func TestDiffCreation(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	lastAcceptedID := ids.GenerateTestID()
-	state, _ := newInitializedState(require)
+	cfg := defaultConfig(latestFork)
+	state, _, err := newInitializedState(cfg)
+	require.NoError(err)
+
 	versions := NewMockVersions(ctrl)
+	lastAcceptedID := ids.GenerateTestID()
 	versions.EXPECT().GetState(lastAcceptedID).AnyTimes().Return(state, true)
 
 	d, err := NewDiff(lastAcceptedID, versions)
@@ -50,9 +53,12 @@ func TestDiffCurrentSupply(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	lastAcceptedID := ids.GenerateTestID()
-	state, _ := newInitializedState(require)
+	cfg := defaultConfig(latestFork)
+	state, _, err := newInitializedState(cfg)
+	require.NoError(err)
+
 	versions := NewMockVersions(ctrl)
+	lastAcceptedID := ids.GenerateTestID()
 	versions.EXPECT().GetState(lastAcceptedID).AnyTimes().Return(state, true)
 
 	d, err := NewDiff(lastAcceptedID, versions)

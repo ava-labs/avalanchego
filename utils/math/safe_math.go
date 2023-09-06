@@ -76,3 +76,16 @@ func Mul64(a, b uint64) (uint64, error) {
 func AbsDiff[T constraints.Unsigned](a, b T) T {
 	return Max(a, b) - Min(a, b)
 }
+
+func IsPowerOfTwo(n int) bool {
+	if n < 0 {
+		n = -n
+	}
+
+	switch n {
+	case 0:
+		return false
+	default:
+		return n&(n-1) == 0
+	}
+}

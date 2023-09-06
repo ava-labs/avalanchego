@@ -159,7 +159,7 @@ func AdvanceTimeTo(
 		}
 
 		potentialReward := rewards.Calculate(
-			stakerToRemove.EndTime.Sub(stakerToRemove.StartTime),
+			stakerToRemove.StakingPeriod,
 			stakerToRemove.Weight,
 			supply,
 		)

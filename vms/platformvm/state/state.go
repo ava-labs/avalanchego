@@ -1277,7 +1277,7 @@ func (s *state) syncGenesis(genesisBlk blocks.Block, genesis *genesis.State) err
 		}
 
 		stakeAmount := tx.Weight()
-		stakeDuration := tx.Validator.Duration()
+		stakeDuration := tx.StakingPeriod()
 		currentSupply, err := s.GetCurrentSupply(constants.PrimaryNetworkID)
 		if err != nil {
 			return err
@@ -1294,8 +1294,8 @@ func (s *state) syncGenesis(genesisBlk blocks.Block, genesis *genesis.State) err
 		}
 
 		// tx is a genesis transactions, hence it's guaranteed to be
-		// pre Continuous staking fork. It's fine to use tx.StartTime
-		staker, err := NewCurrentStaker(vdrTx.ID(), tx, tx.StartTime(), potentialReward)
+		// pre Continuous staking fork. It's fine using tx.StartTime and tx.EndTime
+		staker, err := NewCurrentStaker(vdrTx.ID(), tx, tx.StartTime(), tx.EndTime(), potentialReward)
 		if err != nil {
 			return err
 		}
@@ -1412,9 +1412,13 @@ func (s *state) loadCurrentStakers() error {
 
 		metadataBytes := validatorIt.Value()
 
-		defaultStartTime := time.Time{}
+		var (
+			defaultStartTime = time.Time{}
+			defaultEndTime   = time.Time{}
+		)
 		if preStaker, ok := stakerTx.(txs.PreContinuousStakingStaker); ok {
 			defaultStartTime = preStaker.StartTime()
+			defaultEndTime = preStaker.EndTime()
 		}
 		metadata := &validatorMetadata{
 			txID: txID,
@@ -1423,6 +1427,7 @@ func (s *state) loadCurrentStakers() error {
 			// Note: we don't provide [LastUpdated] here because we expect it to
 			// always be present on disk.
 			StakerStartTime: defaultStartTime.Unix(),
+			StakerEndTime:   defaultEndTime.Unix(),
 		}
 		err = parseValidatorMetadata(metadataBytes, metadata)
 		if err != nil {
@@ -1433,6 +1438,7 @@ func (s *state) loadCurrentStakers() error {
 			txID,
 			stakerTx,
 			time.Unix(metadata.StakerStartTime, 0),
+			time.Unix(metadata.StakerEndTime, 0),
 			metadata.PotentialReward)
 		if err != nil {
 			return err
@@ -1467,15 +1473,20 @@ func (s *state) loadCurrentStakers() error {
 		}
 
 		metadataBytes := subnetValidatorIt.Value()
-		defaultStartTime := time.Time{}
+		var (
+			defaultStartTime = time.Time{}
+			defaultEndTime   = time.Time{}
+		)
 		if preStaker, ok := stakerTx.(txs.PreContinuousStakingStaker); ok {
 			defaultStartTime = preStaker.StartTime()
+			defaultEndTime = preStaker.EndTime()
 		}
 		metadata := &validatorMetadata{
 			txID: txID,
-			// use the start time as the fallback value
-			// in case it's not stored in the database
+			// use the start values as the fallback
+			// in case they are not stored in the database
 			StakerStartTime: defaultStartTime.Unix(),
+			StakerEndTime:   defaultEndTime.Unix(),
 			LastUpdated:     uint64(defaultStartTime.Unix()),
 		}
 		if err := parseValidatorMetadata(metadataBytes, metadata); err != nil {
@@ -1486,12 +1497,12 @@ func (s *state) loadCurrentStakers() error {
 			txID,
 			stakerTx,
 			time.Unix(metadata.StakerStartTime, 0),
+			time.Unix(metadata.StakerEndTime, 0),
 			metadata.PotentialReward,
 		)
 		if err != nil {
 			return err
 		}
-		ShiftStakerAheadInPlace(staker, time.Unix(metadata.StakerStartTime, 0))
 		UpdateStakingPeriodInPlace(staker, time.Duration(metadata.StakerStakingPeriod))
 		IncreaseStakerWeightInPlace(staker, metadata.UpdatedWeight)
 
@@ -1526,14 +1537,19 @@ func (s *state) loadCurrentStakers() error {
 				return fmt.Errorf("expected tx type txs.Staker but got %T", tx.Unsigned)
 			}
 
-			defaultStartTime := time.Time{}
+			var (
+				defaultStartTime = time.Time{}
+				defaultEndTime   = time.Time{}
+			)
 			if preStaker, ok := stakerTx.(txs.PreContinuousStakingStaker); ok {
 				defaultStartTime = preStaker.StartTime()
+				defaultEndTime = preStaker.EndTime()
 			}
 			metadata := &delegatorMetadata{
 				// use the start values as the fallback
 				// in case they are not stored in the database
 				StakerStartTime: defaultStartTime.Unix(),
+				StakerEndTime:   defaultEndTime.Unix(),
 			}
 			err = parseDelegatorMetadata(delegatorIt.Value(), metadata)
 			if err != nil {
@@ -1544,6 +1560,7 @@ func (s *state) loadCurrentStakers() error {
 				txID,
 				stakerTx,
 				time.Unix(metadata.StakerStartTime, 0),
+				time.Unix(metadata.StakerEndTime, 0),
 				metadata.PotentialReward,
 			)
 			if err != nil {
@@ -2006,7 +2023,8 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 					// specified in the tx creating the staker. We store these data
 					// to properly reconstruct staker data.
 					StakerStartTime:     validator.StartTime.Unix(),
-					StakerStakingPeriod: int64(validator.EndTime.Sub(validator.StartTime)),
+					StakerStakingPeriod: int64(validator.CurrentStakingPeriod()),
+					StakerEndTime:       validator.EndTime.Unix(),
 					UpdatedWeight:       validator.Weight,
 				}
 
@@ -2090,7 +2108,8 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 
 				metadata.lastUpdated = validator.StartTime
 				metadata.StakerStartTime = validator.StartTime.Unix()
-				metadata.StakerStakingPeriod = int64(validator.EndTime.Sub(validator.StartTime))
+				metadata.StakerStakingPeriod = int64(validator.CurrentStakingPeriod())
+				metadata.StakerEndTime = validator.EndTime.Unix()
 				metadata.LastUpdated = uint64(metadata.StakerStartTime)
 				metadata.UpdatedWeight = validator.Weight
 
@@ -2103,6 +2122,13 @@ func (s *state) writeCurrentStakers(updateValidators bool, height uint64) error 
 				}
 				if err := s.validatorState.UpdateValidatorMetadata(nodeID, subnetID, metadata); err != nil {
 					return fmt.Errorf("failed updating validator metadata: %w", err)
+				}
+
+				// in current implementation, all delegatee reward are paid back to the user
+				// as soon as the validator is rewarded and shifted. Hence we clean it up if available.
+				err = s.validatorState.DeleteDelegateeReward(subnetID, nodeID)
+				if err != nil && !errors.Is(err, database.ErrNotFound) {
+					return fmt.Errorf("failed to delete delegatee reward: %w", err)
 				}
 
 			case unmodified:
@@ -2208,7 +2234,8 @@ func writeCurrentDelegatorDiff(
 			metadata := &delegatorMetadata{
 				PotentialReward:     delegator.PotentialReward,
 				StakerStartTime:     delegator.StartTime.Unix(),
-				StakerStakingPeriod: int64(delegator.EndTime.Sub(delegator.StartTime)),
+				StakerStakingPeriod: int64(delegator.CurrentStakingPeriod()),
+				StakerEndTime:       delegator.EndTime.Unix(),
 				UpdatedWeight:       delegator.Weight,
 			}
 			metadataBytes, err := metadataCodec.Marshal(v1, metadata)
@@ -2253,7 +2280,8 @@ func writeCurrentDelegatorDiff(
 			}
 
 			metadata.StakerStartTime = delegator.StartTime.Unix()
-			metadata.StakerStakingPeriod = int64(delegator.EndTime.Sub(delegator.StartTime))
+			metadata.StakerStakingPeriod = int64(delegator.CurrentStakingPeriod())
+			metadata.StakerEndTime = delegator.EndTime.Unix()
 			metadata.UpdatedWeight = delegator.Weight
 
 			metadataBytes, err = metadataCodec.Marshal(v1, metadata)
@@ -2372,7 +2400,17 @@ func (s *state) writeTXs() error {
 func (s *state) writeRewardUTXOs() error {
 	for txID, utxos := range s.addedRewardUTXOs {
 		delete(s.addedRewardUTXOs, txID)
-		s.rewardUTXOsCache.Put(txID, utxos)
+
+		// following continuous staking fork it's key not to overwrite
+		// utxos from previous staking periods which may already cached.
+		preUtxos, found := s.rewardUTXOsCache.Get(txID)
+		if found {
+			preUtxos = append(preUtxos, utxos...)
+			s.rewardUTXOsCache.Put(txID, preUtxos)
+		} else {
+			s.rewardUTXOsCache.Put(txID, utxos)
+		}
+
 		rawTxDB := prefixdb.New(txID[:], s.rewardUTXODB)
 		txDB := linkeddb.NewDefault(rawTxDB)
 

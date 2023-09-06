@@ -36,6 +36,7 @@ type validatorMetadata struct {
 
 	StakerStartTime     int64  `v1:"true"`
 	StakerStakingPeriod int64  `v1:"true"`
+	StakerEndTime       int64  `v1:"true"`
 	UpdatedWeight       uint64 `v1:"true"`
 
 	txID        ids.ID
@@ -122,6 +123,11 @@ type validatorState interface {
 		subnetID ids.ID,
 		vdrID ids.NodeID,
 		amount uint64,
+	) error
+
+	DeleteDelegateeReward(
+		subnetID ids.ID,
+		vdrID ids.NodeID,
 	) error
 
 	UpdateValidatorMetadata(
@@ -219,6 +225,20 @@ func (m *metadata) SetDelegateeReward(
 		return database.ErrNotFound
 	}
 	metadata.PotentialDelegateeReward = amount
+
+	m.addUpdatedMetadata(vdrID, subnetID)
+	return nil
+}
+
+func (m *metadata) DeleteDelegateeReward(
+	subnetID ids.ID,
+	vdrID ids.NodeID,
+) error {
+	metadata, exists := m.metadata[vdrID][subnetID]
+	if !exists {
+		return database.ErrNotFound
+	}
+	metadata.PotentialDelegateeReward = 0
 
 	m.addUpdatedMetadata(vdrID, subnetID)
 	return nil

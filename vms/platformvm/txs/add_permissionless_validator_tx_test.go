@@ -1468,7 +1468,7 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 					DelegationShares: reward.PercentDenominator + 1,
 				}
 			},
-			err: errTooManyShares,
+			err: errTooManyDelegatorsShares,
 		},
 		{
 			name: "invalid BaseTx",

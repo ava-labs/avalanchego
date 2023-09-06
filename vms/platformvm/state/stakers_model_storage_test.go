@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -64,7 +65,7 @@ func TestStateAndDiffComparisonToStorageModel(t *testing.T) {
 	properties := gopter.NewProperties(nil)
 
 	// // to reproduce a given scenario do something like this:
-	// parameters := gopter.DefaultTestParametersWithSeed(1688121928651346121)
+	// parameters := gopter.DefaultTestParametersWithSeed(1688659181806322207)
 	// properties := gopter.NewProperties(parameters)
 
 	properties.Property("state comparison to storage model", commands.Prop(stakersCommands))
@@ -162,7 +163,13 @@ func (cmd *putCurrentValidatorCommand) Run(sut commands.SystemUnderTest) command
 	}
 
 	stakerTx := sTx.Unsigned.(txs.StakerTx)
-	currentVal, err := NewCurrentStaker(sTx.ID(), stakerTx, dummyStartTime, uint64(1000))
+	currentVal, err := NewCurrentStaker(
+		sTx.ID(),
+		stakerTx,
+		dummyStartTime,
+		mockable.MaxTime,
+		uint64(1000),
+	)
 	if err != nil {
 		return sys // state checks later on should spot missing validator
 	}
@@ -176,7 +183,13 @@ func (cmd *putCurrentValidatorCommand) Run(sut commands.SystemUnderTest) command
 func (cmd *putCurrentValidatorCommand) NextState(cmdState commands.State) commands.State {
 	sTx := cmd.sTx
 	stakerTx := sTx.Unsigned.(txs.StakerTx)
-	currentVal, err := NewCurrentStaker(sTx.ID(), stakerTx, dummyStartTime, uint64(1000))
+	currentVal, err := NewCurrentStaker(
+		sTx.ID(),
+		stakerTx,
+		dummyStartTime,
+		mockable.MaxTime,
+		uint64(1000),
+	)
 	if err != nil {
 		return cmdState // state checks later on should spot missing validator
 	}
@@ -214,7 +227,7 @@ func (cmd *putCurrentValidatorCommand) String() string {
 		stakerTx.NodeID(),
 		cmd.sTx.TxID,
 		stakerTx.CurrentPriority(),
-		stakerTx.Duration(),
+		stakerTx.StakingPeriod(),
 	)
 }
 
@@ -266,12 +279,12 @@ func shiftCurrentValidatorInSystem(sys *sysUnderTest) error {
 	}
 
 	var (
-		found  bool
-		staker *Staker
+		found     bool
+		validator *Staker
 	)
 	for !found && stakerIt.Next() {
-		staker = stakerIt.Value()
-		if staker.Priority.IsCurrentValidator() {
+		validator = stakerIt.Value()
+		if validator.Priority.IsCurrentValidator() {
 			found = true
 			break
 		}
@@ -285,15 +298,15 @@ func shiftCurrentValidatorInSystem(sys *sysUnderTest) error {
 	chain = sys.getTopChainState()
 
 	// 3. query the staker
-	staker, err = chain.GetCurrentValidator(staker.SubnetID, staker.NodeID)
+	validator, err = chain.GetCurrentValidator(validator.SubnetID, validator.NodeID)
 	if err != nil {
 		return err
 	}
 
 	// 4. shift staker times and update the staker
-	updatedStaker := *staker
-	ShiftStakerAheadInPlace(&updatedStaker, updatedStaker.EndTime)
-	return chain.UpdateCurrentValidator(&updatedStaker)
+	updatedValidator := *validator
+	ShiftStakerAheadInPlace(&updatedValidator, updatedValidator.NextTime)
+	return chain.UpdateCurrentValidator(&updatedValidator)
 }
 
 func (cmd *shiftCurrentValidatorCommand) NextState(cmdState commands.State) commands.State {
@@ -313,12 +326,12 @@ func shiftCurrentValidatorInModel(model *stakersStorageModel) error {
 	}
 
 	var (
-		found  bool
-		staker *Staker
+		found     bool
+		validator *Staker
 	)
 	for !found && stakerIt.Next() {
-		staker = stakerIt.Value()
-		if staker.Priority.IsCurrentValidator() {
+		validator = stakerIt.Value()
+		if validator.Priority.IsCurrentValidator() {
 			found = true
 			break
 		}
@@ -329,9 +342,9 @@ func shiftCurrentValidatorInModel(model *stakersStorageModel) error {
 	}
 	stakerIt.Release()
 
-	updatedStaker := *staker
-	ShiftStakerAheadInPlace(&updatedStaker, updatedStaker.EndTime)
-	return model.UpdateCurrentValidator(&updatedStaker)
+	updatedValidator := *validator
+	ShiftStakerAheadInPlace(&updatedValidator, updatedValidator.NextTime)
+	return model.UpdateCurrentValidator(&updatedValidator)
 }
 
 func (*shiftCurrentValidatorCommand) PreCondition(commands.State) bool {
@@ -421,11 +434,7 @@ func updateStakingPeriodCurrentValidatorInSystem(sys *sysUnderTest) error {
 	// 3. modify staker period and update the staker
 	updatedStaker := *staker
 	stakingPeriod := staker.EndTime.Sub(staker.StartTime)
-	if stakingPeriod%2 == 0 {
-		stakingPeriod -= 30 * time.Minute
-	} else {
-		stakingPeriod = 3*stakingPeriod + 1
-	}
+	stakingPeriod = pickNewStakingPeriod(stakingPeriod)
 	UpdateStakingPeriodInPlace(&updatedStaker, stakingPeriod)
 	return chain.UpdateCurrentValidator(&updatedStaker)
 }
@@ -465,11 +474,7 @@ func updateStakingPeriodCurrentValidatorInModel(model *stakersStorageModel) erro
 
 	updatedStaker := *staker
 	stakingPeriod := staker.EndTime.Sub(staker.StartTime)
-	if stakingPeriod%2 == 0 {
-		stakingPeriod -= 30 * time.Minute
-	} else {
-		stakingPeriod = 3*stakingPeriod + 1
-	}
+	stakingPeriod = pickNewStakingPeriod(stakingPeriod)
 	UpdateStakingPeriodInPlace(&updatedStaker, stakingPeriod)
 	return model.UpdateCurrentValidator(&updatedStaker)
 }
@@ -829,7 +834,14 @@ func addCurrentDelegatorInSystem(sys *sysUnderTest, candidateDelegatorTx txs.Uns
 		return fmt.Errorf("failed signing tx, %w", err)
 	}
 
-	delegator, err := NewCurrentStaker(signedTx.ID(), signedTx.Unsigned.(txs.Staker), dummyStartTime, uint64(1000))
+	stakerTx := signedTx.Unsigned.(txs.Staker)
+	delegator, err := NewCurrentStaker(
+		signedTx.ID(),
+		stakerTx,
+		dummyStartTime,
+		mockable.MaxTime,
+		uint64(1000),
+	)
 	if err != nil {
 		return fmt.Errorf("failed generating staker, %w", err)
 	}
@@ -887,7 +899,14 @@ func addCurrentDelegatorInModel(model *stakersStorageModel, candidateDelegatorTx
 		return fmt.Errorf("failed signing tx, %w", err)
 	}
 
-	delegator, err := NewCurrentStaker(signedTx.ID(), signedTx.Unsigned.(txs.Staker), dummyStartTime, uint64(1000))
+	stakerTx := signedTx.Unsigned.(txs.Staker)
+	delegator, err := NewCurrentStaker(
+		signedTx.ID(),
+		stakerTx,
+		dummyStartTime,
+		mockable.MaxTime,
+		uint64(1000),
+	)
 	if err != nil {
 		return fmt.Errorf("failed generating staker, %w", err)
 	}
@@ -924,7 +943,7 @@ func (cmd *putCurrentDelegatorCommand) String() string {
 		stakerTx.NodeID(),
 		cmd.sTx.TxID,
 		stakerTx.CurrentPriority(),
-		stakerTx.Duration(),
+		stakerTx.StakingPeriod(),
 	)
 }
 
@@ -996,11 +1015,7 @@ func updateStakingPeriodCurrentDelegatorInSystem(sys *sysUnderTest) error {
 	// 3. update delegator staking period and update the staker
 	updatedDelegator := *delegator
 	stakingPeriod := delegator.EndTime.Sub(delegator.StartTime)
-	if stakingPeriod%2 == 0 {
-		stakingPeriod -= 30 * time.Minute
-	} else {
-		stakingPeriod = 3*stakingPeriod + 1
-	}
+	stakingPeriod = pickNewStakingPeriod(stakingPeriod)
 	UpdateStakingPeriodInPlace(&updatedDelegator, stakingPeriod)
 	return chain.UpdateCurrentDelegator(&updatedDelegator)
 }
@@ -1040,11 +1055,7 @@ func updateStakingPeriodCurrentDelegatorInModel(model *stakersStorageModel) erro
 
 	updatedDelegator := *delegator
 	stakingPeriod := delegator.EndTime.Sub(delegator.StartTime)
-	if stakingPeriod%2 == 0 {
-		stakingPeriod -= 30 * time.Minute
-	} else {
-		stakingPeriod = 3*stakingPeriod + 1
-	}
+	stakingPeriod = pickNewStakingPeriod(stakingPeriod)
 	UpdateStakingPeriodInPlace(&updatedDelegator, stakingPeriod)
 	return model.UpdateCurrentDelegator(&updatedDelegator)
 }
@@ -1128,7 +1139,7 @@ func shiftCurrentDelegatorInSystem(sys *sysUnderTest) error {
 
 	// 2. Shift delegator times and update the staker
 	updatedDelegator := *delegator
-	ShiftStakerAheadInPlace(&updatedDelegator, updatedDelegator.EndTime)
+	ShiftStakerAheadInPlace(&updatedDelegator, updatedDelegator.NextTime)
 	return chain.UpdateCurrentDelegator(&updatedDelegator)
 }
 
@@ -1166,7 +1177,7 @@ func shiftCurrentDelegatorInModel(model *stakersStorageModel) error {
 	stakerIt.Release()
 
 	updatedDelegator := *delegator
-	ShiftStakerAheadInPlace(&updatedDelegator, updatedDelegator.EndTime)
+	ShiftStakerAheadInPlace(&updatedDelegator, updatedDelegator.NextTime)
 	return model.UpdateCurrentDelegator(&updatedDelegator)
 }
 
@@ -1783,4 +1794,15 @@ func (s *sysUnderTest) checkThereIsADiff() error {
 	}
 
 	return s.addDiffOnTop()
+}
+
+// pickNewStakingPeriod is just a way to randomly change period in a reproducible way
+func pickNewStakingPeriod(stakingPeriod time.Duration) time.Duration {
+	if stakingPeriod%2 == 0 {
+		stakingPeriod -= 30 * time.Minute
+	} else {
+		stakingPeriod += 30 * time.Minute
+	}
+
+	return stakingPeriod
 }

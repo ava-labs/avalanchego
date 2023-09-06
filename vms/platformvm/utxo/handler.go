@@ -37,6 +37,7 @@ var (
 	errLocktimeMismatch             = errors.New("input locktime does not match UTXO locktime")
 	errCantSign                     = errors.New("can't sign")
 	errLockedFundsNotMarkedAsLocked = errors.New("locked funds not marked as locked")
+	errUnauthorizedStakerStopping   = errors.New("unauthorized staker stopping")
 )
 
 // TODO: Stake and Authorize should be replaced by similar methods in the
@@ -74,6 +75,16 @@ type Spender interface {
 	Authorize(
 		state state.Chain,
 		subnetID ids.ID,
+		keys []*secp256k1.PrivateKey,
+	) (
+		verify.Verifiable, // Input that names owners
+		[]*secp256k1.PrivateKey, // Keys that prove ownership
+		error,
+	)
+
+	AuthorizeStopStaking(
+		state state.Chain,
+		stakerTxID ids.ID,
 		keys []*secp256k1.PrivateKey,
 	) (
 		verify.Verifiable, // Input that names owners
@@ -416,6 +427,51 @@ func (h *handler) Authorize(
 	owner, ok := subnet.Owner.(*secp256k1fx.OutputOwners)
 	if !ok {
 		return nil, nil, fmt.Errorf("expected *secp256k1fx.OutputOwners but got %T", subnet.Owner)
+	}
+
+	// Add the keys to a keychain
+	kc := secp256k1fx.NewKeychain(keys...)
+
+	// Make sure that the operation is valid after a minimum time
+	now := uint64(h.clk.Time().Unix())
+
+	// Attempt to prove ownership of the subnet
+	indices, signers, matches := kc.Match(owner, now)
+	if !matches {
+		return nil, nil, errCantSign
+	}
+
+	return &secp256k1fx.Input{SigIndices: indices}, signers, nil
+}
+
+func (h *handler) AuthorizeStopStaking(
+	state state.Chain,
+	stakerTxID ids.ID,
+	keys []*secp256k1.PrivateKey,
+) (
+	verify.Verifiable, // Input that names owners
+	[]*secp256k1.PrivateKey, // Keys that prove ownership
+	error,
+) {
+	stakerTx, _, err := state.GetTx(stakerTxID)
+	if err != nil {
+		return nil, nil, fmt.Errorf(
+			"failed to fetch tx %s: %w",
+			stakerTxID,
+			err,
+		)
+	}
+
+	continuousStakerTx, ok := stakerTx.Unsigned.(txs.ContinuousStaker)
+	if !ok {
+		return nil, nil, errUnauthorizedStakerStopping
+	}
+	stakerOwner := continuousStakerTx.ManagementKey()
+
+	// Make sure the owners of the subnet match the provided keys
+	owner, ok := stakerOwner.(*secp256k1fx.OutputOwners)
+	if !ok {
+		return nil, nil, fmt.Errorf("expected *secp256k1fx.OutputOwners but got %T", stakerOwner)
 	}
 
 	// Add the keys to a keychain
