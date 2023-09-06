@@ -10,10 +10,10 @@ import (
 	"fmt"
 	"runtime"
 	"strings"
+	"sync"
 	"sync/atomic"
 
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/cockroachdb/pebble"
@@ -47,13 +47,16 @@ var (
 		MemTableSize:                16 * units.MiB,
 		MaxOpenFiles:                4 * units.KiB,
 	}
+
+	comparer = pebble.DefaultComparer
 )
 
 type Database struct {
+	lock     sync.RWMutex
 	pebbleDB *pebble.DB
-	closed   utils.Atomic[bool]
 	// closeCh is closed when Close() is called.
 	closeCh chan struct{}
+	closed  bool
 }
 
 type Config struct {
@@ -71,6 +74,7 @@ func New(file string, cfg Config, log logging.Logger, _ string, _ prometheus.Reg
 	opts := &pebble.Options{
 		Cache:        pebble.NewCache(int64(cfg.CacheSize)),
 		BytesPerSync: cfg.BytesPerSync,
+		Comparer:     comparer,
 		// Although we use `pebble.NoSync`, we still keep the WAL enabled. Pebble
 		// will fsync the WAL during shutdown and should ensure the db is
 		// recoverable if shutdown correctly.
@@ -111,12 +115,19 @@ func New(file string, cfg Config, log logging.Logger, _ string, _ prometheus.Reg
 }
 
 func (db *Database) Close() error {
-	// close a db twice will trigger panic by pebble instead of error
-	if db.closed.Get() {
+	db.lock.Lock()
+	defer db.lock.Unlock()
+
+	if db.closed {
 		return database.ErrClosed
 	}
-	db.closed.Set(true)
 
+	db.closed = true
+
+	// TODO: Address the following comment from pebbledb.Close:
+	// "It is not safe to close a DB until all outstanding iterators are closed or to call
+	// Close concurrently with any other DB method. It is not valid to call any of a DB's
+	// methods after the DB has been closed.""
 	err := updateError(db.pebbleDB.Close())
 	if err != nil && strings.Contains(err.Error(), "leaked iterator") {
 		// avalanche database support close db w/o error
@@ -129,14 +140,20 @@ func (db *Database) Close() error {
 }
 
 func (db *Database) HealthCheck(_ context.Context) (interface{}, error) {
-	if db.closed.Get() {
+	db.lock.RLock()
+	defer db.lock.RUnlock()
+
+	if db.closed {
 		return nil, database.ErrClosed
 	}
 	return nil, nil
 }
 
 func (db *Database) Has(key []byte) (bool, error) {
-	if db.closed.Get() {
+	db.lock.RLock()
+	defer db.lock.RUnlock()
+
+	if db.closed {
 		return false, database.ErrClosed
 	}
 
@@ -144,7 +161,6 @@ func (db *Database) Has(key []byte) (bool, error) {
 	if err == pebble.ErrNotFound {
 		return false, nil
 	}
-
 	if err != nil {
 		return false, updateError(err)
 	}
@@ -152,7 +168,10 @@ func (db *Database) Has(key []byte) (bool, error) {
 }
 
 func (db *Database) Get(key []byte) ([]byte, error) {
-	if db.closed.Get() {
+	db.lock.RLock()
+	defer db.lock.RUnlock()
+
+	if db.closed {
 		return nil, database.ErrClosed
 	}
 
@@ -160,13 +179,15 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 	if err != nil {
 		return nil, updateError(err)
 	}
-	ret := slices.Clone(data)
-	return ret, closer.Close()
+	dataClone := slices.Clone(data)
+	return dataClone, closer.Close()
 }
 
 func (db *Database) Put(key []byte, value []byte) error {
-	// Put causes panic if the db has already been closed
-	if db.closed.Get() {
+	db.lock.Lock()
+	defer db.lock.Unlock()
+
+	if db.closed {
 		return database.ErrClosed
 	}
 
@@ -177,8 +198,10 @@ func (db *Database) Put(key []byte, value []byte) error {
 }
 
 func (db *Database) Delete(key []byte) error {
-	// Delete causes panic if the db has already been closed
-	if db.closed.Get() {
+	db.lock.Lock()
+	defer db.lock.Unlock()
+
+	if db.closed {
 		return database.ErrClosed
 	}
 
@@ -186,43 +209,35 @@ func (db *Database) Delete(key []byte) error {
 }
 
 func (db *Database) Compact(start []byte, limit []byte) error {
-	// Pebble Compact causes panic if the db has already been closed.
-	// Avalanche database just return error instead.
-	if db.closed.Get() {
+	db.lock.Lock()
+	defer db.lock.Unlock()
+
+	if db.closed {
 		return database.ErrClosed
 	}
 
-	if bytes.Equal(start, limit) && limit != nil {
-		// The default compare function of pebble is bytes.Compare.
-		// Use this default compare function since we don't setup
-		// the compare function when we create pebble db.
-		// It's impossible to retrieve this default
-		// compare function from the pebble package since
-		// it's defined in internal.
-		// We use bytes.Equal instead of bytes.Compare
-		// because golangci_lint recommends
-
-		// pebble return error if start and limit are the same,
-		// even if both are nil.
-		// Do nothing just ignore the error if start and limt are the same
-		// and not nil since there is no need to compact and avalanche db
-		// expects a nil return.
+	if comparer.Compare(start, limit) >= 0 {
+		// pebble's Compact will no-op & error if start >= limit
+		// according to pebble's comparer.
 		return nil
-	} else if limit != nil {
-		return updateError(db.pebbleDB.Compact(start, limit, true))
 	}
 
-	// A nil limit is treated as a key after all keys in avalanche DB.
-	// But pebble treats a nil, no matter start or limit, as a key before
-	// all keys in the DB
+	if limit != nil {
+		return updateError(db.pebbleDB.Compact(start, limit, true /* parallelize */))
+	}
+
+	// The database.Database spec says that a nil [limit] is treated as a key after all keys.
+	// But pebble treats a nil [limit] as being the key before all keys.
+	// Use the greatest key in the database as the [limit] to get the desired behavior.
 	it := db.pebbleDB.NewIter(&pebble.IterOptions{})
 	if it.Last() {
 		if lastkey := it.Key(); lastkey != nil {
-			return updateError(db.pebbleDB.Compact(start, lastkey, true))
+			return updateError(db.pebbleDB.Compact(start, lastkey, true /* parallelize */))
 		}
 	}
 
-	return database.ErrNotFoundLastKey
+	// Either this database is empty or the only key in it is nil.
+	return nil
 }
 
 // batch is a wrapper around a pebbleDB batch to contain sizes.
@@ -255,8 +270,10 @@ func (b *batch) Delete(key []byte) error {
 func (b *batch) Size() int { return b.size }
 
 func (b *batch) Write() error {
-	// write causes panic if the db has already been closed
-	if b.db.closed.Get() {
+	b.db.lock.Lock() // TODO do we need write lock?
+	defer b.db.lock.Unlock()
+
+	if b.db.closed {
 		return database.ErrClosed
 	}
 
@@ -314,20 +331,15 @@ func (b *batch) Replay(w database.KeyValueWriterDeleter) error {
 
 func (b *batch) Inner() database.Batch { return b }
 
-type iter struct {
-	db       *Database
-	iter     *pebble.Iterator
-	setFirst bool
-
-	valid bool
-	err   error
-}
-
 func (db *Database) NewIterator() database.Iterator {
-	// Don't call NewIter of pebble after the db closed. It panics otherwise.
-	if db.closed.Get() {
+	db.lock.Lock() // TODO do we need write lock?
+	defer db.lock.Unlock()
+
+	if db.closed {
 		return &iter{
-			db: db,
+			db:     db,
+			closed: true,
+			err:    database.ErrClosed,
 		}
 	}
 
@@ -338,9 +350,14 @@ func (db *Database) NewIterator() database.Iterator {
 }
 
 func (db *Database) NewIteratorWithStart(start []byte) database.Iterator {
-	if db.closed.Get() {
+	db.lock.Lock() // TODO do we need write lock?
+	defer db.lock.Unlock()
+
+	if db.closed {
 		return &iter{
-			db: db,
+			db:     db,
+			closed: true,
+			err:    database.ErrClosed,
 		}
 	}
 
@@ -367,9 +384,14 @@ func bytesPrefix(prefix []byte) *pebble.IterOptions {
 }
 
 func (db *Database) NewIteratorWithPrefix(prefix []byte) database.Iterator {
-	if db.closed.Get() {
+	db.lock.Lock() // TODO do we need write lock?
+	defer db.lock.Unlock()
+
+	if db.closed {
 		return &iter{
-			db: db,
+			db:     db,
+			closed: true,
+			err:    database.ErrClosed,
 		}
 	}
 
@@ -386,9 +408,14 @@ func (db *Database) NewIteratorWithPrefix(prefix []byte) database.Iterator {
 // Prefix should be some key contained within [start] or else the lower bound
 // of the iteration will be overwritten with [start].
 func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database.Iterator {
-	if db.closed.Get() {
+	db.lock.Lock() // TODO do we need write lock?
+	defer db.lock.Unlock()
+
+	if db.closed {
 		return &iter{
-			db: db,
+			db:     db,
+			closed: true,
+			err:    database.ErrClosed,
 		}
 	}
 
@@ -402,57 +429,8 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 	}
 }
 
-func (it *iter) Next() bool {
-	// Short-circuit and set an error if the underlying database has been closed.
-	db := it.db
-	if db.closed.Get() {
-		it.valid = false
-		it.err = database.ErrClosed
-		return false
-	}
-
-	var hasNext bool
-	if !it.setFirst {
-		hasNext = it.iter.First()
-		it.setFirst = true
-	} else {
-		hasNext = it.iter.Next()
-	}
-	it.valid = hasNext
-	return hasNext
-}
-
-func (it *iter) Error() error {
-	if it.err != nil {
-		return it.err
-	}
-	return updateError(it.iter.Error())
-}
-
-func (it *iter) Key() []byte {
-	if !it.valid {
-		return nil
-	}
-	return slices.Clone(it.iter.Key())
-}
-
-func (it *iter) Value() []byte {
-	if !it.valid {
-		return nil
-	}
-	return slices.Clone(it.iter.Value())
-}
-
-func (it *iter) Release() {
-	if it.db.closed.Get() {
-		return
-	}
-
-	it.iter.Close()
-}
-
-// updateError casts pebble-specific errors to errors that Avalanche VMs expect
-// to see (they do not know which type of db may be provided).
+// updateError converts a pebble-specific error to to its
+// Avalanche equivalent, if applicable.
 func updateError(err error) error {
 	switch err {
 	case pebble.ErrClosed:
