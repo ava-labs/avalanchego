@@ -2,7 +2,6 @@
 // See the file LICENSE for licensing terms.
 
 //go:build !linux && !darwin
-// +build !linux !darwin
 
 package rpcchainvm
 
