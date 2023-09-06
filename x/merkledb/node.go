@@ -4,9 +4,10 @@
 package merkledb
 
 import (
-	"github.com/ava-labs/avalanchego/x/merkledb/paths"
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
+
+	"github.com/ava-labs/avalanchego/x/merkledb/paths"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/hashing"
