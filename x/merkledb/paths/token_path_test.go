@@ -138,7 +138,6 @@ func FuzzPath(f *testing.F) {
 			p := NewTokenPath(pathBytes, branching)
 
 			serializedPath := p.Serialize()
-			require.Equal(len(pathBytes), len(serializedPath.Value))
 			require.True(bytes.Equal(pathBytes, serializedPath.Value))
 			require.Equal(tokensPerByte*len(pathBytes), serializedPath.NibbleLength)
 
