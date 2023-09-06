@@ -4,6 +4,8 @@
 package pebble
 
 import (
+	"sync"
+
 	"github.com/cockroachdb/pebble"
 
 	"golang.org/x/exp/slices"
@@ -14,6 +16,8 @@ import (
 var _ database.Iterator = (*iter)(nil)
 
 type iter struct {
+	lock sync.Mutex
+
 	db          *Database
 	iter        *pebble.Iterator
 	initialized bool
@@ -23,7 +27,11 @@ type iter struct {
 	err   error
 }
 
+// Must not be called with [db.lock] held.
 func (it *iter) Next() bool {
+	it.lock.Lock()
+	defer it.lock.Unlock()
+
 	if it.closed {
 		return false
 	}
@@ -50,6 +58,9 @@ func (it *iter) Next() bool {
 }
 
 func (it *iter) Error() error {
+	it.lock.Lock()
+	defer it.lock.Unlock()
+
 	if it.err != nil {
 		return it.err
 	}
@@ -60,6 +71,9 @@ func (it *iter) Error() error {
 }
 
 func (it *iter) Key() []byte {
+	it.lock.Lock()
+	defer it.lock.Unlock()
+
 	if !it.valid {
 		return nil
 	}
@@ -67,16 +81,30 @@ func (it *iter) Key() []byte {
 }
 
 func (it *iter) Value() []byte {
+	it.lock.Lock()
+	defer it.lock.Unlock()
+
 	if !it.valid {
 		return nil
 	}
+	// TODO Value() is deprecated; use ValueAndErr instead.
 	return slices.Clone(it.iter.Value())
 }
 
 func (it *iter) Release() {
+	it.lock.Lock()
+	defer it.lock.Unlock()
+
 	if it.closed {
 		return
 	}
+
+	it.db.lock.Lock()
+	defer it.db.lock.Unlock()
+
+	// Remove the iterator from the list of open iterators.
+	it.db.openIterators.Remove(it)
+
 	it.closed = true
 	it.valid = false
 	_ = it.iter.Close()

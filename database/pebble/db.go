@@ -20,6 +20,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
@@ -50,9 +51,10 @@ var (
 )
 
 type Database struct {
-	lock     sync.RWMutex
-	pebbleDB *pebble.DB
-	closed   bool
+	lock          sync.RWMutex
+	pebbleDB      *pebble.DB
+	closed        bool
+	openIterators set.Set[*iter]
 }
 
 type Config struct {
@@ -97,7 +99,8 @@ func New(file string, cfg Config, log logging.Logger, _ string, _ prometheus.Reg
 	}
 
 	return &Database{
-		pebbleDB: db,
+		pebbleDB:      db,
+		openIterators: set.Set[*iter]{},
 	}, nil
 }
 
@@ -236,10 +239,12 @@ func (db *Database) NewIterator() database.Iterator {
 		}
 	}
 
-	return &iter{
+	iter := &iter{
 		db:   db,
 		iter: db.pebbleDB.NewIter(&pebble.IterOptions{}),
 	}
+	db.openIterators.Add(iter)
+	return iter
 }
 
 func (db *Database) NewIteratorWithStart(start []byte) database.Iterator {
@@ -254,10 +259,12 @@ func (db *Database) NewIteratorWithStart(start []byte) database.Iterator {
 		}
 	}
 
-	return &iter{
+	iter := &iter{
 		db:   db,
 		iter: db.pebbleDB.NewIter(&pebble.IterOptions{LowerBound: start}),
 	}
+	db.openIterators.Add(iter)
+	return iter
 }
 
 func (db *Database) NewIteratorWithPrefix(prefix []byte) database.Iterator {
@@ -272,10 +279,12 @@ func (db *Database) NewIteratorWithPrefix(prefix []byte) database.Iterator {
 		}
 	}
 
-	return &iter{
+	iter := &iter{
 		db:   db,
 		iter: db.pebbleDB.NewIter(bytesPrefix(prefix)),
 	}
+	db.openIterators.Add(iter)
+	return iter
 }
 
 // NewIteratorWithStartAndPrefix creates a lexicographically ordered iterator
@@ -300,10 +309,12 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 	if bytes.Compare(start, prefix) == 1 {
 		iterRange.LowerBound = start
 	}
-	return &iter{
+	iter := &iter{
 		db:   db,
 		iter: db.pebbleDB.NewIter(iterRange),
 	}
+	db.openIterators.Add(iter)
+	return iter
 }
 
 // updateError converts a pebble-specific error to to its
