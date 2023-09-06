@@ -4,6 +4,7 @@
 package paths
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -101,19 +102,50 @@ func Test_SerializedPath_Equal(t *testing.T) {
 }
 
 func FuzzPath(f *testing.F) {
-	f.Fuzz(func(t *testing.T, pathBytes []byte) {
-		require := require.New(t)
+	for bit0 := 0; bit0 < 2; bit0++ {
+		for bit1 := 0; bit1 < 2; bit1++ {
+			f.Add([]byte{0x01, 0xF0, 0x0F, 0x00}, bit0 == 0, bit1 == 0)
+			f.Add([]byte{}, bit0 == 0, bit1 == 0)
+			f.Add([]byte(nil), bit0 == 0, bit1 == 0)
+		}
+	}
+	f.Fuzz(
+		func(
+			t *testing.T,
+			pathBytes []byte,
+			branchingBit0 bool,
+			branchingBit1 bool,
+		) {
+			var branching BranchFactor
+			var tokensPerByte int
+			switch {
+			case branchingBit0 && branchingBit1:
+				branching = BranchFactor256
+				tokensPerByte = 1
+			case branchingBit0 && !branchingBit1:
+				branching = BranchFactor16
+				tokensPerByte = 2
+			case !branchingBit0 && branchingBit1:
+				branching = BranchFactor4
+				tokensPerByte = 4
+			case !branchingBit0 && !branchingBit1:
+				branching = BranchFactor2
+				tokensPerByte = 8
+			}
 
-		p := NewTokenPath16(pathBytes)
+			require := require.New(t)
 
-		serializedPath := p.Serialize()
-		require.Equal(pathBytes, serializedPath.Value)
-		require.Equal(2*len(pathBytes), serializedPath.NibbleLength)
+			p := NewTokenPath(pathBytes, branching)
 
-		deserializedPath := serializedPath.Deserialize()
-		require.Equal(p, deserializedPath)
+			serializedPath := p.Serialize()
+			require.Equal(len(pathBytes), len(serializedPath.Value))
+			require.True(bytes.Equal(pathBytes, serializedPath.Value))
+			require.Equal(tokensPerByte*len(pathBytes), serializedPath.NibbleLength)
 
-		reserializedPath := deserializedPath.Serialize()
-		require.Equal(serializedPath, reserializedPath)
-	})
+			deserializedPath := serializedPath.Deserialize(branching)
+			require.Equal(p, deserializedPath)
+
+			reserializedPath := deserializedPath.Serialize()
+			require.Equal(serializedPath, reserializedPath)
+		})
 }

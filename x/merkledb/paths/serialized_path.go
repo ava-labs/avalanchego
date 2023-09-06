@@ -17,10 +17,9 @@ func (s SerializedPath) Equal(other SerializedPath) bool {
 	return s.NibbleLength == other.NibbleLength && bytes.Equal(s.Value, other.Value)
 }
 
-func (s SerializedPath) Deserialize() TokenPath {
-	result := NewTokenPath16(s.Value)
-	// trim the last nibble if the path has an odd length
-	return result.Slice(0, result.Length()-s.NibbleLength&1)
+func (s SerializedPath) Deserialize(factor BranchFactor) TokenPath {
+	result := NewTokenPath(s.Value, factor)
+	return result.Take(s.NibbleLength)
 }
 
 // HasPrefix returns true iff [prefix] is a prefix of [s] or equal to it.

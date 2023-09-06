@@ -46,7 +46,7 @@ var (
 	RootPath          = paths.EmptyPath(paths.BranchFactor16)
 	_        MerkleDB = (*merkleDB)(nil)
 
-	codec = newCodec()
+	codec = newCodec(paths.BranchFactor16)
 
 	metadataPrefix         = []byte{0}
 	valueNodePrefix        = []byte{1}

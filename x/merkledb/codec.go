@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"io"
 	"math"
 	"sync"
@@ -45,8 +44,8 @@ var (
 	falseBytes = []byte{falseByte}
 
 	errNegativeNumChildren  = errors.New("number of children is negative")
-	errTooManyChildren      = fmt.Errorf("length of children list is larger than branching factor of %d", paths.BranchFactor16)
-	errChildIndexTooLarge   = fmt.Errorf("invalid child index. Must be less than branching factor of %d", paths.BranchFactor16)
+	errTooManyChildren      = errors.New("length of children list is larger than branching factor")
+	errChildIndexTooLarge   = errors.New("invalid child index. Must be less than branching factor")
 	errNegativeNibbleLength = errors.New("nibble length is negative")
 	errIntTooLarge          = errors.New("integer too large to be decoded")
 	errLeadingZeroes        = errors.New("varint has leading zeroes")
@@ -75,8 +74,9 @@ type decoder interface {
 	decodeDBNode(bytes []byte, n *dbNode) error
 }
 
-func newCodec() encoderDecoder {
+func newCodec(branchFactor paths.BranchFactor) encoderDecoder {
 	return &codecImpl{
+		branchFactor: branchFactor,
 		varIntPool: sync.Pool{
 			New: func() interface{} {
 				return make([]byte, binary.MaxVarintLen64)
@@ -88,7 +88,8 @@ func newCodec() encoderDecoder {
 // Note that bytes.Buffer.Write always returns nil so we
 // can ignore its return values in [codecImpl] methods.
 type codecImpl struct {
-	varIntPool sync.Pool
+	branchFactor paths.BranchFactor
+	varIntPool   sync.Pool
 }
 
 func (c *codecImpl) encodeDBNode(n *dbNode) []byte {
@@ -103,7 +104,7 @@ func (c *codecImpl) encodeDBNode(n *dbNode) []byte {
 	c.encodeInt(buf, numChildren)
 	// Note we insert children in order of increasing index
 	// for determinism.
-	for index := byte(0); index < byte(paths.BranchFactor16); index++ {
+	for index := byte(0); index < byte(c.branchFactor); index++ {
 		if entry, ok := n.children[index]; ok {
 			c.encodeInt(buf, int(index))
 			path := entry.compressedPath.Serialize()
@@ -126,7 +127,7 @@ func (c *codecImpl) encodeHashValues(hv *hashValues) []byte {
 	c.encodeInt(buf, numChildren)
 
 	// ensure that the order of entries is consistent
-	for index := byte(0); index < byte(paths.BranchFactor16); index++ {
+	for index := byte(0); index < byte(c.branchFactor); index++ {
 		if entry, ok := hv.Children[index]; ok {
 			c.encodeInt(buf, int(index))
 			_, _ = buf.Write(entry.id[:])
@@ -157,20 +158,20 @@ func (c *codecImpl) decodeDBNode(b []byte, n *dbNode) error {
 		return err
 	case numChildren < 0:
 		return errNegativeNumChildren
-	case numChildren > int(paths.BranchFactor16):
+	case numChildren > int(c.branchFactor):
 		return errTooManyChildren
 	case numChildren > src.Len()/minChildLen:
 		return io.ErrUnexpectedEOF
 	}
 
-	n.children = make(map[byte]child, paths.BranchFactor16)
+	n.children = make(map[byte]child, c.branchFactor)
 	previousChild := -1
 	for i := 0; i < numChildren; i++ {
 		index, err := c.decodeInt(src)
 		if err != nil {
 			return err
 		}
-		if index <= previousChild || index >= int(paths.BranchFactor16) {
+		if index <= previousChild || index >= int(c.branchFactor) {
 			return errChildIndexTooLarge
 		}
 		previousChild = index
@@ -188,7 +189,7 @@ func (c *codecImpl) decodeDBNode(b []byte, n *dbNode) error {
 			return err
 		}
 		n.children[byte(index)] = child{
-			compressedPath: compressedPath.Deserialize(),
+			compressedPath: compressedPath.Deserialize(c.branchFactor),
 			id:             childID,
 			hasValue:       hasValue,
 		}

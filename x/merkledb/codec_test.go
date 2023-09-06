@@ -98,7 +98,7 @@ func FuzzCodecSerializedPath(f *testing.F) {
 			require.Len(bufBytes, numRead)
 			require.Equal(b[:numRead], bufBytes)
 
-			clonedGot := got.Deserialize().Serialize()
+			clonedGot := got.Deserialize(paths.BranchFactor16).Serialize()
 			require.Equal(got, clonedGot)
 		},
 	)
@@ -220,8 +220,8 @@ func TestCodecDecodeDBNode(t *testing.T) {
 
 // Ensure that encodeHashValues is deterministic
 func FuzzEncodeHashValues(f *testing.F) {
-	codec1 := newCodec()
-	codec2 := newCodec()
+	codec1 := newCodec(paths.BranchFactor16)
+	codec2 := newCodec(paths.BranchFactor16)
 
 	f.Fuzz(
 		func(

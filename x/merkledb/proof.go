@@ -184,7 +184,7 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID) error {
 	// Insert all proof nodes.
 	// [provenPath] is the path that we are proving exists, or the path
 	// that is where the path we are proving doesn't exist should be.
-	provenPath := maybe.Some(proof.Path[len(proof.Path)-1].KeyPath.Deserialize())
+	provenPath := maybe.Some(proof.Path[len(proof.Path)-1].KeyPath.Deserialize(paths.BranchFactor16))
 
 	if err = addPathInfo(view, proof.Path, provenPath, provenPath); err != nil {
 		return err
@@ -470,7 +470,7 @@ func verifyAllRangeProofKeyValuesPresent(proof []ProofNode, start paths.TokenPat
 		var (
 			node     = proof[i]
 			nodeKey  = node.KeyPath
-			nodePath = nodeKey.Deserialize()
+			nodePath = nodeKey.Deserialize(paths.BranchFactor16)
 		)
 
 		// Skip odd length keys since they cannot have a value (enforced by [verifyProofPath]).
@@ -652,7 +652,7 @@ func verifyAllChangeProofKeyValuesPresent(
 		var (
 			node     = proof[i]
 			nodeKey  = node.KeyPath
-			nodePath = nodeKey.Deserialize()
+			nodePath = nodeKey.Deserialize(paths.BranchFactor16)
 		)
 
 		// Check the value of any node with a key that is within the range.
@@ -827,7 +827,7 @@ func addPathInfo(
 
 	for i := len(proofPath) - 1; i >= 0; i-- {
 		proofNode := proofPath[i]
-		keyPath := proofNode.KeyPath.Deserialize()
+		keyPath := proofNode.KeyPath.Deserialize(paths.BranchFactor16)
 
 		if keyPath.Length()%keyPath.TokensPerByte() != 0 && !proofNode.ValueOrHash.IsNothing() {
 			// a value cannot have an odd number of nibbles in its key

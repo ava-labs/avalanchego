@@ -1733,12 +1733,12 @@ func FuzzRangeProofInvariants(f *testing.F) {
 		// that are in the end proof.
 		endProofKeys := set.Set[paths.TokenPath]{}
 		for _, node := range rangeProof.EndProof {
-			path := node.KeyPath.Deserialize()
+			path := node.KeyPath.Deserialize(paths.BranchFactor16)
 			endProofKeys.Add(path)
 		}
 
 		for _, node := range rangeProof.StartProof {
-			path := node.KeyPath.Deserialize()
+			path := node.KeyPath.Deserialize(paths.BranchFactor16)
 			require.NotContains(endProofKeys, path)
 		}
 
