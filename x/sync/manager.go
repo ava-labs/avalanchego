@@ -10,8 +10,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/ava-labs/avalanchego/x/merkledb/paths"
-
 	"go.uber.org/zap"
 	"golang.org/x/exp/slices"
 
@@ -19,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/x/merkledb"
+	"github.com/ava-labs/avalanchego/x/merkledb/paths"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
@@ -793,7 +792,7 @@ func findChildDifference(node1, node2 *merkledb.ProofNode, startIndex byte) (byt
 		child1, child2 ids.ID
 		ok1, ok2       bool
 	)
-	for childIndex := startIndex; childIndex < merkledb.NodeBranchFactor; childIndex++ {
+	for childIndex := startIndex; childIndex < byte(paths.BranchFactor16); childIndex++ {
 		if node1 != nil {
 			child1, ok1 = node1.Children[childIndex]
 		}
