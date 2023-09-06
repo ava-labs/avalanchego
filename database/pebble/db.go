@@ -54,9 +54,7 @@ var (
 type Database struct {
 	lock     sync.RWMutex
 	pebbleDB *pebble.DB
-	// closeCh is closed when Close() is called.
-	closeCh chan struct{}
-	closed  bool
+	closed   bool
 }
 
 type Config struct {
@@ -110,7 +108,6 @@ func New(file string, cfg Config, log logging.Logger, _ string, _ prometheus.Reg
 
 	return &Database{
 		pebbleDB: db,
-		closeCh:  make(chan struct{}),
 	}, nil
 }
 
