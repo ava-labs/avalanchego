@@ -54,7 +54,7 @@ func TestAppRequestResponse(t *testing.T) {
 						return response, nil
 					})
 
-				callback := func(actualNodeID ids.NodeID, actualResponse []byte, err error) {
+				callback := func(_ context.Context, actualNodeID ids.NodeID, actualResponse []byte, err error) {
 					defer wg.Done()
 
 					require.NoError(t, err)
@@ -77,7 +77,7 @@ func TestAppRequestResponse(t *testing.T) {
 						}
 					})
 
-				callback := func(actualNodeID ids.NodeID, actualResponse []byte, err error) {
+				callback := func(_ context.Context, actualNodeID ids.NodeID, actualResponse []byte, err error) {
 					defer wg.Done()
 
 					require.ErrorIs(t, err, ErrAppRequestFailed)
@@ -110,7 +110,7 @@ func TestAppRequestResponse(t *testing.T) {
 						return response, nil
 					})
 
-				callback := func(actualChainID ids.ID, actualResponse []byte, err error) {
+				callback := func(_ context.Context, actualChainID ids.ID, actualResponse []byte, err error) {
 					defer wg.Done()
 					require.NoError(t, err)
 					require.Equal(t, chainID, actualChainID)
@@ -130,7 +130,7 @@ func TestAppRequestResponse(t *testing.T) {
 						}()
 					})
 
-				callback := func(actualChainID ids.ID, actualResponse []byte, err error) {
+				callback := func(_ context.Context, actualChainID ids.ID, actualResponse []byte, err error) {
 					defer wg.Done()
 
 					require.ErrorIs(t, err, ErrAppRequestFailed)

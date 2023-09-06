@@ -23,6 +23,7 @@ var (
 // issued by Client.
 // Callers should check [err] to see whether the AppRequest failed or not.
 type AppResponseCallback func(
+	ctx context.Context,
 	nodeID ids.NodeID,
 	responseBytes []byte,
 	err error,
@@ -32,6 +33,7 @@ type AppResponseCallback func(
 // CrossChainAppResponse for a CrossChainAppRequest issued by Client.
 // Callers should check [err] to see whether the AppRequest failed or not.
 type CrossChainAppResponseCallback func(
+	ctx context.Context,
 	chainID ids.ID,
 	responseBytes []byte,
 	err error,
