@@ -27,7 +27,8 @@ func TestAppRequestResponse(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 	chainID := ids.GenerateTestID()
 
-	var ctxKey, ctxVal *string
+	ctxKey := new(string)
+	ctxVal := new(string)
 	*ctxKey = "foo"
 	*ctxVal = "bar"
 
