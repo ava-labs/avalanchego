@@ -9,7 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -87,14 +87,14 @@ func (tx *AddPermissionlessValidatorTx) PublicKey() (*bls.PublicKey, bool, error
 }
 
 func (tx *AddPermissionlessValidatorTx) PendingPriority() Priority {
-	if tx.Subnet == constants.PrimaryNetworkID {
+	if tx.Subnet == constant.PrimaryNetworkID {
 		return PrimaryNetworkValidatorPendingPriority
 	}
 	return SubnetPermissionlessValidatorPendingPriority
 }
 
 func (tx *AddPermissionlessValidatorTx) CurrentPriority() Priority {
-	if tx.Subnet == constants.PrimaryNetworkID {
+	if tx.Subnet == constant.PrimaryNetworkID {
 		return PrimaryNetworkValidatorCurrentPriority
 	}
 	return SubnetPermissionlessValidatorCurrentPriority
@@ -139,7 +139,7 @@ func (tx *AddPermissionlessValidatorTx) SyntacticVerify(ctx *snow.Context) error
 	}
 
 	hasKey := tx.Signer.Key() != nil
-	isPrimaryNetwork := tx.Subnet == constants.PrimaryNetworkID
+	isPrimaryNetwork := tx.Subnet == constant.PrimaryNetworkID
 	if hasKey != isPrimaryNetwork {
 		return fmt.Errorf(
 			"%w: hasKey=%v != isPrimaryNetwork=%v",

@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/utils/compression"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/metric"
@@ -151,11 +151,11 @@ func newMsgBuilder(
 	metrics prometheus.Registerer,
 	maxMessageTimeout time.Duration,
 ) (*msgBuilder, error) {
-	gzipCompressor, err := compression.NewGzipCompressor(constants.DefaultMaxMessageSize)
+	gzipCompressor, err := compression.NewGzipCompressor(constant.DefaultMaxMessageSize)
 	if err != nil {
 		return nil, err
 	}
-	zstdCompressor, err := compression.NewZstdCompressor(constants.DefaultMaxMessageSize)
+	zstdCompressor, err := compression.NewZstdCompressor(constant.DefaultMaxMessageSize)
 	if err != nil {
 		return nil, err
 	}

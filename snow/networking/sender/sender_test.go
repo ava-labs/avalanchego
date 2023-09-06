@@ -28,7 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/subnets"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
 	"github.com/ava-labs/avalanchego/utils/resource"
@@ -78,7 +78,7 @@ func TestTimeout(t *testing.T) {
 		logging.NoLog{},
 		metrics,
 		"dummyNamespace",
-		constants.DefaultNetworkCompressionType,
+		constant.DefaultNetworkCompressionType,
 		10*time.Second,
 	)
 	require.NoError(err)
@@ -336,7 +336,7 @@ func TestReliableMessages(t *testing.T) {
 		logging.NoLog{},
 		metrics,
 		"dummyNamespace",
-		constants.DefaultNetworkCompressionType,
+		constant.DefaultNetworkCompressionType,
 		10*time.Second,
 	)
 	require.NoError(err)
@@ -486,7 +486,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		logging.NoLog{},
 		metrics,
 		"dummyNamespace",
-		constants.DefaultNetworkCompressionType,
+		constant.DefaultNetworkCompressionType,
 		10*time.Second,
 	)
 	require.NoError(err)

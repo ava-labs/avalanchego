@@ -8,7 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
@@ -243,7 +243,7 @@ func (m *metadata) WriteValidatorMetadata(
 				return err
 			}
 			db := dbSubnet
-			if subnetID == constants.PrimaryNetworkID {
+			if subnetID == constant.PrimaryNetworkID {
 				db = dbPrimary
 			}
 			if err := db.Put(metadata.txID[:], metadataBytes); err != nil {

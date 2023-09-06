@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 )
 
@@ -24,7 +24,7 @@ func TestSignerWrongChainID(t *testing.T, s Signer, _ *bls.SecretKey, _ uint32, 
 	require := require.New(t)
 
 	msg, err := NewUnsignedMessage(
-		constants.UnitTestID,
+		constant.UnitTestID,
 		ids.GenerateTestID(),
 		[]byte("payload"),
 	)

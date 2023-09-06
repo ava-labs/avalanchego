@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests/e2e"
 	"github.com/ava-labs/avalanchego/utils/cb58"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
@@ -21,7 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 
-	ginkgo "github.com/onsi/ginkgo/v2"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
@@ -42,7 +42,7 @@ var _ = ginkgo.Describe("[StaticHandlers]", func() {
 			} {
 				addr, err := ids.ShortFromString(addrStr)
 				gomega.Expect(err).Should(gomega.BeNil())
-				addrMap[addrStr], err = address.FormatBech32(constants.NetworkIDToHRP[constants.LocalID], addr[:])
+				addrMap[addrStr], err = address.FormatBech32(constant.NetworkIDToHRP[constant.LocalID], addr[:])
 				gomega.Expect(err).Should(gomega.BeNil())
 			}
 			avmArgs := avm.BuildGenesisArgs{
@@ -136,7 +136,7 @@ var _ = ginkgo.Describe("[StaticHandlers]", func() {
 		}
 
 		genesisUTXOs := make([]api.UTXO, len(keys))
-		hrp := constants.NetworkIDToHRP[constants.UnitTestID]
+		hrp := constant.NetworkIDToHRP[constant.UnitTestID]
 		for i, key := range keys {
 			id := key.PublicKey().Address()
 			addr, err := address.FormatBech32(hrp, id.Bytes())
@@ -171,7 +171,7 @@ var _ = ginkgo.Describe("[StaticHandlers]", func() {
 		}
 
 		buildGenesisArgs := api.BuildGenesisArgs{
-			NetworkID:     json.Uint32(constants.UnitTestID),
+			NetworkID:     json.Uint32(constant.UnitTestID),
 			AvaxAssetID:   ids.ID{'a', 'v', 'a', 'x'},
 			UTXOs:         genesisUTXOs,
 			Validators:    genesisValidators,

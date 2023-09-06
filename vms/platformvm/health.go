@@ -9,12 +9,12 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 )
 
 func (vm *VM) HealthCheck(context.Context) (interface{}, error) {
 	localPrimaryValidator, err := vm.state.GetCurrentValidator(
-		constants.PrimaryNetworkID,
+		constant.PrimaryNetworkID,
 		vm.ctx.NodeID,
 	)
 	switch err {

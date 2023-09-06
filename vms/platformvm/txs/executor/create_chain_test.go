@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -33,7 +33,7 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 	tx, err := env.txBuilder.NewCreateChainTx(
 		testSubnet1.ID(),
 		nil,
-		constants.AVMID,
+		constant.AVMID,
 		nil,
 		"chain name",
 		[]*secp256k1.PrivateKey{preFundedKeys[0], preFundedKeys[1]},
@@ -68,7 +68,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 	tx, err := env.txBuilder.NewCreateChainTx(
 		testSubnet1.ID(),
 		nil,
-		constants.AVMID,
+		constant.AVMID,
 		nil,
 		"chain name",
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
@@ -111,7 +111,7 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 	tx, err := env.txBuilder.NewCreateChainTx(
 		testSubnet1.ID(),
 		nil,
-		constants.AVMID,
+		constant.AVMID,
 		nil,
 		"chain name",
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
@@ -145,7 +145,7 @@ func TestCreateChainTxValid(t *testing.T) {
 	tx, err := env.txBuilder.NewCreateChainTx(
 		testSubnet1.ID(),
 		nil,
-		constants.AVMID,
+		constant.AVMID,
 		nil,
 		"chain name",
 		[]*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
@@ -219,7 +219,7 @@ func TestCreateChainTxAP3FeeChange(t *testing.T) {
 					Outs:         outs,
 				}},
 				SubnetID:   testSubnet1.ID(),
-				VMID:       constants.AVMID,
+				VMID:       constant.AVMID,
 				SubnetAuth: subnetAuth,
 			}
 			tx := &txs.Tx{Unsigned: utx}

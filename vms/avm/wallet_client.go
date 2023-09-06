@@ -9,7 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/rpc"
@@ -64,7 +64,7 @@ func NewWalletClient(uri, chain string) WalletClient {
 	path := fmt.Sprintf(
 		"%s/ext/%s/%s/wallet",
 		uri,
-		constants.ChainAliasPrefix,
+		constant.ChainAliasPrefix,
 		chain,
 	)
 	return &walletClient{

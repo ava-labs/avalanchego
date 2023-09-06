@@ -8,7 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -53,7 +53,7 @@ func (tx *AddValidatorTx) InitCtx(ctx *snow.Context) {
 }
 
 func (*AddValidatorTx) SubnetID() ids.ID {
-	return constants.PrimaryNetworkID
+	return constant.PrimaryNetworkID
 }
 
 func (tx *AddValidatorTx) NodeID() ids.NodeID {

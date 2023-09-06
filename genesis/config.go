@@ -14,7 +14,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -46,7 +46,7 @@ func (a Allocation) Unparse(networkID uint32) (UnparsedAllocation, error) {
 	}
 	avaxAddr, err := address.Format(
 		"X",
-		constants.GetHRP(networkID),
+		constant.GetHRP(networkID),
 		a.AVAXAddr.Bytes(),
 	)
 	ua.AVAXAddr = avaxAddr
@@ -67,7 +67,7 @@ type Staker struct {
 func (s Staker) Unparse(networkID uint32) (UnparsedStaker, error) {
 	avaxAddr, err := address.Format(
 		"X",
-		constants.GetHRP(networkID),
+		constant.GetHRP(networkID),
 		s.RewardAddress.Bytes(),
 	)
 	return UnparsedStaker{
@@ -116,7 +116,7 @@ func (c Config) Unparse() (UnparsedConfig, error) {
 	for i, isa := range c.InitialStakedFunds {
 		avaxAddr, err := address.Format(
 			"X",
-			constants.GetHRP(uc.NetworkID),
+			constant.GetHRP(uc.NetworkID),
 			isa.Bytes(),
 		)
 		if err != nil {
@@ -201,11 +201,11 @@ func init() {
 
 func GetConfig(networkID uint32) *Config {
 	switch networkID {
-	case constants.MainnetID:
+	case constant.MainnetID:
 		return &MainnetConfig
-	case constants.FujiID:
+	case constant.FujiID:
 		return &FujiConfig
-	case constants.LocalID:
+	case constant.LocalID:
 		return &LocalConfig
 	default:
 		tempConfig := LocalConfig

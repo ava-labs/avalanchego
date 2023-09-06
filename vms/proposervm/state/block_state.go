@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
@@ -51,9 +51,9 @@ type blockWrapper struct {
 
 func cachedBlockSize(_ ids.ID, bw *blockWrapper) int {
 	if bw == nil {
-		return ids.IDLen + constants.PointerOverhead
+		return ids.IDLen + constant.PointerOverhead
 	}
-	return ids.IDLen + len(bw.Block) + wrappers.IntLen + 2*constants.PointerOverhead
+	return ids.IDLen + len(bw.Block) + wrappers.IntLen + 2*constant.PointerOverhead
 }
 
 func NewBlockState(db database.Database) BlockState {

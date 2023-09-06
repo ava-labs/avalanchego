@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -144,7 +144,7 @@ func (c *Config) GetCreateSubnetTxFee(timestamp time.Time) uint64 {
 // the subnet that validates the chain
 func (c *Config) CreateChain(chainID ids.ID, tx *txs.CreateChainTx) {
 	if c.SybilProtectionEnabled && // Sybil protection is enabled, so nodes might not validate all chains
-		constants.PrimaryNetworkID != tx.SubnetID && // All nodes must validate the primary network
+		constant.PrimaryNetworkID != tx.SubnetID && // All nodes must validate the primary network
 		!c.TrackedSubnets.Contains(tx.SubnetID) { // This node doesn't validate this blockchain
 		return
 	}

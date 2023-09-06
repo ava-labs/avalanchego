@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -38,7 +38,7 @@ func main() {
 	}
 	log.Printf("fetched state of %s in %s\n", addrStr, time.Since(fetchStartTime))
 
-	pUTXOs := primary.NewChainUTXOs(constants.PlatformChainID, state.UTXOs)
+	pUTXOs := primary.NewChainUTXOs(constant.PlatformChainID, state.UTXOs)
 	pBackend := p.NewBackend(state.PCTX, pUTXOs, make(map[ids.ID]*txs.Tx))
 	pBuilder := p.NewBuilder(addresses, pBackend)
 

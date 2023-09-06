@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
@@ -813,7 +813,7 @@ func (c *client) GetTotalStake(ctx context.Context, subnetID ids.ID, options ...
 		SubnetID: subnetID,
 	}, res, options...)
 	var amount json.Uint64
-	if subnetID == constants.PrimaryNetworkID {
+	if subnetID == constant.PrimaryNetworkID {
 		amount = res.Stake
 	} else {
 		amount = res.Weight

@@ -10,7 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -345,7 +345,7 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 	}
 
 	primaryNetworkValidator, err := e.OnCommitState.GetCurrentValidator(
-		constants.PrimaryNetworkID,
+		constant.PrimaryNetworkID,
 		stakerToRemove.NodeID,
 	)
 	if err != nil {
@@ -622,7 +622,7 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 	e.OnAbortState.SetCurrentSupply(stakerToRemove.SubnetID, newSupply)
 
 	var expectedUptimePercentage float64
-	if stakerToRemove.SubnetID != constants.PrimaryNetworkID {
+	if stakerToRemove.SubnetID != constant.PrimaryNetworkID {
 		transformSubnetIntf, err := e.OnCommitState.GetSubnetTransformation(stakerToRemove.SubnetID)
 		if err != nil {
 			return err
@@ -640,7 +640,7 @@ func (e *ProposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 	// TODO: calculate subnet uptimes
 	uptime, err := e.Uptimes.CalculateUptimePercentFrom(
 		primaryNetworkValidator.NodeID,
-		constants.PrimaryNetworkID,
+		constant.PrimaryNetworkID,
 		primaryNetworkValidator.StartTime,
 	)
 	if err != nil {

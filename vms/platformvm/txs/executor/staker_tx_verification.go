@@ -6,13 +6,12 @@ package executor
 import (
 	"errors"
 	"fmt"
-	"time"
-
 	stdmath "math"
+	"time"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -101,7 +100,7 @@ func verifyAddValidatorTx(
 		)
 	}
 
-	_, err := GetValidator(chainState, constants.PrimaryNetworkID, tx.Validator.NodeID)
+	_, err := GetValidator(chainState, constant.PrimaryNetworkID, tx.Validator.NodeID)
 	if err == nil {
 		return nil, fmt.Errorf(
 			"%s is %w of the primary network",
@@ -198,7 +197,7 @@ func verifyAddSubnetValidatorTx(
 		)
 	}
 
-	primaryNetworkValidator, err := GetValidator(chainState, constants.PrimaryNetworkID, tx.Validator.NodeID)
+	primaryNetworkValidator, err := GetValidator(chainState, constant.PrimaryNetworkID, tx.Validator.NodeID)
 	if err == database.ErrNotFound {
 		return fmt.Errorf(
 			"%s %w of the primary network",
@@ -373,7 +372,7 @@ func verifyAddDelegatorTx(
 		)
 	}
 
-	primaryNetworkValidator, err := GetValidator(chainState, constants.PrimaryNetworkID, tx.Validator.NodeID)
+	primaryNetworkValidator, err := GetValidator(chainState, constant.PrimaryNetworkID, tx.Validator.NodeID)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"failed to fetch the primary network validator for %s: %w",
@@ -523,8 +522,8 @@ func verifyAddPermissionlessValidatorTx(
 	}
 
 	var txFee uint64
-	if tx.Subnet != constants.PrimaryNetworkID {
-		primaryNetworkValidator, err := GetValidator(chainState, constants.PrimaryNetworkID, tx.Validator.NodeID)
+	if tx.Subnet != constant.PrimaryNetworkID {
+		primaryNetworkValidator, err := GetValidator(chainState, constant.PrimaryNetworkID, tx.Validator.NodeID)
 		if err != nil {
 			return fmt.Errorf(
 				"failed to fetch the primary network validator for %s: %w",
@@ -591,7 +590,7 @@ func getValidatorRules(
 	chainState state.Chain,
 	subnetID ids.ID,
 ) (*addValidatorRules, error) {
-	if subnetID == constants.PrimaryNetworkID {
+	if subnetID == constant.PrimaryNetworkID {
 		return &addValidatorRules{
 			assetID:           backend.Ctx.AVAXAssetID,
 			minValidatorStake: backend.Config.MinValidatorStake,
@@ -725,7 +724,7 @@ func verifyAddPermissionlessDelegatorTx(
 	copy(outs[len(tx.Outs):], tx.StakeOuts)
 
 	var txFee uint64
-	if tx.Subnet != constants.PrimaryNetworkID {
+	if tx.Subnet != constant.PrimaryNetworkID {
 		// Invariant: Delegators must only be able to reference validator
 		//            transactions that implement [txs.ValidatorTx]. All
 		//            validator transactions implement this interface except the
@@ -779,7 +778,7 @@ func getDelegatorRules(
 	chainState state.Chain,
 	subnetID ids.ID,
 ) (*addDelegatorRules, error) {
-	if subnetID == constants.PrimaryNetworkID {
+	if subnetID == constant.PrimaryNetworkID {
 		return &addDelegatorRules{
 			assetID:                  backend.Ctx.AVAXAssetID,
 			minDelegatorStake:        backend.Config.MinDelegatorStake,

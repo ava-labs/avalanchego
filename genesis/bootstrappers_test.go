@@ -8,18 +8,18 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 )
 
 func TestSampleBootstrappers(t *testing.T) {
 	require := require.New(t)
 
-	for networkID, networkName := range constants.NetworkIDToNetworkName {
+	for networkID, networkName := range constant.NetworkIDToNetworkName {
 		length := 10
 		bootstrappers := SampleBootstrappers(networkID, length)
 		t.Logf("%s bootstrappers: %+v", networkName, bootstrappers)
 
-		if networkID == constants.MainnetID || networkID == constants.FujiID {
+		if networkID == constant.MainnetID || networkID == constant.FujiID {
 			require.Len(bootstrappers, length)
 		}
 	}

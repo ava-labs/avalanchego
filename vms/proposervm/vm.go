@@ -29,7 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -82,7 +82,7 @@ func init() {
 }
 
 func cachedBlockSize(_ ids.ID, blk snowman.Block) int {
-	return ids.IDLen + len(blk.Bytes()) + constants.PointerOverhead
+	return ids.IDLen + len(blk.Bytes()) + constant.PointerOverhead
 }
 
 type VM struct {
@@ -735,11 +735,11 @@ func (vm *VM) getForkHeight() (uint64, error) {
 	// The fork block can be easily identified with the provided links because
 	// the `Parent Hash` is equal to the `Proposer Parent ID`.
 	switch vm.ctx.ChainID {
-	case constants.PlatformChainID:
+	case constant.PlatformChainID:
 		switch vm.ctx.NetworkID {
-		case constants.MainnetID:
+		case constant.MainnetID:
 			return 805732, nil // https://subnets.avax.network/p-chain/block/805732
-		case constants.FujiID:
+		case constant.FujiID:
 			return 47529, nil // https://subnets-test.avax.network/p-chain/block/47529
 		}
 	case mainnetXChainID:

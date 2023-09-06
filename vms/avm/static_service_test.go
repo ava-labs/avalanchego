@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
@@ -30,7 +30,7 @@ func TestBuildGenesis(t *testing.T) {
 	for _, addrStr := range addrStrArray {
 		addr, err := ids.ShortFromString(addrStr)
 		require.NoError(err)
-		addrMap[addrStr], err = address.FormatBech32(constants.UnitTestHRP, addr[:])
+		addrMap[addrStr], err = address.FormatBech32(constant.UnitTestHRP, addr[:])
 		require.NoError(err)
 	}
 	args := BuildGenesisArgs{

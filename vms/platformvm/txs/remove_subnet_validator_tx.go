@@ -8,7 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
@@ -36,7 +36,7 @@ func (tx *RemoveSubnetValidatorTx) SyntacticVerify(ctx *snow.Context) error {
 	case tx.SyntacticallyVerified:
 		// already passed syntactic verification
 		return nil
-	case tx.Subnet == constants.PrimaryNetworkID:
+	case tx.Subnet == constant.PrimaryNetworkID:
 		return ErrRemovePrimaryNetworkValidator
 	}
 

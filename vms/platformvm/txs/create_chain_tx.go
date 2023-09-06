@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
@@ -56,7 +56,7 @@ func (tx *CreateChainTx) SyntacticVerify(ctx *snow.Context) error {
 		return ErrNilTx
 	case tx.SyntacticallyVerified: // already passed syntactic verification
 		return nil
-	case tx.SubnetID == constants.PrimaryNetworkID:
+	case tx.SubnetID == constant.PrimaryNetworkID:
 		return ErrCantValidatePrimaryNetwork
 	case len(tx.ChainName) > MaxNameLen:
 		return errNameTooLong

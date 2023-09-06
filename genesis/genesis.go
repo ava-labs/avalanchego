@@ -10,7 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
@@ -71,7 +71,7 @@ func validateInitialStakedFunds(config *Config) error {
 		if initialStakedFundsSet.Contains(staker) {
 			avaxAddr, err := address.Format(
 				configChainIDAlias,
-				constants.GetHRP(config.NetworkID),
+				constant.GetHRP(config.NetworkID),
 				staker.Bytes(),
 			)
 			if err != nil {
@@ -92,7 +92,7 @@ func validateInitialStakedFunds(config *Config) error {
 		if !allocationSet.Contains(staker) {
 			avaxAddr, err := address.Format(
 				configChainIDAlias,
-				constants.GetHRP(config.NetworkID),
+				constant.GetHRP(config.NetworkID),
 				staker.Bytes(),
 			)
 			if err != nil {
@@ -202,11 +202,11 @@ func validateConfig(networkID uint32, config *Config, stakingCfg *StakingConfig)
 //  2. The asset ID of AVAX
 func FromFile(networkID uint32, filepath string, stakingCfg *StakingConfig) ([]byte, ids.ID, error) {
 	switch networkID {
-	case constants.MainnetID, constants.TestnetID, constants.LocalID:
+	case constant.MainnetID, constant.TestnetID, constant.LocalID:
 		return nil, ids.ID{}, fmt.Errorf(
 			"%w: %s",
 			errOverridesStandardNetworkConfig,
-			constants.NetworkName(networkID),
+			constant.NetworkName(networkID),
 		)
 	}
 
@@ -244,11 +244,11 @@ func FromFile(networkID uint32, filepath string, stakingCfg *StakingConfig) ([]b
 //  2. The asset ID of AVAX
 func FromFlag(networkID uint32, genesisContent string, stakingCfg *StakingConfig) ([]byte, ids.ID, error) {
 	switch networkID {
-	case constants.MainnetID, constants.TestnetID, constants.LocalID:
+	case constant.MainnetID, constant.TestnetID, constant.LocalID:
 		return nil, ids.ID{}, fmt.Errorf(
 			"%w: %s",
 			errOverridesStandardNetworkConfig,
-			constants.NetworkName(networkID),
+			constant.NetworkName(networkID),
 		)
 	}
 
@@ -270,7 +270,7 @@ func FromFlag(networkID uint32, genesisContent string, stakingCfg *StakingConfig
 //     (ie the genesis state of the network)
 //  2. The asset ID of AVAX
 func FromConfig(config *Config) ([]byte, ids.ID, error) {
-	hrp := constants.GetHRP(config.NetworkID)
+	hrp := constant.GetHRP(config.NetworkID)
 
 	amount := uint64(0)
 
@@ -443,8 +443,8 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 	platformvmArgs.Chains = []api.Chain{
 		{
 			GenesisData: avmReply.Bytes,
-			SubnetID:    constants.PrimaryNetworkID,
-			VMID:        constants.AVMID,
+			SubnetID:    constant.PrimaryNetworkID,
+			VMID:        constant.AVMID,
 			FxIDs: []ids.ID{
 				secp256k1fx.ID,
 				nftfx.ID,
@@ -454,8 +454,8 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		},
 		{
 			GenesisData: genesisStr,
-			SubnetID:    constants.PrimaryNetworkID,
-			VMID:        constants.EVMID,
+			SubnetID:    constant.PrimaryNetworkID,
+			VMID:        constant.EVMID,
 			Name:        "C-Chain",
 		},
 	}

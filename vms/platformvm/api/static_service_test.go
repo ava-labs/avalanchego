@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
@@ -19,7 +19,7 @@ import (
 func TestBuildGenesisInvalidUTXOBalance(t *testing.T) {
 	require := require.New(t)
 	nodeID := ids.NodeID{1, 2, 3}
-	addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
+	addr, err := address.FormatBech32(constant.UnitTestHRP, nodeID.Bytes())
 	require.NoError(err)
 
 	utxo := UTXO{
@@ -63,7 +63,7 @@ func TestBuildGenesisInvalidUTXOBalance(t *testing.T) {
 func TestBuildGenesisInvalidStakeWeight(t *testing.T) {
 	require := require.New(t)
 	nodeID := ids.NodeID{1, 2, 3}
-	addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
+	addr, err := address.FormatBech32(constant.UnitTestHRP, nodeID.Bytes())
 	require.NoError(err)
 
 	utxo := UTXO{
@@ -107,7 +107,7 @@ func TestBuildGenesisInvalidStakeWeight(t *testing.T) {
 func TestBuildGenesisInvalidEndtime(t *testing.T) {
 	require := require.New(t)
 	nodeID := ids.NodeID{1, 2, 3}
-	addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
+	addr, err := address.FormatBech32(constant.UnitTestHRP, nodeID.Bytes())
 	require.NoError(err)
 
 	utxo := UTXO{
@@ -152,7 +152,7 @@ func TestBuildGenesisInvalidEndtime(t *testing.T) {
 func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 	require := require.New(t)
 	nodeID := ids.NodeID{1}
-	addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
+	addr, err := address.FormatBech32(constant.UnitTestHRP, nodeID.Bytes())
 	require.NoError(err)
 
 	utxo := UTXO{

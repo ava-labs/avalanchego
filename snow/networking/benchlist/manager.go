@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 )
 
 var (
@@ -123,7 +123,7 @@ func (m *manager) RegisterChain(ctx *snow.ConsensusContext) error {
 		vdrs, ok = m.config.Validators.Get(ctx.SubnetID)
 	} else {
 		// If sybil protection is disabled, everyone validates every chain
-		vdrs, ok = m.config.Validators.Get(constants.PrimaryNetworkID)
+		vdrs, ok = m.config.Validators.Get(constant.PrimaryNetworkID)
 	}
 	if !ok {
 		return errUnknownValidators

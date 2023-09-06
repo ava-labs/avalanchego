@@ -16,7 +16,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/nat"
 	"github.com/ava-labs/avalanchego/node"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/perms"
@@ -33,8 +33,8 @@ const (
 )
 
 var (
-	stakingPortName = fmt.Sprintf("%s-staking", constants.AppName)
-	httpPortName    = fmt.Sprintf("%s-http", constants.AppName)
+	stakingPortName = fmt.Sprintf("%s-staking", constant.AppName)
+	httpPortName    = fmt.Sprintf("%s-http", constant.AppName)
 
 	_ App = (*app)(nil)
 )

@@ -10,7 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -76,7 +76,7 @@ func ExampleWallet() {
 	// Send 100 MegaAvax to the P-chain.
 	exportStartTime := time.Now()
 	exportTx, err := xWallet.IssueExportTx(
-		constants.PlatformChainID,
+		constant.PlatformChainID,
 		[]*avax.TransferableOutput{
 			{
 				Asset: avax.Asset{

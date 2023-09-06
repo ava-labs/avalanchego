@@ -4,15 +4,14 @@
 package p
 
 import (
+	stdcontext "context"
 	"errors"
 	"fmt"
 	"time"
 
-	stdcontext "context"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -275,7 +274,7 @@ func (b *builder) GetBalance(
 	options ...common.Option,
 ) (map[ids.ID]uint64, error) {
 	ops := common.NewOptions(options)
-	return b.getBalance(constants.PlatformChainID, ops)
+	return b.getBalance(constant.PlatformChainID, ops)
 }
 
 func (b *builder) GetImportableBalance(
@@ -314,7 +313,7 @@ func (b *builder) NewBaseTx(
 	return &txs.CreateSubnetTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
-			BlockchainID: constants.PlatformChainID,
+			BlockchainID: constant.PlatformChainID,
 			Ins:          inputs,
 			Outs:         outputs,
 			Memo:         ops.Memo(),
@@ -346,7 +345,7 @@ func (b *builder) NewAddValidatorTx(
 	return &txs.AddValidatorTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
-			BlockchainID: constants.PlatformChainID,
+			BlockchainID: constant.PlatformChainID,
 			Ins:          inputs,
 			Outs:         baseOutputs,
 			Memo:         ops.Memo(),
@@ -380,7 +379,7 @@ func (b *builder) NewAddSubnetValidatorTx(
 	return &txs.AddSubnetValidatorTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
-			BlockchainID: constants.PlatformChainID,
+			BlockchainID: constant.PlatformChainID,
 			Ins:          inputs,
 			Outs:         outputs,
 			Memo:         ops.Memo(),
@@ -413,7 +412,7 @@ func (b *builder) NewRemoveSubnetValidatorTx(
 	return &txs.RemoveSubnetValidatorTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
-			BlockchainID: constants.PlatformChainID,
+			BlockchainID: constant.PlatformChainID,
 			Ins:          inputs,
 			Outs:         outputs,
 			Memo:         ops.Memo(),
@@ -446,7 +445,7 @@ func (b *builder) NewAddDelegatorTx(
 	return &txs.AddDelegatorTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
-			BlockchainID: constants.PlatformChainID,
+			BlockchainID: constant.PlatformChainID,
 			Ins:          inputs,
 			Outs:         baseOutputs,
 			Memo:         ops.Memo(),
@@ -484,7 +483,7 @@ func (b *builder) NewCreateChainTx(
 	return &txs.CreateChainTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
-			BlockchainID: constants.PlatformChainID,
+			BlockchainID: constant.PlatformChainID,
 			Ins:          inputs,
 			Outs:         outputs,
 			Memo:         ops.Memo(),
@@ -516,7 +515,7 @@ func (b *builder) NewCreateSubnetTx(
 	return &txs.CreateSubnetTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
-			BlockchainID: constants.PlatformChainID,
+			BlockchainID: constant.PlatformChainID,
 			Ins:          inputs,
 			Outs:         outputs,
 			Memo:         ops.Memo(),
@@ -621,7 +620,7 @@ func (b *builder) NewImportTx(
 	return &txs.ImportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
-			BlockchainID: constants.PlatformChainID,
+			BlockchainID: constant.PlatformChainID,
 			Ins:          inputs,
 			Outs:         outputs,
 			Memo:         ops.Memo(),
@@ -659,7 +658,7 @@ func (b *builder) NewExportTx(
 	return &txs.ExportTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
-			BlockchainID: constants.PlatformChainID,
+			BlockchainID: constant.PlatformChainID,
 			Ins:          inputs,
 			Outs:         changeOutputs,
 			Memo:         ops.Memo(),
@@ -705,7 +704,7 @@ func (b *builder) NewTransformSubnetTx(
 	return &txs.TransformSubnetTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
-			BlockchainID: constants.PlatformChainID,
+			BlockchainID: constant.PlatformChainID,
 			Ins:          inputs,
 			Outs:         outputs,
 			Memo:         ops.Memo(),
@@ -739,7 +738,7 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 ) (*txs.AddPermissionlessValidatorTx, error) {
 	avaxAssetID := b.backend.AVAXAssetID()
 	toBurn := map[ids.ID]uint64{}
-	if vdr.Subnet == constants.PrimaryNetworkID {
+	if vdr.Subnet == constant.PrimaryNetworkID {
 		toBurn[avaxAssetID] = b.backend.AddPrimaryNetworkValidatorFee()
 	} else {
 		toBurn[avaxAssetID] = b.backend.AddSubnetValidatorFee()
@@ -758,7 +757,7 @@ func (b *builder) NewAddPermissionlessValidatorTx(
 	return &txs.AddPermissionlessValidatorTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
-			BlockchainID: constants.PlatformChainID,
+			BlockchainID: constant.PlatformChainID,
 			Ins:          inputs,
 			Outs:         baseOutputs,
 			Memo:         ops.Memo(),
@@ -781,7 +780,7 @@ func (b *builder) NewAddPermissionlessDelegatorTx(
 ) (*txs.AddPermissionlessDelegatorTx, error) {
 	avaxAssetID := b.backend.AVAXAssetID()
 	toBurn := map[ids.ID]uint64{}
-	if vdr.Subnet == constants.PrimaryNetworkID {
+	if vdr.Subnet == constant.PrimaryNetworkID {
 		toBurn[avaxAssetID] = b.backend.AddPrimaryNetworkDelegatorFee()
 	} else {
 		toBurn[avaxAssetID] = b.backend.AddSubnetDelegatorFee()
@@ -799,7 +798,7 @@ func (b *builder) NewAddPermissionlessDelegatorTx(
 	return &txs.AddPermissionlessDelegatorTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    b.backend.NetworkID(),
-			BlockchainID: constants.PlatformChainID,
+			BlockchainID: constant.PlatformChainID,
 			Ins:          inputs,
 			Outs:         baseOutputs,
 			Memo:         ops.Memo(),
@@ -880,7 +879,7 @@ func (b *builder) spend(
 	stakeOutputs []*avax.TransferableOutput,
 	err error,
 ) {
-	utxos, err := b.backend.UTXOs(options.Context(), constants.PlatformChainID)
+	utxos, err := b.backend.UTXOs(options.Context(), constant.PlatformChainID)
 	if err != nil {
 		return nil, nil, nil, err
 	}

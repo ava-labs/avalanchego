@@ -4,13 +4,12 @@
 package p
 
 import (
-	"sync"
-
 	stdcontext "context"
+	"sync"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -57,7 +56,7 @@ func (b *backend) AcceptTx(ctx stdcontext.Context, tx *txs.Tx) error {
 	}
 
 	producedUTXOSlice := tx.UTXOs()
-	err = b.addUTXOs(ctx, constants.PlatformChainID, producedUTXOSlice)
+	err = b.addUTXOs(ctx, constant.PlatformChainID, producedUTXOSlice)
 	if err != nil {
 		return err
 	}

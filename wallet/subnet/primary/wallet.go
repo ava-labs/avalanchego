@@ -7,7 +7,7 @@ import (
 	"context"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/crypto/keychain"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -116,7 +116,7 @@ func MakeWallet(ctx context.Context, config *WalletConfig) (Wallet, error) {
 		pChainTxs[txID] = tx
 	}
 
-	pUTXOs := NewChainUTXOs(constants.PlatformChainID, avaxState.UTXOs)
+	pUTXOs := NewChainUTXOs(constant.PlatformChainID, avaxState.UTXOs)
 	pBackend := p.NewBackend(avaxState.PCTX, pUTXOs, pChainTxs)
 	pBuilder := p.NewBuilder(avaxAddrs, pBackend)
 	pSigner := p.NewSigner(config.AVAXKeychain, pBackend)

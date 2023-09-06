@@ -21,7 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/handler"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -123,7 +123,7 @@ func (cr *ChainRouter) Initialize(
 		version: version.CurrentApp,
 	}
 	myself.trackedSubnets.Union(trackedSubnets)
-	myself.trackedSubnets.Add(constants.PrimaryNetworkID)
+	myself.trackedSubnets.Add(constant.PrimaryNetworkID)
 	cr.peers[nodeID] = myself
 
 	// Register metrics
@@ -275,7 +275,7 @@ func (cr *ChainRouter) HandleInbound(ctx context.Context, msg message.InboundMes
 	// TODO: [requestID] can overflow, which means a timeout on the request
 	//       before the overflow may not be handled properly.
 	if notRequested := message.UnrequestedOps.Contains(op); notRequested ||
-		(op == message.PutOp && requestID == constants.GossipMsgRequestID) {
+		(op == message.PutOp && requestID == constant.GossipMsgRequestID) {
 		if chainCtx.Executing.Get() {
 			cr.log.Debug("dropping message and skipping queue",
 				zap.String("reason", "the chain is currently executing"),
@@ -429,7 +429,7 @@ func (cr *ChainRouter) AddChain(ctx context.Context, chain handler.Handler) {
 
 	// When we register the P-chain, we mark ourselves as connected on all of
 	// the subnets that we have tracked.
-	if chainID != constants.PlatformChainID {
+	if chainID != constant.PlatformChainID {
 		return
 	}
 
@@ -475,7 +475,7 @@ func (cr *ChainRouter) Connected(nodeID ids.NodeID, nodeVersion *version.Applica
 	// When sybil protection is disabled, we only want this clause to happen
 	// once. Therefore, we only update the chains during the connection of the
 	// primary network, which is guaranteed to happen for every peer.
-	if cr.sybilProtectionEnabled || subnetID == constants.PrimaryNetworkID {
+	if cr.sybilProtectionEnabled || subnetID == constant.PrimaryNetworkID {
 		for _, chain := range cr.chainHandlers {
 			// If sybil protection is disabled, send a Connected message to
 			// every chain when connecting to the primary network.
@@ -708,7 +708,7 @@ func (cr *ChainRouter) clearRequest(
 func (cr *ChainRouter) connectedSubnet(peer *peer, nodeID ids.NodeID, subnetID ids.ID) {
 	// if connected to primary network, we can skip this
 	// because Connected has its own internal message
-	if subnetID == constants.PrimaryNetworkID {
+	if subnetID == constant.PrimaryNetworkID {
 		return
 	}
 
@@ -722,7 +722,7 @@ func (cr *ChainRouter) connectedSubnet(peer *peer, nodeID ids.NodeID, subnetID i
 	// that cares about the connectivity of all subnets. Others chains learn
 	// about the connectivity of their own subnet when they receive a
 	// *message.Connected.
-	platformChain, ok := cr.chainHandlers[constants.PlatformChainID]
+	platformChain, ok := cr.chainHandlers[constant.PlatformChainID]
 	if !ok {
 		cr.log.Error("trying to issue InternalConnectedSubnet message, but platform chain is not registered",
 			zap.Stringer("nodeID", nodeID),

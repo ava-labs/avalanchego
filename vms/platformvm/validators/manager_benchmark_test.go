@@ -18,7 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
@@ -63,7 +63,7 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 	genesisTime := time.Now().Truncate(time.Second)
 	genesisEndTime := genesisTime.Add(28 * 24 * time.Hour)
 
-	addr, err := address.FormatBech32(constants.UnitTestHRP, ids.GenerateTestShortID().Bytes())
+	addr, err := address.FormatBech32(constant.UnitTestHRP, ids.GenerateTestShortID().Bytes())
 	require.NoError(err)
 
 	genesisValidators := []api.PermissionlessValidator{{
@@ -84,7 +84,7 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 	}}
 
 	buildGenesisArgs := api.BuildGenesisArgs{
-		NetworkID:     json.Uint32(constants.UnitTestID),
+		NetworkID:     json.Uint32(constant.UnitTestID),
 		AvaxAssetID:   avaxAssetID,
 		UTXOs:         nil,
 		Validators:    genesisValidators,
@@ -102,7 +102,7 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 	require.NoError(err)
 
 	vdrs := validators.NewManager()
-	vdrs.Add(constants.PrimaryNetworkID, validators.NewSet())
+	vdrs.Add(constant.PrimaryNetworkID, validators.NewSet())
 
 	execConfig, err := config.GetExecutionConfig(nil)
 	require.NoError(err)
@@ -119,7 +119,7 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 		},
 		execConfig,
 		&snow.Context{
-			NetworkID: constants.UnitTestID,
+			NetworkID: constant.UnitTestID,
 			NodeID:    ids.GenerateTestNodeID(),
 			Log:       logging.NoLog{},
 		},
@@ -195,7 +195,7 @@ func addPrimaryValidator(
 		TxID:            ids.GenerateTestID(),
 		NodeID:          nodeID,
 		PublicKey:       bls.PublicFromSecretKey(sk),
-		SubnetID:        constants.PrimaryNetworkID,
+		SubnetID:        constant.PrimaryNetworkID,
 		Weight:          2 * units.MegaAvax,
 		StartTime:       startTime,
 		EndTime:         endTime,
@@ -252,7 +252,7 @@ func addSubnetDelegator(
 	nodeIDs []ids.NodeID,
 	height uint64,
 ) error {
-	i := rand.Intn(len(nodeIDs)) //#nosec G404
+	i := rand.Intn(len(nodeIDs)) // #nosec G404
 	nodeID := nodeIDs[i]
 	s.PutCurrentDelegator(&state.Staker{
 		TxID:            ids.GenerateTestID(),

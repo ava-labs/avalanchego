@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -58,17 +58,17 @@ func TestDiffCurrentSupply(t *testing.T) {
 	d, err := NewDiff(lastAcceptedID, versions)
 	require.NoError(err)
 
-	initialCurrentSupply, err := d.GetCurrentSupply(constants.PrimaryNetworkID)
+	initialCurrentSupply, err := d.GetCurrentSupply(constant.PrimaryNetworkID)
 	require.NoError(err)
 
 	newCurrentSupply := initialCurrentSupply + 1
-	d.SetCurrentSupply(constants.PrimaryNetworkID, newCurrentSupply)
+	d.SetCurrentSupply(constant.PrimaryNetworkID, newCurrentSupply)
 
-	returnedNewCurrentSupply, err := d.GetCurrentSupply(constants.PrimaryNetworkID)
+	returnedNewCurrentSupply, err := d.GetCurrentSupply(constant.PrimaryNetworkID)
 	require.NoError(err)
 	require.Equal(newCurrentSupply, returnedNewCurrentSupply)
 
-	returnedBaseCurrentSupply, err := state.GetCurrentSupply(constants.PrimaryNetworkID)
+	returnedBaseCurrentSupply, err := state.GetCurrentSupply(constant.PrimaryNetworkID)
 	require.NoError(err)
 	require.Equal(initialCurrentSupply, returnedBaseCurrentSupply)
 }
@@ -480,10 +480,10 @@ func assertChainsEqual(t *testing.T, expected, actual Chain) {
 
 	require.Equal(expected.GetTimestamp(), actual.GetTimestamp())
 
-	expectedCurrentSupply, err := expected.GetCurrentSupply(constants.PrimaryNetworkID)
+	expectedCurrentSupply, err := expected.GetCurrentSupply(constant.PrimaryNetworkID)
 	require.NoError(err)
 
-	actualCurrentSupply, err := actual.GetCurrentSupply(constants.PrimaryNetworkID)
+	actualCurrentSupply, err := actual.GetCurrentSupply(constant.PrimaryNetworkID)
 	require.NoError(err)
 
 	require.Equal(expectedCurrentSupply, actualCurrentSupply)

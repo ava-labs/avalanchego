@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/window"
@@ -212,7 +212,7 @@ func (m *manager) GetValidatorSet(
 		currentHeight uint64
 		err           error
 	)
-	if subnetID == constants.PrimaryNetworkID {
+	if subnetID == constant.PrimaryNetworkID {
 		validatorSet, currentHeight, err = m.makePrimaryNetworkValidatorSet(ctx, targetHeight)
 	} else {
 		validatorSet, currentHeight, err = m.makeSubnetValidatorSet(ctx, targetHeight, subnetID)
@@ -233,7 +233,7 @@ func (m *manager) GetValidatorSet(
 
 func (m *manager) getValidatorSetCache(subnetID ids.ID) cache.Cacher[uint64, map[ids.NodeID]*validators.GetValidatorOutput] {
 	// Only cache tracked subnets
-	if subnetID != constants.PrimaryNetworkID && !m.cfg.TrackedSubnets.Contains(subnetID) {
+	if subnetID != constant.PrimaryNetworkID && !m.cfg.TrackedSubnets.Contains(subnetID) {
 		return &cache.Empty[uint64, map[ids.NodeID]*validators.GetValidatorOutput]{}
 	}
 
@@ -273,7 +273,7 @@ func (m *manager) makePrimaryNetworkValidatorSet(
 		validatorSet,
 		currentHeight,
 		lastDiffHeight,
-		constants.PlatformChainID,
+		constant.PlatformChainID,
 	)
 	if err != nil {
 		return nil, 0, err
@@ -291,11 +291,11 @@ func (m *manager) makePrimaryNetworkValidatorSet(
 func (m *manager) getCurrentPrimaryValidatorSet(
 	ctx context.Context,
 ) (map[ids.NodeID]*validators.GetValidatorOutput, uint64, error) {
-	currentValidators, ok := m.cfg.Validators.Get(constants.PrimaryNetworkID)
+	currentValidators, ok := m.cfg.Validators.Get(constant.PrimaryNetworkID)
 	if !ok {
 		// This should never happen
 		m.log.Error(ErrMissingValidatorSet.Error(),
-			zap.Stringer("subnetID", constants.PrimaryNetworkID),
+			zap.Stringer("subnetID", constant.PrimaryNetworkID),
 		)
 		return nil, 0, ErrMissingValidatorSet
 	}
@@ -372,11 +372,11 @@ func (m *manager) getCurrentValidatorSets(
 		}
 	}
 
-	currentPrimaryValidators, ok := m.cfg.Validators.Get(constants.PrimaryNetworkID)
+	currentPrimaryValidators, ok := m.cfg.Validators.Get(constant.PrimaryNetworkID)
 	if !ok {
 		// This should never happen
 		m.log.Error(ErrMissingValidatorSet.Error(),
-			zap.Stringer("subnetID", constants.PrimaryNetworkID),
+			zap.Stringer("subnetID", constant.PrimaryNetworkID),
 		)
 		return nil, nil, 0, ErrMissingValidatorSet
 	}
@@ -386,8 +386,8 @@ func (m *manager) getCurrentValidatorSets(
 }
 
 func (m *manager) GetSubnetID(_ context.Context, chainID ids.ID) (ids.ID, error) {
-	if chainID == constants.PlatformChainID {
-		return constants.PrimaryNetworkID, nil
+	if chainID == constant.PlatformChainID {
+		return constant.PrimaryNetworkID, nil
 	}
 
 	chainTx, _, err := m.state.GetTx(chainID)

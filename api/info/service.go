@@ -19,7 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -183,7 +183,7 @@ func (i *Info) GetNetworkName(_ *http.Request, _ *struct{}, reply *GetNetworkNam
 		zap.String("method", "getNetworkName"),
 	)
 
-	reply.NetworkName = constants.NetworkName(i.NetworkID)
+	reply.NetworkName = constant.NetworkName(i.NetworkID)
 	return nil
 }
 

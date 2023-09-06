@@ -25,7 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
@@ -228,9 +228,9 @@ func takeValidatorsSnapshotAtCurrentHeightAndTest(vm *VM, validatorsSetByHeightA
 		}
 
 		blsKey := v.PublicKey
-		if v.SubnetID != constants.PrimaryNetworkID {
+		if v.SubnetID != constant.PrimaryNetworkID {
 			// pick bls key from primary validator
-			s, err := vm.state.GetCurrentValidator(constants.PlatformChainID, v.NodeID)
+			s, err := vm.state.GetCurrentValidator(constant.PlatformChainID, v.NodeID)
 			if err != nil {
 				return err
 			}
@@ -307,7 +307,7 @@ func addPrimaryValidatorWithBLSKey(vm *VM, data *validatorInputData) (*state.Sta
 			End:    uint64(data.endTime.Unix()),
 			Wght:   vm.MinValidatorStake,
 		},
-		Subnet:    constants.PrimaryNetworkID,
+		Subnet:    constant.PrimaryNetworkID,
 		Signer:    signer.NewProofOfPossession(sk),
 		StakeOuts: stakedOuts,
 		ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
@@ -709,7 +709,7 @@ func TestTimestampListGenerator(t *testing.T) {
 func buildVM(t *testing.T) (*VM, ids.ID, error) {
 	vdrs := validators.NewManager()
 	primaryVdrs := validators.NewSet()
-	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
+	_ = vdrs.Add(constant.PrimaryNetworkID, primaryVdrs)
 
 	forkTime := defaultGenesisTime
 	vm := &VM{Config: config.Config{
@@ -814,7 +814,7 @@ func buildCustomGenesis() ([]byte, error) {
 	genesisUTXOs := make([]api.UTXO, len(keys))
 	for i, key := range keys {
 		id := key.PublicKey().Address()
-		addr, err := address.FormatBech32(constants.UnitTestHRP, id.Bytes())
+		addr, err := address.FormatBech32(constant.UnitTestHRP, id.Bytes())
 		if err != nil {
 			return nil, err
 		}
@@ -829,7 +829,7 @@ func buildCustomGenesis() ([]byte, error) {
 	// what happens with production code we push such validator at the end of
 	// times, so to avoid interference with our tests
 	nodeID := ids.NodeID(keys[len(keys)-1].PublicKey().Address())
-	addr, err := address.FormatBech32(constants.UnitTestHRP, nodeID.Bytes())
+	addr, err := address.FormatBech32(constant.UnitTestHRP, nodeID.Bytes())
 	if err != nil {
 		return nil, err
 	}
@@ -855,7 +855,7 @@ func buildCustomGenesis() ([]byte, error) {
 
 	buildGenesisArgs := api.BuildGenesisArgs{
 		Encoding:      formatting.Hex,
-		NetworkID:     json.Uint32(constants.UnitTestID),
+		NetworkID:     json.Uint32(constant.UnitTestID),
 		AvaxAssetID:   avaxAssetID,
 		UTXOs:         genesisUTXOs,
 		Validators:    []api.PermissionlessValidator{genesisValidator},

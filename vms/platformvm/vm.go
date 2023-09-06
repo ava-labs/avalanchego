@@ -26,7 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -249,7 +249,7 @@ func (vm *VM) Initialize(
 func (vm *VM) initBlockchains() error {
 	if vm.Config.PartialSyncPrimaryNetwork {
 		vm.ctx.Log.Info("skipping primary network chain creation")
-	} else if err := vm.createSubnet(constants.PrimaryNetworkID); err != nil {
+	} else if err := vm.createSubnet(constant.PrimaryNetworkID); err != nil {
 		return err
 	}
 
@@ -306,11 +306,11 @@ func (vm *VM) onNormalOperationsStarted() error {
 		return err
 	}
 
-	primaryVdrIDs, err := validators.NodeIDs(vm.Validators, constants.PrimaryNetworkID)
+	primaryVdrIDs, err := validators.NodeIDs(vm.Validators, constant.PrimaryNetworkID)
 	if err != nil {
 		return err
 	}
-	if err := vm.uptimeManager.StartTracking(primaryVdrIDs, constants.PrimaryNetworkID); err != nil {
+	if err := vm.uptimeManager.StartTracking(primaryVdrIDs, constant.PrimaryNetworkID); err != nil {
 		return err
 	}
 
@@ -353,11 +353,11 @@ func (vm *VM) Shutdown(context.Context) error {
 	vm.Builder.Shutdown()
 
 	if vm.bootstrapped.Get() {
-		primaryVdrIDs, err := validators.NodeIDs(vm.Validators, constants.PrimaryNetworkID)
+		primaryVdrIDs, err := validators.NodeIDs(vm.Validators, constant.PrimaryNetworkID)
 		if err != nil {
 			return err
 		}
-		if err := vm.uptimeManager.StopTracking(primaryVdrIDs, constants.PrimaryNetworkID); err != nil {
+		if err := vm.uptimeManager.StopTracking(primaryVdrIDs, constant.PrimaryNetworkID); err != nil {
 			return err
 		}
 
@@ -462,7 +462,7 @@ func (*VM) CreateStaticHandlers(context.Context) (map[string]*common.HTTPHandler
 }
 
 func (vm *VM) Connected(_ context.Context, nodeID ids.NodeID, _ *version.Application) error {
-	return vm.uptimeManager.Connect(nodeID, constants.PrimaryNetworkID)
+	return vm.uptimeManager.Connect(nodeID, constant.PrimaryNetworkID)
 }
 
 func (vm *VM) ConnectedSubnet(_ context.Context, nodeID ids.NodeID, subnetID ids.ID) error {

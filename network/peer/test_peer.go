@@ -19,7 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/staking"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/meter"
@@ -51,7 +51,7 @@ func StartTestPeer(
 	router router.InboundHandler,
 ) (Peer, error) {
 	dialer := net.Dialer{}
-	conn, err := dialer.DialContext(ctx, constants.NetworkType, ip.String())
+	conn, err := dialer.DialContext(ctx, constant.NetworkType, ip.String())
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +76,7 @@ func StartTestPeer(
 		logging.NoLog{},
 		prometheus.NewRegistry(),
 		"",
-		constants.DefaultNetworkCompressionType,
+		constant.DefaultNetworkCompressionType,
 		10*time.Second,
 	)
 	if err != nil {
@@ -117,8 +117,8 @@ func StartTestPeer(
 			MySubnets:            set.Set[ids.ID]{},
 			Beacons:              validators.NewSet(),
 			NetworkID:            networkID,
-			PingFrequency:        constants.DefaultPingFrequency,
-			PongTimeout:          constants.DefaultPingPongTimeout,
+			PingFrequency:        constant.DefaultPingFrequency,
+			PongTimeout:          constant.DefaultPingPongTimeout,
 			MaxClockDifference:   time.Minute,
 			ResourceTracker:      resourceTracker,
 			UptimeCalculator:     uptime.NoOpCalculator,

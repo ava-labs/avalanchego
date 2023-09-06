@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -65,8 +65,8 @@ func TestRemoveSubnetValidatorTxSerialization(t *testing.T) {
 	simpleRemoveValidatorTx := &RemoveSubnetValidatorTx{
 		BaseTx: BaseTx{
 			BaseTx: avax.BaseTx{
-				NetworkID:    constants.MainnetID,
-				BlockchainID: constants.PlatformChainID,
+				NetworkID:    constant.MainnetID,
+				BlockchainID: constant.PlatformChainID,
 				Outs:         []*avax.TransferableOutput{},
 				Ins: []*avax.TransferableInput{
 					{
@@ -96,7 +96,7 @@ func TestRemoveSubnetValidatorTxSerialization(t *testing.T) {
 	}
 	require.NoError(simpleRemoveValidatorTx.SyntacticVerify(&snow.Context{
 		NetworkID:   1,
-		ChainID:     constants.PlatformChainID,
+		ChainID:     constant.PlatformChainID,
 		AVAXAssetID: avaxAssetID,
 	}))
 
@@ -163,8 +163,8 @@ func TestRemoveSubnetValidatorTxSerialization(t *testing.T) {
 	complexRemoveValidatorTx := &RemoveSubnetValidatorTx{
 		BaseTx: BaseTx{
 			BaseTx: avax.BaseTx{
-				NetworkID:    constants.MainnetID,
-				BlockchainID: constants.PlatformChainID,
+				NetworkID:    constant.MainnetID,
+				BlockchainID: constant.PlatformChainID,
 				Outs: []*avax.TransferableOutput{
 					{
 						Asset: avax.Asset{
@@ -264,7 +264,7 @@ func TestRemoveSubnetValidatorTxSerialization(t *testing.T) {
 	utils.Sort(complexRemoveValidatorTx.Ins)
 	require.NoError(simpleRemoveValidatorTx.SyntacticVerify(&snow.Context{
 		NetworkID:   1,
-		ChainID:     constants.PlatformChainID,
+		ChainID:     constant.PlatformChainID,
 		AVAXAssetID: avaxAssetID,
 	}))
 
@@ -495,7 +495,7 @@ func TestRemoveSubnetValidatorTxSyntacticVerify(t *testing.T) {
 					BaseTx: validBaseTx,
 					// Set NodeID so we don't error on that check.
 					NodeID: ids.GenerateTestNodeID(),
-					Subnet: constants.PrimaryNetworkID,
+					Subnet: constant.PrimaryNetworkID,
 				}
 			},
 			expectedErr: ErrRemovePrimaryNetworkValidator,

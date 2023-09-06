@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -93,7 +93,7 @@ func ExampleNewTestNetwork() {
 
 	network, err := NewTestNetwork(
 		log,
-		constants.FujiID,
+		constant.FujiID,
 		validators,
 		trackedSubnets,
 		handler,
@@ -108,7 +108,7 @@ func ExampleNewTestNetwork() {
 
 	// We need to initially connect to some nodes in the network before peer
 	// gossip will enable connecting to all the remaining nodes in the network.
-	bootstrappers := genesis.SampleBootstrappers(constants.FujiID, 5)
+	bootstrappers := genesis.SampleBootstrappers(constant.FujiID, 5)
 	for _, bootstrapper := range bootstrappers {
 		network.ManuallyTrack(bootstrapper.ID, ips.IPPort(bootstrapper.IP))
 	}

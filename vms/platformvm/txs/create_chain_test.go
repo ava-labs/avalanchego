@@ -10,7 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -41,7 +41,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 			description: "tx is nil",
 			subnetID:    testSubnet1ID,
 			genesisData: nil,
-			vmID:        constants.AVMID,
+			vmID:        constant.AVMID,
 			fxIDs:       nil,
 			chainName:   "yeet",
 			keys:        []*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
@@ -54,7 +54,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 			description: "vm ID is empty",
 			subnetID:    testSubnet1ID,
 			genesisData: nil,
-			vmID:        constants.AVMID,
+			vmID:        constant.AVMID,
 			fxIDs:       nil,
 			chainName:   "yeet",
 			keys:        []*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
@@ -68,7 +68,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 			description: "subnet ID is platform chain's ID",
 			subnetID:    testSubnet1ID,
 			genesisData: nil,
-			vmID:        constants.AVMID,
+			vmID:        constant.AVMID,
 			fxIDs:       nil,
 			chainName:   "yeet",
 			keys:        []*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
@@ -82,7 +82,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 			description: "chain name is too long",
 			subnetID:    testSubnet1ID,
 			genesisData: nil,
-			vmID:        constants.AVMID,
+			vmID:        constant.AVMID,
 			fxIDs:       nil,
 			chainName:   "yeet",
 			keys:        []*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
@@ -96,7 +96,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 			description: "chain name has invalid character",
 			subnetID:    testSubnet1ID,
 			genesisData: nil,
-			vmID:        constants.AVMID,
+			vmID:        constant.AVMID,
 			fxIDs:       nil,
 			chainName:   "yeet",
 			keys:        []*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
@@ -110,7 +110,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 			description: "genesis data is too long",
 			subnetID:    testSubnet1ID,
 			genesisData: nil,
-			vmID:        constants.AVMID,
+			vmID:        constant.AVMID,
 			fxIDs:       nil,
 			chainName:   "yeet",
 			keys:        []*secp256k1.PrivateKey{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},

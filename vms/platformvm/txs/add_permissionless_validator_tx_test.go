@@ -5,9 +5,8 @@ package txs
 
 import (
 	"encoding/hex"
-	"testing"
-
 	stdmath "math"
+	"testing"
 
 	"github.com/stretchr/testify/require"
 
@@ -16,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -69,8 +68,8 @@ func TestAddPermissionlessPrimaryValidator(t *testing.T) {
 	simpleAddPrimaryTx := &AddPermissionlessValidatorTx{
 		BaseTx: BaseTx{
 			BaseTx: avax.BaseTx{
-				NetworkID:    constants.MainnetID,
-				BlockchainID: constants.PlatformChainID,
+				NetworkID:    constant.MainnetID,
+				BlockchainID: constant.PlatformChainID,
 				Outs:         []*avax.TransferableOutput{},
 				Ins: []*avax.TransferableInput{
 					{
@@ -98,7 +97,7 @@ func TestAddPermissionlessPrimaryValidator(t *testing.T) {
 			End:    12345 + 200*24*60*60,
 			Wght:   2 * units.KiloAvax,
 		},
-		Subnet: constants.PrimaryNetworkID,
+		Subnet: constant.PrimaryNetworkID,
 		Signer: signer.NewProofOfPossession(sk),
 		StakeOuts: []*avax.TransferableOutput{
 			{
@@ -138,7 +137,7 @@ func TestAddPermissionlessPrimaryValidator(t *testing.T) {
 	utils.Sort(simpleAddPrimaryTx.Ins)
 	require.NoError(simpleAddPrimaryTx.SyntacticVerify(&snow.Context{
 		NetworkID:   1,
-		ChainID:     constants.PlatformChainID,
+		ChainID:     constant.PlatformChainID,
 		AVAXAssetID: avaxAssetID,
 	}))
 
@@ -274,8 +273,8 @@ func TestAddPermissionlessPrimaryValidator(t *testing.T) {
 	complexAddPrimaryTx := &AddPermissionlessValidatorTx{
 		BaseTx: BaseTx{
 			BaseTx: avax.BaseTx{
-				NetworkID:    constants.MainnetID,
-				BlockchainID: constants.PlatformChainID,
+				NetworkID:    constant.MainnetID,
+				BlockchainID: constant.PlatformChainID,
 				Outs: []*avax.TransferableOutput{
 					{
 						Asset: avax.Asset{
@@ -386,7 +385,7 @@ func TestAddPermissionlessPrimaryValidator(t *testing.T) {
 			End:    12345 + 200*24*60*60,
 			Wght:   5 * units.KiloAvax,
 		},
-		Subnet: constants.PrimaryNetworkID,
+		Subnet: constant.PrimaryNetworkID,
 		Signer: signer.NewProofOfPossession(sk),
 		StakeOuts: []*avax.TransferableOutput{
 			{
@@ -437,7 +436,7 @@ func TestAddPermissionlessPrimaryValidator(t *testing.T) {
 	}
 	require.NoError(complexAddPrimaryTx.SyntacticVerify(&snow.Context{
 		NetworkID:   1,
-		ChainID:     constants.PlatformChainID,
+		ChainID:     constant.PlatformChainID,
 		AVAXAssetID: avaxAssetID,
 	}))
 
@@ -740,8 +739,8 @@ func TestAddPermissionlessSubnetValidator(t *testing.T) {
 	simpleAddSubnetTx := &AddPermissionlessValidatorTx{
 		BaseTx: BaseTx{
 			BaseTx: avax.BaseTx{
-				NetworkID:    constants.MainnetID,
-				BlockchainID: constants.PlatformChainID,
+				NetworkID:    constant.MainnetID,
+				BlockchainID: constant.PlatformChainID,
 				Outs:         []*avax.TransferableOutput{},
 				Ins: []*avax.TransferableInput{
 					{
@@ -824,7 +823,7 @@ func TestAddPermissionlessSubnetValidator(t *testing.T) {
 	utils.Sort(simpleAddSubnetTx.Ins)
 	require.NoError(simpleAddSubnetTx.SyntacticVerify(&snow.Context{
 		NetworkID:   1,
-		ChainID:     constants.PlatformChainID,
+		ChainID:     constant.PlatformChainID,
 		AVAXAssetID: avaxAssetID,
 	}))
 
@@ -961,8 +960,8 @@ func TestAddPermissionlessSubnetValidator(t *testing.T) {
 	complexAddSubnetTx := &AddPermissionlessValidatorTx{
 		BaseTx: BaseTx{
 			BaseTx: avax.BaseTx{
-				NetworkID:    constants.MainnetID,
-				BlockchainID: constants.PlatformChainID,
+				NetworkID:    constant.MainnetID,
+				BlockchainID: constant.PlatformChainID,
 				Outs: []*avax.TransferableOutput{
 					{
 						Asset: avax.Asset{
@@ -1124,7 +1123,7 @@ func TestAddPermissionlessSubnetValidator(t *testing.T) {
 	}
 	require.NoError(complexAddSubnetTx.SyntacticVerify(&snow.Context{
 		NetworkID:   1,
-		ChainID:     constants.PlatformChainID,
+		ChainID:     constant.PlatformChainID,
 		AVAXAssetID: avaxAssetID,
 	}))
 
@@ -1534,7 +1533,7 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 						NodeID: ids.GenerateTestNodeID(),
 						Wght:   1,
 					},
-					Subnet: constants.PrimaryNetworkID,
+					Subnet: constant.PrimaryNetworkID,
 					Signer: &signer.Empty{},
 					StakeOuts: []*avax.TransferableOutput{
 						{
@@ -1790,7 +1789,7 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 						NodeID: ids.GenerateTestNodeID(),
 						Wght:   2,
 					},
-					Subnet: constants.PrimaryNetworkID,
+					Subnet: constant.PrimaryNetworkID,
 					Signer: blsPOP,
 					StakeOuts: []*avax.TransferableOutput{
 						{

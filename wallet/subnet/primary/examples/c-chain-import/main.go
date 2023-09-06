@@ -12,7 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -69,7 +69,7 @@ func main() {
 	log.Printf("issued export %s in %s\n", exportTx.ID(), time.Since(exportStartTime))
 
 	importStartTime := time.Now()
-	importTx, err := cWallet.IssueImportTx(constants.PlatformChainID, ethAddr)
+	importTx, err := cWallet.IssueImportTx(constant.PlatformChainID, ethAddr)
 	if err != nil {
 		log.Fatalf("failed to issue import transaction: %s\n", err)
 	}

@@ -5,14 +5,14 @@
 package banff
 
 import (
-	ginkgo "github.com/onsi/ginkgo/v2"
+	"github.com/onsi/ginkgo/v2"
 
 	"github.com/onsi/gomega"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/e2e"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -67,7 +67,7 @@ var _ = ginkgo.Describe("[Banff]", func() {
 
 			ginkgo.By("export new X-chain asset to P-chain", func() {
 				tx, err := xWallet.IssueExportTx(
-					constants.PlatformChainID,
+					constant.PlatformChainID,
 					[]*avax.TransferableOutput{
 						{
 							Asset: avax.Asset{
@@ -113,7 +113,7 @@ var _ = ginkgo.Describe("[Banff]", func() {
 			})
 
 			ginkgo.By("import asset from P-chain on the X-chain", func() {
-				tx, err := xWallet.IssueImportTx(constants.PlatformChainID, owner)
+				tx, err := xWallet.IssueImportTx(constant.PlatformChainID, owner)
 				gomega.Expect(err).Should(gomega.BeNil())
 
 				tests.Outf("{{green}}issued X-chain import{{/}}: %s\n", tx.ID())

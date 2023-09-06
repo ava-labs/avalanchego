@@ -11,7 +11,7 @@ import (
 
 	"github.com/Microsoft/go-winio"
 
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 )
 
 // listen creates a net.Listen backed by a Windows named pipe
@@ -25,7 +25,7 @@ func Dial(addr string) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Client{Conn: c, maxMessageSize: int64(constants.DefaultMaxMessageSize)}, nil
+	return &Client{Conn: c, maxMessageSize: int64(constant.DefaultMaxMessageSize)}, nil
 }
 
 // windowsPipeName turns an address into a valid Windows named pipes name

@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
@@ -35,9 +35,9 @@ func setupSigner(t testing.TB) *testSigner {
 	chainID := ids.GenerateTestID()
 
 	s := &testSigner{
-		server:    warp.NewSigner(sk, constants.UnitTestID, chainID),
+		server:    warp.NewSigner(sk, constant.UnitTestID, chainID),
 		sk:        sk,
-		networkID: constants.UnitTestID,
+		networkID: constant.UnitTestID,
 		chainID:   chainID,
 	}
 

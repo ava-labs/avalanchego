@@ -5,7 +5,7 @@ package txs
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 )
 
 // SubnetValidator validates a subnet on the Avalanche network.
@@ -24,7 +24,7 @@ func (v *SubnetValidator) SubnetID() ids.ID {
 // Verify this validator is valid
 func (v *SubnetValidator) Verify() error {
 	switch v.Subnet {
-	case constants.PrimaryNetworkID:
+	case constant.PrimaryNetworkID:
 		return errBadSubnetID
 	default:
 		return v.Validator.Verify()

@@ -5,11 +5,10 @@ package avm
 
 import (
 	"context"
+	stdjson "encoding/json"
 	"fmt"
 	"testing"
 	"time"
-
-	stdjson "encoding/json"
 
 	"github.com/btcsuite/btcd/btcutil/bech32"
 
@@ -27,7 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
@@ -869,7 +868,7 @@ func newAvaxCreateAssetTxWithOutputs(t *testing.T, vm *VM) *txs.Tx {
 func buildBaseTx(avaxTx *txs.Tx, vm *VM, key *secp256k1.PrivateKey) *txs.Tx {
 	return &txs.Tx{Unsigned: &txs.BaseTx{
 		BaseTx: avax.BaseTx{
-			NetworkID:    constants.UnitTestID,
+			NetworkID:    constant.UnitTestID,
 			BlockchainID: chainID,
 			Memo:         []byte{1, 2, 3, 4, 5, 6, 7, 8},
 			Ins: []*avax.TransferableInput{{
@@ -905,7 +904,7 @@ func buildExportTx(avaxTx *txs.Tx, vm *VM, key *secp256k1.PrivateKey) *txs.Tx {
 	return &txs.Tx{Unsigned: &txs.ExportTx{
 		BaseTx: txs.BaseTx{
 			BaseTx: avax.BaseTx{
-				NetworkID:    constants.UnitTestID,
+				NetworkID:    constant.UnitTestID,
 				BlockchainID: chainID,
 				Ins: []*avax.TransferableInput{{
 					UTXOID: avax.UTXOID{
@@ -920,7 +919,7 @@ func buildExportTx(avaxTx *txs.Tx, vm *VM, key *secp256k1.PrivateKey) *txs.Tx {
 				}},
 			},
 		},
-		DestinationChain: constants.PlatformChainID,
+		DestinationChain: constant.PlatformChainID,
 		ExportedOuts: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: avaxTx.ID()},
 			Out: &secp256k1fx.TransferOutput{
@@ -937,7 +936,7 @@ func buildExportTx(avaxTx *txs.Tx, vm *VM, key *secp256k1.PrivateKey) *txs.Tx {
 func buildCreateAssetTx(key *secp256k1.PrivateKey) *txs.Tx {
 	return &txs.Tx{Unsigned: &txs.CreateAssetTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    constants.UnitTestID,
+			NetworkID:    constant.UnitTestID,
 			BlockchainID: chainID,
 		}},
 		Name:         "Team Rocket",
@@ -1076,7 +1075,7 @@ func buildSecpMintOp(createAssetTx *txs.Tx, key *secp256k1.PrivateKey, outputInd
 func buildOperationTxWithOp(op ...*txs.Operation) *txs.Tx {
 	return &txs.Tx{Unsigned: &txs.OperationTx{
 		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    constants.UnitTestID,
+			NetworkID:    constant.UnitTestID,
 			BlockchainID: chainID,
 		}},
 		Ops: op,
@@ -1141,7 +1140,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 	}
 	require.NoError(t, env.vm.state.Commit())
 
-	sm := env.sharedMemory.NewSharedMemory(constants.PlatformChainID)
+	sm := env.sharedMemory.NewSharedMemory(constant.PlatformChainID)
 
 	elems := make([]*atomic.Element, numUTXOs)
 	codec := env.vm.parser.Codec()
@@ -1178,10 +1177,10 @@ func TestServiceGetUTXOs(t *testing.T) {
 		},
 	}))
 
-	hrp := constants.GetHRP(env.vm.ctx.NetworkID)
+	hrp := constant.GetHRP(env.vm.ctx.NetworkID)
 	xAddr, err := env.vm.FormatLocalAddress(rawAddr)
 	require.NoError(t, err)
-	pAddr, err := env.vm.FormatAddress(constants.PlatformChainID, rawAddr)
+	pAddr, err := env.vm.FormatAddress(constant.PlatformChainID, rawAddr)
 	require.NoError(t, err)
 	unknownChainAddr, err := address.Format("R", hrp, rawAddr.Bytes())
 	require.NoError(t, err)
@@ -1925,7 +1924,7 @@ func TestImport(t *testing.T) {
 			utxoBytes, err := env.vm.parser.Codec().Marshal(txs.CodecVersion, utxo)
 			require.NoError(err)
 
-			peerSharedMemory := env.sharedMemory.NewSharedMemory(constants.PlatformChainID)
+			peerSharedMemory := env.sharedMemory.NewSharedMemory(constant.PlatformChainID)
 			utxoID := utxo.InputID()
 			require.NoError(peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{
 				env.vm.ctx.ChainID: {

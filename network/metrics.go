@@ -11,7 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/peer"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -172,7 +172,7 @@ func newMetrics(namespace string, registerer prometheus.Registerer, initialSubne
 	// init subnet tracker metrics with tracked subnets
 	for subnetID := range initialSubnetIDs {
 		// no need to track primary network ID
-		if subnetID == constants.PrimaryNetworkID {
+		if subnetID == constant.PrimaryNetworkID {
 			continue
 		}
 		// initialize to 0

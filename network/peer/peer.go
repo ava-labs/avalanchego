@@ -21,7 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -257,7 +257,7 @@ func (p *peer) Info() Info {
 		uptimes[subnetID] = json.Uint32(uptime)
 	}
 
-	primaryUptime, exist := p.ObservedUptime(constants.PrimaryNetworkID)
+	primaryUptime, exist := p.ObservedUptime(constant.PrimaryNetworkID)
 	if !exist {
 		primaryUptime = 0
 	}
@@ -383,7 +383,7 @@ func (p *peer) readMessages() {
 		}
 
 		// Parse the message length
-		msgLen, err := readMsgLen(msgLenBytes, constants.DefaultMaxMessageSize)
+		msgLen, err := readMsgLen(msgLenBytes, constant.DefaultMaxMessageSize)
 		if err != nil {
 			p.Log.Verbo("error reading message length",
 				zap.Stringer("nodeID", p.id),
@@ -560,7 +560,7 @@ func (p *peer) writeMessage(writer io.Writer, msg message.OutboundMessage) {
 	}
 
 	msgLen := uint32(len(msgBytes))
-	msgLenBytes, err := writeMsgLen(msgLen, constants.DefaultMaxMessageSize)
+	msgLenBytes, err := writeMsgLen(msgLen, constant.DefaultMaxMessageSize)
 	if err != nil {
 		p.Log.Verbo("error writing message length",
 			zap.Stringer("nodeID", p.id),
@@ -725,12 +725,12 @@ func (p *peer) handlePing(msg *p2p.Ping) {
 func (p *peer) getUptimes() (uint32, []*p2p.SubnetUptime) {
 	primaryUptime, err := p.UptimeCalculator.CalculateUptimePercent(
 		p.id,
-		constants.PrimaryNetworkID,
+		constant.PrimaryNetworkID,
 	)
 	if err != nil {
 		p.Log.Debug("failed to get peer primary uptime percentage",
 			zap.Stringer("nodeID", p.id),
-			zap.Stringer("subnetID", constants.PrimaryNetworkID),
+			zap.Stringer("subnetID", constant.PrimaryNetworkID),
 			zap.Error(err),
 		)
 		primaryUptime = 0
@@ -776,13 +776,13 @@ func (p *peer) observeUptimes(primaryUptime uint32, subnetUptimes []*p2p.SubnetU
 	if primaryUptime > 100 {
 		p.Log.Debug("dropping message with invalid uptime",
 			zap.Stringer("nodeID", p.id),
-			zap.Stringer("subnetID", constants.PrimaryNetworkID),
+			zap.Stringer("subnetID", constant.PrimaryNetworkID),
 			zap.Uint32("uptime", primaryUptime),
 		)
 		p.StartClose()
 		return
 	}
-	p.observeUptime(constants.PrimaryNetworkID, primaryUptime)
+	p.observeUptime(constant.PrimaryNetworkID, primaryUptime)
 
 	for _, subnetUptime := range subnetUptimes {
 		subnetID, err := ids.ToID(subnetUptime.SubnetId)

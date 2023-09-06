@@ -5,10 +5,9 @@ package state
 
 import (
 	"context"
+	stdmath "math"
 	"testing"
 	"time"
-
-	stdmath "math"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -21,7 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -65,12 +64,12 @@ func TestStateSyncGenesis(t *testing.T) {
 	require := require.New(t)
 	state, _ := newInitializedState(require)
 
-	staker, err := state.GetCurrentValidator(constants.PrimaryNetworkID, initialNodeID)
+	staker, err := state.GetCurrentValidator(constant.PrimaryNetworkID, initialNodeID)
 	require.NoError(err)
 	require.NotNil(staker)
 	require.Equal(initialNodeID, staker.NodeID)
 
-	delegatorIterator, err := state.GetCurrentDelegatorIterator(constants.PrimaryNetworkID, initialNodeID)
+	delegatorIterator, err := state.GetCurrentDelegatorIterator(constant.PrimaryNetworkID, initialNodeID)
 	require.NoError(err)
 	assertIteratorsEqual(t, EmptyIterator, delegatorIterator)
 
@@ -78,10 +77,10 @@ func TestStateSyncGenesis(t *testing.T) {
 	require.NoError(err)
 	assertIteratorsEqual(t, NewSliceIterator(staker), stakerIterator)
 
-	_, err = state.GetPendingValidator(constants.PrimaryNetworkID, initialNodeID)
+	_, err = state.GetPendingValidator(constant.PrimaryNetworkID, initialNodeID)
 	require.ErrorIs(err, database.ErrNotFound)
 
-	delegatorIterator, err = state.GetPendingDelegatorIterator(constants.PrimaryNetworkID, initialNodeID)
+	delegatorIterator, err = state.GetPendingDelegatorIterator(constant.PrimaryNetworkID, initialNodeID)
 	require.NoError(err)
 	assertIteratorsEqual(t, EmptyIterator, delegatorIterator)
 }
@@ -111,9 +110,9 @@ func newInitializedState(require *require.Assertions) (State, database.Database)
 	require.NoError(initialValidatorTx.Initialize(txs.Codec))
 
 	initialChain := &txs.CreateChainTx{
-		SubnetID:   constants.PrimaryNetworkID,
+		SubnetID:   constant.PrimaryNetworkID,
 		ChainName:  "x",
-		VMID:       constants.AVMID,
+		VMID:       constant.AVMID,
 		SubnetAuth: &secp256k1fx.Input{},
 	}
 	initialChainTx := &txs.Tx{Unsigned: initialChain}
@@ -158,7 +157,7 @@ func newUninitializedState(require *require.Assertions) (State, database.Databas
 func newStateFromDB(require *require.Assertions, db database.Database) State {
 	vdrs := validators.NewManager()
 	primaryVdrs := validators.NewSet()
-	_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
+	_ = vdrs.Add(constant.PrimaryNetworkID, primaryVdrs)
 
 	execCfg, _ := config.GetExecutionConfig(nil)
 	state, err := newState(
@@ -352,7 +351,7 @@ func TestStateAddRemoveValidator(t *testing.T) {
 			sk, err := bls.NewSecretKey()
 			require.NoError(err)
 			stakers[i].PublicKey = bls.PublicFromSecretKey(sk)
-			stakers[i].SubnetID = constants.PrimaryNetworkID
+			stakers[i].SubnetID = constant.PrimaryNetworkID
 		}
 	}
 
@@ -487,7 +486,7 @@ func TestStateAddRemoveValidator(t *testing.T) {
 				primaryValidatorSet,
 				currentHeight,
 				prevHeight+1,
-				constants.PrimaryNetworkID,
+				constant.PrimaryNetworkID,
 			))
 			requireEqualWeightsValidatorSet(require, prevDiff.expectedPrimaryValidatorSet, primaryValidatorSet)
 

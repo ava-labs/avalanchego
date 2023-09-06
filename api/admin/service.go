@@ -18,7 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/perms"
@@ -161,8 +161,8 @@ func (a *Admin) AliasChain(_ *http.Request, args *AliasChainArgs, _ *api.EmptyRe
 		return err
 	}
 
-	endpoint := path.Join(constants.ChainAliasPrefix, chainID.String())
-	alias := path.Join(constants.ChainAliasPrefix, args.Alias)
+	endpoint := path.Join(constant.ChainAliasPrefix, chainID.String())
+	alias := path.Join(constant.ChainAliasPrefix, args.Alias)
 	return a.HTTPServer.AddAliasesWithReadLock(endpoint, alias)
 }
 

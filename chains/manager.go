@@ -45,7 +45,7 @@ import (
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/buffer"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/perms"
@@ -291,7 +291,7 @@ func (m *manager) QueueChainCreation(chainParams ChainParameters) {
 		sbConfig, ok := m.SubnetConfigs[subnetID]
 		if !ok {
 			// default to primary subnet config
-			sbConfig = m.SubnetConfigs[constants.PrimaryNetworkID]
+			sbConfig = m.SubnetConfigs[constant.PrimaryNetworkID]
 		}
 		sb = subnets.New(m.NodeID, sbConfig)
 		m.subnets[chainParams.SubnetID] = sb
@@ -414,7 +414,7 @@ func (m *manager) createChain(chainParams ChainParameters) {
 	// Note: Registering this after the chain has been tracked prevents a race
 	//       condition between the health check and adding the first chain to
 	//       the manager.
-	if chainParams.ID == constants.PlatformChainID {
+	if chainParams.ID == constant.PlatformChainID {
 		if err := m.registerBootstrappedHealthChecks(); err != nil {
 			chain.Handler.StopWithError(context.TODO(), err)
 		}
@@ -427,7 +427,7 @@ func (m *manager) createChain(chainParams ChainParameters) {
 
 // Create a chain
 func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*chain, error) {
-	if chainParams.ID != constants.PlatformChainID && chainParams.VMID == constants.PlatformVMID {
+	if chainParams.ID != constant.PlatformChainID && chainParams.VMID == constant.PlatformVMID {
 		return nil, errCreatePlatformVM
 	}
 	primaryAlias := m.PrimaryAliasOrDefault(chainParams.ID)
@@ -445,7 +445,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 	}
 
 	consensusMetrics := prometheus.NewRegistry()
-	chainNamespace := fmt.Sprintf("%s_%s", constants.PlatformName, primaryAlias)
+	chainNamespace := fmt.Sprintf("%s_%s", constant.PlatformName, primaryAlias)
 	if err := m.Metrics.Register(chainNamespace, consensusMetrics); err != nil {
 		return nil, fmt.Errorf("error while registering chain's metrics %w", err)
 	}
@@ -533,7 +533,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 	if m.SybilProtectionEnabled {
 		vdrs, hasValidators = m.Validators.Get(chainParams.SubnetID)
 	} else { // Sybil protection is disabled. Every peer validates every subnet.
-		vdrs, hasValidators = m.Validators.Get(constants.PrimaryNetworkID)
+		vdrs, hasValidators = m.Validators.Get(constant.PrimaryNetworkID)
 	}
 	if !hasValidators {
 		return nil, fmt.Errorf("couldn't get validator set of subnet with ID %s. The subnet may not exist", chainParams.SubnetID)
@@ -555,7 +555,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 		}
 	case block.ChainVM:
 		beacons := vdrs
-		if chainParams.ID == constants.PlatformChainID {
+		if chainParams.ID == constant.PlatformChainID {
 			beacons = chainParams.CustomBeacons
 		}
 
@@ -1232,7 +1232,7 @@ func (m *manager) createSnowmanChain(
 		Validators:    vdrs,
 		Params:        consensusParams,
 		Consensus:     consensus,
-		PartialSync:   m.PartialSyncPrimaryNetwork && commonCfg.Ctx.ChainID == constants.PlatformChainID,
+		PartialSync:   m.PartialSyncPrimaryNetwork && commonCfg.Ctx.ChainID == constant.PlatformChainID,
 	}
 	engine, err := smeng.New(engineConfig)
 	if err != nil {
@@ -1352,10 +1352,10 @@ func (m *manager) registerBootstrappedHealthChecks() error {
 	partialSyncCheck := health.CheckerFunc(func(ctx context.Context) (interface{}, error) {
 		// Note: The health check is skipped during bootstrapping to allow a
 		// node to sync the network even if it was previously a validator.
-		if !m.IsBootstrapped(constants.PlatformChainID) {
+		if !m.IsBootstrapped(constant.PlatformChainID) {
 			return "node is currently bootstrapping", nil
 		}
-		if !validators.Contains(m.Validators, constants.PrimaryNetworkID, m.NodeID) {
+		if !validators.Contains(m.Validators, constant.PrimaryNetworkID, m.NodeID) {
 			return "node is not a primary network validator", nil
 		}
 
@@ -1375,7 +1375,7 @@ func (m *manager) registerBootstrappedHealthChecks() error {
 func (m *manager) StartChainCreator(platformParams ChainParameters) error {
 	// Get the Primary Network's subnet config. If it wasn't registered, then we
 	// throw a fatal error.
-	sbConfig, ok := m.SubnetConfigs[constants.PrimaryNetworkID]
+	sbConfig, ok := m.SubnetConfigs[constant.PrimaryNetworkID]
 	if !ok {
 		return errNoPrimaryNetworkConfig
 	}

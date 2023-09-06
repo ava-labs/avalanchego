@@ -7,7 +7,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/constant"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -18,7 +18,7 @@ type insecureValidatorManager struct {
 }
 
 func (i *insecureValidatorManager) Connected(vdrID ids.NodeID, nodeVersion *version.Application, subnetID ids.ID) {
-	if constants.PrimaryNetworkID == subnetID {
+	if constant.PrimaryNetworkID == subnetID {
 		// Sybil protection is disabled so we don't have a txID that added the
 		// peer as a validator. Because each validator needs a txID associated
 		// with it, we hack one together by padding the nodeID with zeroes.
