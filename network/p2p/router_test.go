@@ -26,6 +26,8 @@ func TestAppRequestResponse(t *testing.T) {
 	response := []byte("response")
 	nodeID := ids.GenerateTestNodeID()
 	chainID := ids.GenerateTestID()
+	foo := "foo"
+	bar := "foo"
 
 	tests := []struct {
 		name        string
@@ -45,6 +47,7 @@ func TestAppRequestResponse(t *testing.T) {
 				sender.EXPECT().SendAppResponse(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 					Do(func(ctx context.Context, _ ids.NodeID, requestID uint32, response []byte) {
 						go func() {
+							ctx = context.WithValue(ctx, foo, bar)
 							require.NoError(t, router.AppResponse(ctx, nodeID, requestID, response))
 						}()
 					}).AnyTimes()
@@ -54,10 +57,11 @@ func TestAppRequestResponse(t *testing.T) {
 						return response, nil
 					})
 
-				callback := func(_ context.Context, actualNodeID ids.NodeID, actualResponse []byte, err error) {
+				callback := func(ctx context.Context, actualNodeID ids.NodeID, actualResponse []byte, err error) {
 					defer wg.Done()
 
 					require.NoError(t, err)
+					require.Equal(t, bar, ctx.Value(foo))
 					require.Equal(t, nodeID, actualNodeID)
 					require.Equal(t, response, actualResponse)
 				}
@@ -101,6 +105,7 @@ func TestAppRequestResponse(t *testing.T) {
 				sender.EXPECT().SendCrossChainAppResponse(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 					Do(func(ctx context.Context, chainID ids.ID, requestID uint32, response []byte) {
 						go func() {
+							ctx = context.WithValue(ctx, foo, bar)
 							require.NoError(t, router.CrossChainAppResponse(ctx, chainID, requestID, response))
 						}()
 					}).AnyTimes()
@@ -110,9 +115,10 @@ func TestAppRequestResponse(t *testing.T) {
 						return response, nil
 					})
 
-				callback := func(_ context.Context, actualChainID ids.ID, actualResponse []byte, err error) {
+				callback := func(ctx context.Context, actualChainID ids.ID, actualResponse []byte, err error) {
 					defer wg.Done()
 					require.NoError(t, err)
+					require.Equal(t, bar, ctx.Value(foo))
 					require.Equal(t, chainID, actualChainID)
 					require.Equal(t, response, actualResponse)
 				}
