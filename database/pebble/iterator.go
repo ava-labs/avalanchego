@@ -4,6 +4,8 @@
 package pebble
 
 import (
+	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/cockroachdb/pebble"
@@ -13,13 +15,17 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 )
 
-var _ database.Iterator = (*iter)(nil)
+var (
+	_                  database.Iterator = (*iter)(nil)
+	errCouldntGetValue                   = errors.New("couldnt get iterator value")
+	errNoPointKey                        = errors.New("iterator has no point key")
+)
 
 type iter struct {
 	// [lock] ensures that only one goroutine can access [iter] at a time.
 	// Note that [Database.Close] calls [iter.Release] so we need [lock] to ensure
 	// that the user and [Database.Close] don't execute [iter.Release] concurrently.
-	// Invariant: [Datbase.lock] is never grabbed while holding [lock].
+	// Invariant: [Database.lock] is never grabbed while holding [lock].
 	lock sync.Mutex
 
 	db          *Database
@@ -56,12 +62,36 @@ func (it *iter) Next() bool {
 		it.hasNext = it.iter.Next()
 	}
 
-	if it.hasNext {
-		it.nextKey = it.iter.Key()
-		// TODO Value() is deprecated; use ValueAndErr instead.
-		it.nextVal = it.iter.Value()
+	if !it.hasNext {
+		return false
 	}
-	return it.hasNext
+
+	// Set the next key.
+	it.nextKey = it.iter.Key()
+
+	// Set the next value.
+	// Need to make sure the following invariant for [i.iter.ValueAndErr] holds:
+	// "REQUIRES: iter.Error() == nil and HasPointAndRange() returns true for hasPoint."
+	hasPoint, _ := it.iter.HasPointAndRange()
+	if !hasPoint {
+		it.hasNext = false
+		it.err = fmt.Errorf("%w: %s", errCouldntGetValue, errNoPointKey)
+		return false
+	}
+
+	if err := it.iter.Error(); err != nil {
+		it.hasNext = false
+		it.err = fmt.Errorf("%w: %s", errCouldntGetValue, err.Error())
+		return false
+	}
+
+	var err error
+	it.nextVal, err = it.iter.ValueAndErr()
+	if err != nil {
+		it.hasNext = false
+		it.err = fmt.Errorf("%w: %s", errCouldntGetValue, err.Error())
+	}
+	return true
 }
 
 func (it *iter) Error() error {
