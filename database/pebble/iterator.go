@@ -135,7 +135,6 @@ func (it *iter) Release() {
 	defer it.lock.Unlock()
 
 	it.release()
-
 }
 
 // Assumes [it.lock] and [it.db.lock] are held.
