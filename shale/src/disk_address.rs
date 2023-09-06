@@ -2,10 +2,13 @@ use std::hash::Hash;
 use std::num::NonZeroUsize;
 use std::ops::{Deref, DerefMut};
 
+use bytemuck::NoUninit;
+
 use crate::{CachedStore, ShaleError, Storable};
 
 /// The virtual disk address of an object
-#[derive(Debug, Copy, Clone, Eq, Hash, Ord, PartialOrd, PartialEq)]
+#[repr(C)]
+#[derive(Debug, Copy, Clone, Eq, Hash, Ord, PartialOrd, PartialEq, NoUninit)]
 pub struct DiskAddress(pub Option<NonZeroUsize>);
 
 impl Deref for DiskAddress {

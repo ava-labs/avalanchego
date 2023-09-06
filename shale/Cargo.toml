@@ -11,6 +11,7 @@ license = "MIT"
 hex = "0.4.3"
 lru = "0.11.0"
 thiserror = "1.0.38"
+bytemuck = { version = "1.13.1", features = ["derive"] }
 
 [dev-dependencies]
 criterion = { version = "0.5.1", features = ["html_reports"] }

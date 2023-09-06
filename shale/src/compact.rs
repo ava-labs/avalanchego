@@ -127,7 +127,8 @@ impl Storable for CompactDescriptor {
     }
 }
 
-#[derive(Debug)]
+#[repr(C)]
+#[derive(Copy, Clone, Debug, bytemuck::NoUninit)]
 pub struct CompactSpaceHeader {
     meta_space_tail: DiskAddress,
     compact_space_tail: DiskAddress,

@@ -99,7 +99,7 @@ impl Error for DbError {}
 /// correct parameters are used when the DB is opened later (the parameters here will override the
 /// parameters in [DbConfig] if the DB already exists).
 #[repr(C)]
-#[derive(Debug, Clone, Copy, AnyBitPattern)]
+#[derive(Debug, Clone, Copy, AnyBitPattern, bytemuck::NoUninit)]
 struct DbParams {
     magic: [u8; 16],
     meta_file_nbit: u64,
@@ -180,22 +180,18 @@ fn get_sub_universe_from_empty_delta(
     get_sub_universe_from_deltas(sub_universe, StoreDelta::default(), StoreDelta::default())
 }
 
-/// DB-wide metadata, it keeps track of the roots of the top-level tries.
-#[derive(Debug)]
+/// mutable DB-wide metadata, it keeps track of the root of the top-level trie.
+#[repr(C)]
+#[derive(Copy, Clone, Debug, bytemuck::NoUninit)]
 struct DbHeader {
-    /// The root node of the account model storage. (Where the values are `Account` objects, which
-    /// may contain the root for the secondary trie.)
-    acc_root: DiskAddress,
-    /// The root node of the generic key-value store.
     kv_root: DiskAddress,
 }
 
 impl DbHeader {
-    pub const MSIZE: u64 = 16;
+    pub const MSIZE: u64 = std::mem::size_of::<Self>() as u64;
 
     pub fn new_empty() -> Self {
         Self {
-            acc_root: DiskAddress::null(),
             kv_root: DiskAddress::null(),
         }
     }
@@ -210,8 +206,7 @@ impl Storable for DbHeader {
                 size: Self::MSIZE,
             })?;
         Ok(Self {
-            acc_root: raw.as_deref()[..8].into(),
-            kv_root: raw.as_deref()[8..].into(),
+            kv_root: raw.as_deref().as_slice().into(),
         })
     }
 
@@ -221,7 +216,6 @@ impl Storable for DbHeader {
 
     fn dehydrate(&self, to: &mut [u8]) -> Result<(), ShaleError> {
         let mut cur = Cursor::new(to);
-        cur.write_all(&self.acc_root.to_le_bytes())?;
         cur.write_all(&self.kv_root.to_le_bytes())?;
         Ok(())
     }
@@ -404,23 +398,41 @@ impl Db {
             }
             nix::unistd::ftruncate(fd0, 0).map_err(DbError::System)?;
             nix::unistd::ftruncate(fd0, 1 << cfg.meta_file_nbit).map_err(DbError::System)?;
-            let header = DbParams {
-                magic: *MAGIC_STR,
-                meta_file_nbit: cfg.meta_file_nbit,
-                payload_file_nbit: cfg.payload_file_nbit,
-                payload_regn_nbit: cfg.payload_regn_nbit,
-                wal_file_nbit: cfg.wal.file_nbit,
-                wal_block_nbit: cfg.wal.block_nbit,
-                root_hash_file_nbit: cfg.root_hash_file_nbit,
-            };
 
-            let header_bytes = unsafe {
-                std::slice::from_raw_parts(
-                    &header as *const DbParams as *const u8,
-                    size_of::<DbParams>(),
-                )
-                .to_vec()
-            };
+            // The header consists of three parts:
+            // DbParams
+            // DbHeader (just a pointer to the sentinel)
+            // CompactSpaceHeader for future allocations
+            let header_bytes: Vec<u8> = {
+                let params = DbParams {
+                    magic: *MAGIC_STR,
+                    meta_file_nbit: cfg.meta_file_nbit,
+                    payload_file_nbit: cfg.payload_file_nbit,
+                    payload_regn_nbit: cfg.payload_regn_nbit,
+                    wal_file_nbit: cfg.wal.file_nbit,
+                    wal_block_nbit: cfg.wal.block_nbit,
+                    root_hash_file_nbit: cfg.root_hash_file_nbit,
+                };
+                let bytes = bytemuck::bytes_of(&params).to_vec();
+                bytes.into_iter()
+            }
+            .chain({
+                // compute the DbHeader as bytes
+                let hdr = DbHeader::new_empty();
+                // clippy thinks to_vec isn't necessary, but it actually is :(
+                #[allow(clippy::unnecessary_to_owned)]
+                bytemuck::bytes_of(&hdr).to_vec().into_iter()
+            })
+            .chain({
+                // write out the CompactSpaceHeader
+                let csh = CompactSpaceHeader::new(
+                    NonZeroUsize::new(SPACE_RESERVED as usize).unwrap(),
+                    NonZeroUsize::new(SPACE_RESERVED as usize).unwrap(),
+                );
+                #[allow(clippy::unnecessary_to_owned)]
+                bytemuck::bytes_of(&csh).to_vec().into_iter()
+            })
+            .collect();
 
             nix::sys::uio::pwrite(fd0, &header_bytes, 0).map_err(DbError::System)?;
         }
@@ -659,7 +671,6 @@ impl Db {
             db_header_ref
                 .write(|r| {
                     err = (|| {
-                        r.acc_root = merkle.init_root()?;
                         r.kv_root = merkle.init_root()?;
                         Ok(())
                     })();
