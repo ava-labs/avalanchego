@@ -34,12 +34,12 @@ func (db *Database) NewBatch() database.Batch {
 
 func (b *batch) Put(key, value []byte) error {
 	b.size += len(key) + len(value) + pebbleByteOverHead
-	return b.batch.Set(key, value, pebble.NoSync) // TODO is NoSync OK?
+	return b.batch.Set(key, value, pebble.Sync)
 }
 
 func (b *batch) Delete(key []byte) error {
 	b.size += len(key) + pebbleByteOverHead
-	return b.batch.Delete(key, pebble.NoSync) // TODO is NoSync OK?
+	return b.batch.Delete(key, pebble.Sync)
 }
 
 func (b *batch) Size() int {
@@ -58,7 +58,7 @@ func (b *batch) Write() error {
 	if !b.written.Load() {
 		// This batch has not been written to the database yet.
 		b.written.Store(true)
-		return updateError(b.batch.Commit(pebble.NoSync))
+		return updateError(b.batch.Commit(pebble.Sync))
 	}
 
 	// pebble doesn't support writing a batch twice so we have to create a
@@ -74,7 +74,7 @@ func (b *batch) Write() error {
 	}
 
 	// Commit the new batch.
-	return updateError(newbatch.batch.Commit(pebble.NoSync)) // TODO is NoSync OK?
+	return updateError(newbatch.batch.Commit(pebble.Sync))
 }
 
 func (b *batch) Reset() {

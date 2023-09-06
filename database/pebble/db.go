@@ -69,12 +69,9 @@ func New(file string, cfg Config, log logging.Logger, _ string, _ prometheus.Reg
 	// Original default settings are based on
 	// https://github.com/ethereum/go-ethereum/blob/release/1.11/ethdb/pebble/pebble.go
 	opts := &pebble.Options{
-		Cache:        pebble.NewCache(int64(cfg.CacheSize)),
-		BytesPerSync: cfg.BytesPerSync,
-		Comparer:     comparer,
-		// Although we use `pebble.NoSync`, we still keep the WAL enabled. Pebble
-		// will fsync the WAL during shutdown and should ensure the db is
-		// recoverable if shutdown correctly.
+		Cache:                       pebble.NewCache(int64(cfg.CacheSize)),
+		BytesPerSync:                cfg.BytesPerSync,
+		Comparer:                    comparer,
 		WALBytesPerSync:             cfg.WALBytesPerSync,
 		MemTableStopWritesThreshold: cfg.MemTableStopWritesThreshold,
 		MemTableSize:                cfg.MemTableSize,
@@ -174,7 +171,7 @@ func (db *Database) Put(key []byte, value []byte) error {
 		return database.ErrClosed
 	}
 
-	return updateError(db.pebbleDB.Set(key, value, pebble.NoSync)) // TODO is NoSync OK?
+	return updateError(db.pebbleDB.Set(key, value, pebble.Sync))
 }
 
 func (db *Database) Delete(key []byte) error {
@@ -185,7 +182,7 @@ func (db *Database) Delete(key []byte) error {
 		return database.ErrClosed
 	}
 
-	return updateError(db.pebbleDB.Delete(key, pebble.NoSync)) // TODO is NoSync OK?
+	return updateError(db.pebbleDB.Delete(key, pebble.Sync))
 }
 
 func (db *Database) Compact(start []byte, limit []byte) error {
