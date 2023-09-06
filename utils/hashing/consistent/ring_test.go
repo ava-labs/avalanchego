@@ -6,9 +6,9 @@ package consistent
 import (
 	"testing"
 
-	"github.com/golang/mock/gomock"
-
 	"github.com/stretchr/testify/require"
+
+	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
@@ -177,8 +177,8 @@ func TestGetMapsToClockwiseNode(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ring, hasher, ctrl := setupTest(t, 1)
-			defer ctrl.Finish()
+			require := require.New(t)
+			ring, hasher := setupTest(t, 1)
 
 			// setup expected calls
 			calls := make([]*gomock.Call, len(test.ringNodes)+1)
@@ -196,16 +196,15 @@ func TestGetMapsToClockwiseNode(t *testing.T) {
 			}
 
 			node, err := ring.Get(test.key)
-			require.Equal(t, test.expectedNode, node)
-			require.Nil(t, err)
+			require.NoError(err)
+			require.Equal(test.expectedNode, node)
 		})
 	}
 }
 
 // Tests that if we have an empty ring, trying to call Get results in an error, as there is no node to route to.
 func TestGetOnEmptyRingReturnsError(t *testing.T) {
-	ring, _, ctrl := setupTest(t, 1)
-	defer ctrl.Finish()
+	ring, _ := setupTest(t, 1)
 
 	foo := testKey{
 		key:  "foo",
@@ -217,8 +216,7 @@ func TestGetOnEmptyRingReturnsError(t *testing.T) {
 
 // Tests that trying to call Remove on a node that doesn't exist should return false.
 func TestRemoveNonExistentKeyReturnsFalse(t *testing.T) {
-	ring, hasher, ctrl := setupTest(t, 1)
-	defer ctrl.Finish()
+	ring, hasher := setupTest(t, 1)
 
 	gomock.InOrder(
 		hasher.EXPECT().Hash(getHashKey(node1.ConsistentHashKey(), 0)).Return(uint64(1)).Times(1),
@@ -230,8 +228,7 @@ func TestRemoveNonExistentKeyReturnsFalse(t *testing.T) {
 
 // Tests that trying to call Remove on a node that doesn't exist should return true.
 func TestRemoveExistingKeyReturnsTrue(t *testing.T) {
-	ring, hasher, ctrl := setupTest(t, 1)
-	defer ctrl.Finish()
+	ring, hasher := setupTest(t, 1)
 
 	gomock.InOrder(
 		hasher.EXPECT().Hash(getHashKey(node1.ConsistentHashKey(), 0)).Return(uint64(1)).Times(1),
@@ -256,8 +253,8 @@ func TestRemoveExistingKeyReturnsTrue(t *testing.T) {
 
 // Tests that if we have a collision, the node is replaced.
 func TestAddCollisionReplacement(t *testing.T) {
-	ring, hasher, ctrl := setupTest(t, 1)
-	defer ctrl.Finish()
+	require := require.New(t)
+	ring, hasher := setupTest(t, 1)
 
 	foo := testKey{
 		key:  "foo",
@@ -280,15 +277,14 @@ func TestAddCollisionReplacement(t *testing.T) {
 	ring.Add(node2)
 
 	ringMember, err := ring.Get(foo)
-
-	require.Equal(t, node2, ringMember)
-	require.Nil(t, err)
+	require.NoError(err)
+	require.Equal(node2, ringMember)
 }
 
 // Tests that virtual nodes are replicated on Add.
 func TestAddVirtualNodes(t *testing.T) {
-	ring, hasher, ctrl := setupTest(t, 3)
-	defer ctrl.Finish()
+	require := require.New(t)
+	ring, hasher := setupTest(t, 3)
 
 	gomock.InOrder(
 		// we should see 3 virtual nodes created (0, 1, 2) when we insert a node into the ring.
@@ -328,31 +324,31 @@ func TestAddVirtualNodes(t *testing.T) {
 
 	// Gets that should route to node-1
 	node, err := ring.Get(testKey{key: "foo1"})
-	require.Equal(t, node1, node)
-	require.Nil(t, err)
+	require.NoError(err)
+	require.Equal(node1, node)
 	node, err = ring.Get(testKey{key: "foo3"})
-	require.Equal(t, node1, node)
-	require.Nil(t, err)
+	require.NoError(err)
+	require.Equal(node1, node)
 	node, err = ring.Get(testKey{key: "foo5"})
-	require.Equal(t, node1, node)
-	require.Nil(t, err)
+	require.NoError(err)
+	require.Equal(node1, node)
 
 	// Gets that should route to node-2
 	node, err = ring.Get(testKey{key: "foo0"})
-	require.Equal(t, node2, node)
-	require.Nil(t, err)
+	require.NoError(err)
+	require.Equal(node2, node)
 	node, err = ring.Get(testKey{key: "foo2"})
-	require.Equal(t, node2, node)
-	require.Nil(t, err)
+	require.NoError(err)
+	require.Equal(node2, node)
 	node, err = ring.Get(testKey{key: "foo4"})
-	require.Equal(t, node2, node)
-	require.Nil(t, err)
+	require.NoError(err)
+	require.Equal(node2, node)
 }
 
 // Tests that the node routed to changes if an Add results in a key shuffle.
 func TestGetShuffleOnAdd(t *testing.T) {
-	ring, hasher, ctrl := setupTest(t, 1)
-	defer ctrl.Finish()
+	require := require.New(t)
+	ring, hasher := setupTest(t, 1)
 
 	foo := testKey{
 		key:  "foo",
@@ -378,9 +374,8 @@ func TestGetShuffleOnAdd(t *testing.T) {
 	// Ring:
 	// ... -> node-1 -> foo -> ...
 	node, err := ring.Get(foo)
-
-	require.Equal(t, node1, node)
-	require.Nil(t, err)
+	require.NoError(err)
+	require.Equal(node1, node)
 
 	// Add node-2, which results in foo being shuffled from node-1 to node-2.
 	//
@@ -393,15 +388,14 @@ func TestGetShuffleOnAdd(t *testing.T) {
 	// Ring:
 	// ... -> node-1 -> foo -> node-2 -> ...
 	node, err = ring.Get(foo)
-
-	require.Equal(t, node2, node)
-	require.Nil(t, err)
+	require.NoError(err)
+	require.Equal(node2, node)
 }
 
 // Tests that we can iterate around the ring.
 func TestIteration(t *testing.T) {
-	ring, hasher, ctrl := setupTest(t, 1)
-	defer ctrl.Finish()
+	require := require.New(t)
+	ring, hasher := setupTest(t, 1)
 
 	foo := testKey{
 		key:  "foo",
@@ -433,16 +427,16 @@ func TestIteration(t *testing.T) {
 	// Ring:
 	// ... -> foo -> node-1 -> node-2 -> ...
 	node, err := ring.Get(foo)
-	require.Equal(t, node1, node)
-	require.Nil(t, err)
+	require.NoError(err)
+	require.Equal(node1, node)
 
 	// iterate by re-using node-1 to get node-2
 	node, err = ring.Get(node)
-	require.Equal(t, node2, node)
-	require.Nil(t, err)
+	require.NoError(err)
+	require.Equal(node2, node)
 }
 
-func setupTest(t *testing.T, virtualNodes int) (Ring, *hashing.MockHasher, *gomock.Controller) {
+func setupTest(t *testing.T, virtualNodes int) (Ring, *hashing.MockHasher) {
 	ctrl := gomock.NewController(t)
 	hasher := hashing.NewMockHasher(ctrl)
 
@@ -450,5 +444,5 @@ func setupTest(t *testing.T, virtualNodes int) (Ring, *hashing.MockHasher, *gomo
 		VirtualNodes: virtualNodes,
 		Hasher:       hasher,
 		Degree:       2,
-	}), hasher, ctrl
+	}), hasher
 }

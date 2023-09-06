@@ -33,7 +33,10 @@ type Config struct {
 	UptimeLockedCalculator uptime.LockedCalculator
 
 	// True if the node is being run with staking enabled
-	StakingEnabled bool
+	SybilProtectionEnabled bool
+
+	// If true, only the P-chain will be instantiated on the primary network.
+	PartialSyncPrimaryNetwork bool
 
 	// Set of subnets that this node is validating
 	TrackedSubnets set.Set[ids.ID]
@@ -101,15 +104,6 @@ type Config struct {
 	// Time of the Cortina network upgrade
 	CortinaTime time.Time
 
-	// Subnet ID --> Minimum portion of the subnet's stake this node must be
-	// connected to in order to report healthy.
-	// [constants.PrimaryNetworkID] is always a key in this map.
-	// If a subnet is in this map, but it isn't tracked, its corresponding value
-	// isn't used.
-	// If a subnet is tracked but not in this map, we use the value for the
-	// Primary Network.
-	MinPercentConnectedStakeHealthy map[ids.ID]float64
-
 	// UseCurrentHeight forces [GetMinimumHeight] to return the current height
 	// of the P-Chain instead of the oldest block in the [recentlyAccepted]
 	// window.
@@ -149,7 +143,7 @@ func (c *Config) GetCreateSubnetTxFee(timestamp time.Time) uint64 {
 // Create the blockchain described in [tx], but only if this node is a member of
 // the subnet that validates the chain
 func (c *Config) CreateChain(chainID ids.ID, tx *txs.CreateChainTx) {
-	if c.StakingEnabled && // Staking is enabled, so nodes might not validate all chains
+	if c.SybilProtectionEnabled && // Sybil protection is enabled, so nodes might not validate all chains
 		constants.PrimaryNetworkID != tx.SubnetID && // All nodes must validate the primary network
 		!c.TrackedSubnets.Contains(tx.SubnetID) { // This node doesn't validate this blockchain
 		return

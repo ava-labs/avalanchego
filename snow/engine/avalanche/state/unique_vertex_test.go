@@ -9,6 +9,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -41,6 +43,7 @@ func newTestSerializer(t *testing.T, parse func(context.Context, []byte) (snowst
 }
 
 func TestUnknownUniqueVertexErrors(t *testing.T) {
+	require := require.New(t)
 	s := newTestSerializer(t, nil)
 
 	uVtx := &uniqueVertex{
@@ -49,35 +52,27 @@ func TestUnknownUniqueVertexErrors(t *testing.T) {
 	}
 
 	status := uVtx.Status()
-	if status != choices.Unknown {
-		t.Fatalf("Expected vertex to have Unknown status")
-	}
+	require.Equal(choices.Unknown, status)
 
 	_, err := uVtx.Parents()
-	if err == nil {
-		t.Fatalf("Parents should have produced error for unknown vertex")
-	}
+	require.ErrorIs(err, errGetParents)
 
 	_, err = uVtx.Height()
-	if err == nil {
-		t.Fatalf("Height should have produced error for unknown vertex")
-	}
+	require.ErrorIs(err, errGetHeight)
 
 	_, err = uVtx.Txs(context.Background())
-	if err == nil {
-		t.Fatalf("Txs should have produced an error for unknown vertex")
-	}
+	require.ErrorIs(err, errGetTxs)
 }
 
 func TestUniqueVertexCacheHit(t *testing.T) {
+	require := require.New(t)
+
 	testTx := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
 		IDV: ids.ID{1},
 	}}
 
 	s := newTestSerializer(t, func(_ context.Context, b []byte) (snowstorm.Tx, error) {
-		if !bytes.Equal(b, []byte{0}) {
-			t.Fatal("unknown tx")
-		}
+		require.Equal([]byte{0}, b)
 		return testTx, nil
 	})
 
@@ -92,17 +87,13 @@ func TestUniqueVertexCacheHit(t *testing.T) {
 		parentIDs,
 		[][]byte{{0}},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	uVtx := &uniqueVertex{
 		id:         id,
 		serializer: s,
 	}
-	if err := uVtx.setVertex(context.Background(), vtx); err != nil {
-		t.Fatalf("Failed to set vertex due to: %s", err)
-	}
+	require.NoError(uVtx.setVertex(context.Background(), vtx))
 
 	newUVtx := &uniqueVertex{
 		id:         id,
@@ -110,41 +101,25 @@ func TestUniqueVertexCacheHit(t *testing.T) {
 	}
 
 	parents, err := newUVtx.Parents()
-	if err != nil {
-		t.Fatalf("Error while retrieving parents of known vertex")
-	}
-	if len(parents) != 1 {
-		t.Fatalf("Parents should have length 1")
-	}
-	if parents[0].ID() != parentID {
-		t.Fatalf("ParentID is incorrect")
-	}
+	require.NoError(err)
+	require.Len(parents, 1)
+	require.Equal(parentID, parents[0].ID())
 
 	newHeight, err := newUVtx.Height()
-	if err != nil {
-		t.Fatalf("Error while retrieving height of known vertex")
-	}
-	if height != newHeight {
-		t.Fatalf("Vertex height should have been %d, but was: %d", height, newHeight)
-	}
+	require.NoError(err)
+	require.Equal(height, newHeight)
 
 	txs, err := newUVtx.Txs(context.Background())
-	if err != nil {
-		t.Fatalf("Error while retrieving txs of known vertex: %s", err)
-	}
-	if len(txs) != 1 {
-		t.Fatalf("Incorrect number of transactions")
-	}
-	if txs[0] != testTx {
-		t.Fatalf("Txs retrieved the wrong Tx")
-	}
+	require.NoError(err)
+	require.Len(txs, 1)
+	require.Equal(testTx, txs[0])
 
-	if newUVtx.v != uVtx.v {
-		t.Fatalf("Unique vertex failed to get corresponding vertex state from cache")
-	}
+	require.Equal(uVtx.v, newUVtx.v)
 }
 
 func TestUniqueVertexCacheMiss(t *testing.T) {
+	require := require.New(t)
+
 	txBytesParent := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9}
 	testTxParent := &snowstorm.TestTx{
 		TestDecidable: choices.TestDecidable{
@@ -168,16 +143,14 @@ func TestUniqueVertexCacheMiss(t *testing.T) {
 		if bytes.Equal(txBytes, b) {
 			return testTx, nil
 		}
-		t.Fatal("asked to parse unexpected transaction")
+		require.FailNow("asked to parse unexpected transaction")
 		return nil, nil
 	}
 
 	s := newTestSerializer(t, parseTx)
 
 	uvtxParent := newTestUniqueVertex(t, s, nil, [][]byte{txBytesParent}, false)
-	if err := uvtxParent.Accept(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(uvtxParent.Accept(context.Background()))
 
 	parentID := uvtxParent.ID()
 	parentIDs := []ids.ID{parentID}
@@ -189,9 +162,7 @@ func TestUniqueVertexCacheMiss(t *testing.T) {
 		parentIDs,
 		[][]byte{txBytes},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	id := innerVertex.ID()
 	vtxBytes := innerVertex.Bytes()
@@ -202,56 +173,35 @@ func TestUniqueVertexCacheMiss(t *testing.T) {
 	}
 
 	// Register a cache miss
-	if status := uVtx.Status(); status != choices.Unknown {
-		t.Fatalf("expected status to be unknown, but found: %s", status)
-	}
+	require.Equal(choices.Unknown, uVtx.Status())
 
 	// Register cache hit
 	vtx, err := newUniqueVertex(context.Background(), s, vtxBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
-	if status := vtx.Status(); status != choices.Processing {
-		t.Fatalf("expected status to be processing, but found: %s", status)
-	}
+	require.Equal(choices.Processing, vtx.Status())
 
 	validateVertex := func(vtx *uniqueVertex, expectedStatus choices.Status) {
-		if status := vtx.Status(); status != expectedStatus {
-			t.Fatalf("expected status to be %s, but found: %s", expectedStatus, status)
-		}
+		require.Equal(expectedStatus, vtx.Status())
 
 		// Call bytes first to check for regression bug
 		// where it's unsafe to call Bytes or Verify directly
 		// after calling Status to refresh a vertex
-		if !bytes.Equal(vtx.Bytes(), vtxBytes) {
-			t.Fatalf("Found unexpected vertex bytes")
-		}
+		require.Equal(vtxBytes, vtx.Bytes())
 
 		vtxParents, err := vtx.Parents()
-		if err != nil {
-			t.Fatalf("Fetching vertex parents errored with: %s", err)
-		}
+		require.NoError(err)
+		require.Len(vtxParents, 1)
+		require.Equal(parentID, vtxParents[0].ID())
+
 		vtxHeight, err := vtx.Height()
-		if err != nil {
-			t.Fatalf("Fetching vertex height errored with: %s", err)
-		}
+		require.NoError(err)
+		require.Equal(height, vtxHeight)
+
 		vtxTxs, err := vtx.Txs(context.Background())
-		if err != nil {
-			t.Fatalf("Fetching vertx txs errored with: %s", err)
-		}
-		switch {
-		case vtxHeight != height:
-			t.Fatalf("Expected vertex height to be %d, but found %d", height, vtxHeight)
-		case len(vtxParents) != 1:
-			t.Fatalf("Expected vertex to have 1 parent, but found %d", len(vtxParents))
-		case vtxParents[0].ID() != parentID:
-			t.Fatalf("Found unexpected parentID: %s, expected: %s", vtxParents[0].ID(), parentID)
-		case len(vtxTxs) != 1:
-			t.Fatalf("Exepcted vertex to have 1 transaction, but found %d", len(vtxTxs))
-		case !bytes.Equal(vtxTxs[0].Bytes(), txBytes):
-			t.Fatalf("Found unexpected transaction bytes")
-		}
+		require.NoError(err)
+		require.Len(vtxTxs, 1)
+		require.Equal(txBytes, vtxTxs[0].Bytes())
 	}
 
 	// Replace the vertex, so that it loses reference to parents, etc.
@@ -265,9 +215,7 @@ func TestUniqueVertexCacheMiss(t *testing.T) {
 
 	// Check that a newly parsed vertex refreshed from the cache is valid
 	vtx, err = newUniqueVertex(context.Background(), s, vtxBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	validateVertex(vtx, choices.Processing)
 
 	// Check that refreshing a vertex when it has been removed from
@@ -282,22 +230,20 @@ func TestUniqueVertexCacheMiss(t *testing.T) {
 
 	s.state.uniqueVtx.Flush()
 	vtx, err = newUniqueVertex(context.Background(), s, vtxBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	validateVertex(vtx, choices.Processing)
 }
 
 func TestParseVertexWithIncorrectChainID(t *testing.T) {
+	require := require.New(t)
+
 	statelessVertex, err := vertex.Build( // regular, non-stop vertex
 		ids.GenerateTestID(),
 		0,
 		nil,
 		[][]byte{{1}},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	vtxBytes := statelessVertex.Bytes()
 
 	s := newTestSerializer(t, func(_ context.Context, b []byte) (snowstorm.Tx, error) {
@@ -307,12 +253,13 @@ func TestParseVertexWithIncorrectChainID(t *testing.T) {
 		return nil, errUnknownTx
 	})
 
-	if _, err := s.ParseVtx(context.Background(), vtxBytes); err == nil {
-		t.Fatal("should have failed to parse the vertex due to invalid chainID")
-	}
+	_, err = s.ParseVtx(context.Background(), vtxBytes)
+	require.ErrorIs(err, errWrongChainID)
 }
 
 func TestParseVertexWithInvalidTxs(t *testing.T) {
+	require := require.New(t)
+
 	ctx := snow.DefaultContextTest()
 	statelessVertex, err := vertex.Build( // regular, non-stop vertex
 		ctx.ChainID,
@@ -320,9 +267,7 @@ func TestParseVertexWithInvalidTxs(t *testing.T) {
 		nil,
 		[][]byte{{1}},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	vtxBytes := statelessVertex.Bytes()
 
 	s := newTestSerializer(t, func(_ context.Context, b []byte) (snowstorm.Tx, error) {
@@ -334,18 +279,15 @@ func TestParseVertexWithInvalidTxs(t *testing.T) {
 		}
 	})
 
-	if _, err := s.ParseVtx(context.Background(), vtxBytes); err == nil {
-		t.Fatal("should have failed to parse the vertex due to invalid transactions")
-	}
+	_, err = s.ParseVtx(context.Background(), vtxBytes)
+	require.ErrorIs(err, errUnknownTx)
 
-	if _, err := s.ParseVtx(context.Background(), vtxBytes); err == nil {
-		t.Fatal("should have failed to parse the vertex after previously error on parsing invalid transactions")
-	}
+	_, err = s.ParseVtx(context.Background(), vtxBytes)
+	require.ErrorIs(err, errUnknownTx)
 
 	id := hashing.ComputeHash256Array(vtxBytes)
-	if _, err := s.GetVtx(context.Background(), id); err == nil {
-		t.Fatal("should have failed to lookup invalid vertex after previously error on parsing invalid transactions")
-	}
+	_, err = s.GetVtx(context.Background(), id)
+	require.ErrorIs(err, errUnknownVertex)
 
 	childStatelessVertex, err := vertex.Build( // regular, non-stop vertex
 		ctx.ChainID,
@@ -353,28 +295,18 @@ func TestParseVertexWithInvalidTxs(t *testing.T) {
 		[]ids.ID{id},
 		[][]byte{{2}},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	childVtxBytes := childStatelessVertex.Bytes()
 
 	childVtx, err := s.ParseVtx(context.Background(), childVtxBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	parents, err := childVtx.Parents()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(parents) != 1 {
-		t.Fatal("wrong number of parents")
-	}
+	require.NoError(err)
+	require.Len(parents, 1)
 	parent := parents[0]
 
-	if parent.Status().Fetched() {
-		t.Fatal("the parent is invalid, so it shouldn't be marked as fetched")
-	}
+	require.False(parent.Status().Fetched())
 }
 
 func newTestUniqueVertex(
@@ -384,6 +316,8 @@ func newTestUniqueVertex(
 	txs [][]byte,
 	stopVertex bool,
 ) *uniqueVertex {
+	require := require.New(t)
+
 	var (
 		vtx vertex.StatelessVertex
 		err error
@@ -402,12 +336,8 @@ func newTestUniqueVertex(
 			parentIDs,
 		)
 	}
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	uvtx, err := newUniqueVertex(context.Background(), s, vtx.Bytes())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	return uvtx
 }

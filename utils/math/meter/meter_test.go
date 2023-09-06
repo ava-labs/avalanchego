@@ -5,7 +5,6 @@ package meter
 
 import (
 	"fmt"
-	"math"
 	"testing"
 	"time"
 
@@ -54,116 +53,91 @@ func TestMeters(t *testing.T) {
 }
 
 func NewTest(t *testing.T, factory Factory) {
-	m := factory.New(halflife)
-	require.NotNil(t, m, "should have returned a valid interface")
+	require.NotNil(t, factory.New(halflife))
 }
 
 func TimeTravelTest(t *testing.T, factory Factory) {
+	require := require.New(t)
+
 	m := factory.New(halflife)
 
 	now := time.Date(1, 2, 3, 4, 5, 6, 7, time.UTC)
 	m.Inc(now, 1)
 
 	now = now.Add(halflife - 1)
-	epsilon := 0.0001
-	if uptime := m.Read(now); math.Abs(uptime-.5) > epsilon {
-		t.Fatalf("Wrong uptime value. Expected %f got %f", .5, uptime)
-	}
+	delta := 0.0001
+	require.InDelta(m.Read(now), .5, delta)
 
 	m.Dec(now, 1)
 
 	now = now.Add(-halflife)
-	if uptime := m.Read(now); math.Abs(uptime-.5) > epsilon {
-		t.Fatalf("Wrong uptime value. Expected %f got %f", .5, uptime)
-	}
+	require.InDelta(m.Read(now), .5, delta)
 
 	m.Inc(now, 1)
 
 	now = now.Add(halflife / 2)
-	if uptime := m.Read(now); math.Abs(uptime-.5) > epsilon {
-		t.Fatalf("Wrong uptime value. Expected %f got %f", .5, uptime)
-	}
+	require.InDelta(m.Read(now), .5, delta)
 }
 
 func StandardUsageTest(t *testing.T, factory Factory) {
+	require := require.New(t)
+
 	m := factory.New(halflife)
 
 	now := time.Date(1, 2, 3, 4, 5, 6, 7, time.UTC)
 	m.Inc(now, 1)
 
 	now = now.Add(halflife - 1)
-	epsilon := 0.0001
-	if uptime := m.Read(now); math.Abs(uptime-.5) > epsilon {
-		t.Fatalf("Wrong uptime value. Expected %f got %f", .5, uptime)
-	}
+	delta := 0.0001
+	require.InDelta(m.Read(now), .5, delta)
 
 	m.Inc(now, 1)
+	require.InDelta(m.Read(now), .5, delta)
 
-	if uptime := m.Read(now); math.Abs(uptime-.5) > epsilon {
-		t.Fatalf("Wrong uptime value. Expected %f got %f", .5, uptime)
-	}
+	m.Dec(now, 1)
+	require.InDelta(m.Read(now), .5, delta)
 
 	m.Dec(now, 1)
 
-	if uptime := m.Read(now); math.Abs(uptime-.5) > epsilon {
-		t.Fatalf("Wrong uptime value. Expected %f got %f", .5, uptime)
-	}
-
-	m.Dec(now, 1)
-
-	if uptime := m.Read(now); math.Abs(uptime-.5) > epsilon {
-		t.Fatalf("Wrong uptime value. Expected %f got %f", .5, uptime)
-	}
+	require.InDelta(m.Read(now), .5, delta)
 
 	now = now.Add(halflife)
-	if uptime := m.Read(now); math.Abs(uptime-.25) > epsilon {
-		t.Fatalf("Wrong uptime value. Expected %f got %f", .25, uptime)
-	}
+	require.InDelta(m.Read(now), .25, delta)
 
 	m.Inc(now, 1)
 
 	now = now.Add(halflife)
-	if uptime := m.Read(now); math.Abs(uptime-.625) > epsilon {
-		t.Fatalf("Wrong uptime value. Expected %f got %f", .625, uptime)
-	}
+	require.InDelta(m.Read(now), .625, delta)
 
 	now = now.Add(34 * halflife)
-	if uptime := m.Read(now); math.Abs(uptime-1) > epsilon {
-		t.Fatalf("Wrong uptime value. Expected %d got %f", 1, uptime)
-	}
+	require.InDelta(m.Read(now), 1, delta)
 
 	m.Dec(now, 1)
 
 	now = now.Add(34 * halflife)
-	if uptime := m.Read(now); math.Abs(uptime-0) > epsilon {
-		t.Fatalf("Wrong uptime value. Expected %d got %f", 0, uptime)
-	}
+	require.InDelta(m.Read(now), 0, delta)
 
 	m.Inc(now, 1)
 
 	now = now.Add(2 * halflife)
-	if uptime := m.Read(now); math.Abs(uptime-.75) > epsilon {
-		t.Fatalf("Wrong uptime value. Expected %f got %f", .75, uptime)
-	}
+	require.InDelta(m.Read(now), .75, delta)
 
 	// Second start
 	m.Inc(now, 1)
 
 	now = now.Add(34 * halflife)
-	if uptime := m.Read(now); math.Abs(uptime-2) > epsilon {
-		t.Fatalf("Wrong uptime value. Expected %d got %f", 2, uptime)
-	}
+	require.InDelta(m.Read(now), 2, delta)
 
 	// Stop the second CPU
 	m.Dec(now, 1)
 
 	now = now.Add(34 * halflife)
-	if uptime := m.Read(now); math.Abs(uptime-1) > epsilon {
-		t.Fatalf("Wrong uptime value. Expected %d got %f", 1, uptime)
-	}
+	require.InDelta(m.Read(now), 1, delta)
 }
 
 func TestTimeUntil(t *testing.T) {
+	require := require.New(t)
+
 	halflife := 5 * time.Second
 	f := ContinuousFactory{}
 	m := f.New(halflife)
@@ -184,9 +158,9 @@ func TestTimeUntil(t *testing.T) {
 	now = now.Add(timeUntilDesiredVal)
 	actualVal := m.Read(now)
 	// Make sure the actual/expected are close
-	require.InDelta(t, desiredVal, actualVal, .00001)
+	require.InDelta(desiredVal, actualVal, .00001)
 	// Make sure TimeUntil returns the zero duration if
 	// the value provided >= the current value
-	require.Zero(t, m.TimeUntil(now, actualVal))
-	require.Zero(t, m.TimeUntil(now, actualVal+.1))
+	require.Zero(m.TimeUntil(now, actualVal))
+	require.Zero(m.TimeUntil(now, actualVal+.1))
 }

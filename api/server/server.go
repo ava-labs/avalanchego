@@ -5,7 +5,6 @@ package server
 
 import (
 	"context"
-	"crypto/tls"
 	"errors"
 	"fmt"
 	"net"
@@ -29,7 +28,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -66,8 +64,6 @@ type Server interface {
 	PathAdderWithReadLock
 	// Dispatch starts the API server
 	Dispatch() error
-	// DispatchTLS starts the API server with the provided TLS certificate
-	DispatchTLS(certBytes, keyBytes []byte) error
 	// RegisterChain registers the API endpoints associated with this chain.
 	// That is, add <route, handler> pairs to server so that API calls can be
 	// made to the VM.
@@ -88,9 +84,6 @@ type server struct {
 	log logging.Logger
 	// generates new logs for chains to write to
 	factory logging.Factory
-	// Listens for HTTP traffic on this address
-	listenHost string
-	listenPort uint16
 
 	shutdownTimeout time.Duration
 
@@ -103,14 +96,16 @@ type server struct {
 	router *router
 
 	srv *http.Server
+
+	// Listener used to serve traffic
+	listener net.Listener
 }
 
 // New returns an instance of a Server.
 func New(
 	log logging.Logger,
 	factory logging.Factory,
-	host string,
-	port uint16,
+	listener net.Listener,
 	allowedOrigins []string,
 	shutdownTimeout time.Duration,
 	nodeID ids.NodeID,
@@ -119,6 +114,7 @@ func New(
 	namespace string,
 	registerer prometheus.Registerer,
 	httpConfig HTTPConfig,
+	allowedHosts []string,
 	wrappers ...Wrapper,
 ) (Server, error) {
 	m, err := newMetrics(namespace, registerer)
@@ -127,10 +123,11 @@ func New(
 	}
 
 	router := newRouter()
+	allowedHostsHandler := filterInvalidHosts(router, allowedHosts)
 	corsHandler := cors.New(cors.Options{
 		AllowedOrigins:   allowedOrigins,
 		AllowCredentials: true,
-	}).Handler(router)
+	}).Handler(allowedHostsHandler)
 	gzipHandler := gziphandler.GzipHandler(corsHandler)
 	var handler http.Handler = http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
@@ -151,8 +148,6 @@ func New(
 	return &server{
 		log:             log,
 		factory:         factory,
-		listenHost:      host,
-		listenPort:      port,
 		shutdownTimeout: shutdownTimeout,
 		tracingEnabled:  tracingEnabled,
 		tracer:          tracer,
@@ -165,60 +160,12 @@ func New(
 			WriteTimeout:      httpConfig.WriteTimeout,
 			IdleTimeout:       httpConfig.IdleTimeout,
 		},
+		listener: listener,
 	}, nil
 }
 
 func (s *server) Dispatch() error {
-	listenAddress := fmt.Sprintf("%s:%d", s.listenHost, s.listenPort)
-	listener, err := net.Listen("tcp", listenAddress)
-	if err != nil {
-		return err
-	}
-
-	ipPort, err := ips.ToIPPort(listener.Addr().String())
-	if err != nil {
-		s.log.Info("HTTP API server listening",
-			zap.String("address", listenAddress),
-		)
-	} else {
-		s.log.Info("HTTP API server listening",
-			zap.String("host", s.listenHost),
-			zap.Uint16("port", ipPort.Port),
-		)
-	}
-
-	return s.srv.Serve(listener)
-}
-
-func (s *server) DispatchTLS(certBytes, keyBytes []byte) error {
-	listenAddress := fmt.Sprintf("%s:%d", s.listenHost, s.listenPort)
-	cert, err := tls.X509KeyPair(certBytes, keyBytes)
-	if err != nil {
-		return err
-	}
-	config := &tls.Config{
-		MinVersion:   tls.VersionTLS12,
-		Certificates: []tls.Certificate{cert},
-	}
-
-	listener, err := tls.Listen("tcp", listenAddress, config)
-	if err != nil {
-		return err
-	}
-
-	ipPort, err := ips.ToIPPort(listener.Addr().String())
-	if err != nil {
-		s.log.Info("HTTPS API server listening",
-			zap.String("address", listenAddress),
-		)
-	} else {
-		s.log.Info("HTTPS API server listening",
-			zap.String("host", s.listenHost),
-			zap.Uint16("port", ipPort.Port),
-		)
-	}
-
-	return s.srv.Serve(listener)
+	return s.srv.Serve(s.listener)
 }
 
 func (s *server) RegisterChain(chainName string, ctx *snow.ConsensusContext, vm common.VM) {
@@ -377,9 +324,7 @@ func lockMiddleware(
 func rejectMiddleware(handler http.Handler, ctx *snow.ConsensusContext) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { // If chain isn't done bootstrapping, ignore API calls
 		if ctx.State.Get().State != snow.NormalOp {
-			w.WriteHeader(http.StatusServiceUnavailable)
-			// Doesn't matter if there's an error while writing. They'll get the StatusServiceUnavailable code.
-			_, _ = w.Write([]byte("API call rejected because chain is not done bootstrapping"))
+			http.Error(w, "API call rejected because chain is not done bootstrapping", http.StatusServiceUnavailable)
 		} else {
 			handler.ServeHTTP(w, r)
 		}

@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 
-set -o errexit
-set -o nounset
-set -o pipefail
+set -euo pipefail
 
 # Avalanche root directory
 AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd ../.. && pwd )
@@ -15,5 +13,5 @@ if [[ -z $(git status -s) ]]; then
     # TODO: Revise this check once we can reliably build without changes
     # exit 1
 fi
+
 "$AVALANCHE_PATH"/scripts/build_test.sh
-"$AVALANCHE_PATH"/scripts/build_fuzz.sh

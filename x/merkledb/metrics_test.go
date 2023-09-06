@@ -7,8 +7,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -16,59 +14,55 @@ import (
 )
 
 func Test_Metrics_Basic_Usage(t *testing.T) {
-	db, err := New(
+	config := newDefaultConfig()
+	// Set to nil so that we use a mockMetrics instead of the real one inside
+	// merkledb.
+	config.Reg = nil
+
+	db, err := newDB(
 		context.Background(),
 		memdb.New(),
-		Config{
-			Tracer:        newNoopTracer(),
-			HistoryLength: 300,
-			NodeCacheSize: minCacheSize,
-		},
+		config,
 	)
 	require.NoError(t, err)
 
-	err = db.Put([]byte("key"), []byte("value"))
-	require.NoError(t, err)
+	db.metrics.(*mockMetrics).keyReadCount = 0
+	db.metrics.(*mockMetrics).keyWriteCount = 0
+	db.metrics.(*mockMetrics).hashCount = 0
+
+	require.NoError(t, db.Put([]byte("key"), []byte("value")))
 
 	require.Equal(t, int64(1), db.metrics.(*mockMetrics).keyReadCount)
 	require.Equal(t, int64(1), db.metrics.(*mockMetrics).keyWriteCount)
-	require.Equal(t, int64(3), db.metrics.(*mockMetrics).hashCount)
+	require.Equal(t, int64(2), db.metrics.(*mockMetrics).hashCount)
 
-	err = db.Delete([]byte("key"))
-	require.NoError(t, err)
+	require.NoError(t, db.Delete([]byte("key")))
 
 	require.Equal(t, int64(1), db.metrics.(*mockMetrics).keyReadCount)
 	require.Equal(t, int64(2), db.metrics.(*mockMetrics).keyWriteCount)
-	require.Equal(t, int64(4), db.metrics.(*mockMetrics).hashCount)
+	require.Equal(t, int64(3), db.metrics.(*mockMetrics).hashCount)
 
 	_, err = db.Get([]byte("key2"))
 	require.ErrorIs(t, err, database.ErrNotFound)
 
 	require.Equal(t, int64(2), db.metrics.(*mockMetrics).keyReadCount)
 	require.Equal(t, int64(2), db.metrics.(*mockMetrics).keyWriteCount)
-	require.Equal(t, int64(4), db.metrics.(*mockMetrics).hashCount)
+	require.Equal(t, int64(3), db.metrics.(*mockMetrics).hashCount)
 }
 
 func Test_Metrics_Initialize(t *testing.T) {
 	db, err := New(
 		context.Background(),
 		memdb.New(),
-		Config{
-			Tracer:        newNoopTracer(),
-			HistoryLength: 300,
-			Reg:           prometheus.NewRegistry(),
-			NodeCacheSize: 1000,
-		},
+		newDefaultConfig(),
 	)
 	require.NoError(t, err)
 
-	err = db.Put([]byte("key"), []byte("value"))
-	require.NoError(t, err)
+	require.NoError(t, db.Put([]byte("key"), []byte("value")))
 
 	val, err := db.Get([]byte("key"))
 	require.NoError(t, err)
 	require.Equal(t, []byte("value"), val)
 
-	err = db.Delete([]byte("key"))
-	require.NoError(t, err)
+	require.NoError(t, db.Delete([]byte("key")))
 }

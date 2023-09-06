@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
-
 	"github.com/prometheus/client_golang/prometheus"
+
+	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/chains/atomic"
@@ -35,7 +35,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/utils/window"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -54,15 +53,15 @@ import (
 
 	db_manager "github.com/ava-labs/avalanchego/database/manager"
 	p_tx_builder "github.com/ava-labs/avalanchego/vms/platformvm/txs/builder"
+	pvalidators "github.com/ava-labs/avalanchego/vms/platformvm/validators"
 )
 
 const (
 	pending stakerStatus = iota
 	current
 
-	defaultWeight                 = 10000
-	maxRecentlyAcceptedWindowSize = 256
-	recentlyAcceptedWindowTTL     = 5 * time.Minute
+	defaultWeight = 10000
+	trackChecksum = false
 )
 
 var (
@@ -84,8 +83,7 @@ var (
 	genesisBlkID ids.ID
 	testSubnet1  *txs.Tx
 
-	errMissingPrimaryValidators = errors.New("missing primary validator set")
-	errMissing                  = errors.New("missing")
+	errMissing = errors.New("missing")
 )
 
 type stakerStatus uint
@@ -189,13 +187,6 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 	}
 
 	registerer := prometheus.NewRegistry()
-	window := window.New[ids.ID](
-		window.Config{
-			Clock:   res.clk,
-			MaxSize: maxRecentlyAcceptedWindowSize,
-			TTL:     recentlyAcceptedWindowTTL,
-		},
-	)
 	res.sender = &common.SenderTest{T: t}
 
 	metrics := metrics.Noop
@@ -212,7 +203,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 			metrics,
 			res.state,
 			res.backend,
-			window,
+			pvalidators.TestManager,
 		)
 		addSubnet(res)
 	} else {
@@ -221,7 +212,7 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller) *environment {
 			metrics,
 			res.mockedState,
 			res.backend,
-			window,
+			pvalidators.TestManager,
 		)
 		// we do not add any subnet to state, since we can mock
 		// whatever we need
@@ -277,11 +268,13 @@ func defaultState(
 	rewards reward.Calculator,
 ) state.State {
 	genesisBytes := buildGenesisTest(ctx)
+	execCfg, _ := config.GetExecutionConfig([]byte(`{}`))
 	state, err := state.New(
 		db,
 		genesisBytes,
 		prometheus.NewRegistry(),
 		cfg,
+		execCfg,
 		ctx,
 		metrics.Noop,
 		rewards,
@@ -293,10 +286,6 @@ func defaultState(
 
 	// persist and reload to init a bunch of in-memory stuff
 	state.SetHeight(0)
-	if err := state.Commit(); err != nil {
-		panic(err)
-	}
-	state.SetHeight( /*height*/ 0)
 	if err := state.Commit(); err != nil {
 		panic(err)
 	}
@@ -362,9 +351,9 @@ func defaultConfig() *config.Config {
 }
 
 func defaultClock() *mockable.Clock {
-	clk := mockable.Clock{}
+	clk := &mockable.Clock{}
 	clk.Set(defaultGenesisTime)
-	return &clk
+	return clk
 }
 
 type fxVMInt struct {
@@ -474,15 +463,9 @@ func shutdownEnvironment(t *environment) error {
 	}
 
 	if t.isBootstrapped.Get() {
-		primaryValidatorSet, exist := t.config.Validators.Get(constants.PrimaryNetworkID)
-		if !exist {
-			return errMissingPrimaryValidators
-		}
-		primaryValidators := primaryValidatorSet.List()
-
-		validatorIDs := make([]ids.NodeID, len(primaryValidators))
-		for i, vdr := range primaryValidators {
-			validatorIDs[i] = vdr.NodeID
+		validatorIDs, err := validators.NodeIDs(t.config.Validators, constants.PrimaryNetworkID)
+		if err != nil {
+			return err
 		}
 
 		if err := t.uptimes.StopTracking(validatorIDs, constants.PrimaryNetworkID); err != nil {

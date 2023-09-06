@@ -53,7 +53,8 @@ type HTTPConfig struct {
 	HTTPSKey     []byte `json:"-"`
 	HTTPSCert    []byte `json:"-"`
 
-	APIAllowedOrigins []string `json:"apiAllowedOrigins"`
+	HTTPAllowedOrigins []string `json:"httpAllowedOrigins"`
+	HTTPAllowedHosts   []string `json:"httpAllowedHosts"`
 
 	ShutdownTimeout time.Duration `json:"shutdownTimeout"`
 	ShutdownWait    time.Duration `json:"shutdownWait"`
@@ -80,17 +81,24 @@ type IPConfig struct {
 	AttemptedNATTraversal bool `json:"attemptedNATTraversal"`
 	// Tries to perform network address translation
 	Nat nat.Router `json:"-"`
+	// The host portion of the address to listen on. The port to
+	// listen on will be sourced from IPPort.
+	//
+	// - If empty, listen on all interfaces (both ipv4 and ipv6).
+	// - If populated, listen only on the specified address.
+	ListenHost string `json:"listenHost"`
 }
 
 type StakingConfig struct {
 	genesis.StakingConfig
-	EnableStaking         bool            `json:"enableStaking"`
-	StakingTLSCert        tls.Certificate `json:"-"`
-	StakingSigningKey     *bls.SecretKey  `json:"-"`
-	DisabledStakingWeight uint64          `json:"disabledStakingWeight"`
-	StakingKeyPath        string          `json:"stakingKeyPath"`
-	StakingCertPath       string          `json:"stakingCertPath"`
-	StakingSignerPath     string          `json:"stakingSignerPath"`
+	SybilProtectionEnabled        bool            `json:"sybilProtectionEnabled"`
+	PartialSyncPrimaryNetwork     bool            `json:"partialSyncPrimaryNetwork"`
+	StakingTLSCert                tls.Certificate `json:"-"`
+	StakingSigningKey             *bls.SecretKey  `json:"-"`
+	SybilProtectionDisabledWeight uint64          `json:"sybilProtectionDisabledWeight"`
+	StakingKeyPath                string          `json:"stakingKeyPath"`
+	StakingCertPath               string          `json:"stakingCertPath"`
+	StakingSignerPath             string          `json:"stakingSignerPath"`
 }
 
 type StateSyncConfig struct {
@@ -119,8 +127,7 @@ type BootstrapConfig struct {
 	// ancestors while responding to a GetAncestors message
 	BootstrapMaxTimeGetAncestors time.Duration `json:"bootstrapMaxTimeGetAncestors"`
 
-	BootstrapIDs []ids.NodeID `json:"bootstrapIDs"`
-	BootstrapIPs []ips.IPPort `json:"bootstrapIPs"`
+	Bootstrappers []genesis.Bootstrapper `json:"bootstrappers"`
 }
 
 type DatabaseConfig struct {
@@ -177,8 +184,8 @@ type Config struct {
 	ConsensusRouter          router.Router       `json:"-"`
 	RouterHealthConfig       router.HealthConfig `json:"routerHealthConfig"`
 	ConsensusShutdownTimeout time.Duration       `json:"consensusShutdownTimeout"`
-	// Gossip a container in the accepted frontier every [ConsensusGossipFrequency]
-	ConsensusGossipFrequency time.Duration `json:"consensusGossipFreq"`
+	// Gossip a container in the accepted frontier every [AcceptedFrontierGossipFrequency]
+	AcceptedFrontierGossipFrequency time.Duration `json:"consensusGossipFreq"`
 	// ConsensusAppConcurrency defines the maximum number of goroutines to
 	// handle App messages per chain.
 	ConsensusAppConcurrency int `json:"consensusAppConcurrency"`
@@ -218,10 +225,6 @@ type Config struct {
 
 	TraceConfig trace.Config `json:"traceConfig"`
 
-	// See comment on [MinPercentConnectedStakeHealthy] in platformvm.Config
-	// TODO: consider moving to subnet config
-	MinPercentConnectedStakeHealthy map[ids.ID]float64 `json:"minPercentConnectedStakeHealthy"`
-
 	// See comment on [UseCurrentHeight] in platformvm.Config
 	UseCurrentHeight bool `json:"useCurrentHeight"`
 
@@ -231,4 +234,8 @@ type Config struct {
 	// ChainDataDir is the root path for per-chain directories where VMs can
 	// write arbitrary data.
 	ChainDataDir string `json:"chainDataDir"`
+
+	// Path to write process context to (including PID, API URI, and
+	// staking address).
+	ProcessContextFilePath string `json:"processContextFilePath"`
 }

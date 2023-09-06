@@ -8,19 +8,20 @@
 package state
 
 import (
+	context "context"
 	reflect "reflect"
+	sync "sync"
 	time "time"
 
 	database "github.com/ava-labs/avalanchego/database"
 	ids "github.com/ava-labs/avalanchego/ids"
-	choices "github.com/ava-labs/avalanchego/snow/choices"
 	validators "github.com/ava-labs/avalanchego/snow/validators"
-	bls "github.com/ava-labs/avalanchego/utils/crypto/bls"
+	logging "github.com/ava-labs/avalanchego/utils/logging"
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
 	blocks "github.com/ava-labs/avalanchego/vms/platformvm/blocks"
 	status "github.com/ava-labs/avalanchego/vms/platformvm/status"
 	txs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockState is a mock of State interface.
@@ -83,15 +84,15 @@ func (mr *MockStateMockRecorder) AddRewardUTXO(arg0, arg1 interface{}) *gomock.C
 }
 
 // AddStatelessBlock mocks base method.
-func (m *MockState) AddStatelessBlock(arg0 blocks.Block, arg1 choices.Status) {
+func (m *MockState) AddStatelessBlock(arg0 blocks.Block) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "AddStatelessBlock", arg0, arg1)
+	m.ctrl.Call(m, "AddStatelessBlock", arg0)
 }
 
 // AddStatelessBlock indicates an expected call of AddStatelessBlock.
-func (mr *MockStateMockRecorder) AddStatelessBlock(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockStateMockRecorder) AddStatelessBlock(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddStatelessBlock", reflect.TypeOf((*MockState)(nil).AddStatelessBlock), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddStatelessBlock", reflect.TypeOf((*MockState)(nil).AddStatelessBlock), arg0)
 }
 
 // AddSubnet mocks base method.
@@ -140,6 +141,48 @@ func (m *MockState) AddUTXO(arg0 *avax.UTXO) {
 func (mr *MockStateMockRecorder) AddUTXO(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddUTXO", reflect.TypeOf((*MockState)(nil).AddUTXO), arg0)
+}
+
+// ApplyValidatorPublicKeyDiffs mocks base method.
+func (m *MockState) ApplyValidatorPublicKeyDiffs(arg0 context.Context, arg1 map[ids.NodeID]*validators.GetValidatorOutput, arg2, arg3 uint64) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ApplyValidatorPublicKeyDiffs", arg0, arg1, arg2, arg3)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ApplyValidatorPublicKeyDiffs indicates an expected call of ApplyValidatorPublicKeyDiffs.
+func (mr *MockStateMockRecorder) ApplyValidatorPublicKeyDiffs(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ApplyValidatorPublicKeyDiffs", reflect.TypeOf((*MockState)(nil).ApplyValidatorPublicKeyDiffs), arg0, arg1, arg2, arg3)
+}
+
+// ApplyValidatorWeightDiffs mocks base method.
+func (m *MockState) ApplyValidatorWeightDiffs(arg0 context.Context, arg1 map[ids.NodeID]*validators.GetValidatorOutput, arg2, arg3 uint64, arg4 ids.ID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ApplyValidatorWeightDiffs", arg0, arg1, arg2, arg3, arg4)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ApplyValidatorWeightDiffs indicates an expected call of ApplyValidatorWeightDiffs.
+func (mr *MockStateMockRecorder) ApplyValidatorWeightDiffs(arg0, arg1, arg2, arg3, arg4 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ApplyValidatorWeightDiffs", reflect.TypeOf((*MockState)(nil).ApplyValidatorWeightDiffs), arg0, arg1, arg2, arg3, arg4)
+}
+
+// Checksum mocks base method.
+func (m *MockState) Checksum() ids.ID {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Checksum")
+	ret0, _ := ret[0].(ids.ID)
+	return ret0
+}
+
+// Checksum indicates an expected call of Checksum.
+func (mr *MockStateMockRecorder) Checksum() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Checksum", reflect.TypeOf((*MockState)(nil).Checksum))
 }
 
 // Close mocks base method.
@@ -243,6 +286,21 @@ func (m *MockState) DeleteUTXO(arg0 ids.ID) {
 func (mr *MockStateMockRecorder) DeleteUTXO(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteUTXO", reflect.TypeOf((*MockState)(nil).DeleteUTXO), arg0)
+}
+
+// GetBlockIDAtHeight mocks base method.
+func (m *MockState) GetBlockIDAtHeight(arg0 uint64) (ids.ID, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetBlockIDAtHeight", arg0)
+	ret0, _ := ret[0].(ids.ID)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetBlockIDAtHeight indicates an expected call of GetBlockIDAtHeight.
+func (mr *MockStateMockRecorder) GetBlockIDAtHeight(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlockIDAtHeight", reflect.TypeOf((*MockState)(nil).GetBlockIDAtHeight), arg0)
 }
 
 // GetChains mocks base method.
@@ -425,13 +483,12 @@ func (mr *MockStateMockRecorder) GetStartTime(arg0, arg1 interface{}) *gomock.Ca
 }
 
 // GetStatelessBlock mocks base method.
-func (m *MockState) GetStatelessBlock(arg0 ids.ID) (blocks.Block, choices.Status, error) {
+func (m *MockState) GetStatelessBlock(arg0 ids.ID) (blocks.Block, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetStatelessBlock", arg0)
 	ret0, _ := ret[0].(blocks.Block)
-	ret1, _ := ret[1].(choices.Status)
-	ret2, _ := ret[2].(error)
-	return ret0, ret1, ret2
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // GetStatelessBlock indicates an expected call of GetStatelessBlock.
@@ -531,34 +588,18 @@ func (mr *MockStateMockRecorder) GetUptime(arg0, arg1 interface{}) *gomock.Call 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUptime", reflect.TypeOf((*MockState)(nil).GetUptime), arg0, arg1)
 }
 
-// GetValidatorPublicKeyDiffs mocks base method.
-func (m *MockState) GetValidatorPublicKeyDiffs(arg0 uint64) (map[ids.NodeID]*bls.PublicKey, error) {
+// PruneAndIndex mocks base method.
+func (m *MockState) PruneAndIndex(arg0 sync.Locker, arg1 logging.Logger) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetValidatorPublicKeyDiffs", arg0)
-	ret0, _ := ret[0].(map[ids.NodeID]*bls.PublicKey)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret := m.ctrl.Call(m, "PruneAndIndex", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
-// GetValidatorPublicKeyDiffs indicates an expected call of GetValidatorPublicKeyDiffs.
-func (mr *MockStateMockRecorder) GetValidatorPublicKeyDiffs(arg0 interface{}) *gomock.Call {
+// PruneAndIndex indicates an expected call of PruneAndIndex.
+func (mr *MockStateMockRecorder) PruneAndIndex(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetValidatorPublicKeyDiffs", reflect.TypeOf((*MockState)(nil).GetValidatorPublicKeyDiffs), arg0)
-}
-
-// GetValidatorWeightDiffs mocks base method.
-func (m *MockState) GetValidatorWeightDiffs(arg0 uint64, arg1 ids.ID) (map[ids.NodeID]*ValidatorWeightDiff, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetValidatorWeightDiffs", arg0, arg1)
-	ret0, _ := ret[0].(map[ids.NodeID]*ValidatorWeightDiff)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetValidatorWeightDiffs indicates an expected call of GetValidatorWeightDiffs.
-func (mr *MockStateMockRecorder) GetValidatorWeightDiffs(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetValidatorWeightDiffs", reflect.TypeOf((*MockState)(nil).GetValidatorWeightDiffs), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PruneAndIndex", reflect.TypeOf((*MockState)(nil).PruneAndIndex), arg0, arg1)
 }
 
 // PutCurrentDelegator mocks base method.
@@ -683,6 +724,21 @@ func (m *MockState) SetUptime(arg0 ids.NodeID, arg1 ids.ID, arg2 time.Duration, 
 func (mr *MockStateMockRecorder) SetUptime(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetUptime", reflect.TypeOf((*MockState)(nil).SetUptime), arg0, arg1, arg2, arg3)
+}
+
+// ShouldPrune mocks base method.
+func (m *MockState) ShouldPrune() (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ShouldPrune")
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ShouldPrune indicates an expected call of ShouldPrune.
+func (mr *MockStateMockRecorder) ShouldPrune() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ShouldPrune", reflect.TypeOf((*MockState)(nil).ShouldPrune))
 }
 
 // UTXOIDs mocks base method.

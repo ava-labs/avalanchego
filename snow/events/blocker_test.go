@@ -7,11 +7,15 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 func TestBlocker(t *testing.T) {
+	require := require.New(t)
+
 	b := Blocker(nil)
 
 	a := newTestBlockable()
@@ -43,39 +47,39 @@ func TestBlocker(t *testing.T) {
 
 	b.Register(context.Background(), a)
 
-	switch {
-	case !*calledDep, *calledFill, *calledAbandon, !*calledUpdate:
-		t.Fatalf("Called wrong function")
-	}
+	require.True(*calledDep)
+	require.False(*calledFill)
+	require.False(*calledAbandon)
+	require.True(*calledUpdate)
 
 	b.Fulfill(context.Background(), id2)
 	b.Abandon(context.Background(), id2)
 
-	switch {
-	case !*calledDep, *calledFill, *calledAbandon, !*calledUpdate:
-		t.Fatalf("Called wrong function")
-	}
+	require.True(*calledDep)
+	require.False(*calledFill)
+	require.False(*calledAbandon)
+	require.True(*calledUpdate)
 
 	b.Fulfill(context.Background(), id0)
 
-	switch {
-	case !*calledDep, !*calledFill, *calledAbandon, !*calledUpdate:
-		t.Fatalf("Called wrong function")
-	}
+	require.True(*calledDep)
+	require.True(*calledFill)
+	require.False(*calledAbandon)
+	require.True(*calledUpdate)
 
 	b.Abandon(context.Background(), id0)
 
-	switch {
-	case !*calledDep, !*calledFill, *calledAbandon, !*calledUpdate:
-		t.Fatalf("Called wrong function")
-	}
+	require.True(*calledDep)
+	require.True(*calledFill)
+	require.False(*calledAbandon)
+	require.True(*calledUpdate)
 
 	b.Abandon(context.Background(), id1)
 
-	switch {
-	case !*calledDep, !*calledFill, !*calledAbandon, !*calledUpdate:
-		t.Fatalf("Called wrong function")
-	}
+	require.True(*calledDep)
+	require.True(*calledFill)
+	require.True(*calledAbandon)
+	require.True(*calledUpdate)
 }
 
 type testBlockable struct {

@@ -3,40 +3,25 @@
 
 package formatting
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
 
 func TestIntFormat(t *testing.T) {
-	if format := IntFormat(0); format != "%01d" {
-		t.Fatalf("Wrong int format: %s", format)
-	}
-	if format := IntFormat(9); format != "%01d" {
-		t.Fatalf("Wrong int format: %s", format)
-	}
-	if format := IntFormat(10); format != "%02d" {
-		t.Fatalf("Wrong int format: %s", format)
-	}
-	if format := IntFormat(99); format != "%02d" {
-		t.Fatalf("Wrong int format: %s", format)
-	}
-	if format := IntFormat(100); format != "%03d" {
-		t.Fatalf("Wrong int format: %s", format)
-	}
-	if format := IntFormat(999); format != "%03d" {
-		t.Fatalf("Wrong int format: %s", format)
-	}
-	if format := IntFormat(1000); format != "%04d" {
-		t.Fatalf("Wrong int format: %s", format)
-	}
-	if format := IntFormat(9999); format != "%04d" {
-		t.Fatalf("Wrong int format: %s", format)
-	}
-	if format := IntFormat(10000); format != "%05d" {
-		t.Fatalf("Wrong int format: %s", format)
-	}
-	if format := IntFormat(99999); format != "%05d" {
-		t.Fatalf("Wrong int format: %s", format)
-	}
-	if format := IntFormat(100000); format != "%06d" {
-		t.Fatalf("Wrong int format: %s", format)
-	}
+	require := require.New(t)
+
+	require.Equal("%01d", IntFormat(0))
+	require.Equal("%01d", IntFormat(9))
+	require.Equal("%02d", IntFormat(10))
+	require.Equal("%02d", IntFormat(99))
+	require.Equal("%03d", IntFormat(100))
+	require.Equal("%03d", IntFormat(999))
+	require.Equal("%04d", IntFormat(1000))
+	require.Equal("%04d", IntFormat(9999))
+	require.Equal("%05d", IntFormat(10000))
+	require.Equal("%05d", IntFormat(99999))
+	require.Equal("%06d", IntFormat(100000))
+	require.Equal("%06d", IntFormat(999999))
 }

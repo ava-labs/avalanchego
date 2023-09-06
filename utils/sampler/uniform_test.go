@@ -97,34 +97,35 @@ func UniformOutOfRangeTest(t *testing.T, s Uniform) {
 }
 
 func UniformEmptyTest(t *testing.T, s Uniform) {
+	require := require.New(t)
+
 	s.Initialize(1)
 
 	val, err := s.Sample(0)
-	require.NoError(t, err)
-	require.Empty(t, val)
+	require.NoError(err)
+	require.Empty(val)
 }
 
 func UniformSingletonTest(t *testing.T, s Uniform) {
+	require := require.New(t)
+
 	s.Initialize(1)
 
 	val, err := s.Sample(1)
-	require.NoError(t, err)
-	require.Equal(t, []uint64{0}, val, "should have selected the only element")
+	require.NoError(err)
+	require.Equal([]uint64{0}, val)
 }
 
 func UniformDistributionTest(t *testing.T, s Uniform) {
+	require := require.New(t)
+
 	s.Initialize(3)
 
 	val, err := s.Sample(3)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	slices.Sort(val)
-	require.Equal(
-		t,
-		[]uint64{0, 1, 2},
-		val,
-		"should have selected the only element",
-	)
+	require.Equal([]uint64{0, 1, 2}, val)
 }
 
 func UniformOverSampleTest(t *testing.T, s Uniform) {
@@ -135,20 +136,22 @@ func UniformOverSampleTest(t *testing.T, s Uniform) {
 }
 
 func UniformLazilySample(t *testing.T, s Uniform) {
+	require := require.New(t)
+
 	s.Initialize(3)
 
 	for j := 0; j < 2; j++ {
 		sampled := map[uint64]bool{}
 		for i := 0; i < 3; i++ {
 			val, err := s.Next()
-			require.NoError(t, err)
-			require.False(t, sampled[val])
+			require.NoError(err)
+			require.False(sampled[val])
 
 			sampled[val] = true
 		}
 
 		_, err := s.Next()
-		require.ErrorIs(t, err, ErrOutOfRange)
+		require.ErrorIs(err, ErrOutOfRange)
 
 		s.Reset()
 	}

@@ -30,6 +30,9 @@ var (
 type UTXOState interface {
 	UTXOReader
 	UTXOWriter
+
+	// Checksum returns the current UTXOChecksum.
+	Checksum() ids.ID
 }
 
 // UTXOReader is a thin wrapper around a database to provide fetching of UTXOs.
@@ -76,10 +79,17 @@ type utxoState struct {
 
 	indexDB    database.Database
 	indexCache cache.Cacher[string, linkeddb.LinkedDB]
+
+	trackChecksum bool
+	checksum      ids.ID
 }
 
-func NewUTXOState(db database.Database, codec codec.Manager) UTXOState {
-	return &utxoState{
+func NewUTXOState(
+	db database.Database,
+	codec codec.Manager,
+	trackChecksum bool,
+) (UTXOState, error) {
+	s := &utxoState{
 		codec: codec,
 
 		utxoCache: &cache.LRU[ids.ID, *UTXO]{Size: utxoCacheSize},
@@ -87,10 +97,18 @@ func NewUTXOState(db database.Database, codec codec.Manager) UTXOState {
 
 		indexDB:    prefixdb.New(indexPrefix, db),
 		indexCache: &cache.LRU[string, linkeddb.LinkedDB]{Size: indexCacheSize},
+
+		trackChecksum: trackChecksum,
 	}
+	return s, s.initChecksum()
 }
 
-func NewMeteredUTXOState(db database.Database, codec codec.Manager, metrics prometheus.Registerer) (UTXOState, error) {
+func NewMeteredUTXOState(
+	db database.Database,
+	codec codec.Manager,
+	metrics prometheus.Registerer,
+	trackChecksum bool,
+) (UTXOState, error) {
 	utxoCache, err := metercacher.New[ids.ID, *UTXO](
 		"utxo_cache",
 		metrics,
@@ -107,7 +125,11 @@ func NewMeteredUTXOState(db database.Database, codec codec.Manager, metrics prom
 			Size: indexCacheSize,
 		},
 	)
-	return &utxoState{
+	if err != nil {
+		return nil, err
+	}
+
+	s := &utxoState{
 		codec: codec,
 
 		utxoCache: utxoCache,
@@ -115,7 +137,10 @@ func NewMeteredUTXOState(db database.Database, codec codec.Manager, metrics prom
 
 		indexDB:    prefixdb.New(indexPrefix, db),
 		indexCache: indexCache,
-	}, err
+
+		trackChecksum: trackChecksum,
+	}
+	return s, s.initChecksum()
 }
 
 func (s *utxoState) GetUTXO(utxoID ids.ID) (*UTXO, error) {
@@ -152,6 +177,8 @@ func (s *utxoState) PutUTXO(utxo *UTXO) error {
 	}
 
 	utxoID := utxo.InputID()
+	s.updateChecksum(utxoID)
+
 	s.utxoCache.Put(utxoID, utxo)
 	if err := s.utxoDB.Put(utxoID[:], utxoBytes); err != nil {
 		return err
@@ -180,6 +207,8 @@ func (s *utxoState) DeleteUTXO(utxoID ids.ID) error {
 	if err != nil {
 		return err
 	}
+
+	s.updateChecksum(utxoID)
 
 	s.utxoCache.Put(utxoID, nil)
 	if err := s.utxoDB.Delete(utxoID[:]); err != nil {
@@ -222,6 +251,10 @@ func (s *utxoState) UTXOIDs(addr []byte, start ids.ID, limit int) ([]ids.ID, err
 	return utxoIDs, iter.Error()
 }
 
+func (s *utxoState) Checksum() ids.ID {
+	return s.checksum
+}
+
 func (s *utxoState) getIndexDB(addr []byte) linkeddb.LinkedDB {
 	addrStr := string(addr)
 	if indexList, exists := s.indexCache.Get(addrStr); exists {
@@ -232,4 +265,30 @@ func (s *utxoState) getIndexDB(addr []byte) linkeddb.LinkedDB {
 	indexList := linkeddb.NewDefault(indexDB)
 	s.indexCache.Put(addrStr, indexList)
 	return indexList
+}
+
+func (s *utxoState) initChecksum() error {
+	if !s.trackChecksum {
+		return nil
+	}
+
+	it := s.utxoDB.NewIterator()
+	defer it.Release()
+
+	for it.Next() {
+		utxoID, err := ids.ToID(it.Key())
+		if err != nil {
+			return err
+		}
+		s.updateChecksum(utxoID)
+	}
+	return it.Error()
+}
+
+func (s *utxoState) updateChecksum(modifiedID ids.ID) {
+	if !s.trackChecksum {
+		return
+	}
+
+	s.checksum = s.checksum.XOR(modifiedID)
 }

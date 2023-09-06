@@ -42,8 +42,7 @@ func awaitHealthy(t *testing.T, r Reporter, healthy bool) {
 }
 
 func awaitLiveness(t *testing.T, r Reporter, liveness bool) {
-	require := require.New(t)
-	require.Eventually(func() bool {
+	require.Eventually(t, func() bool {
 		_, ok := r.Liveness()
 		return ok == liveness
 	}, awaitTimeout, awaitFreq)
@@ -245,11 +244,10 @@ func TestDeadlockRegression(t *testing.T) {
 	h.Start(context.Background(), time.Nanosecond)
 	defer h.Stop()
 
-	for i := 0; i < 1000; i++ {
+	for i := 0; i < 100; i++ {
 		lock.Lock()
-		err = h.RegisterHealthCheck(fmt.Sprintf("check-%d", i), check)
+		require.NoError(h.RegisterHealthCheck(fmt.Sprintf("check-%d", i), check))
 		lock.Unlock()
-		require.NoError(err)
 	}
 
 	awaitHealthy(t, h, true)
@@ -268,7 +266,7 @@ func TestTags(t *testing.T) {
 	require.NoError(h.RegisterHealthCheck("check2", check, "tag1"))
 	require.NoError(h.RegisterHealthCheck("check3", check, "tag2"))
 	require.NoError(h.RegisterHealthCheck("check4", check, "tag1", "tag2"))
-	require.NoError(h.RegisterHealthCheck("check5", check, GlobalTag))
+	require.NoError(h.RegisterHealthCheck("check5", check, ApplicationTag))
 
 	// default checks
 	{
@@ -378,8 +376,8 @@ func TestTags(t *testing.T) {
 		require.Contains(healthResult, "check5")
 		require.True(health)
 
-		// add global tag
-		require.NoError(h.RegisterHealthCheck("check7", check, GlobalTag))
+		// add application tag
+		require.NoError(h.RegisterHealthCheck("check7", check, ApplicationTag))
 
 		awaitHealthy(t, h, false)
 

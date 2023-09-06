@@ -69,8 +69,6 @@ func TestOutputOwnersVerify(t *testing.T) {
 			require := require.New(t)
 			err := tt.out.Verify()
 			require.ErrorIs(err, tt.expectedErr)
-			err = tt.out.VerifyState()
-			require.ErrorIs(err, tt.expectedErr)
 		})
 	}
 }

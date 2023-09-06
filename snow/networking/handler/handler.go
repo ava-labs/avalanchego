@@ -17,6 +17,8 @@ import (
 
 	"go.uber.org/zap"
 
+	"golang.org/x/sync/errgroup"
+
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
@@ -24,12 +26,13 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
-	"github.com/ava-labs/avalanchego/snow/networking/worker"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+
+	commontracker "github.com/ava-labs/avalanchego/snow/engine/common/tracker"
 )
 
 const (
@@ -63,9 +66,13 @@ type Handler interface {
 	Start(ctx context.Context, recoverPanic bool)
 	Push(ctx context.Context, msg Message)
 	Len() int
+
 	Stop(ctx context.Context)
 	StopWithError(ctx context.Context, err error)
-	Stopped() chan struct{}
+	// AwaitStopped returns an error if the call would block and [ctx] is done.
+	// Even if [ctx] is done when passed into this function, this function will
+	// return a nil error if it will not block.
+	AwaitStopped(ctx context.Context) (time.Duration, error)
 }
 
 // handler passes incoming messages from the network to the consensus engine.
@@ -78,6 +85,8 @@ type handler struct {
 
 	ctx *snow.ConsensusContext
 	// The validator set that validates this chain
+	// TODO: consider using peerTracker instead of validators
+	// since peerTracker is already tracking validators
 	validators validators.Set
 	// Receives messages from the VM
 	msgFromVMChan   <-chan common.Message
@@ -100,10 +109,12 @@ type handler struct {
 	// [unprocessedAsyncMsgsCond.L] must be held while accessing [asyncMessageQueue].
 	asyncMessageQueue MessageQueue
 	// Worker pool for handling asynchronous consensus messages
-	asyncMessagePool worker.Pool
+	asyncMessagePool errgroup.Group
 	timeouts         chan struct{}
 
 	closeOnce            sync.Once
+	startClosingTime     time.Time
+	totalClosingTime     time.Duration
 	closingChan          chan struct{}
 	numDispatchersClosed int
 	// Closed when this handler and [engine] are done shutting down
@@ -111,7 +122,10 @@ type handler struct {
 
 	subnetConnector validators.SubnetConnector
 
-	subnetAllower subnets.Allower
+	subnet subnets.Subnet
+
+	// Tracks the peers that are currently connected to this subnet
+	peerTracker commontracker.Peers
 }
 
 // Initialize this consensus handler
@@ -125,21 +139,23 @@ func New(
 	resourceTracker tracker.ResourceTracker,
 	subnetConnector validators.SubnetConnector,
 	subnet subnets.Subnet,
+	peerTracker commontracker.Peers,
 ) (Handler, error) {
 	h := &handler{
-		ctx:              ctx,
-		validators:       validators,
-		msgFromVMChan:    msgFromVMChan,
-		preemptTimeouts:  subnet.OnBootstrapCompleted(),
-		gossipFrequency:  gossipFrequency,
-		asyncMessagePool: worker.NewPool(threadPoolSize),
-		timeouts:         make(chan struct{}, 1),
-		closingChan:      make(chan struct{}),
-		closed:           make(chan struct{}),
-		resourceTracker:  resourceTracker,
-		subnetConnector:  subnetConnector,
-		subnetAllower:    subnet,
+		ctx:             ctx,
+		validators:      validators,
+		msgFromVMChan:   msgFromVMChan,
+		preemptTimeouts: subnet.OnBootstrapCompleted(),
+		gossipFrequency: gossipFrequency,
+		timeouts:        make(chan struct{}, 1),
+		closingChan:     make(chan struct{}),
+		closed:          make(chan struct{}),
+		resourceTracker: resourceTracker,
+		subnetConnector: subnetConnector,
+		subnet:          subnet,
+		peerTracker:     peerTracker,
 	}
+	h.asyncMessagePool.SetLimit(threadPoolSize)
 
 	var err error
 
@@ -164,7 +180,7 @@ func (h *handler) Context() *snow.ConsensusContext {
 }
 
 func (h *handler) ShouldHandle(nodeID ids.NodeID) bool {
-	return h.subnetAllower.IsAllowed(nodeID, h.validators.Contains(nodeID))
+	return h.subnet.IsAllowed(nodeID, h.validators.Contains(nodeID))
 }
 
 func (h *handler) SetEngineManager(engineManager *EngineManager) {
@@ -250,23 +266,6 @@ func (h *handler) Start(ctx context.Context, recoverPanic bool) {
 	}
 }
 
-func (h *handler) HealthCheck(ctx context.Context) (interface{}, error) {
-	h.ctx.Lock.Lock()
-	defer h.ctx.Lock.Unlock()
-
-	state := h.ctx.State.Get()
-	engine, ok := h.engineManager.Get(state.Type).Get(state.State)
-	if !ok {
-		return nil, fmt.Errorf(
-			"%w %s running %s",
-			errMissingEngine,
-			state.State,
-			state.Type,
-		)
-	}
-	return engine.HealthCheck(ctx)
-}
-
 // Push the message onto the handler's queue
 func (h *handler) Push(ctx context.Context, msg Message) {
 	switch msg.Op() {
@@ -303,8 +302,12 @@ func (h *handler) RegisterTimeout(d time.Duration) {
 }
 
 // Note: It is possible for Stop to be called before/concurrently with Start.
+//
+// Invariant: Stop must never block.
 func (h *handler) Stop(ctx context.Context) {
 	h.closeOnce.Do(func() {
+		h.startClosingTime = h.clock.Time()
+
 		// Must hold the locks here to ensure there's no race condition in where
 		// we check the value of [h.closing] after the call to [Signal].
 		h.syncMessageQueue.Shutdown()
@@ -340,8 +343,19 @@ func (h *handler) StopWithError(ctx context.Context, err error) {
 	h.Stop(ctx)
 }
 
-func (h *handler) Stopped() chan struct{} {
-	return h.closed
+func (h *handler) AwaitStopped(ctx context.Context) (time.Duration, error) {
+	select {
+	case <-h.closed:
+		return h.totalClosingTime, nil
+	default:
+	}
+
+	select {
+	case <-ctx.Done():
+		return 0, ctx.Err()
+	case <-h.closed:
+		return h.totalClosingTime, nil
+	}
 }
 
 func (h *handler) dispatchSync(ctx context.Context) {
@@ -370,7 +384,9 @@ func (h *handler) dispatchSync(ctx context.Context) {
 
 func (h *handler) dispatchAsync(ctx context.Context) {
 	defer func() {
-		h.asyncMessagePool.Shutdown()
+		// We never return an error in any of our functions, so it is safe to
+		// drop any error here.
+		_ = h.asyncMessagePool.Wait()
 		h.closeDispatcher(ctx)
 	}()
 
@@ -413,7 +429,7 @@ func (h *handler) dispatchChans(ctx context.Context) {
 
 		if err := h.handleChanMsg(msg); err != nil {
 			h.StopWithError(ctx, fmt.Errorf(
-				"%w while processing async message: %s",
+				"%w while processing chan message: %s",
 				err,
 				msg,
 			))
@@ -582,19 +598,19 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 		return engine.GetAcceptedFrontier(ctx, nodeID, msg.RequestId)
 
 	case *p2p.AcceptedFrontier:
-		containerIDs, err := getIDs(msg.ContainerIds)
+		containerID, err := ids.ToID(msg.ContainerId)
 		if err != nil {
 			h.ctx.Log.Debug("message with invalid field",
 				zap.Stringer("nodeID", nodeID),
 				zap.Stringer("messageOp", message.AcceptedFrontierOp),
 				zap.Uint32("requestID", msg.RequestId),
-				zap.String("field", "ContainerIDs"),
+				zap.String("field", "ContainerID"),
 				zap.Error(err),
 			)
 			return engine.GetAcceptedFrontierFailed(ctx, nodeID, msg.RequestId)
 		}
 
-		return engine.AcceptedFrontier(ctx, nodeID, msg.RequestId, containerIDs)
+		return engine.AcceptedFrontier(ctx, nodeID, msg.RequestId, containerID)
 
 	case *message.GetAcceptedFrontierFailed:
 		return engine.GetAcceptedFrontierFailed(ctx, nodeID, msg.RequestID)
@@ -693,43 +709,51 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 		return engine.PullQuery(ctx, nodeID, msg.RequestId, containerID)
 
 	case *p2p.Chits:
-		votes, err := getIDs(msg.PreferredContainerIds)
+		preferredID, err := ids.ToID(msg.PreferredId)
 		if err != nil {
 			h.ctx.Log.Debug("message with invalid field",
 				zap.Stringer("nodeID", nodeID),
 				zap.Stringer("messageOp", message.ChitsOp),
 				zap.Uint32("requestID", msg.RequestId),
-				zap.String("field", "PreferredContainerIDs"),
+				zap.String("field", "PreferredID"),
 				zap.Error(err),
 			)
 			return engine.QueryFailed(ctx, nodeID, msg.RequestId)
 		}
 
-		accepted, err := getIDs(msg.AcceptedContainerIds)
+		acceptedID, err := ids.ToID(msg.AcceptedId)
 		if err != nil {
 			h.ctx.Log.Debug("message with invalid field",
 				zap.Stringer("nodeID", nodeID),
 				zap.Stringer("messageOp", message.ChitsOp),
 				zap.Uint32("requestID", msg.RequestId),
-				zap.String("field", "AcceptedContainerIDs"),
+				zap.String("field", "AcceptedID"),
 				zap.Error(err),
 			)
 			return engine.QueryFailed(ctx, nodeID, msg.RequestId)
 		}
 
-		return engine.Chits(ctx, nodeID, msg.RequestId, votes, accepted)
+		return engine.Chits(ctx, nodeID, msg.RequestId, preferredID, acceptedID)
 
 	case *message.QueryFailed:
 		return engine.QueryFailed(ctx, nodeID, msg.RequestID)
 
 	// Connection messages can be sent to the currently executing engine
 	case *message.Connected:
+		err := h.peerTracker.Connected(ctx, nodeID, msg.NodeVersion)
+		if err != nil {
+			return err
+		}
 		return engine.Connected(ctx, nodeID, msg.NodeVersion)
 
 	case *message.ConnectedSubnet:
 		return h.subnetConnector.ConnectedSubnet(ctx, nodeID, msg.SubnetID)
 
 	case *message.Disconnected:
+		err := h.peerTracker.Disconnected(ctx, nodeID)
+		if err != nil {
+			return err
+		}
 		return engine.Disconnected(ctx, nodeID)
 
 	default:
@@ -741,7 +765,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 }
 
 func (h *handler) handleAsyncMsg(ctx context.Context, msg Message) {
-	h.asyncMessagePool.Send(func() {
+	h.asyncMessagePool.Go(func() error {
 		if err := h.executeAsyncMsg(ctx, msg); err != nil {
 			h.StopWithError(ctx, fmt.Errorf(
 				"%w while processing async message: %s",
@@ -749,6 +773,7 @@ func (h *handler) handleAsyncMsg(ctx context.Context, msg Message) {
 				msg,
 			))
 		}
+		return nil
 	})
 }
 
@@ -977,8 +1002,16 @@ func (h *handler) shutdown(ctx context.Context) {
 		if h.onStopped != nil {
 			go h.onStopped()
 		}
+
+		h.totalClosingTime = h.clock.Time().Sub(h.startClosingTime)
 		close(h.closed)
 	}()
+
+	// shutdown may be called during Start, so we populate the start closing
+	// time here in case Stop was never called.
+	if h.startClosingTime.IsZero() {
+		h.startClosingTime = h.clock.Time()
+	}
 
 	state := h.ctx.State.Get()
 	engine, ok := h.engineManager.Get(state.Type).Get(state.State)

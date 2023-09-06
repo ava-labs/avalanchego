@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/golang/mock/gomock"
-
 	"github.com/stretchr/testify/require"
+
+	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -50,7 +50,6 @@ func TestLoadVMsSuccess(t *testing.T) {
 	require := require.New(t)
 
 	resources := initLoadVMsTest(t)
-	defer resources.ctrl.Finish()
 
 	id1 := ids.GenerateTestID()
 	id2 := ids.GenerateTestID()
@@ -75,10 +74,8 @@ func TestLoadVMsSuccess(t *testing.T) {
 
 	// execute test
 	reply := LoadVMsReply{}
-	err := resources.admin.LoadVMs(&http.Request{}, nil, &reply)
-
+	require.NoError(resources.admin.LoadVMs(&http.Request{}, nil, &reply))
 	require.Equal(expectedVMRegistry, reply.NewVMs)
-	require.NoError(err)
 }
 
 // Tests behavior for LoadVMs if we fail to reload vms.
@@ -86,7 +83,6 @@ func TestLoadVMsReloadFails(t *testing.T) {
 	require := require.New(t)
 
 	resources := initLoadVMsTest(t)
-	defer resources.ctrl.Finish()
 
 	resources.mockLog.EXPECT().Debug(gomock.Any(), gomock.Any()).Times(1)
 	// Reload fails
@@ -102,7 +98,6 @@ func TestLoadVMsGetAliasesFails(t *testing.T) {
 	require := require.New(t)
 
 	resources := initLoadVMsTest(t)
-	defer resources.ctrl.Finish()
 
 	id1 := ids.GenerateTestID()
 	id2 := ids.GenerateTestID()

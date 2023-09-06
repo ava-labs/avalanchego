@@ -47,7 +47,7 @@ type Manager interface {
 type Config struct {
 	Benchable              Benchable          `json:"-"`
 	Validators             validators.Manager `json:"-"`
-	StakingEnabled         bool               `json:"-"`
+	SybilProtectionEnabled bool               `json:"-"`
 	Threshold              int                `json:"threshold"`
 	MinimumFailingDuration time.Duration      `json:"minimumFailingDuration"`
 	Duration               time.Duration      `json:"duration"`
@@ -119,10 +119,10 @@ func (m *manager) RegisterChain(ctx *snow.ConsensusContext) error {
 		vdrs validators.Set
 		ok   bool
 	)
-	if m.config.StakingEnabled {
+	if m.config.SybilProtectionEnabled {
 		vdrs, ok = m.config.Validators.Get(ctx.SubnetID)
 	} else {
-		// If staking is disabled, everyone validates every chain
+		// If sybil protection is disabled, everyone validates every chain
 		vdrs, ok = m.config.Validators.Get(constants.PrimaryNetworkID)
 	}
 	if !ok {

@@ -62,7 +62,7 @@ type FrontierSender interface {
 		ctx context.Context,
 		nodeID ids.NodeID,
 		requestID uint32,
-		containerIDs []ids.ID,
+		containerID ids.ID,
 	)
 }
 
@@ -117,7 +117,7 @@ type QuerySender interface {
 	SendPullQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, containerID ids.ID)
 
 	// Send chits to the specified node
-	SendChits(ctx context.Context, nodeID ids.NodeID, requestID uint32, votes []ids.ID, accepted []ids.ID)
+	SendChits(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredID ids.ID, acceptedID ids.ID)
 }
 
 // Gossiper defines how a consensus engine gossips a container on the accepted

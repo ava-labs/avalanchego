@@ -8,9 +8,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/golang/mock/gomock"
-
 	"github.com/stretchr/testify/require"
+
+	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -140,7 +140,6 @@ func TestNetworkAppGossip(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 
 			parser, err := txs.NewParser([]fxs.Fx{
 				&secp256k1fx.Fx{},
@@ -158,8 +157,7 @@ func TestNetworkAppGossip(t *testing.T) {
 				tt.mempoolFunc(ctrl),
 				tt.appSenderFunc(ctrl),
 			)
-			err = n.AppGossip(context.Background(), ids.GenerateTestNodeID(), tt.msgBytesFunc())
-			require.NoError(err)
+			require.NoError(n.AppGossip(context.Background(), ids.GenerateTestNodeID(), tt.msgBytesFunc()))
 		})
 	}
 }
@@ -281,7 +279,6 @@ func TestNetworkIssueTx(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 
 			parser, err := txs.NewParser([]fxs.Fx{
 				&secp256k1fx.Fx{},
@@ -308,7 +305,6 @@ func TestNetworkIssueTx(t *testing.T) {
 func TestNetworkGossipTx(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	parser, err := txs.NewParser([]fxs.Fx{
 		&secp256k1fx.Fx{},

@@ -233,7 +233,7 @@ func VerifyTx(
 			}
 			fc.Consume(in.AssetID(), in.Input().Amount())
 		}
-		if !utils.IsSortedAndUniqueSortable(ins) {
+		if !utils.IsSortedAndUnique(ins) {
 			return ErrInputsNotSortedUnique
 		}
 	}

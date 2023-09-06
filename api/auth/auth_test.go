@@ -144,8 +144,7 @@ func TestRevokeToken(t *testing.T) {
 	tokenStr, err := auth.NewToken(testPassword, defaultTokenLifespan, endpoints)
 	require.NoError(err)
 
-	err = auth.RevokeToken(tokenStr, testPassword)
-	require.NoError(err)
+	require.NoError(auth.RevokeToken(tokenStr, testPassword))
 	require.Len(auth.revoked, 1)
 }
 

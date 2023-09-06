@@ -39,10 +39,14 @@ func main() {
 	}
 	log.Printf("fetched node ID %s in %s\n", nodeID, time.Since(nodeInfoStartTime))
 
-	// NewWalletFromURI fetches the available UTXOs owned by [kc] on the network
-	// that [uri] is hosting.
+	// MakeWallet fetches the available UTXOs owned by [kc] on the network that
+	// [uri] is hosting.
 	walletSyncStartTime := time.Now()
-	wallet, err := primary.NewWalletFromURI(ctx, uri, kc)
+	wallet, err := primary.MakeWallet(ctx, &primary.WalletConfig{
+		URI:          uri,
+		AVAXKeychain: kc,
+		EthKeychain:  kc,
+	})
 	if err != nil {
 		log.Fatalf("failed to initialize wallet: %s\n", err)
 	}
@@ -53,7 +57,7 @@ func main() {
 	avaxAssetID := pWallet.AVAXAssetID()
 
 	addValidatorStartTime := time.Now()
-	addValidatorTxID, err := pWallet.IssueAddPermissionlessValidatorTx(
+	addValidatorTx, err := pWallet.IssueAddPermissionlessValidatorTx(
 		&txs.SubnetValidator{Validator: txs.Validator{
 			NodeID: nodeID,
 			Start:  uint64(startTime.Unix()),
@@ -75,5 +79,5 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to issue add permissionless validator transaction: %s\n", err)
 	}
-	log.Printf("added new primary network validator %s with %s in %s\n", nodeID, addValidatorTxID, time.Since(addValidatorStartTime))
+	log.Printf("added new primary network validator %s with %s in %s\n", nodeID, addValidatorTx.ID(), time.Since(addValidatorStartTime))
 }

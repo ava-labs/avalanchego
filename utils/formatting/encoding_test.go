@@ -4,6 +4,7 @@
 package formatting
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"testing"
 
@@ -11,35 +12,29 @@ import (
 )
 
 func TestEncodingMarshalJSON(t *testing.T) {
+	require := require.New(t)
+
 	enc := Hex
 	jsonBytes, err := enc.MarshalJSON()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(jsonBytes) != `"hex"` {
-		t.Fatal("should be 'hex'")
-	}
+	require.NoError(err)
+	require.Equal(`"hex"`, string(jsonBytes))
 }
 
 func TestEncodingUnmarshalJSON(t *testing.T) {
+	require := require.New(t)
+
 	jsonBytes := []byte(`"hex"`)
 	var enc Encoding
-	if err := json.Unmarshal(jsonBytes, &enc); err != nil {
-		t.Fatal(err)
-	}
-	if enc != Hex {
-		t.Fatal("should be hex")
-	}
+	require.NoError(json.Unmarshal(jsonBytes, &enc))
+	require.Equal(Hex, enc)
 
+	var serr *json.SyntaxError
 	jsonBytes = []byte("")
-	if err := json.Unmarshal(jsonBytes, &enc); err == nil {
-		t.Fatal("should have erred due to invalid encoding")
-	}
+	require.ErrorAs(json.Unmarshal(jsonBytes, &enc), &serr)
 
 	jsonBytes = []byte(`""`)
-	if err := json.Unmarshal(jsonBytes, &enc); err == nil {
-		t.Fatal("should have erred due to invalid encoding")
-	}
+	err := json.Unmarshal(jsonBytes, &enc)
+	require.ErrorIs(err, errInvalidEncoding)
 }
 
 func TestEncodingString(t *testing.T) {
@@ -49,6 +44,8 @@ func TestEncodingString(t *testing.T) {
 
 // Test encoding bytes to a string and decoding back to bytes
 func TestEncodeDecode(t *testing.T) {
+	require := require.New(t)
+
 	type test struct {
 		encoding Encoding
 		bytes    []byte
@@ -82,44 +79,63 @@ func TestEncodeDecode(t *testing.T) {
 	for _, test := range tests {
 		// Encode the bytes
 		strResult, err := Encode(test.encoding, test.bytes)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 		// Make sure the string repr. is what we expected
-		require.Equal(t, test.str, strResult)
+		require.Equal(test.str, strResult)
 		// Decode the string
 		bytesResult, err := Decode(test.encoding, strResult)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 		// Make sure we got the same bytes back
-		require.Equal(t, test.bytes, bytesResult)
+		require.Equal(test.bytes, bytesResult)
 	}
 }
 
 // Test that encoding nil bytes works
 func TestEncodeNil(t *testing.T) {
+	require := require.New(t)
+
 	str, err := Encode(Hex, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	require.Equal(t, "0x7852b855", str)
+	require.NoError(err)
+	require.Equal("0x7852b855", str)
 }
 
 func TestDecodeHexInvalid(t *testing.T) {
-	invalidHex := []string{"0", "x", "0xg", "0x0017afa0Zd", "0xafafafafaf"}
-	for _, str := range invalidHex {
-		_, err := Decode(Hex, str)
-		if err == nil {
-			t.Fatalf("should have failed to decode invalid hex '%s'", str)
-		}
+	tests := []struct {
+		inputStr    string
+		expectedErr error
+	}{
+		{
+			inputStr:    "0",
+			expectedErr: errMissingHexPrefix,
+		},
+		{
+			inputStr:    "x",
+			expectedErr: errMissingHexPrefix,
+		},
+		{
+			inputStr:    "0xg",
+			expectedErr: hex.InvalidByteError('g'),
+		},
+		{
+			inputStr:    "0x0017afa0Zd",
+			expectedErr: hex.InvalidByteError('Z'),
+		},
+		{
+			inputStr:    "0xafafafafaf",
+			expectedErr: errBadChecksum,
+		},
+	}
+	for _, test := range tests {
+		_, err := Decode(Hex, test.inputStr)
+		require.ErrorIs(t, err, test.expectedErr)
 	}
 }
 
 func TestDecodeNil(t *testing.T) {
-	if result, err := Decode(Hex, ""); err != nil || len(result) != 0 {
-		t.Fatal("decoding the empty string should return an empty byte slice")
-	}
+	require := require.New(t)
+	result, err := Decode(Hex, "")
+	require.NoError(err)
+	require.Empty(result)
 }
 
 func FuzzEncodeDecode(f *testing.F) {

@@ -7,8 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
-
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -17,7 +15,7 @@ import (
 )
 
 func TestNewExportTx(t *testing.T) {
-	env := newEnvironment(true /*=postBanff*/, false /*=postCortina*/)
+	env := newEnvironment(t, true /*=postBanff*/, false /*=postCortina*/)
 	env.ctx.Lock.Lock()
 	defer func() {
 		require.NoError(t, shutdownEnvironment(env))
@@ -51,8 +49,6 @@ func TestNewExportTx(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
 			require := require.New(t)
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 
 			tx, err := env.txBuilder.NewExportTx(
 				defaultBalance-defaultTxFee, // Amount of tokens to export
@@ -77,8 +73,7 @@ func TestNewExportTx(t *testing.T) {
 				StateVersions: env,
 				Tx:            tx,
 			}
-			err = tx.Unsigned.Visit(&verifier)
-			require.NoError(err)
+			require.NoError(tx.Unsigned.Visit(&verifier))
 		})
 	}
 }

@@ -19,9 +19,7 @@ func TestInterface(t *testing.T) {
 
 	for _, test := range ids.AliasTests {
 		listener, err := grpcutils.NewListener()
-		if err != nil {
-			t.Fatalf("Failed to create listener: %s", err)
-		}
+		require.NoError(err)
 		serverCloser := grpcutils.ServerCloser{}
 		w := ids.NewAliaser()
 

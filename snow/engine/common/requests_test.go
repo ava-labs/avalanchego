@@ -12,79 +12,58 @@ import (
 )
 
 func TestRequests(t *testing.T) {
+	require := require.New(t)
+
 	req := Requests{}
 
-	length := req.Len()
-	require.Zero(t, length, "should have had no outstanding requests")
+	require.Empty(req)
 
 	_, removed := req.Remove(ids.EmptyNodeID, 0)
-	require.False(t, removed, "shouldn't have removed the request")
+	require.False(removed)
 
-	removed = req.RemoveAny(ids.Empty)
-	require.False(t, removed, "shouldn't have removed the request")
-
-	constains := req.Contains(ids.Empty)
-	require.False(t, constains, "shouldn't contain this request")
+	require.False(req.RemoveAny(ids.Empty))
+	require.False(req.Contains(ids.Empty))
 
 	req.Add(ids.EmptyNodeID, 0, ids.Empty)
-
-	length = req.Len()
-	require.Equal(t, 1, length, "should have had one outstanding request")
+	require.Equal(1, req.Len())
 
 	_, removed = req.Remove(ids.EmptyNodeID, 1)
-	require.False(t, removed, "shouldn't have removed the request")
+	require.False(removed)
 
 	_, removed = req.Remove(ids.NodeID{1}, 0)
-	require.False(t, removed, "shouldn't have removed the request")
+	require.False(removed)
 
-	constains = req.Contains(ids.Empty)
-	require.True(t, constains, "should contain this request")
-
-	length = req.Len()
-	require.Equal(t, 1, length, "should have had one outstanding request")
+	require.True(req.Contains(ids.Empty))
+	require.Equal(1, req.Len())
 
 	req.Add(ids.EmptyNodeID, 10, ids.Empty.Prefix(0))
-
-	length = req.Len()
-	require.Equal(t, 2, length, "should have had two outstanding requests")
+	require.Equal(2, req.Len())
 
 	_, removed = req.Remove(ids.EmptyNodeID, 1)
-	require.False(t, removed, "shouldn't have removed the request")
+	require.False(removed)
 
 	_, removed = req.Remove(ids.NodeID{1}, 0)
-	require.False(t, removed, "shouldn't have removed the request")
+	require.False(removed)
 
-	constains = req.Contains(ids.Empty)
-	require.True(t, constains, "should contain this request")
-
-	length = req.Len()
-	require.Equal(t, 2, length, "should have had two outstanding requests")
+	require.True(req.Contains(ids.Empty))
+	require.Equal(2, req.Len())
 
 	removedID, removed := req.Remove(ids.EmptyNodeID, 0)
-	require.Equal(t, ids.Empty, removedID, "should have removed the requested ID")
-	require.True(t, removed, "should have removed the request")
+	require.True(removed)
+	require.Equal(ids.Empty, removedID)
 
 	removedID, removed = req.Remove(ids.EmptyNodeID, 10)
-	require.Equal(t, ids.Empty.Prefix(0), removedID, "should have removed the requested ID")
-	require.True(t, removed, "should have removed the request")
+	require.True(removed)
+	require.Equal(ids.Empty.Prefix(0), removedID)
 
-	length = req.Len()
-	require.Zero(t, length, "should have had no outstanding requests")
+	require.Zero(req.Len())
 
 	req.Add(ids.EmptyNodeID, 0, ids.Empty)
+	require.Equal(1, req.Len())
 
-	length = req.Len()
-	require.Equal(t, 1, length, "should have had one outstanding request")
+	require.True(req.RemoveAny(ids.Empty))
+	require.Zero(req.Len())
 
-	removed = req.RemoveAny(ids.Empty)
-	require.True(t, removed, "should have removed the request")
-
-	length = req.Len()
-	require.Zero(t, length, "should have had no outstanding requests")
-
-	removed = req.RemoveAny(ids.Empty)
-	require.False(t, removed, "shouldn't have removed the request")
-
-	length = req.Len()
-	require.Zero(t, length, "should have had no outstanding requests")
+	require.False(req.RemoveAny(ids.Empty))
+	require.Zero(req.Len())
 }

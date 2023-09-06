@@ -37,7 +37,7 @@ type Network interface {
 
 type network struct {
 	ctx        *snow.Context
-	blkBuilder Builder
+	blkBuilder *builder
 
 	// gossip related attributes
 	appSender common.AppSender
@@ -98,6 +98,13 @@ func (n *network) AppGossip(_ context.Context, nodeID ids.NodeID, msgBytes []byt
 		zap.Stringer("nodeID", nodeID),
 		zap.Int("messageLen", len(msgBytes)),
 	)
+
+	if n.blkBuilder.txExecutorBackend.Config.PartialSyncPrimaryNetwork {
+		n.ctx.Log.Debug("dropping AppGossip message",
+			zap.String("reason", "primary network is not being fully synced"),
+		)
+		return nil
+	}
 
 	msgIntf, err := message.Parse(msgBytes)
 	if err != nil {

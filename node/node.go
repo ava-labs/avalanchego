@@ -6,9 +6,12 @@ package node
 import (
 	"context"
 	"crypto"
+	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net"
 	"os"
 	"path/filepath"
@@ -54,6 +57,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -144,15 +148,22 @@ type Node struct {
 	networkNamespace string
 	Net              network.Network
 
+	// The staking address will optionally be written to a process context
+	// file to enable other nodes to be configured to use this node as a
+	// beacon.
+	stakingAddress string
+
 	// tlsKeyLogWriterCloser is a debug file handle that writes all the TLS
 	// session keys. This value should only be non-nil during debugging.
 	tlsKeyLogWriterCloser io.WriteCloser
 
 	// this node's initial connections to the network
-	beacons validators.Set
+	bootstrappers validators.Set
 
 	// current validators of the network
 	vdrs validators.Manager
+
+	apiURI string
 
 	// Handles HTTP API calls
 	APIServer server.Server
@@ -212,7 +223,27 @@ type Node struct {
 // Assumes [n.CPUTracker] and [n.CPUTargeter] have been initialized.
 func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 	currentIPPort := n.Config.IPPort.IPPort()
-	listener, err := net.Listen(constants.NetworkType, fmt.Sprintf(":%d", currentIPPort.Port))
+
+	// Providing either loopback address - `::1` for ipv6 and `127.0.0.1` for ipv4 - as the listen
+	// host will avoid the need for a firewall exception on recent MacOS:
+	//
+	//   - MacOS requires a manually-approved firewall exception [1] for each version of a given
+	//   binary that wants to bind to all interfaces (i.e. with an address of `:[port]`). Each
+	//   compiled version of avalanchego requires a separate exception to be allowed to bind to all
+	//   interfaces.
+	//
+	//   - A firewall exception is not required to bind to a loopback interface, but the only way for
+	//   Listen() to bind to loopback for both ipv4 and ipv6 is to bind to all interfaces [2] which
+	//   requires an exception.
+	//
+	//   - Thus, the only way to start a node on MacOS without approving a firewall exception for the
+	//   avalanchego binary is to bind to loopback by specifying the host to be `::1` or `127.0.0.1`.
+	//
+	// 1: https://apple.stackexchange.com/questions/393715/do-you-want-the-application-main-to-accept-incoming-network-connections-pop
+	// 2: https://github.com/golang/go/issues/56998
+	listenAddress := net.JoinHostPort(n.Config.ListenHost, fmt.Sprintf("%d", currentIPPort.Port))
+
+	listener, err := net.Listen(constants.NetworkType, listenAddress)
 	if err != nil {
 		return err
 	}
@@ -234,6 +265,9 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 		)
 	}
 
+	// Record the bound address to enable inclusion in process context file.
+	n.stakingAddress = listener.Addr().String()
+
 	tlsKey, ok := n.Config.StakingTLSCert.PrivateKey.(crypto.Signer)
 	if !ok {
 		return errInvalidTLSKey
@@ -254,16 +288,16 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 	// Configure benchlist
 	n.Config.BenchlistConfig.Validators = n.vdrs
 	n.Config.BenchlistConfig.Benchable = n.Config.ConsensusRouter
-	n.Config.BenchlistConfig.StakingEnabled = n.Config.EnableStaking
+	n.Config.BenchlistConfig.SybilProtectionEnabled = n.Config.SybilProtectionEnabled
 	n.benchlistManager = benchlist.NewManager(&n.Config.BenchlistConfig)
 
 	n.uptimeCalculator = uptime.NewLockedCalculator()
 
 	consensusRouter := n.Config.ConsensusRouter
-	if !n.Config.EnableStaking {
-		// Staking is disabled so we don't have a txID that added us as a
-		// validator. Because each validator needs a txID associated with it, we
-		// hack one together by just padding our nodeID with zeroes.
+	if !n.Config.SybilProtectionEnabled {
+		// Sybil protection is disabled so we don't have a txID that added us as
+		// a validator. Because each validator needs a txID associated with it,
+		// we hack one together by just padding our nodeID with zeroes.
 		dummyTxID := ids.Empty
 		copy(dummyTxID[:], n.ID[:])
 
@@ -271,7 +305,7 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 			n.ID,
 			bls.PublicFromSecretKey(n.Config.StakingSigningKey),
 			dummyTxID,
-			n.Config.DisabledStakingWeight,
+			n.Config.SybilProtectionDisabledWeight,
 		)
 		if err != nil {
 			return err
@@ -280,12 +314,12 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 		consensusRouter = &insecureValidatorManager{
 			Router: consensusRouter,
 			vdrs:   primaryNetVdrs,
-			weight: n.Config.DisabledStakingWeight,
+			weight: n.Config.SybilProtectionDisabledWeight,
 		}
 	}
 
-	numBeacons := n.beacons.Len()
-	requiredConns := (3*numBeacons + 3) / 4
+	numBootstrappers := n.bootstrappers.Len()
+	requiredConns := (3*numBootstrappers + 3) / 4
 
 	if requiredConns > 0 {
 		// Set a timer that will fire after a given timeout unless we connect
@@ -295,7 +329,7 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 			// If the timeout fires and we're already shutting down, nothing to do.
 			if !n.shuttingDown.Get() {
 				n.Log.Warn("failed to connect to bootstrap nodes",
-					zap.Stringer("beacons", n.beacons),
+					zap.Stringer("bootstrappers", n.bootstrappers),
 					zap.Duration("duration", n.Config.BootstrapBeaconConnectionTimeout),
 				)
 			}
@@ -307,7 +341,7 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 		consensusRouter = &beaconManager{
 			Router:        consensusRouter,
 			timer:         timer,
-			beacons:       n.beacons,
+			beacons:       n.bootstrappers,
 			requiredConns: int64(requiredConns),
 		}
 	}
@@ -330,7 +364,7 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 	n.Config.NetworkConfig.MyIPPort = n.Config.IPPort
 	n.Config.NetworkConfig.NetworkID = n.Config.NetworkID
 	n.Config.NetworkConfig.Validators = n.vdrs
-	n.Config.NetworkConfig.Beacons = n.beacons
+	n.Config.NetworkConfig.Beacons = n.bootstrappers
 	n.Config.NetworkConfig.TLSConfig = tlsConfig
 	n.Config.NetworkConfig.TLSKey = tlsKey
 	n.Config.NetworkConfig.TrackedSubnets = n.Config.TrackedSubnets
@@ -354,19 +388,51 @@ func (n *Node) initNetworking(primaryNetVdrs validators.Set) error {
 	return err
 }
 
+type NodeProcessContext struct {
+	// The process id of the node
+	PID int `json:"pid"`
+	// URI to access the node API
+	// Format: [https|http]://[host]:[port]
+	URI string `json:"uri"`
+	// Address other nodes can use to communicate with this node
+	// Format: [host]:[port]
+	StakingAddress string `json:"stakingAddress"`
+}
+
+// Write process context to the configured path. Supports the use of
+// dynamically chosen network ports with local network orchestration.
+func (n *Node) writeProcessContext() error {
+	n.Log.Info("writing process context", zap.String("path", n.Config.ProcessContextFilePath))
+
+	// Write the process context to disk
+	processContext := &NodeProcessContext{
+		PID:            os.Getpid(),
+		URI:            n.apiURI,
+		StakingAddress: n.stakingAddress, // Set by network initialization
+	}
+	bytes, err := json.MarshalIndent(processContext, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal process context: %w", err)
+	}
+	if err := os.WriteFile(n.Config.ProcessContextFilePath, bytes, perms.ReadWrite); err != nil {
+		return fmt.Errorf("failed to write process context: %w", err)
+	}
+	return nil
+}
+
 // Dispatch starts the node's servers.
 // Returns when the node exits.
 func (n *Node) Dispatch() error {
+	if err := n.writeProcessContext(); err != nil {
+		return err
+	}
+
 	// Start the HTTP API server
 	go n.Log.RecoverAndPanic(func() {
-		var err error
-		if n.Config.HTTPSEnabled {
-			n.Log.Debug("initializing API server with TLS")
-			err = n.APIServer.DispatchTLS(n.Config.HTTPSCert, n.Config.HTTPSKey)
-		} else {
-			n.Log.Debug("initializing API server without TLS")
-			err = n.APIServer.Dispatch()
-		}
+		n.Log.Info("API server listening",
+			zap.String("uri", n.apiURI),
+		)
+		err := n.APIServer.Dispatch()
 		// When [n].Shutdown() is called, [n.APIServer].Close() is called.
 		// This causes [n.APIServer].Dispatch() to return an error.
 		// If that happened, don't log/return an error here.
@@ -386,8 +452,8 @@ func (n *Node) Dispatch() error {
 	}
 
 	// Add bootstrap nodes to the peer network
-	for i, peerIP := range n.Config.BootstrapIPs {
-		n.Net.ManuallyTrack(n.Config.BootstrapIDs[i], peerIP)
+	for _, bootstrapper := range n.Config.Bootstrappers {
+		n.Net.ManuallyTrack(bootstrapper.ID, ips.IPPort(bootstrapper.IP))
 	}
 
 	// Start P2P connections
@@ -409,6 +475,16 @@ func (n *Node) Dispatch() error {
 
 	// Wait until the node is done shutting down before returning
 	n.DoneShuttingDown.Wait()
+
+	// Remove the process context file to communicate to an orchestrator
+	// that the node is no longer running.
+	if err := os.Remove(n.Config.ProcessContextFilePath); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		n.Log.Error("removal of process context file failed",
+			zap.String("path", n.Config.ProcessContextFilePath),
+			zap.Error(err),
+		)
+	}
+
 	return err
 }
 
@@ -481,13 +557,13 @@ func (n *Node) initDatabase() error {
 }
 
 // Set the node IDs of the peers this node should first connect to
-func (n *Node) initBeacons() error {
-	n.beacons = validators.NewSet()
-	for _, peerID := range n.Config.BootstrapIDs {
+func (n *Node) initBootstrappers() error {
+	n.bootstrappers = validators.NewSet()
+	for _, bootstrapper := range n.Config.Bootstrappers {
 		// Note: The beacon connection manager will treat all beaconIDs as
 		//       equal.
 		// Invariant: We never use the TxID or BLS keys populated here.
-		if err := n.beacons.Add(peerID, nil, ids.Empty, 1); err != nil {
+		if err := n.bootstrappers.Add(bootstrapper.ID, nil, ids.Empty, 1); err != nil {
 			return err
 		}
 	}
@@ -565,7 +641,7 @@ func (n *Node) initChains(genesisBytes []byte) error {
 		SubnetID:      constants.PrimaryNetworkID,
 		GenesisData:   genesisBytes, // Specifies other chains to create
 		VMID:          constants.PlatformVMID,
-		CustomBeacons: n.beacons,
+		CustomBeacons: n.bootstrappers,
 	}
 
 	// Start the chain creator with the Platform Chain
@@ -581,14 +657,35 @@ func (n *Node) initMetrics() {
 func (n *Node) initAPIServer() error {
 	n.Log.Info("initializing API server")
 
+	listenAddress := net.JoinHostPort(n.Config.HTTPHost, fmt.Sprintf("%d", n.Config.HTTPPort))
+	listener, err := net.Listen("tcp", listenAddress)
+	if err != nil {
+		return err
+	}
+
+	protocol := "http"
+	if n.Config.HTTPSEnabled {
+		cert, err := tls.X509KeyPair(n.Config.HTTPSCert, n.Config.HTTPSKey)
+		if err != nil {
+			return err
+		}
+		config := &tls.Config{
+			MinVersion:   tls.VersionTLS12,
+			Certificates: []tls.Certificate{cert},
+		}
+		listener = tls.NewListener(listener, config)
+
+		protocol = "https"
+	}
+	n.apiURI = fmt.Sprintf("%s://%s", protocol, listener.Addr())
+
 	if !n.Config.APIRequireAuthToken {
 		var err error
 		n.APIServer, err = server.New(
 			n.Log,
 			n.LogFactory,
-			n.Config.HTTPHost,
-			n.Config.HTTPPort,
-			n.Config.APIAllowedOrigins,
+			listener,
+			n.Config.HTTPAllowedOrigins,
 			n.Config.ShutdownTimeout,
 			n.ID,
 			n.Config.TraceConfig.Enabled,
@@ -596,6 +693,7 @@ func (n *Node) initAPIServer() error {
 			"api",
 			n.MetricsRegisterer,
 			n.Config.HTTPConfig.HTTPConfig,
+			n.Config.HTTPAllowedHosts,
 		)
 		return err
 	}
@@ -608,9 +706,8 @@ func (n *Node) initAPIServer() error {
 	n.APIServer, err = server.New(
 		n.Log,
 		n.LogFactory,
-		n.Config.HTTPHost,
-		n.Config.HTTPPort,
-		n.Config.APIAllowedOrigins,
+		listener,
+		n.Config.HTTPAllowedOrigins,
 		n.Config.ShutdownTimeout,
 		n.ID,
 		n.Config.TraceConfig.Enabled,
@@ -618,6 +715,7 @@ func (n *Node) initAPIServer() error {
 		"api",
 		n.MetricsRegisterer,
 		n.Config.HTTPConfig.HTTPConfig,
+		n.Config.HTTPAllowedHosts,
 		a,
 	)
 	if err != nil {
@@ -695,7 +793,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		timeoutManager,
 		n.Config.ConsensusShutdownTimeout,
 		criticalChains,
-		n.Config.EnableStaking,
+		n.Config.SybilProtectionEnabled,
 		n.Config.TrackedSubnets,
 		n.Shutdown,
 		n.Config.RouterHealthConfig,
@@ -707,8 +805,8 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	}
 
 	n.chainManager = chains.New(&chains.ManagerConfig{
-		StakingEnabled:                          n.Config.EnableStaking,
-		StakingCert:                             n.Config.StakingTLSCert,
+		SybilProtectionEnabled:                  n.Config.SybilProtectionEnabled,
+		StakingTLSCert:                          n.Config.StakingTLSCert,
 		StakingBLSKey:                           n.Config.StakingSigningKey,
 		Log:                                     n.Log,
 		LogFactory:                              n.LogFactory,
@@ -721,6 +819,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		Router:                                  n.Config.ConsensusRouter,
 		Net:                                     n.Net,
 		Validators:                              n.vdrs,
+		PartialSyncPrimaryNetwork:               n.Config.PartialSyncPrimaryNetwork,
 		NodeID:                                  n.ID,
 		NetworkID:                               n.Config.NetworkID,
 		Server:                                  n.APIServer,
@@ -739,7 +838,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		Metrics:                                 n.MetricsGatherer,
 		SubnetConfigs:                           n.Config.SubnetConfigs,
 		ChainConfigs:                            n.Config.ChainConfigs,
-		ConsensusGossipFrequency:                n.Config.ConsensusGossipFrequency,
+		AcceptedFrontierGossipFrequency:         n.Config.AcceptedFrontierGossipFrequency,
 		ConsensusAppConcurrency:                 n.Config.ConsensusAppConcurrency,
 		BootstrapMaxTimeGetAncestors:            n.Config.BootstrapMaxTimeGetAncestors,
 		BootstrapAncestorsMaxContainersSent:     n.Config.BootstrapAncestorsMaxContainersSent,
@@ -764,10 +863,10 @@ func (n *Node) initVMs() error {
 
 	vdrs := n.vdrs
 
-	// If staking is disabled, ignore updates to Subnets' validator sets
-	// Instead of updating node's validator manager, platform chain makes changes
-	// to its own local validator manager (which isn't used for sampling)
-	if !n.Config.EnableStaking {
+	// If sybil protection is disabled, we provide the P-chain its own local
+	// validator manager that will not be used by the rest of the node. This
+	// allows the node's validator sets to be determined by network connections.
+	if !n.Config.SybilProtectionEnabled {
 		vdrs = validators.NewManager()
 		primaryVdrs := validators.NewSet()
 		_ = vdrs.Add(constants.PrimaryNetworkID, primaryVdrs)
@@ -785,34 +884,34 @@ func (n *Node) initVMs() error {
 	errs.Add(
 		vmRegisterer.Register(context.TODO(), constants.PlatformVMID, &platformvm.Factory{
 			Config: platformconfig.Config{
-				Chains:                          n.chainManager,
-				Validators:                      vdrs,
-				UptimeLockedCalculator:          n.uptimeCalculator,
-				StakingEnabled:                  n.Config.EnableStaking,
-				TrackedSubnets:                  n.Config.TrackedSubnets,
-				TxFee:                           n.Config.TxFee,
-				CreateAssetTxFee:                n.Config.CreateAssetTxFee,
-				CreateSubnetTxFee:               n.Config.CreateSubnetTxFee,
-				TransformSubnetTxFee:            n.Config.TransformSubnetTxFee,
-				CreateBlockchainTxFee:           n.Config.CreateBlockchainTxFee,
-				AddPrimaryNetworkValidatorFee:   n.Config.AddPrimaryNetworkValidatorFee,
-				AddPrimaryNetworkDelegatorFee:   n.Config.AddPrimaryNetworkDelegatorFee,
-				AddSubnetValidatorFee:           n.Config.AddSubnetValidatorFee,
-				AddSubnetDelegatorFee:           n.Config.AddSubnetDelegatorFee,
-				UptimePercentage:                n.Config.UptimeRequirement,
-				MinValidatorStake:               n.Config.MinValidatorStake,
-				MaxValidatorStake:               n.Config.MaxValidatorStake,
-				MinDelegatorStake:               n.Config.MinDelegatorStake,
-				MinDelegationFee:                n.Config.MinDelegationFee,
-				MinStakeDuration:                n.Config.MinStakeDuration,
-				MaxStakeDuration:                n.Config.MaxStakeDuration,
-				RewardConfig:                    n.Config.RewardConfig,
-				ApricotPhase3Time:               version.GetApricotPhase3Time(n.Config.NetworkID),
-				ApricotPhase5Time:               version.GetApricotPhase5Time(n.Config.NetworkID),
-				BanffTime:                       version.GetBanffTime(n.Config.NetworkID),
-				CortinaTime:                     version.GetCortinaTime(n.Config.NetworkID),
-				MinPercentConnectedStakeHealthy: n.Config.MinPercentConnectedStakeHealthy,
-				UseCurrentHeight:                n.Config.UseCurrentHeight,
+				Chains:                        n.chainManager,
+				Validators:                    vdrs,
+				UptimeLockedCalculator:        n.uptimeCalculator,
+				SybilProtectionEnabled:        n.Config.SybilProtectionEnabled,
+				PartialSyncPrimaryNetwork:     n.Config.PartialSyncPrimaryNetwork,
+				TrackedSubnets:                n.Config.TrackedSubnets,
+				TxFee:                         n.Config.TxFee,
+				CreateAssetTxFee:              n.Config.CreateAssetTxFee,
+				CreateSubnetTxFee:             n.Config.CreateSubnetTxFee,
+				TransformSubnetTxFee:          n.Config.TransformSubnetTxFee,
+				CreateBlockchainTxFee:         n.Config.CreateBlockchainTxFee,
+				AddPrimaryNetworkValidatorFee: n.Config.AddPrimaryNetworkValidatorFee,
+				AddPrimaryNetworkDelegatorFee: n.Config.AddPrimaryNetworkDelegatorFee,
+				AddSubnetValidatorFee:         n.Config.AddSubnetValidatorFee,
+				AddSubnetDelegatorFee:         n.Config.AddSubnetDelegatorFee,
+				UptimePercentage:              n.Config.UptimeRequirement,
+				MinValidatorStake:             n.Config.MinValidatorStake,
+				MaxValidatorStake:             n.Config.MaxValidatorStake,
+				MinDelegatorStake:             n.Config.MinDelegatorStake,
+				MinDelegationFee:              n.Config.MinDelegationFee,
+				MinStakeDuration:              n.Config.MinStakeDuration,
+				MaxStakeDuration:              n.Config.MaxStakeDuration,
+				RewardConfig:                  n.Config.RewardConfig,
+				ApricotPhase3Time:             version.GetApricotPhase3Time(n.Config.NetworkID),
+				ApricotPhase5Time:             version.GetApricotPhase5Time(n.Config.NetworkID),
+				BanffTime:                     version.GetBanffTime(n.Config.NetworkID),
+				CortinaTime:                   version.GetCortinaTime(n.Config.NetworkID),
+				UseCurrentHeight:              n.Config.UseCurrentHeight,
 			},
 		}),
 		vmRegisterer.Register(context.TODO(), constants.AVMID, &avm.Factory{
@@ -1030,18 +1129,18 @@ func (n *Node) initHealthAPI() error {
 	}
 
 	n.Log.Info("initializing Health API")
-	err = healthChecker.RegisterHealthCheck("network", n.Net, health.GlobalTag)
+	err = healthChecker.RegisterHealthCheck("network", n.Net, health.ApplicationTag)
 	if err != nil {
 		return fmt.Errorf("couldn't register network health check: %w", err)
 	}
 
-	err = healthChecker.RegisterHealthCheck("router", n.Config.ConsensusRouter, health.GlobalTag)
+	err = healthChecker.RegisterHealthCheck("router", n.Config.ConsensusRouter, health.ApplicationTag)
 	if err != nil {
 		return fmt.Errorf("couldn't register router health check: %w", err)
 	}
 
 	// TODO: add database health to liveness check
-	err = healthChecker.RegisterHealthCheck("database", n.DB, health.GlobalTag)
+	err = healthChecker.RegisterHealthCheck("database", n.DB, health.ApplicationTag)
 	if err != nil {
 		return fmt.Errorf("couldn't register database health check: %w", err)
 	}
@@ -1068,7 +1167,7 @@ func (n *Node) initHealthAPI() error {
 		}, err
 	})
 
-	err = n.health.RegisterHealthCheck("diskspace", diskSpaceCheck, health.GlobalTag)
+	err = n.health.RegisterHealthCheck("diskspace", diskSpaceCheck, health.ApplicationTag)
 	if err != nil {
 		return fmt.Errorf("couldn't register resource health check: %w", err)
 	}
@@ -1196,15 +1295,20 @@ func (n *Node) initVdrs() validators.Set {
 
 // Initialize [n.resourceManager].
 func (n *Node) initResourceManager(reg prometheus.Registerer) error {
-	n.resourceManager = resource.NewManager(
+	resourceManager, err := resource.NewManager(
+		n.Log,
 		n.Config.DatabaseConfig.Path,
 		n.Config.SystemTrackerFrequency,
 		n.Config.SystemTrackerCPUHalflife,
 		n.Config.SystemTrackerDiskHalflife,
+		reg,
 	)
+	if err != nil {
+		return err
+	}
+	n.resourceManager = resourceManager
 	n.resourceManager.TrackProcess(os.Getpid())
 
-	var err error
 	n.resourceTracker, err = tracker.NewResourceTracker(reg, n.resourceManager, &meter.ContinuousFactory{}, n.Config.SystemTrackerProcessingHalflife)
 	return err
 }
@@ -1241,9 +1345,15 @@ func (n *Node) Initialize(
 	logger logging.Logger,
 	logFactory logging.Factory,
 ) error {
+	tlsCert := config.StakingTLSCert.Leaf
+	stakingCert := staking.CertificateFromX509(tlsCert)
+	if err := staking.ValidateCertificate(stakingCert); err != nil {
+		return fmt.Errorf("invalid staking certificate: %w", err)
+	}
+
 	n.Log = logger
 	n.Config = config
-	n.ID = ids.NodeIDFromCert(n.Config.StakingTLSCert.Leaf)
+	n.ID = ids.NodeIDFromCert(stakingCert)
 	n.LogFactory = logFactory
 	n.DoneShuttingDown.Add(1)
 
@@ -1251,6 +1361,7 @@ func (n *Node) Initialize(
 	n.Log.Info("initializing node",
 		zap.Stringer("version", version.CurrentApp),
 		zap.Stringer("nodeID", n.ID),
+		zap.Stringer("stakingKeyType", tlsCert.PublicKeyAlgorithm),
 		zap.Reflect("nodePOP", pop),
 		zap.Reflect("providedFlags", n.Config.ProvidedFlags),
 		zap.Reflect("config", n.Config),
@@ -1264,7 +1375,7 @@ func (n *Node) Initialize(
 
 	n.VMManager = vms.NewManager(n.VMFactoryLog, config.VMAliaser)
 
-	if err := n.initBeacons(); err != nil { // Configure the beacons
+	if err := n.initBootstrappers(); err != nil { // Configure the bootstrappers
 		return fmt.Errorf("problem initializing node beacons: %w", err)
 	}
 
@@ -1307,7 +1418,7 @@ func (n *Node) Initialize(
 		n.Log,
 		n.MetricsRegisterer,
 		n.networkNamespace,
-		constants.DefaultNetworkCompressionType,
+		n.Config.NetworkConfig.CompressionType,
 		n.Config.NetworkConfig.MaximumInboundMessageTimeout,
 	)
 	if err != nil {
@@ -1396,7 +1507,7 @@ func (n *Node) shutdown() {
 			}, errShuttingDown
 		})
 
-		err := n.health.RegisterHealthCheck("shuttingDown", shuttingDownCheck, health.GlobalTag)
+		err := n.health.RegisterHealthCheck("shuttingDown", shuttingDownCheck, health.ApplicationTag)
 		if err != nil {
 			n.Log.Debug("couldn't register shuttingDown health check",
 				zap.Error(err),

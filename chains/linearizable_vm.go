@@ -65,6 +65,12 @@ type linearizeOnInitializeVM struct {
 	stopVertexID ids.ID
 }
 
+func NewLinearizeOnInitializeVM(vm vertex.LinearizableVMWithEngine) *linearizeOnInitializeVM {
+	return &linearizeOnInitializeVM{
+		LinearizableVMWithEngine: vm,
+	}
+}
+
 func (vm *linearizeOnInitializeVM) Initialize(
 	ctx context.Context,
 	_ *snow.Context,

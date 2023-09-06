@@ -207,8 +207,7 @@ func (s *sender) SendStateSummaryFrontier(ctx context.Context, nodeID ids.NodeID
 	}
 
 	// Send the message over the network.
-	nodeIDs := set.NewSet[ids.NodeID](1)
-	nodeIDs.Add(nodeID)
+	nodeIDs := set.Of(nodeID)
 	sentTo := s.sender.Send(
 		outMsg,
 		nodeIDs,
@@ -351,8 +350,7 @@ func (s *sender) SendAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID
 	}
 
 	// Send the message over the network.
-	nodeIDs := set.NewSet[ids.NodeID](1)
-	nodeIDs.Add(nodeID)
+	nodeIDs := set.Of(nodeID)
 	sentTo := s.sender.Send(
 		outMsg,
 		nodeIDs,
@@ -454,7 +452,7 @@ func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs set.Set[id
 	}
 }
 
-func (s *sender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) {
+func (s *sender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
 	ctx = utils.Detach(ctx)
 
 	// Sending this message to myself.
@@ -462,7 +460,7 @@ func (s *sender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, re
 		inMsg := message.InboundAcceptedFrontier(
 			s.ctx.ChainID,
 			requestID,
-			containerIDs,
+			containerID,
 			nodeID,
 		)
 		go s.router.HandleInbound(ctx, inMsg)
@@ -473,22 +471,21 @@ func (s *sender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, re
 	outMsg, err := s.msgCreator.AcceptedFrontier(
 		s.ctx.ChainID,
 		requestID,
-		containerIDs,
+		containerID,
 	)
 	if err != nil {
 		s.ctx.Log.Error("failed to build message",
 			zap.Stringer("messageOp", message.AcceptedFrontierOp),
 			zap.Stringer("chainID", s.ctx.ChainID),
 			zap.Uint32("requestID", requestID),
-			zap.Stringers("containerIDs", containerIDs),
+			zap.Stringer("containerID", containerID),
 			zap.Error(err),
 		)
 		return
 	}
 
 	// Send the message over the network.
-	nodeIDs := set.NewSet[ids.NodeID](1)
-	nodeIDs.Add(nodeID)
+	nodeIDs := set.Of(nodeID)
 	sentTo := s.sender.Send(
 		outMsg,
 		nodeIDs,
@@ -501,7 +498,7 @@ func (s *sender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, re
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("chainID", s.ctx.ChainID),
 			zap.Uint32("requestID", requestID),
-			zap.Stringers("containerIDs", containerIDs),
+			zap.Stringer("containerID", containerID),
 		)
 	}
 }
@@ -621,8 +618,7 @@ func (s *sender) SendAccepted(ctx context.Context, nodeID ids.NodeID, requestID 
 	}
 
 	// Send the message over the network.
-	nodeIDs := set.NewSet[ids.NodeID](1)
-	nodeIDs.Add(nodeID)
+	nodeIDs := set.Of(nodeID)
 	sentTo := s.sender.Send(
 		outMsg,
 		nodeIDs,
@@ -702,8 +698,7 @@ func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, reques
 	}
 
 	// Send the message over the network.
-	nodeIDs := set.NewSet[ids.NodeID](1)
-	nodeIDs.Add(nodeID)
+	nodeIDs := set.Of(nodeID)
 	sentTo := s.sender.Send(
 		outMsg,
 		nodeIDs,
@@ -742,8 +737,7 @@ func (s *sender) SendAncestors(_ context.Context, nodeID ids.NodeID, requestID u
 	}
 
 	// Send the message over the network.
-	nodeIDs := set.NewSet[ids.NodeID](1)
-	nodeIDs.Add(nodeID)
+	nodeIDs := set.Of(nodeID)
 	sentTo := s.sender.Send(
 		outMsg,
 		nodeIDs,
@@ -817,8 +811,7 @@ func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint3
 	// Send the message over the network.
 	var sentTo set.Set[ids.NodeID]
 	if err == nil {
-		nodeIDs := set.NewSet[ids.NodeID](1)
-		nodeIDs.Add(nodeID)
+		nodeIDs := set.Of(nodeID)
 		sentTo = s.sender.Send(
 			outMsg,
 			nodeIDs,
@@ -869,8 +862,7 @@ func (s *sender) SendPut(_ context.Context, nodeID ids.NodeID, requestID uint32,
 	}
 
 	// Send the message over the network.
-	nodeIDs := set.NewSet[ids.NodeID](1)
-	nodeIDs.Add(nodeID)
+	nodeIDs := set.Of(nodeID)
 	sentTo := s.sender.Send(
 		outMsg,
 		nodeIDs,
@@ -1153,7 +1145,7 @@ func (s *sender) SendPullQuery(ctx context.Context, nodeIDs set.Set[ids.NodeID],
 }
 
 // SendChits sends chits
-func (s *sender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID uint32, votes, accepted []ids.ID) {
+func (s *sender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredID, acceptedID ids.ID) {
 	ctx = utils.Detach(ctx)
 
 	// If [nodeID] is myself, send this message directly
@@ -1162,8 +1154,8 @@ func (s *sender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID uin
 		inMsg := message.InboundChits(
 			s.ctx.ChainID,
 			requestID,
-			votes,
-			accepted,
+			preferredID,
+			acceptedID,
 			nodeID,
 		)
 		go s.router.HandleInbound(ctx, inMsg)
@@ -1171,21 +1163,21 @@ func (s *sender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID uin
 	}
 
 	// Create the outbound message.
-	outMsg, err := s.msgCreator.Chits(s.ctx.ChainID, requestID, votes, accepted)
+	outMsg, err := s.msgCreator.Chits(s.ctx.ChainID, requestID, preferredID, acceptedID)
 	if err != nil {
 		s.ctx.Log.Error("failed to build message",
 			zap.Stringer("messageOp", message.ChitsOp),
 			zap.Stringer("chainID", s.ctx.ChainID),
 			zap.Uint32("requestID", requestID),
-			zap.Stringers("containerIDs", votes),
+			zap.Stringer("preferredID", preferredID),
+			zap.Stringer("acceptedID", acceptedID),
 			zap.Error(err),
 		)
 		return
 	}
 
 	// Send the message over the network.
-	nodeIDs := set.NewSet[ids.NodeID](1)
-	nodeIDs.Add(nodeID)
+	nodeIDs := set.Of(nodeID)
 	sentTo := s.sender.Send(
 		outMsg,
 		nodeIDs,
@@ -1198,7 +1190,8 @@ func (s *sender) SendChits(ctx context.Context, nodeID ids.NodeID, requestID uin
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("chainID", s.ctx.ChainID),
 			zap.Uint32("requestID", requestID),
-			zap.Stringers("containerIDs", votes),
+			zap.Stringer("preferredID", preferredID),
+			zap.Stringer("acceptedID", acceptedID),
 		)
 	}
 }
@@ -1411,8 +1404,7 @@ func (s *sender) SendAppResponse(ctx context.Context, nodeID ids.NodeID, request
 	}
 
 	// Send the message over the network.
-	nodeIDs := set.NewSet[ids.NodeID](1)
-	nodeIDs.Add(nodeID)
+	nodeIDs := set.Of(nodeID)
 	sentTo := s.sender.Send(
 		outMsg,
 		nodeIDs,

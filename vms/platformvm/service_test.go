@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"math/rand"
 	"testing"
 	"time"
@@ -14,6 +15,8 @@ import (
 	stdjson "encoding/json"
 
 	"github.com/stretchr/testify/require"
+
+	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/api/keystore"
@@ -23,8 +26,11 @@ import (
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
@@ -68,12 +74,11 @@ var (
 )
 
 func defaultService(t *testing.T) (*Service, *mutableSharedMemory) {
-	vm, _, mutableSharedMemory := defaultVM()
+	vm, _, mutableSharedMemory := defaultVM(t)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 	ks := keystore.New(logging.NoLog{}, manager.NewMemDB(version.Semantic1_0_0))
-	err := ks.CreateUser(testUsername, testPassword)
-	require.NoError(t, err)
+	require.NoError(t, ks.CreateUser(testUsername, testPassword))
 
 	vm.ctx.Keystore = ks.NewBlockchainKeyStore(vm.ctx.ChainID)
 	return &Service{
@@ -87,55 +92,56 @@ func defaultService(t *testing.T) (*Service, *mutableSharedMemory) {
 
 // Give user [testUsername] control of [testPrivateKey] and keys[0] (which is funded)
 func defaultAddress(t *testing.T, service *Service) {
+	require := require.New(t)
+
 	service.vm.ctx.Lock.Lock()
 	defer service.vm.ctx.Lock.Unlock()
 	user, err := vmkeystore.NewUserFromKeystore(service.vm.ctx.Keystore, testUsername, testPassword)
-	require.NoError(t, err)
+	require.NoError(err)
 
 	pk, err := testKeyFactory.ToPrivateKey(testPrivateKey)
-	require.NoError(t, err)
+	require.NoError(err)
 
-	err = user.PutKeys(pk, keys[0])
-	require.NoError(t, err)
+	require.NoError(user.PutKeys(pk, keys[0]))
 }
 
 func TestAddValidator(t *testing.T) {
+	require := require.New(t)
+
 	expectedJSONString := `{"username":"","password":"","from":null,"changeAddr":"","txID":"11111111111111111111111111111111LpoYY","startTime":"0","endTime":"0","weight":"0","nodeID":"NodeID-111111111111111111116DBWJs","rewardAddress":"","delegationFeeRate":"0.0000"}`
 	args := AddValidatorArgs{}
 	bytes, err := stdjson.Marshal(&args)
-	require.NoError(t, err)
-	require.Equal(t, expectedJSONString, string(bytes))
+	require.NoError(err)
+	require.Equal(expectedJSONString, string(bytes))
 }
 
 func TestCreateBlockchainArgsParsing(t *testing.T) {
+	require := require.New(t)
+
 	jsonString := `{"vmID":"lol","fxIDs":["secp256k1"], "name":"awesome", "username":"bob loblaw", "password":"yeet", "genesisData":"SkB92YpWm4Q2iPnLGCuDPZPgUQMxajqQQuz91oi3xD984f8r"}`
 	args := CreateBlockchainArgs{}
-	err := stdjson.Unmarshal([]byte(jsonString), &args)
-	require.NoError(t, err)
+	require.NoError(stdjson.Unmarshal([]byte(jsonString), &args))
 
-	_, err = stdjson.Marshal(args.GenesisData)
-	require.NoError(t, err)
+	_, err := stdjson.Marshal(args.GenesisData)
+	require.NoError(err)
 }
 
 func TestExportKey(t *testing.T) {
 	require := require.New(t)
 	jsonString := `{"username":"ScoobyUser","password":"ShaggyPassword1Zoinks!","address":"` + testAddress + `"}`
 	args := ExportKeyArgs{}
-	err := stdjson.Unmarshal([]byte(jsonString), &args)
-	require.NoError(err)
+	require.NoError(stdjson.Unmarshal([]byte(jsonString), &args))
 
 	service, _ := defaultService(t)
 	defaultAddress(t, service)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
-		err := service.vm.Shutdown(context.Background())
-		require.NoError(err)
+		require.NoError(service.vm.Shutdown(context.Background()))
 		service.vm.ctx.Lock.Unlock()
 	}()
 
 	reply := ExportKeyReply{}
-	err = service.ExportKey(nil, &args, &reply)
-	require.NoError(err)
+	require.NoError(service.ExportKey(nil, &args, &reply))
 
 	require.Equal(testPrivateKey, reply.PrivateKey.Bytes())
 }
@@ -144,20 +150,17 @@ func TestImportKey(t *testing.T) {
 	require := require.New(t)
 	jsonString := `{"username":"ScoobyUser","password":"ShaggyPassword1Zoinks!","privateKey":"PrivateKey-ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN"}`
 	args := ImportKeyArgs{}
-	err := stdjson.Unmarshal([]byte(jsonString), &args)
-	require.NoError(err)
+	require.NoError(stdjson.Unmarshal([]byte(jsonString), &args))
 
 	service, _ := defaultService(t)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
-		err := service.vm.Shutdown(context.Background())
-		require.NoError(err)
+		require.NoError(service.vm.Shutdown(context.Background()))
 		service.vm.ctx.Lock.Unlock()
 	}()
 
 	reply := api.JSONAddress{}
-	err = service.ImportKey(nil, &args, &reply)
-	require.NoError(err)
+	require.NoError(service.ImportKey(nil, &args, &reply))
 	require.Equal(testAddress, reply.Address)
 }
 
@@ -168,8 +171,7 @@ func TestGetTxStatus(t *testing.T) {
 	defaultAddress(t, service)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
-		err := service.vm.Shutdown(context.Background())
-		require.NoError(err)
+		require.NoError(service.vm.Shutdown(context.Background()))
 		service.vm.ctx.Lock.Unlock()
 	}()
 
@@ -202,7 +204,7 @@ func TestGetTxStatus(t *testing.T) {
 	require.NoError(err)
 
 	inputID := utxo.InputID()
-	err = peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{
+	require.NoError(peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{
 		service.vm.ctx.ChainID: {
 			PutRequests: []*atomic.Element{
 				{
@@ -214,8 +216,7 @@ func TestGetTxStatus(t *testing.T) {
 				},
 			},
 		},
-	})
-	require.NoError(err)
+	}))
 
 	oldSharedMemory := mutableSharedMemory.SharedMemory
 	mutableSharedMemory.SharedMemory = sm
@@ -229,8 +230,7 @@ func TestGetTxStatus(t *testing.T) {
 		arg  = &GetTxStatusArgs{TxID: tx.ID()}
 		resp GetTxStatusResponse
 	)
-	err = service.GetTxStatus(nil, arg, &resp)
-	require.NoError(err)
+	require.NoError(service.GetTxStatus(nil, arg, &resp))
 	require.Equal(status.Unknown, resp.Status)
 	require.Zero(resp.Reason)
 
@@ -240,22 +240,18 @@ func TestGetTxStatus(t *testing.T) {
 
 	mutableSharedMemory.SharedMemory = sm
 
-	err = service.vm.Builder.AddUnverifiedTx(tx)
-	require.NoError(err)
+	require.NoError(service.vm.Builder.AddUnverifiedTx(tx))
 
 	block, err := service.vm.BuildBlock(context.Background())
 	require.NoError(err)
 
 	blk := block.(*blockexecutor.Block)
-	err = blk.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(blk.Verify(context.Background()))
 
-	err = blk.Accept(context.Background())
-	require.NoError(err)
+	require.NoError(blk.Accept(context.Background()))
 
 	resp = GetTxStatusResponse{} // reset
-	err = service.GetTxStatus(nil, arg, &resp)
-	require.NoError(err)
+	require.NoError(service.GetTxStatus(nil, arg, &resp))
 	require.Equal(status.Committed, resp.Status)
 	require.Zero(resp.Reason)
 }
@@ -334,17 +330,14 @@ func TestGetTx(t *testing.T) {
 				err = service.GetTx(nil, arg, &response)
 				require.ErrorIs(err, database.ErrNotFound) // We haven't issued the tx yet
 
-				err = service.vm.Builder.AddUnverifiedTx(tx)
-				require.NoError(err)
+				require.NoError(service.vm.Builder.AddUnverifiedTx(tx))
 
 				block, err := service.vm.BuildBlock(context.Background())
 				require.NoError(err)
 
-				err = block.Verify(context.Background())
-				require.NoError(err)
+				require.NoError(block.Verify(context.Background()))
 
-				err = block.Accept(context.Background())
-				require.NoError(err)
+				require.NoError(block.Accept(context.Background()))
 
 				if blk, ok := block.(snowman.OracleBlock); ok { // For proposal blocks, commit them
 					options, err := blk.Options(context.Background())
@@ -353,17 +346,12 @@ func TestGetTx(t *testing.T) {
 
 						commit := options[0].(*blockexecutor.Block)
 						require.IsType(&blocks.BanffCommitBlock{}, commit.Block)
-
-						err := commit.Verify(context.Background())
-						require.NoError(err)
-
-						err = commit.Accept(context.Background())
-						require.NoError(err)
+						require.NoError(commit.Verify(context.Background()))
+						require.NoError(commit.Accept(context.Background()))
 					}
 				}
 
-				err = service.GetTx(nil, arg, &response)
-				require.NoError(err)
+				require.NoError(service.GetTx(nil, arg, &response))
 
 				switch encoding {
 				case formatting.Hex:
@@ -378,8 +366,7 @@ func TestGetTx(t *testing.T) {
 					require.Equal(tx.ID(), responseTx.ID())
 				}
 
-				err = service.vm.Shutdown(context.Background())
-				require.NoError(err)
+				require.NoError(service.vm.Shutdown(context.Background()))
 				service.vm.ctx.Lock.Unlock()
 			})
 		}
@@ -393,13 +380,12 @@ func TestGetBalance(t *testing.T) {
 	defaultAddress(t, service)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
-		err := service.vm.Shutdown(context.Background())
-		require.NoError(err)
+		require.NoError(service.vm.Shutdown(context.Background()))
 		service.vm.ctx.Lock.Unlock()
 	}()
 
 	// Ensure GetStake is correct for each of the genesis validators
-	genesis, _ := defaultGenesis()
+	genesis, _ := defaultGenesis(t)
 	for _, utxo := range genesis.UTXOs {
 		request := GetBalanceRequest{
 			Addresses: []string{
@@ -428,7 +414,7 @@ func TestGetStake(t *testing.T) {
 	}()
 
 	// Ensure GetStake is correct for each of the genesis validators
-	genesis, _ := defaultGenesis()
+	genesis, _ := defaultGenesis(t)
 	addrsStrs := []string{}
 	for i, validator := range genesis.Validators {
 		addr := fmt.Sprintf("P-%s", validator.RewardOwner.Addresses[0])
@@ -589,19 +575,17 @@ func TestGetCurrentValidators(t *testing.T) {
 	defaultAddress(t, service)
 	service.vm.ctx.Lock.Lock()
 	defer func() {
-		err := service.vm.Shutdown(context.Background())
-		require.NoError(err)
+		require.NoError(service.vm.Shutdown(context.Background()))
 		service.vm.ctx.Lock.Unlock()
 	}()
 
-	genesis, _ := defaultGenesis()
+	genesis, _ := defaultGenesis(t)
 
 	// Call getValidators
 	args := GetCurrentValidatorsArgs{SubnetID: constants.PrimaryNetworkID}
 	response := GetCurrentValidatorsReply{}
 
-	err := service.GetCurrentValidators(nil, &args, &response)
-	require.NoError(err)
+	require.NoError(service.GetCurrentValidators(nil, &args, &response))
 	require.Len(response.Validators, len(genesis.Validators))
 
 	for _, vdr := range genesis.Validators {
@@ -645,13 +629,11 @@ func TestGetCurrentValidators(t *testing.T) {
 
 	service.vm.state.PutCurrentDelegator(staker)
 	service.vm.state.AddTx(delTx, status.Committed)
-	err = service.vm.state.Commit()
-	require.NoError(err)
+	require.NoError(service.vm.state.Commit())
 
 	// Call getCurrentValidators
 	args = GetCurrentValidatorsArgs{SubnetID: constants.PrimaryNetworkID}
-	err = service.GetCurrentValidators(nil, &args, &response)
-	require.NoError(err)
+	require.NoError(service.GetCurrentValidators(nil, &args, &response))
 	require.Len(response.Validators, len(genesis.Validators))
 
 	// Make sure the delegator is there
@@ -670,8 +652,7 @@ func TestGetCurrentValidators(t *testing.T) {
 			NodeIDs:  []ids.NodeID{vdr.NodeID},
 		}
 		innerResponse := GetCurrentValidatorsReply{}
-		err = service.GetCurrentValidators(nil, &innerArgs, &innerResponse)
-		require.NoError(err)
+		require.NoError(service.GetCurrentValidators(nil, &innerArgs, &innerResponse))
 		require.Len(innerResponse.Validators, 1)
 
 		innerVdr := innerResponse.Validators[0].(pchainapi.PermissionlessValidator)
@@ -786,8 +767,7 @@ func TestGetBlock(t *testing.T) {
 				Encoding: test.encoding,
 			}
 			response := api.GetBlockResponse{}
-			err = service.GetBlock(nil, &args, &response)
-			require.NoError(err)
+			require.NoError(service.GetBlock(nil, &args, &response))
 
 			switch {
 			case test.encoding == formatting.JSON:
@@ -803,6 +783,226 @@ func TestGetBlock(t *testing.T) {
 			}
 
 			require.Equal(test.encoding, response.Encoding)
+		})
+	}
+}
+
+func TestGetValidatorsAtReplyMarshalling(t *testing.T) {
+	require := require.New(t)
+
+	reply := &GetValidatorsAtReply{
+		Validators: make(map[ids.NodeID]*validators.GetValidatorOutput),
+	}
+
+	{
+		reply.Validators[ids.EmptyNodeID] = &validators.GetValidatorOutput{
+			NodeID:    ids.EmptyNodeID,
+			PublicKey: nil,
+			Weight:    0,
+		}
+	}
+	{
+		nodeID := ids.GenerateTestNodeID()
+		sk, err := bls.NewSecretKey()
+		require.NoError(err)
+		reply.Validators[nodeID] = &validators.GetValidatorOutput{
+			NodeID:    nodeID,
+			PublicKey: bls.PublicFromSecretKey(sk),
+			Weight:    math.MaxUint64,
+		}
+	}
+
+	replyJSON, err := reply.MarshalJSON()
+	require.NoError(err)
+
+	var parsedReply GetValidatorsAtReply
+	require.NoError(parsedReply.UnmarshalJSON(replyJSON))
+	require.Equal(reply, &parsedReply)
+}
+
+func TestServiceGetBlockByHeight(t *testing.T) {
+	ctrl := gomock.NewController(t)
+
+	blockID := ids.GenerateTestID()
+	blockHeight := uint64(1337)
+
+	type test struct {
+		name                        string
+		serviceAndExpectedBlockFunc func(t *testing.T, ctrl *gomock.Controller) (*Service, interface{})
+		encoding                    formatting.Encoding
+		expectedErr                 error
+	}
+
+	tests := []test{
+		{
+			name: "block height not found",
+			serviceAndExpectedBlockFunc: func(_ *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
+				state := state.NewMockState(ctrl)
+				state.EXPECT().GetBlockIDAtHeight(blockHeight).Return(ids.Empty, database.ErrNotFound)
+
+				manager := blockexecutor.NewMockManager(ctrl)
+				return &Service{
+					vm: &VM{
+						state:   state,
+						manager: manager,
+						ctx: &snow.Context{
+							Log: logging.NoLog{},
+						},
+					},
+				}, nil
+			},
+			encoding:    formatting.Hex,
+			expectedErr: database.ErrNotFound,
+		},
+		{
+			name: "block not found",
+			serviceAndExpectedBlockFunc: func(_ *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
+				state := state.NewMockState(ctrl)
+				state.EXPECT().GetBlockIDAtHeight(blockHeight).Return(blockID, nil)
+
+				manager := blockexecutor.NewMockManager(ctrl)
+				manager.EXPECT().GetStatelessBlock(blockID).Return(nil, database.ErrNotFound)
+				return &Service{
+					vm: &VM{
+						state:   state,
+						manager: manager,
+						ctx: &snow.Context{
+							Log: logging.NoLog{},
+						},
+					},
+				}, nil
+			},
+			encoding:    formatting.Hex,
+			expectedErr: database.ErrNotFound,
+		},
+		{
+			name: "JSON format",
+			serviceAndExpectedBlockFunc: func(_ *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
+				block := blocks.NewMockBlock(ctrl)
+				block.EXPECT().InitCtx(gomock.Any())
+
+				state := state.NewMockState(ctrl)
+				state.EXPECT().GetBlockIDAtHeight(blockHeight).Return(blockID, nil)
+
+				manager := blockexecutor.NewMockManager(ctrl)
+				manager.EXPECT().GetStatelessBlock(blockID).Return(block, nil)
+				return &Service{
+					vm: &VM{
+						state:   state,
+						manager: manager,
+						ctx: &snow.Context{
+							Log: logging.NoLog{},
+						},
+					},
+				}, block
+			},
+			encoding:    formatting.JSON,
+			expectedErr: nil,
+		},
+		{
+			name: "hex format",
+			serviceAndExpectedBlockFunc: func(t *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
+				block := blocks.NewMockBlock(ctrl)
+				blockBytes := []byte("hi mom")
+				block.EXPECT().Bytes().Return(blockBytes)
+
+				state := state.NewMockState(ctrl)
+				state.EXPECT().GetBlockIDAtHeight(blockHeight).Return(blockID, nil)
+
+				expected, err := formatting.Encode(formatting.Hex, blockBytes)
+				require.NoError(t, err)
+
+				manager := blockexecutor.NewMockManager(ctrl)
+				manager.EXPECT().GetStatelessBlock(blockID).Return(block, nil)
+				return &Service{
+					vm: &VM{
+						state:   state,
+						manager: manager,
+						ctx: &snow.Context{
+							Log: logging.NoLog{},
+						},
+					},
+				}, expected
+			},
+			encoding:    formatting.Hex,
+			expectedErr: nil,
+		},
+		{
+			name: "hexc format",
+			serviceAndExpectedBlockFunc: func(t *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
+				block := blocks.NewMockBlock(ctrl)
+				blockBytes := []byte("hi mom")
+				block.EXPECT().Bytes().Return(blockBytes)
+
+				state := state.NewMockState(ctrl)
+				state.EXPECT().GetBlockIDAtHeight(blockHeight).Return(blockID, nil)
+
+				expected, err := formatting.Encode(formatting.HexC, blockBytes)
+				require.NoError(t, err)
+
+				manager := blockexecutor.NewMockManager(ctrl)
+				manager.EXPECT().GetStatelessBlock(blockID).Return(block, nil)
+				return &Service{
+					vm: &VM{
+						state:   state,
+						manager: manager,
+						ctx: &snow.Context{
+							Log: logging.NoLog{},
+						},
+					},
+				}, expected
+			},
+			encoding:    formatting.HexC,
+			expectedErr: nil,
+		},
+		{
+			name: "hexnc format",
+			serviceAndExpectedBlockFunc: func(t *testing.T, ctrl *gomock.Controller) (*Service, interface{}) {
+				block := blocks.NewMockBlock(ctrl)
+				blockBytes := []byte("hi mom")
+				block.EXPECT().Bytes().Return(blockBytes)
+
+				state := state.NewMockState(ctrl)
+				state.EXPECT().GetBlockIDAtHeight(blockHeight).Return(blockID, nil)
+
+				expected, err := formatting.Encode(formatting.HexNC, blockBytes)
+				require.NoError(t, err)
+
+				manager := blockexecutor.NewMockManager(ctrl)
+				manager.EXPECT().GetStatelessBlock(blockID).Return(block, nil)
+				return &Service{
+					vm: &VM{
+						state:   state,
+						manager: manager,
+						ctx: &snow.Context{
+							Log: logging.NoLog{},
+						},
+					},
+				}, expected
+			},
+			encoding:    formatting.HexNC,
+			expectedErr: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+
+			service, expected := tt.serviceAndExpectedBlockFunc(t, ctrl)
+
+			args := &api.GetBlockByHeightArgs{
+				Height:   json.Uint64(blockHeight),
+				Encoding: tt.encoding,
+			}
+			reply := &api.GetBlockResponse{}
+			err := service.GetBlockByHeight(nil, args, reply)
+			require.ErrorIs(err, tt.expectedErr)
+			if tt.expectedErr == nil {
+				return
+			}
+			require.Equal(tt.encoding, reply.Encoding)
+			require.Equal(expected, reply.Block)
 		})
 	}
 }

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"time"
 
+	stdjson "encoding/json"
 	stdmath "math"
 
 	"go.uber.org/zap"
@@ -20,8 +21,10 @@ import (
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
@@ -2536,11 +2539,68 @@ type GetValidatorsAtArgs struct {
 	SubnetID ids.ID      `json:"subnetID"`
 }
 
+type jsonGetValidatorOutput struct {
+	PublicKey *string     `json:"publicKey"`
+	Weight    json.Uint64 `json:"weight"`
+}
+
+func (v *GetValidatorsAtReply) MarshalJSON() ([]byte, error) {
+	m := make(map[ids.NodeID]*jsonGetValidatorOutput, len(v.Validators))
+	for _, vdr := range v.Validators {
+		vdrJSON := &jsonGetValidatorOutput{
+			Weight: json.Uint64(vdr.Weight),
+		}
+
+		if vdr.PublicKey != nil {
+			pk, err := formatting.Encode(formatting.HexNC, bls.PublicKeyToBytes(vdr.PublicKey))
+			if err != nil {
+				return nil, err
+			}
+			vdrJSON.PublicKey = &pk
+		}
+
+		m[vdr.NodeID] = vdrJSON
+	}
+	return stdjson.Marshal(m)
+}
+
+func (v *GetValidatorsAtReply) UnmarshalJSON(b []byte) error {
+	var m map[ids.NodeID]*jsonGetValidatorOutput
+	if err := stdjson.Unmarshal(b, &m); err != nil {
+		return err
+	}
+
+	if m == nil {
+		v.Validators = nil
+		return nil
+	}
+
+	v.Validators = make(map[ids.NodeID]*validators.GetValidatorOutput, len(m))
+	for nodeID, vdrJSON := range m {
+		vdr := &validators.GetValidatorOutput{
+			NodeID: nodeID,
+			Weight: uint64(vdrJSON.Weight),
+		}
+
+		if vdrJSON.PublicKey != nil {
+			pkBytes, err := formatting.Decode(formatting.HexNC, *vdrJSON.PublicKey)
+			if err != nil {
+				return err
+			}
+			vdr.PublicKey, err = bls.PublicKeyFromBytes(pkBytes)
+			if err != nil {
+				return err
+			}
+		}
+
+		v.Validators[nodeID] = vdr
+	}
+	return nil
+}
+
 // GetValidatorsAtReply is the response from GetValidatorsAt
 type GetValidatorsAtReply struct {
-	// TODO should we change this to map[ids.NodeID]*validators.Validator?
-	// We'd have to add a MarshalJSON method to validators.Validator.
-	Validators map[ids.NodeID]uint64 `json:"validators"`
+	Validators map[ids.NodeID]*validators.GetValidatorOutput
 }
 
 // GetValidatorsAt returns the weights of the validator set of a provided subnet
@@ -2556,13 +2616,9 @@ func (s *Service) GetValidatorsAt(r *http.Request, args *GetValidatorsAtArgs, re
 
 	ctx := r.Context()
 	var err error
-	vdrs, err := s.vm.GetValidatorSet(ctx, height, args.SubnetID)
+	reply.Validators, err = s.vm.GetValidatorSet(ctx, height, args.SubnetID)
 	if err != nil {
 		return fmt.Errorf("failed to get validator set: %w", err)
-	}
-	reply.Validators = make(map[ids.NodeID]uint64, len(vdrs))
-	for _, vdr := range vdrs {
-		reply.Validators[vdr.NodeID] = vdr.Weight
 	}
 	return nil
 }
@@ -2590,6 +2646,44 @@ func (s *Service) GetBlock(_ *http.Request, args *api.GetBlockArgs, response *ap
 	response.Block, err = formatting.Encode(args.Encoding, block.Bytes())
 	if err != nil {
 		return fmt.Errorf("couldn't encode block %s as %s: %w", args.BlockID, args.Encoding, err)
+	}
+
+	return nil
+}
+
+// GetBlockByHeight returns the block at the given height.
+func (s *Service) GetBlockByHeight(_ *http.Request, args *api.GetBlockByHeightArgs, response *api.GetBlockResponse) error {
+	s.vm.ctx.Log.Debug("API called",
+		zap.String("service", "platform"),
+		zap.String("method", "getBlockByHeight"),
+		zap.Uint64("height", uint64(args.Height)),
+		zap.Stringer("encoding", args.Encoding),
+	)
+
+	blockID, err := s.vm.state.GetBlockIDAtHeight(uint64(args.Height))
+	if err != nil {
+		return fmt.Errorf("couldn't get block at height %d: %w", args.Height, err)
+	}
+
+	block, err := s.vm.manager.GetStatelessBlock(blockID)
+	if err != nil {
+		s.vm.ctx.Log.Error("couldn't get accepted block",
+			zap.Stringer("blkID", blockID),
+			zap.Error(err),
+		)
+		return fmt.Errorf("couldn't get block with id %s: %w", blockID, err)
+	}
+	response.Encoding = args.Encoding
+
+	if args.Encoding == formatting.JSON {
+		block.InitCtx(s.vm.ctx)
+		response.Block = block
+		return nil
+	}
+
+	response.Block, err = formatting.Encode(args.Encoding, block.Bytes())
+	if err != nil {
+		return fmt.Errorf("couldn't encode block %s as %s: %w", blockID, args.Encoding, err)
 	}
 
 	return nil

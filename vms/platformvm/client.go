@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting"
@@ -250,11 +251,18 @@ type Client interface {
 	GetRewardUTXOs(context.Context, *api.GetTxArgs, ...rpc.Option) ([][]byte, error)
 	// GetTimestamp returns the current chain timestamp
 	GetTimestamp(ctx context.Context, options ...rpc.Option) (time.Time, error)
-	// GetValidatorsAt returns the weights of the validator set of a provided subnet
-	// at the specified height.
-	GetValidatorsAt(ctx context.Context, subnetID ids.ID, height uint64, options ...rpc.Option) (map[ids.NodeID]uint64, error)
+	// GetValidatorsAt returns the weights of the validator set of a provided
+	// subnet at the specified height.
+	GetValidatorsAt(
+		ctx context.Context,
+		subnetID ids.ID,
+		height uint64,
+		options ...rpc.Option,
+	) (map[ids.NodeID]*validators.GetValidatorOutput, error)
 	// GetBlock returns the block with the given id.
 	GetBlock(ctx context.Context, blockID ids.ID, options ...rpc.Option) ([]byte, error)
+	// GetBlockByHeight returns the block at the given [height].
+	GetBlockByHeight(ctx context.Context, height uint64, options ...rpc.Option) ([]byte, error)
 }
 
 // Client implementation for interacting with the P Chain endpoint
@@ -847,7 +855,12 @@ func (c *client) GetTimestamp(ctx context.Context, options ...rpc.Option) (time.
 	return res.Timestamp, err
 }
 
-func (c *client) GetValidatorsAt(ctx context.Context, subnetID ids.ID, height uint64, options ...rpc.Option) (map[ids.NodeID]uint64, error) {
+func (c *client) GetValidatorsAt(
+	ctx context.Context,
+	subnetID ids.ID,
+	height uint64,
+	options ...rpc.Option,
+) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 	res := &GetValidatorsAtReply{}
 	err := c.requester.SendRequest(ctx, "platform.getValidatorsAt", &GetValidatorsAtArgs{
 		SubnetID: subnetID,
@@ -862,6 +875,18 @@ func (c *client) GetBlock(ctx context.Context, blockID ids.ID, options ...rpc.Op
 		BlockID:  blockID,
 		Encoding: formatting.Hex,
 	}, res, options...); err != nil {
+		return nil, err
+	}
+	return formatting.Decode(res.Encoding, res.Block)
+}
+
+func (c *client) GetBlockByHeight(ctx context.Context, height uint64, options ...rpc.Option) ([]byte, error) {
+	res := &api.FormattedBlock{}
+	err := c.requester.SendRequest(ctx, "platform.getBlockByHeight", &api.GetBlockByHeightArgs{
+		Height:   json.Uint64(height),
+		Encoding: formatting.HexNC,
+	}, res, options...)
+	if err != nil {
 		return nil, err
 	}
 	return formatting.Decode(res.Encoding, res.Block)

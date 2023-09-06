@@ -24,14 +24,14 @@ type testDatabase struct {
 }
 
 func setupDB(t testing.TB) *testDatabase {
+	require := require.New(t)
+
 	db := &testDatabase{
 		server: memdb.New(),
 	}
 
 	listener, err := grpcutils.NewListener()
-	if err != nil {
-		t.Fatalf("Failed to create listener: %s", err)
-	}
+	require.NoError(err)
 	serverCloser := grpcutils.ServerCloser{}
 
 	server := grpcutils.NewServer()
@@ -41,9 +41,7 @@ func setupDB(t testing.TB) *testDatabase {
 	go grpcutils.Serve(listener, server)
 
 	conn, err := grpcutils.Dial(listener.Addr().String())
-	if err != nil {
-		t.Fatalf("Failed to dial: %s", err)
-	}
+	require.NoError(err)
 
 	db.client = NewClient(rpcdbpb.NewDatabaseClient(conn))
 	db.closeFn = func() {
@@ -84,8 +82,6 @@ func BenchmarkInterface(b *testing.B) {
 }
 
 func TestHealthCheck(t *testing.T) {
-	require := require.New(t)
-
 	scenarios := []struct {
 		name         string
 		testDatabase *testDatabase
@@ -112,6 +108,8 @@ func TestHealthCheck(t *testing.T) {
 	}
 	for _, scenario := range scenarios {
 		t.Run(scenario.name, func(t *testing.T) {
+			require := require.New(t)
+
 			baseDB := setupDB(t)
 			db := corruptabledb.New(baseDB.server)
 			defer db.Close()
@@ -119,26 +117,15 @@ func TestHealthCheck(t *testing.T) {
 
 			// check db HealthCheck
 			_, err := db.HealthCheck(context.Background())
-			if err == nil && scenario.wantErr {
-				t.Fatalf("wanted error got nil")
-				return
-			}
 			if scenario.wantErr {
-				require.Containsf(err.Error(), scenario.wantErrMsg, "expected error containing %q, got %s", scenario.wantErrMsg, err)
+				require.Error(err) //nolint:forbidigo
+				require.Contains(err.Error(), scenario.wantErrMsg)
 				return
 			}
 			require.NoError(err)
 
 			// check rpc HealthCheck
 			_, err = baseDB.client.HealthCheck(context.Background())
-			if err == nil && scenario.wantErr {
-				t.Fatalf("wanted error got nil")
-				return
-			}
-			if scenario.wantErr {
-				require.Containsf(err.Error(), scenario.wantErrMsg, "expected error containing %q, got %s", scenario.wantErrMsg, err)
-				return
-			}
 			require.NoError(err)
 		})
 	}

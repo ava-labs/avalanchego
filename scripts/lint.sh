@@ -1,13 +1,21 @@
 #!/usr/bin/env bash
 
-set -o errexit
-set -o pipefail
-set -e
+set -euo pipefail
 
 if ! [[ "$0" =~ scripts/lint.sh ]]; then
   echo "must be run from repository root"
   exit 255
 fi
+
+# The -P option is not supported by the grep version installed by
+# default on macos. Since `-o errexit` is ignored in an if
+# conditional, triggering the problem here ensures script failure when
+# using an unsupported version of grep.
+grep -P 'lint.sh' scripts/lint.sh &> /dev/null || (\
+  >&2 echo "error: This script requires a recent version of gnu grep.";\
+  >&2 echo "       On macos, gnu grep can be installed with 'brew install grep'.";\
+  >&2 echo "       It will also be necessary to ensure that gnu grep is available in the path.";\
+  exit 255 )
 
 if [ "$#" -eq 0 ]; then
   # by default, check all source code
@@ -21,7 +29,7 @@ fi
 # by default, "./scripts/lint.sh" runs all lint tests
 # to run only "license_header" test
 # TESTS='license_header' ./scripts/lint.sh
-TESTS=${TESTS:-"golangci_lint license_header require_error_is_no_funcs_as_params single_import interface_compliance_nil require_equal_zero require_len_zero require_equal_len require_nil"}
+TESTS=${TESTS:-"golangci_lint license_header require_error_is_no_funcs_as_params single_import interface_compliance_nil require_equal_zero require_len_zero require_equal_len require_nil require_no_error_inline_func"}
 
 function test_golangci_lint {
   go install -v github.com/golangci/golangci-lint/cmd/golangci-lint@v1.51.2
@@ -38,7 +46,7 @@ function test_license_header {
   while IFS= read -r line; do files+=("$line"); done < <(find . -type f -name '*.go' ! -name '*.pb.go' ! -name 'mock_*.go')
 
   go-license \
-  --config=./license.yml \
+  --config=./header.yml \
   ${_addlicense_flags} \
   "${files[@]}"
 }
@@ -120,6 +128,15 @@ function test_require_nil {
   if grep -R -o -P 'require\.ErrorIs.+?nil\)' .; then
     echo ""
     echo "Use require.NoError instead of require.ErrorIs when testing for nil error."
+    echo ""
+    return 1
+  fi
+}
+
+function test_require_no_error_inline_func {
+  if grep -R -zo -P '\t+err :?= ((?!require|if).|\n)*require\.NoError\((t, )?err\)' .; then
+    echo ""
+    echo "Checking that a function with a single error return doesn't error should be done in-line."
     echo ""
     return 1
   fi

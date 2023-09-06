@@ -8,6 +8,8 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
@@ -58,9 +60,8 @@ func BenchmarkEncodings(b *testing.B) {
 		_, _ = rand.Read(bytes) // #nosec G404
 		b.Run(fmt.Sprintf("%s-%d bytes", benchmark.encoding, benchmark.size), func(b *testing.B) {
 			for n := 0; n < b.N; n++ {
-				if _, err := Encode(benchmark.encoding, bytes); err != nil {
-					b.Fatal(err)
-				}
+				_, err := Encode(benchmark.encoding, bytes)
+				require.NoError(b, err)
 			}
 		})
 	}

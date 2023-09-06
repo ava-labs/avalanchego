@@ -45,7 +45,7 @@ func TestMsgBufferThrottler(t *testing.T) {
 	}()
 	select {
 	case <-done:
-		t.Fatal("should block on acquiring")
+		require.FailNow("should block on acquiring")
 	case <-time.After(50 * time.Millisecond):
 	}
 
@@ -90,7 +90,7 @@ func TestMsgBufferThrottlerContextCancelled(t *testing.T) {
 	}()
 	select {
 	case <-done:
-		t.Fatal("should block on acquiring")
+		require.FailNow("should block on acquiring")
 	case <-time.After(50 * time.Millisecond):
 	}
 
@@ -102,7 +102,7 @@ func TestMsgBufferThrottlerContextCancelled(t *testing.T) {
 	}()
 	select {
 	case <-done2:
-		t.Fatal("should block on acquiring")
+		require.FailNow("should block on acquiring")
 	case <-time.After(50 * time.Millisecond):
 	}
 
@@ -111,11 +111,11 @@ func TestMsgBufferThrottlerContextCancelled(t *testing.T) {
 	select {
 	case <-done2:
 	case <-time.After(50 * time.Millisecond):
-		t.Fatal("cancelling context should unblock Acquire")
+		require.FailNow("cancelling context should unblock Acquire")
 	}
 	select {
 	case <-done:
 	case <-time.After(50 * time.Millisecond):
-		t.Fatal("should be blocked")
+		require.FailNow("should be blocked")
 	}
 }

@@ -9,9 +9,9 @@ import (
 	"math"
 	"testing"
 
-	"github.com/golang/mock/gomock"
-
 	"github.com/stretchr/testify/require"
+
+	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -135,7 +135,6 @@ func TestGetCanonicalValidatorSet(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 
 			state := tt.stateF(ctrl)
 
@@ -245,9 +244,10 @@ func TestFilterValidators(t *testing.T) {
 
 			vdrs, err := FilterValidators(tt.indices, tt.vdrs)
 			require.ErrorIs(err, tt.expectedErr)
-			if err == nil {
-				require.Equal(tt.expectedVdrs, vdrs)
+			if tt.expectedErr != nil {
+				return
 			}
+			require.Equal(tt.expectedVdrs, vdrs)
 		})
 	}
 }
@@ -299,9 +299,10 @@ func TestSumWeight(t *testing.T) {
 
 			sum, err := SumWeight(tt.vdrs)
 			require.ErrorIs(err, tt.expectedErr)
-			if err == nil {
-				require.Equal(tt.expectedSum, sum)
+			if tt.expectedErr != nil {
+				return
 			}
+			require.Equal(tt.expectedSum, sum)
 		})
 	}
 }

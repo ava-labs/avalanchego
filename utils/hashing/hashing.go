@@ -5,6 +5,7 @@ package hashing
 
 import (
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"io"
 
@@ -15,6 +16,8 @@ const (
 	HashLen = sha256.Size
 	AddrLen = ripemd160.Size
 )
+
+var ErrInvalidHashLen = errors.New("invalid hash length")
 
 // Hash256 A 256 bit long hash value.
 type Hash256 = [HashLen]byte
@@ -85,7 +88,7 @@ func Checksum(bytes []byte, length int) []byte {
 func ToHash256(bytes []byte) (Hash256, error) {
 	hash := Hash256{}
 	if bytesLen := len(bytes); bytesLen != HashLen {
-		return hash, fmt.Errorf("expected 32 bytes but got %d", bytesLen)
+		return hash, fmt.Errorf("%w: expected 32 bytes but got %d", ErrInvalidHashLen, bytesLen)
 	}
 	copy(hash[:], bytes)
 	return hash, nil
@@ -94,7 +97,7 @@ func ToHash256(bytes []byte) (Hash256, error) {
 func ToHash160(bytes []byte) (Hash160, error) {
 	hash := Hash160{}
 	if bytesLen := len(bytes); bytesLen != ripemd160.Size {
-		return hash, fmt.Errorf("expected 20 bytes but got %d", bytesLen)
+		return hash, fmt.Errorf("%w: expected 20 bytes but got %d", ErrInvalidHashLen, bytesLen)
 	}
 	copy(hash[:], bytes)
 	return hash, nil

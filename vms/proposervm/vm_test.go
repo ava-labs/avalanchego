@@ -7,15 +7,16 @@ import (
 	"bytes"
 	"context"
 	"crypto"
-	"crypto/tls"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
-
 	"github.com/stretchr/testify/require"
 
+	"go.uber.org/mock/gomock"
+
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -26,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/mocks"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
@@ -35,19 +37,18 @@ import (
 )
 
 var (
-	_ block.ChainVM              = (*fullVM)(nil)
-	_ block.HeightIndexedChainVM = (*fullVM)(nil)
-	_ block.StateSyncableVM      = (*fullVM)(nil)
+	_ block.ChainVM         = (*fullVM)(nil)
+	_ block.StateSyncableVM = (*fullVM)(nil)
 )
 
 type fullVM struct {
 	*block.TestVM
-	*block.TestHeightIndexedVM
 	*block.TestStateSyncableVM
 }
 
 var (
-	pTestCert *tls.Certificate
+	pTestSigner crypto.Signer
+	pTestCert   *staking.Certificate
 
 	genesisUnixTimestamp int64 = 1000
 	genesisTimestamp           = time.Unix(genesisUnixTimestamp, 0)
@@ -58,14 +59,16 @@ var (
 	errUnverifiedBlock   = errors.New("unverified block")
 	errMarshallingFailed = errors.New("marshalling failed")
 	errTooHigh           = errors.New("too high")
+	errUnexpectedCall    = errors.New("unexpected call")
 )
 
 func init() {
-	var err error
-	pTestCert, err = staking.NewTLSCert()
+	tlsCert, err := staking.NewTLSCert()
 	if err != nil {
 		panic(err)
 	}
+	pTestSigner = tlsCert.PrivateKey.(crypto.Signer)
+	pTestCert = staking.CertificateFromX509(tlsCert.Leaf)
 }
 
 func initTestProposerVM(
@@ -79,6 +82,8 @@ func initTestProposerVM(
 	*snowman.TestBlock,
 	manager.Manager,
 ) {
+	require := require.New(t)
+
 	coreGenBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
@@ -95,9 +100,6 @@ func initTestProposerVM(
 			TestVM: common.TestVM{
 				T: t,
 			},
-		},
-		TestHeightIndexedVM: &block.TestHeightIndexedVM{
-			T: t,
 		},
 		TestStateSyncableVM: &block.TestStateSyncableVM{
 			T: t,
@@ -135,8 +137,9 @@ func initTestProposerVM(
 		proBlkStartTime,
 		minPChainHeight,
 		DefaultMinBlockDelay,
-		pTestCert.PrivateKey.(crypto.Signer),
-		pTestCert.Leaf,
+		DefaultNumHistoricalBlocks,
+		pTestSigner,
+		pTestCert,
 	)
 
 	valState := &validators.TestState{
@@ -170,7 +173,8 @@ func initTestProposerVM(
 	}
 
 	ctx := snow.DefaultContextTest()
-	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
+	ctx.ChainID = ids.ID{1}
+	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
 	ctx.ValidatorState = valState
 
 	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
@@ -181,7 +185,7 @@ func initTestProposerVM(
 		return nil
 	}
 
-	err := proVM.Initialize(
+	require.NoError(proVM.Initialize(
 		context.Background(),
 		ctx,
 		dummyDBManager,
@@ -191,21 +195,13 @@ func initTestProposerVM(
 		nil,
 		nil,
 		nil,
-	)
-	if err != nil {
-		t.Fatalf("failed to initialize proposerVM with %s", err)
-	}
+	))
 
 	// Initialize shouldn't be called again
 	coreVM.InitializeF = nil
 
-	if err := proVM.SetState(context.Background(), snow.NormalOp); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := proVM.SetPreference(context.Background(), coreGenBlk.IDV); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(proVM.SetState(context.Background(), snow.NormalOp))
+	require.NoError(proVM.SetPreference(context.Background(), coreGenBlk.IDV))
 
 	return coreVM, valState, proVM, coreGenBlk, dummyDBManager
 }
@@ -213,8 +209,14 @@ func initTestProposerVM(
 // VM.BuildBlock tests section
 
 func TestBuildBlockTimestampAreRoundedToSeconds(t *testing.T) {
+	require := require.New(t)
+
 	// given the same core block, BuildBlock returns the same proposer block
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
+
 	skewedTimestamp := time.Now().Truncate(time.Second).Add(time.Millisecond)
 	proVM.Set(skewedTimestamp)
 
@@ -234,18 +236,19 @@ func TestBuildBlockTimestampAreRoundedToSeconds(t *testing.T) {
 
 	// test
 	builtBlk, err := proVM.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatal("proposerVM could not build block")
-	}
+	require.NoError(err)
 
-	if builtBlk.Timestamp().Truncate(time.Second) != builtBlk.Timestamp() {
-		t.Fatal("Timestamp should be rounded to second")
-	}
+	require.Equal(builtBlk.Timestamp().Truncate(time.Second), builtBlk.Timestamp())
 }
 
 func TestBuildBlockIsIdempotent(t *testing.T) {
+	require := require.New(t)
+
 	// given the same core block, BuildBlock returns the same proposer block
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	coreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -263,18 +266,12 @@ func TestBuildBlockIsIdempotent(t *testing.T) {
 
 	// test
 	builtBlk1, err := proVM.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatal("proposerVM could not build block")
-	}
+	require.NoError(err)
 
 	builtBlk2, err := proVM.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatal("proposerVM could not build block")
-	}
+	require.NoError(err)
 
-	if !bytes.Equal(builtBlk1.Bytes(), builtBlk2.Bytes()) {
-		t.Fatal("proposer blocks wrapping the same core block are different")
-	}
+	require.Equal(builtBlk1.Bytes(), builtBlk2.Bytes())
 }
 
 func TestFirstProposerBlockIsBuiltOnTopOfGenesis(t *testing.T) {
@@ -282,6 +279,9 @@ func TestFirstProposerBlockIsBuiltOnTopOfGenesis(t *testing.T) {
 
 	// setup
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	coreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -299,22 +299,23 @@ func TestFirstProposerBlockIsBuiltOnTopOfGenesis(t *testing.T) {
 
 	// test
 	snowBlock, err := proVM.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatal("Could not build block")
-	}
+	require.NoError(err)
 
 	// checks
 	require.IsType(&postForkBlock{}, snowBlock)
 	proBlock := snowBlock.(*postForkBlock)
 
-	if proBlock.innerBlk != coreBlk {
-		t.Fatal("different block was expected to be built")
-	}
+	require.Equal(coreBlk, proBlock.innerBlk)
 }
 
 // both core blocks and pro blocks must be built on preferred
 func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
+	require := require.New(t)
+
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	// add two proBlks...
 	coreBlk1 := &snowman.TestBlock{
@@ -331,9 +332,7 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 		return coreBlk1, nil
 	}
 	proBlk1, err := proVM.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatalf("Could not build proBlk1 due to %s", err)
-	}
+	require.NoError(err)
 
 	coreBlk2 := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -349,16 +348,9 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 		return coreBlk2, nil
 	}
 	proBlk2, err := proVM.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatal("Could not build proBlk2")
-	}
-	if proBlk1.ID() == proBlk2.ID() {
-		t.Fatal("proBlk1 and proBlk2 should be different for this test")
-	}
-
-	if err := proBlk2.Verify(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
+	require.NotEqual(proBlk2.ID(), proBlk1.ID())
+	require.NoError(proBlk2.Verify(context.Background()))
 
 	// ...and set one as preferred
 	var prefcoreBlk *snowman.TestBlock
@@ -371,7 +363,7 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 			prefcoreBlk = coreBlk2
 			return nil
 		default:
-			t.Fatal("Unknown core Blocks set as preferred")
+			require.FailNow("prefID does not match coreBlk1 or coreBlk2")
 			return nil
 		}
 	}
@@ -382,14 +374,12 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 		case bytes.Equal(b, coreBlk2.Bytes()):
 			return coreBlk2, nil
 		default:
-			t.Fatalf("Wrong bytes")
+			require.FailNow("bytes do not match coreBlk1 or coreBlk2")
 			return nil, nil
 		}
 	}
 
-	if err := proVM.SetPreference(context.Background(), proBlk2.ID()); err != nil {
-		t.Fatal("Could not set preference")
-	}
+	require.NoError(proVM.SetPreference(context.Background(), proBlk2.ID()))
 
 	// build block...
 	coreBlk3 := &snowman.TestBlock{
@@ -408,18 +398,19 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 
 	proVM.Set(proVM.Time().Add(proposer.MaxDelay))
 	builtBlk, err := proVM.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatalf("unexpectedly could not build block due to %s", err)
-	}
+	require.NoError(err)
 
 	// ...show that parent is the preferred one
-	if builtBlk.Parent() != proBlk2.ID() {
-		t.Fatal("proposer block not built on preferred parent")
-	}
+	require.Equal(proBlk2.ID(), builtBlk.Parent())
 }
 
 func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
+	require := require.New(t)
+
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	coreBlk1 := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -435,9 +426,7 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 		return coreBlk1, nil
 	}
 	proBlk1, err := proVM.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatal("Could not build proBlk1")
-	}
+	require.NoError(err)
 
 	coreBlk2 := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -453,16 +442,10 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 		return coreBlk2, nil
 	}
 	proBlk2, err := proVM.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatal("Could not build proBlk2")
-	}
-	if proBlk1.ID() == proBlk2.ID() {
-		t.Fatal("proBlk1 and proBlk2 should be different for this test")
-	}
+	require.NoError(err)
+	require.NotEqual(proBlk1.ID(), proBlk2.ID())
 
-	if err := proBlk2.Verify(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(proBlk2.Verify(context.Background()))
 
 	// ...and set one as preferred
 	var wronglyPreferredcoreBlk *snowman.TestBlock
@@ -475,7 +458,7 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 			wronglyPreferredcoreBlk = coreBlk1
 			return nil
 		default:
-			t.Fatal("Unknown core Blocks set as preferred")
+			require.FailNow("Unknown core Blocks set as preferred")
 			return nil
 		}
 	}
@@ -486,14 +469,12 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 		case bytes.Equal(b, coreBlk2.Bytes()):
 			return coreBlk2, nil
 		default:
-			t.Fatalf("Wrong bytes")
+			require.FailNow("Wrong bytes")
 			return nil, nil
 		}
 	}
 
-	if err := proVM.SetPreference(context.Background(), proBlk2.ID()); err != nil {
-		t.Fatal("Could not set preference")
-	}
+	require.NoError(proVM.SetPreference(context.Background(), proBlk2.ID()))
 
 	// build block...
 	coreBlk3 := &snowman.TestBlock{
@@ -512,18 +493,20 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 
 	proVM.Set(proVM.Time().Add(proposer.MaxDelay))
 	blk, err := proVM.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
-	if err := blk.Verify(context.Background()); err == nil {
-		t.Fatal("coreVM does not build on preferred coreBlock. It should err")
-	}
+	err = blk.Verify(context.Background())
+	require.ErrorIs(err, errInnerParentMismatch)
 }
 
 // VM.ParseBlock tests section
 func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
+	require := require.New(t)
+
 	coreVM, _, proVM, _, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	innerBlk := &snowman.TestBlock{
 		BytesV:     []byte{1},
@@ -541,9 +524,7 @@ func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
 		proVM.ctx.ChainID,
 		proVM.stakingLeafSigner,
 	)
-	if err != nil {
-		t.Fatal("could not build stateless block")
-	}
+	require.NoError(err)
 	proBlk := postForkBlock{
 		SignedBlock: slb,
 		postForkCommonComponents: postForkCommonComponents{
@@ -554,14 +535,17 @@ func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
 	}
 
 	// test
-
-	if _, err := proVM.ParseBlock(context.Background(), proBlk.Bytes()); err == nil {
-		t.Fatal("failed parsing proposervm.Block. Error:", err)
-	}
+	_, err = proVM.ParseBlock(context.Background(), proBlk.Bytes())
+	require.ErrorIs(err, errMarshallingFailed)
 }
 
 func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
+	require := require.New(t)
+
 	coreVM, _, proVM, gencoreBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	// create two Proposer blocks at the same height
 	innerBlk := &snowman.TestBlock{
@@ -571,9 +555,7 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		TimestampV: proVM.Time(),
 	}
 	coreVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
-		if !bytes.Equal(b, innerBlk.Bytes()) {
-			t.Fatalf("Wrong bytes")
-		}
+		require.Equal(innerBlk.Bytes(), b)
 		return innerBlk, nil
 	}
 
@@ -586,9 +568,7 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		proVM.ctx.ChainID,
 		proVM.stakingLeafSigner,
 	)
-	if err != nil {
-		t.Fatal("could not build stateless block")
-	}
+	require.NoError(err)
 	proBlk1 := postForkBlock{
 		SignedBlock: slb1,
 		postForkCommonComponents: postForkCommonComponents{
@@ -607,9 +587,7 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		proVM.ctx.ChainID,
 		proVM.stakingLeafSigner,
 	)
-	if err != nil {
-		t.Fatal("could not build stateless block")
-	}
+	require.NoError(err)
 	proBlk2 := postForkBlock{
 		SignedBlock: slb2,
 		postForkCommonComponents: postForkCommonComponents{
@@ -619,31 +597,26 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		},
 	}
 
-	if proBlk1.ID() == proBlk2.ID() {
-		t.Fatal("Test requires proBlk1 and proBlk2 to be different")
-	}
+	require.NotEqual(proBlk1.ID(), proBlk2.ID())
 
 	// Show that both can be parsed and retrieved
 	parsedBlk1, err := proVM.ParseBlock(context.Background(), proBlk1.Bytes())
-	if err != nil {
-		t.Fatal("proposerVM could not parse parsedBlk1")
-	}
+	require.NoError(err)
 	parsedBlk2, err := proVM.ParseBlock(context.Background(), proBlk2.Bytes())
-	if err != nil {
-		t.Fatal("proposerVM could not parse parsedBlk2")
-	}
+	require.NoError(err)
 
-	if parsedBlk1.ID() != proBlk1.ID() {
-		t.Fatal("error in parsing block")
-	}
-	if parsedBlk2.ID() != proBlk2.ID() {
-		t.Fatal("error in parsing block")
-	}
+	require.Equal(proBlk1.ID(), parsedBlk1.ID())
+	require.Equal(proBlk2.ID(), parsedBlk2.ID())
 }
 
 // VM.BuildBlock and VM.ParseBlock interoperability tests section
 func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
+	require := require.New(t)
+
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	// one block is built from this proVM
 	localcoreBlk := &snowman.TestBlock{
@@ -657,12 +630,8 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 	}
 
 	builtBlk, err := proVM.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatal("Could not build block")
-	}
-	if err := builtBlk.Verify(context.Background()); err != nil {
-		t.Fatal("Built block does not verify")
-	}
+	require.NoError(err)
+	require.NoError(builtBlk.Verify(context.Background()))
 
 	// another block with same parent comes from network and is parsed
 	netcoreBlk := &snowman.TestBlock{
@@ -680,15 +649,13 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 		case bytes.Equal(b, netcoreBlk.Bytes()):
 			return netcoreBlk, nil
 		default:
-			t.Fatalf("Unknown bytes")
+			require.FailNow("Unknown bytes")
 			return nil, nil
 		}
 	}
 
 	pChainHeight, err := proVM.ctx.ValidatorState.GetCurrentHeight(context.Background())
-	if err != nil {
-		t.Fatal("could not retrieve pChain height")
-	}
+	require.NoError(err)
 
 	netSlb, err := statelessblock.BuildUnsigned(
 		proVM.preferred,
@@ -696,9 +663,7 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 		pChainHeight,
 		netcoreBlk.Bytes(),
 	)
-	if err != nil {
-		t.Fatal("could not build stateless block")
-	}
+	require.NoError(err)
 	netProBlk := postForkBlock{
 		SignedBlock: netSlb,
 		postForkCommonComponents: postForkCommonComponents{
@@ -709,9 +674,7 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 	}
 
 	// prove that also block from network verifies
-	if err := netProBlk.Verify(context.Background()); err != nil {
-		t.Fatal("block from network does not verify")
-	}
+	require.NoError(netProBlk.Verify(context.Background()))
 }
 
 // Pre Fork tests section
@@ -719,28 +682,28 @@ func TestPreFork_Initialize(t *testing.T) {
 	require := require.New(t)
 
 	_, _, proVM, coreGenBlk, _ := initTestProposerVM(t, mockable.MaxTime, 0) // disable ProBlks
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	// checks
 	blkID, err := proVM.LastAccepted(context.Background())
-	if err != nil {
-		t.Fatal("failed to retrieve last accepted block")
-	}
+	require.NoError(err)
 
 	rtvdBlk, err := proVM.GetBlock(context.Background(), blkID)
-	if err != nil {
-		t.Fatal("Block should be returned without calling core vm")
-	}
+	require.NoError(err)
 
 	require.IsType(&preForkBlock{}, rtvdBlk)
-	if !bytes.Equal(rtvdBlk.Bytes(), coreGenBlk.Bytes()) {
-		t.Fatal("Stored block is not genesis")
-	}
+	require.Equal(coreGenBlk.Bytes(), rtvdBlk.Bytes())
 }
 
 func TestPreFork_BuildBlock(t *testing.T) {
 	require := require.New(t)
 
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, mockable.MaxTime, 0) // disable ProBlks
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	coreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -758,28 +721,18 @@ func TestPreFork_BuildBlock(t *testing.T) {
 
 	// test
 	builtBlk, err := proVM.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatal("proposerVM could not build block")
-	}
+	require.NoError(err)
 	require.IsType(&preForkBlock{}, builtBlk)
-	if builtBlk.ID() != coreBlk.ID() {
-		t.Fatal("unexpected built block")
-	}
-	if !bytes.Equal(builtBlk.Bytes(), coreBlk.Bytes()) {
-		t.Fatal("unexpected built block")
-	}
+	require.Equal(coreBlk.ID(), builtBlk.ID())
+	require.Equal(coreBlk.Bytes(), builtBlk.Bytes())
 
 	// test
 	coreVM.GetBlockF = func(context.Context, ids.ID) (snowman.Block, error) {
 		return coreBlk, nil
 	}
 	storedBlk, err := proVM.GetBlock(context.Background(), builtBlk.ID())
-	if err != nil {
-		t.Fatal("proposerVM has not cached built block")
-	}
-	if storedBlk.ID() != builtBlk.ID() {
-		t.Fatal("proposerVM retrieved wrong block")
-	}
+	require.NoError(err)
+	require.Equal(builtBlk.ID(), storedBlk.ID())
 }
 
 func TestPreFork_ParseBlock(t *testing.T) {
@@ -787,6 +740,9 @@ func TestPreFork_ParseBlock(t *testing.T) {
 
 	// setup
 	coreVM, _, proVM, _, _ := initTestProposerVM(t, mockable.MaxTime, 0) // disable ProBlks
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	coreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -796,41 +752,32 @@ func TestPreFork_ParseBlock(t *testing.T) {
 	}
 
 	coreVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
-		if !bytes.Equal(b, coreBlk.Bytes()) {
-			t.Fatalf("Wrong bytes")
-		}
+		require.Equal(coreBlk.Bytes(), b)
 		return coreBlk, nil
 	}
 
 	parsedBlk, err := proVM.ParseBlock(context.Background(), coreBlk.Bytes())
-	if err != nil {
-		t.Fatal("Could not parse naked core block")
-	}
+	require.NoError(err)
 	require.IsType(&preForkBlock{}, parsedBlk)
-	if parsedBlk.ID() != coreBlk.ID() {
-		t.Fatal("Parsed block does not match expected block")
-	}
-	if !bytes.Equal(parsedBlk.Bytes(), coreBlk.Bytes()) {
-		t.Fatal("Parsed block does not match expected block")
-	}
+	require.Equal(coreBlk.ID(), parsedBlk.ID())
+	require.Equal(coreBlk.Bytes(), parsedBlk.Bytes())
 
 	coreVM.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
-		if id != coreBlk.ID() {
-			t.Fatalf("Unknown core block")
-		}
+		require.Equal(coreBlk.ID(), id)
 		return coreBlk, nil
 	}
 	storedBlk, err := proVM.GetBlock(context.Background(), parsedBlk.ID())
-	if err != nil {
-		t.Fatal("proposerVM has not cached parsed block")
-	}
-	if storedBlk.ID() != parsedBlk.ID() {
-		t.Fatal("proposerVM retrieved wrong block")
-	}
+	require.NoError(err)
+	require.Equal(parsedBlk.ID(), storedBlk.ID())
 }
 
 func TestPreFork_SetPreference(t *testing.T) {
+	require := require.New(t)
+
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, mockable.MaxTime, 0) // disable ProBlks
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	coreBlk0 := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -846,9 +793,7 @@ func TestPreFork_SetPreference(t *testing.T) {
 		return coreBlk0, nil
 	}
 	builtBlk, err := proVM.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatal("Could not build proposer block")
-	}
+	require.NoError(err)
 
 	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
@@ -870,9 +815,7 @@ func TestPreFork_SetPreference(t *testing.T) {
 			return nil, errUnknownBlock
 		}
 	}
-	if err := proVM.SetPreference(context.Background(), builtBlk.ID()); err != nil {
-		t.Fatal("Could not set preference on proposer Block")
-	}
+	require.NoError(proVM.SetPreference(context.Background(), builtBlk.ID()))
 
 	coreBlk1 := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -888,15 +831,13 @@ func TestPreFork_SetPreference(t *testing.T) {
 		return coreBlk1, nil
 	}
 	nextBlk, err := proVM.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatalf("Could not build proposer block %s", err)
-	}
-	if nextBlk.Parent() != builtBlk.ID() {
-		t.Fatal("Preferred block should be parent of next built block")
-	}
+	require.NoError(err)
+	require.Equal(builtBlk.ID(), nextBlk.Parent())
 }
 
 func TestExpiredBuildBlock(t *testing.T) {
+	require := require.New(t)
+
 	coreGenBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
@@ -935,8 +876,9 @@ func TestExpiredBuildBlock(t *testing.T) {
 		time.Time{},
 		0,
 		DefaultMinBlockDelay,
-		pTestCert.PrivateKey.(crypto.Signer),
-		pTestCert.Leaf,
+		DefaultNumHistoricalBlocks,
+		pTestSigner,
+		pTestCert,
 	)
 
 	valState := &validators.TestState{
@@ -958,7 +900,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 	}
 
 	ctx := snow.DefaultContextTest()
-	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
+	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
 	ctx.ValidatorState = valState
 
 	dbManager := manager.NewMemDB(version.Semantic1_0_0)
@@ -979,9 +921,12 @@ func TestExpiredBuildBlock(t *testing.T) {
 		toScheduler = toEngineChan
 		return nil
 	}
+	coreVM.VerifyHeightIndexF = func(context.Context) error {
+		return nil
+	}
 
 	// make sure that DBs are compressed correctly
-	err := proVM.Initialize(
+	require.NoError(proVM.Initialize(
 		context.Background(),
 		ctx,
 		dbManager,
@@ -991,21 +936,17 @@ func TestExpiredBuildBlock(t *testing.T) {
 		toEngine,
 		nil,
 		nil,
-	)
-	if err != nil {
-		t.Fatalf("failed to initialize proposerVM with %s", err)
-	}
+	))
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	// Initialize shouldn't be called again
 	coreVM.InitializeF = nil
 
-	if err := proVM.SetState(context.Background(), snow.NormalOp); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(proVM.SetState(context.Background(), snow.NormalOp))
 
-	if err := proVM.SetPreference(context.Background(), coreGenBlk.IDV); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(proVM.SetPreference(context.Background(), coreGenBlk.IDV))
 
 	// Make sure that passing a message works
 	toScheduler <- common.PendingTxs
@@ -1030,9 +971,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 		0,
 		coreBlk.Bytes(),
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
@@ -1058,29 +997,22 @@ func TestExpiredBuildBlock(t *testing.T) {
 	proVM.Clock.Set(statelessBlock.Timestamp())
 
 	parsedBlock, err := proVM.ParseBlock(context.Background(), statelessBlock.Bytes())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
-	if err := parsedBlock.Verify(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(parsedBlock.Verify(context.Background()))
 
-	if err := proVM.SetPreference(context.Background(), parsedBlock.ID()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(proVM.SetPreference(context.Background(), parsedBlock.ID()))
 
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
-		t.Fatal("unexpectedly called build block")
-		panic("unexpectedly called build block")
+		require.FailNow(fmt.Errorf("%w: BuildBlock", errUnexpectedCall).Error())
+		return nil, errUnexpectedCall
 	}
 
 	// The first notification will be read from the consensus engine
 	<-toEngine
 
-	if _, err := proVM.BuildBlock(context.Background()); err == nil {
-		t.Fatal("build block when the proposer window hasn't started")
-	}
+	_, err = proVM.BuildBlock(context.Background())
+	require.ErrorIs(err, errProposerWindowNotStarted)
 
 	proVM.Set(statelessBlock.Timestamp().Add(proposer.MaxDelay))
 	proVM.Scheduler.SetBuildBlockTime(time.Now())
@@ -1111,7 +1043,12 @@ func (b *wrappedBlock) Verify(ctx context.Context) error {
 }
 
 func TestInnerBlockDeduplication(t *testing.T) {
+	require := require.New(t)
+
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // disable ProBlks
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	coreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -1135,18 +1072,14 @@ func TestInnerBlockDeduplication(t *testing.T) {
 		0,
 		coreBlk.Bytes(),
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 	statelessBlock1, err := statelessblock.BuildUnsigned(
 		coreGenBlk.ID(),
 		coreBlk.Timestamp(),
 		1,
 		coreBlk.Bytes(),
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
@@ -1170,17 +1103,11 @@ func TestInnerBlockDeduplication(t *testing.T) {
 	}
 
 	parsedBlock0, err := proVM.ParseBlock(context.Background(), statelessBlock0.Bytes())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
-	if err := parsedBlock0.Verify(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(parsedBlock0.Verify(context.Background()))
 
-	if err := proVM.SetPreference(context.Background(), parsedBlock0.ID()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(proVM.SetPreference(context.Background(), parsedBlock0.ID()))
 
 	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
@@ -1204,24 +1131,18 @@ func TestInnerBlockDeduplication(t *testing.T) {
 	}
 
 	parsedBlock1, err := proVM.ParseBlock(context.Background(), statelessBlock1.Bytes())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
-	if err := parsedBlock1.Verify(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(parsedBlock1.Verify(context.Background()))
 
-	if err := proVM.SetPreference(context.Background(), parsedBlock1.ID()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(proVM.SetPreference(context.Background(), parsedBlock1.ID()))
 
-	if err := parsedBlock1.Accept(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(parsedBlock1.Accept(context.Background()))
 }
 
 func TestInnerVMRollback(t *testing.T) {
+	require := require.New(t)
+
 	coreGenBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
@@ -1271,7 +1192,7 @@ func TestInnerVMRollback(t *testing.T) {
 	}
 
 	ctx := snow.DefaultContextTest()
-	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
+	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
 	ctx.ValidatorState = valState
 
 	coreVM.InitializeF = func(
@@ -1287,6 +1208,9 @@ func TestInnerVMRollback(t *testing.T) {
 	) error {
 		return nil
 	}
+	coreVM.VerifyHeightIndexF = func(context.Context) error {
+		return nil
+	}
 
 	dbManager := manager.NewMemDB(version.Semantic1_0_0)
 
@@ -1295,11 +1219,12 @@ func TestInnerVMRollback(t *testing.T) {
 		time.Time{},
 		0,
 		DefaultMinBlockDelay,
-		pTestCert.PrivateKey.(crypto.Signer),
-		pTestCert.Leaf,
+		DefaultNumHistoricalBlocks,
+		pTestSigner,
+		pTestCert,
 	)
 
-	err := proVM.Initialize(
+	require.NoError(proVM.Initialize(
 		context.Background(),
 		ctx,
 		dbManager,
@@ -1309,18 +1234,10 @@ func TestInnerVMRollback(t *testing.T) {
 		nil,
 		nil,
 		nil,
-	)
-	if err != nil {
-		t.Fatalf("failed to initialize proposerVM with %s", err)
-	}
+	))
 
-	if err := proVM.SetState(context.Background(), snow.NormalOp); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := proVM.SetPreference(context.Background(), coreGenBlk.IDV); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(proVM.SetState(context.Background(), snow.NormalOp))
+	require.NoError(proVM.SetPreference(context.Background(), coreGenBlk.IDV))
 
 	coreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -1338,9 +1255,7 @@ func TestInnerVMRollback(t *testing.T) {
 		0,
 		coreBlk.Bytes(),
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
@@ -1366,49 +1281,37 @@ func TestInnerVMRollback(t *testing.T) {
 	proVM.Clock.Set(statelessBlock.Timestamp())
 
 	parsedBlock, err := proVM.ParseBlock(context.Background(), statelessBlock.Bytes())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
-	if status := parsedBlock.Status(); status != choices.Processing {
-		t.Fatalf("expected status to be %s but was %s", choices.Processing, status)
-	}
+	require.Equal(choices.Processing, parsedBlock.Status())
 
-	if err := parsedBlock.Verify(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := proVM.SetPreference(context.Background(), parsedBlock.ID()); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := parsedBlock.Accept(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(parsedBlock.Verify(context.Background()))
+	require.NoError(proVM.SetPreference(context.Background(), parsedBlock.ID()))
+	require.NoError(parsedBlock.Accept(context.Background()))
 
 	fetchedBlock, err := proVM.GetBlock(context.Background(), parsedBlock.ID())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
-	if status := fetchedBlock.Status(); status != choices.Accepted {
-		t.Fatalf("unexpected status %s. Expected %s", status, choices.Accepted)
-	}
+	require.Equal(choices.Accepted, fetchedBlock.Status())
 
 	// Restart the node and have the inner VM rollback state.
-
+	require.NoError(proVM.Shutdown(context.Background()))
 	coreBlk.StatusV = choices.Processing
+	coreVM.VerifyHeightIndexF = func(ctx context.Context) error {
+		return nil
+	}
 
 	proVM = New(
 		coreVM,
 		time.Time{},
 		0,
 		DefaultMinBlockDelay,
-		pTestCert.PrivateKey.(crypto.Signer),
-		pTestCert.Leaf,
+		DefaultNumHistoricalBlocks,
+		pTestSigner,
+		pTestCert,
 	)
 
-	err = proVM.Initialize(
+	require.NoError(proVM.Initialize(
 		context.Background(),
 		ctx,
 		dbManager,
@@ -1418,32 +1321,29 @@ func TestInnerVMRollback(t *testing.T) {
 		nil,
 		nil,
 		nil,
-	)
-	if err != nil {
-		t.Fatalf("failed to initialize proposerVM with %s", err)
-	}
+	))
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	lastAcceptedID, err := proVM.LastAccepted(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
-	if lastAcceptedID != coreGenBlk.IDV {
-		t.Fatalf("failed to roll back the VM to the last accepted block")
-	}
+	require.Equal(coreGenBlk.IDV, lastAcceptedID)
 
 	parsedBlock, err = proVM.ParseBlock(context.Background(), statelessBlock.Bytes())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
-	if status := parsedBlock.Status(); status != choices.Processing {
-		t.Fatalf("expected status to be %s but was %s", choices.Processing, status)
-	}
+	require.Equal(choices.Processing, parsedBlock.Status())
 }
 
 func TestBuildBlockDuringWindow(t *testing.T) {
+	require := require.New(t)
+
 	coreVM, valState, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 		return map[ids.NodeID]*validators.GetValidatorOutput{
@@ -1480,9 +1380,7 @@ func TestBuildBlockDuringWindow(t *testing.T) {
 		0,
 		coreBlk0.Bytes(),
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
 	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
@@ -1512,42 +1410,26 @@ func TestBuildBlockDuringWindow(t *testing.T) {
 	proVM.Clock.Set(statelessBlock0.Timestamp())
 
 	statefulBlock0, err := proVM.ParseBlock(context.Background(), statelessBlock0.Bytes())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
-	if err := statefulBlock0.Verify(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(statefulBlock0.Verify(context.Background()))
 
-	if err := proVM.SetPreference(context.Background(), statefulBlock0.ID()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(proVM.SetPreference(context.Background(), statefulBlock0.ID()))
 
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return coreBlk1, nil
 	}
 
 	statefulBlock1, err := proVM.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(err)
 
-	if err := statefulBlock1.Verify(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(statefulBlock1.Verify(context.Background()))
 
-	if err := proVM.SetPreference(context.Background(), statefulBlock1.ID()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(proVM.SetPreference(context.Background(), statefulBlock1.ID()))
 
-	if err := statefulBlock0.Accept(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(statefulBlock0.Accept(context.Background()))
 
-	if err := statefulBlock1.Accept(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(statefulBlock1.Accept(context.Background()))
 }
 
 // Ensure that Accepting a PostForkBlock (A) containing core block (X) causes
@@ -1559,8 +1441,13 @@ func TestBuildBlockDuringWindow(t *testing.T) {
 //	        |
 //	       C(Z)
 func TestTwoForks_OneIsAccepted(t *testing.T) {
+	require := require.New(t)
+
 	forkTime := time.Unix(0, 0)
 	coreVM, _, proVM, gBlock, _ := initTestProposerVM(t, forkTime, 0)
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	// create pre-fork block X and post-fork block A
 	xBlock := &snowman.TestBlock{
@@ -1578,13 +1465,9 @@ func TestTwoForks_OneIsAccepted(t *testing.T) {
 		return xBlock, nil
 	}
 	aBlock, err := proVM.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatalf("proposerVM could not build block due to %s", err)
-	}
+	require.NoError(err)
 	coreVM.BuildBlockF = nil
-	if err := aBlock.Verify(context.Background()); err != nil {
-		t.Fatalf("could not verify valid block due to %s", err)
-	}
+	require.NoError(aBlock.Verify(context.Background()))
 
 	// use a different way to construct pre-fork block Y and post-fork block B
 	yBlock := &snowman.TestBlock{
@@ -1604,9 +1487,7 @@ func TestTwoForks_OneIsAccepted(t *testing.T) {
 		defaultPChainHeight,
 		yBlock.Bytes(),
 	)
-	if err != nil {
-		t.Fatalf("fail to manually build a block due to %s", err)
-	}
+	require.NoError(err)
 
 	bBlock := postForkBlock{
 		SignedBlock: ySlb,
@@ -1617,9 +1498,7 @@ func TestTwoForks_OneIsAccepted(t *testing.T) {
 		},
 	}
 
-	if err := bBlock.Verify(context.Background()); err != nil {
-		t.Fatalf("could not verify valid block due to %s", err)
-	}
+	require.NoError(bBlock.Verify(context.Background()))
 
 	// append Z/C to Y/B
 	zBlock := &snowman.TestBlock{
@@ -1636,49 +1515,35 @@ func TestTwoForks_OneIsAccepted(t *testing.T) {
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return zBlock, nil
 	}
-	if err := proVM.SetPreference(context.Background(), bBlock.ID()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(proVM.SetPreference(context.Background(), bBlock.ID()))
 	cBlock, err := proVM.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatalf("proposerVM could not build block due to %s", err)
-	}
+	require.NoError(err)
 	coreVM.BuildBlockF = nil
 
-	if err := cBlock.Verify(context.Background()); err != nil {
-		t.Fatalf("could not verify valid block due to %s", err)
-	}
+	require.NoError(cBlock.Verify(context.Background()))
 
-	if aBlock.Parent() != bBlock.Parent() ||
-		zBlock.Parent() != yBlock.ID() ||
-		cBlock.Parent() != bBlock.ID() {
-		t.Fatal("inconsistent parent")
-	}
+	require.Equal(bBlock.Parent(), aBlock.Parent())
+	require.Equal(yBlock.ID(), zBlock.Parent())
+	require.Equal(bBlock.ID(), cBlock.Parent())
 
-	if yBlock.Status() == choices.Rejected {
-		t.Fatal("yBlock should not be rejected")
-	}
+	require.NotEqual(choices.Rejected, yBlock.Status())
 
 	// accept A
-	if err := aBlock.Accept(context.Background()); err != nil {
-		t.Fatalf("could not accept valid block due to %s", err)
-	}
+	require.NoError(aBlock.Accept(context.Background()))
 
-	if xBlock.Status() != choices.Accepted {
-		t.Fatal("xBlock should be accepted because aBlock is accepted")
-	}
-
-	if yBlock.Status() != choices.Rejected {
-		t.Fatal("yBlock should be rejected")
-	}
-	if zBlock.Status() != choices.Rejected {
-		t.Fatal("zBlock should be rejected")
-	}
+	require.Equal(choices.Accepted, xBlock.Status())
+	require.Equal(choices.Rejected, yBlock.Status())
+	require.Equal(choices.Rejected, zBlock.Status())
 }
 
 func TestTooFarAdvanced(t *testing.T) {
+	require := require.New(t)
+
 	forkTime := time.Unix(0, 0)
 	coreVM, _, proVM, gBlock, _ := initTestProposerVM(t, forkTime, 0)
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	xBlock := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -1706,12 +1571,8 @@ func TestTooFarAdvanced(t *testing.T) {
 		return xBlock, nil
 	}
 	aBlock, err := proVM.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatalf("proposerVM could not build block due to %s", err)
-	}
-	if err := aBlock.Verify(context.Background()); err != nil {
-		t.Fatalf("could not verify valid block due to %s", err)
-	}
+	require.NoError(err)
+	require.NoError(aBlock.Verify(context.Background()))
 
 	ySlb, err := statelessblock.BuildUnsigned(
 		aBlock.ID(),
@@ -1719,9 +1580,7 @@ func TestTooFarAdvanced(t *testing.T) {
 		defaultPChainHeight,
 		yBlock.Bytes(),
 	)
-	if err != nil {
-		t.Fatalf("fail to manually build a block due to %s", err)
-	}
+	require.NoError(err)
 
 	bBlock := postForkBlock{
 		SignedBlock: ySlb,
@@ -1732,9 +1591,8 @@ func TestTooFarAdvanced(t *testing.T) {
 		},
 	}
 
-	if err := bBlock.Verify(context.Background()); err != errProposerWindowNotStarted {
-		t.Fatal("should have errored errProposerWindowNotStarted")
-	}
+	err = bBlock.Verify(context.Background())
+	require.ErrorIs(err, errProposerWindowNotStarted)
 
 	ySlb, err = statelessblock.BuildUnsigned(
 		aBlock.ID(),
@@ -1743,9 +1601,7 @@ func TestTooFarAdvanced(t *testing.T) {
 		yBlock.Bytes(),
 	)
 
-	if err != nil {
-		t.Fatalf("fail to manually build a block due to %s", err)
-	}
+	require.NoError(err)
 
 	bBlock = postForkBlock{
 		SignedBlock: ySlb,
@@ -1756,9 +1612,8 @@ func TestTooFarAdvanced(t *testing.T) {
 		},
 	}
 
-	if err := bBlock.Verify(context.Background()); err != errTimeTooAdvanced {
-		t.Fatal("should have errored errTimeTooAdvanced")
-	}
+	err = bBlock.Verify(context.Background())
+	require.ErrorIs(err, errTimeTooAdvanced)
 }
 
 // Ensure that Accepting a PostForkOption (B) causes both the other option and
@@ -1777,6 +1632,9 @@ func TestTwoOptions_OneIsAccepted(t *testing.T) {
 
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
 	proVM.Set(coreGenBlk.Timestamp())
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	xBlockID := ids.GenerateTestID()
 	xBlock := &TestOptionsBlock{
@@ -1815,51 +1673,31 @@ func TestTwoOptions_OneIsAccepted(t *testing.T) {
 		return xBlock, nil
 	}
 	aBlockIntf, err := proVM.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatal("could not build post fork oracle block")
-	}
+	require.NoError(err)
 
 	require.IsType(&postForkBlock{}, aBlockIntf)
 	aBlock := aBlockIntf.(*postForkBlock)
 
 	opts, err := aBlock.Options(context.Background())
-	if err != nil {
-		t.Fatal("could not retrieve options from post fork oracle block")
-	}
+	require.NoError(err)
 
-	if err := aBlock.Verify(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(aBlock.Verify(context.Background()))
 	bBlock := opts[0]
-	if err := bBlock.Verify(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(bBlock.Verify(context.Background()))
 	cBlock := opts[1]
-	if err := cBlock.Verify(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(cBlock.Verify(context.Background()))
 
-	if err := aBlock.Accept(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(aBlock.Accept(context.Background()))
 
-	if err := bBlock.Accept(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(bBlock.Accept(context.Background()))
 
 	// the other pre-fork option should be rejected
-	if xBlock.opts[1].Status() != choices.Rejected {
-		t.Fatal("the pre-fork option block should have be rejected")
-	}
+	require.Equal(choices.Rejected, xBlock.opts[1].Status())
 
 	// the other post-fork option should also be rejected
-	if err := cBlock.Reject(context.Background()); err != nil {
-		t.Fatal("the post-fork option block should have be rejected")
-	}
+	require.NoError(cBlock.Reject(context.Background()))
 
-	if cBlock.Status() != choices.Rejected {
-		t.Fatal("cBlock status should not be accepted")
-	}
+	require.Equal(choices.Rejected, cBlock.Status())
 }
 
 // Ensure that given the chance, built blocks will reference a lagged P-chain
@@ -1869,6 +1707,9 @@ func TestLaggedPChainHeight(t *testing.T) {
 
 	coreVM, _, proVM, coreGenBlk, _ := initTestProposerVM(t, time.Time{}, 0)
 	proVM.Set(coreGenBlk.Timestamp())
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	innerBlock := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -1911,26 +1752,18 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 	coreHeights := []ids.ID{coreGenBlk.ID()}
 
 	initialState := []byte("genesis state")
-	coreVM := &struct {
-		block.TestVM
-		block.TestHeightIndexedVM
-	}{
-		TestVM: block.TestVM{
-			TestVM: common.TestVM{
-				T: t,
-			},
-		},
-		TestHeightIndexedVM: block.TestHeightIndexedVM{
+	coreVM := &block.TestVM{
+		TestVM: common.TestVM{
 			T: t,
-			VerifyHeightIndexF: func(context.Context) error {
-				return nil
-			},
-			GetBlockIDAtHeightF: func(_ context.Context, height uint64) (ids.ID, error) {
-				if height >= uint64(len(coreHeights)) {
-					return ids.ID{}, errTooHigh
-				}
-				return coreHeights[height], nil
-			},
+		},
+		VerifyHeightIndexF: func(context.Context) error {
+			return nil
+		},
+		GetBlockIDAtHeightF: func(_ context.Context, height uint64) (ids.ID, error) {
+			if height >= uint64(len(coreHeights)) {
+				return ids.ID{}, errTooHigh
+			}
+			return coreHeights[height], nil
 		},
 	}
 
@@ -1965,8 +1798,9 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 		time.Time{},
 		0,
 		DefaultMinBlockDelay,
-		pTestCert.PrivateKey.(crypto.Signer),
-		pTestCert.Leaf,
+		DefaultNumHistoricalBlocks,
+		pTestSigner,
+		pTestCert,
 	)
 
 	valState := &validators.TestState{
@@ -2000,13 +1834,13 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 	}
 
 	ctx := snow.DefaultContextTest()
-	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
+	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
 	ctx.ValidatorState = valState
 
 	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	// make sure that DBs are compressed correctly
 	dummyDBManager = dummyDBManager.NewPrefixDBManager([]byte{})
-	err := proVM.Initialize(
+	require.NoError(proVM.Initialize(
 		context.Background(),
 		ctx,
 		dummyDBManager,
@@ -2016,17 +1850,17 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 		nil,
 		nil,
 		nil,
-	)
-	require.NoError(err)
+	))
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	// Initialize shouldn't be called again
 	coreVM.InitializeF = nil
 
-	err = proVM.SetState(context.Background(), snow.NormalOp)
-	require.NoError(err)
+	require.NoError(proVM.SetState(context.Background(), snow.NormalOp))
 
-	err = proVM.SetPreference(context.Background(), coreGenBlk.IDV)
-	require.NoError(err)
+	require.NoError(proVM.SetPreference(context.Background(), coreGenBlk.IDV))
 
 	ctx.Lock.Lock()
 	for proVM.VerifyHeightIndex(context.Background()) != nil {
@@ -2055,8 +1889,7 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 	require.NoError(err)
 
 	coreVM.BuildBlockF = nil
-	err = aBlock.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(aBlock.Verify(context.Background()))
 
 	// use a different way to construct inner block Y and outer block B
 	yBlock := &snowman.TestBlock{
@@ -2087,12 +1920,10 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 		},
 	}
 
-	err = bBlock.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(bBlock.Verify(context.Background()))
 
 	// accept A
-	err = aBlock.Accept(context.Background())
-	require.NoError(err)
+	require.NoError(aBlock.Accept(context.Background()))
 	coreHeights = append(coreHeights, xBlock.ID())
 
 	blkID, err := proVM.GetBlockIDAtHeight(context.Background(), aBlock.Height())
@@ -2100,8 +1931,7 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 	require.Equal(aBlock.ID(), blkID)
 
 	// reject B
-	err = bBlock.Reject(context.Background())
-	require.NoError(err)
+	require.NoError(bBlock.Reject(context.Background()))
 
 	blkID, err = proVM.GetBlockIDAtHeight(context.Background(), aBlock.Height())
 	require.NoError(err)
@@ -2126,26 +1956,18 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 	coreHeights := []ids.ID{coreGenBlk.ID()}
 
 	initialState := []byte("genesis state")
-	coreVM := &struct {
-		block.TestVM
-		block.TestHeightIndexedVM
-	}{
-		TestVM: block.TestVM{
-			TestVM: common.TestVM{
-				T: t,
-			},
-		},
-		TestHeightIndexedVM: block.TestHeightIndexedVM{
+	coreVM := &block.TestVM{
+		TestVM: common.TestVM{
 			T: t,
-			VerifyHeightIndexF: func(context.Context) error {
-				return nil
-			},
-			GetBlockIDAtHeightF: func(_ context.Context, height uint64) (ids.ID, error) {
-				if height >= uint64(len(coreHeights)) {
-					return ids.ID{}, errTooHigh
-				}
-				return coreHeights[height], nil
-			},
+		},
+		VerifyHeightIndexF: func(context.Context) error {
+			return nil
+		},
+		GetBlockIDAtHeightF: func(_ context.Context, height uint64) (ids.ID, error) {
+			if height >= uint64(len(coreHeights)) {
+				return ids.ID{}, errTooHigh
+			}
+			return coreHeights[height], nil
 		},
 	}
 
@@ -2180,8 +2002,9 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 		time.Time{},
 		0,
 		DefaultMinBlockDelay,
-		pTestCert.PrivateKey.(crypto.Signer),
-		pTestCert.Leaf,
+		DefaultNumHistoricalBlocks,
+		pTestSigner,
+		pTestCert,
 	)
 
 	valState := &validators.TestState{
@@ -2215,13 +2038,13 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 	}
 
 	ctx := snow.DefaultContextTest()
-	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
+	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
 	ctx.ValidatorState = valState
 
 	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
 	// make sure that DBs are compressed correctly
 	dummyDBManager = dummyDBManager.NewPrefixDBManager([]byte{})
-	err := proVM.Initialize(
+	require.NoError(proVM.Initialize(
 		context.Background(),
 		ctx,
 		dummyDBManager,
@@ -2231,17 +2054,17 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 		nil,
 		nil,
 		nil,
-	)
-	require.NoError(err)
+	))
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	// Initialize shouldn't be called again
 	coreVM.InitializeF = nil
 
-	err = proVM.SetState(context.Background(), snow.NormalOp)
-	require.NoError(err)
+	require.NoError(proVM.SetState(context.Background(), snow.NormalOp))
 
-	err = proVM.SetPreference(context.Background(), coreGenBlk.IDV)
-	require.NoError(err)
+	require.NoError(proVM.SetPreference(context.Background(), coreGenBlk.IDV))
 
 	ctx.Lock.Lock()
 	for proVM.VerifyHeightIndex(context.Background()) != nil {
@@ -2296,20 +2119,16 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 	opts, err := aBlock.Options(context.Background())
 	require.NoError(err)
 
-	err = aBlock.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(aBlock.Verify(context.Background()))
 
 	bBlock := opts[0]
-	err = bBlock.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(bBlock.Verify(context.Background()))
 
 	cBlock := opts[1]
-	err = cBlock.Verify(context.Background())
-	require.NoError(err)
+	require.NoError(cBlock.Verify(context.Background()))
 
 	// accept A
-	err = aBlock.Accept(context.Background())
-	require.NoError(err)
+	require.NoError(aBlock.Accept(context.Background()))
 	coreHeights = append(coreHeights, xBlock.ID())
 
 	blkID, err := proVM.GetBlockIDAtHeight(context.Background(), aBlock.Height())
@@ -2317,8 +2136,7 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 	require.Equal(aBlock.ID(), blkID)
 
 	// accept B
-	err = bBlock.Accept(context.Background())
-	require.NoError(err)
+	require.NoError(bBlock.Accept(context.Background()))
 	coreHeights = append(coreHeights, xBlock.opts[0].ID())
 
 	blkID, err = proVM.GetBlockIDAtHeight(context.Background(), bBlock.Height())
@@ -2326,8 +2144,7 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 	require.Equal(bBlock.ID(), blkID)
 
 	// reject C
-	err = cBlock.Reject(context.Background())
-	require.NoError(err)
+	require.NoError(cBlock.Reject(context.Background()))
 
 	blkID, err = proVM.GetBlockIDAtHeight(context.Background(), cBlock.Height())
 	require.NoError(err)
@@ -2337,7 +2154,6 @@ func TestRejectedOptionHeightNotIndexed(t *testing.T) {
 func TestVMInnerBlkCache(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	// Create a VM
 	innerVM := mocks.NewMockChainVM(ctrl)
@@ -2346,8 +2162,9 @@ func TestVMInnerBlkCache(t *testing.T) {
 		time.Time{}, // fork is active
 		0,           // minimum P-Chain height
 		DefaultMinBlockDelay,
-		pTestCert.PrivateKey.(crypto.Signer),
-		pTestCert.Leaf,
+		DefaultNumHistoricalBlocks,
+		pTestSigner,
+		pTestCert,
 	)
 
 	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
@@ -2365,11 +2182,20 @@ func TestVMInnerBlkCache(t *testing.T) {
 		gomock.Any(),
 		gomock.Any(),
 	).Return(nil)
+	innerVM.EXPECT().VerifyHeightIndex(gomock.Any()).Return(nil)
+	innerVM.EXPECT().Shutdown(gomock.Any()).Return(nil)
+
+	{
+		innerBlk := snowman.NewMockBlock(ctrl)
+		innerBlkID := ids.GenerateTestID()
+		innerVM.EXPECT().LastAccepted(gomock.Any()).Return(innerBlkID, nil)
+		innerVM.EXPECT().GetBlock(gomock.Any(), innerBlkID).Return(innerBlk, nil)
+	}
 
 	ctx := snow.DefaultContextTest()
-	ctx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
+	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
 
-	err := vm.Initialize(
+	require.NoError(vm.Initialize(
 		context.Background(),
 		ctx,
 		dummyDBManager,
@@ -2379,8 +2205,11 @@ func TestVMInnerBlkCache(t *testing.T) {
 		nil,
 		nil,
 		nil,
-	)
-	require.NoError(err)
+	))
+	defer func() {
+		require.NoError(vm.Shutdown(context.Background()))
+	}()
+
 	state := state.NewMockState(ctrl) // mock state
 	vm.State = state
 
@@ -2403,6 +2232,8 @@ func TestVMInnerBlkCache(t *testing.T) {
 	// We will ask the inner VM to parse.
 	mockInnerBlkNearTip := snowman.NewMockBlock(ctrl)
 	mockInnerBlkNearTip.EXPECT().Height().Return(uint64(1)).Times(2)
+	mockInnerBlkNearTip.EXPECT().Bytes().Return(blkNearTipInnerBytes).Times(1)
+
 	innerVM.EXPECT().ParseBlock(gomock.Any(), blkNearTipInnerBytes).Return(mockInnerBlkNearTip, nil).Times(2)
 	_, err = vm.ParseBlock(context.Background(), blkNearTip.Bytes())
 	require.NoError(err)
@@ -2433,6 +2264,9 @@ func TestVMInnerBlkCacheDeduplicationRegression(t *testing.T) {
 	require := require.New(t)
 	forkTime := time.Unix(0, 0)
 	coreVM, _, proVM, gBlock, _ := initTestProposerVM(t, forkTime, 0)
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
 
 	// create pre-fork block X and post-fork block A
 	xBlock := &snowman.TestBlock{
@@ -2479,17 +2313,10 @@ func TestVMInnerBlkCacheDeduplicationRegression(t *testing.T) {
 	bBlock, err := proVM.ParseBlock(context.Background(), bBlockBytes)
 	require.NoError(err)
 
-	err = aBlock.Verify(context.Background())
-	require.NoError(err)
-
-	err = bBlock.Verify(context.Background())
-	require.NoError(err)
-
-	err = aBlock.Accept(context.Background())
-	require.NoError(err)
-
-	err = bBlock.Reject(context.Background())
-	require.NoError(err)
+	require.NoError(aBlock.Verify(context.Background()))
+	require.NoError(bBlock.Verify(context.Background()))
+	require.NoError(aBlock.Accept(context.Background()))
+	require.NoError(bBlock.Reject(context.Background()))
 
 	require.Equal(
 		choices.Accepted,
@@ -2509,6 +2336,46 @@ func TestVMInnerBlkCacheDeduplicationRegression(t *testing.T) {
 	)
 }
 
+func TestVMInnerBlkMarkedAcceptedRegression(t *testing.T) {
+	require := require.New(t)
+	forkTime := time.Unix(0, 0)
+	coreVM, _, proVM, gBlock, _ := initTestProposerVM(t, forkTime, 0)
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
+
+	// create an inner block and wrap it in an postForkBlock.
+	innerBlock := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		BytesV:     []byte{1},
+		ParentV:    gBlock.ID(),
+		HeightV:    gBlock.Height() + 1,
+		TimestampV: gBlock.Timestamp(),
+	}
+
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return innerBlock, nil
+	}
+	outerBlock, err := proVM.BuildBlock(context.Background())
+	require.NoError(err)
+	coreVM.BuildBlockF = nil
+
+	require.NoError(outerBlock.Verify(context.Background()))
+	require.NoError(outerBlock.Accept(context.Background()))
+
+	coreVM.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
+		require.Equal(innerBlock.ID(), id)
+		return innerBlock, nil
+	}
+
+	wrappedInnerBlock, err := proVM.GetBlock(context.Background(), innerBlock.ID())
+	require.NoError(err)
+	require.Equal(choices.Rejected, wrappedInnerBlock.Status())
+}
+
 type blockWithVerifyContext struct {
 	*snowman.MockBlock
 	*mocks.MockWithVerifyContext
@@ -2520,7 +2387,6 @@ type blockWithVerifyContext struct {
 func TestVM_VerifyBlockWithContext(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	// Create a VM
 	innerVM := mocks.NewMockChainVM(ctrl)
@@ -2529,8 +2395,9 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 		time.Time{}, // fork is active
 		0,           // minimum P-Chain height
 		DefaultMinBlockDelay,
-		pTestCert.PrivateKey.(crypto.Signer),
-		pTestCert.Leaf,
+		DefaultNumHistoricalBlocks,
+		pTestSigner,
+		pTestCert,
 	)
 
 	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
@@ -2548,11 +2415,20 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 		gomock.Any(),
 		gomock.Any(),
 	).Return(nil)
+	innerVM.EXPECT().VerifyHeightIndex(gomock.Any()).Return(nil)
+	innerVM.EXPECT().Shutdown(gomock.Any()).Return(nil)
+
+	{
+		innerBlk := snowman.NewMockBlock(ctrl)
+		innerBlkID := ids.GenerateTestID()
+		innerVM.EXPECT().LastAccepted(gomock.Any()).Return(innerBlkID, nil)
+		innerVM.EXPECT().GetBlock(gomock.Any(), innerBlkID).Return(innerBlk, nil)
+	}
 
 	snowCtx := snow.DefaultContextTest()
-	snowCtx.NodeID = ids.NodeIDFromCert(pTestCert.Leaf)
+	snowCtx.NodeID = ids.NodeIDFromCert(pTestCert)
 
-	err := vm.Initialize(
+	require.NoError(vm.Initialize(
 		context.Background(),
 		snowCtx,
 		dummyDBManager,
@@ -2562,8 +2438,10 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 		nil,
 		nil,
 		nil,
-	)
-	require.NoError(err)
+	))
+	defer func() {
+		require.NoError(vm.Shutdown(context.Background()))
+	}()
 
 	{
 		pChainHeight := uint64(0)
@@ -2579,20 +2457,20 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 		).Return(nil)
 		innerBlk.MockBlock.EXPECT().Parent().Return(ids.GenerateTestID()).AnyTimes()
 		innerBlk.MockBlock.EXPECT().ID().Return(ids.GenerateTestID()).AnyTimes()
+		innerBlk.MockBlock.EXPECT().Bytes().Return(utils.RandomBytes(1024)).AnyTimes()
 
 		blk := NewMockPostForkBlock(ctrl)
 		blk.EXPECT().getInnerBlk().Return(innerBlk).AnyTimes()
 		blkID := ids.GenerateTestID()
 		blk.EXPECT().ID().Return(blkID).AnyTimes()
 
-		err = vm.verifyAndRecordInnerBlk(
+		require.NoError(vm.verifyAndRecordInnerBlk(
 			context.Background(),
 			&block.Context{
 				PChainHeight: pChainHeight,
 			},
 			blk,
-		)
-		require.NoError(err)
+		))
 
 		// Call VerifyWithContext again but with a different P-Chain height
 		blk.EXPECT().setInnerBlk(innerBlk).AnyTimes()
@@ -2603,14 +2481,13 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 			},
 		).Return(nil)
 
-		err = vm.verifyAndRecordInnerBlk(
+		require.NoError(vm.verifyAndRecordInnerBlk(
 			context.Background(),
 			&block.Context{
 				PChainHeight: pChainHeight,
 			},
 			blk,
-		)
-		require.NoError(err)
+		))
 	}
 
 	{
@@ -2628,14 +2505,13 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 		blk.EXPECT().getInnerBlk().Return(innerBlk).AnyTimes()
 		blkID := ids.GenerateTestID()
 		blk.EXPECT().ID().Return(blkID).AnyTimes()
-		err = vm.verifyAndRecordInnerBlk(
+		require.NoError(vm.verifyAndRecordInnerBlk(
 			context.Background(),
 			&block.Context{
 				PChainHeight: 1,
 			},
 			blk,
-		)
-		require.NoError(err)
+		))
 	}
 
 	{
@@ -2651,7 +2527,265 @@ func TestVM_VerifyBlockWithContext(t *testing.T) {
 		blk.EXPECT().getInnerBlk().Return(innerBlk).AnyTimes()
 		blkID := ids.GenerateTestID()
 		blk.EXPECT().ID().Return(blkID).AnyTimes()
-		err = vm.verifyAndRecordInnerBlk(context.Background(), nil, blk)
-		require.NoError(err)
+		require.NoError(vm.verifyAndRecordInnerBlk(context.Background(), nil, blk))
 	}
+}
+
+func TestHistoricalBlockDeletion(t *testing.T) {
+	require := require.New(t)
+
+	coreGenBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Accepted,
+		},
+		HeightV:    0,
+		TimestampV: genesisTimestamp,
+		BytesV:     utils.RandomBytes(1024),
+	}
+	acceptedBlocks := []snowman.Block{coreGenBlk}
+	currentHeight := uint64(0)
+
+	initialState := []byte("genesis state")
+	coreVM := &block.TestVM{
+		TestVM: common.TestVM{
+			T: t,
+			InitializeF: func(context.Context, *snow.Context, manager.Manager, []byte, []byte, []byte, chan<- common.Message, []*common.Fx, common.AppSender) error {
+				return nil
+			},
+		},
+		LastAcceptedF: func(context.Context) (ids.ID, error) {
+			return acceptedBlocks[currentHeight].ID(), nil
+		},
+		GetBlockF: func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+			for _, blk := range acceptedBlocks {
+				if blkID == blk.ID() {
+					return blk, nil
+				}
+			}
+			return nil, errUnknownBlock
+		},
+		ParseBlockF: func(_ context.Context, b []byte) (snowman.Block, error) {
+			for _, blk := range acceptedBlocks {
+				if bytes.Equal(b, blk.Bytes()) {
+					return blk, nil
+				}
+			}
+			return nil, errUnknownBlock
+		},
+		VerifyHeightIndexF: func(context.Context) error {
+			return nil
+		},
+		GetBlockIDAtHeightF: func(_ context.Context, height uint64) (ids.ID, error) {
+			if height >= uint64(len(acceptedBlocks)) {
+				return ids.ID{}, errTooHigh
+			}
+			return acceptedBlocks[height].ID(), nil
+		},
+	}
+
+	ctx := snow.DefaultContextTest()
+	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
+	ctx.ValidatorState = &validators.TestState{
+		T: t,
+		GetMinimumHeightF: func(context.Context) (uint64, error) {
+			return coreGenBlk.HeightV, nil
+		},
+		GetCurrentHeightF: func(context.Context) (uint64, error) {
+			return defaultPChainHeight, nil
+		},
+		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+			return nil, nil
+		},
+	}
+
+	dummyDBManager := manager.NewMemDB(version.Semantic1_0_0)
+	// make sure that DBs are compressed correctly
+	dummyDBManager = dummyDBManager.NewPrefixDBManager([]byte{})
+
+	proVM := New(
+		coreVM,
+		time.Time{},
+		0,
+		DefaultMinBlockDelay,
+		DefaultNumHistoricalBlocks,
+		pTestSigner,
+		pTestCert,
+	)
+
+	require.NoError(proVM.Initialize(
+		context.Background(),
+		ctx,
+		dummyDBManager,
+		initialState,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+	))
+
+	lastAcceptedID, err := proVM.LastAccepted(context.Background())
+	require.NoError(err)
+
+	require.NoError(proVM.SetState(context.Background(), snow.NormalOp))
+	require.NoError(proVM.SetPreference(context.Background(), lastAcceptedID))
+	require.NoError(proVM.VerifyHeightIndex(context.Background()))
+
+	issueBlock := func() {
+		lastAcceptedBlock := acceptedBlocks[currentHeight]
+		innerBlock := &snowman.TestBlock{
+			TestDecidable: choices.TestDecidable{
+				IDV:     ids.GenerateTestID(),
+				StatusV: choices.Processing,
+			},
+			ParentV:    lastAcceptedBlock.ID(),
+			HeightV:    lastAcceptedBlock.Height() + 1,
+			TimestampV: lastAcceptedBlock.Timestamp(),
+			BytesV:     utils.RandomBytes(1024),
+		}
+
+		coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+			return innerBlock, nil
+		}
+		proBlock, err := proVM.BuildBlock(context.Background())
+		require.NoError(err)
+
+		require.NoError(proBlock.Verify(context.Background()))
+		require.NoError(proVM.SetPreference(context.Background(), proBlock.ID()))
+		require.NoError(proBlock.Accept(context.Background()))
+
+		acceptedBlocks = append(acceptedBlocks, innerBlock)
+		currentHeight++
+	}
+
+	requireHeights := func(start, end uint64) {
+		for i := start; i <= end; i++ {
+			_, err := proVM.GetBlockIDAtHeight(context.Background(), i)
+			require.NoError(err)
+		}
+	}
+
+	requireMissingHeights := func(start, end uint64) {
+		for i := start; i <= end; i++ {
+			_, err := proVM.GetBlockIDAtHeight(context.Background(), i)
+			require.ErrorIs(err, database.ErrNotFound)
+		}
+	}
+
+	requireNumHeights := func(numIndexed uint64) {
+		requireHeights(0, 0)
+		requireMissingHeights(1, currentHeight-numIndexed-1)
+		requireHeights(currentHeight-numIndexed, currentHeight)
+	}
+
+	// Because block pruning is disabled by default, the heights should be
+	// populated for every accepted block.
+	requireHeights(0, currentHeight)
+
+	issueBlock()
+	requireHeights(0, currentHeight)
+
+	issueBlock()
+	requireHeights(0, currentHeight)
+
+	issueBlock()
+	requireHeights(0, currentHeight)
+
+	issueBlock()
+	requireHeights(0, currentHeight)
+
+	issueBlock()
+	requireHeights(0, currentHeight)
+
+	require.NoError(proVM.Shutdown(context.Background()))
+
+	numHistoricalBlocks := uint64(2)
+	proVM = New(
+		coreVM,
+		time.Time{},
+		0,
+		DefaultMinBlockDelay,
+		numHistoricalBlocks,
+		pTestSigner,
+		pTestCert,
+	)
+
+	require.NoError(proVM.Initialize(
+		context.Background(),
+		ctx,
+		dummyDBManager,
+		initialState,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+	))
+
+	lastAcceptedID, err = proVM.LastAccepted(context.Background())
+	require.NoError(err)
+
+	require.NoError(proVM.SetState(context.Background(), snow.NormalOp))
+	require.NoError(proVM.SetPreference(context.Background(), lastAcceptedID))
+	require.NoError(proVM.VerifyHeightIndex(context.Background()))
+
+	// Verify that old blocks were pruned during startup
+	requireNumHeights(numHistoricalBlocks)
+
+	// As we issue new blocks, the oldest indexed height should be pruned.
+	issueBlock()
+	requireNumHeights(numHistoricalBlocks)
+
+	issueBlock()
+	requireNumHeights(numHistoricalBlocks)
+
+	require.NoError(proVM.Shutdown(context.Background()))
+
+	newNumHistoricalBlocks := numHistoricalBlocks + 2
+	proVM = New(
+		coreVM,
+		time.Time{},
+		0,
+		DefaultMinBlockDelay,
+		newNumHistoricalBlocks,
+		pTestSigner,
+		pTestCert,
+	)
+
+	require.NoError(proVM.Initialize(
+		context.Background(),
+		ctx,
+		dummyDBManager,
+		initialState,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+	))
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
+
+	lastAcceptedID, err = proVM.LastAccepted(context.Background())
+	require.NoError(err)
+
+	require.NoError(proVM.SetState(context.Background(), snow.NormalOp))
+	require.NoError(proVM.SetPreference(context.Background(), lastAcceptedID))
+	require.NoError(proVM.VerifyHeightIndex(context.Background()))
+
+	// The height index shouldn't be modified at this point
+	requireNumHeights(numHistoricalBlocks)
+
+	// As we issue new blocks, the number of indexed blocks should increase
+	// until we hit our target again.
+	issueBlock()
+	requireNumHeights(numHistoricalBlocks + 1)
+
+	issueBlock()
+	requireNumHeights(newNumHistoricalBlocks)
+
+	issueBlock()
+	requireNumHeights(newNumHistoricalBlocks)
 }

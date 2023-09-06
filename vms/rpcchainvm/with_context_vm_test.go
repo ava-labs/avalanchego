@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
-
 	"github.com/stretchr/testify/require"
+
+	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
@@ -47,7 +47,7 @@ type ContextEnabledBlockMock struct {
 	*mocks.MockWithVerifyContext
 }
 
-func contextEnabledTestPlugin(t *testing.T, loadExpectations bool) (block.ChainVM, *gomock.Controller) {
+func contextEnabledTestPlugin(t *testing.T, loadExpectations bool) block.ChainVM {
 	// test key is "contextTestKey"
 
 	// create mock
@@ -88,7 +88,7 @@ func contextEnabledTestPlugin(t *testing.T, loadExpectations bool) (block.ChainV
 		)
 	}
 
-	return ctxVM, ctrl
+	return ctxVM
 }
 
 func TestContextVMSummary(t *testing.T) {
@@ -102,8 +102,7 @@ func TestContextVMSummary(t *testing.T) {
 	ctx := snow.DefaultContextTest()
 	dbManager := manager.NewMemDB(version.Semantic1_0_0)
 
-	err := vm.Initialize(context.Background(), ctx, dbManager, nil, nil, nil, nil, nil, nil)
-	require.NoError(err)
+	require.NoError(vm.Initialize(context.Background(), ctx, dbManager, nil, nil, nil, nil, nil, nil))
 
 	blkIntf, err := vm.BuildBlockWithContext(context.Background(), blockContext)
 	require.NoError(err)
@@ -115,6 +114,5 @@ func TestContextVMSummary(t *testing.T) {
 	require.NoError(err)
 	require.True(shouldVerify)
 
-	err = blk.VerifyWithContext(context.Background(), blockContext)
-	require.NoError(err)
+	require.NoError(blk.VerifyWithContext(context.Background(), blockContext))
 }

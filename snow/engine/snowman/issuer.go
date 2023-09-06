@@ -17,6 +17,7 @@ type issuer struct {
 	blk       snowman.Block
 	abandoned bool
 	deps      set.Set[ids.ID]
+	push      bool
 }
 
 func (i *issuer) Dependencies() set.Set[ids.ID] {
@@ -50,5 +51,5 @@ func (i *issuer) Update(ctx context.Context) {
 		return
 	}
 	// Issue the block into consensus
-	i.t.errs.Add(i.t.deliver(ctx, i.blk))
+	i.t.errs.Add(i.t.deliver(ctx, i.blk, i.push))
 }

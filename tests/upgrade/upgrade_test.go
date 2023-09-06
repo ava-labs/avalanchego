@@ -16,8 +16,11 @@ import (
 	"github.com/onsi/gomega"
 
 	runner_sdk "github.com/ava-labs/avalanche-network-runner-sdk"
+
 	"github.com/ava-labs/avalanchego/tests"
 )
+
+const DefaultTimeout = 2 * time.Minute
 
 func TestUpgrade(t *testing.T) {
 	gomega.RegisterFailHandler(ginkgo.Fail)
@@ -81,14 +84,14 @@ var _ = ginkgo.BeforeSuite(func() {
 	})
 	gomega.Expect(err).Should(gomega.BeNil())
 
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
 	presp, err := runnerCli.Ping(ctx)
 	cancel()
 	gomega.Expect(err).Should(gomega.BeNil())
 	tests.Outf("{{green}}network-runner running in PID %d{{/}}\n", presp.Pid)
 
 	tests.Outf("{{magenta}}starting network-runner with %q{{/}}\n", networkRunnerAvalancheGoExecPath)
-	ctx, cancel = context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel = context.WithTimeout(context.Background(), DefaultTimeout)
 	resp, err := runnerCli.Start(ctx, networkRunnerAvalancheGoExecPath,
 		runner_sdk.WithNumNodes(5),
 		runner_sdk.WithGlobalNodeConfig(fmt.Sprintf(`{"log-level":"%s"}`, networkRunnerAvalancheGoLogLevel)),
@@ -97,10 +100,7 @@ var _ = ginkgo.BeforeSuite(func() {
 	gomega.Expect(err).Should(gomega.BeNil())
 	tests.Outf("{{green}}successfully started network-runner: {{/}} %+v\n", resp.ClusterInfo.NodeNames)
 
-	// start is async, so wait some time for cluster health
-	time.Sleep(time.Minute)
-
-	ctx, cancel = context.WithTimeout(context.Background(), 2*time.Minute)
+	ctx, cancel = context.WithTimeout(context.Background(), DefaultTimeout)
 	_, err = runnerCli.Health(ctx)
 	cancel()
 	gomega.Expect(err).Should(gomega.BeNil())
@@ -108,7 +108,7 @@ var _ = ginkgo.BeforeSuite(func() {
 
 var _ = ginkgo.AfterSuite(func() {
 	tests.Outf("{{red}}shutting down network-runner cluster{{/}}\n")
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
 	_, err := runnerCli.Stop(ctx)
 	cancel()
 	gomega.Expect(err).Should(gomega.BeNil())
@@ -121,21 +121,19 @@ var _ = ginkgo.AfterSuite(func() {
 var _ = ginkgo.Describe("[Upgrade]", func() {
 	ginkgo.It("can upgrade versions", func() {
 		tests.Outf("{{magenta}}starting upgrade tests %q{{/}}\n", networkRunnerAvalancheGoExecPathToUpgrade)
-		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
 		sresp, err := runnerCli.Status(ctx)
 		cancel()
 		gomega.Expect(err).Should(gomega.BeNil())
 
 		for _, name := range sresp.ClusterInfo.NodeNames {
 			tests.Outf("{{magenta}}restarting the node %q{{/}} with %q\n", name, networkRunnerAvalancheGoExecPathToUpgrade)
-			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+			ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
 			resp, err := runnerCli.RestartNode(ctx, name, runner_sdk.WithExecPath(networkRunnerAvalancheGoExecPathToUpgrade))
 			cancel()
 			gomega.Expect(err).Should(gomega.BeNil())
 
-			time.Sleep(20 * time.Second)
-
-			ctx, cancel = context.WithTimeout(context.Background(), 2*time.Minute)
+			ctx, cancel = context.WithTimeout(context.Background(), DefaultTimeout)
 			_, err = runnerCli.Health(ctx)
 			cancel()
 			gomega.Expect(err).Should(gomega.BeNil())

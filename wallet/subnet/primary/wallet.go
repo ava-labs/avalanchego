@@ -9,9 +9,9 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/keychain"
-	"github.com/ava-labs/avalanchego/vms/avm"
-	"github.com/ava-labs/avalanchego/vms/platformvm"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/wallet/chain/c"
 	"github.com/ava-labs/avalanchego/wallet/chain/p"
 	"github.com/ava-labs/avalanchego/wallet/chain/x"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
@@ -23,11 +23,13 @@ var _ Wallet = (*wallet)(nil)
 type Wallet interface {
 	P() p.Wallet
 	X() x.Wallet
+	C() c.Wallet
 }
 
 type wallet struct {
 	p p.Wallet
 	x x.Wallet
+	c c.Wallet
 }
 
 func (w *wallet) P() p.Wallet {
@@ -38,84 +40,17 @@ func (w *wallet) X() x.Wallet {
 	return w.x
 }
 
-// NewWalletFromURI returns a wallet that supports issuing transactions to the
-// chains living in the primary network to a provided [uri].
-//
-// On creation, the wallet attaches to the provided [uri] and fetches all UTXOs
-// that reference any of the keys contained in [kc]. If the UTXOs are modified
-// through an external issuance process, such as another instance of the wallet,
-// the UTXOs may become out of sync.
-//
-// The wallet manages all UTXOs locally, and performs all tx signing locally.
-func NewWalletFromURI(ctx context.Context, uri string, kc keychain.Keychain) (Wallet, error) {
-	pCTX, xCTX, utxos, err := FetchState(ctx, uri, kc.Addresses())
-	if err != nil {
-		return nil, err
-	}
-	return NewWalletWithState(uri, pCTX, xCTX, utxos, kc), nil
+func (w *wallet) C() c.Wallet {
+	return w.c
 }
 
-// Creates a wallet with pre-loaded/cached P-chain transactions.
-func NewWalletWithTxs(ctx context.Context, uri string, kc keychain.Keychain, preloadTXs ...ids.ID) (Wallet, error) {
-	pCTX, xCTX, utxos, err := FetchState(ctx, uri, kc.Addresses())
-	if err != nil {
-		return nil, err
+// Creates a new default wallet
+func NewWallet(p p.Wallet, x x.Wallet, c c.Wallet) Wallet {
+	return &wallet{
+		p: p,
+		x: x,
+		c: c,
 	}
-	pTXs := make(map[ids.ID]*txs.Tx)
-	pClient := platformvm.NewClient(uri)
-	for _, id := range preloadTXs {
-		txBytes, err := pClient.GetTx(ctx, id)
-		if err != nil {
-			return nil, err
-		}
-		tx, err := txs.Parse(txs.Codec, txBytes)
-		if err != nil {
-			return nil, err
-		}
-		pTXs[id] = tx
-	}
-	return NewWalletWithTxsAndState(uri, pCTX, xCTX, utxos, kc, pTXs), nil
-}
-
-// Creates a wallet with pre-loaded/cached P-chain transactions and state.
-func NewWalletWithTxsAndState(
-	uri string,
-	pCTX p.Context,
-	xCTX x.Context,
-	utxos UTXOs,
-	kc keychain.Keychain,
-	pTXs map[ids.ID]*txs.Tx,
-) Wallet {
-	addrs := kc.Addresses()
-	pUTXOs := NewChainUTXOs(constants.PlatformChainID, utxos)
-	pBackend := p.NewBackend(pCTX, pUTXOs, pTXs)
-	pBuilder := p.NewBuilder(addrs, pBackend)
-	pSigner := p.NewSigner(kc, pBackend)
-	pClient := platformvm.NewClient(uri)
-
-	xChainID := xCTX.BlockchainID()
-	xUTXOs := NewChainUTXOs(xChainID, utxos)
-	xBackend := x.NewBackend(xCTX, xChainID, xUTXOs)
-	xBuilder := x.NewBuilder(addrs, xBackend)
-	xSigner := x.NewSigner(kc, xBackend)
-	xClient := avm.NewClient(uri, "X")
-
-	return NewWallet(
-		p.NewWallet(pBuilder, pSigner, pClient, pBackend),
-		x.NewWallet(xBuilder, xSigner, xClient, xBackend),
-	)
-}
-
-// Creates a wallet with pre-fetched state.
-func NewWalletWithState(
-	uri string,
-	pCTX p.Context,
-	xCTX x.Context,
-	utxos UTXOs,
-	kc keychain.Keychain,
-) Wallet {
-	pTXs := make(map[ids.ID]*txs.Tx)
-	return NewWalletWithTxsAndState(uri, pCTX, xCTX, utxos, kc, pTXs)
 }
 
 // Creates a Wallet with the given set of options
@@ -123,13 +58,84 @@ func NewWalletWithOptions(w Wallet, options ...common.Option) Wallet {
 	return NewWallet(
 		p.NewWalletWithOptions(w.P(), options...),
 		x.NewWalletWithOptions(w.X(), options...),
+		c.NewWalletWithOptions(w.C(), options...),
 	)
 }
 
-// Creates a new default wallet
-func NewWallet(p p.Wallet, x x.Wallet) Wallet {
-	return &wallet{
-		p: p,
-		x: x,
+type WalletConfig struct {
+	// Base URI to use for all node requests.
+	URI string // required
+	// Keys to use for signing all transactions.
+	AVAXKeychain keychain.Keychain // required
+	EthKeychain  c.EthKeychain     // required
+	// Set of P-chain transactions that the wallet should know about to be able
+	// to generate transactions.
+	PChainTxs map[ids.ID]*txs.Tx // optional
+	// Set of P-chain transactions that the wallet should fetch to be able to
+	// generate transactions.
+	PChainTxsToFetch set.Set[ids.ID] // optional
+}
+
+// MakeWallet returns a wallet that supports issuing transactions to the chains
+// living in the primary network.
+//
+// On creation, the wallet attaches to the provided uri and fetches all UTXOs
+// that reference any of the provided keys. If the UTXOs are modified through an
+// external issuance process, such as another instance of the wallet, the UTXOs
+// may become out of sync. The wallet will also fetch all requested P-chain
+// transactions.
+//
+// The wallet manages all state locally, and performs all tx signing locally.
+func MakeWallet(ctx context.Context, config *WalletConfig) (Wallet, error) {
+	avaxAddrs := config.AVAXKeychain.Addresses()
+	avaxState, err := FetchState(ctx, config.URI, avaxAddrs)
+	if err != nil {
+		return nil, err
 	}
+
+	ethAddrs := config.EthKeychain.EthAddresses()
+	ethState, err := FetchEthState(ctx, config.URI, ethAddrs)
+	if err != nil {
+		return nil, err
+	}
+
+	pChainTxs := config.PChainTxs
+	if pChainTxs == nil {
+		pChainTxs = make(map[ids.ID]*txs.Tx)
+	}
+
+	for txID := range config.PChainTxsToFetch {
+		txBytes, err := avaxState.PClient.GetTx(ctx, txID)
+		if err != nil {
+			return nil, err
+		}
+		tx, err := txs.Parse(txs.Codec, txBytes)
+		if err != nil {
+			return nil, err
+		}
+		pChainTxs[txID] = tx
+	}
+
+	pUTXOs := NewChainUTXOs(constants.PlatformChainID, avaxState.UTXOs)
+	pBackend := p.NewBackend(avaxState.PCTX, pUTXOs, pChainTxs)
+	pBuilder := p.NewBuilder(avaxAddrs, pBackend)
+	pSigner := p.NewSigner(config.AVAXKeychain, pBackend)
+
+	xChainID := avaxState.XCTX.BlockchainID()
+	xUTXOs := NewChainUTXOs(xChainID, avaxState.UTXOs)
+	xBackend := x.NewBackend(avaxState.XCTX, xUTXOs)
+	xBuilder := x.NewBuilder(avaxAddrs, xBackend)
+	xSigner := x.NewSigner(config.AVAXKeychain, xBackend)
+
+	cChainID := avaxState.CCTX.BlockchainID()
+	cUTXOs := NewChainUTXOs(cChainID, avaxState.UTXOs)
+	cBackend := c.NewBackend(avaxState.CCTX, cUTXOs, ethState.Accounts)
+	cBuilder := c.NewBuilder(avaxAddrs, ethAddrs, cBackend)
+	cSigner := c.NewSigner(config.AVAXKeychain, config.EthKeychain, cBackend)
+
+	return NewWallet(
+		p.NewWallet(pBuilder, pSigner, avaxState.PClient, pBackend),
+		x.NewWallet(xBuilder, xSigner, avaxState.XClient, xBackend),
+		c.NewWallet(cBuilder, cSigner, avaxState.CClient, ethState.Client, cBackend),
+	), nil
 }
