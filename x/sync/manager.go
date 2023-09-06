@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/ava-labs/avalanchego/x/merkledb/paths"
+
 	"go.uber.org/zap"
 	"golang.org/x/exp/slices"
 
@@ -395,7 +397,7 @@ func (m *Manager) findNextKey(
 	// and traversing them from the longest key to the shortest key.
 	// For each node in these proofs, compare if the children of that node exist
 	// or have the same ID in the other proof.
-	proofKeyPath := merkledb.SerializedPath{
+	proofKeyPath := paths.SerializedPath{
 		Value:        lastReceivedKey,
 		NibbleLength: 2 * len(lastReceivedKey),
 	}

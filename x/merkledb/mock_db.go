@@ -9,8 +9,9 @@ package merkledb
 
 import (
 	context "context"
-	"github.com/ava-labs/avalanchego/x/merkledb/paths"
 	reflect "reflect"
+
+	"github.com/ava-labs/avalanchego/x/merkledb/paths"
 
 	database "github.com/ava-labs/avalanchego/database"
 	ids "github.com/ava-labs/avalanchego/ids"

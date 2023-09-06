@@ -157,7 +157,6 @@ func (p TokenPath) Serialize() SerializedPath {
 		keyIndex := pathIndex / tokensPerByte
 		offset := pathIndex % tokensPerByte
 		result.Value[keyIndex] += p.value[pathIndex] << branchToOffsetShifts[p.branchFactor][offset]
-		keyIndex++
 	}
 
 	return result
