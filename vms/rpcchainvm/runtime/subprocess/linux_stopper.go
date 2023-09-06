@@ -4,7 +4,7 @@
 //go:build linux
 // +build linux
 
-// ^ SIGTERM signal is not available on Windows
+// ^ SIGUSR1 signal is not available on Windows
 // ^ syscall.SysProcAttr only has field Pdeathsig on Linux
 
 package subprocess
@@ -23,7 +23,7 @@ import (
 
 func NewCmd(path string, args ...string) *exec.Cmd {
 	cmd := exec.Command(path, args...)
-	cmd.SysProcAttr = &syscall.SysProcAttr{Pdeathsig: syscall.SIGTERM}
+	cmd.SysProcAttr = &syscall.SysProcAttr{Pdeathsig: syscall.SIGUSR1}
 	return cmd
 }
 
@@ -32,7 +32,7 @@ func stop(ctx context.Context, log logging.Logger, cmd *exec.Cmd) {
 	go func() {
 		// attempt graceful shutdown
 		errs := wrappers.Errs{}
-		err := cmd.Process.Signal(syscall.SIGTERM)
+		err := cmd.Process.Signal(syscall.SIGUSR1)
 		errs.Add(err)
 		_, err = cmd.Process.Wait()
 		errs.Add(err)

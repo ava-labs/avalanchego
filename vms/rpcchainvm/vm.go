@@ -34,7 +34,7 @@ const defaultRuntimeDialTimeout = 5 * time.Second
 // Serve starts the RPC Chain VM server and performs a handshake with the VM runtime service.
 func Serve(ctx context.Context, vm block.ChainVM, opts ...grpcutils.ServerOption) error {
 	signals := make(chan os.Signal, 2)
-	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM, syscall.SIGUSR1)
 
 	server := newVMServer(vm, opts...)
 	go func(ctx context.Context) {
@@ -47,10 +47,10 @@ func Serve(ctx context.Context, vm block.ChainVM, opts ...grpcutils.ServerOption
 			select {
 			case s := <-signals:
 				switch s {
-				case syscall.SIGINT:
-					fmt.Println("runtime engine: ignoring signal: SIGINT")
-				case syscall.SIGTERM:
-					fmt.Println("runtime engine: received shutdown signal: SIGTERM")
+				case syscall.SIGINT, syscall.SIGTERM:
+					fmt.Printf("runtime engine: ignoring signal: %s\n", s)
+				case syscall.SIGUSR1:
+					fmt.Printf("runtime engine: received shutdown signal: %s\n", s)
 					return
 				}
 			case <-ctx.Done():
