@@ -7,8 +7,9 @@ import (
 	"fmt"
 	"sync/atomic"
 
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/cockroachdb/pebble"
+
+	"github.com/ava-labs/avalanchego/database"
 )
 
 var _ database.Batch = (*batch)(nil)

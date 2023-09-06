@@ -28,8 +28,7 @@ const (
 	// should be added to a batch size per operation.
 	pebbleByteOverHead = 8
 
-	blockSize      = 64 * units.KiB
-	indexBlockSize = 256 * units.KiB
+	targetFileSize = 2 * units.MiB
 	filterPolicy   = bloom.FilterPolicy(10)
 )
 
@@ -79,22 +78,14 @@ func New(file string, cfg Config, log logging.Logger, _ string, _ prometheus.Reg
 		MemTableStopWritesThreshold: cfg.MemTableStopWritesThreshold,
 		MemTableSize:                cfg.MemTableSize,
 		MaxOpenFiles:                cfg.MaxOpenFiles,
-		MaxConcurrentCompactions:    runtime.NumCPU,
+		MaxConcurrentCompactions:    runtime.NumCPU, // TODO what should default be?
 		Levels:                      make([]pebble.LevelOptions, 7),
 		// TODO: add support for adding a custom logger
 	}
-
-	// Default configuration sourced from:
-	// https://github.com/cockroachdb/pebble/blob/crl-release-23.1/cmd/pebble/db.go
 	for i := 0; i < len(opts.Levels); i++ {
 		l := &opts.Levels[i]
-		l.BlockSize = blockSize
-		l.IndexBlockSize = indexBlockSize
+		l.TargetFileSize = targetFileSize
 		l.FilterPolicy = filterPolicy
-		l.FilterType = pebble.TableFilter
-		if i > 0 {
-			l.TargetFileSize = opts.Levels[i-1].TargetFileSize * 2
-		}
 	}
 	opts.Experimental.ReadSamplingMultiplier = -1 // explicitly disable seek compaction
 
