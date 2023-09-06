@@ -143,7 +143,7 @@ func (c *client) GetChangeProof(
 				endKey,
 				endRoot,
 			); err != nil {
-				return nil, fmt.Errorf("%s due to %w", errInvalidRangeProof, err)
+				return nil, fmt.Errorf("%w due to %w", errInvalidRangeProof, err)
 			}
 
 			return &merkledb.ChangeOrRangeProof{
@@ -221,7 +221,7 @@ func parseAndVerifyRangeProof(
 		end,
 		root,
 	); err != nil {
-		return nil, fmt.Errorf("%s due to %w", errInvalidRangeProof, err)
+		return nil, fmt.Errorf("%w due to %w", errInvalidRangeProof, err)
 	}
 	return &rangeProof, nil
 }
@@ -322,7 +322,7 @@ func getAndParse[T any](
 			if lastErr != nil {
 				// prefer reporting [lastErr] if it's not nil.
 				return nil, fmt.Errorf(
-					"request failed after %d attempts with last error %w and ctx error %s",
+					"request failed after %d attempts with last error %w and ctx error %w",
 					attempt, lastErr, ctx.Err(),
 				)
 			}

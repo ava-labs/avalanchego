@@ -422,39 +422,17 @@ func (ln *LocalNetwork) GetURIs() []string {
 	return uris
 }
 
-type NodeStopError struct {
-	NodeID    ids.NodeID
-	StopError error
-}
-
-func (e *NodeStopError) Error() string {
-	return fmt.Sprintf("failed to stop node %s: %v", e.NodeID, e.StopError)
-}
-
-type NetworkStopError struct {
-	Errors []*NodeStopError
-}
-
-func (e *NetworkStopError) Error() string {
-	return fmt.Sprintf("failed to stop network: %v", e.Errors)
-}
-
 // Stop all nodes in the network.
 func (ln *LocalNetwork) Stop() error {
-	errs := []*NodeStopError{}
+	var errs []error
 	// Assume the nodes are loaded and the pids are current
 	for _, node := range ln.Nodes {
 		if err := node.Stop(); err != nil {
-			errs = append(errs, &NodeStopError{
-				NodeID:    node.NodeID,
-				StopError: err,
-			})
+			errs = append(errs, fmt.Errorf("failed to stop node %s: %w", node.NodeID, err))
 		}
 	}
 	if len(errs) > 0 {
-		// TODO(marun) When avalanchego updates to go 1.20, update to
-		// use the new capability to wrap multiple errors.
-		return &NetworkStopError{Errors: errs}
+		return fmt.Errorf("failed to stop network:\n%w", errors.Join(errs...))
 	}
 	return nil
 }
