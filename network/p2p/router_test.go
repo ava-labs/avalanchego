@@ -27,7 +27,7 @@ func TestAppRequestResponse(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 	chainID := ids.GenerateTestID()
 	foo := "foo"
-	bar := "foo"
+	bar := "bar"
 
 	tests := []struct {
 		name        string
