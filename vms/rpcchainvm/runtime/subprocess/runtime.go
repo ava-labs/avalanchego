@@ -132,12 +132,12 @@ func Bootstrap(
 	case <-intitializer.initialized:
 	case <-timeout.C:
 		stopper.Stop(ctx)
-		return nil, nil, fmt.Errorf("%w: %v", runtime.ErrHandshakeFailed, runtime.ErrProcessNotFound)
+		return nil, nil, fmt.Errorf("%w: %w", runtime.ErrHandshakeFailed, runtime.ErrProcessNotFound)
 	}
 
 	if intitializer.err != nil {
 		stopper.Stop(ctx)
-		return nil, nil, fmt.Errorf("%w: %v", runtime.ErrHandshakeFailed, intitializer.err)
+		return nil, nil, fmt.Errorf("%w: %w", runtime.ErrHandshakeFailed, intitializer.err)
 	}
 
 	log.Info("plugin handshake succeeded",
