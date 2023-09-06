@@ -17,7 +17,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/chains"
+	"github.com/ava-labs/avalanchego/chain"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/subnets"
@@ -27,25 +27,25 @@ func TestGetChainConfigsFromFiles(t *testing.T) {
 	tests := map[string]struct {
 		configs  map[string]string
 		upgrades map[string]string
-		expected map[string]chains.ChainConfig
+		expected map[string]chain.ChainConfig
 	}{
 		"no chain configs": {
 			configs:  map[string]string{},
 			upgrades: map[string]string{},
-			expected: map[string]chains.ChainConfig{},
+			expected: map[string]chain.ChainConfig{},
 		},
 		"valid chain-id": {
 			configs:  map[string]string{"yH8D7ThNJkxmtkuv2jgBa4P1Rn3Qpr4pPr7QYNfcdoS6k6HWp": "hello", "2JVSBoinj9C2J33VntvzYtVJNZdN2NKiwwKjcumHUWEb5DbBrm": "world"},
 			upgrades: map[string]string{"yH8D7ThNJkxmtkuv2jgBa4P1Rn3Qpr4pPr7QYNfcdoS6k6HWp": "helloUpgrades"},
-			expected: func() map[string]chains.ChainConfig {
-				m := map[string]chains.ChainConfig{}
+			expected: func() map[string]chain.ChainConfig {
+				m := map[string]chain.ChainConfig{}
 				id1, err := ids.FromString("yH8D7ThNJkxmtkuv2jgBa4P1Rn3Qpr4pPr7QYNfcdoS6k6HWp")
 				require.NoError(t, err)
-				m[id1.String()] = chains.ChainConfig{Config: []byte("hello"), Upgrade: []byte("helloUpgrades")}
+				m[id1.String()] = chain.ChainConfig{Config: []byte("hello"), Upgrade: []byte("helloUpgrades")}
 
 				id2, err := ids.FromString("2JVSBoinj9C2J33VntvzYtVJNZdN2NKiwwKjcumHUWEb5DbBrm")
 				require.NoError(t, err)
-				m[id2.String()] = chains.ChainConfig{Config: []byte("world"), Upgrade: []byte(nil)}
+				m[id2.String()] = chain.ChainConfig{Config: []byte("world"), Upgrade: []byte(nil)}
 
 				return m
 			}(),
@@ -53,10 +53,10 @@ func TestGetChainConfigsFromFiles(t *testing.T) {
 		"valid alias": {
 			configs:  map[string]string{"C": "hello", "X": "world"},
 			upgrades: map[string]string{"C": "upgradess"},
-			expected: func() map[string]chains.ChainConfig {
-				m := map[string]chains.ChainConfig{}
-				m["C"] = chains.ChainConfig{Config: []byte("hello"), Upgrade: []byte("upgradess")}
-				m["X"] = chains.ChainConfig{Config: []byte("world"), Upgrade: []byte(nil)}
+			expected: func() map[string]chain.ChainConfig {
+				m := map[string]chain.ChainConfig{}
+				m["C"] = chain.ChainConfig{Config: []byte("hello"), Upgrade: []byte("upgradess")}
+				m["X"] = chain.ChainConfig{Config: []byte("world"), Upgrade: []byte(nil)}
 
 				return m
 			}(),
@@ -96,7 +96,7 @@ func TestGetChainConfigsDirNotExist(t *testing.T) {
 		structure   string
 		file        map[string]string
 		expectedErr error
-		expected    map[string]chains.ChainConfig
+		expected    map[string]chain.ChainConfig
 	}{
 		"cdir not exist": {
 			structure:   "/",
@@ -114,13 +114,13 @@ func TestGetChainConfigsDirNotExist(t *testing.T) {
 			structure:   "/cdir/",
 			file:        map[string]string{"config.ex": "noeffect"},
 			expectedErr: nil,
-			expected:    map[string]chains.ChainConfig{},
+			expected:    map[string]chain.ChainConfig{},
 		},
 		"full structure": {
 			structure:   "/cdir/C/",
 			file:        map[string]string{"config.ex": "hello"},
 			expectedErr: nil,
-			expected:    map[string]chains.ChainConfig{"C": {Config: []byte("hello"), Upgrade: []byte(nil)}},
+			expected:    map[string]chain.ChainConfig{"C": {Config: []byte("hello"), Upgrade: []byte(nil)}},
 		},
 	}
 
@@ -165,54 +165,54 @@ func TestSetChainConfigDefaultDir(t *testing.T) {
 	setupFile(t, chainsDir, chainConfigFileName+".ex", "helloworld")
 	chainConfigs, err := getChainConfigs(v)
 	require.NoError(err)
-	expected := map[string]chains.ChainConfig{"C": {Config: []byte("helloworld"), Upgrade: []byte(nil)}}
+	expected := map[string]chain.ChainConfig{"C": {Config: []byte("helloworld"), Upgrade: []byte(nil)}}
 	require.Equal(expected, chainConfigs)
 }
 
 func TestGetChainConfigsFromFlags(t *testing.T) {
 	tests := map[string]struct {
-		fullConfigs map[string]chains.ChainConfig
-		expected    map[string]chains.ChainConfig
+		fullConfigs map[string]chain.ChainConfig
+		expected    map[string]chain.ChainConfig
 	}{
 		"no chain configs": {
-			fullConfigs: map[string]chains.ChainConfig{},
-			expected:    map[string]chains.ChainConfig{},
+			fullConfigs: map[string]chain.ChainConfig{},
+			expected:    map[string]chain.ChainConfig{},
 		},
 		"valid chain-id": {
-			fullConfigs: func() map[string]chains.ChainConfig {
-				m := map[string]chains.ChainConfig{}
+			fullConfigs: func() map[string]chain.ChainConfig {
+				m := map[string]chain.ChainConfig{}
 				id1, err := ids.FromString("yH8D7ThNJkxmtkuv2jgBa4P1Rn3Qpr4pPr7QYNfcdoS6k6HWp")
 				require.NoError(t, err)
-				m[id1.String()] = chains.ChainConfig{Config: []byte("hello"), Upgrade: []byte("helloUpgrades")}
+				m[id1.String()] = chain.ChainConfig{Config: []byte("hello"), Upgrade: []byte("helloUpgrades")}
 
 				id2, err := ids.FromString("2JVSBoinj9C2J33VntvzYtVJNZdN2NKiwwKjcumHUWEb5DbBrm")
 				require.NoError(t, err)
-				m[id2.String()] = chains.ChainConfig{Config: []byte("world"), Upgrade: []byte(nil)}
+				m[id2.String()] = chain.ChainConfig{Config: []byte("world"), Upgrade: []byte(nil)}
 
 				return m
 			}(),
-			expected: func() map[string]chains.ChainConfig {
-				m := map[string]chains.ChainConfig{}
+			expected: func() map[string]chain.ChainConfig {
+				m := map[string]chain.ChainConfig{}
 				id1, err := ids.FromString("yH8D7ThNJkxmtkuv2jgBa4P1Rn3Qpr4pPr7QYNfcdoS6k6HWp")
 				require.NoError(t, err)
-				m[id1.String()] = chains.ChainConfig{Config: []byte("hello"), Upgrade: []byte("helloUpgrades")}
+				m[id1.String()] = chain.ChainConfig{Config: []byte("hello"), Upgrade: []byte("helloUpgrades")}
 
 				id2, err := ids.FromString("2JVSBoinj9C2J33VntvzYtVJNZdN2NKiwwKjcumHUWEb5DbBrm")
 				require.NoError(t, err)
-				m[id2.String()] = chains.ChainConfig{Config: []byte("world"), Upgrade: []byte(nil)}
+				m[id2.String()] = chain.ChainConfig{Config: []byte("world"), Upgrade: []byte(nil)}
 
 				return m
 			}(),
 		},
 		"valid alias": {
-			fullConfigs: map[string]chains.ChainConfig{
+			fullConfigs: map[string]chain.ChainConfig{
 				"C": {Config: []byte("hello"), Upgrade: []byte("upgradess")},
 				"X": {Config: []byte("world"), Upgrade: []byte(nil)},
 			},
-			expected: func() map[string]chains.ChainConfig {
-				m := map[string]chains.ChainConfig{}
-				m["C"] = chains.ChainConfig{Config: []byte("hello"), Upgrade: []byte("upgradess")}
-				m["X"] = chains.ChainConfig{Config: []byte("world"), Upgrade: []byte(nil)}
+			expected: func() map[string]chain.ChainConfig {
+				m := map[string]chain.ChainConfig{}
+				m["C"] = chain.ChainConfig{Config: []byte("hello"), Upgrade: []byte("upgradess")}
+				m["X"] = chain.ChainConfig{Config: []byte("world"), Upgrade: []byte(nil)}
 
 				return m
 			}(),

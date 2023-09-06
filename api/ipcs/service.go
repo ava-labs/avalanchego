@@ -12,7 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/api/server"
-	"github.com/ava-labs/avalanchego/chains"
+	"github.com/ava-labs/avalanchego/chain"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/ipcs"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -23,13 +23,13 @@ import (
 // IPCServer maintains the IPCs
 type IPCServer struct {
 	httpServer   server.Server
-	chainManager chains.Manager
+	chainManager chain.Manager
 	log          logging.Logger
 	ipcs         *ipcs.ChainIPCs
 }
 
 // NewService returns a new IPCs API service
-func NewService(log logging.Logger, chainManager chains.Manager, httpServer server.Server, ipcs *ipcs.ChainIPCs) (*common.HTTPHandler, error) {
+func NewService(log logging.Logger, chainManager chain.Manager, httpServer server.Server, ipcs *ipcs.ChainIPCs) (*common.HTTPHandler, error) {
 	ipcServer := &IPCServer{
 		log:          log,
 		chainManager: chainManager,
