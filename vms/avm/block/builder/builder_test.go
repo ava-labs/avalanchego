@@ -27,7 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
-	"github.com/ava-labs/avalanchego/vms/avm/blocks"
+	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/avm/metrics"
 	"github.com/ava-labs/avalanchego/vms/avm/states"
@@ -36,7 +36,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	blkexecutor "github.com/ava-labs/avalanchego/vms/avm/blocks/executor"
+	blkexecutor "github.com/ava-labs/avalanchego/vms/avm/block/executor"
 	txexecutor "github.com/ava-labs/avalanchego/vms/avm/txs/executor"
 )
 
@@ -86,7 +86,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				preferredID := ids.GenerateTestID()
 				preferredHeight := uint64(1337)
 				preferredTimestamp := time.Now()
-				preferredBlock := blocks.NewMockBlock(ctrl)
+				preferredBlock := block.NewMockBlock(ctrl)
 				preferredBlock.EXPECT().Height().Return(preferredHeight)
 				preferredBlock.EXPECT().Timestamp().Return(preferredTimestamp)
 
@@ -117,7 +117,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				preferredID := ids.GenerateTestID()
 				preferredHeight := uint64(1337)
 				preferredTimestamp := time.Now()
-				preferredBlock := blocks.NewMockBlock(ctrl)
+				preferredBlock := block.NewMockBlock(ctrl)
 				preferredBlock.EXPECT().Height().Return(preferredHeight)
 				preferredBlock.EXPECT().Timestamp().Return(preferredTimestamp)
 
@@ -161,7 +161,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				preferredID := ids.GenerateTestID()
 				preferredHeight := uint64(1337)
 				preferredTimestamp := time.Now()
-				preferredBlock := blocks.NewMockBlock(ctrl)
+				preferredBlock := block.NewMockBlock(ctrl)
 				preferredBlock.EXPECT().Height().Return(preferredHeight)
 				preferredBlock.EXPECT().Timestamp().Return(preferredTimestamp)
 
@@ -206,7 +206,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				preferredID := ids.GenerateTestID()
 				preferredHeight := uint64(1337)
 				preferredTimestamp := time.Now()
-				preferredBlock := blocks.NewMockBlock(ctrl)
+				preferredBlock := block.NewMockBlock(ctrl)
 				preferredBlock.EXPECT().Height().Return(preferredHeight)
 				preferredBlock.EXPECT().Timestamp().Return(preferredTimestamp)
 
@@ -252,7 +252,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				preferredID := ids.GenerateTestID()
 				preferredHeight := uint64(1337)
 				preferredTimestamp := time.Now()
-				preferredBlock := blocks.NewMockBlock(ctrl)
+				preferredBlock := block.NewMockBlock(ctrl)
 				preferredBlock.EXPECT().Height().Return(preferredHeight)
 				preferredBlock.EXPECT().Timestamp().Return(preferredTimestamp)
 
@@ -300,7 +300,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				// Assert created block has one tx, tx1,
 				// and other fields are set correctly.
 				manager.EXPECT().NewBlock(gomock.Any()).DoAndReturn(
-					func(block *blocks.StandardBlock) snowman.Block {
+					func(block *block.StandardBlock) snowman.Block {
 						require.Len(t, block.Transactions, 1)
 						require.Equal(t, tx1, block.Transactions[0])
 						require.Equal(t, preferredHeight+1, block.Height())
@@ -345,7 +345,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				preferredID := ids.GenerateTestID()
 				preferredHeight := uint64(1337)
 				preferredTimestamp := time.Now()
-				preferredBlock := blocks.NewMockBlock(ctrl)
+				preferredBlock := block.NewMockBlock(ctrl)
 				preferredBlock.EXPECT().Height().Return(preferredHeight)
 				preferredBlock.EXPECT().Timestamp().Return(preferredTimestamp)
 
@@ -365,7 +365,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				manager.EXPECT().VerifyUniqueInputs(preferredID, gomock.Any()).Return(nil)
 				// Assert that the created block has the right timestamp
 				manager.EXPECT().NewBlock(gomock.Any()).DoAndReturn(
-					func(block *blocks.StandardBlock) snowman.Block {
+					func(block *block.StandardBlock) snowman.Block {
 						require.Equal(t, preferredTimestamp.Unix(), block.Timestamp().Unix())
 						return nil
 					},
@@ -419,7 +419,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				// preferred block's timestamp is after the time reported by clock
 				now := time.Now()
 				preferredTimestamp := now.Add(-2 * time.Second)
-				preferredBlock := blocks.NewMockBlock(ctrl)
+				preferredBlock := block.NewMockBlock(ctrl)
 				preferredBlock.EXPECT().Height().Return(preferredHeight)
 				preferredBlock.EXPECT().Timestamp().Return(preferredTimestamp)
 
@@ -439,7 +439,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 				manager.EXPECT().VerifyUniqueInputs(preferredID, gomock.Any()).Return(nil)
 				// Assert that the created block has the right timestamp
 				manager.EXPECT().NewBlock(gomock.Any()).DoAndReturn(
-					func(block *blocks.StandardBlock) snowman.Block {
+					func(block *block.StandardBlock) snowman.Block {
 						require.Equal(t, now.Unix(), block.Timestamp().Unix())
 						return nil
 					},
@@ -513,7 +513,7 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	require.NoError(mempool.Add(tx))
 	require.True(mempool.Has(txID))
 
-	parser, err := blocks.NewParser([]fxs.Fx{
+	parser, err := block.NewParser([]fxs.Fx{
 		&secp256k1fx.Fx{},
 	})
 	require.NoError(err)
@@ -539,7 +539,7 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	cm := parser.Codec()
 	txs, err := createParentTxs(cm)
 	require.NoError(err)
-	parentBlk, err := blocks.NewStandardBlock(parentID, 0, parentTimestamp, txs, cm)
+	parentBlk, err := block.NewStandardBlock(parentID, 0, parentTimestamp, txs, cm)
 	require.NoError(err)
 	state.AddBlock(parentBlk)
 	state.SetLastAccepted(parentBlk.ID())
