@@ -16,6 +16,10 @@ import (
 var _ database.Iterator = (*iter)(nil)
 
 type iter struct {
+	// [lock] ensures that only one goroutine can access [iter] at a time.
+	// Note that [Database.Close] calls [iter.Release] so we need [lock] to ensure
+	// that the user and [Database.Close] don't execute [iter.Release] concurrently.
+	// Invariant: [Datbase.lock] is never grabbed while holding [lock].
 	lock sync.Mutex
 
 	db          *Database
@@ -23,38 +27,41 @@ type iter struct {
 	initialized bool
 	closed      bool
 
-	valid bool
-	err   error
+	hasNext bool
+	nextKey []byte
+	nextVal []byte
+
+	err error
 }
 
 // Must not be called with [db.lock] held.
 func (it *iter) Next() bool {
+	it.db.lock.RLock()
+	dbClosed := it.db.closed
+	it.db.lock.RUnlock()
+
 	it.lock.Lock()
 	defer it.lock.Unlock()
 
-	if it.closed {
-		return false
-	}
-
-	db := it.db
-
-	db.lock.RLock()
-	closed := db.closed
-	db.lock.RUnlock()
-
-	if closed {
-		it.valid = false
+	if it.closed || dbClosed {
+		it.hasNext = false
 		it.err = database.ErrClosed
 		return false
 	}
 
 	if !it.initialized {
-		it.valid = it.iter.First()
+		it.hasNext = it.iter.First()
 		it.initialized = true
 	} else {
-		it.valid = it.iter.Next()
+		it.hasNext = it.iter.Next()
 	}
-	return it.valid
+
+	if it.hasNext {
+		it.nextKey = it.iter.Key()
+		// TODO Value() is deprecated; use ValueAndErr instead.
+		it.nextVal = it.iter.Value()
+	}
+	return it.hasNext
 }
 
 func (it *iter) Error() error {
@@ -74,38 +81,42 @@ func (it *iter) Key() []byte {
 	it.lock.Lock()
 	defer it.lock.Unlock()
 
-	if !it.valid {
+	if !it.hasNext {
 		return nil
 	}
-	return slices.Clone(it.iter.Key())
+	return slices.Clone(it.nextKey)
 }
 
 func (it *iter) Value() []byte {
 	it.lock.Lock()
 	defer it.lock.Unlock()
 
-	if !it.valid {
+	if !it.hasNext {
 		return nil
 	}
-	// TODO Value() is deprecated; use ValueAndErr instead.
-	return slices.Clone(it.iter.Value())
+	return slices.Clone(it.nextVal)
 }
 
 func (it *iter) Release() {
+	it.db.lock.Lock()
+	defer it.db.lock.Unlock()
+
 	it.lock.Lock()
 	defer it.lock.Unlock()
 
+	it.release()
+
+}
+
+// Assumes [it.lock] and [it.db.lock] are held.
+func (it *iter) release() {
 	if it.closed {
 		return
 	}
-
-	it.db.lock.Lock()
-	defer it.db.lock.Unlock()
 
 	// Remove the iterator from the list of open iterators.
 	it.db.openIterators.Remove(it)
 
 	it.closed = true
-	it.valid = false
 	_ = it.iter.Close()
 }

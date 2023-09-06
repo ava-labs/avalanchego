@@ -8,7 +8,6 @@ import (
 	"context"
 	"errors"
 	"runtime"
-	"strings"
 	"sync"
 
 	"github.com/cockroachdb/pebble"
@@ -114,19 +113,14 @@ func (db *Database) Close() error {
 
 	db.closed = true
 
-	// TODO: Address the following comment from pebbledb.Close:
-	// "It is not safe to close a DB until all outstanding iterators are closed or to call
-	// Close concurrently with any other DB method. It is not valid to call any of a DB's
-	// methods after the DB has been closed.""
-	err := updateError(db.pebbleDB.Close())
-	if err != nil && strings.Contains(err.Error(), "leaked iterator") {
-		// avalanche database support close db w/o error
-		// even if there is an iterator which is not released
-		// TODO: This is a fragile way to detect "leaked iterator". Try to
-		// find a better way to do it.
-		return nil
+	for iter := range db.openIterators {
+		iter.lock.Lock()
+		iter.release()
+		iter.lock.Unlock()
 	}
-	return err
+	db.openIterators.Clear()
+
+	return updateError(db.pebbleDB.Close())
 }
 
 func (db *Database) HealthCheck(_ context.Context) (interface{}, error) {
