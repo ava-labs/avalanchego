@@ -8,8 +8,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/ava-labs/avalanchego/x/merkledb/paths"
 	"math"
+
+	"github.com/ava-labs/avalanchego/x/merkledb/paths"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"

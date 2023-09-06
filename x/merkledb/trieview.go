@@ -8,8 +8,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/ava-labs/avalanchego/x/merkledb/paths"
 	"sync"
+
+	"github.com/ava-labs/avalanchego/x/merkledb/paths"
 
 	"go.opentelemetry.io/otel/attribute"
 

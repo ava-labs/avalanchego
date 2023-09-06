@@ -6,11 +6,12 @@ package merkledb
 import (
 	"bytes"
 	"context"
-	"github.com/ava-labs/avalanchego/x/merkledb/paths"
 	"math/rand"
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/ava-labs/avalanchego/x/merkledb/paths"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"

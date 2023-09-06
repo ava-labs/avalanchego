@@ -5,6 +5,7 @@ package merkledb
 
 import (
 	"context"
+
 	"github.com/ava-labs/avalanchego/x/merkledb/paths"
 
 	"github.com/ava-labs/avalanchego/database"

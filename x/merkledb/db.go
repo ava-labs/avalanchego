@@ -8,9 +8,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/ava-labs/avalanchego/x/merkledb/paths"
 	"runtime"
 	"sync"
+
+	"github.com/ava-labs/avalanchego/x/merkledb/paths"
 
 	"github.com/prometheus/client_golang/prometheus"
 

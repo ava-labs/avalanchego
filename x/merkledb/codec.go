@@ -8,10 +8,11 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/ava-labs/avalanchego/x/merkledb/paths"
 	"io"
 	"math"
 	"sync"
+
+	"github.com/ava-labs/avalanchego/x/merkledb/paths"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/maybe"

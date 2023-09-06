@@ -5,10 +5,11 @@ package merkledb
 
 import (
 	"bytes"
-	"github.com/ava-labs/avalanchego/x/merkledb/paths"
 	"io"
 	"math/rand"
 	"testing"
+
+	"github.com/ava-labs/avalanchego/x/merkledb/paths"
 
 	"github.com/stretchr/testify/require"
 

@@ -6,10 +6,11 @@ package merkledb
 import (
 	"bytes"
 	"context"
-	"github.com/ava-labs/avalanchego/x/merkledb/paths"
 	"math/rand"
 	"testing"
 	"time"
+
+	"github.com/ava-labs/avalanchego/x/merkledb/paths"
 
 	"github.com/stretchr/testify/require"
 

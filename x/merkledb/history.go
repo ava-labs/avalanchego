@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+
 	"github.com/ava-labs/avalanchego/x/merkledb/paths"
 
 	"github.com/ava-labs/avalanchego/ids"
