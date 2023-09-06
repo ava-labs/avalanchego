@@ -38,15 +38,13 @@ func (it *iter) Next() bool {
 		return false
 	}
 
-	var hasNext bool
 	if !it.initialized {
-		hasNext = it.iter.First()
+		it.valid = it.iter.First()
 		it.initialized = true
 	} else {
-		hasNext = it.iter.Next()
+		it.valid = it.iter.Next()
 	}
-	it.valid = hasNext
-	return hasNext
+	return it.valid
 }
 
 func (it *iter) Error() error {
