@@ -14,12 +14,7 @@ import (
 	"syscall"
 
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/gruntime"
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
-
-	runtimepb "github.com/ava-labs/avalanchego/proto/pb/vm/runtime"
 )
 
 func serve(ctx context.Context, vm block.ChainVM, opts ...grpcutils.ServerOption) error {
@@ -40,34 +35,6 @@ func serve(ctx context.Context, vm block.ChainVM, opts ...grpcutils.ServerOption
 		}
 	}(ctx)
 
-	// address of Runtime server from ENV
-	runtimeAddr := os.Getenv(runtime.EngineAddressKey)
-	if runtimeAddr == "" {
-		return fmt.Errorf("required env var missing: %q", runtime.EngineAddressKey)
-	}
-
-	clientConn, err := grpcutils.Dial(runtimeAddr)
-	if err != nil {
-		return fmt.Errorf("failed to create client conn: %w", err)
-	}
-
-	client := gruntime.NewClient(runtimepb.NewRuntimeClient(clientConn))
-
-	listener, err := grpcutils.NewListener()
-	if err != nil {
-		return fmt.Errorf("failed to create new listener: %w", err)
-	}
-
-	ctx, cancel := context.WithTimeout(ctx, defaultRuntimeDialTimeout)
-	defer cancel()
-	err = client.Initialize(ctx, version.RPCChainVMProtocol, listener.Addr().String())
-	if err != nil {
-		_ = listener.Close()
-		return fmt.Errorf("failed to initialize vm runtime: %w", err)
-	}
-
 	// start RPC Chain VM server
-	grpcutils.Serve(listener, server)
-
-	return nil
+	return startVMServer(ctx, server)
 }
