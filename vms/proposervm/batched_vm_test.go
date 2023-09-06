@@ -1022,6 +1022,7 @@ func initTestRemoteProposerVM(
 		proBlkStartTime,
 		0,
 		DefaultMinBlockDelay,
+		DefaultNumHistoricalBlocks,
 		pTestSigner,
 		pTestCert,
 	)

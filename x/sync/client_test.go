@@ -32,11 +32,12 @@ import (
 
 func newDefaultDBConfig() merkledb.Config {
 	return merkledb.Config{
-		EvictionBatchSize: 100,
-		HistoryLength:     defaultRequestKeyLimit,
-		NodeCacheSize:     defaultRequestKeyLimit,
-		Reg:               prometheus.NewRegistry(),
-		Tracer:            trace.Noop,
+		EvictionBatchSize:         100,
+		HistoryLength:             defaultRequestKeyLimit,
+		ValueNodeCacheSize:        defaultRequestKeyLimit,
+		IntermediateNodeCacheSize: defaultRequestKeyLimit,
+		Reg:                       prometheus.NewRegistry(),
+		Tracer:                    trace.Noop,
 	}
 }
 

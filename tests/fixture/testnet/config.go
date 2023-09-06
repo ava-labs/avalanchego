@@ -33,7 +33,7 @@ import (
 )
 
 const (
-	DefaultNodeCount      = 5
+	DefaultNodeCount      = 2 // Minimum required to ensure connectivity-based health checks will pass
 	DefaultFundedKeyCount = 50
 
 	DefaultGasLimit = uint64(100_000_000) // Gas limit is arbitrary
