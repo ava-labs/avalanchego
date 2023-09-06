@@ -5,6 +5,7 @@ package merkledb
 
 import (
 	"bytes"
+	"github.com/ava-labs/avalanchego/x/merkledb/paths"
 	"io"
 	"math/rand"
 	"testing"
@@ -96,7 +97,7 @@ func FuzzCodecSerializedPath(f *testing.F) {
 			require.Len(bufBytes, numRead)
 			require.Equal(b[:numRead], bufBytes)
 
-			clonedGot := got.deserialize().Serialize()
+			clonedGot := got.Deserialize().Serialize()
 			require.Equal(got, clonedGot)
 		},
 	)
@@ -158,7 +159,7 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 				_, _ = r.Read(childPathBytes)              // #nosec G404
 
 				children[byte(i)] = child{
-					compressedPath: newPath(childPathBytes),
+					compressedPath: paths.NewNibblePath(childPathBytes),
 					id:             childID,
 				}
 			}
@@ -239,7 +240,7 @@ func FuzzEncodeHashValues(f *testing.F) {
 				_, _ = r.Read(compressedPathBytes) // #nosec G404
 
 				children[byte(i)] = child{
-					compressedPath: newPath(compressedPathBytes),
+					compressedPath: paths.NewNibblePath(compressedPathBytes),
 					id:             ids.GenerateTestID(),
 					hasValue:       r.Intn(2) == 1, // #nosec G404
 				}
@@ -259,7 +260,7 @@ func FuzzEncodeHashValues(f *testing.F) {
 			hv := &hashValues{
 				Children: children,
 				Value:    value,
-				Key:      newPath(key).Serialize(),
+				Key:      paths.NewNibblePath(key).Serialize(),
 			}
 
 			// Serialize the *hashValues with both codecs

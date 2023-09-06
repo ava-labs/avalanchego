@@ -4,6 +4,7 @@
 package merkledb
 
 import (
+	"github.com/ava-labs/avalanchego/x/merkledb/paths"
 	"sync"
 	"testing"
 
@@ -38,7 +39,7 @@ func TestIntermediateNodeDB(t *testing.T) {
 	)
 
 	// Put a key-node pair
-	node1Key := newPath([]byte{0x01})
+	node1Key := paths.NewNibblePath([]byte{0x01})
 	node1 := newNode(nil, node1Key)
 	node1.setValue(maybe.Some([]byte{byte(0x01)}))
 	require.NoError(db.Put(node1Key, node1))
@@ -69,8 +70,8 @@ func TestIntermediateNodeDB(t *testing.T) {
 	expectedSize := 0
 	added := 0
 	for {
-		key := newPath([]byte{byte(added)})
-		node := newNode(nil, EmptyPath)
+		key := paths.NewNibblePath([]byte{byte(added)})
+		node := newNode(nil, paths.EmptyPath[16])
 		node.setValue(maybe.Some([]byte{byte(added)}))
 		newExpectedSize := expectedSize + cacheEntrySize(key, node)
 		if newExpectedSize > cacheSize {
@@ -89,8 +90,8 @@ func TestIntermediateNodeDB(t *testing.T) {
 	// Put one more element in the cache, which should trigger an eviction
 	// of all but 2 elements. 2 elements remain rather than 1 element because of
 	// the added key prefix increasing the size tracked by the batch.
-	key := newPath([]byte{byte(added)})
-	node := newNode(nil, EmptyPath)
+	key := paths.NewNibblePath([]byte{byte(added)})
+	node := newNode(nil, paths.EmptyPath[16])
 	node.setValue(maybe.Some([]byte{byte(added)}))
 	require.NoError(db.Put(key, node))
 
@@ -98,7 +99,7 @@ func TestIntermediateNodeDB(t *testing.T) {
 	require.Equal(1, db.nodeCache.fifo.Len())
 	gotKey, _, ok := db.nodeCache.fifo.Oldest()
 	require.True(ok)
-	require.Equal(newPath([]byte{byte(added)}), gotKey)
+	require.Equal(paths.NewNibblePath([]byte{byte(added)}), gotKey)
 
 	// Get a node from the base database
 	// Use an early key that has been evicted from the cache

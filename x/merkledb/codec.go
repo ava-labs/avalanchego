@@ -8,6 +8,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/ava-labs/avalanchego/x/merkledb/paths"
 	"io"
 	"math"
 	"sync"
@@ -186,7 +187,7 @@ func (c *codecImpl) decodeDBNode(b []byte, n *dbNode) error {
 			return err
 		}
 		n.children[byte(index)] = child{
-			compressedPath: compressedPath.deserialize(),
+			compressedPath: compressedPath.Deserialize(),
 			id:             childID,
 			hasValue:       hasValue,
 		}
@@ -339,45 +340,45 @@ func (*codecImpl) decodeID(src *bytes.Reader) (ids.ID, error) {
 	return id, err
 }
 
-func (c *codecImpl) encodeSerializedPath(dst *bytes.Buffer, s SerializedPath) {
+func (c *codecImpl) encodeSerializedPath(dst *bytes.Buffer, s paths.SerializedPath) {
 	c.encodeInt(dst, s.NibbleLength)
 	_, _ = dst.Write(s.Value)
 }
 
-func (c *codecImpl) decodeSerializedPath(src *bytes.Reader) (SerializedPath, error) {
+func (c *codecImpl) decodeSerializedPath(src *bytes.Reader) (paths.SerializedPath, error) {
 	if minSerializedPathLen > src.Len() {
-		return SerializedPath{}, io.ErrUnexpectedEOF
+		return paths.SerializedPath{}, io.ErrUnexpectedEOF
 	}
 
 	var (
-		result SerializedPath
+		result paths.SerializedPath
 		err    error
 	)
 	if result.NibbleLength, err = c.decodeInt(src); err != nil {
-		return SerializedPath{}, err
+		return paths.SerializedPath{}, err
 	}
 	if result.NibbleLength < 0 {
-		return SerializedPath{}, errNegativeNibbleLength
+		return paths.SerializedPath{}, errNegativeNibbleLength
 	}
 	pathBytesLen := result.NibbleLength >> 1
-	hasOddLen := result.hasOddLength()
+	hasOddLen := result.NibbleLength%2 == 1
 	if hasOddLen {
 		pathBytesLen++
 	}
 	if pathBytesLen > src.Len() {
-		return SerializedPath{}, io.ErrUnexpectedEOF
+		return paths.SerializedPath{}, io.ErrUnexpectedEOF
 	}
 	result.Value = make([]byte, pathBytesLen)
 	if _, err := io.ReadFull(src, result.Value); err != nil {
 		if err == io.EOF {
 			err = io.ErrUnexpectedEOF
 		}
-		return SerializedPath{}, err
+		return paths.SerializedPath{}, err
 	}
 	if hasOddLen {
 		paddedNibble := result.Value[pathBytesLen-1] & 0x0F
 		if paddedNibble != 0 {
-			return SerializedPath{}, errNonZeroNibblePadding
+			return paths.SerializedPath{}, errNonZeroNibblePadding
 		}
 	}
 	return result, nil

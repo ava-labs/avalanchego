@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/ava-labs/avalanchego/x/merkledb/paths"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
@@ -52,14 +53,14 @@ type changeSummaryAndInsertNumber struct {
 // Tracks all of the node and value changes that resulted in the rootID.
 type changeSummary struct {
 	rootID ids.ID
-	nodes  map[path]*change[*node]
-	values map[path]*change[maybe.Maybe[[]byte]]
+	nodes  map[paths.TokenPath]*change[*node]
+	values map[paths.TokenPath]*change[maybe.Maybe[[]byte]]
 }
 
 func newChangeSummary(estimatedSize int) *changeSummary {
 	return &changeSummary{
-		nodes:  make(map[path]*change[*node], estimatedSize),
-		values: make(map[path]*change[maybe.Maybe[[]byte]], estimatedSize),
+		nodes:  make(map[paths.TokenPath]*change[*node], estimatedSize),
+		values: make(map[paths.TokenPath]*change[maybe.Maybe[[]byte]], estimatedSize),
 	}
 }
 
@@ -153,10 +154,10 @@ func (th *trieHistory) getValueChanges(
 	var (
 		// Keep track of changed keys so the largest can be removed
 		// in order to stay within the [maxLength] limit if necessary.
-		changedKeys = set.Set[path]{}
+		changedKeys = set.Set[paths.TokenPath]{}
 
-		startPath = maybe.Bind(start, newPath)
-		endPath   = maybe.Bind(end, newPath)
+		startPath = maybe.Bind(start, paths.NewNibblePath)
+		endPath   = maybe.Bind(end, paths.NewNibblePath)
 
 		// For each element in the history in the range between [startRoot]'s
 		// last appearance (exclusive) and [endRoot]'s last appearance (inclusive),
@@ -234,8 +235,8 @@ func (th *trieHistory) getChangesToGetToRoot(rootID ids.ID, start maybe.Maybe[[]
 	}
 
 	var (
-		startPath                    = maybe.Bind(start, newPath)
-		endPath                      = maybe.Bind(end, newPath)
+		startPath                    = maybe.Bind(start, paths.NewNibblePath)
+		endPath                      = maybe.Bind(end, paths.NewNibblePath)
 		combinedChanges              = newChangeSummary(defaultPreallocationSize)
 		mostRecentChangeInsertNumber = th.nextInsertNumber - 1
 		mostRecentChangeIndex        = th.history.Len() - 1

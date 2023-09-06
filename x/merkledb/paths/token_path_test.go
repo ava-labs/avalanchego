@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package merkledb
+package paths
 
 import (
 	"testing"
@@ -104,14 +104,14 @@ func FuzzPath(f *testing.F) {
 	f.Fuzz(func(t *testing.T, pathBytes []byte) {
 		require := require.New(t)
 
-		path := newPath(pathBytes)
+		p := NewNibblePath(pathBytes)
 
-		serializedPath := path.Serialize()
+		serializedPath := p.Serialize()
 		require.Equal(pathBytes, serializedPath.Value)
 		require.Equal(2*len(pathBytes), serializedPath.NibbleLength)
 
-		deserializedPath := serializedPath.deserialize()
-		require.Equal(path, deserializedPath)
+		deserializedPath := serializedPath.Deserialize()
+		require.Equal(p, deserializedPath)
 
 		reserializedPath := deserializedPath.Serialize()
 		require.Equal(serializedPath, reserializedPath)

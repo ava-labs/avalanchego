@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/ava-labs/avalanchego/x/merkledb/paths"
 	"math"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -55,7 +56,7 @@ var (
 )
 
 type ProofNode struct {
-	KeyPath SerializedPath
+	KeyPath paths.SerializedPath
 	// Nothing if this is an intermediate node.
 	// The value in this node if its length < [HashLen].
 	// The hash of the value in this node otherwise.
@@ -147,7 +148,7 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID) error {
 	if len(proof.Path) == 0 {
 		return ErrNoProof
 	}
-	if err := verifyProofPath(proof.Path, newPath(proof.Key)); err != nil {
+	if err := verifyProofPath(proof.Path, paths.NewNibblePath(proof.Key)); err != nil {
 		return err
 	}
 
@@ -158,7 +159,7 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID) error {
 	// then the value of the last proof node must match [proof.Value].
 	// Note odd length keys can never match the [proof.Key] since it's bytes,
 	// and thus an even number of nibbles.
-	if !lastNode.KeyPath.hasOddLength() &&
+	if lastNode.KeyPath.NibbleLength%2 == 0 &&
 		bytes.Equal(proof.Key, lastNode.KeyPath.Value) &&
 		!valueOrHashMatches(proof.Value, lastNode.ValueOrHash) {
 		return ErrProofValueDoesntMatch
@@ -168,7 +169,7 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID) error {
 	// then this is an exclusion proof and should prove that [proof.Key] isn't in the trie..
 	// Note odd length keys can never match the [proof.Key] since it's bytes,
 	// and thus an even number of nibbles.
-	if (lastNode.KeyPath.hasOddLength() || !bytes.Equal(proof.Key, lastNode.KeyPath.Value)) &&
+	if (lastNode.KeyPath.NibbleLength%2 == 1 || !bytes.Equal(proof.Key, lastNode.KeyPath.Value)) &&
 		proof.Value.HasValue() {
 		return ErrProofValueDoesntMatch
 	}
@@ -182,7 +183,7 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID) error {
 	// Insert all proof nodes.
 	// [provenPath] is the path that we are proving exists, or the path
 	// that is where the path we are proving doesn't exist should be.
-	provenPath := maybe.Some(proof.Path[len(proof.Path)-1].KeyPath.deserialize())
+	provenPath := maybe.Some(proof.Path[len(proof.Path)-1].KeyPath.Deserialize())
 
 	if err = addPathInfo(view, proof.Path, provenPath, provenPath); err != nil {
 		return err
@@ -313,20 +314,20 @@ func (proof *RangeProof) Verify(
 	// If [largestProvenPath] is Nothing, [proof] should
 	// provide and prove all keys > [smallestProvenPath].
 	// If both are Nothing, [proof] should prove the entire trie.
-	smallestProvenPath := maybe.Bind(start, newPath)
+	smallestProvenPath := maybe.Bind(start, paths.NewNibblePath)
 
-	largestProvenPath := maybe.Bind(end, newPath)
+	largestProvenPath := maybe.Bind(end, paths.NewNibblePath)
 	if len(proof.KeyValues) > 0 {
 		// If [proof] has key-value pairs, we should insert children
 		// greater than [largestProvenPath] to ancestors of the node containing
 		// [largestProvenPath] so that we get the expected root ID.
-		largestProvenPath = maybe.Some(newPath(proof.KeyValues[len(proof.KeyValues)-1].Key))
+		largestProvenPath = maybe.Some(paths.NewNibblePath(proof.KeyValues[len(proof.KeyValues)-1].Key))
 	}
 
 	// The key-value pairs (allegedly) proven by [proof].
-	keyValues := make(map[path][]byte, len(proof.KeyValues))
+	keyValues := make(map[paths.TokenPath][]byte, len(proof.KeyValues))
 	for _, keyValue := range proof.KeyValues {
-		keyValues[newPath(keyValue.Key)] = keyValue.Value
+		keyValues[paths.NewNibblePath(keyValue.Key)] = keyValue.Value
 	}
 
 	// Ensure that the start proof is valid and contains values that
@@ -463,16 +464,16 @@ func (proof *RangeProof) UnmarshalProto(pbProof *pb.RangeProof) error {
 
 // Verify that all non-intermediate nodes in [proof] which have keys
 // in [[start], [end]] have the value given for that key in [keysValues].
-func verifyAllRangeProofKeyValuesPresent(proof []ProofNode, start path, end maybe.Maybe[path], keysValues map[path][]byte) error {
+func verifyAllRangeProofKeyValuesPresent(proof []ProofNode, start paths.TokenPath, end maybe.Maybe[paths.TokenPath], keysValues map[paths.TokenPath][]byte) error {
 	for i := 0; i < len(proof); i++ {
 		var (
 			node     = proof[i]
 			nodeKey  = node.KeyPath
-			nodePath = nodeKey.deserialize()
+			nodePath = nodeKey.Deserialize()
 		)
 
 		// Skip odd length keys since they cannot have a value (enforced by [verifyProofPath]).
-		if !nodeKey.hasOddLength() && nodePath.Compare(start) >= 0 && (end.IsNothing() || nodePath.Compare(end.Value()) <= 0) {
+		if nodeKey.NibbleLength%2 == 0 && nodePath.Compare(start) >= 0 && (end.IsNothing() || nodePath.Compare(end.Value()) <= 0) {
 			value, ok := keysValues[nodePath]
 			if !ok && node.ValueOrHash.HasValue() {
 				// We didn't get a key-value pair for this key, but the proof node has a value.
@@ -642,20 +643,20 @@ func verifyAllChangeProofKeyValuesPresent(
 	ctx context.Context,
 	db MerkleDB,
 	proof []ProofNode,
-	start path,
-	end maybe.Maybe[path],
-	keysValues map[path]maybe.Maybe[[]byte],
+	start paths.TokenPath,
+	end maybe.Maybe[paths.TokenPath],
+	keysValues map[paths.TokenPath]maybe.Maybe[[]byte],
 ) error {
 	for i := 0; i < len(proof); i++ {
 		var (
 			node     = proof[i]
 			nodeKey  = node.KeyPath
-			nodePath = nodeKey.deserialize()
+			nodePath = nodeKey.Deserialize()
 		)
 
 		// Check the value of any node with a key that is within the range.
 		// Skip odd length keys since they cannot have a value (enforced by [verifyProofPath]).
-		if !nodeKey.hasOddLength() && nodePath.Compare(start) >= 0 && (end.IsNothing() || nodePath.Compare(end.Value()) <= 0) {
+		if nodeKey.NibbleLength%2 == 0 && nodePath.Compare(start) >= 0 && (end.IsNothing() || nodePath.Compare(end.Value()) <= 0) {
 			value, ok := keysValues[nodePath]
 			if !ok {
 				// This value isn't in the list of key-value pairs we got.
@@ -745,7 +746,7 @@ func verifyKeyValues(kvs []KeyValue, start maybe.Maybe[[]byte], end maybe.Maybe[
 //   - Each key in [proof] is a strict prefix of [keyBytes], except possibly the last.
 //   - If the last element in [proof] is [keyPath], this is an inclusion proof.
 //     Otherwise, this is an exclusion proof and [keyBytes] must not be in [proof].
-func verifyProofPath(proof []ProofNode, keyPath path) error {
+func verifyProofPath(proof []ProofNode, keyPath paths.TokenPath) error {
 	if len(proof) == 0 {
 		return nil
 	}
@@ -756,7 +757,7 @@ func verifyProofPath(proof []ProofNode, keyPath path) error {
 		nodeKey := proof[i].KeyPath
 
 		// intermediate nodes (nodes with odd nibble length) should never have a value associated with them
-		if nodeKey.hasOddLength() && !proof[i].ValueOrHash.IsNothing() {
+		if nodeKey.NibbleLength%2 == 1 && !proof[i].ValueOrHash.IsNothing() {
 			return ErrOddLengthWithValue
 		}
 
@@ -775,7 +776,7 @@ func verifyProofPath(proof []ProofNode, keyPath path) error {
 	// check the last node for a value since the above loop doesn't check the last node
 	if len(proof) > 0 {
 		lastNode := proof[len(proof)-1]
-		if lastNode.KeyPath.hasOddLength() && !lastNode.ValueOrHash.IsNothing() {
+		if lastNode.KeyPath.NibbleLength%2 == 1 && !lastNode.ValueOrHash.IsNothing() {
 			return ErrOddLengthWithValue
 		}
 	}
@@ -815,8 +816,8 @@ func valueOrHashMatches(value maybe.Maybe[[]byte], valueOrHash maybe.Maybe[[]byt
 func addPathInfo(
 	t *trieView,
 	proofPath []ProofNode,
-	insertChildrenLessThan maybe.Maybe[path],
-	insertChildrenGreaterThan maybe.Maybe[path],
+	insertChildrenLessThan maybe.Maybe[paths.TokenPath],
+	insertChildrenGreaterThan maybe.Maybe[paths.TokenPath],
 ) error {
 	var (
 		shouldInsertLeftChildren  = insertChildrenLessThan.HasValue()
@@ -825,9 +826,9 @@ func addPathInfo(
 
 	for i := len(proofPath) - 1; i >= 0; i-- {
 		proofNode := proofPath[i]
-		keyPath := proofNode.KeyPath.deserialize()
+		keyPath := proofNode.KeyPath.Deserialize()
 
-		if len(keyPath)&1 == 1 && !proofNode.ValueOrHash.IsNothing() {
+		if keyPath.Length()%keyPath.TokensPerByte() != 0 && !proofNode.ValueOrHash.IsNothing() {
 			// a value cannot have an odd number of nibbles in its key
 			return ErrOddLengthWithValue
 		}
@@ -850,12 +851,12 @@ func addPathInfo(
 
 		// Add [proofNode]'s children which are outside the range
 		// [insertChildrenLessThan, insertChildrenGreaterThan].
-		compressedPath := EmptyPath
+		compressedPath := paths.EmptyPath[16]
 		for index, childID := range proofNode.Children {
 			if existingChild, ok := n.children[index]; ok {
 				compressedPath = existingChild.compressedPath
 			}
-			childPath := keyPath.Append(index) + compressedPath
+			childPath := keyPath.Append(index).Extend(compressedPath)
 			if (shouldInsertLeftChildren && childPath.Compare(insertChildrenLessThan.Value()) < 0) ||
 				(shouldInsertRightChildren && childPath.Compare(insertChildrenGreaterThan.Value()) > 0) {
 				// We don't know if the child had a value or not, but it doesn't matter.

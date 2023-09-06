@@ -4,6 +4,7 @@
 package merkledb
 
 import (
+	"github.com/ava-labs/avalanchego/x/merkledb/paths"
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 
@@ -21,7 +22,7 @@ const (
 type hashValues struct {
 	Children map[byte]child
 	Value    maybe.Maybe[[]byte]
-	Key      SerializedPath
+	Key      paths.SerializedPath
 }
 
 // Representation of a node stored in the database.
@@ -31,7 +32,7 @@ type dbNode struct {
 }
 
 type child struct {
-	compressedPath path
+	compressedPath paths.TokenPath
 	id             ids.ID
 	hasValue       bool
 }
@@ -40,14 +41,14 @@ type child struct {
 type node struct {
 	dbNode
 	id          ids.ID
-	key         path
+	key         paths.TokenPath
 	nodeBytes   []byte
 	valueDigest maybe.Maybe[[]byte]
 }
 
 // Returns a new node with the given [key] and no value.
 // If [parent] isn't nil, the new node is added as a child of [parent].
-func newNode(parent *node, key path) *node {
+func newNode(parent *node, key paths.TokenPath) *node {
 	newNode := &node{
 		dbNode: dbNode{
 			children: make(map[byte]child, NodeBranchFactor),
@@ -61,7 +62,7 @@ func newNode(parent *node, key path) *node {
 }
 
 // Parse [nodeBytes] to a node and set its key to [key].
-func parseNode(key path, nodeBytes []byte) (*node, error) {
+func parseNode(key paths.TokenPath, nodeBytes []byte) (*node, error) {
 	n := dbNode{}
 	if err := codec.decodeDBNode(nodeBytes, &n); err != nil {
 		return nil, err
@@ -132,15 +133,15 @@ func (n *node) setValueDigest() {
 // That is, [n.key] is a prefix of [child.key].
 func (n *node) addChild(child *node) {
 	n.addChildWithoutNode(
-		child.key[len(n.key)],
-		child.key[len(n.key)+1:],
+		child.key.Token(n.key.Length()),
+		child.key.Skip(n.key.Length()+1),
 		child.id,
 		child.hasValue(),
 	)
 }
 
 // Adds a child to [n] without a reference to the child node.
-func (n *node) addChildWithoutNode(index byte, compressedPath path, childID ids.ID, hasValue bool) {
+func (n *node) addChildWithoutNode(index byte, compressedPath paths.TokenPath, childID ids.ID, hasValue bool) {
 	n.onNodeChanged()
 	n.children[index] = child{
 		compressedPath: compressedPath,
@@ -152,7 +153,7 @@ func (n *node) addChildWithoutNode(index byte, compressedPath path, childID ids.
 // Removes [child] from [n]'s children.
 func (n *node) removeChild(child *node) {
 	n.onNodeChanged()
-	delete(n.children, child.key[len(n.key)])
+	delete(n.children, child.key.Token(n.key.Length()))
 }
 
 // clone Returns a copy of [n].

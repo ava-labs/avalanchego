@@ -9,6 +9,7 @@ package merkledb
 
 import (
 	context "context"
+	"github.com/ava-labs/avalanchego/x/merkledb/paths"
 	reflect "reflect"
 
 	database "github.com/ava-labs/avalanchego/database"
@@ -374,7 +375,7 @@ func (mr *MockMerkleDBMockRecorder) VerifyChangeProof(arg0, arg1, arg2, arg3, ar
 }
 
 // getEditableNode mocks base method.
-func (m *MockMerkleDB) getEditableNode(arg0 path, arg1 bool) (*node, error) {
+func (m *MockMerkleDB) getEditableNode(arg0 paths.TokenPath, arg1 bool) (*node, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "getEditableNode", arg0, arg1)
 	ret0, _ := ret[0].(*node)
@@ -389,7 +390,7 @@ func (mr *MockMerkleDBMockRecorder) getEditableNode(arg0, arg1 interface{}) *gom
 }
 
 // getValue mocks base method.
-func (m *MockMerkleDB) getValue(arg0 path) ([]byte, error) {
+func (m *MockMerkleDB) getValue(arg0 paths.TokenPath) ([]byte, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "getValue", arg0)
 	ret0, _ := ret[0].([]byte)

@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/ava-labs/avalanchego/x/merkledb/paths"
 	"runtime"
 	"sync"
 
@@ -32,7 +33,6 @@ import (
 )
 
 const (
-	RootPath = EmptyPath
 
 	// TODO: name better
 	rebuildViewSizeFractionOfCacheSize   = 50
@@ -42,7 +42,8 @@ const (
 )
 
 var (
-	_ MerkleDB = (*merkleDB)(nil)
+	RootPath          = paths.EmptyPath[16]
+	_        MerkleDB = (*merkleDB)(nil)
 
 	codec = newCodec()
 
@@ -234,8 +235,8 @@ func newDatabase(
 	// add current root to history (has no changes)
 	trieDB.history.record(&changeSummary{
 		rootID: root,
-		values: map[path]*change[maybe.Maybe[[]byte]]{},
-		nodes:  map[path]*change[*node]{},
+		values: map[paths.TokenPath]*change[maybe.Maybe[[]byte]]{},
+		nodes:  map[paths.TokenPath]*change[*node]{},
 	})
 
 	shutdownType, err := trieDB.baseDB.Get(cleanShutdownKey)
@@ -424,7 +425,7 @@ func (db *merkleDB) GetValues(ctx context.Context, keys [][]byte) ([][]byte, []e
 	values := make([][]byte, len(keys))
 	errors := make([]error, len(keys))
 	for i, key := range keys {
-		values[i], errors[i] = db.getValueCopy(newPath(key))
+		values[i], errors[i] = db.getValueCopy(paths.NewNibblePath(key))
 	}
 	return values, errors
 }
@@ -438,13 +439,13 @@ func (db *merkleDB) GetValue(ctx context.Context, key []byte) ([]byte, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	return db.getValueCopy(newPath(key))
+	return db.getValueCopy(paths.NewNibblePath(key))
 }
 
 // getValueCopy returns a copy of the value for the given [key].
 // Returns database.ErrNotFound if it doesn't exist.
 // Assumes [db.lock] is read locked.
-func (db *merkleDB) getValueCopy(key path) ([]byte, error) {
+func (db *merkleDB) getValueCopy(key paths.TokenPath) ([]byte, error) {
 	val, err := db.getValueWithoutLock(key)
 	if err != nil {
 		return nil, err
@@ -455,7 +456,7 @@ func (db *merkleDB) getValueCopy(key path) ([]byte, error) {
 // getValue returns the value for the given [key].
 // Returns database.ErrNotFound if it doesn't exist.
 // Assumes [db.lock] isn't held.
-func (db *merkleDB) getValue(key path) ([]byte, error) {
+func (db *merkleDB) getValue(key paths.TokenPath) ([]byte, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
@@ -465,7 +466,7 @@ func (db *merkleDB) getValue(key path) ([]byte, error) {
 // getValueWithoutLock returns the value for the given [key].
 // Returns database.ErrNotFound if it doesn't exist.
 // Assumes [db.lock] is read locked.
-func (db *merkleDB) getValueWithoutLock(key path) ([]byte, error) {
+func (db *merkleDB) getValueWithoutLock(key paths.TokenPath) ([]byte, error) {
 	if db.closed {
 		return nil, database.ErrClosed
 	}
@@ -705,7 +706,7 @@ func (db *merkleDB) Has(k []byte) (bool, error) {
 		return false, database.ErrClosed
 	}
 
-	_, err := db.getValueWithoutLock(newPath(k))
+	_, err := db.getValueWithoutLock(paths.NewNibblePath(k))
 	if err == database.ErrNotFound {
 		return false, nil
 	}
@@ -943,7 +944,7 @@ func (db *merkleDB) VerifyChangeProof(
 	}
 
 	// Note that if [start] is Nothing, smallestPath is the empty path.
-	smallestPath := newPath(start.Value())
+	smallestPath := paths.NewNibblePath(start.Value())
 
 	// Make sure the start proof, if given, is well-formed.
 	if err := verifyProofPath(proof.StartProof, smallestPath); err != nil {
@@ -953,12 +954,12 @@ func (db *merkleDB) VerifyChangeProof(
 	// Find the greatest key in [proof.KeyChanges]
 	// Note that [proof.EndProof] is a proof for this key.
 	// [largestPath] is also used when we add children of proof nodes to [trie] below.
-	largestPath := maybe.Bind(end, newPath)
+	largestPath := maybe.Bind(end, paths.NewNibblePath)
 	if len(proof.KeyChanges) > 0 {
 		// If [proof] has key-value pairs, we should insert children
 		// greater than [end] to ancestors of the node containing [end]
 		// so that we get the expected root ID.
-		largestPath = maybe.Some(newPath(proof.KeyChanges[len(proof.KeyChanges)-1].Key))
+		largestPath = maybe.Some(paths.NewNibblePath(proof.KeyChanges[len(proof.KeyChanges)-1].Key))
 	}
 
 	// Make sure the end proof, if given, is well-formed.
@@ -966,9 +967,9 @@ func (db *merkleDB) VerifyChangeProof(
 		return err
 	}
 
-	keyValues := make(map[path]maybe.Maybe[[]byte], len(proof.KeyChanges))
+	keyValues := make(map[paths.TokenPath]maybe.Maybe[[]byte], len(proof.KeyChanges))
 	for _, keyValue := range proof.KeyChanges {
-		keyValues[newPath(keyValue.Key)] = keyValue.Value
+		keyValues[paths.NewNibblePath(keyValue.Key)] = keyValue.Value
 	}
 
 	// want to prevent commit writes to DB, but not prevent DB reads
@@ -1021,8 +1022,8 @@ func (db *merkleDB) VerifyChangeProof(
 	// keys are less than [insertChildrenLessThan] or whose keys are greater
 	// than [insertChildrenGreaterThan] into the trie so that we get the
 	// expected root ID (if this proof is valid).
-	insertChildrenLessThan := maybe.Nothing[path]()
-	if len(smallestPath) > 0 {
+	insertChildrenLessThan := maybe.Nothing[paths.TokenPath]()
+	if smallestPath.Length() > 0 {
 		insertChildrenLessThan = maybe.Some(smallestPath)
 	}
 	if err := addPathInfo(
@@ -1155,7 +1156,7 @@ func (db *merkleDB) getKeysNotInSet(start, end []byte, keySet set.Set[string]) (
 // This copy may be edited by the caller without affecting the database state.
 // Returns database.ErrNotFound if the node doesn't exist.
 // Assumes [db.lock] isn't held.
-func (db *merkleDB) getEditableNode(key path, hasValue bool) (*node, error) {
+func (db *merkleDB) getEditableNode(key paths.TokenPath, hasValue bool) (*node, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
@@ -1171,7 +1172,7 @@ func (db *merkleDB) getEditableNode(key path, hasValue bool) (*node, error) {
 // Editing the returned node affects the database state.
 // Returns database.ErrNotFound if the node doesn't exist.
 // Assumes [db.lock] is read locked.
-func (db *merkleDB) getNode(key path, hasValue bool) (*node, error) {
+func (db *merkleDB) getNode(key paths.TokenPath, hasValue bool) (*node, error) {
 	switch {
 	case db.closed:
 		return nil, database.ErrClosed
@@ -1205,10 +1206,10 @@ func addPrefixToKey(bufferPool *sync.Pool, prefix []byte, key []byte) []byte {
 }
 
 // cacheEntrySize returns a rough approximation of the memory consumed by storing the path and node
-func cacheEntrySize(p path, n *node) int {
+func cacheEntrySize(p paths.TokenPath, n *node) int {
 	if n == nil {
-		return len(p)
+		return p.Length()
 	}
 	// nodes cache their bytes representation so the total memory consumed is roughly twice that
-	return len(p) + 2*len(n.bytes())
+	return p.Length() + 2*len(n.bytes())
 }

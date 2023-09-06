@@ -4,6 +4,7 @@
 package merkledb
 
 import (
+	"github.com/ava-labs/avalanchego/x/merkledb/paths"
 	"sync"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -24,7 +25,7 @@ type valueNodeDB struct {
 
 	// If a value is nil, the corresponding key isn't in the trie.
 	// Paths in [nodeCache] aren't prefixed with [valueNodePrefix].
-	nodeCache cache.Cacher[path, *node]
+	nodeCache cache.Cacher[paths.TokenPath, *node]
 	metrics   merkleMetrics
 
 	closed utils.Atomic[bool]
@@ -58,11 +59,11 @@ func (db *valueNodeDB) Close() {
 func (db *valueNodeDB) NewBatch() *valueNodeBatch {
 	return &valueNodeBatch{
 		db:  db,
-		ops: make(map[path]*node, defaultBufferLength),
+		ops: make(map[paths.TokenPath]*node, defaultBufferLength),
 	}
 }
 
-func (db *valueNodeDB) Get(key path) (*node, error) {
+func (db *valueNodeDB) Get(key paths.TokenPath) (*node, error) {
 	if cachedValue, isCached := db.nodeCache.Get(key); isCached {
 		db.metrics.ValueNodeCacheHit()
 		if cachedValue == nil {
@@ -87,14 +88,14 @@ func (db *valueNodeDB) Get(key path) (*node, error) {
 // Batch of database operations
 type valueNodeBatch struct {
 	db  *valueNodeDB
-	ops map[path]*node
+	ops map[paths.TokenPath]*node
 }
 
-func (b *valueNodeBatch) Put(key path, value *node) {
+func (b *valueNodeBatch) Put(key paths.TokenPath, value *node) {
 	b.ops[key] = value
 }
 
-func (b *valueNodeBatch) Delete(key path) {
+func (b *valueNodeBatch) Delete(key paths.TokenPath) {
 	b.ops[key] = nil
 }
 
@@ -162,7 +163,7 @@ func (i *iterator) Next() bool {
 	i.db.metrics.DatabaseNodeRead()
 	key := i.nodeIter.Key()
 	key = key[valueNodePrefixLen:]
-	n, err := parseNode(newPath(key), i.nodeIter.Value())
+	n, err := parseNode(paths.NewNibblePath(key), i.nodeIter.Value())
 	if err != nil {
 		i.err = err
 		return false

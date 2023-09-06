@@ -6,6 +6,7 @@ package merkledb
 import (
 	"bytes"
 	"context"
+	"github.com/ava-labs/avalanchego/x/merkledb/paths"
 	"math/rand"
 	"strconv"
 	"testing"
@@ -54,7 +55,7 @@ func Test_MerkleDB_Get_Safety(t *testing.T) {
 
 	val, err := db.Get([]byte{0})
 	require.NoError(err)
-	n, err := db.getNode(newPath([]byte{0}), true)
+	n, err := db.getNode(paths.NewNibblePath([]byte{0}), true)
 	require.NoError(err)
 	val[0] = 1
 
@@ -761,10 +762,10 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 	startRoot, err := db.GetMerkleRoot(context.Background())
 	require.NoError(err)
 
-	values := make(map[path][]byte) // tracks content of the trie
+	values := make(map[paths.TokenPath][]byte) // tracks content of the trie
 	currentBatch := db.NewBatch()
-	currentValues := make(map[path][]byte)
-	deleteValues := make(map[path]struct{})
+	currentValues := make(map[paths.TokenPath][]byte)
+	deleteValues := make(map[paths.TokenPath]struct{})
 	pastRoots := []ids.ID{}
 
 	for i, step := range rt {
@@ -772,12 +773,12 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 		switch step.op {
 		case opUpdate:
 			require.NoError(currentBatch.Put(step.key, step.value))
-			currentValues[newPath(step.key)] = step.value
-			delete(deleteValues, newPath(step.key))
+			currentValues[paths.NewNibblePath(step.key)] = step.value
+			delete(deleteValues, paths.NewNibblePath(step.key))
 		case opDelete:
 			require.NoError(currentBatch.Delete(step.key))
-			deleteValues[newPath(step.key)] = struct{}{}
-			delete(currentValues, newPath(step.key))
+			deleteValues[paths.NewNibblePath(step.key)] = struct{}{}
+			delete(currentValues, paths.NewNibblePath(step.key))
 		case opGenerateRangeProof:
 			root, err := db.GetMerkleRoot(context.Background())
 			require.NoError(err)
@@ -856,15 +857,15 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest) {
 					pastRoots = pastRoots[len(pastRoots)-300:]
 				}
 			}
-			currentValues = map[path][]byte{}
-			deleteValues = map[path]struct{}{}
+			currentValues = map[paths.TokenPath][]byte{}
+			deleteValues = map[paths.TokenPath]struct{}{}
 			currentBatch = db.NewBatch()
 		case opGet:
 			v, err := db.Get(step.key)
 			if err != nil {
 				require.ErrorIs(err, database.ErrNotFound)
 			}
-			want := values[newPath(step.key)]
+			want := values[paths.NewNibblePath(step.key)]
 			require.True(bytes.Equal(want, v)) // Use bytes.Equal so nil treated equal to []byte{}
 			trieValue, err := getNodeValue(db, string(step.key))
 			if err != nil {
