@@ -26,8 +26,10 @@ func TestAppRequestResponse(t *testing.T) {
 	response := []byte("response")
 	nodeID := ids.GenerateTestNodeID()
 	chainID := ids.GenerateTestID()
-	foo := "foo"
-	bar := "bar"
+
+	var ctxKey, ctxVal *string
+	*ctxKey = "foo"
+	*ctxVal = "bar"
 
 	tests := []struct {
 		name        string
@@ -47,7 +49,7 @@ func TestAppRequestResponse(t *testing.T) {
 				sender.EXPECT().SendAppResponse(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 					Do(func(ctx context.Context, _ ids.NodeID, requestID uint32, response []byte) {
 						go func() {
-							ctx = context.WithValue(ctx, foo, bar)
+							ctx = context.WithValue(ctx, ctxKey, ctxVal)
 							require.NoError(t, router.AppResponse(ctx, nodeID, requestID, response))
 						}()
 					}).AnyTimes()
@@ -61,7 +63,7 @@ func TestAppRequestResponse(t *testing.T) {
 					defer wg.Done()
 
 					require.NoError(t, err)
-					require.Equal(t, bar, ctx.Value(foo))
+					require.Equal(t, ctxVal, ctx.Value(ctxKey))
 					require.Equal(t, nodeID, actualNodeID)
 					require.Equal(t, response, actualResponse)
 				}
@@ -105,7 +107,7 @@ func TestAppRequestResponse(t *testing.T) {
 				sender.EXPECT().SendCrossChainAppResponse(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 					Do(func(ctx context.Context, chainID ids.ID, requestID uint32, response []byte) {
 						go func() {
-							ctx = context.WithValue(ctx, foo, bar)
+							ctx = context.WithValue(ctx, ctxKey, ctxVal)
 							require.NoError(t, router.CrossChainAppResponse(ctx, chainID, requestID, response))
 						}()
 					}).AnyTimes()
@@ -118,7 +120,7 @@ func TestAppRequestResponse(t *testing.T) {
 				callback := func(ctx context.Context, actualChainID ids.ID, actualResponse []byte, err error) {
 					defer wg.Done()
 					require.NoError(t, err)
-					require.Equal(t, bar, ctx.Value(foo))
+					require.Equal(t, ctxVal, ctx.Value(ctxKey))
 					require.Equal(t, chainID, actualChainID)
 					require.Equal(t, response, actualResponse)
 				}
