@@ -65,7 +65,7 @@ type Config struct {
 	MaxOpenFiles                int
 }
 
-func New(file string, cfg Config, log logging.Logger, _ string, _ prometheus.Registerer) (database.Database, error) {
+func New(file string, cfg Config, log logging.Logger, _ string, _ prometheus.Registerer) (*Database, error) {
 	// Original default settings are based on
 	// https://github.com/ethereum/go-ethereum/blob/release/1.11/ethdb/pebble/pebble.go
 	opts := &pebble.Options{
