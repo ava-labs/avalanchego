@@ -516,7 +516,7 @@ func TestPrecompileBind(t *testing.T) {
 			if err = os.WriteFile(filepath.Join(precompilePath, "contract.go"), []byte(bindedFiles.Contract), 0o600); err != nil {
 				t.Fatalf("test %d: failed to write binding: %v", i, err)
 			}
-			if err = os.WriteFile(filepath.Join(precompilePath, "contract_test.go"), []byte(bindedFiles.ConfigTest), 0o600); err != nil {
+			if err = os.WriteFile(filepath.Join(precompilePath, "config_test.go"), []byte(bindedFiles.ConfigTest), 0o600); err != nil {
 				t.Fatalf("test %d: failed to write binding: %v", i, err)
 			}
 			if err = os.WriteFile(filepath.Join(precompilePath, "contract_test.go"), []byte(bindedFiles.ContractTest), 0o600); err != nil {
