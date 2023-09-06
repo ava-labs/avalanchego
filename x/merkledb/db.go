@@ -43,7 +43,7 @@ const (
 )
 
 var (
-	RootPath          = paths.EmptyPath[16]
+	RootPath          = paths.EmptyPath(paths.BranchFactor16)
 	_        MerkleDB = (*merkleDB)(nil)
 
 	codec = newCodec()
@@ -426,7 +426,7 @@ func (db *merkleDB) GetValues(ctx context.Context, keys [][]byte) ([][]byte, []e
 	values := make([][]byte, len(keys))
 	errors := make([]error, len(keys))
 	for i, key := range keys {
-		values[i], errors[i] = db.getValueCopy(paths.NewNibblePath(key))
+		values[i], errors[i] = db.getValueCopy(paths.NewTokenPath16(key))
 	}
 	return values, errors
 }
@@ -440,7 +440,7 @@ func (db *merkleDB) GetValue(ctx context.Context, key []byte) ([]byte, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	return db.getValueCopy(paths.NewNibblePath(key))
+	return db.getValueCopy(paths.NewTokenPath16(key))
 }
 
 // getValueCopy returns a copy of the value for the given [key].
@@ -707,7 +707,7 @@ func (db *merkleDB) Has(k []byte) (bool, error) {
 		return false, database.ErrClosed
 	}
 
-	_, err := db.getValueWithoutLock(paths.NewNibblePath(k))
+	_, err := db.getValueWithoutLock(paths.NewTokenPath16(k))
 	if err == database.ErrNotFound {
 		return false, nil
 	}
@@ -945,7 +945,7 @@ func (db *merkleDB) VerifyChangeProof(
 	}
 
 	// Note that if [start] is Nothing, smallestPath is the empty path.
-	smallestPath := paths.NewNibblePath(start.Value())
+	smallestPath := paths.NewTokenPath16(start.Value())
 
 	// Make sure the start proof, if given, is well-formed.
 	if err := verifyProofPath(proof.StartProof, smallestPath); err != nil {
@@ -955,12 +955,12 @@ func (db *merkleDB) VerifyChangeProof(
 	// Find the greatest key in [proof.KeyChanges]
 	// Note that [proof.EndProof] is a proof for this key.
 	// [largestPath] is also used when we add children of proof nodes to [trie] below.
-	largestPath := maybe.Bind(end, paths.NewNibblePath)
+	largestPath := maybe.Bind(end, paths.NewTokenPath16)
 	if len(proof.KeyChanges) > 0 {
 		// If [proof] has key-value pairs, we should insert children
 		// greater than [end] to ancestors of the node containing [end]
 		// so that we get the expected root ID.
-		largestPath = maybe.Some(paths.NewNibblePath(proof.KeyChanges[len(proof.KeyChanges)-1].Key))
+		largestPath = maybe.Some(paths.NewTokenPath16(proof.KeyChanges[len(proof.KeyChanges)-1].Key))
 	}
 
 	// Make sure the end proof, if given, is well-formed.
@@ -970,7 +970,7 @@ func (db *merkleDB) VerifyChangeProof(
 
 	keyValues := make(map[paths.TokenPath]maybe.Maybe[[]byte], len(proof.KeyChanges))
 	for _, keyValue := range proof.KeyChanges {
-		keyValues[paths.NewNibblePath(keyValue.Key)] = keyValue.Value
+		keyValues[paths.NewTokenPath16(keyValue.Key)] = keyValue.Value
 	}
 
 	// want to prevent commit writes to DB, but not prevent DB reads

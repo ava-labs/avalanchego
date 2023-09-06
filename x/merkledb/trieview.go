@@ -171,7 +171,7 @@ func newTrieView(
 			}
 			newVal = maybe.Some(val)
 		}
-		if err := newView.recordValueChange(paths.NewNibblePath(op.Key), newVal); err != nil {
+		if err := newView.recordValueChange(paths.NewTokenPath16(op.Key), newVal); err != nil {
 			return nil, err
 		}
 	}
@@ -179,7 +179,7 @@ func newTrieView(
 		if !changes.ConsumeBytes {
 			val = maybe.Bind(val, slices.Clone[[]byte])
 		}
-		if err := newView.recordValueChange(paths.NewNibblePath([]byte(key)), val); err != nil {
+		if err := newView.recordValueChange(paths.NewTokenPath16([]byte(key)), val); err != nil {
 			return nil, err
 		}
 	}
@@ -330,7 +330,7 @@ func (t *trieView) getProof(ctx context.Context, key []byte) (*Proof, error) {
 	}
 
 	// Get the node at the given path, or the node closest to it.
-	keyPath := paths.NewNibblePath(key)
+	keyPath := paths.NewTokenPath16(key)
 
 	proofPath, err := t.getPathTo(keyPath)
 	if err != nil {
@@ -553,7 +553,7 @@ func (t *trieView) GetValues(ctx context.Context, keys [][]byte) ([][]byte, []er
 	valueErrors := make([]error, len(keys))
 
 	for i, key := range keys {
-		results[i], valueErrors[i] = t.getValueCopy(paths.NewNibblePath(key))
+		results[i], valueErrors[i] = t.getValueCopy(paths.NewTokenPath16(key))
 	}
 	return results, valueErrors
 }
@@ -564,7 +564,7 @@ func (t *trieView) GetValue(ctx context.Context, key []byte) ([]byte, error) {
 	_, span := t.db.debugTracer.Start(ctx, "MerkleDB.trieview.GetValue")
 	defer span.End()
 
-	return t.getValueCopy(paths.NewNibblePath(key))
+	return t.getValueCopy(paths.NewTokenPath16(key))
 }
 
 // getValueCopy returns a copy of the value for the given [key].

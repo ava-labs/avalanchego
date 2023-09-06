@@ -45,8 +45,8 @@ var (
 	falseBytes = []byte{falseByte}
 
 	errNegativeNumChildren  = errors.New("number of children is negative")
-	errTooManyChildren      = fmt.Errorf("length of children list is larger than branching factor of %d", NodeBranchFactor)
-	errChildIndexTooLarge   = fmt.Errorf("invalid child index. Must be less than branching factor of %d", NodeBranchFactor)
+	errTooManyChildren      = fmt.Errorf("length of children list is larger than branching factor of %d", paths.BranchFactor16)
+	errChildIndexTooLarge   = fmt.Errorf("invalid child index. Must be less than branching factor of %d", paths.BranchFactor16)
 	errNegativeNibbleLength = errors.New("nibble length is negative")
 	errIntTooLarge          = errors.New("integer too large to be decoded")
 	errLeadingZeroes        = errors.New("varint has leading zeroes")
@@ -103,7 +103,7 @@ func (c *codecImpl) encodeDBNode(n *dbNode) []byte {
 	c.encodeInt(buf, numChildren)
 	// Note we insert children in order of increasing index
 	// for determinism.
-	for index := byte(0); index < NodeBranchFactor; index++ {
+	for index := byte(0); index < byte(paths.BranchFactor16); index++ {
 		if entry, ok := n.children[index]; ok {
 			c.encodeInt(buf, int(index))
 			path := entry.compressedPath.Serialize()
@@ -126,7 +126,7 @@ func (c *codecImpl) encodeHashValues(hv *hashValues) []byte {
 	c.encodeInt(buf, numChildren)
 
 	// ensure that the order of entries is consistent
-	for index := byte(0); index < NodeBranchFactor; index++ {
+	for index := byte(0); index < byte(paths.BranchFactor16); index++ {
 		if entry, ok := hv.Children[index]; ok {
 			c.encodeInt(buf, int(index))
 			_, _ = buf.Write(entry.id[:])
@@ -157,20 +157,20 @@ func (c *codecImpl) decodeDBNode(b []byte, n *dbNode) error {
 		return err
 	case numChildren < 0:
 		return errNegativeNumChildren
-	case numChildren > NodeBranchFactor:
+	case numChildren > int(paths.BranchFactor16):
 		return errTooManyChildren
 	case numChildren > src.Len()/minChildLen:
 		return io.ErrUnexpectedEOF
 	}
 
-	n.children = make(map[byte]child, NodeBranchFactor)
+	n.children = make(map[byte]child, paths.BranchFactor16)
 	previousChild := -1
 	for i := 0; i < numChildren; i++ {
 		index, err := c.decodeInt(src)
 		if err != nil {
 			return err
 		}
-		if index <= previousChild || index >= NodeBranchFactor {
+		if index <= previousChild || index >= int(paths.BranchFactor16) {
 			return errChildIndexTooLarge
 		}
 		previousChild = index

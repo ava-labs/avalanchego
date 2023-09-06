@@ -149,7 +149,7 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 				value = maybe.Some(valueBytes)
 			}
 
-			numChildren := r.Intn(NodeBranchFactor) // #nosec G404
+			numChildren := r.Intn(int(paths.BranchFactor16)) // #nosec G404
 
 			children := map[byte]child{}
 			for i := 0; i < numChildren; i++ {
@@ -160,7 +160,7 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 				_, _ = r.Read(childPathBytes)              // #nosec G404
 
 				children[byte(i)] = child{
-					compressedPath: paths.NewNibblePath(childPathBytes),
+					compressedPath: paths.NewTokenPath16(childPathBytes),
 					id:             childID,
 				}
 			}
@@ -211,8 +211,8 @@ func TestCodecDecodeDBNode(t *testing.T) {
 	nodeBytes = proofBytesBuf.Bytes()
 	nodeBytes = nodeBytes[:len(nodeBytes)-minVarIntLen]
 	proofBytesBuf = bytes.NewBuffer(nodeBytes)
-	// Put num children NodeBranchFactor+1 at end
-	codec.(*codecImpl).encodeInt(proofBytesBuf, NodeBranchFactor+1)
+	// Put num children paths.BranchFactor16+1 at end
+	codec.(*codecImpl).encodeInt(proofBytesBuf, int(paths.BranchFactor16)+1)
 
 	err = codec.decodeDBNode(proofBytesBuf.Bytes(), &parsedDBNode)
 	require.ErrorIs(err, errTooManyChildren)
@@ -234,14 +234,14 @@ func FuzzEncodeHashValues(f *testing.F) {
 			r := rand.New(rand.NewSource(int64(randSeed))) // #nosec G404
 
 			children := map[byte]child{}
-			numChildren := r.Intn(NodeBranchFactor) // #nosec G404
+			numChildren := r.Intn(int(paths.BranchFactor16)) // #nosec G404
 			for i := 0; i < numChildren; i++ {
 				compressedPathLen := r.Intn(32) // #nosec G404
 				compressedPathBytes := make([]byte, compressedPathLen)
 				_, _ = r.Read(compressedPathBytes) // #nosec G404
 
 				children[byte(i)] = child{
-					compressedPath: paths.NewNibblePath(compressedPathBytes),
+					compressedPath: paths.NewTokenPath16(compressedPathBytes),
 					id:             ids.GenerateTestID(),
 					hasValue:       r.Intn(2) == 1, // #nosec G404
 				}
@@ -261,7 +261,7 @@ func FuzzEncodeHashValues(f *testing.F) {
 			hv := &hashValues{
 				Children: children,
 				Value:    value,
-				Key:      paths.NewNibblePath(key).Serialize(),
+				Key:      paths.NewTokenPath16(key).Serialize(),
 			}
 
 			// Serialize the *hashValues with both codecs

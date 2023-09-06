@@ -164,7 +164,7 @@ func (i *iterator) Next() bool {
 	i.db.metrics.DatabaseNodeRead()
 	key := i.nodeIter.Key()
 	key = key[valueNodePrefixLen:]
-	n, err := parseNode(paths.NewNibblePath(key), i.nodeIter.Value())
+	n, err := parseNode(paths.NewTokenPath16(key), i.nodeIter.Value())
 	if err != nil {
 		i.err = err
 		return false

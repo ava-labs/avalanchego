@@ -9,55 +9,71 @@ import (
 	"unsafe"
 )
 
+type (
+	BranchFactor int
+)
+
+const (
+	Bit    int = 1
+	Crumb  int = 2
+	Nibble int = 4
+	Byte   int = 8
+
+	BranchFactor2   BranchFactor = 2
+	BranchFactor4   BranchFactor = 4
+	BranchFactor16  BranchFactor = 16
+	BranchFactor256 BranchFactor = 256
+)
+
 var (
-	EmptyPath = map[int]TokenPath{
-		2:   {branchFactor: 2},
-		4:   {branchFactor: 4},
-		16:  {branchFactor: 16},
-		256: {branchFactor: 256},
+	EmptyPath = func(bf BranchFactor) TokenPath {
+		return TokenPath{tokenBitSize: branchFactorToTokenSize[bf]}
 	}
-	branchFactorToTokenCount = map[int]int{2: 8, 4: 4, 16: 2, 256: 1}
-	branchToOffsetMasks      = map[int]map[int]byte{
-		2:   {0: 0b1000_0000, 1: 0b0100_0000, 2: 0b0010_0000, 3: 0b0001_0000, 4: 0b0000_1000, 5: 0b0000_0100, 6: 0b0000_0010, 7: 0b0000_0001},
-		4:   {0: 0b1100_0000, 1: 0b0011_0000, 2: 0b0000_1100, 3: 0b0000_0011},
-		16:  {1: 0x0F, 0: 0xF0},
-		256: {0: 0xFF},
+
+	branchFactorToTokenSize = map[BranchFactor]int{
+		BranchFactor2:   Bit,
+		BranchFactor4:   Crumb,
+		BranchFactor16:  Nibble,
+		BranchFactor256: Byte,
 	}
-	branchToOffsetShifts = map[int]map[int]byte{
-		2:   {0: 7, 1: 6, 2: 5, 3: 4, 4: 3, 5: 2, 6: 1, 7: 0},
-		4:   {0: 6, 1: 4, 2: 2, 3: 0},
-		16:  {0: 4, 1: 0},
-		256: {0: 0},
+
+	tokenSizeToBranchFactor = map[int]BranchFactor{
+		Bit:    BranchFactor2,
+		Crumb:  BranchFactor4,
+		Nibble: BranchFactor16,
+		Byte:   BranchFactor256,
 	}
 )
 
 type TokenPath struct {
 	value        string
-	branchFactor int
+	tokenBitSize int
 }
 
-func NewTokenPath(p []byte, branchFactor int) TokenPath {
-	// create new buffer with double the length of the input since each byte gets split into two nibbles
-	tokensPerByte := branchFactorToTokenCount[branchFactor]
+func NewTokenPath(p []byte, branchFactor BranchFactor) TokenPath {
+	result := EmptyPath(branchFactor)
+
+	// create new buffer with a multiple of the input length since each byte gets split into multiple tokens
+	tokensPerByte := result.TokensPerByte()
 	buffer := make([]byte, len(p)*tokensPerByte)
 
-	// first nibble gets shifted right 4 (divided by 16) to isolate the first nibble
-	// second nibble gets bitwise anded with 0x0F (1111) to isolate the second nibble
+	// Each token gets bitwise anded with a bit mask to isolate the bits of current token
+	// and then shifted right to make it a value between [0, BranchFactor)
 	bufferIndex := 0
 	for _, currentByte := range p {
 		for currentOffset := 0; currentOffset < tokensPerByte; currentOffset++ {
-			mask := branchToOffsetMasks[branchFactor][currentOffset]
-			shift := branchToOffsetShifts[branchFactor][currentOffset]
-			buffer[bufferIndex+currentOffset] = currentByte & mask >> shift
+			buffer[bufferIndex+currentOffset] = currentByte & result.mask(currentOffset) >> result.shift(currentOffset)
 		}
 		bufferIndex += tokensPerByte
 	}
 
 	// avoid copying during the conversion
-	return TokenPath{
-		value:        *(*string)(unsafe.Pointer(&buffer)),
-		branchFactor: branchFactor,
-	}
+	result.value = *(*string)(unsafe.Pointer(&buffer))
+	return result
+}
+
+func NewTokenPath16(p []byte) TokenPath {
+	return NewTokenPath(p, BranchFactor16)
 }
 
 func (p TokenPath) Equal(other TokenPath) bool {
@@ -87,40 +103,57 @@ func (p TokenPath) HasPrefix(prefix TokenPath) bool {
 func (p TokenPath) Append(token byte) TokenPath {
 	return TokenPath{
 		value:        p.value + string(token),
-		branchFactor: p.branchFactor,
+		tokenBitSize: p.tokenBitSize,
 	}
 }
 
 func (p TokenPath) Extend(path TokenPath) TokenPath {
 	return TokenPath{
 		value:        p.value + path.value,
-		branchFactor: p.branchFactor,
+		tokenBitSize: p.tokenBitSize,
 	}
 }
 
 func (p TokenPath) Slice(start, end int) TokenPath {
 	return TokenPath{
 		value:        p.value[start:end],
-		branchFactor: p.branchFactor,
+		tokenBitSize: p.tokenBitSize,
 	}
 }
 
 func (p TokenPath) Skip(tokensToSkip int) TokenPath {
 	return TokenPath{
 		value:        p.value[tokensToSkip:],
-		branchFactor: p.branchFactor,
+		tokenBitSize: p.tokenBitSize,
 	}
 }
 
 func (p TokenPath) Take(tokensToTake int) TokenPath {
 	return TokenPath{
 		value:        p.value[:tokensToTake],
-		branchFactor: p.branchFactor,
+		tokenBitSize: p.tokenBitSize,
 	}
 }
 
+func (p TokenPath) BranchFactor() int {
+	return int(tokenSizeToBranchFactor[p.tokenBitSize])
+}
+
+func (p TokenPath) TokenBitSize() int {
+	return p.tokenBitSize
+}
+
 func (p TokenPath) TokensPerByte() int {
-	return branchFactorToTokenCount[p.branchFactor]
+	return Byte / p.tokenBitSize
+}
+
+// gets the amount of shift(>> or <<) that a token needs to be shifted based on the offset into the current byte
+func (p TokenPath) shift(offset int) int {
+	return Byte - (p.tokenBitSize * (offset + 1))
+}
+
+func (p TokenPath) mask(offset int) byte {
+	return byte(tokenSizeToBranchFactor[p.tokenBitSize]-1) << p.shift(offset)
 }
 
 // Invariant: The returned value must not be modified.
@@ -140,10 +173,12 @@ func (p TokenPath) Serialize() SerializedPath {
 			Value:        []byte{},
 		}
 	}
-	// add one so there is a byte for the odd nibble if it exists
-	tokensPerByte := branchFactorToTokenCount[p.branchFactor]
+
+	tokensPerByte := p.TokensPerByte()
 	byteLength := len(p.value) / tokensPerByte
 	remainder := len(p.value) % tokensPerByte
+
+	// add one so there is a byte for the remainder tokens if any exist
 	if remainder > 0 {
 		byteLength++
 	}
@@ -156,12 +191,8 @@ func (p TokenPath) Serialize() SerializedPath {
 	for pathIndex := 0; pathIndex < len(p.value); pathIndex++ {
 		keyIndex := pathIndex / tokensPerByte
 		offset := pathIndex % tokensPerByte
-		result.Value[keyIndex] += p.value[pathIndex] << branchToOffsetShifts[p.branchFactor][offset]
+		result.Value[keyIndex] += p.value[pathIndex] << p.shift(offset)
 	}
 
 	return result
-}
-
-func NewNibblePath(p []byte) TokenPath {
-	return NewTokenPath(p, 16)
 }

@@ -14,8 +14,7 @@ import (
 )
 
 const (
-	NodeBranchFactor = 16
-	HashLength       = 32
+	HashLength = 32
 )
 
 // the values that go into the node's id
@@ -51,7 +50,7 @@ type node struct {
 func newNode(parent *node, key paths.TokenPath) *node {
 	newNode := &node{
 		dbNode: dbNode{
-			children: make(map[byte]child, NodeBranchFactor),
+			children: make(map[byte]child, key.BranchFactor()),
 		},
 		key: key,
 	}

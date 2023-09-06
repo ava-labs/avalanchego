@@ -44,7 +44,7 @@ var (
 	ErrProofValueDoesntMatch       = errors.New("the provided value does not match the proof node for the provided key's value")
 	ErrProofNodeHasUnincludedValue = errors.New("the provided proof has a value for a key within the range that is not present in the provided key/values")
 	ErrInvalidMaybe                = errors.New("maybe is nothing but has value")
-	ErrInvalidChildIndex           = fmt.Errorf("child index must be less than %d", NodeBranchFactor)
+	ErrInvalidChildIndex           = fmt.Errorf("child index must be less than %d", int(paths.BranchFactor16))
 	ErrNilProofNode                = errors.New("proof node is nil")
 	ErrNilValueOrHash              = errors.New("proof node's valueOrHash field is nil")
 	ErrNilSerializedPath           = errors.New("serialized path is nil")
@@ -110,7 +110,7 @@ func (node *ProofNode) UnmarshalProto(pbNode *pb.ProofNode) error {
 
 	node.Children = make(map[byte]ids.ID, len(pbNode.Children))
 	for childIndex, childIDBytes := range pbNode.Children {
-		if childIndex >= NodeBranchFactor {
+		if childIndex >= uint32(paths.BranchFactor16) {
 			return ErrInvalidChildIndex
 		}
 		childID, err := ids.ToID(childIDBytes)
@@ -149,7 +149,7 @@ func (proof *Proof) Verify(ctx context.Context, expectedRootID ids.ID) error {
 	if len(proof.Path) == 0 {
 		return ErrNoProof
 	}
-	if err := verifyProofPath(proof.Path, paths.NewNibblePath(proof.Key)); err != nil {
+	if err := verifyProofPath(proof.Path, paths.NewTokenPath16(proof.Key)); err != nil {
 		return err
 	}
 
@@ -315,20 +315,20 @@ func (proof *RangeProof) Verify(
 	// If [largestProvenPath] is Nothing, [proof] should
 	// provide and prove all keys > [smallestProvenPath].
 	// If both are Nothing, [proof] should prove the entire trie.
-	smallestProvenPath := maybe.Bind(start, paths.NewNibblePath)
+	smallestProvenPath := maybe.Bind(start, paths.NewTokenPath16)
 
-	largestProvenPath := maybe.Bind(end, paths.NewNibblePath)
+	largestProvenPath := maybe.Bind(end, paths.NewTokenPath16)
 	if len(proof.KeyValues) > 0 {
 		// If [proof] has key-value pairs, we should insert children
 		// greater than [largestProvenPath] to ancestors of the node containing
 		// [largestProvenPath] so that we get the expected root ID.
-		largestProvenPath = maybe.Some(paths.NewNibblePath(proof.KeyValues[len(proof.KeyValues)-1].Key))
+		largestProvenPath = maybe.Some(paths.NewTokenPath16(proof.KeyValues[len(proof.KeyValues)-1].Key))
 	}
 
 	// The key-value pairs (allegedly) proven by [proof].
 	keyValues := make(map[paths.TokenPath][]byte, len(proof.KeyValues))
 	for _, keyValue := range proof.KeyValues {
-		keyValues[paths.NewNibblePath(keyValue.Key)] = keyValue.Value
+		keyValues[paths.NewTokenPath16(keyValue.Key)] = keyValue.Value
 	}
 
 	// Ensure that the start proof is valid and contains values that
@@ -852,7 +852,7 @@ func addPathInfo(
 
 		// Add [proofNode]'s children which are outside the range
 		// [insertChildrenLessThan, insertChildrenGreaterThan].
-		compressedPath := paths.EmptyPath[16]
+		compressedPath := paths.EmptyPath(paths.BranchFactor16)
 		for index, childID := range proofNode.Children {
 			if existingChild, ok := n.children[index]; ok {
 				compressedPath = existingChild.compressedPath

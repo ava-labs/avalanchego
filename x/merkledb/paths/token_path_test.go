@@ -104,7 +104,7 @@ func FuzzPath(f *testing.F) {
 	f.Fuzz(func(t *testing.T, pathBytes []byte) {
 		require := require.New(t)
 
-		p := NewNibblePath(pathBytes)
+		p := NewTokenPath16(pathBytes)
 
 		serializedPath := p.Serialize()
 		require.Equal(pathBytes, serializedPath.Value)

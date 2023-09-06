@@ -157,8 +157,8 @@ func (th *trieHistory) getValueChanges(
 		// in order to stay within the [maxLength] limit if necessary.
 		changedKeys = set.Set[paths.TokenPath]{}
 
-		startPath = maybe.Bind(start, paths.NewNibblePath)
-		endPath   = maybe.Bind(end, paths.NewNibblePath)
+		startPath = maybe.Bind(start, paths.NewTokenPath16)
+		endPath   = maybe.Bind(end, paths.NewTokenPath16)
 
 		// For each element in the history in the range between [startRoot]'s
 		// last appearance (exclusive) and [endRoot]'s last appearance (inclusive),
@@ -236,8 +236,8 @@ func (th *trieHistory) getChangesToGetToRoot(rootID ids.ID, start maybe.Maybe[[]
 	}
 
 	var (
-		startPath                    = maybe.Bind(start, paths.NewNibblePath)
-		endPath                      = maybe.Bind(end, paths.NewNibblePath)
+		startPath                    = maybe.Bind(start, paths.NewTokenPath16)
+		endPath                      = maybe.Bind(end, paths.NewTokenPath16)
 		combinedChanges              = newChangeSummary(defaultPreallocationSize)
 		mostRecentChangeInsertNumber = th.nextInsertNumber - 1
 		mostRecentChangeIndex        = th.history.Len() - 1
