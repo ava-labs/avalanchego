@@ -48,6 +48,9 @@ func Serve(ctx context.Context, vm block.ChainVM, opts ...grpcutils.ServerOption
 			case s := <-signals:
 				switch s {
 				case syscall.SIGINT, syscall.SIGTERM:
+					// these signals are ignored because ctrl-c will send SIGINT
+					// to all processes and systemd will send SIGTERM to all
+					// processes by default during stop.
 					fmt.Printf("runtime engine: ignoring signal: %s\n", s)
 				case syscall.SIGUSR1:
 					fmt.Printf("runtime engine: received shutdown signal: %s\n", s)
