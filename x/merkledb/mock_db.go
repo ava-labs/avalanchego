@@ -11,11 +11,10 @@ import (
 	context "context"
 	reflect "reflect"
 
-	"github.com/ava-labs/avalanchego/x/merkledb/paths"
-
 	database "github.com/ava-labs/avalanchego/database"
 	ids "github.com/ava-labs/avalanchego/ids"
 	maybe "github.com/ava-labs/avalanchego/utils/maybe"
+	paths "github.com/ava-labs/avalanchego/x/merkledb/paths"
 	gomock "go.uber.org/mock/gomock"
 )
 
