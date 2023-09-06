@@ -26,6 +26,10 @@ const (
 	// pebbleByteOverHead is the number of bytes of constant overhead that
 	// should be added to a batch size per operation.
 	pebbleByteOverHead = 8
+
+	blockSize      = 64 * units.KiB
+	indexBlockSize = 256 * units.KiB
+	filterPolicy   = bloom.FilterPolicy(10)
 )
 
 var (
@@ -34,11 +38,20 @@ var (
 	_ database.Iterator = (*iter)(nil)
 
 	ErrInvalidOperation = errors.New("invalid operation")
+
+	DefaultConfig = Config{
+		CacheSize:                   units.GiB,
+		BytesPerSync:                units.MiB,
+		WALBytesPerSync:             units.MiB,
+		MemTableStopWritesThreshold: 8,
+		MemTableSize:                16 * units.MiB,
+		MaxOpenFiles:                4 * units.KiB,
+	}
 )
 
 type Database struct {
-	db     *pebble.DB
-	closed utils.Atomic[bool]
+	pebbleDB *pebble.DB
+	closed   utils.Atomic[bool]
 	// closeCh is closed when Close() is called.
 	closeCh chan struct{}
 }
@@ -50,17 +63,6 @@ type Config struct {
 	MemTableStopWritesThreshold int // num tables
 	MemTableSize                int // Byte
 	MaxOpenFiles                int
-}
-
-func NewDefaultConfig() Config {
-	return Config{
-		CacheSize:                   units.GiB,
-		BytesPerSync:                units.MiB,
-		WALBytesPerSync:             units.MiB,
-		MemTableStopWritesThreshold: 8,
-		MemTableSize:                16 * units.MiB,
-		MaxOpenFiles:                4 * units.KiB,
-	}
 }
 
 func New(file string, cfg Config, log logging.Logger, _ string, _ prometheus.Registerer) (database.Database, error) {
@@ -85,9 +87,9 @@ func New(file string, cfg Config, log logging.Logger, _ string, _ prometheus.Reg
 	// https://github.com/cockroachdb/pebble/blob/crl-release-23.1/cmd/pebble/db.go
 	for i := 0; i < len(opts.Levels); i++ {
 		l := &opts.Levels[i]
-		l.BlockSize = 64 * units.KiB
-		l.IndexBlockSize = 256 * units.KiB
-		l.FilterPolicy = bloom.FilterPolicy(10)
+		l.BlockSize = blockSize
+		l.IndexBlockSize = indexBlockSize
+		l.FilterPolicy = filterPolicy
 		l.FilterType = pebble.TableFilter
 		if i > 0 {
 			l.TargetFileSize = opts.Levels[i-1].TargetFileSize * 2
@@ -95,7 +97,7 @@ func New(file string, cfg Config, log logging.Logger, _ string, _ prometheus.Reg
 	}
 	opts.Experimental.ReadSamplingMultiplier = -1 // explicitly disable seek compaction
 
-	log.Info("creating pebbledb")
+	log.Info("opening pebble")
 
 	db, err := pebble.Open(file, opts)
 	if err != nil {
@@ -103,8 +105,8 @@ func New(file string, cfg Config, log logging.Logger, _ string, _ prometheus.Reg
 	}
 
 	return &Database{
-		db:      db,
-		closeCh: make(chan struct{}),
+		pebbleDB: db,
+		closeCh:  make(chan struct{}),
 	}, nil
 }
 
@@ -115,7 +117,7 @@ func (db *Database) Close() error {
 	}
 	db.closed.Set(true)
 
-	err := updateError(db.db.Close())
+	err := updateError(db.pebbleDB.Close())
 	if err != nil && strings.Contains(err.Error(), "leaked iterator") {
 		// avalanche database support close db w/o error
 		// even if there is an iterator which is not released
@@ -138,7 +140,7 @@ func (db *Database) Has(key []byte) (bool, error) {
 		return false, database.ErrClosed
 	}
 
-	_, closer, err := db.db.Get(key)
+	_, closer, err := db.pebbleDB.Get(key)
 	if err == pebble.ErrNotFound {
 		return false, nil
 	}
@@ -154,7 +156,7 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 		return nil, database.ErrClosed
 	}
 
-	data, closer, err := db.db.Get(key)
+	data, closer, err := db.pebbleDB.Get(key)
 	if err != nil {
 		return nil, updateError(err)
 	}
@@ -171,7 +173,7 @@ func (db *Database) Put(key []byte, value []byte) error {
 	// Use of [pebble.NoSync] here means we don't wait for the [Set] to be
 	// persisted to the WAL before returning. Basic benchmarking indicates that
 	// waiting for the WAL to sync reduces performance by 20%.
-	return updateError(db.db.Set(key, value, pebble.NoSync))
+	return updateError(db.pebbleDB.Set(key, value, pebble.NoSync))
 }
 
 func (db *Database) Delete(key []byte) error {
@@ -180,7 +182,7 @@ func (db *Database) Delete(key []byte) error {
 		return database.ErrClosed
 	}
 
-	return updateError(db.db.Delete(key, pebble.NoSync))
+	return updateError(db.pebbleDB.Delete(key, pebble.NoSync))
 }
 
 func (db *Database) Compact(start []byte, limit []byte) error {
@@ -207,16 +209,16 @@ func (db *Database) Compact(start []byte, limit []byte) error {
 		// expects a nil return.
 		return nil
 	} else if limit != nil {
-		return updateError(db.db.Compact(start, limit, true))
+		return updateError(db.pebbleDB.Compact(start, limit, true))
 	}
 
 	// A nil limit is treated as a key after all keys in avalanche DB.
 	// But pebble treats a nil, no matter start or limit, as a key before
 	// all keys in the DB
-	it := db.db.NewIter(&pebble.IterOptions{})
+	it := db.pebbleDB.NewIter(&pebble.IterOptions{})
 	if it.Last() {
 		if lastkey := it.Key(); lastkey != nil {
-			return updateError(db.db.Compact(start, lastkey, true))
+			return updateError(db.pebbleDB.Compact(start, lastkey, true))
 		}
 	}
 
@@ -236,7 +238,7 @@ type batch struct {
 func (db *Database) NewBatch() database.Batch {
 	return &batch{
 		db:    db,
-		batch: db.db.NewBatch(),
+		batch: db.pebbleDB.NewBatch(),
 	}
 }
 
@@ -268,7 +270,7 @@ func (b *batch) Write() error {
 		// Create a new batch to do Commit
 		newbatch := &batch{
 			db:    b.db,
-			batch: b.db.db.NewBatch(),
+			batch: b.db.pebbleDB.NewBatch(),
 		}
 
 		// duplicate b.batch to newbatch.batch
@@ -331,7 +333,7 @@ func (db *Database) NewIterator() database.Iterator {
 
 	return &iter{
 		db:   db,
-		iter: db.db.NewIter(&pebble.IterOptions{}),
+		iter: db.pebbleDB.NewIter(&pebble.IterOptions{}),
 	}
 }
 
@@ -344,7 +346,7 @@ func (db *Database) NewIteratorWithStart(start []byte) database.Iterator {
 
 	return &iter{
 		db:   db,
-		iter: db.db.NewIter(&pebble.IterOptions{LowerBound: start}),
+		iter: db.pebbleDB.NewIter(&pebble.IterOptions{LowerBound: start}),
 	}
 }
 
@@ -373,7 +375,7 @@ func (db *Database) NewIteratorWithPrefix(prefix []byte) database.Iterator {
 
 	return &iter{
 		db:   db,
-		iter: db.db.NewIter(bytesPrefix(prefix)),
+		iter: db.pebbleDB.NewIter(bytesPrefix(prefix)),
 	}
 }
 
@@ -396,7 +398,7 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 	}
 	return &iter{
 		db:   db,
-		iter: db.db.NewIter(iterRange),
+		iter: db.pebbleDB.NewIter(iterRange),
 	}
 }
 

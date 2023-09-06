@@ -17,7 +17,7 @@ import (
 func TestInterface(t *testing.T) {
 	for _, test := range database.Tests {
 		folder := t.TempDir()
-		cfg := NewDefaultConfig()
+		cfg := DefaultConfig
 		db, err := New(folder, cfg, logging.NoLog{}, "pebble", prometheus.NewRegistry())
 		require.NoError(t, err)
 		defer db.Close()
@@ -33,7 +33,7 @@ func TestInterface(t *testing.T) {
 func FuzzInterface(f *testing.F) {
 	for _, test := range database.FuzzTests {
 		folder := f.TempDir()
-		cfg := NewDefaultConfig()
+		cfg := DefaultConfig
 		db, err := New(folder, cfg, logging.NoLog{}, "", prometheus.NewRegistry())
 		require.NoError(f, err)
 		defer db.Close()
@@ -51,7 +51,7 @@ func BenchmarkInterface(b *testing.B) {
 		keys, values := database.SetupBenchmark(b, size[0], size[1], size[2])
 		for _, bench := range database.Benchmarks {
 			folder := b.TempDir()
-			cfg := NewDefaultConfig()
+			cfg := DefaultConfig
 
 			db, err := New(folder, cfg, logging.NoLog{}, "", prometheus.NewRegistry())
 			require.NoError(b, err)
