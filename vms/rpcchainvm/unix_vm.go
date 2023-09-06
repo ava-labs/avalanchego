@@ -1,8 +1,8 @@
 // Copyright (C) 2019-2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-//go:build linux
-// +build linux
+//go:build linux || darwin
+// +build linux darwin
 
 // ^ SIGUSR1 signal is not available on Windows
 
