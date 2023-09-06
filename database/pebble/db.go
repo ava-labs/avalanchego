@@ -163,8 +163,7 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 	if err != nil {
 		return nil, updateError(err)
 	}
-	dataClone := slices.Clone(data)
-	return dataClone, closer.Close()
+	return slices.Clone(data), closer.Close()
 }
 
 func (db *Database) Put(key []byte, value []byte) error {

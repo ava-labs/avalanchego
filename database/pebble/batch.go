@@ -14,13 +14,15 @@ import (
 
 var _ database.Batch = (*batch)(nil)
 
+// Not safe for concurrent use.
 type batch struct {
 	batch *pebble.Batch
 	db    *Database
 	size  int
 
-	// Support batch rewrite
-	applied atomic.Bool
+	// True iff [batch] has been written to the database
+	// since the last time [Reset] was called.
+	written atomic.Bool
 }
 
 func (db *Database) NewBatch() database.Batch {
@@ -40,43 +42,44 @@ func (b *batch) Delete(key []byte) error {
 	return b.batch.Delete(key, pebble.NoSync) // TODO is NoSync OK?
 }
 
-func (b *batch) Size() int { return b.size }
+func (b *batch) Size() int {
+	return b.size
+}
 
+// Assumes [b.db.lock] is not held.
 func (b *batch) Write() error {
-	b.db.lock.Lock() // TODO do we need write lock?
-	defer b.db.lock.Unlock()
+	b.db.lock.RLock()
+	defer b.db.lock.RUnlock()
 
 	if b.db.closed {
 		return database.ErrClosed
 	}
 
-	// Support batch rewrite
-	// The underlying pebble db doesn't support batch rewrites but panics instead
-	// We have to create a new batch which is a kind of duplicate of the given
-	// batch(arg b) and commit this new batch on behalf of the given batch.
-	if b.applied.Load() {
-		// the given batch b has already been committed
-		// Don't Commit it again, got panic otherwise
-		// Create a new batch to do Commit
-		newbatch := &batch{
-			db:    b.db,
-			batch: b.db.pebbleDB.NewBatch(),
-		}
-
-		// duplicate b.batch to newbatch.batch
-		if err := newbatch.batch.Apply(b.batch, nil); err != nil {
-			return err
-		}
-		return updateError(newbatch.batch.Commit(pebble.NoSync)) // TODO is NoSync OK?
+	if !b.written.Load() {
+		// This batch has not been written to the database yet.
+		b.written.Store(true)
+		return updateError(b.batch.Commit(pebble.NoSync))
 	}
-	// mark it for alerady committed
-	b.applied.Store(true)
 
-	return updateError(b.batch.Commit(pebble.NoSync))
+	// pebble doesn't support writing a batch twice so we have to create a
+	// batch which is a kind of duplicate of [db] and commit the new batch.
+	newbatch := &batch{
+		db:    b.db,
+		batch: b.db.pebbleDB.NewBatch(),
+	}
+
+	// Copy the batch.
+	if err := newbatch.batch.Apply(b.batch, nil); err != nil {
+		return err
+	}
+
+	// Commit the new batch.
+	return updateError(newbatch.batch.Commit(pebble.NoSync)) // TODO is NoSync OK?
 }
 
 func (b *batch) Reset() {
 	b.batch.Reset()
+	b.written.Store(false)
 	b.size = 0
 }
 
@@ -102,4 +105,6 @@ func (b *batch) Replay(w database.KeyValueWriterDeleter) error {
 	}
 }
 
-func (b *batch) Inner() database.Batch { return b }
+func (b *batch) Inner() database.Batch {
+	return b
+}
