@@ -31,7 +31,7 @@ use std::{
     io::{Cursor, Write},
     mem::size_of,
     num::NonZeroUsize,
-    os::fd::AsFd,
+    os::fd::{AsFd, BorrowedFd},
     path::Path,
     sync::Arc,
     thread::JoinHandle,
@@ -396,45 +396,7 @@ impl Db {
             {
                 return Err(DbError::InvalidParams);
             }
-            nix::unistd::ftruncate(fd0, 0).map_err(DbError::System)?;
-            nix::unistd::ftruncate(fd0, 1 << cfg.meta_file_nbit).map_err(DbError::System)?;
-
-            // The header consists of three parts:
-            // DbParams
-            // DbHeader (just a pointer to the sentinel)
-            // CompactSpaceHeader for future allocations
-            let header_bytes: Vec<u8> = {
-                let params = DbParams {
-                    magic: *MAGIC_STR,
-                    meta_file_nbit: cfg.meta_file_nbit,
-                    payload_file_nbit: cfg.payload_file_nbit,
-                    payload_regn_nbit: cfg.payload_regn_nbit,
-                    wal_file_nbit: cfg.wal.file_nbit,
-                    wal_block_nbit: cfg.wal.block_nbit,
-                    root_hash_file_nbit: cfg.root_hash_file_nbit,
-                };
-                let bytes = bytemuck::bytes_of(&params).to_vec();
-                bytes.into_iter()
-            }
-            .chain({
-                // compute the DbHeader as bytes
-                let hdr = DbHeader::new_empty();
-                // clippy thinks to_vec isn't necessary, but it actually is :(
-                #[allow(clippy::unnecessary_to_owned)]
-                bytemuck::bytes_of(&hdr).to_vec().into_iter()
-            })
-            .chain({
-                // write out the CompactSpaceHeader
-                let csh = CompactSpaceHeader::new(
-                    NonZeroUsize::new(SPACE_RESERVED as usize).unwrap(),
-                    NonZeroUsize::new(SPACE_RESERVED as usize).unwrap(),
-                );
-                #[allow(clippy::unnecessary_to_owned)]
-                bytemuck::bytes_of(&csh).to_vec().into_iter()
-            })
-            .collect();
-
-            nix::sys::uio::pwrite(fd0, &header_bytes, 0).map_err(DbError::System)?;
+            Self::initialize_header_on_disk(cfg, fd0)?;
         }
 
         // read DbParams
@@ -556,6 +518,45 @@ impl Db {
             metrics: Arc::new(DbMetrics::default()),
             cfg: cfg.clone(),
         })
+    }
+
+    fn initialize_header_on_disk(cfg: &DbConfig, fd0: BorrowedFd) -> Result<(), DbError> {
+        // The header consists of three parts:
+        // DbParams
+        // DbHeader (just a pointer to the sentinel)
+        // CompactSpaceHeader for future allocations
+        let (params, hdr, csh);
+        let header_bytes: Vec<u8> = {
+            params = DbParams {
+                magic: *MAGIC_STR,
+                meta_file_nbit: cfg.meta_file_nbit,
+                payload_file_nbit: cfg.payload_file_nbit,
+                payload_regn_nbit: cfg.payload_regn_nbit,
+                wal_file_nbit: cfg.wal.file_nbit,
+                wal_block_nbit: cfg.wal.block_nbit,
+                root_hash_file_nbit: cfg.root_hash_file_nbit,
+            };
+            let bytes = bytemuck::bytes_of(&params);
+            bytes.iter()
+        }
+        .chain({
+            // compute the DbHeader as bytes
+            hdr = DbHeader::new_empty();
+            bytemuck::bytes_of(&hdr)
+        })
+        .chain({
+            // write out the CompactSpaceHeader
+            csh = CompactSpaceHeader::new(
+                NonZeroUsize::new(SPACE_RESERVED as usize).unwrap(),
+                NonZeroUsize::new(SPACE_RESERVED as usize).unwrap(),
+            );
+            bytemuck::bytes_of(&csh)
+        })
+        .copied()
+        .collect();
+
+        nix::sys::uio::pwrite(fd0, &header_bytes, 0).map_err(DbError::System)?;
+        Ok(())
     }
 
     /// Create a new mutable store and an alterable revision of the DB on top.
