@@ -22,12 +22,12 @@ func (t *testTx) GetID() ids.ID {
 }
 
 func (t *testTx) Marshal() ([]byte, error) {
-	return t.id[:], nil
+	return t.id.Bytes(), nil
 }
 
 func (t *testTx) Unmarshal(bytes []byte) error {
 	t.id = ids.ID{}
-	copy(t.id[:], bytes)
+	copy(ids.Writable(&(t.id)), bytes)
 	return nil
 }
 

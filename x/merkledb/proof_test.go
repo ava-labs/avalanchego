@@ -55,7 +55,7 @@ func newRandomProofNode(r *rand.Rand) ProofNode {
 	for j := 0; j < NodeBranchFactor; j++ {
 		if r.Float64() < 0.5 {
 			var childID ids.ID
-			_, _ = r.Read(childID[:]) // #nosec G404
+			_, _ = r.Read(ids.Writable(&childID)) // #nosec G404
 			children[byte(j)] = childID
 		}
 	}

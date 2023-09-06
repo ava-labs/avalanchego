@@ -138,5 +138,5 @@ func (s *blockState) PutBlock(blk block.Block, status choices.Status) error {
 
 func (s *blockState) DeleteBlock(blkID ids.ID) error {
 	s.blkCache.Evict(blkID)
-	return s.db.Delete(blkID[:])
+	return s.db.Delete(blkID.Bytes())
 }
