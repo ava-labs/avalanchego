@@ -11,6 +11,8 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 )
 
+var _ database.Iterator = (*iter)(nil)
+
 type iter struct {
 	db          *Database
 	iter        *pebble.Iterator
