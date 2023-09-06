@@ -28,16 +28,16 @@ type iter struct {
 	// Invariant: [Database.lock] is never grabbed while holding [lock].
 	lock sync.Mutex
 
-	db          *Database
-	iter        *pebble.Iterator
+	db   *Database
+	iter *pebble.Iterator
+
 	initialized bool
 	closed      bool
+	err         error
 
 	hasNext bool
 	nextKey []byte
 	nextVal []byte
-
-	err error
 }
 
 // Must not be called with [db.lock] held.
@@ -49,16 +49,18 @@ func (it *iter) Next() bool {
 	it.lock.Lock()
 	defer it.lock.Unlock()
 
-	if it.closed || dbClosed {
+	switch {
+	case it.closed || dbClosed:
 		it.hasNext = false
 		it.err = database.ErrClosed
 		return false
-	}
-
-	if !it.initialized {
+	case it.err != nil:
+		it.hasNext = false
+		return false
+	case !it.initialized:
 		it.hasNext = it.iter.First()
 		it.initialized = true
-	} else {
+	default:
 		it.hasNext = it.iter.Next()
 	}
 
@@ -90,7 +92,9 @@ func (it *iter) Next() bool {
 	if err != nil {
 		it.hasNext = false
 		it.err = fmt.Errorf("%w: %s", errCouldntGetValue, err.Error())
+		return false
 	}
+
 	return true
 }
 
