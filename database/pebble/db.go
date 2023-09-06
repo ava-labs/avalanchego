@@ -191,9 +191,6 @@ func (db *Database) Put(key []byte, value []byte) error {
 		return database.ErrClosed
 	}
 
-	// Use of [pebble.NoSync] here means we don't wait for the [Set] to be
-	// persisted to the WAL before returning. Basic benchmarking indicates that
-	// waiting for the WAL to sync reduces performance by 20%.
 	return updateError(db.pebbleDB.Set(key, value, pebble.NoSync))
 }
 
@@ -332,8 +329,8 @@ func (b *batch) Replay(w database.KeyValueWriterDeleter) error {
 func (b *batch) Inner() database.Batch { return b }
 
 func (db *Database) NewIterator() database.Iterator {
-	db.lock.Lock() // TODO do we need write lock?
-	defer db.lock.Unlock()
+	db.lock.RLock()
+	defer db.lock.RUnlock()
 
 	if db.closed {
 		return &iter{
@@ -350,8 +347,8 @@ func (db *Database) NewIterator() database.Iterator {
 }
 
 func (db *Database) NewIteratorWithStart(start []byte) database.Iterator {
-	db.lock.Lock() // TODO do we need write lock?
-	defer db.lock.Unlock()
+	db.lock.RLock()
+	defer db.lock.RUnlock()
 
 	if db.closed {
 		return &iter{
@@ -367,25 +364,9 @@ func (db *Database) NewIteratorWithStart(start []byte) database.Iterator {
 	}
 }
 
-// bytesPrefix returns key range that satisfy the given prefix.
-// This only applicable for the standard 'bytes comparer'.
-func bytesPrefix(prefix []byte) *pebble.IterOptions {
-	var limit []byte
-	for i := len(prefix) - 1; i >= 0; i-- {
-		c := prefix[i]
-		if c < 0xff {
-			limit = make([]byte, i+1)
-			copy(limit, prefix)
-			limit[i] = c + 1
-			break
-		}
-	}
-	return &pebble.IterOptions{LowerBound: prefix, UpperBound: limit}
-}
-
 func (db *Database) NewIteratorWithPrefix(prefix []byte) database.Iterator {
-	db.lock.Lock() // TODO do we need write lock?
-	defer db.lock.Unlock()
+	db.lock.RLock()
+	defer db.lock.RUnlock()
 
 	if db.closed {
 		return &iter{
@@ -408,8 +389,8 @@ func (db *Database) NewIteratorWithPrefix(prefix []byte) database.Iterator {
 // Prefix should be some key contained within [start] or else the lower bound
 // of the iteration will be overwritten with [start].
 func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database.Iterator {
-	db.lock.Lock() // TODO do we need write lock?
-	defer db.lock.Unlock()
+	db.lock.RLock()
+	defer db.lock.RUnlock()
 
 	if db.closed {
 		return &iter{
@@ -439,5 +420,24 @@ func updateError(err error) error {
 		return database.ErrNotFound
 	default:
 		return err
+	}
+}
+
+// bytesPrefix returns key range that satisfy the given prefix.
+// This only applicable for the standard 'bytes comparer'.
+func bytesPrefix(prefix []byte) *pebble.IterOptions {
+	var limit []byte
+	for i := len(prefix) - 1; i >= 0; i-- {
+		c := prefix[i]
+		if c < 0xff {
+			limit = make([]byte, i+1)
+			copy(limit, prefix)
+			limit[i] = c + 1
+			break
+		}
+	}
+	return &pebble.IterOptions{
+		LowerBound: prefix,
+		UpperBound: limit,
 	}
 }
